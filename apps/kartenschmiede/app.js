@@ -152,7 +152,7 @@
       const r = n => (Math.sin(i * 91.7 + n * 13.1) + 1) / 2;
       return `<i style="left:${(r(1) * 96).toFixed(1)}%;--d:${(4 + r(2) * 5).toFixed(2)}s;--dl:${(-r(3) * 8).toFixed(2)}s;--dx:${((r(4) - .5) * 14).toFixed(1)}cqw;bottom:${(r(5) * 30 - 4).toFixed(1)}%"></i>`;
     }).join("");
-    const rolle = s.role === "hero" ? " · Held" : s.role === "companion" ? " · Gefährte" : "";
+    const rolle = s.role === "hero" ? " · Held" : s.gefaehrte || s.role === "companion" ? " · Gefährte" : "";
     const skills = Array.isArray(s.skills) ? s.skills : [];
     const eigeneRegel = s.bossName || s.bossText;
     const sonderTitel = tier === 6 && s.role !== "hero" ? "Boss-Fähigkeiten" : "Fähigkeiten";
@@ -222,6 +222,8 @@
     $("faction").innerHTML = [...namen, ...extra].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
   }
   function insFormular() {
+    // Es gibt nur noch Held und Gegner; Gefährten sind Gegner, die eine Gruppe freigeschaltet hat
+    if (state.role !== "hero") state.role = "enemy";
     fraktionsAuswahl();
     FELDER.forEach(f => { const el = $(f); if (el) el.value = state[f] ?? ""; });
     if (!["0", "5", "10", "20"].includes(String(state.special))) $("special").value = "0";
@@ -254,7 +256,7 @@
       ``,
       `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Composition: ${quer ? "landscape 7:5, creature on the right half, head and weapons in the upper half, left half dark and calm" : "portrait 5:7, head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 5:7, head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
       ``,
       `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
@@ -609,21 +611,39 @@
     const bilder = [];
     for (const k of karten) {
       const halter = document.createElement("div");
-      halter.style.cssText = "position:fixed;left:-10000px;top:0;width:600px;padding:60px 30px 30px;background:transparent";
-      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true });
+      const quer = k.orient === "land";
+      halter.style.cssText = `position:fixed;left:-10000px;top:0;width:${quer ? 840 : 600}px;padding:60px 30px 30px;background:transparent`;
+      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: quer });
       document.body.appendChild(halter); passeAn(halter);
       try { await document.fonts.ready; bilder.push(await htmlToImage.toPng(halter, { pixelRatio: 2, style: { position: "static", left: "0", top: "0" } })); }
       catch { /* eine Karte überspringen */ } finally { halter.remove(); }
     }
     $("outMany").innerHTML = bilder.map((src, i) => `<img src="${src}" alt="${esc(karten[i].name)}">`).join("");
   }
-  function drucken(karten) {
+  // Drucken: Gegner sind fix als Postkarte (15 × 10 cm), Helden auf A5 oder A4; „Bogen“ legt mehrere kleine Karten auf A4
+  const DRUCKFORMATE = [
+    ["auto", "Gegner Postkarte, Helden A5"], ["postkarte", "Postkarte 15 × 10 cm"], ["a5", "DIN A5"], ["a4", "DIN A4"], ["bogen", "Mehrere auf A4"],
+  ];
+  // Kartenbreite je Seite. Oben bleibt Platz für Krone und Punkte-Abzeichen, die über den Kartenrand ragen.
+  const DRUCKBREITE = { "postkarte-quer": "132mm", "postkarte-hoch": "92mm", "a5-quer": "196mm", "a5-hoch": "136mm", "a4-quer": "276mm", "a4-hoch": "196mm" };
+  const druckFormat = () => { try { return localStorage.getItem("kartenschmiede-druck") || "auto"; } catch { return "auto"; } };
+  function drucken(karten, format = druckFormat()) {
     const bereich = $("printArea");
-    bereich.innerHTML = karten.map(k => renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true })).join("");
+    const karte = k => renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: k.orient === "land" });
+    if (format === "bogen") {
+      bereich.innerHTML = `<div class="bogen">${karten.map(k => `<div style="width:${k.orient === "land" ? 88 : 63}mm">${karte(k)}</div>`).join("")}</div>`;
+    } else {
+      bereich.innerHTML = karten.map(k => {
+        const f = format === "auto" ? (k.role === "hero" ? "a5" : "postkarte") : format;
+        const seite = `${f}-${k.orient === "land" ? "quer" : "hoch"}`;
+        return `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${karte(k)}</div>`;
+      }).join("");
+    }
     bereich.classList.add("bereit");
     passeAn(bereich);
     requestAnimationFrame(() => window.print());
   }
+
 
   // ---------- Tag-Filter und Prägung (gemeinsam für Werkstatt, Baukasten, Gruppe) ----------
   // Jede Liste hat ihren eigenen Filter; ein Klick auf einen Tag zeichnet die Liste über ihren Rückruf neu.
@@ -882,6 +902,9 @@
   document.addEventListener("focusout", () => { tip.hidden = true; });
   document.addEventListener("scroll", () => { tip.hidden = true; }, true);
   $("jsonIn").addEventListener("click", textUebernehmen);
+  $("druckFormat").innerHTML = DRUCKFORMATE.map(([id, n]) => `<option value="${id}" ${id === druckFormat() ? "selected" : ""}>${n}</option>`).join("");
+  $("druckFormat").addEventListener("change", e => { try { localStorage.setItem("kartenschmiede-druck", e.target.value); } catch { /* egal */ } });
+  $("druckBtn").addEventListener("click", () => drucken([JSON.parse(JSON.stringify(state))], $("druckFormat").value));
   $("jsonOut").addEventListener("click", () => { $("cardJson").value = karteAlsText(); $("jsonMsg").textContent = "Das ist die aktuelle Karte als Text, ohne das Artwork."; });
   // Bearbeiten mit Formular oder Baukasten: dieselbe Karte, zwei Ansichten
   let modus = "form";
@@ -937,7 +960,7 @@
     zeigeReiter: name => reiter(name),
     oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte)), { autoTier: true }); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
-    zeigePngs, drucken,
+    zeigePngs, drucken, DRUCKFORMATE, druckFormat,
   };
 
   const gemerkt = lade();

@@ -50,7 +50,10 @@
 
   // ---------- Rechnen ----------
   const punkteVon = k => R.punkte(k);
-  function aktualisiere(k) { k.points = punkteVon(k).pts; k.tier = R.stufeFuerPunkte(k.points); return k; }
+  function aktualisiere(k) {
+    if (k.role === "companion") { k.role = "enemy"; k.gefaehrte = true; } // ältere Gruppen kannten noch die Rolle „Gefährte“
+    k.points = punkteVon(k).pts; k.tier = R.stufeFuerPunkte(k.points); return k;
+  }
   const summe = rolle => aktiv.mitglieder.filter(k => !rolle || k.role === rolle).reduce((s, k) => s + (+k.points || 0), 0);
 
   // ---------- Anzeige ----------
@@ -58,19 +61,32 @@
     $("gListe").innerHTML = gruppen.length ? gruppen.map(g => `<button type="button" class="g-item" data-g="${esc(g.id)}" aria-current="${aktiv && aktiv.id === g.id}">
       <b>${esc(g.name)}</b><small>${g.mitglieder} Mitglieder</small></button>`).join("") : `<p class="hint">Noch keine Gruppe.</p>`;
   }
-  function kandidaten() {
-    const vorlagen = KS.VORLAGEN.filter(v => v.d.role === "hero" || v.d.role === "companion" || v.eigen);
-    return `<option value="">Mitglied hinzufügen …</option><option value="werkstatt">Aktuelle Karte aus der Werkstatt</option>
-      <optgroup label="Vorlagen">${vorlagen.map(v => `<option value="v:${v.key}">${esc(v.d.name)} (${ROLLEN[v.d.role || "enemy"]})</option>`).join("")}</optgroup>
-      ${KS.SERVER ? `<optgroup label="Meine Karten" id="gMeine"></optgroup>` : ""}`;
+  // Helden kommen aus Vorlagen und gespeicherten Karten. Gefährten sind Gegner, die der Spielleiter für diese
+  // Gruppe freigeschaltet hat – jeder Gegner kann einer werden. Schlüssel: "v:<vorlage>" oder "k:<karten-id>".
+  const istHeld = d => d && d.role === "hero";
+  function alleGegner() {
+    return KS.VORLAGEN.filter(v => !istHeld(v.d)).map(v => ({ key: "v:" + v.key, name: v.d.name, pts: R.punkte(v.d).pts }))
+      .concat((KS.serverKarten() || []).filter(k => k.role !== "hero").map(k => ({ key: "k:" + k.id, name: k.name, pts: k.points })));
   }
-  async function meineKartenOptionen() {
-    const og = $("gMeine"); if (!og) return;
-    try {
-      const r = await fetch("/api/kartenschmiede/karten", { credentials: "same-origin" });
-      const { karten } = await r.json();
-      og.innerHTML = karten.map(k => `<option value="k:${esc(k.id)}">${esc(k.name)} · ${k.points} P.</option>`).join("");
-    } catch { /* ohne Liste weiter */ }
+  const freigeschaltet = () => new Set(aktiv.freigeschaltet || []);
+  const helden = () => aktiv.mitglieder.filter(k => k.role === "hero");
+  const gefaehrten = () => aktiv.mitglieder.filter(k => k.gefaehrte);
+  function kandidaten() {
+    const vorlagen = KS.VORLAGEN.filter(v => istHeld(v.d));
+    const meine = (KS.serverKarten() || []).filter(k => k.role === "hero");
+    const frei = freigeschaltet();
+    const offen = alleGegner().filter(g => frei.has(g.key));
+    const platz = gefaehrten().length < helden().length;
+    return `<option value="">Mitglied hinzufügen …</option><option value="werkstatt">Aktuelle Karte aus „Erstellen“</option>
+      <optgroup label="Helden">${vorlagen.map(v => `<option value="v:${v.key}">${esc(v.d.name)}</option>`).join("")}${meine.map(k => `<option value="k:${esc(k.id)}">${esc(k.name)} · ${k.points} P.</option>`).join("")}</optgroup>
+      <optgroup label="${platz ? "Gefährten (freigeschaltet)" : "Gefährten: höchstens einer je Held"}">${offen.map(g => `<option value="g:${esc(g.key)}" ${platz ? "" : "disabled"}>${esc(g.name)} · ${g.pts} P.</option>`).join("") || `<option disabled>Noch keiner freigeschaltet</option>`}</optgroup>`;
+  }
+  function spielleiterBereich() {
+    if (!aktiv.spielleiter) return "";
+    const frei = freigeschaltet();
+    return `<div class="g-gm"><h4>Gefährten freischalten</h4>
+      <p class="hint">Jeder Gegner kann ein Gefährte werden, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Freigeschaltete erscheinen oben in der Auswahl.</p>
+      <div class="tgls">${alleGegner().map(g => `<button type="button" class="tgl" data-frei="${esc(g.key)}" aria-pressed="${frei.has(g.key)}">${frei.has(g.key) ? "" : "🔒 "}${esc(g.name)} <span class="cost">${g.pts}</span></button>`).join("")}</div></div>`;
   }
   function zeigeGruppe() {
     const main = $("gMain");
@@ -87,28 +103,31 @@
       </div>
       <div class="g-stats">
         <div class="g-stat"><span>Gruppenpunkte</span><b>${gesamt}</b></div>
-        <div class="g-stat"><span>Helden</span><b>${aktiv.mitglieder.filter(k => k.role === "hero").length}</b></div>
-        <div class="g-stat"><span>Gefährten</span><b>${aktiv.mitglieder.filter(k => k.role === "companion").length}</b></div>
+        <div class="g-stat"><span>Helden</span><b>${helden().length}</b></div>
+        <div class="g-stat"><span>Gefährten</span><b>${gefaehrten().length}</b></div>
         <div class="g-stat"><span>Gegnerwelle</span><b>${Math.round(gesamt * schw.anteil)}</b></div>
       </div>
       <p class="hint">Quest-Regel: Jede Gegnerwelle hat ${Math.round(schw.anteil * 100)} % der Gruppenpunkte. Gefährten zählen mit, deshalb bleibt das Spiel im Gleichgewicht, egal wen ihr anwerbt.</p>
       <div class="g-add">
         <label class="f">Mitglied <select id="gAdd">${kandidaten()}</select></label>
-        ${KS.SERVER ? `<button type="button" class="btn ghost sm" id="gDruck">Alle drucken</button>` : ""}
+        <button type="button" class="btn ghost sm" id="gDruck">Alle drucken</button>
+        <select id="gDruckFormat" aria-label="Druckformat" class="druck-format">${KS.DRUCKFORMATE.map(([id, n]) => `<option value="${id}" ${id === KS.druckFormat() ? "selected" : ""}>${n}</option>`).join("")}</select>
         <button type="button" class="btn ghost sm" id="gPng">Alle als PNG</button>
+        <label class="check gm-schalter"><input type="checkbox" id="gSpielleiter" ${aktiv.spielleiter ? "checked" : ""}> Spielleiter</label>
         <button type="button" class="btn ghost sm" id="gWeg">Gruppe löschen</button>
       </div>
+      ${spielleiterBereich()}
       <p class="hint" id="gMsg" aria-live="polite"></p>
       <div class="g-members">${aktiv.mitglieder.map((k, i) => mitglied(k, i)).join("") || `<p class="hint">Noch niemand in der Gruppe.</p>`}</div>`;
     main.querySelectorAll(".cwrap").forEach(passeAn);
-    meineKartenOptionen();
   }
   function mitglied(k, i) {
     const held = k.role === "hero";
     const roh = punkteVon(k).roh;
     const rest = aktiv.budget - Math.round(roh);
     const skills = Array.isArray(k.skills) ? k.skills : [];
-    const angebote = KS.alleFaehigkeiten().filter(f => f.fuer.includes(k.role || "enemy"));
+    // Gefährten bringen ihre eigenen Regeln mit, bekommen aber keine Skills dazu
+    const angebote = k.gefaehrte ? [] : KS.alleFaehigkeiten().filter(f => f.fuer.includes(k.role || "enemy"));
     const knopf = f => {
       const an = skills.some(s => s.id === f.id);
       const kf = !an && KS.konfliktVon(f, k);
@@ -123,8 +142,8 @@
       <div class="cwrap">${renderCard(k, k.tier || 1, {})}</div>
       ${held ? `<div class="meter" role="img" aria-label="${Math.round(roh)} von ${aktiv.budget} Punkten"><i style="width:${anteil}%"></i></div>
         <div class="g-budget"><b>${Math.round(roh)}</b> von ${aktiv.budget} Punkten · <b>${rest}</b> übrig</div>`
-        : `<div class="g-budget"><b>${k.points}</b> Punkte · ${ROLLEN[k.role || "enemy"]} · ${STUFEN[k.tier || 1]}</div>`}
-      ${KS.tagLeiste("gruppe" + i, angebote, zeigeGruppe)}
+        : `<div class="g-budget"><b>${k.points}</b> Punkte · ${k.gefaehrte ? "Gefährte" : ROLLEN[k.role || "enemy"]} · ${STUFEN[k.tier || 1]}</div>`}
+      ${k.gefaehrte ? `<p class="hint">Gefährte: keine Power, keine Skills, keine XP.</p>` : KS.tagLeiste("gruppe" + i, angebote, zeigeGruppe)}
       <div class="tgls">${angebote.filter(f => skills.some(s => s.id === f.id) || KS.filterPasst("gruppe" + i, f)).map(knopf).join("")}</div>
       <div class="acts"><button type="button" class="btn ghost sm" data-oeffnen="${i}">In Werkstatt öffnen</button><button type="button" class="btn ghost sm" data-raus="${i}">Entfernen</button></div>
     </div>`;
@@ -139,6 +158,13 @@
     let karte = null;
     if (wert === "werkstatt") karte = KS.aktuelleKarte();
     else if (wert.startsWith("v:")) { const v = KS.VORLAGEN.find(x => x.key === wert.slice(2)); karte = v && JSON.parse(JSON.stringify(v.d)); }
+    else if (wert.startsWith("g:")) {
+      if (gefaehrten().length >= helden().length) { melde("Höchstens ein Gefährte je Held."); zeigeGruppe(); return; }
+      const key = wert.slice(2);
+      if (key.startsWith("v:")) { const v = KS.VORLAGEN.find(x => x.key === key.slice(2)); karte = v && JSON.parse(JSON.stringify(v.d)); }
+      else { const r = await fetch(`/api/kartenschmiede/karten/${encodeURIComponent(key.slice(2))}`, { credentials: "same-origin" }); if (r.ok) karte = (await r.json()).inhalt; }
+      if (karte) { karte.gefaehrte = true; karte.role = "enemy"; karte.skills = (karte.skills || []).filter(f => f.kosten && f.kosten.typ === "prozent"); }
+    }
     else if (wert.startsWith("k:")) {
       const r = await fetch(`/api/kartenschmiede/karten/${encodeURIComponent(wert.slice(2))}`, { credentials: "same-origin" });
       if (r.ok) karte = (await r.json()).inhalt;
@@ -161,11 +187,17 @@
       if (e.target.id === "gBudget") { aktiv.budget = Math.max(20, +e.target.value || 100); zeigeGruppe(); spaeterSpeichern(); }
       if (e.target.id === "gSchw") { aktiv.schwierigkeit = +e.target.value; zeigeGruppe(); spaeterSpeichern(); }
       if (e.target.id === "gAdd" && e.target.value) hinzufuegen(e.target.value);
+      if (e.target.id === "gSpielleiter") { aktiv.spielleiter = e.target.checked; zeigeGruppe(); spaeterSpeichern(); }
+      if (e.target.id === "gDruckFormat") { try { localStorage.setItem("kartenschmiede-druck", e.target.value); } catch { /* egal */ } }
     });
     $("gMain").addEventListener("click", e => {
       if (!aktiv) return;
       const t = e.target.closest("button"); if (!t) return;
-      if (t.dataset.skill !== undefined) {
+      if (t.dataset.frei !== undefined) {
+        const frei = freigeschaltet();
+        if (frei.has(t.dataset.frei)) frei.delete(t.dataset.frei); else frei.add(t.dataset.frei);
+        aktiv.freigeschaltet = [...frei]; zeigeGruppe(); spaeterSpeichern();
+      } else if (t.dataset.skill !== undefined) {
         const k = aktiv.mitglieder[+t.dataset.i];
         const skills = Array.isArray(k.skills) ? k.skills : [];
         const f = KS.alleFaehigkeiten().find(x => x.id === t.dataset.skill);
@@ -175,7 +207,7 @@
         aktiv.mitglieder.splice(+t.dataset.raus, 1); zeigeGruppe(); spaeterSpeichern();
       } else if (t.dataset.oeffnen !== undefined) {
         KS.oeffneInWerkstatt(aktiv.mitglieder[+t.dataset.oeffnen]);
-      } else if (t.id === "gDruck") KS.drucken(aktiv.mitglieder);
+      } else if (t.id === "gDruck") KS.drucken(aktiv.mitglieder, $("gDruckFormat").value);
       else if (t.id === "gPng") KS.zeigePngs(aktiv.mitglieder);
       else if (t.id === "gWeg") {
         if (t.dataset.sicher !== "1") { t.dataset.sicher = "1"; t.textContent = "Wirklich löschen?"; return; }

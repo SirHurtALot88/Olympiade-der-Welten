@@ -198,6 +198,10 @@ details.mehr summary:hover { color: var(--brass); }
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--el) 50%, #fff) 0%, var(--el) 48%, color-mix(in srgb, var(--el) 55%, #000) 100%);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 6px color-mix(in srgb, var(--el) 55%, transparent); }
 .elem.eckig { border-radius: 28%; }
+.g-gm { display: grid; gap: 8px; padding: 12px 14px; border: 1px dashed var(--brass); border-radius: 8px; }
+.g-gm h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.gm-schalter { margin-left: auto; }
+.druck-format { width: auto; font-size: 13px; padding: 6px 8px; }
 .save-wahl { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; vertical-align: middle; }
 .chip-f.kat { font-size: 15px; padding: 7px 12px; }
 .chip-f.kat svg { width: 17px; height: 17px; color: var(--brass); }
@@ -253,7 +257,8 @@ table.charaktere tbody tr { cursor: default; }
   font-family: var(--ui); line-height: 1.1; text-align: left;
   box-shadow: 0 calc(var(--u)*2) calc(var(--u)*5) rgba(0,0,0,.55), inset 0 0 0 calc(var(--u)*.35) rgba(255,255,255,.08);
 }
-.card.land { aspect-ratio: 7 / 5; --u: .62cqw; }
+/* Querformat im Postkartenverhältnis 15 × 10 cm */
+.card.land { aspect-ratio: 3 / 2; --u: .62cqw; }
 .face {
   position: relative; height: 100%; border-radius: calc(var(--u) * 2.2); overflow: hidden; background: #0c0c0d;
   display: grid; grid-template-rows: auto 1fr auto; grid-template-areas: "head" "gap" "panel";
@@ -493,14 +498,33 @@ fieldset.checks legend { margin-bottom: 6px; }
 .out-many img { width: 180px; height: auto; border-radius: 6px; }
 .print-area { display: none; }
 /* Zum Einpassen der Texte muss der Druckbereich kurz gerendert werden, außerhalb des Bildschirms */
-.print-area.bereit { display: flex; flex-wrap: wrap; gap: 4mm; position: fixed; left: -10000px; top: 0; width: 194mm; }
-.print-area.bereit .cw { width: 63mm; }
+/* Druck: jede Karte auf eigener Seite, Seitengröße je Karte (benannte Seiten). Postkarte 15 × 10 cm, A5, A4,
+   oder „Bogen“: mehrere kleine Karten (63 mm) auf A4. */
+.print-area.bereit { display: block; position: fixed; left: -10000px; top: 0; width: 297mm; }
+.print-area .seite { display: grid; place-items: center; box-sizing: border-box; overflow: hidden; }
+.print-area .seite:not(:last-child) { break-after: page; }
+.print-area .seite { align-items: end; padding-bottom: 2mm; }
+.print-area .seite.postkarte-quer { page: postkarte-quer; width: 150mm; height: 100mm; }
+.print-area .seite.postkarte-hoch { page: postkarte-hoch; width: 100mm; height: 150mm; }
+.print-area .seite.a5-hoch { page: a5-hoch; width: 148mm; height: 210mm; }
+.print-area .seite.a5-quer { page: a5-quer; width: 210mm; height: 148mm; }
+.print-area .seite.a4-hoch { page: a4-hoch; width: 210mm; height: 297mm; }
+.print-area .seite.a4-quer { page: a4-quer; width: 297mm; height: 210mm; }
+.print-area .seite .cw { width: var(--breite); }
+.print-area .bogen { page: a4-bogen; display: flex; flex-wrap: wrap; gap: 4mm; width: 194mm; padding: 8mm; }
+.print-area .bogen > div { break-inside: avoid; }
+.print-area .bogen .cw { width: 100%; }
+@page postkarte-quer { size: 150mm 100mm; margin: 0; }
+@page postkarte-hoch { size: 100mm 150mm; margin: 0; }
+@page a5-hoch { size: A5 portrait; margin: 0; }
+@page a5-quer { size: A5 landscape; margin: 0; }
+@page a4-hoch { size: A4 portrait; margin: 0; }
+@page a4-quer { size: A4 landscape; margin: 0; }
+@page a4-bogen { size: A4; margin: 0; }
 @media print {
-  @page { size: A4; margin: 8mm; }
-  html, body { background: #fff !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   body > *:not(.print-area) { display: none !important; }
-  .print-area { display: flex !important; flex-wrap: wrap; gap: 4mm; position: static !important; width: auto !important; }
-  .print-area .cw { width: 63mm; break-inside: avoid; }
+  .print-area { display: block !important; position: static !important; width: auto !important; }
   .print-area .card { box-shadow: none; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
@@ -638,7 +662,7 @@ fieldset.checks legend { margin-bottom: 6px; }
             <label class="f">Name <input type="text" id="name"></label>
             <label class="f">Fraktion <span class="fac-sel"><span class="fac-preview" id="facIcon"></span><select id="faction"></select></span></label>
             <label class="f">Rolle
-              <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option><option value="companion">Gefährte</option></select>
+              <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option></select>
             </label>
           </div>
           <div class="f">Prägung <span class="chips-f" id="praegung"></span></div>
@@ -729,6 +753,8 @@ fieldset.checks legend { margin-bottom: 6px; }
             <button type="button" data-o="land" aria-pressed="false">Quer</button>
           </div>
           <button type="button" class="btn sm" id="exportBtn">PNG</button>
+          <button type="button" class="btn ghost sm" id="druckBtn">Drucken</button>
+          <select id="druckFormat" aria-label="Druckformat" class="druck-format"></select>
           <button type="button" class="btn ghost sm" id="saveBtn" hidden>Speichern</button>
         </div>
         <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
@@ -746,7 +772,7 @@ fieldset.checks legend { margin-bottom: 6px; }
       <h2 id="h-liste">Fertige Charaktere</h2>
       <div class="liste-filter">
         <input type="search" id="lSuche" placeholder="Suchen" aria-label="Charaktere suchen">
-        <select id="lRolle" aria-label="Rolle"><option value="">Alle Rollen</option><option value="hero">Helden</option><option value="companion">Gefährten</option><option value="enemy">Gegner</option></select>
+        <select id="lRolle" aria-label="Rolle"><option value="">Alle Rollen</option><option value="hero">Helden</option><option value="enemy">Gegner</option></select>
         <select id="lQuelle" aria-label="Quelle"><option value="">Vorlagen und gespeicherte</option><option value="vorlage">Nur Vorlagen</option><option value="server">Nur gespeicherte</option></select>
       </div>
     </div>
@@ -843,7 +869,7 @@ fieldset.checks legend { margin-bottom: 6px; }
         <h3>Normal und Elite</h3>
         <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
-        <p>Wer die Elite-Version einer Gegnerart besiegt, darf deren normale Version als Gefährten anwerben. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
+        <p>Jeder Gegner kann ein Gefährte werden. Der Spielleiter schaltet ihn für eine Gruppe frei, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>
     </div>
   </section>
@@ -944,7 +970,6 @@ fieldset.checks legend { margin-bottom: 6px; }
               <label class="f" id="dbIconRow" hidden>Symbol <select id="dbIcon"></select></label>
               <fieldset class="checks" id="dbFuerRow"><legend>Für</legend>
                 <label class="check"><input type="checkbox" id="dbHero" checked> Held</label>
-                <label class="check"><input type="checkbox" id="dbComp" checked> Gefährte</label>
                 <label class="check"><input type="checkbox" id="dbEnemy" checked> Gegner</label>
               </fieldset>
               <div class="f">Tags <div class="chipset" id="dbFormTags"></div></div>

@@ -11,7 +11,7 @@
   function zeilen() {
     const vorlagen = KS.VORLAGEN.map(v => ({ quelle: "vorlage", key: v.key, d: v.d, bild: KS.IMG[v.d.art] || null, von: "Vorlage" }));
     const server = (KS.serverKarten() || []).map(k => ({ quelle: "server", id: k.id, bild: k.vorschau,
-      von: k.gespeichertVon ? "von " + k.gespeichertVon : "gespeichert", d: { name: k.name, role: k.role, ...(k.werte || {}) } }));
+      von: k.gespeichertVon ? "von " + k.gespeichertVon : "gespeichert", d: { name: k.name, role: k.role === "hero" ? "hero" : "enemy", ...(k.werte || {}) } }));
     return vorlagen.concat(server).map(z => {
       const pts = R.punkte(z.d).pts;
       return { ...z, pts, stufe: R.stufeFuerPunkte(pts), waffen: R.leseWaffen(z.d.weapons), passiv: R.leseListe(z.d.passives),

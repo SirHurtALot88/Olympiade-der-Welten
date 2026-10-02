@@ -237,6 +237,11 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(rumpf).toContain("Kartenschmiede");
     expect(rumpf).toContain("KartenschmiedeCharaktere");
     for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente"]) expect(rumpf).toContain(`id="${id}"`);
+    // Gegner werden als Postkarte gedruckt: Querformat im Verhältnis 3:2 und eine eigene Seitengröße 15 × 10 cm
+    expect(kopf + rumpf).toContain(".card.land { aspect-ratio: 3 / 2;");
+    expect(kopf + rumpf).toContain("@page postkarte-quer { size: 150mm 100mm;");
+    // Es gibt nur Held und Gegner zur Auswahl; Gefährten entstehen in der Gruppe
+    expect(rumpf).not.toContain('<option value="companion">');
   });
 
   it("speichert, listet, lädt und löscht Karten", () => {

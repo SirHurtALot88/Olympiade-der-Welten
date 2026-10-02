@@ -38,7 +38,7 @@
   }
   function eintraege() {
     const einheiten = KS.VORLAGEN.map(v => einheitEintrag(v.d, "v:" + v.key, KS.IMG[v.d.art] || null, "Vorlage"))
-      .concat(serverKarten.map(k => ({ typ: "einheit", id: "k:" + k.id, name: k.name, art: ROLLEN[k.role || "enemy"], fuer: [k.role || "enemy"], tags: [],
+      .concat(serverKarten.map(k => ({ typ: "einheit", id: "k:" + k.id, name: k.name, art: ROLLEN[k.role === "hero" ? "hero" : "enemy"], fuer: [k.role === "hero" ? "hero" : "enemy"], tags: [],
         kosten: { typ: "fest", wert: k.points }, stufe: k.tier, bild: k.vorschau, quelle: k.gespeichertVon ? "gespeichert von " + k.gespeichertVon : "gespeichert", text: "Gespeicherte Karte" })));
     return einheiten.concat(KS.alleEintraege());
   }
@@ -89,7 +89,7 @@
       ${e.typ === "waffe" ? waffenWerte(e.waffe) : ""}
       ${tags.length ? `<div class="tagzeile">${tags.map(t => `<span data-tip="${esc(TAG[t].name)}">${KS.tagIco(t)}</span>`).join("")}</div>` : ""}
       ${e.text ? `<p>${esc(e.text)}</p>` : ""}
-      ${e.fuer && e.typ !== "fraktion" && e.typ !== "einheit" && e.fuer.length < 3 ? `<p><small>Nur für: ${e.fuer.map(r => ROLLEN[r]).join(", ")}</small></p>` : ""}
+      ${e.fuer && e.typ !== "fraktion" && e.typ !== "einheit" && !(e.fuer.includes("hero") && e.fuer.includes("enemy")) ? `<p><small>Nur für: ${e.fuer.filter(r => r !== "companion").map(r => ROLLEN[r]).join(", ")}</small></p>` : ""}
       ${opts.neu ? `<div class="acts"><button type="button" class="btn sm" data-aufnehmen="1">In die Datenbank</button><button type="button" class="btn ghost sm" data-vorschlag-karte="1" data-tip="${esc(knopfTip(e))}">+ Zur Karte</button><button type="button" class="btn ghost sm" data-neu-wuerfeln="1">Neu würfeln</button></div>`
         : `<div class="acts">${aktion}${eigen ? `<button type="button" class="btn ghost sm" data-loeschen="${esc(e.id)}">Löschen</button>` : ""}</div>`}
     </article>`;
@@ -104,7 +104,7 @@
     $("dbTags").innerHTML = KAT.TAGS.filter(t => filter.tags.has(t.id) || inKat.some(e => (e.tags || []).includes(t.id)))
       .map(t => `<button type="button" class="chip-f" data-tag="${t.id}" aria-pressed="${filter.tags.has(t.id)}" data-tip="${esc(t.name)}">${KS.tagIco(t.id)}${esc(t.name)}</button>`).join("");
     $("dbRollenRow").hidden = filter.kat === "fraktion";
-    $("dbRollen").innerHTML = [["", "Alle"], ["hero", "Held"], ["companion", "Gefährte"], ["enemy", "Gegner"]]
+    $("dbRollen").innerHTML = [["", "Alle"], ["hero", "Held"], ["enemy", "Gegner"]]
       .map(([r, n]) => `<button type="button" class="chip-f" data-rolle="${r}" aria-pressed="${filter.rolle === r}">${n}</button>`).join("");
   }
   function zeigeListe() {
@@ -160,7 +160,7 @@
     e.preventDefault();
     const typ = $("dbTyp").value;
     const name = $("dbName").value.trim();
-    const fuer = [["dbHero", "hero"], ["dbComp", "companion"], ["dbEnemy", "enemy"]].filter(([id]) => $(id).checked).map(([, r]) => r);
+    const fuer = [["dbHero", ["hero"]], ["dbEnemy", ["enemy", "companion"]]].filter(([id]) => $(id).checked).flatMap(([, r]) => r);
     const eintrag = { typ, name, fuer, tags: [...formTags], text: $("dbText").value.trim(), kosten: kostenAusFormular(),
       art: typ === "zauber" ? "Zauber" : typ === "waffe" ? "" : typ === "fraktion" ? "Fraktion" : $("dbArt").value };
     if (typ === "waffe") {
