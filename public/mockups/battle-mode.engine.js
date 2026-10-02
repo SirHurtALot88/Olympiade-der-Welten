@@ -35168,20 +35168,26 @@
         // wie bei Torment vorher). Charisma von 35 auf 28 und Will von 25 auf 30 (bei
         // Determination unveraendert 32, Torment unveraendert 10) stabilisierte Charisma
         // (+0,6/+0,8) und drueckte Pp auf 18,9/17,7 -- beide Stroeme deutlich unter der
-        // 25-Schranke, im angestrebten 15-18-Korridor (Projektrichtlinie aus Breaking Paket
-        // 3: komfortabler Puffer statt knapper Unterschreitung).
+        // 25-Schranke, im fuer diese Runde vorgegebenen 15-18-Korridor (Auftragsvorgabe
+        // Task #45, KEINE in CLAUDE.md/docs/design schriftlich festgehaltene Regel -- s.
+        // Diagnose-Doku Abschnitt 7, Quellenkorrektur nach Review).
         //
-        // ISOLATIONSPRUEFUNG (Diagnose-Doku Abschnitt 3): u.WUCHT ist EIN gemeinsam
-        // berechneter Wert (`spurtWerte()`), den `koennen` (die 4 WUCHT-Fallen, via
-        // `fallenKoennen`), `durch` (alle 14 Fallen) UND `tackleAb`/Chaos (`u.WUCHT>30`)
-        // LESEN -- es gibt dafuer KEINEN getrennten Lesepfad, ein struktureller
-        // Isolationsbeweis ("andere Mechanik, anderer Wert") ist darum unmoeglich. Empirisch
-        // (scripts/takeshi-chaos-diag-02-10.mjs, volle Zahlen in der Commit-Botschaft)
-        // bleiben Tackles/Getroffene/Ausgewichen/Gedraenge je Rennen sowie Median/Spanne von
-        // u.WUCHT und die Sauber/Durchbruch/Sturz-Quoten an den vier WUCHT-Fallen innerhalb
-        // weniger Prozentpunkte des Vorher-Stands (keine Kennzahl kollabiert auf 0 % oder
-        // laeuft auf 100 % -- die Mechanik bleibt praktisch unveraendert, nur WELCHE
-        // Attribute in den gemeinsamen Wert einzahlen, hat sich verschoben.
+        // ISOLATIONSPRUEFUNG (Diagnose-Doku Abschnitt 5/7): u.WUCHT ist EIN gemeinsam
+        // berechneter Wert (`spurtWerte()`). NICHT nur `koennen`/`durch`/`tackleAb` lesen
+        // ihn, sondern SECHS Stellen (volle Liste mit Zeilenankern: Diagnose-Doku Abschnitt
+        // 7, von der Review nachgezogen): Hindernis-Zeitpreis + Sauber-Wurf an den 4
+        // WUCHT-Fallen (ein gemeinsames `hSkill`), Durchbruch-Wurf an allen 14 Fallen,
+        // Gedraenge-/Pulk-Kosten an JEDER Falle, Tackle-Schwelle, Tackle-Ausweich-Duell,
+        // Tackle-Erfolgs-Duell ("stark" gegen ROBUST). Es gibt dafuer KEINEN getrennten
+        // Lesepfad, ein struktureller Isolationsbeweis ("andere Mechanik, anderer Wert") ist
+        // darum unmoeglich. Empirisch (scripts/takeshi-chaos-diag-02-10.mjs, volle Zahlen in
+        // der Commit-Botschaft) bleiben Tackles/Getroffene/Ausgewichen/Gedraenge je Rennen
+        // sowie Median/Spanne von u.WUCHT und die Sauber/Durchbruch/Sturz-Quoten an den
+        // vier WUCHT-Fallen innerhalb weniger Prozentpunkte des Vorher-Stands (keine
+        // Kennzahl kollabiert auf 0 % oder laeuft auf 100 % -- die Mechanik bleibt
+        // praktisch unveraendert, nur WELCHE Attribute in den gemeinsamen Wert einzahlen,
+        // hat sich verschoben). Diese Nettomessung deckt den Effekt aller sechs Stellen
+        // zusammen ab, auch ohne dass sie hier einzeln vorgerechnet wird.
         WUCHT:      {charisma:28,determination:32,will:30,torment:10},
         ROBUST:     {health:28,will:30,determination:24,charisma:18}
       },

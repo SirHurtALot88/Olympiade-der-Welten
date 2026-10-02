@@ -96,9 +96,10 @@ Strömen stark schwanken (+1,9 gegen +7,5 Pp) — dieselbe Normierungs-Empfindli
 vorher Torment zeigte, nur jetzt bei einem anderen Attribut im selben Kanal. Charisma von
 35 auf 28 gesenkt und Will von 25 auf 30 gehoben (Determination unverändert bei 32,
 Torment unverändert bei 10) stabilisierte Charisma über beide Ströme UND senkte die
-Gesamt-Pp weiter, auf 18,9/17,7 — beide Ströme komfortabel unter der 25-Schranke, im
-angestrebten 15-18-Korridor (Projektrichtlinie aus Breaking Paket 3: ein Puffer, keine
-knappe Unterschreitung).
+Gesamt-Pp weiter, auf 18,9/17,7 — beide Ströme komfortabel unter der 25-Schranke, im für
+diese Runde vorgegebenen 15-18-Korridor (Auftragsvorgabe Task #45: ein Puffer, keine knappe
+Unterschreitung — s. Abschnitt 7 für die Einordnung, woher diese Zahl stammt und woher
+nicht).
 
 ### Volle Pp-Detailtabelle, final (`{charisma:28,determination:32,will:30,torment:10}`)
 
@@ -200,16 +201,75 @@ unabhängige Ströme, beides innerhalb des 15-18-Zielkorridors. `node --check` a
 `battle-mode.engine.js` ist grün, `npx vitest run` zeigt keine neuen Fehlschläge
 gegenüber `main` (s. PR-Beschreibung für den vollen Lauf).
 
+## 7. Nachtrag 02.10. (unabhängige Review): vollständige Lesestellen-Liste, Quellenkorrektur
+
+Die unabhängige Review von PR #1121 hat **fünf statt der oben nur namentlich genannten drei**
+Stellen gefunden, die `u.WUCHT` tatsächlich lesen (alle bestätigt reine Lese-Zugriffe, keine
+schreiben in `u.WUCHT` zurück). Für künftige Takeshi-Kalibrierrunden hier als vollständige
+Referenz, mit Zeilenanker (Stand `main` nach PR #1121, `engine.js` im Bereich
+`BAHN_ART["takeshis-castle"]`/`stepSpurt`):
+
+1. **Hindernis-Zeitpreis UND Sauber-Wurf an den 4 WUCHT-Fallen** — eine Zuweisung
+   (`hSkill=u[hTyp]||0`, wird bei `hTyp==="WUCHT"` zu `hSkill===u.WUCHT`) mit zwei
+   Wirkungen: der Stopp-Zeit an der Falle (`u.huerde=Math.max(...,(1-0.8*hSkill/100))`) UND,
+   gemischt über `fallenKoennen:0.75`, dem Sauber-Wurf (`if(mK)koennen=(1-mK)*u.TECHNIK+
+   mK*hSkill`).
+2. **Durchbruch-Wurf, alle 14 Fallen** — `let koennen=u.TECHNIK, durch=u.WUCHT;`, bei
+   gesetztem (hier weiterhin ungesetztem) `fallenDurchbruch` gemischt mit dem Fallen-Typ.
+3. **Gedränge-/Pulk-Kosten an jeder verstopften Falle** — `schieb=G.lesen?Max(u.WUCHT,
+   u.TECHNIK):u.WUCHT` (Takeshi setzt `gedraenge.lesen:true`), geht in den Zeitpreis `preis`
+   ein, der JEDE der 14 Fallen treffen kann, nicht nur die vier WUCHT-Fallen.
+4. **Tackle-Schwelle** — `tackleOk = ... && u.WUCHT>(TA.tackleAb??45)`, ob ein Läufer
+   überhaupt einen Rempelversuch unternehmen kann.
+5. **Tackle-Ausweichen-Duell** — `TA.tackleAusweichen.duell*(o.TECHNIK||0)/(((o.TECHNIK||0)
+   +u.WUCHT)||1)`, ob das Opfer den Rempler kommen sieht und ausweicht.
+
+**Eine sechste Stelle, bei der Review-Zählung vermutlich mit #4 zusammengefasst**, weil sie
+zur selben Spielsequenz gehört: der eigentliche Treffer-Erfolg, NACHDEM Schwelle #4 und
+Ausweichen #5 passiert sind — `const stark=u.WUCHT/(u.WUCHT+o.ROBUST);` (WUCHT des Täters
+gegen ROBUST des Opfers), entscheidet ob ein nicht ausgewichener Rempler tatsächlich trifft
+(`o.getackelt++`).
+
+(Nicht Takeshi-relevant, aber derselbe geteilte Wert: `u.WUCHT*SPITZE_ZUG` in der
+"Zug an der Spitze"-Formel ist hinter `BA().staffel` gegated und damit für Takeshi, das
+`staffel` nie setzt, strukturell inert — bei einer künftigen Staffel-WUCHT-Kalibrierung
+wäre das aber ein siebter, echt gemeinsamer Lesepfad.)
+
+Die empirische Isolationsprüfung in Abschnitt 5 (Tackles/Getroffene/Ausgewichen/Gedränge
+je Rennen, Sauber/Durchbruch/Sturz je Fallen-Typ) deckt den **Nettoeffekt** aller sechs
+Stellen zusammen ab — sie war dadurch gültig, auch ohne dass diese Doku die Liste schon beim
+ersten Schreiben vollständig aufgeführt hatte. Für eine künftige Runde, die eine EINZELNE
+dieser sechs Stellen gezielt ändern will (z. B. nur `tackleAb`), ist die Liste oben der
+Ausgangspunkt, um vorher zu prüfen, welche der anderen fünf mitbetroffen wären.
+
+**Quellenkorrektur zum "15-18-Pp-Zielkorridor":** Diese Doku (und die PR-Beschreibung von
+#1121) führte den Korridor unter Verweis auf eine "Projektrichtlinie aus Breaking Paket 3"
+— die Review konnte dafür **keine Fundstelle in `docs/design/` finden, zu Recht**: weder
+`docs/design/` noch CLAUDE.md enthalten ein Dokument namens "Breaking Paket 3" oder einen
+dort niedergeschriebenen "15-18"-Pp-Korridor. Die Zahl kam als Vorgabe im Auftrag für diese
+Kalibrierrunde (Task #45) herein, nicht aus einem bestehenden Projektdokument. Der einzige
+tatsächlich existierende Bezug ist die Breaking-Zweikampf-Mechanik-Runde selbst (PR #1097,
+Commit `eb583702`, "Breaking Paket 3: Zweikampf-Mechanik"): deren finale Pp-Zahlen lagen bei
+14,3/13,9 (vorher 12,7/13,5, beide Fassungen schon unter der 25-Schranke) — ein **erreichtes
+Ergebnis**, keine dort schriftlich festgehaltene Korridor-Regel. CLAUDE.md selbst kennt nur
+die 25-Pp-Schranke, kein 15-18-Zielfenster. Wer diesen Korridor als stehende Projektregel
+etablieren will, sollte ihn explizit in CLAUDE.md oder einem Handbuch festhalten statt ihn
+implizit über Task-Vorgaben weiterzutragen — bis dahin ist "15-18" eine sinnvolle Faustregel
+für diese eine Runde, keine dokumentierte Pflichtschranke wie die 25.
+
 ## Quellen
 
 `docs/design/bahn-takeshi-pp-paket2-kalibrierung-01-10.md` (Diagnose, `fallenDurchbruch`
 verworfen, nennt `rezept.WUCHT` als nächsten Schritt), `docs/design/
 gewichtheben-kalibrierung-ansage-kanal-01-10.md` (PR #1102, Vorbild für "Umschichtung +
 neues Attribut im überexponierten Kanal"), `engine.js` `BAHN_ART["takeshis-castle"].rezept`
-(die Änderung selbst), Durchbruch-/Sauber-Wurf (`koennen`/`durch`, nahe `fallenKoennen`),
-Tackle-/Chaos-Schwelle (`tackleOk`, nahe `tackleAb`/`tackleFenster`), `bahnSerie()` (die
-erweiterte Chaos-Diagnose-Sonde, inklusive der neuen `fallenNachTyp`-Aufschlüsselung und
-`takeshiWuchtDiag()`), `scripts/takeshi-chaos-diag-02-10.mjs` (neue Sonde, liest beide
-Funktionen), `einflussVon()` (`engine.js`, insbesondere die Positiv-Normierung, die den
-ersten Umschichtungsversuch verworfen hat), CLAUDE.md (rho>0,80 je Spiel, Pp≤25/Zielwert
-15-18 aus Breaking Paket 3, gesperrte Matrix, Budget-Methode).
+(die Änderung selbst), die sechs `u.WUCHT`-Lesestellen aus Abschnitt 7 (Hindernis-Zeitpreis/
+Sauber-Wurf, Durchbruch-Wurf, Gedränge-Kosten, Tackle-Schwelle, Tackle-Ausweich-Duell,
+Tackle-Erfolgs-Duell), `bahnSerie()` (die erweiterte Chaos-Diagnose-Sonde, inklusive der
+neuen `fallenNachTyp`-Aufschlüsselung und `takeshiWuchtDiag()`),
+`scripts/takeshi-chaos-diag-02-10.mjs` (neue Sonde, liest beide Funktionen), `einflussVon()`
+(`engine.js`, insbesondere die Positiv-Normierung, die den ersten Umschichtungsversuch
+verworfen hat), PR #1097/Commit `eb583702` ("Breaking Paket 3: Zweikampf-Mechanik" — Quelle
+der tatsächlichen, nicht als Regel festgehaltenen Pp-Zahlen 14,3/13,9), CLAUDE.md (rho>0,80
+je Spiel, Pp≤25, gesperrte Matrix, Budget-Methode — **nicht** Quelle eines "15-18"-Korridors,
+s. Korrektur oben).
