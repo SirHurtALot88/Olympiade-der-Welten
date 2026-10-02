@@ -35068,7 +35068,63 @@
         TECHNIK:    {intelligence:36,awareness:30,dexterity:22,will:12},
         WENDIGKEIT: {charisma:40,dexterity:32,awareness:28},
         STEHEN:     {will:46,determination:34,health:20},
-        WUCHT:      {charisma:38,determination:32,torment:30},
+        // BAHN PAKET 2, WUCHT-KALIBRIERUNG (Task #45, 02.10., docs/design/
+        // bahn-takeshi-wucht-kalibrierung-02-10.md): `fallenDurchbruch` war verworfen (s.
+        // Kommentar bei `fallenKoennen` unten) -- die Pp-Diagnose (docs/design/
+        // bahn-takeshi-pp-paket2-kalibrierung-01-10.md Abschnitt 4) empfahl stattdessen die
+        // direkte Rezept-Kalibrierung. Diagnose: Torment ist in JEDEM Saatstrom das am
+        // staerksten ueberzeichnete Attribut (Matrix 7, gemessen 9-16 %), weil es NUR hier
+        // sitzt und dieser Kanal an allen 14 Fallen den Durchbruch-Wurf entscheidet
+        // (A.fallenDurchbruch ungesetzt) UND an den 4 WUCHT-Fallen zu 75 % den Sauber-Wurf
+        // (A.fallenKoennen:0.75) UND die Tackle-/Chaos-Schwelle (`u.WUCHT>tackleAb`)
+        // entscheidet -- WUCHT ist dadurch der mit Abstand am staerksten "verstaerkte" Kanal
+        // des Rezepts, genau wie ANSAGE es beim Gewichtheben war (PR #1102).
+        //
+        // ERSTER VERSUCH, VERWORFEN (reine Prozent-Umschichtung zwischen den drei
+        // bestehenden Attributen, {charisma:30,determination:55,torment:15}): Determination
+        // uebersteuerte dadurch IN DIESELBE Verstaerkung, die vorher Torment ueberzeichnet
+        // hatte (gemessen +7,1 Pp statt vorher +2,3, Gesamt-Pp 32,0 -> 34,3 -- SCHLECHTER).
+        // Torments eigene Abweichung bewegte sich dabei kaum (+2,2 -> +2,8), obwohl sein
+        // Rezept-Anteil halbiert wurde -- derselbe Positiv-Summen-Normierungs-Effekt wie bei
+        // `fallenDurchbruch` (s. Diagnose-Doku Abschnitt 3): ohne das Attribut zu WECHSELN,
+        // das den verstaerkten Kanal belegt, wandert das Problem nur zum naechsten
+        // Kandidaten, es verschwindet nicht.
+        //
+        // FIX (dieselbe Lehre wie die Gewichtheben-ANSAGE-Kalibrierung, die NICHT nur
+        // power/charisma kuerzte, sondern die UNTERzeichneten Attribute will/dexterity/
+        // health NEU in den verstaerkten Kanal aufnahm): Will ist Takeshis am staerksten
+        // UNTERzeichnetes Attribut (Matrix 22, das hoechste Einzelgewicht ueberhaupt,
+        // gemessen -6,2/-9,3) und fehlte im WUCHT-Rezept komplett, obwohl die Diagnose genau
+        // das als Gegenstueck zu Torments Ueberzeichnung benennt (Abschnitt 1: "Will … fehlt
+        // aber im Durchbruch-Wurf komplett, solange der rein WUCHT liest"). Statt Torment nur
+        // zu kuerzen, nimmt WUCHT jetzt WILL neu auf -- derselbe verstaerkte Kanal, der
+        // bisher ein mit 7 leichtgewichtiges Attribut ueberzeichnete, hebt jetzt gezielt das
+        // mit 22 schwerste. Thema passt ebenfalls: "Durchbrettern" durch Willenskraft ist
+        // dieselbe Eigenschaft, die anderswo in dieser Bahn "Wille"/"Nehmerqualitaet" heisst
+        // (STEHEN/ROBUST).
+        //
+        // ZWEI ZWISCHENSCHRITTE bis zur hier stehenden Besetzung (volle Messreihe:
+        // Commit-Botschaft/Diagnose-Doku): {charisma:35,determination:30,will:25,torment:10}
+        // senkte Pp bereits deutlich (32,0/31,8 -> 26,1/25,6), liess Charisma aber zwischen
+        // den Stroemen stark schwanken (+1,9/+7,5 -- dieselbe Normierungs-Empfindlichkeit
+        // wie bei Torment vorher). Charisma von 35 auf 28 und Will von 25 auf 30 (bei
+        // Determination unveraendert 32, Torment unveraendert 10) stabilisierte Charisma
+        // (+0,6/+0,8) und drueckte Pp auf 18,9/17,7 -- beide Stroeme deutlich unter der
+        // 25-Schranke, im angestrebten 15-18-Korridor (Projektrichtlinie aus Breaking Paket
+        // 3: komfortabler Puffer statt knapper Unterschreitung).
+        //
+        // ISOLATIONSPRUEFUNG (Diagnose-Doku Abschnitt 3): u.WUCHT ist EIN gemeinsam
+        // berechneter Wert (`spurtWerte()`), den `koennen` (die 4 WUCHT-Fallen, via
+        // `fallenKoennen`), `durch` (alle 14 Fallen) UND `tackleAb`/Chaos (`u.WUCHT>30`)
+        // LESEN -- es gibt dafuer KEINEN getrennten Lesepfad, ein struktureller
+        // Isolationsbeweis ("andere Mechanik, anderer Wert") ist darum unmoeglich. Empirisch
+        // (scripts/takeshi-chaos-diag-02-10.mjs, volle Zahlen in der Commit-Botschaft)
+        // bleiben Tackles/Getroffene/Ausgewichen/Gedraenge je Rennen sowie Median/Spanne von
+        // u.WUCHT und die Sauber/Durchbruch/Sturz-Quoten an den vier WUCHT-Fallen innerhalb
+        // weniger Prozentpunkte des Vorher-Stands (keine Kennzahl kollabiert auf 0 % oder
+        // laeuft auf 100 % -- die Mechanik bleibt praktisch unveraendert, nur WELCHE
+        // Attribute in den gemeinsamen Wert einzahlen, hat sich verschoben.
+        WUCHT:      {charisma:28,determination:32,will:30,torment:10},
         ROBUST:     {health:28,will:30,determination:24,charisma:18}
       },
       lang:{ANTRITT:"Losstürmen",ENDTEMPO:"Durchhaltetempo",TECHNIK:"Falle lesen",
@@ -43672,6 +43728,13 @@
     const alt={disc, bahnDisc, LAEUFER, rennFertig, rennT, done};
     disc=d; bahnDisc=d;
     const summe={}; let leerGesamt=0, schattenGesamt=0, laeufe=0;
+    // FALLEN-TYP-DIAGNOSE (Bahn Paket 2, 02.10., Isolationspruefung fuer die rezept.WUCHT-
+    // Kalibrierung, docs/design/bahn-takeshi-wucht-kalibrierung-02-10.md): sauber/durchbruch/
+    // sturz je Fallen-TYP (TECHNIK/WENDIGKEIT/WUCHT/STEHEN/ROBUST), aus `u.fallen` gelesen
+    // (B.5/B.6 des Takeshi-Plans, s. Schreibstelle in stepSpurt). Reiner Zaehler -- liest nur,
+    // schreibt nichts zurueck, kein rr()-Aufruf, kein Einfluss auf eine laufende Simulation.
+    // Ausserhalb von Takeshi/Spurt fuehrt kein Laeufer `u.fallen`, bleibt also leer.
+    const fallenTyp={};
     for(let i=0;i<n;i++){
       zieheFormkarten(20260823+i*104729);
       bauSpurt(1337+i*7919);
@@ -43693,6 +43756,11 @@
         e.leer+=u.leer?1:0; e.stolper+=u.gestolpert; e.tackles+=u.tackles; e.getackelt+=u.getackelt;
         e.ausgewichen+=u.ausgewichen||0; e.gedraengt+=u.gedraengt||0; e.gedraengeZeit+=u.gedraengeZeit||0;
         leerGesamt+=u.leer?1:0; schattenGesamt+=u.schattenS/Math.max(0.1,u.schattenS+u.spitzeS);
+        for(const f of (u.fallen||[])){
+          const t=fallenTyp[f.typ]||(fallenTyp[f.typ]={sauber:0,durchbruch:0,sturz:0,n:0});
+          t.n++;
+          if(f.aus==="durchbruch")t.durchbruch++; else if(f.aus==="sturz")t.sturz++; else t.sauber++;
+        }
       });
     }
     disc=alt.disc; bahnDisc=alt.bahnDisc; LAEUFER=alt.LAEUFER; rennFertig=alt.rennFertig;
@@ -43707,9 +43775,13 @@
       ausgewichen:+(e.ausgewichen/laeufe).toFixed(2), gedraengt:+(e.gedraengt/laeufe).toFixed(2),
       gedraengeZeit:+(e.gedraengeZeit/laeufe).toFixed(2)})).sort((a,b)=>a.platz-b.platz);
     const koepfe=Math.max(1,reihen.length);
+    const fallenNachTyp=Object.fromEntries(Object.entries(fallenTyp).map(([t,c])=>[t,
+      {n:c.n, sauberPct:Math.round(c.sauber/c.n*1000)/10, durchbruchPct:Math.round(c.durchbruch/c.n*1000)/10,
+       sturzPct:Math.round(c.sturz/c.n*1000)/10}]));
     return {disziplin:d, laeufe, reihen,
       leerQuote:Math.round(leerGesamt/(laeufe*koepfe)*100),
-      schattenAnteil:Math.round(schattenGesamt/(laeufe*koepfe)*100)};
+      schattenAnteil:Math.round(schattenGesamt/(laeufe*koepfe)*100),
+      fallenNachTyp};
   }
   const spurtSerie=(n)=>bahnSerie("spurt",n);
 
@@ -44146,6 +44218,24 @@
       });
       M.zurueck(g);
       return out;
+    },
+    // u.WUCHT-VERTEILUNG (Bahn Paket 2, 02.10., Isolationspruefung fuer die rezept.WUCHT-
+    // Kalibrierung): Median/Spanne des berechneten Sub-Skills ueber eine Aufstellung, reine
+    // Diagnose, dasselbe Sichern/Bauen/Zuruecksetzen-Muster wie feldspielSubskills direkt
+    // darueber. Gebraucht, weil `tackleAb` (s. BAHN_ART["takeshis-castle"]) gegen genau
+    // diesen Median kalibriert ist ("liegt nach mengeAusEignung im Median bei 43") -- eine
+    // Rezept-Aenderung, die den Median spuerbar verschiebt, verschiebt auch die Tackle-Quote,
+    // ohne dass tackleAb selbst angefasst wurde.
+    takeshiWuchtDiag:()=>{
+      const dId="takeshis-castle";
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher(); M.bau(1337);
+      const werte=LAEUFER.map(u=>u.WUCHT).filter(v=>v!=null).sort((a,b)=>a-b);
+      M.zurueck(g);
+      if(!werte.length)return null;
+      const mitte=Math.floor(werte.length/2);
+      const median=werte.length%2?werte[mitte]:(werte[mitte-1]+werte[mitte])/2;
+      return {median:Math.round(median*10)/10, min:werte[0], max:werte[werte.length-1], n:werte.length};
     },
     // BATTLE-MODE PR5 — „EIN SPIEL, EIN ERGEBNIS" (Plan, Abschnitt 3.3a). Bisher gab es fuer
     // Feldspiel-Disziplinen keinen sauberen einzelnen Aufruf, der einmal simuliert und ein
