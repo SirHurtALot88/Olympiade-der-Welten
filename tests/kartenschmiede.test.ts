@@ -39,6 +39,8 @@ const F = laden("../apps/kartenschmiede/katalog.js") as {
   TAGS: Array<{ id: string; icon: string }>;
   PRAEGUNGEN: string[];
   konflikt(e: { tags: string[] }, praegung: string[]): { praegung: string; tag: string } | null;
+  skaliere(e: Record<string, unknown>, stufe: number): { karte: Record<string, unknown> & { tier: number; points: number; skills: Array<{ id: string; tags: string[] }> }; neu: string[]; weg: string[] };
+  FAEHIGKEITEN_JE_STUFE: number[];
 };
 type Eintrag = { typ: string; name: string; tags: string[]; waffe?: string; text: string; kosten: { typ: string; wert: number } };
 const G = laden("../apps/kartenschmiede/generator.js") as {
@@ -110,6 +112,25 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     expect(F.konflikt({ tags: ["technik"] }, ["magie"])).not.toBeNull();
     // Psi-Kräfte sind Technik, keine Magie: eine Sci-Fi-Einheit darf sie nehmen
     for (const f of F.GRUNDBESTAND.filter(x => x.tags.includes("technik"))) expect(f.tags, f.name).not.toContain("magie");
+  });
+
+  it("skaliert eine Einheit auf jede Seltenheit: Punkte in der Stufe, mehr Fähigkeiten nach oben, keine Sperren verletzt", () => {
+    const grab = { name: "Grabritter", role: "enemy", praegung: ["schatten"], quality: "4+", defense: "3+", tough: "3", size: "1",
+      weapons: "Dornenmorgenstern | Nahkampf | A3 | DS(1), Schatten", passives: "Furchtlos", skills: [] };
+    let vorher = -1;
+    for (let stufe = 1; stufe <= 6; stufe++) {
+      const { karte } = F.skaliere(grab, stufe);
+      expect(karte.tier, `Stufe ${stufe}`).toBe(stufe);
+      expect(karte.skills.length).toBe(F.FAEHIGKEITEN_JE_STUFE[stufe]);
+      expect(karte.points).toBeGreaterThan(vorher);
+      for (const k of karte.skills) expect(F.konflikt(k, ["schatten"])).toBeNull();
+      vorher = karte.points;
+    }
+    // Runter und wieder hoch landet in derselben Stufe; überzählige Fähigkeiten werden gemeldet
+    const boss = F.skaliere(grab, 6).karte;
+    const klein = F.skaliere(boss, 1);
+    expect(klein.karte.tier).toBe(1);
+    expect(klein.weg.length).toBe(4);
   });
 
   it("gibt jeder Fraktion genau ein eigenes Symbol", () => {

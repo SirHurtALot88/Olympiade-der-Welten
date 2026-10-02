@@ -169,6 +169,7 @@ ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--bra
 .create-bar select { width: auto; max-width: 300px; }
 @media (min-width: 881px) { .create-bar .seg { margin-left: auto; } }
 @media (min-width: 881px) { .shop { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 32px; } }
+@media (min-width: 1100px) { .shop.quer { grid-template-columns: minmax(0, 1fr) minmax(0, 600px); } .shop.quer .stage-col .tiers { max-width: 600px; } }
 form.editor { display: grid; gap: 18px; columns: auto; }
 .form-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px 26px; align-items: start; }
 .form-cols[hidden], #bauModus[hidden] { display: none; }
@@ -197,6 +198,7 @@ details.mehr summary:hover { color: var(--brass); }
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--el) 50%, #fff) 0%, var(--el) 48%, color-mix(in srgb, var(--el) 55%, #000) 100%);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 6px color-mix(in srgb, var(--el) 55%, transparent); }
 .elem.eckig { border-radius: 28%; }
+.save-wahl { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; vertical-align: middle; }
 .chip-f.kat { font-size: 15px; padding: 7px 12px; }
 .chip-f.kat svg { width: 17px; height: 17px; color: var(--brass); }
 .chip-f.kat[aria-pressed="true"] svg { color: var(--bg); }
@@ -730,7 +732,7 @@ fieldset.checks legend { margin-bottom: 6px; }
           <button type="button" class="btn ghost sm" id="saveBtn" hidden>Speichern</button>
         </div>
         <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
-        <label class="check"><input type="checkbox" id="autoTier"> Stufe folgt den Punkten <span class="info" id="suggest" data-tip="">ⓘ</span></label>
+        <label class="check" data-tip="An: Ein Klick auf eine Stufe passt Werte und Fähigkeiten an diese Stufe an. Aus: Der Klick wechselt nur den Rahmen."><input type="checkbox" id="autoTier"> Stufe folgt den Punkten <span class="info" id="suggest" data-tip="">ⓘ</span></label>
         <p class="hint" id="saveMsg" aria-live="polite"></p>
         <div class="stage" id="stage"></div>
         <p class="tier-note fit-note" id="fitNote" aria-live="polite"></p>

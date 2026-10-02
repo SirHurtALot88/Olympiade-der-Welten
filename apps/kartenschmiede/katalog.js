@@ -251,7 +251,90 @@
     return t;
   }
 
-  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, KATEGORIEN, kategorieVon, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
+
+  // ---------- Auf eine Seltenheit skalieren ----------
+  // Ein Klick auf „Gewöhnlich“ … „Boss“ passt die Einheit an: erst die Zahl der Fähigkeiten (ein Boss kann mehr
+  // als ein Grunzer), dann Qualität, Verteidigung, Zäh und Attacken reihum, bis die Punkte in der Stufe liegen.
+  const FAEHIGKEITEN_JE_STUFE = [0, 0, 1, 1, 2, 3, 4];
+  const ZIEL_JE_STUFE = [0, 25, 60, 85, 130, 190, 260];
+  const zahl = (x, d) => parseInt(x, 10) || d;
+  // Alle Waffen um eine Attacke rauf oder runter (zwischen A1 und A12); null, wenn sich keine ändern lässt
+  function mitAttacken(weapons, delta) {
+    let geaendert = false;
+    const zeilen = String(weapons || "").split("\n").map(z => {
+      const teile = z.split("|");
+      if (teile.length < 3) return z;
+      const a = zahl(String(teile[2]).replace(/\D/g, ""), 1), neu = a + delta;
+      if (neu < 1 || neu > 12) return z;
+      geaendert = true;
+      teile[2] = ` A${neu} `;
+      return teile.join("|");
+    });
+    return geaendert ? zeilen.join("\n") : null;
+  }
+
+  function passendeFaehigkeiten(s, kandidaten) {
+    const rolle = s.role || "enemy";
+    const praegung = Array.isArray(s.praegung) ? s.praegung : [];
+    const zauberer = /zauberer|caster/i.test(s.passives || "");
+    const waffenTags = new Set(Regeln.leseWaffen(s.weapons).flatMap(tagsFuerWaffe));
+    const vorhanden = new Set((s.skills || []).map(k => k.id));
+    const wert = f => (f.tags || []).reduce((n, t) => n + (praegung.includes(t) ? 3 : waffenTags.has(t) ? 1 : 0), 0)
+      + (rolle === "enemy" && f.art === "Sonderregel" ? 1 : 0);
+    return kandidaten
+      .filter(f => (f.fuer || []).includes(rolle) && !vorhanden.has(f.id) && !konflikt(f, praegung)
+        && (f.typ === "faehigkeit" || (f.typ === "zauber" && zauberer)))
+      .sort((a, b) => wert(b) - wert(a) || (a.kosten.wert - b.kosten.wert) || a.name.localeCompare(b.name));
+  }
+  function skaliere(einheit, stufe, kandidaten = GRUNDBESTAND) {
+    const s = JSON.parse(JSON.stringify(einheit));
+    // Ziel ist die Mitte der Stufe, nicht ihr Rand: ±12 %, aber nie über die Stufengrenzen hinaus
+    const mitte = ZIEL_JE_STUFE[stufe];
+    const lo = Math.max(Regeln.GRENZEN[stufe], Math.round(mitte * 0.88)), hi = Math.min(stufe < 6 ? Regeln.GRENZEN[stufe + 1] - 5 : 999, Math.round(mitte * 1.12));
+    // Fähigkeiten: überzählige von hinten weg, fehlende passend zu Prägung und Waffen dazu
+    const soll = FAEHIGKEITEN_JE_STUFE[stufe];
+    const vorher = Array.isArray(s.skills) ? s.skills : [];
+    const weg = vorher.slice(soll).map(k => k.name);
+    s.skills = vorher.slice(0, soll);
+    const neu = [];
+    for (const f of passendeFaehigkeiten(s, kandidaten)) {
+      if (s.skills.length >= soll) break;
+      s.skills.push({ id: f.id, typ: f.typ, name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten } });
+      neu.push(f.name);
+    }
+    // Werte reihum verschieben, damit keiner allein ausreißt
+    const pts = x => Regeln.punkte(x).pts;
+    // Qualität und Verteidigung 2+ nur für Legendär und Boss, 6+ auf Treffer nie; Zäh und Attacken tragen die großen Sprünge
+    // Qualität und Verteidigung wandern höchstens eine Stufe vom Ausgangswert, damit der Charakter erkennbar bleibt
+    const q0 = zahl(s.quality, 4), d0 = zahl(s.defense, 5);
+    const qMin = Math.max(stufe >= 5 ? 2 : 3, q0 - 1), qMax = Math.min(5, Math.max(q0, q0 + 1));
+    const dMin = Math.max(stufe >= 5 ? 2 : 3, d0 - 1), dMax = Math.min(6, d0 + 1);
+    const ZUEGE = [
+      [x => zahl(x.tough, 1) < 40 && { tough: String(zahl(x.tough, 1) + 1) }, x => zahl(x.tough, 1) > 1 && { tough: String(zahl(x.tough, 1) - 1) }],
+      [x => { const w = mitAttacken(x.weapons, 1); return w !== null && { weapons: w }; },
+        x => { const w = mitAttacken(x.weapons, -1); return w !== null && { weapons: w }; }],
+      [x => zahl(x.quality, 4) > qMin && { quality: zahl(x.quality, 4) - 1 + "+" }, x => zahl(x.quality, 4) < qMax && { quality: zahl(x.quality, 4) + 1 + "+" }],
+      [x => zahl(x.defense, 5) > dMin && { defense: zahl(x.defense, 5) - 1 + "+" }, x => zahl(x.defense, 5) < dMax && { defense: zahl(x.defense, 5) + 1 + "+" }],
+    ];
+    for (let i = 0; i < 160; i++) {
+      const p = pts(s);
+      // Boss hat nach oben keine Grenze: Wer schon darüber liegt, wird nicht künstlich geschwächt
+      if (p >= lo && (p <= hi || stufe === 6)) break;
+      const rauf = p < lo;
+      const versuche = ZUEGE.map((_, k) => ZUEGE[(i + k) % ZUEGE.length][rauf ? 0 : 1](s)).filter(Boolean)
+        .map(aend => ({ aend, p: pts({ ...s, ...aend }) }));
+      if (!versuche.length) break;
+      const treffer = versuche.find(v => v.p >= lo && v.p <= hi)
+        || versuche.find(v => rauf ? v.p > p && v.p <= hi : v.p < p && v.p >= lo)
+        || versuche.slice().sort((a, b) => Math.abs(a.p - mitte) - Math.abs(b.p - mitte))[0];
+      Object.assign(s, treffer.aend);
+    }
+    s.points = pts(s);
+    s.tier = Regeln.stufeFuerPunkte(s.points);
+    return { karte: s, neu, weg };
+  }
+
+  const Katalog = { TAGS, FRAKTIONEN, GRUNDBESTAND, STAERKEN, TYPEN, KATEGORIEN, kategorieVon, skaliere, FAEHIGKEITEN_JE_STUFE, PRAEGUNGEN, GEGENSAETZE, konflikt, tagsFuerWaffe };
   if (typeof module !== "undefined" && module.exports) module.exports = Katalog;
   else root.Katalog = Katalog;
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -284,6 +284,7 @@
     const land = state.orient === "land";
     const stage = $("stage");
     stage.classList.toggle("land", land);
+    stage.closest(".shop").classList.toggle("quer", land);
     stage.innerHTML = renderCard(state, state.tier, { land });
     $("ladder").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `
       <button type="button" class="rung" data-t="${t}" aria-pressed="${t === state.tier}">
@@ -307,7 +308,8 @@
 
   function vorlage(key) {
     const v = VORLAGEN.find(x => x.key === key) || VORLAGEN[0];
-    state = Object.assign({ orient: state.orient || "port", upload: null, autoTier: true }, JSON.parse(JSON.stringify(v.d)));
+    state = Object.assign({ upload: null, autoTier: true }, JSON.parse(JSON.stringify(v.d)));
+    state.orient = formatFuer(state.role);
     delete state.altPunkte;
     $("preset").value = v.key;
     bModell = null;
@@ -464,7 +466,7 @@
     modellUebernehmen();
   }
   function frisch(rolle) {
-    state = Object.assign({}, state, { id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
+    state = Object.assign({}, state, { orient: formatFuer(rolle), id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
     bModell = { rolle, budget: +state.budget || 100, q: 5, d: 6, t: rolle === "hero" ? 3 : 1, n: 1,
       waffen: [{ name: "Handwaffe", reichweite: 0, a: 1, ds: 0, rest: [] }], faeh: new Set(), rest: [], special: "0", skills: [] };
     modellUebernehmen();
@@ -546,9 +548,33 @@
     }
     if (window.KartenschmiedeCharaktere) window.KartenschmiedeCharaktere.zeigen();
   }
-  async function speichern() {
+  // Speichern: Gibt es die Karte schon (gleiche ID oder gleicher Name), fragt die Seite nach: überschreiben oder neu anlegen?
+  const neueId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^a-z0-9-]/gi, "");
+  function speichern() {
     const msg = $("saveMsg");
-    if (!state.id) state.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^a-z0-9-]/gi, "");
+    const liste = serverKarten || [];
+    const gleich = (state.id && liste.find(k => k.id === state.id))
+      || liste.find(k => (k.name || "").trim().toLowerCase() === (state.name || "").trim().toLowerCase());
+    if (!gleich) { if (!state.id) state.id = neueId(); return speichereWirklich(); }
+    msg.innerHTML = `„${esc(gleich.name)}“ ist schon gespeichert${gleich.gespeichertVon ? ` (von ${esc(gleich.gespeichertVon)})` : ""}.
+      <span class="save-wahl"><button type="button" class="btn sm" data-save="ueber">Überschreiben</button>
+      <button type="button" class="btn ghost sm" data-save="neu">Als neue Karte</button>
+      <button type="button" class="btn ghost sm" data-save="nein">Abbrechen</button></span>`;
+    msg.onclick = e => {
+      const b = e.target.closest("[data-save]"); if (!b) return;
+      msg.onclick = null;
+      if (b.dataset.save === "nein") { msg.textContent = "Nicht gespeichert."; return; }
+      if (b.dataset.save === "ueber") state.id = gleich.id;
+      else {
+        state.id = neueId();
+        if ((state.name || "").trim().toLowerCase() === (gleich.name || "").trim().toLowerCase()) state.name = `${state.name} (2)`;
+        insFormular();
+      }
+      speichereWirklich();
+    };
+  }
+  async function speichereWirklich() {
+    const msg = $("saveMsg");
     msg.textContent = "Speichert …";
     try {
       const vs = await vorschau(state.art === "upload" ? state.upload : IMG[state.art]);
@@ -561,11 +587,12 @@
       msg.textContent = `Speichern fehlgeschlagen (${e.message}). Ist das Artwork sehr groß, hilft ein kleineres Bild.`;
     }
   }
+
   async function ladeKarte(id) {
     const r = await fetch(`${API}/${encodeURIComponent(id)}`, { credentials: "same-origin" });
     if (!r.ok) { $("saveMsg").textContent = "Die Karte ließ sich nicht laden."; return; }
     const { karte } = await r.json();
-    state = Object.assign({ orient: "port", autoTier: true }, karte);
+    state = Object.assign({ orient: formatFuer(karte.role) }, karte, { autoTier: true });
     bModell = null; insFormular(); alles();
     reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" });
   }
@@ -721,6 +748,7 @@
     const behalte = { upload: state.upload, art: state.art, ax: state.ax, ay: state.ay, zoom: state.zoom, orient: state.orient };
     state = Object.assign({ autoTier: true, special: "0", bossName: "", bossText: "", flavor: "", look: "", size: "1", role: "enemy" }, d, behalte, { skills, id: undefined });
     if (d.art && IMG[d.art]) state.art = d.art;
+    if (!d.orient) state.orient = formatFuer(state.role);
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
     state.praegung = Array.isArray(d.praegung) ? d.praegung.filter(t => KAT.PRAEGUNGEN.includes(t)) : [];
@@ -733,7 +761,18 @@
   $("tiers").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `<button type="button" data-t="${t}" aria-pressed="false">${STUFEN[t]}</button>`).join("");
   $("preset").addEventListener("change", e => vorlage(e.target.value));
   $("autoTier").addEventListener("change", e => { state.autoTier = e.target.checked; alles(); });
-  const stufeWaehlen = t => { state.tier = t; state.autoTier = false; insFormular(); alles(); };
+  // Stufe wählen: Folgt die Stufe den Punkten (Standard), passt sich die Einheit an – Werte und Zahl der Fähigkeiten.
+  // Ist der Haken aus, wechselt nur der Rahmen.
+  const stufeWaehlen = t => {
+    if (state.autoTier === false) { state.tier = t; insFormular(); alles(); return; }
+    const { karte, neu, weg } = KAT.skaliere(state, t, alleFaehigkeiten());
+    state = Object.assign(state, karte, { autoTier: true });
+    bModell = null; insFormular(); alles(); simOptionen();
+    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, Zäh ${state.tough}.`
+      + (neu.length ? ` Neu: ${neu.join(", ")}.` : "") + (weg.length ? ` Entfernt: ${weg.join(", ")}.` : "");
+  };
+  // Gegner und Gefährten im Querformat (Platz für mehrere Fähigkeiten), Helden im Hochformat
+  function formatFuer(rolle) { return rolle === "hero" ? "port" : "land"; }
   $("tiers").addEventListener("click", e => { const b = e.target.closest("button"); if (b) stufeWaehlen(+b.dataset.t); });
   $("ladder").addEventListener("click", e => { const b = e.target.closest(".rung"); if (b) stufeWaehlen(+b.dataset.t); });
   document.querySelectorAll(".toolbar .seg button").forEach(b => b.addEventListener("click", () => { state.orient = b.dataset.o; insFormular(); alles(); }));
@@ -744,6 +783,7 @@
     if (!FELDER.includes(id)) return;
     state[id] = ["ax", "ay", "zoom"].includes(id) ? +e.target.value : e.target.value;
     if (["quality", "defense", "tough", "size", "weapons", "passives", "special", "role"].includes(id)) bModell = null;
+    if (id === "role") state.orient = formatFuer(state.role);
     clearTimeout(takt); takt = setTimeout(() => { alles(); simOptionen(); }, 60);
   });
   $("artfile").addEventListener("change", e => {
@@ -895,13 +935,13 @@
     async loescheEigenen(id) { eigene = eigene.filter(f => f.id !== id); await sichereEigene(); alles(); },
     nachAenderung() { insFormular(); alles(); simOptionen(); },
     zeigeReiter: name => reiter(name),
-    oeffneInWerkstatt(karte) { state = Object.assign({ orient: "port", autoTier: true }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
+    oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte)), { autoTier: true }); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
     zeigePngs, drucken,
   };
 
   const gemerkt = lade();
-  if (gemerkt && gemerkt.name !== undefined) { state = gemerkt; insFormular(); alles(); } else vorlage("frostfang");
+  if (gemerkt && gemerkt.name !== undefined) { state = Object.assign(gemerkt, { autoTier: true }); insFormular(); alles(); } else vorlage("frostfang");
   simOptionen();
   ladeEigene().then(() => { insFormular(); alles(); if (window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.neu(); });
   if (location.hash === "#gruppe") reiter("gruppe");
