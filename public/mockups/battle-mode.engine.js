@@ -680,6 +680,92 @@
     const paarId=partner?Math.min(u.id,partner.id):u.id;
     return "hsl("+Math.floor(kuerHash(paarId,11)*360)+" 70% 55%)";
   }
+  // ================= E-F4 — "JEDES PAAR HAT EIN PROGRAMM" (Fable-Ideen Buehne-Auftritt ========
+  // Paket 3, 01.10., docs/design/fable-ideen-buehne-auftritt-30-09.md Abschnitt 2 "E-F4",
+  // Klasse A, klein) =============================================================================
+  // Reine Identitaet, "nach dem Showcase-Act-Muster" (actVon(), weiter unten): ein
+  // Programmtitel und eine Stimmung, deterministisch aus Klasse/Rasse/Traits -- als
+  // Einblender beim Betreten des Eises (zeichneDuett(), GRUPPEN-ETIKETTEN). Kein Punkt,
+  // kein Wuerfel: eiskunstlaufProgramm() liest ausschliesslich u.c/u.r/u.tp/u.tn (dieselben
+  // Showcase-Adapterfelder, auch auf Eiskunstlauf-Teilnehmern gesetzt, s. actVon()-
+  // Kommentar "dieselben, die `p` im Kader traegt") und kuerHash() -- KEIN rr(), KEIN
+  // Einfluss auf eig/wert()/rundenN, exakt derselbe Vertrag wie actVon()/
+  // eiskunstlaufKostuemfarbe() oben.
+  //
+  // MOOD-GRUPPEN: dieselbe Vierer-Farbgruppierung wie KLASSENFARBE (s. dort) statt einer
+  // neuen Kategorisierung -- vier bestehende Archetyp-Gruppen, keine fuenfte Tabelle.
+  // Sprinter/Rogue/Charger (KLASSENFARBE "gruen") fallen bewusst auf den Default "elegant":
+  // schnell/leichtfuessig liegt naeher an elegant als an einer der drei anderen Stimmungen,
+  // eine eigene vierte Gruppe fuer drei Klassen waere fuer ein "klein, ein halber Tag"-
+  // Feature reiner Mehraufwand ohne Mehrwert.
+  const EISKUNSTLAUF_PROGRAMM_MOOD_KLASSE={
+    Berserker:"kraftvoll", Warlord:"kraftvoll", Tank:"kraftvoll",
+    Mage:"mystisch", Overseer:"mystisch", Templar:"mystisch",
+    Bard:"verspielt", Hero:"verspielt", Badass:"verspielt", Tactician:"verspielt"
+  };
+  const EISKUNSTLAUF_PROGRAMM_MOOD_RASSE={
+    Divine:"mystisch", Voidborn:"mystisch",
+    Demon:"kraftvoll", Orc:"kraftvoll", Tauren:"kraftvoll", Construct:"kraftvoll",
+    Elf:"elegant", Aqua:"elegant", Plant:"elegant", Animal:"elegant",
+    Goblin:"verspielt", Lizard:"verspielt", Alien:"verspielt"
+    // Human traegt wie jede unbekannte Rasse keinen Punkt (s. add() in
+    // eiskunstlaufProgrammMood() -- `if(!mood)return;`).
+  };
+  const EISKUNSTLAUF_PROGRAMM_MOOD_TRAIT={
+    Eloquent:"verspielt", FanFavorite:"verspielt", Flexible:"verspielt", Cool:"verspielt",
+    Stoic:"kraftvoll", Fearless:"kraftvoll", Loyal:"kraftvoll"
+  };
+  // Drei Programme je Stimmung -- "Nocturne" und "Sturm über den Klippen" sind woertlich
+  // die beiden Beispiele aus dem Konzeptpapier (Abschnitt 2, E-F4).
+  const EISKUNSTLAUF_PROGRAMME={
+    kraftvoll:[
+      {titel:"Sturm über den Klippen", stimmung:"kraftvoll, aufwühlend"},
+      {titel:"Eiserner Thron", stimmung:"wuchtig, entschlossen"},
+      {titel:"Lawine", stimmung:"roh, unaufhaltsam"}
+    ],
+    mystisch:[
+      {titel:"Nocturne", stimmung:"mystisch, schwebend"},
+      {titel:"Nebelgesang", stimmung:"geheimnisvoll, leise"},
+      {titel:"Sternenschleier", stimmung:"verträumt, fern"}
+    ],
+    verspielt:[
+      {titel:"Funkenregen", stimmung:"verspielt, leichtfüßig"},
+      {titel:"Karussell", stimmung:"übermütig, bunt"},
+      {titel:"Lausbubenstück", stimmung:"frech, humorvoll"}
+    ],
+    elegant:[
+      {titel:"Schwanenfeder", stimmung:"elegant, fließend"},
+      {titel:"Morgentau", stimmung:"zart, ruhig"},
+      {titel:"Seidenlinie", stimmung:"geschmeidig, präzise"}
+    ]
+  };
+  // Wie lange der Einblender in zeichneDuett() steht (Sekunden), die letzten 0,6s davon als
+  // Ausblendung -- reine Taktzahl, aendert nichts an rundenDauer/rundenN.
+  const EISKUNSTLAUF_PROGRAMM_DAUER=3.2;
+  function eiskunstlaufProgrammMood(u){
+    const punkte={};
+    const add=(mood,n)=>{ if(!mood)return; punkte[mood]=(punkte[mood]||0)+n; };
+    add(EISKUNSTLAUF_PROGRAMM_MOOD_KLASSE[u.c],3);
+    add(EISKUNSTLAUF_PROGRAMM_MOOD_RASSE[u.r],1);
+    (u.tp||[]).forEach(t=>add(EISKUNSTLAUF_PROGRAMM_MOOD_TRAIT[t],1));
+    (u.tn||[]).forEach(t=>add(EISKUNSTLAUF_PROGRAMM_MOOD_TRAIT[t],1));
+    let best="elegant", bestP=0;
+    for(const m in punkte)if(punkte[m]>bestP){bestP=punkte[m];best=m;}
+    return best;
+  }
+  // paarId wie eiskunstlaufKostuemfarbe() oben (die KLEINERE der beiden u.id, Solo-Rest
+  // traegt seine eigene) -- dasselbe Paar zeigt bei zwei Besuchen (E-F1, Kurzprogramm+Kuer)
+  // deshalb immer DENSELBEN Titel. Die Mood kommt vom "Fuehrer" des Paares (der mit der
+  // kleineren u.id) statt von beiden gemischt -- ein Programm hat EINEN Titel, kein
+  // Mittelwert aus zwei Stimmungen.
+  function eiskunstlaufProgramm(u){
+    const partner=u.duettN?TEILNEHMER.find(x=>x.side===u.side&&x.n===u.duettN):null;
+    const paarId=partner?Math.min(u.id,partner.id):u.id;
+    const fuehrer=(!partner||u.id===paarId)?u:partner;
+    const mood=eiskunstlaufProgrammMood(fuehrer);
+    const pool=EISKUNSTLAUF_PROGRAMME[mood]||EISKUNSTLAUF_PROGRAMME.elegant;
+    return pool[Math.floor(kuerHash(paarId,31)*pool.length)%pool.length];
+  }
 
   // GRIFFPUNKTE FUER VOLLBILD-/REIHERMECH-KREATUREN (02.09.). Reihenfolge je Eintrag wie
   // blickAus(): 0 hinten, 1 links, 2 vorn, 3 rechts. Koordinaten sind Zell-Koordinaten
@@ -14537,7 +14623,11 @@
       // Worte, und die letzte Zeile erklaert die neue "Wü"-Spalte, die keine eigene Wertung
       // ist (s. Kommentar bei WERTUNG_AUFTRITT()).
       wertungTabelle:{failKopf:"Pause",
-        fuss:"Jeder Durchgang (eine Minute am Tisch) bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (die Minute zählt dann nur 65 %). „Abfall\" vergleicht die späten Minuten mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt. „Wü\" rechnet „Pkt\" nur in Würstchen um (Anzeige, keine eigene Wertung)."}
+        // W-F2 (01.10.): die Zusatzspalte rechnet "Pkt" in die Einheit des GERICHTS DES
+        // SPIELTAGS um, nicht mehr fest "Würstchen" -- der Fusstext bleibt deshalb
+        // dish-neutral formuliert (der Spaltenkopf selbst zeigt die jeweilige Einheit, s.
+        // WERTUNG_AUFTRITT()).
+        fuss:"Jeder Durchgang (eine Minute am Tisch) bringt Punkte; „Pause\" zählt, wie oft er kurz aussetzen musste (die Minute zählt dann nur 65 %). „Abfall\" vergleicht die späten Minuten mit den frühen — wer hinten raus einbricht, steht hier im Minus. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt. Die letzte Spalte rechnet „Pkt\" nur in die Einheit des heutigen Gerichts um (Anzeige, keine eigene Wertung)."}
     },
 
     "speed-schach":{
@@ -15235,6 +15325,18 @@
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
+    // W-F2 ("Menue des Spieltags", Fable-Ideen Buehne-Auftritt Paket 3 (01.10.), Klasse A):
+    // EIN Gericht pro Spiel, aus der ROHEN, NOCH UNVERBRAUCHTEN Saat gehasht -- bewusst
+    // cypherHash() statt rr(): rr() wuerde den fuer die Wertung verbrauchten Zufallsstrom
+    // verschieben (jede Minute je Esser zieht genau einen rr()-Wurf, s. setz()), cypherHash()
+    // ist reiner Hash ohne globalen Zustand, exakt das Werkzeug, das diese Datei ueberall
+    // sonst fuer "waehlt nur die Variante, nie den Zufall der Wertung" einsetzt (actVon(),
+    // showcaseJurySpruch(), eiskunstlaufProgramm() oben). Gilt nur fuer Wettessen; jede
+    // andere Disziplin setzt wettessenMenuWahl zurueck auf den Default (Wuerstchen) --
+    // defensiv, falls ein Renderer ihn je ausserhalb von art.wettessen lesen sollte.
+    wettessenMenuWahl=(buehneDisc==="wettessen")
+      ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
+      :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
@@ -17919,8 +18021,10 @@
         const fuehrer=sortiert[0].u, zweiter=sortiert[1]?sortiert[1].u:null;
         const fWu=wettessenWuerstchen(fuehrer.summe);
         const tempo=wettessenTempo(fuehrer,fuehrer.aktuell);
+        // W-F2: Einheit kommt aus dem Gericht des Tages statt dem festen "Wü" (s.
+        // wettessenMenuWahl/bauBuehne()).
         let text="Minute "+minute+": "+(fuehrer.n.split(" ")[0]||fuehrer.n)+" führt mit "
-          +wettessenWuerstchenText(fWu)+" Wü";
+          +wettessenWuerstchenText(fWu)+" "+wettessenMenuWahl.einheit;
         if(zweiter){
           const diff=fWu-wettessenWuerstchen(zweiter.summe);
           if(diff>0.001)text+=" (+"+wettessenWuerstchenText(diff)+" auf "+(zweiter.n.split(" ")[0]||zweiter.n)+")";
@@ -18444,6 +18548,11 @@
         u.vizKissT=u.vizRolleVorher==="kiss"?(u.vizKissT||0)+dt:0;
         if(u.vizRolleVorher!=="kiss")u.vizKissBesuch=(u.vizKissBesuch||0)+1;
       }
+      // E-F4 (Paket 3, 01.10., Klasse A): seit wann steht dieses Paar/dieser Solo-Lauf in
+      // diesem "kuer"-Besuch -- treibt ausschliesslich den Programmtitel-Einblender in
+      // zeichneDuett() (GRUPPEN-ETIKETTEN, s. dort). Derselbe Rollenwechsel-Kantentreffer
+      // wie vizKissT/vizKissBesuch oben. Kein rr(), keine Wirkung auf u.summe.
+      if(u.vizRolle==="kuer"&&u.vizRolleVorher!=="kuer")u.vizKuerSeit=buehneT;
       u.vizRolleVorher=u.vizRolle;
 
       // TON (A4 0->20, Welle 1, Opus-Plan 09-10 Abschnitt 4.4, uebernommen aus PR #903):
@@ -20683,6 +20792,34 @@
   // Die Tafel laeuft deshalb jetzt WEITER UNTEN, direkt unter der EINEN Sitzreihe aus
   // zeichneWettessen() (s. wettessenSitzplaetze() dort) -- Heim links, Gast rechts,
   // Trikotfarbe plus Faehnchen am Platz statt zweier Bloecke, die sich anschauen.
+  //
+  // W-F2 ("Menue des Spieltags", Paket 3, 01.10., Klasse A): kleine Neon-Plakette mit dem
+  // Gericht des Tages (wettessenMenuWahl, s. bauBuehne()). ABSICHTLICH NICHT an der
+  // Stelle, an der bis zum 30.09. ein Schild "WETTESSEN" stand (y:4-30, s. Kommentar bei
+  // bodenWettessen()) -- genau dort liegt der HTML-Score-Bug (.bbug, top:8px), mit dem das
+  // alte Schild nachweislich kollidierte (F1-Broadcast-Audit Runde 2, Punkt 6, Bild 11).
+  // Diese Plakette steht stattdessen links aussen (x 10-106), UNTERHALB des Bugs: NACHGEMESSEN
+  // (getBoundingClientRect(), s. zeichneWettessenMenuSchild()) reicht .bbug mit seinen zwei
+  // Zeilen (Teamname + "X am Tisch") bis ~61px Canvas-Innenkoordinate, nicht nur bis 30px wie
+  // der alte Kommentar nahelegt -- bei einer Sicht-QA mit y0=48 ueberlappte die erste
+  // Schildzeile sichtbar mit der Bug-Unterkante. y0=66 laesst Luft. Links vom Kopf-an-Kopf-
+  // Band (beginnt erst bei x=W*0.14) -- reine Anzeige, kein rr(), liest nur wettessenMenuWahl.
+  function zeichneWettessenMenuSchild(){
+    // y0=66 statt der anfangs vermuteten 48: NACHGEMESSEN (getBoundingClientRect() des
+    // HTML-Score-Bugs .bbug, auf 1240x470 Canvas-Innenkoordinaten umgerechnet), nicht nur
+    // aus dem alten "y:4-30"-Entfernungskommentar uebernommen -- der Bug ist mit zwei
+    // Zeilen (Teamname fett + "X am Tisch" klein) in Wirklichkeit bis ~61px hoch, nicht nur
+    // 30px. Bei y0=48 ueberlappte die erste Schildzeile sichtbar mit der unteren Kante des
+    // Bugs (Sicht-QA 01.10., Crop-Screenshot). y0=66 laesst durchgehend ~5px Luft.
+    const x0=10,y0=66,bw=96,bh=30;
+    ctx.fillStyle="rgba(20,10,6,.75)"; ctx.fillRect(x0,y0,bw,bh);
+    ctx.strokeStyle="rgba(242,193,78,.6)"; ctx.lineWidth=1; ctx.strokeRect(x0,y0,bw,bh);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 7px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(242,193,78,.8)";
+    ctx.fillText("HEUTE AUF DER TAFEL",x0+bw/2,y0+9);
+    ctx.font="800 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#fff6df";
+    ctx.fillText(wettessenMenuWahl.n,x0+bw/2,y0+21);
+  }
   function bodenWettessen(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -20702,6 +20839,13 @@
     // wenn dieses Schild verschwindet. Die 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3)
     // haben eigene Zonen weiter unten im Bild, s. zeichneWettessenUhr()/
     // zeichneWettessenBand() -- unveraendert.
+    //
+    // W-F2 BRINGT EIN NEUES, EIGENES SCHILD ZURUECK -- AN EINER ANDEREN STELLE. Nicht bei
+    // y:4-30 (der Grund fuer die Entfernung oben gilt unveraendert), sondern links aussen,
+    // unterhalb der Wimpelkette (die bis y 42 reicht) und links vom Kopf-an-Kopf-Band
+    // (zeichneWettessenBand(): Band beginnt erst bei x=W*0.14 ≈ 174px bei W=1240) -- eine
+    // Flaeche, die bislang kein anderes Wettessen-Element belegt.
+    zeichneWettessenMenuSchild();
 
     // WIMPELKETTE, dieselbe Idee wie platter.tsx' Banner-Band.
     ctx.fillStyle="rgba(230,210,180,.35)";
@@ -22590,7 +22734,33 @@
   // echten Regelwerk -- fuer eine 9-11px-Anzeige ist das grob genug und trotzdem sichtbar
   // "kein Punktestand mehr".
   const WETTESSEN_WUERSTCHEN_SKALA=18;
-  function wettessenWuerstchen(summe){ return Math.round((summe/WETTESSEN_WUERSTCHEN_SKALA)*2)/2; }
+  // ================= W-F2 — "DAS MENUE DES SPIELTAGS" (Fable-Ideen Buehne-Auftritt Paket 3, =
+  // 01.10., docs/design/fable-ideen-buehne-auftritt-30-09.md Abschnitt 4 "W-F2", Klasse A, ===
+  // klein) =======================================================================================
+  // EIN Gericht pro Spiel (bauBuehne(), s. dort), aendert AUSSCHLIESSLICH die Anzeige --
+  // Einheit auf der Wendetafel/im Band, Neon-Schild, Feed-Vokabular, Serviettenfarbe. Kein
+  // Punkt, kein Wuerfel, keine Rollenverschiebung (Papier: "eine mechanische Fassung ... waere
+  // der Validitaetsbruch, den CLAUDE.md beschreibt"). `skala` ersetzt
+  // WETTESSEN_WUERSTCHEN_SKALA als reine Darstellungsumrechnung von u.summe -- die Wertung
+  // selbst (u.summe/PPs/Teamstand/rho) liest `skala` nirgends.
+  //
+  // NUR DER ERSTE EINTRAG IST KALIBRIERT (WETTESSEN_WUERSTCHEN_SKALA, s. Kommentar oben:
+  // disziplinProbe-Median 716 -> 39,8). Die anderen vier sind Startwerte fuer plausible
+  // Groessenordnungen (Wings/Austern werden in Stueckzahlen gezaehlt und liegen bei echten
+  // Major-League-Eating-Rekorden um ein Vielfaches hoeher als Nathan's Wuerstchenzahl, Chili
+  // wird in Portionen gegessen und liegt deutlich niedriger) -- reine Kulisse, keine neue
+  // Kalibrierrunde noetig, weil kein Attribut/keine Wertung an `skala` haengt.
+  const WETTESSEN_MENU=[
+    {n:"Würstchen",   einheit:"Wü", skala:WETTESSEN_WUERSTCHEN_SKALA, servFarbe:"#e6432e"},
+    {n:"Wings",       einheit:"Wi", skala:4,   servFarbe:"#c9741f"},
+    {n:"Pfannkuchen", einheit:"Pf", skala:9,   servFarbe:"#d9a441"},
+    {n:"Chili",       einheit:"Ch", skala:60,  servFarbe:"#8a2a1a"},
+    {n:"Austern",     einheit:"Au", skala:2.8, servFarbe:"#4a7a93"}
+  ];
+  // Modulweiter Default, bevor das erste bauBuehne() gelaufen ist (5.3-Vertrag wie
+  // u.vizX==null) -- derselbe Wert, den jedes Spiel VOR W-F2 immer zeigte.
+  let wettessenMenuWahl=WETTESSEN_MENU[0];
+  function wettessenWuerstchen(summe){ return Math.round((summe/wettessenMenuWahl.skala)*2)/2; }
   function wettessenWuerstchenText(w){ return Number.isInteger(w)?String(w):w.toFixed(1).replace(".",","); }
   // ANZEIGE-SUMME (W-B1, Broadcast-Optik Buehne-Auftritt 27.09.): `u.summe` springt bei
   // Wettessen einmal je Minute um den GANZEN Minutenwert (buehneGruppenGroesse enthuellt
@@ -22724,9 +22894,12 @@
 
         zeichneSprite(ctx,u,x,y);
 
-        // LATZ-SERVIETTE, rot-weiss gestreift, am Hals -- platter.tsx' Serviette-Motiv.
+        // LATZ-SERVIETTE am Hals -- platter.tsx' Serviette-Motiv. W-F2: der Farbstreifen
+        // kommt aus dem Gericht des Tages (wettessenMenuWahl.servFarbe) statt des fest
+        // einprogrammierten Wuerstchen-Rot -- dieselbe "Tischrequisite ändert sich mit dem
+        // Menü"-Idee wie das Neon-Schild (zeichneWettessenMenuSchild(), s. dort).
         for(let s=0;s<4;s++){
-          ctx.fillStyle=s%2===0?"#f2ede2":"#e6432e";
+          ctx.fillStyle=s%2===0?"#f2ede2":wettessenMenuWahl.servFarbe;
           ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
         }
 
@@ -22766,7 +22939,9 @@
           u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
         }
         const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
-        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wuJetzt)+" Wü",betontWu);
+        // W-F2: Einheit kommt aus dem Gericht des Tages (wettessenMenuWahl), statt des
+        // fest einprogrammierten "Wü".
+        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wuJetzt)+" "+wettessenMenuWahl.einheit,betontWu);
 
         const w=30,pFuell=Math.min(1,u.summe/maxSumme);
         ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
@@ -22874,8 +23049,9 @@
       ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
       ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#dfe6ef";
       // W-B1: dieselbe stetig hochzaehlende Anzeige wie an der Wendetafel, statt des
-      // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort).
-      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" Würstchen",tx,mitteY+9);
+      // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort). W-F2: der volle
+      // Gerichtname (wettessenMenuWahl.n) statt des fest einprogrammierten "Würstchen".
+      ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" "+wettessenMenuWahl.n,tx,mitteY+9);
     };
     zeile(erster,true); zeile(zweiter,false);
 
@@ -24363,8 +24539,24 @@
       ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.lineWidth=2.5; ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineJoin="round";
       if(rolle==="kuer"){
-        if(grp.length!==2)return;
         if(pos.some(p=>p.x>=W*0.78))return;   // noch im Einlaufen, s. "BESCHRIFTUNG ERST AUF DEM EIS" oben
+        // E-F4 ("Jedes Paar hat ein Programm", Paket 3, 01.10., Klasse A): Programmtitel +
+        // Stimmung, kurz eingeblendet sobald das Paar/der Solo-Lauf wirklich auf dem Eis
+        // steht (derselbe Einlaufen-Waechter wie "DUETT" unten) -- reine Ablesung aus
+        // vizKuerSeit (stepKuer(), s. dort) und eiskunstlaufProgramm() (reine Funktion,
+        // kein rr()). Gilt fuer Duett UND Solo-Rest, deshalb VOR dem grp.length-Zweig unten.
+        const seitKuer=buehneT-(grp[0].vizKuerSeit??buehneT);
+        if(seitKuer<EISKUNSTLAUF_PROGRAMM_DAUER){
+          const prog=eiskunstlaufProgramm(grp[0]);
+          ctx.globalAlpha=seitKuer>EISKUNSTLAUF_PROGRAMM_DAUER-0.6
+            ?Math.max(0,(EISKUNSTLAUF_PROGRAMM_DAUER-seitKuer)/0.6):1;
+          ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#f2d75a";
+          ctx.strokeText("„"+prog.titel+"“",mx,oben-46); ctx.fillText("„"+prog.titel+"“",mx,oben-46);
+          ctx.font="400 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#c7cedb";
+          ctx.strokeText(prog.stimmung,mx,oben-35); ctx.fillText(prog.stimmung,mx,oben-35);
+          ctx.globalAlpha=1;
+        }
+        if(grp.length!==2)return;
         // UNTER das Paar statt darueber (13.09.): oben haengen die Schwebetexte ("+92"),
         // die sich mit dem Etikett gegenseitig unleserlich gemacht haben. Unten ist die
         // Spalte zwischen den beiden auseinandergeschobenen Namensetiketten frei.
@@ -24701,8 +24893,12 @@
         // (wettessenWuerstchen()/wettessenWuerstchenText(), s. dort) -- NUR bei Wettessen.
         // "Pkt" bleibt die Spalte, an der sich die Rangtreue misst; diese Spalte ist reine
         // Zierde wie die I-Spy-Spalten direkt unten.
+        // W-F2: Kopf/Titel kommen aus dem Gericht des Tages (wettessenMenuWahl) statt des
+        // fest einprogrammierten "Wü"/"Würstchen" -- WERTUNG_AUFTRITT(art) wird je Bild neu
+        // aufgerufen, liest also immer den aktuellen Stand.
         ...(art.wettessen?[
-          {id:"wuerstchen",kopf:"Wü", titel:"Würstchen (Anzeige-Skala aus „Pkt“, s. Fußnote)",
+          {id:"wuerstchen",kopf:wettessenMenuWahl.einheit,
+            titel:wettessenMenuWahl.n+" (Anzeige-Skala aus „Pkt“, s. Fußnote)",
             wert:z=>z.u.summe?wettessenWuerstchenText(wettessenWuerstchen(z.u.summe)):null}
         ]:[]),
         // S-F2 (Bester Act je Kategorie, "Etiketten und Stimmen" Paket 2, 01.10., Klasse A):
@@ -43951,6 +44147,30 @@
       const u={n:p.n,id:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a};
       return actVon(u);
     },
+    // E-F4-SONDE (Fable-Ideen Buehne-Auftritt Paket 3, 01.10., Klasse A): reine
+    // Diagnose-Sonde, dasselbe Prinzip wie showcaseActProbe direkt oberhalb -- kein
+    // Gameplay, kein rr(), liest den Kader (SQUAD/OPP) genauso wie renderProbe. `id:0`,
+    // `duettN:null` (Solo-Fall, paarId=eigene id) -- ausserhalb eines echten Kuer-Auftritts
+    // gibt es keine echte Paarung.
+    eiskunstlaufProgrammProbe:(name)=>{
+      const p=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      if(!p)return null;
+      const u={n:p.n,id:0,side:0,c:p.c,r:p.r,sub:p.sub,tp:p.tp,tn:p.tn,a:p.a,duettN:null};
+      return eiskunstlaufProgramm(u);
+    },
+    // W-F2-SONDE (Fable-Ideen Buehne-Auftritt Paket 3, 01.10., Klasse A): liest das fuer
+    // das AKTUELL GEBAUTE Spiel gezogene Gericht (bauBuehne(), s. dort) -- reine Ablesung
+    // des Modulvariable, kein rr(), kein Gameplay.
+    wettessenMenuProbe:()=>wettessenMenuWahl,
+    // W-F2-SONDE FUER EINE BELIEBIGE SAAT: reine Formel-Ablesung (exakt dieselbe
+    // cypherHash(seed,733)-Zeile wie in bauBuehne(), s. dort), OHNE bauBuehne() selbst
+    // aufzurufen -- ein echter bauBuehne()-Aufruf wuerde TEILNEHMER/buehneQueue/etc.
+    // ueberschreiben und damit ein gerade laufendes Spiel im Demo-UI zerstoeren. Reine
+    // Diagnose, kein rr(), kein Gameplay. Dient dem Nachweis, dass das Menue tatsaechlich
+    // mit der Saat variiert (die Demo-UI startet ohne geladenen Spielstand immer mit der
+    // FESTEN Saat 1337, s. normalisiereSaat()/gebuchteSaatFuerAktuelleDisziplin() -- ein
+    // echtes Spiel auf dem Server zieht dagegen seine eigene Spieltags-Saat).
+    wettessenMenuProbeFuerSaat:(saat)=>WETTESSEN_MENU[cypherHash(normalisiereSaat(saat),733)%WETTESSEN_MENU.length],
     // NACHFUELLFOLGE-SONDE (Opus-Gegencheck 2, 22.09., Abschnitt 3.1 als Vorlage): reine
     // Diagnose-Sonde nach demselben Prinzip wie showcaseActProbe direkt oberhalb — kein
     // Rendering, kein eigener rr()-Verbrauch (der einzige Wurf-Verbrauch ist der ganz normale

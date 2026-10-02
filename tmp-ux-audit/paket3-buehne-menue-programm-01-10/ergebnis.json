@@ -1,0 +1,143 @@
+{
+  "wettessen": {
+    "spiel0": {
+      "fehler": [],
+      "gericht": {
+        "n": "Austern",
+        "einheit": "Au",
+        "skala": 2.8,
+        "servFarbe": "#4a7a93"
+      },
+      "einheitImFeed": true,
+      "einheitInWertungstabelle": true,
+      "feedAuszug": [
+        "0:00Aufstellung steht.0:00Krolach — schlingt durch (112 Punkte, Durchgang 1/10).0:00Minute 1: Draco führt mit 36 Au (+6 auf Greenkraut), Tempo 36/min.",
+        "0:00Aufstellung steht.0:00Krolach — schlingt durch (112 Punkte, Durchgang 1/10)."
+      ]
+    },
+    "spiel1": {
+      "fehler": [],
+      "gericht": {
+        "n": "Austern",
+        "einheit": "Au",
+        "skala": 2.8,
+        "servFarbe": "#4a7a93"
+      },
+      "einheitImFeed": true,
+      "einheitInWertungstabelle": true,
+      "feedAuszug": [
+        "0:00Aufstellung steht.0:00Krolach — schlingt durch (112 Punkte, Durchgang 1/10).0:00Minute 1: Draco führt mit 36 Au (+6 auf Greenkraut), Tempo 36/min.",
+        "0:00Aufstellung steht.0:00Krolach — schlingt durch (112 Punkte, Durchgang 1/10)."
+      ]
+    }
+  },
+  "eiskunstlauf": {
+    "spiel0": {
+      "fehler": []
+    },
+    "spiel1": {
+      "fehler": []
+    }
+  },
+  "wettessenFormelVariation": {
+    "fehler": [],
+    "gerichteGesehen": [
+      "Austern",
+      "Wings",
+      "Würstchen",
+      "Pfannkuchen",
+      "Chili"
+    ],
+    "saatenGezaehlt": 30
+  },
+  "eiskunstlaufSonde": [
+    {
+      "name": "Draco",
+      "p1": {
+        "titel": "Sturm über den Klippen",
+        "stimmung": "kraftvoll, aufwühlend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Lava Golem",
+      "p1": {
+        "titel": "Sturm über den Klippen",
+        "stimmung": "kraftvoll, aufwühlend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Krolach",
+      "p1": {
+        "titel": "Nocturne",
+        "stimmung": "mystisch, schwebend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Johanna",
+      "p1": {
+        "titel": "Nocturne",
+        "stimmung": "mystisch, schwebend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "King Arlen Morgolor",
+      "p1": {
+        "titel": "Funkenregen",
+        "stimmung": "verspielt, leichtfüßig"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Gram",
+      "p1": {
+        "titel": "Sturm über den Klippen",
+        "stimmung": "kraftvoll, aufwühlend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Rhyx'Tal",
+      "p1": {
+        "titel": "Funkenregen",
+        "stimmung": "verspielt, leichtfüßig"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Xelara",
+      "p1": {
+        "titel": "Funkenregen",
+        "stimmung": "verspielt, leichtfüßig"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Jorund",
+      "p1": {
+        "titel": "Funkenregen",
+        "stimmung": "verspielt, leichtfüßig"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Inefinna",
+      "p1": {
+        "titel": "Nocturne",
+        "stimmung": "mystisch, schwebend"
+      },
+      "stabil": true
+    },
+    {
+      "name": "Lulu",
+      "p1": {
+        "titel": "Funkenregen",
+        "stimmung": "verspielt, leichtfüßig"
+      },
+      "stabil": true
+    }
+  ]
+}
