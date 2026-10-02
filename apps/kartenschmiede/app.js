@@ -215,7 +215,7 @@
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
-            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
+            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${symText(s.bossText)}</p>` : ""}</div>` : ""}
             <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${tagIco(t)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
@@ -536,6 +536,23 @@
       <p class="verdict">${urteil}</p>
       <p class="hint">Im Schnitt ${zahl(r.runden)} Runden. Übrige Lebenspunkte: ${esc(a.name)} ${prozent(r.restA)}, ${esc(b.name)} ${prozent(r.restB)}.</p>`;
   }
+  // Preis-Check aller Fähigkeiten und Zauber im Duell
+  function preisCheck() {
+    const btn = $("simCheck"); btn.disabled = true; btn.textContent = "Rechnet …";
+    setTimeout(() => {
+      const zeilen = alleFaehigkeiten().filter(f => f.typ === "faehigkeit" || f.typ === "zauber")
+        .map(f => ({ f, ...R.faehigkeitsCheck(f, { kaempfe: 600 }) }))
+        .sort((a, b) => (b.messbar - a.messbar) || (b.sieg - a.sieg));
+      const urteil = z => !z.messbar ? ["", "im Duell nicht messbar"] : z.sieg >= 0.6 ? ["hi", "eher zu billig"] : z.sieg <= 0.4 ? ["lo", "eher zu teuer"] : ["ok", "passt"];
+      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an Zäh bekommt. 50 % heißt: Preis passt.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>Fähigkeit</th><th class="num">Kosten</th><th class="num">Siege</th><th>Einschätzung</th></tr></thead><tbody class="static">${zeilen.map(z => {
+          const [cls, txt] = urteil(z);
+          return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f.kosten))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
+        }).join("")}</tbody></table></div>
+        <p class="hint">Vereinfacht: ein Duell 1 gegen 1. Beschwörungen, Bewegung, Auren für Verbündete und Gruppenwirkung zählen hier nicht, deshalb stehen solche Fähigkeiten unter „nicht messbar“.</p>`;
+      btn.disabled = false; btn.textContent = "Preis-Check: Fähigkeiten";
+    }, 30);
+  }
   function balance() {
     const btn = $("simFair"); btn.disabled = true; btn.textContent = "Rechnet …";
     setTimeout(() => {
@@ -653,28 +670,47 @@
   const stufeVon = k => R.stufeFuerPunkte(R.punkte(k).pts);
   function heldenbogen(k) {
     const zaeh = (parseInt(k.tough, 10) || 1) * (parseInt(k.size, 10) || 1);
-    const kaestchen = (n, rund) => `<div class="kaestchen${rund ? " rund" : ""}">${"<i></i>".repeat(n)}</div>`;
+    const kaestchen = (n, rund, voll = 0) => `<div class="kaestchen${rund ? " rund" : ""}">${Array.from({ length: n }, (_, i) => `<i${i < voll ? ' class="voll"' : ""}></i>`).join("")}</div>`;
+    const ep = Math.max(0, +k.ep || 0);
+    const zeilen = (texte, n) => Array.from({ length: n }, (_, i) => `<div>${esc(texte[i] || "")}</div>`).join("");
+    const beute = String(k.beute || "").split(/\n|,\s*/).map(x => x.trim()).filter(Boolean);
+    const verlauf = (Array.isArray(k.verlauf) ? k.verlauf : []).slice(-6).map(v => `${v.d}: ${v.t}`);
     const skills = Array.isArray(k.skills) ? k.skills : [];
     return `<div class="heldenbogen">
       <div class="hb-karte">${renderCard(k, stufeVon(k), { snap: true, land: false })}</div>
       <div class="hb-seite">
         <h2>${esc(k.name || "Held")}</h2>
         <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
-        <h3>Erfahrung</h3>${kaestchen(20)}
+        <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
         <h3>Power</h3>${kaestchen(6, true)}
         <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
-        <h3>Ausrüstung und Beute</h3><div class="linien">${"<div></div>".repeat(5)}</div>
-        <h3>Notizen</h3><div class="linien">${"<div></div>".repeat(6)}</div>
+        <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
+        <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
       </div>
       ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${symText(f.text)}</p>`).join("")}</div></div>` : ""}
     </div>`;
+  }
+  // Rückseite für Postkarten: Seltenheitsrahmen, großes Fraktionssymbol, Name und Stufe – symmetrisch, damit sie beim
+  // beidseitigen Druck egal wie gewendet passt
+  const mitRueckseite = () => { try { return localStorage.getItem("kartenschmiede-rueckseite") === "1"; } catch { return false; } };
+  function rueckseite(k, tier, land) {
+    return `<div class="cw"><article class="card t${tier} rueck${land ? " land" : ""}">
+      <div class="face rueck-face">
+        <div class="rueck-symbol">${ico(iconFuer(k))}</div>
+        <div class="rueck-name">${esc(k.name || "")}</div>
+        <div class="rueck-stufe"><span class="pips">${[1, 2, 3, 4, 5, 6].map(n => `<span class="pip${n <= tier ? " on" : ""}"></span>`).join("")}</span>${esc(STUFEN[tier])}</div>
+        <div class="rueck-fuss">Olympiade der Welten · Age of Fantasy Quest</div>
+      </div>
+      ${tier >= 3 ? ["tl", "tr", "bl", "br"].map(c => sym(tier === 6 ? "c-crown" : tier === 5 ? "c-filigree" : "c-bracket", "corner " + c)).join("") : ""}
+    </article></div>`;
   }
   function drucken(karten, format = druckFormat()) {
     const bereich = $("printArea");
     bereich.innerHTML = karten.map(k => {
       if (format === "auto" && k.role === "hero") return heldenbogen(k);
       const seite = k.orient === "land" ? "postkarte-quer" : "postkarte-hoch";
-      return `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${renderCard(k, stufeVon(k), { snap: true, land: k.orient === "land" })}</div>`;
+      const vorne = `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${renderCard(k, stufeVon(k), { snap: true, land: k.orient === "land" })}</div>`;
+      return vorne + (mitRueckseite() ? `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${rueckseite(k, stufeVon(k), k.orient === "land")}</div>` : "");
     }).join("");
     bereich.classList.add("bereit");
     passeAn(bereich);
@@ -897,6 +933,7 @@
   $("simRun").addEventListener("click", simStart);
   $("simFair").textContent = "Balance-Test: Fern gegen Nah";
   $("simFair").addEventListener("click", balance);
+  $("simCheck").addEventListener("click", preisCheck);
   if (SERVER) {
     $("saveBtn").hidden = false;
     $("saveBtn").addEventListener("click", speichern);
@@ -939,6 +976,8 @@
   $("jsonIn").addEventListener("click", textUebernehmen);
   $("druckFormat").innerHTML = DRUCKFORMATE.map(([id, n]) => `<option value="${id}" ${id === druckFormat() ? "selected" : ""}>${n}</option>`).join("");
   $("druckFormat").addEventListener("change", e => { try { localStorage.setItem("kartenschmiede-druck", e.target.value); } catch { /* egal */ } });
+  $("rueckBox").checked = mitRueckseite();
+  $("rueckBox").addEventListener("change", e => { try { localStorage.setItem("kartenschmiede-rueckseite", e.target.checked ? "1" : "0"); } catch { /* egal */ } });
   $("druckBtn").addEventListener("click", () => drucken([JSON.parse(JSON.stringify(state))], $("druckFormat").value));
   $("jsonOut").addEventListener("click", () => { $("cardJson").value = karteAlsText(); $("jsonMsg").textContent = "Das ist die aktuelle Karte als Text, ohne das Artwork."; });
   // Bearbeiten mit Formular oder Baukasten: dieselbe Karte, zwei Ansichten
@@ -999,7 +1038,7 @@
     zeigeReiter: name => reiter(name),
     oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
-    zeigePngs, drucken, DRUCKFORMATE, druckFormat,
+    zeigePngs, drucken, DRUCKFORMATE, druckFormat, rueckseite, mitRueckseite,
   };
 
   const gemerkt = lade();
