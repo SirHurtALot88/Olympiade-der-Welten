@@ -15779,6 +15779,9 @@
     // nicht die mutierte globale `seed` -- die Falle-17-Ziehungen des Finales (s. dort) brauchen
     // nur IRGENDEINEN von der Hantel unabhaengigen, aber reproduzierbaren Ursprung, und der rohe
     // Aufrufwert ist der klarste.
+    // TODO(Sandsack-Finale, Task #60): baueSandsackFinale() ist bis zur Kalibrierrunde
+    // (Pp<=25/Validitaet>=0,80) bewusst folgenlos fuer `seiten` -- s. Gate-Kommentar bei
+    // `const seiten=` in spieleBuehneHeben().
     if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
     // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
     // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
@@ -45093,6 +45096,11 @@
             kuehneErfolge:teiln.kuehneErfolge||0, kuehnVerletzt:teiln.kuehnVerletzt||0}:{})};
       });
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen).length;
+      // TODO(Sandsack-Finale, Task #60): `seiten` zaehlt bewusst weiter NUR die sechs
+      // Hantel-Duelle. Der 7. Mannschaftspunkt (baueSandsackFinale/spieleSandsackFinale)
+      // darf hier erst einfliessen, wenn die eigene Kalibrierrunde (Task #60) Pp-Abweichung
+      // <=25 (beide Stroeme) UND Team-Validitaet >=0,80 erreicht hat -- unabhaengiges Review
+      // von PR #1139 hat das ausdruecklich als Bedingung vor jeder Verdrahtung festgehalten.
       const seiten=[duelle(0),duelle(1)];
       const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
       M.zurueck(g);
