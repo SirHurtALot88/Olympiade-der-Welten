@@ -15398,6 +15398,12 @@
   const buehneTauziehVersatz=(v,maxV,maxPx)=>maxV>0?maxPx*Math.max(-1,Math.min(1,v/maxV)):0;
 
   let TEILNEHMER=[], buehneT=0, buehneZeiger=0, buehneQueue=[], buehneAkt=0;
+  // SANDSACK-FINALE (Paket 1, Opus-Konzept 03.10., docs/design/gewichtheben-sandsack-rennen-
+  // opus-konzept-03-10.md): das Ergebnis des siebten Mannschaftspunkts nach den sechs Hantel-
+  // Duellen. NULL ausserhalb von Gewichtheben und vor jedem bauBuehne()-Aufruf (Reset dort).
+  // Schreibt NIE in TEILNEHMER.summe/.zweikampf/.runden/.duellGewonnen oder buehneQueue — nur
+  // additive Felder (s. baueSandsackFinale unten) und dieses eigene Objekt.
+  let LASTEN_FINALE=null;
   // FUEHRUNG IM BILD -- EISKUNSTLAUF (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a,
   // umgesetzt 26.09.). Merkt sich nur, WELCHE Seite zuletzt fuehrte und SEIT WANN (in
   // buehneT-Zeit), damit das Bandenlicht in bodenEis() beim Fuehrungswechsel kurz aufhellen
@@ -15599,6 +15605,7 @@
       ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    LASTEN_FINALE=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -15766,7 +15773,16 @@
     // Jury-Punkten: was die eine Seite pro Durchgang gewinnt, verliert die andere — die
     // Punkteformel bleibt exakt dieselbe wie bei jeder anderen Buehnen-Disziplin, nur die
     // Auswertung ist jetzt relativ zueinander statt absolut fuer sich.
-    if(art.heben){ baueHebenDuelle(art,mine,gegner); return; }
+    // SANDSACK-FINALE (Paket 1, 03.10.): rein additiv NACH baueHebenDuelle() — der Zweikampf
+    // steht da bereits bit-fertig (u.summe/u.zweikampf/u.runden/u.duellGewonnen/buehneQueue sind
+    // bereits geschrieben). `saat` ist hier noch der ROHE, unmutierte Aufrufwert von bauBuehne(),
+    // nicht die mutierte globale `seed` -- die Falle-17-Ziehungen des Finales (s. dort) brauchen
+    // nur IRGENDEINEN von der Hantel unabhaengigen, aber reproduzierbaren Ursprung, und der rohe
+    // Aufrufwert ist der klarste.
+    // TODO(Sandsack-Finale, Task #60): baueSandsackFinale() ist bis zur Kalibrierrunde
+    // (Pp<=25/Validitaet>=0,80) bewusst folgenlos fuer `seiten` -- s. Gate-Kommentar bei
+    // `const seiten=` in spieleBuehneHeben().
+    if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
     // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
     // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
     // selbst (chronologische Kampf-Reihenfolge statt der generischen REIHENFOLGE ganz unten,
@@ -16393,6 +16409,348 @@
     const g=Math.max(1,Math.min(10,Math.round(groesse||5)));
     return Math.round(kg/HEBEN_SINCLAIR[g-1]);
   };
+
+  // =====================================================================================
+  // SANDSACK-FINALE — Paket 1 (03.10., docs/design/gewichtheben-sandsack-rennen-opus-
+  // konzept-03-10.md, Chris' Freigabe "1 ja / 2 3 Stationen / 3 Fable-Koexistenz / 4
+  // Lastenplan nach Traits"). Siebter Mannschaftspunkt NACH den sechs Hantel-Duellen.
+  //
+  // BAUREGEL (Abschnitt 7.1 des Konzepts, fuer die Bit-Identitaet der Hantel): diese ganze
+  // Sektion liest NUR u.LAST/u.TECHNIK/u.NERVEN/u.ANSAGE/u.ERHOLUNG (die laengst VOR
+  // baueHebenDuelle() auf TEILNEHMER stehen, s. setz() oben) und schreibt NIE in u.summe,
+  // u.zweikampf, u.runden, u.duellGewonnen, u.tagesmax, ansage[] oder buehneQueue. Neue
+  // Felder sind ausschliesslich u.lastKg/u.lastSaecke/u.lastRutscher/u.lastPausen/
+  // u.lastDoppelt (additiv, wie u.kuehneVersuche es fuer den kuehnen Versuch ist) und das
+  // eigene Objekt LASTEN_FINALE. `seiten`/`duelle(s)` in spieleBuehneHeben() bleiben in
+  // diesem Paket UNVERAENDERT — das Verdrahten des Finalpunkts in die Arena-Tabelle (Opus
+  // 10, Schritt 3 "erst dann seiten in die Arena-Wertung") ist bewusst ZURUECKGESTELLT,
+  // bis die Praesentation (Paket 2) existiert; vorher eine Tabellenwirkung ohne sichtbares
+  // Rennen zu verdrahten waere eine neue, aus Chris' vier Antworten nicht ableitbare
+  // Spielablauf-Aenderung (s. PR-Beschreibung, "Offene Frage").
+  //
+  // DREI STATIONEN (Chris, 03.10., Antwort 2), Gewichte/Strecken aus Opus 4.1. `label` ist
+  // der mechanische Name, `fableLabel` die Fable-Praesentationsbezeichnung (Depot/Steg/
+  // Rampe & Silo, docs/design/gewichtheben-sandsack-rennen-fable-praesentation-03-10.md
+  // Abschnitt 2.2) — reines Flavour-Text-Feld fuer Paket 2, OHNE jede mechanische Wirkung
+  // (Auftrag: "Fable-Namen nur als Label/Flavour-Text, Opus-Formeln als mechanische
+  // Wahrheit").
+  const SANDSACK_STATIONEN=[
+    {id:"hof",       label:"Der Hof",       fableLabel:"Depot",        saecke:[15,20,25,30,35,40], d:24, steig:1,   kante:false, doppelnErlaubt:true},
+    {id:"rampe",     label:"Die Rampe",     fableLabel:"Steg",         saecke:[30,40,50,60,70],    d:16, steig:1.3, kante:false, doppelnErlaubt:true},
+    {id:"ladekante", label:"Die Ladekante", fableLabel:"Rampe & Silo", saecke:[60,75,90,105],      d:8,  steig:1,   kante:true,  doppelnErlaubt:false}
+  ];
+  const SANDSACK_SAECKE_GESAMT=SANDSACK_STATIONEN.reduce((s,st)=>s+st.saecke.length,0); // 15
+  // sichere Traglast K = 30 + 1,2*LAST (Opus 4.1)
+  const SANDSACK_K_BASIS=30, SANDSACK_K_LAST=1.2;
+  // Wagnis-Flex (Opus 4.2): Kf = K*(1+0,012*(ANSAGE-50))
+  const SANDSACK_WAGNIS_FLEX=0.012;
+  // vLeer = 3,6 + 0,6*TECHNIK/100
+  const SANDSACK_VLEER_BASIS=3.6, SANDSACK_VLEER_TECHNIK_K=0.006;
+  // Biss: nur oberhalb rf>0,7, dann 1+0,25*(NERVEN-50)/50
+  const SANDSACK_BISS_SCHWELLE=0.7, SANDSACK_BISS_NERVEN_K=0.005;
+  // vLast-Kurve
+  const SANDSACK_VLAST_FAKTOR=0.85, SANDSACK_VLAST_EXPONENT=1.6, SANDSACK_VLAST_MIN=0.18;
+  const SANDSACK_VLAST_ERMUEDUNG_K=0.35;     // (1-0,35*E/100) im Lasttempo
+  const SANDSACK_RUECKWEG_ERMUEDUNG_K=0.25;  // (1-0,25*E/100) im Leertempo des Rueckwegs
+  // Doppeln (Opus 4.3): (kg1+kg2)/Kf <= 0,40+0,005*(ANSAGE-50)
+  const SANDSACK_DOPPELN_SCHWELLE=0.40, SANDSACK_DOPPELN_ANSAGE_K=0.005;
+  // Erschoepfung (Opus 4.5)
+  const SANDSACK_ERMUEDUNG_K=60, SANDSACK_ERMUEDUNG_ERHOLUNG_BASIS=1.35, SANDSACK_ERMUEDUNG_ERHOLUNG_K=0.7;
+  const SANDSACK_RUECKWEG_E_K=2;             // E -= 2*ERHOLUNG/100*d/20 auf dem Rueckweg
+  const SANDSACK_RAST_E_BASIS=2, SANDSACK_RAST_E_ERHOLUNG_K=4; // E -= (2+4*ERHOLUNG/100) je Sekunde Ruhe (Staffel-Partner)
+  // Pause (Opus 4.6)
+  const SANDSACK_PAUSE_SCHWELLE_BASIS=50, SANDSACK_PAUSE_SCHWELLE_NERVEN_K=0.35, SANDSACK_PAUSE_ZIEL_ABSTAND=25;
+  const SANDSACK_PAUSE_RATE_BASIS=3, SANDSACK_PAUSE_RATE_ERHOLUNG_K=5;
+  // Rutscher (Opus 4.7), Wahrscheinlichkeit auf [0,005; 0,45] gedeckelt
+  const SANDSACK_RUTSCHER_BASIS=0.02, SANDSACK_RUTSCHER_RF_K=0.35, SANDSACK_RUTSCHER_RF_SCHWELLE=0.6;
+  const SANDSACK_RUTSCHER_E_K=0.15, SANDSACK_RUTSCHER_TECHNIK_K=0.04;
+  const SANDSACK_RUTSCHER_MIN=0.005, SANDSACK_RUTSCHER_MAX=0.45;
+  const SANDSACK_RUTSCHER_ZEIT_BASIS=0.8, SANDSACK_RUTSCHER_ZEIT_R_K=0.8;
+  const SANDSACK_RUTSCHER_NERVEN_BASIS=1.3, SANDSACK_RUTSCHER_NERVEN_K=0.6;
+  const SANDSACK_RUTSCHER_E_ZUSCHLAG=4;
+  // Wechsel (Opus 4.8) und Zeitlimit/Medley-Regel (Opus 4.4)
+  const SANDSACK_WECHSEL_SEK=0.3;
+  const SANDSACK_ZEITLIMIT=190;
+
+  // -------------------------------------------------------------------------------------
+  // TEAM-TAKTIK AUS PERSOENLICHKEIT (Chris' Antwort 4, 03.10.): KEIN neues Trait-System —
+  // dieselben vier Kanaele, die PR #1133 im bestehenden PERSZIEL/PERSDEF-Bund fuer die
+  // Arena schon nutzt (Zielneigung, Haltung, Zusammenhalt, Bindung). `leitePers(p)` ist
+  // eine reine Funktion von Klasse/Rasse/Unterklasse/Traits (s. oben) — hier DIREKT auf
+  // die ORIGINAL-Spielerobjekte (mine[i]/gegner[i], mit .c/.r/.sub/.tp/.tn) angewendet,
+  // NICHT ueber das globale `persOf` (das haengt am zuletzt gesetzten SQUAD/OPP und ist
+  // Arena-Zustand, den dieser Code nicht mitlesen soll — kein Shared-State-Lauf zwischen
+  // Gewichtheben und der Arena).
+  //
+  // ABLEITUNGSREGEL (Designentscheidung dieses Pakets, dokumentiert statt stillschweigend
+  // gewaehlt — s. PR-Beschreibung):
+  //   - Zusammenhalt (PERSDEF[pk].z, Skala SK(ZUSAMMEN,.)) UND Bindung (PERSDEF[pk].b,
+  //     Skala SK(BINDUNG,.)) sind die beiden direktesten Signale aus Chris' eigenem Satz
+  //     ("ob sie besser zusammenarbeiten" = Zusammenhalt; "denken sie waeren besser als
+  //     ihre Kollegen" = eine geringe BINDUNG/Verlaesslichkeit gegenueber dem Team, nicht
+  //     Opportunismus im Kampf-Sinn, sondern derselbe Kanal uebertragen auf die Werkbank).
+  //     Zusammen 70 % Gewicht (0,40/0,30), weil sie im Bestandssystem bereits GENAU
+  //     "wie nah bleibt er bei der Mannschaft" (z) bzw. "wie verlaesslich/stetig" (b)
+  //     bedeuten.
+  //   - Zielneigung (PERSZIEL[pk]) traegt 20 %: "speer" (die gegnerische Spitze ALLEIN
+  //     aufbrechen) und "bedrohung" (den Staerksten direkt herausfordern) sind
+  //     Dominanz-/Alleingang-Signale; "schild" (fuer die eigenen Leute freiraeumen) und
+  //     "hinten" (die unauffaellige Rand-Rolle) sind Team-Signale; "naechster"/"schwach"
+  //     sind geometrisch/opportunistisch und werten neutral.
+  //   - Haltung (PERSDEF[pk].h) traegt die restlichen 10 % als kleiner Zuschlag: "wild"/
+  //     "offensiv" (ruecksichtslos, kaempft/traegt allein bis zum Ende) hebt den Ego-Wert
+  //     leicht, "defensiv"/"vorsichtig" senkt ihn leicht.
+  // Ergebnis: team=0 reiner Alleingang/Ego, team=1 reiner Mannschaftsspieler. Teamwert
+  // ueber 0,60 -> Staffel-Neigung, unter 0,40 -> Anker-Neigung, dazwischen -> Stationen
+  // (die ausgewogene Mitte). Die Schwellen sind bewusst symmetrisch um 0,5 und lassen eine
+  // breite neutrale Zone fuer "Stationen" (Mehrwege-Leitlinie: ein Team ohne klare
+  // Mannschafts- oder Ego-Schlagseite bekommt trotzdem einen eigenen, plausiblen Plan statt
+  // eines erzwungenen Extrems).
+  const SANDSACK_ZIEL_EGO={bedrohung:0.5, speer:1, schild:-1, hinten:-0.5, naechster:0, schwach:0};
+  const SANDSACK_HALTUNG_EGO={defensiv:-1, vorsichtig:-0.5, ausgewogen:0, offensiv:0.5, wild:1};
+  const SANDSACK_STAFFEL_SCHWELLE=0.60, SANDSACK_ANKER_SCHWELLE=0.40;
+  function sandsackPersoenlichkeit(p){
+    const pk=leitePers(p).key, def=PERSDEF[pk]||PERSDEF.duellant;
+    const z=SK(ZUSAMMEN, def.z), b=SK(BINDUNG, def.b);
+    const zielEgo=SANDSACK_ZIEL_EGO[PERSZIEL[pk]]||0;
+    const haltungEgo=SANDSACK_HALTUNG_EGO[def.h]||0;
+    const team=Math.max(0,Math.min(1, 0.40*z + 0.30*b + 0.20*(0.5-zielEgo/2) + 0.10*(0.5-haltungEgo/2)));
+    return {pers:pk, team};
+  }
+  function sandsackLastenplan(spieler){
+    const profile=spieler.map(p=>sandsackPersoenlichkeit(p));
+    const mittel=profile.length?profile.reduce((s,x)=>s+x.team,0)/profile.length:0.5;
+    const plan=mittel>=SANDSACK_STAFFEL_SCHWELLE?"staffel":(mittel<=SANDSACK_ANKER_SCHWELLE?"anker":"stationen");
+    return {plan, mittel, profile};
+  }
+
+  // -------------------------------------------------------------------------------------
+  // ROLLENVERTEILUNG INNERHALB DES GEWAEHLTEN PLANS. Chris' Antwort 4 entscheidet NUR den
+  // PLAN per Persoenlichkeit — WER konkret welche Station traegt, ist davon unberuehrt und
+  // bleibt eine kleine, dokumentierte Eignungs-Heuristik (kein Auftrag, hier ebenfalls
+  // weg von Leistung zu geben; die Opus-846-Kombinationen-Suche aus Stufe 1 des
+  // Konzeptpapiers ist durch die trait-gesteuerte Planwahl bereits ersetzt).
+  //
+  // ZWEI VERWORFENE FASSUNGEN VOR DIESER (Selbstverifikation dieses Pakets, s. PR-
+  // Beschreibung): eine reine Sub-Skill-Gewichtung und ein 65/35-Mix aus `u.eig` und
+  // Sub-Skills liessen beide wiederholt einen Spieler mit sehr niedrigem LAST (z.B. 22) an
+  // der Ladekante (60-105 kg) landen, weil sein NERVEN/ERHOLUNG den Linearwert trotzdem
+  // hob — `K=30+1,2*LAST` macht so jemanden an schweren Saecken katastrophal langsam
+  // (r=kg/K bis ueber 1,8), was `scripts/miss-sandsack-finale.mjs` als vollstaendige
+  // Favoriten-Umkehr in zwei von fuenf Paarungen zeigte (Team lief sogar ins Zeitlimit).
+  // Ein LINEARER Blend aus Sub-Skills kann diese K-Kapazitaetsschwelle nicht abbilden, egal
+  // wie die Gewichte stehen.
+  //
+  // FIX: keine Gewichte mehr raten — direkt die ECHTE Gang-Formel (sandsackGang, Opus 4.2)
+  // fragen, wie lange DIESER Spieler fuer DIESE Station solo braeuchte (E=0, kein Rutscher-
+  // Wurf — eine Schaetzung fuer die Zuteilung, nicht die eigentliche, variable Simulation
+  // weiter unten). Das bildet die K-Schwelle automatisch korrekt ab UND erzeugt die von
+  // Opus 6.3 gewollte Spezialisierung (Agile vorn, Kraft hinten) als Konsequenz der echten
+  // Formel, nicht als zusaetzliche Handarbeit. Der Anker (Opus 5.1, woertlich "Der Beste
+  // traegt jeden Sack") ist damit wer die geschaetzte GESAMTZEIT ueber alle drei Stationen
+  // minimiert.
+  const sandsackSchaetzStationszeit=(u,station)=>{
+    let t=0; for(const kg of station.saecke)t+=sandsackGang(u,kg,station,0,1).dauer;
+    return t;
+  };
+  const sandsackSchaetzGesamtzeit=(u)=>SANDSACK_STATIONEN.reduce((s,st)=>s+sandsackSchaetzStationszeit(u,st),0);
+  const sandsackSuitAnker=(u)=>-sandsackSchaetzGesamtzeit(u);
+  const sandsackSuitStation=(u,s)=>-sandsackSchaetzStationszeit(u,SANDSACK_STATIONEN[s]);
+  function sandsackZuteilung(plan,u6){
+    const n=SANDSACK_STATIONEN.length;
+    if(!u6.length)return SANDSACK_STATIONEN.map(()=>({leute:[]}));
+    if(plan==="anker"||u6.length<2){
+      const carrier=[...u6].sort((a,b)=>sandsackSuitAnker(b)-sandsackSuitAnker(a))[0];
+      return SANDSACK_STATIONEN.map(()=>({leute:[carrier]}));
+    }
+    const fallback=[...u6].sort((a,b)=>sandsackSuitAnker(b)-sandsackSuitAnker(a))[0];
+    if(plan==="staffel"){
+      const pool=[...u6]; const paare=new Array(n).fill(null);
+      for(let s=0;s<n&&pool.length>=2;s++){
+        let best=null;
+        for(let i=0;i<pool.length;i++)for(let j=i+1;j<pool.length;j++){
+          const score=sandsackSuitStation(pool[i],s)+sandsackSuitStation(pool[j],s);
+          if(!best||score>best.score)best={i,j,score};
+        }
+        paare[s]=[pool[best.i],pool[best.j]];
+        pool.splice(Math.max(best.i,best.j),1); pool.splice(Math.min(best.i,best.j),1);
+      }
+      return paare.map(p=>({leute:p||[fallback]}));
+    }
+    // "stationen": drei Spezialisten, je einer pro Station, groedig bestes Paar
+    // (Spieler,Station) zuerst vergeben — kein Auftrag fuer eine erschoepfende
+    // Zuteilungssuche, eine deterministische Heuristik reicht fuer Paket 1.
+    const pool=[...u6]; const zuteilung=new Array(n).fill(null);
+    for(let runde=0;runde<Math.min(n,u6.length);runde++){
+      let best=null;
+      for(const u of pool)for(let s=0;s<n;s++){
+        if(zuteilung[s])continue;
+        const score=sandsackSuitStation(u,s);
+        if(!best||score>best.score)best={u,s,score};
+      }
+      if(!best)break;
+      zuteilung[best.s]=best.u; pool.splice(pool.indexOf(best.u),1);
+    }
+    return zuteilung.map(u=>({leute:[u||fallback]}));
+  }
+
+  // -------------------------------------------------------------------------------------
+  // FALLE 17, WOERTLICH ERNST GENOMMEN (Opus 4.7, Handbuch-Falle 17): Doppeln veraendert
+  // die Zahl der Gaenge, deshalb duerfen die Rutscher-Wuerfe NICHT "on demand" je Gang
+  // gezogen werden (sonst verschiebt eine hoehere ANSAGE die Ziehungsfolge). Stattdessen:
+  // GENAU 15 feste Ziehungen je Team, VOR dem Rennen, indiziert nach Sack-Position
+  // (0..14) in der GESAMTEN 15-Sack-Reihenfolge — ein Gang nutzt den Wurf seines ersten
+  // Sack-Index, der zweite Index bei einem Doppel-Gang verfaellt ungenutzt, wird aber
+  // trotzdem gezogen (das Array hat immer Laenge 15, unabhaengig davon, wie viele Gaenge
+  // das Rennen am Ende tatsaechlich braucht).
+  //
+  // EIGENER SAATSTROM (Opus 5.7.1/7.1): eine komplett separate, lokal seedende Quelle statt
+  // eines Zugriffs auf den globalen `rr()`/`seed` der Hantel — damit ist nicht nur die
+  // ZAHL der Ziehungen fix (Falle 17), sondern es gibt ueberhaupt KEINEN gemeinsamen
+  // veraenderlichen Zustand mit baueHebenDuelle()/hebeUebung() mehr, der je verschoben
+  // werden koennte. `saat` ist der rohe bauBuehne()-Aufrufwert (s. Aufrufstelle oben), die
+  // XOR-Konstanten trennen Heim- von Gastziehungen UND das Finale von jedem anderen
+  // Verbraucher derselben Spielsaat (z.B. Mutatoren, Formkarten).
+  function sandsackWuerfe(saat,seite){
+    let s=(normalisiereSaat(saat)^(seite===1?0x9E3779B1:0x2545F491)^0x53414E44)>>>0;
+    const z=[];
+    for(let i=0;i<SANDSACK_SAECKE_GESAMT;i++){ s=(s*1664525+1013904223)>>>0; z.push(s/4294967296); }
+    return z;
+  }
+
+  // Eine Last-Gang-Zeit (Opus 4.2) plus Rutscher-Ausgang (Opus 4.7) fuer EINEN Traeger.
+  // `E` ist die Erschoepfung VOR diesem Gang (0..100, theoretisch unbegrenzt nach oben —
+  // deshalb die defensiven Max(0,1; ...)-Boeden in vLast/Leertempo, die im Opus-Papier
+  // nicht explizit stehen, aber jede Division vor einem negativen/Null-Nenner schuetzen,
+  // ohne die Werte im normalen Bereich (E bis ~150) ueberhaupt zu beruehren).
+  function sandsackGang(u,kg,station,E,wurf){
+    const K=SANDSACK_K_BASIS+SANDSACK_K_LAST*u.LAST;
+    const Kf=K*(1+SANDSACK_WAGNIS_FLEX*(u.ANSAGE-50));
+    const r=kg/K, rf=kg/Kf;
+    const vLeer=SANDSACK_VLEER_BASIS+SANDSACK_VLEER_TECHNIK_K*u.TECHNIK;
+    const biss=rf>SANDSACK_BISS_SCHWELLE?1+SANDSACK_BISS_NERVEN_K*(u.NERVEN-50):1;
+    const vLast=vLeer*Math.max(SANDSACK_VLAST_MIN,1-SANDSACK_VLAST_FAKTOR*Math.pow(rf,SANDSACK_VLAST_EXPONENT))
+                *Math.max(0.1,1-SANDSACK_VLAST_ERMUEDUNG_K*E/100)*biss;
+    let dauer=(0.5+0.6*r) + (station.d*station.steig)/vLast
+      + (station.kante?0.6+1.5*Math.max(0,r-0.5):0)
+      + station.d/(vLeer*Math.max(0.1,1-SANDSACK_RUECKWEG_ERMUEDUNG_K*E/100));
+    const p=Math.min(SANDSACK_RUTSCHER_MAX,Math.max(SANDSACK_RUTSCHER_MIN,
+      SANDSACK_RUTSCHER_BASIS+SANDSACK_RUTSCHER_RF_K*Math.max(0,rf-SANDSACK_RUTSCHER_RF_SCHWELLE)
+      +SANDSACK_RUTSCHER_E_K*Math.pow(E/100,2)-SANDSACK_RUTSCHER_TECHNIK_K*(u.TECHNIK-50)/50));
+    let rutscher=false;
+    if(wurf<p){
+      rutscher=true;
+      dauer+=(SANDSACK_RUTSCHER_ZEIT_BASIS+SANDSACK_RUTSCHER_ZEIT_R_K*r)*(SANDSACK_RUTSCHER_NERVEN_BASIS-SANDSACK_RUTSCHER_NERVEN_K*u.NERVEN/100);
+    }
+    return {dauer,rutscher,r};
+  }
+
+  // Ein Rennen fuer EINE Seite: drei Stationen nacheinander (Opus 4.1), je nach Plan ein
+  // Alleingang (anker/stationen-Spezialist) oder ein alternierendes Paar (staffel).
+  function sandsackSeiteLauf(bahnen,wuerfe){
+    const E=new Map(); const getE=(u)=>E.get(u)||0; const setE=(u,v)=>E.set(u,Math.max(0,v));
+    let t=0, abgeliefertKg=0, saeckeGesamt=0, rutscherN=0, pausenN=0, doppeltN=0;
+    let letzterTraeger=null, sackIdx=0, zeitlimitErreicht=false;
+    const protokoll=[], pausen=[];
+    for(let s=0;s<SANDSACK_STATIONEN.length && !zeitlimitErreicht;s++){
+      const station=SANDSACK_STATIONEN[s], leute=bahnen[s].leute;
+      if(!leute.length)continue;
+      let partnerIdx=0, i=0;
+      while(i<station.saecke.length){
+        if(t>=SANDSACK_ZEITLIMIT){ zeitlimitErreicht=true; break; }
+        const carrier=leute[partnerIdx%leute.length];
+        // Pause: deterministisch, VOR dem Gang (Opus 4.6).
+        let eStand=getE(carrier);
+        const schwelle=SANDSACK_PAUSE_SCHWELLE_BASIS+SANDSACK_PAUSE_SCHWELLE_NERVEN_K*(carrier.NERVEN-50);
+        if(eStand>=schwelle){
+          const ziel=schwelle-SANDSACK_PAUSE_ZIEL_ABSTAND;
+          const rate=SANDSACK_PAUSE_RATE_BASIS+SANDSACK_PAUSE_RATE_ERHOLUNG_K*carrier.ERHOLUNG/100;
+          t+=(eStand-ziel)/rate; pausenN++; pausen.push({u:carrier});
+          setE(carrier,ziel); eStand=ziel;
+        }
+        // Doppeln: deterministisch, nur Station A/B (Opus 4.3).
+        let kg=station.saecke[i], saeckeDiesmal=1, doppelt=false;
+        if(station.doppelnErlaubt && i+1<station.saecke.length){
+          const K=SANDSACK_K_BASIS+SANDSACK_K_LAST*carrier.LAST;
+          const Kf=K*(1+SANDSACK_WAGNIS_FLEX*(carrier.ANSAGE-50));
+          const kombiniert=station.saecke[i]+station.saecke[i+1];
+          if(kombiniert/Kf<=SANDSACK_DOPPELN_SCHWELLE+SANDSACK_DOPPELN_ANSAGE_K*(carrier.ANSAGE-50)){
+            kg=kombiniert; saeckeDiesmal=2; doppelt=true;
+          }
+        }
+        // Wechsel: 0,3 s, nur wenn sich der Traeger seit dem letzten Gang aendert (Opus 4.8).
+        if(letzterTraeger&&letzterTraeger!==carrier)t+=SANDSACK_WECHSEL_SEK;
+        letzterTraeger=carrier;
+        const wurf=wuerfe[sackIdx]??1;
+        const {dauer,rutscher,r}=sandsackGang(carrier,kg,station,eStand,wurf);
+        t+=dauer;
+        if(rutscher)rutscherN++;
+        if(doppelt)doppeltN++;
+        // Erschoepfung NACH dem Gang (Opus 4.5): r*r, nicht r — die relative Last entscheidet.
+        let e2=eStand+SANDSACK_ERMUEDUNG_K*r*r*(station.d*station.steig/20)
+          *(SANDSACK_ERMUEDUNG_ERHOLUNG_BASIS-SANDSACK_ERMUEDUNG_ERHOLUNG_K*carrier.ERHOLUNG/100);
+        if(rutscher)e2+=SANDSACK_RUTSCHER_E_ZUSCHLAG;
+        e2-=SANDSACK_RUECKWEG_E_K*(carrier.ERHOLUNG/100)*(station.d/20);
+        setE(carrier,e2);
+        // Staffel: der ruhende Partner erholt sich waehrend dieser Gangzeit (Opus 4.5, dritte Zeile).
+        if(leute.length===2){
+          const partner=leute[(partnerIdx+1)%2];
+          setE(partner,getE(partner)-(SANDSACK_RAST_E_BASIS+SANDSACK_RAST_E_ERHOLUNG_K*partner.ERHOLUNG/100)*dauer);
+        }
+        protokoll.push({u:carrier,kg,saecke:saeckeDiesmal,rutscher,doppelt});
+        abgeliefertKg+=kg; saeckeGesamt+=saeckeDiesmal;
+        i+=saeckeDiesmal; sackIdx+=saeckeDiesmal;
+        if(leute.length===2)partnerIdx++;
+      }
+    }
+    return {zeit:t, fertig:!zeitlimitErreicht, abgeliefertKg, saecke:saeckeGesamt,
+      rutscherN, pausenN, doppeltN, protokoll, pausen};
+  }
+
+  // EINSTIEGSPUNKT: nach baueHebenDuelle() aufgerufen (s. Aufrufstelle oben). `saat` ist der
+  // rohe bauBuehne()-Aufrufwert, NICHT die mutierte globale `seed`.
+  function baueSandsackFinale(art,mine,gegner,saat){
+    const rosterSeiten=[mine,gegner];
+    const ergebnis=[];
+    for(let side=0;side<2;side++){
+      const spieler=rosterSeiten[side]||[];
+      const u6=spieler.map(p=>TEILNEHMER.find(x=>x.side===side&&x.n===p.n)).filter(Boolean);
+      const personenMitU=spieler.filter(p=>u6.some(u=>u.n===p.n));
+      const {plan,mittel}=sandsackLastenplan(personenMitU.length?personenMitU:spieler);
+      const bahnen=sandsackZuteilung(plan,u6);
+      const wuerfe=sandsackWuerfe(saat,side);
+      // RANDFALL: eine Seite ohne jeden Teilnehmer (SQUAD/OPP leer — ausserhalb jedes echten
+      // Spielstands) darf nicht als "fertig in 0 Sekunden" gegen eine echte Mannschaft
+      // gewinnen; sandsackSeiteLauf() selbst kann das nicht unterscheiden (leere Stationen
+      // sehen wie ein Rennen ohne Gaenge aus, s. dort). Betrifft keinen echten Spielstand
+      // (mine/gegner kommen immer aus einer befuellten SQUAD/OPP-Aufstellung).
+      const lauf=u6.length?sandsackSeiteLauf(bahnen,wuerfe)
+        :{zeit:Infinity,fertig:false,abgeliefertKg:0,saecke:0,rutscherN:0,pausenN:0,doppeltN:0,protokoll:[],pausen:[]};
+      ergebnis.push({plan,teamScore:+mittel.toFixed(3),...lauf});
+      for(const u of u6){ u.lastKg=0; u.lastSaecke=0; u.lastRutscher=0; u.lastPausen=0; u.lastDoppelt=0; }
+      for(const e of lauf.protokoll){
+        e.u.lastKg+=e.kg; e.u.lastSaecke+=e.saecke;
+        if(e.rutscher)e.u.lastRutscher++; if(e.doppelt)e.u.lastDoppelt++;
+      }
+      for(const pa of lauf.pausen)pa.u.lastPausen++;
+    }
+    const [A,B]=ergebnis;
+    // Medley-Regel (Opus 4.4): beide fertig -> kuerzere Zeit; einer fertig -> der ist Sieger;
+    // keiner fertig -> mehr abgeliefertes Gewicht, dann mehr Saecke, dann kuerzere Zeit.
+    let sieger=null;
+    if(A.fertig&&B.fertig)sieger=A.zeit===B.zeit?null:(A.zeit<B.zeit?0:1);
+    else if(A.fertig!==B.fertig)sieger=A.fertig?0:1;
+    else if(A.abgeliefertKg!==B.abgeliefertKg)sieger=A.abgeliefertKg>B.abgeliefertKg?0:1;
+    else if(A.saecke!==B.saecke)sieger=A.saecke>B.saecke?0:1;
+    else sieger=A.zeit<=B.zeit?0:1;
+    LASTEN_FINALE={
+      plan:[A.plan,B.plan], teamScore:[A.teamScore,B.teamScore],
+      zeit:[+A.zeit.toFixed(2),+B.zeit.toFixed(2)], fertig:[A.fertig,B.fertig],
+      abgeliefertKg:[A.abgeliefertKg,B.abgeliefertKg], saecke:[A.saecke,B.saecke],
+      rutscher:[A.rutscherN,B.rutscherN], pausen:[A.pausenN,B.pausenN],
+      doppelt:[A.doppeltN,B.doppeltN], sieger
+    };
+  }
 
   function baueHebenDuelle(art,mine,gegner){
     const n=Math.min(mine.length,gegner.length);
@@ -43826,10 +44184,14 @@
   // der groesser besser heisst, keine Platzierung noetig.
   for(const bd of Object.keys(BUEHNE_ART)){
     MOTOREN[bd]={
-      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done}),
+      // LASTEN_FINALE additiv mitgesichert (Sandsack-Finale, Paket 1): sonst koennte ein
+      // verschachtelter M.bau()/M.zurueck()-Aufruf (z.B. in einer Mess-Sonde) den Stand
+      // eines FREMDEN Laufs stehen lassen, obwohl TEILNEHMER/buehneQueue schon zurueckgesetzt
+      // sind. Fuer jede Nicht-Heben-Buehne bleibt LASTEN_FINALE ohnehin immer null.
+      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done, LASTEN_FINALE}),
       zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER;
                     buehneT=a.buehneT; buehneZeiger=a.buehneZeiger; buehneQueue=a.buehneQueue;
-                    buehneAkt=a.buehneAkt; done=a.done;},
+                    buehneAkt=a.buehneAkt; done=a.done; LASTEN_FINALE=a.LASTEN_FINALE;},
       vorher:()=>{disc=bd; buehneDisc=bd;},
       bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
@@ -43971,6 +44333,68 @@
       abweichungPp:Math.round(abweichung*10)/10, reihen};
   }
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
+
+  // =====================================================================================
+  // SANDSACK-FINALE-PFLICHTSONDE (Paket 1, Opus-Nebenbefund 1, docs/design/gewichtheben-
+  // sandsack-rennen-opus-konzept-03-10.md Abschnitt 7.2/11.1): einflussVon() oben ist fuer
+  // einen Teampunkt AUSSERHALB von `wert()` blind — es liest `M.wert()`, und das Finale
+  // schreibt dort nie hinein (Bauregel oben bei baueSandsackFinale). Diese Sonde ist die
+  // separate Budget-Methode fuer GENAU diesen Teampunkt: dieselbe Logik wie einflussVon
+  // (ein Attribut bei einem Spieler um +10 heben, Gewinn messen, ueber alle Attribute
+  // normieren, gegen die gesperrte Matrix vergleichen), aber mit einem ANDEREN "wert" —
+  // der NEGIERTEN eigenen Rennzeit der Seite, auf der der Spieler steht (niedrigere Zeit
+  // ist besser, s. sandsackFinaleWert unten). Absichtlich ein eigener, kleiner Zwilling
+  // statt einer Erweiterung von einflussVon(): das haette jede bestehende Pp-Messung einer
+  // Nicht-Heben-Disziplin unnoetig riskiert.
+  //
+  // SHARED-TEAM-ERGEBNIS, WIE BEI DER STAFFEL (vgl. VORGABE.staffel=144 oben): sechs
+  // Traeger teilen sich EINE Rennzeit, deshalb gilt dieselbe n>=144-Lehre.
+  function sandsackFinaleWert(){
+    if(!LASTEN_FINALE)return {};
+    const o={};
+    for(const u of TEILNEHMER)o[u.n]=-LASTEN_FINALE.zeit[u.side];
+    return o;
+  }
+  function einflussVonSandsackFinale(n,saatVersatz){
+    const M=MOTOREN.gewichtheben;
+    if(!M)return {disziplin:"gewichtheben-sandsack-finale", fehler:"kein Motor angemeldet", reihen:[]};
+    const hoehe=10; // Opus 6.4: "je Spieler und Attribut +10 Punkte"
+    const versatz=saatVersatz||0;
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG;
+    if(M.vorher)M.vorher();
+
+    const durchlauf=(wer,attribut)=>{
+      ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+      const w={};
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+versatz+i*104729);
+        M.bau(1337+versatz+i*7919);
+        M.lauf();
+        const e=sandsackFinaleWert();
+        for(const k in e)w[k]=(w[k]||0)+e[k]/n;
+      }
+      return w;
+    };
+
+    M.bau(1337);
+    const namen=M.namen();
+    const grund=durchlauf(null,null);
+    const roh=EINFLUSS_ATTR.map(at=>{
+      let summe=0;
+      for(const wer of namen)summe+=(durchlauf(wer,at)[wer]-grund[wer]);
+      return {attribut:at, gewinn:+(summe/namen.length).toFixed(4)};
+    });
+
+    ATTR_HEBUNG=hebungVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+    const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
+                    .sort((a,b)=>b.gewinn-a.gewinn);
+    const W=BASIS_JE_DISC.gewichtheben||{};
+    const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
+      s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    return {disziplin:"gewichtheben-sandsack-finale", laeufe:n, anhebung:hoehe, saatVersatz:versatz,
+      abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
 
   // BOXSCORE-SERIE: dasselbe Bau/Lauf-Muster wie einflussVon, aber statt eines
   // Einflussvektors ueber alle Attribute liefert sie Siegquote (favoritenlastig oder
@@ -44456,7 +44880,7 @@
     } finally { M.zurueck(g); }
   }
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, boxscoreSerie,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
@@ -44672,10 +45096,40 @@
             kuehneErfolge:teiln.kuehneErfolge||0, kuehnVerletzt:teiln.kuehnVerletzt||0}:{})};
       });
       const duelle=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen).length;
+      // TODO(Sandsack-Finale, Task #60): `seiten` zaehlt bewusst weiter NUR die sechs
+      // Hantel-Duelle. Der 7. Mannschaftspunkt (baueSandsackFinale/spieleSandsackFinale)
+      // darf hier erst einfliessen, wenn die eigene Kalibrierrunde (Task #60) Pp-Abweichung
+      // <=25 (beide Stroeme) UND Team-Validitaet >=0,80 erreicht hat -- unabhaengiges Review
+      // von PR #1139 hat das ausdruecklich als Bedingung vor jeder Verdrahtung festgehalten.
       const seiten=[duelle(0),duelle(1)];
       const gesamtKg=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore, gesamtKg};
+    },
+    // SANDSACK-FINALE-SONDE (Paket 1, 03.10.): eigener Einstiegspunkt NEBEN
+    // spieleBuehneHeben(), aus demselben Grund, den spieleBuehneHeben() selbst fuer
+    // spieleFeldspiel() nennt (s. dort) — ein bereits produktiver, gemessener Pfad bleibt
+    // unangefasst. `seiten`/`gesamtKg`/`boxscore[].wert` oben sind nach diesem Paket
+    // UNVERAENDERT bit-identisch (Isolationsnachweis in der PR-Beschreibung); diese Sonde
+    // liest ausschliesslich das additive LASTEN_FINALE-Objekt und die additiven
+    // u.lastKg/u.lastSaecke/u.lastRutscher/u.lastPausen/u.lastDoppelt-Felder, nie `wert`.
+    spieleSandsackFinale:(bd,saat)=>{
+      if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].heben)return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat);
+      M.lauf();
+      const finale=LASTEN_FINALE;
+      // `eig` kommt additiv mit (dieselbe Eignung, die auch disziplinProbe() fuer die
+      // normale rho-Abnahme liest, s. eigVon() dort) — die Team-Validitaetsmessung
+      // (Rennzeit <-> Sigma Eignung) braucht sie, ohne die Slot-/Top-6-Auswahl ein zweites
+      // Mal nachzubauen.
+      const boxscore=TEILNEHMER.map(u=>({name:u.n, seite:u.side,
+        eig:u.eigOhneMutator!=null?u.eigOhneMutator:(u.eig||0),
+        lastKg:u.lastKg||0, lastSaecke:u.lastSaecke||0, lastRutscher:u.lastRutscher||0,
+        lastPausen:u.lastPausen||0, lastDoppelt:u.lastDoppelt||0}));
+      M.zurueck(g);
+      return {disziplin:bd, finale, boxscore};
     },
     // PRODUKTIVIERUNGSWELLE 1 (docs/design/speed-schach-showcase-produktivierung.md, 06.09.):
     // ZWEITER NEUER EINSTIEGSPUNKT NEBEN spieleBuehneHeben(), NICHT DESSEN ERWEITERUNG -- aus
