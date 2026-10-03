@@ -15315,11 +15315,19 @@
   // `verlauf` — exakt der Wert, den Ticker/Callout unten ebenfalls zeigen. Tennis ändert
   // NUR das Wort, nicht die Zahl (dort gibt es keinen solchen Widerspruch, s. Auftrag).
   function duellWorte(art){
+    // T-F1a (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F1, Paket 2): "Punkt" hiess hier
+    // bisher woertlich der kumulierte `verlauf`-Vorsprung, nur umbenannt (30.09.-Kommentar,
+    // s. Git-Historie) -- Fables eigener Befund dazu: Tennis "spricht" das Wort, ohne die
+    // Sache zu haben. Seit dem Nullsummen-Punkt-Vergleich im `art.duell`-Paarungsblock
+    // (bauBuehne(), `r.punktGewinner`) gibt es jetzt EINEN diskreten Punktgewinner je
+    // Ballwechsel -- die Tabellenspalte "Punkt" (WERTUNG_DUELL() unten) zeigt diesen echten
+    // Abstand, "Stand" bleibt bewusst unveraendert der Vorsprung-basierte Brettsieger (s.
+    // dortiger Kommentar) -- der Fuss-Text unten sagt das jetzt auch ausdruecklich.
     if(art.tennis)return {
       brett:"Platz", zug:"Ballwechsel", vort:"Punkt",
       zugTitel:"gespielte Ballwechsel",
-      vortTitel:"laufender Punktvorsprung gegen den Gegner auf diesem Platz",
-      fuss:"„Pkt\" sind die eigenen Punkte aus den Ballwechseln (das Maß der Rangtreue), „Punkt\" ist der laufende Punktvorsprung auf diesem Platz gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Ballwechsel entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
+      vortTitel:"Punktabstand aus dem Nullsummen-Vergleich (pro Ballwechsel gewinnt genau eine Seite den Punkt) auf diesem Platz",
+      fuss:"„Pkt\" sind die eigenen Punkte aus den Ballwechseln (das Maß der Rangtreue), „Punkt\" ist der ECHTE Punktabstand aus dem Nullsummen-Vergleich (T-F1a) — pro Ballwechsel gewinnt genau eine Seite den Punkt, nicht mehr der kumulierte Vorsprung. „Stand\" wird weiterhin aus dem Vorsprung entschieden (unveraendert): + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
     };
     if(art.fechten)return {
       brett:"Bahn", zug:"Gang", vort:"Treffer",
@@ -15334,6 +15342,32 @@
       fuss:"„Pkt\" sind die eigenen Zugpunkte (das Maß der Rangtreue), „Vort\" der laufende Vorteil am Brett gegen den Gegner in derselben Zeile. „Stand\" wird erst nach dem letzten Zug entschieden: + Sieg, = Remis, − Niederlage. „Leist\" vergleicht die Punkte mit dem, was der Einsatzwert erwarten lässt."
     };
   }
+
+  // T-F1a -- AUFSCHLAG-LABEL (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F1, Paket 2:
+  // "Tennis-Punkt"). REINE ANZEIGE-/EREIGNIS-ZUWEISUNG -- diese Funktion fliesst NIRGENDS in
+  // `erfolg`/`punkte`/`rr()` ein, sie entscheidet nur, welche Seite in einer gegebenen Runde
+  // als "Aufschlaeger" GILT (fuer die Comparison im `art.duell`-Paarungsblock unten und fuer
+  // den Break-Banner in stepBuehne()). Das ist ausdruecklich NICHT das im Fable-Papier
+  // separat benannte "Aufschlag-Handicap im Wurf" (eine Aenderung an `erfolg`/`punkte`
+  // selbst waere Klasse B und braucht eine eigene Messrunde + Chris' Zustimmung, s.
+  // PR-Beschreibung) -- hier bekommt der Aufschlaeger nur einen festen Zuschlag TENNIS_AUFSCHLAG_H
+  // *innerhalb des Vergleichs* (s. unten), nicht auf den gespeicherten `punkte`-Wert selbst,
+  // der `u.summe`/rho/Pp unveraendert speist.
+  //
+  // MATCH-TIEBREAK-WECHSELREGEL (Fable-Dokument: "Punkt 1 Spieler A, danach alle zwei
+  // Punkte; Brett 1 beginnt Heim, Brett 2 Gast, … — Spiegelsymmetrie"): die eroeffnende
+  // Seite wechselt mit der Brett-Paritaet, danach wechselt der Aufschlag nach dem ersten
+  // Punkt alle zwei Punkte.
+  function tennisAufschlagSeite(brett,r){
+    const start=(brett%2===0)?0:1;
+    if(r<=0)return start;
+    return (start+1+Math.floor((r-1)/2))%2;
+  }
+  // Kalibriert gegen eine Stichprobe repraesentativer Attributwerte (30-80, s.
+  // PR-Beschreibung/scripts-Notiz): h=10 ergab dort rund 64 % Punktgewinn fuer den
+  // Aufschlaeger -- innerhalb des ATP-Zielbands 62-65 % (Fable-Dokument, Abschnitt T-F1,
+  // mit Sekundaerquellen-Vorbehalt wie dort vermerkt). Reine Vergleichsgroesse (s. oben).
+  const TENNIS_AUFSCHLAG_H=10;
 
   // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
   // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
@@ -15707,7 +15741,18 @@
           knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
-        L.runden.push({punkte,ereignis,knapp});
+        // T-F1a -- GESPEICHERTER ERFOLGSABSTAND (Fable-Ideen Buehne-Duell 30.09., Abschnitt
+        // T-F1: "der gespeicherte Wurfabstand (erfolg - wurf) ... er muesste nur als Zahl
+        // auf dem Rundeneintrag mitgefuehrt werden, ein `viz`-artiges Feld nach dem
+        // `knapp`-Muster"). NUR fuer Tennis befuellt (art.tennis), exakt das `knapp`-Muster
+        // direkt daneben: derselbe bereits gezogene `wurf` wird nur zusaetzlich gehalten,
+        // kein zweiter rr()-Aufruf, kein Einfluss auf `punkte`/`erfolg`/`wert()`. Dient
+        // ausschliesslich dem seltenen Gleichstand-Fall im Nullsummen-Punkt-Vergleich unten
+        // (`art.duell`-Paarungsblock) -- je groesser `marge`, desto klarer war dieser
+        // Ballwechsel fuer diese Seite entschieden, ohne dass dafuer ein zweiter Wurf noetig
+        // waere.
+        const marge=art.tennis?erfolg-wurf:undefined;
+        L.runden.push(art.tennis?{punkte,ereignis,knapp,marge}:{punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -15804,6 +15849,39 @@
           // gab, nicht bei jedem gewoehnlichen Sieg nach mehr Treffern.
           a.gefechtGleichstand=gleichstand; b.gefechtGleichstand=gleichstand;
           a.prioritaet=prioA===true; b.prioritaet=prioA===false;
+        }
+        // T-F1a -- NULLSUMMEN-PUNKT DURCH VERGLEICH (Fable-Ideen Buehne-Duell 30.09.,
+        // Abschnitt T-F1, Paket 2 "Tennis-Punkt"). Derselbe Geist wie F1 fuer Fechten direkt
+        // darueber: ein zweites, DISKRETES Ergebnisfeld je Runde, das NICHTS an `vorteil`/
+        // `verlauf`/`u.summe`/rho/Pp aendert -- Brettsieger bleibt fuer Tennis unveraendert
+        // `vorteil` (s. "Stand"-Spalte, WERTUNG_DUELL()), rho/Pp bleiben darum bit-identisch
+        // (keine Messrunde noetig, anders als beim vollen T-F1 aus dem Fable-Papier, das
+        // diesen Vergleich zum BRETTENTSCHEIDER machen wuerde -- das ist ausdruecklich NICHT
+        // Teil dieses Pakets, s. PR-Beschreibung). Reiner VERGLEICH der laengst berechneten
+        // `runden[r].punkte`, kein zweiter rr()-Aufruf.
+        //
+        // AUFSCHLAG NUR IM VERGLEICH, NICHT IM WURF (Fable-Dokument, wortgleich): der
+        // TENNIS_AUFSCHLAG_H-Zuschlag wirkt ausschliesslich auf die lokalen `pa`/`pb` dieser
+        // Schleife, NIE auf `ra.punkte`/`rb.punkte` selbst -- genau die Trennung, die das
+        // Fable-Papier fordert ("Aufschlag als Handicap im Vergleich, nicht im Wurf").
+        //
+        // GLEICHSTAND (`pa===pb`, selten): `marge` (s. setz()-Kommentar, "erfolg-wurf") der
+        // JEWEILS EIGENEN Runde entscheidet, ohne zweiten Wurf -- groesserer Abstand zur
+        // eigenen Erfolgschance gewinnt.
+        if(art.tennis){
+          for(let r=0;r<art.rundenN;r++){
+            const ra=a.runden[r], rb=b.runden[r];
+            if(!ra||!rb)continue;
+            const server=tennisAufschlagSeite(i,r);
+            const pa=ra.punkte+(server===0?TENNIS_AUFSCHLAG_H:0);
+            const pb=rb.punkte+(server===1?TENNIS_AUFSCHLAG_H:0);
+            let gewinner;
+            if(pa>pb)gewinner=0;
+            else if(pb>pa)gewinner=1;
+            else gewinner=(ra.marge??0)>=(rb.marge??0)?0:1;
+            ra.punktGewinner=gewinner; rb.punktGewinner=gewinner;
+            ra.aufschlag=server; rb.aufschlag=server;
+          }
         }
       }
     }
@@ -18038,6 +18116,38 @@
           buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,
           BB().schach?"kippZug":"fuehrungswechsel",undefined,undefined,
           BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
+        // T-F1a -- BREAK-BANNER (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F4: "Das im
+        // selben Abschnitt vorgeschlagene 'BREAK!'-Banner braucht einen diskreten
+        // Punktgewinner -- der existiert erst mit T-F1", s. der T-F4-Kommentar bei
+        // zeichneTennis() [Paket 1, 01.10., seither aktualisiert]. Der diskrete
+        // Punktgewinner existiert jetzt (`r.punktGewinner`, oben im `art.duell`-
+        // Paarungsblock in bauBuehne() gesetzt). "Break" heisst hier: der Rueckschlaeger
+        // (die Seite, die laut `r.aufschlag` NICHT aufschlug) gewinnt den Punkt.
+        //
+        // GATE WIE "FUEHRUNGSWECHSEL AM BRETT"/"PERIODE BEENDET": beide Seiten durchlaufen
+        // denselben Zug unabhaengig voneinander (REIHENFOLGE: `mine[i]` dann `gegner[i]`,
+        // Runde fuer Runde) -- ohne Gate feuerte die Meldung zweimal (einmal je
+        // Seitenperspektive). Nur die Seite, deren Gegner diese Runde ebenfalls schon
+        // enthuellt hat (`gegner.aktuell>=u.aktuell`), darf feuern.
+        //
+        // KEIN EFFEKT AUF erfolg/punkte/rr()/u.summe/u.vorteil/u.verlauf -- reine Textzeile
+        // ueber ein bereits in bauBuehne() feststehendes Feld. Gedrosselt wie jeder andere
+        // Routine-Wendepunkt der Buehne (buehneBahnGrossDrosseln, kein Prioritaets-Bypass):
+        // ohne ein echtes Aufschlag-Handicap im Wurf selbst (bewusst NICHT Teil dieses
+        // Pakets, s. PR-Beschreibung) waere ein Break sonst ein Routine-Ereignis auf
+        // praktisch jedem zweiten Punkt -- TENNIS_AUFSCHLAG_H mildert das nur als reine
+        // Vergleichsgroesse (s. dortiger Kommentar), macht es aber nicht selten genug, um
+        // auf die Drossel zu verzichten.
+        if(BB().tennis&&r.punktGewinner!=null&&gegner&&gegner.aktuell>=u.aktuell){
+          const seite0=u.side===0?u:gegner, seite1=u.side===0?gegner:u;
+          if(r.punktGewinner!==r.aufschlag){
+            const rueckschlaeger=r.punktGewinner===0?seite0:seite1;
+            const aufschlaeger=r.aufschlag===0?seite0:seite1;
+            feed(0,"BREAK — "+rueckschlaeger.n+" gewinnt den Punkt gegen den Aufschlag von "
+              +aufschlaeger.n+" ("+worte.brett+" "+((u.brett??0)+1)+").",
+              buehneBahnGrossDrosseln(true,false),undefined,"tennisBreak");
+          }
+        }
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
         // Gaenge, genau das Reissen/Stossen-Zwischenstand-Muster von Gewichtheben
         // (baueHebenDuelle-Kommentar oben), nur mit drei statt zwei Etappen und rein
@@ -22335,15 +22445,36 @@
     // Seiten = langer Ballwechsel, ermued aus AUSDAUER macht spaete Runden kuerzer, s. Fable-
     // Dokument): reine Summe der beiden bereits vorhandenen `runden[idx].punkte`-Werte, kein
     // neues Feld auf TEILNEHMER, kein rr(). Das im selben Abschnitt vorgeschlagene "BREAK!"-
-    // Banner braucht einen diskreten Punktgewinner -- der existiert erst mit T-F1 (Nullsummen-
-    // Punkt durch Vergleich), einer Klasse-B-Mechanikaenderung, die NICHT Teil von Paket 1 ist
-    // (eigene Messrunde + Chris' Zustimmung noetig) -- bleibt deshalb hier bewusst aus.
+    // Banner brauchte einen diskreten Punktgewinner -- der existiert seit T-F1a (Paket 2,
+    // `r.punktGewinner`/`r.aufschlag`, bauBuehne()s `art.duell`-Paarungsblock) und feuert jetzt
+    // als eigene Ticker-/Callout-Zeile in stepBuehne() (s. dortiger "T-F1a -- BREAK-BANNER"-
+    // Kommentar). Die volle T-F1-Mechanikaenderung (dieser Vergleich wird BRETTENTSCHEIDER
+    // statt `vorteil`, plus 13-Runden-Zaehlung ohne Remis) bleibt weiterhin NICHT Teil dieses
+    // Pakets -- eigene Messrunde + Chris' Zustimmung noetig, s. PR-Beschreibung.
     const letzterIdx=fa?fa.aktuell:-1;
     const schlagzahl=(letzterIdx>=0&&fa&&fb&&fa.runden[letzterIdx]&&fb.runden[letzterIdx])
       ?fa.runden[letzterIdx].punkte+fb.runden[letzterIdx].punkte:null;
+    // T-F1a -- PUNKTE-STAND UND AUFSCHLAG IM FOKUS-BRETT (Paket 2). Rein additive HUD-Zeile:
+    // `eigen`/`gegn` zaehlen nur bereits enthuellte Runden (`fa.aktuell`), exakt dieselbe
+    // Zaehlweise wie die "vort"-Spalte in WERTUNG_DUELL() -- kein Spoiler. Aufschlag-Label
+    // nennt die Seite, die laut `tennisAufschlagSeite()` den NAECHSTEN (oder, falls das Brett
+    // fertig ist, letzten) Punkt aufschlaegt -- reine Anzeige, s. Kommentar bei der Funktion.
+    let punkteText="";
+    if(fa&&fb&&fa.aktuell>=0){
+      let eigen=0,gegn=0;
+      for(let ri2=0;ri2<=fa.aktuell;ri2++){
+        const rr2=fa.runden[ri2]; if(!rr2||rr2.punktGewinner==null)continue;
+        if(rr2.punktGewinner===fa.side)eigen++; else gegn++;
+      }
+      const naechste=Math.min(fa.aktuell+1,art.rundenN-1);
+      const serverSeite=tennisAufschlagSeite(tennisFokus,naechste);
+      const serverName=(serverSeite===fa.side?fa:fb).n;
+      punkteText=" · Punkte "+eigen+":"+gegn+" · Aufschlag "+(serverName.length>12?serverName.slice(0,11)+"…":serverName);
+    }
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
-      +(schlagzahl!=null?" · "+schlagzahl+" Schläge":""),W/2,H*0.12);
+      +(schlagzahl!=null?" · "+schlagzahl+" Schläge":"")
+      +punkteText,W/2,H*0.12);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
@@ -25146,13 +25277,34 @@
         // 26.09. fortgesetzt): genau die Tabellenzelle, die im Audit als "VORT +109 neben
         // einem verlorenen Gefecht" auffiel — der laufende Vorteil (`u.verlauf`) ist fuer
         // Fechten seit F1 eine interne Rechengroesse, keine Anzeigegroesse (s. Auftrag).
-        // Schach/Tennis lesen unveraendert `u.verlauf`, nur das Spaltenwort wechselt.
+        // Schach liest unveraendert `u.verlauf`, nur das Spaltenwort wechselt.
+        //
+        // T-F1a -- TENNIS ZEIGT HIER JETZT DEN ECHTEN PUNKTABSTAND, NICHT MEHR `verlauf`
+        // (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F1, Paket 2): dasselbe Muster wie
+        // Fechtens Trefferumstellung direkt darueber -- "Punkt" hiess hier bisher woertlich
+        // der Vorsprung, nur umbenannt (duellWorte()-Kommentar oben). Gezaehlt werden
+        // AUSSCHLIESSLICH bereits enthuellte Runden (`z.r`, dieselbe `bisher(u)`-Historie wie
+        // jede andere Spalte) -- kein Spoiler. `z.u.side` ist die absolute Seite dieses
+        // Teilnehmers (0/1), `r.punktGewinner` traegt denselben Massstab (s. bauBuehne()).
+        // "Stand" (Spalte darunter) bleibt bewusst unveraendert vorsprung-basiert -- der
+        // Brettsieger aendert sich durch diese Spalte nicht, s. Kommentar dort/PR-Text.
         {id:"vort", kopf:worte.vort, titel:worte.vortTitel,
           wert:z=>{
-            if(!art.fechten)return z.r.length&&z.u.verlauf?z.u.verlauf[z.r.length-1]:0;
-            if(!z.r.length)return 0;
-            const gegner=TEILNEHMER.find(x=>x.brett===z.u.brett&&x.side!==z.u.side);
-            return (z.u.treffer||0)-(gegner?gegner.treffer||0:0);
+            if(art.fechten){
+              if(!z.r.length)return 0;
+              const gegner=TEILNEHMER.find(x=>x.brett===z.u.brett&&x.side!==z.u.side);
+              return (z.u.treffer||0)-(gegner?gegner.treffer||0:0);
+            }
+            if(art.tennis){
+              if(!z.r.length)return 0;
+              let eigen=0,gegn=0;
+              for(const rr of z.r){
+                if(rr.punktGewinner==null)continue;
+                if(rr.punktGewinner===z.u.side)eigen++; else gegn++;
+              }
+              return eigen-gegn;
+            }
+            return z.r.length&&z.u.verlauf?z.u.verlauf[z.r.length-1]:0;
           },
           fmt:v=>(v>0?"+":"")+v, farbe:v=>v>0?"var(--ok)":v<0?"var(--crit)":null},
         {id:"stand",kopf:"Stand", titel:worte.brett+" entschieden (+ Sieg, = Remis, − Niederlage)",
@@ -39683,6 +39835,8 @@
     angeschlagen:"ANGESCHLAGEN",
     tresor:"TRESOR",
     kippZug:"KIPP-ZUG",
+    // T-F1a (Fable-Ideen Buehne-Duell 30.09., Paket 2 "Tennis-Punkt"), NUR Tennis.
+    tennisBreak:"BREAK!",
     entschieden:"ENTSCHIEDEN",
     remis:"REMIS",
     goldenerBuzzer:"GOLDENER BUZZER",
