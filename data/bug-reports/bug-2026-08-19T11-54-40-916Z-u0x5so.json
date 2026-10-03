@@ -1,0 +1,41 @@
+{
+  "note": "AI Teams dürfen ihre Formkarten wenn sie eine Rote haben auch in grünen Diszis zum Boostne einsetzen, da bekomen sie zwar keinen x2 boost, aber manchmal kann sihc das lohnen! bitte einbauen",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=V-W",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2752,
+    "height": 1044
+  },
+  "clientTime": "2026-08-19T11:54:40.908Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-19T11-54-40-916Z-u0x5so",
+  "createdAt": "2026-08-19T11:54:40.916Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "active",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 8,
+    "matchdayId": "matchday-8",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}

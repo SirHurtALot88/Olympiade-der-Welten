@@ -1,0 +1,41 @@
+{
+  "note": "Wir haben im Saisonstand immernohc keine Rank änderung zur letzten Disziplin drin! nur deraktuelle Rank ist angegeben -> bitte einfügen",
+  "view": "seasonV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=seasonV2&team=S-C",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3440,
+    "height": 1271
+  },
+  "clientTime": "2026-08-04T13:20:48.991Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T13-20-49-011Z-191wtu",
+  "createdAt": "2026-08-04T13:20:49.011Z",
+  "page": {
+    "path": "/foundation",
+    "view": "seasonV2",
+    "tab": null,
+    "label": "Spieltag · Saisonstand"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "active",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 5,
+    "matchdayId": "matchday-5",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "note": "Wir müssen mal schauen was wir mitr den verletzungen machen, je später wir in der saison unterwegs sind desto mehr verletzungen gibt es - zb allein in D1 an MD8 haben wir nun 34 Verletzungen! Die AI managed das nicht gut und die teams mit weniger Spielern haben auch kaum Möglichkeiten zu rotieren - entweder müssen wir da ans balancing noch mal ran oder dafür sorgen, dass die teams mehr spieler kaufen und sich mehr richtung ihrem OPT orientieren - Vorschläge?",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T18:43:26.789Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T18-43-26-880Z-ne85u5",
+  "createdAt": "2026-08-14T18:43:26.880Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 8,
+    "matchdayId": "season-2-matchday-8",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}
