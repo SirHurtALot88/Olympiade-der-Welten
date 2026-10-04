@@ -4,6 +4,9 @@ import type {
   PlayerPerformancePreview,
   ResolveHighlightType,
 } from "@/lib/resolve/legacy-matchday-resolve-types";
+// S. Kommentar an diesem Import in legacy-lineup-types.ts -- `import type` zieht keine
+// Playwright-/`node:fs`-Laufzeitimporte mit.
+import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 
 export type MatchdayResultPayloadStatus = "preview_applied" | "superseded" | "voided";
 export type ResultReadinessStatus =
@@ -69,6 +72,8 @@ export type DisciplineResultWritePayload = {
   pointSource: string;
   resolutionSource?: "pps" | "arena";
   arenaMatchSeed?: string | null;
+  /** "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A) -- s. Kommentar an `DisciplineTeamResolvePreview.momente`. */
+  momente?: ArenaMomentEintrag[] | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -220,6 +225,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           pointSource: teamResult.pointSource,
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
+          momente: teamResult.momente,
         };
       }),
   );

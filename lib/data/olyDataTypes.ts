@@ -1,5 +1,8 @@
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
+// `import type` -- rein typseitig, erzeugt keine Laufzeit-Zirkularitaet trotz des
+// Rueckimports von GameState/Player aus dieser Datei in arena-headless-runner.ts (s. dort).
+import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 // Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
@@ -2578,6 +2581,14 @@ export type DisciplineResultRecord = {
   pointSource?: string;
   resolutionSource?: "pps" | "arena";
   arenaMatchSeed?: string | null;
+  /**
+   * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
+   * Klasse A): wie `arenaMatchSeed` additiv und optional -- aeltere Zeilen (vor dieser Aenderung
+   * geschrieben) haben dieses Feld nicht, jeder Leser behandelt sein Fehlen als "keine Momente",
+   * nie als Fehler (kein Breaking Change am Schema). S. `ArenaMomentEintrag`,
+   * lib/battle/arena-headless-runner.ts.
+   */
+  momente?: ArenaMomentEintrag[] | null;
 };
 
 export type PlayerDisciplinePerformanceRecord = {

@@ -91,16 +91,24 @@
     5: "<b>Legendär, Diablo-Orange:</b> glühende Bronze, Filigran-Ecken, Edelstein oben, Holo-Folie und ein Lichtstreif über die Karte.",
     6: "<b>Boss, rot:</b> blutroter Rahmen mit Goldbeschlägen, Hörnerkrone, Boss-Banner, Frakturschrift, glühender Kranz und Funkenflug.",
   };
+  // Stimmung je Seltenheit: nur Kamera und Licht, keine zusätzlichen Effekte im Hintergrund
   const STIMMUNG = {
-    1: "unremarkable grunt of its kind, eye-level camera, quiet low light, simple dark background",
-    2: "a tougher specimen, eye-level camera, faint green-tinted rim light",
-    3: "a creature touched by magic, slightly low camera, cool blue rim light, a few glowing particles",
-    4: "confident, threatening stance, low camera, warm golden key light and a brighter glowing accent",
-    5: "powerful and dangerous, low camera angle, strong orange backlight glow behind it, sparks drifting in the air",
-    6: "overwhelming boss presence, very low camera angle looking up, deep red and orange glow behind it, embers and ash in the air, the creature fills the frame and the viewer should feel small",
+    1: "an ordinary specimen of its kind, eye-level camera, quiet dim light",
+    2: "a tougher specimen, eye-level camera, faint cool rim light",
+    3: "a creature touched by magic, slightly low camera, soft blue rim light",
+    4: "confident, threatening stance, low camera, warm golden key light from one side",
+    5: "powerful and dangerous, low camera angle, strong warm backlight outlining the silhouette",
+    6: "overwhelming boss presence, very low camera angle looking up, deep red backlight outlining the silhouette, the creature fills the frame and the viewer should feel small",
   };
-  // Stil wie die Olympiade-Bilder: Filmstill, dunkel, warmes Licht, genau ein leuchtender Sci-Fi-Akzent
-  const STIL = "photorealistic cinematic film still from a dark fantasy movie with a subtle science-fiction edge. Real creature with practical-effects texture (skin, scales, fur, cloth, metal all physically real), shot on a full-frame cinema camera with an 85mm lens, shallow depth of field, softly blurred background, dark and moody low-key lighting, warm practical light from lanterns, candles or embers, plus exactly one glowing accent (runes, energy veins, lava cracks or tech inlays) that hints at sci-fi, haze and floating dust in the air, rich detail, natural colour grade, no over-sharpening.";
+  // Stil wie die Olympiade-Bilder: Standbild aus einem Realfilm, dunkel, warmes Licht, genau ein leuchtender Akzent
+  const STIL = "a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the creature is a real, physical being made with practical effects (real skin, fur, scales, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.";
+  // Der eine leuchtende Akzent folgt der Prägung, damit Bild und Element-Symbol zusammenpassen
+  const AKZENT = {
+    feuer: "glowing orange lava cracks", frost: "pale blue frost glowing in the cracks of its skin or armour", natur: "faint green bioluminescent veins",
+    gift: "a sickly yellow-green toxic glow", licht: "warm golden glowing runes", schatten: "wisps of violet shadow-fire",
+    magie: "softly glowing magenta arcane runes", technik: "thin cyan glowing tech inlays",
+  };
+  const akzentVon = s => { const p = (Array.isArray(s.praegung) ? s.praegung : []).find(t => AKZENT[t]); return p ? AKZENT[p] : "one subtle glowing detail such as runes, energy veins or tech inlays"; };
 
   // ---------- Hilfen ----------
   const $ = id => document.getElementById(id);
@@ -121,11 +129,37 @@
   ];
   const symbolFuer = s => (SYMBOLE.find(([re]) => re.test(s)) || [0, "rune"])[1];
   // Tag-Symbole: auf der Karte und in Listen statt ausgeschriebener Schlagworte, Name per Hover
+  // Symbole im Regeltext: {P1} kostet 1 Power, {A2} 2 Treffer, {V+1} +1 Verteidigung … Macht Texte kurz und lesbar.
+  const minus = w => w.replace(/^-/, "−");
+  const SYMBOLTEXT = {
+    P: { icon: "power", name: "Power", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Power` : `kostet ${w} Power` },
+    Z: { icon: "rune", name: "Zauberwurf", zeige: w => w + "+", tip: w => `Zauberwurf ${w}+: gelingt bei ${w}+, sonst verpufft der Zauber` },
+    S: { icon: "potion", name: "Einmal pro Spiel", zeige: () => "1×", tip: () => "einmal pro Spiel" },
+    RU: { icon: "runde", name: "Einmal pro Runde", zeige: () => "1×", tip: () => "einmal pro Runde" },
+    A: { icon: "sword", name: "Treffer / Attacken", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Attacke je Waffe` : `${w} Treffer (bei Waffen: ${w} Attacken je Modell)` },
+    DS: { icon: "down", name: "Durchschlag", zeige: w => w, tip: w => `Durchschlag ${w.replace("+", "+ ")}: Ziel −${w.replace("+", "")} auf Verteidigung` },
+    V: { icon: "shield", name: "Verteidigung", zeige: minus, tip: w => `${minus(w)} Verteidigung` },
+    T: { icon: "target", name: "auf Treffer", zeige: minus, tip: w => `${minus(w)} auf Treffer` },
+    H: { icon: "heart", name: "Heilen", zeige: w => w, tip: w => `heilt ${w} Wunden` },
+    W: { icon: "fang", name: "Wunde", zeige: w => w, tip: w => `erleidet ${w} Wunde${w === "1" ? "" : "n"}` },
+    R: { icon: "reach", name: "Reichweite", zeige: w => w + '"', tip: w => w.startsWith("+") ? `${w} Zoll Reichweite` : `in ${w} Zoll Reichweite` },
+    F: { icon: "burst", name: "Umkreis", zeige: w => w + '"', tip: w => `alle im Umkreis von ${w} Zoll` },
+    B: { icon: "wing", name: "Bewegung", zeige: w => minus(w) + '"', tip: w => /^[+-]/.test(w) ? `${minus(w)} Zoll Bewegung` : `bis ${w} Zoll bewegen` },
+    X: { icon: "spiral", name: "Betäubt", zeige: () => "", tip: () => "betäubt: darf sich bei der nächsten Aktivierung nur bewegen" },
+    D: { icon: "dice", name: "Wurf", zeige: w => w + "+", tip: w => `bei einem Wurf von ${w}+` },
+  };
+  const SYMBOL_MUSTER = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}/g;
+  const symbol = (k, w) => { const d = SYMBOLTEXT[k], z = d.zeige(w); return `<span class="sym" data-tip="${esc(d.tip(w))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`; };
+  const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
+  // Für Stellen ohne Symbole (Prompt, Suche): Klartext
+  const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => SYMBOLTEXT[k].tip(w));
+
   // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
-  const tagIco = t => TAG[t] && TAG[t].element ? `<span class="elem" style="--el:${TAG[t].farbe}">${ico(TAG[t].icon)}</span>` : TAG[t] ? ico(TAG[t].icon) : "";
+  // Jeder Tag als farbiges Abzeichen: Elemente rund, alle anderen Tags eckig
+  const tagIco = t => TAG[t] ? `<span class="elem${TAG[t].element ? "" : " eckig"}" style="--el:${TAG[t].farbe || "#c9a35b"}">${ico(TAG[t].icon)}</span>` : "";
   const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
     ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${tagIco(t)}</span>` : tagIco(t)).join("")}</span>` : "";
-  const tipText = f => `<b>${esc(f.name)}</b>${esc(f.text || "")}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
+  const tipText = f => `<b>${esc(f.name)}</b>${symText(f.text)}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
 
   let state = {};
   const SPEICHER = "kartenschmiede-v3";
@@ -143,7 +177,7 @@
       const r = n => (Math.sin(i * 91.7 + n * 13.1) + 1) / 2;
       return `<i style="left:${(r(1) * 96).toFixed(1)}%;--d:${(4 + r(2) * 5).toFixed(2)}s;--dl:${(-r(3) * 8).toFixed(2)}s;--dx:${((r(4) - .5) * 14).toFixed(1)}cqw;bottom:${(r(5) * 30 - 4).toFixed(1)}%"></i>`;
     }).join("");
-    const rolle = s.role === "hero" ? " · Held" : s.role === "companion" ? " · Gefährte" : "";
+    const rolle = s.role === "hero" ? " · Held" : s.gefaehrte || s.role === "companion" ? " · Gefährte" : "";
     const skills = Array.isArray(s.skills) ? s.skills : [];
     const eigeneRegel = s.bossName || s.bossText;
     const sonderTitel = tier === 6 && s.role !== "hero" ? "Boss-Fähigkeiten" : "Fähigkeiten";
@@ -176,18 +210,19 @@
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
               const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${r.element && TAG[r.element] ? tagIco(r.element) : ""}${esc(t)}</span>` : esc(t); };
-              const unter = [nah ? "" : esc(w.reichweite + '"'), "A" + w.a].concat(regeln.split(",").map(t => t.trim()).filter(Boolean).map(mitTip)).filter(Boolean).join(", ");
+              const werte = symText(`${nah ? "" : `{R${w.reichweite}} `}{A${w.a}}${w.ds ? ` {DS${w.ds}}` : ""}`);
+              const unter = [werte].concat(regeln.split(",").map(t => t.trim()).filter(t => t && !/^(DS|AP)\s*\(/i.test(t)).map(mitTip)).join(" ");
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
-            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p>${tagIcons(k.tags, false)}<b>${esc(k.name)}.</b> ${esc(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${esc(s.bossText)}</p>` : ""}</div>` : ""}
+            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${symText(s.bossText)}</p>` : ""}</div>` : ""}
             <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${tagIco(t)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
         <div class="badge">${sym("i-crown", "crown")}<b>${punkte}</b><span>Punkte</span></div>
         ${tier >= 3 ? ["tl", "tr", "bl", "br"].map(c => sym(tier === 6 ? "c-crown" : tier === 5 ? "c-filigree" : "c-bracket", "corner " + c)).join("") : ""}
-        ${tier === 6 ? sym("i-horns", "crest", "width:34%;height:auto;top:calc(var(--u)*-7)")
-          : tier === 5 ? sym("i-gem", "crest", "width:18%;height:auto;top:calc(var(--u)*-4.6)") : ""}
+        ${tier === 6 ? sym("i-horns", "crest", "width:26%;height:auto;top:calc(var(--u)*.4)")
+          : tier === 5 ? sym("i-gem", "crest", "width:14%;height:auto;top:calc(var(--u)*.6)") : ""}
       </article>
     </div>`;
   }
@@ -213,11 +248,12 @@
     $("faction").innerHTML = [...namen, ...extra].map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
   }
   function insFormular() {
+    // Es gibt nur noch Held und Gegner; Gefährten sind Gegner, die eine Gruppe freigeschaltet hat
+    if (state.role !== "hero") state.role = "enemy";
     fraktionsAuswahl();
     FELDER.forEach(f => { const el = $(f); if (el) el.value = state[f] ?? ""; });
     if (!["0", "5", "10", "20"].includes(String(state.special))) $("special").value = "0";
     if (!state.role) $("role").value = "enemy";
-    $("autoTier").checked = state.autoTier !== false;
     document.querySelectorAll("#tiers button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.t === state.tier)));
     document.querySelectorAll(".toolbar .seg button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.o === (state.orient || "port"))));
   }
@@ -231,20 +267,26 @@
 
   function prompt() {
     const s = state;
+    const quer = s.orient === "land";
     return [
-      `Turn the attached photo of my hand-painted tabletop miniature into a photorealistic cinematic film still of this creature as a real, living being. Keep its pose, silhouette, proportions, colour scheme and distinctive details (weapons, chains, armour, the ground of its base) clearly recognisable.`,
+      `Create one image: ${STIL}`,
+      ``,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep its pose, silhouette, proportions, paint colours and distinctive details (weapons, chains, armour) clearly recognisable, but show it as a living creature, not a figure. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
       ``,
-      `Mood: ${STIMMUNG[s.tier]}.`,
+      `Mood and camera: ${STIMMUNG[s.tier]}.`,
       ``,
-      `Style anchor (identical for every card in the set): ${STIL}`,
+      `Glowing accent: exactly one, ${akzentVon(s)}. Nothing else in the image glows.`,
       ``,
-      `Composition: ${s.orient === "land" ? "landscape 7:5, creature on the right half, left half darker and calm so text can sit on top" : "portrait 5:7, creature fills the upper two thirds, lower third darker and calm so text can sit on top"}.`,
+      `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Avoid: painterly or illustrated look, plastic or toy look, cluttered background, spaceships or cities in the sky, oversaturated colours. No lettering, numbers, logos, card frame, border or user interface. Only the image.`,
+      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      ``,
+      `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
   }
+
 
   function neigen() {
     const cw = $("stage").querySelector(".cw");
@@ -262,13 +304,14 @@
 
   function alles() {
     state.points = R.punkte(state).pts;
-    if (state.autoTier !== false) state.tier = R.stufeFuerPunkte(+state.points || 0);
-    state.tier = Math.min(6, Math.max(1, state.tier || 1));
+    // Der Rahmen hängt fest an den Punkten: jede Stufe hat ihre feste Punktespanne
+    state.tier = R.stufeFuerPunkte(+state.points || 0);
     document.querySelectorAll("#tiers button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.t === state.tier)));
     zeigeRechnung();
     const land = state.orient === "land";
     const stage = $("stage");
     stage.classList.toggle("land", land);
+    stage.closest(".shop").classList.toggle("quer", land);
     stage.innerHTML = renderCard(state, state.tier, { land });
     $("ladder").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `
       <button type="button" class="rung" data-t="${t}" aria-pressed="${t === state.tier}">
@@ -281,7 +324,7 @@
       $("fitNote").textContent = ueberlauf ? "Zu viel Text für die Karte: Der untere Teil wird abgeschnitten. Kürze Regeltexte oder nimm eine Fähigkeit weg."
         : kleinste < 0.8 ? `Viel Text: Die Schrift ist auf ${Math.round(kleinste * 100)} % verkleinert, damit alles passt. Beim Druck bleibt es lesbar bis etwa 70 %.` : "";
     });
-    $("suggest").dataset.tip = `${state.points || 0} Punkte ergeben: ${STUFEN[R.stufeFuerPunkte(+state.points || 0)]}. Staffel: ${R.GRENZEN_TEXT.slice(1).join(" · ")}.`;
+    $("suggest").textContent = `${state.points || 0} Punkte = ${STUFEN[state.tier]}.`;
     $("tierNote").innerHTML = NOTIZEN[state.tier];
     $("prompt").value = prompt();
     zeigeSkills();
@@ -292,7 +335,8 @@
 
   function vorlage(key) {
     const v = VORLAGEN.find(x => x.key === key) || VORLAGEN[0];
-    state = Object.assign({ orient: state.orient || "port", upload: null, autoTier: true }, JSON.parse(JSON.stringify(v.d)));
+    state = Object.assign({ upload: null }, JSON.parse(JSON.stringify(v.d)));
+    state.orient = formatFuer(state.role);
     delete state.altPunkte;
     $("preset").value = v.key;
     bModell = null;
@@ -449,7 +493,7 @@
     modellUebernehmen();
   }
   function frisch(rolle) {
-    state = Object.assign({}, state, { id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null, autoTier: true });
+    state = Object.assign({}, state, { orient: formatFuer(rolle), id: undefined, skills: [], name: rolle === "hero" ? "Neuer Held" : "Neuer Gegner", faction: rolle === "hero" ? "Helden" : state.faction, bossName: "", bossText: "", flavor: "", look: "", art: "", upload: null });
     bModell = { rolle, budget: +state.budget || 100, q: 5, d: 6, t: rolle === "hero" ? 3 : 1, n: 1,
       waffen: [{ name: "Handwaffe", reichweite: 0, a: 1, ds: 0, rest: [] }], faeh: new Set(), rest: [], special: "0", skills: [] };
     modellUebernehmen();
@@ -492,6 +536,23 @@
       <p class="verdict">${urteil}</p>
       <p class="hint">Im Schnitt ${zahl(r.runden)} Runden. Übrige Lebenspunkte: ${esc(a.name)} ${prozent(r.restA)}, ${esc(b.name)} ${prozent(r.restB)}.</p>`;
   }
+  // Preis-Check aller Fähigkeiten und Zauber im Duell
+  function preisCheck() {
+    const btn = $("simCheck"); btn.disabled = true; btn.textContent = "Rechnet …";
+    setTimeout(() => {
+      const zeilen = alleFaehigkeiten().filter(f => f.typ === "faehigkeit" || f.typ === "zauber")
+        .map(f => ({ f, ...R.faehigkeitsCheck(f, { kaempfe: 600 }) }))
+        .sort((a, b) => (b.messbar - a.messbar) || (b.sieg - a.sieg));
+      const urteil = z => !z.messbar ? ["", "im Duell nicht messbar"] : z.sieg >= 0.6 ? ["hi", "eher zu billig"] : z.sieg <= 0.4 ? ["lo", "eher zu teuer"] : ["ok", "passt"];
+      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an Zäh bekommt. 50 % heißt: Preis passt.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>Fähigkeit</th><th class="num">Kosten</th><th class="num">Siege</th><th>Einschätzung</th></tr></thead><tbody class="static">${zeilen.map(z => {
+          const [cls, txt] = urteil(z);
+          return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f.kosten))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
+        }).join("")}</tbody></table></div>
+        <p class="hint">Vereinfacht: ein Duell 1 gegen 1. Beschwörungen, Bewegung, Auren für Verbündete und Gruppenwirkung zählen hier nicht, deshalb stehen solche Fähigkeiten unter „nicht messbar“.</p>`;
+      btn.disabled = false; btn.textContent = "Preis-Check: Fähigkeiten";
+    }, 30);
+  }
   function balance() {
     const btn = $("simFair"); btn.disabled = true; btn.textContent = "Rechnet …";
     setTimeout(() => {
@@ -531,9 +592,33 @@
     }
     if (window.KartenschmiedeCharaktere) window.KartenschmiedeCharaktere.zeigen();
   }
-  async function speichern() {
+  // Speichern: Gibt es die Karte schon (gleiche ID oder gleicher Name), fragt die Seite nach: überschreiben oder neu anlegen?
+  const neueId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^a-z0-9-]/gi, "");
+  function speichern() {
     const msg = $("saveMsg");
-    if (!state.id) state.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/[^a-z0-9-]/gi, "");
+    const liste = serverKarten || [];
+    const gleich = (state.id && liste.find(k => k.id === state.id))
+      || liste.find(k => (k.name || "").trim().toLowerCase() === (state.name || "").trim().toLowerCase());
+    if (!gleich) { if (!state.id) state.id = neueId(); return speichereWirklich(); }
+    msg.innerHTML = `„${esc(gleich.name)}“ ist schon gespeichert${gleich.gespeichertVon ? ` (von ${esc(gleich.gespeichertVon)})` : ""}.
+      <span class="save-wahl"><button type="button" class="btn sm" data-save="ueber">Überschreiben</button>
+      <button type="button" class="btn ghost sm" data-save="neu">Als neue Karte</button>
+      <button type="button" class="btn ghost sm" data-save="nein">Abbrechen</button></span>`;
+    msg.onclick = e => {
+      const b = e.target.closest("[data-save]"); if (!b) return;
+      msg.onclick = null;
+      if (b.dataset.save === "nein") { msg.textContent = "Nicht gespeichert."; return; }
+      if (b.dataset.save === "ueber") state.id = gleich.id;
+      else {
+        state.id = neueId();
+        if ((state.name || "").trim().toLowerCase() === (gleich.name || "").trim().toLowerCase()) state.name = `${state.name} (2)`;
+        insFormular();
+      }
+      speichereWirklich();
+    };
+  }
+  async function speichereWirklich() {
+    const msg = $("saveMsg");
     msg.textContent = "Speichert …";
     try {
       const vs = await vorschau(state.art === "upload" ? state.upload : IMG[state.art]);
@@ -546,11 +631,12 @@
       msg.textContent = `Speichern fehlgeschlagen (${e.message}). Ist das Artwork sehr groß, hilft ein kleineres Bild.`;
     }
   }
+
   async function ladeKarte(id) {
     const r = await fetch(`${API}/${encodeURIComponent(id)}`, { credentials: "same-origin" });
     if (!r.ok) { $("saveMsg").textContent = "Die Karte ließ sich nicht laden."; return; }
     const { karte } = await r.json();
-    state = Object.assign({ orient: "port", autoTier: true }, karte);
+    state = Object.assign({ orient: formatFuer(karte.role) }, karte);
     bModell = null; insFormular(); alles();
     reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" });
   }
@@ -567,36 +653,87 @@
     const bilder = [];
     for (const k of karten) {
       const halter = document.createElement("div");
-      halter.style.cssText = "position:fixed;left:-10000px;top:0;width:600px;padding:60px 30px 30px;background:transparent";
-      halter.innerHTML = renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true });
+      const quer = k.orient === "land";
+      halter.style.cssText = `position:fixed;left:-10000px;top:0;width:${quer ? 840 : 600}px;padding:60px 30px 30px;background:transparent`;
+      halter.innerHTML = renderCard(k, R.stufeFuerPunkte(R.punkte(k).pts), { snap: true, land: quer });
       document.body.appendChild(halter); passeAn(halter);
       try { await document.fonts.ready; bilder.push(await htmlToImage.toPng(halter, { pixelRatio: 2, style: { position: "static", left: "0", top: "0" } })); }
       catch { /* eine Karte überspringen */ } finally { halter.remove(); }
     }
     $("outMany").innerHTML = bilder.map((src, i) => `<img src="${src}" alt="${esc(karten[i].name)}">`).join("");
   }
-  function drucken(karten) {
+  // Drucken: Karten immer im Postkartenformat (Gegner quer 15 × 10 cm, Helden hoch 10 × 15 cm), mit 2 mm Rand.
+  // Helden gibt es zusätzlich als Heldenbogen auf A4 – der ändert sich mit dem Helden und wird vor dem Spiel neu gedruckt.
+  const DRUCKFORMATE = [["auto", "Helden als Heldenbogen A4, Gegner als Postkarte"], ["postkarte", "Alles als Postkarte 15 × 10 cm"]];
+  const DRUCKBREITE = { "postkarte-quer": "144mm", "postkarte-hoch": "96mm" };
+  const druckFormat = () => { try { const f = localStorage.getItem("kartenschmiede-druck"); return DRUCKFORMATE.some(([id]) => id === f) ? f : "auto"; } catch { return "auto"; } };
+  const stufeVon = k => R.stufeFuerPunkte(R.punkte(k).pts);
+  function heldenbogen(k) {
+    const zaeh = (parseInt(k.tough, 10) || 1) * (parseInt(k.size, 10) || 1);
+    const kaestchen = (n, rund, voll = 0) => `<div class="kaestchen${rund ? " rund" : ""}">${Array.from({ length: n }, (_, i) => `<i${i < voll ? ' class="voll"' : ""}></i>`).join("")}</div>`;
+    const ep = Math.max(0, +k.ep || 0);
+    const zeilen = (texte, n) => Array.from({ length: n }, (_, i) => `<div>${esc(texte[i] || "")}</div>`).join("");
+    const beute = String(k.beute || "").split(/\n|,\s*/).map(x => x.trim()).filter(Boolean);
+    const verlauf = (Array.isArray(k.verlauf) ? k.verlauf : []).slice(-6).map(v => `${v.d}: ${v.t}`);
+    const skills = Array.isArray(k.skills) ? k.skills : [];
+    return `<div class="heldenbogen">
+      <div class="hb-karte">${renderCard(k, stufeVon(k), { snap: true, land: false })}</div>
+      <div class="hb-seite">
+        <h2>${esc(k.name || "Held")}</h2>
+        <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
+        <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
+        <h3>Power</h3>${kaestchen(6, true)}
+        <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
+        <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
+        <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
+      </div>
+      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${symText(f.text)}</p>`).join("")}</div></div>` : ""}
+    </div>`;
+  }
+  // Rückseite für Postkarten: Seltenheitsrahmen, großes Fraktionssymbol, Name und Stufe – symmetrisch, damit sie beim
+  // beidseitigen Druck egal wie gewendet passt
+  const mitRueckseite = () => { try { return localStorage.getItem("kartenschmiede-rueckseite") === "1"; } catch { return false; } };
+  function rueckseite(k, tier, land) {
+    return `<div class="cw"><article class="card t${tier} rueck${land ? " land" : ""}">
+      <div class="face rueck-face">
+        <div class="rueck-symbol">${ico(iconFuer(k))}</div>
+        <div class="rueck-name">${esc(k.name || "")}</div>
+        <div class="rueck-stufe"><span class="pips">${[1, 2, 3, 4, 5, 6].map(n => `<span class="pip${n <= tier ? " on" : ""}"></span>`).join("")}</span>${esc(STUFEN[tier])}</div>
+        <div class="rueck-fuss">Olympiade der Welten · Age of Fantasy Quest</div>
+      </div>
+      ${tier >= 3 ? ["tl", "tr", "bl", "br"].map(c => sym(tier === 6 ? "c-crown" : tier === 5 ? "c-filigree" : "c-bracket", "corner " + c)).join("") : ""}
+    </article></div>`;
+  }
+  function drucken(karten, format = druckFormat()) {
     const bereich = $("printArea");
-    bereich.innerHTML = karten.map(k => renderCard(k, k.tier || R.stufeFuerPunkte(R.punkte(k).pts), { snap: true })).join("");
+    bereich.innerHTML = karten.map(k => {
+      if (format === "auto" && k.role === "hero") return heldenbogen(k);
+      const seite = k.orient === "land" ? "postkarte-quer" : "postkarte-hoch";
+      const vorne = `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${renderCard(k, stufeVon(k), { snap: true, land: k.orient === "land" })}</div>`;
+      return vorne + (mitRueckseite() ? `<div class="seite ${seite}" style="--breite:${DRUCKBREITE[seite]}">${rueckseite(k, stufeVon(k), k.orient === "land")}</div>` : "");
+    }).join("");
     bereich.classList.add("bereit");
     passeAn(bereich);
     requestAnimationFrame(() => window.print());
   }
 
+
+
   // ---------- Tag-Filter und Prägung (gemeinsam für Werkstatt, Baukasten, Gruppe) ----------
   // Jede Liste hat ihren eigenen Filter; ein Klick auf einen Tag zeichnet die Liste über ihren Rückruf neu.
   const FILTER = {}, NEU_ZEICHNEN = {};
   const filterVon = schluessel => FILTER[schluessel] || (FILTER[schluessel] = { tags: new Set(), typ: "" });
-  const TYP_KURZ = [["faehigkeit", "Fähigkeiten"], ["zauber", "Zauber"], ["gegenstand", "Gegenstände"]];
+  // Dieselben Kategorien wie im Reiter „Datenbank“
+  const TYP_KURZ = KAT.KATEGORIEN.filter(k => k.id === "faehigkeiten" || k.id === "ausruestung").map(k => [k.id, k.name, k.typen]);
   function tagLeiste(schluessel, eintraege, neuZeichnen) {
     NEU_ZEICHNEN[schluessel] = neuZeichnen;
     const f = filterVon(schluessel);
     const tags = KAT.TAGS.filter(t => eintraege.some(e => (e.tags || []).includes(t.id)));
-    const typen = TYP_KURZ.filter(([id]) => eintraege.some(e => e.typ === id));
+    const typen = TYP_KURZ.filter(([, , t]) => eintraege.some(e => t.includes(e.typ)));
     return `<div class="tagleiste" data-leiste="${schluessel}">${typen.length > 1 ? typen.map(([id, n]) => `<button type="button" class="chip-f" data-ftyp="${id}" aria-pressed="${f.typ === id}">${n}</button>`).join("") : ""}${tags.map(t =>
       `<button type="button" class="chip-f" data-ftag="${t.id}" aria-pressed="${f.tags.has(t.id)}" data-tip="${esc(t.name)}">${tagIco(t.id)}</button>`).join("")}${f.tags.size || f.typ ? `<button type="button" class="chip-f" data-freset="1">× Filter</button>` : ""}</div>`;
   }
-  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || e.typ === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
+  const filterPasst = (schluessel, e) => { const f = filterVon(schluessel); return (!f.typ || KAT.kategorieVon(e.typ) === f.typ) && [...f.tags].every(t => (e.tags || []).includes(t)); };
   document.addEventListener("click", e => {
     const b = e.target.closest(".tagleiste button"); if (!b) return;
     const schluessel = b.closest(".tagleiste").dataset.leiste, f = filterVon(schluessel);
@@ -703,8 +840,9 @@
       if (typeof k === "object" && k.name) { const e = await nimmAuf(k); neu.push(e.name); skills.push(skillKopie(e)); }
     }
     const behalte = { upload: state.upload, art: state.art, ax: state.ax, ay: state.ay, zoom: state.zoom, orient: state.orient };
-    state = Object.assign({ autoTier: true, special: "0", bossName: "", bossText: "", flavor: "", look: "", size: "1", role: "enemy" }, d, behalte, { skills, id: undefined });
+    state = Object.assign({ special: "0", bossName: "", bossText: "", flavor: "", look: "", size: "1", role: "enemy" }, d, behalte, { skills, id: undefined });
     if (d.art && IMG[d.art]) state.art = d.art;
+    if (!d.orient) state.orient = formatFuer(state.role);
     state.weapons = Array.isArray(d.weapons) ? d.weapons.join("\n") : String(d.weapons || "");
     state.passives = Array.isArray(d.passives) ? d.passives.join(", ") : String(d.passives || "");
     state.praegung = Array.isArray(d.praegung) ? d.praegung.filter(t => KAT.PRAEGUNGEN.includes(t)) : [];
@@ -714,10 +852,18 @@
 
   // ---------- Verdrahtung ----------
   $("preset").innerHTML = VORLAGEN.map(v => `<option value="${v.key}">${esc(v.label)}</option>`).join("");
-  $("tiers").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `<button type="button" data-t="${t}" aria-pressed="false">${STUFEN[t]}</button>`).join("");
+  $("tiers").innerHTML = [1, 2, 3, 4, 5, 6].map(t => `<button type="button" data-t="${t}" aria-pressed="false">${STUFEN[t]}<small>${R.GRENZEN_TEXT[t]}</small></button>`).join("");
   $("preset").addEventListener("change", e => vorlage(e.target.value));
-  $("autoTier").addEventListener("change", e => { state.autoTier = e.target.checked; alles(); });
-  const stufeWaehlen = t => { state.tier = t; state.autoTier = false; insFormular(); alles(); };
+  // Stufe wählen: Der Rahmen hängt fest an den Punkten, also passt ein Klick die Einheit an – Werte und Zahl der Fähigkeiten
+  const stufeWaehlen = t => {
+    const { karte, neu, weg } = KAT.skaliere(state, t, alleFaehigkeiten());
+    state = Object.assign(state, karte);
+    bModell = null; insFormular(); alles(); simOptionen();
+    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, Zäh ${state.tough}.`
+      + (neu.length ? ` Neu: ${neu.join(", ")}.` : "") + (weg.length ? ` Entfernt: ${weg.join(", ")}.` : "");
+  };
+  // Gegner und Gefährten im Querformat (Platz für mehrere Fähigkeiten), Helden im Hochformat
+  function formatFuer(rolle) { return rolle === "hero" ? "port" : "land"; }
   $("tiers").addEventListener("click", e => { const b = e.target.closest("button"); if (b) stufeWaehlen(+b.dataset.t); });
   $("ladder").addEventListener("click", e => { const b = e.target.closest(".rung"); if (b) stufeWaehlen(+b.dataset.t); });
   document.querySelectorAll(".toolbar .seg button").forEach(b => b.addEventListener("click", () => { state.orient = b.dataset.o; insFormular(); alles(); }));
@@ -728,6 +874,7 @@
     if (!FELDER.includes(id)) return;
     state[id] = ["ax", "ay", "zoom"].includes(id) ? +e.target.value : e.target.value;
     if (["quality", "defense", "tough", "size", "weapons", "passives", "special", "role"].includes(id)) bModell = null;
+    if (id === "role") state.orient = formatFuer(state.role);
     clearTimeout(takt); takt = setTimeout(() => { alles(); simOptionen(); }, 60);
   });
   $("artfile").addEventListener("change", e => {
@@ -743,7 +890,7 @@
         c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
         c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
         state.upload = c.toDataURL("image/jpeg", .88);
-        state.art = "upload"; state.ax = 50; state.ay = 30; state.zoom = 100;
+        state.art = "upload"; state.ax = 50; state.ay = 35; state.zoom = 100;
         insFormular(); alles();
       };
       img.src = rd.result;
@@ -786,6 +933,7 @@
   $("simRun").addEventListener("click", simStart);
   $("simFair").textContent = "Balance-Test: Fern gegen Nah";
   $("simFair").addEventListener("click", balance);
+  $("simCheck").addEventListener("click", preisCheck);
   if (SERVER) {
     $("saveBtn").hidden = false;
     $("saveBtn").addEventListener("click", speichern);
@@ -826,6 +974,11 @@
   document.addEventListener("focusout", () => { tip.hidden = true; });
   document.addEventListener("scroll", () => { tip.hidden = true; }, true);
   $("jsonIn").addEventListener("click", textUebernehmen);
+  $("druckFormat").innerHTML = DRUCKFORMATE.map(([id, n]) => `<option value="${id}" ${id === druckFormat() ? "selected" : ""}>${n}</option>`).join("");
+  $("druckFormat").addEventListener("change", e => { try { localStorage.setItem("kartenschmiede-druck", e.target.value); } catch { /* egal */ } });
+  $("rueckBox").checked = mitRueckseite();
+  $("rueckBox").addEventListener("change", e => { try { localStorage.setItem("kartenschmiede-rueckseite", e.target.checked ? "1" : "0"); } catch { /* egal */ } });
+  $("druckBtn").addEventListener("click", () => drucken([JSON.parse(JSON.stringify(state))], $("druckFormat").value));
   $("jsonOut").addEventListener("click", () => { $("cardJson").value = karteAlsText(); $("jsonMsg").textContent = "Das ist die aktuelle Karte als Text, ohne das Artwork."; });
   // Bearbeiten mit Formular oder Baukasten: dieselbe Karte, zwei Ansichten
   let modus = "form";
@@ -854,7 +1007,11 @@
       <p><b>Prägung</b> – was eine Einheit ihrem Wesen nach ist. Sie sperrt alle Fähigkeiten, Zauber, Gegenstände und Waffen mit dem Gegen-Element: Ein Feuerelementar lernt keine Frostzauber, eine Sci-Fi-Einheit keine Magie. Die Fraktion schlägt eine Prägung vor (Dämonen Feuer, Frostvolk Frost, Untote Schatten, Elfen Natur, Urwild Gift).</p>
       <p><b>Element einer Waffe</b> – ein Wort bei den Regeln, zum Beispiel <code>Frostklauen | Nahkampf | A4 | Reißend, Frost</code>. Trifft die Waffe eine Einheit derselben Prägung, würfelt das Ziel seine Verteidigung mit +1, bei der Gegen-Prägung mit −1. Alle anderen Ziele: keine Änderung.</p>
       <p><b>Punkte</b> – Elemente kosten nichts: Mal nützen sie, mal schaden sie. Der Duell-Simulator würfelt sie mit.</p>
-    </div>`;
+        </div>
+    <h3 style="margin-top:28px">Symbole in Regeltexten</h3>
+    <p class="hint">Statt „erleidet 2 Treffer mit Durchschlag 1“ steht auf der Karte ein Schwert mit 2 und ein Durchschlag-Pfeil mit 1. Beim Hovern erscheint die Erklärung. Eigene Texte nutzen dieselben Kürzel in geschweiften Klammern.</p>
+    <div class="sym-legende">${[["P1"], ["Z4"], ["S"], ["RU"], ["A2"], ["A+1"], ["DS1"], ["V+1"], ["T-1"], ["HW3"], ["W1"], ["R12"], ["F3"], ["B6"], ["X"], ["D4"]]
+      .map(([c]) => { const m = c.match(/^(RU|DS|[A-Z])(.*)$/); return `<div>${symbol(m[1], m[2])}<span>${esc(SYMBOLTEXT[m[1]].tip(m[2]))}</span> <code>{${c}}</code></div>`; }).join("")}</div>`;
   }
 
   // Reiter
@@ -870,7 +1027,7 @@
 
   // Schnittstelle für den Reiter „Gruppe“ (gruppe.js)
   window.KS = {
-    tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon, tagIco, ladeKarte, loescheKarte,
+    symText, klarText, SYMBOLTEXT, symbol, tagLeiste, filterPasst, konfliktVon, konfliktText, praegungVon, tagIco, ladeKarte, loescheKarte,
     serverKarten: () => serverKarten,
     vorlageLaden: key => { vorlage(key); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     R, IMG, SERVER, STUFEN, ROLLEN, TAG, KAT, esc, ico, renderCard, passeAn, alleFaehigkeiten, alleEintraege, findeFaehigkeit, skillKopie, kostenText,
@@ -879,9 +1036,9 @@
     async loescheEigenen(id) { eigene = eigene.filter(f => f.id !== id); await sichereEigene(); alles(); },
     nachAenderung() { insFormular(); alles(); simOptionen(); },
     zeigeReiter: name => reiter(name),
-    oeffneInWerkstatt(karte) { state = Object.assign({ orient: "port", autoTier: true }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
+    oeffneInWerkstatt(karte) { state = Object.assign({ orient: formatFuer(karte.role) }, JSON.parse(JSON.stringify(karte))); bModell = null; insFormular(); alles(); reiter("karten"); $("h-shop").closest("section").scrollIntoView({ behavior: "smooth" }); },
     aktuelleKarte: () => JSON.parse(JSON.stringify(state)),
-    zeigePngs, drucken,
+    zeigePngs, drucken, DRUCKFORMATE, druckFormat, rueckseite, mitRueckseite,
   };
 
   const gemerkt = lade();

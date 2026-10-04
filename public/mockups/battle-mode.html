@@ -226,6 +226,12 @@
                fuer Bahn-Spiele (renderEndstandBahn()) leer und hidden, weil Bahn-Ereignisse
                nie ein `kind` tragen. -->
           <div class="eszene" id="eszene" hidden></div>
+          <!-- ALTERNATIV-RECHNER (Klasse A*, docs/design/fable-ideen-bahn-30-09.md Abschnitt
+               1.3, 01.10.): "was haette der andere Plan gebracht?" — je Heimlaeufer eine
+               Zeile, gefuellt von renderEndstandBahn()/bahnAlternativZeilen(). Dieselbe
+               CSS-Klasse wie #ehighlights direkt darunter (kein neues CSS), nur fuer Bahn
+               befuellt; bleibt fuer Kampf/Buehne leer und hidden. -->
+          <div class="ehighlights" id="ealternativ" hidden></div>
           <!-- HOEHEPUNKTE. Text-Rueckblick auf alle big-Ereignisse dieses Spiels (HIGHLIGHTS[],
                gefuellt aus feed()) -- bewusst eine Textliste, kein Bild-Replay, s. Abschnitt 4.3
                derselben Recherche. Nur befuellt/sichtbar, wo dieses Endstand-Overlay ueberhaupt
@@ -317,7 +323,23 @@
       </div>
       </div><!-- /.arenaHaupt -->
       <div class="untenraum">
-        <div class="feed" id="feed"></div>
+        <!-- TICKER + PROTOKOLL-REITER (F1-Broadcast-Audit Runde 2, 30.09., Prio-1-Punkt 8
+             "Ticker entschlacken"): #feed bleibt der sichtbare Ticker, zeigt aber nur noch
+             Ereignisse plus hoechstens ~30 Zeilen je Minute Sendezeit; #protokoll haelt den
+             VOLLSTAENDIGEN, ungedrosselten Verlauf (jede feed()-Zeile, auch die im Ticker
+             ausgeblendeten). Reiter-Muster wie die Seiten-Reiter oben (role=tablist/tab,
+             aria-selected, aria-controls), aber eigene Klasse .ftab statt .tab: der
+             Seiten-Umschalter in battle-mode.engine.js greift jedes .tab ab und wuerde beim
+             Klick die Seiten-Panels umschalten. #protmehr zaehlt die nur im Protokoll
+             stehenden Zeilen ("+N"), statt sie stillschweigend wegzulassen. -->
+        <div class="tickerbox">
+          <div class="ftabs" role="tablist" aria-label="Spielverlauf">
+            <button class="ftab" type="button" role="tab" id="ftTicker" aria-selected="true" aria-controls="feed">Ticker</button>
+            <button class="ftab" type="button" role="tab" id="ftProtokoll" aria-selected="false" aria-controls="protokoll">Protokoll <em id="protmehr" hidden></em></button>
+          </div>
+          <div class="feed" id="feed" role="tabpanel" aria-labelledby="ftTicker"></div>
+          <div class="feed protokoll" id="protokoll" role="tabpanel" aria-labelledby="ftProtokoll" hidden></div>
+        </div>
         <!-- id="wertungBox" (Broadcast-Optik-Audit, Punkt 9, 28.09.): reiner CSS-Hook fuer
              die Disziplin-Akzentfarbe (--wakzent, s. battle-mode.css). renderWertungTabelle()
              setzt data-disc darauf, sobald sich die Disziplin aendert -- Spalten/Sortierung/

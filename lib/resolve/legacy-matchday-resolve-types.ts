@@ -1,5 +1,8 @@
 import type { LegacyMutatorSlotEffect, LegacyResolveMutatorMode } from "@/lib/lineups/legacy-lineup-types";
 import type { TeamPowerEffectType, TeamPowerTargetMode } from "@/lib/data/olyDataTypes";
+// S. Kommentar an diesem Import in legacy-lineup-types.ts -- `import type` zieht keine
+// Playwright-/`node:fs`-Laufzeitimporte mit.
+import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
 
 export type ResolveHighlightType =
   | "best_player_discipline"
@@ -129,6 +132,13 @@ export type DisciplineTeamResolvePreview = {
    * Replay-Funktion, nur eine sichtbare, nachvollziehbare Kennung je Ergebnis.
    */
   arenaMatchSeed?: string | null;
+  /**
+   * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
+   * Klasse A): wie `arenaMatchSeed` nur gesetzt, wenn `resolutionSource === "arena"` -- die drei
+   * aus dem Ereignisprotokoll des gelaufenen Arena-Duells abgeleiteten Momente (s.
+   * `ArenaMomentEintrag`, lib/battle/arena-headless-runner.ts), fuer Heim UND Gast identisch.
+   */
+  momente?: ArenaMomentEintrag[] | null;
   warnings: string[];
   missingLineup: boolean;
   missingPlayers: number;

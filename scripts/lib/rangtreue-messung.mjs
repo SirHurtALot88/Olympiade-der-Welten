@@ -72,6 +72,50 @@ export function ohneTorwart(spieleListe) {
   return spieleListe.map((s) => ({ ...s, teilnehmer: s.teilnehmer.filter((t) => !t.torwart) }));
 }
 
+// H4 (Hockey-Opus-Review Abschnitt 4.4/6, 02.10.): "eine Rangtreue-Zeile je Slot-Gruppe waere
+// der naechste Split — dieselbe Bauform wie feldOnlyZusatz(), nur nach slotId statt nach
+// torwart." `slotId` kommt additiv aus disziplinProbe (s. battle-mode.engine.js), fuer jede
+// Disziplin AUSSER Hockey heute `null` (keine Wirkung auf bestehende Aufrufer). Hockeys sechs
+// Slot-Themen (SLOTS_JE_DISC.hockey) sind keine NHL-Positionen, aber "defensivewall" ist die
+// einzige defensiv benannte — die anderen vier gelten als Stuermer. `torwart` (die ECHTE
+// Rollen-Identitaet, s. bestimmeTorwaerter) geht VOR jeder Slot-Zuordnung, weil ohne gesetzte
+// Aufstellung ohnehin der PARADE-Ruecfall entscheidet, nicht der Rundlauf-Slot (CLAUDE.md/
+// hockey-opus-review-nhl.md 4.3a).
+const VERTEIDIGER_SLOTS = new Set(["defensivewall"]);
+export function rolleVon(t) {
+  if (t.torwart) return "torwart";
+  if (t.slotId && VERTEIDIGER_SLOTS.has(t.slotId)) return "verteidiger";
+  return "stuermer";
+}
+
+// Dieselbe `spiele`-Liste, nur die Teilnehmer EINER Rolle — Pendant zu `ohneTorwart()` oben.
+export function nurRolle(spieleListe, rolle) {
+  return spieleListe.map((s) => ({ ...s, teilnehmer: s.teilnehmer.filter((t) => rolleVon(t) === rolle) }));
+}
+
+// GEPOOLTE SAISON-RANGTREUE UEBER MEHRERE KADER-PAARUNGEN (H4, 02.10.) — fuer Gruppen, die
+// JE SEITE nur EINEN Platz stellen (Hockeys "defensivewall"-Slot, und ebenso der ECHTE
+// Torwart: GENAU EINER je Seite, s. bestimmeTorwaerter). Mit nur zwei Teilnehmern je Spiel
+// (einer je Seite) ist eine Rangtreue INNERHALB eines einzelnen Spiels nicht definiert
+// (Spearman braucht n>=3, s. rho() oben) — das ist kein Messfehler, sondern eine
+// strukturelle Grenze der Gruppengroesse. Gepoolt ueber ALLE Paarungen einer Kader-Familie
+// (zehn bzw. mehr distincte Spieler) ist die FRAGE trotzdem beantwortbar, nur auf
+// Saison-Ebene: `eig`/`wert` werden je Spieler UND Paarung gemittelt (Schluessel
+// "<Paarungsindex>:<Name>", damit gleichnamige Spieler verschiedener Paarungen nicht
+// verschmelzen) und EINMAL geordnet, ueber die ganze gepoolte Menge.
+export function gepoolteSaisonRho(gruppen, spieleVon) {
+  const agg = new Map();
+  gruppen.forEach((g, gi) => {
+    for (const s of spieleVon(g)) for (const t of s.teilnehmer) {
+      const key = gi + ":" + t.n;
+      const a = agg.get(key) || { eig: 0, wert: 0, k: 0 };
+      a.eig += t.eig; a.wert += t.wert; a.k++; agg.set(key, a);
+    }
+  });
+  const paare = [...agg.values()].map((a) => ({ eig: a.eig / a.k, wert: a.wert / a.k }));
+  return { rho: rho(paare), n: paare.length };
+}
+
 export function median(werte) {
   const s = [...werte].sort((a, b) => a - b);
   const n = s.length, m = n >> 1;

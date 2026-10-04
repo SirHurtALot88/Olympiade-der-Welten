@@ -173,6 +173,42 @@
   }
 
   // ---------- Duell-Simulator ----------
+  // Fähigkeiten für den Simulator: Die Wirkung steht als Symbol im Regeltext ({A2} Treffer, {HW3} heilen,
+  // {V+1} Verteidigung, {X} betäubt …), der Takt in Kürzeln wie {S}, {RU}, {P1} oder in festen Wendungen.
+  // Bewusst vereinfacht: Reichweiten und Flächen zählen im Duell nicht, nur ob und wie oft eine Wirkung greift.
+  const SYMBOL = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}/g;
+  const symbolWert = w => {
+    const m = String(w || "").match(/^W(\d)(?:\+(\d))?$/);
+    if (m) return (+m[1] + 1) / 2 + (+m[2] || 0);
+    return parseInt(String(w || "").replace("−", "-"), 10) || 0;
+  };
+  function effekteAus(s) {
+    const texte = (Array.isArray(s.skills) ? s.skills : []).map(k => ({ id: k && k.id, text: String((k && k.text) || "") }));
+    if (s.bossText) texte.push({ id: "eigen", text: String(s.bossText) });
+    return texte.map(({ id, text }) => {
+      const tok = [...text.matchAll(SYMBOL)].map(m => [m[1], m[2]]);
+      const erstes = k => tok.find(t => t[0] === k);
+      const wurf = erstes("Z") || erstes("D");
+      const e = {
+        id, chance: wurf ? Math.max(0, Math.min(1, (7 - symbolWert(wurf[1])) / 6)) : 1,
+        takt: /^Stirbt es/.test(text) ? "tod" : /Erleidet es eine Wunde/.test(text) ? "wunde" : erstes("S") ? "einmal" : erstes("P") ? "power" : "jede",
+        abHalb: /halbe|Hälfte/.test(text) && !erstes("S"),
+      };
+      for (const [k, w] of tok) {
+        const n = symbolWert(w);
+        if (k === "A" && /^\+/.test(w)) e.attacken = n; else if (k === "A") e.treffer = (e.treffer || 0) + n;
+        if (k === "DS") e.ds = n;
+        if (k === "H") e.heilen = n;
+        if (k === "W") e.wunde = n;
+        if (k === "V") e.verteidigung = n;
+        if (k === "T") { if (n > 0) e.trefferBonus = n; else if (/gegen diesen|gegen es/.test(text)) e.schutz = -n; else e.feindMalus = -n; }
+        if (k === "X") e.betaeubt = true;
+      }
+      if (id === "wiederkehr") e.wiederkehr = true;
+      return e;
+    }).filter(e => e.treffer || e.attacken || e.heilen || e.wunde || e.verteidigung || e.trefferBonus || e.schutz || e.feindMalus || e.betaeubt || e.wiederkehr);
+  }
+
   function einheitAus(s) {
     const passiv = leseListe(s.passives);
     const n = parseInt(s.size, 10) || 1;
@@ -185,6 +221,7 @@
       rasend: hat(passiv, /rasend|furious/i), ausweichen: hat(passiv, /ausweich|evasive/i),
       tarnung: hat(passiv, /tarnung|stealth/i), regeneration: hat(passiv, /regenerat/i),
       praegung: Array.isArray(s.praegung) ? s.praegung : [],
+      effekte: effekteAus(s),
       hinterhalt: hat(passiv, /hinterhalt|ambush/i), wucht: zahlIn(passiv, /^(?:wucht|impact)\s*\((\d+)\)$/i),
     };
   }
@@ -206,7 +243,7 @@
 
     for (let k = 0; k < N; k++) {
       const mk = (e, pos, richtung) => ({ ...e, pos, richtung, lp: Array(e.n).fill(e.T), aktiv: !e.hinterhalt,
-        nah: erwartung(e, false) >= erwartung(e, true) });
+        nah: erwartung(e, false) >= erwartung(e, true), benutzt: new Set(), tot: false, buff: {} });
       const A = mk(A0, TISCH / 2 - start / 2, 1), B = mk(B0, TISCH / 2 + start / 2, -1);
       const lebend = u => u.lp.filter(x => x > 0).length;
       const abst = () => Math.max(0, Math.abs(B.pos - A.pos));
@@ -216,10 +253,10 @@
         const modelle = lebend(att); if (!modelle || !lebend(ziel)) return;
         let treffer = [];
         const ziel_ = w.zuverlaessig ? 2 : att.q;
-        let mod = 0;
+        let mod = (att.buff.treffer || 0) - (ziel.buff.schutz || 0) - (att.buff.malus || 0);
         if (ziel.ausweichen) mod -= 1;
         if (schuss && ziel.tarnung && abst() > 9) mod -= 1;
-        for (let i = 0; i < w.a * modelle; i++) {
+        for (let i = 0; i < (w.a + (w.zuverlaessig && !w.reichweite && w.a === att.wucht ? 0 : att.buff.attacken || 0)) * modelle; i++) {
           const x = w6(rnd);
           if (x === 6 || (x !== 1 && x + mod >= ziel_)) {
             treffer.push(x === 6);
@@ -230,7 +267,7 @@
         for (const sechs of treffer) {
           if (!lebend(ziel)) break;
           const ds = sechs && w.reissend ? Math.max(w.ds, 4) : w.ds;
-          const bedarf = ziel.d + ds + (schuss && inDeckung ? -1 : 0) - elementWirkung(w.element, ziel.praegung);
+          const bedarf = ziel.d - (ziel.buff.verteidigung || 0) + ds + (schuss && inDeckung ? -1 : 0) - elementWirkung(w.element, ziel.praegung);
           let x = w6(rnd);
           if (w.gift && x === 6) x = w6(rnd);
           if (x !== 1 && x >= bedarf) continue;
@@ -238,6 +275,44 @@
           if (ziel.regeneration && !w.gift) { let rest = 0; for (let i = 0; i < wunden; i++) if (w6(rnd) < 5) rest++; wunden = rest; }
           const i = ziel.lp.findIndex(v => v > 0);
           ziel.lp[i] = Math.max(0, ziel.lp[i] - wunden);
+          // Reaktionen des Ziels („Erleidet es eine Wunde“), nicht auf Reaktionen hin
+          if (wunden > 0 && !w.reaktion) for (const e of ziel.effekte) if (e.takt === "wunde" && rnd() < e.chance) {
+            if (e.wunde) verwunde(att, e.wunde); else if (e.treffer) direkt(ziel, att, e.treffer, e.ds || 0);
+          }
+        }
+      };
+      const verwunde = (u, n) => { for (let k = 0; k < n; k++) { const i = u.lp.findIndex(v => v > 0); if (i < 0) return; u.lp[i] -= 1; } };
+      // Treffer aus Fähigkeiten: treffen automatisch, das Ziel würfelt Verteidigung
+      const direkt = (von, ziel, n, ds) => angriff({ ...von, n: 1, lp: [1], q: 2, buff: {}, rasend: false }, ziel, { a: Math.round(n), ds, zuverlaessig: true, reaktion: true }, {});
+      // Fähigkeiten zu Beginn der eigenen Aktivierung: Puffer setzen, heilen, Schaden, Betäubung
+      const faehigkeiten = (u, g) => {
+        u.buff = {};
+        const halb = u.lp.reduce((a, x) => a + x, 0) <= u.n * u.T / 2;
+        for (const [i, e] of u.effekte.entries()) {
+          if (e.takt === "tod" || e.takt === "wunde") continue;
+          if (e.takt === "einmal" && u.benutzt.has(i)) continue;
+          if (e.takt === "power" && r % 2 === 0) continue;   // Power reicht im Schnitt für jede zweite Runde
+          if (e.abHalb && !halb) continue;
+          if (e.takt === "einmal" && !(e.heilen ? halb : true)) continue;
+          if (rnd() >= e.chance) continue;
+          if (e.takt === "einmal") u.benutzt.add(i);
+          if (e.heilen) { let rest = Math.round(e.heilen); for (let k = 0; k < u.lp.length && rest; k++) while (u.lp[k] > 0 && u.lp[k] < u.T && rest) { u.lp[k]++; rest--; } }
+          if (e.verteidigung) u.buff.verteidigung = (u.buff.verteidigung || 0) + e.verteidigung;
+          if (e.trefferBonus) u.buff.treffer = (u.buff.treffer || 0) + e.trefferBonus;
+          if (e.schutz) u.buff.schutz = (u.buff.schutz || 0) + e.schutz;
+          if (e.feindMalus) g.buff.malus = (g.buff.malus || 0) + e.feindMalus;
+          if (e.attacken) u.buff.attacken = (u.buff.attacken || 0) + e.attacken;
+          if (e.betaeubt) g.betaeubt = true;
+          if (e.treffer) direkt(u, g, e.treffer, e.ds || 0);
+        }
+      };
+      // Tod: „Stirbt es“-Wirkungen und Wiederkehr
+      const todPruefen = (u, g) => {
+        if (u.tot || u.lp.some(x => x > 0)) return;
+        u.tot = true;
+        for (const e of u.effekte) {
+          if (e.wiederkehr && rnd() < e.chance) { u.lp[0] = 1; u.tot = false; }
+          else if (e.takt === "tod" && e.treffer && rnd() < e.chance) direkt(u, g, e.treffer, e.ds || 0);
         }
       };
       const nahWaffen = u => u.waffen.filter(w => w.reichweite === 0);
@@ -257,6 +332,9 @@
 
       const aktiviere = (u, g) => {
         if (!lebend(u) || !lebend(g)) return;
+        if (u.betaeubt) { u.betaeubt = false; u.buff = {}; return; }
+        faehigkeiten(u, g);
+        if (!lebend(g)) return;
         if (!u.aktiv) { u.aktiv = true; u.pos = g.pos - u.richtung * Math.min(abst(), 9); return; }
         const d = abst();
         if (u.nah) {
@@ -276,8 +354,8 @@
 
       for (r = 1; r <= runden && lebend(A) && lebend(B); r++) {
         const erst = rnd() < 0.5 ? [A, B] : [B, A];
-        aktiviere(erst[0], erst[1]);
-        aktiviere(erst[1], erst[0]);
+        aktiviere(erst[0], erst[1]); todPruefen(A, B); todPruefen(B, A);
+        aktiviere(erst[1], erst[0]); todPruefen(A, B); todPruefen(B, A);
       }
       const la = lebend(A), lb = lebend(B);
       if (la && !lb) erg.a++; else if (lb && !la) erg.b++; else erg.u++;
@@ -317,7 +395,26 @@
       jeReichweite: Object.fromEntries(Object.entries(jeReichweite).map(([k, v]) => [k, mittel(v)])) };
   }
 
-  const Regeln = { STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
+  // Preis-Check einer Fähigkeit: Standardeinheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür so viel
+  // Zäh bekommt, dass beide gleich viele Punkte kosten. Um 50 % Siege heißt: Der Preis passt.
+  const CHECK_EINHEIT = { quality: "4+", defense: "4+", tough: "6", size: "1", weapons: "Klinge | Nahkampf | A3 |\nBogen | 18\" | A1 |", passives: "", role: "hero" };
+  function faehigkeitsCheck(faehigkeit, opt = {}) {
+    const extra = /zauber/i.test(faehigkeit.typ || "") ? "Zauberer(1)" : "";
+    const ohne = { ...CHECK_EINHEIT, passives: extra, skills: [] };
+    const mit = { ...ohne, skills: [faehigkeit] };
+    const ziel = punkte(mit).roh;
+    const gegner = { ...ohne };
+    for (let t = 6; t < 60 && punkte(gegner).roh < ziel; t++) gegner.tough = String(t + 1);
+    // Zwischen zwei Zäh-Stufen: die nähere nehmen
+    const kleiner = { ...gegner, tough: String(Math.max(1, +gegner.tough - 1)) };
+    const g = Math.abs(punkte(kleiner).roh - ziel) < Math.abs(punkte(gegner).roh - ziel) ? kleiner : gegner;
+    const r = simuliere(mit, g, { kaempfe: opt.kaempfe || 800, seed: opt.seed || 11, abstand: 18 });
+    // Beschwörungen, Bewegung und Hilfe für Verbündete kommen im Duell 1 gegen 1 nicht vor
+    const messbar = effekteAus(mit).length > 0 && !(faehigkeit.tags || []).some(t => t === "beschwoerung" || t === "aura" && !/Feinde/.test(faehigkeit.text || ""));
+    return { sieg: r.a / Math.max(0.001, r.a + r.b), punkte: Math.round(ziel - punkte(ohne).roh), gegnerZaeh: +g.tough, messbar };
+  }
+
+  const Regeln = { faehigkeitsCheck, effekteAus, STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
     reichweitenFaktor, FAEHIGKEITEN, punkte, simuliere, einheitAus, balanceTest };
   if (typeof module !== "undefined" && module.exports) module.exports = Regeln;
   else root.Regeln = Regeln;

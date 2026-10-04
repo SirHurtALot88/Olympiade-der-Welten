@@ -26,6 +26,8 @@ type Regeln = {
   leseWaffe(z: string): { reichweite: number; a: number; ds: number; reissend: boolean; explosion: number; regeln: string };
   regelnVon(regeln: string): Array<{ name: string; text: string }>;
   elementAus(regeln: string): string | null;
+  effekteAus(e: Record<string, unknown>): Array<Record<string, unknown>>;
+  faehigkeitsCheck(f: unknown, o?: Record<string, unknown>): { sieg: number; messbar: boolean };
   elementWirkung(element: string | null, praegung: string[]): number;
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
@@ -39,6 +41,10 @@ const F = laden("../apps/kartenschmiede/katalog.js") as {
   TAGS: Array<{ id: string; icon: string }>;
   PRAEGUNGEN: string[];
   konflikt(e: { tags: string[] }, praegung: string[]): { praegung: string; tag: string } | null;
+  skaliere(e: Record<string, unknown>, stufe: number): { karte: Record<string, unknown> & { tier: number; points: number; skills: Array<{ id: string; tags: string[] }> }; neu: string[]; weg: string[] };
+  FAEHIGKEITEN_JE_STUFE: number[];
+  welleWuerfeln(pool: Array<{ key: string; name: string; pts: number; stufe: number; faction: string }>, ziel: number, o: Record<string, unknown>):
+    { einheiten: Array<{ key: string; pts: number; stufe: number; anzahl: number; faction: string }>; summe: number };
 };
 type Eintrag = { typ: string; name: string; tags: string[]; waffe?: string; text: string; kosten: { typ: string; wert: number } };
 const G = laden("../apps/kartenschmiede/generator.js") as {
@@ -112,6 +118,48 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     for (const f of F.GRUNDBESTAND.filter(x => x.tags.includes("technik"))) expect(f.tags, f.name).not.toContain("magie");
   });
 
+  it("skaliert eine Einheit auf jede Seltenheit: Punkte in der Stufe, mehr Fähigkeiten nach oben, keine Sperren verletzt", () => {
+    const grab = { name: "Grabritter", role: "enemy", praegung: ["schatten"], quality: "4+", defense: "3+", tough: "3", size: "1",
+      weapons: "Dornenmorgenstern | Nahkampf | A3 | DS(1), Schatten", passives: "Furchtlos", skills: [] };
+    let vorher = -1;
+    for (let stufe = 1; stufe <= 6; stufe++) {
+      const { karte } = F.skaliere(grab, stufe);
+      expect(karte.tier, `Stufe ${stufe}`).toBe(stufe);
+      expect(karte.skills.length).toBe(F.FAEHIGKEITEN_JE_STUFE[stufe]);
+      expect(karte.points).toBeGreaterThan(vorher);
+      for (const k of karte.skills) expect(F.konflikt(k, ["schatten"])).toBeNull();
+      vorher = karte.points;
+    }
+    // Runter und wieder hoch landet in derselben Stufe; überzählige Fähigkeiten werden gemeldet
+    const boss = F.skaliere(grab, 6).karte;
+    const klein = F.skaliere(boss, 1);
+    expect(klein.karte.tier).toBe(1);
+    expect(klein.weg.length).toBe(4);
+  });
+
+  it("nutzt in Regeltexten nur bekannte Symbol-Kürzel", () => {
+    // Muss zu SYMBOLTEXT in apps/kartenschmiede/app.js passen
+    const gueltig = /^\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}$/;
+    const texte = [...F.GRUNDBESTAND.map(f => f.text)];
+    for (const typ of ["faehigkeit", "zauber", "gegenstand"]) for (let i = 1; i < 30; i++) texte.push(G.generiere(R, typ, { stufe: 1 + (i % 6), seed: i, rolle: i % 2 ? "enemy" : "hero", tag: i % 5 ? undefined : "technik" }).text);
+    for (const t of texte) for (const k of t.match(/\{[^}]*\}/g) || []) expect(k, t).toMatch(gueltig);
+  });
+
+  it("würfelt Gegnerwellen nahe am Ziel, mit Stufengrenze je Schwierigkeit, höchstens einem Boss und drei Gleichen", () => {
+    const pool = [["a", 25, 1, "Urwild"], ["b", 35, 1, "Dämonen"], ["c", 50, 2, "Dämonen"], ["d", 75, 3, "Urwild"], ["e", 120, 4, "Urwild"],
+      ["f", 170, 5, "Urwild"], ["g", 240, 6, "Wilde Jagd"], ["h", 30, 1, "Urwild"]].map(([key, pts, stufe, faction]) => ({ key: String(key), name: String(key), pts: +pts, stufe: +stufe, faction: String(faction) }));
+    for (let seed = 1; seed <= 30; seed++) for (const [ziel, schw] of [[85, 1], [170, 2], [260, 3], [420, 4]]) {
+      const w = F.welleWuerfeln(pool, ziel, { schwierigkeit: schw, seed });
+      expect(w.summe, `${ziel}/${schw}`).toBeGreaterThanOrEqual(ziel * 0.85);
+      expect(w.summe).toBeLessThanOrEqual(ziel * 1.1);
+      expect(Math.max(...w.einheiten.map(e => e.stufe))).toBeLessThanOrEqual([0, 3, 4, 5, 6][schw]);
+      expect(w.einheiten.filter(e => e.stufe === 6).reduce((n, e) => n + e.anzahl, 0)).toBeLessThanOrEqual(1);
+      for (const e of w.einheiten) expect(e.anzahl).toBeLessThanOrEqual(3);
+    }
+    const nurUrwild = F.welleWuerfeln(pool, 170, { schwierigkeit: 2, fraktion: "Urwild", seed: 3 });
+    for (const e of nurUrwild.einheiten) expect(e.faction).toBe("Urwild");
+  });
+
   it("gibt jeder Fraktion genau ein eigenes Symbol", () => {
     const symbole = F.FRAKTIONEN.map(f => f.icon);
     expect(new Set(symbole).size).toBe(symbole.length);
@@ -176,6 +224,18 @@ describe("Kartenschmiede – Generator", () => {
     expect(gegenFrost).toBeGreaterThan(gegenFeuer + 0.1);
   });
 
+  it("liest Fähigkeiten für den Simulator aus den Symbolen und rechnet sie mit", () => {
+    const heilen = F.GRUNDBESTAND.find(f => f.id === "wunden-heilen")!;
+    expect(R.effekteAus({ skills: [heilen] })[0]).toMatchObject({ takt: "power", heilen: 2 });
+    expect(R.effekteAus({ skills: [F.GRUNDBESTAND.find(f => f.id === "psiblitz")!] })[0]).toMatchObject({ treffer: 2, ds: 2, chance: 0.5 });
+    const basis = einheit(4, 4, 5, "Schwert | Nahkampf | A3 |");
+    const mit = { ...basis, skills: [heilen] } as unknown as Einheit;
+    expect(R.simuliere(mit, basis, { kaempfe: 2000, seed: 7 }).a).toBeGreaterThan(0.62);
+    // Preis-Check: Heilung bei gleichen Punkten im Vorteil, Beschwörungen gelten als nicht messbar
+    expect(R.faehigkeitsCheck(heilen).messbar).toBe(true);
+    expect(R.faehigkeitsCheck(F.GRUNDBESTAND.find(f => f.id === "geistwolf")!).messbar).toBe(false);
+  });
+
   it("bepreist Sonderregeln für Gegner in Prozent", () => {
     expect(G.generiere(R, "faehigkeit", { stufe: 4, seed: 5, rolle: "enemy" }).kosten.typ).toBe("prozent");
   });
@@ -215,7 +275,13 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(rumpf).toContain("window.KARTENSCHMIEDE_SERVER=true");
     expect(rumpf).toContain("Kartenschmiede");
     expect(rumpf).toContain("KartenschmiedeCharaktere");
-    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente"]) expect(rumpf).toContain(`id="${id}"`);
+    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente", "rueckBox", "simCheck"]) expect(rumpf).toContain(`id="${id}"`);
+    // Gegner werden als Postkarte gedruckt: Querformat im Verhältnis 3:2 und eine eigene Seitengröße 15 × 10 cm
+    expect(kopf + rumpf).toContain(".card.land { aspect-ratio: 3 / 2;");
+    expect(kopf + rumpf).toContain("@page postkarte-quer { size: 150mm 100mm;");
+    expect(kopf + rumpf).toContain("aspect-ratio: 2 / 3;");
+    // Es gibt nur Held und Gegner zur Auswahl; Gefährten entstehen in der Gruppe
+    expect(rumpf).not.toContain('<option value="companion">');
   });
 
   it("speichert, listet, lädt und löscht Karten", () => {

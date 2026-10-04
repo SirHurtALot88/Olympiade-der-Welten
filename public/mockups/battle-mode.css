@@ -777,6 +777,14 @@
   .oly-battle-arena.oly-battle-arena .bbug .seite b{color:#fff;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bbug .seite small{display:block;color:#c3ccd8;font-size:9px;
     white-space:normal}
+  /* C2 (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4): Wappen vor dem Namen im
+     Score-Bug, wie jeder TV-Bug eins zeigt -- `wappen()`/`bbugWappenHtml()` im Motor liefern
+     entweder dieses <img> oder, ohne Logo-Datei, ein <i class="mono"> mit dem Kuerzel. */
+  .oly-battle-arena.oly-battle-arena .bbug .bbugwappen{display:inline-block;width:16px;
+    height:16px;border-radius:3px;vertical-align:-3px;margin-right:4px;object-fit:cover}
+  .oly-battle-arena.oly-battle-arena .bbug i.bbugwappen.mono{background:rgba(255,255,255,.16);
+    color:#fff;font-style:normal;font-weight:700;font-size:7px;line-height:16px;
+    text-align:center;letter-spacing:.2px}
   /* LEBENS-PIPS (K2, Broadcast-Optik-Recherche 27.09., Abschnitt 3): eine CS-Scorebar-
      Reihe je Seite, ein Punkt je Kaempfer -- die dritte Zeile im Score-Bug, unter Name
      und Zusatzzeile (dasselbe display:block-Zeilenmuster wie ".seite small" darueber,
@@ -838,6 +846,18 @@
      die Score-Fuehrung wechselt (`.wechsel` wird in aktualisiereBbug() gesetzt/entfernt). */
   .oly-battle-arena.oly-battle-arena .bbugmitte.wechsel{box-shadow:0 0 0 2px var(--warn),
     0 0 14px 2px var(--warn)}
+  /* C2 -- ZIFFERN-ROLL (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4, C2,
+     zweiter Teil): die alte Ziffer rollt nach oben raus, die neue von unten rein -- wie an
+     einem NHL/NBA-Bug. `aktualisiereBbug()` setzt die Klasse nur in dem einen Tick, in dem
+     sich der Score-Text aendert, auf einen frisch erzeugten Knoten (s. dortiger Kommentar);
+     die globale `prefers-reduced-motion`-Regel am Dateiende deckt diese Animation mit ab. */
+  @keyframes ziffernroll{
+    0%{transform:translateY(-60%);opacity:0}
+    40%{transform:translateY(0);opacity:1}
+    100%{transform:translateY(0);opacity:1}
+  }
+  .oly-battle-arena.oly-battle-arena .bbugmitte b.ziffernroll{display:inline-block;
+    animation:ziffernroll .2s ease-out}
   /* UEBERZAHL-KENNUNG (K2): "4 : 3" in der Farbe der Seite mit mehr Lebenden, nur wenn
      die Zahlen ungleich sind (aktualisiereBbug() haengt <small> nur dann ueberhaupt an).
      Eigene Zeile unter Score/Uhr, dasselbe display:block-Muster wie oben. */
@@ -907,6 +927,17 @@
   .oly-battle-arena.oly-battle-arena .bbugcallout em{display:block;font-style:normal;
     font-size:.78em;font-weight:500;color:#c3ccd8;letter-spacing:0;margin-top:2px;
     text-transform:none}
+  /* HIGHLIGHT-TITEL (C3, Fable-Ideen Broadcast-Praesentation 30.09., umgesetzt 01.10.): ein
+     big-Ereignis mit `kind` zeigt oben das Titelwort gross -- dieselbe Schrift, dasselbe
+     Gewicht und dieselbe Grossschreibung wie .esieger im Endstand, in --warn wie der
+     Callout-Rahmen --, darunter den bisherigen Ticker-Satz als Caption (.cosatz). Die
+     Kommentar-Caption (em) bleibt die dritte, kleinste Zeile. Ohne `kind` rendert
+     callout() keinen der beiden Spans, das alte Bild bleibt unveraendert. */
+  .oly-battle-arena.oly-battle-arena .bbugcallout .cotitel{display:block;
+    font:700 clamp(17px,2.7vw,28px)/1.1 "RaniraSeason",Georgia,"Times New Roman",serif;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .bbugcallout .cosatz{display:block;font-size:.88em;
+    font-weight:600;margin-top:3px;letter-spacing:.01em}
 
   /* SZENE DES SPIELS (K5 Stufe 1, Broadcast-Optik-Recherche 27.09.): dieselbe Zeilen-Optik
      wie .ehighlights direkt darunter, aber als eigene, hervorgehobene Karte (--warn-Rahmen,
@@ -944,6 +975,18 @@
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h .eht{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a{border-color:color-mix(in srgb,var(--away) 45%,var(--line-soft))}
   .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a .eht{color:var(--away)}
+  /* KICKER VOR DEM ZEITSTEMPEL (C3, 01.10.): der Highlight-Titel des Chips, klein, fett,
+     gesperrt und in der Seitenfarbe -- dieselbe Kicker-Typografie wie .kicker oben, nur
+     fett. .mitkick gibt dem Chip links Luft, weil dort jetzt Text statt der runden
+     Zeitstempel-Pille am Rand sitzt. In der Szene des Spiels traegt das Etikett (.eht)
+     dieselbe Klasse und damit dieselbe Lesart. */
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.mitkick{padding-left:11px}
+  .oly-battle-arena.oly-battle-arena .ehkick{flex:none;font-weight:700;font-size:9.5px;
+    letter-spacing:.12em;text-transform:uppercase}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.h .ehkick{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ehighlights .ehzeile.a .ehkick{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .eszene .ehzeile .eht.ehkick{color:var(--warn);min-width:0;
+    font-size:10.5px}
   .oly-battle-arena.oly-battle-arena .ehzeile{display:flex;gap:9px}
   .oly-battle-arena.oly-battle-arena .ehzeile .eht{color:var(--faint);flex:none}
   .oly-battle-arena.oly-battle-arena .ehzeile.h{color:var(--home)}
@@ -1159,6 +1202,27 @@
       border-top:0;border-left:1px solid var(--line-soft)}
   }
   .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
+  /* TICKER/PROTOKOLL-REITER (Broadcast-Audit Runde 2, Punkt 8, 30.09.): die Reiterleiste
+     sitzt IN der bisherigen 210px-Hoehe (26px Leiste + 184px Liste), damit das kompakte
+     Sendungslayout aus Punkt 16 nicht wieder waechst. Optik wie die Seiten-Reiter (.tab:
+     Versalien, Unterstrich in Heimfarbe fuer den aktiven Reiter), nur klein. */
+  .oly-battle-arena.oly-battle-arena .tickerbox{display:flex;flex-direction:column;min-width:0}
+  .oly-battle-arena.oly-battle-arena .ftabs{display:flex;gap:2px;padding:0 12px;height:26px;flex:none;
+    border-bottom:1px solid var(--line-soft)}
+  .oly-battle-arena.oly-battle-arena .ftab{font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;background:none;border:0;border-bottom:2px solid transparent;
+    color:var(--muted);padding:5px 8px 3px;cursor:pointer;margin-bottom:-1px;font-style:normal;
+    transition:color .15s ease,border-color .15s ease}
+  .oly-battle-arena.oly-battle-arena .ftab:hover{color:var(--ink);border-bottom-color:var(--line)}
+  .oly-battle-arena.oly-battle-arena .ftab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .ftab:focus-visible{outline:2px solid var(--home);outline-offset:1px}
+  .oly-battle-arena.oly-battle-arena .ftab em{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;
+    color:var(--faint);font-variant-numeric:tabular-nums;margin-left:3px}
+  .oly-battle-arena.oly-battle-arena .tickerbox>.feed{height:184px}
+  .oly-battle-arena.oly-battle-arena .tickerbox>.feed[hidden]{display:none}
+  /* Im Protokoll stehen auch die Zeilen, die der Ticker ausgeblendet hat -- leicht
+     zurueckgenommen, damit die Ereignisse (dieselben wie im Ticker) beim Querlesen tragen. */
+  .oly-battle-arena.oly-battle-arena .protokoll .nurprot{opacity:.72}
   .oly-battle-arena.oly-battle-arena .wertung{border-left:1px solid var(--line-soft);padding:9px 14px;height:210px;overflow-y:auto;display:flex;flex-direction:column;
     border-top:3px solid var(--wakzent, transparent)}
   /* Kein flex:1/min-height:0 hier (Chris' Fund, 29.08.): das gab .wsplit eine vom

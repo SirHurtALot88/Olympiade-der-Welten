@@ -169,6 +169,7 @@ ol.steps li::marker { font-family: var(--ui); font-weight: 700; color: var(--bra
 .create-bar select { width: auto; max-width: 300px; }
 @media (min-width: 881px) { .create-bar .seg { margin-left: auto; } }
 @media (min-width: 881px) { .shop { grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 32px; } }
+@media (min-width: 1100px) { .shop.quer { grid-template-columns: minmax(0, 1fr) minmax(0, 600px); } .shop.quer .stage-col .tiers { max-width: 600px; } }
 form.editor { display: grid; gap: 18px; columns: auto; }
 .form-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px 26px; align-items: start; }
 .form-cols[hidden], #bauModus[hidden] { display: none; }
@@ -187,7 +188,9 @@ details.mehr summary:hover { color: var(--brass); }
 .info { cursor: help; color: var(--brass); font-size: 13px; margin-left: 4px; }
 .stage-col { gap: 10px; }
 .stage-col .tiers { width: 100%; max-width: 420px; }
-.stage-col .tiers button { font-size: 12px; padding: 6px 2px; }
+.stage-col .tiers button { font-size: 12px; padding: 5px 2px; display: grid; gap: 1px; }
+.stage-col .tiers button small { font-size: 10px; font-weight: 600; letter-spacing: .04em; opacity: .75; text-transform: none; }
+.tier-hint { text-align: center; margin: 0; }
 #prompt { min-height: 160px; font-size: 13px; }
 .el-wahl { align-items: center; }
 .el-wahl .tgl { padding: 4px 6px; }
@@ -196,6 +199,52 @@ details.mehr summary:hover { color: var(--brass); }
 .elem { display: inline-grid; place-items: center; width: 1.35em; height: 1.35em; border-radius: 50%; vertical-align: middle; flex: none;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--el) 50%, #fff) 0%, var(--el) 48%, color-mix(in srgb, var(--el) 55%, #000) 100%);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 0 6px color-mix(in srgb, var(--el) 55%, transparent); }
+.elem.eckig { border-radius: 28%; }
+.g-gm { display: grid; gap: 8px; padding: 12px 14px; border: 1px dashed var(--brass); border-radius: 8px; }
+.g-gm h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.gm-schalter { margin-left: auto; }
+.g-welle { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.g-welle h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.g-welle h4 small { color: var(--dim); letter-spacing: .04em; text-transform: none; font-weight: 600; margin-left: 8px; }
+.g-welle-zeile { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.g-welle-zeile select, .g-welle-zeile input { width: auto; flex: 1; min-width: 160px; }
+.g-welle-liste { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-family: var(--ui); }
+.g-welle-liste small { color: var(--dim); }
+.g-fortschritt { display: grid; gap: 8px; }
+.g-ep { display: flex; align-items: center; gap: 8px; font-family: var(--ui); }
+.g-ep span { color: var(--dim); font-size: 14px; }
+.g-ep b { font-size: 20px; min-width: 2ch; text-align: center; }
+.g-verlauf { margin: 0; padding-left: 1.1em; font-family: var(--ui); font-size: 14px; display: grid; gap: 2px; }
+.g-verlauf small { color: var(--dim); margin-right: 6px; }
+.heldenbogen .kaestchen i.voll { background: #7a5a1a; }
+.heldenbogen .linien div { font-size: 9.5pt; display: flex; align-items: end; padding-bottom: .6mm; }
+label.check.klein { font-size: 13px; gap: 5px; }
+label.check.klein input { width: 15px; height: 15px; }
+/* Kartenrückseite */
+.card .face.rueck-face { display: grid; grid-template-rows: auto auto auto; grid-template-columns: 1fr; grid-template-areas: none; place-items: center; align-content: center; gap: calc(var(--u)*2.4); text-align: center;
+  background: radial-gradient(70% 60% at 50% 45%, color-mix(in srgb, var(--acc) 30%, rgb(var(--panel))), rgb(var(--panel)) 75%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 calc(var(--u)*.5), transparent calc(var(--u)*.5) calc(var(--u)*2.2)); }
+.card.rueck .face::before, .card.rueck .face::after { display: none; }
+.rueck-symbol svg { width: calc(var(--u)*30); height: calc(var(--u)*30); color: var(--acc); filter: drop-shadow(0 0 calc(var(--u)*3) color-mix(in srgb, var(--acc) 60%, transparent)); }
+.land .rueck-symbol svg { width: calc(var(--u)*24); height: calc(var(--u)*24); }
+.rueck-name { font: 800 calc(var(--u)*6.4) var(--disp); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-c); padding-inline: calc(var(--u)*8); }
+.rueck-stufe { display: flex; gap: calc(var(--u)*1.6); align-items: center; font-size: calc(var(--u)*3); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--acc); }
+.rueck-fuss { position: absolute; bottom: calc(var(--u)*4); left: 0; right: 0; font-size: calc(var(--u)*2.2); letter-spacing: .2em; text-transform: uppercase; color: var(--sub); }
+.druck-format { width: auto; font-size: 13px; padding: 6px 8px; }
+/* Symbole im Regeltext: {A2} → Schwert 2, {V+1} → Schild +1 … */
+.sym { display: inline-flex; align-items: center; gap: .12em; padding: 0 .28em 0 .18em; margin: 0 .05em; border-radius: .35em; background: rgba(255,255,255,.11);
+  white-space: nowrap; vertical-align: -.12em; line-height: 1.25; font-family: var(--ui); font-weight: 800; font-style: normal; }
+.sym svg { width: 1.05em !important; height: 1.05em !important; color: var(--acc, var(--brass)) !important; flex: none; }
+.sym b { font-weight: 800; }
+.heldenbogen .sym { background: rgba(0,0,0,.07); }
+.heldenbogen .sym svg { color: #7a5a1a !important; }
+.sym-legende { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 20px; margin-top: 18px; font-family: var(--ui); font-size: 15px; }
+.sym-legende div { display: flex; gap: 10px; align-items: center; }
+.sym-legende code { color: var(--dim); font-size: 13px; }
+.save-wahl { display: inline-flex; gap: 6px; flex-wrap: wrap; margin-left: 6px; vertical-align: middle; }
+.chip-f.kat { font-size: 15px; padding: 7px 12px; }
+.chip-f.kat svg { width: 17px; height: 17px; color: var(--brass); }
+.chip-f.kat[aria-pressed="true"] svg { color: var(--bg); }
 .elem > svg { width: 68% !important; height: 68% !important; color: #17110a !important; }
 .tagzeile .elem, .werte .elem, .tagleiste .elem, .chip-f .elem { width: 20px; height: 20px; }
 .el-tabelle .el-name { display: inline-flex; gap: 8px; align-items: center; }
@@ -242,12 +291,13 @@ table.charaktere tbody tr { cursor: default; }
   --u: 1cqw; --k: 1;
   --frame: #3a3d41; --edge: rgba(255,255,255,.14); --acc: #b3b8bf; --acc2: #6c7178;
   --plate: rgba(16,17,19,.82); --panel: 12,12,13; --ink-c: #ece6da; --sub: #b9b2a5;
-  position: relative; aspect-ratio: 5 / 7; border-radius: calc(var(--u) * 4.2); padding: calc(var(--u) * 2.4);
+  position: relative; aspect-ratio: 2 / 3; border-radius: calc(var(--u) * 4.2); padding: calc(var(--u) * 2.4);
   background: var(--frame); isolation: isolate; box-sizing: border-box; color: var(--ink-c);
   font-family: var(--ui); line-height: 1.1; text-align: left;
   box-shadow: 0 calc(var(--u)*2) calc(var(--u)*5) rgba(0,0,0,.55), inset 0 0 0 calc(var(--u)*.35) rgba(255,255,255,.08);
 }
-.card.land { aspect-ratio: 7 / 5; --u: .62cqw; }
+/* Postkartenformat: hoch 10 × 15 cm (2:3, siehe .card), quer 15 × 10 cm */
+.card.land { aspect-ratio: 3 / 2; --u: .62cqw; }
 .face {
   position: relative; height: 100%; border-radius: calc(var(--u) * 2.2); overflow: hidden; background: #0c0c0d;
   display: grid; grid-template-rows: auto 1fr auto; grid-template-areas: "head" "gap" "panel";
@@ -310,12 +360,38 @@ table.charaktere tbody tr { cursor: default; }
 .foot .fac svg { width: calc(var(--u)*4.4*var(--k)); height: calc(var(--u)*4.4*var(--k)); }
 .foot q { font-family: var(--prose); font-style: italic; font-size: calc(var(--u)*2.7*var(--k)); line-height: 1.2; color: var(--sub); quotes: none; padding-left: calc(var(--u)*2); border-left: calc(var(--u)*.25) solid rgba(255,255,255,.14); }
 
-/* Querformat: Text links, Bild rechts */
-.land .face { grid-template-columns: 47% 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head gap" "panel gap"; }
-.land .face::before { content: ""; position: absolute; z-index: 2; inset: 0 auto 0 0; width: 47%; background: rgb(var(--panel)); }
-.land .art { left: 38%; -webkit-mask-image: linear-gradient(to right, transparent, #000 18%); mask-image: linear-gradient(to right, transparent, #000 18%); }
-.land .head { padding-right: calc(var(--u)*3); background: none; }
-.land .panel { padding-top: calc(var(--u)*1); background: none; align-content: start; }
+/* Querformat: Text links (50 %), Bild rechts schmaler, damit sich auch Hochformat-Bilder zurechtschieben lassen.
+   Schräge Kante mit Leuchtlinie in der Seltenheitsfarbe, Panel mit Farbschimmer statt flacher Fläche. */
+.land .face { grid-template-columns: 50% 1fr; grid-template-rows: auto 1fr; grid-template-areas: "head gap" "panel gap"; }
+.land .face::before, .land .face::after { content: ""; position: absolute; inset: 0 auto 0 0; clip-path: polygon(0 0, 100% 0, 93% 100%, 0 100%); pointer-events: none; }
+.land .face::before { z-index: 2; width: 54%;
+  background:
+    radial-gradient(90% 55% at 0% 0%, color-mix(in srgb, var(--acc) 20%, transparent), transparent 70%),
+    radial-gradient(80% 45% at 0% 100%, color-mix(in srgb, var(--acc2) 22%, transparent), transparent 75%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.022) 0 calc(var(--u)*.35), transparent calc(var(--u)*.35) calc(var(--u)*1.6)),
+    linear-gradient(165deg, rgb(var(--panel)), color-mix(in srgb, rgb(var(--panel)) 80%, #000)); }
+.land .face::after { z-index: 1; width: calc(54% + var(--u)*.8);
+  background: linear-gradient(to bottom, var(--acc), var(--acc2) 55%, color-mix(in srgb, var(--acc2) 30%, transparent)); }
+.land .art { left: 46%; -webkit-mask-image: linear-gradient(to right, transparent, #000 9%); mask-image: linear-gradient(to right, transparent, #000 9%); }
+.land .head { padding-right: calc(var(--u)*6); background: none; }
+.land .panel { padding-top: calc(var(--u)*1); padding-right: calc(var(--u)*6); background: none; align-content: start; }
+.land .stat { border-radius: calc(var(--u)*.8); background: linear-gradient(to bottom, rgba(255,255,255,.1), rgba(255,255,255,.03)); }
+.land .wep, .land .boss { border-radius: calc(var(--u)*.8); }
+/* Querformat kompakter: kleinerer Name, flachere Wertefelder und Waffenzeilen, damit Regeltexte groß bleiben */
+.land .name { font-size: calc(var(--u)*6.6*var(--k)); }
+.land.t6 .name { font-size: calc(var(--u)*7.8*var(--k)); }
+.land .head { padding-bottom: calc(var(--u)*1.6); }
+.land .panel { gap: calc(var(--u)*1.25*var(--k)); }
+.land .stat { padding: calc(var(--u)*.6) 0 calc(var(--u)*.8); }
+.land .stat b { font-size: calc(var(--u)*4.8*var(--k)); }
+.land .wep { padding-block: calc(var(--u)*.7*var(--k)); }
+.land .wep svg { width: calc(var(--u)*3.8*var(--k)); height: calc(var(--u)*3.8*var(--k)); }
+.land .boss { padding: calc(var(--u)*1.1) calc(var(--u)*1.5); }
+.land .boss p .tico { margin-right: calc(var(--u)*.6); }
+.land .wep { background: linear-gradient(to right, rgba(255,255,255,.08), rgba(255,255,255,.02)); }
+/* Krone, Edelstein und Boss-Banner sitzen im Querformat über dem Bild, nicht über dem Namen */
+.land .crest { left: 75%; width: 24% !important; }
+.land .ribbon { left: 75%; top: calc(var(--u)*11.5); }
 
 /* Ornamente (standardmäßig aus) */
 .corner, .crest, .foil, .sheen, .embers, .halo, .ribbon { display: none; }
@@ -379,8 +455,9 @@ table.charaktere tbody tr { cursor: default; }
 .t6 .name { font-family: "Grenze Gotisch", var(--disp); text-transform: none; font-weight: 700; font-size: calc(var(--u)*9.4*var(--k)); line-height: .95; letter-spacing: 0;
   color: #ff7a4a; background: linear-gradient(to bottom, #ffe9d6 8%, #ff7a3a 52%, #c4160c 95%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   text-shadow: none; filter: drop-shadow(0 calc(var(--u)*.4) calc(var(--u)*.6) rgba(0,0,0,.9)) drop-shadow(0 0 calc(var(--u)*2.6) rgba(255,50,20,.55)); }
-.t6 .head { padding-top: calc(var(--u)*6.4); padding-left: calc(var(--u)*6); }
-.land.t6 .head { padding-top: calc(var(--u)*8); }
+.t6 .head { padding-top: calc(var(--u)*14); padding-left: calc(var(--u)*6); }
+.t5 .head { padding-top: calc(var(--u)*10); }
+.land.t6 .head, .land.t5 .head { padding-top: calc(var(--u)*5); }
 .t6 .badge { top: calc(var(--u)*1.2); background: linear-gradient(135deg, #ffe3a0, #c98a22 45%, #fff0c0 60%, #8a5a14); border: 0; color: #3a0906; padding-top: calc(var(--u)*1); padding-bottom: calc(var(--u)*5);
   clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%); }
 .t6 .badge span { color: #5a1208; }
@@ -395,7 +472,7 @@ table.charaktere tbody tr { cursor: default; }
   background: conic-gradient(from var(--ang), #ff2a12, #ff8a1f, transparent 22%, #ff3b1a 40%, transparent 55%, #ffb03a 72%, #c80f06 88%, #ff2a12); opacity: .9;
   animation: spin 7s linear infinite; }
 @keyframes spin { to { --ang: 360deg; } }
-.ribbon { position: absolute; z-index: 8; left: 50%; top: calc(var(--u)*1.8); translate: -50% 0; padding: calc(var(--u)*.6) calc(var(--u)*4.2);
+.ribbon { position: absolute; z-index: 8; left: 50%; top: calc(var(--u)*8.2); translate: -50% 0; padding: calc(var(--u)*.6) calc(var(--u)*4.2);
   font-size: calc(var(--u)*2.5); font-weight: 800; letter-spacing: .34em; text-transform: uppercase; color: #ffd98a;
   background: linear-gradient(#1c0302, #000); clip-path: polygon(0 0, 100% 0, 94% 50%, 100% 100%, 0 100%, 6% 50%); }
 .embers { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
@@ -487,15 +564,38 @@ fieldset.checks legend { margin-bottom: 6px; }
 .out-many img { width: 180px; height: auto; border-radius: 6px; }
 .print-area { display: none; }
 /* Zum Einpassen der Texte muss der Druckbereich kurz gerendert werden, außerhalb des Bildschirms */
-.print-area.bereit { display: flex; flex-wrap: wrap; gap: 4mm; position: fixed; left: -10000px; top: 0; width: 194mm; }
-.print-area.bereit .cw { width: 63mm; }
+/* Druck: jede Karte auf eigener Seite in Postkartengröße (benannte Seiten), mit mindestens 2 mm Rand rundum.
+   Helden zusätzlich als Heldenbogen auf A4: große Karte plus Felder für Erfahrung, Power, Wunden und Notizen. */
+.print-area.bereit { display: block; position: fixed; left: -10000px; top: 0; width: 297mm; }
+.print-area .seite { display: grid; place-items: center; box-sizing: border-box; overflow: hidden; background: #fff; }
+.print-area .seite:not(:last-child) { break-after: page; }
+.print-area .seite.postkarte-quer { page: postkarte-quer; width: 150mm; height: 100mm; }
+.print-area .seite.postkarte-hoch { page: postkarte-hoch; width: 100mm; height: 150mm; }
+.print-area .seite .cw { width: var(--breite); }
+.print-area .halo, .print-area .embers { display: none !important; }
+.print-area .card { box-shadow: none !important; }
+.print-area .heldenbogen { page: a4-hoch; width: 210mm; height: 297mm; padding: 12mm; display: grid; grid-template-columns: 100mm 1fr; grid-template-rows: auto 1fr;
+  gap: 8mm; place-items: start stretch; color: #1a1a1a; font-family: var(--ui); }
+.heldenbogen .hb-karte .cw { width: 100mm; }
+.heldenbogen h2 { margin: 0; font: 800 22pt var(--disp); }
+.heldenbogen .hb-unter { margin: 1mm 0 5mm; font-size: 10pt; color: #555; letter-spacing: .04em; }
+.heldenbogen h3 { margin: 4mm 0 2mm; font: 700 9pt var(--ui); letter-spacing: .16em; text-transform: uppercase; color: #7a5a1a; border-bottom: .3mm solid #c9a35b; padding-bottom: 1mm; }
+.heldenbogen .kaestchen { display: flex; flex-wrap: wrap; gap: 1.6mm; }
+.heldenbogen .kaestchen i { width: 6mm; height: 6mm; border: .35mm solid #333; border-radius: 1mm; }
+.heldenbogen .kaestchen.rund i { border-radius: 50%; }
+.heldenbogen .linien div { height: 8mm; border-bottom: .25mm solid #999; }
+.heldenbogen .hb-faeh { grid-column: 1 / -1; align-self: start; font-size: 9.5pt; line-height: 1.35; }
+.heldenbogen .hb-spalten { columns: 2; column-gap: 8mm; }
+.heldenbogen .hb-faeh p { margin: 0 0 2.5mm; break-inside: avoid; }
+.heldenbogen .hb-faeh .tico svg { width: 4mm; height: 4mm; }
+.heldenbogen .hb-faeh .elem { width: 4.6mm; height: 4.6mm; }
+@page postkarte-quer { size: 150mm 100mm; margin: 0; }
+@page postkarte-hoch { size: 100mm 150mm; margin: 0; }
+@page a4-hoch { size: A4 portrait; margin: 0; }
 @media print {
-  @page { size: A4; margin: 8mm; }
-  html, body { background: #fff !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
   body > *:not(.print-area) { display: none !important; }
-  .print-area { display: flex !important; flex-wrap: wrap; gap: 4mm; position: static !important; width: auto !important; }
-  .print-area .cw { width: 63mm; break-inside: avoid; }
-  .print-area .card { box-shadow: none; }
+  .print-area { display: block !important; position: static !important; width: auto !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 .fac-preview { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; font-family: var(--ui); font-size: 16px; color: var(--ink); }
@@ -586,6 +686,9 @@ fieldset.checks legend { margin-bottom: 6px; }
     <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1.5 8 8.5-11h-6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
     <symbol id="i-dice" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="8.5" cy="8.5" r="1.6" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2.5l2.4 7.1 7.1 2.4-7.1 2.4L12 21.5l-2.4-7.1L2.5 12l7.1-2.4z" fill="currentColor"/></symbol>
+    <symbol id="i-runde" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.8 3.8v4.6h-4.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-reach" viewBox="0 0 24 24"><path d="M3 12h18M7 7.5L2.5 12 7 16.5M17 7.5l4.5 4.5-4.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-hammer" viewBox="0 0 24 24"><path d="M4 7.5l4-4 7 7-4 4zM11.5 11l8.5 8.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
     <symbol id="i-axe" viewBox="0 0 24 24"><path d="M9 21L19 5M14 6c2.5-2.5 6-2 7 .5-1 3-3.5 4.5-6.5 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-fang" viewBox="0 0 24 24"><path d="M4 5h16c-1 6-3.5 11-5.5 14-.8-3-1.6-5-2.5-5s-1.7 2-2.5 5C7.5 16 5 11 4 5z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
@@ -632,7 +735,7 @@ fieldset.checks legend { margin-bottom: 6px; }
             <label class="f">Name <input type="text" id="name"></label>
             <label class="f">Fraktion <span class="fac-sel"><span class="fac-preview" id="facIcon"></span><select id="faction"></select></span></label>
             <label class="f">Rolle
-              <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option><option value="companion">Gefährte</option></select>
+              <select id="role"><option value="enemy">Gegner</option><option value="hero">Held</option></select>
             </label>
           </div>
           <div class="f">Prägung <span class="chips-f" id="praegung"></span></div>
@@ -664,7 +767,7 @@ fieldset.checks legend { margin-bottom: 6px; }
             <details class="mehr">
               <summary>Eigene Sonderregel</summary>
               <label class="f">Name <input type="text" id="bossName"></label>
-              <label class="f">Regeltext <textarea id="bossText" rows="2"></textarea></label>
+              <label class="f"><span>Regeltext <span class="info" data-tip="Kürzel werden zu Symbolen: {P1} Power, {A2} Treffer, {DS1} Durchschlag, {V+1} Verteidigung, {T-1} auf Treffer, {HW3} heilen, {R12} Reichweite, {F3} Umkreis, {B6} Bewegung, {X} betäubt, {D4} Wurf, {S} einmal pro Spiel, {RU} einmal pro Runde. Die ganze Liste steht im Reiter Regeln.">ⓘ</span></span><textarea id="bossText" rows="2" placeholder="z. B. {RU} Feind {R6}: {A2} {DS1}"></textarea></label>
               <label class="f">Stärke
                 <select id="special">
                   <option value="0">Keine oder nur Flavour</option><option value="5">Klein, +5 %</option><option value="10">Mittel, +10 %</option>
@@ -723,10 +826,13 @@ fieldset.checks legend { margin-bottom: 6px; }
             <button type="button" data-o="land" aria-pressed="false">Quer</button>
           </div>
           <button type="button" class="btn sm" id="exportBtn">PNG</button>
+          <button type="button" class="btn ghost sm" id="druckBtn">Drucken</button>
+          <select id="druckFormat" aria-label="Druckformat" class="druck-format"></select>
+          <label class="check klein" data-tip="Druckt nach jeder Postkarte ihre Rückseite: für beidseitigen Druck (an der langen Kante wenden)."><input type="checkbox" id="rueckBox"> Rückseite</label>
           <button type="button" class="btn ghost sm" id="saveBtn" hidden>Speichern</button>
         </div>
         <div class="tiers" id="tiers" role="group" aria-label="Seltenheit"></div>
-        <label class="check"><input type="checkbox" id="autoTier"> Stufe folgt den Punkten <span class="info" id="suggest" data-tip="">ⓘ</span></label>
+        <p class="hint tier-hint">Rahmen = Punkte: <span id="suggest"></span> Ein Klick auf eine Stufe passt Werte und Fähigkeiten an.</p>
         <p class="hint" id="saveMsg" aria-live="polite"></p>
         <div class="stage" id="stage"></div>
         <p class="tier-note fit-note" id="fitNote" aria-live="polite"></p>
@@ -740,7 +846,7 @@ fieldset.checks legend { margin-bottom: 6px; }
       <h2 id="h-liste">Fertige Charaktere</h2>
       <div class="liste-filter">
         <input type="search" id="lSuche" placeholder="Suchen" aria-label="Charaktere suchen">
-        <select id="lRolle" aria-label="Rolle"><option value="">Alle Rollen</option><option value="hero">Helden</option><option value="companion">Gefährten</option><option value="enemy">Gegner</option></select>
+        <select id="lRolle" aria-label="Rolle"><option value="">Alle Rollen</option><option value="hero">Helden</option><option value="enemy">Gegner</option></select>
         <select id="lQuelle" aria-label="Quelle"><option value="">Vorlagen und gespeicherte</option><option value="vorlage">Nur Vorlagen</option><option value="server">Nur gespeicherte</option></select>
       </div>
     </div>
@@ -793,6 +899,7 @@ fieldset.checks legend { margin-bottom: 6px; }
         <div class="copyrow">
           <button type="button" class="btn" id="simRun">Würfeln</button>
           <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
+          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an Zäh bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
       </div>
@@ -837,7 +944,7 @@ fieldset.checks legend { margin-bottom: 6px; }
         <h3>Normal und Elite</h3>
         <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
-        <p>Wer die Elite-Version einer Gegnerart besiegt, darf deren normale Version als Gefährten anwerben. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
+        <p>Jeder Gegner kann ein Gefährte werden. Der Spielleiter schaltet ihn für eine Gruppe frei, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>
     </div>
   </section>
@@ -891,9 +998,9 @@ fieldset.checks legend { margin-bottom: 6px; }
       <div class="dbx">
         <aside class="dbx-filter">
           <label class="f">Suchen <input type="search" id="dbSuche" placeholder="Name oder Regeltext"></label>
-          <div class="f">Typ <div class="chipset" id="dbTypen"></div></div>
+          <div class="f">Kategorie <div class="chipset" id="dbTypen"></div></div>
           <div class="f">Tags <div class="chipset" id="dbTags"></div></div>
-          <div class="f">Für <div class="chipset" id="dbRollen"></div></div>
+          <div class="f" id="dbRollenRow">Für <div class="chipset" id="dbRollen"></div></div>
           <p class="hint" id="dbAnzahl"></p>
         </aside>
         <div class="dbx-main">
@@ -938,7 +1045,6 @@ fieldset.checks legend { margin-bottom: 6px; }
               <label class="f" id="dbIconRow" hidden>Symbol <select id="dbIcon"></select></label>
               <fieldset class="checks" id="dbFuerRow"><legend>Für</legend>
                 <label class="check"><input type="checkbox" id="dbHero" checked> Held</label>
-                <label class="check"><input type="checkbox" id="dbComp" checked> Gefährte</label>
                 <label class="check"><input type="checkbox" id="dbEnemy" checked> Gegner</label>
               </fieldset>
               <div class="f">Tags <div class="chipset" id="dbFormTags"></div></div>

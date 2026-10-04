@@ -95,43 +95,44 @@
   // ---------- Wirkungen für Fähigkeiten, Zauber und Gegenstände ----------
   // sg/pl: Satzende für ein Ziel oder mehrere
   const WIRKUNGEN = [
-    { id: "schaden", tags: ["magie"], feind: true, basis: 10, sg: "erleidet W3 Treffer mit DS(1)", pl: "erleiden je W3 Treffer mit DS(1)", namen: ["Runenschlag", "Blutpfeil", "Aschehagel", "Schattenlanze"] },
-    { id: "feuer", tags: ["feuer"], feind: true, basis: 12, sg: "erleidet W3 Treffer; bei einer 6 brennt es und erleidet in der nächsten Runde 1 weiteren Treffer", pl: "erleiden je W3 Treffer; bei einer 6 brennen sie und erleiden in der nächsten Runde 1 weiteren Treffer", namen: ["Glutstoß", "Feuerzunge", "Aschenbrand", "Höllenfunke"] },
-    { id: "frost", tags: ["frost", "schwaechung"], feind: true, basis: 9, sg: "erleidet 1 Treffer und bewegt sich bis zu seiner nächsten Aktivierung nur halb so weit", pl: "erleiden je 1 Treffer und bewegen sich bis zu ihrer nächsten Aktivierung nur halb so weit", namen: ["Frostgriff", "Eisatem", "Raureif", "Winterbiss"] },
-    { id: "betaeubung", tags: ["betaeubung"], feind: true, basis: 15, sg: "ist betäubt und darf sich bei seiner nächsten Aktivierung nur bewegen", pl: "sind betäubt und dürfen sich bei ihrer nächsten Aktivierung nur bewegen", namen: ["Donnerhall", "Lähmfluch", "Schockwelle", "Nervenstoß"] },
-    { id: "gift", tags: ["gift"], feind: true, basis: 8, sg: "erhält 2 Treffer mit Gift", pl: "erhalten je 2 Treffer mit Gift", namen: ["Giftwolke", "Natternkuss", "Fäulnis", "Sporenhauch"] },
-    { id: "furcht", tags: ["furcht"], feind: true, basis: 7, sg: "legt sofort eine Moralprobe ab", pl: "legen sofort eine Moralprobe ab", namen: ["Schreckensruf", "Grabesstimme", "Albtraum"] },
-    { id: "stoss", tags: ["bewegung"], feind: true, basis: 5, sg: "wird W3+1\" zurückgestoßen", pl: "werden W3+1\" zurückgestoßen", namen: ["Sturmstoß", "Druckwelle", "Titanenfaust"] },
-    { id: "schwaechung", tags: ["schwaechung"], feind: true, basis: 8, sg: "erhält −1 auf Treffer bis zu seiner nächsten Aktivierung", pl: "erhalten −1 auf Treffer bis zu ihrer nächsten Aktivierung", namen: ["Fluch der Schwäche", "Nebelschleier", "Störsignal"] },
-    { id: "heilung", tags: ["heilung"], feind: false, basis: 10, sg: "heilt W3 Wunden", pl: "heilen je W3 Wunden", namen: ["Lebensfunke", "Heilende Hände", "Mondtau", "Regenerationsschub"] },
-    { id: "schutz", tags: ["schutz"], feind: false, basis: 8, sg: "erhält +1 Verteidigung bis zu seiner nächsten Aktivierung", pl: "erhalten +1 Verteidigung bis zu ihrer nächsten Aktivierung", namen: ["Eisenhaut", "Schutzkreis", "Kraftfeld", "Wächtersegen"] },
-    { id: "staerkung", tags: ["staerkung"], feind: false, basis: 8, sg: "erhält +1 auf Treffer bis zum Ende seiner nächsten Aktivierung", pl: "erhalten +1 auf Treffer bis zum Ende ihrer nächsten Aktivierung", namen: ["Kriegsruf", "Blutdurst", "Zielsucher", "Kampfrausch"] },
-    { id: "sprung", tags: ["bewegung"], selbst: true, basis: 6, sg: "versetzt sich bis zu 6\" in beliebige Richtung", pl: "", namen: ["Phasensprung", "Blinzeln", "Sprungdüse", "Schattensprung"] },
-    { id: "tarnung", tags: ["tarnung"], selbst: true, basis: 6, sg: "kann bis zu seiner nächsten Aktivierung nur aus 9\" oder näher beschossen werden", pl: "", namen: ["Schattenmantel", "Tarnfeld", "Nebelgestalt"] },
-    { id: "beschwoerung", tags: ["beschwoerung"], selbst: true, basis: 20, sg: "ruft einen Geistwolf (Qualität 4+, Verteidigung 5+, Zäh 3, A2 Nahkampf) in 3\" herbei, der bis zum Ende des Spiels bleibt", pl: "", namen: ["Ruf der Wildnis", "Seelenbeschwörung", "Portalriss"] },
+    { id: "schaden", tags: ["magie"], feind: true, basis: 10, sg: "{AW3} {DS1}", pl: "{AW3} {DS1}", namen: ["Runenschlag", "Blutpfeil", "Aschehagel", "Schattenlanze"] },
+    { id: "feuer", tags: ["feuer"], feind: true, basis: 12, sg: "{AW3}, bei einer 6 brennt das Ziel: nächste Runde {A1}", pl: "{AW3}, bei einer 6 brennt das Ziel: nächste Runde {A1}", namen: ["Glutstoß", "Feuerzunge", "Aschenbrand", "Höllenfunke"] },
+    { id: "frost", tags: ["frost", "schwaechung"], feind: true, basis: 9, sg: "{A1}, halbe Bewegung bis zur nächsten Aktivierung", pl: "{A1}, halbe Bewegung bis zur nächsten Aktivierung", namen: ["Frostgriff", "Eisatem", "Raureif", "Winterbiss"] },
+    { id: "betaeubung", tags: ["betaeubung"], feind: true, basis: 15, sg: "{X}", pl: "{X}", namen: ["Donnerhall", "Lähmfluch", "Schockwelle", "Nervenstoß"] },
+    { id: "gift", tags: ["gift"], feind: true, basis: 8, sg: "{A2} mit Gift", pl: "{A2} mit Gift", namen: ["Giftwolke", "Natternkuss", "Fäulnis", "Sporenhauch"] },
+    { id: "furcht", tags: ["furcht"], feind: true, basis: 7, sg: "sofort Moralprobe", pl: "sofort Moralprobe", namen: ["Schreckensruf", "Grabesstimme", "Albtraum"] },
+    { id: "stoss", tags: ["bewegung"], feind: true, basis: 5, sg: "W3+1\" zurückgestoßen", pl: "W3+1\" zurückgestoßen", namen: ["Sturmstoß", "Druckwelle", "Titanenfaust"] },
+    { id: "schwaechung", tags: ["schwaechung"], feind: true, basis: 8, sg: "{T-1} bis zur nächsten Aktivierung", pl: "{T-1} bis zur nächsten Aktivierung", namen: ["Fluch der Schwäche", "Nebelschleier", "Störsignal"] },
+    { id: "heilung", tags: ["heilung"], feind: false, basis: 10, sg: "{HW3}", pl: "{HW3}", namen: ["Lebensfunke", "Heilende Hände", "Mondtau", "Regenerationsschub"] },
+    { id: "schutz", tags: ["schutz"], feind: false, basis: 8, sg: "{V+1} bis zur nächsten Aktivierung", pl: "{V+1} bis zur nächsten Aktivierung", namen: ["Eisenhaut", "Schutzkreis", "Kraftfeld", "Wächtersegen"] },
+    { id: "staerkung", tags: ["staerkung"], feind: false, basis: 8, sg: "{T+1} bis zum Ende der nächsten Aktivierung", pl: "{T+1} bis zum Ende der nächsten Aktivierung", namen: ["Kriegsruf", "Blutdurst", "Zielsucher", "Kampfrausch"] },
+    { id: "sprung", tags: ["bewegung"], selbst: true, basis: 6, sg: "{B6} in beliebige Richtung", pl: "", namen: ["Phasensprung", "Blinzeln", "Sprungdüse", "Schattensprung"] },
+    { id: "tarnung", tags: ["tarnung"], selbst: true, basis: 6, sg: "bis zur nächsten Aktivierung nur aus 9\" oder näher beschießbar", pl: "", namen: ["Schattenmantel", "Tarnfeld", "Nebelgestalt"] },
+    { id: "beschwoerung", tags: ["beschwoerung"], selbst: true, basis: 20, sg: "Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf), bleibt bis Spielende", pl: "", namen: ["Ruf der Wildnis", "Seelenbeschwörung", "Portalriss"] },
   ];
-  const ZIELE_FEIND = [{ t: "Ein Feind in {rw}", m: 1 }, { t: "Alle Feinde in {rw}", m: 1.8, tag: "flaeche", pl: true, flaeche: true }];
-  const ZIELE_FREUND = [{ t: "Ein Verbündeter in {rw}", m: 1 }, { t: "Alle Verbündeten in {rw}", m: 1.8, tag: "flaeche", pl: true, flaeche: true }, { t: "Dieses Modell", m: 0.7, ohneRw: true }];
+  // {R} wird zu {R6} (Reichweite), {F} zu {F6} (alle im Umkreis) – Symbole siehe app.js SYMBOLTEXT
+  const ZIELE_FEIND = [{ t: "Feind {R}", m: 1 }, { t: "Alle Feinde {F}", m: 1.8, tag: "flaeche", pl: true, flaeche: true }];
+  const ZIELE_FREUND = [{ t: "Verbündeter {R}", m: 1 }, { t: "Alle Verbündeten {F}", m: 1.8, tag: "flaeche", pl: true, flaeche: true }, { t: "Dieses Modell", m: 0.7, ohneRw: true }];
   const ZIEL_SELBST = [{ t: "Dieses Modell", m: 1, ohneRw: true }];
   const REICHWEITEN = [{ z: 3, m: 0.8 }, { z: 6, m: 1 }, { z: 12, m: 1.25 }, { z: 18, m: 1.45 }];
   const NUTZUNG = {
-    faehigkeit: [{ t: "Skill, 1 Power:", m: 1 }, { t: "Einmal pro Spiel:", m: 0.6, tag: "einmalig" }],
-    sonderregel: [{ t: "Einmal pro Runde:", m: 1.2 }, { t: "Einmal pro Spiel:", m: 0.6, tag: "einmalig" }, { t: "Am Ende jeder Runde:", m: 1.8, tag: "aura" },
-      { t: "Erleidet dieses Modell eine Wunde:", m: 1.1, tag: "reaktion", angreifer: true }],
-    zauber: [{ t: "Zauber (4+):", m: 0.9 }, { t: "Zauber (5+):", m: 0.75 }, { t: "Zauber (3+):", m: 1.1 }],
-    gegenstand: [{ t: "Einmal:", m: 0.5, tag: "einmalig", art: "Trank" }, { t: "Einmal pro Spiel:", m: 0.6, tag: "einmalig", art: "Artefakt" }, { t: "Einmal pro Runde:", m: 1.1, art: "Artefakt" }],
+    faehigkeit: [{ t: "{P1}", m: 1 }, { t: "{S}", m: 0.6, tag: "einmalig" }],
+    sonderregel: [{ t: "{RU}", m: 1.2 }, { t: "{S}", m: 0.6, tag: "einmalig" }, { t: "Rundenende:", m: 1.8, tag: "aura" },
+      { t: "Erleidet es eine Wunde:", m: 1.1, tag: "reaktion", angreifer: true }],
+    zauber: [{ t: "{Z4}", m: 0.9 }, { t: "{Z5}", m: 0.75 }, { t: "{Z3}", m: 1.1 }],
+    gegenstand: [{ t: "{S}", m: 0.5, tag: "einmalig", art: "Trank" }, { t: "{S}", m: 0.6, tag: "einmalig", art: "Artefakt" }, { t: "{RU}", m: 1.1, art: "Artefakt" }],
   };
   const ZIEL_BUDGET = [0, 5, 8, 12, 18, 25, 35];
 
   // Dauerhafte Ausrüstung ohne Auslöser
   const AUSRUESTUNG = [
-    { text: "+1 Verteidigung gegen Beschuss.", basis: 10, tags: ["schutz"], vor: ["Runen", "Eisen", "Wächter"], nomen: ["schild", "umhang", "panzer"] },
-    { text: "+2\" beim Bewegen und Angreifen.", basis: 5, tags: ["bewegung"], vor: ["Wind", "Sprung", "Schatten"], nomen: ["stiefel", "mantel"] },
+    { text: "{V+1} gegen Beschuss.", basis: 10, tags: ["schutz"], vor: ["Runen", "Eisen", "Wächter"], nomen: ["schild", "umhang", "panzer"] },
+    { text: "{B+2} beim Bewegen und Angreifen.", basis: 5, tags: ["bewegung"], vor: ["Wind", "Sprung", "Schatten"], nomen: ["stiefel", "mantel"] },
     { text: "Nahkampfwaffen erhalten Reißend.", basis: 12, tags: ["nahkampf", "staerkung"], vor: ["Blut", "Klingen", "Reiß"], nomen: ["handschuhe", "wetzstein", "ring"] },
-    { text: "Fernkampfwaffen erhalten +6\" Reichweite.", basis: 8, tags: ["fernkampf", "staerkung"], vor: ["Falken", "Ziel", "Adler"], nomen: ["linse", "visier", "auge"] },
+    { text: "Fernkampfwaffen: {R+6} Reichweite.", basis: 8, tags: ["fernkampf", "staerkung"], vor: ["Falken", "Ziel", "Adler"], nomen: ["linse", "visier", "auge"] },
     { text: "Immun gegen Gift und Furcht.", basis: 6, tags: ["schutz"], vor: ["Reinheits", "Mut", "Heil"], nomen: ["amulett", "talisman"] },
-    { text: "Einmal pro Spiel einen eigenen Wurf wiederholen.", basis: 5, tags: ["einmalig"], vor: ["Glücks", "Schicksals"], nomen: ["münze", "knochen", "würfel"] },
-    { text: "+1 Power (Quest).", basis: 10, tags: ["magie"], vor: ["Äther", "Kristall", "Stern"], nomen: ["fokus", "splitter", "kern"] },
+    { text: "{S} Einen eigenen Wurf wiederholen.", basis: 5, tags: ["einmalig"], vor: ["Glücks", "Schicksals"], nomen: ["münze", "knochen", "würfel"] },
+    { text: "{P+1} dauerhaft (Quest).", basis: 10, tags: ["magie"], vor: ["Äther", "Kristall", "Stern"], nomen: ["fokus", "splitter", "kern"] },
     { text: "Ignoriert Deckung beim Schießen.", basis: 8, tags: ["fernkampf"], vor: ["Durchblick", "Geister", "Spür"], nomen: ["brille", "rune", "zielgerät"] },
   ];
 
@@ -156,7 +157,7 @@
       const nu = wahl(r, nutzungen);
       if (opt.tag && ["einmalig", "aura", "reaktion"].includes(opt.tag) && nu.tag !== opt.tag) continue;
       if (nu.angreifer && !wk.feind) continue;
-      const ziele = nu.angreifer ? [{ t: "Der Angreifer", m: 1, ohneRw: true }] : wk.selbst ? ZIEL_SELBST : wk.feind ? ZIELE_FEIND : ZIELE_FREUND;
+      const ziele = nu.angreifer ? [{ t: "Angreifer", m: 1, ohneRw: true }] : wk.selbst ? ZIEL_SELBST : wk.feind ? ZIELE_FEIND : ZIELE_FREUND;
       const zi = wahl(r, ziele);
       if (opt.tag === "flaeche" && !zi.flaeche) continue;
       const rw = zi.ohneRw ? { z: 0, m: 1 } : wahl(r, zi.flaeche ? REICHWEITEN.slice(0, 2) : REICHWEITEN);
@@ -167,9 +168,9 @@
     }
     const { wk, nu, zi, rw, roh } = beste;
     const sf = opt.tag === "technik";
-    const zielText = zi.t.replace("{rw}", rw.z + "\"");
-    let satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`;
-    if (sf) satz = satz.replace("einen Geistwolf", "eine Kampfdrohne").replace("A2 Nahkampf) in 3\" herbei, der", "Laser 12\" A1) in 3\" herbei, die").replace(/^Zauber/, "Psi");
+    const zielText = wk.id === "beschwoerung" ? "" : zi.t.replace("{R}", `{R${rw.z}}`).replace("{F}", `{F${rw.z}}`) + ":";
+    let satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`.replace(/\s+/g, " ");
+    if (sf) satz = satz.replace("Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf)", "Kampfdrohne {R3} aufstellen (Q4+ V5+ Zäh 3, Laser 12\" A1)");
     // Sci-Fi und Magie schließen sich aus: Psi-Kräfte sind Technik, keine Magie
     const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" && !sf ? "magie" : null, sf ? "technik" : null].filter(Boolean))].filter(t => !sf || t !== "magie");
     const namen = sf && SF_NAMEN[wk.id] ? SF_NAMEN[wk.id] : wk.namen;

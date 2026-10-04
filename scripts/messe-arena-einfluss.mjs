@@ -74,6 +74,22 @@ const browser = await chromium.launch({
   executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
 });
 const seite = await browser.newPage();
+// KEIN AUDIOCONTEXT IM MESSLAUF (Speicherleck-Fix, 01.10.). einflussVon() laeuft als EIN
+// synchroner evaluate()-Aufruf ueber (1 + 12 x Teilnehmer) x n Spiele. Die Ton-Schicht
+// (sfx()/ton*, battle-mode.engine.js) baut dabei je Ereignis frische WebAudio-Knoten
+// (Oszillator/Filter/Gain an ctx.destination) -- Breaking allein rund 600 sfx()-Aufrufe je
+// Spiel (Herzschlag/Hieb/Freeze aus stepCypher()). Headless-Chromium startet den Kontext
+// ohne Nutzergeste als "running"; abgelaufene Knoten gibt Chromium aber erst in einer
+// Main-Thread-Aufgabe NACH dem laufenden Skript frei, und das kommt hier erst nach Minuten
+// bis Stunden. Gemessen: ~2 GB Renderer-RSS je Lauf, bei n=12 der cgroup-OOM-Kill.
+// Die Engine sieht den fehlenden Kontext bereits als Messfall vor ("ohne AudioContext
+// (Messlaeufe) ist sfx() ohnehin ein No-Op", tonKontext() faengt den Fehler ab), und die
+// Ton-Schicht ruft vertraglich nie rr() und schreibt nie auf Teilnehmer -- die Messwerte
+// bleiben bit-identisch (nachgemessen, s. PR).
+await seite.addInitScript(() => {
+  window.AudioContext = undefined;
+  window.webkitAudioContext = undefined;
+});
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(datei, { waitUntil: "networkidle" });
@@ -87,8 +103,23 @@ if (!motoren.includes(disziplin)) {
 }
 
 const start = Date.now();
+// ZWEITE HAELFTE DESSELBEN LECKS: Timer. Auch ohne AudioContext legt die Anzeige-Schicht
+// je Ereignis einen setTimeout an (Breaking: der zweite Herzschlag-Ton, ~30 000 je Lauf, dazu
+// das Ausblenden der Callouts). Waehrend des einen synchronen Aufrufs kann keiner davon
+// feuern -- sie stapeln sich (n=48: ~1,5 Mio., gemessen ~1,5-2 GB nach elf Minuten) und
+// liefen erst NACH dem fertigen Ergebnis los. Deshalb ist es fuer die Messwerte gleich, ob
+// sie angelegt werden: setTimeout ist fuer genau diesen Aufruf ein No-Op und wird danach
+// wiederhergestellt.
 const e = await seite.evaluate(
-  ([d, n, versatz, modus]) => window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined),
+  ([d, n, versatz, modus]) => {
+    const st = window.setTimeout;
+    window.setTimeout = () => 0;
+    try {
+      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined);
+    } finally {
+      window.setTimeout = st;
+    }
+  },
   [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS],
 );
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
