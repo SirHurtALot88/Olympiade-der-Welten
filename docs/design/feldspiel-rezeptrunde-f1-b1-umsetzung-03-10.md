@@ -26,7 +26,9 @@ beide, wenn auch nur um 0,6 bzw. 0,2 Prozentpunkte (Details Abschnitt 2).
 - **Instrumentierung** (reine Buchfuehrung, kein neuer `rr()`-Aufruf): `starteSnap()` haelt
   JEDEN Snap als `{down,toGo,spot,side}` in `fsFbLog.epaZustaende` fest; jeder reale
   Punktgewinn (Touchdown, Field Goal) wird als `{idx,side,punkte}` in `fsFbLog.epaScores`
-  nachgetragen. Beide Arrays sind ausserhalb der Messsonde ungelesen.
+  nachgetragen. Beide Arrays sind ausserhalb der Messsonde ungelesen — werden aber bei JEDEM
+  Football-Produktionsspiel weiterhin befuellt (vernachlaessigbare Kosten, ≤~40
+  Snap-Objekte/Spiel, analog zu den bestehenden Boxscore-Zaehlern), nicht nur unter der Sonde.
 - **Produktionsbuchhaltung** in `vollziehFootballErgebnis`/`footballDownWeiter` (6
   Buchungsstellen: komplett, lauf, sack, interception, punt, plus die gemeinsame
   Touchdown-/Erster-Versuch-/Turnover-on-Downs-Verzweigung in `footballDownWeiter`):

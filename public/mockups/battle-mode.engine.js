@@ -9755,8 +9755,11 @@
   // so viel wie ein Passer-Yard. Dieselbe Quote auf die Offense-EPA eines kompletten Passes.
   const FB_EPA_RECEIVER_ANTEIL=(1/10)/((1/25)+(1/10));   // 0,7143
   const FB_EPA_PASSER_ANTEIL=1-FB_EPA_RECEIVER_ANTEIL;    // 0,2857
-  // GEWICHT DER EPA-SPALTE IN feldspielWert() -- 1.0 als Startwert (EPA ersetzt die drei
-  // Yards-Terme 1:1 in derselben Einheit "Punkte"), s. dortiger Kommentar und PR-Messung.
+  // AKTUELL UNGENUTZT (Review-Auflage PR #1149): war als Gewicht fuer eine EPA-Spalte in
+  // feldspielWert() gedacht, falls F1 doch verdrahtet wird. F1 wurde nach Messung verworfen
+  // (s. feldspielWert()s Football-Zweig und docs/design/feldspiel-rezeptrunde-f1-b1-
+  // umsetzung-03-10.md) -- diese Konstante wird von keiner Wertformel gelesen. Stehen
+  // gelassen als Parameter fuer eine moegliche spaetere additive (nicht ersetzende) Variante.
   const FB_EPA_GEWICHT=1.0;
   function footballDownWeiter(fb,yards,traeger){
     // MESSPUNKT + PRODUKTIONSBUCHUNG IN EINEM: `fb.down/toGo/spot` sind hier noch der
