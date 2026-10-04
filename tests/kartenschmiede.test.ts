@@ -31,6 +31,10 @@ type Regeln = {
   elementWirkung(element: string | null, praegung: string[]): number;
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
+  energieVon(f: Record<string, unknown>): number;
+  preisVon(f: Record<string, unknown>): number;
+  ENERGIE_FAKTOR: number[];
+  ENERGIE_PRO_ZUG: number;
 };
 const laden = createRequire(import.meta.url);
 const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
@@ -81,7 +85,7 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     const basis = einheit(4, 5, 5, "Klingen | Nahkampf | A4 | Reißend");
     const skill = F.GRUNDBESTAND.find(f => f.id === "schattenschritt")!;
     const regel = F.GRUNDBESTAND.find(f => f.id === "strahlende-aura")!;
-    expect(R.punkte({ ...basis, skills: [skill] } as never).roh - R.punkte(basis).roh).toBeCloseTo(10);
+    expect(R.punkte({ ...basis, skills: [skill] } as never).roh - R.punkte(basis).roh).toBeCloseTo(9);
     expect(R.punkte({ ...basis, skills: [regel] } as never).roh / R.punkte(basis).roh).toBeCloseTo(1.2);
   });
 
@@ -241,6 +245,51 @@ describe("Kartenschmiede – Generator", () => {
   });
 });
 
+describe("Kartenschmiede – Energie", () => {
+  const eintrag = (id: string) => F.GRUNDBESTAND.find(f => f.id === id)! as unknown as Record<string, unknown>;
+
+  it("liest die Energie aus dem Regeltext: Power-Symbol, Zauber, Auslöser, Passives, freie Aktion", () => {
+    expect(R.ENERGIE_PRO_ZUG).toBe(3);
+    expect(R.energieVon(eintrag("schattenschritt"))).toBe(1);   // {P1}
+    expect(R.energieVon(eintrag("tiergefaehrte"))).toBe(2);     // {P2}
+    expect(R.energieVon(eintrag("psiblitz"))).toBe(1);          // Zauber {Z4}
+    expect(R.energieVon(eintrag("stasisfeld"))).toBe(2);        // schwerer Zauber {Z5}
+    expect(R.energieVon(eintrag("schutzkreis"))).toBe(2);       // Zauber, obwohl er mit „Verbündete {F6}“ beginnt
+    expect(R.energieVon(eintrag("feuerball"))).toBe(2);         // im Katalog ausdrücklich gesetzt
+    expect(R.energieVon(eintrag("sporenwolke"))).toBe(0);       // „Stirbt es“
+    expect(R.energieVon(eintrag("lebensentzug"))).toBe(0);      // {RU} mit Auslöser
+    expect(R.energieVon(eintrag("aura-reissend"))).toBe(0);     // Aura wirkt von selbst
+    expect(R.energieVon(eintrag("heiltrank"))).toBe(0);         // Freie Aktion
+    expect(R.energieVon(eintrag("betaeubungsbombe"))).toBe(1);  // {S} zum Benutzen
+    expect(R.energieVon({ text: "{P1} Feind: {A1}.", energie: 3 })).toBe(3);   // von Hand gesetzt schlägt den Text
+    for (const f of F.GRUNDBESTAND) expect(R.energieVon(f as unknown as Record<string, unknown>)).toBeLessThanOrEqual(3);
+  });
+
+  it("macht Fähigkeiten mit Energiekosten beim Bauen billiger, passive bleiben beim Grundpreis", () => {
+    expect(R.ENERGIE_FAKTOR[0]).toBe(1);
+    expect(R.ENERGIE_FAKTOR).toEqual([...R.ENERGIE_FAKTOR].sort((a, b) => b - a));
+    const basis = einheit(4, 4, 5, "Schwert | Nahkampf | A3 |");
+    const mit = (f: Record<string, unknown>) => R.punkte({ ...basis, skills: [f] } as never).roh - R.punkte(basis).roh;
+    const teuer = { typ: "faehigkeit", text: "Feind {R12}: {A2}.", kosten: { typ: "fest", wert: 20 } };
+    expect(mit({ ...teuer, energie: 0 })).toBeCloseTo(20);
+    expect(mit({ ...teuer, energie: 2 })).toBeCloseTo(Math.round(20 * R.ENERGIE_FAKTOR[2]));
+    expect(mit({ ...teuer, energie: 3 })).toBeLessThan(mit({ ...teuer, energie: 1 }));
+  });
+
+  it("gibt im Simulator nur aus, was nach Bewegen und Angreifen übrig ist", () => {
+    // Heilung für 3 Energie kommt nie zum Zug, weil jeder Zug mindestens einen Angriff braucht
+    const basis = einheit(4, 4, 6, "Schwert | Nahkampf | A3 |");
+    const heilen = (energie: number) => ({ ...basis, skills: [{ id: "h", typ: "faehigkeit", text: "Dieses Modell: {H3}.", energie, kosten: { typ: "fest", wert: 0 } }] }) as unknown as Einheit;
+    const frei = R.simuliere(heilen(0), basis, { kaempfe: 1500, seed: 4 }).a;
+    const zwei = R.simuliere(heilen(2), basis, { kaempfe: 1500, seed: 4 }).a;
+    const drei = R.simuliere(heilen(3), basis, { kaempfe: 1500, seed: 4 }).a;
+    const ohne = R.simuliere(basis, basis, { kaempfe: 1500, seed: 4 }).a;
+    expect(frei).toBeGreaterThan(0.75);
+    expect(zwei).toBeGreaterThan(ohne + 0.1);
+    expect(Math.abs(drei - ohne)).toBeLessThan(0.06);
+  });
+});
+
 describe("Kartenschmiede – Duell-Simulator", () => {
   it("lässt die deutlich teurere Einheit fast immer gewinnen", () => {
     const stark = einheit(3, 3, 12, "Klauen | Nahkampf | A6 | DS(2)");
@@ -311,6 +360,12 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     ]);
     expect(gespeichert.map(f => f.id)).toEqual(["frostatem"]);
     expect(ladeFaehigkeiten("gemeinsam")[0]).toMatchObject({ name: "Frostatem", kosten: { typ: "prozent", wert: 10 } });
+    expect(ladeFaehigkeiten("gemeinsam")[0].energie).toBeUndefined();
+    const energie = speichereFaehigkeiten("gemeinsam", [
+      { id: "frostatem", name: "Frostatem", kosten: { typ: "prozent", wert: 10 }, text: "x", energie: 2 },
+      { id: "zu-viel", name: "Zu viel", text: "x", energie: 9 },
+    ]);
+    expect(energie.map(f => f.energie)).toEqual([2, 3]);
     const mehr = speichereFaehigkeiten("gemeinsam", [
       { id: "blutaxt", typ: "waffe", name: "Blutaxt", waffe: "Blutaxt | Nahkampf | A3 | Reißend", tags: ["nahkampf", "../x"], kosten: { typ: "fest", wert: 0 } },
       { id: "nachtgoblins", typ: "fraktion", name: "Nachtgoblins", icon: "spiral" },

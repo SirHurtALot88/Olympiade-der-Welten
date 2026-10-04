@@ -17,9 +17,13 @@
   const AUF_KARTE = ["faehigkeit", "zauber", "gegenstand"];
   const alleFaehigkeiten = () => alleEintraege().filter(e => AUF_KARTE.includes(e.typ || "faehigkeit"));
   const findeFaehigkeit = id => alleEintraege().find(f => f.id === id);
-  const skillKopie = f => ({ id: f.id, typ: f.typ || "faehigkeit", name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten } });
+  const skillKopie = f => ({ id: f.id, typ: f.typ || "faehigkeit", name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten }, ...(f.energie !== undefined ? { energie: f.energie } : {}) });
   const sk = (...ids) => ids.map(id => GRUND.find(g => g.id === id)).filter(Boolean).map(skillKopie);
-  const kostenText = k => k.typ === "fest" ? `${k.wert} P.` : `${k.wert > 0 ? "+" : ""}${k.wert} %`;
+  // Preis einer Fähigkeit: Grundpreis mal Energie-Faktor, dazu die Energie (⚡). Ohne Fähigkeit nur die Kosten.
+  const kostenText = f => {
+    const k = f && f.kosten ? f.kosten : f || {}, e = f && f.kosten ? R.energieVon(f) : 0, w = f && f.kosten ? R.preisVon(f) : k.wert;
+    return `${k.typ === "fest" ? `${w} P.` : `${w > 0 ? "+" : ""}${w} %`}${e ? ` · ⚡${e}` : ""}`;
+  };
   const fraktionen = () => alleEintraege().filter(e => e.typ === "fraktion");
   const fraktionVon = name => fraktionen().find(f => f.name.toLowerCase() === String(name || "").trim().toLowerCase());
   const iconFuer = s => (fraktionVon(s.faction) || {}).icon || s.ficon || "rune";
@@ -132,7 +136,7 @@
   // Symbole im Regeltext: {P1} kostet 1 Power, {A2} 2 Treffer, {V+1} +1 Verteidigung … Macht Texte kurz und lesbar.
   const minus = w => w.replace(/^-/, "−");
   const SYMBOLTEXT = {
-    P: { icon: "power", name: "Power", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Power` : `kostet ${w} Power` },
+    P: { icon: "power", name: "Energie", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Energie` : `kostet ${w} Energie` },
     Z: { icon: "rune", name: "Zauberwurf", zeige: w => w + "+", tip: w => `Zauberwurf ${w}+: gelingt bei ${w}+, sonst verpufft der Zauber` },
     S: { icon: "potion", name: "Einmal pro Spiel", zeige: () => "1×", tip: () => "einmal pro Spiel" },
     RU: { icon: "runde", name: "Einmal pro Runde", zeige: () => "1×", tip: () => "einmal pro Runde" },
@@ -153,13 +157,15 @@
   const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
   // Für Stellen ohne Symbole (Prompt, Suche): Klartext
   const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => SYMBOLTEXT[k].tip(w));
+  // Energie vor dem Regeltext, wenn sie nicht schon als Symbol drinsteht ({P1} …)
+  const energieSym = f => { const e = R.energieVon(f); return e && !/\{P\d\}/.test(String(f.text || "")) ? symbol("P", String(e)) + " " : ""; };
 
   // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
   // Jeder Tag als farbiges Abzeichen: Elemente rund, alle anderen Tags eckig
   const tagIco = t => TAG[t] ? `<span class="elem${TAG[t].element ? "" : " eckig"}" style="--el:${TAG[t].farbe || "#c9a35b"}">${ico(TAG[t].icon)}</span>` : "";
   const tagIcons = (tags, mitTip = true) => (tags || []).filter(t => TAG[t]).length
     ? `<span class="tico">${(tags || []).filter(t => TAG[t]).map(t => mitTip ? `<span data-tip="${esc(TAG[t].name)}">${tagIco(t)}</span>` : tagIco(t)).join("")}</span>` : "";
-  const tipText = f => `<b>${esc(f.name)}</b>${symText(f.text)}<small>${esc([f.art, kostenText(f.kosten), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
+  const tipText = f => `<b>${esc(f.name)}</b>${symText(f.text)}<small>${esc([f.art, kostenText(f), (f.tags || []).map(t => TAG[t] ? TAG[t].name : "").filter(Boolean).join(", ")].filter(Boolean).join(" · "))}</small>`;
 
   let state = {};
   const SPEICHER = "kartenschmiede-v3";
@@ -215,7 +221,7 @@
               return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
-            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${symText(s.bossText)}</p>` : ""}</div>` : ""}
+            ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${energieSym(k)}${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${energieSym({ typ: "faehigkeit", text: s.bossText })}${symText(s.bossText)}</p>` : ""}</div>` : ""}
             <div class="foot"><span class="fac">${ico(iconFuer(s))}${esc(s.faction)}${praegungVon(s).filter(t => TAG[t]).map(t => `<span class="praeg" data-tip="Prägung: ${esc(TAG[t].name)}">${tagIco(t)}</span>`).join("")}</span>${s.flavor ? `<q>${esc(s.flavor)}</q>` : "<span></span>"}</div>
           </div>
         </div>
@@ -547,7 +553,7 @@
       $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an Zäh bekommt. 50 % heißt: Preis passt.</p>
         <div class="tbl-wrap"><table><thead><tr><th>Fähigkeit</th><th class="num">Kosten</th><th class="num">Siege</th><th>Einschätzung</th></tr></thead><tbody class="static">${zeilen.map(z => {
           const [cls, txt] = urteil(z);
-          return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f.kosten))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
+          return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
         }).join("")}</tbody></table></div>
         <p class="hint">Vereinfacht: ein Duell 1 gegen 1. Beschwörungen, Bewegung, Auren für Verbündete und Gruppenwirkung zählen hier nicht, deshalb stehen solche Fähigkeiten unter „nicht messbar“.</p>`;
       btn.disabled = false; btn.textContent = "Preis-Check: Fähigkeiten";
@@ -682,12 +688,12 @@
         <h2>${esc(k.name || "Held")}</h2>
         <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
         <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
-        <h3>Power</h3>${kaestchen(6, true)}
+        <h3>Energie (${R.ENERGIE_PRO_ZUG} pro Zug)</h3>${kaestchen(R.ENERGIE_PRO_ZUG, true)}<p class="hb-unter">Bewegen 1 · Angreifen 1 · Helfen 1 · Sprinten 2 · Fähigkeiten wie angegeben</p>
         <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
         <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
         <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
       </div>
-      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f.kosten))})</small> – ${symText(f.text)}</p>`).join("")}</div></div>` : ""}
+      ${skills.length ? `<div class="hb-faeh"><h3>Fähigkeiten</h3><div class="hb-spalten">${skills.map(f => `<p>${tagIcons(f.tags, false)}<b>${esc(f.name)}</b> <small>(${esc(kostenText(f))})</small> – ${symText(f.text)}</p>`).join("")}</div></div>` : ""}
     </div>`;
   }
   // Rückseite für Postkarten: Seltenheitsrahmen, großes Fraktionssymbol, Name und Stufe – symmetrisch, damit sie beim
@@ -758,7 +764,7 @@
     const rolle = state.role || "enemy";
     const skills = Array.isArray(state.skills) ? state.skills : [];
     zeigePraegung();
-    $("skillChips").innerHTML = skills.length ? skills.map(k => { const kf = konfliktVon(k, state); return `<span class="skill-chip${kf ? " konflikt" : ""}" data-tip="${esc(kf ? `<b>${esc(k.name)}</b>${esc(konfliktText(kf))}` : tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k.kosten)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`; }).join("")
+    $("skillChips").innerHTML = skills.length ? skills.map(k => { const kf = konfliktVon(k, state); return `<span class="skill-chip${kf ? " konflikt" : ""}" data-tip="${esc(kf ? `<b>${esc(k.name)}</b>${esc(konfliktText(kf))}` : tipText(k))}">${tagIcons(k.tags, false)}${esc(k.name)} <small>${kostenText(k)}</small><button type="button" data-skill-weg="${esc(k.id)}" aria-label="${esc(k.name)} entfernen">×</button></span>`; }).join("")
       : `<span class="hint">Noch keine.</span>`;
     const q = pickerSuche.toLowerCase();
     const fuerRolle = alleFaehigkeiten().filter(f => f.fuer.includes(rolle));
@@ -772,7 +778,7 @@
     }
     $("pickerTags").innerHTML = tagLeiste("werkstatt", fuerRolle, zeigeSkills);
     $("pickerListe").innerHTML = frei.map(f => `<button type="button" class="picker-item" data-add="${esc(f.id)}" data-tip="${esc(tipText(f))}">
-        <span>${tagIcons(f.tags, false)}${esc(f.name)} <small>${esc(f.art)}</small></span><small>${kostenText(f.kosten)}</small></button>`).join("")
+        <span>${tagIcons(f.tags, false)}${esc(f.name)} <small>${esc(f.art)}</small></span><small>${kostenText(f)}</small></button>`).join("")
       || `<p class="hint">Nichts gefunden.</p>`;
     if (gesperrt) $("pickerListe").insertAdjacentHTML("beforeend", `<p class="gesperrt-hinweis">${gesperrt} weitere durch die Prägung gesperrt.</p>`);
     // Waffen aus der Datenbank
@@ -813,6 +819,7 @@
     const eintrag = { id, typ: f.typ || "faehigkeit", name: f.name, art: f.art || "Sonderregel", fuer: f.fuer && f.fuer.length ? f.fuer : ["hero", "companion", "enemy"],
       tags: (f.tags || []).filter(t => TAG[t]), kosten: { typ: f.kosten && f.kosten.typ === "fest" ? "fest" : "prozent", wert: +(f.kosten && f.kosten.wert) || 0 },
       text: f.text || "", quelle: f.quelle || "eigen" };
+    if (f.energie !== undefined && f.energie !== "" && !isNaN(+f.energie)) eintrag.energie = Math.max(0, Math.min(3, Math.round(+f.energie)));
     if (eintrag.typ === "waffe") eintrag.waffe = f.waffe || "";
     if (eintrag.typ === "fraktion") eintrag.icon = f.icon || "rune";
     eigene = eigene.filter(e => e.id !== id).concat(eintrag);
@@ -1007,6 +1014,12 @@
       <p><b>Prägung</b> – was eine Einheit ihrem Wesen nach ist. Sie sperrt alle Fähigkeiten, Zauber, Gegenstände und Waffen mit dem Gegen-Element: Ein Feuerelementar lernt keine Frostzauber, eine Sci-Fi-Einheit keine Magie. Die Fraktion schlägt eine Prägung vor (Dämonen Feuer, Frostvolk Frost, Untote Schatten, Elfen Natur, Urwild Gift).</p>
       <p><b>Element einer Waffe</b> – ein Wort bei den Regeln, zum Beispiel <code>Frostklauen | Nahkampf | A4 | Reißend, Frost</code>. Trifft die Waffe eine Einheit derselben Prägung, würfelt das Ziel seine Verteidigung mit +1, bei der Gegen-Prägung mit −1. Alle anderen Ziele: keine Änderung.</p>
       <p><b>Punkte</b> – Elemente kosten nichts: Mal nützen sie, mal schaden sie. Der Duell-Simulator würfelt sie mit.</p>
+        </div>
+    <h3 style="margin-top:28px">Energie</h3>
+    <div class="el-regeln">
+      <p><b>3 Energie pro Zug</b> – für jede Figur, Helden wie Gegner. Bewegen (6"), Angreifen und Helfen kosten je 1 und gehen jeweils höchstens einmal pro Zug, Sprinten (12") kostet 2. Was übrig bleibt, verfällt. Befallene Helden haben nur 2, schwer befallene 1.</p>
+      <p><b>Fähigkeiten</b> kosten 0 bis 3 Energie (${symbol("P", "1")} auf der Karte). Passive Regeln und Auslöser wie „Stirbt es“ oder „Rundenende“ wirken von selbst und kosten nichts. Zauber kosten 1, schwere Zauber (Wurf 5+) 2. Gegenstände zum Benutzen kosten 1, „Freie Aktion“ 0.</p>
+      <p><b>Punkte</b> – Wer Energie zahlt, verzichtet im Zug auf etwas. Deshalb wird eine Fähigkeit beim Bauen billiger: ×${R.ENERGIE_FAKTOR.slice(1).map((f, i) => `${String(f).replace(".", ",")} bei ${i + 1} Energie`).join(", ×")}. Gegner folgen dem Verhaltenswürfel, der ihre 3 Energie verteilt.</p>
         </div>
     <h3 style="margin-top:28px">Symbole in Regeltexten</h3>
     <p class="hint">Statt „erleidet 2 Treffer mit Durchschlag 1“ steht auf der Karte ein Schwert mit 2 und ein Durchschlag-Pfeil mit 1. Beim Hovern erscheint die Erklärung. Eigene Texte nutzen dieselben Kürzel in geschweiften Klammern.</p>

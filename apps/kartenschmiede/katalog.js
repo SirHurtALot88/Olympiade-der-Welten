@@ -109,7 +109,7 @@
     f("phasenschritt", "faehigkeit", "Phasenschritt", "Sonderregel", ALLE, ["bewegung", "reaktion"], "prozent", 10, "{RU} Nach einem Angriff gegen es: bei {D4} {B3} in beliebige Richtung.", "Vorschlag"),
 
     // Zauber: nur für Modelle mit Zauberer(X). Wurf auf den angegebenen Wert, bei Fehlschlag verpufft der Zauber.
-    f("feuerball", "zauber", "Feuerball", "Zauber", ALLE, ["feuer", "flaeche", "fernkampf", "magie"], "fest", 15, "{Z4} Punkt {R18}: alle Einheiten {F3} {AW3}."),
+    { ...f("feuerball", "zauber", "Feuerball", "Zauber", ALLE, ["feuer", "flaeche", "fernkampf", "magie"], "fest", 15, "{Z4} Punkt {R18}: alle Einheiten {F3} {AW3}."), energie: 2 },
     f("frostlanze", "zauber", "Frostlanze", "Zauber", ALLE, ["frost", "fernkampf", "schwaechung", "magie"], "fest", 10, "{Z4} Feind {R12}: {A2} {DS1}, bis zur nächsten Aktivierung halbe Bewegung."),
     f("heilendes-licht", "zauber", "Heilendes Licht", "Zauber", FREUNDE, ["heilung", "magie", "licht"], "fest", 10, "{Z4} Verbündeter {R12}: {HW3}."),
     f("schutzkreis", "zauber", "Schutzkreis", "Zauber", ALLE, ["schutz", "aura", "magie", "licht"], "fest", 15, "{Z5} Verbündete {F6}: {V+1} bis zur nächsten Runde."),
@@ -301,7 +301,7 @@
     const neu = [];
     for (const f of passendeFaehigkeiten(s, kandidaten)) {
       if (s.skills.length >= soll) break;
-      s.skills.push({ id: f.id, typ: f.typ, name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten } });
+      s.skills.push({ id: f.id, typ: f.typ, name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten }, ...(f.energie !== undefined ? { energie: f.energie } : {}) });
       neu.push(f.name);
     }
     // Werte reihum verschieben, damit keiner allein ausreißt
