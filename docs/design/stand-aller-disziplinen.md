@@ -1138,3 +1138,62 @@ nicht empfehlenswert; mit Stufe 2 waehlen langsame Haende Blitzen, und nur noch 
 Manager-Entscheidungen (Heim rechnen: 22,2 %). Sensitivitaet, nicht eingebaut: KI-Rand 10 s →
 0,7 %, 0 s → 3,3 % (rho 0,901, Pp 11,8) — eine einzige Konstante (`SCHACH_KI_RAND_S`), falls Chris
 das Zielband 1–5 % auch ohne Manager-Eingriff will.
+
+## 9. Wettessen: „Die Mauer, die Haltung" (K1 + K2) — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/wettessen-nachtkonzept-03-10.md` (Abschnitt 3 K1/K2, Anhang A), von Chris
+freigegeben. K3 (Tunken) nicht gebaut; keine Disqualifikation, kein Live-Eingriff, `rundenN`/
+`rundenDauer`/60 s Sendezeit unveraendert. Klasse B hinter `BUEHNE_FLAGS.wettessenMauer`
+(0 aus · 1 K1 · 2 K1+K2), **Standard 0**. Eigene Weiche `mauer:true` an `BUEHNE_ART.wettessen`;
+`ermued` entfaellt nur dort und nur mit Flag, die anderen fuenf Buehnen bleiben unberuehrt.
+Messwerkzeug neu: `scripts/miss-wettessen-mauer.mjs` (echter Motor, kaderfest, inkl. Erwartung je
+Esser und Haltung ueber 40 feste Zufallsstroeme — der „tote Knopf"-Test).
+
+Gebaut: Fuellstand = Summe der Minutenpunkte, K = 65 + AUSDAUER·5 (Steigung 5 behalten — health/
+stamina liegen nur +0,4 bis +1,0 ueber der Matrix, die Stellschraube „4" war nicht noetig);
+Mauerfaktor 0,45+NERVEN·0,005, Erfolg −0,05, halber Bonus; Minute 10 doppelter WAGNIS-Trade-off,
+voller Bonus. K2: Sprint/Gleichmaessig/Schlussspurt, KI nach NERVEN (≥60 Schlussspurt, <45
+Gleichmaessig, sonst Sprint), Uebergabe `{d,slot,haltung}`.
+
+**Kalibrierung K2 am Motor** (das Papier warnte: erster Satz „Sprint immer am besten"). Am echten
+Motor kippte es mit den Startwerten andersherum: Sprint beste Wahl fuer 7 % (toter Knopf),
+Schlussspurt 69 %, beste Haltung staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+fuenf Konstanten, gewaehlt: Sprint-Erfolg −0,10 → **−0,07**, Schlussspurt-Bonus ×1,5 → **×1,18**,
+NERVEN-Zuschlag 0,004 → **0,006**, frueh ×0,97 → **×0,965** (Sprint-Basis ×1,10, K ×0,92 und
+Minuten wie im Papier). Ergebnis n=24 × 5 Paarungen:
+
+| Beste Haltung (Erwartung) | Sprint | Gleichmaessig | Schlussspurt |
+|---|---:|---:|---:|
+| alle Esser | 26,7 % | 26,8 % | 46,5 % |
+| NERVEN < 45 | 17,6 % | 79,2 % | 3,3 % |
+| NERVEN 45-59 | 35,1 % | 44,1 % | 20,9 % |
+| NERVEN ≥ 60 | 25,4 % | 2,6 % | 72,0 % |
+
+rho(beste Haltung, NERVEN) 0,657 > rho(…, Eignung) 0,625. KI trifft die beste Haltung in 63 %,
+Verlust gegen das Optimum 2,3 Punkte je Esser — jede Pauschale verliert mehr (alle Schlussspurt
+3,5 · alle Sprint 5,9 · alle Gleichmaessig 7,2): kein Knopf ist immer besser. Schwaechste Stelle:
+im Band NERVEN 45-59 waehlt die KI Sprint, im Mittel waere dort Gleichmaessig knapp besser (44 zu 35 %).
+
+Gemessen am echten Motor, kaderfest (Familie live-save), 04.10.:
+
+| | Flag aus (heute) | K1 | K1+K2, KI | Papier-Sonde (ohne Slot/Form) |
+|---|---:|---:|---:|---:|
+| rho je Spiel 6 je Seite (n=24) | 0,866 | 0,908 | **0,910** | 0,951 → 0,962 |
+| rho je Spiel 4 je Seite (n=24) | 0,801 | 0,833 | **0,848** | — |
+| rho je Spiel 2 je Seite (n=48) | 0,771 (knapp) | 0,792 (knapp) | **0,811** | — |
+| Pp n=48, zwei Saatstroeme | 14,1 / 15,0 | 9,2 / 9,8 | **8,7 / 10,0** | 11,8 → 12,2 |
+| will-Anteil (Matrix 26) / torment (6) | 22,5 / 12,0 | 25,6 / 7,4 | 25,3 / 9,0 | — |
+| Pp alle Sprint / alle Schlussspurt | — | — | 8,1 / 7,5 | 13,5 / 12,0 |
+| Mauer-Minute Median, Spanne | — | 7, 4-10 | 6, 4-10 | 7, 4-10 |
+| Spiegeltest Heim:Gast (300) | 154:146 | 149:151 | 152:147 | — |
+
+Kurve je Minute (K1+K2): 73 72 73 72 69 61 56 59 58 63 — statt der flachen Ist-Linie. Extremfaelle
+rho (6 je Seite): alle Sprint 0,913, alle Gleichmaessig 0,908 (= K1, bit-identisch), alle
+Schlussspurt 0,909; einseitige Pauschalen 0,909-0,914, Heimsieg 46,7-48,3 % gegen 50,0 % mit KI.
+
+**Offen/ehrlich:** (1) Die mittlere Seitensumme sinkt mit der Mauer um ~10,5 % (Spiegel 4744 → 4242
+Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` gilt fuer den
+Standardmotor und wurde deshalb NICHT neu gezogen; sie muss neu gezogen werden, sobald das Flag
+live geht. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
+Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
+ohne Grundgeruest entscheidet immer die KI-Vorgabe.

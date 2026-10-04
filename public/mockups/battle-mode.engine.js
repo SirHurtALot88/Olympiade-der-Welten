@@ -14974,7 +14974,12 @@
       // rundenDauer=60/(rundenN*jeSeite*2)) -- hier reicht die einfache Form, weil die
       // Gruppierung den Faktor jeSeite*2 bereits aus der Rechnung nimmt. Eine Runde = eine
       // Spielminute, sechs Sekunden Bildschirmzeit dafuer.
-      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true,
+      // mauer:true (04.10., Nachtkonzept K1/K2): eigene Weiche fuer den Fuellstand-Rechner
+      // wettessenMauerSetz() — Muster `heben`/`gauntlet`/`schatzsuche`. Wirkt NUR, solange
+      // BUEHNE_FLAGS.wettessenMauer>=1; bei 0 (Standard) laeuft Wettessen unveraendert durch den
+      // generischen Auftritt-Block in setz(). Die fuenf anderen Buehnen tragen das Flag nicht
+      // und bleiben in jedem Fall unberuehrt (ihr `ermued` bleibt).
+      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true, mauer:true,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -15731,7 +15736,7 @@
   // `sandsackVorschauAktiv` (Gewichtheben-Sandsack-Finale Paket 2): ein Modul-Zustand mit
   // Default "aus", gesetzt ausschliesslich ueber die Test-/QA-Schnittstelle
   // `window.__arena.buehneFlags({...})` (s. window.__arena unten) und die Messskripte
-  // (`--flags=speedSchachUhr:2`, s. scripts/lib/rangtreue-messung.mjs). Solange alle auf 0
+  // (`--flags=speedSchachUhr:2,wettessenMauer:2`, s. scripts/lib/rangtreue-messung.mjs). Solange alle auf 0
   // stehen (jeder echte Spielstand), laeuft JEDE Zeile der Buehne bit-identisch zu vorher —
   // keiner der neuen Zweige wird betreten, kein Feld kommt auf TEILNEHMER hinzu
   // (nachgemessen: miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs zahlengleich vor/nach).
@@ -15739,7 +15744,9 @@
   //
   //   speedSchachUhr  0 aus · 1 Stufe 1 „Das Blaettchen faellt" · 2 Stufe 1+2 „Tempo-Ansage"
   //                   (docs/design/speed-schach-nachtkonzept-03-10.md Abschnitt 3.2/3.3)
-  const BUEHNE_FLAGS={speedSchachUhr:0};
+  //   wettessenMauer  0 aus · 1 K1 „Mauer als Fuellstand" · 2 K1+K2 „Haltung"
+  //                   (docs/design/wettessen-nachtkonzept-03-10.md Abschnitt 3, K1/K2)
+  const BUEHNE_FLAGS={speedSchachUhr:0, wettessenMauer:0};
   // PAUSCHALE HALTUNG JE SEITE — NUR fuer Messungen ("alle rechnen", "Heim blitzen, Gast KI"
   // usw., Messpflicht der Konsultation 02.10. Regel 5: KI-Regel beidseitig plus Extremfaelle).
   // null = keine Vorgabe (Aufstellung bzw. KI-Vorgabe gilt). Gesetzt nur ueber
@@ -15837,7 +15844,7 @@
   // durchgelaufenen TEILNEHMER-Stand, schreibt nichts, kein rr(). Je Duell-Brett: Vorteil,
   // Blaettchen beider Seiten, Brettentscheid, Ansage/TEMPO/Zeitnot; dazu der Teamstand in
   // gewonnenen Brettern (dieselbe Zaehlung wie spieleBuehneDuell()).
-  function buehneDiagVon(dId){
+  function buehneDiagVon(dId,evLaeufe){
     const art=BUEHNE_ART[dId]; if(!art)return null;
     const diag={};
     if(art.duell){
@@ -15851,8 +15858,151 @@
           tempoA:a.TEMPO??null, tempoB:b.TEMPO??null};
       });
       diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s&&u.brett!=null&&duellBrettSieg(art,u)).length);
+    } else if(!art.heben&&!art.gauntlet){
+      // Auftritt-Buehnen: Seitenstand = Summe der Auftrittswerte, dieselbe Zahl wie
+      // spieleBuehneAuftritt()/updateHudBuehne().
+      diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
+    }
+    // WETTESSEN-MAUER (K1/K2): je Esser Haltung, Quelle, Mauer-Minute und Kapazitaet. Mit
+    // `evLaeufe` zusaetzlich die ERWARTETE Summe je Haltung ueber feste, private Zufallsstroeme
+    // (gemeinsame Zufallszahlen fuer alle drei Haltungen, wettessenMauerRunden() mit eigener
+    // Wurfquelle — kein rr(), der Motorstrom bleibt unberuehrt). Das ist die Messung fuer
+    // "kein toter Knopf": welche Haltung waere fuer DIESEN Esser in DIESEM Spiel (mit Slot,
+    // Form, Mutator) im Mittel die beste?
+    if(art.mauer&&BUEHNE_FLAGS.wettessenMauer>=1){
+      diag.esser=TEILNEHMER.map((u,idx)=>{
+        const e={n:u.n, seite:u.side, haltung:u.haltung||null, quelle:u.haltungQuelle||null,
+          mauerMinute:u.mauerMinute??null, K:Math.round(u.mauerK||0), NERVEN:u.NERVEN,
+          AUSDAUER:u.AUSDAUER, summe:u.summe, eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig,
+          kurve:u.runden.map(r=>r.punkte)};
+        if(evLaeufe>0){
+          e.ev={};
+          for(const h of WETTESSEN_HALTUNGEN){
+            let s=0;
+            for(let k=0;k<evLaeufe;k++){
+              let z=(0x9E3779B1^(idx*7919+k*104729+1))>>>0;
+              const quelle=()=>{ z=(z*1664525+1013904223)>>>0; return z/4294967296; };
+              s+=wettessenMauerRunden(u,h,art,quelle).reduce((a,r)=>a+r.punkte,0);
+            }
+            e.ev[h]=Math.round(s/evLaeufe*10)/10;
+          }
+        }
+        return e;
+      });
     }
     return diag;
+  }
+
+  // ============ WETTESSEN „DIE MAUER, DIE HALTUNG" (K1 + K2) ============
+  // docs/design/wettessen-nachtkonzept-03-10.md, Abschnitt 3 (K1/K2) und Anhang A, gebaut 04.10.
+  //
+  // K1 — DIE MAUER ALS FUELLSTAND. Statt einer festen Mauer-Minute ein Magen-Budget: der
+  // Fuellstand ist die Summe der bisher gegessenen Minutenpunkte, die Kapazitaet
+  // K = 65 + AUSDAUER·k (AUSDAUER = stamina 50/health 30/will 20). Wer vorne mehr isst, ist
+  // frueher voll — Chris' "mehr Risiko → uebertrifft sich oder bricht ein" als EINE Regel, ohne
+  // Zusatzwuerfel. Drei Phasen ergeben sich, sie werden nicht gesetzt:
+  //   vor der Mauer   Basis 20+GRUNDLAGE·0,7 (KEIN `ermued` mehr — AUSDAUER traegt jetzt K),
+  //                   Erfolgschance und Bonus wie bisher
+  //   hinter der Mauer Basis × Mauerfaktor (0,45+NERVEN·0,005, gedeckelt 0,4-0,95), Erfolg −0,05,
+  //                   halber Bonus — ab hier isst nur noch der Wille
+  //   Schlussminute   (Minute 10) WAGNIS-Trade-off doppelt, voller Bonus ("Final Bite")
+  // Genau ein rr() je Minute wie im generischen Block; kein Zustand zwischen Essern (keine
+  // Wechselwirkung — die Feldgroessen-Robustheit 2-6 bleibt per Bauart erhalten).
+  //
+  // K2 — DIE HALTUNG je Esser, vorab (kein Live-Eingriff):
+  //   sprint         Minute 1-4: Basis ×1,10, Erfolg −0,10; Kapazitaet ×0,92 (frueher voll)
+  //   gleichmaessig  bit-identisch zu K1 ohne Zusatz (der Standard)
+  //   schlussspurt   Minute 1-7: Basis ×0,97; Minute 8-10: Bonus ×1,5, WAGNIS-Trade-off doppelt,
+  //                  hinter der Mauer Mauerfaktor + max(0,NERVEN−50)·0,004 (Deckel 0,98)
+  // KI-Vorgabe deterministisch aus den Werten des Essers (Muster berechneFokusAuto): nach
+  // NERVEN — s. wettessenKiHaltung(). Der Konzepttext warnt: der erste Parametersatz ergab
+  // "Sprint immer am besten" (toter Knopf). Kalibrierkriterium deshalb gemessen, nicht
+  // angenommen: jede Haltung ist fuer mindestens ein Fuenftel der Esser die beste (Erwartung
+  // ueber feste Zufallsstroeme, s. buehneDiagVon/scripts/miss-wettessen-mauer.mjs), und die beste
+  // Haltung haengt an NERVEN, nicht an `eig`.
+  const WETTESSEN_HALTUNGEN=["sprint","gleichmaessig","schlussspurt"];
+  const WETTESSEN_K_BASIS=65, WETTESSEN_K_AUSDAUER=5;
+  const WETTESSEN_MAUER_BASIS=0.45, WETTESSEN_MAUER_NERVEN=0.005;
+  const WETTESSEN_MAUER_MIN=0.4, WETTESSEN_MAUER_MAX=0.95;
+  const WETTESSEN_MAUER_ERFOLG=-0.05, WETTESSEN_MAUER_BONUS=0.5;
+  // KALIBRIERT AM MOTOR (04.10., Kaderfamilie live-save, 12 Spiele × 5 Paarungen, Erwartung je
+  // Esser ueber 40 feste Stroeme, s. scripts/miss-wettessen-mauer.mjs). Die Konzept-Startwerte
+  // (Sprint-Erfolg −0,10, Schlussspurt-Bonus ×1,5, NERVEN-Zuschlag 0,004, frueh ×0,97) ergaben
+  // am echten Motor genau die Falle, vor der das Papier warnt — nur andersherum: Sprint war fuer
+  // 7 % der Esser die beste Wahl (toter Knopf), Schlussspurt fuer 69 % (Pflichtknopf), und die
+  // beste Haltung hing staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+  // Sprint-Erfolg {−0,06 … −0,10}, Sprint-K {0,92 … 0,96}, Schlussspurt-Bonus {1,1 … 1,5},
+  // NERVEN-Zuschlag {0,004 … 0,01}, frueh {0,96 … 0,97}: gewaehlt der ausgewogenste Satz —
+  // beste Wahl Sprint 26 % · Gleichmaessig 27 % · Schlussspurt 47 %, nach NERVEN sortiert
+  // (Mittel 64 / 44 / 73), rho(beste Haltung, NERVEN) 0,65 > rho(…, Eignung) 0,62.
+  const WETTESSEN_SPRINT_MINUTEN=4, WETTESSEN_SPRINT_BASIS=1.10, WETTESSEN_SPRINT_ERFOLG=-0.07, WETTESSEN_SPRINT_K=0.92;
+  const WETTESSEN_SCHLUSS_FRUEH_BASIS=0.965, WETTESSEN_SCHLUSS_AB_MINUTE=8, WETTESSEN_SCHLUSS_BONUS=1.18;
+  const WETTESSEN_SCHLUSS_NERVEN_K=0.006, WETTESSEN_SCHLUSS_MAUER_MAX=0.98;
+  const WETTESSEN_KI_SCHLUSS_AB=60, WETTESSEN_KI_GLEICH_UNTER=45;
+  const wettessenKapazitaet=(L,haltung)=>
+    (WETTESSEN_K_BASIS+L.AUSDAUER*WETTESSEN_K_AUSDAUER)*(haltung==="sprint"?WETTESSEN_SPRINT_K:1);
+  function wettessenKiHaltung(L){
+    if(L.NERVEN>=WETTESSEN_KI_SCHLUSS_AB)return "schlussspurt";
+    if(L.NERVEN<WETTESSEN_KI_GLEICH_UNTER)return "gleichmaessig";
+    return "sprint";
+  }
+  // DER MINUTENRECHNER — eine reine Funktion der Sub-Skills, der Haltung und einer Wurfquelle.
+  // Im Spiel ist die Quelle rr() (genau ein Wurf je Minute, s. wettessenMauerSetz()), in der
+  // Messdiagnose ein privater Strom. Liefert die fertigen runden[]-Eintraege.
+  function wettessenMauerRunden(L,haltung,art,wurfQuelle){
+    const sprint=haltung==="sprint", schluss=haltung==="schlussspurt";
+    const K=wettessenKapazitaet(L,haltung);
+    const mfGrund=Math.max(WETTESSEN_MAUER_MIN,Math.min(WETTESSEN_MAUER_MAX,
+      WETTESSEN_MAUER_BASIS+L.NERVEN*WETTESSEN_MAUER_NERVEN));
+    const runden=[]; let fuell=0, mauerGesehen=false;
+    for(let ri=0;ri<art.rundenN;ri++){
+      const minute=ri+1, letzte=ri===art.rundenN-1;
+      const hinter=fuell>K;
+      const mauerNeu=hinter&&!mauerGesehen; if(hinter)mauerGesehen=true;
+      const spaet=schluss&&minute>=WETTESSEN_SCHLUSS_AB_MINUTE;
+      let basis=20+L.GRUNDLAGE*0.7, dErf=0, bonusMul=1, wagMul=1;
+      if(sprint&&minute<=WETTESSEN_SPRINT_MINUTEN){ basis*=WETTESSEN_SPRINT_BASIS; dErf+=WETTESSEN_SPRINT_ERFOLG; }
+      if(schluss&&!spaet)basis*=WETTESSEN_SCHLUSS_FRUEH_BASIS;
+      if(hinter){
+        const mf=spaet?Math.min(WETTESSEN_SCHLUSS_MAUER_MAX,mfGrund+Math.max(0,L.NERVEN-50)*WETTESSEN_SCHLUSS_NERVEN_K):mfGrund;
+        basis*=mf; dErf+=WETTESSEN_MAUER_ERFOLG; bonusMul*=WETTESSEN_MAUER_BONUS;
+      }
+      if(letzte){ wagMul=2; bonusMul=Math.max(bonusMul,1); }
+      if(spaet){ wagMul=2; bonusMul*=WETTESSEN_SCHLUSS_BONUS; }
+      const erfolg=Math.max(0.05,Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035
+        -(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO*wagMul+dErf));
+      const wagnisFaktor=Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG*wagMul);
+      const wurf=wurfQuelle();
+      let punkte, ereignis, knapp=false;
+      if(wurf<erfolg){
+        punkte=basis+L.SPITZENMOMENT*0.35*wagnisFaktor*bonusMul;
+        ereignis=art.erfolgWort;
+      } else {
+        punkte=basis*art.failAbzug;
+        ereignis=art.failWort;
+        knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
+      }
+      punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+      fuell+=punkte;
+      runden.push({punkte,ereignis,knapp,mauer:hinter,mauerNeu,fuell});
+    }
+    return runden;
+  }
+  // DER SPIELPFAD: Haltung waehlen (Messvorgabe > Aufstellung > KI) und die Minuten mit rr()
+  // rechnen. Bei Flag-Stufe 1 (nur K1) gilt fuer alle "gleichmaessig" — die Haltung ist erst
+  // Teil von Stufe 2.
+  function wettessenMauerSetz(L,p,seite,art){
+    if(BUEHNE_FLAGS.wettessenMauer>=2){
+      const vorgabe=buehneHaltungVon(p,seite,WETTESSEN_HALTUNGEN);
+      L.haltung=vorgabe||wettessenKiHaltung(L);
+      L.haltungQuelle=vorgabe?"vorgabe":"ki";
+    } else {
+      L.haltung="gleichmaessig"; L.haltungQuelle="k1";
+    }
+    L.mauerK=wettessenKapazitaet(L,L.haltung);
+    L.runden=wettessenMauerRunden(L,L.haltung,art,rr);
+    const m=L.runden.findIndex(r=>r.mauerNeu);
+    L.mauerMinute=m>=0?m+1:null;
   }
 
   // ================== PAKET 1 (30.09.): "STARTREIHENFOLGE NACH ERGEBNIS" ==================
@@ -16039,6 +16189,13 @@
       // keine Adapter-Aenderung. Nur fuer Showcase befuellt, die sechs Geschwister-Buehnen
       // lesen diese Felder nirgends.
       if(art.showcase){L.c=p.c;L.r=p.r;L.sub=p.sub;L.tp=p.tp;L.tn=p.tn;L.a=p.a;}
+      // WETTESSEN-MAUER (K1/K2, s. WETTESSEN_* oben): eigener Minutenrechner mit genau einem
+      // rr() je Minute wie die generische Schleife darunter — ersetzt sie NUR fuer Wettessen
+      // und NUR bei gesetztem Flag. Ohne Flag laeuft Wettessen unveraendert unten durch.
+      if(art.mauer&&BUEHNE_FLAGS.wettessenMauer>=1){
+        wettessenMauerSetz(L,p,seite,art);
+        TEILNEHMER.push(L); return;
+      }
       // SPEED-SCHACH-UHR (Stufe 1/2, s. BUEHNE_FLAGS/SCHACH_* oben): nur bei gesetztem Flag
       // betreten. TEMPO entsteht aus demselben `attr` (Slot-/Form-/Mutator-Zuschlag inklusive)
       // und derselben `mische()`-Formel wie jeder Rezept-Sub-Skill in R2 oben — es ist nur
@@ -19604,6 +19761,15 @@
         // bekommt weiterhin SEINE EIGENE Zeile, genau wie bisher. Alles andere sammelt sich
         // nur in wettBuendel -- HIGHLIGHTS/Callout haengen ausschliesslich an dieser
         // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
+        // MAUER-ZEILE (Wettessen K1, Konzept K4 "Mauer-Banner", hier nur als Tickerzeile):
+        // `r.mauerNeu` steht nur mit BUEHNE_FLAGS.wettessenMauer>=1 auf dem Rundeneintrag (s.
+        // wettessenMauerRunden()) — die erste Minute, die dieser Esser hinter seiner Mauer
+        // beginnt. Reine Ablesung, kein rr(), keine Wirkung auf u.summe. Nicht big: zwoelf
+        // Esser, zwoelf verschiedene Mauer-Minuten — als Banner waere das Dauerfeuer.
+        if(r.mauerNeu){
+          feed(u.side,"Mauer! "+u.n+" ist voll (Minute "+(u.aktuell+1)+") — ab jetzt isst nur noch der Wille"
+            +(u.haltung&&u.haltung!=="gleichmaessig"?" ("+(u.haltung==="sprint"?"Sprint":"Schlussspurt")+")":"")+".",false);
+        }
         const wettBig=buehneAuftrittBig(u,r,vorherSumme);
         if(wettBig){
           feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
@@ -47154,7 +47320,7 @@
             // BUEHNEN-DIAGNOSE (04.10., additiv wie `zielDiag`): nur mit `o.buehneDiag` — die
             // Brett-/Haltungskennzahlen der Nachtkonzept-Mechaniken (s. buehneDiagVon()). Ohne
             // die Option fehlt das Feld, die Rueckgabe bleibt byte-identisch.
-            ...(o.buehneDiag&&istBuehne(dId)?{buehne:buehneDiagVon(dId)}:{}),
+            ...(o.buehneDiag&&istBuehne(dId)?{buehne:buehneDiagVon(dId,o.haltungEV||0)}:{}),
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
               wert:Math.round((w[u.n]||0)*100)/100,

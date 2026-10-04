@@ -33,7 +33,8 @@ import { resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
  * `haltung` (optional, 04.10.): die Spieler-Anweisung des Managers, drittes Feld der Übergabe
  * `{d, slot, haltung}` aus dem Grundgerüst der Konsultation 02.10. (Zeile 0). Gelesen nur von
  * Bühnen-Mechaniken hinter `BUEHNE_FLAGS` in battle-mode.engine.js (standardmäßig aus):
- * Speed-Schach (`"rechnen" | "normal" | "blitzen"`). Fehlt das Feld, entscheidet die KI-Vorgabe
+ * Speed-Schach (`"rechnen" | "normal" | "blitzen"`) und Wettessen
+ * (`"sprint" | "gleichmaessig" | "schlussspurt"`). Fehlt das Feld, entscheidet die KI-Vorgabe
  * der Disziplin. Diese Datei füllt es noch nicht — der Aufstellungsentwurf hat (noch) kein
  * Haltungsfeld; das Rohr steht, die Buchse in der Einsatzliste folgt mit dem Grundgerüst.
  */
