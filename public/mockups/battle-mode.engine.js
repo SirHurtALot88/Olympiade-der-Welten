@@ -16440,12 +16440,16 @@
     {id:"ladekante", label:"Die Ladekante", fableLabel:"Rampe & Silo", saecke:[60,75,90,105],      d:8,  steig:1,   kante:true,  doppelnErlaubt:false}
   ];
   const SANDSACK_SAECKE_GESAMT=SANDSACK_STATIONEN.reduce((s,st)=>s+st.saecke.length,0); // 15
-  // sichere Traglast K = 30 + 1,2*LAST (Opus 4.1)
-  const SANDSACK_K_BASIS=30, SANDSACK_K_LAST=1.2;
+  // sichere Traglast K = 30 + 1,2*LAST (Opus 4.1). Paket-1b-Kalibrierrunde (04.10., Task #60,
+  // docs/design/gewichtheben-sandsack-finale-paket1b-kalibrierung-04-10.md): K_LAST auf 1,3
+  // angehoben (Hebel A dort) — der bei weitem wichtigste Pp-Hebel, misst aber rho-empfindlich
+  // (nicht-monotone Reaktion auf Nachbarwerte, s. Dokument Abschnitt 2).
+  const SANDSACK_K_BASIS=30, SANDSACK_K_LAST=1.3;
   // Wagnis-Flex (Opus 4.2): Kf = K*(1+0,012*(ANSAGE-50))
   const SANDSACK_WAGNIS_FLEX=0.012;
-  // vLeer = 3,6 + 0,6*TECHNIK/100
-  const SANDSACK_VLEER_BASIS=3.6, SANDSACK_VLEER_TECHNIK_K=0.006;
+  // vLeer = 3,6 + 0,6*TECHNIK/100. Paket-1b: TECHNIK_K von 0,006 auf 0,003 halbiert (Hebel B,
+  // s.o.) — behebt die dexterity/speed-Ueberzeichnung aus Paket 1 ohne rho zu schaden.
+  const SANDSACK_VLEER_BASIS=3.6, SANDSACK_VLEER_TECHNIK_K=0.003;
   // Biss: nur oberhalb rf>0,7, dann 1+0,25*(NERVEN-50)/50
   const SANDSACK_BISS_SCHWELLE=0.7, SANDSACK_BISS_NERVEN_K=0.005;
   // vLast-Kurve
@@ -16454,13 +16458,19 @@
   const SANDSACK_RUECKWEG_ERMUEDUNG_K=0.25;  // (1-0,25*E/100) im Leertempo des Rueckwegs
   // Doppeln (Opus 4.3): (kg1+kg2)/Kf <= 0,40+0,005*(ANSAGE-50)
   const SANDSACK_DOPPELN_SCHWELLE=0.40, SANDSACK_DOPPELN_ANSAGE_K=0.005;
-  // Erschoepfung (Opus 4.5)
-  const SANDSACK_ERMUEDUNG_K=60, SANDSACK_ERMUEDUNG_ERHOLUNG_BASIS=1.35, SANDSACK_ERMUEDUNG_ERHOLUNG_K=0.7;
+  // Erschoepfung (Opus 4.5). Paket-1b: ERMUEDUNG_K von 60 auf 130 angehoben (Hebel D, wichtigster
+  // Einzelfund der Kalibrierrunde — verstaerkt LASTs Vorteil KUMULATIV ueber die 15 Saecke statt
+  // nur je Sack). Ein scharfes lokales Optimum: 150/180 brechen rho stark ein (mehr Teams
+  // erreichen das Zeitlimit, die Zeit-Rangordnung zerfaellt), 90/100 sind schwaecher als 130.
+  const SANDSACK_ERMUEDUNG_K=130, SANDSACK_ERMUEDUNG_ERHOLUNG_BASIS=1.35, SANDSACK_ERMUEDUNG_ERHOLUNG_K=0.7;
   const SANDSACK_RUECKWEG_E_K=2;             // E -= 2*ERHOLUNG/100*d/20 auf dem Rueckweg
   const SANDSACK_RAST_E_BASIS=2, SANDSACK_RAST_E_ERHOLUNG_K=4; // E -= (2+4*ERHOLUNG/100) je Sekunde Ruhe (Staffel-Partner)
   // Pause (Opus 4.6)
   const SANDSACK_PAUSE_SCHWELLE_BASIS=50, SANDSACK_PAUSE_SCHWELLE_NERVEN_K=0.35, SANDSACK_PAUSE_ZIEL_ABSTAND=25;
-  const SANDSACK_PAUSE_RATE_BASIS=3, SANDSACK_PAUSE_RATE_ERHOLUNG_K=5;
+  // Paket-1b: PAUSE_RATE_ERHOLUNG_K von 5 auf 9 angehoben (Hebel I) — daempft das durch die
+  // hoehere Erschoepfungskurve eingefuehrte Pausen-Rauschen, letzter Schritt von rho 0,782 auf
+  // 0,794. Werte darueber (10/13) bringen keinen weiteren Gewinn (Plateau bzw. Verschlechterung).
+  const SANDSACK_PAUSE_RATE_BASIS=3, SANDSACK_PAUSE_RATE_ERHOLUNG_K=9;
   // Rutscher (Opus 4.7), Wahrscheinlichkeit auf [0,005; 0,45] gedeckelt
   const SANDSACK_RUTSCHER_BASIS=0.02, SANDSACK_RUTSCHER_RF_K=0.35, SANDSACK_RUTSCHER_RF_SCHWELLE=0.6;
   const SANDSACK_RUTSCHER_E_K=0.15, SANDSACK_RUTSCHER_TECHNIK_K=0.04;
@@ -16471,6 +16481,11 @@
   // Wechsel (Opus 4.8) und Zeitlimit/Medley-Regel (Opus 4.4)
   const SANDSACK_WECHSEL_SEK=0.3;
   const SANDSACK_ZEITLIMIT=190;
+  // Ladekante-Wuchtbonus (Opus 4.2, "auf die Ladekante wuchten"): 0,6 + FAKTOR*max(0,r-0,5).
+  // Eigener, benannter Hebel (Paket 1b Kalibrierrunde) statt des Inline-Literals 1,5 — wirkt
+  // NUR an Station C (schwerste Saecke, hoechstes rf) und damit gezielter auf LAST als eine
+  // globale K_LAST-Aenderung, die alle drei Stationen gleichzeitig verschiebt.
+  const SANDSACK_KANTE_WUCHT_BASIS=0.6, SANDSACK_KANTE_WUCHT_R_K=1.5;
 
   // -------------------------------------------------------------------------------------
   // TEAM-TAKTIK AUS PERSOENLICHKEIT (Chris' Antwort 4, 03.10.): KEIN neues Trait-System —
@@ -16632,7 +16647,7 @@
     const vLast=vLeer*Math.max(SANDSACK_VLAST_MIN,1-SANDSACK_VLAST_FAKTOR*Math.pow(rf,SANDSACK_VLAST_EXPONENT))
                 *Math.max(0.1,1-SANDSACK_VLAST_ERMUEDUNG_K*E/100)*biss;
     let dauer=(0.5+0.6*r) + (station.d*station.steig)/vLast
-      + (station.kante?0.6+1.5*Math.max(0,r-0.5):0)
+      + (station.kante?SANDSACK_KANTE_WUCHT_BASIS+SANDSACK_KANTE_WUCHT_R_K*Math.max(0,r-0.5):0)
       + station.d/(vLeer*Math.max(0.1,1-SANDSACK_RUECKWEG_ERMUEDUNG_K*E/100));
     const p=Math.min(SANDSACK_RUTSCHER_MAX,Math.max(SANDSACK_RUTSCHER_MIN,
       SANDSACK_RUTSCHER_BASIS+SANDSACK_RUTSCHER_RF_K*Math.max(0,rf-SANDSACK_RUTSCHER_RF_SCHWELLE)
