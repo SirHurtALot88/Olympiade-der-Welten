@@ -16953,6 +16953,439 @@
     };
   }
 
+  // =====================================================================================
+  // SANDSACK-FINALE: PRAeSENTATION (Paket 2, 04.10., Task #58,
+  // docs/design/gewichtheben-sandsack-finale-paket2-praesentation-04-10.md). Baut
+  // ausschliesslich auf bereits ENTHUELLTEN, von baueSandsackFinale() oben gelieferten Daten
+  // auf: LASTEN_FINALE, u.lastKg/u.lastSaecke/u.lastRutscher/u.lastPausen/u.lastDoppelt, sowie
+  // den rein deterministischen (KEIN rr(), KEIN neuer Zufallsverbrauch, kein Seiteneffekt)
+  // Helfern sandsackZuteilung()/SANDSACK_STATIONEN. KEINE Aenderung an einer SANDSACK_*-
+  // Konstante, an baueSandsackFinale()/sandsackSeiteLauf()/sandsackGang()/sandsackWuerfe()/
+  // sandsackLastenplan()/sandsackPersoenlichkeit() oder an LASTEN_FINALE selbst — diese
+  // gesamte Sektion LIEST nur, so wie der Auftrag es verlangt ("nur LESEN der Datenfelder,
+  // die die Mechanik bereits liefert").
+  //
+  // GATE (wie `seiten` in spieleBuehneHeben(), s. dort): diese Szene laeuft NUR, wenn
+  // `sandsackVorschauAktiv` true ist — gesetzt ausschliesslich vom Probe-Einstieg
+  // window.__arena.sandsackVorschau() (s. window.__arena-Objekt weiter unten). Ein echtes
+  // Spiel zeigt sie nie, solange Chris nicht entscheidet, WANN/OB das Sandsack-Finale
+  // Sendezeit bekommt (Fable-Papier gewichtheben-sandsack-rennen-fable-praesentation-03-10.md
+  // Abschnitt 8, Weg A/B/C — dieselbe offene Frage, die Paket 1 schon bei `seiten` liegen
+  // liess). Bei sandsackVorschauAktiv===false (Default, jeder echte Spielstand) erreichen
+  // buehnenBewegung()/zeichneBuehne() diesen gesamten Block gar nicht (s. die beiden
+  // Gate-Zeilen dort, direkt vor den bestehenden stepHeben()/zeichneHeben()-Zweigen) — der
+  // Isolationsnachweis ist dadurch strukturell erfuellt, nicht nur gemessen.
+  let sandsackVorschauAktiv=false;
+  let SANDSACK_SZENE=null, sandsackSzeneT=0, sandsackSzenePublikumAn=false;
+
+  // SACK-STUFEN (Fable-Papier 3.1): sechs Stufen, rein optisch, KEIN Motorwert — dieselbe
+  // Idee wie HEBEN_SCHEIBEN_STUFEN weiter oben. `anker` "schulter" fuer die Stufen 1-3,
+  // "brust" (= der bestehende Front-Rack-Anker HEBEN_PHASEN.zug.anteil, den die Ladestrecke
+  // schon fuer den Scheibenstapel nutzt) fuer 4-6.
+  const SANDSACK_VIZ_STUFEN=[
+    {w:14,h:10,farbe:"#c9a86a",naht:1,anker:"schulter"},
+    {w:15,h:11,farbe:"#bd9b5e",naht:1,anker:"schulter"},
+    {w:17,h:12,farbe:"#ab8a50",naht:2,anker:"schulter"},
+    {w:19,h:14,farbe:"#937444",naht:2,anker:"brust"},
+    {w:21,h:15,farbe:"#7d6239",naht:3,anker:"brust"},
+    {w:24,h:17,farbe:"#6a5230",naht:3,anker:"brust",band:true},
+  ];
+  // Stufen-Index 0..5 aus dem Sackgewicht relativ zur schwersten Station (105 kg, Ladekante)
+  // — reine Anzeige-Ableitung ohne jede Wirkung auf eine Formel.
+  function sandsackVizStufe(kg){
+    const r=Math.max(0,Math.min(1,(kg||0)/105));
+    return SANDSACK_VIZ_STUFEN[Math.min(5,Math.floor(r*6))];
+  }
+
+  // Praesentationszeiten (Sekunden) fuer die Pantomimen — NICHT Teil der Mechanik, reine
+  // Pacing-Werte aus dem Fable-Papier Abschnitt 3.3/3.4. Aendern diese Werte spaeter einmal,
+  // bleibt LASTEN_FINALE/die Rangtreue davon vollstaendig unberuehrt (s. Gate-Kommentar oben).
+  const SANDSACK_VIZ_RUTSCHER_DAUER=1.3, SANDSACK_VIZ_PAUSE_DAUER=1.8;
+  const SANDSACK_VIZ_UEBERGABE_DAUER=0.9, SANDSACK_VIZ_AUFSTELLUNG_DAUER=1.5;
+  const SANDSACK_VIZ_ZIELEINLAUF_DAUER=1.2, SANDSACK_VIZ_MAX_DAUER=150;
+
+  // SZENE BAUEN, EINE SEITE. Liest TEILNEHMER (bereits mit u.last* befuellt) und
+  // LASTEN_FINALE.plan[side]; ruft sandsackZuteilung() ein ZWEITES Mal auf, um zu erfahren,
+  // WER welche Station bekam — LASTEN_FINALE selbst traegt das nicht einzeln, nur Summen je
+  // Seite. sandsackZuteilung() ist eine reine Funktion (kein rr(), kein globaler Zustand,
+  // s. deren eigener Kopfkommentar oben) — ein zweiter Aufruf mit denselben Eingaben liefert
+  // exakt dasselbe Ergebnis wie der erste in baueSandsackFinale(), aendert also nichts.
+  //
+  // EHRLICH (Design-Dokument Abschnitt 3): die genaue Position jedes Rutschers/jeder Pause/
+  // jedes Doppel-Gangs ist von der Mechanik NICHT einzeln exponiert — LASTEN_FINALE und
+  // u.lastRutscher/u.lastPausen/u.lastDoppelt tragen nur die SUMME je Athlet. Die Verteilung
+  // unten (greedy, in Stations-/Gangreihenfolge) ist deshalb eine deterministische
+  // Anzeige-Heuristik, keine Replik der echten, internen Simulation.
+  function sandsackSzeneSeite(side){
+    const u6=TEILNEHMER.filter(u=>u.side===side&&u.lastSaecke!=null);
+    const plan=(LASTEN_FINALE&&LASTEN_FINALE.plan)?LASTEN_FINALE.plan[side]:"stationen";
+    const bahnen=sandsackZuteilung(plan,u6);
+    const budget=new Map(u6.map(u=>[u,{doppelt:u.lastDoppelt||0,rutscher:u.lastRutscher||0,pausen:u.lastPausen||0}]));
+    const trips=[];
+    SANDSACK_STATIONEN.forEach((station,s)=>{
+      const leute=((bahnen[s]&&bahnen[s].leute)||[]).filter(Boolean);
+      if(!leute.length)return;
+      let i=0,partnerIdx=0;
+      while(i<station.saecke.length){
+        const carrier=leute[partnerIdx%leute.length];
+        const b=budget.get(carrier)||{doppelt:0,rutscher:0,pausen:0};
+        let doppelt=false,n=1;
+        if(station.doppelnErlaubt&&i+1<station.saecke.length&&b.doppelt>0){ doppelt=true;n=2;b.doppelt--; }
+        let rutscher=false; if(b.rutscher>0){ rutscher=true; b.rutscher--; }
+        let pause=false; if(b.pausen>0){ pause=true; b.pausen--; }
+        trips.push({stationIdx:s,station,u:carrier,
+          kg:doppelt?station.saecke[i]+station.saecke[i+1]:station.saecke[i],
+          doppelt,rutscher,pause,
+          uebergabe:leute.length===2&&partnerIdx>0});
+        i+=n; if(leute.length===2)partnerIdx++;
+      }
+    });
+    return {side,plan,u6,bahnen,trips};
+  }
+
+  // ZEITPLAN: verteilt die bereits bekannte ECHTE Gesamtzeit LASTEN_FINALE.zeit[side] auf die
+  // oben gebauten Trips, gewichtet nach Sackgewicht plus einem festen Aufschlag fuer
+  // Doppeln/Rutscher/Pause/Uebergabe — reines Pacing fuer die Anzeige, aendert nichts an der
+  // Zahl selbst (sie wird nur umverteilt, nicht neu berechnet). Faellt LASTEN_FINALE.zeit auf
+  // Infinity (Randfall leeres Team, s. Kommentar in baueSandsackFinale()), wird stattdessen
+  // direkt die Basiszeit verwendet.
+  function sandsackSzeneZeitplan(seite){
+    const basis=seite.trips.map(tr=>
+      0.6+0.045*tr.kg+(tr.doppelt?0.4:0)+(tr.rutscher?SANDSACK_VIZ_RUTSCHER_DAUER:0)
+      +(tr.pause?SANDSACK_VIZ_PAUSE_DAUER:0)+(tr.uebergabe?SANDSACK_VIZ_UEBERGABE_DAUER:0));
+    const summeBasis=basis.reduce((s,x)=>s+x,0)||1;
+    const echtZeit=LASTEN_FINALE?LASTEN_FINALE.zeit[seite.side]:null;
+    const ziel=(typeof echtZeit==="number"&&isFinite(echtZeit)&&echtZeit>0)
+      ?Math.min(echtZeit,SANDSACK_VIZ_MAX_DAUER):summeBasis;
+    const faktor=ziel/summeBasis;
+    let t=SANDSACK_VIZ_AUFSTELLUNG_DAUER;
+    const geplant=seite.trips.map((tr,i)=>{
+      const dauer=Math.max(0.5,basis[i]*faktor);
+      const start=t; t+=dauer; return {...tr,start,dauer,_tickerDone:false};
+    });
+    return {...seite,trips:geplant,gesamtDauer:t+SANDSACK_VIZ_ZIELEINLAUF_DAUER};
+  }
+
+  // EINSTIEG: baut beide Seiten aus dem AKTUELLEN LASTEN_FINALE. Jeder gebaute
+  // gewichtheben-Buehnenaufbau hat LASTEN_FINALE bereits gesetzt (baueSandsackFinale() laeuft
+  // unmittelbar nach baueHebenDuelle(), s. Aufrufstelle oben) — diese Funktion rechnet selbst
+  // nichts Neues, sie liest nur und ordnet fuer die Anzeige.
+  function sandsackSzeneBauen(){
+    if(!LASTEN_FINALE)return null;
+    SANDSACK_SZENE={seiten:[0,1].map(side=>sandsackSzeneZeitplan(sandsackSzeneSeite(side)))};
+    sandsackSzeneT=0;
+    return SANDSACK_SZENE;
+  }
+
+  function sandsackBadgeText(side){
+    const seite=SANDSACK_SZENE&&SANDSACK_SZENE.seiten[side]; if(!seite)return "";
+    const label=seite.plan==="staffel"?"Staffel":seite.plan==="anker"?"Alleingang":"Stationen";
+    return (side===0?"Heim":"Gast")+": "+label;
+  }
+  function sandsackTickerName(u){ return ((u&&u.n)||"").split(" ")[0]||"Jemand"; }
+
+  // TICKER (Fable-Papier Abschnitt 5, Haus-Stil wie hebenTickerAmUrteil()): jede Zeile wird
+  // AM MOMENT des Ereignisses geschrieben (ein Trip meldet sich erst, wenn sandsackSzeneT
+  // seinen Start erreicht hat — Spoiler-Regel wie bei den Kampfrichterlampen), nie an einer
+  // Enthuellung vorab. Elf unterscheidbare Zeilenarten (aufstellung/start/station/last/
+  // uebergabe/rutscher(2)/pause(2)/laufsieg(2)/nachlese) decken Fable's Tabelle ab.
+  function sandsackTickerPruefen(){
+    if(!SANDSACK_SZENE)return;
+    if(!SANDSACK_SZENE._aufstellungGemeldet&&sandsackSzeneT>=0.05){
+      SANDSACK_SZENE._aufstellungGemeldet=true;
+      SANDSACK_SZENE.seiten.forEach(seite=>{
+        const wer=seite.plan==="anker"
+          ?sandsackTickerName(seite.u6[0])+" trägt allein, sechs Säcke."
+          :seite.bahnen.map((b,i)=>{
+              const namen=(b.leute||[]).filter(Boolean).map(sandsackTickerName);
+              return namen.length?namen.join(" & ")+" an "+SANDSACK_STATIONEN[i].fableLabel:null;
+            }).filter(Boolean).join(", ")+".";
+        feed(seite.side,"Sandsack-Rennen: "+sandsackBadgeText(seite.side)+" — "+wer,false,undefined,"aufstellung");
+        sfx("gewichtheben","hupe");
+      });
+    }
+    SANDSACK_SZENE.seiten.forEach(seite=>{
+      seite.trips.forEach((tr,idx)=>{
+        if(tr._tickerDone||sandsackSzeneT<tr.start)return;
+        tr._tickerDone=true;
+        const name=sandsackTickerName(tr.u), st=tr.station.fableLabel;
+        const vorige=idx>0?seite.trips[idx-1]:null;
+        if(!vorige||vorige.stationIdx!==tr.stationIdx){
+          feed(seite.side,name+" erreicht "+st+" — "+tr.kg+" kg.",false,undefined,"zwischenstand");
+          sfx("gewichtheben","sack_auf");
+        }
+        if(tr.station.kante&&tr.kg>=90)
+          feed(seite.side,"Schwerer Sack: "+tr.kg+" kg auf der Ladekante für "+name+".",false,undefined,"last");
+        if(tr.uebergabe){
+          feed(seite.side,"Übergabe an "+st.toLowerCase()+": "+name+" übernimmt.",false,undefined,"uebergabe");
+          sfx("gewichtheben","uebergabe");
+        }
+        if(tr.rutscher){
+          feed(seite.side,name+" verliert den Sack auf "+st+" — rutscht ihm weg.",false,undefined,"rutscher");
+          sfx("gewichtheben","sack_fall");
+        }
+        if(tr.pause){
+          const txt=seite.plan==="anker"
+            ?name+" setzt ab, wieder — allein alle Säcke zu tragen, das kostet."
+            :name+" muss durchatmen — der Sack steht neben sich.";
+          feed(seite.side,txt,false,undefined,"pause");
+          sfx("gewichtheben","sack_ab");
+        }
+      });
+    });
+    if(!SANDSACK_SZENE._zielGemeldet){
+      const seiten=SANDSACK_SZENE.seiten;
+      const fertig=seiten.every(s=>{
+        const letzter=s.trips[s.trips.length-1];
+        return !letzter||sandsackSzeneT>=letzter.start+letzter.dauer;
+      });
+      if(fertig){
+        SANDSACK_SZENE._zielGemeldet=true;
+        sfx("gewichtheben","sack_silo");
+        const sieger=LASTEN_FINALE?LASTEN_FINALE.sieger:null;
+        if(sieger==null){
+          feed(0,"Beide Seiten gleichzeitig im Silo — denkbar knapp.",true,undefined,"laufsieg");
+        }else{
+          const verlierer=1-sieger;
+          const zA=LASTEN_FINALE.zeit[sieger], zB=LASTEN_FINALE.zeit[verlierer];
+          const knapp=isFinite(zA)&&isFinite(zB)&&(zB-zA)<zA*0.08;
+          const siegName=(side=>side===0?"Heim":"Gast")(sieger);
+          feed(sieger,knapp
+            ?"Letzter Sack im Silo — "+siegName+" gewinnt das Sandsack-Rennen hauchdünn."
+            :"Letzter Sack im Silo — das Sandsack-Rennen geht klar an "+siegName+".",
+            true,undefined,"laufsieg");
+          sfx("gewichtheben","laufsieg");
+          if(knapp)feed(verlierer,"So nah dran — "+((side=>side===0?"Heim":"Gast")(verlierer))+" verliert das Rennen um Schritte.",false,undefined,"nachlese");
+        }
+      }
+    }
+  }
+
+  // SCHRITT: treibt die Trips der Reihe nach, schreibt AUSSCHLIESSLICH neue viz*-Felder auf
+  // die betroffenen TEILNEHMER-Objekte (u.vizSandsack*/u.vizPuste/u.vizSchritt/u.vizAniPhase)
+  // — exakt derselbe Vertrag wie stepFechten()/stepTennis()/stepSchatzsuche() (s. deren
+  // Kopfkommentare): nie u.summe/u.runden/u.lastKg/..., nie rr(). Nur aktiv, solange
+  // sandsackVorschauAktiv true ist (s. Gate-Kommentar oben).
+  function sandsackTripAktiv(trips,tSzene){
+    for(const tr of trips) if(tSzene>=tr.start&&tSzene<tr.start+tr.dauer) return tr;
+    return null;
+  }
+  function stepSandsackVorschau(dt){
+    if(!SANDSACK_SZENE){ sandsackSzeneBauen(); if(!SANDSACK_SZENE)return; }
+    sandsackSzeneT+=dt;
+    SANDSACK_SZENE.seiten.forEach(seite=>{
+      const tr=sandsackTripAktiv(seite.trips,sandsackSzeneT);
+      seite.u6.forEach(u=>{
+        if(!tr||tr.u!==u){ u.vizSandsackAktiv=false; return; }
+        u.vizSandsackAktiv=true;
+        const p=Math.max(0,Math.min(0.999,(sandsackSzeneT-tr.start)/tr.dauer));
+        const sonderDauer=tr.rutscher?SANDSACK_VIZ_RUTSCHER_DAUER:tr.pause?SANDSACK_VIZ_PAUSE_DAUER:0;
+        const sonderAnteil=Math.min(0.7,sonderDauer/tr.dauer);
+        const sonderStart=sonderDauer?Math.max(0.15,0.5-sonderAnteil/2):0;
+        const sonderEnde=sonderStart+sonderAnteil;
+        let phase="hin",phaseP=p/Math.max(0.0001,sonderDauer?sonderStart:0.55);
+        if(sonderDauer&&p>=sonderStart&&p<sonderEnde){
+          phase=tr.rutscher?"rutscher":"pause"; phaseP=(p-sonderStart)/Math.max(0.0001,sonderEnde-sonderStart);
+        }else if(p>=(sonderDauer?sonderEnde:0.55)){
+          phase="rueck"; phaseP=(p-(sonderDauer?sonderEnde:0.55))/Math.max(0.0001,1-(sonderDauer?sonderEnde:0.55));
+        }
+        u.vizSandsackPhase=phase; u.vizSandsackPhaseP=Math.max(0,Math.min(1,phaseP));
+        u.vizSandsackKg=tr.kg; u.vizSandsackStation=tr.stationIdx;
+        u.vizSandsackLast=phase==="rueck"?0:Math.max(0,Math.min(1,tr.kg/105));
+        const anstrengung=(phase==="hin"?p:phase==="rueck"?0:0.6)*(1+u.vizSandsackLast);
+        let puste=Math.max(0,Math.min(1,1-anstrengung*0.22-(u.lastRutscher||0)*0.03));
+        if(phase==="pause")puste=Math.min(1,puste+phaseP*0.55);
+        u.vizPuste=puste;
+        if(u.vizSchritt==null)u.vizSchritt=(u.id||0)*2.3;
+        if(phase!=="rutscher"&&phase!=="pause")u.vizSchritt+=dt*(2.3-1.1*u.vizSandsackLast);
+        u.vizAniPhase=(u.vizSchritt/9)%1;
+      });
+    });
+    sandsackTickerPruefen();
+  }
+
+  // ZEICHNEN: Sack als abgerundetes Rechteck mit Zipfel/Naht/Schatten — Sackleinen, kein Logo,
+  // keine Zahl (Fable 3.1: "waere unter 9 px"). x/y ist die MITTE des Sacks.
+  function sandsackVizZeichneSack(zx,zy,s,stufe){
+    const w=stufe.w*s,h=stufe.h*s,r=Math.min(w,h)*0.28;
+    ctx.save(); ctx.translate(zx,zy);
+    ctx.fillStyle="rgba(0,0,0,.28)";
+    ctx.beginPath(); ctx.ellipse(0,h*0.58,w*0.52,h*0.2,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=stufe.farbe;
+    ctx.beginPath();
+    ctx.moveTo(-w/2+r,-h/2); ctx.lineTo(w/2-r,-h/2); ctx.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
+    ctx.lineTo(w/2,h/2-r); ctx.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
+    ctx.lineTo(-w/2+r,h/2); ctx.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
+    ctx.lineTo(-w/2,-h/2+r); ctx.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-w*0.14,-h/2); ctx.lineTo(w*0.14,-h/2); ctx.lineTo(0,-h/2-h*0.3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,.32)"; ctx.lineWidth=1;
+    for(let i=0;i<stufe.naht;i++){
+      const ny=-h/2+(h*(i+1))/(stufe.naht+1);
+      ctx.beginPath(); ctx.moveTo(-w/2+1,ny); ctx.lineTo(w/2-1,ny); ctx.stroke();
+    }
+    if(stufe.band){ ctx.strokeStyle="rgba(10,10,10,.65)"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(w/2,0); ctx.stroke(); }
+    ctx.restore();
+  }
+  // PUSTE-RING (Fable 3.2): Kreisbogen ueber dem Kopf, Fuellung = puste, Farbe amber->grau->
+  // crit. Bewusst AUSSERHALB jeder Rotation/Stauchung der Figur gezeichnet (bleibt lesbar wie
+  // ein HUD-Element, dieselbe Entscheidung wie die Kampfrichterlampen ueber der Plattform).
+  function sandsackVizPusteRing(x,y,puste){
+    const p=Math.max(0,Math.min(1,puste==null?1:puste));
+    const farbe=p>0.5?"#d6ac36":p>0.2?"#5f6675":(css("--crit")||"#e05a4e");
+    ctx.save();
+    ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=farbe; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(x,y,7,-Math.PI/2,-Math.PI/2+p*Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }
+  // FIGUR MIT SACK: Vorneigung/Schwanken/Stauchung um den Fusspunkt (dasselbe translate/
+  // scale/translate-Muster wie zeichneTeambank()), Sack am Schulter-/Brust-Anker (3.1),
+  // Rutscher (Sack faellt, Sandwolke) und Pause (Sack steht ab, Atemheben) als eigene
+  // Sub-Phasen innerhalb des Trips — EHRLICH wie Fable 3.2/7.3 verlangt: keine Haende am
+  // Sack, kein Gesicht, der Sack verdeckt genau den Bereich, den das Blatt nicht zeichnet.
+  function zeichneSandsackTraeger(u,side,zoneX0,zoneW,laneY){
+    const s=u.vizSandsackStation||0, x0=zoneX0+s*zoneW, x1=x0+zoneW;
+    const phase=u.vizSandsackPhase||"hin", pp=u.vizSandsackPhaseP||0;
+    let x;
+    if(phase==="hin")x=x0+(x1-x0)*Math.min(1,pp*1.08);
+    else if(phase==="rutscher"||phase==="pause")x=x0+(x1-x0)*0.55;
+    else x=x1-(x1-x0)*Math.min(1,pp*1.08);
+    const fussY=laneY, last=phase==="rueck"?0:(u.vizSandsackLast||0);
+    const puste=u.vizPuste==null?1:u.vizPuste;
+    const neigung=(side===0?1:-1)*(0.03+0.12*last*(1.3-puste));
+    const stauch=phase==="pause"?1+0.03*Math.sin(sandsackSzeneT*2*Math.PI*1.6):1-0.06*last;
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+    const koerperHoehe=(HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*Z;
+    const scheitelY=fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z;
+
+    ctx.save();
+    ctx.translate(x,fussY); ctx.rotate(neigung); ctx.scale(1,stauch); ctx.translate(-x,-fussY);
+    const spriteArg={...u,vx:(phase==="rueck"?-1:1)*(side===0?1:-1),vy:0,lunge:0,down:false};
+    zeichneSprite(ctx,spriteArg,x,fussY-19);
+    if(phase!=="rueck"){
+      const stufe=sandsackVizStufe(u.vizSandsackKg||0);
+      const vorRichtung=side===0?1:-1;
+      let dx=-5*vorRichtung, dy=koerperHoehe*(stufe.anker==="brust"?HEBEN_PHASEN.zug.anteil:0.22);
+      if(phase==="rutscher"){
+        const fall=Math.min(1,pp/0.4);
+        dy=dy*(1-fall)+koerperHoehe*0.98*fall;
+        if(pp<0.35){
+          ctx.fillStyle="rgba(138,122,85,.5)";
+          for(let k=0;k<6;k++){ const a=k/6*Math.PI*2;
+            ctx.beginPath(); ctx.arc(x+dx+Math.cos(a)*7*fall,scheitelY+dy+Math.sin(a)*2.2,1.2,0,Math.PI*2); ctx.fill(); }
+        }
+      }else if(phase==="pause"){
+        dx=16*vorRichtung; dy=koerperHoehe*0.8;
+      }
+      sandsackVizZeichneSack(x+dx,scheitelY+dy,0.85,stufe);
+    }
+    ctx.restore();
+    sandsackVizPusteRing(x,scheitelY-10,puste);
+    if(puste<0.4&&phase!=="rueck"){
+      ctx.fillStyle="rgba(207,227,255,.75)";
+      ctx.beginPath(); ctx.arc(x+3,scheitelY+6+((sandsackSzeneT*3)%6),1.3,0,Math.PI*2); ctx.fill();
+    }
+  }
+
+  // BUEHNENBILD "DER HOF" (Fable-Papier Abschnitt 2): zwei Bahnen, drei Stationen (Depot/
+  // Steg/Rampe & Silo — SANDSACK_STATIONEN[*].fableLabel, reines Flavour-Feld aus Paket 1),
+  // Silo als Spielstand-ohne-Zahl (2.3), Wartezone hinter dem Depot (2.4), Taktik-Badge
+  // (4.3). Alles Canvas-Formen, kein neues Sprite-Blatt (Ehrlichkeits-Prinzip, Fable 7.3).
+  function zeichneSandsackBuehne(art){
+    if(!SANDSACK_SZENE)sandsackSzeneBauen();
+    if(!SANDSACK_SZENE)return;
+    if(!sandsackSzenePublikumAn){ tonLoopStart("gewichtheben"); sandsackSzenePublikumAn=true; }
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#181c24"); g.addColorStop(0.55,"#101319"); g.addColorStop(1,"#0a0b0e");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#d6ac36";
+    ctx.fillText("SANDSACK-RENNEN",W/2,H*0.08);
+    ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#8a93a3";
+    ctx.fillText(sandsackBadgeText(0)+"   ·   "+sandsackBadgeText(1),W/2,H*0.14);
+
+    const laneY=[H*0.36,H*0.62], laneH=H*0.17;
+    const zoneX0=W*0.08, zoneX1=W*0.92, zoneW=(zoneX1-zoneX0)/SANDSACK_STATIONEN.length;
+    const FLOOR=["#3b3426","#20242c","#181c22"];
+
+    SANDSACK_STATIONEN.forEach((station,s)=>{
+      const x0=zoneX0+s*zoneW;
+      [0,1].forEach(side=>{
+        ctx.fillStyle=FLOOR[s]; ctx.globalAlpha=0.55;
+        ctx.fillRect(x0,laneY[side]-laneH/2,zoneW,laneH); ctx.globalAlpha=1;
+      });
+    });
+    ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
+    SANDSACK_STATIONEN.forEach((station,s)=>{
+      const x0=zoneX0+s*zoneW;
+      if(s>0){ ctx.beginPath(); ctx.moveTo(x0,laneY[0]-laneH/2-8); ctx.lineTo(x0,laneY[1]+laneH/2+8); ctx.stroke(); }
+      ctx.font="400 9px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(255,255,255,.6)";
+      ctx.fillText(station.fableLabel,x0+zoneW/2,laneY[0]-laneH/2-12);
+    });
+    ctx.strokeStyle="rgba(255,255,255,.14)";
+    [0,1].forEach(side=>{
+      ctx.beginPath(); ctx.moveTo(zoneX0,laneY[side]+laneH/2); ctx.lineTo(zoneX1,laneY[side]+laneH/2); ctx.stroke();
+      ctx.save(); ctx.strokeStyle=(side===0?css("--home"):css("--away"))||"rgba(255,255,255,.3)";
+      ctx.globalAlpha=0.35; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(zoneX0,laneY[side]+laneH/2); ctx.lineTo(zoneX1,laneY[side]+laneH/2); ctx.stroke();
+      ctx.restore();
+    });
+
+    // Depot-Stapel (Station 0): noch nicht abgeholte Saecke dieser Seite, als Pyramide.
+    [0,1].forEach(side=>{
+      const seite=SANDSACK_SZENE.seiten[side]; if(!seite)return;
+      const stationTrips=seite.trips.filter(t=>t.stationIdx===0);
+      const rest=stationTrips.filter(t=>sandsackSzeneT<t.start).length;
+      const bx=zoneX0+16, by=laneY[side]+laneH/2-6;
+      for(let i=0;i<Math.min(rest,6);i++)
+        sandsackVizZeichneSack(bx+(i%3)*5,by-6-Math.floor(i/3)*9,0.8,SANDSACK_VIZ_STUFEN[0]);
+    });
+
+    // Silo je Seite am rechten Rand der letzten Station — Fuellstand statt Zahl (2.3).
+    [0,1].forEach(side=>{
+      const seite=SANDSACK_SZENE.seiten[side]; if(!seite)return;
+      const gesamtKg=seite.trips.reduce((s,t)=>s+t.kg,0)||1;
+      const abgeliefertKg=seite.trips.filter(t=>sandsackSzeneT>=t.start+t.dauer).reduce((s,t)=>s+t.kg,0);
+      const fuell=Math.max(0,Math.min(1,abgeliefertKg/gesamtKg));
+      const sx=zoneX1-20, sTop=laneY[side]-laneH/2-6, sH=laneH+10, sW=16;
+      ctx.fillStyle="#3a3f4c"; ctx.fillRect(sx,sTop,sW,sH);
+      ctx.fillStyle="#0c0d10"; ctx.fillRect(sx+2,sTop+2,sW-4,sH-4);
+      const farbe=(side===0?css("--home"):css("--away"))||(side===0?"#8ab4f8":"#f28b82");
+      const fH=(sH-4)*fuell;
+      ctx.fillStyle=farbe; ctx.fillRect(sx+2,sTop+2+(sH-4-fH),sW-4,fH);
+      if(fuell>=0.999){ ctx.save(); ctx.globalAlpha=0.5; ctx.fillStyle=farbe;
+        ctx.fillRect(sx-3,sTop-3,sW+6,sH+6); ctx.restore(); }
+      ctx.font="700 8px Georgia,serif"; ctx.fillStyle="#cfd6e3";
+      const erledigt=seite.trips.filter(t=>sandsackSzeneT>=t.start+t.dauer).length;
+      ctx.fillText(erledigt+"/"+seite.trips.length,sx+sW/2,sTop+sH+9);
+    });
+
+    // Wartezone hinter dem Depot: wer gerade keinen Trip faehrt.
+    [0,1].forEach(side=>{
+      const seite=SANDSACK_SZENE.seiten[side]; if(!seite)return;
+      const wartend=seite.u6.filter(u=>!u.vizSandsackAktiv);
+      if(wartend.length)
+        zeichneTeambank(wartend,side,{x0:W*0.015,x1:W*0.065,fussY:laneY[side]+laneH/2+6},0.7,0);
+    });
+
+    // Taktik-Badge am Bahnanfang (4.3), bleibt den ganzen Lauf sichtbar.
+    ctx.textAlign="left";
+    [0,1].forEach(side=>{
+      ctx.font="700 9px Georgia,'Times New Roman',serif";
+      ctx.fillStyle=(side===0?css("--home"):css("--away"))||(side===0?"#8ab4f8":"#f28b82");
+      ctx.fillText(sandsackBadgeText(side),zoneX0,laneY[side]-laneH/2-24);
+    });
+
+    // Aktive Traeger je Seite.
+    [0,1].forEach(side=>{
+      const seite=SANDSACK_SZENE.seiten[side]; if(!seite)return;
+      seite.u6.forEach(u=>{ if(u.vizSandsackAktiv)zeichneSandsackTraeger(u,side,zoneX0,zoneW,laneY[side]); });
+    });
+  }
+
   function baueHebenDuelle(art,mine,gegner){
     const n=Math.min(mine.length,gegner.length);
     const paar=[];
@@ -19019,6 +19452,10 @@
   // Bedingung.
   function buehnenBewegung(dt){
     const art=BB();
+    // SANDSACK-FINALE VORSCHAU (Paket 2, Task #58): exklusiv auf `sandsackVorschauAktiv`
+    // gegated (s. Kopfkommentar bei stepSandsackVorschau oben) -- bei jedem echten Spielstand
+    // false, dann erreicht dieser Zweig stepHeben() direkt darunter unveraendert.
+    if(art.heben && sandsackVorschauAktiv && typeof stepSandsackVorschau==="function"){ stepSandsackVorschau(dt); return; }
     if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
     // B2/B3 (Broadcast-Optik-Recherche 27.09.): stepGauntletHp() laeuft NUR fuer den
     // Gauntlet (art.gauntlet) direkt nach stepCypher() mit -- dieselbe reine Anzeige-
@@ -22600,6 +23037,9 @@
     // die Teilnehmer-Zeichnung. Faellt ein spaeterer Agent eine weitere eigene Boden-
     // funktion dazu, ist das eine weitere else-if-Zeile hier, keine Umstrukturierung.
     const art=BB();
+    // SANDSACK-FINALE VORSCHAU (Paket 2, Task #58): exklusiv auf `sandsackVorschauAktiv`
+    // gegated, s. Kommentar bei buehnenBewegung() oben -- bei jedem echten Spielstand false.
+    if(art.heben && sandsackVorschauAktiv && typeof zeichneSandsackBuehne==="function"){ zeichneSandsackBuehne(art); return; }
     // SHOWCASE (PR S1, Konzept 17.09.): eigener Boden statt des generischen Podests --
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
     // WETTESSEN (Opus-Plan Naechste-Drei-Disziplinen 17-09, D2.a): genau die weitere
@@ -32960,7 +33400,21 @@
       // nachgezogen wird (s. `r.ansageAlt`-Aufruf). Kurzer, heller Klick wie `klatschen`,
       // aber auf einer eigenen, tieferen Tonhoehe, damit beide Ereignisse unterscheidbar
       // bleiben.
-      kreide:    {synth:(vol)=>tonKlick(vol,1800,0.04)}
+      kreide:    {synth:(vol)=>tonKlick(vol,1800,0.04)},
+      // SANDSACK-FINALE (Paket 2, Task #58, Fable-Papier Abschnitt 6): neun Ereignisse, ALLE
+      // aus den fuenf vorhandenen Primitiven (kein sechster Baustein, Katalog-Regel s.
+      // Climbing-Kommentar). `publikum`/`ausbruch`/`raunen` oben werden mitgenutzt. Nur
+      // erreichbar, solange sandsackVorschauAktiv true ist (s. Kopfkommentar bei
+      // baueSandsackFinale()/sandsackSzeneBauen() oben) -- ein echtes Spiel loest sie nie aus.
+      hupe:        {synth:(vol)=>tonTon(vol,220,0.6)},
+      sack_auf:    {synth:(vol)=>{ tonSchlag(vol,180,90,0.08); tonRauschen((vol??0.6)*0.5,350,0.12,false); }},
+      sack_ab:     {synth:(vol)=>tonSchlag((vol??0.6)*0.8,140,70,0.10)},
+      schritt_last:{synth:(vol)=>tonSchlag((vol??0.6)*0.35,120,60,0.05)},
+      sack_fall:   {synth:(vol)=>{ tonSchlag(vol,200,50,0.2); tonRauschen((vol??0.6)*0.6,600,0.25,false); }},
+      keuchen:     {synth:(vol)=>tonRauschen((vol??0.6)*0.35,900,0.18,false)},
+      uebergabe:   {synth:(vol)=>{ tonKlick(vol,1600,0.04); tonKlick((vol??0.6)*0.7,2000,0.03); }},
+      sack_silo:   {synth:(vol)=>{ tonRauschen(vol,1200,0.3,false); tonMetall((vol??0.6)*0.5,400,0.15); }},
+      laufsieg:    {synth:(vol)=>tonDoppelton(vol,700,1050,0.32)}
     },
     eiskunstlauf:{
       kufe:     {synth:(vol)=>tonKlick(vol,3200,0.05)},
@@ -45100,6 +45554,44 @@
     // wartet auf Chris' Zustimmung). Reine Anzeige: teamFeierAusloesen() schreibt nur
     // `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin ein No-Op).
     teamFeierProbe:(seite,stufe)=>{ teamFeierAusloesen(seite===1?1:0,stufe||"gross",null); return teamFeiern.length; },
+    // SANDSACK-FINALE-VORSCHAU (Paket 2, 04.10., Task #58): schaltet die reine
+    // Anzeige-Szene aus zeichneSandsackBuehne()/stepSandsackVorschau() ein/aus -- s. deren
+    // ausfuehrlichen Gate-Kommentar oben. Braucht ein bereits gebautes Gewichtheben-Duell
+    // (LASTEN_FINALE wird von baueSandsackFinale() automatisch mitgefuellt, sobald die
+    // Buehne gebaut ist -- also nach setDisc("gewichtheben") + dem ueblichen Spielaufbau,
+    // genau wie bei jeder anderen Disziplin-Sonde hier). sandsackVorschau(false) schaltet
+    // zurueck auf den normalen stepHeben()/zeichneHeben()-Pfad. Reine Anzeige: liest nur
+    // bereits vorhandene Felder, schreibt ausschliesslich neue viz*-Felder, kein rr().
+    sandsackVorschau:(an,vorspulenSekunden)=>{
+      if(an===false){ sandsackVorschauAktiv=false; SANDSACK_SZENE=null; return {aktiv:false}; }
+      sandsackVorschauAktiv=true;
+      // `running` erzwingen: das normale Gewichtheben-Duell ist zu diesem Zeitpunkt oft
+      // laengst `done` (running=false, s. die Spielende-Stelle oben) -- ohne diese Zeile
+      // riefe loop() stepSim()/buehnenBewegung() gar nicht mehr auf, und die Vorschau-Uhr
+      // staende fuer immer still. stepBuehne() ruft buehnenBewegung() bewusst AUCH nach
+      // `done` weiter auf (s. deren eigener "N-Fix"-Kommentar) -- das hier nutzt genau das.
+      // Reine Anzeige-Zustandsaenderung, kein Einfluss auf eine bereits abgeschlossene
+      // Messung/Wertung.
+      running=true;
+      const szene=sandsackSzeneBauen();
+      // VORSPULEN (optional, fuer Playwright-Screenshots/QA): ruft stepSandsackVorschau()
+      // direkt in 1/60-Schritten vor, statt auf echte Sim-Frames zu warten -- derselbe
+      // Vorteil, den buehneReihenfolge()/calloutProbe() oben mit direkten Aufrufen statt
+      // Warten auf ein organisches Ereignis haben. Reine Anzeige, kein rr(), kein Einfluss
+      // auf LASTEN_FINALE/eine Messung.
+      if(vorspulenSekunden>0)for(let i=0;i<vorspulenSekunden*60;i++)stepSandsackVorschau(1/60);
+      return {aktiv:true, bereit:!!szene,
+        plan:szene?szene.seiten.map(s=>s.plan):null,
+        gesamtDauer:szene?szene.seiten.map(s=>+s.gesamtDauer.toFixed(1)):null,
+        t:sandsackSzeneT};
+    },
+    // SANDSACK-FINALE-VORSCHAU, ZEITPLAN-SONDE: der volle Trip-Zeitplan beider Seiten
+    // (Station/Traeger/Start/Dauer/Rutscher/Pause/Uebergabe), ohne die Szene selbst zu
+    // veraendern -- fuer Playwright/QA, um gezielt auf einen Rutscher-/Pause-/Uebergabe-
+    // Moment vorzuspulen, statt blind zu raten. Reine Anzeige, liest nur SANDSACK_SZENE.
+    sandsackVorschauZeitplan:()=>SANDSACK_SZENE?SANDSACK_SZENE.seiten.map(s=>({side:s.side,plan:s.plan,
+      trips:s.trips.map(t=>({station:t.station.fableLabel,u:t.u.n,kg:t.kg,start:+t.start.toFixed(2),
+        dauer:+t.dauer.toFixed(2),rutscher:t.rutscher,pause:t.pause,doppelt:t.doppelt,uebergabe:t.uebergabe}))})):null,
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
