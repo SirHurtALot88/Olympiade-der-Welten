@@ -17302,10 +17302,13 @@
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
     ctx.textAlign="center"; ctx.textBaseline="middle";
+    // Review-Auflage PR #1150: H*0.08/H*0.14 lag genau unter der bestehenden Spielstand-HUD
+    // (Team-Boxen/Uhr, oberer Bildrand) und war dort unleserlich -- auf H*0.20/H*0.26
+    // verschoben, klar unterhalb der HUD und mit Abstand ueber den Bahnen (ab H*0.36).
     ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#d6ac36";
-    ctx.fillText("SANDSACK-RENNEN",W/2,H*0.08);
+    ctx.fillText("SANDSACK-RENNEN",W/2,H*0.20);
     ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#8a93a3";
-    ctx.fillText(sandsackBadgeText(0)+"   ·   "+sandsackBadgeText(1),W/2,H*0.14);
+    ctx.fillText(sandsackBadgeText(0)+"   ·   "+sandsackBadgeText(1),W/2,H*0.26);
 
     const laneY=[H*0.36,H*0.62], laneH=H*0.17;
     const zoneX0=W*0.08, zoneX1=W*0.92, zoneW=(zoneX1-zoneX0)/SANDSACK_STATIONEN.length;
@@ -45563,7 +45566,17 @@
     // zurueck auf den normalen stepHeben()/zeichneHeben()-Pfad. Reine Anzeige: liest nur
     // bereits vorhandene Felder, schreibt ausschliesslich neue viz*-Felder, kein rr().
     sandsackVorschau:(an,vorspulenSekunden)=>{
-      if(an===false){ sandsackVorschauAktiv=false; SANDSACK_SZENE=null; return {aktiv:false}; }
+      // Review-Auflage PR #1150: dasselbe Start/Stop-Flaggen-Muster wie hebenPublikumAn
+      // (s. bodenBuehne() oben) -- sonst liefe bei interaktivem Ausschalten+Disziplinwechsel
+      // der Publikums-Ton im Hintergrund weiter, und eine erneute Aktivierung starte ihn
+      // nicht neu, weil die Flagge faelschlich `true` bliebe. Im echten Spiel unerreichbar
+      // (das Gate verhindert jeden Aufruf ausserhalb dieser QA-Funktion), aber fuer
+      // interaktive Devtools-Nutzung sauber.
+      if(an===false){
+        sandsackVorschauAktiv=false; SANDSACK_SZENE=null;
+        if(sandsackSzenePublikumAn){ tonLoopStop(); sandsackSzenePublikumAn=false; }
+        return {aktiv:false};
+      }
       sandsackVorschauAktiv=true;
       // `running` erzwingen: das normale Gewichtheben-Duell ist zu diesem Zeitpunkt oft
       // laengst `done` (running=false, s. die Spielende-Stelle oben) -- ohne diese Zeile
