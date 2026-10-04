@@ -7462,6 +7462,17 @@
   const LAUF_ZUM_BALL_RADIUS=260;   // ab wann jemand seinen Posten verlaesst, um einen freien Ball zu holen
   const BEDRAENGT_RADIUS=30;        // Deckerabstand, innerhalb dessen ein Wurf-Malus greift
   const HILFE_RADIUS=90;            // ab wann ein NICHT zustaendiger Verteidiger als Doppel-Helfer in Frage kommt (s. bewegeSpielerLive)
+  // B1 -- GRAVITY-ASSIST, STUFE 1 (docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 3,
+  // "der Schuetze ohne Ball hat einen Wert"). NUR Buchhaltung (Klasse W, K3-Bauform): kein
+  // neuer Wurf, keine neue Bewegung, nutzt ausschliesslich Deckerabstaende, die der Motor im
+  // Wurfmoment ohnehin kennt. SCHUSS_FERN = intelligence50/awareness22/spirit16/dexterity12
+  // (s. battle-mode.rezepte.js) -- bewusst die drei laut Pp-Sonde unterbelichteten Attribute
+  // (Spirit 17,8% statt Ziel 22, Awareness 9,1% statt Ziel 14). Schwelle 55 = spuerbar ueber
+  // dem Rezept-Mittel (ein "respektierter" Distanzschuetze, kein Durchschnittswerfer).
+  const GRAVITY_SCHUSS_FERN_SCHWELLE=55;
+  // GEWICHT PLATZHALTER, MESSPFLICHT (Auftrag): je gewertetem Feldkorb EIN Gravity-Assist
+  // moeglich. 0.5 haelt den Posten klein neben Assist (1.0)/Rebound (1.2) in feldspielWert.
+  const GRAVITY_ASSIST_GEWICHT=0.5;
   // FOKUS-DOPPELN (Chris, 29.08.: „ich kann zb einen spieler der gegner selektieren und
   // der wird dann mehr von help defense gedoppelt"). Die Hilfsverteidigung existierte
   // bereits (s. bewegeSpielerLive, HILFE_RADIUS oben) — neu ist ausschliesslich eine
@@ -7796,7 +7807,16 @@
     // fsFbLog-Mechanismus wie jede andere Kennzahl hier.
     fsFbLog=feldspielDisc==="football"?{passAtt:0,passComp:0,passInt:0,sacks:0,rushAtt:0,
       fumbles:0,fumblesLost:0,tds:0,fgAtt:0,fgMade:0,punts:0,
-      passerPgSum:0,passerTgSum:0,passerN:0}:null;
+      passerPgSum:0,passerTgSum:0,passerN:0,
+      // F1 -- EPA-MESSPUNKTE (scripts/messe-football-epa-tabelle.mjs), reine Buchfuehrung,
+      // kein rr()-Aufruf: `epaZustaende` haelt JEDEN Snap als {down,toGo,spot,side} in
+      // Spielreihenfolge fest (gefuellt in starteSnap(), s. dort), `epaScores` jeden
+      // tatsaechlichen Punktgewinn (Touchdown/Field-Goal) als {idx,side,punkte} mit `idx`
+      // = Index des Snaps in `epaZustaende`, der den Punkt erzielt hat. Aus beiden zusammen
+      // zieht die Sonde "mittlere Folge-Punkte je Zustand" (EP), dieselbe Ehrlichkeit wie
+      // `passerPgSum` oben. Ausserhalb der Messsonde ungelesen -- footballEpVon() liest
+      // ausschliesslich die EINMAL gezogene Konstante FOOTBALL_EP_TABELLE, nicht diese Arrays.
+      epaZustaende:[],epaScores:[]}:null;
     const art=FB(), n=art.jeSeite, R=art.rezept;
     const slotListe=slotsVon(feldspielDisc);
     const gesetzt=inDisc(feldspielDisc);
@@ -7930,11 +7950,22 @@
         // versuchs (K3-Analog, s. wirf()/feldspielWert). Ausserhalb von Basketball immer 0
         // und ungelesen.
         xp:0,
+        // NUR BASKETBALL (B1 -- Gravity-Assist Stufe 1, s. wirf()/loeseFlugAuf/
+        // feldspielWert): Anzahl der gefallenen Feldkoerbe eines Mitspielers, bei denen
+        // dieser Spieler SELBST nicht geworfen hat, aber sein Verteidiger im Abwurfmoment
+        // naeher an der Hilfe-/Ball-Position stand als an ihm. Ausserhalb von Basketball
+        // immer 0 und ungelesen.
+        gravityAssist:0,
         checks:0,saves:0,gegentore:0,
         fouls:0,freiwuerfe:0,freiwurfTreffer:0,feldwuerfe:0,feldwuerfeTreffer:0,
         // NUR FOOTBALL: Yards nach Quelle getrennt (feldspielWert unten), wie eine reale
         // Box-Score-Zeile. Ausserhalb von Football immer 0 und ungelesen.
         passYards:0,laufYards:0,fangYards:0,
+        // NUR FOOTBALL (F1 -- EPA statt Yards, s. footballDownWeiter/vollziehFootballErgebnis):
+        // aufsummierte Expected-Points-Added, aus Passer-/Receiver-Split, vollem Laeufer-
+        // Kredit, negativer Defensiv-Gutschrift (Tackler/Rusher/Interceptor) und Punter-
+        // Feldpositionswert. Ausserhalb von Football immer 0 und ungelesen.
+        epa:0,
         x:0,y:0};
     };
     FSTEAM=[mine.map((p,i)=>bauSpieler(p,0,i)), gegner.map((o,i)=>bauSpieler(o,1,i))];
@@ -8866,6 +8897,28 @@
       // (0,12 -> 0,794; 0,20 -> 0,792; 0,35 -> 0,772), ist also robust und nicht
       // uebergefittet. `checks` ist football-seitig ausschliesslich der Solo-Tackle aus
       // vollziehFootballErgebnis (Zweige "lauf"/"komplett").
+      // F1 -- EPA STATT YARDS, GEBAUT UND GEMESSEN, NICHT UEBERNOMMEN (Task #33,
+      // docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 4, volle Messreihe in
+      // docs/design/feldspiel-rezeptrunde-f1-b1-umsetzung-*.md). `u.epa` wird WEITERHIN
+      // vollstaendig gebucht (vollziehFootballErgebnis/footballDownWeiter, Passer/Receiver-
+      // Split, voller Laeufer-Kredit, negative Defensiv-Gutschrift Tackler/Rusher/
+      // Interceptor, Punter-Feldpositionswert — ueber FOOTBALL_EP_TABELLE, aus 240 Spielen
+      // des eigenen Motors gezogen, scripts/messe-football-epa-tabelle.mjs) -- NUR diese
+      // Wertformel liest es nicht mehr. GEMESSEN (miss-alle-disziplinen.mjs 24 football,
+      // Kader-Familie): die reine Ersetzung der drei Yards-Terme durch Passer/Receiver-
+      // Offense-EPA (ohne jede Defensiv-/Punter-Gutschrift) senkte rho je Spiel bereits von
+      // 0,814 auf 0,680; mit allen Gutschriften (wie im Auftrag beschrieben) auf 0,399 --
+      // beide WEIT unter der 0,80-Schranke und ausserhalb jeder Kader-Spannweite. Grund
+      // (Befund, nicht nur Vermutung): die EP-Tabelle ist stufig in Down/Distanzklasse/
+      // Zehner-Feldstand, ein Yard-Gewinn, der eine Bucket-Grenze NICHT ueberschreitet, zaehlt
+      // oft NICHTS oder sogar negativ (Down "verbraucht"), waehrend derselbe Gewinn in Yards
+      // immer positiv war — das macht die Spielerwertung stufig/diskontinuierlich statt
+      // glatt skaliert mit der tatsaechlichen Sub-Skill-Differenz, und trifft die Tackler-/
+      // Interceptor-Gutschrift am haertesten: wer einen groesen gegnerischen Gewinn beendet
+      // (die eigentliche Verteidigungsleistung), wird dafuer mit der GROSSEN negativen
+      // Offense-EPA dieses Zugs bestraft, obwohl der Gewinn selbst meist an der Coverage
+      // woanders lag. Als „nicht erfolgreich, verworfen" dokumentiert (CLAUDE.md erlaubt
+      // das ausdruecklich) -- die drei Original-Terme bleiben deshalb unten stehen.
       return u.punkte*1.0 + (u.passYards||0)/25 + (u.laufYards||0)/10 + (u.fangYards||0)/10
         + u.assists*0.3 + u.bloecke*1.0 + u.steals*2.0 + u.rebounds*1.0 - u.verluste*2.0
         + (u.checks||0)*0.15;
@@ -8996,8 +9049,13 @@
       // vorher 3 — der Unterschied ist die gesenkte Streuung, keine Restwertung nach
       // unten), Freiwuerfe zaehlen unveraendert 1:1.
       const ftPunkte=u.freiwurfTreffer||0, fgPunkte=u.punkte-ftPunkte;
+      // B1 -- GRAVITY-ASSIST STUFE 1 (docs/design/fable-ideen-feldspiel-30-09.md Abschnitt
+      // 3, scripts/messe-arena-einfluss.mjs basketball): kleines, additives Gewicht fuer
+      // einen Kanal, der nicht ueber das eigene Wurfvolumen laeuft (s. GRAVITY_ASSIST_GEWICHT
+      // oben bei den Konstanten).
       return fgPunkte*0.5+(u.xp||0)*0.5+ftPunkte
-            +u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
+            +u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8
+            +(u.gravityAssist||0)*GRAVITY_ASSIST_GEWICHT;
     }
     return u.punkte+u.assists*1.0+u.rebounds*1.2+(u.steals+u.bloecke)*1.5-u.verluste*0.8;
   }
@@ -9659,7 +9717,55 @@
   // eines neuen naechsterAngriff()-Parameters, weil naechsterAngriff() generisch fuer alle
   // vier Feldspiel-Disziplinen bleiben soll.
   let fkNaechsterSpot=null;
+
+  // F1 -- EPA STATT YARDS (Fable-Ideen-Runde 30.09., docs/design/fable-ideen-feldspiel-
+  // 30-09.md Abschnitt 4, "die Football-Fassung von K3"). `feldspielWert()` bucht Football
+  // bisher ausschliesslich Yards (passYards/25+laufYards/10+fangYards/10) -- ein 5-Yard-Lauf
+  // bei 3rd&4 (rettet die Serie) zaehlt exakt gleich viel wie derselbe Lauf bei 3rd&12
+  // (bringt nichts). EPA (Expected Points Added) macht genau diesen Unterschied sichtbar:
+  // EP(Zustand) ist die GEMESSENE mittlere Folge-Punktzahl (wer auch immer als naechstes
+  // trifft, aus Sicht der Seite, die GERADE den Ball haelt) fuer (Down, Distanzklasse,
+  // Feldstand in Zehnerschritten) -- aus dem EIGENEN Motor gezogen (scripts/messe-football-
+  // epa-tabelle.mjs, 240 Spiele, dieselbe Ehrlichkeit wie `kurve.skillMittel`), KEINE echte
+  // NFL-Tabelle. `FOOTBALL_EP_TABELLE` ist die feine Stufe (down|distanzklasse|zehner),
+  // `FOOTBALL_EP_TABELLE_GROB` der Rueckfall nur nach Feldstand (fuer Zellen, die in 240
+  // Spielen zu selten besucht wurden, um einen eigenen Mittelwert zu tragen -- v.a. 4th
+  // Down bei kurzer Distanz tief im eigenen Feld).
+  // GEZOGEN, NICHT ERFUNDEN (scripts/messe-football-epa-tabelle.mjs, 240 Spiele, 26821
+  // Snaps, 1411 Punktgewinne, Standard-EPA-Methodik "naechster Punkt im Spiel", s. dortiger
+  // Kopfkommentar). `FOOTBALL_EP_TABELLE` ist die Feinzelle (down|distanzklasse|zehner, 102
+  // von 120 moeglichen Zellen mit >=25 Besuchen), `FOOTBALL_EP_TABELLE_GROB` der Rueckfall
+  // nur nach Feldstand (alle zehn Zehner-Zellen besetzt) fuer die restlichen, zu seltenen
+  // Kombinationen (v.a. "1st & mittel", das strukturell kaum vorkommt, weil toGo im 1.
+  // Versuch immer min(10,spot) ist). Neu ziehen, wenn sich Rezept/Korridor spuerbar
+  // verschieben -- derselbe Pflegehinweis wie bei `kurve.skillMittel`.
+  const FOOTBALL_EP_TABELLE={"1|lang|70":1.03,"2|mittel|70":1.21,"3|kurz|60":1.2,"1|lang|60":1.86,"2|kurz|50":2.69,"1|lang|40":3.15,"2|lang|40":2.88,"3|lang|40":1.87,"4|lang|40":0.43,"1|lang|90":-0.66,"2|mittel|80":0.8,"3|kurz|80":-0.64,"2|lang|70":0.7,"3|kurz|70":0.82,"3|lang|60":0.41,"1|lang|50":2.49,"2|lang|50":1.81,"3|mittel|50":1.67,"4|mittel|50":-0.72,"1|lang|80":0.3,"3|mittel|80":-0.43,"1|lang|30":3.86,"2|lang|30":3.14,"1|lang|10":5.43,"2|lang|10":5.12,"3|mittel|10":4.16,"4|kurz|0":2.6,"2|lang|90":-1.63,"2|kurz|40":3.04,"1|lang|20":4.51,"3|lang|70":-0.27,"4|lang|70":-1.83,"2|lang|20":4.01,"4|kurz|10":2.71,"2|mittel|50":2.09,"2|mittel|40":3.08,"3|mittel|40":2.48,"4|mittel|40":1,"2|kurz|80":1.3,"2|kurz|70":-0.27,"3|mittel|60":1.14,"2|lang|60":1.14,"2|mittel|10":4.86,"3|mittel|70":0.37,"1|lang|0":5.85,"3|kurz|40":3.19,"4|kurz|40":1.76,"2|kurz|30":3.41,"3|kurz|20":3.88,"2|mittel|60":1.49,"2|kurz|0":6.26,"3|kurz|0":5.86,"3|kurz|50":2.11,"2|mittel|20":4.59,"1|mittel|0":6.4,"4|kurz|70":-0.27,"2|kurz|20":4.45,"2|kurz|10":5.34,"3|lang|20":3.27,"3|kurz|10":4.78,"3|lang|10":4.23,"1|kurz|0":6.58,"2|kurz|60":1.62,"3|lang|30":2.41,"4|lang|30":1.19,"2|mittel|90":-0.39,"2|mittel|0":5.99,"3|lang|50":1.26,"4|lang|60":-1.16,"2|lang|0":4.75,"2|mittel|30":3.44,"4|kurz|20":1.76,"3|kurz|30":3.69,"4|kurz|30":2.36,"4|lang|10":2.91,"3|mittel|0":4.76,"4|mittel|0":3,"3|lang|90":-3.77,"3|mittel|30":2.63,"4|mittel|30":1.2,"4|kurz|60":-0.29,"4|mittel|20":1.44,"4|kurz|50":1.1,"3|mittel|20":3.6,"2|lang|80":-0.48,"3|lang|80":-1.24,"4|lang|50":0.04,"4|lang|90":-3.55,"4|lang|20":2.13,"4|mittel|60":-0.49,"4|mittel|70":-1.68,"4|lang|80":-2.17,"3|mittel|90":-0.71,"4|mittel|10":3.11};
+  const FOOTBALL_EP_TABELLE_GROB={"0":5.76,"10":4.93,"20":4.02,"30":3.31,"40":2.78,"50":2,"60":1.31,"70":0.65,"80":-0.31,"90":-1.34};
+  function footballEpDistanzklasse(toGo){ return toGo<=3?"kurz":toGo<=7?"mittel":"lang"; }
+  function footballEpZehner(spot){ return Math.max(0,Math.min(90,Math.floor(spot/10)*10)); }
+  function footballEpVon(down,toGo,spot){
+    const d=Math.max(1,Math.min(4,down)), z=footballEpZehner(spot);
+    const key=d+"|"+footballEpDistanzklasse(toGo)+"|"+z;
+    if(FOOTBALL_EP_TABELLE[key]!=null)return FOOTBALL_EP_TABELLE[key];
+    if(FOOTBALL_EP_TABELLE_GROB[z]!=null)return FOOTBALL_EP_TABELLE_GROB[z];
+    return 0; // nie erreicht, wenn die Tabelle alle zehn Zehner-Zellen traegt (s. Messsonde)
+  }
+  // SPLIT PASSER/RECEIVER NACH DEMSELBEN VERHAELTNIS, DAS HEUTE YARDS TEILT (Auftrag F1):
+  // feldspielWert() bucht passYards/25 gegen fangYards/10 -- ein Receiver-Yard zaehlt 2,5x
+  // so viel wie ein Passer-Yard. Dieselbe Quote auf die Offense-EPA eines kompletten Passes.
+  const FB_EPA_RECEIVER_ANTEIL=(1/10)/((1/25)+(1/10));   // 0,7143
+  const FB_EPA_PASSER_ANTEIL=1-FB_EPA_RECEIVER_ANTEIL;    // 0,2857
+  // AKTUELL UNGENUTZT (Review-Auflage PR #1149): war als Gewicht fuer eine EPA-Spalte in
+  // feldspielWert() gedacht, falls F1 doch verdrahtet wird. F1 wurde nach Messung verworfen
+  // (s. feldspielWert()s Football-Zweig und docs/design/feldspiel-rezeptrunde-f1-b1-
+  // umsetzung-03-10.md) -- diese Konstante wird von keiner Wertformel gelesen. Stehen
+  // gelassen als Parameter fuer eine moegliche spaetere additive (nicht ersetzende) Variante.
+  const FB_EPA_GEWICHT=1.0;
   function footballDownWeiter(fb,yards,traeger){
+    // MESSPUNKT + PRODUKTIONSBUCHUNG IN EINEM: `fb.down/toGo/spot` sind hier noch der
+    // Zustand VOR diesem Spielzug (footballDownWeiter mutiert sie erst unten) -- exakt die
+    // Groesse, die die Messsonde (starteSnap, s. dort) fuer DIESELBE Momentaufnahme braucht.
+    const epVorher=footballEpVon(fb.down,fb.toGo,fb.spot);
     const neuerSpot=Math.max(0,Math.min(100,fb.spot-yards));
     if(neuerSpot<=0){
       if(traeger)traeger.punkte+=6;
@@ -9668,22 +9774,32 @@
         traeger?waehleCaption(CAPTION_TOUCHDOWN,traeger.n):undefined,"touchdown");
       schwebe({x:0,y:0,txt:"TOUCHDOWN!",life:1.7,crit:true,_gross:true,_spieler:traeger&&traeger.id});
       logZug(fb.side,"treffer",{spieler:traeger,punkte:6});
-      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feedEreignis(fb.side,"Extra-Punkt ist gut."); }
-      if(fsFbLog)fsFbLog.tds++;
+      // F1-MESSPUNKT: der real erzielte Punktwert dieses Zugs (6 oder 7) ist die EP-
+      // Entsprechung eines "naechsten Treffers" mit Index 0 -- derselbe Zug, der den
+      // Zustand aufgeloest hat, s. Kopfkommentar der Messsonde zu `epaScores`.
+      let fbPunkteGesamt=6;
+      if(rr()<FB().live.downs.xpQuote){ fsPunkte[fb.side]+=1; feedEreignis(fb.side,"Extra-Punkt ist gut."); fbPunkteGesamt=7; }
+      if(fsFbLog){
+        fsFbLog.tds++;
+        if(fsFbLog.epaZustaende)fsFbLog.epaScores.push({idx:fsFbLog.epaZustaende.length-1,side:fb.side,punkte:fbPunkteGesamt});
+      }
       fsLive.football=null; naechsterAngriff(1-fb.side);
-      return;
+      return fbPunkteGesamt-epVorher;
     }
     const neuesToGo=fb.toGo-yards;
     if(neuesToGo<=0){
       feed(fb.side,"Erster Versuch!");
       fb.down=1; fb.spot=neuerSpot; fb.toGo=Math.min(10,neuerSpot);
-      return;
+      return footballEpVon(fb.down,fb.toGo,fb.spot)-epVorher;
     }
     fb.spot=neuerSpot; fb.toGo=Math.min(neuesToGo,neuerSpot); fb.down++;
     if(fb.down>fb.max){
       feedEreignis(fb.side,"Turnover on Downs.");
-      fkNaechsterSpot=100-neuerSpot; fsLive.football=null; naechsterAngriff(1-fb.side);
+      const spotGegner=100-neuerSpot;
+      fkNaechsterSpot=spotGegner; fsLive.football=null; naechsterAngriff(1-fb.side);
+      return -footballEpVon(1,Math.min(10,spotGegner),spotGegner)-epVorher;
     }
+    return footballEpVon(fb.down,fb.toGo,fb.spot)-epVorher;
   }
   function vollziehFootballErgebnis(erg,fb){
     const off=FSTEAM[fb.side], def=FSTEAM[1-fb.side];
@@ -9697,7 +9813,16 @@
         // scripts/miss-feldspiel-rangtreue.mjs), deshalb ein symbolischer Namenstraeger
         // ohne mechanische Wirkung (der Punktestand haengt allein an fsPunkte oben).
         logZug(fb.side,"treffer",{spieler:fkLos(off,"PASSGENAUIGKEIT"),punkte:3});
-        if(fsFbLog){ fsFbLog.fgAtt++; fsFbLog.fgMade++; }
+        if(fsFbLog){
+          fsFbLog.fgAtt++; fsFbLog.fgMade++;
+          // F1-MESSPUNKT: ein Field Goal ist ein realer Punktgewinn wie ein Touchdown (s.
+          // footballDownWeiter) -- ohne ihn wuerde die EP-Tabelle die vielen Drives, die in
+          // einem Field Goal statt einem Touchdown enden, als "nie bepunktet" verbuchen und
+          // den Feldstand vor dem gegnerischen Ziel systematisch unterschaetzen. KEINE
+          // Produktions-EPA-Gutschrift an den symbolischen Namenstraeger (s. Kommentar oben
+          // "ohne mechanische Wirkung") -- nur die Messsonde liest `epaScores`.
+          fsFbLog.epaScores.push({idx:fsFbLog.epaZustaende.length-1,side:fb.side,punkte:3});
+        }
         fsLive.football=null; naechsterAngriff(1-fb.side);
       } else {
         feedEreignis(fb.side,"Field-Goal-Versuch von "+Math.round(erg.distanz)+" Yards verfehlt.");
@@ -9707,9 +9832,21 @@
       return;
     }
     if(erg.typ==="punt"){
+      // F1 -- FELDPOSITIONS-EPA AUF DEN PUNTER (Auftrag, "entsteht von selbst"). KEIN
+      // fkLos()-Zug hier: fkLos() wuerfelt (gewichtetesLosNach()), und ein zusaetzlicher
+      // rr()-Aufruf an dieser Stelle wuerde die komplette restliche Zufallsfolge des Spiels
+      // verschieben -- genau die Kaskade, vor der CLAUDE.md warnt (Zoneneintritt-Lehre).
+      // Stattdessen eine DETERMINISTISCHE Auswahl (groesste PASSGENAUIGKEIT im Kader) ohne
+      // jeden Wurf -- derselbe symbolische Namenstraeger-Gedanke wie beim Field Goal oben,
+      // nur ohne dessen rr()-Kosten (die dort schon vor dieser Aenderung bestanden).
+      const epVorher=footballEpVon(fb.down,fb.toGo,fb.spot);
+      const spotGegner=100-Math.max(1,fb.spot-erg.yards);
+      const epNachher=-footballEpVon(1,Math.min(10,spotGegner),spotGegner);
+      const punter=off.reduce((a,b)=>b.PASSGENAUIGKEIT>a.PASSGENAUIGKEIT?b:a,off[0]);
+      punter.epa=(punter.epa||0)+(epNachher-epVorher);
       feed(fb.side,"Punt — Ballwechsel.");
       if(fsFbLog)fsFbLog.punts++;
-      fkNaechsterSpot=100-Math.max(1,fb.spot-erg.yards);
+      fkNaechsterSpot=spotGegner;
       fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
     }
@@ -9719,7 +9856,12 @@
       feed(erg.verteidiger.side,erg.verteidiger.n+" sackt "+erg.spieler.n+" — "+FB().wortBlock+"!",true,undefined,"sack");
       schwebe({x:0,y:0,txt:FB().wortBlock.toUpperCase()+"!",life:1.1,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"block",{verteidiger:erg.verteidiger,spieler:erg.spieler});
-      footballDownWeiter(fb,erg.yards);
+      // F1: der Sacker ("Rusher") bekommt die NEGATIVE Offense-EPA dieses Zugs als
+      // Defensiv-Gutschrift (Auftrag) -- additiv zu `bloecke*1.0` in feldspielWert(), kein
+      // Ersatz dafuer. Der Passer bekommt hier bewusst KEINE EPA (ein Sack ist fuer ihn
+      // schon ueber `passYards` negativ, s. Zeile oben).
+      const offenseEpa=footballDownWeiter(fb,erg.yards);
+      erg.verteidiger.epa=(erg.verteidiger.epa||0)-offenseEpa;
       return;
     }
     if(erg.typ==="fumble"){
@@ -9754,7 +9896,15 @@
       feed(erg.verteidiger.side,erg.verteidiger.n+" fängt den Pass ab — Interception!",true,undefined,"interception");
       schwebe({x:0,y:0,txt:"INTERCEPTION!",life:1.3,crit:true,_def:true,_spieler:erg.verteidiger.id});
       logZug(erg.verteidiger.side,"steal",{verteidiger:erg.verteidiger,spieler:erg.spieler});
-      fkNaechsterSpot=100-fb.spot; fsLive.football=null; naechsterAngriff(1-fb.side);
+      // F1: der Interceptor bekommt die negative Offense-EPA (Auftrag) -- additiv zu
+      // `steals*2.0` in feldspielWert(). `fb.down/toGo/spot` sind hier noch unmutiert
+      // (dieser Zweig ruft footballDownWeiter() nie auf), exakt der Zustand, den die
+      // Messsonde fuer denselben Snap in starteSnap() festgehalten hat.
+      const epVorher=footballEpVon(fb.down,fb.toGo,fb.spot);
+      const spotGegner=100-fb.spot;
+      const epNachher=-footballEpVon(1,Math.min(10,spotGegner),spotGegner);
+      erg.verteidiger.epa=(erg.verteidiger.epa||0)-(epNachher-epVorher);
+      fkNaechsterSpot=spotGegner; fsLive.football=null; naechsterAngriff(1-fb.side);
       return;
     }
     if(erg.typ==="incomplete"){
@@ -9784,7 +9934,14 @@
       if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog){ fsFbLog.passAtt++; fsFbLog.passComp++; }
       feed(fb.side,erg.spieler.n+" zu "+erg.receiver.n+" für "+erg.yards+" Yards.");
-      footballDownWeiter(fb,erg.yards,erg.receiver);
+      // F1: Passer und Receiver teilen sich die Offense-EPA dieses Zugs im selben
+      // Verhaeltnis, das feldspielWert() heute bei Yards anlegt (FB_EPA_PASSER_ANTEIL/
+      // FB_EPA_RECEIVER_ANTEIL, s. dortiger Kommentar); der Tackler bekommt die negative
+      // Offense-EPA als Defensiv-Gutschrift, additiv zu `checks*0.15` oben.
+      const offenseEpa=footballDownWeiter(fb,erg.yards,erg.receiver);
+      erg.spieler.epa=(erg.spieler.epa||0)+offenseEpa*FB_EPA_PASSER_ANTEIL;
+      erg.receiver.epa=(erg.receiver.epa||0)+offenseEpa*FB_EPA_RECEIVER_ANTEIL;
+      if(erg.verteidiger)erg.verteidiger.epa=(erg.verteidiger.epa||0)-offenseEpa;
       return;
     }
     if(erg.typ==="lauf"){
@@ -9793,7 +9950,11 @@
       if(erg.verteidiger&&fb.spot-erg.yards>0)erg.verteidiger.checks++;
       if(fsFbLog)fsFbLog.rushAtt++;
       feed(fb.side,erg.spieler.n+" läuft für "+erg.yards+" Yards.");
-      footballDownWeiter(fb,erg.yards,erg.spieler);
+      // F1: der Laeufer bekommt die Offense-EPA dieses Zugs VOLL (Auftrag), der Tackler die
+      // negative Offense-EPA als Defensiv-Gutschrift, additiv zu `checks*0.15` oben.
+      const offenseEpa=footballDownWeiter(fb,erg.yards,erg.spieler);
+      erg.spieler.epa=(erg.spieler.epa||0)+offenseEpa;
+      if(erg.verteidiger)erg.verteidiger.epa=(erg.verteidiger.epa||0)-offenseEpa;
     }
   }
 
@@ -9806,6 +9967,11 @@
   // Spielzeit, keine separate Pause.
   function starteSnap(){
     const fb=fsLive.football;
+    // F1-MESSPUNKT (s. fsFbLog-Kopfkommentar in bauFeldspiel): JEDER Snap genau einmal,
+    // bevor irgendeine Entscheidung (Spielzugwahl, 4th-Down-Logik) faellt -- der Zustand
+    // ist unabhaengig davon, was als naechstes gewuerfelt wird. Reine Buchfuehrung, kein
+    // rr()-Aufruf, ausserhalb der Messsonde ungelesen.
+    if(fsFbLog)fsFbLog.epaZustaende.push({down:fb.down,toGo:fb.toGo,spot:fb.spot,side:fb.side});
     const vierter=fb.down===fb.max?waehleVierterVersuch(fb.spot,fb.toGo):null;
     const spielTyp=vierter&&vierter!=="go"?vierter:waehlePlayCall(fb.down,fb.toGo);
     const formOff=waehleFormationOffense(fb.down,fb.toGo);
@@ -10908,6 +11074,21 @@
     // entscheideBallaktion, hier am Schuetzen im Abwurfmoment (kann bei Spielzuegen/
     // Alley-Oop von der Person abweichen, die die Aktion ausgeloest hat).
     const gedoppeltBeiWurf=FSTEAM[1-schuetze.side].filter(v=>!stehtImTor(v)&&dist(schuetze,v)<BEDRAENGT_RADIUS).length>=2;
+    // B1 -- GRAVITY-ASSIST-KANDIDATEN (NUR Basketball, s. Konstanten-Kommentar oben): fuer
+    // jeden Mitspieler des Schuetzen (ohne ihn selbst) steht sein eigener Verteidiger im
+    // ABWURFMOMENT entweder bei ihm (normale Deckung) oder naeher am Ballfuehrer/Schuetzen
+    // (er "haengt" — dieselbe Bewegung, die bewegeSpielerLive als Hilfe/Doppeln modelliert,
+    // hier nur gemessen statt neu gewuerfelt). `dist(decker,schuetze)<dist(decker,mann)`
+    // ist exakt diese Lesung: naeher an der Hilfe-/Ball-Position als am eigenen Mann. Kein
+    // neuer rr()-Aufruf, keine neue Bewegung -- reine Momentaufnahme bereits vorhandener
+    // Positionen, dieselbe Bauform wie `deckerAbstandBeiWurf` zwei Zeilen oben.
+    const gravityKandidaten=feldspielDisc==="basketball"
+      ? FSTEAM[schuetze.side].filter(mann=>{
+          if(mann===schuetze||(mann.SCHUSS_FERN||0)<GRAVITY_SCHUSS_FERN_SCHWELLE)return false;
+          const decker=FSTEAM[1-schuetze.side].find(v=>v.deckt===mann);
+          return decker&&dist(decker,schuetze)<dist(decker,mann);
+        })
+      : [];
     // FOUL-CHANCE: nur wenn ueberhaupt ein Verteidiger nah genug dran ist, um als
     // Block-Kandidat zu gelten (blockKandidat wird vom Aufrufer nur bei bedraengnis>0
     // gesetzt) — genau die Situationen, in denen ein Kontaktfoul plausibel ist. Basis
@@ -10958,6 +11139,7 @@
       art:zug?"alley":"wurf", t:0, dauer:flugDauer, // PLATZHALTER
       treffer, tier, fern, punkte:fern?art.punkteFern:art.punkteNah, foul, zumKorbBeiWurf,
       deckerAbstandBeiWurf, deckerLauftempoBeiWurf, imFastbreakBeiWurf, gedoppeltBeiWurf,
+      gravityKandidaten,
       schuetze, passgeber, zug, ziel:schuetze, blockKandidat
     };
   }
@@ -11847,6 +12029,10 @@
       const nachFuehrung=Math.sign(fsPunkte[0]-fsPunkte[1]);
       schuetze.feldwuerfeTreffer++;
       if(flug.passgeber)flug.passgeber.assists++;
+      // B1 -- GRAVITY-ASSIST GUTSCHREIBEN: nur wenn der Feldkorb FAELLT (Auftrag, "Wenn ein
+      // Feldwurf faellt"), fuer jeden am Abwurf festgehaltenen Kandidaten (s. wirf()).
+      if(flug.gravityKandidaten&&flug.gravityKandidaten.length)
+        for(const mann of flug.gravityKandidaten)mann.gravityAssist=(mann.gravityAssist||0)+1;
       const txt=szDef ? szDef.label+"! "+szDef.text(flug.passgeber,schuetze)+" — +"+flug.punkte+"!"
                        : schuetze.n+" trifft"+(flug.fern?" von weit draußen":flug.tier==="dunk"?" mit einem Dunk":"")+" — +"+flug.punkte+".";
       // Big nur bei: einem einstudierten Spielzug (szDef), einem Dunk, einem Dreier oder
@@ -44794,9 +44980,13 @@
               // NUR BASKETBALL (K3-Analog zu xg oben): aufsummierte Feldkorb-Trefferwahr-
               // scheinlichkeit, s. wirf()/feldspielWert. Ausserhalb von Basketball immer 0.
               xp:+((u.xp||0).toFixed(3)),
+              // NUR BASKETBALL (B1 -- Gravity-Assist Stufe 1), s. wirf()/loeseFlugAuf.
+              gravityAssist:u.gravityAssist||0,
               // Football-eigene Spalten (Rezept-Feinkalibrierung), dasselbe Muster: an
               // jeder Einheit vorhanden, ausserhalb von Football immer 0.
               passYards:u.passYards, laufYards:u.laufYards, fangYards:u.fangYards,
+              // F1: nur Football gefuellt, s. footballDownWeiter/vollziehFootballErgebnis.
+              epa:+((u.epa||0).toFixed(3)),
               fga:u.feldwuerfe, fgm:u.feldwuerfeTreffer,
               fgOffenV:z.gesamt.offenV, fgOffenT:z.gesamt.offenT,
               fgEngV:z.gesamt.engV, fgEngT:z.gesamt.engT, fgTier:z.tier,
