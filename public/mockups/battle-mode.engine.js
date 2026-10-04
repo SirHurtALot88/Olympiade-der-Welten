@@ -32340,6 +32340,10 @@
   // meldet. Liest nur `u.zz[]`, das `stepSpurt` fuer eine andere Anzeige (Panel, Ticker-
   // Bestand) ohnehin schon fuehrt -- diese Anzeige schreibt nichts in den Sim-Schritt zurueck.
   let bahnZzGemeldet=new Set();
+  // J2 LIVE-AMPEL (Time-Trial): welche (Fahrer, Messpunkt)-Paare schon ausgewertet sind und
+  // seit wann die Regie auf dem aktuellen Fokus steht (Mindestverweildauer). Je Rennen geleert.
+  let ttAmpelGemeldet=new Set(), ttRegieSeit=-999;
+  const TT_REGIE_NAEHE=0.03, TT_REGIE_MIN_SEK=4;   // J2-Regie: 3 % am Hot Seat, 4 echte Sekunden Verweildauer
   // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). Haelt fest, welche Fallen-Indizes ihren
   // Namensschild-Einblender schon hatten (einmal je Falle, ausgeloest vom ERSTEN Laeufer,
   // der sie erreicht) und die aktuell laufende Einblendung ({i, bis}).
@@ -32834,6 +32838,61 @@
             neueBest,undefined,"bestzeit");
         }
       });
+    }
+    // J2 LIVE-AMPEL MIT KIPPPUNKTEN (Time-Trial, Klasse A, docs/design/time-trial-
+    // nachtkonzept-03-10.md Abschnitt 3.3). An jedem stillen Messpunkt (`u.mp`, s. stepSpurt)
+    // wird der Fahrer gegen den HOT-SEAT-HALTER an derselben Stelle verglichen (dessen
+    // eigene Messpunktzeit — derselbe Bezug wie der Geisterfahrer), solange es noch keinen
+    // gibt gegen die Bestzeit im Feld an diesem Punkt. Ergebnis ist `u.vizAmpel` (grün/rot,
+    // gelesen vom Fokus-Panel). Der Ticker meldet NUR KIPPPUNKTE — den Moment, in dem die
+    // Farbe eines Fahrers wechselt —, keine Zeile je Messpunkt. Reiner Lesezugriff auf
+    // u.mp/bahnHotSeat(), kein rr(), schreibt nur das Anzeigefeld u.vizAmpel.
+    if(BA().ampelPunkte){
+      const P=BA().ampelPunkte, hs=bahnHotSeat();
+      for(const u of LAEUFER){
+        if(!u.mp)continue;
+        for(let k=0;k<P.length;k++){
+          if(u.mp[k]==null)continue;
+          const key=u.id+"|"+k;
+          if(ttAmpelGemeldet.has(key))continue;
+          ttAmpelGemeldet.add(key);
+          let ref=null, bezug=null;
+          if(hs&&hs.u!==u&&hs.u.mp&&hs.u.mp[k]!=null){ ref=hs.u.mp[k]; bezug="der Hot Seat"; }
+          else {
+            for(const o of LAEUFER){ if(o===u||!o.mp||o.mp[k]==null)continue; if(ref==null||o.mp[k]<ref)ref=o.mp[k]; }
+            if(ref!=null)bezug="die Bestzeit";
+          }
+          if(ref==null)continue;
+          const delta=u.mp[k]-ref, farbe=delta<0?"gruen":"rot";
+          const vorher=u.vizAmpel&&u.vizAmpel.farbe;
+          u.vizAmpel={farbe,k,delta,ref,bezug,prozent:Math.round(P[k]*100)};
+          if(vorher&&vorher!==farbe){
+            // Warum es kippt, wenn es am Gelaende liegt: der Abschnitt seit dem letzten
+            // Messpunkt (dieselbe Zonenliste wie das Hoehenprofil im Panel).
+            const mitte=(P[k]+(k>0?P[k-1]:0))/2, z=gelaendeAn(mitte);
+            const grund=farbe==="rot"&&z?(z.art==="steigung"?" — der Berg kostet":z.art==="kurve"?" — die Kurve kostet":""):
+              (farbe==="gruen"&&z&&z.art==="abfahrt"?" — die Abfahrt bringt es":"");
+            feed(u.seite,farbe==="gruen"
+              ?u.n+" fährt grün — bei "+Math.round(P[k]*100)+" % schneller als "+bezug+grund+"."
+              :u.n+" kippt auf rot — bei "+Math.round(P[k]*100)+" % langsamer als "+bezug+grund+".",
+              false,undefined,undefined,undefined,undefined,"ereignis");
+          }
+        }
+      }
+      // J2-REGIE (optional, Klasse A): die Kamera-Automatik springt auf den Fahrer, der am
+      // letzten Messpunkt innerhalb von 3 % des Hot Seats liegt — statt stur nach
+      // Startnummer —, mit einer Mindestverweildauer von 4 echten Sekunden, damit sie nicht
+      // zwischen Kandidaten flackert. Nur im Auto-Modus und erst mit einem Hot Seat; ohne
+      // Kandidaten bleibt die alte Automatik (naechster nach Startnummer, s. stepSpurt).
+      if(hs&&bahnFokusAuto&&!done&&(rennT-ttRegieSeit)*zeitFaktor()>=TT_REGIE_MIN_SEK){
+        let kand=null;
+        for(const u of LAEUFER){
+          if(u.fertig!=null||!u.vizAmpel||(u.startT||0)>rennT)continue;
+          if(Math.abs(u.vizAmpel.delta)>TT_REGIE_NAEHE*u.vizAmpel.ref)continue;
+          if(!kand||u.vizAmpel.k>kand.vizAmpel.k||(u.vizAmpel.k===kand.vizAmpel.k&&Math.abs(u.vizAmpel.delta)<Math.abs(kand.vizAmpel.delta)))kand=u;
+        }
+        if(kand&&kand.id!==bahnFokus){ bahnFokus=kand.id; ttRegieSeit=rennT; }
+      }
     }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
@@ -35584,6 +35643,12 @@
       // DAHIN schnellsten Laeufer im Feld (dieselbe "vorlaeufig, aber ehrlich"-Logik wie
       // bahnRangliste fuer den laufenden Punktestand), nicht gegen einen festen Rivalen.
       zwischenzeiten:[0.40,0.76],
+      // J2 "DIE LIVE-AMPEL" (docs/design/time-trial-nachtkonzept-03-10.md Abschnitt 3.3,
+      // Klasse A): STILLE Messpunkte alle 10 % — ein EIGENES Feld, bewusst NICHT in
+      // `zwischenzeiten` (das wuerde die Endstand-Spalten und die ZZ-Toene verlaengern, s.
+      // Warnung dort). Erfasst wird nur die eigene Laufzeit je Punkt (`u.mp`), kein rr(), nie
+      // zurueckgelesen in die Simulation; sie erscheinen nicht als Tafel, nur als Ampelfarbe.
+      ampelPunkte:[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9],
       gelaende:[
         {von:0.04,bis:0.17,art:"kurve"},
         {von:0.22,bis:0.34,art:"steigung"},{von:0.34,bis:0.40,art:"abfahrt"},
@@ -37458,6 +37523,7 @@
     // Fuehrungswechsel-Variablen oben -- jede dieser Anzeigen darf beim naechsten Rennen
     // nicht mehr vom vorigen wissen.
     bahnHotSeatId=null; bahnZzGemeldet=new Set();
+    ttAmpelGemeldet=new Set(); ttRegieSeit=-999;
     bahnBauchbindeIdx=0; bahnBauchbindeNaechste=0;
     bahnFalleGemeldet=new Set(); bahnFalleAnzeige=null;
     staffelAktivVorher=[null,null]; staffelWechselAnzeige=null;
@@ -38385,6 +38451,18 @@
         u.zz=u.zz||[];
         BA().zwischenzeiten.forEach((cp,ci)=>{
           if(u.zz[ci]==null&&vor<cp&&u.pos>=cp)u.zz[ci]=rennT-(u.startT||0);
+        });
+      }
+      // J2 STILLE MESSPUNKTE (Time-Trial, Klasse A): dieselbe Uebergangs-Pruefung wie die
+      // Zwischenzeiten darueber, eigenes Feld `u.mp`. Die Uebergangszeit wird innerhalb des
+      // Ticks linear interpoliert, damit die Ampel nicht an der 1/60-s-Quantisierung kippt.
+      // Reine Erfassung: kein rr(), nichts davon fliesst in tempoVon()/wert() zurueck.
+      if(BA().ampelPunkte){
+        u.mp=u.mp||[];
+        const schritt=u.pos-vor;
+        BA().ampelPunkte.forEach((cp,k)=>{
+          if(u.mp[k]==null&&vor<cp&&u.pos>=cp)
+            u.mp[k]=rennT-(u.startT||0)-(schritt>0?dt*(u.pos-cp)/schritt:0);
         });
       }
 
@@ -42595,6 +42673,17 @@
         } else if(u.fertig==null){
           standEl.appendChild(el("span",null," · noch keine Zeit"));
         }
+        // J2 LIVE-AMPEL (Klasse A): solange er faehrt, grün/rot gegen den Hot Seat (bzw. die
+        // Bestzeit) am letzten stillen Messpunkt — mit Abstand und Messpunkt. Liest nur das
+        // in updateHudBahn() gesetzte Anzeigefeld u.vizAmpel.
+        if(u.fertig==null&&u.vizAmpel){
+          const a=u.vizAmpel, gruen=a.farbe==="gruen";
+          const amp=el("span",gruen?"gut":"schlecht"," · "+(gruen?"● GRÜN ":"● ROT ")
+            +(gruen?"−":"+")+bahnZeitText(bahnSpanneAnzeige(Math.abs(a.delta)))
+            +" gegen "+(a.bezug==="der Hot Seat"?"Hot Seat":"Bestzeit")+" bei "+a.prozent+" %");
+          amp.title="Live-Ampel: Vergleich am letzten stillen Messpunkt (alle 10 % der Strecke)";
+          standEl.appendChild(amp);
+        }
         // AUSDAUER ALS ZAHL, MIT DEM WORT DARAN (Chris' Punkt 4: "ausdauer muss besser
         // funktionieren"). Die Mechanik gibt es laengst (KRAFT_VON/`zehr`/`u.leer` senken
         // das Tempo in tempoVon), sie war nur unlesbar — und zwar doppelt: ein 3-px-Balken
@@ -46002,6 +46091,53 @@
         ?{aktiv:true, modus:o.modus||"ki", fliegMax:o.fliegMax!=null?+o.fliegMax:0.24}
         :{aktiv:false, modus:"ki", fliegMax:0.24};
       return {...staffelMarkeZug};
+    },
+    // TIME-TRIAL J2 AMPEL-SONDE (04.10.): faehrt n Rennen je Paarung stumm und spielt danach
+    // die Ampel-Logik aus updateHudBahn() in ECHTER Zeitreihenfolge nach (Messpunkt-Ereignis
+    // bei startT+mp[k], Zieleinlauf bei fertig — der Hot Seat ist zu jedem Zeitpunkt der
+    // Schnellste unter den bis dahin Angekommenen). Zaehlt Kipppunkte (Farbwechsel) und Hot-
+    // Seat-Wechsel je Rennen. Reine Diagnose, kein Eingriff in die Rennen.
+    ttAmpelProbe:(opt)=>{
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN["time-trial"], gesichert=M.sichern(), kaderVorher={SQUAD,OPP}, mutatorenVorher=MUTATOREN;
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const rennen=[];
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);
+            M.bau(saat0+i*schritt); M.lauf();
+            const P=BA().ampelPunkte||[], ev=[];
+            for(const u of LAEUFER){
+              (u.mp||[]).forEach((t,k)=>{ if(t!=null)ev.push({t:(u.startT||0)+t,art:"mp",u,k}); });
+              if(u.fertig!=null)ev.push({t:u.fertig,art:"ziel",u});
+            }
+            ev.sort((a,b)=>a.t-b.t||(a.art==="ziel"?-1:1));
+            const fertig=[], farbe=new Map(); let kipp=0, hsWechsel=0, hsId=null;
+            for(const e of ev){
+              if(e.art==="ziel"){ fertig.push(e.u);
+                const hs=fertig.reduce((b,x)=>!b||bahnZeit(x)<bahnZeit(b)?x:b,null);
+                if(hsId!=null&&hs.id!==hsId)hsWechsel++; hsId=hs.id; continue; }
+              const hs=fertig.reduce((b,x)=>!b||bahnZeit(x)<bahnZeit(b)?x:b,null);
+              let ref=null;
+              if(hs&&hs!==e.u&&hs.mp&&hs.mp[e.k]!=null)ref=hs.mp[e.k];
+              else for(const x of LAEUFER){ if(x===e.u||!x.mp||x.mp[e.k]==null||(x.startT||0)+x.mp[e.k]>e.t)continue; if(ref==null||x.mp[e.k]<ref)ref=x.mp[e.k]; }
+              if(ref==null)continue;
+              const f=e.u.mp[e.k]<ref?"gruen":"rot", vorher=farbe.get(e.u.id);
+              if(vorher&&vorher!==f)kipp++;
+              farbe.set(e.u.id,f);
+            }
+            rennen.push({label:v?v.label:null, kipppunkte:kipp, hotSeatWechsel:hsWechsel, messpunkte:ev.filter(e=>e.art==="mp").length, P:P.length});
+          }
+        }
+      } finally {
+        MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return rennen;
     },
     // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, 04.10.) — QA-SCHALTER, Muster wie
     // staffelMarkeZug() oben. spurtSaeule(true) = freigegebenes Paket (Joker + Kriechen),
