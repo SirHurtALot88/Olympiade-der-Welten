@@ -1089,3 +1089,52 @@ Varianten fehlerfrei, das Verhalten ist monoton im Koennen; das Problem liegt in
 deterministischer Rätselart-Rotation statt fixer Spezialisierung, oder Chris' Entscheidung zur
 "ehrlicheren Abnahme" aus `CLAUDE.md` (Ist-Stand erfuellt dort 3 von 4 Bedingungen, Star Rang1 nur
 2,5 Punkte unter der Schranke).
+
+## 8. Speed-Schach: „Die Uhr wird der dritte Spieler", Stufe 1 + 2 — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/speed-schach-nachtkonzept-03-10.md` (Abschnitt 3.2/3.3), von Chris zum Bau
+freigegeben. Stufe 3 (Armageddon) bewusst **nicht** gebaut (Klasse T, abgelehnt); auch sonst kein
+Mechanismus, der ein 3:3 erzwingt oder verhindert. Klasse B, deshalb hinter
+`BUEHNE_FLAGS.speedSchachUhr` in `battle-mode.engine.js`, **Standard 0 = aus** — jeder echte
+Spielstand laeuft unveraendert (Muster `sandsackVorschauAktiv`). Einschalten fuer Messungen:
+`--flags=speedSchachUhr:1|2` an `miss-alle-disziplinen.mjs`, `messe-arena-einfluss.mjs`,
+`miss-speed-schach-spiegel.mjs` und dem neuen `miss-speed-schach-uhr.mjs` (Brett-Kennzahlen).
+
+Gebaut: TEMPO (speed 50/dexterity 30/awareness 20), entkoppelte Uhr 12 s/17 s × (1+(50−TEMPO)·0,022),
+Start 180 s, Zeitnot unter 30 s, `u.geflaggt`/`u.zeitSieg` im Paarungsblock (genau einer geflaggt →
+Brett auf Zeit verloren, sonst `vorteil`), ein gemeinsamer Brettentscheid `duellBrettSieg()` fuer
+alle fuenf Leser. Stufe 2: Ansage rechnen/normal/blitzen (×1,30/+4 pp · ×1 · ×0,72/−4 pp), Zeitnot
+−0,10·(1−NERVEN/100)·1,6 auf die Erfolgschance, Restzuege nach dem Blaettchen 0 Punkte, KI =
+Zeitbudget-Regel (25 s Rand). Uebergabe `{d,slot,haltung}` im Motor und im Adapter-Typ angelegt
+(die Einsatzliste selbst hat noch kein Haltungsfeld — Grundgeruest der Konsultation, Zeile 0).
+
+Gemessen am echten Motor, kaderfest (Familie live-save, 5 Paarungen), 04.10.:
+
+| | Flag aus (heute) | Stufe 1 | Stufe 2, KI beidseitig | Papier-Sonde (5.2, KI) |
+|---|---:|---:|---:|---:|
+| rho je Spiel (Median, n=24) | 0,898 | 0,898 (bit-identisch) | **0,909** | 0,923 |
+| rho je Spiel 4 / 2 je Seite | 0,914 / 0,906 | — | 0,915 / 0,892 | — |
+| Pp n=48, zwei Saatstroeme | 17,7 / 17,6 | 17,7 (bit-identisch) | **11,8 / 11,4** | 12,2 / 13,4 |
+| Pp n=24 gestueckelt 4×6, zwei Stroeme | 17,2 / 18,4 | — | **12,6 / 11,3** | — |
+| speed-Anteil (Matrix 10) | 7,0 % | 7,0 % | 10,2 % | 8,5 % |
+| Spieler geflaggt (n=48 je Paarung) | — | 26,8 % | 5,6 % | 1,2 % |
+| Brett auf Zeit gegen den Vorteil | — | **3,9 %** | **0,0 %** | 0,0 % |
+| Mannschaftskampf 3:3 | 22,5 % | 21,7 % | 20,4 % | ~30 % |
+| Spiegeltest Heim:Gast (600, identischer Kader) | 256:260 | 256:260 | 249:243, Bretter 2,52:2,52 | — |
+
+„Kein Knopf immer besser" (Heimsieg gegen KI-beidseitig 67,5 % / Gastsieg 12,1 %, die Familie ist
+heimlastig, s. Flag aus 68,3/9,2): Heim pauschal rechnen 20,4 %, pauschal blitzen 63,8 %; Gast
+pauschal rechnen 9,2 %, blitzen 7,9 % — beide Pauschalen verlieren auf beiden Seiten gegen die
+KI-Regel. Extremfaelle: alle rechnen rho 0,839 (47 % geflaggt, 16,7 % Entscheide gegen den
+Vorteil), alle blitzen 0,887. KI-Ansagen: rechnen 44 % · normal 17 % · blitzen 38 %.
+
+**Ehrliche Befunde.** (1) Der echte Kader streut TEMPO von 10 bis 99 (Quartile 34/75) — viel
+breiter als die synthetische Sonde. In **Stufe 1 allein** flaggt deshalb praktisch jeder unter
+TEMPO 35 und keiner ueber 40: 46,5 % der Bretter werden auf Zeit entschieden, fast immer im Einklang
+mit dem Vorteil, aber deterministisch nach TEMPO statt als Ereignis. Stufe 1 ohne Stufe 2 ist so
+nicht empfehlenswert; mit Stufe 2 waehlen langsame Haende Blitzen, und nur noch 5,6 % flaggen.
+(2) Mit der Zeitbudget-KI auf **beiden** Seiten entsteht **kein** Sieg auf Zeit gegen den Vorteil
+(0,0 %, wie die Sonde in 5.2 und deren Lesart 5.3 Punkt 5): Botez-Hansen-Momente kommen nur aus
+Manager-Entscheidungen (Heim rechnen: 22,2 %). Sensitivitaet, nicht eingebaut: KI-Rand 10 s →
+0,7 %, 0 s → 3,3 % (rho 0,901, Pp 11,8) — eine einzige Konstante (`SCHACH_KI_RAND_S`), falls Chris
+das Zielband 1–5 % auch ohne Manager-Eingriff will.

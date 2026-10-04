@@ -15725,6 +15725,136 @@
     0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
   const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
 
+  // ============ FEATURE-FLAGS DER BUEHNEN-NACHTKONZEPTE (04.10., Klasse B) ============
+  // Zwei Mechanik-Aenderungen aus den Nachtkonzepten vom 03.10., von Chris zum Bau
+  // freigegeben, aber Klasse B — deshalb HINTER EINEM SCHALTER, STANDARDMAESSIG AUS. Muster:
+  // `sandsackVorschauAktiv` (Gewichtheben-Sandsack-Finale Paket 2): ein Modul-Zustand mit
+  // Default "aus", gesetzt ausschliesslich ueber die Test-/QA-Schnittstelle
+  // `window.__arena.buehneFlags({...})` (s. window.__arena unten) und die Messskripte
+  // (`--flags=speedSchachUhr:2`, s. scripts/lib/rangtreue-messung.mjs). Solange alle auf 0
+  // stehen (jeder echte Spielstand), laeuft JEDE Zeile der Buehne bit-identisch zu vorher —
+  // keiner der neuen Zweige wird betreten, kein Feld kommt auf TEILNEHMER hinzu
+  // (nachgemessen: miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs zahlengleich vor/nach).
+  // Einschalten fuer das echte Spiel = den Default hier aendern, nach Chris' Abnahme.
+  //
+  //   speedSchachUhr  0 aus · 1 Stufe 1 „Das Blaettchen faellt" · 2 Stufe 1+2 „Tempo-Ansage"
+  //                   (docs/design/speed-schach-nachtkonzept-03-10.md Abschnitt 3.2/3.3)
+  const BUEHNE_FLAGS={speedSchachUhr:0};
+  // PAUSCHALE HALTUNG JE SEITE — NUR fuer Messungen ("alle rechnen", "Heim blitzen, Gast KI"
+  // usw., Messpflicht der Konsultation 02.10. Regel 5: KI-Regel beidseitig plus Extremfaelle).
+  // null = keine Vorgabe (Aufstellung bzw. KI-Vorgabe gilt). Gesetzt nur ueber
+  // window.__arena.buehneHaltungTest(), nie im Spiel.
+  let buehneHaltungTest={0:null,1:null};
+  // WOHER EINE HALTUNG KOMMT, in Prioritaet: (1) Messvorgabe je Seite, (2) die Aufstellung
+  // (`place[n].haltung`, das neue dritte Feld der Uebergabe {d,slot,haltung} — s.
+  // echterKader.aufstellung weiter unten und lib/foundation/battle-arena/arena-aufstellung-
+  // adapter.ts), (3) null = die KI-Vorgabe der jeweiligen Disziplin entscheidet. Nur Werte aus
+  // `erlaubt` werden angenommen; alles andere faellt still auf die KI zurueck (alte Aufrufer,
+  // Tippfehler, Haltung einer anderen Disziplin).
+  function buehneHaltungVon(p,seite,erlaubt){
+    const t=buehneHaltungTest[seite];
+    if(t&&erlaubt.includes(t))return t;
+    const e=place[p.n];
+    if(e&&e.d===buehneDisc&&erlaubt.includes(e.haltung))return e.haltung;
+    return null;
+  }
+
+  // ============ SPEED-SCHACH „DIE UHR WIRD DER DRITTE SPIELER" (Stufe 1 + 2) ============
+  // docs/design/speed-schach-nachtkonzept-03-10.md, Abschnitt 3.1-3.3, gebaut 04.10.
+  //
+  // STUFE 1 — DAS BLAETTCHEN FAELLT. Jeder Spieler bekommt eine echte Uhr (180 s), die aus
+  // seinen EIGENEN Haenden laeuft: Sub-Skill TEMPO (speed 50 / dexterity 30 / awareness 20 —
+  // nur Matrixattribute, die schon in WAGNIS/NERVEN/TECHNIK sitzen, kein neues Attribut).
+  // Jeder Zug kostet 12 s (starker Zug) bzw. 17 s (schwacher Zug), mal
+  // (1 + (50 − TEMPO)·0,022). Das ist die ENTKOPPELTE Uhr aus Tabelle 5.2: mit den alten
+  // 8/20 s fiel nur, wer ohnehin auf Punkte verlor (0,1 % Flagg-Entscheid gegen den
+  // Vorteil, "das erzaehlt nichts Neues") — erst 12/17 s mit dem staerkeren Tempo-Faktor
+  // erzeugt den Botez-Hansen-Moment. Faellt genau einer der beiden auf 0, hat er das Brett
+  // AUF ZEIT verloren, egal wie der Vorteil steht; fallen beide oder keiner, entscheidet
+  // `vorteil` wie bisher (ein Remis bleibt ein Remis — KEIN Tiebreak, KEIN Armageddon:
+  // Chris' Design-Leitlinie, Mannschaftskaempfe duerfen 3:3 enden).
+  //
+  // Stufe 1 ist rho-/Pp-NEUTRAL PER KONSTRUKTION: Erfolgschance, Punkte, rr()-Verbrauch und
+  // damit u.summe (der Messwert von MOTOREN["speed-schach"].wert()) bleiben Zeichen fuer
+  // Zeichen gleich — die Uhr liest die fertigen Zuege nur nach, wie schachUhrWert() es fuer
+  // die Anzeige schon immer tat. Geaendert ist nur, WER das Brett gewinnt (`u.zeitSieg`,
+  // gelesen ueber duellBrettSieg() an jeder Stelle, die bisher `vorteil>0` las).
+  //
+  // STUFE 2 — DIE TEMPO-ANSAGE (Chris' Manager-Hebel). Je Brett vorab "rechnen" (Zeit ×1,30,
+  // Erfolgschance +4 pp), "normal" oder "blitzen" (Zeit ×0,72, −4 pp). Zeitnot wirkt ins
+  // Rezept: wer einen Zug mit weniger als 30 s auf der Uhr beginnt, spielt ihn mit
+  // 0,10·(1−NERVEN/100)·1,6 weniger Erfolgschance (will/determination daempfen); ist das
+  // Blaettchen gefallen, bringen die RESTZUEGE 0 Punkte (woertlich Konzept 3.3: der Zug, mit
+  // dem die Uhr auf 0 lief, ist gespielt und zaehlt noch; alle danach nicht — gemessen
+  // gleichwertig zur strengeren Lesart, rho 0,899 gegen 0,895, Pp 12,1/11,0 gegen 11,8/11,4). Damit
+  // aendert sich u.summe — Stufe 2 braucht ihre eigene Messrunde (s. stand-aller-
+  // disziplinen.md, Nachtrag 04.10.).
+  //
+  // KI-VORGABE = DIE ZEITBUDGET-REGEL (Abschnitt 3.3), NICHT "schnelle Haende blitzen": die
+  // rechnendste Ansage, deren ERWARTETE Uhrzeit (aus Erfolgschance und TEMPO, ohne Wurf) plus
+  // 25 s Sicherheitsrand unter 180 s bleibt, sonst Blitzen. Die naive Regel trieb Pp in der
+  // Sonde auf 21,6 (ein speed-Zuwachs kippte die KI in die flachere Ansage) — die KI-Vorgabe ist
+  // Teil der Mechanik, nicht Beiwerk. Gilt fuer BEIDE Seiten gleich, solange die Aufstellung
+  // keine Ansage traegt.
+  const SCHACH_UHR_START=180, SCHACH_ZEITNOT_S=30;
+  const SCHACH_ZUG_STARK_S=12, SCHACH_ZUG_SCHWACH_S=17;
+  const SCHACH_TEMPO_K=0.022;
+  const SCHACH_TEMPO_REZEPT={speed:50,dexterity:30,awareness:20};
+  const SCHACH_ANSAGEN=["rechnen","normal","blitzen"];
+  const SCHACH_ANSAGE={rechnen:{zeit:1.30,erfolg:0.04}, normal:{zeit:1,erfolg:0}, blitzen:{zeit:0.72,erfolg:-0.04}};
+  const SCHACH_ZEITNOT_ABZUG=0.10, SCHACH_ZEITNOT_SKALA=1.6;
+  const SCHACH_KI_RAND_S=25;
+  // Untergrenze 0,5: ein TEMPO ueber 72 wuerde die Zugzeit sonst unter die Haelfte druecken —
+  // im Kader praktisch unerreichbar, nur ein Sicherheitsnetz gegen negative Zugzeiten.
+  const schachTempoFaktor=(L)=>Math.max(0.5,1+(50-L.TEMPO)*SCHACH_TEMPO_K);
+  const schachZugZeit=(L,stark,ansage)=>
+    (stark?SCHACH_ZUG_STARK_S:SCHACH_ZUG_SCHWACH_S)*schachTempoFaktor(L)*((SCHACH_ANSAGE[ansage]||SCHACH_ANSAGE.normal).zeit);
+  const schachAnsageErfolg=(L,ansage)=>Math.max(0.05,Math.min(0.94,
+    buehneErfolgschance(L)+(SCHACH_ANSAGE[ansage]||SCHACH_ANSAGE.normal).erfolg));
+  // Erwartete Gesamtzeit ueber alle Zuege — deterministisch, ohne rr(), ohne Zeitnot-Abzug
+  // (die Regel plant mit dem Normalfall und haelt dafuer 25 s Rand).
+  function schachErwarteteZeit(L,ansage,zuege){
+    const p=schachAnsageErfolg(L,ansage);
+    return zuege*(p*schachZugZeit(L,true,ansage)+(1-p)*schachZugZeit(L,false,ansage));
+  }
+  function schachKiAnsage(L,zuege){
+    for(const a of ["rechnen","normal"])
+      if(schachErwarteteZeit(L,a,zuege)+SCHACH_KI_RAND_S<SCHACH_UHR_START)return a;
+    return "blitzen";
+  }
+  // EIN BRETTENTSCHEID FUER ALLE LESER. Bisher stand an fuenf Stellen (HUD-Stand,
+  // Kaderleiste, Schach-Sieger auf dem Brett, buehneStand(), spieleBuehneDuell()) dieselbe
+  // Weiche `fechten ? gefechtSieg : vorteil>0` als Kopie. Neu ist nur der mittlere Fall: ein
+  // Brett, das auf Zeit entschieden wurde (`u.zeitSieg` true/false, NUR gesetzt bei
+  // BUEHNE_FLAGS.speedSchachUhr>=1 und genau einem gefallenen Blaettchen). Ohne Flag existiert
+  // das Feld nie, und die Funktion ist exakt die alte Weiche.
+  function duellBrettSieg(art,u){
+    if(art.fechten)return !!u.gefechtSieg;
+    if(u.zeitSieg!=null)return u.zeitSieg;
+    return u.vorteil>0;
+  }
+  // MESS-DIAGNOSE fuer disziplinProbe({buehneDiag:true}) — liest nur den fertig gebauten und
+  // durchgelaufenen TEILNEHMER-Stand, schreibt nichts, kein rr(). Je Duell-Brett: Vorteil,
+  // Blaettchen beider Seiten, Brettentscheid, Ansage/TEMPO/Zeitnot; dazu der Teamstand in
+  // gewonnenen Brettern (dieselbe Zaehlung wie spieleBuehneDuell()).
+  function buehneDiagVon(dId){
+    const art=BUEHNE_ART[dId]; if(!art)return null;
+    const diag={};
+    if(art.duell){
+      diag.bretter=TEILNEHMER.filter(u=>u.side===0&&u.brett!=null).map(a=>{
+        const b=TEILNEHMER.find(u=>u.side===1&&u.brett===a.brett)||{};
+        return {vorteil:a.vorteil, fa:!!a.geflaggt, fb:!!b.geflaggt,
+          zeitSieg:a.zeitSieg??null, gegen:!!a.zeitGegenVorteil, kippt:!!a.zeitKippt,
+          sa:duellBrettSieg(art,a), sb:duellBrettSieg(art,b),
+          ansageA:a.ansage||null, ansageB:b.ansage||null,
+          zeitnotA:a.zeitnotZug!=null, zeitnotB:b.zeitnotZug!=null,
+          tempoA:a.TEMPO??null, tempoB:b.TEMPO??null};
+      });
+      diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s&&u.brett!=null&&duellBrettSieg(art,u)).length);
+    }
+    return diag;
+  }
+
   // ================== PAKET 1 (30.09.): "STARTREIHENFOLGE NACH ERGEBNIS" ==================
   // Fable-Ideen Buehne-AUFTRITT 30.09. (docs/design/fable-ideen-buehne-auftritt-30-09.md,
   // Showcase/Eiskunstlauf/Wettessen -- NICHT zu verwechseln mit dem gleichnamigen Buehne-
@@ -15909,11 +16039,34 @@
       // keine Adapter-Aenderung. Nur fuer Showcase befuellt, die sechs Geschwister-Buehnen
       // lesen diese Felder nirgends.
       if(art.showcase){L.c=p.c;L.r=p.r;L.sub=p.sub;L.tp=p.tp;L.tn=p.tn;L.a=p.a;}
+      // SPEED-SCHACH-UHR (Stufe 1/2, s. BUEHNE_FLAGS/SCHACH_* oben): nur bei gesetztem Flag
+      // betreten. TEMPO entsteht aus demselben `attr` (Slot-/Form-/Mutator-Zuschlag inklusive)
+      // und derselben `mische()`-Formel wie jeder Rezept-Sub-Skill in R2 oben — es ist nur
+      // KEIN Rezept-Eintrag, damit das Rezept (und alles, was es liest) unberuehrt bleibt.
+      const schachUhr=!!art.schach&&BUEHNE_FLAGS.speedSchachUhr>=1;
+      const schachAnsage=schachUhr&&BUEHNE_FLAGS.speedSchachUhr>=2;
+      let uhr=SCHACH_UHR_START;
+      if(schachUhr){
+        L.TEMPO=Math.round(mische({a:attr},SCHACH_TEMPO_REZEPT));
+        L.geflaggt=false; L.flaggZug=null; L.zeitnotZug=null;
+        if(schachAnsage){
+          const vorgabe=buehneHaltungVon(p,seite,SCHACH_ANSAGEN);
+          L.ansage=vorgabe||schachKiAnsage(L,art.rundenN);
+          L.ansageQuelle=vorgabe?"vorgabe":"ki";
+        }
+      }
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
         // WAGNIS wirkt jetzt in BEIDE Richtungen, s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben.
-        const erfolg=buehneErfolgschance(L);
+        // STUFE 2: Ansage und Zeitnot verschieben die Erfolgschance (gedeckelt wie ueberall auf
+        // 0,05-0,94). Ohne Flag ist `erfolg` exakt buehneErfolgschance(L) wie bisher.
+        const zeitnot=schachUhr&&uhr<SCHACH_ZEITNOT_S;
+        if(zeitnot&&L.zeitnotZug==null)L.zeitnotZug=ri;
+        const erfolg=schachAnsage
+          ?Math.max(0.05,Math.min(0.94,schachAnsageErfolg(L,L.ansage)
+            -(zeitnot?SCHACH_ZEITNOT_ABZUG*(1-L.NERVEN/100)*SCHACH_ZEITNOT_SKALA:0)))
+          :buehneErfolgschance(L);
         let punkte, ereignis, knapp=false;
         // GENAU EIN rr()-AUFRUF, WIE VORHER (E0, Buehne-Auftritt-Konzeptreview 26.09.,
         // Abschnitt 2.4): der ohnehin gezogene Wert wird nur ZUSAETZLICH in `wurf` gehalten,
@@ -15934,6 +16087,20 @@
           knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+        // SPEED-SCHACH-UHR: die Zugzeit haengt am Ausgang DIESES Zuges (stark/schwach) — der
+        // schon gezogene `wurf`, kein zweiter rr(). Stufe 1 schreibt nur die Uhr mit; erst
+        // Stufe 2 nimmt allen Zuegen NACH dem, in dem das Blaettchen fiel, die Punkte.
+        // Der rr()-Verbrauch bleibt auch nach dem Fallen bei genau einem je Zug, damit der
+        // Zufallsstrom aller folgenden Teilnehmer unverschoben bleibt.
+        let schachZusatz=null;
+        if(schachUhr){
+          if(!L.geflaggt){
+            uhr-=schachZugZeit(L,wurf<erfolg,schachAnsage?L.ansage:"normal");
+            if(uhr<=0){ uhr=0; L.geflaggt=true; L.flaggZug=ri; }
+          }
+          if(schachAnsage&&L.geflaggt&&L.flaggZug<ri)punkte=0;
+          schachZusatz={uhr:Math.round(uhr*10)/10, zeitnot, flagg:L.flaggZug===ri};
+        }
         // T-F1a -- GESPEICHERTER ERFOLGSABSTAND (Fable-Ideen Buehne-Duell 30.09., Abschnitt
         // T-F1: "der gespeicherte Wurfabstand (erfolg - wurf) ... er muesste nur als Zahl
         // auf dem Rundeneintrag mitgefuehrt werden, ein `viz`-artiges Feld nach dem
@@ -15945,7 +16112,8 @@
         // Ballwechsel fuer diese Seite entschieden, ohne dass dafuer ein zweiter Wurf noetig
         // waere.
         const marge=art.tennis?erfolg-wurf:undefined;
-        L.runden.push(art.tennis?{punkte,ereignis,knapp,marge}:{punkte,ereignis,knapp});
+        L.runden.push(art.tennis?{punkte,ereignis,knapp,marge}
+          :schachZusatz?{punkte,ereignis,knapp,...schachZusatz}:{punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -16006,6 +16174,19 @@
         a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+        // SPEED-SCHACH STUFE 1 — DAS BLAETTCHEN FAELLT (s. BUEHNE_FLAGS/SCHACH_* oben). Ist
+        // GENAU EINER der beiden geflaggt, verliert er das Brett auf Zeit — `vorteil`/`verlauf`
+        // bleiben unangetastet (sie bleiben die Aktionsqualitaet und die Tauzieh-Anzeige), nur
+        // der Brettentscheid bekommt einen zweiten Weg. Beide oder keiner geflaggt: `vorteil`
+        // wie bisher, ein Remis bleibt ein Remis. `zeitGegenVorteil` markiert den
+        // Botez-Hansen-Fall (der Sieger auf Zeit lag auf dem Brett zurueck) — die Kennzahl,
+        // an der Stufe 1 laut Konzept steht oder faellt (Zielband 2-4 % der Bretter).
+        if(art.schach&&BUEHNE_FLAGS.speedSchachUhr>=1&&!!a.geflaggt!==!!b.geflaggt){
+          a.zeitSieg=!a.geflaggt; b.zeitSieg=!b.geflaggt;
+          const siegerVorteil=a.zeitSieg?a.vorteil:b.vorteil;
+          a.zeitGegenVorteil=b.zeitGegenVorteil=siegerVorteil<0;
+          a.zeitKippt=b.zeitKippt=siegerVorteil<=0;
+        }
         // F1 -- TREFFER SIND DER STAND (Opus-Konzeptreview Buehnen-Duell, 26.09., Abschnitt
         // 3.3): der Kern-Befund des Reviews war, dass Fechten sich selbst widerspricht -- der
         // ANGEZEIGTE Trefferstand ("Treffer 5:4") entschied nichts, das Gefecht gewann, wer
@@ -19067,8 +19248,14 @@
         if(BB().schach&&gegner&&!u.vizSchachAufgegeben&&u.aktuell+1>=6&&u.aktuell+1<BB().rundenN
            &&gegner.aktuell>=u.aktuell){
           const imRueckstand=v<0?u:(v>0?gegner:null);
-          if(imRueckstand&&buehneMaxRestPunkte(imRueckstand,BB())<Math.abs(v)){
-            const fuehrend=imRueckstand===u?gegner:u;
+          // MIT ECHTER UHR (Speed-Schach Stufe 1) ist ein Punktvorsprung nur dann
+          // "uneinholbar", wenn der Fuehrende auch nicht mehr auf Zeit verlieren kann — sonst
+          // meldete der Ticker ein Brett als entschieden, das danach auf Zeit kippt.
+          // schachKannNochFallen() liest nur bereits enthuellte Zuege; ohne Flag immer false.
+          const fuehrendKandidat=imRueckstand?(imRueckstand===u?gegner:u):null;
+          if(imRueckstand&&buehneMaxRestPunkte(imRueckstand,BB())<Math.abs(v)
+             &&!schachKannNochFallen(fuehrendKandidat,BB())){
+            const fuehrend=fuehrendKandidat;
             u.vizSchachAufgegeben=true; gegner.vizSchachAufgegeben=true;
             feed(0,"Brett "+((u.brett??0)+1)+" vorzeitig entschieden — "+fuehrend.n
               +" liegt uneinholbar vorn, die Kamera bleibt bei den offenen Brettern.",
@@ -19221,12 +19408,25 @@
         // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
         // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
         // `wert()`/`rr()` bleiben unberuehrt.
+        // BLAETTCHEN GEFALLEN (Speed-Schach Stufe 1, Konzept 3.2 "Narrativ"): der Zug, in dem
+        // die Uhr dieses Spielers 0 erreicht hat, wird enthuellt. `r.flagg` steht nur mit
+        // BUEHNE_FLAGS.speedSchachUhr>=1 auf dem Rundeneintrag (s. setz()). Ob es das Brett
+        // entscheidet, haengt noch an der Uhr des Gegners — deshalb hier nur der Moment selbst,
+        // der Brettentscheid kommt wie immer mit "Brett entschieden" darunter.
+        if(BB().schach&&r.flagg){
+          feed(u.side,worte.brett+" "+((u.brett??0)+1)+": Blättchen gefallen — "+u.n
+            +" überschreitet die Zeit ("+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+", "+statText+").",
+            buehneBahnGrossDrosseln(true,true),undefined,"entschieden");
+        }
         if(u.aktuell+1>=BB().rundenN){
           const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
           if(brettGegnerFertig){
             const brettText=BB().fechten
               ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
                              :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
+              // AUF ZEIT (Speed-Schach Stufe 1): `u.zeitSieg` entscheidet vor `v` — derselbe
+              // Brettentscheid wie duellBrettSieg(), damit Ticker und Stand-Spalte uebereinstimmen.
+              :u.zeitSieg!=null?(u.zeitSieg?"auf Zeit gewonnen":"auf Zeit verloren")
               :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
             // KEIN "(Vorteil +v)" MEHR BEI FECHTEN (30.09.): genau der Widerspruch aus dem
             // Audit ("Brett 3 verloren (Vorteil +124)") -- `v`/`u.verlauf` sind fuer
@@ -20777,9 +20977,26 @@
   // sichtbares Herunterticken (M2/M4).
   const SCHACH_GLEIT_T=0.28, SCHACH_SCHLAG_T=0.18;
   function schachUhrWert(u,art){
+    // ECHTE UHR (Speed-Schach Stufe 1, BUEHNE_FLAGS.speedSchachUhr>=1): setz() schreibt die
+    // Restzeit nach jedem Zug auf den Rundeneintrag (`r.uhr`) — die Anzeige zeigt dann genau die
+    // Uhr, die auch ueber das Brett entscheidet, statt der alten 8/20-s-Kulisse. Vor dem
+    // ersten enthuellten Zug stehen 180 s. Ohne Flag fehlt `r.uhr`, und es bleibt beim Bisherigen.
+    if(u.runden[0]&&u.runden[0].uhr!=null)
+      return u.aktuell>=0&&u.runden[u.aktuell]?u.runden[u.aktuell].uhr:SCHACH_UHR_START;
     let t=180;
     for(let i=0;i<=u.aktuell;i++){ const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20); }
     return Math.max(0,t);
+  }
+  // KANN DIESE UHR NOCH FALLEN? (Speed-Schach Stufe 1) — spoilerfrei aus der bereits
+  // enthuellten Restzeit und dem schlechtesten Fall fuer die verbleibenden Zuege (alle
+  // schwach). Liest nur u.runden[0..u.aktuell], u.TEMPO und u.ansage. Ohne Flag (kein `uhr`
+  // auf den Runden) immer false — S-F2 verhaelt sich dann exakt wie vorher.
+  function schachKannNochFallen(u,art){
+    if(!u||!u.runden[0]||u.runden[0].uhr==null)return false;
+    const jetzt=u.aktuell>=0&&u.runden[u.aktuell]?u.runden[u.aktuell].uhr:SCHACH_UHR_START;
+    if(jetzt<=0)return true;
+    const rest=art.rundenN-1-u.aktuell;
+    return jetzt-rest*schachZugZeit(u,false,u.ansage||"normal")<=0;
   }
   function stepSchach(dt,art){
     if(!TEILNEHMER.length)return;
@@ -21402,7 +21619,7 @@
     // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
     // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
     // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-    const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+    const brettSieg=u=>duellBrettSieg(BB(),u);
     const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
     // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
     // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
@@ -26310,8 +26527,12 @@
           },
           fmt:v=>(v>0?"+":"")+v, farbe:v=>v>0?"var(--ok)":v<0?"var(--crit)":null},
         {id:"stand",kopf:"Stand", titel:worte.brett+" entschieden (+ Sieg, = Remis, − Niederlage)",
-          wert:z=>!z.fertig?"…":(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"="),
-          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null},
+          // AUF ZEIT ENTSCHIEDEN (Speed-Schach Stufe 1, nur mit BUEHNE_FLAGS.speedSchachUhr):
+          // `u.zeitSieg` schlaegt den Vorteil, ⌛ macht den Grund lesbar (Konzept 3.2: "die
+          // Wertungstabelle bekommt in ‚Stand' ein ⌛ neben + / −"). Ohne Flag nie gesetzt.
+          wert:z=>!z.fertig?"…":(z.u.zeitSieg!=null?(z.u.zeitSieg?"+⌛":"−⌛")
+            :(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"=")),
+          farbe:v=>v[0]==="+"?"var(--ok)":v[0]==="−"?"var(--crit)":null},
         {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
           farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
         {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
@@ -27105,7 +27326,7 @@
     // (updateHudBuehne()s BB().duell-Zweig) -- zwei identische Zahlen uebereinander. `gew()`
     // bleibt als reine Ableitung stehen: die Sieger-Kennung unten (SIEG-Rahmen/-Text) braucht
     // sie weiterhin.
-    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&(s===0?x.vorteil>0:y.vorteil>0))n++;}return n;};
+    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&duellBrettSieg(BB(),s===0?x:y))n++;}return n;};
     ctx.textAlign="center";ctx.textBaseline="middle";
     // Opus-Review-Fund (06.09.): dass die Regie gerade ABGESCHALTET ist, war nirgends zu
     // sehen — der gelbe Rahmen unten wird nur an Mini-Brettern gezeichnet, und das
@@ -28283,7 +28504,12 @@
     for(const n of Object.keys(echterKader.aufstellung)){
       const e=echterKader.aufstellung[n];
       if(e&&typeof e.d==="string"&&typeof e.slot==="string"){
-        place[n]={d:e.d,slot:e.slot};
+        // DRITTES FELD `haltung` (04.10., Uebergabe {d,slot,haltung} aus dem Grundgeruest der
+        // Konsultation 02.10., Zeile 0): optional, nur uebernommen, wenn es ein String ist.
+        // Gelesen ausschliesslich von buehneHaltungVon() — und dort nur, solange das Flag der
+        // jeweiligen Disziplin an ist (BUEHNE_FLAGS). Fehlt es (jeder heutige Aufrufer), ist
+        // `place[n]` exakt das alte {d,slot}.
+        place[n]=typeof e.haltung==="string"?{d:e.d,slot:e.slot,haltung:e.haltung}:{d:e.d,slot:e.slot};
         order[n]=slotOrd(e.slot);
       }
     }
@@ -43452,7 +43678,7 @@
       const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
     }
     if(art.duell){
-      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const brettSieg=u=>duellBrettSieg(art,u);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
       const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
     }
@@ -45550,6 +45776,22 @@
     // sofort pruefen, statt Minuten Sim-Zeit abzuwarten, bis ein Highlight zufaellig faellt.
     // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
     // kein Einfluss auf MESS/Wertung/RNG.
+    // NACHTKONZEPT-SCHALTER (04.10., s. BUEHNE_FLAGS): Test-/QA-/Mess-Schnittstelle, dasselbe
+    // Muster wie sandsackVorschau() unten. Ohne Argument nur lesen. Unbekannte Schluessel und
+    // Nicht-Zahlen werden ignoriert. Kein echtes Spiel ruft das auf.
+    buehneFlags:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const k of Object.keys(BUEHNE_FLAGS))
+          if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
+      return {...BUEHNE_FLAGS};
+    },
+    // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
+    // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
+    buehneHaltungTest:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
+      return {...buehneHaltungTest};
+    },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
     // aus -- dasselbe Prinzip wie calloutProbe darueber. Noetig vor allem fuer die Stufe
@@ -45887,7 +46129,7 @@
       // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
       // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
       // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-      const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const brettSieg=u=>duellBrettSieg(BUEHNE_ART[bd],u);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
@@ -46909,6 +47151,10 @@
                 persTyp:persOf[u.n]||null,
                 heilerSub:u.heiler?(((spielerVonName(u.n)||{}).sub||[]).find(s=>HEILER.has(s))||null):null}:{})}));
           spiele.push({saat:saat0+i*schritt,
+            // BUEHNEN-DIAGNOSE (04.10., additiv wie `zielDiag`): nur mit `o.buehneDiag` — die
+            // Brett-/Haltungskennzahlen der Nachtkonzept-Mechaniken (s. buehneDiagVon()). Ohne
+            // die Option fehlt das Feld, die Rueckgabe bleibt byte-identisch.
+            ...(o.buehneDiag&&istBuehne(dId)?{buehne:buehneDiagVon(dId)}:{}),
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
               wert:Math.round((w[u.n]||0)*100)/100,
