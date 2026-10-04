@@ -32359,6 +32359,15 @@
   let staffelMarkeZug={aktiv:false, modus:"ki", fliegMax:0.24};
   // B4.3 BEIN-DUELL-BANNER: welche Beine schon gemeldet sind (je Rennen geleert).
   let staffelBeinDuellGemeldet=new Set();
+  // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, docs/design/spurt-nachtkonzept-03-10.md):
+  // QA-Schalter, Standard AUS, nur window.__arena.spurtSaeule() schreibt ihn. `joker`:
+  // S-N1 Joker-Station (KI-Vorgabe, 8 %), `kriechen`: S-N2 Station als Bewegung (k=0,25,
+  // Puste-Gutschrift skaliert). Beide Teilschalter fuer die Einzelmessung ("nie zwei
+  // Eingriffe in einer Messung"); das freigegebene Paket ist beides zusammen. Bedeutung und
+  // Gate s. spurtSaeuleSetzen() (nahe stepSpurt).
+  let spurtSaeule={aktiv:false, joker:true, kriechen:true};
+  // S-N5 Anzeigen: Stationsbestzeiten (saubere Station) und Fotofinish, je Rennen geleert.
+  let spurtStationBest=[], spurtFotofinishGezeigt=false;
   // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3). Ringpuffer aus
   // {t (echte Sekunden), delta, seite} -- ein Punkt je Frame, in updateHudBahn() gefuellt,
   // von bauSpurt() geleert. Reine Anzeige: liest nur staffelZeitDelta(), das die Simulation
@@ -35407,6 +35416,11 @@
       // fuehren ihre eigenen `huerdePreis`-Werte unveraendert (0,80/0,42, s. dort).
       muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.45,
       wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
+      // "DIE SAEULE MUSS LAUFEN" (docs/design/spurt-nachtkonzept-03-10.md, Paket S-N1+S-N2):
+      // Joker-Schleife 8 % der Strecke (11 % lag mit Pp 25,1 knapp ueber der Schranke) und
+      // Kriechanteil k=0,25 an der Station. Beide Werte liest der Motor NUR bei
+      // eingeschaltetem QA-Schalter `spurtSaeule` (s. spurtSaeuleSetzen()); ohne ihn wirkungslos.
+      jokerLaenge:0.08, kriechAnteil:0.25,
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
       // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.
@@ -37219,6 +37233,13 @@
     // Motor-Wert, hier wird nur die gezeichnete Hoehe kurz interpoliert (s. Kommentar bei
     // `climbAnzeigeAnteil`, bodenWand()).
     if(istWand())return {x:wandX(u.bahnZ), y:camY(climbAnzeigeAnteil(u))};
+    // S-N1 JOKER-SCHLEIFE (Spurt, QA-Schalter): waehrend `u.umwegRest` offen ist, schwingt die
+    // Figur in einem Bogen seitlich um die Station herum und kommt auf ihrer Bahn wieder an —
+    // reine Zeichnung aus dem Schleifenfortschritt, `u.pos` bleibt an der Station.
+    if(!istRoute()&&u.umwegRest>0){
+      const L=BA().jokerLaenge||1, p=Math.max(0,Math.min(1,1-u.umwegRest/L));
+      return {x:camX(u.pos)+Math.sin(p*Math.PI)*14, y:bahnY(u.bahnZ)+Math.sin(p*Math.PI)*34};
+    }
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -37445,6 +37466,7 @@
     // Rennen wissen.
     staffelVerlauf=[]; staffelBeinMarken=[]; staffelAnkerGezeigt=[false,false];
     staffelBeinDuellGemeldet=new Set();
+    spurtStationBest=[]; spurtFotofinishGezeigt=false;
     spurtStationStats=(BA().hindernisse||[]).map(()=>({sauber:0,durch:0,sturz:0}));
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
@@ -37671,6 +37693,9 @@
     // weil die Marke vom Paar (Geber = Bein davor) abhaengt. Nur bei eingeschaltetem
     // QA-Schalter — sonst traegt kein Laeufer `haltung`/`marke`, s. Kopfkommentar dort.
     if(art.staffel&&staffelMarkeZug.aktiv)staffelHaltungenSetzen();
+    // SPURT "DIE SAEULE MUSS LAUFEN" (S-N1/S-N2): Joker-Station und Kriechfaktor je Laeufer,
+    // nur bei eingeschaltetem QA-Schalter — sonst traegt kein Laeufer jokerIdx/kriechK.
+    if(art.spurt&&spurtSaeule.aktiv)spurtSaeuleSetzen();
     // ZEITFAHREN-FOKUS: die Kamera startet auf dem ersten Fahrer der Startrampe, nicht auf
     // "niemand" — sonst zeigt das erste Bild eines Zeitfahrens die Feldansicht, obwohl nur
     // einer unterwegs ist.
@@ -37927,6 +37952,55 @@
       u.wechselNetto=null; u.wechselGewinn=null; u.wechselPatzer=false;
     }
   }
+  // =====================================================================================
+  // SPURT "DIE SAEULE MUSS LAUFEN" — Paket S-N1+S-N2 (docs/design/spurt-nachtkonzept-03-10.md,
+  // Chris' Freigabe 04.10.). Klasse B, hinter dem QA-Schalter `spurtSaeule` (Standard aus).
+  //
+  // S-N1 JOKER-STATION (Rallycross-Joker, Konzept 3.1): jeder Laeufer laeuft GENAU EINMAL
+  // statt einer Station eine Umlaufschleife von `jokerLaenge` (8 % der Strecke) — kein Stopp,
+  // kein Wurf, kein Sturz, normales Tempo und normaler Puste-Verbrauch, aber ohne die
+  // Atempause der Station ("zwei Waehrungen": Puste statt Standzeit). Primaerweg bleibt die
+  // Station (TECHNIK/WENDIGKEIT/WUCHT je Typ), der Joker ist der knappe Nebenweg ueber das
+  // Laufen. NUR DIE KI-VORGABE ist gebaut (die gemessene Variante): Joker an der Station mit
+  // dem TEUERSTEN eigenen Stopp (huerdePreis x wuchtPreisFaktor x (1-0,8*Skill/100)), bei
+  // Gleichstand die spaeteste. Die Manager-Anweisung (Klasse M) ist nicht Teil dieses Pakets.
+  //
+  // S-N2 STATION ALS BEWEGUNG (Konzept 3.2): statt Vollstopp kriecht er mit k=0,25 seines
+  // Tempos ueber das Hindernis, die Stoppdauer waechst um 1/(1-k) — der Zeitverlust bleibt
+  // rechnerisch identisch (D/(1-k) - k*D/(1-k) = D). Die volle Puste-Gutschrift am Hindernis
+  // wird mit (1-k) skaliert, sonst kaeme je Station mehr Puste zurueck als heute und der
+  // SP-P1-Haushalt bindet nicht mehr (Konzept: Restpuste 32 % statt 14 % ohne Skalierung).
+  // Kein neuer rr()-Zug; der Joker laesst die Wuerfe SEINER Station aus (gewollt, Klasse B).
+  function spurtSaeuleSetzen(){
+    const A=BA(), N=HUERDEN_N();
+    for(const u of LAEUFER){
+      u.kriechK=spurtSaeule.kriechen?(A.kriechAnteil||0):0;
+      u.jokerIdx=null; u.jokerGenommen=false; u.umwegRest=0; u.jokerPos=null;
+      if(!spurtSaeule.joker||!A.jokerLaenge||!A.hindernisTypen)continue;
+      let best=-1, bestKosten=-Infinity;
+      N.forEach((h,i)=>{
+        const typ=HUERDEN_TYP(i);
+        const kosten=(A.huerdePreis??0)*(typ==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*(u[typ]||0)/100);
+        if(kosten>=bestKosten){ bestKosten=kosten; best=i; }   // >= : bei Gleichstand die spaetere
+      });
+      u.jokerIdx=best>=0?best:null;
+    }
+  }
+  // S-N5 (Klasse A, nur mit QA-Schalter): Stationsbestzeit je Station. Gemeldet wird eine
+  // neue Bestzeit erst ab der dritten sauberen Passage — gedrosselt, damit der Ticker die
+  // Stillen fuellt und nicht jede Station siebenfach meldet. Liest nur den bereits
+  // feststehenden Stationspreis, kein rr(), nie zurueckgelesen.
+  const SPURT_FOTOFINISH_SEK=0.1;
+  function spurtStationSauber(u,i,wort){
+    if(i<0||u.stationPreis==null)return;
+    const b=spurtStationBest[i]=spurtStationBest[i]||{zeit:Infinity,n:null,sauber:0};
+    b.sauber++;
+    if(u.stationPreis<b.zeit){
+      b.zeit=u.stationPreis; b.n=u.n;
+      if(b.sauber>=3)feedEreignis(u.seite,u.n+" fliegt über "+(wort||("Station "+(i+1)))
+        +" — schnellste Zeit an Station "+(i+1)+" ("+fmtDauer(u.stationPreis)+").");
+    }
+  }
   // B4.6 ANWEISUNGSBILANZ je Seite (Konzept 3.5.6): was die fliegenden Wechsel gebracht
   // haben (Summe der Gewinne, dazu die Netto-Wechselzeit) und wie viele Angriffe getragen
   // haben bzw. eingebrochen sind. Liest nur Buchhaltungsfelder, schreibt nichts.
@@ -38085,7 +38159,9 @@
     const gespuerSkill=BA().gespuerSkill;
     const gespuer=gespuerSkill?1-(100-skillLesen(u,gespuerSkill))*(BA().gespuerGrad??0):1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
-           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
+           // S-N2 (Spurt, QA-Schalter): an der Station kriecht er mit `u.kriechK` statt zu
+           // stehen. Ohne Schalter ist kriechK undefined, (undefined||0) also 0 wie vorher.
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?(u.kriechK||0):1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.
@@ -38281,6 +38357,17 @@
         }
       }
       const vor=u.pos;
+      // S-N1 JOKER-SCHLEIFE (Spurt, QA-Schalter): solange `u.umwegRest` offen ist, fliesst der
+      // Fortschritt zuerst in die Schleife — er laeuft, aber nicht auf der Hauptstrecke. Ohne
+      // Schalter ist umwegRest undefined und die Zeile im else-Zweig die alte.
+      if(u.umwegRest>0){
+        const schritt=u.v*dt/strecke, ab=Math.min(u.umwegRest,schritt);
+        u.umwegRest-=ab; u.pos+=schritt-ab;
+        if(u.umwegRest<=0){
+          u.umwegRest=0;
+          schwebe({...laeuferSchwebeXY(u,-20),txt:"zurück auf der Bahn",life:.8,crit:false,_laeufer:u.id});
+        }
+      } else
       u.pos+=u.v*dt/strecke;
       // HOECHSTMARKE (Gegencheck 3.3, Aenderung 1): die Wertung liest fuer Climbing
       // `u.hoch`, nicht `u.pos` (s. bahnRangliste()/MOTOREN.climbing.wert() unten) — ein
@@ -38366,7 +38453,9 @@
       //
       // Eine Bahn OHNE `pusteRegen` (heute keine) bleibt bit-identisch.
       if(BA().pusteRegen){
-        const ruhe=u.huerde>0?1:(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
+        // S-N2: wer an der Station kriecht, bekommt die volle Gutschrift nur zu (1-k) — die
+        // Station dauert 1/(1-k) laenger, je Station kommt so dieselbe Puste zurueck wie heute.
+        const ruhe=u.huerde>0?(u.kriechK?1-u.kriechK:1):(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
         if(ruhe>0)u.reserve=Math.min(u.reserveMax,
           u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
       }
@@ -38456,6 +38545,17 @@
           // Gemessen hat das Zeitfahren Intelligence mit 3,5 % gefuehrt, wo die Matrix 18
           // sagt. Der Grund war genau das: die Kurve war zu leicht.
           const A=BA();
+          // S-N1 JOKER (Spurt, QA-Schalter): an SEINER Joker-Station kein Stopp, kein Wurf,
+          // kein Sturz — er biegt in die Schleife ab. Der Ueberstand dieses Ticks zaehlt schon
+          // als Schleifenstrecke. Ohne Schalter ist u.jokerIdx undefined, der Vergleich falsch.
+          if(u.jokerIdx!=null && !u.jokerGenommen && HUERDEN_N().indexOf(h)===u.jokerIdx){
+            u.jokerGenommen=true; u.jokerPos=h;
+            u.umwegRest=Math.max(0,(A.jokerLaenge||0)-(u.pos-h)); u.pos=h;
+            const ji=u.jokerIdx, jw=(A.hindernisWorte||[])[ji]||("Station "+(ji+1));
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"JOKER",life:1.1,crit:false,_laeufer:u.id});
+            feedEreignis(u.seite,u.n+" nimmt den Joker — läuft außen um "+jw+" herum.");
+            continue;
+          }
           // HINDERNIS-ZEITPREIS (P6, Fable-Recherche 05.09.2026): JEDES Hindernis kostet
           // einen vollen Stopp, dessen Dauer der zum Hindernis-Typ gehoerige Sub-Skill
           // bestimmt — nicht erst beim Misslingen. Real kostet auch die genommene Huerde
@@ -38490,7 +38590,13 @@
             // Sekunde fuer Sekunde herunterlaeuft (`if(u.huerde>0)u.huerde-=dt`, oben) und ein
             // Lesen nach dem Rennen nur noch 0 zeigen wuerde.
             const huerdeVor=u.huerde||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            const stationsPreis=(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100);
+            // S-N2 (QA-Schalter): kriechend dauert die Station 1/(1-k) laenger — derselbe
+            // Zeitverlust, weil er dabei mit k weiterlaeuft. Ohne Schalter der alte Preis.
+            u.huerde=Math.max(u.huerde||0,u.kriechK?stationsPreis/(1-u.kriechK):stationsPreis);
+            // S-N5 (Anzeige): welche Station er gerade nimmt und wie lang sie insgesamt dauert,
+            // fuer die Stationsduell-Tafel; der reine Zeitverlust fuer die Stationsbestzeit.
+            if(u.kriechK!=null){ u.stationIdx=HUERDEN_N().indexOf(h); u.stationDauer=u.huerde; u.stationPreis=stationsPreis; }
             // RAST AN DER EXE (Gegencheck 3.11): eine PLAN-Schwelle statt fester Booleans
             // je Zone — an einem Henkel (`hTyp==="STEHEN"`, das sind bei Climbing genau die
             // drei `zonen`-Positionen) wird zusaetzlich gerastet, wenn die Reserve UNTER
@@ -38505,7 +38611,8 @@
               if(A.balanceSteigungGrad)u.balance=Math.min(1,(u.balance??1)+0.40*(0.5+(u.GLEICHGEWICHT||0)/200));
               feedRoutine(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
             }
-            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
+            // (S-N2: kriechend ist der Zeitverlust (1-k) der Stationsdauer; ohne Schalter *1.)
+            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor)*(u.kriechK?1-u.kriechK:1);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
@@ -38773,6 +38880,8 @@
             // Zweig ist derselbe fuer beide Bahnen), zeichnet die Zahl aber nirgends, s.
             // bodenSpurtGerade(). Reiner Anzeige-Zaehler, kein rr()-Aufruf, kein Ruecklesen.
             if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sauber++;
+            // S-N5 TICKER FUER DIE SAUBERE STATION (nur mit QA-Schalter, kein rr()).
+            if(A.spurt&&u.kriechK!=null)spurtStationSauber(u,meldeStation,wortAkk);
             if(meldeTyp==="stark"){
               schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
               melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
@@ -39232,6 +39341,18 @@
             // Kommentar am startAbstand-Zweig oben.
             feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
               zielPlatz<=3,undefined,"zieleinlauf",undefined,undefined,"ereignis");
+            // S-N5 FOTOFINISH-LUPE (Spurt, nur mit QA-Schalter): liegt Platz 2 weniger als
+            // 0,1 echte Sekunden hinter Platz 1, ein eigener Banner mit dem Abstand. KEINE
+            // Pause, kein Standbild, keine Wandzeit — nur der Banner ueber den laufenden Bildern
+            // (die angehaltene Sekunde aus dem Konzept waere Klasse T und ist nicht gebaut).
+            if(BA().spurt&&spurtSaeule.aktiv&&zielPlatz===2&&!spurtFotofinishGezeigt){
+              const erster=rennFertig.filter(x=>!x.raus)[0];
+              const real=erster?bahnRealSek(rennT-erster.fertig):null;
+              if(real!=null&&real<SPURT_FOTOFINISH_SEK){
+                spurtFotofinishGezeigt=true;
+                callout("FOTOFINISH · "+erster.n+" vor "+u.n+" um "+real.toFixed(2).replace(".",",")+" s");
+              }
+            }
           }
         }
       }
@@ -40309,6 +40430,35 @@
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
+    // S-N5 STATIONSDUELL-TAFEL (Spurt, Klasse A, nur mit QA-Schalter `spurtSaeule`): stehen
+    // ein Heim- und ein Gastlaeufer gleichzeitig an DERSELBEN Station (innerhalb 0,03
+    // Strecke), zeigt eine kleine Tafel beider Rest-Stationszeiten als Balken — "wer kommt
+    // zuerst los?", der Positionskampf, der sonst unsichtbar im Hindernis passiert. Liest nur
+    // u.huerde/u.stationDauer/u.stationIdx, schreibt nichts.
+    if(BA().spurt && spurtSaeule.aktiv && !istRoute()){
+      const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0);
+      let paar=null;
+      for(const a of an){ if(a.seite!==0)continue;
+        const b=an.find(o=>o.seite===1&&o.stationIdx===a.stationIdx&&Math.abs(o.pos-a.pos)<0.03);
+        if(b){ paar=[a,b]; break; } }
+      if(paar){
+        const sx=camX(BA().hindernisse[paar[0].stationIdx]);
+        const sy=Math.min(bahnY(paar[0].bahnZ),bahnY(paar[1].bahnZ))-58;
+        const name=(BA().hindernisNamen||[])[paar[0].stationIdx]||("STATION "+(paar[0].stationIdx+1));
+        ctx.save(); ctx.globalAlpha=0.92;
+        ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(sx-62,sy-12,124,38);
+        ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+name,sx,sy-3);
+        paar.forEach((o,k)=>{
+          const rest=Math.max(0,Math.min(1,o.huerde/o.stationDauer)), yy=sy+5+k*11;
+          ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(sx-20,yy,76,6);
+          ctx.fillStyle=o.seite===0?"#f2a03d":"#45b0c9"; ctx.fillRect(sx-20,yy,76*rest,6);
+          ctx.textAlign="right"; ctx.font="600 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          ctx.fillStyle="#dfe4ee"; ctx.fillText(o.n.slice(0,9),sx-23,yy+6);
+        });
+        ctx.restore();
+      }
+    }
     // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3, "das
     // Gegenstueck zu TT-1"). Die Tafel haengt an der Position, an der der GEBENDE Laeufer
     // gerade steht -- `u.pos=u.beinBis` seit dem Wechsel (stepSpurt), also exakt die
@@ -45852,6 +46002,65 @@
         ?{aktiv:true, modus:o.modus||"ki", fliegMax:o.fliegMax!=null?+o.fliegMax:0.24}
         :{aktiv:false, modus:"ki", fliegMax:0.24};
       return {...staffelMarkeZug};
+    },
+    // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, 04.10.) — QA-SCHALTER, Muster wie
+    // staffelMarkeZug() oben. spurtSaeule(true) = freigegebenes Paket (Joker + Kriechen),
+    // spurtSaeule(true,{joker:false}) bzw. {kriechen:false} fuer die Einzelmessung,
+    // spurtSaeule(false) aus. Wirkt ab dem naechsten Rennaufbau.
+    spurtSaeule:(an,opt)=>{
+      const o=opt||{};
+      spurtSaeule=an
+        ?{aktiv:true, joker:o.joker!==false, kriechen:o.kriechen!==false}
+        :{aktiv:false, joker:true, kriechen:true};
+      return {...spurtSaeule};
+    },
+    // SZENEN-SONDE (Spurt-Konzept 4.1/4.2): je Rennen in 1/60-Ticks — derselbe Takt wie
+    // MOTOREN.spurt.lauf(), also dieselben Rennen wie disziplinProbe — Stillstand (Anteil der
+    // Laeuferzeit mit Tempo 0), Saeulenzeit (Anteil der Rennzeit, in der mindestens das halbe
+    // Feld an EINER Station steht), Rest-Puste im Ziel, Einbrueche, Renndauer und wo
+    // gejokert wurde. Reine Diagnose mit dem gerade gesetzten Schalterstand.
+    spurtSzenenProbe:(opt)=>{
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN.spurt, gesichert=M.sichern(), kaderVorher={SQUAD,OPP}, mutatorenVorher=MUTATOREN;
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const rennen=[];
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);
+            M.bau(saat0+i*schritt);
+            const H=HUERDEN_N(), feld=LAEUFER.length;
+            let laeuferT=0, stehT=0, saeuleT=0, g=0, einbr=0;
+            const warLeer=new Map(LAEUFER.map(u=>[u.id,false]));
+            while(!done&&g<90){
+              stepSpurt(1/60); g+=1/60;
+              const anStation=new Array(H.length).fill(0);
+              for(const u of LAEUFER){
+                if(u.fertig!=null)continue;
+                laeuferT+=1/60;
+                if(!(u.v>0)){ stehT+=1/60;
+                  const k=H.findIndex(h=>Math.abs(u.pos-h)<0.02); if(k>=0)anStation[k]++; }
+                if(u.leer&&!warLeer.get(u.id))einbr++;
+                warLeer.set(u.id,!!u.leer);
+              }
+              if(Math.max(0,...anStation)*2>=feld)saeuleT+=1/60;
+            }
+            const joker={}; for(const u of LAEUFER)if(u.jokerIdx!=null){ joker[u.jokerIdx]=(joker[u.jokerIdx]||0)+1; }
+            rennen.push({label:v?v.label:null, dauer:+rennT.toFixed(3),
+              stillstand:laeuferT?+(stehT/laeuferT).toFixed(4):0,
+              saeule:rennT?+(saeuleT/rennT).toFixed(4):0,
+              restPuste:+(LAEUFER.reduce((s,u)=>s+(u.reserveMax?u.reserve/u.reserveMax:0),0)/feld).toFixed(4),
+              einbrueche:einbr, stuerze:LAEUFER.reduce((s,u)=>s+(u.gestolpert||0),0), joker});
+          }
+        }
+      } finally {
+        MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return rennen;
     },
     // BREAK-EVEN-SONDE (Konzept 5.2/7.4): faehrt fuer jeden Laeufer der echten Kader (nach
     // M.bau, also mit Slot/Form/Trait-Werten) SEIN Bein isoliert dreimal — Normal, Angreifen,

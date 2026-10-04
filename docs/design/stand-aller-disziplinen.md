@@ -73,6 +73,40 @@ alle Zahlen hier; Pp mit `einflussVon` an zwei Saatstaemmen (Versatz 0 / 10 000 
    gemessen als Fuehrung je 1 % Strecke), Zielabstand waechst (1,20 → 1,43 Sim-s Median).
    Sichtprobe (Live-Rennen, Tempo 4×): keine Seitenfehler, alle B4-Anzeigen erscheinen.
 
+2. **Spurt — Paket S-N1 + S-N2 „Die Säule muss laufen"** (`docs/design/spurt-nachtkonzept-03-10.md`).
+   Gebaut: S-N1 Joker-Station (8 % der Strecke, **nur KI-Vorgabe**: teuerster eigener Stopp, bei
+   Gleichstand die spaeteste — keine Manager-Anweisung), S-N2 Station als Bewegung (Kriechen
+   k=0,25, Stopp ×1/(1−k), Puste-Gutschrift am Hindernis ×(1−k)), S-N5 Anzeigen
+   (Stationsduell-Tafel, gedrosselter Ticker fuer die saubere Station mit Stationsbestzeit,
+   Fotofinish-Banner unter 0,1 echten Sekunden **ohne** Pause/Standbild — die angehaltene
+   Sekunde waere T und ist nicht gebaut), dazu die Joker-Schleife als Bogen im Bild und eine
+   Tickerzeile beim Abbiegen. Nicht gebaut: S-N3, S-N4, Manager-Joker.
+   Schalter: `window.__arena.spurtSaeule(true)` (Teilschalter `{joker:false}` /
+   `{kriechen:false}` fuer die Einzelmessung). Neue Sonde: `spurtSzenenProbe`.
+
+   Gemessen n=24 je Paarung, 6 je Seite (Papier-Vorhersage in Klammern):
+
+   | Variante | rho/Spiel | Saison | Pp S1 / S2 | Stillstand | Saeulenzeit | Restpuste | Einbr./Rennen | Star Rang 1 / ≤ 2 | Paare ≥15 |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | heute | 0,880 | 0,939 | 19,2 / 15,4 | 43,3 % | 19,7 % | 15 % | 3,4 | 48 / 76 % | 99,3 % |
+   | **Paket** | **0,910** (0,907) | 0,963 (0,964) | **18,7 / 15,6** (16,1 / 12,5) | **0,0 %** (0) | **0,0 %** (0) | 18 % (18) | 2,5 | 57 / 80 % | 99,5 % |
+   | nur Joker | 0,901 (0,903) | 0,964 (0,972) | 18,9 / 18,0 (23,5 / 19,5) | 36,1 % | 17,3 % | 12 % (11) | 5,2 | 57 / 85 % | 99,5 % |
+   | nur Kriechen | 0,891 (0,891) | 0,965 (0,965) | 17,8 / 18,9 (17,8) | 0,0 % | 0,0 % | 25 % (24) | 1,3 | 50 / 73 % | 99,4 % |
+
+   Joker-Stationen (KI, 120 Rennen × 12): Mauer 1044, Seil 252, Strohballen 96 — die
+   Kraftstationen dominieren wegen `wuchtPreisFaktor`, wie das Papier vorhersagt.
+   Beingroessen (Paket, n=24): 4 je Seite 0,870 → 0,921; **2 je Seite 0,725 → 0,717** — dort
+   lag schon die Basis unter 0,80 (das Papier hat 2/4 je Seite nicht gemessen); ehrlichere
+   Abnahme bei 2 je Seite: Star in den ersten zwei 93 % → 93 %, Paare ≥15 96,6 % → 97,8 %.
+
+   **Bewertung:** rho, Saison, Stillstand, Saeule und Restpuste treffen die Vorhersage auf ±0,01
+   bzw. ±1 Punkt. **Pp bleibt an beiden Staemmen klar unter 25, verbessert sich aber nicht wie
+   vorhergesagt** (18,7/15,6 gegen heute 19,2/15,4, Papier 16,1/12,5) — im Mittel neutral.
+   Ohne Schalter bit-identisch (Rohdaten-Hash spurt `fc7f6b28a7e8` unveraendert);
+   Isolationsnachweis ueber alle zwanzig s. Punkt 4 unten. Sichtprobe: keine Seitenfehler,
+   Joker-Bogen, Duell-Tafel und Stationsbestzeiten erscheinen; ein Fotofinish unter 0,1 s kam
+   im Probelauf nicht vor (selten, wie im Papier).
+
 **Fuenfzehnter Nachtrag 02.10. — reine Doku-Pflege: Staffel-Pp bei n=48 bestaetigt, Breaking-Pp
 nach dem Speicherleck-Fix neu gemessen.** Zwei offene Positionen aus fruaheren Nachtraegen
 nachgezogen, keine Code-Aenderung in `battle-mode.engine.js`.
@@ -1097,7 +1131,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | **Takeshi's Castle** | **50 %** | **0,874 (26.09.-Nachtrag)** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |
 | **Staffel** | **48 %** | **0,899 (26.09.-Nachtrag)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand · **Nachtrag 04.10.:** Paket O2 „Marke und Zug" hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter KI rho 0,937 (heute 0,895, n=48), Pp 35,6/37,9, Sentinel vigilante-armageddon 0,756 — **weiter unter 0,80**, s. Sechzehnter Nachtrag |
 | I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) |
-| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt |
+| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 04.10.:** Paket S-N1+S-N2 (Joker 8 % + Kriechen) hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter rho 0,910 (heute 0,880, n=24), Pp 18,7/15,6, Stillstand und Saeulenzeit 0 %, s. Sechzehnter Nachtrag |
 | **Football** | **32 %** | **0,818 (26.09.-Nachtrag — die alte 0,516 war stale, keine heutige Codeaenderung an Football, s. Zwoelfter Nachtrag)** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
 | Mini-DM | 30 % | 0,394 (26.09.-Nachtrag) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
 | TDM | 30 % | 0,306–0,326 (26.09.-Nachtrag) | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
