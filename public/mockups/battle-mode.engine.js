@@ -15747,6 +15747,19 @@
   //   wettessenMauer  0 aus · 1 K1 „Mauer als Fuellstand" · 2 K1+K2 „Haltung"
   //                   (docs/design/wettessen-nachtkonzept-03-10.md Abschnitt 3, K1/K2)
   const BUEHNE_FLAGS={speedSchachUhr:0, wettessenMauer:0};
+  // STARTWERT AUS DEM FENSTER (04.10., PPS-Referenz Wettessen): der Headless-Runner
+  // (lib/battle/arena-headless-runner.ts) haengt die Engine JE FIXTURE NEU ein — ein ueber
+  // window.__arena.buehneFlags() gesetzter Schalter waere beim naechsten Fixture wieder 0. Wer
+  // die Flags fuer einen ganzen Lauf braucht (scripts/ziehe-buehne-pps-referenz.ts --flags=...),
+  // setzt deshalb `window.__olyBuehneFlags` vor dem Laden (Option `buehneFlags` des Runners).
+  // Die echte App setzt das Feld nie; fehlt es, bleibt jeder Schalter auf seinem Standard.
+  // Nur bekannte Schluessel mit Zahlenwert werden uebernommen.
+  try{
+    const startFlags=window.__olyBuehneFlags;
+    if(startFlags&&typeof startFlags==="object")
+      for(const k of Object.keys(BUEHNE_FLAGS))
+        if(Number.isFinite(Number(startFlags[k])))BUEHNE_FLAGS[k]=Number(startFlags[k]);
+  }catch(e){}
   // PAUSCHALE HALTUNG JE SEITE — NUR fuer Messungen ("alle rechnen", "Heim blitzen, Gast KI"
   // usw., Messpflicht der Konsultation 02.10. Regel 5: KI-Regel beidseitig plus Extremfaelle).
   // null = keine Vorgabe (Aufstellung bzw. KI-Vorgabe gilt). Gesetzt nur ueber

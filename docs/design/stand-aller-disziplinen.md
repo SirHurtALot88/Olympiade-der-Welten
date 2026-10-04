@@ -1192,8 +1192,13 @@ rho (6 je Seite): alle Sprint 0,913, alle Gleichmaessig 0,908 (= K1, bit-identis
 Schlussspurt 0,909; einseitige Pauschalen 0,909-0,914, Heimsieg 46,7-48,3 % gegen 50,0 % mit KI.
 
 **Offen/ehrlich:** (1) Die mittlere Seitensumme sinkt mit der Mauer um ~10,5 % (Spiegel 4744 → 4242
-Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` gilt fuer den
-Standardmotor und wurde deshalb NICHT neu gezogen; sie muss neu gezogen werden, sobald das Flag
-live geht. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
+Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` ist seit dem 04.10.
+(Nachtrag) MIT `wettessenMauer:2` gezogen (`scripts/ziehe-buehne-pps-referenz.ts wettessen
+--flags=wettessenMauer:2`, 64 Fixtures je Feldgroesse 2-6, Feld `buehneFlags` in der Datei).
+Mediane je Feldgroesse 847/798,5/764,5/742/699,5 → 781,5/745/703/666/632 (−6,7 bis −10,2 %),
+iKrass nur −0,2 bis −3,6 % (1230 → 1197 bei 5). Der Median-Esser bekommt damit wieder genau
+1,38 PPS (5,5 · 0,25); gegen die alte Referenz laege er mit Mauer bei 1,02-1,10. **Kopplung:**
+die Referenz wird unabhaengig vom Schalter statisch importiert — sie und `BUEHNE_FLAGS.wettessenMauer=2`
+muessen GEMEINSAM live gehen; mit Flag aus gegen die neue Referenz waere Wettessen ueberbewertet. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
 Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
 ohne Grundgeruest entscheidet immer die KI-Vorgabe.
