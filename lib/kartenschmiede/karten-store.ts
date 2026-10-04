@@ -26,7 +26,7 @@ export type KartenEintrag = {
 };
 export type KartenWerte = {
   faction: string; praegung: string[]; size: string; quality: string; defense: string; tough: string;
-  weapons: string; passives: string; skills: Array<{ id: string; name: string; text: string; tags: string[]; art: string; kosten: unknown }>;
+  weapons: string; passives: string; skills: Array<{ id: string; name: string; text: string; tags: string[]; art: string; kosten: unknown; energie?: number }>;
 };
 
 function werteVon(inhalt: Record<string, unknown>): KartenWerte {
@@ -40,7 +40,8 @@ function werteVon(inhalt: Record<string, unknown>): KartenWerte {
     skills: liste(inhalt.skills).slice(0, 20).map((k) => {
       const f = (k ?? {}) as Record<string, unknown>;
       return { id: text(f.id, 80), name: text(f.name, 80), text: text(f.text, 600), art: text(f.art, 40),
-        tags: liste(f.tags).filter((x): x is string => typeof x === "string").slice(0, 8), kosten: f.kosten ?? null };
+        tags: liste(f.tags).filter((x): x is string => typeof x === "string").slice(0, 8), kosten: f.kosten ?? null,
+        ...(Number.isFinite(Number(f.energie)) && f.energie !== null && f.energie !== "" ? { energie: Math.max(0, Math.min(3, Math.round(Number(f.energie)))) } : {}) };
     }),
   };
 }
@@ -158,6 +159,7 @@ export type Faehigkeit = {
   quelle: string;
   waffe?: string;
   icon?: string;
+  energie?: number;
 };
 
 const faehigkeitenDatei = (sammlung: string) => path.join(ordnerVon(sammlung, "karten"), "_faehigkeiten.json");
@@ -188,6 +190,9 @@ function pruefeFaehigkeit(roh: unknown): Faehigkeit | null {
   };
   if (typ === "waffe") eintrag.waffe = text(f.waffe, 200);
   if (typ === "fraktion") eintrag.icon = /^[a-z-]{2,20}$/.test(String(f.icon)) ? String(f.icon) : "rune";
+  // Energie im Zug (0–3), nur wenn ausdrücklich gesetzt; sonst liest die Kartenschmiede sie aus dem Text
+  if (f.energie !== undefined && f.energie !== null && f.energie !== "" && Number.isFinite(Number(f.energie)))
+    eintrag.energie = Math.max(0, Math.min(3, Math.round(Number(f.energie))));
   return eintrag;
 }
 

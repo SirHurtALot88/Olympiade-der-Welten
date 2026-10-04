@@ -145,6 +145,36 @@
   const hat = (liste, re) => liste.some(p => re.test(p));
   const zahlIn = (liste, re) => { for (const p of liste) { const m = p.match(re); if (m) return +m[m.length - 1]; } return 0; };
 
+  // ---------- Energie ----------
+  // Jede Figur hat 3 Energie pro Zug, Helden wie Gegner. Bewegen, Angreifen und Helfen kosten je 1 (jede höchstens
+  // einmal pro Zug), Sprinten 2. Fähigkeiten kosten 0 bis 3: Passive Regeln und Auslöser („Stirbt es“, „Rundenende“)
+  // wirken von selbst und kosten nichts, aktive kosten Energie. Wer dafür Energie zahlt, verzichtet im Zug auf etwas –
+  // deshalb wird die Fähigkeit beim Bauen billiger. Gemessen mit dem Simulator (gleicher Effekt, Preis bis 50 % Siege):
+  // 1 Energie ist fast frei, weil Bewegen und Angreifen meist nur 2 brauchen (0,85–1,0); 2 Energie kostet öfter den
+  // Angriff (0,7–1,0). 3 Energie heißt, auf den Angriff zu verzichten – das wählt der Simulator nie, der Faktor 0,5 ist gesetzt.
+  const ENERGIE_PRO_ZUG = 3;
+  const ENERGIE_FAKTOR = [1, 0.9, 0.75, 0.5];
+  const AUSLOESER = /^(?:Erleidet|Stirbt|Rundenende|Zu Beginn|Ab halben|Greift ein weiteres|Steht ein weiteres|Verursacht es|Nach einem Angriff|Reaktion|Fällt es|Ignoriert|Alle Fernkampfwaffen|Verbündete \{F|Verbündete dürfen|Feinde mit|Eine Wunde|Einen Treffer|Statt zu gehen)/;
+  const AKTIV = /^(?:Feind|Verbündeter|Verbündete|Punkt|Modell|Sichtbarer|Falle|Eine Fernkampfwaffe|Jeder Feind|Nächster|Alle |Bis |Dieses Modell|Der Zauberer)/;
+  function energieVon(f) {
+    if (!f) return 0;
+    if (f.energie !== undefined && f.energie !== null && f.energie !== "" && !isNaN(+f.energie)) return Math.max(0, Math.min(3, Math.round(+f.energie)));
+    const text = String(f.text || "").trim();
+    const p = text.match(/\{P(\d)\}/);
+    if (p) return Math.min(3, +p[1]);
+    if (/Freie Aktion/.test(text)) return 0;
+    if (f.typ === "zauber") return /\{Z5\}/.test(text) ? 2 : 1;
+    const rest = text.replace(/^\{(?:S|RU|D\d)\}\s*/, "");
+    if (AUSLOESER.test(rest)) return 0;
+    if (/^\{(?:S|RU)\}/.test(text) || AKTIV.test(rest)) return 1;
+    return 0;
+  }
+  // Preis einer Fähigkeit nach Energie: der Grundpreis aus der Datenbank mal Energie-Faktor, auf ganze Punkte
+  const preisVon = f => {
+    const wert = +(f && f.kosten && f.kosten.wert) || 0;
+    return Math.round(wert * ENERGIE_FAKTOR[energieVon(f)]);
+  };
+
   function punkte(s) {
     const Q = parseInt(s.quality, 10) || 4;
     const D = Math.min(6, Math.max(2, parseInt(s.defense, 10) || 5));
@@ -161,9 +191,10 @@
       const wu = p.match(/^(?:wucht|impact)\s*\((\d+)\)$/i); if (wu) K += +wu[1] * 0.5 * n;
       const z = p.match(/^(?:zauberer|caster)\s*\((\d)\)$/i); if (z) fest += 20 + 15 * (+z[1] - 1);
     }
-    // Fähigkeiten aus der Datenbank: feste Punkte (Skills, Auren) oder Aufschlag in Prozent (Sonderregeln)
+    // Fähigkeiten aus der Datenbank: feste Punkte (Skills, Auren) oder Aufschlag in Prozent (Sonderregeln),
+    // jeweils nach Energie verbilligt
     for (const k of Array.isArray(s.skills) ? s.skills : []) {
-      const wert = +(k && k.kosten && k.kosten.wert) || 0;
+      const wert = preisVon(k);
       if (k && k.kosten && k.kosten.typ === "fest") fest += wert; else b += wert / 100;
     }
     b += (+s.special || 0) / 100;
@@ -183,14 +214,14 @@
     return parseInt(String(w || "").replace("−", "-"), 10) || 0;
   };
   function effekteAus(s) {
-    const texte = (Array.isArray(s.skills) ? s.skills : []).map(k => ({ id: k && k.id, text: String((k && k.text) || "") }));
-    if (s.bossText) texte.push({ id: "eigen", text: String(s.bossText) });
-    return texte.map(({ id, text }) => {
+    const texte = (Array.isArray(s.skills) ? s.skills : []).map(k => ({ id: k && k.id, text: String((k && k.text) || ""), energie: energieVon(k) }));
+    if (s.bossText) texte.push({ id: "eigen", text: String(s.bossText), energie: energieVon({ typ: "faehigkeit", text: s.bossText, energie: s.bossEnergie }) });
+    return texte.map(({ id, text, energie }) => {
       const tok = [...text.matchAll(SYMBOL)].map(m => [m[1], m[2]]);
       const erstes = k => tok.find(t => t[0] === k);
       const wurf = erstes("Z") || erstes("D");
       const e = {
-        id, chance: wurf ? Math.max(0, Math.min(1, (7 - symbolWert(wurf[1])) / 6)) : 1,
+        id, energie, chance: wurf ? Math.max(0, Math.min(1, (7 - symbolWert(wurf[1])) / 6)) : 1,
         takt: /^Stirbt es/.test(text) ? "tod" : /Erleidet es eine Wunde/.test(text) ? "wunde" : erstes("S") ? "einmal" : erstes("P") ? "power" : "jede",
         abHalb: /halbe|Hälfte/.test(text) && !erstes("S"),
       };
@@ -285,16 +316,18 @@
       // Treffer aus Fähigkeiten: treffen automatisch, das Ziel würfelt Verteidigung
       const direkt = (von, ziel, n, ds) => angriff({ ...von, n: 1, lp: [1], q: 2, buff: {}, rasend: false }, ziel, { a: Math.round(n), ds, zuverlaessig: true, reaktion: true }, {});
       // Fähigkeiten zu Beginn der eigenen Aktivierung: Puffer setzen, heilen, Schaden, Betäubung
-      const faehigkeiten = (u, g) => {
+      // Energie: Was der Zug für Bewegen und Angreifen braucht, steht vorher fest; der Rest geht in Fähigkeiten.
+      const faehigkeiten = (u, g, energie) => {
         u.buff = {};
         const halb = u.lp.reduce((a, x) => a + x, 0) <= u.n * u.T / 2;
         for (const [i, e] of u.effekte.entries()) {
           if (e.takt === "tod" || e.takt === "wunde") continue;
           if (e.takt === "einmal" && u.benutzt.has(i)) continue;
-          if (e.takt === "power" && r % 2 === 0) continue;   // Power reicht im Schnitt für jede zweite Runde
+          if (e.energie > energie) continue;
           if (e.abHalb && !halb) continue;
           if (e.takt === "einmal" && !(e.heilen ? halb : true)) continue;
           if (rnd() >= e.chance) continue;
+          energie -= e.energie;
           if (e.takt === "einmal") u.benutzt.add(i);
           if (e.heilen) { let rest = Math.round(e.heilen); for (let k = 0; k < u.lp.length && rest; k++) while (u.lp[k] > 0 && u.lp[k] < u.T && rest) { u.lp[k]++; rest--; } }
           if (e.verteidigung) u.buff.verteidigung = (u.buff.verteidigung || 0) + e.verteidigung;
@@ -330,10 +363,20 @@
       const bew = u => 6 + (u.schnell ? 2 : 0) - (u.langsam ? 2 : 0);
       const lauf = u => 12 + (u.schnell ? 4 : 0) - (u.langsam ? 4 : 0);
 
+      // Energie für den geplanten Zug: Angriff aus dem Stand 1, Bewegen und Angreifen 2, Ansturm über 6" (Sprint
+      // und Angriff) 3, Laufen ohne Angriff 2. Dieselbe Entscheidung wie unten in aktiviere().
+      const bedarf = (u, g) => {
+        if (!u.aktiv) return 1;
+        const d = abst();
+        // Nach einem Nahkampf weicht der Angreifer 1" zurück (OPR); am Tisch bleibt er im Kampf, also nur Angriff.
+        if (u.nah) return d <= 1 ? 1 : d <= bew(u) ? 2 : d <= lauf(u) ? 3 : 2;
+        const R = Math.max(0, ...u.waffen.map(w => w.reichweite));
+        return d <= R && !(g.nah && d + bew(u) <= R) ? 1 : 2;
+      };
       const aktiviere = (u, g) => {
         if (!lebend(u) || !lebend(g)) return;
         if (u.betaeubt) { u.betaeubt = false; u.buff = {}; return; }
-        faehigkeiten(u, g);
+        faehigkeiten(u, g, Math.max(0, ENERGIE_PRO_ZUG - bedarf(u, g)));
         if (!lebend(g)) return;
         if (!u.aktiv) { u.aktiv = true; u.pos = g.pos - u.richtung * Math.min(abst(), 9); return; }
         const d = abst();
@@ -414,7 +457,7 @@
     return { sieg: r.a / Math.max(0.001, r.a + r.b), punkte: Math.round(ziel - punkte(ohne).roh), gegnerZaeh: +g.tough, messbar };
   }
 
-  const Regeln = { faehigkeitsCheck, effekteAus, STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
+  const Regeln = { ENERGIE_PRO_ZUG, ENERGIE_FAKTOR, energieVon, preisVon, faehigkeitsCheck, effekteAus, STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
     reichweitenFaktor, FAEHIGKEITEN, punkte, simuliere, einheitAus, balanceTest };
   if (typeof module !== "undefined" && module.exports) module.exports = Regeln;
   else root.Regeln = Regeln;
