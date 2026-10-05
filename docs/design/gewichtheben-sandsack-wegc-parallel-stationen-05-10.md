@@ -408,3 +408,10 @@ Ergebnis (n = 24, in Klammern n = 48):
 * KI-Vorgabe normal / durch / direkt 39 / 41 / 20 %.
 
 Flag 6 bleibt bit-identisch.
+
+**Flag 9 (alle sechs entscheiden):** Station 3 bekommt eine eigene Zweier-Kette mit Übergabe am
+Rampenfuß, 6 m nach dem Stapel und 2 m vor dem Silo. Die 115-kg-Säcke wechseln nur zwischen den
+beiden an Station 3. Das ergibt rho 0,869 (0,874), schwächste Paarung 0,805 (0,802) und Pp
+10,8 / 12,0. Keine einzige Sackklasse wird vermischt (0 von 2880 Spieler-Spielen). Die Mitte (4 m)
+scheitert. Details im Dokument zu den Entscheidungen, Abschnitt 10. Flag 6 und 8 bleiben
+bit-identisch.

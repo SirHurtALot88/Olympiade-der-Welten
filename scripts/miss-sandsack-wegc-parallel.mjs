@@ -35,7 +35,8 @@ const KALIB = Object.fromEntries(((process.argv.find((a) => a.startsWith("--kali
   .slice(8).split(",").filter(Boolean).map((t) => { const [k, v] = t.split(":"); return [k, Number(v)]; })));
 const KURZ = process.argv.includes("--kurz");
 const NAME = { 6: "parallel, Zuteilung nach LAST", 7: "parallel, Zuteilung per Formel",
-  8: "parallel, Zuteilung nach LAST, Kette mit Entscheidungen (normal/durch/direkt)" };
+  8: "parallel, Zuteilung nach LAST, Kette mit Entscheidungen (normal/durch/direkt)",
+  9: "wie 8, zusaetzlich Station 3 als eigene Kette (Uebergabe am Rampenfuss)" };
 
 // Ueberleitungen wie miss-sandsack-wegc.mjs (Schaetzung): je Schicht 8,7 s, je Spiel 8 s.
 const UEBERLEITUNG_JE_LAUF = 1.5 + 1.2 + 4 + 2;
@@ -139,10 +140,11 @@ try {
     }
     console.log("");
 
-    // Nur Variante 8: die Entscheidungen je Traeger (Kette an Station 1/2).
+    // Nur Variante 8/9: die Entscheidungen je Traeger (Kette an Station 1/2, bei 9 auch an 3).
     const K8 = alleSpiele.flatMap((s) => s.boxscore).filter((b) => b.parRolle === "kette");
+    const KS = [1, 2, 3].filter((s) => K8.some((b) => b.parStation === s));
     if (K8.length) {
-      console.log("=== 3b. Entscheidungen an der Ablage (Kette, Station 1/2) ===\n");
+      console.log(`=== 3b. Entscheidungen an der Ablage (Kette, Station ${KS.join("/")}) ===\n`);
       const summe = (f) => K8.reduce((a, b) => a + f(b), 0);
       const n = summe((b) => b.parEntsch.normal), d = summe((b) => b.parEntsch.durch);
       const r = summe((b) => b.parEntsch.direkt), e = summe((b) => b.parEntsch.erzwungen);
@@ -151,12 +153,12 @@ try {
       console.log(`Freie Wahlen je Traeger und Schicht ${(frei / K8.length).toFixed(1)}, erzwungen ${(e / K8.length).toFixed(1)}`);
       console.log(`KI-Vorgabe (freie Wahlen): normal ${p(n, frei)}, durchpowern ${p(d, frei)}, direkt ${p(r, frei)}`);
       console.log(`alle Ankuenfte an der Ablage: normal ${p(n, alle)}, durch ${p(d, alle)}, direkt ${p(r, alle)}, erzwungen durch ${p(e, alle)}`);
-      for (const s of [1, 2]) {
+      for (const s of KS) {
         const B = K8.filter((b) => b.parStation === s);
         if (!B.length) continue;
         const f = (k) => B.reduce((a, b) => a + b.parEntsch[k], 0);
         const fr = f("normal") + f("durch") + f("direkt");
-        console.log(`  Station ${s}: normal ${p(f("normal"), fr)}, durch ${p(f("durch"), fr)}, direkt ${p(f("direkt"), fr)}, erzwungen ${(f("erzwungen") / B.length).toFixed(1)} je Traeger`);
+        console.log(`  Station ${s}: normal ${p(f("normal"), fr)}, durch ${p(f("durch"), fr)}, direkt ${p(f("direkt"), fr)}, erzwungen ${(f("erzwungen") / B.length).toFixed(1)} je Traeger (frei ${(fr / B.length).toFixed(1)})`);
       }
       // Wer waehlt was? rho zwischen Anteil durch bzw. direkt und Wagemut/Teamsinn/Reserve-Kanaelen.
       const anteil = (b, k) => { const fr = b.parEntsch.normal + b.parEntsch.durch + b.parEntsch.direkt; return fr ? b.parEntsch[k] / fr : 0; };
@@ -172,15 +174,38 @@ try {
         kiGap += m - b.parOptionKg[3];
       }
       console.log(`Beste feste Wahl je Traeger (Silo-kg der Station, gleiche Wuerfe, Partner KI): normal ${p(beste[0], K8.length)}, durch ${p(beste[1], K8.length)}, direkt-wo-moeglich ${p(beste[2], K8.length)}`);
-      for (const s of [1, 2]) {
+      for (const s of KS) {
         const B = K8.filter((b) => b.parStation === s), be = [0, 0, 0];
         for (const b of B) { const o = b.parOptionKg.slice(0, 3), m = Math.max(...o), w = o.filter((x) => x === m).length; o.forEach((x, i) => { if (x === m) be[i] += 1 / w; }); }
         const mk = (i) => mittel(B.map((b) => b.parOptionKg[i]));
         console.log(`  Station ${s}: beste feste Wahl normal ${p(be[0], B.length)}, durch ${p(be[1], B.length)}, direkt ${p(be[2], B.length)} | Silo-kg der Station: normal ${mk(0).toFixed(0)}, durch ${mk(1).toFixed(0)}, direkt ${mk(2).toFixed(0)}, KI ${mk(3).toFixed(0)}`);
       }
       console.log(`KI-Vorgabe mindestens so gut wie die beste feste Wahl: ${p(kiBest, K8.length)}, mittlerer Abstand zur besten ${(kiGap / K8.length).toFixed(1)} kg`);
+      for (const s of KS) {
+        const B = K8.filter((b) => b.parStation === s);
+        const kb = B.filter((b) => b.parOptionKg[3] >= Math.max(...b.parOptionKg.slice(0, 3))).length;
+        console.log(`  Station ${s}: KI mindestens so gut wie die beste feste Wahl ${p(kb, B.length)}, Abstand ${mittel(B.map((b) => Math.max(...b.parOptionKg.slice(0, 3)) - b.parOptionKg[3])).toFixed(1)} kg`);
+      }
       const L8 = alleSpiele.map((s) => s.wegc.laeufe[0]);
       console.log(`Saecke an der Ablage liegen geblieben (Hupe) je Seite: ${mittel(L8.flatMap((x) => x.haufenRest)).toFixed(2)}\n`);
+    }
+
+    // Nur Variante 9: ISOLATIONSNACHWEIS der Sackklassen — jeder Spieler darf nur Saecke der
+    // Klasse seiner Station getragen haben (kg je Sack, auch nach Ablage/Uebergabe).
+    const KL = alleSpiele.flatMap((s) => s.boxscore).filter((b) => Array.isArray(b.parSackKlassen));
+    if (KL.length) {
+      console.log("=== 3c. Isolationsnachweis: Sackklassen je Station (kg je Sack, den ein Spieler je getragen hat) ===\n");
+      const soll = { 1: konf.kg1, 2: konf.kg2, 3: konf.kg3 };
+      let fremd = 0;
+      for (const s of [1, 2, 3]) {
+        const B = KL.filter((b) => b.parStation === s);
+        const klassen = [...new Set(B.flatMap((b) => b.parSackKlassen))].sort((a, b) => a - b);
+        const f = B.filter((b) => b.parSackKlassen.some((k) => k !== soll[s])).length;
+        fremd += f;
+        console.log(`  Station ${s} (Soll ${soll[s]} kg): ${B.length} Spieler-Spiele, getragene Klassen {${klassen.join(", ")}} kg, mit fremder Klasse ${f}`);
+      }
+      const leer = KL.filter((b) => !b.parSackKlassen.length).length;
+      console.log(`  ${fremd === 0 ? "GETRENNT" : "VERMISCHT"}: ${fremd} von ${KL.length} Spieler-Spielen mit fremder Sackklasse (ohne einen getragenen Sack: ${leer})\n`);
     }
 
     console.log("=== 4. Sendezeit und Mannschaftsebene ===\n");

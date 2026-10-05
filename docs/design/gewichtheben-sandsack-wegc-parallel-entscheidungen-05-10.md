@@ -2,7 +2,8 @@
 
 **Status: reine Messvariante, kein Spielpfad, kein Bild.** Hinter
 `BUEHNE_FLAGS.gewichthebenSandsack` 8, nur über die Messskripte erreichbar. Flag 0…7 sind
-bit-identisch (Abschnitt 9). Grundlage ist das parallele Stationsformat (Flag 6,
+bit-identisch (Abschnitt 9). **Fortsetzung Flag 9** (Station 3 entscheidet mit, Übergabe am
+Rampenfuß): Abschnitt 10. Flag 0…8 sind dabei bit-identisch geblieben. Grundlage ist das parallele Stationsformat (Flag 6,
 `gewichtheben-sandsack-wegc-parallel-stationen-05-10.md`): sechs je Team, je zwei an einer von
 drei Stationen, 150 s Schicht, Silo-kg.
 
@@ -78,7 +79,7 @@ Folgende ist **Annahme dieser Runde**.
 |---|---|---|---|
 | B1 | **Der Verbündete ist der Stationspartner** (gleicher Stapel, gleiche Sackklasse). Die beiden an Station 1 bzw. 2 bilden eine Zweier-Kette auf ihrer Strecke. | Eine Kette **über** die Stationen (Station 2 übernimmt den 35-kg-Sack von Station 1) widerspricht den Sackklassen und der kg-Wertung: Die Kraftpakete an Station 3 trügen dann leichte Säcke, und jedes Ablegen kostete die Mannschaft schwere kg. | Kette über alle drei Stationen |
 | B2 | **Die Ablage (Zonengrenze) ist die nächste Station auf dem Weg zum Silo, 8 m nach dem Stapel.** Station 1 legt an Station 2 ab (danach 16 m bis zum Silo), Station 2 an Station 3 (danach 8 m). | Chris: „an jeder Station ablegen". Die nächste Station ist der natürliche Punkt. | Station 1 auch an Station 3 (zweite Ablage) |
-| B3 | **Station 3 hat keine Entscheidung.** Zwischen Station 3 und dem Silo liegt keine Station. Station 3 trägt wie Flag 6 (eigene Spur, Erschöpfung 0,15). | Es gibt dort keinen Ort zum Ablegen. Eine erfundene Ablage auf 4 m wäre keine Station. | Ablage am Rampenfuß |
+| B3 | **Station 3 hat keine Entscheidung.** Zwischen Station 3 und dem Silo liegt keine Station. Station 3 trägt wie Flag 6 (eigene Spur, Erschöpfung 0,15). | Es gibt dort keinen Ort zum Ablegen. Eine erfundene Ablage auf 4 m wäre keine Station. | Ablage am Rampenfuß — **gebaut als Flag 9, Abschnitt 10** (die Mitte bei 4 m scheitert tatsächlich, 2 m vor dem Silo trägt es) |
 | B4 | **Ablegen geht nur, wenn ein Abholer hinter der Ablage ist** (der Partner kommt vom Silo zurück, trägt gerade zum Silo oder wartet). | Sonst läge der Sack, bis keiner mehr vorbeikommt. Ohne Abholer bleibt nur „durch" (gezählt als „erzwungen"). | — |
 | B5 | **Die Ablage fasst einen Sack.** Liegt dort schon einer, ist „normal" nicht möglich. | Man stapelt an einer Übergabe keine Säcke. Gemessen: Ohne diese Grenze lagen bei „alle normal" 9,7 Säcke je Seite an der Hupe nutzlos an der Ablage, die Rollen froren ein (einer nur vorn, einer nur hinten), rho fiel auf 0,774. | unbegrenzte Ablage |
 | B6 | **Die Rast dauert 0,75 s** und senkt die Erschöpfung mit der **dreifachen Atem-Rate der Zwangspause** (`SANDSACK_PAUSE_RATE_*` × `rastRateFaktor` 3). | Chris: „kurz durchatmen". Erholung ist am Anfang am schnellsten. Eine freiwillige Rast **vor** der Erschöpfung bringt je Sekunde mehr als eine Zwangspause **an** der Schwelle. Gemessen: Mit Faktor 1 ist „nie rasten, bei Bedarf pausieren" immer billiger, und die KI verliert gegen „alle durch" (Abschnitt 4). | Faktor 1 oder 2, längere Rast |
@@ -311,8 +312,8 @@ Bei 2,5 s wären es bis zu 4 m, und der Partner wartet länger.
    Unterschied zeigt sich in den Pausen (9,9 gegen 4,6), nicht im Silo. Soll „normal" im Silo
    sichtbar mehr wert sein, wäre der Hebel eine höhere Erschöpfung. Ab 0,25 sinkt aber die
    Rangtreue (Abschnitt 4).
-4. **Station 3 entscheidet nicht** (B3). Damit entscheiden vier von sechs Spielern je Team. Ob
-   Chris dort eine Ablage am Rampenfuß will, ist offen.
+4. **Station 3 entscheidet nicht** (B3). Damit entscheiden vier von sechs Spielern je Team.
+   In Flag 9 gelöst (Abschnitt 10): Übergabe am Rampenfuß, alle sechs entscheiden.
 5. **Die Kette über die Stationen** (Chris' Satz wörtlich genommen: „an jeder Station") ist nicht
    gebaut. Begründung in B1. Ebenso fehlt die zweite Ablage für Station 1 (an Station 3).
 6. **Die Kontext-Inversion ist eine Modellrechnung:** „was hätte ein Referenzträger an deiner
@@ -378,3 +379,221 @@ node scripts/miss-arena-buehne-spiegel.mjs 1000 gewichtheben --flags=gewichthebe
   Entscheidungen, Zusammenhang mit Persönlichkeit, beste feste Wahl je Träger und Station, KI
   gegen feste Wahl, liegengebliebene Säcke).
 * Dieses Dokument. Dazu ein Verweis im Dokument zum parallelen Format, Abschnitt 9.
+
+---
+
+## 10. Fortsetzung: Station 3 entscheidet mit (Flag 9, 05.10.)
+
+Chris will alle sechs Spieler einbeziehen, Station 3 eingeschlossen. Der Grund für B3 bleibt
+gültig: Eine Kette **über** die Stationen ließe Station 3 leichte Säcke tragen und verwässerte die
+Sackklassen. Flag 9 gibt Station 3 deshalb eine **eigene** Zweier-Kette auf ihrem eigenen kurzen
+Stück. Flag 8 bleibt unverändert erreichbar und bit-identisch.
+
+### 10.1 Die Konstruktion: Übergabe am Rampenfuß
+
+| # | Annahme | Begründung |
+|---|---|---|
+| C1 | **Die beiden an Station 3 bilden eine eigene Kette.** Sie tauschen nur ihre 115-kg-Säcke, mit eigenem Stapel, eigener Ablage und eigenem Simulationsaufruf. Station 1/2 laufen genau wie Flag 8. | Die Sackklassen bleiben strukturell getrennt. Eine Kette über die Stationen (B1) bleibt ungebaut. |
+| C2 | **Der Übergabepunkt ist der Rampenfuß, 6 m nach dem Stapel, 2 m vor dem Silo** (`ketteMarke3` 6). Die ersten 6 m sind eben, die letzten 2 m sind die Rampe zur Silokante. | „Rampe & Silo“ ist schon der Fable-Name von Station 3. Der Rampenfuß ist damit ein sichtbarer Ort und keine erfundene Station. Die Lage ist gemessen (10.3), die Mitte (4 m) scheitert. |
+| C3 | **Sonst gilt alles wie an Station 1/2:** dieselbe KI-Vorgabe (`sandsackKetteWahl`, Ausdauer-Reserve, Wagemut, Teamsinn), dieselbe Erschöpfung 0,2, dieselbe Rast, dasselbe Fenster, dieselbe Kontext-Inversion. | Kein Sonderhebel für Station 3 außer dem Ort der Übergabe. `ermuedungFaktorKette3` und `noteKetteMass3` stehen auf −1 (= wie Station 1/2). |
+| C4 | **Kein Doppeln an Station 3**, wie bisher. | unverändert (A6) |
+
+Dramaturgisch ergeben sich zwei Rollen, die von selbst wechseln. Der eine trägt die 6 m eben und
+darf am Rampenfuß ablegen und durchatmen. Der andere nimmt den Sack die Rampe hoch und wuchtet ihn
+über die Kante. Bei der Direktübergabe kommt der Rampenmann die zwei Schritte herunter und nimmt den
+Sack aus der Hand.
+
+### 10.2 Ergebnis: Vergleich Flag 6, 8 und 9
+
+Dieselben Spiele, Saaten, Formkarten und Mutatoren. n = 24, in Klammern n = 48.
+
+| Größe | Flag 6 (keine Entscheidung) | Flag 8 (Station 1/2) | **Flag 9 (alle drei Stationen)** |
+|---|---:|---:|---:|
+| rho je Spiel, Median | 0,930 (0,922) | 0,883 (0,886) | **0,869 (0,874)** |
+| rho, schwächste Paarung | 0,810 (0,829) | 0,802 (0,813) | **0,805 (0,802)** |
+| rho Mortal Sin – Natures Wrath | 0,810 (0,829) | 0,802 (0,814) | **0,823 (0,830)** |
+| rho Golden Gladiators – Silver Soldiers | 0,835 (0,850) | 0,814 (0,813) | 0,805 (0,802) |
+| rho Pirate Crew – Raging Lunatics | 0,931 (0,925) | 0,883 (0,886) | 0,869 (0,874) |
+| rho Saison, Median | 0,951 (0,944) | 0,944 (0,937) | 0,965 (0,965) |
+| 90-%-Bootstrap des Medians | [0,810; 0,952] | [0,802; 0,923] | [0,806; 0,940] |
+| Pp Strom 1 / 2, n = 24 (≤ 25) | 14,5 / 13,6 | 14,0 / 13,5 | **10,8 / 12,0** ✓ |
+| Pp Strom 1 / 2, n = 48 | 14,4 / 14,2 | 9,8 / 13,3 | **8,4 / 13,1** ✓ |
+| Synthetische Kader-Familie, rho Median | 0,950 | 0,941 | 0,940 |
+| Sendezeit je Spiel | 2:47 fest | 2:47 fest | **2:47 fest** |
+| Spieler-Spiele ohne einen Sack | 0 % | 0 % | 0 % |
+| Spieler, die entscheiden | 0 von 6 | 4 von 6 | **6 von 6** |
+| Pausen je Schicht (beide Seiten) | 4,83 | 4,55 | **3,63** |
+| Rutscher je Schicht | 9,13 | 9,64 | 9,59 |
+| Pausen / Rutscher je Spieler an Station 3 | 0,58 / 1,45 | 0,58 / 1,45 | **0,35 / 1,44** |
+| Säcke je Schicht | 120,8 | 118,9 | 117,6 |
+| Silo-kg je Seite | 4814 | 4752 | 4679 |
+| Anteil Station 3 am Silo | 58 % | 58 % | 58 % |
+| Eignungsstärkeres Team gewinnt | 71,7 % (70,4 %) | 71,7 % (70,0 %) | 70,0 % (69,6 %) |
+| Spiegeltest 1000 Läufe | 505 : 495 | 521 : 479 | 495 : 505 |
+| rho innerhalb Station 3 | 0,945 | 0,945 | 0,946 |
+
+* **Beide Pflichtabnahmen halten.** Die schwächste Paarung liegt bei 0,805 (n = 48: 0,802), auf
+  Flag-8-Niveau. Pp liegt bei 8–13. Der Median verliert gegenüber Flag 8 noch einmal gut 0,01. Das liegt
+  innerhalb des Rauschens benachbarter Rasterpunkte (±0,02).
+* **Mortal Sin – Natures Wrath steigt** auf 0,823 (n = 48: 0,830). Das ist die Grimflora-Lücke aus
+  dem Dokument zum parallelen Format (Abschnitt 5, offener Punkt 7). Grimflora (LAST 79, Eignung 40,7) bekam in Flag 8 die
+  Note 49,5 und bekommt jetzt 42,0, also fast seine Eignung. Die Kontext-Inversion misst ihn neben
+  Buttercup, statt allein gegen eine Referenzspur. Das ist ein Nebeneffekt und nicht gezielt
+  kalibriert.
+* **Golden Gladiators ist jetzt die schwächste Paarung** (0,805 / 0,802), knapp über der Schranke.
+
+### 10.3 Warum der Rampenfuß 2 m vor dem Silo liegt und nicht in der Mitte
+
+Station 3 ist kurz (8 m), und ihre Säcke sind schwer. Ablegen und wieder Aufheben eines 115-kg-Sacks
+kostet etwa 1,5 s (Aufheben 0,5 + 0,6 r s bei r ≈ 0,85…1, Ablegen die Hälfte). Auf einem 4-m-Stück
+ist das mehr, als die Rast einbringt. Gemessen, Median über fünf Paarungen, n = 48 (Zeilen mit * bei
+n = 24):
+
+| Rampenfuß | Mass / Erschöpfung | rho | schwächste | beste feste Wahl n / d / r | Silo Station 3: normal / durch / KI |
+|---|---|---:|---:|---|---|
+| 4 m (Mitte) | Bewegung / 0,15 | 0,814 | **0,687** | 10 / 75 / 16 % | 2556 / 2774 / 2781 |
+| 4 m | Arbeit bis Hupe / 0,15 | 0,860 | 0,788 | 10 / 75 / 16 % | 2556 / 2774 / 2781 |
+| 4 m | Bewegung / 0,2 | 0,801 | **0,697** | 11 / 72 / 18 % | 2532 / 2719 / 2726 |
+| 5 m | Bewegung / 0,2 | 0,843 | 0,793 | 16 / 56 / 28 % | 2555 / 2727 / 2731 |
+| **6 m (Stand)** | **Bewegung / 0,2** | **0,874** | **0,802** | **21 / 47 / 32 %** | **2691 / 2744 / 2747** |
+| 6 m | Bewegung / 0,25 | 0,880 | 0,804 | 26 / 44 / 31 % | 2655 / 2688 / 2693 |
+| 6 m | Arbeit bis Hupe / 0,15 | 0,873 | 0,806 | 18 / 52 / 30 % | 2729 / 2806 / 2802 |
+| 7 m | Bewegung / 0,2 | 0,854 | 0,809 | 30 / 42 / 28 % | 2723 / 2741 / **2731** |
+| Station 3 auf 12 m verlängert, Übergabe 4 m* | Arbeit bis Hupe / 0,15 | 0,856 | 0,791 | 21 / 59 / 20 % | 1936 / 1997 / 1996 |
+| Station 3 auf 12 m verlängert, Übergabe 6 m* | Arbeit bis Hupe / 0,15 | 0,819 | 0,703 | 17 / 65 / 18 % | 1895 / 1985 / 1989 |
+
+* **Die Mitte (4 m) scheitert ehrlich.** „Normal“ kostet die Station 8 % Silo. Es ist nur für 10 %
+  der Träger die beste Wahl, also fast ein toter Knopf. Die KI wählt es trotzdem in 20–27 % der
+  Fälle, vor allem bei vorsichtigen Persönlichkeiten. Weil das Ergebnis von der Persönlichkeit
+  abhängt und nicht von der Eignung, verliert die schwächste Paarung bis zu 0,13 (n = 48: 0,687 gegen 0,813 in Flag 8).
+* **Ab 6 m kostet „normal“ an Station 3 so viel wie an Station 2** (−2 %, Station 2: −3 %). Jede
+  Option ist wieder für mindestens ein Fünftel der Träger die beste. Bei 7 m verliert die KI knapp
+  gegen „alle durch“ (2731 gegen 2741 kg). 6 m ist der einzige Punkt, an dem alle drei Bedingungen
+  aus Abschnitt 4 gleichzeitig halten.
+* **Station 3 zu verlängern löst das Problem nicht.** Bei 12 m sinkt die Rangtreue (0,70–0,79).
+  Außerdem verschiebt sich die ganze Kalibrierung: Station 3 liefert fast ein Drittel weniger (1996 statt 2747 kg), und die
+  Sackklassen 35/80/115 bei 24/16/8 m sind auf die kurze Station abgestimmt (Dokument zum parallelen
+  Format, Abschnitt 4). Chris' Bild „die schweren von Station 3 nur bis zur Endstation“ bleibt so
+  wörtlich erhalten.
+* Mit dem Mass der Station-1/2-Kette (Arbeit je Bewegungssekunde) und Erschöpfung 0,15 lag der
+  Median nur bei 0,834. Mit „Arbeit bis zur Hupe“ waren es 0,873. Gewählt ist trotzdem die
+  Station-1/2-Regel bei 0,2: Sie liefert dasselbe Ergebnis (0,874 / 0,802), braucht aber keinen
+  Sonderhebel. Erschöpfung 0,25 hebt die Pausen wieder auf Flag-8-Niveau (4,47 je Schicht) bei
+  gleicher Rangtreue (0,880 / 0,804). Das ist ein möglicher Regler, falls Station 3 sichtbar mehr
+  pausieren soll.
+
+### 10.4 Isolationsnachweis: die Sackklassen mischen sich nicht
+
+Jeder Spieler bekommt in Flag 9 das Feld `parSackKlassen`: alle kg-je-Sack-Werte, die er in der
+Schicht je in der Hand hatte, auch nach Ablage oder Übergabe (Sonde, Abschnitt 3c).
+
+| | Spieler-Spiele n = 24 / n = 48 | getragene Klassen | mit fremder Klasse |
+|---|---:|---|---:|
+| Station 1 (Soll 35 kg) | 480 / 960 | {35} | 0 |
+| Station 2 (Soll 80 kg) | 480 / 960 | {80} | 0 |
+| Station 3 (Soll 115 kg) | 480 / 960 | {115} | 0 |
+
+**0 von 2880 Spieler-Spielen** haben eine fremde Sackklasse getragen. Der Anteil von Station 3 am
+Silo bleibt bei 58 %. Strukturell ist das ohnehin garantiert: Jede Station läuft in einem eigenen
+Aufruf von `sandsackKetteSchicht()` mit eigener Ablage (`haufen`). Ein Sack kann die Station gar
+nicht verlassen.
+
+### 10.5 KI-Verteilung je Station (n = 24; n = 48 innerhalb ±1 Pp)
+
+| | normal | durch | direkt | erzwungen „durch“ je Träger | freie Wahlen je Träger |
+|---|---:|---:|---:|---:|---:|
+| Station 1 (35 kg, 24 m, Ablage 8 m) | 31 % | 51 % | 19 % | 3,8 | 5,2 |
+| Station 2 (80 kg, 16 m, Ablage 8 m) | 48 % | 31 % | 21 % | 2,9 | 5,4 |
+| **Station 3** (115 kg, 8 m, Rampenfuß 6 m) | **30 %** | **26 %** | **45 %** | **6,7** | 5,6 |
+| alle freien Wahlen | 36 % | 36 % | 28 % | | |
+
+* An Station 3 wird am häufigsten **direkt** übergeben. Der Rampenmann hat nur 2 m Rückweg und
+  steht deshalb fast immer im Fenster.
+* **Schwachstelle:** An Station 3 sind 6,7 von 12,3 Ankünften am Rampenfuß erzwungenes „durch“,
+  also mehr als die Hälfte. Der Grund: Findet der Rampenmann keinen Sack vor und kommt keiner in
+  1,5 s, geht er die 6 m zum Stapel zurück. Dann stehen beide vorn, und der Nächste am Rampenfuß hat
+  keinen Abholer. Zwei mögliche Hebel, beide nicht gebaut: Der Rampenmann wartet länger am
+  Rampenfuß (eigenes Wartefenster). Oder die Rolle bleibt fest (einer nur eben, einer nur Rampe).
+  Beides verändert die Rollenverteilung und müsste neu abgenommen werden.
+
+### 10.6 Kein Knopf ist immer besser, auch an Station 3
+
+Feste Wahl **nur an Station 3** (`entscheidModus3`), Station 1/2 bleiben KI. n = 24, Silo-kg der
+beiden Station-3-Träger je Seite:
+
+| Vorgabe an Station 3 | Silo Station 3 | Pausen je Spieler St. 3 | Rutscher je Spieler St. 3 | Pausen je Schicht | rho | schwächste |
+|---|---:|---:|---:|---:|---:|---:|
+| **KI-Vorgabe** | **2753** | **0,35** | 1,44 | 3,63 | 0,869 | 0,805 |
+| alle **normal** | 2645 (−3,9 %) | 0,29 | 1,34 | 3,36 | 0,867 | 0,798 |
+| alle **durch** | 2741 (−0,4 %) | **1,26** | 1,53 | 7,27 | 0,879 | 0,803 |
+| **direkt** wo möglich, sonst normal | 2704 (−1,8 %) | 0,64 | 1,47 | 4,78 | 0,868 | 0,780 |
+
+Und für **alle** Kettenträger (`entscheidModus`, Station 1, 2 und 3):
+
+| Vorgabe | Silo-kg je Seite | Pausen je Schicht | Rutscher je Schicht | rho | schwächste |
+|---|---:|---:|---:|---:|---:|
+| **KI-Vorgabe** | **4679** | 3,63 | 9,59 | 0,869 | 0,805 |
+| alle normal | 4494 | 3,24 | 9,07 | 0,874 | 0,795 |
+| alle durch | 4666 | **12,57** | 10,10 | 0,892 | 0,799 |
+| direkt wo möglich, sonst normal | 4553 | 5,70 | 9,67 | 0,858 | 0,766 |
+
+* **Beste feste Wahl je Station-3-Träger** (gleiche Würfe, Partner KI): normal 21 %, durch 47 %,
+  direkt 32 % (n = 48). Jede Option ist für mindestens ein Fünftel die beste.
+* **Die KI schlägt an Station 3 jede feste Wahl** (2753 gegen 2741 / 2704 / 2645 kg). Sie trifft in
+  76 % mindestens die beste feste Wahl. Der mittlere Abstand zur besten liegt bei 19 kg (0,7 %).
+* **Dasselbe Muster wie an Station 1/2:** „Alle durch“ holt fast dieselbe Menge, aber mit 3,6-mal so
+  vielen Zwangspausen. „Alle normal“ ist die ruhigste Fassung und kostet 4 %.
+
+### 10.7 Offen und unsicher
+
+1. **Die Lage des Rampenfußes (6 m) ist kalibriert, nicht vorgegeben.** Das Plateau ist schmal:
+   5 m liegt mit 0,793 knapp unter der Schranke, 7 m lässt die KI gegen „alle durch“ verlieren.
+   Chris müsste bestätigen, dass „die letzten zwei Meter sind die Rampe“ zu seinem Bild passt.
+2. **Mehr als die Hälfte der Ankünfte an Station 3 ist erzwungen** (10.5). Die Entscheidung findet
+   statt, aber seltener frei als an Station 1/2.
+3. **Die Rampe hat keine eigene Physik.** `steig` ist 1 wie überall, der Rampenfuß ist nur ein
+   benannter Ort. Bekommt die Rampe später eine Steigung, muss die Lage neu gemessen werden.
+4. **Weniger Pausen** (3,63 statt 4,55 je Schicht), weil sich zwei die schwere Strecke teilen. Wer
+   mehr sichtbare Erschöpfung an Station 3 will: `ermuedungFaktorKette3` 0,25 (10.3).
+5. **Der Median sinkt um weitere gut 0,01** gegenüber Flag 8, insgesamt 0,06 gegenüber Flag 6. Die
+   schwächste Paarung hält, Golden Gladiators liegt mit 0,80 aber knapp an der Schranke.
+6. **Kein Bild**, wie Flag 8. Die Rollen „Ebene“ und „Rampe“ stehen nur im Protokoll.
+
+### 10.8 Isolation, Befehle, Dateien
+
+**Isolation:** SHA-256 über `spieleBuehneHeben`, `spieleSandsackFinale` und `spieleSandsackWegC`,
+5 Paarungen × 4 Saaten, je Flag 0–8, vor und nach allen Änderungen: identisch. Alle neuen
+Schlüssel liest nur Flag 9. `parSackKlassen` erscheint nur bei Flag 9 im Boxscore.
+
+**Befehle:**
+
+```
+node scripts/miss-sandsack-wegc-parallel.mjs 24 --varianten=6,8,9
+node scripts/miss-sandsack-wegc-parallel.mjs 24 --varianten=9 --kalib=entscheidModus3:2
+node scripts/miss-sandsack-wegc-parallel.mjs 48 --varianten=9 --kalib=ketteMarke3:4
+node scripts/miss-alle-disziplinen.mjs 24 gewichtheben --flags=gewichthebenSandsack:9 --bootstrap-unsicherheit
+node scripts/messe-arena-einfluss.mjs gewichtheben 24 --flags=gewichthebenSandsack:9 [--saat-versatz=10000000]
+OLY_KADER_FAMILIE=/nicht-vorhanden node scripts/miss-alle-disziplinen.mjs 24 gewichtheben --flags=gewichthebenSandsack:9
+node scripts/miss-arena-buehne-spiegel.mjs 1000 gewichtheben --flags=gewichthebenSandsack:9
+```
+
+**Hebel** (`SANDSACK_PAR_KONF`, nur Flag 9): `ketteMarke3` 6 (Rampenfuß, m nach dem
+Station-3-Stapel; 0 = keine Kette), `ermuedungFaktorKette3` −1 (= `ermuedungFaktorKette`),
+`noteKetteMass3` −1 (= `noteKetteModus`; 0 Arbeit bis Hupe, 1 je aktiver Sekunde),
+`entscheidModus3` −1 (= `entscheidModus`; 0…3 feste Wahl nur an Station 3).
+
+**Dateien:**
+
+* `public/mockups/battle-mode.engine.js`:
+  * `baueSandsackParallel()`: Sprung auch bei Flag 9;
+  * `baueSandsackParallelKette()`: Station-3-Kopie mit `ketteMarke`/`ermFaktor`/`noteMass`, Kette
+    an Station 3 nur bei Flag 9, `entscheidModus3`, Feld `parSackKlassen`;
+  * `sandsackKetteSchicht()`, `sandsackKetteDE()`, `sandsackKetteMass()`: lesen die
+    Station-3-Felder, wenn gesetzt (Flag 8 setzt sie nie);
+  * `sandsackKetteNoteKontext()`: reicht eine feste Wahl an Partner und Referenz durch (Flag 8:
+    keine);
+  * die neuen Schlüssel in `SANDSACK_PAR_KONF`, Boxscore-Feld `parSackKlassen`, Flag-Liste bei
+    `BUEHNE_FLAGS`.
+* `scripts/miss-sandsack-wegc-parallel.mjs`: Variante 9, Abschnitt 3b über alle Kettenstationen
+  (mit freien Wahlen und KI gegen feste Wahl je Station), neuer Abschnitt 3c (Isolationsnachweis
+  der Sackklassen).
