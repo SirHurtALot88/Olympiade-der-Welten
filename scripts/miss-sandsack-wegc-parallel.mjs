@@ -36,7 +36,8 @@ const KALIB = Object.fromEntries(((process.argv.find((a) => a.startsWith("--kali
 const KURZ = process.argv.includes("--kurz");
 const NAME = { 6: "parallel, Zuteilung nach LAST", 7: "parallel, Zuteilung per Formel",
   8: "parallel, Zuteilung nach LAST, Kette mit Entscheidungen (normal/durch/direkt)",
-  9: "wie 8, zusaetzlich Station 3 als eigene Kette (Uebergabe am Rampenfuss)" };
+  9: "wie 8, zusaetzlich Station 3 als eigene Kette (Uebergabe am Rampenfuss)",
+  10: "wie 9, aber freie Stationswahl (KI nach awareness, Wechsel nach jedem Zyklus)" };
 
 // Ueberleitungen wie miss-sandsack-wegc.mjs (Schaetzung): je Schicht 8,7 s, je Spiel 8 s.
 const UEBERLEITUNG_JE_LAUF = 1.5 + 1.2 + 4 + 2;
@@ -206,6 +207,71 @@ try {
       }
       const leer = KL.filter((b) => !b.parSackKlassen.length).length;
       console.log(`  ${fremd === 0 ? "GETRENNT" : "VERMISCHT"}: ${fremd} von ${KL.length} Spieler-Spielen mit fremder Sackklasse (ohne einen getragenen Sack: ${leer})\n`);
+    }
+
+    // Nur Variante 10: FREIE STATIONSWAHL — wer wechselt wie oft wohin, wo verbringt man die
+    // Schicht, entscheidet hohe awareness besser, sinkt das erzwungene "durch", und bleibt jede
+    // Sackklasse an ihrer Station.
+    const FR = alleSpiele.flatMap((s) => s.boxscore).filter((b) => b.parFrei);
+    if (FR.length) {
+      console.log("=== 3d. Freie Stationswahl (Flag 10) ===\n");
+      const p = (x, y) => `${(100 * x / y).toFixed(1)} %`;
+      const wN = FR.reduce((a, b) => a + b.parFrei.wechsel, 0);
+      const ent = FR.reduce((a, b) => a + b.parFrei.entscheidungen, 0);
+      console.log(`Wechsel je Spieler und Schicht ${(wN / FR.length).toFixed(2)} (je Team ${(6 * wN / FR.length).toFixed(1)}), Entscheidungen je Spieler ${(ent / FR.length).toFixed(1)}, Wechselquote je Entscheidung ${p(wN, ent)}`);
+      console.log(`Warten am Uebergabepunkt (freiWarten) je Spieler und Schicht ${mittel(FR.map((b) => b.parFrei.warten || 0)).toFixed(2)}`);
+      console.log(`Spieler-Spiele ohne Wechsel ${p(FR.filter((b) => !b.parFrei.wechsel).length, FR.length)}, mit 1 ${p(FR.filter((b) => b.parFrei.wechsel === 1).length, FR.length)}, mit 2+ ${p(FR.filter((b) => b.parFrei.wechsel >= 2).length, FR.length)}`);
+      const mat = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      for (const b of FR) for (const [v, n] of b.parFrei.pfad) mat[v - 1][n - 1]++;
+      console.log("Wechsel von -> nach (Anzahl je Schicht beider Seiten):");
+      for (let v = 0; v < 3; v++) console.log(`  von Station ${v + 1}: ${[0, 1, 2].map((n) => `-> ${n + 1} ${(mat[v][n] / alleSpiele.length).toFixed(2)}`).join("   ")}`);
+      const zeit = [0, 1, 2, 3].map((k) => mittel(FR.map((b) => b.parFrei.zeit[k])));
+      console.log(`Zeit je Spieler: Station 1 ${zeit[0].toFixed(1)} s, Station 2 ${zeit[1].toFixed(1)} s, Station 3 ${zeit[2].toFixed(1)} s, unterwegs ${zeit[3].toFixed(1)} s`);
+      for (const s of [1, 2, 3]) {
+        const B = FR.filter((b) => b.parStation === s);
+        const z = [0, 1, 2, 3].map((k) => mittel(B.map((b) => b.parFrei.zeit[k])));
+        console.log(`  Startstation ${s}: Zeit an 1/2/3 ${z.slice(0, 3).map((x) => x.toFixed(0)).join(" / ")} s, unterwegs ${z[3].toFixed(1)} s, Wechsel ${mittel(B.map((b) => b.parFrei.wechsel)).toFixed(2)}, Note ${mittel(B.map((b) => b.wert / 10)).toFixed(1)}`);
+      }
+      // Besetzung im Mittel der Schicht (Kopfzahl je Station = Summe Zeit / Schicht)
+      const T = konf.zeitfenster;
+      console.log(`Mittlere Besetzung je Team: Station 1 ${(6 * zeit[0] / T).toFixed(2)}, Station 2 ${(6 * zeit[1] / T).toFixed(2)}, Station 3 ${(6 * zeit[2] / T).toFixed(2)}, unterwegs ${(6 * zeit[3] / T).toFixed(2)}`);
+      // Erzwungenes "durch" je Station (Ankuenfte an der Ablage, nach Station der Ankunft)
+      for (const s of [0, 1, 2]) {
+        const f = (k) => FR.reduce((a, b) => a + b.parFrei.entschSt[s][k], 0);
+        const alle = f("normal") + f("durch") + f("direkt") + f("erzwungen");
+        if (!alle) continue;
+        console.log(`  Station ${s + 1}: Ankuenfte ${(alle / alleSpiele.length / 2).toFixed(1)} je Team, erzwungen durch ${p(f("erzwungen"), alle)} (${(f("erzwungen") / alleSpiele.length / 2).toFixed(1)} je Team), normal ${p(f("normal"), alle)}, durch ${p(f("durch"), alle)}, direkt ${p(f("direkt"), alle)}`);
+      }
+      // Entscheidungsguete nach awareness: Bedauern (delta der Orakel-Wahl minus delta der
+      // eigenen Wahl, Silo-kg in der Vorschau) und Orakel-Treffer, in awareness-Dritteln.
+      const mitE = FR.filter((b) => b.parFrei.entscheidungen);
+      const awS = mitE.map((b) => b.parFrei.aw).sort((a, b) => a - b);
+      const g1 = awS[Math.floor(awS.length / 3)], g2 = awS[Math.floor(2 * awS.length / 3)];
+      for (const [name, f] of [["aw niedrig", (b) => b.parFrei.aw < g1], ["aw mittel", (b) => b.parFrei.aw >= g1 && b.parFrei.aw < g2], ["aw hoch", (b) => b.parFrei.aw >= g2]]) {
+        const B = mitE.filter(f);
+        const e = B.reduce((a, b) => a + b.parFrei.entscheidungen, 0);
+        console.log(`  ${name.padEnd(10)} (aw ${mittel(B.map((b) => b.parFrei.aw)).toFixed(0)}): Orakel-Treffer ${p(B.reduce((a, b) => a + b.parFrei.orakelTreffer, 0), e)}, Bedauern je Entscheidung ${(100 * B.reduce((a, b) => a + b.parFrei.bedauern * b.parFrei.entscheidungen, 0) / e).toFixed(1)} % (einer 50er-Vorschau), Wechsel ${mittel(B.map((b) => b.parFrei.wechsel)).toFixed(2)}, Orakel wollte wechseln ${p(B.reduce((a, b) => a + b.parFrei.orakelWechsel, 0), e)}`);
+      }
+      const rr = (f, g) => rho(mitE.map((b) => ({ eig: f(b), wert: g(b) })));
+      console.log(`rho(awareness, Bedauern) ${rr((b) => b.parFrei.aw, (b) => b.parFrei.bedauern).toFixed(2)}, rho(awareness, Treffer-Anteil) ${rr((b) => b.parFrei.aw, (b) => b.parFrei.orakelTreffer / b.parFrei.entscheidungen).toFixed(2)}, rho(awareness, Note - Eignung) ${rho(FR.map((b) => ({ eig: b.parFrei.aw, wert: b.wert / 10 - b.eig }))).toFixed(2)}`);
+      // Isolation: Sackklassen je Station, an der sie getragen wurden
+      const soll = { 1: konf.kg1, 2: konf.kg2, 3: konf.kg3 };
+      let fremd = 0;
+      for (const s of [1, 2, 3]) {
+        const kl = [...new Set(FR.flatMap((b) => b.parFrei.klassen[s]))].sort((a, b) => a - b);
+        const f = FR.filter((b) => b.parFrei.klassen[s].some((k) => k !== soll[s])).length;
+        fremd += f;
+        console.log(`  an Station ${s} (Soll ${soll[s]} kg) getragene Klassen {${kl.join(", ")}}, Spieler-Spiele mit fremder Klasse ${f}`);
+      }
+      const L10 = alleSpiele.map((s) => s.wegc.laeufe[0]);
+      const verst = L10.reduce((a, x) => a + x.verstoesse[0] + x.verstoesse[1], 0);
+      const quelle = L10.every((x) => x.quelleOk[0] && x.quelleOk[1]);
+      const mehrKl = FR.filter((b) => [1, 2, 3].filter((s) => b.parFrei.klassen[s].length).length > 1).length;
+      console.log(`  ${fremd === 0 && verst === 0 && quelle ? "GETRENNT" : "VERMISCHT"}: fremde Klasse an einer Station ${fremd}, Teilstrecken mit Sack fremder Station ${verst}, jede Lieferung an ihrer Herkunftsstation ${quelle ? "ja" : "NEIN"}; Spieler mit mehr als einer Klasse (gewollt, nach Wechsel) ${p(mehrKl, FR.length)}`);
+      console.log(`Saecke an einer Ablage liegen geblieben (Hupe) je Seite: ${mittel(L10.flatMap((x) => x.haufenRest)).toFixed(2)}`);
+      const kgSt = [0, 1, 2].map((j) => mittel(L10.flatMap((x) => x.kgJeStation.map((k) => k[j]))));
+      const kgS = kgSt.reduce((a, b) => a + b, 0);
+      console.log(`Mannschaftswertung ${L10[0].wertung}; Silo-kg je Seite nach Station, an der getragen wurde: ${kgSt.map((x, j) => `St.${j + 1} ${x.toFixed(0)} (${(100 * x / kgS).toFixed(0)} %)`).join(", ")}; Arbeitswert je Seite ${mittel(L10.flatMap((x) => x.arbeit)).toFixed(0)}\n`);
     }
 
     console.log("=== 4. Sendezeit und Mannschaftsebene ===\n");

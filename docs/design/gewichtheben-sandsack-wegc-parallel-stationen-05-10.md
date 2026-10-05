@@ -415,3 +415,9 @@ beiden an Station 3. Das ergibt rho 0,869 (0,874), schwächste Paarung 0,805 (0,
 10,8 / 12,0. Keine einzige Sackklasse wird vermischt (0 von 2880 Spieler-Spielen). Die Mitte (4 m)
 scheitert. Details im Dokument zu den Entscheidungen, Abschnitt 10. Flag 6 und 8 bleiben
 bit-identisch.
+
+**Flag 10 (freie Stationswahl):** Jeder der sechs kann nach jedem Zyklus an jede Station wechseln,
+KI nach awareness („Auffassungsgabe"), Fußweg zwischen den Stapeln. Ohne Gegengewicht läuft die
+Mannschaft bei Silo-kg zu Station 3; Flag 10 wertet nach Arbeitswert (Abschnitt 6 hier). rho 0,849
+(0,842), schwächste Paarung 0,825 (0,828). Details in
+`gewichtheben-sandsack-wegc-freie-stationswahl-05-10.md`. Flag 6…9 bleiben bit-identisch.

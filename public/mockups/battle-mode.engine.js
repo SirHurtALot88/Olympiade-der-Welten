@@ -15616,6 +15616,10 @@
   //                            Uebergabe am RAMPENFUSS (SANDSACK_PAR_KONF.ketteMarke3); die
   //                            115-kg-Saecke wechseln nur zwischen den beiden an Station 3
   //                            (Messvariante, 05.10.)
+  //                       10   wie 9, aber FREIE STATIONSWAHL: jeder der sechs kann nach jedem
+  //                            Zyklus an jede Station wechseln (Fussweg zwischen den Stapeln),
+  //                            KI-Entscheidung nach awareness ("Auffassungsgabe"), s.
+  //                            baueSandsackParallelFrei() (Messvariante, 05.10.)
   //
   // Gesetzt nur ueber window.__arena.buehneFlags({...}) (Messskripte: --flags=...) oder, fuer
   // den Headless-Runner, ueber window.__olyBuehneFlags vor dem Laden. Die echte App setzt
@@ -17623,7 +17627,61 @@
     //                          (Arbeit je Bewegungssekunde), 0 Arbeit bis zur Hupe, 1 je aktiver Sek.
     //   entscheidModus3        -1 wie entscheidModus; 0 KI, 1/2/3 feste Wahl NUR an Station 3
     //                          (nur Messung: "kein Knopf ist immer besser" an Station 3)
-    ketteMarke3:6, ermuedungFaktorKette3:-1, noteKetteMass3:-1, entscheidModus3:-1};
+    ketteMarke3:6, ermuedungFaktorKette3:-1, noteKetteMass3:-1, entscheidModus3:-1,
+    // NUR Flag 10 (freie Stationswahl, Block "WEG C FREI" unten) — Flag 6..9 lesen keinen
+    // dieser Schluessel:
+    //   freiModus        0 KI nach awareness, 1 fest (kein Wechsel = Flag 9), 2 zufaellig
+    //                    gleichverteilt je Entscheidung, 3 zufaellig mit Rate freiZufallRate,
+    //                    4 perfekt (Vorschau ohne Rauschen und ohne Sturheit, fuer alle)
+    //   freiHorizont     Vorschau der KI in Sekunden (Grenzbeitrag hier gegen dort)
+    //   Vorteil, Rauschen und Schwellen sind EINHEITENFREI: Anteil dessen, was ein Referenz-
+    //   traeger der Stufe 50 an der eigenen Station im Vorschaufenster schafft.
+    //   freiRauschen     Wahrnehmungsfehler (Standardabweichung) bei awareness 0 (x (1 - aw/100))
+    //   freiSchwelle     Mindestvorteil fuer einen Wechsel (auch bei awareness 100)
+    //   freiStur         zusaetzliche Sturheit bei awareness 0 (x (1 - aw/100))
+    //   freiZufallRate   Wechselwahrscheinlichkeit je Entscheidung im Modus 3
+    //   freiMinBesetzung 1 = der Letzte an einer Station geht nicht weg, 0 = keine Regel
+    //   freiPlaetze      hoechstens so viele arbeiten gleichzeitig an einer Station (0 = keine
+    //                    Grenze). Ohne beide Regeln laeuft fast die ganze Mannschaft zu Station 3
+    //                    (115 kg auf 8 m bringt je Sekunde mehr Silo-kg als 35 kg auf 24 m, fuer
+    //                    jeden Spieler; Doku Abschnitt 3)
+    //   freiRMax         niemand WECHSELT an eine Station, deren Sack ueber dem freiRMax-fachen
+    //                    seiner Traglast K liegt (0 = keine Grenze). Die Startaufstellung ist davon
+    //                    nicht betroffen (Mortal Sin stellt Traeger mit r ~ 1,23 an Station 3).
+    //                    Ohne die Grenze helfen Schwache (LAST ~ 40, r ~ 1,4) an Station 3 aus und
+    //                    tragen am Tempo-Boden SANDSACK_VLAST_MIN, wo die Note kaum trennt
+    //   freiWertung      Waehrung der KI UND Mannschaftswertung (immer gemeinsam, damit die KI das
+    //                    optimiert, wonach gewertet wird): 0 Silo-kg (A5 wie Flag 6..9), 1
+    //                    ARBEITSWERT (jeder Sack zaehlt die Sekunden, die ein Referenztraeger der
+    //                    Stufe 50 an seiner Station je Sack braucht; Diagnose aus dem Parallel-
+    //                    Dokument, Abschnitt 6). Mit 1 ist jede Station fuer einen 50er gleich viel
+    //                    wert, und die Wahl folgt Staerke und Bedarf statt dem schwersten Sack.
+    //   freiWarten       1 = zweite Entscheidung nach Auffassungsgabe: wer leer vom Silo an den
+    //                    Uebergabepunkt kommt und dort nichts vorfindet, waegt per Vorschau ab, ob
+    //                    er auf den naechsten Beladenen seiner Station wartet (Direktuebergabe)
+    //                    statt zum Stapel zu gehen — gegen das erzwungene "durch". 0 = aus (wie 9)
+    //   freiNoteAw       0 = Referenz der Kontext-Inversion hat die awareness des Spielers
+    //                    (awareness wirkt aufs Team, nicht auf die eigene Note; Matrixgewicht 0),
+    //                    1 = Referenz hat awareness 50 (Gegenprobe)
+    //   freiNoteMass     Mass der Kontext-Inversion: 0 kg x Meter je Bewegungssekunde (wie Flag 8/9),
+    //                    1 ARBEITSWERT je Bewegungssekunde (jede Teilstrecke mit den Referenz-50-
+    //                    Sekunden je kg ihrer Station gewichtet): stationsneutral, denn wer
+    //                    wechselt, sammelt seine Arbeit an mehreren Stationen
+    //   freiNoteRef      0 = der Referenztraeger der Kontext-Inversion waehlt seine Stationen selbst
+    //                    (mit awareness und Entscheidungs-Strom des Spielers), 1 = er FOLGT dem
+    //                    Stationsverlauf des Spielers (zu jeder Entscheidung dorthin, wo der Spieler
+    //                    zu dieser Zeit war): die Note misst dann nur das Tragen, die Stationswahl
+    //                    wirkt nur aufs Team
+    //   freiNoteSchritt  Rasterweite v der Kontext-Inversion
+    //   freiAwFest       >= 0: alle Spieler mit dieser awareness (nur Messung), -1 echte Werte
+    //   freiAwHeim/-Gast >= 0: nur diese Seite mit dieser awareness (nur Messung: "bringt hohe
+    //                    Auffassungsgabe im direkten Duell etwas?"), -1 wie freiAwFest
+    //   freiModusHeim/-Gast >= 0: freiModus nur fuer diese Seite (nur Messung), -1 wie freiModus
+    //   freiOhneNote     1 = keine Kontext-Inversion und keine Knopf-Diagnose (nur Messung der
+    //                    Mannschaftsebene, ~30x schneller); Spielerwerte sind dann 0
+    freiModus:0, freiHorizont:45, freiRauschen:0.2, freiSchwelle:0.15, freiStur:0.3, freiZufallRate:0.05,
+    freiMinBesetzung:1, freiPlaetze:3, freiRMax:1.3, freiWertung:1, freiWarten:0, freiNoteAw:0, freiNoteMass:1, freiNoteRef:1, freiNoteSchritt:4, freiAwFest:-1,
+    freiAwHeim:-1, freiAwGast:-1, freiModusHeim:-1, freiModusGast:-1, freiOhneNote:0};
   try{
     const startKalib=window.__olySandsackParKalib;
     if(startKalib&&typeof startKalib==="object")
@@ -17754,6 +17812,7 @@
     return beste.zut;
   }
   function baueSandsackParallel(art,mine,gegner,saat){
+    if(BUEHNE_FLAGS.gewichthebenSandsack===10)return baueSandsackParallelFrei(art,mine,gegner,saat);
     if(BUEHNE_FLAGS.gewichthebenSandsack===8||BUEHNE_FLAGS.gewichthebenSandsack===9)return baueSandsackParallelKette(art,mine,gegner,saat);
     const modus=BUEHNE_FLAGS.gewichthebenSandsack===7?"formel":"last";
     const st=sandsackParStationen(), T=SANDSACK_PAR_KONF.zeitfenster;
@@ -18220,6 +18279,502 @@
       stationen:seitenDaten.map(S=>S.spieler6.map(x=>({n:x.u.n, station:x.station+1}))),
       traeger:seitenDaten.map(S=>S.spieler6.map(x=>x.u.n))};
     SANDSACK_WEGC={format:"parallel-kette", variante:alleDrei?9:8, zuteilung:"last",
+      laeufe:[lauf], seiten:[sieger===0?1:0, sieger===1?1:0],
+      sendezeitSim:T, sendezeitBeide:T, abgeliefertKg:[A.kg,B.kg]};
+    buehneQueue=[];
+  }
+
+  // =====================================================================================
+  // WEG C FREI — FREIE STATIONSWAHL NACH AUFFASSUNGSGABE (Flag 10, 05.10., docs/design/
+  // gewichtheben-sandsack-wegc-freie-stationswahl-05-10.md). REINE MESSVARIANTE wie 6..9, kein
+  // Bild, kein Spielpfad. Flag 6..9 laufen unveraendert durch ihre eigenen Bloecke; nur Flag 10
+  // springt hierher (erste Zeile von baueSandsackParallel()).
+  //
+  // Chris, woertlich: "JEDER SPIELER kann JEDE station betreten! das muss KI basiert sein und
+  // auf der auffassungsgabe vom spieler basieren"
+  //
+  // UMSETZUNG (Annahmen im Dokument, Abschnitt 1):
+  //   * Alles wie Flag 9 (drei Ketten, Ablage an der naechsten Station bzw. am Rampenfuss, KI
+  //     normal/durch/direkt, Kontext-Inversion), aber die sechs eines Teams laufen in EINER
+  //     Ereignis-Simulation ueber alle drei Stationen. Die Kettenlogik ist von "der eine
+  //     Partner" auf "alle anderen, die gerade an dieser Station arbeiten" verallgemeinert. Bei
+  //     genau zwei je Station ist es dieselbe Rechnung (freiModus 1 = Flag 9, gemessen).
+  //   * Startaufstellung wie bisher nach LAST (2/2/2, die Staerksten an Station 3).
+  //   * Nach jedem Zyklus (leer zurueck am Stapel) entscheidet jeder: bleiben oder wechseln. Ein
+  //     Wechsel kostet den Fussweg zwischen den Stapeln (|d_s - d_s'|, 8 m je Stationsschritt) im
+  //     Leertempo. Beladen wechselt niemand: ein Sack verlaesst seine Station nie und behaelt
+  //     seine Klasse; wer wechselt, traegt dort die dortige Klasse.
+  //   * DIE KI (sandsackFreiWahl): kurze Vorschau (freiHorizont s, ohne Wuerfel) des eigenen
+  //     GRENZBEITRAGS je Station = Arbeit der Station mit mir minus ohne mich, Arbeit in Silo-kg-
+  //     Aequivalenten (kg x getragene Meter / Stationsstrecke). Wechsel lohnt, wenn der
+  //     Grenzbeitrag dort den hiesigen uebersteigt. Das erfasst "wo bringe ich selbst am
+  //     meisten" (eigenes Tempo bei dieser Last, eigene Ermuedung, Fussweg) UND "wo werde ich
+  //     gebraucht" (einer Kette ohne Abholer hilft ein Dritter; eine Kette, die ich verlasse,
+  //     bricht, und mein Partner muss durchpowern).
+  //   * AUFFASSUNGSGABE = awareness (Anzeige "Gespuer"). Sie bestimmt, wie GENAU der Spieler den
+  //     Grenzbeitrag wahrnimmt (Normalrauschen freiRauschen x (1 - aw/100)) und wie STUR er an
+  //     seiner Station klebt (Schwelle freiSchwelle + freiStur x (1 - aw/100)). Das Rauschen
+  //     kommt aus einem eigenen Entscheidungs-Strom je Seite und Platz (Falle 17); die Rutscher-
+  //     Stroeme aus sandsackParWuerfe() bleiben unberuehrt.
+  //   * Spielerwert: Kontext-Inversion wie Flag 8/9, aber ueber die GANZE Mannschaft: der
+  //     Referenztraeger (alle fuenf Sub-Skills = v, neutrale Persoenlichkeit, ohne Rutscher)
+  //     startet an der Startstation des Spielers und entscheidet selbst, mit DESSEN awareness
+  //     und DESSEN Entscheidungs-Strom (freiNoteAw 0). awareness hat in der Gewichtheben-Matrix
+  //     das Gewicht 0: Die Auffassungsgabe soll das Mannschaftsergebnis tragen, nicht die
+  //     eigene Note (Matrix gesperrt, CLAUDE.md).
+  // =====================================================================================
+  const sandsackFreiStationen=()=>{
+    const KO=SANDSACK_PAR_KONF, st=sandsackParStationen();
+    st[2]={...st[2], ketteMarke:KO.ketteMarke3,
+      ...(KO.ermuedungFaktorKette3>=0?{ermFaktor:KO.ermuedungFaktorKette3}:{})};
+    return st;
+  };
+  // WERT JE KG je Station in der Waehrung von freiWertung: Silo-kg (1 je kg) oder Arbeitswert
+  // (Referenz-50-Sekunden je Sack / kg je Sack, dieselbe Groesse wie `sekJeSack` in
+  // baueSandsackParallel()). Gecacht je Konfiguration.
+  const sandsackFreiSekCache=new Map();
+  function sandsackFreiSekJeKg(st){
+    const KO=SANDSACK_PAR_KONF, key=JSON.stringify(KO);
+    let w=sandsackFreiSekCache.get(key);
+    if(w)return w;
+    const T=KO.zeitfenster;
+    w=st.map(s=>{ const gs=sandsackParSchicht(sandsackWegCRefProfil(50),s,()=>1,T);
+      const n=gs.reduce((a,g)=>a+g.saecke,0); return n?gs[gs.length-1].ablieferung/n/s.kg:0; });
+    if(sandsackFreiSekCache.size>32)sandsackFreiSekCache.clear();
+    sandsackFreiSekCache.set(key,w);
+    return w;
+  }
+  const sandsackFreiWertJeKg=(st)=>SANDSACK_PAR_KONF.freiWertung===1?sandsackFreiSekJeKg(st):[1,1,1];
+  // Fussweg zwischen zwei Stapeln (alle Stapel liegen auf derselben Bahn, d1 - d Meter nach dem
+  // Start: 0 / 8 / 16 m).
+  const sandsackFreiWeg=(st,s1,s2)=>Math.abs(st[s1].d-st[s2].d);
+  // EIGENER ENTSCHEIDUNGS-STROM je Seite und Aufstellungsplatz (Falle 17), unabhaengig von den
+  // Rutscher-Wuerfen.
+  const SANDSACK_FREI_WUERFE=256;
+  function sandsackFreiWuerfe(saat,seite,platz){
+    let s=(normalisiereSaat(saat)^(seite===1?0x7F4A7C15:0x1B873593)^Math.imul(platz+1,0x85EBCA6B)^0x46524549)>>>0;
+    const z=[];
+    for(let i=0;i<SANDSACK_FREI_WUERFE;i++){ s=(s*1664525+1013904223)>>>0; z.push(s/4294967296); }
+    return z;
+  }
+  // team[i] = {u, haltung, wurfVon, entVon, aw, s (Startstation 0..2), frei (Modus oder null =
+  // kein Wechsel), modus? (feste Kettenwahl, nur Messung)}.
+  function sandsackFreiStart(team){
+    const KO=SANDSACK_PAR_KONF;
+    const leerEntsch=()=>({normal:0,durch:0,direkt:0,erzwungen:0});
+    return {ag:team.map((c,i)=>({i, u:c.u, h:c.haltung||{mut:0.5,team:0.5}, wurfVon:c.wurfVon||(()=>1),
+        modus:c.modus!=null?c.modus:null, frei:c.frei!=null?c.frei:null, aw:c.aw!=null?c.aw:50,
+        entVon:c.entVon||(()=>0.5), eIdx:0, s:c.s, bereit:false, pfad:c.pfad||[], pfadStart:c.s,
+        t:0, E:0, pos:0, zustand:"amStapel", last:null, wIdx:0,
+        legs:[], seg:[], pausen:0, pausenZeit:0, rutscher:0, doppelt:0, rastZeit:0, wartZeit:0, walk:null,
+        wartetSeit:0, wartetAuf:-1, entsch:leerEntsch(), entschSt:[leerEntsch(),leerEntsch(),leerEntsch()],
+        wechsel:[], warten:0,
+        schwelle:KO.pauseSchwelle+SANDSACK_PAUSE_SCHWELLE_NERVEN_K*(c.u.NERVEN-50)})),
+      haufen:[[],[],[]], lieferungen:[], protokoll:null, entscheidungen:null, verstoesse:0};
+  }
+  // DIE EREIGNIS-SIMULATION. Dieselben Schritte wie sandsackKetteSchicht() (Rechnung Zeichen fuer
+  // Zeichen uebernommen), mit drei Unterschieden: (1) die Station haengt am Traeger (a.s), (2)
+  // "Partner" heisst jeder andere an derselben Station, und wer an der Ablage wartet, merkt sich,
+  // auf wen (wartetAuf), (3) am Stapel nach einem Zyklus die Stationswahl (nur mitWechsel).
+  // Laeuft bis zum ersten Ereignis nach tStop (Schicht: T; Vorschau der KI: a.t + Horizont).
+  function sandsackFreiLauf(Z,st,T,tStop,mitWechsel){
+    const KO=SANDSACK_PAR_KONF, ag=Z.ag;
+    const markeVon=(S)=>S.ketteMarke!=null?S.ketteMarke:KO.ketteMarke;
+    const fEVon=(S)=>S.ermFaktor!=null?S.ermFaktor:null;
+    const pause=(a)=>{
+      if(a.E<a.schwelle)return;
+      const ziel=Math.max(0,a.schwelle-SANDSACK_PAUSE_ZIEL_ABSTAND);
+      const rate=SANDSACK_PAUSE_RATE_BASIS+SANDSACK_PAUSE_RATE_ERHOLUNG_K*a.u.ERHOLUNG/100;
+      const d=(a.E-ziel)/rate; a.seg.push({start:a.t, ende:a.t+d}); a.t+=d; a.E=ziel; a.pausen++; a.pausenZeit+=d;
+    };
+    const ruhe=(a,sek)=>{ if(sek>0){ a.E=Math.max(0,a.E-sandsackKetteRuheRate(a.u)*sek); } };
+    const warte=(a,bis)=>{ const sek=Math.max(0,Math.min(bis,T)-Math.min(a.wartetSeit,T)); ruhe(a,bis-a.wartetSeit); a.wartZeit+=sek; };
+    const gehe=(a,len)=>{ const d=len/sandsackKetteVLeer(a.u,a.E); a.seg.push({start:a.t, ende:a.t+d}); a.t+=d; a.E=Math.max(0,a.E-sandsackKetteRegen(a.u,len)); };
+    const leg=(a,von,bis,mitWurf)=>{
+      const S=st[a.s], D=S.d, fE=fEVon(S);
+      const len=bis-von; if(len<=1e-9)return;
+      const L=a.last, start=a.t, {K,Kf}=sandsackKetteKap(a.u), r=L.kg/K, rf=L.kg/Kf;
+      let dauer=len/sandsackKetteVLast(a.u,L.kg,a.E), rut=false;
+      if(mitWurf){
+        const p=Math.min(SANDSACK_RUTSCHER_MAX,Math.max(SANDSACK_RUTSCHER_MIN,
+          SANDSACK_RUTSCHER_BASIS+SANDSACK_RUTSCHER_RF_K*Math.max(0,rf-SANDSACK_RUTSCHER_RF_SCHWELLE)
+          +SANDSACK_RUTSCHER_E_K*Math.pow(a.E/100,2)-KO.rutscherTechnikK*(a.u.TECHNIK-50)/50))*len/D;
+        if(a.wurfVon(a.wIdx++)<p){
+          rut=true; a.rutscher++;
+          dauer+=(SANDSACK_RUTSCHER_ZEIT_BASIS+SANDSACK_RUTSCHER_ZEIT_R_K*r)*(SANDSACK_RUTSCHER_NERVEN_BASIS-SANDSACK_RUTSCHER_NERVEN_K*a.u.NERVEN/100);
+        }
+      }
+      a.E=Math.max(0,a.E+sandsackKetteDE(a.u,L.kg,len,fE)+(rut?SANDSACK_RUTSCHER_E_ZUSCHLAG:0));
+      a.t+=dauer;
+      a.seg.push({start, ende:a.t});
+      // ISOLATION: der Sack gehoert zu der Station, an der er aufgehoben wurde, und hat deren
+      // Klasse. Strukturell garantiert (Wechsel nur leer), hier trotzdem gezaehlt.
+      if(L.s!==a.s||L.kgListe.some(k=>k!==S.kg))Z.verstoesse++;
+      a.legs.push({kg:L.kg, saecke:L.saecke, kgListe:L.kgListe, len, start, ende:a.t, rutscher:rut, s:a.s});
+    };
+    const liefere=(a)=>{
+      const S=st[a.s], D=S.d, m=markeVon(S), hatAblage=m>0&&m<D;
+      const L=a.last, r=L.kg/sandsackKetteKap(a.u).K;
+      a.t+=S.kante?SANDSACK_KANTE_WUCHT_BASIS+SANDSACK_KANTE_WUCHT_R_K*Math.max(0,r-0.5):0;
+      Z.lieferungen.push({kg:L.kg, saecke:L.saecke, ablieferung:a.t, u:a.u, s:a.s, quelle:L.s, kgListe:L.kgListe});
+      a.last=null; a.pos=D;
+      if(hatAblage){ const v=sandsackKetteVLeer(a.u,a.E); a.walk={t0:a.t,E0:a.E,v}; a.zustand="zurueck"; a.t+=(D-m)/v; }
+      else { gehe(a,D); a.pos=0; a.zustand="amStapel"; a.bereit=true; }
+    };
+    const nimmVomHaufen=(a)=>{
+      const m=markeVon(st[a.s]);
+      const h=Z.haufen[a.s].shift();
+      a.t=Math.max(a.t,h.bereit); pause(a);
+      a.last=h.last; a.t+=0.5+0.6*a.last.kg/sandsackKetteKap(a.u).K;
+      a.pos=m; a.zustand="traegtAb";
+    };
+    const zumStapel=(a,von)=>{ gehe(a,von); a.pos=0; a.zustand="amStapel"; a.bereit=true; };
+    const andere=(a)=>ag.filter(x=>x!==a&&x.s===a.s);
+    const wartetAufA=(a)=>{ for(const x of ag)if(x.zustand==="wartet"&&x.wartetAuf===a.i&&x.s===a.s)return x; return null; };
+    for(let guard=0;guard<40000;guard++){
+      let a=null;
+      for(const x of ag)if(x.zustand!=="wartet"&&(!a||x.t<a.t))a=x;
+      if(!a||a.t>tStop)break;
+      const S=st[a.s], D=S.d, m=markeVon(S), fE=fEVon(S), hatAblage=m>0&&m<D, haufen=Z.haufen[a.s];
+      if(a.zustand==="amStapel"){
+        if(a.bereit){
+          a.bereit=false;
+          if(mitWechsel&&a.frei!=null){
+            const ziel=sandsackFreiWahl(Z,st,T,a);
+            if(ziel!==a.s){
+              const von=a.s, tLos=a.t;
+              // Wer auf a gewartet hat (freiWarten), geht jetzt doch zum Stapel.
+              for(const y of ag)if(y.zustand==="wartet"&&y.wartetAuf===a.i){
+                warte(y,a.t); y.t=a.t; y.wartetAuf=-1; zumStapel(y,markeVon(st[y.s]));
+              }
+              gehe(a,sandsackFreiWeg(st,von,ziel));
+              a.s=ziel;
+              a.wechsel.push({t:tLos, ankunft:a.t, von, nach:ziel});
+              continue;
+            }
+          }
+        }
+        pause(a);
+        let kgListe=[S.kg];
+        if(S.doppelnErlaubt&&KO.doppeln){
+          const {Kf}=sandsackKetteKap(a.u);
+          if(2*S.kg/Kf<=KO.doppelnSchwelle+KO.doppelnAnsageK*(a.u.ANSAGE-50)){ kgListe=[S.kg,S.kg]; a.doppelt++; }
+        }
+        const kg=kgListe.reduce((x,y)=>x+y,0);
+        a.last={kg, saecke:kgListe.length, kgListe, s:a.s};
+        a.t+=0.5+0.6*kg/sandsackKetteKap(a.u).K;
+        if(hatAblage){ leg(a,0,m,true); a.pos=m; a.zustand="anAblage"; }
+        else { leg(a,0,D,true); liefere(a); }
+      }else if(a.zustand==="anAblage"){
+        const t0=a.t, W=wartetAufA(a);
+        // Direktuebergabe an den, der auf a wartet, sonst an den, der gerade vom Silo kommt und
+        // binnen ketteFenster an der Ablage waere (der fruehste). Bei zwei je Station ist das
+        // genau der Partner aus sandsackKetteSchicht().
+        let P=null;
+        if(W&&W.E<W.schwelle)P=W;
+        else for(const x of andere(a))
+          if(x.zustand==="zurueck"&&x.E<x.schwelle&&x.t-t0<=KO.ketteFenster&&(!P||x.t<P.t))P=x;
+        const direktMoeglich=!!P;
+        const nimmtAb=andere(a).some(x=>x.zustand==="wartet"||x.zustand==="zurueck"||x.zustand==="traegtAb")
+          &&(!KO.ablagePlaetze||haufen.length<KO.ablagePlaetze);
+        const wahl=sandsackKetteWahl(a,{direktMoeglich, nimmtAb, haufen:haufen.length,
+          dELeg:sandsackKetteDE(a.u,a.last.kg,D-m,fE)});
+        a.entsch[wahl]++; a.entschSt[a.s][wahl]++;
+        if(Z.protokoll)Z.protokoll.push({i:a.i, s:a.s, t:t0, wahl, E:a.E, schwelle:a.schwelle, haufen:haufen.length, direktMoeglich});
+        if(wahl==="normal"){
+          a.t+=KO.ablegenK*(0.5+0.6*a.last.kg/sandsackKetteKap(a.u).K);
+          haufen.push({last:a.last, bereit:a.t}); a.last=null;
+          a.E=Math.max(0,a.E-sandsackKetteRastRate(a.u)*KO.rastSek); a.rastZeit+=Math.max(0,Math.min(a.t+KO.rastSek,T)-Math.min(a.t,T)); a.t+=KO.rastSek;
+          zumStapel(a,m);
+          if(W){ warte(W,haufen[0].bereit); W.t=W.wartetSeit; W.wartetAuf=-1; nimmVomHaufen(W); }
+        }else if(wahl==="direkt"){
+          let x=m;
+          if(P.zustand==="zurueck"){
+            const vA=sandsackKetteVLast(a.u,a.last.kg,a.E), gap=(P.t-t0)*P.walk.v, tau=gap/(vA+P.walk.v);
+            x=m+vA*tau;
+            leg(a,m,x,false);
+            P.seg.push({start:P.walk.t0, ende:t0+tau});
+            P.E=Math.max(0,P.walk.E0-sandsackKetteRegen(P.u,D-x));
+          }else{
+            warte(P,t0);
+          }
+          const tUeb=a.t+SANDSACK_WECHSEL_SEK;
+          P.last=a.last; P.pos=x; P.t=tUeb; P.zustand="traegtAb"; P.walk=null; P.wartetAuf=-1;
+          a.last=null; a.t=tUeb;
+          zumStapel(a,x);
+        }else{ // durch / erzwungen
+          if(W){ warte(W,t0); W.t=t0; W.wartetAuf=-1; zumStapel(W,m); }
+          pause(a);
+          leg(a,m,D,true); liefere(a);
+        }
+      }else if(a.zustand==="traegtAb"){
+        pause(a);
+        leg(a,a.pos,D,true); liefere(a);
+      }else if(a.zustand==="zurueck"){
+        a.E=Math.max(0,a.walk.E0-sandsackKetteRegen(a.u,D-m)); a.seg.push({start:a.walk.t0, ende:a.t}); a.walk=null; a.pos=m;
+        if(haufen.length)nimmVomHaufen(a);
+        else{
+          let Q=null;
+          for(const x of andere(a))
+            if(x.zustand==="anAblage"&&x.t-a.t<=KO.ketteFenster&&!wartetAufA(x)&&(!Q||x.t<Q.t))Q=x;
+          if(Q&&a.E<a.schwelle){ a.zustand="wartet"; a.wartetSeit=a.t; a.wartetAuf=Q.i; a.t=Infinity; }
+          else{
+            // FLAG 10, freiWarten: kommt bald ein Beladener (am Stapel oder auf dem Weg zur
+            // Ablage, noch von niemandem erwartet), waegt a ab, ob er wartet.
+            let R=null;
+            if(mitWechsel&&KO.freiWarten&&a.frei!=null&&a.E<a.schwelle)
+              for(const x of andere(a))
+                if((x.zustand==="amStapel"||x.zustand==="anAblage")&&!wartetAufA(x)&&(!R||x.t<R.t))R=x;
+            if(R&&sandsackFreiWarteWahl(Z,st,T,a,R)){ a.zustand="wartet"; a.wartetSeit=a.t; a.wartetAuf=R.i; a.t=Infinity; a.warten++; }
+            else zumStapel(a,m);
+          }
+        }
+      }
+    }
+    return Z;
+  }
+  function sandsackFreiSchicht(team,st,T,protokoll){
+    const Z=sandsackFreiStart(team);
+    if(protokoll){ Z.protokoll=[]; Z.entscheidungen=[]; Z.warteEntscheidungen=[]; }
+    sandsackFreiLauf(Z,st,T,T,true);
+    return {agenten:Z.ag, lieferungen:Z.lieferungen.filter(l=>l.ablieferung<=T), protokoll:Z.protokoll,
+      entscheidungen:Z.entscheidungen, warteEntscheidungen:Z.warteEntscheidungen, haufenRest:Z.haufen.reduce((s,h)=>s+h.length,0), verstoesse:Z.verstoesse};
+  }
+  // VORSCHAU DER KI: Arbeit (Silo-kg-Aequivalente) an Station x von jetzt (a.t) bis tEnd, mit
+  // oder ohne Traeger a, alle anderen dort im jetzigen Zustand, ohne Wuerfel, ohne weitere
+  // Wechsel. Mit a an einer anderen Station: a kommt erst nach dem Fussweg dort an.
+  function sandsackFreiVorschau(Z,st,T,a,x,mitA,tEnd,aufbau){
+    const leer=()=>({normal:0,durch:0,direkt:0,erzwungen:0});
+    const kl=(y)=>({...y, wurfVon:()=>1, legs:[], seg:[], walk:y.walk?{...y.walk}:null, entsch:leer(),
+      entschSt:[leer(),leer(),leer()], wechsel:[], frei:null, bereit:false});
+    const ag=[];
+    for(const y of Z.ag)if(y!==a&&y.s===x)ag.push(kl(y));
+    if(mitA&&aufbau){ const c=kl(a); aufbau(c); ag.push(c); }
+    else if(mitA){
+      const c=kl(a);
+      if(x!==a.s){
+        const len=sandsackFreiWeg(st,a.s,x);
+        c.t+=len/sandsackKetteVLeer(c.u,c.E); c.E=Math.max(0,c.E-sandsackKetteRegen(c.u,len)); c.s=x;
+      }
+      ag.push(c);
+    }
+    if(!ag.length)return 0;
+    const V={ag, haufen:[0,1,2].map(j=>j===x?Z.haufen[x].slice():[]), lieferungen:[], protokoll:null,
+      entscheidungen:null, verstoesse:0};
+    sandsackFreiLauf(V,st,T,tEnd,false);
+    const t0=a.t, D=st[x].d, wk=sandsackFreiWertJeKg(st)[x];
+    let w=0;
+    for(const y of ag)for(const l of y.legs){
+      const lo=Math.max(l.start,t0), hi=Math.min(l.ende,tEnd);
+      if(hi<=lo)continue;
+      w+=wk*l.kg*l.len/D*(l.ende>l.start?(hi-lo)/(l.ende-l.start):1);
+    }
+    return w;
+  }
+  // DIE STATIONSWAHL. Rueckgabe: Zielstation (a.s = bleiben).
+  //   a.frei 0  KI nach awareness: wahrgenommener Vorteil = delta + Rauschen - Schwelle, das
+  //             Maximum gewinnt, wenn es > 0 ist.
+  //          2  zufaellig gleichverteilt unter den drei Stationen (schlechtester Fall)
+  //          3  zufaellig: mit freiZufallRate wechseln, Ziel gleichverteilt unter den zwei anderen
+  //          4  perfekt: delta ohne Rauschen und ohne Sturheit (nur freiSchwelle)
+  // delta[x] = Grenzbeitrag an x minus Grenzbeitrag hier (Vorschau, s.o.). Bei Protokoll wird je
+  // Entscheidung auch die Orakel-Wahl (perfekt) und das Bedauern (delta Orakel - delta Wahl)
+  // notiert — damit laesst sich messen, ob hohe awareness wirklich besser entscheidet.
+  function sandsackFreiWahl(Z,st,T,a){
+    const KO=SANDSACK_PAR_KONF, r=()=>a.entVon(a.eIdx++);
+    // freiNoteRef 1 (nur Referenztraeger der Kontext-Inversion): dorthin, wo der Spieler zu
+    // dieser Zeit war (bei einem Wechsel unterwegs: sein Ziel). Keine Formatregeln, denn die
+    // Referenz steht an der Stelle des Spielers, der sie schon eingehalten hat.
+    if(a.frei===5){ let z=a.pfadStart; for(const w of a.pfad)if(w.t<=a.t)z=w.nach; return z; }
+    // FORMATREGELN (gelten fuer KI UND Zufall): der Letzte an einer Station geht nicht weg
+    // (freiMinBesetzung), und eine volle Station nimmt niemanden mehr auf (freiPlaetze; wer
+    // gerade dorthin unterwegs ist, zaehlt schon mit).
+    const kopf=[0,0,0];
+    for(const y of Z.ag)kopf[y.s]++;
+    if(KO.freiMinBesetzung>=1&&kopf[a.s]<=KO.freiMinBesetzung)return a.s;
+    const offen=(x)=>x!==a.s&&(!KO.freiPlaetze||kopf[x]<KO.freiPlaetze)
+      &&(!(KO.freiRMax>0)||st[x].kg/sandsackKetteKap(a.u).K<=KO.freiRMax);
+    const ziele=[0,1,2].filter(offen);
+    if(!ziele.length)return a.s;
+    const braucheDelta=a.frei===0||a.frei===4||!!Z.entscheidungen;
+    const delta=[0,0,0];
+    if(braucheDelta){
+      const tEnd=Math.min(T,a.t+KO.freiHorizont);
+      const hier=sandsackFreiVorschau(Z,st,T,a,a.s,true,tEnd)-sandsackFreiVorschau(Z,st,T,a,a.s,false,tEnd);
+      // EINHEITENFREI: Vorteil als Anteil dessen, was ein Referenztraeger der Stufe 50 an MEINER
+      // Station im Vorschaufenster schafft (in der Waehrung von freiWertung). Rauschen und
+      // Schwellen gelten damit fuer Silo-kg und Arbeitswert gleich.
+      const basis=Math.max(1e-6,(tEnd-a.t)*sandsackFreiWertJeKg(st)[a.s]/Math.max(1e-9,sandsackFreiSekJeKg(st)[a.s]));
+      for(const x of ziele)
+        delta[x]=(sandsackFreiVorschau(Z,st,T,a,x,true,tEnd)-sandsackFreiVorschau(Z,st,T,a,x,false,tEnd)-hier)/basis;
+    }
+    let orakel=a.s, obest=0;
+    for(const x of ziele)if(delta[x]-KO.freiSchwelle>obest){ obest=delta[x]-KO.freiSchwelle; orakel=x; }
+    let ziel=a.s;
+    if(a.frei===2){ const w=[a.s,...ziele]; ziel=w[Math.min(w.length-1,Math.floor(r()*w.length))]; }
+    else if(a.frei===3){ const u1=r(), u2=r(); if(u1<KO.freiZufallRate)ziel=ziele[Math.min(ziele.length-1,Math.floor(u2*ziele.length))]; }
+    else{
+      const perfekt=a.frei===4, aw=Math.max(0,Math.min(100,a.aw))/100;
+      const sig=perfekt?0:KO.freiRauschen*(1-aw), thr=KO.freiSchwelle+(perfekt?0:KO.freiStur*(1-aw));
+      let best=0;
+      for(const x of ziele){
+        const u1=Math.max(1e-12,r()), u2=r(), z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+        const p=delta[x]+sig*z-thr;
+        if(p>best){ best=p; ziel=x; }
+      }
+    }
+    if(Z.entscheidungen)Z.entscheidungen.push({i:a.i, t:a.t, s:a.s, ziel, orakel, delta:delta.slice(),
+      aw:a.aw, bedauern:delta[orakel]-delta[ziel]});
+    return ziel;
+  }
+  // WARTEN AM UEBERGABEPUNKT (freiWarten 1): Vorschau der eigenen Station mit a wartend auf R
+  // gegen a zurueck zum Stapel, dieselbe Einheit, dasselbe Rauschen, dieselbe Sturheit wie die
+  // Stationswahl (die Gewohnheit ist "zurueck zum Stapel"). Rueckgabe true = warten.
+  function sandsackFreiWarteWahl(Z,st,T,a,R){
+    const KO=SANDSACK_PAR_KONF, r=()=>a.entVon(a.eIdx++);
+    const tEnd=Math.min(T,a.t+KO.freiHorizont), m=st[a.s].ketteMarke!=null?st[a.s].ketteMarke:KO.ketteMarke;
+    const vWarte=sandsackFreiVorschau(Z,st,T,a,a.s,true,tEnd,(c)=>{ c.zustand="wartet"; c.wartetSeit=a.t; c.wartetAuf=R.i; c.t=Infinity; });
+    const vGehe=sandsackFreiVorschau(Z,st,T,a,a.s,true,tEnd,(c)=>{
+      c.t+=m/sandsackKetteVLeer(c.u,c.E); c.E=Math.max(0,c.E-sandsackKetteRegen(c.u,m)); c.pos=0; c.zustand="amStapel"; });
+    const basis=Math.max(1e-6,(tEnd-a.t)*sandsackFreiWertJeKg(st)[a.s]/Math.max(1e-9,sandsackFreiSekJeKg(st)[a.s]));
+    const d=(vWarte-vGehe)/basis;
+    const u1=Math.max(1e-12,r()), u2=r(), z=Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+    if(a.frei===2||a.frei===3)return u1<0.5;
+    const perfekt=a.frei===4, aw=Math.max(0,Math.min(100,a.aw))/100;
+    const sig=perfekt?0:KO.freiRauschen*(1-aw), thr=KO.freiSchwelle+(perfekt?0:KO.freiStur*(1-aw));
+    if(Z.warteEntscheidungen)Z.warteEntscheidungen.push({i:a.i, d, aw:a.aw});
+    return d+sig*z-thr>0;
+  }
+  // DAS MASS DER NOTE (freiNoteMass): Arbeit je Bewegungssekunde wie sandsackKetteMass() mit
+  // noteKetteModus >= 2, die Arbeit aber je Teilstrecke in der Waehrung der Station.
+  function sandsackFreiMass(A,T,st){
+    if(SANDSACK_PAR_KONF.freiNoteMass!==1)return sandsackKetteMass(A,T);
+    const sek=sandsackFreiSekJeKg(st);
+    const w=A.legs.reduce((s,l)=>s+sek[l.s]*l.kg*l.len/st[l.s].d*
+      (l.ende<=T?1:(l.start>=T?0:(T-l.start)/(l.ende-l.start))),0);
+    return w/Math.max(1,A.seg.reduce((s,g)=>s+Math.max(0,Math.min(g.ende,T)-Math.min(g.start,T)),0));
+  }
+  // KONTEXT-INVERSION UEBER DIE MANNSCHAFT: wie sandsackKetteNoteKontext(), nur dass der
+  // Referenztraeger in der ganzen Mannschaft steht (Startstation des Spielers) und selbst
+  // die Stationen waehlt. freiNoteAw 0: mit der awareness des Spielers, 1: mit awareness 50.
+  function sandsackFreiNoteKontext(team,k,st,mass,pfad){
+    const KO=SANDSACK_PAR_KONF, T=KO.zeitfenster, tab=[], schritt=Math.max(1,KO.freiNoteSchritt);
+    const folgt=KO.freiNoteRef===1&&team[k].frei!=null;
+    for(let v=0;v<=100+1e-9;v+=schritt){
+      const t2=team.map((c,j)=>j===k?{...c, u:sandsackWegCRefProfil(v), haltung:{mut:0.5,team:0.5}, wurfVon:()=>1,
+          aw:KO.freiNoteAw===1?50:c.aw, ...(folgt?{frei:5, pfad:pfad||[]}:{})}
+        :{...c, wurfVon:()=>1});
+      tab.push({v, w:sandsackFreiMass(sandsackFreiSchicht(t2,st,T,false).agenten[k],T,st)});
+    }
+    for(let i=1;i<tab.length;i++)tab[i].w=Math.max(tab[i].w,tab[i-1].w);
+    if(mass<=tab[0].w)return 0;
+    if(mass>=tab[tab.length-1].w)return tab[tab.length-1].v;
+    for(let i=0;i<tab.length-1;i++){
+      const a=tab[i], b=tab[i+1];
+      if(mass>=a.w&&mass<=b.w)return b.w>a.w?a.v+(b.v-a.v)*(mass-a.w)/(b.w-a.w):a.v;
+    }
+    return tab[tab.length-1].v;
+  }
+  // Zeit je Station in der Schicht (Index 3 = unterwegs zwischen zwei Stapeln).
+  function sandsackFreiStationZeit(A,start,T){
+    const z=[0,0,0,0];
+    let s=start, t=0;
+    for(const w of A.wechsel){
+      const t1=Math.min(w.t,T), t2=Math.min(w.ankunft,T);
+      z[s]+=Math.max(0,t1-t); z[3]+=Math.max(0,t2-t1); s=w.nach; t=t2;
+    }
+    z[s]+=Math.max(0,T-t);
+    return z;
+  }
+  function baueSandsackParallelFrei(art,mine,gegner,saat){
+    const KO=SANDSACK_PAR_KONF, T=KO.zeitfenster, st=sandsackFreiStationen();
+    const freiVon=(side)=>{ const m=side===0?KO.freiModusHeim:KO.freiModusGast; const mo=m>=0?m:KO.freiModus; return mo===1?null:mo; };
+    for(const u of TEILNEHMER){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.lastKg=0; u.lastSaecke=0; u.lastRutscher=0; u.lastPausen=0; u.lastDoppelt=0;
+      u.laufNr=null; u.laufGewonnen=false; u.tragenote=null; u.parStation=null;
+      u.parEntsch=null; u.parHaltung=null; u.parOptionKg=null; u.parRolle=null;
+      u.parSackKlassen=undefined; u.parFrei=undefined;
+    }
+    const awVon=(u)=>{
+      const seitenFest=u.side===0?KO.freiAwHeim:KO.freiAwGast;
+      if(seitenFest>=0)return seitenFest;
+      return KO.freiAwFest>=0?KO.freiAwFest:Math.max(0,Math.min(100,Number(u.attr&&u.attr.awareness)||0));
+    };
+    const seitenDaten=[mine,gegner].map((spieler,side)=>{
+      const u6=spieler.map(p=>TEILNEHMER.find(x=>x.side===side&&x.n===p.n)).filter(Boolean);
+      const wahl=side===0?KO.zuteilungHeim:KO.zuteilungGast;
+      const zut=sandsackParZuteilung(u6,wahl===2?"formel":"last");
+      const team=u6.map((u,i)=>{
+        const w=sandsackParWuerfe(saat,side,i), e=sandsackFreiWuerfe(saat,side,i);
+        return {u, haltung:sandsackKetteHaltung(spieler.find(p=>p.n===u.n)), wurfVon:(j)=>w[j]??1,
+          entVon:(j)=>e[j]??0.5, aw:awVon(u), s:zut[i], frei:freiVon(side)};
+      });
+      const erg=sandsackFreiSchicht(team,st,T,true);
+      const kgVon=(e)=>e.lieferungen.reduce((a,l)=>a+l.kg,0);
+      const kg=kgVon(erg), saecke=erg.lieferungen.reduce((a,l)=>a+l.saecke,0);
+      // Arbeitswert (immer berechnet; Mannschaftswertung nur bei freiWertung 1) und kg je Station
+      const sekJeKg=sandsackFreiSekJeKg(st);
+      const arbeit=erg.lieferungen.reduce((a,l)=>a+l.kg*sekJeKg[l.s],0);
+      const kgJeStation=[0,1,2].map(j=>erg.lieferungen.filter(l=>l.s===j).reduce((a,l)=>a+l.kg,0));
+      // DIAGNOSE "kein toter Knopf" wie Flag 8/9: ein Traeger mit fester Kettenwahl (1 normal,
+      // 2 durch, 3 direkt wo moeglich), alle anderen KI, gleiche Wuerfe; Silo-kg der MANNSCHAFT.
+      const optKg=KO.freiOhneNote?team.map(()=>[0,0,0]):team.map((c,k)=>[1,2,3].map(mo=>kgVon(sandsackFreiSchicht(team.map((cc,j)=>j===k?{...cc,modus:mo}:cc),st,T,false))));
+      const entsch={normal:0,durch:0,direkt:0,erzwungen:0};
+      let kgm=0, rutscher=0, pausen=0, doppelt=0, wechsel=0;
+      const spieler6=erg.agenten.map((A,k)=>{
+        const w=sandsackKetteW(A.legs,T);
+        kgm+=w; rutscher+=A.rutscher; pausen+=A.pausen; doppelt+=A.doppelt; wechsel+=A.wechsel.length;
+        for(const x of Object.keys(entsch))entsch[x]+=A.entsch[x];
+        const mass=sandsackFreiMass(A,T,st);
+        const anteil=(l)=>l.ende<=T?1:(l.start>=T?0:(T-l.start)/(l.ende-l.start));
+        const ents=(erg.entscheidungen||[]).filter(x=>x.i===k);
+        const klassen={1:[],2:[],3:[]};
+        for(const l of A.legs)for(const kgS of l.kgListe)if(!klassen[l.s+1].includes(kgS))klassen[l.s+1].push(kgS);
+        return {u:A.u, station:team[k].s, note:KO.freiOhneNote?null:sandsackFreiNoteKontext(team,k,st,mass,A.wechsel),
+          kg:A.legs.reduce((a,l)=>a+l.kg*l.len*anteil(l)/st[l.s].d,0),
+          saecke:A.legs.reduce((a,l)=>a+l.saecke*l.len*(l.ende<=T?1:0)/st[l.s].d,0),
+          rutscher:A.rutscher, pausen:A.pausen, doppelt:A.doppelt, entsch:{...A.entsch}, haltung:A.h,
+          optionKg:[...optKg[k],kg],
+          frei:{aw:team[k].aw, wechsel:A.wechsel.length,
+            pfad:A.wechsel.map(x=>[x.von+1,x.nach+1,+x.t.toFixed(1)]),
+            zeit:sandsackFreiStationZeit(A,team[k].s,T).map(x=>+x.toFixed(1)),
+            entschSt:A.entschSt.map(x=>({...x})),
+            entscheidungen:ents.length, bedauern:ents.length?+(ents.reduce((a,x)=>a+x.bedauern,0)/ents.length).toFixed(4):0,
+            orakelTreffer:ents.filter(x=>x.ziel===x.orakel).length,
+            orakelWechsel:ents.filter(x=>x.orakel!==x.s).length, warten:A.warten,
+            klassen}};
+      });
+      return {u6, spieler6, kg, saecke, arbeit, kgJeStation, kgm, rutscher, pausen, doppelt, entsch, wechsel,
+        haufenRest:erg.haufenRest, verstoesse:erg.verstoesse,
+        quelleOk:erg.lieferungen.every(l=>l.quelle===l.s&&l.kgListe.every(x=>x===st[l.s].kg))};
+    });
+    const [A,B]=seitenDaten;
+    // Mannschaft: freiWertung 0 mehr Silo-kg (dann Saecke), 1 mehr Arbeitswert (dann Silo-kg).
+    let sieger=KO.freiWertung===1
+      ?(A.arbeit!==B.arbeit?(A.arbeit>B.arbeit?0:1):(A.kg!==B.kg?(A.kg>B.kg?0:1):null))
+      :(A.kg!==B.kg?(A.kg>B.kg?0:1):(A.saecke!==B.saecke?(A.saecke>B.saecke?0:1):null));
+    if(sieger==null)sieger=cypherHash(normalisiereSaat(saat),977)%2;
+    for(const S of seitenDaten)for(const x of S.spieler6){
+      const u=x.u;
+      u.tragenote=x.note==null?null:+x.note.toFixed(2);
+      u.summe=x.note==null?0:Math.round(x.note*10);
+      u.parStation=x.station+1;
+      u.lastKg=Math.round(x.kg); u.lastSaecke=+x.saecke.toFixed(2);
+      u.lastRutscher=x.rutscher; u.lastPausen=x.pausen; u.lastDoppelt=x.doppelt;
+      u.parEntsch=x.entsch; u.parHaltung={mut:+x.haltung.mut.toFixed(3), team:+x.haltung.team.toFixed(3), pers:x.haltung.pers||null};
+      u.parOptionKg=x.optionKg; u.parRolle="kette"; u.parFrei=x.frei;
+      u.laufNr=0; u.laufGewonnen=sieger===u.side;
+    }
+    const lauf={nr:0, sieger, ende:T, endeBeide:T, zeit:[T,T], fertig:[false,false],
+      abgeliefertKg:[A.kg,B.kg], saecke:[A.saecke,B.saecke], kgm:[A.kgm,B.kgm], arbeit:[A.arbeit,B.arbeit],
+      kgJeStation:[A.kgJeStation,B.kgJeStation], wertung:KO.freiWertung===1?"arbeitswert":"silo-kg",
+      rutscher:[A.rutscher,B.rutscher], pausen:[A.pausen,B.pausen], doppelt:[A.doppelt,B.doppelt],
+      entsch:[A.entsch,B.entsch], haufenRest:[A.haufenRest,B.haufenRest],
+      wechsel:[A.wechsel,B.wechsel], verstoesse:[A.verstoesse,B.verstoesse], quelleOk:[A.quelleOk,B.quelleOk],
+      stationen:seitenDaten.map(S=>S.spieler6.map(x=>({n:x.u.n, station:x.station+1}))),
+      traeger:seitenDaten.map(S=>S.spieler6.map(x=>x.u.n))};
+    SANDSACK_WEGC={format:"parallel-frei", variante:10, zuteilung:"last", freiModus:KO.freiModus,
       laeufe:[lauf], seiten:[sieger===0?1:0, sieger===1?1:0],
       sendezeitSim:T, sendezeitBeide:T, abgeliefertKg:[A.kg,B.kg]};
     buehneQueue=[];
@@ -47648,7 +48203,11 @@
             parOptionKg:u.parOptionKg}:{}),
           // nur Flag 9: Sackklassen (kg je Sack), die dieser Spieler je getragen hat —
           // Isolationsnachweis "Station 3 traegt nie leichte Saecke"
-          ...(u.parSackKlassen!=null?{parSackKlassen:u.parSackKlassen}:{})}));
+          ...(u.parSackKlassen!=null?{parSackKlassen:u.parSackKlassen}:{}),
+          // nur Flag 10 (freie Stationswahl): awareness, Wechsel, Pfad, Zeit je Station,
+          // Kettenwahlen je Station, Entscheidungsguete (Bedauern, Orakel-Treffer), Sackklassen
+          // je Station
+          ...(u.parFrei!=null?{parFrei:u.parFrei}:{})}));
         // `opt.hantelVergleich` (optional, nur Messung): DASSELBE Spiel (gleiche Saat, gleiche
         // Formkarten, gleicher Mutator-Wurf, gleiche Aufstellung) noch einmal im heutigen Format
         // (Flag 0: sechs Hantel-Duelle + additives Paket-1-Finale) -- fuer den Vergleich der

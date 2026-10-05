@@ -3,7 +3,8 @@
 **Status: reine Messvariante, kein Spielpfad, kein Bild.** Hinter
 `BUEHNE_FLAGS.gewichthebenSandsack` 8, nur über die Messskripte erreichbar. Flag 0…7 sind
 bit-identisch (Abschnitt 9). **Fortsetzung Flag 9** (Station 3 entscheidet mit, Übergabe am
-Rampenfuß): Abschnitt 10. Flag 0…8 sind dabei bit-identisch geblieben. Grundlage ist das parallele Stationsformat (Flag 6,
+Rampenfuß): Abschnitt 10. Flag 0…8 sind dabei bit-identisch geblieben. **Fortsetzung Flag 10**
+(freie Stationswahl nach Auffassungsgabe): Abschnitt 11 und eigenes Dokument. Grundlage ist das parallele Stationsformat (Flag 6,
 `gewichtheben-sandsack-wegc-parallel-stationen-05-10.md`): sechs je Team, je zwei an einer von
 drei Stationen, 150 s Schicht, Silo-kg.
 
@@ -597,3 +598,23 @@ Station-3-Stapel; 0 = keine Kette), `ermuedungFaktorKette3` −1 (= `ermuedungFa
 * `scripts/miss-sandsack-wegc-parallel.mjs`: Variante 9, Abschnitt 3b über alle Kettenstationen
   (mit freien Wahlen und KI gegen feste Wahl je Station), neuer Abschnitt 3c (Isolationsnachweis
   der Sackklassen).
+
+---
+
+## 11. Fortsetzung: freie Stationswahl nach Auffassungsgabe (Flag 10, 05.10.)
+
+Chris: „JEDER SPIELER kann JEDE station betreten! das muss KI basiert sein und auf der
+auffassungsgabe vom spieler basieren". Gebaut und gemessen als Flag 10 in
+`gewichtheben-sandsack-wegc-freie-stationswahl-05-10.md`. Kurz:
+
+* Auffassungsgabe = **awareness** („Gespür"), Matrixgewicht im Gewichtheben 0. Sie steuert die
+  Entscheidung (Vorschau des eigenen Grenzbeitrags, Rauschen und Sturheit nach awareness), nicht die
+  eigene Note (die Referenz der Kontext-Inversion folgt dem Stationsverlauf des Spielers).
+* Bei Silo-kg läuft fast die ganze Mannschaft zu Station 3 (+30 % Silo-kg). Flag 10 wertet deshalb
+  nach **Arbeitswert** (Chris' Entscheidung offen).
+* rho 0,849 (n = 48 0,842), schwächste Paarung 0,825 (0,828), Sendezeit 2:47 fest, Sackklassen
+  getrennt, Flag 0…9 bit-identisch; ohne Wechsel ist Flag 10 Spieler für Spieler Flag 9.
+* KI +3,2 % Arbeitswert gegen feste Stationen, awareness 0 / 100 für alle +2,2 / +3,8 %, Zufall bei
+  gleicher Wechselrate −3,4 %.
+* Das erzwungene „durch" (10.5) bleibt bei 45 %. Es kostet die Mannschaft kaum etwas, deshalb wählt
+  auch eine KI mit Warte-Option fast nie das Warten.
