@@ -141,3 +141,44 @@ hinter `sandsackVorschauAktiv` oder in der neuen Probe. Keine Zeile an
   `sandsackTragePoseProbe`.
 * `scripts/screenshot-sandsack-trage-pose.mjs` (neu).
 * Drei PNGs und dieses Dokument unter `docs/design/`.
+
+## 8. Nachtrag 05.10.: Jutesack statt „Kuchen“, kein Schild beim Tragen
+
+Rückmeldung von Chris (Ramona hat mitgeschaut) auf die Screenshots oben:
+„Das sieht aus wie Kuchen, eher wie Sandsäcke wäre gut“ und „Die Leute sollten kein Schild
+tragen.“ Weiter reine Präsentation (Klasse A), weiter nur hinter `sandsackVorschauAktiv`.
+
+**Sackform** (`sandsackVizZeichneSack()`, `SANDSACK_VIZ_STUFEN`). Das abgerundete Rechteck
+mit waagrechten Trennstrichen und Dreiecks-Zipfel las als Tortenschicht. Jetzt ein liegender
+Jutesack: unregelmäßiger, praller Umriss mit zwei Eck-„Ohren“ am zugenähten Ende, am anderen
+Ende zum Hals gerafft und mit einer Kordel abgebunden (herabhängendes Kordelende), darüber der
+ausgefranste Zipfel schräg nach oben. Falten laufen vom Abbinder in den Bauch, Sackleinen als
+Diagonal-Webmuster, Licht oben/Last unten. `naht` zählt jetzt **Kreuzstich**-Nähte (1 =
+zugenähtes Ende, 2 = + Längsnaht, 3 = + aufgenähter Flicken), Stufe 6 bekommt statt des
+schwarzen Querbalkens einen quer umgeschlungenen, gedrehten Strick. Die sechs Stufen sind
+länglicher (w/h ≈ 1,6 statt 1,4: 16×10 … 26×15,5) und werden mit `bauch` 0,90 … 1,15
+zunehmend praller. Neuer optionaler Parameter `{richtung, haengen}`: das Bindeende zeigt auf
+der Schulter nach hinten, und die Enden hängen über die Schulter herab (`haengen` 0,6);
+umarmt und am Boden zeigt es nach vorn, im Depot-Stapel abwechselnd.
+
+**Kein Schild.** Neue Aufrufer-Flagge `u.vizOhneSchild` in `zeichneSprite()` (neben der
+bestehenden Football-Sperre); ohne die Flagge bleibt der Schild überall wie bisher. Gesetzt
+nur in der Sandsack-Szene: Trage-Pose (alle sechs Stufen, Pause, Rutscher/Bücken, auch die
+Vollbild-Fassung), Rückweg leer, Wartezone am Depot (als Kopie, sonst tauchte der Schild
+zwischen zwei Gängen auf und verschwände wieder), Handfarben-Messbild und die Probe.
+Waffen waren schon vorher unterdrückt (`vizWaffe:null`); Helm, Krone und Rüstung bleiben.
+
+Screenshots (gleicher Mechanismus, `scripts/screenshot-sandsack-trage-pose.mjs`, vorher =
+die drei Bilder aus Abschnitt 3):
+
+* `gewichtheben-sandsack-jutesack-ohne-schild-galerie-05-10.png`: sechs Figuren × Stufe 1–6,
+  Pause, Rutscher, leer (Draco und Johanna ohne Schild)
+* `gewichtheben-sandsack-jutesack-ohne-schild-szene-05-10.png`: Szene in Spielgröße
+* `gewichtheben-sandsack-jutesack-ohne-schild-szene-05-10-stufen.png`: Stufen 2–6 in der
+  Szene (Stufe 1 hat in diesem Duell keinen Trip, wie vorher)
+
+Das Skript schließt jetzt die erste Seite, bevor die zweite (dreifache Pixeldichte) lädt, und
+startet Chromium mit `--disable-gpu`. Zwei gleichzeitige Renderer der großen Seite stürzten in
+der Agenten-Umgebung reproduzierbar ab, auch mit dem unveränderten Motor.
+
+Isolationsnachweis: `miss-alle-disziplinen.mjs 4` byte-identisch gegen `bf1403e4` (alle 20).
