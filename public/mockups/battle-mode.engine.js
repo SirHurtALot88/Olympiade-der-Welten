@@ -16002,6 +16002,9 @@
     // WEG C (BUEHNE_FLAGS.gewichthebenSandsack>=1, Stufe 2): drei Sandsack-Laeufe ERSETZEN die
     // sechs Hantel-Duelle (und damit auch das additive Paket-1-Finale, das nach den Duellen
     // liefe). Bei Flag 0 (Standard) bleibt die Zeile darunter exakt wie vorher.
+    // 2..5: Weg C im Sechser-Bild, reine MESSVARIANTE (docs/design/gewichtheben-sandsack-wegc-
+    // 6v6-vergleich-05-10.md), s. baueSandsack6v6(). 0 und 1 laufen unveraendert.
+    if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=2){ baueSandsack6v6(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=1){ baueSandsackWegC(art,mine,gegner,saat); return; }
     if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
     // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
@@ -16898,13 +16901,16 @@
       while(i<station.saecke.length){
         if(t>=SANDSACK_ZEITLIMIT){ zeitlimitErreicht=true; break; }
         const carrier=leute[partnerIdx%leute.length];
+        // gangStart/pauseDauer: nur fuer das Protokoll (Weg-C-6v6-Messvariante, s.
+        // baueSandsack6v6), dieselbe Rechnung wie vorher.
+        const gangStart=t; let pauseDauer=0;
         // Pause: deterministisch, VOR dem Gang (Opus 4.6).
         let eStand=getE(carrier);
         const schwelle=SANDSACK_PAUSE_SCHWELLE_BASIS+SANDSACK_PAUSE_SCHWELLE_NERVEN_K*(carrier.NERVEN-50);
         if(eStand>=schwelle){
           const ziel=schwelle-SANDSACK_PAUSE_ZIEL_ABSTAND;
           const rate=SANDSACK_PAUSE_RATE_BASIS+SANDSACK_PAUSE_RATE_ERHOLUNG_K*carrier.ERHOLUNG/100;
-          t+=(eStand-ziel)/rate; pausenN++; pausen.push({u:carrier});
+          pauseDauer=(eStand-ziel)/rate; t+=pauseDauer; pausenN++; pausen.push({u:carrier});
           setE(carrier,ziel); eStand=ziel;
         }
         // Doppeln: deterministisch, nur Station A/B (Opus 4.3).
@@ -16936,7 +16942,11 @@
           const partner=leute[(partnerIdx+1)%2];
           setE(partner,getE(partner)-(SANDSACK_RAST_E_BASIS+SANDSACK_RAST_E_ERHOLUNG_K*partner.ERHOLUNG/100)*dauer);
         }
-        protokoll.push({u:carrier,kg,saecke:saeckeDiesmal,rutscher,doppelt});
+        // Felder ab stationIdx: additiv (Weg-C-6v6-Messvariante, Tragenote je Gang), von
+        // Paket 1/2 nicht gelesen.
+        protokoll.push({u:carrier,kg,saecke:saeckeDiesmal,rutscher,doppelt,
+          stationIdx:s, kgListe:doppelt?[station.saecke[i],station.saecke[i+1]]:[station.saecke[i]],
+          gangDauer:dauer, pauseDauer, start:gangStart, ende:t});
         abgeliefertKg+=kg; saeckeGesamt+=saeckeDiesmal;
         i+=saeckeDiesmal; sackIdx+=saeckeDiesmal;
         if(leute.length===2)partnerIdx++;
@@ -17414,6 +17424,105 @@
     const seiten=[0,1].map(s=>laeufe.filter(L=>L.sieger===s).length);
     SANDSACK_WEGC={laeufe, seiten,
       sendezeitSim:+laeufe.reduce((a,L)=>a+L.ende,0).toFixed(2),
+      abgeliefertKg:[0,1].map(s=>laeufe.reduce((a,L)=>a+L.abgeliefertKg[s],0))};
+    buehneQueue=[];
+  }
+
+  // =====================================================================================
+  // WEG C IM SECHSER-BILD — REINE MESSVARIANTE (05.10., docs/design/gewichtheben-sandsack-wegc-
+  // 6v6-vergleich-05-10.md). Chris' Frage: wie saehe Weg C aus, wenn statt der Paare (Stufe 2)
+  // das Paket-1-Sechserbild laeuft — alle sechs eines Teams in EINEM Rennen, Lastenplan
+  // Staffel/Stationen/Anker aus der Persoenlichkeit? Aktiv NUR bei
+  // BUEHNE_FLAGS.gewichthebenSandsack 2..5 (Messskripte, --flags=...), nie im Spiel, kein Bild:
+  //   2  drei volle 6-gegen-6-Rennen, Mannschaft = gewonnene Rennen (bestes aus drei)
+  //   3  EIN 6-gegen-6-Rennen ersetzt die sechs Duelle (Referenzpunkt; Rennen 1 ist Zeichen fuer
+  //      Zeichen das Paket-1-Finale, das bei Flag 0 additiv hinter den Duellen laeuft)
+  //   4  wie 2, aber Plan fuer jedes Team Staffel erzwungen (alle sechs tragen) — Diagnose: die
+  //      fuer die Rangtreue guenstigste Sechser-Fassung, NICHT Chris' Lastenplan
+  //   5  wie 3 (EIN Rennen), Plan Staffel erzwungen — dieselbe Diagnose im Sendezeit-Fenster
+  // WIEDERVERWENDET, UNVERAENDERT: sandsackLastenplan() (Plan aus Persoenlichkeit),
+  // sandsackZuteilung() (wer welche Station), sandsackWuerfe() (Falle 17), sandsackSeiteLauf()
+  // (das Rennen: Paket-1b-Konstanten, volle Strecke, 15 Saecke, Zeitlimit 190 s) und
+  // sandsackWegCMedley() (Laufsieger). Neu ist nur der Spielerwert: dieselbe Tragenote per
+  // Inversion wie Stufe 2 (sandsackWegCNoteInvers), gemessen gegen die Paket-1-Stationen und
+  // -Konstanten, ueber die eigenen Gaenge ALLER Rennen. Plan und Zuteilung haengen nicht am
+  // Zufall — wer in Rennen 1 nichts traegt, traegt auch in Rennen 2 und 3 nichts und hat
+  // keinen Spielerwert (summe 0, wie ein Heber ohne gueltigen Versuch).
+  // Erschoepfung beginnt in jedem Rennen bei 0 (eigene Rennen mit Pause dazwischen).
+  // =====================================================================================
+  const SANDSACK_6V6_VARIANTEN={2:{laeufe:3,plan:null},3:{laeufe:1,plan:null},4:{laeufe:3,plan:"staffel"},5:{laeufe:1,plan:"staffel"}};
+  function sandsack6v6RefLast(v,g){
+    const station=SANDSACK_STATIONEN[g.stationIdx], prof=sandsackWegCRefProfil(v);
+    return g.kgListe.reduce((a,kg)=>a+sandsackGang(prof,kg,station,0,1).dauer,0);
+  }
+  // Wie sandsackWegCNoteInvers(), nur mit sandsack6v6RefLast (Paket-1-Stationen/-Konstanten).
+  function sandsack6v6Note(gaenge){
+    let summe=0, gewicht=0;
+    for(const g of gaenge){
+      const eigen=g.gangDauer+g.pauseDauer;
+      let lo=0, hi=100;
+      if(sandsack6v6RefLast(hi,g)>=eigen)lo=hi;
+      else if(sandsack6v6RefLast(lo,g)<=eigen)hi=lo;
+      else for(let it=0;it<24;it++){ const m=(lo+hi)/2; if(sandsack6v6RefLast(m,g)>eigen)lo=m; else hi=m; }
+      const v=(lo+hi)/2;
+      const w=Math.log(sandsack6v6RefLast(40,g)/sandsack6v6RefLast(60,g));
+      summe+=v*w; gewicht+=w;
+    }
+    return gewicht>0?summe/gewicht:null;
+  }
+  function baueSandsack6v6(art,mine,gegner,saat){
+    const V=SANDSACK_6V6_VARIANTEN[BUEHNE_FLAGS.gewichthebenSandsack]||SANDSACK_6V6_VARIANTEN[2];
+    // Aufbau je Seite genau wie baueSandsackFinale(): Plan aus der Persoenlichkeit, Bahnen aus
+    // sandsackZuteilung().
+    const seitenDaten=[mine,gegner].map((spieler,side)=>{
+      const u6=spieler.map(p=>TEILNEHMER.find(x=>x.side===side&&x.n===p.n)).filter(Boolean);
+      const personenMitU=spieler.filter(p=>u6.some(u=>u.n===p.n));
+      const lp=sandsackLastenplan(personenMitU.length?personenMitU:spieler);
+      const plan=V.plan||lp.plan;
+      return {u6, plan, teamScore:+lp.mittel.toFixed(3), bahnen:sandsackZuteilung(plan,u6)};
+    });
+    const leer={zeit:Infinity,fertig:false,abgeliefertKg:0,saecke:0,rutscherN:0,pausenN:0,doppeltN:0,protokoll:[],pausen:[]};
+    const laeufe=[], gaengeVon=new Map();
+    for(let nr=0;nr<V.laeufe;nr++){
+      // Rennen 1 mit der rohen Saat (= Paket-1-Finale), Rennen 2/3 mit eingemischter Nummer.
+      const saatLauf=nr===0?saat:((normalisiereSaat(saat)^Math.imul(nr,0x5BD1E995))>>>0);
+      const ls=seitenDaten.map((S,side)=>S.u6.length?sandsackSeiteLauf(S.bahnen,sandsackWuerfe(saatLauf,side)):leer);
+      let sieger=sandsackWegCMedley(ls[0],ls[1]);
+      if(sieger==null)sieger=cypherHash(normalisiereSaat(saatLauf),977)%2;
+      for(const L of ls)for(const e of L.protokoll){
+        if(!gaengeVon.has(e.u))gaengeVon.set(e.u,[]);
+        gaengeVon.get(e.u).push(e);
+      }
+      const zeit=ls.map(L=>L.zeit);
+      laeufe.push({nr, sieger, plan:seitenDaten.map(S=>S.plan), teamScore:seitenDaten.map(S=>S.teamScore),
+        // Ende im Bild: Sieger im Ziel (ohne Fertige: letzter begonnener Gang); endeBeide: bis auch
+        // die Verlierer fertig sind (so zeigt es die Paket-2-Szene).
+        ende:+(ls[sieger].fertig?zeit[sieger]:Math.max(...zeit)).toFixed(2),
+        endeBeide:+Math.max(...zeit).toFixed(2),
+        zeit:zeit.map(t=>+t.toFixed(2)), fertig:ls.map(L=>L.fertig),
+        abgeliefertKg:ls.map(L=>L.abgeliefertKg), saecke:ls.map(L=>L.saecke),
+        rutscher:ls.map(L=>L.rutscherN), pausen:ls.map(L=>L.pausenN), doppelt:ls.map(L=>L.doppeltN),
+        traeger:ls.map(L=>[...new Set(L.protokoll.map(e=>e.u.n))])});
+    }
+    for(const u of TEILNEHMER){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.lastKg=0; u.lastSaecke=0; u.lastRutscher=0; u.lastPausen=0; u.lastDoppelt=0;
+      u.laufNr=null; u.laufGewonnen=false; u.tragenote=null;
+    }
+    for(const [u,gs] of gaengeVon){
+      const note=sandsack6v6Note(gs);
+      u.tragenote=note==null?null:+note.toFixed(2);
+      u.summe=note==null?0:Math.round(note*10);
+      u.lastKg=gs.reduce((a,g)=>a+g.kg,0); u.lastSaecke=gs.reduce((a,g)=>a+g.saecke,0);
+      u.lastRutscher=gs.filter(g=>g.rutscher).length; u.lastPausen=gs.filter(g=>g.pauseDauer>0).length;
+      u.lastDoppelt=gs.filter(g=>g.doppelt).length;
+      // Diagnose (Sonde): an welchen Stationen dieser Spieler getragen hat.
+      u.sandsack6v6Stationen=[...new Set(gs.map(g=>SANDSACK_STATIONEN[g.stationIdx].id))].join("+");
+    }
+    const seiten=[0,1].map(s=>laeufe.filter(L=>L.sieger===s).length);
+    SANDSACK_WEGC={format:"6v6", variante:BUEHNE_FLAGS.gewichthebenSandsack, laeufe, seiten,
+      sendezeitSim:+laeufe.reduce((a,L)=>a+L.ende,0).toFixed(2),
+      sendezeitBeide:+laeufe.reduce((a,L)=>a+L.endeBeide,0).toFixed(2),
       abgeliefertKg:[0,1].map(s=>laeufe.reduce((a,L)=>a+L.abgeliefertKg[s],0))};
     buehneQueue=[];
   }
@@ -46803,7 +46912,9 @@
       const g=M.sichern(); if(M.vorher)M.vorher();
       const flagVorher=BUEHNE_FLAGS.gewichthebenSandsack, mutatorenVorher=MUTATOREN;
       const o=opt||{};
-      BUEHNE_FLAGS.gewichthebenSandsack=1;
+      // `opt.flag` (optional, nur Messung): 2..5 = Sechser-Bild-Messvariante (baueSandsack6v6),
+      // ohne Angabe 1 = Weg C Stufe 2 wie bisher.
+      BUEHNE_FLAGS.gewichthebenSandsack=o.flag!=null?Number(o.flag):1;
       try{
         if(o.formSaat!=null)zieheFormkarten(o.formSaat);
         if(o.mutatorSaat!=null)MUTATOREN=zieheMutatorenWieSpiel(o.mutatorSaat);
@@ -46817,7 +46928,9 @@
           soloNote:sandsackWegCNote(sandsackWegCSimuliere({traeger:SANDSACK_WEGC_SACK_STATION.map(()=>u)},[u],()=>1,null,null).gaenge),
           laufNr:u.laufNr, laufGewonnen:u.laufGewonnen, lastKg:u.lastKg, lastSaecke:u.lastSaecke,
           lastRutscher:u.lastRutscher, lastPausen:u.lastPausen, lastDoppelt:u.lastDoppelt,
-          LAST:u.LAST, TECHNIK:u.TECHNIK, NERVEN:u.NERVEN, ANSAGE:u.ANSAGE, ERHOLUNG:u.ERHOLUNG}));
+          LAST:u.LAST, TECHNIK:u.TECHNIK, NERVEN:u.NERVEN, ANSAGE:u.ANSAGE, ERHOLUNG:u.ERHOLUNG,
+          // nur Sechser-Bild-Messvariante (Flag 2..5): Stationen, an denen er getragen hat
+          ...(u.sandsack6v6Stationen!=null?{stationen6v6:u.sandsack6v6Stationen}:{})}));
         // `opt.hantelVergleich` (optional, nur Messung): DASSELBE Spiel (gleiche Saat, gleiche
         // Formkarten, gleicher Mutator-Wurf, gleiche Aufstellung) noch einmal im heutigen Format
         // (Flag 0: sechs Hantel-Duelle + additives Paket-1-Finale) -- fuer den Vergleich der
