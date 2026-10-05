@@ -15606,6 +15606,9 @@
   //                           ERSETZEN die sechs Duelle (docs/design/gewichtheben-sandsack-
   //                           finale-wegc-format-05-10.md). Mechanik headless; Boxscore/HUD/
   //                           Kaderbildschirm/Sonden-Skripte (Stufe 3) sind NICHT verdrahtet.
+  //                       2..5 Sechser-Bild sequentiell (Messvariante, s. baueSandsack6v6)
+  //                       6/7  Sechser-Bild PARALLEL an drei Stationen (Messvariante, s.
+  //                            baueSandsackParallel): 6 Zuteilung nach LAST, 7 per Formel
   //
   // Gesetzt nur ueber window.__arena.buehneFlags({...}) (Messskripte: --flags=...) oder, fuer
   // den Headless-Runner, ueber window.__olyBuehneFlags vor dem Laden. Die echte App setzt
@@ -16004,6 +16007,9 @@
     // liefe). Bei Flag 0 (Standard) bleibt die Zeile darunter exakt wie vorher.
     // 2..5: Weg C im Sechser-Bild, reine MESSVARIANTE (docs/design/gewichtheben-sandsack-wegc-
     // 6v6-vergleich-05-10.md), s. baueSandsack6v6(). 0 und 1 laufen unveraendert.
+    // 6/7: Weg C PARALLEL (alle sechs gleichzeitig an drei Stationen), reine MESSVARIANTE
+    // (docs/design/gewichtheben-sandsack-wegc-parallel-stationen-05-10.md), s. baueSandsackParallel().
+    if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=6){ baueSandsackParallel(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=2){ baueSandsack6v6(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=1){ baueSandsackWegC(art,mine,gegner,saat); return; }
     if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
@@ -17524,6 +17530,255 @@
       sendezeitSim:+laeufe.reduce((a,L)=>a+L.ende,0).toFixed(2),
       sendezeitBeide:+laeufe.reduce((a,L)=>a+L.endeBeide,0).toFixed(2),
       abgeliefertKg:[0,1].map(s=>laeufe.reduce((a,L)=>a+L.abgeliefertKg[s],0))};
+    buehneQueue=[];
+  }
+
+  // =====================================================================================
+  // WEG C PARALLEL — ALLE SECHS GLEICHZEITIG AN DEN STATIONEN (05.10., docs/design/
+  // gewichtheben-sandsack-wegc-parallel-stationen-05-10.md). REINE MESSVARIANTE wie 2..5,
+  // aktiv NUR bei BUEHNE_FLAGS.gewichthebenSandsack 6/7 (Messskripte, --flags=...), kein Bild.
+  //
+  // Chris' Korrektur zum sequentiellen Sechser-Bild (Flag 2..5), woertlich: "6v6 muss
+  // funktionieren, ALLE sollen gleichzeitig aktiv sein! nicht nacheinander. Sie sollen sich
+  // dann nur aufteilen auf die Stationen. Zb sind die schwersten Saecke in Station 3 und da
+  // gehen zb die starken Spieler hin. Die leichten Saecke muessen vom Start also Station 1 bis
+  // zur Endstation getragen werden, die schweren von Station 3 nur bis zur Endstation."
+  //
+  // UMSETZUNG (Annahmen im Dokument, Abschnitt 1, ausdruecklich als Annahmen markiert):
+  //   * Eine gerade Bahn: Start = Station 1 — Station 2 — Station 3 — Silo (Endstation), je
+  //     8 m Abstand. Tragestrecke also 24 / 16 / 8 m — genau die Paket-1-Strecken, die damit
+  //     zum ersten Mal eine zusammenhaengende Geometrie bekommen.
+  //   * JEDE Station hat EINE feste Sackklasse (SANDSACK_PAR_KONF.kg1..kg3), leicht/mittel/
+  //     schwer; nichts steigt mit der Zeit.
+  //   * Zwei Spieler je Station (bei sechs je Seite). Beide tragen GLEICHZEITIG, jeder auf
+  //     eigener Spur vom eigenen Stapel — kein Warten, kein Wechsel, keine Staffel.
+  //   * Eine SCHICHT mit festem Zeitfenster (SANDSACK_PAR_KONF.zeitfenster Sim-Sekunden):
+  //     jeder traegt in Zyklen (holen -> zum Silo -> zurueck) bis zur Schlusshupe. Ein Sack
+  //     zaehlt, wenn er VOR der Hupe im Silo liegt. Mannschaft: mehr kg im Silo gewinnt (dann
+  //     mehr Saecke, dann Los aus cypherHash, kein rr()).
+  //   * Am Silo wird jeder Sack gewuchtet (kante:true fuer alle drei Stationen — es ist
+  //     derselbe Silo); Doppeln (zwei Saecke auf einmal, ANSAGE) nur an Station 1/2.
+  //   * STATIONSZUTEILUNG (Team-Taktik):
+  //       Flag 6  Standardregel: nach LAST sortiert (dasselbe Sub-Skill, das heute die
+  //               Traglast K = 30 + 1,3*LAST bestimmt) — die zwei Staerksten an Station 3,
+  //               die naechsten zwei an Station 2, der Rest an Station 1.
+  //       Flag 7  "Manager rechnet": von allen 90 Aufteilungen 2/2/2 die mit der hoechsten
+  //               erwarteten Silo-Menge (dieselbe Formel, ohne Rutscher) — die Obergrenze
+  //               dessen, was eine Taktikwahl ueberhaupt herausholen kann.
+  //
+  // WIEDERVERWENDET, UNVERAENDERT: sandsackGang() (Gangzeit + Rutscher, mit eigenem
+  // Konstantensatz `k` wie Weg C), die Paket-1b-Formeln fuer Pause, Erschoepfung, Doppeln,
+  // die Medley-Logik (kg, dann Saecke) und der Spielerwert per Inversion (Stufe 2, 3.4):
+  // Tragenote = die Stufe v, bei der ein Referenztraeger (alle fuenf Sub-Skills = v) fuer
+  // GENAU DIESE Last an DIESER Station so lange braeuchte. Die Note haengt damit nicht daran,
+  // WELCHE Station einer bekommen hat — sonst stuende der Rang schon mit der Zuteilung fest
+  // (genau die Falle, die die 6v6-Messung bei "alle tragen" fand, Abschnitt 3 dort).
+  // =====================================================================================
+  // DIE HEBEL DIESER MESSVARIANTE (Startwerte = gemessener Stand, Doku Abschnitt 4).
+  // Veraenderlich NUR ueber window.__arena.sandsackParKalib() bzw. window.__olySandsackParKalib
+  // vor dem Laden (Messlaeufe), nie im Spiel:
+  //   zeitfenster       Schichtlaenge in Sim-Sekunden (1:1-Wiedergabe = Sendezeit der Schicht)
+  //   kg1/kg2/kg3       feste Sackklasse je Station
+  //   d1/d2/d3          Tragestrecke Station -> Silo
+  //   ermuedungFaktor   Erschoepfung je Gang mal Faktor (Paket-1b-Formel, die fuer EINEN Gang
+  //                     je 15 Saecke gebaut war; hier traegt jeder ununterbrochen)
+  //   pauseSchwelle     E-Schwelle der Pause bei NERVEN 50 (Paket 1: 50)
+  //   rastK             Erholung auf dem Rueckweg: E -= rastK*ERHOLUNG/100*d/20 (Paket 1: 2)
+  //   noteModus         0 Gang-Inversion (Stufe 2, je Gang gegen einen Referenz-Gang)
+  //                     1 Schicht-Inversion: die Stufe v, bei der ein Referenztraeger an
+  //                       DERSELBEN Station unter denselben Regeln (eigenes Doppeln, eigene
+  //                       Pausen, eigene Ermuedung) seinen n-ten Sack im selben Moment im Silo
+  //                       haette wie der Spieler (n = abgelieferte Saecke des Spielers)
+  //   doppeln           1 Doppeln an Station 1/2 erlaubt (Paket-1-Regel), 0 nie
+  //   zuteilungHeim/-Gast  0 wie das Flag (6 LAST, 7 Formel), 1 LAST, 2 Formel — je Seite, fuer
+  //                     die Messung "bringt die Manager-Wahl im direkten Duell etwas?"
+  const SANDSACK_PAR_KONF={zeitfenster:150, kg1:35, kg2:80, kg3:115, d1:24, d2:16, d3:8,
+    noteModus:1, doppeln:1, zuteilungHeim:0, zuteilungGast:0,
+    ermuedungFaktor:0.15, pauseSchwelle:SANDSACK_PAUSE_SCHWELLE_BASIS, rastK:SANDSACK_RUECKWEG_E_K,
+    kLast:SANDSACK_K_LAST, wagnisFlex:SANDSACK_WAGNIS_FLEX, vleerTechnikK:SANDSACK_VLEER_TECHNIK_K,
+    bissNervenK:SANDSACK_BISS_NERVEN_K, rutscherTechnikK:SANDSACK_RUTSCHER_TECHNIK_K,
+    doppelnSchwelle:SANDSACK_DOPPELN_SCHWELLE, doppelnAnsageK:SANDSACK_DOPPELN_ANSAGE_K};
+  try{
+    const startKalib=window.__olySandsackParKalib;
+    if(startKalib&&typeof startKalib==="object")
+      for(const k of Object.keys(SANDSACK_PAR_KONF))
+        if(Number.isFinite(Number(startKalib[k])))SANDSACK_PAR_KONF[k]=Number(startKalib[k]);
+  }catch(e){}
+  const SANDSACK_PAR_WUERFE=96; // feste Ziehungen je Spieler (Falle 17), mehr als je ein Spieler traegt
+  const sandsackParStationen=()=>{
+    const K=SANDSACK_PAR_KONF;
+    return [
+      {id:"station1", label:"Station 1", fableLabel:"Depot", kg:K.kg1, d:K.d1, steig:1, kante:true, doppelnErlaubt:true},
+      {id:"station2", label:"Station 2", fableLabel:"Steg",  kg:K.kg2, d:K.d2, steig:1, kante:true, doppelnErlaubt:true},
+      {id:"station3", label:"Station 3", fableLabel:"Rampe & Silo", kg:K.kg3, d:K.d3, steig:1, kante:true, doppelnErlaubt:false}
+    ];
+  };
+  // EIGENER SAATSTROM JE SPIELER (Falle 17 wie Paket 1): feste Folge nach Sack-Index, je Seite
+  // und Aufstellungsplatz eine eigene, kein Zugriff auf rr(). Doppeln verbraucht zwei Indizes.
+  function sandsackParWuerfe(saat,seite,platz){
+    let s=(normalisiereSaat(saat)^(seite===1?0x9E3779B1:0x2545F491)^Math.imul(platz+1,0x27D4EB2F)^0x50415241)>>>0;
+    const z=[];
+    for(let i=0;i<SANDSACK_PAR_WUERFE;i++){ s=(s*1664525+1013904223)>>>0; z.push(s/4294967296); }
+    return z;
+  }
+  // EINE SCHICHT FUER EINEN TRAEGER an seiner Station, unabhaengig von allen anderen (eigene
+  // Spur, eigener Stapel). Dieselbe Reihenfolge wie sandsackSeiteLauf(): Pause vor dem Gang ->
+  // Doppeln -> Gang -> Erschoepfung danach. `ablieferung` = Zeitpunkt, an dem der Sack im Silo
+  // liegt (Gang ohne den Rueckweg); nur Saecke mit ablieferung <= zeitfenster zaehlen.
+  // `wurfVon(i)` liefert den Rutscher-Wurf je Sack-Index; ()=>1 = ohne Rutscher (Schaetzung).
+  function sandsackParSchicht(u,station,wurfVon,zeitfenster,bisSaecke){
+    const KO=SANDSACK_PAR_KONF;
+    let t=0, E=0, sackIdx=0;
+    const gaenge=[];
+    for(let guard=0;guard<SANDSACK_PAR_WUERFE;guard++){
+      if(bisSaecke!=null&&sackIdx>=bisSaecke)break;
+      const gangStart=t;
+      let eStand=E, pauseDauer=0;
+      const schwelle=KO.pauseSchwelle+SANDSACK_PAUSE_SCHWELLE_NERVEN_K*(u.NERVEN-50);
+      if(eStand>=schwelle){
+        const ziel=Math.max(0,schwelle-SANDSACK_PAUSE_ZIEL_ABSTAND);
+        const rate=SANDSACK_PAUSE_RATE_BASIS+SANDSACK_PAUSE_RATE_ERHOLUNG_K*u.ERHOLUNG/100;
+        pauseDauer=(eStand-ziel)/rate; eStand=ziel;
+      }
+      let kgListe=[station.kg], doppelt=false;
+      if(station.doppelnErlaubt&&KO.doppeln){
+        const K=SANDSACK_K_BASIS+KO.kLast*u.LAST;
+        const Kf=K*(1+KO.wagnisFlex*(u.ANSAGE-50));
+        if(2*station.kg/Kf<=KO.doppelnSchwelle+KO.doppelnAnsageK*(u.ANSAGE-50)){ kgListe=[station.kg,station.kg]; doppelt=true; }
+      }
+      const kg=kgListe.reduce((a,b)=>a+b,0);
+      const g=sandsackGang(u,kg,station,eStand,wurfVon(sackIdx),KO);
+      // Rueckweg genau wie in sandsackGang() (letzter Summand dort) — abgezogen ergibt das den
+      // Moment, in dem der Sack im Silo liegt.
+      const vLeer=SANDSACK_VLEER_BASIS+KO.vleerTechnikK*u.TECHNIK;
+      const rueck=station.d/(vLeer*Math.max(0.1,1-SANDSACK_RUECKWEG_ERMUEDUNG_K*eStand/100));
+      const ablieferung=gangStart+pauseDauer+g.dauer-rueck;
+      if(ablieferung>zeitfenster)break; // Hupe: Sack noch nicht im Silo
+      t=gangStart+pauseDauer+g.dauer;
+      let e2=eStand+KO.ermuedungFaktor*SANDSACK_ERMUEDUNG_K*g.r*g.r*(station.d*station.steig/20)
+        *(SANDSACK_ERMUEDUNG_ERHOLUNG_BASIS-SANDSACK_ERMUEDUNG_ERHOLUNG_K*u.ERHOLUNG/100);
+      if(g.rutscher)e2+=SANDSACK_RUTSCHER_E_ZUSCHLAG;
+      e2-=KO.rastK*(u.ERHOLUNG/100)*(station.d/20);
+      E=Math.max(0,e2);
+      gaenge.push({u, kgListe, kg, saecke:kgListe.length, doppelt, rutscher:g.rutscher, eVor:eStand,
+        pauseDauer, gangDauer:g.dauer, start:gangStart, ablieferung, ende:t, sackIdx});
+      sackIdx+=kgListe.length;
+    }
+    return gaenge;
+  }
+  // Tragenote per Inversion (wie sandsackWegCNoteInvers), gegen die Parallel-Station. Alle Gaenge
+  // eines Spielers liegen an derselben Station mit derselben Last; das Gewicht w_g bleibt trotzdem
+  // drin (Doppel-Gaenge trennen anders als Einzel-Gaenge).
+  function sandsackParRefLast(v,g,station){
+    const prof=sandsackWegCRefProfil(v);
+    return g.kgListe.reduce((a,kg)=>a+sandsackGang(prof,kg,station,0,1,SANDSACK_PAR_KONF).dauer,0);
+  }
+  // SCHICHT-INVERSION (noteModus 1): Zeitpunkt, an dem ein Referenztraeger der Stufe v an dieser
+  // Station seinen n-ten Sack im Silo hat (frisch, ohne Rutscher, ohne Zeitfenster).
+  function sandsackParRefSchicht(v,station,n){
+    const gs=sandsackParSchicht(sandsackWegCRefProfil(v),station,()=>1,Infinity,n);
+    return gs.length?gs[gs.length-1].ablieferung:0;
+  }
+  function sandsackParNoteSchicht(gaenge,station){
+    if(!gaenge.length)return null;
+    const n=gaenge.reduce((a,g)=>a+g.saecke,0), eigen=gaenge[gaenge.length-1].ablieferung;
+    let lo=0, hi=100;
+    if(sandsackParRefSchicht(hi,station,n)>=eigen)return 100;
+    if(sandsackParRefSchicht(lo,station,n)<=eigen)return 0;
+    for(let it=0;it<20;it++){ const m=(lo+hi)/2; if(sandsackParRefSchicht(m,station,n)>eigen)lo=m; else hi=m; }
+    return (lo+hi)/2;
+  }
+  function sandsackParNote(gaenge,station){
+    if(SANDSACK_PAR_KONF.noteModus===1)return sandsackParNoteSchicht(gaenge,station);
+    let summe=0, gewicht=0;
+    for(const g of gaenge){
+      const eigen=g.gangDauer+g.pauseDauer;
+      let lo=0, hi=100;
+      if(sandsackParRefLast(hi,g,station)>=eigen)lo=hi;
+      else if(sandsackParRefLast(lo,g,station)<=eigen)hi=lo;
+      else for(let it=0;it<24;it++){ const m=(lo+hi)/2; if(sandsackParRefLast(m,g,station)>eigen)lo=m; else hi=m; }
+      const v=(lo+hi)/2;
+      const w=Math.log(sandsackParRefLast(40,g,station)/sandsackParRefLast(60,g,station));
+      summe+=v*w; gewicht+=w;
+    }
+    return gewicht>0?summe/gewicht:null;
+  }
+  // STATIONSZUTEILUNG. Rueckgabe: Stationsindex (0..2) je Spieler in u6-Reihenfolge.
+  // Plaetze je Station: n=6 -> 2/2/2; allgemein Rang i (nach LAST absteigend) -> Station
+  // 2-floor(3i/n), damit bei kleineren Kadern (--je-seite) Station 3 zuerst besetzt wird.
+  function sandsackParZuteilung(u6,modus){
+    const n=u6.length;
+    const rangStation=(i)=>2-Math.floor(3*i/n);
+    const nachLast=u6.map((u,i)=>({u,i})).sort((a,b)=>b.u.LAST-a.u.LAST||a.i-b.i);
+    const regel=new Array(n);
+    nachLast.forEach((x,rang)=>{ regel[x.i]=rangStation(rang); });
+    if(modus!=="formel"||n<2)return regel;
+    // "Manager rechnet": alle Aufteilungen mit denselben Platzzahlen je Station, erwartete
+    // Silo-kg ohne Rutscher (Schaetzung je Spieler und Station einmal vorab).
+    const st=sandsackParStationen(), T=SANDSACK_PAR_KONF.zeitfenster;
+    const kgVon=u6.map(u=>st.map(s=>sandsackParSchicht(u,s,()=>1,T).reduce((a,g)=>a+g.kg,0)));
+    const plaetze=[0,0,0]; regel.forEach(s=>plaetze[s]++);
+    let beste=null;
+    const zut=new Array(n), frei=plaetze.slice();
+    const suche=(i,summe)=>{
+      if(i===n){ if(!beste||summe>beste.summe)beste={summe,zut:zut.slice()}; return; }
+      for(let s=2;s>=0;s--){ if(!frei[s])continue; frei[s]--; zut[i]=s; suche(i+1,summe+kgVon[i][s]); frei[s]++; }
+    };
+    suche(0,0);
+    return beste.zut;
+  }
+  function baueSandsackParallel(art,mine,gegner,saat){
+    const modus=BUEHNE_FLAGS.gewichthebenSandsack===7?"formel":"last";
+    const st=sandsackParStationen(), T=SANDSACK_PAR_KONF.zeitfenster;
+    for(const u of TEILNEHMER){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.lastKg=0; u.lastSaecke=0; u.lastRutscher=0; u.lastPausen=0; u.lastDoppelt=0;
+      u.laufNr=null; u.laufGewonnen=false; u.tragenote=null; u.parStation=null;
+    }
+    const seitenDaten=[mine,gegner].map((spieler,side)=>{
+      const u6=spieler.map(p=>TEILNEHMER.find(x=>x.side===side&&x.n===p.n)).filter(Boolean);
+      const wahl=side===0?SANDSACK_PAR_KONF.zuteilungHeim:SANDSACK_PAR_KONF.zuteilungGast;
+      const zut=sandsackParZuteilung(u6,wahl===1?"last":(wahl===2?"formel":modus));
+      const traeger=u6.map((u,platz)=>{
+        const w=sandsackParWuerfe(saat,side,platz);
+        const gaenge=sandsackParSchicht(u,st[zut[platz]],(i)=>w[i]??1,T);
+        return {u, station:zut[platz], gaenge};
+      });
+      const alle=traeger.flatMap(t=>t.gaenge);
+      return {u6, traeger,
+        kg:alle.reduce((a,g)=>a+g.kg,0), saecke:alle.reduce((a,g)=>a+g.saecke,0),
+        kgm:traeger.reduce((a,t)=>a+t.gaenge.reduce((b,g)=>b+g.kg*st[t.station].d,0),0),
+        rutscher:alle.filter(g=>g.rutscher).length, pausen:alle.filter(g=>g.pauseDauer>0).length,
+        doppelt:alle.filter(g=>g.doppelt).length};
+    });
+    // DIAGNOSE (nur Messung, keine Wertung): "Arbeitswert" je Seite — jeder Sack zaehlt so viele
+    // Sekunden, wie ein Referenztraeger der Stufe 50 an dieser Station je Sack braucht. Damit
+    // waere jede Station fuer die Mannschaft gleich viel wert (Silo-kg gewichtet Station 3 ~60 %).
+    const sekJeSack=st.map(s=>{ const gs=sandsackParSchicht(sandsackWegCRefProfil(50),s,()=>1,T);
+      const n=gs.reduce((a,g)=>a+g.saecke,0); return n?gs[gs.length-1].ablieferung/n:0; });
+    for(const S of seitenDaten)S.arbeit=S.traeger.reduce((a,t)=>a+t.gaenge.reduce((b,g)=>b+g.saecke,0)*sekJeSack[t.station],0);
+    const [A,B]=seitenDaten;
+    let sieger=A.kg!==B.kg?(A.kg>B.kg?0:1):(A.saecke!==B.saecke?(A.saecke>B.saecke?0:1):null);
+    if(sieger==null)sieger=cypherHash(normalisiereSaat(saat),977)%2;
+    for(const S of seitenDaten)for(const t of S.traeger){
+      const u=t.u, gs=t.gaenge;
+      const note=sandsackParNote(gs,st[t.station]);
+      u.tragenote=note==null?null:+note.toFixed(2);
+      u.summe=note==null?0:Math.round(note*10);
+      u.parStation=t.station+1;
+      u.lastKg=gs.reduce((a,g)=>a+g.kg,0); u.lastSaecke=gs.reduce((a,g)=>a+g.saecke,0);
+      u.lastRutscher=gs.filter(g=>g.rutscher).length; u.lastPausen=gs.filter(g=>g.pauseDauer>0).length;
+      u.lastDoppelt=gs.filter(g=>g.doppelt).length;
+      u.laufNr=0; u.laufGewonnen=sieger===u.side;
+    }
+    const lauf={nr:0, sieger, ende:T, endeBeide:T, zeit:[T,T], fertig:[false,false],
+      abgeliefertKg:[A.kg,B.kg], saecke:[A.saecke,B.saecke], kgm:[A.kgm,B.kgm], arbeit:[A.arbeit,B.arbeit],
+      rutscher:[A.rutscher,B.rutscher], pausen:[A.pausen,B.pausen], doppelt:[A.doppelt,B.doppelt],
+      stationen:seitenDaten.map(S=>S.traeger.map(t=>({n:t.u.n, station:t.station+1}))),
+      traeger:seitenDaten.map(S=>S.traeger.filter(t=>t.gaenge.length).map(t=>t.u.n))};
+    SANDSACK_WEGC={format:"parallel", variante:BUEHNE_FLAGS.gewichthebenSandsack, zuteilung:modus,
+      laeufe:[lauf], seiten:[sieger===0?1:0, sieger===1?1:0],
+      sendezeitSim:T, sendezeitBeide:T, abgeliefertKg:[A.kg,B.kg]};
     buehneQueue=[];
   }
 
@@ -46894,6 +47149,13 @@
       sandsackWegCAbleiten();
       return {...SANDSACK_WEGC_KONF};
     },
+    // KALIBRIERHEBEL Weg C parallel (Flag 6/7, nur Messlaeufe): setzt bekannte Schluessel von
+    // SANDSACK_PAR_KONF, gibt den Stand zurueck.
+    sandsackParKalib:(neu)=>{
+      if(neu&&typeof neu==="object")for(const k of Object.keys(SANDSACK_PAR_KONF))
+        if(Number.isFinite(Number(neu[k])))SANDSACK_PAR_KONF[k]=Number(neu[k]);
+      return {...SANDSACK_PAR_KONF};
+    },
     buehneFlags:(neu)=>{
       if(neu&&typeof neu==="object")
         for(const k of Object.keys(BUEHNE_FLAGS))
@@ -46930,7 +47192,13 @@
           lastRutscher:u.lastRutscher, lastPausen:u.lastPausen, lastDoppelt:u.lastDoppelt,
           LAST:u.LAST, TECHNIK:u.TECHNIK, NERVEN:u.NERVEN, ANSAGE:u.ANSAGE, ERHOLUNG:u.ERHOLUNG,
           // nur Sechser-Bild-Messvariante (Flag 2..5): Stationen, an denen er getragen hat
-          ...(u.sandsack6v6Stationen!=null?{stationen6v6:u.sandsack6v6Stationen}:{})}));
+          ...(u.sandsack6v6Stationen!=null?{stationen6v6:u.sandsack6v6Stationen}:{}),
+          // nur Parallel-Messvariante (Flag 6/7): Station 1..3 dieses Spielers
+          ...(u.parStation!=null?{parStation:u.parStation,
+            // DIAGNOSE: dieselbe Note, wenn dieser Spieler die ganze Schicht an Station 1/2/3
+            // truege (deterministisch, ohne Rutscher) — trennt "Formel gegen Eignung" von der
+            // Stationszuteilung.
+            parSoloNoten:sandsackParStationen().map(st=>sandsackParNote(sandsackParSchicht(u,st,()=>1,SANDSACK_PAR_KONF.zeitfenster),st))}:{})}));
         // `opt.hantelVergleich` (optional, nur Messung): DASSELBE Spiel (gleiche Saat, gleiche
         // Formkarten, gleicher Mutator-Wurf, gleiche Aufstellung) noch einmal im heutigen Format
         // (Flag 0: sechs Hantel-Duelle + additives Paket-1-Finale) -- fuer den Vergleich der
