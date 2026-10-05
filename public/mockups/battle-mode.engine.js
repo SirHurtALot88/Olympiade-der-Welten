@@ -17206,45 +17206,364 @@
 
   // ZEICHNEN: Sack als abgerundetes Rechteck mit Zipfel/Naht/Schatten — Sackleinen, kein Logo,
   // keine Zahl (Fable 3.1: "waere unter 9 px"). x/y ist die MITTE des Sacks.
-  function sandsackVizZeichneSack(zx,zy,s,stufe){
+  // `g` (optional, Trage-Pose 05.10.): Zielkontext. Ohne Argument wie bisher die Buehne
+  // (`ctx`) — fuer die bestehenden Aufrufer (Depot-Stapel, Rutscher/Pause) zeichengleich.
+  // `ohneSchatten` (optional): am Koerper getragen wirft der Sack keinen eigenen
+  // Bodenschatten-Fleck auf Brust/Schulter.
+  function sandsackVizZeichneSack(zx,zy,s,stufe,g,ohneSchatten){
+    const c=g||ctx;
     const w=stufe.w*s,h=stufe.h*s,r=Math.min(w,h)*0.28;
-    ctx.save(); ctx.translate(zx,zy);
-    ctx.fillStyle="rgba(0,0,0,.28)";
-    ctx.beginPath(); ctx.ellipse(0,h*0.58,w*0.52,h*0.2,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle=stufe.farbe;
-    ctx.beginPath();
-    ctx.moveTo(-w/2+r,-h/2); ctx.lineTo(w/2-r,-h/2); ctx.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
-    ctx.lineTo(w/2,h/2-r); ctx.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
-    ctx.lineTo(-w/2+r,h/2); ctx.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
-    ctx.lineTo(-w/2,-h/2+r); ctx.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-w*0.14,-h/2); ctx.lineTo(w*0.14,-h/2); ctx.lineTo(0,-h/2-h*0.3); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle="rgba(0,0,0,.32)"; ctx.lineWidth=1;
+    c.save(); c.translate(zx,zy);
+    if(!ohneSchatten){
+      c.fillStyle="rgba(0,0,0,.28)";
+      c.beginPath(); c.ellipse(0,h*0.58,w*0.52,h*0.2,0,0,Math.PI*2); c.fill();
+    }
+    c.fillStyle=stufe.farbe;
+    c.beginPath();
+    c.moveTo(-w/2+r,-h/2); c.lineTo(w/2-r,-h/2); c.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
+    c.lineTo(w/2,h/2-r); c.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
+    c.lineTo(-w/2+r,h/2); c.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
+    c.lineTo(-w/2,-h/2+r); c.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
+    c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(-w*0.14,-h/2); c.lineTo(w*0.14,-h/2); c.lineTo(0,-h/2-h*0.3); c.closePath(); c.fill();
+    c.strokeStyle="rgba(0,0,0,.32)"; c.lineWidth=1;
     for(let i=0;i<stufe.naht;i++){
       const ny=-h/2+(h*(i+1))/(stufe.naht+1);
-      ctx.beginPath(); ctx.moveTo(-w/2+1,ny); ctx.lineTo(w/2-1,ny); ctx.stroke();
+      c.beginPath(); c.moveTo(-w/2+1,ny); c.lineTo(w/2-1,ny); c.stroke();
     }
-    if(stufe.band){ ctx.strokeStyle="rgba(10,10,10,.65)"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-w/2,0); ctx.lineTo(w/2,0); ctx.stroke(); }
-    ctx.restore();
+    if(stufe.band){ c.strokeStyle="rgba(10,10,10,.65)"; c.lineWidth=2; c.beginPath(); c.moveTo(-w/2,0); c.lineTo(w/2,0); c.stroke(); }
+    c.restore();
   }
   // PUSTE-RING (Fable 3.2): Kreisbogen ueber dem Kopf, Fuellung = puste, Farbe amber->grau->
   // crit. Bewusst AUSSERHALB jeder Rotation/Stauchung der Figur gezeichnet (bleibt lesbar wie
   // ein HUD-Element, dieselbe Entscheidung wie die Kampfrichterlampen ueber der Plattform).
-  function sandsackVizPusteRing(x,y,puste){
+  function sandsackVizPusteRing(x,y,puste,g){
+    const c=g||ctx; // optionaler Zielkontext wie bei sandsackVizZeichneSack (Posen-Probe)
     const p=Math.max(0,Math.min(1,puste==null?1:puste));
     const farbe=p>0.5?"#d6ac36":p>0.2?"#5f6675":(css("--crit")||"#e05a4e");
-    ctx.save();
-    ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke();
-    ctx.strokeStyle=farbe; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(x,y,7,-Math.PI/2,-Math.PI/2+p*Math.PI*2); ctx.stroke();
-    ctx.restore();
+    c.save();
+    c.strokeStyle="rgba(255,255,255,.18)"; c.lineWidth=2.5;
+    c.beginPath(); c.arc(x,y,7,0,Math.PI*2); c.stroke();
+    c.strokeStyle=farbe; c.lineWidth=2.5;
+    c.beginPath(); c.arc(x,y,7,-Math.PI/2,-Math.PI/2+p*Math.PI*2); c.stroke();
+    c.restore();
   }
-  // FIGUR MIT SACK: Vorneigung/Schwanken/Stauchung um den Fusspunkt (dasselbe translate/
-  // scale/translate-Muster wie zeichneTeambank()), Sack am Schulter-/Brust-Anker (3.1),
-  // Rutscher (Sack faellt, Sandwolke) und Pause (Sack steht ab, Atemheben) als eigene
-  // Sub-Phasen innerhalb des Trips — EHRLICH wie Fable 3.2/7.3 verlangt: keine Haende am
-  // Sack, kein Gesicht, der Sack verdeckt genau den Bereich, den das Blatt nicht zeichnet.
+  // =====================================================================================
+  // TRAGE-POSE (Weg C, Stufe 1, 05.10. — docs/design/gewichtheben-sandsack-trage-pose-05-10.md).
+  // Ersetzt die Behelfsloesung "ganze Figur kippen + Sack an einen Anker haengen" durch eine
+  // eigene Koerperhaltung je Last-Stufe. REINE PRAESENTATION (Klasse A) wie der ganze
+  // Paket-2-Block: kein rr(), kein neuer Spielzustand, liest nur u.vizSandsack*/u.vizPuste/
+  // u.vizAniPhase (von stepSandsackVorschau() aus u.last*/LASTEN_FINALE abgeleitet) und
+  // zeichnet. Laeuft ausschliesslich hinter sandsackVorschauAktiv (s. Gate-Kommentar oben).
+  //
+  // WIE, OHNE NEUES SPRITE-BLATT: das Blatt kennt nur walk/slash/shoot/hurt, keine
+  // Trage-Animation. Die Figur wird deshalb zweimal in eine Zwischenleinwand gezeichnet
+  // (ueber die ECHTE zeichneSprite()-Pipeline, also mit Kopf/Ruestung/Haar/Helm jeder Figur):
+  //   (A) im laufenden Schrittbild — liefert die BEINE,
+  //   (B) im Ruhebild des Gehzyklus (Arme anliegend) — liefert RUMPF und KOPF. Wer einen
+  //       Sack schleppt, schwingt die Arme nicht: das ist der erste sichtbare Posenwechsel.
+  // Danach wird die Figur in Streifen wieder zusammengesetzt, jeder Streifen mit eigener
+  // Transformation — ein Gelenk-Rig aus vier Teilen auf einem Pixelblatt:
+  //   Unterschenkel (Sohle fest, Knie nach vorn geschert), Oberschenkel (Knie -> Huefte,
+  //   Becken nach hinten geschert, Huefte abgesenkt) = KNIEBEUGE;
+  //   Rumpf um den Hueftpunkt gedreht = RUECKENBEUGE;
+  //   Kopf um den Nackenpunkt gedreht/abgesenkt = KOPFHALTUNG.
+  // Dazu Unterarme/Haende als Canvas-Striche in der GEMESSENEN Hand-/Aermelfarbe der Figur
+  // (sandsackHandFarbe(), Pixelprobe am Frontbild wie sprite-handpunkte.md), die um den
+  // Sack greifen bzw. in der Pause auf die Knie gestuetzt sind.
+  //
+  // KOERPERANTEILE (0 = Scheitel, 1 = Sohle), am Standardkoerper NEU gemessen (Zeilenbreiten
+  // der Alpha-Silhouette, renderProbe("__Std","walk",false,3)): Kinn/Nacken 0,41, Schulter
+  // 0,45, Guertel/Huefte 0,68, Knie 0,83. Nicht die Hantel-Schulter 0,30 (HEBEN_PHASEN-
+  // Kommentar, Zelle 26,8): die liegt beim grossen LPC-Chibi-Kopf auf AUGENHOEHE — genau
+  // deshalb sass der alte Brust-Anker (0,326) des Sacks vor dem Gesicht.
+  const SANDSACK_KOERPER_ANTEIL={nacken:0.41, schulter:0.45, huefte:0.68, knie:0.83};
+  // Rumpfbild (B) je Griff — alle 13 Bilder des "shoot"-Blatts per renderProbe (vizJubel/
+  // vizAniPhase) gesichtet, 05.10.; ein echtes Umarm-Bild gibt es im Baukasten NICHT:
+  //  - Schulter/Pause: Spalte 0 des 9er-Gehzyklus (Arme anliegend, sprite-handpunkte.md).
+  //  - Brust: shoot-Bild 2 — der nahe Arm ist angewinkelt, Ellbogen hinten, Unterarm vor
+  //    dem Bauch nach vorn. Der gezeichnete Unterarm unter dem Sack setzt genau diese
+  //    Bewegung fort; zusammen liest es sich als "Arm um den Sack".
+  //  - Buecken: shoot-Bild 3 — beide Arme nach vorn gestreckt; mit dem Rumpf tief gekippt
+  //    zeigen sie von selbst nach unten zum gefallenen Sack.
+  // Ueber u.vizJubel erreicht (lunge 0, feldspiel false -> keine Hantel), u.vizWaffe=null
+  // unterdrueckt Bogen/Muendungsfeuer, die sonst am shoot-Bild haengen.
+  const SANDSACK_TP_RUHEBILD=0.5/9, SANDSACK_TP_UMARMBILD=2.5/13, SANDSACK_TP_GREIFBILD=3.5/13;
+  // SECHS POSEN, eine je Sack-Stufe (SANDSACK_VIZ_STUFEN), im Stil von HEBEN_PHASEN: wenige
+  // benannte Groessen, alles Winkel (rad) oder Anteile, nichts in festen Pixeln.
+  //   rumpf   Vorneigung des Oberkoerpers um die Huefte
+  //   kopf    Kopf relativ zum Rumpf (+ nickt nach vorn/unten, - Kinn hoch, Blick nach vorn)
+  //   knie    Kniebeuge 0..1 (Huefte sinkt, Knie wandert vor, Becken zurueck)
+  //   schwank Ausschlag des Torkelns je Schritt (px bei Z=1), zittern: Zittern von Armen/Sack
+  //   griff   "schulter" (Sack auf der Schulter, eine Hand haelt) / "brust" (umarmt, vor dem
+  //           Bauch, beide Haende); sackY Hoehe der Sackmitte als Koerperanteil
+  const SANDSACK_TRAGE_POSEN=[
+    {rumpf:0.02, kopf:-0.03, knie:0.00, schwank:0.3, zittern:0,    griff:"schulter", sackY:0.44}, // 1 beilaeufig
+    {rumpf:0.05, kopf: 0.00, knie:0.10, schwank:0.6, zittern:0,    griff:"schulter", sackY:0.44}, // 2 locker
+    {rumpf:0.10, kopf: 0.06, knie:0.22, schwank:1.0, zittern:0,    griff:"schulter", sackY:0.45}, // 3 Kopf weicht dem Sack
+    {rumpf:0.15, kopf:-0.08, knie:0.36, schwank:1.5, zittern:0.25, griff:"brust",    sackY:0.57}, // 4 umarmt
+    {rumpf:0.24, kopf:-0.14, knie:0.55, schwank:2.1, zittern:0.5,  griff:"brust",    sackY:0.59}, // 5 gebeugt
+    {rumpf:0.34, kopf:-0.20, knie:0.74, schwank:2.8, zittern:0.85, griff:"brust",    sackY:0.61}, // 6 kaempft
+  ];
+  // Sonderhaltungen der beiden Pantomimen (Fable 3.3/3.4): Pause = vornuebergebeugt, Haende
+  // auf den Knien, Atemheben; Buecken = tief nach dem gefallenen Sack greifen.
+  const SANDSACK_POSE_PAUSE ={rumpf:0.42, kopf:-0.16, knie:0.40, schwank:0, zittern:0, griff:"knie",    sackY:0.6, atem:1};
+  const SANDSACK_POSE_BUECKEN={rumpf:0.66, kopf:-0.30, knie:0.72, schwank:0, zittern:0, griff:"greifen", sackY:0.6, atem:0};
+
+  function sandsackPoseMisch(a,b,k){
+    const m=(p,q)=>(p||0)+((q||0)-(p||0))*k;
+    return {rumpf:m(a.rumpf,b.rumpf), kopf:m(a.kopf,b.kopf), knie:m(a.knie,b.knie),
+      schwank:m(a.schwank,b.schwank), zittern:m(a.zittern,b.zittern), sackY:m(a.sackY,b.sackY),
+      atem:m(a.atem,b.atem), griff:k<0.5?a.griff:b.griff};
+  }
+  // Pose aus Stufe, Puste und Pantomimen-Phase. Erschoepfung (puste klein) beugt zusaetzlich
+  // und laesst den Kopf haengen — dieselbe Zahl, die der Puste-Ring zeigt.
+  function sandsackTragePoseAus(stufeIdx,puste,phase,pp){
+    const i=Math.max(0,Math.min(5,stufeIdx|0));
+    const basis={...SANDSACK_TRAGE_POSEN[i],atem:0};
+    const muede=1-Math.max(0,Math.min(1,puste==null?1:puste));
+    basis.rumpf+=muede*(0.03+0.015*i); basis.kopf+=muede*0.14; basis.knie=Math.min(1,basis.knie+muede*0.08);
+    const glatt=k=>{ k=Math.max(0,Math.min(1,k)); return k*k*(3-2*k); };
+    if(phase==="pause"){
+      if(pp<0.15)return sandsackPoseMisch(basis,SANDSACK_POSE_PAUSE,glatt(pp/0.15));
+      if(pp>0.85)return sandsackPoseMisch(SANDSACK_POSE_PAUSE,basis,glatt((pp-0.85)/0.15));
+      return {...SANDSACK_POSE_PAUSE};
+    }
+    if(phase==="rutscher"){
+      if(pp<0.3)return basis;
+      if(pp<0.5)return sandsackPoseMisch(basis,SANDSACK_POSE_BUECKEN,glatt((pp-0.3)/0.2));
+      if(pp<0.85)return {...SANDSACK_POSE_BUECKEN};
+      return sandsackPoseMisch(SANDSACK_POSE_BUECKEN,basis,glatt((pp-0.85)/0.15));
+    }
+    return basis;
+  }
+
+  // HAND-/AERMELFARBE JE FIGUR, gemessen statt geraten (Muster hoehenKorrektur()): einmal je
+  // Name das Frontbild (Ruhebild) in eine Messleinwand, Pixelprobe an der vermessenen
+  // linken Hand (Zelle 20/47, sprite-handpunkte.md) bzw. am Unterarm (21/41). Bei jedem
+  // Fehlschlag die Standard-Hautfarbe des Blatts.
+  const sandsackHandFarbeSpeicher=new Map();
+  function sandsackHandFarbe(u){
+    const key=(u&&u.n)||"";
+    if(sandsackHandFarbeSpeicher.has(key))return sandsackHandFarbeSpeicher.get(key);
+    let erg={hand:"#f9d5ba",aermel:"#f9d5ba",kontur:"#4a2c25"};
+    sandsackHandFarbeSpeicher.set(key,erg);
+    try{
+      const b=BAU[key]||BAU_STD, M=128, ax=64, ay=88;
+      const Zm=hoehenKorrektur({n:key})*bauSkala(b);
+      const c=document.createElement("canvas"); c.width=M; c.height=M;
+      const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
+      zeichneSprite(cx,{n:key,vx:0,vy:5,id:0,lunge:0,down:false,side:0,hop:0,vizAniPhase:SANDSACK_TP_RUHEBILD},ax,ay,false);
+      const px=cx.getImageData(0,0,M,M).data;
+      const probe=(zx,zy)=>{
+        const kand=[];
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+          const X=Math.round(ax+(zx-32)*Zm)+dx, Y=Math.round(ay+(zy-46)*Zm)+dy, o=(Y*M+X)*4;
+          if(X<0||Y<0||X>=M||Y>=M||px[o+3]<200)continue;
+          kand.push([px[o],px[o+1],px[o+2]]);
+        }
+        if(!kand.length)return null;
+        kand.sort((p,q)=>(p[0]+p[1]+p[2])-(q[0]+q[1]+q[2]));
+        return kand[Math.floor(kand.length*0.6)]; // hell-mittig: Kontur-Pixel fallen heraus
+      };
+      const hand=probe(21,47), arm=probe(21,41)||hand;
+      if(hand){
+        const rgb=p=>"rgb("+p[0]+","+p[1]+","+p[2]+")";
+        erg={hand:rgb(hand),aermel:rgb(arm),kontur:rgb(hand.map(v=>Math.round(v*0.32)))};
+        sandsackHandFarbeSpeicher.set(key,erg);
+      }
+    }catch(e){}
+    return erg;
+  }
+
+  // Zwei wiederverwendete Zwischenleinwaende (Beine/Rumpf), gross genug fuer Z bis ~1,8
+  // samt Fluegeln/Hoernern; Zeichenpunkt der Figur darin fest bei (AX,AY).
+  const SANDSACK_TP_LEINWAND=200, SANDSACK_TP_AX=100, SANDSACK_TP_AY=136;
+  let sandsackTpBeine=null, sandsackTpRumpf=null;
+  function sandsackTpLeinwand(alt){
+    if(alt)return alt;
+    const c=document.createElement("canvas"); c.width=SANDSACK_TP_LEINWAND; c.height=SANDSACK_TP_LEINWAND;
+    return c;
+  }
+
+  // ZEICHNET DEN TRAEGER in Pose. g = Zielkontext (Buehne oder Probe-Leinwand), x/fussY wie
+  // bisher in zeichneSandsackTraeger(), o = {vor (+1 rechts/-1 links), stufeIdx 0..5, puste,
+  // phase "hin"/"pause"/"rutscher", pp 0..1, t Szenenzeit}. Gibt den Scheitelpunkt zurueck
+  // (fuer Puste-Ring/Schweiss). Vollbild-Kreaturen/Reiher-Mech haben kein Ebenen-Rig mit
+  // diesen Koerperanteilen — sie bekommen die Posenwerte als Ganzkoerper-Neigung/-Stauchung
+  // (ehrliche Grenze wie Fable 7.3, dieselbe wie bei der Hantel).
+  function zeichneSandsackTragePose(g,u,x,fussY,o){
+    const b=BAU[u.n]||BAU_STD;
+    const vor=o.vor>=0?1:-1, t=o.t||0;
+    const stufe=SANDSACK_VIZ_STUFEN[Math.max(0,Math.min(5,o.stufeIdx|0))];
+    const pose=sandsackTragePoseAus(o.stufeIdx,o.puste,o.phase,o.pp||0);
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    const kh=(HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*Z;
+    const y0=fussY-19, sohleY=y0+(HEBEN_KOERPER_STD.unten-46)*Z;
+    const sk=0.85*Z, sw=stufe.w*sk, sh=stufe.h*sk;
+    // Schrittpuls aus derselben Schrittphase, die die Beine treibt (u.vizAniPhase): zwei
+    // Schritte je Gehzyklus -> sin(4*pi*phase). Torkeln = Vorwaertsruck plus Wanken des Rumpfs.
+    const sp=(((u.vizAniPhase||0)%1)+1)%1;
+    const puls=Math.sin(sp*Math.PI*4);
+    const wankX=vor*puls*pose.schwank*0.6*Z;
+    const zit=Math.sin(t*2*Math.PI*11+(u.id||0))*pose.zittern*(1.3-(o.puste==null?1:o.puste))*0.8*Z;
+    const atem=(pose.atem||0)*Math.sin(t*2*Math.PI*1.6);
+    const theta=vor*(pose.rumpf+puls*0.012*pose.schwank+atem*0.05);
+    const sackBoden=(gx)=>({x:gx,y:sohleY-sh/2+0.5});
+    const zeichneBodenSack=()=>{
+      // Rutscher: faellt vom Trageplatz nach vorn auf den Boden, Sandwolke, liegt, wird
+      // gegen Ende wieder aufgenommen. Pause: wird abgestellt und wieder gegriffen.
+      const ziel=sackBoden(x+vor*0.30*kh), pp=o.pp||0;
+      let p=ziel, start=o._tragePunkt||ziel;
+      if(o.phase==="rutscher"){
+        if(pp<0.3){ const k=pp/0.3; p={x:start.x+(ziel.x-start.x)*k, y:start.y+(ziel.y-start.y)*k*k-Math.sin(k*Math.PI)*3*Z}; }
+        else if(pp>0.88){ const k=(pp-0.88)/0.12; p={x:ziel.x+(start.x-ziel.x)*k, y:ziel.y+(start.y-ziel.y)*k}; }
+        if(pp>=0.3&&pp<0.5){
+          const k=(pp-0.3)/0.2;
+          g.fillStyle="rgba(138,122,85,"+(0.55*(1-k)).toFixed(3)+")";
+          for(let i=0;i<7;i++){ const a=i/7*Math.PI*2;
+            g.beginPath(); g.arc(ziel.x+Math.cos(a)*(4+8*k)*Z,ziel.y+sh*0.4+Math.sin(a)*2*Z-k*3*Z,1.2*Z,0,Math.PI*2); g.fill(); }
+        }
+      }else{
+        if(pp<0.15){ const k=pp/0.15; p={x:start.x+(ziel.x-start.x)*k, y:start.y+(ziel.y-start.y)*k}; }
+        else if(pp>0.85){ const k=(pp-0.85)/0.15; p={x:ziel.x+(start.x-ziel.x)*k, y:ziel.y+(start.y-ziel.y)*k}; }
+      }
+      sandsackVizZeichneSack(p.x,p.y,sk,stufe,g,false);
+      return p;
+    };
+
+    // ---- Vollbild/Reiher-Mech: Ganzkoerper-Rueckfall --------------------------------
+    if(b.vollbild||b.reiherMech){
+      const scheitelY=y0-46*Z+HEBEN_KOERPER_STD.oben*Z;
+      const anker={x:x+(pose.griff==="schulter"?-0.10:0.14)*vor*kh, y:scheitelY+kh*(pose.griff==="schulter"?0.30:0.50)};
+      g.save();
+      g.translate(x,fussY); g.rotate(theta*0.6); g.scale(1,1-0.10*pose.knie); g.translate(-x,-fussY);
+      zeichneSprite(g,{...u,vx:vor,vy:0,lunge:0,down:false},x,y0);
+      if(o.phase==="hin")sandsackVizZeichneSack(anker.x+zit,anker.y,sk,stufe,g,true);
+      g.restore();
+      if(o.phase!=="hin"){ o._tragePunkt=anker; zeichneBodenSack(); }
+      return {x, y:scheitelY};
+    }
+
+    // ---- Ebenen-Figur: Gelenk-Rig aus Streifen ---------------------------------------
+    const OS=SANDSACK_TP_LEINWAND, ax=SANDSACK_TP_AX, ay=SANDSACK_TP_AY;
+    sandsackTpBeine=sandsackTpLeinwand(sandsackTpBeine);
+    sandsackTpRumpf=sandsackTpLeinwand(sandsackTpRumpf);
+    const cb=sandsackTpBeine.getContext("2d"), cr=sandsackTpRumpf.getContext("2d");
+    cb.setTransform(1,0,0,1,0,0); cr.setTransform(1,0,0,1,0,0);
+    cb.clearRect(0,0,OS,OS); cr.clearRect(0,0,OS,OS);
+    cb.imageSmoothingEnabled=false; cr.imageSmoothingEnabled=false;
+    const arg={...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0,vizJubel:false,vizPose:undefined,vizWaffe:null};
+    zeichneSprite(cb,arg,ax,ay);
+    zeichneSprite(cr,
+      pose.griff==="brust"?{...arg,vizJubel:true,vizAniPhase:SANDSACK_TP_UMARMBILD}
+      :pose.griff==="greifen"?{...arg,vizJubel:true,vizAniPhase:SANDSACK_TP_GREIFBILD}
+      :{...arg,vizAniPhase:SANDSACK_TP_RUHEBILD},ax,ay);
+    const T=ay+(HEBEN_KOERPER_STD.oben-46)*Z, S=ay+(HEBEN_KOERPER_STD.unten-46)*Z;
+    const A=SANDSACK_KOERPER_ANTEIL;
+    const nackY=T+A.nacken*kh, huefY=T+A.huefte*kh, knieY=T+A.knie*kh;
+    // Aus (A) nur die Beine: alles oberhalb von knapp unter dem Guertel loeschen — damit
+    // auch die im Schrittbild schwingenden Haende (Gehzyklus-Spalten 3-6 auf Hueft-/
+    // Guertelhoehe, sprite-handpunkte.md). Rumpf, Arme und Kopf kommen allein aus (B).
+    const bis=huefY+3*Z;
+    cb.clearRect(0,0,OS,bis);
+
+    const tiefe=pose.knie*0.075*kh+(1-Math.cos(sp*Math.PI*4))*0.5*pose.knie*0.9*Z;
+    const knieVor=vor*pose.knie*0.07*kh, beckenZurueck=-vor*pose.knie*0.05*kh;
+    const wx=x+wankX, wy=y0;
+    const streifen=(quelle,y1,y2,Y1,Y2,o1,o2)=>{
+      const d=(Y2-Y1)/(y2-y1), c=(o2-o1)/(y2-y1);
+      g.save(); g.transform(1,0,c,d,wx-ax+o1-c*y1,wy-ay+Y1-d*y1);
+      g.drawImage(quelle,0,y1,OS,y2-y1,0,y1,OS,y2-y1);
+      g.restore();
+    };
+    // Unterschenkel (Sohle bleibt stehen), dann Oberschenkel bis an die Huefte.
+    streifen(sandsackTpBeine,knieY-1,S+3,knieY-1+tiefe*0.45,S+3,knieVor,0);
+    streifen(sandsackTpBeine,bis-0.5,knieY+0.6,bis-0.5+tiefe,knieY+0.6+tiefe*0.45,beckenZurueck,knieVor);
+
+    // Rumpf-Transformation: Hueftpunkt der Leinwand -> Weltpunkt, Drehung theta.
+    const hX=wx+beckenZurueck, hY=wy-ay+huefY+tiefe;
+    const ct=Math.cos(theta), st=Math.sin(theta);
+    const welt=(px,py)=>{ const dx=px-ax, dy=py-huefY; return {x:hX+dx*ct-dy*st, y:hY+dx*st+dy*ct}; };
+    const imRumpf=(fn)=>{ g.save(); g.translate(hX,hY); g.rotate(theta); g.translate(-ax,-huefY); fn(); g.restore(); };
+    // Kopf: zusaetzlich um den Nacken, bei schwerer Last etwas zwischen die Schultern gezogen.
+    const kopfWinkel=vor*pose.kopf, kopfSenk=pose.knie*0.6*Z;
+    const zeichneKopf=()=>imRumpf(()=>{
+      g.translate(ax,nackY+kopfSenk); g.rotate(kopfWinkel); g.translate(-ax,-nackY);
+      g.drawImage(sandsackTpRumpf,0,0,OS,nackY+1.5*Z,0,0,OS,nackY+1.5*Z);
+    });
+    const zeichneRumpf=()=>imRumpf(()=>{
+      g.drawImage(sandsackTpRumpf,0,nackY-1,OS,huefY+3*Z-(nackY-1),0,nackY-1,OS,huefY+3*Z-(nackY-1));
+    });
+    // Sackmitte im Rumpf-Rahmen (Leinwandkoordinaten vor der Drehung).
+    const schulter=pose.griff==="schulter";
+    // Schulter: hinter dem Kopf auf der Schulterlinie, so weit nach hinten, dass der grosse
+    // Chibi-Kopf ihn nicht ganz verdeckt. Brust: vor dem Bauch, Kinn knapp darueber.
+    const sackL={x:ax+(schulter?-vor*(0.15*kh+sw*0.10):vor*(0.10*kh+sw*0.16)), y:schulter?T+A.schulter*kh-sh*0.30:T+pose.sackY*kh};
+    const sackW=welt(sackL.x,sackL.y);
+    o._tragePunkt=sackW;
+    const farbe=sandsackHandFarbe(u);
+    const strich=(p,q,breite,col)=>{
+      g.save(); g.lineCap="round";
+      g.strokeStyle=farbe.kontur; g.lineWidth=breite+1.3*Z;
+      g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke();
+      g.strokeStyle=col; g.lineWidth=breite;
+      g.beginPath(); g.moveTo(p.x,p.y); g.lineTo(q.x,q.y); g.stroke();
+      g.restore();
+    };
+    const hand=(p,r,dunkel)=>{
+      g.save(); g.fillStyle=farbe.kontur;
+      g.beginPath(); g.arc(p.x,p.y,r+0.65*Z,0,Math.PI*2); g.fill();
+      g.fillStyle=farbe.hand; if(dunkel)g.globalAlpha=0.8;
+      g.beginPath(); g.arc(p.x,p.y,r,0,Math.PI*2); g.fill();
+      g.restore();
+    };
+    const armB=1.9*Z, handR=1.25*Z;
+    // Pause/Rutscher: der Sack wandert in zeichneBodenSack() vom Trageplatz (o._tragePunkt)
+    // auf den Boden und zurueck, die Arme folgen der Sonderhaltung.
+    const getragen=o.phase==="hin";
+
+    if(getragen&&schulter){
+      // Schulter: Sack liegt hinter dem Kopf auf der Schulter. Der Arm kommt hinter dem Kopf
+      // hervor (Schultergelenk am Nacken, vom Kopf verdeckt) und die Hand haelt den Sack
+      // oben — der Kopf wird ZULETZT gezeichnet, damit nichts quer uebers Gesicht laeuft.
+      zeichneRumpf();
+      imRumpf(()=>sandsackVizZeichneSack(sackL.x,sackL.y+zit*0.3,sk,stufe,g,true));
+      const H=welt(sackL.x+vor*sw*0.12,sackL.y-sh*0.42+zit*0.3);
+      const E=welt(ax-vor*0.05*kh,T+0.50*kh);
+      strich(E,H,armB,farbe.aermel); hand(H,handR);
+      zeichneKopf();
+    }else if(getragen){
+      // Brust: Sack vor dem Bauch, Kinn knapp darueber. Der angewinkelte Arm des Umarm-Bilds
+      // (SANDSACK_TP_UMARMBILD) fuehrt vor den Bauch; der gezeichnete Unterarm setzt ihn
+      // waagrecht unter dem Sack nach vorn fort, die Hand fasst die vordere Unterkante. Die
+      // hintere Hand greift oben vorn an.
+      zeichneRumpf();
+      zeichneKopf();
+      imRumpf(()=>sandsackVizZeichneSack(sackL.x+zit*0.4,sackL.y+zit*0.3,sk,stufe,g,true));
+      hand(welt(sackL.x+vor*sw*0.40+zit*0.4,sackL.y-sh*0.36),handR*0.9,true);
+      const uy=sackL.y+sh*0.36;
+      const E=welt(ax-vor*0.04*kh,uy), H=welt(sackL.x+vor*sw*0.40+zit*0.4,uy);
+      strich(E,H,armB,farbe.aermel); hand(H,handR);
+    }else{
+      // Pause/Rutscher: Sack am Boden (bzw. auf dem Weg dorthin/zurueck), Figur darueber.
+      zeichneBodenSack();
+      zeichneRumpf();
+      zeichneKopf();
+      if(pose.griff==="knie"){
+        // Pause: Hand auf dem vorderen Knie abgestuetzt (beim Buecken zeigen die Arme des
+        // Umarm-Bilds von selbst nach unten zum Sack, ohne zusaetzlichen Strich).
+        const E=welt(ax+vor*0.06*kh,T+0.56*kh);
+        const K={x:wx+knieVor+vor*1.2*Z, y:wy-ay+knieY+tiefe*0.45-1*Z};
+        strich(E,K,armB,farbe.aermel); hand(K,handR);
+      }
+    }
+    return welt(ax,T);
+  }
+
+  // FIGUR MIT SACK (Paket 2, seit 05.10. ueber zeichneSandsackTragePose() oben): hin = Pose
+  // der Last-Stufe, Rutscher/Pause = eigene Pantomimen-Haltungen, rueck = leer, normaler
+  // Gang mit Armschwung — der Kontrast "beladen/leer" ist Teil der Erzaehlung (Fable 3.5).
   function zeichneSandsackTraeger(u,side,zoneX0,zoneW,laneY){
     const s=u.vizSandsackStation||0, x0=zoneX0+s*zoneW, x1=x0+zoneW;
     const phase=u.vizSandsackPhase||"hin", pp=u.vizSandsackPhaseP||0;
@@ -17252,40 +17571,29 @@
     if(phase==="hin")x=x0+(x1-x0)*Math.min(1,pp*1.08);
     else if(phase==="rutscher"||phase==="pause")x=x0+(x1-x0)*0.55;
     else x=x1-(x1-x0)*Math.min(1,pp*1.08);
-    const fussY=laneY, last=phase==="rueck"?0:(u.vizSandsackLast||0);
+    const fussY=laneY;
     const puste=u.vizPuste==null?1:u.vizPuste;
-    const neigung=(side===0?1:-1)*(0.03+0.12*last*(1.3-puste));
-    const stauch=phase==="pause"?1+0.03*Math.sin(sandsackSzeneT*2*Math.PI*1.6):1-0.06*last;
-    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
-    const koerperHoehe=(HEBEN_KOERPER_STD.unten-HEBEN_KOERPER_STD.oben)*Z;
-    const scheitelY=fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z;
-
-    ctx.save();
-    ctx.translate(x,fussY); ctx.rotate(neigung); ctx.scale(1,stauch); ctx.translate(-x,-fussY);
-    const spriteArg={...u,vx:(phase==="rueck"?-1:1)*(side===0?1:-1),vy:0,lunge:0,down:false};
-    zeichneSprite(ctx,spriteArg,x,fussY-19);
-    if(phase!=="rueck"){
-      const stufe=sandsackVizStufe(u.vizSandsackKg||0);
-      const vorRichtung=side===0?1:-1;
-      let dx=-5*vorRichtung, dy=koerperHoehe*(stufe.anker==="brust"?HEBEN_PHASEN.zug.anteil:0.22);
-      if(phase==="rutscher"){
-        const fall=Math.min(1,pp/0.4);
-        dy=dy*(1-fall)+koerperHoehe*0.98*fall;
-        if(pp<0.35){
-          ctx.fillStyle="rgba(138,122,85,.5)";
-          for(let k=0;k<6;k++){ const a=k/6*Math.PI*2;
-            ctx.beginPath(); ctx.arc(x+dx+Math.cos(a)*7*fall,scheitelY+dy+Math.sin(a)*2.2,1.2,0,Math.PI*2); ctx.fill(); }
-        }
-      }else if(phase==="pause"){
-        dx=16*vorRichtung; dy=koerperHoehe*0.8;
-      }
-      sandsackVizZeichneSack(x+dx,scheitelY+dy,0.85,stufe);
+    // BLICKRICHTUNG (05.10., Nebenbefund): BEIDE Bahnen laufen von x0 nach x1, also nach
+    // rechts (Fable 2.1 "zwei Bahnen, gleiche Richtung"). Die Paket-2-Fassung setzte
+    // side===0?1:-1 — der Gast lief damit auf dem Hinweg rueckwaerts (Blick nach links).
+    // Mit einer Vorbeuge-Haltung waere das ein Ruecklehnen gegen die Laufrichtung.
+    const vorRichtung=1;
+    let kopf;
+    if(phase==="rueck"){
+      const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+      ctx.save();
+      ctx.translate(x,fussY); ctx.rotate(-0.03); ctx.translate(-x,-fussY);
+      zeichneSprite(ctx,{...u,vx:-1,vy:0,lunge:0,down:false},x,fussY-19);
+      ctx.restore();
+      kopf={x,y:fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z};
+    }else{
+      const stufeIdx=Math.max(0,SANDSACK_VIZ_STUFEN.indexOf(sandsackVizStufe(u.vizSandsackKg||0)));
+      kopf=zeichneSandsackTragePose(ctx,u,x,fussY,{vor:vorRichtung,stufeIdx,puste,phase,pp,t:sandsackSzeneT});
     }
-    ctx.restore();
-    sandsackVizPusteRing(x,scheitelY-10,puste);
+    sandsackVizPusteRing(kopf.x,kopf.y-10,puste);
     if(puste<0.4&&phase!=="rueck"){
       ctx.fillStyle="rgba(207,227,255,.75)";
-      ctx.beginPath(); ctx.arc(x+3,scheitelY+6+((sandsackSzeneT*3)%6),1.3,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(kopf.x+3*vorRichtung,kopf.y+6+((sandsackSzeneT*3)%6),1.3,0,Math.PI*2); ctx.fill();
     }
   }
 
@@ -45605,6 +45913,38 @@
     sandsackVorschauZeitplan:()=>SANDSACK_SZENE?SANDSACK_SZENE.seiten.map(s=>({side:s.side,plan:s.plan,
       trips:s.trips.map(t=>({station:t.station.fableLabel,u:t.u.n,kg:t.kg,start:+t.start.toFixed(2),
         dauer:+t.dauer.toFixed(2),rutscher:t.rutscher,pause:t.pause,doppelt:t.doppelt,uebergabe:t.uebergabe}))})):null,
+    // TRAGE-POSE-SONDE (Weg C Stufe 1, 05.10.): zeichnet EINE Figur in einer Trage-Pose auf
+    // eine eigene, vergroesserte Leinwand und gibt sie als PNG-Data-URL zurueck — rein
+    // diagnostisch wie renderProbe daneben (kein rr(), kein Spielzustand, kein Duell noetig).
+    // Ruft exakt die Produktions-Zeichenfunktion zeichneSandsackTragePose() auf, die auch
+    // die Vorschau-Szene benutzt. stufe 1..6; opts: {phase:"hin"|"pause"|"rutscher"|"leer",
+    // pp, puste, schritt (Gehzyklus 0..1), t, skala, breite, hoehe, vor (+1/-1)}.
+    sandsackTragePoseProbe:(name,stufe,opts)=>{
+      const o=opts||{}, sk=o.skala||3, bw=o.breite||80, bh=o.hoehe||92;
+      const c=document.createElement("canvas"); c.width=bw*sk; c.height=bh*sk;
+      const g=c.getContext("2d"); g.imageSmoothingEnabled=false;
+      g.fillStyle=o.hintergrund||"#181c24"; g.fillRect(0,0,c.width,c.height);
+      g.scale(sk,sk);
+      const kaderEintrag=SQUAD.find(x=>x.n===name)||OPP.find(x=>x.n===name);
+      const vor=o.vor===-1?-1:1;
+      const u={n:name,id:o.id||0,side:vor===1?0:1,groesse:kaderEintrag?kaderEintrag.groesse??null:null,
+        vizAniPhase:o.schritt!=null?o.schritt:0.3};
+      const fussY=bh-8, x=bw/2-vor*6;
+      const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+      g.strokeStyle="rgba(255,255,255,.25)"; g.lineWidth=1/sk;
+      g.beginPath(); g.moveTo(0,fussY-19+(HEBEN_KOERPER_STD.unten-46)*Z+0.5); g.lineTo(bw,fussY-19+(HEBEN_KOERPER_STD.unten-46)*Z+0.5); g.stroke();
+      const puste=o.puste!=null?o.puste:1;
+      let kopf;
+      if(o.phase==="leer"){
+        zeichneSprite(g,{...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0},x,fussY-19);
+        kopf={x,y:fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z};
+      }else{
+        kopf=zeichneSandsackTragePose(g,u,x,fussY,{vor,stufeIdx:(stufe||1)-1,puste,
+          phase:o.phase||"hin",pp:o.pp||0,t:o.t||0});
+      }
+      if(o.ring!==false)sandsackVizPusteRing(kopf.x,kopf.y-10,puste,g);
+      return c.toDataURL();
+    },
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
     // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
     // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
