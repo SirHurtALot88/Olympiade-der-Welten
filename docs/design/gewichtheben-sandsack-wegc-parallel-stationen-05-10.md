@@ -390,3 +390,21 @@ ist der dritte Positionsparameter von `messe-arena-einfluss.mjs`.
   Wert = kg / Stationsrang / alle an einer Station, Stationsprofile, OLS je Station,
   Mannschaftswertungen, Mortal Sin je Spieler).
 * Dieses Dokument.
+
+---
+
+## 9. Fortsetzung: Entscheidungen je Träger (Flag 8)
+
+Chris hat das Format am selben Tag ergänzt: Ablegen an der Station mit kurzer Rast,
+Durchpowern oder Direktübergabe an den Verbündeten. Gebaut und gemessen als Flag 8 in
+`gewichtheben-sandsack-wegc-parallel-entscheidungen-05-10.md`. Die Zweier an Station 1/2 bilden
+dort eine Kette mit Ablage an der nächsten Station, Station 3 bleibt wie hier.
+
+Ergebnis (n = 24, in Klammern n = 48):
+
+* rho 0,883 (0,886), schwächste Paarung 0,802 (0,813).
+* Pp 14,0 / 13,5 (9,8 / 13,3).
+* Sendezeit fest 2:47, Pausen 4,55 statt 4,83 je Schicht.
+* KI-Vorgabe normal / durch / direkt 39 / 41 / 20 %.
+
+Flag 6 bleibt bit-identisch.
