@@ -34,7 +34,8 @@ type Regeln = {
   energieVon(f: Record<string, unknown>): number;
   preisVon(f: Record<string, unknown>): number;
   ENERGIE_FAKTOR: number[];
-  ENERGIE_PRO_ZUG: number;
+  AKTIONSWUERFEL: number;
+  MINDESTWURF: number[];
 };
 const laden = createRequire(import.meta.url);
 const R = laden("../apps/kartenschmiede/regeln.js") as Regeln;
@@ -85,7 +86,7 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
     const basis = einheit(4, 5, 5, "Klingen | Nahkampf | A4 | Reißend");
     const skill = F.GRUNDBESTAND.find(f => f.id === "schattenschritt")!;
     const regel = F.GRUNDBESTAND.find(f => f.id === "strahlende-aura")!;
-    expect(R.punkte({ ...basis, skills: [skill] } as never).roh - R.punkte(basis).roh).toBeCloseTo(9);
+    expect(R.punkte({ ...basis, skills: [skill] } as never).roh - R.punkte(basis).roh).toBeCloseTo(R.preisVon(skill as never));
     expect(R.punkte({ ...basis, skills: [regel] } as never).roh / R.punkte(basis).roh).toBeCloseTo(1.2);
   });
 
@@ -245,11 +246,12 @@ describe("Kartenschmiede – Generator", () => {
   });
 });
 
-describe("Kartenschmiede – Energie", () => {
+describe("Kartenschmiede – Aktionswürfel", () => {
   const eintrag = (id: string) => F.GRUNDBESTAND.find(f => f.id === id)! as unknown as Record<string, unknown>;
 
-  it("liest die Energie aus dem Regeltext: Power-Symbol, Zauber, Auslöser, Passives, freie Aktion", () => {
-    expect(R.ENERGIE_PRO_ZUG).toBe(3);
+  it("liest die Würfelstufe aus dem Regeltext: Symbol, Zauber, Auslöser, Passives, freie Aktion", () => {
+    expect(R.AKTIONSWUERFEL).toBe(4);
+    expect(R.MINDESTWURF).toEqual([0, 3, 5, 6]);
     expect(R.energieVon(eintrag("schattenschritt"))).toBe(1);   // {P1}
     expect(R.energieVon(eintrag("tiergefaehrte"))).toBe(2);     // {P2}
     expect(R.energieVon(eintrag("psiblitz"))).toBe(1);          // Zauber {Z4}
@@ -265,7 +267,7 @@ describe("Kartenschmiede – Energie", () => {
     for (const f of F.GRUNDBESTAND) expect(R.energieVon(f as unknown as Record<string, unknown>)).toBeLessThanOrEqual(3);
   });
 
-  it("macht Fähigkeiten mit Energiekosten beim Bauen billiger, passive bleiben beim Grundpreis", () => {
+  it("macht Fähigkeiten mit seltenem Mindestwurf beim Bauen billiger, passive bleiben beim Grundpreis", () => {
     expect(R.ENERGIE_FAKTOR[0]).toBe(1);
     expect(R.ENERGIE_FAKTOR).toEqual([...R.ENERGIE_FAKTOR].sort((a, b) => b - a));
     const basis = einheit(4, 4, 5, "Schwert | Nahkampf | A3 |");
@@ -276,17 +278,18 @@ describe("Kartenschmiede – Energie", () => {
     expect(mit({ ...teuer, energie: 3 })).toBeLessThan(mit({ ...teuer, energie: 1 }));
   });
 
-  it("gibt im Simulator nur aus, was nach Bewegen und Angreifen übrig ist", () => {
-    // Heilung für 3 Energie kommt nie zum Zug, weil jeder Zug mindestens einen Angriff braucht
+  it("nutzt im Simulator nur die Würfel, die nach Bewegen und Angreifen übrig sind, nach Mindestwurf", () => {
+    // Je höher der nötige Wurf, desto seltener kommt dieselbe Heilung zum Zug
     const basis = einheit(4, 4, 6, "Schwert | Nahkampf | A3 |");
     const heilen = (energie: number) => ({ ...basis, skills: [{ id: "h", typ: "faehigkeit", text: "Dieses Modell: {H3}.", energie, kosten: { typ: "fest", wert: 0 } }] }) as unknown as Einheit;
     const frei = R.simuliere(heilen(0), basis, { kaempfe: 1500, seed: 4 }).a;
     const zwei = R.simuliere(heilen(2), basis, { kaempfe: 1500, seed: 4 }).a;
     const drei = R.simuliere(heilen(3), basis, { kaempfe: 1500, seed: 4 }).a;
     const ohne = R.simuliere(basis, basis, { kaempfe: 1500, seed: 4 }).a;
-    expect(frei).toBeGreaterThan(0.75);
-    expect(zwei).toBeGreaterThan(ohne + 0.1);
-    expect(Math.abs(drei - ohne)).toBeLessThan(0.06);
+    expect(frei).toBeGreaterThan(0.85);
+    expect(zwei).toBeLessThan(frei - 0.05);
+    expect(drei).toBeLessThan(zwei - 0.05);
+    expect(drei).toBeGreaterThan(ohne + 0.1);
   });
 });
 
