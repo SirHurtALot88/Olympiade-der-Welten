@@ -23,7 +23,10 @@ const outSzene = process.argv[3] || path.join(WURZEL, "tmp-ux-audit/sandsack-tra
 const vorspulen = Number(process.argv[4] || 25);
 const namenArg = process.argv.slice(5);
 
-const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+// Startflaggen gegen sporadische Renderer-Abstuerze ("Target crashed") der sehr grossen
+// Seite in der Agenten-Umgebung (05.10.; trat auch mit dem unveraenderten Motor auf).
+const startArgs = ["--disable-gpu", "--js-flags=--max-old-space-size=4096"];
+const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest, args: startArgs } : { args: startArgs });
 const seite = await browser.newPage({ viewport: { width: 1300, height: 700 } });
 const fehler = [];
 seite.on("pageerror", (e) => fehler.push(String(e)));
@@ -98,6 +101,10 @@ console.log("Szene: " + outSzene);
 const outStufen = outSzene.replace(/\.png$/, "-stufen.png");
 const tmpDir = mkdtempSync(path.join(os.tmpdir(), "sandsack-stufen-"));
 const zeitplan = await seite.evaluate(() => window.__arena.sandsackVorschauZeitplan());
+// Erste Seite schliessen, bevor die zweite (3x) laedt: zwei gleichzeitige Renderer dieser
+// grossen Seite stuerzten in der Agenten-Umgebung reproduzierbar ab ("Page crashed",
+// 05.10.). Der Streifen wird deshalb unten auf `hd` zusammengesetzt.
+await seite.close();
 const stufeVon = (kg) => Math.min(5, Math.floor(Math.max(0, Math.min(1, kg / 105)) * 6));
 const STATIONEN = ["Depot", "Steg", "Rampe & Silo"];
 const ziele = [];
@@ -149,7 +156,7 @@ for (let st = 0; st < 6; st++) {
 const vorhanden = ausschnitte.map((d, i) => (d ? { d, i } : null)).filter(Boolean);
 if (vorhanden.length) {
   const daten = vorhanden.map(({ d, i }) => ({ i, url: "data:image/png;base64," + readFileSync(d).toString("base64"), z: ziele[i] }));
-  const streifen = await seite.evaluate(async (daten) => {
+  const streifen = await hd.evaluate(async (daten) => {
     const ims = [];
     for (const x of daten) { const im = new Image(); im.src = x.url; await im.decode(); ims.push(im); }
     const w = ims[0].width, h = ims[0].height, kopf = 44;

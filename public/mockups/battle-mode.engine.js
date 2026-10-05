@@ -4132,7 +4132,13 @@
     // Schild aus im Football (Sichtbefund bei der Verdrahtung, 05.09.: Johanna/Draco
     // trugen ihren Ritterschild weiterhin unterm Trikot mit — passt zu keiner Football-
     // Montur, dieselbe Suppression wie Krone/Hoerner/Bart/Kapuze oben).
-    if(b.schild&&!footballGear)zeichneSchild("schild_bg");
+    // u.vizOhneSchild (05.10., Chris/Ramona zur Sandsack-Trage-Pose: "Die Leute sollten kein
+    // Schild tragen"): reine Anzeige-Flagge des AUFRUFERS fuer genau einen Zeichenaufruf —
+    // gesetzt nur von der Sandsack-Szene (zeichneSandsackTragePose()/zeichneSandsackTraeger()/
+    // Wartezone/sandsackTragePoseProbe), wer einen Sack schleppt, traegt keinen Schild am Arm.
+    // Ohne die Flagge (jeder andere Aufrufer) bleibt der Schild wie bisher.
+    const schildAn=b.schild&&!footballGear&&!u.vizOhneSchild;
+    if(schildAn)zeichneSchild("schild_bg");
     // Weiblicher Koerper (24.08., README "Weibliche Körper sind da"): eigenstaendiges
     // Blatt aus derselben LPC-Quelle, byte-identische Zellmasse — Drop-in-Ersatz fuer
     // "body_*", unabhaengig vom Kopf/der Rasse (die Tierkoepfe passen laut LPC-
@@ -4254,7 +4260,7 @@
     if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
-    if(b.schild&&!footballGear)zeichneSchild("schild_fg");
+    if(schildAn)zeichneSchild("schild_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
     else if(b.fluegel==="fledermaus")zeichne("fluegel_fledermaus_fg_"+ani,64,0,0,null);
     else if(b.fluegel)zeichneFluegel("z_fluegel_fg");
@@ -17441,13 +17447,18 @@
   // Idee wie HEBEN_SCHEIBEN_STUFEN weiter oben. `anker` "schulter" fuer die Stufen 1-3,
   // "brust" (= der bestehende Front-Rack-Anker HEBEN_PHASEN.zug.anteil, den die Ladestrecke
   // schon fuer den Scheibenstapel nutzt) fuer 4-6.
+  // 05.10. (Chris/Ramona zur Trage-Pose: "Das sieht aus wie Kuchen, eher wie Sandsaecke waere
+  // gut"): laenglicher statt fast quadratisch (w/h ~1,6 statt ~1,4), dazu `bauch` (wie prall
+  // gestopft — schwere Saecke beulen staerker aus). `naht` zaehlt jetzt Kreuzstich-Naehte
+  // (1 = zugenaehtes Ende, 2 = + Laengsnaht, 3 = + aufgenaehter Flicken) statt waagrechter
+  // Trennstriche, `band` ist ein zweiter, quer umgeschlungener Strick (Stufe 6).
   const SANDSACK_VIZ_STUFEN=[
-    {w:14,h:10,farbe:"#c9a86a",naht:1,anker:"schulter"},
-    {w:15,h:11,farbe:"#bd9b5e",naht:1,anker:"schulter"},
-    {w:17,h:12,farbe:"#ab8a50",naht:2,anker:"schulter"},
-    {w:19,h:14,farbe:"#937444",naht:2,anker:"brust"},
-    {w:21,h:15,farbe:"#7d6239",naht:3,anker:"brust"},
-    {w:24,h:17,farbe:"#6a5230",naht:3,anker:"brust",band:true},
+    {w:16,h:10,  farbe:"#c9a86a",naht:1,anker:"schulter",bauch:0.90},
+    {w:17,h:10.5,farbe:"#bd9b5e",naht:1,anker:"schulter",bauch:0.95},
+    {w:19,h:11.5,farbe:"#ab8a50",naht:2,anker:"schulter",bauch:1.00},
+    {w:21,h:13,  farbe:"#937444",naht:2,anker:"brust",   bauch:1.05},
+    {w:23,h:14,  farbe:"#7d6239",naht:3,anker:"brust",   bauch:1.10},
+    {w:26,h:15.5,farbe:"#6a5230",naht:3,anker:"brust",   bauch:1.15,band:true},
   ];
   // Stufen-Index 0..5 aus dem Sackgewicht relativ zur schwersten Station (105 kg, Ladekante)
   // — reine Anzeige-Ableitung ohne jede Wirkung auf eine Formel.
@@ -17669,28 +17680,133 @@
   // (`ctx`) — fuer die bestehenden Aufrufer (Depot-Stapel, Rutscher/Pause) zeichengleich.
   // `ohneSchatten` (optional): am Koerper getragen wirft der Sack keinen eigenen
   // Bodenschatten-Fleck auf Brust/Schulter.
-  function sandsackVizZeichneSack(zx,zy,s,stufe,g,ohneSchatten){
-    const c=g||ctx;
-    const w=stufe.w*s,h=stufe.h*s,r=Math.min(w,h)*0.28;
+  //
+  // NEU 05.10. (Chris/Ramona zur Trage-Pose: "Das sieht aus wie Kuchen, eher wie Sandsaecke
+  // waere gut"): das abgerundete Rechteck mit waagrechten Trennstrichen und Dreiecks-Zipfel
+  // las als Tortenschicht. Jetzt ein LIEGENDER JUTESACK: unregelmaessiger, praller Umriss mit
+  // zwei Eck-"Ohren" am zugenaehten Ende, am anderen Ende zum Hals zusammengerafft und mit
+  // einer Kordel abgebunden, darueber der ausgefranste Zipfel (schraeg nach oben); Falten
+  // laufen vom Abbinder in den Bauch, Sackleinen-Webmuster, Kreuzstich-Naehte (stufe.naht),
+  // bei Stufe 6 zusaetzlich ein quer umgeschlungener Strick (stufe.band).
+  // `o` (optional, 05.10.): {richtung: +1 = Bindeende rechts / -1 links (Default +1),
+  // haengen: 0..1 = die Enden sacken nach unten, wie ueber die Schulter gelegt}.
+  // Reine Anzeige wie bisher — Groesse/Farbe weiter nur aus SANDSACK_VIZ_STUFEN.
+  // Umriss in Einheiten von (w/2, h/2), Bindeende rechts: Start oben links am Eck-Ohr, dann
+  // quadratische Segmente [kontrollX,kontrollY, endX,endY].
+  const SANDSACK_UMRISS_START=[-0.97,-0.82];
+  const SANDSACK_UMRISS=[
+    [-0.30,-1.00,  0.40,-0.80],  // Oberkante, leicht gewoelbt
+    [ 0.62,-0.76,  0.74,-0.70],  // verjuengt sich zum Hals (oben)
+    [ 0.83,-0.59,  0.92,-0.48],  // Hals, abgebunden
+    [ 1.08, 0.02,  0.78, 0.66],  // pralles Ende unter dem Hals
+    [ 0.30, 1.12, -0.45, 0.96],  // Bauch, sackt nach unten durch
+    [-0.82, 0.94, -0.98, 0.86],  // unteres Eck-Ohr
+    [-0.80, 0.00, -0.97,-0.82],  // zugenaehtes Ende, zwischen den Ohren eingezogen
+  ];
+  const SANDSACK_ZIPFEL=[[0.74,-0.70],[0.78,-1.08],[0.88,-0.92],[0.98,-1.14],[1.03,-0.88],[1.17,-0.90],[1.05,-0.62],[0.92,-0.48]];
+  function sandsackVizZeichneSack(zx,zy,s,stufe,g,ohneSchatten,o){
+    const c=g||ctx; o=o||{};
+    const w=stufe.w*s,h=stufe.h*s,a=w/2,b=h/2;
+    const dir=o.richtung===-1?-1:1, haengen=Math.max(0,Math.min(1,o.haengen||0));
+    const bauch=stufe.bauch||1, saat=stufe.w*1.7;
+    // Einheits- -> Sackkoordinaten (vor der Spiegelung): Bauch beult die Mitte aus, `haengen`
+    // biegt die Enden nach unten, ein fester (pro Stufe gleicher) Wellenanteil macht den Umriss
+    // unregelmaessig — fest, damit nichts von Bild zu Bild flackert.
+    const P=(u,v)=>{
+      let vv=v*(1+(bauch-1)*(1-Math.min(1,u*u)));
+      vv+=0.035*Math.sin(u*9+saat)+haengen*(0.75*u*u-0.22);
+      const uu=u+0.02*Math.sin(v*7+saat);
+      return [uu*a,vv*b];
+    };
+    const lw=Math.max(0.55,0.8*s);
+    // Umriss abtasten (quadratische Bezier, je Segment 7 Punkte) und durch P() verformen.
+    const umriss=[];
+    let p0=SANDSACK_UMRISS_START;
+    umriss.push(P(p0[0],p0[1]));
+    for(const sg of SANDSACK_UMRISS){
+      for(let i=1;i<=7;i++){
+        const t=i/7, m=1-t;
+        umriss.push(P(m*m*p0[0]+2*m*t*sg[0]+t*t*sg[2], m*m*p0[1]+2*m*t*sg[1]+t*t*sg[3]));
+      }
+      p0=[sg[2],sg[3]];
+    }
+    const pfad=(pts)=>{ c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]); c.closePath(); };
+    const linie=(pts)=>{ c.beginPath(); c.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++)c.lineTo(pts[i][0],pts[i][1]); };
+    // Kreuzstich entlang einer Strecke (Einheitskoordinaten), ein "x" etwa alle 2,6*s px.
+    const kreuznaht=(u1,v1,u2,v2)=>{
+      const A=P(u1,v1), B=P(u2,v2), len=Math.hypot(B[0]-A[0],B[1]-A[1]);
+      const n=Math.max(2,Math.round(len/(2.6*s))), k=Math.max(0.6,0.75*s);
+      c.beginPath();
+      for(let i=0;i<n;i++){
+        const t=(i+0.5)/n, q=P(u1+(u2-u1)*t, v1+(v2-v1)*t);
+        c.moveTo(q[0]-k,q[1]-k); c.lineTo(q[0]+k,q[1]+k);
+        c.moveTo(q[0]+k,q[1]-k); c.lineTo(q[0]-k,q[1]+k);
+      }
+      c.stroke();
+    };
     c.save(); c.translate(zx,zy);
     if(!ohneSchatten){
       c.fillStyle="rgba(0,0,0,.28)";
       c.beginPath(); c.ellipse(0,h*0.58,w*0.52,h*0.2,0,0,Math.PI*2); c.fill();
     }
-    c.fillStyle=stufe.farbe;
+    c.scale(dir,1);
+    c.lineJoin="round"; c.lineCap="round";
+    // Zipfel ueber dem Abbinder (hinter dem Hals, der Bauch ueberdeckt seinen Ansatz).
+    const zipfel=SANDSACK_ZIPFEL.map(q=>P(q[0],q[1]));
+    c.fillStyle=stufe.farbe; pfad(zipfel); c.fill();
+    c.fillStyle="rgba(0,0,0,.18)"; c.fill();
+    c.strokeStyle="rgba(38,24,10,.85)"; c.lineWidth=lw; c.stroke();
+    // Sackkoerper.
+    c.fillStyle=stufe.farbe; pfad(umriss); c.fill();
+    c.save(); pfad(umriss); c.clip();
+    // Licht oben, Last unten (der Sand sackt in den Bauch).
+    const lg=c.createLinearGradient(0,-b,0,b*1.1);
+    lg.addColorStop(0,"rgba(255,238,200,.22)"); lg.addColorStop(0.45,"rgba(255,238,200,0)");
+    lg.addColorStop(0.7,"rgba(0,0,0,0)"); lg.addColorStop(1,"rgba(0,0,0,.30)");
+    c.fillStyle=lg; c.fillRect(-a*1.3,-b*1.6,a*2.6,b*3.2);
+    // Sackleinen: grobes Webmuster aus zwei Diagonalscharen.
+    c.strokeStyle="rgba(40,26,12,.13)"; c.lineWidth=Math.max(0.4,0.45*s);
+    const sp=Math.max(1.6,1.9*s);
     c.beginPath();
-    c.moveTo(-w/2+r,-h/2); c.lineTo(w/2-r,-h/2); c.quadraticCurveTo(w/2,-h/2,w/2,-h/2+r);
-    c.lineTo(w/2,h/2-r); c.quadraticCurveTo(w/2,h/2,w/2-r,h/2);
-    c.lineTo(-w/2+r,h/2); c.quadraticCurveTo(-w/2,h/2,-w/2,h/2-r);
-    c.lineTo(-w/2,-h/2+r); c.quadraticCurveTo(-w/2,-h/2,-w/2+r,-h/2);
-    c.closePath(); c.fill();
-    c.beginPath(); c.moveTo(-w*0.14,-h/2); c.lineTo(w*0.14,-h/2); c.lineTo(0,-h/2-h*0.3); c.closePath(); c.fill();
-    c.strokeStyle="rgba(0,0,0,.32)"; c.lineWidth=1;
-    for(let i=0;i<stufe.naht;i++){
-      const ny=-h/2+(h*(i+1))/(stufe.naht+1);
-      c.beginPath(); c.moveTo(-w/2+1,ny); c.lineTo(w/2-1,ny); c.stroke();
+    for(let d=-a-b*2;d<a+b*2;d+=sp){ c.moveTo(d,-b*1.4); c.lineTo(d+b*2.8,b*1.4); c.moveTo(d,b*1.4); c.lineTo(d+b*2.8,-b*1.4); }
+    c.stroke();
+    // Falten: vom Abbinder in den Bauch gezogen — das zusammengeraffte Leinen.
+    c.strokeStyle="rgba(30,18,6,.32)"; c.lineWidth=Math.max(0.5,0.6*s);
+    linie([P(0.80,-0.56),P(0.58,-0.42),P(0.36,-0.40)]); c.stroke();
+    linie([P(0.82,-0.50),P(0.66,-0.20),P(0.50,-0.02)]); c.stroke();
+    linie([P(0.86,-0.44),P(0.80,-0.10),P(0.70,0.22)]); c.stroke();
+    // Kreuzstich-Naehte: zugenaehtes Ende immer; Laengsnaht ab naht 2; Flicken ab naht 3.
+    c.strokeStyle="rgba(42,26,10,.80)"; c.lineWidth=Math.max(0.45,0.5*s);
+    kreuznaht(-0.80,-0.62,-0.82,0.64);
+    if(stufe.naht>=2)kreuznaht(-0.62,0.70,0.52,0.66);
+    if(stufe.naht>=3){
+      const fl=[P(-0.34,-0.46),P(0.10,-0.52),P(0.14,0.10),P(-0.30,0.16)];
+      c.fillStyle="rgba(255,228,170,.16)"; pfad(fl); c.fill();
+      c.fillStyle="rgba(0,0,0,.08)"; c.fill();
+      c.strokeStyle="rgba(42,26,10,.55)"; c.lineWidth=Math.max(0.4,0.45*s); c.stroke();
+      c.strokeStyle="rgba(42,26,10,.80)"; c.lineWidth=Math.max(0.45,0.5*s);
+      kreuznaht(-0.34,-0.46,0.10,-0.52); kreuznaht(0.14,0.10,-0.30,0.16);
     }
-    if(stufe.band){ c.strokeStyle="rgba(10,10,10,.65)"; c.lineWidth=2; c.beginPath(); c.moveTo(-w/2,0); c.lineTo(w/2,0); c.stroke(); }
+    c.restore();
+    c.strokeStyle="rgba(38,24,10,.85)"; c.lineWidth=lw; pfad(umriss); c.stroke();
+    // Stufe 6: zweiter Strick, quer um den Sack geschlungen (gedrehte Kordel).
+    if(stufe.band){
+      const bA=[-0.22,-0.98], bB=[-0.10,1.02];
+      const seil=[0,0.25,0.5,0.75,1].map(t=>P(bA[0]+(bB[0]-bA[0])*t,bA[1]+(bB[1]-bA[1])*t));
+      c.strokeStyle="#3a2412"; c.lineWidth=Math.max(1.2,1.7*s); linie(seil); c.stroke();
+      c.strokeStyle="rgba(214,178,120,.70)"; c.lineWidth=Math.max(0.4,0.45*s);
+      c.beginPath();
+      for(let i=1;i<9;i++){ const q=P(bA[0]+(bB[0]-bA[0])*i/9,bA[1]+(bB[1]-bA[1])*i/9);
+        c.moveTo(q[0]-0.6*s,q[1]-0.5*s); c.lineTo(q[0]+0.6*s,q[1]+0.5*s); }
+      c.stroke();
+    }
+    // Kordel um den Hals, mit herabhaengendem Ende.
+    c.strokeStyle="#3a2412"; c.lineWidth=Math.max(1.1,1.5*s);
+    linie([P(0.68,-0.78),P(0.97,-0.42)]); c.stroke();
+    c.lineWidth=Math.max(0.7,0.9*s);
+    linie([P(0.95,-0.45),P(1.08,-0.28),P(1.10,-0.08)]); c.stroke();
+    c.strokeStyle="rgba(214,178,120,.65)"; c.lineWidth=Math.max(0.35,0.4*s);
+    linie([P(0.72,-0.74),P(0.93,-0.47)]); c.stroke();
     c.restore();
   }
   // PUSTE-RING (Fable 3.2): Kreisbogen ueber dem Kopf, Fuellung = puste, Farbe amber->grau->
@@ -17812,7 +17928,7 @@
       const Zm=hoehenKorrektur({n:key})*bauSkala(b);
       const c=document.createElement("canvas"); c.width=M; c.height=M;
       const cx=c.getContext("2d"); cx.imageSmoothingEnabled=false;
-      zeichneSprite(cx,{n:key,vx:0,vy:5,id:0,lunge:0,down:false,side:0,hop:0,vizAniPhase:SANDSACK_TP_RUHEBILD},ax,ay,false);
+      zeichneSprite(cx,{n:key,vx:0,vy:5,id:0,lunge:0,down:false,side:0,hop:0,vizAniPhase:SANDSACK_TP_RUHEBILD,vizOhneSchild:true},ax,ay,false);
       const px=cx.getImageData(0,0,M,M).data;
       const probe=(zx,zy)=>{
         const kand=[];
@@ -17887,7 +18003,7 @@
         if(pp<0.15){ const k=pp/0.15; p={x:start.x+(ziel.x-start.x)*k, y:start.y+(ziel.y-start.y)*k}; }
         else if(pp>0.85){ const k=(pp-0.85)/0.15; p={x:ziel.x+(start.x-ziel.x)*k, y:ziel.y+(start.y-ziel.y)*k}; }
       }
-      sandsackVizZeichneSack(p.x,p.y,sk,stufe,g,false);
+      sandsackVizZeichneSack(p.x,p.y,sk,stufe,g,false,{richtung:vor});
       return p;
     };
 
@@ -17897,8 +18013,9 @@
       const anker={x:x+(pose.griff==="schulter"?-0.10:0.14)*vor*kh, y:scheitelY+kh*(pose.griff==="schulter"?0.30:0.50)};
       g.save();
       g.translate(x,fussY); g.rotate(theta*0.6); g.scale(1,1-0.10*pose.knie); g.translate(-x,-fussY);
-      zeichneSprite(g,{...u,vx:vor,vy:0,lunge:0,down:false},x,y0);
-      if(o.phase==="hin")sandsackVizZeichneSack(anker.x+zit,anker.y,sk,stufe,g,true);
+      zeichneSprite(g,{...u,vx:vor,vy:0,lunge:0,down:false,vizOhneSchild:true},x,y0);
+      if(o.phase==="hin")sandsackVizZeichneSack(anker.x+zit,anker.y,sk,stufe,g,true,
+        pose.griff==="schulter"?{richtung:-vor,haengen:0.6}:{richtung:vor});
       g.restore();
       if(o.phase!=="hin"){ o._tragePunkt=anker; zeichneBodenSack(); }
       return {x, y:scheitelY};
@@ -17912,7 +18029,9 @@
     cb.setTransform(1,0,0,1,0,0); cr.setTransform(1,0,0,1,0,0);
     cb.clearRect(0,0,OS,OS); cr.clearRect(0,0,OS,OS);
     cb.imageSmoothingEnabled=false; cr.imageSmoothingEnabled=false;
-    const arg={...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0,vizJubel:false,vizPose:undefined,vizWaffe:null};
+    // vizOhneSchild (05.10., Chris: "Die Leute sollten kein Schild tragen"): beim Schleppen
+    // keinen Schild am Arm; Waffen unterdrueckt schon vizWaffe:null. Helm/Krone/Ruestung bleiben.
+    const arg={...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0,vizJubel:false,vizPose:undefined,vizWaffe:null,vizOhneSchild:true};
     zeichneSprite(cb,arg,ax,ay);
     zeichneSprite(cr,
       pose.griff==="brust"?{...arg,vizJubel:true,vizAniPhase:SANDSACK_TP_UMARMBILD}
@@ -17987,7 +18106,8 @@
       // hervor (Schultergelenk am Nacken, vom Kopf verdeckt) und die Hand haelt den Sack
       // oben — der Kopf wird ZULETZT gezeichnet, damit nichts quer uebers Gesicht laeuft.
       zeichneRumpf();
-      imRumpf(()=>sandsackVizZeichneSack(sackL.x,sackL.y+zit*0.3,sk,stufe,g,true));
+      // Bindeende nach hinten, Enden haengen ueber die Schulter (05.10.).
+      imRumpf(()=>sandsackVizZeichneSack(sackL.x,sackL.y+zit*0.3,sk,stufe,g,true,{richtung:-vor,haengen:0.6}));
       const H=welt(sackL.x+vor*sw*0.12,sackL.y-sh*0.42+zit*0.3);
       const E=welt(ax-vor*0.05*kh,T+0.50*kh);
       strich(E,H,armB,farbe.aermel); hand(H,handR);
@@ -17999,7 +18119,7 @@
       // hintere Hand greift oben vorn an.
       zeichneRumpf();
       zeichneKopf();
-      imRumpf(()=>sandsackVizZeichneSack(sackL.x+zit*0.4,sackL.y+zit*0.3,sk,stufe,g,true));
+      imRumpf(()=>sandsackVizZeichneSack(sackL.x+zit*0.4,sackL.y+zit*0.3,sk,stufe,g,true,{richtung:vor}));
       hand(welt(sackL.x+vor*sw*0.40+zit*0.4,sackL.y-sh*0.36),handR*0.9,true);
       const uy=sackL.y+sh*0.36;
       const E=welt(ax-vor*0.04*kh,uy), H=welt(sackL.x+vor*sw*0.40+zit*0.4,uy);
@@ -18042,7 +18162,7 @@
       const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
       ctx.save();
       ctx.translate(x,fussY); ctx.rotate(-0.03); ctx.translate(-x,-fussY);
-      zeichneSprite(ctx,{...u,vx:-1,vy:0,lunge:0,down:false},x,fussY-19);
+      zeichneSprite(ctx,{...u,vx:-1,vy:0,lunge:0,down:false,vizOhneSchild:true},x,fussY-19);
       ctx.restore();
       kopf={x,y:fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z};
     }else{
@@ -18111,7 +18231,7 @@
       const rest=stationTrips.filter(t=>sandsackSzeneT<t.start).length;
       const bx=zoneX0+16, by=laneY[side]+laneH/2-6;
       for(let i=0;i<Math.min(rest,6);i++)
-        sandsackVizZeichneSack(bx+(i%3)*5,by-6-Math.floor(i/3)*9,0.8,SANDSACK_VIZ_STUFEN[0]);
+        sandsackVizZeichneSack(bx+(i%3)*5,by-6-Math.floor(i/3)*9,0.8,SANDSACK_VIZ_STUFEN[0],undefined,false,{richtung:i%2?-1:1});
     });
 
     // Silo je Seite am rechten Rand der letzten Station — Fuellstand statt Zahl (2.3).
@@ -18138,7 +18258,9 @@
       const seite=SANDSACK_SZENE.seiten[side]; if(!seite)return;
       const wartend=seite.u6.filter(u=>!u.vizSandsackAktiv);
       if(wartend.length)
-        zeichneTeambank(wartend,side,{x0:W*0.015,x1:W*0.065,fussY:laneY[side]+laneH/2+6},0.7,0);
+        // Kopien mit vizOhneSchild (05.10.): auch wer am Depot wartet, traegt keinen Schild —
+        // sonst taucht er zwischen zwei Gaengen auf und verschwindet wieder.
+        zeichneTeambank(wartend.map(u=>({...u,vizOhneSchild:true})),side,{x0:W*0.015,x1:W*0.065,fussY:laneY[side]+laneH/2+6},0.7,0);
     });
 
     // Taktik-Badge am Bahnanfang (4.3), bleibt den ganzen Lauf sichtbar.
@@ -46397,7 +46519,7 @@
       const puste=o.puste!=null?o.puste:1;
       let kopf;
       if(o.phase==="leer"){
-        zeichneSprite(g,{...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0},x,fussY-19);
+        zeichneSprite(g,{...u,vx:vor*5,vy:0,lunge:0,down:false,hop:0,vizOhneSchild:true},x,fussY-19);
         kopf={x,y:fussY-19-46*Z+HEBEN_KOERPER_STD.oben*Z};
       }else{
         kopf=zeichneSandsackTragePose(g,u,x,fussY,{vor,stufeIdx:(stufe||1)-1,puste,
