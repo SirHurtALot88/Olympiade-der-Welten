@@ -11,6 +11,10 @@
 //   3. vorzeitiger Schluss: wie oft, wie viel Zeit gespart, Schranken-Widersprueche (muss 0 sein)
 //   4. Paar-Plaene, Rutscher/Pausen/Doppeln je Lauf, Zeitlimit
 //   5. Team-Ebene: Laufsieger = Paar mit hoeherer Eignung? Spielsieger = Team mit hoeherer?
+//      Daneben DIESELBEN Spiele im heutigen Format (sechs Hantel-Duelle, Flag 0, ueber
+//      spieleSandsackWegC(...,{hantelVergleich:true})): Spielsieger-Quote, rho je Spiel als
+//      Gegenprobe zu miss-alle-disziplinen.mjs (Flag aus), und der Nullanteil des additiven
+//      Paket-1-Rennens (Spieler-Spiele ohne einen einzigen Sack, Doku 2.2 "warum B ausscheidet")
 //   6. Diagnose: Korrelation des Spielerwerts mit jedem Sub-Skill, Stationsmix
 //
 //   node scripts/miss-sandsack-wegc.mjs [spiele=24]
@@ -71,6 +75,10 @@ try {
   const plaene = {};
   let laufFavoritSieg = 0, laufFavoritN = 0, spielFavoritSieg = 0, spielFavoritN = 0;
   const seitenVerteilung = {};
+  // Heutiges Format auf denselben Spielen (s. Kopf, Punkt 5)
+  let hantelFavSieg = 0, hantelFavN = 0, hantelGleich = 0;
+  const hantelRhoJePaarung = [], hantelVerteilung = {};
+  const finaleNull = {}; // Plan -> {null, n}
   const alleSpieler = []; // fuer die Diagnose
   const zeilen = [];
 
@@ -79,7 +87,7 @@ try {
     const spiele = [];
     for (let i = 0; i < SPIELE; i++) {
       const r = await seite.evaluate(([saat, fs, ms]) =>
-        window.__arena.spieleSandsackWegC("gewichtheben", saat, { formSaat: fs, mutatorSaat: ms }),
+        window.__arena.spieleSandsackWegC("gewichtheben", saat, { formSaat: fs, mutatorSaat: ms, hantelVergleich: true }),
       [1337 + i * 7919, 20260823 + i * 104729, 20260823 + i * 15485863]);
       spiele.push(r);
     }
@@ -88,6 +96,8 @@ try {
     for (const s of spiele) for (const b of s.boxscore) {
       const a = agg.get(b.name) || { eig: 0, wert: 0, k: 0 }; a.eig += b.eig; a.wert += b.wert; a.k++; agg.set(b.name, a);
     }
+    const hantelRhos = spiele.map((s) => rho(s.hantel.boxscore.map((b) => ({ eig: b.eig, wert: b.wert }))));
+    hantelRhoJePaarung.push(hantelRhos.reduce((a, b) => a + b, 0) / hantelRhos.length);
     const rSpiel = rhos.reduce((a, b) => a + b, 0) / rhos.length;
     const rSaison = rho([...agg.values()].map((a) => ({ eig: a.eig / a.k, wert: a.wert / a.k })));
     rhoJePaarung.push(rSpiel); saisonJePaarung.push(rSaison);
@@ -104,6 +114,24 @@ try {
         spielFavoritN++;
         const fav = teamEig[0] > teamEig[1] ? 0 : 1;
         if (w.seiten[fav] > w.seiten[1 - fav]) spielFavoritSieg++;
+      }
+      {
+        // Heutiges Format: Sieger = mehr gewonnene Duelle, bei 3:3 der Gesamt-kg-Tiebreak (wie
+        // arenaTeamPointsForFixtureMitTiebreak). teamEig ist dieselbe Aufstellung (gleicher Bau).
+        const h = s.hantel;
+        const hk = `${h.seiten[0]}:${h.seiten[1]}`; hantelVerteilung[hk] = (hantelVerteilung[hk] || 0) + 1;
+        if (h.seiten[0] === h.seiten[1]) hantelGleich++;
+        if (teamEig[0] !== teamEig[1]) {
+          hantelFavN++;
+          const fav = teamEig[0] > teamEig[1] ? 0 : 1;
+          const favVorn = h.seiten[fav] !== h.seiten[1 - fav] ? h.seiten[fav] > h.seiten[1 - fav] : h.gesamtKg[fav] > h.gesamtKg[1 - fav];
+          if (favVorn) hantelFavSieg++;
+        }
+        for (const b of h.boxscore) {
+          const plan = h.finalePlan ? h.finalePlan[b.seite] : "?";
+          const f = finaleNull[plan] || (finaleNull[plan] = { null: 0, n: 0 });
+          f.n++; if (!b.finaleSaecke) f.null++;
+        }
       }
       for (const L of w.laeufe) {
         laeufeN++;
@@ -160,6 +188,14 @@ try {
   console.log(`Lauf: Paar mit hoeherer Eignungssumme gewinnt ${laufFavoritSieg}/${laufFavoritN} (${(100 * laufFavoritSieg / laufFavoritN).toFixed(1)} %)`);
   console.log(`Spiel: Team mit hoeherer Eignungssumme gewinnt ${spielFavoritSieg}/${spielFavoritN} (${(100 * spielFavoritSieg / spielFavoritN).toFixed(1)} %)`);
   console.log(`Endstaende: ${JSON.stringify(seitenVerteilung)}\n`);
+  console.log("--- Dieselben Spiele im heutigen Format (sechs Hantel-Duelle, Flag 0) ---");
+  console.log(`Spiel: Team mit hoeherer Eignungssumme gewinnt ${hantelFavSieg}/${hantelFavN} (${(100 * hantelFavSieg / hantelFavN).toFixed(1)} %)  (3:3 per Gesamt-kg)`);
+  console.log(`Gleichstand 3:3: ${hantelGleich}/${laeufeN / 3}  Endstaende: ${JSON.stringify(hantelVerteilung)}`);
+  console.log(`rho je Spiel (Mittel je Paarung): ${hantelRhoJePaarung.map((r) => r.toFixed(3)).join(" / ")}  -> Median ${median(hantelRhoJePaarung).toFixed(3)}  (Gegenprobe: miss-alle-disziplinen.mjs ${SPIELE} gewichtheben)`);
+  const fn = Object.values(finaleNull).reduce((a, f) => ({ null: a.null + f.null, n: a.n + f.n }), { null: 0, n: 0 });
+  console.log(`Paket-1-Rennen (additiv, unveraendert): Spieler-Spiele ohne einen Sack ${fn.null}/${fn.n} (${(100 * fn.null / fn.n).toFixed(1)} %)`);
+  for (const [plan, f] of Object.entries(finaleNull)) console.log(`  Plan ${plan.padEnd(10)} ${f.null}/${f.n} ohne Sack (${(100 * f.null / f.n).toFixed(1)} %, ${(6 * f.null / f.n).toFixed(2)} von 6)`);
+  console.log("");
 
   console.log("=== 6. Diagnose: Spielerwert gegen Sub-Skills und Eignung (Pearson, alle Spieler-Spiele) ===\n");
   const wert = alleSpieler.map((b) => b.wert);

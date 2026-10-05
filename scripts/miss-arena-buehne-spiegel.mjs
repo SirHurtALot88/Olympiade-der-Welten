@@ -15,6 +15,9 @@
 //   node scripts/miss-arena-buehne-spiegel.mjs                          -> 60 Laeufe je Disziplin
 //   node scripts/miss-arena-buehne-spiegel.mjs 200                       -> 200 Laeufe je Disziplin
 //   node scripts/miss-arena-buehne-spiegel.mjs 60 speed-schach showcase  -> nur diese Disziplinen
+//   node scripts/miss-arena-buehne-spiegel.mjs 1000 gewichtheben --flags=gewichthebenSandsack:1
+//                                                                         -> Gewichtheben im Weg-C-Format
+//                                                                            (drei Sandsack-Laeufe)
 //   node scripts/miss-arena-buehne-spiegel.mjs 60 "" /pfad/zu/battle-mode.html
 //                                                                         -> gegen einen
 //                                                                            eingefrorenen Entwurf
@@ -22,8 +25,12 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
 
-const args = process.argv.slice(2);
+// --flags=... (NACHT-PAKET-SCHALTER, 05.10., additiv): schaltet Buehnen-Mechaniken hinter
+// BUEHNE_FLAGS ein (z.B. --flags=gewichthebenSandsack:1), s. scripts/lib/rangtreue-messung.mjs.
+const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
+const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
 const N = Number(args[0] || 60);
 const disziplinen = args[1] ? args[1].split(",").filter(Boolean) : ["speed-schach", "showcase", "gewichtheben"];
 const hier = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +67,8 @@ await page.addInitScript((kader) => {
 
 await page.goto(pathToFileURL(seitePfad).href);
 await page.waitForFunction(() => Boolean(window.__arena), null, { timeout: 15000 });
+const schalterGesetzt = await setzeBuehneSchalter(page, BUEHNE_SCHALTER);
+if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 
 let gesamtFehlgeschlagen = 0;
 

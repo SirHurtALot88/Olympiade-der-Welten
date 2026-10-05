@@ -46818,7 +46818,26 @@
           laufNr:u.laufNr, laufGewonnen:u.laufGewonnen, lastKg:u.lastKg, lastSaecke:u.lastSaecke,
           lastRutscher:u.lastRutscher, lastPausen:u.lastPausen, lastDoppelt:u.lastDoppelt,
           LAST:u.LAST, TECHNIK:u.TECHNIK, NERVEN:u.NERVEN, ANSAGE:u.ANSAGE, ERHOLUNG:u.ERHOLUNG}));
-        return {disziplin:bd, wegc, boxscore};
+        // `opt.hantelVergleich` (optional, nur Messung): DASSELBE Spiel (gleiche Saat, gleiche
+        // Formkarten, gleicher Mutator-Wurf, gleiche Aufstellung) noch einmal im heutigen Format
+        // (Flag 0: sechs Hantel-Duelle + additives Paket-1-Finale) -- fuer den Vergleich der
+        // Mannschaftsebene (Weg-C-Doku 7.4) und den Nullanteil des Paket-1-Rennens (2.2).
+        // bauBuehne() setzt SANDSACK_WEGC/LASTEN_FINALE selbst zurueck; ohne die Option laeuft
+        // dieser Einstieg unveraendert.
+        let hantel=null;
+        if(o.hantelVergleich){
+          BUEHNE_FLAGS.gewichthebenSandsack=0;
+          M.bau(saat);
+          M.lauf();
+          const w0=M.wert();
+          hantel={seiten:[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s&&u.duellGewonnen).length),
+            gesamtKg:[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0)),
+            finalePlan:LASTEN_FINALE?LASTEN_FINALE.plan.slice():null,
+            boxscore:TEILNEHMER.map(u=>({name:u.n, seite:u.side,
+              eig:u.eigOhneMutator!=null?u.eigOhneMutator:(u.eig||0), wert:w0[u.n]??0,
+              finaleSaecke:u.lastSaecke||0}))};
+        }
+        return {disziplin:bd, wegc, boxscore, ...(hantel?{hantel}:{})};
       } finally {
         BUEHNE_FLAGS.gewichthebenSandsack=flagVorher;
         if(o.formSaat!=null)zieheFormkarten(20260823);
