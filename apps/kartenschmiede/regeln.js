@@ -145,15 +145,17 @@
   const hat = (liste, re) => liste.some(p => re.test(p));
   const zahlIn = (liste, re) => { for (const p of liste) { const m = p.match(re); if (m) return +m[m.length - 1]; } return 0; };
 
-  // ---------- Energie ----------
-  // Jede Figur hat 3 Energie pro Zug, Helden wie Gegner. Bewegen, Angreifen und Helfen kosten je 1 (jede höchstens
-  // einmal pro Zug), Sprinten 2. Fähigkeiten kosten 0 bis 3: Passive Regeln und Auslöser („Stirbt es“, „Rundenende“)
-  // wirken von selbst und kosten nichts, aktive kosten Energie. Wer dafür Energie zahlt, verzichtet im Zug auf etwas –
-  // deshalb wird die Fähigkeit beim Bauen billiger. Gemessen mit dem Simulator (gleicher Effekt, Preis bis 50 % Siege):
-  // 1 Energie ist fast frei, weil Bewegen und Angreifen meist nur 2 brauchen (0,85–1,0); 2 Energie kostet öfter den
-  // Angriff (0,7–1,0). 3 Energie heißt, auf den Angriff zu verzichten – das wählt der Simulator nie, der Faktor 0,5 ist gesetzt.
-  const ENERGIE_PRO_ZUG = 3;
-  const ENERGIE_FAKTOR = [1, 0.9, 0.75, 0.5];
+  // ---------- Aktionswürfel (nach Warhammer Quest: Blackstone Fortress) ----------
+  // Jede Figur würfelt zu Beginn ihres Zugs 4 W6, Helden wie Gegner; jeder Würfel bezahlt eine Aktion. Bewegen (6",
+  // höchstens zweimal) und Angreifen gehen mit jedem Würfel, ein zweiter Angriff im selben Zug braucht eine 5+.
+  // Fähigkeiten haben eine Stufe 0 bis 3 (Feld „energie“, Symbol {Pn}): 0 wirkt von selbst, 1 braucht einen Würfel mit
+  // 3+, 2 mit 5+, 3 eine 6. Je seltener der Wurf, desto billiger die Fähigkeit beim Bauen – Faktoren mit dem Simulator
+  // gemessen (gleicher Effekt, Preis bis 50 % Siege): 3+ klappt fast immer (0,9–1,0), 5+ etwa jeden zweiten Zug
+  // (0,33–0,67), eine 6 seltener (0,2–0,5).
+  const AKTIONSWUERFEL = 4;
+  const MINDESTWURF = [0, 3, 5, 6];
+  const ZWEITER_ANGRIFF = 5;
+  const ENERGIE_FAKTOR = [1, 0.95, 0.55, 0.35];
   const AUSLOESER = /^(?:Erleidet|Stirbt|Rundenende|Zu Beginn|Ab halben|Greift ein weiteres|Steht ein weiteres|Verursacht es|Nach einem Angriff|Reaktion|Fällt es|Ignoriert|Alle Fernkampfwaffen|Verbündete \{F|Verbündete dürfen|Feinde mit|Eine Wunde|Einen Treffer|Statt zu gehen)/;
   const AKTIV = /^(?:Feind|Verbündeter|Verbündete|Punkt|Modell|Sichtbarer|Falle|Eine Fernkampfwaffe|Jeder Feind|Nächster|Alle |Bis |Dieses Modell|Der Zauberer)/;
   function energieVon(f) {
@@ -316,18 +318,19 @@
       // Treffer aus Fähigkeiten: treffen automatisch, das Ziel würfelt Verteidigung
       const direkt = (von, ziel, n, ds) => angriff({ ...von, n: 1, lp: [1], q: 2, buff: {}, rasend: false }, ziel, { a: Math.round(n), ds, zuverlaessig: true, reaktion: true }, {});
       // Fähigkeiten zu Beginn der eigenen Aktivierung: Puffer setzen, heilen, Schaden, Betäubung
-      // Energie: Was der Zug für Bewegen und Angreifen braucht, steht vorher fest; der Rest geht in Fähigkeiten.
-      const faehigkeiten = (u, g, energie) => {
+      // Aktionswürfel: Die niedrigsten Würfel gehen an Bewegen und Angreifen, die übrigen an Fähigkeiten – jede nimmt
+      // den kleinsten Würfel, der ihren Mindestwurf schafft, die anspruchsvollsten zuerst. Zurück kommen die unbenutzten.
+      const faehigkeiten = (u, g, frei) => {
         u.buff = {};
         const halb = u.lp.reduce((a, x) => a + x, 0) <= u.n * u.T / 2;
-        for (const [i, e] of u.effekte.entries()) {
+        const nimm = stufe => { if (!stufe) return true; const k = frei.findIndex(x => x >= MINDESTWURF[stufe]); if (k < 0) return false; frei.splice(k, 1); return true; };
+        for (const [i, e] of [...u.effekte.entries()].sort((a, b) => b[1].energie - a[1].energie)) {
           if (e.takt === "tod" || e.takt === "wunde") continue;
           if (e.takt === "einmal" && u.benutzt.has(i)) continue;
-          if (e.energie > energie) continue;
           if (e.abHalb && !halb) continue;
           if (e.takt === "einmal" && !(e.heilen ? halb : true)) continue;
-          if (rnd() >= e.chance) continue;
-          energie -= e.energie;
+          if (!nimm(e.energie)) continue;
+          if (rnd() >= e.chance) continue;   // misslungener Zauber: der Würfel ist trotzdem weg
           if (e.takt === "einmal") u.benutzt.add(i);
           if (e.heilen) { let rest = Math.round(e.heilen); for (let k = 0; k < u.lp.length && rest; k++) while (u.lp[k] > 0 && u.lp[k] < u.T && rest) { u.lp[k]++; rest--; } }
           if (e.verteidigung) u.buff.verteidigung = (u.buff.verteidigung || 0) + e.verteidigung;
@@ -338,6 +341,7 @@
           if (e.betaeubt) g.betaeubt = true;
           if (e.treffer) direkt(u, g, e.treffer, e.ds || 0);
         }
+        return frei;
       };
       // Tod: „Stirbt es“-Wirkungen und Wiederkehr
       const todPruefen = (u, g) => {
@@ -351,11 +355,13 @@
       const nahWaffen = u => u.waffen.filter(w => w.reichweite === 0);
       const fernWaffen = (u, dist) => u.waffen.filter(w => w.reichweite > 0 && w.reichweite >= dist);
       const schiessen = (u, g) => { const inDeckung = rnd() < deckung; for (const w of fernWaffen(u, abst())) angriff(u, g, w, { schuss: true, inDeckung }); };
-      const nahkampfRunde = (u, g) => {
+      const nahkampfRunde = (u, g, zweimal = false) => {
         // Wucht(X): X Treffer je Modell auf 2+, bevor die Waffen zuschlagen
         if (u.wucht) angriff({ ...u, rasend: false }, g, { a: u.wucht, ds: 0, zuverlaessig: true });
         for (const w of nahWaffen(u)) angriff(u, g, w, { angreifen: true });
         if (lebend(g)) for (const w of nahWaffen(g)) angriff(g, u, w, {});
+        // Zweiter Angriff (Würfel 5+): nur der Angreifer schlägt noch einmal zu
+        if (zweimal && lebend(u)) for (const w of nahWaffen(u)) angriff(u, g, w, {});
         // OPR: Überlebt das Ziel, weicht der Angreifer 1" zurück. Niemand bleibt im Nahkampf gefangen.
         u.pos = g.pos - u.richtung * 1;
       };
@@ -363,8 +369,8 @@
       const bew = u => 6 + (u.schnell ? 2 : 0) - (u.langsam ? 2 : 0);
       const lauf = u => 12 + (u.schnell ? 4 : 0) - (u.langsam ? 4 : 0);
 
-      // Energie für den geplanten Zug: Angriff aus dem Stand 1, Bewegen und Angreifen 2, Ansturm über 6" (Sprint
-      // und Angriff) 3, Laufen ohne Angriff 2. Dieselbe Entscheidung wie unten in aktiviere().
+      // Würfel für den geplanten Zug: Angriff aus dem Stand 1, Bewegen und Angreifen 2, Ansturm über 6" (zweimal
+      // Bewegen und Angriff) 3, Laufen ohne Angriff 2. Dieselbe Entscheidung wie unten in aktiviere().
       const bedarf = (u, g) => {
         if (!u.aktiv) return 1;
         const d = abst();
@@ -376,22 +382,25 @@
       const aktiviere = (u, g) => {
         if (!lebend(u) || !lebend(g)) return;
         if (u.betaeubt) { u.betaeubt = false; u.buff = {}; return; }
-        faehigkeiten(u, g, Math.max(0, ENERGIE_PRO_ZUG - bedarf(u, g)));
+        const wuerfel = Array.from({ length: AKTIONSWUERFEL }, () => w6(rnd)).sort((a, b) => a - b);
+        const rest = faehigkeiten(u, g, wuerfel.slice(Math.min(wuerfel.length, bedarf(u, g))));
+        const zweimal = rest.some(x => x >= ZWEITER_ANGRIFF);
+        const feuer = () => { schiessen(u, g); if (zweimal && lebend(g)) schiessen(u, g); };
         if (!lebend(g)) return;
         if (!u.aktiv) { u.aktiv = true; u.pos = g.pos - u.richtung * Math.min(abst(), 9); return; }
         const d = abst();
         if (u.nah) {
-          if (d <= lauf(u)) { u.pos = g.pos; return nahkampfRunde(u, g); }
-          if (fernWaffen(u, d - bew(u)).length) { zieh(u, bew(u)); return schiessen(u, g); }
+          if (d <= lauf(u)) { u.pos = g.pos; return nahkampfRunde(u, g, zweimal); }
+          if (fernWaffen(u, d - bew(u)).length) { zieh(u, bew(u)); return feuer(); }
           return zieh(u, lauf(u));
         }
         const R = Math.max(0, ...u.waffen.map(w => w.reichweite));
         if (d <= R) {
           const kannWeichen = (u.richtung > 0 ? u.pos : TISCH - u.pos) >= 1;
           if (g.nah && kannWeichen && d + bew(u) <= R) zieh(u, -bew(u));
-          return schiessen(u, g);
+          return feuer();
         }
-        if (d - bew(u) <= R) { zieh(u, bew(u)); return schiessen(u, g); }
+        if (d - bew(u) <= R) { zieh(u, bew(u)); return feuer(); }
         zieh(u, lauf(u));
       };
 
@@ -457,7 +466,7 @@
     return { sieg: r.a / Math.max(0.001, r.a + r.b), punkte: Math.round(ziel - punkte(ohne).roh), gegnerZaeh: +g.tough, messbar };
   }
 
-  const Regeln = { ENERGIE_PRO_ZUG, ENERGIE_FAKTOR, energieVon, preisVon, faehigkeitsCheck, effekteAus, STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
+  const Regeln = { AKTIONSWUERFEL, MINDESTWURF, ZWEITER_ANGRIFF, ENERGIE_FAKTOR, energieVon, preisVon, faehigkeitsCheck, effekteAus, STUFEN, GRENZEN, GRENZEN_TEXT, stufeFuerPunkte, leseWaffe, leseWaffen, WAFFENREGELN, regelnVon, ELEMENTE, ELEMENT, elementAus, elementWirkung, leseListe, waffenFaktor,
     reichweitenFaktor, FAEHIGKEITEN, punkte, simuliere, einheitAus, balanceTest };
   if (typeof module !== "undefined" && module.exports) module.exports = Regeln;
   else root.Regeln = Regeln;

@@ -19,10 +19,11 @@
   const findeFaehigkeit = id => alleEintraege().find(f => f.id === id);
   const skillKopie = f => ({ id: f.id, typ: f.typ || "faehigkeit", name: f.name, art: f.art, tags: [...(f.tags || [])], text: f.text, kosten: { ...f.kosten }, ...(f.energie !== undefined ? { energie: f.energie } : {}) });
   const sk = (...ids) => ids.map(id => GRUND.find(g => g.id === id)).filter(Boolean).map(skillKopie);
-  // Preis einer Fähigkeit: Grundpreis mal Energie-Faktor, dazu die Energie (⚡). Ohne Fähigkeit nur die Kosten.
+  // Preis einer Fähigkeit: Grundpreis mal Würfel-Faktor, dazu der nötige Aktionswürfel (🎲5+). Ohne Fähigkeit nur die Kosten.
+  const wurfText = e => R.MINDESTWURF[e] >= 6 ? "6" : `${R.MINDESTWURF[e]}+`;
   const kostenText = f => {
     const k = f && f.kosten ? f.kosten : f || {}, e = f && f.kosten ? R.energieVon(f) : 0, w = f && f.kosten ? R.preisVon(f) : k.wert;
-    return `${k.typ === "fest" ? `${w} P.` : `${w > 0 ? "+" : ""}${w} %`}${e ? ` · ⚡${e}` : ""}`;
+    return `${k.typ === "fest" ? `${w} P.` : `${w > 0 ? "+" : ""}${w} %`}${e ? ` · 🎲${wurfText(e)}` : ""}`;
   };
   const fraktionen = () => alleEintraege().filter(e => e.typ === "fraktion");
   const fraktionVon = name => fraktionen().find(f => f.name.toLowerCase() === String(name || "").trim().toLowerCase());
@@ -136,7 +137,7 @@
   // Symbole im Regeltext: {P1} kostet 1 Power, {A2} 2 Treffer, {V+1} +1 Verteidigung … Macht Texte kurz und lesbar.
   const minus = w => w.replace(/^-/, "−");
   const SYMBOLTEXT = {
-    P: { icon: "power", name: "Energie", zeige: w => w, tip: w => w.startsWith("+") ? `${w} Energie` : `kostet ${w} Energie` },
+    P: { icon: "dice", name: "Aktionswürfel", zeige: w => w.startsWith("+") ? w : wurfText(+w || 1), tip: w => w.startsWith("+") ? `${w} Aktionswürfel in diesem Zug` : `braucht einen Aktionswürfel mit ${wurfText(+w || 1)}` },
     Z: { icon: "rune", name: "Zauberwurf", zeige: w => w + "+", tip: w => `Zauberwurf ${w}+: gelingt bei ${w}+, sonst verpufft der Zauber` },
     S: { icon: "potion", name: "Einmal pro Spiel", zeige: () => "1×", tip: () => "einmal pro Spiel" },
     RU: { icon: "runde", name: "Einmal pro Runde", zeige: () => "1×", tip: () => "einmal pro Runde" },
@@ -157,7 +158,7 @@
   const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
   // Für Stellen ohne Symbole (Prompt, Suche): Klartext
   const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => SYMBOLTEXT[k].tip(w));
-  // Energie vor dem Regeltext, wenn sie nicht schon als Symbol drinsteht ({P1} …)
+  // Nötiger Aktionswürfel vor dem Regeltext, wenn er nicht schon als Symbol drinsteht ({P1} …)
   const energieSym = f => { const e = R.energieVon(f); return e && !/\{P\d\}/.test(String(f.text || "")) ? symbol("P", String(e)) + " " : ""; };
 
   // Elemente als farbiges Abzeichen (Feuer rot, Frost eisblau …), alle anderen Tags als Messing-Symbol
@@ -688,7 +689,7 @@
         <h2>${esc(k.name || "Held")}</h2>
         <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
         <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
-        <h3>Energie (${R.ENERGIE_PRO_ZUG} pro Zug)</h3>${kaestchen(R.ENERGIE_PRO_ZUG, true)}<p class="hb-unter">Bewegen 1 · Angreifen 1 · Helfen 1 · Sprinten 2 · Fähigkeiten wie angegeben</p>
+        <h3>Aktionswürfel (${R.AKTIONSWUERFEL} pro Zug)</h3>${kaestchen(R.AKTIONSWUERFEL, true)}<p class="hb-unter">Bewegen 6" (höchstens 2×), Angreifen, Helfen: jeder Würfel · 2. Angriff: ${R.ZWEITER_ANGRIFF}+ · Fähigkeiten: Wurf wie angegeben</p>
         <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
         <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
         <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
@@ -1015,11 +1016,12 @@
       <p><b>Element einer Waffe</b> – ein Wort bei den Regeln, zum Beispiel <code>Frostklauen | Nahkampf | A4 | Reißend, Frost</code>. Trifft die Waffe eine Einheit derselben Prägung, würfelt das Ziel seine Verteidigung mit +1, bei der Gegen-Prägung mit −1. Alle anderen Ziele: keine Änderung.</p>
       <p><b>Punkte</b> – Elemente kosten nichts: Mal nützen sie, mal schaden sie. Der Duell-Simulator würfelt sie mit.</p>
         </div>
-    <h3 style="margin-top:28px">Energie</h3>
+    <h3 style="margin-top:28px">Aktionswürfel</h3>
     <div class="el-regeln">
-      <p><b>3 Energie pro Zug</b> – für jede Figur, Helden wie Gegner. Bewegen (6"), Angreifen und Helfen kosten je 1 und gehen jeweils höchstens einmal pro Zug, Sprinten (12") kostet 2. Was übrig bleibt, verfällt. Befallene Helden haben nur 2, schwer befallene 1.</p>
-      <p><b>Fähigkeiten</b> kosten 0 bis 3 Energie (${symbol("P", "1")} auf der Karte). Passive Regeln und Auslöser wie „Stirbt es“ oder „Rundenende“ wirken von selbst und kosten nichts. Zauber kosten 1, schwere Zauber (Wurf 5+) 2. Gegenstände zum Benutzen kosten 1, „Freie Aktion“ 0.</p>
-      <p><b>Punkte</b> – Wer Energie zahlt, verzichtet im Zug auf etwas. Deshalb wird eine Fähigkeit beim Bauen billiger: ×${R.ENERGIE_FAKTOR.slice(1).map((f, i) => `${String(f).replace(".", ",")} bei ${i + 1} Energie`).join(", ×")}. Gegner folgen dem Verhaltenswürfel, der ihre 3 Energie verteilt.</p>
+      <p><b>${R.AKTIONSWUERFEL} Aktionswürfel pro Zug</b> – jede Figur, Helden wie Gegner, würfelt zu Beginn ihres Zugs ${R.AKTIONSWUERFEL} W6. Jeder Würfel bezahlt eine Aktion. Bewegen (6", höchstens zweimal), Angreifen und Helfen gehen mit jedem Würfel, auch mit einer 1. Ein zweiter Angriff im selben Zug braucht eine ${R.ZWEITER_ANGRIFF}+. Wer am Zug ist, wechselt ab: ein Held, dann eine Gegnergruppe.</p>
+      <p><b>Fähigkeiten</b> brauchen einen Würfel mit Mindestwert (${symbol("P", "1")} auf der Karte): ${[1, 2, 3].map(e => `Stufe ${e} ${wurfText(e)}`).join(", ")}. Passive Regeln, Auslöser wie „Stirbt es“ und „Freie Aktion“ brauchen keinen Würfel. Zauber brauchen 3+, schwere Zauber (Wurf 5+) 5+. Ob ein Angriff oder Zauber gelingt, wird danach wie immer gewürfelt.</p>
+      <p><b>Schicksalswürfel</b> – zu Beginn jeder Runde 5 W6, die einzigartigen Zahlen kommen in einen Pool der Gruppe. Ein Held darf einen eigenen Würfel gegen einen aus dem Pool tauschen.</p>
+      <p><b>Punkte</b> – Je seltener der nötige Wurf, desto billiger die Fähigkeit beim Bauen: ×${R.ENERGIE_FAKTOR.slice(1).map((f, i) => `${String(f).replace(".", ",")} bei ${wurfText(i + 1)}`).join(", ×")}. Gemessen mit dem Duell-Simulator.</p>
         </div>
     <h3 style="margin-top:28px">Symbole in Regeltexten</h3>
     <p class="hint">Statt „erleidet 2 Treffer mit Durchschlag 1“ steht auf der Karte ein Schwert mit 2 und ein Durchschlag-Pfeil mit 1. Beim Hovern erscheint die Erklärung. Eigene Texte nutzen dieselben Kürzel in geschweiften Klammern.</p>

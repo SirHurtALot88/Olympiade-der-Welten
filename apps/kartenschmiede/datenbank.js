@@ -157,7 +157,8 @@
     const k = kostenAusFormular();
     const probe = { typ, text: $("dbText").value, kosten: k, energie: $("dbEnergie").value };
     const e = R.energieVon(probe), w = R.preisVon(probe);
-    const nachEnergie = e ? ` Kostet im Zug ${e} Energie, deshalb ×${String(R.ENERGIE_FAKTOR[e]).replace(".", ",")}: ${k.typ === "fest" ? `${w} Punkte` : `${w} %`}.` : " Kostet im Zug keine Energie.";
+    const wurf = R.MINDESTWURF[e] >= 6 ? "eine 6" : `einen Würfel mit ${R.MINDESTWURF[e]}+`;
+    const nachEnergie = e ? ` Braucht im Zug ${wurf}, deshalb ×${String(R.ENERGIE_FAKTOR[e]).replace(".", ",")}: ${k.typ === "fest" ? `${w} Punkte` : `${w} %`}.` : " Braucht keinen Aktionswürfel.";
     $("dbPreis").textContent = (k.typ === "fest" ? `Grundpreis fest ${k.wert} Punkte (klein 5, mittel 10, groß 15, elite 20).` : `Grundpreis ${k.wert} % Aufschlag auf die Formel, wächst also mit der Einheit.`) + nachEnergie;
   }
   async function anlegen(e) {

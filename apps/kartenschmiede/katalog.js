@@ -119,7 +119,7 @@
     // Gegenstände: Tränke und Bomben aus dem Quest-Kampagnenbuch (Wirkung hier als Vorschlag), dazu Ausrüstung
     f("heiltrank", "gegenstand", "Heiltrank", "Trank", FREUNDE, ["heilung", "einmalig"], "fest", 5, "{S} Freie Aktion: {HW3+1}.", "Quest-Kampagne"),
     f("heldenelixier", "gegenstand", "Heldenelixier", "Trank", FREUNDE, ["staerkung", "einmalig"], "fest", 5, "{S} Bis Rundenende {T+1} und +1 auf Proben.", "Quest-Kampagne"),
-    f("kraftelixier", "gegenstand", "Kraftelixier", "Trank", HELD, ["magie", "einmalig"], "fest", 5, "{S} Sofort {P+3}.", "Quest-Kampagne"),
+    f("kraftelixier", "gegenstand", "Kraftelixier", "Trank", HELD, ["magie", "einmalig"], "fest", 5, "{S} Freie Aktion: {P+1}, ein zusätzlicher Aktionswürfel in diesem Zug.", "Quest-Kampagne"),
     f("teleporttrank", "gegenstand", "Teleporttrank", "Trank", FREUNDE, ["bewegung", "einmalig"], "fest", 5, "{S} {B12} versetzen, auch aus dem Nahkampf.", "Quest-Kampagne"),
     f("betaeubungsbombe", "gegenstand", "Betäubungsbombe", "Bombe", FREUNDE, ["betaeubung", "flaeche", "einmalig"], "fest", 10, "{S} Punkt {R9}: alle Einheiten {F3} bei {D4} {X}.", "Quest-Kampagne"),
     f("runenschild", "gegenstand", "Runenschild", "Ausrüstung", FREUNDE, ["schutz"], "fest", 10, "{V+1} gegen Beschuss."),
