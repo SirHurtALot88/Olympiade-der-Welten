@@ -46398,7 +46398,6 @@
       zeigeTitelkarte(i+1,mdffaRollenLabel(runde.slotId));
       mdffaOffenbarungsTimer=setTimeout(()=>{
         if(titelkarte)titelkarte.hidden=true;
-        aktualisiereHpBalken(runde);
         const tbody=starteRundentafelGestaffelt(runde);
         // PLATZ 4 ZUERST, PLATZ 1 ZULETZT (Auftrag: "Platzierung 4->1 nacheinander
         // enthuellen") -- enthuelleRundenzeile() fuegt jede neue Zeile GANZ OBEN ein, eine
@@ -46408,6 +46407,11 @@
         const platzAbsteigend=runde.teams.slice().sort((a,b)=>b.rundenPlatz-a.rundenPlatz);
         function enthuelleSchritt(idx){
           if(idx>=platzAbsteigend.length){
+            // Spoiler-Fix (Opus-Review PR #1155): HP-Balken/"Ausgeschaltet" ALLER vier Ecken
+            // erst HIER setzen, nachdem die Tabelle selbst schon alle vier Plaetze gestaffelt
+            // gezeigt hat -- vorher (direkt bei Rundenstart) verriet aktualisiereHpBalken() wer
+            // ueberlebt hat, bevor Platz 2/1 ueberhaupt aufgedeckt waren.
+            aktualisiereHpBalken(runde);
             zeigeRundenbanner(runde,i+1);
             runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
             mdffaOffenbarungsTimer=setTimeout(()=>{
