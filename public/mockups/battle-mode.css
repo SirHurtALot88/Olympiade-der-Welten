@@ -322,6 +322,98 @@
   .oly-battle-arena.oly-battle-arena .mdffa-endstand td{text-align:right;padding:5px 8px;color:var(--ink);border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .mdffa-endstand td:first-child{text-align:left}
   .oly-battle-arena.oly-battle-arena .mdffa-endstand tr.mdffa-r1 td{color:var(--warn);font-weight:700}
+
+  /* MINI-DM RUNDENSHOW (Broadcast-Paket C, 06.10., C1-C4): Start-/Tempo-Leiste, Titelkarte,
+     Vorschau-Paarungen, Lebensbalken je Ecke, Ausgeschaltet-Stempel, Rundensieger-Banner und
+     der Phase-5-Endstand-Kopf. Alles ueber dieselben --surface/--line/--ink-Tokens wie der
+     Rest von .oly-battle-arena (keine eigene Farbpalette) -- im Spiel setzt
+     FoundationBattleArenaHost.tsx data-theme="dark" auf die Wurzel, wodurch diese Tokens
+     automatisch auf die dunklen Werte oben (Zeile 29) zeigen; Standalone/Claude-Artefakt
+     bleibt hell, bis @media(prefers-color-scheme:dark) oder data-theme="dark" greift. */
+  .oly-battle-arena.oly-battle-arena .mdffa-ctrl{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  /* [hidden] MUSS GEGEN DAS EIGENE display:flex GEWINNEN: ein Browser-UA-Rule wie
+     [hidden]{display:none} verliert gegen JEDE Autoren-Regel auf derselben Eigenschaft,
+     unabhaengig von der Selektor-Spezifitaet (Cascade-Origin zuerst) -- ohne diese Zeile
+     bliebe die Knopfleiste trotz ctrlBox.hidden=true (zeigeEndstand()) sichtbar, weil
+     .mdffa-ctrl{display:flex} direkt darueber schon eine Autoren-Regel fuer `display` ist. */
+  .oly-battle-arena.oly-battle-arena .mdffa-ctrl[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .mdffa-ctrl .btn[disabled]{opacity:.45;cursor:default}
+  .oly-battle-arena.oly-battle-arena .mdffa-titelkarte{background:var(--surface);border:1px solid var(--line);
+    border-radius:8px;padding:16px 18px;text-align:center;margin-bottom:14px;
+    font-family:"RaniraSeason",Georgia,"Times New Roman",serif}
+  .oly-battle-arena.oly-battle-arena .mdffa-titelkarte b{display:block;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+  .oly-battle-arena.oly-battle-arena .mdffa-titelkarte span{font-size:clamp(20px,3vw,30px);font-weight:700;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .mdffa-titelkarte{animation:mdffaFadeIn 260ms ease both}
+  .oly-battle-arena.oly-battle-arena .mdffa-paarungen{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:8px;margin-bottom:14px}
+  .oly-battle-arena.oly-battle-arena .mdffa-paarung{background:var(--surface);border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;font-size:11.5px;color:var(--muted)}
+  .oly-battle-arena.oly-battle-arena .mdffa-paarung b{display:block;color:var(--ink);font-size:12px;margin-bottom:3px}
+  /* LEBENSBALKEN JE ECKE (C2): startet auf voller Breite, die Transition laeuft auf die
+     tatsaechliche Rundenend-HP, sobald aktualisiereHpBalken() die Zielbreite setzt --
+     ehrlich als "Endzustand nach der Runde" beschriftet (s. .mdffa-hplabel), nicht als
+     Live-Kampfverlauf: die Simulation ist zu diesem Zeitpunkt laengst vollstaendig gelaufen. */
+  .oly-battle-arena.oly-battle-arena .mdffa-hpwrap{margin:7px 0 2px;height:6px;border-radius:3px;
+    background:var(--line-soft);overflow:hidden}
+  .oly-battle-arena.oly-battle-arena .mdffa-hpbar{display:block;height:100%;width:100%;border-radius:3px;
+    background:var(--mdffa-c0);transition:width 900ms cubic-bezier(.22,.7,.3,1)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c0 .mdffa-hpbar{background:var(--mdffa-c0)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c1 .mdffa-hpbar{background:var(--mdffa-c1)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c2 .mdffa-hpbar{background:var(--mdffa-c2)}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-c3 .mdffa-hpbar{background:var(--mdffa-c3)}
+  .oly-battle-arena.oly-battle-arena .mdffa-hplabel{font-size:8.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+  .oly-battle-arena.oly-battle-arena .mdffa-team.mdffa-down{opacity:.6}
+  .oly-battle-arena.oly-battle-arena .mdffa-stempel{display:inline-block;margin-top:4px;font-size:9.5px;
+    font-weight:700;letter-spacing:.08em;color:var(--crit);border:1.5px solid var(--crit);border-radius:4px;
+    padding:1px 5px;transform:rotate(-4deg)}
+  /* PLATZIERUNGS-ENTHUELLUNG MIT POP (C2, "4->1 nacheinander mit kleinem Pop fuer die
+     vergebenen Rundenpunkte"): JEDE Zeile wird erst GENAU DANN ins DOM eingefuegt, wenn sie
+     dran ist (enthuelleRundenzeile() in battle-mode.engine.js) -- anders als eine fruehere
+     Fassung mit reinem CSS-animation-delay lassen noch nicht "faellige" Plaetze deshalb KEINE
+     leere, aber schon raumgreifende Tabellenzeile im Layout stehen. .mdffa-zeile-neu
+     uebernimmt nur noch die Eintritts-Animation einer frisch eingefuegten Zeile. */
+  .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-zeile-neu{animation:mdffaZeileEin 240ms ease both}
+  @keyframes mdffaZeileEin{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+  .oly-battle-arena.oly-battle-arena .mdffa-runde td.mdffa-pop{animation:mdffaPop 420ms ease both}
+  @keyframes mdffaPop{0%{transform:scale(1)}40%{transform:scale(1.35);color:var(--warn)}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion:reduce){
+    .oly-battle-arena.oly-battle-arena .mdffa-runde tr.mdffa-zeile-neu{animation:none}
+    .oly-battle-arena.oly-battle-arena .mdffa-runde td.mdffa-pop{animation:none}
+    .oly-battle-arena.oly-battle-arena .mdffa-titelkarte{animation:none}
+    .oly-battle-arena.oly-battle-arena .mdffa-hpbar{transition:none}
+  }
+  .oly-battle-arena.oly-battle-arena .mdffa-rundenbanner{background:var(--surface-2);border:1px solid var(--line);
+    border-left:4px solid var(--warn);border-radius:6px;padding:7px 12px;margin-bottom:12px;
+    font-size:12.5px;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .mdffa-rundenbanner b{color:var(--warn)}
+  /* ENDSTAND IM PHASE-5-STIL (C3): derselbe Bauplan wie .esieger (grossgeschriebenes
+     Sieger-Banner, satt in --warn), hier als eigenes Element statt des geteilten
+     #esieger/#endstand-Overlays, weil Mini-DM vier statt zwei Seiten zeigt und dasselbe
+     Overlay dafuer nicht gebaut ist (s. Kopfkommentar bei renderMiniDmFfa()). */
+  .oly-battle-arena.oly-battle-arena .mdffa-endstandkopf{margin-bottom:16px}
+  .oly-battle-arena.oly-battle-arena .mdffa-endbanner{font:700 clamp(16px,2.6vw,26px)/1.2 "RaniraSeason",Georgia,"Times New Roman",serif;
+    letter-spacing:.02em;text-transform:uppercase;text-align:center;color:var(--warn);
+    border:2px solid var(--warn);border-radius:8px;padding:10px 14px;margin-bottom:14px;
+    animation:esiegerIn .32s cubic-bezier(.22,.9,.32,1.2) both}
+  @media (prefers-reduced-motion:reduce){.oly-battle-arena.oly-battle-arena .mdffa-endbanner{animation:none}}
+  .oly-battle-arena.oly-battle-arena .mdffa-podest{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+    align-items:end}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz{background:var(--surface);border:1px solid var(--line);
+    border-radius:8px 8px 0 0;text-align:center;padding:10px 8px 14px}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz[data-platz="1"]{padding-top:2px;border-color:var(--warn);order:2}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz[data-platz="2"]{padding-top:10px;order:1}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz[data-platz="3"]{padding-top:16px;order:3}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz[data-platz="4"]{padding-top:22px;order:4}
+  .oly-battle-arena.oly-battle-arena .mdffa-podrang{font-size:22px;font-weight:700;color:var(--faint)}
+  .oly-battle-arena.oly-battle-arena .mdffa-podplatz[data-platz="1"] .mdffa-podrang{color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena .mdffa-podname{font-size:13px;font-weight:600;margin:3px 0;color:var(--ink)}
+  .oly-battle-arena.oly-battle-arena .mdffa-podpunkte{font-size:10.5px;color:var(--muted)}
+  @media (max-width:640px){
+    .oly-battle-arena.oly-battle-arena .mdffa-podest{grid-template-columns:repeat(2,1fr)}
+    .oly-battle-arena.oly-battle-arena .mdffa-podplatz{order:initial!important;padding-top:10px!important}
+  }
+
   /* Slot-Tafel */
   .oly-battle-arena.oly-battle-arena .slotzone{position:relative}
   .oly-battle-arena.oly-battle-arena .slotzone .zname{align-items:flex-start}
@@ -731,14 +823,31 @@
   .oly-battle-arena.oly-battle-arena #etafelL h5{color:var(--home)}
   .oly-battle-arena.oly-battle-arena #etafelR h5{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .etafel h5{margin:0;padding:7px 10px;font-size:12px;color:var(--ink);border-bottom:1px solid var(--line)}
-  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif}
-  .oly-battle-arena.oly-battle-arena .etafel th{padding:4px 5px;text-align:right;color:var(--faint);font-size:9px;font-weight:600;
+  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:10px/1.35 "RaniraSeason",Georgia,"Times New Roman",serif}
+  .oly-battle-arena.oly-battle-arena .etafel th{padding:3px 2.5px;text-align:right;color:var(--faint);font-size:8px;font-weight:600;
     text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel th:first-child, .oly-battle-arena.oly-battle-arena .etafel td:first-child{text-align:left}
-  .oly-battle-arena.oly-battle-arena .etafel td{padding:4px 5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+  .oly-battle-arena.oly-battle-arena .etafel td{padding:3px 2.5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel td.imp{color:var(--warn);font-weight:700}
   .oly-battle-arena.oly-battle-arena .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
   .oly-battle-arena.oly-battle-arena .etafel td.leer{color:var(--faint)}
+  /* LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): volle Breite statt der halben
+     .etafel-Spalte -- sonst dieselbe Tafeloptik (Hintergrund/Rahmen/Tabellenformat), kein
+     neues Zutaten-Set. Teamzeilen in Heim-/Gastfarbe, wie .ehzeile.h/.a daneben. */
+  /* flex-shrink:0 NOETIG (gefunden beim Sichtpruefen): `.endstand` ist eine Flex-Spalte
+     (s. dort), und `.elinescore` erbt `overflow:auto` von `.etafel` -- das setzt per Spezifikation
+     die automatische Flex-Mindesthoehe auf 0 (anders als z.B. `.esieger` ohne eigenes
+     `overflow`, dessen Mindesthoehe am Inhalt haengt). Reicht die Gesamthoehe aller
+     Endstand-Kinder nicht in den sichtbaren Bereich, quetscht der Flex-Algorithmus die
+     Linescore-Tafel dadurch auf 1-4px zusammen, WAEHREND `.etafeln` (ohne eigenes
+     `overflow`, nur ihre Kind-`.etafel`s haben es) ihre volle Hoehe behaelt -- die
+     Linescore-Zeile verschwand dadurch unsichtbar, obwohl sie korrekt befuellt war.
+     `flex-shrink:0` haelt sie auf ihrer natuerlichen Inhaltshoehe, genau wie `.esieger`. */
+  .oly-battle-arena.oly-battle-arena .elinescore{width:100%;flex-shrink:0;margin-bottom:clamp(8px,1.6vw,18px)}
+  .oly-battle-arena.oly-battle-arena .elinescore[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsname.h{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsname.a{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsges{font-weight:700;color:var(--ink);border-left:1px solid var(--line-soft)}
   /* SPIELER DES SPIELS (Broadcast-Audit Runde 2, Punkt 28, 30.09.): ein kleiner Stern vor
      dem Namen der oder des Besten im Endstand -- derselbe Boxscore, nur ein zusaetzliches
      Anzeige-Etikett (s. mvpStern()/ermittleMvp() in battle-mode.engine.js). Faerbung wie
@@ -1200,6 +1309,15 @@
        Reihenfolge gegen die generische `.untenraum`-Regel weiter oben. */
     .oly-battle-arena.oly-battle-arena #p2 .frame>.untenraum{grid-template-columns:1fr;
       border-top:0;border-left:1px solid var(--line-soft)}
+    /* MINI-DM NUTZT DIE VOLLE BREITE (C4, Broadcast-Paket C, 06.10.): `.untenraum` steht
+       fuer Mini-DM auf display:none (s. reset() in battle-mode.engine.js, derselbe Toggle
+       wie fuer .scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl daneben) -- ein display:none-
+       Kind verschwindet zwar aus dem Grid, die 320px-Spalte oben bleibt aber trotzdem
+       reserviert, weil grid-template-columns sie EXPLIZIT fuer den Container definiert, nicht
+       implizit aus der Kindzahl ableitet. Reset() setzt deshalb zusaetzlich diese Klasse auf
+       `.frame`, solange disc==="mini-dm" ist; hoehere Spezifitaet (eine Klasse mehr) gewinnt
+       unabhaengig von der Regel-Reihenfolge gegen die Zweispaltigkeit direkt darueber. */
+    .oly-battle-arena.oly-battle-arena #p2 .frame.mdffa-vollbreite{grid-template-columns:1fr}
   }
   .oly-battle-arena.oly-battle-arena .feed{padding:9px 18px;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:11.5px;height:210px;overflow-y:auto;line-height:1.75}
   /* TICKER/PROTOKOLL-REITER (Broadcast-Audit Runde 2, Punkt 8, 30.09.): die Reiterleiste

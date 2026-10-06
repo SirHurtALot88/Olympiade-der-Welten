@@ -6881,6 +6881,23 @@
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
+  // LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): reiner Anzeige-Merker, EIN Eintrag je
+  // Periode/Drittel -- {periode, a, b}, a/b = die PUNKTE DIESER EINEN PERIODE je Seite
+  // (DELTA gegen den vorigen Eintrag, nicht der kumulierte Spielstand) -- nur so ergibt die
+  // Summe der Spalten am Ende den Endstand, genau wie bei jeder echten Linescore (NBA/NHL/
+  // NFL zeigen auch Periodenpunkte, keine laufende Summe je Spalte). Gefuellt aus zwei
+  // Stellen: starteViertelpause() (s. dort) fuer jede VOR dem Spielende abgeschlossene
+  // Periode -- dieselbe Funktion fuer alle drei Feldspiel-Chassis (Football/Hockey/
+  // Basketball), EIN Fuellpfad fuer alle drei -- und stepFeldspielLive()s Schlusssirenen-
+  // Zweig fuer die LETZTE Periode (die nie durch starteViertelpause() laeuft, weil
+  // naechsterAngriff()s Viertelgrenzen-Pruefung ausdruecklich NUR vor der letzten Periode
+  // greift, s. dortiger Kommentar). `fsPeriodenVorPunkte` haelt den fsPunkte-Stand beim
+  // vorigen Eintrag fest, damit jeder neue Eintrag nur das Delta seit dort traegt. Nur
+  // Anzeige: `renderLinescore()` liest `fsPeriodenStand` fuer die "Q1 | Q2 | ... |
+  // Gesamt"-Zeile, sonst niemand -- kein Einfluss auf fsPunkte/fsZuege/die Wertung. Im
+  // stillen Messmodus (`stumm`, s. dort) bleiben beide ungefuellt, exakt wie HIGHLIGHTS/die
+  // anderen reinen Broadcast-Merker -- die Abnahme-Sonden lesen sie nie.
+  let fsPeriodenStand=[], fsPeriodenVorPunkte=[0,0];
   // ENDSTAND-OVERLAY-WAECHTER FUERS FELDSPIEL (Broadcast-Audit Runde 2, Punkt 4, 30.09.):
   // dasselbe Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` weiter unten
   // in dieser Datei -- s. Kommentar bei deren Reset in bauFeldspiel()/updateHudFeldspiel().
@@ -7799,6 +7816,9 @@
     // neuen Feldspiel-Match.
     fsEndeGemeldet=false;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
+    // LINESCORE-RESET (Broadcast-Paket A, Punkt 4): gehoert zum ABGELAUFENEN Spiel, s.
+    // HIGHLIGHTS-Reset in reset() fuer dasselbe Muster.
+    fsPeriodenStand=[]; fsPeriodenVorPunkte=[0,0];
     // passerPgSum/passerTgSum/passerN NEU (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt
     // 6.1): messen den TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer statt
     // den Kadermittelwert — genau der Unterschied, den kappa=3 zwischen "Referenzakteur der
@@ -10287,6 +10307,14 @@
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
     feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true,undefined,"zwischenstand");
+    // LINESCORE-EINTRAG (Broadcast-Paket A, Punkt 4, 06.10.): EIN Eintrag je abgeschlossener
+    // Periode, mit den PUNKTEN DIESER PERIODE (Delta gegen `fsPeriodenVorPunkte`, s. dessen
+    // Deklaration) -- reiner Anzeige-Merker fuer renderLinescore(), nicht im stillen
+    // Messmodus (`stumm`, wie HIGHLIGHTS/der Feed-Aufruf direkt darueber ihn schon beachten).
+    if(!stumm){
+      fsPeriodenStand.push({periode:zuEnde,a:fsPunkte[0]-fsPeriodenVorPunkte[0],b:fsPunkte[1]-fsPeriodenVorPunkte[1]});
+      fsPeriodenVorPunkte=[fsPunkte[0],fsPunkte[1]];
+    }
     // PUSTE IN DER PAUSE (Chris: „man laedt in pausen etwas auf"). Bewusst eine EINMALIGE
     // Gutschrift am Drittelwechsel und NICHT eine laengere Simulationspause: der
     // Kommentar an FELDSPIEL_ART.basketball.live haelt nachgemessen fest, dass schon eine
@@ -12666,6 +12694,16 @@
       // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
       // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
       // returnt vorher), das erneute Setzen aenderte also nie etwas.
+      // LINESCORE, LETZTE PERIODE (Broadcast-Paket A, Punkt 4, 06.10.): die Periode, in der
+      // das Spiel tatsaechlich endet, durchlaeuft starteViertelpause() NIE (dessen
+      // Aufrufer naechsterAngriff() prueft die Viertelgrenze ausdruecklich nur VOR der
+      // letzten Periode, s. dortiger Kommentar) -- ohne diesen Eintrag fehlte der Linescore
+      // genau die letzte Spalte, und die Summe ueber `fsPeriodenStand` bliebe hinter dem
+      // Endstand zurueck. Gleiche Delta-Logik wie dort, nicht im stillen Messmodus.
+      if(!stumm&&fsLive){
+        fsPeriodenStand.push({periode:fsLive.viertel,a:fsPunkte[0]-fsPeriodenVorPunkte[0],b:fsPunkte[1]-fsPeriodenVorPunkte[1]});
+        fsPeriodenVorPunkte=[fsPunkte[0],fsPunkte[1]];
+      }
       bkSfx("buzzer.mp3",0.8); bkLoopStop();
       // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
       // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
@@ -13106,17 +13144,21 @@
     // ZEIT_DEHNUNG.hockey=2 tickte sie dadurch nur halb so schnell wie die Sendezeit ablief.
     const restRoh=fsLive.viertel*L.periodenDauer-fsT;
     if(restRoh<0){
-      // LETZTE PERIODE OHNE PAUSEN-KLEMME (Audit-Fund: "Football-Viertel-Uhr steht ... auf
-      // 0:00, waehrend noch Spielzuege laufen" -- Anzeige-Bug, kein Sim-Bug). Die
-      // Viertelgrenzen-Pruefung in `naechsterAngriff()` greift nur VOR der letzten Periode
-      // (`fsLive.viertel<L.perioden`); danach laeuft die Simulation unveraendert bis zum
-      // tatsaechlichen Spielende weiter, waehrend die alte Anzeige ab dem Ueberschreiten fuer
-      // den Rest des Spiels bei "0:00" einfror. Zeigt die ueberzogene Zeit jetzt als
-      // Nachspielzeit ("+0:07"), ausschliesslich aus vorhandenem fsT/L hergeleitet -- kein
-      // neuer Zustand, kein Ruecklesen in die Simulation.
-      const ueberSek=Math.floor(-restRoh*zeitFaktor());
-      return periodeLabel+" · +"+Math.floor(ueberSek/60)+":"+String(ueberSek%60).padStart(2,"0");
+      // BROADCAST-PAKET A, PUNKT 2 (06.10.): hier stand bis eben ein "+0:07"-Nachspielzeit-
+      // Ueberlauf, der (anders als der Name "Nachspielzeit" nahelegt) auch MITTEN in der
+      // letzten Periode auftauchte, sobald `naechsterAngriff()`s Viertelgrenzen-Pruefung ab
+      // der letzten Periode nicht mehr greift (s. Kommentar dort: "greift nur VOR der letzten
+      // Periode") -- ein laufendes Spiel zeigte also "Q1 · +0:05" mitten im ersten Viertel
+      // eines verlaengerten letzten Drives, nicht nur am echten Spielende. Gefordert ist eine
+      // saubere "0:00" plus ein kontextueller Zusatz statt der verwirrenden Pluszeit, und bei
+      // komplett beendetem Spiel (`done`, von stepFeldspielLive() gesetzt) eine klare
+      // Abschlussanzeige statt irgendeiner Restzeit-Zahl. Reine Anzeige-Fallunterscheidung --
+      // `fsT`/`fsLive`/`done` werden nur gelesen, nichts wird in die Simulation zurueckgeschrieben.
+      if(done)return periodeLabel+" · Ende";
+      const zusatz=istFootball()?"Drive läuft aus":istHockey()?"Schlussphase":"letzter Angriff";
+      return periodeLabel+" · 0:00 · "+zusatz;
     }
+    if(done)return periodeLabel+" · Ende";
     const restSek=Math.floor(restRoh*zeitFaktor());
     return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(restSek%60).padStart(2,"0");
   }
@@ -15843,6 +15885,29 @@
   // ersten Versuch unabhaengig voneinander, dieses Set verhindert die doppelte Zeile), kein
   // Einfluss auf hebeUebung()/baueHebenDuelle() selbst.
   const hebenTeamBannerGezeigt=new Set();
+  // BROADCAST-SENDUNGSRHYTHMUS PAKET B (06.10.), B2/B3/B4 — rein praesentationale
+  // Zustaende, GENAU dieselbe Kategorie wie letzterHebenZug/hebenTeamBannerGezeigt oben:
+  // Wandzeit-Timer (jetztMs(), NICHT rr()-Simulationszeit, s. CLAUDE.md-Auftrag) bzw. ein
+  // Simulationszeit-Stempel (buehneT, fuer B4), die NUR steuern, WAS zeichneHeben() gerade
+  // zeichnet. Kein rr(), kein Schreibzugriff auf TEILNEHMER/u.summe, keine Wirkung auf
+  // MOTOREN["gewichtheben"].wert() -- disziplinProbe()/miss-alle-disziplinen.mjs rufen diese
+  // Variablen nie ab (sie lesen nur den Simulationszustand, nicht den Zeichenpfad).
+  //
+  // B2 (Duell-Bauchbinde): `hebenLetzteAktivNr` merkt sich das zuletzt gezeigte aktive Duell
+  // (zeichneHeben()s `aktivNr`) -- aendert es sich, startet ein 2,5s-Wandzeit-Fenster
+  // (`hebenBauchbindeSeitMs`/-BisMs), waehrenddessen die Unterzeile eingeblendet bleibt.
+  let hebenLetzteAktivNr=null, hebenBauchbindeSeitMs=0, hebenBauchbindeBisMs=0;
+  // B3 (Zwischenstand nach dem Reissen): `hebenZwischenstandGezeigt` verhindert die doppelte
+  // Tafel je Duell (dasselbe Dedup-Muster wie hebenTeamBannerGezeigt direkt darueber),
+  // `hebenZwischenstandDuell`/-SeitMs/-BisMs sind das Wandzeit-Fenster der GERADE sichtbaren
+  // Tafel.
+  const hebenZwischenstandGezeigt=new Set();
+  let hebenZwischenstandDuell=null, hebenZwischenstandSeitMs=0, hebenZwischenstandBisMs=0;
+  // B4 (Kreidewolke): Simulationszeit-Stempel (buehneT), bis wann der groessere "Knall"-Ring
+  // nach einer tatsaechlichen Ansage-Aenderung noch zu sehen ist (s. stepBuehne(), derselbe
+  // Moment wie der vorhandene sfx("gewichtheben","kreide")-Aufruf). -Infinity statt 0, damit
+  // `buehneT<hebenKreideKnallBisT` vor dem allerersten Versuch nicht faelschlich zutrifft.
+  let hebenKreideKnallBisT=-Infinity;
   // KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A): dasselbe Muster wie
   // letzterHebenZug oben, nur fuer den Gauntlet. `letzterGauntletZug` haelt den zuletzt
   // ENTHUELLTEN Anschlag fest (reveal-gegatet, s. Aufruf in stepBuehne unten) -- exakt das,
@@ -16296,6 +16361,11 @@
       ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    // PAKET B (06.10.): B2/B3/B4-Zustand mit zurueckgesetzt, sonst ueberlebte er ein
+    // naechstes Spiel (gleiches Muster wie hebenTeamBannerGezeigt.clear() direkt davor).
+    hebenLetzteAktivNr=null; hebenBauchbindeSeitMs=0; hebenBauchbindeBisMs=0;
+    hebenZwischenstandGezeigt.clear(); hebenZwischenstandDuell=null; hebenZwischenstandSeitMs=0; hebenZwischenstandBisMs=0;
+    hebenKreideKnallBisT=-Infinity;
     LASTEN_FINALE=null;
     tennisFokus=0; fechtenFokus=0; tennisDruck=[];
     schachMattGehoert=false;
@@ -19563,6 +19633,13 @@
           feed(u.side,u.n+" zieht nach: Ansage "+sinclairAnzeige(r.ansageAlt,u.groesse)
             +" kg — geändert auf "+sinclairAnzeige(r.kg,u.groesse)+" kg.",true);
           sfx("gewichtheben","kreide");
+          // B4 (Broadcast-Sendungsrhythmus Paket B, 06.10.): GENAU dieser Ton hatte bisher
+          // kein visuelles Gegenstueck (Audit-Befund, s. CLAUDE.md-Auftrag Punkt 3) --
+          // `hebenKreideKnallBisT` ist ein reiner Simulationszeit-Stempel (buehneT, NICHT
+          // jetztMs(), weil dieser Code im selben Takt wie buehneT selbst laeuft), den
+          // zeichneHeben() fuer einen kurzen Ring an der Kreidekiste liest. Kein rr(), kein
+          // Schreibzugriff auf u.summe/u.runden.
+          hebenKreideKnallBisT=buehneT+0.6;
         }
         // Der eigentliche Versuchs-Ticker ("... gueltig/ungueltig" -- das Wort steht woertlich
         // in `r.ereignis`), die KUEHNER-VERSUCH-Ausgangszeilen und die abschliessende
@@ -23280,6 +23357,10 @@
   let hebenPublikumAn=false; // rein praesentational, s. bodenBuehne() oben fuer den Stop.
   function bodenHeben(){
     if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
+    // `art` NUR fuer die Versuchsuhr-Zeile der Anzeigetafel (Paket B, B1, s. dort) --
+    // dieselbe BB()-Quelle, die jede andere Uhr dieser Buehne schon liest (z.B.
+    // updateHudBuehne()), rein lesend, kein rr().
+    const art=BB();
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
@@ -23464,7 +23545,17 @@
     // TAFELHOEHE (Broadcast-Audit Runde 2, 30.09., Punkt 26): 80 -> 98px, weil die
     // "Naechster"-Zeile unten jetzt zweizeilig ist (s. dort) -- ohne die zusaetzlichen
     // 18px liefe die "zieht nach"-Zeile aus dem Kasten.
-    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98;
+    // 98 -> 122px (Paket B, B1, 06.10.): die Versuchsuhr zieht aus der Bannerzone in genau
+    // diese Tafel (s. Kommentar beim neuen VERSUCHSUHR-Block unten) und braucht eine eigene
+    // Zeile -- alle Zeilen darunter ruecken um denselben TAFEL_UHR_SHIFT nach unten, damit
+    // keine zwei Zeilen uebereinander landen. CANVAS-RAND GEPRUEFT (B1-Auftrag): tafelX+
+    // tafelW = W-146+132 = W-14, bleibt bei jeder Breite 14px innerhalb des Canvas rechts;
+    // die Hoehe reicht jetzt bis tafelY+122=186 -- etwas TIEFER als die Plattform-Schattenkante
+    // (platY-4=184) reicht, aber das liegt in einer ganz anderen Spalte: die Plattform sitzt
+    // bei X 331-909 (W/2±platW/2, s. bodenHeben() weiter unten), die Tafel bei X 1094-1226 --
+    // keine X-Ueberschneidung, also auch keine Y-Kollision trotz der paar Pixel Ueberlapp.
+    const TAFEL_UHR_SHIFT=24;
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98+TAFEL_UHR_SHIFT;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
     // GOLDENER ZIERSTREIFEN oben, wie die goldene Bandenkante bei bodenEis() — dasselbe
@@ -23480,6 +23571,33 @@
     ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
     ctx.font="700 16px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
     ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
+    // VERSUCHSUHR ALS TAFEL-ZEILE (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): zog
+    // bisher zentriert in die Bannerzone (zeichneHeben(), uhrY=H*0.27) -- GENAU dort, wo
+    // auch #bbugcallout erscheint (positioniereCallout() legt den Banner unter #bbug, der
+    // bei schmalen Fensterbreiten bis zu 44% der Leinwandhoehe braucht, s. Kommentar bei
+    // kuerBahn() weiter oben); die Fuellgrafik verschwand dadurch jedesmal, wenn ein
+    // Highlight-Banner kam. Die Anzeigetafel hier ist ein HTML-unabhaengiger Fixpunkt oben
+    // rechts, derselbe Ort, an dem Uebung/Versuch/kg schon kollisionsfrei stehen -- keine
+    // neue Uhr, nur derselbe Rest/Fortschritt wie vorher (buehneAkt/art.rundenDauer,
+    // zeitFaktor() fuer die ECHTE Sekunde, dasselbe Muster wie updateHudBuehne()). Schrift
+    // 12px (Auftrag: "mindestens 12px", vorher 9,5px), letzte Sekunde rot statt Gold.
+    // KEIN sfx("gewichtheben","hupe"): dieser Ton liegt im TON_KATALOG ausdruecklich im
+    // Sandsack-Finale-Abschnitt ("ein echtes Spiel loest sie nie aus", s. dort) -- ein
+    // echtes Spiel loest sie HIER ausgeloest haette genau diesen Satz falsch gemacht und
+    // die beiden laut Auftrag strikt getrennten Pakete doch vermischt. Rein visuell bleibt
+    // der Fix vollstaendig additiv, ohne das reservierte Sandsack-Geraeusch anzutasten.
+    {
+      const restEcht=Math.max(0,buehneAkt*zeitFaktor());
+      const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
+      const letzteSekunde=restEcht<1;
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle=letzteSekunde?"#e3523f":"#d6ac36";
+      ctx.fillText("Nächster: "+Math.ceil(restEcht)+" s",tafelX+10,tafelY+64);
+      const uhrBarW=tafelW-20,uhrBarH=4,uhrBarX=tafelX+10,uhrBarY=tafelY+72;
+      ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(uhrBarX,uhrBarY,uhrBarW,uhrBarH);
+      ctx.fillStyle=letzteSekunde?"#e3523f":"#d6ac36";
+      ctx.fillRect(uhrBarX,uhrBarY,uhrBarW*fortschritt,uhrBarH);
+    }
     // NAECHSTE ANSAGE (H2.2, Broadcast-Optik-Recherche 27.09., Klasse A): "Nächster Versuch:
     // Draco, 127 kg" — Taktik am Meldetisch (Doku 2.1, belegt). `buehneQueue[buehneZeiger]`
     // ist genau der naechste Teilnehmer, der als naechstes dequeued wird (reine Ablesung,
@@ -23508,9 +23626,9 @@
           ctx.font="400 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#5f6675";
           const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
           const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
-          ctx.fillText("Nächster:",tafelX+10,tafelY+58);
+          ctx.fillText("Nächster:",tafelX+10,tafelY+58+TAFEL_UHR_SHIFT);
           ctx.fillStyle="#c7ccd6";
-          ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69);
+          ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69+TAFEL_UHR_SHIFT);
           // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD
           // SICHTBAR" — ersetzt die vorherige reine Delta-Zeile ("↑ zieht nach, +N kg",
           // gegen den EIGENEN vorigen Versuch) durch den tatsaechlichen Meldetisch-Moment:
@@ -23523,12 +23641,12 @@
             const neuTxt=" → "+sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
             ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
             ctx.fillStyle="#8a93a3";
-            ctx.fillText(altTxt,tafelX+10,tafelY+91);
+            ctx.fillText(altTxt,tafelX+10,tafelY+91+TAFEL_UHR_SHIFT);
             const altW=ctx.measureText(altTxt).width;
             ctx.strokeStyle="#8a93a3";ctx.lineWidth=1;
-            ctx.beginPath();ctx.moveTo(tafelX+10,tafelY+91);ctx.lineTo(tafelX+10+altW,tafelY+91);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(tafelX+10,tafelY+91+TAFEL_UHR_SHIFT);ctx.lineTo(tafelX+10+altW,tafelY+91+TAFEL_UHR_SHIFT);ctx.stroke();
             ctx.fillStyle="#d6ac36";
-            ctx.fillText(neuTxt,tafelX+10+altW,tafelY+91);
+            ctx.fillText(neuTxt,tafelX+10+altW,tafelY+91+TAFEL_UHR_SHIFT);
           }
         }
       }
@@ -27196,6 +27314,9 @@
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
+    // Fuer die "Zuletzt"-Zeile weiter unten (Paket B, B1): wird erst gesetzt, NACHDEM die
+    // Bedarfszeile entschieden hat, ob sie selbst an derselben Stelle zeichnet.
+    let bedarfGezeigt=false;
 
     // TEAM-PUBLIKUM (Konzept team-publikum-feiermomente 3.1): die zehn Heber, die gerade NICHT
     // auf der Plattform stehen, sitzen als Teambank links (Heim) bzw. rechts (Gast) neben der
@@ -27217,40 +27338,15 @@
       });
     }
 
-    // TOTE STRECKEN FUELLEN (Broadcast-Audit Runde 2, Punkt 19, 30.09.): Gewichtheben steht
-    // laut Messung 95 % der Sendezeit als Standbild, bis zu 30 s am Stueck ohne sichtbare
-    // Aenderung (Tabelle 6.2) -- im echten Fernsehen laeuft in dieser Zeit die Versuchsuhr,
-    // die Hantel wird "geladen" und der letzte Versuch nachbesprochen. Alle drei Elemente
-    // hier lesen AUSSCHLIESSLICH bereits vorhandenen Zustand: `buehneAkt`/`art.rundenDauer`
-    // treiben die Enthuellungsanimation ohnehin schon (s. hebePhase() oben), `zeitFaktor()`
-    // ist dieselbe Umrechnung, mit der auch die Uhr im HUD rechnet (s. updateHudBuehne()), und
-    // `letzterHebenLampenZug.r.ereignis` ist derselbe Text, den der Ticker am Lampen-Moment
-    // schreibt (s. hebenTickerAmUrteil()) -- keine neue Simulation, kein rr(), kein zweites
-    // Protokoll.
-    //
-    // LAMPEN-GEGATET, NICHT ENTHUELLUNGS-GEGATET (Folgefund zu PR #1091, Task #35, 01.10.):
-    // vorher stand hier `letzterHebenZug` -- derselbe Transient, den stepBuehne() schon AN DER
-    // ENTHUELLUNG setzt, also VOR der Lampe. `r.ereignis` traegt woertlich "gueltig"/
-    // "ungueltig"; diese Zeile verriet das Urteil damit genauso frueh wie der (inzwischen
-    // verschobene) Haupt-Ticker. `letzterHebenLampenZug` wird dagegen nur in
-    // hebenTickerAmUrteil() gesetzt, also GENAU am Uebergang zug->hoch|ablage -- waehrend des
-    // laufenden Versuchs zeigt dieses Feld deshalb noch den VORHERIGEN, bereits entschiedenen
-    // Versuch (oder nichts, vor dem allerersten).
-    {
-      const restEcht=Math.max(0,buehneAkt*zeitFaktor());
-      const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
-      const uhrY=H*0.27;
-      ctx.font="700 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#d6ac36";
-      ctx.fillText("Nächster Versuch in "+restEcht.toFixed(1).replace(".",",")+" s",W/2,uhrY);
-      const barW=150,barH=5,barX=W/2-barW/2,barY=uhrY+11;
-      ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(barX,barY,barW,barH);
-      ctx.fillStyle="#d6ac36";ctx.fillRect(barX,barY,barW*fortschritt,barH);
-      if(letzterHebenLampenZug&&letzterHebenLampenZug.r){
-        ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Zuletzt: "+letzterHebenLampenZug.u.n.split(" ")[0]+" — "+letzterHebenLampenZug.r.ereignis,
-          W/2,barY+17);
-      }
-    }
+    // VERSUCHSUHR AUSGELAGERT (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): stand hier
+    // bisher zentriert bei H*0.27 -- GENAU in der Zone, in der auch #bbugcallout erscheint
+    // (s. Kommentar bei kuerBahn() weiter oben: der HTML-Banner kann je nach Fensterbreite
+    // deutlich in die Leinwand hineinreichen), die Fuellgrafik verschwand also bei jedem
+    // Highlight-Banner. Die Uhr lebt jetzt in der Anzeigetafel oben rechts (bodenHeben(),
+    // VERSUCHSUHR-Kommentar dort) -- derselbe Rest/Fortschritt, nur ein kollisionsfreier Ort.
+    // Die "Zuletzt"-Zeile bleibt auf der Buehne, zieht aber direkt unter die Duell-
+    // Kopfzeile (s. unten, nach der Bedarfszeile) -- ebenfalls aus derselben Bannerzone
+    // heraus.
 
     // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
     // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
@@ -27298,9 +27394,26 @@
             ctx.strokeText(txt,W/2,H*0.183);
             ctx.fillStyle="#d6ac36";
             ctx.fillText(txt,W/2,H*0.183);
+            bedarfGezeigt=true;
           }
         }
       }
+    }
+
+    // ZULETZT-ZEILE (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): unter die Duell-
+    // Kopfzeile verschoben (vorher Teil der jetzt in die Anzeigetafel ausgelagerten
+    // Versuchsuhr, s. Kommentar oben), damit sie nicht mehr in der Bannerzone (H*0.27)
+    // steht. Ausgelassen, wenn an derselben Stelle schon die Bedarfszeile direkt darueber
+    // (`bedarfGezeigt`, H*0.183) oder — bei kuehnem Versuch — der Kuehn-Badge (kuehnZeileY
+    // weiter unten, H*0.20) steht: dieselbe "keine zwei Ueberschriften uebereinander"-Regel,
+    // die die Bedarfszeile bereits gegenueber dem Kuehn-Badge befolgt (s. deren Kommentar).
+    // LAMPEN-GEGATET (liest letzterHebenLampenZug, nur in hebenTickerAmUrteil() gesetzt,
+    // s. dort) — unveraendert aus der alten Zeile uebernommen, nur der Ort ist neu.
+    if(letzterHebenLampenZug&&letzterHebenLampenZug.r&&!bedarfGezeigt
+       &&!(letzterHebenZug&&letzterHebenZug.r&&letzterHebenZug.r.kuehn)){
+      ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
+      ctx.fillText("Zuletzt: "+letzterHebenLampenZug.u.n.split(" ")[0]+" — "+letzterHebenLampenZug.r.ereignis,
+        W/2,H*0.155+13);
     }
 
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
@@ -27534,6 +27647,126 @@
     } else {
       ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
       ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
+    }
+
+    // ================= BROADCAST-SENDUNGSRHYTHMUS PAKET B (06.10.): B2 + B3 =================
+    // Lower-Third-Flaeche unterhalb der Plattformkante (bodenHeben(): platY+platH=H*0.80) und
+    // oberhalb der "wartende Paare"-Zeile (H*0.90) -- ein bisher ungenutzter Streifen, den
+    // weder Teambank (Fusslinie H*0.70, Koerper reichen nicht so tief) noch Plattform selbst
+    // erreichen. B2 (Duell-Bauchbinde) und B3 (Zwischenstand nach dem Reissen) teilen sich
+    // dieselbe Flaeche und denselben Fade-Helfer, weil sie praktisch nie gleichzeitig noetig
+    // sind (B2 feuert GENAU beim Duellwechsel, B3 fruehestens drei enthuellte Runden spaeter,
+    // s. Ausloeser unten) und beide dieselbe "kurz eingeblendete Unterzeile"-Sprache sprechen.
+    //
+    // WANDZEIT, NICHT SIMULATIONSZEIT (CLAUDE.md-Auftrag woertlich: "jetztMs(), NICHT
+    // rr()-Simulationszeit"): beide Fenster sollen bei jedem Tempo (1x/4x/Pause) dieselbe
+    // ECHTE Sichtdauer haben, nicht eine, die bei Tempo 4x viermal so schnell verschwindet.
+    // Reines Lesen/Schreiben praesentationaler Modulvariablen (s. deren Deklaration weiter
+    // oben), kein rr(), kein Einfluss auf TEILNEHMER/u.summe/MOTOREN["gewichtheben"].wert().
+    const hebenBauchbindeFade=(seitMs,bisMs)=>{
+      const jetzt=jetztMs();
+      if(jetzt>=bisMs)return 0;
+      const t=jetzt-seitMs;
+      if(t<0)return 0;
+      if(t<220)return t/220;
+      const rest=bisMs-jetzt;
+      if(rest<300)return Math.max(0,rest/300);
+      return 1;
+    };
+    // B2: Duellwechsel erkennen -- `aktivNr` ist oben bereits dieselbe Groesse, die auch die
+    // Duell-Kopfzeile nutzt.
+    if(aktivNr!==hebenLetzteAktivNr){
+      hebenLetzteAktivNr=aktivNr;
+      hebenBauchbindeSeitMs=jetztMs();
+      hebenBauchbindeBisMs=hebenBauchbindeSeitMs+2500;
+    }
+    const bauchbindeAlpha=hebenBauchbindeFade(hebenBauchbindeSeitMs,hebenBauchbindeBisMs);
+    // B3: erst wenn BEIDE Duellanten ihren DRITTEN Reissversuch unter der LAMPE gezeigt haben
+    // (hebenLampenIndex(u)>=2 -- Index 0..2 sind die drei Reiss-Versuche, dieselbe
+    // Lampen-Grenze wie bestBisher()/die Versuchstafel, s. dort), einmal je Duell
+    // (hebenZwischenstandGezeigt-Dedup, dasselbe Muster wie hebenTeamBannerGezeigt oben).
+    if(hebenLampenIndex(a)>=2 && hebenLampenIndex(b)>=2 && !hebenZwischenstandGezeigt.has(aktivNr)){
+      hebenZwischenstandGezeigt.add(aktivNr);
+      hebenZwischenstandDuell=aktivNr;
+      hebenZwischenstandSeitMs=jetztMs();
+      hebenZwischenstandBisMs=hebenZwischenstandSeitMs+3000;
+    }
+    // `hebenZwischenstandDuell===aktivNr`-Gate: sobald das naechste Duell beginnt (aktivNr
+    // wechselt), verschwindet eine noch laufende B3-Tafel SOFORT, statt ueber ein fremdes,
+    // schon aktives Duell weiterzulaufen -- verhindert jede Ueberlappung mit B2 von selbst.
+    const zwischenstandAlpha=(hebenZwischenstandDuell===aktivNr)
+      ?hebenBauchbindeFade(hebenZwischenstandSeitMs,hebenZwischenstandBisMs):0;
+    if(bauchbindeAlpha>0||zwischenstandAlpha>0){
+      const boxY0=H*0.805, boxH=32, boxW=W*0.66, boxX=W/2-boxW/2;
+      ctx.save();
+      ctx.globalAlpha=Math.max(bauchbindeAlpha,zwischenstandAlpha);
+      ctx.fillStyle="rgba(10,12,16,.82)";
+      ctx.fillRect(boxX,boxY0,boxW,boxH);
+      ctx.strokeStyle="rgba(242,195,77,.6)";ctx.lineWidth=1.3;
+      ctx.strokeRect(boxX,boxY0,boxW,boxH);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      if(bauchbindeAlpha>=zwischenstandAlpha){
+        // B2-INHALT. Der Stand kommt AUSSCHLIESSLICH aus #score (updateHudBuehne(), s. dort)
+        // -- demselben lampengesteuerten Text, den der Score-Bug oben schon zeigt
+        // (duelle(s)-Zaehlung dort ist hinter hebenDuellEntschieden(u,true) gegated) --
+        // KEINE zweite, eigene Zaehlung, die der Lampe vorgreifen koennte (SEHR WICHTIG
+        // laut CLAUDE.md-Auftrag).
+        const scoreEl=(typeof document!=="undefined")?document.getElementById("score"):null;
+        const standTxt=(scoreEl&&scoreEl.textContent)||"0 : 0";
+        ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c34d";
+        ctx.fillText("DUELL "+(aktivNr+1)+" VON "+gesamtDuelle,W/2,boxY0+11);
+        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
+        ctx.fillText(a.n.split(" ")[0]+" ("+(a.rolle||"Heber")+") gegen "+b.n.split(" ")[0]+" · Stand "+standTxt,
+          W/2,boxY0+23);
+      } else {
+        // B3-INHALT. bestBisher() ist dieselbe lampen-gegatete Funktion wie ueberall sonst
+        // auf dieser Buehne -- zum Zeitpunkt des Ausloesers oben sind beide Reiss-Bloecke
+        // bereits vollstaendig LAMPEN-gezeigt, also kein Spoiler.
+        const ra=bestBisher(a,"reissen"), rb=bestBisher(b,"reissen");
+        const saReissen=sinclairAnzeige(ra,a.groesse), sbReissen=sinclairAnzeige(rb,b.groesse);
+        const diff=saReissen-sbReissen;
+        const diffTxt=diff===0?"gleichauf":("("+(diff>0?"+":"")+diff+")");
+        ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c34d";
+        ctx.fillText("NACH DEM REISSEN",W/2,boxY0+11);
+        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
+        ctx.fillText(a.n.split(" ")[0]+" "+saReissen+" kg · "+b.n.split(" ")[0]+" "+sbReissen+" kg "+diffTxt,
+          W/2,boxY0+23);
+      }
+      ctx.restore();
+    }
+
+    // B4 (Kreidewolke waehrend des Antritts): adressiert den Audit-Befund "keine Bewegung in
+    // der Vorbereitungsphase" -- liest ausschliesslich letzterHebenZug.u.vizPhase/vizPhaseT
+    // (stepHeben(), dieselbe reveal-gegatete Quelle wie die Publikums-Reaktion in
+    // bodenHeben()) und den Simulationszeit-Stempel hebenKreideKnallBisT (stepBuehne(), s.
+    // dort) -- beides reine Anzeige, kein rr(), kein Schreibzugriff auf TEILNEHMER/u.summe.
+    // Laeuft bei JEDEM der 72 Versuche kurz an (nicht nur bei einer Ansage-Aenderung), weil
+    // "antritt" selbst jeden Versuch durchlaeuft -- der groessere Ring unten ist der
+    // zusaetzliche Akzent GENAU am bestehenden sfx("gewichtheben","kreide")-Aufruf.
+    {
+      const kz=letzterHebenZug;
+      const kreideKx=W*0.08+13, kreideKy=H*0.80-7; // Mitte der Kiste, s. bodenHeben()
+      if(kz&&kz.u.vizPhase==="antritt"){
+        const antrittDauer=HEBEN_ANTRITT_T*(art.rundenDauer||1);
+        const t=Math.max(0,Math.min(1,(kz.u.vizPhaseT||0)/(antrittDauer||1)));
+        ctx.save();
+        for(let i=0;i<3;i++){
+          const pt=Math.min(1,t*1.4-i*0.18);
+          if(pt<=0)continue;
+          ctx.globalAlpha=Math.max(0,(1-pt)*0.5);
+          ctx.fillStyle="#e9e6de";
+          ctx.beginPath();ctx.arc(kreideKx+(i-1)*4,kreideKy-pt*10,4+pt*10,0,Math.PI*2);ctx.fill();
+        }
+        ctx.restore();
+      }
+      if(buehneT<hebenKreideKnallBisT){
+        const knallT=Math.max(0,Math.min(1,1-(hebenKreideKnallBisT-buehneT)/0.6));
+        ctx.save();
+        ctx.globalAlpha=Math.max(0,0.6*(1-knallT));
+        ctx.strokeStyle="#e9e6de";ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(kreideKx,kreideKy,10+knallT*22,0,Math.PI*2);ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
@@ -32646,6 +32879,15 @@
   function renderWertungTabelle(){
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
+    // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
+    // blieb bisher auch nach Spielende bei "Wertung laufend" stehen, obwohl die Tabelle
+    // selbst (dieselbe Funktion, gemeinsamer Beendet-Zustand `done`) schon den finalen Stand
+    // zeigt. renderWertungTabelle() laeuft fuer ALLE VIER Chassis (Kampf/Buehne/Bahn/
+    // Feldspiel) aus demselben updateHud()-Takt, `done` ist dieselbe geteilte Variable, die
+    // auch renderEndstand*() oben auswerten -- ein textContent-Update hier gilt also
+    // automatisch fuer alle, kein chassis-eigener Zweig noetig.
+    const titelStand=document.getElementById("wtitelStand");
+    if(titelStand){const soll=done?"Endstand":"laufend"; if(titelStand.textContent!==soll)titelStand.textContent=soll;}
     const w=wertungVon(disc);
     const stand=disc+"|"+w.spalten.map(s=>s.id+s.kopf).join(",");
     if(stand!==wertungKopfStand){
@@ -42214,7 +42456,16 @@
     // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
     // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
     // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
+    //
+    // BROADCAST-PAKET A, PUNKT 3 (06.10.): `fsT`/`buehneT` blieben hier bis eben ROH, obwohl
+    // updateHudFeldspiel() (`fsTAnzeige=fsT*zeitFaktor()`) und bodenEis()/updateHudBuehne()
+    // (`buehneTAnzeige=buehneT*zeitFaktor()`) laengst auf die skalierte Uhr umgestellt sind --
+    // derselbe Fund wie beim Kampf-`t` zwei Jahre vorher, nur fuer Feldspiel/Buehne nie
+    // nachgezogen. Folge: bei Zeitdehnung (z.B. Hockey/Gewichtheben/Fechten) zeigte der
+    // Ticker eine Zeit, die der sichtbaren Kopfzeilen-Uhr klar hinterherhinkt (gemessen:
+    // Hockey-Ticker "4:00 Schlusssirene" nach rund 8 Sendeminuten). Bei zeitFaktor()===1
+    // (kein Dehnungsfaktor fuer diese Disziplin) aendert sich sichtbar nichts.
+    const anzeigeT=istFeldspiel(disc)?fsT*zeitFaktor():istBuehne(disc)?buehneT*zeitFaktor():istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
@@ -44413,6 +44664,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44558,6 +44810,45 @@
     for(const z of zeilen)box.appendChild(el("div","ehzeile",z));
   }
 
+  // LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): "Q1 | Q2 | ... | Gesamt" bzw.
+  // "1. | 2. | 3. Drittel | Gesamt" je Team, aus `fsPeriodenStand` (s. dessen Deklaration/
+  // Fuellung in starteViertelpause()). GLEICHES MUSTER wie renderAlternativRechner() direkt
+  // darueber: eine gemeinsame Funktion fuer ALLE VIER Endstand-Overlays, die selbst
+  // entscheidet, ob es etwas zu zeigen gibt (hier: nur Feldspiel UND mindestens eine
+  // abgeschlossene Periode -- ein Spiel, das in der ersten Periode endet, z.B. durch einen
+  // vorzeitigen Abbruch, zeigt dann bewusst keine leere Linescore-Zeile) und sonst aufraeumt,
+  // damit kein STALE Stand vom vorigen Feldspiel stehen bleibt, sobald als naechstes ein
+  // Kampf/eine Buehne/ein Bahn-Rennen denselben #endstand erneut oeffnet. Reine Anzeige aus
+  // bereits vorhandenem Zustand (`fsPeriodenStand`/`fsPunkte`/`VEREIN`) -- kein rr(), keine
+  // Rueckschreibung, kein Einfluss auf die Wertung.
+  function renderLinescore(){
+    const box=document.getElementById("elinescore");
+    if(!box)return;
+    if(!istFeldspiel(disc)||!fsPeriodenStand.length){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false; box.textContent="";
+    const istDrittel=((LIVE()||{}).periodeWort==="Drittel");
+    const t=el("table");
+    const kopf=el("tr");
+    kopf.appendChild(el("th",null,""));
+    for(const p of fsPeriodenStand)
+      kopf.appendChild(el("th",null,istDrittel?(p.periode+"."):("Q"+p.periode)));
+    kopf.appendChild(el("th",null,"Gesamt"));
+    const thead=el("thead"); thead.appendChild(kopf); t.appendChild(thead);
+    const tb=el("tbody");
+    for(const seite of [0,1]){
+      const tr=el("tr");
+      const nameTd=el("td",null,VEREIN[seite].name);
+      nameTd.classList.add("elsname",seite===0?"h":"a");
+      tr.appendChild(nameTd);
+      for(const p of fsPeriodenStand)tr.appendChild(el("td",null,String(seite===0?p.a:p.b)));
+      const gesTd=el("td",null,String(fsPunkte[seite]));
+      gesTd.classList.add("elsges");
+      tr.appendChild(gesTd);
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb); box.appendChild(t);
+  }
+
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
@@ -44645,6 +44936,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44745,6 +45037,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44769,18 +45062,23 @@
   // renderEndstandBuehne() zwei Funktionen oberhalb, sogar derselbe Funktionskoerper (nur
   // Sieger/Stand kommen hier aus fsStand() statt buehneStand()).
   //
-  // SIEGER/STAND AUS `fsBisher().team`, NICHT AUS `fsPunkte`: `fsBisher().team` ist exakt
-  // die Zahl, die die Scoreline waehrend des GESAMTEN Spiels schon zeigt (s.
-  // updateHudFeldspiel() oben, "Enthuellter Spielstand, nicht das vorab durchgerechnete
-  // Endergebnis"). Fuer Basketball/Hockey ist das ohnehin identisch mit `fsPunkte` (jeder
-  // Treffer aktualisiert beide zusammen); nur Football fuehrt Extra-Punkte/Two-Point-
-  // Conversions bislang ausschliesslich in `fsPunkte` und nicht in `fsZuege` (separater,
-  // schon bekannter Befund, Audit-Punkt 1 -- "welche Zahl zaehlt" ist dort offen und bleibt
-  // hier unangetastet). Dieser Endstand zeigt deshalb bewusst dieselbe Zahl, die der
-  // Zuschauer die ganze Sendung ueber schon gesehen hat, statt eine DRITTE einzufuehren.
+  // SIEGER/STAND AUS `fsPunkte`, NICHT AUS `fsBisher().team` (Broadcast-Paket A, Punkt 1):
+  // `fsBisher().team` ist nur eine Nachzaehlung aus dem Enthuellungs-Log `fsZuege` ueber
+  // `logZug()`-Eintraege -- Football haengt aber jeden Extra-Punkt/jede Two-Point-Conversion
+  // ausschliesslich in `fsPunkte` hoch (footballDownWeiter(), "fsPunkte[fb.side]+=1 ...")
+  // und ruft dafuer NIE `logZug()` auf (TD-6-Punkte werden geloggt, der separate XP-Punkt
+  // nicht). `fsBisher().team` blieb dadurch hinter der Scoreline/dem Ticker zurueck, die
+  // beide schon vorher auf `fsPunkte` umgestellt wurden (s. Kommentar bei der Scoreline
+  // weiter oben) -- Endstand-Banner und Scoreline zeigten zwei verschiedene Zahlen
+  // (gemessen: "9 : 18" im Banner gegen "10 : 21" in Scoreline/Ticker), bei knappen Spielen
+  // sogar faelschlich "UNENTSCHIEDEN". `fsPunkte` ist die EINZIGE Quelle, die
+  // lib/resolve/battle-mode-arena-team-points.ts fuer die Wertung/PPS-Ableitung liest --
+  // der Endstand zeigt jetzt also dieselbe Zahl wie die zaehlende Wertung UND wie die
+  // Scoreline/der Ticker. Fuer Basketball/Hockey war das ohnehin schon identisch (jeder
+  // Treffer aktualisiert beide zusammen), nur Football war betroffen. Reine
+  // Lesequelle-Korrektur -- `fsZuege`/`logZug()`/der Boxscore selbst bleiben unangetastet.
   function fsStand(){
-    const bisher=fsBisher().team;
-    return {a:bisher[0], b:bisher[1], text:bisher[0]+" : "+bisher[1]};
+    return {a:fsPunkte[0], b:fsPunkte[1], text:fsPunkte[0]+" : "+fsPunkte[1]};
   }
   function fsSieger(){ const {a,b}=fsStand(); return a===b?null:(a>b?0:1); }
   // EINHEIT DES STANDS (Punkt 17): Hockey zaehlt Tore, Basketball/Football Punkte --
@@ -44825,6 +45123,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44872,6 +45171,22 @@
   // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
   // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
   let mdffaOffenbarungsTimer=null;
+  // RUNDENSHOW-ZUSTAND (Broadcast-Paket C, "Mini-DM-Rundenshow", 06.10.): Start-/Alles-
+  // zeigen-/Tempo-Knoepfe sitzen fest im Markup (battle-mode.html) und werden EINMAL beim
+  // Laden verdrahtet, lange bevor renderMiniDmFfa() (weiter unten) je gelaufen ist -- genau
+  // dasselbe Hoisting-Problem wie bei mdffaOffenbarungsTimer direkt darueber. Die drei
+  // Variablen halten deshalb hier oben, WELCHE laufende Schau (falls ueberhaupt eine) die
+  // Knoepfe gerade ansteuern sollen; renderMiniDmFfa() ueberschreibt sie bei jedem Aufruf
+  // (jeder Disziplinwechsel/Reset) mit frischen Funktionen ueber das dann neu berechnete
+  // Ereignis, nie mit einem zweiten Berechnungspfad.
+  let mdffaNaechsteRunde=null; // Funktion(rundenIndex) der aktuell sichtbaren Schau, oder null
+  let mdffaSpringeZumEnde=null; // Funktion() fuer "Alles zeigen", oder null
+  // TEMPO DIESER SENDUNGS-CHOREOGRAFIE (1x/2x) -- ausdruecklich NICHT dasselbe wie `speed`
+  // (das Kampftempo der klassischen Zwei-Seiten-Arena, die Mini-DM gar nicht zeigt). Bleibt
+  // ueber Disziplinwechsel hinweg stehen (Komfort: wer 2x gewaehlt hat, behaelt es beim
+  // naechsten Mini-DM-Besuch), wird aber nie von traegheitsarm()/prefers-reduced-motion
+  // ueberschrieben -- diese Pruefung sitzt in renderMiniDmFfa() selbst.
+  let mdffaTempo=1;
 
   // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
   // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
@@ -45046,11 +45361,22 @@
       const knoten=document.querySelector(sel);
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
+    // VOLLE BREITE FUER MINI-DM (C4, Broadcast-Paket C, 06.10.): ohne diese Klasse bleibt die
+    // 320px-Spalte, die battle-mode.css `#p2 .frame` fuer `.untenraum` reserviert, auch dann
+    // leer stehen, wenn `.untenraum` gerade (s. Schleife direkt darueber) display:none ist --
+    // s. Kommentar bei `.frame.mdffa-vollbreite` in battle-mode.css.
+    const p2Frame=document.querySelector("#p2 .frame");
+    if(p2Frame)p2Frame.classList.toggle("mdffa-vollbreite",istMdffa);
     if(istMdffa)renderMiniDmFfa();
-    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
-    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
-    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
-    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // Verlassen von Mini-DM waehrend eine laufende Rundenshow noch tickt (s. renderMiniDmFfa()
+    // oben, Bugfix 27.09., erweitert Broadcast-Paket C 06.10.): sonst tickt der setTimeout auf
+    // dem jetzt ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden
+    // -- und die Start-/Alles-zeigen-Knoepfe duerften keine laengst verlassene Schau mehr
+    // ansteuern koennen.
+    else{
+      if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+      mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
+    }
     // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
     // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
     // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
@@ -45716,14 +46042,34 @@
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
   //
-  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
-  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
+  // `mdffaOffenbarungsTimer`/`mdffaNaechsteRunde`/`mdffaSpringeZumEnde`/`mdffaTempo` (der
+  // Rundenshow-Zustand dieser Funktion) sind bewusst weiter oben deklariert, direkt vor
+  // `reset()` — s. deren Kopfkommentar dort.
+  //
+  // ECHTE SENDUNG STATT AUTOSTART (Broadcast-Paket C "Mini-DM-Rundenshow", 06.10., C1-C4):
+  // vorher rechnete diese Funktion `ereignis` UND spielte die ganze Offenbarung in einem
+  // Rutsch automatisch ab, sobald `reset()` sie aufrief — wer erst spaeter zur Arena
+  // wechselte, verpasste die Enthuellung komplett, und die ganze Schau dauerte nur rund vier
+  // Sekunden. Das Ergebnis steht WEITERHIN sofort und vollstaendig fest (keine Aenderung an
+  // spieleMiniDmFfaEvent()/baueMiniDmFfaRunde(), s. deren Kopfkommentare) — neu ist nur, DASS
+  // und WANN es auf den Schirm kommt: zuerst nur der Einlauf (vier Eckkarten ohne Ergebnis,
+  // die vier bereits feststehenden Rollen-Paarungen), erst der Klick auf #mdffaStart deckt
+  // Runde 1 auf. #mdffaAlles ueberspringt die Animation und zeigt sofort das Endergebnis,
+  // #mdffaSpeedBtn waehlt Tempo 1x/2x fuer die Pausen zwischen den Schritten.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
+    const ctrlBox=document.getElementById("mdffaCtrl");
+    const startBtn=document.getElementById("mdffaStart");
+    const allesBtn=document.getElementById("mdffaAlles");
+    const titelkarte=document.getElementById("mdffaTitelkarte");
+    const paarungenBox=document.getElementById("mdffaPaarungen");
+    const rundenbanner=document.getElementById("mdffaRundenbanner");
+    const endstandKopf=document.getElementById("mdffaEndstandKopf");
     if(!teamsBox||!rundenBox||!endstandBox)return;
     if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -45737,6 +46083,11 @@
       rundenBox.innerHTML="<p class='muted'>Mini-DM-FFA konnte nicht simuliert werden: "+
         (fehler&&fehler.message?fehler.message:String(fehler))+"</p>";
       endstandBox.textContent="";
+      if(ctrlBox)ctrlBox.hidden=true;
+      if(paarungenBox)paarungenBox.textContent="";
+      if(titelkarte)titelkarte.hidden=true;
+      if(rundenbanner)rundenbanner.hidden=true;
+      if(endstandKopf)endstandKopf.hidden=true;
       return;
     }
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
@@ -45753,14 +46104,24 @@
       try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
       catch(e){return false;}
     })();
-    const PAUSE_MS=traegheitsarm?0:900;
-    const ANLAUF_MS=traegheitsarm?0:500;
+    // TEMPO-FAKTOR: teilt jede Pause unten durch `mdffaTempo` (1 oder 2), live lesbar bei
+    // jedem Schritt (ein Tempo-Wechsel MITTEN in der Schau wirkt sich also sofort auf die
+    // naechste Pause aus). traegheitsarm gewinnt immer -- 0ms bleibt 0ms, unabhaengig vom
+    // gewaehlten Tempo.
+    const ms=(basis)=>traegheitsarm?0:Math.round(basis/mdffaTempo);
 
-    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
-    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
-    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
-    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
-    // erkennbar bleibt.
+    if(ctrlBox)ctrlBox.hidden=false;
+    if(startBtn){startBtn.disabled=false;startBtn.textContent="Erste Runde aufdecken";}
+    if(allesBtn)allesBtn.disabled=false;
+    if(titelkarte)titelkarte.hidden=true;
+    if(rundenbanner)rundenbanner.hidden=true;
+    if(endstandKopf)endstandKopf.hidden=true;
+
+    // EINLAUF (C1): vier Eckkarten OHNE Ergebnis (Ecke/Name/"wartet"), dazu die vier bereits
+    // feststehenden Rollen-Paarungen -- WER in welcher Rolle gegen wen antritt, aber KEIN
+    // einziger Wert aus `ereignis.runden[].teams[]` ausser dem Namen (kein Beitrag, kein
+    // Platz, keine Punkte). Kein Spoiler: weder Platz noch Ligapunkte noch die
+    // .mdffa-sieger-Klasse stehen vor dem ersten Klick irgendwo im DOM.
     teamsBox.textContent="";
     teamsBox.setAttribute("aria-live","polite");
     const eckKarten=[0,1,2,3].map(side=>{
@@ -45770,9 +46131,31 @@
       const punkte=el("div","mdffa-punkte","–");
       punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
+      // LEBENSBALKEN (C2) -- bleibt bis zur ersten Runde verborgen ([hidden], s.
+      // aktualisiereHpBalken() unten): vor Runde 1 gibt es noch keinen "Endzustand einer
+      // Runde" zu zeigen, ein voller gruener Balken waere hier eine erfundene Aussage.
+      const hpwrap=el("div","mdffa-hpwrap"); hpwrap.hidden=true;
+      hpwrap.appendChild(el("span","mdffa-hpbar"));
+      karte.appendChild(hpwrap);
+      const hplabel=el("div","mdffa-hplabel",""); hplabel.hidden=true;
+      karte.appendChild(hplabel);
       teamsBox.appendChild(karte);
       return karte;
     });
+
+    if(paarungenBox){
+      paarungenBox.textContent="";
+      ereignis.runden.forEach((runde,i)=>{
+        const box=el("div","mdffa-paarung");
+        box.appendChild(el("b",null,"Runde "+(i+1)+" · "+mdffaRollenLabel(runde.slotId)));
+        const namen=[0,1,2,3].map(side=>{
+          const t=runde.teams.find(tt=>tt.side===side);
+          return t.n+" ("+eintraege[side].name+")";
+        }).join(" · ");
+        box.appendChild(document.createTextNode(namen));
+        paarungenBox.appendChild(box);
+      });
+    }
 
     rundenBox.textContent="";
     rundenBox.setAttribute("aria-live","polite");
@@ -45780,28 +46163,93 @@
 
     const laufendeSumme=[0,0,0,0];
 
-    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
-    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
-    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
-    // abschaltbar).
-    function schreibeRundentafel(runde){
+    // EINE RUNDENZEILE BAUEN (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest). Ausgeschaltete
+    // Kaempfer bekommen den Stempel statt eines HP-Werts (C2). Gemeinsamer Baustein fuer beide
+    // Schreibwege unten -- sofort (alleRundenSofort/"Alles zeigen") und gestaffelt
+    // (naechsteRunde, Normaltempo).
+    function baueRundenzeile(t){
+      const tr=document.createElement("tr");
+      tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
+      const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
+      const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
+      const tdPunkte=document.createElement("td");
+      tdPunkte.className="n mdffa-pop";
+      tdPunkte.textContent=t.rundenPunkte+" Pkt.";
+      const tdHp=document.createElement("td");
+      tdHp.className="n";
+      if(t.down)tdHp.appendChild(el("span","mdffa-stempel","Ausgeschaltet"));
+      else tdHp.textContent=Math.round(t.hp)+"/"+t.max+" HP";
+      tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
+      return tr;
+    }
+
+    // RUNDENTAFEL SOFORT, ALLE VIER ZEILEN AUF EINMAL (fuer "Alles zeigen" -- keine Animation,
+    // kein Zwischenzustand mit unvollstaendiger Tafel).
+    function schreibeRundentafelSofort(runde){
       const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
-      runde.teams.slice().sort((a,b)=>a.rundenPlatz-b.rundenPlatz).forEach(t=>{
-        const tr=document.createElement("tr");
-        tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
-        const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
-        const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
-        const tdPunkte=el("td","n",t.rundenPunkte+" Pkt.");
-        const tdHp=el("td","n",(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP"));
-        tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
-        tbody.appendChild(tr);
-      });
+      runde.teams.slice().sort((a,b)=>a.rundenPlatz-b.rundenPlatz).forEach(t=>tbody.appendChild(baueRundenzeile(t)));
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
+    }
+
+    // RUNDENTAFEL GESTAFFELT, EINE ZEILE NACH DER ANDEREN ECHT IN DEN DOM EINGEFUEGT statt per
+    // CSS-animation-delay nur eingeblendet: eine fruehere Fassung liess die noch nicht
+    // "faelligen" Plaetze als LEERE, aber schon volle Tabellenzeilen im Layout stehen (sichtbare
+    // Luecke vor dem Einblenden, s. PR-Beschreibung) -- Zeilen, die es noch nicht geben soll,
+    // existieren hier schlicht noch nicht im DOM. `starteRundentafelGestaffelt()` legt nur
+    // Ueberschrift+leere Tabelle an und gibt das <tbody> zurueck; `enthuelleRundenzeile()`
+    // fuegt je einen Aufruf GANZ OBEN ein (insertBefore vor dem bisherigen ersten Kind) --
+    // Platz 4 zuerst, Platz 1 zuletzt ergibt am Ende trotzdem die gewohnte Reihenfolge Platz
+    // 1 oben/Platz 4 unten, weil jede neue (bessere) Platzierung die vorherigen nach unten
+    // schiebt, genau wie eine Rangliste, die von unten nach oben aufgebaut wird.
+    function starteRundentafelGestaffelt(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
+      box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
+      const tbl=document.createElement("table");
+      const tbody=document.createElement("tbody");
+      tbl.appendChild(tbody);
+      box.appendChild(tbl);
+      rundenBox.appendChild(box);
+      return tbody;
+    }
+    function enthuelleRundenzeile(tbody,t){
+      const tr=baueRundenzeile(t);
+      tr.classList.add("mdffa-zeile-neu");
+      tbody.insertBefore(tr,tbody.firstChild);
+    }
+
+    // LEBENSBALKEN JE ECKE (C2, 2x2-Raster = dieselben vier Eckkarten): die Breite
+    // transitioniert per CSS (s. .mdffa-hpbar) auf den tatsaechlichen hp-Wert, den
+    // baueMiniDmFfaRunde() fuer diesen Kaempfer am RUNDENENDE zurueckgegeben hat -- EHRLICH
+    // als Endzustand nach der Runde beschriftet (.mdffa-hplabel-Text), nicht als Live-
+    // Kampfverlauf: die Simulation ist zu diesem Zeitpunkt laengst vollstaendig gelaufen.
+    function aktualisiereHpBalken(runde){
+      runde.teams.forEach(t=>{
+        const karte=eckKarten[t.side];
+        const hpwrap=karte.querySelector(".mdffa-hpwrap");
+        const bar=karte.querySelector(".mdffa-hpbar");
+        const label=karte.querySelector(".mdffa-hplabel");
+        if(hpwrap)hpwrap.hidden=false;
+        if(label)label.hidden=false;
+        if(bar)bar.style.width=Math.max(0,Math.min(100,(t.hp/Math.max(1,t.max))*100))+"%";
+        if(label)label.textContent=(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP")+" — Endstand der Runde";
+        karte.classList.toggle("mdffa-down",!!t.down);
+      });
+    }
+
+    // RUNDENSIEGER-BANNER (C2).
+    function zeigeRundenbanner(runde,rundenNr){
+      if(!rundenbanner)return;
+      const sieger=runde.teams.find(t=>t.rundenPlatz===1);
+      if(!sieger){rundenbanner.hidden=true;return;}
+      rundenbanner.textContent="";
+      rundenbanner.appendChild(document.createTextNode("Rundensieger Runde "+rundenNr+": "));
+      rundenbanner.appendChild(el("b",null,sieger.n+" ("+eintraege[sieger.side].name+")"));
+      rundenbanner.hidden=false;
     }
 
     function aktualisiereEckKarte(side,rundenNr){
@@ -45813,22 +46261,107 @@
       punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
     }
 
-    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
-    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
-    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
-    // deren Anfang.
-    function zeigeEndstand(){
-      teamsBox.textContent="";
-      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-        const erg=bySide(side);
-        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
-        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
-        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
-        karte.appendChild(punkte);
-        teamsBox.appendChild(karte);
+    // GESAMTPUNKTZAHL HOCHZAEHLEN UND UMSORTIEREN (C2): FLIP-Technik -- Position JEDER
+    // Eckkarte VOR dem Umsortieren messen, in der neuen Reihenfolge neu anhaengen (reine
+    // DOM-Reihenfolge, .mdffa-teams ist ein 4-Spalten-Grid), dann die dadurch entstandene
+    // Verschiebung als Transform zuruecksetzen und per CSS-Transition (schon auf .mdffa-team
+    // vorhanden) auf 0 abbauen. Reine Praesentation auf laengst feststehenden Werten, keine
+    // neue Berechnung.
+    function sortiereEckkartenUm(){
+      if(traegheitsarm){
+        [0,1,2,3].slice().sort((a,b)=>laufendeSumme[b]-laufendeSumme[a]||a-b)
+          .forEach(side=>teamsBox.appendChild(eckKarten[side]));
+        return;
+      }
+      const vorher=new Map();
+      eckKarten.forEach(k=>vorher.set(k,k.getBoundingClientRect()));
+      const reihenfolge=[0,1,2,3].slice().sort((a,b)=>laufendeSumme[b]-laufendeSumme[a]||a-b);
+      reihenfolge.forEach(side=>teamsBox.appendChild(eckKarten[side]));
+      reihenfolge.forEach(side=>{
+        const node=eckKarten[side];
+        const alt=vorher.get(node);
+        const neu=node.getBoundingClientRect();
+        const dx=alt.left-neu.left, dy=alt.top-neu.top;
+        if(!dx&&!dy)return;
+        node.style.transition="none";
+        node.style.transform="translate("+dx+"px,"+dy+"px)";
+        requestAnimationFrame(()=>{
+          node.style.transition="";
+          node.style.transform="";
+        });
       });
+    }
+
+    // TITELKARTE PRO RUNDE (C2): "Runde X von 4 · <Rolle>", kurz fuer sich allein sichtbar,
+    // bevor die Rundentafel/Lebensbalken/der Rundensieger dazukommen.
+    function zeigeTitelkarte(rundenNr,rolle){
+      if(!titelkarte)return;
+      titelkarte.textContent="";
+      titelkarte.appendChild(el("b",null,"Runde "+rundenNr+" von "+ereignis.runden.length));
+      titelkarte.appendChild(el("span",null,rolle));
+      titelkarte.hidden=false;
+    }
+
+    // ERMITTELT DAS MVP-TEAM (C3): hoechste Beitragssumme ueber alle vier Runden. Reiner
+    // Leser von `ereignis.teams[].beitragSumme` -- derselbe Wert, den die Endstand-Tabelle
+    // unten ohnehin schon je Team zeigt (spieleMiniDmFfaEvent() summiert ihn bereits aus
+    // runden[].teams[].beitrag, s. dessen Kopfkommentar) -- keine neue Berechnung.
+    function ermittleMdffaMvpSeite(){
+      let bester=0;
+      for(let s=1;s<4;s++)if(bySide(s).beitragSumme>bySide(bester).beitragSumme)bester=s;
+      return bester;
+    }
+
+    // ENDSTAND IM PHASE-5-STIL (C3): Banner analog zu .esieger (grossgeschrieben, satt in
+    // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
+    // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
+    function zeigeEndstand(){
+      if(titelkarte)titelkarte.hidden=true;
+      if(rundenbanner)rundenbanner.hidden=true;
+      if(ctrlBox)ctrlBox.hidden=true;
+      if(paarungenBox)paarungenBox.textContent="";
+
+      const reihenfolge=[0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz);
+      reihenfolge.forEach(side=>teamsBox.appendChild(eckKarten[side]));
+      reihenfolge.forEach(side=>{
+        const erg=bySide(side);
+        const karte=eckKarten[side];
+        karte.classList.remove("mdffa-wartet","mdffa-down");
+        karte.classList.toggle("mdffa-sieger",erg.eventPlatz===1);
+        const punkte=karte.querySelector(".mdffa-punkte");
+        punkte.textContent="";
+        punkte.appendChild(document.createTextNode(erg.ligaPunkte+" Liga-Pkt."));
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        const hpwrap=karte.querySelector(".mdffa-hpwrap"); if(hpwrap)hpwrap.remove();
+        const hplabel=karte.querySelector(".mdffa-hplabel"); if(hplabel)hplabel.remove();
+      });
+
+      if(endstandKopf){
+        endstandKopf.hidden=false;
+        const mvpSide=ermittleMdffaMvpSeite();
+        const sieger=bySide(reihenfolge[0]);
+        const banner=document.getElementById("mdffaEndbanner");
+        if(banner)banner.textContent=eintraege[reihenfolge[0]].name.toUpperCase()+" SIEGER — "+
+          sieger.ligaPunkte+" Liga-Pkt. · "+sieger.rundenPunkteSumme+" Rundenpunkte";
+        const podest=document.getElementById("mdffaPodest");
+        if(podest){
+          podest.textContent="";
+          reihenfolge.forEach(side=>{
+            const erg=bySide(side);
+            const platz=el("div","mdffa-podplatz mdffa-c"+side);
+            platz.dataset.platz=String(erg.eventPlatz);
+            platz.appendChild(el("div","mdffa-podrang","#"+erg.eventPlatz));
+            const nameZeile=el("div","mdffa-podname",eintraege[side].name);
+            if(side===mvpSide)nameZeile.insertBefore(
+              mvpStern("Höchster Beitrag über alle vier Runden ("+
+                Math.round(bySide(mvpSide).beitragSumme).toLocaleString("de-DE")+")"),
+              nameZeile.firstChild);
+            platz.appendChild(nameZeile);
+            platz.appendChild(el("div","mdffa-podpunkte",erg.ligaPunkte+" Liga-Pkt. · "+erg.rundenPunkteSumme+" Rundenpkt."));
+            podest.appendChild(platz);
+          });
+        }
+      }
 
       endstandBox.textContent="";
       const tbl=document.createElement("table");
@@ -45837,7 +46370,7 @@
       ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
       thead.appendChild(trh);tbl.appendChild(thead);
       const tbody=document.createElement("tbody");
-      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+      reihenfolge.forEach(side=>{
         const erg=bySide(side);
         const tr=document.createElement("tr");
         if(erg.eventPlatz===1)tr.className="mdffa-r1";
@@ -45851,19 +46384,97 @@
       tbl.appendChild(tbody);
       endstandBox.appendChild(tbl);
       mdffaOffenbarungsTimer=null;
+      mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     }
 
+    // SCHRITT-KETTE EINER RUNDE (C1/C2): Titelkarte -> (Pause) -> Lebensbalken -> Rundentafel
+    // PLATZ 4->1 EINZELN ENTHUELLT -> Rundensieger -> (Pause) -> Eckkarten-Summe+Umsortierung
+    // -> (Pause) -> naechste Runde. `mdffaNaechsteRunde` zeigt IMMER auf dieses `naechsteRunde`
+    // der aktuell sichtbaren Schau -- der Start-Knopf (weiter unten verdrahtet) ruft nur
+    // `mdffaNaechsteRunde(0)`.
     function naechsteRunde(i){
       if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
       const runde=ereignis.runden[i];
-      schreibeRundentafel(runde);
-      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
-      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
-      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+      zeigeTitelkarte(i+1,mdffaRollenLabel(runde.slotId));
+      mdffaOffenbarungsTimer=setTimeout(()=>{
+        if(titelkarte)titelkarte.hidden=true;
+        const tbody=starteRundentafelGestaffelt(runde);
+        // PLATZ 4 ZUERST, PLATZ 1 ZULETZT (Auftrag: "Platzierung 4->1 nacheinander
+        // enthuellen") -- enthuelleRundenzeile() fuegt jede neue Zeile GANZ OBEN ein, eine
+        // absteigend sortierte Platzliste (4,3,2,1) ergibt dadurch am Ende die gewohnte
+        // Reihenfolge Platz 1 oben/Platz 4 unten (s. Kopfkommentar bei
+        // starteRundentafelGestaffelt()).
+        const platzAbsteigend=runde.teams.slice().sort((a,b)=>b.rundenPlatz-a.rundenPlatz);
+        function enthuelleSchritt(idx){
+          if(idx>=platzAbsteigend.length){
+            // Spoiler-Fix (Opus-Review PR #1155): HP-Balken/"Ausgeschaltet" ALLER vier Ecken
+            // erst HIER setzen, nachdem die Tabelle selbst schon alle vier Plaetze gestaffelt
+            // gezeigt hat -- vorher (direkt bei Rundenstart) verriet aktualisiereHpBalken() wer
+            // ueberlebt hat, bevor Platz 2/1 ueberhaupt aufgedeckt waren.
+            aktualisiereHpBalken(runde);
+            zeigeRundenbanner(runde,i+1);
+            runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+            mdffaOffenbarungsTimer=setTimeout(()=>{
+              [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+              sortiereEckkartenUm();
+              mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),ms(1500));
+            },ms(1600));
+            return;
+          }
+          enthuelleRundenzeile(tbody,platzAbsteigend[idx]);
+          mdffaOffenbarungsTimer=setTimeout(()=>enthuelleSchritt(idx+1),ms(550));
+        }
+        enthuelleSchritt(0);
+      },ms(1500));
     }
 
-    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
+    // "ALLES ZEIGEN" (C1): identischer Endzustand wie am Ende eines vollstaendig
+    // durchlaufenen Ablaufs -- dieselbe schreibeRundentafelSofort()/zeigeEndstand(), nur ohne
+    // einen einzigen setTimeout dazwischen. Kein zweiter Berechnungspfad, keine neue Rundung.
+    function alleRundenSofort(){
+      if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+      if(titelkarte)titelkarte.hidden=true;
+      rundenBox.textContent="";
+      for(let i=0;i<ereignis.runden.length;i++){
+        const runde=ereignis.runden[i];
+        aktualisiereHpBalken(runde);
+        schreibeRundentafelSofort(runde);
+        runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+        [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      }
+      sortiereEckkartenUm();
+      zeigeEndstand();
+    }
+
+    mdffaNaechsteRunde=naechsteRunde;
+    mdffaSpringeZumEnde=alleRundenSofort;
+
+    // C1: "Falls prefers-reduced-motion aktiv ist, zeige alles sofort ohne Animation" --
+    // kein Knopfdruck noetig. Der Einlauf oben stand ohnehin nur fuer einen einzigen,
+    // uebersprungenen Render-Tick.
+    if(traegheitsarm)alleRundenSofort();
   }
+
+  // START-/ALLES-ZEIGEN-/TEMPO-KNOEPFE DER MINI-DM-RUNDENSHOW (Broadcast-Paket C, 06.10.):
+  // EINMAL verdrahtet, lange bevor renderMiniDmFfa() ueberhaupt zum ersten Mal lief -- genau
+  // dasselbe Hoisting-Argument wie beim Play/Reset/Tempo-Knopf der klassischen Arena weiter
+  // oben. Jeder Klick ruft nur die von renderMiniDmFfa() zuletzt gesetzte Funktion auf; ist
+  // Mini-DM gerade nicht aktiv, sind die Knoepfe ohnehin unsichtbar (`#minidmffa` dann
+  // `hidden`, s. reset()), ein Klick darauf also ausgeschlossen.
+  document.getElementById("mdffaStart").addEventListener("click",()=>{
+    const startBtn=document.getElementById("mdffaStart");
+    if(startBtn)startBtn.disabled=true;
+    if(mdffaNaechsteRunde)mdffaNaechsteRunde(0);
+  });
+  document.getElementById("mdffaAlles").addEventListener("click",()=>{
+    const startBtn=document.getElementById("mdffaStart");
+    if(startBtn)startBtn.disabled=true;
+    if(mdffaSpringeZumEnde)mdffaSpringeZumEnde();
+  });
+  document.getElementById("mdffaSpeedBtn").addEventListener("click",()=>{
+    mdffaTempo=mdffaTempo===1?2:1;
+    document.getElementById("mdffaSpeedBtn").textContent="Tempo "+mdffaTempo+"×";
+  });
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das

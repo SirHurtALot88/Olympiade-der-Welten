@@ -86,26 +86,41 @@
       <div class="fbar"><span>Arena</span><span class="sep">·</span><span id="arenaDisc">TDM</span>
         <span class="honest">Simulation deterministisch — gleiche Aufstellung, gleicher Verlauf</span></div>
       <div class="planzeile"><b>Plan der KI</b><span id="arenaplan"></span></div>
-      <!-- MINI-DM 4-TEAM-FFA (Bugfix 22.09.): Mini-DM ist kein Zwei-Seiten-Kampf wie
-           TDM/Battlefield, sondern Chris' eigens beschlossenes Vier-Team-Free-for-All
-           (docs/design/mini-dm-4-team-ffa-recherche-06-09.md). Der klassische
-           .scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl/.untenraum-Rahmen darunter ist
-           fuer GENAU ZWEI Seiten gebaut (siehe deren eigene Kommentare zu css("--home")/
-           css("--away")) — ein echter, live animierter Vier-Ecken-Kampf mit eigenen Farben
-           je Team wuerde diesen Rahmen an vielen Stellen aufbrechen, s. PR-Beschreibung fuer
-           den vollen Befund. Diese Ansicht zeigt stattdessen das ECHTE, bereits gebaute
-           FFA-Ergebnis (spieleMiniDmFfaEvent — dieselbe Funktion, die auch
+      <!-- MINI-DM 4-TEAM-FFA (Bugfix 22.09., Rundenshow Broadcast-Paket C, 06.10.): Mini-DM
+           ist kein Zwei-Seiten-Kampf wie TDM/Battlefield, sondern Chris' eigens beschlossenes
+           Vier-Team-Free-for-All (docs/design/mini-dm-4-team-ffa-recherche-06-09.md). Der
+           klassische .scoreline/.hpbars/.arenaraum/.kaderleiste/.ctrl/.untenraum-Rahmen
+           darunter ist fuer GENAU ZWEI Seiten gebaut (siehe deren eigene Kommentare zu
+           css("--home")/css("--away")) — ein echter, live animierter Vier-Ecken-Kampf mit
+           eigenen Farben je Team wuerde diesen Rahmen an vielen Stellen aufbrechen, s.
+           PR-Beschreibung fuer den vollen Befund. Diese Ansicht zeigt stattdessen das ECHTE,
+           bereits gebaute FFA-Ergebnis (spieleMiniDmFfaEvent — dieselbe Funktion, die auch
            arena-headless-runner.ts fuer die zaehlende Simulation nutzt): vier Runden, eine
            je Rolle, alle vier Teams nebeneinander, 2-1-0-0-Ligapunkte am Ende. renderReset()
-           blendet sie ein und den klassischen Rahmen aus, sobald disc==="mini-dm" ist. -->
+           blendet sie ein und den klassischen Rahmen aus, sobald disc==="mini-dm" ist.
+           SEIT 06.10. eine echte Sendung statt eines Autostarts (s. renderMiniDmFfa() in
+           battle-mode.engine.js): das Ergebnis steht beim Betreten sofort fest, aber erst der
+           Klick auf #mdffaStart deckt Runde 1 auf -- kein Spoiler vor dem Einlauf. -->
       <div class="minidmffa" id="minidmffa" hidden>
         <p class="honest">Mini-DM läuft als 4-Team-Free-for-All: eine Ecke je Team, vier
           Runden (eine je Rolle) werden nacheinander aufgedeckt, am Ende 2-1-0-0-Ligapunkte
           für die Endplatzierung — echte Simulation, dieselbe Funktion wie in der zählenden
-          Messung. Eine Live-Grafik mit vier gleichzeitig sichtbaren, animierten Ecken folgt
-          in einer späteren Runde.</p>
+          Messung. Das Ergebnis steht schon vollständig fest; was folgt, ist nur noch die
+          Reihenfolge der Enthüllung, kein neuer Kampfverlauf.</p>
+        <div class="mdffa-ctrl" id="mdffaCtrl">
+          <button class="btn" id="mdffaStart" type="button">Erste Runde aufdecken</button>
+          <button class="btn g" id="mdffaAlles" type="button">Alles zeigen</button>
+          <button class="btn g" id="mdffaSpeedBtn" type="button">Tempo 1×</button>
+        </div>
+        <div class="mdffa-titelkarte" id="mdffaTitelkarte" hidden></div>
         <div class="mdffa-teams" id="mdffaTeams"></div>
+        <div class="mdffa-paarungen" id="mdffaPaarungen"></div>
+        <div class="mdffa-rundenbanner" id="mdffaRundenbanner" hidden></div>
         <div class="mdffa-runden" id="mdffaRunden"></div>
+        <div class="mdffa-endstandkopf" id="mdffaEndstandKopf" hidden>
+          <div class="mdffa-endbanner" id="mdffaEndbanner"></div>
+          <div class="mdffa-podest" id="mdffaPodest"></div>
+        </div>
         <div class="mdffa-endstand" id="mdffaEndstand"></div>
       </div>
       <div class="scoreline">
@@ -215,6 +230,11 @@
              stehen und wie eine Messung auszusehen. -->
         <div class="endstand" id="endstand" hidden>
           <div class="esieger" id="esieger"></div>
+          <!-- LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): "Q1 | Q2 | ... | Gesamt" je
+               Team, aus fsPeriodenStand -- renderLinescore() in battle-mode.engine.js. Nur
+               fuer Feldspiel (Football/Hockey/Basketball) befuellt; bleibt fuer Kampf/Buehne/
+               Bahn leer und hidden, derselbe Gate-Gedanke wie bei #ealternativ unten. -->
+          <div class="etafel elinescore" id="elinescore" hidden></div>
           <div class="etafeln">
             <div class="etafel" id="etafelL"></div>
             <div class="etafel" id="etafelR"></div>
@@ -345,7 +365,11 @@
              setzt data-disc darauf, sobald sich die Disziplin aendert -- Spalten/Sortierung/
              Zeilenquellen bleiben unberuehrt, das ist ausschliesslich Anzeige. -->
         <div class="wertung" id="wertungBox">
-          <div class="wtitel">Wertung <em>laufend</em></div>
+          <!-- "laufend"/"Endstand" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text
+               blieb bisher auch nach Spielende bei "laufend" stehen -- renderWertungTabelle()
+               (battle-mode.engine.js) schaltet #wtitelStand bei `done` auf "Endstand" um,
+               rein textContent, keine neue Spalte/Sortierung. -->
+          <div class="wtitel">Wertung <em id="wtitelStand">laufend</em></div>
           <!-- ZWEI BLOECKE STATT EINER GEMEINSAMEN TABELLE (Chris' Fund, 29.08.): bei
                zwoelf gemischt sortierten Zeilen musste man erst die Team-Farbe der
                ersten Spalte lesen, um "eigen" von "Gegner" zu trennen. Jetzt eigenes
