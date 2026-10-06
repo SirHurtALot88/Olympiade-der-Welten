@@ -14974,7 +14974,12 @@
       // rundenDauer=60/(rundenN*jeSeite*2)) -- hier reicht die einfache Form, weil die
       // Gruppierung den Faktor jeSeite*2 bereits aus der Rechnung nimmt. Eine Runde = eine
       // Spielminute, sechs Sekunden Bildschirmzeit dafuer.
-      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true,
+      // mauer:true (04.10., Nachtkonzept K1/K2): eigene Weiche fuer den Fuellstand-Rechner
+      // wettessenMauerSetz() — Muster `heben`/`gauntlet`/`schatzsuche`. Wirkt NUR, solange
+      // BUEHNE_FLAGS.wettessenMauer>=1; bei 0 (Standard) laeuft Wettessen unveraendert durch den
+      // generischen Auftritt-Block in setz(). Die fuenf anderen Buehnen tragen das Flag nicht
+      // und bleiben in jedem Fall unberuehrt (ihr `ermued` bleibt).
+      label:"Wettessen", jeSeite:6, rundenN:10, rundenDauer:60/10, wettessen:true, mauer:true,
       failAbzug:0.65, failWort:"muss kurz pausieren", erfolgWort:"schlingt durch",
       rezept:{
         GRUNDLAGE:    {stamina:40,health:35,will:25},
@@ -15555,6 +15560,212 @@
   // mit Sekundaerquellen-Vorbehalt wie dort vermerkt). Reine Vergleichsgroesse (s. oben).
   const TENNIS_AUFSCHLAG_H=10;
 
+  // T-N1 -- DER DRUCKMESSER, ABGESCHWAECHTE FASSUNG (Tennis-Nachtkonzept 03.10.,
+  // docs/design/tennis-nachtkonzept-03-10.md Abschnitt 3.1 Absatz "rho/Pp" und Abschnitt 6
+  // Frage 1: "mit Nein bleibt Tennis bei `vorteil`, und T-N1 muss den Druckmesser ueber die
+  // verbleibenden Runden rechnen statt ueber ein Rennen — schwaecher, aber moeglich"). Chris
+  // hat T-N2 (Rennen bis 7 als Platzentscheider, Clutch/Momentum) am 04.10. ausdruecklich
+  // ABGELEHNT -- deshalb hier KEIN Rennen, KEINE Tafel "a:b", sondern dieselbe Kennzahl
+  // (Morris' Wichtigkeit) ueber das heutige Format: 10 Runden je Platz, Platzsieger nach
+  // `vorteil` = Summe der Punktdifferenzen (u.vorteil>0, unveraendert).
+  //
+  // KLASSE A* -- REINE ZWEITRECHNUNG UEBER BEREITS ENTHUELLTE WERTE: kein rr(), kein Feld auf
+  // TEILNEHMER/runden[], keine Aenderung an summe/vorteil/verlauf/punkte/punktGewinner.
+  // Gelesen wird NUR der enthuellte Stand (seite0.verlauf[r] erst, wenn BEIDE Seiten Runde r
+  // enthuellt haben -- dasselbe Gegen-Gate wie BREAK/Fuehrungswechsel) und eine Konstante,
+  // nie `eig`, nie eine zukuenftige Runde: spoilerfrei im Sinn der S-F2-Regel.
+  //
+  // DAS MODELL (symmetrisch, wie im Papier fuer das Rennen bis 7 mit p = 0,5): die
+  // Punktdifferenz einer kuenftigen Runde ist symmetrisch um 0 verteilt, Streuung
+  // TENNIS_DRUCK_SIGMA, Runden unabhaengig -- also ist die Summe ueber k offene Runden
+  // N(0, k*SIGMA^2) und die Siegchance der Heimseite bei Stand v (Heim-Sicht) und k offenen
+  // Runden Phi(v / (SIGMA*sqrt(k))). Analytisch statt Monte-Carlo: dasselbe Ergebnis, auf
+  // das eine Monte-Carlo-Schaetzung konvergieren wuerde, aber ohne Zufallszahl (ein
+  // Monte-Carlo mit rr() wuerde den Wertungsstrom verschieben, mit eigenem Generator waere
+  // es nur langsamer und verrauschter).
+  //
+  // SIGMA = 30, NACHGEMESSEN, NICHT GESETZT (04.10., 720 Plaetze, live-save-Kaderfamilie,
+  // 5 Paarungen x 24 Spiele): Rundendifferenz insgesamt Streuung 36,5, davon Staerkeunter-
+  // schied je Platz (Drift) 21,6 und Rauschen innerhalb eines Platzes 29,4. Das symmetrische
+  // Modell kennt die Drift absichtlich nicht (sie kaeme nur aus `eig` oder einer Schaetzung
+  // aus dem Verlauf). Kalibrierung ueber beide Seitenperspektiven: SIGMA 30 Brier 0,1120,
+  // 35 -> 0,1139, 40 -> 0,1162; ein driftschaetzendes Modell kaeme auf 0,1104 -- der
+  // Unterschied ist klein, das einfache Modell reicht fuer Worte und Leisten.
+  //
+  // WICHTIGKEIT (Morris 1977, uebertragen auf eine stetige Rundendifferenz): erwartete
+  // Siegchance, wenn die naechste Runde an die Heimseite geht (d > 0), minus erwartete
+  // Siegchance, wenn sie an die Gastseite geht (d < 0) -- d ~ N(0, SIGMA^2), Mittelpunkt-
+  // Quadratur ueber 0..4 SIGMA. Werte: Stand 0 bei 10 offenen Runden 0,21, bei 5 offenen 0,30,
+  // bei 2 offenen 0,50, letzte Runde bei Gleichstand 1,00 -- dieselbe Groessenordnung wie die
+  // Rennen-bis-7-Tabelle im Papier (0:0 0,23, 6:6 1,00), aber eigene Zahlen.
+  //
+  // SCHWELLEN, NACHGERECHNET AM ECHTEN `vorteil`-VERLAUF (dieselben 720 Plaetze), NICHT aus
+  // der Rennen-bis-13-Tabelle uebertragen:
+  //   * Die naheliegende "Siegchance ueber 90 %" taugt NICHT als Matchball: sie wird in 91 %
+  //     aller Plaetze ueberschritten, meist schon vor Runde 3-5 (5,5 je Mannschaftskampf) --
+  //     die meisten Plaetze sind in diesem Format frueh strukturell entschieden (nur 6 %
+  //     enden innerhalb +-20).
+  //   * MATCHBALL fuer eine Seite: gewinnt sie die naechste Runde, steht ihre Siegchance im
+  //     Mittel bei mindestens TENNIS_DRUCK_MB_GEW (95 %), verliert sie sie, faellt sie auf
+  //     hoechstens TENNIS_DRUCK_MB_VER (80 %) -- "ein Ball, der den Platz entscheidet, und
+  //     einer, der ihn wieder oeffnet". Gemessen 1,16 je Kampf, nur in Runde 7-10;
+  //     abgewehrt 0,34 je Kampf.
+  //   * ENTSCHEIDUNGSPUNKT: letzte Runde mit Wichtigkeit >= 0,5 (Abstand hoechstens ~20
+  //     Punkte), 0,50 je Kampf.
+  //   * COMEBACK: Platzsieger, dessen Siegchance vor irgendeiner Runde bei hoechstens 15 %
+  //     lag, 0,26 je Kampf.
+  //   * TICKER-DOSIS: nur Runden mit Wichtigkeit >= 0,30 schreiben eine eigene Zeile (oberste
+  //     ~6 % aller Runden, 3,5 je Kampf).
+  // Ehrlich: das ist deutlich weniger Drama als das Rennen bis 7 haette (Papier: ~5
+  // "abgewehrt" je Kampf) -- der Summen-Vorteil wird frueh deutlich, und genau das zeigen die
+  // Zahlen jetzt, statt es zu ueberschreien.
+  const TENNIS_DRUCK_SIGMA=30;
+  const TENNIS_DRUCK_MB_GEW=0.95, TENNIS_DRUCK_MB_VER=0.80;
+  const TENNIS_DRUCK_ENTSCHEIDUNG=0.50, TENNIS_DRUCK_COMEBACK=0.15, TENNIS_DRUCK_TICKER=0.30;
+  // erf nach Abramowitz/Stegun 7.1.26 (Fehler < 1,5e-7) -- Math kennt keine erf.
+  function tennisDruckErf(x){
+    const t=1/(1+0.3275911*Math.abs(x));
+    const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496735)*t+0.254829592)*t*Math.exp(-x*x);
+    return x>=0?y:-y;
+  }
+  // Siegchance der Heimseite bei Stand v (Heim-Sicht) und k offenen Runden; nach der letzten
+  // Runde (k=0) die feste Wertung aus `vorteil` (>0 Sieg, 0 Remis = halb, <0 Niederlage).
+  function tennisSiegchance(v,k){
+    if(k<=0)return v>0?1:v<0?0:0.5;
+    return 0.5*(1+tennisDruckErf(v/(TENNIS_DRUCK_SIGMA*Math.sqrt(k))/Math.SQRT2));
+  }
+  // Voller Druckstand VOR einer Runde: Siegchance jetzt, erwartete Siegchance nach gewonnener
+  // bzw. verlorener naechster Runde (Heim-Sicht) und deren Differenz = Wichtigkeit.
+  const TENNIS_DRUCK_STUETZ=24;
+  function tennisDruckStand(v,k){
+    const w=tennisSiegchance(v,k);
+    if(k<=0)return {w,gew:w,ver:w,imp:0};
+    let sg=0,sv=0,g=0;
+    for(let i=0;i<TENNIS_DRUCK_STUETZ;i++){
+      const z=(i+0.5)/TENNIS_DRUCK_STUETZ*4, gw=Math.exp(-z*z/2), d=z*TENNIS_DRUCK_SIGMA;
+      sg+=gw*tennisSiegchance(v+d,k-1); sv+=gw*tennisSiegchance(v-d,k-1); g+=gw;
+    }
+    return {w,gew:sg/g,ver:sv/g,imp:(sg-sv)/g};
+  }
+  // Anzeige einer Siegchance in Prozent: solange noch gespielt wird, nie "0 %"/"100 %"
+  // (das Modell schliesst nichts aus -- ein Platz ist erst nach der letzten Runde entschieden).
+  function tennisProzent(w,offen){
+    const p=Math.round(w*100);
+    return offen?Math.max(1,Math.min(99,p)):p;
+  }
+  // FORTSCHREIBUNG FUER GENAU EINE ENTHUELLTE RUNDE EINES PLATZES. Nur aufrufen, wenn BEIDE
+  // Seiten diese Runde enthuellt haben (Gegen-Gate in stepBuehne(), `gegner.aktuell>=
+  // u.aktuell`) -- dann ist `seite0.verlauf[r]` der echte, oeffentliche Stand und keine
+  // Vorschau auf eine noch verdeckte Gegnerrunde. Liest `verlauf[r-1]`/`verlauf[r]`, schreibt
+  // ausschliesslich `tennisDruck[brett]` (Anzeige-Zustand). Rueckgabe: die Wichtigkeit DIESER
+  // Runde (Stand davor -- fuer die Ticker-Dosis von Fuehrungswechsel/BREAK) und die
+  // Meldungen, die sie ausloest; feed() ruft der Aufrufer selbst.
+  //
+  // VORZEICHEN: alles intern in Heim-Sicht (w = Siegchance Heim); jede Meldung nennt die
+  // Seite, fuer die sie spricht, und rechnet deren Prozentzahl aus ihrer eigenen Sicht
+  // (Gast: 1-w). Der MATCHBALL gehoert der Seite, deren Siegchance nach einer gewonnenen
+  // naechsten Runde >= TENNIS_DRUCK_MB_GEW waere -- also immer der fuehrenden.
+  function tennisDruckRunde(u,gegner,art){
+    const seite0=u.side===0?u:gegner, seite1=u.side===0?gegner:u;
+    const r=u.aktuell, R=art.rundenN, brett=u.brett??0;
+    const vVor=r>0?seite0.verlauf[r-1]:0, vNach=seite0.verlauf[r];
+    const kNach=R-r-1;
+    const vor=tennisDruckStand(vVor,R-r), nach=tennisDruckStand(vNach,kNach);
+    let z=tennisDruck[brett];
+    if(!z)z=tennisDruck[brett]={minW:[1,1],mb:null,mbZahl:[0,0]};
+    z.minW=[Math.min(z.minW[0],vor.w),Math.min(z.minW[1],1-vor.w)];
+    const name=(s)=>s===0?seite0.n:seite1.n;
+    const pz=(s,st)=>tennisProzent(s===0?st.w:1-st.w,true);
+    // Siegchance mit Namen der fuehrenden Seite ("Greenkraut 71 %"), bei 50 % "50 : 50" --
+    // eine nackte "71 : 29" liesse offen, wer Heim und wer Gast ist.
+    const chance=(st)=>Math.abs(st.w-0.5)<0.005?"50 : 50":(st.w>0.5?name(0)+" "+pz(0,st):name(1)+" "+pz(1,st))+" %";
+    const platz="Platz "+(brett+1), ballw=(r+1)+"/"+R;
+    const meldungen=[];
+    const sieger=kNach>0?-1:(vNach>0?0:vNach<0?1:-1);
+    const comeback=sieger>=0&&z.minW[sieger]<=TENNIS_DRUCK_COMEBACK;
+    // 1) AUSGANG EINES ANGEKUENDIGTEN MATCHBALLS (aus der Vorrunde, s. Punkt 3).
+    let gedeckt=kNach===0; // das Platzende beschreibt schon die "Platz gewonnen"-Zeile
+    if(z.mb!=null){
+      const s=z.mb, o=1-s, ds=(vNach-vVor)*(s===0?1:-1);
+      if(kNach>0){
+        if(ds<0)meldungen.push({seite:o,big:true,kind:"tennisAbgewehrt",txt:"ABGEWEHRT — "+name(o)
+          +" wehrt den Matchball von "+name(s)+" ab ("+platz+", Ballwechsel "+ballw+"): Siegchance "
+          +name(s)+" nur noch "+pz(s,nach)+" %."});
+        else meldungen.push({seite:s,big:false,txt:name(s)+" nutzt den Matchball — "+platz
+          +" so gut wie entschieden (Siegchance "+pz(s,nach)+" %)."});
+        gedeckt=true;
+      } else if(sieger===o&&!comeback){
+        meldungen.push({seite:o,big:true,kind:"tennisAbgewehrt",txt:"ABGEWEHRT — "+name(o)
+          +" wehrt den Matchball von "+name(s)+" ab und dreht "+platz+" mit dem letzten Ballwechsel."});
+      }
+      z.mb=null;
+    }
+    // 2) TICKER-DOSIS: nur grosse Runden bekommen eine eigene Zeile. "Punkte gut machen" ist
+    // die Veraenderung von `vorteil` (das Mass, das den Platz entscheidet), NICHT der
+    // T-F1a-Punktgewinner mit Aufschlag-Zuschlag -- die beiden koennen bei knappen Runden
+    // auseinanderfallen, und die Siegchance haengt nur am `vorteil`.
+    if(!gedeckt&&vor.imp>=TENNIS_DRUCK_TICKER){
+      const d=vNach-vVor, s=d>0?0:d<0?1:-1;
+      meldungen.push({seite:s<0?0:s,big:false,txt:"Großer Ballwechsel auf "+platz+" ("+ballw
+        +", Wichtigkeit "+vor.imp.toFixed(2).replace(".",",")+"): "
+        +(s<0?"keiner macht Punkte gut":name(s)+" macht "+Math.abs(d)+" Punkte gut")
+        +" — Siegchance jetzt "+chance(nach)+"."});
+    }
+    // 3) ANKUENDIGUNG FUER DIE NAECHSTE RUNDE (nur solange noch eine offen ist).
+    if(kNach===1&&nach.imp>=TENNIS_DRUCK_ENTSCHEIDUNG){
+      const f=vNach>0?0:vNach<0?1:-1;
+      meldungen.push({seite:f<0?0:f,big:true,kind:"tennisEntscheidung",txt:"ENTSCHEIDUNGSPUNKT — "+platz
+        +": der letzte Ballwechsel entscheidet, "+(f<0?"Gleichstand":name(f)+" liegt nur "+Math.abs(vNach)
+        +" Punkte vorn")+" (Siegchance "+chance(nach)+")."});
+    } else if(kNach>0){
+      for(const s of [0,1]){
+        // Gast gewinnt die naechste Runde, wenn d<0 -- seine Siegchance ist dann 1-ver.
+        const gew=s===0?nach.gew:1-nach.ver, ver=s===0?nach.ver:1-nach.gew;
+        if(gew>=TENNIS_DRUCK_MB_GEW&&ver<=TENNIS_DRUCK_MB_VER){
+          z.mb=s; z.mbZahl[s]++;
+          meldungen.push({seite:s,big:true,kind:"tennisMatchball",txt:"MATCHBALL — "+name(s)+" ("+platz
+            +(z.mbZahl[s]>1?", erneut":"")+"): gewinnt "+name(s)+" den nächsten Ballwechsel, ist der Platz so gut wie entschieden (Siegchance jetzt "
+            +pz(s,nach)+" %)."});
+          break;
+        }
+      }
+    }
+    // 4) COMEBACK am Platzende: Sieger lag vor irgendeiner Runde bei <= TENNIS_DRUCK_COMEBACK.
+    if(comeback)meldungen.push({seite:sieger,big:true,kind:"tennisComeback",txt:"COMEBACK — "+name(sieger)
+      +" gewinnt "+platz+", obwohl die Siegchance zwischenzeitlich bei "+tennisProzent(z.minW[sieger],true)+" % lag."});
+    z.v=vNach; z.k=kNach; z.w=nach.w; z.imp=nach.imp; z.runde=r; z.namen=[seite0.n,seite1.n];
+    // 5) DRUCK-UEBERSICHT, EINE ZEILE JE RUNDE (sobald der LETZTE Platz diese Runde
+    // abgeschlossen hat -- die Warteschlange enthuellt Runde fuer Runde ueber alle Plaetze):
+    // wo ist es offen, wo nur noch Tendenz, was ist so gut wie vergeben, und die erwartete
+    // Zahl gewonnener Plaetze (Summe der Siegchancen). Ohne diese Zeile blieb der Ticker in
+    // Spielen ohne fruehe knappe Plaetze ~40 s leer (Sichtpruefung 04.10.) -- die Leere war
+    // ehrlich, aber stumm; jetzt sagt der Ticker, DASS es entschieden ist und wo nicht.
+    // "normal"-Stufe (Zeilenbudget), nie Banner. Nach der letzten Runde nicht mehr (dort
+    // sprechen die "Platz gewonnen"-Zeilen und die Schlusszeile).
+    if(kNach>0){
+      const bretterIdx=TEILNEHMER.filter(x=>x.side===0&&x.brett!=null
+        &&TEILNEHMER.some(y=>y.side===1&&y.brett===x.brett)).map(x=>x.brett).sort((a,b)=>a-b);
+      if(bretterIdx.length&&bretterIdx.every(b=>tennisDruck[b]&&tennisDruck[b].runde===r)){
+        const offen=[],tendenz=[],vergeben=[]; let erwartetHeim=0;
+        for(const b of bretterIdx){
+          const t=tennisDruck[b], fw=Math.max(t.w,1-t.w); erwartetHeim+=t.w;
+          const wer=Math.abs(t.w-0.5)<0.005?"50 : 50":(t.w>0.5?t.namen[0]:t.namen[1])+" "+tennisProzent(fw,true)+" %";
+          if(fw<0.8)offen.push("Platz "+(b+1)+" ("+wer+")");
+          else if(fw<TENNIS_DRUCK_MB_GEW)tendenz.push("Platz "+(b+1)+" ("+wer+")");
+          else vergeben.push(String(b+1));
+        }
+        const teile=[];
+        if(offen.length)teile.push("offen: "+offen.join(", "));
+        if(tendenz.length)teile.push("Tendenz: "+tendenz.join(", "));
+        if(vergeben.length)teile.push("so gut wie vergeben: Platz "+vergeben.join(", "));
+        const fmt=(x)=>x.toFixed(1).replace(".",",");
+        meldungen.push({seite:0,big:false,txt:"Druck nach Ballwechsel "+ballw+" — "+teile.join("; ")
+          +" · erwartete Plätze Heim "+fmt(erwartetHeim)+" : "+fmt(bretterIdx.length-erwartetHeim)+" Gast."});
+      }
+    }
+    return {impRunde:vor.imp,meldungen};
+  }
+
   // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
   // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
   // spieler den anderen immer weiter zurück drängen damit man auch optisch besseres
@@ -15674,6 +15885,12 @@
   // (s. dort, direkt vor zeichneTennis()). KEIN Pin: anders als Schach gibt es hier
   // keinen Klick-Handler dafuer, das war nicht Teil des Auftrags.
   let tennisFokus=0, fechtenFokus=0;
+  // T-N1 DRUCKMESSER (s. tennisDruckStand() oben): reiner Anzeige-Zustand je Platz, von
+  // tennisDruckRunde() in stepBuehne() fortgeschrieben, von zeichneTennis() (Spannungsleiste,
+  // Siegchance im Kopf) gelesen. Modulzustand wie tennisFokus, NICHT auf TEILNEHMER --
+  // nichts davon fliesst in summe/vorteil/verlauf/wert()/rr(). Je Platz:
+  //   {v, k, w, imp, minW:[heim,gast], mb:Seite|null, mbZahl:[heim,gast]}
+  let tennisDruck=[];
   // "matt"-Ton (Ziel 5, A4) darf nur EINMAL je Spiel feuern, sobald das Duell entschieden
   // ist (alleFertig && siegSeite!=null, s. zeichneSchach) — sonst spielt jeder weitere
   // Frame nach dem Sieg den Ton erneut ab. Reset hier statt in reset() (s. Kommentar dort
@@ -15724,6 +15941,294 @@
   const buehneErfolgschance=(L)=>Math.max(0.05,Math.min(0.94,
     0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035-(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO));
   const buehneWagnisFaktor=(L)=>Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG);
+
+  // ============ FEATURE-FLAGS DER BUEHNEN-NACHTKONZEPTE (04.10., Klasse B) ============
+  // Zwei Mechanik-Aenderungen aus den Nachtkonzepten vom 03.10., von Chris zum Bau
+  // freigegeben, aber Klasse B — deshalb HINTER EINEM SCHALTER, STANDARDMAESSIG AUS. Muster:
+  // `sandsackVorschauAktiv` (Gewichtheben-Sandsack-Finale Paket 2): ein Modul-Zustand mit
+  // Default "aus", gesetzt ausschliesslich ueber die Test-/QA-Schnittstelle
+  // `window.__arena.buehneFlags({...})` (s. window.__arena unten) und die Messskripte
+  // (`--flags=speedSchachUhr:2,wettessenMauer:2`, s. scripts/lib/rangtreue-messung.mjs). Solange alle auf 0
+  // stehen (jeder echte Spielstand), laeuft JEDE Zeile der Buehne bit-identisch zu vorher —
+  // keiner der neuen Zweige wird betreten, kein Feld kommt auf TEILNEHMER hinzu
+  // (nachgemessen: miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs zahlengleich vor/nach).
+  // Einschalten fuer das echte Spiel = den Default hier aendern, nach Chris' Abnahme.
+  //
+  //   speedSchachUhr  0 aus · 1 Stufe 1 „Das Blaettchen faellt" · 2 Stufe 1+2 „Tempo-Ansage"
+  //                   (docs/design/speed-schach-nachtkonzept-03-10.md Abschnitt 3.2/3.3)
+  //   wettessenMauer  0 aus · 1 K1 „Mauer als Fuellstand" · 2 K1+K2 „Haltung"
+  //                   (docs/design/wettessen-nachtkonzept-03-10.md Abschnitt 3, K1/K2)
+  const BUEHNE_FLAGS={speedSchachUhr:2, wettessenMauer:2};
+  // STARTWERT AUS DEM FENSTER (04.10., PPS-Referenz Wettessen): der Headless-Runner
+  // (lib/battle/arena-headless-runner.ts) haengt die Engine JE FIXTURE NEU ein — ein ueber
+  // window.__arena.buehneFlags() gesetzter Schalter waere beim naechsten Fixture wieder 0. Wer
+  // die Flags fuer einen ganzen Lauf braucht (scripts/ziehe-buehne-pps-referenz.ts --flags=...),
+  // setzt deshalb `window.__olyBuehneFlags` vor dem Laden (Option `buehneFlags` des Runners).
+  // Die echte App setzt das Feld nie; fehlt es, bleibt jeder Schalter auf seinem Standard.
+  // Nur bekannte Schluessel mit Zahlenwert werden uebernommen.
+  try{
+    const startFlags=window.__olyBuehneFlags;
+    if(startFlags&&typeof startFlags==="object")
+      for(const k of Object.keys(BUEHNE_FLAGS))
+        if(Number.isFinite(Number(startFlags[k])))BUEHNE_FLAGS[k]=Number(startFlags[k]);
+  }catch(e){}
+  // PAUSCHALE HALTUNG JE SEITE — NUR fuer Messungen ("alle rechnen", "Heim blitzen, Gast KI"
+  // usw., Messpflicht der Konsultation 02.10. Regel 5: KI-Regel beidseitig plus Extremfaelle).
+  // null = keine Vorgabe (Aufstellung bzw. KI-Vorgabe gilt). Gesetzt nur ueber
+  // window.__arena.buehneHaltungTest(), nie im Spiel.
+  let buehneHaltungTest={0:null,1:null};
+  // WOHER EINE HALTUNG KOMMT, in Prioritaet: (1) Messvorgabe je Seite, (2) die Aufstellung
+  // (`place[n].haltung`, das neue dritte Feld der Uebergabe {d,slot,haltung} — s.
+  // echterKader.aufstellung weiter unten und lib/foundation/battle-arena/arena-aufstellung-
+  // adapter.ts), (3) null = die KI-Vorgabe der jeweiligen Disziplin entscheidet. Nur Werte aus
+  // `erlaubt` werden angenommen; alles andere faellt still auf die KI zurueck (alte Aufrufer,
+  // Tippfehler, Haltung einer anderen Disziplin).
+  function buehneHaltungVon(p,seite,erlaubt){
+    const t=buehneHaltungTest[seite];
+    if(t&&erlaubt.includes(t))return t;
+    const e=place[p.n];
+    if(e&&e.d===buehneDisc&&erlaubt.includes(e.haltung))return e.haltung;
+    return null;
+  }
+
+  // ============ SPEED-SCHACH „DIE UHR WIRD DER DRITTE SPIELER" (Stufe 1 + 2) ============
+  // docs/design/speed-schach-nachtkonzept-03-10.md, Abschnitt 3.1-3.3, gebaut 04.10.
+  //
+  // STUFE 1 — DAS BLAETTCHEN FAELLT. Jeder Spieler bekommt eine echte Uhr (180 s), die aus
+  // seinen EIGENEN Haenden laeuft: Sub-Skill TEMPO (speed 50 / dexterity 30 / awareness 20 —
+  // nur Matrixattribute, die schon in WAGNIS/NERVEN/TECHNIK sitzen, kein neues Attribut).
+  // Jeder Zug kostet 12 s (starker Zug) bzw. 17 s (schwacher Zug), mal
+  // (1 + (50 − TEMPO)·0,022). Das ist die ENTKOPPELTE Uhr aus Tabelle 5.2: mit den alten
+  // 8/20 s fiel nur, wer ohnehin auf Punkte verlor (0,1 % Flagg-Entscheid gegen den
+  // Vorteil, "das erzaehlt nichts Neues") — erst 12/17 s mit dem staerkeren Tempo-Faktor
+  // erzeugt den Botez-Hansen-Moment. Faellt genau einer der beiden auf 0, hat er das Brett
+  // AUF ZEIT verloren, egal wie der Vorteil steht; fallen beide oder keiner, entscheidet
+  // `vorteil` wie bisher (ein Remis bleibt ein Remis — KEIN Tiebreak, KEIN Armageddon:
+  // Chris' Design-Leitlinie, Mannschaftskaempfe duerfen 3:3 enden).
+  //
+  // Stufe 1 ist rho-/Pp-NEUTRAL PER KONSTRUKTION: Erfolgschance, Punkte, rr()-Verbrauch und
+  // damit u.summe (der Messwert von MOTOREN["speed-schach"].wert()) bleiben Zeichen fuer
+  // Zeichen gleich — die Uhr liest die fertigen Zuege nur nach, wie schachUhrWert() es fuer
+  // die Anzeige schon immer tat. Geaendert ist nur, WER das Brett gewinnt (`u.zeitSieg`,
+  // gelesen ueber duellBrettSieg() an jeder Stelle, die bisher `vorteil>0` las).
+  //
+  // STUFE 2 — DIE TEMPO-ANSAGE (Chris' Manager-Hebel). Je Brett vorab "rechnen" (Zeit ×1,30,
+  // Erfolgschance +4 pp), "normal" oder "blitzen" (Zeit ×0,72, −4 pp). Zeitnot wirkt ins
+  // Rezept: wer einen Zug mit weniger als 30 s auf der Uhr beginnt, spielt ihn mit
+  // 0,10·(1−NERVEN/100)·1,6 weniger Erfolgschance (will/determination daempfen); ist das
+  // Blaettchen gefallen, bringen die RESTZUEGE 0 Punkte (woertlich Konzept 3.3: der Zug, mit
+  // dem die Uhr auf 0 lief, ist gespielt und zaehlt noch; alle danach nicht — gemessen
+  // gleichwertig zur strengeren Lesart, rho 0,899 gegen 0,895, Pp 12,1/11,0 gegen 11,8/11,4). Damit
+  // aendert sich u.summe — Stufe 2 braucht ihre eigene Messrunde (s. stand-aller-
+  // disziplinen.md, Nachtrag 04.10.).
+  //
+  // KI-VORGABE = DIE ZEITBUDGET-REGEL (Abschnitt 3.3), NICHT "schnelle Haende blitzen": die
+  // rechnendste Ansage, deren ERWARTETE Uhrzeit (aus Erfolgschance und TEMPO, ohne Wurf) plus
+  // 25 s Sicherheitsrand unter 180 s bleibt, sonst Blitzen. Die naive Regel trieb Pp in der
+  // Sonde auf 21,6 (ein speed-Zuwachs kippte die KI in die flachere Ansage) — die KI-Vorgabe ist
+  // Teil der Mechanik, nicht Beiwerk. Gilt fuer BEIDE Seiten gleich, solange die Aufstellung
+  // keine Ansage traegt.
+  const SCHACH_UHR_START=180, SCHACH_ZEITNOT_S=30;
+  const SCHACH_ZUG_STARK_S=12, SCHACH_ZUG_SCHWACH_S=17;
+  const SCHACH_TEMPO_K=0.022;
+  const SCHACH_TEMPO_REZEPT={speed:50,dexterity:30,awareness:20};
+  const SCHACH_ANSAGEN=["rechnen","normal","blitzen"];
+  const SCHACH_ANSAGE={rechnen:{zeit:1.30,erfolg:0.04}, normal:{zeit:1,erfolg:0}, blitzen:{zeit:0.72,erfolg:-0.04}};
+  const SCHACH_ZEITNOT_ABZUG=0.10, SCHACH_ZEITNOT_SKALA=1.6;
+  const SCHACH_KI_RAND_S=25;
+  // Untergrenze 0,5: ein TEMPO ueber 72 wuerde die Zugzeit sonst unter die Haelfte druecken —
+  // im Kader praktisch unerreichbar, nur ein Sicherheitsnetz gegen negative Zugzeiten.
+  const schachTempoFaktor=(L)=>Math.max(0.5,1+(50-L.TEMPO)*SCHACH_TEMPO_K);
+  const schachZugZeit=(L,stark,ansage)=>
+    (stark?SCHACH_ZUG_STARK_S:SCHACH_ZUG_SCHWACH_S)*schachTempoFaktor(L)*((SCHACH_ANSAGE[ansage]||SCHACH_ANSAGE.normal).zeit);
+  const schachAnsageErfolg=(L,ansage)=>Math.max(0.05,Math.min(0.94,
+    buehneErfolgschance(L)+(SCHACH_ANSAGE[ansage]||SCHACH_ANSAGE.normal).erfolg));
+  // Erwartete Gesamtzeit ueber alle Zuege — deterministisch, ohne rr(), ohne Zeitnot-Abzug
+  // (die Regel plant mit dem Normalfall und haelt dafuer 25 s Rand).
+  function schachErwarteteZeit(L,ansage,zuege){
+    const p=schachAnsageErfolg(L,ansage);
+    return zuege*(p*schachZugZeit(L,true,ansage)+(1-p)*schachZugZeit(L,false,ansage));
+  }
+  function schachKiAnsage(L,zuege){
+    for(const a of ["rechnen","normal"])
+      if(schachErwarteteZeit(L,a,zuege)+SCHACH_KI_RAND_S<SCHACH_UHR_START)return a;
+    return "blitzen";
+  }
+  // EIN BRETTENTSCHEID FUER ALLE LESER. Bisher stand an fuenf Stellen (HUD-Stand,
+  // Kaderleiste, Schach-Sieger auf dem Brett, buehneStand(), spieleBuehneDuell()) dieselbe
+  // Weiche `fechten ? gefechtSieg : vorteil>0` als Kopie. Neu ist nur der mittlere Fall: ein
+  // Brett, das auf Zeit entschieden wurde (`u.zeitSieg` true/false, NUR gesetzt bei
+  // BUEHNE_FLAGS.speedSchachUhr>=1 und genau einem gefallenen Blaettchen). Ohne Flag existiert
+  // das Feld nie, und die Funktion ist exakt die alte Weiche.
+  function duellBrettSieg(art,u){
+    if(art.fechten)return !!u.gefechtSieg;
+    if(u.zeitSieg!=null)return u.zeitSieg;
+    return u.vorteil>0;
+  }
+  // MESS-DIAGNOSE fuer disziplinProbe({buehneDiag:true}) — liest nur den fertig gebauten und
+  // durchgelaufenen TEILNEHMER-Stand, schreibt nichts, kein rr(). Je Duell-Brett: Vorteil,
+  // Blaettchen beider Seiten, Brettentscheid, Ansage/TEMPO/Zeitnot; dazu der Teamstand in
+  // gewonnenen Brettern (dieselbe Zaehlung wie spieleBuehneDuell()).
+  function buehneDiagVon(dId,evLaeufe){
+    const art=BUEHNE_ART[dId]; if(!art)return null;
+    const diag={};
+    if(art.duell){
+      diag.bretter=TEILNEHMER.filter(u=>u.side===0&&u.brett!=null).map(a=>{
+        const b=TEILNEHMER.find(u=>u.side===1&&u.brett===a.brett)||{};
+        return {vorteil:a.vorteil, fa:!!a.geflaggt, fb:!!b.geflaggt,
+          zeitSieg:a.zeitSieg??null, gegen:!!a.zeitGegenVorteil, kippt:!!a.zeitKippt,
+          sa:duellBrettSieg(art,a), sb:duellBrettSieg(art,b),
+          ansageA:a.ansage||null, ansageB:b.ansage||null,
+          zeitnotA:a.zeitnotZug!=null, zeitnotB:b.zeitnotZug!=null,
+          tempoA:a.TEMPO??null, tempoB:b.TEMPO??null};
+      });
+      diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s&&u.brett!=null&&duellBrettSieg(art,u)).length);
+    } else if(!art.heben&&!art.gauntlet){
+      // Auftritt-Buehnen: Seitenstand = Summe der Auftrittswerte, dieselbe Zahl wie
+      // spieleBuehneAuftritt()/updateHudBuehne().
+      diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+(u.summe||0),0));
+    }
+    // WETTESSEN-MAUER (K1/K2): je Esser Haltung, Quelle, Mauer-Minute und Kapazitaet. Mit
+    // `evLaeufe` zusaetzlich die ERWARTETE Summe je Haltung ueber feste, private Zufallsstroeme
+    // (gemeinsame Zufallszahlen fuer alle drei Haltungen, wettessenMauerRunden() mit eigener
+    // Wurfquelle — kein rr(), der Motorstrom bleibt unberuehrt). Das ist die Messung fuer
+    // "kein toter Knopf": welche Haltung waere fuer DIESEN Esser in DIESEM Spiel (mit Slot,
+    // Form, Mutator) im Mittel die beste?
+    if(art.mauer&&BUEHNE_FLAGS.wettessenMauer>=1){
+      diag.esser=TEILNEHMER.map((u,idx)=>{
+        const e={n:u.n, seite:u.side, haltung:u.haltung||null, quelle:u.haltungQuelle||null,
+          mauerMinute:u.mauerMinute??null, K:Math.round(u.mauerK||0), NERVEN:u.NERVEN,
+          AUSDAUER:u.AUSDAUER, summe:u.summe, eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig,
+          kurve:u.runden.map(r=>r.punkte)};
+        if(evLaeufe>0){
+          e.ev={};
+          for(const h of WETTESSEN_HALTUNGEN){
+            let s=0;
+            for(let k=0;k<evLaeufe;k++){
+              let z=(0x9E3779B1^(idx*7919+k*104729+1))>>>0;
+              const quelle=()=>{ z=(z*1664525+1013904223)>>>0; return z/4294967296; };
+              s+=wettessenMauerRunden(u,h,art,quelle).reduce((a,r)=>a+r.punkte,0);
+            }
+            e.ev[h]=Math.round(s/evLaeufe*10)/10;
+          }
+        }
+        return e;
+      });
+    }
+    return diag;
+  }
+
+  // ============ WETTESSEN „DIE MAUER, DIE HALTUNG" (K1 + K2) ============
+  // docs/design/wettessen-nachtkonzept-03-10.md, Abschnitt 3 (K1/K2) und Anhang A, gebaut 04.10.
+  //
+  // K1 — DIE MAUER ALS FUELLSTAND. Statt einer festen Mauer-Minute ein Magen-Budget: der
+  // Fuellstand ist die Summe der bisher gegessenen Minutenpunkte, die Kapazitaet
+  // K = 65 + AUSDAUER·k (AUSDAUER = stamina 50/health 30/will 20). Wer vorne mehr isst, ist
+  // frueher voll — Chris' "mehr Risiko → uebertrifft sich oder bricht ein" als EINE Regel, ohne
+  // Zusatzwuerfel. Drei Phasen ergeben sich, sie werden nicht gesetzt:
+  //   vor der Mauer   Basis 20+GRUNDLAGE·0,7 (KEIN `ermued` mehr — AUSDAUER traegt jetzt K),
+  //                   Erfolgschance und Bonus wie bisher
+  //   hinter der Mauer Basis × Mauerfaktor (0,45+NERVEN·0,005, gedeckelt 0,4-0,95), Erfolg −0,05,
+  //                   halber Bonus — ab hier isst nur noch der Wille
+  //   Schlussminute   (Minute 10) WAGNIS-Trade-off doppelt, voller Bonus ("Final Bite")
+  // Genau ein rr() je Minute wie im generischen Block; kein Zustand zwischen Essern (keine
+  // Wechselwirkung — die Feldgroessen-Robustheit 2-6 bleibt per Bauart erhalten).
+  //
+  // K2 — DIE HALTUNG je Esser, vorab (kein Live-Eingriff):
+  //   sprint         Minute 1-4: Basis ×1,10, Erfolg −0,10; Kapazitaet ×0,92 (frueher voll)
+  //   gleichmaessig  bit-identisch zu K1 ohne Zusatz (der Standard)
+  //   schlussspurt   Minute 1-7: Basis ×0,97; Minute 8-10: Bonus ×1,5, WAGNIS-Trade-off doppelt,
+  //                  hinter der Mauer Mauerfaktor + max(0,NERVEN−50)·0,004 (Deckel 0,98)
+  // KI-Vorgabe deterministisch aus den Werten des Essers (Muster berechneFokusAuto): nach
+  // NERVEN — s. wettessenKiHaltung(). Der Konzepttext warnt: der erste Parametersatz ergab
+  // "Sprint immer am besten" (toter Knopf). Kalibrierkriterium deshalb gemessen, nicht
+  // angenommen: jede Haltung ist fuer mindestens ein Fuenftel der Esser die beste (Erwartung
+  // ueber feste Zufallsstroeme, s. buehneDiagVon/scripts/miss-wettessen-mauer.mjs), und die beste
+  // Haltung haengt an NERVEN, nicht an `eig`.
+  const WETTESSEN_HALTUNGEN=["sprint","gleichmaessig","schlussspurt"];
+  const WETTESSEN_K_BASIS=65, WETTESSEN_K_AUSDAUER=5;
+  const WETTESSEN_MAUER_BASIS=0.45, WETTESSEN_MAUER_NERVEN=0.005;
+  const WETTESSEN_MAUER_MIN=0.4, WETTESSEN_MAUER_MAX=0.95;
+  const WETTESSEN_MAUER_ERFOLG=-0.05, WETTESSEN_MAUER_BONUS=0.5;
+  // KALIBRIERT AM MOTOR (04.10., Kaderfamilie live-save, 12 Spiele × 5 Paarungen, Erwartung je
+  // Esser ueber 40 feste Stroeme, s. scripts/miss-wettessen-mauer.mjs). Die Konzept-Startwerte
+  // (Sprint-Erfolg −0,10, Schlussspurt-Bonus ×1,5, NERVEN-Zuschlag 0,004, frueh ×0,97) ergaben
+  // am echten Motor genau die Falle, vor der das Papier warnt — nur andersherum: Sprint war fuer
+  // 7 % der Esser die beste Wahl (toter Knopf), Schlussspurt fuer 69 % (Pflichtknopf), und die
+  // beste Haltung hing staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+  // Sprint-Erfolg {−0,06 … −0,10}, Sprint-K {0,92 … 0,96}, Schlussspurt-Bonus {1,1 … 1,5},
+  // NERVEN-Zuschlag {0,004 … 0,01}, frueh {0,96 … 0,97}: gewaehlt der ausgewogenste Satz —
+  // beste Wahl Sprint 26 % · Gleichmaessig 27 % · Schlussspurt 47 %, nach NERVEN sortiert
+  // (Mittel 64 / 44 / 73), rho(beste Haltung, NERVEN) 0,65 > rho(…, Eignung) 0,62.
+  const WETTESSEN_SPRINT_MINUTEN=4, WETTESSEN_SPRINT_BASIS=1.10, WETTESSEN_SPRINT_ERFOLG=-0.07, WETTESSEN_SPRINT_K=0.92;
+  const WETTESSEN_SCHLUSS_FRUEH_BASIS=0.965, WETTESSEN_SCHLUSS_AB_MINUTE=8, WETTESSEN_SCHLUSS_BONUS=1.18;
+  const WETTESSEN_SCHLUSS_NERVEN_K=0.006, WETTESSEN_SCHLUSS_MAUER_MAX=0.98;
+  const WETTESSEN_KI_SCHLUSS_AB=60, WETTESSEN_KI_GLEICH_UNTER=45;
+  const wettessenKapazitaet=(L,haltung)=>
+    (WETTESSEN_K_BASIS+L.AUSDAUER*WETTESSEN_K_AUSDAUER)*(haltung==="sprint"?WETTESSEN_SPRINT_K:1);
+  function wettessenKiHaltung(L){
+    if(L.NERVEN>=WETTESSEN_KI_SCHLUSS_AB)return "schlussspurt";
+    if(L.NERVEN<WETTESSEN_KI_GLEICH_UNTER)return "gleichmaessig";
+    return "sprint";
+  }
+  // DER MINUTENRECHNER — eine reine Funktion der Sub-Skills, der Haltung und einer Wurfquelle.
+  // Im Spiel ist die Quelle rr() (genau ein Wurf je Minute, s. wettessenMauerSetz()), in der
+  // Messdiagnose ein privater Strom. Liefert die fertigen runden[]-Eintraege.
+  function wettessenMauerRunden(L,haltung,art,wurfQuelle){
+    const sprint=haltung==="sprint", schluss=haltung==="schlussspurt";
+    const K=wettessenKapazitaet(L,haltung);
+    const mfGrund=Math.max(WETTESSEN_MAUER_MIN,Math.min(WETTESSEN_MAUER_MAX,
+      WETTESSEN_MAUER_BASIS+L.NERVEN*WETTESSEN_MAUER_NERVEN));
+    const runden=[]; let fuell=0, mauerGesehen=false;
+    for(let ri=0;ri<art.rundenN;ri++){
+      const minute=ri+1, letzte=ri===art.rundenN-1;
+      const hinter=fuell>K;
+      const mauerNeu=hinter&&!mauerGesehen; if(hinter)mauerGesehen=true;
+      const spaet=schluss&&minute>=WETTESSEN_SCHLUSS_AB_MINUTE;
+      let basis=20+L.GRUNDLAGE*0.7, dErf=0, bonusMul=1, wagMul=1;
+      if(sprint&&minute<=WETTESSEN_SPRINT_MINUTEN){ basis*=WETTESSEN_SPRINT_BASIS; dErf+=WETTESSEN_SPRINT_ERFOLG; }
+      if(schluss&&!spaet)basis*=WETTESSEN_SCHLUSS_FRUEH_BASIS;
+      if(hinter){
+        const mf=spaet?Math.min(WETTESSEN_SCHLUSS_MAUER_MAX,mfGrund+Math.max(0,L.NERVEN-50)*WETTESSEN_SCHLUSS_NERVEN_K):mfGrund;
+        basis*=mf; dErf+=WETTESSEN_MAUER_ERFOLG; bonusMul*=WETTESSEN_MAUER_BONUS;
+      }
+      if(letzte){ wagMul=2; bonusMul=Math.max(bonusMul,1); }
+      if(spaet){ wagMul=2; bonusMul*=WETTESSEN_SCHLUSS_BONUS; }
+      const erfolg=Math.max(0.05,Math.min(0.94,0.15+L.TECHNIK*0.0055+L.NERVEN*0.0035
+        -(L.WAGNIS-50)*BUEHNE_WAGNIS_RISIKO*wagMul+dErf));
+      const wagnisFaktor=Math.max(0,0.7+(L.WAGNIS-50)*BUEHNE_WAGNIS_ERTRAG*wagMul);
+      const wurf=wurfQuelle();
+      let punkte, ereignis, knapp=false;
+      if(wurf<erfolg){
+        punkte=basis+L.SPITZENMOMENT*0.35*wagnisFaktor*bonusMul;
+        ereignis=art.erfolgWort;
+      } else {
+        punkte=basis*art.failAbzug;
+        ereignis=art.failWort;
+        knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
+      }
+      punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+      fuell+=punkte;
+      runden.push({punkte,ereignis,knapp,mauer:hinter,mauerNeu,fuell});
+    }
+    return runden;
+  }
+  // DER SPIELPFAD: Haltung waehlen (Messvorgabe > Aufstellung > KI) und die Minuten mit rr()
+  // rechnen. Bei Flag-Stufe 1 (nur K1) gilt fuer alle "gleichmaessig" — die Haltung ist erst
+  // Teil von Stufe 2.
+  function wettessenMauerSetz(L,p,seite,art){
+    if(BUEHNE_FLAGS.wettessenMauer>=2){
+      const vorgabe=buehneHaltungVon(p,seite,WETTESSEN_HALTUNGEN);
+      L.haltung=vorgabe||wettessenKiHaltung(L);
+      L.haltungQuelle=vorgabe?"vorgabe":"ki";
+    } else {
+      L.haltung="gleichmaessig"; L.haltungQuelle="k1";
+    }
+    L.mauerK=wettessenKapazitaet(L,L.haltung);
+    L.runden=wettessenMauerRunden(L,L.haltung,art,rr);
+    const m=L.runden.findIndex(r=>r.mauerNeu);
+    L.mauerMinute=m>=0?m+1:null;
+  }
 
   // ================== PAKET 1 (30.09.): "STARTREIHENFOLGE NACH ERGEBNIS" ==================
   // Fable-Ideen Buehne-AUFTRITT 30.09. (docs/design/fable-ideen-buehne-auftritt-30-09.md,
@@ -15792,7 +16297,7 @@
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     LASTEN_FINALE=null;
-    tennisFokus=0; fechtenFokus=0;
+    tennisFokus=0; fechtenFokus=0; tennisDruck=[];
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
     // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln oben) -- derselbe Grund
@@ -15909,11 +16414,41 @@
       // keine Adapter-Aenderung. Nur fuer Showcase befuellt, die sechs Geschwister-Buehnen
       // lesen diese Felder nirgends.
       if(art.showcase){L.c=p.c;L.r=p.r;L.sub=p.sub;L.tp=p.tp;L.tn=p.tn;L.a=p.a;}
+      // WETTESSEN-MAUER (K1/K2, s. WETTESSEN_* oben): eigener Minutenrechner mit genau einem
+      // rr() je Minute wie die generische Schleife darunter — ersetzt sie NUR fuer Wettessen
+      // und NUR bei gesetztem Flag. Ohne Flag laeuft Wettessen unveraendert unten durch.
+      if(art.mauer&&BUEHNE_FLAGS.wettessenMauer>=1){
+        wettessenMauerSetz(L,p,seite,art);
+        TEILNEHMER.push(L); return;
+      }
+      // SPEED-SCHACH-UHR (Stufe 1/2, s. BUEHNE_FLAGS/SCHACH_* oben): nur bei gesetztem Flag
+      // betreten. TEMPO entsteht aus demselben `attr` (Slot-/Form-/Mutator-Zuschlag inklusive)
+      // und derselben `mische()`-Formel wie jeder Rezept-Sub-Skill in R2 oben — es ist nur
+      // KEIN Rezept-Eintrag, damit das Rezept (und alles, was es liest) unberuehrt bleibt.
+      const schachUhr=!!art.schach&&BUEHNE_FLAGS.speedSchachUhr>=1;
+      const schachAnsage=schachUhr&&BUEHNE_FLAGS.speedSchachUhr>=2;
+      let uhr=SCHACH_UHR_START;
+      if(schachUhr){
+        L.TEMPO=Math.round(mische({a:attr},SCHACH_TEMPO_REZEPT));
+        L.geflaggt=false; L.flaggZug=null; L.zeitnotZug=null;
+        if(schachAnsage){
+          const vorgabe=buehneHaltungVon(p,seite,SCHACH_ANSAGEN);
+          L.ansage=vorgabe||schachKiAnsage(L,art.rundenN);
+          L.ansageQuelle=vorgabe?"vorgabe":"ki";
+        }
+      }
       for(let ri=0;ri<art.rundenN;ri++){
         const ermued=1-Math.max(0,(60-L.AUSDAUER))*0.0035*(ri/Math.max(1,art.rundenN-1));
         const basis=(20+L.GRUNDLAGE*0.7)*Math.max(0.4,ermued);
         // WAGNIS wirkt jetzt in BEIDE Richtungen, s. BUEHNE_WAGNIS_RISIKO/_ERTRAG oben.
-        const erfolg=buehneErfolgschance(L);
+        // STUFE 2: Ansage und Zeitnot verschieben die Erfolgschance (gedeckelt wie ueberall auf
+        // 0,05-0,94). Ohne Flag ist `erfolg` exakt buehneErfolgschance(L) wie bisher.
+        const zeitnot=schachUhr&&uhr<SCHACH_ZEITNOT_S;
+        if(zeitnot&&L.zeitnotZug==null)L.zeitnotZug=ri;
+        const erfolg=schachAnsage
+          ?Math.max(0.05,Math.min(0.94,schachAnsageErfolg(L,L.ansage)
+            -(zeitnot?SCHACH_ZEITNOT_ABZUG*(1-L.NERVEN/100)*SCHACH_ZEITNOT_SKALA:0)))
+          :buehneErfolgschance(L);
         let punkte, ereignis, knapp=false;
         // GENAU EIN rr()-AUFRUF, WIE VORHER (E0, Buehne-Auftritt-Konzeptreview 26.09.,
         // Abschnitt 2.4): der ohnehin gezogene Wert wird nur ZUSAETZLICH in `wurf` gehalten,
@@ -15934,6 +16469,20 @@
           knapp=(wurf-erfolg)<(1-erfolg)*KUER_KNAPP_ANTEIL;
         }
         punkte=Math.max(0,Math.round(punkte+L.PUBLIKUM*0.12));
+        // SPEED-SCHACH-UHR: die Zugzeit haengt am Ausgang DIESES Zuges (stark/schwach) — der
+        // schon gezogene `wurf`, kein zweiter rr(). Stufe 1 schreibt nur die Uhr mit; erst
+        // Stufe 2 nimmt allen Zuegen NACH dem, in dem das Blaettchen fiel, die Punkte.
+        // Der rr()-Verbrauch bleibt auch nach dem Fallen bei genau einem je Zug, damit der
+        // Zufallsstrom aller folgenden Teilnehmer unverschoben bleibt.
+        let schachZusatz=null;
+        if(schachUhr){
+          if(!L.geflaggt){
+            uhr-=schachZugZeit(L,wurf<erfolg,schachAnsage?L.ansage:"normal");
+            if(uhr<=0){ uhr=0; L.geflaggt=true; L.flaggZug=ri; }
+          }
+          if(schachAnsage&&L.geflaggt&&L.flaggZug<ri)punkte=0;
+          schachZusatz={uhr:Math.round(uhr*10)/10, zeitnot, flagg:L.flaggZug===ri};
+        }
         // T-F1a -- GESPEICHERTER ERFOLGSABSTAND (Fable-Ideen Buehne-Duell 30.09., Abschnitt
         // T-F1: "der gespeicherte Wurfabstand (erfolg - wurf) ... er muesste nur als Zahl
         // auf dem Rundeneintrag mitgefuehrt werden, ein `viz`-artiges Feld nach dem
@@ -15945,7 +16494,8 @@
         // Ballwechsel fuer diese Seite entschieden, ohne dass dafuer ein zweiter Wurf noetig
         // waere.
         const marge=art.tennis?erfolg-wurf:undefined;
-        L.runden.push(art.tennis?{punkte,ereignis,knapp,marge}:{punkte,ereignis,knapp});
+        L.runden.push(art.tennis?{punkte,ereignis,knapp,marge}
+          :schachZusatz?{punkte,ereignis,knapp,...schachZusatz}:{punkte,ereignis,knapp});
       }
       TEILNEHMER.push(L);
     };
@@ -16006,6 +16556,19 @@
         a.brett=i; b.brett=i; a.gegnerN=b.n; b.gegnerN=a.n;
         a.vorteil=lauf; b.vorteil=-lauf;
         a.verlauf=verlauf; b.verlauf=verlauf.map(v=>-v);
+        // SPEED-SCHACH STUFE 1 — DAS BLAETTCHEN FAELLT (s. BUEHNE_FLAGS/SCHACH_* oben). Ist
+        // GENAU EINER der beiden geflaggt, verliert er das Brett auf Zeit — `vorteil`/`verlauf`
+        // bleiben unangetastet (sie bleiben die Aktionsqualitaet und die Tauzieh-Anzeige), nur
+        // der Brettentscheid bekommt einen zweiten Weg. Beide oder keiner geflaggt: `vorteil`
+        // wie bisher, ein Remis bleibt ein Remis. `zeitGegenVorteil` markiert den
+        // Botez-Hansen-Fall (der Sieger auf Zeit lag auf dem Brett zurueck) — die Kennzahl,
+        // an der Stufe 1 laut Konzept steht oder faellt (Zielband 2-4 % der Bretter).
+        if(art.schach&&BUEHNE_FLAGS.speedSchachUhr>=1&&!!a.geflaggt!==!!b.geflaggt){
+          a.zeitSieg=!a.geflaggt; b.zeitSieg=!b.geflaggt;
+          const siegerVorteil=a.zeitSieg?a.vorteil:b.vorteil;
+          a.zeitGegenVorteil=b.zeitGegenVorteil=siegerVorteil<0;
+          a.zeitKippt=b.zeitKippt=siegerVorteil<=0;
+        }
         // F1 -- TREFFER SIND DER STAND (Opus-Konzeptreview Buehnen-Duell, 26.09., Abschnitt
         // 3.3): der Kern-Befund des Reviews war, dass Fechten sich selbst widerspricht -- der
         // ANGEZEIGTE Trefferstand ("Treffer 5:4") entschied nichts, das Gefecht gewann, wer
@@ -19046,9 +19609,21 @@
         // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
         // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
         // bleiben unberuehrt.
+        // T-N1 DRUCKMESSER (abgeschwaecht, s. tennisDruckStand()/tennisDruckRunde()): genau
+        // einmal je Platz und Runde, am selben Gegen-Gate wie BREAK/Fuehrungswechsel -- erst
+        // wenn BEIDE Seiten diese Runde enthuellt haben, ist der Stand oeffentlich. Reine
+        // Zweitrechnung (Klasse A*), kein rr(), schreibt nur `tennisDruck`. Die Meldungen
+        // feuern weiter unten, NACH der "Platz entschieden"-Zeile.
+        const tennisDruckJetzt=(BB().tennis&&gegner&&gegner.aktuell>=u.aktuell&&gegner.verlauf)
+          ?tennisDruckRunde(u,gegner,BB()):null;
+        // TICKER-DOSIS AUS DER WICHTIGKEIT (Papier 3.1 Punkt 3), NUR TENNIS: Fuehrungswechsel
+        // und BREAK werden nur noch an grossen Runden (Wichtigkeit >= TENNIS_DRUCK_TICKER) zum
+        // Banner -- ein gekippter `vorteil` im zweiten Ballwechsel aendert die Siegchance kaum.
+        const tennisGross=!!tennisDruckJetzt&&tennisDruckJetzt.impRunde>=TENNIS_DRUCK_TICKER;
         const vorteilKipptBig=u.aktuell>0
           &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
-          &&(!gegner||gegner.aktuell>=u.aktuell);
+          &&(!gegner||gegner.aktuell>=u.aktuell)
+          &&(!BB().tennis||tennisGross);
         // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09., Abschnitt 4
         // "S-F2", Paket 1 "Regie & Bild", Klasse A, NUR Speed-Schach -- s. buehneMaxRestPunkte()-
         // Kommentar oben fuer die volle Herleitung der oberen Schranke). Ab Zug 6 prueft dieser
@@ -19067,8 +19642,14 @@
         if(BB().schach&&gegner&&!u.vizSchachAufgegeben&&u.aktuell+1>=6&&u.aktuell+1<BB().rundenN
            &&gegner.aktuell>=u.aktuell){
           const imRueckstand=v<0?u:(v>0?gegner:null);
-          if(imRueckstand&&buehneMaxRestPunkte(imRueckstand,BB())<Math.abs(v)){
-            const fuehrend=imRueckstand===u?gegner:u;
+          // MIT ECHTER UHR (Speed-Schach Stufe 1) ist ein Punktvorsprung nur dann
+          // "uneinholbar", wenn der Fuehrende auch nicht mehr auf Zeit verlieren kann — sonst
+          // meldete der Ticker ein Brett als entschieden, das danach auf Zeit kippt.
+          // schachKannNochFallen() liest nur bereits enthuellte Zuege; ohne Flag immer false.
+          const fuehrendKandidat=imRueckstand?(imRueckstand===u?gegner:u):null;
+          if(imRueckstand&&buehneMaxRestPunkte(imRueckstand,BB())<Math.abs(v)
+             &&!schachKannNochFallen(fuehrendKandidat,BB())){
+            const fuehrend=fuehrendKandidat;
             u.vizSchachAufgegeben=true; gegner.vizSchachAufgegeben=true;
             feed(0,"Brett "+((u.brett??0)+1)+" vorzeitig entschieden — "+fuehrend.n
               +" liegt uneinholbar vorn, die Kamera bleibt bei den offenen Brettern.",
@@ -19105,11 +19686,18 @@
         // und steht nur im Protokoll -- im Ticker bleiben die entschiedenen Bretter/Plaetze/
         // Bahnen (big, s.u.), gekippte Vorteile (big) und im Fechten der Treffer selbst, der
         // dort als einziger zaehlt (der Trefferstand ist die Wertung, s. Kommentar oben).
+        // KIND NUR NOCH BEI ECHTEM BANNER, NUR TENNIS (T-N1 Ticker-Dosis): feed() stuft jede
+        // Zeile MIT `kind` als "ereignis" ein (tickerZeigt(big||kind?...)) -- weil diese
+        // Aufrufstelle `kind` immer mitgab, griff die "routine"-Stufe hier nie, und jeder
+        // einzelne Ballwechsel beider Seiten stand im sichtbaren Ticker (gemessen 04.10.,
+        // miss-ticker-dichte.mjs tennis: 145 Zeilen in 1:02, 140/min, 0 nur im Protokoll).
+        // Schach/Fechten bleiben unveraendert (nicht Teil dieses Auftrags).
+        const zeileBig=buehneBahnGrossDrosseln(vorteilKipptBig,false);
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · "+statText
           +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,
-          BB().schach?"kippZug":"fuehrungswechsel",undefined,undefined,
+          zeileBig,undefined,
+          (BB().tennis&&!zeileBig)?undefined:(BB().schach?"kippZug":"fuehrungswechsel"),undefined,undefined,
           BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
         // T-F1a -- BREAK-BANNER (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F4: "Das im
         // selben Abschnitt vorgeschlagene 'BREAK!'-Banner braucht einen diskreten
@@ -19138,9 +19726,14 @@
           if(r.punktGewinner!==r.aufschlag){
             const rueckschlaeger=r.punktGewinner===0?seite0:seite1;
             const aufschlaeger=r.aufschlag===0?seite0:seite1;
+            // T-N1 TICKER-DOSIS: Banner nur an einem grossen Ballwechsel ("BREAK zum
+            // Matchball" statt Routine bei ~36 % aller Punkte, Papier 3.1 Punkt 3); sonst
+            // steht der Break nur noch im Protokoll.
+            const breakBig=tennisGross&&buehneBahnGrossDrosseln(true,false);
             feed(0,"BREAK — "+rueckschlaeger.n+" gewinnt den Punkt gegen den Aufschlag von "
               +aufschlaeger.n+" ("+worte.brett+" "+((u.brett??0)+1)+").",
-              buehneBahnGrossDrosseln(true,false),undefined,"tennisBreak");
+              breakBig,undefined,breakBig?"tennisBreak":undefined,undefined,undefined,
+              breakBig?undefined:"routine");
           }
         }
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
@@ -19221,12 +19814,25 @@
         // ankommende Seite sieht das Gate noch geschlossen, nur die zweite sieht es offen, also
         // weiterhin genau einmal je Brett. Reine Anzeige-Entscheidung, `v`/`u.gefechtSieg`/
         // `wert()`/`rr()` bleiben unberuehrt.
+        // BLAETTCHEN GEFALLEN (Speed-Schach Stufe 1, Konzept 3.2 "Narrativ"): der Zug, in dem
+        // die Uhr dieses Spielers 0 erreicht hat, wird enthuellt. `r.flagg` steht nur mit
+        // BUEHNE_FLAGS.speedSchachUhr>=1 auf dem Rundeneintrag (s. setz()). Ob es das Brett
+        // entscheidet, haengt noch an der Uhr des Gegners — deshalb hier nur der Moment selbst,
+        // der Brettentscheid kommt wie immer mit "Brett entschieden" darunter.
+        if(BB().schach&&r.flagg){
+          feed(u.side,worte.brett+" "+((u.brett??0)+1)+": Blättchen gefallen — "+u.n
+            +" überschreitet die Zeit ("+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+", "+statText+").",
+            buehneBahnGrossDrosseln(true,true),undefined,"entschieden");
+        }
         if(u.aktuell+1>=BB().rundenN){
           const brettGegnerFertig=!gegner||(gegner.aktuell+1)>=BB().rundenN;
           if(brettGegnerFertig){
             const brettText=BB().fechten
               ?(u.gefechtSieg?"gewonnen"+(u.gefechtGleichstand?" (Priorität nach Treffergleichstand)":"")
                              :"verloren"+(u.gefechtGleichstand?" (Priorität gegen ihn nach Treffergleichstand)":""))
+              // AUF ZEIT (Speed-Schach Stufe 1): `u.zeitSieg` entscheidet vor `v` — derselbe
+              // Brettentscheid wie duellBrettSieg(), damit Ticker und Stand-Spalte uebereinstimmen.
+              :u.zeitSieg!=null?(u.zeitSieg?"auf Zeit gewonnen":"auf Zeit verloren")
               :(v>0?"gewonnen":v<0?"verloren":"unentschieden");
             // KEIN "(Vorteil +v)" MEHR BEI FECHTEN (30.09.): genau der Widerspruch aus dem
             // Audit ("Brett 3 verloren (Vorteil +124)") -- `v`/`u.verlauf` sind fuer
@@ -19243,6 +19849,17 @@
               :worte.vort+" "+(v>0?"+":"")+v;
             feed(u.side,u.n+": "+worte.brett+" "+((u.brett??0)+1)+" "+brettText+" ("+statEnde+").",
               buehneBahnGrossDrosseln(true,true),undefined,brettText==="unentschieden"?"remis":"entschieden");
+          }
+        }
+        // T-N1 DRUCKMESSER -- MELDUNGEN (s. tennisDruckRunde()). Banner nach Wichtigkeit statt
+        // nach Ereignis: Matchball/Abgewehrt/Entscheidungspunkt/Comeback sind selten (gemessen
+        // zusammen ~2,3 je Mannschaftskampf) und deshalb wie "Platz entschieden" ungedrosselt
+        // (Prioritaets-Bypass, setzt den gemeinsamen Cooldown trotzdem neu); die Zeile fuer
+        // einen grossen Ballwechsel ist "normal" (im Ticker, solange das Zeilenbudget reicht).
+        if(tennisDruckJetzt){
+          for(const m of tennisDruckJetzt.meldungen){
+            if(m.big)feed(m.seite,m.txt,buehneBahnGrossDrosseln(true,true),undefined,m.kind);
+            else feed(m.seite,m.txt,false);
           }
         }
       } else if(BB().showcase&&u.vizAct){
@@ -19404,6 +20021,15 @@
         // bekommt weiterhin SEINE EIGENE Zeile, genau wie bisher. Alles andere sammelt sich
         // nur in wettBuendel -- HIGHLIGHTS/Callout haengen ausschliesslich an dieser
         // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
+        // MAUER-ZEILE (Wettessen K1, Konzept K4 "Mauer-Banner", hier nur als Tickerzeile):
+        // `r.mauerNeu` steht nur mit BUEHNE_FLAGS.wettessenMauer>=1 auf dem Rundeneintrag (s.
+        // wettessenMauerRunden()) — die erste Minute, die dieser Esser hinter seiner Mauer
+        // beginnt. Reine Ablesung, kein rr(), keine Wirkung auf u.summe. Nicht big: zwoelf
+        // Esser, zwoelf verschiedene Mauer-Minuten — als Banner waere das Dauerfeuer.
+        if(r.mauerNeu){
+          feed(u.side,"Mauer! "+u.n+" ist voll (Minute "+(u.aktuell+1)+") — ab jetzt isst nur noch der Wille"
+            +(u.haltung&&u.haltung!=="gleichmaessig"?" ("+(u.haltung==="sprint"?"Sprint":"Schlussspurt")+")":"")+".",false);
+        }
         const wettBig=buehneAuftrittBig(u,r,vorherSumme);
         if(wettBig){
           feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
@@ -20777,9 +21403,26 @@
   // sichtbares Herunterticken (M2/M4).
   const SCHACH_GLEIT_T=0.28, SCHACH_SCHLAG_T=0.18;
   function schachUhrWert(u,art){
+    // ECHTE UHR (Speed-Schach Stufe 1, BUEHNE_FLAGS.speedSchachUhr>=1): setz() schreibt die
+    // Restzeit nach jedem Zug auf den Rundeneintrag (`r.uhr`) — die Anzeige zeigt dann genau die
+    // Uhr, die auch ueber das Brett entscheidet, statt der alten 8/20-s-Kulisse. Vor dem
+    // ersten enthuellten Zug stehen 180 s. Ohne Flag fehlt `r.uhr`, und es bleibt beim Bisherigen.
+    if(u.runden[0]&&u.runden[0].uhr!=null)
+      return u.aktuell>=0&&u.runden[u.aktuell]?u.runden[u.aktuell].uhr:SCHACH_UHR_START;
     let t=180;
     for(let i=0;i<=u.aktuell;i++){ const r=u.runden[i]; if(r)t-=(r.ereignis===art.erfolgWort?8:20); }
     return Math.max(0,t);
+  }
+  // KANN DIESE UHR NOCH FALLEN? (Speed-Schach Stufe 1) — spoilerfrei aus der bereits
+  // enthuellten Restzeit und dem schlechtesten Fall fuer die verbleibenden Zuege (alle
+  // schwach). Liest nur u.runden[0..u.aktuell], u.TEMPO und u.ansage. Ohne Flag (kein `uhr`
+  // auf den Runden) immer false — S-F2 verhaelt sich dann exakt wie vorher.
+  function schachKannNochFallen(u,art){
+    if(!u||!u.runden[0]||u.runden[0].uhr==null)return false;
+    const jetzt=u.aktuell>=0&&u.runden[u.aktuell]?u.runden[u.aktuell].uhr:SCHACH_UHR_START;
+    if(jetzt<=0)return true;
+    const rest=art.rundenN-1-u.aktuell;
+    return jetzt-rest*schachZugZeit(u,false,u.ansage||"normal")<=0;
   }
   function stepSchach(dt,art){
     if(!TEILNEHMER.length)return;
@@ -21402,7 +22045,7 @@
     // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
     // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
     // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-    const brettSieg=BB().fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+    const brettSieg=u=>duellBrettSieg(BB(),u);
     const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
     // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
     // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
@@ -23361,6 +24004,16 @@
       ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
       ctx.fillStyle=b.farbVar?css(b.farbVar):"#c7ccd6";
       ctx.fillText(b.text,bx+bw/2,y+bh/2+1);
+      // T-N1 SPANNUNGSLEISTE (nur Tennis setzt `spannung`, 0..1 = Wichtigkeit der naechsten
+      // Runde, s. tennisDruckStand()): Fuellstand am unteren Innenrand der Box (nicht darunter
+      // -- dort ueberdeckt ihn die grosse Nahansicht des Fokus-Platzes), ab 0,5 rot statt gelb.
+      // Schach/Fechten setzen das Feld nicht und zeichnen unveraendert.
+      if(b.spannung!=null){
+        const sy=y+bh-5, sp=Math.max(0,Math.min(1,b.spannung));
+        ctx.fillStyle="rgba(255,255,255,.10)"; ctx.fillRect(bx+2,sy,bw-4,4);
+        ctx.fillStyle=sp>=TENNIS_DRUCK_ENTSCHEIDUNG?"#e0603c":"#f2d75a";
+        ctx.fillRect(bx+2,sy,(bw-4)*sp,4);
+      }
     });
     ctx.restore();
   }
@@ -23473,6 +24126,15 @@
       const serverName=(serverSeite===fa.side?fa:fb).n;
       punkteText=" · Punkte "+eigen+":"+gegn+" · Aufschlag "+(serverName.length>12?serverName.slice(0,11)+"…":serverName);
     }
+    // T-N1 DRUCKMESSER IM KOPF: Siegchance Heim : Gast des Fokus-Platzes aus `tennisDruck`
+    // (nur am Gegen-Gate fortgeschrieben, also nie mit einer verdeckten Gegnerrunde). Vor der
+    // ersten vollstaendigen Runde 50 : 50, nach der letzten nicht mehr gezeigt (dann steht der
+    // Platz als Haekchen in der Mannschafts-Leiste).
+    const fokusDruck=tennisDruck[tennisFokus];
+    if(fa&&fb&&!(fertig(fa)&&fertig(fb))){
+      const w=fokusDruck?fokusDruck.w:0.5;
+      punkteText+=" · Siegchance "+tennisProzent(w,true)+" : "+tennisProzent(1-w,true);
+    }
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
       +(schlagzahl!=null?" · "+schlagzahl+" Schläge":"")
@@ -23482,16 +24144,23 @@
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
     // in Teamfarbe (Fechten, Tennis)" -- ein echter Punktestand existiert erst mit T1+T2 aus
     // dem Konzeptreview, s. T-B5 im Dokument).
+    // T-N1 SPANNUNGSLEISTE (Papier 3.1 Punkt 4): `spannung` = Wichtigkeit der NAECHSTEN Runde
+    // dieses Platzes (tennisDruck[i].imp) -- sechs Leisten nebeneinander zeigen, wohin man
+    // schauen soll. Vor der ersten vollstaendigen Runde der Startwert bei Stand 0, fertige
+    // Plaetze 0.
+    const startSpannung=tennisDruckStand(0,art.rundenN).imp;
     const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
       const [pa,pb]=paar(i);
       if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===tennisFokus};
       const brettFertig=fertig(pa)&&fertig(pb);
       if(brettFertig){
         const wert=pa.vorteil||0;
-        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus};
+        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus,spannung:0};
       }
       const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
-      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus};
+      const dr=tennisDruck[i];
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus,
+        spannung:dr?dr.imp:startSpannung};
     });
     zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
 
@@ -26310,8 +26979,12 @@
           },
           fmt:v=>(v>0?"+":"")+v, farbe:v=>v>0?"var(--ok)":v<0?"var(--crit)":null},
         {id:"stand",kopf:"Stand", titel:worte.brett+" entschieden (+ Sieg, = Remis, − Niederlage)",
-          wert:z=>!z.fertig?"…":(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"="),
-          farbe:v=>v==="+"?"var(--ok)":v==="−"?"var(--crit)":null},
+          // AUF ZEIT ENTSCHIEDEN (Speed-Schach Stufe 1, nur mit BUEHNE_FLAGS.speedSchachUhr):
+          // `u.zeitSieg` schlaegt den Vorteil, ⌛ macht den Grund lesbar (Konzept 3.2: "die
+          // Wertungstabelle bekommt in ‚Stand' ein ⌛ neben + / −"). Ohne Flag nie gesetzt.
+          wert:z=>!z.fertig?"…":(z.u.zeitSieg!=null?(z.u.zeitSieg?"+⌛":"−⌛")
+            :(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"=")),
+          farbe:v=>v[0]==="+"?"var(--ok)":v[0]==="−"?"var(--crit)":null},
         {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
           farbe:v=>v>=140?"var(--ok)":v<=60?"var(--crit)":null},
         {id:"eig",  kopf:"Eig",  wert:z=>z.eig?Math.round(z.eig):null}],
@@ -27105,7 +27778,7 @@
     // (updateHudBuehne()s BB().duell-Zweig) -- zwei identische Zahlen uebereinander. `gew()`
     // bleibt als reine Ableitung stehen: die Sieger-Kennung unten (SIEG-Rahmen/-Text) braucht
     // sie weiterhin.
-    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&(s===0?x.vorteil>0:y.vorteil>0))n++;}return n;};
+    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&duellBrettSieg(BB(),s===0?x:y))n++;}return n;};
     ctx.textAlign="center";ctx.textBaseline="middle";
     // Opus-Review-Fund (06.09.): dass die Regie gerade ABGESCHALTET ist, war nirgends zu
     // sehen — der gelbe Rahmen unten wird nur an Mini-Brettern gezeichnet, und das
@@ -28283,7 +28956,12 @@
     for(const n of Object.keys(echterKader.aufstellung)){
       const e=echterKader.aufstellung[n];
       if(e&&typeof e.d==="string"&&typeof e.slot==="string"){
-        place[n]={d:e.d,slot:e.slot};
+        // DRITTES FELD `haltung` (04.10., Uebergabe {d,slot,haltung} aus dem Grundgeruest der
+        // Konsultation 02.10., Zeile 0): optional, nur uebernommen, wenn es ein String ist.
+        // Gelesen ausschliesslich von buehneHaltungVon() — und dort nur, solange das Flag der
+        // jeweiligen Disziplin an ist (BUEHNE_FLAGS). Fehlt es (jeder heutige Aufrufer), ist
+        // `place[n]` exakt das alte {d,slot}.
+        place[n]=typeof e.haltung==="string"?{d:e.d,slot:e.slot,haltung:e.haltung}:{d:e.d,slot:e.slot};
         order[n]=slotOrd(e.slot);
       }
     }
@@ -32340,6 +33018,10 @@
   // meldet. Liest nur `u.zz[]`, das `stepSpurt` fuer eine andere Anzeige (Panel, Ticker-
   // Bestand) ohnehin schon fuehrt -- diese Anzeige schreibt nichts in den Sim-Schritt zurueck.
   let bahnZzGemeldet=new Set();
+  // J2 LIVE-AMPEL (Time-Trial): welche (Fahrer, Messpunkt)-Paare schon ausgewertet sind und
+  // seit wann die Regie auf dem aktuellen Fokus steht (Mindestverweildauer). Je Rennen geleert.
+  let ttAmpelGemeldet=new Set(), ttRegieSeit=-999;
+  const TT_REGIE_NAEHE=0.03, TT_REGIE_MIN_SEK=4;   // J2-Regie: 3 % am Hot Seat, 4 echte Sekunden Verweildauer
   // TK-1: FALLEN-LOWER-THIRD (Abschnitt 5.3). Haelt fest, welche Fallen-Indizes ihren
   // Namensschild-Einblender schon hatten (einmal je Falle, ausgeloest vom ERSTEN Laeufer,
   // der sie erreicht) und die aktuell laufende Einblendung ({i, bis}).
@@ -32350,6 +33032,24 @@
   // einen Beinwechsel am Wechsel dieser ID erkennt. `staffelWechselAnzeige` ist die aktuell
   // laufende Tafel an der Wechselzone.
   let staffelAktivVorher=[null,null], staffelWechselAnzeige=null;
+  // STAFFEL "MARKE UND ZUG" (Paket O2): QA-Schalter, Standard AUS — Bedeutung und Gate
+  // s. Kopfkommentar bei STAFFEL_MARKE (nahe stepSpurt). Nur window.__arena.staffelMarkeZug()
+  // schreibt ihn. `modus`: "ki" (Automatik Stufe 1 aus der Persoenlichkeit), "kader" (die im
+  // Modell gemessene reine Kader-Regel), "normal"/"angreifen"/"absichern" (alle gleich),
+  // "zufall" (Namens-Hash). `fliegMax`: fliegender Gewinn, 0,24 = Chris' Kompromisswert.
+  // Hier deklariert (vor bauSpurt()), nicht neben den Konstanten — kein TDZ-Risiko.
+  let staffelMarkeZug={aktiv:true, modus:"ki", fliegMax:0.24};
+  // B4.3 BEIN-DUELL-BANNER: welche Beine schon gemeldet sind (je Rennen geleert).
+  let staffelBeinDuellGemeldet=new Set();
+  // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, docs/design/spurt-nachtkonzept-03-10.md):
+  // QA-Schalter, Standard AUS, nur window.__arena.spurtSaeule() schreibt ihn. `joker`:
+  // S-N1 Joker-Station (KI-Vorgabe, 8 %), `kriechen`: S-N2 Station als Bewegung (k=0,25,
+  // Puste-Gutschrift skaliert). Beide Teilschalter fuer die Einzelmessung ("nie zwei
+  // Eingriffe in einer Messung"); das freigegebene Paket ist beides zusammen. Bedeutung und
+  // Gate s. spurtSaeuleSetzen() (nahe stepSpurt).
+  let spurtSaeule={aktiv:true, joker:true, kriechen:true};
+  // S-N5 Anzeigen: Stationsbestzeiten (saubere Station) und Fotofinish, je Rennen geleert.
+  let spurtStationBest=[], spurtFotofinishGezeigt=false;
   // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3). Ringpuffer aus
   // {t (echte Sekunden), delta, seite} -- ein Punkt je Frame, in updateHudBahn() gefuellt,
   // von bauSpurt() geleert. Reine Anzeige: liest nur staffelZeitDelta(), das die Simulation
@@ -32527,7 +33227,11 @@
         // seinen Uebergaben in Sekunden (Chris' Wunsch: "damit man sieht wer da evtl.
         // gestuerzt ist" — ein auffaellig hoher Wert ist der Hinweis). Reine Anzeige, liest nur
         // die zwei bestehenden Felder, aendert nichts an bahnLeistung()/wert()/rho.
-        wechselVon:(u)=>u.wechselN?fmtDauer(Math.max(0,-u.wechselKonto)):"—",
+        // Mit Marke (Staffel "Marke und Zug", u.haltung gesetzt) kann ein Wechsel GEWINNEN
+        // (wechselKonto>0) — dann mit Vorzeichen statt auf 0 geklemmt. Ohne Schalter wie vorher.
+        wechselVon:(u)=>!u.wechselN?"—":(u.haltung
+          ?(u.wechselKonto>0?"−"+fmtDauer(u.wechselKonto):"+"+fmtDauer(-u.wechselKonto))
+          :fmtDauer(Math.max(0,-u.wechselKonto))),
         wechselKopf:"Wechsel",
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
@@ -32574,6 +33278,23 @@
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
+  // B4.3 BEIN-DUELL (Staffel "Marke und Zug"), s. Aufrufstelle in updateHudBahn().
+  function staffelBeinDuellPruefen(){
+    if(!staffelMarkeZug.aktiv||!BA().staffel)return;
+    const beinN=BA().jeSeite||6;
+    for(let b=0;b<beinN;b++){
+      if(staffelBeinDuellGemeldet.has(b))continue;
+      const h=LAEUFER.find(o=>o.seite===0&&o.bein===b), g=LAEUFER.find(o=>o.seite===1&&o.bein===b);
+      if(!h||!g||h.etappenZeit==null||g.etappenZeit==null)continue;
+      staffelBeinDuellGemeldet.add(b);
+      const sieger=h.etappenZeit<=g.etappenZeit?h:g, zweiter=sieger===h?g:h;
+      const txt="Bein "+(b+1)+": "+sieger.n+" "+fmtDauer(sieger.etappenZeit)+" gegen "
+        +zweiter.n+" "+fmtDauer(zweiter.etappenZeit)+" — Bein gewonnen";
+      feedEreignis(sieger.seite,txt+".");
+      callout("BEIN-DUELL · "+txt);
+      break;   // hoechstens ein Banner je Frame
+    }
+  }
   function updateHudBahn(){
     // Anzeige in ECHTEN Sekunden, nicht in Simulationssekunden: rennT selbst bleibt die
     // unangetastete physikalische Zeitbasis (Cooldowns, Ermuedung ...); was hier steht,
@@ -32661,6 +33382,11 @@
                 seite, bein:(alt.bein??0)+1,
                 fSeite:d.unklar?null:d.seite, fDelta:d.unklar?null:d.delta,
                 verlust, verpatzt:verlust!=null&&verlust>WECHSEL_MAX,
+                // B4.2/B4.4 (Marke und Zug): Netto-Wechsel mit Vorzeichen und die Marke des
+                // Nehmers — nur gesetzt, wenn der QA-Schalter Marken vergeben hat.
+                netto:akt&&akt.wechselNetto!=null?akt.wechselNetto:null,
+                marke:akt&&akt.marke?akt.marke:null,
+                patzer:!!(akt&&akt.wechselPatzer),
                 bis:rennT+3/zeitFaktor()
               };
               // ST-4: "Beingrenzen"-Strich fuer den Verlauf -- jeder echte Wechsel, egal auf
@@ -32684,6 +33410,15 @@
           }
           staffelAktivVorher[seite]=aktId;
         }
+        // B4.3 BEIN-DUELL-BANNER (Marke und Zug, Konzept 3.5.3; Muster Tennis-Break-Banner):
+        // sobald beide Laeufer DESSELBEN Beins ihre Etappe beendet haben, steht das Duell als
+        // Banner im Bild — "gegen den Gegner auf demselben Bein", das Mass, das ST-P2 spaeter
+        // braucht. Etappenzeit ist das Stand-Start-Mass (Wechsel herausgerechnet), also der
+        // Laeufer selbst. Ueber callout() DIREKT (wie die Anker-Einblendung oben), nicht als
+        // big-Feed: sechs Banner je Rennen sollen die Hoehepunkte nicht fluten. Nur mit
+        // QA-Schalter; reiner Lesezugriff auf etappenZeit. Das LETZTE Bein meldet
+        // der Staffel-Zieleinlauf in stepSpurt(), weil hier nach `done` nichts mehr laeuft.
+        staffelBeinDuellPruefen();
       } else if(BA().takeshi){
         // TAKESHI'S CASTLE: `bahnRangliste()` sortiert jeden mit gesetztem `u.fertig` nach
         // vorn — auch Ausgeschiedene, die `u.fertig=90+...` bekommen (Nerven-Zweig in
@@ -32781,6 +33516,61 @@
             neueBest,undefined,"bestzeit");
         }
       });
+    }
+    // J2 LIVE-AMPEL MIT KIPPPUNKTEN (Time-Trial, Klasse A, docs/design/time-trial-
+    // nachtkonzept-03-10.md Abschnitt 3.3). An jedem stillen Messpunkt (`u.mp`, s. stepSpurt)
+    // wird der Fahrer gegen den HOT-SEAT-HALTER an derselben Stelle verglichen (dessen
+    // eigene Messpunktzeit — derselbe Bezug wie der Geisterfahrer), solange es noch keinen
+    // gibt gegen die Bestzeit im Feld an diesem Punkt. Ergebnis ist `u.vizAmpel` (grün/rot,
+    // gelesen vom Fokus-Panel). Der Ticker meldet NUR KIPPPUNKTE — den Moment, in dem die
+    // Farbe eines Fahrers wechselt —, keine Zeile je Messpunkt. Reiner Lesezugriff auf
+    // u.mp/bahnHotSeat(), kein rr(), schreibt nur das Anzeigefeld u.vizAmpel.
+    if(BA().ampelPunkte){
+      const P=BA().ampelPunkte, hs=bahnHotSeat();
+      for(const u of LAEUFER){
+        if(!u.mp)continue;
+        for(let k=0;k<P.length;k++){
+          if(u.mp[k]==null)continue;
+          const key=u.id+"|"+k;
+          if(ttAmpelGemeldet.has(key))continue;
+          ttAmpelGemeldet.add(key);
+          let ref=null, bezug=null;
+          if(hs&&hs.u!==u&&hs.u.mp&&hs.u.mp[k]!=null){ ref=hs.u.mp[k]; bezug="der Hot Seat"; }
+          else {
+            for(const o of LAEUFER){ if(o===u||!o.mp||o.mp[k]==null)continue; if(ref==null||o.mp[k]<ref)ref=o.mp[k]; }
+            if(ref!=null)bezug="die Bestzeit";
+          }
+          if(ref==null)continue;
+          const delta=u.mp[k]-ref, farbe=delta<0?"gruen":"rot";
+          const vorher=u.vizAmpel&&u.vizAmpel.farbe;
+          u.vizAmpel={farbe,k,delta,ref,bezug,prozent:Math.round(P[k]*100)};
+          if(vorher&&vorher!==farbe){
+            // Warum es kippt, wenn es am Gelaende liegt: der Abschnitt seit dem letzten
+            // Messpunkt (dieselbe Zonenliste wie das Hoehenprofil im Panel).
+            const mitte=(P[k]+(k>0?P[k-1]:0))/2, z=gelaendeAn(mitte);
+            const grund=farbe==="rot"&&z?(z.art==="steigung"?" — der Berg kostet":z.art==="kurve"?" — die Kurve kostet":""):
+              (farbe==="gruen"&&z&&z.art==="abfahrt"?" — die Abfahrt bringt es":"");
+            feed(u.seite,farbe==="gruen"
+              ?u.n+" fährt grün — bei "+Math.round(P[k]*100)+" % schneller als "+bezug+grund+"."
+              :u.n+" kippt auf rot — bei "+Math.round(P[k]*100)+" % langsamer als "+bezug+grund+".",
+              false,undefined,undefined,undefined,undefined,"ereignis");
+          }
+        }
+      }
+      // J2-REGIE (optional, Klasse A): die Kamera-Automatik springt auf den Fahrer, der am
+      // letzten Messpunkt innerhalb von 3 % des Hot Seats liegt — statt stur nach
+      // Startnummer —, mit einer Mindestverweildauer von 4 echten Sekunden, damit sie nicht
+      // zwischen Kandidaten flackert. Nur im Auto-Modus und erst mit einem Hot Seat; ohne
+      // Kandidaten bleibt die alte Automatik (naechster nach Startnummer, s. stepSpurt).
+      if(hs&&bahnFokusAuto&&!done&&(rennT-ttRegieSeit)*zeitFaktor()>=TT_REGIE_MIN_SEK){
+        let kand=null;
+        for(const u of LAEUFER){
+          if(u.fertig!=null||!u.vizAmpel||(u.startT||0)>rennT)continue;
+          if(Math.abs(u.vizAmpel.delta)>TT_REGIE_NAEHE*u.vizAmpel.ref)continue;
+          if(!kand||u.vizAmpel.k>kand.vizAmpel.k||(u.vizAmpel.k===kand.vizAmpel.k&&Math.abs(u.vizAmpel.delta)<Math.abs(kand.vizAmpel.delta)))kand=u;
+        }
+        if(kand&&kand.id!==bahnFokus){ bahnFokus=kand.id; ttRegieSeit=rennT; }
+      }
     }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
@@ -35363,6 +36153,11 @@
       // fuehren ihre eigenen `huerdePreis`-Werte unveraendert (0,80/0,42, s. dort).
       muedGrad:0.00014, hindernisTypen:["TECHNIK","WENDIGKEIT","WUCHT","WUCHT","WENDIGKEIT","WUCHT","TECHNIK"], huerdePreis:1.45,
       wuchtPreisFaktor:1.4,   // Kraft-Hindernisse (Palisade, Seil, Mauer) kosten mehr Zeit als eine Huerde
+      // "DIE SAEULE MUSS LAUFEN" (docs/design/spurt-nachtkonzept-03-10.md, Paket S-N1+S-N2):
+      // Joker-Schleife 8 % der Strecke (11 % lag mit Pp 25,1 knapp ueber der Schranke) und
+      // Kriechanteil k=0,25 an der Station. Beide Werte liest der Motor NUR bei
+      // eingeschaltetem QA-Schalter `spurtSaeule` (s. spurtSaeuleSetzen()); ohne ihn wirkungslos.
+      jokerLaenge:0.08, kriechAnteil:0.25,
       wendigErholt:0.0035, tackleAb:50, tackleRate:1.0, tackleKosten:0,
       // WERTUNG NACH RANG, dieselbe Regel und derselbe Grund wie beim Time-Trial (s. dort):
       // Chris' Entscheidung 06.09., docs/design/time-trial-einzelzeitfahren-wertung-plan-05-09.md.
@@ -35526,6 +36321,12 @@
       // DAHIN schnellsten Laeufer im Feld (dieselbe "vorlaeufig, aber ehrlich"-Logik wie
       // bahnRangliste fuer den laufenden Punktestand), nicht gegen einen festen Rivalen.
       zwischenzeiten:[0.40,0.76],
+      // J2 "DIE LIVE-AMPEL" (docs/design/time-trial-nachtkonzept-03-10.md Abschnitt 3.3,
+      // Klasse A): STILLE Messpunkte alle 10 % — ein EIGENES Feld, bewusst NICHT in
+      // `zwischenzeiten` (das wuerde die Endstand-Spalten und die ZZ-Toene verlaengern, s.
+      // Warnung dort). Erfasst wird nur die eigene Laufzeit je Punkt (`u.mp`), kein rr(), nie
+      // zurueckgelesen in die Simulation; sie erscheinen nicht als Tafel, nur als Ampelfarbe.
+      ampelPunkte:[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9],
       gelaende:[
         {von:0.04,bis:0.17,art:"kurve"},
         {von:0.22,bis:0.34,art:"steigung"},{von:0.34,bis:0.40,art:"abfahrt"},
@@ -36043,11 +36844,33 @@
       // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
       // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // TEMPO-KANAL NACHGEZOGEN (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, nach O2
+      // "Marke und Zug"). O2 selbst war nicht die Ursache: der Sentinel vigilante-armageddon
+      // blieb bei JEDER Marke/Zug-Variante unter 0,80 (beste 0,797), weil ANTRITT/ENDTEMPO —
+      // ueber `grund*tempoSpanne` praktisch die GANZE Renndauer, s. tempoVon() — allein ueber
+      // SPEED und STAMINA liefen (ANTRITT ohne Awareness/Dexterity, ENDTEMPO ohne Spirit) und
+      // damit zu 90 % traegen (gemessen: `einflussVon`, zwei Saatstroeme, Speed +11,2/+11,3 Pp
+      // ueber Matrix, Stamina +6,8/+7,1, macht zusammen >18 Pp von 36-37 Pp Gesamtabweichung).
+      // In einer Paarung mit vielen Laeufern in enger Eignungsspanne (vigilante-armageddon,
+      // acht von zwoelf zwischen Eig 39 und 46) entschied dadurch die REZEPTFORM statt die
+      // Eignung, s. docs/design/stand-aller-disziplinen.md Sechzehnter Nachtrag.
+      //
+      // TECHNIK und WUCHT bleiben UNVERAENDERT — sie speisen `koennen`/`traeger` im Wechsel-
+      // und Zug-Code (stepSpurt), dessen Break-even-Kalibrierung (ZUG_FADE 0,000068 auf
+      // traeger 62,9) an genau dieser Zusammensetzung haengt; diese Runde ruehrt den Wechsel-/
+      // Zug-Mechanismus nicht an (er war nachweislich nicht die Ursache, s.o.).
+      //
+      // ANTRITT verliert STAMINA (das Beinende traegt STEHEN ohnehin schon separat ueber die
+      // Ermuedung) und gewinnt DEXTERITY/AWARENESS ("explosiv UND wach aus dem Startblock" —
+      // dieselbe Zwei-Weg-Logik wie reale Sprintstarts: Reaktion so wichtig wie reine Kraft).
+      // ENDTEMPO verliert einen Teil von SPEED/STAMINA an SPIRIT ("Zug haelt die Haltung auch
+      // im letzten Drittel"). Matrix bleibt gesperrt (official-discipline-weights.ts) — nur
+      // das Rezept wird nachgezogen, s. CLAUDE.md "Die Eignungsmatrix ist gesperrt".
       rezept:{
-        ANTRITT:    {speed:44,spirit:30,stamina:26},
-        ENDTEMPO:   {speed:38,stamina:35,will:27},
+        ANTRITT:    {speed:28,spirit:34,dexterity:20,awareness:18},
+        ENDTEMPO:   {speed:26,stamina:32,will:28,spirit:14},
         TECHNIK:    {awareness:38,dexterity:32,charisma:30},
-        WENDIGKEIT: {dexterity:42,awareness:34,speed:24},
+        WENDIGKEIT: {dexterity:46,awareness:40,speed:14},
         STEHEN:     {stamina:45,will:33,determination:22},
         WUCHT:      {spirit:45,charisma:33,speed:22},
         ROBUST:     {stamina:30,will:26,health:24,spirit:20}
@@ -37175,6 +37998,13 @@
     // Motor-Wert, hier wird nur die gezeichnete Hoehe kurz interpoliert (s. Kommentar bei
     // `climbAnzeigeAnteil`, bodenWand()).
     if(istWand())return {x:wandX(u.bahnZ), y:camY(climbAnzeigeAnteil(u))};
+    // S-N1 JOKER-SCHLEIFE (Spurt, QA-Schalter): waehrend `u.umwegRest` offen ist, schwingt die
+    // Figur in einem Bogen seitlich um die Station herum und kommt auf ihrer Bahn wieder an —
+    // reine Zeichnung aus dem Schleifenfortschritt, `u.pos` bleibt an der Station.
+    if(!istRoute()&&u.umwegRest>0){
+      const L=BA().jokerLaenge||1, p=Math.max(0,Math.min(1,1-u.umwegRest/L));
+      return {x:camX(u.pos)+Math.sin(p*Math.PI)*14, y:bahnY(u.bahnZ)+Math.sin(p*Math.PI)*34};
+    }
     if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
@@ -37393,6 +38223,7 @@
     // Fuehrungswechsel-Variablen oben -- jede dieser Anzeigen darf beim naechsten Rennen
     // nicht mehr vom vorigen wissen.
     bahnHotSeatId=null; bahnZzGemeldet=new Set();
+    ttAmpelGemeldet=new Set(); ttRegieSeit=-999;
     bahnBauchbindeIdx=0; bahnBauchbindeNaechste=0;
     bahnFalleGemeldet=new Set(); bahnFalleAnzeige=null;
     staffelAktivVorher=[null,null]; staffelWechselAnzeige=null;
@@ -37400,6 +38231,8 @@
     // die Prio-1-Variablen direkt darueber -- keine dieser Anzeigen darf vom vorigen
     // Rennen wissen.
     staffelVerlauf=[]; staffelBeinMarken=[]; staffelAnkerGezeigt=[false,false];
+    staffelBeinDuellGemeldet=new Set();
+    spurtStationBest=[]; spurtFotofinishGezeigt=false;
     spurtStationStats=(BA().hindernisse||[]).map(()=>({sauber:0,durch:0,sturz:0}));
     cam={zoom:1,cx:0.5}; bahnWahl=null; bahnFokus=null; bahnFokusAuto=true; ttPanelSig="";
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
@@ -37622,6 +38455,13 @@
     };
     mine.forEach((p,i)=>setz(p,0,i*2,false,i));
     gegen.forEach((o,i)=>setz(o,1,i*2+1,true,i));
+    // STAFFEL "MARKE UND ZUG" (B3 Stufe 1): Haltungen erst NACH dem Aufbau beider Seiten,
+    // weil die Marke vom Paar (Geber = Bein davor) abhaengt. Nur bei eingeschaltetem
+    // QA-Schalter — sonst traegt kein Laeufer `haltung`/`marke`, s. Kopfkommentar dort.
+    if(art.staffel&&staffelMarkeZug.aktiv)staffelHaltungenSetzen();
+    // SPURT "DIE SAEULE MUSS LAUFEN" (S-N1/S-N2): Joker-Station und Kriechfaktor je Laeufer,
+    // nur bei eingeschaltetem QA-Schalter — sonst traegt kein Laeufer jokerIdx/kriechK.
+    if(art.spurt&&spurtSaeule.aktiv)spurtSaeuleSetzen();
     // ZEITFAHREN-FOKUS: die Kamera startet auf dem ersten Fahrer der Startrampe, nicht auf
     // "niemand" — sonst zeigt das erste Bild eines Zeitfahrens die Feldansicht, obwohl nur
     // einer unterwegs ist.
@@ -37757,9 +38597,199 @@
   // entscheidet ein enges Rennen, statt es als seltener Totalausfall zu erschlagen.
   const WECHSEL_PATZER_KOSTEN=0.34;
   const SPITZE_ZUG=0.0038;         // wieviel WUCHT die Fuehrungsarbeit verbilligt (Staffel)
+  // =====================================================================================
+  // STAFFEL "MARKE UND ZUG" — Paket O2 (docs/design/staffel-nachtkonzept-03-10.md, Chris'
+  // Freigabe "Ja, O2", Traeger 0,5*WUCHT+0,5*TECHNIK, FLIEG_MAX 0,24). Klasse B.
+  //
+  // HINTER EINEM SCHALTER, STANDARD AUS (Muster `sandsackVorschauAktiv`, Gewichtheben-
+  // Sandsack-Finale): `staffelMarkeZug.aktiv` setzt ausschliesslich der QA-Einstieg
+  // window.__arena.staffelMarkeZug(). Solange er aus ist, bekommt kein Laeufer `u.haltung`/
+  // `u.marke` (staffelHaltungenSetzen() laeuft nicht), und JEDE neue Zeile unten haengt an
+  // genau diesen beiden Feldern — tempoVon() multipliziert mit exakt 1, der Wechselzweig
+  // laeuft Zeichen fuer Zeichen den alten Weg, kein zusaetzlicher rr()-Zug. Der
+  // Isolationsnachweis ist dadurch strukturell, nicht nur gemessen.
+  //
+  // EINE HALTUNG JE LAEUFER, ZWEI STELLEN (Konzept 3.1): im WECHSEL ist sie die Anlaufmarke
+  // des Nehmers (`u.marke`, B1), auf dem BEIN das Tempo (`u.haltung`, B2). Beide sind eigene
+  // Felder, weil die Persoenlichkeitstabelle (B3, Konzept 3.4) sie je Persoenlichkeit
+  // getrennt setzt (ein Bollwerk laeuft Normal, sichert aber die Uebergabe ab).
+  //
+  // B1 MARKE: Gewinn/Streuung/Patzer-Multiplikatoren aus Konzept 3.2 (Opus 26.09.).
+  const STAFFEL_MARKE={
+    absichern:{g:0.6, s:0.7, p:0.5, label:"kurze Marke"},
+    normal:   {g:1.0, s:1.0, p:1.0, label:"normale Marke"},
+    angreifen:{g:1.4, s:1.3, p:2.0, label:"weite Marke"}
+  };
+  // B2 ZUG: +5 % bis 45 % des Beins, danach ein linearer Fade, den der Traeger
+  // (0,5*WUCHT+0,5*TECHNIK, "Zug und Uebersicht") abfedert; Boden 0,80. Absichern laeuft
+  // gleichmaessig 1,2 % unter Normal (Konzept 3.3).
+  //
+  // ZUG_FADE IST AM MOTOR KALIBRIERT, NICHT AUS DEM KONZEPT UEBERNOMMEN. Das Konzept nennt
+  // 0,00004 und verspricht damit einen Break-even bei traeger ~65. Nachgerechnet traegt das
+  // nicht: bei 0,00004 liegt der Break-even (Angriff gleich schnell wie Normal) unter
+  // traeger 30 — der Angriff waere fuer fast jeden Kaderlaeufer ein Gewinn, also genau der
+  // "Knopf, der immer besser ist" (Designregel 3), nur umgekehrt zu Konzept 5.2. Der Motor
+  // misst die Beinzeit mit echter Ermuedung (`mued` faellt bei STEHEN 50 schon ab ~60 % des
+  // Beins auf den Boden 0,60), dadurch wiegt die zweite Beinhaelfte zeitlich doppelt. Der
+  // Wert unten ist mit window.__arena.staffelZugProbe() auf den Kaderprofilen der
+  // Kaderfamilie (480 Beine, n=8 je Paarung) so gesetzt, dass der Break-even bei traeger
+  // 62,9 liegt (Kalibrierziel 5.2, "60-65"): ab traeger 65 traegt der Angriff in 100 % der
+  // Beine (+11 bis +41 ms), unter 55 in 0 % (-24 bis -115 ms). 0,00009 lag bei 71,6.
+  // Tabelle in docs/design/stand-aller-disziplinen.md (Sechzehnter Nachtrag, 04.10.).
+  const ZUG_PLUS=0.05, ZUG_AB=0.45, ZUG_BODEN=0.80, ZUG_ABSICHERN=0.012;
+  const ZUG_FADE=0.000068;
+  // FLIEG_MAX 0,24 (Konzept 6/8.7, Kompromiss) steht als Schalterfeld `staffelMarkeZug.
+  // fliegMax` (Deklaration weiter oben bei staffelAktivVorher, vor bauSpurt()), damit die
+  // QA-Sonde `fliegMax:0` den Designregel-1-Nachweis fahren kann ("alle Normal ohne
+  // fliegenden Gewinn" muss bit-identisch zu heute messen).
+  const staffelTraeger=(u)=>0.5*(u.WUCHT||0)+0.5*(u.TECHNIK||0);
+  // Tempofaktor der Haltung auf dem Bein. Ohne `u.haltung` (Schalter aus) und bei "normal"
+  // exakt 1 — tempoVon() bleibt damit bit-identisch.
+  function zugFaktor(u){
+    if(u.haltung==="angreifen"){
+      const a=laufAnteil(u);
+      if(a<ZUG_AB)return 1+ZUG_PLUS;
+      return Math.max(ZUG_BODEN,1+ZUG_PLUS-(100-staffelTraeger(u))*ZUG_FADE*(a-ZUG_AB)*100);
+    }
+    if(u.haltung==="absichern")return 1-ZUG_ABSICHERN;
+    return 1;
+  }
+  // B3 STUFE 1 — DIE AUTOMATIK AUS DER PERSOENLICHKEIT (Konzept 3.4), Muster
+  // sandsackPersoenlichkeit(): deterministisch aus `u.pers` (persOf, dieselbe leitePers()-
+  // Herleitung aus Klasse/Rasse/Unterklasse/Traits, die Arena und Sandsack-Finale lesen) und
+  // den Laeuferwerten, KEIN rr(), keine Oberflaeche. KI und Mensch bekommen dieselbe Regel.
+  // Die Tabelle steht je Persoenlichkeit mit ihrem PERSZIEL/PERSDEF-Kanal:
+  //   draufgaenger (speer, wild)          Bein Angreifen        Marke Angreifen
+  //   duellant     (bedrohung)            Bein Normal           Marke Normal
+  //   opportunist  (schwach)              Angreifen nur bei traeger>=65 (er rechnet), Marke Normal
+  //   bollwerk     (naechster, vorsichtig) Bein Normal          Marke Absichern bei Paar-TECHNIK<50
+  //   beschuetzer  (schild, defensiv)     Bein Absichern        Marke Absichern
+  //   schleicher   (hinten)               Bein Normal           Marke Normal
+  // DUELLANT BEWUSST OHNE DIE BEDINGTE HALTUNG ("Angreifen, wenn die Seite beim Beinstart
+  // hinten liegt"): das ist Option O3 (bedingter Schlussmann) und war NICHT Teil der
+  // Freigabe ("nur O2"). Ohne O3 laeuft er Normal.
+  // KADER-REGEL UEBER DER PERSOENLICHKEIT (Konzept 3.4): ein Paar mit TECHNIK-Schnitt unter
+  // 45 sichert immer ab, eine weite Marke braucht mindestens 55 — der Draufgaenger mit
+  // Butterfingern bekommt keine weite Marke.
+  // Bein 1 (Index 0) laeuft aus dem Block: keine Marke (`u.marke` bleibt null).
+  const STAFFEL_PERS_HALTUNG={
+    draufgaenger:{bein:"angreifen", marke:"angreifen"},
+    duellant:    {bein:"normal",    marke:"normal"},
+    opportunist: {bein:"rechnet",   marke:"normal"},
+    bollwerk:    {bein:"normal",    marke:"vorsicht50"},
+    beschuetzer: {bein:"absichern", marke:"absichern"},
+    schleicher:  {bein:"normal",    marke:"normal"}
+  };
+  const STAFFEL_ZUG_RECHNET=65, STAFFEL_MARKE_SCHARF_AB=55, STAFFEL_MARKE_SICHER_UNTER=45;
+  // Deterministischer Namens-Hash fuer die QA-Variante "zufall" (Konzept 7.3, "Hash aus dem
+  // Namen, wie im Modell") — nur in der Sonde erreichbar.
+  const staffelNamensHash=(s)=>{ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
+  function staffelHaltungenSetzen(){
+    const modus=staffelMarkeZug.modus||"ki";
+    const HALT=["absichern","normal","angreifen"];
+    for(const u of LAEUFER){
+      const geber=u.bein>0?LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein-1):null;
+      const paarTechnik=geber?(geber.TECHNIK+u.TECHNIK)/2:null;
+      let bein="normal", marke="normal";
+      if(modus==="ki"||modus==="kader"){
+        if(modus==="kader"){
+          // Die im Modell gemessene reine Kader-Regel (Konzept 5.3 "KI-Vorgabe"): Angreifen
+          // bei traeger>=65, Absichern bei Paar-TECHNIK<45 — als Vergleichsvariante.
+          const h=staffelTraeger(u)>=STAFFEL_ZUG_RECHNET?"angreifen":"normal";
+          bein=h; marke=h;
+        } else {
+          const t=STAFFEL_PERS_HALTUNG[u.pers]||STAFFEL_PERS_HALTUNG.duellant;
+          bein=t.bein==="rechnet"?(staffelTraeger(u)>=STAFFEL_ZUG_RECHNET?"angreifen":"normal"):t.bein;
+          marke=t.marke==="vorsicht50"?(paarTechnik!=null&&paarTechnik<50?"absichern":"normal"):t.marke;
+        }
+        if(paarTechnik!=null){
+          if(paarTechnik<STAFFEL_MARKE_SICHER_UNTER)marke="absichern";
+          else if(marke==="angreifen"&&paarTechnik<STAFFEL_MARKE_SCHARF_AB)marke="normal";
+        }
+      } else if(modus==="zufall"){
+        const h=staffelNamensHash(u.n);
+        bein=HALT[h%3]; marke=HALT[Math.floor(h/3)%3];
+      } else if(HALT.includes(modus)){
+        bein=modus; marke=modus;
+      }
+      u.haltung=bein;
+      u.marke=geber?marke:null;
+      u.zugBilanz=0; u.zugErgebnis=null; u.zugEingebrochen=false;
+      u.wechselNetto=null; u.wechselGewinn=null; u.wechselPatzer=false;
+    }
+  }
+  // =====================================================================================
+  // SPURT "DIE SAEULE MUSS LAUFEN" — Paket S-N1+S-N2 (docs/design/spurt-nachtkonzept-03-10.md,
+  // Chris' Freigabe 04.10.). Klasse B, hinter dem QA-Schalter `spurtSaeule` (Standard aus).
+  //
+  // S-N1 JOKER-STATION (Rallycross-Joker, Konzept 3.1): jeder Laeufer laeuft GENAU EINMAL
+  // statt einer Station eine Umlaufschleife von `jokerLaenge` (8 % der Strecke) — kein Stopp,
+  // kein Wurf, kein Sturz, normales Tempo und normaler Puste-Verbrauch, aber ohne die
+  // Atempause der Station ("zwei Waehrungen": Puste statt Standzeit). Primaerweg bleibt die
+  // Station (TECHNIK/WENDIGKEIT/WUCHT je Typ), der Joker ist der knappe Nebenweg ueber das
+  // Laufen. NUR DIE KI-VORGABE ist gebaut (die gemessene Variante): Joker an der Station mit
+  // dem TEUERSTEN eigenen Stopp (huerdePreis x wuchtPreisFaktor x (1-0,8*Skill/100)), bei
+  // Gleichstand die spaeteste. Die Manager-Anweisung (Klasse M) ist nicht Teil dieses Pakets.
+  //
+  // S-N2 STATION ALS BEWEGUNG (Konzept 3.2): statt Vollstopp kriecht er mit k=0,25 seines
+  // Tempos ueber das Hindernis, die Stoppdauer waechst um 1/(1-k) — der Zeitverlust bleibt
+  // rechnerisch identisch (D/(1-k) - k*D/(1-k) = D). Die volle Puste-Gutschrift am Hindernis
+  // wird mit (1-k) skaliert, sonst kaeme je Station mehr Puste zurueck als heute und der
+  // SP-P1-Haushalt bindet nicht mehr (Konzept: Restpuste 32 % statt 14 % ohne Skalierung).
+  // Kein neuer rr()-Zug; der Joker laesst die Wuerfe SEINER Station aus (gewollt, Klasse B).
+  function spurtSaeuleSetzen(){
+    const A=BA(), N=HUERDEN_N();
+    for(const u of LAEUFER){
+      u.kriechK=spurtSaeule.kriechen?(A.kriechAnteil||0):0;
+      u.jokerIdx=null; u.jokerGenommen=false; u.umwegRest=0; u.jokerPos=null;
+      if(!spurtSaeule.joker||!A.jokerLaenge||!A.hindernisTypen)continue;
+      let best=-1, bestKosten=-Infinity;
+      N.forEach((h,i)=>{
+        const typ=HUERDEN_TYP(i);
+        const kosten=(A.huerdePreis??0)*(typ==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*(u[typ]||0)/100);
+        if(kosten>=bestKosten){ bestKosten=kosten; best=i; }   // >= : bei Gleichstand die spaetere
+      });
+      u.jokerIdx=best>=0?best:null;
+    }
+  }
+  // S-N5 (Klasse A, nur mit QA-Schalter): Stationsbestzeit je Station. Gemeldet wird eine
+  // neue Bestzeit erst ab der dritten sauberen Passage — gedrosselt, damit der Ticker die
+  // Stillen fuellt und nicht jede Station siebenfach meldet. Liest nur den bereits
+  // feststehenden Stationspreis, kein rr(), nie zurueckgelesen.
+  const SPURT_FOTOFINISH_SEK=0.1;
+  function spurtStationSauber(u,i,wort){
+    if(i<0||u.stationPreis==null)return;
+    const b=spurtStationBest[i]=spurtStationBest[i]||{zeit:Infinity,n:null,sauber:0};
+    b.sauber++;
+    if(u.stationPreis<b.zeit){
+      b.zeit=u.stationPreis; b.n=u.n;
+      if(b.sauber>=3)feedEreignis(u.seite,u.n+" fliegt über "+(wort||("Station "+(i+1)))
+        +" — schnellste Zeit an Station "+(i+1)+" ("+fmtDauer(u.stationPreis)+").");
+    }
+  }
+  // B4.6 ANWEISUNGSBILANZ je Seite (Konzept 3.5.6): was die fliegenden Wechsel gebracht
+  // haben (Summe der Gewinne, dazu die Netto-Wechselzeit) und wie viele Angriffe getragen
+  // haben bzw. eingebrochen sind. Liest nur Buchhaltungsfelder, schreibt nichts.
+  function staffelBilanz(seite){
+    const team=LAEUFER.filter(o=>o.seite===seite);
+    let gewinn=0, netto=0;
+    for(const o of team){ if(o.wechselNetto!=null){ gewinn+=o.wechselGewinn||0; netto+=o.wechselNetto; } }
+    const getragen=team.filter(o=>o.zugErgebnis==="getragen").length;
+    const eingebrochen=team.filter(o=>o.zugErgebnis==="eingebrochen").length;
+    const text=VEREIN[seite].name+" — Rennplan-Bilanz: fliegend gewonnen −"+fmtDauer(gewinn)
+      +" (Wechsel netto "+(netto<0?"−":"+")+fmtDauer(Math.abs(netto))+") · Angriffe: "
+      +getragen+" getragen, "+eingebrochen+" eingebrochen.";
+    return {gewinn, netto, getragen, eingebrochen, text};
+  }
   const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
-  const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
-  const KURVE_WENDIG=0.0016;      // wieviel davon je Punkt WENDIGKEIT zurueckkommt
+  // KURVE_KOSTEN 0,12 -> 0,20 (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, s. Rezept-
+  // Kommentar oben): `kurvenFaktor` ist NUR fuer die Staffel scharf (`if(!BA().staffel)
+  // return 1`, gehoert also nicht dem geteilten Bahn-Chassis) und ausserhalb von TECHNIK/
+  // WUCHT der einzige Hebel, der Awareness/Dexterity ohne den Wechsel-/Zug-Mechanismus
+  // anzufassen mehr Gewicht auf der Uhr gibt. KURVE_WENDIG bleibt proportional (bei
+  // WENDIGKEIT 100 weiterhin der volle Kurvenverlust ausgeglichen).
+  const KURVE_KOSTEN=0.20;        // wieviel Tempo eine Kurve maximal kostet
+  const KURVE_WENDIG=KURVE_KOSTEN/100; // wieviel davon je Punkt WENDIGKEIT zurueckkommt
   // Liegt dieser Laeufer gerade in der Kurve seines Abschnitts? Ausserhalb der Staffel
   // gibt es keine Abschnitte — dort ist der Faktor immer 1 und die Zeile wirkungslos.
   // WIE WEIT IST ER AUF SEINER EIGENEN STRECKE? Ausserhalb der Staffel ist das die
@@ -37901,11 +38931,16 @@
     const gespuerSkill=BA().gespuerSkill;
     const gespuer=gespuerSkill?1-(100-skillLesen(u,gespuerSkill))*(BA().gespuerGrad??0):1;
     return (BA().grundTempo+grund*BA().tempoSpanne)*planT*mued*stolper*sog*leer*nerv*quer
-           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?0:1)
+           // S-N2 (Spurt, QA-Schalter): an der Station kriecht er mit `u.kriechK` statt zu
+           // stehen. Ohne Schalter ist kriechK undefined, (undefined||0) also 0 wie vorher.
+           *kurvenFaktor(u)*(u.kraft>0?0.82:1)*(u.huerde>0?(u.kriechK||0):1)
            // GELAENDE + TAGESFORM (Zeitfahren, K5): fuer jede andere Bahn ist
            // gelaendeFaktor(u) immer 1 und u.formTag immer undefined (||1) — bit-
            // identisch, s. Kommentar bei gelaendeAn.
-           *gelaendeFaktor(u)*(u.formTag||1)*gespuer;
+           *gelaendeFaktor(u)*(u.formTag||1)*gespuer
+           // STAFFEL "MARKE UND ZUG" (B2): Haltung auf dem Bein. Ohne `u.haltung` (Schalter
+           // aus, jede andere Bahn) steht hier exakt *1 — bit-identisch.
+           *(u.haltung?zugFaktor(u):1);
   }
 
   // ===================================================================================
@@ -38077,7 +39112,34 @@
       }
 
       u.v=tempoVon(u);
+      // STAFFEL "MARKE UND ZUG" (B2/B4.5): ZUG-BILANZ des Angreifers — wie viel Zeit der
+      // Angriff gegenueber Normal bisher gebracht (+) oder gekostet (-) hat. In diesem Tick
+      // legt er die Strecke von h*dt Normal-Sekunden in dt zurueck, gewinnt also (h-1)*dt.
+      // Reine Buchhaltung + Anzeige (kein rr(), nie zurueckgelesen in tempoVon()/wert()):
+      // faellt die Bilanz unter null, ist der Vorsprung aus der ersten Beinhaelfte
+      // aufgebraucht — "er bricht ein, der Angriff traegt nicht" (Konzept 3.3/3.5.5).
+      if(u.haltung==="angreifen"){
+        u.zugBilanz=(u.zugBilanz||0)+(zugFaktor(u)-1)*dt;
+        if(!u.zugEingebrochen && u.zugBilanz<0){
+          u.zugEingebrochen=true;
+          schwebe({...laeuferSchwebeXY(u,-20),txt:"bricht ein",life:1.2,crit:true,_laeufer:u.id});
+          const dz=staffelZeitDelta();
+          feed(u.seite,u.n+" bricht ein — der Angriff trägt nicht.",
+            !dz.unklar&&dz.seite===u.seite,undefined,"einbruch");
+        }
+      }
       const vor=u.pos;
+      // S-N1 JOKER-SCHLEIFE (Spurt, QA-Schalter): solange `u.umwegRest` offen ist, fliesst der
+      // Fortschritt zuerst in die Schleife — er laeuft, aber nicht auf der Hauptstrecke. Ohne
+      // Schalter ist umwegRest undefined und die Zeile im else-Zweig die alte.
+      if(u.umwegRest>0){
+        const schritt=u.v*dt/strecke, ab=Math.min(u.umwegRest,schritt);
+        u.umwegRest-=ab; u.pos+=schritt-ab;
+        if(u.umwegRest<=0){
+          u.umwegRest=0;
+          schwebe({...laeuferSchwebeXY(u,-20),txt:"zurück auf der Bahn",life:.8,crit:false,_laeufer:u.id});
+        }
+      } else
       u.pos+=u.v*dt/strecke;
       // HOECHSTMARKE (Gegencheck 3.3, Aenderung 1): die Wertung liest fuer Climbing
       // `u.hoch`, nicht `u.pos` (s. bahnRangliste()/MOTOREN.climbing.wert() unten) — ein
@@ -38095,6 +39157,18 @@
         u.zz=u.zz||[];
         BA().zwischenzeiten.forEach((cp,ci)=>{
           if(u.zz[ci]==null&&vor<cp&&u.pos>=cp)u.zz[ci]=rennT-(u.startT||0);
+        });
+      }
+      // J2 STILLE MESSPUNKTE (Time-Trial, Klasse A): dieselbe Uebergangs-Pruefung wie die
+      // Zwischenzeiten darueber, eigenes Feld `u.mp`. Die Uebergangszeit wird innerhalb des
+      // Ticks linear interpoliert, damit die Ampel nicht an der 1/60-s-Quantisierung kippt.
+      // Reine Erfassung: kein rr(), nichts davon fliesst in tempoVon()/wert() zurueck.
+      if(BA().ampelPunkte){
+        u.mp=u.mp||[];
+        const schritt=u.pos-vor;
+        BA().ampelPunkte.forEach((cp,k)=>{
+          if(u.mp[k]==null&&vor<cp&&u.pos>=cp)
+            u.mp[k]=rennT-(u.startT||0)-(schritt>0?dt*(u.pos-cp)/schritt:0);
         });
       }
 
@@ -38163,7 +39237,9 @@
       //
       // Eine Bahn OHNE `pusteRegen` (heute keine) bleibt bit-identisch.
       if(BA().pusteRegen){
-        const ruhe=u.huerde>0?1:(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
+        // S-N2: wer an der Station kriecht, bekommt die volle Gutschrift nur zu (1-k) — die
+        // Station dauert 1/(1-k) laenger, je Station kommt so dieselbe Puste zurueck wie heute.
+        const ruhe=u.huerde>0?(u.kriechK?1-u.kriechK:1):(u.leer?(BA().leerRegen??1):Math.max(0,1-ueber));
         if(ruhe>0)u.reserve=Math.min(u.reserveMax,
           u.reserve+BA().pusteRegen*(0.45+u.STEHEN*0.011)*ruhe*dt*10);
       }
@@ -38253,6 +39329,17 @@
           // Gemessen hat das Zeitfahren Intelligence mit 3,5 % gefuehrt, wo die Matrix 18
           // sagt. Der Grund war genau das: die Kurve war zu leicht.
           const A=BA();
+          // S-N1 JOKER (Spurt, QA-Schalter): an SEINER Joker-Station kein Stopp, kein Wurf,
+          // kein Sturz — er biegt in die Schleife ab. Der Ueberstand dieses Ticks zaehlt schon
+          // als Schleifenstrecke. Ohne Schalter ist u.jokerIdx undefined, der Vergleich falsch.
+          if(u.jokerIdx!=null && !u.jokerGenommen && HUERDEN_N().indexOf(h)===u.jokerIdx){
+            u.jokerGenommen=true; u.jokerPos=h;
+            u.umwegRest=Math.max(0,(A.jokerLaenge||0)-(u.pos-h)); u.pos=h;
+            const ji=u.jokerIdx, jw=(A.hindernisWorte||[])[ji]||("Station "+(ji+1));
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"JOKER",life:1.1,crit:false,_laeufer:u.id});
+            feedEreignis(u.seite,u.n+" nimmt den Joker — läuft außen um "+jw+" herum.");
+            continue;
+          }
           // HINDERNIS-ZEITPREIS (P6, Fable-Recherche 05.09.2026): JEDES Hindernis kostet
           // einen vollen Stopp, dessen Dauer der zum Hindernis-Typ gehoerige Sub-Skill
           // bestimmt — nicht erst beim Misslingen. Real kostet auch die genommene Huerde
@@ -38287,7 +39374,13 @@
             // Sekunde fuer Sekunde herunterlaeuft (`if(u.huerde>0)u.huerde-=dt`, oben) und ein
             // Lesen nach dem Rennen nur noch 0 zeigen wuerde.
             const huerdeVor=u.huerde||0;
-            u.huerde=Math.max(u.huerde||0,(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100));
+            const stationsPreis=(A.huerdePreis??0)*stFaktor*(hTyp==="WUCHT"?(A.wuchtPreisFaktor??1):1)*(1-0.8*hSkill/100);
+            // S-N2 (QA-Schalter): kriechend dauert die Station 1/(1-k) laenger — derselbe
+            // Zeitverlust, weil er dabei mit k weiterlaeuft. Ohne Schalter der alte Preis.
+            u.huerde=Math.max(u.huerde||0,u.kriechK?stationsPreis/(1-u.kriechK):stationsPreis);
+            // S-N5 (Anzeige): welche Station er gerade nimmt und wie lang sie insgesamt dauert,
+            // fuer die Stationsduell-Tafel; der reine Zeitverlust fuer die Stationsbestzeit.
+            if(u.kriechK!=null){ u.stationIdx=HUERDEN_N().indexOf(h); u.stationDauer=u.huerde; u.stationPreis=stationsPreis; }
             // RAST AN DER EXE (Gegencheck 3.11): eine PLAN-Schwelle statt fester Booleans
             // je Zone — an einem Henkel (`hTyp==="STEHEN"`, das sind bei Climbing genau die
             // drei `zonen`-Positionen) wird zusaetzlich gerastet, wenn die Reserve UNTER
@@ -38302,7 +39395,8 @@
               if(A.balanceSteigungGrad)u.balance=Math.min(1,(u.balance??1)+0.40*(0.5+(u.GLEICHGEWICHT||0)/200));
               feedRoutine(u.seite,u.n+" rastet an der Exe — Puste bei "+Math.round(100*u.reserve/u.reserveMax)+" %.");
             }
-            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor);
+            // (S-N2: kriechend ist der Zeitverlust (1-k) der Stationsdauer; ohne Schalter *1.)
+            u.hindernisZeit=(u.hindernisZeit||0)+Math.max(0,u.huerde-huerdeVor)*(u.kriechK?1-u.kriechK:1);
             // FALLEN-PROTOKOLL (Takeshi's Castle, B.5/B.6 des Plans): je Falle Typ, Skill,
             // Stopp-Anteil und Ausgang — schreibt nur, liest nie zurueck in die Simulation,
             // deshalb bit-identisch fuer jede Bahn ohne `takeshi:true` (Spurt inklusive, das
@@ -38570,6 +39664,8 @@
             // Zweig ist derselbe fuer beide Bahnen), zeichnet die Zahl aber nirgends, s.
             // bodenSpurtGerade(). Reiner Anzeige-Zaehler, kein rr()-Aufruf, kein Ruecklesen.
             if(A.spurt)(spurtStationStats[meldeStation]=spurtStationStats[meldeStation]||{sauber:0,durch:0,sturz:0}).sauber++;
+            // S-N5 TICKER FUER DIE SAUBERE STATION (nur mit QA-Schalter, kein rr()).
+            if(A.spurt&&u.kriechK!=null)spurtStationSauber(u,meldeStation,wortAkk);
             if(meldeTyp==="stark"){
               schwebe({...laeuferSchwebeXY(u,-20),txt:"seine Falle",life:.9,crit:false,_laeufer:u.id});
               melde("stark",u.n+" spaziert durch "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
@@ -38827,6 +39923,8 @@
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
         u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
+        // ZUG-ERGEBNIS am Beinende (B4.6 Anweisungsbilanz) — nur Buchhaltung, s. zugBilanz.
+        if(u.haltung==="angreifen")u.zugErgebnis=u.zugBilanz>=0?"getragen":"eingebrochen";
         if(naechster){
           naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
           // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
@@ -38857,7 +39955,13 @@
           // Timing in der Wechselzone sitzt meistens ungefaehr, selten sehr gut und selten
           // schlecht. Die Breite engt das Koennen ein, ein gutes Paar schwankt also
           // weniger — die Rangtreue bleibt dadurch am TECHNIK-Wert haengen.
-          const streu=Math.max(WECHSEL_STREU_MIN,WECHSEL_STREU_MAX-koennen*WECHSEL_STREU_K);
+          const streu0=Math.max(WECHSEL_STREU_MIN,WECHSEL_STREU_MAX-koennen*WECHSEL_STREU_K);
+          // B1 MARKE (Staffel "Marke und Zug"): die Haltung des NEHMERS ist seine Anlaufmarke.
+          // Ohne `naechster.marke` (Schalter aus) ist `mk` null und alle drei Stellen unten
+          // rechnen Zeichen fuer Zeichen die alte Formel — gleiche Zahl und Reihenfolge der
+          // rr()-Zuege, die Marke multipliziert nur Breite und Schwelle.
+          const mk=naechster.marke?STAFFEL_MARKE[naechster.marke]:null;
+          const streu=mk?streu0*mk.s:streu0;
           verlust=Math.max(WECHSEL_MIN,verlust+streu*((rr()+rr())-1));
           // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
           // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
@@ -38869,13 +39973,42 @@
           // Formel darueber ueberschrieben (der Ausdruck wird bei den ueblichen Werten
           // negativ) und den Patzer damit auf 1 % je Wechsel eingefroren — s. den Block
           // an WECHSEL_STREU_MAX oben, Ursache 2.
-          const patzer=rr()<Math.max(WECHSEL_PATZER_MIN,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
+          const patzerChance0=Math.max(WECHSEL_PATZER_MIN,WECHSEL_PATZER-koennen*WECHSEL_PATZER_K
                                           -verlaesslich*WECHSEL_ROBUST_K);
+          const patzer=rr()<(mk?patzerChance0*mk.p:patzerChance0);
           if(patzer)verlust+=WECHSEL_PATZER_KOSTEN
             *Math.max(0.40,1-naechster.WENDIGKEIT*(BA().wendigErholt??0));
+          // B1 FLIEGENDER GEWINN (K4/ST-P1, Konzept 3.2): der Nehmer laeuft auf seine Marke
+          // los und "hat schon Tempo", wenn der Stab kommt. Q aus TECHNIK beider (Hand),
+          // ENDTEMPO des Gebers (Einlauf), ANTRITT des Nehmers (Anlauf) und WUCHT beider
+          // ("Absprache", Spirit/Charisma). netto = verlust - gewinn; negativ heisst: der
+          // Wechsel war SCHNELLER als ein Stand-Start. Ohne Marke (Schalter aus) ist
+          // netto===verlust und der Zweig unten der alte.
+          let netto=verlust;
+          if(mk){
+            const Q=0.35*koennen/100+0.20*u.ENDTEMPO/100+0.20*naechster.ANTRITT/100
+              +0.25*((u.WUCHT+naechster.WUCHT)/2)/100;
+            const gewinn=(staffelMarkeZug.fliegMax||0)*Q*mk.g;
+            netto=verlust-gewinn;
+            naechster.wechselNetto=netto; naechster.wechselGewinn=gewinn; naechster.wechselPatzer=patzer;
+          }
+          if(netto<0){
+            // GEWINN PHYSISCH: der Nehmer steht 0,65*|netto| Sekunden weiter vorn (dieselbe
+            // 0,65, mit der ein Verlust unten als Stolpern auf 35 % Tempo wirkt — Gewinn
+            // und Verlust sind damit symmetrisch). `startT` rueckt um denselben Betrag vor
+            // (K4 woertlich: "er startet in der Uhr frueher"), damit die ETAPPENZEIT ein
+            // Stand-Start-Mass bleibt und der Gewinn allein im Wechselkonto steht — kein
+            // Bein-Bias. Kein rr(), deterministisch aus den Werten beider.
+            const vorlauf=-netto*0.65;
+            naechster.startT=rennT-vorlauf;
+            naechster.pos=Math.min(naechster.beinBis,naechster.pos+tempoVon(naechster)*vorlauf/strecke);
+            verlust=netto;
+          } else if(mk){
+            verlust=netto;
+          }
           // Der Verlust ist physisch: der Annehmende steht so lange im Weg wie er dauert.
           // Damit schlaegt er auf die Teamzeit durch, entscheidet also wirklich Rennen.
-          naechster.stolper=verlust;
+          if(verlust>0)naechster.stolper=verlust;
           // ...und er wird aus der ETAPPENZEIT des Annehmenden herausgerechnet.
           //
           // Sonst zahlt er zweimal: einmal ueber die laengere Etappe, einmal ueber das
@@ -38888,7 +40021,9 @@
           // Der Faktor 0,65: waehrend `stolper` laeuft, kommt der Laeufer nicht zum
           // Stehen, sondern auf 35 % Tempo (s. tempoVon) — verloren geht also rund
           // zwei Drittel der Stolperdauer.
-          naechster.wechselVerlust+=verlust*0.65;
+          // (Ein fliegender GEWINN, verlust<0, ist oben schon ueber `startT` aus der Etappe
+          // herausgerechnet — hier nur der Verlust.)
+          if(verlust>0)naechster.wechselVerlust+=verlust*0.65;
           // ...und er wird BEIDEN angeschrieben, je zur Haelfte, in Sekunden. Ohne dieses
           // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
           // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
@@ -38902,7 +40037,16 @@
             // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): eine verpatzte
             // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
             // selten (nur bei `patzer`) und sofort verstaendlich.
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
+            // B4.2 (Marke und Zug): bei weiter Marke sagt die Zeile, woran es lag.
+            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n
+              +(naechster.marke==="angreifen"?" bei weiter Marke":"")+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
+          } else if(mk){
+            // B4.2 WECHSEL-ZEILE MIT VORZEICHEN (Konzept 3.5, die Schwimm-Zahl): gewonnen
+            // oder verloren gegenueber einem Stand-Start, dazu die Marke des Nehmers.
+            schwebe({...laeuferSchwebeXY(u,-20),txt:verlust<0?"scharf!":"Stab weiter",life:.8,crit:false,_laeufer:u.id});
+            const art2=naechster.marke==="angreifen"?"scharfer Wechsel":naechster.marke==="absichern"?"sicher übergeben":"Wechsel";
+            feedEreignis(u.seite,u.n+" → "+naechster.n+": "+art2+" "
+              +(verlust<0?"−"+fmtDauer(-verlust)+" gewonnen":"+"+fmtDauer(verlust))+".");
           } else {
             schwebe({...laeuferSchwebeXY(u,-20),txt:"Stab weiter",life:.7,crit:false,_laeufer:u.id});
             feedEreignis(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
@@ -38923,6 +40067,12 @@
           // Zieleinlauf einer Seite ist bei der Staffel ein EINMALIGES Ereignis (die
           // Mannschaft ist im Ziel, nicht ein Einzelner) -- immer big.
           feed(u.seite,u.n+" bringt die Staffel ins Ziel — "+fmtZielzeit(rennT)+".",true,undefined,"zieleinlauf");
+          // B4.6 ANWEISUNGSBILANZ (Marke und Zug, Fable 4.2): hat sich der Rennplan gelohnt?
+          if(u.haltung==="angreifen")u.zugErgebnis=u.zugBilanz>=0?"getragen":"eingebrochen";
+          if(u.haltung){ const b=staffelBilanz(u.seite); feedEreignis(u.seite,b.text);
+            // Duell des LETZTEN Beins: nach dem zweiten Zieleinlauf laeuft updateHudBahn()
+            // nicht mehr, deshalb hier (feed/callout sind im stummen Messpfad No-Ops).
+            staffelBeinDuellPruefen(); }
         } else {
           u.fertig=rennT;rennFertig.push(u);
           // TON (Ziel 3, A4): Ziel erreicht. Dieser Zweig ist der normale Ziel-Einlauf fuer
@@ -38975,6 +40125,18 @@
             // Kommentar am startAbstand-Zweig oben.
             feed(u.seite,u.n+" im Ziel — Platz "+zielPlatz+" bei "+fmtZielzeit(rennT)+".",
               zielPlatz<=3,undefined,"zieleinlauf",undefined,undefined,"ereignis");
+            // S-N5 FOTOFINISH-LUPE (Spurt, nur mit QA-Schalter): liegt Platz 2 weniger als
+            // 0,1 echte Sekunden hinter Platz 1, ein eigener Banner mit dem Abstand. KEINE
+            // Pause, kein Standbild, keine Wandzeit — nur der Banner ueber den laufenden Bildern
+            // (die angehaltene Sekunde aus dem Konzept waere Klasse T und ist nicht gebaut).
+            if(BA().spurt&&spurtSaeule.aktiv&&zielPlatz===2&&!spurtFotofinishGezeigt){
+              const erster=rennFertig.filter(x=>!x.raus)[0];
+              const real=erster?bahnRealSek(rennT-erster.fertig):null;
+              if(real!=null&&real<SPURT_FOTOFINISH_SEK){
+                spurtFotofinishGezeigt=true;
+                callout("FOTOFINISH · "+erster.n+" vor "+u.n+" um "+real.toFixed(2).replace(".",",")+" s");
+              }
+            }
           }
         }
       }
@@ -39078,6 +40240,7 @@
   //     veraendert (die Huerden-Schleife, ":19730", hat bei leerem hindernisse-Array nichts
   //     zu iterieren) — ein reiner Lesevergleich, kein zweiter Zufallszug.
   const STAFFEL_ANLAUF_AB=0.86;       // ab wie viel Vordermann-Fortschritt der Naechste anzieht
+  const STAFFEL_ANLAUF_JE_MARKE={absichern:0.92, normal:0.86, angreifen:0.78};  // B4.1, nur mit Marke
   const STAFFEL_UEBERGABE_DAUER=0.55; // Sekunden, die der Stab sichtbar zwischen den Haenden unterwegs ist
   // BAHN_SCHRITT_PX: dieselbe Schrittlaenge/Herleitung wie ZF_SCHRITT_PX bei stepZeitfahren
   // weiter unten (46 px, s. dortiger Kommentar fuer die volle Rechnung mit v~110-135 ->
@@ -39140,8 +40303,12 @@
       if(!u.aktiv && u.fertig==null && !u.durch){
         const vorgaenger=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein-1);
         const fortschritt=vorgaenger&&vorgaenger.aktiv?laufAnteil(vorgaenger):0;
-        const ziel=fortschritt>STAFFEL_ANLAUF_AB
-          ?Math.min(1,(fortschritt-STAFFEL_ANLAUF_AB)/(1-STAFFEL_ANLAUF_AB)):0;
+        // B4.1 ANLAUFMARKE SICHTBAR (Marke und Zug, Konzept 3.5.1): die weite Marke zieht
+        // frueher an (0,78), die kurze spaeter (0,92) — man SIEHT die Marke, bevor der Stab
+        // kommt. Ohne `u.marke` (Schalter aus) der alte Wert 0,86. Reine Anzeige.
+        const anlaufAb=u.marke?(STAFFEL_ANLAUF_JE_MARKE[u.marke]??STAFFEL_ANLAUF_AB):STAFFEL_ANLAUF_AB;
+        const ziel=fortschritt>anlaufAb
+          ?Math.min(1,(fortschritt-anlaufAb)/(1-anlaufAb)):0;
         u.vizAnlauf+=(ziel-u.vizAnlauf)*(1-Math.exp(-dt/0.15));
       } else {
         u.vizAnlauf=0;
@@ -40047,6 +41214,35 @@
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
+    // S-N5 STATIONSDUELL-TAFEL (Spurt, Klasse A, nur mit QA-Schalter `spurtSaeule`): stehen
+    // ein Heim- und ein Gastlaeufer gleichzeitig an DERSELBEN Station (innerhalb 0,03
+    // Strecke), zeigt eine kleine Tafel beider Rest-Stationszeiten als Balken — "wer kommt
+    // zuerst los?", der Positionskampf, der sonst unsichtbar im Hindernis passiert. Liest nur
+    // u.huerde/u.stationDauer/u.stationIdx, schreibt nichts.
+    if(BA().spurt && spurtSaeule.aktiv && !istRoute()){
+      const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0);
+      let paar=null;
+      for(const a of an){ if(a.seite!==0)continue;
+        const b=an.find(o=>o.seite===1&&o.stationIdx===a.stationIdx&&Math.abs(o.pos-a.pos)<0.03);
+        if(b){ paar=[a,b]; break; } }
+      if(paar){
+        const sx=camX(BA().hindernisse[paar[0].stationIdx]);
+        const sy=Math.min(bahnY(paar[0].bahnZ),bahnY(paar[1].bahnZ))-58;
+        const name=(BA().hindernisNamen||[])[paar[0].stationIdx]||("STATION "+(paar[0].stationIdx+1));
+        ctx.save(); ctx.globalAlpha=0.92;
+        ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(sx-62,sy-12,124,38);
+        ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+name,sx,sy-3);
+        paar.forEach((o,k)=>{
+          const rest=Math.max(0,Math.min(1,o.huerde/o.stationDauer)), yy=sy+5+k*11;
+          ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(sx-20,yy,76,6);
+          ctx.fillStyle=o.seite===0?"#f2a03d":"#45b0c9"; ctx.fillRect(sx-20,yy,76*rest,6);
+          ctx.textAlign="right"; ctx.font="600 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+          ctx.fillStyle="#dfe4ee"; ctx.fillText(o.n.slice(0,9),sx-23,yy+6);
+        });
+        ctx.restore();
+      }
+    }
     // ST-2: STAND NACH JEDEM WECHSEL (broadcast-optik-bahn-27-09.md Abschnitt 4.3, "das
     // Gegenstueck zu TT-1"). Die Tafel haengt an der Position, an der der GEBENDE Laeufer
     // gerade steht -- `u.pos=u.beinBis` seit dem Wechsel (stepSpurt), also exakt die
@@ -40057,16 +41253,28 @@
       const sw=staffelWechselAnzeige;
       const geber=LAEUFER.find(o=>o.seite===sw.seite&&o.bein===sw.bein-1);
       const swp=geber?laeuferXY(geber):{x:W/2,y:H*0.5};
-      const farbe=sw.fSeite==null?"#dfe4ee":(sw.fSeite===0?"#f2a03d":"#45b0c9");
-      const zeile1="NACH BEIN "+sw.bein+(sw.fSeite==null?"":" · "+VEREIN[sw.fSeite].name+" +"+fmtDauer(sw.fDelta));
-      const zeile2=sw.verlust==null?null:(sw.verpatzt?"VERPATZT +"+fmtDauer(sw.verlust):"Wechsel "+fmtDauer(sw.verlust));
+      // Mit Marke (B4.4) in der Farbe der WECHSELNDEN Mannschaft, deren Abstand die Zeile nennt.
+      const farbSeite=sw.netto!=null?sw.seite:sw.fSeite;
+      const farbe=farbSeite==null?"#dfe4ee":(farbSeite===0?"#f2a03d":"#45b0c9");
+      let zeile1="NACH BEIN "+sw.bein+(sw.fSeite==null?"":" · "+VEREIN[sw.fSeite].name+" +"+fmtDauer(sw.fDelta));
+      let zeile2=sw.verlust==null?null:(sw.verpatzt?"VERPATZT +"+fmtDauer(sw.verlust):"Wechsel "+fmtDauer(sw.verlust));
+      // B4.4 ABSTANDSUHR + B4.2 VORZEICHEN (Marke und Zug, nur mit Marke): der Abstand aus
+      // Sicht der wechselnden Mannschaft ("+0,31 s" hinten, "−0,08 s" vorn, Ekiden-Muster)
+      // und der Wechsel mit Vorzeichen und Marke. Reine Anzeige aus staffelWechselAnzeige.
+      if(sw.netto!=null){
+        if(sw.fSeite!=null)zeile1="NACH BEIN "+sw.bein+" · "+VEREIN[sw.seite].name+" "
+          +(sw.fSeite===sw.seite?"−":"+")+fmtDauer(sw.fDelta);
+        const markeWort=sw.marke==="angreifen"?"WEITE MARKE":sw.marke==="absichern"?"KURZE MARKE":"MARKE";
+        zeile2=sw.patzer?"VERPATZT · "+markeWort+" +"+fmtDauer(Math.max(0,sw.netto))
+          :markeWort+" "+(sw.netto<0?"−"+fmtDauer(-sw.netto)+" GEWONNEN":"+"+fmtDauer(sw.netto));
+      }
       ctx.textAlign="center"; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,10,14,.85)";
       ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";
       ctx.strokeText(zeile1,swp.x,swp.y-56); ctx.fillStyle=farbe; ctx.fillText(zeile1,swp.x,swp.y-56);
       if(zeile2){
         ctx.font="600 9px 'RaniraSeason',Georgia,'Times New Roman',serif";
         ctx.strokeText(zeile2,swp.x,swp.y-44);
-        ctx.fillStyle=sw.verpatzt?"#e0685f":"#8795A9"; ctx.fillText(zeile2,swp.x,swp.y-44);
+        ctx.fillStyle=(sw.verpatzt||sw.patzer)?"#e0685f":(sw.netto!=null&&sw.netto<0?"#7fd18b":"#8795A9"); ctx.fillText(zeile2,swp.x,swp.y-44);
       }
       ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
     }
@@ -40853,6 +42061,11 @@
     kippZug:"KIPP-ZUG",
     // T-F1a (Fable-Ideen Buehne-Duell 30.09., Paket 2 "Tennis-Punkt"), NUR Tennis.
     tennisBreak:"BREAK!",
+    // T-N1 Druckmesser (Tennis-Nachtkonzept 03.10., abgeschwaecht), NUR Tennis.
+    tennisMatchball:"MATCHBALL",
+    tennisAbgewehrt:"ABGEWEHRT",
+    tennisEntscheidung:"ENTSCHEIDUNGSPUNKT",
+    tennisComeback:"COMEBACK",
     entschieden:"ENTSCHIEDEN",
     remis:"REMIS",
     goldenerBuzzer:"GOLDENER BUZZER",
@@ -42171,6 +43384,17 @@
         } else if(u.fertig==null){
           standEl.appendChild(el("span",null," · noch keine Zeit"));
         }
+        // J2 LIVE-AMPEL (Klasse A): solange er faehrt, grün/rot gegen den Hot Seat (bzw. die
+        // Bestzeit) am letzten stillen Messpunkt — mit Abstand und Messpunkt. Liest nur das
+        // in updateHudBahn() gesetzte Anzeigefeld u.vizAmpel.
+        if(u.fertig==null&&u.vizAmpel){
+          const a=u.vizAmpel, gruen=a.farbe==="gruen";
+          const amp=el("span",gruen?"gut":"schlecht"," · "+(gruen?"● GRÜN ":"● ROT ")
+            +(gruen?"−":"+")+bahnZeitText(bahnSpanneAnzeige(Math.abs(a.delta)))
+            +" gegen "+(a.bezug==="der Hot Seat"?"Hot Seat":"Bestzeit")+" bei "+a.prozent+" %");
+          amp.title="Live-Ampel: Vergleich am letzten stillen Messpunkt (alle 10 % der Strecke)";
+          standEl.appendChild(amp);
+        }
         // AUSDAUER ALS ZAHL, MIT DEM WORT DARAN (Chris' Punkt 4: "ausdauer muss besser
         // funktionieren"). Die Mechanik gibt es laengst (KRAFT_VON/`zehr`/`u.leer` senken
         // das Tempo in tempoVon), sie war nur unlesbar — und zwar doppelt: ein 3-px-Balken
@@ -43408,6 +44632,15 @@
         tb.appendChild(tr);
       });
       t.appendChild(tb); box.appendChild(t);
+      // B4.6 ANWEISUNGSBILANZ (Staffel "Marke und Zug", Fable 4.2): unter der Tabelle jeder
+      // Seite, ob sich der Rennplan gelohnt hat. Nur wenn der QA-Schalter Haltungen
+      // vergeben hat (`u.haltung`), sonst bleibt der Endstand exakt wie vorher.
+      if(BA().staffel && LAEUFER.some(o=>o.seite===seite&&o.haltung)){
+        const b=staffelBilanz(seite);
+        box.appendChild(el("p","ebilanz","Fliegend gewonnen −"+fmtDauer(b.gewinn)
+          +" · Wechsel netto "+(b.netto<0?"−":"+")+fmtDauer(Math.abs(b.netto))
+          +" · Angriffe: "+b.getragen+" getragen, "+b.eingebrochen+" eingebrochen"));
+      }
     }
     renderSzeneDesSpiels();
     renderHighlights();
@@ -43452,7 +44685,7 @@
       const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
     }
     if(art.duell){
-      const brettSieg=art.fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const brettSieg=u=>duellBrettSieg(art,u);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
       const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
     }
@@ -45550,6 +46783,22 @@
     // sofort pruefen, statt Minuten Sim-Zeit abzuwarten, bis ein Highlight zufaellig faellt.
     // Reine Test-/Anzeigefunktion, dieselbe Wirkung wie ein echtes big-Ereignis auf das DOM,
     // kein Einfluss auf MESS/Wertung/RNG.
+    // NACHTKONZEPT-SCHALTER (04.10., s. BUEHNE_FLAGS): Test-/QA-/Mess-Schnittstelle, dasselbe
+    // Muster wie sandsackVorschau() unten. Ohne Argument nur lesen. Unbekannte Schluessel und
+    // Nicht-Zahlen werden ignoriert. Kein echtes Spiel ruft das auf.
+    buehneFlags:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const k of Object.keys(BUEHNE_FLAGS))
+          if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
+      return {...BUEHNE_FLAGS};
+    },
+    // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
+    // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
+    buehneHaltungTest:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
+      return {...buehneHaltungTest};
+    },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
     // aus -- dasselbe Prinzip wie calloutProbe darueber. Noetig vor allem fuer die Stufe
@@ -45557,6 +46806,216 @@
     // wartet auf Chris' Zustimmung). Reine Anzeige: teamFeierAusloesen() schreibt nur
     // `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin ein No-Op).
     teamFeierProbe:(seite,stufe)=>{ teamFeierAusloesen(seite===1?1:0,stufe||"gross",null); return teamFeiern.length; },
+    // STAFFEL "MARKE UND ZUG" (Paket O2, 04.10.) — QA-SCHALTER nach dem Muster
+    // sandsackVorschau(): der EINZIGE Weg, `staffelMarkeZug.aktiv` einzuschalten. Ein echtes
+    // Spiel laeuft ohne ihn exakt wie vorher (Isolationsnachweis s. Kopfkommentar bei
+    // STAFFEL_MARKE). staffelMarkeZug(true,{modus,fliegMax}) schaltet ein, (false) aus.
+    // `modus`: "ki" (Standard, Automatik Stufe 1), "kader", "normal", "angreifen",
+    // "absichern", "zufall". Wirkt ab dem naechsten Rennaufbau (bauSpurt).
+    staffelMarkeZug:(an,opt)=>{
+      const o=opt||{};
+      staffelMarkeZug=an
+        ?{aktiv:true, modus:o.modus||"ki", fliegMax:o.fliegMax!=null?+o.fliegMax:0.24}
+        :{aktiv:false, modus:"ki", fliegMax:0.24};
+      return {...staffelMarkeZug};
+    },
+    // TIME-TRIAL J2 AMPEL-SONDE (04.10.): faehrt n Rennen je Paarung stumm und spielt danach
+    // die Ampel-Logik aus updateHudBahn() in ECHTER Zeitreihenfolge nach (Messpunkt-Ereignis
+    // bei startT+mp[k], Zieleinlauf bei fertig — der Hot Seat ist zu jedem Zeitpunkt der
+    // Schnellste unter den bis dahin Angekommenen). Zaehlt Kipppunkte (Farbwechsel) und Hot-
+    // Seat-Wechsel je Rennen. Reine Diagnose, kein Eingriff in die Rennen.
+    ttAmpelProbe:(opt)=>{
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN["time-trial"], gesichert=M.sichern(), kaderVorher={SQUAD,OPP}, mutatorenVorher=MUTATOREN;
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const rennen=[];
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);
+            M.bau(saat0+i*schritt); M.lauf();
+            const P=BA().ampelPunkte||[], ev=[];
+            for(const u of LAEUFER){
+              (u.mp||[]).forEach((t,k)=>{ if(t!=null)ev.push({t:(u.startT||0)+t,art:"mp",u,k}); });
+              if(u.fertig!=null)ev.push({t:u.fertig,art:"ziel",u});
+            }
+            ev.sort((a,b)=>a.t-b.t||(a.art==="ziel"?-1:1));
+            const fertig=[], farbe=new Map(); let kipp=0, hsWechsel=0, hsId=null;
+            for(const e of ev){
+              if(e.art==="ziel"){ fertig.push(e.u);
+                const hs=fertig.reduce((b,x)=>!b||bahnZeit(x)<bahnZeit(b)?x:b,null);
+                if(hsId!=null&&hs.id!==hsId)hsWechsel++; hsId=hs.id; continue; }
+              const hs=fertig.reduce((b,x)=>!b||bahnZeit(x)<bahnZeit(b)?x:b,null);
+              let ref=null;
+              if(hs&&hs!==e.u&&hs.mp&&hs.mp[e.k]!=null)ref=hs.mp[e.k];
+              else for(const x of LAEUFER){ if(x===e.u||!x.mp||x.mp[e.k]==null||(x.startT||0)+x.mp[e.k]>e.t)continue; if(ref==null||x.mp[e.k]<ref)ref=x.mp[e.k]; }
+              if(ref==null)continue;
+              const f=e.u.mp[e.k]<ref?"gruen":"rot", vorher=farbe.get(e.u.id);
+              if(vorher&&vorher!==f)kipp++;
+              farbe.set(e.u.id,f);
+            }
+            rennen.push({label:v?v.label:null, kipppunkte:kipp, hotSeatWechsel:hsWechsel, messpunkte:ev.filter(e=>e.art==="mp").length, P:P.length});
+          }
+        }
+      } finally {
+        MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return rennen;
+    },
+    // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, 04.10.) — QA-SCHALTER, Muster wie
+    // staffelMarkeZug() oben. spurtSaeule(true) = freigegebenes Paket (Joker + Kriechen),
+    // spurtSaeule(true,{joker:false}) bzw. {kriechen:false} fuer die Einzelmessung,
+    // spurtSaeule(false) aus. Wirkt ab dem naechsten Rennaufbau.
+    spurtSaeule:(an,opt)=>{
+      const o=opt||{};
+      spurtSaeule=an
+        ?{aktiv:true, joker:o.joker!==false, kriechen:o.kriechen!==false}
+        :{aktiv:false, joker:true, kriechen:true};
+      return {...spurtSaeule};
+    },
+    // SZENEN-SONDE (Spurt-Konzept 4.1/4.2): je Rennen in 1/60-Ticks — derselbe Takt wie
+    // MOTOREN.spurt.lauf(), also dieselben Rennen wie disziplinProbe — Stillstand (Anteil der
+    // Laeuferzeit mit Tempo 0), Saeulenzeit (Anteil der Rennzeit, in der mindestens das halbe
+    // Feld an EINER Station steht), Rest-Puste im Ziel, Einbrueche, Renndauer und wo
+    // gejokert wurde. Reine Diagnose mit dem gerade gesetzten Schalterstand.
+    spurtSzenenProbe:(opt)=>{
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN.spurt, gesichert=M.sichern(), kaderVorher={SQUAD,OPP}, mutatorenVorher=MUTATOREN;
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const rennen=[];
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);
+            M.bau(saat0+i*schritt);
+            const H=HUERDEN_N(), feld=LAEUFER.length;
+            let laeuferT=0, stehT=0, saeuleT=0, g=0, einbr=0;
+            const warLeer=new Map(LAEUFER.map(u=>[u.id,false]));
+            while(!done&&g<90){
+              stepSpurt(1/60); g+=1/60;
+              const anStation=new Array(H.length).fill(0);
+              for(const u of LAEUFER){
+                if(u.fertig!=null)continue;
+                laeuferT+=1/60;
+                if(!(u.v>0)){ stehT+=1/60;
+                  const k=H.findIndex(h=>Math.abs(u.pos-h)<0.02); if(k>=0)anStation[k]++; }
+                if(u.leer&&!warLeer.get(u.id))einbr++;
+                warLeer.set(u.id,!!u.leer);
+              }
+              if(Math.max(0,...anStation)*2>=feld)saeuleT+=1/60;
+            }
+            const joker={}; for(const u of LAEUFER)if(u.jokerIdx!=null){ joker[u.jokerIdx]=(joker[u.jokerIdx]||0)+1; }
+            rennen.push({label:v?v.label:null, dauer:+rennT.toFixed(3),
+              stillstand:laeuferT?+(stehT/laeuferT).toFixed(4):0,
+              saeule:rennT?+(saeuleT/rennT).toFixed(4):0,
+              restPuste:+(LAEUFER.reduce((s,u)=>s+(u.reserveMax?u.reserve/u.reserveMax:0),0)/feld).toFixed(4),
+              einbrueche:einbr, stuerze:LAEUFER.reduce((s,u)=>s+(u.gestolpert||0),0), joker});
+          }
+        }
+      } finally {
+        MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return rennen;
+    },
+    // BREAK-EVEN-SONDE (Konzept 5.2/7.4): faehrt fuer jeden Laeufer der echten Kader (nach
+    // M.bau, also mit Slot/Form/Trait-Werten) SEIN Bein isoliert dreimal — Normal, Angreifen,
+    // Absichern — mit genau der tempoVon()-Formel des Rennens, ohne Wechsel und ohne rr().
+    // `gewinnAngriff` > 0 heisst: der Angriff traegt (schneller als Normal). Reine Diagnose;
+    // rennT/LAEUFER/Kader werden vollstaendig wiederhergestellt.
+    staffelZugProbe:(opt)=>{
+      const o=opt||{}, n=o.n||8, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN.staffel, gesichert=M.sichern(), kaderVorher={SQUAD,OPP};
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const zeilen=[];
+      const beinZeit=(u0,haltung)=>{
+        const u={...u0, haltung, pos:u0.beinVon, startT:0, stolper:0, huerde:0, kraft:0,
+          leer:false, imSchatten:false, wechsel:0};
+        const dt=1/60, strecke=W-170; let t=0; rennT=0;
+        while(t<30){
+          rennT+=dt; t+=dt;
+          const sch=tempoVon(u)*dt/strecke;
+          if(u.pos+sch>=u.beinBis){ t-=dt*(1-(u.beinBis-u.pos)/sch); break; }
+          u.pos+=sch;
+        }
+        return t;
+      };
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            M.bau(saat0+i*schritt);
+            for(const u of LAEUFER){
+              const tn=beinZeit(u,null), ta=beinZeit(u,"angreifen"), ts=beinZeit(u,"absichern");
+              zeilen.push({label:v?v.label:null, n:u.n, bein:u.bein, pers:u.pers,
+                traeger:+staffelTraeger(u).toFixed(1), stehen:u.STEHEN,
+                normal:+tn.toFixed(4), angreifen:+ta.toFixed(4), absichern:+ts.toFixed(4),
+                gewinnAngriff:+(tn-ta).toFixed(4)});
+            }
+          }
+        }
+      } finally {
+        M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return zeilen;
+    },
+    // RENN-STATISTIK (Konzept 5.3/7.3): je Rennen Sieger, Zielabstand, Patzer, Angriffe
+    // getragen/eingebrochen, Fuehrungswechsel ueber die Strecke (wer erreicht jeden
+    // Fortschritt 1..99 % zuerst, aus fortschrittVerlauf) und die vergebenen Haltungen —
+    // mit dem GERADE gesetzten Schalterstand. Dieselbe Saatfolge wie disziplinProbe, damit
+    // "Sieger kippt" zwischen zwei Schalterstaenden je Rennen vergleichbar ist.
+    staffelRennStatistik:(opt)=>{
+      const o=opt||{}, n=o.n||24, saat0=o.saat0!=null?o.saat0:1337, schritt=o.schritt||7919;
+      const M=MOTOREN.staffel, gesichert=M.sichern(), kaderVorher={SQUAD,OPP};
+      const familie=Array.isArray(o.kaderFamilie)&&o.kaderFamilie.length?o.kaderFamilie:[null];
+      const art=BAHN_ART.staffel, altJeSeite=art.jeSeite;
+      if(o.jeSeite)art.jeSeite=o.jeSeite;
+      const rennen=[], mutatorenVorher=MUTATOREN;
+      try{
+        if(M.vorher)M.vorher();
+        for(const v of familie){
+          if(v){ SQUAD=mitKit(v.heim); OPP=mitKit(v.gast); neuPersBerechnen(); }
+          for(let i=0;i<n;i++){
+            zieheFormkarten(20260823+i*104729);
+            MUTATOREN=zieheMutatorenWieSpiel(20260823+i*15485863);   // wie disziplinProbe "je-spiel"
+            M.bau(saat0+i*schritt); M.lauf();
+            const z=[0,1].map(s=>{ const u=LAEUFER.find(x=>x.seite===s&&x.fertig!=null); return u?u.fertig:null; });
+            const zeitBei=(s,p)=>{ const b=fortschrittVerlauf[s]; const k=b.findIndex(pt=>pt.p>=p); return k<0?Infinity:b[k].t; };
+            let fw=0, vorn=null;
+            for(let k=1;k<=99;k++){
+              const t0=zeitBei(0,k/100), t1=zeitBei(1,k/100);
+              if(t0===t1)continue;
+              const f=t0<t1?0:1; if(vorn!=null&&f!==vorn)fw++; vorn=f;
+            }
+            const zaehl=(feld,wert)=>LAEUFER.filter(u=>u[feld]===wert).length;
+            rennen.push({label:v?v.label:null, saat:saat0+i*schritt,
+              sieger:z[0]==null?1:z[1]==null?0:(z[0]<=z[1]?0:1),
+              abstand:z[0]!=null&&z[1]!=null?+Math.abs(z[0]-z[1]).toFixed(4):null,
+              patzer:LAEUFER.reduce((s,u)=>s+(u.gestolpert||0),0),
+              getragen:zaehl("zugErgebnis","getragen"), eingebrochen:zaehl("zugErgebnis","eingebrochen"),
+              fuehrungswechsel:fw,
+              bein:{angreifen:zaehl("haltung","angreifen"), absichern:zaehl("haltung","absichern"), normal:zaehl("haltung","normal")},
+              marke:{angreifen:zaehl("marke","angreifen"), absichern:zaehl("marke","absichern"), normal:zaehl("marke","normal")},
+              gewinnSumme:+LAEUFER.reduce((s,u)=>s+(u.wechselGewinn||0),0).toFixed(4)});
+          }
+        }
+      } finally {
+        art.jeSeite=altJeSeite; MUTATOREN=mutatorenVorher;
+        M.zurueck(gesichert); zieheFormkarten(20260823);
+        SQUAD=kaderVorher.SQUAD; OPP=kaderVorher.OPP; neuPersBerechnen();
+      }
+      return rennen;
+    },
     // SANDSACK-FINALE-VORSCHAU (Paket 2, 04.10., Task #58): schaltet die reine
     // Anzeige-Szene aus zeichneSandsackBuehne()/stepSandsackVorschau() ein/aus -- s. deren
     // ausfuehrlichen Gate-Kommentar oben. Braucht ein bereits gebautes Gewichtheben-Duell
@@ -45887,7 +47346,7 @@
       // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
       // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
       // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-      const brettSieg=BUEHNE_ART[bd].fechten?(u=>!!u.gefechtSieg):(u=>u.vorteil>0);
+      const brettSieg=u=>duellBrettSieg(BUEHNE_ART[bd],u);
       const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
@@ -46909,6 +48368,10 @@
                 persTyp:persOf[u.n]||null,
                 heilerSub:u.heiler?(((spielerVonName(u.n)||{}).sub||[]).find(s=>HEILER.has(s))||null):null}:{})}));
           spiele.push({saat:saat0+i*schritt,
+            // BUEHNEN-DIAGNOSE (04.10., additiv wie `zielDiag`): nur mit `o.buehneDiag` — die
+            // Brett-/Haltungskennzahlen der Nachtkonzept-Mechaniken (s. buehneDiagVon()). Ohne
+            // die Option fehlt das Feld, die Rueckgabe bleibt byte-identisch.
+            ...(o.buehneDiag&&istBuehne(dId)?{buehne:buehneDiagVon(dId,o.haltungEV||0)}:{}),
             teilnehmer:feld.map(u=>({n:u.n,seite:u.seite,
               eig:Math.round((u.eig||0)*100)/100,
               wert:Math.round((w[u.n]||0)*100)/100,

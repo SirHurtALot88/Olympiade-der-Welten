@@ -1,5 +1,278 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Siebzehnter Nachtrag 06.10. — Staffel-Sentinel behoben: der Tempo-Kanal, nicht Marke/Zug.**
+Nach dem Sechzehnten Nachtrag (O2 „Marke und Zug", unten) blieb der Sentinel
+vigilante-armageddon bei JEDER getesteten Variante unter 0,80 (beste 0,797), obwohl der
+Median-rho von 0,895 auf 0,937 stieg und Pp von 37,7/41,1 auf 35,6/37,9 sank. Diagnose mit
+`messe-arena-einfluss.mjs staffel` (zwei Saatstroeme, Versatz 0/10 000 000): ANTRITT und
+ENDTEMPO — ueber `grund*tempoSpanne` praktisch die gesamte Renndauer, s. `tempoVon()` — liefen
+ausschliesslich ueber Speed und Stamina (Speed +11,2/+11,3 Pp ueber Matrix, Stamina +6,8/+7,1),
+ohne jeden Kanal fuer Awareness/Dexterity/Charisma. In einer Paarung mit vielen Laeufern in
+enger Eignungsspanne (vigilante-armageddon, acht von zwoelf zwischen Eig 39 und 46) entschied
+dadurch die Rezeptform statt die Eignung — genau wie das O2-Konzeptpapier es fuer den „Pp-Rest"
+vorhergesagt hatte (staffel-nachtkonzept-03-10.md 5.3: „Der Rest (Speed +10) sitzt im
+Tempo-Kanal … das ist mit keinem Wechsel-/Haltungskonzept zu beheben und gehoert in eine eigene
+Rezept-/Nenner-Runde").
+
+**Ursache bestaetigt, NICHT der Wechsel-/Zug-Mechanismus** (`staffelZugProbe` vor und nach der
+Aenderung: Break-even des Angriffs unveraendert bei traeger ≈ 62-65, da `staffelTraeger` und
+`ZUG_FADE` ausschliesslich WUCHT/TECHNIK lesen, die diese Runde nicht anfasst). Behoben allein
+im Rezept (`public/mockups/battle-mode.engine.js`, `BAHN_ART.staffel.rezept`): ANTRITT verliert
+STAMINA (die Ermuedung traegt STEHEN ohnehin separat) und bekommt DEXTERITY/AWARENESS
+("explosiv UND wach aus dem Startblock"); ENDTEMPO gibt einen Teil von SPEED/STAMINA an SPIRIT
+ab. TECHNIK und WUCHT bleiben byte-identisch — ihre Kalibrierung (ZUG_FADE auf traeger 62,9)
+haengt direkt an ihrer heutigen Zusammensetzung. Zusaetzlich `KURVE_KOSTEN` (nur fuer
+`BA().staffel` scharf, kein geteilter Bahn-Code) 0,12 → 0,20, damit WENDIGKEIT (jetzt
+dexterity:46/awareness:40/speed:14) spuerbar mehr Gewicht auf der Uhr bekommt, ohne den
+Wechsel-/Zug-Code zu beruehren; `KURVE_WENDIG` bleibt proportional (`KURVE_KOSTEN/100`), WENDIGKEIT
+100 gleicht die Kurve weiterhin vollstaendig aus.
+
+Gemessen, Kader-Familie (live-save, fuenf Paarungen), Schalter an (`staffelMarkeZug(true,
+{modus:"ki"})`, FLIEG_MAX 0,24 unveraendert):
+
+| Variante | rho/Spiel (Median) | Spannweite | vigilante-armageddon | Pp S1/S2 | Star Rang1 | Star ≤2 | Paartreue ≥15 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| vorher (O2, Sechzehnter Nachtrag) | 0,937 | 0,188 | 0,756 | 35,6 / 37,9 | 61 % | 88 % | 99,8 % |
+| **nachher (Tempo-Kanal-Fix)** | **0,933** | **0,105** | **0,845** | **21,1 / 22,0** | **60,0 %** | **88,3 %** | **99,9 %** |
+
+Alle fuenf Paarungen einzeln (n=48, nachher): vigilante-armageddon 0,845 · coldsteel-direlegion
+0,878 · goldengladiators-silversoldiers 0,950 · mortalsin-natureswrath 0,936 ·
+piratecrew-raginglunatics 0,933. Reproduziert bei n=96 (0,933 Median, Sentinel 0,840) — kein
+n=48-Zufallstreffer.
+
+**Alle Extremvarianten jetzt ebenfalls ueber 0,80** (vorher war 0,797 das Maximum ueber alle
+getesteten Varianten): KI 0,845 · Kader-Regel 0,849 · alle Normal (mit Gewinn) 0,822 · alle
+Angreifen 0,814 · alle Absichern 0,841 · Zufalls-Haltung 0,826. Das stuetzt die Diagnose: die
+Ursache sass nicht in einer bestimmten Haltung oder einer bestimmten Marke-Vorgabe, sondern im
+rezeptweiten Tempo-Kanal, der jede Variante gleich betraf.
+
+**Vier Abnahmekriterien dieser Runde — drei klar erfuellt, eines ein ehrlicher Fast-Treffer:**
+(a) Sentinel vigilante-armageddon ueber 0,80: **erfuellt**, 0,845 (vorher 0,756), mit Marge
+reproduziert bei n=96 und in jeder getesteten Extremvariante. (b) Median-rho mindestens auf dem
+bisherigen Niveau: **0,933 gegen 0,937, −0,004** — eine Bewegung, die kleiner ist als die eigene
+Kader-Spannweite dieser Messung (0,105-0,111) und nach dem Massstab aus Abschnitt „Messgrundlage
+kaderfest" von Null nicht zu unterscheiden ist, aber formal unter dem Vorwert; mehrere
+Gegenproben (KURVE_KOSTEN 0,17/0,20/0,24, ANTRITT-Speed 28 vs. 32) bestaetigten dasselbe
+Plateau um 0,930-0,935, kein Hinweis auf einen einfachen weiteren Gewinn. (c) Pp ≤ 25 bei zwei
+Saatstroemen: **erfuellt**, 21,1 / 22,0 (vorher 35,6 / 37,9) — der verbleibende Rest sitzt in
+Charisma (−6,0/−6,5 Pp), dessen einzige Kanaele TECHNIK/WUCHT absichtlich unangetastet blieben,
+und Health (−2,0, Matrixgewicht nur 2). (d) Star auf Rang 1 nicht weiter verschlechtert:
+**im Rahmen der Messgenauigkeit erfuellt** (60,0 % gegen 61 % vorher, Differenz < 1 Standardfehler
+bei n=240 Rennen) — bleibt aber klar unter dem Vor-O2-Stand von 69 %. Das deckt sich mit der
+eigenen Diagnose des O2-Konzeptpapiers (5.4): der Ruecksetzer kommt aus dem haelftig geteilten
+fliegenden Gewinn selbst (`FLIEG_MAX`), nicht aus dem Tempo-Kanal, den diese Runde behoben hat —
+eine Korrektur daran wuerde den Wechsel-/Zug-Mechanismus aendern, den diese Runde bewusst nicht
+anfasst, s.o. Bleibt ein offener Punkt fuer eine kuenftige, auf `FLIEG_MAX`/den Marke-Gewinn
+fokussierte Runde.
+
+**Isolation geprueft:** `node scripts/miss-alle-disziplinen.mjs 24 staffel spurt time-trial
+takeshis-castle climbing` — spurt/time-trial/takeshis-castle/climbing unveraendert (0,880 /
+0,923 / 0,898 / 0,837, identisch zum Stand vor dieser Runde), weil `KURVE_KOSTEN`/`KURVE_WENDIG`
+ausschliesslich hinter `BA().staffel` scharf sind und die anderen vier Bahnen ihr eigenes
+`rezept` fuehren. `node --check public/mockups/battle-mode.engine.js` sauber. Staffel mit
+Schalter AUS (Produktionsstand) bewegt sich mit, weil das Rezept unconditional ist (nicht hinter
+`staffelMarkeZug.aktiv`): 0,906 bei n=24 (vorher 0,899, 26.09.-Nachtrag) — keine Verschlechterung
+des heute aktiven Standardverhaltens.
+
+Geaenderte Datei: nur `public/mockups/battle-mode.engine.js` (`BAHN_ART.staffel.rezept`,
+`KURVE_KOSTEN`/`KURVE_WENDIG`). Wechsel-/Zug-Code (`stepSpurt`, `zugFaktor`, `ZUG_FADE`,
+`STAFFEL_MARKE`, `FLIEG_MAX`) byte-identisch.
+
+---
+
+**Sechzehnter Nachtrag 04.10. — drei Bahn-Pakete aus der Nachtkonzeptrunde gebaut (Staffel O2,
+Spurt S-N1+S-N2, Time-Trial J2).** Chris hat nach den Nachtkonzepten vom 03.10. drei Pakete zum
+Bau freigegeben. Alle drei teilen sich `battle-mode.engine.js` (`BAHN_ART`, `stepSpurt`,
+`tempoVon`) und wurden deshalb nacheinander in einem Arbeitsbaum gebaut, je ein Commit. Die
+beiden Klasse-B-Pakete stehen hinter einem QA-Schalter, Standard **aus** (Muster
+`sandsackVorschauAktiv`); ohne Schalter ist jede Bahn bit-identisch zu vorher (Rohdaten-Hash der
+Sonde, nicht nur rho). Gemessen mit derselben Kader-Familie (live-save, fuenf Paarungen) wie
+alle Zahlen hier; Pp mit `einflussVon` an zwei Saatstaemmen (Versatz 0 / 10 000 000).
+
+1. **Staffel — Paket O2 „Marke und Zug"** (`docs/design/staffel-nachtkonzept-03-10.md`).
+   Gebaut: B1 Marke (Wechsel als Risikoregler mit fliegendem Gewinn, FLIEG_MAX 0,24), B2 Zug
+   (Haltung auf dem Bein, Traeger 0,5·WUCHT+0,5·TECHNIK), B3 Stufe 1 (Automatik aus
+   Persoenlichkeit, Tabelle 3.4, ohne den bedingten Duellanten = O3), B4 Anzeigen (Anlaufmarke,
+   Wechselzeile mit Vorzeichen, Bein-Duell-Banner, Abstandsuhr am Wechsel-Schild,
+   Einbruch-Banner, Anweisungsbilanz im Endstand). Nicht gebaut: O3, Stufe-2-Managerfeld.
+   Schalter: `window.__arena.staffelMarkeZug(true,{modus:"ki"})`.
+
+   *Zwei Abweichungen vom Papier, beide begruendet:* (a) Der fliegende Gewinn wird physisch als
+   Vorlauf von 0,65·|netto| Sekunden umgesetzt (symmetrisch zum Stolpern auf 35 % Tempo) und
+   `startT` rueckt um denselben Betrag vor — K4 sagt nur „startet in der Uhr frueher", was in
+   einem integrierenden Motor allein keine Zeit bringt. (b) Der Fade-Beiwert des Angriffs ist am
+   Motor kalibriert: 0,00004 (Papier) ergibt einen Break-even unter traeger 30, der Angriff waere
+   fuer fast alle ein Gewinn. **ZUG_FADE 0,000068 → Break-even traeger 62,9**
+   (`window.__arena.staffelZugProbe`, 480 Beine echter Kaderprofile):
+
+   | traeger | n | Angriff gegen Normal (ms je Bein) | Angriff traegt | Absichern (ms) |
+   |---|---:|---:|---:|---:|
+   | < 40 | 142 | −114,6 | 0 % | −24,8 |
+   | 40–55 | 128 | −50 bis −24 | 0 % | −20,5 |
+   | 55–60 | 37 | −11,6 | 0 % | −20,8 |
+   | 60–65 | 33 | −0,6 | 39 % | −20,9 |
+   | 65–70 | 61 | +11,1 | 100 % | −20,3 |
+   | ≥ 70 | 79 | +21 bis +41 | 100 % | −19 |
+
+   *Designregel 1:* Schalter an, alle Normal, `fliegMax:0` → Hash `b28b99a1475b`, identisch zu
+   Schalter aus. *Isolation:* spurt/time-trial/takeshis-castle/climbing bit-identisch.
+
+   Gemessen, n=48 (rho) / n=48 (Pp), 6 je Seite:
+
+   | Variante | rho/Spiel | vigilante-armageddon | Saison | Pp S1 / S2 | Star Rang 1 | Star ≤ 2 | Paare ≥15 | Patzer | getragen / eingebr. | Sieger kippt |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | heute (Schalter aus) | 0,895 | **0,698** | 0,930 | 37,7 / 41,1 | 69 % | 88 % | 98,8 % | 0,48 | — | — |
+   | **KI (Persoenlichkeit, Stufe 1)** | **0,937** | **0,756** | 0,923 | **35,6 / 37,9** | 61 % | 88 % | 99,8 % | 0,42 | 1,0 / 1,6 | 1 % |
+   | Kader-Regel (Modell-KI) | 0,928 | 0,797 | 0,937 | 37,2 / 34,7 | 65 % | 93 % | 99,8 % | 0,50 | 3,3 / 0 | 3 % |
+   | alle Normal (mit Gewinn) | 0,915 | 0,729 | 0,923 | 38,8 / 39,4 | 60 % | 85 % | 99,6 % | 0,49 | — | 4 % |
+   | alle Angreifen | 0,930 | 0,759 | 0,965 | 31,0 / 30,0 | 61 % | 85 % | 99,7 % | 0,88 | 3,7 / 8,3 | 9 % |
+   | alle Absichern | 0,927 | 0,771 | 0,937 | 42,6 / 40,4 | 65 % | 90 % | 99,7 % | 0,27 | — | 1 % |
+   | Zufall (Namens-Hash) | 0,929 | 0,797 | 0,951 | 35,8 / 35,2 | 62 % | 84 % | 99,5 % | 0,58 | 1,2 / 1,8 | 6 % |
+   | KI, FLIEG_MAX 0,16 (Info) | 0,931 | 0,756 | — | 36,0 / 39,9 | | | | | | |
+   | KI, FLIEG_MAX 0,32 (Info) | 0,940 | 0,769 | — | 34,2 / 35,4 | | | | | | |
+
+   Beingroessen (KI, n=48): 2 je Seite 0,836 (heute 0,825), 4 je Seite 0,870 (heute 0,880), 6 je
+   Seite 0,937 — Median ueberall ueber 0,80; die Automatik zeigt bei 2 je Seite auf keinen
+   fehlenden Mittellaeufer (Bein 1 ohne Marke, jeder Haltung aus eigenem Kader).
+
+   **Ehrlich gegen die Abnahme aus 7.3:** rho-Median bestanden und deutlich besser (0,895 →
+   0,937); Pp nicht schlechter (37,7/41,1 → 35,6/37,9), Ziel ≤ 25 weiter offen. **Nicht
+   bestanden: der Sentinel** — vigilante-armageddon steigt 0,698 → 0,756, bleibt unter 0,80
+   (Modell sagte 0,867; das Modell reproduzierte schon den Basiswert nicht, 0,811 statt 0,698).
+   Auch FLIEG_MAX 0,16/0,32 und alle Extremvarianten bleiben darunter (beste 0,797). Diagnose:
+   in dieser Paarung liegen acht von zwoelf Laeufern zwischen Eignung 39 und 46, und ihre
+   Reihenfolge folgt der Rezeptform statt der Eignung (Lulu, Eig 39,4, im Mittel Rang 4–5;
+   Jorund, Eig 45,8, Rang 7) — das ist der Tempo-Kanal/Pp-Rest (Speed +10), den das Papier selbst
+   als eigene Runde ausweist, nicht ein Wechsel-/Haltungsproblem. **Ebenfalls nicht bestanden:
+   „Star auf Rang 1 nicht unter heute"** — 69 % → 61 % (Star in den ersten zwei bleibt 88 %); der
+   Effekt kommt aus dem fliegenden Gewinn selbst (alle Normal mit Gewinn: 60 %), der hälftig
+   beiden Wechselpartnern gutgeschrieben wird — derselbe Zielkonflikt, den das Papier in 5.4 fuer
+   FLIEG_MAX benennt. **Kleiner als vorhergesagt:** Sieger kippt in 1 % statt 10 % der Rennen
+   (die Automatik vergibt bei diesem Kader ueberwiegend Absichern-Marken, 5,3 von 10, weil viele
+   Paare unter TECHNIK 45 liegen), Fuehrungswechsel steigen nicht (0,56 → 0,51 je Rennen,
+   gemessen als Fuehrung je 1 % Strecke), Zielabstand waechst (1,20 → 1,43 Sim-s Median).
+   Sichtprobe (Live-Rennen, Tempo 4×): keine Seitenfehler, alle B4-Anzeigen erscheinen.
+
+2. **Spurt — Paket S-N1 + S-N2 „Die Säule muss laufen"** (`docs/design/spurt-nachtkonzept-03-10.md`).
+   Gebaut: S-N1 Joker-Station (8 % der Strecke, **nur KI-Vorgabe**: teuerster eigener Stopp, bei
+   Gleichstand die spaeteste — keine Manager-Anweisung), S-N2 Station als Bewegung (Kriechen
+   k=0,25, Stopp ×1/(1−k), Puste-Gutschrift am Hindernis ×(1−k)), S-N5 Anzeigen
+   (Stationsduell-Tafel, gedrosselter Ticker fuer die saubere Station mit Stationsbestzeit,
+   Fotofinish-Banner unter 0,1 echten Sekunden **ohne** Pause/Standbild — die angehaltene
+   Sekunde waere T und ist nicht gebaut), dazu die Joker-Schleife als Bogen im Bild und eine
+   Tickerzeile beim Abbiegen. Nicht gebaut: S-N3, S-N4, Manager-Joker.
+   Schalter: `window.__arena.spurtSaeule(true)` (Teilschalter `{joker:false}` /
+   `{kriechen:false}` fuer die Einzelmessung). Neue Sonde: `spurtSzenenProbe`.
+
+   Gemessen n=24 je Paarung, 6 je Seite (Papier-Vorhersage in Klammern):
+
+   | Variante | rho/Spiel | Saison | Pp S1 / S2 | Stillstand | Saeulenzeit | Restpuste | Einbr./Rennen | Star Rang 1 / ≤ 2 | Paare ≥15 |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | heute | 0,880 | 0,939 | 19,2 / 15,4 | 43,3 % | 19,7 % | 15 % | 3,4 | 48 / 76 % | 99,3 % |
+   | **Paket** | **0,910** (0,907) | 0,963 (0,964) | **18,7 / 15,6** (16,1 / 12,5) | **0,0 %** (0) | **0,0 %** (0) | 18 % (18) | 2,5 | 57 / 80 % | 99,5 % |
+   | nur Joker | 0,901 (0,903) | 0,964 (0,972) | 18,9 / 18,0 (23,5 / 19,5) | 36,1 % | 17,3 % | 12 % (11) | 5,2 | 57 / 85 % | 99,5 % |
+   | nur Kriechen | 0,891 (0,891) | 0,965 (0,965) | 17,8 / 18,9 (17,8) | 0,0 % | 0,0 % | 25 % (24) | 1,3 | 50 / 73 % | 99,4 % |
+
+   Joker-Stationen (KI, 120 Rennen × 12): Mauer 1044, Seil 252, Strohballen 96 — die
+   Kraftstationen dominieren wegen `wuchtPreisFaktor`, wie das Papier vorhersagt.
+   Beingroessen (Paket, n=24): 4 je Seite 0,870 → 0,921; **2 je Seite 0,725 → 0,717** — dort
+   lag schon die Basis unter 0,80 (das Papier hat 2/4 je Seite nicht gemessen); ehrlichere
+   Abnahme bei 2 je Seite: Star in den ersten zwei 93 % → 93 %, Paare ≥15 96,6 % → 97,8 %.
+
+   **Bewertung:** rho, Saison, Stillstand, Saeule und Restpuste treffen die Vorhersage auf ±0,01
+   bzw. ±1 Punkt. **Pp bleibt an beiden Staemmen klar unter 25, verbessert sich aber nicht wie
+   vorhergesagt** (18,7/15,6 gegen heute 19,2/15,4, Papier 16,1/12,5) — im Mittel neutral.
+   Ohne Schalter bit-identisch (Rohdaten-Hash spurt `fc7f6b28a7e8` unveraendert);
+   Isolationsnachweis ueber alle zwanzig s. Punkt 4 unten. Sichtprobe: keine Seitenfehler,
+   Joker-Bogen, Duell-Tafel und Stationsbestzeiten erscheinen; ein Fotofinish unter 0,1 s kam
+   im Probelauf nicht vor (selten, wie im Papier).
+
+3. **Time-Trial — nur J2 „Die Live-Ampel"** (`docs/design/time-trial-nachtkonzept-03-10.md`
+   Abschnitt 3.3). **J1 (Startfolge umkehren) ist NICHT gebaut** — Chris hat es abgelehnt („So
+   lassen"), die Startfolge ist unveraendert. Gebaut, Klasse A, ohne Schalter direkt aktiv: stille
+   Messpunkte alle 10 % als **eigenes** Feld `ampelPunkte`/`u.mp` (nicht in `zwischenzeiten` —
+   Endstand-Spalten und ZZ-Toene bleiben unveraendert), Ampel im Fokus-Panel (grün/rot gegen die
+   Messpunktzeit des Hot-Seat-Halters, vor dem ersten Zieleinlauf gegen die Bestzeit im Feld),
+   Ticker nur bei Kipppunkten (Farbwechsel, mit Gelaendegrund „der Berg kostet" / „die Abfahrt
+   bringt es"), Regie-Automatik auf den Fahrer innerhalb 3 % des Hot Seats mit 4 s
+   Mindestverweildauer. Neue Sonde: `ttAmpelProbe` (spielt die Ampel in echter Zeitfolge nach).
+
+   **Bit-identisch:** Rohdaten-Hash time-trial `6ba2652ef3e4` vor und nach (rho 0,923 / Saison
+   0,902, n=24), ebenso spurt und staffel. Die Messpunkte schreiben nur `u.mp` (Uebergangszeit
+   im Tick interpoliert), nichts davon fliesst in `tempoVon()`/`wert()` zurueck, kein `rr()`.
+   **Dramaturgie wie vorhergesagt fast stumm:** 120 Rennen (Kader-Familie × 24) — Kipppunkte je
+   Rennen Median **1** (Papier 1), P90 5 (Papier 4), 46 % der Rennen ganz ohne Kipppunkt;
+   Hot-Seat-Wechsel Median 0. Das ist der bekannte und akzeptierte Befund „J2 ohne J1 ist die
+   Erzaehlung ohne die Reihenfolge"; die Regie findet ohne J1 kaum Kandidaten innerhalb 3 %
+   und bleibt in der Sichtprobe bei der Startnummernfolge. Sichtprobe: Ampel erscheint im Panel
+   („● ROT +17,8 s gegen Bestzeit bei 80 %", danach „gegen Hot Seat"), keine Seitenfehler.
+
+4. **Isolationsnachweis ueber alle zwanzig.** Endstand dieses Arbeitsbaums (alle drei Pakete,
+   Schalter aus) gegen `main` `e0225175`: der SHA-1 der kompletten `disziplinProbe`-Rohdaten
+   (jeder Teilnehmer, jede Eignung, jeder Wert, jede Etappe) ist fuer **alle zwanzig**
+   Disziplinen identisch (n=4 je Paarung, fuenf Paarungen; bei n=24 zusaetzlich fuer spurt,
+   time-trial, takeshis-castle, climbing und staffel). Ein Hash-Vergleich ist strenger als ein
+   rho-Vergleich — er wuerde schon eine einzige verschobene Nachkommastelle zeigen. Die volle
+   n=24-Runde ueber alle zwanzig wurde zweimal gestartet und abgebrochen: die Maschine lief mit
+   Last ~20 auf 4 Kernen (parallele Messlaeufe anderer Sitzungen), TDM allein brauchte bei n=4
+   sechs Minuten. Ohne Schalter sind die Bahn-Rennen ausserdem strukturell unberuehrt: jede neue
+   Zeile haengt an Feldern (`u.haltung`, `u.marke`, `u.kriechK`, `u.jokerIdx`), die nur der
+   QA-Einstieg vergibt, bzw. an `u.mp`, das nie zurueckgelesen wird.
+
+---
+
+**Sechzehnter Nachtrag 04.10. (Tennis) — nur der abgeschwaechte Druckmesser (T-N1, Klasse A\*),
+die Kernmechanik bleibt `vorteil`.** Chris hat die Tennis-Kernmechanik aus dem Nachtkonzept
+(`docs/design/tennis-nachtkonzept-03-10.md`, **T-N2 „Rennen bis 7" als Platzentscheider mit
+Clutch-/Momentum-Termen**) ausdruecklich **abgelehnt — das gilt weiterhin**. Gebaut wurde deshalb
+weder T-N2 noch das volle T-N1 (eine `a:b`-Tafel ueber ein Rennen, das nicht entscheidet, waere
+genau der Widerspruch, den Fechten mit F1 beseitigt hat), sondern nur die im Papier (3.1, Absatz
+„rho/Pp", und Frage 1 in Abschnitt 6) als „schwaecher, aber moeglich" beschriebene Fassung im
+heutigen Format:
+
+- **Siegchance und Wichtigkeit ueber die verbleibenden Runden** (`tennisDruckStand()` in
+  `battle-mode.engine.js`): symmetrisches Modell, Rundendifferenz ~ N(0, 30²), analytisch statt
+  Monte-Carlo (kein Zufall, kein `rr()`). Sigma 30 ist an 720 echten Plaetzen nachgemessen
+  (Rauschen innerhalb eines Platzes 29,4; Gesamtstreuung 36,5, davon Staerke-Drift 21,6).
+  Wichtigkeit nach Morris = erwartete Siegchance nach gewonnener minus nach verlorener naechster
+  Runde. Gelesen wird nur der von BEIDEN Seiten enthuellte Stand — spoilerfrei.
+- **Banner nach Wichtigkeit statt nach Ereignis**, Schwellen am echten `vorteil`-Verlauf
+  nachgerechnet (nicht aus der Rennen-bis-13-Tabelle uebertragen): MATCHBALL (Fuehrender kaeme
+  mit der naechsten Runde auf ≥ 95 %, faellt mit einer verlorenen auf ≤ 80 %; ~1,2 je
+  Mannschaftskampf, nur Runde 7–10), ABGEWEHRT (~0,3 je Kampf), ENTSCHEIDUNGSPUNKT (letzte Runde,
+  Wichtigkeit ≥ 0,5; ~0,5 je Kampf), COMEBACK (Sieger lag bei ≤ 15 %; ~0,26 je Kampf). Die
+  naheliegende Schwelle „Siegchance > 90 %" taugt in diesem Format NICHT als Matchball: sie wird
+  in 91 % aller Plaetze ueberschritten, meist schon in Runde 2–5.
+- **Ticker-Dosis aus der Wichtigkeit:** eigene Zeile nur fuer Runden mit Wichtigkeit ≥ 0,30,
+  Fuehrungswechsel/BREAK nur dort als Banner, eine Druck-Uebersicht je Runde. Nebenbefund: die
+  Ballwechsel-Zeilen gaben immer ein `kind` mit und landeten deshalb trotz Stufe „routine" alle
+  im sichtbaren Ticker (vorher 145 Zeilen in 1:02 = 140/min). Nachher 20 Zeilen (19,4/min) im
+  Ticker, alles Uebrige im Protokoll — Zielband ≤ 30 erreicht.
+- **Spannungsleiste je Platz** (Fuellstand in der Mannschafts-Leiste = Wichtigkeit der naechsten
+  Runde) und die Siegchance des Fokus-Platzes in der Kopfzeile.
+
+**`vorteil`-System unveraendert:** `u.summe`, `vorteil`, `verlauf`, `runden[]`, Punktevergabe,
+`punktGewinner`/Aufschlag (`TENNIS_AUFSCHLAG_H`, Tiebreak-Wechselregel) und der Platzsieger
+(`u.vorteil>0`) sind bit-identisch — nachgewiesen auf Rundenebene (120 Spiele, voller
+`TEILNEHMER`-Dump), im Produktionspfad `spieleBuehneDuell("tennis")` (200 Spiele, `seiten` +
+`boxscore`) und mit den Abnahmesonden (s. Tabelle). Kein Feature-Flag noetig.
+
+| Sonde (vorher = Engine aus `HEAD`, nachher = dieser Stand, je eigener Spiegelbaum) | vorher | nachher |
+|---|---:|---:|
+| `miss-alle-disziplinen.mjs 24`, Tennis rho je Spiel / Saison (Median, Spannweite) | 0,813 (0,199) / 0,944 | 0,813 (0,199) / 0,944 |
+| `miss-alle-disziplinen.mjs 24`, alle zwanzig Disziplinen | — | Ausgabe zeichengleich (`diff` leer) |
+| `messe-arena-einfluss.mjs tennis 48`, Strom 1 / `--saat-versatz=10000000` | 6,9 / 4,4 Pp | 6,9 / 4,4 Pp (Attributvektoren zeichengleich) |
+| `miss-ticker-dichte.mjs tennis` (sichtbarer Ticker) | 145 Zeilen, 140/min | 20 Zeilen, 19,4/min |
+
+(Die im Nachtkonzept zitierten Pp 9,8 / 6,2 stammen aus PR #1135; der heutige `main`-Stand misst
+6,9 / 4,4 — beides weit unter 25, und von dieser Aenderung unberuehrt.)
+
+**Ehrlich:** das ist deutlich weniger Drama als das abgelehnte Rennen bis 7 (Papier: ~5
+„abgewehrt" je Kampf). Die meisten Plaetze sind im Summenformat frueh strukturell entschieden
+(nur 6 % enden innerhalb ±20 Punkte); in einem von fuenf Sichtpruefungs-Spielen kam gar kein
+Druckmesser-Banner, nur die Uebersichtszeilen. Der Druckmesser zeigt das jetzt, statt es zu
+ueberschreien.
+
 **Fuenfzehnter Nachtrag 02.10. — reine Doku-Pflege: Staffel-Pp bei n=48 bestaetigt, Breaking-Pp
 nach dem Speicherleck-Fix neu gemessen.** Zwei offene Positionen aus fruaheren Nachtraegen
 nachgezogen, keine Code-Aenderung in `battle-mode.engine.js`.
@@ -1013,7 +1286,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Hockey | 71 % | 0,725 (Feldspieler) / 0,686 (alle 12), 26.09.-Nachtrag | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Fechten | 48 % | 0,825 (26.09.-Nachtrag) | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf, bewusst NICHT in dieser Runde umgebaut (Puffer 0,016 kleiner als das eigene Kaderrauschen 0,192 — Beobachtungspunkt fuer die naechste Neumessung, s. Sechster Nachtrag) · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · **Nachtrag 07.09.:** Waffenschwung-Pose zeigt jetzt IMMER eine Schwertwaffenebene statt der zufaelligen Kosmetik-Waffe, rho bit-identisch bestaetigt · nicht im echten Spielstand |
 | Tennis | 48 % | 0,821 (26.09.-Nachtrag) | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · nicht im echten Spielstand · **Nachtrag 07.09. (Tennis-eigene Rezeptkalibrierung, s. `battle-mode.engine.js` Kommentar bei `BUEHNE_ART.tennis`):** das Rezept war bis hierher tatsaechlich 1:1 aus dem alten Feldspiel-Rezept uebernommen, nie gegen Tennis' eigene MATRIX gefittet (`docs/pm-briefings/pm-gesamtstand-07-09.md` Abschnitt 6 Punkt 5) — dieselbe Luecke wie bei Gewichtheben/Breaking vor deren NACHGEZOGEN-Korrekturen: TECHNIK (der Rollenkanal mit dem groessten Erfolgs-Koeffizienten) trug determination (Matrixgewicht 6) statt dexterity (12), und PUBLIKUM (der rauschaermste Kanal, reiner Festzuschlag) trug charisma (Matrixgewicht 4, das niedrigste der ganzen Matrix) mit 45 % Rollengewicht statt awareness (20). Nach dem #820-Symmetriefix war Tennis kaderfest bei 0,786 durchgefallen (s. PR #840, Nebenfund); mit der Rezeptkorrektur (nur `rezept`-Attributgewichte geaendert, keine Aenderung an der gemeinsamen Buehnen-Punkteformel) jetzt kaderfest 0,786 -> 0,825 (n=24, Saison 0,846 -> 0,839) — die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen (`node scripts/miss-alle-disziplinen.mjs 24 gewichtheben showcase eiskunstlauf breaking wettessen speed-schach i-spy tennis fechten`). Ein Review-Anlauf hatte AUSDAUER testweise auf stamina:55/spirit:30/determination:15 verschoben (nicht Matrix-proportional: spirit (18) ist in Tennis' Matrix schwerer als stamina (12), die Verschiebung machte stamina aber noch dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der Schranke), AUSDAUER blieb deshalb unveraendert. Aspiratives 0,85-Ziel nicht erreicht — dafuer fehlt der Buehne weiterhin das Sinkhorn-Rezeptwerkzeug aus Recherche-Teil F.2. |
-| Time-Trial | 55 % | 0,929 (26.09.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis |
+| Time-Trial | 55 % | 0,929 (26.09.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis · **Nachtrag 04.10.:** J2 Live-Ampel (stille Messpunkte, Kipppunkt-Ticker, Regie) gebaut, bit-identisch; J1 nach Chris' Entscheidung nicht gebaut, s. Sechzehnter Nachtrag |
 | Gewichtheben | 70 % | 0,843 (26.09.-Nachtrag) | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 07.09. (kuehner Versuch, `docs/design/gewichtheben-risiko-versuch-recherche-06-09.md`):** freiwilliger Zuschlag ueber das Ausgleichskilo im dritten Versuch, deterministisch aus ANSAGE, mit Verletzungsrisiko bei Misslingen und "Punktesieg"-Auszeichnung bei Gelingen — Belohnung bewusst NICHT in `u.summe`/`u.zweikampf`, sondern reines Ticker-/Boxscore-Ereignis (s. Recherche Abschnitt 2.5). #840 zog die Basislinie nach der #813/#820-Bisektion auf 0,847 zurueck; die frische Neumessung dieser Runde (07.09., an `main` `7a70413e`) bestaetigt seither **0,854** — Bewegung liegt innerhalb der eigenen Kaderrauschen-Spannweite (~0,21) und ist damit nicht von Null unterscheidbar, keine neue Rezeptaenderung. |
 | Climbing | 48 % | 0,814 (26.09.-Nachtrag) | Steigung und Kraftbudget statt Antritt · nach PR 2 (26.09., Griffarten/Balance/Zeitlimit kalibriert) kaderfest wieder bestanden (vorher 0,790, knapp) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,906 (26.09.-Nachtrag) | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld ausser Staffel · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
@@ -1022,9 +1295,9 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Breaking | 40 % | 0,833 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik · **Nachtrag 07.09. (dieselbe Recherche wie Eiskunstlauf):** stand kaderfest mit knappstem Puffer aller bestandenen Disziplinen (0,804, nur 0,004 ueber der Schranke) — `rundenN` 4→8, `rundenDauer` 1,25→0,625 hebt kaderfest auf **0,869** (Saison 0,951). Dazu dieselbe Waffenpose-Korrektur wie Eiskunstlauf, rho-neutral |
 | Showcase | 40 % | 0,896 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,874 (26.09.-Nachtrag)** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |
-| **Staffel** | **48 %** | **0,899 (26.09.-Nachtrag)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |
+| **Staffel** | **48 %** | **0,906 (06.10.-Nachtrag, n=24, Schalter aus)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand · Paket O2 „Marke und Zug" hinter QA-Schalter (Standard aus) · **Nachtrag 06.10. (Siebzehnter Nachtrag):** Tempo-Kanal-Rezept nachgezogen (ANTRITT/ENDTEMPO verloren Speed/Stamina-Uebergewicht, gewannen Dexterity/Awareness/Spirit; `KURVE_KOSTEN` 0,12→0,20) — mit Schalter KI rho 0,933 (n=48/96, vorher 0,937), **Sentinel vigilante-armageddon 0,845 — jetzt ueber 0,80** (vorher 0,756, bestes vorher 0,797), Pp 21,1/22,0 (vorher 35,6/37,9, Ziel ≤25 **erreicht**), Star Rang1 60,0 % (vorher 61 %, statistisch flach, bleibt unter dem Vor-O2-Stand 69 % — Ursache laut O2-Papier der haelftig geteilte fliegende Gewinn, nicht der Tempo-Kanal, absichtlich nicht angefasst). Wechsel-/Zug-Mechanismus (TECHNIK/WUCHT/ZUG_FADE/FLIEG_MAX) byte-identisch, alle Extremvarianten (Angreifen/Absichern/Zufall/Kader-Regel) jetzt ebenfalls ueber 0,80 |
 | I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) |
-| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt |
+| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 04.10.:** Paket S-N1+S-N2 (Joker 8 % + Kriechen) hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter rho 0,910 (heute 0,880, n=24), Pp 18,7/15,6, Stillstand und Saeulenzeit 0 %, s. Sechzehnter Nachtrag |
 | **Football** | **32 %** | **0,818 (26.09.-Nachtrag — die alte 0,516 war stale, keine heutige Codeaenderung an Football, s. Zwoelfter Nachtrag)** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
 | Mini-DM | 30 % | 0,394 (26.09.-Nachtrag) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
 | TDM | 30 % | 0,306–0,326 (26.09.-Nachtrag) | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
@@ -1089,3 +1362,116 @@ Varianten fehlerfrei, das Verhalten ist monoton im Koennen; das Problem liegt in
 deterministischer Rätselart-Rotation statt fixer Spezialisierung, oder Chris' Entscheidung zur
 "ehrlicheren Abnahme" aus `CLAUDE.md` (Ist-Stand erfuellt dort 3 von 4 Bedingungen, Star Rang1 nur
 2,5 Punkte unter der Schranke).
+
+## 8. Speed-Schach: „Die Uhr wird der dritte Spieler", Stufe 1 + 2 — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/speed-schach-nachtkonzept-03-10.md` (Abschnitt 3.2/3.3), von Chris zum Bau
+freigegeben. Stufe 3 (Armageddon) bewusst **nicht** gebaut (Klasse T, abgelehnt); auch sonst kein
+Mechanismus, der ein 3:3 erzwingt oder verhindert. Klasse B, deshalb hinter
+`BUEHNE_FLAGS.speedSchachUhr` in `battle-mode.engine.js`, **Standard 0 = aus** — jeder echte
+Spielstand laeuft unveraendert (Muster `sandsackVorschauAktiv`). Einschalten fuer Messungen:
+`--flags=speedSchachUhr:1|2` an `miss-alle-disziplinen.mjs`, `messe-arena-einfluss.mjs`,
+`miss-speed-schach-spiegel.mjs` und dem neuen `miss-speed-schach-uhr.mjs` (Brett-Kennzahlen).
+
+Gebaut: TEMPO (speed 50/dexterity 30/awareness 20), entkoppelte Uhr 12 s/17 s × (1+(50−TEMPO)·0,022),
+Start 180 s, Zeitnot unter 30 s, `u.geflaggt`/`u.zeitSieg` im Paarungsblock (genau einer geflaggt →
+Brett auf Zeit verloren, sonst `vorteil`), ein gemeinsamer Brettentscheid `duellBrettSieg()` fuer
+alle fuenf Leser. Stufe 2: Ansage rechnen/normal/blitzen (×1,30/+4 pp · ×1 · ×0,72/−4 pp), Zeitnot
+−0,10·(1−NERVEN/100)·1,6 auf die Erfolgschance, Restzuege nach dem Blaettchen 0 Punkte, KI =
+Zeitbudget-Regel (25 s Rand). Uebergabe `{d,slot,haltung}` im Motor und im Adapter-Typ angelegt
+(die Einsatzliste selbst hat noch kein Haltungsfeld — Grundgeruest der Konsultation, Zeile 0).
+
+Gemessen am echten Motor, kaderfest (Familie live-save, 5 Paarungen), 04.10.:
+
+| | Flag aus (heute) | Stufe 1 | Stufe 2, KI beidseitig | Papier-Sonde (5.2, KI) |
+|---|---:|---:|---:|---:|
+| rho je Spiel (Median, n=24) | 0,898 | 0,898 (bit-identisch) | **0,909** | 0,923 |
+| rho je Spiel 4 / 2 je Seite | 0,914 / 0,906 | — | 0,915 / 0,892 | — |
+| Pp n=48, zwei Saatstroeme | 17,7 / 17,6 | 17,7 (bit-identisch) | **11,8 / 11,4** | 12,2 / 13,4 |
+| Pp n=24 gestueckelt 4×6, zwei Stroeme | 17,2 / 18,4 | — | **12,6 / 11,3** | — |
+| speed-Anteil (Matrix 10) | 7,0 % | 7,0 % | 10,2 % | 8,5 % |
+| Spieler geflaggt (n=48 je Paarung) | — | 26,8 % | 5,6 % | 1,2 % |
+| Brett auf Zeit gegen den Vorteil | — | **3,9 %** | **0,0 %** | 0,0 % |
+| Mannschaftskampf 3:3 | 22,5 % | 21,7 % | 20,4 % | ~30 % |
+| Spiegeltest Heim:Gast (600, identischer Kader) | 256:260 | 256:260 | 249:243, Bretter 2,52:2,52 | — |
+
+„Kein Knopf immer besser" (Heimsieg gegen KI-beidseitig 67,5 % / Gastsieg 12,1 %, die Familie ist
+heimlastig, s. Flag aus 68,3/9,2): Heim pauschal rechnen 20,4 %, pauschal blitzen 63,8 %; Gast
+pauschal rechnen 9,2 %, blitzen 7,9 % — beide Pauschalen verlieren auf beiden Seiten gegen die
+KI-Regel. Extremfaelle: alle rechnen rho 0,839 (47 % geflaggt, 16,7 % Entscheide gegen den
+Vorteil), alle blitzen 0,887. KI-Ansagen: rechnen 44 % · normal 17 % · blitzen 38 %.
+
+**Ehrliche Befunde.** (1) Der echte Kader streut TEMPO von 10 bis 99 (Quartile 34/75) — viel
+breiter als die synthetische Sonde. In **Stufe 1 allein** flaggt deshalb praktisch jeder unter
+TEMPO 35 und keiner ueber 40: 46,5 % der Bretter werden auf Zeit entschieden, fast immer im Einklang
+mit dem Vorteil, aber deterministisch nach TEMPO statt als Ereignis. Stufe 1 ohne Stufe 2 ist so
+nicht empfehlenswert; mit Stufe 2 waehlen langsame Haende Blitzen, und nur noch 5,6 % flaggen.
+(2) Mit der Zeitbudget-KI auf **beiden** Seiten entsteht **kein** Sieg auf Zeit gegen den Vorteil
+(0,0 %, wie die Sonde in 5.2 und deren Lesart 5.3 Punkt 5): Botez-Hansen-Momente kommen nur aus
+Manager-Entscheidungen (Heim rechnen: 22,2 %). Sensitivitaet, nicht eingebaut: KI-Rand 10 s →
+0,7 %, 0 s → 3,3 % (rho 0,901, Pp 11,8) — eine einzige Konstante (`SCHACH_KI_RAND_S`), falls Chris
+das Zielband 1–5 % auch ohne Manager-Eingriff will.
+
+## 9. Wettessen: „Die Mauer, die Haltung" (K1 + K2) — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/wettessen-nachtkonzept-03-10.md` (Abschnitt 3 K1/K2, Anhang A), von Chris
+freigegeben. K3 (Tunken) nicht gebaut; keine Disqualifikation, kein Live-Eingriff, `rundenN`/
+`rundenDauer`/60 s Sendezeit unveraendert. Klasse B hinter `BUEHNE_FLAGS.wettessenMauer`
+(0 aus · 1 K1 · 2 K1+K2), **Standard 0**. Eigene Weiche `mauer:true` an `BUEHNE_ART.wettessen`;
+`ermued` entfaellt nur dort und nur mit Flag, die anderen fuenf Buehnen bleiben unberuehrt.
+Messwerkzeug neu: `scripts/miss-wettessen-mauer.mjs` (echter Motor, kaderfest, inkl. Erwartung je
+Esser und Haltung ueber 40 feste Zufallsstroeme — der „tote Knopf"-Test).
+
+Gebaut: Fuellstand = Summe der Minutenpunkte, K = 65 + AUSDAUER·5 (Steigung 5 behalten — health/
+stamina liegen nur +0,4 bis +1,0 ueber der Matrix, die Stellschraube „4" war nicht noetig);
+Mauerfaktor 0,45+NERVEN·0,005, Erfolg −0,05, halber Bonus; Minute 10 doppelter WAGNIS-Trade-off,
+voller Bonus. K2: Sprint/Gleichmaessig/Schlussspurt, KI nach NERVEN (≥60 Schlussspurt, <45
+Gleichmaessig, sonst Sprint), Uebergabe `{d,slot,haltung}`.
+
+**Kalibrierung K2 am Motor** (das Papier warnte: erster Satz „Sprint immer am besten"). Am echten
+Motor kippte es mit den Startwerten andersherum: Sprint beste Wahl fuer 7 % (toter Knopf),
+Schlussspurt 69 %, beste Haltung staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+fuenf Konstanten, gewaehlt: Sprint-Erfolg −0,10 → **−0,07**, Schlussspurt-Bonus ×1,5 → **×1,18**,
+NERVEN-Zuschlag 0,004 → **0,006**, frueh ×0,97 → **×0,965** (Sprint-Basis ×1,10, K ×0,92 und
+Minuten wie im Papier). Ergebnis n=24 × 5 Paarungen:
+
+| Beste Haltung (Erwartung) | Sprint | Gleichmaessig | Schlussspurt |
+|---|---:|---:|---:|
+| alle Esser | 26,7 % | 26,8 % | 46,5 % |
+| NERVEN < 45 | 17,6 % | 79,2 % | 3,3 % |
+| NERVEN 45-59 | 35,1 % | 44,1 % | 20,9 % |
+| NERVEN ≥ 60 | 25,4 % | 2,6 % | 72,0 % |
+
+rho(beste Haltung, NERVEN) 0,657 > rho(…, Eignung) 0,625. KI trifft die beste Haltung in 63 %,
+Verlust gegen das Optimum 2,3 Punkte je Esser — jede Pauschale verliert mehr (alle Schlussspurt
+3,5 · alle Sprint 5,9 · alle Gleichmaessig 7,2): kein Knopf ist immer besser. Schwaechste Stelle:
+im Band NERVEN 45-59 waehlt die KI Sprint, im Mittel waere dort Gleichmaessig knapp besser (44 zu 35 %).
+
+Gemessen am echten Motor, kaderfest (Familie live-save), 04.10.:
+
+| | Flag aus (heute) | K1 | K1+K2, KI | Papier-Sonde (ohne Slot/Form) |
+|---|---:|---:|---:|---:|
+| rho je Spiel 6 je Seite (n=24) | 0,866 | 0,908 | **0,910** | 0,951 → 0,962 |
+| rho je Spiel 4 je Seite (n=24) | 0,801 | 0,833 | **0,848** | — |
+| rho je Spiel 2 je Seite (n=48) | 0,771 (knapp) | 0,792 (knapp) | **0,811** | — |
+| Pp n=48, zwei Saatstroeme | 14,1 / 15,0 | 9,2 / 9,8 | **8,7 / 10,0** | 11,8 → 12,2 |
+| will-Anteil (Matrix 26) / torment (6) | 22,5 / 12,0 | 25,6 / 7,4 | 25,3 / 9,0 | — |
+| Pp alle Sprint / alle Schlussspurt | — | — | 8,1 / 7,5 | 13,5 / 12,0 |
+| Mauer-Minute Median, Spanne | — | 7, 4-10 | 6, 4-10 | 7, 4-10 |
+| Spiegeltest Heim:Gast (300) | 154:146 | 149:151 | 152:147 | — |
+
+Kurve je Minute (K1+K2): 73 72 73 72 69 61 56 59 58 63 — statt der flachen Ist-Linie. Extremfaelle
+rho (6 je Seite): alle Sprint 0,913, alle Gleichmaessig 0,908 (= K1, bit-identisch), alle
+Schlussspurt 0,909; einseitige Pauschalen 0,909-0,914, Heimsieg 46,7-48,3 % gegen 50,0 % mit KI.
+
+**Offen/ehrlich:** (1) Die mittlere Seitensumme sinkt mit der Mauer um ~10,5 % (Spiegel 4744 → 4242
+Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` ist seit dem 04.10.
+(Nachtrag) MIT `wettessenMauer:2` gezogen (`scripts/ziehe-buehne-pps-referenz.ts wettessen
+--flags=wettessenMauer:2`, 64 Fixtures je Feldgroesse 2-6, Feld `buehneFlags` in der Datei).
+Mediane je Feldgroesse 847/798,5/764,5/742/699,5 → 781,5/745/703/666/632 (−6,7 bis −10,2 %),
+iKrass nur −0,2 bis −3,6 % (1230 → 1197 bei 5). Der Median-Esser bekommt damit wieder genau
+1,38 PPS (5,5 · 0,25); gegen die alte Referenz laege er mit Mauer bei 1,02-1,10. **Kopplung:**
+die Referenz wird unabhaengig vom Schalter statisch importiert — sie und `BUEHNE_FLAGS.wettessenMauer=2`
+muessen GEMEINSAM live gehen; mit Flag aus gegen die neue Referenz waere Wettessen ueberbewertet. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
+Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
+ohne Grundgeruest entscheidet immer die KI-Vorgabe.

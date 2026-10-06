@@ -54,6 +54,12 @@
 // schreibt direkt `data/generated/<disziplin>-pps-referenz.json`. `--feldgroesse=<n>` zieht nur
 // eine (Teil-Stand `<disziplin>-pps-referenz.partial-<n>.json`), `--merge` fuehrt die
 // Teil-Staende zusammen — beides wie in den Welle-1-Skripten.
+//
+// `--flags=wettessenMauer:2` (04.10., additiv): zieht die Referenz mit eingeschalteten
+// Nachtkonzept-Mechaniken (`BUEHNE_FLAGS` in battle-mode.engine.js, ueber die Runner-Option
+// `buehneFlags`). Die gesetzten Flags stehen danach als `buehneFlags` in der Referenzdatei (und
+// in jedem Teil-Stand) — eine Referenz gehoert zu GENAU dem Motorzustand, mit dem sie gezogen
+// wurde. Ohne den Schalter unveraendertes Verhalten (Engine-Standard, kein Feld in der Ausgabe).
 // ===================================================================================
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -67,6 +73,18 @@ import { runArenaFixtures } from "@/lib/battle/arena-headless-runner";
 import type { GameState, LineupDraft, LineupDraftEntry } from "@/lib/data/olyDataTypes";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// NACHTKONZEPT-SCHALTER, s. Kopfkommentar. `null` = Engine-Standard (alle Flags aus).
+const BUEHNE_FLAGS_ARG: Record<string, number> | null = (() => {
+  const arg = process.argv.slice(2).find((a) => a.startsWith("--flags="));
+  if (!arg) return null;
+  const flags: Record<string, number> = {};
+  for (const teil of arg.slice("--flags=".length).split(",").filter(Boolean)) {
+    const [k, v] = teil.split(":");
+    flags[k!] = v == null ? 1 : Number(v);
+  }
+  return flags;
+})();
 
 /**
  * DIE EINZIGE STELLE, AN DER SICH DIE FUENF DISZIPLINEN UEBERHAUPT UNTERSCHEIDEN.
@@ -302,7 +320,9 @@ async function zieheFeldgroesse(
   const ergebnisse: Awaited<ReturnType<typeof runArenaFixtures>> = [];
   for (let start = 0; start < fixtureInputs.length; start += BATCH_GROESSE) {
     const batch = fixtureInputs.slice(start, start + BATCH_GROESSE);
-    const batchErgebnisse = await runArenaFixtures(gameStateFuerLauf, batch, disziplin);
+    const batchErgebnisse = await runArenaFixtures(
+      gameStateFuerLauf, batch, disziplin, BUEHNE_FLAGS_ARG ? { buehneFlags: BUEHNE_FLAGS_ARG } : {},
+    );
     ergebnisse.push(...batchErgebnisse);
     console.log(
       `  ${disziplin} n=${n}: ${ergebnisse.length}/${fixtureInputs.length} Fixtures fertig ` +
@@ -421,6 +441,7 @@ function schreibeErgebnis(
       mechanismus: `runArenaFixtures/${motorFunktion} gegen echte Liga-Kader (buildArenaTeam)`,
     },
     fixturesJeFeldgroesse: FIXTURES_ZIEL,
+    ...(BUEHNE_FLAGS_ARG ? { buehneFlags: BUEHNE_FLAGS_ARG } : {}),
     feldgroessen,
   };
   writeFileSync(zielDatei(disziplin), JSON.stringify(ausgabe, null, 1));
@@ -482,6 +503,7 @@ async function main() {
   const quelle = { saveId: kopf.saveId, saveName: kopf.name };
   console.log(`Disziplin: ${disziplin} (Chassis "${DISZIPLINEN[disziplin].chassis}")`);
   console.log(`Quelle: ${quelle.saveName} (${quelle.saveId})`);
+  if (BUEHNE_FLAGS_ARG) console.log(`Buehnen-Flags: ${JSON.stringify(BUEHNE_FLAGS_ARG)}`);
 
   if (feldgroesseArg) {
     const n = Number(feldgroesseArg.split("=")[1]);
@@ -490,7 +512,7 @@ async function main() {
       process.exit(1);
     }
     const ergebnis = await zieheFeldgroesse(disziplin, gameState, kopf.saveId, n);
-    writeFileSync(partialDatei(disziplin, n), JSON.stringify({ quelle, ergebnis }, null, 1));
+    writeFileSync(partialDatei(disziplin, n), JSON.stringify({ quelle, buehneFlags: BUEHNE_FLAGS_ARG, ergebnis }, null, 1));
     console.log(`Teil-Stand geschrieben: ${partialDatei(disziplin, n)}`);
     return;
   }
