@@ -15635,6 +15635,12 @@
   // die sechs Hantel-Duelle ersetzen. NULL bei Flag aus, ausserhalb von Gewichtheben und vor
   // jedem bauBuehne()-Aufruf (Reset dort).
   let SANDSACK_WEGC=null;
+  // WEG C PARALLEL, STUFE 3 (06.10., docs/design/gewichtheben-sandsack-wegc-parallel-stufe3-
+  // sichtbarkeit-06-10.md): der Film der Flag-10-Schicht (baueSandsackParallelFrei(), reine
+  // Anzeige-Ausgabe) und die daraus gebaute Szene. Die Szene baut NUR build() (Live-Pfad), nie
+  // MOTOREN[bd].bau() — die Messung sieht sie nie. Beide NULL bei Flag != 10 und in bauBuehne()
+  // zurueckgesetzt.
+  let SANDSACK_PAR_FILM=null, SANDSACK_PAR_SZENE=null;
   // FUEHRUNG IM BILD -- EISKUNSTLAUF (Broadcast-Praesentation Runde 2, 22.09., Vorschlag 2a,
   // umgesetzt 26.09.). Merkt sich nur, WELCHE Seite zuletzt fuehrte und SEIT WANN (in
   // buehneT-Zeit), damit das Bandenlicht in bodenEis() beim Fuehrungswechsel kurz aufhellen
@@ -15836,7 +15842,7 @@
       ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
-    LASTEN_FINALE=null; SANDSACK_WEGC=null;
+    LASTEN_FINALE=null; SANDSACK_WEGC=null; SANDSACK_PAR_FILM=null; SANDSACK_PAR_SZENE=null;
     tennisFokus=0; fechtenFokus=0;
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
@@ -18381,11 +18387,23 @@
     const KO=SANDSACK_PAR_KONF, ag=Z.ag;
     const markeVon=(S)=>S.ketteMarke!=null?S.ketteMarke:KO.ketteMarke;
     const fEVon=(S)=>S.ermFaktor!=null?S.ermFaktor:null;
+    // FILM (Stufe 3 des parallelen Formats, 06.10., reine Anzeige): NUR im Hauptlauf von
+    // baueSandsackParallelFrei() gesetzt (sandsackFreiSchicht mit protokoll), nie in einer
+    // Vorschau der KI und nie in der Kontext-Inversion. `rec` schreibt AUSSCHLIESSLICH in
+    // Z.film — jede Rechnung oben und unten bleibt Zeichen fuer Zeichen dieselbe (gemessen:
+    // scripts/pruefe-sandsack-wegc-isolation.mjs, Flag 0..10 bit-identisch). Ein Eintrag je
+    // Abschnitt eines Traegers: typ (pause/auf/trag/wucht/geh/ablegen/rast/wartet/uebergabe/
+    // wechsel), Zeit t0..t1, Station s, Position x0 -> x1 in Metern ab dem eigenen Stapel, E am
+    // Ende des Abschnitts (Puste-Ring) und bei Lasten die Sack-Referenz (dieselbe Objekt-
+    // Identitaet ueber Ablage und Direktuebergabe hinweg, fuer den Beitrag je Spieler).
+    const F=Z.film||null;
+    const rec=(a,typ,t0,t1,x0,x1,o)=>{ F.spuren[a.i].push({typ,t0,t1,s:a.s,x0,x1,E:a.E,...(o||{})}); };
     const pause=(a)=>{
       if(a.E<a.schwelle)return;
       const ziel=Math.max(0,a.schwelle-SANDSACK_PAUSE_ZIEL_ABSTAND);
       const rate=SANDSACK_PAUSE_RATE_BASIS+SANDSACK_PAUSE_RATE_ERHOLUNG_K*a.u.ERHOLUNG/100;
       const d=(a.E-ziel)/rate; a.seg.push({start:a.t, ende:a.t+d}); a.t+=d; a.E=ziel; a.pausen++; a.pausenZeit+=d;
+      if(F)rec(a,"pause",a.t-d,a.t,a.pos,a.pos,{kg:a.last?a.last.kg:0, saecke:a.last?a.last.saecke:0, sack:a.last||null});
     };
     const ruhe=(a,sek)=>{ if(sek>0){ a.E=Math.max(0,a.E-sandsackKetteRuheRate(a.u)*sek); } };
     const warte=(a,bis)=>{ const sek=Math.max(0,Math.min(bis,T)-Math.min(a.wartetSeit,T)); ruhe(a,bis-a.wartetSeit); a.wartZeit+=sek; };
@@ -18394,14 +18412,17 @@
       const S=st[a.s], D=S.d, fE=fEVon(S);
       const len=bis-von; if(len<=1e-9)return;
       const L=a.last, start=a.t, {K,Kf}=sandsackKetteKap(a.u), r=L.kg/K, rf=L.kg/Kf;
-      let dauer=len/sandsackKetteVLast(a.u,L.kg,a.E), rut=false;
+      let dauer=len/sandsackKetteVLast(a.u,L.kg,a.E), rut=false, rutZeit=0;
       if(mitWurf){
         const p=Math.min(SANDSACK_RUTSCHER_MAX,Math.max(SANDSACK_RUTSCHER_MIN,
           SANDSACK_RUTSCHER_BASIS+SANDSACK_RUTSCHER_RF_K*Math.max(0,rf-SANDSACK_RUTSCHER_RF_SCHWELLE)
           +SANDSACK_RUTSCHER_E_K*Math.pow(a.E/100,2)-KO.rutscherTechnikK*(a.u.TECHNIK-50)/50))*len/D;
         if(a.wurfVon(a.wIdx++)<p){
           rut=true; a.rutscher++;
-          dauer+=(SANDSACK_RUTSCHER_ZEIT_BASIS+SANDSACK_RUTSCHER_ZEIT_R_K*r)*(SANDSACK_RUTSCHER_NERVEN_BASIS-SANDSACK_RUTSCHER_NERVEN_K*a.u.NERVEN/100);
+          // (zuerst ausgerechnet, dann addiert: dieselbe Gleitkomma-Rechnung wie vorher
+          // `dauer+=(…)*(…)`, der Film braucht den Zeitverlust des Rutschers einzeln)
+          rutZeit=(SANDSACK_RUTSCHER_ZEIT_BASIS+SANDSACK_RUTSCHER_ZEIT_R_K*r)*(SANDSACK_RUTSCHER_NERVEN_BASIS-SANDSACK_RUTSCHER_NERVEN_K*a.u.NERVEN/100);
+          dauer+=rutZeit;
         }
       }
       a.E=Math.max(0,a.E+sandsackKetteDE(a.u,L.kg,len,fE)+(rut?SANDSACK_RUTSCHER_E_ZUSCHLAG:0));
@@ -18411,24 +18432,35 @@
       // Klasse. Strukturell garantiert (Wechsel nur leer), hier trotzdem gezaehlt.
       if(L.s!==a.s||L.kgListe.some(k=>k!==S.kg))Z.verstoesse++;
       a.legs.push({kg:L.kg, saecke:L.saecke, kgListe:L.kgListe, len, start, ende:a.t, rutscher:rut, s:a.s});
+      if(F)rec(a,"trag",start,a.t,von,bis,{kg:L.kg, saecke:L.saecke, sack:L, rut, rutZeit, len, D, mitWurf});
     };
     const liefere=(a)=>{
       const S=st[a.s], D=S.d, m=markeVon(S), hatAblage=m>0&&m<D;
       const L=a.last, r=L.kg/sandsackKetteKap(a.u).K;
+      const tW=a.t;
       a.t+=S.kante?SANDSACK_KANTE_WUCHT_BASIS+SANDSACK_KANTE_WUCHT_R_K*Math.max(0,r-0.5):0;
       Z.lieferungen.push({kg:L.kg, saecke:L.saecke, ablieferung:a.t, u:a.u, s:a.s, quelle:L.s, kgListe:L.kgListe});
+      if(F)rec(a,"wucht",tW,a.t,D,D,{kg:L.kg, saecke:L.saecke, sack:L});
       a.last=null; a.pos=D;
       if(hatAblage){ const v=sandsackKetteVLeer(a.u,a.E); a.walk={t0:a.t,E0:a.E,v}; a.zustand="zurueck"; a.t+=(D-m)/v; }
-      else { gehe(a,D); a.pos=0; a.zustand="amStapel"; a.bereit=true; }
+      else { const tG=a.t; gehe(a,D); if(F)rec(a,"geh",tG,a.t,D,0); a.pos=0; a.zustand="amStapel"; a.bereit=true; }
     };
     const nimmVomHaufen=(a)=>{
       const m=markeVon(st[a.s]);
       const h=Z.haufen[a.s].shift();
-      a.t=Math.max(a.t,h.bereit); pause(a);
-      a.last=h.last; a.t+=0.5+0.6*a.last.kg/sandsackKetteKap(a.u).K;
+      const tVor=a.t;
+      a.t=Math.max(a.t,h.bereit);
+      if(F&&a.t>tVor)rec(a,"wartet",tVor,a.t,m,m);
+      pause(a);
+      a.last=h.last;
+      const tA=a.t;
+      a.t+=0.5+0.6*a.last.kg/sandsackKetteKap(a.u).K;
+      if(F){ if(h.film)h.film.t1=tA; rec(a,"auf",tA,a.t,m,m,{kg:a.last.kg, saecke:a.last.saecke, sack:a.last, vomBoden:true}); }
       a.pos=m; a.zustand="traegtAb";
     };
-    const zumStapel=(a,von)=>{ gehe(a,von); a.pos=0; a.zustand="amStapel"; a.bereit=true; };
+    const zumStapel=(a,von)=>{ const tG=a.t; gehe(a,von); if(F)rec(a,"geh",tG,a.t,von,0); a.pos=0; a.zustand="amStapel"; a.bereit=true; };
+    // Wer auf einen anderen gewartet hat: der Warte-Abschnitt endet jetzt (nur Film).
+    const warteEnde=(y,bis)=>{ if(F&&bis>y.wartetSeit)rec(y,"wartet",y.wartetSeit,bis,y.pos,y.pos,{auf:y.wartetAuf}); };
     const andere=(a)=>ag.filter(x=>x!==a&&x.s===a.s);
     const wartetAufA=(a)=>{ for(const x of ag)if(x.zustand==="wartet"&&x.wartetAuf===a.i&&x.s===a.s)return x; return null; };
     for(let guard=0;guard<40000;guard++){
@@ -18445,11 +18477,12 @@
               const von=a.s, tLos=a.t;
               // Wer auf a gewartet hat (freiWarten), geht jetzt doch zum Stapel.
               for(const y of ag)if(y.zustand==="wartet"&&y.wartetAuf===a.i){
-                warte(y,a.t); y.t=a.t; y.wartetAuf=-1; zumStapel(y,markeVon(st[y.s]));
+                warte(y,a.t); warteEnde(y,a.t); y.t=a.t; y.wartetAuf=-1; zumStapel(y,markeVon(st[y.s]));
               }
               gehe(a,sandsackFreiWeg(st,von,ziel));
               a.s=ziel;
               a.wechsel.push({t:tLos, ankunft:a.t, von, nach:ziel});
+              if(F)rec(a,"wechsel",tLos,a.t,0,0,{s:von, nach:ziel});
               continue;
             }
           }
@@ -18462,7 +18495,9 @@
         }
         const kg=kgListe.reduce((x,y)=>x+y,0);
         a.last={kg, saecke:kgListe.length, kgListe, s:a.s};
+        const tA=a.t;
         a.t+=0.5+0.6*kg/sandsackKetteKap(a.u).K;
+        if(F)rec(a,"auf",tA,a.t,0,0,{kg, saecke:kgListe.length, sack:a.last});
         if(hatAblage){ leg(a,0,m,true); a.pos=m; a.zustand="anAblage"; }
         else { leg(a,0,D,true); liefere(a); }
       }else if(a.zustand==="anAblage"){
@@ -18481,10 +18516,16 @@
           dELeg:sandsackKetteDE(a.u,a.last.kg,D-m,fE)});
         a.entsch[wahl]++; a.entschSt[a.s][wahl]++;
         if(Z.protokoll)Z.protokoll.push({i:a.i, s:a.s, t:t0, wahl, E:a.E, schwelle:a.schwelle, haufen:haufen.length, direktMoeglich});
+        if(F)F.entsch.push({i:a.i, s:a.s, t:t0, wahl, an:wahl==="direkt"?P.i:(wahl==="normal"&&W?W.i:-1), kg:a.last.kg});
         if(wahl==="normal"){
+          const tL=a.t;
           a.t+=KO.ablegenK*(0.5+0.6*a.last.kg/sandsackKetteKap(a.u).K);
-          haufen.push({last:a.last, bereit:a.t}); a.last=null;
+          if(F)rec(a,"ablegen",tL,a.t,m,m,{kg:a.last.kg, saecke:a.last.saecke, sack:a.last});
+          const hf=F?{s:a.s, kg:a.last.kg, saecke:a.last.saecke, x:m, t0:a.t, t1:Infinity, von:a.i}:null;
+          if(hf)F.haufen.push(hf);
+          haufen.push({last:a.last, bereit:a.t, ...(hf?{film:hf}:{})}); a.last=null;
           a.E=Math.max(0,a.E-sandsackKetteRastRate(a.u)*KO.rastSek); a.rastZeit+=Math.max(0,Math.min(a.t+KO.rastSek,T)-Math.min(a.t,T)); a.t+=KO.rastSek;
+          if(F)rec(a,"rast",a.t-KO.rastSek,a.t,m,m);
           zumStapel(a,m);
           if(W){ warte(W,haufen[0].bereit); W.t=W.wartetSeit; W.wartetAuf=-1; nimmVomHaufen(W); }
         }else if(wahl==="direkt"){
@@ -18495,15 +18536,19 @@
             leg(a,m,x,false);
             P.seg.push({start:P.walk.t0, ende:t0+tau});
             P.E=Math.max(0,P.walk.E0-sandsackKetteRegen(P.u,D-x));
+            if(F)rec(P,"geh",P.walk.t0,t0+tau,D,x);
           }else{
             warte(P,t0);
+            warteEnde(P,t0);
           }
           const tUeb=a.t+SANDSACK_WECHSEL_SEK;
+          if(F){ rec(a,"uebergabe",a.t,tUeb,x,x,{kg:a.last.kg, saecke:a.last.saecke, sack:a.last, rolle:"gibt", an:P.i});
+            rec(P,"uebergabe",a.t,tUeb,x,x,{kg:a.last.kg, saecke:a.last.saecke, sack:a.last, rolle:"nimmt", von:a.i}); }
           P.last=a.last; P.pos=x; P.t=tUeb; P.zustand="traegtAb"; P.walk=null; P.wartetAuf=-1;
           a.last=null; a.t=tUeb;
           zumStapel(a,x);
         }else{ // durch / erzwungen
-          if(W){ warte(W,t0); W.t=t0; W.wartetAuf=-1; zumStapel(W,m); }
+          if(W){ warte(W,t0); warteEnde(W,t0); W.t=t0; W.wartetAuf=-1; zumStapel(W,m); }
           pause(a);
           leg(a,m,D,true); liefere(a);
         }
@@ -18511,7 +18556,9 @@
         pause(a);
         leg(a,a.pos,D,true); liefere(a);
       }else if(a.zustand==="zurueck"){
-        a.E=Math.max(0,a.walk.E0-sandsackKetteRegen(a.u,D-m)); a.seg.push({start:a.walk.t0, ende:a.t}); a.walk=null; a.pos=m;
+        a.E=Math.max(0,a.walk.E0-sandsackKetteRegen(a.u,D-m)); a.seg.push({start:a.walk.t0, ende:a.t});
+        if(F)rec(a,"geh",a.walk.t0,a.t,D,m);
+        a.walk=null; a.pos=m;
         if(haufen.length)nimmVomHaufen(a);
         else{
           let Q=null;
@@ -18531,14 +18578,22 @@
         }
       }
     }
+    // FILM: was bei der Schlusshupe noch offen ist (Rueckweg vom Silo, Warten an der Ablage).
+    if(F)for(const a of ag){
+      if(a.zustand==="zurueck"&&a.walk){ const S=st[a.s]; rec(a,"geh",a.walk.t0,a.t,S.d,markeVon(S)); }
+      else if(a.zustand==="wartet")rec(a,"wartet",a.wartetSeit,Infinity,a.pos,a.pos,{auf:a.wartetAuf});
+    }
     return Z;
   }
   function sandsackFreiSchicht(team,st,T,protokoll){
     const Z=sandsackFreiStart(team);
-    if(protokoll){ Z.protokoll=[]; Z.entscheidungen=[]; Z.warteEntscheidungen=[]; }
+    // FILM (Stufe 3, reine Anzeige) nur im Hauptlauf — derselbe Schalter wie das Protokoll.
+    if(protokoll){ Z.protokoll=[]; Z.entscheidungen=[]; Z.warteEntscheidungen=[];
+      Z.film={spuren:Z.ag.map(()=>[]), haufen:[], entsch:[]}; }
     sandsackFreiLauf(Z,st,T,T,true);
     return {agenten:Z.ag, lieferungen:Z.lieferungen.filter(l=>l.ablieferung<=T), protokoll:Z.protokoll,
-      entscheidungen:Z.entscheidungen, warteEntscheidungen:Z.warteEntscheidungen, haufenRest:Z.haufen.reduce((s,h)=>s+h.length,0), verstoesse:Z.verstoesse};
+      entscheidungen:Z.entscheidungen, warteEntscheidungen:Z.warteEntscheidungen, haufenRest:Z.haufen.reduce((s,h)=>s+h.length,0), verstoesse:Z.verstoesse,
+      film:Z.film||null};
   }
   // VORSCHAU DER KI: Arbeit (Silo-kg-Aequivalente) an Station x von jetzt (a.t) bis tEnd, mit
   // oder ohne Traeger a, alle anderen dort im jetzigen Zustand, ohne Wuerfel, ohne weitere
@@ -18747,7 +18802,9 @@
       });
       return {u6, spieler6, kg, saecke, arbeit, kgJeStation, kgm, rutscher, pausen, doppelt, entsch, wechsel,
         haufenRest:erg.haufenRest, verstoesse:erg.verstoesse,
-        quelleOk:erg.lieferungen.every(l=>l.quelle===l.s&&l.kgListe.every(x=>x===st[l.s].kg))};
+        quelleOk:erg.lieferungen.every(l=>l.quelle===l.s&&l.kgListe.every(x=>x===st[l.s].kg)),
+        // nur fuer SANDSACK_PAR_FILM (Stufe 3, Anzeige) — geht in keine Wertung
+        film:erg.film, filmTeam:team, filmAgenten:erg.agenten, filmLieferungen:erg.lieferungen};
     });
     const [A,B]=seitenDaten;
     // Mannschaft: freiWertung 0 mehr Silo-kg (dann Saecke), 1 mehr Arbeitswert (dann Silo-kg).
@@ -18777,6 +18834,16 @@
     SANDSACK_WEGC={format:"parallel-frei", variante:10, zuteilung:"last", freiModus:KO.freiModus,
       laeufe:[lauf], seiten:[sieger===0?1:0, sieger===1?1:0],
       sendezeitSim:T, sendezeitBeide:T, abgeliefertKg:[A.kg,B.kg]};
+    // STUFE 3 (Sichtbarkeit, 06.10.): der Film der Schicht fuer das Buehnenbild — eigener
+    // Global, NICHT in SANDSACK_WEGC (das die Messskripte ausgeben und hashen). Nur Lesestoff fuer
+    // sandsackParSzeneBauen(); kein Feld hiervon geht in Wertung, Spielerwert oder Sieger.
+    SANDSACK_PAR_FILM={T, sieger, wertung:lauf.wertung, sekJeKg:sandsackFreiSekJeKg(st),
+      stationen:st.map(s=>({id:s.id, label:s.label, fable:s.fableLabel, kg:s.kg, d:s.d,
+        marke:s.ketteMarke!=null?s.ketteMarke:KO.ketteMarke})),
+      seiten:seitenDaten.map((S,side)=>({side, arbeit:S.arbeit, kg:S.kg, saecke:S.saecke,
+        spuren:S.film?S.film.spuren:[], haufen:S.film?S.film.haufen:[], entsch:S.film?S.film.entsch:[],
+        lieferungen:S.filmLieferungen.map(l=>({t:l.ablieferung, kg:l.kg, saecke:l.saecke, s:l.s, n:l.u.n})),
+        traeger:S.filmTeam.map((c,i)=>({u:c.u, start:c.s, aw:c.aw, schwelle:S.filmAgenten[i].schwelle}))}))};
     buehneQueue=[];
   }
 
@@ -47098,11 +47165,15 @@
       // eines FREMDEN Laufs stehen lassen, obwohl TEILNEHMER/buehneQueue schon zurueckgesetzt
       // sind. Fuer jede Nicht-Heben-Buehne bleibt LASTEN_FINALE ohnehin immer null.
       // SANDSACK_WEGC (Weg C, Stufe 2) aus demselben Grund mitgesichert; bei Flag 0 immer null.
-      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done, LASTEN_FINALE, SANDSACK_WEGC}),
+      // SANDSACK_PAR_FILM/_SZENE (Weg C parallel, Stufe 3) aus demselben Grund: eine Mess-Sonde
+      // waehrend eines laufenden Live-Spiels (bauBuehne() setzt beide zurueck) loeschte sonst
+      // das Bild der Schicht. Bei Flag != 10 immer null.
+      sichern:()=>({disc, buehneDisc, TEILNEHMER, buehneT, buehneZeiger, buehneQueue, buehneAkt, done, LASTEN_FINALE, SANDSACK_WEGC, SANDSACK_PAR_FILM, SANDSACK_PAR_SZENE}),
       zurueck:(a)=>{disc=a.disc; buehneDisc=a.buehneDisc; TEILNEHMER=a.TEILNEHMER;
                     buehneT=a.buehneT; buehneZeiger=a.buehneZeiger; buehneQueue=a.buehneQueue;
                     buehneAkt=a.buehneAkt; done=a.done; LASTEN_FINALE=a.LASTEN_FINALE;
-                    SANDSACK_WEGC=a.SANDSACK_WEGC??null;},
+                    SANDSACK_WEGC=a.SANDSACK_WEGC??null;
+                    SANDSACK_PAR_FILM=a.SANDSACK_PAR_FILM??null; SANDSACK_PAR_SZENE=a.SANDSACK_PAR_SZENE??null;},
       vorher:()=>{disc=bd; buehneDisc=bd;},
       bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
       lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
