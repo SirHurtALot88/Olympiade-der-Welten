@@ -15885,6 +15885,29 @@
   // ersten Versuch unabhaengig voneinander, dieses Set verhindert die doppelte Zeile), kein
   // Einfluss auf hebeUebung()/baueHebenDuelle() selbst.
   const hebenTeamBannerGezeigt=new Set();
+  // BROADCAST-SENDUNGSRHYTHMUS PAKET B (06.10.), B2/B3/B4 — rein praesentationale
+  // Zustaende, GENAU dieselbe Kategorie wie letzterHebenZug/hebenTeamBannerGezeigt oben:
+  // Wandzeit-Timer (jetztMs(), NICHT rr()-Simulationszeit, s. CLAUDE.md-Auftrag) bzw. ein
+  // Simulationszeit-Stempel (buehneT, fuer B4), die NUR steuern, WAS zeichneHeben() gerade
+  // zeichnet. Kein rr(), kein Schreibzugriff auf TEILNEHMER/u.summe, keine Wirkung auf
+  // MOTOREN["gewichtheben"].wert() -- disziplinProbe()/miss-alle-disziplinen.mjs rufen diese
+  // Variablen nie ab (sie lesen nur den Simulationszustand, nicht den Zeichenpfad).
+  //
+  // B2 (Duell-Bauchbinde): `hebenLetzteAktivNr` merkt sich das zuletzt gezeigte aktive Duell
+  // (zeichneHeben()s `aktivNr`) -- aendert es sich, startet ein 2,5s-Wandzeit-Fenster
+  // (`hebenBauchbindeSeitMs`/-BisMs), waehrenddessen die Unterzeile eingeblendet bleibt.
+  let hebenLetzteAktivNr=null, hebenBauchbindeSeitMs=0, hebenBauchbindeBisMs=0;
+  // B3 (Zwischenstand nach dem Reissen): `hebenZwischenstandGezeigt` verhindert die doppelte
+  // Tafel je Duell (dasselbe Dedup-Muster wie hebenTeamBannerGezeigt direkt darueber),
+  // `hebenZwischenstandDuell`/-SeitMs/-BisMs sind das Wandzeit-Fenster der GERADE sichtbaren
+  // Tafel.
+  const hebenZwischenstandGezeigt=new Set();
+  let hebenZwischenstandDuell=null, hebenZwischenstandSeitMs=0, hebenZwischenstandBisMs=0;
+  // B4 (Kreidewolke): Simulationszeit-Stempel (buehneT), bis wann der groessere "Knall"-Ring
+  // nach einer tatsaechlichen Ansage-Aenderung noch zu sehen ist (s. stepBuehne(), derselbe
+  // Moment wie der vorhandene sfx("gewichtheben","kreide")-Aufruf). -Infinity statt 0, damit
+  // `buehneT<hebenKreideKnallBisT` vor dem allerersten Versuch nicht faelschlich zutrifft.
+  let hebenKreideKnallBisT=-Infinity;
   // KETTENLEISTE (B1, Broadcast-Optik-Recherche 27.09., Klasse A): dasselbe Muster wie
   // letzterHebenZug oben, nur fuer den Gauntlet. `letzterGauntletZug` haelt den zuletzt
   // ENTHUELLTEN Anschlag fest (reveal-gegatet, s. Aufruf in stepBuehne unten) -- exakt das,
@@ -16338,6 +16361,11 @@
       ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    // PAKET B (06.10.): B2/B3/B4-Zustand mit zurueckgesetzt, sonst ueberlebte er ein
+    // naechstes Spiel (gleiches Muster wie hebenTeamBannerGezeigt.clear() direkt davor).
+    hebenLetzteAktivNr=null; hebenBauchbindeSeitMs=0; hebenBauchbindeBisMs=0;
+    hebenZwischenstandGezeigt.clear(); hebenZwischenstandDuell=null; hebenZwischenstandSeitMs=0; hebenZwischenstandBisMs=0;
+    hebenKreideKnallBisT=-Infinity;
     LASTEN_FINALE=null;
     tennisFokus=0; fechtenFokus=0; tennisDruck=[];
     schachMattGehoert=false;
@@ -19605,6 +19633,13 @@
           feed(u.side,u.n+" zieht nach: Ansage "+sinclairAnzeige(r.ansageAlt,u.groesse)
             +" kg — geändert auf "+sinclairAnzeige(r.kg,u.groesse)+" kg.",true);
           sfx("gewichtheben","kreide");
+          // B4 (Broadcast-Sendungsrhythmus Paket B, 06.10.): GENAU dieser Ton hatte bisher
+          // kein visuelles Gegenstueck (Audit-Befund, s. CLAUDE.md-Auftrag Punkt 3) --
+          // `hebenKreideKnallBisT` ist ein reiner Simulationszeit-Stempel (buehneT, NICHT
+          // jetztMs(), weil dieser Code im selben Takt wie buehneT selbst laeuft), den
+          // zeichneHeben() fuer einen kurzen Ring an der Kreidekiste liest. Kein rr(), kein
+          // Schreibzugriff auf u.summe/u.runden.
+          hebenKreideKnallBisT=buehneT+0.6;
         }
         // Der eigentliche Versuchs-Ticker ("... gueltig/ungueltig" -- das Wort steht woertlich
         // in `r.ereignis`), die KUEHNER-VERSUCH-Ausgangszeilen und die abschliessende
@@ -23322,6 +23357,10 @@
   let hebenPublikumAn=false; // rein praesentational, s. bodenBuehne() oben fuer den Stop.
   function bodenHeben(){
     if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
+    // `art` NUR fuer die Versuchsuhr-Zeile der Anzeigetafel (Paket B, B1, s. dort) --
+    // dieselbe BB()-Quelle, die jede andere Uhr dieser Buehne schon liest (z.B.
+    // updateHudBuehne()), rein lesend, kein rr().
+    const art=BB();
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
@@ -23506,7 +23545,17 @@
     // TAFELHOEHE (Broadcast-Audit Runde 2, 30.09., Punkt 26): 80 -> 98px, weil die
     // "Naechster"-Zeile unten jetzt zweizeilig ist (s. dort) -- ohne die zusaetzlichen
     // 18px liefe die "zieht nach"-Zeile aus dem Kasten.
-    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98;
+    // 98 -> 122px (Paket B, B1, 06.10.): die Versuchsuhr zieht aus der Bannerzone in genau
+    // diese Tafel (s. Kommentar beim neuen VERSUCHSUHR-Block unten) und braucht eine eigene
+    // Zeile -- alle Zeilen darunter ruecken um denselben TAFEL_UHR_SHIFT nach unten, damit
+    // keine zwei Zeilen uebereinander landen. CANVAS-RAND GEPRUEFT (B1-Auftrag): tafelX+
+    // tafelW = W-146+132 = W-14, bleibt bei jeder Breite 14px innerhalb des Canvas rechts;
+    // die Hoehe reicht jetzt bis tafelY+122=186 -- etwas TIEFER als die Plattform-Schattenkante
+    // (platY-4=184) reicht, aber das liegt in einer ganz anderen Spalte: die Plattform sitzt
+    // bei X 331-909 (W/2±platW/2, s. bodenHeben() weiter unten), die Tafel bei X 1094-1226 --
+    // keine X-Ueberschneidung, also auch keine Y-Kollision trotz der paar Pixel Ueberlapp.
+    const TAFEL_UHR_SHIFT=24;
+    const tafelX=W-146, tafelY=64, tafelW=132, tafelH=98+TAFEL_UHR_SHIFT;
     ctx.fillStyle="#0c0d10";ctx.fillRect(tafelX,tafelY,tafelW,tafelH);
     ctx.strokeStyle="#3a3d46";ctx.lineWidth=1;ctx.strokeRect(tafelX,tafelY,tafelW,tafelH);
     // GOLDENER ZIERSTREIFEN oben, wie die goldene Bandenkante bei bodenEis() — dasselbe
@@ -23522,6 +23571,33 @@
     ctx.fillText(zug?("Versuch "+zug.r.versuch+"/3"):"wartet",tafelX+10,tafelY+32);
     ctx.font="700 16px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
     ctx.fillText(zug?(sinclairAnzeige(zug.r.kg,zug.u.groesse)+" kg"):"—",tafelX+10,tafelY+46);
+    // VERSUCHSUHR ALS TAFEL-ZEILE (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): zog
+    // bisher zentriert in die Bannerzone (zeichneHeben(), uhrY=H*0.27) -- GENAU dort, wo
+    // auch #bbugcallout erscheint (positioniereCallout() legt den Banner unter #bbug, der
+    // bei schmalen Fensterbreiten bis zu 44% der Leinwandhoehe braucht, s. Kommentar bei
+    // kuerBahn() weiter oben); die Fuellgrafik verschwand dadurch jedesmal, wenn ein
+    // Highlight-Banner kam. Die Anzeigetafel hier ist ein HTML-unabhaengiger Fixpunkt oben
+    // rechts, derselbe Ort, an dem Uebung/Versuch/kg schon kollisionsfrei stehen -- keine
+    // neue Uhr, nur derselbe Rest/Fortschritt wie vorher (buehneAkt/art.rundenDauer,
+    // zeitFaktor() fuer die ECHTE Sekunde, dasselbe Muster wie updateHudBuehne()). Schrift
+    // 12px (Auftrag: "mindestens 12px", vorher 9,5px), letzte Sekunde rot statt Gold.
+    // KEIN sfx("gewichtheben","hupe"): dieser Ton liegt im TON_KATALOG ausdruecklich im
+    // Sandsack-Finale-Abschnitt ("ein echtes Spiel loest sie nie aus", s. dort) -- ein
+    // echtes Spiel loest sie HIER ausgeloest haette genau diesen Satz falsch gemacht und
+    // die beiden laut Auftrag strikt getrennten Pakete doch vermischt. Rein visuell bleibt
+    // der Fix vollstaendig additiv, ohne das reservierte Sandsack-Geraeusch anzutasten.
+    {
+      const restEcht=Math.max(0,buehneAkt*zeitFaktor());
+      const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
+      const letzteSekunde=restEcht<1;
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle=letzteSekunde?"#e3523f":"#d6ac36";
+      ctx.fillText("Nächster: "+Math.ceil(restEcht)+" s",tafelX+10,tafelY+64);
+      const uhrBarW=tafelW-20,uhrBarH=4,uhrBarX=tafelX+10,uhrBarY=tafelY+72;
+      ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(uhrBarX,uhrBarY,uhrBarW,uhrBarH);
+      ctx.fillStyle=letzteSekunde?"#e3523f":"#d6ac36";
+      ctx.fillRect(uhrBarX,uhrBarY,uhrBarW*fortschritt,uhrBarH);
+    }
     // NAECHSTE ANSAGE (H2.2, Broadcast-Optik-Recherche 27.09., Klasse A): "Nächster Versuch:
     // Draco, 127 kg" — Taktik am Meldetisch (Doku 2.1, belegt). `buehneQueue[buehneZeiger]`
     // ist genau der naechste Teilnehmer, der als naechstes dequeued wird (reine Ablesung,
@@ -23550,9 +23626,9 @@
           ctx.font="400 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#5f6675";
           const kgTxt=sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
           const naechsterName=naechsterU.n.length>13?naechsterU.n.slice(0,12)+"…":naechsterU.n;
-          ctx.fillText("Nächster:",tafelX+10,tafelY+58);
+          ctx.fillText("Nächster:",tafelX+10,tafelY+58+TAFEL_UHR_SHIFT);
           ctx.fillStyle="#c7ccd6";
-          ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69);
+          ctx.fillText(naechsterName+", "+kgTxt,tafelX+10,tafelY+69+TAFEL_UHR_SHIFT);
           // G3 (Fable-Ideen 30.09., Politur A, Klasse A): "DIE ANSAGE-AENDERUNG WIRD
           // SICHTBAR" — ersetzt die vorherige reine Delta-Zeile ("↑ zieht nach, +N kg",
           // gegen den EIGENEN vorigen Versuch) durch den tatsaechlichen Meldetisch-Moment:
@@ -23565,12 +23641,12 @@
             const neuTxt=" → "+sinclairAnzeige(naechsteR.kg,naechsterU.groesse)+" kg";
             ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
             ctx.fillStyle="#8a93a3";
-            ctx.fillText(altTxt,tafelX+10,tafelY+91);
+            ctx.fillText(altTxt,tafelX+10,tafelY+91+TAFEL_UHR_SHIFT);
             const altW=ctx.measureText(altTxt).width;
             ctx.strokeStyle="#8a93a3";ctx.lineWidth=1;
-            ctx.beginPath();ctx.moveTo(tafelX+10,tafelY+91);ctx.lineTo(tafelX+10+altW,tafelY+91);ctx.stroke();
+            ctx.beginPath();ctx.moveTo(tafelX+10,tafelY+91+TAFEL_UHR_SHIFT);ctx.lineTo(tafelX+10+altW,tafelY+91+TAFEL_UHR_SHIFT);ctx.stroke();
             ctx.fillStyle="#d6ac36";
-            ctx.fillText(neuTxt,tafelX+10+altW,tafelY+91);
+            ctx.fillText(neuTxt,tafelX+10+altW,tafelY+91+TAFEL_UHR_SHIFT);
           }
         }
       }
@@ -27238,6 +27314,9 @@
     ctx.textAlign="center";ctx.textBaseline="middle";
     ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
     ctx.fillText("Duell "+(aktivNr+1)+" von "+gesamtDuelle+" · "+(a.rolle||"Heber"),W/2,H*0.155);
+    // Fuer die "Zuletzt"-Zeile weiter unten (Paket B, B1): wird erst gesetzt, NACHDEM die
+    // Bedarfszeile entschieden hat, ob sie selbst an derselben Stelle zeichnet.
+    let bedarfGezeigt=false;
 
     // TEAM-PUBLIKUM (Konzept team-publikum-feiermomente 3.1): die zehn Heber, die gerade NICHT
     // auf der Plattform stehen, sitzen als Teambank links (Heim) bzw. rechts (Gast) neben der
@@ -27259,40 +27338,15 @@
       });
     }
 
-    // TOTE STRECKEN FUELLEN (Broadcast-Audit Runde 2, Punkt 19, 30.09.): Gewichtheben steht
-    // laut Messung 95 % der Sendezeit als Standbild, bis zu 30 s am Stueck ohne sichtbare
-    // Aenderung (Tabelle 6.2) -- im echten Fernsehen laeuft in dieser Zeit die Versuchsuhr,
-    // die Hantel wird "geladen" und der letzte Versuch nachbesprochen. Alle drei Elemente
-    // hier lesen AUSSCHLIESSLICH bereits vorhandenen Zustand: `buehneAkt`/`art.rundenDauer`
-    // treiben die Enthuellungsanimation ohnehin schon (s. hebePhase() oben), `zeitFaktor()`
-    // ist dieselbe Umrechnung, mit der auch die Uhr im HUD rechnet (s. updateHudBuehne()), und
-    // `letzterHebenLampenZug.r.ereignis` ist derselbe Text, den der Ticker am Lampen-Moment
-    // schreibt (s. hebenTickerAmUrteil()) -- keine neue Simulation, kein rr(), kein zweites
-    // Protokoll.
-    //
-    // LAMPEN-GEGATET, NICHT ENTHUELLUNGS-GEGATET (Folgefund zu PR #1091, Task #35, 01.10.):
-    // vorher stand hier `letzterHebenZug` -- derselbe Transient, den stepBuehne() schon AN DER
-    // ENTHUELLUNG setzt, also VOR der Lampe. `r.ereignis` traegt woertlich "gueltig"/
-    // "ungueltig"; diese Zeile verriet das Urteil damit genauso frueh wie der (inzwischen
-    // verschobene) Haupt-Ticker. `letzterHebenLampenZug` wird dagegen nur in
-    // hebenTickerAmUrteil() gesetzt, also GENAU am Uebergang zug->hoch|ablage -- waehrend des
-    // laufenden Versuchs zeigt dieses Feld deshalb noch den VORHERIGEN, bereits entschiedenen
-    // Versuch (oder nichts, vor dem allerersten).
-    {
-      const restEcht=Math.max(0,buehneAkt*zeitFaktor());
-      const fortschritt=Math.max(0,Math.min(1,1-buehneAkt/(art.rundenDauer||1)));
-      const uhrY=H*0.27;
-      ctx.font="700 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#d6ac36";
-      ctx.fillText("Nächster Versuch in "+restEcht.toFixed(1).replace(".",",")+" s",W/2,uhrY);
-      const barW=150,barH=5,barX=W/2-barW/2,barY=uhrY+11;
-      ctx.fillStyle="rgba(255,255,255,.14)";ctx.fillRect(barX,barY,barW,barH);
-      ctx.fillStyle="#d6ac36";ctx.fillRect(barX,barY,barW*fortschritt,barH);
-      if(letzterHebenLampenZug&&letzterHebenLampenZug.r){
-        ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Zuletzt: "+letzterHebenLampenZug.u.n.split(" ")[0]+" — "+letzterHebenLampenZug.r.ereignis,
-          W/2,barY+17);
-      }
-    }
+    // VERSUCHSUHR AUSGELAGERT (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): stand hier
+    // bisher zentriert bei H*0.27 -- GENAU in der Zone, in der auch #bbugcallout erscheint
+    // (s. Kommentar bei kuerBahn() weiter oben: der HTML-Banner kann je nach Fensterbreite
+    // deutlich in die Leinwand hineinreichen), die Fuellgrafik verschwand also bei jedem
+    // Highlight-Banner. Die Uhr lebt jetzt in der Anzeigetafel oben rechts (bodenHeben(),
+    // VERSUCHSUHR-Kommentar dort) -- derselbe Rest/Fortschritt, nur ein kollisionsfreier Ort.
+    // Die "Zuletzt"-Zeile bleibt auf der Buehne, zieht aber direkt unter die Duell-
+    // Kopfzeile (s. unten, nach der Bedarfszeile) -- ebenfalls aus derselben Bannerzone
+    // heraus.
 
     // BEDARFSZEILE (H2.1, Broadcast-Optik-Recherche 27.09., Klasse A): "braucht X kg fuer
     // den Duellsieg" bzw. "fuehrt, Gegner braucht Y" — die eine Zahl, die laut Recherche
@@ -27340,9 +27394,26 @@
             ctx.strokeText(txt,W/2,H*0.183);
             ctx.fillStyle="#d6ac36";
             ctx.fillText(txt,W/2,H*0.183);
+            bedarfGezeigt=true;
           }
         }
       }
+    }
+
+    // ZULETZT-ZEILE (Broadcast-Sendungsrhythmus Paket B, B1, 06.10.): unter die Duell-
+    // Kopfzeile verschoben (vorher Teil der jetzt in die Anzeigetafel ausgelagerten
+    // Versuchsuhr, s. Kommentar oben), damit sie nicht mehr in der Bannerzone (H*0.27)
+    // steht. Ausgelassen, wenn an derselben Stelle schon die Bedarfszeile direkt darueber
+    // (`bedarfGezeigt`, H*0.183) oder — bei kuehnem Versuch — der Kuehn-Badge (kuehnZeileY
+    // weiter unten, H*0.20) steht: dieselbe "keine zwei Ueberschriften uebereinander"-Regel,
+    // die die Bedarfszeile bereits gegenueber dem Kuehn-Badge befolgt (s. deren Kommentar).
+    // LAMPEN-GEGATET (liest letzterHebenLampenZug, nur in hebenTickerAmUrteil() gesetzt,
+    // s. dort) — unveraendert aus der alten Zeile uebernommen, nur der Ort ist neu.
+    if(letzterHebenLampenZug&&letzterHebenLampenZug.r&&!bedarfGezeigt
+       &&!(letzterHebenZug&&letzterHebenZug.r&&letzterHebenZug.r.kuehn)){
+      ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
+      ctx.fillText("Zuletzt: "+letzterHebenLampenZug.u.n.split(" ")[0]+" — "+letzterHebenLampenZug.r.ereignis,
+        W/2,H*0.155+13);
     }
 
     // ZWEI HEBER MITTIG, Kopf an Kopf statt in Reihen uebereinander — das Bild, das
@@ -27576,6 +27647,126 @@
     } else {
       ctx.font="400 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
       ctx.fillText("Erste Ansage folgt …",bx,kopfZeileY);
+    }
+
+    // ================= BROADCAST-SENDUNGSRHYTHMUS PAKET B (06.10.): B2 + B3 =================
+    // Lower-Third-Flaeche unterhalb der Plattformkante (bodenHeben(): platY+platH=H*0.80) und
+    // oberhalb der "wartende Paare"-Zeile (H*0.90) -- ein bisher ungenutzter Streifen, den
+    // weder Teambank (Fusslinie H*0.70, Koerper reichen nicht so tief) noch Plattform selbst
+    // erreichen. B2 (Duell-Bauchbinde) und B3 (Zwischenstand nach dem Reissen) teilen sich
+    // dieselbe Flaeche und denselben Fade-Helfer, weil sie praktisch nie gleichzeitig noetig
+    // sind (B2 feuert GENAU beim Duellwechsel, B3 fruehestens drei enthuellte Runden spaeter,
+    // s. Ausloeser unten) und beide dieselbe "kurz eingeblendete Unterzeile"-Sprache sprechen.
+    //
+    // WANDZEIT, NICHT SIMULATIONSZEIT (CLAUDE.md-Auftrag woertlich: "jetztMs(), NICHT
+    // rr()-Simulationszeit"): beide Fenster sollen bei jedem Tempo (1x/4x/Pause) dieselbe
+    // ECHTE Sichtdauer haben, nicht eine, die bei Tempo 4x viermal so schnell verschwindet.
+    // Reines Lesen/Schreiben praesentationaler Modulvariablen (s. deren Deklaration weiter
+    // oben), kein rr(), kein Einfluss auf TEILNEHMER/u.summe/MOTOREN["gewichtheben"].wert().
+    const hebenBauchbindeFade=(seitMs,bisMs)=>{
+      const jetzt=jetztMs();
+      if(jetzt>=bisMs)return 0;
+      const t=jetzt-seitMs;
+      if(t<0)return 0;
+      if(t<220)return t/220;
+      const rest=bisMs-jetzt;
+      if(rest<300)return Math.max(0,rest/300);
+      return 1;
+    };
+    // B2: Duellwechsel erkennen -- `aktivNr` ist oben bereits dieselbe Groesse, die auch die
+    // Duell-Kopfzeile nutzt.
+    if(aktivNr!==hebenLetzteAktivNr){
+      hebenLetzteAktivNr=aktivNr;
+      hebenBauchbindeSeitMs=jetztMs();
+      hebenBauchbindeBisMs=hebenBauchbindeSeitMs+2500;
+    }
+    const bauchbindeAlpha=hebenBauchbindeFade(hebenBauchbindeSeitMs,hebenBauchbindeBisMs);
+    // B3: erst wenn BEIDE Duellanten ihren DRITTEN Reissversuch unter der LAMPE gezeigt haben
+    // (hebenLampenIndex(u)>=2 -- Index 0..2 sind die drei Reiss-Versuche, dieselbe
+    // Lampen-Grenze wie bestBisher()/die Versuchstafel, s. dort), einmal je Duell
+    // (hebenZwischenstandGezeigt-Dedup, dasselbe Muster wie hebenTeamBannerGezeigt oben).
+    if(hebenLampenIndex(a)>=2 && hebenLampenIndex(b)>=2 && !hebenZwischenstandGezeigt.has(aktivNr)){
+      hebenZwischenstandGezeigt.add(aktivNr);
+      hebenZwischenstandDuell=aktivNr;
+      hebenZwischenstandSeitMs=jetztMs();
+      hebenZwischenstandBisMs=hebenZwischenstandSeitMs+3000;
+    }
+    // `hebenZwischenstandDuell===aktivNr`-Gate: sobald das naechste Duell beginnt (aktivNr
+    // wechselt), verschwindet eine noch laufende B3-Tafel SOFORT, statt ueber ein fremdes,
+    // schon aktives Duell weiterzulaufen -- verhindert jede Ueberlappung mit B2 von selbst.
+    const zwischenstandAlpha=(hebenZwischenstandDuell===aktivNr)
+      ?hebenBauchbindeFade(hebenZwischenstandSeitMs,hebenZwischenstandBisMs):0;
+    if(bauchbindeAlpha>0||zwischenstandAlpha>0){
+      const boxY0=H*0.805, boxH=32, boxW=W*0.66, boxX=W/2-boxW/2;
+      ctx.save();
+      ctx.globalAlpha=Math.max(bauchbindeAlpha,zwischenstandAlpha);
+      ctx.fillStyle="rgba(10,12,16,.82)";
+      ctx.fillRect(boxX,boxY0,boxW,boxH);
+      ctx.strokeStyle="rgba(242,195,77,.6)";ctx.lineWidth=1.3;
+      ctx.strokeRect(boxX,boxY0,boxW,boxH);
+      ctx.textAlign="center";ctx.textBaseline="middle";
+      if(bauchbindeAlpha>=zwischenstandAlpha){
+        // B2-INHALT. Der Stand kommt AUSSCHLIESSLICH aus #score (updateHudBuehne(), s. dort)
+        // -- demselben lampengesteuerten Text, den der Score-Bug oben schon zeigt
+        // (duelle(s)-Zaehlung dort ist hinter hebenDuellEntschieden(u,true) gegated) --
+        // KEINE zweite, eigene Zaehlung, die der Lampe vorgreifen koennte (SEHR WICHTIG
+        // laut CLAUDE.md-Auftrag).
+        const scoreEl=(typeof document!=="undefined")?document.getElementById("score"):null;
+        const standTxt=(scoreEl&&scoreEl.textContent)||"0 : 0";
+        ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c34d";
+        ctx.fillText("DUELL "+(aktivNr+1)+" VON "+gesamtDuelle,W/2,boxY0+11);
+        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
+        ctx.fillText(a.n.split(" ")[0]+" ("+(a.rolle||"Heber")+") gegen "+b.n.split(" ")[0]+" · Stand "+standTxt,
+          W/2,boxY0+23);
+      } else {
+        // B3-INHALT. bestBisher() ist dieselbe lampen-gegatete Funktion wie ueberall sonst
+        // auf dieser Buehne -- zum Zeitpunkt des Ausloesers oben sind beide Reiss-Bloecke
+        // bereits vollstaendig LAMPEN-gezeigt, also kein Spoiler.
+        const ra=bestBisher(a,"reissen"), rb=bestBisher(b,"reissen");
+        const saReissen=sinclairAnzeige(ra,a.groesse), sbReissen=sinclairAnzeige(rb,b.groesse);
+        const diff=saReissen-sbReissen;
+        const diffTxt=diff===0?"gleichauf":("("+(diff>0?"+":"")+diff+")");
+        ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c34d";
+        ctx.fillText("NACH DEM REISSEN",W/2,boxY0+11);
+        ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#e8e2d0";
+        ctx.fillText(a.n.split(" ")[0]+" "+saReissen+" kg · "+b.n.split(" ")[0]+" "+sbReissen+" kg "+diffTxt,
+          W/2,boxY0+23);
+      }
+      ctx.restore();
+    }
+
+    // B4 (Kreidewolke waehrend des Antritts): adressiert den Audit-Befund "keine Bewegung in
+    // der Vorbereitungsphase" -- liest ausschliesslich letzterHebenZug.u.vizPhase/vizPhaseT
+    // (stepHeben(), dieselbe reveal-gegatete Quelle wie die Publikums-Reaktion in
+    // bodenHeben()) und den Simulationszeit-Stempel hebenKreideKnallBisT (stepBuehne(), s.
+    // dort) -- beides reine Anzeige, kein rr(), kein Schreibzugriff auf TEILNEHMER/u.summe.
+    // Laeuft bei JEDEM der 72 Versuche kurz an (nicht nur bei einer Ansage-Aenderung), weil
+    // "antritt" selbst jeden Versuch durchlaeuft -- der groessere Ring unten ist der
+    // zusaetzliche Akzent GENAU am bestehenden sfx("gewichtheben","kreide")-Aufruf.
+    {
+      const kz=letzterHebenZug;
+      const kreideKx=W*0.08+13, kreideKy=H*0.80-7; // Mitte der Kiste, s. bodenHeben()
+      if(kz&&kz.u.vizPhase==="antritt"){
+        const antrittDauer=HEBEN_ANTRITT_T*(art.rundenDauer||1);
+        const t=Math.max(0,Math.min(1,(kz.u.vizPhaseT||0)/(antrittDauer||1)));
+        ctx.save();
+        for(let i=0;i<3;i++){
+          const pt=Math.min(1,t*1.4-i*0.18);
+          if(pt<=0)continue;
+          ctx.globalAlpha=Math.max(0,(1-pt)*0.5);
+          ctx.fillStyle="#e9e6de";
+          ctx.beginPath();ctx.arc(kreideKx+(i-1)*4,kreideKy-pt*10,4+pt*10,0,Math.PI*2);ctx.fill();
+        }
+        ctx.restore();
+      }
+      if(buehneT<hebenKreideKnallBisT){
+        const knallT=Math.max(0,Math.min(1,1-(hebenKreideKnallBisT-buehneT)/0.6));
+        ctx.save();
+        ctx.globalAlpha=Math.max(0,0.6*(1-knallT));
+        ctx.strokeStyle="#e9e6de";ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(kreideKx,kreideKy,10+knallT*22,0,Math.PI*2);ctx.stroke();
+        ctx.restore();
+      }
     }
 
     // WARTENDE PAARE AM RAND — alle Duelle ausser dem aktiven, klein am unteren Rand,
