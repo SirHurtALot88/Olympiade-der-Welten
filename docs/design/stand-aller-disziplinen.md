@@ -219,6 +219,60 @@ alle Zahlen hier; Pp mit `einflussVon` an zwei Saatstaemmen (Versatz 0 / 10 000 
    Zeile haengt an Feldern (`u.haltung`, `u.marke`, `u.kriechK`, `u.jokerIdx`), die nur der
    QA-Einstieg vergibt, bzw. an `u.mp`, das nie zurueckgelesen wird.
 
+---
+
+**Sechzehnter Nachtrag 04.10. (Tennis) — nur der abgeschwaechte Druckmesser (T-N1, Klasse A\*),
+die Kernmechanik bleibt `vorteil`.** Chris hat die Tennis-Kernmechanik aus dem Nachtkonzept
+(`docs/design/tennis-nachtkonzept-03-10.md`, **T-N2 „Rennen bis 7" als Platzentscheider mit
+Clutch-/Momentum-Termen**) ausdruecklich **abgelehnt — das gilt weiterhin**. Gebaut wurde deshalb
+weder T-N2 noch das volle T-N1 (eine `a:b`-Tafel ueber ein Rennen, das nicht entscheidet, waere
+genau der Widerspruch, den Fechten mit F1 beseitigt hat), sondern nur die im Papier (3.1, Absatz
+„rho/Pp", und Frage 1 in Abschnitt 6) als „schwaecher, aber moeglich" beschriebene Fassung im
+heutigen Format:
+
+- **Siegchance und Wichtigkeit ueber die verbleibenden Runden** (`tennisDruckStand()` in
+  `battle-mode.engine.js`): symmetrisches Modell, Rundendifferenz ~ N(0, 30²), analytisch statt
+  Monte-Carlo (kein Zufall, kein `rr()`). Sigma 30 ist an 720 echten Plaetzen nachgemessen
+  (Rauschen innerhalb eines Platzes 29,4; Gesamtstreuung 36,5, davon Staerke-Drift 21,6).
+  Wichtigkeit nach Morris = erwartete Siegchance nach gewonnener minus nach verlorener naechster
+  Runde. Gelesen wird nur der von BEIDEN Seiten enthuellte Stand — spoilerfrei.
+- **Banner nach Wichtigkeit statt nach Ereignis**, Schwellen am echten `vorteil`-Verlauf
+  nachgerechnet (nicht aus der Rennen-bis-13-Tabelle uebertragen): MATCHBALL (Fuehrender kaeme
+  mit der naechsten Runde auf ≥ 95 %, faellt mit einer verlorenen auf ≤ 80 %; ~1,2 je
+  Mannschaftskampf, nur Runde 7–10), ABGEWEHRT (~0,3 je Kampf), ENTSCHEIDUNGSPUNKT (letzte Runde,
+  Wichtigkeit ≥ 0,5; ~0,5 je Kampf), COMEBACK (Sieger lag bei ≤ 15 %; ~0,26 je Kampf). Die
+  naheliegende Schwelle „Siegchance > 90 %" taugt in diesem Format NICHT als Matchball: sie wird
+  in 91 % aller Plaetze ueberschritten, meist schon in Runde 2–5.
+- **Ticker-Dosis aus der Wichtigkeit:** eigene Zeile nur fuer Runden mit Wichtigkeit ≥ 0,30,
+  Fuehrungswechsel/BREAK nur dort als Banner, eine Druck-Uebersicht je Runde. Nebenbefund: die
+  Ballwechsel-Zeilen gaben immer ein `kind` mit und landeten deshalb trotz Stufe „routine" alle
+  im sichtbaren Ticker (vorher 145 Zeilen in 1:02 = 140/min). Nachher 20 Zeilen (19,4/min) im
+  Ticker, alles Uebrige im Protokoll — Zielband ≤ 30 erreicht.
+- **Spannungsleiste je Platz** (Fuellstand in der Mannschafts-Leiste = Wichtigkeit der naechsten
+  Runde) und die Siegchance des Fokus-Platzes in der Kopfzeile.
+
+**`vorteil`-System unveraendert:** `u.summe`, `vorteil`, `verlauf`, `runden[]`, Punktevergabe,
+`punktGewinner`/Aufschlag (`TENNIS_AUFSCHLAG_H`, Tiebreak-Wechselregel) und der Platzsieger
+(`u.vorteil>0`) sind bit-identisch — nachgewiesen auf Rundenebene (120 Spiele, voller
+`TEILNEHMER`-Dump), im Produktionspfad `spieleBuehneDuell("tennis")` (200 Spiele, `seiten` +
+`boxscore`) und mit den Abnahmesonden (s. Tabelle). Kein Feature-Flag noetig.
+
+| Sonde (vorher = Engine aus `HEAD`, nachher = dieser Stand, je eigener Spiegelbaum) | vorher | nachher |
+|---|---:|---:|
+| `miss-alle-disziplinen.mjs 24`, Tennis rho je Spiel / Saison (Median, Spannweite) | 0,813 (0,199) / 0,944 | 0,813 (0,199) / 0,944 |
+| `miss-alle-disziplinen.mjs 24`, alle zwanzig Disziplinen | — | Ausgabe zeichengleich (`diff` leer) |
+| `messe-arena-einfluss.mjs tennis 48`, Strom 1 / `--saat-versatz=10000000` | 6,9 / 4,4 Pp | 6,9 / 4,4 Pp (Attributvektoren zeichengleich) |
+| `miss-ticker-dichte.mjs tennis` (sichtbarer Ticker) | 145 Zeilen, 140/min | 20 Zeilen, 19,4/min |
+
+(Die im Nachtkonzept zitierten Pp 9,8 / 6,2 stammen aus PR #1135; der heutige `main`-Stand misst
+6,9 / 4,4 — beides weit unter 25, und von dieser Aenderung unberuehrt.)
+
+**Ehrlich:** das ist deutlich weniger Drama als das abgelehnte Rennen bis 7 (Papier: ~5
+„abgewehrt" je Kampf). Die meisten Plaetze sind im Summenformat frueh strukturell entschieden
+(nur 6 % enden innerhalb ±20 Punkte); in einem von fuenf Sichtpruefungs-Spielen kam gar kein
+Druckmesser-Banner, nur die Uebersichtszeilen. Der Druckmesser zeigt das jetzt, statt es zu
+ueberschreien.
+
 **Fuenfzehnter Nachtrag 02.10. — reine Doku-Pflege: Staffel-Pp bei n=48 bestaetigt, Breaking-Pp
 nach dem Speicherleck-Fix neu gemessen.** Zwei offene Positionen aus fruaheren Nachtraegen
 nachgezogen, keine Code-Aenderung in `battle-mode.engine.js`.

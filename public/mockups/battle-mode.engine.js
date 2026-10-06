@@ -15560,6 +15560,212 @@
   // mit Sekundaerquellen-Vorbehalt wie dort vermerkt). Reine Vergleichsgroesse (s. oben).
   const TENNIS_AUFSCHLAG_H=10;
 
+  // T-N1 -- DER DRUCKMESSER, ABGESCHWAECHTE FASSUNG (Tennis-Nachtkonzept 03.10.,
+  // docs/design/tennis-nachtkonzept-03-10.md Abschnitt 3.1 Absatz "rho/Pp" und Abschnitt 6
+  // Frage 1: "mit Nein bleibt Tennis bei `vorteil`, und T-N1 muss den Druckmesser ueber die
+  // verbleibenden Runden rechnen statt ueber ein Rennen — schwaecher, aber moeglich"). Chris
+  // hat T-N2 (Rennen bis 7 als Platzentscheider, Clutch/Momentum) am 04.10. ausdruecklich
+  // ABGELEHNT -- deshalb hier KEIN Rennen, KEINE Tafel "a:b", sondern dieselbe Kennzahl
+  // (Morris' Wichtigkeit) ueber das heutige Format: 10 Runden je Platz, Platzsieger nach
+  // `vorteil` = Summe der Punktdifferenzen (u.vorteil>0, unveraendert).
+  //
+  // KLASSE A* -- REINE ZWEITRECHNUNG UEBER BEREITS ENTHUELLTE WERTE: kein rr(), kein Feld auf
+  // TEILNEHMER/runden[], keine Aenderung an summe/vorteil/verlauf/punkte/punktGewinner.
+  // Gelesen wird NUR der enthuellte Stand (seite0.verlauf[r] erst, wenn BEIDE Seiten Runde r
+  // enthuellt haben -- dasselbe Gegen-Gate wie BREAK/Fuehrungswechsel) und eine Konstante,
+  // nie `eig`, nie eine zukuenftige Runde: spoilerfrei im Sinn der S-F2-Regel.
+  //
+  // DAS MODELL (symmetrisch, wie im Papier fuer das Rennen bis 7 mit p = 0,5): die
+  // Punktdifferenz einer kuenftigen Runde ist symmetrisch um 0 verteilt, Streuung
+  // TENNIS_DRUCK_SIGMA, Runden unabhaengig -- also ist die Summe ueber k offene Runden
+  // N(0, k*SIGMA^2) und die Siegchance der Heimseite bei Stand v (Heim-Sicht) und k offenen
+  // Runden Phi(v / (SIGMA*sqrt(k))). Analytisch statt Monte-Carlo: dasselbe Ergebnis, auf
+  // das eine Monte-Carlo-Schaetzung konvergieren wuerde, aber ohne Zufallszahl (ein
+  // Monte-Carlo mit rr() wuerde den Wertungsstrom verschieben, mit eigenem Generator waere
+  // es nur langsamer und verrauschter).
+  //
+  // SIGMA = 30, NACHGEMESSEN, NICHT GESETZT (04.10., 720 Plaetze, live-save-Kaderfamilie,
+  // 5 Paarungen x 24 Spiele): Rundendifferenz insgesamt Streuung 36,5, davon Staerkeunter-
+  // schied je Platz (Drift) 21,6 und Rauschen innerhalb eines Platzes 29,4. Das symmetrische
+  // Modell kennt die Drift absichtlich nicht (sie kaeme nur aus `eig` oder einer Schaetzung
+  // aus dem Verlauf). Kalibrierung ueber beide Seitenperspektiven: SIGMA 30 Brier 0,1120,
+  // 35 -> 0,1139, 40 -> 0,1162; ein driftschaetzendes Modell kaeme auf 0,1104 -- der
+  // Unterschied ist klein, das einfache Modell reicht fuer Worte und Leisten.
+  //
+  // WICHTIGKEIT (Morris 1977, uebertragen auf eine stetige Rundendifferenz): erwartete
+  // Siegchance, wenn die naechste Runde an die Heimseite geht (d > 0), minus erwartete
+  // Siegchance, wenn sie an die Gastseite geht (d < 0) -- d ~ N(0, SIGMA^2), Mittelpunkt-
+  // Quadratur ueber 0..4 SIGMA. Werte: Stand 0 bei 10 offenen Runden 0,21, bei 5 offenen 0,30,
+  // bei 2 offenen 0,50, letzte Runde bei Gleichstand 1,00 -- dieselbe Groessenordnung wie die
+  // Rennen-bis-7-Tabelle im Papier (0:0 0,23, 6:6 1,00), aber eigene Zahlen.
+  //
+  // SCHWELLEN, NACHGERECHNET AM ECHTEN `vorteil`-VERLAUF (dieselben 720 Plaetze), NICHT aus
+  // der Rennen-bis-13-Tabelle uebertragen:
+  //   * Die naheliegende "Siegchance ueber 90 %" taugt NICHT als Matchball: sie wird in 91 %
+  //     aller Plaetze ueberschritten, meist schon vor Runde 3-5 (5,5 je Mannschaftskampf) --
+  //     die meisten Plaetze sind in diesem Format frueh strukturell entschieden (nur 6 %
+  //     enden innerhalb +-20).
+  //   * MATCHBALL fuer eine Seite: gewinnt sie die naechste Runde, steht ihre Siegchance im
+  //     Mittel bei mindestens TENNIS_DRUCK_MB_GEW (95 %), verliert sie sie, faellt sie auf
+  //     hoechstens TENNIS_DRUCK_MB_VER (80 %) -- "ein Ball, der den Platz entscheidet, und
+  //     einer, der ihn wieder oeffnet". Gemessen 1,16 je Kampf, nur in Runde 7-10;
+  //     abgewehrt 0,34 je Kampf.
+  //   * ENTSCHEIDUNGSPUNKT: letzte Runde mit Wichtigkeit >= 0,5 (Abstand hoechstens ~20
+  //     Punkte), 0,50 je Kampf.
+  //   * COMEBACK: Platzsieger, dessen Siegchance vor irgendeiner Runde bei hoechstens 15 %
+  //     lag, 0,26 je Kampf.
+  //   * TICKER-DOSIS: nur Runden mit Wichtigkeit >= 0,30 schreiben eine eigene Zeile (oberste
+  //     ~6 % aller Runden, 3,5 je Kampf).
+  // Ehrlich: das ist deutlich weniger Drama als das Rennen bis 7 haette (Papier: ~5
+  // "abgewehrt" je Kampf) -- der Summen-Vorteil wird frueh deutlich, und genau das zeigen die
+  // Zahlen jetzt, statt es zu ueberschreien.
+  const TENNIS_DRUCK_SIGMA=30;
+  const TENNIS_DRUCK_MB_GEW=0.95, TENNIS_DRUCK_MB_VER=0.80;
+  const TENNIS_DRUCK_ENTSCHEIDUNG=0.50, TENNIS_DRUCK_COMEBACK=0.15, TENNIS_DRUCK_TICKER=0.30;
+  // erf nach Abramowitz/Stegun 7.1.26 (Fehler < 1,5e-7) -- Math kennt keine erf.
+  function tennisDruckErf(x){
+    const t=1/(1+0.3275911*Math.abs(x));
+    const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496735)*t+0.254829592)*t*Math.exp(-x*x);
+    return x>=0?y:-y;
+  }
+  // Siegchance der Heimseite bei Stand v (Heim-Sicht) und k offenen Runden; nach der letzten
+  // Runde (k=0) die feste Wertung aus `vorteil` (>0 Sieg, 0 Remis = halb, <0 Niederlage).
+  function tennisSiegchance(v,k){
+    if(k<=0)return v>0?1:v<0?0:0.5;
+    return 0.5*(1+tennisDruckErf(v/(TENNIS_DRUCK_SIGMA*Math.sqrt(k))/Math.SQRT2));
+  }
+  // Voller Druckstand VOR einer Runde: Siegchance jetzt, erwartete Siegchance nach gewonnener
+  // bzw. verlorener naechster Runde (Heim-Sicht) und deren Differenz = Wichtigkeit.
+  const TENNIS_DRUCK_STUETZ=24;
+  function tennisDruckStand(v,k){
+    const w=tennisSiegchance(v,k);
+    if(k<=0)return {w,gew:w,ver:w,imp:0};
+    let sg=0,sv=0,g=0;
+    for(let i=0;i<TENNIS_DRUCK_STUETZ;i++){
+      const z=(i+0.5)/TENNIS_DRUCK_STUETZ*4, gw=Math.exp(-z*z/2), d=z*TENNIS_DRUCK_SIGMA;
+      sg+=gw*tennisSiegchance(v+d,k-1); sv+=gw*tennisSiegchance(v-d,k-1); g+=gw;
+    }
+    return {w,gew:sg/g,ver:sv/g,imp:(sg-sv)/g};
+  }
+  // Anzeige einer Siegchance in Prozent: solange noch gespielt wird, nie "0 %"/"100 %"
+  // (das Modell schliesst nichts aus -- ein Platz ist erst nach der letzten Runde entschieden).
+  function tennisProzent(w,offen){
+    const p=Math.round(w*100);
+    return offen?Math.max(1,Math.min(99,p)):p;
+  }
+  // FORTSCHREIBUNG FUER GENAU EINE ENTHUELLTE RUNDE EINES PLATZES. Nur aufrufen, wenn BEIDE
+  // Seiten diese Runde enthuellt haben (Gegen-Gate in stepBuehne(), `gegner.aktuell>=
+  // u.aktuell`) -- dann ist `seite0.verlauf[r]` der echte, oeffentliche Stand und keine
+  // Vorschau auf eine noch verdeckte Gegnerrunde. Liest `verlauf[r-1]`/`verlauf[r]`, schreibt
+  // ausschliesslich `tennisDruck[brett]` (Anzeige-Zustand). Rueckgabe: die Wichtigkeit DIESER
+  // Runde (Stand davor -- fuer die Ticker-Dosis von Fuehrungswechsel/BREAK) und die
+  // Meldungen, die sie ausloest; feed() ruft der Aufrufer selbst.
+  //
+  // VORZEICHEN: alles intern in Heim-Sicht (w = Siegchance Heim); jede Meldung nennt die
+  // Seite, fuer die sie spricht, und rechnet deren Prozentzahl aus ihrer eigenen Sicht
+  // (Gast: 1-w). Der MATCHBALL gehoert der Seite, deren Siegchance nach einer gewonnenen
+  // naechsten Runde >= TENNIS_DRUCK_MB_GEW waere -- also immer der fuehrenden.
+  function tennisDruckRunde(u,gegner,art){
+    const seite0=u.side===0?u:gegner, seite1=u.side===0?gegner:u;
+    const r=u.aktuell, R=art.rundenN, brett=u.brett??0;
+    const vVor=r>0?seite0.verlauf[r-1]:0, vNach=seite0.verlauf[r];
+    const kNach=R-r-1;
+    const vor=tennisDruckStand(vVor,R-r), nach=tennisDruckStand(vNach,kNach);
+    let z=tennisDruck[brett];
+    if(!z)z=tennisDruck[brett]={minW:[1,1],mb:null,mbZahl:[0,0]};
+    z.minW=[Math.min(z.minW[0],vor.w),Math.min(z.minW[1],1-vor.w)];
+    const name=(s)=>s===0?seite0.n:seite1.n;
+    const pz=(s,st)=>tennisProzent(s===0?st.w:1-st.w,true);
+    // Siegchance mit Namen der fuehrenden Seite ("Greenkraut 71 %"), bei 50 % "50 : 50" --
+    // eine nackte "71 : 29" liesse offen, wer Heim und wer Gast ist.
+    const chance=(st)=>Math.abs(st.w-0.5)<0.005?"50 : 50":(st.w>0.5?name(0)+" "+pz(0,st):name(1)+" "+pz(1,st))+" %";
+    const platz="Platz "+(brett+1), ballw=(r+1)+"/"+R;
+    const meldungen=[];
+    const sieger=kNach>0?-1:(vNach>0?0:vNach<0?1:-1);
+    const comeback=sieger>=0&&z.minW[sieger]<=TENNIS_DRUCK_COMEBACK;
+    // 1) AUSGANG EINES ANGEKUENDIGTEN MATCHBALLS (aus der Vorrunde, s. Punkt 3).
+    let gedeckt=kNach===0; // das Platzende beschreibt schon die "Platz gewonnen"-Zeile
+    if(z.mb!=null){
+      const s=z.mb, o=1-s, ds=(vNach-vVor)*(s===0?1:-1);
+      if(kNach>0){
+        if(ds<0)meldungen.push({seite:o,big:true,kind:"tennisAbgewehrt",txt:"ABGEWEHRT — "+name(o)
+          +" wehrt den Matchball von "+name(s)+" ab ("+platz+", Ballwechsel "+ballw+"): Siegchance "
+          +name(s)+" nur noch "+pz(s,nach)+" %."});
+        else meldungen.push({seite:s,big:false,txt:name(s)+" nutzt den Matchball — "+platz
+          +" so gut wie entschieden (Siegchance "+pz(s,nach)+" %)."});
+        gedeckt=true;
+      } else if(sieger===o&&!comeback){
+        meldungen.push({seite:o,big:true,kind:"tennisAbgewehrt",txt:"ABGEWEHRT — "+name(o)
+          +" wehrt den Matchball von "+name(s)+" ab und dreht "+platz+" mit dem letzten Ballwechsel."});
+      }
+      z.mb=null;
+    }
+    // 2) TICKER-DOSIS: nur grosse Runden bekommen eine eigene Zeile. "Punkte gut machen" ist
+    // die Veraenderung von `vorteil` (das Mass, das den Platz entscheidet), NICHT der
+    // T-F1a-Punktgewinner mit Aufschlag-Zuschlag -- die beiden koennen bei knappen Runden
+    // auseinanderfallen, und die Siegchance haengt nur am `vorteil`.
+    if(!gedeckt&&vor.imp>=TENNIS_DRUCK_TICKER){
+      const d=vNach-vVor, s=d>0?0:d<0?1:-1;
+      meldungen.push({seite:s<0?0:s,big:false,txt:"Großer Ballwechsel auf "+platz+" ("+ballw
+        +", Wichtigkeit "+vor.imp.toFixed(2).replace(".",",")+"): "
+        +(s<0?"keiner macht Punkte gut":name(s)+" macht "+Math.abs(d)+" Punkte gut")
+        +" — Siegchance jetzt "+chance(nach)+"."});
+    }
+    // 3) ANKUENDIGUNG FUER DIE NAECHSTE RUNDE (nur solange noch eine offen ist).
+    if(kNach===1&&nach.imp>=TENNIS_DRUCK_ENTSCHEIDUNG){
+      const f=vNach>0?0:vNach<0?1:-1;
+      meldungen.push({seite:f<0?0:f,big:true,kind:"tennisEntscheidung",txt:"ENTSCHEIDUNGSPUNKT — "+platz
+        +": der letzte Ballwechsel entscheidet, "+(f<0?"Gleichstand":name(f)+" liegt nur "+Math.abs(vNach)
+        +" Punkte vorn")+" (Siegchance "+chance(nach)+")."});
+    } else if(kNach>0){
+      for(const s of [0,1]){
+        // Gast gewinnt die naechste Runde, wenn d<0 -- seine Siegchance ist dann 1-ver.
+        const gew=s===0?nach.gew:1-nach.ver, ver=s===0?nach.ver:1-nach.gew;
+        if(gew>=TENNIS_DRUCK_MB_GEW&&ver<=TENNIS_DRUCK_MB_VER){
+          z.mb=s; z.mbZahl[s]++;
+          meldungen.push({seite:s,big:true,kind:"tennisMatchball",txt:"MATCHBALL — "+name(s)+" ("+platz
+            +(z.mbZahl[s]>1?", erneut":"")+"): gewinnt "+name(s)+" den nächsten Ballwechsel, ist der Platz so gut wie entschieden (Siegchance jetzt "
+            +pz(s,nach)+" %)."});
+          break;
+        }
+      }
+    }
+    // 4) COMEBACK am Platzende: Sieger lag vor irgendeiner Runde bei <= TENNIS_DRUCK_COMEBACK.
+    if(comeback)meldungen.push({seite:sieger,big:true,kind:"tennisComeback",txt:"COMEBACK — "+name(sieger)
+      +" gewinnt "+platz+", obwohl die Siegchance zwischenzeitlich bei "+tennisProzent(z.minW[sieger],true)+" % lag."});
+    z.v=vNach; z.k=kNach; z.w=nach.w; z.imp=nach.imp; z.runde=r; z.namen=[seite0.n,seite1.n];
+    // 5) DRUCK-UEBERSICHT, EINE ZEILE JE RUNDE (sobald der LETZTE Platz diese Runde
+    // abgeschlossen hat -- die Warteschlange enthuellt Runde fuer Runde ueber alle Plaetze):
+    // wo ist es offen, wo nur noch Tendenz, was ist so gut wie vergeben, und die erwartete
+    // Zahl gewonnener Plaetze (Summe der Siegchancen). Ohne diese Zeile blieb der Ticker in
+    // Spielen ohne fruehe knappe Plaetze ~40 s leer (Sichtpruefung 04.10.) -- die Leere war
+    // ehrlich, aber stumm; jetzt sagt der Ticker, DASS es entschieden ist und wo nicht.
+    // "normal"-Stufe (Zeilenbudget), nie Banner. Nach der letzten Runde nicht mehr (dort
+    // sprechen die "Platz gewonnen"-Zeilen und die Schlusszeile).
+    if(kNach>0){
+      const bretterIdx=TEILNEHMER.filter(x=>x.side===0&&x.brett!=null
+        &&TEILNEHMER.some(y=>y.side===1&&y.brett===x.brett)).map(x=>x.brett).sort((a,b)=>a-b);
+      if(bretterIdx.length&&bretterIdx.every(b=>tennisDruck[b]&&tennisDruck[b].runde===r)){
+        const offen=[],tendenz=[],vergeben=[]; let erwartetHeim=0;
+        for(const b of bretterIdx){
+          const t=tennisDruck[b], fw=Math.max(t.w,1-t.w); erwartetHeim+=t.w;
+          const wer=Math.abs(t.w-0.5)<0.005?"50 : 50":(t.w>0.5?t.namen[0]:t.namen[1])+" "+tennisProzent(fw,true)+" %";
+          if(fw<0.8)offen.push("Platz "+(b+1)+" ("+wer+")");
+          else if(fw<TENNIS_DRUCK_MB_GEW)tendenz.push("Platz "+(b+1)+" ("+wer+")");
+          else vergeben.push(String(b+1));
+        }
+        const teile=[];
+        if(offen.length)teile.push("offen: "+offen.join(", "));
+        if(tendenz.length)teile.push("Tendenz: "+tendenz.join(", "));
+        if(vergeben.length)teile.push("so gut wie vergeben: Platz "+vergeben.join(", "));
+        const fmt=(x)=>x.toFixed(1).replace(".",",");
+        meldungen.push({seite:0,big:false,txt:"Druck nach Ballwechsel "+ballw+" — "+teile.join("; ")
+          +" · erwartete Plätze Heim "+fmt(erwartetHeim)+" : "+fmt(bretterIdx.length-erwartetHeim)+" Gast."});
+      }
+    }
+    return {impRunde:vor.imp,meldungen};
+  }
+
   // TAUZIEH-VERSATZ FUER BUEHNEN-DUELL-BAHNEN (Chris, 22.09., zu einem Screenshot einer
   // Fechten-Uebersicht mit mehreren Bahnen nebeneinander: "hier sollte der gewinnende
   // spieler den anderen immer weiter zurück drängen damit man auch optisch besseres
@@ -15679,6 +15885,12 @@
   // (s. dort, direkt vor zeichneTennis()). KEIN Pin: anders als Schach gibt es hier
   // keinen Klick-Handler dafuer, das war nicht Teil des Auftrags.
   let tennisFokus=0, fechtenFokus=0;
+  // T-N1 DRUCKMESSER (s. tennisDruckStand() oben): reiner Anzeige-Zustand je Platz, von
+  // tennisDruckRunde() in stepBuehne() fortgeschrieben, von zeichneTennis() (Spannungsleiste,
+  // Siegchance im Kopf) gelesen. Modulzustand wie tennisFokus, NICHT auf TEILNEHMER --
+  // nichts davon fliesst in summe/vorteil/verlauf/wert()/rr(). Je Platz:
+  //   {v, k, w, imp, minW:[heim,gast], mb:Seite|null, mbZahl:[heim,gast]}
+  let tennisDruck=[];
   // "matt"-Ton (Ziel 5, A4) darf nur EINMAL je Spiel feuern, sobald das Duell entschieden
   // ist (alleFertig && siegSeite!=null, s. zeichneSchach) — sonst spielt jeder weitere
   // Frame nach dem Sieg den Ton erneut ab. Reset hier statt in reset() (s. Kommentar dort
@@ -16085,7 +16297,7 @@
       :WETTESSEN_MENU[0];
     floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     LASTEN_FINALE=null;
-    tennisFokus=0; fechtenFokus=0;
+    tennisFokus=0; fechtenFokus=0; tennisDruck=[];
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
     // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln oben) -- derselbe Grund
@@ -19397,9 +19609,21 @@
         // wie beim Gegen-Gate bei "PERIODE BEENDET" unten (dasselbe Muster, hier nur je Zug
         // statt je Periode). Reine Anzeige-Entscheidung -- `v`/`u.verlauf`/`wert()`/`rr()`
         // bleiben unberuehrt.
+        // T-N1 DRUCKMESSER (abgeschwaecht, s. tennisDruckStand()/tennisDruckRunde()): genau
+        // einmal je Platz und Runde, am selben Gegen-Gate wie BREAK/Fuehrungswechsel -- erst
+        // wenn BEIDE Seiten diese Runde enthuellt haben, ist der Stand oeffentlich. Reine
+        // Zweitrechnung (Klasse A*), kein rr(), schreibt nur `tennisDruck`. Die Meldungen
+        // feuern weiter unten, NACH der "Platz entschieden"-Zeile.
+        const tennisDruckJetzt=(BB().tennis&&gegner&&gegner.aktuell>=u.aktuell&&gegner.verlauf)
+          ?tennisDruckRunde(u,gegner,BB()):null;
+        // TICKER-DOSIS AUS DER WICHTIGKEIT (Papier 3.1 Punkt 3), NUR TENNIS: Fuehrungswechsel
+        // und BREAK werden nur noch an grossen Runden (Wichtigkeit >= TENNIS_DRUCK_TICKER) zum
+        // Banner -- ein gekippter `vorteil` im zweiten Ballwechsel aendert die Siegchance kaum.
+        const tennisGross=!!tennisDruckJetzt&&tennisDruckJetzt.impRunde>=TENNIS_DRUCK_TICKER;
         const vorteilKipptBig=u.aktuell>0
           &&Math.sign(v)!==Math.sign(u.verlauf[u.aktuell-1])
-          &&(!gegner||gegner.aktuell>=u.aktuell);
+          &&(!gegner||gegner.aktuell>=u.aktuell)
+          &&(!BB().tennis||tennisGross);
         // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09., Abschnitt 4
         // "S-F2", Paket 1 "Regie & Bild", Klasse A, NUR Speed-Schach -- s. buehneMaxRestPunkte()-
         // Kommentar oben fuer die volle Herleitung der oberen Schranke). Ab Zug 6 prueft dieser
@@ -19462,11 +19686,18 @@
         // und steht nur im Protokoll -- im Ticker bleiben die entschiedenen Bretter/Plaetze/
         // Bahnen (big, s.u.), gekippte Vorteile (big) und im Fechten der Treffer selbst, der
         // dort als einziger zaehlt (der Trefferstand ist die Wertung, s. Kommentar oben).
+        // KIND NUR NOCH BEI ECHTEM BANNER, NUR TENNIS (T-N1 Ticker-Dosis): feed() stuft jede
+        // Zeile MIT `kind` als "ereignis" ein (tickerZeigt(big||kind?...)) -- weil diese
+        // Aufrufstelle `kind` immer mitgab, griff die "routine"-Stufe hier nie, und jeder
+        // einzelne Ballwechsel beider Seiten stand im sichtbaren Ticker (gemessen 04.10.,
+        // miss-ticker-dichte.mjs tennis: 145 Zeilen in 1:02, 140/min, 0 nur im Protokoll).
+        // Schach/Fechten bleiben unveraendert (nicht Teil dieses Auftrags).
+        const zeileBig=buehneBahnGrossDrosseln(vorteilKipptBig,false);
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · "+statText
           +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",
-          buehneBahnGrossDrosseln(vorteilKipptBig,false),undefined,
-          BB().schach?"kippZug":"fuehrungswechsel",undefined,undefined,
+          zeileBig,undefined,
+          (BB().tennis&&!zeileBig)?undefined:(BB().schach?"kippZug":"fuehrungswechsel"),undefined,undefined,
           BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
         // T-F1a -- BREAK-BANNER (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F4: "Das im
         // selben Abschnitt vorgeschlagene 'BREAK!'-Banner braucht einen diskreten
@@ -19495,9 +19726,14 @@
           if(r.punktGewinner!==r.aufschlag){
             const rueckschlaeger=r.punktGewinner===0?seite0:seite1;
             const aufschlaeger=r.aufschlag===0?seite0:seite1;
+            // T-N1 TICKER-DOSIS: Banner nur an einem grossen Ballwechsel ("BREAK zum
+            // Matchball" statt Routine bei ~36 % aller Punkte, Papier 3.1 Punkt 3); sonst
+            // steht der Break nur noch im Protokoll.
+            const breakBig=tennisGross&&buehneBahnGrossDrosseln(true,false);
             feed(0,"BREAK — "+rueckschlaeger.n+" gewinnt den Punkt gegen den Aufschlag von "
               +aufschlaeger.n+" ("+worte.brett+" "+((u.brett??0)+1)+").",
-              buehneBahnGrossDrosseln(true,false),undefined,"tennisBreak");
+              breakBig,undefined,breakBig?"tennisBreak":undefined,undefined,undefined,
+              breakBig?undefined:"routine");
           }
         }
         // PERIODE BEENDET (Option 1, dieselbe Stelle): Zwischenstand alle rundenN/3
@@ -19613,6 +19849,17 @@
               :worte.vort+" "+(v>0?"+":"")+v;
             feed(u.side,u.n+": "+worte.brett+" "+((u.brett??0)+1)+" "+brettText+" ("+statEnde+").",
               buehneBahnGrossDrosseln(true,true),undefined,brettText==="unentschieden"?"remis":"entschieden");
+          }
+        }
+        // T-N1 DRUCKMESSER -- MELDUNGEN (s. tennisDruckRunde()). Banner nach Wichtigkeit statt
+        // nach Ereignis: Matchball/Abgewehrt/Entscheidungspunkt/Comeback sind selten (gemessen
+        // zusammen ~2,3 je Mannschaftskampf) und deshalb wie "Platz entschieden" ungedrosselt
+        // (Prioritaets-Bypass, setzt den gemeinsamen Cooldown trotzdem neu); die Zeile fuer
+        // einen grossen Ballwechsel ist "normal" (im Ticker, solange das Zeilenbudget reicht).
+        if(tennisDruckJetzt){
+          for(const m of tennisDruckJetzt.meldungen){
+            if(m.big)feed(m.seite,m.txt,buehneBahnGrossDrosseln(true,true),undefined,m.kind);
+            else feed(m.seite,m.txt,false);
           }
         }
       } else if(BB().showcase&&u.vizAct){
@@ -23757,6 +24004,16 @@
       ctx.font=(b.fertig?"800 ":"600 ")+fontPx+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
       ctx.fillStyle=b.farbVar?css(b.farbVar):"#c7ccd6";
       ctx.fillText(b.text,bx+bw/2,y+bh/2+1);
+      // T-N1 SPANNUNGSLEISTE (nur Tennis setzt `spannung`, 0..1 = Wichtigkeit der naechsten
+      // Runde, s. tennisDruckStand()): Fuellstand am unteren Innenrand der Box (nicht darunter
+      // -- dort ueberdeckt ihn die grosse Nahansicht des Fokus-Platzes), ab 0,5 rot statt gelb.
+      // Schach/Fechten setzen das Feld nicht und zeichnen unveraendert.
+      if(b.spannung!=null){
+        const sy=y+bh-5, sp=Math.max(0,Math.min(1,b.spannung));
+        ctx.fillStyle="rgba(255,255,255,.10)"; ctx.fillRect(bx+2,sy,bw-4,4);
+        ctx.fillStyle=sp>=TENNIS_DRUCK_ENTSCHEIDUNG?"#e0603c":"#f2d75a";
+        ctx.fillRect(bx+2,sy,(bw-4)*sp,4);
+      }
     });
     ctx.restore();
   }
@@ -23869,6 +24126,15 @@
       const serverName=(serverSeite===fa.side?fa:fb).n;
       punkteText=" · Punkte "+eigen+":"+gegn+" · Aufschlag "+(serverName.length>12?serverName.slice(0,11)+"…":serverName);
     }
+    // T-N1 DRUCKMESSER IM KOPF: Siegchance Heim : Gast des Fokus-Platzes aus `tennisDruck`
+    // (nur am Gegen-Gate fortgeschrieben, also nie mit einer verdeckten Gegnerrunde). Vor der
+    // ersten vollstaendigen Runde 50 : 50, nach der letzten nicht mehr gezeigt (dann steht der
+    // Platz als Haekchen in der Mannschafts-Leiste).
+    const fokusDruck=tennisDruck[tennisFokus];
+    if(fa&&fb&&!(fertig(fa)&&fertig(fb))){
+      const w=fokusDruck?fokusDruck.w:0.5;
+      punkteText+=" · Siegchance "+tennisProzent(w,true)+" : "+tennisProzent(1-w,true);
+    }
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
       +(schlagzahl!=null?" · "+schlagzahl+" Schläge":"")
@@ -23878,16 +24144,23 @@
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
     // in Teamfarbe (Fechten, Tennis)" -- ein echter Punktestand existiert erst mit T1+T2 aus
     // dem Konzeptreview, s. T-B5 im Dokument).
+    // T-N1 SPANNUNGSLEISTE (Papier 3.1 Punkt 4): `spannung` = Wichtigkeit der NAECHSTEN Runde
+    // dieses Platzes (tennisDruck[i].imp) -- sechs Leisten nebeneinander zeigen, wohin man
+    // schauen soll. Vor der ersten vollstaendigen Runde der Startwert bei Stand 0, fertige
+    // Plaetze 0.
+    const startSpannung=tennisDruckStand(0,art.rundenN).imp;
     const leisteBoxen=Array.from({length:bretter},(_,i)=>i).map(i=>{
       const [pa,pb]=paar(i);
       if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===tennisFokus};
       const brettFertig=fertig(pa)&&fertig(pb);
       if(brettFertig){
         const wert=pa.vorteil||0;
-        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus};
+        return {fertig:true,text:"✓",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===tennisFokus,spannung:0};
       }
       const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
-      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus};
+      const dr=tennisDruck[i];
+      return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus,
+        spannung:dr?dr.imp:startSpannung};
     });
     zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
 
@@ -41788,6 +42061,11 @@
     kippZug:"KIPP-ZUG",
     // T-F1a (Fable-Ideen Buehne-Duell 30.09., Paket 2 "Tennis-Punkt"), NUR Tennis.
     tennisBreak:"BREAK!",
+    // T-N1 Druckmesser (Tennis-Nachtkonzept 03.10., abgeschwaecht), NUR Tennis.
+    tennisMatchball:"MATCHBALL",
+    tennisAbgewehrt:"ABGEWEHRT",
+    tennisEntscheidung:"ENTSCHEIDUNGSPUNKT",
+    tennisComeback:"COMEBACK",
     entschieden:"ENTSCHIEDEN",
     remis:"REMIS",
     goldenerBuzzer:"GOLDENER BUZZER",
