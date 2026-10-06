@@ -56,6 +56,14 @@ for (const [i, saat] of SAATEN.entries()) {
   await page.waitForFunction(() => Boolean(window.__arena), null, { timeout: 15000 });
   await page.click("#t2"); // Tab "Arena"
   await page.evaluate(() => window.__arena.setDisc("mini-dm"));
+  // RUNDENSHOW STATT AUTOSTART (Broadcast-Paket C "Mini-DM-Rundenshow", 06.10.): die
+  // Enthuellung startet seitdem nicht mehr automatisch bei setDisc()/reset() -- ein Klick auf
+  // "Alles zeigen" (#mdffaAlles) ueberspringt die Animation und zeigt sofort denselben
+  // Endzustand, den dieses Skript schon vor dem Umbau prueft (vier Rundentafeln, vier
+  // Endstand-Zeilen). Vor diesem Klick stehen absichtlich weder Platzierungen noch
+  // Ligapunkte im DOM -- das prueft die separate Sichtprobe/Validierung des PRs, nicht
+  // dieses auf "vier echte Teams sichtbar" spezialisierte Skript.
+  await page.click("#mdffaAlles");
 
   const zustand = await page.evaluate(() => ({
     mdffaHidden: document.getElementById("minidmffa")?.hidden,

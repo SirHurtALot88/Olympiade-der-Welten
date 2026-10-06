@@ -45171,6 +45171,22 @@
   // noch in der Temporal Dead Zone. Reines Timer-Housekeeping fuer die Anzeige — beruehrt
   // weder spieleMiniDmFfaEvent() noch dessen Rueckgabewert.
   let mdffaOffenbarungsTimer=null;
+  // RUNDENSHOW-ZUSTAND (Broadcast-Paket C, "Mini-DM-Rundenshow", 06.10.): Start-/Alles-
+  // zeigen-/Tempo-Knoepfe sitzen fest im Markup (battle-mode.html) und werden EINMAL beim
+  // Laden verdrahtet, lange bevor renderMiniDmFfa() (weiter unten) je gelaufen ist -- genau
+  // dasselbe Hoisting-Problem wie bei mdffaOffenbarungsTimer direkt darueber. Die drei
+  // Variablen halten deshalb hier oben, WELCHE laufende Schau (falls ueberhaupt eine) die
+  // Knoepfe gerade ansteuern sollen; renderMiniDmFfa() ueberschreibt sie bei jedem Aufruf
+  // (jeder Disziplinwechsel/Reset) mit frischen Funktionen ueber das dann neu berechnete
+  // Ereignis, nie mit einem zweiten Berechnungspfad.
+  let mdffaNaechsteRunde=null; // Funktion(rundenIndex) der aktuell sichtbaren Schau, oder null
+  let mdffaSpringeZumEnde=null; // Funktion() fuer "Alles zeigen", oder null
+  // TEMPO DIESER SENDUNGS-CHOREOGRAFIE (1x/2x) -- ausdruecklich NICHT dasselbe wie `speed`
+  // (das Kampftempo der klassischen Zwei-Seiten-Arena, die Mini-DM gar nicht zeigt). Bleibt
+  // ueber Disziplinwechsel hinweg stehen (Komfort: wer 2x gewaehlt hat, behaelt es beim
+  // naechsten Mini-DM-Besuch), wird aber nie von traegheitsarm()/prefers-reduced-motion
+  // ueberschrieben -- diese Pruefung sitzt in renderMiniDmFfa() selbst.
+  let mdffaTempo=1;
 
   // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
   // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
@@ -45345,11 +45361,22 @@
       const knoten=document.querySelector(sel);
       if(knoten)knoten.style.display=istMdffa?"none":"";
     });
+    // VOLLE BREITE FUER MINI-DM (C4, Broadcast-Paket C, 06.10.): ohne diese Klasse bleibt die
+    // 320px-Spalte, die battle-mode.css `#p2 .frame` fuer `.untenraum` reserviert, auch dann
+    // leer stehen, wenn `.untenraum` gerade (s. Schleife direkt darueber) display:none ist --
+    // s. Kommentar bei `.frame.mdffa-vollbreite` in battle-mode.css.
+    const p2Frame=document.querySelector("#p2 .frame");
+    if(p2Frame)p2Frame.classList.toggle("mdffa-vollbreite",istMdffa);
     if(istMdffa)renderMiniDmFfa();
-    // Verlassen von Mini-DM waehrend eine Live-Offenbarung noch laeuft (s. renderMiniDmFfa()
-    // oben, "Live-Reveal", Bugfix 27.09.): sonst tickt der setTimeout auf dem jetzt
-    // ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden.
-    else if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    // Verlassen von Mini-DM waehrend eine laufende Rundenshow noch tickt (s. renderMiniDmFfa()
+    // oben, Bugfix 27.09., erweitert Broadcast-Paket C 06.10.): sonst tickt der setTimeout auf
+    // dem jetzt ausgeblendeten Panel unbeirrt weiter, statt mit dem Disziplinwechsel zu enden
+    // -- und die Start-/Alles-zeigen-Knoepfe duerften keine laengst verlassene Schau mehr
+    // ansteuern koennen.
+    else{
+      if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+      mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
+    }
     // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
     // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
     // #tdmEntwurfNotes) sind TDM-spezifische Entwicklerdokumentation und ergaben bisher
@@ -46015,14 +46042,34 @@
   // Fenster-Resize o.ae. nicht neu wuerfelt — `renderMiniDmFfa()` rechnet nur bei einem
   // echten reset() (Disziplinwechsel oder Klick auf „Zuruecksetzen") neu.
   //
-  // `mdffaOffenbarungsTimer` (der Live-Reveal-Timer dieser Funktion) ist bewusst weiter oben
-  // deklariert, direkt vor `reset()` — s. dessen Kopfkommentar dort.
+  // `mdffaOffenbarungsTimer`/`mdffaNaechsteRunde`/`mdffaSpringeZumEnde`/`mdffaTempo` (der
+  // Rundenshow-Zustand dieser Funktion) sind bewusst weiter oben deklariert, direkt vor
+  // `reset()` — s. deren Kopfkommentar dort.
+  //
+  // ECHTE SENDUNG STATT AUTOSTART (Broadcast-Paket C "Mini-DM-Rundenshow", 06.10., C1-C4):
+  // vorher rechnete diese Funktion `ereignis` UND spielte die ganze Offenbarung in einem
+  // Rutsch automatisch ab, sobald `reset()` sie aufrief — wer erst spaeter zur Arena
+  // wechselte, verpasste die Enthuellung komplett, und die ganze Schau dauerte nur rund vier
+  // Sekunden. Das Ergebnis steht WEITERHIN sofort und vollstaendig fest (keine Aenderung an
+  // spieleMiniDmFfaEvent()/baueMiniDmFfaRunde(), s. deren Kopfkommentare) — neu ist nur, DASS
+  // und WANN es auf den Schirm kommt: zuerst nur der Einlauf (vier Eckkarten ohne Ergebnis,
+  // die vier bereits feststehenden Rollen-Paarungen), erst der Klick auf #mdffaStart deckt
+  // Runde 1 auf. #mdffaAlles ueberspringt die Animation und zeigt sofort das Endergebnis,
+  // #mdffaSpeedBtn waehlt Tempo 1x/2x fuer die Pausen zwischen den Schritten.
   function renderMiniDmFfa(){
     const teamsBox=document.getElementById("mdffaTeams");
     const rundenBox=document.getElementById("mdffaRunden");
     const endstandBox=document.getElementById("mdffaEndstand");
+    const ctrlBox=document.getElementById("mdffaCtrl");
+    const startBtn=document.getElementById("mdffaStart");
+    const allesBtn=document.getElementById("mdffaAlles");
+    const titelkarte=document.getElementById("mdffaTitelkarte");
+    const paarungenBox=document.getElementById("mdffaPaarungen");
+    const rundenbanner=document.getElementById("mdffaRundenbanner");
+    const endstandKopf=document.getElementById("mdffaEndstandKopf");
     if(!teamsBox||!rundenBox||!endstandBox)return;
     if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+    mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     const eintraege=mdffaTeamEintraege();
     // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
     // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
@@ -46036,6 +46083,11 @@
       rundenBox.innerHTML="<p class='muted'>Mini-DM-FFA konnte nicht simuliert werden: "+
         (fehler&&fehler.message?fehler.message:String(fehler))+"</p>";
       endstandBox.textContent="";
+      if(ctrlBox)ctrlBox.hidden=true;
+      if(paarungenBox)paarungenBox.textContent="";
+      if(titelkarte)titelkarte.hidden=true;
+      if(rundenbanner)rundenbanner.hidden=true;
+      if(endstandKopf)endstandKopf.hidden=true;
       return;
     }
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
@@ -46052,14 +46104,24 @@
       try{return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);}
       catch(e){return false;}
     })();
-    const PAUSE_MS=traegheitsarm?0:900;
-    const ANLAUF_MS=traegheitsarm?0:500;
+    // TEMPO-FAKTOR: teilt jede Pause unten durch `mdffaTempo` (1 oder 2), live lesbar bei
+    // jedem Schritt (ein Tempo-Wechsel MITTEN in der Schau wirkt sich also sofort auf die
+    // naechste Pause aus). traegheitsarm gewinnt immer -- 0ms bleibt 0ms, unabhaengig vom
+    // gewaehlten Tempo.
+    const ms=(basis)=>traegheitsarm?0:Math.round(basis/mdffaTempo);
 
-    // VIER ECKEN-KARTEN, ANFANGSZUSTAND: Ecke/Name stehen fest, aber noch keine Runde ist
-    // gewertet — kein Platz, keine Ligapunkte, kein Rundenpunkte-Stand. Die Farbe (mdffa-c0..3)
-    // haengt an der ECKE (side), nicht am erst spaeter feststehenden Rang, damit "das bin ich"
-    // ueber die ganze Offenbarung und den Sprung in die nach Platz sortierte Endkarte hinweg
-    // erkennbar bleibt.
+    if(ctrlBox)ctrlBox.hidden=false;
+    if(startBtn){startBtn.disabled=false;startBtn.textContent="Erste Runde aufdecken";}
+    if(allesBtn)allesBtn.disabled=false;
+    if(titelkarte)titelkarte.hidden=true;
+    if(rundenbanner)rundenbanner.hidden=true;
+    if(endstandKopf)endstandKopf.hidden=true;
+
+    // EINLAUF (C1): vier Eckkarten OHNE Ergebnis (Ecke/Name/"wartet"), dazu die vier bereits
+    // feststehenden Rollen-Paarungen -- WER in welcher Rolle gegen wen antritt, aber KEIN
+    // einziger Wert aus `ereignis.runden[].teams[]` ausser dem Namen (kein Beitrag, kein
+    // Platz, keine Punkte). Kein Spoiler: weder Platz noch Ligapunkte noch die
+    // .mdffa-sieger-Klasse stehen vor dem ersten Klick irgendwo im DOM.
     teamsBox.textContent="";
     teamsBox.setAttribute("aria-live","polite");
     const eckKarten=[0,1,2,3].map(side=>{
@@ -46069,9 +46131,31 @@
       const punkte=el("div","mdffa-punkte","–");
       punkte.appendChild(el("em",null,"wartet auf Runde 1"));
       karte.appendChild(punkte);
+      // LEBENSBALKEN (C2) -- bleibt bis zur ersten Runde verborgen ([hidden], s.
+      // aktualisiereHpBalken() unten): vor Runde 1 gibt es noch keinen "Endzustand einer
+      // Runde" zu zeigen, ein voller gruener Balken waere hier eine erfundene Aussage.
+      const hpwrap=el("div","mdffa-hpwrap"); hpwrap.hidden=true;
+      hpwrap.appendChild(el("span","mdffa-hpbar"));
+      karte.appendChild(hpwrap);
+      const hplabel=el("div","mdffa-hplabel",""); hplabel.hidden=true;
+      karte.appendChild(hplabel);
       teamsBox.appendChild(karte);
       return karte;
     });
+
+    if(paarungenBox){
+      paarungenBox.textContent="";
+      ereignis.runden.forEach((runde,i)=>{
+        const box=el("div","mdffa-paarung");
+        box.appendChild(el("b",null,"Runde "+(i+1)+" · "+mdffaRollenLabel(runde.slotId)));
+        const namen=[0,1,2,3].map(side=>{
+          const t=runde.teams.find(tt=>tt.side===side);
+          return t.n+" ("+eintraege[side].name+")";
+        }).join(" · ");
+        box.appendChild(document.createTextNode(namen));
+        paarungenBox.appendChild(box);
+      });
+    }
 
     rundenBox.textContent="";
     rundenBox.setAttribute("aria-live","polite");
@@ -46079,28 +46163,93 @@
 
     const laufendeSumme=[0,0,0,0];
 
-    // Rundentafel schreiben (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest) — Inhalt
-    // byte-identisch zur vorherigen, sofortigen Fassung, nur jetzt EINE statt aller vier
-    // auf einmal, mit einer kurzen Einblend-Animation (CSS, per prefers-reduced-motion
-    // abschaltbar).
-    function schreibeRundentafel(runde){
+    // EINE RUNDENZEILE BAUEN (Kaempfer, Beitrag, Rundenplatz/-punkte, HP-Rest). Ausgeschaltete
+    // Kaempfer bekommen den Stempel statt eines HP-Werts (C2). Gemeinsamer Baustein fuer beide
+    // Schreibwege unten -- sofort (alleRundenSofort/"Alles zeigen") und gestaffelt
+    // (naechsteRunde, Normaltempo).
+    function baueRundenzeile(t){
+      const tr=document.createElement("tr");
+      tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
+      const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
+      const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
+      const tdPunkte=document.createElement("td");
+      tdPunkte.className="n mdffa-pop";
+      tdPunkte.textContent=t.rundenPunkte+" Pkt.";
+      const tdHp=document.createElement("td");
+      tdHp.className="n";
+      if(t.down)tdHp.appendChild(el("span","mdffa-stempel","Ausgeschaltet"));
+      else tdHp.textContent=Math.round(t.hp)+"/"+t.max+" HP";
+      tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
+      return tr;
+    }
+
+    // RUNDENTAFEL SOFORT, ALLE VIER ZEILEN AUF EINMAL (fuer "Alles zeigen" -- keine Animation,
+    // kein Zwischenzustand mit unvollstaendiger Tafel).
+    function schreibeRundentafelSofort(runde){
       const box=el("div","mdffa-runde mdffa-runde-neu");
       box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
       const tbl=document.createElement("table");
       const tbody=document.createElement("tbody");
-      runde.teams.slice().sort((a,b)=>a.rundenPlatz-b.rundenPlatz).forEach(t=>{
-        const tr=document.createElement("tr");
-        tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
-        const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
-        const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
-        const tdPunkte=el("td","n",t.rundenPunkte+" Pkt.");
-        const tdHp=el("td","n",(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP"));
-        tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
-        tbody.appendChild(tr);
-      });
+      runde.teams.slice().sort((a,b)=>a.rundenPlatz-b.rundenPlatz).forEach(t=>tbody.appendChild(baueRundenzeile(t)));
       tbl.appendChild(tbody);
       box.appendChild(tbl);
       rundenBox.appendChild(box);
+    }
+
+    // RUNDENTAFEL GESTAFFELT, EINE ZEILE NACH DER ANDEREN ECHT IN DEN DOM EINGEFUEGT statt per
+    // CSS-animation-delay nur eingeblendet: eine fruehere Fassung liess die noch nicht
+    // "faelligen" Plaetze als LEERE, aber schon volle Tabellenzeilen im Layout stehen (sichtbare
+    // Luecke vor dem Einblenden, s. PR-Beschreibung) -- Zeilen, die es noch nicht geben soll,
+    // existieren hier schlicht noch nicht im DOM. `starteRundentafelGestaffelt()` legt nur
+    // Ueberschrift+leere Tabelle an und gibt das <tbody> zurueck; `enthuelleRundenzeile()`
+    // fuegt je einen Aufruf GANZ OBEN ein (insertBefore vor dem bisherigen ersten Kind) --
+    // Platz 4 zuerst, Platz 1 zuletzt ergibt am Ende trotzdem die gewohnte Reihenfolge Platz
+    // 1 oben/Platz 4 unten, weil jede neue (bessere) Platzierung die vorherigen nach unten
+    // schiebt, genau wie eine Rangliste, die von unten nach oben aufgebaut wird.
+    function starteRundentafelGestaffelt(runde){
+      const box=el("div","mdffa-runde mdffa-runde-neu");
+      box.appendChild(el("h5",null,mdffaRollenLabel(runde.slotId)));
+      const tbl=document.createElement("table");
+      const tbody=document.createElement("tbody");
+      tbl.appendChild(tbody);
+      box.appendChild(tbl);
+      rundenBox.appendChild(box);
+      return tbody;
+    }
+    function enthuelleRundenzeile(tbody,t){
+      const tr=baueRundenzeile(t);
+      tr.classList.add("mdffa-zeile-neu");
+      tbody.insertBefore(tr,tbody.firstChild);
+    }
+
+    // LEBENSBALKEN JE ECKE (C2, 2x2-Raster = dieselben vier Eckkarten): die Breite
+    // transitioniert per CSS (s. .mdffa-hpbar) auf den tatsaechlichen hp-Wert, den
+    // baueMiniDmFfaRunde() fuer diesen Kaempfer am RUNDENENDE zurueckgegeben hat -- EHRLICH
+    // als Endzustand nach der Runde beschriftet (.mdffa-hplabel-Text), nicht als Live-
+    // Kampfverlauf: die Simulation ist zu diesem Zeitpunkt laengst vollstaendig gelaufen.
+    function aktualisiereHpBalken(runde){
+      runde.teams.forEach(t=>{
+        const karte=eckKarten[t.side];
+        const hpwrap=karte.querySelector(".mdffa-hpwrap");
+        const bar=karte.querySelector(".mdffa-hpbar");
+        const label=karte.querySelector(".mdffa-hplabel");
+        if(hpwrap)hpwrap.hidden=false;
+        if(label)label.hidden=false;
+        if(bar)bar.style.width=Math.max(0,Math.min(100,(t.hp/Math.max(1,t.max))*100))+"%";
+        if(label)label.textContent=(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP")+" — Endstand der Runde";
+        karte.classList.toggle("mdffa-down",!!t.down);
+      });
+    }
+
+    // RUNDENSIEGER-BANNER (C2).
+    function zeigeRundenbanner(runde,rundenNr){
+      if(!rundenbanner)return;
+      const sieger=runde.teams.find(t=>t.rundenPlatz===1);
+      if(!sieger){rundenbanner.hidden=true;return;}
+      rundenbanner.textContent="";
+      rundenbanner.appendChild(document.createTextNode("Rundensieger Runde "+rundenNr+": "));
+      rundenbanner.appendChild(el("b",null,sieger.n+" ("+eintraege[sieger.side].name+")"));
+      rundenbanner.hidden=false;
     }
 
     function aktualisiereEckKarte(side,rundenNr){
@@ -46112,22 +46261,107 @@
       punkte.appendChild(el("em",null,"nach Runde "+rundenNr+" von "+ereignis.runden.length));
     }
 
-    // ENDSTAND, LETZTER SCHRITT DER KETTE: exakt dieselbe Team-Kopfzeile und Endstand-
-    // Tabelle wie in der vorherigen Fassung dieser Funktion (Werte, Sortierung, Sieger-
-    // Markierung unveraendert) — nur zeitlich ans Ende der Offenbarung verschoben statt an
-    // deren Anfang.
-    function zeigeEndstand(){
-      teamsBox.textContent="";
-      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
-        const erg=bySide(side);
-        const karte=el("div","mdffa-team mdffa-c"+side+(erg.eventPlatz===1?" mdffa-sieger":""));
-        karte.appendChild(el("div","mdffa-eck",ECKEN[side]));
-        karte.appendChild(el("div","mdffa-name",eintraege[side].name));
-        const punkte=el("div","mdffa-punkte",erg.ligaPunkte+" Liga-Pkt.");
-        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
-        karte.appendChild(punkte);
-        teamsBox.appendChild(karte);
+    // GESAMTPUNKTZAHL HOCHZAEHLEN UND UMSORTIEREN (C2): FLIP-Technik -- Position JEDER
+    // Eckkarte VOR dem Umsortieren messen, in der neuen Reihenfolge neu anhaengen (reine
+    // DOM-Reihenfolge, .mdffa-teams ist ein 4-Spalten-Grid), dann die dadurch entstandene
+    // Verschiebung als Transform zuruecksetzen und per CSS-Transition (schon auf .mdffa-team
+    // vorhanden) auf 0 abbauen. Reine Praesentation auf laengst feststehenden Werten, keine
+    // neue Berechnung.
+    function sortiereEckkartenUm(){
+      if(traegheitsarm){
+        [0,1,2,3].slice().sort((a,b)=>laufendeSumme[b]-laufendeSumme[a]||a-b)
+          .forEach(side=>teamsBox.appendChild(eckKarten[side]));
+        return;
+      }
+      const vorher=new Map();
+      eckKarten.forEach(k=>vorher.set(k,k.getBoundingClientRect()));
+      const reihenfolge=[0,1,2,3].slice().sort((a,b)=>laufendeSumme[b]-laufendeSumme[a]||a-b);
+      reihenfolge.forEach(side=>teamsBox.appendChild(eckKarten[side]));
+      reihenfolge.forEach(side=>{
+        const node=eckKarten[side];
+        const alt=vorher.get(node);
+        const neu=node.getBoundingClientRect();
+        const dx=alt.left-neu.left, dy=alt.top-neu.top;
+        if(!dx&&!dy)return;
+        node.style.transition="none";
+        node.style.transform="translate("+dx+"px,"+dy+"px)";
+        requestAnimationFrame(()=>{
+          node.style.transition="";
+          node.style.transform="";
+        });
       });
+    }
+
+    // TITELKARTE PRO RUNDE (C2): "Runde X von 4 · <Rolle>", kurz fuer sich allein sichtbar,
+    // bevor die Rundentafel/Lebensbalken/der Rundensieger dazukommen.
+    function zeigeTitelkarte(rundenNr,rolle){
+      if(!titelkarte)return;
+      titelkarte.textContent="";
+      titelkarte.appendChild(el("b",null,"Runde "+rundenNr+" von "+ereignis.runden.length));
+      titelkarte.appendChild(el("span",null,rolle));
+      titelkarte.hidden=false;
+    }
+
+    // ERMITTELT DAS MVP-TEAM (C3): hoechste Beitragssumme ueber alle vier Runden. Reiner
+    // Leser von `ereignis.teams[].beitragSumme` -- derselbe Wert, den die Endstand-Tabelle
+    // unten ohnehin schon je Team zeigt (spieleMiniDmFfaEvent() summiert ihn bereits aus
+    // runden[].teams[].beitrag, s. dessen Kopfkommentar) -- keine neue Berechnung.
+    function ermittleMdffaMvpSeite(){
+      let bester=0;
+      for(let s=1;s<4;s++)if(bySide(s).beitragSumme>bySide(bester).beitragSumme)bester=s;
+      return bester;
+    }
+
+    // ENDSTAND IM PHASE-5-STIL (C3): Banner analog zu .esieger (grossgeschrieben, satt in
+    // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
+    // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
+    function zeigeEndstand(){
+      if(titelkarte)titelkarte.hidden=true;
+      if(rundenbanner)rundenbanner.hidden=true;
+      if(ctrlBox)ctrlBox.hidden=true;
+      if(paarungenBox)paarungenBox.textContent="";
+
+      const reihenfolge=[0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz);
+      reihenfolge.forEach(side=>teamsBox.appendChild(eckKarten[side]));
+      reihenfolge.forEach(side=>{
+        const erg=bySide(side);
+        const karte=eckKarten[side];
+        karte.classList.remove("mdffa-wartet","mdffa-down");
+        karte.classList.toggle("mdffa-sieger",erg.eventPlatz===1);
+        const punkte=karte.querySelector(".mdffa-punkte");
+        punkte.textContent="";
+        punkte.appendChild(document.createTextNode(erg.ligaPunkte+" Liga-Pkt."));
+        punkte.appendChild(el("em",null,"Platz "+erg.eventPlatz+" · "+erg.rundenPunkteSumme+" Rundenpunkte"));
+        const hpwrap=karte.querySelector(".mdffa-hpwrap"); if(hpwrap)hpwrap.remove();
+        const hplabel=karte.querySelector(".mdffa-hplabel"); if(hplabel)hplabel.remove();
+      });
+
+      if(endstandKopf){
+        endstandKopf.hidden=false;
+        const mvpSide=ermittleMdffaMvpSeite();
+        const sieger=bySide(reihenfolge[0]);
+        const banner=document.getElementById("mdffaEndbanner");
+        if(banner)banner.textContent=eintraege[reihenfolge[0]].name.toUpperCase()+" SIEGER — "+
+          sieger.ligaPunkte+" Liga-Pkt. · "+sieger.rundenPunkteSumme+" Rundenpunkte";
+        const podest=document.getElementById("mdffaPodest");
+        if(podest){
+          podest.textContent="";
+          reihenfolge.forEach(side=>{
+            const erg=bySide(side);
+            const platz=el("div","mdffa-podplatz mdffa-c"+side);
+            platz.dataset.platz=String(erg.eventPlatz);
+            platz.appendChild(el("div","mdffa-podrang","#"+erg.eventPlatz));
+            const nameZeile=el("div","mdffa-podname",eintraege[side].name);
+            if(side===mvpSide)nameZeile.insertBefore(
+              mvpStern("Höchster Beitrag über alle vier Runden ("+
+                Math.round(bySide(mvpSide).beitragSumme).toLocaleString("de-DE")+")"),
+              nameZeile.firstChild);
+            platz.appendChild(nameZeile);
+            platz.appendChild(el("div","mdffa-podpunkte",erg.ligaPunkte+" Liga-Pkt. · "+erg.rundenPunkteSumme+" Rundenpkt."));
+            podest.appendChild(platz);
+          });
+        }
+      }
 
       endstandBox.textContent="";
       const tbl=document.createElement("table");
@@ -46136,7 +46370,7 @@
       ["Team","Platz","Rundenpunkte","Beitrag gesamt","Liga-Punkte"].forEach(txt=>trh.appendChild(el("th",null,txt)));
       thead.appendChild(trh);tbl.appendChild(thead);
       const tbody=document.createElement("tbody");
-      [0,1,2,3].slice().sort((a,b)=>bySide(a).eventPlatz-bySide(b).eventPlatz).forEach(side=>{
+      reihenfolge.forEach(side=>{
         const erg=bySide(side);
         const tr=document.createElement("tr");
         if(erg.eventPlatz===1)tr.className="mdffa-r1";
@@ -46150,19 +46384,93 @@
       tbl.appendChild(tbody);
       endstandBox.appendChild(tbl);
       mdffaOffenbarungsTimer=null;
+      mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     }
 
+    // SCHRITT-KETTE EINER RUNDE (C1/C2): Titelkarte -> (Pause) -> Lebensbalken -> Rundentafel
+    // PLATZ 4->1 EINZELN ENTHUELLT -> Rundensieger -> (Pause) -> Eckkarten-Summe+Umsortierung
+    // -> (Pause) -> naechste Runde. `mdffaNaechsteRunde` zeigt IMMER auf dieses `naechsteRunde`
+    // der aktuell sichtbaren Schau -- der Start-Knopf (weiter unten verdrahtet) ruft nur
+    // `mdffaNaechsteRunde(0)`.
     function naechsteRunde(i){
       if(i>=ereignis.runden.length){ zeigeEndstand(); return; }
       const runde=ereignis.runden[i];
-      schreibeRundentafel(runde);
-      runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
-      [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
-      mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),PAUSE_MS);
+      zeigeTitelkarte(i+1,mdffaRollenLabel(runde.slotId));
+      mdffaOffenbarungsTimer=setTimeout(()=>{
+        if(titelkarte)titelkarte.hidden=true;
+        aktualisiereHpBalken(runde);
+        const tbody=starteRundentafelGestaffelt(runde);
+        // PLATZ 4 ZUERST, PLATZ 1 ZULETZT (Auftrag: "Platzierung 4->1 nacheinander
+        // enthuellen") -- enthuelleRundenzeile() fuegt jede neue Zeile GANZ OBEN ein, eine
+        // absteigend sortierte Platzliste (4,3,2,1) ergibt dadurch am Ende die gewohnte
+        // Reihenfolge Platz 1 oben/Platz 4 unten (s. Kopfkommentar bei
+        // starteRundentafelGestaffelt()).
+        const platzAbsteigend=runde.teams.slice().sort((a,b)=>b.rundenPlatz-a.rundenPlatz);
+        function enthuelleSchritt(idx){
+          if(idx>=platzAbsteigend.length){
+            zeigeRundenbanner(runde,i+1);
+            runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+            mdffaOffenbarungsTimer=setTimeout(()=>{
+              [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+              sortiereEckkartenUm();
+              mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(i+1),ms(1500));
+            },ms(1600));
+            return;
+          }
+          enthuelleRundenzeile(tbody,platzAbsteigend[idx]);
+          mdffaOffenbarungsTimer=setTimeout(()=>enthuelleSchritt(idx+1),ms(550));
+        }
+        enthuelleSchritt(0);
+      },ms(1500));
     }
 
-    mdffaOffenbarungsTimer=setTimeout(()=>naechsteRunde(0),ANLAUF_MS);
+    // "ALLES ZEIGEN" (C1): identischer Endzustand wie am Ende eines vollstaendig
+    // durchlaufenen Ablaufs -- dieselbe schreibeRundentafelSofort()/zeigeEndstand(), nur ohne
+    // einen einzigen setTimeout dazwischen. Kein zweiter Berechnungspfad, keine neue Rundung.
+    function alleRundenSofort(){
+      if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
+      if(titelkarte)titelkarte.hidden=true;
+      rundenBox.textContent="";
+      for(let i=0;i<ereignis.runden.length;i++){
+        const runde=ereignis.runden[i];
+        aktualisiereHpBalken(runde);
+        schreibeRundentafelSofort(runde);
+        runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
+        [0,1,2,3].forEach(side=>aktualisiereEckKarte(side,i+1));
+      }
+      sortiereEckkartenUm();
+      zeigeEndstand();
+    }
+
+    mdffaNaechsteRunde=naechsteRunde;
+    mdffaSpringeZumEnde=alleRundenSofort;
+
+    // C1: "Falls prefers-reduced-motion aktiv ist, zeige alles sofort ohne Animation" --
+    // kein Knopfdruck noetig. Der Einlauf oben stand ohnehin nur fuer einen einzigen,
+    // uebersprungenen Render-Tick.
+    if(traegheitsarm)alleRundenSofort();
   }
+
+  // START-/ALLES-ZEIGEN-/TEMPO-KNOEPFE DER MINI-DM-RUNDENSHOW (Broadcast-Paket C, 06.10.):
+  // EINMAL verdrahtet, lange bevor renderMiniDmFfa() ueberhaupt zum ersten Mal lief -- genau
+  // dasselbe Hoisting-Argument wie beim Play/Reset/Tempo-Knopf der klassischen Arena weiter
+  // oben. Jeder Klick ruft nur die von renderMiniDmFfa() zuletzt gesetzte Funktion auf; ist
+  // Mini-DM gerade nicht aktiv, sind die Knoepfe ohnehin unsichtbar (`#minidmffa` dann
+  // `hidden`, s. reset()), ein Klick darauf also ausgeschlossen.
+  document.getElementById("mdffaStart").addEventListener("click",()=>{
+    const startBtn=document.getElementById("mdffaStart");
+    if(startBtn)startBtn.disabled=true;
+    if(mdffaNaechsteRunde)mdffaNaechsteRunde(0);
+  });
+  document.getElementById("mdffaAlles").addEventListener("click",()=>{
+    const startBtn=document.getElementById("mdffaStart");
+    if(startBtn)startBtn.disabled=true;
+    if(mdffaSpringeZumEnde)mdffaSpringeZumEnde();
+  });
+  document.getElementById("mdffaSpeedBtn").addEventListener("click",()=>{
+    mdffaTempo=mdffaTempo===1?2:1;
+    document.getElementById("mdffaSpeedBtn").textContent="Tempo "+mdffaTempo+"×";
+  });
 
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
