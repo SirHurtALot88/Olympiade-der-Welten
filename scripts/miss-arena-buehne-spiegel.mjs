@@ -22,8 +22,12 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
 
-const args = process.argv.slice(2);
+// --flags=... / --haltung-*=... (NACHTKONZEPT-SCHALTER, 04.10., additiv, s. scripts/lib/rangtreue-
+// messung.mjs): ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
+const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
+const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
 const N = Number(args[0] || 60);
 const disziplinen = args[1] ? args[1].split(",").filter(Boolean) : ["speed-schach", "showcase", "gewichtheben"];
 const hier = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +64,8 @@ await page.addInitScript((kader) => {
 
 await page.goto(pathToFileURL(seitePfad).href);
 await page.waitForFunction(() => Boolean(window.__arena), null, { timeout: 15000 });
+const schalterGesetzt = await setzeBuehneSchalter(page, BUEHNE_SCHALTER);
+if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 
 let gesamtFehlgeschlagen = 0;
 

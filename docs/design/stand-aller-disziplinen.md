@@ -1089,3 +1089,116 @@ Varianten fehlerfrei, das Verhalten ist monoton im Koennen; das Problem liegt in
 deterministischer Rätselart-Rotation statt fixer Spezialisierung, oder Chris' Entscheidung zur
 "ehrlicheren Abnahme" aus `CLAUDE.md` (Ist-Stand erfuellt dort 3 von 4 Bedingungen, Star Rang1 nur
 2,5 Punkte unter der Schranke).
+
+## 8. Speed-Schach: „Die Uhr wird der dritte Spieler", Stufe 1 + 2 — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/speed-schach-nachtkonzept-03-10.md` (Abschnitt 3.2/3.3), von Chris zum Bau
+freigegeben. Stufe 3 (Armageddon) bewusst **nicht** gebaut (Klasse T, abgelehnt); auch sonst kein
+Mechanismus, der ein 3:3 erzwingt oder verhindert. Klasse B, deshalb hinter
+`BUEHNE_FLAGS.speedSchachUhr` in `battle-mode.engine.js`, **Standard 0 = aus** — jeder echte
+Spielstand laeuft unveraendert (Muster `sandsackVorschauAktiv`). Einschalten fuer Messungen:
+`--flags=speedSchachUhr:1|2` an `miss-alle-disziplinen.mjs`, `messe-arena-einfluss.mjs`,
+`miss-speed-schach-spiegel.mjs` und dem neuen `miss-speed-schach-uhr.mjs` (Brett-Kennzahlen).
+
+Gebaut: TEMPO (speed 50/dexterity 30/awareness 20), entkoppelte Uhr 12 s/17 s × (1+(50−TEMPO)·0,022),
+Start 180 s, Zeitnot unter 30 s, `u.geflaggt`/`u.zeitSieg` im Paarungsblock (genau einer geflaggt →
+Brett auf Zeit verloren, sonst `vorteil`), ein gemeinsamer Brettentscheid `duellBrettSieg()` fuer
+alle fuenf Leser. Stufe 2: Ansage rechnen/normal/blitzen (×1,30/+4 pp · ×1 · ×0,72/−4 pp), Zeitnot
+−0,10·(1−NERVEN/100)·1,6 auf die Erfolgschance, Restzuege nach dem Blaettchen 0 Punkte, KI =
+Zeitbudget-Regel (25 s Rand). Uebergabe `{d,slot,haltung}` im Motor und im Adapter-Typ angelegt
+(die Einsatzliste selbst hat noch kein Haltungsfeld — Grundgeruest der Konsultation, Zeile 0).
+
+Gemessen am echten Motor, kaderfest (Familie live-save, 5 Paarungen), 04.10.:
+
+| | Flag aus (heute) | Stufe 1 | Stufe 2, KI beidseitig | Papier-Sonde (5.2, KI) |
+|---|---:|---:|---:|---:|
+| rho je Spiel (Median, n=24) | 0,898 | 0,898 (bit-identisch) | **0,909** | 0,923 |
+| rho je Spiel 4 / 2 je Seite | 0,914 / 0,906 | — | 0,915 / 0,892 | — |
+| Pp n=48, zwei Saatstroeme | 17,7 / 17,6 | 17,7 (bit-identisch) | **11,8 / 11,4** | 12,2 / 13,4 |
+| Pp n=24 gestueckelt 4×6, zwei Stroeme | 17,2 / 18,4 | — | **12,6 / 11,3** | — |
+| speed-Anteil (Matrix 10) | 7,0 % | 7,0 % | 10,2 % | 8,5 % |
+| Spieler geflaggt (n=48 je Paarung) | — | 26,8 % | 5,6 % | 1,2 % |
+| Brett auf Zeit gegen den Vorteil | — | **3,9 %** | **0,0 %** | 0,0 % |
+| Mannschaftskampf 3:3 | 22,5 % | 21,7 % | 20,4 % | ~30 % |
+| Spiegeltest Heim:Gast (600, identischer Kader) | 256:260 | 256:260 | 249:243, Bretter 2,52:2,52 | — |
+
+„Kein Knopf immer besser" (Heimsieg gegen KI-beidseitig 67,5 % / Gastsieg 12,1 %, die Familie ist
+heimlastig, s. Flag aus 68,3/9,2): Heim pauschal rechnen 20,4 %, pauschal blitzen 63,8 %; Gast
+pauschal rechnen 9,2 %, blitzen 7,9 % — beide Pauschalen verlieren auf beiden Seiten gegen die
+KI-Regel. Extremfaelle: alle rechnen rho 0,839 (47 % geflaggt, 16,7 % Entscheide gegen den
+Vorteil), alle blitzen 0,887. KI-Ansagen: rechnen 44 % · normal 17 % · blitzen 38 %.
+
+**Ehrliche Befunde.** (1) Der echte Kader streut TEMPO von 10 bis 99 (Quartile 34/75) — viel
+breiter als die synthetische Sonde. In **Stufe 1 allein** flaggt deshalb praktisch jeder unter
+TEMPO 35 und keiner ueber 40: 46,5 % der Bretter werden auf Zeit entschieden, fast immer im Einklang
+mit dem Vorteil, aber deterministisch nach TEMPO statt als Ereignis. Stufe 1 ohne Stufe 2 ist so
+nicht empfehlenswert; mit Stufe 2 waehlen langsame Haende Blitzen, und nur noch 5,6 % flaggen.
+(2) Mit der Zeitbudget-KI auf **beiden** Seiten entsteht **kein** Sieg auf Zeit gegen den Vorteil
+(0,0 %, wie die Sonde in 5.2 und deren Lesart 5.3 Punkt 5): Botez-Hansen-Momente kommen nur aus
+Manager-Entscheidungen (Heim rechnen: 22,2 %). Sensitivitaet, nicht eingebaut: KI-Rand 10 s →
+0,7 %, 0 s → 3,3 % (rho 0,901, Pp 11,8) — eine einzige Konstante (`SCHACH_KI_RAND_S`), falls Chris
+das Zielband 1–5 % auch ohne Manager-Eingriff will.
+
+## 9. Wettessen: „Die Mauer, die Haltung" (K1 + K2) — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/wettessen-nachtkonzept-03-10.md` (Abschnitt 3 K1/K2, Anhang A), von Chris
+freigegeben. K3 (Tunken) nicht gebaut; keine Disqualifikation, kein Live-Eingriff, `rundenN`/
+`rundenDauer`/60 s Sendezeit unveraendert. Klasse B hinter `BUEHNE_FLAGS.wettessenMauer`
+(0 aus · 1 K1 · 2 K1+K2), **Standard 0**. Eigene Weiche `mauer:true` an `BUEHNE_ART.wettessen`;
+`ermued` entfaellt nur dort und nur mit Flag, die anderen fuenf Buehnen bleiben unberuehrt.
+Messwerkzeug neu: `scripts/miss-wettessen-mauer.mjs` (echter Motor, kaderfest, inkl. Erwartung je
+Esser und Haltung ueber 40 feste Zufallsstroeme — der „tote Knopf"-Test).
+
+Gebaut: Fuellstand = Summe der Minutenpunkte, K = 65 + AUSDAUER·5 (Steigung 5 behalten — health/
+stamina liegen nur +0,4 bis +1,0 ueber der Matrix, die Stellschraube „4" war nicht noetig);
+Mauerfaktor 0,45+NERVEN·0,005, Erfolg −0,05, halber Bonus; Minute 10 doppelter WAGNIS-Trade-off,
+voller Bonus. K2: Sprint/Gleichmaessig/Schlussspurt, KI nach NERVEN (≥60 Schlussspurt, <45
+Gleichmaessig, sonst Sprint), Uebergabe `{d,slot,haltung}`.
+
+**Kalibrierung K2 am Motor** (das Papier warnte: erster Satz „Sprint immer am besten"). Am echten
+Motor kippte es mit den Startwerten andersherum: Sprint beste Wahl fuer 7 % (toter Knopf),
+Schlussspurt 69 %, beste Haltung staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+fuenf Konstanten, gewaehlt: Sprint-Erfolg −0,10 → **−0,07**, Schlussspurt-Bonus ×1,5 → **×1,18**,
+NERVEN-Zuschlag 0,004 → **0,006**, frueh ×0,97 → **×0,965** (Sprint-Basis ×1,10, K ×0,92 und
+Minuten wie im Papier). Ergebnis n=24 × 5 Paarungen:
+
+| Beste Haltung (Erwartung) | Sprint | Gleichmaessig | Schlussspurt |
+|---|---:|---:|---:|
+| alle Esser | 26,7 % | 26,8 % | 46,5 % |
+| NERVEN < 45 | 17,6 % | 79,2 % | 3,3 % |
+| NERVEN 45-59 | 35,1 % | 44,1 % | 20,9 % |
+| NERVEN ≥ 60 | 25,4 % | 2,6 % | 72,0 % |
+
+rho(beste Haltung, NERVEN) 0,657 > rho(…, Eignung) 0,625. KI trifft die beste Haltung in 63 %,
+Verlust gegen das Optimum 2,3 Punkte je Esser — jede Pauschale verliert mehr (alle Schlussspurt
+3,5 · alle Sprint 5,9 · alle Gleichmaessig 7,2): kein Knopf ist immer besser. Schwaechste Stelle:
+im Band NERVEN 45-59 waehlt die KI Sprint, im Mittel waere dort Gleichmaessig knapp besser (44 zu 35 %).
+
+Gemessen am echten Motor, kaderfest (Familie live-save), 04.10.:
+
+| | Flag aus (heute) | K1 | K1+K2, KI | Papier-Sonde (ohne Slot/Form) |
+|---|---:|---:|---:|---:|
+| rho je Spiel 6 je Seite (n=24) | 0,866 | 0,908 | **0,910** | 0,951 → 0,962 |
+| rho je Spiel 4 je Seite (n=24) | 0,801 | 0,833 | **0,848** | — |
+| rho je Spiel 2 je Seite (n=48) | 0,771 (knapp) | 0,792 (knapp) | **0,811** | — |
+| Pp n=48, zwei Saatstroeme | 14,1 / 15,0 | 9,2 / 9,8 | **8,7 / 10,0** | 11,8 → 12,2 |
+| will-Anteil (Matrix 26) / torment (6) | 22,5 / 12,0 | 25,6 / 7,4 | 25,3 / 9,0 | — |
+| Pp alle Sprint / alle Schlussspurt | — | — | 8,1 / 7,5 | 13,5 / 12,0 |
+| Mauer-Minute Median, Spanne | — | 7, 4-10 | 6, 4-10 | 7, 4-10 |
+| Spiegeltest Heim:Gast (300) | 154:146 | 149:151 | 152:147 | — |
+
+Kurve je Minute (K1+K2): 73 72 73 72 69 61 56 59 58 63 — statt der flachen Ist-Linie. Extremfaelle
+rho (6 je Seite): alle Sprint 0,913, alle Gleichmaessig 0,908 (= K1, bit-identisch), alle
+Schlussspurt 0,909; einseitige Pauschalen 0,909-0,914, Heimsieg 46,7-48,3 % gegen 50,0 % mit KI.
+
+**Offen/ehrlich:** (1) Die mittlere Seitensumme sinkt mit der Mauer um ~10,5 % (Spiegel 4744 → 4242
+Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` ist seit dem 04.10.
+(Nachtrag) MIT `wettessenMauer:2` gezogen (`scripts/ziehe-buehne-pps-referenz.ts wettessen
+--flags=wettessenMauer:2`, 64 Fixtures je Feldgroesse 2-6, Feld `buehneFlags` in der Datei).
+Mediane je Feldgroesse 847/798,5/764,5/742/699,5 → 781,5/745/703/666/632 (−6,7 bis −10,2 %),
+iKrass nur −0,2 bis −3,6 % (1230 → 1197 bei 5). Der Median-Esser bekommt damit wieder genau
+1,38 PPS (5,5 · 0,25); gegen die alte Referenz laege er mit Mauer bei 1,02-1,10. **Kopplung:**
+die Referenz wird unabhaengig vom Schalter statisch importiert — sie und `BUEHNE_FLAGS.wettessenMauer=2`
+muessen GEMEINSAM live gehen; mit Flag aus gegen die neue Referenz waere Wettessen ueberbewertet. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
+Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
+ohne Grundgeruest entscheidet immer die KI-Vorgabe.

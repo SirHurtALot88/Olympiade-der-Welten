@@ -53,6 +53,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, bootstrapMedianUnsicherheit,
+  IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -75,7 +76,11 @@ const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
 // der Standard der Engine ("je-spiel": jedes Spiel zieht seinen eigenen Wurf wie im Spiel).
 const mutatorenArg = roheArgs.find((a) => a.startsWith("--mutatoren="));
 const MUTATOREN = mutatorenArg ? mutatorenArg.split("=")[1] : null;
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren="));
+// --flags=... / --haltung-heim=... / --haltung-gast=... (NACHTKONZEPT-SCHALTER, 04.10., additiv):
+// schalten die Buehnen-Mechaniken hinter BUEHNE_FLAGS ein, s. scripts/lib/rangtreue-messung.mjs.
+// Ohne sie misst das Skript den Motor wie er im Spiel laeuft (alle Flags aus).
+const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !IST_BUEHNE_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -90,12 +95,13 @@ if (!EINZELKADER) {
 // Speicher/die Festplatte wegnehmen (selbst beobachtet: ein abgebrochener Lauf ohne diesen
 // Block liess fuenf Chromium-Kindprozesse zurueck).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-let zeilen, fehler = [];
+let zeilen, fehler = [], schalterGesetzt = null;
 try {
   const seite = await browser.newPage();
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
 
   if (!EINZELKADER && !kaderFamilie) {
     const gebaut = await baueSynthetischeKaderFamilie(seite);
@@ -120,7 +126,8 @@ try {
 const titel = EINZELKADER
   ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
   : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
-console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "") + "\n");
+console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "")
+  + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }

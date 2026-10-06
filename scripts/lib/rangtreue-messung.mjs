@@ -276,3 +276,49 @@ export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite, muta
     ...feldOnlyZusatz([{ label: null, spiele: x.spiele }]),
   };
 }
+
+// ===================================================================================
+// NACHTKONZEPT-SCHALTER (04.10.) — gemeinsam fuer alle Messskripte, die eine Buehne messen.
+//
+// Die Mechaniken aus den Nachtkonzepten vom 03.10. (Speed-Schach-Uhr, spaeter Wettessen-Mauer)
+// liegen in battle-mode.engine.js hinter `BUEHNE_FLAGS`, standardmaessig AUS. Ohne einen der
+// Schalter unten misst jedes Skript also unveraendert den heutigen Motor — byte-identisch zu
+// vorher.
+//
+//   --flags=speedSchachUhr:2                    Flag-Stufen setzen (Wert fehlt -> 1)
+//   --haltung-heim=rechnen  --haltung-gast=ki   pauschale Haltung je Seite (nur Messung;
+//                                               "ki" oder weglassen = KI-Vorgabe)
+// ===================================================================================
+export const IST_BUEHNE_SCHALTER = (a) =>
+  a.startsWith("--flags=") || a.startsWith("--haltung-heim=") || a.startsWith("--haltung-gast=");
+
+export function buehneSchalterAusArgs(args) {
+  const flags = {};
+  const flagsArg = args.find((a) => a.startsWith("--flags="));
+  if (flagsArg) {
+    for (const teil of flagsArg.slice("--flags=".length).split(",").filter(Boolean)) {
+      const [k, v] = teil.split(":");
+      flags[k] = v == null ? 1 : Number(v);
+    }
+  }
+  const wert = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split("=")[1] ?? null;
+  const haltung = { 0: wert("haltung-heim"), 1: wert("haltung-gast") };
+  const aktiv = Object.keys(flags).length > 0 || haltung[0] != null || haltung[1] != null;
+  return { flags, haltung, aktiv };
+}
+
+/** Setzt die Schalter auf einer geladenen Seite. Gibt den tatsaechlich gesetzten Stand zurueck. */
+export async function setzeBuehneSchalter(seite, schalter) {
+  if (!schalter || !schalter.aktiv) return null;
+  return seite.evaluate(([f, h]) => {
+    if (!window.__arena.buehneFlags) throw new Error("window.__arena.buehneFlags fehlt — Engine zu alt?");
+    return { flags: window.__arena.buehneFlags(f), haltung: window.__arena.buehneHaltungTest(h) };
+  }, [schalter.flags, schalter.haltung]);
+}
+
+export function buehneSchalterText(gesetzt) {
+  if (!gesetzt) return "";
+  const f = Object.entries(gesetzt.flags).map(([k, v]) => `${k}=${v}`).join(", ");
+  const h = `Heim ${gesetzt.haltung[0] ?? "KI"}, Gast ${gesetzt.haltung[1] ?? "KI"}`;
+  return `Buehnen-Flags: ${f} · Haltung: ${h}`;
+}

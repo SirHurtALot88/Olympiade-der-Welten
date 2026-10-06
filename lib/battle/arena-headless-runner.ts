@@ -350,6 +350,14 @@ export type RunArenaFixturesOptions = {
    * (Referenzziehungen, Tests) soll niemanden zufaellig besser machen.
    */
   mutatoren?: readonly string[];
+  /**
+   * NACHTKONZEPT-SCHALTER (04.10.): Startwerte fuer `BUEHNE_FLAGS` in battle-mode.engine.js
+   * (z. B. `{ wettessenMauer: 2 }`). Faehrt als `window.__olyBuehneFlags` in JEDE neu
+   * eingehaengte Engine-Instanz (die Engine wird je Fixture neu geladen, ein nachtraeglich
+   * gesetzter Schalter ginge verloren). Nur fuer Messungen/Referenzziehungen wie
+   * scripts/ziehe-buehne-pps-referenz.ts --flags=...; weggelassen -> Engine-Standard.
+   */
+  buehneFlags?: Readonly<Record<string, number>>;
 };
 
 type VorbereitetesFixture = {
@@ -608,6 +616,13 @@ export async function runArenaFixtures(
         fenster.__name = (fn) => fn;
       }
     });
+    // BUEHNEN-FLAGS (s. `buehneFlags` in RunArenaFixturesOptions): ein Fensterwert ueberlebt das
+    // Neu-Einhaengen der Engine je Fixture. Ohne Option wird nichts gesetzt.
+    if (options.buehneFlags) {
+      await page.addInitScript((flags) => {
+        (window as unknown as { __olyBuehneFlags?: unknown }).__olyBuehneFlags = flags;
+      }, { ...options.buehneFlags });
+    }
     // Erstes Fixture VOR der Navigation setzen (Plan Abschnitt 3.3b) — der normale
     // Seitenaufbau (battle-mode.html haengt battle-mode.engine.js selbst per <script src> ein)
     // liest diesen Kader dann beim allerersten Motor-Start, kein zusaetzliches Einhaengen noetig.

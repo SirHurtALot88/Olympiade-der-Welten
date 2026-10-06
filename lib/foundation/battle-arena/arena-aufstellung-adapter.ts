@@ -27,8 +27,18 @@ import { resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
  * ueber ihre Form hin. Diese Datei bleibt reine Verdrahtung.
  */
 
-/** Was der Motor als `place`-Eintrag erwartet: Disziplin plus kurze Rollenkennung. */
-export type ArenaAufstellungEintrag = { d: string; slot: string };
+/**
+ * Was der Motor als `place`-Eintrag erwartet: Disziplin plus kurze Rollenkennung.
+ *
+ * `haltung` (optional, 04.10.): die Spieler-Anweisung des Managers, drittes Feld der Übergabe
+ * `{d, slot, haltung}` aus dem Grundgerüst der Konsultation 02.10. (Zeile 0). Gelesen nur von
+ * Bühnen-Mechaniken hinter `BUEHNE_FLAGS` in battle-mode.engine.js (standardmäßig aus):
+ * Speed-Schach (`"rechnen" | "normal" | "blitzen"`) und Wettessen
+ * (`"sprint" | "gleichmaessig" | "schlussspurt"`). Fehlt das Feld, entscheidet die KI-Vorgabe
+ * der Disziplin. Diese Datei füllt es noch nicht — der Aufstellungsentwurf hat (noch) kein
+ * Haltungsfeld; das Rohr steht, die Buchse in der Einsatzliste folgt mit dem Grundgerüst.
+ */
+export type ArenaAufstellungEintrag = { d: string; slot: string; haltung?: string };
 
 /** Spielername -> Platzierung. Der Motor schluesselt `place` ueber den NAMEN, nicht die ID. */
 export type ArenaAufstellung = Record<string, ArenaAufstellungEintrag>;
