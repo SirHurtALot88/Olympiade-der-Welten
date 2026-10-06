@@ -731,14 +731,31 @@
   .oly-battle-arena.oly-battle-arena #etafelL h5{color:var(--home)}
   .oly-battle-arena.oly-battle-arena #etafelR h5{color:var(--away)}
   .oly-battle-arena.oly-battle-arena .etafel h5{margin:0;padding:7px 10px;font-size:12px;color:var(--ink);border-bottom:1px solid var(--line)}
-  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:11px/1.4 "RaniraSeason",Georgia,"Times New Roman",serif}
-  .oly-battle-arena.oly-battle-arena .etafel th{padding:4px 5px;text-align:right;color:var(--faint);font-size:9px;font-weight:600;
+  .oly-battle-arena.oly-battle-arena .etafel table{width:100%;border-collapse:collapse;font:10px/1.35 "RaniraSeason",Georgia,"Times New Roman",serif}
+  .oly-battle-arena.oly-battle-arena .etafel th{padding:3px 2.5px;text-align:right;color:var(--faint);font-size:8px;font-weight:600;
     text-transform:uppercase;border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel th:first-child, .oly-battle-arena.oly-battle-arena .etafel td:first-child{text-align:left}
-  .oly-battle-arena.oly-battle-arena .etafel td{padding:4px 5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
+  .oly-battle-arena.oly-battle-arena .etafel td{padding:3px 2.5px;text-align:right;color:var(--ink);border-bottom:1px solid var(--line-soft)}
   .oly-battle-arena.oly-battle-arena .etafel td.imp{color:var(--warn);font-weight:700}
   .oly-battle-arena.oly-battle-arena .etafel tr.tot td:first-child{text-decoration:line-through;opacity:.6}
   .oly-battle-arena.oly-battle-arena .etafel td.leer{color:var(--faint)}
+  /* LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): volle Breite statt der halben
+     .etafel-Spalte -- sonst dieselbe Tafeloptik (Hintergrund/Rahmen/Tabellenformat), kein
+     neues Zutaten-Set. Teamzeilen in Heim-/Gastfarbe, wie .ehzeile.h/.a daneben. */
+  /* flex-shrink:0 NOETIG (gefunden beim Sichtpruefen): `.endstand` ist eine Flex-Spalte
+     (s. dort), und `.elinescore` erbt `overflow:auto` von `.etafel` -- das setzt per Spezifikation
+     die automatische Flex-Mindesthoehe auf 0 (anders als z.B. `.esieger` ohne eigenes
+     `overflow`, dessen Mindesthoehe am Inhalt haengt). Reicht die Gesamthoehe aller
+     Endstand-Kinder nicht in den sichtbaren Bereich, quetscht der Flex-Algorithmus die
+     Linescore-Tafel dadurch auf 1-4px zusammen, WAEHREND `.etafeln` (ohne eigenes
+     `overflow`, nur ihre Kind-`.etafel`s haben es) ihre volle Hoehe behaelt -- die
+     Linescore-Zeile verschwand dadurch unsichtbar, obwohl sie korrekt befuellt war.
+     `flex-shrink:0` haelt sie auf ihrer natuerlichen Inhaltshoehe, genau wie `.esieger`. */
+  .oly-battle-arena.oly-battle-arena .elinescore{width:100%;flex-shrink:0;margin-bottom:clamp(8px,1.6vw,18px)}
+  .oly-battle-arena.oly-battle-arena .elinescore[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsname.h{color:var(--home)}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsname.a{color:var(--away)}
+  .oly-battle-arena.oly-battle-arena .elinescore td.elsges{font-weight:700;color:var(--ink);border-left:1px solid var(--line-soft)}
   /* SPIELER DES SPIELS (Broadcast-Audit Runde 2, Punkt 28, 30.09.): ein kleiner Stern vor
      dem Namen der oder des Besten im Endstand -- derselbe Boxscore, nur ein zusaetzliches
      Anzeige-Etikett (s. mvpStern()/ermittleMvp() in battle-mode.engine.js). Faerbung wie

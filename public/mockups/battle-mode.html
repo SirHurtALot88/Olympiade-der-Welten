@@ -215,6 +215,11 @@
              stehen und wie eine Messung auszusehen. -->
         <div class="endstand" id="endstand" hidden>
           <div class="esieger" id="esieger"></div>
+          <!-- LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): "Q1 | Q2 | ... | Gesamt" je
+               Team, aus fsPeriodenStand -- renderLinescore() in battle-mode.engine.js. Nur
+               fuer Feldspiel (Football/Hockey/Basketball) befuellt; bleibt fuer Kampf/Buehne/
+               Bahn leer und hidden, derselbe Gate-Gedanke wie bei #ealternativ unten. -->
+          <div class="etafel elinescore" id="elinescore" hidden></div>
           <div class="etafeln">
             <div class="etafel" id="etafelL"></div>
             <div class="etafel" id="etafelR"></div>
@@ -345,7 +350,11 @@
              setzt data-disc darauf, sobald sich die Disziplin aendert -- Spalten/Sortierung/
              Zeilenquellen bleiben unberuehrt, das ist ausschliesslich Anzeige. -->
         <div class="wertung" id="wertungBox">
-          <div class="wtitel">Wertung <em>laufend</em></div>
+          <!-- "laufend"/"Endstand" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text
+               blieb bisher auch nach Spielende bei "laufend" stehen -- renderWertungTabelle()
+               (battle-mode.engine.js) schaltet #wtitelStand bei `done` auf "Endstand" um,
+               rein textContent, keine neue Spalte/Sortierung. -->
+          <div class="wtitel">Wertung <em id="wtitelStand">laufend</em></div>
           <!-- ZWEI BLOECKE STATT EINER GEMEINSAMEN TABELLE (Chris' Fund, 29.08.): bei
                zwoelf gemischt sortierten Zeilen musste man erst die Team-Farbe der
                ersten Spalte lesen, um "eigen" von "Gegner" zu trennen. Jetzt eigenes

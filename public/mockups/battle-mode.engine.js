@@ -6881,6 +6881,23 @@
   const istFeldspiel=(d)=>!!FELDSPIEL_ART[d];
 
   let FSTEAM=[[],[]], fsZuege=[], fsZeiger=0, fsAkt=0, fsAktMax=1, fsT=0, fsPunkte=[0,0];
+  // LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): reiner Anzeige-Merker, EIN Eintrag je
+  // Periode/Drittel -- {periode, a, b}, a/b = die PUNKTE DIESER EINEN PERIODE je Seite
+  // (DELTA gegen den vorigen Eintrag, nicht der kumulierte Spielstand) -- nur so ergibt die
+  // Summe der Spalten am Ende den Endstand, genau wie bei jeder echten Linescore (NBA/NHL/
+  // NFL zeigen auch Periodenpunkte, keine laufende Summe je Spalte). Gefuellt aus zwei
+  // Stellen: starteViertelpause() (s. dort) fuer jede VOR dem Spielende abgeschlossene
+  // Periode -- dieselbe Funktion fuer alle drei Feldspiel-Chassis (Football/Hockey/
+  // Basketball), EIN Fuellpfad fuer alle drei -- und stepFeldspielLive()s Schlusssirenen-
+  // Zweig fuer die LETZTE Periode (die nie durch starteViertelpause() laeuft, weil
+  // naechsterAngriff()s Viertelgrenzen-Pruefung ausdruecklich NUR vor der letzten Periode
+  // greift, s. dortiger Kommentar). `fsPeriodenVorPunkte` haelt den fsPunkte-Stand beim
+  // vorigen Eintrag fest, damit jeder neue Eintrag nur das Delta seit dort traegt. Nur
+  // Anzeige: `renderLinescore()` liest `fsPeriodenStand` fuer die "Q1 | Q2 | ... |
+  // Gesamt"-Zeile, sonst niemand -- kein Einfluss auf fsPunkte/fsZuege/die Wertung. Im
+  // stillen Messmodus (`stumm`, s. dort) bleiben beide ungefuellt, exakt wie HIGHLIGHTS/die
+  // anderen reinen Broadcast-Merker -- die Abnahme-Sonden lesen sie nie.
+  let fsPeriodenStand=[], fsPeriodenVorPunkte=[0,0];
   // ENDSTAND-OVERLAY-WAECHTER FUERS FELDSPIEL (Broadcast-Audit Runde 2, Punkt 4, 30.09.):
   // dasselbe Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` weiter unten
   // in dieser Datei -- s. Kommentar bei deren Reset in bauFeldspiel()/updateHudFeldspiel().
@@ -7799,6 +7816,9 @@
     // neuen Feldspiel-Match.
     fsEndeGemeldet=false;
     fsBall={sichtbar:false,x:0,y:0}; fsPunkte=[0,0]; floats.length=0; fsLive=null; fsSchiri=null;
+    // LINESCORE-RESET (Broadcast-Paket A, Punkt 4): gehoert zum ABGELAUFENEN Spiel, s.
+    // HIGHLIGHTS-Reset in reset() fuer dasselbe Muster.
+    fsPeriodenStand=[]; fsPeriodenVorPunkte=[0,0];
     // passerPgSum/passerTgSum/passerN NEU (Korridor-Refit-Runde, Opus-Plan 10.09. Abschnitt
     // 6.1): messen den TATSAECHLICH von fkLos(off,"PASSGENAUIGKEIT") gezogenen Passer statt
     // den Kadermittelwert — genau der Unterschied, den kappa=3 zwischen "Referenzakteur der
@@ -10287,6 +10307,14 @@
     // Eishockey las der Feed "Ende 1. Viertel".
     const periode=(LIVE()||{}).periodeWort||"Viertel";
     feed(0,"Ende "+zuEnde+". "+periode+" — Stand "+fsPunkte[0]+":"+fsPunkte[1]+".",true,undefined,"zwischenstand");
+    // LINESCORE-EINTRAG (Broadcast-Paket A, Punkt 4, 06.10.): EIN Eintrag je abgeschlossener
+    // Periode, mit den PUNKTEN DIESER PERIODE (Delta gegen `fsPeriodenVorPunkte`, s. dessen
+    // Deklaration) -- reiner Anzeige-Merker fuer renderLinescore(), nicht im stillen
+    // Messmodus (`stumm`, wie HIGHLIGHTS/der Feed-Aufruf direkt darueber ihn schon beachten).
+    if(!stumm){
+      fsPeriodenStand.push({periode:zuEnde,a:fsPunkte[0]-fsPeriodenVorPunkte[0],b:fsPunkte[1]-fsPeriodenVorPunkte[1]});
+      fsPeriodenVorPunkte=[fsPunkte[0],fsPunkte[1]];
+    }
     // PUSTE IN DER PAUSE (Chris: „man laedt in pausen etwas auf"). Bewusst eine EINMALIGE
     // Gutschrift am Drittelwechsel und NICHT eine laengere Simulationspause: der
     // Kommentar an FELDSPIEL_ART.basketball.live haelt nachgemessen fest, dass schon eine
@@ -12666,6 +12694,16 @@
       // Opus-Review-Fund (30.08.): toter Code entfernt — dieser Zweig ist nur erreichbar,
       // wenn fsLive.phase bereits "laufend" ist (der "freiwurf"-Zweig direkt darueber
       // returnt vorher), das erneute Setzen aenderte also nie etwas.
+      // LINESCORE, LETZTE PERIODE (Broadcast-Paket A, Punkt 4, 06.10.): die Periode, in der
+      // das Spiel tatsaechlich endet, durchlaeuft starteViertelpause() NIE (dessen
+      // Aufrufer naechsterAngriff() prueft die Viertelgrenze ausdruecklich nur VOR der
+      // letzten Periode, s. dortiger Kommentar) -- ohne diesen Eintrag fehlte der Linescore
+      // genau die letzte Spalte, und die Summe ueber `fsPeriodenStand` bliebe hinter dem
+      // Endstand zurueck. Gleiche Delta-Logik wie dort, nicht im stillen Messmodus.
+      if(!stumm&&fsLive){
+        fsPeriodenStand.push({periode:fsLive.viertel,a:fsPunkte[0]-fsPeriodenVorPunkte[0],b:fsPunkte[1]-fsPeriodenVorPunkte[1]});
+        fsPeriodenVorPunkte=[fsPunkte[0],fsPunkte[1]];
+      }
       bkSfx("buzzer.mp3",0.8); bkLoopStop();
       // Fable-Fund (Runde 2, 25.08.): das Spiel endete kommentarlos — der Feed hoerte
       // mitten im Ballbesitz auf, ohne je Sieger oder Endstand zu nennen. finish()/
@@ -13106,17 +13144,21 @@
     // ZEIT_DEHNUNG.hockey=2 tickte sie dadurch nur halb so schnell wie die Sendezeit ablief.
     const restRoh=fsLive.viertel*L.periodenDauer-fsT;
     if(restRoh<0){
-      // LETZTE PERIODE OHNE PAUSEN-KLEMME (Audit-Fund: "Football-Viertel-Uhr steht ... auf
-      // 0:00, waehrend noch Spielzuege laufen" -- Anzeige-Bug, kein Sim-Bug). Die
-      // Viertelgrenzen-Pruefung in `naechsterAngriff()` greift nur VOR der letzten Periode
-      // (`fsLive.viertel<L.perioden`); danach laeuft die Simulation unveraendert bis zum
-      // tatsaechlichen Spielende weiter, waehrend die alte Anzeige ab dem Ueberschreiten fuer
-      // den Rest des Spiels bei "0:00" einfror. Zeigt die ueberzogene Zeit jetzt als
-      // Nachspielzeit ("+0:07"), ausschliesslich aus vorhandenem fsT/L hergeleitet -- kein
-      // neuer Zustand, kein Ruecklesen in die Simulation.
-      const ueberSek=Math.floor(-restRoh*zeitFaktor());
-      return periodeLabel+" · +"+Math.floor(ueberSek/60)+":"+String(ueberSek%60).padStart(2,"0");
+      // BROADCAST-PAKET A, PUNKT 2 (06.10.): hier stand bis eben ein "+0:07"-Nachspielzeit-
+      // Ueberlauf, der (anders als der Name "Nachspielzeit" nahelegt) auch MITTEN in der
+      // letzten Periode auftauchte, sobald `naechsterAngriff()`s Viertelgrenzen-Pruefung ab
+      // der letzten Periode nicht mehr greift (s. Kommentar dort: "greift nur VOR der letzten
+      // Periode") -- ein laufendes Spiel zeigte also "Q1 · +0:05" mitten im ersten Viertel
+      // eines verlaengerten letzten Drives, nicht nur am echten Spielende. Gefordert ist eine
+      // saubere "0:00" plus ein kontextueller Zusatz statt der verwirrenden Pluszeit, und bei
+      // komplett beendetem Spiel (`done`, von stepFeldspielLive() gesetzt) eine klare
+      // Abschlussanzeige statt irgendeiner Restzeit-Zahl. Reine Anzeige-Fallunterscheidung --
+      // `fsT`/`fsLive`/`done` werden nur gelesen, nichts wird in die Simulation zurueckgeschrieben.
+      if(done)return periodeLabel+" · Ende";
+      const zusatz=istFootball()?"Drive läuft aus":istHockey()?"Schlussphase":"letzter Angriff";
+      return periodeLabel+" · 0:00 · "+zusatz;
     }
+    if(done)return periodeLabel+" · Ende";
     const restSek=Math.floor(restRoh*zeitFaktor());
     return periodeLabel+" · "+Math.floor(restSek/60)+":"+String(restSek%60).padStart(2,"0");
   }
@@ -32646,6 +32688,15 @@
   function renderWertungTabelle(){
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
+    // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
+    // blieb bisher auch nach Spielende bei "Wertung laufend" stehen, obwohl die Tabelle
+    // selbst (dieselbe Funktion, gemeinsamer Beendet-Zustand `done`) schon den finalen Stand
+    // zeigt. renderWertungTabelle() laeuft fuer ALLE VIER Chassis (Kampf/Buehne/Bahn/
+    // Feldspiel) aus demselben updateHud()-Takt, `done` ist dieselbe geteilte Variable, die
+    // auch renderEndstand*() oben auswerten -- ein textContent-Update hier gilt also
+    // automatisch fuer alle, kein chassis-eigener Zweig noetig.
+    const titelStand=document.getElementById("wtitelStand");
+    if(titelStand){const soll=done?"Endstand":"laufend"; if(titelStand.textContent!==soll)titelStand.textContent=soll;}
     const w=wertungVon(disc);
     const stand=disc+"|"+w.spalten.map(s=>s.id+s.kopf).join(",");
     if(stand!==wertungKopfStand){
@@ -42214,7 +42265,16 @@
     // stand am Spielende "1:59" im Kopf und "0:23" in derselben Ticker-Zeile/denselben
     // Hoehepunkten fuer denselben Moment. Dieselbe Skalierung wie bei Bahn zwei Zeilen
     // ueber dieser: `t*zeitFaktor()`, keine neue Formel.
-    const anzeigeT=istFeldspiel(disc)?fsT:istBuehne(disc)?buehneT:istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
+    //
+    // BROADCAST-PAKET A, PUNKT 3 (06.10.): `fsT`/`buehneT` blieben hier bis eben ROH, obwohl
+    // updateHudFeldspiel() (`fsTAnzeige=fsT*zeitFaktor()`) und bodenEis()/updateHudBuehne()
+    // (`buehneTAnzeige=buehneT*zeitFaktor()`) laengst auf die skalierte Uhr umgestellt sind --
+    // derselbe Fund wie beim Kampf-`t` zwei Jahre vorher, nur fuer Feldspiel/Buehne nie
+    // nachgezogen. Folge: bei Zeitdehnung (z.B. Hockey/Gewichtheben/Fechten) zeigte der
+    // Ticker eine Zeit, die der sichtbaren Kopfzeilen-Uhr klar hinterherhinkt (gemessen:
+    // Hockey-Ticker "4:00 Schlusssirene" nach rund 8 Sendeminuten). Bei zeitFaktor()===1
+    // (kein Dehnungsfaktor fuer diese Disziplin) aendert sich sichtbar nichts.
+    const anzeigeT=istFeldspiel(disc)?fsT*zeitFaktor():istBuehne(disc)?buehneT*zeitFaktor():istBahn(disc)?rennT*zeitFaktor():t*zeitFaktor();
     // MINUTENUMBRUCH (Welle-2-Fund, time-trial-einzelzeitfahren-wertung-plan-05-09.md
     // Abschnitt 1.5): vorher immer "0:"+Sekunden ohne Ueberlauf — auf der Bahn stand dort
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
@@ -44413,6 +44473,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44558,6 +44619,45 @@
     for(const z of zeilen)box.appendChild(el("div","ehzeile",z));
   }
 
+  // LINESCORE (Broadcast-Paket A, Punkt 4, 06.10.): "Q1 | Q2 | ... | Gesamt" bzw.
+  // "1. | 2. | 3. Drittel | Gesamt" je Team, aus `fsPeriodenStand` (s. dessen Deklaration/
+  // Fuellung in starteViertelpause()). GLEICHES MUSTER wie renderAlternativRechner() direkt
+  // darueber: eine gemeinsame Funktion fuer ALLE VIER Endstand-Overlays, die selbst
+  // entscheidet, ob es etwas zu zeigen gibt (hier: nur Feldspiel UND mindestens eine
+  // abgeschlossene Periode -- ein Spiel, das in der ersten Periode endet, z.B. durch einen
+  // vorzeitigen Abbruch, zeigt dann bewusst keine leere Linescore-Zeile) und sonst aufraeumt,
+  // damit kein STALE Stand vom vorigen Feldspiel stehen bleibt, sobald als naechstes ein
+  // Kampf/eine Buehne/ein Bahn-Rennen denselben #endstand erneut oeffnet. Reine Anzeige aus
+  // bereits vorhandenem Zustand (`fsPeriodenStand`/`fsPunkte`/`VEREIN`) -- kein rr(), keine
+  // Rueckschreibung, kein Einfluss auf die Wertung.
+  function renderLinescore(){
+    const box=document.getElementById("elinescore");
+    if(!box)return;
+    if(!istFeldspiel(disc)||!fsPeriodenStand.length){ box.hidden=true; box.textContent=""; return; }
+    box.hidden=false; box.textContent="";
+    const istDrittel=((LIVE()||{}).periodeWort==="Drittel");
+    const t=el("table");
+    const kopf=el("tr");
+    kopf.appendChild(el("th",null,""));
+    for(const p of fsPeriodenStand)
+      kopf.appendChild(el("th",null,istDrittel?(p.periode+"."):("Q"+p.periode)));
+    kopf.appendChild(el("th",null,"Gesamt"));
+    const thead=el("thead"); thead.appendChild(kopf); t.appendChild(thead);
+    const tb=el("tbody");
+    for(const seite of [0,1]){
+      const tr=el("tr");
+      const nameTd=el("td",null,VEREIN[seite].name);
+      nameTd.classList.add("elsname",seite===0?"h":"a");
+      tr.appendChild(nameTd);
+      for(const p of fsPeriodenStand)tr.appendChild(el("td",null,String(seite===0?p.a:p.b)));
+      const gesTd=el("td",null,String(fsPunkte[seite]));
+      gesTd.classList.add("elsges");
+      tr.appendChild(gesTd);
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb); box.appendChild(t);
+  }
+
   function renderEndstandBahn(){
     const rang=bahnRangliste(), stand=bahnTeamstand();
     const [pL,pR]=stand.seiten;
@@ -44645,6 +44745,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44745,6 +44846,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
@@ -44769,18 +44871,23 @@
   // renderEndstandBuehne() zwei Funktionen oberhalb, sogar derselbe Funktionskoerper (nur
   // Sieger/Stand kommen hier aus fsStand() statt buehneStand()).
   //
-  // SIEGER/STAND AUS `fsBisher().team`, NICHT AUS `fsPunkte`: `fsBisher().team` ist exakt
-  // die Zahl, die die Scoreline waehrend des GESAMTEN Spiels schon zeigt (s.
-  // updateHudFeldspiel() oben, "Enthuellter Spielstand, nicht das vorab durchgerechnete
-  // Endergebnis"). Fuer Basketball/Hockey ist das ohnehin identisch mit `fsPunkte` (jeder
-  // Treffer aktualisiert beide zusammen); nur Football fuehrt Extra-Punkte/Two-Point-
-  // Conversions bislang ausschliesslich in `fsPunkte` und nicht in `fsZuege` (separater,
-  // schon bekannter Befund, Audit-Punkt 1 -- "welche Zahl zaehlt" ist dort offen und bleibt
-  // hier unangetastet). Dieser Endstand zeigt deshalb bewusst dieselbe Zahl, die der
-  // Zuschauer die ganze Sendung ueber schon gesehen hat, statt eine DRITTE einzufuehren.
+  // SIEGER/STAND AUS `fsPunkte`, NICHT AUS `fsBisher().team` (Broadcast-Paket A, Punkt 1):
+  // `fsBisher().team` ist nur eine Nachzaehlung aus dem Enthuellungs-Log `fsZuege` ueber
+  // `logZug()`-Eintraege -- Football haengt aber jeden Extra-Punkt/jede Two-Point-Conversion
+  // ausschliesslich in `fsPunkte` hoch (footballDownWeiter(), "fsPunkte[fb.side]+=1 ...")
+  // und ruft dafuer NIE `logZug()` auf (TD-6-Punkte werden geloggt, der separate XP-Punkt
+  // nicht). `fsBisher().team` blieb dadurch hinter der Scoreline/dem Ticker zurueck, die
+  // beide schon vorher auf `fsPunkte` umgestellt wurden (s. Kommentar bei der Scoreline
+  // weiter oben) -- Endstand-Banner und Scoreline zeigten zwei verschiedene Zahlen
+  // (gemessen: "9 : 18" im Banner gegen "10 : 21" in Scoreline/Ticker), bei knappen Spielen
+  // sogar faelschlich "UNENTSCHIEDEN". `fsPunkte` ist die EINZIGE Quelle, die
+  // lib/resolve/battle-mode-arena-team-points.ts fuer die Wertung/PPS-Ableitung liest --
+  // der Endstand zeigt jetzt also dieselbe Zahl wie die zaehlende Wertung UND wie die
+  // Scoreline/der Ticker. Fuer Basketball/Hockey war das ohnehin schon identisch (jeder
+  // Treffer aktualisiert beide zusammen), nur Football war betroffen. Reine
+  // Lesequelle-Korrektur -- `fsZuege`/`logZug()`/der Boxscore selbst bleiben unangetastet.
   function fsStand(){
-    const bisher=fsBisher().team;
-    return {a:bisher[0], b:bisher[1], text:bisher[0]+" : "+bisher[1]};
+    return {a:fsPunkte[0], b:fsPunkte[1], text:fsPunkte[0]+" : "+fsPunkte[1]};
   }
   function fsSieger(){ const {a,b}=fsStand(); return a===b?null:(a>b?0:1); }
   // EINHEIT DES STANDS (Punkt 17): Hockey zaehlt Tore, Basketball/Football Punkte --
@@ -44825,6 +44932,7 @@
     renderSzeneDesSpiels();
     renderHighlights();
     renderAlternativRechner();
+    renderLinescore();
     document.getElementById("endstand").hidden=false;
   }
 
