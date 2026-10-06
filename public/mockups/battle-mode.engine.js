@@ -19775,8 +19775,15 @@
   }
 
   // RUTSCHER-ZEITPUNKT einer Teilstrecke: der Zeitverlust steht im Film, der Ort ist wie in der
-  // Laeufe-Szene auf 45 % des Wegs gesetzt (Bewegung mit gleichmaessigem Tempo).
-  function sspRutschVon(r){ const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0)); return r.t0+0.45*m; }
+  // Laeufe-Szene auf 45 % des Wegs gesetzt (Bewegung mit gleichmaessigem Tempo). Laeuft die
+  // Teilstrecke ueber die Schlusshupe, rutscht der Sack spaetestens 0,5 s vor der Hupe — die
+  // Mechanik zaehlt den Rutscher (gewuerfelt beim Losgehen), also soll man ihn auch sehen.
+  function sspRutschAnteil(r,T){
+    const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0));
+    if(T!=null&&r.t0+0.45*m>T-0.5)return Math.max(0,Math.min(0.45,(T-0.5-r.t0)/m));
+    return 0.45;
+  }
+  function sspRutschVon(r,T){ const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0)); return r.t0+sspRutschAnteil(r,T)*m; }
 
   // STUFE DER TRAGE-POSE je Station (Auftrag Punkt 2): Station 1 bleibt bei den leichten Stufen
   // (1, gedoppelt 2), Station 2 bei den mittleren (3/4), Station 3 bei den schweren (5/6). Die
@@ -19796,7 +19803,7 @@
     sz.seiten.forEach(S=>{
       S.traeger.forEach(tr=>tr.spur.forEach(r=>{
         if(r.t0>sz.T)return;
-        if(r.typ==="trag"&&r.rut){ const ts=sspRutschVon(r);
+        if(r.typ==="trag"&&r.rut){ const ts=sspRutschVon(r,sz.T);
           if(ts<=sz.T)L.push({t:ts, side:S.side, i:tr.i, s:r.s, typ:"rutscher", prio:4, kg:r.kg, dauer:r.rutZeit}); }
         else if(r.typ==="pause")L.push({t:r.t0, side:S.side, i:tr.i, s:r.s, typ:"pause", prio:3, kg:r.kg, dauer:r.t1-r.t0});
         else if(r.typ==="wechsel")L.push({t:r.t0, side:S.side, i:tr.i, s:r.nach, von:r.s, nach:r.nach, typ:"wechsel", prio:3, dauer:r.t1-r.t0});
@@ -19978,7 +19985,7 @@
     let saecke=0, pausen=0, rutscher=0, wechsel=0;
     for(const r of sp){
       if(r.typ==="trag"&&r.t1<=tau&&r.t1<=T)saecke+=r.saecke*r.len/r.D;
-      if(r.typ==="trag"&&r.rut&&sspRutschVon(r)<=tau)rutscher++;
+      if(r.typ==="trag"&&r.rut&&sspRutschVon(r,T)<=tau)rutscher++;
       if(r.typ==="pause"&&r.t0<=tau)pausen++;
       if(r.typ==="wechsel"&&r.t0<=tau){ wechsel++; stationen.push(r.nach); }
     }
@@ -20017,9 +20024,9 @@
       case "trag": {
         const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0));
         let frac;
-        if(r.rut){ const ts=r.t0+0.45*m;
+        if(r.rut){ const fa=sspRutschAnteil(r,sz.T), ts=r.t0+fa*m;
           if(tau<ts)frac=(tau-r.t0)/m;
-          else if(tau<ts+r.rutZeit){ frac=0.45; z.phase="rutscher"; z.pp=(tau-ts)/Math.max(1e-6,r.rutZeit); }
+          else if(tau<ts+r.rutZeit){ frac=fa; z.phase="rutscher"; z.pp=(tau-ts)/Math.max(1e-6,r.rutZeit); }
           else frac=(tau-r.t0-r.rutZeit)/m;
         } else frac=(tau-r.t0)/m;
         frac=Math.max(0,Math.min(1,frac));
@@ -20390,21 +20397,21 @@
       sortierung:(a,b)=>{ const ta=sspTraegerVon(a.u), tb=sspTraegerVon(b.u);
         return (tb?tb.start:0)-(ta?ta.start:0)||(b.sv.beitrag-a.sv.beitrag); },
       spalten:[
-        {id:"st",  kopf:"Station", titel:"Startstation und jeder Wechsel (1 = 35 kg/24 m, 2 = 80 kg/16 m, 3 = 115 kg/8 m)", wert:z=>pfad(z)},
+        {id:"st",  kopf:"St", titel:"Startstation und jeder Wechsel (1 = 35 kg/24 m, 2 = 80 kg/16 m, 3 = 115 kg/8 m)", wert:z=>pfad(z)},
         {id:"sack",kopf:"Säcke", titel:"getragene Säcke, anteilig nach Metern (wer übergibt oder ablegt, teilt den Sack)",
           wert:z=>z.sv.saecke?z.sv.saecke:null, fmt:v=>v.toFixed(1).replace(".",",")},
         {id:"abl", kopf:"Abl%", titel:"Anteil seiner Entscheidungen an der Ablage: ablegen + kurz rasten", wert:z=>anteil(z,"normal")},
-        {id:"dur", kopf:"Durch%", titel:"Anteil durchpowern bis zum Silo (frei und erzwungen, wenn kein Abholer da war)", wert:z=>anteil(z,"durch")},
+        {id:"dur", kopf:"Dur%", titel:"Anteil durchpowern bis zum Silo (frei und erzwungen, wenn kein Abholer da war)", wert:z=>anteil(z,"durch")},
         {id:"dir", kopf:"Dir%", titel:"Anteil Direktübergabe in die Hand", wert:z=>anteil(z,"direkt")},
         {id:"pau", kopf:"Pau", titel:"Zwangspausen", wert:z=>zahl(z.sv.pausen)},
         {id:"rut", kopf:"Rut", titel:"Rutscher", wert:z=>zahl(z.sv.rutscher)},
         {id:"wch", kopf:"Wch", titel:"Stationswechsel", wert:z=>zahl(z.sv.wechsel)},
-        {id:"aw",  kopf:"Beitrag", top:true, titel:"Anteil am Arbeitswert des Teams: jeder abgelieferte Sack nach getragenen Metern verteilt (Wertung vorläufig)",
+        {id:"aw",  kopf:"AW", top:true, titel:"Anteil am Arbeitswert des Teams: jeder abgelieferte Sack nach getragenen Metern verteilt (Wertung vorläufig)",
           wert:z=>z.sv.beitrag?z.sv.beitrag:null, fmt:v=>String(Math.round(v))},
         {id:"note",kopf:"Note", top:true, titel:"Tragenote (Spielerwert = Note ×10), erst nach der Schlusshupe",
           wert:z=>done&&z.u.tragenote!=null?z.u.tragenote:null, fmt:v=>v.toFixed(1).replace(".",",")},
         {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"Sechs gegen sechs, alle gleichzeitig. „Station\" zeigt Start und Wechsel. „Säcke\" zählt anteilig nach getragenen Metern. „Abl/Durch/Direkt\" sind die Anteile seiner Entscheidungen an der Ablage (Durch schließt erzwungenes Durchpowern ein). „Beitrag\" ist sein Anteil am Arbeitswert des Teams — die Wertung nach Arbeitswert ist vorläufig, Chris' Bestätigung steht aus. „Note\" ist der Spielerwert/10 und steht erst nach der Schlusshupe fest."};
+      fuss:"Sechs gegen sechs, alle gleichzeitig. „St\" zeigt Startstation und Wechsel. „Säcke\" zählt anteilig nach getragenen Metern. „Abl/Durch/Direkt\" sind die Anteile seiner Entscheidungen an der Ablage (Durch schließt erzwungenes Durchpowern ein). „AW\" ist sein Beitrag zum Arbeitswert des Teams — die Wertung nach Arbeitswert ist vorläufig, Chris' Bestätigung steht aus. „Note\" ist der Spielerwert/10 und steht erst nach der Schlusshupe fest."};
   }
 
   function baueHebenDuelle(art,mine,gegner){

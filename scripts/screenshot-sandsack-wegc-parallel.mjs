@@ -8,7 +8,9 @@
 // Auftakt, Startaufstellung, laufende Schicht, Direktuebergabe, Stationswechsel, Rutscher, Pause,
 // Endstand/Boxscore. Danach dieselben Ereignisse als Lupe (2,5-fache Pixeldichte).
 //
-//   node scripts/screenshot-sandsack-wegc-parallel.mjs [zielordner] [--paarung=k] [--ohne-lupe]
+//   node scripts/screenshot-sandsack-wegc-parallel.mjs [zielordner] [--paarung=k] [--ohne-lupe] [--nur-abgleich]
+//
+// --nur-abgleich: keine Bilder, nur bis zum Ende spulen und Film gegen Mechanik abgleichen.
 //
 // --paarung=k (0..4) setzt vor dem Spiel die k-te Paarung der Kader-Familie live-save
 // (window.__arena.kaderSetzen); ohne Angabe der Standardkader der Seite.
@@ -25,7 +27,8 @@ const posArg = process.argv.slice(2).find((a) => !a.startsWith("--"));
 const ziel = path.resolve(posArg || path.join(WURZEL, "docs/design"));
 const paarArg = process.argv.find((a) => a.startsWith("--paarung="));
 const PAARUNG = paarArg ? Number(paarArg.slice(10)) : null;
-const MIT_LUPE = !process.argv.includes("--ohne-lupe");
+const NUR_ABGLEICH = process.argv.includes("--nur-abgleich");
+const MIT_LUPE = !process.argv.includes("--ohne-lupe") && !NUR_ABGLEICH;
 mkdirSync(ziel, { recursive: true });
 const datei = (m) => path.join(ziel, "gewichtheben-sandsack-wegc-parallel-stufe3-" + m + "-06-10.png");
 
@@ -61,7 +64,7 @@ console.log("Flags:", JSON.stringify(await seite.evaluate(() => window.__arena.b
 await seite.click("#t2");
 await seite.waitForTimeout(400);
 const einlauf = await seite.$("#einlauf");
-if (einlauf && await einlauf.isVisible()) { await einlauf.screenshot({ path: datei("einlauf") }); console.log("einlauf ->", datei("einlauf")); }
+if (!NUR_ABGLEICH && einlauf && await einlauf.isVisible()) { await einlauf.screenshot({ path: datei("einlauf") }); console.log("einlauf ->", datei("einlauf")); }
 await seite.click("#play");
 await seite.waitForTimeout(300);
 // Anhalten: die Sonde spult selbst (stepBuehne), die Zeichenschleife malt weiter — so laeuft
@@ -98,7 +101,7 @@ const momente = [
   ...(pause ? [["pause", L + pause.t + Math.min(1.0, (pause.dauer || 2) * 0.4), pause]] : []),
   ...(durch ? [["durchpowern", L + durch.t + 0.3, durch]] : []),
   ["ende", plan.gesamt + 1, null],
-].sort((a, b) => a[1] - b[1]);
+].filter((m) => !NUR_ABGLEICH || m[0] === "ende").sort((a, b) => a[1] - b[1]);
 console.log("Momente:", momente.map(([m, t]) => m + "@" + t.toFixed(1)).join(" "));
 
 const cv = await seite.$("#cv");
@@ -106,15 +109,14 @@ let abgleich = null;
 const lupen = [];
 for (const [moment, t, h] of momente) {
   const st = await spule(seite, t);
+  if (moment === "ende" && NUR_ABGLEICH) { abgleich = st.abgleich; console.log("ende:", JSON.stringify({ t: st.t, done: st.done, stand: st.stand })); continue; }
   if (moment === "ende") {
     const haupt = await seite.$(".arenaHaupt");
     await (haupt || cv).screenshot({ path: datei("endstand") });
-    const box = await seite.$("#wertungBox");
-    if (box) await box.screenshot({ path: datei("boxscore") });
     const es = await seite.$("#endstand");
     if (es && await es.isVisible()) await es.screenshot({ path: datei("endstand-overlay") });
     abgleich = st.abgleich;
-    console.log("ende:", JSON.stringify({ t: st.t, done: st.done, stand: st.stand }), "->", datei("endstand"), datei("boxscore"));
+    console.log("ende:", JSON.stringify({ t: st.t, done: st.done, stand: st.stand }), "->", datei("endstand"), datei("endstand-overlay"));
     continue;
   }
   await cv.screenshot({ path: datei(moment) });
@@ -122,8 +124,6 @@ for (const [moment, t, h] of momente) {
   if (moment === "schicht") {
     const haupt = await seite.$(".arenaHaupt");
     if (haupt) await haupt.screenshot({ path: datei("hud") });
-    const box = await seite.$("#wertungBox");
-    if (box) await box.screenshot({ path: datei("boxscore-live") });
   }
   if (h && st.figuren) {
     const f = st.figuren.find((x) => x.n === h.n);

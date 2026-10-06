@@ -330,6 +330,9 @@ Entscheidungsströme, wie in Flag 6–9.
 6. **Das erzwungene „durch" bleibt bei 45 %** (Abschnitt 7). Es kostet aber kaum etwas.
 7. **Kein Bild.** Wechsel, Pfade und Zeiten je Station stehen im Boxscore (`parFrei`). Für Stufe 3
    wäre der Gang zwischen den Stapeln eine eigene kleine Szene („Abyssalfin geht nach vorn").
+   **Nachtrag 06.10.:** gebaut, siehe
+   `gewichtheben-sandsack-wegc-parallel-stufe3-sichtbarkeit-06-10.md` (Bühnenbild, HUD, Boxscore,
+   Ticker der Flag-10-Schicht im echten Spiel; Mechanik unverändert, Flag 0…10 bit-identisch).
 8. Die Knopf-Diagnose aus Flag 8/9 (`parOptionKg`, eine feste Kettenwahl je Träger) misst bei Flag 10
    die Mannschaft statt der Station und vermischt sich mit den Wechseln. Sie ist dort nur grob
    lesbar (KI mindestens so gut wie die beste feste Wahl in 48 % statt 76 %).
