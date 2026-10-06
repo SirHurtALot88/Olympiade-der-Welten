@@ -15958,7 +15958,7 @@
   //                   (docs/design/speed-schach-nachtkonzept-03-10.md Abschnitt 3.2/3.3)
   //   wettessenMauer  0 aus · 1 K1 „Mauer als Fuellstand" · 2 K1+K2 „Haltung"
   //                   (docs/design/wettessen-nachtkonzept-03-10.md Abschnitt 3, K1/K2)
-  const BUEHNE_FLAGS={speedSchachUhr:0, wettessenMauer:0};
+  const BUEHNE_FLAGS={speedSchachUhr:2, wettessenMauer:2};
   // STARTWERT AUS DEM FENSTER (04.10., PPS-Referenz Wettessen): der Headless-Runner
   // (lib/battle/arena-headless-runner.ts) haengt die Engine JE FIXTURE NEU ein — ein ueber
   // window.__arena.buehneFlags() gesetzter Schalter waere beim naechsten Fixture wieder 0. Wer
@@ -33038,7 +33038,7 @@
   // Modell gemessene reine Kader-Regel), "normal"/"angreifen"/"absichern" (alle gleich),
   // "zufall" (Namens-Hash). `fliegMax`: fliegender Gewinn, 0,24 = Chris' Kompromisswert.
   // Hier deklariert (vor bauSpurt()), nicht neben den Konstanten — kein TDZ-Risiko.
-  let staffelMarkeZug={aktiv:false, modus:"ki", fliegMax:0.24};
+  let staffelMarkeZug={aktiv:true, modus:"ki", fliegMax:0.24};
   // B4.3 BEIN-DUELL-BANNER: welche Beine schon gemeldet sind (je Rennen geleert).
   let staffelBeinDuellGemeldet=new Set();
   // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, docs/design/spurt-nachtkonzept-03-10.md):
@@ -33047,7 +33047,7 @@
   // Puste-Gutschrift skaliert). Beide Teilschalter fuer die Einzelmessung ("nie zwei
   // Eingriffe in einer Messung"); das freigegebene Paket ist beides zusammen. Bedeutung und
   // Gate s. spurtSaeuleSetzen() (nahe stepSpurt).
-  let spurtSaeule={aktiv:false, joker:true, kriechen:true};
+  let spurtSaeule={aktiv:true, joker:true, kriechen:true};
   // S-N5 Anzeigen: Stationsbestzeiten (saubere Station) und Fotofinish, je Rennen geleert.
   let spurtStationBest=[], spurtFotofinishGezeigt=false;
   // ST-4: FUEHRUNGSVERLAUF IM INNENFELD (Abschnitt 4.3). Ringpuffer aus
