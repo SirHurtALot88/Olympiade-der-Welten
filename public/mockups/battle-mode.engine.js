@@ -19707,6 +19707,706 @@
     });
   }
 
+  // =====================================================================================
+  // SANDSACK WEG C PARALLEL — STUFE 3: SICHTBARKEIT DER FLAG-10-SCHICHT (06.10., docs/design/
+  // gewichtheben-sandsack-wegc-parallel-stufe3-sichtbarkeit-06-10.md). Das Bild der freien
+  // Stationswahl (BUEHNE_FLAGS.gewichthebenSandsack=10) im ECHTEN Spiel: sechs gegen sechs,
+  // alle gleichzeitig, drei Stationen, 150-s-Schicht. Gebaut NUR von build() (Live-Pfad) aus
+  // SANDSACK_PAR_FILM, nie von MOTOREN[bd].bau() — die Messung sieht die Szene nie.
+  //
+  // REINE ANZEIGE (Klasse A): kein rr(), kein Schreiben in u.summe/u.last*/u.par*/SANDSACK_WEGC,
+  // nur Lesen des Films und viz-Felder (vizAniPhase/vizPuste). Der Film ist KEINE Heuristik:
+  // sandsackFreiLauf() hat jeden Abschnitt jedes Traegers mit Zeit, Ort, Last und Erschoepfung
+  // protokolliert (Pause, Aufheben, Tragen, Wuchten, Gehen, Ablegen, Rast, Warten, Direkt-
+  // uebergabe, Stationswechsel). Die Szene spielt genau das 1:1 ab (Simulationssekunde =
+  // Zuschausekunde). Rekonstruiert ist nur, WO innerhalb einer Teilstrecke der Rutscher passiert
+  // (bei 45 % des Wegs, wie in Stufe 3 der Laeufe) — Beginn, Ende und Zeitverlust sind exakt.
+  //
+  // DARSTELLUNG ZWOELF GLEICHZEITIGER TRAEGER: eine gerade Bahn je Station und Team (Stapel bei
+  // 0 / 8 / 16 m, Silo bei 24 m), die drei Stationen als drei REIHEN untereinander, die beiden
+  // Teams gespiegelt (Heim laeuft nach rechts, Gast nach links, beide Silos in der Mitte). Damit
+  // steht jede Station in einer eigenen Bildzone, und die Geometrie bleibt woertlich die der
+  // Mechanik (der Stapel von Station 2 liegt genau ueber der Ablage von Station 1). KAMERA:
+  // eine Fokus-Reihe (Regie mit Vorschau auf den Film: Rutscher > Pause/Wechsel > Direkt-
+  // uebergabe; ohne Ereignis ein langsamer Rundgang), die groesser und heller gezeigt wird; die
+  // anderen beiden bleiben sichtbar, nur kleiner.
+  //
+  // WERTUNG: angezeigt wird der ARBEITSWERT, weil Flag 10 so wertet (freiWertung 1). OFFEN:
+  // Silo-kg oder Arbeitswert ist noch NICHT von Chris bestaetigt (Doku freie Stationswahl,
+  // Abschnitt 3 und 10.1). Die Szene schreibt das sichtbar dazu ("vorläufig").
+  // =====================================================================================
+  const SSP_AUFTAKT=3.0, SSP_AUFSTELLUNG=3.5, SSP_SCHLUSS=5.0;
+  const SSP_FOKUS_HALTEN=3.0, SSP_FOKUS_VORSCHAU=2.0, SSP_FOKUS_RUNDGANG=9.0, SSP_FOKUS_BLENDE=0.6;
+  // Reihenbereich: oben liegt die HTML-Spielstandleiste ueber der Leinwand (Paket-2-Fund:
+  // H*0.08/0.14 war dort unleserlich), unten das Band mit Uhr, Arbeitswert und Belegung.
+  const SSP_REIHE_Y0=104, SSP_REIHE_Y1=412;
+  const SSP_RAND=58, SSP_SILO_ABSTAND=50, SSP_SILO_B=30;
+  const SSP_KG_SKALA=6500; // Silo-Fuellstand: kg je Turm (gemessen ~4800 je Seite, Doku 0)
+  const SSP_REIHE_FARBE=["#2f2a20","#2a2620","#23252b"];
+  const SSP_WAHL_TEXT={normal:"ABLAGE", durch:"DURCH!", erzwungen:"DURCH", direkt:"DIREKT"};
+  const sspZeit=(s)=>{ const v=Math.max(0,s); const m=Math.floor(v/60), r=Math.floor(v-60*m);
+    return m+":"+(r<10?"0":"")+r; };
+  const sspName=(u)=>((u&&u.n)||"").split(" ")[0]||"Jemand";
+  const sspTeam=(side)=>(VEREIN[side]&&VEREIN[side].name)||(side===0?"Heim":"Gast");
+  const sspFarbe=(side)=>(side===0?css("--home"):css("--away"))||(side===0?"#8ab4f8":"#f28b82");
+  const sspGlatt=(k)=>{ k=Math.max(0,Math.min(1,k)); return k*k*(3-2*k); };
+
+  // GEOMETRIE: Meter g auf der gemeinsamen Bahn (0 = Stapel Station 1, Dmax = Silo) -> x.
+  function sspGeo(){
+    const F=SANDSACK_PAR_FILM; const Dmax=F?Math.max(...F.stationen.map(s=>s.d)):24;
+    const xSilo=W/2-SSP_SILO_ABSTAND, pxm=(xSilo-SSP_RAND)/Dmax;
+    return {Dmax, pxm, xSilo};
+  }
+  const sspX=(geo,side,g)=>side===0?SSP_RAND+g*geo.pxm:W-SSP_RAND-g*geo.pxm;
+  // Meter auf der gemeinsamen Bahn aus Station s und Position x (Meter ab dem eigenen Stapel).
+  const sspGVon=(sz,s,x)=>sz.Dmax-sz.stationen[s].d+x;
+
+  // ZEIT IN DER SCHICHT (tau): -1 vor der Hupe, sonst 0..T.
+  function sspTau(sz){
+    if(!sz)return -1;
+    if(sz.t<sz.laufVon)return -1;
+    return Math.min(sz.T,sz.t-sz.laufVon);
+  }
+  function sspAbschnitt(sz){
+    if(sz.t<SSP_AUFTAKT)return "auftakt";
+    if(sz.t<sz.laufVon)return "aufstellung";
+    if(sz.t<sz.schlussVon)return "schicht";
+    return "schluss";
+  }
+
+  // RUTSCHER-ZEITPUNKT einer Teilstrecke: der Zeitverlust steht im Film, der Ort ist wie in der
+  // Laeufe-Szene auf 45 % des Wegs gesetzt (Bewegung mit gleichmaessigem Tempo).
+  function sspRutschVon(r){ const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0)); return r.t0+0.45*m; }
+
+  // STUFE DER TRAGE-POSE je Station (Auftrag Punkt 2): Station 1 bleibt bei den leichten Stufen
+  // (1, gedoppelt 2), Station 2 bei den mittleren (3/4), Station 3 bei den schweren (5/6). Die
+  // obere Stufe der Station waehlt die RELATIVE Last kg/K (K = Traglast des Spielers): wer an
+  // seiner Grenze traegt, kaempft sichtbar mehr als ein Kraftpaket mit demselben Sack.
+  function sspStufe(s,kg,u){
+    const K=sandsackKetteKap(u).K, r=kg/Math.max(1,K);
+    if(s===0)return kg>=60?1:0;
+    if(s===1)return r>=0.75?3:2;
+    return r>=0.95?5:4;
+  }
+
+  // HOEHEPUNKTE aus dem Film (fuer Regie, Ticker und Etiketten): Rutscher, Zwangspause,
+  // Stationswechsel, Direktuebergabe, Durchpowern (frei/erzwungen), Ablage.
+  function sspHoehepunkte(sz){
+    const L=[];
+    sz.seiten.forEach(S=>{
+      S.traeger.forEach(tr=>tr.spur.forEach(r=>{
+        if(r.t0>sz.T)return;
+        if(r.typ==="trag"&&r.rut){ const ts=sspRutschVon(r);
+          if(ts<=sz.T)L.push({t:ts, side:S.side, i:tr.i, s:r.s, typ:"rutscher", prio:4, kg:r.kg, dauer:r.rutZeit}); }
+        else if(r.typ==="pause")L.push({t:r.t0, side:S.side, i:tr.i, s:r.s, typ:"pause", prio:3, kg:r.kg, dauer:r.t1-r.t0});
+        else if(r.typ==="wechsel")L.push({t:r.t0, side:S.side, i:tr.i, s:r.nach, von:r.s, nach:r.nach, typ:"wechsel", prio:3, dauer:r.t1-r.t0});
+        else if(r.typ==="uebergabe"&&r.rolle==="gibt")L.push({t:r.t0, side:S.side, i:tr.i, an:r.an, s:r.s, typ:"direkt", prio:2, kg:r.kg});
+      }));
+      S.entsch.forEach(e=>{
+        if(e.t>sz.T)return;
+        if(e.wahl==="durch"||e.wahl==="erzwungen")L.push({t:e.t, side:S.side, i:e.i, s:e.s, typ:e.wahl, prio:e.wahl==="durch"?1:0.6, kg:e.kg});
+        else if(e.wahl==="normal")L.push({t:e.t, side:S.side, i:e.i, s:e.s, typ:"ablage", prio:0.5, kg:e.kg, an:e.an});
+      });
+    });
+    L.sort((a,b)=>a.t-b.t||b.prio-a.prio);
+    return L;
+  }
+
+  // REGIE (Kamera-Fokus): vorab aus dem Film geplant, also eine reine Funktion der Szenenzeit
+  // (Vorspulen und Bildfolge liefern dasselbe). Alle 0,1 s: Fokus mindestens SSP_FOKUS_HALTEN
+  // halten; dann auf die Reihe mit dem wichtigsten Ereignis der naechsten SSP_FOKUS_VORSCHAU
+  // Sekunden schneiden (Prioritaet >= 2), sonst nach SSP_FOKUS_RUNDGANG Sekunden zur naechsten
+  // Reihe weiter. Ein bevorstehendes, gleich wichtiges Ereignis in der jetzigen Reihe haelt sie.
+  function sspFokusPlan(sz){
+    const L=sz.hoehepunkte.filter(h=>h.prio>=2);
+    const erst=L.length?L[0].s:2;
+    const plan=[{t:0, row:erst, grund:null}];
+    let f=erst, seit=0;
+    for(let k=1;k*0.1<=sz.T+1e-9;k++){
+      const t=k*0.1;
+      if(t-seit<SSP_FOKUS_HALTEN)continue;
+      let best=null, hier=null;
+      for(const h of L){
+        if(h.t<t)continue; if(h.t>t+SSP_FOKUS_VORSCHAU)break;
+        if(h.s===f){ if(!hier||h.prio>hier.prio)hier=h; continue; }
+        if(!best||h.prio>best.prio)best=h;
+      }
+      if(best&&(!hier||best.prio>hier.prio)){ f=best.s; seit=t; plan.push({t, row:f, grund:best}); }
+      else if(!hier&&t-seit>=SSP_FOKUS_RUNDGANG){ f=(f+1)%3; seit=t; plan.push({t, row:f, grund:null}); }
+    }
+    return plan;
+  }
+  // Gewicht je Reihe (0..1) zur Schichtzeit tau; vor und nach der Schicht alle 0 (gleich gross).
+  function sspFokusGewichte(sz){
+    const w=[0,0,0];
+    if(!sz||sspAbschnitt(sz)!=="schicht")return {w, row:-1, grund:null};
+    const tau=sspTau(sz), P=sz.fokus;
+    let k=0; while(k+1<P.length&&P[k+1].t<=tau)k++;
+    const b=sspGlatt((tau-P[k].t)/SSP_FOKUS_BLENDE);
+    w[P[k].row]+=k===0?1:b;
+    if(k>0)w[P[k-1].row]+=1-b;
+    return {w, row:P[k].row, grund:P[k].grund, seit:P[k].t};
+  }
+  // REIHEN-LAYOUT aus den Fokus-Gewichten: Hoehe, Fusslinie, Figurenmassstab.
+  function sspReihen(sz){
+    const {w}=sspFokusGewichte(sz);
+    const extra=0.8, summe=3+extra*(w[0]+w[1]+w[2]), Hb=SSP_REIHE_Y1-SSP_REIHE_Y0;
+    let y=SSP_REIHE_Y0;
+    return [0,1,2].map(s=>{ const h=Hb*(1+extra*w[s])/summe;
+      const r={s, top:y, h, fuss:y+h*0.84, sk:0.84+0.30*w[s], w:w[s]}; y+=h; return r; });
+  }
+
+  // SZENE BAUEN (aus build(), nur wenn baueSandsackParallelFrei() einen Film hinterlassen hat).
+  function sandsackParSzeneBauen(){
+    const F=SANDSACK_PAR_FILM; if(!F)return null;
+    const T=F.T, Dmax=Math.max(...F.stationen.map(s=>s.d));
+    const laufVon=SSP_AUFTAKT+SSP_AUFSTELLUNG, schlussVon=laufVon+T, gesamt=schlussVon+SSP_SCHLUSS;
+    const seiten=F.seiten.map(S=>{
+      const traeger=S.traeger.map((tr,i)=>{
+        const u=TEILNEHMER.find(x=>x.side===S.side&&x.n===tr.u.n)||tr.u;
+        const spur=(S.spuren[i]||[]).slice().sort((a,b)=>a.t0-b.t0||a.t1-b.t1);
+        return {i, u, side:S.side, start:tr.start, aw:tr.aw, schwelle:tr.schwelle||50, spur, idx:0};
+      });
+      // BEITRAG je Spieler (Boxscore, Auftrag Punkt 6): jeder bis zur Hupe abgelieferte Sack
+      // verteilt seinen Arbeitswert nach GETRAGENEN METERN auf alle, die ihn getragen haben
+      // (Ablage und Direktuebergabe teilen einen Sack), gutgeschrieben im Moment der
+      // Ablieferung. Die Summe je Team ist genau der Arbeitswert der Mannschaftswertung.
+      const legs=new Map();
+      traeger.forEach(tr=>tr.spur.forEach(r=>{
+        if(r.typ==="trag"&&r.sack){ const l=legs.get(r.sack)||[]; l.push({i:tr.i, len:r.len}); legs.set(r.sack,l); } }));
+      const gutschrift=[];
+      traeger.forEach(tr=>tr.spur.forEach(r=>{
+        if(r.typ!=="wucht"||!(r.t1<=T)||!r.sack)return;
+        const aw=r.kg*F.sekJeKg[r.s], l=legs.get(r.sack)||[{i:tr.i,len:1}];
+        const sum=l.reduce((a,x)=>a+x.len,0)||1;
+        for(const x of l)gutschrift.push({t:r.t1, i:x.i, aw:aw*x.len/sum});
+      }));
+      gutschrift.sort((a,b)=>a.t-b.t);
+      return {side:S.side, traeger, haufen:S.haufen, entsch:S.entsch, lieferungen:S.lieferungen,
+        gutschrift, arbeitEnde:S.arbeit, kgEnde:S.kg};
+    });
+    const sz={t:0, gesamt, laufVon, schlussVon, T, Dmax, stationen:F.stationen, sekJeKg:F.sekJeKg,
+      sieger:F.sieger, wertung:F.wertung, fertig:false, seiten, ereignisse:[], fokus:null, hoehepunkte:null};
+    sz.hoehepunkte=sspHoehepunkte(sz);
+    sz.fokus=sspFokusPlan(sz);
+    sspEreignisseBauen(sz);
+    SANDSACK_PAR_SZENE=sz;
+    return sz;
+  }
+
+  // TICKER UND TON. Jede Zeile steht mit Szenenzeit fest und wird AM MOMENT geschrieben, an dem
+  // sie im Bild passiert. Wechsel, Rutscher und Zwangspausen immer; Direktuebergabe und
+  // Durchpowern sind zu haeufig fuer den Ticker (rund 120 Entscheidungen je Schicht): die erste
+  // Direktuebergabe je Team immer, danach nur in der Fokus-Reihe und mit Mindestabstand.
+  function sspEreignisseBauen(sz){
+    const E=sz.ereignisse, add=(t,fn)=>E.push({t,fn,getan:false});
+    const T0=sz.laufVon, st=sz.stationen;
+    const tr=(side,i)=>sz.seiten[side].traeger[i];
+    add(0.2,()=>feed(0,"Sandsack-Schicht: "+sz.seiten[0].traeger.length+" gegen "+sz.seiten[1].traeger.length+
+      ", alle gleichzeitig an drei Stationen, "+Math.round(sz.T)+" Sekunden. Gewertet wird der Arbeitswert (vorläufig).",false,undefined,"aufstellung"));
+    add(SSP_AUFTAKT+0.2,()=>sz.seiten.forEach(S=>{
+      const teil=[2,1,0].map(s=>"Station "+(s+1)+": "+(S.traeger.filter(x=>x.start===s).map(x=>sspName(x.u)).join(" & ")||"—"));
+      feed(S.side,sspTeam(S.side)+" — "+teil.join(" · ")+".",false,undefined,"aufstellung");
+    }));
+    add(T0,()=>{ sfx("gewichtheben","hupe"); feed(0,"Hupe — die Schicht läuft.",false,undefined,"zwischenstand"); });
+    const ersteDirekt=[false,false];
+    let letzteEntschZeile=-99;
+    const fokusZu=(t)=>{ let k=0; while(k+1<sz.fokus.length&&sz.fokus[k+1].t<=t)k++; return sz.fokus[k].row; };
+    for(const h of sz.hoehepunkte){
+      const a=tr(h.side,h.i), name=sspName(a.u), wo="Station "+(h.s+1);
+      if(h.typ==="wechsel"){
+        add(T0+h.t,()=>feed(h.side,name+" wechselt von Station "+(h.von+1)+" zu Station "+(h.nach+1)+".",false,undefined,"zwischenstand"));
+      }else if(h.typ==="rutscher"){
+        add(T0+h.t,()=>{ feed(h.side,name+" rutscht der Sack weg — "+h.kg+" kg an "+wo+".",false,undefined,"rutscher"); sfx("gewichtheben","sack_fall"); });
+      }else if(h.typ==="pause"){
+        add(T0+h.t,()=>{ feed(h.side,name+" muss verschnaufen ("+wo+") — zu lange ohne Rast.",false,undefined,"pause"); sfx("gewichtheben","keuchen"); });
+      }else if(h.typ==="direkt"){
+        const b=tr(h.side,h.an);
+        const imFokus=fokusZu(h.t)===h.s;
+        if(!ersteDirekt[h.side]||(imFokus&&h.t-letzteEntschZeile>=6)){
+          const erste=!ersteDirekt[h.side]; ersteDirekt[h.side]=true; letzteEntschZeile=h.t;
+          add(T0+h.t,()=>{ feed(h.side,(erste?"Erste Direktübergabe: ":"")+name+" gibt "+sspName(b.u)+" den Sack direkt in die Hand ("+wo+", keine Rast).",false,undefined,"zwischenstand",undefined,undefined,"routine"); sfx("gewichtheben","uebergabe"); });
+        }
+      }else if(h.typ==="durch"){
+        if(fokusZu(h.t)===h.s&&h.t-letzteEntschZeile>=6){
+          letzteEntschZeile=h.t;
+          add(T0+h.t,()=>feed(h.side,name+" powert durch bis zum Silo ("+wo+", "+h.kg+" kg) statt abzulegen.",false,undefined,"zwischenstand",undefined,undefined,"routine"));
+        }
+      }
+    }
+    for(let m=30;m<sz.T;m+=30)add(T0+m,()=>{ const st2=sspStand(); feed(0,"Zwischenstand nach "+sspZeit(m)+": Arbeitswert "+
+      Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+" (Silo "+Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+" kg).",false,undefined,"zwischenstand"); });
+    add(sz.schlussVon,()=>{
+      sfx("gewichtheben","hupe");
+      const s=sz.sieger, st2=sspStand();
+      feed(s,"Schlusshupe — "+sspTeam(s)+" gewinnt die Schicht. Arbeitswert "+Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+
+        " (Silo "+Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+" kg).",false,undefined,"laufsieg");
+      sfx("gewichtheben","laufsieg");
+      teamFeierAusloesen(s,"gross",null);
+    });
+    E.sort((a,b)=>a.t-b.t);
+  }
+
+  // STAND IM BILD: Arbeitswert, Silo-kg und Saecke je Seite bis zur gezeigten Schichtzeit (dieselben
+  // Lieferungen, dieselbe Reihenfolge, dieselbe Rechnung wie die Mannschaftswertung).
+  function sspStand(){
+    const sz=SANDSACK_PAR_SZENE; if(!sz)return {aw:[0,0], kg:[0,0], saecke:[0,0]};
+    const tau=done?sz.T:sspTau(sz);
+    const aw=[0,0], kg=[0,0], saecke=[0,0];
+    sz.seiten.forEach(S=>{
+      const ls=S.lieferungen.filter(l=>l.t<=tau);
+      aw[S.side]=ls.reduce((a,l)=>a+l.kg*sz.sekJeKg[l.s],0);
+      kg[S.side]=ls.reduce((a,l)=>a+l.kg,0);
+      saecke[S.side]=ls.reduce((a,l)=>a+l.saecke,0);
+    });
+    return {aw, kg, saecke};
+  }
+  // WAS EIN SPIELER BIS JETZT IM BILD GETAN HAT (Boxscore live). Nach `done` stehen genau die
+  // Werte der Mechanik da (u.lastSaecke/u.lastPausen/u.lastRutscher/u.parEntsch/u.parFrei).
+  function sspTraegerVon(u){
+    const sz=SANDSACK_PAR_SZENE; if(!sz||!u)return null;
+    const S=sz.seiten[u.side]; return S?S.traeger.find(x=>x.u===u)||null:null;
+  }
+  // `nurFilm` (nur QA-Sonde): auch nach `done` die aus dem Film gezaehlten Werte.
+  function sspSichtbar(u,nurFilm){
+    const sz=SANDSACK_PAR_SZENE, tr=sspTraegerVon(u);
+    const leer={saecke:0,pausen:0,rutscher:0,wechsel:0,entsch:{normal:0,durch:0,direkt:0,erzwungen:0},beitrag:0,stationen:[],gezeigt:false};
+    if(!sz||!tr)return leer;
+    const tau=done?sz.T:sspTau(sz);
+    const T=sz.T, sp=tr.spur;
+    const stationen=[tr.start];
+    let saecke=0, pausen=0, rutscher=0, wechsel=0;
+    for(const r of sp){
+      if(r.typ==="trag"&&r.t1<=tau&&r.t1<=T)saecke+=r.saecke*r.len/r.D;
+      if(r.typ==="trag"&&r.rut&&sspRutschVon(r)<=tau)rutscher++;
+      if(r.typ==="pause"&&r.t0<=tau)pausen++;
+      if(r.typ==="wechsel"&&r.t0<=tau){ wechsel++; stationen.push(r.nach); }
+    }
+    const entsch={normal:0,durch:0,direkt:0,erzwungen:0};
+    for(const e of sz.seiten[u.side].entsch)if(e.i===tr.i&&e.t<=tau)entsch[e.wahl]++;
+    const beitrag=sz.seiten[u.side].gutschrift.filter(g=>g.i===tr.i&&g.t<=tau).reduce((a,g)=>a+g.aw,0);
+    if(done&&!nurFilm){
+      return {saecke:u.lastSaecke||0, pausen:u.lastPausen||0, rutscher:u.lastRutscher||0,
+        wechsel:u.parFrei?u.parFrei.wechsel:wechsel, entsch:u.parEntsch||entsch, beitrag, stationen, gezeigt:true};
+    }
+    return {saecke, pausen, rutscher, wechsel, entsch, beitrag, stationen, gezeigt:tau>=0};
+  }
+
+  // ZUSTAND EINES TRAEGERS zur Schichtzeit tau, aus dem Film: Phase, Station, Ort (Meter ab dem
+  // eigenen Stapel), Last, Blickrichtung (+1 zum Silo), Erschoepfung E.
+  function sspZustand(sz,tr,tau){
+    const sp=tr.spur;
+    if(!sp.length)return {typ:"steht", s:tr.start, x:0, E:0, dir:1};
+    let k=tr.idx; if(k>=sp.length||sp[k].t0>tau)k=0;
+    while(k+1<sp.length&&sp[k+1].t0<=tau)k++;
+    tr.idx=k;
+    const r=sp[k], Evor=k>0?sp[k-1].E:0;
+    if(tau<r.t0)return {typ:"steht", s:tr.start, x:0, E:0, dir:1};
+    if(tau>=r.t1){
+      const s=r.typ==="wechsel"?r.nach:r.s;
+      return {typ:"steht", s, x:r.typ==="wechsel"?0:r.x1, E:r.E, dir:1, r};
+    }
+    const p=Number.isFinite(r.t1)?Math.max(0,Math.min(1,(tau-r.t0)/Math.max(1e-6,r.t1-r.t0))):0;
+    const E=Evor+(r.E-Evor)*p;
+    const z={typ:r.typ, s:r.s, x:r.x0, E, dir:1, r, p, kg:r.kg||0, saecke:r.saecke||0};
+    switch(r.typ){
+      case "pause": z.phase="pause"; z.pp=p; z.last=r.kg>0; if(!z.kg)z.kg=sz.stationen[r.s].kg; break;
+      case "auf": z.phase="pause"; z.pp=0.85+0.15*p; break;
+      case "ablegen": z.phase="pause"; z.pp=0.15*p; break;
+      case "wucht": z.phase="hin"; z.x=r.x0; z.hub=Math.sin(p*Math.PI); break;
+      case "trag": {
+        const m=Math.max(1e-6,(r.t1-r.t0)-(r.rutZeit||0));
+        let frac;
+        if(r.rut){ const ts=r.t0+0.45*m;
+          if(tau<ts)frac=(tau-r.t0)/m;
+          else if(tau<ts+r.rutZeit){ frac=0.45; z.phase="rutscher"; z.pp=(tau-ts)/Math.max(1e-6,r.rutZeit); }
+          else frac=(tau-r.t0-r.rutZeit)/m;
+        } else frac=(tau-r.t0)/m;
+        frac=Math.max(0,Math.min(1,frac));
+        z.x=r.x0+(r.x1-r.x0)*frac; if(!z.phase)z.phase="hin"; z.laeuft=z.phase==="hin"; break;
+      }
+      case "geh": z.x=r.x0+(r.x1-r.x0)*p; z.dir=r.x1>=r.x0?1:-1; z.laeuft=true; break;
+      case "rast": z.atmet=true; break;
+      case "wartet": z.dir=-1; break; // schaut dem kommenden Traeger entgegen (zum Stapel)
+      case "uebergabe":
+        if(r.rolle==="gibt"){ if(p<0.5){ z.phase="hin"; } else { z.typ="steht"; } }
+        else { if(p>=0.5){ z.phase="hin"; } else { z.dir=-1; } }
+        z.uebergabe=true; break;
+      case "wechsel": {
+        const g0=sspGVon(sz,r.s,0), g1=sspGVon(sz,r.nach,0);
+        z.wechsel={von:r.s, nach:r.nach, g0, g1, p}; z.g=g0+(g1-g0)*p; z.dir=g1>=g0?1:-1; z.laeuft=true; break;
+      }
+    }
+    // Naehe zu einer Direktuebergabe (0,4 s davor bis 0,4 s danach): fuer den Bild-Versatz von
+    // Geber und Nehmer, damit beide nicht auf demselben Pixel stehen und nichts springt.
+    for(const q of [sp[k-1],r,sp[k+1]]){
+      if(!q||q.typ!=="uebergabe")continue;
+      const d=tau<q.t0?q.t0-tau:(tau>q.t1?tau-q.t1:0), w=Math.max(0,1-d/0.4);
+      if(w>0){ z.ueb={rolle:q.rolle, w}; break; }
+    }
+    return z;
+  }
+
+  // SCHRITT: Szenenzeit vorwaerts, Ticker-Ereignisse. Schreibt nur in die Szene, kein rr().
+  function stepSandsackParSzene(dt){
+    const sz=SANDSACK_PAR_SZENE; if(!sz)return;
+    sz.t=Math.min(sz.gesamt,sz.t+dt);
+    for(const e of sz.ereignisse){ if(e.t>sz.t)break; if(!e.getan){ e.getan=true; try{ e.fn(); }catch(err){} } }
+    if(sz.t>=sz.gesamt)sz.fertig=true;
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // ZEICHNEN
+  function sspSprite(u,x,fussY,vor,laeuft,sk,aniPhase){
+    ctx.save();
+    ctx.translate(x,fussY); ctx.scale(sk,sk); ctx.translate(-x,-fussY);
+    zeichneSprite(ctx,{...u,vx:vor,vy:0,lunge:0,down:false,hop:0,vizOhneSchild:true,vizWaffe:null,
+      vizAniPhase:laeuft?aniPhase:SANDSACK_TP_RUHEBILD},x,fussY-19);
+    ctx.restore();
+    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u);
+    return {x, y:fussY-(19+46*Z-HEBEN_KOERPER_STD.oben*Z)*sk};
+  }
+  function sspPose(u,x,fussY,sk,o){
+    ctx.save();
+    ctx.translate(x,fussY); ctx.scale(sk,sk); ctx.translate(-x,-fussY);
+    const k=zeichneSandsackTragePose(ctx,u,x,fussY,o);
+    ctx.restore();
+    return {x:x+(k.x-x)*sk, y:fussY+(k.y-fussY)*sk};
+  }
+  function sspStapel(x,fussY,stufe,sk,dir){
+    for(let i=0;i<4;i++){
+      const ix=i<3?(i-1)*stufe.w*0.55*sk:0, iy=i<3?0:-stufe.h*0.7*sk;
+      sandsackVizZeichneSack(x+ix,fussY-stufe.h*0.45*sk+iy,0.7*sk,stufe,undefined,i>0,{richtung:i%2?-dir:dir});
+    }
+  }
+  function sspEtikett(x,y,text,farbe,sk,alpha){
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.font="700 "+Math.round(8+3*sk)+"px Georgia,'Times New Roman',serif";
+    const w=ctx.measureText(text).width+8, h=Math.round(11+3*sk);
+    ctx.fillStyle="rgba(10,11,14,.82)"; ctx.fillRect(x-w/2,y-h,w,h);
+    ctx.strokeStyle=farbe; ctx.lineWidth=1; ctx.strokeRect(x-w/2+0.5,y-h+0.5,w-1,h-1);
+    ctx.fillStyle=farbe; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(text,x,y-h/2+0.5);
+    ctx.restore();
+  }
+
+  function zeichneSandsackParBuehne(art){
+    const sz=SANDSACK_PAR_SZENE; if(!sz)return;
+    if(!hebenPublikumAn){ tonLoopStart("gewichtheben"); hebenPublikumAn=true; }
+    const geo=sspGeo(), abschnitt=sspAbschnitt(sz), tau=sspTau(sz), tauB=Math.max(0,tau);
+    const reihen=sspReihen(sz), fokus=sspFokusGewichte(sz);
+    const st=sz.stationen;
+    // HINTERGRUND: die Hofhalle, dunkel, Licht von oben (wie die Laeufe-Szene).
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#1a1d25"); g.addColorStop(0.55,"#11141a"); g.addColorStop(1,"#0a0b0e");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+    // REIHEN (eine je Station), Fokus-Reihe heller und mit Spot.
+    reihen.forEach(R=>{
+      ctx.fillStyle=SSP_REIHE_FARBE[R.s]; ctx.globalAlpha=0.55+0.35*R.w; ctx.fillRect(0,R.top+1,W,R.h-2); ctx.globalAlpha=1;
+      if(R.w>0.02){
+        const sp=ctx.createLinearGradient(0,R.top,0,R.top+R.h);
+        sp.addColorStop(0,"rgba(255,226,170,0)"); sp.addColorStop(0.75,"rgba(255,226,170,"+(0.10*R.w).toFixed(3)+")"); sp.addColorStop(1,"rgba(255,226,170,0)");
+        ctx.fillStyle=sp; ctx.fillRect(0,R.top,W,R.h);
+        ctx.fillStyle="rgba(214,172,54,"+(0.9*R.w).toFixed(3)+")"; ctx.fillRect(0,R.top+2,3,R.h-4); ctx.fillRect(W-3,R.top+2,3,R.h-4);
+      }
+      const S_=st[R.s];
+      // Stationsname links/rechts aussen, je Team die eigene Bahn.
+      ctx.textBaseline="middle";
+      ctx.font="700 "+Math.round(9+2*R.w)+"px Georgia,'Times New Roman',serif";
+      ctx.fillStyle=R.w>0.5?"#d6ac36":"rgba(220,226,236,.75)";
+      ctx.textAlign="left"; ctx.fillText("S"+(R.s+1),6,R.top+11);
+      ctx.textAlign="right"; ctx.fillText("S"+(R.s+1),W-6,R.top+11);
+      [0,1].forEach(side=>{
+        const xSt=sspX(geo,side,sspGVon(sz,R.s,0)), xSi=sspX(geo,side,geo.Dmax), dir=side===0?1:-1;
+        // Bahn: Boden in Teamfarbe, von Stapel bis Silo.
+        ctx.save(); ctx.strokeStyle=sspFarbe(side); ctx.globalAlpha=0.35+0.25*R.w; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(xSt-dir*14,R.fuss+1); ctx.lineTo(xSi,R.fuss+1); ctx.stroke(); ctx.restore();
+        // Ablage (Station 1/2: an der naechsten Station) bzw. Rampenfuss (Station 3).
+        const xA=sspX(geo,side,sspGVon(sz,R.s,S_.marke));
+        ctx.fillStyle="rgba(120,96,58,.85)"; ctx.fillRect(xA-9,R.fuss-1,18,3);
+        if(R.s===2){
+          // RAMPE: die letzten Meter zum Silo steigen an.
+          ctx.fillStyle="#3a3f4c";
+          ctx.beginPath(); ctx.moveTo(xA,R.fuss+2); ctx.lineTo(xSi,R.fuss-8*R.sk); ctx.lineTo(xSi,R.fuss+2); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle="rgba(214,172,54,.6)"; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(xA,R.fuss+1); ctx.lineTo(xSi,R.fuss-8*R.sk); ctx.stroke();
+        }
+        // Stapel (Saecke dieser Station; die Schicht ist zeitbegrenzt, der Stapel leert sich nicht).
+        sspStapel(xSt-dir*7*R.sk,R.fuss,SANDSACK_VIZ_STUFEN[[0,2,4][R.s]],R.sk,dir);
+        // Beschriftung ueber dem Stapel.
+        ctx.font="400 "+Math.round(8+R.w*1.5)+"px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(200,206,218,"+(0.55+0.4*R.w).toFixed(2)+")";
+        ctx.textAlign=side===0?"left":"right";
+        ctx.fillText(S_.fable+" · "+S_.kg+" kg · "+S_.d+" m",xSt-dir*16,R.top+11);
+        ctx.font="400 8px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(200,206,218,.45)"; ctx.textAlign="center";
+        if(R.w>0.4)ctx.fillText(R.s===2?"Rampenfuß":"Ablage",xA,R.fuss+10);
+      });
+    });
+
+    // SILOS: ein Turm je Team in der Mitte, Einlauf je Reihe; Fuellstand = Silo-kg im Bild.
+    const stand=sspStand();
+    [0,1].forEach(side=>{
+      const x0=side===0?geo.xSilo:W-geo.xSilo-SSP_SILO_B, top=SSP_REIHE_Y0+4, bot=SSP_REIHE_Y1-2;
+      ctx.fillStyle="#3a3f4c"; ctx.fillRect(x0,top,SSP_SILO_B,bot-top);
+      ctx.fillStyle="#0c0d10"; ctx.fillRect(x0+3,top+3,SSP_SILO_B-6,bot-top-6);
+      const f=Math.max(0,Math.min(1,stand.kg[side]/SSP_KG_SKALA)), fh=(bot-top-6)*f;
+      ctx.fillStyle=sspFarbe(side); ctx.globalAlpha=0.85; ctx.fillRect(x0+3,bot-3-fh,SSP_SILO_B-6,fh); ctx.globalAlpha=1;
+      ctx.strokeStyle="rgba(255,255,255,.12)"; ctx.lineWidth=1;
+      for(let y=bot-3-30;y>top;y-=30){ ctx.beginPath(); ctx.moveTo(x0+3,y); ctx.lineTo(x0+SSP_SILO_B-3,y); ctx.stroke(); }
+      reihen.forEach(R=>{ ctx.fillStyle="#555b68"; ctx.fillRect(side===0?x0-4:x0+SSP_SILO_B,R.fuss-12*R.sk,4,10*R.sk); });
+      ctx.save(); ctx.translate(x0+SSP_SILO_B/2,(top+bot)/2); ctx.rotate(-Math.PI/2);
+      ctx.font="700 9px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(233,237,245,.55)"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("SILO · "+Math.round(stand.kg[side])+" kg",0,0); ctx.restore();
+    });
+
+    // ABGELEGTE SAECKE an Ablage/Rampenfuss (der naechste Traeger hebt sie dort auf).
+    sz.seiten.forEach(S=>{
+      for(const h of S.haufen){
+        if(!(tauB>=h.t0&&tauB<h.t1)||tau<0)continue;
+        const R=reihen[h.s], dir=S.side===0?1:-1;
+        const x=sspX(geo,S.side,sspGVon(sz,h.s,h.x))+dir*9*R.sk;
+        const stufe=SANDSACK_VIZ_STUFEN[[0,2,4][h.s]+(h.saecke>1?1:0)];
+        sandsackVizZeichneSack(x,R.fuss-stufe.h*0.45*R.sk,0.85*R.sk,stufe,undefined,false,{richtung:dir});
+      }
+    });
+
+    // FIGUREN: alle Traeger beider Teams, hinten (kleinerer Versatz) zuerst.
+    const figuren=[];
+    sz.seiten.forEach(S=>{
+      const dirTeam=S.side===0?1:-1;
+      S.traeger.forEach(tr=>{
+        const u=tr.u;
+        let z;
+        if(abschnitt==="auftakt"||abschnitt==="aufstellung"){
+          // AUFSTELLUNG: von aussen an die Startstation.
+          const p=abschnitt==="auftakt"?0:sspGlatt((sz.t-SSP_AUFTAKT)/SSP_AUFSTELLUNG);
+          const gZiel=sspGVon(sz,tr.start,0)-0.6, g0=-2.2;
+          z={typ:"steht", s:tr.start, g:g0+(gZiel-g0)*p, E:0, dir:1, laeuft:p>0&&p<1};
+        } else z=sspZustand(sz,tr,abschnitt==="schluss"?sz.T:tauB);
+        if(abschnitt==="schluss"){ z.laeuft=false; }
+        const s=z.wechsel?z.wechsel.von:z.s;
+        const gM=z.g!=null?z.g:sspGVon(sz,s,z.x);
+        let fuss, sk;
+        if(z.wechsel){
+          const A=reihen[z.wechsel.von], B=reihen[z.wechsel.nach], k=sspGlatt(z.wechsel.p);
+          fuss=A.fuss+(B.fuss-A.fuss)*k; sk=A.sk+(B.sk-A.sk)*k;
+        } else { fuss=reihen[s].fuss; sk=reihen[s].sk; }
+        // eigene Spur je Traeger innerhalb der Reihe (leichter Hoehenversatz nach Platz).
+        const platz=tr.i%3;
+        fuss-=platz*4*sk;
+        let x=sspX(geo,S.side,gM);
+        // DIREKTUEBERGABE: beide stehen am selben Meter. Im Bild steht der Geber einen halben
+        // Schritt hinter, der Nehmer einen halben Schritt vor dem Uebergabeort, einander
+        // zugewandt, bis der Sack die Hand gewechselt hat — die Hand-zu-Hand-Geste.
+        if(z.ueb)x+=(z.ueb.rolle==="gibt"?-1:1)*dirTeam*9*sk*z.ueb.w;
+        if(z.uebergabe&&z.r){ const gibt=z.r.rolle==="gibt";
+          if(!gibt&&!z.phase)z.dir=-1; if(gibt&&!z.phase)z.dir=1; }
+        figuren.push({tr, u, z, x, fuss, sk, side:S.side, dir:z.dir*dirTeam, gM, platz, reihe:s});
+      });
+    });
+    figuren.sort((a,b)=>a.fuss-b.fuss);
+    const etiketten=[];
+    for(const f of figuren){
+      const {u,z,tr}=f;
+      const puste=Math.max(0,Math.min(1,1-(z.E||0)/Math.max(1,tr.schwelle)));
+      u.vizPuste=puste;
+      // Schrittbild aus dem zurueckgelegten Weg (deterministisch, Vorspulen-fest): ein Gehzyklus
+      // je 1,4 m, beladen kuerzere Schritte.
+      const ani=(((f.gM/(z.phase==="hin"?1.1:1.4))%1)+1)%1;
+      u.vizAniPhase=ani;
+      // DURCHPOWERN (Auftrag Punkt 3): kurze Beschleunigung nach der Entscheidung — Vorlage
+      // und Tempostriche, 0,9 s lang.
+      const ent=abschnitt==="schicht"?sz.seiten[f.side].entsch.find(e=>e.i===tr.i&&tauB>=e.t&&tauB<e.t+0.9&&(e.wahl==="durch"||e.wahl==="erzwungen")):null;
+      let kopf;
+      if(z.phase){
+        const stufeIdx=sspStufe(z.s,z.kg,u);
+        ctx.save();
+        if(ent){ const k=1-(tauB-ent.t)/0.9; ctx.translate(f.x,f.fuss); ctx.rotate(f.dir*0.10*k); ctx.translate(-f.x,-f.fuss); }
+        kopf=sspPose(u,f.x,f.fuss-(z.hub||0)*2*f.sk,f.sk,{vor:f.dir,stufeIdx,puste,phase:z.phase,pp:z.pp||0,t:sz.t});
+        ctx.restore();
+        if(ent){
+          const k=1-(tauB-ent.t)/0.9;
+          ctx.save(); ctx.strokeStyle="rgba(214,172,54,"+(0.8*k).toFixed(3)+")"; ctx.lineWidth=1.5;
+          for(let j=0;j<3;j++){ const yy=f.fuss-(14+j*9)*f.sk, x1=f.x-f.dir*(12+j*3)*f.sk;
+            ctx.beginPath(); ctx.moveTo(x1,yy); ctx.lineTo(x1-f.dir*(14+6*k)*f.sk,yy); ctx.stroke(); }
+          ctx.restore();
+        }
+        if(z.saecke>1&&z.phase==="hin")etiketten.push({x:kopf.x+f.dir*12*f.sk,y:kopf.y+8*f.sk,text:"×2",farbe:"#cfd6e3",sk:f.sk*0.7,a:0.9});
+      } else {
+        kopf=sspSprite(u,f.x,f.fuss,f.dir,!!z.laeuft,f.sk,ani);
+        if(z.atmet){ ctx.fillStyle="rgba(207,227,255,.55)"; ctx.beginPath();
+          ctx.arc(kopf.x+f.dir*6*f.sk,kopf.y+10*f.sk-((sz.t*2)%1)*4,1.8*f.sk,0,Math.PI*2); ctx.fill(); }
+      }
+      // Puste-Ring und Name.
+      if(abschnitt!=="auftakt"){
+        ctx.save(); ctx.translate(kopf.x,kopf.y-8*f.sk); ctx.scale(Math.max(0.7,f.sk),Math.max(0.7,f.sk));
+        sandsackVizPusteRing(0,0,puste); ctx.restore();
+      }
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 "+Math.round(6+3*f.sk)+"px Georgia,'Times New Roman',serif";
+      ctx.fillStyle=sspFarbe(f.side); ctx.globalAlpha=0.6+0.4*Math.min(1,f.sk);
+      ctx.fillText(sspName(u),f.x,f.fuss+7+f.platz*0.5);
+      ctx.globalAlpha=1;
+      f.kopf=kopf;
+    }
+
+    // UEBERGABEN, WECHSELWEGE, ETIKETTEN — ueber den Figuren.
+    if(abschnitt==="schicht"){
+      sz.seiten.forEach(S=>{
+        const dirTeam=S.side===0?1:-1;
+        S.traeger.forEach(tr=>{
+          // DIREKTUEBERGABE (Auftrag Punkt 3): Hand zu Hand — der Sack wandert im Bogen vom
+          // Geber zum Nehmer, dazu ein Ring am Uebergabeort (1,2 s sichtbar).
+          for(const r of tr.spur){
+            if(r.typ!=="uebergabe"||r.rolle!=="gibt")continue;
+            if(tauB<r.t0||tauB>r.t0+1.2)continue;
+            const R=reihen[r.s], x=sspX(geo,S.side,sspGVon(sz,r.s,r.x0)), k=(tauB-r.t0)/1.2;
+            ctx.save(); ctx.strokeStyle="rgba(127,209,139,"+(0.9*(1-k)).toFixed(3)+")"; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.ellipse(x,R.fuss-2,(10+14*k)*R.sk,(4+5*k)*R.sk,0,0,Math.PI*2); ctx.stroke(); ctx.restore();
+            if(tauB<r.t1+0.25){
+              const q=Math.max(0,Math.min(1,(tauB-r.t0)/Math.max(0.05,r.t1-r.t0+0.25)));
+              const sx=x-dirTeam*8*R.sk+dirTeam*16*R.sk*q, sy=R.fuss-30*R.sk-Math.sin(q*Math.PI)*8*R.sk;
+              sandsackVizZeichneSack(sx,sy,0.75*R.sk,SANDSACK_VIZ_STUFEN[sspStufe(r.s,r.kg,tr.u)],undefined,true,{richtung:dirTeam});
+            }
+          }
+          // STATIONSWECHSEL (Auftrag Punkt 4): gestrichelter Weg vom alten zum neuen Stapel.
+          for(const r of tr.spur){
+            if(r.typ!=="wechsel"||tauB<r.t0||tauB>r.t1+0.6)continue;
+            const A=reihen[r.s], B=reihen[r.nach];
+            const xa=sspX(geo,S.side,sspGVon(sz,r.s,0)), xb=sspX(geo,S.side,sspGVon(sz,r.nach,0));
+            ctx.save(); ctx.strokeStyle=sspFarbe(S.side); ctx.globalAlpha=0.8; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+            ctx.beginPath(); ctx.moveTo(xa,A.fuss-4); ctx.lineTo(xb,B.fuss-4); ctx.stroke(); ctx.setLineDash([]);
+            const ang=Math.atan2(B.fuss-A.fuss,xb-xa);
+            ctx.beginPath(); ctx.moveTo(xb,B.fuss-4); ctx.lineTo(xb-8*Math.cos(ang-0.4),B.fuss-4-8*Math.sin(ang-0.4));
+            ctx.lineTo(xb-8*Math.cos(ang+0.4),B.fuss-4-8*Math.sin(ang+0.4)); ctx.closePath(); ctx.fillStyle=sspFarbe(S.side); ctx.fill();
+            ctx.restore();
+          }
+        });
+      });
+      // ETIKETTEN ueber dem Kopf: Wahl an der Ablage, Rutscher, Pause, Wechsel. In der Fokus-
+      // Reihe alle, sonst nur die wichtigen (Rutscher, Pause, Wechsel, Direkt).
+      for(const h of sz.hoehepunkte){
+        // sichtbar, solange das Ereignis dauert (Pause, Rutscher, Fussweg), mindestens 1,4 s
+        const bis=h.t+Math.max(1.4,(h.typ==="pause"||h.typ==="rutscher"||h.typ==="wechsel")?(h.dauer||0)+0.5:0);
+        if(tauB<h.t||tauB>bis)continue;
+        const f=figuren.find(x=>x.side===h.side&&x.tr.i===h.i); if(!f||!f.kopf)continue;
+        const imFokus=fokus.row===f.reihe;
+        if(!imFokus&&h.prio<2)continue;
+        const text=h.typ==="rutscher"?"RUTSCHER":h.typ==="pause"?"PAUSE":h.typ==="wechsel"?"→ STATION "+(h.nach+1)
+          :h.typ==="ablage"?"ABLAGE + RAST":SSP_WAHL_TEXT[h.typ]||h.typ.toUpperCase();
+        const farbe=h.typ==="rutscher"?(css("--crit")||"#e05a4e"):h.typ==="pause"?"#8ab4f8":h.typ==="direkt"?"#7fd18b"
+          :h.typ==="wechsel"?"#e9edf5":h.typ==="durch"?"#d6ac36":"#aab2c0";
+        const a=Math.min(1,(bis-tauB)/0.4);
+        etiketten.push({x:f.kopf.x,y:f.kopf.y-16*f.sk,text,farbe,sk:imFokus?1:0.6,a});
+      }
+    }
+    for(const e of etiketten)sspEtikett(e.x,e.y,e.text,e.farbe,e.sk,e.a);
+    // Fuer die QA-Sonde (Lupen-Ausschnitte der Screenshots): wo stand wer im letzten Bild.
+    sz.letzteFiguren=figuren.map(f=>({n:f.u.n, side:f.side, x:Math.round(f.x), y:Math.round(f.fuss), reihe:f.reihe}));
+
+    // OBEN: Titel, Schichtuhr, Fokus-Zeile.
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="700 11px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#d6ac36";
+    ctx.fillText("SANDSACK-SCHICHT · "+sz.seiten[0].traeger.length+" GEGEN "+sz.seiten[1].traeger.length,W/2,H*0.185);
+    if(abschnitt==="schicht"&&fokus.row>=0){
+      ctx.font="400 9px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(214,172,54,.8)";
+      const gr=fokus.grund, grText=!gr?"Rundgang":gr.typ==="rutscher"?"Rutscher":gr.typ==="pause"?"Pause":gr.typ==="wechsel"?"Wechsel":gr.typ==="direkt"?"Direktübergabe":"";
+      ctx.fillText("Kamera: Station "+(fokus.row+1)+(grText?" ("+grText+")":""),W/2,H*0.185+12);
+    }
+
+    // UNTEN: Schichtuhr gegen die Hupe, Arbeitswert, Belegung je Station, Wertungshinweis.
+    {
+      const by=H*0.935, bx0=W/2-170, bx1=W/2+170;
+      ctx.fillStyle="rgba(255,255,255,.08)"; ctx.fillRect(bx0,by-3,bx1-bx0,6);
+      ctx.fillStyle=tauB>=sz.T-10&&abschnitt==="schicht"?(css("--crit")||"#e05a4e"):"#d6ac36";
+      ctx.fillRect(bx0,by-3,(bx1-bx0)*Math.min(1,tauB/sz.T),6);
+      ctx.font="700 12px Georgia,'Times New Roman',serif"; ctx.fillStyle="#e9edf5"; ctx.textAlign="center";
+      const rest=abschnitt==="schicht"?sz.T-tauB:(abschnitt==="schluss"?0:sz.T);
+      ctx.fillText((abschnitt==="schluss"?"Schichtende":"Schicht noch ")+(abschnitt==="schluss"?"":sspZeit(Math.ceil(rest-1e-9))),W/2,by-11);
+      ctx.font="400 8px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(200,206,218,.55)";
+      ctx.fillText("Wertung: Arbeitswert — vorläufig, Silo-kg oder Arbeitswert ist noch offen",W/2,by+12);
+      [0,1].forEach(side=>{
+        const x=side===0?16:W-16, al=side===0?"left":"right";
+        ctx.textAlign=al; ctx.font="700 12px Georgia,'Times New Roman',serif"; ctx.fillStyle=sspFarbe(side);
+        ctx.fillText("Arbeitswert "+Math.round(stand.aw[side]),x,by-9);
+        // BELEGUNG je Station (Auftrag Punkt 5): Punkte in Teamfarbe, wer gerade wohin geht hohl.
+        const bel=[[],[],[]];
+        figuren.filter(f=>f.side===side).forEach(f=>{ const z=f.z;
+          if(z.wechsel)bel[z.wechsel.nach].push(true); else bel[f.reihe].push(false); });
+        let xx=side===0?x:x-180;
+        ctx.font="400 9px Georgia,'Times New Roman',serif"; ctx.textAlign="left";
+        for(let s=0;s<3;s++){
+          ctx.fillStyle="rgba(200,206,218,.75)"; ctx.fillText("S"+(s+1),xx,by+9); xx+=14;
+          for(const unterwegs of bel[s]){ ctx.beginPath(); ctx.arc(xx+3,by+9,3.2,0,Math.PI*2);
+            if(unterwegs){ ctx.strokeStyle=sspFarbe(side); ctx.lineWidth=1.2; ctx.stroke(); } else { ctx.fillStyle=sspFarbe(side); ctx.fill(); }
+            xx+=9; }
+          xx+=12;
+        }
+      });
+    }
+
+    // TAFELN: Auftakt, Aufstellung, Schicht-Ende.
+    const tafel=(zeilen,alpha)=>{
+      const bw=W*0.5, bh=22+zeilen.length*16, bx=W/2-bw/2, by=H*0.30;
+      ctx.save(); ctx.globalAlpha=alpha;
+      ctx.fillStyle="rgba(10,11,14,.88)"; ctx.fillRect(bx,by,bw,bh);
+      ctx.strokeStyle="rgba(214,172,54,.55)"; ctx.lineWidth=1; ctx.strokeRect(bx+0.5,by+0.5,bw-1,bh-1);
+      ctx.textAlign="center"; ctx.textBaseline="middle";
+      zeilen.forEach((z,i)=>{ ctx.font=z.font||"400 10px Georgia,'Times New Roman',serif"; ctx.fillStyle=z.farbe||"#cfd6e3";
+        ctx.fillText(z.text,W/2,by+17+i*16); });
+      ctx.restore();
+    };
+    const ein=(p,rand)=>Math.max(0,Math.min(1,Math.min(p/rand,(1-p)/rand)));
+    if(abschnitt==="auftakt"){
+      tafel([{text:"SANDSACK-SCHICHT",font:"700 13px 'RaniraSeason',Georgia,serif",farbe:"#d6ac36"},
+        {text:"Alle gleichzeitig: je zwei an Station 1 (35 kg, 24 m), 2 (80 kg, 16 m) und 3 (115 kg, 8 m über die Rampe)."},
+        {text:"Ablegen und kurz rasten, durchpowern oder direkt in die Hand geben — und jeder darf die Station wechseln."},
+        {text:Math.round(sz.T)+" Sekunden. Gewertet wird der Arbeitswert (vorläufig).",farbe:"rgba(200,206,218,.75)"}],ein(sz.t/SSP_AUFTAKT,0.12));
+    } else if(abschnitt==="aufstellung"){
+      const z=[{text:"STARTAUFSTELLUNG — die Stärksten an Station 3",font:"700 12px 'RaniraSeason',Georgia,serif",farbe:"#d6ac36"}];
+      sz.seiten.forEach(S=>z.push({text:sspTeam(S.side)+": "+[2,1,0].map(s=>"S"+(s+1)+" "+(S.traeger.filter(x=>x.start===s).map(x=>sspName(x.u)).join(" & ")||"—")).join(" · "),
+        font:"700 10px Georgia,serif",farbe:sspFarbe(S.side)}));
+      z.push({text:"Danach wählt jeder selbst — nach Gespür (Auffassungsgabe).",farbe:"rgba(200,206,218,.75)"});
+      tafel(z,ein((sz.t-SSP_AUFTAKT)/SSP_AUFSTELLUNG,0.1));
+    } else if(abschnitt==="schluss"){
+      const s=sz.sieger, p=(sz.t-sz.schlussVon)/SSP_SCHLUSS;
+      tafel([{text:"SCHICHTENDE — "+sspTeam(s).toUpperCase()+" GEWINNT",font:"700 13px 'RaniraSeason',Georgia,serif",farbe:sspFarbe(s)},
+        {text:"Arbeitswert "+Math.round(stand.aw[0])+" : "+Math.round(stand.aw[1])+"  ·  Silo "+Math.round(stand.kg[0])+" : "+Math.round(stand.kg[1])+" kg  ·  Säcke "+stand.saecke[0]+" : "+stand.saecke[1]},
+        {text:"Wertung nach Arbeitswert ist vorläufig (Chris' Bestätigung offen).",farbe:"rgba(200,206,218,.7)"}],Math.min(1,p/0.1));
+    }
+    teamFeierEffekte(side=>({x:side===0?geo.xSilo+SSP_SILO_B/2:W-geo.xSilo-SSP_SILO_B/2, y:SSP_REIHE_Y0+20}));
+  }
+
+  // BOXSCORE DER SCHICHT (Auftrag Punkt 6): je Spieler Station(en), Saecke, Wahl an der Ablage
+  // (Anteile), Pausen, Rutscher, Wechsel, Beitrag zum Arbeitswert, dazu die Note (erst am Ende).
+  // SPOILERFREI wie die Laeufe-Tabelle: alles waechst mit dem Bild (sspSichtbar()); nach `done`
+  // stehen genau die Werte der Mechanik.
+  function WERTUNG_SANDSACK_PAR(art){
+    const zeilen=()=>TEILNEHMER.map(u=>({n:u.n,side:u.side,raus:false,eig:u.eig,u,sv:sspSichtbar(u)}));
+    const zahl=(v)=>v?v:null;
+    const anteil=(z,k)=>{ const e=z.sv.entsch, n=e.normal+e.durch+e.direkt+e.erzwungen; if(!n)return null;
+      const v=k==="durch"?e.durch+e.erzwungen:e[k]; return Math.round(100*v/n); };
+    const pfad=(z)=>{ const tr=sspTraegerVon(z.u); if(!tr)return null; return z.sv.stationen.map(s=>s+1).join("→"); };
+    return {namen:"Träger", zeilen,
+      sortierung:(a,b)=>{ const ta=sspTraegerVon(a.u), tb=sspTraegerVon(b.u);
+        return (tb?tb.start:0)-(ta?ta.start:0)||(b.sv.beitrag-a.sv.beitrag); },
+      spalten:[
+        {id:"st",  kopf:"Station", titel:"Startstation und jeder Wechsel (1 = 35 kg/24 m, 2 = 80 kg/16 m, 3 = 115 kg/8 m)", wert:z=>pfad(z)},
+        {id:"sack",kopf:"Säcke", titel:"getragene Säcke, anteilig nach Metern (wer übergibt oder ablegt, teilt den Sack)",
+          wert:z=>z.sv.saecke?z.sv.saecke:null, fmt:v=>v.toFixed(1).replace(".",",")},
+        {id:"abl", kopf:"Abl%", titel:"Anteil seiner Entscheidungen an der Ablage: ablegen + kurz rasten", wert:z=>anteil(z,"normal")},
+        {id:"dur", kopf:"Durch%", titel:"Anteil durchpowern bis zum Silo (frei und erzwungen, wenn kein Abholer da war)", wert:z=>anteil(z,"durch")},
+        {id:"dir", kopf:"Dir%", titel:"Anteil Direktübergabe in die Hand", wert:z=>anteil(z,"direkt")},
+        {id:"pau", kopf:"Pau", titel:"Zwangspausen", wert:z=>zahl(z.sv.pausen)},
+        {id:"rut", kopf:"Rut", titel:"Rutscher", wert:z=>zahl(z.sv.rutscher)},
+        {id:"wch", kopf:"Wch", titel:"Stationswechsel", wert:z=>zahl(z.sv.wechsel)},
+        {id:"aw",  kopf:"Beitrag", top:true, titel:"Anteil am Arbeitswert des Teams: jeder abgelieferte Sack nach getragenen Metern verteilt (Wertung vorläufig)",
+          wert:z=>z.sv.beitrag?z.sv.beitrag:null, fmt:v=>String(Math.round(v))},
+        {id:"note",kopf:"Note", top:true, titel:"Tragenote (Spielerwert = Note ×10), erst nach der Schlusshupe",
+          wert:z=>done&&z.u.tragenote!=null?z.u.tragenote:null, fmt:v=>v.toFixed(1).replace(".",",")},
+        {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
+      fuss:"Sechs gegen sechs, alle gleichzeitig. „Station\" zeigt Start und Wechsel. „Säcke\" zählt anteilig nach getragenen Metern. „Abl/Durch/Direkt\" sind die Anteile seiner Entscheidungen an der Ablage (Durch schließt erzwungenes Durchpowern ein). „Beitrag\" ist sein Anteil am Arbeitswert des Teams — die Wertung nach Arbeitswert ist vorläufig, Chris' Bestätigung steht aus. „Note\" ist der Spielerwert/10 und steht erst nach der Schlusshupe fest."};
+  }
+
   function baueHebenDuelle(art,mine,gegner){
     const n=Math.min(mine.length,gegner.length);
     const paar=[];
@@ -21755,7 +22455,11 @@
       buehneAkt=BB().rundenDauer;
     }
     buehnenBewegung(dt);
-    if(buehneZeiger>=buehneQueue.length)done=true;
+    // WEG C PARALLEL (Stufe 3, Flag 10): die Warteschlange ist leer (keine Hantel-Enthuellung),
+    // das Ergebnis steht seit bauBuehne() fest. Im Live-Spiel haelt die laufende Szene `done`
+    // zurueck, bis die Schicht gezeigt ist. Ohne Szene (jedes andere Flag, jeder Messlauf)
+    // unveraendert.
+    if(buehneZeiger>=buehneQueue.length&&!(SANDSACK_PAR_SZENE&&!SANDSACK_PAR_SZENE.fertig))done=true;
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT (PR 0, Opus-Plan Abschnitt 3.3). Der Dispatcher ist absichtlich
@@ -21776,6 +22480,9 @@
     // SANDSACK-FINALE VORSCHAU (Paket 2, Task #58): exklusiv auf `sandsackVorschauAktiv`
     // gegated (s. Kopfkommentar bei stepSandsackVorschau oben) -- bei jedem echten Spielstand
     // false, dann erreicht dieser Zweig stepHeben() direkt darunter unveraendert.
+    // WEG C PARALLEL (Stufe 3): die Flag-10-Schicht im echten Spiel. Nur mit gebauter Szene
+    // (Live-Pfad, s. build()) — bei jedem anderen Flag und in jedem Messlauf ist sie null.
+    if(art.heben && SANDSACK_PAR_SZENE){ stepSandsackParSzene(dt); return; }
     if(art.heben && sandsackVorschauAktiv && typeof stepSandsackVorschau==="function"){ stepSandsackVorschau(dt); return; }
     if(art.duett && typeof stepKuer==="function"){ stepKuer(dt,art); return; }   // Ziel 2
     // B2/B3 (Broadcast-Optik-Recherche 27.09.): stepGauntletHp() laeuft NUR fuer den
@@ -23757,6 +24464,10 @@
       const minutenFertig=Math.max(0,(TEILNEHMER[0]&&TEILNEHMER[0].aktuell+1)||0);
       document.getElementById("clock").textContent=
         "Minute "+Math.min(BB().rundenN,minutenFertig+(done?0:1))+"/"+BB().rundenN;
+    } else if(BB().heben&&SANDSACK_PAR_SZENE){
+      // WEG C PARALLEL (Stufe 3): die Schichtuhr zaehlt die verbleibende Zeit bis zur Hupe.
+      const sz=SANDSACK_PAR_SZENE, tau=sspTau(sz), rest=done?0:(tau<0?sz.T:Math.max(0,sz.T-tau));
+      document.getElementById("clock").textContent=sspZeit(Math.ceil(rest-1e-9));
     } else {
       document.getElementById("clock").textContent=
         Math.floor(buehneTAnzeige/60)+":"+String(Math.floor(buehneTAnzeige%60)).padStart(2,"0");
@@ -23770,7 +24481,11 @@
     // Dieselben Beschriftungen wie im Kampf passen hier nicht: niemand ist "im Kampf",
     // und es gibt kein Sudden Death — nur Durchgaenge, die der Reihe nach enthuellt werden.
     const sd=document.querySelector(".hpbars .sd");
-    if(sd)sd.textContent=BB().heben
+    // WEG C PARALLEL (Stufe 3): eigene Unterzeile, nur mit gebauter Flag-10-Szene.
+    const parHud=BB().heben&&!!SANDSACK_PAR_SZENE;
+    if(sd)sd.textContent=parHud
+      ? "Alle gleichzeitig an drei Stationen, 150-s-Schicht — Arbeitswert (vorläufig)"
+      : BB().heben
       ? "Reißen und Stoßen, je drei Versuche — Duell um Duell"
       : BB().fechten
       // PERIODEN (Option 1, s. BUEHNE_ART.fechten-Kommentar): eigene Unterzeile statt
@@ -23800,7 +24515,8 @@
     // Bretter/Bahnen/Fundorte parallel), "aufgetreten" behauptet einen Einzelauftritt, den es
     // dort nicht gibt (s. Auftrag). Gewichtheben/Showcase/Eiskunstlauf/Breaking bleiben bei
     // "aufgetreten" — dort enthuellt/performt tatsaechlich einer nach dem anderen.
-    const auftrittsWort=BB().wettessen?"am Tisch"
+    const auftrittsWort=parHud?"an den Stationen"
+      :BB().wettessen?"am Tisch"
       :BB().tennis?"auf dem Platz"
       :BB().schach?"an den Brettern"
       :BB().fechten?"an der Bahn"
@@ -23811,19 +24527,27 @@
       e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,auftrittsWort);});
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
-    document.getElementById("klsuffix").textContent="Punkte";
+    document.getElementById("klsuffix").textContent=parHud?"Arbeitswert":"Punkte";
     // GENERALISIERT (22.09.): `u.runden.length` statt der festen `BB().rundenN` -- fuer jede
     // Nicht-Gauntlet-Disziplin ist das bit-identisch (`baueHebenDuelle()`/der generische
     // Auftritt-/Duell-Block bauen IMMER exakt `art.rundenN` Runden je Teilnehmer, s. dortige
     // Schleifen), fuer Gauntlet (Breaking) aber der einzig richtige Massstab: ein Teilnehmer
     // ist "fertig", sobald ALLE seine EIGENEN, tatsaechlich gebauten Zuege enthuellt sind --
     // egal ob er nach drei Zuegen ausschied oder nach zwanzig als Sieger dastand.
-    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
+    // WEG C PARALLEL: `runden` ist leer — gezaehlt wird, wer (im Bild) an den Stationen arbeitet.
+    const fertig=parHud
+      ? (s)=>{ const sz=SANDSACK_PAR_SZENE; return sz&&sspAbschnitt(sz)!=="auftakt"?(sz.seiten[s]?sz.seiten[s].traeger.length:0):0; }
+      : (s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
     // rohe Punktesumme — genau wie beim Schach-Mannschaftskampf, den es nachbildet.
-    if(BB().heben){
+    if(parHud){
+      // WEG C PARALLEL: ARBEITSWERT im Bild (abgelieferte Saecke bis zur gezeigten Zeit) —
+      // vorlaeufige Wertung, Silo-kg oder Arbeitswert ist Chris' Entscheidung (Doku 10.1).
+      const st=sspStand();
+      document.getElementById("score").textContent=Math.round(st.aw[0])+" : "+Math.round(st.aw[1]);
+    } else if(BB().heben){
       // Der Punktestand zaehlt GEWONNENE DUELLE, wie Chris es wollte — bei sechs Slots
       // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
       // Gesamt-Kilogramm beider Mannschaften (der Tiebreak aus Plan 3.5), damit die
@@ -23873,6 +24597,12 @@
       };
       document.getElementById("thpL").style.width=(frac(0)*100)+"%";
       document.getElementById("thpR").style.width=(frac(1)*100)+"%";
+    } else if(parHud){
+      // WEG C PARALLEL: Arbeitswert im Bild gegen einen festen Massstab (1300, gemessen ~1074 je
+      // Seite) — kein Spoiler aus dem Endstand.
+      const st=sspStand(), voll=Math.max(1300,st.aw[0],st.aw[1]);
+      document.getElementById("thpL").style.width=(Math.min(1,st.aw[0]/voll)*100)+"%";
+      document.getElementById("thpR").style.width=(Math.min(1,st.aw[1]/voll)*100)+"%";
     } else {
       // GEWICHTHEBEN (Broadcast-Audit Runde 2, Punkt 2): die Team-Balken standen aus dem
       // fertigen `summe` schon im Einlauf auf ihrem Endstand (z. B. 69 % gegen 55 %) --
@@ -25360,6 +26090,8 @@
     const art=BB();
     // SANDSACK-FINALE VORSCHAU (Paket 2, Task #58): exklusiv auf `sandsackVorschauAktiv`
     // gegated, s. Kommentar bei buehnenBewegung() oben -- bei jedem echten Spielstand false.
+    // WEG C PARALLEL (Stufe 3): Buehnenbild der Schicht, nur mit gebauter Szene.
+    if(art.heben && SANDSACK_PAR_SZENE){ zeichneSandsackParBuehne(art); return; }
     if(art.heben && sandsackVorschauAktiv && typeof zeichneSandsackBuehne==="function"){ zeichneSandsackBuehne(art); return; }
     // SHOWCASE (PR S1, Konzept 17.09.): eigener Boden statt des generischen Podests --
     // dasselbe else-if-Muster wie Heben/Eiskunstlauf, s. bodenShowcase() oben.
@@ -31538,6 +32270,19 @@
         if(apb0){apb0.textContent="Gauntlet, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+"."; apb0.title=apb0.textContent;}
         const pl0=document.querySelector(".planzeile b");
         if(pl0)pl0.textContent="Gauntlet";
+      } else if(BB().heben&&BUEHNE_FLAGS.gewichthebenSandsack===10){
+        // WEG C PARALLEL (Stufe 3): die Sandsack-Schicht statt sechs Hantel-Duellen — eigener
+        // Plantext, nur mit Flag 10.
+        k.appendChild(el("b",null,"Sandsack-Schicht"));
+        k.appendChild(el("p",null,"Alle gleichzeitig, 150 Sekunden: Station 1 trägt 35-kg-Säcke über 24 m, "+
+          "Station 2 80 kg über 16 m, Station 3 115 kg über 8 m und die Rampe. Startaufstellung nach Kraft, "+
+          "danach wählt jeder selbst (Gespür): ablegen und rasten, durchpowern, direkt übergeben oder die "+
+          "Station wechseln. Gewertet wird der Arbeitswert — vorläufig."));
+        box.appendChild(k);
+        const apw=document.getElementById("arenaplan");
+        if(apw){apw.textContent="Sandsack-Schicht, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+", drei Stationen."; apw.title=apw.textContent;}
+        const plw=document.querySelector(".planzeile b");
+        if(plw)plw.textContent="Format";
       } else {
         k.appendChild(el("b",null,"Bewertung"));
         k.appendChild(el("p",null,BB().rundenN+" Durchgänge je Teilnehmer, abwechselnd zwischen "+
@@ -31939,7 +32684,10 @@
     // Die beiden Zeilen sind fuer Feldspiel/Buehne/Bahn wirkungslos: dort fragt sie niemand.
     KFOKUS=null; KFOKUS_CD=0;
     if(istFeldspiel(disc)){feldspielDisc=disc; return bauFeldspiel(saat);}
-    if(istBuehne(disc)){buehneDisc=disc; return bauBuehne(saat);}
+    // WEG C PARALLEL (Stufe 3): NUR hier, im Live-Pfad, bekommt die Flag-10-Schicht ihre Szene —
+    // MOTOREN[bd].bau() ruft bauBuehne() direkt und baut nie eine. Bei jedem anderen Flag ist
+    // SANDSACK_PAR_FILM null, die Zeile tut dann nichts.
+    if(istBuehne(disc)){buehneDisc=disc; const erg=bauBuehne(saat); if(SANDSACK_PAR_FILM)sandsackParSzeneBauen(); return erg;}
     if(istBahn(disc)){bahnDisc=disc; bahnAktuelleSaat=saat; return bauSpurt(saat);}
     seed=normalisiereSaat(saat);U=[];floats.length=0;t=0;done=false;freigabe=[false,false];pfeile=[];MESS={};
     // HIGHLIGHT-ZUSTAND EINES NEUEN KAMPFES (s. schalteAus oben): "erster Blutzoll" gehoert
@@ -34257,7 +35005,8 @@
         {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
       fuss:"„Verluste\" sind Ballverluste — abgefangene Pässe, eigene Fehlpässe und erzwungene Steals. „Blocks\" zählt nur den abgewehrten Wurf, nicht den anschließenden Rebound-Kampf. „FG\" zeigt Treffer/Versuche aus dem Feld (Freiwürfe zählen nicht mit), „FG%\" dieselbe Quote als Prozentzahl. „Impact\" ist derselbe Wert, den auch die Rangtreue-Messung benutzt. „Eignung\" ist der erwartete Einsatzwert für diese Disziplin (Basis + Form + Position) — der Vergleich mit der tatsächlichen Leistung zeigt einen guten oder schlechten Tag."
     }),
-    buehne:(art)=>art.heben?WERTUNG_HEBEN(art):art.duell?WERTUNG_DUELL(art):WERTUNG_AUFTRITT(art),
+    // WEG C PARALLEL (Stufe 3): eigene Tabelle der Schicht, nur mit gebauter Flag-10-Szene.
+    buehne:(art)=>art.heben?(SANDSACK_PAR_SZENE?WERTUNG_SANDSACK_PAR(art):WERTUNG_HEBEN(art)):art.duell?WERTUNG_DUELL(art):WERTUNG_AUFTRITT(art),
     bahn:(art)=>art.staffel?WERTUNG_STAFFEL(art):WERTUNG_RENNEN(art)
   };
 
@@ -43572,7 +44321,10 @@
     // Ticks x 6 Teilnehmer x 2 Seiten), ohne dass irgendwo ein Lesbarkeits-Problem
     // gemessen oder gemeldet waere -- reine Praesentation, aber ohne Grund keine Aenderung.
   };
-  const zeitFaktor=()=>ZEIT_DEHNUNG[disc]||1;
+  // WEG C PARALLEL (Stufe 3): die Schicht laeuft 1:1 (Simulationssekunde = Zuschausekunde, 150 s
+  // Schicht = 2:30 Sendezeit). Die Dehnung 4 gilt den Hantel-Versuchen und wuerde die Schicht auf
+  // 10 Minuten strecken. Ohne Szene (jedes andere Flag) unveraendert.
+  const zeitFaktor=()=>(SANDSACK_PAR_SZENE&&istBuehne(disc))?1:(ZEIT_DEHNUNG[disc]||1);
 
   // SCHWEBETEXTE FORTSCHREIBEN — ausgelagert (A0.2), damit der Sonden-Modus (s.
   // window.__arena.sondenLauf() weiter unten) dieselbe Formel je TICK anwenden kann statt
@@ -43957,7 +44709,13 @@
         // aufgestellt war, zeigte hier trotzdem deren Rollen-Label (z.B. TDM-Slot
         // "Shotcaller" beim Basketball-Einlauf) — place[n].d haelt fest, fuer welche
         // Disziplin der Slot gilt, wurde hier aber nie geprueft.
-        const rolle=(pl&&pl.d===disc&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
+        let rolle=(pl&&pl.d===disc&&SLOTVON[pl.slot])?SLOTVON[pl.slot].label:(u.ord||"");
+        // WEG C PARALLEL (Stufe 3): vor dem Slot die STARTSTATION (nach LAST), exakt die
+        // Aufstellung, die baueSandsackParallelFrei() gebaut hat.
+        if(istBuehne(disc)&&BB().heben&&SANDSACK_PAR_SZENE){
+          const t=TEILNEHMER.find(x=>x.side===seite&&x.n===u.n);
+          if(t&&t.parStation!=null)rolle="Station "+t.parStation+" · "+(rolle||t.vizSlotLabel||"");
+        }
         z.appendChild(el("span","erolle",rolle.toUpperCase()));
         z.appendChild(el("span","ename",u.n));
         // Chris' Fund (25.08.): hier stand nur die fertig verrechnete Endzahl — jetzt
@@ -44972,6 +45730,16 @@
         // UND Balken-Massstab, sonst verriete schon die Balkenlaenge relativ zum (fertigen)
         // Maximum das Ergebnis. Jede andere Buehne liest unveraendert `summe`.
         :istBuehne(disc)?(()=>{
+          // WEG C PARALLEL (Stufe 3): Beitrag zum Arbeitswert im Bild, davor die Station(en) —
+          // Massstab das bisher GEZEIGTE Maximum (kein Spoiler).
+          if(BB().heben&&SANDSACK_PAR_SZENE){
+            const sv=new Map(TEILNEHMER.map(y=>[y,sspSichtbar(y)]));
+            const kmax=Math.max(1,...TEILNEHMER.map(y=>sv.get(y).beitrag));
+            return TEILNEHMER.filter(x=>x.side===seite).map(x=>{ const v=sv.get(x);
+              return {n:x.n,down:false,hp:v.beitrag,max:kmax,
+                leiste:{wert:v.beitrag,max:kmax,wort:"Beitrag zum Arbeitswert",
+                  zusatz:"S"+v.stationen.map(s=>s+1).join("→")+" · "+Math.round(v.beitrag)}}; });
+          }
           const kw=BB().heben?hebenSichtbareSumme:(y=>y.summe);
           const kmax=Math.max(1,...TEILNEHMER.map(kw));
           return TEILNEHMER.filter(x=>x.side===seite).map(x=>({n:x.n,down:false,
@@ -45167,6 +45935,9 @@
         // PUNKT 2 (derselbe Audit): nicht `x.summe` (der fertige Zweikampf, steht ab dem
         // Einlauf fest), sondern der bis zur letzten gezeigten Lampe aufgebaute Wert, s.
         // hebenSichtbareSumme(). Startet bei "KG 0 : 0" und waechst Versuch fuer Versuch.
+        // WEG C PARALLEL (Stufe 3): Arbeitswert im Bild (sspStand()), Praefix "AW".
+        : (BB().heben&&SANDSACK_PAR_SZENE)
+        ? (()=>{ const st=sspStand(); return "AW "+Math.round(st.aw[0])+" : "+Math.round(st.aw[1]); })()
         : BB().heben
         ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+hebenSichtbareSumme(x),0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+hebenSichtbareSumme(x),0)))
@@ -45762,6 +46533,14 @@
     // dazu, muesste sie an BEIDEN Stellen ergaenzt werden; bis dahin sind es exakt die vier
     // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
     const art=BB();
+    if(art.heben&&SANDSACK_PAR_SZENE){
+      // WEG C PARALLEL (Stufe 3): ARBEITSWERT im Bild (vorlaeufige Wertung). Nach `done` der
+      // Sieger der Mechanik (Arbeitswert, dann Silo-kg, dann Los) — auch wenn die gerundeten
+      // Zahlen gleich aussehen.
+      const st=sspStand(), a=Math.round(st.aw[0]), b=Math.round(st.aw[1]);
+      const sieger=done?SANDSACK_PAR_SZENE.sieger:(st.aw[0]===st.aw[1]?null:(st.aw[0]>st.aw[1]?0:1));
+      return {a,b,sieger,text:a+" : "+b+(a===b&&done?" (knapp, "+(st.aw[0]-st.aw[1]).toFixed(1).replace(".",",")+")":"")};
+    }
     if(art.heben){
       // Beide Duellanten fertig (hebenDuellEntschieden(), Konzept team-publikum-feiermomente
       // Abschnitt 5) -- nach `done` ohnehin fuer jedes Duell erfuellt, der Endstand bleibt
@@ -45781,11 +46560,12 @@
     const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
     const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
   }
-  function buehneSieger(){ const {a,b}=buehneStand(); return a===b?null:(a>b?0:1); }
+  function buehneSieger(){ const {a,b,sieger}=buehneStand(); if(sieger!==undefined)return sieger; return a===b?null:(a>b?0:1); }
   // EINHEIT DES STANDS (Punkt 17): welches Wort die beiden Zahlen aus buehneStand()
   // meinen -- dieselben vier Zweige, dieselben `art.*`-Flags, die buehneStand() zwei
   // Funktionen oberhalb schon kennt. Reiner Textbaustein fuer den Sieger-Banner.
   function buehneEinheitLabel(art){
+    if(art.heben&&SANDSACK_PAR_SZENE)return "Arbeitswert";
     if(art.heben)return "Duelle";
     if(art.duell)return art.tennis?"Plätze":art.fechten?"Bahnen":"Bretter";
     if(art.gauntlet)return "Verbliebene";
@@ -48224,6 +49004,35 @@
       if(neu&&typeof neu==="object")for(const k of Object.keys(SANDSACK_PAR_KONF))
         if(Number.isFinite(Number(neu[k])))SANDSACK_PAR_KONF[k]=Number(neu[k]);
       return {...SANDSACK_PAR_KONF};
+    },
+    // WEG-C-PARALLEL-SZENE (Stufe 3, QA/Screenshots): spult das LIVE gebaute Flag-10-Spiel ueber
+    // stepBuehne() vor (dieselbe Schrittfunktion wie loop(), nur ohne auf Frames zu warten) und
+    // liefert Zeitplan, Fokus und die Hoehepunkte des Films. Am Ende (`done`) zusaetzlich der
+    // Abgleich Film gegen Mechanik je Spieler (Saecke, Pausen, Rutscher, Wechsel, Entscheidungen,
+    // Beitrag-Summe gegen Arbeitswert). Ohne gebaute Szene null.
+    sandsackParSzene:(vorspulenSekunden)=>{
+      if(!SANDSACK_PAR_SZENE)return null;
+      const n=Math.max(0,Math.round((vorspulenSekunden||0)*60));
+      for(let i=0;i<n&&!done;i++)stepBuehne(1/60);
+      if(done)stepBuehne(1/60);
+      const sz=SANDSACK_PAR_SZENE, fo=sspFokusGewichte(sz);
+      // Bei angehaltenem Spiel zeichnet loop() weiter, aktualisiert aber die HTML-Anzeige nicht.
+      try{ updateHudBuehne(); }catch(e){}
+      const erg={t:+sz.t.toFixed(2), gesamt:+sz.gesamt.toFixed(2), laufVon:sz.laufVon, schlussVon:sz.schlussVon,
+        fertig:sz.fertig, done, abschnitt:sspAbschnitt(sz), tau:+sspTau(sz).toFixed(2), fokus:fo.row, sieger:sz.sieger,
+        stand:sspStand(), fokusWechsel:sz.fokus.length, figuren:sz.letzteFiguren||null,
+        hoehepunkte:sz.hoehepunkte.filter(h=>h.prio>=1).map(h=>({t:+h.t.toFixed(2), typ:h.typ, side:h.side, s:h.s,
+          n:sz.seiten[h.side].traeger[h.i].u.n, ...(h.nach!=null?{von:h.von,nach:h.nach}:{}), dauer:h.dauer!=null?+h.dauer.toFixed(2):undefined}))};
+      if(done){
+        erg.abgleich=sz.seiten.map(S=>({side:S.side, arbeitEnde:S.arbeitEnde,
+          beitragSumme:S.gutschrift.reduce((a,g)=>a+g.aw,0),
+          spieler:S.traeger.map(tr=>{ const u=tr.u, v=sspSichtbar(u,true);
+            const pe=u.parEntsch||{};
+            return {n:u.n, film:{saecke:+v.saecke.toFixed(2), pausen:v.pausen, rutscher:v.rutscher, wechsel:v.wechsel, entsch:v.entsch},
+              mechanik:{saecke:u.lastSaecke, pausen:u.lastPausen, rutscher:u.lastRutscher, wechsel:u.parFrei?u.parFrei.wechsel:null,
+                entsch:{normal:pe.normal,durch:pe.durch,direkt:pe.direkt,erzwungen:pe.erzwungen}}}; })}));
+      }
+      return erg;
     },
     buehneFlags:(neu)=>{
       if(neu&&typeof neu==="object")
