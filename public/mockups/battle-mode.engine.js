@@ -36166,11 +36166,33 @@
       // Rangtreue des ganzen Feldes, und ihren Puste-Haushalt wirklich beissen zu lassen ist
       // eine eigene Kalibrierrunde mit eigener Messung (Konzeptdokument, offene Frage 8).
       pusteRegen:1.0, leerSchonung:0.45, leerRegen:6.0, pusteFangen:0.12,
+      // TEMPO-KANAL NACHGEZOGEN (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, nach O2
+      // "Marke und Zug"). O2 selbst war nicht die Ursache: der Sentinel vigilante-armageddon
+      // blieb bei JEDER Marke/Zug-Variante unter 0,80 (beste 0,797), weil ANTRITT/ENDTEMPO —
+      // ueber `grund*tempoSpanne` praktisch die GANZE Renndauer, s. tempoVon() — allein ueber
+      // SPEED und STAMINA liefen (ANTRITT ohne Awareness/Dexterity, ENDTEMPO ohne Spirit) und
+      // damit zu 90 % traegen (gemessen: `einflussVon`, zwei Saatstroeme, Speed +11,2/+11,3 Pp
+      // ueber Matrix, Stamina +6,8/+7,1, macht zusammen >18 Pp von 36-37 Pp Gesamtabweichung).
+      // In einer Paarung mit vielen Laeufern in enger Eignungsspanne (vigilante-armageddon,
+      // acht von zwoelf zwischen Eig 39 und 46) entschied dadurch die REZEPTFORM statt die
+      // Eignung, s. docs/design/stand-aller-disziplinen.md Sechzehnter Nachtrag.
+      //
+      // TECHNIK und WUCHT bleiben UNVERAENDERT — sie speisen `koennen`/`traeger` im Wechsel-
+      // und Zug-Code (stepSpurt), dessen Break-even-Kalibrierung (ZUG_FADE 0,000068 auf
+      // traeger 62,9) an genau dieser Zusammensetzung haengt; diese Runde ruehrt den Wechsel-/
+      // Zug-Mechanismus nicht an (er war nachweislich nicht die Ursache, s.o.).
+      //
+      // ANTRITT verliert STAMINA (das Beinende traegt STEHEN ohnehin schon separat ueber die
+      // Ermuedung) und gewinnt DEXTERITY/AWARENESS ("explosiv UND wach aus dem Startblock" —
+      // dieselbe Zwei-Weg-Logik wie reale Sprintstarts: Reaktion so wichtig wie reine Kraft).
+      // ENDTEMPO verliert einen Teil von SPEED/STAMINA an SPIRIT ("Zug haelt die Haltung auch
+      // im letzten Drittel"). Matrix bleibt gesperrt (official-discipline-weights.ts) — nur
+      // das Rezept wird nachgezogen, s. CLAUDE.md "Die Eignungsmatrix ist gesperrt".
       rezept:{
-        ANTRITT:    {speed:44,spirit:30,stamina:26},
-        ENDTEMPO:   {speed:38,stamina:35,will:27},
+        ANTRITT:    {speed:28,spirit:34,dexterity:20,awareness:18},
+        ENDTEMPO:   {speed:26,stamina:32,will:28,spirit:14},
         TECHNIK:    {awareness:38,dexterity:32,charisma:30},
-        WENDIGKEIT: {dexterity:42,awareness:34,speed:24},
+        WENDIGKEIT: {dexterity:46,awareness:40,speed:14},
         STEHEN:     {stamina:45,will:33,determination:22},
         WUCHT:      {spirit:45,charisma:33,speed:22},
         ROBUST:     {stamina:30,will:26,health:24,spirit:20}
@@ -38082,8 +38104,14 @@
     return {gewinn, netto, getragen, eingebrochen, text};
   }
   const KURVE_ANTEIL=0.55;        // Anteil eines Abschnitts, der in der Kurve liegt
-  const KURVE_KOSTEN=0.12;        // wieviel Tempo eine Kurve maximal kostet
-  const KURVE_WENDIG=0.0016;      // wieviel davon je Punkt WENDIGKEIT zurueckkommt
+  // KURVE_KOSTEN 0,12 -> 0,20 (Sechzehnter Nachtrag, Staffel-Sentinel-Runde, s. Rezept-
+  // Kommentar oben): `kurvenFaktor` ist NUR fuer die Staffel scharf (`if(!BA().staffel)
+  // return 1`, gehoert also nicht dem geteilten Bahn-Chassis) und ausserhalb von TECHNIK/
+  // WUCHT der einzige Hebel, der Awareness/Dexterity ohne den Wechsel-/Zug-Mechanismus
+  // anzufassen mehr Gewicht auf der Uhr gibt. KURVE_WENDIG bleibt proportional (bei
+  // WENDIGKEIT 100 weiterhin der volle Kurvenverlust ausgeglichen).
+  const KURVE_KOSTEN=0.20;        // wieviel Tempo eine Kurve maximal kostet
+  const KURVE_WENDIG=KURVE_KOSTEN/100; // wieviel davon je Punkt WENDIGKEIT zurueckkommt
   // Liegt dieser Laeufer gerade in der Kurve seines Abschnitts? Ausserhalb der Staffel
   // gibt es keine Abschnitte — dort ist der Faktor immer 1 und die Zeile wirkungslos.
   // WIE WEIT IST ER AUF SEINER EIGENEN STRECKE? Ausserhalb der Staffel ist das die
