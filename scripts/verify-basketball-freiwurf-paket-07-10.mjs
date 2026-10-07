@@ -3,18 +3,25 @@
 //
 // Die Freiwurf-Trefferchance las bis hierher ABSCHLUSS (einen Auswahl-Wert mit power/charisma/
 // stamina im Rezept). Jetzt liest sie `ftWert`, einen spirit-gefuehrten Kanal aus spirit/
-// dexterity/intelligence (FREIWURF_KANAL in battle-mode.engine.js), in einem engen Band 55-92 %,
+// intelligence/dexterity (FREIWURF_KANAL in battle-mode.engine.js), matrixtreu gewichtet
+// (Basketball-Matrix 22/16/8 auf die drei normiert = 48/35/17), in einem engen Band 55-92 %,
 // ohne Kontest-, Distanz- oder Fastbreak-Term. Diese Sonde prueft:
 //
-//   (a) Mischung: genau spirit/dexterity/intelligence, spirit fuehrt mit >= 50 % der Summe.
-//   (b) Formel/Band: chance(0)=55 %, chance(50)=72 %, chance(100)=92 %, monoton steigend.
+//   (a) Mischung: genau spirit/intelligence/dexterity, Gewichte = Matrix 22/16/8 normiert (±1).
+//   (b) Formel/Band: chance(0)=55 %, chance(50)=72 %, chance(100)=92 %, monoton steigend; ohne
+//       Kanal (ftWert null, jede andere Disziplin) zeichengleich die alte ABSCHLUSS-Kurve.
 //   (c) Kanal wirkt am ECHTEN Spieler: derselbe Kader mehrfach gebaut, bei einem Spieler je EIN
-//       Attribut um +30 gehoben — ftWert steigt je Punkt fuer spirit > dexterity > intelligence
-//       > 0 (spirit ~0,5), und Attribute ausserhalb des Kanals (power/charisma/awareness/speed)
+//       Attribut um +30 gehoben — ftWert steigt je Punkt fuer spirit > intelligence > dexterity
+//       > 0 (spirit ~0,48), und Attribute ausserhalb des Kanals (power/charisma/awareness/speed)
 //       bewegen ihn weniger als das schwaechste Kanal-Attribut (nur ueber den Normierungsrest
 //       des Slot-/Form-Aufschlags, s. dort).
 //   (d) Im Spiel: jeder Freiwurf-Versuch hat einen Schuetzen mit endlichem ftWert, und die
 //       beobachtete Quote liegt innerhalb von 3 Sigma um die Summe der Formel-Chancen.
+//   (d2) TRENNSCHARF gegen die alte Formel (Review 07.10.): zwei Kunstkader mit fast gleichem
+//       ABSCHLUSS (~53-56, alte Kurve: beide ~72 %), aber spiegelverkehrtem Kanal (spirit/
+//       intelligence/dexterity 95 gegen 5). Neue Formel: ~92 % gegen ~55 %. Geprueft wird, dass
+//       der Abstand gross ist und jede Seite in 3 Sigma ihrer NEUEN Erwartung liegt — eine
+//       Rueckkehr zur ABSCHLUSS-Formel faellt hier sicher durch.
 //   (e) Isolation: Hockey- und Football-Spieler tragen ftWert === null.
 //   (f) keine `pageerror`.
 //
@@ -52,19 +59,25 @@ try {
     const pkt = [0, 20, 50, 72, 86, 100, 150].map((w) => [w, f.chance(w)]);
     let monoton = true; let vorher = -1;
     for (let w = 0; w <= 100; w++) { const c = f.chance(w); if (c < vorher - 1e-12) monoton = false; vorher = c; }
-    return { kanal: f.kanal, band: f.band, pkt, monoton };
+    // alte Kurve (main 2470c502, verbucheFreiwurf), zeichengleich nachgerechnet
+    const alt = (A) => Math.min(0.90, Math.max(0.60, 0.72 + (A - 50) * 0.0006 + Math.max(0, A - 60) * 0.0056));
+    let rueckfallGleich = true;
+    for (let A = 1; A <= 99; A++) if (f.chanceOhneKanal(A) !== alt(A)) rueckfallGleich = false;
+    return { kanal: f.kanal, band: f.band, pkt, monoton, rueckfallGleich };
   });
   const k = formel.kanal, summe = Object.values(k).reduce((s, x) => s + x, 0);
-  pruefe("(a) Kanal = spirit/dexterity/intelligence",
+  pruefe("(a) Kanal = spirit/intelligence/dexterity",
     Object.keys(k).sort().join(",") === "dexterity,intelligence,spirit", JSON.stringify(k));
-  pruefe("(a) spirit fuehrt (>= 50 % der Summe, groesstes Gewicht)",
-    k.spirit / summe >= 0.5 && k.spirit > k.dexterity && k.spirit > k.intelligence,
-    `spirit ${(100 * k.spirit / summe).toFixed(0)} %`);
+  const matrix = { spirit: 22, intelligence: 16, dexterity: 8 }, mSumme = 46;
+  pruefe("(a) Gewichte matrixtreu (Basketball 22/16/8 normiert, ±1)",
+    Object.entries(matrix).every(([a, m]) => Math.abs(100 * k[a] / summe - 100 * m / mSumme) <= 1),
+    Object.keys(matrix).map((a) => `${a} ${(100 * k[a] / summe).toFixed(0)} (Matrix ${(100 * matrix[a] / mSumme).toFixed(1)})`).join(", "));
   const c = Object.fromEntries(formel.pkt);
   pruefe("(b) Band 55-92 %", formel.band[0] === 0.55 && formel.band[1] === 0.92 && c[0] === 0.55 && c[150] === 0.92,
     formel.pkt.map(([w, x]) => `${w}:${(100 * x).toFixed(1)}%`).join(" "));
   pruefe("(b) Ankerpunkt 50 -> 72 %", Math.abs(c[50] - 0.72) < 1e-9);
   pruefe("(b) monoton steigend 0..100", formel.monoton);
+  pruefe("(b) ohne Kanal (ftWert null) zeichengleich die alte ABSCHLUSS-Kurve", formel.rueckfallGleich);
 
   // (c) am echten Spieler: ftWert-Differenz je gehobenem Attributpunkt
   const ftVon = async (heim, gast, name) => seite.evaluate(([heim, gast, name]) => {
@@ -84,7 +97,7 @@ try {
   // ein FAKTOR auf alle Attribute der Disziplin, normiert auf deren Matrix-Summe — wer ein
   // Attribut hebt, verschiebt diesen Faktor fuer alle anderen ein wenig mit. Die Differenz
   // ist deshalb anteil*hub*f plus ein kleiner Normierungsrest, nicht exakt anteil*hub. Was
-  // der Kanal garantiert und was hier geprueft wird: spirit > dexterity > intelligence > 0
+  // der Kanal garantiert und was hier geprueft wird: spirit > intelligence > dexterity > 0
   // je Punkt, und jedes Attribut AUSSERHALB des Kanals bewegt ftWert weniger als das
   // schwaechste im Kanal (nur ueber den Normierungsrest).
   const HUB = 30;
@@ -96,12 +109,12 @@ try {
   }
   const zeige = Object.entries(dJePunkt).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(", ");
   console.log(`      ${ziel.n}: ftWert ${basis?.ft}, ABSCHLUSS ${basis?.abschluss}; dftWert je Attributpunkt: ${zeige}`);
-  pruefe("(c) spirit > dexterity > intelligence > 0 (je Punkt)",
-    dJePunkt.spirit > dJePunkt.dexterity && dJePunkt.dexterity > dJePunkt.intelligence && dJePunkt.intelligence > 0);
-  pruefe("(c) spirit je Punkt ~0,5 (Kanalanteil 50 %)", dJePunkt.spirit >= 0.35 && dJePunkt.spirit <= 0.7, dJePunkt.spirit.toFixed(2));
+  pruefe("(c) spirit > intelligence > dexterity > 0 (je Punkt)",
+    dJePunkt.spirit > dJePunkt.intelligence && dJePunkt.intelligence > dJePunkt.dexterity && dJePunkt.dexterity > 0);
+  pruefe("(c) spirit je Punkt ~0,48 (Kanalanteil 48 %)", dJePunkt.spirit >= 0.35 && dJePunkt.spirit <= 0.65, dJePunkt.spirit.toFixed(2));
   const aussen = ["power", "charisma", "awareness", "speed"];
-  pruefe("(c) Attribute ausserhalb des Kanals bewegen ftWert kaum (|d| < intelligence)",
-    aussen.every((k) => Math.abs(dJePunkt[k]) < dJePunkt.intelligence),
+  pruefe("(c) Attribute ausserhalb des Kanals bewegen ftWert kaum (|d| < dexterity)",
+    aussen.every((k) => Math.abs(dJePunkt[k]) < dJePunkt.dexterity),
     aussen.map((k) => `${k} ${dJePunkt[k].toFixed(2)}`).join(", "));
 
   // (d) im Spiel, ueber den Kader-Familie-Kader
@@ -128,6 +141,43 @@ try {
     Math.abs(spiel.treffer - spiel.erw) <= 3 * spiel.sigma,
     `beobachtet ${spiel.treffer}/${spiel.versuche} = ${(100 * spiel.treffer / spiel.versuche).toFixed(1)} %, ` +
     `Formel ${(100 * spiel.erw / spiel.versuche).toFixed(1)} % (±${(100 * 3 * spiel.sigma / spiel.versuche).toFixed(1)} Pp)`);
+
+  // (d2) trennscharf gegen die alte Formel: zwei Kunstkader, gleicher ABSCHLUSS, Kanal gespiegelt.
+  const vorlage = [...variante.heim].sort((x, y) => (y.d.basketball || 0) - (x.d.basketball || 0)).slice(0, 6);
+  const KANAL = ["spirit", "intelligence", "dexterity"];
+  const kunst = (praefix, kanalWert, restWert) => vorlage.map((p, i) => ({
+    ...p, n: `${praefix}${i}`,
+    a: Object.fromEntries(Object.keys(p.a).map((x) => [x, KANAL.includes(x) ? kanalWert : restWert])),
+  }));
+  const trenn = await seite.evaluate(([heim, gast, n]) => {
+    window.__arena.kaderSetzen({ heim, gast });
+    const f = window.__arena.freiwurfKanal();
+    const s = [0, 1].map(() => ({ v: 0, t: 0, erw: 0, varianz: 0, ft: [], abschluss: [] }));
+    for (let i = 0; i < n; i++) {
+      for (const e of window.__arena.spiele("basketball", 9001 + i * 7919).protokoll) {
+        if (e.art !== "freiwurf_versuch") continue;
+        const z = s[e.spieler.side];
+        z.v++; if (e.treffer) z.t++;
+        const p = f.chance(e.spieler.ftWert); z.erw += p; z.varianz += p * (1 - p);
+        z.ft.push(e.spieler.ftWert); z.abschluss.push(e.spieler.ABSCHLUSS);
+      }
+    }
+    const mittel = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
+    return s.map((z) => ({ v: z.v, t: z.t, erw: z.erw, sigma: Math.sqrt(z.varianz), ft: mittel(z.ft), abschluss: mittel(z.abschluss) }));
+  }, [kunst("Kanal-hoch-", 95, 5), kunst("Kanal-tief-", 5, 95), Math.max(SPIELE, 60)]);
+  const [hoch, tief] = trenn;
+  const quote = (z) => z.v ? z.t / z.v : NaN;
+  console.log(`      Kanal hoch: ftWert ${hoch.ft.toFixed(0)}, ABSCHLUSS ${hoch.abschluss.toFixed(0)}, ${hoch.t}/${hoch.v} = ${(100 * quote(hoch)).toFixed(1)} % (Formel ${(100 * hoch.erw / hoch.v).toFixed(1)} %)`);
+  console.log(`      Kanal tief: ftWert ${tief.ft.toFixed(0)}, ABSCHLUSS ${tief.abschluss.toFixed(0)}, ${tief.t}/${tief.v} = ${(100 * quote(tief)).toFixed(1)} % (Formel ${(100 * tief.erw / tief.v).toFixed(1)} %)`);
+  pruefe("(d2) beide Kunstkader werfen Freiwuerfe", hoch.v >= 15 && tief.v >= 15, `${hoch.v} / ${tief.v} Versuche`);
+  const altKurve = (A) => Math.min(0.90, Math.max(0.60, 0.72 + (A - 50) * 0.0006 + Math.max(0, A - 60) * 0.0056));
+  const altAbstand = altKurve(hoch.abschluss) - altKurve(tief.abschluss);
+  pruefe("(d2) alte ABSCHLUSS-Formel saehe zwischen beiden < 3 Pp Unterschied", Math.abs(altAbstand) < 0.03,
+    `alt ${(100 * altKurve(hoch.abschluss)).toFixed(1)} % gegen ${(100 * altKurve(tief.abschluss)).toFixed(1)} %`);
+  pruefe("(d2) Kanal hoch trifft mindestens 20 Pp besser als Kanal tief", quote(hoch) - quote(tief) >= 0.20,
+    `${(100 * (quote(hoch) - quote(tief))).toFixed(1)} Pp`);
+  pruefe("(d2) beide Seiten in 3 Sigma ihrer neuen Erwartung",
+    Math.abs(hoch.t - hoch.erw) <= 3 * hoch.sigma && Math.abs(tief.t - tief.erw) <= 3 * tief.sigma);
 
   // (e) Isolation
   const iso = await seite.evaluate(() => {
