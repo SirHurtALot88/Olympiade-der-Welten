@@ -20023,9 +20023,10 @@
         const hpJetzt=Math.max(0,r.hpNach);
         // TICKER-STUFE (Punkt 8): "haelt stand" ist Routine (gut die Haelfte aller Breaking-
         // Zeilen, nur im Protokoll); "bricht ein" bleibt im Ticker, solange das Budget reicht,
-        // das Aufgeben (darunter, big mit Vorrang) immer. Stufenwechsel (gauntletStufenwechsel(),
-        // HP-Schwelle ueberschritten) bekommt seit B1 (s. Kommentar unten) kein eigenes Banner
-        // mehr, bleibt aber wie jede andere Zeile im Ticker/Protokoll stehen.
+        // das Aufgeben (darunter, big mit Vorrang) immer. Ein Stufenwechsel (HP-Schwelle
+        // ueberschritten) bekam vor B1 (s. Kommentar unten) noch ein eigenes Banner -- die dafuer
+        // zustaendige Funktion ist seitdem entfernt (nichts leitet mehr big() daraus ab); eine
+        // Stufenwechsel-Zeile laeuft jetzt wie jede andere Routine-Zeile durchs Ticker/Protokoll.
         // B1 (Fable 30.09., Paket 3): der Ticker nennt jetzt zusaetzlich das Geraet dieses Zuges
         // ("hält stand (Zange)" / "bricht ein (Brandeisen)", bei B5-Provokation zusaetzlich
         // "provoziert") -- reiner Textzusatz aus `r.stufe`/`r.provoziert`, `r.ereignis` selbst
