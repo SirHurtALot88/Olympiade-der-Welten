@@ -31,6 +31,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -129,6 +130,7 @@ if (gesetzt !== true) {
 const loopStandNach = async () => {
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd"); // 4x Tempo, damit ein Rennen schnell durchlaeuft
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   await seite.waitForTimeout(1500);
   return seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 };
@@ -190,6 +192,7 @@ for (const disc of geschwister) {
   if (gesetzt2 !== true) { leckErgebnisse.push({ disc, fehler: gesetzt2 }); continue; }
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd");
+  await warteAufAnpfiff(seite);
   // Bis zu 100s Wallclock warten oder bis die Disziplin fertig ist (done-Flag ueber
   // renderProbe/andere Debug-Wege nicht direkt exponiert -- ein fester Zeitrahmen genuegt
   // hier, weil der Leck-Test nicht "das Rennen ist fertig" braucht, sondern nur "die

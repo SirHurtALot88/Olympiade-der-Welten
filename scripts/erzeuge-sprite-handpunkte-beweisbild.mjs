@@ -24,6 +24,7 @@ import { chromium } from "playwright";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HIER, "..");
@@ -83,6 +84,7 @@ for (const { dir, name } of DIRS) standBilder[name] = await frameVon(NAME, dir);
 
 // 2) Kampf kurz anwerfen, um t vorzuspulen, dann wieder pausieren (s. Kommentar oben).
 await seite.evaluate(() => document.getElementById("play").click());
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 let besteSpanne = -1, schwungBilder = null;
 for (let i = 0; i < 40; i++) {
   await seite.waitForTimeout(80);

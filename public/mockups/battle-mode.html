@@ -271,6 +271,23 @@
           <span id="vpUntertitel">Ende 1. Viertel — Stand 0:0</span>
           <em id="vpCountdown">3</em>
         </div>
+        <!-- A4 ANPFIFF-COUNTDOWN (Klasse T, von Chris am 07.10. freigegeben, docs/design/
+             broadcast-d7-a4-fable-empfehlung-02-10.md Abschnitt 3.3): das Startritual der
+             Sportart ("Auf die Plätze · Fertig", "En garde · Prêts · Allez", "3 · 2 · 1" …),
+             UEBER dem Einlauf, dessen Wappen dabei nach aussen fahren (.einlauf.anpfiff-laeuft).
+             Gefuellt von anpfiffTick() in der Engine; pointer-events:none, der zweite Klick
+             auf #play darunter bleibt erreichbar. -->
+        <div class="anpfiff" id="anpfiff" hidden>
+          <span id="anpfiffDisc"></span>
+          <b id="anpfiffText"></b>
+        </div>
+        <!-- A3 STINGER-WISCHER (fable-ideen-broadcast-praesentation-30-09.md A3): zwei Keile
+             in Teamfarben, dazwischen Schwarz, 450 ms von links nach rechts -- Einlauf ->
+             Anpfiff und Spiel -> Endstand. Steht als LETZTES Overlay im DOM, liegt also ueber
+             Einlauf/Endstand/Viertelpause. -->
+        <div class="stinger" id="stinger" hidden aria-hidden="true">
+          <i class="band"><i class="keil home"></i><i class="schwarz"></i><i class="keil away"></i></i>
+        </div>
       </div>
       <!-- KADERLEISTE. Auf einen Blick: wer steht noch, wer ist raus. Beide Seiten,
            getrennt durch den Stand, mit Lebensbalken und durchgestrichenem Namen. -->
@@ -340,6 +357,10 @@
         <button class="btn g" id="ton" title="Ton an/aus" aria-pressed="false">🔊 Ton</button>
         <input type="range" id="vol" min="0" max="100" value="60" title="Lautstärke"
           style="width:90px;accent-color:var(--home,#4c8);align-self:center" aria-label="Lautstärke">
+        <!-- D7 "FINALE IN ECHTZEIT" (Klasse T, Chris 07.10.): dauerhafter Schalter, in
+             localStorage wie Ton/Lautstaerke, Standard an. Nur im Feldspiel sichtbar. -->
+        <button class="btn g" id="finaleschalter" type="button" aria-pressed="true" hidden
+          title="Letzte 30 Sekunden eines knappen Spiels in Echtzeit statt im Zeitraffer">⏱ Finale in Echtzeit: an</button>
       </div>
       </div><!-- /.arenaHaupt -->
       <div class="untenraum">

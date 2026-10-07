@@ -13317,7 +13317,10 @@
     const bug=document.getElementById("bbug");
     if(!bug)return;
     const einlauf=document.getElementById("einlauf");
-    bug.hidden=!!(einlauf&&!einlauf.hidden)||!!done;
+    // ENDSTAND-NACHLAUF (2.6): waehrend der 3,5 s zwischen Schlusspfiff und Endstand-Overlay
+    // bleibt der Bug mit dem Endstand stehen -- sonst verschwaende der Score im Moment des
+    // Pfiffs und der Nachlauf zeigte eine Szene ohne Ergebnis.
+    bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf);
     if(bug.hidden){
       // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
       // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
@@ -13585,10 +13588,14 @@
     // Schlusssirene-Feed-Zeile selbst steht bereits in stepFeldspielLive() (unveraendert,
     // feuert genau einmal beim `done=true`-Uebergang) -- dieser Zweig ergaenzt nur das
     // Overlay, das bislang dazu fehlte.
+    // ENDSTAND-NACHLAUF (Feiermomente 2.6, Klasse T, Chris 07.10.): das Overlay kommt erst
+    // ENDSTAND_NACHLAUF_MS nach dem Schlusspfiff (s. endstandVormerken() vor loop()).
     if(done&&!fsEndeGemeldet){
       fsEndeGemeldet=true;
-      renderEndstandFeldspiel();
+      endstandVormerken(renderEndstandFeldspiel,
+        fsPunkte[0]>fsPunkte[1]?0:fsPunkte[1]>fsPunkte[0]?1:null);
     }
+    endstandNachlaufPruefen();
   }
 
   // Basketball bekommt einen echten Platz — zwei Koerbe, Zonen, Dreierlinien. Die
@@ -19488,7 +19495,14 @@
     // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Ertragender in
     // "eintritt", letzte Eiskunstlauf-Schlusspose) fror auf halbem Weg ein. `done` bleibt hier
     // unveraendert -- nur buehnenBewegung() darf nach dem Abschluss weiterlaufen.
-    if(done){ buehnenBewegung(dt); return; }
+    // ENDSTAND-NACHLAUF (Sendungsrahmen-Paket 07.10., Opus-Review-Fund 2): auch die `lunge`-Uhr
+    // muss nach `done` weiter abklingen. Ohne das blieb `u.lunge` des zuletzt Enthuellten auf
+    // 0,5, stepHeben() hielt ihn mit `frischEnthuellt` in JEDEM Tick auf "antritt" fest, und die
+    // letzte Hebung (Lampen, Urteil, Ticker) kam nie -- erst seit dem 3,5-s-Nachlauf sichtbar,
+    // vorher deckte das Overlay es im selben Frame zu (Befund B4). `u.lunge` ist reine
+    // Animationsuhr (keine Wertung liest sie), und nach `done` laeuft ohnehin nur noch der
+    // praesentationale Pfad; die Tick-Folge bis `done` bleibt unberuehrt.
+    if(done){ for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt); buehnenBewegung(dt); return; }
     buehneT+=dt;
     for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     buehneAkt-=dt;
@@ -21341,7 +21355,10 @@
     if(!u||u.aktuell+1<u.runden.length)return false;
     const g=hebenGegner(u);
     if(!g||g.aktuell+1<g.runden.length)return false;
-    if(nachLampe&&!done){
+    // ENDSTAND-NACHLAUF (07.10.): waehrend der 3,5 s nach `done` steht der Score-Bug noch und
+    // die letzte Lampe kommt erst -- auch dort erst nach der Lampe zaehlen, sonst verriete der
+    // Bug das letzte Duell vor dem Urteil.
+    if(nachLampe&&(!done||endstandNachlauf)){
       const offen=x=>x.vizPhase==="antritt"||x.vizPhase==="zug";
       if(offen(u)||offen(g))return false;
     }
@@ -21355,7 +21372,8 @@
   //   Duell entschieden (beide fertig, Gegner-Urteil schon gezeigt) -> gross fuer den Sieger
   //   Kuehner Versuch geglueckt (Punktesieg)                        -> mittel fuer u.side
   //   Gueltiger Versuch                                             -> klein fuer u.side
-  // Die Stufe "finale" (Spiel entschieden) entfaellt in Phase 1, s. Modulkopf teamFeiern.
+  // Die Stufe "finale" (Spiel entschieden) loest seit 07.10. der Endstand-Nachlauf aus
+  // (endstandVormerken() im done-Zweig von updateHudBuehne()), nicht diese Funktion.
   function hebenFeierAmUrteil(u,r){
     if(stumm||!r)return;
     if(hebenDuellEntschieden(u,true)){
@@ -22351,8 +22369,12 @@
       const sieger=buehneSieger(), stand=buehneStand();
       feed(0,(sieger===0?VEREIN[0].name+" gewinnt ":sieger===1?VEREIN[1].name+" gewinnt ":"Unentschieden ")
         +stand.text+".",true,undefined,"endstand");
-      renderEndstandBuehne();
+      // ENDSTAND-NACHLAUF (Feiermomente 2.6): Feedzeile sofort, Overlay nach 3,5 s, dazwischen
+      // das Team-Feier-"finale" fuer buehneSieger() -- erst damit ist z.B. die letzte Hebung
+      // im Gewichtheben ueberhaupt zu sehen (Befund B4).
+      endstandVormerken(renderEndstandBuehne,sieger);
     }
+    endstandNachlaufPruefen();
   }
 
   function bodenBuehne(){
@@ -22429,11 +22451,13 @@
   // gekoppelt (pixelstabil, s. pruefe-sonden-modus-determinismus.mjs). Streuung
   // ausschliesslich ueber cypherHash().
   //
-  // BEWUSST NICHT GEBAUT (Konzept 2.6): der Endstand-Nachlauf. Er verschiebt den Ablauf um
-  // 3,5s (vergleichbar Klasse T) und braucht vorher Chris' Zustimmung. Die Stufe "finale"
-  // samt Feuerwerk steht im Baukasten bereit, hat in Phase 1 aber KEINEN Ausloeser -- ohne
-  // Nachlauf deckt das Endstand-Overlay die Buehne im selben Frame zu (Befund B4). Sichtbar
-  // machen laesst sie sich nur ueber window.__arena.teamFeierProbe() (Screenshot-Sonde).
+  // ENDSTAND-NACHLAUF (Konzept 2.6) IST SEIT 07.10. GEBAUT (Klasse T, von Chris freigegeben,
+  // s. Block "SENDUNGSRAHMEN-TAKTUNG" vor loop()): beim ersten done-Frame loest
+  // endstandVormerken() die Stufe "finale" fuer den Sieger aus, das Endstand-Overlay kommt
+  // erst 3,5 s spaeter -- genau die Dauer der Stufe. Mit abgeschaltetem Nachlauf
+  // (window.__arena.endstandNachlauf(false), Sonden) bleibt es beim alten Verhalten: kein
+  // "finale", Overlay im selben Frame. window.__arena.teamFeierProbe() bleibt als
+  // Screenshot-Sonde fuer jede Stufe erhalten.
   let teamFeiern=[];            // hoechstens 4 Eintraege {seite,stufe,seitMs,nr,anker,funken}
   let teamFeierNr=0;            // Saat fuer cypherHash, deterministisch je Spiel (reset())
   const TEAM_FEIER_STUFEN={
@@ -33941,8 +33965,10 @@
         : "Rennen beendet — "+fmtSeite(pL)+":"+fmtSeite(pR)+" "+stand.suffix
           +" (für diese Disziplin gibt es noch keine Wertung)",true,
         siegerName?waehleCaption(CAPTION_ZIELEINLAUF,siegerName):undefined,"endstand");
-      renderEndstandBahn();
+      // ENDSTAND-NACHLAUF (Feiermomente 2.6): s. updateHudBuehne()/endstandVormerken().
+      endstandVormerken(renderEndstandBahn,pL>pR?0:pR>pL?1:null);
     }
+    endstandNachlaufPruefen();
     // Die Balken zeigen den Streckenschnitt der Mannschaft, nicht Leben.
     //
     // BUGFIX 27.09. (Opus-Review desselben Tages, Staffel-Fortschrittsbalken): bei der
@@ -34820,7 +34846,18 @@
       // ≈ 1,26) -- erkennbar verwandt, aber unterscheidbar: "das ist etwas Besonderes".
       rekord: {synth:(vol)=>tonDoppelton(vol,655,982,0.32)},
       // Sirene aus Buzzer + Ton, fuer den Schlusspfiff-Moment.
-      schluss: {synth:(vol)=>{ tonBuzzer(vol,0.35); tonTon((vol??0.6)*0.7,660,0.4); }}
+      schluss: {synth:(vol)=>{ tonBuzzer(vol,0.35); tonTon((vol??0.6)*0.7,660,0.4); }},
+      // SENDUNGSRAHMEN (A3/A4, 07.10.) -- dieselben fuenf Bausteine, kein neuer:
+      //  stinger:     A3-Wischer, kurzes Rausch-Swoosh (0,25 s, 2000 Hz, Konzept A3 woertlich).
+      //  piep/startpiep: A4 Zeitfahren/Climbing, die Starttonfolge (kurz je Zahl, lang + hoeher
+      //               beim Start -- Radsport-Zeitnahme bzw. IFSC-Speed).
+      //  gong:        A4 Kampf ("Bereit · — · Kampf!").
+      //  startbuzzer: A4 Wettessen ("3 · 2 · 1", Buzzer).
+      stinger:     {synth:(vol)=>tonRauschen(vol,2000,0.25,false)},
+      piep:        {synth:(vol)=>tonTon(vol,880,0.12)},
+      startpiep:   {synth:(vol)=>tonTon(vol,1320,0.45)},
+      gong:        {synth:(vol)=>{ tonMetall(vol,180,0.9); tonRauschen((vol??0.6)*0.4,160,0.6,false); }},
+      startbuzzer: {synth:(vol)=>tonBuzzer(vol,0.45)}
     }
   };
 
@@ -42848,30 +42885,262 @@
     for(let i=floats.length-1;i>=0;i--)if(floats[i].life<=0)floats.splice(i,1);
   }
 
-  // D7 ("Finale in Echtzeit", Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 5) ist
-  // NICHT Teil dieser Runde: das Fable-Papier stuft es selbst als "Klasse A, nur speed" ein,
-  // aber es aendert die vom Zuschauer erlebte Wandzeit-/Spielfluss-Taktung (sperrt das
-  // Tempo in der Schlussphase auf 1x) -- genau das, was CLAUDE.md als Klasse T fasst und
-  // ausdruecklich NUR mit Chris' eigener, expliziter Zustimmung bauen laesst, nicht per
-  // Build-Agent-Selbsteinstufung (dieselbe Falle wie beim Fechten-Format, PR #1111). Separat
-  // als Task fuer Chris vorgemerkt; hier bewusst nicht implementiert.
+  // =====================================================================================
+  // SENDUNGSRAHMEN-TAKTUNG — D7 "Finale in Echtzeit", A4 "Anpfiff-Countdown" (+ A3
+  // Stinger-Wischer) und der Endstand-Nachlauf (Feiermomente 2.6).
+  //
+  // KLASSE T, VON CHRIS FREIGEGEBEN (07.10., persoenlich, jeder Entscheidungspunkt einzeln):
+  // docs/design/broadcast-d7-a4-fable-empfehlung-02-10.md Abschnitt 4 ist ausgefuellt mit
+  //   D7  Stufe 1 (weiches Finale), 30 Zuschau-Sekunden inkl. Nachspielzeit (restRoh<0),
+  //       Abstand Basketball <=3 / Hockey <=1 / Football <=8, Hysterese bis `done`, Klick auf
+  //       #spd stellt das Wunschtempo fuer DIESES Spiel wieder her (nicht verschluckt),
+  //       dauerhafter Schalter "Finale in Echtzeit" (localStorage wie bkMuted, Standard AN),
+  //       nur Feldspiel, Anzeige "Tempo 1× · Finale (Klick: zurück auf 4×)", Sonden-Schalter
+  //       window.__arena.finaleEchtzeit(false) -- NICHT ueber navigator.webdriver.
+  //   A4  1,5-3 s je Chassis bei 1× (Tabelle 3.3), bei Tempo >=2× komplett uebersprungen,
+  //       zweiter Klick auf #play = sofortiger Anpfiff, kein Countdown nach Pause (nur beim
+  //       ersten Start eines Spiels und nach reset()), Fuellung = Startritual je Chassis,
+  //       Sonden-Schalter window.__arena.anpfiffCountdown(false); A3 im selben Zug.
+  //   Nachlauf 3,5 s Wandzeit zwischen Schlusspfiff und Endstand-Overlay (2.6), Sonden-
+  //       Schalter window.__arena.endstandNachlauf(false).
+  // Die harte D7-Form (Klick wirkungslos) und Stufe 0 (nur Hinweis) sind bewusst NICHT gebaut.
+  //
+  // VERTRAG (Isolation): nichts hier ruft rr(), stepSim() oder schreibt Simulationszustand.
+  //   - D7 zwingt nur den Multiplikator in `acc+=dt*…` (loop()) temporaer auf 1; `speed`
+  //     (der Wunschwert des Zuschauers) bleibt unveraendert. Die Tick-Folge ist bei 1×/2×/4×
+  //     ohnehin bit-identisch, nur die Wandzeit dazwischen aendert sich.
+  //   - A4 verschiebt den Moment, in dem `running` wahr wird, um Wandzeit -- vor dem ersten
+  //     stepSim(), also ohne jede Wirkung auf dessen Folge.
+  //   - Der Nachlauf verschiebt nur den Aufruf von renderEndstand*() (reine Anzeige).
+  // Headless-Sonden (miss-alle-disziplinen.mjs, disziplinProbe, einflussVon, spiele*) rufen
+  // weder loop() noch den #play-Handler noch updateHud*() auf -- fuer sie existiert dieser
+  // Block nicht. sondenLauf() ruft updateHud*() auf und sieht deshalb den Nachlauf (in
+  // Sonden-Zeit, jetztMs()), aber nie D7/A4.
+  //
+  // DIE DREI SCHWAECHEN DES ZURUECKGENOMMENEN ERSTEN D7-BAUS (PR #1117, dfb93f6d/06666101),
+  // hier ausdruecklich vermieden: (a) Pruefung je Frame ohne Hysterese -> Tempo-Flattern:
+  // `finaleAktiv` ist ein Riegel (finaleSchritt), der bis reset() haelt; (b) Nachspielzeit
+  // ausgeschlossen: finaleBedingungAus() laesst restRoh<0 ausdruecklich durch; (c) Klick auf
+  // #spd verschluckt: der Klick hebt die Drosselung fuer dieses Spiel auf (finaleAbgewaehlt)
+  // und stellt das Wunschtempo wieder her.
+  const wandMs=()=>(typeof performance!=="undefined"?performance.now():Date.now());
+  function lsLesen(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSchreiben(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+  // ---- D7 ----
+  const FINALE_RESTZEIT_ZUSCHAU_S=30;
+  const FINALE_ABSTAND={basketball:3,hockey:1,football:8};
+  let finaleEchtzeitAn=lsLesen("finaleEchtzeit")!=="0"; // dauerhafter Schalter, Standard AN
+  let finaleAktiv=false;      // Hysterese-Riegel: einmal ausgeloest, bis reset()
+  let finaleAbgewaehlt=false; // Opt-out je Spiel (Klick auf #spd waehrend des Finales)
+  let tempoAnzeigeLetzte=null;
+  // Reine Funktion (fuer die Verifikation direkt aufrufbar, s. window.__arena.finaleProbe):
+  // z={perioden,viertel,viertelpause,restRoh,zeitFaktor,abstand,schwelle}.
+  function finaleBedingungAus(z){
+    if(!z||z.schwelle==null)return false;
+    if(z.viertel<z.perioden||z.viertelpause)return false;              // 1. letzte Periode, keine Pause
+    if(z.restRoh*z.zeitFaktor>FINALE_RESTZEIT_ZUSCHAU_S)return false;  // 2. <=30 Zuschau-s, restRoh<0 zaehlt mit
+    return z.abstand<=z.schwelle;                                      // 3. eine Aktion gleicht aus
+  }
+  function finaleZustandLive(){
+    if(!istFeldspiel(disc)||!fsLive)return null;
+    const L=LIVE(); if(!L)return null;
+    return {perioden:L.perioden, viertel:fsLive.viertel, viertelpause:!!fsLive.viertelpause,
+      restRoh:fsLive.viertel*L.periodenDauer-fsT, zeitFaktor:zeitFaktor(),
+      abstand:Math.abs(fsPunkte[0]-fsPunkte[1]), schwelle:FINALE_ABSTAND[feldspielDisc]??null};
+  }
+  // HYSTERESE: nur der Uebergang aus -> an, nie zurueck. Wachsender Abstand nach dem
+  // Ausloesen laesst das Finale stehen (kein 4×->1×->4×-Flattern).
+  function finaleSchritt(bedingung){
+    if(!finaleAktiv&&bedingung){ finaleAktiv=true; return true; }
+    return false;
+  }
+  // "bleibt aktiv bis done" (Chris 07.10.): mit dem Schlusspfiff endet die Drosselung, die
+  // Tempo-Taste zeigt wieder das Wunschtempo (der Riegel selbst faellt erst mit reset()).
+  const finaleDrosseltJetzt=()=>finaleAktiv&&!done&&!finaleAbgewaehlt&&finaleEchtzeitAn&&speed>1;
+  const wirksamesTempo=()=>finaleDrosseltJetzt()?1:speed;
+  function tempoAnzeigeAktualisieren(){
+    const b=document.getElementById("spd"); if(!b)return;
+    const drosselt=finaleDrosseltJetzt();
+    const txt=drosselt?"Tempo 1× · Finale (Klick: zurück auf "+speed+"×)":"Tempo "+speed+"×";
+    if(txt===tempoAnzeigeLetzte)return;
+    tempoAnzeigeLetzte=txt; b.textContent=txt;
+    b.classList.toggle("finale",drosselt);
+    // derselbe hud-in-Uebergang wie am Score-Bug, beim Einsetzen des Finales neu gestartet
+    if(drosselt){ b.classList.remove("hud-in"); void b.offsetWidth; b.classList.add("hud-in"); }
+  }
+  function finaleSchalterAnzeige(){
+    const b=document.getElementById("finaleschalter"); if(!b)return;
+    b.hidden=!istFeldspiel(disc);                       // D7 gibt es in dieser Runde nur im Feldspiel
+    b.textContent="⏱ Finale in Echtzeit: "+(finaleEchtzeitAn?"an":"aus");
+    b.setAttribute("aria-pressed",finaleEchtzeitAn?"true":"false");
+  }
+
+  // ---- A3 Stinger-Wischer ----
+  // fable-ideen-broadcast-praesentation-30-09.md A3: zwei Keile in --home/--away, dazwischen
+  // ein schwarzer Streifen, 450 ms von links nach rechts; das darunterliegende Overlay wird
+  // in der Mitte (225 ms, voll abgedeckt) umgeschaltet. Einsatzstellen in DIESER Runde: Einlauf
+  // -> Anpfiff (Ende des A4-Countdowns) und Spiel -> Endstand (Ende des Nachlaufs). Laeuft
+  // nur, wo eine dieser beiden Pausen auch wirklich laeuft -- bei uebersprungenem Countdown,
+  // bei "Sofort starten" und mit ausgeschaltetem Nachlauf schneidet es hart wie bisher.
+  // prefers-reduced-motion: die globale Regel am Ende von battle-mode.css stellt die Animation
+  // ab, der Keil bleibt dann ausserhalb des Bildes stehen (kein Wischer, nur der Schnitt).
+  const STINGER_MS=450, STINGER_HALB_MS=225;
+  let stingerBisWand=0, stingerZahl=0; // stingerZahl: nur fuer anpfiffStatus() (Verifikation)
+  function stingerStarten(){
+    const s=document.getElementById("stinger"); if(!s)return;
+    stingerZahl++;
+    s.hidden=false; s.classList.remove("laeuft"); void s.offsetWidth; s.classList.add("laeuft");
+    stingerBisWand=wandMs()+STINGER_MS;
+    sfx("broadcast","stinger",0.4);
+  }
+  function stingerAus(){
+    stingerBisWand=0;
+    const s=document.getElementById("stinger");
+    if(s){ s.hidden=true; s.classList.remove("laeuft"); }
+  }
+  function stingerPruefen(){ if(stingerBisWand&&wandMs()>=stingerBisWand)stingerAus(); }
+
+  // ---- A4 Anpfiff-Countdown ----
+  // Startritual je Chassis, Tabelle 3.3 des Konzepts. `ab` = Beginn der Stufe in ms ab Klick
+  // (bei 1×); ein "—" der Tabelle heisst: die vorige Ansage bleibt stehen bis zum Signal.
+  // `ton` = Schlusston aus dem vorhandenen TON_KATALOG (sfx() ist ohne AudioContext ein No-Op).
+  // Spurt/Staffel feuern ihren Startschuss im ersten Tick schon selbst (spurtStartschussAn/
+  // staffelStartschussAn) -- dort kein zweiter.
+  const ANPFIFF_GRUPPE={
+    spurt:"bahnStart",staffel:"bahnStart","takeshis-castle":"bahnStart",
+    "time-trial":"piep",climbing:"piep",
+    fechten:"fechten",
+    tdm:"kampf","mini-dm":"kampf",battlefield:"kampf",
+    basketball:"feldspiel",hockey:"feldspiel",football:"feldspiel",
+    "speed-schach":"uhr",tennis:"uhr",
+    eiskunstlauf:"buehne",showcase:"buehne",gewichtheben:"buehne",breaking:"buehne","i-spy":"buehne",
+    wettessen:"zahlen"
+  };
+  function buehnenAnsage(d){
+    const erster=(buehneQueue&&buehneQueue[0])||null;
+    // I-Spy tritt nicht nacheinander auf (alle Fundorte gleichzeitig) -- dort die Paarung.
+    if(erster&&erster.n&&d!=="i-spy")return (d==="gewichtheben"?"Nächster: ":"Auf der Bühne: ")+erster.n;
+    return "Auf der Bühne: "+VEREIN[0].kurz+" · "+VEREIN[1].kurz;
+  }
+  function anpfiffRitualVon(d){
+    switch(ANPFIFF_GRUPPE[d]){
+      case "bahnStart": return {dauer:2500, stufen:[{ab:0,txt:"Auf die Plätze"},{ab:900,txt:"Fertig"}],
+        ton:(d==="spurt"||d==="staffel")?null:["spurt","startschuss"]};
+      case "piep": return {dauer:3000, stufen:[5,4,3,2,1].map((n,i)=>({ab:i*600,txt:String(n),piep:true})),
+        ton:["broadcast","startpiep"]};
+      case "fechten": return {dauer:2500, stufen:[{ab:0,txt:"En garde"},{ab:850,txt:"Prêts"},{ab:1700,txt:"Allez"}],
+        ton:["fechten","klingen"]};
+      case "kampf": return {dauer:2000, stufen:[{ab:0,txt:"Bereit"},{ab:1300,txt:"Kampf!"}], ton:["broadcast","gong"]};
+      // Feldspiel: "nur ein Schiedsrichter-Beat" -- die Wappen fahren auseinander, dann der Pfiff.
+      case "feldspiel": return {dauer:1500,
+        stufen:[{ab:0,txt:d==="hockey"?"Bully":d==="football"?"Kickoff":"Sprungball"}],
+        ton:d==="hockey"?["hockey","pfiff"]:["football","pfiff"]};
+      case "uhr": return {dauer:1500, stufen:[{ab:0,txt:"Uhren laufen"}], ton:["speed-schach","uhr"]};
+      case "buehne": return {dauer:2000, stufen:[{ab:0,txt:buehnenAnsage(d)}], ton:["showcase","applaus"]};
+      // Wettessen: hier ist der Zahlencountdown das echte Ritual.
+      case "zahlen": return {dauer:3000, stufen:[{ab:0,txt:"3"},{ab:1000,txt:"2"},{ab:2000,txt:"1"}],
+        ton:["broadcast","startbuzzer"]};
+      default: return null;
+    }
+  }
+  let anpfiffCountdownAn=true;  // Sonden-Schalter (window.__arena.anpfiffCountdown)
+  let anpfiffErfolgt=false;     // erster Start dieses Spiels schon passiert? reset() -> false
+  let anpfiffLauf=null;         // {startWand, ritual, stufe, stinger} waehrend des Countdowns
+  let ticksSeitReset=0;         // loop()-Ticks seit reset() -- fuer warteAufAnpfiff() in Skripten
+  function anpfiffOverlayAus(){
+    const o=document.getElementById("anpfiff"); if(o)o.hidden=true;
+    const e=document.getElementById("einlauf"); if(e)e.classList.remove("anpfiff-laeuft");
+  }
+  function anpfiffCountdownStarten(ritual){
+    anpfiffLauf={startWand:wandMs(), ritual, stufe:-1, stinger:false};
+    const e=document.getElementById("einlauf"); if(e)e.classList.add("anpfiff-laeuft");
+    const o=document.getElementById("anpfiff");
+    if(o){
+      o.hidden=false;
+      const dl=document.getElementById("anpfiffDisc");
+      if(dl)dl.textContent=(DISCS[disc]?DISCS[disc].label:disc);
+    }
+    const p=document.getElementById("play");
+    p.textContent="Sofort starten";
+    anpfiffTick();
+  }
+  function anpfiffTick(){
+    const l=anpfiffLauf; if(!l)return;
+    // Tempo waehrend des Countdowns auf >=2× gestellt: dieselbe Regel wie vor dem Klick --
+    // kompletter Skip, also auch ohne Schlusston.
+    if(speed>=2){ anpfiffAusfuehren(false); return; }
+    const r=l.ritual, verg=wandMs()-l.startWand;
+    let idx=0;
+    for(let i=0;i<r.stufen.length;i++)if(verg>=r.stufen[i].ab)idx=i;
+    if(idx!==l.stufe){
+      l.stufe=idx;
+      const t=document.getElementById("anpfiffText");
+      if(t){ t.textContent=r.stufen[idx].txt; t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop"); }
+      if(r.stufen[idx].piep)sfx("broadcast","piep",0.5);
+    }
+    if(!l.stinger&&verg>=r.dauer-STINGER_HALB_MS){ l.stinger=true; stingerStarten(); }
+    if(verg>=r.dauer)anpfiffAusfuehren(true);
+  }
+  // Ende des Countdowns -- regulaer bzw. per zweitem Klick ("Sofort starten", beide mit dem
+  // Startsignal der Sportart) oder weil das Tempo auf >=2× ging (kompletter Skip, stumm).
+  function anpfiffAusfuehren(mitSignal){
+    const l=anpfiffLauf; anpfiffLauf=null;
+    anpfiffOverlayAus();
+    zeigeEinlauf(false);
+    if(mitSignal&&l&&l.ritual.ton)sfx(l.ritual.ton[0],l.ritual.ton[1]);
+    spielLaeuft(true);
+  }
+
+  // ---- Endstand-Nachlauf (team-publikum-feiermomente-konzept-30-09.md 2.6) ----
+  // Beim ersten done-Frame merkt sich updateHudBuehne()/-Bahn()/-Feldspiel() nur den Zeitpunkt
+  // (und loest das Team-Feier-"finale" aus); das Endstand-Overlay kommt erst nach
+  // ENDSTAND_NACHLAUF_MS. Die Sieger-Feedzeile bleibt sofort. Uhr = jetztMs() wie im Konzept
+  // (im Sonden-Modus an sondenSimMs gekoppelt -- deterministisch). Der Kampf (finish())
+  // bleibt ohne Nachlauf: 2.6 nennt ihn nicht, und finish() haelt `running` sofort an.
+  const ENDSTAND_NACHLAUF_MS=3500;
+  let endstandNachlaufAn=true;  // Sonden-Schalter (window.__arena.endstandNachlauf)
+  let endstandNachlauf=null;    // {seitMs, render, stinger}
+  function endstandVormerken(render,sieger){
+    if(!endstandNachlaufAn){ render(); return; }
+    endstandNachlauf={seitMs:jetztMs(), render, stinger:false};
+    teamFeierAusloesen(sieger,"finale",null);
+    // Der Score-Bug wurde in diesem Frame schon VOR dem done-Zweig aktualisiert (und dabei,
+    // weil `done` neu ist und der Nachlauf noch nicht vermerkt war, ausgeblendet) -- sofort
+    // nachziehen, sonst flackert er einen Frame lang weg.
+    aktualisiereBbug();
+  }
+  function endstandNachlaufPruefen(){
+    const n=endstandNachlauf; if(!n)return;
+    const v=jetztMs()-n.seitMs;
+    // Im Sonden-Modus kein Wischer: der laeuft in CSS-Wandzeit und wuerde einen
+    // sonst pixelstabilen Sonden-Screenshot zufaellig mitten im Keil treffen.
+    if(!n.stinger&&v>=ENDSTAND_NACHLAUF_MS-STINGER_HALB_MS){ n.stinger=true; if(!sondenAktiv)stingerStarten(); }
+    if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
+  }
 
   function loop(ts){
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
+    if(anpfiffLauf)anpfiffTick();
+    stingerPruefen();
     if(running){
-      acc+=dt*speed;
+      // D7: `wirksamesTempo()` statt `speed` -- `speed` selbst bleibt der Wunschwert.
+      acc+=dt*wirksamesTempo();
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
       // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
-      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;}
+      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;ticksSeitReset++;}
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
       if(istFeldspiel(disc))updateHudFeldspiel();
       else if(istBuehne(disc))updateHudBuehne();
       else if(istBahn(disc))updateHudBahn();
+      // D7-Riegel: nach den Ticks dieses Frames, wirkt ab dem naechsten Frame.
+      if(!done&&!finaleAktiv){ const z=finaleZustandLive(); if(z)finaleSchritt(finaleBedingungAus(z)); }
     }
+    tempoAnzeigeAktualisieren();
     draw();
     requestAnimationFrame(loop);
   }
@@ -45343,6 +45612,13 @@
     // nicht bei Sonden-Zeit 0, obwohl er inhaltlich frisch aufgebaut ist. `sondenAktiv` selbst
     // bleibt bewusst unangetastet (s. sondenLauf()-Kommentar bei window.__arena weiter unten).
     sondenSimMs=0;
+    // SENDUNGSRAHMEN-TAKTUNG (D7/A4/A3/Nachlauf, s. Block vor loop()): alles gehoert zum
+    // ABGELAUFENEN Spiel. Ein neues Spiel bekommt wieder einen Countdown (anpfiffErfolgt),
+    // ein frisches Finale (Riegel + Opt-out je Spiel) und keinen haengenden Nachlauf/Wischer.
+    // `speed` (der Wunschwert) bleibt wie bisher ueber reset() hinweg stehen.
+    anpfiffLauf=null; anpfiffErfolgt=false; anpfiffOverlayAus(); stingerAus();
+    finaleAktiv=false; finaleAbgewaehlt=false;
+    endstandNachlauf=null; ticksSeitReset=0;
     // Broadcast-Bausteine fuer ein neues Spiel zuruecksetzen: HIGHLIGHTS gehoert zum
     // ABGELAUFENEN Spiel und darf im naechsten Endstand nicht mehr auftauchen; ein noch
     // sichtbarer Callout aus dem letzten Spiel darf nicht ueber den neuen Einlauf stehen.
@@ -45539,6 +45815,7 @@
       :istBahn(disc)?"Start"
       :istBuehne(disc)?"Auftakt"
       :"Kampf starten";
+    tempoAnzeigeAktualisieren(); finaleSchalterAnzeige();
     document.getElementById("arenaDisc").textContent=istMdffa
       ?(DISCS[disc]?DISCS[disc].label:disc)+" · 4-Team-FFA"
       :(DISCS[disc]?DISCS[disc].label:disc)+" · "+
@@ -45570,10 +45847,11 @@
     renderOpp();
   }
 
-  document.getElementById("play").addEventListener("click",()=>{
-    if(done)reset();
-    zeigeEinlauf(false);
-    running=!running;
+  // `running` an/aus samt allem, was am Uebergang haengt -- ausgelagert, weil A4 den Anpfiff
+  // jetzt auch NACH dem Klick (am Ende des Countdowns, anpfiffAusfuehren()) ausloesen kann.
+  function spielLaeuft(an){
+    running=an;
+    if(an)anpfiffErfolgt=true;
     document.getElementById("play").textContent=running?"Pause":"Weiter";
     // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
     // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
@@ -45582,17 +45860,32 @@
     // naechsten Kampf-Tick auf dem alten Stand haengen.
     aktualisiereTdmNotizen();
     // Dribbeln/Publikum nur bei Basketball und nur, solange wirklich gespielt wird — echte
-    // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio.
+    // Nutzergeste (dieser Klick) noetig, sonst blockt der Browser Audio. Kommt der Aufruf
+    // erst am Ende des A4-Countdowns, reicht die "sticky activation" desselben Klicks
+    // (Autoplay-Regel der Browser: einmal interagiert, darf die Seite abspielen).
     if(disc==="basketball"){ if(running)bkLoopStart(); else bkLoopPause(); }
     // TON-SCHICHT, BREAKING-BEAT (Ziel 4, 7.4): derselbe Play/Pause-Rahmen wie beim
     // Basketball-Dribbeln oben, nur ueber TON_KATALOG.breaking.beat statt einer Audio-
     // Datei. tonLoopStart()/-Stop() sind selbst try/catch-abgesichert (No-Op ohne
     // AudioContext bzw. vor der ersten Nutzergeste).
     if(disc==="breaking"){ if(running)tonLoopStart("breaking"); else tonLoopStop(); }
+  }
+  document.getElementById("play").addEventListener("click",()=>{
     // TON-SCHICHT (PR 0, 3.1): derselbe Autoplay-Grundsatz wie bei Basketball — der
     // AudioContext fuer sfx()/tonLoop* darf erst nach einer echten Nutzergeste starten.
     // Dieser Klick ist die erste; try/catch macht jeden frueheren sfx()-Aufruf zum No-Op.
+    // (Vor die Verzweigung gezogen, damit auch die Countdown-Toene schon klingen.)
     try{ const c=tonKontext(); if(c&&c.state==="suspended")c.resume(); }catch(e){}
+    if(done)reset();
+    // A4: zweiter Klick waehrend des Countdowns = sofortiger Anpfiff.
+    if(anpfiffLauf){ anpfiffAusfuehren(true); return; }
+    // A4: Countdown nur beim ERSTEN Start dieses Spiels (nicht beim Fortsetzen nach Pause),
+    // nur bei Tempo 1× (>=2× komplett uebersprungen) und nur, solange keine Sonde ihn
+    // ausdruecklich abgeschaltet hat.
+    const ritual=(!running&&!anpfiffErfolgt&&anpfiffCountdownAn&&speed<2)?anpfiffRitualVon(disc):null;
+    if(ritual){ anpfiffCountdownStarten(ritual); return; }
+    zeigeEinlauf(false);
+    spielLaeuft(!running);
   });
   document.getElementById("reset").addEventListener("click",reset);
   verdrahteFokusAuswahl();
@@ -45603,9 +45896,29 @@
   verdrahteKampfHover();
   document.getElementById("ezu").addEventListener("click",()=>{document.getElementById("endstand").hidden=true;});
   document.getElementById("spd").addEventListener("click",()=>{
-    speed=speed===1?2:speed===2?4:1;
-    document.getElementById("spd").textContent="Tempo "+speed+"×";
+    // D7, KLICK WIRD NICHT VERSCHLUCKT (Nebenbefund 2c): drosselt das Finale gerade, hebt der
+    // Klick die Drosselung fuer DIESES Spiel auf -- das Wunschtempo `speed` gilt sofort wieder
+    // (genau das, was die Taste ansagt: "Klick: zurück auf 4×"). Sonst die gewohnte Reihe
+    // 1× -> 2× -> 4× -> 1×; faellt der Klick in ein bereits ausgeloestes, aber (bei 1×)
+    // wirkungsloses Finale, zaehlt er ebenfalls als Abwahl, damit das neu gewaehlte Tempo
+    // nicht sofort wieder auf 1× gedrueckt wird.
+    if(finaleDrosseltJetzt())finaleAbgewaehlt=true;
+    else{
+      speed=speed===1?2:speed===2?4:1;
+      if(finaleAktiv)finaleAbgewaehlt=true;
+    }
+    tempoAnzeigeAktualisieren();
   });
+  // D7 -- DAUERHAFTER SCHALTER "Finale in Echtzeit" (neben Ton/Lautstaerke, localStorage wie
+  // bkMuted, Standard AN). Nur im Feldspiel sichtbar (finaleSchalterAnzeige()).
+  const finaleBtn=document.getElementById("finaleschalter");
+  if(finaleBtn){
+    finaleSchalterAnzeige();
+    finaleBtn.addEventListener("click",()=>{
+      finaleEchtzeitAn=!finaleEchtzeitAn; lsSchreiben("finaleEchtzeit",finaleEchtzeitAn?"1":"0");
+      finaleSchalterAnzeige(); tempoAnzeigeAktualisieren();
+    });
+  }
   // Ton-Regler: wirkt sofort auf laufende Loops (bkLoopLautstaerkeAnwenden), nicht erst
   // beim naechsten bkSfx-Aufruf — sonst bliebe Dribbeln/Publikum beim Verstellen stumm,
   // bis zufaellig ein neuer Ein-Schuss-Effekt startet.
@@ -47585,11 +47898,56 @@
     },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
-    // aus -- dasselbe Prinzip wie calloutProbe darueber. Noetig vor allem fuer die Stufe
-    // "finale", die in Phase 1 bewusst keinen organischen Ausloeser hat (Endstand-Nachlauf 2.6
-    // wartet auf Chris' Zustimmung). Reine Anzeige: teamFeierAusloesen() schreibt nur
-    // `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin ein No-Op).
+    // aus -- dasselbe Prinzip wie calloutProbe darueber. Die Stufe "finale" hat seit 07.10.
+    // einen organischen Ausloeser (Endstand-Nachlauf 2.6, endstandVormerken()); die Sonde
+    // bleibt fuer gezielte Screenshots jeder Stufe. Reine Anzeige: teamFeierAusloesen()
+    // schreibt nur `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin
+    // ein No-Op).
     teamFeierProbe:(seite,stufe)=>{ teamFeierAusloesen(seite===1?1:0,stufe||"gross",null); return teamFeiern.length; },
+    // ===== SENDUNGSRAHMEN-TAKTUNG (D7 / A4+A3 / Endstand-Nachlauf, 07.10.) =====
+    // Ausdrueckliche SONDEN-SCHALTER fuer Skripte -- bewusst NICHT automatisch ueber
+    // navigator.webdriver (sonst saehen Agenten-Screenshots etwas anderes als Chris). Ohne
+    // Argument nur lesen; mit true/false setzen (nur fuer diese Seite, nicht in localStorage).
+    // Gilt bis zum Neuladen der Seite, auch ueber setDisc()/reset() hinweg.
+    anpfiffCountdown:(an)=>{ if(an!==undefined)anpfiffCountdownAn=!!an; return anpfiffCountdownAn; },
+    finaleEchtzeit:(an)=>{
+      if(an!==undefined){ finaleEchtzeitAn=!!an; finaleSchalterAnzeige(); tempoAnzeigeAktualisieren(); }
+      return finaleEchtzeitAn;
+    },
+    endstandNachlauf:(an)=>{ if(an!==undefined)endstandNachlaufAn=!!an; return endstandNachlaufAn; },
+    // Bequemer Sammelschalter: alle drei Wandzeit-Bausteine an/aus.
+    sendungsrahmen:(an)=>{
+      // finaleEchtzeit beim Wiedereinschalten auf die gespeicherte Wahl des Zuschauers
+      // zuruecksetzen statt sie fuer diese Seite pauschal auf "an" zu zwingen.
+      const a=!!an; anpfiffCountdownAn=a; endstandNachlaufAn=a; finaleEchtzeitAn=a&&lsLesen("finaleEchtzeit")!=="0";
+      finaleSchalterAnzeige(); tempoAnzeigeAktualisieren();
+      return {anpfiffCountdown:a, finaleEchtzeit:finaleEchtzeitAn, endstandNachlauf:a};
+    },
+    // Fuer scripts/lib/arena-anpfiff.mjs (warteAufAnpfiff): "laeuft und erster Tick ist durch".
+    anpfiffStatus:()=>({laeuft:running, countdown:!!anpfiffLauf, angepfiffen:anpfiffErfolgt,
+      ticks:ticksSeitReset, done, stinger:stingerBisWand>0, stingerZahl, text:anpfiffLauf?(document.getElementById("anpfiffText")||{}).textContent||"":null}),
+    anpfiffRitual:(d)=>{ const r=anpfiffRitualVon(d||disc); return r?JSON.parse(JSON.stringify(r)):null; },
+    tempoStatus:()=>({speed, wirksam:wirksamesTempo(), finaleAktiv, finaleAbgewaehlt, finaleEchtzeitAn,
+      drosselt:finaleDrosseltJetzt(), anzeige:(document.getElementById("spd")||{}).textContent||""}),
+    // finaleProbe(z): reine Bedingung fuer einen gegebenen Zustand (Felder wie
+    // finaleZustandLive(), fehlende aus dem Live-Zustand ergaenzt); ohne Argument der
+    // Live-Zustand samt Ergebnis. Schreibt nichts.
+    finaleProbe:(z)=>{
+      const live=finaleZustandLive();
+      const zz=z?{...(live||{}),...z}:live;
+      return {zustand:zz, bedingung:finaleBedingungAus(zz)};
+    },
+    // finaleRiegelProbe([b0,b1,...]): schickt eine Folge von Bedingungs-Ergebnissen durch
+    // DIESELBE Riegel-Funktion wie loop() (finaleSchritt) und gibt den Riegelstand nach jedem
+    // Schritt zurueck -- Nachweis der Hysterese ohne ein passend knappes Spiel abwarten zu
+    // muessen. Stellt den vorherigen Riegelstand danach wieder her.
+    finaleRiegelProbe:(folge)=>{
+      const vorher=finaleAktiv; finaleAktiv=false;
+      try{ return (folge||[]).map(b=>{ finaleSchritt(!!b); return finaleAktiv; }); }
+      finally{ finaleAktiv=vorher; }
+    },
+    endstandNachlaufStatus:()=>({aktiv:!!endstandNachlauf, nachlaufMs:ENDSTAND_NACHLAUF_MS,
+      seitMs:endstandNachlauf?endstandNachlauf.seitMs:null, jetztMs:jetztMs()}),
     // STAFFEL "MARKE UND ZUG" (Paket O2, 04.10.) — QA-SCHALTER nach dem Muster
     // sandsackVorschau(): der EINZIGE Weg, `staffelMarkeZug.aktiv` einzuschalten. Ein echtes
     // Spiel laeuft ohne ihn exakt wie vorher (Isolationsnachweis s. Kopfkommentar bei
@@ -48410,7 +48768,16 @@
     },
     // Kehrt zur echten Wanduhr zurueck (s. sondenLauf() oben) — z.B. wenn nach einem Sonden-
     // Lauf noch interaktiv per "Kampf starten" weitergespielt werden soll.
-    sondenAus:()=>{ sondenAktiv=false; },
+    // ENDSTAND-NACHLAUF (07.10., Opus-Review): ein im Sonden-Modus begonnener Nachlauf traegt
+    // `seitMs` in Sonden-Zeit -- beim Wechsel auf die Wanduhr auf dieselbe verbleibende Dauer
+    // umrechnen, sonst hinge er (Sonden-Zeit >> performance.now()) minutenlang.
+    sondenAus:()=>{
+      if(sondenAktiv&&endstandNachlauf){
+        const vergangen=sondenSimMs-endstandNachlauf.seitMs;
+        endstandNachlauf.seitMs=wandMs()-vergangen;
+      }
+      sondenAktiv=false;
+    },
     renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker,viz)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also

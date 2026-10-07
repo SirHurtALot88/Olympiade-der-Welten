@@ -348,6 +348,43 @@ als eigener Task mit genau diesem Umfang. Kein Agent leitet aus diesem Papier ei
    Spiel nachsieht, ist es der Moment, für den die Arena da ist. Falls Chris D7 heute ablehnt,
    lohnt die Frage nach dem Replay-Go erneut.
 
+## 6. Chris' Entscheidung (07.10.) und Umsetzung
+
+Chris hat am 07.10. persönlich jeden Punkt aus Abschnitt 4 einzeln freigegeben:
+
+* **D7: Ja, weiches Finale (Stufe 1)** — 30 Zuschau-Sekunden, Nachspielzeit inklusive;
+  Abstand Basketball ≤ 3, Hockey ≤ 1, Football ≤ 8; Hysterese bis `done`; Klick auf `#spd`
+  stellt das Wunschtempo für dieses Spiel wieder her (nicht verschluckt); dauerhafter Schalter
+  „Finale in Echtzeit", Standard **an**; nur Feldspiel; Anzeige „Tempo 1× · Finale (Klick:
+  zurück auf 4×)"; Sonden-Schalter ausdrücklich, nicht über `navigator.webdriver`. Harte Form
+  und Stufe 0 nicht gebaut.
+* **A4: Ja** — 1,5–3 s je Chassis nach Tabelle 3.3, bei Tempo ≥ 2× komplett übersprungen,
+  zweiter Klick = sofortiger Anpfiff, kein Countdown nach Pause (nur erster Start und nach
+  `reset()`), Startritual je Chassis, A3 im selben Task, Tooling-Runde zuerst.
+* **Endstand-Nachlauf: Ja, mit entschieden** — 3,5 s (Feiermomente 2.6).
+
+Gebaut im Paket `broadcast-d7-a4-nachlauf-paket-07-10` (Block „SENDUNGSRAHMEN-TAKTUNG" vor
+`loop()` in `battle-mode.engine.js`); Helfer für Skripte `scripts/lib/arena-anpfiff.mjs`
+(`warteAufAnpfiff(seite)`, `sendungsrahmenAus(seite)`), Abnahme
+`scripts/verify-broadcast-d7-a4-nachlauf-paket-07-10.mjs`. Sonden-Schalter:
+`window.__arena.anpfiffCountdown(false)`, `.finaleEchtzeit(false)`, `.endstandNachlauf(false)`
+(Sammelschalter `.sendungsrahmen(false)`).
+
+Wahlen, die die Entscheidung nicht ausdrücklich abdeckte (jeweils der Empfehlung am nächsten):
+
+* **A3-Einsatzstellen:** nur Einlauf → Anpfiff (Ende des Countdowns) und Spiel → Endstand (Ende
+  des Nachlaufs) — die beiden Stellen, die erst durch A4/Nachlauf eine Pause zum Überdecken
+  haben. Viertelpause und Fechten-/Schach-Regieschnitt bleiben harte Schnitte (eigene Runde).
+  Kein Stinger beim übersprungenen Countdown (≥ 2×), bei „Sofort starten" und bei
+  abgeschaltetem Nachlauf — dort wird wie bisher hart geschnitten.
+* **Tempo während des Countdowns auf ≥ 2×:** bricht den Countdown ab (dieselbe Regel wie vor
+  dem Klick), stumm. „Sofort starten" (zweiter Klick) gibt das Startsignal der Sportart.
+* **Nachlauf-Umfang:** Bühne, Bahn und Feldspiel (die drei Chassis mit dem
+  `done`-Einmal-Muster in `updateHud*()`); der Kampf (`finish()`) bleibt ohne Nachlauf, weil
+  2.6 ihn nicht nennt und `finish()` `running` sofort anhält. Der Score-Bug bleibt während des
+  Nachlaufs stehen; das Team-Feier-„finale" wird nur bei eingeschaltetem Nachlauf ausgelöst.
+* **Feldspiel-Ansage:** „Sprungball" / „Bully" / „Kickoff" als ein Schiedsrichter-Beat.
+
 ## Quellen im Repo
 
 `public/mockups/battle-mode.engine.js` (`speed` `:28229`, `ZEIT_DEHNUNG` `:39990`, `loop()`

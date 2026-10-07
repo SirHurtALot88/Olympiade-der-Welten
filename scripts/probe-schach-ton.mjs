@@ -48,6 +48,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -132,6 +133,7 @@ if (gesetzt !== true) {
 }
 await seite.click("#play");
 await seite.click("#spd"); await seite.click("#spd"); // 4x
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 await seite.waitForTimeout(1200);
 const loopNach = [];
 loopNach.push(await seite.evaluate(() => window.__loopStarts));
@@ -139,6 +141,7 @@ for (let i = 0; i < 3; i++) {
   await seite.click("#reset");
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd"); // Tempo-Flag sicherheitshalber neu setzen
+  await warteAufAnpfiff(seite);
   await seite.waitForTimeout(1200);
   loopNach.push(await seite.evaluate(() => window.__loopStarts));
 }
@@ -190,6 +193,7 @@ for (const disc of GESCHWISTER) {
   await seite.evaluate(() => { window.__wertLog.length = 0; });
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd"); // 4x
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   await seite.waitForTimeout(8000);
   const log = await seite.evaluate(() => window.__wertLog.slice());
   // Dieselben verfeinerten Bucket-Regeln wie TEIL C (Doppel-Bucket fuer schlag/matt, s.

@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -51,6 +52,11 @@ try {
   seite.on("console", (m) => { if (m.type() === "error") fehler.push("console: " + m.text()); });
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+  // SENDUNGSRAHMEN-PAKET (07.10.): diese Sonde fotografiert das LAUFENDE Spiel 2,5 s nach dem
+  // Start (1), wartet in Hockey bei 4× auf einen Callout (2) und den TDM-Endstand (3) --
+  // Anpfiff-Countdown, Finale-in-Echtzeit und Endstand-Nachlauf ausdruecklich aus
+  // (scripts/lib/arena-anpfiff.mjs), damit die Bilder dieselben bleiben wie vor dem Paket.
+  await sendungsrahmenAus(seite);
 
   // ---- 1) Hockey: HUD-Overlay (#bbug) waehrend des laufenden Spiels ----
   await seite.evaluate(() => window.__arena.setDisc("hockey"));
@@ -58,6 +64,7 @@ try {
   await seite.click("#play");
   await seite.click("#spd"); // 2x
   await seite.click("#spd"); // 4x
+  await warteAufAnpfiff(seite);
   await seite.waitForTimeout(2500);
   await (await seite.$(".arenaraum")).screenshot({ path: path.join(OUT_DIR, "01-bbug-overlay-live.png") });
   console.log("bbug hidden? " + await seite.$eval("#bbug", (e) => e.hidden));
@@ -82,6 +89,7 @@ try {
   await seite.click("#play");
   await seite.click("#spd");
   await seite.click("#spd");
+  await warteAufAnpfiff(seite);
   await seite.waitForFunction(() => document.getElementById("endstand") && !document.getElementById("endstand").hidden, null, { timeout: 90000 });
   await seite.waitForTimeout(300);
   const anzahlHighlights = await seite.$$eval("#ehighlights .ehzeile", (els) => els.length);

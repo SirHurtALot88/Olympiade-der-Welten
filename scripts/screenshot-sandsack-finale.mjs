@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -23,6 +24,7 @@ await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null
 await seite.evaluate((saat) => window.__arena.setDisc("gewichtheben"), saat);
 await seite.click("#t2");
 await seite.click("#play");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 // Kurz laufen lassen, damit LASTEN_FINALE sicher gesetzt ist (baueSandsackFinale() laeuft
 // unmittelbar nach baueHebenDuelle() beim Buehnenaufbau), dann die Vorschau einschalten.
 await seite.waitForTimeout(400);

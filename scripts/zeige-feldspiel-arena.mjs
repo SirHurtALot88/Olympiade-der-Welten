@@ -12,6 +12,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -31,6 +32,7 @@ await seite.evaluate((d) => window.__arena.setDisc(d), DISZIPLIN);
 // Klick per DOM: der Startknopf ist erst sichtbar, wenn die Oberflaeche ihn einblendet —
 // ein Playwright-Klick wartet darauf und laeuft sonst in den Zeitablauf.
 await seite.evaluate(() => document.getElementById("play").click());
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
 let letzte = 0;
 for (const sek of SEKUNDEN) {

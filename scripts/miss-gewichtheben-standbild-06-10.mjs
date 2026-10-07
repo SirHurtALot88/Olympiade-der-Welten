@@ -22,6 +22,7 @@ import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import sharp from "sharp";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -91,10 +92,12 @@ try {
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
   await seite.evaluate(() => window.__arena.setDisc("gewichtheben"));
+  await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false }); // Sendungsrahmen-Paket 07.10.: Standbild-Mass ab Spielbeginn, ohne Countdown-Bilder
   await seite.click("#t2");
   const tempoTxt = await seite.$eval("#spd", (e) => e.textContent.trim());
   console.log(`Tempo laut Button: "${tempoTxt}" (erwartet "Tempo 1×", kein Klick noetig)`);
   await seite.click("#play");
+  await warteAufAnpfiff(seite);
 
   const arenaraum = await seite.$(".arenaraum");
   let vorher = null;

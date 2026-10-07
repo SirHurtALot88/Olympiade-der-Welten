@@ -16,6 +16,7 @@ import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const [vorherPfad, nachherPfad, zielArg] = process.argv.slice(2);
 if (!vorherPfad || !nachherPfad || !zielArg) {
@@ -37,6 +38,7 @@ async function lauf(pfad, marke) {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(pathToFileURL(resolve(pfad)).href, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => Boolean(window.__arena), null, { timeout: 30000 });
+  await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Vorher/Nachher-Vergleich zweier Engine-Staende -- Countdown/Finale/Nachlauf aus, damit beide Laeufe gleich getaktet sind (aeltere Engine: No-Op)
 
   // Basketball waehlen (derselbe Einstieg, den auch die Disziplin-Leiste benutzt) und in
   // den Arena-Reiter wechseln.
@@ -50,7 +52,7 @@ async function lauf(pfad, marke) {
   // Bild laeuft, nicht das Ergebnis (s. loop()/ZEIT_DEHNUNG im Motor): bei hoeherem Tempo
   // laeuft stepSim oefter mit demselben festen dt, nicht mit groesserem dt.
   let tempo = await seite.textContent("#spd");
-  for (let i = 0; i < 6 && !/4/.test(tempo || ""); i++) {
+  for (let i = 0; i < 6 && !/^Tempo 4×$/.test((tempo || "").trim()); i++) {
     await seite.click("#spd");
     await seite.waitForTimeout(120);
     tempo = await seite.textContent("#spd");

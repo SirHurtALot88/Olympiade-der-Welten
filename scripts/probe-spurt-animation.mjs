@@ -22,6 +22,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -38,6 +39,7 @@ await seite.waitForFunction(() => window.__arena && window.__arena.zeitfahrenViz
 await seite.click("#t2");
 await seite.evaluate(() => window.__arena.setDisc("spurt"));
 await seite.click("#play");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
 const proben = [];
 const start = Date.now();
