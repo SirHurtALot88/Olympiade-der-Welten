@@ -15198,7 +15198,19 @@
         FINGERFERTIGKEIT: {dexterity:45,speed:35,torment:20},
         NERVEN:           {will:25,awareness:20,determination:25,dexterity:20,speed:10},
         TEAMGEIST:        {spirit:55,charisma:25,awareness:20},
-        AUSDAUER:         {spirit:50,health:30,speed:20}
+        AUSDAUER:         {spirit:50,health:30,speed:20},
+        // KENNERBLICK (I-2k, docs/design/i-spy-fable-empfehlung-02-10.md Abschnitt 5.2): der
+        // NEBENWEG im Finden, gelesen ausschliesslich in ispySeiteTick() ueber
+        // ISPY_KENNERBLICK_FAKTOR. Das ist das Mittel der drei Knack-Sub-Skills LOGIK/
+        // MENSCHENKENNTNIS/FINGERFERTIGKEIT als EIGENE Rezeptzeile (das Mittel dreier
+        // gewichteter Mittel mit gleicher Gewichtssumme 100 ist das gewichtete Mittel der
+        // gemittelten Gewichte: will 48/3, dexterity 45/3, torment 42/3, charisma 40/3,
+        // spirit 38/3, speed 35/3, determination 30/3, intelligence 22/3 — auf ganze Zahlen
+        // gerundet, Summe 100), damit die Mischung sichtbar und Pp-kalibrierbar bleibt, statt
+        // inline gemittelt zu werden. Breite statt Themenwahl, die P1-Lehre: die Fassung vom
+        // 30.09. (Befragen = charisma/spirit/torment, Beschatten = speed/dexterity/will) haette
+        // laut Kaderprobe (Abschnitt 4) die Ordnung des Zugangs in zwei Paarungen gekippt.
+        KENNERBLICK:      {will:16,dexterity:15,torment:14,charisma:13,spirit:13,speed:12,determination:10,intelligence:7}
       },
       // ZWOELF FUNDORTE (Konzept 2.1, KORRIGIERTES Layout aus dem Gegencheck Abschnitt 3.4/T5
       // — nicht die Drittel-Anzahl-Fassung des ersten Entwurfs): Logik 5 (4x Notiz/Akte + EIN
@@ -18515,6 +18527,36 @@
   // oder schlechter).
   const ISPY_SIEHT2_BASIS=0.20, ISPY_SIEHT2_K=0.010, ISPY_SIEHT2_MAX=0.95;
   const ISPY_SIEHT3_BASIS=0.00, ISPY_SIEHT3_K=0.013, ISPY_SIEHT3_MAX=0.90;
+  // KENNERBLICK — DER NEBENWEG IM FINDEN (I-2k, docs/design/i-spy-fable-empfehlung-02-10.md
+  // Abschnitt 5, von Chris zum Prototyp freigegeben 07.10.): die Sichtschwellen sieht2/sieht3 lesen nicht
+  // mehr SPUERSINN allein, sondern FINDEN = max(SPUERSINN, ISPY_KENNERBLICK_FAKTOR*KENNERBLICK).
+  // Primaerweg bleibt das Beobachten (SPUERSINN, voller Zuwachs); der Nebenweg ist der
+  // Kennerblick (Rezeptzeile KENNERBLICK = Mittel der drei Knack-Sub-Skills): wer Schloesser,
+  // Zeugen und Chiffren kennt, erkennt am Schloss, was dahinter liegt — langsamer (Faktor < 1,
+  // ~18 % mehr Koennen fuer dieselbe Sicht bei 0,85), aber er kommt an. Ausloeser (Abschnitt 1):
+  // der eignungsbeste Spieler von piratecrew-raginglunatics hatte schlechteren Tresorzugang als
+  // drei Mitspieler mit niedrigerer Eignung, weil will/spirit/dexterity/speed (41 der 100
+  // Matrixpunkte) am Sichttor gar nicht vorkamen.
+  //
+  // KEIN NEUER rr()-WURF (Handbuch-Falle 17): derselbe eine `x=rr()` je Teilnehmer je Tick wird
+  // nur gegen eine fuer Kennerblick-Spieler hoehere Schwelle verglichen. Fuer einen Spieler mit
+  // SPUERSINN >= FAKTOR*KENNERBLICK ist der Zug byte-identisch zu vorher; bei FAKTOR 0 ist das
+  // ganze Spiel bit-identisch (Nullprobe: miss-alle-disziplinen.mjs 24 i-spy las exakt die
+  // Basislinie 0,750/0,177/0,881/0,210, SHA-256 ueber alle Rohdaten der Probe gleich main).
+  //
+  // GEMESSEN UND VERWORFEN (07.10., Befund i-spy-fable-empfehlung-02-10.md Abschnitt 10):
+  // Faktor 0,80/0,85/0,90 senkte rho je Spiel auf 0,717/0,724/0,738 (Ist 0,750), die Saison-
+  // Validitaet auf 0,818/0,818/0,804 (Ist 0,881), Star Rang 1 und Paartreue ebenfalls; Pp bei
+  // 0,90 25,9/19,0 (n=24). Sechs von acht Zeilen des Abbruchkriteriums verfehlt. Der Nebenweg
+  // hebt das Mittelfeld mit hoher Knack-Kompetenz, nicht den Star. DESHALB STEHT DER FAKTOR HIER
+  // AUF 0 (bit-identisch zum Ist-Stand) — dieser Code liegt nur auf dem Diagnose-Branch
+  // i-spy-kennerblick-paket-07-10 zur Reproduktion und ist NICHT zum Mergen gedacht.
+  const ISPY_KENNERBLICK_FAKTOR=0;
+  // Sonden-Haken fuer window.__arena.ispyKennerblickSondeStart/-Stopp (s. dort) — null im
+  // normalen Spiel, rein additiv, kein rr()-Verbrauch: zaehlt je Zug, ob FINDEN > SPUERSINN
+  // (Kennerblick hat die Schwelle gehoben) und ob sich dadurch sieht3 tatsaechlich bewegt hat
+  // (nicht schon am Sichtdeckel).
+  let ISPY_KENNERBLICK_SONDE=null;
   // NEBENWEG-ABWERTUNG (1.6, Chris' asymmetrischer Nachtrag 21.09.): Variante A ("weniger
   // Punkte") — der Primaerweg zahlt den vollen Punktwert, der Nebenweg nur 65 %. Variante B
   // (zusaetzlicher Chance-Abzug) bleibt bewusst ungesetzt, um die KNACK-Formel nicht doppelt
@@ -18912,8 +18954,12 @@
       // Laeufer oder einem normal waehlenden Teamkollegen kommt.
       const istLaeufer=(u===laeufer);
       const x=rr();
-      const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+u.SPUERSINN*ISPY_SIEHT2_K);
-      const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
+      // FINDEN = max(Primaerweg SPUERSINN, Nebenweg Kennerblick), s. ISPY_KENNERBLICK_FAKTOR.
+      // Nur die Schwellen aendern sich, `x` und jeder weitere Wurf bleiben, wo sie waren.
+      const finden=Math.max(u.SPUERSINN,ISPY_KENNERBLICK_FAKTOR*u.KENNERBLICK);
+      const sieht2=Math.min(ISPY_SIEHT2_MAX,ISPY_SIEHT2_BASIS+finden*ISPY_SIEHT2_K);
+      const sieht3=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+finden*ISPY_SIEHT3_K);
+      if(ISPY_KENNERBLICK_SONDE)ISPY_KENNERBLICK_SONDE(u,finden,sieht3);
       const hinweisBonus=(t)=>(istLaeufer&&t.idx===zielIdx)?ISPY_HINWEIS_BONUS:0;
       const sichtbarF=(t)=>t.stufeAktuell===1
         ||(t.stufeAktuell===2&&x<sieht2+hinweisBonus(t))
@@ -48337,6 +48383,39 @@
         logik:Math.round((s.n?s.logik/s.n:0)*1000)/10,
         verhoer:Math.round((s.n?s.verhoer/s.n:0)*1000)/10,
         mechanik:Math.round((s.n?s.mechanik/s.n:0)*1000)/10}));
+    },
+    // KENNERBLICK-SONDE (I-2k, docs/design/i-spy-fable-empfehlung-02-10.md Abschnitt 6 Schritt
+    // 6): reine Zaehl-Sonde nach dem Muster von ispyNachfuellSonde, aber als Start/Stopp-Paar,
+    // damit sie JEDEN Lauf mitzaehlen kann, der zwischen beiden I-Spy faehrt (typisch:
+    // disziplinProbe("i-spy",{n,kaderFamilie}) — dieselbe kaderfeste Messung wie die Abnahme).
+    // Kein Rendering, kein rr(), kein Gameplay: der Haken in ispySeiteTick() liest nur
+    // u.SPUERSINN/finden/sieht3, nachdem die Schwellen ohnehin berechnet sind.
+    // Rueckgabe: Zuege gesamt, Anteil der Zuege mit FINDEN > SPUERSINN (Kennerblick hat die
+    // Schwelle gehoben; Zielkorridor 15-45 %), Anteil mit tatsaechlich hoeherem sieht3 (nicht
+    // schon am Deckel), und dieselben zwei Anteile je Spielername.
+    ispyKennerblickSondeStart:()=>{
+      const z={zuege:0,kennerblick:0,wirksam:0,jeSpieler:{}};
+      ISPY_KENNERBLICK_SONDE=(u,finden,sieht3)=>{
+        const s=z.jeSpieler[u.n]||(z.jeSpieler[u.n]={zuege:0,kennerblick:0,wirksam:0});
+        z.zuege++; s.zuege++;
+        if(finden>u.SPUERSINN){
+          z.kennerblick++; s.kennerblick++;
+          const ohne=Math.min(ISPY_SIEHT3_MAX,ISPY_SIEHT3_BASIS+u.SPUERSINN*ISPY_SIEHT3_K);
+          if(sieht3>ohne){ z.wirksam++; s.wirksam++; }
+        }
+      };
+      ISPY_KENNERBLICK_SONDE.zaehler=z;
+      return true;
+    },
+    ispyKennerblickSondeStopp:()=>{
+      const h=ISPY_KENNERBLICK_SONDE; ISPY_KENNERBLICK_SONDE=null;
+      if(!h)return null;
+      const z=h.zaehler, q=(a,b)=>b?Math.round(a/b*1000)/10:0;
+      const jeSpieler={};
+      for(const [n,s] of Object.entries(z.jeSpieler))jeSpieler[n]={zuege:s.zuege,
+        anteilProzent:q(s.kennerblick,s.zuege), wirksamProzent:q(s.wirksam,s.zuege)};
+      return {faktor:ISPY_KENNERBLICK_FAKTOR, zuege:z.zuege, kennerblickZuege:z.kennerblick,
+        anteilProzent:q(z.kennerblick,z.zuege), wirksamProzent:q(z.wirksam,z.zuege), jeSpieler};
     },
     // A0.2 — DETERMINISTISCHER SONDEN-MODUS FUER SCREENSHOT-QA
     // (docs/design/deterministischer-sonden-modus-19-09.md, Opus-Synthese Echtzeit-vs-
