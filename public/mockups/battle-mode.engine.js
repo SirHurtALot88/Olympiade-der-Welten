@@ -10666,6 +10666,9 @@
     if(stehtImTor(u)||hockeyRiegelKlaert(u)){
       const mitspieler=FSTEAM[u.side].filter(m=>m!==u);
       const ziel=mitspieler.length?offensterMitspieler(mitspieler,u):null;
+      // H-C-Zaehler (reine Buchfuehrung, kein rr()): wie oft spielt der Torwart aus dem Tor
+      // heraus ueberhaupt einen Pass? Gelesen nur von __arena.hockeyTorwartPaesse.
+      if(ziel&&stehtImTor(u))fsLive.torwartPaesse=(fsLive.torwartPaesse||0)+1;
       if(ziel){ passeAb(u,ziel); return; }
       // Klaeren: der Puck fliegt an die Bande in der eigenen Haelfte und ist wieder frei.
       const k=RINK();
@@ -11501,11 +11504,32 @@
   // von der ABWEHR des naechsten Verteidigers an der Passlinie (`flug.passLinienAbwehr`,
   // s. passeAb). Faengt der Verteidiger den Pass nicht ab, steht er trotzdem oft genug im
   // Weg, dass die Anspielposition nicht die volle Qualitaet traegt.
+  // H-C — DER TORWART ALS ERSTER PASSGEBER (07.10., docs/design/fable-ideen-feldspiel-30-09.md
+  // §5 H-C, mit Chris' Zustimmung). Welcher Wert die QUALITAET eines Passes traegt: fuer jeden
+  // Feldspieler unveraendert AUFBAU, fuer den Torwart, der aus seinem Tor heraus spielt
+  // (stehtImTor, also nicht der gezogene Torwart in der Endphase), seine TECHNIK
+  // (awareness 46 / determination 31 / dexterity 23) — dieselbe Mischung, die das Dokument
+  // nennt, und kein neuer Sub-Skill. Gelesen an genau den drei Stellen der Passqualitaets-
+  // Kette, an denen bisher AUFBAU des Passgebers stand: eigener Fehlpass (passeAb),
+  // Assist-Fenster (loeseFlugAuf) und hockeyPassQualBonus (Schussqualitaet beim Empfaenger).
+  //
+  // GEPRUEFT VOR DEM BAU (das Dokument hatte es offen gelassen): die ZIELWAHL des Torwartpasses
+  // laeuft heute schon ueber dieselbe Kette wie jeder Feldspielerpass — entscheideBallaktion
+  // ruft im Torwart-Zweig offensterMitspieler(), und dessen Gewicht (ABSCHLUSS des Ziels,
+  // qualitaet(ziel), offenheitFuerPass, Decker-ABWEHR) liest KEINEN Wert des Passgebers, nur
+  // seine Position. H-C aendert deshalb nichts daran, WER den Puck bekommt, nur die Qualitaet
+  // des Zuspiels: eine Schwellen-, keine Kaskadenaenderung. Und es gab keinen Festwert: die
+  // Kette las schon bisher den AUFBAU des Torwarts (stamina/speed-gefuehrt, fuer einen
+  // Torwart inhaltlich falsch). A1/A2 bucht die Beruehrungskette (merkeBeruehrung) fuer ihn
+  // wie fuer jeden anderen. Ausserhalb von Hockey liefert die Funktion zeichengleich AUFBAU.
+  function passQualitaetVon(von){
+    return (istHockey()&&stehtImTor(von))?von.TECHNIK:von.AUFBAU;
+  }
   function hockeyPassQualBonus(schuetze,passgeber){
     if(!passgeber)return 0;
     const g=schuetze.frischerPassGeometrie;
     const basis=g==="slot"?HK_PASSQUAL_SLOT:g==="hinterTor"?HK_PASSQUAL_HINTERTOR:HK_PASSQUAL_SONST;
-    const aufbauSkala=Math.max(0.7,Math.min(1.3,0.85+(passgeber.AUFBAU-50)*0.0060));
+    const aufbauSkala=Math.max(0.7,Math.min(1.3,0.85+(passQualitaetVon(passgeber)-50)*0.0060));
     const abwehrDaempfung=Math.max(0.6,Math.min(1.05,1.05-((schuetze.frischerPassAbwehr||50)-50)*0.0040));
     return basis*aufbauSkala*abwehrDaempfung;
   }
@@ -11568,7 +11592,7 @@
     // Steal-Anteil an den Ballverlusten nicht in Richtung der NBA-55%, sondern bleibt nur
     // insgesamt niedriger. Ausserhalb von Basketball (Hockey) bitgleich die alte Formel.
     const fehlpassSkala=feldspielDisc==="basketball"?BK_FEHLPASS_SKALA:1;
-    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015*fehlpassSkala,0.05*fehlpassSkala-(von.AUFBAU-50)*0.0016);
+    const eigenerFehler=!abgefangenVon&&rr()<Math.max(0.015*fehlpassSkala,0.05*fehlpassSkala-(passQualitaetVon(von)-50)*0.0016);
     // PASSDAUER NACH STRECKE, nur im Eishockey. Die feste Drittelsekunde traegt auf einem
     // Basketballcourt, weil dort kein Pass weit ist. Auf der Eisflaeche misst der laengste
     // gemessene Pass 992 px — in 0,3 s waeren das 3300 px/s, also ein Teleport, und genau
@@ -12029,7 +12053,7 @@
       // sortiert werden und ist bis zum Wurf laengst kein Assist mehr. Faktor 0,70 bei
       // AUFBAU 50 bis 1,00 bei AUFBAU 100 — das Fenster wird also nie laenger als
       // ASSIST_FENSTER, nur kuerzer, wenn der Passgeber keiner ist.
-      const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(flug.passgeber.AUFBAU-50)*0.0060));
+      const fensterFaktor=Math.max(0.55,Math.min(1,0.70+(passQualitaetVon(flug.passgeber)-50)*0.0060));
       flug.ziel.frischerPassVon=flug.passgeber; flug.ziel.frischerPassBis=fsT+ASSIST_FENSTER*fensterFaktor;
       // PASSQUALITAETS-KETTE (nur Hockey, s. hockeyPassQualBonus): Geometrie am
       // Ankunftsort festhalten, nicht am Abwurfort — das ist die Position, die auch fuer
@@ -48836,6 +48860,18 @@
     // KEIN "kein Fokus"-Referenzlauf mehr — wer den braucht (Vorher/Nachher-Vergleich der
     // Fokus-Mechanik selbst), nutzt diesen Einstiegspunkt.
     spieleBasketballOhneFokus:(saat)=>spieleDisziplin("basketball",saat,{fokusAus:true,zustandBehalten:true}).protokoll,
+    // H-C (07.10.): read-only Einblicke fuer scripts/verify-hockey-torwartpass-paket-07-10.mjs.
+    // `hockeyPassQualitaet(u,disc)` rechnet passQualitaetVon fuer ein beliebiges Spielerobjekt
+    // unter der angegebenen Disziplin (feldspielDisc wird danach zurueckgesetzt);
+    // `hockeyTorwartPaesse(saat)` spielt ein Hockeyspiel und meldet den Torwartpass-Zaehler.
+    hockeyPassQualitaet:(u,disc)=>{
+      const vorher=feldspielDisc; feldspielDisc=disc||"hockey";
+      try{ return passQualitaetVon(u); } finally { feldspielDisc=vorher; }
+    },
+    hockeyTorwartPaesse:(saat)=>{
+      const r=spieleDisziplin("hockey",saat,{zustandBehalten:true});
+      return {paesse:(fsLive&&fsLive.torwartPaesse)||0, protokoll:r.protokoll};
+    },
     // DERSELBE LAUF FUER JEDE DISZIPLIN: window.__arena.spiele(dId, saat) liefert
     // {disziplin, protokoll, wert, punkte, namen} — s. spieleDisziplin() oben, dort steht
     // auch, was "Protokoll" je Chassis heisst und warum "punkte" nur im Feldspiel
