@@ -391,14 +391,16 @@ try {
       stand: (document.getElementById("esieger") || {}).textContent || "" };
     A.sondenAus(); return r;
   });
-  pruefe(n3.lampeVorEndstand && Math.abs(n3.k - 210) <= 1,
+  // done faellt irgendwo in den letzten 20er-Schritt -> 190..211 Restticks bis #endstand.
+  pruefe(n3.lampeVorEndstand && n3.k >= 190 && n3.k <= 211,
     `(N3) gewichtheben: letzte Hebung laeuft im Nachlauf ab (${n3.phasenFolge.join(" -> ")}), Lampe vor #endstand ${n3.lampeVorEndstand}, #endstand nach ${n3.k} Ticks; Bug bei done "${n3.scoreBeiDone}" -> "${n3.scoreEnde}"`);
 
   // (T) Werkzeug: jedes Skript, das den Helfer aufruft, importiert ihn auch (node --check faengt
   // einen fehlenden Import nicht -- erst die Laufzeit, Opus-Review-Fund 1).
   {
     const { readdirSync } = await import("node:fs");
-    const ohneImport = readdirSync(path.join(WURZEL, "scripts")).filter((f) => f.endsWith(".mjs")).filter((f) => {
+    const selbst = path.basename(fileURLToPath(import.meta.url)); // nennt die Namen nur im Suchmuster
+    const ohneImport = readdirSync(path.join(WURZEL, "scripts")).filter((f) => f.endsWith(".mjs") && f !== selbst).filter((f) => {
       const q = readFileSync(path.join(WURZEL, "scripts", f), "utf8");
       return /(warteAufAnpfiff|sendungsrahmenAus)\(/.test(q) && !/^import .*from "\.\/lib\/arena-anpfiff\.mjs";/m.test(q);
     });
