@@ -40097,7 +40097,26 @@
             melde("schwach",u.n+" liegt an "+(A.hindernisWort||"Hürde")+" "+(meldeStation+1)+
               " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
           } else {
-            feed(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt "+(wortAkk||("die "+BA().hindernisWort))+"."));
+            // T-STURZ (Takeshi-Ticker-Paket, 07.10., docs/design/takeshi-ticker-paket-plan-
+            // 07-10.md, korrigiert nach Opus-Review): bisher ohne stufe, also "normal"
+            // (budgetiert, aber am Budget-Wettbewerb beteiligt) -- derselbe Kommentar direkt
+            // oberhalb dieser Stelle sagt es selbst: "ein Sturz ist in Takeshi der
+            // Normalfall, keine Ausnahme". Der Schwester-Zweig "nimmt ... mit Gewalt"
+            // (Z. 40001, durchbruch-Fall) ist laengst feedRoutine(); dieser Sturz-Fall blieb
+            // es nicht. Gemessen 49 Zeilen je Rennen (zweithaeufigstes Ereignis ueberhaupt)
+            // -- diese verdraengten im Budget-Wettbewerb die selteneren, interessanteren
+            // Normal-Zeilen (Gedraenge, Rempler).
+            // NUR TAKESHI, nicht pauschal jede Bahn mit Huerden: der Rempler-Kommentar eine
+            // Funktion weiter oben trifft fuer die Haeufigkeit genau dieselbe Unterscheidung
+            // ("selten genug ... IN TAKESHI ... AUSSER ... Spurt ... bleibt unveraendert"),
+            // und derselbe A.takeshi-Schalter steuert direkt daneben schon den Sturz-Ton
+            // (Z. 40078, "sonst hoerte man den Takeshi-Sturzton auch im Spurt"). Die erste
+            // Fassung dieses Fixes hatte das uebersehen und feedRoutine() fuer ALLE Bahnen
+            // mit Huerden gesetzt -- das nahm Spurt 19 Sturz-Zeilen aus dem Ticker, obwohl
+            // Spurt nie ueber der Schranke lag und laut jenem Kommentar dort seltener und
+            // damit weiterhin ticker-wuerdig bleiben soll.
+            const sturzZeile=u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt "+(wortAkk||("die "+BA().hindernisWort))+".");
+            if(A.takeshi)feedRoutine(u.seite,sturzZeile); else feed(u.seite,sturzZeile);
           }
           }
         }
@@ -40217,8 +40236,18 @@
               // um" zu einem der haeufigsten Bannertexte -- kein Ausscheiden/Zieleinlauf/
               // Fuehrungswechsel, also nicht mehr big. Spurt (deutlich seltener, "selten genug"
               // trifft dort weiter zu) bleibt unveraendert.
+              // T-REMPLER (Time-Trial-Broadcast-Paket-Nebenfund, 07.10., docs/design/time-
+              // trial-broadcast-paket-plan-07-10.md): `kind="rempler"` stand bedingungslos
+              // da -- dieselbe kind-Falle wie bei TDM/Breaking/Time-Trial/Schach/Fechten
+              // (feed() stuft jede Zeile mit gesetztem kind immer als "ereignis" ein, auch
+              // wenn big laengst korrekt false ist). Takeshi hatte big schon richtig auf
+              // false gesetzt, aber kind lief trotzdem ungebremst durch: 13,3 Rempler je
+              // Rennen standen alle im sichtbaren Ticker (Takeshi 31,5 statt 30 Zeilen/min).
+              // kind jetzt dieselbe Bedingung wie big -- fuer jede andere Bahn unveraendert.
+              const remplerBig=!TA.takeshi;
               feed(u.seite,u.n+(TA.tackleFenster?" rammt "+o.n+" vor der "+(TA.hindernisWort||"Hürde")+" um."
-                                                :" räumt "+o.n+" von der Bahn."),!TA.takeshi,undefined,"rempler");
+                                                :" räumt "+o.n+" von der Bahn."),remplerBig,undefined,
+                remplerBig?"rempler":undefined);
             } else {
               schwebe({x:camX(o.pos),y:bahnY(o.bahnZ)-20,txt:"hält stand",life:.9,crit:false,_laeufer:o.id});
               feedRoutine(o.seite,o.n+" steckt den Rempler weg.");
