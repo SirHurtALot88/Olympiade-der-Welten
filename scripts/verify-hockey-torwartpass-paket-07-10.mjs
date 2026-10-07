@@ -33,13 +33,20 @@ const pruefe = (name, ok, detail) => {
   if (!ok) alleOk = false;
 };
 
-// (b) statisch: Rumpf von offensterMitspieler bis zur naechsten Top-Level-Funktion
-const start = quelle.indexOf("  function offensterMitspieler(mitspieler,von){");
-const ende = quelle.indexOf("\n  function ", start + 10);
-const rumpf = quelle.slice(start, ende).split("\n").filter((z) => !z.trim().startsWith("//")).join("\n");
-pruefe("(b) offensterMitspieler liest keinen Wert des Passgebers",
-  start > 0 && !/von\.(AUFBAU|TECHNIK|ABSCHLUSS|TEAMGEIST|PARADE)/.test(rumpf),
-  "nur Position (offenheitFuerPass(von,m))");
+// (b) statisch: die Ruempfe von offensterMitspieler UND offenheitFuerPass (die einzige
+// Unterfunktion, die `von` bekommt; Review 07.10.). Gesucht wird nach JEDEM Attributzugriff
+// auf `von` (Grossbuchstaben-Feld = Sub-Skill/PARADE) — erlaubt sind nur x/y/side und der
+// Vergleich `v.deckt===von`.
+const rumpfVon = (kopf) => {
+  const start = quelle.indexOf(kopf);
+  const ende = quelle.indexOf("\n  function ", start + 10);
+  return start < 0 ? "" : quelle.slice(start, ende).split("\n").filter((z) => !z.trim().startsWith("//")).join("\n");
+};
+const ruempfe = rumpfVon("  function offensterMitspieler(mitspieler,von){") + rumpfVon("  function offenheitFuerPass(von,ziel){");
+const vonFelder = [...new Set([...ruempfe.matchAll(/\bvon\.([A-Za-z_]+)/g)].map((m) => m[1]))];
+pruefe("(b) Zielwahl liest keinen Attributwert des Passgebers (offensterMitspieler + offenheitFuerPass)",
+  ruempfe.length > 0 && vonFelder.every((f) => ["x", "y", "side"].includes(f)),
+  `von.* gelesen: ${vonFelder.join(", ") || "nur als Argument/Vergleich"}`);
 const stellen = (quelle.match(/passQualitaetVon\(/g) || []).length;
 pruefe("(a) passQualitaetVon an den drei Ketten-Stellen + Hook", stellen >= 4, `${stellen} Aufrufe/Definitionen`);
 
