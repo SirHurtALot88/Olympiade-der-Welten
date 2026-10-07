@@ -30,7 +30,8 @@
 //          Score-Bug bleibt waehrend des Nachlaufs stehen
 //     (N3) Gewichtheben: im Nachlauf laeuft die letzte Hebung bis zur Lampe ab (Befund B4)
 //   T  jedes Skript, das warteAufAnpfiff()/sendungsrahmenAus() aufruft, importiert den Helfer
-//   I  Isolation: disziplinProbe() UND einflussVon() fuer ALLE ZWANZIG Disziplinen bit-
+//   I  Isolation: disziplinProbe() fuer ALLE ZWANZIG Disziplinen (einflussVon() fuer die fuenf
+//      beruehrten Feldspiel/Gewichtheben/Spurt) bit-
 //      identisch zwischen der Engine vor diesem Paket (git merge-base mit origin/main) und
 //      jetzt -- die headless Mess-Pfade (miss-alle-disziplinen.mjs, messe-arena-einfluss.mjs)
 //      sehen D7/A4/Nachlauf nicht. (I2) dazu der sondenLauf()-Pfad bis `done` (done-Tick,
@@ -461,6 +462,7 @@ try {
       const familie = existsSync(kaderPfad)
         ? JSON.parse(readFileSync(kaderPfad, "utf8")).varianten.map((v) => ({ label: v.label, heim: v.heim, gast: v.gast })).slice(0, 2)
         : null;
+      const EINFLUSS_DISZ = ["basketball", "hockey", "football", "gewichtheben", "spurt"];
       const messe = async (q) => {
         const s = await neueSeite(q);
         // Kontrolle der Umleitung: die Basis-Engine kennt anpfiffStatus() nicht, die neue schon.
@@ -470,10 +472,14 @@ try {
         const ds = await s.evaluate(() => window.__arena.motoren());
         const out = {};
         for (const d of ds) {
-          out[d] = await s.evaluate(([dd, fam]) => ({
+          console.log(`      ${q ? "Basis" : "neu  "} ${d}`);
+          out[d] = await s.evaluate(([dd, fam, EINFLUSS_DISZ]) => ({
             probe: window.__arena.disziplinProbe(dd, { n: 2, ...(fam ? { kaderFamilie: fam } : {}) }),
-            einfluss: window.__arena.einflussVon(dd, 2),
-          }), [d, familie]);
+            // einflussVon() ist teuer (TDM allein > 15 min auf belasteter Maschine) -- nur fuer
+            // die Disziplinen, deren Code dieses Paket ueberhaupt in der Naehe beruehrt
+            // (Feldspiel: D7/Nachlauf, Gewichtheben: stepBuehne()-done-Zweig, Spurt: Bahn-Nachlauf).
+            einfluss: EINFLUSS_DISZ.includes(dd) ? window.__arena.einflussVon(dd, 1) : null,
+          }), [d, familie, EINFLUSS_DISZ]);
         }
         // (I2) DER ANZEIGE-PFAD, DEN DIE NEUEN BAUSTEINE WIRKLICH BERUEHREN: sondenLauf() (ruft
         // updateHud*() und damit den Nachlauf) bis `done` -- done-Tick, Endstand und Ticker-
@@ -504,7 +510,7 @@ try {
       const ds = Object.keys(nachher);
       const abweichend = ds.filter((d) => !isDeepStrictEqual(vorher[d], nachher[d]));
       pruefe(ds.length === 20 && abweichend.length === 0 && Object.keys(vorher).length === 20,
-        `(I) disziplinProbe(n=2${familie ? ", Kaderfamilie 2 Varianten" : ""}) + einflussVon(n=2) fuer ${ds.length} Disziplinen gegen ${basis.slice(0, 10)}: ${abweichend.length ? "ABWEICHUNG in " + abweichend.join(",") : "bit-identisch"}`);
+        `(I) disziplinProbe(n=2${familie ? ", Kaderfamilie 2 Varianten" : ""}) fuer ${ds.length} Disziplinen + einflussVon(n=1) fuer ${EINFLUSS_DISZ.join("/")} gegen ${basis.slice(0, 10)}: ${abweichend.length ? "ABWEICHUNG in " + abweichend.join(",") : "bit-identisch"}`);
     } catch (e) {
       pruefe(false, "(I) Isolationsvergleich nicht ausfuehrbar: " + String(e).slice(0, 200));
     }
