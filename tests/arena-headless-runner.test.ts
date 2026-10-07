@@ -46,17 +46,129 @@ function chromiumVerfuegbar(): boolean {
 
 const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 
-function zaehleChromiumKindprozesse(): number {
+type PsZeile = { pid: string; ppid: string; args: string };
+
+/**
+ * Ein `ps`-Schnappschuss mit PPID -- Grundlage sowohl fuer die Abstammungspruefung (waehrend des
+ * Laufs) als auch fuer den reinen Pfad-Grep danach (s. `eigeneProfileAusSchnappschuss` /
+ * `wartetBisProfileVerschwinden`).
+ */
+function schnappschuss(): PsZeile[] | null {
   try {
-    const ausgabe = execSync("ps -eo pid,args", { encoding: "utf8" });
-    return ausgabe
-      .split("\n")
-      .filter((zeile) => zeile.includes(CHROMIUM_PFAD))
-      .length;
+    // `-ww`: ohne diesen Schalter kappt `ps` jede Zeile an `$COLUMNS` (in manchen Shells/CI
+    // exportiert) -- die Hauptprozesszeile ist mit all ihren Chromium-Flags weit ueber 1000
+    // Zeichen lang, das `--user-data-dir` liegt also oft hinter dem Schnitt und `profile` bliebe
+    // leer, obwohl ein Browser lief (Fund im Opus-Review 07.10.).
+    const ausgabe = execSync("ps -ww -eo pid,ppid,args", { encoding: "utf8" });
+    const zeilen: PsZeile[] = [];
+    for (const zeile of ausgabe.split("\n")) {
+      const treffer = zeile.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (treffer) zeilen.push({ pid: treffer[1], ppid: treffer[2], args: treffer[3] });
+    }
+    return zeilen;
   } catch {
     // `ps` selbst nicht verfuegbar (z. B. minimaler Container) -> Test kann diesen Aspekt nicht
     // pruefen, soll aber nicht deswegen rot werden.
-    return -1;
+    return null;
+  }
+}
+
+function istNachkommeVon(pid: string, ppidVon: Map<string, string>, wurzel: string): boolean {
+  let aktuell = pid;
+  const gesehen = new Set<string>();
+  for (;;) {
+    const ppid = ppidVon.get(aktuell);
+    if (!ppid || gesehen.has(aktuell)) return false;
+    if (ppid === wurzel) return true;
+    gesehen.add(aktuell);
+    aktuell = ppid;
+  }
+}
+
+/**
+ * Liefert die `--user-data-dir`-Profile aller Chromium-Prozesse im Schnappschuss, die zu diesem
+ * Zeitpunkt (noch) Nachkommen von `wurzelPid` sind -- also nachweisbar von DIESEM Testprozess
+ * gestartet wurden, nicht von irgendeinem anderen, gleichzeitig in dieser geteilten Umgebung
+ * laufenden Agenten.
+ */
+function eigeneProfileAusSchnappschuss(zeilen: PsZeile[], wurzelPid: number): Set<string> {
+  const ppidVon = new Map(zeilen.map((z) => [z.pid, z.ppid]));
+  const profile = new Set<string>();
+  for (const z of zeilen) {
+    if (!z.args.includes(CHROMIUM_PFAD)) continue;
+    if (!istNachkommeVon(z.pid, ppidVon, String(wurzelPid))) continue;
+    const treffer = z.args.match(/--user-data-dir=(\S+)/);
+    if (treffer) profile.add(treffer[1]);
+  }
+  return profile;
+}
+
+/**
+ * Sammelt waehrend `aktion()` laufend (alle 100ms) die Playwright-Profilverzeichnisse, die dieser
+ * Testprozess selbst gestartet hat. Das ist der einzige Moment, in dem sich "unser" Chromium
+ * zuverlaessig von gleichzeitiger Chromium-Aktivitaet ANDERER Agenten in dieser geteilten
+ * Umgebung unterscheiden laesst: ein reiner Vorher/Nachher-PID-Vergleich ueber ALLE
+ * Chromium-Prozesse der Maschine (die fruehere Fassung dieses Tests) wird faelschlich rot, sobald
+ * irgendein anderer Prozess im selben Fenster zufaellig ebenfalls Chromium startet oder beendet --
+ * nachgemessen 07.10. (Flaky-Fund, mehrfach auch nach einer reinen Gnadenfrist noch rot). Sobald
+ * `browser.close()` den Hauptprozess beendet, werden seine verbliebenen Helfer (Zygote/GPU/
+ * Utility) vom Kernel auf PID 1 umgehaengt -- danach ist eine Abstammungspruefung wirkungslos,
+ * weil sie genau die nachlaufenden Prozesse verliert. Das pro Start zufaellige `--user-data-dir`
+ * bleibt dagegen in jedem zugehoerigen Prozess (auch den umgehaengten) sichtbar und erlaubt
+ * danach trotzdem noch, gezielt genau diese wiederzufinden.
+ *
+ * LUECKE (Opus-Review 07.10.): `chrome_crashpad_handler` traegt in seiner Kommandozeile WEDER
+ * `--user-data-dir` NOCH sonst einen Bezug zu seinem Hauptprozess und ist schon beim Start (nicht
+ * erst nach `close()`) ein Kind von PID 1 -- weder die Abstammungspruefung waehrend des Laufs noch
+ * der Profil-Grep danach erfassen ihn je. Bewusst hingenommen: nachgemessen (ps -eo
+ * pid,ppid,stat,args) beendet sich der Handler selbststaendig binnen rund 1,2s, nachdem sein
+ * ueberwachter Chrome-Prozess ausgelaufen ist (er startet mit `--monitor-self`) -- ein echtes
+ * Haengenbleiben waere ein voellig anderer Fehler (der Handler ueberlebt seinen Chrome-Prozess),
+ * kein Leck von `browser.close()`. Die alte, system-weite PID-Zaehlung "erfasste" ihn nur
+ * scheinbar -- sie erbte dafuer genau die Fragilitaet, die dieser Umbau beheben soll.
+ */
+async function sammleEigeneProfileWaehrend(aktion: () => Promise<void>): Promise<Set<string>> {
+  const profile = new Set<string>();
+  let laeuft = true;
+  const erfasse = () => {
+    const zeilen = schnappschuss();
+    if (zeilen) for (const p of eigeneProfileAusSchnappschuss(zeilen, process.pid)) profile.add(p);
+  };
+  const sammlerFertig = (async () => {
+    while (laeuft) {
+      erfasse();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    erfasse(); // letzter Schnappschuss, falls `aktion` zwischen zwei Intervallen fertig wurde
+  })();
+  try {
+    await aktion();
+  } finally {
+    laeuft = false;
+    await sammlerFertig;
+  }
+  return profile;
+}
+
+/**
+ * Wartet bis zu `maxWartenMs` darauf, dass kein Chromium-Prozess mit einem der gesammelten
+ * Profile mehr lebt, und liefert die am Ende noch lebenden PIDs zurueck (leer = kein Leck).
+ * `browser.close()` kehrt zurueck, sobald Playwright dem Hauptprozess das Schliessen signalisiert
+ * hat -- die Kindprozesse brauchen danach noch ein kurzes, vom Betriebssystem abhaengiges
+ * Nachlaufen, um tatsaechlich eingesammelt zu werden. Nur PIDs, die auch nach `maxWartenMs` noch
+ * leben, zaehlen als Leck.
+ */
+async function wartetBisProfileVerschwinden(profile: Set<string>, maxWartenMs = 5000): Promise<string[]> {
+  if (profile.size === 0) return [];
+  const start = Date.now();
+  for (;;) {
+    const zeilen = schnappschuss();
+    const lebend =
+      zeilen === null
+        ? []
+        : zeilen.filter((z) => z.args.includes(CHROMIUM_PFAD) && [...profile].some((p) => z.args.includes(p))).map((z) => z.pid);
+    if (lebend.length === 0 || Date.now() - start >= maxWartenMs) return lebend;
+    await new Promise((resolve) => setTimeout(resolve, 150));
   }
 }
 
@@ -223,36 +335,40 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
   it(
     "schliesst den Browser nach Erfolg und nach Fehlern zuverlaessig (kein Zombie-Prozess)",
     async () => {
-      const vorher = zaehleChromiumKindprozesse();
-
       const gameState = baueGameState(
         { teamId: "team-heim", prefix: "Heim" },
         { teamId: "team-gast", prefix: "Gast" },
       );
-      await runArenaFixtures(
-        gameState,
-        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "shutdown-erfolg" }],
-        "basketball",
-      );
 
-      // Unbekannte Disziplin -> spieleFeldspiel() liefert null -> der Runner wirft NACH dem
-      // Browser-Start, aber VOR dem regulaeren Rueckgabepfad. Der finally-Block muss trotzdem
-      // greifen.
-      await expect(
-        runArenaFixtures(
+      const profile = await sammleEigeneProfileWaehrend(async () => {
+        await runArenaFixtures(
           gameState,
-          [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "shutdown-fehler" }],
-          "keine-disziplin-die-es-gibt",
-        ),
-      ).rejects.toThrow();
+          [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "shutdown-erfolg" }],
+          "basketball",
+        );
 
-      const nachher = zaehleChromiumKindprozesse();
-      if (vorher === -1 || nachher === -1) {
-        // `ps` in dieser Umgebung nicht verfuegbar -- der eigentliche Determinismus-/Batch-Teil
-        // oben hat den Runner trotzdem bereits mehrfach erfolgreich durchlaufen lassen.
+        // Unbekannte Disziplin -> spieleFeldspiel() liefert null -> der Runner wirft NACH dem
+        // Browser-Start, aber VOR dem regulaeren Rueckgabepfad. Der finally-Block muss trotzdem
+        // greifen.
+        await expect(
+          runArenaFixtures(
+            gameState,
+            [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "shutdown-fehler" }],
+            "keine-disziplin-die-es-gibt",
+          ),
+        ).rejects.toThrow();
+      });
+
+      if (profile.size === 0) {
+        // `ps` in dieser Umgebung nicht verfuegbar, ODER das 100ms-Sampling hat keinen einzigen
+        // Schnappschuss waehrend eines lebenden Chromium-Prozesses getroffen -- in beiden Faellen
+        // kann dieser Testaspekt nicht sinnvoll geprueft werden. Der eigentliche
+        // Determinismus-/Batch-Teil oben hat den Runner trotzdem bereits mehrfach erfolgreich
+        // durchlaufen lassen.
         return;
       }
-      expect(nachher).toBe(vorher);
+      const lebend = await wartetBisProfileVerschwinden(profile);
+      expect(lebend).toEqual([]);
     },
     LAUF_TIMEOUT_MS,
   );
