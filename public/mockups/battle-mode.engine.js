@@ -19495,7 +19495,14 @@
     // lief dann nie wieder, und die zuletzt enthuellte Bewegung (letzter Breaking-Ertragender in
     // "eintritt", letzte Eiskunstlauf-Schlusspose) fror auf halbem Weg ein. `done` bleibt hier
     // unveraendert -- nur buehnenBewegung() darf nach dem Abschluss weiterlaufen.
-    if(done){ buehnenBewegung(dt); return; }
+    // ENDSTAND-NACHLAUF (Sendungsrahmen-Paket 07.10., Opus-Review-Fund 2): auch die `lunge`-Uhr
+    // muss nach `done` weiter abklingen. Ohne das blieb `u.lunge` des zuletzt Enthuellten auf
+    // 0,5, stepHeben() hielt ihn mit `frischEnthuellt` in JEDEM Tick auf "antritt" fest, und die
+    // letzte Hebung (Lampen, Urteil, Ticker) kam nie -- erst seit dem 3,5-s-Nachlauf sichtbar,
+    // vorher deckte das Overlay es im selben Frame zu (Befund B4). `u.lunge` ist reine
+    // Animationsuhr (keine Wertung liest sie), und nach `done` laeuft ohnehin nur noch der
+    // praesentationale Pfad; die Tick-Folge bis `done` bleibt unberuehrt.
+    if(done){ for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt); buehnenBewegung(dt); return; }
     buehneT+=dt;
     for(const u of TEILNEHMER)if(u.lunge>0)u.lunge=Math.max(0,u.lunge-dt);
     buehneAkt-=dt;
@@ -21348,7 +21355,10 @@
     if(!u||u.aktuell+1<u.runden.length)return false;
     const g=hebenGegner(u);
     if(!g||g.aktuell+1<g.runden.length)return false;
-    if(nachLampe&&!done){
+    // ENDSTAND-NACHLAUF (07.10.): waehrend der 3,5 s nach `done` steht der Score-Bug noch und
+    // die letzte Lampe kommt erst -- auch dort erst nach der Lampe zaehlen, sonst verriete der
+    // Bug das letzte Duell vor dem Urteil.
+    if(nachLampe&&(!done||endstandNachlauf)){
       const offen=x=>x.vizPhase==="antritt"||x.vizPhase==="zug";
       if(offen(u)||offen(g))return false;
     }
@@ -47907,9 +47917,11 @@
     endstandNachlauf:(an)=>{ if(an!==undefined)endstandNachlaufAn=!!an; return endstandNachlaufAn; },
     // Bequemer Sammelschalter: alle drei Wandzeit-Bausteine an/aus.
     sendungsrahmen:(an)=>{
-      const a=!!an; anpfiffCountdownAn=a; endstandNachlaufAn=a; finaleEchtzeitAn=a;
+      // finaleEchtzeit beim Wiedereinschalten auf die gespeicherte Wahl des Zuschauers
+      // zuruecksetzen statt sie fuer diese Seite pauschal auf "an" zu zwingen.
+      const a=!!an; anpfiffCountdownAn=a; endstandNachlaufAn=a; finaleEchtzeitAn=a&&lsLesen("finaleEchtzeit")!=="0";
       finaleSchalterAnzeige(); tempoAnzeigeAktualisieren();
-      return {anpfiffCountdown:a, finaleEchtzeit:a, endstandNachlauf:a};
+      return {anpfiffCountdown:a, finaleEchtzeit:finaleEchtzeitAn, endstandNachlauf:a};
     },
     // Fuer scripts/lib/arena-anpfiff.mjs (warteAufAnpfiff): "laeuft und erster Tick ist durch".
     anpfiffStatus:()=>({laeuft:running, countdown:!!anpfiffLauf, angepfiffen:anpfiffErfolgt,
@@ -48756,7 +48768,16 @@
     },
     // Kehrt zur echten Wanduhr zurueck (s. sondenLauf() oben) — z.B. wenn nach einem Sonden-
     // Lauf noch interaktiv per "Kampf starten" weitergespielt werden soll.
-    sondenAus:()=>{ sondenAktiv=false; },
+    // ENDSTAND-NACHLAUF (07.10., Opus-Review): ein im Sonden-Modus begonnener Nachlauf traegt
+    // `seitMs` in Sonden-Zeit -- beim Wechsel auf die Wanduhr auf dieselbe verbleibende Dauer
+    // umrechnen, sonst hinge er (Sonden-Zeit >> performance.now()) minutenlang.
+    sondenAus:()=>{
+      if(sondenAktiv&&endstandNachlauf){
+        const vergangen=sondenSimMs-endstandNachlauf.seitMs;
+        endstandNachlauf.seitMs=wandMs()-vergangen;
+      }
+      sondenAktiv=false;
+    },
     renderProbe:(name,ani,feldspiel,dir,lunge,leinwand,vizPhase,anker,viz)=>{
       // LEINWAND (optional, Vorgabe 64): eine grosse Figur laeuft bei 64 Pixeln oben aus
       // dem Bild — der Sprite wird bei y-46*Z angesetzt und ist 64*Z hoch, bei Z=1,19 also

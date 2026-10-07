@@ -28,10 +28,13 @@
 //          sofort; mit endstandNachlauf(false) im selben Tick (altes Verhalten)
 //     (N2) Echtzeit (Feldspiel/Bahn/Buehne je einmal): Abstand done -> #endstand 3,5 s ±150 ms,
 //          Score-Bug bleibt waehrend des Nachlaufs stehen
+//     (N3) Gewichtheben: im Nachlauf laeuft die letzte Hebung bis zur Lampe ab (Befund B4)
+//   T  jedes Skript, das warteAufAnpfiff()/sendungsrahmenAus() aufruft, importiert den Helfer
 //   I  Isolation: disziplinProbe() UND einflussVon() fuer ALLE ZWANZIG Disziplinen bit-
 //      identisch zwischen der Engine vor diesem Paket (git merge-base mit origin/main) und
 //      jetzt -- die headless Mess-Pfade (miss-alle-disziplinen.mjs, messe-arena-einfluss.mjs)
-//      sehen D7/A4/Nachlauf nicht.
+//      sehen D7/A4/Nachlauf nicht. (I2) dazu der sondenLauf()-Pfad bis `done` (done-Tick,
+//      Endstand, Tickerzeilen) fuer je eine Disziplin je Chassis plus Gewichtheben.
 //   F  keine pageerror
 //
 // Aufruf: node scripts/verify-broadcast-d7-a4-nachlauf-paket-07-10.mjs [--ohne-isolation]
@@ -139,7 +142,7 @@ try {
     // Untergrenze hart (nie vor Ablauf des Rituals), Obergrenze um die laengste gemessene
     // Frame-Luecke erweitert: der Motor prueft den Countdown je requestAnimationFrame, auf einer
     // belasteten Maschine kommt der naechste Frame spaeter -- das ist Frame-Jitter, keine Logik.
-    const spiel = 150 + m.frameMax;
+    const spiel = 300 + 2 * m.frameMax; // bis zu zwei Frame-Luecken: Motor-Frame und Mess-Frame
     const dauerOk = m.laeuftAb != null && m.laeuftAb >= m.r.dauer - 20 && m.laeuftAb <= m.r.dauer + spiel;
     // Stinger: genau einmal gestartet (Zaehler des Motors). Die Sichtbarkeit selbst kann auf
     // einer belasteten Maschine zwischen zwei Frames fallen (450 ms < Frame-Luecke) -- dann nur
@@ -269,7 +272,7 @@ try {
       const t0 = performance.now();
       const schritt = () => {
         const t = performance.now() - t0, ts = A.tempoStatus(), as = A.anpfiffStatus(), fp = A.finaleProbe();
-        proben.push({ t, ticks: as.ticks, drosselt: ts.drosselt });
+        proben.push({ t, ticks: as.ticks, drosselt: ts.drosselt, wirksam: ts.wirksam });
         if (ts.drosselt && finaleAb == null) { finaleAb = t; }
         if (ts.drosselt && finaleAb != null && t - finaleAb > 300 && anzeigeImFinale == null) anzeigeImFinale = ts.anzeige;
         if (ts.finaleAktiv && fp.zustand && fp.zustand.abstand > fp.zustand.schwelle) abstandUeberSchwelleImFinale = true;
@@ -282,7 +285,10 @@ try {
             const a = proben.find((x) => x.t >= von), b = [...proben].reverse().find((x) => x.t <= bis);
             return a && b && b.t > a.t ? (b.ticks - a.ticks) / ((b.t - a.t) / 1000) : null;
           };
-          resolve({ finaleAb, geklicktAb, anzeigeImFinale, rueckfall, abstandUeberSchwelleImFinale, nachspielzeitImFinale,
+          const wirksamVor = finaleAb != null ? [...new Set(proben.filter((x) => x.t < finaleAb).map((x) => x.wirksam))] : null;
+          const wirksamFinale = finaleAb != null ? [...new Set(proben.filter((x) => x.t >= finaleAb && (geklicktAb == null || x.t <= geklicktAb)).map((x) => x.wirksam))] : null;
+          const wirksamNach = geklicktAb != null ? [...new Set(proben.filter((x) => x.t > geklicktAb && !x.done).map((x) => x.wirksam))] : null;
+          resolve({ wirksamVor, wirksamFinale, wirksamNach, finaleAb, geklicktAb, anzeigeImFinale, rueckfall, abstandUeberSchwelleImFinale, nachspielzeitImFinale,
             rateVor: finaleAb != null ? rate(Math.max(0, finaleAb - 1500), finaleAb - 100) : null,
             rateFinale: finaleAb != null ? rate(finaleAb + 200, finaleAb + 1400) : null,
             rateNachKlick: geklicktAb != null ? rate(geklicktAb + 200, geklicktAb + 1000) : null,
@@ -291,12 +297,15 @@ try {
       };
       requestAnimationFrame(schritt);
     }));
-    // Verhaeltnisse statt absoluter Raten: loop() deckelt dt auf 50 ms, auf einer belasteten
-    // Maschine sinken alle Raten gemeinsam -- das Verhaeltnis 4×:1× bleibt 4.
-    const ratenOk = live.rateVor > 0 && live.rateFinale / live.rateVor > 0.15 && live.rateFinale / live.rateVor < 0.4
-      && (live.rateNachKlick == null || live.rateNachKlick / live.rateFinale > 1.5);
+    // Massgeblich ist der vom Motor wirklich benutzte Multiplikator (tempoStatus().wirksam, genau
+    // der Wert in `acc+=dt*wirksamesTempo()`): vorher 4, im Finale 1, nach dem Klick wieder 4.
+    // Die Tick-Raten sind nur Beleg der Richtung -- auf einer belasteten Maschine schwanken die
+    // Frame-Zeiten zu stark fuer feste Verhaeltnisse.
+    const ratenOk = isDeepStrictEqual(live.wirksamVor, [4]) && isDeepStrictEqual(live.wirksamFinale, [1])
+      && (live.wirksamNach == null || isDeepStrictEqual(live.wirksamNach, [4]))
+      && live.rateFinale < live.rateVor && (live.rateNachKlick == null || live.rateNachKlick > live.rateFinale);
     pruefe(live.finaleAb != null && live.anzeigeImFinale === "Tempo 1× · Finale (Klick: zurück auf 4×)" && ratenOk,
-      `(D3) ${d}: Finale greift nach ${live.finaleAb?.toFixed(0)} ms, Anzeige "${live.anzeigeImFinale}", Ticks/s vorher ${live.rateVor?.toFixed(0)} -> Finale ${live.rateFinale?.toFixed(0)} -> nach Klick ${live.rateNachKlick?.toFixed(0) ?? "(Spiel vorher zu Ende)"}`);
+      `(D3) ${d}: Finale greift nach ${live.finaleAb?.toFixed(0)} ms, Anzeige "${live.anzeigeImFinale}", wirksam ${JSON.stringify(live.wirksamVor)} -> ${JSON.stringify(live.wirksamFinale)} -> ${JSON.stringify(live.wirksamNach)}, Ticks/s vorher ${live.rateVor?.toFixed(0)} -> Finale ${live.rateFinale?.toFixed(0)} -> nach Klick ${live.rateNachKlick?.toFixed(0) ?? "(Spiel vorher zu Ende)"}`);
     if (live.geklicktAb != null) {
       pruefe(live.nachKlick.speed === 4 && live.nachKlick.finaleAbgewaehlt && !live.nachKlick.drosselt && live.nachKlick.finaleAktiv
         && !live.rueckfall && live.nachKlick.anzeige === "Tempo 4×",
@@ -319,6 +328,7 @@ try {
     break;
   }
   if (!liveGeprueft) pruefe(false, "(D3) kein Feldspiel mit knapper Schlussphase gefunden -- Live-Pruefung nicht moeglich");
+  else console.log("      (D3/D4 live an EINEM Feldspiel gefahren -- dem ersten mit knapper Schlussphase; die Bedingung selbst ist in D1 fuer alle drei geprueft)");
   await setzeTempo(seite, 1);
 
   // ===================================================================== N
@@ -361,6 +371,40 @@ try {
   });
   pruefe(n1k.vorbei && n1k.sichtbar && !n1k.aktiv,
     `(N1) tdm (Kontrolle Kampf) : #endstand sofort bei done (${n1k.n} Ticks), kein Nachlauf -- unveraendert`);
+  // (N3) Gewichtheben (Befund B4 / Opus-Review-Fund 2): im Nachlauf muss die letzte Hebung
+  // wirklich ablaufen (antritt -> zug -> Lampe, also "hoch" oder "ablage"), bevor #endstand kommt,
+  // und der Score-Bug darf das letzte Duell erst nach der Lampe zaehlen.
+  const n3 = await seite.evaluate(() => {
+    const A = window.__arena; A.endstandNachlauf(true); A.setDisc("gewichtheben");
+    document.getElementById("einlauf").hidden = true;
+    let n = 0; while (!A.vorbei() && n < 60 * 60 * 20) { A.sondenLauf(20); n += 20; }
+    const phasenFolge = []; let lampeVorEndstand = false, scoreBeiDone = document.getElementById("score").textContent;
+    const aktiv = () => A.cypherVizProbe().filter((x) => x.phase && x.phase !== "boden").map((x) => x.phase).join(",");
+    let k = 0;
+    while (document.getElementById("endstand").hidden && k < 400) {
+      A.sondenLauf(1); k++;
+      const ph = aktiv();
+      if (phasenFolge[phasenFolge.length - 1] !== ph) phasenFolge.push(ph);
+      if (/hoch|ablage/.test(ph)) lampeVorEndstand = true;
+    }
+    const r = { k, phasenFolge, lampeVorEndstand, scoreBeiDone, scoreEnde: document.getElementById("score").textContent,
+      stand: (document.getElementById("esieger") || {}).textContent || "" };
+    A.sondenAus(); return r;
+  });
+  pruefe(n3.lampeVorEndstand && Math.abs(n3.k - 210) <= 1,
+    `(N3) gewichtheben: letzte Hebung laeuft im Nachlauf ab (${n3.phasenFolge.join(" -> ")}), Lampe vor #endstand ${n3.lampeVorEndstand}, #endstand nach ${n3.k} Ticks; Bug bei done "${n3.scoreBeiDone}" -> "${n3.scoreEnde}"`);
+
+  // (T) Werkzeug: jedes Skript, das den Helfer aufruft, importiert ihn auch (node --check faengt
+  // einen fehlenden Import nicht -- erst die Laufzeit, Opus-Review-Fund 1).
+  {
+    const { readdirSync } = await import("node:fs");
+    const ohneImport = readdirSync(path.join(WURZEL, "scripts")).filter((f) => f.endsWith(".mjs")).filter((f) => {
+      const q = readFileSync(path.join(WURZEL, "scripts", f), "utf8");
+      return /(warteAufAnpfiff|sendungsrahmenAus)\(/.test(q) && !/^import .*from "\.\/lib\/arena-anpfiff\.mjs";/m.test(q);
+    });
+    pruefe(ohneImport.length === 0, `(T) Skripte mit warteAufAnpfiff/sendungsrahmenAus ohne Import: ${ohneImport.length ? ohneImport.join(", ") : "keine"}`);
+  }
+
   // (N2) Echtzeit, je Chassis einmal (Feldspiel-Ende aus der D3-Suche).
   for (const d of ["football", "spurt", "speed-schach"]) {
     if (doneTick[d] == null) { pruefe(false, `(N2) ${d}: kein done-Tick bekannt`); continue; }
@@ -383,7 +427,7 @@ try {
     }), [d, doneTick[d]]);
     const delta = n2.endAb != null && n2.doneAb != null ? n2.endAb - n2.doneAb : null;
     // Untergrenze hart, Obergrenze um die laengste Frame-Luecke erweitert (Frame-Jitter, s. A2).
-    pruefe(delta != null && delta >= 3500 - 20 && delta <= 3500 + 150 + n2.frameMax && n2.bugImNachlauf,
+    pruefe(delta != null && delta >= 3500 - 20 && delta <= 3500 + 300 + 2 * n2.frameMax && n2.bugImNachlauf,
       `(N2) ${d.padEnd(12)} Echtzeit: done -> #endstand ${delta?.toFixed(0)} ms (soll 3500, laengste Frame-Luecke ${n2.frameMax?.toFixed(0)} ms), Score-Bug im Nachlauf sichtbar ${n2.bugImNachlauf}`);
   }
   await seite.close();
@@ -400,7 +444,9 @@ try {
       const engineJetzt = readFileSync(path.join(PUBLIC, "mockups", "battle-mode.engine.js"), "utf8");
       let quelle = execFileSync("git", ["show", `${basis}:public/mockups/battle-mode.engine.js`], { cwd: WURZEL, encoding: "utf8", maxBuffer: 64 << 20 });
       if (quelle === engineJetzt || quelle.includes("function anpfiffRitualVon(")) {
-        const vorPaket = execFileSync("git", ["log", "-1", "--format=%H", "-S", "function anpfiffRitualVon(", "--reverse", "--", "public/mockups/battle-mode.engine.js"], { cwd: WURZEL, encoding: "utf8" }).trim();
+        // `-1` wuerde VOR `--reverse` greifen (juengster Treffer) -- deshalb alle Treffer
+        // aufsteigend holen und den aeltesten nehmen: der Commit, der das Paket einfuehrte.
+        const vorPaket = execFileSync("git", ["log", "--format=%H", "--reverse", "-S", "function anpfiffRitualVon(", "--", "public/mockups/battle-mode.engine.js"], { cwd: WURZEL, encoding: "utf8" }).trim().split("\n")[0];
         basis = vorPaket + "~1";
         quelle = execFileSync("git", ["show", `${basis}:public/mockups/battle-mode.engine.js`], { cwd: WURZEL, encoding: "utf8", maxBuffer: 64 << 20 });
       }
@@ -410,6 +456,10 @@ try {
         : null;
       const messe = async (q) => {
         const s = await neueSeite(q);
+        // Kontrolle der Umleitung: die Basis-Engine kennt anpfiffStatus() nicht, die neue schon.
+        // Schluege die route()-Umleitung still fehl, verglichen wir sonst die neue Engine mit sich.
+        const kennt = await s.evaluate(() => typeof window.__arena.anpfiffStatus === "function");
+        if (kennt !== !q) throw new Error(`falsche Engine ausgeliefert (anpfiffStatus ${kennt ? "vorhanden" : "fehlt"}, erwartet ${q ? "Basis" : "neu"})`);
         const ds = await s.evaluate(() => window.__arena.motoren());
         const out = {};
         for (const d of ds) {
@@ -418,11 +468,32 @@ try {
             einfluss: window.__arena.einflussVon(dd, 2),
           }), [d, familie]);
         }
+        // (I2) DER ANZEIGE-PFAD, DEN DIE NEUEN BAUSTEINE WIRKLICH BERUEHREN: sondenLauf() (ruft
+        // updateHud*() und damit den Nachlauf) bis `done` -- done-Tick, Endstand und Ticker-
+        // Zeilen bis `done` muessen gleich bleiben. Nachlauf aus, damit #endstand wie frueher im
+        // done-Tick erscheint (der Nachlauf selbst ist in N1 geprueft). Auswahl: je Chassis eine
+        // Disziplin, dazu Gewichtheben (stepBuehne()-done-Zweig angefasst).
+        out.__sonde = {};
+        for (const d of ["gewichtheben", "speed-schach", "spurt", "basketball", "tdm"]) {
+          out.__sonde[d] = await s.evaluate((dd) => {
+            const A = window.__arena;
+            if (A.sendungsrahmen) A.sendungsrahmen(false);
+            A.setDisc(dd);
+            let n = 0; while (!A.vorbei() && n < 60 * 60 * 15) { A.sondenLauf(20); n += 20; }
+            return { n, score: document.getElementById("score").textContent,
+              feed: document.getElementById("feed").children.length,
+              endstand: !document.getElementById("endstand").hidden };
+          }, d);
+        }
         await s.close();
         return out;
       };
       const vorher = await messe(quelle);
       const nachher = await messe(null);
+      const sondeAbw = Object.keys(nachher.__sonde).filter((d) => !isDeepStrictEqual(vorher.__sonde[d], nachher.__sonde[d]));
+      pruefe(sondeAbw.length === 0,
+        `(I2) sondenLauf() bis done (gewichtheben, speed-schach, spurt, basketball, tdm): done-Tick, Endstand, Tickerzeilen ${sondeAbw.length ? "ABWEICHUNG in " + sondeAbw.map((d) => d + " " + JSON.stringify(vorher.__sonde[d]) + " vs " + JSON.stringify(nachher.__sonde[d])).join("; ") : "identisch " + JSON.stringify(nachher.__sonde)}`);
+      delete vorher.__sonde; delete nachher.__sonde;
       const ds = Object.keys(nachher);
       const abweichend = ds.filter((d) => !isDeepStrictEqual(vorher[d], nachher[d]));
       pruefe(ds.length === 20 && abweichend.length === 0 && Object.keys(vorher).length === 20,

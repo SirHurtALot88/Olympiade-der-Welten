@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createReadStream, statSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const ROOT = process.argv[2];
 const OUT = process.argv[3];

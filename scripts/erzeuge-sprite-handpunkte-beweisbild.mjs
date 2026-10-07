@@ -24,6 +24,7 @@ import { chromium } from "playwright";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HIER, "..");

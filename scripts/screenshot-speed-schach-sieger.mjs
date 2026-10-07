@@ -7,6 +7,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { createReadStream, statSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");

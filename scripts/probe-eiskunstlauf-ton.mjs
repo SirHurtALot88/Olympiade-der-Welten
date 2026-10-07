@@ -41,6 +41,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;

@@ -29,6 +29,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const htmlPfad = process.argv[2] || path.join(WURZEL, "public/mockups/battle-mode.html");
@@ -70,7 +71,7 @@ async function neueSeite() {
 
 async function hoechsteStufe(seite) {
   let tempo = await seite.textContent("#spd");
-  for (let i = 0; i < 6 && !/4/.test(tempo || ""); i++) {
+  for (let i = 0; i < 6 && !/^Tempo 4×$/.test((tempo || "").trim()); i++) {
     await seite.click("#spd");
     await seite.waitForTimeout(80);
     tempo = await seite.textContent("#spd");

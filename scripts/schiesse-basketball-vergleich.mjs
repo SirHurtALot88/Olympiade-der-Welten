@@ -52,7 +52,7 @@ async function lauf(pfad, marke) {
   // Bild laeuft, nicht das Ergebnis (s. loop()/ZEIT_DEHNUNG im Motor): bei hoeherem Tempo
   // laeuft stepSim oefter mit demselben festen dt, nicht mit groesserem dt.
   let tempo = await seite.textContent("#spd");
-  for (let i = 0; i < 6 && !/4/.test(tempo || ""); i++) {
+  for (let i = 0; i < 6 && !/^Tempo 4×$/.test((tempo || "").trim()); i++) {
     await seite.click("#spd");
     await seite.waitForTimeout(120);
     tempo = await seite.textContent("#spd");
