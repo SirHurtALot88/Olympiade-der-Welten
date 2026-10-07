@@ -20,8 +20,15 @@
 // an Ort und Stelle aktualisiert und zaehlt nicht als neue Zeile.
 //
 // Aufruf: node scripts/miss-ticker-dichte.mjs [disziplin,disziplin,...] [--zeilen datei.json]
+//   [--schranke n]
 //   ohne Disziplinliste: die fuenf, die der Audit fuer Punkt 8 nennt, plus Battlefield.
 //   --zeilen schreibt zusaetzlich alle Ticker-/Protokollzeilen je Disziplin als JSON.
+//   --schranke n (TDM-Broadcast-Paket, 07.10., docs/design/tdm-broadcast-paket-plan-07-10.md
+//   Abschnitt 2.5): Exit-Code 1, wenn mindestens eine Disziplin ueber n Ticker-Zeilen je
+//   Minute liegt -- ohne den Schalter bleibt das Verhalten wie bisher (reine Ausgabe, immer
+//   Exit 0). Die Sonde kannte bisher keine Schranke und gab nur eine Tabelle aus; genau das
+//   liess die Regression vom 01.10. (TDM 23 -> 349 Zeilen/min durch Merge 0fd081b3d noch am
+//   selben Tag) unbemerkt durchrutschen, s. Plan Abschnitt 2.5.
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { existsSync, createReadStream, statSync, writeFileSync } from "node:fs";
@@ -41,7 +48,10 @@ const MIME = {
 const args = process.argv.slice(2);
 const zeilenIdx = args.indexOf("--zeilen");
 const zeilenDatei = zeilenIdx >= 0 ? args[zeilenIdx + 1] : null;
-const positional = args.filter((a, i) => !a.startsWith("--") && (zeilenIdx < 0 || i !== zeilenIdx + 1));
+const schrankeIdx = args.indexOf("--schranke");
+const schranke = schrankeIdx >= 0 ? Number(args[schrankeIdx + 1]) : null;
+const positional = args.filter((a, i) =>
+  !a.startsWith("--") && (zeilenIdx < 0 || i !== zeilenIdx + 1) && (schrankeIdx < 0 || i !== schrankeIdx + 1));
 const DISZIPLINEN = (positional[0] || "tdm,battlefield,eiskunstlauf,speed-schach,tennis,takeshis-castle")
   .split(",").map((s) => s.trim()).filter(Boolean);
 // Obergrenze je Spiel: 10 Minuten Sendezeit (Hockey, das laengste, misst laut Audit 7:50).
@@ -68,6 +78,7 @@ function starteServer() {
 const server = await starteServer();
 const SEITE = `http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`;
 const alleZeilen = {};
+const jeMin = {};
 let browser;
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
@@ -124,6 +135,7 @@ try {
     const min = ticks / 60 / 60;
     const dauer = `${Math.floor(ticks / 3600)}:${String(Math.floor((ticks / 60) % 60)).padStart(2, "0")}`;
     const proT = z.prot.length ? z.prot.length : z.feed.length;
+    jeMin[disc] = z.feed.length / min;
     console.log(
       `${disc.padEnd(16)} ${dauer.padStart(8)}  ${String(z.feed.length).padStart(13)}  ${(z.feed.length / min).toFixed(1).padStart(6)}` +
       `   ${String(proT).padStart(9)}  ${(proT / min).toFixed(1).padStart(6)}   ${String(proT - z.feed.length).padStart(12)}` +
@@ -137,3 +149,14 @@ try {
   server.close();
 }
 if (zeilenDatei) writeFileSync(zeilenDatei, JSON.stringify(alleZeilen, null, 1));
+if (schranke !== null) {
+  const ueberschritten = Object.entries(jeMin).filter(([, n]) => n > schranke);
+  if (ueberschritten.length) {
+    console.error(
+      `\nSCHRANKE (${schranke}/min) ueberschritten: ` +
+      ueberschritten.map(([d, n]) => `${d} ${n.toFixed(1)}`).join(", "),
+    );
+    process.exit(1);
+  }
+  console.log(`\nSchranke ${schranke}/min eingehalten.`);
+}

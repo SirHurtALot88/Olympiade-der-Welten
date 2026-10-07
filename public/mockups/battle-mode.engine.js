@@ -13415,11 +13415,15 @@
           ueb.className="ueberzahl "+seite;
           // F1-BROADCAST-AUDIT RUNDE 2 (30.09.), PUNKT 3: stand bisher als "groesser :
           // kleiner" (Math.max/Math.min) -- gegenlaeufig zur Kaderleiste direkt darunter
-          // (renderKader()s kmitte, "Lebende "+live(0).length+" : "+live(1).length), die
-          // schon immer in Seitenreihenfolge zaehlt. Jetzt dieselbe Reihenfolge UND
-          // dasselbe Label wie dort: wer vorn liegt, sagt weiterhin die Farbe (Klasse
+          // (renderKader()s kmitte), die schon immer in Seitenreihenfolge zaehlt. Jetzt
+          // dieselbe Reihenfolge wie dort: wer vorn liegt, sagt weiterhin die Farbe (Klasse
           // "l"/"r" unten), nicht mehr die Ziffernreihenfolge.
-          ueb.textContent="Lebende "+nL+" : "+nR;
+          // S3 (TDM-Broadcast-Paket, 07.10., Plan Abschnitt 3/4, Audit-Punkt 3 "Ueberzahl im
+          // Bug in Seitenreihenfolge ('5 v 6')"): "Lebende 5 : 6" war ein zweites "a : b" im
+          // selben Format wie der Stand direkt darueber, obwohl es eine andere Groesse zeigt
+          // (seit S2 zeigt die Kaderleiste dieselbe Zahl wie #score, nicht mehr "Lebende"). "v"
+          // statt ":" haelt den Doppelpunkt dem Stand vorbehalten.
+          ueb.textContent=nL+" v "+nR;
           mitte.appendChild(ueb);
         }
         // K6 -- KONTROLLPUNKT KLEIN IM SCORE-BUG (Broadcast-Optik-Recherche 27.09.,
@@ -31104,12 +31108,18 @@
     const d=treffer(u,tg,roh,sd);
     stossen(tg,u.x,u.y,knock);
     schwebe({x:tg.x,y:tg.y-26,txt:"−"+d,life:.95,crit});
-    // KOMBINIERT (Merge #1093/#1095): kind="grosserTreffer" fuer den Highlight-Titel UND
-    // stufe="routine" fuer den Ticker/Protokoll-Filter -- feedRoutine() kennt keinen
-    // kind-Parameter, deshalb hier feed() direkt mit beiden Werten.
+    // KOMBINIERT (Merge #1093/#1095), REGRESSION BEHOBEN (TDM-Broadcast-Paket, 07.10.,
+    // docs/design/tdm-broadcast-paket-plan-07-10.md Abschnitt 2): kind="grosserTreffer" stand
+    // hier BEDINGUNGSLOS, auch wenn `big` false war. feed() stuft aber jede Zeile MIT kind
+    // automatisch als "ereignis" ein, egal welche stufe uebergeben wird (s. Kopfkommentar von
+    // feed()) -- "routine" griff dadurch nie, und jeder gewoehnliche Treffer ohne Banner landete
+    // im sichtbaren Ticker (TDM 349 Zeilen/min statt der von Punkt 8 vorgesehenen <=30, Battlefield
+    // 144). kind nur noch, wenn die Zeile wirklich ein Banner ist -- derselbe Fund und dieselbe
+    // Loesung wie beim Tennis-Ticker-Fix (T-N1, 04.10.).
+    const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false);
     feed(u.side,u.n+(label?" — "+label+" auf ":(crit?" trifft kritisch ":" trifft "))+tg.n+" · "+d,
-      kampfGrossDrosseln(grosserTreffer(hpVorher,tg.hp,d,tg.max,crit),false),undefined,
-      "grosserTreffer",undefined,undefined,"routine");
+      gross,undefined,
+      gross?"grosserTreffer":undefined,undefined,undefined,"routine");
     if(tg.hp===0&&!tg.down)schalteAus(tg,u);
   }
 
@@ -31394,6 +31404,21 @@
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     const pL=nR-live(1).length, pR=nL-live(0).length;
     return pL===pR?null:(pL>pR?0:1);
+  }
+  // STAND-TEXT, EIN MASSSTAB FUER SCORELINE UND KADERLEISTE (TDM-Broadcast-Paket, 07.10.,
+  // docs/design/tdm-broadcast-paket-plan-07-10.md Abschnitt 4, S2): dieselbe Formel, die
+  // updateHud() fuer #score benutzt (TDM: Summe der Ausschaltungen u.st.ko je Seite;
+  // Battlefield/Mini-DM: Ergaenzung der aktuell Lebenden). renderKader() zeigt damit in der
+  // Kaderleiste-Mitte garantiert dieselbe Zahl wie die Scoreline -- vorher zeigte #kmitte dort
+  // separat "Lebende nL:nR" (dieselbe Lebenden-Zahl, aber ein ZWEITES "a:b" im selben Bild, das
+  // unter Respawn in 6,7 % der Sendezeit sogar in die Gegenrichtung von #score zeigte, s. Plan
+  // Abschnitt 3.2). Dasselbe Prinzip wie buehneDuellStandText() beim Buehnen-Duell (Review-Fund
+  // PR #1083): EINE Funktion, zwei Aufrufer, kann nie mehr auseinanderlaufen.
+  function kampfStandText(){
+    const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
+    return disc==="tdm"
+      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
+      :(nR-live(1).length)+" : "+(nL-live(0).length);
   }
 
   // ===================================================================================
@@ -31779,13 +31804,15 @@
         // GROSSER TREFFER: dieselbe Schwelle wie bei nahschlag() oben (grosserTreffer()) —
         // vorher war ein Geschosstreffer nur bei einem (heute konstant falschen) Krit big,
         // nie bei Schaden. Kein separates Kriterium fuer Fern- vs. Nahkampf noetig.
-        // feedRoutine() kennt keinen kind-Parameter (nur 3 Argumente) -- die zusaetzlichen
-        // Argumente wuerden beim Aufruf stillschweigend verworfen, genau wie bei nahschlag()
-        // oben dokumentiert. Deshalb hier feed() direkt mit kind UND stufe.
+        // REGRESSION BEHOBEN (TDM-Broadcast-Paket, 07.10., s. Kommentar bei nahschlag() oben):
+        // kind="grosserTreffer" stand hier ebenfalls bedingungslos und uebersteuerte stufe=
+        // "routine" in feed() fuer JEDEN Geschosstreffer. kind nur noch, wenn die Zeile
+        // wirklich ein Banner ist.
+        const gross=kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false);
         feed(pf.von.side,pf.von.n+(crit?" trifft "+z.n+" kritisch":" trifft "+z.n)+
           (fremd?" (danebengezielt)":"")+" · "+d,
-          kampfGrossDrosseln(grosserTreffer(hpVorher,z.hp,d,z.max,crit),false),undefined,
-          "grosserTreffer",undefined,undefined,"routine");
+          gross,undefined,
+          gross?"grosserTreffer":undefined,undefined,undefined,"routine");
         if(z.hp===0&&!z.down)schalteAus(z,pf.von);
         pf.tot=true;
         continue;
@@ -34097,7 +34124,11 @@
     // Ausschaltungen, KP.punkte wandert in die kleine #kpzeile darunter (nur fuer Battlefield
     // sichtbar). Reine Anzeige-Vertauschung: kampfSieger()/dominationSieger()/kpTick bleiben
     // unveraendert, KP.punkte entscheidet den Sieg weiterhin genauso wie vorher.
-    document.getElementById("klsuffix").textContent="Punkte";
+    // S1 (TDM-Broadcast-Paket, 07.10., Plan Abschnitt 4): "Punkte" war hier falsch -- die
+    // Saisonwertung vergibt 2/1/0 Punkte je Spiel (battle-mode-arena-team-points.ts), nicht die
+    // Ausschaltungszahl. Endstand-Banner und Ticker nennen dieselbe Groesse schon "Ausschaltungen"
+    // (renderEndstand()/finish()); jetzt heisst sie ueberall gleich.
+    document.getElementById("klsuffix").textContent="Ausschaltungen";
     const kpzeile=document.getElementById("kpzeile");
     if(kpzeile){
       if(KP){
@@ -34107,12 +34138,11 @@
         kpzeile.style.display="none";
       }
     }
-    const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     document.getElementById("aliveL").textContent=String(live(0).length);
     document.getElementById("aliveR").textContent=String(live(1).length);
     // PUNKTE = ausgeschaltete Gegner. Bei 6 gegen 6 holt ein komplett siegreiches Team 6.
-    // TDM-HUD-FIX (27.09.): `(nR-live(1).length)` zaehlt nur die GERADE Gefallenen — unter
-    // Respawn faellt das nach jedem Respawn wieder auf 0 zurueck, der Score sank sichtbar.
+    // TDM-HUD-FIX (27.09.): `(nR-live(1).length)` zaehlte nur die GERADE Gefallenen — unter
+    // Respawn fiel das nach jedem Respawn wieder auf 0 zurueck, der Score sank sichtbar.
     // finish() (s. dort) und der Serien-Export nehmen fuer TDM schon laenger korrekt die
     // Summe der Ausschaltungen UEBER DAS GANZE SPIEL (u.st.ko je Seite) — dieselbe Summe
     // jetzt auch hier, damit die Live-Anzeige waehrend des Kampfs monoton steigt statt zu
@@ -34120,10 +34150,9 @@
     // dauerhafte Ausschaltung wie Mini-DM), fuer Battlefield/Mini-DM bleibt die
     // live()-Differenz deshalb weiterhin bitgleich mit der Ausschaltungssumme. #bbug
     // uebernimmt das automatisch: aktualisiereBbug() liest #score erst, NACHDEM diese Zeile
-    // geschrieben hat (Aufruf am Ende dieser Funktion).
-    document.getElementById("score").textContent=disc==="tdm"
-      ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
-      :(nR-live(1).length)+" : "+(nL-live(0).length);
+    // geschrieben hat (Aufruf am Ende dieser Funktion). S2 (TDM-Broadcast-Paket, 07.10.): die
+    // Formel steht jetzt nur noch einmal, in kampfStandText(), das auch renderKader() ruft.
+    document.getElementById("score").textContent=kampfStandText();
     const sum=s=>{const g=U.filter(u=>u.side===s);return g.reduce((a,u)=>a+u.hp,0)/g.reduce((a,u)=>a+u.max,0);};
     document.getElementById("thpL").style.width=(sum(0)*100)+"%";
     document.getElementById("thpR").style.width=(sum(1)*100)+"%";
@@ -42381,6 +42410,12 @@
   //     die Drosseln kampfGrossDrosseln/buehneBahnGrossDrosseln haben schon entschieden)
   //     und jede Zeile mit Momentart `kind`; ausdruecklich gesetzt an den Ereignis-
   //     Aufrufstellen der Audit-Liste (Ausschaltung, Tor, Wechsel, Rekord ...).
+  //     FALLE (zweimal hineingelaufen -- Merge 0fd081b3d am 01.10., dann erneut bis zum
+  //     TDM-Broadcast-Paket, 07.10., docs/design/tdm-broadcast-paket-plan-07-10.md Abschnitt 2.2):
+  //     `kind` schlaegt IMMER eine ausdruecklich uebergebene stufe="routine" -- eine
+  //     Aufrufstelle, die kind UND stufe:"routine" gemeinsam uebergibt, OHNE dass kind an
+  //     `big` haengt, landet trotz "routine" vollstaendig im sichtbaren Ticker. kind nur bei
+  //     wirklichem Banner (big) uebergeben, nie bedingungslos.
   //   * "routine" -- nur im Protokoll (ausser sie ist big): die Massenzeilen, die der Audit
   //     ausdruecklich nennt -- gewoehnlicher Treffer, Heilung, Pass, Skillwahl.
   //   * "normal" (Vorgabe) -- im Ticker, solange das Zeilenbudget reicht.
@@ -44337,11 +44372,13 @@
       // Scoreline -- `fsPunkte` statt des um die Extra-Punkte hinterherhinkenden
       // `fsStand.team` (= fsBisher().team).
       ? (fsPunkte[0]+" : "+fsPunkte[1])
-      // LEBENDE, jetzt explizit beschriftet UND in Seitenreihenfolge (Punkt 3): dieselbe
-      // Zahl, dieselbe Reihenfolge wie die "Ueberzahl"-Zeile im Bug (aktualisiereBbug()) --
-      // vorher standen hier zwei unbeschriftete "a:b" mit vertauschter Reihenfolge
-      // nebeneinander (Bug: groesser:kleiner: Kaderleiste: Seite 0:Seite 1).
-      : ("Lebende "+live(0).length+" : "+live(1).length);
+      // S2 (TDM-Broadcast-Paket, 07.10., Plan Abschnitt 3/4): hier stand bisher "Lebende
+      // nL:nR" -- dieselbe Reihenfolge wie die "Ueberzahl"-Zeile im Bug, aber eine ANDERE
+      // Groesse als die Scoreline direkt darueber (#score zeigt Ausschaltungen). Unter Respawn
+      // widersprachen sich beide Zahlen in 6,7 % der Sendezeit in der Richtung (gemessen,
+      // Plan Abschnitt 3.2). kampfStandText() ist jetzt dieselbe Quelle wie #score -- genau
+      // das Prinzip, das buehneDuellStandText() zwei Zweige weiter oben schon zeigt.
+      : kampfStandText();
     // EINE Zeile unter der Kaderleiste, zwei Mechaniken: Fokus-Doppeln im Basketball,
     // Zielansage im Kampf. Sie schliessen sich gegenseitig aus (eine Disziplin ist immer
     // nur das eine), deshalb schreibt hier immer genau eine der beiden Fassungen — und die
