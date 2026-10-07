@@ -19759,18 +19759,25 @@
         // und steht nur im Protokoll -- im Ticker bleiben die entschiedenen Bretter/Plaetze/
         // Bahnen (big, s.u.), gekippte Vorteile (big) und im Fechten der Treffer selbst, der
         // dort als einziger zaehlt (der Trefferstand ist die Wertung, s. Kommentar oben).
-        // KIND NUR NOCH BEI ECHTEM BANNER, NUR TENNIS (T-N1 Ticker-Dosis): feed() stuft jede
-        // Zeile MIT `kind` als "ereignis" ein (tickerZeigt(big||kind?...)) -- weil diese
-        // Aufrufstelle `kind` immer mitgab, griff die "routine"-Stufe hier nie, und jeder
-        // einzelne Ballwechsel beider Seiten stand im sichtbaren Ticker (gemessen 04.10.,
-        // miss-ticker-dichte.mjs tennis: 145 Zeilen in 1:02, 140/min, 0 nur im Protokoll).
-        // Schach/Fechten bleiben unveraendert (nicht Teil dieses Auftrags).
+        // KIND NUR NOCH BEI ECHTEM BANNER (T-N1 Ticker-Dosis, 04.10., zuerst nur fuer Tennis
+        // gegated): feed() stuft jede Zeile MIT `kind` als "ereignis" ein
+        // (tickerZeigt(big||kind?...)) -- weil diese Aufrufstelle `kind` bedingungslos
+        // mitgab, griff die "routine"-Stufe hier nie, und jeder einzelne Ballwechsel/Zug/
+        // Gang stand im sichtbaren Ticker (Tennis gemessen 04.10.: 145 Zeilen in 1:02,
+        // 140/min, 0 nur im Protokoll). Das Gate galt bisher NUR fuer Tennis -- derselbe
+        // Code-Pfad bedient aber auch Schach und Fechten, und beide trugen dieselbe Falle
+        // unveraendert weiter: Schach 134/134 Zeilen (129,7/min), Fechten 117/117 (72,4/min),
+        // in beiden Faellen 0 Zeilen nur im Protokoll (Time-Trial-Broadcast-Paket-Nachbarfund,
+        // 07.10., dieselbe kind-Falle wie bei TDM/Breaking/Time-Trial). Jetzt disziplin-
+        // uebergreifend: `kind` nur noch, wenn `zeileBig` -- also exakt dann, wenn auch das
+        // Banner steht -- sonst undefined. Fuer Tennis unveraendert (zeileBig war die
+        // Bedingung schon vorher), fuer Schach/Fechten neu.
         const zeileBig=buehneBahnGrossDrosseln(vorteilKipptBig,false);
         feed(u.side,u.n+" — "+r.ereignis+" gegen "+u.gegnerN+
           " · "+statText
           +" ("+worte.brett+" "+((u.brett??0)+1)+", "+worte.zug+" "+(u.aktuell+1)+"/"+BB().rundenN+").",
           zeileBig,undefined,
-          (BB().tennis&&!zeileBig)?undefined:(BB().schach?"kippZug":"fuehrungswechsel"),undefined,undefined,
+          zeileBig?(BB().schach?"kippZug":"fuehrungswechsel"):undefined,undefined,undefined,
           BB().fechten&&r.ereignis===BB().erfolgWort?undefined:"routine");
         // T-F1a -- BREAK-BANNER (Fable-Ideen Buehne-Duell 30.09., Abschnitt T-F4: "Das im
         // selben Abschnitt vorgeschlagene 'BREAK!'-Banner braucht einen diskreten
