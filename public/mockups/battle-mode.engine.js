@@ -19366,22 +19366,14 @@
     }
   }
 
-  // GAUNTLET-STUFENWECHSEL (Audit-Punkt 7, Abschnitt 3.4: "big nur noch fuer ... Stufenwechsel
-  // [neues Foltergeraet/neue Eskalationsstufe]"). Zwei HP-Schwellen (die Haelfte, dann ein
-  // Fuenftel der HP) markieren, wann sich das Kraeftemessen dieses EINEN Ertragenden sichtbar
-  // dreht -- dieselbe Schwellenwert-UEBERSCHREITUNG wie grosserTreffer() im Kampf (dort
-  // Prozent des Lebens, hier derselbe Gedanke fuer den Gauntlet), keine neue Zufallsziehung:
-  // `hpVor`/`hpNach` liegen an der Aufrufstelle ohnehin schon vor (dasselbe Rundenobjekt `r`,
-  // das baueGauntlet() fuer den Ticker fuehrt). `hpNach<=0` (Aufgabe/Elimination) ist bewusst
-  // AUSGENOMMEN -- die hat bereits ihre eigene, immer sichtbare Zeile direkt darunter.
-  const GAUNTLET_STUFEN=[0.5,0.2];
-  function gauntletStufenwechsel(hpVor,hpNach,hpMax){
-    if(hpNach<=0)return false;
-    return GAUNTLET_STUFEN.some(f=>{
-      const schwelle=f*hpMax;
-      return hpVor>schwelle && hpNach<=schwelle;
-    });
-  }
+  // GAUNTLET-STUFENWECHSEL war hier (Audit-Punkt 7, Abschnitt 3.4): eine Funktion
+  // `gauntletStufenwechsel(hpVor,hpNach,hpMax)` markierte per HP-Schwelle (die Haelfte, dann
+  // ein Fuenftel), wann sich das Kraeftemessen eines Ertragenden sichtbar dreht, und loeste
+  // dafuer ein eigenes Banner aus. Breaking-Broadcast-Paket (07.10., Plan Abschnitt 2.2, B1):
+  // in 13 von 13 gemessenen Faellen kuendigte dieses Banner nur 3-9s vor dem Banner fuer die
+  // Aufgabe DESSELBEN Kaempfers denselben Moment ein zweites Mal an. Banner bleiben seitdem
+  // ausschliesslich der Aufgabe (Elimination) vorbehalten; die Funktion wurde entfernt, weil
+  // nichts mehr big() daraus ableitet.
   // B3 (Fable-Ideen 30.09., Politur A, Klasse A): „GIBT AUF" ODER „GEBROCHEN". Chris: „bis
   // einer aufgibt" -- heute faellt jeder bei HP 0 unter demselben Stempel aus dem Ring.
   // AUSDRUECKLICH BEWUSST KEINE MECHANIK (s. Dokument 3.7/B3-Begruendung): der Ausscheidende
@@ -20013,23 +20005,28 @@
         // BANNER-DOSIS + KEIN TEXTBALKEN MEHR (Audit-Punkt 7, Abschnitt 3.4/Messanhang 6.1,
         // Belegbild 14): `versuchBig` (=`r.punkte>=60`) machte hier praktisch JEDES "haelt
         // stand" big -- gemessen 195 verschiedene Bannertexte, 92 % Sendezeit sichtbar. `big`
-        // ist jetzt nur noch, was das Publikum wirklich als Wendepunkt sieht: Aufgabe
-        // (Elimination, eigene Zeile unten, IMMER sichtbar, s. Prioritaets-Bypass) oder
-        // Stufenwechsel (gauntletStufenwechsel() unten, HP-Schwelle ueberschritten -- eine
-        // "neue Eskalationsstufe" fuer GENAU diesen Ertragenden). Kein Rekord-Konzept fuer
-        // Breaking im Motor vorhanden (keine hoechste-Serie-o.ae.-Groesse wird gefuehrt) --
-        // anders als bei Kampf/Fechten faellt diese dritte Ausnahme hier deshalb ehrlich weg,
-        // statt eine neue Simulationszahl nur fuer eine Banner-Bedingung zu erfinden.
+        // ist jetzt nur noch, was das Publikum wirklich als Wendepunkt sieht: die Aufgabe
+        // (Elimination, eigene Zeile unten, IMMER sichtbar, s. Prioritaets-Bypass). Ein
+        // Stufenwechsel (neues Foltergeraet/neue Eskalationsstufe) bekam zwischenzeitlich
+        // ebenfalls ein eigenes Banner, bis das Breaking-Broadcast-Paket (07.10., Plan
+        // Abschnitt 2.2, B1) es wieder strich: in 13 von 13 Faellen kuendigte es nur 3-9s vor
+        // dem Banner fuer die Aufgabe DESSELBEN Kaempfers denselben Moment zweimal an. Kein
+        // Rekord-Konzept fuer Breaking im Motor vorhanden (keine hoechste-Serie-o.ae.-Groesse
+        // wird gefuehrt) -- anders als bei Kampf/Fechten faellt diese dritte Ausnahme hier
+        // deshalb ehrlich weg, statt eine neue Simulationszahl nur fuer eine Banner-Bedingung
+        // zu erfinden.
         // Ausserdem entfaellt `gauntletBalken()` (die "██████░░░░"-Bloecke) aus dem
         // Banner-/Ticker-Text -- ein Textbalken gehoert nicht in eine Broadcast-Grafik (Audit-
         // Nebenbefund), die nackte HP-Zahl traegt dieselbe Information. Die kompakte
         // Farbleiste in zeichneBreaking() (B2, "Ersetzt die ASCII-Bloecke ... durch zwei
         // GESPIEGELTE Balken") zeigt den HP-Stand ohnehin schon grafisch.
         const hpJetzt=Math.max(0,r.hpNach);
-        const stufenwechsel=gauntletStufenwechsel(r.hpVor,r.hpNach,r.hpMax);
         // TICKER-STUFE (Punkt 8): "haelt stand" ist Routine (gut die Haelfte aller Breaking-
         // Zeilen, nur im Protokoll); "bricht ein" bleibt im Ticker, solange das Budget reicht,
-        // Stufenwechsel (big) und das Aufgeben (darunter, big mit Vorrang) immer.
+        // das Aufgeben (darunter, big mit Vorrang) immer. Ein Stufenwechsel (HP-Schwelle
+        // ueberschritten) bekam vor B1 (s. Kommentar unten) noch ein eigenes Banner -- die dafuer
+        // zustaendige Funktion ist seitdem entfernt (nichts leitet mehr big() daraus ab); eine
+        // Stufenwechsel-Zeile laeuft jetzt wie jede andere Routine-Zeile durchs Ticker/Protokoll.
         // B1 (Fable 30.09., Paket 3): der Ticker nennt jetzt zusaetzlich das Geraet dieses Zuges
         // ("hält stand (Zange)" / "bricht ein (Brandeisen)", bei B5-Provokation zusaetzlich
         // "provoziert") -- reiner Textzusatz aus `r.stufe`/`r.provoziert`, `r.ereignis` selbst
@@ -20044,9 +20041,23 @@
         // aneinander (Text kommt aus `geraetHinweis`, Titel-Klasse aus `kind`).
         const geraetName=FOLTER_GERAETE[r.stufe]?FOLTER_GERAETE[r.stufe].name:null;
         const geraetHinweis=geraetName?" ("+geraetName+(r.provoziert?", provoziert":"")+")":"";
+        // T1+B1 (Breaking-Broadcast-Paket, 07.10., docs/design/breaking-broadcast-paket-plan-
+        // 07-10.md Abschnitt 2/4): zwei Fixes an derselben Stelle.
+        // T1 -- REGRESSION BEHOBEN (dieselbe wie bei TDM, Merge 0fd081b3d, 01.10. 17:12):
+        // `kind="angeschlagen"` stand bisher bedingungslos, uebersteuerte dadurch in feed() die
+        // ausdruecklich gesetzte stufe="routine" fuer jede gewoehnliche "haelt stand"-Zeile --
+        // Ticker 170 statt der von Punkt 8 vorgesehenen <=30 Zeilen/min. kind nur noch, wenn die
+        // Zeile wirklich ein Banner ist (big).
+        // B1 -- STUFENWECHSEL OHNE EIGENES BANNER: `gauntletStufenwechsel()` kuendigte in 13 von
+        // 13 gemessenen Faellen (Plan Abschnitt 2.2) dieselbe Aufgabe desselben Kaempfers nur
+        // 3-9s vorher an -- derselbe Moment zweimal, nicht zwei Momente. Das Banner bleibt
+        // deshalb ausschliesslich der Aufgabe (Zeile direkt darunter) vorbehalten; die
+        // Stufenwechsel-Zeile bleibt unveraendert im Ticker/Protokoll stehen (big=false faellt
+        // dafuer unter routine/budget, genau wie ein gewoehnlicher "haelt stand"-Zug).
+        const angeschlagenBig=false;
         feed(u.side,u.n+" — "+r.ereignis+geraetHinweis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
-          +" (Kampf "+r.bout+").",buehneBahnGrossDrosseln(stufenwechsel,false),undefined,
-          "angeschlagen",undefined,undefined,
+          +" (Kampf "+r.bout+").",angeschlagenBig,undefined,
+          angeschlagenBig?"angeschlagen":undefined,undefined,undefined,
           r.ereignis===BB().erfolgWort?"routine":undefined);
         if(r.hpNach<=0){
           // B3: "GIBT AUF" ODER "GEBROCHEN" (s. gauntletAusscheidenWort()-Kommentar oben) --
@@ -22206,25 +22217,41 @@
     // Bretter/Bahnen/Fundorte parallel), "aufgetreten" behauptet einen Einzelauftritt, den es
     // dort nicht gibt (s. Auftrag). Gewichtheben/Showcase/Eiskunstlauf/Breaking bleiben bei
     // "aufgetreten" — dort enthuellt/performt tatsaechlich einer nach dem anderen.
+    // S3 (Breaking-Broadcast-Paket, 07.10., Plan Abschnitt 3/4): "aufgetreten" fuer den
+    // Gauntlet war nicht nur falsch beschriftet, sondern ein Spoiler -- s. `fertig` unten.
     const auftrittsWort=BB().wettessen?"am Tisch"
       :BB().tennis?"auf dem Platz"
       :BB().schach?"an den Brettern"
       :BB().fechten?"an der Bahn"
       :BB().schatzsuche?"an den Fundorten"
+      :BB().gauntlet?"ausgeschieden"
       :"aufgetreten";
     document.querySelectorAll(".scoreline .tname em").forEach(e=>{
       if(e.dataset.origHtml===undefined)e.dataset.origHtml=e.innerHTML;
       e.innerHTML=e.dataset.origHtml.replace(/im Kampf/g,auftrittsWort);});
     // Nicht mehr per innerHTML-Restore (Fable-Fund Runde 2, s. updateHudFeldspiel) —
     // #klsuffix ist ein eigenes Element, das die Live-Spans #clock/#phase nie beruehrt.
-    document.getElementById("klsuffix").textContent="Punkte";
+    // S1 (Breaking-Broadcast-Paket, 07.10.): "Punkte" war fuer den Gauntlet falsch -- #score
+    // zeigt dort die Verbliebenen, nicht die Folterpunkte (die vergeben gar keinen Mannschafts-
+    // sieg, s. `spieleBuehneGauntlet()`). Der Endstand-Banner sagt bereits "Verbliebene"
+    // (`buehneEinheitLabel()`); jetzt heisst es ueberall gleich.
+    document.getElementById("klsuffix").textContent=BB().gauntlet?"Verbliebene":"Punkte";
     // GENERALISIERT (22.09.): `u.runden.length` statt der festen `BB().rundenN` -- fuer jede
     // Nicht-Gauntlet-Disziplin ist das bit-identisch (`baueHebenDuelle()`/der generische
     // Auftritt-/Duell-Block bauen IMMER exakt `art.rundenN` Runden je Teilnehmer, s. dortige
     // Schleifen), fuer Gauntlet (Breaking) aber der einzig richtige Massstab: ein Teilnehmer
     // ist "fertig", sobald ALLE seine EIGENEN, tatsaechlich gebauten Zuege enthuellt sind --
     // egal ob er nach drei Zuegen ausschied oder nach zwanzig als Sieger dastand.
-    const fertig=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
+    // S3 (Breaking-Broadcast-Paket, 07.10., Plan Abschnitt 3.2): `u.aktuell+1>=u.runden.length`
+    // zaehlt im Gauntlet einen Kaempfer, der NIE in den Ring steigt (`runden.length===0`, weil
+    // sein Team vorher gewinnt), schon ab Tick 0 als "fertig" -- verriet dadurch schon beim
+    // Anpfiff, welches Team am Ende Kaempfer uebrig hat (derselbe Spoiler-Typ wie der
+    // Gewichtheben-Fund vom 30.09., `80096ab6`). `gauntletRausJetzt()` ist bereits
+    // reveal-gegatet und zaehlt nur tatsaechlich (bis zum aktuellen Enthuellungsstand)
+    // ausgeschiedene Kaempfer -- dieselbe Quelle wie #score/`buehneStand()` oben.
+    const fertig=BB().gauntlet
+      ?(s)=>TEILNEHMER.filter(u=>u.side===s&&gauntletRausJetzt(u)).length
+      :(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
@@ -44362,9 +44389,18 @@
         : BB().heben
         ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+hebenSichtbareSumme(x),0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+hebenSichtbareSumme(x),0)))
+        // S2 (Breaking-Broadcast-Paket, 07.10., Plan Abschnitt 3/4): hier stand bisher das
+        // PKT-Praefix vor der Summe der Folterpunkte (`x.summe`) -- eine ANDERE Groesse als die
+        // Scoreline direkt darueber (#score zeigt die Verbliebenen, s. updateHudBuehne()). Das
+        // Praefix hat die Zahlen beschriftet, aber nicht aufgeloest: zu jedem Zeitpunkt standen
+        // zwei "a : b" verschiedener Bedeutung im selben Bild, in 1,1 % der Sendezeit sogar
+        // gegenlaeufig (Plan Abschnitt 3.2). `buehneStand()` ist dieselbe Quelle, die
+        // renderEndstandBuehne() fuer den Gauntlet-Zweig schon liest -- Kaderleiste kann jetzt
+        // nie mehr von der Scoreline abweichen. Die Pkt-Spalte je Kaempfer bleibt unveraendert
+        // in der Wertungstabelle und auf jeder Kaderkarte sichtbar; die Teamsumme hat fuer den
+        // Sieg ohnehin nie etwas entschieden (s. `spieleBuehneGauntlet()`).
         : BB().gauntlet
-        ? ("PKT "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
-           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0)))
+        ? buehneStand().text
         : (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+x.summe,0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+x.summe,0))))
       : istFeldspiel(disc)
