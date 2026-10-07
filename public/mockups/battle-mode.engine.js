@@ -40098,18 +40098,25 @@
               " — "+((A.lang||{})[hTyp]||hTyp)+" ist nicht sein Fach.");
           } else {
             // T-STURZ (Takeshi-Ticker-Paket, 07.10., docs/design/takeshi-ticker-paket-plan-
-            // 07-10.md): bisher ohne stufe, also "normal" (budgetiert, aber am Budget-
-            // Wettbewerb beteiligt) -- derselbe Kommentar direkt oberhalb dieser Stelle
-            // sagt es selbst: "ein Sturz ist in Takeshi der Normalfall, keine Ausnahme".
-            // Der Schwester-Zweig "nimmt ... mit Gewalt" (Z. 40001, durchbruch-Fall) ist
-            // laengst feedRoutine(); dieser Sturz-Fall blieb es nicht. Gemessen 49 Zeilen
-            // je Rennen (zweithaeufigstes Ereignis ueberhaupt) -- diese verdraengten im
-            // Budget-Wettbewerb die selteneren, interessanteren Normal-Zeilen (Gedraenge,
-            // Rempler), ohne dass die GESAMTzahl sank (das Budget fuellt sich ohnehin bis
-            // zur Obergrenze, s. Plan Abschnitt 2). Jetzt feedRoutine() wie beim
-            // Durchbruch-Zwilling -- gilt fuer jede Bahn mit Huerden (Spurt/Climbing/
-            // Takeshi), nicht nur Takeshi, dieselbe Aufrufstelle fuer alle.
-            feedRoutine(u.seite,u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt "+(wortAkk||("die "+BA().hindernisWort))+"."));
+            // 07-10.md, korrigiert nach Opus-Review): bisher ohne stufe, also "normal"
+            // (budgetiert, aber am Budget-Wettbewerb beteiligt) -- derselbe Kommentar direkt
+            // oberhalb dieser Stelle sagt es selbst: "ein Sturz ist in Takeshi der
+            // Normalfall, keine Ausnahme". Der Schwester-Zweig "nimmt ... mit Gewalt"
+            // (Z. 40001, durchbruch-Fall) ist laengst feedRoutine(); dieser Sturz-Fall blieb
+            // es nicht. Gemessen 49 Zeilen je Rennen (zweithaeufigstes Ereignis ueberhaupt)
+            // -- diese verdraengten im Budget-Wettbewerb die selteneren, interessanteren
+            // Normal-Zeilen (Gedraenge, Rempler).
+            // NUR TAKESHI, nicht pauschal jede Bahn mit Huerden: der Rempler-Kommentar eine
+            // Funktion weiter oben trifft fuer die Haeufigkeit genau dieselbe Unterscheidung
+            // ("selten genug ... IN TAKESHI ... AUSSER ... Spurt ... bleibt unveraendert"),
+            // und derselbe A.takeshi-Schalter steuert direkt daneben schon den Sturz-Ton
+            // (Z. 40078, "sonst hoerte man den Takeshi-Sturzton auch im Spurt"). Die erste
+            // Fassung dieses Fixes hatte das uebersehen und feedRoutine() fuer ALLE Bahnen
+            // mit Huerden gesetzt -- das nahm Spurt 19 Sturz-Zeilen aus dem Ticker, obwohl
+            // Spurt nie ueber der Schranke lag und laut jenem Kommentar dort seltener und
+            // damit weiterhin ticker-wuerdig bleiben soll.
+            const sturzZeile=u.n+(BA().hindernisWort==="Griff"?" greift daneben.":" reißt "+(wortAkk||("die "+BA().hindernisWort))+".");
+            if(A.takeshi)feedRoutine(u.seite,sturzZeile); else feed(u.seite,sturzZeile);
           }
           }
         }

@@ -1,20 +1,25 @@
 // VERIFIKATION TAKESHI-TICKER-PAKET (07.10., docs/design/takeshi-ticker-paket-plan-07-10.md):
 // zwei kind/stufe-Inkonsistenzen in stepSpurt() behoben -- T-REMPLER (kind="rempler" lief
 // bedingungslos, dieselbe kind-Falle wie bei TDM/Breaking/Time-Trial/Schach/Fechten) und
-// T-STURZ ("X reisst die Falle" war "normal" statt "routine", anders als der Durchbruch-
-// Zwilling "nimmt die Falle mit Gewalt"). WICHTIG: dieses Paket bringt Takeshi NICHT unter die
-// 30er-Ticker-Schranke (bleibt bei 31,5/min, strukturell bedingt durch 16 erzwungene
-// Ereignis-Zeilen in einem 61s-Rennen, s. Plan Abschnitt "Warum die Gesamtzahl trotzdem bei
-// 31,5 bleibt") -- die Sonde prueft deshalb NICHT auf eine Schranke, sondern auf die beiden
-// tatsaechlich behobenen Inkonsistenzen:
+// T-STURZ ("X reisst die Falle" war fuer TAKESHI "normal" statt "routine", anders als der
+// Durchbruch-Zwilling "nimmt die Falle mit Gewalt"). WICHTIG: dieses Paket bringt Takeshi
+// NICHT unter die 30er-Ticker-Schranke (bleibt bei 31,5/min, strukturell bedingt, s. Plan) --
+// die Sonde prueft deshalb NICHT auf eine Schranke, sondern auf die tatsaechlich behobenen
+// Inkonsistenzen. BEIDE Fixes sind NUR-TAKESHI (A.takeshi-Gate, Opus-Review 07.10.: die erste
+// Fassung von T-STURZ hatte das uebersehen und Spurt mit entschlackt, obwohl der Rempler-
+// Kommentar an derselben Stelle ausdruecklich zwischen Takeshi und Spurt unterscheidet und
+// Spurt nie ueber der Schranke lag):
 //
-//   (a) "reisst die Falle"/"greift daneben" steht NIE MEHR im sichtbaren Ticker (nur noch im
-//       Protokoll) -- fuer Takeshi, Spurt UND Climbing (eine Aufrufstelle fuer alle drei).
-//   (b) "rammt ... um" ist fuer Takeshi nicht mehr erzwungen: vorher liess die kind-Falle
+//   (a) Takeshi: "reisst die Falle"/"greift daneben" steht NIE MEHR im sichtbaren Ticker (nur
+//       noch im Protokoll). Spurt/Climbing: UNVERAENDERT -- diese Zeilen bleiben "normal"
+//       (budgetiert wie zuvor), die Sonde prueft hier auf KEINE Aenderung, nicht auf dieselbe
+//       Unterdrueckung wie bei Takeshi.
+//   (b) Takeshi: "rammt ... um" ist nicht mehr erzwungen: vorher liess die kind-Falle
 //       praktisch jeden Treffer durch (kind="rempler" bedingungslos), jetzt nur noch, wenn
 //       das Zeilenbudget gerade Platz hat -- Ticker-Zahl bleibt also klar UNTER der
-//       Protokoll-Zahl. Fuer Spurt (big=true, unveraendert) bleiben Ticker- und Protokoll-
-//       Zahl weiterhin gleich (jeder Treffer dort ist ein echtes Banner, kein Budget-Fall).
+//       Protokoll-Zahl. Spurt (big=true, unveraendert) hat im Testkader keine Rempler-Treffer
+//       (0 Zeilen) -- dieser Teilcheck ist dort bewusst ein Negativ-Nachweis (0=0, keine
+//       Aenderung), kein Nachweis von Verhalten unter Last.
 //   (c) keine `pageerror`
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
@@ -92,12 +97,29 @@ try {
     await seite.waitForTimeout(300);
     const z = await seite.evaluate(() => ({ feed: window.__tickerZaehler.feed, prot: window.__tickerZaehler.prot }));
 
-    // (a) "reisst die Falle"/"greift daneben" nie im Ticker
+    // (a) Takeshi: "reisst die Falle"/"greift daneben" nie im Ticker (feedRoutine).
+    //     Spurt/Climbing: unveraendert "normal" -- Protokoll-Zahl > 0 erwartet (sonst
+    //     pruefte dieser Zweig nichts), Ticker-Zahl darf dort frei schwanken.
     const sturzImFeed = z.feed.filter((f) => /reißt die|greift daneben/.test(f.txt));
     const sturzImProt = z.prot.filter((f) => /reißt die|greift daneben/.test(f.txt));
-    const aOk = sturzImFeed.length === 0;
-    console.log(`(a) ${disc}: Sturz-Zeilen im Ticker: ${sturzImFeed.length} (im Protokoll: ${sturzImProt.length}) -> ${aOk ? "OK" : "FEHLER"}`);
-    if (!aOk) alleOk = false;
+    let aOk;
+    if (disc === "takeshis-castle") {
+      aOk = sturzImFeed.length === 0 && sturzImProt.length > 0;
+      console.log(`(a) ${disc}: Sturz-Zeilen im Ticker: ${sturzImFeed.length} (im Protokoll: ${sturzImProt.length}, muss >0 und Ticker=0 sein) -> ${aOk ? "OK" : "FEHLER"}`);
+      if (!aOk) alleOk = false;
+    } else if (disc === "spurt") {
+      // Regressionsschutz: diese Disziplin blieb bewusst "normal" (nicht routine) -- in
+      // diesem deterministischen Testkader treten ueberhaupt Sturz-Zeilen auf, und bei
+      // Spurts geringer Gesamtdichte (13,6/min, weit unter dem Budget-Deckel) passt jede
+      // einzelne ins Budget: Ticker=Protokoll ist hier das erwartete, gemessene Verhalten.
+      aOk = sturzImProt.length > 0 && sturzImFeed.length === sturzImProt.length;
+      console.log(`(a) ${disc}: Sturz-Zeilen im Ticker: ${sturzImFeed.length}, im Protokoll: ${sturzImProt.length} (unveraendert "normal", muss >0 und Ticker=Protokoll sein) -> ${aOk ? "OK" : "FEHLER"}`);
+      if (!aOk) alleOk = false;
+    } else {
+      // Climbing: in diesem Testkader treten gar keine Sturz-Zeilen auf (kein Regressions-
+      // signal moeglich) -- nur zur Information, kein Pruefkriterium.
+      console.log(`(a) ${disc}: Sturz-Zeilen im Ticker: ${sturzImFeed.length}, im Protokoll: ${sturzImProt.length} (kein Vorkommen in diesem Testkader, kein Pruefkriterium)`);
+    }
 
     // (b) Takeshi: Rempler nicht mehr erzwungen -- Ticker-Zahl klar unter Protokoll-Zahl
     //     (vorher liess kind="rempler" bedingungslos praktisch jeden Treffer durch).
