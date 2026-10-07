@@ -39548,8 +39548,15 @@
         // FUEHRENDE einbricht -- jeder andere Einbruch waere wieder Protokoll (heute
         // ohnehin schon kein `true` hier, dieser Vergleich ist neu). `bahnRangliste()` ist
         // dieselbe Rangliste, die HUD/Endstand lesen -- kein neuer Vergleich.
+        // T1 (Time-Trial-Broadcast-Paket, 07.10.): `kind` nur, wenn `fuehrt` -- vorher stand
+        // "einbruch" bedingungslos da (Merge 0fd081b3d, C3, 01.10.), und feed() stuft jede
+        // Zeile mit gesetztem `kind` immer als Ereignis ein (big||kind?"ereignis":stufe),
+        // egal was big sagt. Das liess alle 24 Einbrueche am Zeilenbudget vorbei, dieselbe
+        // kind-Falle wie bei TDM und Breaking, s. docs/design/time-trial-broadcast-paket-
+        // plan-07-10.md Abschnitt 3.
+        const fuehrt=bahnRangliste().reihe[0]?.id===u.id;
         feed(u.seite,u.n+" bricht ein — Puste leer bei "+Math.round(u.pos*100)+" % der Strecke.",
-          bahnRangliste().reihe[0]?.id===u.id,undefined,"einbruch");
+          fuehrt,undefined,fuehrt?"einbruch":undefined);
       }
       // ...UND ER FAENGT SICH WIEDER. Die Gegenrichtung zur Zeile darueber, und der
       // eigentliche Punkt der ganzen Aenderung: ohne sie ist "kurz regenerieren" nicht
@@ -42443,6 +42450,10 @@
   //     Aufrufstelle, die kind UND stufe:"routine" gemeinsam uebergibt, OHNE dass kind an
   //     `big` haengt, landet trotz "routine" vollstaendig im sichtbaren Ticker. kind nur bei
   //     wirklichem Banner (big) uebergeben, nie bedingungslos.
+  //     Vierter Fall (Bahn-Einbruch, 07.10. behoben, docs/design/time-trial-broadcast-
+  //     paket-plan-07-10.md Abschnitt 3): die Zwischenzeit-Zeile (TT-1) in updateHudBahn()
+  //     uebergibt `kind="bestzeit"` bewusst weiter bedingungslos -- Zwischenzeiten sollen
+  //     alle im Ticker stehen, das ist keine fuenfte Instanz dieser Falle, s. Plan 3.1.
   //   * "routine" -- nur im Protokoll (ausser sie ist big): die Massenzeilen, die der Audit
   //     ausdruecklich nennt -- gewoehnlicher Treffer, Heilung, Pass, Skillwahl.
   //   * "normal" (Vorgabe) -- im Ticker, solange das Zeilenbudget reicht.
@@ -44763,7 +44774,11 @@
   // Zweitlauf geht ausschliesslich ueber bahnLauf() — dieselbe Funktion, die auch
   // window.__arena.bahnLauf() oeffentlich macht und die Opus' eigene Plan-Sonde schon
   // nutzt. bahnLauf() sichert den kompletten Renn-Zustand (M.sichern(): disc, bahnDisc,
-  // LAEUFER, rennFertig, rennT, done), baut mit M.bau(saat) EINE NEUE LAEUFER-Liste in
+  // LAEUFER, rennFertig, rennT, done) UND seit dem Time-Trial-Broadcast-Paket (07.10.,
+  // docs/design/time-trial-broadcast-paket-plan-07-10.md) auch den Anzeige-Zustand
+  // (bahnAnzeigeSichern()/bahnAnzeigeZurueck()) — vorher leerte jeder Zweitlauf ueber
+  // bauSpurt() Flags wie bahnEndeGemeldet/bahnZzGemeldet, die updateHudBahn() im naechsten
+  // Frame als "noch nicht gemeldet" las. Baut mit M.bau(saat) EINE NEUE LAEUFER-Liste in
   // einer neuen Variable auf (die alte Liste bleibt als Objekt unberuehrt im Sicherungs-
   // Schnappschuss liegen) und spielt am Ende GENAU DIESEN Schnappschuss mit M.zurueck()
   // zurueck — das echte, bereits beendete Rennen (die Werte, die bahnRangliste()/
@@ -46549,13 +46564,51 @@
     document.getElementById("mdffaSpeedBtn").textContent="Tempo "+mdffaTempo+"×";
   });
 
+  // ANZEIGE-ZUSTAND DER BAHN (Time-Trial-Broadcast-Paket 07.10., docs/design/time-trial-
+  // broadcast-paket-plan-07-10.md Abschnitt 2.3): genau die Globals, die bauSpurt() neben
+  // dem Rennzustand zuruecksetzt -- ohne `seed` (s. Alternativ-Rechner-Kommentar weiter
+  // unten). Seit e0fb49da ruft renderEndstandBahn() bahnLauf() auf; ohne diese Sicherung
+  // leerte jeder Zweitlauf bahnEndeGemeldet/bahnZzGemeldet & Co., und updateHudBahn()
+  // meldete im naechsten Frame alles neu -- inklusive des Endstands selbst, der wieder
+  // renderEndstandBahn() ausloeste, das wieder neue Zweitlaeufe baute: eine Endlosschleife
+  // je Frame (Time-Trial 1025 Ticker-Zeilen nach dem Zieleinlauf, 1,6 statt 60 Bilder/s).
+  // WER IN bauSpurt() EIN NEUES ANZEIGE-GLOBAL ZURUECKSETZT, TRAEGT ES HIER EIN.
+  function bahnAnzeigeSichern(){
+    return {fortschrittVerlauf, letzterBuehneBahnGrossT, bahnFallenTypen, bahnKursName,
+      bahnKursChaos, bahnGedraengeGemeldet, bahnKoennenGemeldet, bahnEndeGemeldet,
+      bahnFuehrenderId, bahnFuehrenderSeit, staffelFuehrendeSeite, bahnHotSeatId,
+      bahnZzGemeldet, ttAmpelGemeldet, ttRegieSeit, bahnBauchbindeIdx,
+      bahnBauchbindeNaechste, bahnFalleGemeldet, bahnFalleAnzeige, staffelAktivVorher,
+      staffelWechselAnzeige, staffelVerlauf, staffelBeinMarken, staffelAnkerGezeigt,
+      staffelBeinDuellGemeldet, spurtStationBest, spurtFotofinishGezeigt,
+      spurtStationStats, cam, camR, bahnWahl, bahnFokus, bahnFokusAuto, ttPanelSig,
+      routeCache};
+  }
+  function bahnAnzeigeZurueck(a){
+    if(!a)return;
+    fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
+    bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
+    bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
+    bahnEndeGemeldet=a.bahnEndeGemeldet; bahnFuehrenderId=a.bahnFuehrenderId;
+    bahnFuehrenderSeit=a.bahnFuehrenderSeit; staffelFuehrendeSeite=a.staffelFuehrendeSeite;
+    bahnHotSeatId=a.bahnHotSeatId; bahnZzGemeldet=a.bahnZzGemeldet; ttAmpelGemeldet=a.ttAmpelGemeldet;
+    ttRegieSeit=a.ttRegieSeit; bahnBauchbindeIdx=a.bahnBauchbindeIdx;
+    bahnBauchbindeNaechste=a.bahnBauchbindeNaechste; bahnFalleGemeldet=a.bahnFalleGemeldet;
+    bahnFalleAnzeige=a.bahnFalleAnzeige; staffelAktivVorher=a.staffelAktivVorher;
+    staffelWechselAnzeige=a.staffelWechselAnzeige; staffelVerlauf=a.staffelVerlauf;
+    staffelBeinMarken=a.staffelBeinMarken; staffelAnkerGezeigt=a.staffelAnkerGezeigt;
+    staffelBeinDuellGemeldet=a.staffelBeinDuellGemeldet; spurtStationBest=a.spurtStationBest;
+    spurtFotofinishGezeigt=a.spurtFotofinishGezeigt; spurtStationStats=a.spurtStationStats;
+    cam=a.cam; camR=a.camR; bahnWahl=a.bahnWahl; bahnFokus=a.bahnFokus;
+    bahnFokusAuto=a.bahnFokusAuto; ttPanelSig=a.ttPanelSig; routeCache=a.routeCache;
+  }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das
   // Zeitfahren und die Wand. Kommt eine sechste Bahn dazu, reicht ein Eintrag in
   // BAHN_ART; hier ist nichts nachzutragen.
   for(const bd of Object.keys(BAHN_ART)){
     MOTOREN[bd]={
-      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done}),
+      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern()}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
                     rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
                     // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
@@ -46563,7 +46616,10 @@
                     // den es nicht mehr gibt — die ids gibt es im echten Rennen aber auch,
                     // also klebten sie sonst am falschen Mann. Vorher fiel das nicht auf,
                     // weil zeichneSpurt Schwebetexte gar nicht gezeichnet hat.
-                    floats.length=0;},
+                    floats.length=0;
+                    // Anzeige-Zustand ZULETZT zurueckstellen (Time-Trial-Broadcast-Paket
+                    // 07.10.): bauSpurt() im Zweitlauf hat ihn geleert, hier kommt er zurueck.
+                    bahnAnzeigeZurueck(a.anzeige);},
       vorher:()=>{disc=bd; bahnDisc=bd;},
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
