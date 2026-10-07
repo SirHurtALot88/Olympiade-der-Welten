@@ -48,7 +48,12 @@ type PsZeile = { pid: string; ppid: string; args: string };
  */
 function schnappschuss(): PsZeile[] | null {
   try {
-    const ausgabe = execSync("ps -eo pid,ppid,args", { encoding: "utf8" });
+    // `-ww`: ohne diesen Schalter kappt `ps` jede Zeile an `$COLUMNS` (in manchen Shells/CI
+    // exportiert) -- die Hauptprozesszeile ist mit all ihren Chromium-Flags weit ueber 1000
+    // Zeichen lang, das `--user-data-dir` liegt also oft hinter dem Schnitt und `profile` bliebe
+    // leer, obwohl ein Browser lief (Fund im Opus-Review 07.10., s. ausfuehrlicher Kommentar in
+    // tests/arena-headless-runner.test.ts).
+    const ausgabe = execSync("ps -ww -eo pid,ppid,args", { encoding: "utf8" });
     const zeilen: PsZeile[] = [];
     for (const zeile of ausgabe.split("\n")) {
       const treffer = zeile.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
@@ -92,11 +97,12 @@ function eigeneProfileAusSchnappschuss(zeilen: PsZeile[], wurzelPid: number): Se
 
 /**
  * Sammelt waehrend `aktion()` laufend (alle 100ms) die Playwright-Profilverzeichnisse, die dieser
- * Testprozess selbst gestartet hat (ausfuehrlicher Kommentar in
- * tests/arena-headless-runner.test.ts). Sobald `browser.close()` den Hauptprozess beendet, werden
- * seine verbliebenen Helfer (Zygote/GPU/Utility/crashpad_handler) vom Kernel auf PID 1
- * umgehaengt -- danach ist eine Abstammungspruefung wirkungslos. Das pro Start zufaellige
- * `--user-data-dir` bleibt dagegen in jedem zugehoerigen Prozess sichtbar.
+ * Testprozess selbst gestartet hat (ausfuehrlicher Kommentar, inklusive der bewusst
+ * hingenommenen crashpad_handler-Luecke, in tests/arena-headless-runner.test.ts). Sobald
+ * `browser.close()` den Hauptprozess beendet, werden seine verbliebenen Helfer (Zygote/GPU/
+ * Utility) vom Kernel auf PID 1 umgehaengt -- danach ist eine Abstammungspruefung wirkungslos.
+ * Das pro Start zufaellige `--user-data-dir` bleibt dagegen in jedem zugehoerigen Prozess
+ * sichtbar.
  */
 async function sammleEigeneProfileWaehrend(aktion: () => Promise<void>): Promise<Set<string>> {
   const profile = new Set<string>();
@@ -339,11 +345,15 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
         ]);
       });
       expect(ergebnisse).toEqual([null]);
-      if (profile.size === 0) {
+      if (schnappschuss() === null) {
+        // `ps` in dieser Umgebung nicht verfuegbar -- der Determinismus-Teil oben (ergebnisse)
+        // hat die eigentliche Behauptung des Tests bereits geprueft.
         return;
       }
-      const lebend = await wartetBisProfileVerschwinden(profile);
-      expect(lebend).toEqual([]);
+      // Die Abstammungspruefung macht jetzt sichtbar, ob WIRKLICH kein Browser gestartet wurde
+      // (statt wie frueher nur stillschweigend durchzufallen, wenn zufaellig nichts Neues auftauchte):
+      // kein eigener Chromium-Nachkomme bedeutet kein gelerntes Profil.
+      expect(profile.size).toBe(0);
     },
     LAUF_TIMEOUT_MS,
   );

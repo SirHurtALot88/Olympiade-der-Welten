@@ -55,7 +55,11 @@ type PsZeile = { pid: string; ppid: string; args: string };
  */
 function schnappschuss(): PsZeile[] | null {
   try {
-    const ausgabe = execSync("ps -eo pid,ppid,args", { encoding: "utf8" });
+    // `-ww`: ohne diesen Schalter kappt `ps` jede Zeile an `$COLUMNS` (in manchen Shells/CI
+    // exportiert) -- die Hauptprozesszeile ist mit all ihren Chromium-Flags weit ueber 1000
+    // Zeichen lang, das `--user-data-dir` liegt also oft hinter dem Schnitt und `profile` bliebe
+    // leer, obwohl ein Browser lief (Fund im Opus-Review 07.10.).
+    const ausgabe = execSync("ps -ww -eo pid,ppid,args", { encoding: "utf8" });
     const zeilen: PsZeile[] = [];
     for (const zeile of ausgabe.split("\n")) {
       const treffer = zeile.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
@@ -107,11 +111,21 @@ function eigeneProfileAusSchnappschuss(zeilen: PsZeile[], wurzelPid: number): Se
  * Chromium-Prozesse der Maschine (die fruehere Fassung dieses Tests) wird faelschlich rot, sobald
  * irgendein anderer Prozess im selben Fenster zufaellig ebenfalls Chromium startet oder beendet --
  * nachgemessen 07.10. (Flaky-Fund, mehrfach auch nach einer reinen Gnadenfrist noch rot). Sobald
- * `browser.close()` den Hauptprozess beendet, werden seine verbliebenen Helfer
- * (Zygote/GPU/Utility/crashpad_handler) vom Kernel auf PID 1 umgehaengt -- danach ist eine
- * Abstammungspruefung wirkungslos, weil sie genau die nachlaufenden Prozesse verliert. Das pro
- * Start zufaellige `--user-data-dir` bleibt dagegen in jedem zugehoerigen Prozess (auch den
- * umgehaengten) sichtbar und erlaubt danach trotzdem noch, gezielt genau diese wiederzufinden.
+ * `browser.close()` den Hauptprozess beendet, werden seine verbliebenen Helfer (Zygote/GPU/
+ * Utility) vom Kernel auf PID 1 umgehaengt -- danach ist eine Abstammungspruefung wirkungslos,
+ * weil sie genau die nachlaufenden Prozesse verliert. Das pro Start zufaellige `--user-data-dir`
+ * bleibt dagegen in jedem zugehoerigen Prozess (auch den umgehaengten) sichtbar und erlaubt
+ * danach trotzdem noch, gezielt genau diese wiederzufinden.
+ *
+ * LUECKE (Opus-Review 07.10.): `chrome_crashpad_handler` traegt in seiner Kommandozeile WEDER
+ * `--user-data-dir` NOCH sonst einen Bezug zu seinem Hauptprozess und ist schon beim Start (nicht
+ * erst nach `close()`) ein Kind von PID 1 -- weder die Abstammungspruefung waehrend des Laufs noch
+ * der Profil-Grep danach erfassen ihn je. Bewusst hingenommen: nachgemessen (ps -eo
+ * pid,ppid,stat,args) beendet sich der Handler selbststaendig binnen rund 1,2s, nachdem sein
+ * ueberwachter Chrome-Prozess ausgelaufen ist (er startet mit `--monitor-self`) -- ein echtes
+ * Haengenbleiben waere ein voellig anderer Fehler (der Handler ueberlebt seinen Chrome-Prozess),
+ * kein Leck von `browser.close()`. Die alte, system-weite PID-Zaehlung "erfasste" ihn nur
+ * scheinbar -- sie erbte dafuer genau die Fragilitaet, die dieser Umbau beheben soll.
  */
 async function sammleEigeneProfileWaehrend(aktion: () => Promise<void>): Promise<Set<string>> {
   const profile = new Set<string>();
