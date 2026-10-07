@@ -67,6 +67,15 @@ const AUS = { tdm: [], "mini-dm": [], battlefield: [] };
 // --variante=battlefield:z+b,tdm:z  (Diagnose, s. Kopf): ueberschreibt die "an"-Belegung je Disziplin.
 const VARIANTE = Object.fromEntries((wert("variante", "") || "").split(",").filter(Boolean)
   .map((t) => { const [d, k] = t.split(":"); return [d, (k || "").split("+").filter(Boolean)]; }));
+// Eingaben pruefen, bevor ein Browser startet: ein Tippfehler darf nicht still den eingebauten
+// Stand als "Variante" messen, ein unbekannter Strom nicht erst im Browser abstuerzen.
+for (const [d, k] of Object.entries(VARIANTE)) {
+  if (!(d in AUS)) { console.error(`--variante: unbekannte Arena-Disziplin "${d}" (erlaubt: ${Object.keys(AUS).join(", ")})`); process.exit(2); }
+  if (k.some((x) => x !== "z" && x !== "b")) { console.error(`--variante: nur "z" und "b" erlaubt, bekam ${k.join("+")}`); process.exit(2); }
+}
+for (const s of STROEME) if (!STROM[s]) { console.error(`--stroeme: unbekannter Strom ${s} (erlaubt: 1, 2)`); process.exit(2); }
+// Die Nullprobe-Referenz gilt nur fuer die eingecheckte Kader-Familie auf der eigenen Seite.
+const REFERENZ_GILT = N === 24 && !process.env.OLY_KADER_FAMILIE && !args.some((a) => a.startsWith("--seite="));
 
 // NULLPROBE-REFERENZ: SHA-256 (erste 16 Hex-Zeichen) ueber JSON.stringify der `varianten`
 // (label + spiele) aus disziplinProbe(d,{n:24,kaderFamilie,zielDiag:true,saat0,mutatorSaat}),
@@ -217,7 +226,7 @@ try {
   console.log(`Kader-Quelle: ${geladen.quelle} (${kaderFamilie.length} Paarungen), n=${N} je Paarung, Stroeme ${STROEME.join("/")}\n`);
 
   if (!NUR_IST) {
-    if (!hatSchalter) { console.error("window.__arena.persHandwerk fehlt — Seite ohne P1? Mit --nur-ist messen."); process.exit(2); }
+    if (!hatSchalter) throw new Error("window.__arena.persHandwerk fehlt — Seite ohne P1? Mit --nur-ist messen.");
     stand = await seite.evaluate(() => window.__arena.persHandwerk());
     anBelegung = { ...stand, ...VARIANTE };
     if (Object.keys(VARIANTE).length) {
@@ -292,7 +301,7 @@ if (NUR_IST) {
     // (N)
     for (const s of STROEME) {
       const ref = NULLPROBE_REFERENZ[`${d}|${s}`];
-      if (N !== 24 || !ref) console.log(`  —      (N) Strom ${s}: keine Referenz fuer n=${N} — uebersprungen (Fingerabdruck ${e[s].aus.hash})`);
+      if (!REFERENZ_GILT || !ref) console.log(`  —      (N) Strom ${s}: Referenz gilt nur fuer n=24, eingecheckte Kader-Familie, eigene Seite — uebersprungen (Fingerabdruck ${e[s].aus.hash})`);
       else pruefe(e[s].aus.hash === ref, `(N) Nullprobe Strom ${s} bit-identisch zum Stand vor P1 (${e[s].aus.hash} / Referenz ${ref})`);
     }
     // Leeres Handwerk (Battlefield nach Abbruchregel 1): der eingebaute Stand IST die Nullprobe.
@@ -316,12 +325,15 @@ if (NUR_IST) {
     // (D)
     for (const s of STROEME) {
       const a = e[s].aus, b = e[s].an;
-      const dOk = b.starRang1 >= a.starRang1 - 0.03 && b.starTop2 >= a.starTop2 - 0.03 && b.paartreue >= a.paartreue - 0.03;
+      // null (keine Paare >= 15 gemessen) zaehlt als NICHT bestanden, nicht als still OK.
+      const dOk = b.starRang1 >= a.starRang1 - 0.03 && b.starTop2 >= a.starTop2 - 0.03
+        && a.paartreue != null && b.paartreue != null && b.paartreue >= a.paartreue - 0.03;
       pruefe(dOk, `(D) Strom ${s}: Star R1 ${pct(a.starRang1)} -> ${pct(b.starRang1)}, Top2 ${pct(a.starTop2)} -> ${pct(b.starTop2)}, Paare>=15 ${pct(a.paartreue)} -> ${pct(b.paartreue)} (je hoechstens 3 Pp darunter)`);
     }
     // (E)
     const mT = (k) => STROEME.reduce((x, s) => x + e[s][k].teamTreue, 0) / STROEME.length;
-    pruefe(mT("an") >= mT("aus") - 0.05, `(E) Team-Ergebnistreue Mittel der Stroeme ${pct(mT("aus"))} -> ${pct(mT("an"))} (hoechstens 5 Pp darunter)`);
+    const eGemessen = STROEME.every((s) => e[s].aus.teamTreue != null && e[s].an.teamTreue != null);
+    pruefe(eGemessen && mT("an") >= mT("aus") - 0.05, `(E) Team-Ergebnistreue Mittel der Stroeme ${pct(mT("aus"))} -> ${pct(mT("an"))} (hoechstens 5 Pp darunter)`);
     console.log("");
   }
 }

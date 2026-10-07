@@ -46089,14 +46089,25 @@
       const tmp=eckenReihenfolge[i]; eckenReihenfolge[i]=eckenReihenfolge[j]; eckenReihenfolge[j]=tmp;
     }
     let id=0;
-    for(let ecke=0; ecke<4; ecke++){
-      const side=eckenReihenfolge[ecke];
-      const p=vierSpieler[side];
-      const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
-        zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
-      const spawn=miniDmFfaSpawn(ecke);
-      einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
-      U.push(einheit);
+    // P1-PERSOENLICHKEITS-HANDWERK GILT HIER NICHT (07.10.): `persHandwerk:["z"]` ist nur fuer das
+    // gemessene 4-gegen-4 abgenommen (rho/Pp, arena-zielwahl-opus-empfehlung-02-10.md Abschnitt
+    // 10). Das FFA vergibt Ligapunkte und ist mit der Aenderung NICHT gemessen — es baut seine
+    // Einheiten deshalb mit der unveraenderten PERSDEF-Grundstellung (bit-identisch zu vorher),
+    // bis eine FFA-Sonde es abnimmt.
+    const handwerkVorher=ARENA_ART["mini-dm"].persHandwerk;
+    ARENA_ART["mini-dm"].persHandwerk=[];
+    try{
+      for(let ecke=0; ecke<4; ecke++){
+        const side=eckenReihenfolge[ecke];
+        const p=vierSpieler[side];
+        const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
+          zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
+        const spawn=miniDmFfaSpawn(ecke);
+        einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
+        U.push(einheit);
+      }
+    }finally{
+      ARENA_ART["mini-dm"].persHandwerk=handwerkVorher;
     }
     // U bleibt WAEHREND DES KAMPFES in der ausgewuerfelten Eckenreihenfolge (das ist der
     // Fix von oben — gegner() muss die Ecken-Lotterie sehen, sonst greift sie nicht). Fuer

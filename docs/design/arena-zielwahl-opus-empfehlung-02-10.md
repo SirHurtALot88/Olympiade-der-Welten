@@ -575,10 +575,14 @@ wie vorher (78–85), nur deutlich weniger. Eingeschaltet wird es trotzdem: Krit
 Dokuments (nicht mehr als 6 Pp über Ist) ist genau für diesen Fall formuliert, und der Schritt
 verbessert **beide** Pflichtzahlen der Disziplin, rho und Pp.
 
-Das 4-Team-FFA (`spieleMiniDmFfaRunde`) baut seine Einheiten über denselben
-`baueEinheit(...,"mini-dm")`, bekommt den Zusammenhalt also mit. Gewählt, weil es **eine**
-Mechanik je Disziplin sein soll (4.3); im FFA hat jedes Team ohnehin nur einen Kämpfer.
-Der Spiegeltest `scripts/miss-mini-dm-ffa-spiegel.mjs 96` (384 Runden, vier identische Kämpfer)
+Das 4-Team-FFA baut seine Einheiten über denselben `baueEinheit(...,"mini-dm")`. Es vergibt
+im echten Spiel Ligapunkte (`FoundationBattleArenaHost`) und ist mit dieser Änderung **nicht**
+gemessen. Nach dem Opus-Review baut das FFA seine Einheiten deshalb ausdrücklich ohne Handwerk
+(`persHandwerk` wird nur für den FFA-Aufbau geleert) und bleibt bit-identisch, bis eine
+FFA-Sonde es abnimmt. Eingeschaltet ist P1 damit genau dort, wo es gemessen ist: im
+Mini-DM-4-gegen-4. Nachgewiesen über `window.__arena.miniDmFfaEvent` mit vier echten,
+unterschiedlichen Kadern aus der Kader-Familie und sechs Saaten: SHA-256 der Ereignisse
+gleich dem `origin/main`-Abzug (`0f494fdb…`). Der Spiegeltest `scripts/miss-mini-dm-ffa-spiegel.mjs 96` (384 Runden, vier identische Kämpfer)
 liefert vorher und nachher dieselbe Tabelle bis auf die letzte Stelle (größte Abweichung von
 25 % auf Platz 1: 6,0 Prozentpunkte, beide Male). Das ist ein Fairness-Nachweis, keine
 Wirkungsmessung: Vier identische Kämpfer sind gegen jede Verhaltensänderung symmetrisch. Ob der
@@ -606,6 +610,10 @@ dieser Runde ändert nichts an der Aussage aus 4.4 (Haltung rangtreue-neutral).
 ---
 
 ## Anhang A — Messmethode (zum Wiederholen)
+
+**Seit der Bau-Runde 07.10. (Abschnitt 10) gibt es dafür ein Skript:**
+`scripts/verify-arena-persoenlichkeit-p1-paket-07-10.mjs` (Varianten über `--variante=`, z. B.
+`tdm:z+b`). Der folgende Text beschreibt den ursprünglichen Weg der Konsultation.
 
 Kein Skript im Repo, mit Absicht: Die Konsultation sollte keinen Code bringen. Wiederholbar in drei
 Schritten:
