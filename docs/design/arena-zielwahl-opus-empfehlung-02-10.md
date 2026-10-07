@@ -476,7 +476,144 @@ Ich empfehle sie trotzdem nicht, aus drei Gründen:
 
 ---
 
+## 10. Bau-Runde 07.10. — eingeschaltet nur Mini-DM; Battlefield verfehlt F, TDM: F ungemessen
+
+**Ergebnis in einem Satz:** Die Mechanik ist gebaut, eingeschaltet ist sie nur in Mini-DM
+(`persHandwerk:["z"]`, alle Kriterien A–F bestanden). Battlefield steht nach Abbruchregel 1 auf
+`[]` (A–E bestanden, F klar verfehlt). TDM steht ebenfalls auf `[]`: A–E bestanden, aber die
+Pflicht-Pp-Messung (F) kam auf der überlasteten Messmaschine nicht ins Ziel (10.3a). Beide sind
+damit bit-identisch zum Stand vor P1.
+
+Chris hat Frage 1 aus Abschnitt 9 freigegeben. Gebaut wurde **exakt Abschnitt 4.1**:
+`HANDWERK_MITTE`, `persDefVon(pk,dId)`, `behav(name,dId)`, `baueEinheit()` ruft `behav(p.n,d)`,
+das Taktik-Panel liest Anzeige und Stern über `persDefVon(pk,disc)`, `PERSDEF` bleibt
+unverändert. Dazu eine Mess-Schnittstelle `window.__arena.persHandwerk({...})` nach dem Muster
+`buehneFlags` (nur Messung/QA, kein Spiel ruft sie). Gemessen mit
+`scripts/verify-arena-persoenlichkeit-p1-paket-07-10.mjs` (Nullprobe und Eingriff auf derselben
+Seite, beide Saatströme wie in 2.2, Kriterien A–E automatisch), Pp mit
+`scripts/messe-arena-einfluss.mjs` (Strom 2 über `--saat-versatz=10000000`, „vorher“ auf einem
+`origin/main`-Abzug 2470c502 über den Pfad-Parameter des Skripts).
+
+**Die Vorschau aus der Konsultation bestätigt sich am echten Code auf die dritte
+Nachkommastelle** — rho je Spiel, rho Saison, Spannweite, Star, Top 2, Paare ≥ 15 und
+Team-Ergebnistreue sind in allen sechs Disziplin-Strom-Zellen identisch mit Abschnitt 2.2
+(einzige Abweichung: TDM-Paare ≥ 15 Strom 1 76,2 statt 76,1 %, Rundung; TDM-Star Rang 1
+Strom 2 15,0 statt 14,2 %).
+Nachjustiert wurde nichts.
+
+### 10.1 Nullprobe
+
+Schalter aus (`persHandwerk:[]` für alle drei) ist **bit-identisch** zum Stand vor P1: SHA-256
+über alle zurückgegebenen Teilnehmerlisten (n = 24, fünf Paarungen, `zielDiag:true`) gleich dem
+`origin/main`-Abzug in allen sechs Disziplin-Strom-Zellen (`tdm` f1dee6dc…/8c535b45…, `mini-dm`
+b1e1bd3f…/c3dc4234…, `battlefield` bb0f1f6d…/d23e76fc…). Die Fingerabdrücke stehen als Referenz
+im Verify-Skript.
+
+### 10.2 Kriterien A–F je Disziplin (Strom 1 / Strom 2)
+
+| | TDM (z+b, V9) | Mini-DM (z, V5) | Battlefield (z+b, V9) |
+|---|---|---|---|
+| **A** rho je Spiel | 0,324/0,247 → **0,416/0,432** ✓ | 0,365/0,363 → **0,588/0,576** ✓ | 0,399/0,391 → 0,583/0,616 ✓ |
+| **B** rho Saison | 0,308/0,189 → 0,448/0,413 ✓ | 0,311/0,311 → 0,595/0,643 ✓ | 0,310/0,310 → 0,810/0,762 ✓ |
+| **C** Paarungen besser | 6 von 10 ✓ | 10 von 10 ✓ | 7 von 10 ✓ |
+| **D** Star Rang 1 | 1,7/2,5 → 14,2/15,0 % ✓ | 37,5/32,5 → 37,5/38,3 % ✓ | 19,2/20,8 → 25,0/22,5 % ✓ |
+| **D** Star Top 2 | 17,5/20,8 → 35,8/29,2 % ✓ | 55,0/52,5 → 55,0/53,3 % ✓ | 35,8/32,5 → 50,8/50,8 % ✓ |
+| **D** Paare ≥ 15 | 68,8/67,6 → 76,2/75,0 % ✓ | 67,2/65,8 → 77,0/75,7 % ✓ | 75,6/75,3 → 84,9/85,1 % ✓ |
+| **E** Team-Ergebnistreue (Mittel) | 58,0 → 57,0 % ✓ | 88,7 → 86,5 % ✓ | 96,9 → 95,9 % ✓ |
+| **F** Pp (vorher → nachher) | **nicht gemessen** (10.3a) | 77,9/85,2 → **55,6/43,9** ✓ | 35,7/48,6 → **62,8/85,4** ✗ |
+| ε² Persönlichkeit | 0,229/0,255 → ≈ 0/≈ 0 | 0,133/0,078 → 0,019/0,068 | 0,100/0,087 → ≈ 0/≈ 0 |
+| Verlässlichkeit | 0,858/0,866 → 0,481/0,508 | 0,629/0,466 → 0,579/0,657 | 0,744/0,736 → 0,470/0,561 |
+
+Pp: Mini-DM und Battlefield n = 12, zwei Ströme, „vorher“ auf dem `origin/main`-Abzug. Die
+TDM- und Battlefield-Spalten von A–E sind mit V9 gemessen (Diagnose, heute nicht eingeschaltet).
+Die offizielle `miss-star-paartreue.mjs`-Gegenmessung wurde aus Zeitgründen abgebrochen; Star,
+Top 2 und Paare ≥ 15 stammen aus dem Verify-Skript, das dieselbe Definition auf denselben
+`disziplinProbe`-Rohdaten rechnet.
+
+### 10.3a TDM: A–E bestanden, F ungemessen — vorerst `persHandwerk:[]`
+
+Die TDM-Pp-Messung (n = 6, zwei Ströme, vorher/nachher, vier parallele Läufe) lief 2,7 Stunden,
+ohne ein Ergebnis zu liefern — die Messmaschine war mit mehreren parallelen Agenten überlastet
+(Last 20–50 auf vier Kernen; ohne Last braucht ein Lauf rund 80 min). Abgebrochen auf Anweisung
+der Koordination. CLAUDE.md macht Pp zur Pflichtprüfung, und Battlefield zeigt, dass V9 Pp
+deutlich verschlechtern kann. Ohne F-Zahl wird TDM deshalb **nicht** eingeschaltet. Nachholen:
+
+    node scripts/messe-arena-einfluss.mjs tdm 6 <origin/main-Abzug>/public/mockups/battle-mode.html
+    node scripts/messe-arena-einfluss.mjs tdm 6 <…> --saat-versatz=10000000
+    (und dieselben zwei mit tdm:{persHandwerk:["z","b"]} im Arbeitsbaum)
+
+Hält F (nicht mehr als 6 Pp über Ist), genügt die Ein-Zeilen-Änderung `persHandwerk:["z","b"]`
+in `ARENA_ART.tdm`. A–E sind dann bereits belegt (Tabelle oben).
+
+### 10.3 Battlefield: F verfehlt — `persHandwerk:[]`
+
+Battlefield besteht A–E klar, verfehlt aber F in **beiden** Strömen deutlich: +27,1 und +36,8
+Pp, erlaubt waren +6 (die gemessene Stromspreizung der Ist-Messung selbst liegt bei 12,9 Pp).
+Nach Abbruchregel 1 bekommt Battlefield deshalb `persHandwerk:[]` und läuft bit-identisch wie
+vor P1. Die Erwartung aus Abschnitt 6 („Fallen eigenmächtiges Laufen und
+Umzielen weg, sollte der Tempo-Anteil eher sinken“) hat sich für Battlefield also **nicht**
+bestätigt. Das Muster je Strom ist bei n = 12 nicht stabil genug für eine Ursachenaussage
+(Strom 1: Charisma, Matrixgewicht 20, fällt von 20,2 % auf 1,1 %, Spirit steigt von 16,8 auf
+27,9 %; Strom 2: Awareness und Intelligence — beide tragen TMP, das außerhalb von
+`aufEignung()` liegt — steigen zusammen von 40,0 auf 67,7 %, Torment fällt von 14,5 auf 0 %).
+Stabil ist nur die Summe: Die Mechanik ordnet mit V9 das Ergebnis nach Eignung deutlich besser
+(Saison-Validität 0,31 → 0,76–0,81), aber aus anderen Attributen, als die Matrix bepreist —
+genau der Fall, den die Pp-Pflicht aus CLAUDE.md abfangen soll.
+
+Für eine spätere Battlefield-Runde heißt das: Der Persönlichkeits-Schritt ist dort messbar der
+richtige rho-Hebel, braucht aber vorher oder zugleich die Pp-Reparatur am Chassis (TMP/AUS-
+Normierung, Abschnitt 6 letzter Absatz). Die Diagnose-Variante ist mit
+`node scripts/verify-arena-persoenlichkeit-p1-paket-07-10.mjs --disziplinen=battlefield --variante=battlefield:z+b`
+jederzeit wiederholbar.
+
+### 10.4 Mini-DM
+
+Mini-DM verbessert sich in **allen** Kriterien, auch in F: Pp sinkt um 22 bzw. 41 Punkte. Der
+größte Einzelgewinn ist Will (Matrix 14), der vorher in beiden Strömen 0 % las und jetzt mit
+Gewicht ankommt. Mini-DM bleibt mit 44–56 Pp über der absoluten 25-Pp-Schranke aus CLAUDE.md —
+wie vorher (78–85), nur deutlich weniger. Eingeschaltet wird es trotzdem: Kriterium F dieses
+Dokuments (nicht mehr als 6 Pp über Ist) ist genau für diesen Fall formuliert, und der Schritt
+verbessert **beide** Pflichtzahlen der Disziplin, rho und Pp.
+
+Das 4-Team-FFA baut seine Einheiten über denselben `baueEinheit(...,"mini-dm")`. Es vergibt
+im echten Spiel Ligapunkte (`FoundationBattleArenaHost`) und ist mit dieser Änderung **nicht**
+gemessen. Nach dem Opus-Review baut das FFA seine Einheiten deshalb ausdrücklich ohne Handwerk
+(`persHandwerk` wird nur für den FFA-Aufbau geleert) und bleibt bit-identisch, bis eine
+FFA-Sonde es abnimmt. Eingeschaltet ist P1 damit genau dort, wo es gemessen ist: im
+Mini-DM-4-gegen-4. Nachgewiesen über `window.__arena.miniDmFfaEvent` mit vier echten,
+unterschiedlichen Kadern aus der Kader-Familie und sechs Saaten: SHA-256 der Ereignisse
+gleich dem `origin/main`-Abzug (`0f494fdb…`). Der Spiegeltest `scripts/miss-mini-dm-ffa-spiegel.mjs 96` (384 Runden, vier identische Kämpfer)
+liefert vorher und nachher dieselbe Tabelle bis auf die letzte Stelle (größte Abweichung von
+25 % auf Platz 1: 6,0 Prozentpunkte, beide Male). Das ist ein Fairness-Nachweis, keine
+Wirkungsmessung: Vier identische Kämpfer sind gegen jede Verhaltensänderung symmetrisch. Ob der
+Zusammenhalt im FFA die Rangtreue bewegt, bleibt — wie in 2.3 — ungemessen, solange die Sonde das
+FFA nicht abnimmt.
+
+### 10.5 Isolation (G)
+
+Alle zwanzig Disziplinen über `disziplinProbe` (Kader-Familie, n = 2 je Paarung — gekürzt,
+weil `miss-alle-disziplinen.mjs 24` für alle zwanzig auf der überlasteten Maschine nicht in
+vertretbarer Zeit durchlief), SHA-256 der vollständigen Rückgabe, eingebauter Stand gegen den
+`origin/main`-Abzug: **19 von 20 bit-identisch**, nur Mini-DM bewegt sich (`169b125e…` →
+`69cffcb4…`). TDM und Battlefield sind mit `persHandwerk:[]` eingeschlossen; für sie belegt
+zusätzlich die n = 24-Nullprobe aus 10.1 die Bit-Gleichheit in beiden Strömen. Seitenfehler
+keine. Das Taktik-Panel zeigt in Spurt unverändert die `PERSDEF`-Sterne, in einer Disziplin mit
+Handwerk „Ausgewogen ★“ (Playwright-Stichprobe).
+
+### 10.6 Die zweite Frage an Chris
+
+Frage 2 aus Abschnitt 9 (Haltung als erster Manager-Risiko-Knopf) ist **nicht** Teil dieses
+Pakets — sie geht über die Bau-Freigabe hinaus und gehört in das Grundgerüst aus PR #1118. Die
+Haltung bleibt hier, wie in 4.1 empfohlen, persönlichkeitsabhängig und unverändert; die Messung
+dieser Runde ändert nichts an der Aussage aus 4.4 (Haltung rangtreue-neutral).
+
+---
+
 ## Anhang A — Messmethode (zum Wiederholen)
+
+**Seit der Bau-Runde 07.10. (Abschnitt 10) gibt es dafür ein Skript:**
+`scripts/verify-arena-persoenlichkeit-p1-paket-07-10.mjs` (Varianten über `--variante=`, z. B.
+`tdm:z+b`). Der folgende Text beschreibt den ursprünglichen Weg der Konsultation.
 
 Kein Skript im Repo, mit Absicht: Die Konsultation sollte keinen Code bringen. Wiederholbar in drei
 Schritten:

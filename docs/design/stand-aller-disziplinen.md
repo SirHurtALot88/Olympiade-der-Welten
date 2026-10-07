@@ -404,7 +404,7 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
 | Tennis | 53,9 / 56,4 | 48, 2 Saatstroeme | VERLETZT |
 | Battlefield | 54 | 24 | VERLETZT |
 | Staffel | 61,9 | 48 (PR #1109 bit-identisch bestaetigt, s. Fuenfzehnter Nachtrag) | VERLETZT, klar verletzt |
-| Mini-DM | 115 | 24 | VERLETZT, deutlichste Verletzung im Feld |
+| Mini-DM | 115 → 55,6 / 43,9 (07.10., P1, n=12, 2 Saatstroeme; vorher am selben n 77,9 / 85,2) | 24 / 12 | VERLETZT, aber deutlich kleiner |
 
 **Ursachen, wo bekannt:**
 - **Fechten/Tennis/Showcase:** der WAGNIS-Fix (PR #1036, 26.09., generischer Auftritt-Risiko-Block
@@ -801,9 +801,9 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | I-Spy | Buehne | 0,756 | 0,170 | 0,909 | knapp |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,686 | 0,180 | 0,860 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,725 | 0,204 | 0,836 | knapp |
-| Mini-DM | Arena | 0,394 | 0,563 | 0,500 | durchgefallen |
-| Battlefield | Arena | 0,392 | 0,746 | 0,524 | durchgefallen |
-| TDM | Arena | 0,306–0,326 | 0,934 | 0,252 | durchgefallen |
+| Mini-DM | Arena | 0,588 (07.10., P1; vorher 0,365) | 0,680 | 0,595 | durchgefallen |
+| Battlefield | Arena | 0,399 (07.10., unveraendert) | 0,834 | 0,310 | durchgefallen |
+| TDM | Arena | 0,324 (07.10., unveraendert) | 0,861 | 0,308 | durchgefallen |
 
 **Diese Tabelle ist die komplette Neumessung vom 26.09. (Abend), s. Zwoelfter Nachtrag ganz
 oben.** Die Saison-Spannweite (fuenfte Spalte der alten Tabelle) wurde in dieser Runde nicht mit
@@ -1299,9 +1299,9 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) · I-2k "Kennerblick" (07.10.) gebaut, gemessen, verworfen (Abschnitt 7, Nachtrag) |
 | Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 04.10.:** Paket S-N1+S-N2 (Joker 8 % + Kriechen) hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter rho 0,910 (heute 0,880, n=24), Pp 18,7/15,6, Stillstand und Saeulenzeit 0 %, s. Sechzehnter Nachtrag |
 | **Football** | **32 %** | **0,818 (26.09.-Nachtrag — die alte 0,516 war stale, keine heutige Codeaenderung an Football, s. Zwoelfter Nachtrag)** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
-| Mini-DM | 30 % | 0,394 (26.09.-Nachtrag) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
-| TDM | 30 % | 0,306–0,326 (26.09.-Nachtrag) | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
-| Battlefield | 30 % | 0,392 (26.09.-Nachtrag) | Aufstellung repariert und nachgemessen (Siege Core stand hinten, Saison-Validitaet 0,595) · Zielwahl-Redesign recherchiert, nicht umgesetzt |
+| Mini-DM | 35 % | **0,588 / 0,576** (07.10., Strom 1/2; vorher 0,365/0,363) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · **Nachtrag 07.10. (Arena-Persoenlichkeit P1, `arena-zielwahl-opus-empfehlung-02-10.md` Abschnitt 10):** Zusammenhalt ist Handwerk (`ARENA_ART["mini-dm"].persHandwerk:["z"]`, alle auf "ausgewogen"), Zielneigung/Haltung/Bindung bleiben Persoenlichkeit — rho Saison 0,311 → 0,595/0,643, 10 von 10 Paarung-Strom-Faellen besser, Paare ≥15 67/66 → 77/76 %, Team-Ergebnistreue 88,7 → 86,5 %, **Pp 77,9/85,2 → 55,6/43,9** (n=12, besser, aber weiter ueber 25) · gemessen wird weiter das 4-gegen-4, nicht das FFA |
+| TDM | 30 % | 0,324 / 0,247 (07.10., Strom 1/2, unveraendert) | Aeltester Motor, am staerksten eingemessen · **Nachtrag 07.10. (P1):** mit Zusammenhalt+Bindung als Handwerk (V9) gemessen 0,416/0,432, Star Rang 1 2 → 14–15 %, A–E bestanden — aber **vorerst nicht eingeschaltet** (`persHandwerk:[]`), weil die Pflicht-Pp-Messung (F) auf der ueberlasteten Messmaschine nicht ins Ziel kam; Einschalten ist eine Zeile, sobald F gemessen ist |
+| Battlefield | 30 % | 0,399 / 0,391 (07.10., Strom 1/2, unveraendert) | Aufstellung repariert und nachgemessen · **Nachtrag 07.10. (P1):** mit V9 gemessen 0,583/0,616, Saison-Validitaet 0,31 → 0,81/0,76, A–E bestanden, aber **Pp 35,7/48,6 → 62,8/85,4** (Kriterium F klar verfehlt) — nach Abbruchregel 1 `persHandwerk:[]`, bit-identisch zum Stand davor; braucht zuerst die TMP/AUS-Pp-Reparatur am Chassis |
 
 **Kein Durchschnitt ueber alles**, weil die Achsen ungleich schwer wiegen: die neunzehn
 Disziplinen ausserhalb von Basketball koennen zusammen keine 15 % erreichen, solange sie nicht

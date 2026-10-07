@@ -5284,8 +5284,36 @@
   // "natürlich" heisst: die Persoenlichkeit entscheidet. Genau der Kniff aus dem Vorbild —
   // man stellt nur ein, was einen wirklich stoert, der Rest bleibt Charakter.
   const takt={};
-  function behav(name){
-    const pk=persOf[name]||"duellant",def=PERSDEF[pk],t=takt[name]||{};
+  // PERSOENLICHKEIT WAEHLT ZIEL UND MUT, DAS HANDWERK IST FUER ALLE GLEICH (P1, 07.10.,
+  // docs/design/arena-zielwahl-opus-empfehlung-02-10.md Abschnitt 4.1, von Chris freigegeben).
+  //
+  // "Persoenlichkeit" steuert in der Arena vier Kanaele: Zielneigung (PERSZIEL), Haltung (h),
+  // Zusammenhalt (z) und Bindung (b). Die kontrafaktische Zerlegung (dort Abschnitt 2) zeigt:
+  // die eignungsfremde Fehlordnung tragen NICHT Zielneigung und Haltung, sondern z und b —
+  // der Draufgaenger ("eigen"/"opportun") lief allein ueber das Feld, zielte staendig um und
+  // liess sich von jedem Abfaenger stellen, und verlor damit Menge statt nur Stil.
+  //
+  // Eine Disziplin erklaert ueber `ARENA_ART[d].persHandwerk` (Liste aus "z"/"b"), welche dieser
+  // Skalen bei ihr Handwerk sind; die stehen dann fuer alle sechs Persoenlichkeiten auf der
+  // Skalenmitte "ausgewogen" (gemessen V9 bzw. V5 — "zielstrebig" als Mitte waere messbar
+  // schlechter, Dokument 2.1). Zielneigung und Haltung bleiben Charakter, die manuellen
+  // Taktik-Regler (`takt`) gehen weiter vor. Fehlt das Feld (jede Nicht-Arena-Disziplin, oder
+  // eine Arena-Disziplin mit `[]`), liefert persDefVon() exakt PERSDEF — bit-identisch.
+  // PERSDEF selbst bleibt unveraendert (das Sandsack-Finale liest es direkt).
+  //
+  // BEWUSST NICHT K1 (arena-zielwahl-umsetzung.md, zweimal gescheitert): die Zielvielfalt
+  // bleibt vollstaendig erhalten, und an keiner Stelle wird die Eignung gelesen.
+  const HANDWERK_MITTE={z:"ausgewogen",b:"ausgewogen"};
+  function persDefVon(pk,dId){
+    const def=PERSDEF[pk]||PERSDEF.duellant;
+    const frei=(dId&&ARENA_ART[dId]&&ARENA_ART[dId].persHandwerk)||[];
+    if(!frei.length)return def;
+    return {h:def.h,
+            z:frei.includes("z")?HANDWERK_MITTE.z:def.z,
+            b:frei.includes("b")?HANDWERK_MITTE.b:def.b};
+  }
+  function behav(name,dId){
+    const pk=persOf[name]||"duellant",def=persDefVon(pk,dId),t=takt[name]||{};
     const h=t.h||def.h, z=t.z||def.z, b=t.b||def.b;
     return{
       h,z,b,
@@ -6061,7 +6089,17 @@
     // Schranke und in der Richtung, die bei groesserem n eher waechst als schrumpft. rho
     // je Spiel 0,404 (n=24) bleibt die eigentlich bindende Verletzung (CLAUDE.md: rho vor
     // Pp) und haengt an der Zielwahl (Geometrie statt Bedrohung/Eignung), nicht am Rezept.
-    tdm:{ label:"TDM", jeSeite:6, rezept:REC.power },
+    //
+    // PERSOENLICHKEITS-HANDWERK (P1, 07.10., s. persDefVon() oben): VORERST AUS. Mit
+    // ["z","b"] (V9) bestand TDM die Kriterien A-E der Opus-Empfehlung vom 02.10. in beiden
+    // Saatstroemen (rho je Spiel 0,324/0,247 -> 0,416/0,432, Star Rang 1 2 % -> 14-15 %), das
+    // Pflichtkriterium F (Pp nicht mehr als 6 ueber Ist) ist aber NICHT gemessen: die
+    // TDM-Pp-Messung (n=6, zwei Stroeme, vorher/nachher) kam auf der ueberlasteten Messmaschine
+    // in 2,7 h nicht ins Ziel. Nach CLAUDE.md ist Pp eine Pflichtpruefung — ohne Zahl kein
+    // Einbau. Battlefield hat F mit V9 deutlich verfehlt, die Richtung ist also nicht
+    // selbstverstaendlich. Einschalten = ["z","b"] hier, sobald F gemessen ist (Dokument
+    // arena-zielwahl-opus-empfehlung-02-10.md, Abschnitt 10).
+    tdm:{ label:"TDM", jeSeite:6, rezept:REC.power, persHandwerk:[] },
 
     "mini-dm":{
       // MATRIX: torment 24, health 20, power 16, stamina 16, will 14, dexterity 10.
@@ -6076,6 +6114,11 @@
       // sich hier aus Dexterity, Ausdauer und Torment, also aus dem, was die Matrix
       // wirklich fuehrt.
       label:"Mini-DM", jeSeite:4,
+      // PERSOENLICHKEITS-HANDWERK (P1, 07.10.): NUR der Zusammenhalt (V5). Jede Variante, die
+      // hier auch die Bindung vereinheitlicht, kostete die Team-Ergebnistreue 10-19
+      // Prozentpunkte (Opus-Empfehlung 02.10., Abschnitt 2.3) — die geht vor einem hoeheren
+      // Median (dort Abschnitt 7, Abbruchregel 3).
+      persHandwerk:["z"],
       rezept:{ANG:{torment:46,power:34,dexterity:20},
               VER:{health:44,stamina:30,will:26},
               LP:{health:42,stamina:32,will:26},
@@ -6108,6 +6151,15 @@
       // ein Schlag), Spirit die Verteidigung, und das Tempo kommt aus Aufmerksamkeit und
       // Verstand statt aus den Beinen: man ist frueher da, weil man frueher weiss, wohin.
       label:"Battlefield", jeSeite:4,
+      // PERSOENLICHKEITS-HANDWERK (P1, 07.10.): BEWUSST AUS — Abbruchregel 1 der Opus-Empfehlung
+      // (Abschnitt 7: "Verfehlt eine Disziplin eines der Kriterien A-F -> nur dort
+      // persHandwerk:[]"). Mit ["z","b"] (V9) bestand Battlefield A-E klar (rho je Spiel
+      // 0,399/0,391 -> 0,583/0,616, Saison 0,31 -> 0,81/0,76), verfehlte aber F deutlich: Pp
+      // (n=12, zwei Stroeme) 35,7/48,6 -> 62,8/85,4, erlaubt waren +6. Charisma (Matrix 20)
+      // fiel dabei von rund 20 % auf rund 1 % gemessenen Einfluss — die Mechanik belohnt mit
+      // V9 die Eignung zwar besser im Ergebnis, aber aus den falschen Attributen. Befund und
+      // Zahlen: docs/design/arena-zielwahl-opus-empfehlung-02-10.md, Abschnitt 10.
+      persHandwerk:[],
       // NACHGEZOGEN, WEIL DIE MESSUNG ES VERLANGT HAT. Erste Fassung stand bei 110 Pp,
       // und das Profil sagte genau, warum: Entschlossenheit und Ausdauer lasen 24,6 und
       // 24,4 % bei einem Matrixgewicht von je 4, waehrend Charisma (20), Intelligence
@@ -29963,14 +30015,18 @@
 
         // Drei Skalen, jeweils mit „natürlich" als Vorgabe: dann entscheidet die
         // Persoenlichkeit. Man stellt nur ein, was einen wirklich stoert.
-        const b=behav(p.n);
+        // P1 (07.10.): Anzeige und Stern ueber dieselbe persDefVon()-Quelle wie der Kampf —
+        // sonst zeigte das Panel in TDM/Battlefield/Mini-DM einen Standard, den der Kampf
+        // nicht mehr faehrt (Opus-Empfehlung 02.10., Abschnitt 4.1, erster Bauhinweis).
+        const b=behav(p.n,disc);
+        const pDef=persDefVon(persOf[p.n]||"duellant",disc);
         const tw=el("div","bwrap");
         [["h","Haltung",HALTUNG,b.h],["z","Zusammenhalt",ZUSAMMEN,b.z],["b","Bindung",BINDUNG,b.b]]
           .forEach(([key,lbl,arr,cur])=>{
             const row=el("div","srow");row.title=lbl;
             row.appendChild(el("b",null,lbl));
             const se=el("select");se.setAttribute("aria-label",lbl+" von "+p.n);
-            const std=PERSDEF[persOf[p.n]||"duellant"][key];
+            const std=pDef[key];
             arr.forEach(([v,l])=>{
               // Der Standard dieser Persoenlichkeit traegt einen Stern. Kein leeres Wort mehr,
               // sondern immer ein konkreter Wert — man sieht, was der Spieler TUT.
@@ -30592,7 +30648,8 @@
   };
   function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
     const d=dId||"tdm";
-    const bh=behav(p.n);
+    // P1 (07.10.): Zusammenhalt/Bindung je Disziplin als Handwerk, s. persDefVon().
+    const bh=behav(p.n,d);
     // MUTATOR ORGANISCH (29.09.): hier stand `+tr.netto` — der flache +6-Weg ueber die zwei
     // Slot-Fokus-Attribute ("eng"). Er ist ERSETZT, nicht ergaenzt: der Mutator wirkt jetzt in
     // allen vier Chassis gleich, ueber gehoben() auf alle zwoelf Attribute und ueber
@@ -46398,14 +46455,25 @@
       const tmp=eckenReihenfolge[i]; eckenReihenfolge[i]=eckenReihenfolge[j]; eckenReihenfolge[j]=tmp;
     }
     let id=0;
-    for(let ecke=0; ecke<4; ecke++){
-      const side=eckenReihenfolge[ecke];
-      const p=vierSpieler[side];
-      const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
-        zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
-      const spawn=miniDmFfaSpawn(ecke);
-      einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
-      U.push(einheit);
+    // P1-PERSOENLICHKEITS-HANDWERK GILT HIER NICHT (07.10.): `persHandwerk:["z"]` ist nur fuer das
+    // gemessene 4-gegen-4 abgenommen (rho/Pp, arena-zielwahl-opus-empfehlung-02-10.md Abschnitt
+    // 10). Das FFA vergibt Ligapunkte und ist mit der Aenderung NICHT gemessen — es baut seine
+    // Einheiten deshalb mit der unveraenderten PERSDEF-Grundstellung (bit-identisch zu vorher),
+    // bis eine FFA-Sonde es abnimmt.
+    const handwerkVorher=ARENA_ART["mini-dm"].persHandwerk;
+    ARENA_ART["mini-dm"].persHandwerk=[];
+    try{
+      for(let ecke=0; ecke<4; ecke++){
+        const side=eckenReihenfolge[ecke];
+        const p=vierSpieler[side];
+        const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
+          zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
+        const spawn=miniDmFfaSpawn(ecke);
+        einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
+        U.push(einheit);
+      }
+    }finally{
+      ARENA_ART["mini-dm"].persHandwerk=handwerkVorher;
     }
     // U bleibt WAEHREND DES KAMPFES in der ausgewuerfelten Eckenreihenfolge (das ist der
     // Fix von oben — gegner() muss die Ecken-Lotterie sehen, sonst greift sie nicht). Fuer
@@ -47948,6 +48016,17 @@
       if(neu&&typeof neu==="object")
         for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
       return {...buehneHaltungTest};
+    },
+    // PERSOENLICHKEITS-HANDWERK (P1, 07.10., s. persDefVon()): Mess-/QA-Schnittstelle nach dem
+    // Muster buehneFlags darueber. {tdm:[], "mini-dm":["z"], ...} setzt `ARENA_ART[d].persHandwerk`
+    // je Arena-Disziplin (nur "z"/"b", andere Schluessel und Nicht-Arena-Disziplinen werden
+    // ignoriert); ohne Argument nur lesen. `[]` fuer alle drei ist die Nullprobe — bit-identisch
+    // zum Stand vor P1. Kein echtes Spiel ruft das auf.
+    persHandwerk:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const d of Object.keys(ARENA_ART))
+          if(Array.isArray(neu[d]))ARENA_ART[d].persHandwerk=neu[d].filter(k=>k==="z"||k==="b");
+      return Object.fromEntries(Object.keys(ARENA_ART).map(d=>[d,[...(ARENA_ART[d].persHandwerk||[])]]));
     },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
