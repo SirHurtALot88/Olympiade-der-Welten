@@ -3,11 +3,21 @@
 // Gewichtheben verdrahtet. Kein Teil der Abnahme-Sonden — nur zum Ansehen/Belegen (Vorher/
 // Nachher-Screenshots je Ziel-PR).
 //
-// Aufruf: node scripts/screenshot-disziplin.mjs <disziplin> [wartenMs] [ausgabe]
+// Aufruf: node scripts/screenshot-disziplin.mjs <disziplin> [wartenMs] [ausgabe] [--mit-countdown]
 //   <disziplin>  window.__arena.setDisc()-Name, z.B. "gewichtheben", "eiskunstlauf",
 //                "breaking", "takeshis-castle" (genau wie in BUEHNE_ART/BAHN_ART/#dd).
-//   [wartenMs]   wie lange nach #play gewartet wird, bevor der Screenshot faellt (Default 3000).
+//   [wartenMs]   wie lange nach dem ANPFIFF gewartet wird, bevor der Screenshot faellt
+//                (Default 3000). Mit --mit-countdown: wie lange nach dem #play-KLICK.
 //   [ausgabe]    Zieldatei fuer das PNG (Default tmp-ux-audit/<disziplin>-buehne.png).
+//   --mit-countdown  den A4-Anpfiff-Countdown NICHT abschalten -- zum Sichtpruefen des
+//                Countdowns selbst (z.B. wartenMs 800 -> Bild mitten im Startritual).
+//
+// ANPFIFF-COUNTDOWN (A4, Sendungsrahmen-Paket 07.10.): seit dem Paket laeuft nach dem ersten
+// #play-Klick bei Tempo 1× ein 1,5-3 s langes Startritual, BEVOR das Spiel losgeht. Die alte
+// Voreinstellung "3000 ms nach #play" haette damit genau den Countdown fotografiert statt des
+// laufenden Spiels (Befund im Konzept 3.2). Standard deshalb: Countdown per ausdruecklichem
+// Sonden-Schalter aus (scripts/lib/arena-anpfiff.mjs), danach warteAufAnpfiff() und erst DANN
+// wartenMs -- dasselbe Bild wie vor dem Paket.
 //
 // Die drei bestehenden screenshot-*.mjs-Dateien (gewichtheben, speed-schach,
 // speed-schach-sieger, schild-krolach, broadcast-hud) bleiben unangetastet — sie sind in
@@ -29,6 +39,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -74,13 +85,15 @@ function starteServer() {
   });
 }
 
-const disziplin = process.argv[2];
+const MIT_COUNTDOWN = process.argv.includes("--mit-countdown");
+const argumente = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const disziplin = argumente[0];
 if (!disziplin) {
-  console.error("Nutzung: node scripts/screenshot-disziplin.mjs <disziplin> [wartenMs] [ausgabe]");
+  console.error("Nutzung: node scripts/screenshot-disziplin.mjs <disziplin> [wartenMs] [ausgabe] [--mit-countdown]");
   process.exit(1);
 }
-const wartenMs = Number(process.argv[3] || 3000);
-const out = process.argv[4] || path.join(WURZEL, "tmp-ux-audit", disziplin + "-buehne.png");
+const wartenMs = Number(argumente[1] || 3000);
+const out = argumente[2] || path.join(WURZEL, "tmp-ux-audit", disziplin + "-buehne.png");
 mkdirSync(path.dirname(out), { recursive: true });
 
 const server = await starteServer();
@@ -107,7 +120,9 @@ try {
     process.exit(1);
   }
   await seite.click("#t2");
+  if (!MIT_COUNTDOWN) await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false });
   await seite.click("#play");
+  if (!MIT_COUNTDOWN) await warteAufAnpfiff(seite);
   await seite.waitForTimeout(wartenMs);
   const cv = await seite.$("#cv");
   await cv.screenshot({ path: out });

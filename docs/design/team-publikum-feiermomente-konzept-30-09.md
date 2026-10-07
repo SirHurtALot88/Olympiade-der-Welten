@@ -212,6 +212,15 @@ heute überhaupt nicht zu sehen (B4). Falls Chris ablehnt: Finale entfällt, all
 bleiben unberührt. Einziger bekannter Verbraucher des Overlays in Skripten:
 `scripts/screenshot-broadcast-hud.mjs` — dort ggf. Wartezeit anpassen.
 
+**Gebaut am 07.10.** (Chris' Freigabe zusammen mit D7/A4, s.
+`broadcast-d7-a4-fable-empfehlung-02-10.md` Abschnitt 6): `endstandVormerken()`/
+`endstandNachlaufPruefen()` in `updateHudBuehne()`, `updateHudBahn()` und — zusätzlich, weil es
+seit 30.09. dasselbe Einmal-Muster hat — `updateHudFeldspiel()`. 3,5 s über `jetztMs()`, Sieger-
+Feedzeile sofort, Stufe „finale" für den Sieger, Score-Bug bleibt im Nachlauf stehen, A3-Wischer
+deckt den Übergang zum Overlay. Sonden-Schalter `window.__arena.endstandNachlauf(false)` stellt
+das alte Verhalten her (Overlay im selben Frame, kein „finale"); gesetzt in allen Skripten, die die
+Ticker-Dichte bis zum Endstand zählen oder per `sondenLauf()` den Endstand fotografieren.
+
 ---
 
 ## 3. Die Disziplinen

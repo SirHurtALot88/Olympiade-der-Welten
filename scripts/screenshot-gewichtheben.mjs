@@ -20,6 +20,7 @@ await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null
 await seite.evaluate(() => window.__arena.setDisc("gewichtheben"));
 await seite.click("#t2");
 await seite.click("#play");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 await seite.waitForTimeout(wartenMs);
 const cv = await seite.$("#cv");
 await cv.screenshot({ path: out });

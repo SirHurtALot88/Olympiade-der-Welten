@@ -181,6 +181,7 @@ try {
     document.querySelector(".oly-battle-arena")?.classList.add("im-spiel");
   });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc && window.__arena.sondenLauf, null, { timeout: 30000 });
+  await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Endstand-Nachlauf (und Countdown/Finale) aus -- die Ticker-Dichte zaehlt Ticks bis #endstand, 3,5 s Nachlauf wuerden sie verduennen, s. scripts/lib/arena-anpfiff.mjs
   await seite.evaluate(() => window.__arena.setDisc("time-trial"));
   await seite.click("#t2").catch(() => {});
   await seite.evaluate(() => { const e = document.getElementById("einlauf"); if (e) e.hidden = true; });

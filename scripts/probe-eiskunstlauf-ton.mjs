@@ -172,6 +172,7 @@ if (gesetzt !== true) {
 const naechsterKampf = async () => {
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd"); // Tempo auf 4x
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   await seite.waitForTimeout(1500);
   return seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 };
@@ -204,6 +205,7 @@ console.log(loopOk ? "TEIL B: BESTANDEN\n" : "TEIL B: FEHLGESCHLAGEN\n");
 await seite.click("#reset");
 await seite.evaluate(() => { window.__oscLog.length = 0; window.__filterLog.length = 0; });
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(15000);
 const log1 = await seite.evaluate(() => window.__oscLog.slice());
 const filt1 = await seite.evaluate(() => window.__filterLog.slice());
@@ -271,6 +273,7 @@ for (const d of GESCHWISTER) {
   await seite.evaluate(() => { window.__oscLog.length = 0; window.__filterLog.length = 0; });
   await seite.click("#play");
   await seite.click("#spd"); await seite.click("#spd"); // 4x, frisch je Disziplin gesetzt
+  await warteAufAnpfiff(seite);
   await seite.waitForTimeout(11000);
   const log = await seite.evaluate(() => window.__oscLog.slice());
   const filt = await seite.evaluate(() => window.__filterLog.slice());

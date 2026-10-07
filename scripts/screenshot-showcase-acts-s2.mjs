@@ -134,6 +134,7 @@ if (gesetzt !== true) {
 }
 await seite.click("#t2");
 await seite.click("#play");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
 const cv = await seite.$("#cv");
 const FENSTER_S = 5.0; // rundenN(5) * rundenDauer(1.0s)

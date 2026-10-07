@@ -57,6 +57,7 @@ try {
     await seite.evaluate(() => { window.__arena.setDisc("climbing"); });
     await seite.click("#t2");
     await seite.click("#play");
+    await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
     // FRUEH: kurz nach dem Start, alle noch nahe am Wandfuss (posFrac ~0) -- prueft, dass
     // die neue Felskulisse/das Crack-Scrollen ohne Fehler rendert und niemand seltsam
@@ -79,6 +80,9 @@ try {
     await (await seite.$("#cv")).screenshot({ path: path.join(OUT_DIR, `saat${saat}-03-naeheTopout.png`) });
 
     await seite.waitForFunction(() => document.getElementById("phase")?.textContent === "beendet", null, { timeout: 60000 }).catch(() => {});
+    // ENDSTAND-NACHLAUF (Sendungsrahmen-Paket 07.10.): das Overlay kommt 3,5 s nach "beendet",
+    // nicht mehr im selben Frame -- auf das Overlay selbst warten statt auf eine feste Zeit.
+    await seite.waitForFunction(() => !document.getElementById("endstand").hidden, null, { timeout: 15000 }).catch(() => {});
     await seite.waitForTimeout(200);
     await (await seite.$("#cv")).screenshot({ path: path.join(OUT_DIR, `saat${saat}-04-endstand.png`) });
 
@@ -98,6 +102,7 @@ try {
     await seite.evaluate(() => { window.__arena.setDisc("breaking"); });
     await seite.click("#t2");
     await seite.click("#play");
+    await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
     await seite.waitForTimeout(1500);
     await (await seite.$("#cv")).screenshot({ path: path.join(OUT_DIR, `vergleich-breaking.png`) });
     if (fehler.length) console.error("Breaking Seitenfehler:", fehler.slice(0, 10));

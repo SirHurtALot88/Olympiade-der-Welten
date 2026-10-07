@@ -11,6 +11,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -63,6 +64,7 @@ if (gesetzt !== true) {
   process.exit(1);
 }
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach1 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
@@ -71,12 +73,14 @@ const nach1 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: 
 // Disziplin zu wechseln, also derselbe Codepfad wie "noch ein Gewichtheben-Kampf".
 await seite.click("#reset");
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach2 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
 // Dritter Kampf zur Absicherung -- die Reviewer-Erwartung war explizit "1, 2, 3", nicht nur "1, 2".
 await seite.click("#reset");
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach3 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 

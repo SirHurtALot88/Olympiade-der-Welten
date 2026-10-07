@@ -124,17 +124,20 @@ if (gesetzt !== true) {
 await seite.click("#play");
 // Tempo auf 4x, damit ein Spiel in vertretbarer Wallclock-Zeit durchlaeuft.
 await seite.click("#spd"); await seite.click("#spd");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 await seite.waitForTimeout(1500);
 const nach1 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
 await seite.click("#reset");
 await seite.click("#play");
 await seite.click("#spd"); await seite.click("#spd"); // Tempo-Flag sicherheitshalber neu setzen
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach2 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
 await seite.click("#reset");
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach3 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 

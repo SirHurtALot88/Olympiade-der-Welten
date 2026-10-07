@@ -867,6 +867,44 @@
   .oly-battle-arena.oly-battle-arena .viertelpause em{font:700 clamp(28px,5vw,48px)/1 "RaniraSeason",Georgia,"Times New Roman",serif;
     font-style:normal;color:var(--warn)}
 
+  /* A4 ANPFIFF-COUNTDOWN (Klasse T, Chris 07.10.): das Startritual der Sportart, dieselbe Typo
+     wie #vpCountdown, ueber dem Einlauf. Der Einlauf selbst bleibt stehen, nur seine Wappen
+     fahren nach aussen und die Aufstellung blendet aus (.anpfiff-laeuft) -- "Einlauf-Overlay
+     faehrt die beiden Wappen nach aussen, in der Mitte zaehlt …" (Konzept A4). */
+  .oly-battle-arena.oly-battle-arena .anpfiff{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:10px;text-align:center;pointer-events:none}
+  .oly-battle-arena.oly-battle-arena .anpfiff[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .anpfiff span{font:600 clamp(10px,1.3vw,13px)/1.2 "RaniraSeason",Georgia,"Times New Roman",serif;
+    letter-spacing:.16em;text-transform:uppercase;color:#93a1b3}
+  .oly-battle-arena.oly-battle-arena .anpfiff b{font:700 clamp(28px,5.2vw,56px)/1.05 "RaniraSeason",Georgia,"Times New Roman",serif;
+    color:var(--warn);max-width:92%;padding:.18em .55em;border-radius:12px;background:rgba(16,20,26,.78);
+    text-shadow:0 2px 14px rgba(0,0,0,.55)}
+  .oly-battle-arena.oly-battle-arena .anpfiff b.pop{animation:anpfiffPop 260ms ease-out both}
+  @keyframes anpfiffPop{from{opacity:0;transform:scale(1.3)}to{opacity:1;transform:scale(1)}}
+  .oly-battle-arena.oly-battle-arena .einlauf .eteam,
+  .oly-battle-arena.oly-battle-arena .einlauf .egegen,
+  .oly-battle-arena.oly-battle-arena .einlauf .eaufstellung{transition:transform 700ms ease-in,opacity 300ms ease-out}
+  .oly-battle-arena.oly-battle-arena .einlauf.anpfiff-laeuft .eteam{transform:translateX(-12%)}
+  .oly-battle-arena.oly-battle-arena .einlauf.anpfiff-laeuft .eteam.r{transform:translateX(12%)}
+  .oly-battle-arena.oly-battle-arena .einlauf.anpfiff-laeuft .egegen,
+  .oly-battle-arena.oly-battle-arena .einlauf.anpfiff-laeuft .eaufstellung{opacity:0}
+
+  /* A3 STINGER-WISCHER: ein schraeges Band (Heim-Keil · Schwarz · Gast-Keil), 450 ms von
+     links nach rechts. Rechnung: Band = 300 % der Flaeche; Start -100 % (ganz links draussen),
+     Ende +34 % (ganz rechts draussen); bei der Haelfte (-33 %) deckt es die Flaeche voll ab --
+     dort schaltet die Engine das Overlay darunter um (STINGER_HALB_MS). Bei
+     prefers-reduced-motion (globale Regel am Dateiende) bleibt das Band draussen stehen. */
+  .oly-battle-arena.oly-battle-arena .stinger{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+  .oly-battle-arena.oly-battle-arena .stinger[hidden]{display:none}
+  .oly-battle-arena.oly-battle-arena .stinger .band{position:absolute;top:-20%;bottom:-20%;left:0;width:300%;display:flex;
+    transform:translateX(-100%) skewX(-14deg)}
+  .oly-battle-arena.oly-battle-arena .stinger.laeuft .band{animation:stingerZug 450ms cubic-bezier(.55,0,.45,1) both}
+  .oly-battle-arena.oly-battle-arena .stinger .keil{flex:1 1 0}
+  .oly-battle-arena.oly-battle-arena .stinger .keil.home{background:var(--home)}
+  .oly-battle-arena.oly-battle-arena .stinger .keil.away{background:var(--away)}
+  .oly-battle-arena.oly-battle-arena .stinger .schwarz{flex:0 0 12%;background:#07090c}
+  @keyframes stingerZug{from{transform:translateX(-100%) skewX(-14deg)}to{transform:translateX(34%) skewX(-14deg)}}
+
   /* BROADCAST-BUG: persistentes HUD-Overlay waehrend des laufenden Spiels (Recherche
      docs/design/broadcast-praesentation-uebergreifend-recherche-06-09.md Abschnitt 3).
      Halbtransparent statt blickdicht -- die Leinwand dahinter bleibt sichtbar, anders als
@@ -1280,6 +1318,12 @@
   .oly-battle-arena.oly-battle-arena .btn.g{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
   .oly-battle-arena.oly-battle-arena .btn.g:hover{filter:none;border-color:var(--faint);background:var(--surface)}
   .oly-battle-arena.oly-battle-arena .btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  /* D7 "FINALE IN ECHTZEIT" (Klasse T, Chris 07.10.): die Tempo-Taste sagt, dass gerade das
+     Finale drosselt -- Warnfarbe statt neuer Farbe, dazu der vorhandene hud-in-Uebergang
+     (Engine: tempoAnzeigeAktualisieren()). Der dauerhafte Schalter daneben wird bei "aus"
+     nur gedimmt, wie ein ausgeschalteter Ton. */
+  .oly-battle-arena.oly-battle-arena .btn.g.finale{border-color:var(--warn);color:var(--warn)}
+  .oly-battle-arena.oly-battle-arena #finaleschalter[aria-pressed="false"]{opacity:.62}
   /* Chris' Fund (29.08.): der Ticker nahm die Mehrheit der Breite, waehrend die
      Wertungstabelle (jetzt zwei Team-Bloecke nebeneinander, s. .wsplit) auf 380px
      gequetscht war. Verhaeltnis umgedreht statt nur verschoben: der Ticker ist eine

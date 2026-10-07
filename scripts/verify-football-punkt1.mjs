@@ -50,6 +50,7 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("football"));
   await seite.click("#t2");
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
   const lies = () => seite.evaluate(() => ({
     score: document.getElementById("score")?.textContent?.trim() || null,

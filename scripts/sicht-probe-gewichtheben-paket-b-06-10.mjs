@@ -63,6 +63,7 @@ try {
   await seite.click("#play");
   await seite.click("#spd"); // 2x
   await seite.click("#spd"); // 4x
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   console.log("Tempo: " + await seite.$eval("#spd", (e) => e.textContent.trim()));
 
   const arenaraum = await seite.$(".arenaraum");

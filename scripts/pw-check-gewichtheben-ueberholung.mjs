@@ -91,6 +91,7 @@ const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest 
 
   const start = Date.now();
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   // TEMPO-PROBE: der Feed bekommt einen neuen Eintrag pro enthuelltem Versuch. Bleibt der
   // Text ueber ~5s nach dem ersten Versuch UNVERAENDERT, ist ZEIT_DEHNUNG.gewichtheben=4
   // wirksam (~6,2s je Versuch); ein zu frueher zweiter Eintrag waere ein Regressionssignal.

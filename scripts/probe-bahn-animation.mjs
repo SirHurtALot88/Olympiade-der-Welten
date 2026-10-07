@@ -51,6 +51,7 @@ if (gesetzt !== true) {
   process.exit(1);
 }
 await seite.click("#play");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
 const proben = [];
 for (let i = 0; i < SEK; i++) {

@@ -107,6 +107,7 @@ async function pruefeDisziplin(d) {
     await hoechsteStufe(seite);
     const vorStart = await leseTabelle(seite);
     await seite.click("#play");
+    await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
     await seite.waitForTimeout(WARTE_S * 1000);
     const nach = await leseTabelle(seite);
 

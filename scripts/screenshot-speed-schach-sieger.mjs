@@ -53,6 +53,7 @@ try {
     // 4x Tempo (Klick-Zyklus 1x -> 2x -> 4x), damit das ~60s-Spiel schneller durchlaeuft.
     await seite.click("#spd"); await seite.click("#spd");
     await seite.click("#play");
+    await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
     // Kurz nach Start: Beschriftung "Weiss"/"Schwarz" pruefen (Heim links, Gast rechts).
     await seite.waitForTimeout(1200);
