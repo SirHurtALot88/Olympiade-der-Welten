@@ -7931,6 +7931,10 @@
         // Zeile fest) — kann also nichts an TDM/Formkarte/Slot-Rechnung aendern.
         groesse:p.groesse??null,
         eig:basisWert+engP+breitP,mutatorTreffer:mutatorTreffer(p),...R2,
+        // B2a (fable-ideen-feldspiel-30-09.md §3 B2, nur der Freiwurf-Teil): Eingang der
+        // Freiwurf-Formel, s. FREIWURF_KANAL bei verbucheFreiwurf. Nur Basketball rechnet
+        // ihn aus; jede andere Disziplin traegt null und liest ihn nie.
+        ftWert:feldspielDisc==="basketball"?mische({a:attr},FREIWURF_KANAL):null,
         // `slotId` haelt fest, AUF WELCHEN Slot dieser Spieler gesetzt wurde — bisher
         // wurde die Rolle nur zum Berechnen des Aufschlags gebraucht und danach
         // weggeworfen. Der Torwart ist aber ein Slot, kein Attributwert: der Motor muss
@@ -11201,9 +11205,58 @@
   // Schleife darum ist weg: sie ist jetzt die Standphase (s. stepFreiwurfPhase), damit
   // jeder einzelne Wurf einen sichtbaren Ballflug bekommt statt im Hintergrund
   // durchgerechnet zu werden. Pro Aufruf genau EIN rr() wie zuvor.
+  //
+  // B2a — DER SPIRIT-FREIWURF (07.10., docs/design/fable-ideen-feldspiel-30-09.md §3 B2,
+  // nur der Freiwurf-Teil, mit Chris' Zustimmung; Foulsystem P1 und Hack-a-X bleiben
+  // ausdruecklich draussen). Die Formel oben las ABSCHLUSS — ein Auswahl-Wert (wer
+  // angespielt wird, wie frueh einer wirft), der laut Rezept power/charisma/stamina
+  // mitfuehrt; nichts davon hat mit einem ungestoerten Wurf von der Linie zu tun. Jetzt
+  // liest der Freiwurf einen eigenen, spirit-gefuehrten Kanal aus den drei Attributen,
+  // die das Dokument nennt: spirit (Nervenstaerke), intelligence (Routine/Technik),
+  // dexterity (Wurfgefuehl). KEIN neuer Sub-Skill: `ftWert` steht in keinem Rezept,
+  // keiner Anzeige, keiner Slot- oder Kaderwahl — er ist der Eingang genau dieser einen
+  // Formel und wird in bauFeldspiel einmal aus denselben Attributen (inkl. Slot-/Form-
+  // Aufschlag) gemischt, aus denen auch jeder Sub-Skill entsteht (dieselbe Bauform wie
+  // Speed-Schachs L.TEMPO).
+  //
+  // GEWICHTE MATRIXTREU (Review 07.10.): das Dokument nennt die drei Attribute, aber keine
+  // Gewichte. Genommen ist die gesperrte Basketball-Matrix, auf diese drei normiert —
+  // spirit 22 / intelligence 16 / dexterity 8 von 46 ergibt 48 / 35 / 17. Eine erste
+  // Fassung mit 50/30/20 hatte dexterity (Matrix 8) vor intelligence (Matrix 16) gestellt;
+  // das widerspricht CLAUDE.md ("jede Disziplin-Mechanik muss die Matrixgewichte
+  // tatsaechlich durchreichen").
+  //
+  // FORM wie vom Dokument verlangt: rauscharm, enges Band 55-92 %, KEIN Kontest-,
+  // Distanz- oder Fastbreak-Term. Eine Gerade statt Knick, Chris' Durchschnitts-Anker
+  // ("den AVG kannst du lassen", 72 % bei 50) bleibt: 20 -> 55,5 %, 50 -> 72,0 %,
+  // 60 -> 77,5 %, 72 -> 84,1 %, 84 -> 90,7 %, ab ~87 Deckel 92 % (gegen die alte Kurve
+  // liegen die Guten damit rund +5 Pp hoeher, wie Chris es fuer sie wollte).
+  // Weiterhin genau EIN rr() je Freiwurf; die Zahl der Freiwuerfe haengt nicht an dieser
+  // Formel (die kommt aus foulChance in wirf()), nur ihr Ausgang — und weil beendeFreiwuerfe
+  // den Ballbesitz unabhaengig vom Ergebnis abgibt, bleibt der rr()-Strom danach bitgleich.
+  //
+  // VORLAEUFIG GEEICHT: FW_STEIGUNG und das Band sind an dem Kanal gemessen, den es heute
+  // gibt — rund 2 Freiwuerfe je Spiel. Das Dokument rechnet nach dem Foulsystem P1 mit
+  // ~20 und sagt ausdruecklich "Kalibrierung gehoert in die P1-Runde". Wer P1 baut, muss
+  // diese vier Konstanten gegen rho und die Pp-Sonde NEU messen, nicht als abgenommen lesen.
+  //
+  // spirit-SCHRANKE (Dokument: "die Freiwurf-Formel darf spirit nicht ueber 22 treiben"):
+  // nachgemessen mit messe-arena-einfluss.mjs basketball 48 in zwei Saatstroemen, s.
+  // scripts/verify-basketball-freiwurf-paket-07-10.mjs und die PR-Beschreibung.
+  const FREIWURF_KANAL={spirit:48,intelligence:35,dexterity:17};
+  const FW_BASIS=0.72, FW_STEIGUNG=0.0055, FW_MIN=0.55, FW_MAX=0.92;
+  function freiwurfChance(schuetze){
+    // Nur Basketball rechnet ftWert aus (bauFeldspiel). Kommt eine andere Live-Disziplin
+    // spaeter in die Freiwurf-Standphase, bekommt sie NICHT stillschweigend diese
+    // spirit-geeichte Gerade, sondern zeichengleich die alte ABSCHLUSS-Kurve (Review 07.10.).
+    if(schuetze.ftWert==null){
+      const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
+      return Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
+    }
+    return Math.min(FW_MAX,Math.max(FW_MIN,FW_BASIS+(schuetze.ftWert-50)*FW_STEIGUNG));
+  }
   function verbucheFreiwurf(schuetze){
-    const zusatzGut=Math.max(0,schuetze.ABSCHLUSS-60)*0.0056;
-    const chance=Math.min(0.90,Math.max(0.60,0.72+(schuetze.ABSCHLUSS-50)*0.0006+zusatzGut));
+    const chance=freiwurfChance(schuetze);
     const treffer=rr()<chance;
     if(treffer){
       schuetze.punkte+=1; fsPunkte[schuetze.side]+=1;
@@ -49203,6 +49256,12 @@
     // KEIN "kein Fokus"-Referenzlauf mehr — wer den braucht (Vorher/Nachher-Vergleich der
     // Fokus-Mechanik selbst), nutzt diesen Einstiegspunkt.
     spieleBasketballOhneFokus:(saat)=>spieleDisziplin("basketball",saat,{fokusAus:true,zustandBehalten:true}).protokoll,
+    // B2a (07.10.): read-only Einblick in den Freiwurf-Kanal fuer
+    // scripts/verify-basketball-freiwurf-paket-07-10.mjs — Mischung, Band und die Formel
+    // selbst (kein rr(), kein Zustand). `chance(w)` rechnet fuer einen Kanalwert w.
+    freiwurfKanal:()=>({kanal:{...FREIWURF_KANAL},band:[FW_MIN,FW_MAX],
+      chance:(w)=>freiwurfChance({ftWert:w}),
+      chanceOhneKanal:(abschluss)=>freiwurfChance({ftWert:null,ABSCHLUSS:abschluss})}),
     // DERSELBE LAUF FUER JEDE DISZIPLIN: window.__arena.spiele(dId, saat) liefert
     // {disziplin, protokoll, wert, punkte, namen} — s. spieleDisziplin() oben, dort steht
     // auch, was "Protokoll" je Chassis heisst und warum "punkte" nur im Feldspiel
