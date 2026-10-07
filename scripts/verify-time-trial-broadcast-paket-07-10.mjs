@@ -17,17 +17,23 @@
 //   (e) Anzeige-Zustand nach dem Alternativ-Rechner unveraendert: #esieger-Text ist nach dem
 //       Nachlauf aus (a) identisch zu dem direkt beim Endstand.
 //   (f) keine `pageerror`
-//   (g) Waechter fuer F1: bauSpurt() wird nach Modul-Variablen-Zuweisungen durchsucht: jedes
-//       Ziel, das weder in der ANZEIGE-Liste (bahnAnzeigeSichern()) noch im Rennzustand
-//       (disc/bahnDisc/LAEUFER/rennFertig/rennT/done) steht und nicht `seed` ist, ist ein
-//       vergessenes Global -- Fehler statt stillem Leck beim naechsten Fund.
+//   (g) Waechter fuer F1, STATISCH AM QUELLTEXT (kein Browser-Hook -- ein frueherer Entwurf
+//       rief window.__arena.bauSpurtQuelle() auf, das es in der Engine nicht gibt; die
+//       Pruefung sprang deshalb jedesmal stillschweigend leer durch und "ALLE PRUEFUNGEN
+//       BESTANDEN" behauptete etwas, das nie gelaufen war -- Opus-Review 07.10. am ersten
+//       Branch-Stand): der Funktionskoerper von bauSpurt() wird aus der Engine-Quelldatei
+//       per Klammerzaehlung extrahiert, lokal deklarierte Namen (const/let/var, Funktions-
+//       parameter) werden ausgenommen, Objektfeld-Zuweisungen (`u.feld=`) ebenfalls. Jedes
+//       verbleibende Ziel, das weder in der ANZEIGE-Liste (bahnAnzeigeSichern()) noch im
+//       Rennzustand steht, ist ein vergessenes Global -- Fehler statt stillem Leck beim
+//       naechsten Fund.
 //
 // EINE EINZIGE evaluate()-SCHLEIFE fuer den Hauptlauf (Muster aus verify-breaking-broadcast-
 // paket-07-10.mjs): viele kleine Playwright-Rundreisen sind unnoetig teuer und bei Breaking
 // sogar nachweislich kaputt (docs/design/breaking-performance-einbruch-befund-01-10.md).
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
+import { existsSync, mkdirSync, createReadStream, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 
@@ -81,6 +87,84 @@ const ANZEIGE_GLOBALS = [
 ];
 const RENNZUSTAND_GLOBALS = ["seed", "rennT", "done", "LAEUFER", "rennFertig", "floats"];
 
+// (g) WAECHTER FUER F1, STATISCH AM QUELLTEXT -- kein Browser-Hook (s. Kopfkommentar):
+// bauSpurt()s Funktionskoerper wird per Klammerzaehlung aus der Engine-Quelldatei
+// geschnitten, Kommentare werden entfernt (ein erster Entwurf liess sie stehen und meldete
+// "Geber" als Fund, weil ein FLIESSTEXT-Kommentar zufaellig "Geber = Bein davor" enthielt),
+// lokale Deklarationen (const/let/var -- AUCH mehrere kommagetrennt wie "const d=bahnDisc,
+// art=BA(), n=art.jeSeite", AUCH ohne Initialisierer), Arrow-Function-Parameter ("p=>...",
+// derselbe erste Entwurf verwechselte das mit einer Zuweisung "p=") und Objektfeld-
+// Zuweisungen ("u.feld=") fallen raus. Was danach als Ziel einer Zuweisung uebrig bleibt,
+// MUSS entweder in der ANZEIGE-Liste oder im Rennzustand stehen -- sonst ist es ein Global,
+// das bauSpurt() zuruecksetzt, ohne dass F1 es sichert.
+function extrahiereFunktionskoerper(quelle, signatur) {
+  const start = quelle.indexOf(signatur);
+  if (start < 0) return null;
+  const klammerStart = quelle.indexOf("{", start);
+  let tiefe = 0, i = klammerStart;
+  for (; i < quelle.length; i++) {
+    if (quelle[i] === "{") tiefe++;
+    else if (quelle[i] === "}") { tiefe--; if (tiefe === 0) break; }
+  }
+  return quelle.slice(klammerStart + 1, i);
+}
+function entferneKommentare(koerper) {
+  // Genuegt fuer diese eine Funktion (keine Strings mit "//" oder "/*" im Koerper): erst
+  // Blockkommentare, dann Zeilenkommentare -- je ein Durchlauf, keine Verschachtelung noetig.
+  return koerper.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, "");
+}
+function sammleTopLevelNamen(anweisung) {
+  // Zerlegt eine const/let/var-Anweisung (OHNE das Schluesselwort selbst) an Kommas auf
+  // oberster Klammerebene -- "d=bahnDisc, art=BA(), n=art.jeSeite" -> drei Teile -- und nimmt
+  // von jedem Teil nur den Namen vor einem "=" oder Ende (Destrukturierung "[a,b]"/"{a,b}"
+  // wird uebersprungen, bauSpurt() nutzt keine).
+  const namen = [];
+  let tiefe = 0, start = 0;
+  const teile = [];
+  for (let i = 0; i <= anweisung.length; i++) {
+    const c = anweisung[i];
+    if (c && "([{".includes(c)) tiefe++;
+    else if (c && ")]}".includes(c)) tiefe--;
+    if (tiefe === 0 && (c === "," || i === anweisung.length)) {
+      teile.push(anweisung.slice(start, i));
+      start = i + 1;
+    }
+  }
+  for (const teil of teile) {
+    const m = teil.match(/^\s*([a-zA-Z_]\w*)/);
+    if (m) namen.push(m[1]);
+  }
+  return namen;
+}
+function findeUnbekannteModulZuweisungen(koerperMitKommentaren, bekannt) {
+  const koerper = entferneKommentare(koerperMitKommentaren);
+  const lokal = new Set(["saat"]);
+  const deklRe = /\b(?:const|let|var)\s+/g;
+  let m;
+  while ((m = deklRe.exec(koerper))) {
+    let i = m.index + m[0].length, tiefe = 0;
+    for (; i < koerper.length; i++) {
+      const c = koerper[i];
+      if ("([{".includes(c)) tiefe++;
+      else if (")]}".includes(c)) { if (tiefe === 0) break; tiefe--; }
+      else if (c === ";" && tiefe === 0) break;
+    }
+    for (const n of sammleTopLevelNamen(koerper.slice(m.index + m[0].length, i))) lokal.add(n);
+  }
+  // Arrow-Function-Parameter ("p=>...", auch "(p)=>" -- der Klammerfall deklariert ueber
+  // die obige const/let-Suche ohnehin nichts, hier geht es um den NACKTEN Parameter ohne
+  // Klammern) zaehlen ebenfalls als lokal, sonst liest die Zuweisungs-Suche "p=" aus "p=>".
+  for (const m2 of koerper.matchAll(/\b([a-zA-Z_]\w*)\s*=>/g)) lokal.add(m2[1]);
+  const ziele = new Set();
+  // Gruppe 1 schliesst ein vorangehendes "." (Objektfeld) und Vergleichsoperator-Zeichen
+  // (!,<,>,=) aus -- damit faellt "u.feld=" raus, "===""!=""<=""" ebenfalls, waehrend eine
+  // einfache Zuweisung "name=wert" (auch am Zeilenanfang) erhalten bleibt. Das Lookahead
+  // schliesst sowohl "==" als auch "=>" aus (Pfeilfunktion, s.o. -- ohne diesen zweiten
+  // Ausschluss waere die lokal-Liste oben die einzige Verteidigung).
+  for (const m3 of koerper.matchAll(/(^|[^.\w!<>=])\b([a-zA-Z_]\w*)\s*=(?![=>])/g)) ziele.add(m3[2]);
+  return [...ziele].filter((n) => !lokal.has(n) && !bekannt.has(n));
+}
+
 let alleOk = true;
 
 let browser;
@@ -100,13 +184,6 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("time-trial"));
   await seite.click("#t2").catch(() => {});
   await seite.evaluate(() => { const e = document.getElementById("einlauf"); if (e) e.hidden = true; });
-
-  // (g) Waechter: bauSpurt() nach Modul-Variablen-Zuweisungen absuchen, Muster
-  // `name=...` oder `name=new ...`, nicht `==`/`===`, nicht Objekt-Felder (`u.name=`).
-  const waechterBefund = await seite.evaluate(() => {
-    const quelle = window.__arena.bauSpurtQuelle ? window.__arena.bauSpurtQuelle() : null;
-    return quelle;
-  }).catch(() => null);
 
   // Ticker-/Protokoll-Zaehler, Muster aus miss-ticker-dichte.mjs.
   await seite.evaluate(() => {
@@ -254,16 +331,18 @@ try {
   console.log(`(f) Seitenfehler: ${fOk ? "keine" : fehler.join(" | ")} -> ${fOk ? "OK" : "FEHLER"}`);
   if (!fOk) alleOk = false;
 
-  // (g) Waechter: findet der Browser bauSpurt() als Quelltext, auf Modul-Variablen pruefen.
-  let gOk = true;
-  if (typeof waechterBefund === "string" && waechterBefund.length) {
-    const zuweisungen = [...waechterBefund.matchAll(/\b([a-zA-Z_]\w*)\s*=(?!=)/g)].map((m) => m[1]);
-    const bekannt = new Set([...ANZEIGE_GLOBALS, ...RENNZUSTAND_GLOBALS, "seed", "s0", "h", "d", "n", "art", "gesetzt", "slotListe", "ersatz", "kurs", "rnd"]);
-    const unbekannt = [...new Set(zuweisungen)].filter((n) => !bekannt.has(n) && n.length > 2);
-    gOk = unbekannt.length === 0;
-    console.log(`(g) Waechter (Quelltext-Scan): ${unbekannt.length ? "unbekannte Zuweisungen: " + unbekannt.join(", ") : "keine neuen Globals gefunden"} -> ${gOk ? "OK" : "FEHLER"}`);
+  // (g) Waechter: bauSpurt() direkt aus der Engine-Quelldatei lesen (kein Browser-Hook noetig).
+  const engineQuelle = readFileSync(path.join(PUBLIC, "mockups", "battle-mode.engine.js"), "utf8");
+  const bauSpurtKoerper = extrahiereFunktionskoerper(engineQuelle, "function bauSpurt(saat){");
+  let gOk;
+  if (!bauSpurtKoerper) {
+    gOk = false;
+    console.log(`(g) FEHLER: bauSpurt() nicht im Quelltext gefunden (Signatur geaendert?) -> FEHLER`);
   } else {
-    console.log(`(g) Waechter uebersprungen: window.__arena.bauSpurtQuelle() nicht verfuegbar (optionaler Debug-Haken, kein Pflichtteil der Engine-API).`);
+    const bekannt = new Set([...ANZEIGE_GLOBALS, ...RENNZUSTAND_GLOBALS]);
+    const unbekannt = findeUnbekannteModulZuweisungen(bauSpurtKoerper, bekannt);
+    gOk = unbekannt.length === 0;
+    console.log(`(g) Waechter (Quelltext-Scan bauSpurt()): ${unbekannt.length ? "unbekannte Zuweisungen: " + unbekannt.join(", ") : "keine unbekannten Modul-Zuweisungen gefunden"} -> ${gOk ? "OK" : "FEHLER"}`);
   }
   if (!gOk) alleOk = false;
 

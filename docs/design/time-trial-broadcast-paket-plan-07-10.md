@@ -4,8 +4,18 @@
 echten Engine (nicht nur an der Kopie): Time-Trial 1087 → 42 Ticker-Zeilen (557,4 → 21,5/min),
 Protokoll unveraendert 83, rho bit-identisch (n=24 und n=12, Diffs leer), Spurt/Staffel/Takeshi/
 Climbing bestehen weiterhin (n=12), `pruefe-bahn-alternativ-isolation.mjs` weiterhin "ISOLATION
-NACHGEWIESEN". Neue Sonde `scripts/verify-time-trial-broadcast-paket-07-10.mjs`, alle Pruefungen
-bestanden, TDM-/Breaking-Sonde liefen als Rauchtest sauber mit. PR folgt.
+NACHGEWIESEN". Neue Sonde `scripts/verify-time-trial-broadcast-paket-07-10.mjs`, TDM-/Breaking-
+Sonde liefen als Rauchtest sauber mit.
+
+**Nachtrag Opus-Review (07.10.):** Engine (F1/T1) ohne Befund mergebar bestaetigt -- die
+35-Globals-Liste deckt `bauSpurt()` Zuweisung fuer Zuweisung ab, keines der Globals fliesst in
+`wert()`/`rr()`/`bahnRangliste()` ein, T1 aendert den `if(big)`-Zweig von `feed()` nicht, alle
+vier Bahnen werden gleich behandelt. EIN echter Mangel in der ersten Sonden-Fassung: Pruefung
+(g) rief `window.__arena.bauSpurtQuelle()` auf, das es in der Engine nicht gibt -- die Pruefung
+sprang deshalb immer leer durch, trotzdem stand am Ende "ALLE PRUEFUNGEN BESTANDEN". Behoben:
+(g) liest `bauSpurt()` jetzt direkt aus der Quelldatei (Klammerzaehlung statt Browser-Hook) und
+ist seitdem ein echter Test -- im Gegentest (ein Eintrag versuchsweise aus der bekannten Liste
+entfernt) schlaegt sie korrekt fehl. Jetzt alle sieben Pruefungen echt bestanden.
 
 **Reiner Plan, kein Code geändert.** Auftrag: die Ticker-Flut beim Time-Trial (aus einer
 früheren Session „rund 557 Zeilen je Minute, nach der Ziellinie laufen ~1000 Zeilen nach“,
