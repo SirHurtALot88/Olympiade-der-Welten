@@ -36,12 +36,106 @@ function chromiumVerfuegbar(): boolean {
 
 const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 
-function zaehleChromiumKindprozesse(): number {
+type PsZeile = { pid: string; ppid: string; args: string };
+
+/**
+ * Ein `ps`-Schnappschuss mit PPID -- aus demselben Grund wie in
+ * tests/arena-headless-runner.test.ts (Flaky-Fund 07.10.): ein reiner Vorher/Nachher-Vergleich
+ * ueber ALLE Chromium-Prozesse der Maschine ist fragil, sobald irgendein ANDERER Prozess waehrend
+ * des Tests nebenlaeufig Chromium startet oder beendet. Die PPID traegt die Abstammungspruefung
+ * in `eigeneProfileAusSchnappschuss()`, die stattdessen nur UNSERE eigenen Chromium-Prozesse
+ * findet.
+ */
+function schnappschuss(): PsZeile[] | null {
   try {
-    const ausgabe = execSync("ps -eo pid,args", { encoding: "utf8" });
-    return ausgabe.split("\n").filter((zeile) => zeile.includes(CHROMIUM_PFAD)).length;
+    const ausgabe = execSync("ps -eo pid,ppid,args", { encoding: "utf8" });
+    const zeilen: PsZeile[] = [];
+    for (const zeile of ausgabe.split("\n")) {
+      const treffer = zeile.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (treffer) zeilen.push({ pid: treffer[1], ppid: treffer[2], args: treffer[3] });
+    }
+    return zeilen;
   } catch {
-    return -1;
+    return null;
+  }
+}
+
+function istNachkommeVon(pid: string, ppidVon: Map<string, string>, wurzel: string): boolean {
+  let aktuell = pid;
+  const gesehen = new Set<string>();
+  for (;;) {
+    const ppid = ppidVon.get(aktuell);
+    if (!ppid || gesehen.has(aktuell)) return false;
+    if (ppid === wurzel) return true;
+    gesehen.add(aktuell);
+    aktuell = ppid;
+  }
+}
+
+/**
+ * Liefert die `--user-data-dir`-Profile aller Chromium-Prozesse im Schnappschuss, die zu diesem
+ * Zeitpunkt (noch) Nachkommen von `wurzelPid` sind -- also nachweisbar von DIESEM Testprozess
+ * gestartet wurden, nicht von irgendeinem anderen, gleichzeitig in dieser geteilten Umgebung
+ * laufenden Agenten (ausfuehrlicher Kommentar in tests/arena-headless-runner.test.ts).
+ */
+function eigeneProfileAusSchnappschuss(zeilen: PsZeile[], wurzelPid: number): Set<string> {
+  const ppidVon = new Map(zeilen.map((z) => [z.pid, z.ppid]));
+  const profile = new Set<string>();
+  for (const z of zeilen) {
+    if (!z.args.includes(CHROMIUM_PFAD)) continue;
+    if (!istNachkommeVon(z.pid, ppidVon, String(wurzelPid))) continue;
+    const treffer = z.args.match(/--user-data-dir=(\S+)/);
+    if (treffer) profile.add(treffer[1]);
+  }
+  return profile;
+}
+
+/**
+ * Sammelt waehrend `aktion()` laufend (alle 100ms) die Playwright-Profilverzeichnisse, die dieser
+ * Testprozess selbst gestartet hat (ausfuehrlicher Kommentar in
+ * tests/arena-headless-runner.test.ts). Sobald `browser.close()` den Hauptprozess beendet, werden
+ * seine verbliebenen Helfer (Zygote/GPU/Utility/crashpad_handler) vom Kernel auf PID 1
+ * umgehaengt -- danach ist eine Abstammungspruefung wirkungslos. Das pro Start zufaellige
+ * `--user-data-dir` bleibt dagegen in jedem zugehoerigen Prozess sichtbar.
+ */
+async function sammleEigeneProfileWaehrend(aktion: () => Promise<void>): Promise<Set<string>> {
+  const profile = new Set<string>();
+  let laeuft = true;
+  const erfasse = () => {
+    const zeilen = schnappschuss();
+    if (zeilen) for (const p of eigeneProfileAusSchnappschuss(zeilen, process.pid)) profile.add(p);
+  };
+  const sammlerFertig = (async () => {
+    while (laeuft) {
+      erfasse();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    erfasse(); // letzter Schnappschuss, falls `aktion` zwischen zwei Intervallen fertig wurde
+  })();
+  try {
+    await aktion();
+  } finally {
+    laeuft = false;
+    await sammlerFertig;
+  }
+  return profile;
+}
+
+/**
+ * Wartet bis zu `maxWartenMs` darauf, dass kein Chromium-Prozess mit einem der gesammelten
+ * Profile mehr lebt, und liefert die am Ende noch lebenden PIDs zurueck (leer = kein Leck).
+ */
+async function wartetBisProfileVerschwinden(profile: Set<string>, maxWartenMs = 5000): Promise<string[]> {
+  if (profile.size === 0) return [];
+  const start = Date.now();
+  for (;;) {
+    const zeilen = schnappschuss();
+    const lebend =
+      zeilen === null
+        ? []
+        : zeilen.filter((z) => z.args.includes(CHROMIUM_PFAD) && [...profile].some((p) => z.args.includes(p))).map((z) => z.pid);
+    if (lebend.length === 0 || Date.now() - start >= maxWartenMs) return lebend;
+    await new Promise((resolve) => setTimeout(resolve, 150));
   }
 }
 
@@ -209,30 +303,27 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
   it(
     "schliesst den Browser zuverlaessig nach Erfolg (kein Zombie-Prozess)",
     async () => {
-      // DELTA statt absolutem Nullwert (wie tests/arena-headless-runner.test.ts es fuer
-      // `runArenaFixtures()` bereits vormacht): diese Umgebung kann bereits vor diesem Test
-      // Chromium-Prozesse fuehren (z. B. ein zeitgleich laufender anderer Chromium-Test); nur der
-      // Unterschied VOR/NACH diesem Aufruf ist aussagekraeftig, ein absolutes `toBe(0)` waere
-      // gegen jede Parallelitaet fragil.
-      const vorher = zaehleChromiumKindprozesse();
-
       const gameState = baueGameState(
         { teamId: "team-a", prefix: "A" },
         { teamId: "team-b", prefix: "B" },
         { teamId: "team-c", prefix: "C" },
         { teamId: "team-d", prefix: "D" },
       );
-      await runMiniDmFfaPodFixtures(gameState, [
-        { podId: "pod-shutdown", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-shutdown" },
-      ]);
 
-      const nachher = zaehleChromiumKindprozesse();
-      if (vorher === -1 || nachher === -1) {
-        // `ps` in dieser Umgebung nicht verfuegbar -- der eigentliche Simulationslauf oben ist
-        // trotzdem bereits erfolgreich durchgelaufen.
+      const profile = await sammleEigeneProfileWaehrend(async () => {
+        await runMiniDmFfaPodFixtures(gameState, [
+          { podId: "pod-shutdown", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-shutdown" },
+        ]);
+      });
+
+      if (profile.size === 0) {
+        // `ps` in dieser Umgebung nicht verfuegbar, ODER das 100ms-Sampling hat keinen einzigen
+        // Schnappschuss waehrend eines lebenden Chromium-Prozesses getroffen -- der eigentliche
+        // Simulationslauf oben ist trotzdem bereits erfolgreich durchgelaufen.
         return;
       }
-      expect(nachher).toBe(vorher);
+      const lebend = await wartetBisProfileVerschwinden(profile);
+      expect(lebend).toEqual([]);
     },
     LAUF_TIMEOUT_MS,
   );
@@ -240,17 +331,19 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
   it(
     "liefert null (statt zu werfen) und startet keinen Browser, wenn ALLE Pods unvollstaendig sind",
     async () => {
-      const vorher = zaehleChromiumKindprozesse();
       const gameState = baueGameState({ teamId: "team-a", prefix: "A" });
-      const ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
-        { podId: "pod-leer", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-leer" },
-      ]);
+      let ergebnisse: (MiniDmFfaPodFixtureResult | null)[] = [];
+      const profile = await sammleEigeneProfileWaehrend(async () => {
+        ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
+          { podId: "pod-leer", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-leer" },
+        ]);
+      });
       expect(ergebnisse).toEqual([null]);
-      const nachher = zaehleChromiumKindprozesse();
-      if (vorher === -1 || nachher === -1) {
+      if (profile.size === 0) {
         return;
       }
-      expect(nachher).toBe(vorher);
+      const lebend = await wartetBisProfileVerschwinden(profile);
+      expect(lebend).toEqual([]);
     },
     LAUF_TIMEOUT_MS,
   );
