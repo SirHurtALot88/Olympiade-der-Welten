@@ -19987,8 +19987,16 @@
           ?" — Fallakte "+ispyFallakteStand(u.side):"";
         // TICKER-STUFE (Punkt 8, s. feed()): eine erfolglose Untersuchung ist Routine und steht
         // nur im Protokoll; jeder Fund (Punkte) bleibt im Ticker, solange das Budget reicht.
-        feed(u.side,ispyTickerZeile(u,r)+fallakteAnhang,versuchBig||fuehrungswechsel,undefined,
-          versuchBig?"tresor":"fuehrungswechsel",undefined,undefined,
+        // KIND-FALLE (I-Spy-Ticker-Paket, 07.10., dieselbe wie bei TDM/Breaking/Time-Trial/
+        // Schach/Fechten/Takeshi): `kind` stand bedingungslos auf "tresor" ODER
+        // "fuehrungswechsel" -- nie undefined. feed() stuft jede Zeile mit gesetztem kind
+        // immer als "ereignis" ein (big||kind?"ereignis":stufe), unabhaengig vom big-Flag
+        // UND vom stufe="routine" direkt darunter -- das liess jede einzelne Untersuchung
+        // (Erfolg wie Fehlschlag) ungebremst durch (gemessen 95,4 Zeilen/min, 97 von 99
+        // Protokollzeilen im Ticker). Jetzt kind nur noch, wenn tatsaechlich big.
+        const ispyBig=versuchBig||fuehrungswechsel;
+        feed(u.side,ispyTickerZeile(u,r)+fallakteAnhang,ispyBig,undefined,
+          ispyBig?(versuchBig?"tresor":"fuehrungswechsel"):undefined,undefined,undefined,
           r.ereignis===BUEHNE_ART["i-spy"].erfolgWort?undefined:"routine");
         // AM ENDE DER ENTHUELLUNG (Konzept: "am Ende blendet der Ticker [...] ein"): die
         // generische Enthuellungs-Warteschlange (s. Kopfkommentar bei BUEHNE_ART["i-spy"])
