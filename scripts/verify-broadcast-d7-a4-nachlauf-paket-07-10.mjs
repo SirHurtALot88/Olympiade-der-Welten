@@ -37,7 +37,7 @@
 //      Endstand, Tickerzeilen) fuer je eine Disziplin je Chassis plus Gewichtheben.
 //   F  keine pageerror
 //
-// Aufruf: node scripts/verify-broadcast-d7-a4-nachlauf-paket-07-10.mjs [--ohne-isolation]
+// Aufruf: node scripts/verify-broadcast-d7-a4-nachlauf-paket-07-10.mjs [--ohne-isolation | --nur-isolation]
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { existsSync, createReadStream, statSync, readFileSync } from "node:fs";
@@ -51,6 +51,8 @@ const PUBLIC = path.join(WURZEL, "public");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" };
 const OHNE_ISOLATION = process.argv.includes("--ohne-isolation");
+// --nur-isolation: nur Abschnitt I (laeuft auf belasteter Maschine lange -- als eigener Lauf).
+const NUR_ISOLATION = process.argv.includes("--nur-isolation");
 
 function starteServer() {
   return new Promise((resolve) => {
@@ -100,6 +102,7 @@ async function setzeTempo(seite, ziel) {
 
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
+  if (!NUR_ISOLATION) {
   const seite = await neueSeite(null);
   await seite.click("#t2");
 
@@ -433,6 +436,8 @@ try {
       `(N2) ${d.padEnd(12)} Echtzeit: done -> #endstand ${delta?.toFixed(0)} ms (soll 3500, laengste Frame-Luecke ${n2.frameMax?.toFixed(0)} ms), Score-Bug im Nachlauf sichtbar ${n2.bugImNachlauf}`);
   }
   await seite.close();
+
+  } // Ende !NUR_ISOLATION
 
   // ===================================================================== I
   console.log("\n== I: Isolation (headless Mess-Pfade bit-identisch) ==");
