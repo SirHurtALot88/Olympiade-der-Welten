@@ -1,0 +1,41 @@
+{
+  "note": "Beim Spieltagsranking ist immernoch ein Team 1. mit 6,5 + 0,3 Mutator punkten was korrekt ist! ABER im Season rank steht rang 2  weil da nur 6,5 kalkuliert werden. das muss sowohl in der Spieltagstabelle als auch in der Season ansicht gefixt werden Mutatorpunkte gehören zu den punkten der Disziplin!",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=V-W&saveId=new-game-1787123325719-swnjlk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1186
+  },
+  "clientTime": "2026-08-22T10:22:52.369Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-22T10-22-45-927Z-qg6cpy",
+  "createdAt": "2026-08-22T10:22:45.927Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}

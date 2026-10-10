@@ -1,0 +1,41 @@
+{
+  "note": "Beim Training müssen AI Teams auch die Ermüdung berücksichtigen! Hartes Trainnig kann stark sein aber kostet auch viel Fatigue - man muss berükcsichtiggne dass man dann weniger pushen kann oder ggf. recovery buildings hat \n\nReview -> sollten wir Recovery gebäude etwas stärker machen?",
+  "view": "trainingCompact",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=trainingCompact&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T07:00:18.853Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T07-00-11-313Z-xrqysh",
+  "createdAt": "2026-08-14T07:00:11.313Z",
+  "page": {
+    "path": "/foundation",
+    "view": "trainingCompact",
+    "tab": null,
+    "label": "Team · Training"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "note": "Apron scheint nicht korrket zu ziehen! M-M hat Gehalt 123,5 Mio und die 2. Linie ist 67,3 Mio! \n\nDie müssten fast 60 mio Strafe zahlen!",
+  "view": "finances",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=finances&team=M-M&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T08:24:54.536Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T08-24-46-954Z-6fv43h",
+  "createdAt": "2026-08-14T08:24:46.954Z",
+  "page": {
+    "path": "/foundation",
+    "view": "finances",
+    "tab": null,
+    "label": "Markt · Finanzen"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}
