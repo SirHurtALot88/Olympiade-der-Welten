@@ -85,3 +85,66 @@ Folgeereignisse — Klasse B mit Kaskadenrisiko, eigene Messrunde, und eine Frag
 (wie oft haelt ein Torwart fest und wirft ab, wie oft gibt es Bully?). Erst danach lohnt es sich,
 H-C (TECHNIK statt AUFBAU im Torwartpass) wieder aufzugreifen; der Code dafuer liegt auf diesem
 Branch bereit.
+
+---
+
+## 6. Nachtrag aus dem unabhaengigen Review (10.10.)
+
+Ein unabhaengiger Review-Agent hat die Befunde oben am Code und an eigenen Messungen
+nachgeprueft. Beide zentralen Behauptungen halten:
+
+- **Zielwahl liest keinen Passgeber-Wert** — bestaetigt. In `offensterMitspieler` wird der
+  Parameter `von` ausschliesslich an `offenheitFuerPass(von,m)` weitergegeben, und das liest
+  nur `von.side`, `v.deckt===von` und `distZuLinie(v,von,ziel)`, also Seite und Position.
+  Kein Attribut. H-C ist damit eine Schwellen-, keine Kaskadenaenderung.
+  Nebenbefund zur URSACHE der Seltenheit: `offensterMitspieler` schliesst den Torwart in
+  Hockey ausdruecklich als Pass-ZIEL aus (s. Kommentar dort, 282 von 1147 Paessen gingen
+  vorher an ihn). Er kann deshalb kaum in die Lage kommen, selbst zu passen.
+- **0,033 Torwartpaesse je Spiel** — mit der Sonde reproduziert (4 in 120 Spielen, 1 A1, 0 A2).
+- **rho zeichengleich** — eigener Lauf `miss-alle-disziplinen.mjs 24 basketball hockey football`
+  gegen `main` 2470c502: die Ausgabe ist Zeichen fuer Zeichen identisch, auch Basketball und
+  Football (Isolation).
+
+### 6.1 Ein Fund, der VOR einem Wiederaufgreifen behoben werden muss
+
+`passQualitaetVon(von)` prueft `stehtImTor(von)` — **veraenderlichen Zustand**. Der Torwart wird
+in der Endphase gezogen (`tw.imTor=false`, s. `aktualisiereHockeyEndphase`) und kann
+zurueckkehren (`alt.imTor=true`). Die drei Ketten-Stellen werden aber zu drei verschiedenen
+ZEITPUNKTEN desselben Passes ausgewertet:
+
+| Stelle | Zeitpunkt |
+|---|---|
+| `passeAb` (eigener Fehlpass) | Abwurf |
+| `loeseFlugAuf` (Assist-Fenster) | Ankunft des Passes |
+| `hockeyPassQualBonus` (ueber `moeglicherAssist` in `entscheideBallaktion`) | Schuss des Empfaengers, bis zu `ASSIST_FENSTER` spaeter |
+
+Wird der Torwart zwischen Abwurf und Schuss gezogen — genau die Rueckstandssituation spaet im
+Spiel, in der ein Torwartpass ueberhaupt vorkommt —, traegt derselbe Pass an zwei Stellen
+TECHNIK und an der dritten AUFBAU. Vor H-C lasen alle drei `von.AUFBAU`, eine unveraenderliche
+Zahl, und waren daher immer einig: **H-C fuehrt die Inkonsistenz ein, sie ist nicht vorbestehend.**
+Bei 0,033 Paessen je Spiel ist sie heute nicht beobachtbar, und sie ist auch nicht der Grund
+fuer die Abbruchregel — aber wer H-C nach einem P-Paket wiederaufgreift, muss die Qualitaet
+**zum Passzeitpunkt einfrieren** (z. B. auf `flug`/`frischerPassVon` mitgeben) statt sie dreimal
+neu aus dem Spielzustand abzuleiten.
+
+Zweiter, kleinerer Punkt: `fsLive.torwartPaesse` ist ein reiner Sondenzaehler im
+Produktionspfad, in `initFeldspielLive` nicht initialisiert (verlaesst sich auf `||0`). Ohne
+`rr()`, also ohne Determinismus-Folgen — aber er gehoert hinter denselben Schalter wie die
+uebrigen Debug-Haken, wenn der Branch wiederbelebt wird.
+
+### 6.2 Der Branch mergt inzwischen nicht mehr
+
+`feldspiel-hc-torwartpass-paket-07-10` (a84167d) **konfliktiert** mit dem aktuellen `main`:
+beide Seiten haengen Haken in dasselbe `window.__arena`-Objekt (B2a `freiwurfKanal`, H-C
+`hockeyPassQualitaet`/`hockeyTorwartPaesse`). Der Konflikt ist trivial — beide Seiten behalten —,
+aber er waechst mit jedem weiteren Paket. Wer den Code aufheben will, sollte ihn entweder
+zeitnah auf `main` nachziehen oder sich darauf verlassen, dass dieses Dokument die Mechanik
+vollstaendig genug beschreibt, um sie neu zu bauen.
+
+### 6.3 Eine Praezisierung zur Formulierung oben
+
+Abschnitt 3 eroeffnet mit „alle Rangtreue-Zahlen sind bit-identisch zu `main`". Fuer die
+Rangtreue-ZAHLEN stimmt das; der Motor ist es nicht durchgaengig, was Abschnitt 3 am Ende selbst
+offenlegt (Draco 3,9 → 4,0, Seraph-11 6,0 → 6,1 im Testkader). Die vier tatsaechlich gespielten
+Torwartpaesse aendern Einzelwerte, nur keine Rangfolge. Die Abbruchregel greift dadurch
+unveraendert — die Ueberschrift ist lediglich staerker als der Befund.
