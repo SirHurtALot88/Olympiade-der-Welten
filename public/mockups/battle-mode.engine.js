@@ -22593,7 +22593,11 @@
   }
   // anker: Bildschirmpunkt {x,y} (Konfetti-/Blitz-Ursprung) oder null (dann der Rueckfall der
   // Disziplin, s. `ankerVonSeite` in teamFeierEffekte()). opt.funken: Breaking-Tonalitaet
-  // (Teamfarbe + Gold als Funkenregen statt Papierkonfetti, Konzept 3.2).
+  // (Teamfarbe + Gold als Funkenregen statt Papierkonfetti, Konzept 3.2). opt.raunen: die
+  // GEGENSEITE sackt auch bei einer kleinen/mittleren Feier kurz ein (teamFeierHaltung) --
+  // sonst gilt das "Raunen" nur fuer gross/finale. Staffel nutzt es beim Fehlwechsel
+  // (Konzept 3.3: die patzende Seite "sackt ueber `sackt`", die Gegenseite feiert klein);
+  // ohne den Schalter bliebe die patzende Seite dort regungslos, weil "klein" kein Raunen kennt.
   function teamFeierAusloesen(seite,stufe,anker,opt){
     if(stumm)return;                                   // Messpfad: nie
     if(seite!==0&&seite!==1)return;                     // Remis/unklar: keine Feier
@@ -22605,7 +22609,8 @@
     const laufend=teamFeiern.find(f=>f.seite===seite&&jetzt-f.seitMs>=0&&jetzt-f.seitMs<TEAM_FEIER_STUFEN[f.stufe].dauer);
     if(laufend&&rang(laufend.stufe)>=rang(stufe))return;
     teamFeiern=teamFeiern.filter(f=>f!==laufend);
-    teamFeiern.push({seite,stufe,seitMs:jetzt,nr:++teamFeierNr,anker:anker||null,funken:!!(opt&&opt.funken)});
+    teamFeiern.push({seite,stufe,seitMs:jetzt,nr:++teamFeierNr,anker:anker||null,funken:!!(opt&&opt.funken),
+      raunen:!!(opt&&opt.raunen)});
     if(teamFeiern.length>4)teamFeiern.shift();
   }
   // HALTUNG einer Publikumsfigur: {dy,pose,sackt}. dy<0 = Huepfer (Bildschirm-Pixel), die
@@ -22627,7 +22632,7 @@
         const ausklingen=1-Math.max(0,(p-0.75)/0.25);
         dy=Math.min(dy,-Math.abs(Math.sin(p*Math.PI*S.hops))*S.amp*ausklingen);
         pose=pose||(S.pose&&p>0&&p<0.85);
-      } else if(f.stufe==="gross"||f.stufe==="finale"){
+      } else if(f.stufe==="gross"||f.stufe==="finale"||f.raunen){
         sackt=Math.max(sackt,3*Math.max(0,1-alter/700));
       }
     }
@@ -22672,8 +22677,12 @@
   }
   // EFFEKTE (Konzept 2.4): Lichtblitz (gross/finale), Konfetti bzw. Funken (ab mittel),
   // Feuerwerk (nur finale). Am ENDE der Chassis-Zeichenfunktion aufrufen. ankerVonSeite(s)
-  // liefert den Ursprung, wenn die Feier ohne eigenen Anker ausgeloest wurde.
-  function teamFeierEffekte(ankerVonSeite){
+  // liefert den Ursprung, wenn die Feier ohne eigenen Anker ausgeloest wurde. opt.feuerwerkAb:
+  // Oberkante des Feuerwerk-Bands als Bruchteil von H (Vorgabe 0,12 -> Band 0,12-0,30 H, das
+  // obere Bilddrittel aus dem Konzept). Staffel legt es tiefer, weil dort das Bahn-HUD
+  // (#bahnHud, DOM) genau das obere Drittel der Leinwand bedeckt.
+  function teamFeierEffekte(ankerVonSeite,opt){
+    const feuerwerkAb=(opt&&opt.feuerwerkAb!=null)?opt.feuerwerkAb:0.12;
     if(!teamFeiern.length)return;
     const jetzt=jetztMs();
     for(const f of teamFeiern){
@@ -22730,7 +22739,7 @@
         const bAlter=alter-b*350; if(bAlter<0||bAlter>1200)continue;
         const bt=bAlter/1000, hb=cypherHash(f.nr*104729+b,f.seite);
         const bx=Math.max(W*0.12,Math.min(W*0.88,a.x+((hb%240)-120)));
-        const by=H*(0.12+((hb>>>8)%19)/100);
+        const by=H*(feuerwerkAb+((hb>>>8)%19)/100);
         const rMax=150+(hb%60);
         ctx.globalAlpha=Math.max(0,1-bAlter/1200);
         ctx.fillStyle=bAlter<120?"#ffffff":c;
@@ -33796,6 +33805,11 @@
           else if(d.seite!==staffelFuehrendeSeite && (rennT-bahnFuehrenderSeit)>2){
             staffelFuehrendeSeite=d.seite; bahnFuehrenderSeit=rennT;
             feed(d.seite,VEREIN[d.seite].name+" übernimmt die Führung.",true,undefined,"fuehrungswechsel");
+            // TEAM-FEIER 3.3: das Team, das die Fuehrung UEBERNIMMT, feiert mittel -- Anker ist
+            // sein gerade laufender Laeufer. Reine Anzeige (teamFeierAusloesen schreibt nur
+            // `teamFeiern`), dieselbe Flanke wie die Tickerzeile direkt darueber.
+            const fuehrAkt=LAEUFER.find(o=>o.seite===d.seite&&o.aktiv);
+            teamFeierAusloesen(d.seite,"mittel",fuehrAkt?staffelFeierAnker(laeuferXY(fuehrAkt)):null);
           }
         }
         // ST-4: FUEHRUNGSVERLAUF (Abschnitt 4.3). Ein Punkt je Frame, exakt wie im Konzept
@@ -40818,6 +40832,7 @@
           naechster.vizUebergabeT=STAFFEL_UEBERGABE_DAUER;
           naechster.vizUebergabeGeberId=u.id;
           sfx("staffel", u.gestolpert>0 ? "fehlwechsel" : "uebergabe");
+          staffelFeierUebergabe(u,naechster);   // TEAM-FEIER 3.3, s. dort; liest nur
         }
       }
       if(u.vizUebergabeT>0)u.vizUebergabeT=Math.max(0,u.vizUebergabeT-dt);
@@ -40828,8 +40843,113 @@
       // ein Sechser-Ziel den Ton sechsfach aus.
       if(u.fertig!=null && !u.vizZielGesehen && u.bein===(art.jeSeite-1)){
         u.vizZielGesehen=true; sfx("staffel","ziel");
+        staffelFeierZiel(u,art);              // TEAM-FEIER 3.3, s. dort; liest nur
       }
     }
+  }
+
+  // ================== TEAM-FEIER STAFFEL (Feiermomente-Konzept 3.3, Phase 2, 11.10.) ==================
+  // docs/design/team-publikum-feiermomente-konzept-30-09.md Abschnitt 3.3: das Publikum steht
+  // schon im Bild -- die fuenf gerade nicht laufenden Teamkollegen im Innenfeld an ihrer
+  // Wechselzone (ovalPunkt()). Duenner Adapter auf den Baukasten (teamFeierAusloesen/
+  // teamFeierHaltung/teamFeierEffekte, s. Block "TEAM-FEIER" oben), exakt wie
+  // hebenFeierAmUrteil() (Gewichtheben) und der Bruch-Haken in stepBuehne() (Breaking).
+  //
+  // VIER AUSLOESER, alle an Flanken, die es vorher schon gab:
+  //   Uebergabe       stepStaffel(), Flanke `u.durch&&!u.vizDurchGesehen` (dort faellt schon
+  //                   sfx uebergabe/fehlwechsel)                  -> staffelFeierUebergabe()
+  //   Fuehrungswechsel updateHudBahn(), `staffelFuehrendeSeite` wechselt -> mittel, inline dort
+  //   Team im Ziel    stepStaffel(), Flanke `vizZielGesehen` (Schlusslaeufer) -> staffelFeierZiel()
+  //   Rennen entschieden  updateHudBahn() erster done-Frame -> endstandVormerken() loest
+  //                   "finale" fuer den Sieger aus stand.seiten aus (seit 07.10. fuer alle Bahnen
+  //                   gebaut); dieses Paket macht es auf dem Oval nur SICHTBAR (Effekte in
+  //                   zeichneSpurt(), Huepfer der eingelaufenen Mannschaft).
+  //
+  // VERTRAG (Klasse A, Konzept Abschnitt 4): REINE ANZEIGE. Kein rr(), kein Math.random(),
+  // kein Schreibzugriff auf irgendein Feld an `u`/`naechster` -- gelesen werden nur
+  // u.seite/u.gestolpert/u.fertig/u.bein und Bildschirmpositionen ueber laeuferXY(). Beide
+  // Funktionen kehren bei `stumm` SOFORT zurueck (stepStaffel laeuft ueber bahnBewegung() auch
+  // im Messpfad, s. Vertrag am stepStaffel-Kopf), noch bevor laeuferXY() fuer den Anker
+  // gerufen wird -- der Messpfad sieht dieses Modul also gar nicht.
+  // KONFETTI-ANKER (Konzept: laeuferXY() des ausloesenden Laeufers) -- mit EINER Abweichung,
+  // gefunden in der Sichtprobe: die Ziellinie und die ganze Zielgerade liegen im oberen
+  // Leinwand-Drittel, und genau dort liegt im Spiel das Bahn-HUD (#bahnHud mit "AKTUELL/
+  // NAECHSTE" und dem Fuehrungsbalken, DOM ueber der Leinwand). Ein dort geworfenes Konfetti
+  // (Scheitel 46-139 px ueber dem Anker) verschwand vollstaendig hinter den Kaesten. Die
+  // Waagerechte bleibt die des Laeufers, die Senkrechte wird auf mindestens 0,66 H gezogen
+  // (unteres Innenfeld): der Wurf steigt dann sichtbar ueber Innenfeld/Gegengerade auf und
+  // bleibt unter dem HUD. Auf der Gegengeraden (y ~ 400) aendert sich nichts.
+  const STAFFEL_FEIER_ANKER_MIN_Y=H*0.66;
+  function staffelFeierAnker(p){ return p?{x:p.x,y:Math.max(p.y,STAFFEL_FEIER_ANKER_MIN_Y)}:null; }
+  function staffelFeierUebergabe(u,naechster){
+    if(stumm)return;
+    // Anker = der Nehmer: er ist in diesem Tick schon aktiv und steht damit AUF der Laufspur
+    // genau am Uebergabepunkt (laeuferXY(u) wuerde den Geber schon ins Innenfeld stellen).
+    // ("klein" wirft ohnehin kein Konfetti -- der Anker ist nur der Vollstaendigkeit halber da.)
+    const anker=staffelFeierAnker(laeuferXY(naechster));
+    // FEHLWECHSEL (u.gestolpert>0 -- stepSpurt zaehlt es fuer den Geber im selben Tick, in dem
+    // u.durch kippt, und bei der Staffel ist das die einzige Stelle, s. Kopf von stepStaffel):
+    // KEINE Feier fuer die eigene Seite. Die Gegenseite freut sich klein, die patzende Seite
+    // sackt kurz ein (opt.raunen, s. teamFeierAusloesen).
+    if(u.gestolpert>0)teamFeierAusloesen(1-u.seite,"klein",anker,{raunen:true});
+    else teamFeierAusloesen(u.seite,"klein",anker);
+  }
+  function staffelFeierZiel(u,art){
+    if(stumm)return;
+    const gegner=LAEUFER.find(o=>o.seite!==u.seite&&o.bein===(art.jeSeite-1));
+    // SIEGER, wenn der Schlusslaeufer der Gegenseite noch nicht fertig ist (Konzept). Kommen
+    // beide im SELBEN Tick an, entscheidet die Einlaufreihenfolge in rennFertig (dieselbe,
+    // aus der bahnRangliste()/stand.seiten den Sieger lesen) -- sonst bekaeme der Sieger nur
+    // "klein", weil der Gegner im Moment seiner Flanke formal schon `fertig` ist.
+    const sieger=!gegner||gegner.fertig==null||rennFertig.indexOf(u)<rennFertig.indexOf(gegner);
+    teamFeierAusloesen(u.seite,sieger?"gross":"klein",staffelFeierAnker(laeuferXY(u)));
+  }
+  // Laeuft fuer diese Seite gerade eine Feier? (fuer die Dimm-Aufhebung in zeichneSpurt():
+  // ueber die ganze Feierdauer, nicht nur waehrend dy<0 -- sonst flackerte die Dimmung
+  // zwischen zwei Huepfern an und aus).
+  function teamFeierLaeuftFuer(seite){
+    if(!teamFeiern.length)return false;
+    const jetzt=jetztMs();
+    return teamFeiern.some(f=>f.seite===seite&&jetzt-f.seitMs>=0&&jetzt-f.seitMs<=TEAM_FEIER_STUFEN[f.stufe].dauer);
+  }
+  // ANFEUERN OHNE EREIGNIS (Konzept 3.3, "die Welle"): wartende Teamkollegen an der
+  // Wechselzone, der sich der EIGENE aktive Laeufer naehert (Abstand < 0,12 Runde in
+  // Laufrichtung), wippen mit 3 px bei 3 Hz. Die Zone eines Wartenden ist sein eigenes
+  // ovalAnteil() (er steht exakt auf einer Beingrenze, s. ovalPunkt()); verglichen wird modulo
+  // EINE Runde, weil die Kollegen an der PHYSISCHEN Stelle stehen, an der der Laeufer gerade
+  // vorbeikommt -- so wandert die Welle mit dem Laeufer ums Oval (Ziellinie -> Gegengerade ->
+  // Ziellinie). Reines Lesen von u.pos ueber ovalAnteil(); Uhr jetztMs() (Befund B3,
+  // Sonden-Modus deterministisch). Nur waehrend das Rennen laeuft (kein Wippen vor dem
+  // Startschuss, in der Pause oder nach dem Ziel).
+  const STAFFEL_ANFEUERN_ZONE=0.12, STAFFEL_ANFEUERN_AMP=3, STAFFEL_ANFEUERN_HZ=3;
+  function staffelAnfeuernDy(u){
+    if(done||!(rennT>0)||!(running||sondenAktiv))return 0;
+    if(u.aktiv||u.fertig!=null)return 0;
+    const laeufer=LAEUFER.find(o=>o.seite===u.seite&&o.aktiv&&o.fertig==null);
+    if(!laeufer)return 0;
+    // Dieselbe gezeichnete Position wie ovalPunkt() (beim Stolpern der festgehaltene Punkt).
+    const la=(laeufer.stolper>0&&laeufer.vizStolperAnteil!=null)?laeufer.vizStolperAnteil:ovalAnteil(laeufer);
+    const vorAus=((((ovalAnteil(u)-la)%1)+1)%1);   // Runden bis zur Zone, in Laufrichtung
+    if(vorAus>=STAFFEL_ANFEUERN_ZONE)return 0;
+    // Weich einsetzen (letzte 0,03 Runde vor der Schwelle), damit niemand auf einen Schlag losspringt.
+    const ein=Math.min(1,(STAFFEL_ANFEUERN_ZONE-vorAus)/0.03);
+    // |sin(pi*f*t)| hat f Huepfer je Sekunde; der Versatz je Bein laesst die Gruppe wellen.
+    const phase=(u.bein||0)*0.9;
+    return -Math.abs(Math.sin(Math.PI*STAFFEL_ANFEUERN_HZ*jetztMs()/1000+phase))*STAFFEL_ANFEUERN_AMP*ein;
+  }
+  // BILD EINER STAFFEL-FIGUR ALS PUBLIKUM: {publikum, dy, feiert, anfeuern}. Publikum ist, wer
+  // gerade NICHT laeuft: die Wartenden im Innenfeld (`!u.aktiv`) und nach dem Zieleinlauf die
+  // ganze eingelaufene Mannschaft inklusive Schlusslaeufer (`u.fertig!=null` -- er bleibt
+  // formal `aktiv`, laeuft aber nicht mehr; ohne ihn huepfte beim Ziel-Jubel ausgerechnet der
+  // Held nicht mit). Ausgenommen der Naechste im sichtbaren Anlauf (vizAnlauf>0,4, dieselbe
+  // Schwelle wie `anlaufLaeuft` in zeichneSpurt): wer gerade auf die Bahn sprintet, huepft
+  // nicht. dy = Huepfer (teamFeierHaltung, inkl. Einsacken der Gegenseite) + Anfeuern-Welle;
+  // feiert = eine EIGENE Feier laeuft (hebt die Dimmung auf). Liest nur, schreibt nichts.
+  function staffelFeierBild(u){
+    const wartet=!u.aktiv&&u.fertig==null;
+    if(!(!u.aktiv||u.fertig!=null)||(wartet&&u.vizAnlauf>0.4))return {publikum:false,dy:0,feiert:false,anfeuern:0};
+    const anfeuern=staffelAnfeuernDy(u);
+    return {publikum:true,dy:teamFeierHaltung(u).dy+anfeuern,feiert:teamFeierLaeuftFuer(u.seite),anfeuern};
   }
 
   // ================= stepParcours(): DER LAEUFER SELBST REAGIERT (Ziel 3, Opus-Plan =========
@@ -41249,6 +41369,10 @@
   }
   function zeichneSpurt(){
     zeichneBoden();
+    // TEAM-FEIER STAFFEL (Konzept 3.3): Teamfarben einmal je Frame (Befund B5). Nur Staffel --
+    // jede andere Bahn zeichnet ohne Feier-Publikum und bleibt Zeichen fuer Zeichen wie vorher.
+    const staffelFeier=!!BA().staffel;
+    if(staffelFeier)teamFeierFarbenLesen();
     // AUF DER ROUTE nach Bildschirm-y sortiert zeichnen: wer weiter unten steht, ueberdeckt
     // den, der weiter oben steht — dieselbe Tiefenstaffelung wie im Feldspiel. Auf der
     // geraden Bahn gibt es nichts zu staffeln (jede Spur hat ihre eigene Zeile), dort
@@ -41315,7 +41439,16 @@
       // wert()/rr()/rho.
       const raus=!!u.raus;
       const sk=wartet?sk0*0.88:sk0;
-      const dimAlpha=raus?0.4:(wartet?0.72:1);
+      // TEAM-FEIER STAFFEL (Konzept 3.3): wer gerade nicht laeuft, ist Publikum (Wartende im
+      // Innenfeld, nach dem Ziel die eingelaufene Mannschaft, s. staffelFeierBild()).
+      // Huepfer (teamFeierHaltung) + Anfeuern-Welle (staffelAnfeuernDy) gehen als reiner
+      // Zeichen-Versatz in den Bewegungs-Transform unten (Befund B1: die Sprite-Uhr steht auf
+      // der Bahn). Waehrend einer EIGENEN Feier faellt die 0,72-Dimmung der Wartenden weg --
+      // sonst verpufft der Jubel im Grau. Die Rechnung steht in staffelFeierBild() (eine
+      // Quelle fuer Zeichnung und Sonde window.__arena.staffelFeierProbe()).
+      const feierBild=staffelFeier?staffelFeierBild(u):null;
+      const feierDy=feierBild?feierBild.dy:0;
+      const dimAlpha=raus?0.4:(wartet&&!(feierBild&&feierBild.feiert)?0.72:1);
       ctx.globalAlpha=dimAlpha;
       ctx.fillStyle="#000";
       ctx.globalAlpha*=0.25;
@@ -41410,7 +41543,9 @@
       const huerdeAusschlag=BA().spurt?(u.vizHuerde||0):0;
       const huerdeHop=huerdeAusschlag*6*sk0;
       const huerdeHaltung=1-huerdeAusschlag*0.06;
-      ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
+      // feierDy (Team-Feier Staffel, s. `feierFigur` oben): Bildschirm-Pixel VOR der Skalierung,
+      // der Fussschatten oben bleibt am Boden -- genau das macht den Sprung lesbar.
+      ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop+feierDy); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
       ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
       // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
       // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
@@ -41835,6 +41970,17 @@
     // Schwebetexten, damit ein Text nie unter einem frischen Effekt verschwindet --
     // dieselbe Reihenfolge wie im Kampf-draw().
     zeichneEffekte(1/60);
+    // TEAM-FEIER STAFFEL (Konzept 3.3/2.4): Lichtblitz, Konfetti, Feuerwerk -- nach den
+    // Figuren und vor den Schwebetexten (Zahlen bleiben lesbar). Ohne eigenen Anker (das
+    // "finale" aus endstandVormerken()) kommt der Ursprung vom Schlusslaeufer der Seite, sonst
+    // vom gerade laufenden Laeufer -- beide ueber staffelFeierAnker() unter das Bahn-HUD
+    // gezogen; aus demselben Grund liegt das Feuerwerk-Band bei 0,50-0,68 H statt im oberen
+    // Drittel (s. teamFeierEffekte). Nur Staffel; jede andere Bahn ruft das hier nicht.
+    if(staffelFeier)teamFeierEffekte(s=>{
+      const o=LAEUFER.find(l=>l.seite===s&&l.bein===(BA().jeSeite-1)&&l.fertig!=null)
+        ||LAEUFER.find(l=>l.seite===s&&l.aktiv);
+      return o?staffelFeierAnker(laeuferXY(o)):null;
+    },{feuerwerkAb:0.50});
     // SCHWEBETEXTE. Sie fehlten auf der Bahn komplett: stepSpurt ruft schwebe() an acht
     // Stellen ("stolpert", "getackelt", "eingebrochen", "Stab weiter", "ausgeschieden"
     // ...), gezeichnet wurden sie aber nur im Kampf (draw), im Feldspiel und auf der
@@ -48036,6 +48182,15 @@
     // schreibt nur `teamFeiern`, kein Einfluss auf MESS/Wertung/RNG (und bei `stumm` ohnehin
     // ein No-Op).
     teamFeierProbe:(seite,stufe)=>{ teamFeierAusloesen(seite===1?1:0,stufe||"gross",null); return teamFeiern.length; },
+    // TEAM-FEIER STAFFEL (Phase 2, 11.10.), zwei REIN LESENDE Sonden fuer
+    // scripts/verify-team-feier-staffel-paket-11-10.mjs: teamFeierStand() = Kopie der laufenden
+    // Feier-Liste (nr waechst je Ausloesung, damit ein Skript jede neue Feier genau einmal
+    // sieht); staffelFeierProbe() = je Laeufer dieselben Groessen, die zeichneSpurt() fuer den
+    // Huepfer/die Dimmung benutzt (staffelFeierBild()), plus Zustand fuer die Zuordnung.
+    teamFeierStand:()=>teamFeiern.map(f=>({seite:f.seite,stufe:f.stufe,nr:f.nr,seitMs:f.seitMs,
+      anker:f.anker?{x:f.anker.x,y:f.anker.y}:null,raunen:!!f.raunen,funken:!!f.funken})),
+    staffelFeierProbe:()=>BA().staffel?LAEUFER.map(u=>({id:u.id,seite:u.seite,bein:u.bein,aktiv:!!u.aktiv,
+      fertig:u.fertig!=null,gestolpert:u.gestolpert||0,anteil:ovalAnteil(u),...staffelFeierBild(u)})):null,
     // ===== SENDUNGSRAHMEN-TAKTUNG (D7 / A4+A3 / Endstand-Nachlauf, 07.10.) =====
     // Ausdrueckliche SONDEN-SCHALTER fuer Skripte -- bewusst NICHT automatisch ueber
     // navigator.webdriver (sonst saehen Agenten-Screenshots etwas anderes als Chris). Ohne

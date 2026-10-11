@@ -332,6 +332,23 @@ der sich der eigene aktive Läufer nähert (`ovalAnteil()`-Abstand zur Zone < 0,
 Teamreaktion; dazu das Anfeuern durchgehend. **Klasse:** A (`stepStaffel` ist `bahnBewegung`-Pfad,
 Vertrag Z. 35248ff; `updateHudBahn` ist HUD). **Aufwand:** M.
 
+**Gebaut am 11.10.** (Block „TEAM-FEIER STAFFEL" hinter `stepStaffel()`: `staffelFeierUebergabe()`,
+`staffelFeierZiel()`, `staffelAnfeuernDy()`, `staffelFeierBild()`; Führungswechsel inline in
+`updateHudBahn()`; Finale kam schon mit dem Endstand-Nachlauf 2.6). Vier Abweichungen vom Text oben,
+alle aus der Sichtprobe bzw. aus Lücken im Text:
+1. **Fehlwechsel-Einsacken:** `sackt` gab es nur für groß/Finale. `teamFeierAusloesen()` kennt dafür
+   jetzt `opt.raunen` — die Gegenseite feiert klein, die patzende Seite sackt trotzdem ein.
+2. **Publikum nach dem Ziel:** auch der Schlussläufer (bleibt formal `aktiv`, läuft aber nicht mehr)
+   hüpft mit — Bedingung `!u.aktiv || u.fertig!=null`, ausgenommen der Nächste im sichtbaren Anlauf.
+3. **Konfetti-Anker:** `laeuferXY()` wie vorgesehen, aber senkrecht auf mindestens 0,66 H gezogen —
+   Ziellinie und Zielgerade liegen unter dem Bahn-HUD (DOM), das Konfetti verschwand dort komplett.
+   Aus demselben Grund liegt das Feuerwerk-Band der Staffel bei 0,50–0,68 H (`opt.feuerwerkAb` von
+   `teamFeierEffekte()`, Vorgabe für alle anderen unverändert 0,12).
+4. **Ziel im selben Tick:** kommen beide Schlussläufer im selben Tick an, entscheidet die
+   Reihenfolge in `rennFertig` über groß/klein.
+Abnahme: `miss-alle-disziplinen.mjs 24` (alle zwanzig) vor/nach bit-identisch;
+`scripts/verify-team-feier-staffel-paket-11-10.mjs` (Orakel je Auslöser, Isolation, Sichtprobe).
+
 ### 3.4 Time-Trial — Teambank im Bildschirmraum
 
 | | |
