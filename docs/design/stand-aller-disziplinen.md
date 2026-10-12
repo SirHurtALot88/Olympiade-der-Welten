@@ -44,6 +44,38 @@ Pp 20,9/21,6 bzw. 22,2/21,5 (heute 21,1/22,0, Schranke 25). Die Bein-Reihenfolge
 umgekehrt 0,929 → 0,923, verwuerfelt 0,883 → 0,924 — die alte Fehlzuordnung Rennplan/Bein kostete
 bei verwuerfelter Aufstellung rho.
 
+**Unabhaengiges Review (12.10., PR #1172), vier Befunde — keiner davon ein Korruptions- oder
+Determinismus-Bug, alle dokumentiert statt behoben:**
+
+1. **Wirkt heute an keinem einzigen Live-Spielstand (alle sieben laufen im Manager Mode).** Der
+   Bonus und die Beinreihenfolge-Korrektur sitzen im Motor (`battle-mode.engine.js`); ein Ergebnis
+   geht dort nur durch, wenn `isBattleModeSave(gameState)` UND die Disziplin einen eigenen Eintrag
+   in `arenaTeamPointsByDisciplineId` hat (`legacy-matchday-resolve-engine.ts` Z. 338-347) — sonst
+   bleibt es beim PPS-Pfad. Keiner der sieben Spielstaende im Live-Abbild hat `scenarioMeta.gameMode`
+   gesetzt, laeuft also im Manager Mode: dasselbe gilt seit PR #1154 schon fuer O2 „Marke und Zug".
+   Der Zaehler wird trotzdem fortgeschrieben und das Einsatzlisten-Badge trotzdem angezeigt — Chris
+   sieht ein Versprechen („wechselt etwas schneller und sicherer"), das sich in seinen eigenen
+   Spielstaenden nicht einloest. Das ist dieselbe Einschraenkung, die in der Tabelle unten bei fast
+   jeder Disziplin als „nicht im echten Spielstand" steht, hier nur zum ersten Mal konkret an einem
+   sichtbaren UI-Element. Kein Blocker fuer diesen PR (konsistent mit dem gesamten Projektstand),
+   aber Chris sollte es wissen, bevor er das Badge zum ersten Mal sieht.
+2. **Idempotenz gilt nur fuer den juengsten Spieltag mit unveraenderter Aufstellung.**
+   Wird ueber `forceReplace` ein AELTERER Spieltag neu gebucht, nachdem bereits ein neuerer lief
+   (oder derselbe Spieltag mit geaenderter Aufstellung), kann das die Paare des zwischenzeitlich
+   gelaufenen, neueren Spieltags auf 0 zuruecksetzen. Erreichbar nur ueber manuelles Neu-Buchen
+   (Apply-Route/MVP-Scoring/Debug-Bootstrap), nicht im normalen Spielfluss. Niedrige Schwere:
+   betrifft nur die Zaehler-Anzeige/den Bonus, nicht die Korrektheit des gebuchten Ergebnisses.
+3. **Zaehler und Motor koennen auseinanderlaufen, wenn ein im Entwurf stehender Laeufer in der
+   Arena nicht antritt** (fehlender Attributbogen o.ae. — `resolveStaffelLegPlayerIds` prueft nur
+   `players`, der Arena-Adapter filtert zusaetzlich). Die Geber-Pruefung (`wechselPaarGeber`)
+   verhindert, dass ein falscher Bonus wirkt; gezaehlt werden kann aber ein Paar, das nie
+   gewechselt hat. Niedrige Schwere, reine Anzeige-Ungenauigkeit.
+4. **Die (I)-Isolationspruefung im Verify-Skript ist schwaecher, als sie aussieht** — der Messpfad
+   stellt nie eine Staffel-Aufstellung, beruehrt den neuen Code also strukturell nicht und muss
+   zwangslaeufig gruen sein. Die Rueckfallzweige (doppelter/unbekannter Slot, Teilaufstellung) sind
+   nur durch Lesen, nicht durch einen Test geprueft (und laut Review korrekt). Fuer eine kuenftige
+   Kalibrierrunde: das Verify-Skript sollte diese Zweige direkt pruefen statt nur durch Code-Lesen.
+
 **Siebzehnter Nachtrag 06.10. — Staffel-Sentinel behoben: der Tempo-Kanal, nicht Marke/Zug.**
 Nach dem Sechzehnten Nachtrag (O2 „Marke und Zug", unten) blieb der Sentinel
 vigilante-armageddon bei JEDER getesteten Variante unter 0,80 (beste 0,797), obwohl der
