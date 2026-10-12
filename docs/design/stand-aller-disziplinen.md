@@ -1,5 +1,49 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Achtzehnter Nachtrag 11.10. — Staffel O7 „Eingespielte Paare" gebaut (Klasse S); dabei die
+Bein-Reihenfolge im Produktivpfad repariert.** Chris' Freigabe 11.10. („Ja, bauen") zu Fable 4.1
+(`fable-ideen-bahn-30-09.md` 4.1, O7 in `staffel-nachtkonzept-03-10.md`): jedes Geber/Nehmer-Paar
+eines Teams bekommt im Spielstand einen Zaehler (`SeasonState.staffelWechselPaare?`, additiv und
+optional wie `DisciplineResultRecord.momente?` — ein Stand ohne das Feld hat einfach noch keine
+Paar-Geschichte). Bonus auf `Q` der Wechselformel nach gemeinsamen Spielen VOR dem Rennen:
+1 → +0,03, 2 → +0,06, ≥3 → +0,10 und „eingespielt" (Ausfuehrungsstreuung ×0,90). Neue Reihenfolge
+oder Kaderwechsel setzt genau das betroffene Paar zurueck. Fortgeschrieben im Result-Apply (jeder
+Spieltagspfad, idempotent je Spieltag), gelesen im Aufstellungs-Rohr zur Arena und in der
+Einsatzliste („eingespielt seit N Spielen"). Kein zusaetzlicher `rr()`-Zug.
+
+**Befund vor dem Bau, das Abbruchkriterium des Auftrags:** der Motor lief die Staffel-Beine im
+echten Spiel NICHT in Aufstellungsreihenfolge. `inDisc()` filtert den Kader nur, und der Kader
+kommt nach TDM-Eignung sortiert (`buildArenaTeam`) — ein als Anchor gesetzter Laeufer lief Bein 1,
+der Start Runner das letzte (Playwright, Aufstellung ueber `__olyArenaKader` wie im
+Headless-Lauf). Der Slot wirkte nur auf Slot-Aufschlag und Rennplan (`planJeSlot` „schluss" auf
+Bein 1). Ein Paar-Zaehler nach Aufstellung haette also andere Laeufer belohnt als die, die den
+Stab tauschen. Minimal-invasive Korrektur: nur fuer die Staffel und nur, wenn jeder gesetzte
+Laeufer einen eindeutigen Staffel-Slot hat, werden die Gesetzten nach Slot-Index geordnet
+(`staffelNachSlot` in `bauSpurt()`); Messpfad (keine Aufstellung) und jede andere Bahn
+bit-identisch. Zusaetzlich wendet der Motor den Bonus nur an, wenn der tatsaechliche Geber der
+erwartete ist (`wechselPaarGeber`). Spieler-Identitaet: `playerId`, aufgeloest ueber die
+Kaderzeile (`activePlayerId` ist die Zeilen-Id) — am Live-Abbild in allen 10 052
+Aufstellungseintraegen konsistent.
+
+Gemessen (Kader-Familie live-save, fuenf Paarungen; Bonus kaderfest ueber die neue Mess-Sonde
+`--staffel-paare=…`, weil die Messung keine Staffel aufstellt):
+
+| Variante | rho/Spiel Median (n=48) | Spannweite | vigilante-armageddon | Pp S1/S2 (n=144) | Star Rang1 | Star ≤2 | Paartreue ≥15 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ohne Paar-Geschichte (= heute, Nullprobe) | 0,933 | 0,105 | 0,845 | 21,1 / 22,0 | 60,0 % | 88,3 % | 99,9 % |
+| „zufall": 0–3 Spiele je Paar, unabhaengig vom Koennen | 0,933 | 0,123 | 0,832 | 20,9 / 21,6 | 62,5 % | 89,2 % | 99,9 % |
+| „alle": jedes Paar eingespielt (Obergrenze) | 0,941 | 0,114 | 0,840 | 22,2 / 21,5 | 63,8 % | 87,9 % | 99,9 % |
+
+Nullprobe ohne Paar-Felder: `miss-alle-disziplinen.mjs 24` fuer alle zwanzig ALLE_ZWANZIG, Pp
+21,1/22,0 wie im Siebzehnten Nachtrag; `verify-staffel-o7-eingespielte-paare-paket-11-10.mjs`
+(I) disziplinProbe aller zwanzig + einflussVon(staffel) gegen den Stand vor dem Paket
+bit-identisch. Die Abbruchregel („kostet der Bonus rho, kleiner machen") musste nicht greifen:
+Median unveraendert, Sentinel −0,013 bzw. −0,005 (innerhalb der Kaderspannweite, klar ueber 0,80),
+Pp 20,9/21,6 bzw. 22,2/21,5 (heute 21,1/22,0, Schranke 25). Die Bein-Reihenfolge-Korrektur produktionsnah gemessen (Aufstellung ueber
+`__olyArenaKader`, n=48, Basis gegen neu): Slotfolge = Kaderfolge 0,937 → 0,937 (identisch),
+umgekehrt 0,929 → 0,923, verwuerfelt 0,883 → 0,924 — die alte Fehlzuordnung Rennplan/Bein kostete
+bei verwuerfelter Aufstellung rho.
+
 **Siebzehnter Nachtrag 06.10. — Staffel-Sentinel behoben: der Tempo-Kanal, nicht Marke/Zug.**
 Nach dem Sechzehnten Nachtrag (O2 „Marke und Zug", unten) blieb der Sentinel
 vigilante-armageddon bei JEDER getesteten Variante unter 0,80 (beste 0,797), obwohl der
@@ -1295,7 +1339,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Breaking | 40 % | 0,833 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik · **Nachtrag 07.09. (dieselbe Recherche wie Eiskunstlauf):** stand kaderfest mit knappstem Puffer aller bestandenen Disziplinen (0,804, nur 0,004 ueber der Schranke) — `rundenN` 4→8, `rundenDauer` 1,25→0,625 hebt kaderfest auf **0,869** (Saison 0,951). Dazu dieselbe Waffenpose-Korrektur wie Eiskunstlauf, rho-neutral |
 | Showcase | 40 % | 0,896 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,874 (26.09.-Nachtrag)** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |
-| **Staffel** | **48 %** | **0,906 (06.10.-Nachtrag, n=24, Schalter aus)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand · Paket O2 „Marke und Zug" hinter QA-Schalter (Standard aus) · **Nachtrag 06.10. (Siebzehnter Nachtrag):** Tempo-Kanal-Rezept nachgezogen (ANTRITT/ENDTEMPO verloren Speed/Stamina-Uebergewicht, gewannen Dexterity/Awareness/Spirit; `KURVE_KOSTEN` 0,12→0,20) — mit Schalter KI rho 0,933 (n=48/96, vorher 0,937), **Sentinel vigilante-armageddon 0,845 — jetzt ueber 0,80** (vorher 0,756, bestes vorher 0,797), Pp 21,1/22,0 (vorher 35,6/37,9, Ziel ≤25 **erreicht**), Star Rang1 60,0 % (vorher 61 %, statistisch flach, bleibt unter dem Vor-O2-Stand 69 % — Ursache laut O2-Papier der haelftig geteilte fliegende Gewinn, nicht der Tempo-Kanal, absichtlich nicht angefasst). Wechsel-/Zug-Mechanismus (TECHNIK/WUCHT/ZUG_FADE/FLIEG_MAX) byte-identisch, alle Extremvarianten (Angreifen/Absichern/Zufall/Kader-Regel) jetzt ebenfalls ueber 0,80 |
+| **Staffel** | **48 %** | **0,906 (06.10.-Nachtrag, n=24, Schalter aus)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand · Paket O2 „Marke und Zug" hinter QA-Schalter (Standard aus) · **Nachtrag 06.10. (Siebzehnter Nachtrag):** Tempo-Kanal-Rezept nachgezogen (ANTRITT/ENDTEMPO verloren Speed/Stamina-Uebergewicht, gewannen Dexterity/Awareness/Spirit; `KURVE_KOSTEN` 0,12→0,20) — mit Schalter KI rho 0,933 (n=48/96, vorher 0,937), **Sentinel vigilante-armageddon 0,845 — jetzt ueber 0,80** (vorher 0,756, bestes vorher 0,797), Pp 21,1/22,0 (vorher 35,6/37,9, Ziel ≤25 **erreicht**), Star Rang1 60,0 % (vorher 61 %, statistisch flach, bleibt unter dem Vor-O2-Stand 69 % — Ursache laut O2-Papier der haelftig geteilte fliegende Gewinn, nicht der Tempo-Kanal, absichtlich nicht angefasst). Wechsel-/Zug-Mechanismus (TECHNIK/WUCHT/ZUG_FADE/FLIEG_MAX) byte-identisch, alle Extremvarianten (Angreifen/Absichern/Zufall/Kader-Regel) jetzt ebenfalls ueber 0,80 · **Nachtrag 11.10. (Achtzehnter Nachtrag):** O7 „Eingespielte Paare" gebaut (Paar-Zaehler im Spielstand, bis +0,10 auf Q, ab drei Spielen engere Streuung) — rho 0,933 → 0,933 (zufaellige Paar-Geschichte) / 0,941 (alle eingespielt), Sentinel 0,832/0,840, Pp 20,9/21,6 bzw. 22,2/21,5; dabei die Bein-Reihenfolge im Produktivpfad auf die Slot-Reihenfolge korrigiert (vorher lief der Kader-TDM-Beste Bein 1, egal welcher Slot) |
 | I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) · I-2k "Kennerblick" (07.10.) gebaut, gemessen, verworfen (Abschnitt 7, Nachtrag) |
 | Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 04.10.:** Paket S-N1+S-N2 (Joker 8 % + Kriechen) hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter rho 0,910 (heute 0,880, n=24), Pp 18,7/15,6, Stillstand und Saeulenzeit 0 %, s. Sechzehnter Nachtrag |
 | **Football** | **32 %** | **0,818 (26.09.-Nachtrag — die alte 0,516 war stale, keine heutige Codeaenderung an Football, s. Zwoelfter Nachtrag)** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |

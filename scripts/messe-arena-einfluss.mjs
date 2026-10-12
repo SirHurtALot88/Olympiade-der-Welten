@@ -25,7 +25,10 @@
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
-import { buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
+import {
+  buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
+  staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
+} from "./lib/rangtreue-messung.mjs";
 
 // Additive Schalter (29.09., MUTATOR ORGANISCH), in beliebiger Position, ohne sie unveraendertes
 // Verhalten der Positionsargumente:
@@ -41,6 +44,8 @@ const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
 // --flags=... / --haltung-heim=... / --haltung-gast=... (NACHTKONZEPT-SCHALTER, 04.10., additiv),
 // s. scripts/lib/rangtreue-messung.mjs. Ohne sie misst das Skript den Motor mit allen Flags aus.
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
+// --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv), s. scripts/lib/rangtreue-messung.mjs.
+const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(schalter);
 process.argv = [process.argv[0], process.argv[1], ...positionen];
 const disziplin = process.argv[2] || "spurt";
 // WIE VIELE LAEUFE ES BRAUCHT — nachgemessen, nicht gewaehlt.
@@ -99,6 +104,7 @@ seite.on("pageerror", (e) => fehler.push(String(e)));
 await seite.goto(datei, { waitUntil: "networkidle" });
 await seite.waitForFunction(() => window.__arena, null, { timeout: 30000 });
 const schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
+const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 
 const motoren = await seite.evaluate(() => window.__arena.motoren());
 if (!motoren.includes(disziplin)) {
@@ -136,6 +142,7 @@ console.log(`Gemessene Datei: ${pfad}`);
 console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`
   + (e.mutatorModus ? `, Mutatoren ${e.mutatorModus}` : "") + (SAAT_VERSATZ ? `, Saatversatz ${SAAT_VERSATZ}` : ""));
 if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
+if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
 console.log(`Abweichung zur Matrix: ${e.abweichungPp} Pp\n`);
 console.log("Attribut          Anteil   Matrix   Differenz");
 const matrix = await seite.evaluate((d) => window.__arena.matrix(d), disziplin);

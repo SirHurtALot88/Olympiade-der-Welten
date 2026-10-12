@@ -29379,6 +29379,19 @@
         // jeweiligen Disziplin an ist (BUEHNE_FLAGS). Fehlt es (jeder heutige Aufrufer), ist
         // `place[n]` exakt das alte {d,slot}.
         place[n]=typeof e.haltung==="string"?{d:e.d,slot:e.slot,haltung:e.haltung}:{d:e.d,slot:e.slot};
+        // STAFFEL O7 "EINGESPIELTE PAARE" (11.10., lib/season/staffel-wechsel-paar-bonus-service.ts):
+        // drei weitere optionale Felder, nur am NEHMER eines Paares mit Geschichte gesetzt —
+        // Bonus auf Q, Name des erwarteten Gebers, "eingespielt". Uebernommen nur vollstaendig
+        // und typrichtig; sonst bleibt `place[n]` exakt wie oben. Gelesen ausschliesslich von
+        // bauSpurt()/setz() fuer die Staffel und im WECHSEL-Block (staffelPaarVon()). Die
+        // Obergrenze (STAFFEL_PAAR_BONUS_MAX) greift erst dort — die Konstante steht weiter
+        // unten und ist hier, beim Modul-Aufbau, noch nicht initialisiert.
+        if(typeof e.wechselPaarBonus==="number"&&Number.isFinite(e.wechselPaarBonus)&&e.wechselPaarBonus>0
+           &&typeof e.wechselPaarGeber==="string"&&e.wechselPaarGeber){
+          place[n].wechselPaarBonus=e.wechselPaarBonus;
+          place[n].wechselPaarGeber=e.wechselPaarGeber;
+          place[n].wechselPaarEingespielt=e.wechselPaarEingespielt===true;
+        }
         order[n]=slotOrd(e.slot);
       }
     }
@@ -33493,6 +33506,13 @@
   // "zufall" (Namens-Hash). `fliegMax`: fliegender Gewinn, 0,24 = Chris' Kompromisswert.
   // Hier deklariert (vor bauSpurt()), nicht neben den Konstanten — kein TDZ-Risiko.
   let staffelMarkeZug={aktiv:true, modus:"ki", fliegMax:0.24};
+  // STAFFEL O7 "EINGESPIELTE PAARE" — MESS-SONDE, Standard AUS (null). Im Spiel kommt der
+  // Paar-Bonus ausschliesslich ueber die Aufstellung (`place[n].wechselPaarBonus`, s. Parser bei
+  // echterKader.aufstellung); die kaderfeste Messung (disziplinProbe/einflussVon) setzt aber nie
+  // eine Staffel-Aufstellung und saehe den Bonus damit nie. Nur window.__arena.staffelPaarSonde()
+  // schreibt diesen Schalter; Bedeutung s. staffelPaarSondeSetzen() (nahe staffelHaltungenSetzen).
+  // Hier deklariert (vor bauSpurt()) — kein TDZ-Risiko.
+  let staffelPaarSonde=null;
   // B4.3 BEIN-DUELL-BANNER: welche Beine schon gemeldet sind (je Rennen geleert).
   let staffelBeinDuellGemeldet=new Set();
   // SPURT "DIE SAEULE MUSS LAUFEN" (Paket S-N1+S-N2, docs/design/spurt-nachtkonzept-03-10.md):
@@ -38723,7 +38743,32 @@
     const gesetzt=inDisc(d);
     const slotListe=slotsVon(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
-    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // ============ STAFFEL: DIE BEINE IN AUFSTELLUNGSREIHENFOLGE (O7-Vorbedingung, 11.10.) =====
+    // NACHGEMESSEN, nicht vermutet (Playwright, echte Kaderfamilie, Aufstellung ueber
+    // window.__olyArenaKader wie im Produktivpfad): bis hierher bekam `L.bein` den Index in
+    // `inDisc(d)` — und inDisc() FILTERT nur den Kader, es sortiert nicht. Im Spiel ist der Kader
+    // nach TDM-Eignung sortiert (`buildArenaTeam`, arena-kader-adapter.ts), also lief Bein 1, wer
+    // die hoechste TDM-Eignung hatte, egal in welchem Slot er stand: ein als "Anchor" gesetzter
+    // Laeufer lief das ERSTE Bein, der "Start Runner" das letzte (gemessen, alle sechs Beine
+    // vertauscht bei umgekehrter Slotfolge). Der Slot wirkte nur auf Slot-Aufschlag und Rennplan
+    // (planJeSlot: "schluss" fuer den Anchor — auf Bein 1). Die Entwurfspapiere gingen vom
+    // Gegenteil aus ("Im Spiel stellt Chris selbst auf, ueber die sechs Staffel-Slots",
+    // staffel-offene-fragen-plus-takeshis-castle-05-09.md 1.2), und die kaderfeste Messung misst
+    // ohnehin Slot i = Bein i (Ersatzaufstellung, slotFuer reihum).
+    //
+    // Fuer O7 "Eingespielte Paare" ist das keine Nebensache: ein Paar ist Bein i -> Bein i+1 in der
+    // Reihenfolge, die der Manager setzt; ohne diese Zeile tauschten im Rennen andere Laeufer den
+    // Stab als die, deren Zaehler steigt. Deshalb: NUR fuer die Staffel, NUR wenn JEDER gesetzte
+    // Laeufer einen eindeutigen, bekannten Staffel-Slot hat, werden die Gesetzten nach Slot-Index
+    // geordnet (stabil). Jeder andere Fall — andere Bahn, keine Aufstellung (Messung,
+    // Ersatzaufstellung), unbekannter oder doppelter Slot — laeuft Zeichen fuer Zeichen wie vorher.
+    const staffelNachSlot=(liste)=>{
+      if(!art.staffel||liste.length<2)return liste;
+      const idx=liste.map(p=>slotListe.findIndex(s=>s.id===(place[p.n]&&place[p.n].slot)));
+      if(idx.some(i=>i<0)||new Set(idx).size!==idx.length)return liste;
+      return liste.map((p,i)=>({p,i:idx[i]})).sort((a,b)=>a.i-b.i).map(x=>x.p);
+    };
+    const mine=(gesetzt.length?staffelNachSlot(gesetzt):ersatz).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
     // DIE GASTSEITE LIEST DIE AUFSTELLUNG GENAUSO WIE DIE HEIMSEITE — sonst rechnet die
@@ -38732,7 +38777,8 @@
     // `buehneDisc`, hier `d`, das oben bereits `bahnDisc` ist). Ohne Aufstellung Zeichen
     // fuer Zeichen das alte `OPP.slice(0,n)`.
     const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
-    const gegen=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    // Staffel: dieselbe Slot-Reihenfolge fuer die Gastseite (s. staffelNachSlot oben).
+    const gegen=(gastGesetzt.length?staffelNachSlot(gastGesetzt):OPP).slice(0,n);
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
       // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
@@ -38879,6 +38925,14 @@
       if(art.staffel){
         L.bein=idx; L.beinVon=idx/n; L.beinBis=(idx+1)/n;
         L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
+        // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus des NEHMERS aus der Aufstellung (s.
+        // Parser bei echterKader.aufstellung). Ohne die Felder bekommt der Laeufer keines der
+        // drei — staffelPaarVon() im WECHSEL-Block liefert dann null, die Formel ist die alte.
+        const pl=place[p.n];
+        if(pl&&pl.d===d&&pl.wechselPaarBonus>0&&pl.wechselPaarGeber){
+          L.wechselPaarBonus=pl.wechselPaarBonus; L.wechselPaarGeber=pl.wechselPaarGeber;
+          L.wechselPaarEingespielt=!!pl.wechselPaarEingespielt;
+        }
       }
       // GESTAFFELTER START (Zeitfahren, K5): gated hinter `startAbstand`, das nur
       // Time-Trial setzt — jede andere Bahn bleibt bei `startT` unveraendert (undefined,
@@ -38933,6 +38987,8 @@
     // weil die Marke vom Paar (Geber = Bein davor) abhaengt. Nur bei eingeschaltetem
     // QA-Schalter — sonst traegt kein Laeufer `haltung`/`marke`, s. Kopfkommentar dort.
     if(art.staffel&&staffelMarkeZug.aktiv)staffelHaltungenSetzen();
+    // STAFFEL O7 MESS-SONDE: nur bei eingeschaltetem Schalter (Standard null) — s. dort.
+    if(art.staffel&&staffelPaarSonde)staffelPaarSondeSetzen();
     // SPURT "DIE SAEULE MUSS LAUFEN" (S-N1/S-N2): Joker-Station und Kriechfaktor je Laeufer,
     // nur bei eingeschaltetem QA-Schalter — sonst traegt kein Laeufer jokerIdx/kriechK.
     if(art.spurt&&spurtSaeule.aktiv)spurtSaeuleSetzen();
@@ -39190,6 +39246,63 @@
       u.marke=geber?marke:null;
       u.zugBilanz=0; u.zugErgebnis=null; u.zugEingebrochen=false;
       u.wechselNetto=null; u.wechselGewinn=null; u.wechselPatzer=false;
+    }
+  }
+  // =====================================================================================
+  // STAFFEL O7 "EINGESPIELTE PAARE" (docs/design/fable-ideen-bahn-30-09.md 4.1, eingeordnet als
+  // O7 in staffel-nachtkonzept-03-10.md; Chris' Freigabe 11.10.: "Ja, bauen"). Klasse S.
+  //
+  // Ein Geber/Nehmer-Paar mit gemeinsamer Staffel-Geschichte (Zaehler im Spielstand, gepflegt in
+  // lib/season/staffel-wechsel-paar-bonus-service.ts) bekommt im WECHSEL zwei Dinge:
+  //   1. einen kleinen Bonus auf Q (drei Stufen 0,03/0,06/0,10 nach 1/2/3+ gemeinsamen Spielen —
+  //      die Stufen leben in der TS-Schicht, der Motor bekommt nur den fertigen Wert ueber die
+  //      Aufstellung und klemmt ihn auf STAFFEL_PAAR_BONUS_MAX),
+  //   2. ab "eingespielt" (drei gemeinsame Spiele) eine etwas engere Ausfuehrungsstreuung.
+  // Beides am NEHMER (`naechster`), weil Q dort berechnet wird. Der Gewinn landet wie jeder
+  // Wechsel haelftig auf beiden Konten (wechselKonto) — symmetrisch, wie Fable 4.1 es verlangt,
+  // und er geht in Q, nicht in die Etappe.
+  //
+  // KEIN ZUSAETZLICHER rr()-ZUG: der Bonus ist ein Summand im bestehenden Q, die Daempfung ein
+  // Faktor auf die bestehende Streubreite — gleiche Zahl und Reihenfolge der Wuerfe, mit oder ohne
+  // Paar. Ohne Paar-Felder liefert staffelPaarVon() null, und beide Stellen rechnen Zeichen fuer
+  // Zeichen die alte Formel (strukturelle Isolation, gemessen bit-identisch: PR-Beschreibung).
+  //
+  // GEBER-PRUEFUNG: der Bonus gilt nur, wenn der TATSAECHLICHE Geber der ist, den die Aufstellung
+  // erwartet (`wechselPaarGeber`). Faellt ein gesetzter Laeufer aus dem Arena-Kader (fehlender
+  // Attributbogen), ruecken die Beine auf und andere tauschen den Stab — dann verfaellt der Bonus
+  // des Nehmers, statt auf ein fremdes Paar zu wandern.
+  const STAFFEL_PAAR_BONUS_MAX=0.10;        // Obergrenze auf Q (Fable 4.1: "bis zu +0,10")
+  const STAFFEL_PAAR_STREU_DAEMPFUNG=0.90;  // Streubreite eines eingespielten Paares: x0,90
+  function staffelPaarVon(geber,nehmer){
+    if(!(nehmer.wechselPaarBonus>0)||!nehmer.wechselPaarGeber||nehmer.wechselPaarGeber!==geber.n)return null;
+    return {bonus:Math.min(STAFFEL_PAAR_BONUS_MAX,nehmer.wechselPaarBonus), eingespielt:!!nehmer.wechselPaarEingespielt};
+  }
+  // MESS-SONDE (Schalter `staffelPaarSonde`, Standard null — im Spiel nie gesetzt). Die kaderfeste
+  // Messung (disziplinProbe/einflussVon) stellt keine Staffel auf, kennt also keine Paar-Geschichte;
+  // ohne diese Sonde liesse sich der Bonus nicht gegen rho/Pp abnehmen. Sie setzt jedem Nehmer OHNE
+  // Bonus aus der Aufstellung einen, nach `modus`:
+  //   "zufall"  gemeinsame Spiele 0..3 gleichverteilt aus einem Hash der beiden NAMEN — fest je
+  //             Paar ueber alle Saaten (wie ein Spielstand), aber UNABHAENGIG vom Koennen. Das ist
+  //             der vorsichtige Fall: ein Bonus, der mit dem Koennen korreliert (Fable: "gute
+  //             Wechsler bleiben oefter zusammen"), haette rho eher geholfen.
+  //   "alle"    jedes Paar eingespielt (oberste Stufe + Daempfung) — die Obergrenze der Wirkung.
+  //   "stufe"   jedes Paar mit genau `spiele` (0..3) gemeinsamen Spielen.
+  // `stufen` (optional, vier Werte) ersetzt die Standardstufen; Standard = STAFFEL_PAAR_BONUS_STUFEN
+  // der TS-Schicht. Kein rr(), nur Felder am Laeufer, die auch das Aufstellungs-Rohr setzen wuerde.
+  const STAFFEL_PAAR_SONDE_STUFEN=[0,0.03,0.06,0.10];
+  function staffelPaarSondeSetzen(){
+    const o=staffelPaarSonde||{};
+    const stufen=Array.isArray(o.stufen)&&o.stufen.length===4?o.stufen.map(Number):STAFFEL_PAAR_SONDE_STUFEN;
+    for(const u of LAEUFER){
+      if(!(u.bein>0)||u.wechselPaarBonus>0)continue;
+      const geber=LAEUFER.find(x=>x.seite===u.seite&&x.bein===u.bein-1);
+      if(!geber)continue;
+      const spiele=o.modus==="alle"?3
+        :o.modus==="stufe"?Math.max(0,Math.min(3,Math.floor(Number(o.spiele)||0)))
+        :staffelNamensHash(geber.n+">"+u.n)%4;
+      const bonus=stufen[spiele]||0;
+      if(!(bonus>0))continue;
+      u.wechselPaarBonus=bonus; u.wechselPaarGeber=geber.n; u.wechselPaarEingespielt=spiele>=3;
     }
   }
   // =====================================================================================
@@ -40471,7 +40584,11 @@
           // rechnen Zeichen fuer Zeichen die alte Formel — gleiche Zahl und Reihenfolge der
           // rr()-Zuege, die Marke multipliziert nur Breite und Schwelle.
           const mk=naechster.marke?STAFFEL_MARKE[naechster.marke]:null;
-          const streu=mk?streu0*mk.s:streu0;
+          // STAFFEL O7 "EINGESPIELTE PAARE" (s. Kopfkommentar bei staffelPaarVon): ohne Paar-Felder
+          // null, dann rechnen die beiden O7-Stellen unten (Streuung hier, Q weiter unten) nichts.
+          const paar=staffelPaarVon(u,naechster);
+          let streu=mk?streu0*mk.s:streu0;
+          if(paar&&paar.eingespielt){ streu*=STAFFEL_PAAR_STREU_DAEMPFUNG; naechster.wechselPaarGedaempft=true; }
           verlust=Math.max(WECHSEL_MIN,verlust+streu*((rr()+rr())-1));
           // VERLAESSLICHKEIT. ROBUST heisst in der Staffel so (s. BAHN_ART.staffel.lang)
           // und war dort ebenso arbeitslos wie WUCHT: es federt sonst Rempler ab, und
@@ -40496,8 +40613,10 @@
           // netto===verlust und der Zweig unten der alte.
           let netto=verlust;
           if(mk){
-            const Q=0.35*koennen/100+0.20*u.ENDTEMPO/100+0.20*naechster.ANTRITT/100
+            let Q=0.35*koennen/100+0.20*u.ENDTEMPO/100+0.20*naechster.ANTRITT/100
               +0.25*((u.WUCHT+naechster.WUCHT)/2)/100;
+            // STAFFEL O7: das eingespielte Paar trifft die Marke besser — Summand auf Q.
+            if(paar){ Q+=paar.bonus; naechster.wechselPaarWirkung=paar.bonus; }
             const gewinn=(staffelMarkeZug.fliegMax||0)*Q*mk.g;
             netto=verlust-gewinn;
             naechster.wechselNetto=netto; naechster.wechselGewinn=gewinn; naechster.wechselPatzer=patzer;
@@ -48247,6 +48366,36 @@
         ?{aktiv:true, modus:o.modus||"ki", fliegMax:o.fliegMax!=null?+o.fliegMax:0.24}
         :{aktiv:false, modus:"ki", fliegMax:0.24};
       return {...staffelMarkeZug};
+    },
+    // STAFFEL O7 "EINGESPIELTE PAARE" — MESS-SONDE (11.10.), s. staffelPaarSondeSetzen(). Ein
+    // echtes Spiel ruft das nie; der Bonus kommt dort ausschliesslich ueber die Aufstellung.
+    // staffelPaarSonde({modus:"zufall"|"alle"|"stufe", spiele, stufen}) schaltet ein,
+    // staffelPaarSonde(null) aus. Wirkt ab dem naechsten Rennaufbau (bauSpurt).
+    staffelPaarSonde:(opt)=>{
+      staffelPaarSonde=opt&&typeof opt==="object"
+        ?{modus:opt.modus||"zufall", spiele:opt.spiele!=null?+opt.spiele:null,
+          stufen:Array.isArray(opt.stufen)?opt.stufen.map(Number):null}
+        :null;
+      return staffelPaarSonde?{...staffelPaarSonde}:null;
+    },
+    // Je Laeufer einer Staffel die O7-Felder — welcher Bonus aus Aufstellung/Sonde anlag, welcher
+    // Geber erwartet war und was im Wechsel davon tatsaechlich wirkte (`wirkung` = Summand auf Q,
+    // `gedaempft` = engere Streuung). Mit `saat`: baut und faehrt EIN Rennen stumm (derselbe
+    // M.bau()/M.lauf()-Pfad wie spieleBahn()) und stellt den vorherigen Zustand danach wieder her;
+    // ohne `saat`: liest das gerade gebaute/laufende Rennen. Fuer scripts/verify-staffel-o7-
+    // eingespielte-paare-paket-11-10.mjs. Kein eigener rr()-Zug, kein Eingriff in die Simulation.
+    staffelPaarProbe:(saat)=>{
+      const lesen=()=>LAEUFER.map(u=>({n:u.n, seite:u.seite, bein:u.bein,
+        bonus:u.wechselPaarBonus??null, geber:u.wechselPaarGeber??null,
+        eingespielt:u.wechselPaarEingespielt??null, wirkung:u.wechselPaarWirkung??null,
+        gedaempft:!!u.wechselPaarGedaempft, gewinn:u.wechselGewinn??null, marke:u.marke??null,
+        etappe:u.etappenZeit??null, wechselKonto:+(u.wechselKonto||0).toFixed(6)}));
+      if(saat==null)return BA().staffel?lesen():null;
+      const M=MOTOREN.staffel; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      stumm=true;
+      try{ M.bau(saat); M.lauf(); return lesen(); }
+      finally{ stumm=false; M.zurueck(g); }
     },
     // TIME-TRIAL J2 AMPEL-SONDE (04.10.): faehrt n Rennen je Paarung stumm und spielt danach
     // die Ampel-Logik aus updateHudBahn() in ECHTER Zeitreihenfolge nach (Messpunkt-Ereignis

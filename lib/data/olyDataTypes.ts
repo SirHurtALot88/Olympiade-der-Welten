@@ -3487,6 +3487,17 @@ export type SeasonState = {
   formCardPlans?: FormCardPlanRecord[];
   teamPowers?: TeamPowerRecord[];
   lineupDrafts?: LineupDraft[];
+  /**
+   * STAFFEL O7 "EINGESPIELTE PAARE" (11.10., s. `StaffelWechselPaarRecord`): wie `momente?` an
+   * `DisciplineResultRecord` additiv und optional -- jeder Spielstand von vor dieser Aenderung hat
+   * dieses Feld nicht, und jeder Leser behandelt sein Fehlen als "noch keine Paar-Geschichte"
+   * (`?? []`, Bonus 0), nie als Fehler (kein Breaking Change am Schema, keine Migration noetig).
+   * Traegt bewusst ueber den Saisonwechsel: der Saisonstart (preseason-workflow-service.ts)
+   * kopiert den alten `seasonState` per Spread und setzt nur die aufgezaehlten Felder zurueck --
+   * dieses gehoert nicht dazu, weil die Staffel je Team nur ein- bis zweimal pro Saison laeuft und
+   * ein reiner Saisonzaehler die Stufe "eingespielt" (ab drei Spielen) nie erreichen koennte.
+   */
+  staffelWechselPaare?: StaffelWechselPaarRecord[];
   /** Per-team depth stress ledger for next-season roster planning (computed at season_end). */
   teamRosterStressByTeamId?: Record<string, TeamRosterStressRecord>;
   matchdayResults?: MatchdayResultRecord[];
@@ -3627,6 +3638,31 @@ export type LineupDraft = {
   entries: LineupDraftEntry[];
   modifiers?: LineupDraftModifiers;
   createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * STAFFEL O7 "EINGESPIELTE PAARE" (Fable 4.1, docs/design/fable-ideen-bahn-30-09.md; Chris'
+ * Freigabe 11.10.): wie oft ein Geber/Nehmer-Paar EINES Teams in der Staffel ohne Unterbrechung
+ * zusammen gewechselt hat. Gerichtet: Geber = Bein i, Nehmer = Bein i+1 in Aufstellungs-
+ * reihenfolge (Slot-Reihenfolge, seit O7 auch die Bein-Reihenfolge des Motors). Ein Paar, das im
+ * naechsten tatsaechlich gelaufenen Staffel-Spiel seines Teams nicht mehr benachbart steht
+ * (Kaderwechsel, neue Reihenfolge), verliert seinen Eintrag; beim naechsten gemeinsamen Spiel
+ * beginnt es wieder bei 1. Gepflegt ausschliesslich von
+ * lib/season/staffel-wechsel-paar-bonus-service.ts.
+ */
+export type StaffelWechselPaarRecord = {
+  id: string;
+  saveId: string;
+  /** Saison des LETZTEN gezaehlten Spiels (nicht: Gueltigkeit — der Zaehler traegt ueber den Saisonwechsel). */
+  seasonId: string;
+  teamId: string;
+  geberPlayerId: string;
+  nehmerPlayerId: string;
+  /** Anzahl gemeinsamer Staffel-Spiele in Folge, einschliesslich `lastMatchdayId`. Immer >= 1. */
+  gamesTogether: number;
+  /** Spieltag des letzten gezaehlten Spiels; zusammen mit `seasonId` der Idempotenz-Schluessel. */
+  lastMatchdayId: string;
   updatedAt: string;
 };
 
