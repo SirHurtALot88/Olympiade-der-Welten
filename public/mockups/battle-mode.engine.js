@@ -11293,8 +11293,9 @@
   // diese vier Konstanten gegen rho und die Pp-Sonde NEU messen, nicht als abgenommen lesen.
   //
   // spirit-SCHRANKE (Dokument: "die Freiwurf-Formel darf spirit nicht ueber 22 treiben"):
-  // nachgemessen mit messe-arena-einfluss.mjs basketball 48 in zwei Saatstroemen, s.
-  // scripts/verify-basketball-freiwurf-paket-07-10.mjs und die PR-Beschreibung.
+  // haelt (19,7% / 18,2% in zwei Saatstroemen), nachgemessen mit messe-arena-einfluss.mjs
+  // basketball 12 (gepaarte Saaten, nicht die vollen 48 der Abnahme), s.
+  // docs/design/b2a-freiwurf-review-nachtrag-10-10.md Abschnitt 2.
   const FREIWURF_KANAL={spirit:48,intelligence:35,dexterity:17};
   const FW_BASIS=0.72, FW_STEIGUNG=0.0055, FW_MIN=0.55, FW_MAX=0.92;
   function freiwurfChance(schuetze){
