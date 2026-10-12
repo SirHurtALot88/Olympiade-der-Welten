@@ -322,3 +322,48 @@ export function buehneSchalterText(gesetzt) {
   const h = `Heim ${gesetzt.haltung[0] ?? "KI"}, Gast ${gesetzt.haltung[1] ?? "KI"}`;
   return `Buehnen-Flags: ${f} · Haltung: ${h}`;
 }
+
+// ===================================================================================
+// STAFFEL O7 "EINGESPIELTE PAARE" — MESS-SCHALTER (11.10.), additiv wie die Buehnen-Schalter oben.
+//
+// Der Paar-Bonus kommt im Spiel ausschliesslich ueber die Aufstellung (Paar-Zaehler im Spielstand);
+// die kaderfeste Messung stellt aber keine Staffel auf. Dieser Schalter setzt deshalb die Mess-Sonde
+// `window.__arena.staffelPaarSonde()` (battle-mode.engine.js, s. staffelPaarSondeSetzen). Ohne ihn
+// misst jedes Skript den Motor wie im Spiel ohne Paar-Geschichte — byte-identisch zu vorher.
+//
+//   --staffel-paare=zufall        gemeinsame Spiele 0..3 je Paar gleichverteilt (Namens-Hash,
+//                                 unabhaengig vom Koennen — der vorsichtige Fall fuer rho)
+//   --staffel-paare=alle          jedes Paar eingespielt (oberste Stufe + engere Streuung)
+//   --staffel-paare=stufe:N       jedes Paar mit genau N (0..3) gemeinsamen Spielen
+//   --staffel-paar-stufen=a,b,c,d andere Bonusstufen (Standard 0,0.03,0.06,0.10 wie die TS-Schicht)
+// ===================================================================================
+export const IST_STAFFEL_PAAR_SCHALTER = (a) =>
+  a.startsWith("--staffel-paare=") || a.startsWith("--staffel-paar-stufen=");
+
+export function staffelPaarSchalterAusArgs(args) {
+  const roh = args.find((a) => a.startsWith("--staffel-paare="))?.slice("--staffel-paare=".length) ?? null;
+  if (!roh) return null;
+  const [modus, spiele] = roh.split(":");
+  const stufenRoh = args.find((a) => a.startsWith("--staffel-paar-stufen="))?.slice("--staffel-paar-stufen=".length) ?? null;
+  const stufen = stufenRoh ? stufenRoh.split(",").map(Number) : null;
+  if (stufen && (stufen.length !== 4 || stufen.some((s) => !Number.isFinite(s)))) {
+    throw new Error(`--staffel-paar-stufen braucht genau vier Zahlen, bekam "${stufenRoh}"`);
+  }
+  if (!["zufall", "alle", "stufe"].includes(modus)) throw new Error(`--staffel-paare: unbekannter Modus "${modus}"`);
+  return { modus, ...(modus === "stufe" ? { spiele: Number(spiele) } : {}), ...(stufen ? { stufen } : {}) };
+}
+
+/** Setzt die Sonde auf einer geladenen Seite. Gibt den tatsaechlich gesetzten Stand zurueck (oder null). */
+export async function setzeStaffelPaarSonde(seite, schalter) {
+  if (!schalter) return null;
+  return seite.evaluate((s) => {
+    if (!window.__arena.staffelPaarSonde) throw new Error("window.__arena.staffelPaarSonde fehlt — Engine zu alt?");
+    return window.__arena.staffelPaarSonde(s);
+  }, schalter);
+}
+
+export function staffelPaarSchalterText(gesetzt) {
+  if (!gesetzt) return "";
+  return `Staffel-Paar-Sonde: ${gesetzt.modus}${gesetzt.spiele != null ? ` (${gesetzt.spiele} Spiele)` : ""}`
+    + `${gesetzt.stufen ? ` · Stufen ${gesetzt.stufen.join("/")}` : " · Standardstufen 0/0,03/0,06/0,10"}`;
+}

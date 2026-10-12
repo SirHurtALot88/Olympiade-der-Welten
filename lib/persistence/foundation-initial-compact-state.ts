@@ -400,6 +400,16 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
        */
       matchdayResolveSnapshots:
         existing.seasonState.matchdayResolveSnapshots ?? incoming.seasonState.matchdayResolveSnapshots,
+      /**
+       * STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Zaehler des SPIELSTANDS gewinnt immer. Der Client
+       * verfasst ihn nie — geschrieben wird er ausschliesslich serverseitig im Result-Apply
+       * (lib/season/staffel-wechsel-paar-bonus-service.ts). Ein Browser-Tab, der noch den Stand
+       * von VOR dem gebuchten Spieltag haelt, wuerde sonst beim naechsten Speichern die gerade
+       * gezaehlten Paare auf den alten Stand zuruecksetzen. Nur wenn der Spielstand das Feld gar
+       * nicht hat (jeder Stand vor O7), bleibt der eingehende Wert stehen — dann ist es ohnehin
+       * derselbe leere Stand.
+       */
+      staffelWechselPaare: existing.seasonState.staffelWechselPaare ?? incoming.seasonState.staffelWechselPaare,
       // Append-only-Archive: der kompakte Client stempelt eine leere Liste `[]` an diese
       // Stelle. Die Wache haelt jeden vorhandenen Eintrag unveraendert fest und laesst nur
       // NEUE hinzukommen — siehe `preserveAppendOnlyArchive`.

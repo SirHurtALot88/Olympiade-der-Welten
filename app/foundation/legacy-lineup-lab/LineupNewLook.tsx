@@ -187,6 +187,15 @@ export type LineupNewLookProps = Pick<
   /** Pro Seite: läuft gerade ein Formplan-Save (Dropdowns kurz deaktivieren). */
   formCardSavePendingSide?: { d1: boolean; d2: boolean } | null;
   /**
+   * STAFFEL O7 „Eingespielte Paare" (optional, additiv): gemeinsame Staffel-Spiele je
+   * Geber>Nehmer-Paar (`"geberSpielerId>nehmerSpielerId"`) VOR diesem Spieltag, aus dem
+   * Paar-Zähler des Spielstands (lib/season/staffel-wechsel-paar-bonus-service.ts). Die Ansicht
+   * zeigt am NEHMER-Slot ein kleines Badge, solange das Paar in der aktuellen Auswahl direkt
+   * benachbart steht (Slot-Reihenfolge = Bein-Reihenfolge). Fehlt die Prop (kein
+   * Staffel-Spieltag, keine Paar-Geschichte), bleibt die Ansicht unverändert.
+   */
+  staffelPairGamesByKey?: Record<string, number> | null;
+  /**
    * Team-Power-Auswahl je Diszi (optional, additiv). Fehlt die Prop, bleibt die
    * Ansicht unverändert — dieselbe Konvention wie bei den Formkarten.
    */
@@ -1081,6 +1090,7 @@ export default function LineupNewLook({
   formCardControlsBySide,
   onAssignDisciplineFormCard,
   formCardSavePendingSide,
+  staffelPairGamesByKey = null,
   teamPowerControlsBySide,
   onAssignTeamPower,
 }: LineupNewLookProps) {
@@ -1557,6 +1567,26 @@ export default function LineupNewLook({
     // reine Standings-Ableitung, dieselbe Größe, die bereits in die Projektion fließt.
     const nearestRivalRank = standingsRivals.length > 0 ? Math.min(...standingsRivals.map((rival) => rival.rank)) : null;
     const rivalPressureElevated = nearestRivalRank != null && nearestRivalRank <= 3;
+
+    // STAFFEL O7 „Eingespielte Paare": besetzte Slots in Slot-Reihenfolge (= Bein-Reihenfolge im
+    // Rennen), je direkt benachbartes Paar die gemeinsamen Spiele aus dem Spielstand. Das Badge
+    // steht am NEHMER (Bein i+1), weil der Bonus dort im Wechsel greift. Ohne Prop oder an einer
+    // anderen Disziplin bleibt die Map leer — keine Änderung an der Ansicht.
+    const staffelPairBySlotKey = new Map<string, { spiele: number; geberName: string }>();
+    if (disciplineId === "staffel" && staffelPairGamesByKey) {
+      const besetzt = [...sideSlots]
+        .sort((left, right) => left.slotIndex - right.slotIndex)
+        .flatMap((slot) => {
+          const card = selections[slot.key] ? rosterCardByActivePlayerId.get(selections[slot.key]) ?? null : null;
+          return card ? [{ slotKey: slot.key, playerId: card.id, name: card.name }] : [];
+        });
+      for (let index = 1; index < besetzt.length; index += 1) {
+        const geber = besetzt[index - 1]!;
+        const nehmer = besetzt[index]!;
+        const spiele = staffelPairGamesByKey[`${geber.playerId}>${nehmer.playerId}`] ?? 0;
+        if (spiele > 0) staffelPairBySlotKey.set(nehmer.slotKey, { spiele, geberName: geber.name });
+      }
+    }
 
     return (
       <section
@@ -2123,6 +2153,28 @@ export default function LineupNewLook({
                         Nach Spieltag hoch
                       </span>
                     ) : null}
+                    {/* STAFFEL O7 „Eingespielte Paare": Badge am Nehmer, solange das Paar direkt
+                        benachbart steht. Ab drei gemeinsamen Spielen „eingespielt" (oberste
+                        Stufe, engere Streuung im Wechsel), darunter die Vorstufe. */}
+                    {player && staffelPairBySlotKey.has(slot.key)
+                      ? (() => {
+                          const paar = staffelPairBySlotKey.get(slot.key)!;
+                          const eingespielt = paar.spiele >= 3;
+                          return (
+                            <span
+                              className={`nl-lineup-chip ${eingespielt ? "is-good" : "is-accent"}`}
+                              data-staffel-paar-spiele={paar.spiele}
+                              title={`Übernimmt den Stab von ${paar.geberName}: ${paar.spiele} gemeinsame${
+                                paar.spiele === 1 ? "s Staffel-Spiel" : " Staffel-Spiele"
+                              } in Folge. Ein eingespieltes Paar wechselt etwas schneller und sicherer; eine neue Reihenfolge setzt den Zähler zurück.`}
+                            >
+                              {eingespielt
+                                ? `eingespielt seit ${paar.spiele} Spielen`
+                                : `${paar.spiele}× mit ${paar.geberName}`}
+                            </span>
+                          );
+                        })()
+                      : null}
                   </span>
                 </button>
 

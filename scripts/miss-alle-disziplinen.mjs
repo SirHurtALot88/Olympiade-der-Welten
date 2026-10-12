@@ -54,6 +54,7 @@ import path from "node:path";
 import {
   disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, bootstrapMedianUnsicherheit,
   IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
+  IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,7 +81,10 @@ const MUTATOREN = mutatorenArg ? mutatorenArg.split("=")[1] : null;
 // schalten die Buehnen-Mechaniken hinter BUEHNE_FLAGS ein, s. scripts/lib/rangtreue-messung.mjs.
 // Ohne sie misst das Skript den Motor wie er im Spiel laeuft (alle Flags aus).
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);
-const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !IST_BUEHNE_SCHALTER(a));
+// --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv): Mess-Sonde fuer den Paar-Bonus,
+// s. scripts/lib/rangtreue-messung.mjs. Ohne den Schalter unveraendertes Verhalten.
+const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(roheArgs);
+const rest = roheArgs.filter((a) => a !== "--einzelkader" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -95,13 +99,14 @@ if (!EINZELKADER) {
 // Speicher/die Festplatte wegnehmen (selbst beobachtet: ein abgebrochener Lauf ohne diesen
 // Block liess fuenf Chromium-Kindprozesse zurueck).
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-let zeilen, fehler = [], schalterGesetzt = null;
+let zeilen, fehler = [], schalterGesetzt = null, staffelPaarGesetzt = null;
 try {
   const seite = await browser.newPage();
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
   schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
+  staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 
   if (!EINZELKADER && !kaderFamilie) {
     const gebaut = await baueSynthetischeKaderFamilie(seite);
@@ -127,7 +132,8 @@ const titel = EINZELKADER
   ? `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Disziplin, EIN Kader (--einzelkader, nicht abnahmefaehig)`
   : `Rangtreue aller Disziplinen — ${SPIELE} Spiele je Kader-Variante, ${kaderFamilie.length} Varianten je Disziplin\nKader-Quelle: ${kaderQuelle}`;
 console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "")
-  + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "") + "\n");
+  + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "")
+  + (staffelPaarGesetzt ? `\n${staffelPaarSchalterText(staffelPaarGesetzt)}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
 for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }

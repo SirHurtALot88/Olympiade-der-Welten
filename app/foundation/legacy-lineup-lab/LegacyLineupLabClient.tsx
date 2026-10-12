@@ -83,6 +83,7 @@ import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
 import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
+import { buildStaffelPairGamesLookup, STAFFEL_DISCIPLINE_ID } from "@/lib/season/staffel-wechsel-paar-bonus-service";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
 // verschoben (siehe dortige Kommentare). Diese Komponente behaelt nur noch duenne
@@ -2131,6 +2132,35 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     if (!gameStateForCaptain || !teamId) return null;
     return selectTeamCaptain(gameStateForCaptain, teamId);
   }, [props.embeddedGameState, context?.gameState, context?.teamId, params.teamId]);
+
+  // STAFFEL O7 "EINGESPIELTE PAARE": gemeinsame Staffel-Spiele je Geber>Nehmer-Paar (Spieler-Ids)
+  // VOR diesem Spieltag, aus dem Paar-Zaehler des Spielstands. Nur an einem Staffel-Spieltag und
+  // nur, wenn es ueberhaupt eine Paar-Geschichte gibt — sonst `null`, und die Einsatzliste zeigt
+  // nichts Neues. Welche Paare gerade benachbart stehen, entscheidet die Ansicht aus der Auswahl.
+  const staffelPairGamesByKey = useMemo(() => {
+    const gameStateForPairs = props.embeddedGameState ?? context?.gameState ?? null;
+    const teamId = context?.teamId ?? params.teamId;
+    if (!gameStateForPairs || !teamId) return null;
+    const istStaffelSpieltag =
+      context?.matchdayContract?.discipline1?.disciplineId === STAFFEL_DISCIPLINE_ID ||
+      context?.matchdayContract?.discipline2?.disciplineId === STAFFEL_DISCIPLINE_ID;
+    if (!istStaffelSpieltag) return null;
+    const lookup = buildStaffelPairGamesLookup(gameStateForPairs, {
+      teamId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+    });
+    return Object.keys(lookup).length > 0 ? lookup : null;
+  }, [
+    props.embeddedGameState,
+    context?.gameState,
+    context?.teamId,
+    context?.matchdayContract?.discipline1?.disciplineId,
+    context?.matchdayContract?.discipline2?.disciplineId,
+    params.teamId,
+    params.seasonId,
+    params.matchdayId,
+  ]);
 
   const rivalryPressureByDiscipline = useMemo(() => {
     const rivalryPressureReductionPct = activeTeamCaptain?.effects.rivalryPressureReductionPct ?? 0;
@@ -6295,6 +6325,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           d2: buildLineupFormCardControlForSide("d2"),
         }}
         onAssignDisciplineFormCard={assignDisciplineFormCardFromLineup}
+        staffelPairGamesByKey={staffelPairGamesByKey}
         formCardSavePendingSide={{
           d1: formCardPlanPendingKey === `${params.matchdayId}:d1`,
           d2: formCardPlanPendingKey === `${params.matchdayId}:d2`,
