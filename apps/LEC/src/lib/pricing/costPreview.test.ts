@@ -43,7 +43,7 @@ describe("Einstellungen-Vorschau", () => {
         currentEk: null,
         latestMarketTrend: null,
         windows: {
-          "365": { qty: 3400, revenue: 3400 * ex.vk, ek: 3400 * ex.ek, ebayFeeTotal: 0, shippingCost: 0, dbI: 0, dbII: 0, avgPrice: ex.vk, rank: null },
+          "365": { qty: 3400, revenue: 3400 * ex.vk, ek: 3400 * ex.ek, ebayFeeTotal: 0, shippingCost: 0, dbI: 0, dbII: 0, fixedCostShare: 0, avgPrice: ex.vk, rank: null },
         },
       };
       // Gleiche Shop-Menge wie in der Vorschau erzwingen (N = 3.400, N_T je nach Beispiel).

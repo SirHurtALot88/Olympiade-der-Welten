@@ -18,6 +18,7 @@ function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
     shippingCost: 1,
     dbI: 7,
     dbII: 5,
+    fixedCostShare: 0,
     avgPrice: 10,
     rank: null,
     ...overrides,
@@ -382,3 +383,32 @@ describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)",
   });
 });
 
+describe("DB III (Vollkosten-Ergebnis)", () => {
+  it("DB III = DB II minus Fixkostenanteil; DB II bleibt der Deckungsbeitrag", () => {
+    // Regression: zuvor steckte der Fixkostenanteil in DB II und es gab keine
+    // dritte Stufe. Chris braucht alle drei getrennt -- DB I fuer den Einkauf,
+    // DB II fuer "lohnt der einzelne Verkauf", DB III fuer "traegt der Artikel
+    // seinen Anteil an Shop, Billbee, Lexoffice, Raumkosten und Lizenzen".
+    const card = article("Yu-Gi-Oh! TST-DE900 Dreistufig", {
+      windows: {
+        "365": agg({ qty: 10, revenue: 100, ek: 40, dbI: 60, dbII: 30, fixedCostShare: 12 }),
+      },
+    });
+    const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    expect(row.dbIPerUnit).toBeCloseTo(6, 5);
+    expect(row.dbIIPerUnit).toBeCloseTo(3, 5);
+    expect(row.dbIIIPerUnit).toBeCloseTo((30 - 12) / 10, 5);
+    expect(row.dbIIIPercent).toBeCloseTo((30 - 12) / 100, 5);
+    expect(row.dbIIIPerUnit).toBeLessThan(row.dbIIPerUnit);
+  });
+
+  it("DB III gleicht DB II, wenn kein Fixkostenanteil anfaellt", () => {
+    const card = article("Yu-Gi-Oh! TST-DE901 Ohne Fixkosten", {
+      windows: {
+        "365": agg({ qty: 10, revenue: 100, ek: 40, dbI: 60, dbII: 30, fixedCostShare: 0 }),
+      },
+    });
+    const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    expect(row.dbIIIPerUnit).toBeCloseTo(row.dbIIPerUnit, 5);
+  });
+});

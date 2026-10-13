@@ -38,7 +38,7 @@ describe("buildMarketComparisonRow", () => {
     const a = article({
       currentVk: 9.99,
       windows: {
-        "365": { qty: 5, revenue: 25, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 15, dbII: 10, avgPrice: 5, rank: null },
+        "365": { qty: 5, revenue: 25, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 15, dbII: 10, fixedCostShare: 0, avgPrice: 5, rank: null },
       },
     });
     const row = buildMarketComparisonRow(a, quote(), DEFAULT_COST_SETTINGS, null);
@@ -48,7 +48,7 @@ describe("buildMarketComparisonRow", () => {
   it("faellt auf den realisierten Ø-VK zurueck, wenn kein Listen-VK gepflegt ist", () => {
     const a = article({
       windows: {
-        "365": { qty: 5, revenue: 25, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 15, dbII: 10, avgPrice: 5, rank: null },
+        "365": { qty: 5, revenue: 25, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 15, dbII: 10, fixedCostShare: 0, avgPrice: 5, rank: null },
       },
     });
     const row = buildMarketComparisonRow(a, quote(), DEFAULT_COST_SETTINGS, null);
@@ -82,7 +82,7 @@ describe("buildMarketComparisonRow", () => {
     const a = article({
       currentVk: 9.99,
       windows: {
-        "365": { qty: 5, revenue: 50, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 40, dbII: 30, avgPrice: 10, rank: null },
+        "365": { qty: 5, revenue: 50, ek: 10, ebayFeeTotal: 0, shippingCost: 0, dbI: 40, dbII: 30, fixedCostShare: 0, avgPrice: 10, rank: null },
       },
     });
     const shop = { units365d: 3400, unitsAtOrAboveThreshold: 60 };

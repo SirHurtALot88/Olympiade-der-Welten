@@ -19,6 +19,9 @@ export interface WindowAggregate {
   shippingCost: number;
   dbI: number;
   dbII: number;
+  /** Anteil der SHOPWEITEN Jahresfixkosten, der auf dieses Fenster entfaellt.
+   * NICHT in dbII enthalten -- DB II ist ein Deckungsbeitrag. DB III = dbII - fixedCostShare. */
+  fixedCostShare: number;
   avgPrice: number;
   rank: number | null;
 }
@@ -121,6 +124,9 @@ export interface SortimentRow {
   dbIPerUnit: number;
   dbIIPerUnit: number;
   dbIIPercent: number;
+  /** DB III = DB II abzueglich Fixkostenanteil (Vollkosten-Ergebnis) je Stueck. */
+  dbIIIPerUnit: number;
+  dbIIIPercent: number;
   /** true = weder realisierter EK (Referenz-Fenster) noch aktueller Listen-EK bekannt
    * (FIX 1, KONZEPT §7.3/§8) -- betrifft laut Chris 747 aktive Artikel. Ohne diesen Flag
    * wuerde die App Phantom-Margen (dbI = Umsatz − 0) als echte Marge behandeln. */
@@ -332,6 +338,7 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
     ek: 0,
     dbI: 0,
     dbII: 0,
+    fixedCostShare: 0,
     ebayFeeTotal: 0,
     shippingCost: 0,
     avgPrice: 0,
@@ -473,6 +480,12 @@ export function buildSortimentRow(
   const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
   const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
   const dbIIPercent = referenceAgg && referenceAgg.revenue > 0 ? referenceAgg.dbII / referenceAgg.revenue : 0;
+  // DB III = DB II - Fixkostenanteil (Vollkosten). DB II traegt bewusst KEINE
+  // Fixkosten, siehe importPlan.ts; erst DB III sagt, ob der Artikel seinen
+  // Anteil an Shop, Billbee, Lexoffice, Raumkosten und Lizenzen traegt.
+  const dbIII = referenceAgg ? referenceAgg.dbII - referenceAgg.fixedCostShare : 0;
+  const dbIIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? dbIII / referenceAgg.qty : 0;
+  const dbIIIPercent = referenceAgg && referenceAgg.revenue > 0 ? dbIII / referenceAgg.revenue : 0;
 
   const windowMetrics: SortimentRow["windows"] = {};
   for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
@@ -501,6 +514,8 @@ export function buildSortimentRow(
     dbIPerUnit,
     dbIIPerUnit,
     dbIIPercent,
+    dbIIIPerUnit,
+    dbIIIPercent,
     ekMissing,
     windows: windowMetrics,
     active: a.active,
