@@ -176,6 +176,104 @@
    }
   ]
  },
+ "antreiben": [
+  {
+   "titel": "Das Flüstern",
+   "vorlesen": "Aus der Kapelle, durch die Mauer: Flüstern. Viele Stimmen, ein Wort. Es hört nicht auf.",
+   "gmNotiz": "Weist zur Kapelle. Fenster (5) und Haupttür (H) sind die Wege hinein. Kein Lärm.",
+   "wenn": {
+    "flag": "drinnen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-draussen"
+   ]
+  },
+  {
+   "titel": "Das Seil knarrt",
+   "vorlesen": "Vom Turm her knarrt ein Seil im Wind. Einmal. Dann ist es wieder still.",
+   "gmNotiz": "Erinnert an den Turm, ohne das Seil anzubieten. Wer hinsieht: Taste 6.",
+   "wenn": {
+    "flag": "glocke_geschlagen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-draussen"
+   ]
+  },
+  {
+   "titel": "Die Erde arbeitet",
+   "vorlesen": "Zwischen den Gräbern bewegt sich Erde. Nicht viel. Ein Rieseln, als zöge unten jemand die Decke zurecht.",
+   "gmNotiz": "Nur Stimmung, kein Grabgänger. Wer draußen bleibt, bekommt den Satz, bis er hineingeht.",
+   "wenn": {
+    "flag": "gemeinde_wach",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-draussen",
+    "kampf-grab"
+   ]
+  },
+  {
+   "titel": "Der Boden ist warm",
+   "vorlesen": "Vorn am Altar ist die Luft wärmer. Ihr merkt es erst, als ihr stehen bleibt.",
+   "gmNotiz": "Zeigt zum Altar (Taste 4). Die Falltür wird nicht genannt.",
+   "wenn": {
+    "flag": "altar_untersucht",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-drinnen"
+   ]
+  },
+  {
+   "titel": "Das Flüstern wird schneller",
+   "vorlesen": "Das Flüstern wird schneller. Nicht lauter. Schneller, als hätte es etwas bemerkt.",
+   "gmNotiz": "Nur Stimmung, kein Lärm. Der Stups, wenn drinnen zu lange überlegt wird.",
+   "wenn": {
+    "flag": "gemeinde_wach",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-drinnen",
+    "wahl-falltuer"
+   ]
+  },
+  {
+   "titel": "Nicht ewig Kerze",
+   "vorlesen": "Das Licht in den Ritzen flackert. Von unten, leise: „Ich hab nicht ewig Kerze.“",
+   "gmNotiz": "Hedda drängt. Anhänger, aufbrechen, Name oder reden: die Wahl steht.",
+   "wenn": {
+    "flag": "falltuer_offen",
+    "ist": false
+   },
+   "schritte": [
+    "wahl-falltuer",
+    "falltuer-klopfen-nein"
+   ]
+  },
+  {
+   "titel": "Die letzte Kerze",
+   "vorlesen": "Die Kerze in ihrer Hand ist auf Daumenlänge herunter. „Fragt. Oder geht. Beides ist besser als stehen.“",
+   "gmNotiz": "Fünf Minuten sind um. Ist die Geduld leer: Q. Dann Weiter zum Weg.",
+   "schritte": [
+    "npc-hedda",
+    "wahl-hedda-ansprache",
+    "wahl-hedda-tochter",
+    "npc-hedda-fragen"
+   ]
+  },
+  {
+   "titel": "Der Hammer",
+   "vorlesen": "Durch die Erde, von weit her: ein Hammer. Gleichmäßig. Er wartet auf niemanden.",
+   "gmNotiz": "Der Schmied, nichts erklären. Der Weg muss gewählt werden: Gang oder Hauptweg.",
+   "schritte": [
+    "hedda-weg",
+    "hedda-weg-stumm",
+    "wahl-weg"
+   ]
+  }
+ ],
  "tischplan": {
   "helden": {
    "x": 12,
@@ -572,71 +670,73 @@
     },
     "zeichen": "H"
    },
-   "wer": "Lenes Mutter und die Älteste von Moosgrab, um die sechzig. Grau, knochig, eine Schürze über dem Kleid, als wäre sie mitten aus der Küche gegangen. Seit zwei Tagen in der Krypta unter dem Altar, eine Kerze in der einen Hand, ein Brotmesser in der anderen. Vor drei Nächten hat sie die Haustür gehört, als Lene hinausging, und ist nicht aufgestanden. Das ist das Einzige, was sie nicht sagen wird. (Vorschlag: der Grund für ihre Härte.)",
-   "stimme": "Leise, kurze Sätze, keine Fragen zurück, außer der einen: was im Wald war. Jeder Satz klingt, als koste er etwas. Die Kerze hält sie zwischen sich und den Helden, das Messer bleibt die ganze Zeit in der Hand, Spitze nach unten. Sie sagt nie einen Namen, auch Lenes nicht: „meine Tochter“, „das Kind“. Höchstens fünf Minuten live, dann schickt sie die Helden los.",
+   "wer": "Lenes Mutter und die Älteste von Moosgrab, um die sechzig: grau, knochig, eine Schürze über dem Kleid. Seit zwei Tagen in der Krypta unter dem Altar, Kerze in der einen Hand, Brotmesser in der anderen. Vor drei Nächten hat sie die Haustür gehört, als Lene hinausging, und ist nicht aufgestanden; das sagt sie niemandem.",
+   "stimme": "Leise, langsam, jeder Satz kostet etwas. Kerze zwischen sich und den Helden, Messerspitze nach unten; nie ein Name, nur „meine Tochter“.",
    "motiv": "Überleben, und dass noch jemand aus dem Dorf überlebt. Und wissen, was mit ihrer Tochter ist, obwohl sie die Antwort ahnt.",
    "ziel": "In dieser Szene will sie drei Dinge: erfahren, wo ihre Tochter ist; die Helden dazu bringen, keine Namen zu sagen; und sie ins Dorf schicken, zum Brunnen, wo sie selbst nicht mehr hinkann.",
    "kern": [
-    "„Sagt keine Namen.“ Die Wurzeln lernen Namen; wer gerufen wird, den findet es.",
-    "„Es fing mit dem Brunnen an.“ Seit drei Wochen kommt warme Luft aus dem Brunnen, der seit vierzig Wintern kalt war.",
-    "„Das Dorf ist nicht leer.“ Überlebende hinter verriegelten Türen, aber auch Befallene, die noch normal aussehen.",
-    "Auf alles, was unter dem Dorf liegt: „Das weiß der Brunnen.“"
+    "„Keine Namen. Wen es beim Namen kennt, den findet es.“",
+    "„Es fing mit dem Brunnen an. Vierzig Winter kalt. Dann warm.“",
+    "„Das Dorf ist nicht leer. Hinter den Riegeln hocken noch welche. Und manche machen auf, wenn man klopft.“",
+    "„Was da unten atmet? Das weiß der Brunnen.“"
+   ],
+   "weiss": [
+    {
+     "info": "„Zweiunddreißig Häuser. In sechs brennt noch Licht. Wer noch Mensch ist, macht nicht auf.“",
+     "wie": "Nach dem Dorf fragen, nach Überlebenden (Taste 3). Kostet 1 Geduld."
+    },
+    {
+     "info": "„Erst die Hunde, dann das Vieh, dann Lichter im Wald, dann die Gräber.“ Der Brunnen ist zugenagelt; Werkzeug gibt es in der Schmiede.",
+     "wie": "Nach dem Brunnen fragen (Taste 4). Mit dem Brunnen-Hinweis aus Map 1 bestätigt sie Lenes Satz: „Das hat sie von mir.“"
+    },
+    {
+     "info": "„Als ich ein Kind war, fiel ein Stern in den Wald. Die Männer, die ihn suchten, kamen nicht zurück. Wir haben das Loch zugeschüttet und den Brunnen darauf gebaut.“",
+     "wie": "Nur, wenn jemand fragt, was vor dem Brunnen war oder warum er genau dort steht (Taste 5). Von selbst erwähnt sie den Stern nie."
+    },
+    {
+     "info": "„Der Bäcker. Die Müllerin. Der alte Vogt. Sie sind reingekommen, um zu beten, und haben nicht mehr aufgehört.“",
+     "wie": "Nach den Knienden oben fragen (Taste 6), oder erzählen, dass man dem Bäcker ins Gesicht gesehen hat."
+    },
+    {
+     "info": "„Es lernt. Erst die Tiere, dann uns, dann, wie wir heißen. Die da oben flüstern den Namen, den es zuletzt gelernt hat.“",
+     "wie": "Fragen, warum keine Namen (Taste 7). Sagen die Helden, dass sie oben „Lene“ verstanden haben: sie stellt die Kerze ab und schweigt eine Weile."
+    },
+    {
+     "info": "„Er ist in den Wald. Vor einer Woche. Er hat gesagt, er hört es rufen.“",
+     "wie": "Nach dem Priester fragen (Taste 8). Wissen die Helden, dass er tot im Moos liegt, und sagen es: „Dann hat es ihn beim Namen gekannt.“"
+    },
+    {
+     "info": "„Der Schmied hämmert seit drei Tagen auf nichts. Die Harms sitzen vor drei Tellern und essen nicht.“",
+     "wie": "Nur, wenn sie die Wahrheit über Lene kennt (Taste 9). Sonst: „Fragt mich nicht, wer.“ Geduld braucht es trotzdem."
+    }
    ],
    "wennSieFragen": [
     [
-     "nach dem Dorf",
-     "„Zweiunddreißig Häuser. In sechs brennt noch Licht. Ich weiß nicht mehr, in welchen.“"
-    ],
-    [
-     "nach ihrer Tochter, bevor die Helden es gesagt haben",
-     "„Sie ist nachts raus. Zum Wald. Ich hab die Tür gehört.“ Mehr nicht. Sie wartet, dass die Helden reden."
-    ],
-    [
-     "nach dem Brunnen",
-     "„Vierzig Winter kalt. Dann warm. Erst die Hunde, dann das Vieh, dann Lichter im Wald. Dann die Gräber.“"
-    ],
-    [
-     "nach dem Stern",
-     "„Als ich ein Kind war, fiel ein Stern in den Wald. Die Männer, die ihn suchten, trugen Rüstungen ohne Nähte. Keiner kam zurück. Wir haben das Loch zugeschüttet und den Brunnen darauf gebaut.“"
-    ],
-    [
-     "nach dem Schmied",
-     "„Er hämmert. Seit drei Tagen. Auf nichts.“ Sie schließt die Augen. „Geht nicht in die Schmiede.“"
-    ],
-    [
-     "nach der Gemeinde oben",
-     "„Der Bäcker. Die Müllerin. Der alte Vogt. Sie sind reingekommen, um zu beten, und dann haben sie nicht mehr aufgehört.“"
-    ],
-    [
-     "warum keine Namen",
-     "„Weil es sie lernt. Erst die Tiere. Dann uns. Dann, wie wir heißen. Wen es beim Namen kennt, den findet es im Dunkeln.“"
-    ],
-    [
-     "nach dem Priester",
-     "„Er ist in den Wald. Vor einer Woche. Er hat gesagt, er hört es rufen, und dass er es segnen will.“ Wissen die Helden, dass er tot ist, und sagen es: Sie nickt nur. „Dann hat es ihn beim Namen gekannt.“"
-    ],
-    [
-     "nach den Harms",
-     "„Drei Teller. Sie sitzen am Tisch. Sie essen nicht.“ Mehr sagt sie nur, wenn sie die Wahrheit über ihre Tochter weiß."
+     "nach ihrer Tochter, bevor die Helden etwas gesagt haben",
+     "„Sie ist nachts raus. Zum Wald. Ich hab die Tür gehört.“ Dann wartet sie, dass die Helden reden."
     ],
     [
      "nach dem Anhänger",
-     "„Den hat sie um den Hals gehabt, seit sie sechs war. Von ihrem Vater.“ Sie streckt die Hand nicht aus. Sie wartet, ob die Helden ihn geben."
+     "„Den hat sie um den Hals gehabt, seit sie sechs war.“ Sie streckt die Hand nicht aus. Geben sie ihn: Kellerschlüssel (Taste 1)."
     ],
     [
      "ob sie mitkommt",
      "„Bis zum Dorfrand. Nicht weiter. Ich bin zu alt für das, was unter dem Brunnen ist.“"
     ],
     [
-     "was unten atmet",
-     "„Das weiß der Brunnen.“ Kostet keine Geduld."
+     "was unten atmet, wer die Rüstungsmänner waren, wie man es aufhält",
+     "„Das weiß der Brunnen.“ Kostet keine Geduld (Taste 0)."
+    ],
+    [
+     "grob, drohend, mit Waffe",
+     "Sie hebt das Messer und schweigt. Nur noch: „Sagt keine Namen.“"
     ]
    ],
    "nichtWissen": [
-    "Was unten atmet. Sie weiß nur, dass es warm ist und dass es Namen lernt.",
-    "Wer die Männer in den Rüstungen ohne Nähte waren. Für sie waren es Fremde, die den Stern suchten.",
-    "Wie man den Pilz aufhält. Sie hat es mit Feuer versucht, an einem Grab. Es hat nicht geholfen, sagt sie; ob das stimmt, weiß sie selbst nicht.",
-    "Dass ihre Tochter sie noch einmal erwähnt hat. Wenn die Helden den Satz ausrichten, trifft er sie."
+    "Was unten atmet: nur, dass es warm ist und Namen lernt.",
+    "Wer die Männer in den Rüstungen ohne Nähte waren: für sie Fremde, die den Stern suchten.",
+    "Wie man es aufhält: Feuer an einem Grab hat nichts gebracht, sagt sie.",
+    "Dass Lene sie zuletzt noch erwähnt hat: richten die Helden den Satz aus, trifft er sie."
    ]
   }
  },
@@ -874,6 +974,8 @@
  "ereignisse": {
   "marker1": {
    "name": "Suchmarker 1 (die Linde, links unten)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 1",
    "taste": "1",
    "marker": "1",
    "einmal": true,
@@ -897,6 +999,8 @@
   },
   "marker2": {
    "name": "Suchmarker 2 (Grabstein Harm, rechts)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 2",
    "taste": "2",
    "marker": "2",
    "einmal": true,
@@ -924,6 +1028,8 @@
   },
   "grab": {
    "name": "Das zuckende Grab ansehen (Tischmitte)",
+   "gruppe": "Untersuchen",
+   "kurz": "Grab ansehen",
    "taste": "3",
    "marker": "G",
    "einmal": true,
@@ -946,6 +1052,8 @@
   },
   "grab-angriff": {
    "name": "Ein Held steht direkt neben dem zuckenden Grab",
+   "gruppe": "Kampf",
+   "kurz": "Grab schnappt",
    "taste": "4",
    "einmal": true,
    "nurWenn": {
@@ -958,6 +1066,8 @@
   },
   "fenster": {
    "name": "Durchs Fenster spähen (linke Seite der Kapelle)",
+   "gruppe": "Untersuchen",
+   "kurz": "Fenster spähen",
    "taste": "5",
    "marker": "fenster:F",
    "einmal": true,
@@ -982,6 +1092,8 @@
   },
   "turm": {
    "name": "Den Glockenturm ansehen (rechts oben)",
+   "gruppe": "Untersuchen",
+   "kurz": "Turm ansehen",
    "taste": "6",
    "einmal": true,
    "kosten": "Held in Sichtweite, keine Aktion",
@@ -1003,6 +1115,8 @@
   },
   "haupttuer": {
    "name": "Durch die Haupttür hinein",
+   "gruppe": "Wege",
+   "kurz": "Haupttür",
    "taste": "H",
    "marker": "T",
    "einmal": true,
@@ -1019,6 +1133,8 @@
   },
   "fenster-einstieg": {
    "name": "Durchs zerbrochene Fenster hinein",
+   "gruppe": "Wege",
+   "kurz": "Fenster",
    "taste": "E",
    "marker": "fenster:F",
    "einmal": true,
@@ -1032,6 +1148,8 @@
   },
   "sakristei": {
    "name": "Durch die Sakristei hinein (mit Schlüssel)",
+   "gruppe": "Wege",
+   "kurz": "Sakristei",
    "taste": "K",
    "marker": "S",
    "einmal": true,
@@ -1049,6 +1167,8 @@
   },
   "glocke": {
    "name": "Ein Held zieht am Glockenseil",
+   "gruppe": "Lärm",
+   "kurz": "Glocke",
    "taste": "G",
    "einmal": true,
    "kosten": "Held in Kontakt mit dem Seil, 1 Aktion",
@@ -1064,6 +1184,8 @@
   },
   "laerm-nah": {
    "name": "Lärm: Nahkampf (+1)",
+   "gruppe": "Lärm",
+   "kurz": "Nahkampf +1",
    "taste": "L",
    "einmal": false,
    "leisten": {
@@ -1073,6 +1195,8 @@
   },
   "laerm-fern": {
    "name": "Lärm: Fernkampf oder Zauber (+2)",
+   "gruppe": "Lärm",
+   "kurz": "Fernkampf +2",
    "taste": "Z",
    "einmal": false,
    "leisten": {
@@ -1082,6 +1206,8 @@
   },
   "laerm-tuer": {
    "name": "Lärm: eine Tür aufbrechen (+2)",
+   "gruppe": "Lärm",
+   "kurz": "Tür +2",
    "taste": "T",
    "einmal": false,
    "leisten": {
@@ -1091,6 +1217,8 @@
   },
   "gesicht": {
    "name": "Einem Knienden ins Gesicht sehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Gesicht",
    "taste": "1",
    "einmal": true,
    "kosten": "Held in Kontakt, keine Aktion, kein Lärm",
@@ -1112,6 +1240,8 @@
   },
   "hinhoeren": {
    "name": "Hinhören, was sie flüstern",
+   "gruppe": "Untersuchen",
+   "kurz": "Hinhören",
    "taste": "2",
    "einmal": true,
    "kosten": "Held näher als eine Kartenlänge, keine Aktion",
@@ -1136,6 +1266,8 @@
   },
   "kerze": {
    "name": "Die Kerze auf dem Altar ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Kerze",
    "taste": "3",
    "einmal": true,
    "kosten": "Held in Kontakt mit dem Altar, keine Aktion",
@@ -1143,6 +1275,8 @@
   },
   "altar": {
    "name": "Den Altar untersuchen",
+   "gruppe": "Untersuchen",
+   "kurz": "Altar",
    "taste": "4",
    "marker": "falltuer:F",
    "einmal": true,
@@ -1156,6 +1290,8 @@
   },
   "krypta": {
    "name": "Sich in der Krypta umsehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Krypta umsehen",
    "taste": "2",
    "einmal": true,
    "kosten": "Keine Aktion",
@@ -1177,6 +1313,8 @@
   },
   "anhaenger-geben": {
    "name": "Die Helden geben Hedda den Anhänger",
+   "gruppe": "Story",
+   "kurz": "Anhänger geben",
    "taste": "1",
    "einmal": true,
    "nurWenn": {
@@ -1204,6 +1342,8 @@
   },
   "frage-dorf": {
    "name": "Frage: das Dorf",
+   "gruppe": "Fragen",
+   "kurz": "Dorf",
    "taste": "3",
    "einmal": true,
    "nurWenn": {
@@ -1225,6 +1365,8 @@
   },
   "frage-brunnen": {
    "name": "Frage: der Brunnen",
+   "gruppe": "Fragen",
+   "kurz": "Brunnen",
    "taste": "4",
    "einmal": true,
    "nurWenn": {
@@ -1250,6 +1392,8 @@
   },
   "frage-stern": {
    "name": "Frage: der Stern",
+   "gruppe": "Fragen",
+   "kurz": "Stern",
    "taste": "5",
    "einmal": true,
    "nurWenn": {
@@ -1272,6 +1416,8 @@
   },
   "frage-gemeinde": {
    "name": "Frage: die Gemeinde oben",
+   "gruppe": "Fragen",
+   "kurz": "Gemeinde oben",
    "taste": "6",
    "einmal": true,
    "nurWenn": {
@@ -1293,6 +1439,8 @@
   },
   "frage-namen": {
    "name": "Frage: warum keine Namen",
+   "gruppe": "Fragen",
+   "kurz": "Warum Namen",
    "taste": "7",
    "einmal": true,
    "nurWenn": {
@@ -1315,6 +1463,8 @@
   },
   "frage-priester": {
    "name": "Frage: der Priester",
+   "gruppe": "Fragen",
+   "kurz": "Priester",
    "taste": "8",
    "einmal": true,
    "nurWenn": {
@@ -1337,6 +1487,8 @@
   },
   "frage-befallene": {
    "name": "Frage: wer im Dorf ist verloren (Schmied, Harms)",
+   "gruppe": "Fragen",
+   "kurz": "Schmied, Harms",
    "taste": "9",
    "einmal": true,
    "nurWenn": {
@@ -1366,6 +1518,8 @@
   },
   "frage-befallene-knapp": {
    "name": "Frage: Schmied oder Harms, knapp (ohne Wahrheit)",
+   "gruppe": "Fragen",
+   "kurz": "Schmied, knapp",
    "taste": "9",
    "einmal": true,
    "nurWenn": {
@@ -1392,6 +1546,8 @@
   },
   "frage-unten": {
    "name": "Frage: was unten atmet",
+   "gruppe": "Fragen",
+   "kurz": "Was unten atmet",
    "taste": "0",
    "einmal": false,
    "vorlesen": "„Das weiß der Brunnen.“",
@@ -1399,6 +1555,8 @@
   },
   "frage-zuviel": {
    "name": "Noch eine Frage (Geduld ist leer oder Hedda schweigt)",
+   "gruppe": "Fragen",
+   "kurz": "Genug",
    "taste": "Q",
    "einmal": false,
    "nurWenn": {
@@ -1643,6 +1801,7 @@
   "spieler-draussen": {
    "typ": "spieler",
    "titel": "Draußen",
+   "zeitlimit": 12,
    "runden": true,
    "text": "Die Spieler erkunden den Friedhof. Sie suchen, schauen, wählen ihren Weg hinein. Du zählst Lärm. Rundenende: R.",
    "hinweise": [
@@ -1767,6 +1926,7 @@
   "spieler-drinnen": {
    "typ": "spieler",
    "titel": "Drinnen",
+   "zeitlimit": 8,
    "runden": true,
    "text": "Die Spieler sind in der Kapelle. Sie schleichen, schauen, hören hin, untersuchen den Altar. Du zählst Lärm. Rundenende: R.",
    "hinweise": [
@@ -1807,6 +1967,7 @@
   "wahl-falltuer": {
    "typ": "wahl",
    "titel": "An der Falltür",
+   "zeitlimit": 4,
    "ansage": "Unter dem Altar eine Platte mit einem Ring. Von unten verriegelt. Durch die Ritzen Kerzenlicht, und eine alte Stimme, leise: „Wer ist da? Sagt keine Namen.“",
    "frage": "Was tun die Helden?",
    "optionen": [
@@ -1958,6 +2119,7 @@
   "npc-hedda": {
    "typ": "npc",
    "titel": "Du spielst Mutter Hedda",
+   "zeitlimit": 3,
    "figur": "hedda",
    "einstieg": "Keine Namen. Wer ihr auch seid: hier unten keine Namen. … Ihr kommt aus dem Wald. Ich rieche es an euch. Was war im Wald?",
    "gmNotiz": "Leise, die Kerze zwischen sich und den Helden, das Messer in der Hand. Sie fragt nur das eine. Tragen die Helden den Anhänger sichtbar, starrt sie darauf und sagt nichts dazu, noch nicht. Hör zu, wie die Spieler sie ansprechen, und wähle im nächsten Schritt.",
@@ -1969,6 +2131,7 @@
   "wahl-hedda-ansprache": {
    "typ": "wahl",
    "titel": "Wie sprechen die Helden Hedda an?",
+   "zeitlimit": 3,
    "frage": "Wähle, was dem am nächsten kommt, was Franky und Ramona sagen.",
    "optionen": [
     {
@@ -2046,6 +2209,7 @@
   "wahl-hedda-tochter": {
    "typ": "wahl",
    "titel": "Was sagen die Helden über die Tochter?",
+   "zeitlimit": 4,
    "frage": "Du hörst nur zu. Dann wähle, was dem am nächsten kommt.",
    "optionen": [
     {
@@ -2260,6 +2424,7 @@
   "npc-hedda-fragen": {
    "typ": "npc",
    "titel": "Die Helden fragen Hedda",
+   "zeitlimit": 5,
    "figur": "hedda",
    "einstieg": "Fragt. Aber fragt schnell. Die Kerze ist die letzte.",
    "gmNotiz": "Höchstens fünf Minuten live. Leise, kurze Sätze. Jede Frage kostet einen Strich Geduld; ist sie leer, kommt nur noch „Fragt den Brunnen“ (Taste Q). Taste 0 ist die Antwort auf alles, was unter dem Dorf liegt, und kostet nichts. Taste 1: die Helden geben ihr den Anhänger, dafür der Kellerschlüssel. Taste 2: sich umsehen (Probe).",
@@ -2308,6 +2473,7 @@
   "wahl-weg": {
    "typ": "wahl",
    "titel": "Welchen Weg nehmen die Helden?",
+   "zeitlimit": 3,
    "frage": "Die Spieler entscheiden. Wähle.",
    "optionen": [
     {

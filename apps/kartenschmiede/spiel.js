@@ -170,7 +170,7 @@
     if (stand.letzte !== vorherLetzte || stand.schritt !== vorher) for (const k of Object.keys(wuerfe)) if (k !== "ende") delete wuerfe[k];
     const s = motor.schritt(stand);
     if (s && s.typ === "ende") stand.uebernahme = motor.uebernahme(stand);
-    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; }
+    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; antreiberNr = 0; antreiberZu = null; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; }
     spaeter();
     zeige();
   }
@@ -202,6 +202,20 @@
     else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(() => melde("Vollbild ging nicht. Am Mac: Ctrl + Cmd + F."));
   }
 
+  // ---------- Beute ----------
+  // Ein Beutewurf wie „Heiltrank“ wird über den Katalog zum Gegenstand mit Regeltext und lässt sich einem Helden geben
+  const gegenstand = text => ((window.Katalog || {}).GRUNDBESTAND || []).filter(x => x.typ === "gegenstand").find(x => String(text || "").includes(x.name)) || null;
+  function beuteHtml(wurf) {
+    if (!wurf) return "";
+    const g = gegenstand(wurf.text);
+    return `<b>${wurf.wurf}</b> · ${esc(wurf.text)}${g ? `<span class="sp-beute"><small>${symText(g.text)}</small><span>Geben an: ${helden.map(h => `<button type="button" class="btn ghost sm" data-sp="geben" data-held="${esc(h.name)}" data-sache="${esc(g.name)}">${esc(h.name)}</button>`).join("")}</span></span>` : ""}`;
+  }
+  const inventarHtml = name => {
+    const liste = (stand.inventar || {})[name] || [];
+    if (!liste.length) return `<p class="hint">Keine Beute.</p>`;
+    return `<ul class="sp-inventar">${liste.map((x, i) => { const g = gegenstand(x); return `<li><b>${esc(x)}</b>${g ? ` <small>${symText(g.text)}</small>` : ""} <button type="button" class="btn ghost sm" data-sp="benutzen" data-held="${esc(name)}" data-i="${i}">benutzt</button></li>`; }).join("")}</ul>`;
+  };
+
   // ---------- Bausteine ----------
   const symText = t => (KS.symText ? KS.symText(t) : esc(t));
   const liste = (punkte, cls = "") => punkte && punkte.length ? `<ul class="${cls}">${punkte.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : "";
@@ -210,6 +224,19 @@
   const sag = text => text ? `<p class="sp-sag">„${esc(String(text).replace(/^[„"]|[“"]$/g, ""))}“</p>` : "";
   const gm = text => text ? `<p class="sp-gm">${esc(text)}</p>` : "";
   const taste = t => t ? `<kbd>${esc(t)}</kbd>` : "";
+
+  // ---------- Uhr und Antreiber ----------
+  const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
+  const uhrHtml = () => `<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>`;
+  let antreiberNr = 0, antreiberZu = null;
+  function antreiberHtml(immer) {
+    const liste = motor.antreiber(stand);
+    if (!liste.length || (!immer && (!ueberzogen() || antreiberZu === stand.schritt))) return "";
+    const a = liste[antreiberNr % liste.length];
+    return `<div class="sp-antreiber"><header><b>⏳ ${immer ? "Antreiben" : "Die Szene zieht sich"}: ${esc(a.titel || "")}</b>
+      <span>${liste.length > 1 ? `<button type="button" class="btn ghost sm" data-sp="antreiber-naechster">Anderer (${(antreiberNr % liste.length) + 1}/${liste.length})</button>` : ""}<button type="button" class="btn ghost sm" data-sp="antreiber-zu">✕</button></span></header>
+      ${vorlesen(a.vorlesen)}${gm(a.gmNotiz)}</div>`;
+  }
 
   // ---------- Kopfleiste ----------
   function zeigeKopf() {
@@ -226,21 +253,37 @@
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         <span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
-      <div class="sp-kopfknoepfe"><button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
+      <div class="sp-kopfknoepfe">${uhrHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Vorschläge, um die Spieler weiterzubringen">Antreiben</button>
+        <button type="button" class="btn ghost sm" data-sp="log">Log ${taste("P")}</button>
+        <button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
         <button type="button" class="btn ghost sm" data-sp="vollbild" title="Am Mac auch Ctrl + Cmd + F">Vollbild</button>
         <button type="button" class="btn ghost sm" data-sp="schliessen">Menü</button></div>`;
   }
 
   // ---------- Aktionsleiste unten ----------
+  const GRUPPEN = ["Untersuchen", "Bewegen", "Wege", "Story", "Fragen", "Lärm", "Kampf", "Aktionen"];
+  // Ohne Angabe in den Daten: aus dem Ereignis erraten (Probe/Marker = Untersuchen, Lärm-Leiste = Lärm …)
+  function gruppeVon(e) {
+    if (e.gruppe) return e.gruppe;
+    if (e.leisten && Object.keys(e.leisten).some(k => /laerm/.test(k))) return "Lärm";
+    if (e.marker || e.probe || e.beutewurf) return "Untersuchen";
+    if (/^Frage|fragen/i.test(e.name || "")) return "Fragen";
+    return "Aktionen";
+  }
   // In der Leiste nur der Kern des Namens: Ortsangaben in Klammern stehen im Tooltip und auf der Tischkarte, „(+1)“ bleibt
   const kurzName = e => e.kurz || String(e.name || "").replace(/\s*\((?![+−-]\d)[^)]*\)/g, "").trim();
   function aktionsLeiste(s) {
     // Was noch nicht möglich ist (z. B. die Quelle vor Marker 3), bleibt ausgeblendet; Erledigtes bleibt mit ✓ stehen
     const ids = (s.ereignisse || []).filter(id => map.ereignisse[id] && !map.ereignisse[id].intern && (stand.ereignisse[id] || motor.ereignisErlaubt(stand, id)));
-    const evs = ids.map(id => {
+    const knopf = id => {
       const e = map.ereignisse[id], ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
       return `<button type="button" class="btn ghost sm ${ok ? "" : "aus"} ${schon ? "erledigt" : ""}" data-ev="${esc(id)}" ${ok ? "" : "disabled"} title="${esc([e.name, e.kosten].filter(Boolean).join(" · "))}">${taste(e.taste)} ${esc(kurzName(e))}${schon ? " ✓" : ""}</button>`;
-    }).join("");
+    };
+    // Nach Gruppen gegliedert (Untersuchen, Wege, Lärm …), jede Gruppe mit eigenem Etikett und eigener Farbe
+    const gruppen = new Map();
+    for (const id of ids) { const g = gruppeVon(map.ereignisse[id]); if (!gruppen.has(g)) gruppen.set(g, []); gruppen.get(g).push(id); }
+    const evs = [...gruppen.entries()].sort((a, b) => GRUPPEN.indexOf(a[0]) - GRUPPEN.indexOf(b[0]))
+      .map(([g, liste]) => `<div class="sp-gruppe g-${esc(g.toLowerCase().replace(/[^a-zäöü]/g, ""))}"><span>${esc(g)}</span>${liste.map(knopf).join("")}</div>`).join("");
     const rw = map.rundenwurf && motor.gilt(stand, map.rundenwurf.wenn) && stand.rundenAktiv && s.typ !== "ende";
     const rwFaellig = rw && stand.runde > 0 && stand.rundenwurfRunde !== stand.runde;
     const runden = stand.rundenAktiv && s.typ !== "ende";
@@ -302,7 +345,8 @@
       case "ende": {
         const ep = motor.epListe(stand);
         return `<h4>Erfahrung</h4><ul>${ep.map(e => `<li class="${e.erreicht ? "ja" : "nein"}">${e.erreicht ? "✓" : "✗"} ${esc(e.text)}: ${e.ep} EP</li>`).join("")}</ul>
-          <h4>Beute</h4>${liste(s.beute)}<p><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${wuerfe.ende ? `<b>${wuerfe.ende.wurf}</b> · ${esc(wuerfe.ende.text)}` : ""}</p>
+          <h4>Beute</h4>${liste(s.beute)}<p class="sp-beutezeile"><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${beuteHtml(wuerfe.ende)}</p>
+          <h4>Inventar der Helden</h4><div class="sp-inventare">${helden.map(h => `<div><b>${esc(h.name)}</b>${inventarHtml(h.name)}</div>`).join("")}</div>
           <h4>Folgen für die nächste Map</h4>${liste(motor.folgen(stand), "sp-folgen")}
           <h4>Notieren</h4>${liste(s.notieren)}<p class="sp-gm">${esc((s.zuruecksetzen || []).join(", "))} zurücksetzen. Der Spielstand ist gespeichert; die nächste Map übernimmt Leisten und Entscheidungen.</p>`;
       }
@@ -328,7 +372,7 @@
             <button type="button" class="btn ghost sm" data-probe="${i}" data-w="0">App würfelt</button></div>
             <small>${esc(((def.probe || {}).stufen || []).map(st => `ab ${st.ab}`).join(" · "))} · Tasten 1–6</small></div>`;
       return `<div class="sp-ev ${e.art ? `art-${e.art}` : ""}"><h4>${esc(e.name)}</h4>${vorlesen(e.vorlesen)}${gm(e.gmNotiz)}${probeHtml}
-        ${e.beutewurf ? `<p>${wuerfe[i] ? `<b>Beutewurf: ${wuerfe[i].wurf}</b> · ${esc(wuerfe[i].text)}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
+        ${e.beutewurf ? `<p class="sp-beutezeile">${wuerfe[i] ? `Beutewurf: ${beuteHtml(wuerfe[i])}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
     }).join("")}</div>`;
   }
 
@@ -392,7 +436,7 @@
     let kopf = "", inhalt = "";
     if (art === "held") {
       const h = helden.find(x => x.name === id);
-      kopf = `<b>${esc(id)}</b><small>Held</small>`; inhalt = `<p>${esc((h && h.info) || "")}</p>`;
+      kopf = `<b>${esc(id)}</b><small>Held</small>`; inhalt = `<p>${esc((h && h.info) || "")}</p><h5>Beute</h5>${inventarHtml(id)}`;
     } else if (art === "f") {
       const f = map.figuren[id] || {};
       kopf = `<b>${esc(f.name || id)}</b><small>NPC</small>`;
@@ -436,18 +480,37 @@
     return `<div class="sp-aktiv"><h4>Gilt jetzt</h4>${bedingt.map(r => `<p><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}</p>`).join("")}</div>`;
   }
 
+  // Jeder aktive Zähler mit Wert, was er bedeutet und welche Schwellen schon ausgelöst haben
+  function zaehlerHtml() {
+    const aktiv = Object.entries(map.leisten || {}).filter(([k]) => stand.leisten[k] && stand.leisten[k].aktiv);
+    if (!aktiv.length) return `<p class="hint">Keine.</p>`;
+    return aktiv.map(([k, def]) => {
+      const w = stand.leisten[k].wert;
+      const sw = (def.schwellen || []).map(x => `<li class="${stand.schwellen[`${k}:${x.ab}`] ? "ja" : ""}">${stand.schwellen[`${k}:${x.ab}`] ? "✓" : "○"} ab ${x.ab}: ${esc(x.titel || "")}</li>`).join("");
+      return `<div class="sp-regel"><b>${esc(def.name)}: ${w}</b> <small>(${def.min}–${def.max})</small> ${esc(def.text || "")}${sw ? `<ul class="sp-schwellen">${sw}</ul>` : ""}</div>`;
+    }).join("");
+  }
+
   // ---------- Fenster ----------
   function fensterHtml() {
     if (fenster === "npc" || (fenster && fenster.startsWith("npc:"))) {
       const id = fenster.startsWith("npc:") ? fenster.slice(4) : ([...stand.verlauf].reverse().map(x => map.schritte[x]).find(x => x && x.typ === "npc") || {}).figur;
       const f = id && map.figuren[id];
       if (!f) return "";
-      return `<div class="sp-fenster" role="dialog" aria-label="${esc(f.name)}"><div class="sp-fenster-innen breit">
+      const weiss = f.weiss || [];
+      return `<div class="sp-fenster" role="dialog" aria-label="${esc(f.name)}"><div class="sp-fenster-innen breit sp-npc">
         <header><h3>${esc(f.name)}</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
-        <div class="sp-npc-raster"><div><p>${esc(f.wer || "")}</p>${f.stimme ? `<p><b>So spricht sie:</b> ${esc(f.stimme)}</p>` : ""}${f.motiv ? `<p><b>Motiv:</b> ${esc(f.motiv)}</p>` : ""}${f.ziel ? `<p><b>Will in dieser Szene:</b> ${esc(f.ziel)}</p>` : ""}
-          <h4>Was sie nicht weiß</h4>${liste(f.nichtWissen)}</div>
-        <div><h4>Sätze, die immer kommen</h4>${(f.kern || []).map(k => vorlesen(k)).join("")}</div></div>
-        ${f.wennSieFragen ? `<h4>Wenn sie fragen …</h4><table class="sz-tab sp-fragen"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table>` : ""}
+        <div class="sp-npc-oben">
+          <div class="sp-npc-steckbrief"><p>${esc(f.wer || "")}</p>
+            <dl>${f.stimme ? `<dt>Spricht</dt><dd>${esc(f.stimme)}</dd>` : ""}${f.motiv ? `<dt>Motiv</dt><dd>${esc(f.motiv)}</dd>` : ""}${f.ziel ? `<dt>Will jetzt</dt><dd>${esc(f.ziel)}</dd>` : ""}</dl></div>
+          <div class="sp-npc-kern"><h4>🗣️ Sätze, die immer kommen</h4>${(f.kern || []).map(k => vorlesen(k)).join("")}</div>
+        </div>
+        <div class="sp-npc-unten">
+          <section><h4>Was sie weiß · zum Herauskitzeln</h4>${weiss.length ? `<table class="sz-tab sp-weiss"><tbody>${weiss.map(w => `<tr><td>${esc(w.info)}</td><td>${esc(w.wie || "")}</td></tr>`).join("")}</tbody></table>`
+            : f.wennSieFragen ? `<table class="sz-tab sp-weiss"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(b)}</td><td>${esc(a)}</td></tr>`).join("")}</tbody></table>` : `<p class="hint">–</p>`}</section>
+          <section><h4>Was sie nicht weiß</h4>${liste(f.nichtWissen)}</section>
+        </div>
+        ${weiss.length && f.wennSieFragen ? `<details class="sp-mehr"><summary>Wenn sie fragen …</summary><table class="sz-tab sp-fragen"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></details>` : ""}
       </div></div>`;
     }
     if (fenster === "eingabe" && eingabeFuer) {
@@ -459,6 +522,17 @@
         ${e.aus === "gruppe" ? `<label class="f">Oder Name eintippen <input type="text" id="spEingabeFrei" placeholder="Name des Helden"></label><button type="button" class="btn sm" data-sp="eingabe-frei">Übernehmen</button>` : ""}
       </div></div>`;
     }
+    if (fenster === "log") {
+      const ICON = { wahl: "🟥", ereignis: "⚡", probe: "🎲", runde: "⟳", rundenwurf: "🎲", schritt: "→", tod: "☠", beute: "🎁" };
+      const eintraege = (stand.log || []).slice().reverse();
+      const chips = e => [...e.leisten.map(l => `<span class="sp-chip ${l.neu > l.alt ? "hoch" : "runter"}">${esc(l.name)} ${l.alt} → ${l.neu}</span>`),
+        ...e.flags.map(f => `<span class="sp-chip flag ${f.spaeter ? "spaeter" : ""}" title="${esc(f.id)}">${f.spaeter ? `<i>→ Map ${f.spaeter}</i> ` : ""}${esc(f.text)}${f.wert ? `: ${esc(f.wert)}` : ""}</span>`)].join("");
+      return `<div class="sp-fenster" role="dialog" aria-label="Log"><div class="sp-fenster-innen breit">
+        <header><h3>Log · Entscheidungen und Leisten</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+        <p class="hint">Nur für dich. Neueste oben. Gezeigt wird alles, was eine Leiste oder eine Entscheidung verändert hat, dazu jede Antwortwahl. Mit „→ Map“ markiert ist, was in einer späteren Map nachwirkt.</p>
+        ${eintraege.length ? `<ol class="sp-log">${eintraege.map(e => `<li class="art-${esc(e.art)}"><span class="sp-log-r">R${e.runde}</span><span class="sp-log-i">${ICON[e.art] || "•"}</span><div><b>${esc(e.text)}</b><small>${esc((map.schritte[e.schritt] || {}).titel || "")}</small>${chips(e) ? `<div class="sp-chips">${chips(e)}</div>` : ""}</div></li>`).join("")}</ol>` : `<p class="hint">Noch nichts passiert.</p>`}
+      </div></div>`;
+    }
     if (fenster === "lage") {
       const l = motor.lage(stand), rw = map.rundenwurf;
       return `<div class="sp-fenster" role="dialog" aria-label="Lage"><div class="sp-fenster-innen breit">
@@ -467,7 +541,8 @@
           <section><h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
-          <section><h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
+          <section><h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
+            <h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
             ${rw ? `<h4>${esc(rw.name)}</h4>${gm(rw.text)}<table class="sz-tab"><tbody>${(rw.tabelle || []).map(z => `<tr><td>${esc((z.w || []).join(", "))}</td><td><b>${esc(z.titel || "")}</b> ${esc(z.gmNotiz || "")}</td></tr>`).join("")}</tbody></table>` : ""}
             <h4>Protokoll</h4><ol class="sp-protokoll">${stand.protokoll.slice(-14).reverse().map(p => `<li><small>R${p.runde}</small> ${esc(p.text)}</li>`).join("")}</ol></section>
         </div></div></div>`;
@@ -512,6 +587,7 @@
       <div class="sp-mitte ${mitSeite(s) ? "" : "ohne-seite"}">
         <section class="sp-karte typ-${farbe}">
           <header><span class="sp-typ">${zeichen} ${esc(etikett)}</span><h3>${esc(s.titel || "")}</h3></header>
+          ${antreiberHtml(antreiberZu === `zeigen:${stand.schritt}`)}
           ${schrittInhalt(s)}
           ${letzteEreignisse()}
           <footer>${s.typ === "wahl" ? `<span class="hint">Wähle die Antwort, die am nächsten an dem ist, was die Spieler sagen (1–${s.optionen.length}).</span>` : !naechster ? `<span class="hint">Ende der Map.</span>`
@@ -601,6 +677,12 @@
         case "lage": fenster = "lage"; zeige(); break;
         case "vollbild": vollbild(); break;
         case "popzu": popup = null; zeige(); break;
+        case "antreiben": antreiberZu = `zeigen:${stand.schritt}`; zeige(); break;
+        case "antreiber-naechster": antreiberNr++; zeige(); break;
+        case "antreiber-zu": antreiberZu = stand.schritt; zeige(); break;
+        case "log": fenster = "log"; zeige(); break;
+        case "geben": tue(() => motor.gibBeute(stand, t.dataset.held, t.dataset.sache)); break;
+        case "benutzen": tue(() => motor.benutze(stand, t.dataset.held, +t.dataset.i)); break;
         case "zu": fenster = null; eingabeFuer = null; zeige(); break;
         case "eingabe-frei": { const v = ($("spEingabeFrei") || {}).value; if (v && v.trim()) eingabeFertig(v.trim()); break; }
         case "schliessen": await speichere(); stand = null; standId = null; popup = null; fenster = null; stoppe(); if (document.fullscreenElement) document.exitFullscreen(); await ladeListe(); zeige(); break;
@@ -622,7 +704,7 @@
         if (knopf) eingabeFertig(knopf.dataset.eingabe);
         e.preventDefault(); return;
       }
-      if (fenster) { if (k === "l" || k === "L") { fenster = null; zeige(); } return; }
+      if (fenster) { if ((k === "l" || k === "L") && fenster === "lage") { fenster = null; zeige(); } if ((k === "p" || k === "P") && fenster === "log") { fenster = null; zeige(); } return; }
       // Eine offene Probe nimmt die Ziffern zuerst: Der Spieler hat gerade gewürfelt
       const offen = offeneProbe();
       if (offen >= 0 && /^[1-6]$/.test(k)) { probe(offen, +k); return; }
@@ -641,6 +723,7 @@
       if (k === "r" || k === "R") { if (stand.rundenAktiv) runde(); return; }
       if (k === "w" || k === "W") { if (map.rundenwurf && stand.rundenAktiv) rundenwurf(0); return; }
       if (k === "l" || k === "L") { fenster = "lage"; zeige(); return; }
+      if (k === "p" || k === "P") { fenster = "log"; zeige(); return; }
       if (k === "a" || k === "A") { if (s && s.cue) spiele(s.cue); return; }
       if (k === "s" || k === "S") { stoppe(); zeige(); return; }
       if (k === "n" || k === "N") { if ([...stand.verlauf].some(id => (map.schritte[id] || {}).typ === "npc")) { fenster = "npc"; zeige(); } return; }
@@ -655,6 +738,15 @@
       if (markiert && markiert.startsWith("g:") && (k === "+" || k === "-" || k === "*")) tue(() => motor.schaden(stand, markiert.slice(2), k === "+" ? 1 : k === "*" ? 2 : -1));
     });
   }
+
+  // Die Uhr läuft weiter, auch wenn niemand klickt; überschreitet ein Schritt sein Zeitlimit, erscheint der Antreiber
+  let warSpaet = false;
+  setInterval(() => {
+    if (!stand || $("tabSpielen").hidden) return;
+    const spaet = ueberzogen();
+    if (spaet && !warSpaet && !fenster) zeige(); else zeigeKopf();
+    warSpaet = spaet;
+  }, 30000);
 
   window.KartenschmiedeSpiel = {
     async zeigen() {

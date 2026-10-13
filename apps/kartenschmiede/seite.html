@@ -838,7 +838,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-unten { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg2); }
 .sp-evs, .sp-runden { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 /* Viele Aktionen (Map 2 draußen hat 13): höchstens drei Zeilen, der Rest scrollt; die Rundenknöpfe bleiben in einer Zeile */
-.sp-evs { flex: 1; min-width: 0; max-height: 118px; overflow: auto; }
+.sp-evs { flex: 1; min-width: 0; max-height: 136px; overflow: auto; }
 .sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; }
 .sp-runden { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 5px; justify-content: end; flex-shrink: 0; }
 @media (max-width: 1000px) { .sp-app { position: static; display: block; } .sp-mitte { grid-template-columns: 1fr; } .sp-seite { overflow: visible; } .sp-unten { flex-wrap: wrap; } }
@@ -859,6 +859,56 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
 .sp-protokoll small { color: var(--brass); margin-right: 6px; }
 .sp-kartenbox { width: 100%; }
+/* Aktionsleiste: nach Gruppen gegliedert, jede Gruppe mit Etikett und Farbstreifen */
+.sp-evs { gap: 6px 10px; }
+.sp-gruppe { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 3px 6px 3px 0; border-left: 3px solid var(--gf, var(--line)); padding-left: 6px; }
+.sp-gruppe > span { font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--gf, var(--dim)); margin-right: 2px; }
+.sp-gruppe.g-untersuchen { --gf: #f2cf4a; } .sp-gruppe.g-bewegen { --gf: #6fb0ff; } .sp-gruppe.g-wege { --gf: #9fb4ff; }
+.sp-gruppe.g-story { --gf: #cfa75e; } .sp-gruppe.g-fragen { --gf: #a26bff; } .sp-gruppe.g-lärm { --gf: #ff8a1f; } .sp-gruppe.g-kampf { --gf: #ff4a36; }
+/* Uhr und Antreiber */
+.sp-uhr { display: inline-flex; align-items: center; padding: 0 8px; font: 700 14px var(--ui); color: var(--dim); font-variant-numeric: tabular-nums; }
+.sp-uhr.spaet { color: #ff8a1f; }
+.sp-antreiber { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #ff8a1f; border-radius: 8px; background: rgba(255,138,31,.08); }
+.sp-antreiber header { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-family: var(--ui); }
+.sp-antreiber header span { display: inline-flex; gap: 6px; }
+.sp-antreiber .sp-lies { font-size: 21px; }
+/* Beute und Inventar */
+.sp-beutezeile { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--ui); }
+.sp-beute { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sp-beute small { color: var(--dim); font-size: 14px; }
+.sp-beute > span { display: inline-flex; gap: 4px; align-items: center; font-size: 14px; }
+.sp-inventar { list-style: none; padding: 0 !important; display: grid; gap: 4px; font-size: 15px; }
+.sp-inventar small { color: var(--dim); }
+.sp-inventare { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.sp-pop h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+/* NPC-Fenster: Steckbrief und Kernsätze oben, unten was sie weiß und was nicht */
+.sp-npc-oben { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.sp-npc-steckbrief { display: grid; gap: 8px; }
+.sp-npc-steckbrief dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.sp-npc-steckbrief dt { font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); padding-top: 3px; }
+.sp-npc-steckbrief dd { margin: 0; }
+.sp-npc-kern { display: grid; gap: 8px; }
+.sp-npc-kern .sp-lies { font-size: 21px; padding: 10px 14px; }
+.sp-npc-unten { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .9fr); gap: 22px; align-items: start; border-top: 1px solid var(--line); padding-top: 12px; }
+.sp-npc-unten section { display: grid; gap: 8px; }
+.sp-weiss td:first-child { width: 58% !important; font-family: var(--prose) !important; font-weight: 400 !important; }
+.sp-weiss td:last-child { color: var(--dim); font-family: var(--ui); }
+.sp-mehr summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+@media (max-width: 900px) { .sp-npc-oben, .sp-npc-unten { grid-template-columns: 1fr; } }
+/* Log */
+.sp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sp-log li { display: grid; grid-template-columns: 34px 24px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.sp-log li.art-wahl { border-color: #e2483a; }
+.sp-log-r { font: 700 13px var(--ui); color: var(--brass); padding-top: 3px; }
+.sp-log b { font: 700 17px var(--ui); display: block; }
+.sp-log small { color: var(--dim); font: 500 13px var(--ui); }
+.sp-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.sp-chip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); font: 600 13px var(--ui); }
+.sp-chip.spaeter { border-color: var(--brass); }
+.sp-chip i { font-style: normal; color: var(--brass); font-weight: 800; }
+.sp-chip.hoch { border-color: #ff8a1f; color: #ffb070; } .sp-chip.runter { border-color: #6fb0ff; color: #9fc8ff; } .sp-chip.flag { color: var(--ink); }
+.sp-schwellen { list-style: none; padding: 0 !important; margin: 4px 0 0; font: 500 14px var(--ui); color: var(--dim); }
+.sp-schwellen li.ja { color: #ff8a1f; }
 body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
 </style>
 
