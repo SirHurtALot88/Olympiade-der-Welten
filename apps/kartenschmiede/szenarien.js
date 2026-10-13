@@ -441,7 +441,7 @@
         konsequenzen: [
           "Zwei oder mehr Menschen gerettet: Sie zünden in Map 5 ein Signalfeuer, die Marines finden den Brunnen schneller (+1 Marine).",
           "Ein Befallener im Keller: In Map 5 kommen aus dem Gemeindehaus 2 zusätzliche Gegner.",
-          "Der Schmied wurde besiegt: Die Myzel-Soldaten in Map 4 hören keinen Takt mehr – sie wachen eine Runde später auf.",
+          "Der Schmied wurde besiegt: Die Myzel-Soldaten in Map 4 hören keinen Takt mehr. In der ersten Runde nach dem Erwachen gilt für sie die ruhige Tabelle.",
           "Brunnen mit Gewalt geöffnet: Atemzug-Leiste +1.",
           "Gemeinde aus Map 2 wach: Sie kommt ab Runde 3 über den Hauptweg (2 Figuren je Runde).",
         ],
@@ -498,7 +498,7 @@
           "Protokoll mitgenommen: Ein Held, der es in Ruhe liest (eine Rast), kennt die Schwachstelle des Herzens: Angriffe auf das Herz mit DS(+1).",
           "Probe mitgenommen: Die Marines wollen sie haben. In Map 5 könnt ihr sie ihnen geben, statt das Herz zu verlassen – oder sie damit täuschen (die Probe ist tot).",
           "Kein Fundstück: Map 5 ohne Vorteil, Atemzug-Leiste +1.",
-          "Der Schmied lebt noch (Map 3): Die Soldaten wachen eine Runde früher auf (3 statt 4 Runden Vorlauf, dann 4 Runden durchhalten).",
+          "Der Schmied lebt noch (Map 3): Der Takt hallt bis hierher. Die Soldaten starten das Erwachen sofort mit der wütenden Tabelle.",
         ],
         hinweis: "Hier soll es kippen. Beschreibt das Metall erst, wenn es jemand berührt, und nennt nie Wörter wie Station oder Soldat – es sind „Rüstungsmänner“, so wie Hedda sie nannte. Die Myzel-Soldaten sind absichtlich zu stark: Startwelle 100 % der Heldenpunkte, unabhängig von der Schwierigkeit. Wer kämpft statt zu rennen, soll verlieren können, aber 4 Runden in guter Deckung sind schaffbar. Am Ende von Runde 4 erstarren alle Soldaten und horchen nach oben: Bohrlärm, Licht, Funk. Dort endet die Map.",
         gegner: "Myzel-Soldaten (Sci-Fi-Gegner, Fraktion Urwild mit Gift-Prägung oder Menschen mit Sci-Fi-Waffen; Waffen funktionieren noch, z. B. Gewehr 24\" A2). Vor dem Erwachen: Sporenlinge in den Wurzelgängen (2 je Feindzone).",
