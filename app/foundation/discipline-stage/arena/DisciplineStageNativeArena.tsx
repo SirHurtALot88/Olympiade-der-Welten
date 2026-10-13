@@ -107,6 +107,13 @@ export type NativeStageTeam = {
    * Team keinen benannt hat) → kleiner Stern am Wappen (`TokenChrome`).
    */
   captainName?: string | null;
+  /**
+   * Task #116 (Fechten sequenziell/Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU
+   * diesem Zwei-Team-Arena-Duell (nur gesetzt, wenn die Disziplin arena-aufgeloest ist, sonst
+   * `null`/`undefined`). Treibt für `prim === "lamps"` die paarweise Board-für-Board-Sequenz +
+   * den Matchup-Reveal (`advance()` unten) -- jede andere Disziplin ignoriert das Feld.
+   */
+  opponentTeamId?: string | null;
 };
 export type StagePrimitive =
   | "track"
@@ -975,6 +982,11 @@ export function renderTerritory(sorted: RT[], W: number, H: number, env: StageEn
 }
 
 export const STAR_MIN = 80;
+// Task #116 (Fechten sequenziell/Reveal): wie lange die "wer gegen wen"-Karte vor einem Fecht-
+// Paar-Board steht, bevor die Cascade mit diesem Paar weiterläuft. Bewusst kurz ("n kleinen
+// Reveal", Chris 13.10.) -- lang genug zum Lesen von Namen + Eignung, kurz genug, um nicht den
+// Fluss der Runde zu bremsen.
+export const FECHT_REVEAL_MS = 1100;
 // Staffel/track: eine Reveal-Runde dauert ~5 s (langsam, folgbar). Innerhalb einer
 // Runde peilen ALLE Token gleichzeitig ihre Runden-Endposition an und gleiten
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
@@ -1361,6 +1373,9 @@ export type RT = {
   // Highlight-Zooms und Farbgeber des Puls-Rings (rot statt Medaillenfarbe).
   stageInjured: boolean;
   glowUntil: number;
+  // Task #116: s. `NativeStageTeam.opponentTeamId` -- 1:1 durchgereicht, hier zusätzlich gegen
+  // `null` statt `undefined` normalisiert (einfacherer Vergleich in der Paar-Bildung unten).
+  opponentTeamId: string | null;
 };
 
 type Impact = { tier: 0 | 1 | 2; cause: string; color: string; text: string; delta: number };
@@ -1575,6 +1590,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       rel: t.rel ?? null,
       missingLineup: t.missingLineup ?? false,
       captainName: t.captainName ?? null,
+      opponentTeamId: t.opponentTeamId ?? null,
       players: t.players,
       seasonRank: t.seasonRank ?? idx + 1,
       laneIdx: idx,
@@ -1634,6 +1650,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
    */
   const [pops, setPops] = useState<Pop[]>([]);
   const [frags, setFrags] = useState<Frag[]>([]);
+  /**
+   * Task #116 (Fechten sequenziell/Reveal, Chris 13.10. — docs/design/chris-feedback-breite-
+   * runde-13-10.md Abschnitt "Fechten" Punkt 15): „die Spieler sollen auch nacheinander 1v1
+   * kämpfen und nicht alle gleichzeitig die permanent durchgeschaltet werden - da könnte man
+   * auch n kleinen Reveal machen wer gegen wen - evtl die Stats zeigen wie die Eignung ist".
+   *
+   * NUR für `prim === "lamps"` (Fechten) befüllt. Ein Board (= eine Runde `r`) enthüllte bisher
+   * ALLE Teams der Liga im Gleichschritt, kurz nacheinander durchgetaktet (`order` unten) — exakt
+   * das „alle gleichzeitig durchgeschaltet", über das Chris sich beschwert. Für lamps wird `order`
+   * stattdessen nach Gegner-Paaren (`opponentTeamId`) gruppiert: EIN Duell-Paar enthüllt sein
+   * Board vollständig (beide Seiten direkt hintereinander), DANN erst das nächste Paar — mit
+   * genau diesem kleinen Reveal (wer gegen wen + Eignung = `NativeStagePlayer.val`, derselbe
+   * Basiswert, den auch die Simulation nutzt) davor. Teams ohne auflösbaren Gegner (fehlende
+   * Paarung, Modell-/Random-Vorschau ohne Arena-Duell) fallen auf die alte Einzel-Enthüllung ohne
+   * Reveal-Karte zurück — keine Regression, nur kein Zusatz.
+   */
+  const [fechtDuel, setFechtDuel] = useState<{
+    a: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    slotLbl: string;
+  } | null>(null);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
   // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
   const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
@@ -1845,6 +1882,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBanner(null);
     setHandoffTs(0);
     setPhotoFinish(false);
+    setFechtDuel(null); // Task #116: keine stehengebliebene Matchup-Karte nach „↻ Neu"
     setStageCrown(null);
     stageCrownRef.current = { list: [], stage: 0, label: null };
     setDemandKg(null);
@@ -2870,7 +2908,41 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       }
     }
     const order = [...rt].sort((a, b) => b.trueRank - a.trueRank); // schlechteste zuerst
+    /**
+     * Task #116: für lamps (Fechten) `order` nach Gegner-Paaren umgruppieren, statt die
+     * Einzelteam-Reihenfolge zu übernehmen -- EIN Duell-Paar (beide Seiten direkt
+     * hintereinander) statt der Liga im Gleichschritt. Die Rangfolge der PAARE bleibt
+     * "schlechtestes zuerst" (dieselbe Dramaturgie wie vorher: das beste Team/Paar kommt
+     * zuletzt). Ein Team ohne auflösbaren Gegner (fehlende Paarung) bleibt einzeln in der
+     * Reihenfolge -- kein Absturz, nur kein Paar-Reveal dafür.
+     */
+    let pairStartIdx: Set<number> | null = null;
+    let pairPartnerAtIdx: Map<number, RT> | null = null;
+    if (prim === "lamps") {
+      const byTeamId = new Map(rt.filter((t) => t.teamId).map((t) => [t.teamId as string, t]));
+      const used = new Set<number>();
+      const pairedOrder: RT[] = [];
+      const starts = new Set<number>();
+      const partners = new Map<number, RT>();
+      for (const t of order) {
+        if (used.has(t.idx)) continue;
+        used.add(t.idx);
+        const opp = t.opponentTeamId ? byTeamId.get(t.opponentTeamId) ?? null : null;
+        starts.add(pairedOrder.length);
+        pairedOrder.push(t);
+        if (opp && opp.idx !== t.idx && !used.has(opp.idx)) {
+          used.add(opp.idx);
+          partners.set(pairedOrder.length - 1, opp);
+          pairedOrder.push(opp);
+        }
+      }
+      order.length = 0;
+      order.push(...pairedOrder);
+      pairStartIdx = starts;
+      pairPartnerAtIdx = partners;
+    }
     let i = 0;
+    const revealShownAt = new Set<number>(); // Paar-Start-Indizes, deren Reveal-Karte schon lief
     const doOne = () => {
       // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
       // busyRef bleibt true → Reihenfolge/Choreografie unverändert). Gleiches gilt für
@@ -2879,6 +2951,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       if (pauseRef.current || manualPauseRef.current || highlightHoldRef.current > Date.now()) {
         later(doOne, 120);
         return;
+      }
+      // Task #116: Matchup-Reveal vor jedem neuen Fecht-Paar (nur lamps, nur echte Paare mit
+      // aufgelöstem Gegner) -- "wer gegen wen" + Eignung (NativeStagePlayer.val) für GENAU
+      // dieses Board, bevor das Paar enthüllt. Einzelteams ohne Partner (kein `pairPartnerAtIdx`-
+      // Eintrag) bekommen keine Karte und laufen wie bisher durch.
+      if (pairStartIdx?.has(i) && !revealShownAt.has(i) && i < order.length) {
+        const partner = pairPartnerAtIdx?.get(i) ?? null;
+        if (partner) {
+          revealShownAt.add(i);
+          const home = order[i]!;
+          setFechtDuel({
+            a: { code: home.code, name: home.name, logoUrl: home.logoUrl, isOwn: home.isOwn, player: home.players[r] ?? null },
+            b: { code: partner.code, name: partner.name, logoUrl: partner.logoUrl, isOwn: partner.isOwn, player: partner.players[r] ?? null },
+            slotLbl: slots[r] ?? `Gefecht ${r + 1}`,
+          });
+          later(() => {
+            setFechtDuel(null);
+            doOne();
+          }, FECHT_REVEAL_MS);
+          return;
+        }
       }
       if (i >= order.length) {
         // Rundenende
@@ -3122,6 +3215,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       stageCrownRef.current = { list: [], stage: 0, label: null };
       setDemandKg(null);
       setBarbellMsg(null);
+      setFechtDuel(null); // Task #116: Sprung-Zielbild ohne Kaskade zeigt keine stehende Matchup-Karte
       barbellDemandRef.current = null;
       barbellPrevDemandRef.current = null;
       barbellPrevRankRef.current = {};
@@ -3362,6 +3456,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setHandoffTs(0);
     setPhotoFinish(false);
     setStageCrown(null);
+    setFechtDuel(null); // Task #116: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
     // Jede laufende Pause (Leertaste/Hover ODER eine Perioden-Pause, Feature „Viertel/
     // Drittel/Halbzeit" weiter unten) ist nach einem Quick-Sim gegenstandslos — sonst stuende
     // die Buehne auf „✔ Disziplin gewertet" UND zeigte weiterhin den „⏸ Pausiert"-Chip.
@@ -4137,6 +4232,56 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             Gewichtheben ab, das oben seine eigene „Dein Heber"-Karte hat. (Der frühere schlanke
             MyTracker-Fallback war toter Code: animField ≡ prim !== "barbell".) */}
         {me && animField ? renderMyTeamCard() : null}
+
+        {/* Task #116 (Fechten sequenziell/Reveal): Matchup-Karte vor jedem Fecht-Paar-Board --
+            "wer gegen wen" + Eignung (NativeStagePlayer.val, derselbe Basiswert wie die
+            Simulation). Nur lamps, nur wenn ein echtes Gegner-Paar aufgelöst werden konnte. */}
+        {prim === "lamps" && fechtDuel ? (
+          <div
+            className="oly-anim"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+              padding: "10px 16px",
+              marginBottom: 10,
+              borderRadius: 12,
+              border: "1.5px solid var(--nl-warn)",
+              background: "color-mix(in srgb, var(--nl-warn) 10%, var(--nl-panel))",
+            }}
+          >
+            {([fechtDuel.a, fechtDuel.b] as const).map((side, sideIdx) => (
+              <Fragment key={sideIdx}>
+                {sideIdx === 1 ? (
+                  <div style={{ flex: "none", fontWeight: 900, fontSize: 15, letterSpacing: "0.06em", color: "var(--nl-warn)" }}>⚔ VS</div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                  <PlayerMark
+                    src={side.player?.portraitUrl ?? null}
+                    alt={side.player?.name ?? side.code}
+                    size={34}
+                    isOwn={side.isOwn}
+                    starTier={getPlayerStarTier(side.player?.ovrRank)}
+                  />
+                  <div style={{ minWidth: 0, textAlign: sideIdx === 1 ? "right" : "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                      <TeamMark src={side.logoUrl} alt={side.name} size={15} radius={4} isOwn={side.isOwn} placeholderColor={teamPrimaryColor(side.code)} placeholderLabel={side.code} />
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em", color: side.isOwn ? "var(--nl-accent)" : "var(--nl-mut)" }}>{side.code}</span>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap" }}>{side.player?.name ?? "—"}</div>
+                    <div style={{ fontSize: 11, color: "var(--nl-mut)" }}>
+                      Eignung {side.player ? fmt1(side.player.val) : "–"}
+                    </div>
+                  </div>
+                </div>
+              </Fragment>
+            ))}
+            <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
+              {fechtDuel.slotLbl}
+            </div>
+          </div>
+        ) : null}
 
         {/* Spotlight-Banner — bei Verletzung erzwingt der Risk-Ton Rahmen/Kicker/Score,
             unabhängig von mine/warn, damit der verletzte Spieler nie als normaler

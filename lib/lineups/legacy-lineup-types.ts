@@ -585,7 +585,24 @@ export type LegacyResolvePreviewOptions = {
    */
   arenaTeamPointsByDisciplineId?: ReadonlyMap<
     string,
-    ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string; momente?: ArenaMomentEintrag[] }>
+    ReadonlyMap<
+      string,
+      {
+        teamPoints: number;
+        arenaMatchSeed: string;
+        momente?: ArenaMomentEintrag[];
+        /**
+         * Task #116 (Fechten sequenziell/Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU
+         * diesem Zwei-Team-Duell -- durchgereicht aus `ArenaTeamPointsOverride.opponentTeamId`
+         * (lib/resolve/battle-mode-arena-team-points.ts), das dieses Feld schon immer trug. Bis
+         * hierher wurde es an dieser engen Zwischenstelle STILL fallengelassen (dieselbe Lücke wie
+         * bei `momente`, bevor es hier ergänzt wurde) -- reine Typ-Erweiterung, keine Laufzeit-
+         * änderung: das Objekt trug das Feld schon, nur ungenutzt. Erlaubt der Bühne, Fecht-Duelle
+         * paarweise zu sequenzieren statt alle Teams im Gleichschritt zu enthüllen.
+         */
+        opponentTeamId?: string;
+      }
+    >
   > | null;
   /**
    * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7) — SEIT

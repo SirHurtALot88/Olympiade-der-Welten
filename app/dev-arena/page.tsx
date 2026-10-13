@@ -75,6 +75,10 @@ function buildTeams(): NativeStageTeam[] {
       };
     });
     const rel = i === 8 || i === 4 ? "mine" : i === 5 || i === 22 ? "ally" : i === 19 || i === 27 ? "rival" : null;
+    // Task #116 (Fechten sequenziell/Reveal): Nachbar-Paarung (0<->1, 2<->3, ...) -- derselbe
+    // Zweck wie `opponentTeamId` in der Produktions-Preview, hier synthetisch, damit sich die
+    // Fecht-Paar-Sequenz + der Matchup-Reveal im Dev-Harness ohne echten Spielstand zeigen lässt.
+    const partnerIdx = i % 2 === 0 ? i + 1 : i - 1;
     return {
       code,
       name: `Team ${code}`,
@@ -83,6 +87,7 @@ function buildTeams(): NativeStageTeam[] {
       players,
       seasonRank: i + 1,
       teamId: `team-${code}`,
+      opponentTeamId: `team-${CODES[partnerIdx]}`,
       rel: rel as NativeStageTeam["rel"],
     };
   });
