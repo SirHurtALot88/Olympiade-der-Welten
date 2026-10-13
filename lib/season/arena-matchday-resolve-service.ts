@@ -191,9 +191,10 @@ async function fuehreArenaMatchdayApplyAus(input: {
     // dieses "ein Browser zur selben Zeit"-Muster bewusst begrenzt. Kostet dafuer bis zu doppelte
     // Laufzeit (6-16+ Sekunden je Disziplin) — im Hintergrundlauf, den ohnehin niemand synchron
     // abwartet, ein bewusst akzeptierter Preis.
-    // opponentTeamId (Task #116, Fechten-Reveal): nur die Typ-Annotation wird hier breiter -- der
-    // Wert selbst ist seit je her die volle `ArenaTeamPointsOverride` (s. dortigen Kommentar),
-    // `runBattleModeArenaMatchday()` gibt sie unveraendert durch. S. Kommentar an
+    // opponentTeamId (Tasks #116/#126/#127, Fechten/Tennis/Schach-Reveal): nur die
+    // Typ-Annotation wird hier breiter -- der Wert selbst ist seit je her die volle
+    // `ArenaTeamPointsOverride` (s. dortigen Kommentar), `runBattleModeArenaMatchday()` gibt sie
+    // unveraendert durch. S. Kommentar an
     // `arenaTeamPointsByDisciplineId` in legacy-lineup-types.ts.
     const arenaTeamPointsByDisciplineId = new Map<
       string,

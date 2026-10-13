@@ -2040,8 +2040,9 @@ export default function DisciplineStageArena({
           missingLineup: t.missingLineup,
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
-          // Task #116 (Fechten sequenziell/Reveal): Gegner-Team-ID aus dem Arena-Duell, sonst
-          // null -- treibt die paarweise Board-Sequenz + Matchup-Reveal (prim === "lamps").
+          // Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal): Gegner-Team-ID aus
+          // dem Arena-Duell, sonst null -- treibt die paarweise Board-Sequenz + Matchup-Reveal in
+          // DisciplineStageNativeArena.tsx (`prim === "lamps"`/`"klassen"`).
           opponentTeamId: t.opponentTeamId,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           //
@@ -2078,7 +2079,7 @@ export default function DisciplineStageArena({
           missingLineup: false,
           // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
           captainName: null as string | null,
-          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Task #116).
+          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Tasks #116/#126/#127).
           opponentTeamId: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
@@ -2192,6 +2193,9 @@ export default function DisciplineStageArena({
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
         captainName: t.captainName,
+        // Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): 1:1 durchgereicht aus der oben
+        // gebauten `teams`-Zwischenstufe → NativeStageTeam.opponentTeamId.
+        opponentTeamId: t.opponentTeamId,
         // Luecken bleiben Luecken (Ticket #35) — `null` heisst „diese Etappe ist unbesetzt".
         players: t.players.map((p) =>
           p == null

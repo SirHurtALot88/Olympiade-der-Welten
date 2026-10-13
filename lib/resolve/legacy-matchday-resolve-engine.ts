@@ -797,10 +797,10 @@ export function buildLegacyMatchdayResolvePreview(
         arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
         // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): s. `ArenaMomentEintrag`-Kommentar.
         momente: arenaOverride?.momente ?? null,
-        // Task #116 (Fechten sequenziell/Reveal): die Gegner-Team-ID dieses Zwei-Team-Duells, nur
-        // gesetzt bei `resolutionSource === "arena"` -- die Bühne braucht sie, um Fecht-Boards
-        // paarweise zu sequenzieren statt alle Teams im Gleichschritt zu enthüllen (s.
-        // DisciplineStageNativeArena.tsx, `prim === "lamps"`).
+        // Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal): die Gegner-Team-ID
+        // dieses Zwei-Team-Duells, nur gesetzt bei `resolutionSource === "arena"` -- die Bühne
+        // braucht sie, um Boards paarweise zu sequenzieren statt alle Teams im Gleichschritt zu
+        // enthüllen (s. DisciplineStageNativeArena.tsx, `prim === "lamps"`/`"klassen"`).
         opponentTeamId: arenaOverride?.opponentTeamId ?? null,
       };
     });
