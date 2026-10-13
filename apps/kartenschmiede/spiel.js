@@ -649,7 +649,8 @@
         <p class="hint">Für alles, was nicht im Skript steht: ein NPC wird angegriffen, eine Gestalt steht doch auf, du willst nachlegen. Die Figur erscheint auf der Tischkarte und in der Gegnerliste.</p>
         <div class="row4"><label class="f">Anzahl <input type="number" id="spNeuAnzahl" min="1" max="12" value="1"></label>
           <label class="f">Zone <select id="spNeuZone"><option value="">Tischmitte</option>${zonen.map(z => `<option>${esc(z)}</option>`).join("")}</select></label></div>
-        ${npcs.length ? `<h4>NPC kämpft</h4><div class="sp-neu-liste">${npcs.map(([id, f]) => `<button type="button" class="btn sm" data-npc-kampf="${esc(id)}">⚔ ${esc(f.name)}</button>`).join("")}</div>` : ""}
+        <h4>NPC kämpft</h4><div class="sp-neu-liste">${npcs.map(([id, f]) => `<button type="button" class="btn sm" data-npc-kampf="${esc(id)}" title="${f.kampf ? "Haupt-NPC mit eigenen Kampfwerten" : "Ohne eigene Werte: schwache Grundwerte"}">⚔ ${esc(f.name)}${f.kampf ? "" : " (schwach)"}</button>`).join("")}
+          <button type="button" class="btn ghost sm" data-sp="npc-namenlos" title="Passant, Gehilfe, Dorfbewohner: Qualität 6+, Verteidigung 6+, Zäh 1">⚔ Namenloser NPC</button></div>
         <h4>Aus dieser Map</h4><div class="sp-neu-liste">${ausMap.map(([id, d]) => `<button type="button" class="btn ghost sm" data-neu="${esc(id)}">${esc(d.name || id)}</button>`).join("")}</div>
         <h4>Aus den Vorlagen</h4><div class="sp-neu-liste">${vorlagen.map(v => `<button type="button" class="btn ghost sm" data-vorlage="${esc(v.key)}">${esc(v.d.name)}</button>`).join("")}</div>
       </div></div>`;
@@ -848,6 +849,7 @@
         case "antreiber-zu": antreiberZu = stand.schritt; zeige(); break;
         case "log": fenster = "log"; zeige(); break;
         case "gegner-neu": fenster = "gegner-neu"; zeige(); break;
+        case "npc-namenlos": { const anzahl = Math.max(1, Math.min(12, +(($("spNeuAnzahl") || {}).value) || 1)), zone = ($("spNeuZone") || {}).value || ""; fenster = null; tue(() => motor.zufallsNpc(stand, "", anzahl, zone)); break; }
         case "erinnern": erinnern = !erinnern; zeige(); break;
         case "geben": tue(() => motor.gibBeute(stand, t.dataset.held, t.dataset.sache)); break;
         case "benutzen": tue(() => motor.benutze(stand, t.dataset.held, +t.dataset.i)); break;

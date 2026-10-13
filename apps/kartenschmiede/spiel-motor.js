@@ -275,9 +275,13 @@
       return neu;
     }
     // Ein NPC kämpft (wird angegriffen oder greift an): aus der Figur wird ein Gegner an ihrer Stelle am Tisch
-    // Ohne eigene Kampfwerte kämpft ein NPC als einfacher Dorfbewohner (gilt für jede Figur jeder Map, auch Händler)
-    const STANDARD_NPC = name => ({ werte: { name, faction: "NPC", quality: "5+", defense: "6+", tough: "2", size: "1", role: "enemy",
-      weapons: "Fäuste oder Werkzeug | Nahkampf | A1 | ", passives: "" }, notiz: "Standardwerte für einen NPC ohne eigene Kampfwerte. Mit „Anpassen“ stärker oder schwächer machen." });
+    // Haupt-NPCs bringen eigene Kampfwerte mit (`kampf`). Wer keine hat, ist ein namenloser NPC und kämpft mit
+    // schwachen Grundwerten: Er fällt beim ersten Treffer (gilt für jede Figur jeder Map, auch einen Händler)
+    const STANDARD_NPC = name => ({ werte: { name, faction: "NPC", quality: "6+", defense: "6+", tough: "1", size: "1", role: "enemy",
+      weapons: "Fäuste oder Werkzeug | Nahkampf | A1 | ", passives: "" }, info: "Namenloser NPC: schwache Grundwerte, fällt beim ersten Treffer.",
+      notiz: "Grundwerte für einen namenlosen NPC. Mit „Anpassen“ stärker machen, wenn er mehr aushalten soll." });
+    // Ein namenloser NPC, der nicht als Figur in der Map steht (Passant, Händlergehilfe …), auf Knopfdruck
+    const zufallsNpc = (state, name, anzahl, zone) => fuegeGegnerHinzu(state, "npc-namenlos", anzahl, zone, { name: name || "Namenloser NPC", ...STANDARD_NPC(name || "Namenloser NPC") });
     function npcAlsGegner(state, figurId) {
       const f = (map.figuren || {})[figurId];
       if (!f || state.npcKampf[figurId]) return null;
@@ -584,7 +588,7 @@
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
-      effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, auftraege,
+      effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, zufallsNpc, auftraege,
       schritt: state => map.schritte[state.schritt] || null,
       naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
     };

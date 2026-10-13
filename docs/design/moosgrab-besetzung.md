@@ -17,6 +17,10 @@ Gemeinde und Befallene können dieselben Figuren sein (sie sind dieselben Mensch
 
 ## NPCs (sprechen, können aber angegriffen werden)
 
+Das sind die Haupt-NPCs: Sie bekommen eine eigene Mini und eigene Kampfwerte. Namenlose NPCs (Passanten, Gehilfen)
+brauchen keine eigene Mini; greift man sie an, kämpfen sie mit schwachen Grundwerten (Qualität 6+, Verteidigung 6+,
+Zäh 1) und fallen beim ersten Treffer.
+
 | Rolle | Map | Anzahl | Mini |
 |---|---|---:|---|
 | Die Frau aus den Wurzeln (Lene), halb verwandelt | 1 | 1 | |
