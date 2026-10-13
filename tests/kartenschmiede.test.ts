@@ -678,6 +678,36 @@ const MINI = {
   },
 };
 describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  it("stärkt und schwächt Gegner, holt Gegner dazu und lässt NPCs kämpfen", () => {
+    type G = { uid: string; id: string; zaeh: number };
+    const m = SM.erstelle(JSON.parse(JSON.stringify(MINI)), { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2 & {
+      effektiveWerte(s: Stand2, g: G): Record<string, string>; modText(s: Stand2, g: G): Array<{ text: string }>; passeGegnerAn(s: Stand2, z: { uid?: string; typ?: string }, mod: Record<string, unknown>, t: string): void;
+      fuegeGegnerHinzu(s: Stand2, id: string, n: number, zone: string, def?: unknown): G[]; npcAlsGegner(s: Stand2, id: string): G | null; figurenAmTisch(s: Stand2): Array<{ id: string }>;
+    };
+    const s = m.neu();
+    m.weiter(s);
+    const boss = s.gegner[0] as G;
+    m.passeGegnerAn(s, { uid: boss.uid }, { quality: 1, tough: 2, passives: ["Dornen"] }, "stärker");
+    expect(m.effektiveWerte(s, boss)).toMatchObject({ tough: "5", passives: "Dornen" });
+    expect(boss.zaeh).toBe(5);
+    expect(m.modText(s, boss).map(x => x.text)).toContain("Dornen");
+    const neu = m.fuegeGegnerHinzu(s, "boss", 2, "", undefined);
+    expect(neu).toHaveLength(2);
+    expect(neu[0].zaeh).toBe(3);
+    m.passeGegnerAn(s, { typ: "boss" }, { tough: -1 }, "alle schwächer");
+    expect(neu[0].zaeh).toBe(2);
+    expect(m.fuegeGegnerHinzu(s, "boss", 1, "", undefined)[0].zaeh).toBe(2);
+    const v = m.fuegeGegnerHinzu(s, "v-wolf", 1, "", { name: "Wolf", werte: { tough: "4", quality: "4+", weapons: "Biss | Nahkampf | A2 | " } })[0];
+    m.passeGegnerAn(s, { uid: v.uid }, { attacks: 1, quality: 1 }, "Rudel");
+    expect(m.effektiveWerte(s, v)).toMatchObject({ quality: "3+", weapons: "Biss | Nahkampf | A3 | " });
+    s.flags.umgedreht = true;
+    expect(m.figurenAmTisch(s).map(f => f.id)).toEqual(["frau"]);
+    const frau = m.npcAlsGegner(s, "frau")!;
+    expect(frau.id).toBe("npc-frau");
+    expect(m.figurenAmTisch(s)).toEqual([]);
+    expect(m.npcAlsGegner(s, "frau")).toBeNull();
+    expect((s as unknown as { log: Array<{ art: string }> }).log.filter(e => e.art === "gegner").length).toBeGreaterThanOrEqual(5);
+  });
   it("führt ein Log mit Leisten- und Entscheidungsänderungen, ein Inventar und Antreiber nach Zeitlimit", () => {
     let uhr = 0;
     const m = SM.erstelle(MINI, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0, jetzt: () => uhr }) as unknown as Motor2 & {

@@ -101,6 +101,15 @@
      "ist": true
     },
     "text": "Beim Hinhören in der Kapelle würfelt der Held mit +1."
+   },
+   {
+    "titel": "Hedda wehrt sich",
+    "wenn": {
+     "flag": "hedda_angegriffen",
+     "ist": true
+    },
+    "text": "Ein Held hat Hedda angegriffen: Sie ist jetzt ein Gegner an ihrer Stelle (Brotmesser, Zäh 3) und weicht nach jedem Zug eine Kartenbreite zwischen die Särge zurück. Jeder Nahkampf gegen sie: Lärm +1 (Taste L), die Gemeinde oben hört es durch die Platte. Sie sagt nichts mehr, und sie gibt nichts mehr.",
+    "ansage": "Das Messer kommt hoch. Diesmal nicht als Warnung."
    }
   ],
   "ziele": [
@@ -130,6 +139,80 @@
    }
   ]
  },
+ "auftraege": [
+  {
+   "id": "kapelle",
+   "art": "Haupt",
+   "titel": "Wer lebt noch in der Kapelle?",
+   "spieler": "Findet heraus, wer in der Kapelle noch lebt, und erfahrt von ihm, was mit Moosgrab geschehen ist.",
+   "quelle": "Der Auftrag aus dem Wald: Lenes Bitte oder das Zeichen auf dem Anhänger (Schritt „Warum ihr hier seid“)",
+   "vorlesen": "Von drinnen Flüstern, durch die Mauer. Wer flüstert, lebt. Oder hat gelebt. Das herauszufinden seid ihr hier.",
+   "erledigt": {
+    "flag": "ep_haupt",
+    "ist": true
+   }
+  },
+  {
+   "id": "mutter",
+   "art": "Haupt",
+   "titel": "Der Mutter die Nachricht bringen",
+   "spieler": "Richtet der Mutter der Frau aus dem Wald aus: Sie hat den Weg nicht gefunden.",
+   "quelle": "Lene, am Waldrand (Map 1)",
+   "vorlesen": "„Sagt meiner Mutter, ich hab den Weg nicht gefunden.“ Das habt ihr versprochen. Sie ist hier irgendwo.",
+   "ab": {
+    "flag": "versprechen_mutter",
+    "ist": true
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "flag": "nachricht_ausgerichtet",
+      "ist": true
+     },
+     {
+      "flag": "hedda_schweigt",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "leise",
+   "art": "Neben",
+   "titel": "Nichts aufwecken",
+   "spieler": "Sieben Gestalten knien in der Kapelle und flüstern. Bleibt so leise, dass keine aufsteht.",
+   "quelle": "Der Blick in die Kapelle (Fenster oder Tür)",
+   "vorlesen": "Sie knien noch. Jeder Laut zählt auf dem Zählstein. Bei drei drehen sich Köpfe. Bei vier stehen sie auf.",
+   "ab": {
+    "flag": "inneres_aufgebaut",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "ep_neben",
+    "ist": true
+   }
+  },
+  {
+   "id": "brunnen",
+   "art": "Haupt",
+   "titel": "Ins Dorf, zum Brunnen",
+   "spieler": "Geht ins Dorf. Es fing mit dem Brunnen an, dort liegt die Antwort. Sagt keine Namen.",
+   "quelle": "Mutter Hedda (Cue 02-5 und „Der Weg ins Dorf“)",
+   "vorlesen": "„Es fing mit dem Brunnen an.“ Der Brunnen liegt mitten im Dorf, und er ist zugenagelt. Werkzeug gibt es in der Schmiede. Zwei Wege führen hin.",
+   "ab": {
+    "flag": "brunnen_bekannt",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "aufbruch",
+    "ist": true
+   }
+  }
+ ],
  "rundenwurf": {
   "name": "Was flüstert die Gemeinde?",
   "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde, solange die Gemeinde kniet, würfelst du einen W6. Meistens passiert nichts.",
@@ -177,6 +260,18 @@
   ]
  },
  "antreiben": [
+  {
+   "titel": "Der Auftrag",
+   "vorlesen": "Ihr seid hier, um herauszufinden, wer noch lebt, und was mit dem Dorf geschehen ist. Drinnen flüstert jemand. Draußen wartet niemand auf euch.",
+   "gmNotiz": "Wenn die Spieler am Friedhof hängen bleiben: Der Auftrag steht oben in der App. Marker sind Beiwerk, die Kapelle ist das Ziel.",
+   "wenn": {
+    "flag": "drinnen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-draussen"
+   ]
+  },
   {
    "titel": "Das Flüstern",
    "vorlesen": "Aus der Kapelle, durch die Mauer: Flüstern. Viele Stimmen, ein Wort. Es hört nicht auf.",
@@ -585,6 +680,26 @@
    "start": false,
    "text": "Nebenziel: die Krypta erreicht, ohne dass eine Gestalt aufstand (1 EP).",
    "wirktIn": "gruppe"
+  },
+  "auftrag_kapelle": {
+   "start": false,
+   "text": "Der Auftrag dieser Map ist ausgesprochen: herausfinden, wer in der Kapelle noch lebt.",
+   "wirktIn": "map2"
+  },
+  "nachricht_ausgerichtet": {
+   "start": false,
+   "text": "Die Helden haben Hedda Lenes Satz ausgerichtet („Sie hat den Weg nicht gefunden“).",
+   "wirktIn": "map2"
+  },
+  "hedda_angegriffen": {
+   "start": false,
+   "text": "Ein Held hat Mutter Hedda angegriffen. Sie schweigt ab da, und das Dorf wird es erfahren (Map 3: die Wirtin).",
+   "wirktIn": "map3"
+  },
+  "hedda_tot": {
+   "start": false,
+   "text": "Mutter Hedda ist tot. Map 3: kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte; niemand begleitet die Helden zum Dorfrand; die Wirtin fragt nach der Ältesten.",
+   "wirktIn": "map3"
   }
  },
  "audio": {
@@ -737,7 +852,44 @@
     "Wer die Männer in den Rüstungen ohne Nähte waren: für sie Fremde, die den Stern suchten.",
     "Wie man es aufhält: Feuer an einem Grab hat nichts gebracht, sagt sie.",
     "Dass Lene sie zuletzt noch erwähnt hat: richten die Helden den Satz aus, trifft er sie."
-   ]
+   ],
+   "kampf": {
+    "werte": {
+     "name": "Mutter Hedda",
+     "faction": "Moosgrab",
+     "size": "1",
+     "quality": "5+",
+     "defense": "5+",
+     "tough": "3",
+     "role": "enemy",
+     "weapons": "Brotmesser | Nahkampf | A1 | ",
+     "passives": "Weicht zurück: nach jedem Zug eine Kartenbreite zwischen die Särge; greift nur an, wer sie erreicht",
+     "flavor": "Zwei Tage Krypta, eine Kerze, ein Messer. Sie hat nicht vor, hier zu sterben."
+    },
+    "notiz": "Mini: (offen, Chris sucht aus). Keine Kämpferin, aber zäh und verzweifelt: Qualität 5+, Verteidigung 5+, Zäh 3, ein Brotmesser mit einer Attacke, etwa 20 Punkte. Jeder Nahkampf gegen sie kostet Lärm (Taste L). Nur drücken, wenn ein Held sie wirklich angreift oder packt; Drohen allein ist die Antwort 4 im Gespräch.",
+    "setzt": {
+     "hedda_angegriffen": true,
+     "hedda_schweigt": true
+    },
+    "info": "Lenes Mutter, die Älteste von Moosgrab. Wird sie angegriffen, wehrt sie sich mit dem Brotmesser und sagt kein Wort mehr.",
+    "bedrohungSatz": "Eine alte Frau mit einem Brotmesser. Sie trifft euch nicht. Aber sie ist das Einzige hier, das noch reden kann.",
+    "zustandSaetze": {
+     "unverletzt": "Sie weicht zurück, das Messer vor sich, die Kerze hinter sich. Sie sagt nichts.",
+     "angekratzt": "Ein Schnitt am Arm. Sie sieht nicht hin. Das Messer bleibt oben.",
+     "verwundet": "Sie stützt sich an einem Sarg ab. Die Kerze zittert jetzt.",
+     "schwer verwundet": "Sie sitzt. Mit dem Rücken an der Wand, das Messer mit beiden Händen.",
+     "am Ende": "Ein Treffer noch. Sie weiß es, und sie sieht euch an, als wüsste sie noch mehr.",
+     "gefallen": "Die Kerze fällt zuerst."
+    },
+    "tod": {
+     "vorlesen": "Die Kerze fällt zuerst. Sie geht aus, bevor sie den Boden erreicht. Hedda sinkt zwischen die Särge, das Messer noch in der Hand, und sagt nichts mehr. Oben, durch die Platte, flüstert die Gemeinde weiter, kein bisschen leiser.",
+     "gmNotiz": "Hedda ist tot. Alles, was sie noch nicht gesagt hat, bleibt ungesagt: keine Fragen mehr, kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte, niemand begleitet die Helden zum Dorfrand. Beide Wege ins Dorf bleiben: das Loch in der Rückwand und die Treppe. Für die Kampagne: Map 3 ohne Hedda am Dorfrand; die Wirtin fragt nach der Ältesten, und die Antwort entscheidet, ob das Dorf den Helden noch aufmacht (Vorschlag). Das Gemeindehaus muss ohne Schlüssel aufgebrochen werden (+2 Lärm). Hat sie ihre Sätze (Cue 02-5) noch nicht gesagt, ist das Hauptziel verfehlt. Danach „Springen“ zu „Der Weg ins Dorf, ohne Hedda“ (hedda-weg-tot): aus den Gesprächsschritten führt kein Weiter mehr sinnvoll weiter.",
+     "setzt": {
+      "hedda_tot": true,
+      "hedda_schweigt": true
+     }
+    }
+   }
   }
  },
  "gegner": {
@@ -773,8 +925,11 @@
       "flag": "glocke_geschlagen",
       "ist": true
      },
-     "text": "Die Glocke hat sie gerufen: sie verfolgen bis zum Zaun, nicht weiter. (Vorschlag)",
-     "ansage": "Der Ton hängt noch in der Luft, und sie gehen ihm nach."
+     "text": "Die Glocke hat sie gerufen: sie verfolgen bis zum Zaun, nicht weiter, und sie treffen eine Stufe besser (Qualität 5+ → 4+, steht an der Karte). (Vorschlag)",
+     "ansage": "Der Ton hängt noch in der Luft, und sie gehen ihm nach.",
+     "werte": {
+      "quality": 1
+     }
     }
    ]
   },
@@ -1238,6 +1393,26 @@
     ]
    }
   },
+  "kniende-angreifen": {
+   "name": "Ein Held greift einen Knienden an",
+   "gruppe": "Kampf",
+   "kurz": "Kniende angreifen",
+   "taste": "B",
+   "einmal": false,
+   "kosten": "Held in Kontakt, 1 Aktion. Nahkampf: der Lärm ist hier schon verbucht (+1), kein L dazu.",
+   "vorlesen": "Die Gestalt bricht das Flüstern ab. Mitten im Wort. Der Kopf dreht sich zu euch, langsam, auf dem Hals, als säße er nicht fest. Dann steht sie auf, ohne die Hände zu benutzen.",
+   "gmNotiz": "Eine der knienden Figuren ist ab jetzt dieser Gegner (Karte erscheint in der Spalte, Zone K). Die anderen knien weiter, bis die Lärm-Leiste sie weckt: dieser Angriff zählt +1, das ist schon verbucht. Mit der ersten Attacke des Helden abrechnen, dann greift die Gestalt jede Runde an, wer sie berührt (ruhige Tabelle, verfolgt nicht). Steht die Gemeinde später ganz auf, kommen nur noch so viele Karten dazu, wie noch knien: die App zählt das nicht mit, nimm dann eine Karte weniger.",
+   "leisten": {
+    "laerm": 1
+   },
+   "gegnerHinzu": [
+    {
+     "id": "gemeinde",
+     "anzahl": 1,
+     "zone": "K"
+    }
+   ]
+  },
   "hinhoeren": {
    "name": "Hinhören, was sie flüstern",
    "gruppe": "Untersuchen",
@@ -1329,7 +1504,7 @@
      }
     ]
    },
-   "vorlesen": "Sie schließt die Hand darum. Lange. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher.“",
+   "vorlesen": "Sie schließt die Hand darum. Lange. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher. Wen ihr im Dorf noch lebend findet: bringt ihn dorthin.“",
    "gmNotiz": "Zettel „Kellerschlüssel Gemeindehaus“ übergeben. Der Anhänger ist weg. Geduld +1.",
    "setzt": {
     "anhaenger_zurueck": true,
@@ -1796,6 +1971,34 @@
    "titel": "Ankunft",
    "cue": "02-1",
    "notiz": "Endet mit „Erkundet den Friedhof. Wählt euren Weg hinein. Ihr seid am Zug.“ Hat jemand in Map 1 seinen Namen verraten, sagst du jetzt leise zu ihm: „Das Moos hat deinen Namen gehört.“ Und gibst ihm den Sporenpunkt.",
+   "weiter": "auftrag-kapelle-mutter"
+  },
+  "auftrag-kapelle-mutter": {
+   "typ": "vorlesen",
+   "titel": "Warum ihr hier seid",
+   "wenn": {
+    "flag": "versprechen_mutter",
+    "ist": true
+   },
+   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. „Sagt meiner Mutter, ich hab den Weg nicht gefunden“, hat Lene gesagt. „Sie ist in der Kapelle. Alle sind in der Kapelle.“ Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Findet ihre Mutter. Und erfahrt, was mit dem Dorf geschehen ist.",
+   "gmNotiz": "Der Auftrag für die Spieler, laut und deutlich: Lenes Mutter finden, herausfinden, was in Moosgrab los ist. Nicht sagen, wer flüstert, nicht sagen, wo die Mutter ist. Dann Weiter: die Spieler sind dran.",
+   "setzt": {
+    "auftrag_kapelle": true
+   },
+   "weiter": "auftrag-kapelle-zeichen"
+  },
+  "auftrag-kapelle-zeichen": {
+   "typ": "vorlesen",
+   "titel": "Warum ihr hier seid",
+   "wenn": {
+    "flag": "versprechen_mutter",
+    "ist": false
+   },
+   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. Hier fängt der Weg ins Dorf an, und hier ist der erste Ort, an dem noch jemand sein könnte. Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Und erfahrt, was mit dem Dorf geschehen ist.",
+   "gmNotiz": "Die Helden haben Lene nicht nach ihrer Mutter gefragt (oder sie nicht erreicht): nur das Zeichen führt sie her. Der Auftrag für die Spieler, laut und deutlich: herausfinden, wer in der Kapelle noch lebt und was in Moosgrab los ist. Dann Weiter: die Spieler sind dran.",
+   "setzt": {
+    "auftrag_kapelle": true
+   },
    "weiter": "spieler-draussen"
   },
   "spieler-draussen": {
@@ -1809,7 +2012,8 @@
     "Wege hinein: Haupttür H (+1 Lärm), Fenster E (leise, aber die ganze Bewegung), Sakristei K (nur mit Schlüssel von Marker 2, leise, direkt neben dem Altar).",
     "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T Tür aufbrechen +2. Das Grab greift nur an, wer direkt daneben steht (Taste 4).",
     "Das Glockenseil erwähnst du, wenn jemand den Turm ansieht. Du bietest es nicht an. Zieht jemand: G.",
-    "Rundenwurf „Was flüstert die Gemeinde?“ am Rundenende, wenn du ihn nimmst."
+    "Rundenwurf „Was flüstert die Gemeinde?“ am Rundenende, wenn du ihn nimmst.",
+    "Faden verloren? „Drinnen flüstert jemand. Wer flüstert, lebt. Das herauszufinden seid ihr hier.“ Der Friedhof ist Beiwerk, die Kapelle das Ziel."
    ],
    "ereignisse": [
     "marker1",
@@ -1934,13 +2138,16 @@
     "Ins Gesicht sehen (1), Hinhören (2), Kerze (3), Altar (4): jeweils Grundtext, dann Wurf, dann Stufen. Hinhören: kein Wurf, wenn die Helden den Namen Lene kennen.",
     "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T Tür aufbrechen +2.",
     "Wer draußen bleibt, darf weiter Marker suchen: die Tasten von draußen stehen hier noch.",
-    "Wer den Altar untersucht hat: die App springt zu Cue 02-3."
+    "Wer den Altar untersucht hat: die App springt zu Cue 02-3.",
+    "Faden verloren? „Sieben knien. Einer hat die Kerze angezündet, und der kniet nicht. Findet ihn.“ Der Altar ist der Weg, aber das sagst du nicht.",
+    "Greift ein Held eine kniende Gestalt an: B. Sie steht auf und wehrt sich, die anderen knien weiter."
    ],
    "ereignisse": [
     "gesicht",
     "hinhoeren",
     "kerze",
     "altar",
+    "kniende-angreifen",
     "laerm-nah",
     "laerm-fern",
     "laerm-tuer",
@@ -2292,7 +2499,7 @@
    "typ": "vorlesen",
    "titel": "Sie schließt die Hand",
    "als": "hedda",
-   "text": "Sie schließt die Hand um den Anhänger. Lange. Niemand sagt etwas, und sie fragt nicht. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher.“ Und, leiser: „Der Schmied ist verloren. Und die Harms, alle drei. Geht nicht zu ihnen.“",
+   "text": "Sie schließt die Hand um den Anhänger. Lange. Niemand sagt etwas, und sie fragt nicht. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher. Wen ihr im Dorf noch lebend findet: bringt ihn dorthin.“ Und, leiser: „Der Schmied ist verloren. Und die Harms, alle drei. Geht nicht zu ihnen.“",
    "gmNotiz": "Zettel „Kellerschlüssel Gemeindehaus“ übergeben. Befallene bekannt. Jetzt prüft die App, ob die Helden auch von einem Angriff oder dem Feuer erzählen.",
    "weiter": "wahl-hedda-angriff"
   },
@@ -2376,7 +2583,7 @@
      }
     ]
    },
-   "text": "„Ihr habt sie zugedeckt.“ Sie sagt es zweimal, das zweite Mal leiser. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher.“",
+   "text": "„Ihr habt sie zugedeckt.“ Sie sagt es zweimal, das zweite Mal leiser. Dann greift sie in die Schürze und holt einen Schlüssel heraus, schwer, mit einem Holzgriff. „Der Keller unter dem Gemeindehaus. Da sind sie sicher. Da war ich sicher. Wen ihr im Dorf noch lebend findet: bringt ihn dorthin.“",
    "gmNotiz": "Zettel „Kellerschlüssel Gemeindehaus“ übergeben. Kellerschlüssel ohne Anhänger, weil die Helden Lene zugedeckt haben. Geduld +1.",
    "setzt": {
     "kellerschluessel": true
@@ -2407,7 +2614,10 @@
    "leisten": {
     "geduld": 1
    },
-   "weiter": "cue-02-5"
+   "weiter": "cue-02-5",
+   "setzt": {
+    "nachricht_ausgerichtet": true
+   }
   },
   "cue-02-5": {
    "typ": "cue",
@@ -2427,7 +2637,7 @@
    "zeitlimit": 5,
    "figur": "hedda",
    "einstieg": "Fragt. Aber fragt schnell. Die Kerze ist die letzte.",
-   "gmNotiz": "Höchstens fünf Minuten live. Leise, kurze Sätze. Jede Frage kostet einen Strich Geduld; ist sie leer, kommt nur noch „Fragt den Brunnen“ (Taste Q). Taste 0 ist die Antwort auf alles, was unter dem Dorf liegt, und kostet nichts. Taste 1: die Helden geben ihr den Anhänger, dafür der Kellerschlüssel. Taste 2: sich umsehen (Probe).",
+   "gmNotiz": "Höchstens fünf Minuten live. Leise, kurze Sätze. Jede Frage kostet einen Strich Geduld; ist sie leer, kommt nur noch „Fragt den Brunnen“ (Taste Q). Taste 0 ist die Antwort auf alles, was unter dem Dorf liegt, und kostet nichts. Taste 1: die Helden geben ihr den Anhänger, dafür der Kellerschlüssel. Taste 2: sich umsehen (Probe). Bleibt ein Held oben und greift eine kniende Gestalt an: B. Wird Hedda selbst angegriffen: der Kampf-Knopf an ihrer Figur macht sie zum Gegner.",
    "ereignisse": [
     "anhaenger-geben",
     "krypta",
@@ -2441,6 +2651,7 @@
     "frage-befallene-knapp",
     "frage-unten",
     "frage-zuviel",
+    "kniende-angreifen",
     "laerm-nah",
     "laerm-fern"
    ],
@@ -2454,8 +2665,8 @@
     "flag": "hedda_schweigt",
     "ist": false
    },
-   "text": "„Ich komme mit bis zum Dorfrand. Nicht weiter. Ich bin zu alt für das, was unter dem Brunnen ist.“ Sie zeigt mit der Kerze auf das Loch in der Rückwand. „Welchen Weg nehmt ihr: den Gang aus der Krypta, leise, dunkel, eng – oder den Hauptweg, offen?“",
-   "gmNotiz": "Der Gang kommt im alten Eiskeller links vom Dorfplatz heraus, mitten im Dorf. Der Hauptweg führt über den Friedhof zurück, an der Gemeinde vorbei, und von unten ins Dorf.",
+   "text": "„Ihr wisst jetzt, was ich weiß. Geht ins Dorf. Zum Brunnen, da hat es angefangen, da müsst ihr hinunter. Er ist zugenagelt, in der Schmiede ist Werkzeug. Und sagt keine Namen, keinen einzigen.“ Sie hebt die Kerze. „Ich komme mit bis zum Dorfrand. Nicht weiter. Ich bin zu alt für das, was unter dem Brunnen ist.“ Sie zeigt mit der Kerze auf das Loch in der Rückwand. „Welchen Weg nehmt ihr: den Gang aus der Krypta, leise, dunkel, eng – oder den Hauptweg, offen?“",
+   "gmNotiz": "Der Auftrag für Map 3, von Hedda ausgesprochen: ins Dorf, zum Brunnen, hinunter, keine Namen. Haben die Helden den Kellerschlüssel: „Und wen ihr hinter den Riegeln noch lebend findet, bringt in den Keller unter dem Gemeindehaus.“ Der Gang kommt im alten Eiskeller links vom Dorfplatz heraus, mitten im Dorf. Der Hauptweg führt über den Friedhof zurück, an der Gemeinde vorbei, und von unten ins Dorf.",
    "weiter": "hedda-weg-stumm"
   },
   "hedda-weg-stumm": {
@@ -2463,11 +2674,30 @@
    "titel": "Der Weg ins Dorf, ohne Worte",
    "als": "hedda",
    "wenn": {
-    "flag": "hedda_schweigt",
-    "ist": true
+    "alle": [
+     {
+      "flag": "hedda_schweigt",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
    },
    "text": "Sie sagt nichts. Sie zeigt mit dem Messer auf das Loch in der Rückwand, schwarz, in das man gebückt hineinkäme. Dann auf die Treppe nach oben. Dann sieht sie weg.",
-   "gmNotiz": "Beide Wege sind bekannt, auch ohne Erklärung. Sie kommt nicht mit.",
+   "gmNotiz": "Beide Wege sind bekannt, auch ohne Erklärung. Sie kommt nicht mit. Der Auftrag bleibt trotzdem klar, er steht im Cue 02-5: ins Dorf, zum Brunnen, keine Namen. Wenn die Spieler fragen, sag es als Erzähler.",
+   "weiter": "hedda-weg-tot"
+  },
+  "hedda-weg-tot": {
+   "typ": "vorlesen",
+   "titel": "Der Weg ins Dorf, ohne Hedda",
+   "wenn": {
+    "flag": "hedda_tot",
+    "ist": true
+   },
+   "text": "Niemand sagt euch mehr, wohin. Aber ihr wisst es: Es fing mit dem Brunnen an. An der Rückwand das Loch, schwarz, in das man gebückt hineinkäme. Und hinter euch die Treppe nach oben, zu denen, die knien.",
+   "gmNotiz": "Hedda ist tot. Der Auftrag kommt vom Erzähler: ins Dorf, zum Brunnen, keine Namen (alles aus Cue 02-5, falls er lief; sonst sag es jetzt). Beide Wege stehen offen, niemand begleitet sie.",
    "weiter": "wahl-weg"
   },
   "wahl-weg": {
@@ -2514,7 +2744,7 @@
     {
      "taste": "4",
      "kurz": "Noch nicht: zurück zu Hedda, noch etwas fragen",
-     "text": "Die Spieler haben noch eine Frage, oder wollen ihr den Anhänger doch geben.",
+     "text": "Die Spieler haben noch eine Frage, oder wollen ihr den Anhänger doch geben. Nicht, wenn Hedda tot ist oder schweigt.",
      "folge": "Zurück zum Fragen-Schritt.",
      "ziel": "npc-hedda-fragen"
     }
@@ -2567,10 +2797,11 @@
    "hinweise": [
     "Bedrohung ansagen: „Das war der Bäcker. Jetzt ist es etwas, das seine Hände benutzt.“",
     "Lärm weiter zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2. Bei 6 erwacht der Rest: die App springt um.",
-    "Die vier Knienden greifen nicht ein, solange niemand sie berührt.",
+    "Die vier Knienden greifen nicht ein, solange niemand sie berührt. Greift ein Held eine an: B (sie steht auf, +1 Lärm).",
     "Fallen alle drei: weiter, dann ist es wieder still."
    ],
    "ereignisse": [
+    "kniende-angreifen",
     "laerm-nah",
     "laerm-fern",
     "laerm-tuer",
@@ -3007,6 +3238,27 @@
       "ist": true
      },
      "text": "Quelle in Map 1 zerstört: im Finale weniger Nachschub (wird weitergereicht)."
+    },
+    {
+     "wenn": {
+      "flag": "hedda_angegriffen",
+      "ist": true
+     },
+     "text": "Ein Held hat Hedda angegriffen: Map 3 weiß es (die Wirtin hat es von ihr, falls sie lebt), die Dorfbewohner machen den Helden schwerer auf (Vorschlag)."
+    },
+    {
+     "wenn": {
+      "flag": "hedda_tot",
+      "ist": true
+     },
+     "text": "Hedda ist tot: niemand am Dorfrand, kein Kellerschlüssel (falls nicht vorher gegeben), die Wirtin fragt nach der Ältesten. Das Gemeindehaus muss aufgebrochen werden, falls der Schlüssel fehlt."
+    },
+    {
+     "wenn": {
+      "flag": "brunnen_bekannt",
+      "ist": true
+     },
+     "text": "Der Auftrag für Map 3 ist ausgesprochen: ins Dorf, zum Brunnen, hinunter. Keine Namen."
     }
    ],
    "notieren": [
@@ -3015,9 +3267,11 @@
     "Welcher Weg: Krypta-Gang oder Hauptweg",
     "Glocke, Lärm 3, Gemeinde wach oder gefallen",
     "Wahrheit, geschont oder belogen; Kellerschlüssel ja oder nein",
-    "Budget je Held +10 im Reiter Gruppe eintragen"
+    "Budget je Held +10 im Reiter Gruppe eintragen",
+    "Hedda: lebt, angegriffen oder tot"
    ],
-   "weiter": null
+   "weiter": null,
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ins Dorf. Zum Brunnen. Er ist zugenagelt, Werkzeug gibt es in der Schmiede. Und keine Namen.“ Mit Kellerschlüssel: „Wer noch lebt, gehört in den Keller unter dem Gemeindehaus.“"
   }
  }
 }

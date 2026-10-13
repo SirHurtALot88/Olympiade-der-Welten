@@ -177,7 +177,7 @@
     if (stand.letzte !== vorherLetzte || stand.schritt !== vorher) for (const k of Object.keys(wuerfe)) if (k !== "ende") delete wuerfe[k];
     const s = motor.schritt(stand);
     if (s && s.typ === "ende") stand.uebernahme = motor.uebernahme(stand);
-    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; antreiberNr = 0; antreiberZu = null; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; else if (fenster && fenster.startsWith("npc")) fenster = null; }
+    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; erinnern = false; antreiberNr = 0; antreiberZu = null; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; else if (fenster && fenster.startsWith("npc")) fenster = null; }
     spaeter();
     zeige();
   }
@@ -243,6 +243,19 @@
     return `<div class="sp-antreiber"><header><b>⏳ ${immer ? "Antreiben" : "Die Szene zieht sich"}: ${esc(a.titel || "")}</b>
       <span>${liste.length > 1 ? `<button type="button" class="btn ghost sm" data-sp="antreiber-naechster">Anderer (${(antreiberNr % liste.length) + 1}/${liste.length})</button>` : ""}<button type="button" class="btn ghost sm" data-sp="antreiber-zu">✕</button></span></header>
       ${vorlesen(a.vorlesen)}${gm(a.gmNotiz)}</div>`;
+  }
+
+  // ---------- Aufträge ----------
+  // Der aktive Hauptauftrag steht dauerhaft über der Schrittkarte: so weiß Chris immer, was die Spieler gerade wissen und tun sollen
+  let erinnern = false;
+  function auftragHtml() {
+    const alle = motor.auftraege(stand), offen = alle.filter(a => !a.erledigtJetzt);
+    if (!alle.length) return "";
+    const haupt = offen.find(a => a.art === "Haupt") || offen[0];
+    if (!haupt) return `<div class="sp-auftrag fertig">🎯 Alle Aufträge dieser Map erledigt.</div>`;
+    const neben = offen.filter(a => a !== haupt).length;
+    return `<div class="sp-auftrag"><span>🎯 ${esc(haupt.art || "Auftrag")}</span><b>${esc(haupt.titel || "")}</b><em>„${esc(haupt.spieler || "")}“</em>
+      ${neben ? `<small>+${neben} weitere (Lage)</small>` : ""}${haupt.vorlesen ? `<button type="button" class="btn ghost sm" data-sp="erinnern">Erinnern</button>` : ""}</div>${erinnern ? vorlesen(haupt.vorlesen, "Erinnerung") : ""}`;
   }
 
   // ---------- Kopfleiste ----------
@@ -511,7 +524,7 @@
     } else if (art === "f") {
       const f = map.figuren[id] || {};
       kopf = `<b>${esc(f.name || id)}</b><small>NPC</small>`;
-      inhalt = `<p>${esc(f.wer || "")}</p>${f.ziel ? `<p><b>Will gerade:</b> ${esc(f.ziel)}</p>` : ""}<button type="button" class="btn ghost sm" data-sp="npc-von" data-figur="${esc(id)}">NPC-Karte ${taste("N")}</button>`;
+      inhalt = `<p>${esc(f.wer || "")}</p>${f.ziel ? `<p><b>Will gerade:</b> ${esc(f.ziel)}</p>` : ""}<span class="sp-g-knoepfe"><button type="button" class="btn ghost sm" data-sp="npc-von" data-figur="${esc(id)}">NPC-Karte ${taste("N")}</button><button type="button" class="btn sm" data-npc-kampf="${esc(id)}" title="Wird angegriffen oder greift an: wird zum Gegner">⚔ kämpft</button></span>`;
     } else if (art === "g") {
       const g = stand.gegner.find(x => x.uid === id);
       if (!g) return "";
@@ -532,18 +545,31 @@
     const aktiv = stand.gegner.filter(g => !g.weg);
     if (!aktiv.length) return `<p class="hint">Noch keine Gegner am Tisch.</p>`;
     return aktiv.map(g => {
-      const def = map.gegner[g.id] || {}, z = motor.zustand(g), b = motor.bedrohung(def), offen = markiert === `g:${g.uid}`;
+      const def = map.gegner[g.id] || {}, z = motor.zustand(g), b = motor.bedrohung(def, motor.effektiveWerte(stand, g)), offen = markiert === `g:${g.uid}`;
+      const mods = motor.modText(stand, g);
       const zusatz = motor.zusaetze(stand, def);
       return `<div class="sp-gegner ${offen ? "markiert" : ""} ${z.id === "gefallen" ? "gefallen" : ""}" data-gegner="${esc(g.uid)}">
         <div class="sp-g-zeile"><span class="sp-g-tok">${esc(gegnerKuerzel(g))}</span><b>${esc(def.name || g.id)}</b><span class="sp-schaedel" title="Bedrohung">${"☠".repeat(b.schaedel)}</span>
           <span class="sp-g-balken">${Array.from({ length: g.zaeh }, (_, i) => `<i class="${i < g.wunden ? "wunde" : ""}"></i>`).join("")}</span>
           <span class="sp-g-knoepfe">${z.id === "gefallen" ? `<button type="button" class="btn ghost sm" data-weg="1">vom Tisch</button>` : `<button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button>`}<button type="button" class="btn ghost sm" data-dmg="-1">−1</button></span></div>
         <div class="sp-g-zustand"><em class="z-${esc(z.id.replace(/\s+/g, "-"))}">${esc(z.id)}</em> ${sag(z.satz)}</div>
+        ${mods.length ? `<p class="sp-mods">${mods.map(m => `<i class="${m.staerker ? "plus" : "minus"}">${esc(m.text)}</i>`).join("")}</p>` : ""}
         ${offen ? `<div class="sp-g-mehr">${g.wunden === 0 && b.satz ? `<h5>Bedrohung ansagen</h5>${sag(b.satz)}` : ""}${zusatz.length ? `<h5>Gilt gerade</h5>${zusatz.map(x => `${gm(x.text)}${x.ansage ? sag(x.ansage) : ""}`).join("")}` : ""}
-          <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button></div>` : ""}
+          <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button>
+          ${anpassenHtml(g)}</div>` : ""}
       </div>`;
     }).join("");
   }
+  // Von Hand stärken oder schwächen: wirkt sofort auf Karte, Bedrohung und (bei Zäh) die Wundleiste
+  const ANPASSEN = [["quality", "Qualität"], ["defense", "Verteidigung"], ["tough", "Zäh"], ["attacks", "Angriffe"]];
+  function anpassenHtml(g) {
+    const name = (map.gegner[g.id] || {}).name || g.id;
+    return `<div class="sp-anpassen"><h5>Anpassen</h5>
+      <div class="sp-anpassen-raster">${ANPASSEN.map(([k, n]) => `<span>${n}</span><button type="button" class="btn ghost sm" data-mod="${k}" data-d="1" title="${n} stärker">+</button><button type="button" class="btn ghost sm" data-mod="${k}" data-d="-1" title="${n} schwächer">−</button>`).join("")}</div>
+      <div class="sp-anpassen-regel"><input type="text" id="spRegel-${esc(g.uid)}" placeholder="Regel dazu, z. B. Brennt"><button type="button" class="btn ghost sm" data-mod="passives">+ Regel</button></div>
+      <label class="sp-alle"><input type="checkbox" id="spAlle-${esc(g.uid)}"> für alle „${esc(name)}“, auch später erscheinende</label></div>`;
+  }
+
   // Sonderregeln, die eine frühere Entscheidung freigeschaltet hat, gehören immer in den Blick
   function aktiveRegeln() {
     const bedingt = ((map.lage || {}).sonderregeln || []).filter(r => r.wenn && motor.gilt(stand, r.wenn));
@@ -582,7 +608,7 @@
     const stimme = Array.isArray(f.stimme) ? f.stimme : String(f.stimme || "").split(/;\s*|\.\s+(?=[A-ZÄÖÜ„])/).filter(Boolean);
     const geduld = stand.leisten.geduld && stand.leisten.geduld.aktiv ? stand.leisten.geduld.wert : null;
     return `<aside class="sp-schublade" role="dialog" aria-label="${esc(f.name)}">
-      <header><h3>${esc(f.name)}</h3>${geduld !== null ? `<span class="sp-pill"><b>Geduld</b> <em>${geduld}</em></span>` : ""}<button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+      <header><h3>${esc(f.name)}</h3>${geduld !== null ? `<span class="sp-pill"><b>Geduld</b> <em>${geduld}</em></span>` : ""}${!stand.npcKampf[id] ? `<button type="button" class="btn ghost sm" data-npc-kampf="${esc(id)}" title="Wird angegriffen oder greift an: wird zum Gegner">⚔ kämpft</button>` : ""}<button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
       <div class="sp-npc-oben">
         <div class="sp-npc-steckbrief"><h4>So spricht ${f.anzeige === "er" ? "er" : "sie"}</h4>${liste(stimme.map(x => x.replace(/\.$/, "")))}
           ${f.ziel ? `<p class="sp-will"><b>Will jetzt:</b> ${esc(f.ziel)}</p>` : ""}${f.motiv ? `<p class="sp-will"><b>Motiv:</b> ${esc(f.motiv)}</p>` : ""}</div>
@@ -613,6 +639,22 @@
         ${e.aus === "gruppe" ? `<label class="f">Oder Name eintippen <input type="text" id="spEingabeFrei" placeholder="Name des Helden"></label><button type="button" class="btn sm" data-sp="eingabe-frei">Übernehmen</button>` : ""}
       </div></div>`;
     }
+    if (fenster === "gegner-neu") {
+      const ausMap = Object.entries(map.gegner || {}).filter(([id]) => !id.startsWith("npc-"));
+      const npcs = Object.entries(map.figuren || {}).filter(([id]) => !stand.npcKampf[id]);
+      const vorlagen = KS.VORLAGEN.filter(v => v.d.role === "enemy");
+      const zonen = Object.keys((map.tischplan || {}).zonen || {});
+      return `<div class="sp-fenster" role="dialog" aria-label="Gegner dazuholen"><div class="sp-fenster-innen">
+        <header><h3>Gegner dazuholen</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+        <p class="hint">Für alles, was nicht im Skript steht: ein NPC wird angegriffen, eine Gestalt steht doch auf, du willst nachlegen. Die Figur erscheint auf der Tischkarte und in der Gegnerliste.</p>
+        <div class="row4"><label class="f">Anzahl <input type="number" id="spNeuAnzahl" min="1" max="12" value="1"></label>
+          <label class="f">Zone <select id="spNeuZone"><option value="">Tischmitte</option>${zonen.map(z => `<option>${esc(z)}</option>`).join("")}</select></label></div>
+        <h4>NPC kämpft</h4><div class="sp-neu-liste">${npcs.map(([id, f]) => `<button type="button" class="btn sm" data-npc-kampf="${esc(id)}" title="${f.kampf ? "Haupt-NPC mit eigenen Kampfwerten" : "Ohne eigene Werte: schwache Grundwerte"}">⚔ ${esc(f.name)}${f.kampf ? "" : " (schwach)"}</button>`).join("")}
+          <button type="button" class="btn ghost sm" data-sp="npc-namenlos" title="Passant, Gehilfe, Dorfbewohner: Qualität 6+, Verteidigung 6+, Zäh 1">⚔ Namenloser NPC</button></div>
+        <h4>Aus dieser Map</h4><div class="sp-neu-liste">${ausMap.map(([id, d]) => `<button type="button" class="btn ghost sm" data-neu="${esc(id)}">${esc(d.name || id)}</button>`).join("")}</div>
+        <h4>Aus den Vorlagen</h4><div class="sp-neu-liste">${vorlagen.map(v => `<button type="button" class="btn ghost sm" data-vorlage="${esc(v.key)}">${esc(v.d.name)}</button>`).join("")}</div>
+      </div></div>`;
+    }
     if (fenster === "log") {
       const ICON = { wahl: "🟥", ereignis: "⚡", probe: "🎲", runde: "⟳", rundenwurf: "🎲", schritt: "→", tod: "☠", beute: "🎁" };
       const eintraege = (stand.log || []).slice().reverse();
@@ -629,7 +671,8 @@
       return `<div class="sp-fenster" role="dialog" aria-label="Lage"><div class="sp-fenster-innen breit">
         <header><h3>Lage</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
         <div class="sp-lage">
-          <section><h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
+          <section>${motor.auftraege(stand).length ? `<h4>Aufträge der Spieler</h4><ul class="sp-ziele">${motor.auftraege(stand).map(a => `<li class="${a.erledigtJetzt ? "ja" : ""}">${a.erledigtJetzt ? "✓" : "○"} <b>${esc(a.titel)}</b> „${esc(a.spieler || "")}“ <small>· ${esc(a.quelle || "")}</small></li>`).join("")}</ul>` : ""}
+            <h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
           <section><h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
@@ -640,11 +683,13 @@
     }
     if (fenster && fenster.startsWith("karte:")) {
       const g = stand.gegner.find(x => x.uid === fenster.slice(6));
-      const werte = g && werteFuer(map.gegner[g.id]);
+      const werte = g && motor.effektiveWerte(stand, g);
       if (!werte || !werte.quality) return "";
       const def = map.gegner[g.id] || {};
+      const mods = motor.modText(stand, g);
       return `<div class="sp-fenster" role="dialog"><div class="sp-fenster-innen karte">
         <header><h3>${esc(werte.name || "")}</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+        ${mods.length ? `<p class="sp-mods">Angepasst: ${mods.map(m => `<i class="${m.staerker ? "plus" : "minus"}">${esc(m.text)}</i>`).join("")}</p>` : ""}
         <div class="sp-kartenbox">${KS.renderCard(werte, stufeFuer(werte), {})}</div>${gm(def.notiz)}${motor.zusaetze(stand, def).map(z => gm(z.text)).join("")}
       </div></div>`;
     }
@@ -685,6 +730,7 @@
       <header class="sp-oben" id="spKopf"></header>
       <div class="sp-mitte ${mitSeite(s) ? "" : "ohne-seite"}">
         <section class="sp-karte typ-${farbe}">
+          ${auftragHtml()}
           <header><span class="sp-typ">${zeichen} ${esc(etikett)}</span><h3>${esc(s.titel || "")}</h3></header>
           ${antreiberHtml(antreiberZu === `zeigen:${stand.schritt}`)}
           ${mitPassiert(schrittInhalt(s), letzteEreignisse())}
@@ -693,7 +739,7 @@
             : `<span class="hint">Als Nächstes: <b>${esc(nachTitel)}</b></span>`}</footer>
         </section>
         ${schubladeHtml()}
-        ${!mitSeite(s) ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner</h4>${gegnerListe()}</div></aside>`}
+        ${!mitSeite(s) ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner <button type="button" class="btn ghost sm" data-sp="gegner-neu" title="Gegner dazuholen (auch einen NPC, der kämpft)">＋ Gegner</button></h4>${gegnerListe()}</div></aside>`}
       </div>
       <footer class="sp-unten">${aktionsLeiste(s)}</footer>
     </div>${fensterHtml()}`;
@@ -748,6 +794,8 @@
     tab.addEventListener("pointermove", ziehe);
     tab.addEventListener("pointerup", ziehEnde);
     tab.addEventListener("click", async e => {
+      // Eingabefelder (Regel, Häkchen) dürfen den Gegner nicht zuklappen
+      if (e.target.closest("input, select, textarea, label")) return;
       const chip = e.target.closest("[data-chip]");
       if (chip) { popup = popup && popup.tok === chip.dataset.chip ? null : { tok: chip.dataset.chip, x: 3, y: 40 }; zeige(); return; }
       const marker = e.target.closest(".sp-tok.marker");
@@ -755,11 +803,29 @@
       const t = e.target.closest("button, [data-gegner]");
       if (!t) return;
       const g = t.closest("[data-gegner]");
+      if (t.dataset.mod && g) {
+        const uid = g.dataset.gegner, alle = ($(`spAlle-${uid}`) || {}).checked, k = t.dataset.mod;
+        const gg = stand.gegner.find(x => x.uid === uid);
+        let mod, text;
+        if (k === "passives") { const r = (($(`spRegel-${uid}`) || {}).value || "").trim(); if (!r) return; mod = { passives: [r] }; text = `+ ${r}`; }
+        else { const d = +t.dataset.d; mod = { [k]: d }; text = `${(ANPASSEN.find(x => x[0] === k) || [])[1]} ${d > 0 ? "stärker" : "schwächer"}`; }
+        tue(() => motor.passeGegnerAn(stand, alle ? { typ: gg.id } : { uid }, mod, text));
+        return;
+      }
       if (t.dataset.dmg && g) { markiert = `g:${g.dataset.gegner}`; tue(() => motor.schaden(stand, g.dataset.gegner, +t.dataset.dmg)); return; }
       if (t.dataset.karte && g) { fenster = `karte:${g.dataset.gegner}`; zeige(); return; }
       if (t.dataset.weg && g) { tue(() => motor.entferne(stand, g.dataset.gegner)); return; }
       if (t.matches("[data-gegner]")) { markiert = markiert === `g:${t.dataset.gegner}` ? null : `g:${t.dataset.gegner}`; zeige(); return; }
       if (t.dataset.wahl) { waehle(t.dataset.wahl); return; }
+      if (t.dataset.neu || t.dataset.vorlage) {
+        const anzahl = Math.max(1, Math.min(12, +(($("spNeuAnzahl") || {}).value) || 1)), zone = ($("spNeuZone") || {}).value || "";
+        const v = t.dataset.vorlage && KS.VORLAGEN.find(x => x.key === t.dataset.vorlage);
+        const id = v ? `v-${v.key}` : t.dataset.neu, def = v ? { name: v.d.name, karte: `v:${v.key}`, info: v.d.flavor || "" } : null;
+        fenster = null;
+        tue(() => motor.fuegeGegnerHinzu(stand, id, anzahl, zone, def));
+        return;
+      }
+      if (t.dataset.npcKampf) { const id = t.dataset.npcKampf; fenster = null; popup = null; tue(() => motor.npcAlsGegner(stand, id)); return; }
       if (t.dataset.eingabe) { eingabeFertig(t.dataset.eingabe); return; }
       if (t.dataset.probe !== undefined) { probe(+t.dataset.probe, +t.dataset.w || 0); return; }
       if (t.dataset.ev) { popup = null; tue(() => motor.ereignis(stand, t.dataset.ev)); return; }
@@ -782,6 +848,9 @@
         case "antreiber-naechster": antreiberNr++; zeige(); break;
         case "antreiber-zu": antreiberZu = stand.schritt; zeige(); break;
         case "log": fenster = "log"; zeige(); break;
+        case "gegner-neu": fenster = "gegner-neu"; zeige(); break;
+        case "npc-namenlos": { const anzahl = Math.max(1, Math.min(12, +(($("spNeuAnzahl") || {}).value) || 1)), zone = ($("spNeuZone") || {}).value || ""; fenster = null; tue(() => motor.zufallsNpc(stand, "", anzahl, zone)); break; }
+        case "erinnern": erinnern = !erinnern; zeige(); break;
         case "geben": tue(() => motor.gibBeute(stand, t.dataset.held, t.dataset.sache)); break;
         case "benutzen": tue(() => motor.benutze(stand, t.dataset.held, +t.dataset.i)); break;
         case "zu": fenster = null; eingabeFuer = null; zeige(); break;

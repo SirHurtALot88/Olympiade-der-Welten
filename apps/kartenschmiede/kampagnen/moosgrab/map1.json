@@ -102,6 +102,15 @@
      "ist": true
     },
     "text": "Die Helden haben an Marker 3 gesehen, dass das Licht pulst: Angriffe auf die Quelle treffen mit +1."
+   },
+   {
+    "titel": "Ohne die Quelle",
+    "wenn": {
+     "flag": "quelle_zerstoert",
+     "ist": true
+    },
+    "text": "Die Quelle ist aus: Die Erblühte hat 2 Zäh weniger (steht an ihrer Karte). Was in ihr wächst, bekommt keinen Nachschub mehr.",
+    "ansage": "Das Singen ist weg. Sie merkt es. Ihr auch."
    }
   ],
   "ziele": [
@@ -131,6 +140,76 @@
    }
   ]
  },
+ "auftraege": [
+  {
+   "id": "waldrand",
+   "art": "Haupt",
+   "titel": "Den Waldrand untersuchen",
+   "spieler": "Seht euch die drei Stellen am Waldrand an, an denen etwas nicht stimmt, und findet heraus, was das Dorf krank macht.",
+   "quelle": "Der Fuhrmann, der euch geschickt hat (Vorschlag, Schritt „Warum ihr hier seid“)",
+   "vorlesen": "Drei Stellen am Waldrand, an denen etwas nicht stimmt. Der Fuhrmann hat gesagt: Dort fängt es an. Ihr habt noch nicht alle gesehen.",
+   "erledigt": {
+    "flag": "ep_haupt",
+    "ist": true
+   }
+  },
+  {
+   "id": "frau",
+   "art": "Haupt",
+   "titel": "Die Frau aus dem Wald retten",
+   "spieler": "Jemand schreit im Wald. Erreicht die Frau, bevor es zu spät ist.",
+   "quelle": "Der Schrei (Cue 01B-1), dann die Frau am linken Waldrand",
+   "vorlesen": "Sie steht noch. Links, am Waldrand. Und die Uhr auf dem Tisch zählt nicht für euch.",
+   "ab": {
+    "flag": "auftrag_frau",
+    "ist": true
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "flag": "frau_erreicht",
+      "ist": true
+     },
+     {
+      "flag": "erbluehte_am_tisch",
+      "ist": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "licht",
+   "art": "Neben",
+   "titel": "Das grüne Licht löschen",
+   "spieler": "In der Ruine oben leuchtet etwas grün. Die Spuren führen dorthin. Macht es aus, wenn ihr könnt.",
+   "quelle": "Die Spuren an Marker 3; Lene: „Geht nicht hin.“",
+   "vorlesen": "Oben zwischen den Steinen pulst das Grün. Dorthin führen alle Spuren. Es wehrt sich nicht.",
+   "ab": {
+    "flag": "marker3",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "quelle_zerstoert",
+    "ist": true
+   }
+  },
+  {
+   "id": "kapelle",
+   "art": "Haupt",
+   "titel": "Zur Kapelle vor dem Dorf",
+   "spieler": "Der Weg ins Dorf führt an der Kapelle vorbei. Dort gehört das Zeichen auf dem Anhänger hin, und dort soll Lenes Mutter sein. Geht hin.",
+   "quelle": "Lene („Sagt meiner Mutter … sie ist in der Kapelle“) oder der Kupferanhänger mit dem Zeichen der Kapelle",
+   "vorlesen": "Ein Turm mit einer Glocke, in Kupfer. Die Kapelle vor dem Dorf trägt dasselbe Zeichen. Da geht es weiter.",
+   "ab": {
+    "flag": "auftrag_kapelle",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "aufbruch_kapelle",
+    "ist": true
+   }
+  }
+ ],
  "rundenwurf": {
   "name": "Was regt sich im Wald?",
   "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde ab dem Erscheinen der Sporenlinge würfelst du einen W6. Meistens passiert nichts.",
@@ -175,6 +254,15 @@
   ]
  },
  "antreiben": [
+  {
+   "titel": "Der Auftrag",
+   "vorlesen": "Drei Stellen auf dem Tisch, an denen etwas nicht stimmt. Ein Schrei von links. Und ein Fuhrmann, der auf Antwort wartet. Womit fangt ihr an?",
+   "gmNotiz": "Wenn die Spieler nicht wissen, was sie tun sollen: Der Auftrag steht oben in der App. Marker untersuchen, zur Frau laufen, beides geht.",
+   "schritte": [
+    "spieler-erste-bewegung",
+    "spieler-runde1"
+   ]
+  },
   {
    "titel": "Der Wald atmet",
    "vorlesen": "Hinter euch, im Moos, hebt und senkt sich etwas. Langsam. Wie ein Atem, der näher kommt.",
@@ -444,6 +532,21 @@
    "start": false,
    "text": "Nebenziel: die Frau vor dem Aufblühen erreicht (1 EP).",
    "wirktIn": "gruppe"
+  },
+  "auftrag_frau": {
+   "start": false,
+   "text": "Die Helden haben den Schrei gehört: Auftrag „Die Frau aus dem Wald retten“ ist bekannt.",
+   "wirktIn": "map1"
+  },
+  "auftrag_kapelle": {
+   "start": false,
+   "text": "Die Helden wissen, wohin es weitergeht: zur Kapelle vor dem Dorf (Lene oder das Zeichen auf dem Anhänger).",
+   "wirktIn": "map1"
+  },
+  "aufbruch_kapelle": {
+   "start": false,
+   "text": "Map 1 ist zu Ende, die Helden brechen zur Kapelle auf.",
+   "wirktIn": "map1"
   }
  },
  "audio": {
@@ -531,8 +634,8 @@
      "wie": "Ruhig beruhigen und nach ihr fragen (Wahl 1). Wer stattdessen seinen eigenen Namen nennt, bekommt ihn wiederholt und startet Map 2 mit 1 Sporenpunkt."
     },
     {
-     "info": "„Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden.“",
-     "wie": "Nach ihrer Mutter fragen oder Hilfe versprechen (Wahl 1 oder 2). Das Versprechen öffnet in Map 2 die Falltür ohne Lärm."
+     "info": "„Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
+     "wie": "Nach ihrer Mutter fragen oder Hilfe versprechen (Wahl 1 oder 2). Das Versprechen öffnet in Map 2 den Weg zu Hedda ohne Lärm. Der Satz von der Kapelle gibt den Helden den nächsten Auftrag: dorthin."
     },
     {
      "info": "„Es fing mit dem Brunnen an. Vierzig Winter kalt, und dann warm.“",
@@ -573,7 +676,38 @@
      "nach ihrem Namen, drängend",
      "Sie zögert. Nur wer ruhig bleibt, bekommt ihn (Wahl 1)."
     ]
-   ]
+   ],
+   "kampf": {
+    "werte": {
+     "name": "Die Frau aus den Wurzeln",
+     "faction": "Moosgrab",
+     "size": "1",
+     "quality": "5+",
+     "defense": "6+",
+     "tough": "1",
+     "role": "enemy",
+     "weapons": "Wurzelarme | Nahkampf | A1 | Gift",
+     "passives": "Bewegt sich nicht, wehrt sich nur, wenn sie angegriffen wird; jede Wunde löst das Aufblühen aus",
+     "flavor": "Sie wollte nach Hause. Die Füße sind schon drin."
+    },
+    "notiz": "Mini: (offen, Chris sucht aus). Halb verwandelt: die Wurzeln an den Armen schlagen zurück, mehr nicht. Verteidigung 6+, Zäh 1 wie in der Sonderregel „Die Frau“: die erste Wunde ist zugleich das Aufblühen. Nur drücken, wenn ein Held sie wirklich angreift.",
+    "setzt": {
+     "frau_angegriffen": true
+    },
+    "info": "Lene, halb von den Wurzeln übernommen. Kein Gegner, bis jemand sie angreift.",
+    "bedrohungSatz": "Das ist keine Gegnerin. Das ist eine Frau, die nach Hause will. Wenn ihr zuschlagt, wisst ihr nicht, was zurückschlägt.",
+    "zustandSaetze": {
+     "unverletzt": "Sie hebt die Arme vors Gesicht. Die Wurzeln daran zittern.",
+     "gefallen": "Der Schlag trifft. Sie sieht nicht einmal hin."
+    },
+    "tod": {
+     "vorlesen": "Der Schlag trifft. Sie sieht nicht einmal hin. Die Wurzeln an ihren Armen schießen in die Erde, alle auf einmal, ihr Rücken biegt sich, und am Hals geht etwas auf, langsam, wie eine Blüte.",
+     "gmNotiz": "Jede Wunde löst das Aufblühen aus: Sporenuhr aus (Zählstein weg), dann „Springen“ zu Das Aufblühen (cue-01b4b). Die Wahl „Was tun die Helden, während sie sich verwandelt“ läuft normal; die Erblühte beginnt mit voller Zähigkeit und wütend (frau_angegriffen ist gesetzt). Kein Hinweis, kein Nebenziel. Map 2: erzählen sie Hedda davon, zieht sie sich zurück.",
+     "setzt": {
+      "frau_angegriffen": true
+     }
+    }
+   }
   }
  },
  "gegner": {
@@ -692,7 +826,12 @@
       "ist": "angriff"
      },
      "text": "Freier Angriff für jeden Helden, der sie erreichen kann, bevor Runde 1 beginnt. Danach wütende Tabelle und Dornen (passiv): Wer sie im Nahkampf trifft, würfelt je Treffer einen W6, bei einer 6 nimmt er selbst einen Treffer (normal verteidigen).",
-     "ansage": "Sie hat euch gesehen. Die Ranken stehen von ihr ab wie Nadeln."
+     "ansage": "Sie hat euch gesehen. Die Ranken stehen von ihr ab wie Nadeln.",
+     "werte": {
+      "passives": [
+       "Dornen: Wer sie im Nahkampf trifft, würfelt je Treffer einen W6; bei einer 6 nimmt er selbst einen Treffer (normal verteidigen)"
+      ]
+     }
     },
     {
      "wenn": {
@@ -1083,13 +1222,22 @@
     "ist": true
    },
    "vorlesen": "Das Licht zwischen den Steinen flackert, wird weiß, und geht aus. Für einen Moment ist der Wald still. Dann atmet er wieder, aber flacher.",
-   "gmNotiz": "Atemzug −1. Nur drücken, wenn die Quelle wirklich auf 0 ist.",
+   "gmNotiz": "Atemzug −1. Nur drücken, wenn die Quelle wirklich auf 0 ist. Die Erblühte verliert ohne die Quelle 2 Zäh (die App rechnet es an ihrer Karte an, auch wenn sie erst später erscheint).",
    "setzt": {
     "quelle_zerstoert": true
    },
    "leisten": {
     "atemzug": -1
-   }
+   },
+   "gegnerMod": [
+    {
+     "id": "erbluehte",
+     "werte": {
+      "tough": -2
+     },
+     "text": "Ohne die Quelle wächst nichts nach: Zäh −2"
+    }
+   ]
   },
   "pruefe-alle-marker": {
    "name": "intern: alle Marker?",
@@ -1174,6 +1322,13 @@
     "Feindzone B an die linke Kante, auf halber Höhe",
     "Die obere Hälfte bleibt leer"
    ],
+   "weiter": "auftrag-waldrand"
+  },
+  "auftrag-waldrand": {
+   "typ": "vorlesen",
+   "titel": "Warum ihr hier seid",
+   "text": "Zwei Tage ist es her, dass euch der Fuhrmann angehalten hat. Seit drei Wochen kommt aus Moosgrab kein Karren mehr, kein Brief, kein Mensch. Nachts stehen Lichter im Wald, wo keine sein sollten. „Seht nach, was da los ist“, hat er gesagt. „Fangt am Waldrand an. Da fängt es an.“ Und er hat gezahlt, im Voraus, die Hälfte. Jetzt steht ihr am Waldrand vor Moosgrab. Das Moos ist zu weich, die Luft zu warm. Drei Stellen vor euch, an denen etwas nicht stimmt. Seht sie euch an. Findet heraus, was das Dorf krank macht. Der Weg ins Dorf führt hier entlang und an der Kapelle vorbei.",
+   "gmNotiz": "(Vorschlag) Der Fuhrmann ist neu erfunden, damit die Helden einen Auftrag haben, bevor der erste NPC auftaucht. Wenn dein Intro E0 schon sagt, warum die Helden hier sind, lies nur die letzten vier Sätze (ab „Jetzt steht ihr …“). Die drei Stellen sind die Suchmarker auf dem Tisch; zeig auf sie. Die Kapelle wird hier nur als Wegmarke genannt, mehr nicht.",
    "weiter": "regel-sporennebel"
   },
   "regel-sporennebel": {
@@ -1186,14 +1341,18 @@
    "typ": "cue",
    "titel": "Der Schrei",
    "cue": "01B-1",
-   "notiz": "Die Frau ist nur zu hören. Noch keine Figur auf dem Tisch.",
-   "weiter": "vorlesen-was-tut-ihr"
+   "notiz": "Die Frau ist nur zu hören. Noch keine Figur auf dem Tisch. Ab jetzt steht „Die Frau aus dem Wald retten“ als Auftrag in der App.",
+   "weiter": "vorlesen-was-tut-ihr",
+   "setzt": {
+    "auftrag_frau": true
+   }
   },
   "vorlesen-was-tut-ihr": {
    "typ": "vorlesen",
    "titel": "Die erste Frage",
    "text": "Was tut ihr?",
-   "weiter": "spieler-erste-bewegung"
+   "weiter": "spieler-erste-bewegung",
+   "gmNotiz": "Wenn sie zögern: Der Schrei kam von links, vom Waldrand. Und die drei Stellen auf dem Tisch warten. Beides ist ihr Auftrag, die Reihenfolge ist ihre Sache."
   },
   "spieler-erste-bewegung": {
    "typ": "spieler",
@@ -1204,7 +1363,8 @@
    "hinweise": [
     "Noch keine Gegner. Noch keine Uhr.",
     "Wer sofort sucht: Marker 2 und 3 sind erreichbar, aber die Uhr hat noch nicht begonnen.",
-    "Jeder Suchmarker: Grundtext vorlesen, dann würfelt der Spieler einen W6, und du liest die Stufen dazu."
+    "Jeder Suchmarker: Grundtext vorlesen, dann würfelt der Spieler einen W6, und du liest die Stufen dazu.",
+    "Faden verloren? Auftrag oben in der App vorlesen: drei Stellen, ein Schrei, der Fuhrmann wartet."
    ],
    "ereignisse": [
     "marker2",
@@ -1246,7 +1406,8 @@
     "Sobald ein Held die Tischmitte überschreitet: M (obere Hälfte aufbauen).",
     "Erreicht ein Held die Frau schon jetzt: F. Dann läuft 01B-4A vor den Kreaturen; die Sporenlinge kommen trotzdem am Ende von Runde 1.",
     "Die Frau ist etwa zwei Kartenlängen vom Heldenstart entfernt: wer zweimal läuft, steht in Runde 1 bei ihr.",
-    "Rundenende: Sporenuhr 3 → 2."
+    "Rundenende: Sporenuhr 3 → 2.",
+    "Faden verloren? „Die Frau links. Die Marker. Die Uhr zählt nicht für euch.“"
    ],
    "ereignisse": [
     "marker1",
@@ -1351,7 +1512,8 @@
     "Die Spieler kämpfen, suchen oder laufen zur Frau. Jedes Rundenende: R (Sporenuhr −1), dann der Rundenwurf, wenn du ihn nimmst.",
     "Erreicht ein Held die Frau, solange die Uhr über 0 steht: F.",
     "Steht die Uhr auf 0 und niemand war bei ihr: die App springt von selbst zum Aufblühen.",
-    "Punkte: 4 Figuren sind 100 P. nach Karte, das Playbook sagt ≈ 50. Wenn es zu hart wird: nur eine Figur je Zone."
+    "Punkte: 4 Figuren sind 100 P. nach Karte, das Playbook sagt ≈ 50. Wenn es zu hart wird: nur eine Figur je Zone.",
+    "Faden verloren? Der Kampf ist nicht der Auftrag: Marker und Frau bleiben das Ziel, das Kleinvieh steht nur im Weg."
    ],
    "ereignisse": [
     "marker1",
@@ -1458,30 +1620,41 @@
    "typ": "vorlesen",
    "titel": "Sie antwortet",
    "als": "frau",
-   "text": "„Lene. Ich bin … Lene.“ Als sie den Namen sagt, zucken die Wurzeln an ihren Armen, alle auf einmal. Sie sieht hin, dann zu euch. „Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden.“",
-   "weiter": "cue-01b4b"
+   "text": "„Lene. Ich bin … Lene.“ Als sie den Namen sagt, zucken die Wurzeln an ihren Armen, alle auf einmal. Sie sieht hin, dann zu euch. „Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
+   "weiter": "cue-01b4b",
+   "setzt": {
+    "auftrag_kapelle": true
+   },
+   "gmNotiz": "Damit wissen die Spieler, wohin es weitergeht: zur Kapelle vor dem Dorf, zu Lenes Mutter. Der Auftrag steht ab jetzt oben in der App."
   },
   "frau-antwort-2": {
    "typ": "vorlesen",
    "titel": "Sie antwortet",
    "als": "frau",
-   "text": "Sie wiederholt den Namen. Langsam, als müsste sie ihn festhalten. Die Wurzeln an ihren Armen richten sich auf, alle in eure Richtung. „Das Moos hat gehört. Es … es merkt sich alles.“ Dann, leiser: „Sagt meiner Mutter, ich hab den Weg nicht gefunden.“",
-   "gmNotiz": "Den Helden nicht erklären, was das heißt. Map 2 erklärt es.",
-   "weiter": "cue-01b4b"
+   "text": "Sie wiederholt den Namen. Langsam, als müsste sie ihn festhalten. Die Wurzeln an ihren Armen richten sich auf, alle in eure Richtung. „Das Moos hat gehört. Es … es merkt sich alles.“ Dann, leiser: „Sagt meiner Mutter, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
+   "gmNotiz": "Den Helden nicht erklären, was das heißt. Map 2 erklärt es. Wohin es weitergeht, ist jetzt klar: zur Kapelle vor dem Dorf, zu ihrer Mutter.",
+   "weiter": "cue-01b4b",
+   "setzt": {
+    "auftrag_kapelle": true
+   }
   },
   "frau-antwort-3": {
    "typ": "vorlesen",
    "titel": "Sie antwortet",
    "als": "frau",
-   "text": "„Es fing … mit dem Brunnen an. Er war warm. Vierzig Winter kalt, und dann warm.“ Sie schüttelt den Kopf, als würde sie etwas abschütteln wollen. „Das Licht hat gesungen. Geht nicht hin. Sagt meiner Mutter, ich hab den Weg nicht gefunden.“",
-   "weiter": "cue-01b4b"
+   "text": "„Es fing … mit dem Brunnen an. Er war warm. Vierzig Winter kalt, und dann warm.“ Sie schüttelt den Kopf, als würde sie etwas abschütteln wollen. „Das Licht hat gesungen. Geht nicht hin. Sagt meiner Mutter, ich hab den Weg nicht gefunden. In der Kapelle. Sucht sie in der Kapelle.“",
+   "weiter": "cue-01b4b",
+   "setzt": {
+    "auftrag_kapelle": true
+   },
+   "gmNotiz": "Damit wissen die Spieler, wohin es weitergeht: zur Kapelle vor dem Dorf. Der Auftrag steht ab jetzt oben in der App."
   },
   "frau-antwort-4": {
    "typ": "vorlesen",
    "titel": "Sie weicht zurück",
    "als": "frau",
    "text": "Sie hebt die Arme vors Gesicht. Die Wurzeln daran sind länger geworden, seit ihr sie zuerst gesehen habt. „Nicht … ich wollte doch nur nach Hause.“",
-   "gmNotiz": "Wird sie angegriffen: Verteidigung 6+, Zäh 1. Jede Wunde löst sofort das Aufblühen aus, die Erblühte beginnt mit voller Zähigkeit.",
+   "gmNotiz": "Wird sie angegriffen: Verteidigung 6+, Zäh 1. Jede Wunde löst sofort das Aufblühen aus, die Erblühte beginnt mit voller Zähigkeit. Kein Hinweis auf die Kapelle: den Weg dorthin zeigt später nur das Zeichen auf dem Anhänger (und der Fuhrmann hat die Kapelle als Wegmarke genannt).",
    "weiter": "cue-01b4b"
   },
   "cue-01b4b": {
@@ -1516,7 +1689,7 @@
       "aufbluehen_wahl": "angriff",
       "aufbluehen_angriff": true
      },
-     "folge": "Die Helden handeln zuerst: ein freier Angriff für jeden, der sie erreichen kann. Aber sie startet wütend und bekommt Dornen (wer sie im Nahkampf trifft, nimmt bei einer 6 einen Treffer zurück). Map 2: Hedda zieht sich zurück, wenn sie das erfährt.",
+     "folge": "Die Helden handeln zuerst: ein freier Angriff für jeden, der sie erreichen kann. Aber sie startet wütend und bekommt Dornen als Regel auf der Karte (wer sie im Nahkampf trifft, nimmt bei einer 6 einen Treffer zurück). Map 2: Hedda zieht sich zurück, wenn sie das erfährt.",
      "ziel": "aufbluehen-angriff"
     },
     {
@@ -1742,28 +1915,41 @@
    "typ": "vorlesen",
    "titel": "Der Anhänger",
    "text": "Kupfer, grün angelaufen, an einer Schnur aus Leder. Darauf ein Zeichen: ein Turm mit einer Glocke. Die Kapelle vor dem Dorf trägt dasselbe.",
-   "gmNotiz": "Zettel „Kupferanhänger, Zeichen der Kapelle“ übergeben. Wer ihn trägt, steht im Stand.",
-   "weiter": "wahl-nachsuche"
+   "gmNotiz": "Zettel „Kupferanhänger, Zeichen der Kapelle“ übergeben. Wer ihn trägt, steht im Stand. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "weiter": "wahl-nachsuche",
+   "setzt": {
+    "auftrag_kapelle": true
+   }
   },
   "anhaenger-begraben": {
    "typ": "vorlesen",
    "titel": "Zugedeckt",
    "text": "Ihr deckt sie zu. Erde, Äste, Moos. Das Moos ist warm, als ihr es anfasst. Als ihr fertig seid, ist es dunkler geworden, und der Wald atmet lauter als vorher.",
-   "gmNotiz": "Atemzug-Leiste +1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben.",
-   "weiter": "wahl-nachsuche"
+   "gmNotiz": "Atemzug-Leiste +1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "weiter": "wahl-nachsuche",
+   "setzt": {
+    "auftrag_kapelle": true
+   }
   },
   "anhaenger-liegen": {
    "typ": "vorlesen",
    "titel": "Liegen gelassen",
-   "text": "Der Anhänger bleibt im Moos. Kupfer, grün angelaufen, ein Turm mit einer Glocke darauf. Ihr geht weiter. Hinter euch schließt sich das Moos über ihm.",
-   "weiter": "wahl-nachsuche"
+   "text": "Der Anhänger bleibt im Moos. Kupfer, grün angelaufen, ein Turm mit einer Glocke darauf. Ihr geht weiter. Hinter euch schließt sich das Moos über ihm. Das Zeichen habt ihr gesehen: Die Kapelle vor dem Dorf trägt dasselbe.",
+   "weiter": "wahl-nachsuche",
+   "setzt": {
+    "auftrag_kapelle": true
+   },
+   "gmNotiz": "Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“"
   },
   "anhaenger-verbrannt": {
    "typ": "vorlesen",
    "titel": "Feuer",
    "text": "Die Wurzeln brennen schlecht, sie zischen und drehen sich. Dann fangen die Sporen Feuer, und für einen Augenblick steht der ganze Waldrand in grünem Licht. Danach riecht es nach nassem Brot. Der Anhänger ist warm in der Hand.",
-   "gmNotiz": "Atemzug-Leiste −1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben.",
-   "weiter": "wahl-nachsuche"
+   "gmNotiz": "Atemzug-Leiste −1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "weiter": "wahl-nachsuche",
+   "setzt": {
+    "auftrag_kapelle": true
+   }
   },
   "wahl-nachsuche": {
    "typ": "wahl",
@@ -1943,6 +2129,20 @@
       "ist": true
      },
      "text": "Quelle zerstört: im Finale weniger Nachschub (Atemzug −1 schon verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "versprechen_mutter",
+      "ist": true
+     },
+     "text": "Die Helden wissen, dass Lenes Mutter in der Kapelle ist: Map 2 beginnt mit diesem Auftrag."
+    },
+    {
+     "wenn": {
+      "flag": "versprechen_mutter",
+      "ist": false
+     },
+     "text": "Kein Wort von Lene über die Kapelle: Map 2 beginnt nur mit dem Zeichen auf dem Anhänger als Hinweis."
     }
    ],
    "notieren": [
@@ -1951,7 +2151,11 @@
     "Sporenpunkte je Held (name_verraten → 1)",
     "Budget je Held +10 im Reiter Gruppe eintragen"
    ],
-   "weiter": null
+   "weiter": null,
+   "setzt": {
+    "aufbruch_kapelle": true
+   },
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen, damit niemand mit einem Fragezeichen nach Hause geht: „Der Weg ins Dorf führt an der Kapelle vorbei. Das Zeichen auf dem Anhänger ist ihres. Nächstes Mal steht ihr davor.“"
   }
  }
 }
