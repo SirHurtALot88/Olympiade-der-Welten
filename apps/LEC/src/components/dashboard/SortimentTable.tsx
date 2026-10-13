@@ -16,6 +16,9 @@ interface Props {
 
 export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; label: string }> = {
   unter_min: { cls: "p-crit", label: "unter MIN" },
+  // Schon die Marge VOR Fixkosten liegt bei diesem VK unter dem MIN-Ziel -- das Ziel ist mit
+  // diesem VK nicht erreichbar. Bewusst gelb statt rot: struktureller Befund, kein Dauer-Alarm.
+  ziel_unerreichbar: { cls: "p-warn", label: "Ziel unerreichbar" },
   im_korridor: { cls: "p-good", label: "im Korridor" },
   ueber_gut: { cls: "p-mkt", label: "über Markt" },
   // FIX 1: kein Korridor-Status, sondern Kennzeichnung "wir kennen den EK nicht" --
@@ -79,7 +82,13 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
                   <td className="r num">€ {formatEuro(row.revenue365)}</td>
                   <td className="r num">{vkForDisplay > 0 ? `${formatEuroCents(vkForDisplay)} €` : "—"}</td>
                   <td>
-                    <Corridor min={row.corridor.min} good={row.corridor.good} vk={vkForDisplay} />
+                    <Corridor
+                      min={row.corridor.min}
+                      good={row.corridor.good}
+                      contribution={row.corridor.contribution}
+                      vk={vkForDisplay}
+                      status={row.priceStatus}
+                    />
                   </td>
                   <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
                   <td>
@@ -115,16 +124,30 @@ interface CorridorProps {
   min: number;
   good: number;
   vk: number;
+  /** Deckungsbeitrags-Grenze: VK, unter dem jeder Verkauf schon vor Fixkosten Geld kostet (roter Marker "DB"). */
+  contribution?: number;
+  /** Status des Artikels; "ziel_unerreichbar" faerbt den VK-Marker gelb statt rot. */
+  status?: SortimentRow["priceStatus"];
   /** Optionaler Cardmarket-Preistrend -- rendert einen zusaetzlichen blauen Markt-Marker (PAGES_CONCEPT §3). */
   marketValue?: number | null;
 }
 
-export function Corridor({ min, good, vk, marketValue }: CorridorProps) {
-  const rangeMin = min * 0.7;
+export function Corridor({ min, good, vk, contribution, status, marketValue }: CorridorProps) {
+  const hasContribution = contribution !== undefined && Number.isFinite(contribution) && contribution > 0;
+  const rangeMin = Math.min(min, hasContribution ? contribution : min) * 0.7;
   const rangeMax = good * 1.25;
   const range = rangeMax - rangeMin || 1;
   const pos = (x: number) => Math.max(0, Math.min(100, ((x - rangeMin) / range) * 100));
-  const meColor = vk === 0 ? "var(--faint)" : vk < min ? "var(--crit)" : vk > good ? "var(--market)" : "var(--good)";
+  const meColor =
+    vk === 0
+      ? "var(--faint)"
+      : status === "ziel_unerreichbar"
+        ? "var(--warn)"
+        : vk < min
+          ? "var(--crit)"
+          : vk > good
+            ? "var(--market)"
+            : "var(--good)";
 
   return (
     <div className="corridor">
@@ -133,6 +156,13 @@ export function Corridor({ min, good, vk, marketValue }: CorridorProps) {
           className="band"
           style={{ left: `${pos(min)}%`, width: `${pos(good) - pos(min)}%` }}
         />
+        {hasContribution && (
+          <div
+            className="dk"
+            style={{ left: `${pos(contribution)}%` }}
+            title={`Deckungsbeitrags-Grenze ${contribution.toFixed(2)} € — darunter Verlust pro Verkauf`}
+          />
+        )}
         <div className="mn" style={{ left: `${pos(min)}%` }} />
         <div className="gx" style={{ left: `${pos(good)}%` }} />
         {marketValue !== undefined && marketValue !== null && marketValue > 0 && (
@@ -141,6 +171,7 @@ export function Corridor({ min, good, vk, marketValue }: CorridorProps) {
         {vk > 0 && <div className="me" style={{ left: `${pos(vk)}%`, background: meColor }} />}
       </div>
       <div className="clabels">
+        {hasContribution && <span title="Deckungsbeitrags-Grenze">DB {contribution.toFixed(2)}</span>}
         <span>MIN {min.toFixed(2)}</span>
         <span>GUT {good.toFixed(2)}</span>
       </div>

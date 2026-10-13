@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
-import { loadActiveCostSettings, listRecentImportBatches } from "@/lib/dashboard/queries";
+import { loadActiveCostSettings, loadArticleAggregates, listRecentImportBatches } from "@/lib/dashboard/queries";
+import { shopVolumeFromAggregates } from "@/lib/dashboard/viewModel";
 import { getAuthConfig } from "@/lib/auth/config";
 import { EinstellungenPage } from "@/components/einstellungen/EinstellungenPage";
 
@@ -7,6 +8,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const costSettings = await loadActiveCostSettings(prisma);
+  // Shopweite 365-Tage-Menge (N, N_T) aus dem letzten Import -- gleiche Quelle wie Dashboard/Sortiment.
+  const { aggregates } = await loadArticleAggregates(prisma);
+  const shopVolume = shopVolumeFromAggregates(aggregates, costSettings);
   const importBatchesRaw = await listRecentImportBatches(prisma, 20);
   const importBatches = importBatchesRaw.map((b) => ({
     ...b,
@@ -21,6 +25,7 @@ export default async function Page() {
       costSettings={costSettings}
       importBatches={importBatches}
       authEnabled={auth.enabled}
+      shopVolume={shopVolume}
     />
   );
 }

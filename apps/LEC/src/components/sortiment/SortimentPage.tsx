@@ -24,7 +24,7 @@ const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", "faellt
 /** SortimentRow.priceStatus statt costEngine.PriceStatus (FIX 1): enthaelt zusaetzlich
  * "kein_ek" fuer Artikel ohne jeden EK-Anhaltspunkt. */
 type RowPriceStatus = SortimentRow["priceStatus"];
-const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "im_korridor", "ueber_gut", "kein_ek"];
+const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "ziel_unerreichbar", "im_korridor", "ueber_gut", "kein_ek"];
 
 type ColId =
   | "artikel"
@@ -38,7 +38,9 @@ type ColId =
   | "ek"
   | "dbI"
   | "dbII"
+  | "dbIII"
   | "dbIIpct"
+  | "dbIIIpct"
   | "klasse"
   | "status"
   | "stock"
@@ -60,7 +62,13 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "ek", label: "Preis EK", def: 82, min: 65, align: "r" },
   { id: "dbI", label: "DB I/Stk", def: 84, min: 65, align: "r" },
   { id: "dbII", label: "DB II/Stk", def: 88, min: 65, align: "r" },
+  // DB III = DB II abzueglich Fixkostenanteil. DB II sagt "lohnt der einzelne
+  // Verkauf", DB III sagt "traegt der Artikel seinen Anteil an Shop, Billbee,
+  // Lexoffice, Raumkosten und Lizenzen". Bei Billigkarten liegen beide weit
+  // auseinander -- genau dort faellt die Sortimentsentscheidung.
+  { id: "dbIII", label: "DB III/Stk", def: 92, min: 65, align: "r" },
   { id: "dbIIpct", label: "DB II %", def: 76, min: 60, align: "r" },
+  { id: "dbIIIpct", label: "DB III %", def: 80, min: 60, align: "r" },
   { id: "klasse", label: "Klasse", def: 100, min: 80 },
   { id: "status", label: "Status", def: 116, min: 90 },
   { id: "stock", label: "Stk", def: 62, min: 50, align: "r" },
@@ -79,7 +87,9 @@ const SORTABLE_COLS: ColId[] = [
   "ek",
   "dbI",
   "dbII",
+  "dbIII",
   "dbIIpct",
+  "dbIIIpct",
   "stock",
   "potvk",
   "stockcover",
@@ -118,8 +128,12 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
       return row.dbIPerUnit;
     case "dbII":
       return row.dbIIPerUnit;
+    case "dbIII":
+      return row.dbIIIPerUnit;
     case "dbIIpct":
       return row.dbIIPercent;
+    case "dbIIIpct":
+      return row.dbIIIPercent;
     case "stock":
       return row.stock;
     case "potvk":
@@ -365,6 +379,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                       <Corridor
                         min={row.corridor.min}
                         good={row.corridor.good}
+                        contribution={row.corridor.contribution}
+                        status={row.priceStatus}
                         vk={vkForCorridor}
                         marketValue={row.priceTrend}
                       />
@@ -372,7 +388,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                     <td className="r num">{row.ek > 0 ? `${formatEuroCents(row.ek)} €` : "—"}</td>
                     <td className="r num">{formatEuroCents(row.dbIPerUnit)} €</td>
                     <td className="r num">{formatEuroCents(row.dbIIPerUnit)} €</td>
+                    <td className="r num" style={{ color: row.dbIIIPerUnit < 0 ? "var(--crit)" : undefined }}>
+                      {formatEuroCents(row.dbIIIPerUnit)} €
+                    </td>
                     <td className="r num">{formatPercent(row.dbIIPercent)}%</td>
+                    <td className="r num" style={{ color: row.dbIIIPercent < 0 ? "var(--crit)" : undefined }}>
+                      {formatPercent(row.dbIIIPercent)}%
+                    </td>
                     <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
                     <td>
                       <span className={`pill ${pill.cls}`}>

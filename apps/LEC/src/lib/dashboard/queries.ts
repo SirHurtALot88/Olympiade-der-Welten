@@ -22,15 +22,19 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
   return {
     buyShippingUnderFive: active.buyShippingUnderFive,
     buyShippingFive: active.buyShippingFive,
+    buyShippingShareFactor: active.buyShippingShareFactor,
     shippingSingle: active.shippingSingle,
     shippingPack: active.shippingPack,
-    registeredSingle: active.registeredSingle,
-    registeredPack: active.registeredPack,
+    registeredCostPerShipment: active.registeredCostPerShipment,
+    registeredThreshold: active.registeredThreshold,
+    registeredStampsPerYear: active.registeredStampsPerYear,
     packagingSingle: active.packagingSingle,
     packagingPack: active.packagingPack,
     fixedYearlyEbayShop: active.fixedYearlyEbayShop,
     fixedYearlyBillbee: active.fixedYearlyBillbee,
     fixedYearlyLexoffice: active.fixedYearlyLexoffice,
+    fixedYearlyPackagingLicense: active.fixedYearlyPackagingLicense,
+    fixedYearlyOther: active.fixedYearlyOther,
     ebayCommissionRate: active.ebayCommissionRate,
     ebayCommissionVat: active.ebayCommissionVat,
     ebayCommissionFixed: active.ebayCommissionFixed,
@@ -83,6 +87,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
         existing.shippingCost += sw.shippingCost;
         existing.dbI += sw.dbI;
         existing.dbII += sw.dbII;
+        existing.fixedCostShare += sw.fixedCostShare;
         existing.avgPrice = existing.qty > 0 ? existing.revenue / existing.qty : 0;
         existing.rank = existing.rank ?? sw.rank ?? null;
       } else {
@@ -94,6 +99,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
           shippingCost: sw.shippingCost,
           dbI: sw.dbI,
           dbII: sw.dbII,
+          fixedCostShare: sw.fixedCostShare,
           avgPrice: sw.avgPrice,
           rank: sw.rank ?? null,
         };

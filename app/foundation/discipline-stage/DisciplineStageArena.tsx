@@ -3060,6 +3060,7 @@ export default function DisciplineStageArena({
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         disciplineId={disciplineId}
+        matchdayId={matchdayId ?? null}
         disciplineName={model.disciplineName}
         accent={DISCIPLINE_SKIN[disciplineId]?.accent}
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}

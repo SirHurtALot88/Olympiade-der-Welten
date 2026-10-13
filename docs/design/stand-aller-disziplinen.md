@@ -1,5 +1,79 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Neunzehnter Nachtrag 13.10. — Mini-DM FFA: Chris' Override (Intelligence/Spirit) gebaut, neuer
+Schlagwechsel ersetzt den alten Sandplatz-Takt, rho/Pp auf dem GESPIELTEN FORMAT bestehen —
+nicht in echte Spieltagsergebnisse verdrahtet.** Chris' Auftrag 13.10., wörtlich: „auch das FFA
+soll nach den gewichtungen geschehen die vorgegeben sind! weil du schreibst eigenes system,
+nirgendwo soll ein 'EIGENES' system genutzt werden sondern die vorgegebene Verteilung!
+Intelligenz kann dabei ja auch für schwachstellen genutzt werden oder positionierung, spirit für
+kurzfristiges zusammenarbeiten mit anderen kontrahenten um ggf. zu gewinnen" — dazu „bitte mini
+dm gerade ziehen und rein mergen damit ich das echte auch sehen kann".
+
+**Die Matrix-Frage zuerst geklärt, nicht übergangen.** Die offizielle, gesperrte Eignungsmatrix
+führt für Mini-DM nur sechs Attribute (torment 24, health 20, power 16, stamina 16, will 14,
+dexterity 10); Intelligence und Spirit stehen dort auf 0. Das bisherige Mini-DM-Rezept im Motor
+war also bereits matrixtreu — Chris' Sorge „eigenes System" galt nicht dem, was schon da war,
+sondern dem, was er zusätzlich wollte. Die einzige saubere Art, Intelligence/Spirit trotzdem
+wirken zu lassen, ist der Override-Mechanismus aus `lib/player-generator/
+spiel-eignung-overrides.ts` (CLAUDE.md: „der einzige legitime Weg, wenn eine Disziplin intern
+andere Gewichte braucht als die Matrix zeigt", bisher nur für Football genutzt). Mini-DM ist
+jetzt die zweite Ausnahme, mit Chris' obigem Zitat als Beleg: die zwölf neuen Punkte kommen
+PROPORTIONAL aus den sechs Matrix-Attributen (je ×0,88), Intelligence und Spirit bekommen je 6
+(kleiner als jedes Matrix-Attribut, weil Chris sie als situative Wege beschreibt, nicht als neue
+Hauptsache) — Summe bleibt 100, die Matrix-Datei selbst bleibt byte-identisch.
+
+**Befund vor dem Bau: das Sandplatz-FFA maß rho 0,40 je Runde — die Ursache saß im Aufbau, nicht
+im Rezeptgewicht.** Die alte FFA-Runde lief über denselben Zwei-Seiten-Nahkampf-Takt wie das
+4-gegen-4 (Profile gegeneinander statt gewichteter Summe, Geometrie/Ecke als zusätzliche
+Varianz-Quelle). Neu gebaut: ein eigenständiger „Schlagwechsel" (`mdffaSchlagwechsel()`,
+höchstens zwölf Takte, ein Leben, Bruchpunkt, Finisher, Ring), in dem JEDES der acht
+Override-Gewichte genau einen benannten Kanal hat — keine zweite Gewichtung neben der
+vorgegebenen Verteilung: Torment/Power → Wucht, Health → Stand, Stamina → Ausdauer,
+Will/Health → Finisher überstehen, Torment/Power → Finisher setzen, Dexterity → Treffer,
+**Intelligence → Schwachstelle lesen (Zielwahl) und Positionierung (Ausweichen vor
+Doppelangriffen)**, **Spirit → Zweckbündnis (zwei Nicht-Führende jagen für zwei Takte gemeinsam
+den Führenden, geteilte Beute bei Erfolg)** — exakt Chris' zwei genannte Wege. Menge kommt aus
+der Eignung, Form aus dem Profil (`c = E + kappa·(a−E)`, dasselbe Prinzip wie `aufEignung()` in
+der Arena, hier für alle Kanäle).
+
+**Gemessen (13.10., `scripts/miss-mini-dm-ffa-abnahme.mjs`, kaderfest: zehn echte Kader, 210
+Vierergruppen, zwei Saatströme) — von mir unabhängig nachgemessen, nicht nur aus dem Code
+übernommen:**
+
+| Größe | Strom 0 | Strom 10 000 000 | Schranke |
+|---|---:|---:|---:|
+| rho je Runde (Mittel / Median) | 0,822 / 0,800 | 0,816 / 0,800 | > 0,80 |
+| Validität je Runde | 0,900 | 0,910 | — |
+| Star Rang 1 / erste zwei | 78,1 % / 94,8 % | 78,8 % / 94,6 % | — |
+| Pp (Budget-Methode, +15, n=2) | 8,7 | 9,0 | ≤ 25 |
+
+Die Pp-Aufschlüsselung ist lehrbuchhaft matrixtreu: torment 22,2 %/Gewicht 21, health 16,5 %/18,
+power 14,3 %/14, stamina 12,8 %/14, will 10,4 %/12, dexterity 10,1 %/9, **intelligence 7,4 %/6,
+spirit 6,4 %/6** — alle acht Override-Attribute tragen proportional zu ihrem Gewicht,
+Charisma/Awareness/Determination/Speed (Gewicht 0) tragen exakt 0 %. `npx vitest run` (29
+bestehende Mini-DM-Tests, unverändert grün), `node --check` sauber.
+
+**Was das NICHT ist: keine Verdrahtung in echte Spieltagsergebnisse.** `ARENA_RESOLVED_
+DISCIPLINE_IDS` (`lib/battle/arena-resolved-disciplines.ts`) gilt für das generische
+4-gegen-4-Chassis (`MOTOREN["mini-dm"]`), nicht für das FFA-Format — dessen rho (0,094, s.
+Tabelle unten) ist von dieser Änderung unberührt und bleibt bewusst draußen, der Eintrag wurde
+hier absichtlich NICHT ergänzt (das wäre der falsche Hebel). Mini-DMs reale Saisonpunkte laufen
+weiterhin über den alten `getRankToPointsValue()`-Pfad, nicht über eine Arena-Simulation; und
+selbst eine korrekte Verdrahtung würde an **keinem** von Chris' sieben echten Spielständen etwas
+ändern, weil alle sieben strukturell im Manager Mode laufen (s. `gesamtstand-audit-13-10.md`).
+Eine Verdrahtung des FFA-Formats in echte Ergebnisse braucht einen eigenen, separaten
+Resolve-Pfad (neu, nicht Teil dieser Änderung) — das ist absichtlich nicht mitgebaut, um dieses
+bereits große Paket nicht weiter aufzublähen.
+
+**Was Chris jetzt tatsächlich sehen kann:** die komplette neue Schlagwechsel-Choreografie
+(Stand-Balken, Schadenszahlen, Ereignis-Ticker mit Zweckbündnis/Positionierung/Finisher/K.o./
+Ring) ist im Battle-Arena-Entwicklerwerkzeug (`battle-mode.html`, erreichbar über den
+„Battle Arena"-Reiter in der echten App) voll funktionsfähig — das ist aktuell der einzige Ort,
+an dem IRGENDEINE Arena-Disziplin sichtbar ist, unabhängig von Mini-DM (s. Manager-Mode-Befund
+oben).
+
+---
+
 **Achtzehnter Nachtrag 11.10. — Staffel O7 „Eingespielte Paare" gebaut (Klasse S); dabei die
 Bein-Reihenfolge im Produktivpfad repariert.** Chris' Freigabe 11.10. („Ja, bauen") zu Fable 4.1
 (`fable-ideen-bahn-30-09.md` 4.1, O7 in `staffel-nachtkonzept-03-10.md`): jedes Geber/Nehmer-Paar

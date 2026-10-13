@@ -125,6 +125,7 @@ export function MarktpreisePage({ rows }: Props) {
                 <Corridor
                   min={detailRow.corridor.min}
                   good={detailRow.corridor.good}
+                  contribution={detailRow.corridor.contribution}
                   vk={detailRow.ownVk}
                   marketValue={detailRow.marketTrend}
                 />
