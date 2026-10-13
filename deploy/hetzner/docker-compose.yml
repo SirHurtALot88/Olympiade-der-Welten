@@ -65,6 +65,10 @@ services:
       LEC_AUTH_ENABLED: ${LEC_AUTH_ENABLED:-1}
       LEC_PASSWORD: ${LEC_PASSWORD:-}
       LEC_AUTH_SECRET: ${LEC_AUTH_SECRET:-}
+      # Billbee-API (optional): ohne die drei Werte bleibt der Abruf aus. Werte aus .env.
+      BILLBEE_API_KEY: ${BILLBEE_API_KEY:-}
+      BILLBEE_USER: ${BILLBEE_USER:-}
+      BILLBEE_PASSWORD: ${BILLBEE_PASSWORD:-}
     volumes:
       - lec-data:/app/data
     expose:
