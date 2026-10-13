@@ -8,6 +8,7 @@ function tile(itemId: string, title: string, guid: string): string {
 <button aria-label="beobachten ${title}" class=str-item-card__watch--icon></button>
 <a href=https://www.ebay.de/itm/${itemId}?itmmeta=X&hash=item:g:${guid} aria-label="${title}" class=str-item-card__link>
 <img data-testid=str-img _type=Image imageId=${guid} imageIdType=ZOOM_GUID src=https://i.ebayimg.com/images/g/${guid}/s-l300.jpg alt>
+<span class=str-item-card__property-displayPrice>EUR 4,19</span><span>EUR 5,99</span>
 </a></article>`;
 }
 
@@ -19,8 +20,8 @@ describe("parseStorePage", () => {
       tile("226617703309", "3x Yu-Gi-Oh! RA03-DE052 Wiedergeburt Ultra Rare NM 1st", "zGAAAOSwwhRntvqj") +
       "</html>";
     expect(parseStorePage(html)).toEqual([
-      { itemId: "226616295629", title: "Yu-Gi-Oh! SDP-G001 Aufgegeben Ultra Rare NM 1st Ed", imageGuid: "i3gAAOSwbMtieQla" },
-      { itemId: "226617703309", title: "3x Yu-Gi-Oh! RA03-DE052 Wiedergeburt Ultra Rare NM 1st", imageGuid: "zGAAAOSwwhRntvqj" },
+      { itemId: "226616295629", title: "Yu-Gi-Oh! SDP-G001 Aufgegeben Ultra Rare NM 1st Ed", imageGuid: "i3gAAOSwbMtieQla", price: 4.19 },
+      { itemId: "226617703309", title: "3x Yu-Gi-Oh! RA03-DE052 Wiedergeburt Ultra Rare NM 1st", imageGuid: "zGAAAOSwwhRntvqj", price: 4.19 },
     ]);
   });
 

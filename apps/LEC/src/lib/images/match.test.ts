@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { matchListingsToArticles } from "./match";
 
 const art = (id: string, nameNormalized: string, packQty = 1) => ({ id, nameNormalized, packQty });
-const lst = (itemId: string, title: string) => ({ itemId, title, imageGuid: `g${itemId}` });
+const lst = (itemId: string, title: string) => ({ itemId, title, imageGuid: `g${itemId}`, price: null });
 
 describe("matchListingsToArticles", () => {
   it("ordnet ueber den normalisierten Namen zu (1:1 wie Billbee)", () => {

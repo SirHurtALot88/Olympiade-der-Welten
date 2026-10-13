@@ -31,7 +31,7 @@ const fmtTime = (iso: string) =>
 /**
  * Kartenbilder: eigene eBay-Fotos zuerst, YGOPRODeck als Rueckfall
  * (src/lib/images/). Ein Lauf dauert gut anderthalb Minuten und laeuft im
- * Hintergrund; die Karte fragt waehrenddessen alle drei Sekunden nach.
+ * Hintergrund (src/instrumentation.ts, Import); die Karte zeigt nur den Stand.
  */
 export function ImageSyncCard() {
   const [status, setStatus] = useState<Status | null>(null);
@@ -57,21 +57,6 @@ export function ImageSyncCard() {
     return () => clearInterval(t);
   }, [status?.running, load]);
 
-  async function start(force: boolean) {
-    setError(null);
-    try {
-      const res = await fetch("/api/images/sync", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ force }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setStatus(await res.json());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Start fehlgeschlagen.");
-    }
-  }
-
   const c = status?.counts;
   const r = status?.lastReport;
   const pct = c && c.total > 0 ? Math.round((c.withImage / c.total) * 100) : 0;
@@ -81,8 +66,8 @@ export function ImageSyncCard() {
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Kartenbilder</div>
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
         Zuerst deine eigenen Fotos aus dem eBay-Shop, für alles, was dort gerade nicht gelistet ist, das Kartenbild von
-        YGOPRODeck über den Set-Code. Jedes Bild wird einmal geladen und auf dem Server abgelegt. Nach jedem Import laufen
-        neue Artikel automatisch nach.
+        YGOPRODeck über den Set-Code. Jedes Bild wird einmal geladen und auf dem Server abgelegt. Läuft automatisch beim
+        Serverstart, nach jedem Import und einmal täglich. Reine Anzeige.
       </div>
 
       {c && (
@@ -131,21 +116,6 @@ export function ImageSyncCard() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="chip" disabled={!status || status.running} onClick={() => start(false)} style={{ padding: "8px 16px" }}>
-          {status?.running ? "Läuft …" : "Bilder holen"}
-        </button>
-        <button
-          type="button"
-          className="chip"
-          disabled={!status || status.running}
-          onClick={() => start(true)}
-          title="Alle Bilder neu laden, auch vorhandene"
-          style={{ padding: "8px 16px" }}
-        >
-          Alle neu laden
-        </button>
-      </div>
     </div>
   );
 }

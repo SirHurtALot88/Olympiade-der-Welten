@@ -149,7 +149,7 @@ model MarketPrice {
   id         String   @id @default(cuid())
   articleId  String
   article    Article  @relation(fields: [articleId], references: [id])
-  source     String // "cardmarket-manual"
+  source     String // "cardmarket-priceguide" (automatisch), frueher "cardmarket-manual"
   priceFrom  Float?
   priceTrend Float?
   priceAvg30 Float?
@@ -158,6 +158,16 @@ model MarketPrice {
   available  Int?
   fetchedAt  DateTime @default(now())
   raw        String? // JSON-Blob (Angebotsliste etc.)
+  /// Cardmarket-Produkt (Preisliste), wenn eindeutig zugeordnet.
+  idProduct    Int?
+  /// "eindeutig" | "mehrdeutig" (siehe src/lib/market/catalog.ts).
+  matchQuality String?
+  /// Mehrdeutig: Trend der billigsten und der teuersten Variante, je Karte.
+  priceMin     Float?
+  priceMax     Float?
+  variants     Int?
+
+  @@index([articleId, source])
 }
 
 /// Konfigurierbare Kostensätze für die VK-Kalkulation (KONZEPT §7.3), versioniert.

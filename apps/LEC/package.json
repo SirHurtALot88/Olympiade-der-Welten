@@ -15,7 +15,8 @@
     "db:push": "tsx scripts/with-db-env.ts db push",
     "db:studio": "tsx scripts/with-db-env.ts studio",
     "import:local": "tsx scripts/import-local-fixtures.ts",
-    "images:sync": "tsx scripts/sync-images.ts"
+    "images:sync": "tsx scripts/sync-images.ts",
+    "market:sync": "tsx scripts/sync-market.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",

@@ -16,10 +16,13 @@ export interface StoreListing {
   itemId: string;
   title: string;
   imageGuid: string;
+  /** Erster Preis der Kachel (aktueller Angebotspreis), null wenn nicht lesbar. */
+  price: number | null;
 }
 
 const TILE_START = /<article\b[^>]*\bdata-testid=["']?ig-(\d{6,})/g;
 const LINK_LABEL = /<a\b[^>]*\/itm\/\d+[^>]*\baria-label=(?:"([^"]*)"|'([^']*)')/;
+const PRICE = /EUR\s*([\d.]+,\d{2})/;
 const IMAGE_ID = /\bimageId=["']?([A-Za-z0-9_~-]{8,})/;
 
 /**
@@ -65,8 +68,11 @@ export function parseStorePage(html: string): StoreListing[] {
     const title = decodeEntities(label[1] ?? label[2] ?? "").trim();
     if (!title) continue;
 
+    const priceMatch = tile.replace(/<[^>]+>/g, " ").match(PRICE);
+    const price = priceMatch ? parseFloat(priceMatch[1].replace(/\./g, "").replace(",", ".")) : null;
+
     seen.add(itemId);
-    listings.push({ itemId, title, imageGuid: guid[1] });
+    listings.push({ itemId, title, imageGuid: guid[1], price });
   }
   return listings;
 }
