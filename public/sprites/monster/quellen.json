@@ -144,7 +144,8 @@
     "urheber": "Stephen 'Redshrike' Challener (Grafik), William Thompson/William.Thompsonj (Beitrag)",
     "lizenz": "CC-BY 4.0 / CC-BY 3.0 / GPL 3.0 / GPL 2.0 / OGA-BY 3.0",
     "url": "https://opengameart.org/content/lpc-golem",
-    "verwendung": "grosses/'maechtiges' Steinmonster im normalen 64px-Raster — kein Stilbruch noetig"
+    "verwendung": "grosses/'maechtiges' Steinmonster im normalen 64px-Raster — kein Stilbruch noetig",
+    "nachtrag_13_10": "Sprite-Fit-Nachlieferung: fuenfter Nutzer neben Lava Golem/Vorrak/Krag'Zul/Krolach/Terradon — Grieving Colossus (trauernder Obsidian-Koloss mit Lava-Traenen, bislang nur Orc-Kopf+schwarze Haut ohne jeden Stein-/Koloss-Bezug) bekommt sehr dunkle Obsidian-Faerbung (vollbildFarbe), gluehenderRiss:true und effekt:'feuer' am Kopf fuer die Lava-Traenen."
   },
   "golem_angriff.png": {
     "original": "golem-atk.png",
@@ -168,7 +169,8 @@
     "urheber": "Diligent Dodo (a.k.a. soniccuz), eingereicht von StendhalGame",
     "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
     "url": "https://opengameart.org/content/kraken",
-    "hinweis": "BEWUSSTER STILBRUCH wie die Drachen: 96x128-Zellen statt 64x64. Riesenoktopus/Kraken als 'maechtiges' Seeungeheuer — passt sowohl zu 'grosse Monster' als auch zu Unterwasser-Gegnern."
+    "hinweis": "BEWUSSTER STILBRUCH wie die Drachen: 96x128-Zellen statt 64x64. Riesenoktopus/Kraken als 'maechtiges' Seeungeheuer — passt sowohl zu 'grosse Monster' als auch zu Unterwasser-Gegnern.",
+    "nachtrag_13_10": "Sprite-Fit-Nachlieferung: auch fuer Galactus (riesige schwarze Krabben-Kreatur mit rot gluehenden Augen/Lava-Klauen, vorher Echsenkopf+Platte ohne jeden Bezug) verdrahtet, mit vollbildFarbeModus:'farbe' auf dunkles Grau-Schwarz statt des nativen Rots plus effekt:'voidRot' fuer den roten Glueh-Akzent. Keine Asset-Exklusivitaet mit Abysskraken (dort Tuerkis-Faerbung) — Kopffuesser statt Krebstier bleibt eine grobe Naeherung, keine exakte Artform."
   },
   "drache_mechanisch.png": {
     "original": "dracomachina.png",
@@ -218,7 +220,8 @@
     "lizenz": "CC-BY-SA 3.0 / GPL 3.0",
     "url": "https://opengameart.org/content/lpc-skorpios-scifi-sprite-pack",
     "blatt": "Mechs/Mech2/Mech2Walk.png, unveraendert (768x384 = 8 Spalten x 4 Reihen zu 96x96, LPC-Zeilenfolge)",
-    "verwendung": "grosser schwerer Kampf-Mech mit Schulterkanone — dritte, deutlich massigere Bot-Optik"
+    "verwendung": "grosser schwerer Kampf-Mech mit Schulterkanone — dritte, deutlich massigere Bot-Optik",
+    "nachtrag_13_10": "Sprite-Fit-Nachlieferung: zusaetzlich fuer Tavascron verdrahtet (keine Asset-Exklusivitaet mit Robofighter) — mech_transformer_walk.png (walker3.png, s. oben) blieb zwar ein echter Mech, aber dessen von renderProbe() standardmaessig gezeigte Profilzeile ist laut eigenem Kommentar bei VOLLBILD_SCHLAEGER 'eine ungewoehnliche, schwer lesbare Haltung' — bei 64px kaum als Mech erkennbar. mech_gross_walk.png zeigt aus allen vier Richtungen einen aufrechten, lesbaren Mech; Tavascron bekommt zusaetzlich vollbildFarbe Stahlblau statt des natuerlichen Sandtons, damit beide Nutzer unterscheidbar bleiben."
   },
   "mech_gross_hurt.png": {
     "paket": "[LPC] Skorpio's SciFi Sprite Pack",
