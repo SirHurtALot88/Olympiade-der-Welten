@@ -305,9 +305,12 @@ describe("Rechenkern der Einsatzliste (lib/lineups/lineup-candidate-model.ts + l
     // Fia (sauberer Fit, geringe Fatigue) VOR Enzo (aehnlicher Skill, aber hohe Fatigue drueckt den
     // projizierten Score). Cato ist in D2 schon gesetzt, Dee verletzt, Aria/Bo sind D1-Basiswert-los
     // fuer Mini DM (kein Score) — alle vier tauchen hier nicht als Top-3-Kandidat auf.
+    // Werte seit 13.10. (Mini-DM-Override, s. lib/player-generator/spiel-eignung-overrides.ts):
+    // Intelligence/Spirit tragen jetzt auch zur Mini-DM-Eignung bei, s. stand-aller-
+    // disziplinen.md Neunzehnter Nachtrag — verschiebt beide projizierten Scores geringfuegig.
     expect(summary?.topCandidates.map((entry) => ({ id: entry.activePlayerId, name: entry.name, projectedScore: entry.projectedScore }))).toEqual([
-      { id: "active-6", name: "Fia Rook", projectedScore: 55 },
-      { id: "active-5", name: "Enzo Kade", projectedScore: 46 },
+      { id: "active-6", name: "Fia Rook", projectedScore: 54.9 },
+      { id: "active-5", name: "Enzo Kade", projectedScore: 45.8 },
     ]);
     expect(summary?.topCandidates[1].warnings).toEqual(["Fatigue 72 kostet bereits 23% Leistung"]);
   });
@@ -353,7 +356,8 @@ describe("Rechenkern der Einsatzliste (lib/lineups/lineup-candidate-model.ts + l
     expect(matchdayPreviewCards.openSlots).toBe(1);
     expect(matchdayPreviewCards.riskLevel).toBe("hoch");
     expect(matchdayPreviewCards.d1Projected).toBeCloseTo(158.8, 5);
-    expect(matchdayPreviewCards.d2Projected).toBeCloseTo(76.3, 5);
+    // d2 = Mini-DM; Wert seit 13.10.-Override verschoben (s. Kommentar oben).
+    expect(matchdayPreviewCards.d2Projected).toBeCloseTo(76.7, 5);
   });
 
   it("lineupMiniAudit: gatet das Speichern — der offene Slot ist ein Blocking-Item", () => {
