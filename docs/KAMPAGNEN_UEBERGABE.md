@@ -109,6 +109,26 @@ lernt erst Tiere, dann Menschen, dann Namen. Ein Space-Marine-Bergungstrupp will
   Die eigenständige Seite für Browser-Tests baut `npx tsx scripts/kartenschmiede-eigenstaendig.ts <out.html>`.
 - **Chris' Freigabe: Kartenschmiede-PRs mergen, sobald CI grün ist.**
 
+## Arbeitsweise: von der bemalten Mini zur fertigen Karte
+
+Chris' Vorgabe vom 13.10.: **Keine Karten auf Verdacht bauen.** Jede Karte entsteht aus einer Mini, die Chris
+selbst bemalt hat und zeigt. Ablauf, immer in einem Rutsch:
+
+1. Chris schickt Fotos einer fertig bemalten Mini.
+2. Du liest daraus Größe (Infanterie, groß, Monster), Ausrüstung, Pose und Farben, und baust eine Karte ins
+   bestehende Konzept: Fraktion, Prägung, Werte nach der Punkte-Formel, Waffen und Fähigkeiten.
+3. **Fehlt eine passende Fähigkeit, legst du eine neue an.** Sie kommt in `katalog.js` (`GRUNDBESTAND`), mit
+   Symbol-Kürzeln, Würfelstufe und Preis, der Preis geprüft mit dem Preis-Check.
+4. Du schreibst den Bild-Prompt im Stil der Kartenschmiede (Funktion `prompt()` in `app.js`), mit dem Hinweis auf das
+   Mini-Foto als Vorlage. Chris gibt ihn zusammen mit dem Foto in ChatGPT.
+5. Karte und Prompt landen in der **Werkbank** (`apps/kartenschmiede/werkbank/<name>.json`), Status
+   „wartet auf Bild“. So geht nichts verloren, auch wenn das Bild erst Tage später kommt.
+6. Schreibt Chris „das ist das Bild von XY“, setzt du es ein:
+   - Bild nach `apps/kartenschmiede/assets/`, Eintrag in `BILDER` in `lib/kartenschmiede/seite.ts`.
+   - Karte als Vorlage in `VORLAGEN` in `app.js`, mit Ausschnitt und Zoom.
+   - Druckfertige Karte als JPG an Chris schicken, Status in der Werkbank auf „fertig“.
+   - PR, mergen bei grünem CI.
+
 ## Offene Entscheidungen für Chris
 
 1. **Boss-Modus:** Bosse nach jedem zweiten Helden aktivieren, mit Simulator-Modus „Boss gegen Gruppe“.
