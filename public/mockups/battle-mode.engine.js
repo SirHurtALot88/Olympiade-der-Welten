@@ -16910,6 +16910,36 @@
     if(u.zeitSieg!=null)return u.zeitSieg;
     return u.vorteil>0;
   }
+  // EINE ZAEHLUNG FUER ALLE FUeNF STELLEN (T-F2, Fable-Ideen Buehne-Duell 30.09., Abschnitt
+  // T-F2, Paket 5 "Davis Cup"): bisher zaehlte jede der fuenf oben genannten Stellen
+  // `TEILNEHMER.filter(u=>u.side===s&&...&&duellBrettSieg(art,u)).length` -- ein Teilnehmer,
+  // ein Brett, eine Zaehlung. Das Davis-Cup-Doppel (s. "T-F2"-Kommentar im `art.duell`-
+  // Paarungsblock in bauBuehne()) bricht diese 1:1-Annahme bewusst: zwei Teilnehmer teilen
+  // sich jetzt EIN Brett (`u.rubberIdx`, neues Feld, Default = `u.brett`). Ein nackter
+  // `.length`-Zaehler wuerde das gewonnene Doppel-Rubber doppelt zaehlen (zwei Spieler, ein
+  // Sieg). Diese Funktion gruppiert deshalb nach `rubberIdx` (faellt fuer jede andere
+  // Disziplin und fuer Tennis-Einzel auf `.brett` zurueck, dort schon immer eindeutig je
+  // Teilnehmer -- Gruppengroesse 1, Zaehlung bit-identisch zu vorher) und zaehlt eine Gruppe
+  // nur, wenn ALLE ihre Mitglieder den optionalen `fertigPred` erfuellen (sonst wuerde die
+  // Live-Enthuellung ein Doppel-Rubber als gewonnen zeigen, bevor beide Doppelpartner fertig
+  // enthuellt sind) und wenn `duellBrettSieg()` fuer die Gruppe zutrifft (bei einem echten
+  // Doppel teilen sich beide Partner `.vorteil`, die Abfrage liefert fuer beide dasselbe).
+  function duellBretterGewonnen(art,seite,fertigPred){
+    const gruppen=new Map();
+    for(const u of TEILNEHMER){
+      if(u.side!==seite)continue;
+      const key=u.rubberIdx??u.brett;
+      if(key==null)continue;
+      if(!gruppen.has(key))gruppen.set(key,[]);
+      gruppen.get(key).push(u);
+    }
+    let n=0;
+    for(const arr of gruppen.values()){
+      if(fertigPred&&!arr.every(fertigPred))continue;
+      if(duellBrettSieg(art,arr[0]))n++;
+    }
+    return n;
+  }
   // MESS-DIAGNOSE fuer disziplinProbe({buehneDiag:true}) — liest nur den fertig gebauten und
   // durchgelaufenen TEILNEHMER-Stand, schreibt nichts, kein rr(). Je Duell-Brett: Vorteil,
   // Blaettchen beider Seiten, Brettentscheid, Ansage/TEMPO/Zeitnot; dazu der Teamstand in
@@ -16927,7 +16957,7 @@
           zeitnotA:a.zeitnotZug!=null, zeitnotB:b.zeitnotZug!=null,
           tempoA:a.TEMPO??null, tempoB:b.TEMPO??null};
       });
-      diag.seiten=[0,1].map(s=>TEILNEHMER.filter(u=>u.side===s&&u.brett!=null&&duellBrettSieg(art,u)).length);
+      diag.seiten=[0,1].map(s=>duellBretterGewonnen(art,s));
     } else if(!art.heben&&!art.gauntlet){
       // Auftritt-Buehnen: Seitenstand = Summe der Auftrittswerte, dieselbe Zahl wie
       // spieleBuehneAuftritt()/updateHudBuehne().
@@ -17496,6 +17526,59 @@
             else gewinner=(ra.marge??0)>=(rb.marge??0)?0:1;
             ra.punktGewinner=gewinner; rb.punktGewinner=gewinner;
             ra.aufschlag=server; rb.aufschlag=server;
+          }
+        }
+      }
+      // T-F2 -- DAVIS CUP: FORMAT-STRUKTUR, EIN DOPPEL ALS GETEILTES RUBBER (Fable-Ideen
+      // Buehne-Duell 30.09., Abschnitt T-F2 "Davis Cup: vier Einzel und ein Doppel", Paket
+      // 5). TEILSCHRITT, bewusst (PR-Beschreibung): nur die Begegnungsstruktur (mehrere
+      // Rubber inkl. einem Doppel) und AUTOMATISCHE Nominierung -- die Skalierungsregel aus
+      // dem Fable-Dokument ("bei n >= 3 bilden die letzten zwei Aufstellungsplaetze das
+      // Doppel, bei n = 2 gibt es nur das Doppel"), nicht die vom Dokument zusaetzlich
+      // genannte Slot-Zuordnung (Serve/Net Pressure) -- deren Nominierung waere Chris'
+      // echte Kapitaensentscheidung und ist eine dokumentierte Luecke fuer einen Folge-PR
+      // (s. PR-Beschreibung), keine stillschweigende Abweichung.
+      //
+      // WARUM NUR `.vorteil`/`.verlauf`/`.rubberIdx`, NIEMALS `.runden`/`.summe`: jeder
+      // Spieler hat sich in setz() LAENGST unveraendert seine eigenen `rundenN` Durchgaenge
+      // gewuerfelt -- derselbe Pfad wie jeder Einzelspieler, kein zweiter `rr()`-Aufruf hier.
+      // `u.summe` (der Messwert fuer rho, `MOTOREN["tennis"].wert()`) bleibt darum fuer BEIDE
+      // Doppelspieler bit-identisch zu vorher -- das Fable-Dokument selbst empfiehlt genau
+      // das ("die unfusionierten [Punkte], weil ein Doppelspieler nicht fuer seinen Partner
+      // bewertet werden soll"), anders als die Duett-Fusion (Eiskunstlauf, direkt unten),
+      // die bewusst in `runden[].punkte` hineinschreibt und damit `u.summe` mitveraendert.
+      //
+      // WARUM SUMMIEREN GENUEGT (keine 0,8/0,2-Fusion noetig): jedes der letzten zwei
+      // Bretter ist zu diesem Zeitpunkt schon ein vollstaendiges 1:1-Rubber (Spieler i gegen
+      // Spieler i). `vorteil` ist je Brett die Punktdifferenz dieses Bretts; die Summe der
+      // beiden Brettdifferenzen ist linear identisch mit "(Punkte Partner 1 + Punkte
+      // Partner 2) minus (Punkte Gegner 1 + Punkte Gegner 2)" -- exakt der kombinierte
+      // Team-gegen-Team-Stand, den ein echtes Doppel bräuchte, ohne einen zweiten Durchgang
+      // zu erfinden.
+      //
+      // `.brett` (die physische Platz-/Bahn-Nummer auf der Buehne) bleibt UNVERAeNDERT fuer
+      // beide Doppelspieler -- nur `.rubberIdx` (neues Feld, s. duellBretterGewonnen())
+      // traegt die geteilte Kennung. Die Live-Enthuellung zeigt das Doppel deshalb vorerst
+      // weiterhin als zwei eigene Plaetze mit je eigenem Punkt-fuer-Punkt-Ticker (T-F1a) --
+      // eine eigene 2-gegen-2-Hofpraesentation (ein gemeinsamer Platz, Serve-Rotation im
+      // Paar) ist eine Ausbaustufe, kein Teil dieses Paketes (s. PR-Beschreibung).
+      if(art.tennis&&duellBretter>=2){
+        const dbA=duellBretter-2, dbB=duellBretter-1;
+        const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbA].n);
+        const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbB].n);
+        const b0=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbA].n);
+        const b1=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbB].n);
+        if(a0&&a1&&b0&&b1){
+          const rubberIdx=dbA;
+          const verlaufPaar=a0.verlauf.map((v,ri)=>v+(a1.verlauf[ri]??0));
+          const vorteilPaar=a0.vorteil+a1.vorteil;
+          for(const u of [a0,a1]){
+            u.rubberIdx=rubberIdx; u.vorteil=vorteilPaar; u.verlauf=verlaufPaar;
+            u.doppel=true; u.doppelPartnerN=(u===a0?a1.n:a0.n);
+          }
+          for(const u of [b0,b1]){
+            u.rubberIdx=rubberIdx; u.vorteil=-vorteilPaar; u.verlauf=verlaufPaar.map(v=>-v);
+            u.doppel=true; u.doppelPartnerN=(u===b0?b1.n:b0.n);
           }
         }
       }
@@ -22941,8 +23024,7 @@
     // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
     // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
     // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-    const brettSieg=u=>duellBrettSieg(BB(),u);
-    const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+    const bretter=(s)=>duellBretterGewonnen(BB(),s,u=>u.aktuell+1>=u.runden.length);
     // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
     // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
     // alle Bretter laufen parallel im selben Takt: fast keins ist fertig, bis fast alle es
@@ -46449,8 +46531,7 @@
       const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
     }
     if(art.duell){
-      const brettSieg=u=>duellBrettSieg(art,u);
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length&&brettSieg(u)).length;
+      const bretter=(s)=>duellBretterGewonnen(art,s,u=>u.aktuell+1>=u.runden.length);
       const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
     }
     if(art.gauntlet){
@@ -50078,8 +50159,9 @@
       // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
       // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
       // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
-      const brettSieg=u=>duellBrettSieg(BUEHNE_ART[bd],u);
-      const bretter=(s)=>TEILNEHMER.filter(u=>u.side===s&&brettSieg(u)).length;
+      // TENNIS-DOPPEL (T-F2) ZAEHLT HIER PER `duellBretterGewonnen()` ALS EIN RUBBER, NICHT
+      // ALS ZWEI: s. Kommentar dort.
+      const bretter=(s)=>duellBretterGewonnen(BUEHNE_ART[bd],s);
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
