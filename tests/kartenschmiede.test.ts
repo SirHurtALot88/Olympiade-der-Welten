@@ -619,6 +619,28 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
   });
 });
 
+// Alles, was Chris vorliest oder ansagt (nicht die GM-Notizen): Hier dürfen keine Tabu-Wörter der Kampagne stehen
+const LAUT = ["vorlesen", "einstieg", "ansage", "kern", "zustandSaetze", "bedrohungSatz", "spieler", "titel", "kurz", "name", "info"];
+function lauteTexte(knoten: unknown, schluessel = "", aus: string[] = []): string[] {
+  if (typeof knoten === "string") { if (LAUT.includes(schluessel)) aus.push(knoten); return aus; }
+  if (Array.isArray(knoten)) { for (const x of knoten) lauteTexte(x, schluessel, aus); return aus; }
+  if (knoten && typeof knoten === "object") for (const [k, v] of Object.entries(knoten)) if (!["gmNotiz", "notiz", "hinweis", "hinweise", "quelle", "text", "folge"].includes(k)) lauteTexte(v, LAUT.includes(k) ? k : schluessel === "zustandSaetze" ? "zustandSaetze" : k, aus);
+  return aus;
+}
+describe("Kartenschmiede – Spielmodus ohne Spoiler", () => {
+  for (const datei of ["map1", "map2"]) {
+    it(`${datei}: kein Tabu-Wort in Vorlese- und Ansagetexten`, () => {
+      const m = JSON.parse(fs.readFileSync(path.join(__dirname, `../apps/kartenschmiede/kampagnen/moosgrab/${datei}.json`), "utf8"));
+      const texte = lauteTexte({ schritte: m.schritte, ereignisse: m.ereignisse, figuren: m.figuren, gegner: m.gegner, auftraege: m.auftraege, antreiben: m.antreiben, audio: m.audio, rundenwurf: m.rundenwurf, leisten: m.leisten });
+      expect(texte.length).toBeGreaterThan(50);
+      for (const wort of ["Station", "Labor", "Soldat", "Myzel", "Marine", "Forschung", "Experiment"]) {
+        expect(texte.filter(t => t.includes(wort)), wort).toEqual([]);
+      }
+      expect(texte.filter(t => /\d\s*(Zoll|")/.test(t)), "Zoll-Angaben").toEqual([]);
+    });
+  }
+});
+
 const MAP2 = JSON.parse(fs.readFileSync(path.join(__dirname, "../apps/kartenschmiede/kampagnen/moosgrab/map2.json"), "utf8"));
 describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
   const motor2 = () => SM.erstelle(MAP2, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: VORLAGE_ZAEH[d.karte] || "1", size: "1" }, stufe: () => 2, zufall: () => 0.5 });

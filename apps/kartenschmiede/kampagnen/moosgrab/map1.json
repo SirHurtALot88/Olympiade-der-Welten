@@ -159,7 +159,7 @@
    "titel": "Die Frau aus dem Wald retten",
    "spieler": "Jemand schreit im Wald. Erreicht die Frau, bevor es zu spät ist.",
    "quelle": "Der Schrei (Cue 01B-1), dann die Frau am linken Waldrand",
-   "vorlesen": "Sie steht noch. Links, am Waldrand. Und die Uhr auf dem Tisch zählt nicht für euch.",
+   "vorlesen": "Der Schrei kam von links, vom Waldrand. Wer da ruft, lebt noch. Und wer da ruft, wartet nicht ewig.",
    "ab": {
     "flag": "auftrag_frau",
     "ist": true
@@ -183,7 +183,7 @@
    "titel": "Das grüne Licht löschen",
    "spieler": "In der Ruine oben leuchtet etwas grün. Die Spuren führen dorthin. Macht es aus, wenn ihr könnt.",
    "quelle": "Die Spuren an Marker 3; Lene: „Geht nicht hin.“",
-   "vorlesen": "Oben zwischen den Steinen pulst das Grün. Dorthin führen alle Spuren. Es wehrt sich nicht.",
+   "vorlesen": "Oben zwischen den Steinen leuchtet das Grün. Dorthin führen alle Spuren. Es wehrt sich nicht.",
    "ab": {
     "flag": "marker3",
     "ist": true
@@ -197,9 +197,9 @@
    "id": "kapelle",
    "art": "Haupt",
    "titel": "Zur Kapelle vor dem Dorf",
-   "spieler": "Der Weg ins Dorf führt an der Kapelle vorbei. Dort gehört das Zeichen auf dem Anhänger hin, und dort soll Lenes Mutter sein. Geht hin.",
-   "quelle": "Lene („Sagt meiner Mutter … sie ist in der Kapelle“) oder der Kupferanhänger mit dem Zeichen der Kapelle",
-   "vorlesen": "Ein Turm mit einer Glocke, in Kupfer. Die Kapelle vor dem Dorf trägt dasselbe Zeichen. Da geht es weiter.",
+   "spieler": "Der Weg ins Dorf führt an der Kapelle vorbei. Alles, was ihr am Waldrand gehört und gefunden habt, zeigt dorthin. Geht hin.",
+   "quelle": "Lene („Sagt meiner Mutter … sie ist in der Kapelle“, Antwort 1 bis 3) oder der Kupferanhänger mit dem Zeichen der Kapelle. Der Text bleibt absichtlich allgemein: er erscheint auch, wenn die Frau den Namen nicht gesagt hat (Antwort 2 und 3) oder der Anhänger noch nicht im Moos liegt.",
+   "vorlesen": "Die Kapelle vor dem Dorf. Dorthin zeigt, was ihr hier gehört und gefunden habt. Da geht es weiter.",
    "ab": {
     "flag": "auftrag_kapelle",
     "ist": true
@@ -315,9 +315,9 @@
    ]
   },
   {
-   "titel": "Das Licht pulst",
-   "vorlesen": "Oben, zwischen den Steinen der Ruine, wird das Grün für einen Atemzug heller. Dann wieder dunkler. Als hätte etwas eingeatmet.",
-   "gmNotiz": "Zeigt den Weg nach oben. Marker 3 liegt in der Wolke rechts unten, die Spuren führen zur Ruine.",
+   "titel": "Das Licht in der Ruine",
+   "vorlesen": "Oben, zwischen den Steinen der Ruine, glimmt es grün. Von hier unten sieht man es nur, wenn man stehen bleibt. Und wer stehen bleibt, sieht es.",
+   "gmNotiz": "Zeigt den Weg nach oben. Marker 3 liegt in der Wolke rechts unten, die Spuren führen zur Ruine. Dass das Licht pulst, sagst du nicht: das ist die Probe an Marker 3 (ab 5) und gibt +1 auf die Quelle.",
    "wenn": {
     "flag": "oben_aufgebaut",
     "ist": true
@@ -642,8 +642,8 @@
      "wie": "Sachlich fragen, woher das kommt, was im Dorf los ist (Wahl 3). Hedda bestätigt den Satz in Map 2."
     },
     {
-     "info": "„Alle knien. In der Kapelle. Alle flüstern.“",
-     "wie": "Nach dem Dorf fragen. Mehr sagt sie dazu nicht."
+     "info": "„Alle sind in der Kapelle. Alle. Und keiner kommt mehr raus.“",
+     "wie": "Nach dem Dorf fragen. Mehr sagt sie dazu nicht. Dass die Leute dort knien und flüstern, erfahren die Helden erst in Map 2 (Cue 02-1, Fenster): hier nicht vorwegnehmen."
     },
     {
      "info": "„Es hat gesungen. Dann hat es wehgetan.“ Sie zeigt zur Ruine.",
@@ -1915,7 +1915,7 @@
    "typ": "vorlesen",
    "titel": "Der Anhänger",
    "text": "Kupfer, grün angelaufen, an einer Schnur aus Leder. Darauf ein Zeichen: ein Turm mit einer Glocke. Die Kapelle vor dem Dorf trägt dasselbe.",
-   "gmNotiz": "Zettel „Kupferanhänger, Zeichen der Kapelle“ übergeben. Wer ihn trägt, steht im Stand. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "gmNotiz": "Zettel „Kupferanhänger, Zeichen der Kapelle“ übergeben. Wer ihn trägt, steht im Stand. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Nur wenn die Frau von ihrer Mutter gesprochen hat (Antwort 1 bis 3): „Und dort ist ihre Mutter.“ Ihren Namen sagst du nicht; den kennen die Spieler nur nach Antwort 1.",
    "weiter": "wahl-nachsuche",
    "setzt": {
     "auftrag_kapelle": true
@@ -1925,7 +1925,7 @@
    "typ": "vorlesen",
    "titel": "Zugedeckt",
    "text": "Ihr deckt sie zu. Erde, Äste, Moos. Das Moos ist warm, als ihr es anfasst. Als ihr fertig seid, ist es dunkler geworden, und der Wald atmet lauter als vorher.",
-   "gmNotiz": "Atemzug-Leiste +1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "gmNotiz": "Atemzug-Leiste +1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Nur wenn die Frau von ihrer Mutter gesprochen hat (Antwort 1 bis 3): „Und dort ist ihre Mutter.“ Ihren Namen sagst du nicht; den kennen die Spieler nur nach Antwort 1.",
    "weiter": "wahl-nachsuche",
    "setzt": {
     "auftrag_kapelle": true
@@ -1939,13 +1939,13 @@
    "setzt": {
     "auftrag_kapelle": true
    },
-   "gmNotiz": "Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“"
+   "gmNotiz": "Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Nur wenn die Frau von ihrer Mutter gesprochen hat (Antwort 1 bis 3): „Und dort ist ihre Mutter.“ Ihren Namen sagst du nicht; den kennen die Spieler nur nach Antwort 1."
   },
   "anhaenger-verbrannt": {
    "typ": "vorlesen",
    "titel": "Feuer",
    "text": "Die Wurzeln brennen schlecht, sie zischen und drehen sich. Dann fangen die Sporen Feuer, und für einen Augenblick steht der ganze Waldrand in grünem Licht. Danach riecht es nach nassem Brot. Der Anhänger ist warm in der Hand.",
-   "gmNotiz": "Atemzug-Leiste −1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Haben sie Lene gesprochen: „Und dort ist ihre Mutter.“",
+   "gmNotiz": "Atemzug-Leiste −1 ist schon verbucht. Zettel „Kupferanhänger“ übergeben. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Nur wenn die Frau von ihrer Mutter gesprochen hat (Antwort 1 bis 3): „Und dort ist ihre Mutter.“ Ihren Namen sagst du nicht; den kennen die Spieler nur nach Antwort 1.",
    "weiter": "wahl-nachsuche",
    "setzt": {
     "auftrag_kapelle": true

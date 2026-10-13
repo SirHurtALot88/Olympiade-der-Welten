@@ -50,12 +50,16 @@
        "ist": true
       },
       {
+       "flag": "altar_untersucht",
+       "ist": true
+      },
+      {
        "flag": "falltuer_offen",
        "ist": false
       }
      ]
     },
-    "text": "Die Gemeinde ist wach, bevor die Falltür offen war: Hedda hält sie von unten zu. Sie öffnet erst, wenn oben keine Gestalt mehr steht (alle Gemeinde-Figuren gefallen), oder sofort, wenn ihr der Anhänger gezeigt wird.",
+    "text": "Die Gemeinde ist wach, bevor die Falltür offen war: Hedda hält sie von unten zu. Sie öffnet erst, wenn oben keine Gestalt mehr steht (alle Gemeinde-Figuren gefallen), oder sofort, wenn ihr der Anhänger gezeigt wird. Die Ansage kommt erst, wenn der Altar untersucht ist: vorher wissen die Spieler nicht, dass unter ihnen jemand sitzt.",
     "ansage": "Von unten kommt kein Laut mehr. Wer da ist, hat sich eingeschlossen."
    },
    {
@@ -186,7 +190,7 @@
    "titel": "Nichts aufwecken",
    "spieler": "Sieben Gestalten knien in der Kapelle und flüstern. Bleibt so leise, dass keine aufsteht.",
    "quelle": "Der Blick in die Kapelle (Fenster oder Tür)",
-   "vorlesen": "Sie knien noch. Jeder Laut zählt auf dem Zählstein. Bei drei drehen sich Köpfe. Bei vier stehen sie auf.",
+   "vorlesen": "Sie knien noch. Jeder Laut zählt auf dem Zählstein, und je höher er steht, desto mehr von ihnen hören euch.",
    "ab": {
     "flag": "inneres_aufgebaut",
     "ist": true
@@ -200,9 +204,9 @@
    "id": "brunnen",
    "art": "Haupt",
    "titel": "Ins Dorf, zum Brunnen",
-   "spieler": "Geht ins Dorf. Es fing mit dem Brunnen an, dort liegt die Antwort. Sagt keine Namen.",
-   "quelle": "Mutter Hedda (Cue 02-5 und „Der Weg ins Dorf“)",
-   "vorlesen": "„Es fing mit dem Brunnen an.“ Der Brunnen liegt mitten im Dorf, und er ist zugenagelt. Werkzeug gibt es in der Schmiede. Zwei Wege führen hin.",
+   "spieler": "Geht ins Dorf, zum Brunnen. Dort hat es angefangen, dort liegt die Antwort. Sagt keine Namen.",
+   "quelle": "Mutter Hedda (Cue 02-5, Frage „Der Brunnen“ oder „Der Weg ins Dorf“; ohne Hedda der Erzähler). Dass er zugenagelt ist und das Werkzeug in der Schmiede liegt, steht hier absichtlich nicht: das sagt Hedda selbst (Taste 4 oder „Der Weg ins Dorf“), sonst du am Ende.",
+   "vorlesen": "„Es fing mit dem Brunnen an.“ Der Brunnen liegt mitten im Dorf. Dort geht es weiter. Und keine Namen.",
    "ab": {
     "flag": "brunnen_bekannt",
     "ist": true
@@ -215,10 +219,18 @@
  ],
  "rundenwurf": {
   "name": "Was flüstert die Gemeinde?",
-  "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde, solange die Gemeinde kniet, würfelst du einen W6. Meistens passiert nichts.",
+  "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde, solange die Gemeinde kniet und die Helden sie gesehen haben (Innere steht), würfelst du einen W6. Meistens passiert nichts. Draußen, bevor jemand hineingesehen hat, gibt es keinen Wurf: die Tabelle beschreibt Gestalten, Kerze und Altar, die noch niemand kennt.",
   "wenn": {
-   "flag": "gemeinde_wach",
-   "ist": false
+   "alle": [
+    {
+     "flag": "gemeinde_wach",
+     "ist": false
+    },
+    {
+     "flag": "inneres_aufgebaut",
+     "ist": true
+    }
+   ]
   },
   "tabelle": [
    {
@@ -310,7 +322,7 @@
    ]
   },
   {
-   "titel": "Der Boden ist warm",
+   "titel": "Die Luft am Altar",
    "vorlesen": "Vorn am Altar ist die Luft wärmer. Ihr merkt es erst, als ihr stehen bleibt.",
    "gmNotiz": "Zeigt zum Altar (Taste 4). Die Falltür wird nicht genannt.",
    "wenn": {
@@ -418,7 +430,7 @@
      "ab": 3,
      "titel": "Drei Köpfe drehen sich",
      "vorlesen": "Drei Köpfe drehen sich. Langsam, alle gleich. Die Augen sind zugewachsen, aber sie sehen in eure Richtung.",
-     "gmNotiz": "Cue 02-X1, falls der Track da ist. Noch kein Kampf. Merk dir, welche drei Figuren es sind: die stehen bei 4 auf.",
+     "gmNotiz": "Cue 02-X1, falls der Track da ist. Noch kein Kampf. Merk dir, welche drei Figuren es sind: die stehen bei 4 auf. Steht das Innere noch nicht (alle Helden draußen, niemand hat hineingesehen), liest du stattdessen nur: „Drinnen setzen drei Stimmen aus. Dann flüstern sie weiter, und es klingt, als hätten sie sich zu euch gedreht.“ Die Köpfe beschreibst du erst, wenn jemand hineinsieht.",
      "setzt": {
       "laerm3_erreicht": true
      }
@@ -899,7 +911,7 @@
    "karte": "v:giftmade",
    "info": "Ein befallener Dorfbewohner, kniet und flüstert. Greift erst nach Lärm an. Platzhalter Giftmade, Figur: Black Grail.",
    "notiz": "Platzhalter Giftmade (25 P., Zäh 3) für die Black-Grail-Figuren aus Trench Crusade. Sieben Stück zusammen ≈ 175 P., das Playbook sagt ≈ 155. Giftspeichel gilt als Sporenhusten mit kurzer Reichweite (eine Kartenlänge). Wenn eine eigene Befallenen-Karte da ist: hier eintragen.",
-   "bedrohungSatz": "Das war der Bäcker. Jetzt ist es etwas, das seine Hände benutzt. Einzeln kein Gegner. Zu siebt schon.",
+   "bedrohungSatz": "Das war einer aus dem Dorf. Jetzt ist es etwas, das seine Hände benutzt. Einzeln kein Gegner. Zu siebt schon.",
    "zustandSaetze": {
     "unverletzt": "Es kniet. Es flüstert. Es hat euch noch nicht einmal angesehen.",
     "angekratzt": "Der Schlag sitzt, und es flüstert weiter, nur schneller.",
@@ -1313,7 +1325,7 @@
     "ist": true
    },
    "kosten": "Held in Kontakt mit der Sakristei-Tür, eine Bewegung",
-   "vorlesen": "Der Schlüssel dreht sich ohne Widerstand. Ein schmaler Raum, Talare an Haken, ein Vorhang. Dahinter, direkt daneben, der Altar, und davor, mit dem Rücken zu euch, die Gemeinde.",
+   "vorlesen": "Der Schlüssel dreht sich ohne Widerstand. Ein schmaler Raum, Talare an Haken, ein Vorhang. Dahinter, direkt daneben, der Altar, und davor, mit dem Rücken zu euch, sieben kniende Gestalten. Sie flüstern.",
    "gmNotiz": "Kein Lärm. Der Held steht direkt neben dem Altar. Danach Cue 02-2.",
    "setzt": {
     "drinnen": true
@@ -1963,7 +1975,8 @@
   "regel-laerm": {
    "typ": "regel",
    "titel": "Regeln für diese Map",
-   "text": "Zwei Regeln ab jetzt. Erstens: Wer den Namen seines Helden laut sagt, bekommt einen Sporenpunkt. Zweitens: Jeder Krach zählt auf der Lärm-Leiste. Nahkampf eins, Fernkampf oder Zauber zwei, eine Tür aufbrechen zwei. Bei drei drehen sich Gestalten um, bei vier stehen sie auf, bei sechs erwacht die Gemeinde.",
+   "text": "Zwei Regeln ab jetzt. Erstens: Wer den Namen seines Helden laut sagt, bekommt einen Sporenpunkt. Zweitens: Jeder Krach zählt auf der Lärm-Leiste. Nahkampf eins, Fernkampf oder Zauber zwei, eine Tür aufbrechen zwei, die Haupttür eins. Je höher die Leiste steht, desto mehr hört euch. Was bei drei, bei vier und bei sechs geschieht, erfahrt ihr, wenn es so weit ist.",
+   "gmNotiz": "Was bei den Schwellen passiert (Köpfe drehen sich, drei stehen auf, die Gemeinde erwacht), sagst du nicht an: die Spieler wissen noch nicht, wer drinnen kniet. Die Leiste steht sichtbar auf dem Tisch, das reicht als Drohung.",
    "weiter": "cue-02-1"
   },
   "cue-02-1": {
@@ -1980,8 +1993,8 @@
     "flag": "versprechen_mutter",
     "ist": true
    },
-   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. „Sagt meiner Mutter, ich hab den Weg nicht gefunden“, hat Lene gesagt. „Sie ist in der Kapelle. Alle sind in der Kapelle.“ Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Findet ihre Mutter. Und erfahrt, was mit dem Dorf geschehen ist.",
-   "gmNotiz": "Der Auftrag für die Spieler, laut und deutlich: Lenes Mutter finden, herausfinden, was in Moosgrab los ist. Nicht sagen, wer flüstert, nicht sagen, wo die Mutter ist. Dann Weiter: die Spieler sind dran.",
+   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. „Sagt meiner Mutter, ich hab den Weg nicht gefunden“, hat die Frau am Waldrand gesagt. „Sie ist in der Kapelle. Alle sind in der Kapelle.“ Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Findet ihre Mutter. Und erfahrt, was mit dem Dorf geschehen ist.",
+   "gmNotiz": "Der Auftrag für die Spieler, laut und deutlich: Lenes Mutter finden, herausfinden, was in Moosgrab los ist. Nicht sagen, wer flüstert, nicht sagen, wo die Mutter ist. Den Namen Lene sagst du nur, wenn die Spieler ihn kennen (Stand: frau_name); nach Antwort 2 in Map 1 kennen sie ihn nicht. Dann Weiter: die Spieler sind dran.",
    "setzt": {
     "auftrag_kapelle": true
    },
@@ -2139,7 +2152,7 @@
     "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T Tür aufbrechen +2.",
     "Wer draußen bleibt, darf weiter Marker suchen: die Tasten von draußen stehen hier noch.",
     "Wer den Altar untersucht hat: die App springt zu Cue 02-3.",
-    "Faden verloren? „Sieben knien. Einer hat die Kerze angezündet, und der kniet nicht. Findet ihn.“ Der Altar ist der Weg, aber das sagst du nicht.",
+    "Faden verloren? „Sieben knien. Vorn brennt eine Kerze. Wer hat sie angezündet?“ Dass dieser Jemand nicht kniet, ist die Probe am Fenster oder die Kerze (Taste 3), das sagst du nicht von dir aus. Der Altar ist der Weg, aber das sagst du auch nicht.",
     "Greift ein Held eine kniende Gestalt an: B. Sie steht auf und wehrt sich, die anderen knien weiter."
    ],
    "ereignisse": [
@@ -2425,10 +2438,9 @@
      "text": "Sie erzählen, was am Waldrand passiert ist: die Wurzeln, das Aufblühen, der Kampf.",
      "setzt": {
       "hedda_wahrheit": true,
-      "brunnen_bekannt": true,
       "befallene_bekannt": true
      },
-     "folge": "Sie sagt, wer im Dorf schon verloren ist (Schmied, Harms). Map 3: Brunnen und Befallene bekannt. Haben die Helden Lene angegriffen oder verbrannt, fragt die App gleich, ob sie das auch sagen.",
+     "folge": "Sie sagt, wer im Dorf schon verloren ist (Schmied, Harms). Map 3: Brunnen (ab Cue 02-5) und Befallene bekannt. Haben die Helden Lene angegriffen oder verbrannt, fragt die App gleich, ob sie das auch sagen.",
      "ziel": "hedda-tochter-1"
     },
     {
@@ -2436,8 +2448,7 @@
      "kurz": "Schonen: Sie ist tot. Mehr nicht.",
      "text": "Sie sagen, dass sie zu spät kamen, und verschweigen, was aus ihr wurde.",
      "setzt": {
-      "hedda_geschont": true,
-      "brunnen_bekannt": true
+      "hedda_geschont": true
      },
      "leisten": {
       "geduld": -1
@@ -2451,7 +2462,6 @@
      "text": "Nur, wenn sie ihn tragen. Ein Held legt ihr den Anhänger in die Hand. Das sagt alles.",
      "setzt": {
       "hedda_wahrheit": true,
-      "brunnen_bekannt": true,
       "befallene_bekannt": true,
       "anhaenger_zurueck": true,
       "kellerschluessel": true,
@@ -2468,8 +2478,7 @@
      "kurz": "Ausweichen oder lügen: Sie lebt, sie kommt nach.",
      "text": "Sie behaupten, die Tochter sei noch im Wald, oder sie hätten sie nicht gesehen.",
      "setzt": {
-      "hedda_belogen": true,
-      "brunnen_bekannt": true
+      "hedda_belogen": true
      },
      "leisten": {
       "geduld": -1
@@ -2698,6 +2707,9 @@
    },
    "text": "Niemand sagt euch mehr, wohin. Aber ihr wisst es: Es fing mit dem Brunnen an. An der Rückwand das Loch, schwarz, in das man gebückt hineinkäme. Und hinter euch die Treppe nach oben, zu denen, die knien.",
    "gmNotiz": "Hedda ist tot. Der Auftrag kommt vom Erzähler: ins Dorf, zum Brunnen, keine Namen (alles aus Cue 02-5, falls er lief; sonst sag es jetzt). Beide Wege stehen offen, niemand begleitet sie.",
+   "setzt": {
+    "brunnen_bekannt": true
+   },
    "weiter": "wahl-weg"
   },
   "wahl-weg": {
@@ -2795,7 +2807,7 @@
    },
    "text": "Lärm 4: Die drei, die sich umgedreht hatten, stehen auf und greifen an. Die anderen vier knien weiter. Ruhige Tabelle, bis die Leiste 6 zeigt.",
    "hinweise": [
-    "Bedrohung ansagen: „Das war der Bäcker. Jetzt ist es etwas, das seine Hände benutzt.“",
+    "Bedrohung ansagen: „Das war einer aus dem Dorf. Jetzt ist es etwas, das seine Hände benutzt.“ Den Bäcker nennst du nur, wenn ihm jemand ins Gesicht gesehen hat (Taste 1) oder Hedda ihn genannt hat.",
     "Lärm weiter zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2. Bei 6 erwacht der Rest: die App springt um.",
     "Die vier Knienden greifen nicht ein, solange niemand sie berührt. Greift ein Held eine an: B (sie steht auf, +1 Lärm).",
     "Fallen alle drei: weiter, dann ist es wieder still."
