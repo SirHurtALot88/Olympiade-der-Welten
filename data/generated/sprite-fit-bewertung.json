@@ -653,9 +653,9 @@
  {
   "name": "Orakelpfropf",
   "slug": "orakelpfropf",
-  "sterne": 2,
-  "begruendung": "Neu: ein prozedural gezeichneter halbtransparenter Becher sitzt jetzt ueber Kopf/Ohren (zeichneEimerKopf) - die auffaelligste Requisite aus dem Bild ist damit erstmals vorhanden. Die Kreatur bleibt aber ein stehender Zweibeiner mit dunklem Fell statt der liegenden, hellen getigerten Katze - Gattung und Farbe treffen weiterhin nicht, deshalb nur ein loser thematischer Bezug (★★) statt mehr.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Zweite Nachbesserung (13.10., Chris' direkte Korrektur der ersten Fassung: 'fuer orakelpropf muesstest du eine katze als base modell nehmen und ihr dann ein glas oder so auf den kopf setzen'). Der bipedale Humanoid-Bauplan (kopf:'wolf',ohren:'katze',schwanz:'katze') ist komplett ersetzt durch vollbild:'katze' - ein echtes Katzen-Vierbeiner-Sheet ('[LPC] Cats and Dogs', bluecarrot16, CC-BY 3.0, s. public/sprites/katze/quellen.json), in einer eigens zusammengesetzten, dauerhaft liegenden/kauernden Pose statt eines Gehzyklus - trifft die stationaere Portrait-Haltung direkt. Die halbtransparente Becher-Requisite (zeichneEimerKopf) sitzt jetzt, am tatsaechlichen Katzenkopf des neuen Sprites nachgemessen (nicht mehr am alten Humanoid-Kopf), sichtbar korrekt auf dem Kopf. Koerpertyp/Rasse/Silhouette/Pose und die zentrale Requisite stimmen jetzt alle. Fehlt weiterhin: die Tigerstreifen-/Tabby-Musterung im Fell (Sprite zeigt reine Flaechenfarbe 'gold'/tan ohne Streifenzeichnung, s. Farbvergleich in quellen.json) - ein einzelnes, klar benennbares Detail, kein struktureller Fehler mehr.",
+  "fehlendesDetail": "Tigerstreifen-/Tabby-Musterung im Fell (Sprite ist einfarbig tan, keine Streifentextur verfuegbar)"
  },
  {
   "name": "Orichalcos",
