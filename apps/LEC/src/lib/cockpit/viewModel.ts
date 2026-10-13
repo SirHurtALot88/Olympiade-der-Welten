@@ -62,6 +62,13 @@ export interface CockpitViewModel {
   market: MarketHints;
   planwerte: Planwerte;
   fixedYearly: number;
+  /**
+   * Maßstab der Preis-Ampel = MIN/GUT-Korridor aus costEngine (`computePriceCorridor`):
+   * VK-MIN = Basis × marginMinMultiplier, VK-GUT = Basis × marginGoodMultiplier. Die zugehoerige
+   * Vollkosten-Marge ist 1 − 1/Multiplikator (1,33 → 24,8 %, Chris' "25 % Minimum"). Nur zur
+   * Beschriftung -- die Einstufung selbst kommt aus `SortimentRow.priceStatus`.
+   */
+  corridor: { minMultiplier: number; goodMultiplier: number; minMargin: number; goodMargin: number };
   imports: ImportStatus[];
   totals: { articles: number; active: number };
 }
@@ -114,6 +121,12 @@ export function buildCockpitViewModel(input: CockpitInputs): CockpitViewModel {
     market: computeMarketHints(aggregates, input.quotes ?? new Map(), costSettings, images),
     planwerte,
     fixedYearly: totalFixedYearly(costSettings),
+    corridor: {
+      minMultiplier: costSettings.marginMinMultiplier,
+      goodMultiplier: costSettings.marginGoodMultiplier,
+      minMargin: 1 - 1 / costSettings.marginMinMultiplier,
+      goodMargin: 1 - 1 / costSettings.marginGoodMultiplier,
+    },
     imports: input.imports ?? [],
     totals: { articles: aggregates.length, active: aggregates.filter((a) => a.active).length },
   };

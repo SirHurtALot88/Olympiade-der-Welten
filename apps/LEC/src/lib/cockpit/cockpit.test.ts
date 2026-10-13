@@ -222,5 +222,8 @@ describe("viewModel", () => {
     expect(vm.totals).toEqual({ articles: 4, active: 3 });
     expect(vm.guardrails).toHaveLength(3);
     expect(vm.fixedYearly).toBeCloseTo(4229);
+    // Preis-Ampel-Maßstab = MIN/GUT-Korridor aus den Kostensaetzen (1,33 -> ~25 % Marge).
+    expect(vm.corridor.minMultiplier).toBe(DEFAULT_COST_SETTINGS.marginMinMultiplier);
+    expect(vm.corridor.minMargin).toBeCloseTo(0.248, 2);
   });
 });

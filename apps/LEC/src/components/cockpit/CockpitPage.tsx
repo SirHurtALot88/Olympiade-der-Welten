@@ -9,7 +9,7 @@ import { DistributionCard } from "./DistributionCard";
 import { MoversCard } from "./MoversCard";
 import { CapitalCard } from "./CapitalCard";
 import { MarketHintsCard } from "./MarketHintsCard";
-import { dateDe, eur } from "./format";
+import { dateDe, eur, pct } from "./format";
 
 /** Zusammenbau der Cockpit-Seite (Server Component). Reihenfolge = COCKPIT_V2_KONZEPT §3. */
 export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
@@ -67,7 +67,7 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
           scope="aktive Artikel · Listen-VK vs. Korridor"
           distribution={vm.priceStatus}
           classPrefix="ck-p"
-          note="Aktueller Listen-VK gegen den Vollkosten-Korridor (MIN 25 % / GUT 35 %). „Kein EK“ = ohne Einkaufspreis ist kein Korridor berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist."
+          note={`Aktueller Listen-VK gegen den Vollkosten-Korridor aus den Kostensätzen: MIN = Basis × ${vm.corridor.minMultiplier.toLocaleString("de-DE")} (≈ ${pct(vm.corridor.minMargin)} Marge), GUT = Basis × ${vm.corridor.goodMultiplier.toLocaleString("de-DE")} (≈ ${pct(vm.corridor.goodMargin)}). „Kein EK“ = ohne Einkaufspreis ist kein Korridor berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist.`}
         />
       </div>
 

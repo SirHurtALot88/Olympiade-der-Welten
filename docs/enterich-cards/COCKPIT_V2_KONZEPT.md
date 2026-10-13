@@ -138,7 +138,7 @@ Klassen und Fensterzahlen **per Konstruktion** mit der alten Seite überein — 
 | 7 | **Leitplanken** | `windows["365"].revenue`; DB III 365 T; `Purchase`-Tabelle (falls Daten) | `planwerte.ts`, `guardrails.ts` | **3 Bullet Graphs** | Few: Ist-Balken dick, Zielmarke dünn, Kontextbänder grau. Grenze (24.000/25.000) und Korridor (1.600–1.800) sind Bänder, nicht Tacho. |
 | 8 | **Tempo** | Fenster 30/90/365 | `bands.ts`: Ø/Monat je Band für Umsatz, Wareneinsatz, DB II | gruppierte Säulen, 3 Serien, 3 Gruppen | Zeigt Verkaufstempo vs. Wareneinsatz-Tempo (EÜR-Logik: Ware ist sofort Aufwand). 3 Serien = kategorisch sicher (validiert, s. 6). Legende + Direktlabel. |
 | 9 | **Sortimentsgesundheit** | `vm.sortiment[].articleClass`, `revenue365` | `distribution.ts` | 2 × 100 %-Stapelbalken (Artikel-Anteil, Umsatz-Anteil) | Teil-zum-Ganzen über 6 geordnete Klassen (Champion → Ladenhüter) = ordinal; eine Hue-Rampe von Good zu Crit ist hier **Status**, deshalb mit Label + Zahl je Segment, nie Farbe allein. |
-| 10 | **Preis-Ampel** | `vm.sortiment[].priceStatus` (nur `active`) | `distribution.ts` | 100 %-Stapelbalken | Verteilung der Korridor-Zustände, „kein EK" als eigener grauer Anteil. |
+| 10 | **Preis-Ampel** | `vm.sortiment[].priceStatus` (nur `active`) = `classifyPriceStatus` gegen den MIN/GUT-Korridor aus `costEngine.ts` (`computePriceCorridor`) | `distribution.ts` | 100 %-Stapelbalken | Verteilung der Korridor-Zustände, „kein EK" als eigener grauer Anteil. **Maßstab ist Chris' Preis-Spanne** (Deckungsbeitrags-Marge Minimum bis Optimum): VK-MIN = Basis × `marginMinMultiplier` (1,33 → ≈ 25 %), VK-GUT = Basis × `marginGoodMultiplier`. Das Cockpit rechnet keinen eigenen Maßstab, es zählt die Einstufung und beschriftet sie aus den aktiven Kostensätzen. |
 | 11 | **Läuft / Bremst / Fällt ab** | `vm.sortiment` (Fenster-Umsatz, DB II, Klasse) | `movers.ts`: Top 6 je Liste für das gewählte Fenster | Listen mit Mini-Balken (relativ zu Platz 1) + Kartenbild | Identität braucht Namen, nicht Farbe. Bild hilft Chris beim Erkennen (Übergabe §6). |
 | 12 | **Kapital & Tempo** | `boundCapitalOf(a)`, `stock`, Wareneinsatz je Band, `Purchase` | `capital.ts` | Stat-Tiles + Bullet (Reichweite) | Einkauf vs. Verkauf ist der EÜR-Hebel. Ohne Purchase-Daten: leerer Zustand + Planwert. |
 | 13 | **Datenstand** | `listRecentImportBatches(prisma)` (bestehend) | letzter Lauf je `kind` | Footer-Zeile | Ein veraltetes Abbild sieht aus wie ein gültiger Stand (CLAUDE.md-Lektion). |
@@ -324,6 +324,12 @@ Nach jedem größeren Schritt: `npx tsc --noEmit`, `npm test`, `npm run build`.
 3. **Planwerte:** Stimmen 1.400 / 1.600–1.800 / 24.000 / 25.000 / 980 / 782 so, und gelten sie für
    2026? Pflege erfolgt in `src/lib/cockpit/planwerte.ts`.
 4. **Fenster-Default** 90 T wie überall — oder soll das Cockpit mit 30 T öffnen?
+5. **Optimum-Marge 33 % vs. Kostensatz:** Chris nennt als Preis-Spanne 25 % (Minimum) bis 33 %
+   (Optimum). Der aktive Kostensatz `marginGoodMultiplier` steht auf 1,66, das entspricht
+   1 − 1/1,66 ≈ 39,8 % Vollkosten-Marge (der Kommentar in `costEngine.ts` nennt „~35 %"). Für 33 %
+   wäre der Multiplikator 1,49. Das Cockpit zeigt den Wert, den die Kostensätze vorgeben, und
+   ändert nichts an `costEngine.ts` — ob 1,66 bleibt oder auf 1,49 soll, ist eine Entscheidung für
+   die Kostensätze (Import/Datei), nicht fürs Cockpit.
 
 ---
 
