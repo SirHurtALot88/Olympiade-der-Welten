@@ -9,6 +9,7 @@ import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
 import { AppShell } from "@/components/shell/AppShell";
 import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
 import { ImageSyncCard } from "./ImageSyncCard";
+import { BillbeeSyncCard } from "./BillbeeSyncCard";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -275,6 +276,8 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
           </div>
 
           <ImportHistoryCard batches={importBatches} />
+
+          <BillbeeSyncCard />
 
           <ImageSyncCard />
 

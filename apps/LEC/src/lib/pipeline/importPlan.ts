@@ -89,6 +89,11 @@ export interface BuildImportPlanOptions {
   /** Standardmenge fuer den Cardmarket-Einkauf einer Einzelkarte, wenn unbekannt (Staffel-Schwelle 5 Stk). */
   defaultPurchaseQty?: number;
   aliases?: AliasMap;
+  /**
+   * eBay-Gebuehr je Stueck (nameNormalized -> EUR) aus frueheren Importen. Greift, wenn dieser
+   * Lauf keinen eBay-Report mitbringt (z. B. Billbee-API), damit DB II die Gebuehren nicht verliert.
+   */
+  knownFeePerUnit?: Map<string, number>;
 }
 
 export function buildImportPlan(
@@ -194,7 +199,7 @@ export function buildImportPlan(
     for (const row of result.rows) {
       if (!row.isCard) continue; // Privatverkaeufe fliessen nicht in die Karten-Analytics ein.
 
-      const feePerUnit = ebayFeePerUnitByName.get(row.nameNormalized) ?? 0;
+      const feePerUnit = ebayFeePerUnitByName.get(row.nameNormalized) ?? options.knownFeePerUnit?.get(row.nameNormalized) ?? 0;
       const ebayFeeTotal = feePerUnit * row.qty;
 
       const kind: ItemKind = row.packQty > 1 ? "pack" : "single";
