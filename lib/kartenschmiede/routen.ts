@@ -8,6 +8,7 @@ import {
   ladeFaehigkeiten,
   listeGruppen,
   listeKarten,
+  listeSpielstaende,
   listeSzenarien,
   loescheEintrag,
   speichereEintrag,
@@ -23,7 +24,13 @@ export function listenRoute(art: Art) {
     const zugriff = await kartenZugriff();
     if (!zugriff) return nichtEingeloggt();
     const eintraege =
-      art === "karten" ? listeKarten(zugriff.sammlung) : art === "szenarien" ? listeSzenarien(zugriff.sammlung) : listeGruppen(zugriff.sammlung);
+      art === "karten"
+        ? listeKarten(zugriff.sammlung)
+        : art === "szenarien"
+          ? listeSzenarien(zugriff.sammlung)
+          : art === "spielstaende"
+            ? listeSpielstaende(zugriff.sammlung)
+            : listeGruppen(zugriff.sammlung);
     return NextResponse.json({ ok: true, [art]: eintraege });
   };
 }

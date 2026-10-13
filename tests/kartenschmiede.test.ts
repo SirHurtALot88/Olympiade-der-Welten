@@ -14,6 +14,11 @@ import {
   listeGruppen,
   listeKarten,
   listeSzenarien,
+  listeSpielstaende,
+  speichereAudio,
+  audioDatei,
+  listeAudio,
+  loescheAudio,
   loescheKarte,
   speichereEintrag,
   speichereFaehigkeiten,
@@ -387,6 +392,25 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     speichereEintrag("gemeinsam", "szenarien", "szenario-1234abcd", { titel: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }, null, "Chris");
     expect(listeSzenarien("gemeinsam")).toMatchObject([{ id: "szenario-1234abcd", name: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }]);
     expect(ladeEintrag("gemeinsam", "szenarien", "szenario-1234abcd")).toMatchObject({ titel: "Das Nest" });
+  });
+
+  it("speichert Spielstände und Audio-Cues, und lässt nur Audio mit gültiger Id durch", () => {
+    speichereEintrag("gemeinsam", "spielstaende", "spielstand-1234abcd", { name: "Moosgrab mit Franky", kampagne: "moosgrab" }, null, "Chris");
+    expect(listeSpielstaende("gemeinsam")).toMatchObject([{ id: "spielstand-1234abcd", name: "Moosgrab mit Franky", kampagne: "moosgrab" }]);
+    const mp3 = Buffer.from("ID3-test-daten");
+    expect(speichereAudio("gemeinsam", "moosgrab-01b-1", mp3, "audio/mpeg", "Der Schrei.mp3", "Chris")).toMatchObject({ id: "moosgrab-01b-1", typ: "audio/mpeg", bytes: mp3.length });
+    expect(listeAudio("gemeinsam").map(a => a.id)).toEqual(["moosgrab-01b-1"]);
+    const datei = audioDatei("gemeinsam", "moosgrab-01b-1");
+    expect(datei && fs.readFileSync(datei.pfad).toString()).toBe("ID3-test-daten");
+    // Neu hochladen ersetzt, auch mit anderem Format
+    speichereAudio("gemeinsam", "moosgrab-01b-1", Buffer.from("OggS"), "audio/ogg", "neu.ogg");
+    expect(audioDatei("gemeinsam", "moosgrab-01b-1")!.pfad.endsWith(".ogg")).toBe(true);
+    expect(fs.readdirSync(path.dirname(audioDatei("gemeinsam", "moosgrab-01b-1")!.pfad)).filter(n => n.startsWith("moosgrab-01b-1"))).toEqual(["moosgrab-01b-1.ogg"]);
+    expect(() => speichereAudio("gemeinsam", "../boese", mp3, "audio/mpeg", "x")).toThrow("ungueltige_id");
+    expect(() => speichereAudio("gemeinsam", "moosgrab-x", mp3, "text/html", "x")).toThrow("kein_audio");
+    expect(audioDatei("gemeinsam", "../../etc/passwd")).toBeNull();
+    expect(loescheAudio("gemeinsam", "moosgrab-01b-1")).toBe(true);
+    expect(listeAudio("gemeinsam")).toEqual([]);
   });
 
   it("lässt keine Pfade als Karten-ID durch", () => {
