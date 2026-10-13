@@ -36738,48 +36738,24 @@
     const n=BAHNEN_N(), steigung=BA().steigung??0.85;
     const griffe=BA().hindernisse||[];
 
-    // ================== FERNE FELSKULISSE, PARALLAX (Broadcast-Optik Phase 5,
-    // Climbing-Audit-Fund 28.09., Klasse A) ==================
-    // Der Opus-Audit stellte Climbing direkt neben Breaking und fand die Wand "Punkte auf
-    // Linien vor leerem Hintergrund" -- keine Tiefe, kein Gefuehl fuer Hoehe. Drei
-    // Bergsilhouetten-Baender HINTER der eigentlichen Wand beheben das mit dem klassischen
-    // Parallax-Trick: je weiter weg, desto langsamer scrollt die Schicht relativ zum
-    // tatsaechlichen Klettertempo -- genau das Signal, das dem Auge "das ist weit weg, ich
-    // steige daran vorbei" sagt, statt einer mitlaufenden Tapete.
-    //
-    // `scrollPx` ist derselbe Weltversatz in Bildschirm-Pixeln, den camY() fuer Griffe/
-    // Kletterer bei RATE 1 (voller Geschwindigkeit) ohnehin schon anwendet (`oben*zoom`,
-    // s. camY()-Definition oben) -- hier nur je Schicht gedaempft (0,25/0,4/0,6) und, weil
-    // dieser Versatz ueber ein ganzes Rennen die Bildhoehe um ein Vielfaches uebersteigen
-    // kann, GEKACHELT (Modulo TILE), damit die Kulisse nie ausgeht, egal wie weit die
-    // Kamera schon gewandert ist. Reine additive Bildschicht vor jeder anderen Zeichnung
-    // dieser Funktion -- kein Leser von `scrollPx`/den Kachel-Werten sitzt in
-    // stepSpurt/tempoVon/MOTOREN.climbing.wert(), derselbe Vertrag wie jede andere
-    // boden*()-Zeichnung.
-    {
-      const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE=220;
-      const SCHICHTEN=[[0.60,"rgba(28,25,23,.50)",0.30],[0.40,"rgba(37,32,29,.60)",0.20],
-                        [0.25,"rgba(49,43,39,.72)",0.12]];
-      SCHICHTEN.forEach(([rate,farbe,amp],si)=>{
-        const off=((scrollPx*rate)%TILE+TILE)%TILE;
-        ctx.fillStyle=farbe;
-        const reihen=Math.ceil(H/TILE)+2;
-        for(let row=-1;row<reihen;row++){
-          const baseY=row*TILE-off;
-          if(baseY>H||baseY+TILE<0)continue;
-          ctx.beginPath();
-          ctx.moveTo(0,baseY+TILE);
-          const SCHRITTE=9;
-          for(let k=0;k<=SCHRITTE;k++){
-            const x=k*W/SCHRITTE;
-            const zack=bodenSaat(si*401+row*97+k*13)*TILE*amp;
-            ctx.lineTo(x,baseY+TILE*0.4+zack);
-          }
-          ctx.lineTo(W,baseY+TILE);
-          ctx.closePath(); ctx.fill();
-        }
-      });
-    }
+    // ================== FERNE FELSKULISSE/PARALLAX ENTFERNT (Chris, 13.10.,
+    // docs/design/chris-feedback-breite-runde-13-10.md Abschnitt "Climbing" Punkt 7,
+    // woertlich: "der leicht angehauchte 3D-Effekt beim Klettern wirkt komisch - da koennte
+    // einem beim Zuschauen schlecht werden, dann evtl lieber doch in 2D bleiben" --
+    // Entscheidung im Dokument: "climbing -> 2d") ==================
+    // Hier stand bis zu dieser PR der GEGENTEILIGE Auftrag von frueher (Broadcast-Optik
+    // Phase 5, Climbing-Audit-Fund 28.09., Klasse A): drei Bergsilhouetten-Baender HINTER
+    // der Wand, die per Parallax (jede Schicht scrollt langsamer als die Wand selbst)
+    // gezielt Tiefenwirkung erzeugen sollten -- "das Signal, das dem Auge 'das ist weit
+    // weg, ich steige daran vorbei' sagt". Genau dieses Signal ist jetzt der gemeldete
+    // Fehler, nicht mehr das Ziel: eine Schicht, die relativ zur Wand zurueckbleibt,
+    // ist die klassische Ursache von Simulator-Uebelkeit (zwei widerspruechliche
+    // Bewegungstiefen im selben Bild). Die Wand bleibt ohne jede Parallax-Kulisse bei ihrem
+    // flachen Grund-Gradienten (zwei Zeilen oben) -- keine zusaetzliche Schicht, keine
+    // Scroll-Rate, keine Tiefenillusion. Reine Zeichenaenderung: `scrollPx`/die Kachel-Werte
+    // hatte ohnehin nie ein Leser in stepSpurt/tempoVon/MOTOREN.climbing.wert() -- bit-
+    // identische Rangtreue vor/nach dieser PR (s. PR-Beschreibung, node scripts/miss-alle-
+    // disziplinen.mjs 24 climbing).
 
     // ---- Schicht 1: Ueberhang-Schattierung, zehn gleich breite Baender von Wandfuss (0) zu
     // Top-out (1), Deckkraft linear zunehmend -- "die Wand wird nach oben steiler" ist jetzt
