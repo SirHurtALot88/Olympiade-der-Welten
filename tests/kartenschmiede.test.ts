@@ -545,7 +545,12 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     m.waehle(s, "2", "Krieger");
     expect(s.flags.name_verraten).toBe("Krieger");
     expect(s.schritt).toBe("frau-antwort-2");
+    // Während sie aufblüht: Angreifen gibt den ersten Schlag, aber sie startet wütend
+    expect(bisTyp(m, s, "wahl-aufbluehen")).toBe("wahl-aufbluehen");
+    m.waehle(s, "2");
+    expect(s.flags.aufbluehen_angriff).toBe(true);
     expect(bisTyp(m, s, "kampf-erbluehte")).toBe("kampf-erbluehte");
+    expect(m.wuetend(s)).toBe(true);
     const boss = s.gegner.find(g => g.id === "erbluehte")!;
     expect(boss.zaeh).toBe(10);
     m.schaden(s, boss.uid, 5);
@@ -605,10 +610,39 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     m.ereignis(s, "frau-erreicht");
     bisTyp(m, s, "wahl-frau");
     m.waehle(s, "1");
+    bisTyp(m, s, "wahl-aufbluehen");
+    m.waehle(s, "1");
     bisTyp(m, s, "wahl-anhaenger");
     m.waehle(s, "3");
     m.weiter(s);
     expect(s.schritt).toBe("ende-map1");
+  });
+});
+
+const MAP2 = JSON.parse(fs.readFileSync(path.join(__dirname, "../apps/kartenschmiede/kampagnen/moosgrab/map2.json"), "utf8"));
+describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
+  const motor2 = () => SM.erstelle(MAP2, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: VORLAGE_ZAEH[d.karte] || "1", size: "1" }, stufe: () => 2, zufall: () => 0.5 });
+  it("hat in Map 2 keine kaputten Verweise und gehört zur selben Kampagne", () => {
+    expect(SM.pruefe(MAP2)).toEqual([]);
+    expect(MAP2.kampagne).toBe(MAP1.kampagne);
+    expect(MAP2.map).toBe(2);
+  });
+  it("übernimmt Anhänger und Atemzug aus Map 1", () => {
+    const m1 = motor(), s1 = m1.neu();
+    s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;
+    const s2 = motor2().neu({ uebernahme: m1.uebernahme(s1) });
+    expect(s2.flags.anhaenger).toBe(true);
+    expect(s2.flags.anhaenger_traeger).toBe("Krieger");
+    expect(s2.leisten.atemzug.wert).toBe(2);
+  });
+  it("kommt ohne Kampf bis zum Ende, wenn die Helden leise bleiben", () => {
+    const m = motor2(), s = m.neu();
+    for (let i = 0; i < 120 && s.schritt !== "ende-map2"; i++) {
+      const st = (MAP2.schritte as Record<string, { typ: string; optionen?: Array<{ taste: string; eingabe?: unknown }> }>)[s.schritt];
+      if (st.typ === "wahl") { const o = st.optionen!.find(x => !x.eingabe) || st.optionen![0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
+    }
+    expect(s.schritt).toBe("ende-map2");
+    expect(s.gegner.filter(g => (g as { id: string }).id === "gemeinde")).toHaveLength(0);
   });
 });
 

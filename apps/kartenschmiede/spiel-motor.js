@@ -417,6 +417,8 @@
       if (s.cue && !(map.audio || {})[s.cue]) fehler.push(`${id}: Cue ${s.cue} fehlt`);
       if (s.figur && !(map.figuren || {})[s.figur]) fehler.push(`${id}: Figur ${s.figur} fehlt`);
       if (s.typ === "wahl" && !(s.optionen || []).length) fehler.push(`${id}: Wahl ohne Optionen`);
+      // Ein Schritt mit `wenn` wird übersprungen, wenn die Bedingung nicht gilt: Dafür braucht er ein `weiter`
+      if (s.wenn && !s.weiter) fehler.push(`${id}: hat wenn, aber kein weiter zum Überspringen`);
     }
     for (const [id, e] of Object.entries(map.ereignisse || {})) {
       if (e.springe && !istSchritt(e.springe)) fehler.push(`Ereignis ${id}: springe → ${e.springe} fehlt`);

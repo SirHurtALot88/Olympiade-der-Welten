@@ -36,7 +36,7 @@ const BILDER: Record<string, string> = {
 };
 
 /** Maps, die der Reiter „Spielen“ Schritt für Schritt abspielen kann (apps/kartenschmiede/kampagnen). */
-const SPIELMODUS_MAPS = ["moosgrab/map1.json"];
+const SPIELMODUS_MAPS = ["moosgrab/map1.json", "moosgrab/map2.json"];
 
 const lies = (...teile: string[]) => fs.readFileSync(path.join(QUELLE, ...teile));
 const alsDataUri = (typ: string, daten: Buffer) => `data:${typ};base64,${daten.toString("base64")}`;

@@ -174,6 +174,8 @@
     spaeter();
     zeige();
   }
+  // Die Seitenspalte (Tischkarte, Gegner) fehlt nur beim Aufbau, solange noch keine Gegner am Tisch stehen
+  const mitSeite = s => s.typ !== "aufbau" || stand.gegner.some(g => !g.weg);
   // Ein Kampf ohne erreichtes Ziel endet nur mit Klick, nicht mit der Leertaste (sonst ist die Frau aus Versehen verloren)
   const kampfOffen = s => s && s.typ === "kampf" && !stand.kampfZiel;
   const weiter = () => tue(() => motor.weiter(stand));
@@ -224,17 +226,20 @@
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         <span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
-      <div class="sp-kopfknoepfe"><button type="button" class="btn ghost sm" data-sp="lage">Lage ${taste("L")}</button>
+      <div class="sp-kopfknoepfe"><button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
         <button type="button" class="btn ghost sm" data-sp="vollbild" title="Am Mac auch Ctrl + Cmd + F">Vollbild</button>
         <button type="button" class="btn ghost sm" data-sp="schliessen">Menü</button></div>`;
   }
 
   // ---------- Aktionsleiste unten ----------
+  // In der Leiste nur der Kern des Namens: Ortsangaben in Klammern stehen im Tooltip und auf der Tischkarte, „(+1)“ bleibt
+  const kurzName = e => e.kurz || String(e.name || "").replace(/\s*\((?![+−-]\d)[^)]*\)/g, "").trim();
   function aktionsLeiste(s) {
-    const ids = (s.ereignisse || []).filter(id => map.ereignisse[id] && !map.ereignisse[id].intern);
+    // Was noch nicht möglich ist (z. B. die Quelle vor Marker 3), bleibt ausgeblendet; Erledigtes bleibt mit ✓ stehen
+    const ids = (s.ereignisse || []).filter(id => map.ereignisse[id] && !map.ereignisse[id].intern && (stand.ereignisse[id] || motor.ereignisErlaubt(stand, id)));
     const evs = ids.map(id => {
       const e = map.ereignisse[id], ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
-      return `<button type="button" class="btn ghost sm ${ok ? "" : "aus"} ${schon ? "erledigt" : ""}" data-ev="${esc(id)}" ${ok ? "" : "disabled"} title="${esc(e.kosten || e.gmNotiz || "")}">${taste(e.taste)} ${esc(e.kurz || e.name)}${schon ? " ✓" : ""}</button>`;
+      return `<button type="button" class="btn ghost sm ${ok ? "" : "aus"} ${schon ? "erledigt" : ""}" data-ev="${esc(id)}" ${ok ? "" : "disabled"} title="${esc([e.name, e.kosten].filter(Boolean).join(" · "))}">${taste(e.taste)} ${esc(kurzName(e))}${schon ? " ✓" : ""}</button>`;
     }).join("");
     const rw = map.rundenwurf && motor.gilt(stand, map.rundenwurf.wenn) && stand.rundenAktiv && s.typ !== "ende";
     const rwFaellig = rw && stand.runde > 0 && stand.rundenwurfRunde !== stand.runde;
@@ -274,8 +279,11 @@
         const k = `${stand.schritt}:${i}`;
         return `<li><label><input type="checkbox" data-check="${esc(k)}" ${stand.checks[k] ? "checked" : ""}> ${esc(c)}</label></li>`;
       }).join("")}</ul>${gm(s.hinweis)}${stand.schritt === "vorb-stand" ? audioListe() : ""}`;
-      case "aufbau": return `<div class="sp-aufbau"><div>${liste(s.tisch, "sp-tisch")}${s.regel ? `<h4>Sag an</h4>${vorlesen(s.regel)}` : ""}${gm(s.hinweis)}</div>
-        <div class="sp-aufbaukarte">${tischKarte({ gross: true, skizze: s.skizze })}${aufbauLegende()}</div></div>`;
+      case "aufbau": {
+        const text = `${liste(s.tisch, "sp-tisch")}${s.regel ? `<h4>Sag an</h4>${vorlesen(s.regel)}` : ""}${gm(s.hinweis)}`;
+        if (mitSeite(s)) return text;
+        return `<div class="sp-aufbau"><div>${text}</div><div class="sp-aufbaukarte">${tischKarte({ gross: true, skizze: s.skizze })}${aufbauLegende()}</div></div>`;
+      }
       case "cue": return `${cueKnopf(s.cue, true)}${gm(s.notiz || s.gmNotiz)}${s.optional && !hatAudio(s.cue) ? `<p class="sp-gm">Kein Track da: einfach weiter, du spielst die Szene live.</p>` : ""}${s.text ? vorlesen(s.text) : ""}`;
       case "vorlesen": return `${vorlesen(s.text, s.als && map.figuren[s.als] ? map.figuren[s.als].name : "")}${gm(s.gmNotiz)}`;
       case "regel": return `${vorlesen(s.text)}${gm(s.gmNotiz)}`;
@@ -501,7 +509,7 @@
     main.dataset.schritt = stand.schritt;
     main.innerHTML = `<div class="sp-app">
       <header class="sp-oben" id="spKopf"></header>
-      <div class="sp-mitte ${s.typ === "aufbau" ? "ohne-seite" : ""}">
+      <div class="sp-mitte ${mitSeite(s) ? "" : "ohne-seite"}">
         <section class="sp-karte typ-${farbe}">
           <header><span class="sp-typ">${zeichen} ${esc(etikett)}</span><h3>${esc(s.titel || "")}</h3></header>
           ${schrittInhalt(s)}
@@ -511,7 +519,7 @@
             : `<span class="hint">Als Nächstes: ${esc(nachTitel)}</span>`}
             <p class="hint sp-msg" id="spMsg" role="status">${esc(meldung)}</p></footer>
         </section>
-        ${s.typ === "aufbau" ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner</h4>${gegnerListe()}</div></aside>`}
+        ${!mitSeite(s) ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner</h4>${gegnerListe()}</div></aside>`}
       </div>
       <footer class="sp-unten">${aktionsLeiste(s)}</footer>
     </div>${fensterHtml()}`;
@@ -626,7 +634,9 @@
       }
       if (k === "Backspace") { e.preventDefault(); zurueck(); return; }
       if (s && s.typ === "wahl" && /^[1-9]$/.test(k)) { waehle(k); return; }
-      const ev = (s && s.ereignisse || []).find(id => map.ereignisse[id] && String(map.ereignisse[id].taste || "").toLowerCase() === k.toLowerCase());
+      // Zwei Ereignisse dürfen dieselbe Taste haben, wenn nur eines gerade erlaubt ist (Hedda: Frage 9 lang oder knapp)
+      const mitTaste = (s && s.ereignisse || []).filter(id => map.ereignisse[id] && String(map.ereignisse[id].taste || "").toLowerCase() === k.toLowerCase());
+      const ev = mitTaste.find(id => motor.ereignisErlaubt(stand, id)) || mitTaste[0];
       if (ev) { tue(() => motor.ereignis(stand, ev)); return; }
       if (k === "r" || k === "R") { if (stand.rundenAktiv) runde(); return; }
       if (k === "w" || k === "W") { if (map.rundenwurf && stand.rundenAktiv) rundenwurf(0); return; }

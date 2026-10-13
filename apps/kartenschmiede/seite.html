@@ -814,7 +814,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-pop header b { font: 700 18px var(--ui); display: block; }
 .sp-pop header small { font: 500 14px var(--ui); color: var(--dim); }
 .sp-pop p { margin: 0; }
-.sp-aktiv { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
+.sp-aktiv { max-height: 26vh; overflow: auto; display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
 .sp-gegnerliste { display: grid; gap: 6px; align-content: start; overflow: auto; min-height: 0; padding-right: 4px; }
 .sp-gegner { display: grid; gap: 3px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); cursor: pointer; }
 .sp-gegner.markiert { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(207,167,94,.35); }
@@ -836,8 +836,11 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-g-mehr h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-g-mehr .sp-gm { font-size: 15px; }
 .sp-unten { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg2); }
-.sp-evs, .sp-runden { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.sp-runden { justify-content: flex-end; }
+.sp-evs, .sp-runden { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+/* Viele Aktionen (Map 2 draußen hat 13): höchstens drei Zeilen, der Rest scrollt; die Rundenknöpfe bleiben in einer Zeile */
+.sp-evs { flex: 1; min-width: 0; max-height: 118px; overflow: auto; }
+.sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; }
+.sp-runden { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 5px; justify-content: end; flex-shrink: 0; }
 @media (max-width: 1000px) { .sp-app { position: static; display: block; } .sp-mitte { grid-template-columns: 1fr; } .sp-seite { overflow: visible; } .sp-unten { flex-wrap: wrap; } }
 .sp-fenster { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.62); }
 .sp-fenster-innen { display: grid; gap: 10px; width: min(820px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 20px 24px; border: 1px solid var(--brass); border-radius: 12px; background: var(--bg); font-size: 18px; }
