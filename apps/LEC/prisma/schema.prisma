@@ -32,6 +32,19 @@ model Article {
   currentEk      Float?
   /// false = herausgefiltert (Privatverkauf/Nicht-Karte)
   isCard         Boolean  @default(true)
+  /// Kartenbild aus Chris' eigenem eBay-Shop (siehe src/lib/images/). Einmal
+  /// gefunden und abgelegt, danach nur neu geladen, wenn sich das Angebotsbild aendert.
+  ebayItemId     String?
+  imageGuid      String?
+  /// Dateiname im Bildordner neben der SQLite (Volume lec-data), null = kein Bild.
+  imageFile      String?
+  /// "item_id" | "name" | "alias" — wie das Angebot dem Artikel zugeordnet wurde.
+  imageMatchedBy String?
+  imageFetchedAt DateTime?
+  /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
+  /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
+  ebayPrice      Float?
+  ebayPriceAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -140,7 +153,7 @@ model MarketPrice {
   id         String   @id @default(cuid())
   articleId  String
   article    Article  @relation(fields: [articleId], references: [id])
-  source     String // "cardmarket-manual"
+  source     String // "cardmarket-priceguide" (automatisch), frueher "cardmarket-manual"
   priceFrom  Float?
   priceTrend Float?
   priceAvg30 Float?
@@ -149,6 +162,16 @@ model MarketPrice {
   available  Int?
   fetchedAt  DateTime @default(now())
   raw        String? // JSON-Blob (Angebotsliste etc.)
+  /// Cardmarket-Produkt (Preisliste), wenn eindeutig zugeordnet.
+  idProduct    Int?
+  /// "eindeutig" | "mehrdeutig" (siehe src/lib/market/catalog.ts).
+  matchQuality String?
+  /// Mehrdeutig: Trend der billigsten und der teuersten Variante, je Karte.
+  priceMin     Float?
+  priceMax     Float?
+  variants     Int?
+
+  @@index([articleId, source])
 }
 
 /// Konfigurierbare Kostensätze für die VK-Kalkulation (KONZEPT §7.3), versioniert.
@@ -181,6 +204,7 @@ model CostSettings {
   adFeeRateSingle             Float    @default(0.09)
   adFeeRateMin                Float    @default(0.09)
   adFeeRateGood               Float    @default(0.10)
+  /// UNGENUTZT seit 13.10.2026: der Korridor ist 25-33 % Deckungsbeitrags-Marge (src/lib/pricing/costEngine.ts).
   marginMinMultiplier         Float    @default(1.33)
   marginGoodMultiplier        Float    @default(1.66)
   createdAt                   DateTime @default(now())

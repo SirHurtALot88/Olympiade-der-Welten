@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { formatEuro, formatEuroCents } from "@/lib/format";
+import { RANGE_TOLERANCE } from "@/lib/pricing/costEngine";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
 
@@ -15,12 +16,10 @@ interface Props {
 }
 
 export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; label: string }> = {
-  unter_min: { cls: "p-crit", label: "unter MIN" },
-  // Schon die Marge VOR Fixkosten liegt bei diesem VK unter dem MIN-Ziel -- das Ziel ist mit
-  // diesem VK nicht erreichbar. Bewusst gelb statt rot: struktureller Befund, kein Dauer-Alarm.
-  ziel_unerreichbar: { cls: "p-warn", label: "Ziel unerreichbar" },
+  // Zielspanne = 25 % bis 33 % Deckungsbeitrags-Marge (Chris, 13.10.), mindestens 4,99 €.
+  unter_min: { cls: "p-warn", label: "zu günstig" },
   im_korridor: { cls: "p-good", label: "im Korridor" },
-  ueber_gut: { cls: "p-mkt", label: "über Markt" },
+  ueber_gut: { cls: "p-mkt", label: "zu teuer" },
   // FIX 1: kein Korridor-Status, sondern Kennzeichnung "wir kennen den EK nicht" --
   // bewusst NICHT gruen/rot, damit hier keine falsche Sicherheit vorgetaeuscht wird.
   kein_ek: { cls: "p-warn", label: "kein EK" },
@@ -87,7 +86,6 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
                       good={row.corridor.good}
                       contribution={row.corridor.contribution}
                       vk={vkForDisplay}
-                      status={row.priceStatus}
                     />
                   </td>
                   <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{row.classLabel}</td>
@@ -126,13 +124,11 @@ interface CorridorProps {
   vk: number;
   /** Deckungsbeitrags-Grenze: VK, unter dem jeder Verkauf schon vor Fixkosten Geld kostet (roter Marker "DB"). */
   contribution?: number;
-  /** Status des Artikels; "ziel_unerreichbar" faerbt den VK-Marker gelb statt rot. */
-  status?: SortimentRow["priceStatus"];
   /** Optionaler Cardmarket-Preistrend -- rendert einen zusaetzlichen blauen Markt-Marker (PAGES_CONCEPT §3). */
   marketValue?: number | null;
 }
 
-export function Corridor({ min, good, vk, contribution, status, marketValue }: CorridorProps) {
+export function Corridor({ min, good, vk, contribution, marketValue }: CorridorProps) {
   const hasContribution = contribution !== undefined && Number.isFinite(contribution) && contribution > 0;
   const rangeMin = Math.min(min, hasContribution ? contribution : min) * 0.7;
   const rangeMax = good * 1.25;
@@ -141,13 +137,11 @@ export function Corridor({ min, good, vk, contribution, status, marketValue }: C
   const meColor =
     vk === 0
       ? "var(--faint)"
-      : status === "ziel_unerreichbar"
-        ? "var(--warn)"
-        : vk < min
-          ? "var(--crit)"
-          : vk > good
-            ? "var(--market)"
-            : "var(--good)";
+      : vk < min * (1 - RANGE_TOLERANCE)
+        ? "var(--crit)"
+        : vk > good * (1 + RANGE_TOLERANCE)
+          ? "var(--market)"
+          : "var(--good)";
 
   return (
     <div className="corridor">
@@ -166,14 +160,14 @@ export function Corridor({ min, good, vk, contribution, status, marketValue }: C
         <div className="mn" style={{ left: `${pos(min)}%` }} />
         <div className="gx" style={{ left: `${pos(good)}%` }} />
         {marketValue !== undefined && marketValue !== null && marketValue > 0 && (
-          <div className="mk" style={{ left: `${pos(marketValue)}%` }} title={`Markt-Trend ${marketValue.toFixed(2)} €`} />
+          <div className="mk" style={{ left: `${pos(marketValue)}%` }} title={`Marktwert ${marketValue.toFixed(2)} €`} />
         )}
         {vk > 0 && <div className="me" style={{ left: `${pos(vk)}%`, background: meColor }} />}
       </div>
       <div className="clabels">
         {hasContribution && <span title="Deckungsbeitrags-Grenze">DB {contribution.toFixed(2)}</span>}
-        <span>MIN {min.toFixed(2)}</span>
-        <span>GUT {good.toFixed(2)}</span>
+        <span title="VK für 25 % Deckungsbeitrags-Marge">25 % {min.toFixed(2)}</span>
+        <span title="VK für 33 % Deckungsbeitrags-Marge">33 % {good.toFixed(2)}</span>
       </div>
     </div>
   );

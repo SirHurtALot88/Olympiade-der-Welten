@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
+import { marketValueOf, type LatestQuote } from "./marketComparison";
 import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
 export interface ArticleAggregatesResult {
@@ -41,8 +42,6 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     adFeeRateSingle: active.adFeeRateSingle,
     adFeeRateMin: active.adFeeRateMin,
     adFeeRateGood: active.adFeeRateGood,
-    marginMinMultiplier: active.marginMinMultiplier,
-    marginGoodMultiplier: active.marginGoodMultiplier,
   };
 }
 
@@ -65,14 +64,33 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
   ]);
 
   // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
-  const latestTrendByArticle = new Map<string, number | null>();
+  const latestQuoteByArticle = new Map<string, LatestQuote>();
   for (const mp of latestMarketPrices) {
-    if (!latestTrendByArticle.has(mp.articleId)) {
-      latestTrendByArticle.set(mp.articleId, mp.priceTrend ?? null);
+    if (latestQuoteByArticle.has(mp.articleId)) continue;
+    let how: string | null = null;
+    try {
+      how = (mp.raw ? (JSON.parse(mp.raw) as { how?: string }).how : null) ?? null;
+    } catch {
+      how = null;
     }
+    latestQuoteByArticle.set(mp.articleId, {
+      priceFrom: mp.priceFrom,
+      priceTrend: mp.priceTrend,
+      priceAvg30: mp.priceAvg30,
+      priceAvg7: mp.priceAvg7,
+      priceAvg1: mp.priceAvg1,
+      available: mp.available,
+      fetchedAt: mp.fetchedAt,
+      matchQuality: mp.matchQuality,
+      priceMin: mp.priceMin,
+      priceMax: mp.priceMax,
+      variants: mp.variants,
+      how,
+    });
   }
 
   const aggregates: ArticleAggregate[] = articles.map((article) => {
+    const quote = latestQuoteByArticle.get(article.id);
     const windows: ArticleAggregate["windows"] = {};
     for (const sw of article.saleWindows) {
       const key = sw.window as SaleWindowKey;
@@ -113,9 +131,14 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
-      currentVk: article.currentVk,
+      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
+      currentVk: article.ebayPrice ?? article.currentVk,
+      vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
+      vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
-      latestMarketTrend: latestTrendByArticle.get(article.id) ?? null,
+      // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
+      latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
+      marketQuote: quote ?? null,
       windows,
     };
   });

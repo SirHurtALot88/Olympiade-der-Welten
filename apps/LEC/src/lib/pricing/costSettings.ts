@@ -61,8 +61,6 @@ export interface CostSettingsValues {
   adFeeRateSingle: number;
   adFeeRateMin: number;
   adFeeRateGood: number;
-  marginMinMultiplier: number;
-  marginGoodMultiplier: number;
 }
 
 export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
@@ -87,6 +85,4 @@ export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
   adFeeRateSingle: 0.09,
   adFeeRateMin: 0.09,
   adFeeRateGood: 0.1,
-  marginMinMultiplier: 1.33,
-  marginGoodMultiplier: 1.66,
 };

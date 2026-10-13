@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { UploadZone } from "./UploadZone";
 import { BillbeeArtikelUpload } from "./BillbeeArtikelUpload";
 import { ImportSummaryCard } from "./ImportSummaryCard";
-import { ReviewRow } from "./ReviewRow";
 import type { ImportSummary, OpenReviewItem } from "./types";
 
 interface Props {
@@ -59,9 +58,6 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
     }
   }
 
-  function handleResolved(id: string) {
-    setReviewItems((items) => items.filter((i) => i.id !== id));
-  }
 
   return (
     <>
@@ -128,11 +124,22 @@ export function ImportView({ initialReviewItems, articleCount }: Props) {
                 color: "var(--faint)",
               }}
             >
-              Billbee-Zeilen ohne eBay-Match zuordnen (gelernter Alias matcht künftig automatisch)
-              oder Privatverkäufe ignorieren.
+              Zeilen ohne Gegenstück im jeweils anderen Export. Reine Anzeige — Zuordnungen
+              werden nicht hier von Hand gepflegt, sondern beim Einarbeiten der Dateien.
             </div>
             {reviewItems.map((item) => (
-              <ReviewRow key={item.id} item={item} onResolved={handleResolved} />
+              <div
+                key={item.id}
+                style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 16px", borderTop: "1px solid var(--line)" }}
+              >
+                <span className={`pill ${item.source === "billbee" ? "p-warn" : "p-mkt"}`} style={{ flex: "none" }}>
+                  {item.source}
+                </span>
+                <span className="artname" style={{ maxWidth: "none", flex: 1 }} title={item.nameRaw}>
+                  {item.nameRaw}
+                </span>
+                {item.setCode && <span className="code">{item.setCode}</span>}
+              </div>
             ))}
           </div>
         )}

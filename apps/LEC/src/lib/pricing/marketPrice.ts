@@ -1,3 +1,5 @@
+import { RANGE_TOLERANCE, type TargetRange } from "./costEngine";
+
 /**
  * Marktpreis-Provider-Interface (KONZEPT.md §7.1). v1 = Provider B: Chris hat
  * keine Cardmarket-API, deshalb werden Preisdaten manuell/halbautomatisch
@@ -90,5 +92,13 @@ export function classifyMarketStatus(ownVk: number, trend: number): MarketStatus
   const diff = (ownVk - trend) / trend;
   if (diff < -0.15) return "zu_guenstig";
   if (diff > 0.15) return "zu_teuer";
+  return "im_korridor";
+}
+
+/** Ampel gegen die Zielspanne (25 % bis 33 % Deckungsbeitrag, siehe costEngine.computeTargetRange). */
+export function classifyAgainstRange(ownVk: number, range: TargetRange): MarketStatus {
+  if (!(ownVk > 0)) return "im_korridor";
+  if (ownVk < range.min * (1 - RANGE_TOLERANCE)) return "zu_guenstig";
+  if (ownVk > range.opt * (1 + RANGE_TOLERANCE)) return "zu_teuer";
   return "im_korridor";
 }

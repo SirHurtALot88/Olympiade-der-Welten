@@ -1,16 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { CostSettingsValues } from "@/lib/pricing/costSettings";
-import { DEFAULT_COST_SETTINGS } from "@/lib/pricing/costSettings";
-import { totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
+import { DB_MARGIN_MIN, DB_MARGIN_OPT, totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
 import { PREVIEW_EXAMPLES, buildCostPreview, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
 import { formatEuroCents } from "@/lib/format";
 import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
-import { parseGermanNumber } from "@/lib/parsing/number";
 import { AppShell } from "@/components/shell/AppShell";
 import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
+import { ImageSyncCard } from "./ImageSyncCard";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -128,13 +126,6 @@ const GROUPS: Group[] = [
       },
     ],
   },
-  {
-    title: "Margen-Ziele",
-    fields: [
-      { key: "marginMinMultiplier", label: "MIN-Multiplikator", unit: "x" },
-      { key: "marginGoodMultiplier", label: "GUT-Multiplikator", unit: "x" },
-    ],
-  },
 ];
 
 function toDisplay(value: number, unit: Unit): string {
@@ -143,20 +134,6 @@ function toDisplay(value: number, unit: Unit): string {
   return rounded.toString().replace(".", ",");
 }
 
-function fromDisplay(raw: string, unit: Unit): number {
-  const v = parseGermanNumber(raw);
-  return unit === "percent" ? v / 100 : v;
-}
-
-function buildDisplayValues(settings: CostSettingsValues): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const g of GROUPS) {
-    for (const f of g.fields) {
-      out[f.key] = toDisplay(settings[f.key], f.unit);
-    }
-  }
-  return out;
-}
 
 interface Props {
   costSettings: CostSettingsValues;
@@ -171,22 +148,12 @@ interface Props {
 }
 
 export function EinstellungenPage({ costSettings, importBatches, authEnabled, shopVolume }: Props) {
-  const router = useRouter();
-  const [values, setValues] = useState<Record<string, string>>(() => buildDisplayValues(costSettings));
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [savedNote, setSavedNote] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const parsed = useMemo((): CostSettingsValues => {
-    const result = {} as CostSettingsValues;
-    for (const g of GROUPS) {
-      for (const f of g.fields) {
-        result[f.key] = fromDisplay(values[f.key] ?? "0", f.unit);
-      }
-    }
-    return result;
-  }, [values]);
+  // Reine Anzeige (Chris, 13.10.: "dort soll nichts per Hand eingepflegt werden").
+  // Die Kostensaetze kommen aus der aktiven, versionierten DB-Version bzw. den
+  // Defaults in lib/pricing/costSettings.ts und werden per Code/Datei gepflegt.
+  const parsed = costSettings;
 
   // Live-Vorschau: dieselben Engine-Funktionen und dieselbe Shop-Menge wie Dashboard/Sortiment
   // (siehe lib/pricing/costPreview.ts) -- die Vorschau darf der App nicht widersprechen.
@@ -195,53 +162,6 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
     [parsed, shopVolume]
   );
   const facts = useMemo(() => deriveCostFacts(parsed, shopVolume), [parsed, shopVolume]);
-
-  function setField(key: string, raw: string) {
-    setValues((prev) => ({ ...prev, [key]: raw }));
-    setSavedNote(null);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/settings/costs", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || "Speichern fehlgeschlagen.");
-      }
-      setSavedNote("Gespeichert als neue Version (vorherige bleibt in der Historie erhalten).");
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Fehler beim Speichern.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleReset() {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/settings/costs", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reset: true }),
-      });
-      if (!res.ok) throw new Error("Zurücksetzen fehlgeschlagen.");
-      setValues(buildDisplayValues(DEFAULT_COST_SETTINGS));
-      setSavedNote("Auf Konzept-Defaults zurückgesetzt (als neue Version gespeichert).");
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Fehler beim Zurücksetzen.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -253,14 +173,11 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
     }
   }
 
-  const minMarginPct = ((parsed.marginMinMultiplier - 1) / parsed.marginMinMultiplier) * 100;
-  const goodMarginPct = ((parsed.marginGoodMultiplier - 1) / parsed.marginGoodMultiplier) * 100;
-
   return (
     <AppShell
       title="Einstellungen"
       subtitle="Kostensätze der Preis-Engine, Datenstand, Konto"
-      footer={<span>Speichern legt immer eine neue Version an — die vorherige bleibt erhalten.</span>}
+      footer={<span>Reine Anzeige. Kostensätze werden per Datei/Code gepflegt, nicht hier.</span>}
     >
       <section className="grid-2" style={{ alignItems: "start" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -275,22 +192,9 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
                       {f.unit === "percent" && " (%)"}
                       {f.unit === "x" && " (×)"}
                     </label>
-                    <input
-                      value={values[f.key] ?? ""}
-                      onChange={(e) => setField(f.key, e.target.value)}
-                      style={{
-                        width: "100%",
-                        background: "var(--panel2)",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--r-sm)",
-                        padding: "6px 9px",
-                        color: "var(--ink)",
-                        font: "inherit",
-                        fontSize: 12.5,
-                        outline: "none",
-                        marginTop: 2,
-                      }}
-                    />
+                    <div className="num" style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
+                      {f.unit === "eur" ? eur(parsed[f.key]) : toDisplay(parsed[f.key], f.unit)}
+                    </div>
                     {f.derived && (
                       <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{f.derived(parsed)}</div>
                     )}
@@ -298,31 +202,9 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
                 ))}
               </div>
               {g.note && <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>{g.note(parsed)}</div>}
-              {g.title === "Margen-Ziele" && (
-                <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>
-                  MIN ≈ {minMarginPct.toFixed(0)} % Gewinnmarge · GUT ≈ {goodMarginPct.toFixed(0)} % Gewinnmarge
-                  (Klartext-Ableitung aus den Multiplikatoren).
-                </div>
-              )}
             </div>
           ))}
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              type="button"
-              className="chip c-good"
-              disabled={saving}
-              onClick={handleSave}
-              style={{ padding: "9px 18px", opacity: saving ? 0.6 : 1 }}
-            >
-              {saving ? "Speichere …" : "Speichern (neue Version)"}
-            </button>
-            <button type="button" className="chip" disabled={saving} onClick={handleReset} style={{ padding: "9px 16px" }}>
-              Zurücksetzen (Defaults)
-            </button>
-          </div>
-          {error && <div style={{ fontSize: 11.5, color: "var(--crit)" }}>{error}</div>}
-          {savedNote && !error && <div style={{ fontSize: 11.5, color: "var(--good)" }}>{savedNote}</div>}
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -393,6 +275,8 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
           </div>
 
           <ImportHistoryCard batches={importBatches} />
+
+          <ImageSyncCard />
 
           <div className="card" style={{ padding: "15px 16px 16px" }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 10 }}>Konto</div>
@@ -481,11 +365,11 @@ function PreviewColumn({ pv, parsed }: { pv: CostPreview; parsed: CostSettingsVa
         <span>{eur(corridor.vkContribution)}</span>
       </div>
       <div className="row tot" style={{ color: "var(--good)" }}>
-        <span>VK-Preis MIN (× {parsed.marginMinMultiplier.toFixed(2).replace(".", ",")}, Vollkosten)</span>
+        <span>VK-Preis MIN ({pct(DB_MARGIN_MIN)} Deckungsbeitrag)</span>
         <span>{eur(corridor.vkMin)}</span>
       </div>
       <div className="row tot" style={{ color: "var(--accent-ink)" }}>
-        <span>VK-Preis GUT (× {parsed.marginGoodMultiplier.toFixed(2).replace(".", ",")}, Vollkosten)</span>
+        <span>VK-Preis GUT ({pct(DB_MARGIN_OPT)} Deckungsbeitrag)</span>
         <span>{eur(corridor.vkGood)}</span>
       </div>
       <div style={{ marginTop: 8 }}>

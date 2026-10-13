@@ -6,6 +6,9 @@ import {
   computeEbayFees,
   computeHk,
   computeMargin,
+  computeMarketTargetRange,
+  marketCapFactor,
+  contributionMarginForPrice,
   computePriceCorridor,
   computeShopVolume,
   contributionMarginAt,
@@ -210,31 +213,61 @@ function corridorFor(ek: number, vk: number, shop: ShopVolume | null = SHOP) {
     { ek, kind: "single", fixedCostPerUnit: fixedCostPerUnit(shop?.units365d ?? 0, S), vk, shop },
     S
   );
-  return { hk, corridor: computePriceCorridor(hk, vk, S) };
+  return { hk, corridor: computePriceCorridor(hk, vk, S, { kind: "single", shop }) };
 }
 
-describe("computePriceCorridor: Vollkosten-Korridor", () => {
-  it("VK-MIN/VK-GUT sind (HK + VK-Kosten) x 1,33 / x 1,66", () => {
-    const { hk, corridor } = corridorFor(2.5, 10);
-    const basis = hk.total + corridor.currentVkFees.total;
-    expect(corridor.vkMin).toBeCloseTo(basis * 1.33, 5);
-    expect(corridor.vkGood).toBeCloseTo(basis * 1.66, 5);
-    expect(corridor.vkGood).toBeGreaterThan(corridor.vkMin);
+// Handrechnung (unabhaengig vom Code), Einzelkarte, EK 2,50, Shop 3.400 Stk/Jahr, 60 davon ab 30 €:
+//   Einschreiben unter der Schwelle r = (100 - 60) x 2,35 / (3.400 - 60) = 0,02814
+//   HK ohne Fixkosten = 2,50 + 0,575 (Einkaufs-Versand 1,15 x 50 %) + 0,67 + 0,053 + 0,02814 = 3,82614
+//   VK-MIN (25 %, Anzeigen 9 %):  (0,35 + 3,82614) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 8,1565
+//   VK-GUT (33 %, Anzeigen 10 %): (0,35 + 3,82614) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 9,9408
+describe("computePriceCorridor: Zielspanne 25 % bis 33 % Deckungsbeitrag", () => {
+  it("VK-MIN / VK-GUT = VK fuer 25 % / 33 % Marge vor Fixkosten (handgerechnet)", () => {
+    const { corridor } = corridorFor(2.5, 10);
+    expect(corridor.vkMin).toBeCloseTo(8.1565, 3);
+    expect(corridor.vkGood).toBeCloseTo(9.9408, 3);
+    expect(corridor.targetMargin).toBe(0.25);
   });
 
-  it("enthaelt die Fixkosten: derselbe Artikel ohne Fixkosten hat ein niedrigeres MIN", () => {
-    // Regression: Aufrufer uebergaben fixedCostPerUnit: 0 -> Korridor ohne Fixkosten.
-    const mit = corridorFor(2.5, 10).corridor;
-    const ohne = (() => {
-      const hk = computeHk({ ek: 2.5, kind: "single", fixedCostPerUnit: 0, vk: 10, shop: SHOP }, S);
-      return computePriceCorridor(hk, 10, S);
-    })();
-    expect(mit.vkMin - ohne.vkMin).toBeCloseTo((4229 / 3400) * 1.33, 5);
+  it("die Marge an den Grenzen ist exakt 25 % bzw. 33 % (Gebuehren am Zielpreis, nicht am heutigen VK)", () => {
+    const { corridor } = corridorFor(2.5, 10);
+    const input = { ek: 2.5, kind: "single" as const, shop: SHOP };
+    expect(contributionMarginForPrice(corridor.vkMin, input, S.adFeeRateMin, S)).toBeCloseTo(0.25, 6);
+    expect(contributionMarginForPrice(corridor.vkGood, input, S.adFeeRateGood, S)).toBeCloseTo(0.33, 6);
+  });
+
+  it("haengt NICHT vom heutigen VK ab (frueher: Gebuehren zum aktuellen VK, ein zu niedriger Preis senkte sein eigenes MIN)", () => {
+    expect(corridorFor(2.5, 3).corridor.vkMin).toBeCloseTo(corridorFor(2.5, 30).corridor.vkMin, 6);
+  });
+
+  it("enthaelt keine Fixkosten (Deckungsbeitrag): mit und ohne Fixkostenanteil dieselbe Spanne", () => {
+    const hk = computeHk({ ek: 2.5, kind: "single", fixedCostPerUnit: 0, vk: 10, shop: SHOP }, S);
+    const ohne = computePriceCorridor(hk, 10, S, { kind: "single", shop: SHOP });
+    expect(ohne.vkMin).toBeCloseTo(corridorFor(2.5, 10).corridor.vkMin, 8);
+  });
+
+  it("Untergrenze 4,99 €: bei sehr niedrigem EK ist die Spanne die Untergrenze (Warenkorb-Fueller)", () => {
+    const { corridor } = corridorFor(0.2, 4.99);
+    expect(corridor.vkMin).toBe(4.99);
+    expect(corridor.vkGood).toBe(4.99);
+  });
+
+  it("Einschreiben: ab Zielpreis 30 € traegt der Preis die vollen 2,35 € (iteriert bis konsistent)", () => {
+    // EK 20: HK = 20 + 0,575 + 0,67 + 0,053 + 2,35 = 23,648 -> VK-MIN = (0,35 + 23,648) / 0,512 = 46,87
+    const { corridor } = corridorFor(20, 50);
+    expect(corridor.vkMin).toBeCloseTo(46.871, 2);
+  });
+
+  it("Pack: eigener Versand/Verpackung, Einkaufs-Versand nur einmal", () => {
+    const hk = computeHk({ ek: 1.5, kind: "pack", packSize: 3, fixedCostPerUnit: 0, vk: null, shop: null }, S);
+    const c = computePriceCorridor(hk, 5.99, S, { kind: "pack", packSize: 3, shop: null });
+    // HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> (0,35 + 2,637) / 0,512 = 5,834
+    expect(c.vkMin).toBeCloseTo(5.834, 2);
   });
 });
 
 describe("Deckungsbeitrags-Grenze", () => {
-  it("liegt unter dem Vollkosten-MIN und genau dort, wo der Gewinn VOR Fixkosten 0 ist", () => {
+  it("liegt unter VK-MIN und genau dort, wo der Gewinn VOR Fixkosten 0 ist", () => {
     const { corridor } = corridorFor(2.5, 10);
     expect(corridor.vkContribution).toBeLessThan(corridor.vkMin);
     const atLine = computeMargin(corridor.vkContribution, corridor.hkContribution, S.adFeeRateGood, S);
@@ -253,44 +286,93 @@ describe("Deckungsbeitrags-Grenze", () => {
 });
 
 describe("classifyPriceStatus", () => {
-  it("klassifiziert VK im Korridor / ueber GUT korrekt", () => {
+  it("in der Spanne = im Korridor, darueber = ueber_gut, darunter = unter_min", () => {
     const { corridor } = corridorFor(2.5, 10);
     expect(classifyPriceStatus((corridor.vkMin + corridor.vkGood) / 2, corridor)).toBe("im_korridor");
-    expect(classifyPriceStatus(corridor.vkGood + 1, corridor)).toBe("ueber_gut");
+    expect(classifyPriceStatus(corridor.vkGood + 2, corridor)).toBe("ueber_gut");
+    expect(classifyPriceStatus(corridor.vkMin - 2, corridor)).toBe("unter_min");
   });
 
-  it("klassifiziert VK unter MIN bei erreichbarem Ziel als 'zu guenstig' (unter_min)", () => {
-    // EK 2,50 / VK 10: Marge vor Fixkosten liegt klar ueber dem 25-%-Ziel -> Ziel bei diesem VK erreichbar.
+  it("3 % Toleranz an beiden Grenzen (x,99-Rundung)", () => {
     const { corridor } = corridorFor(2.5, 10);
-    const vk = corridor.vkMin - 0.5;
-    expect(contributionMarginAt(vk, corridor)).toBeGreaterThanOrEqual(corridor.targetMargin);
-    expect(classifyPriceStatus(vk, corridor)).toBe("unter_min");
+    expect(classifyPriceStatus(corridor.vkMin * 0.98, corridor)).toBe("im_korridor");
+    expect(classifyPriceStatus(corridor.vkMin * 0.95, corridor)).toBe("unter_min");
+    expect(classifyPriceStatus(corridor.vkGood * 1.02, corridor)).toBe("im_korridor");
+    expect(classifyPriceStatus(corridor.vkGood * 1.05, corridor)).toBe("ueber_gut");
   });
 
-  it("EK 0,90 / VK 4,99: 25 % Vollkosten-Marge sind unmoeglich -> 'ziel_unerreichbar', nicht 'unter_min'", () => {
+  it("EK 0,90 / VK 4,99: knapp unter VK-MIN (5,03 €), aber innerhalb der Toleranz -> im Korridor (frueher Dauer-Alarm 'Ziel unerreichbar')", () => {
+    // (0,35 + 0,90 + 0,575 + 0,67 + 0,053 + 0,02814) / 0,512 = 5,0315
     const { corridor } = corridorFor(0.9, 4.99);
-    // Selbst mit null Fixkosten liegt die Obergrenze unter dem Ziel (24,8 %) ...
-    expect(contributionMarginAt(4.99, corridor)).toBeLessThan(corridor.targetMargin);
-    expect(contributionMarginAt(4.99, corridor)).toBeLessThan(0.25);
-    // ... der Verkauf deckt aber noch seine variablen Kosten (kein echter Verlust) ...
-    expect(4.99).toBeGreaterThan(corridor.vkContribution);
-    // ... und liegt unter dem Vollkosten-MIN (das war heute dauerhaft "unter MIN").
-    expect(4.99).toBeLessThan(corridor.vkMin);
-    expect(classifyPriceStatus(4.99, corridor)).toBe("ziel_unerreichbar");
+    expect(corridor.vkMin).toBeCloseTo(5.0315, 3);
+    expect(classifyPriceStatus(4.99, corridor)).toBe("im_korridor");
   });
 
-  it("bleibt 'unter_min', sobald der Verkauf unter der Deckungsbeitrags-Grenze liegt (echter Verlust)", () => {
-    const { corridor } = corridorFor(0.9, 4.99);
-    const verlustVk = corridor.vkContribution - 0.3;
-    expect(classifyPriceStatus(verlustVk, corridor)).toBe("unter_min");
+  it("unter der Deckungsbeitrags-Grenze (echter Verlust) bleibt unter_min", () => {
+    const { corridor } = corridorFor(8, 6);
+    expect(6).toBeLessThan(corridor.vkContribution);
+    expect(classifyPriceStatus(6, corridor)).toBe("unter_min");
+  });
+});
+
+// Marktdeckel (Chris, 13.10.): teure Karten gehen selten ueber das 1,5-fache vom Marktwert.
+// Handrechnung, Einzelkarte, kein Shop-Volumen (Einschreiben nur ab VK 30 €):
+//   Basiskosten ohne EK = 0,575 + 0,67 + 0,053 = 1,298, Fixgebuehr 0,35
+describe("Marktdeckel fuer teure Karten", () => {
+  const ctx = { kind: "single" as const, shop: null };
+
+  it("Faktor: bis 5 € kein Deckel, ab 40 € 1,5-fach, dazwischen linear von 3,2 auf 1,5", () => {
+    expect(marketCapFactor(5)).toBeNull();
+    expect(marketCapFactor(40)).toBe(1.5);
+    expect(marketCapFactor(200)).toBe(1.5);
+    expect(marketCapFactor(22.5)).toBeCloseTo(2.35, 6); // Mitte: 3,2 - 1,7 x 0,5
   });
 
-  it("zwischen Ziel-Linie und Vollkosten-MIN frisst nur die Fixkostenumlage das Ziel -> unter_min", () => {
-    const { corridor } = corridorFor(0.9, 4.99);
-    // VK, ab dem das Ziel VOR Fixkosten erreichbar ist: (HK ohne Fixkosten + 0,35) / (1 - Gebuehrensatz - Ziel)
-    const vkZielVorFixkosten = (corridor.hkContribution + corridor.feeFixed) / (1 - corridor.feeRate - corridor.targetMargin);
-    const vk = (vkZielVorFixkosten + corridor.vkMin) / 2;
-    expect(vk).toBeLessThan(corridor.vkMin);
-    expect(classifyPriceStatus(vk, corridor)).toBe("unter_min");
+  it("billige Karte (Marktwert 2 €): unveraendert 25-33 %-Regel, kein Deckel", () => {
+    const r = computeMarketTargetRange(2, ctx, S);
+    expect(r.min).toBeCloseTo(7.125, 3);
+    expect(r.opt).toBeCloseTo(8.684, 3);
+    expect(r.capped).toBe(false);
+    expect(r.marginReachable).toBe(true);
+  });
+
+  it("Marktwert 10 €: Deckel 29,57 € liegt ueber beiden Marge-Preisen (22,75 € / 27,73 €) -> keine Begrenzung", () => {
+    const r = computeMarketTargetRange(10, ctx, S);
+    expect(r.min).toBeCloseTo((0.35 + 10 + 1.298) / 0.512, 3);
+    expect(r.opt).toBeCloseTo((0.35 + 10 + 1.298) / 0.4201, 2);
+    expect(r.capped).toBe(false);
+  });
+
+  it("Marktwert 20 €: 25 % erreichbar (46,87 € inkl. Einschreiben 2,35 € ab 30 €), 33 % liegt ueber dem Deckel 49,43 € -> begrenzt", () => {
+    // (0,35 + 20 + 1,298 + 2,35) / 0,512 = 46,871
+    const r = computeMarketTargetRange(20, ctx, S);
+    expect(r.min).toBeCloseTo(46.871, 2);
+    // Deckel 49,43 € waere nur 5,5 % ueber dem 25-%-Preis -> Mindestbreite 6 %: 46,871 x 1,06 = 49,683
+    expect(r.opt).toBeCloseTo(49.683, 2);
+    expect(r.capped).toBe(true);
+    expect(r.marginReachable).toBe(true);
+  });
+
+  it("Dominus-Funke (Marktwert 47,83 €): 25 % ist nicht erreichbar, Verkaufszone 59,79-71,75 € — 69,99 € ist ein guter Preis", () => {
+    const r = computeMarketTargetRange(47.83, ctx, S);
+    expect(r.opt).toBeCloseTo(71.745, 3);
+    expect(r.min).toBeCloseTo(59.7875, 3);
+    expect(r.marginReachable).toBe(false);
+    expect(69.99).toBeGreaterThanOrEqual(r.min);
+    expect(69.99).toBeLessThanOrEqual(r.opt);
+  });
+
+  it("Phara (Marktwert 121,47 €): Verkaufszone 151,84-182,21 €; 229,99 € liegt klar darueber", () => {
+    const r = computeMarketTargetRange(121.47, ctx, S);
+    expect(r.opt).toBeCloseTo(182.205, 3);
+    expect(r.min).toBeCloseTo(151.8375, 3);
+    expect(229.99).toBeGreaterThan(r.opt * 1.03);
+  });
+
+  it("die Spanne bricht am Uebergang nicht zusammen (mindestens 6 % Breite)", () => {
+    for (const m of [26, 27, 27.67, 28, 29]) {
+      const r = computeMarketTargetRange(m, ctx, S);
+      expect(r.opt).toBeGreaterThanOrEqual(r.min * 1.0599);
+    }
   });
 });
