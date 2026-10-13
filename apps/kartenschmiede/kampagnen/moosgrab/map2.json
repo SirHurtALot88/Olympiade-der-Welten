@@ -415,7 +415,8 @@
    "max": 6,
    "start": 1,
    "richtung": "hoch",
-   "text": "Aus Map 1 übernommen. Nach jeder Map +1. Im Finale bestimmt die Leiste den Nachschub pro Runde."
+   "text": "Aus Map 1 übernommen. Nach jeder Map +1. Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch"
   },
   "laerm": {
    "name": "Lärm",
@@ -449,7 +450,8 @@
      "gmNotiz": "Cue 02-X2, dann Battle Cue 2. Alle erwachen, draußen kommt pro Runde ein Grabgänger aus den Gräbern.",
      "springe": "kampf-gemeinde"
     }
-   ]
+   ],
+   "schlecht": "hoch"
   },
   "geduld": {
    "name": "Heddas Geduld",
@@ -459,7 +461,8 @@
    "start": 2,
    "richtung": "hoch",
    "aktiv": false,
-   "text": "So viele Fragen beantwortet Hedda über ihre Kernsätze hinaus. Steigt durch Vertrauen, sinkt durch Gewalt und Lügen. Vorschlag."
+   "text": "So viele Fragen beantwortet Hedda über ihre Kernsätze hinaus. Steigt durch Vertrauen, sinkt durch Gewalt und Lügen. Vorschlag.",
+   "schlecht": "runter"
   }
  },
  "flags": {

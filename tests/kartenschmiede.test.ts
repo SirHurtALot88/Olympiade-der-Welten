@@ -658,6 +658,22 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(s2.sporen.Krieger).toBe(3);
     expect(s2.inventar.Schurke).toEqual(["Heiltrank"]);
   });
+  it("macht Kämpfe und Antworten nach Schwierigkeit härter oder leichter", () => {
+    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; effektiveWerte(s: Spielstand, g: unknown): Record<string, string>; schwierigkeit(s: Spielstand): { id: string } };
+    const m = SM.erstelle(MAP2, { werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    const schonen = { leisten: { geduld: -1 } }, anhaenger = { leisten: { geduld: 1 } }, laut = { leisten: { laerm: 2 } };
+    const normal = m.neu(), schwer = m.neu({ schwierigkeit: "schwer" }), leicht = m.neu({ schwierigkeit: "leicht" }), alb = m.neu({ schwierigkeit: "albtraum" });
+    expect(m.wahlLeisten(normal, schonen)).toEqual({ geduld: -1 });
+    expect(m.wahlLeisten(schwer, schonen)).toEqual({ geduld: -2 });
+    expect(m.wahlLeisten(schwer, laut)).toEqual({ laerm: 3 });
+    expect(m.wahlLeisten(leicht, anhaenger)).toEqual({ geduld: 2 });
+    expect(m.wahlLeisten(alb, anhaenger)).toEqual({ geduld: 0 });
+    const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
+    expect(m.effektiveWerte(schwer, g).quality).toBe("4+");
+    expect(m.effektiveWerte(normal, g).quality).toBe("5+");
+    expect(m.effektiveWerte(leicht, g).tough).toBe("2");
+    expect(m.schwierigkeit(m.neu({ uebernahme: m.uebernahme(alb) })).id).toBe("albtraum");
+  });
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();
     s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;

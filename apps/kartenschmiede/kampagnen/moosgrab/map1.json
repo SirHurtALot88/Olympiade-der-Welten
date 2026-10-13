@@ -374,7 +374,8 @@
    "max": 6,
    "start": 0,
    "richtung": "hoch",
-   "text": "Nach jeder Map +1. Jeder Suchmarker, der erst nach dem Kampf gesucht wird: +1. Im Finale bestimmt die Leiste den Nachschub pro Runde."
+   "text": "Nach jeder Map +1. Jeder Suchmarker, der erst nach dem Kampf gesucht wird: +1. Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch"
   },
   "sporenuhr": {
    "name": "Sporenuhr",
@@ -384,7 +385,8 @@
    "start": 3,
    "richtung": "runter",
    "aktiv": false,
-   "text": "Startet mit Cue 01B-2 auf 3. Sinkt am Ende jeder Runde um 1. Bei 0 blüht die Frau auf, ob die Helden bei ihr sind oder nicht."
+   "text": "Startet mit Cue 01B-2 auf 3. Sinkt am Ende jeder Runde um 1. Bei 0 blüht die Frau auf, ob die Helden bei ihr sind oder nicht.",
+   "schlecht": "runter"
   }
  },
  "flags": {

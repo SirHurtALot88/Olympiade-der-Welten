@@ -19,6 +19,19 @@
   const MAX_UNDO = 80;
   const VERGLEICH = { "<=": (a, b) => a <= b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, ">": (a, b) => a > b, "==": (a, b) => a === b };
 
+  // Schwierigkeit: wirkt auf Kämpfe (Gegnerwerte, Gruppengröße) und darauf, wie stark Antworten Leisten bewegen.
+  // rp.schlecht/rp.gut: so viel stärker (+) oder schwächer (−) wirkt eine Antwort, die eine Leiste in die schlechte bzw.
+  // gute Richtung bewegt (Richtung je Leiste im Feld `schlecht`: "hoch" oder "runter"). Namenlose NPCs bleiben schwach.
+  const SCHWIERIGKEITEN = {
+    leicht: { name: "Leicht", gegner: { tough: -1 }, anzahl: 0.75, rp: { gut: 1, schlecht: 0 },
+      text: "Gegner haben 1 Zäh weniger, große Gruppen sind kleiner. Gute Antworten wirken stärker." },
+    normal: { name: "Normal", gegner: {}, anzahl: 1, rp: { gut: 0, schlecht: 0 }, text: "So, wie die Map geschrieben ist." },
+    schwer: { name: "Schwer", gegner: { quality: 1 }, anzahl: 1, rp: { gut: 0, schlecht: 1 },
+      text: "Gegner treffen besser (Qualität eine Stufe besser). Schlechte Antworten wirken stärker." },
+    albtraum: { name: "Albtraum", gegner: { quality: 1, tough: 1 }, anzahl: 1.25, rp: { gut: -1, schlecht: 1 },
+      text: "Gegner treffen besser, halten mehr aus, größere Gruppen. Schlechte Antworten wirken stärker, gute schwächer." },
+  };
+
   // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, zufall() → 0..1 }
   function erstelle(map, hilfen = {}) {
     const zufall = hilfen.zufall || Math.random;
@@ -36,13 +49,14 @@
       for (const [k, v] of Object.entries(ueber.leisten || {})) if (leisten[k] && map.leisten[k].gilt === "kampagne") leisten[k].wert = v;
       Object.assign(flags, ueber.flags || {});
       const mitgebracht = { inventar: kopie(ueber.inventar || {}), sporen: kopie(ueber.sporen || {}) };
+      const schwierigkeit = SCHWIERIGKEITEN[opt.schwierigkeit] ? opt.schwierigkeit : SCHWIERIGKEITEN[ueber.schwierigkeit] ? ueber.schwierigkeit : "normal";
       const state = {
         version: 1, kampagne: map.kampagne, map: map.map, name: opt.name || `${map.titel}`,
         schritt: null, verlauf: [], flags, leisten, runde: 0, rundenAktiv: false,
         gegner: [], gespawnt: {}, ereignisse: {}, angewendet: {}, wahlen: {}, checks: {}, kampfZiel: null,
         letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
         schwellen: {}, tote: {}, pos: {}, sprung: null, log: [], inventar: {}, schrittSeit: jetzt(), typMod: {},
-        extraGegner: {}, npcKampf: {}, extraNr: 0, aktiviert: {}, abendSeit: jetzt(), ...mitgebracht,
+        extraGegner: {}, npcKampf: {}, extraNr: 0, aktiviert: {}, abendSeit: jetzt(), ...mitgebracht, schwierigkeit,
       };
       betrete(state, map.start);
       return state;
@@ -65,6 +79,7 @@
     const migriere = state => {
       for (const k of ["schwellen", "tote", "pos", "inventar", "typMod", "extraGegner", "npcKampf", "aktiviert", "sporen"]) if (!state[k]) state[k] = {};
       if (!state.abendSeit) state.abendSeit = jetzt();
+      if (!SCHWIERIGKEITEN[state.schwierigkeit]) state.schwierigkeit = "normal";
       if (!state.extraNr) state.extraNr = 0;
       registriere(state);
       if (!state.log) state.log = [];
@@ -180,8 +195,8 @@
         if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
         state.gespawnt[schluessel] = true;
         const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
-          + (+((state.typMod || {})[e.id] || {}).tough || 0));
-        for (let n = 0; n < (e.anzahl || 1); n++) state.gegner.push({ uid: `${schluessel}:${n}`, id: e.id, zone: e.zone || "", wunden: 0, zaeh, weg: false });
+          + (+((state.typMod || {})[e.id] || {}).tough || 0) + (+vonStufe(state, e.id).tough || 0));
+        for (let n = 0; n < anzahlNach(state, e.anzahl); n++) state.gegner.push({ uid: `${schluessel}:${n}`, id: e.id, zone: e.zone || "", wunden: 0, zaeh, weg: false });
       });
     }
     // ---------- Gegner stärken und schwächen ----------
@@ -196,9 +211,12 @@
     }
     const leer = m => !m || (!ZAHL_FELDER.some(k => m[k]) && !(m.passives || []).length);
     // Alles, was gerade auf diesen Gegner wirkt: Zusatzregeln aus Entscheidungen, Anpassungen des Typs, eigene
+    const stufeVon = state => SCHWIERIGKEITEN[state.schwierigkeit] || SCHWIERIGKEITEN.normal;
+    const vonStufe = (state, id) => (String(id).startsWith("npc-") ? {} : stufeVon(state).gegner);
+    const anzahlNach = (state, n) => Math.max(1, Math.floor((n || 1) * stufeVon(state).anzahl + 0.25));
     function modVon(state, g) {
       const def = map.gegner[g.id] || {};
-      let m = {};
+      let m = summe({}, vonStufe(state, g.id));
       for (const z of zusaetze(state, def)) if (z.werte) m = summe(m, z.werte);
       m = summe(m, (state.typMod || {})[g.id]);
       return summe(m, g.mod);
@@ -256,7 +274,7 @@
       if (def && !map.gegner[id]) { state.extraGegner[id] = def; registriere(state); }
       const d = map.gegner[id];
       if (!d) return [];
-      const zaeh = Math.max(1, zaehVon(werteVon(d)) + (+((state.typMod || {})[id] || {}).tough || 0));
+      const zaeh = Math.max(1, zaehVon(werteVon(d)) + (+((state.typMod || {})[id] || {}).tough || 0) + (+vonStufe(state, id).tough || 0));
       const neu = [];
       for (let n = 0; n < (anzahl || 1); n++) {
         state.extraNr = (state.extraNr || 0) + 1;
@@ -460,6 +478,18 @@
     }
 
     // ---------- Antwortwahl ----------
+    // Was eine Antwort an Leisten bewegt, nach Schwierigkeit verstärkt oder abgeschwächt (nie über die Null hinaus)
+    function wahlLeisten(state, o) {
+      const rp = stufeVon(state).rp, r = {};
+      for (const [k, d] of Object.entries(o.leisten || {})) {
+        const richtung = ((map.leisten || {})[k] || {}).schlecht;
+        if (!richtung || !d) { r[k] = d; continue; }
+        const schlecht = (richtung === "hoch" && d > 0) || (richtung === "runter" && d < 0);
+        const extra = schlecht ? rp.schlecht : rp.gut, neu = Math.abs(d) + extra;
+        r[k] = neu <= 0 ? 0 : Math.sign(d) * neu;
+      }
+      return r;
+    }
     const offeneMarker = state => Object.entries(map.ereignisse || {}).filter(([id, e]) => e.beutewurf && e.einmal && !state.ereignisse[id]).map(([id]) => id);
     function waehle(state, taste, eingabe) {
       const s = map.schritte[state.schritt];
@@ -472,7 +502,7 @@
       setze(state, o.setzt, eingabe);
       wendeGegnerModAn(state, o.gegnerMod);
       holeAlle(state, o.gegnerHinzu);
-      aendere(state, o.leisten);
+      aendere(state, wahlLeisten(state, o));
       notiere(state, `${s.titel}: ${o.kurz}${eingabe ? ` (${eingabe})` : ""}`);
       // Nachsuche: offene Marker kosten je einen Strich Atemzug
       const marker = o.wirkung === "offene-marker-alle" ? offeneMarker(state) : o.wirkung === "offene-marker-einer" && eingabe ? [eingabe] : [];
@@ -603,6 +633,7 @@
     }
     // Was die nächste Map übernimmt
     const uebernahme = state => ({
+      schwierigkeit: state.schwierigkeit || "normal",
       inventar: kopie(state.inventar || {}),
       sporen: kopie(state.sporen || {}),
       leisten: Object.fromEntries(Object.entries(state.leisten).filter(([k]) => (map.leisten[k] || {}).gilt === "kampagne").map(([k, l]) => [k, l.wert])),
@@ -614,7 +645,8 @@
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
       effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, zufallsNpc, auftraege,
-      aktiviere, sporen, befall, verhaltenWurf, minutenSeit,
+      aktiviere, sporen, befall, verhaltenWurf, minutenSeit, wahlLeisten,
+      schwierigkeit: state => ({ id: state.schwierigkeit || "normal", ...stufeVon(state) }),
       schritt: state => map.schritte[state.schritt] || null,
       naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
     };
@@ -655,7 +687,7 @@
     return fehler;
   }
 
-  const SpielMotor = { erstelle, pruefe };
+  const SpielMotor = { erstelle, pruefe, SCHWIERIGKEITEN };
   if (typeof module !== "undefined" && module.exports) module.exports = SpielMotor;
   else root.SpielMotor = SpielMotor;
 })(typeof globalThis !== "undefined" ? globalThis : this);

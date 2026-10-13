@@ -869,6 +869,9 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
 .sp-protokoll small { color: var(--brass); margin-right: 6px; }
 .sp-kartenbox { width: 100%; }
+.sp-stufen { display: grid; gap: 4px; font-family: var(--ui); font-size: 15px; color: var(--dim); }
+.sp-stufen b { color: var(--ink); margin-right: 6px; }
+.sp-stufe { font-weight: 700; } .sp-stufe.st-leicht { color: #7fd06a; } .sp-stufe.st-schwer { color: #ff8a1f; } .sp-stufe.st-albtraum { color: var(--t6); }
 /* Zug, Haken, Verhaltenswurf, Sporen */
 .sp-zug em { font-size: 14px; color: var(--brass); }
 .sp-hak { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font: 800 13px var(--ui); cursor: pointer; flex-shrink: 0; }
@@ -898,7 +901,9 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-mods { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; max-width: none; }
 .sp-mods i { font: 700 12px var(--ui); font-style: normal; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
 .sp-mods i.plus { color: #ff8a7a; border-color: #e2483a; } .sp-mods i.minus { color: #7fd06a; border-color: #5fbf5a; }
-.sp-anpassen { display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.sp-anpassen { display: grid; gap: 0; padding-top: 6px; border-top: 1px dashed var(--line); }
+.sp-anpassen summary { cursor: pointer; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-anpassen[open] { gap: 6px; }
 .sp-anpassen h5 { margin: 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-anpassen-raster { display: grid; grid-template-columns: repeat(2, auto 34px 34px); gap: 4px 6px; align-items: center; font: 600 14px var(--ui); justify-content: start; }
 .sp-anpassen-raster .btn.sm { min-width: 0; min-height: 0; padding: 3px 0; }

@@ -143,6 +143,7 @@
     const mp = map && (S.MOOSGRAB.maps || []).find(x => x.nr === map.map);
     karte = mp ? mp.karte : null;
   }
+  const letzteStufe = () => { try { return localStorage.getItem("kartenschmiede-stufe") || "normal"; } catch { return "normal"; } };
   async function neuerAbend() {
     const nr = $("spMapWahl") ? $("spMapWahl").value : (MAPS[0] || {}).map;
     waehleMap(nr);
@@ -152,7 +153,9 @@
     if (vorher) { const alt = await ladeStand(vorher.id); if (alt && alt.map < map.map) uebernahme = alt.uebernahme || null; }
     const gruppeId = $("spGruppe") ? $("spGruppe").value || null : null;
     standId = neueId();
-    stand = motor.neu({ name: `${map.titel} · ${new Date().toLocaleDateString("de-DE")}`, gruppeId, uebernahme });
+    const schwierigkeit = ($("spStufe") || {}).value || "normal";
+    try { localStorage.setItem("kartenschmiede-stufe", schwierigkeit); } catch { /* egal */ }
+    stand = motor.neu({ name: `${map.titel} · ${new Date().toLocaleDateString("de-DE")}`, gruppeId, uebernahme, schwierigkeit });
     meldung = uebernahme ? "Leisten und Entscheidungen aus der letzten Map übernommen." : "";
     await ladeHelden();
     await speichere(); await ladeListe();
@@ -244,9 +247,9 @@
     if (!gegner.length) return "";
     const heldenFertig = h >= helden.length, gegnerFertig = g >= gegner.length;
     const dran = heldenFertig && gegnerFertig ? "Runde beenden (R)" : heldenFertig ? "Gegner" : gegnerFertig ? "Helden" : h <= g ? "Helden" : "Gegner";
-    return `<span class="sp-pill sp-zug" title="Abwechselnd aktivieren. Haken setzen: Heldenchip ✓ oder ✓ am Gegner"><b>Zug</b> Helden ${h}/${helden.length} · Gegner ${g}/${gegner.length} <em>→ ${dran}</em></span>`;
+    return `<span class="sp-pill sp-zug" title="Abwechselnd aktivieren: Helden ${h} von ${helden.length}, Gegner ${g} von ${gegner.length}. Haken am Heldenchip oder am Gegner setzen."><b>Zug</b> H ${h}/${helden.length} · G ${g}/${gegner.length} <em>→ ${dran}</em></span>`;
   };
-  const uhrHtml = () => `${abendHtml()}<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>`;
+  const uhrHtml = () => `<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>${abendHtml()}`;
   let antreiberNr = 0, antreiberZu = null;
   function antreiberHtml(immer) {
     const liste = motor.antreiber(stand);
@@ -283,10 +286,10 @@
       letzteWerte[k] = l.wert;
       if (d) blitz[k] = { d, bis: Date.now() + 3000 };
       const b = blitz[k] && blitz[k].bis > Date.now() ? blitz[k] : null;
-      return `<span class="sp-pill ${b ? (b.d > 0 ? "blitz-hoch" : "blitz-runter") : ""}" title="${esc(def.text || "")}">${b ? `<sup>${b.d > 0 ? "↑" : "↓"}${Math.abs(b.d)}</sup>` : ""}<b>${esc(def.name)}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
+      return `<span class="sp-pill ${b ? (b.d > 0 ? "blitz-hoch" : "blitz-runter") : ""}" title="${esc(`${def.name}: ${def.text || ""}`)}">${b ? `<sup>${b.d > 0 ? "↑" : "↓"}${Math.abs(b.d)}</sup>` : ""}<b>${esc(String(def.name).replace(/-Leiste$/, "").replace(/^Heddas /, ""))}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
     }).join("");
     const laeuft = [spieler.haupt, spieler.schleife].filter(a => !a.paused).map(a => a.dataset.cue);
-    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><small>${esc(map.titel)} · Schritt ${pos}/${ids.length}</small></div>
+    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><small>${esc(map.titel)} · Schritt ${pos}/${ids.length} · <span class="sp-stufe st-${esc(motor.schwierigkeit(stand).id)}" title="${esc(motor.schwierigkeit(stand).text)}">${esc(motor.schwierigkeit(stand).name)}</span></small></div>
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         ${zugHtml()}<span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
@@ -375,7 +378,11 @@
   // ---------- Schrittkarte ----------
   // Was eine Antwort bewirkt, als Pillen: Leisten rauf/runter, Entscheidungen, die in einer späteren Map nachwirken
   function folgePillen(o) {
-    const pillen = Object.entries(o.leisten || {}).map(([k, d]) => `<i class="${d > 0 ? "plus" : "minus"}">${esc((map.leisten[k] || {}).name || k)} ${d > 0 ? "+" : "−"}${Math.abs(d)}</i>`);
+    // Die Werte nach Schwierigkeit: auf „Schwer“ wiegt eine schlechte Antwort schwerer als im Text der Map steht
+    const pillen = Object.entries(motor.wahlLeisten(stand, o)).filter(([, d]) => d).map(([k, d]) => {
+      const def = map.leisten[k] || {}, gut = def.schlecht ? (def.schlecht === "hoch" ? d < 0 : d > 0) : d > 0, anders = (o.leisten || {})[k] !== d;
+      return `<i class="${gut ? "plus" : "minus"}" ${anders ? `title="Nach Schwierigkeit angepasst (im Text: ${(o.leisten || {})[k] > 0 ? "+" : ""}${(o.leisten || {})[k]})"` : ""}>${esc(def.name || k)} ${d > 0 ? "+" : "−"}${Math.abs(d)}${anders ? " *" : ""}</i>`;
+    });
     const spaeter = new Set();
     for (const k of Object.keys(o.setzt || {})) { const m = ((map.flags[k] || {}).wirktIn || "").match(/map(\d)/); if (m && +m[1] > map.map) spaeter.add(+m[1]); }
     for (const n of spaeter) pillen.push(`<i class="spaeter">wirkt in Map ${n}</i>`);
@@ -588,10 +595,10 @@
   const ANPASSEN = [["quality", "Qualität"], ["defense", "Verteidigung"], ["tough", "Zäh"], ["attacks", "Angriffe"]];
   function anpassenHtml(g) {
     const name = (map.gegner[g.id] || {}).name || g.id;
-    return `<div class="sp-anpassen"><h5>Anpassen</h5>
+    return `<details class="sp-anpassen"><summary>Anpassen: stärker oder schwächer</summary>
       <div class="sp-anpassen-raster">${ANPASSEN.map(([k, n]) => `<span>${n}</span><button type="button" class="btn ghost sm" data-mod="${k}" data-d="1" title="${n} stärker">+</button><button type="button" class="btn ghost sm" data-mod="${k}" data-d="-1" title="${n} schwächer">−</button>`).join("")}</div>
       <div class="sp-anpassen-regel"><input type="text" id="spRegel-${esc(g.uid)}" placeholder="Regel dazu, z. B. Brennt"><button type="button" class="btn ghost sm" data-mod="passives">+ Regel</button></div>
-      <label class="sp-alle"><input type="checkbox" id="spAlle-${esc(g.uid)}"> für alle „${esc(name)}“, auch später erscheinende</label></div>`;
+      <label class="sp-alle"><input type="checkbox" id="spAlle-${esc(g.uid)}"> für alle „${esc(name)}“, auch später erscheinende</label></details>`;
   }
 
   // Sonderregeln, die eine frühere Entscheidung freigeschaltet hat, gehören immer in den Blick
@@ -699,7 +706,8 @@
             <h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
-          <section><h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
+          <section><h4>Schwierigkeit: ${esc(motor.schwierigkeit(stand).name)}</h4><p>${esc(motor.schwierigkeit(stand).text)}</p>
+            <h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
             <h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
             ${rw ? `<h4>${esc(rw.name)}</h4>${gm(rw.text)}<table class="sz-tab"><tbody>${(rw.tabelle || []).map(z => `<tr><td>${esc((z.w || []).join(", "))}</td><td><b>${esc(z.titel || "")}</b> ${esc(z.gmNotiz || "")}</td></tr>`).join("")}</tbody></table>` : ""}
             <h4>Protokoll</h4><ol class="sp-protokoll">${stand.protokoll.slice(-14).reverse().map(p => `<li><small>R${p.runde}</small> ${esc(p.text)}</li>`).join("")}</ol></section>
@@ -736,7 +744,9 @@
       document.body.classList.remove("sp-laeuft");
       main.innerHTML = `<div class="sp-start"><p class="lede">Wähle einen Spielstand oder starte einen neuen Abend.</p>
         <div class="row4"><label class="f">Map <select id="spMapWahl">${MAPS.map(m => `<option value="${m.map}">${esc(m.kampagne)} · Map ${m.map}: ${esc(m.titel)}</option>`).join("")}</select></label>
+        <label class="f">Schwierigkeit <select id="spStufe">${Object.entries(SM.SCHWIERIGKEITEN).map(([id, st]) => `<option value="${id}" ${id === letzteStufe() ? "selected" : ""}>${esc(st.name)}</option>`).join("")}</select></label>
         <label class="f">Gruppe <select id="spGruppe"><option value="">Ohne Gruppe (Vorlagen-Helden)</option>${(window.__spGruppen || []).map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("")}</select></label></div>
+        <div class="sp-stufen">${Object.values(SM.SCHWIERIGKEITEN).map(st => `<p><b>${esc(st.name)}</b> ${esc(st.text)}</p>`).join("")}</div>
         <div class="copyrow"><button type="button" class="btn" data-sp="neu">Neuen Abend starten</button></div>
         <p class="hint">Tipp: Im Spiel auf „Vollbild“ (am Mac Ctrl + Cmd + F). Die Seite ist für einen 15-Zoll-Laptop gebaut.</p>
         ${staende.length ? `<h4>Gespeicherte Abende</h4><div class="sp-staende">${staende.map(x => `<button type="button" class="g-item" data-stand="${esc(x.id)}"><b>${esc(x.name)}</b><small>${esc(x.kampagne)}</small></button>`).join("")}</div>` : ""}
