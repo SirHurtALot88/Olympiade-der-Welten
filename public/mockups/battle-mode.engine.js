@@ -48334,10 +48334,18 @@
     }
     // DER KAMPF SELBST (13.10.): Takt fuer Takt die Staende, Schadenszahlen und Ticker-Zeilen aus
     // `runde.takte` — dem Protokoll, das baueMiniDmFfaRunde() schon vollstaendig gerechnet hat.
+    //
+    // TAKT-PAUSE 250ms, NICHT 800ms (Broadcast-Konsistenz-Paket 1, 13.10.): die urspruengliche
+    // Pause liess die ganze Schau bei bis zu 12 Takten/Runde auf 53 s anwachsen (gemessen, vier
+    // Runden mit durchschnittlich ~8 Takten) -- weit ueber dem Zielband 25-40 s, das Broadcast-
+    // Paket C (06.10.) fuer genau diese Schau festgelegt hat und das die alte Pause `ms(800)`
+    // beim Einbau der Takt-Anzeige (selbes Datum wie dieser Fix) nicht neu kalibriert hatte. 250ms
+    // haelt auch den Maximalfall (4x12 Takte = 48) mit 39,2s knapp im Band; reine Choreografie-
+    // Konstante, `runde.takte`/die Simulation selbst sind unberuehrt.
     function spieleTakte(runde,ti,fertig){
       if(ti>=runde.takte.length){ fertig(); return; }
       zeigeTakt(runde,runde.takte[ti]);
-      mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,ti+1,fertig),ms(800));
+      mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,ti+1,fertig),ms(250));
     }
     function tafelUndSumme(runde,i){
       {
