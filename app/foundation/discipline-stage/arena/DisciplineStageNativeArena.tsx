@@ -21,6 +21,7 @@ import type { TeamRelationshipKind } from "@/lib/foundation/team-relationship";
 import { getDisciplineField } from "./disciplines/registry";
 import type { DisciplineFieldProps } from "./disciplines/types";
 import { getPlayerStarTier } from "@/lib/foundation/player-star-tier";
+import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import {
   ARENA_STEP_DURATION_MS,
   estimateServerNowMs,
@@ -63,6 +64,12 @@ export type NativeStagePlayer = {
   portraitUrl: string | null;
   mods: NativeStageMod[];
   pointsAwarded: number | null;
+  /**
+   * Disziplin-Mutator-Aufschlag, getrennt von `pointsAwarded` (siehe `player-points-total.ts`).
+   * Beide zusammen (`resolveAwardedPlayerPoints`) ergeben die PP-Summe, die die Detail-
+   * Ergebnistabelle nach dem Podest je Spieler zeigt (Task #102).
+   */
+  mutatorPpsBonus?: number | null;
   /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rings am `PlayerMark` (siehe `player-star-tier.ts`). */
   ovrRank?: number | null;
 };
@@ -3420,6 +3427,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             boniMali: p ? modSum(p.mods) : 0,
             isBest: p ? Math.abs(net - bestNet[s]) < 0.05 && net > 0 : false,
             calc: p ? calcString(p) : "—",
+            // Task #102 ("bei allen Diszis fehlt am Ende noch wie viele PPs welcher Spieler
+            // mit seiner Leistung erhalten hat"): dieselbe Summe wie Top-Spieler-Chip + Hover-
+            // Karte (Team-Anteil + Mutator-Aufschlag). `null` solange dieser Slot noch nicht
+            // gewertet ist (Anti-Spoiler, kein 0 vortäuschen).
+            pp: p ? resolveAwardedPlayerPoints({ pointsAwarded: p.pointsAwarded, mutatorPpsBonus: p.mutatorPpsBonus }) : null,
           };
         }),
       }));

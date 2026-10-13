@@ -2058,6 +2058,10 @@ export default function DisciplineStageArena({
             traits: [] as string[],
             mods: p.mods,
             pointsAwarded: p.pointsAwarded,
+            // Task #102: Mutator-Aufschlag 1:1 durchreichen, damit die Detail-Ergebnistabelle
+            // die VOLLE gutgeschriebene PP-Summe zeigen kann (resolveAwardedPlayerPoints),
+            // nicht nur den Team-Anteil.
+            mutatorPpsBonus: p.mutatorPpsBonus,
             ovrRank: p.playerId ? ratingByPlayerId.get(p.playerId)?.ovrRank ?? null : null,
           })),
         }))
@@ -2083,6 +2087,9 @@ export default function DisciplineStageArena({
             // nativeTeams liest ausschließlich p.mods (SHOULD-1, Variante a).
             mods: mode === "real" ? realMods(s) : [...realMods(s), ...traitMutatorMods(s.traits, mutatorTraits)],
             pointsAwarded: null as number | null,
+            // Modell-/Random-Modus kennt keine gebuchte PP-Zuteilung (kein Engine-Preview) —
+            // bleibt konsequent null, wie pointsAwarded direkt darüber.
+            mutatorPpsBonus: null as number | null,
             ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
           })),
         }));
