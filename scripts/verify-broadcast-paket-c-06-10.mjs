@@ -86,13 +86,21 @@ async function neueSeite(page, { saat, dunkel } = {}) {
   await page.screenshot({ path: resolve(AUSGABE, "mini-dm-einlauf.png"), fullPage: true });
 
   await page.click("#mdffaStart");
-  await page.waitForTimeout(2200);
+  // Seit der Takt-Anzeige (13.10.) haengt die Zeit bis zur ersten Rundentafel von der Zahl
+  // der Takte dieser Runde ab (bis zu 12) -- ein fester 2200ms-Wartepunkt traf frueher
+  // zuverlaessig mitten in Runde 1, kann seitdem je nach Saat vor ODER nach dem Erscheinen der
+  // ersten Tafel liegen. Pollen statt raten: warten, bis die erste Tafel im DOM steht, dann
+  // sofort pruefen, dass es nicht schon die zweite ist.
+  await page.waitForFunction(
+    () => document.querySelectorAll("#mdffaRunden .mdffa-runde").length >= 1,
+    null, { timeout: 15000 },
+  );
   await page.screenshot({ path: resolve(AUSGABE, "mini-dm-runde.png"), fullPage: true });
   const mitten = await page.evaluate(() => ({
     rundenTafeln: document.querySelectorAll("#mdffaRunden .mdffa-runde").length,
     zeilenOhneLeerraum: [...document.querySelectorAll("#mdffaRunden tbody tr")].every(tr => tr.textContent.trim().length > 0),
   }));
-  melde(mitten.rundenTafeln === 1, "genau eine Rundentafel sichtbar waehrend Runde 1 laeuft");
+  melde(mitten.rundenTafeln === 1, "genau eine Rundentafel sichtbar, sobald die erste erscheint (Runde 1 laeuft noch)");
   melde(mitten.zeilenOhneLeerraum, "keine leeren/reservierten Tabellenzeilen vor ihrer Enthuellung");
 
   await page.click("#mdffaAlles");
