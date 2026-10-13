@@ -7,8 +7,9 @@ import { imageUrlFor } from "./movers";
 
 /**
  * Preis-Hinweise aus dem automatischen Cardmarket-Marktwert (MarketPrice, source
- * "cardmarket-priceguide"): wie viele Artikel liegen nach Chris' Formel (VK = EK × 3 + 0,99)
- * zu guenstig / zu teuer, bei wie vielen liegt der EK ueber dem Markt. Bewertung kommt 1:1 aus
+ * "cardmarket-priceguide"): wie viele Artikel liegen gegen die Zielspanne (25 % bis 33 %
+ * Deckungsbeitrags-Marge auf Marktwert-EK + Einkaufs-Versand, mindestens 4,99 €) zu guenstig /
+ * zu teuer, bei wie vielen liegt der EK ueber dem Markt. Bewertung kommt 1:1 aus
  * `buildMarketComparisonRow` (dieselbe Zeile wie /marktpreise) -- das Cockpit zaehlt nur.
  */
 export interface MarketHintEntry {
@@ -16,12 +17,14 @@ export interface MarketHintEntry {
   nameRaw: string;
   setCode: string | null;
   ownVk: number;
-  formulaVk: number;
+  /** Zielspanne des VK (25 % .. 33 % Deckungsbeitrags-Marge bei Marktwert-EK). */
+  targetMin: number;
+  targetOpt: number;
   marketValue: number;
   deltaPercent: number;
   /** Hebel in Stk: max(Bestand, 90-T-Absatz) -- fuer die Sortierung "wo liegt am meisten Geld". */
   lever: number;
-  /** |VK − Formel-VK| × Hebel, € gesamt. */
+  /** Abstand zur naechsten Spannengrenze × Hebel, € gesamt (zu guenstig: Ziel-Minimum − VK, zu teuer: VK − Ziel-Optimum). */
   effect: number;
   imageUrl: string | null;
 }
@@ -38,7 +41,7 @@ export interface MarketHints {
   inCorridor: number;
   tooExpensive: number;
   ekAboveMarket: number;
-  /** Σ (Formel-VK − VK) × Hebel ueber "zu guenstig" -- liegengelassenes Geld, € gesamt. */
+  /** Σ (Ziel-Minimum − VK) × Hebel ueber "zu guenstig" -- liegengelassenes Geld, € gesamt. */
   tooCheapEffect: number;
   topTooCheap: MarketHintEntry[];
   topTooExpensive: MarketHintEntry[];
@@ -49,18 +52,20 @@ export interface MarketHints {
 const LIMIT = 5;
 
 function toEntry(a: ArticleAggregate, r: MarketComparisonRow, images: ImageMap): MarketHintEntry | null {
-  if (r.formulaVk === null || r.marketValue === null || r.deltaPercent === null) return null;
+  if (r.targetMin === null || r.targetOpt === null || r.marketValue === null || r.deltaPercent === null) return null;
   const lever = Math.max(a.active ? a.stock : 0, a.windows["90"]?.qty ?? 0);
+  const gap = r.status === "zu_guenstig" ? r.targetMin - r.ownVk : r.status === "zu_teuer" ? r.ownVk - r.targetOpt : 0;
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
     setCode: a.setCode,
     ownVk: r.ownVk,
-    formulaVk: r.formulaVk,
+    targetMin: r.targetMin,
+    targetOpt: r.targetOpt,
     marketValue: r.marketValue,
     deltaPercent: r.deltaPercent,
     lever,
-    effect: Math.abs(r.ownVk - r.formulaVk) * lever,
+    effect: Math.max(0, gap) * lever,
     imageUrl: imageUrlFor(a.articleId, images),
   };
 }
@@ -107,7 +112,7 @@ export function computeMarketHints(
     if (!e) continue;
     if (r.status === "zu_guenstig") {
       cheap.push(e);
-      hints.tooCheapEffect += (e.formulaVk - e.ownVk) * e.lever;
+      hints.tooCheapEffect += (e.targetMin - e.ownVk) * e.lever;
     } else if (r.status === "zu_teuer") {
       expensive.push(e);
     }

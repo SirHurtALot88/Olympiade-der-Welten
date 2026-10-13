@@ -2,8 +2,8 @@ import type { MarketHintEntry, MarketHints } from "@/lib/cockpit/marketHints";
 import { dateDe, eur, eurCents, pct, shortName } from "./format";
 
 /**
- * Preis-Hinweise aus dem automatischen Cardmarket-Marktwert: Zaehlung nach Chris' Formel
- * (VK = EK × 3 + 0,99, Untergrenze 4,99) plus die fuenf Artikel mit dem groessten €-Hebel je
+ * Preis-Hinweise aus dem automatischen Cardmarket-Marktwert: Zaehlung gegen die Zielspanne
+ * (25 % bis 33 % Deckungsbeitrags-Marge auf Marktwert + Einkaufs-Versand, Untergrenze 4,99) plus die fuenf Artikel mit dem groessten €-Hebel je
  * Richtung. Reine Anzeige -- bewertet wird in `buildMarketComparisonRow`, wie auf /marktpreise.
  */
 export function MarketHintsCard({ market }: { market: MarketHints }) {
@@ -13,7 +13,7 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
       <div className="ck-h">
         <h2>Preis-Hinweise Cardmarket</h2>
         <span className="ck-scope">
-          Marktwert je Karte vs. Formel VK = EK × 3 + 0,99 · Abruf {dateDe(m.latestFetch)}
+          Marktwert vs. Zielspanne 25–33 % Deckungsbeitrag · Preisliste vom {dateDe(m.latestFetch)}
         </span>
       </div>
       <div className="ck-body">
@@ -23,8 +23,8 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
           <>
             <div className="ck-facts" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
               <Fact label="Zu günstig" value={m.tooCheap} tone="crit" sub={`≈ ${eur(m.tooCheapEffect)} liegen gelassen (Lücke × Bestand/90-T-Absatz)`} />
-              <Fact label="Im Korridor" value={m.inCorridor} tone="good" sub="±15 % um den Formel-VK" />
-              <Fact label="Zu teuer" value={m.tooExpensive} tone="warn" sub="über Formel-VK — Markt gefallen oder Preis zu hoch" />
+              <Fact label="Im Korridor" value={m.inCorridor} tone="good" sub="innerhalb 25–33 % Marge (±3 %)" />
+              <Fact label="Zu teuer" value={m.tooExpensive} tone="warn" sub="über dem 33-%-Preis — Markt gefallen oder Preis zu hoch" />
               <Fact label="EK über Markt" value={m.ekAboveMarket} tone="warn" sub="eigener EK > 150 % des Marktwerts" />
               <Fact
                 label="Abdeckung"
@@ -88,7 +88,7 @@ function HintList({ title, entries, tone }: { title: string; entries: MarketHint
               <div className="ck-rv">{eur(e.effect)}</div>
               <div className="ck-mt">
                 <span>VK {eurCents(e.ownVk)}</span>
-                <span>Formel {eurCents(e.formulaVk)}</span>
+                <span>Ziel {eurCents(e.targetMin)}–{eurCents(e.targetOpt)}</span>
                 <span>Markt {eurCents(e.marketValue)}</span>
                 <span>
                   {e.deltaPercent > 0 ? "+" : ""}

@@ -33,9 +33,9 @@ export function MarktpreisePage({ rows }: Props) {
       subtitle="Cardmarket-Preisliste, täglich automatisch · eigener VK und EK gegen den Markt"
       footer={
         <span>
-          Marktwert = Cardmarket-Trend je Karte × Pack-Menge (alle Sprachen). Formel-VK = deine Regel 3 × Marktwert + 0,99 €,
-          mindestens 4,99 €. Gibt es die Karte im Set in mehreren Seltenheiten, zeigt Cardmarket sie ohne Seltenheit — dann
-          steht die Spanne da statt eines geratenen Werts.
+          Marktwert = Cardmarket-7-Tage-Schnitt je Karte × Pack-Menge. Zielspanne = VK, bei dem die Deckungsbeitrags-Marge
+          (vor Fixkosten) 25 % (Minimum) bis 33 % (Optimum) beträgt, wenn die Karte heute zum Marktwert nachgekauft wird
+          (inkl. anteiligem Einkaufs-Versand), mindestens 4,99 €. Außerhalb der Spanne (±3 %) schlägt die Ampel an.
         </span>
       }
     >
@@ -125,8 +125,8 @@ export function MarktpreisePage({ rows }: Props) {
                 </span>
                 {detailRow.deltaPercent !== null && (
                   <span style={{ marginLeft: 10, fontSize: 12, color: "var(--faint)" }}>
-                    Δ VK↔Formel-VK: {detailRow.deltaPercent > 0 ? "+" : ""}
-                    {formatPercent(detailRow.deltaPercent)}% (−15 % bis +50 % gilt als passend)
+                    Abstand zur Zielspanne: {detailRow.deltaPercent > 0 ? "+" : ""}
+                    {formatPercent(detailRow.deltaPercent)}% (0 % = innerhalb von 25–33 %)
                   </span>
                 )}
               </div>

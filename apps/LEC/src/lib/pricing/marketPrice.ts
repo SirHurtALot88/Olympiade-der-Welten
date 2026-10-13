@@ -94,27 +94,33 @@ export function classifyMarketStatus(ownVk: number, trend: number): MarketStatus
 }
 
 /**
- * Chris' Preisformel: VK = 3 x EK + 0,99 €, Untergrenze 4,99 € (seit September).
- * Angewandt auf den heutigen Marktwert ergibt sie, wo der VK stehen muesste, wenn
- * die Karte heute zum Marktpreis nachgekauft wuerde.
+ * Zielspanne des Verkaufspreises (Chris, 13.10.): Deckungsbeitrags-Marge (vor Fixkosten)
+ * mindestens 25 %, optimal 33 %. Gerechnet wird mit dem heutigen Cardmarket-Marktwert als
+ * EK plus dem anteiligen Einkaufs-Versand, also dem, was der Nachkauf heute kosten wuerde.
  */
-export const PRICE_FORMULA = { factor: 3, add: 0.99, floor: 4.99 } as const;
-
-export function formulaVk(ek: number): number {
-  return Math.max(PRICE_FORMULA.floor, PRICE_FORMULA.factor * ek + PRICE_FORMULA.add);
-}
+export const DB_MARGIN_MIN = 0.25;
+export const DB_MARGIN_OPT = 0.33;
 
 /**
- * Abgleich des eigenen VK mit der Formel auf Marktwert. Bewusst NICHT ±15 % um den
- * Cardmarket-Trend: Chris' VK liegt im Median beim Fuenffachen des Trends
- * (Untergrenze 4,99 € bei Billigkarten, nachgemessen 13.10.) — der alte Vergleich
- * haette fast alles "zu teuer" gefaerbt.
- * - zu guenstig: VK unter 85 % des Formel-VK (bei heutigem Markt verschenkt)
- * - zu teuer:    VK ueber 150 % des Formel-VK (deutlich ueber der eigenen Regel)
+ * Untergrenze 4,99 € (seit September): Billigkarten sind bewusst Warenkorb-Fueller.
+ * Ein Artikel, der auf der Untergrenze steht, ist damit "im Rahmen", auch wenn die
+ * reine Margenrechnung weniger verlangen wuerde.
  */
-export function classifyAgainstFormula(ownVk: number, formula: number): MarketStatus {
-  if (ownVk <= 0 || formula <= 0) return "im_korridor";
-  if (ownVk < formula * 0.85) return "zu_guenstig";
-  if (ownVk > formula * 1.5) return "zu_teuer";
+export const PRICE_FLOOR = 4.99;
+
+/** Toleranz gegen x,99-Rundung: knapp neben der Spanne ist noch keine Abweichung. */
+export const RANGE_TOLERANCE = 0.03;
+
+export interface TargetRange {
+  /** VK fuer 25 % Deckungsbeitrags-Marge, mindestens PRICE_FLOOR. */
+  min: number;
+  /** VK fuer 33 %, mindestens PRICE_FLOOR. */
+  opt: number;
+}
+
+export function classifyAgainstRange(ownVk: number, range: TargetRange): MarketStatus {
+  if (!(ownVk > 0)) return "im_korridor";
+  if (ownVk < range.min * (1 - RANGE_TOLERANCE)) return "zu_guenstig";
+  if (ownVk > range.opt * (1 + RANGE_TOLERANCE)) return "zu_teuer";
   return "im_korridor";
 }

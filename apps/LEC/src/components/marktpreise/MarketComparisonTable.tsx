@@ -5,21 +5,21 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
 
-type ColId = "artikel" | "vk" | "ek" | "marktwert" | "formel" | "delta" | "ampel" | "ekhinweis" | "datenstand";
+type ColId = "artikel" | "vk" | "ek" | "marktwert" | "ziel" | "marge" | "ampel" | "ekhinweis" | "datenstand";
 
 const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 260, min: 140 },
   { id: "vk", label: "Eigener VK", def: 96, min: 75, align: "r" },
   { id: "ek", label: "EK/Stk", def: 84, min: 65, align: "r" },
   { id: "marktwert", label: "Marktwert", def: 120, min: 85, align: "r" },
-  { id: "formel", label: "Formel-VK", def: 92, min: 70, align: "r" },
-  { id: "delta", label: "Δ VK↔Formel", def: 100, min: 75, align: "r" },
+  { id: "ziel", label: "Zielspanne 25–33 %", def: 138, min: 100, align: "r" },
+  { id: "marge", label: "Marge bei Nachkauf", def: 112, min: 85, align: "r" },
   { id: "ampel", label: "Ampel", def: 140, min: 110 },
   { id: "ekhinweis", label: "EK ggü. Markt", def: 130, min: 90 },
   { id: "datenstand", label: "Preisliste vom", def: 110, min: 90 },
 ];
 
-const STORAGE_KEY = "lec.marktpreise.colWidths.v2";
+const STORAGE_KEY = "lec.marktpreise.colWidths.v3";
 
 export const STATUS_PILL: Record<MarketComparisonRow["status"], { cls: string; label: string }> = {
   zu_guenstig: { cls: "p-warn", label: "zu günstig" },
@@ -80,9 +80,15 @@ export function MarketComparisonTable({ rows, selectedArticleId, onSelectRow }: 
                         ? `${formatEuroCents(row.marketRange.min)}–${eur(row.marketRange.max)}`
                         : "—"}
                   </td>
-                  <td className="r num">{row.formulaVk !== null ? eur(row.formulaVk) : "—"}</td>
-                  <td className="r num">
-                    {row.deltaPercent !== null ? `${row.deltaPercent > 0 ? "+" : ""}${formatPercent(row.deltaPercent)}%` : "—"}
+                  <td className="r num" title="VK für 25 % (Minimum) bis 33 % (Optimum) Deckungsbeitrags-Marge, wenn die Karte heute zum Marktwert nachgekauft wird (inkl. Einkaufs-Versand), mindestens 4,99 €">
+                    {row.targetMin !== null && row.targetOpt !== null
+                      ? row.targetMin === row.targetOpt
+                        ? eur(row.targetMin)
+                        : `${formatEuroCents(row.targetMin)}–${eur(row.targetOpt)}`
+                      : "—"}
+                  </td>
+                  <td className="r num" title="Deckungsbeitrags-Marge (vor Fixkosten), die dein heutiger VK bringt, wenn die Karte zum Marktwert nachgekauft wird">
+                    {row.marginAtMarket !== null ? `${formatPercent(row.marginAtMarket)} %` : "—"}
                   </td>
                   <td>
                     {row.marketValue === null && !row.marketRange ? (

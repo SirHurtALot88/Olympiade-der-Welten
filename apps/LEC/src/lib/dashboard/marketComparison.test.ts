@@ -55,24 +55,60 @@ describe("buildMarketComparisonRow", () => {
     expect(row.ownVk).toBeCloseTo(5);
   });
 
-  it("misst den VK an Chris' Formel auf Marktwert, nicht an ±15 % um den Trend", () => {
-    // Trend 1 € -> Formel-VK max(4,99; 3 x 1 + 0,99) = 4,99. VK 5 € ist damit in Ordnung,
-    // obwohl er das Fuenffache des Trends ist (alter Vergleich: "zu teuer").
-    const ok = buildMarketComparisonRow(article({ currentVk: 5 }), quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null);
-    expect(ok.formulaVk).toBeCloseTo(4.99);
-    expect(ok.status).toBe("im_korridor");
-    const teuer = buildMarketComparisonRow(article({ currentVk: 9.99 }), quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null);
-    expect(teuer.status).toBe("zu_teuer");
-    expect(teuer.deltaPercent).toBeGreaterThan(0);
-    const guenstig = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceTrend: 4 }), DEFAULT_COST_SETTINGS, null);
-    expect(guenstig.formulaVk).toBeCloseTo(12.99);
+  // Handgerechnet (unabhaengig vom Code), Einzelkarte, Markt-EK 2,00 €, kein Shop-Volumen:
+  // HK = 2,00 + 0,575 (Einkaufs-Versand 1,15 x 50 %) + 0,67 + 0,053 = 3,298
+  // 25 %: (0,35 + 3,298) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 7,125   (Anzeigen-Satz MIN 9 %)
+  // 33 %: (0,35 + 3,298) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 8,684   (Anzeigen-Satz GUT 10 %)
+  it("Zielspanne = 25 % bis 33 % Deckungsbeitrags-Marge auf Marktwert-EK plus Einkaufs-Versand", () => {
+    const row = buildMarketComparisonRow(article({ currentVk: 8 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.marketValue).toBeCloseTo(2);
+    expect(row.targetMin).toBeCloseTo(7.125, 2);
+    expect(row.targetOpt).toBeCloseTo(8.684, 2);
+    expect(row.status).toBe("im_korridor");
+    expect(row.deltaPercent).toBe(0);
+  });
+
+  it("zu guenstig unter, zu teuer ueber der Spanne (je 3 % Toleranz)", () => {
+    const guenstig = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
     expect(guenstig.status).toBe("zu_guenstig");
+    expect(guenstig.deltaPercent).toBeCloseTo((4.99 - 7.125) / 7.125, 3);
+    const teuer = buildMarketComparisonRow(article({ currentVk: 11.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(teuer.status).toBe("zu_teuer");
+    expect(teuer.deltaPercent).toBeCloseTo((11.99 - 8.684) / 8.684, 3);
+    // knapp unter 7,125 (x,99-Rundung) ist noch keine Abweichung
+    expect(buildMarketComparisonRow(article({ currentVk: 6.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("im_korridor");
+  });
+
+  it("die Untergrenze 4,99 € zaehlt als im Rahmen (Billigkarten sind Warenkorb-Fueller)", () => {
+    const row = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceAvg7: 0.3 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.targetMin).toBeCloseTo(4.99);
+    expect(row.targetOpt).toBeCloseTo(4.99);
+    expect(row.status).toBe("im_korridor");
+  });
+
+  it("Pack-Artikel: Preis je Karte x Pack-Menge, Pack-Versand und -Verpackung", () => {
+    // Markt 3 x 0,50 = 1,50; HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> 25 %: 2,987 / 0,512 = 5,834
+    const row = buildMarketComparisonRow(article({ packQty: 3, currentVk: 5.99 }), quote({ priceAvg7: 0.5 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.marketValue).toBeCloseTo(1.5);
+    expect(row.targetMin).toBeCloseTo(5.834, 2);
+  });
+
+  it("Marktwert = 7-Tage-Schnitt, sonst 30-Tage-Schnitt, sonst Trend", () => {
+    const v = (q: Partial<LatestQuote>) => buildMarketComparisonRow(article({ currentVk: 8 }), quote(q), DEFAULT_COST_SETTINGS, null).marketValue;
+    expect(v({ priceAvg7: 2, priceAvg30: 3, priceTrend: 4 })).toBe(2);
+    expect(v({ priceAvg30: 3, priceTrend: 4 })).toBe(3);
+    expect(v({ priceTrend: 4 })).toBe(4);
+  });
+
+  it("Marge des heutigen VK bei Nachkauf zum Marktwert (Deckungsbeitrag, vor Fixkosten)", () => {
+    // VK 8,00, Gebuehren 0,35 + 8 x (0,11 + 0,10) x 1,19 = 2,349, HK 3,298 -> (8 - 2,349 - 3,298) / 8 = 0,294
+    const row = buildMarketComparisonRow(article({ currentVk: 8 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.marginAtMarket).toBeCloseTo(0.294, 3);
   });
 
   it("rechnet Pack-Artikel mit Trend x Pack-Menge", () => {
     const row = buildMarketComparisonRow(article({ packQty: 3, currentVk: 5.99 }), quote({ priceTrend: 0.5 }), DEFAULT_COST_SETTINGS, null);
     expect(row.marketValue).toBeCloseTo(1.5);
-    expect(row.formulaVk).toBeCloseTo(5.49);
   });
 
   it("mehrdeutig: Spanne statt Wert, Ampel nur bei klarer Lage", () => {
@@ -80,9 +116,9 @@ describe("buildMarketComparisonRow", () => {
     const row = buildMarketComparisonRow(article({ currentVk: 6.99 }), q, DEFAULT_COST_SETTINGS, null);
     expect(row.marketValue).toBeNull();
     expect(row.marketRange).toEqual({ min: 0.3, max: 30, variants: 3 });
-    // 6,99 € liegt zwischen den Formel-VKs der Varianten (4,99 .. 90,99): kein Urteil.
+    // 6,99 € liegt zwischen den Zielspannen der Varianten (ab 4,99 .. ueber 38 €): kein Urteil.
     expect(row.status).toBe("im_korridor");
-    // Selbst gegen die billigste Variante (Formel 12,99) zu billig: eindeutig zu guenstig.
+    // Selbst gegen die billigste Variante (Markt 4 € -> Ziel-Min ~11,03 €) zu billig: eindeutig zu guenstig.
     const billig = buildMarketComparisonRow(
       article({ currentVk: 4.99 }),
       quote({ matchQuality: "mehrdeutig", priceMin: 4, priceMax: 30, variants: 2 }),
@@ -94,8 +130,8 @@ describe("buildMarketComparisonRow", () => {
 
   it("markiert einen EK deutlich ueber Marktwert", () => {
     const a = article({ currentVk: 9.99, currentEk: 3 });
-    expect(buildMarketComparisonRow(a, quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(true);
-    expect(buildMarketComparisonRow(a, quote({ priceTrend: 2.5 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(false);
+    expect(buildMarketComparisonRow(a, quote({ priceAvg7: 1 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(true);
+    expect(buildMarketComparisonRow(a, quote({ priceAvg7: 2.5 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(false);
   });
 
   it("bleibt neutral ('im_korridor') ohne Markt-Trend (kein erfundener Vergleich)", () => {

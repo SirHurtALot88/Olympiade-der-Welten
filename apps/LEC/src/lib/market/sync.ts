@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { YGO_CARDINFO_URL } from "../images/ygoprodeck";
+import rarityMapData from "./rarityMap.json";
 import {
   CM_PRICE_GUIDE_URL,
   CM_PRODUCTS_URL,
@@ -7,7 +8,10 @@ import {
   resolveMarket,
   type CmPrice,
   type CmProduct,
+  type RarityMap,
 } from "./catalog";
+
+const RARITY_MAP = rarityMapData as RarityMap;
 
 export const MARKET_SOURCE = "cardmarket-priceguide";
 
@@ -15,7 +19,11 @@ export interface MarketSyncReport {
   priceGuideDate: string | null;
   articles: number;
   eindeutig: number;
+  /** Davon ueber die Seltenheit aus dem Titel zugeordnet (Rest: Karte hat im Set nur eine Variante). */
+  perSeltenheit: number;
   mehrdeutig: number;
+  /** Mehrdeutig, aufgeschluesselt nach Grund. */
+  mehrdeutigGrund: Record<string, number>;
   keiner: Record<"kein_set_code" | "set_code_unbekannt" | "kein_produkt", number>;
   startedAt: string;
   finishedAt: string;
@@ -42,12 +50,14 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
   const index = buildCatalogIndex(ygo.data ?? [], products.products, guide.priceGuides);
   const fetchedAt = guide.createdAt ? new Date(guide.createdAt) : new Date();
 
-  const articles = await prisma.article.findMany({ where: { isCard: true }, select: { id: true, setCode: true } });
+  const articles = await prisma.article.findMany({ where: { isCard: true }, select: { id: true, setCode: true, nameRaw: true } });
   const report: MarketSyncReport = {
     priceGuideDate: guide.createdAt ?? null,
     articles: articles.length,
     eindeutig: 0,
+    perSeltenheit: 0,
     mehrdeutig: 0,
+    mehrdeutigGrund: {},
     keiner: { kein_set_code: 0, set_code_unbekannt: 0, kein_produkt: 0 },
     startedAt,
     finishedAt: "",
@@ -55,9 +65,10 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
 
   const rows = [];
   for (const a of articles) {
-    const r = resolveMarket(index, a.setCode);
+    const r = resolveMarket(index, a.setCode, a.nameRaw, RARITY_MAP);
     if (r.quality === "eindeutig") {
       report.eindeutig++;
+      if (r.how === "seltenheit") report.perSeltenheit++;
       rows.push({
         articleId: a.id,
         source: MARKET_SOURCE,
@@ -65,6 +76,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         idProduct: r.idProduct,
         priceFrom: r.price.low,
         priceTrend: r.price.trend,
+        raw: JSON.stringify({ how: r.how }),
         priceAvg30: r.price.avg30,
         priceAvg7: r.price.avg7,
         priceAvg1: r.price.avg1,
@@ -73,10 +85,12 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
       });
     } else if (r.quality === "mehrdeutig") {
       report.mehrdeutig++;
+      report.mehrdeutigGrund[r.why] = (report.mehrdeutigGrund[r.why] ?? 0) + 1;
       rows.push({
         articleId: a.id,
         source: MARKET_SOURCE,
         matchQuality: "mehrdeutig",
+        raw: JSON.stringify({ why: r.why }),
         priceMin: r.trendMin,
         priceMax: r.trendMax,
         variants: r.variants,

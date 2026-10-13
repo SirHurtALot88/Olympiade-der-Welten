@@ -1,7 +1,22 @@
 import type { ArticleAggregate } from "./viewModel";
 import type { CostSettingsValues } from "../pricing/costSettings";
-import { computeHk, computePriceCorridor, fixedCostPerUnit, type ShopVolume } from "../pricing/costEngine";
-import { classifyAgainstFormula, computeMarketEk, formulaVk, type MarketStatus } from "../pricing/marketPrice";
+import {
+  computeHk,
+  computePriceCorridor,
+  contributionMarginForPrice,
+  fixedCostPerUnit,
+  targetPriceForMargin,
+  type ShopVolume,
+} from "../pricing/costEngine";
+import {
+  DB_MARGIN_MIN,
+  DB_MARGIN_OPT,
+  PRICE_FLOOR,
+  classifyAgainstRange,
+  computeMarketEk,
+  type MarketStatus,
+  type TargetRange,
+} from "../pricing/marketPrice";
 
 /** Minimaler Auszug eines MarketPrice-Datensatzes, den die Vergleichs-Zeile braucht. */
 export interface LatestQuote {
@@ -33,18 +48,27 @@ export interface MarketComparisonRow {
   /** Cardmarket-Werte JE KARTE, wie in der Preisliste. */
   marketFrom: number | null;
   marketTrend: number | null;
-  /** Marktwert des ARTIKELS = Trend (sonst 30-T-Schnitt) x Pack-Menge. Null wenn mehrdeutig. */
+  /** Marktwert des ARTIKELS = 7-Tage-Schnitt (wie Cardcluster; sonst 30-T, sonst Trend) x Pack-Menge. Null wenn mehrdeutig. */
   marketValue: number | null;
   /** Mehrdeutig: Spanne des Artikel-Marktwerts (billigste..teuerste Variante, x Pack). */
   marketRange: { min: number; max: number; variants: number } | null;
-  /** Wo der VK nach Chris' Formel bei heutigem Marktwert stuende. */
-  formulaVk: number | null;
+  /**
+   * Zielspanne des VK bei heutigem Marktwert als EK + Einkaufs-Versand: 25 % (min) bis
+   * 33 % (opt) Deckungsbeitrags-Marge, mindestens 4,99 €. Bei mehrdeutiger Seltenheit
+   * spannt sie alle Varianten auf (billigste min .. teuerste opt).
+   */
+  targetMin: number | null;
+  targetOpt: number | null;
+  /** Deckungsbeitrags-Marge, die der heutige VK braeuchte, wenn die Karte zum Marktwert nachgekauft wird. */
+  marginAtMarket: number | null;
+  /** Deckungsbeitrags-Marge des heutigen VK mit dem tatsaechlichen EK (null ohne EK). */
+  marginAtOwnEk: number | null;
   /** Eigener EK deutlich (>50 %) ueber dem Marktwert: teuer eingekauft oder Markt gefallen. */
   ekAboveMarket: boolean;
   matchQuality: string | null;
   /** Aus Markt-ab x Packgroesse + Einkaufs-Versand (KONZEPT §7.2), null ohne "ab"-Preis. */
   marketEk: number | null;
-  /** (ownVk - formulaVk) / formulaVk, null ohne Marktwert. */
+  /** Abstand zur naechsten Spannengrenze: unter min negativ, ueber opt positiv, in der Spanne 0. Null ohne Marktwert. */
   deltaPercent: number | null;
   status: MarketStatus;
   fetchedAt: Date;
@@ -87,22 +111,48 @@ export function buildMarketComparisonRow(
   const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings);
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
-  const perCard = quote.priceTrend ?? quote.priceAvg30 ?? null;
+  const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
   const marketValue = quote.matchQuality === "mehrdeutig" || perCard === null ? null : perCard * pack;
   const marketRange =
     quote.matchQuality === "mehrdeutig" && quote.priceMin != null && quote.priceMax != null
       ? { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 }
       : null;
 
-  const formula = marketValue !== null ? formulaVk(marketValue) : null;
-  let status: MarketStatus = formula !== null ? classifyAgainstFormula(ownVk, formula) : "im_korridor";
-  // Mehrdeutig: nur werten, wenn das Urteil fuer JEDE Variante gilt — zu guenstig
-  // selbst gegen die billigste, zu teuer selbst gegen die teuerste. Sonst keine Ampel.
-  if (marketRange) {
-    if (classifyAgainstFormula(ownVk, formulaVk(marketRange.min)) === "zu_guenstig") status = "zu_guenstig";
-    else if (classifyAgainstFormula(ownVk, formulaVk(marketRange.max)) === "zu_teuer") status = "zu_teuer";
+  const kind = a.packQty > 1 ? "pack" : "single";
+  const rangeFor = (marketPerUnit: number): TargetRange => {
+    const input = { ek: marketPerUnit, kind, packSize: a.packQty, shop } as const;
+    const min = targetPriceForMargin(input, DB_MARGIN_MIN, costSettings.adFeeRateMin, costSettings);
+    const opt = targetPriceForMargin(input, DB_MARGIN_OPT, costSettings.adFeeRateGood, costSettings);
+    return { min: Math.max(PRICE_FLOOR, min ?? PRICE_FLOOR), opt: Math.max(PRICE_FLOOR, opt ?? PRICE_FLOOR) };
+  };
+
+  let target: TargetRange | null = null;
+  let status: MarketStatus = "im_korridor";
+  if (marketValue !== null) {
+    target = rangeFor(marketValue);
+    status = classifyAgainstRange(ownVk, target);
+  } else if (marketRange) {
+    // Mehrdeutig: nur werten, wenn das Urteil fuer JEDE Variante gilt — zu guenstig
+    // selbst gegen die billigste, zu teuer selbst gegen die teuerste. Sonst keine Ampel.
+    const lo = rangeFor(marketRange.min);
+    const hi = rangeFor(marketRange.max);
+    target = { min: lo.min, opt: hi.opt };
+    if (classifyAgainstRange(ownVk, lo) === "zu_guenstig") status = "zu_guenstig";
+    else if (classifyAgainstRange(ownVk, hi) === "zu_teuer") status = "zu_teuer";
   }
-  const deltaPercent = formula !== null && ownVk > 0 ? (ownVk - formula) / formula : null;
+
+  let deltaPercent: number | null = null;
+  if (target !== null && ownVk > 0) {
+    deltaPercent = ownVk < target.min ? (ownVk - target.min) / target.min : ownVk > target.opt ? (ownVk - target.opt) / target.opt : 0;
+  }
+  const marginAtMarket =
+    marketValue !== null && ownVk > 0
+      ? contributionMarginForPrice(ownVk, { ek: marketValue, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
+      : null;
+  const marginAtOwnEk =
+    ek > 0 && ownVk > 0
+      ? contributionMarginForPrice(ownVk, { ek, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
+      : null;
   const ekAboveMarket = marketValue !== null && marketValue > 0 && ek > marketValue * 1.5;
 
   const marketEk = quote.priceFrom !== null ? computeMarketEk(quote.priceFrom, a.packQty, hk.buyShipping) : null;
@@ -121,7 +171,10 @@ export function buildMarketComparisonRow(
     marketTrend: quote.priceTrend,
     marketValue,
     marketRange,
-    formulaVk: formula,
+    targetMin: target ? target.min : null,
+    targetOpt: target ? target.opt : null,
+    marginAtMarket,
+    marginAtOwnEk,
     ekAboveMarket,
     matchQuality: quote.matchQuality ?? null,
     marketEk,

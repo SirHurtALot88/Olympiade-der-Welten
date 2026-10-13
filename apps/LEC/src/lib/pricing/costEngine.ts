@@ -313,3 +313,55 @@ export function classifyPriceStatus(vk: number, corridor: PriceCorridor): PriceS
   if (contributionMarginAt(vk, corridor) < corridor.targetMargin) return "ziel_unerreichbar";
   return "unter_min";
 }
+
+/**
+ * Zielpreis fuer eine Deckungsbeitrags-Marge (Marge VOR Fixkosten, also nach Ware,
+ * Einkaufs-Versand, Versand, Verpackung, Einschreiben und eBay-Gebuehren).
+ * Chris, 13.10.: "25 % Deckungsbeitragsmarge als Minimum, 33 % waeren das Optimum."
+ *
+ * Geschlossene Form statt Schaetzung zum aktuellen VK (die Gebuehren haengen am
+ * Zielpreis selbst):
+ *   VK x (1 - Gebuehrensatz - m) = Fixgebuehr + HK ohne Fixkosten
+ * Das Einschreiben haengt ebenfalls am VK (ab Schwelle voller Satz); deshalb wird
+ * es bis zur Konsistenz iteriert (hoechstens vier Schritte).
+ *
+ * `ek` ist der EK der Verkaufseinheit (bei Pack bereits Pack-EK). Null, wenn die
+ * Marge mit dieser Kostenstruktur nicht erreichbar ist (Gebuehrensatz + m >= 1).
+ */
+export function targetPriceForMargin(
+  input: Omit<HkInput, "vk" | "fixedCostPerUnit">,
+  margin: number,
+  adRate: number,
+  settings: CostSettingsValues
+): number | null {
+  const feeRate = (settings.ebayCommissionRate + adRate) * (1 + settings.ebayCommissionVat);
+  const denom = 1 - feeRate - margin;
+  if (!(denom > 0)) return null;
+
+  let vk: number | null = null;
+  let guess: number | null = null;
+  for (let i = 0; i < 4; i++) {
+    const hk = computeHk({ ...input, fixedCostPerUnit: 0, vk: guess }, settings);
+    const next = (settings.ebayCommissionFixed + hk.total) / denom;
+    if (vk !== null && Math.abs(next - vk) < 0.005) {
+      vk = next;
+      break;
+    }
+    vk = next;
+    guess = next;
+  }
+  return vk;
+}
+
+/** Deckungsbeitrags-Marge (vor Fixkosten) bei einem VK, EK der Verkaufseinheit gegeben. */
+export function contributionMarginForPrice(
+  vk: number,
+  input: Omit<HkInput, "vk" | "fixedCostPerUnit">,
+  adRate: number,
+  settings: CostSettingsValues
+): number {
+  if (!(vk > 0)) return 0;
+  const hk = computeHk({ ...input, fixedCostPerUnit: 0, vk }, settings);
+  const fees = computeEbayFees(vk, adRate, settings);
+  return (vk - fees.total - hk.total) / vk;
+}
