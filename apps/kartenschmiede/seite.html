@@ -869,6 +869,27 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
 .sp-protokoll small { color: var(--brass); margin-right: 6px; }
 .sp-kartenbox { width: 100%; }
+/* Auftrag der Spieler, dauerhaft über der Schrittkarte */
+.sp-auftrag { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--brass); border-radius: 8px; background: rgba(207,167,94,.07); font-family: var(--ui); font-size: 16px; }
+.sp-auftrag > span { font: 700 12px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-auftrag b { font-size: 17px; }
+.sp-auftrag em { font-family: var(--prose); color: var(--ink); }
+.sp-auftrag small { color: var(--dim); }
+.sp-auftrag .btn { margin-left: auto; }
+.sp-auftrag.fertig { border-color: #5fbf5a; color: #7fd06a; }
+/* Gegner anpassen */
+.sp-mods { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; max-width: none; }
+.sp-mods i { font: 700 12px var(--ui); font-style: normal; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+.sp-mods i.plus { color: #ff8a7a; border-color: #e2483a; } .sp-mods i.minus { color: #7fd06a; border-color: #5fbf5a; }
+.sp-anpassen { display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.sp-anpassen h5 { margin: 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-anpassen-raster { display: grid; grid-template-columns: repeat(2, auto 34px 34px); gap: 4px 6px; align-items: center; font: 600 14px var(--ui); justify-content: start; }
+.sp-anpassen-raster .btn.sm { min-width: 0; min-height: 0; padding: 3px 0; }
+.sp-anpassen-regel { display: flex; gap: 6px; }
+.sp-anpassen-regel input { flex: 1; min-width: 0; }
+.sp-alle { font: 500 13px var(--ui); color: var(--dim); display: flex; gap: 6px; align-items: center; }
+.sp-gegnerliste > h4 { display: flex; justify-content: space-between; align-items: center; }
+.sp-neu-liste { display: flex; flex-wrap: wrap; gap: 6px; }
 /* Antworten: Spalten nach Anzahl, Folgen als Pillen */
 .sp-anleitung { font: 500 17px var(--ui); color: var(--dim); max-width: none; }
 .sp-optionen.n1, .sp-optionen.n2 { grid-template-columns: 1fr; }
