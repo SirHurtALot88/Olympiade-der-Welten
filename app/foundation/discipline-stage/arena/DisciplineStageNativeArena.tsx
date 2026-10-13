@@ -72,6 +72,14 @@ export type NativeStagePlayer = {
   mutatorPpsBonus?: number | null;
   /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rings am `PlayerMark` (siehe `player-star-tier.ts`). */
   ovrRank?: number | null;
+  /**
+   * Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully, Chris 13.10. — docs/design/
+   * chris-feedback-breite-runde-13-10.md Abschnitt "Basketball" Punkt 21 / "Eishockey" Punkt
+   * 24): Körpergröße (Skala 1-10, `lib/player-generator/provisional-height.ts`) — einzige
+   * Grundlage für die "2 größten Spieler/Centers"-Auswahl des Spielstart-Rituals unten. KEIN
+   * Attribut der gesperrten Eignungsmatrix (`official-discipline-weights.ts`), rein kosmetisch.
+   */
+  height?: number | null;
 };
 // Live-Ergebnis eines bereits AUFGEDECKTEN Spielers (für den Team-Drawer: „was hat
 // der Spieler in dieser Disziplin geholt + Boni/Abzüge"). Nur enthüllte Slots.
@@ -991,6 +999,30 @@ export const FECHT_REVEAL_MS = 1100;
 // Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): dieselbe Karte für `prim === "klassen"`,
 // analog zu Fechtens Reveal oben.
 export const KLASSEN_REVEAL_MS = 1100;
+/**
+ * Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully, Chris 13.10. — docs/design/
+ * chris-feedback-breite-runde-13-10.md Abschnitt "Basketball" Punkt 21 / "Eishockey" Punkt 24):
+ * „beim basketball steht SPRUNGBALL! Dann sollten die 2 größten Spieler oder die 'Centers' den
+ * auch ausführen da benötigen wir Animation und quasi Anpfiff-Spielzug!" / „Eishockey ebenso das
+ * muss in der mitte mit dem bully anfangen!" — EIN gemeinsamer, disziplin-bewusster Spielstart-
+ * Moment für beide Feldspiel-Chassis-Primitive (court = Basketball, rink = Eishockey, beide über
+ * `bauFeldspiel` im alten Motor, hier aber auf der NEUEN Spieltags-Bühne gebaut, die Basketball/
+ * Hockey tatsächlich zeigt — s. NATIVE_PRIMITIVE in DisciplineStageArena.tsx). Läuft EINMALIG vor
+ * dem allerersten Reveal dieser Arena-Instanz (r===0, i===0 in `doOne()` unten), analog zu den
+ * Matchup-Reveal-Karten oben (Tasks #116/#126/#127) -- reine Präsentation, KEINE Rezeptänderung:
+ * Score/Reihenfolge der folgenden Cascade bleiben exakt gleich, nur ein zusätzlicher, einmaliger
+ * Zeige-Schritt davor. Die "2 größten Spieler" sind je Team der Spieler mit der größten `height`
+ * (NativeStagePlayer.height, s. Typ oben) über ALLE gefeldeten Slots -- nicht nur Slot 0 -- damit
+ * wirklich der größte Spieler des Kaders antritt, nicht nur der auf Position 1 gelistete.
+ */
+export const KICKOFF_RITUAL: Partial<Record<StagePrimitive, { label: string; verb: string }>> = {
+  court: { label: "🏀 SPRUNGBALL", verb: "Die Centers kämpfen um den Sprungball" },
+  rink: { label: "🏒 BULLY", verb: "Die Centers kämpfen um den Bully" },
+};
+// Bewusst länger als der Fecht-/Klassen-Reveal (1100ms): der Sprungball/Bully ist der EINMALIGE
+// Spielauftakt der ganzen Disziplin (nicht ein wiederkehrender Board-Wechsel) und darf einen Tick
+// mehr "Anpfiff-Moment" tragen, bremst dafür aber auch nur EIN einziges Mal den Einstieg.
+export const KICKOFF_RITUAL_MS = 1600;
 // Staffel/track: eine Reveal-Runde dauert ~5 s (langsam, folgbar). Innerhalb einer
 // Runde peilen ALLE Token gleichzeitig ihre Runden-Endposition an und gleiten
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
@@ -1692,6 +1724,21 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
     slotLbl: string;
   } | null>(null);
+  /**
+   * Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully) — s. `KICKOFF_RITUAL` oben für den
+   * vollen Hintergrund. Nur für `prim === "court" | "rink"` befüllt, genau einmal pro Arena-
+   * Instanz (`kickoffShownRef`), bevor der allererste Reveal läuft.
+   */
+  const [kickoff, setKickoff] = useState<{
+    a: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    label: string;
+    verb: string;
+  } | null>(null);
+  // Ob das Sprungball-/Bully-Ritual für DIESE Arena-Instanz schon lief (nicht re-triggern bei
+  // jeder Runde) -- zurückgesetzt bei `reset()` ("↻ Neu"), NICHT bei Jump/Quick-Sim (dort würde
+  // ein retroaktiver Spielauftakt keinen Sinn ergeben, s. jeweilige Stellen unten).
+  const kickoffShownRef = useRef(false);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
   // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
   const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
@@ -1905,6 +1952,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPhotoFinish(false);
     setFechtDuel(null); // Task #116: keine stehengebliebene Matchup-Karte nach „↻ Neu"
     setKlassenDuel(null); // Tasks #126/#127: dasselbe für klassen
+    setKickoff(null); // Tasks #21/#24a: dasselbe für den Sprungball-/Bully-Auftakt
+    kickoffShownRef.current = false; // „↻ Neu" ist ein echter Neustart → Ritual darf wieder laufen
     setStageCrown(null);
     stageCrownRef.current = { list: [], stage: 0, label: null };
     setDemandKg(null);
@@ -3006,6 +3055,34 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         later(doOne, 120);
         return;
       }
+      // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully) — s. `KICKOFF_RITUAL` oben.
+      // Läuft NUR vor dem allerersten Reveal (r===0, i===0) dieser Arena-Instanz, NUR für
+      // court/rink, NUR bei genau 2 Teams (Feldspiel-Duell; bei einer anderen Teamzahl —
+      // sollte hier nie vorkommen — wird das Ritual übersprungen statt zu raten, wer antritt).
+      const kickoffRitual = KICKOFF_RITUAL[prim];
+      if (r === 0 && i === 0 && kickoffRitual && !kickoffShownRef.current && rt.length === 2) {
+        kickoffShownRef.current = true;
+        const tallestOf = (t: RT): NativeStagePlayer | null => {
+          let best: NativeStagePlayer | null = null;
+          for (const p of t.players) {
+            if (!p) continue;
+            if (!best || (p.height ?? -Infinity) > (best.height ?? -Infinity)) best = p;
+          }
+          return best;
+        };
+        const [teamA, teamB] = rt;
+        setKickoff({
+          a: { code: teamA.code, name: teamA.name, logoUrl: teamA.logoUrl, isOwn: teamA.isOwn, player: tallestOf(teamA) },
+          b: { code: teamB.code, name: teamB.name, logoUrl: teamB.logoUrl, isOwn: teamB.isOwn, player: tallestOf(teamB) },
+          label: kickoffRitual.label,
+          verb: kickoffRitual.verb,
+        });
+        later(() => {
+          setKickoff(null);
+          doOne();
+        }, KICKOFF_RITUAL_MS);
+        return;
+      }
       // Task #116: Matchup-Reveal vor jedem neuen Fecht-Paar (nur lamps, nur echte Paare mit
       // aufgelöstem Gegner) -- "wer gegen wen" + Eignung (NativeStagePlayer.val) für GENAU
       // dieses Board, bevor das Paar enthüllt. Einzelteams ohne Partner (kein `pairPartnerAtIdx`-
@@ -3273,6 +3350,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       setHandoffTs(0);
       setPhotoFinish(false);
       setKlassenDuel(null); // Tasks #126/#127: Sprung-Zielbild ohne Kaskade zeigt keine stehende Matchup-Karte
+      setKickoff(null); // Tasks #21/#24a: dasselbe für den Sprungball-/Bully-Auftakt
+      // Sprung VOR Runde 1 (Host-Reset-Echo, s. Kommentar unten) darf das Ritual erneut zeigen;
+      // ein Sprung mitten ins Spiel (Nachholsprung/Late-Join) überspringt es -- kein retroaktiver
+      // Spielauftakt auf einem Zielbild, das längst weiter ist.
+      kickoffShownRef.current = clamped > 0;
       setStageCrown(null);
       // A2 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher fehlten hier genau die Felder, die
       // `reset()` (Knopf/Mount) laengst raeumt — podium/flash/shake/hover/stageCrownRef/demandKg/
@@ -3534,6 +3616,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setKlassenDuel(null); // Tasks #126/#127: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
     setStageCrown(null);
     setFechtDuel(null); // Task #116: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
+    setKickoff(null); // Tasks #21/#24a: dasselbe für den Sprungball-/Bully-Auftakt
+    kickoffShownRef.current = true; // Quick-Sim übersprang den Spielauftakt -- nicht nachträglich zeigen
     // Jede laufende Pause (Leertaste/Hover ODER eine Perioden-Pause, Feature „Viertel/
     // Drittel/Halbzeit" weiter unten) ist nach einem Quick-Sim gegenstandslos — sonst stuende
     // die Buehne auf „✔ Disziplin gewertet" UND zeigte weiterhin den „⏸ Pausiert"-Chip.
@@ -4408,6 +4492,58 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
               {klassenDuel.slotLbl}
             </div>
+          </div>
+        ) : null}
+
+        {/* Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): einmaliger Spielstart-Moment
+            vor dem allerersten Reveal -- "die 2 größten Spieler/Centers" beider Teams (höchste
+            `height`, s. KICKOFF_RITUAL oben) treten zum Sprungball/Bully an. Nur court/rink, nur
+            wenn das Ritual gerade läuft (`kickoff` state). Analog zu den VS-Matchup-Karten oben
+            (Tasks #116/#126/#127), aber eigener Akzent (nl-accent statt nl-warn) und eigenes
+            Label/Verb statt "⚔ VS" -- ein Spielauftakt ist kein Gegner-Duell-Board. */}
+        {(prim === "court" || prim === "rink") && kickoff ? (
+          <div
+            className="oly-anim"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "12px 16px",
+              marginBottom: 10,
+              borderRadius: 12,
+              border: "1.5px solid var(--nl-accent)",
+              background: "color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel))",
+            }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 15, letterSpacing: "0.08em", color: "var(--nl-accent)" }}>{kickoff.label}</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14 }}>
+              {([kickoff.a, kickoff.b] as const).map((side, sideIdx) => (
+                <Fragment key={sideIdx}>
+                  {sideIdx === 1 ? (
+                    <div style={{ flex: "none", fontWeight: 900, fontSize: 14, color: "var(--nl-mut)" }}>vs</div>
+                  ) : null}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                    <PlayerMark
+                      src={side.player?.portraitUrl ?? null}
+                      alt={side.player?.name ?? side.code}
+                      size={34}
+                      isOwn={side.isOwn}
+                      starTier={getPlayerStarTier(side.player?.ovrRank)}
+                    />
+                    <div style={{ minWidth: 0, textAlign: sideIdx === 1 ? "right" : "left" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                        <TeamMark src={side.logoUrl} alt={side.name} size={15} radius={4} isOwn={side.isOwn} placeholderColor={teamPrimaryColor(side.code)} placeholderLabel={side.code} />
+                        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em", color: side.isOwn ? "var(--nl-accent)" : "var(--nl-mut)" }}>{side.code}</span>
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap" }}>{side.player?.name ?? "—"}</div>
+                    </div>
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--nl-mut)" }}>{kickoff.verb}</div>
           </div>
         ) : null}
 

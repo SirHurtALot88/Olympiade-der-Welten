@@ -99,6 +99,13 @@ export default function DevArenaPage() {
   const teams = useMemo(buildTeams, []);
   const slots = ["Etappe 1", "Etappe 2", "Etappe 3", "Etappe 4"];
   const disc = DISCIPLINES.find((d) => d.id === discId) ?? DISCIPLINES[0]!;
+  // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): das Sprungball-/Bully-Ritual in
+  // DisciplineStageNativeArena.tsx greift nur bei GENAU 2 Teams (echtes Feldspiel-Duell, s.
+  // KICKOFF_RITUAL dort) -- dieses generische Harness baut sonst immer 32 synthetische Teams
+  // (s. `buildTeams` oben), egal welche Disziplin gewählt ist. Nur für court/rink auf die
+  // ersten 2 Teams kürzen, damit sich das Ritual auch hier zeigen lässt; alle anderen
+  // Primitives bleiben unverändert bei 32 Teams.
+  const effectiveTeams = disc.prim === "court" || disc.prim === "rink" ? teams.slice(0, 2) : teams;
   return (
     <div style={{ padding: 16, background: "var(--nl-bg, #0a0e15)", color: "var(--nl-ink, #eef4fb)", minHeight: "100vh" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
@@ -122,7 +129,7 @@ export default function DevArenaPage() {
       </div>
       <DisciplineStageNativeArena
         key={disc.id}
-        teams={teams}
+        teams={effectiveTeams}
         slots={slots}
         primitive={disc.prim}
         disciplineId={disc.id}
