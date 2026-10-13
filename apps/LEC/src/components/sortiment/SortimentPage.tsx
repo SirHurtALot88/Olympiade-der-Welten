@@ -17,6 +17,8 @@ import {
 } from "@/lib/dashboard/marketFilter";
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
+import { PreisBoard } from "./PreisBoard";
+import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
 import { MicroVelocity, Corridor, STATUS_PILL } from "@/components/dashboard/SortimentTable";
@@ -213,6 +215,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     return raw ? new Set(raw.split(",").filter((m): m is MarketFilter => MARKET_FILTER_ORDER.includes(m as MarketFilter))) : new Set();
   });
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
+  // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
+  const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
+  const [boardSort, setBoardSort] = useState<BoardSortKey>("abweichung");
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
@@ -230,10 +235,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (selectedWindow !== "90") params.set("fenster", selectedWindow);
     if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
+    if (view === "alles") params.set("ansicht", "alles");
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter]);
+  }, [query, selectedWindow, classFilter, marketFilter, view]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -314,6 +320,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active).map((r) => r.market)), [rows]);
 
   const visible = sorted.slice(0, visibleCount);
+  const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
+  const extraFiltersActive = classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -334,38 +342,67 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               placeholder="Name oder Set-Code …"
             />
           </div>
-          <div className="seg">
-            {WINDOW_ORDER.map((w) => (
-              <button
-                key={w.key}
-                type="button"
-                className={selectedWindow === w.key ? "on" : undefined}
-                onClick={() => setSelectedWindow(w.key)}
-              >
-                {w.label}
-              </button>
-            ))}
+          <div className="seg" title="Kompakt: nur der Preis-Vergleich. Alle Spalten: Verkäufe, Deckungsbeiträge, Klassen.">
+            <button type="button" className={view === "kompakt" ? "on" : undefined} onClick={() => setView("kompakt")}>
+              Kompakt
+            </button>
+            <button type="button" className={view === "alles" ? "on" : undefined} onClick={() => setView("alles")}>
+              Alle Spalten
+            </button>
           </div>
+          {view === "alles" && (
+            <div className="seg">
+              {WINDOW_ORDER.map((w) => (
+                <button key={w.key} type="button" className={selectedWindow === w.key ? "on" : undefined} onClick={() => setSelectedWindow(w.key)}>
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       }
       footer={<span>Alle Zahlen serverseitig berechnet · Filter/Sortierung laufen clientseitig.</span>}
     >
-      <div className="filterrow">
-        <span className="flabel" title={"Preis gegen den Cardmarket-Marktwert: Zielspanne = VK für 25 % bis 33 % Deckungsbeitrag, wenn die Karte heute nachgekauft wird"}>
-          VK vs. Markt
-        </span>
-        {MARKET_FILTER_ORDER.map((f) => (
+      <div className="bd-cards" role="group" aria-label="VK gegen Marktwert">
+        {(
+          [
+            { f: "zu_guenstig", tone: "low", hint: "VK unter dem Preis für 25 % Marge — Geld liegt auf dem Tisch" },
+            { f: "im_korridor", tone: "ok", hint: "VK in der Zielspanne 25–33 %" },
+            { f: "zu_teuer", tone: "high", hint: "VK über dem Preis für 33 % Marge" },
+            { f: "offen", tone: "none", hint: "Kein Marktwert oder Seltenheit nicht eindeutig" },
+          ] as const
+        ).map(({ f, tone, hint }) => (
           <button
             key={f}
             type="button"
-            className={`chip${marketFilter.has(f) ? " on" : ""}`}
+            className={`bd-card bd-card-${tone}${marketFilter.has(f) ? " on" : ""}`}
             title={MARKET_FILTER_HINT[f]}
+            aria-pressed={marketFilter.has(f)}
             onClick={() => toggleMarket(f)}
           >
-            {MARKET_FILTER_LABEL[f]} <span className="chipn">{marketCounts[f]}</span>
+            <span className="bd-card-label">{MARKET_FILTER_LABEL[f]}</span>
+            <span className="bd-card-n">{marketCounts[f].toLocaleString("de-DE")}</span>
+            <span className="bd-card-hint">{hint}</span>
           </button>
         ))}
       </div>
+      <details className="bd-more" open={extraFiltersActive}>
+        <summary>
+          Weitere Filter{extraFiltersActive ? " · aktiv" : ""}
+          <span className="count">
+            {filtered.length.toLocaleString("de-DE")} von {totalCount.toLocaleString("de-DE")} Artikeln
+          </span>
+        </summary>
+        <div className="filterrow" style={{ marginBottom: 0 }}>
+          <button
+            type="button"
+            className={`chip${marketFilter.has("ek_ueber") ? " on" : ""}`}
+            title={MARKET_FILTER_HINT.ek_ueber}
+            onClick={() => toggleMarket("ek_ueber")}
+          >
+            {MARKET_FILTER_LABEL.ek_ueber} <span className="chipn">{marketCounts.ek_ueber}</span>
+          </button>
+        </div>
       <div className="filterrow">
         <span className="flabel">Klasse</span>
         {CLASS_ORDER.map((cls) => (
@@ -414,11 +451,36 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         >
           auch ausgelaufene zeigen
         </button>
-        <span className="count">
-          {filtered.length} von {totalCount}
-        </span>
       </div>
+      </details>
 
+      {view === "kompakt" ? (
+        <section className="bd-card-list">
+          <div className="bd-toolbar">
+            <label>
+              Sortierung
+              <select value={boardSort} onChange={(e) => setBoardSort(e.target.value as BoardSortKey)}>
+                {(Object.keys(BOARD_SORT_LABEL) as BoardSortKey[]).map((k) => (
+                  <option key={k} value={k}>
+                    {BOARD_SORT_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="bd-legend">
+              <i className="bd-lg-band" /> Zielspanne 25–33 %<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
+            </span>
+          </div>
+          <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} />
+          {filtered.length > boardRows.length && (
+            <div className="bd-more-rows">
+              <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
+                Weitere {Math.min(PAGE_SIZE, filtered.length - boardRows.length)} anzeigen · {(filtered.length - boardRows.length).toLocaleString("de-DE")} übrig
+              </button>
+            </div>
+          )}
+        </section>
+      ) : (
       <section className="card">
         <h3>
           Alle Artikel <span className="r">Fenster: {WINDOW_ORDER.find((w) => w.key === selectedWindow)?.label}</span>
@@ -598,6 +660,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </div>
         )}
       </section>
+      )}
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="cardpreview" src={preview.src} alt="" style={{ left: preview.x, top: preview.y }} />
