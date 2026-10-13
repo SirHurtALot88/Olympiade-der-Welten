@@ -359,8 +359,8 @@
  {
   "name": "Hellvoice",
   "slug": "hellvoice",
-  "sterne": 2,
-  "begruendung": "Dunkles Haar und ein Flügel als Ansatz vorhanden, aber die namensgebende rote Teufels-Haut, die Hörner und die leuchtende Laute fehlen komplett.",
+  "sterne": 3,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - jetzt echte, solide schwarze Lederschwingen statt des alten braunen Platzhalters, naeher am Succubus-/Daemon-Look. Hoerner und Ohren bleiben, Hautfarbe amber ist die naechstliegende Annaeherung an Teufelsrot.",
   "fehlendesDetail": null
  },
  {
@@ -520,9 +520,9 @@
  {
   "name": "Lumen Serene",
   "slug": "lumen-serene",
-  "sterne": 2,
-  "begruendung": "Ein Flügel als Andeutung des Engelswesens vorhanden, aber die Form (Fledermaus- statt Federflügel), Farbe (hautfarben statt strahlend weiß) und die friedliche, in sich gekehrte Pose fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: fluegel von generisch auf \"federn\" umgestellt - echte, SOLIDE WEISSE Federfluegel statt des alten hautfarbenen Fledermaus-Platzhalters. Form UND Farbe treffen jetzt direkt das 'strahlend weisse Engelswesen'-Bild.",
+  "fehlendesDetail": "Die ruhige, in sich gekehrte Meditationspose fehlt - die Figur steht in der normalen Kampfhaltung statt in sich gekehrt."
  },
  {
   "name": "Lynara",
@@ -611,9 +611,9 @@
  {
   "name": "Nelchael",
   "slug": "nelchael",
-  "sterne": 2,
-  "begruendung": "Graues Haar passt, aber das ausgezehrte, skelettartige Gesicht der Untoten-Hexe fehlt komplett - das Sprite hat ein rundliches, junges Gesicht statt eines hageren Totenkopfs, und das Kräuterbündel fehlt.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: kopf/koerper von zombie (pralle Verwesungshaut) auf skeleton/skelett umgestellt - das ausgezehrte, hagere Skelettgesicht mit weissem Haar trifft jetzt direkt die Untoten-Hexe aus dem Portrait.",
+  "fehlendesDetail": "Das Kraeuter-/Stockbuendel in den Haenden fehlt."
  },
  {
   "name": "Nhyra-Vel",
@@ -625,8 +625,8 @@
  {
   "name": "Nimri",
   "slug": "nimri",
-  "sterne": 2,
-  "begruendung": "Die bläuliche Hautfarbe passt zur Wasserfee, aber die Fledermausflügel statt zarter Schmetterlingsflügel sowie kleine Hörner (die im Portrait gar nicht vorkommen) passen nicht.",
+  "sterne": 3,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fledermaus-Fremdbild) auf \"federn\" umgestellt - echte weisse Federfluegel lesen sich naeher an den zarten, lichten Schmetterlings-/Feenschwingen des Portraits. Blaue Hautfarbe bleibt eine passable Annaeherung an das Tuerkis.",
   "fehlendesDetail": null
  },
  {
@@ -646,8 +646,8 @@
  {
   "name": "Omniclops",
   "slug": "omniclops",
-  "sterne": 2,
-  "begruendung": "Gehörnter Kopf als grobe Analogie zum Dämon vorhanden, aber Farbe (hellbraun statt dunkles Rindenschwarz), die violett leuchtende Brust-Ader und die riesigen Krallen fehlen - wirkt wie ein generisches Rentier-Wesen.",
+  "sterne": 3,
+  "begruendung": "13.10.: Hautfarbe von brown auf black umgestellt - der Kopf wirkt jetzt sichtbar dunkler/rindenschwarz statt warm braun, naeher am 'dunkles Rindengestein'-Bild. effekt:void (violett) am Koerper trifft den gluehenden Brustriss bereits gut.",
   "fehlendesDetail": null
  },
  {
@@ -702,22 +702,22 @@
  {
   "name": "Ralazar the Balanced",
   "slug": "ralazar-the-balanced",
-  "sterne": 2,
-  "begruendung": "Menschliche männliche Figur korrekt, aber die komplette Rüstung fehlt (nur ein einfaches Tanktop statt Plattenpanzer), und der buschige Vollbart im Sprite existiert im glattrasierten Portrait gar nicht.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "13.10., Bild-schlaegt-Tags-Fund: bart:true entfernt - das Portrait zeigt ein glattrasiertes Gesicht, der Code behauptete faelschlich 'Bart wie im Portrait'. Die Figur ist jetzt bartlos wie im Bild.",
+  "fehlendesDetail": "Die Plattenruestung liest sich bei dieser Blickrichtung weiterhin wie ein einfaches Tanktop statt sichtbarer Panzerplatten."
  },
  {
   "name": "Raven",
   "slug": "raven",
-  "sterne": 2,
-  "begruendung": "Ein Flügel als grobe Analogie zum geflügelten Krieger vorhanden, aber der Kopf ist ein Kaniden-Schnabel statt eines Rabenkopfs, Farbe (braun statt schwarz) und Flügeltyp (Fledermaus statt Federn) passen nicht.",
+  "sterne": 3,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - solide schwarze Fluegel (vorher braun/rotstichig) treffen jetzt die Farbe der riesigen, bildfuellenden schwarzen Schwingen aus dem Portrait. \"federn\" wurde probiert, rendert aber immer weiss statt schwarz (s. Code-Kommentar) und waere eine neue, andere Farbabweichung gewesen.",
   "fehlendesDetail": null
  },
  {
   "name": "Reefstrike",
   "slug": "reefstrike",
-  "sterne": 2,
-  "begruendung": "Die hellgraue Farbe erinnert entfernt an Haihaut, aber der Kopf ist eindeutig ein Kanide statt eines Hais, und die Mönchsrobe mit umwickelten Fäusten fehlt komplett.",
+  "sterne": 3,
+  "begruendung": "13.10.: Hautfarbe von blue auf fur_grey umgestellt - der Kopf ist jetzt sichtbar grau statt blau, deutlich naeher an der Haihaut aus dem Portrait. kopf:wolf bleibt die naechstliegende Kaniden-Annaeherung, ein echter Hai-Kopf fehlt im Baukasten.",
   "fehlendesDetail": null
  },
  {
@@ -751,9 +751,9 @@
  {
   "name": "Rootheart",
   "slug": "rootheart",
-  "sterne": 2,
-  "begruendung": "Grüne Hautfarbe passt lose zum Wald-Riesen, aber Moos-Bart, Schild, Speer und die massive Baumgestalt-Textur fehlen - wirkt wie ein generischer grüner Goblin statt eines Ent-Riesen.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: von kopf:orc/haut:dark_green (generischer gruener Goblin) auf vollbild:treant umgestellt (dieselbe Baumriesen-Vorlage wie Treantos, dunkler/moosiger eingefaerbt) - Rinden-Textur und die massive Baumriesen-Statur treffen jetzt direkt.",
+  "fehlendesDetail": "Schild und Speer (die Kampfausruestung aus dem Portrait) fehlen - das Vollbild-Blatt zeichnet keine Waffen-/Schild-Ebene."
  },
  {
   "name": "Sanctrix",
@@ -779,16 +779,16 @@
  {
   "name": "Shadowsage",
   "slug": "shadowsage",
-  "sterne": 2,
-  "begruendung": "Kapuze als grobe Analogie zur Nekromanten-Robe vorhanden, aber die violette Farbgebung, der leuchtende Stab und das skelettartige Gesicht fehlen komplett - wirkt wie ein normaler Abenteurer statt eines Lichs.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "13.10.: kopf von human auf skeleton umgestellt - unter der Kapuze ist jetzt ein echtes Skelettgesicht sichtbar statt eines menschlichen, die Lich-Identitaet aus dem Portrait wird direkt erkennbar. effekt:void (violett) liefert einen schwachen violetten Schimmer passend zur 'violetten Farbgebung'.",
+  "fehlendesDetail": "Die durchgehend violette Robenfaerbung und der sichtbare leuchtende Stab fehlen - leder bleibt naturfarben, der Stab zeigt sich nur waehrend eines Schlag-Frames."
  },
  {
   "name": "Shield",
   "slug": "shield",
-  "sterne": 2,
-  "begruendung": "Bronzefarbene Rüstung passt vom Ton her, aber der namensgebende riesige Schild - das absolut zentrale Element - fehlt komplett, ebenso der Kriegshammer und der Spitzhelm.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: schild:true ergaenzt (dieselbe Schild-Ebene wie bei Draco/Johanna) - der namensgebende, bildfuellende Rundschild ist jetzt da und dominiert die Silhouette wie im Portrait.",
+  "fehlendesDetail": "Der Kriegshammer fehlt (die gefuehrte Waffe bleibt ein Schwert, kein Hammer-Layer im Baukasten)."
  },
  {
   "name": "Shroomgator",
@@ -800,8 +800,8 @@
  {
   "name": "Sister Ilora",
   "slug": "sister-ilora",
-  "sterne": 2,
-  "begruendung": "Menschliche weibliche Figur korrekt, aber die leuchtenden Augen, die orangene Heilenergie in den Händen und die taktische Ausrüstung der Kampf-Priesterin fehlen komplett.",
+  "sterne": 3,
+  "begruendung": "13.10.: effekt:{typ:heilig,pos:kopf} ergaenzt - ein sichtbarer goldener Glühring ueber dem Kopf steht jetzt fuer die leuchtenden Augen/Heilenergie der Kampf-Priesterin, auch wenn die Farbe warmes Gold statt des im Portrait gezeigten Orange ist.",
   "fehlendesDetail": null
  },
  {
@@ -891,9 +891,9 @@
  {
   "name": "Tidesprinter",
   "slug": "tidesprinter",
-  "sterne": 2,
-  "begruendung": "Die türkise Farbe passt sehr gut zum Wassermann, aber die Form (kleine kauernde Amphibie statt muskulösem Krieger), der Dreizack und die leuchtende Flossen-Frisur fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "13.10.: vollbild von froschmensch (kauernder Frosch) auf meerjungfrau_aal umgestellt - jetzt eine aufrechte Wassermann-Figur mit Schuppenschwanz, wallendem Haar und einer nach vorn ausgestreckten leuchtenden Waffe (ein Aal statt Dreizack). Kategorie und Pose treffen jetzt deutlich naeher, aber Hautton (braun statt tuerkis) und die exakte Dreizack-Requisite bleiben falsch.",
+  "fehlendesDetail": "Hautfarbe muesste tuerkis statt braun sein, und die Waffe ein Dreizack statt eines Aals."
  },
  {
   "name": "Timantha",
@@ -905,9 +905,9 @@
  {
   "name": "Treantos",
   "slug": "treantos",
-  "sterne": 2,
-  "begruendung": "Grüne Hautfarbe passt lose zum Baum-Wächter, aber Rinden-Textur, die leuchtende grüne Kugel in der Hand und die gewaltige Baumriesen-Statur fehlen - wirkt wie ein generischer grüner Goblin.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Score-folgt-dem-Sprite-Nachtrag (13.10.): vollbild:treant (seit 01.09. im Code, aber nie nachgepflegt) zeigt tatsaechlich schon eine echte Baumriesen-Figur mit Rinden-Stamm und gruener Laubkrone - die alte Bewertung (\"generischer gruener Goblin\") war seit dem Umbau nicht mehr wahr.",
+  "fehlendesDetail": "Die leuchtend gruene Kugel in der Hand und das deutlich erkennbare gruene Augenglühen aus dem Portrait fehlen."
  },
  {
   "name": "Tropfina",
@@ -926,9 +926,9 @@
  {
   "name": "Umbra",
   "slug": "umbra",
-  "sterne": 2,
-  "begruendung": "Kapuze als grobe Analogie zum Trenchcoat-Assassinen vorhanden, aber die helle statt schwarze Farbe, die Gasmaske mit rot leuchtenden Augen und die Pistole fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "13.10.: waffe von bogen (klar falsch) ueber schwert auf \"pistole\" umgestellt (echter b.waffe-Wert aus Skorpio's SciFi Sprite Pack, als Feuerwaffe DAUERHAFT sichtbar, nicht nur in einem Schlag-Frame) - die Figur haelt jetzt tatsaechlich eine Pistole wie im Portrait. effekt:voidRot am Kopf liefert einen sichtbaren roten Glühpunkt nahe dem Gesicht, passend zu den rot leuchtenden Maskenaugen.",
+  "fehlendesDetail": "Die schwarze Mantelfarbe der Kapuze (natur-/cremefarben statt schwarz, strukturelle Engine-Grenze, s. Code-Kommentar) und die genaue Vogel-/Schnabelmaske fehlen."
  },
  {
   "name": "Vargan",
@@ -968,9 +968,9 @@
  {
   "name": "Whispra",
   "slug": "whispra",
-  "sterne": 2,
-  "begruendung": "Kapuze als grobe Analogie vorhanden, aber die schwarze Rabenfarbe (statt cremeweiß), der Schnabel und die Totenkopf-Trophäen am Gürtel fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - die Fluegel sind jetzt solide SCHWARZ statt braun, naeher an der namensgebenden Rabenfarbe (fluegel_federn wurde probiert, rendert aber immer weiss statt schwarz, s. Code-Kommentar). Hautfarbe black war schon korrekt.",
+  "fehlendesDetail": "Die Kapuze bleibt naturfarben/creme statt schwarz (strukturelle Engine-Grenze), Schnabel und Totenkopf-Trophaeen am Guertel fehlen."
  },
  {
   "name": "Wingless",
@@ -1003,9 +1003,9 @@
  {
   "name": "Xylaris",
   "slug": "xylaris",
-  "sterne": 2,
-  "begruendung": "Nur das helle Haar erinnert entfernt an den Erzengel, aber Flügeltyp/-farbe (Fledermaus statt goldweißer Federn), die grün-goldene Robe und der leuchtende Stab mit Heiligenschein-Symbol fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fledermaus-Fremdbild) auf \"federn\" (solide weiss) umgestellt, dazu effekt:{typ:heilig,pos:kopf} ergaenzt - weisse Federfluegel, weisses Haar UND ein sichtbarer goldener Heiligenschein ueber dem Kopf treffen jetzt direkt den Erzengel-Look.",
+  "fehlendesDetail": "Die gruen-goldene Robenfaerbung (bleibt braunes Leder) und das sichtbare Heiligenschein-Symbol am Stab fehlen."
  },
  {
   "name": "Yuko",
