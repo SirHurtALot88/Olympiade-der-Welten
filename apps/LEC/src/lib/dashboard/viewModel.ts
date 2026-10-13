@@ -1,6 +1,14 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
-import { computeHk, computePriceCorridor, classifyPriceStatus, type ItemKind } from "../pricing/costEngine";
+import {
+  computeHk,
+  computePriceCorridor,
+  classifyPriceStatus,
+  computeShopVolume,
+  fixedCostPerUnit,
+  type ItemKind,
+  type ShopVolume,
+} from "../pricing/costEngine";
 import type { CostSettingsValues } from "../pricing/costSettings";
 
 export interface WindowAggregate {
@@ -11,6 +19,9 @@ export interface WindowAggregate {
   shippingCost: number;
   dbI: number;
   dbII: number;
+  /** Anteil der SHOPWEITEN Jahresfixkosten, der auf dieses Fenster entfaellt.
+   * NICHT in dbII enthalten -- DB II ist ein Deckungsbeitrag. DB III = dbII - fixedCostShare. */
+  fixedCostShare: number;
   avgPrice: number;
   rank: number | null;
 }
@@ -97,7 +108,9 @@ export interface SortimentRow {
   ek: number;
   /** Aktueller Listen-EK aus dem Artikelstamm-Export, rein informativ (Repricing), null falls unbekannt. */
   currentEk: number | null;
-  corridor: { min: number; good: number };
+  /** Vollkosten-Korridor MIN/GUT plus Deckungsbeitrags-Grenze `contribution` (VK, ab dem der Verkauf
+   * vor Fixkosten kein Geld mehr verliert). */
+  corridor: { min: number; good: number; contribution: number };
   /** Ampel-Status: vergleicht den AKTUELLEN Listen-VK (Fallback: realisierter Ø-VK, wenn kein
    * Artikelstamm-Preis vorliegt) gegen den Korridor. `"kein_ek"` (FIX 1) statt einem der drei
    * Korridor-Status, wenn `ekMissing` true ist -- der Korridor waere sonst auf Basis EK=0
@@ -111,6 +124,9 @@ export interface SortimentRow {
   dbIPerUnit: number;
   dbIIPerUnit: number;
   dbIIPercent: number;
+  /** DB III = DB II abzueglich Fixkostenanteil (Vollkosten-Ergebnis) je Stueck. */
+  dbIIIPerUnit: number;
+  dbIIIPercent: number;
   /** true = weder realisierter EK (Referenz-Fenster) noch aktueller Listen-EK bekannt
    * (FIX 1, KONZEPT §7.3/§8) -- betrifft laut Chris 747 aktive Artikel. Ohne diesen Flag
    * wuerde die App Phantom-Margen (dbI = Umsatz − 0) als echte Marge behandeln. */
@@ -178,6 +194,32 @@ export interface DashboardViewModel {
 
 function pct(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
+}
+
+/**
+ * Shopweite 365-Tage-Stueckzahl (N) und Stueck ab Einschreiben-Schwelle (N_T) aus den
+ * Artikel-Aggregaten — dieselbe Quelle wie im Import (`importPlan.ts`): das "365"-Fenster,
+ * sonst "all" als Naeherung. EINE Zahl fuer den ganzen Shop; sie speist die Fixkosten-
+ * Umlage UND den Einschreiben-Satz in JEDEM Korridor (Dashboard, Sortiment, Marktpreise,
+ * Einstellungen), damit die App sich nicht selbst widerspricht.
+ * `null`, wenn kein Fenster mit Verkaeufen vorliegt (dann ist nichts umzulegen).
+ */
+export function shopVolumeFromAggregates(
+  articles: ArticleAggregate[],
+  costSettings: CostSettingsValues
+): ShopVolume | null {
+  const windowKey: SaleWindowKey | null = articles.some((a) => a.windows["365"])
+    ? "365"
+    : articles.some((a) => a.windows.all)
+      ? "all"
+      : null;
+  if (windowKey === null) return null;
+  const rows = articles
+    .map((a) => a.windows[windowKey])
+    .filter((w): w is WindowAggregate => !!w)
+    .map((w) => ({ qty: w.qty, avgPrice: w.avgPrice }));
+  const volume = computeShopVolume(rows, costSettings);
+  return volume.units365d > 0 ? volume : null;
 }
 
 export function buildDashboardViewModel(
@@ -296,6 +338,7 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
     ek: 0,
     dbI: 0,
     dbII: 0,
+    fixedCostShare: 0,
     ebayFeeTotal: 0,
     shippingCost: 0,
     avgPrice: 0,
@@ -391,7 +434,8 @@ function monthlyVelocity(a: ArticleAggregate): number {
 export function buildSortimentRow(
   a: ArticleAggregate,
   articleClass: ArticleClass,
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  shop: ShopVolume | null
 ): SortimentRow {
   const referenceAgg = a.windows["365"] ?? a.windows.all;
   // REALISIERTER Ø-VK/EK der Referenz-Periode -- Basis der Marge/DB, siehe
@@ -407,11 +451,20 @@ export function buildSortimentRow(
   const listingVk = a.currentVk !== null && a.currentVk > 0 ? a.currentVk : null;
   const vkForCorridor = listingVk ?? avgVkRealized;
 
+  // Shopweiter Fixkostenanteil (KONZEPT §7.3: HK-Bestandteil) -- NICHT 0: sonst enthielte der
+  // Korridor keine Fixkosten. Einschreiben haengt am VK (Schwelle), daher VK mit durchreichen.
   const hk = computeHk(
-    { ek: ekPerUnit, kind, packSize: a.packQty, fixedCostPerUnit: 0 },
+    {
+      ek: ekPerUnit,
+      kind,
+      packSize: a.packQty,
+      fixedCostPerUnit: fixedCostPerUnit(shop?.units365d ?? 0, costSettings),
+      vk: vkForCorridor > 0 ? vkForCorridor : null,
+      shop,
+    },
     costSettings
   );
-  const corridor = computePriceCorridor(hk.total, vkForCorridor || hk.total, costSettings);
+  const corridor = computePriceCorridor(hk, vkForCorridor || hk.total, costSettings);
   const ekMissing = hasNoEkData(a);
   // FIX 1: Ohne EK ist der Korridor auf Basis EK=0 winzig (HK enthaelt praktisch nur
   // Versand/Gebuehren) -- der reale VK liegt dann fast immer "im Korridor" oder "ueber
@@ -427,6 +480,12 @@ export function buildSortimentRow(
   const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
   const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
   const dbIIPercent = referenceAgg && referenceAgg.revenue > 0 ? referenceAgg.dbII / referenceAgg.revenue : 0;
+  // DB III = DB II - Fixkostenanteil (Vollkosten). DB II traegt bewusst KEINE
+  // Fixkosten, siehe importPlan.ts; erst DB III sagt, ob der Artikel seinen
+  // Anteil an Shop, Billbee, Lexoffice, Raumkosten und Lizenzen traegt.
+  const dbIII = referenceAgg ? referenceAgg.dbII - referenceAgg.fixedCostShare : 0;
+  const dbIIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? dbIII / referenceAgg.qty : 0;
+  const dbIIIPercent = referenceAgg && referenceAgg.revenue > 0 ? dbIII / referenceAgg.revenue : 0;
 
   const windowMetrics: SortimentRow["windows"] = {};
   for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
@@ -448,13 +507,15 @@ export function buildSortimentRow(
     listingVk,
     ek: ekPerUnit,
     currentEk: a.currentEk,
-    corridor: { min: corridor.vkMin, good: corridor.vkGood },
+    corridor: { min: corridor.vkMin, good: corridor.vkGood, contribution: corridor.vkContribution },
     priceStatus,
     articleClass,
     classLabel: LABELS_DE[articleClass],
     dbIPerUnit,
     dbIIPerUnit,
     dbIIPercent,
+    dbIIIPerUnit,
+    dbIIIPercent,
     ekMissing,
     windows: windowMetrics,
     active: a.active,
@@ -477,6 +538,7 @@ export function buildFullSortiment(
   costSettings: CostSettingsValues
 ): SortimentRow[] {
   const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
+  const shop = shopVolumeFromAggregates(articles, costSettings);
   return [...articles]
     .sort((a, b) => {
       const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
@@ -488,7 +550,7 @@ export function buildFullSortiment(
         (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
       );
     })
-    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings));
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop));
 }
 
 /** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
@@ -569,7 +631,9 @@ export function buildRecommendations(
   }
 
   // Preis anpassen: JEDER Artikel unter dem MIN-Korridor (kein_ek-Artikel fallen hier
-  // automatisch raus, siehe SortimentRow.priceStatus/FIX 1).
+  // automatisch raus, siehe SortimentRow.priceStatus/FIX 1). "ziel_unerreichbar" ist bewusst
+  // NICHT dabei: dort liegt die Marge schon vor Fixkosten unter dem Ziel, "VK anheben" bis MIN
+  // waere kein sinnvoller Handlungsvorschlag, sondern Dauerrauschen (Signal ohne Aussage).
   // FIX 4: effectValue = Preis-Luecke/Stk x Hebel (max. aus Bestand ODER 90T-Velocity) --
   // "€ gesamt", NICHT mehr €/Stk. Der Hebel ist bewusst das Maximum aus Bestand (koennte man
   // sofort umpreisen) und 90T-Absatz (wird ohnehin in den naechsten ~3 Monaten verkauft),
