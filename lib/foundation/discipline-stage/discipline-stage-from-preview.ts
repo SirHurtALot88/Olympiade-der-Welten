@@ -44,6 +44,13 @@ export type StagePreviewPlayer = {
   portraitUrl: string | null;
   mods: StagePreviewMod[];
   pointsAwarded: number | null;
+  /**
+   * Disziplin-Mutator-Aufschlag (die „0,3er" fuer getroffene Mutatoren), getrennt von
+   * `pointsAwarded`. Zusammen ergeben beide die TATSAECHLICH gutgeschriebene PP-Summe
+   * (`resolveAwardedPlayerPoints`, `lib/foundation/player-points-total.ts`) — dieselbe
+   * Aufteilung, die Top-Spieler-Zeile und Hover-Karte schon nutzen (Task #102).
+   */
+  mutatorPpsBonus: number | null;
 };
 
 export type StagePreviewTeam = {
@@ -172,6 +179,7 @@ export function buildDisciplineStageTeamsFromPreview(
         portraitUrl: portraitById.get(entry.playerId) ?? null,
         mods,
         pointsAwarded: entry.pointsAwarded ?? null,
+        mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
       };
     });
 
