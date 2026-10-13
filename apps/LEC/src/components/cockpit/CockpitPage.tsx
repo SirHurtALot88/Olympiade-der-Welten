@@ -8,6 +8,7 @@ import { TempoCard } from "./TempoCard";
 import { DistributionCard } from "./DistributionCard";
 import { MoversCard } from "./MoversCard";
 import { CapitalCard } from "./CapitalCard";
+import { MarketHintsCard } from "./MarketHintsCard";
 import { dateDe, eur } from "./format";
 
 /** Zusammenbau der Cockpit-Seite (Server Component). Reihenfolge = COCKPIT_V2_KONZEPT §3. */
@@ -68,6 +69,10 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
           classPrefix="ck-p"
           note="Aktueller Listen-VK gegen den Vollkosten-Korridor (MIN 25 % / GUT 35 %). „Kein EK“ = ohne Einkaufspreis ist kein Korridor berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist."
         />
+      </div>
+
+      <div className="ck-grid">
+        <MarketHintsCard market={vm.market} />
       </div>
 
       <div className="ck-grid">

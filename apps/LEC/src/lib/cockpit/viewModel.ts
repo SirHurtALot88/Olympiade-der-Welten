@@ -14,6 +14,8 @@ import { classDistribution, priceStatusDistribution, type Distribution, type Pri
 import { computeEkGap, type EkGap } from "./ekGap";
 import { buildGuardrails, type BulletGuardrail, type PurchaseFacts } from "./guardrails";
 import { buildMovers, type ImageMap, type Movers } from "./movers";
+import { computeMarketHints, type MarketHints } from "./marketHints";
+import type { LatestQuote } from "../dashboard/marketComparison";
 import { PLANWERTE, type Planwerte } from "./planwerte";
 import { sumAllWindows, type WindowSums } from "./windowSums";
 import type { ArticleClass } from "../pricing/classification";
@@ -57,6 +59,7 @@ export interface CockpitViewModel {
   movers: Movers;
   guardrails: BulletGuardrail[];
   capital: CapitalFacts;
+  market: MarketHints;
   planwerte: Planwerte;
   fixedYearly: number;
   imports: ImportStatus[];
@@ -71,6 +74,8 @@ export interface CockpitInputs {
   purchases?: PurchaseFacts;
   imports?: ImportStatus[];
   planwerte?: Planwerte;
+  /** Juengster Cardmarket-Marktwert je Artikel-ID (MarketPrice). */
+  quotes?: ReadonlyMap<string, LatestQuote>;
 }
 
 const NO_PURCHASES: PurchaseFacts = { spentInBudgetMonths: null, spentLast90d: null, recordCount: 0 };
@@ -106,6 +111,7 @@ export function buildCockpitViewModel(input: CockpitInputs): CockpitViewModel {
     movers: buildMovers(aggregates, classified, window, images),
     guardrails: buildGuardrails(sums["365"], purchases, planwerte),
     capital: computeCapital(aggregates, bands, purchases),
+    market: computeMarketHints(aggregates, input.quotes ?? new Map(), costSettings, images),
     planwerte,
     fixedYearly: totalFixedYearly(costSettings),
     imports: input.imports ?? [],

@@ -102,11 +102,17 @@ Kurz und gezielt (13.10.2026, Quellen am Ende):
 └───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+Modul 14 (Preis-Hinweise Cardmarket) sitzt zwischen Preis-Ampel und Läuft/Bremst; es kam mit dem
+Merge von `claude/peaceful-rubin-k1nggz` (automatischer Cardmarket-Marktwert, alle manuellen
+Eingaben aus der App entfernt) dazu.
+
 ### 3.3 Bewusst **nicht** auf dem Cockpit
 
 - Keine vollständige Sortiment-Tabelle (dafür gibt es `/sortiment`; das Cockpit verlinkt).
 - Keine Empfehlungsliste mit Klartext (dafür `/empfehlungen`); das Cockpit zeigt nur Zahlen.
-- Kein Cardmarket-Platzhalter (keine Daten = kein Modul; Marktpreise bleiben auf `/marktpreise`).
+- Kein Cardmarket-Platzhalter und keine Marktpreis-Erfassung: der Marktwert kommt automatisch
+  (`MarketPrice`, source `cardmarket-priceguide`), das Cockpit zählt ihn nur aus (Modul 14); die
+  Detailtabelle bleibt auf `/marktpreise`.
 - Keine Kalenderjahres-GuV: die DB kennt nur rollierende Fenster (30/90/365/all), **keine
   Kalenderjahr-Summe**. Alles „Jahres"-Artige ist deshalb als **„rollierend 365 T"** beschriftet
   und ausdrücklich **kein Ersatz für die EÜR** (siehe 5.3).
@@ -136,6 +142,7 @@ Klassen und Fensterzahlen **per Konstruktion** mit der alten Seite überein — 
 | 11 | **Läuft / Bremst / Fällt ab** | `vm.sortiment` (Fenster-Umsatz, DB II, Klasse) | `movers.ts`: Top 6 je Liste für das gewählte Fenster | Listen mit Mini-Balken (relativ zu Platz 1) + Kartenbild | Identität braucht Namen, nicht Farbe. Bild hilft Chris beim Erkennen (Übergabe §6). |
 | 12 | **Kapital & Tempo** | `boundCapitalOf(a)`, `stock`, Wareneinsatz je Band, `Purchase` | `capital.ts` | Stat-Tiles + Bullet (Reichweite) | Einkauf vs. Verkauf ist der EÜR-Hebel. Ohne Purchase-Daten: leerer Zustand + Planwert. |
 | 13 | **Datenstand** | `listRecentImportBatches(prisma)` (bestehend) | letzter Lauf je `kind` | Footer-Zeile | Ein veraltetes Abbild sieht aus wie ein gültiger Stand (CLAUDE.md-Lektion). |
+| 14 | **Preis-Hinweise Cardmarket** | `MarketPrice` (source `cardmarket-priceguide`, automatisch), `buildMarketComparisonRow` aus `marketComparison.ts` (dieselbe Zeile wie `/marktpreise`) | `marketHints.ts`: Zählung zu günstig / im Korridor / zu teuer / EK über Markt, Abdeckung, mehrdeutig, veraltet; Top 5 je Richtung nach €-Hebel (Lücke × max(Bestand, 90-T-Absatz)) | 5 Fakt-Kacheln + 2 Listen mit Mini-Balken | Marktwert ist eine Zahl je Artikel, kein Zeitverlauf: Zählen und Rangliste sind die ehrliche Form. Bewertung wird nicht dupliziert, nur gezählt. Ohne Marktwert kein Urteil, keine erfundenen Preise. |
 
 ### 4.1 Fenster-Semantik
 

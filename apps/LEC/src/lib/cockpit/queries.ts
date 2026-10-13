@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { listRecentImportBatches, loadArticleAggregates } from "../dashboard/queries";
+import type { LatestQuote } from "../dashboard/marketComparison";
 import type { PurchaseFacts } from "./guardrails";
 import type { ArticleImageRef, ImageMap } from "./movers";
 import { PLANWERTE } from "./planwerte";
@@ -74,12 +75,23 @@ export async function loadImportStatus(prisma: PrismaClient): Promise<ImportStat
   return out.sort((a, b) => a.label.localeCompare(b.label, "de"));
 }
 
+/** Juengster Cardmarket-Marktwert je Artikel (dieselbe Auswahl wie /marktpreise). */
+export async function loadLatestQuotes(prisma: PrismaClient): Promise<Map<string, LatestQuote>> {
+  const quotes = await prisma.marketPrice.findMany({ orderBy: { fetchedAt: "desc" } });
+  const latest = new Map<string, LatestQuote>();
+  for (const q of quotes) {
+    if (!latest.has(q.articleId)) latest.set(q.articleId, q);
+  }
+  return latest;
+}
+
 export async function loadCockpitViewModel(prisma: PrismaClient, window: SaleWindowKey): Promise<CockpitViewModel> {
-  const [{ aggregates, costSettings }, images, purchases, imports] = await Promise.all([
+  const [{ aggregates, costSettings }, images, purchases, imports, quotes] = await Promise.all([
     loadArticleAggregates(prisma),
     loadArticleImages(prisma),
     loadPurchaseFacts(prisma),
     loadImportStatus(prisma),
+    loadLatestQuotes(prisma),
   ]);
-  return buildCockpitViewModel({ aggregates, costSettings, window, images, purchases, imports });
+  return buildCockpitViewModel({ aggregates, costSettings, window, images, purchases, imports, quotes });
 }

@@ -304,6 +304,38 @@ async function main() {
     }
   }
   console.log(`Einkaeufe: ${purchases}`);
+
+  // Cardmarket-Marktwerte (automatische Preisliste, Werte JE KARTE) fuer ~70 % der aktiven
+  // Artikel: Trend um den eigenen EK gestreut, damit "zu guenstig / im Korridor / zu teuer"
+  // nach Chris' Formel alle vorkommen; ~15 % mehrdeutig mit Spanne.
+  const marketArticles = await prisma.article.findMany({ where: { active: true }, select: { id: true, currentVk: true, currentEk: true, packQty: true } });
+  let quotes = 0;
+  for (const a of marketArticles) {
+    if (rand() > 0.7) continue;
+    const perCardVk = (a.currentVk ?? 5) / Math.max(1, a.packQty);
+    // Marktwert ≈ ein Drittel des VK (Formel VK = EK×3+0,99), gestreut 0,5..2,2 -> alle Urteile.
+    const trend = round2(Math.max(0.05, ((perCardVk - 0.99) / 3) * between(0.5, 2.2)));
+    const ambiguous = rand() < 0.15;
+    await prisma.marketPrice.create({
+      data: {
+        articleId: a.id,
+        source: "cardmarket-priceguide",
+        priceFrom: round2(trend * between(0.6, 0.95)),
+        priceTrend: trend,
+        priceAvg30: round2(trend * between(0.9, 1.1)),
+        priceAvg7: round2(trend * between(0.9, 1.1)),
+        priceAvg1: null,
+        available: Math.floor(between(3, 400)),
+        fetchedAt: new Date(today.getTime() - Math.floor(between(0, 45)) * 86400000),
+        matchQuality: ambiguous ? "mehrdeutig" : "eindeutig",
+        priceMin: ambiguous ? round2(trend * 0.4) : null,
+        priceMax: ambiguous ? round2(trend * 3) : null,
+        variants: ambiguous ? Math.floor(between(2, 6)) : null,
+      },
+    });
+    quotes++;
+  }
+  console.log(`Marktwerte: ${quotes}`);
   await prisma.$disconnect();
 }
 

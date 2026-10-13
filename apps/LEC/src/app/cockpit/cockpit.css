@@ -209,7 +209,7 @@
 @media (max-width: 1180px) {
   .ck-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ck-c7, .ck-c5 { grid-column: span 12; }
-  .ck-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ck-facts { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 @media (max-width: 920px) {
   .ck-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -225,6 +225,6 @@
 @media (max-width: 480px) {
   .ck-kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
   .ck-grid { gap: 10px; }
-  .ck-facts { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ck-facts { grid-template-columns: 1fr 1fr !important; gap: 8px; }
   .ck-wf { grid-template-columns: 92px minmax(0, 1fr) 70px; font-size: 11.5px; }
 }
