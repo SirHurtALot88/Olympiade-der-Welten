@@ -9,6 +9,7 @@
     "lizenz": "CC-BY 3.0 / OGA-BY 3.0",
     "url": "https://opengameart.org/content/arachne",
     "verwendung": "humanoide Spinnenfrau — menschlicher Oberkoerper mit grauem Haar geht nahtlos in einen schwarz-goldenen Spinnen-Hinterleib mit vier Beinpaaren ueber. Einziges insektoides/arachnides Vollkoerper-Motiv im Baukasten bislang.",
-    "verdrahtet": "25.08. in public/mockups/battle-mode.html eingebettet (B_SPRITES 'b_spinnenwesen', VOLLBILD-Eintrag 'spinne') und Arachna zugewiesen."
+    "verdrahtet": "25.08. in public/mockups/battle-mode.html eingebettet (B_SPRITES 'b_spinnenwesen', VOLLBILD-Eintrag 'spinne') und Arachna zugewiesen.",
+    "nachtrag_13_10": "Sprite-Fit-Nachlieferung: Grundform (Halb-Mensch-Halb-Spinne) traf Arachnas Portrait schon, nur die Farbe (gedeckte Oliv-/Grautoene statt der dunkel-goldenen Ornament-Ruestung im Bild) nicht. vollbildFarbeModus:'farbe' auf warmes Bronze-Gold ergaenzt."
   }
 }

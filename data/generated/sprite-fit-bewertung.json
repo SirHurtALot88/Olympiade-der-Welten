@@ -2,9 +2,9 @@
  {
   "name": "Abysskraken",
   "slug": "abysskraken",
-  "sterne": 2,
-  "begruendung": "Der runde Tentakel-Klumpen mit einem Auge trifft die Grundform eines Kraken-Monsters lose, aber Farbe (Rot statt Türkis-Dunkel), die vielen roten Augen, Reißzähne und Klauen aus dem Portrait fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "vollbildFarbeModus:\"farbe\" (neuer CSS-color-Blend statt multiply, s. bHolEingefaerbt-Kommentar) kippt die Grundfarbe von Knallrot auf dunkles Tiefsee-Tuerkis - multiply allein konnte das nicht, weil das Originalblatt keinerlei Gruen-/Blauanteil hatte. Die grobe Kraken-Kategorie UND jetzt auch die Farbfamilie stimmen; rote Augen/Reisszaehne/Klauen fehlen weiterhin (kein Augen-Layer fuer Vollbild-Kreaturen).",
+  "fehlendesDetail": "Mehrere rot leuchtende Augen, Reisszaehne und Klauen aus dem Portrait fehlen; nur die Grundfarbe wurde korrigiert."
  },
  {
   "name": "Aegirion",
@@ -37,9 +37,9 @@
  {
   "name": "Arachna",
   "slug": "arachna",
-  "sterne": 2,
-  "begruendung": "Spinnenbeine als thematischer Bezug vorhanden, aber die entscheidende Halb-Mensch-Identität (Gesicht, Krone, Rüstung, menschlicher Oberkörper) fehlt - stattdessen ein reines Insekten-Konstrukt.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "vollbildFarbeModus:\"farbe\" auf warmes Bronze-Gold statt der natuerlichen Oliv-/Grautoene des Blatts - naehert die ornamentale Gold-Ruestung aus dem Bild deutlich an. Die Halb-Mensch-Halb-Spinne-Silhouette (menschlicher Oberkoerper mit langem Haar auf Spinnenbeinen) war strukturell bereits korrekt vorhanden, nur die Farbe passte nicht.",
+  "fehlendesDetail": "Spitze Krone fehlt (kein Overlay-Slot fuer vollbild-Kreaturen)."
  },
  {
   "name": "Aurora",
@@ -65,9 +65,9 @@
  {
   "name": "Bearington",
   "slug": "bearington",
-  "sterne": 2,
-  "begruendung": "Vierbeinig-humanoide Kreatur trifft die Kategorie 'flauschiges Wesen' grob, aber falsche Spezies (Wolf/Fuchs statt Bär), falsche Farbe (grau/weiß statt rosa) und die blaue Fliege fehlen.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Neue HAUT-Rampe \"pink\" (bislang gab es nur \"lavender\", blass Blau-Violett statt Rosa) ersetzt \"lavender\" - das rosa Plueschfell ist jetzt klar statt nur entfernt erkennbar, per renderProbe verifiziert. Wolf/Fuchs-Kopf bleibt die naechstliegende Vierbeiner-Schnauze (kein Baeren-Kopf im Baukasten).",
+  "fehlendesDetail": "Blaue Fliege und schwarze Bratpfanne-Requisite fehlen (keine Slots dafuer)."
  },
  {
   "name": "Bloater",
@@ -79,29 +79,29 @@
  {
   "name": "Bombblitzer",
   "slug": "bombblitzer",
-  "sterne": 2,
-  "begruendung": "Muskulöser Monster-Humanoid als grobe Kategorie vorhanden, aber Football-Trikot, Ball, Stachelhelm und Totenschädel-Gesicht fehlen vollständig; wirkt wie ein generischer gehörnter Ork statt eines Football-Zombies.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "kopf von \"orc\" auf \"skeleton\" (Totenschaedel statt Ork-Gesicht) und effekt von \"void\" (violett) auf \"voidRot\" (rot wabernd) - trifft jetzt sowohl die Totenschaedel-Silhouette als auch die Augenfarbe aus dem Bild. Football-Trikot/-Helm zeigt die Arena-Vorschau grundsaetzlich nie (footballGear greift nur waehrend eines echten Football-Spiels), das bleibt also unabhaengig vom Rezept unsichtbar.",
+  "fehlendesDetail": "Football-Trikot/-Ball/-Stachelhelm bleiben in der Standard-Ansicht unsichtbar (nur waehrend eines echten Football-Spiels aktiv); Ketten fehlen."
  },
  {
   "name": "Breeze",
   "slug": "breeze",
-  "sterne": 2,
-  "begruendung": "Menschliche Form korrekt, aber generischer dunkelhaariger Look statt der brillentragenden Gelehrten mit goldener Robe, Zauberbuch und magischem Lichtwirbel.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "ruestTon von Standard-Lederbraun auf \"gold\" - die cremegoldene, bestickte Robe aus dem Bild ist jetzt deutlich sichtbar statt des generischen Looks. Brille und Buch-Requisite fehlen weiterhin (kein Requisiten-Slot dafuer; ein Zauberstab waere die falsche Requisite gewesen, deshalb bewusst nicht erzwungen).",
+  "fehlendesDetail": "Brille und aufgeschlagenes Buch fehlen (kein Requisiten-Slot im Baukasten)."
  },
  {
   "name": "Brightpaw",
   "slug": "brightpaw",
-  "sterne": 2,
-  "begruendung": "Die Wolfsform passt als Spezies, aber die Farbe ist komplett falsch (dunkelbraun statt leuchtend weiß) und die magischen blauen Rune-Markierungen fehlen völlig.",
+  "sterne": 3,
+  "begruendung": "vollbildFarbeModus:\"farbe\" kippt den Werwolf von Dunkelbraun auf ein kuehles Hellblau-Grau statt des komplett falschen Brauns - behaelt die vorhandene Schattierung (keine flache Silhouette). Bipedale Werwolf-Pose statt des vierbeinigen Wolfs aus dem Bild bleibt eine strukturelle Luecke (ein echtes Vierbeiner-Wolfsblatt existiert im Repo, aber dessen Zeilen sind nach Animation statt Blickrichtung sortiert und passen nicht ins bestehende rowMap-Raster, s. Code-Kommentar bei Brightpaw) - deshalb noch keine 4 Sterne trotz jetzt stimmiger Farbfamilie.",
   "fehlendesDetail": null
  },
  {
   "name": "Brobot",
   "slug": "brobot",
-  "sterne": 2,
-  "begruendung": "Nur die Flügel sind eine echte strukturelle Gemeinsamkeit; Farbe (braun statt blau-violett), Fledermausflügel statt Insektenflügel und der komplette Tech-Rüstungslook fehlen - wirkt wie ein niedlicher Fledermaus-Imp statt eines sleeken Cyber-Insekten-Kriegers.",
+  "sterne": 3,
+  "begruendung": "Neue RUEST_TON-Rampe \"violett\" (bislang gab es nur gold/bronze/dunkel) ersetzt \"dunkel\" (Grau) - die blau-violette Tech-Ruestung aus dem Bild ist jetzt als Farbfamilie da. Fledermausfluegel (statisches, nicht umfaerbbares Blatt) bleiben statt echter Insektenfluegel die einzige verfuegbare Naeherung.",
   "fehlendesDetail": null
  },
  {
@@ -128,16 +128,16 @@
  {
   "name": "Byrd",
   "slug": "byrd",
-  "sterne": 1,
-  "begruendung": "Die generische Abenteurer-Vorlage hat keinerlei Bezug zum bizarren Zwiebelkopf-Wesen mit Schutzbrille, gelbem Cardigan und Kehrbesen-Requisiten - das Portrait zeigt ein anthropomorphes Objekt/Gemüse, für das der Baukasten strukturell nichts hergibt.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Kopf wurde durch einen prozedural gezeichneten Zwiebelkopf ersetzt (rote Knolle, Papierhaut-Streifen, Wurzelbuesch, dunkle Schutzbrille mit hellem Rand) plus goldgelber Cardigan-Ton (ruestTon gold) - das namensgebende bizarre Element ist jetzt klar erkennbar, per renderProbe bei echter 64px-Groesse verifiziert.",
+  "fehlendesDetail": "Besen-/Kehrblech-Requisite in den Haenden und die Perlenkette fehlen noch (kein Requisiten-Slot dafuer im Baukasten)."
  },
  {
   "name": "Byrnja",
   "slug": "byrnja",
-  "sterne": 2,
-  "begruendung": "Die menschliche Grundform stimmt, und das helle Haar ist ein loser Treffer, aber das absolut namensgebende, bizarre Element - ein auf dem Kopf balancierter, aufgeschnittener Kuchen - fehlt komplett, ebenso die schwarze Kleidung.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Kopf wurde durch einen prozedural gezeichneten, angeschnittenen Tortenboden mit rosa Zuckerguss, Streuseln und sichtbarer Schnittflaeche ersetzt (zeichneKuchenKopf) - das absolut namensgebende bizarre Element ist jetzt da, dazu ruestTon \"dunkel\" fuer das schwarze Kleid. Per renderProbe bei echter 64px-Groesse verifiziert.",
+  "fehlendesDetail": "Das Messer, das das Tortenstueck herausschneidet, und die duesteren Augenringe/Lippen-Details fehlen."
  },
  {
   "name": "Cadrael",
@@ -149,9 +149,9 @@
  {
   "name": "Caldor",
   "slug": "caldor",
-  "sterne": 2,
-  "begruendung": "Nur der goldgelbe Farbton erinnert entfernt an die bronzene Rüstung; die komplette Ausrüstungsszene (Plattenpanzer, Helm mit Federbusch, Löwen-Schild) fehlt - wirkt wie ein einfacher Dorfbewohner statt eines gerüsteten Kriegers.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "helm:true + schild:true ergaenzt. Recherche-Befund: ruest:\"plate\" ist bei JEDEM Charakter nur ein schlichtes Bruststueck ohne Armschutz (kein Caldor-spezifischer Fehler, s. Code-Kommentar) - erst mit sichtbarem Helm und Schild liest sich die Figur als geruesteter Krieger statt als einfacher Dorfbewohner.",
+  "fehlendesDetail": "Federbusch-Helmzier und Loewen-Wappen auf dem Schild fehlen (keine Wappen-/Federbusch-Textur im Baukasten)."
  },
  {
   "name": "Cassandra",
@@ -170,8 +170,8 @@
  {
   "name": "Ciacia",
   "slug": "ciacia",
-  "sterne": 2,
-  "begruendung": "Nur eine vage 'Raubtier-Kreatur'-Silhouette bleibt übrig; die robotische Panther-Mechanik, Metalltextur und leuchtenden Kabel des Cyberpunk-Konzepts fehlen völlig - wirkt wie ein feuriges Fabelwesen statt eines Maschinen-Panthers.",
+  "sterne": 3,
+  "begruendung": "ruestTon von \"dunkel\" (Grau) auf die neue Rampe \"violett\" - naehert den violetten Cyberpunk-Metallton klar an. effekt:\"arkan\" ergaenzt fuer die leuchtenden Kabel-Akzente. Bleibt strukturell ein Standard-Humanoid mit Katzenohren/-schwanz statt eines echten vierbeinigen Roboter-Panthers.",
   "fehlendesDetail": null
  },
  {
@@ -191,9 +191,9 @@
  {
   "name": "Cyrn",
   "slug": "cyrn",
-  "sterne": 2,
-  "begruendung": "Grüne Hautfarbe passt lose zum Wald-Wesen, aber Rinden-/Blatt-Textur, Schild, Speer und die leuchtende Kristallbrust des Treants fehlen - wirkt wie ein generischer grüner Goblin statt eines Baum-Wächters.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "vollbild von Orc-Kopf+Lederruestung auf \"treant\" umgestellt (dieselbe Quelle wie Treantos, keine Asset-Exklusivitaet) - echte Baumwesen-Silhouette (Laubkrone, Holzstamm-Koerper) statt eines gruenhaeutigen Humanoiden, behebt genau das im Dokument benannte 'Wald-Riese'-Musterproblem. effekt:\"frost\" als Naeherung an den gluehenden Brust-Kristall.",
+  "fehlendesDetail": "Blatt-Schild, Speer und der genaue tuerkise Kristallton fehlen noch - generischer Treant statt des spezifischen Laub-Ruestungs-Looks."
  },
  {
   "name": "Dawnwhisper",
@@ -282,9 +282,9 @@
  {
   "name": "Erna Wellenlaut",
   "slug": "erna-wellenlaut",
-  "sterne": 2,
-  "begruendung": "Silbernes Haar passt, aber Flügel, Flöte und das durchscheinende fließende Kleid der Wasser-/Wind-Fee fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "fluegel:\"federn\" ergaenzt (echter Fluegel-Layer, bislang komplett gefehlt) plus effekt:\"frost\" fuer den schimmernden Wasser-/Luft-Schein - geist:true (Transparenz) traf die durchscheinende Erscheinung schon vorher. Fluegel sind jetzt klar sichtbar in der Vorschau.",
+  "fehlendesDetail": "Floete-Requisite fehlt (kein Instrumenten-Layer im Baukasten)."
  },
  {
   "name": "Falcon",
@@ -296,9 +296,9 @@
  {
   "name": "Galactus",
   "slug": "galactus",
-  "sterne": 2,
-  "begruendung": "Nur eine vage außerirdisch-nichtmenschliche Kopfform bleibt als Bezug; die riesige Krabben-Kreatur mit schwarzem Panzer, glühend roten Augen und Lava-Klauen aus dem Portrait ist komplett verschwunden - wirkt wie ein normal großer grauer Alien.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "vollbild von Echsenkopf+Platte auf \"kraken\" umgestellt (keine Asset-Exklusivitaet, s. Abysskraken) mit vollbildFarbeModus:\"farbe\" auf dunkles Grau-Schwarz statt des nativen Rots, dazu effekt:\"voidRot\" fuer den roten Glueh-Akzent - eine rundliche Vielbein-Silhouette kommt der Krabbenform strukturell naeher als ein aufrechter Humanoid, auch wenn Kopffuesser und Krebstier nicht dasselbe sind.",
+  "fehlendesDetail": "Echte Krabbenbeine/-scheren und eine klarere Panzer-Textur fehlen - ein Kraken-Blatt bleibt eine grobe Naeherung an ein Krebstier."
  },
  {
   "name": "Gralakar",
@@ -317,9 +317,9 @@
  {
   "name": "Greenkraut",
   "slug": "greenkraut",
-  "sterne": 2,
-  "begruendung": "Grüne Hautfarbe erinnert entfernt an die Natur-Kreatur, aber die Rinden-Textur, die auffällige orangene Trichterblüte an der Schulter und das sanfte Baumwesen-Auftreten fehlen komplett - wirkt wie ein generischer grüner Goblin.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "vollbild von Orc-Kopf+Lederruestung+Kapuze auf \"treant\" umgestellt (dieselbe Quelle wie Treantos/Cyrn, keine Asset-Exklusivitaet) mit vollbildFarbeModus:\"farbe\" auf graubraunen Rinden-Ton statt des natuerlichen Laubgruens - trifft sowohl die Baumwesen-Kategorie als auch die helle Rinden-Palette des Bildes, unterscheidet sich zugleich farblich von Cyrn/Treantos.",
+  "fehlendesDetail": "Orange Trichterbluete auf der Schulter und die kauernde, sanfte Pose fehlen (kein Blueten-Requisit, keine alternative Pose im Blatt)."
  },
  {
   "name": "Greybeard",
@@ -331,15 +331,15 @@
  {
   "name": "Grieving Colossus",
   "slug": "grieving-colossus",
-  "sterne": 2,
-  "begruendung": "Nur eine grobe 'großes Monster'-Silhouette bleibt übrig; die dunkle Obsidian-Farbe, die schweren Ketten und die Lava-Tränen aus Augen/Mund des trauernden Stein-Koloss fehlen komplett - wirkt wie ein generisches braunes Fellmonster.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "vollbild von Orc-Kopf+schwarzer Haut auf \"golem\" umgestellt (dieselbe Familie wie Lava Golem/Vorrak/Krag'Zul) mit sehr dunkler Obsidian-Faerbung, gluehenderRiss:true und effekt:\"feuer\" am Kopf fuer die Lava-Traenen - der gluehende Feuer-Akzent ist im Kontrast zum fast schwarzen Koerper klar sichtbar, trifft Kategorie (Stein-Koloss) und Farbfamilie jetzt deutlich.",
+  "fehlendesDetail": "Schwere Ketten und die kauernde Vierbeiner-Haltung aus dem Bild fehlen (kein Ketten-Layer, golem_walk.png zeigt nur eine aufrechte Pose)."
  },
  {
   "name": "Grizz",
   "slug": "grizz",
-  "sterne": 2,
-  "begruendung": "Nur ein grüner Ärmel deutet entfernt auf den Ork hin; der Kopf ist ein generischer Roboter-Visier-Kopf statt eines grünhäutigen Orks mit Schutzbrille, es fehlen die blau leuchtenden Zahnräder.",
+  "sterne": 3,
+  "begruendung": "helm:true entfernt - derselbe Roboter-Visier-Helm wie bei Draco/Steel Sinister verdeckte das gruene Ork-Gesicht komplett, obwohl das Portrait nur eine hochgeschobene Brille zeigt (keinen Vollhelm). Das Ork-Gesicht ist jetzt klar sichtbar, effekt:\"frost\" ergaenzt fuer die blauen Zahnrad-Lichter.",
   "fehlendesDetail": null
  },
  {
@@ -653,8 +653,8 @@
  {
   "name": "Orakelpfropf",
   "slug": "orakelpfropf",
-  "sterne": 1,
-  "begruendung": "Das realistische Foto einer Katze mit Eimer auf dem Kopf hat keinerlei Bezug zur generischen braunen Fantasie-Kreatur - komplett andere Gattung (echtes Tier statt Fabelwesen), keine Requisite (Eimer), kein realistischer Look.",
+  "sterne": 2,
+  "begruendung": "Neu: ein prozedural gezeichneter halbtransparenter Becher sitzt jetzt ueber Kopf/Ohren (zeichneEimerKopf) - die auffaelligste Requisite aus dem Bild ist damit erstmals vorhanden. Die Kreatur bleibt aber ein stehender Zweibeiner mit dunklem Fell statt der liegenden, hellen getigerten Katze - Gattung und Farbe treffen weiterhin nicht, deshalb nur ein loser thematischer Bezug (★★) statt mehr.",
   "fehlendesDetail": null
  },
  {
@@ -863,9 +863,9 @@
  {
   "name": "Tavascron",
   "slug": "tavascron",
-  "sterne": 1,
-  "begruendung": "Die Sprite-Form ist als unklarer grünlich-brauner Klumpen kaum als Figur erkennbar und hat keinerlei erkennbaren Bezug zum wuchtigen, blau leuchtenden Kampf-Mech des Portraits.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Von mech_transformer_walk.png (dessen Standard-QA-Profilpose selbst als \"schwer lesbare Haltung\" dokumentiert war) auf mech_gross_walk.png umgehaengt (dieselbe Quelle wie Robofighter, keine Asset-Exklusivitaet) + Stahlblau-Tint: jetzt aus allen vier Richtungen ein klar lesbarer, aufrechter Kampfmech mit Schulterkanone und blauem Grundton statt eines unklaren Klumpens.",
+  "fehlendesDetail": "Transformer-Doppelfaust-Silhouette und das kraeftige Neon-Leuchten (Visier/Gelenke) aus dem Portrait fehlen noch, dazu mehrere kleinere Detail-Abweichungen (Kopfform, Waffenzahl) - generischer schwerer Mech statt des spezifischen Transformers."
  },
  {
   "name": "Terradon",
