@@ -451,6 +451,49 @@ Animation, sondern rechnet den Rest **ohne Bild** durch und öffnet den Endstand
 **Klasse T** — und Chris hat ihn ausdrücklich bestellt. Das gilt als seine Zustimmung zu diesem
 Knopf, nicht zu anderen Tempo-Eingriffen.
 
+**Nachtrag (Task #104, Agent-Recherche 13.10.): der Knopf existiert schon.** Bevor dieser
+Abschnitt in Code umgesetzt wurde, stellte sich heraus, dass Chris denselben Wunsch bereits am
+04.09. geäußert hatte („wir brauchen noch nen quick sim button um das ergebnis zu simulieren") und
+er seitdem gebaut ist: **„⏩ Quick-Sim"** in `DisciplineStageNativeArena.tsx` (`quickSim()`,
+~Zeile 3300; Knopf ~Zeile 3942). Das Dokument hier ist nicht veraltet in der Absicht, nur im
+technischen Bild — geschrieben, als wäre die Bühne noch die alte iframe-Engine
+(`public/mockups/battle-mode.engine.js`, `#spd`, `sondenLauf()`). Tatsächlich läuft seit dem
+iframe-Abbau (s. `docs/discipline-stage-native-rebuild-plan.md`) **jede** der zwanzig Disziplinen
+über `DisciplineStageNativeArena.tsx` — ein einziges, geteiltes Bauteil, kein Chassis-Unterschied
+mehr zwischen Bühne/Bahn/Feldspiel/Arena auf dieser Ebene. Das ändert die Antwort auf die Fragen
+unten:
+
+- **Kein viertes Tempo gegenüber 1×/2×/4× nötig**, weil es diese Tempo-Stufen in der nativen Bühne
+  gar nicht mehr gibt (nur noch Einzel-Etappen-Fortschritt + Quick-Sim + Reset). Die alte Engine mit
+  `#spd` lebt nur noch als Dev-Vorschau (`FoundationBattleArenaHost.tsx` /
+  `FoundationShellRouterBody.tsx`) und für den **serverseitigen, headless Resolve**, der `preview`
+  erzeugt — dort war Simulation nie wandzeituhr-gebunden, das Problem bestand dort nie.
+- **Determinismus ist bauartbedingt gegeben, nicht nur gemessen:** `commitFinishedDiscipline`
+  (`DisciplineStageArena.tsx:2339`) bucht IMMER `onCommitDiscipline(side, preview)` — dasselbe
+  `preview`-Objekt, unabhängig davon, ob die Bühne bis zum Ende durchlief oder Quick-Sim gedrückt
+  wurde. Die Bühne selbst berechnet keine Wertung, sie zeigt nur den bereits aufgelösten Spielplan-
+  Eintrag an (`buildRT()`/`playerNet()`/`recomputeRanks()` sind reine Funktionen über diese Daten,
+  ohne `Math.random()` im Score-Pfad — Zufall taucht nur noch in Konfetti-/Partikel-Koordinaten
+  auf, nie im Endstand). Ein Feld-Primitive wie `duelhp.tsx` (Arena-Chassis) zeichnet nur, was es
+  an Props bekommt — es führt keine eigene Simulation.
+- **Bereits empirisch belegt:** `tests/arena-bereits-gewertet.test.ts:19` hält fest, dass der
+  Spielstand nach einem vollen Quick-Sim **md5-identisch** mit einem normal durchgespielten Lauf
+  war (Season 1, Spieltag 10). Ergänzend abgesichert durch `tests/arena-ladder-rank-delta.test.ts`
+  (Rang-Verlauf je Etappe, nicht nur am Ende), `tests/arena-gemeinsame-zeitbasis.test.ts` /
+  `tests/arena-steuerung-erreicht-den-gast.test.ts` / `tests/vier-restbefunde.test.ts`
+  (Multiplayer-Quick-Sim bleibt auf der aktiven Spieltagsseite, Gast sieht denselben Sprung).
+- **Eine kleine, nicht blockierende Abweichung vom Ideal „ohne Bild":** Quick-Sim ruft nach ~200 ms
+  weiterhin `showPodium()` auf, die reguläre Podest-Enthüllung mit Konfetti/Ton (~2,4 s), bevor
+  `onEnded()`/die Buchung feuert — es ist also kein 0-Frame-Sprung, sondern ein kurzer, stummer-bis-
+  auf-das-Podest Übergang. Bucht trotzdem korrekt und sofort genug für Chris' Anliegen; ein echtes
+  „sofort, ganz ohne Podest" wäre ein separater, rein kosmetischer Folge-Task, kein Korrektheits-Bug.
+
+**Empfehlung:** Task #104 als erledigt schließen (Referenz: „⏩ Quick-Sim", 04.09., seitdem laut
+Code-Kommentaren mehrfach nachgebessert — Rang-Verlauf je Etappe statt Endrang-Kopien, Multiplayer-
+Sprung bleibt auf der aktiven Spieltagsseite, `busyRef`-Fix gegen einen wirkungslosen Klick während
+der laufenden Kaskade). Kein neuer, zweiter Knopf nötig; zwei nahezu gleiche Knöpfe nebeneinander
+wären eine Verschlechterung, keine Verbesserung.
+
 **Das Sendezeit-Budget.** Mit dem Knopf wird eine Frage beantwortbar, die bisher jede T-Idee
 blockiert hat: **Darf eine Disziplin länger als eine Minute dauern, wenn man sie überspringen kann?**
 Vorschlag für Entscheidung E2:
