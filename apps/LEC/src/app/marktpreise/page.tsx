@@ -6,6 +6,11 @@ import { MarktpreisePage } from "@/components/marktpreise/MarktpreisePage";
 
 export const dynamic = "force-dynamic";
 
+function urgency(r: ReturnType<typeof buildMarketComparisonRow>): number {
+  const base = r.status === "zu_guenstig" ? 3000 : r.status === "zu_teuer" ? 2000 : r.ekAboveMarket ? 1000 : 0;
+  return base + Math.min(999, Math.abs(r.deltaPercent ?? 0) * 100);
+}
+
 export default async function Page() {
   const { aggregates, costSettings } = await loadArticleAggregates(prisma);
 
@@ -19,7 +24,9 @@ export default async function Page() {
   const rows = aggregates
     .filter((a) => latestByArticle.has(a.articleId))
     .map((a) => buildMarketComparisonRow(a, latestByArticle.get(a.articleId)!, costSettings, shop))
-    .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime());
+    // Handlungsbedarf zuerst: zu guenstig (Geld liegt liegen), zu teuer, EK ueber Markt,
+    // danach nach Abstand zum Formel-VK.
+    .sort((a, b) => urgency(b) - urgency(a));
 
   return <MarktpreisePage rows={rows} />;
 }

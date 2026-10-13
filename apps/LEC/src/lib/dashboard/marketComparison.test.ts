@@ -55,11 +55,47 @@ describe("buildMarketComparisonRow", () => {
     expect(row.ownVk).toBeCloseTo(5);
   });
 
-  it("klassifiziert 'zu teuer' bei eigenem VK deutlich ueber dem Markt-Trend", () => {
-    const a = article({ currentVk: 5 });
-    const row = buildMarketComparisonRow(a, quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null);
-    expect(row.status).toBe("zu_teuer");
-    expect(row.deltaPercent).toBeGreaterThan(0);
+  it("misst den VK an Chris' Formel auf Marktwert, nicht an ±15 % um den Trend", () => {
+    // Trend 1 € -> Formel-VK max(4,99; 3 x 1 + 0,99) = 4,99. VK 5 € ist damit in Ordnung,
+    // obwohl er das Fuenffache des Trends ist (alter Vergleich: "zu teuer").
+    const ok = buildMarketComparisonRow(article({ currentVk: 5 }), quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null);
+    expect(ok.formulaVk).toBeCloseTo(4.99);
+    expect(ok.status).toBe("im_korridor");
+    const teuer = buildMarketComparisonRow(article({ currentVk: 9.99 }), quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null);
+    expect(teuer.status).toBe("zu_teuer");
+    expect(teuer.deltaPercent).toBeGreaterThan(0);
+    const guenstig = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceTrend: 4 }), DEFAULT_COST_SETTINGS, null);
+    expect(guenstig.formulaVk).toBeCloseTo(12.99);
+    expect(guenstig.status).toBe("zu_guenstig");
+  });
+
+  it("rechnet Pack-Artikel mit Trend x Pack-Menge", () => {
+    const row = buildMarketComparisonRow(article({ packQty: 3, currentVk: 5.99 }), quote({ priceTrend: 0.5 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.marketValue).toBeCloseTo(1.5);
+    expect(row.formulaVk).toBeCloseTo(5.49);
+  });
+
+  it("mehrdeutig: Spanne statt Wert, Ampel nur bei klarer Lage", () => {
+    const q = quote({ matchQuality: "mehrdeutig", priceMin: 0.3, priceMax: 30, variants: 3 });
+    const row = buildMarketComparisonRow(article({ currentVk: 6.99 }), q, DEFAULT_COST_SETTINGS, null);
+    expect(row.marketValue).toBeNull();
+    expect(row.marketRange).toEqual({ min: 0.3, max: 30, variants: 3 });
+    // 6,99 € liegt zwischen den Formel-VKs der Varianten (4,99 .. 90,99): kein Urteil.
+    expect(row.status).toBe("im_korridor");
+    // Selbst gegen die billigste Variante (Formel 12,99) zu billig: eindeutig zu guenstig.
+    const billig = buildMarketComparisonRow(
+      article({ currentVk: 4.99 }),
+      quote({ matchQuality: "mehrdeutig", priceMin: 4, priceMax: 30, variants: 2 }),
+      DEFAULT_COST_SETTINGS,
+      null
+    );
+    expect(billig.status).toBe("zu_guenstig");
+  });
+
+  it("markiert einen EK deutlich ueber Marktwert", () => {
+    const a = article({ currentVk: 9.99, currentEk: 3 });
+    expect(buildMarketComparisonRow(a, quote({ priceTrend: 1 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(true);
+    expect(buildMarketComparisonRow(a, quote({ priceTrend: 2.5 }), DEFAULT_COST_SETTINGS, null).ekAboveMarket).toBe(false);
   });
 
   it("bleibt neutral ('im_korridor') ohne Markt-Trend (kein erfundener Vergleich)", () => {

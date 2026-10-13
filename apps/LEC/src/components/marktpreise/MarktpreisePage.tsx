@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { MarketComparisonRow } from "@/lib/dashboard/marketComparison";
 import { formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { Corridor } from "@/components/dashboard/SortimentTable";
-import { MarketPriceForm, type SelectedArticle } from "./MarketPriceForm";
 import { MarketComparisonTable } from "./MarketComparisonTable";
 
 const STATUS_TILE: Record<MarketComparisonRow["status"], { cls: string; label: string }> = {
@@ -20,37 +18,27 @@ interface Props {
 }
 
 export function MarktpreisePage({ rows }: Props) {
-  const router = useRouter();
-  const [selected, setSelected] = useState<SelectedArticle | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
 
   const detailRow = rows.find((r) => r.articleId === selectedArticleId) ?? null;
 
-  function handleSelectFromForm(article: SelectedArticle) {
-    setSelected(article);
-    setSelectedArticleId(article.id);
-  }
-
   function handleSelectFromTable(articleId: string) {
-    const row = rows.find((r) => r.articleId === articleId);
-    if (row) {
-      setSelected({ id: row.articleId, nameRaw: row.nameRaw, setCode: row.setCode, packQty: row.packQty });
-      setSelectedArticleId(articleId);
-    }
+    setSelectedArticleId(articleId);
   }
 
-  function handleSaved() {
-    router.refresh();
-  }
 
   return (
     <AppShell
       title="Marktpreise"
-      subtitle="Cardmarket-Vergleich · Provider B, manuell erfasst"
-      footer={<span>{rows.length} Artikel mit erfasstem Marktpreis · eigener VK/EK vs. Cardmarket.</span>}
+      subtitle="Cardmarket-Preisliste, täglich automatisch · eigener VK und EK gegen den Markt"
+      footer={
+        <span>
+          Marktwert = Cardmarket-Trend je Karte × Pack-Menge (alle Sprachen). Formel-VK = deine Regel 3 × Marktwert + 0,99 €,
+          mindestens 4,99 €. Gibt es die Karte im Set in mehreren Seltenheiten, zeigt Cardmarket sie ohne Seltenheit — dann
+          steht die Spanne da statt eines geratenen Werts.
+        </span>
+      }
     >
-      <MarketPriceForm onSelect={handleSelectFromForm} selected={selected} onSaved={handleSaved} />
-
       <section style={{ marginTop: 16, marginBottom: 16 }}>
         {detailRow ? (
           <div className="grid-2" style={{ marginBottom: 0 }}>
@@ -61,11 +49,11 @@ export function MarktpreisePage({ rows }: Props) {
               <div className="price">
                 <div className="pricegrid">
                   <div className="pcell">
-                    <div className="k">Markt ab</div>
+                    <div className="k">Markt ab (je Karte)</div>
                     <div className="v">{detailRow.marketFrom !== null ? `${formatEuroCents(detailRow.marketFrom)} €` : "—"}</div>
                   </div>
                   <div className="pcell">
-                    <div className="k">Markt Trend</div>
+                    <div className="k">Trend (je Karte)</div>
                     <div className="v">{detailRow.marketTrend !== null ? `${formatEuroCents(detailRow.marketTrend)} €` : "—"}</div>
                   </div>
                   <div className="pcell">
@@ -120,14 +108,14 @@ export function MarktpreisePage({ rows }: Props) {
             <div className="card" style={{ padding: "15px 16px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <div style={{ fontSize: 11.5, color: "var(--muted)", fontWeight: 600, marginBottom: 8 }}>
-                  Preis-Korridor <span style={{ color: "var(--faint)" }}>· eigener VK vs. MIN/GUT + Markt-Trend</span>
+                  Preis-Korridor <span style={{ color: "var(--faint)" }}>· eigener VK vs. MIN/GUT + Marktwert</span>
                 </div>
                 <Corridor
                   min={detailRow.corridor.min}
                   good={detailRow.corridor.good}
                   contribution={detailRow.corridor.contribution}
                   vk={detailRow.ownVk}
-                  marketValue={detailRow.marketTrend}
+                  marketValue={detailRow.marketValue}
                 />
               </div>
               <div>
@@ -137,8 +125,8 @@ export function MarktpreisePage({ rows }: Props) {
                 </span>
                 {detailRow.deltaPercent !== null && (
                   <span style={{ marginLeft: 10, fontSize: 12, color: "var(--faint)" }}>
-                    Δ VK↔Trend: {detailRow.deltaPercent > 0 ? "+" : ""}
-                    {formatPercent(detailRow.deltaPercent)}% (±15 % gilt als neutral)
+                    Δ VK↔Formel-VK: {detailRow.deltaPercent > 0 ? "+" : ""}
+                    {formatPercent(detailRow.deltaPercent)}% (−15 % bis +50 % gilt als passend)
                   </span>
                 )}
               </div>
@@ -157,7 +145,7 @@ export function MarktpreisePage({ rows }: Props) {
           >
             <b>Noch kein Artikel ausgewählt.</b>
             <span style={{ fontSize: 12.5, color: "var(--muted)" }}>
-              Oben einen Artikel suchen und Preisdaten erfassen, oder unten eine Zeile in der Vergleichstabelle anklicken.
+              Unten eine Zeile in der Vergleichstabelle anklicken.
             </span>
           </div>
         )}
