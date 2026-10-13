@@ -34391,6 +34391,17 @@
           ?(u.wechselKonto>0?"−"+fmtDauer(u.wechselKonto):"+"+fmtDauer(-u.wechselKonto))
           :fmtDauer(Math.max(0,-u.wechselKonto))),
         wechselKopf:"Wechsel",
+        // GESAMTZEIT JE LAEUFER (Chris' Feedback 13.10., Punkt 12: "Bei Staffel fehlt auch
+        // beim Ergebnis noch eine Gesamtzeit also Bahn + Wechsel"): reine Summe der zwei
+        // Spalten, die direkt daneben ohnehin schon stehen -- Etappe (`u.etappenZeit`, die
+        // eigene Laufzeit) plus die Wechselbilanz (`u.wechselKonto`, negativ = verloren,
+        // positiv = gewonnen bei Marke-und-Zug). Keine neue Zahl, kein neuer Rechenpfad,
+        // nur dieselbe Vorzeichenkonvention wie `wechselVon` direkt darueber ein zweites Mal
+        // gelesen (`etappenZeit-wechselKonto`, weil ein NEGATIVES Konto die Gesamtzeit
+        // VERGROESSERT). `null` nur, wenn `etappenZeit` selbst noch fehlt (Laeufer noch nicht
+        // am Ziel seiner Etappe) -- derselbe Fall, den `zeitVon` oben schon mit "—" zeigt.
+        gesamtVon:(u)=>u.etappenZeit==null?"—":fmtDauer(u.etappenZeit-(u.wechselKonto||0)),
+        gesamtKopf:"Gesamt",
         zeitKopf:"Etappe", platzKopf:"Rang"};
     }
     // TAKESHI'S CASTLE (Prototyp 06.09.): die Burgpunkte SIND die Wertung (Chris 05.09.,
@@ -34446,10 +34457,10 @@
       if(!h||!g||h.etappenZeit==null||g.etappenZeit==null)continue;
       staffelBeinDuellGemeldet.add(b);
       const sieger=h.etappenZeit<=g.etappenZeit?h:g, zweiter=sieger===h?g:h;
-      const txt="Bein "+(b+1)+": "+sieger.n+" "+fmtDauer(sieger.etappenZeit)+" gegen "
-        +zweiter.n+" "+fmtDauer(zweiter.etappenZeit)+" — Bein gewonnen";
+      const txt="Abschnitt "+(b+1)+": "+sieger.n+" "+fmtDauer(sieger.etappenZeit)+" gegen "
+        +zweiter.n+" "+fmtDauer(zweiter.etappenZeit)+" — Abschnitt gewonnen";
       feedEreignis(sieger.seite,txt+".");
-      callout("BEIN-DUELL · "+txt);
+      callout("ABSCHNITT-DUELL · "+txt);
       break;   // hoechstens ein Banner je Frame
     }
   }
@@ -34849,16 +34860,16 @@
           deltaEl.classList.remove("bh-home","bh-away");
           const balken=(anteil,klasse)=>'<span class="bhbar"><i class="'+klasse
             +'" style="width:'+Math.round(Math.max(3,Math.min(100,anteil*100)))+'%"></i></span>';
-          // ST-3: BEIN-/RUNDENZEILE (Abschnitt 4.3, "Bein 4/6 · Runde 2/3"). Runde 2
+          // ST-3: ABSCHNITT-/RUNDENZEILE (Abschnitt 4.3, "Abschnitt 4/6 · Runde 2/3"). Runde 2
           // (Vorschlag 3) warnte ausdruecklich vor einer dritten HUD-Zeile JE SEITE --
           // deshalb hier im mittleren Delta-Feld statt in .bhside. Fuehrender Fortschritt
-          // (welche Seite weiter ist) bestimmt, wessen Bein gezaehlt wird; nach Zieleinlauf
-          // einer Seite bleibt ihr letztes Bein stehen (gesamtfortschritt()==1).
+          // (welche Seite weiter ist) bestimmt, wessen Abschnitt gezaehlt wird; nach Zieleinlauf
+          // einer Seite bleibt ihr letzter Abschnitt stehen (gesamtfortschritt()==1).
           const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
           const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
           const beinN=BA().jeSeite||6, jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
           const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
-          const beinZeile='<small class="bhbein">Bein '+beinNr+'/'+beinN+' · Runde '
+          const beinZeile='<small class="bhbein">Abschnitt '+beinNr+'/'+beinN+' · Runde '
             +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
           if(done){
             // AM ZIEL: derselbe Zieleinlauf-Abstand wie im Endstand-Overlay
@@ -34923,11 +34934,11 @@
         const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
         const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
         if(!aktivBein)return null;
-        return "Positionskampf: "+VEREIN[voran].name+" führt auf Bein "
+        return "Positionskampf: "+VEREIN[voran].name+" führt auf Abschnitt "
           +(aktivBein.bein+1)+"/"+(BA().jeSeite||6);
       }
       if(!staffelWechselAnzeige)return null;
-      return "Letzter Wechsel: Bein "+staffelWechselAnzeige.bein
+      return "Letzter Wechsel: Abschnitt "+staffelWechselAnzeige.bein
         +(staffelWechselAnzeige.verpatzt?" — verpatzt":" — sauber");
     }
     // SPURT / TIME-TRIAL: generisch ueber u.pos/bahnHochrechnung, keine Staffel-Sonderfelder.
@@ -38639,7 +38650,7 @@
   // STAFFEL (`staffel:true`): nur einer je Team laeuft gleichzeitig — die anderen fuenf
   // Spalten der Rennen-Vorlage passen deshalb nicht (kein individuelles Hindernis-Feld,
   // kein Windschatten-Anteil, der etwas ueber die STAFFEL aussagt). Eigene Spalten:
-  // welches Bein, wie stand die eigene Etappe, wie viele Wechsel, wie viel dabei
+  // welcher Abschnitt, wie stand die eigene Etappe, wie viele Wechsel, wie viel dabei
   // verloren ging. `laufAnteil()` (oben) rechnet den Fortschritt im EIGENEN Abschnitt
   // bereits fuer die Kamera vor — hier wiederverwendet statt zweimal gebaut.
   function WERTUNG_STAFFEL(art){
@@ -38651,7 +38662,10 @@
     };
     return {namen:"Läufer", zeilen, sortierung:(a,b)=>(a.u.bein??0)-(b.u.bein??0),
       spalten:[
-        {id:"bein", kopf:"Bein", titel:"Abschnitt", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
+        // "Bein" hiess diese Spalte bis 13.10. (1:1 von "Leg" uebersetzt, Chris' Feedback
+        // Punkt 11, chris-feedback-breite-runde-13-10.md) — jetzt "Abschnitt", wie ueberall
+        // sonst im Projekt (s. "Etappe"/"Abschnitt" auf der Spieltags-Buehne).
+        {id:"bein", kopf:"Abschnitt", titel:"welcher Streckenabschnitt (1 von "+(art.jeSeite||6)+")", wert:z=>z.u.bein!=null?String(z.u.bein+1):null},
         // Beide Zeitspalten in ECHTEN Sekunden, nicht in Simulationssekunden (13.09.,
         // s. bahnRealSek oben) — vorher stand hier "1.8 s" fuer eine Etappe, die der
         // Zuschauer 25,7 Sekunden lang sieht. `wert` traegt weiterhin eine Zahl (die
@@ -46348,11 +46362,14 @@
       box.textContent="";
       box.appendChild(el("h5",null,VEREIN[seite].name));
       const t=el("table"), kopf=el("tr");
-      // WECHSEL-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`, s. bahnTeamstand):
-      // fuer jede andere Bahn ist das Feld undefined, Kopf- und Datenzeile bleiben dann exakt
-      // die alten vier Spalten.
+      // WECHSEL-/GESAMT-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`/`stand.gesamtVon`,
+      // s. bahnTeamstand): fuer jede andere Bahn sind die Felder undefined, Kopf- und Datenzeile
+      // bleiben dann exakt die alten vier Spalten.
       const kopfLabels=["Läufer",stand.platzKopf||"Platz",stand.zeitKopf||"Zeit"];
       if(stand.wechselVon)kopfLabels.push(stand.wechselKopf||"Wechsel");
+      // GESAMTZEIT (Punkt 12, 13.10.): Etappe + Wechsel in einer Spalte, direkt neben den
+      // beiden Einzelwerten, aus denen sie sich zusammensetzt.
+      if(stand.gesamtVon)kopfLabels.push(stand.gesamtKopf||"Gesamt");
       kopfLabels.push("Punkte");
       for(const lab of kopfLabels)kopf.appendChild(el("th",null,lab));
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
@@ -46367,6 +46384,7 @@
         if(stand.zeitVon){
           tr.appendChild(el("td",null,stand.zeitVon(u)));
           if(stand.wechselVon)tr.appendChild(el("td",null,stand.wechselVon(u)));
+          if(stand.gesamtVon)tr.appendChild(el("td",null,stand.gesamtVon(u)));
           tr.appendChild(el("td",null,fmtP(stand.punkte.get(u.id))));
           tb.appendChild(tr); return;
         }

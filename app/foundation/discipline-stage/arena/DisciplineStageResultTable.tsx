@@ -155,10 +155,17 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                         <div style={{ fontWeight: 800, color: "var(--nl-ink)" }}>
                           {c.isBest ? <span style={{ color: "var(--nl-warn)" }}>★ </span> : null}
                           <span style={{ fontSize: 11, fontWeight: 800, color: ampel(c.slotRank), marginRight: 5 }}>#{c.slotRank}</span>
-                          {/* Netto NEUTRAL (ink): früher nach Mod-Vorzeichen gefärbt → durch Fatigue
-                              fast überall rot, wirkte als wären alle Werte schlecht. Farbcodierung
-                              trägt der Slot-Rang (#N, ampel). Bonus/Malus steckt weiter im Tooltip (calc). */}
-                          {fmt1(c.net)}
+                          {/* Chris' Feedback 13.10. (Punkt 13, Staffel — gilt fuer jede Disziplin,
+                              die diese Tabelle teilt): "man koennte das finale Scoreboard noch
+                              farblich besser darstellen dass man direkt starke und schwache
+                              Performances erkennen kann". Vorher trug NUR das kleine #Rang-Abzeichen
+                              die Ampelfarbe, die grosse Netto-Zahl blieb neutral (ink) — nach dem
+                              fruehen Mod-Vorzeichen-Versuch oben, der durch Fatigue fast ueberall rot
+                              war und keine Rang-Aussage hatte. Jetzt traegt die Netto-Zahl selbst
+                              dieselbe, bereits berechnete Ampelfarbe (ampel(c.slotRank)) — keine neue
+                              Zahl, nur dieselbe Farbe zusaetzlich am groesseren, auffaelligeren
+                              Element. Bonus/Malus steckt weiter im Tooltip (calc). */}
+                          <span style={{ color: ampel(c.slotRank) }}>{fmt1(c.net)}</span>
                           {/* Rang-Δ dieser Etappe: wie viele Ränge das Team seit der Vorrunde
                               gut-/schlechtgemacht hat. 1. Etappe = kein Vorwert → kein Pfeil. */}
                           {(() => {
