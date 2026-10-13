@@ -108,10 +108,11 @@ export type NativeStageTeam = {
    */
   captainName?: string | null;
   /**
-   * Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal, Chris 13.10.): die Team-ID
-   * des Gegners in GENAU diesem Zwei-Team-Arena-Duell (nur gesetzt, wenn die Disziplin
-   * arena-aufgeloest ist, sonst `null`/`undefined`). Treibt für `prim === "lamps"` (Fechten) UND
-   * `"klassen"` (Tennis/Speed-Schach) die paarweise Board-für-Board-Sequenz + den Matchup-Reveal
+   * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+   * sequenziell+Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU diesem Zwei-Team-
+   * Arena-Duell (nur gesetzt, wenn die Disziplin arena-aufgeloest ist, sonst `null`/`undefined`).
+   * Treibt für `prim === "lamps"` (Fechten), `"klassen"` (Tennis/Speed-Schach) UND `"stage"`
+   * (Showcase/Eiskunstlauf) die paarweise Board-für-Board-Sequenz + den Matchup-Reveal
    * (`advance()` unten) -- jede andere Disziplin ignoriert das Feld.
    */
   opponentTeamId?: string | null;
@@ -991,6 +992,21 @@ export const FECHT_REVEAL_MS = 1100;
 // Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): dieselbe Karte für `prim === "klassen"`,
 // analog zu Fechtens Reveal oben.
 export const KLASSEN_REVEAL_MS = 1100;
+// Task #118/#119 (Showcase/Eiskunstlauf sequenziell/Reveal, Chris 13.10., analog Task #116
+// Fechten/FECHT_REVEAL_MS): wie lange die "wer gegen wen"-Karte vor einem Showcase-/Eiskunstlauf-
+// Paar-Board steht, bevor die Cascade mit diesem Paar weiterläuft. Minimal länger als Fechtens
+// 1100ms, weil Eiskunstlauf bis zu zwei Namen je Seite zeigt (mehr zu lesen).
+export const STAGE_REVEAL_MS = 1300;
+/**
+ * Task #119 (Eiskunstlauf, Chris 13.10., wörtlich): „treten quasi 2 von team a vs 2 von team b
+ * an und wenn beide ihre Durchgänge drin haben dann wird gewechselt" — Eiskunstlauf zeigt zwei
+ * Läufer je Seite pro Matchup-Block, Showcase (dieselbe Chris-Forderung, Punkt 17) bleibt reines
+ * 1v1 wie Fechten. EINE Stelle für diese Weiche, damit Karte UND Rundenauswahl (s. `advance()`)
+ * nie auseinanderlaufen können.
+ */
+export function stagePairGroupSize(disciplineId: string | null | undefined): number {
+  return disciplineId === "eiskunstlauf" ? 2 : 1;
+}
 // Staffel/track: eine Reveal-Runde dauert ~5 s (langsam, folgbar). Innerhalb einer
 // Runde peilen ALLE Token gleichzeitig ihre Runden-Endposition an und gleiten
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
@@ -1377,8 +1393,8 @@ export type RT = {
   // Highlight-Zooms und Farbgeber des Puls-Rings (rot statt Medaillenfarbe).
   stageInjured: boolean;
   glowUntil: number;
-  // Tasks #116/#126/#127: s. `NativeStageTeam.opponentTeamId` -- 1:1 durchgereicht, hier
-  // zusätzlich gegen `null` statt `undefined` normalisiert (einfacherer Vergleich in der
+  // Tasks #116/#118/#119/#126/#127: s. `NativeStageTeam.opponentTeamId` -- 1:1 durchgereicht,
+  // hier zusätzlich gegen `null` statt `undefined` normalisiert (einfacherer Vergleich in der
   // Paar-Bildung unten).
   opponentTeamId: string | null;
 };
@@ -1692,6 +1708,30 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
     slotLbl: string;
   } | null>(null);
+  /**
+   * Task #118/#119 (Showcase/Eiskunstlauf sequenziell/Reveal, Chris 13.10. — docs/design/
+   * chris-feedback-breite-runde-13-10.md Punkte 17/18, analog Task #116 Fechten/`fechtDuel`):
+   * „Showcase: Bitte auch die Spieler im 1v1 aufstellen und nicht immer hin und her switchen, das
+   * nächste Matchup kommt erst wenn das vorherige durch ist!" (Showcase, 1v1) und „Eiskunstlauf
+   * genauso! […] treten quasi 2 von team a vs 2 von team b an" (Eiskunstlauf, 2v2 —
+   * `stagePairGroupSize`).
+   *
+   * NUR für `prim === "stage"` befüllt, nach demselben Muster wie Fechtens `lamps`-Pendant: pro
+   * Opponent-Paar (`opponentTeamId`) wird EIN Matchup-Block (1 oder 2 Läufer je Seite, je
+   * Gruppengröße) vollständig enthüllt, bevor das nächste Paar/der nächste Block an der Reihe
+   * ist — statt wie vorher alle 32 Teams im Gleichschritt durchzutakten. Bei Gruppengröße 2
+   * zeigt die Karte Runde `r` UND `r+1` gemeinsam (beide bereits in `t.players` vorhanden, nur
+   * noch nicht einzeln enthüllt) und bleibt für BEIDE Runden stehen, statt bei jeder einzelnen
+   * Runde neu aufzublitzen — das ist die rein darstellerische Bündelung, die Chris' „wenn beide
+   * ihre Durchgänge drin haben dann wird gewechselt" trägt, ohne die geteilte Rundenuhr
+   * (Score-Rampe, Perioden-Pause, Multiplayer-Gleichlauf) anzufassen, die weiterhin EINE Runde
+   * pro `advance()`-Aufruf für alle 32 Teams gleichzeitig verarbeitet.
+   */
+  const [stageDuel, setStageDuel] = useState<{
+    a: { code: string; name: string; logoUrl: string | null; isOwn: boolean; players: NativeStagePlayer[] };
+    b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; players: NativeStagePlayer[] };
+    slotLbl: string;
+  } | null>(null);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
   // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
   const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
@@ -1905,6 +1945,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setPhotoFinish(false);
     setFechtDuel(null); // Task #116: keine stehengebliebene Matchup-Karte nach „↻ Neu"
     setKlassenDuel(null); // Tasks #126/#127: dasselbe für klassen
+    setStageDuel(null); // Task #118/#119: dasselbe für stage
     setStageCrown(null);
     stageCrownRef.current = { list: [], stage: 0, label: null };
     setDemandKg(null);
@@ -2994,9 +3035,46 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       klassenPairStartIdx = starts;
       klassenPairPartnerAtIdx = partners;
     }
+    /**
+     * Task #118/#119 (Showcase/Eiskunstlauf sequenziell/Reveal): für `stage` `order` nach
+     * Gegner-Paaren umgruppieren, nach demselben Muster wie oben für lamps/klassen. Eng auf
+     * `"stage"` beschränkt, damit sich das nicht mit den anderen beiden Primitiven überlappt.
+     */
+    let stagePairStartIdx: Set<number> | null = null;
+    let stagePairPartnerAtIdx: Map<number, RT> | null = null;
+    if (prim === "stage") {
+      const byTeamId = new Map(rt.filter((t) => t.teamId).map((t) => [t.teamId as string, t]));
+      const used = new Set<number>();
+      const pairedOrder: RT[] = [];
+      const starts = new Set<number>();
+      const partners = new Map<number, RT>();
+      for (const t of order) {
+        if (used.has(t.idx)) continue;
+        used.add(t.idx);
+        const opp = t.opponentTeamId ? byTeamId.get(t.opponentTeamId) ?? null : null;
+        starts.add(pairedOrder.length);
+        pairedOrder.push(t);
+        if (opp && opp.idx !== t.idx && !used.has(opp.idx)) {
+          used.add(opp.idx);
+          partners.set(pairedOrder.length - 1, opp);
+          pairedOrder.push(opp);
+        }
+      }
+      order.length = 0;
+      order.push(...pairedOrder);
+      stagePairStartIdx = starts;
+      stagePairPartnerAtIdx = partners;
+    }
+    // Task #119 (Eiskunstlauf, 2v2): wie viele aufeinanderfolgende Runden (Läufer derselben
+    // Seite) EIN Matchup-Block umfasst. Showcase/jede andere Disziplin bleibt bei 1 (= exakt
+    // Fechtens 1v1-Verhalten). Nur die KARTE/Sequenz-Kadenz hängt daran, NICHT die geteilte
+    // Rundenuhr (Score-Rampe etc.) -- die verarbeitet unverändert genau EINE Runde `r` je
+    // `advance()`-Aufruf für alle 32 Teams gleichzeitig (s. Kommentar an `stageDuel`).
+    const stageGroupSize = prim === "stage" ? stagePairGroupSize(disciplineId) : 1;
     let i = 0;
     const revealShownAt = new Set<number>(); // Paar-Start-Indizes, deren Reveal-Karte schon lief (lamps)
     const klassenRevealShownAt = new Set<number>(); // dasselbe für klassen
+    const stageRevealShownAt = new Set<number>(); // Paar-Start-Indizes, deren Stage-Reveal-Karte in DIESER Runde schon lief
     const doOne = () => {
       // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
       // busyRef bleibt true → Reihenfolge/Choreografie unverändert). Gleiches gilt für
@@ -3046,6 +3124,39 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             doOne();
           }, KLASSEN_REVEAL_MS);
           return;
+        }
+      }
+      // Task #118/#119: Matchup-Reveal vor jedem neuen Showcase-/Eiskunstlauf-Paar-Board (nur
+      // stage, nur echte Paare mit aufgelöstem Gegner) -- "wer gegen wen" + Eignung
+      // (NativeStagePlayer.val) für diesen Block. Bei Gruppengröße 2 (Eiskunstlauf) zeigt die
+      // Karte NUR an geraden Runden (`r % stageGroupSize === 0`) -- die ungerade Folgerunde
+      // desselben Blocks läuft ohne neue Karte durch (kein zweites Aufblitzen mitten im selben
+      // "2 von Team A vs 2 von Team B"-Durchgang). Einzelteams ohne Partner (kein
+      // `stagePairPartnerAtIdx`-Eintrag) bekommen keine Karte und laufen wie bisher durch.
+      if (prim === "stage" && r % stageGroupSize === 0 && stagePairStartIdx?.has(i) && !stageRevealShownAt.has(i) && i < order.length) {
+        const partner = stagePairPartnerAtIdx?.get(i) ?? null;
+        if (partner) {
+          stageRevealShownAt.add(i);
+          const home = order[i]!;
+          const playersOf = (team: RT): NativeStagePlayer[] =>
+            Array.from({ length: stageGroupSize }, (_, off) => team.players[r + off] ?? null).filter(
+              (p): p is NativeStagePlayer => p != null,
+            );
+          const homePlayers = playersOf(home);
+          const partnerPlayers = playersOf(partner);
+          if (homePlayers.length > 0 || partnerPlayers.length > 0) {
+            const lastSlotIdx = Math.min(r + stageGroupSize - 1, slotCount - 1);
+            setStageDuel({
+              a: { code: home.code, name: home.name, logoUrl: home.logoUrl, isOwn: home.isOwn, players: homePlayers },
+              b: { code: partner.code, name: partner.name, logoUrl: partner.logoUrl, isOwn: partner.isOwn, players: partnerPlayers },
+              slotLbl: lastSlotIdx > r ? `${slots[r] ?? `Auftritt ${r + 1}`} – ${slots[lastSlotIdx] ?? `Auftritt ${lastSlotIdx + 1}`}` : slots[r] ?? `Auftritt ${r + 1}`,
+            });
+            later(() => {
+              setStageDuel(null);
+              doOne();
+            }, STAGE_REVEAL_MS);
+            return;
+          }
         }
       }
       if (i >= order.length) {
@@ -3273,6 +3384,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       setHandoffTs(0);
       setPhotoFinish(false);
       setKlassenDuel(null); // Tasks #126/#127: Sprung-Zielbild ohne Kaskade zeigt keine stehende Matchup-Karte
+      setStageDuel(null); // Task #118/#119: dasselbe für stage
       setStageCrown(null);
       // A2 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher fehlten hier genau die Felder, die
       // `reset()` (Knopf/Mount) laengst raeumt — podium/flash/shake/hover/stageCrownRef/demandKg/
@@ -3532,6 +3644,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setHandoffTs(0);
     setPhotoFinish(false);
     setKlassenDuel(null); // Tasks #126/#127: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
+    setStageDuel(null); // Task #118/#119: dasselbe für stage
     setStageCrown(null);
     setFechtDuel(null); // Task #116: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
     // Jede laufende Pause (Leertaste/Hover ODER eine Perioden-Pause, Feature „Viertel/
@@ -4407,6 +4520,61 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ))}
             <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
               {klassenDuel.slotLbl}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Task #118/#119 (Showcase/Eiskunstlauf sequenziell/Reveal): Matchup-Karte vor jedem
+            Paar-Board -- "wer gegen wen" + Eignung (NativeStagePlayer.val, derselbe Basiswert
+            wie die Simulation). Nur stage, nur wenn ein echtes Gegner-Paar aufgelöst werden
+            konnte. Eiskunstlauf zeigt bis zu zwei Läufer je Seite (stagePairGroupSize === 2),
+            Showcase genau einen (reines 1v1, wie Fechtens „⚔ VS"-Karte). */}
+        {prim === "stage" && stageDuel ? (
+          <div
+            className="oly-anim"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+              padding: "10px 16px",
+              marginBottom: 10,
+              borderRadius: 12,
+              border: "1.5px solid var(--nl-accent)",
+              background: "color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel))",
+            }}
+          >
+            {([stageDuel.a, stageDuel.b] as const).map((side, sideIdx) => (
+              <Fragment key={sideIdx}>
+                {sideIdx === 1 ? (
+                  <div style={{ flex: "none", fontWeight: 900, fontSize: 15, letterSpacing: "0.06em", color: "var(--nl-accent)" }}>✨ VS</div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                  {side.players.map((p, pIdx) => (
+                    <Fragment key={p.playerId ?? pIdx}>
+                      <PlayerMark src={p.portraitUrl} alt={p.name} size={34} isOwn={side.isOwn} starTier={getPlayerStarTier(p.ovrRank)} />
+                    </Fragment>
+                  ))}
+                  <div style={{ minWidth: 0, textAlign: sideIdx === 1 ? "right" : "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                      <TeamMark src={side.logoUrl} alt={side.name} size={15} radius={4} isOwn={side.isOwn} placeholderColor={teamPrimaryColor(side.code)} placeholderLabel={side.code} />
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em", color: side.isOwn ? "var(--nl-accent)" : "var(--nl-mut)" }}>{side.code}</span>
+                    </div>
+                    {side.players.length > 0 ? (
+                      side.players.map((p, pIdx) => (
+                        <div key={p.playerId ?? pIdx} style={{ fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>
+                          {p.name} <span style={{ fontWeight: 600, fontSize: 10.5, color: "var(--nl-mut)" }}>· Eignung {fmt1(p.val)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ fontWeight: 800, fontSize: 14 }}>—</div>
+                    )}
+                  </div>
+                </div>
+              </Fragment>
+            ))}
+            <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
+              {stageDuel.slotLbl}
             </div>
           </div>
         ) : null}

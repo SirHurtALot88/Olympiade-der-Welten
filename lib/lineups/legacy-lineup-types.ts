@@ -592,14 +592,15 @@ export type LegacyResolvePreviewOptions = {
         arenaMatchSeed: string;
         momente?: ArenaMomentEintrag[];
         /**
-         * Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal, Chris 13.10.): die
-         * Team-ID des Gegners in GENAU diesem Zwei-Team-Duell -- durchgereicht aus
-         * `ArenaTeamPointsOverride.opponentTeamId` (lib/resolve/battle-mode-arena-team-points.ts),
-         * das dieses Feld schon immer trug. Bis hierher wurde es an dieser engen Zwischenstelle
-         * STILL fallengelassen (dieselbe Lücke wie bei `momente`, bevor es hier ergänzt wurde) --
-         * reine Typ-Erweiterung, keine Laufzeitänderung: das Objekt trug das Feld schon, nur
-         * ungenutzt. Erlaubt der Bühne, Board-für-Board-Paare (Fechten/Tennis/Schach) statt aller
-         * Teams im Gleichschritt zu enthüllen.
+         * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+         * sequenziell+Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU diesem
+         * Zwei-Team-Duell -- durchgereicht aus `ArenaTeamPointsOverride.opponentTeamId`
+         * (lib/resolve/battle-mode-arena-team-points.ts), das dieses Feld schon immer trug. Bis
+         * hierher wurde es an dieser engen Zwischenstelle STILL fallengelassen (dieselbe Lücke
+         * wie bei `momente`, bevor es hier ergänzt wurde) -- reine Typ-Erweiterung, keine
+         * Laufzeitänderung: das Objekt trug das Feld schon, nur ungenutzt. Erlaubt der Bühne,
+         * Board-für-Board-Paare für JEDE arena-aufgelöste Disziplin zu sequenzieren statt alle
+         * Teams im Gleichschritt zu enthüllen (`prim === "lamps"` / `"klassen"` / `"stage"`).
          */
         opponentTeamId?: string;
       }
