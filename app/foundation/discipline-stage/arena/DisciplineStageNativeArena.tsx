@@ -151,6 +151,11 @@ export type DisciplineStageNativeArenaProps = {
   topPlayers?: { rows: DisciplineStageTopPlayer[]; ids: (string | null)[] } | null;
   primitive?: StagePrimitive;
   disciplineId?: string; // Disziplin-Identität für die Feld-Registry (mehrere Diszis teilen sich ein Primitive)
+  // ZF1 (`fable-konzept-broadcast-vorbilder-13-10.md` 3.1): einziger erlaubter Seed für
+  // anzeige-generierte Zonen/Profile (z.B. Zeitfahren-Geländeprofil) — rein informativ, NIE
+  // Eingabe für score/displayScore/rank. `null`/fehlend ⇒ Felder, die ihn nutzen, fallen auf
+  // einen festen Demo-Seed zurück (Vorschau ohne echten Spieltag).
+  matchdayId?: string | null;
   progressLabel?: string; // z.B. "Position auf dem Oval = kumulierte Punkte"
   disciplineName?: string; // Feld-Wasserzeichen (Identität je Disziplin)
   accent?: string; // Akzentfarbe der Disziplin (Wasserzeichen + Feldlinien)
@@ -1519,7 +1524,7 @@ function currentPeriodForRound(round: number, boundaries: number[], periodCount:
   return Math.min(p, periodCount);
 }
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, matchdayId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   // Perioden-Pause: nur fuer Disziplinen mit einem konfigurierten Vorbild (s.o.), nie erzwungen
@@ -1694,6 +1699,10 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   // < Last) reißt und fällt auf sein Endgewicht (= Score-Rang). Endstand = Score.
   const [demandKg, setDemandKg] = useState<number | null>(null);
   const [barbellMsg, setBarbellMsg] = useState<{ text: string; kind: "kg" | "red" | "end" } | null>(null);
+  // ZF1.4 (Wertung als Overlay statt Seitenspalte, NUR Zeitfahren/peloton): die Overlay-Liste
+  // zeigt standardmäßig nur die ersten paar Zeilen, ausklappbar auf alle. Reiner UI-Zustand,
+  // kein Einfluss auf Score/Rang.
+  const [pelotonLadderExpanded, setPelotonLadderExpanded] = useState(false);
   // Renn-Highlight-Banner (nur track): kurzer Pop über dem Oval bei Etappensieger,
   // neuer Gesamtführung oder Etappen-Wechsel. Ein Slot, neuester Anlass gewinnt.
   const [banner, setBanner] = useState<{ text: string; kind: "gold" | "cyan"; id: number } | null>(null);
@@ -3726,6 +3735,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   const fieldCtx: DisciplineFieldProps = {
     primitive: prim,
     disciplineName,
+    matchdayId,
     accent,
     skinAccent,
     motif,
@@ -4203,6 +4213,69 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             <FieldComp {...fieldCtx} />
           </svg>
 
+          {/* ZF1.4 (`fable-konzept-broadcast-vorbilder-13-10.md` 3.1, Punkt 4): die Wertung
+              wandert NUR für Zeitfahren von der Seitenspalte in ein kompaktes Overlay auf der
+              Strecke (NBA-1-Muster: Information AUF dem Bild, nicht daneben). Die rechte
+              Live-Ladder entfällt dafür unten (`prim !== "peloton"`-Zweig); die ausführliche
+              `DisciplineStageResultTable` bleibt unten als Nachlese unverändert stehen. Liest
+              exakt dieselben Größen (t.rank/shownScore) wie die Ladder — reiner Leser, kein
+              zweiter Wertungscode. */}
+          {prim === "peloton" ? (
+            <div
+              data-testid="arena-peloton-ladder-overlay"
+              style={{
+                position: "absolute",
+                top: 10,
+                left: 10,
+                zIndex: 4,
+                maxWidth: 230,
+                borderRadius: 10,
+                border: "1px solid var(--nl-line)",
+                background: "color-mix(in srgb, var(--nl-panel) 74%, transparent)",
+                backdropFilter: "blur(3px)",
+                padding: "7px 8px",
+                fontSize: 11.5,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 800, color: "var(--nl-mut)" }}>
+                  {done ? "Endstand" : "Rundenstand"}
+                </span>
+                {sorted.length > 6 ? (
+                  <button
+                    type="button"
+                    data-testid="arena-peloton-ladder-toggle"
+                    onClick={() => setPelotonLadderExpanded((v) => !v)}
+                    style={{ marginLeft: "auto", padding: "1px 6px", fontSize: 9.5, fontWeight: 800, border: "1px solid var(--nl-line)", borderRadius: 999, background: "transparent", color: "var(--nl-mut)", cursor: "pointer" }}
+                  >
+                    {pelotonLadderExpanded ? "▲ weniger" : `▼ alle ${sorted.length}`}
+                  </button>
+                ) : null}
+              </div>
+              {(pelotonLadderExpanded ? sorted : sorted.slice(0, 6)).map((t) => {
+                const dispRank = t.rank;
+                const dispScore = shownScore(t);
+                const behind = leader ? shownScore(leader) - dispScore : 0;
+                const teamClickable = Boolean(onOpenTeam && t.teamId);
+                return (
+                  <div
+                    key={t.code}
+                    onClick={teamClickable ? () => onOpenTeam!(t.teamId!) : undefined}
+                    title={teamClickable ? "Team-Karte öffnen" : undefined}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 2px", borderRadius: 6, cursor: teamClickable ? "pointer" : "default", background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 16%, transparent)" : "transparent" }}
+                  >
+                    <span style={{ width: 16, textAlign: "right", fontWeight: 800, fontSize: 10.5, color: ampel(dispRank) }}>#{dispRank}</span>
+                    <span style={{ width: 38, fontWeight: 800, fontSize: 11, color: t.isOwn ? "var(--nl-accent)" : "inherit" }}>{t.code}</span>
+                    <span style={{ flex: 1, textAlign: "right", fontSize: 10.5, fontWeight: 700, color: dispRank === 1 ? "var(--nl-warn)" : "var(--nl-mut)" }}>
+                      {dispRank === 1 ? "Führung" : `−${fmt1(behind)}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
           {/* Score-Pops (Nr. 207): die großen hochzählenden +N-Zahlen irritieren und bügeln
               über das Feld — entfernt. Der Wert steht live in der Rangliste, den Zugewinn
               zeigt der Ghost der Vorrunde direkt am Token. Highlights kommen als
@@ -4671,7 +4744,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
 
       </div>
 
-      {/* Live-Ladder rechts */}
+      {/* Live-Ladder rechts — ZF1.4: für Zeitfahren entfällt diese Seitenspalte, die Wertung
+          sitzt dort als Overlay direkt auf der Strecke (s.o., `arena-peloton-ladder-overlay`).
+          Alle anderen Disziplinen unverändert. */}
+      {prim !== "peloton" ? (
+      <>
       {/* `height` statt `maxHeight` und kein `sticky` mehr: die Tabelle soll exakt
           mit der Arena anfangen und aufhoeren. Sticky liess sie beim Scrollen
           gegenueber der Arena wandern, `maxHeight` deckelte nur nach oben und liess
@@ -4866,6 +4943,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
         })}
         </div>
       </div>
+      </>
+      ) : null}
 
       {/* Detail-Ergebnistabelle (volle Breite unter der Arena, nach dem Podest) */}
       {ended ? (
