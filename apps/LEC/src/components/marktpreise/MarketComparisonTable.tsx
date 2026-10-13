@@ -23,9 +23,9 @@ const COLS: ColumnDef<ColId>[] = [
 
 const STORAGE_KEY = "lec.marktpreise.colWidths.v3";
 
-// Dieselben Farben wie die Ampel im Sortiment: zu guenstig = Marge unter 25 % (rot), zu teuer = ueber der Spanne (blau).
+// Dieselben Farben wie die Ampel im Sortiment: zu guenstig = unter der Spanne (gelb), zu teuer = ueber der Spanne (blau), rot nur fuer negative Marge.
 export const STATUS_PILL: Record<MarketComparisonRow["status"], { cls: string; label: string }> = {
-  zu_guenstig: { cls: "p-crit", label: "zu günstig" },
+  zu_guenstig: { cls: "p-warn", label: "zu günstig" },
   im_korridor: { cls: "p-good", label: "im Rahmen" },
   zu_teuer: { cls: "p-mkt", label: "zu teuer" },
 };

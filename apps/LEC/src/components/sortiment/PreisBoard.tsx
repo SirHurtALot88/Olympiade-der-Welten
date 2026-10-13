@@ -14,7 +14,7 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 type Verdict = "zu_guenstig" | "im_korridor" | "zu_teuer";
 
 const VERDICT: Record<Verdict, { label: string; cls: string; color: string }> = {
-  zu_guenstig: { label: "zu günstig", cls: "bd-v-low", color: "var(--crit)" },
+  zu_guenstig: { label: "zu günstig", cls: "bd-v-low", color: "var(--warn)" },
   im_korridor: { label: "im Rahmen", cls: "bd-v-ok", color: "var(--good)" },
   zu_teuer: { label: "zu teuer", cls: "bd-v-high", color: "var(--market)" },
 };
@@ -35,7 +35,12 @@ export function PriceRange({ row }: { row: SortimentRow }) {
   const verdict: Verdict = m.rated ? m.status : "im_korridor";
   const rated = m.rated;
   return (
-    <div className="bd-range" title={`Zielspanne ${eur(m.targetMin)} – ${eur(m.targetOpt)} · dein VK ${eur(vk)}${m.value !== null ? ` · Marktwert ${eur(m.value)}` : ""}`}>
+    <div
+      className="bd-range"
+      title={`${m.marginReachable ? "Zielspanne" : "Verkaufszone"} ${eur(m.targetMin)} – ${eur(m.targetOpt)} · dein VK ${eur(vk)}${m.value !== null ? ` · Marktwert ${eur(m.value)}` : ""}${
+        m.capped ? " · Marktdeckel: teure Karten gehen selten über das 1,5-fache vom Marktwert" : ""
+      }`}
+    >
       <div className="bd-track">
         <div className="bd-band" style={{ left: pos(m.targetMin), width: `calc(${pos(m.targetOpt)} - ${pos(m.targetMin)})` }} />
         {m.value !== null && <div className="bd-mk" style={{ left: pos(m.value) }} />}
@@ -43,6 +48,11 @@ export function PriceRange({ row }: { row: SortimentRow }) {
       </div>
       <div className="bd-rangelabel">
         <b>{m.targetMin === m.targetOpt ? eur(m.targetMin) : `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}`}</b>
+        {m.capped && (
+          <span className="bd-cap" title="Marktdeckel: teure Karten gehen selten über das 1,5-fache vom Marktwert. Die 25-%-Marge ist dort nicht immer erreichbar.">
+            {m.marginReachable ? "Marktdeckel" : "Markt gibt keine 25 % her"}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -83,7 +93,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview }: Props) 
           <tr>
             <th>Artikel</th>
             <th className="r">Dein VK</th>
-            <th>Empfohlener VK · 25–33 %</th>
+            <th>Empfohlener VK</th>
             <th className="r">Marktwert</th>
             <th className="r" title="Deckungsbeitrags-Marge, die dein heutiger VK bringt, wenn du die Karte jetzt zum Marktwert nachkaufst">
               Marge
@@ -135,7 +145,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview }: Props) 
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
                 </td>
-                <td data-label="Empfohlener VK · 25–33 %">
+                <td data-label="Empfohlener VK">
                   <PriceRange row={row} />
                 </td>
                 <td data-label="Marktwert" className="r bd-num" title={m ? marketTitle(m) : undefined}>

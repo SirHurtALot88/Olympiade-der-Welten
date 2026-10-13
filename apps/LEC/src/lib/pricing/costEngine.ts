@@ -286,6 +286,56 @@ export function computeTargetRange(ek: number, ctx: TargetContext, settings: Cos
 }
 
 /**
+ * Marktdeckel (Chris, 13.10.): Bei teuren Karten gibt der Markt keinen grossen Aufschlag her —
+ * "selten mehr als das 1,5-fache vom Marktwert, das waere schon ein super guter Deal"
+ * (Dominus-Funke: Einkauf rund 48 €, verkauft fuer 69,99 €); eine Karte mit Marktwert 120 geht
+ * bei etwa 150 weg, man bietet sie bei 170-180 an. Die 25-%-Marge-Regel (rund das Doppelte
+ * des EK) ist dort nicht erreichbar.
+ *
+ * Bis CHEAP_UNTIL € Marktwert gilt allein die Margenregel (Chris' eigene Formel
+ * 3 x EK + 0,99 liegt dort bei 3,2-fach). Ab EXPENSIVE_FROM € gilt der Deckel von 1,5-fach,
+ * dazwischen gleitet der Faktor linear herunter.
+ */
+export const CHEAP_UNTIL = 5;
+export const EXPENSIVE_FROM = 40;
+export const CAP_FACTOR_CHEAP = 3.2;
+export const CAP_FACTOR_EXPENSIVE = 1.5;
+/** Realistische Verkaufszone unter dem Deckel: ab 1,25-fach (statt 1,5-fach) gilt ein Preis noch als marktgerecht. */
+export const SELL_ZONE_LOW = 1.25 / 1.5;
+
+/** Hoechster realistischer Aufschlag auf den Marktwert; null = kein Deckel (billige Karten). */
+export function marketCapFactor(market: number): number | null {
+  if (!(market > CHEAP_UNTIL)) return null;
+  if (market >= EXPENSIVE_FROM) return CAP_FACTOR_EXPENSIVE;
+  const t = (market - CHEAP_UNTIL) / (EXPENSIVE_FROM - CHEAP_UNTIL);
+  return CAP_FACTOR_CHEAP + (CAP_FACTOR_EXPENSIVE - CAP_FACTOR_CHEAP) * t;
+}
+
+export interface MarketTargetRange extends TargetRange {
+  /** Der Marktdeckel hat die Spanne begrenzt (33 %-Preis oder auch 25 %-Preis liegen darueber). */
+  capped: boolean;
+  /** Ist die 25-%-Marge bei realistischem Preis erreichbar? Nein = der Markt gibt fuer diese Karte nicht mehr her. */
+  marginReachable: boolean;
+}
+
+/**
+ * Zielspanne bei Nachkauf zum Marktwert `market`: Margenregel (25-33 %) begrenzt durch den Marktdeckel.
+ * Ist 25 % nicht erreichbar, ist die Spanne die Verkaufszone unter dem Deckel (1,25- bis 1,5-fach).
+ */
+export function computeMarketTargetRange(market: number, ctx: TargetContext, settings: CostSettingsValues): MarketTargetRange {
+  const base = computeTargetRange(market, ctx, settings);
+  const factor = marketCapFactor(market);
+  if (factor === null) return { ...base, capped: false, marginReachable: true };
+  const cap = Math.max(PRICE_FLOOR, factor * market);
+  if (base.min <= cap) {
+    // Mindestens 6 % Breite, damit die Spanne am Uebergang nicht zu einem Strich zusammenfaellt.
+    const opt = Math.max(Math.min(base.opt, cap), base.min * 1.06);
+    return { min: base.min, opt, capped: base.opt > cap, marginReachable: true };
+  }
+  return { min: Math.max(PRICE_FLOOR, SELL_ZONE_LOW * cap), opt: cap, capped: true, marginReachable: false };
+}
+
+/**
  * Preis-Korridor MIN/GUT plus Deckungsbeitrags-Grenze (Chris, 13.10.: 25 % Deckungsbeitrags-
  * Marge als Minimum, 33 % als Optimum):
  * VK-MIN = VK fuer 25 % Marge vor Fixkosten, VK-GUT = VK fuer 33 %, jeweils mit dem EK des

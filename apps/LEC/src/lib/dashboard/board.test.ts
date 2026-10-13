@@ -4,7 +4,7 @@ import { boardGap, boardVk, cleanTitle, sortBoard } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
-    value: 2, range: null, targetMin: 7.12, targetOpt: 8.68, margin: 0.29, status: "im_korridor", rated: true,
+    value: 2, range: null, targetMin: 7.12, targetOpt: 8.68, capped: false, marginReachable: true, margin: 0.29, status: "im_korridor", rated: true,
     quality: "eindeutig", how: "seltenheit", ekAboveMarket: false, fetchedAt: "2026-10-12T00:00:00.000Z", ...over,
   };
 }

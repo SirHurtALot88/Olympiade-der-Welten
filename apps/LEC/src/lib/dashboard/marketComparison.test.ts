@@ -79,6 +79,18 @@ describe("buildMarketComparisonRow", () => {
     expect(buildMarketComparisonRow(article({ currentVk: 6.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("im_korridor");
   });
 
+  it("teure Karte: Marktdeckel 1,5-fach, 69,99 € bei Marktwert 47,83 € ist im Rahmen, 229,99 € bei 121,47 € ist zu teuer", () => {
+    const dominus = buildMarketComparisonRow(article({ currentVk: 69.99 }), quote({ priceAvg7: 47.83 }), DEFAULT_COST_SETTINGS, null);
+    expect(dominus.status).toBe("im_korridor");
+    expect(dominus.marginReachable).toBe(false);
+    expect(dominus.capped).toBe(true);
+    const phara = buildMarketComparisonRow(article({ currentVk: 229.99 }), quote({ priceAvg7: 121.47 }), DEFAULT_COST_SETTINGS, null);
+    expect(phara.status).toBe("zu_teuer");
+    expect(phara.targetOpt).toBeCloseTo(182.205, 2);
+    const tiefstapler = buildMarketComparisonRow(article({ currentVk: 4.49 }), quote({ priceAvg7: 27.67 }), DEFAULT_COST_SETTINGS, null);
+    expect(tiefstapler.status).toBe("zu_guenstig");
+  });
+
   it("die Untergrenze 4,99 € zaehlt als im Rahmen (Billigkarten sind Warenkorb-Fueller)", () => {
     const row = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceAvg7: 0.3 }), DEFAULT_COST_SETTINGS, null);
     expect(row.targetMin).toBeCloseTo(4.99);

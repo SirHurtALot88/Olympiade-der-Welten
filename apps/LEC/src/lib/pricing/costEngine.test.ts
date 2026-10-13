@@ -6,6 +6,8 @@ import {
   computeEbayFees,
   computeHk,
   computeMargin,
+  computeMarketTargetRange,
+  marketCapFactor,
   contributionMarginForPrice,
   computePriceCorridor,
   computeShopVolume,
@@ -310,5 +312,67 @@ describe("classifyPriceStatus", () => {
     const { corridor } = corridorFor(8, 6);
     expect(6).toBeLessThan(corridor.vkContribution);
     expect(classifyPriceStatus(6, corridor)).toBe("unter_min");
+  });
+});
+
+// Marktdeckel (Chris, 13.10.): teure Karten gehen selten ueber das 1,5-fache vom Marktwert.
+// Handrechnung, Einzelkarte, kein Shop-Volumen (Einschreiben nur ab VK 30 €):
+//   Basiskosten ohne EK = 0,575 + 0,67 + 0,053 = 1,298, Fixgebuehr 0,35
+describe("Marktdeckel fuer teure Karten", () => {
+  const ctx = { kind: "single" as const, shop: null };
+
+  it("Faktor: bis 5 € kein Deckel, ab 40 € 1,5-fach, dazwischen linear von 3,2 auf 1,5", () => {
+    expect(marketCapFactor(5)).toBeNull();
+    expect(marketCapFactor(40)).toBe(1.5);
+    expect(marketCapFactor(200)).toBe(1.5);
+    expect(marketCapFactor(22.5)).toBeCloseTo(2.35, 6); // Mitte: 3,2 - 1,7 x 0,5
+  });
+
+  it("billige Karte (Marktwert 2 €): unveraendert 25-33 %-Regel, kein Deckel", () => {
+    const r = computeMarketTargetRange(2, ctx, S);
+    expect(r.min).toBeCloseTo(7.125, 3);
+    expect(r.opt).toBeCloseTo(8.684, 3);
+    expect(r.capped).toBe(false);
+    expect(r.marginReachable).toBe(true);
+  });
+
+  it("Marktwert 10 €: Deckel 29,57 € liegt ueber beiden Marge-Preisen (22,75 € / 27,73 €) -> keine Begrenzung", () => {
+    const r = computeMarketTargetRange(10, ctx, S);
+    expect(r.min).toBeCloseTo((0.35 + 10 + 1.298) / 0.512, 3);
+    expect(r.opt).toBeCloseTo((0.35 + 10 + 1.298) / 0.4201, 2);
+    expect(r.capped).toBe(false);
+  });
+
+  it("Marktwert 20 €: 25 % erreichbar (46,87 € inkl. Einschreiben 2,35 € ab 30 €), 33 % liegt ueber dem Deckel 49,43 € -> begrenzt", () => {
+    // (0,35 + 20 + 1,298 + 2,35) / 0,512 = 46,871
+    const r = computeMarketTargetRange(20, ctx, S);
+    expect(r.min).toBeCloseTo(46.871, 2);
+    // Deckel 49,43 € waere nur 5,5 % ueber dem 25-%-Preis -> Mindestbreite 6 %: 46,871 x 1,06 = 49,683
+    expect(r.opt).toBeCloseTo(49.683, 2);
+    expect(r.capped).toBe(true);
+    expect(r.marginReachable).toBe(true);
+  });
+
+  it("Dominus-Funke (Marktwert 47,83 €): 25 % ist nicht erreichbar, Verkaufszone 59,79-71,75 € — 69,99 € ist ein guter Preis", () => {
+    const r = computeMarketTargetRange(47.83, ctx, S);
+    expect(r.opt).toBeCloseTo(71.745, 3);
+    expect(r.min).toBeCloseTo(59.7875, 3);
+    expect(r.marginReachable).toBe(false);
+    expect(69.99).toBeGreaterThanOrEqual(r.min);
+    expect(69.99).toBeLessThanOrEqual(r.opt);
+  });
+
+  it("Phara (Marktwert 121,47 €): Verkaufszone 151,84-182,21 €; 229,99 € liegt klar darueber", () => {
+    const r = computeMarketTargetRange(121.47, ctx, S);
+    expect(r.opt).toBeCloseTo(182.205, 3);
+    expect(r.min).toBeCloseTo(151.8375, 3);
+    expect(229.99).toBeGreaterThan(r.opt * 1.03);
+  });
+
+  it("die Spanne bricht am Uebergang nicht zusammen (mindestens 6 % Breite)", () => {
+    for (const m of [26, 27, 27.67, 28, 29]) {
+      const r = computeMarketTargetRange(m, ctx, S);
+      expect(r.opt).toBeGreaterThanOrEqual(r.min * 1.0599);
+    }
   });
 });

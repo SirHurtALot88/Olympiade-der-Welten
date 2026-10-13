@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { PreisUeberblick, type BandPoint } from "./PreisUeberblick";
 import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
@@ -37,7 +38,7 @@ type RowPriceStatus = SortimentRow["priceStatus"];
 const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "im_korridor", "ueber_gut", "kein_ek"];
 
 const MARKET_PILL: Record<SortimentMarket["status"], { cls: string; label: string }> = {
-  zu_guenstig: { cls: "p-crit", label: "zu günstig" },
+  zu_guenstig: { cls: "p-warn", label: "zu günstig" },
   im_korridor: { cls: "p-good", label: "im Rahmen" },
   zu_teuer: { cls: "p-mkt", label: "zu teuer" },
 };
@@ -142,6 +143,8 @@ interface Props {
   ladenhueterCount: number;
   /** articleId -> Bildkennung; fehlt ein Artikel, gibt es (noch) kein Bild. */
   imageVersions: Record<string, string>;
+  /** Zielband (25–33 %) an log-verteilten Marktwerten, fuer die Grafik. */
+  band: BandPoint[];
 }
 
 function imageSrc(articleId: string, version: string): string {
@@ -195,7 +198,7 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
   }
 }
 
-export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions }: Props) {
+export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions, band }: Props) {
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -366,9 +369,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       <div className="bd-cards" role="group" aria-label="VK gegen Marktwert">
         {(
           [
-            { f: "zu_guenstig", tone: "low", hint: "VK unter dem Preis für 25 % Marge — Geld liegt auf dem Tisch" },
-            { f: "im_korridor", tone: "ok", hint: "VK in der Zielspanne 25–33 %" },
-            { f: "zu_teuer", tone: "high", hint: "VK über dem Preis für 33 % Marge" },
+            { f: "zu_guenstig", tone: "low", hint: "VK unter der Zielspanne — hier liegt Geld auf dem Tisch" },
+            { f: "im_korridor", tone: "ok", hint: "VK in der Zielspanne (25–33 % Marge, teure Karten bis 1,5× Markt)" },
+            { f: "zu_teuer", tone: "high", hint: "VK über der Zielspanne — verkauft sich vermutlich nicht" },
             { f: "offen", tone: "none", hint: "Kein Marktwert oder Seltenheit nicht eindeutig" },
           ] as const
         ).map(({ f, tone, hint }) => (
@@ -456,6 +459,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
 
       {view === "kompakt" ? (
         <section className="bd-card-list">
+          <details className="bd-over">
+            <summary>Überblick: Grafiken zur Auswahl</summary>
+            <PreisUeberblick rows={filtered} band={band} />
+          </details>
           <div className="bd-toolbar">
             <label>
               Sortierung
@@ -468,7 +475,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               </select>
             </label>
             <span className="bd-legend">
-              <i className="bd-lg-band" /> Zielspanne 25–33 %<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
+              <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
           <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} />

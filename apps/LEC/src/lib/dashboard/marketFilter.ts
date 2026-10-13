@@ -18,9 +18,9 @@ export const MARKET_FILTER_LABEL: Record<MarketFilter, string> = {
 };
 
 export const MARKET_FILTER_HINT: Record<MarketFilter, string> = {
-  zu_guenstig: "VK liegt unter dem Preis für 25 % Deckungsbeitrag bei Nachkauf zum Marktwert",
+  zu_guenstig: "VK liegt unter der Zielspanne: unter dem Preis für 25 % Deckungsbeitrag bei Nachkauf zum Marktwert (teure Karten: unter 1,25-fach)",
   im_korridor: "VK liegt in der Zielspanne 25–33 % (±3 %) oder auf der Untergrenze 4,99 €",
-  zu_teuer: "VK liegt über dem Preis für 33 % Deckungsbeitrag bei Nachkauf zum Marktwert",
+  zu_teuer: "VK liegt über der Zielspanne: über dem Preis für 33 % Deckungsbeitrag, bei teuren Karten über dem 1,5-fachen Marktwert",
   ek_ueber: "Dein EK liegt mehr als 50 % über dem heutigen Marktwert",
   offen: "Kein Marktwert oder mehrere Seltenheits-Varianten ohne einheitliches Urteil",
 };

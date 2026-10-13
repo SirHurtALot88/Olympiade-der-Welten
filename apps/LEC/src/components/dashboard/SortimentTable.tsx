@@ -17,7 +17,7 @@ interface Props {
 
 export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; label: string }> = {
   // Zielspanne = 25 % bis 33 % Deckungsbeitrags-Marge (Chris, 13.10.), mindestens 4,99 €.
-  unter_min: { cls: "p-crit", label: "zu günstig" },
+  unter_min: { cls: "p-warn", label: "zu günstig" },
   im_korridor: { cls: "p-good", label: "im Korridor" },
   ueber_gut: { cls: "p-mkt", label: "zu teuer" },
   // FIX 1: kein Korridor-Status, sondern Kennzeichnung "wir kennen den EK nicht" --

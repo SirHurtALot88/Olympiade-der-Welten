@@ -165,6 +165,10 @@ export interface SortimentMarket {
   /** VK fuer 25 % (min) bis 33 % (opt) Deckungsbeitrags-Marge bei Marktwert-EK, mindestens 4,99 €. */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
+  capped: boolean;
+  /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
+  marginReachable: boolean;
   /** Deckungsbeitrags-Marge des heutigen VK bei Nachkauf zum Marktwert. */
   margin: number | null;
   status: "zu_guenstig" | "im_korridor" | "zu_teuer";
@@ -537,6 +541,8 @@ export function buildSortimentRow(
       range: m.marketRange,
       targetMin: m.targetMin,
       targetOpt: m.targetOpt,
+      capped: m.capped,
+      marginReachable: m.marginReachable,
       margin: m.marginAtMarket,
       status: m.status,
       // Urteil nur mit Marktwert; bei Spanne nur, wenn die Ampel fuer JEDE Variante anschlaegt.

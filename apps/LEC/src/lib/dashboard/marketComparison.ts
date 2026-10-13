@@ -3,7 +3,8 @@ import type { CostSettingsValues } from "../pricing/costSettings";
 import {
   computeHk,
   computePriceCorridor,
-  computeTargetRange,
+  computeMarketTargetRange,
+  type MarketTargetRange,
   contributionMarginForPrice,
   fixedCostPerUnit,
   type ShopVolume,
@@ -71,6 +72,10 @@ export interface MarketComparisonRow {
    */
   targetMin: number | null;
   targetOpt: number | null;
+  /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
+  capped: boolean;
+  /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
+  marginReachable: boolean;
   /** Deckungsbeitrags-Marge, die der heutige VK braeuchte, wenn die Karte zum Marktwert nachgekauft wird. */
   marginAtMarket: number | null;
   /** Deckungsbeitrags-Marge des heutigen VK mit dem tatsaechlichen EK (null ohne EK). */
@@ -129,13 +134,18 @@ export function buildMarketComparisonRow(
   const marketValue = marketValueOf(quote, pack);
   const marketRange = marketRangeOf(quote, pack);
 
-  const rangeFor = (marketPerUnit: number): TargetRange =>
-    computeTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
+  const rangeFor = (marketPerUnit: number): MarketTargetRange =>
+    computeMarketTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
 
   let target: TargetRange | null = null;
+  let capped = false;
+  let marginReachable = true;
   let status: MarketStatus = "im_korridor";
   if (marketValue !== null) {
-    target = rangeFor(marketValue);
+    const r = rangeFor(marketValue);
+    target = r;
+    capped = r.capped;
+    marginReachable = r.marginReachable;
     status = classifyAgainstRange(ownVk, target);
   } else if (marketRange) {
     // Mehrdeutig: nur werten, wenn das Urteil fuer JEDE Variante gilt — zu guenstig
@@ -143,6 +153,8 @@ export function buildMarketComparisonRow(
     const lo = rangeFor(marketRange.min);
     const hi = rangeFor(marketRange.max);
     target = { min: lo.min, opt: hi.opt };
+    capped = lo.capped || hi.capped;
+    marginReachable = lo.marginReachable && hi.marginReachable;
     if (classifyAgainstRange(ownVk, lo) === "zu_guenstig") status = "zu_guenstig";
     else if (classifyAgainstRange(ownVk, hi) === "zu_teuer") status = "zu_teuer";
   }
@@ -179,6 +191,8 @@ export function buildMarketComparisonRow(
     marketRange,
     targetMin: target ? target.min : null,
     targetOpt: target ? target.opt : null,
+    capped,
+    marginReachable,
     marginAtMarket,
     marginAtOwnEk,
     ekAboveMarket,
