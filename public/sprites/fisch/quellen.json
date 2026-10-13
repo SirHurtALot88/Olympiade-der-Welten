@@ -43,7 +43,7 @@
     "urheber": "Kiovenn",
     "lizenz": "CC-BY 4.0",
     "url": "https://opengameart.org/content/64x64-creature-sprites",
-    "hinweis": "Statisches Einzelbild wie die anderen Sprites dieses Pakets (siehe auch drache_mechanisch.png in monster/) — kein 4-Richtungs-Walkzyklus wie bei den LPC-Monstern, aber im gleichen 64x64-Kachelmass"
+    "hinweis": "Statisches Einzelbild wie die anderen Sprites dieses Pakets (siehe auch drache_mechanisch.png in monster/) — kein 4-Richtungs-Walkzyklus wie bei den LPC-Monstern, aber im gleichen 64x64-Kachelmass. Seit 13.10. verdrahtet als VOLLBILD.meerjungfrau fuer Tidesprinter (Sprite-Fit-Nachlieferung Batch 2) — ersetzt froschmensch.png, das die Aqua-Rasse, aber nicht die aufrechte Wassermann-Haltung traf."
   },
   "tintenfisch_stachel.png": {
     "original": "shredSquid.png",
