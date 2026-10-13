@@ -83,9 +83,10 @@ interface Props {
   imageVersions: Record<string, string>;
   imageSrc: (articleId: string, version: string) => string;
   onPreview: (p: { src: string; x: number; y: number } | null) => void;
+  onOpen: (articleId: string) => void;
 }
 
-export function PreisBoard({ rows, imageVersions, imageSrc, onPreview }: Props) {
+export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }: Props) {
   return (
     <div className="bd-wrap">
       <table className="bd">
@@ -108,7 +109,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview }: Props) 
             const clean = cleanTitle(row.nameRaw);
             const v = imageVersions[row.articleId];
             return (
-              <tr key={row.articleId}>
+              <tr key={row.articleId} onClick={() => onOpen(row.articleId)}>
                 <td>
                   <div className="bd-art">
                     {v ? (

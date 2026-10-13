@@ -439,3 +439,24 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 .bd-bar-n small { display: block; font-weight: 400; color: var(--faint); font-size: 10.5px; }
 .bd-fig-note { font-size: 11.5px; color: var(--faint); line-height: 1.45; margin: 14px 0 0; }
 @media (max-width: 860px) { .bd-over-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---- Preis-Board: Detail-Fenster ---- */
+.bd tbody tr { cursor: pointer; }
+.bd-dt-back { position: fixed; inset: 0; z-index: 60; background: rgba(8, 5, 14, .55); display: flex; justify-content: flex-end; }
+.bd-dt { position: relative; width: min(480px, 100%); height: 100%; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 22px 22px 40px; box-shadow: -12px 0 40px rgba(0, 0, 0, .35); }
+.bd-dt-x { position: absolute; top: 10px; right: 14px; background: none; border: 0; font-size: 26px; color: var(--muted); cursor: pointer; line-height: 1; }
+.bd-dt-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 18px; padding-right: 24px; }
+.bd-dt-img { width: 120px; border-radius: 8px; flex: none; }
+.bd-dt-head h3 { margin: 0 0 6px; font-size: 17px; }
+.bd-dt-full { margin: 8px 0 0; font-size: 11.5px; color: var(--faint); }
+.bd-dt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+.bd-dt-stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.bd-dt-stat span { font-size: 11px; color: var(--muted); }
+.bd-dt-stat b { font-size: 15px; }
+.bd-dt-stat small { font-size: 10.5px; color: var(--faint); }
+.bd-dt h4 { margin: 20px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.bd-dt-t { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; }
+.bd-dt-t th { text-align: left; font-weight: 500; color: var(--faint); padding: 3px 0; }
+.bd-dt-t td { padding: 5px 0; border-top: 1px solid var(--line); }
+.bd-dt-t .r { text-align: right; font-variant-numeric: tabular-nums; }
+.bd-dt-sum { font-size: 12.5px; margin: 0 0 6px; font-weight: 600; }

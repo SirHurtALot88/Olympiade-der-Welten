@@ -18,6 +18,7 @@ import {
 import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
+import { ArtikelDetail } from "./ArtikelDetail";
 import { PreisUeberblick, type BandPoint } from "./PreisUeberblick";
 import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
@@ -200,6 +201,8 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
 
 export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions, band }: Props) {
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailRow = useMemo(() => (detailId ? rows.find((r) => r.articleId === detailId) ?? null : null), [detailId, rows]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -478,7 +481,14 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
               <i className="bd-lg-band" /> Zielspanne<i className="bd-lg-me" /> dein VK<i className="bd-lg-mk" /> Marktwert
             </span>
           </div>
-          <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} />
+          <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
+          {detailRow && (
+            <ArtikelDetail
+              row={detailRow}
+              imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
+              onClose={() => setDetailId(null)}
+            />
+          )}
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
