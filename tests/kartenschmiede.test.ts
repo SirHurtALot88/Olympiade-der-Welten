@@ -619,6 +619,28 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
   });
 });
 
+// Alles, was Chris vorliest oder ansagt (nicht die GM-Notizen): Hier dürfen keine Tabu-Wörter der Kampagne stehen
+const LAUT = ["vorlesen", "einstieg", "ansage", "kern", "zustandSaetze", "bedrohungSatz", "spieler", "titel", "kurz", "name", "info"];
+function lauteTexte(knoten: unknown, schluessel = "", aus: string[] = []): string[] {
+  if (typeof knoten === "string") { if (LAUT.includes(schluessel)) aus.push(knoten); return aus; }
+  if (Array.isArray(knoten)) { for (const x of knoten) lauteTexte(x, schluessel, aus); return aus; }
+  if (knoten && typeof knoten === "object") for (const [k, v] of Object.entries(knoten)) if (!["gmNotiz", "notiz", "hinweis", "hinweise", "quelle", "text", "folge"].includes(k)) lauteTexte(v, LAUT.includes(k) ? k : schluessel === "zustandSaetze" ? "zustandSaetze" : k, aus);
+  return aus;
+}
+describe("Kartenschmiede – Spielmodus ohne Spoiler", () => {
+  for (const datei of ["map1", "map2"]) {
+    it(`${datei}: kein Tabu-Wort in Vorlese- und Ansagetexten`, () => {
+      const m = JSON.parse(fs.readFileSync(path.join(__dirname, `../apps/kartenschmiede/kampagnen/moosgrab/${datei}.json`), "utf8"));
+      const texte = lauteTexte({ schritte: m.schritte, ereignisse: m.ereignisse, figuren: m.figuren, gegner: m.gegner, auftraege: m.auftraege, antreiben: m.antreiben, audio: m.audio, rundenwurf: m.rundenwurf, leisten: m.leisten });
+      expect(texte.length).toBeGreaterThan(50);
+      for (const wort of ["Station", "Labor", "Soldat", "Myzel", "Marine", "Forschung", "Experiment"]) {
+        expect(texte.filter(t => t.includes(wort)), wort).toEqual([]);
+      }
+      expect(texte.filter(t => /\d\s*(Zoll|")/.test(t)), "Zoll-Angaben").toEqual([]);
+    });
+  }
+});
+
 const MAP2 = JSON.parse(fs.readFileSync(path.join(__dirname, "../apps/kartenschmiede/kampagnen/moosgrab/map2.json"), "utf8"));
 describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
   const motor2 = () => SM.erstelle(MAP2, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: VORLAGE_ZAEH[d.karte] || "1", size: "1" }, stufe: () => 2, zufall: () => 0.5 });
@@ -626,6 +648,65 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(SM.pruefe(MAP2)).toEqual([]);
     expect(MAP2.kampagne).toBe(MAP1.kampagne);
     expect(MAP2.map).toBe(2);
+  });
+  it("nimmt Sporenpunkte und Beute der Helden in die nächste Map mit", () => {
+    const m1 = motor() as unknown as Motor & { sporen(s: Spielstand, h: string, d: number): void; gibBeute(s: Spielstand, h: string, x: string): void };
+    const s1 = m1.neu();
+    m1.sporen(s1, "Krieger", 1); m1.sporen(s1, "Krieger", 2);
+    m1.gibBeute(s1, "Schurke", "Heiltrank");
+    const s2 = motor2().neu({ uebernahme: m1.uebernahme(s1) }) as unknown as { sporen: Record<string, number>; inventar: Record<string, string[]> };
+    expect(s2.sporen.Krieger).toBe(3);
+    expect(s2.inventar.Schurke).toEqual(["Heiltrank"]);
+  });
+  it("gibt jedem Kampf Gegnerpunkte wie in OPR (Heldenpunkte × 25/50/75/100 %) und lässt die Werte, wie sie sind", () => {
+    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; effektiveWerte(s: Spielstand, g: unknown): Record<string, string>;
+      schwierigkeit(s: Spielstand): { id: string }; springe(s: Spielstand, id: string): void; budgetVon(s: Spielstand, id: string): { ziel: number; summe: number } | null };
+    // Jeder Gegner ohne eigene Werte kostet 25 Punkte, die Erblühte 130
+    const punkte = (w: Record<string, string>) => (w.name === "Die Erblühte" ? 130 : 25);
+    const werte = (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" };
+    const m = SM.erstelle(MAP2, { werte, punkte, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    const stufen = ["anfaenger", "fortgeschritten", "experte", "legendaer"];
+    const neu = (mm: M, st: string, hp = 340) => mm.neu({ schwierigkeit: st, heldenpunkte: hp });
+    const ids = (mm: M, s: Spielstand, id: string) => { mm.springe(s, id); return (s as unknown as { gegner: Array<{ id: string }> }).gegner.map(x => x.id); };
+    // Die Map ist für 340 Heldenpunkte auf Fortgeschritten (50 %) geschrieben. Die sieben Knienden sind das Dorf und
+    // bleiben sieben; mehr Punkte heißt mehr Grabgänger (25 Punkte je Figur)
+    const zahl = (x: string[], id: string) => x.filter(y => y === id).length;
+    const erloesen = stufen.map(st => ids(m, neu(m, st), "kampf-erloesen"));
+    expect(erloesen.map(x => zahl(x, "gemeinde"))).toEqual([7, 7, 7, 7]);
+    expect(erloesen.map(x => zahl(x, "grabgaenger"))).toEqual([0, 0, 4, 7]);
+    const gemeinde = stufen.map(st => zahl(ids(m, neu(m, st), "kampf-gemeinde"), "grabgaenger"));
+    expect(gemeinde).toEqual([0, 3, 8, 13]);
+    // Mehr Heldenpunkte, mehr Gegner – wie in OPR, wenn die Gruppe wächst
+    expect(zahl(ids(m, neu(m, "fortgeschritten", 680), "kampf-gemeinde"), "grabgaenger")).toBe(13);
+    const s = neu(m, "experte"); ids(m, s, "kampf-erloesen");
+    expect(m.budgetVon(s, "kampf-erloesen")).toMatchObject({ ziel: 263, summe: 275 });
+    // „Die drei stehen auf“ bleibt bei drei, egal auf welcher Stufe
+    for (const st of stufen) expect(ids(m, neu(m, st), "kampf-drei").length).toBe(3);
+    // Die Werte ändern sich nie
+    const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
+    for (const st of stufen) expect(m.effektiveWerte(neu(m, st), g)).toEqual(m.effektiveWerte(neu(m, "fortgeschritten"), g));
+    // Ein Boss bleibt immer; hat er Platz im Budget, füllen Begleiter den Rest
+    const m1 = SM.erstelle(MAP1, { werte, punkte, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    expect(ids(m1, neu(m1, "anfaenger"), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(ids(m1, neu(m1, "fortgeschritten"), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(ids(m1, neu(m1, "legendaer"), "kampf-erbluehte")).toEqual(["erbluehte", ...Array(5).fill("sporenling-klein")]);
+    // Ohne Heldenpunkte (oder ohne Punkteberechnung) bleibt alles, wie die Map es schreibt
+    expect(ids(m, m.neu({ schwierigkeit: "legendaer" }), "kampf-gemeinde").length).toBe(10);
+  });
+  it("lässt Antworten je nach Schwierigkeit stärker oder schwächer wirken und übernimmt die Stufe", () => {
+    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; schwierigkeit(s: Spielstand): { id: string } };
+    const m = SM.erstelle(MAP2, { werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    const schonen = { leisten: { geduld: -1 } }, anhaenger = { leisten: { geduld: 1 } }, laut = { leisten: { laerm: 2 } };
+    const normal = m.neu(), schwer = m.neu({ schwierigkeit: "experte" }), leicht = m.neu({ schwierigkeit: "anfaenger" }), alb = m.neu({ schwierigkeit: "legendaer" });
+    expect(m.schwierigkeit(normal).id).toBe("fortgeschritten");
+    expect(m.wahlLeisten(normal, schonen)).toEqual({ geduld: -1 });
+    expect(m.wahlLeisten(schwer, schonen)).toEqual({ geduld: -2 });
+    expect(m.wahlLeisten(schwer, laut)).toEqual({ laerm: 3 });
+    expect(m.wahlLeisten(leicht, anhaenger)).toEqual({ geduld: 2 });
+    expect(m.wahlLeisten(alb, anhaenger)).toEqual({ geduld: 0 });
+    expect(m.schwierigkeit(m.neu({ uebernahme: m.uebernahme(alb) })).id).toBe("legendaer");
+    // Ältere Spielstände mit den früheren Stufennamen
+    expect(m.schwierigkeit(m.neu({ schwierigkeit: "schwer" })).id).toBe("experte");
   });
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();
@@ -678,6 +759,19 @@ const MINI = {
   },
 };
 describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  it("zählt Aktivierungen je Runde, würfelt Verhalten und stuft Befall ab", () => {
+    const m = mini() as unknown as Motor2 & { aktiviere(s: Stand2, k: string, an?: boolean): void; verhaltenWurf(s: Stand2): { wurf: number; text: string }; befall(n: number): { stufe: string; wuerfel: number } };
+    const s = m.neu() as Stand2 & { aktiviert: Record<string, boolean> };
+    m.aktiviere(s, "held:Krieger");
+    m.aktiviere(s, "g:x");
+    expect(s.aktiviert).toEqual({ "held:Krieger": true, "g:x": true });
+    m.aktiviere(s, "g:x");
+    expect(s.aktiviert["g:x"]).toBe(false);
+    m.runde(s);
+    expect(s.aktiviert).toEqual({});
+    expect(m.verhaltenWurf(s).wurf).toBe(1);
+    expect([m.befall(2).wuerfel, m.befall(3).wuerfel, m.befall(5).wuerfel]).toEqual([4, 3, 2]);
+  });
   it("stärkt und schwächt Gegner, holt Gegner dazu und lässt NPCs kämpfen", () => {
     type G = { uid: string; id: string; zaeh: number };
     const m = SM.erstelle(JSON.parse(JSON.stringify(MINI)), { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2 & {
