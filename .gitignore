@@ -23,6 +23,19 @@ outputs/
 reports/
 backups/
 
+# scripts/export-team-principal-mod.mjs erzeugt Team-Logo-/Fahrer-Portrait-PNGs neben
+# teams.json/drivers.json -- die JSONs bleiben versioniert, aber hunderte Bilddateien
+# (~130 MB) gehoeren nicht ins Git (s. CLAUDE.md "Deploy": genau dieses Bloat-Problem
+# hat den Server schon einmal per vollem Root-Volume lahmgelegt).
+data/generated/team-principal-mod/logos/
+data/generated/team-principal-mod/portraits/
+
+# scripts/export-pcm-mod.mjs patcht Chris' eigene "Pro Cycling Manager 2026"-WorldDB
+# (.cdb, lizenzierte Mod-Datenbank -- nicht unser Content) in-place. Weder die Original-
+# noch die geschriebene Datei gehoeren ins Repo, nur der kleine JSON-Trace waere es wert,
+# aber auch der haengt an einem bestimmten Oly-Save und wird deshalb ebenfalls ausgelassen.
+data/generated/pcm-mod/
+
 # local databases / saves
 *.sqlite
 *.sqlite3
