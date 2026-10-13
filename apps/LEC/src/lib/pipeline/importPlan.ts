@@ -1,7 +1,7 @@
 import type { BillbeeImportResult, BillbeeRow } from "../importers/billbee";
 import type { EbayImportResult } from "../importers/ebay";
 import { matchBillbeeToEbay, type AliasMap } from "../matching/engine";
-import { computeHk, fixedCostPerUnit, type ItemKind } from "../pricing/costEngine";
+import { computeHk, computeShopVolume, fixedCostPerUnit, type ItemKind, type ShopVolume } from "../pricing/costEngine";
 import type { CostSettingsValues } from "../pricing/costSettings";
 import type { SaleWindowKey } from "../parsing/date";
 
@@ -116,7 +116,7 @@ export function buildImportPlan(
   }
   const billbeeResults = Array.from(byWindow.values());
 
-  // Fixkosten (eBay-Shop/Billbee/Lexoffice) sind SHOPWEITE Jahresgebuehren,
+  // Fixkosten (eBay-Shop/Billbee/Lexoffice/Verpackungslizenz) sind SHOPWEITE Jahresgebuehren,
   // keine Artikel-Fixkosten -- sie werden EINMAL durch die insgesamt im Shop
   // verkauften Stueck/365T geteilt (nicht je Artikel), sonst wuerden
   // Nischen-Artikel mit wenigen eigenen Verkaeufen faelschlich die komplette
@@ -128,14 +128,22 @@ export function buildImportPlan(
     : billbeeResults.some((r) => r.window === "all")
       ? "all"
       : undefined;
-  const totalShopUnits365d =
+  // N (alle Stueck) und N_T (Stueck mit VK >= Einschreiben-Schwelle) kommen aus DERSELBEN
+  // Zeilenmenge; sie speisen Fixkosten-Umlage UND den Einschreiben-Satz unter der Schwelle.
+  // Ohne eigenes Fenster bleibt nur die bekannte Gesamtzahl -> N_T unbekannt (null), das
+  // Einschreiben faellt dann auf den flachen Satz S*C/N zurueck.
+  const shopVolume: ShopVolume =
     shopWindow !== undefined
-      ? billbeeResults
-          .filter((r) => r.window === shopWindow)
-          .flatMap((r) => r.rows)
-          .filter((r) => r.isCard)
-          .reduce((sum, r) => sum + r.qty, 0)
-      : (options.knownShopUnits365d ?? 0);
+      ? computeShopVolume(
+          billbeeResults
+            .filter((r) => r.window === shopWindow)
+            .flatMap((r) => r.rows)
+            .filter((r) => r.isCard)
+            .map((r) => ({ qty: r.qty, avgPrice: r.qty > 0 ? r.revenue / r.qty : 0 })),
+          costSettings
+        )
+      : { units365d: options.knownShopUnits365d ?? 0, unitsAtOrAboveThreshold: null };
+  const totalShopUnits365d = shopVolume.units365d;
   const shopFixedCostPerUnit = fixedCostPerUnit(totalShopUnits365d, costSettings);
 
   // 1. Artikel-Katalog: union aller Billbee-Fenster, dedupliziert nach nameNormalized.
@@ -197,10 +205,18 @@ export function buildImportPlan(
           purchaseQty: defaultPurchaseQty,
           packSize: row.packQty,
           fixedCostPerUnit: shopFixedCostPerUnit,
+          // Einschreiben haengt am VK: Ø-VK der Zeile (Umsatz/Stueck) entscheidet ueber die Schwelle.
+          vk: row.qty > 0 ? row.revenue / row.qty : null,
+          shop: shopVolume,
         },
         costSettings
       );
-      const variableCostPerUnit = hk.total - hk.ek; // hk.ek ist 0, total = alle Nebenkosten/Stueck.
+      // DB II ist ein DECKUNGSBEITRAG: nur VARIABLE Nebenkosten, OHNE Fixkostenanteil
+      // (KONZEPT: "DB II = DB I - variable Kosten"). Der Fixkostenanteil wird separat
+      // als fixedCostShare gefuehrt; das Vollkosten-Ergebnis ist dbII - fixedCostShare.
+      // Beides zu mischen hatte zwei Folgen: DB II war in Wahrheit schon ein
+      // Vollkosten-Wert, und wer fixedCostShare zusaetzlich abzog, zaehlte doppelt.
+      const variableCostPerUnit = hk.total - hk.ek - hk.fixedCostShare;
       const shippingCost = variableCostPerUnit * row.qty;
 
       const dbI = row.revenue - row.ek;
