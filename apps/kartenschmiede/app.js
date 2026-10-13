@@ -1034,10 +1034,12 @@
     document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
     $("tabKarten").hidden = name !== "karten"; $("tabGruppe").hidden = name !== "gruppe"; $("tabDb").hidden = name !== "db"; $("tabRegeln").hidden = name !== "regeln";
     $("tabSzenarien").hidden = name !== "szenarien";
+    $("tabSpielen").hidden = name !== "spielen";
     if (name === "regeln") { zeigeElemente(); passeAn($("ladder")); }
     if (name === "gruppe" && window.KartenschmiedeGruppe) window.KartenschmiedeGruppe.zeigen();
     if (name === "db" && window.KartenschmiedeDatenbank) window.KartenschmiedeDatenbank.zeigen();
     if (name === "szenarien" && window.KartenschmiedeSzenarien) window.KartenschmiedeSzenarien.zeigen();
+    if (name === "spielen" && window.KartenschmiedeSpiel) window.KartenschmiedeSpiel.zeigen();
     try { history.replaceState(null, "", "#" + name); } catch { /* egal */ }
   };
   document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => reiter(b.dataset.tab)));
@@ -1066,4 +1068,5 @@
   if (location.hash === "#db") reiter("db");
   if (location.hash === "#regeln") reiter("regeln");
   if (location.hash === "#szenarien") reiter("szenarien");
+  if (location.hash === "#spielen") reiter("spielen");
 })();

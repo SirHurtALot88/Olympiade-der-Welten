@@ -35,6 +35,9 @@ const BILDER: Record<string, string> = {
   einheit8: "einheit-8.jpg",
 };
 
+/** Maps, die der Reiter „Spielen“ Schritt für Schritt abspielen kann (apps/kartenschmiede/kampagnen). */
+const SPIELMODUS_MAPS = ["moosgrab/map1.json"];
+
 const lies = (...teile: string[]) => fs.readFileSync(path.join(QUELLE, ...teile));
 const alsDataUri = (typ: string, daten: Buffer) => `data:${typ};base64,${daten.toString("base64")}`;
 /** Inline-Skripte dürfen kein "</script" enthalten, sonst endet der Block vorzeitig. */
@@ -62,6 +65,9 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("gruppe.js").toString("utf8")),
     skript(lies("szenarien.js").toString("utf8")),
     skript(lies("szenarien-ui.js").toString("utf8")),
+    skript(lies("spiel-motor.js").toString("utf8")),
+    skript(`window.SPIELMODUS_MAPS=${JSON.stringify(SPIELMODUS_MAPS.map(datei => JSON.parse(lies("kampagnen", ...datei.split("/")).toString("utf8"))))};`),
+    skript(lies("spiel.js").toString("utf8")),
     skript(lies("datenbank.js").toString("utf8")),
     skript(lies("charaktere.js").toString("utf8")),
   ].join("\n");

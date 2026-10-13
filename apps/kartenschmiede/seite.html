@@ -710,6 +710,93 @@ fieldset.checks legend { margin-bottom: 6px; }
 .eintrag .thumb { width: 100%; aspect-ratio: 5 / 3; border-radius: 6px; background: #0c0c0d center 25% / cover no-repeat; }
 .fit-note { color: #ffb070; }
 .fit-note:empty { display: none; }
+
+/* ---------- Reiter „Spielen“ ---------- */
+.sp-start { display: grid; gap: 14px; max-width: 900px; }
+.sp-start .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.sp-staende { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sp-kopf { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
+.sp-leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; position: sticky; top: 0; z-index: 5; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.sp-pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; font: 600 15px var(--ui); background: var(--bg2); }
+.sp-pill b { letter-spacing: .06em; text-transform: uppercase; font-size: 13px; color: var(--dim); }
+.sp-pill em { font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+.sp-pill i { display: inline-block; width: 10px; height: 14px; border: 1px solid var(--dim); border-radius: 2px; }
+.sp-pill i.an { background: var(--t5); border-color: var(--t5); }
+.sp-verhalten.wuetend { border-color: var(--t6); color: var(--t6); }
+.sp-verhalten.wuetend b { color: var(--t6); }
+.sp-ton { border-color: #a26bff; }
+.sp-knoepfe { margin-left: auto; display: inline-flex; gap: 8px; }
+.sp-raster { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .sp-raster { grid-template-columns: 1fr; } }
+.sp-karte { --typ: var(--line); display: grid; gap: 14px; padding: 20px 22px; border: 1px solid var(--line); border-left: 6px solid var(--typ); border-radius: 10px; background: var(--bg2); }
+.sp-karte.typ-blau { --typ: #4f8fe8; } .sp-karte.typ-lila { --typ: #a26bff; } .sp-karte.typ-messing { --typ: var(--brass); }
+.sp-karte.typ-gelb { --typ: #e8c63a; } .sp-karte.typ-rot { --typ: #e2483a; } .sp-karte.typ-orange { --typ: #f08a2a; } .sp-karte.typ-gruen { --typ: #5fbf5a; }
+.sp-karte header { display: grid; gap: 4px; }
+.sp-typ { font: 700 14px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--typ); }
+.sp-karte h3 { font-size: clamp(24px, 3vw, 32px); }
+.sp-karte h4, .sp-seite h4, .sp-fenster h4, .sp-start h4 { margin: 4px 0 0; font: 700 13px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-karte ul { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
+.sp-karte footer { display: grid; gap: 6px; justify-items: start; border-top: 1px solid var(--line); padding-top: 14px; }
+.sp-lies { margin: 0; padding: 12px 16px; border-left: 4px solid var(--brass); background: rgba(207,167,94,.08); border-radius: 0 8px 8px 0; font-size: 21px; line-height: 1.5; font-style: italic; max-width: 70ch; }
+.sp-lies small { display: block; font: 700 13px var(--ui); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); margin-bottom: 4px; }
+.sp-gm { font-family: var(--ui); font-size: 16px; color: var(--dim); max-width: 75ch; }
+.sp-gm::before { content: "Nur für dich: "; font-weight: 700; color: #6fb0ff; }
+.sp-text { font-size: 19px; max-width: 70ch; }
+.sp-hinweise { color: var(--dim); }
+.sp-check { list-style: none; padding: 0 !important; }
+.sp-check label { display: flex; gap: 10px; align-items: baseline; cursor: pointer; font-size: 18px; }
+.sp-check input { width: 18px; height: 18px; accent-color: var(--brass); }
+.sp-tisch { font-size: 18px; }
+.sp-cue { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-family: var(--ui); font-size: 16px; }
+.sp-cue.gross { padding: 14px; border: 1px dashed #a26bff; border-radius: 8px; font-size: 19px; }
+.sp-cue.gross .btn { font-size: 18px; padding: 14px 22px; }
+.sp-audioliste { display: grid; gap: 8px; }
+.sp-upload { cursor: pointer; }
+.sp-skizze { display: grid; gap: 6px; max-width: 760px; }
+.sp-skizze svg { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+.sp-skizze small { font-family: var(--ui); color: var(--dim); }
+.sp-ereignisse { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 10px; border-top: 1px dashed var(--line); }
+.sp-ereignisse h4 { flex-basis: 100%; }
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font: 700 13px var(--ui); }
+.btn.aus { opacity: .4; }
+.sp-letzte { display: grid; gap: 10px; }
+.sp-ev { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--brass); border-radius: 8px; }
+.sp-optionen { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.sp-option { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; text-align: left; padding: 14px; border: 1px solid #e2483a; border-radius: 8px; background: rgba(226,72,58,.07); color: var(--ink); cursor: pointer; font: inherit; }
+.sp-option:hover, .sp-option:focus-visible { background: rgba(226,72,58,.18); }
+.sp-option kbd { color: #e2483a; min-width: 30px; height: 30px; font-size: 17px; }
+.sp-option span { display: grid; gap: 4px; }
+.sp-option b { font: 700 18px var(--ui); }
+.sp-option small { font-size: 15px; color: var(--ink); }
+.sp-option em { font: 500 14px var(--ui); color: var(--dim); font-style: normal; }
+.sp-ziel { padding: 10px 12px; border: 1px solid #5fbf5a; border-radius: 8px; font-family: var(--ui); }
+.sp-verh td:first-child, .sp-verh th:first-child { width: 4em !important; }
+.sp-karte li.ja { color: #7fd06a; } .sp-karte li.nein { color: var(--dim); }
+.sp-seite { display: grid; gap: 10px; position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto; }
+@media (max-width: 1000px) { .sp-seite { position: static; max-height: none; } }
+.sp-gegner { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); cursor: pointer; }
+.sp-gegner.markiert { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(207,167,94,.35); }
+.sp-gegner.gefallen { opacity: .55; }
+.sp-g-kopf { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.sp-g-kopf b { font: 700 17px var(--ui); }
+.sp-g-kopf small { font: 500 13px var(--ui); color: var(--dim); }
+.sp-schaedel { margin-left: auto; color: var(--t6); letter-spacing: .1em; }
+.sp-g-balken { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.sp-g-balken i { width: 12px; height: 12px; border-radius: 2px; background: #3a5a36; }
+.sp-g-balken i.wunde { background: var(--t6); }
+.sp-g-balken em { font: 700 13px var(--ui); font-style: normal; color: var(--dim); margin-left: 6px; }
+.sp-g-zustand { font-size: 15px; }
+.sp-g-zustand b { font-family: var(--ui); text-transform: uppercase; letter-spacing: .06em; }
+.sp-g-knoepfe { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-fenster { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.6); }
+.sp-fenster-innen { display: grid; gap: 10px; width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 20px 22px; border: 1px solid var(--brass); border-radius: 12px; background: var(--bg); }
+.sp-fenster-innen.klein { width: min(620px, 100%); }
+.sp-fenster-innen.karte { width: min(680px, 100%); }
+.sp-fenster-innen header { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.sp-kartenbox { width: 100%; }
+/* Solange ein Abend läuft, schrumpft der Seitenkopf: der Platz gehört der Schrittkarte */
+body.sp-laeuft:has(#tabSpielen:not([hidden])) header.top > :not(.tabs), body.sp-laeuft #tabSpielen .sec-head { display: none; }
+body.sp-laeuft:has(#tabSpielen:not([hidden])) .wrap { padding-block-start: 10px; gap: 16px; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -766,6 +853,7 @@ fieldset.checks legend { margin-bottom: 6px; }
       <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Erstellen</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
       <button type="button" role="tab" id="tab-szenarien" data-tab="szenarien" aria-selected="false" aria-controls="tabSzenarien">Szenarien</button>
+      <button type="button" role="tab" id="tab-spielen" data-tab="spielen" aria-selected="false" aria-controls="tabSpielen">Spielen</button>
       <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
       <button type="button" role="tab" id="tab-regeln" data-tab="regeln" aria-selected="false" aria-controls="tabRegeln">Regeln</button>
     </nav>
@@ -1061,6 +1149,16 @@ fieldset.checks legend { margin-bottom: 6px; }
         </aside>
         <div class="g-main" id="szMain"></div>
       </div>
+    </section>
+  </div>
+
+  <div id="tabSpielen" role="tabpanel" aria-labelledby="tab-spielen" class="tabpanel" hidden>
+    <section aria-labelledby="h-spielen">
+      <div class="sec-head">
+        <h2 id="h-spielen">Spielen</h2>
+        <p class="lede">Der Laptop als Spielleiter-Schirm: Map Schritt für Schritt, Vorlesetexte, Audio-Cues, NPCs und Gegner mit verdeckten Lebenspunkten. Die Figuren bewegt ihr am Tisch.</p>
+      </div>
+      <div id="spMain"></div>
     </section>
   </div>
 

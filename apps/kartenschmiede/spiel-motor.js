@@ -1,0 +1,327 @@
+/* Kartenschmiede – Spielmotor für den Reiter „Spielen“: spielt eine Map als Schritt-Graph ab.
+   Reines JavaScript ohne DOM, damit dieselbe Datei im Browser läuft und in den Tests eine ganze Map durchspielt.
+
+   Datenmodell und Begriffe: docs/design/moosgrab-spielmodus-konzept.md, Beispiel kampagnen/moosgrab/map1.json.
+   - Eine Map hat `schritte` (id → Schritt), `start`, `leisten`, `flags`, `ereignisse`, `rundenende`, `gegner`, `fog`.
+   - Der Spielstand ist reines JSON (wird auf dem Server gespeichert), der Motor schreibt nur in ihn hinein.
+   - `runde` zählt BEENDETE Runden; angezeigt wird „Runde runde + 1“. Bedingungen auf `runde` lesen also beendete Runden.
+   - Jede Aktion legt vorher einen Schnappschuss an, „Zurück“ stellt ihn wieder her (auch Wunden und Flags). */
+(function (root) {
+  "use strict";
+
+  const kopie = x => JSON.parse(JSON.stringify(x));
+  const MAX_UNDO = 80;
+  const VERGLEICH = { "<=": (a, b) => a <= b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, ">": (a, b) => a > b, "==": (a, b) => a === b };
+
+  // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, zufall() → 0..1 }
+  function erstelle(map, hilfen = {}) {
+    const zufall = hilfen.zufall || Math.random;
+    const werteVon = def => (hilfen.werte ? hilfen.werte(def) : def.werte) || def.werte || {};
+    const zaehVon = werte => Math.max(1, (parseFloat(werte.tough) || 1) * (parseInt(werte.size, 10) || 1));
+
+    // ---------- Spielstand ----------
+    function neu(opt = {}) {
+      const flags = {}, leisten = {};
+      for (const [k, f] of Object.entries(map.flags || {})) flags[k] = f.start === undefined ? null : f.start;
+      for (const [k, l] of Object.entries(map.leisten || {})) leisten[k] = { wert: l.start || 0, aktiv: l.aktiv !== false };
+      // Was aus früheren Maps kommt (Kampagnen-Leisten und Flags), überschreibt die Startwerte
+      const ueber = opt.uebernahme || {};
+      for (const [k, v] of Object.entries(ueber.leisten || {})) if (leisten[k] && map.leisten[k].gilt === "kampagne") leisten[k].wert = v;
+      Object.assign(flags, ueber.flags || {});
+      const state = {
+        version: 1, kampagne: map.kampagne, map: map.map, name: opt.name || `${map.titel}`,
+        schritt: null, verlauf: [], flags, leisten, runde: 0, rundenAktiv: false,
+        gegner: [], gespawnt: {}, ereignisse: {}, angewendet: {}, wahlen: {}, checks: {}, kampfZiel: null,
+        letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
+      };
+      betrete(state, map.start);
+      return state;
+    }
+    const merke = state => {
+      const schnapp = kopie({ ...state, undo: [] });
+      state.undo.push(schnapp);
+      if (state.undo.length > MAX_UNDO) state.undo.shift();
+    };
+    function zurueck(state) {
+      const alt = state.undo.pop();
+      if (!alt) return false;
+      const undo = state.undo;
+      for (const k of Object.keys(state)) delete state[k];
+      Object.assign(state, alt, { undo });
+      return true;
+    }
+    const notiere = (state, text) => { state.protokoll.push({ runde: state.runde + 1, schritt: state.schritt, text }); if (state.protokoll.length > 500) state.protokoll.shift(); };
+
+    // ---------- Bedingungen ----------
+    function gilt(state, w) {
+      if (!w) return true;
+      if (Array.isArray(w)) return w.every(x => gilt(state, x));
+      if (w.alle) return w.alle.every(x => gilt(state, x));
+      if (w.eine) return w.eine.some(x => gilt(state, x));
+      if (w.flag !== undefined) {
+        const v = state.flags[w.flag] === undefined ? null : state.flags[w.flag];
+        if ("ist" in w) return v === w.ist;
+        if ("nicht" in w) return v !== w.nicht;
+        return !!v;
+      }
+      if (w.nicht) return !gilt(state, w.nicht);
+      if (w.leisteAktiv) return !!(state.leisten[w.leisteAktiv] && state.leisten[w.leisteAktiv].aktiv);
+      if (w.leiste) {
+        const l = state.leisten[w.leiste];
+        const wert = l ? l.wert : 0;
+        return Object.entries(VERGLEICH).every(([op, f]) => !(op in w) || f(wert, w[op]));
+      }
+      if (w.runde) return (VERGLEICH[w.runde] || VERGLEICH[">="])(state.runde, +w.wert || 0);
+      if (w.gegnerGefallen) {
+        const alle = state.gegner.filter(g => g.id === w.gegnerGefallen);
+        return alle.length > 0 && alle.every(g => g.wunden >= g.zaeh);
+      }
+      return true;
+    }
+    function ziel(state, weiter) {
+      if (!weiter) return null;
+      if (typeof weiter === "string") return weiter;
+      for (const e of weiter) if (!e.wenn || gilt(state, e.wenn)) return e.ziel;
+      return null;
+    }
+
+    // ---------- Wirkungen ----------
+    const ersetze = (wert, eingabe) => (wert === "@held" ? (eingabe || "ein Held") : wert);
+    function setze(state, setzt, eingabe) {
+      for (const [k, v] of Object.entries(setzt || {})) state.flags[k] = ersetze(v, eingabe);
+    }
+    function aendere(state, leisten) {
+      for (const [k, d] of Object.entries(leisten || {})) {
+        const l = state.leisten[k], def = (map.leisten || {})[k];
+        if (!l || !def) continue;
+        l.wert = Math.max(def.min ?? -Infinity, Math.min(def.max ?? Infinity, l.wert + d));
+      }
+    }
+    const schalte = (state, namen, an) => { for (const n of namen || []) if (state.leisten[n]) state.leisten[n].aktiv = an; };
+
+    // ---------- Gegner ----------
+    function spawne(state, schrittId) {
+      const s = map.schritte[schrittId];
+      if (!s || s.typ !== "kampf") return;
+      (s.gegner || []).forEach((e, i) => {
+        const schluessel = `${schrittId}:${i}`;
+        if (state.gespawnt[schluessel]) return;
+        const def = map.gegner[e.id];
+        if (!def) return;
+        if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
+        state.gespawnt[schluessel] = true;
+        const zaeh = zaehVon(werteVon(def));
+        for (let n = 0; n < (e.anzahl || 1); n++) state.gegner.push({ uid: `${schluessel}:${n}`, id: e.id, zone: e.zone || "", wunden: 0, zaeh, weg: false });
+      });
+    }
+    // Gegner mit nurWenn erscheinen, sobald die Bedingung stimmt (die Quelle nach Marker 3)
+    const pruefeSpawns = state => { for (const id of new Set(state.verlauf)) spawne(state, id); };
+    function schaden(state, uid, delta) {
+      const g = state.gegner.find(x => x.uid === uid);
+      if (!g) return null;
+      merke(state);
+      g.wunden = Math.max(0, Math.min(g.zaeh, g.wunden + delta));
+      notiere(state, `${anzeigeName(g)} ${delta > 0 ? "+" : ""}${delta} Wunden (${g.wunden}/${g.zaeh})`);
+      pruefeKampf(state);
+      return g;
+    }
+    function entferne(state, uid) {
+      const g = state.gegner.find(x => x.uid === uid);
+      if (!g) return;
+      merke(state);
+      g.weg = true;
+      notiere(state, `${anzeigeName(g)} vom Tisch`);
+    }
+    const anzeigeName = g => (map.gegner[g.id] || {}).name || g.id;
+    function zustand(g) {
+      const rest = g.zaeh - g.wunden, z = g.zaeh;
+      const id = g.wunden === 0 ? "unverletzt" : rest <= 0 ? "gefallen" : rest === 1 ? "am Ende" : rest <= z / 4 ? "schwer verwundet" : rest <= z / 2 ? "verwundet" : "angekratzt";
+      const def = map.gegner[g.id] || {};
+      const stufe = ((map.fog || {}).stufen || []).find(s => s.id === id) || {};
+      return { id, satz: (def.zustandSaetze && def.zustandSaetze[id]) || stufe.satz || "", rest };
+    }
+    function bedrohung(def) {
+      const schaedel = hilfen.stufe ? hilfen.stufe(werteVon(def)) : 1;
+      const eintrag = ((map.fog || {}).bedrohung || []).find(b => schaedel >= b.schaedel[0] && schaedel <= b.schaedel[b.schaedel.length - 1]) || {};
+      return { schaedel, satz: def.bedrohungSatz || eintrag.satz || "" };
+    }
+    function pruefeKampf(state) {
+      const s = map.schritte[state.schritt];
+      if (!s || s.typ !== "kampf") return;
+      for (const e of s.ende || []) {
+        if (gilt(state, e.wenn)) {
+          if (state.kampfZiel !== e.ziel) { setze(state, e.setzt); state.kampfZiel = e.ziel; notiere(state, `Kampfziel erreicht → ${e.ziel}`); }
+          return;
+        }
+      }
+    }
+    function wuetend(state) {
+      if (state.flags.gegner_wuetend) return true;
+      const kampf = [...state.verlauf].reverse().map(id => map.schritte[id]).find(s => s && s.typ === "kampf");
+      if (!kampf || !kampf.verhalten) return false;
+      return kampf.verhalten.start === "wuetend" || !!(kampf.verhalten.wuetendWenn && gilt(state, kampf.verhalten.wuetendWenn));
+    }
+
+    // ---------- Schritte ----------
+    function betrete(state, id, tiefe = 0) {
+      if (!id || tiefe > 50) return null;
+      const s = map.schritte[id];
+      if (!s) throw new Error(`Schritt fehlt: ${id}`);
+      // Schritte mit `wenn`, die nicht gelten, werden übersprungen (z. B. die Nachsuche, wenn alles gefunden ist)
+      if (s.wenn && !gilt(state, s.wenn)) return betrete(state, ziel(state, s.weiter), tiefe + 1);
+      state.schritt = id;
+      state.verlauf.push(id);
+      state.kampfZiel = null;
+      if (!state.angewendet[id]) {
+        state.angewendet[id] = true;
+        setze(state, s.setzt);
+        aendere(state, s.leisten);
+        schalte(state, s.leistenAn, true);
+        schalte(state, s.leistenAus, false);
+      }
+      if (s.runden) state.rundenAktiv = true;
+      if (s.typ === "kampf") { spawne(state, id); pruefeKampf(state); }
+      return s;
+    }
+    function weiter(state) {
+      const s = map.schritte[state.schritt];
+      if (!s || s.typ === "wahl") return null;
+      const naechster = state.kampfZiel || ziel(state, s.weiter);
+      if (!naechster) return null;
+      merke(state);
+      state.letzte = [];
+      return betrete(state, naechster);
+    }
+    function springe(state, id) {
+      merke(state);
+      state.letzte = [];
+      return betrete(state, id);
+    }
+
+    // ---------- Ereignisse (jederzeit per Taste) ----------
+    function ereignisErlaubt(state, id) {
+      const e = map.ereignisse[id];
+      if (!e) return false;
+      if (e.einmal && state.ereignisse[id]) return false;
+      return !e.nurWenn || gilt(state, e.nurWenn);
+    }
+    function loeseAus(state, id, still) {
+      const e = map.ereignisse[id];
+      if (!e || !ereignisErlaubt(state, id)) return null;
+      if (e.intern && e.wenn && !gilt(state, e.wenn)) return null;
+      state.ereignisse[id] = true;
+      setze(state, e.setzt);
+      aendere(state, e.leisten);
+      schalte(state, e.leistenAus, false);
+      if (!e.intern) notiere(state, e.name);
+      const ergebnis = { id, name: e.name, vorlesen: e.vorlesen || "", gmNotiz: e.gmNotiz || "", beutewurf: !!e.beutewurf };
+      if (!still && !e.intern) state.letzte.push(ergebnis);
+      if (e.danach) loeseAus(state, e.danach, true);
+      pruefeSpawns(state);
+      pruefeKampf(state);
+      if (e.springe) { state.letzte = []; betrete(state, e.springe); }
+      return ergebnis;
+    }
+    function ereignis(state, id) {
+      if (!ereignisErlaubt(state, id)) return null;
+      merke(state);
+      return loeseAus(state, id, false);
+    }
+
+    // ---------- Antwortwahl ----------
+    const offeneMarker = state => Object.entries(map.ereignisse || {}).filter(([id, e]) => e.beutewurf && e.einmal && !state.ereignisse[id]).map(([id]) => id);
+    function waehle(state, taste, eingabe) {
+      const s = map.schritte[state.schritt];
+      if (!s || s.typ !== "wahl") return null;
+      const o = s.optionen.find(x => String(x.taste) === String(taste));
+      if (!o) return null;
+      merke(state);
+      state.letzte = [];
+      state.wahlen[state.schritt] = o.taste;
+      setze(state, o.setzt, eingabe);
+      aendere(state, o.leisten);
+      notiere(state, `${s.titel}: ${o.kurz}${eingabe ? ` (${eingabe})` : ""}`);
+      // Nachsuche: offene Marker kosten je einen Strich Atemzug
+      const marker = o.wirkung === "offene-marker-alle" ? offeneMarker(state) : o.wirkung === "offene-marker-einer" && eingabe ? [eingabe] : [];
+      for (const m of marker) {
+        const r = loeseAus(state, m, false);
+        if (r) { aendere(state, { atemzug: 1 }); state.flags.nachsuche = (+state.flags.nachsuche || 0) + 1; }
+      }
+      const gefunden = state.letzte;
+      betrete(state, o.ziel || ziel(state, s.weiter));
+      state.letzte = gefunden;
+      return o;
+    }
+
+    // ---------- Rundenende ----------
+    function runde(state) {
+      merke(state);
+      state.runde += 1;
+      const texte = [];
+      let sprung = null;
+      for (const r of map.rundenende || []) {
+        if (!gilt(state, r.wenn)) continue;
+        // Eine Regel, die nur Flags setzt, die schon stehen (ab Runde 4 wütend), meldet sich nur beim ersten Mal
+        const neuGesetzt = Object.entries(r.setzt || {}).some(([k, v]) => state.flags[k] !== v);
+        aendere(state, r.leisten);
+        setze(state, r.setzt);
+        if (r.springe && !sprung && !state.angewendet[r.springe]) sprung = r.springe;
+        if (r.text && (r.leisten || r.springe || neuGesetzt)) texte.push(r.text);
+      }
+      notiere(state, `Runde ${state.runde} beendet`);
+      state.letzte = [];
+      if (sprung) betrete(state, sprung);
+      return { texte, sprung };
+    }
+
+    // ---------- Abschluss ----------
+    const epListe = state => ((map.schritte[state.schritt] || {}).ep || []).map(e => ({ ...e, erreicht: gilt(state, e.wenn) }));
+    const folgen = state => ((map.schritte[state.schritt] || {}).folgen || []).filter(f => gilt(state, f.wenn)).map(f => f.text);
+    function wuerfle(tabelle) {
+      const w = 1 + Math.floor(zufall() * 6);
+      const zeile = (tabelle || map.beutewurf || []).find(([n]) => n === w);
+      return { wurf: w, text: zeile ? zeile[1] : "" };
+    }
+    // Was die nächste Map übernimmt
+    const uebernahme = state => ({
+      leisten: Object.fromEntries(Object.entries(state.leisten).filter(([k]) => (map.leisten[k] || {}).gilt === "kampagne").map(([k, l]) => [k, l.wert])),
+      flags: Object.fromEntries(Object.entries(state.flags).filter(([k]) => /map[2-9]/.test((map.flags[k] || {}).wirktIn || ""))),
+    });
+
+    return {
+      map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
+      zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
+      schritt: state => map.schritte[state.schritt] || null,
+      naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
+    };
+  }
+
+  // Prüft eine Map auf kaputte Verweise. Liefert eine Liste von Fehlern (leer = in Ordnung).
+  function pruefe(map) {
+    const fehler = [];
+    const schritte = map.schritte || {};
+    const istSchritt = id => !id || !!schritte[id];
+    const zielListe = w => (!w ? [] : typeof w === "string" ? [w] : w.map(e => e.ziel));
+    if (!schritte[map.start]) fehler.push(`start ${map.start} fehlt`);
+    for (const [id, s] of Object.entries(schritte)) {
+      for (const z of zielListe(s.weiter)) if (!istSchritt(z)) fehler.push(`${id}: weiter → ${z} fehlt`);
+      for (const o of s.optionen || []) if (o.ziel && !istSchritt(o.ziel)) fehler.push(`${id}: Option ${o.taste} → ${o.ziel} fehlt`);
+      for (const e of s.ende || []) if (!istSchritt(e.ziel)) fehler.push(`${id}: ende → ${e.ziel} fehlt`);
+      for (const e of s.ereignisse || []) if (!(map.ereignisse || {})[e]) fehler.push(`${id}: Ereignis ${e} fehlt`);
+      for (const g of s.gegner || []) if (!(map.gegner || {})[g.id]) fehler.push(`${id}: Gegner ${g.id} fehlt`);
+      if (s.cue && !(map.audio || {})[s.cue]) fehler.push(`${id}: Cue ${s.cue} fehlt`);
+      if (s.figur && !(map.figuren || {})[s.figur]) fehler.push(`${id}: Figur ${s.figur} fehlt`);
+      if (s.typ === "wahl" && !(s.optionen || []).length) fehler.push(`${id}: Wahl ohne Optionen`);
+    }
+    for (const [id, e] of Object.entries(map.ereignisse || {})) {
+      if (e.springe && !istSchritt(e.springe)) fehler.push(`Ereignis ${id}: springe → ${e.springe} fehlt`);
+      if (e.danach && !(map.ereignisse || {})[e.danach]) fehler.push(`Ereignis ${id}: danach → ${e.danach} fehlt`);
+    }
+    for (const r of map.rundenende || []) if (r.springe && !istSchritt(r.springe)) fehler.push(`Rundenende: springe → ${r.springe} fehlt`);
+    return fehler;
+  }
+
+  const SpielMotor = { erstelle, pruefe };
+  if (typeof module !== "undefined" && module.exports) module.exports = SpielMotor;
+  else root.SpielMotor = SpielMotor;
+})(typeof globalThis !== "undefined" ? globalThis : this);
