@@ -89,11 +89,18 @@
       teile.push(art.form === "rund"
         ? `<ellipse cx="${g.x + g.w / 2}" cy="${g.y + g.h / 2}" rx="${g.w / 2}" ry="${g.h / 2}" fill="${f}88" stroke="${f}" stroke-width=".18"/>`
         : `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="${art.form === "lang" ? .5 : .3}" fill="${f}88" stroke="${f}" stroke-width=".18"/>`);
-      teile.push(`<text x="${g.x + g.w / 2}" y="${g.y + g.h / 2 + .4}" font-size="1.1" text-anchor="middle" fill="${tinte}" ${SCHRIFT}>${n}</text>`);
+      // namen: Gelände beschriften statt nummerieren (Reiter „Spielen“, dort verwechselt man Nummern mit Suchmarkern)
+      if (opt.namen) {
+        const wort = schluessel, quer = g.w >= g.h, platz = (quer ? g.w : g.h) * 1.7;
+        const gr = Math.max(.55, Math.min(1, platz / Math.max(1, wort.length)));
+        teile.push(`<text x="${g.x + g.w / 2}" y="${g.y + g.h / 2 + gr * .35}" font-size="${gr}" text-anchor="middle" fill="${tinte}" ${SCHRIFT}${quer ? "" : ` transform="rotate(-90 ${g.x + g.w / 2} ${g.y + g.h / 2})"`}>${esc(wort)}</text>`);
+      } else teile.push(`<text x="${g.x + g.w / 2}" y="${g.y + g.h / 2 + .4}" font-size="1.1" text-anchor="middle" fill="${tinte}" ${SCHRIFT}>${n}</text>`);
     }
     const typen = new Set();
+    // aufgedeckt: geheime Marker, die im Spiel schon gefunden sind (Reiter „Spielen“)
+    const aufgedeckt = opt.aufgedeckt || [];
     for (const m of karte.marker) {
-      if (m.geheim && !geheim) continue;
+      if (m.geheim && !geheim && !aufgedeckt.includes(m.label) && !aufgedeckt.includes(`${m.typ}:${m.label}`)) continue;
       const [z, f] = MARKER[m.typ] || ["•", "#fff"];
       typen.add(m.typ);
       if (m.typ === "zone") { teile.push(`<circle cx="${m.x}" cy="${m.y}" r="${m.radius || 4}" fill="${f}18" stroke="${f}" stroke-width=".2" stroke-dasharray="1 .5"/>`); continue; }
@@ -106,7 +113,7 @@
       teile.push(`<circle cx="${x}" cy="${y}" r=".95" fill="${f}" stroke="#1b1509" stroke-width=".12"${m.geheim ? ` stroke-dasharray=".3 .2"` : ""}/><text x="${x}" y="${y + .42}" font-size="1.15" text-anchor="middle" fill="#1b1509" ${SCHRIFT}>${esc(m.label && m.label.length <= 2 ? m.label : z)}</text>`);
     }
     const tischName = (S.TISCHE.find(t => t.id === karte.tisch) || {}).name || `${B}" × ${T}"`;
-    teile.push(`<text x="${B - .4}" y="${T - .4}" font-size=".85" text-anchor="end" fill="${tinte}" opacity=".7" font-family="Barlow Condensed, sans-serif">${esc(tischName)} · Raster 6" (15 cm) · Norden oben</text>`);
+    teile.push(`<text x="${B - .4}" y="${T - .4}" font-size=".85" text-anchor="end" fill="${tinte}" opacity=".7" font-family="Barlow Condensed, sans-serif">${esc(opt.fuss || `${tischName} · Raster 6" (15 cm) · Norden oben`)}</text>`);
     return {
       svg: `<svg class="sz-karte" viewBox="0 0 ${B} ${T}" role="img" aria-label="Tischskizze ${esc(tischName)}">${teile.join("")}</svg>`,
       legende: [...legende.values()], typen: [...typen],
@@ -331,7 +338,7 @@
       }
       zeigeListe(); zeige();
     },
-    mapBogen, zusatzBogen, karteSvg,
+    mapBogen, zusatzBogen, karteSvg, MARKER,
   };
   if (!$("tabSzenarien").hidden) window.KartenschmiedeSzenarien.zeigen();
 })();

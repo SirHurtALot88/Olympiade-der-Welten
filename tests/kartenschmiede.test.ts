@@ -611,3 +611,93 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     expect(s.schritt).toBe("ende-map1");
   });
 });
+
+// Kleine Testmap für die Bausteine, die Map 1 und Map 2 gemeinsam nutzen
+type SpielEintrag = { id: string; name: string; art?: string; probe?: { wurf: number | null; stufen: Array<{ ab: number; vorlesen: string }> } };
+type Stand2 = Spielstand & { letzte: SpielEintrag[]; pos: Record<string, { x: number; y: number }>; rundenwurfRunde?: number };
+type Motor2 = {
+  neu(): Stand2; weiter(s: Stand2): unknown; zurueck(s: Stand2): boolean; runde(s: Stand2): unknown; ereignis(s: Stand2, id: string): unknown;
+  schaden(s: Stand2, uid: string, d: number): unknown; probe(s: Stand2, i: number, w: number): { wurf: number } | null;
+  rundenwurf(s: Stand2, w: number): { wurf: number; titel?: string } | null; zustand(g: { wunden: number; zaeh: number; id: string }): { id: string; satz: string };
+  lage(s: Stand2): { sonderregeln: Array<{ titel: string }>; ziele: Array<{ ist: boolean }> }; setzePos(s: Stand2, k: string, x: number, y: number): void;
+  aufgedeckt(s: Stand2): string[]; figurenAmTisch(s: Stand2): Array<{ id: string }>;
+};
+const MINI = {
+  kampagne: "Test", map: 9, titel: "Mini", start: "a",
+  leisten: { laerm: { name: "Lärm", min: 0, max: 6, start: 0, schwellen: [{ ab: 3, titel: "Sie drehen sich um", setzt: { umgedreht: true } }, { ab: 6, titel: "Alle wach", springe: "kampf" }] } },
+  flags: { angegriffen: { start: false }, umgedreht: { start: false }, gefunden: { start: false } },
+  figuren: { frau: { name: "Die Frau", tisch: { x: 2, y: 2, ab: { flag: "umgedreht" }, bis: { flag: "angegriffen" } } } },
+  tischplan: { aufdecken: { "falltuer:F": { flag: "gefunden" } } },
+  lage: { sonderregeln: [{ titel: "Immer" }, { titel: "Nach Angriff", wenn: { flag: "angegriffen" } }], ziele: [{ art: "Hauptziel", text: "finden", erreicht: { flag: "gefunden" } }] },
+  rundenwurf: { name: "Wald", tabelle: [{ w: [1], titel: "Wind", setzt: { gefunden: true } }, { w: [2, 3, 4, 5, 6], titel: "Nichts" }] },
+  ereignisse: {
+    marker: { name: "Marker", taste: "1", vorlesen: "Ein Reh.", marker: "1", probe: { stufen: [{ ab: 3, vorlesen: "Pilze." }, { ab: 5, vorlesen: "Die Tiere zuerst.", setzt: { gefunden: true } }] } },
+    laut: { name: "Laut", leisten: { laerm: 2 } },
+    angriff: { name: "Angriff", setzt: { angegriffen: true } },
+  },
+  gegner: { boss: { name: "Boss", werte: { tough: "3" }, zusatz: [{ wenn: { flag: "angegriffen" }, text: "Wütend", zaeh: 2 }], tod: { vorlesen: "Sie sackt zusammen.", setzt: { boss_tot: true } } } },
+  schritte: {
+    a: { typ: "spieler", titel: "A", ereignisse: ["marker", "laut", "angriff"], runden: true, weiter: "kampf" },
+    kampf: { typ: "kampf", titel: "Kampf", gegner: [{ id: "boss", anzahl: 1 }], ende: [{ wenn: { gegnerGefallen: "boss" }, ziel: "ende" }], weiter: "ende" },
+    ende: { typ: "ende", titel: "Ende" },
+  },
+};
+describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  const mini = () => SM.erstelle(MINI, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2;
+  it("hat in der Testmap keine kaputten Verweise", () => {
+    expect(SM.pruefe(MINI)).toEqual([]);
+    expect(SM.pruefe({ ...MINI, rundenwurf: { name: "x", tabelle: [{ w: [1] }] } })).toContain("Rundenwurf: 2 fehlt in der Tabelle");
+  });
+  it("legt bei einer Probe die Stufen bis zum Wurf frei, mit Wirkung", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "marker");
+    expect(s.letzte[0].probe?.wurf).toBeNull();
+    m.probe(s, 0, 4);
+    expect(s.letzte[0].probe?.stufen.map(x => x.vorlesen)).toEqual(["Pilze."]);
+    expect(s.flags.gefunden).toBe(false);
+    m.zurueck(s);
+    m.probe(s, 0, 5);
+    expect(s.letzte[0].probe?.stufen).toHaveLength(2);
+    expect(s.flags.gefunden).toBe(true);
+    expect(m.aufgedeckt(s)).toEqual(["falltuer:F"]);
+    expect(m.lage(s).ziele[0].ist).toBe(true);
+    expect(m.probe(s, 0, 6)).toBeNull();
+  });
+  it("löst Schwellen einmal aus und springt bei der letzten in den Kampf", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "laut");
+    expect(s.flags.umgedreht).toBe(false);
+    m.ereignis(s, "laut");
+    expect(s.flags.umgedreht).toBe(true);
+    expect(s.letzte.some(e => e.art === "schwelle")).toBe(true);
+    expect(m.figurenAmTisch(s).map(f => f.id)).toEqual(["frau"]);
+    m.ereignis(s, "laut");
+    expect(s.schritt).toBe("kampf");
+    expect(s.letzte.filter(e => e.art === "schwelle")).toHaveLength(2);
+  });
+  it("gibt Zusatzregeln aus Entscheidungen weiter und zeigt den Todestext", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "angriff");
+    expect(m.lage(s).sonderregeln.map(r => r.titel)).toEqual(["Immer", "Nach Angriff"]);
+    expect(m.figurenAmTisch(s)).toEqual([]);
+    m.weiter(s);
+    const boss = s.gegner[0];
+    expect(boss.zaeh).toBe(5);
+    m.schaden(s, boss.uid, 5);
+    expect(m.zustand(boss).satz).toBe("Sie sackt zusammen.");
+    expect(s.flags.boss_tot).toBe(true);
+    expect(s.letzte.some(e => e.art === "tod")).toBe(true);
+  });
+  it("würfelt am Rundenende und lässt Figurenpositionen beim Zurück stehen", () => {
+    const m = mini(), s = m.neu();
+    m.runde(s);
+    const r = m.rundenwurf(s, 1);
+    expect(r?.titel).toBe("Wind");
+    expect(s.rundenwurfRunde).toBe(1);
+    expect(s.flags.gefunden).toBe(true);
+    m.setzePos(s, "held:A", 3, 4);
+    m.zurueck(s);
+    expect(s.flags.gefunden).toBe(false);
+    expect(s.pos["held:A"]).toEqual({ x: 3, y: 4 });
+  });
+});
