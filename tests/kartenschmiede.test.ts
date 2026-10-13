@@ -13,6 +13,12 @@ import {
   ladeKarte,
   listeGruppen,
   listeKarten,
+  listeSzenarien,
+  listeSpielstaende,
+  speichereAudio,
+  audioDatei,
+  listeAudio,
+  loescheAudio,
   loescheKarte,
   speichereEintrag,
   speichereFaehigkeiten,
@@ -327,7 +333,10 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(rumpf).toContain("window.KARTENSCHMIEDE_SERVER=true");
     expect(rumpf).toContain("Kartenschmiede");
     expect(rumpf).toContain("KartenschmiedeCharaktere");
-    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente", "rueckBox", "simCheck"]) expect(rumpf).toContain(`id="${id}"`);
+    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente", "rueckBox", "simCheck", "tabSzenarien", "szKampagne", "szMain", "tabSpielen", "spMain"]) expect(rumpf).toContain(`id="${id}"`);
+    expect(rumpf).toContain("KartenschmiedeSzenarien");
+    expect(rumpf).toContain("KartenschmiedeSpiel");
+    expect(rumpf).toContain("window.SPIELMODUS_MAPS=");
     // Gegner werden als Postkarte gedruckt: Querformat im Verhältnis 3:2 und eine eigene Seitengröße 15 × 10 cm
     expect(kopf + rumpf).toContain(".card.land { aspect-ratio: 3 / 2;");
     expect(kopf + rumpf).toContain("@page postkarte-quer { size: 150mm 100mm;");
@@ -381,8 +390,348 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(listeKarten("gemeinsam").map(k => k.id)).toEqual(["karte-abcdef12"]);
   });
 
+  it("speichert und listet Zusatzmissionen", () => {
+    speichereEintrag("gemeinsam", "szenarien", "szenario-1234abcd", { titel: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }, null, "Chris");
+    expect(listeSzenarien("gemeinsam")).toMatchObject([{ id: "szenario-1234abcd", name: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }]);
+    expect(ladeEintrag("gemeinsam", "szenarien", "szenario-1234abcd")).toMatchObject({ titel: "Das Nest" });
+  });
+
+  it("speichert Spielstände und Audio-Cues, und lässt nur Audio mit gültiger Id durch", () => {
+    speichereEintrag("gemeinsam", "spielstaende", "spielstand-1234abcd", { name: "Moosgrab mit Franky", kampagne: "moosgrab" }, null, "Chris");
+    expect(listeSpielstaende("gemeinsam")).toMatchObject([{ id: "spielstand-1234abcd", name: "Moosgrab mit Franky", kampagne: "moosgrab" }]);
+    const mp3 = Buffer.from("ID3-test-daten");
+    expect(speichereAudio("gemeinsam", "moosgrab-01b-1", mp3, "audio/mpeg", "Der Schrei.mp3", "Chris")).toMatchObject({ id: "moosgrab-01b-1", typ: "audio/mpeg", bytes: mp3.length });
+    expect(listeAudio("gemeinsam").map(a => a.id)).toEqual(["moosgrab-01b-1"]);
+    const datei = audioDatei("gemeinsam", "moosgrab-01b-1");
+    expect(datei && fs.readFileSync(datei.pfad).toString()).toBe("ID3-test-daten");
+    // Neu hochladen ersetzt, auch mit anderem Format
+    speichereAudio("gemeinsam", "moosgrab-01b-1", Buffer.from("OggS"), "audio/ogg", "neu.ogg");
+    expect(audioDatei("gemeinsam", "moosgrab-01b-1")!.pfad.endsWith(".ogg")).toBe(true);
+    expect(fs.readdirSync(path.dirname(audioDatei("gemeinsam", "moosgrab-01b-1")!.pfad)).filter(n => n.startsWith("moosgrab-01b-1"))).toEqual(["moosgrab-01b-1.ogg"]);
+    expect(() => speichereAudio("gemeinsam", "../boese", mp3, "audio/mpeg", "x")).toThrow("ungueltige_id");
+    expect(() => speichereAudio("gemeinsam", "moosgrab-x", mp3, "text/html", "x")).toThrow("kein_audio");
+    expect(audioDatei("gemeinsam", "../../etc/passwd")).toBeNull();
+    expect(loescheAudio("gemeinsam", "moosgrab-01b-1")).toBe(true);
+    expect(listeAudio("gemeinsam")).toEqual([]);
+  });
+
   it("lässt keine Pfade als Karten-ID durch", () => {
     expect(istGueltigeKartenId("../../etc/passwd")).toBe(false);
     expect(() => speichereKarte("gemeinsam", "../boese", { name: "x" }, null)).toThrow();
+  });
+});
+
+type Karte = { tisch: string; b: number; t: number; aufstellung: { x: number; y: number; w: number; h: number };
+  gelaende: Array<{ art: string; x: number; y: number; w: number; h: number; label?: string; geheim?: boolean }>;
+  marker: Array<{ typ: string; x?: number; y?: number; label?: string; geheim?: boolean; kante?: boolean }> };
+type Map = { nr: number; empfohlen: string; titel: string; einleitung: string; hauptziel: string; nebenziel: string; spezial: string[]; belohnung: string;
+  konsequenzen: string[]; hinweis: string; karte: Karte; teile: Array<{ name: string; ausloeser: string }>; spieler?: Partial<Map> };
+const S = laden("../apps/kartenschmiede/szenarien.js") as {
+  TISCHE: Array<{ id: string; b: number; t: number }>;
+  GELAENDE: Record<string, unknown>;
+  SCHAUPLAETZE: Array<{ id: string; gelaende: string[]; ereignisse: string[] }>;
+  ZIELE: Array<{ id: string; marker: Array<{ anzahl: number }> }>;
+  MOOSGRAB: { maps: Map[] };
+  erzeuge(o: Record<string, unknown>): { ziel: string; karte: Karte; ep: { haupt: number; neben: number } };
+  wellenPunkte(sz: unknown, p: number): Array<{ punkte: number }>;
+  skaliereKarte(k: Karte, tisch: string): Karte;
+};
+const imTisch = (k: Karte) => k.gelaende.every(g => g.x >= 0 && g.y >= 0 && g.x + g.w <= k.b + 0.01 && g.y + g.h <= k.t + 0.01);
+
+describe("Kartenschmiede – Szenarien", () => {
+  it("würfelt mit derselben Saat dasselbe Szenario, mit allen Markern und Gelände auf jedem Tisch", () => {
+    expect(JSON.stringify(S.erzeuge({ seed: 42 }))).toBe(JSON.stringify(S.erzeuge({ seed: 42 })));
+    for (let seed = 1; seed <= 300; seed++) for (const t of S.TISCHE) {
+      const sz = S.erzeuge({ seed, tisch: t.id });
+      const soll = S.ZIELE.find(z => z.id === sz.ziel)!.marker.reduce((n, m) => n + m.anzahl, 0);
+      expect(sz.karte.marker.filter(m => m.typ !== "feind" && m.typ !== "truhe").length, `${seed}/${t.id}`).toBe(soll);
+      expect(imTisch(sz.karte), `${seed}/${t.id}`).toBe(true);
+      // Kleines Geländebudget: auch auf 120 × 80 höchstens ein Dutzend Stücke
+      expect(sz.karte.gelaende.length).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("rechnet Wellen nach OPR aus den Heldenpunkten", () => {
+    const sz = S.erzeuge({ seed: 7, ziel: "bergen", schwierigkeit: 2 });
+    expect(S.wellenPunkte(sz, 345).map(w => w.punkte)).toEqual([Math.round(345 * 0.5 * 0.8), Math.round(345 * 0.5 * 0.35)]);
+    expect(sz.ep).toEqual({ haupt: 4, neben: 2 });
+  });
+
+  it("kennt jedes Gelände, das Schauplätze und Kampagne verwenden", () => {
+    for (const s of S.SCHAUPLAETZE) { for (const a of s.gelaende) expect(S.GELAENDE[a], s.id).toBeTruthy(); expect(s.ereignisse).toHaveLength(6); }
+    for (const m of S.MOOSGRAB.maps) for (const g of m.karte.gelaende) expect(S.GELAENDE[g.art], `Map ${m.nr}`).toBeTruthy();
+  });
+
+  it("hat fünf vollständige Moosgrab-Maps, die auf jeden Tisch passen", () => {
+    expect(S.MOOSGRAB.maps.map(m => m.nr)).toEqual([1, 2, 3, 4, 5]);
+    for (const m of S.MOOSGRAB.maps) {
+      for (const feld of ["titel", "einleitung", "hauptziel", "nebenziel", "belohnung", "hinweis"] as const) expect(m[feld], `Map ${m.nr} ${feld}`).toBeTruthy();
+      expect(m.spezial.length).toBeGreaterThan(0);
+      expect(m.konsequenzen.length).toBeGreaterThan(0);
+      expect(m.teile.length).toBeGreaterThan(0);
+      expect(S.TISCHE.map(t => t.id)).toContain(m.empfohlen);
+      expect(imTisch(m.karte), `Map ${m.nr}`).toBe(true);
+      for (const t of S.TISCHE) expect(imTisch(S.skaliereKarte(m.karte, t.id)), `Map ${m.nr} auf ${t.id}`).toBe(true);
+    }
+  });
+
+  it("verrät in der Spieler-Ansicht nichts, was erst gefunden werden soll", () => {
+    // Was die Spieler je Map noch nicht wissen dürfen (docs/KAMPAGNEN_UEBERGABE.md: keine Spoiler)
+    const verboten: Record<number, string[]> = {
+      1: ["Kupferanhänger", "verwandel", "Erblühte", "mutiert"],
+      2: ["Hedda", "Krypta", "Falltür", "Gemeinde", "Kellerschlüssel"],
+      3: ["Schmied und", "Harm", "befallenen Häuser", "Station"],
+      4: ["Erkennungsmarke", "Protokoll", "Probe", "Soldat", "Erwachen", "Labor", "Metall"],
+      5: ["Probe", "Epilog"],
+    };
+    for (const m of S.MOOSGRAB.maps) {
+      const v = { ...m, ...(m.spieler || {}) };
+      const sichtbar = [v.titel, v.einleitung, v.hauptziel, v.nebenziel, v.belohnung, ...v.spezial,
+        ...m.karte.gelaende.filter(g => !g.geheim).map(g => g.label || ""), ...m.karte.marker.filter(x => !x.geheim).map(x => x.label || "")].join(" | ");
+      for (const wort of verboten[m.nr]) expect(sichtbar, `Map ${m.nr}: ${wort}`).not.toContain(wort);
+    }
+  });
+});
+
+type Spielstand = { schritt: string; runde: number; flags: Record<string, unknown>; leisten: Record<string, { wert: number; aktiv: boolean }>;
+  gegner: Array<{ uid: string; id: string; wunden: number; zaeh: number }>; letzte: Array<{ id: string; vorlesen: string }>; undo: unknown[] };
+type Motor = {
+  neu(o?: Record<string, unknown>): Spielstand; weiter(s: Spielstand): unknown; zurueck(s: Spielstand): boolean; runde(s: Spielstand): { texte: string[]; sprung: string | null };
+  ereignis(s: Spielstand, id: string): unknown; waehle(s: Spielstand, taste: string, eingabe?: string): unknown; schaden(s: Spielstand, uid: string, d: number): unknown;
+  zustand(g: { wunden: number; zaeh: number; id: string }): { id: string; satz: string }; wuetend(s: Spielstand): boolean; folgen(s: Spielstand): string[];
+  epListe(s: Spielstand): Array<{ ep: number; erreicht: boolean }>; uebernahme(s: Spielstand): { leisten: Record<string, number>; flags: Record<string, unknown> };
+};
+const SM = laden("../apps/kartenschmiede/spiel-motor.js") as { erstelle(m: unknown, h?: Record<string, unknown>): Motor; pruefe(m: unknown): string[] };
+const MAP1 = JSON.parse(fs.readFileSync(path.join(__dirname, "../apps/kartenschmiede/kampagnen/moosgrab/map1.json"), "utf8"));
+// Gegnerwerte wie in der Kartenschmiede: Vorlagen-Schlüssel auf Zäh abbilden (Giftmade 3, Sporenhülle 4, Frostfang 12)
+const VORLAGE_ZAEH: Record<string, string> = { "v:giftmade": "3", "v:sporenhuelle": "4", "v:frostfang": "12" };
+const motor = () => SM.erstelle(MAP1, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: VORLAGE_ZAEH[d.karte] || "1", size: "1" }, stufe: () => 2, zufall: () => 0.5 });
+const bisTyp = (m: Motor, s: Spielstand, id: string, max = 40) => { for (let i = 0; i < max && s.schritt !== id; i++) m.weiter(s); return s.schritt; };
+
+describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
+  it("hat in Map 1 keine kaputten Verweise", () => {
+    expect(SM.pruefe(MAP1)).toEqual([]);
+  });
+
+  it("spielt den Weg mit der Frau, dem Boss und dem Anhänger bis zum Ende", () => {
+    const m = motor(), s = m.neu();
+    expect(s.schritt).toBe("vorb-material");
+    expect(bisTyp(m, s, "spieler-runde1")).toBe("spieler-runde1");
+    expect(s.leisten.sporenuhr).toEqual({ wert: 3, aktiv: true });
+    m.ereignis(s, "mitte");
+    expect(s.schritt).toBe("aufbau-oben");
+    expect(s.flags.oben_aufgebaut).toBe(true);
+    m.weiter(s); // noch Runde 1: zurück zur Runde
+    expect(s.schritt).toBe("spieler-runde1");
+    m.runde(s);
+    expect(s.leisten.sporenuhr.wert).toBe(2);
+    m.weiter(s);
+    expect(s.schritt).toBe("cue-01b3");
+    m.weiter(s);
+    expect(s.schritt).toBe("kampf-sporenlinge");
+    expect(s.gegner.map(g => g.id)).toEqual(["sporenling-klein", "sporenling-zaeh", "sporenling-klein", "sporenling-zaeh"]);
+    expect(m.wuetend(s)).toBe(false);
+    m.ereignis(s, "marker2");
+    expect(m.wuetend(s)).toBe(true);
+    expect(s.letzte[0].vorlesen).toContain("Pilze");
+    // Die Quelle erscheint erst nach Marker 3
+    m.ereignis(s, "marker3");
+    expect(s.gegner.some(g => g.id === "quelle")).toBe(true);
+    m.ereignis(s, "frau-erreicht");
+    expect(s.schritt).toBe("cue-01b4a");
+    expect(s.leisten.sporenuhr.aktiv).toBe(false);
+    m.weiter(s); m.weiter(s);
+    expect(s.schritt).toBe("wahl-frau");
+    m.waehle(s, "2", "Krieger");
+    expect(s.flags.name_verraten).toBe("Krieger");
+    expect(s.schritt).toBe("frau-antwort-2");
+    // Während sie aufblüht: Angreifen gibt den ersten Schlag, aber sie startet wütend
+    expect(bisTyp(m, s, "wahl-aufbluehen")).toBe("wahl-aufbluehen");
+    m.waehle(s, "2");
+    expect(s.flags.aufbluehen_angriff).toBe(true);
+    expect(bisTyp(m, s, "kampf-erbluehte")).toBe("kampf-erbluehte");
+    expect(m.wuetend(s)).toBe(true);
+    const boss = s.gegner.find(g => g.id === "erbluehte")!;
+    expect(boss.zaeh).toBe(10);
+    m.schaden(s, boss.uid, 5);
+    expect(m.zustand(boss).id).toBe("verwundet");
+    m.schaden(s, boss.uid, 4);
+    expect(m.zustand(boss).id).toBe("am Ende");
+    m.schaden(s, boss.uid, 1);
+    expect(s.flags.boss_gefallen).toBe(true);
+    m.weiter(s);
+    expect(s.schritt).toBe("cue-01b5");
+    m.weiter(s);
+    expect(s.schritt).toBe("wahl-anhaenger");
+    const atemVorher = s.leisten.atemzug.wert;
+    m.waehle(s, "2", "Kleriker");
+    expect(s.flags.anhaenger_traeger).toBe("Kleriker");
+    expect(s.leisten.atemzug.wert).toBe(atemVorher + 1);
+    m.weiter(s);
+    expect(s.schritt).toBe("wahl-nachsuche");
+    m.waehle(s, "1");
+    expect(s.flags.alle_marker).toBe(true);
+    expect(s.flags.nachsuche).toBe(1);
+    expect(s.schritt).toBe("ende-map1");
+    expect(m.epListe(s).filter(e => e.erreicht).reduce((n, e) => n + e.ep, 0)).toBe(3);
+    expect(m.folgen(s).join(" ")).toContain("Kellerschlüssel");
+    expect(m.uebernahme(s).flags.name_verraten).toBe("Krieger");
+  });
+
+  it("springt bei abgelaufener Sporenuhr von selbst zum Aufblühen, und Zurück stellt alles wieder her", () => {
+    const m = motor(), s = m.neu();
+    bisTyp(m, s, "spieler-runde1");
+    m.ereignis(s, "mitte"); m.weiter(s);
+    m.runde(s); m.weiter(s); m.weiter(s);
+    expect(s.schritt).toBe("kampf-sporenlinge");
+    const g = s.gegner[0];
+    m.schaden(s, g.uid, 2);
+    expect(s.gegner[0].wunden).toBe(2);
+    m.zurueck(s);
+    expect(s.gegner[0].wunden).toBe(0);
+    m.runde(s);
+    const r = m.runde(s);
+    expect(s.leisten.sporenuhr.wert).toBe(0);
+    expect(r.sprung).toBe("uhr-null");
+    expect(s.schritt).toBe("uhr-null");
+    expect(s.flags.frau_erreicht).toBe(false);
+    // Ab der dritten beendeten Runde wütend
+    expect(s.flags.gegner_wuetend).toBe(true);
+    m.weiter(s);
+    expect(s.schritt).toBe("cue-01b4b");
+  });
+
+  it("überspringt die Nachsuche, wenn schon alle Marker gefunden sind", () => {
+    const m = motor(), s = m.neu();
+    bisTyp(m, s, "spieler-runde1");
+    for (const e of ["marker1", "marker2", "marker3"]) m.ereignis(s, e);
+    expect(s.flags.alle_marker).toBe(true);
+    expect(m.ereignis(s, "marker1")).toBeNull();
+    m.ereignis(s, "frau-erreicht");
+    bisTyp(m, s, "wahl-frau");
+    m.waehle(s, "1");
+    bisTyp(m, s, "wahl-aufbluehen");
+    m.waehle(s, "1");
+    bisTyp(m, s, "wahl-anhaenger");
+    m.waehle(s, "3");
+    m.weiter(s);
+    expect(s.schritt).toBe("ende-map1");
+  });
+});
+
+const MAP2 = JSON.parse(fs.readFileSync(path.join(__dirname, "../apps/kartenschmiede/kampagnen/moosgrab/map2.json"), "utf8"));
+describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
+  const motor2 = () => SM.erstelle(MAP2, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: VORLAGE_ZAEH[d.karte] || "1", size: "1" }, stufe: () => 2, zufall: () => 0.5 });
+  it("hat in Map 2 keine kaputten Verweise und gehört zur selben Kampagne", () => {
+    expect(SM.pruefe(MAP2)).toEqual([]);
+    expect(MAP2.kampagne).toBe(MAP1.kampagne);
+    expect(MAP2.map).toBe(2);
+  });
+  it("übernimmt Anhänger und Atemzug aus Map 1", () => {
+    const m1 = motor(), s1 = m1.neu();
+    s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;
+    const s2 = motor2().neu({ uebernahme: m1.uebernahme(s1) });
+    expect(s2.flags.anhaenger).toBe(true);
+    expect(s2.flags.anhaenger_traeger).toBe("Krieger");
+    expect(s2.leisten.atemzug.wert).toBe(2);
+  });
+  it("kommt ohne Kampf bis zum Ende, wenn die Helden leise bleiben", () => {
+    const m = motor2(), s = m.neu();
+    for (let i = 0; i < 120 && s.schritt !== "ende-map2"; i++) {
+      const st = (MAP2.schritte as Record<string, { typ: string; optionen?: Array<{ taste: string; eingabe?: unknown }> }>)[s.schritt];
+      if (st.typ === "wahl") { const o = st.optionen!.find(x => !x.eingabe) || st.optionen![0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
+    }
+    expect(s.schritt).toBe("ende-map2");
+    expect(s.gegner.filter(g => (g as { id: string }).id === "gemeinde")).toHaveLength(0);
+  });
+});
+
+// Kleine Testmap für die Bausteine, die Map 1 und Map 2 gemeinsam nutzen
+type SpielEintrag = { id: string; name: string; art?: string; probe?: { wurf: number | null; stufen: Array<{ ab: number; vorlesen: string }> } };
+type Stand2 = Spielstand & { letzte: SpielEintrag[]; pos: Record<string, { x: number; y: number }>; rundenwurfRunde?: number };
+type Motor2 = {
+  neu(): Stand2; weiter(s: Stand2): unknown; zurueck(s: Stand2): boolean; runde(s: Stand2): unknown; ereignis(s: Stand2, id: string): unknown;
+  schaden(s: Stand2, uid: string, d: number): unknown; probe(s: Stand2, i: number, w: number): { wurf: number } | null;
+  rundenwurf(s: Stand2, w: number): { wurf: number; titel?: string } | null; zustand(g: { wunden: number; zaeh: number; id: string }): { id: string; satz: string };
+  lage(s: Stand2): { sonderregeln: Array<{ titel: string }>; ziele: Array<{ ist: boolean }> }; setzePos(s: Stand2, k: string, x: number, y: number): void;
+  aufgedeckt(s: Stand2): string[]; figurenAmTisch(s: Stand2): Array<{ id: string }>;
+};
+const MINI = {
+  kampagne: "Test", map: 9, titel: "Mini", start: "a",
+  leisten: { laerm: { name: "Lärm", min: 0, max: 6, start: 0, schwellen: [{ ab: 3, titel: "Sie drehen sich um", setzt: { umgedreht: true } }, { ab: 6, titel: "Alle wach", springe: "kampf" }] } },
+  flags: { angegriffen: { start: false }, umgedreht: { start: false }, gefunden: { start: false } },
+  figuren: { frau: { name: "Die Frau", tisch: { x: 2, y: 2, ab: { flag: "umgedreht" }, bis: { flag: "angegriffen" } } } },
+  tischplan: { aufdecken: { "falltuer:F": { flag: "gefunden" } } },
+  lage: { sonderregeln: [{ titel: "Immer" }, { titel: "Nach Angriff", wenn: { flag: "angegriffen" } }], ziele: [{ art: "Hauptziel", text: "finden", erreicht: { flag: "gefunden" } }] },
+  rundenwurf: { name: "Wald", tabelle: [{ w: [1], titel: "Wind", setzt: { gefunden: true } }, { w: [2, 3, 4, 5, 6], titel: "Nichts" }] },
+  ereignisse: {
+    marker: { name: "Marker", taste: "1", vorlesen: "Ein Reh.", marker: "1", probe: { stufen: [{ ab: 3, vorlesen: "Pilze." }, { ab: 5, vorlesen: "Die Tiere zuerst.", setzt: { gefunden: true } }] } },
+    laut: { name: "Laut", leisten: { laerm: 2 } },
+    angriff: { name: "Angriff", setzt: { angegriffen: true } },
+  },
+  gegner: { boss: { name: "Boss", werte: { tough: "3" }, zusatz: [{ wenn: { flag: "angegriffen" }, text: "Wütend", zaeh: 2 }], tod: { vorlesen: "Sie sackt zusammen.", setzt: { boss_tot: true } } } },
+  schritte: {
+    a: { typ: "spieler", titel: "A", ereignisse: ["marker", "laut", "angriff"], runden: true, weiter: "kampf" },
+    kampf: { typ: "kampf", titel: "Kampf", gegner: [{ id: "boss", anzahl: 1 }], ende: [{ wenn: { gegnerGefallen: "boss" }, ziel: "ende" }], weiter: "ende" },
+    ende: { typ: "ende", titel: "Ende" },
+  },
+};
+describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  const mini = () => SM.erstelle(MINI, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2;
+  it("hat in der Testmap keine kaputten Verweise", () => {
+    expect(SM.pruefe(MINI)).toEqual([]);
+    expect(SM.pruefe({ ...MINI, rundenwurf: { name: "x", tabelle: [{ w: [1] }] } })).toContain("Rundenwurf: 2 fehlt in der Tabelle");
+  });
+  it("legt bei einer Probe die Stufen bis zum Wurf frei, mit Wirkung", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "marker");
+    expect(s.letzte[0].probe?.wurf).toBeNull();
+    m.probe(s, 0, 4);
+    expect(s.letzte[0].probe?.stufen.map(x => x.vorlesen)).toEqual(["Pilze."]);
+    expect(s.flags.gefunden).toBe(false);
+    m.zurueck(s);
+    m.probe(s, 0, 5);
+    expect(s.letzte[0].probe?.stufen).toHaveLength(2);
+    expect(s.flags.gefunden).toBe(true);
+    expect(m.aufgedeckt(s)).toEqual(["falltuer:F"]);
+    expect(m.lage(s).ziele[0].ist).toBe(true);
+    expect(m.probe(s, 0, 6)).toBeNull();
+  });
+  it("löst Schwellen einmal aus und springt bei der letzten in den Kampf", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "laut");
+    expect(s.flags.umgedreht).toBe(false);
+    m.ereignis(s, "laut");
+    expect(s.flags.umgedreht).toBe(true);
+    expect(s.letzte.some(e => e.art === "schwelle")).toBe(true);
+    expect(m.figurenAmTisch(s).map(f => f.id)).toEqual(["frau"]);
+    m.ereignis(s, "laut");
+    expect(s.schritt).toBe("kampf");
+    expect(s.letzte.filter(e => e.art === "schwelle")).toHaveLength(2);
+  });
+  it("gibt Zusatzregeln aus Entscheidungen weiter und zeigt den Todestext", () => {
+    const m = mini(), s = m.neu();
+    m.ereignis(s, "angriff");
+    expect(m.lage(s).sonderregeln.map(r => r.titel)).toEqual(["Immer", "Nach Angriff"]);
+    expect(m.figurenAmTisch(s)).toEqual([]);
+    m.weiter(s);
+    const boss = s.gegner[0];
+    expect(boss.zaeh).toBe(5);
+    m.schaden(s, boss.uid, 5);
+    expect(m.zustand(boss).satz).toBe("Sie sackt zusammen.");
+    expect(s.flags.boss_tot).toBe(true);
+    expect(s.letzte.some(e => e.art === "tod")).toBe(true);
+  });
+  it("würfelt am Rundenende und lässt Figurenpositionen beim Zurück stehen", () => {
+    const m = mini(), s = m.neu();
+    m.runde(s);
+    const r = m.rundenwurf(s, 1);
+    expect(r?.titel).toBe("Wind");
+    expect(s.rundenwurfRunde).toBe(1);
+    expect(s.flags.gefunden).toBe(true);
+    m.setzePos(s, "held:A", 3, 4);
+    m.zurueck(s);
+    expect(s.flags.gefunden).toBe(false);
+    expect(s.pos["held:A"]).toEqual({ x: 3, y: 4 });
   });
 });

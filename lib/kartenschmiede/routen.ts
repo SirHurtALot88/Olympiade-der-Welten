@@ -8,12 +8,14 @@ import {
   ladeFaehigkeiten,
   listeGruppen,
   listeKarten,
+  listeSpielstaende,
+  listeSzenarien,
   loescheEintrag,
   speichereEintrag,
   speichereFaehigkeiten,
 } from "@/lib/kartenschmiede/karten-store";
 
-/** Gemeinsame Handler für /api/kartenschmiede/karten und /api/kartenschmiede/gruppen. */
+/** Gemeinsame Handler für /api/kartenschmiede/karten, /gruppen und /szenarien. */
 type Kontext = { params: Promise<{ id: string }> };
 const nichtEingeloggt = () => NextResponse.json({ ok: false, error: "nicht_eingeloggt" }, { status: 401 });
 
@@ -21,7 +23,14 @@ export function listenRoute(art: Art) {
   return async function GET() {
     const zugriff = await kartenZugriff();
     if (!zugriff) return nichtEingeloggt();
-    const eintraege = art === "karten" ? listeKarten(zugriff.sammlung) : listeGruppen(zugriff.sammlung);
+    const eintraege =
+      art === "karten"
+        ? listeKarten(zugriff.sammlung)
+        : art === "szenarien"
+          ? listeSzenarien(zugriff.sammlung)
+          : art === "spielstaende"
+            ? listeSpielstaende(zugriff.sammlung)
+            : listeGruppen(zugriff.sammlung);
     return NextResponse.json({ ok: true, [art]: eintraege });
   };
 }

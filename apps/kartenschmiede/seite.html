@@ -589,6 +589,62 @@ fieldset.checks legend { margin-bottom: 6px; }
 .heldenbogen .hb-faeh p { margin: 0 0 2.5mm; break-inside: avoid; }
 .heldenbogen .hb-faeh .tico svg { width: 4mm; height: 4mm; }
 .heldenbogen .hb-faeh .elem { width: 4.6mm; height: 4.6mm; }
+/* ---------- Szenarien ---------- */
+.sz-akt { font: 700 13px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--brass); margin: 14px 0 4px; }
+.sz-leiste-oben { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.sz-leiste-oben label.f { min-width: 180px; }
+.sz-leiste-oben .hint { flex-basis: 100%; }
+.sz-gen .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.sz-gen summary { cursor: pointer; list-style: none; }
+.sz-gen summary::-webkit-details-marker { display: none; }
+.sz-gen summary h3::after { content: " ▾"; color: var(--dim); font-size: 16px; }
+.sz-gen[open] summary h3::after { content: " ▴"; }
+.sz-blatt { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.sz-kopf { display: grid; gap: 4px; }
+.sz-titel { font-size: clamp(26px, 3.4vw, 34px); }
+.sz-meta { font-family: var(--ui); color: var(--dim); font-size: 15px; }
+.sz-vorlesen { font-style: italic; font-size: 19px; border-left: 3px solid var(--brass); padding-left: 14px; max-width: 75ch; }
+.sz-raster { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .sz-raster { grid-template-columns: 1fr; } }
+.sz-unten { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.sz-karte { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+.sz-kartenspalte { display: grid; gap: 10px; }
+.sz-text, .sz-teil { display: grid; gap: 8px; align-content: start; }
+.sz-text section, .sz-unten section { display: grid; gap: 6px; }
+.sz-blatt h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sz-blatt ul, .sz-blatt ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sz-teil { border-top: 1px solid var(--line); padding-top: 14px; }
+.sz-ausl { font-family: var(--ui); color: var(--dim); }
+.sz-legende { font-size: 15px; list-style: none; padding: 0 !important; }
+.sz-legende small { color: var(--dim); font-family: var(--ui); }
+.sz-marker { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 14px var(--ui); color: var(--dim); max-width: none; }
+.sz-marker span { display: inline-flex; gap: 6px; align-items: center; }
+.sz-marker i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #1b1509; font-size: 12px; font-weight: 800; }
+.sz-tab { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+.sz-tab th:first-child, .sz-tab td:first-child { width: 34%; }
+.sz-unten .sz-tab th:first-child, .sz-unten .sz-tab td:first-child { width: 3em; }
+.sz-text section, .sz-unten section, .sz-teil { min-width: 0; }
+.sz-tab th { text-align: left; font: 700 13px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td, .sz-tab th { white-space: normal; }
+.sz-tab td { overflow-wrap: anywhere; vertical-align: top; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td:first-child { font-family: var(--ui); font-weight: 600; }
+.sz-leiste { list-style: none; padding: 0 !important; display: flex !important; flex-wrap: wrap; gap: 4px !important; }
+.sz-leiste li { display: grid; place-items: center; min-width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 4px; font: 700 14px var(--ui); }
+.sz-leiste li.start { border-color: var(--t3); }
+.sz-leiste li.ende { border-color: var(--t6); color: var(--t6); }
+.sz-w6 { font-size: 15px; }
+.sz-wellen { list-style: none; padding: 0 !important; }
+.print-area .sz-seite { page: a4-hoch; width: 210mm; box-sizing: border-box; padding: 10mm; background: #fff; color: #1b1509; }
+.print-area .sz-blatt { background: #fff; border: 0; padding: 0; color: #1b1509; gap: 10px; font-size: 12px; }
+.print-area .sz-blatt h4, .print-area .sz-blatt .eyebrow { color: #7a5a1e; }
+.print-area .sz-raster { grid-template-columns: 105mm 1fr; gap: 6mm; }
+.print-area .sz-unten { grid-template-columns: repeat(3, 1fr); }
+.print-area .sz-vorlesen { font-size: 13px; }
+.print-area .sz-tab { font-size: 11px; }
+.print-area .sz-tab th, .print-area .sz-tab td { border-color: #ccc; padding: 3px 5px; }
+.print-area .sz-teil { border-color: #ccc; break-inside: avoid; }
+.print-area .sz-legende, .print-area .sz-w6 { font-size: 11px; }
+.print-area .sz-meta, .print-area .sz-ausl, .print-area .hint, .print-area .sz-legende small { color: #555; }
 @page postkarte-quer { size: 150mm 100mm; margin: 0; }
 @page postkarte-hoch { size: 100mm 150mm; margin: 0; }
 @page a4-hoch { size: A4 portrait; margin: 0; }
@@ -654,6 +710,156 @@ fieldset.checks legend { margin-bottom: 6px; }
 .eintrag .thumb { width: 100%; aspect-ratio: 5 / 3; border-radius: 6px; background: #0c0c0d center 25% / cover no-repeat; }
 .fit-note { color: #ffb070; }
 .fit-note:empty { display: none; }
+
+/* ---------- Reiter „Spielen“ ---------- */
+/* Gebaut für einen 15-Zoll-Laptop (etwa 1440–1512 × 800–950 Pixel): Ein laufender Abend füllt den ganzen Bildschirm,
+   oben die Leisten, links die Schrittkarte, rechts Tischkarte und Gegner, unten die Aktionen. */
+.sp-start { display: grid; gap: 14px; max-width: 900px; }
+.sp-start .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.sp-start h4, .sp-karte h4, .sp-seite h4, .sp-fenster h4 { margin: 4px 0 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-staende { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sp-app { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--bg); font-size: 19px; }
+.sp-oben { display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+.sp-titel { display: grid; line-height: 1.15; font-family: var(--ui); }
+.sp-titel b { font-size: 16px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-titel small { font-size: 14px; color: var(--dim); }
+.sp-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
+.sp-kopfknoepfe { display: flex; gap: 6px; }
+.sp-pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; font: 600 16px var(--ui); background: var(--bg); }
+.sp-pill b { letter-spacing: .06em; text-transform: uppercase; font-size: 13px; color: var(--dim); }
+.sp-pill em { font-style: normal; font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
+.sp-pill i { display: inline-block; width: 11px; height: 16px; border: 1px solid var(--dim); border-radius: 2px; }
+.sp-pill i.an { background: var(--t5); border-color: var(--t5); }
+.sp-runde { border-color: var(--brass); }
+.sp-verhalten.wuetend { border-color: var(--t6); color: var(--t6); background: rgba(255,74,54,.12); }
+.sp-verhalten.wuetend b { color: var(--t6); }
+.sp-ton { border-color: #a26bff; }
+.sp-mitte { display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 34vw, 560px); min-height: 0; }
+.sp-karte { --typ: var(--line); display: grid; gap: 14px; align-content: start; padding: 18px 26px 24px; overflow: auto; border-left: 8px solid var(--typ); min-height: 0; }
+.sp-karte.typ-blau { --typ: #4f8fe8; } .sp-karte.typ-lila { --typ: #a26bff; } .sp-karte.typ-messing { --typ: var(--brass); }
+.sp-karte.typ-gelb { --typ: #e8c63a; } .sp-karte.typ-rot { --typ: #e2483a; } .sp-karte.typ-orange { --typ: #f08a2a; } .sp-karte.typ-gruen { --typ: #5fbf5a; }
+.sp-karte > header { display: grid; gap: 2px; }
+.sp-typ { font: 700 15px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--typ); }
+.sp-karte h3 { font-size: clamp(28px, 2.6vw, 36px); }
+.sp-karte ul { margin: 0; padding-left: 24px; display: grid; gap: 5px; }
+.sp-karte > footer { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.sp-msg { font-size: 15px; color: var(--ink); }
+.sp-lies { margin: 0; padding: 14px 18px; border-left: 5px solid var(--brass); background: rgba(207,167,94,.09); border-radius: 0 8px 8px 0; font-size: 24px; line-height: 1.45; font-style: italic; max-width: 62ch; }
+.sp-lies small { display: block; font: 700 13px var(--ui); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); margin-bottom: 4px; }
+.sp-gm { font-family: var(--ui); font-size: 17px; color: var(--dim); max-width: 75ch; }
+.sp-gm::before { content: "Nur für dich: "; font-weight: 700; color: #6fb0ff; }
+.sp-sag { font-style: italic; font-size: 17px; color: var(--ink); margin: 0; max-width: none; }
+.sp-sag::before { content: "🗣️ "; font-style: normal; }
+.sp-text { font-size: 21px; max-width: 65ch; }
+.sp-hinweise { color: var(--dim); }
+.sp-check { list-style: none; padding: 0 !important; }
+.sp-check label { display: flex; gap: 12px; align-items: baseline; cursor: pointer; font-size: 20px; }
+.sp-check input { width: 20px; height: 20px; accent-color: var(--brass); }
+.sp-tisch { font-size: 19px; }
+.sp-aufbau { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: 22px; align-items: start; }
+@media (max-width: 1250px) { .sp-aufbau { grid-template-columns: 1fr; } }
+.sp-aufbaukarte { display: grid; gap: 10px; }
+.sp-mitte.ohne-seite { grid-template-columns: minmax(0, 1fr); }
+.sp-mitte.ohne-seite .sp-aufbau { grid-template-columns: minmax(280px, .7fr) minmax(0, 1.3fr); }
+.sp-aufbaukarte { grid-template-columns: minmax(0, 1fr) 220px; align-items: start; }
+.sp-aufbaukarte .sp-legende { grid-template-columns: 1fr; }
+.sp-gel { list-style: disc !important; padding-left: 20px !important; }
+.sp-legende { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-family: var(--ui); font-size: 16px; }
+.sp-legende ol, .sp-legende ul { padding-left: 22px; }
+.sp-legende ul { list-style: none; padding-left: 0 !important; }
+.sp-legende li i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; margin-right: 8px; color: #1b1509; font: 800 12px var(--ui); font-style: normal; }
+.sp-cue { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-family: var(--ui); font-size: 17px; }
+.sp-cue.gross { padding: 16px; border: 1px dashed #a26bff; border-radius: 8px; font-size: 21px; }
+.sp-cue.gross > .btn { font-size: 19px; padding: 14px 24px; }
+.sp-audioliste { display: grid; gap: 6px; }
+.sp-upload { cursor: pointer; }
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font: 700 12px var(--ui); letter-spacing: 0; text-transform: none; opacity: .85; }
+.btn.aus { opacity: .4; }
+.btn.erledigt { border-color: #5fbf5a; color: #7fd06a; }
+.btn.weiter { min-width: 190px; }
+.btn.faellig { animation: sp-puls 1.4s ease-in-out infinite; }
+@keyframes sp-puls { 50% { box-shadow: 0 0 0 4px rgba(207,167,94,.45); } }
+.sp-letzte { display: grid; gap: 10px; }
+.sp-ev { display: grid; gap: 8px; padding: 12px 16px; border: 1px solid var(--brass); border-radius: 8px; }
+.sp-ev.art-tod { border-color: var(--t6); }
+.sp-ev.art-schwelle, .sp-ev.art-rundenwurf { border-color: #a26bff; }
+.sp-probe { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed #e2483a; border-radius: 8px; font-family: var(--ui); font-size: 18px; }
+.sp-probe > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-probe .btn.sm { min-width: 46px; font-size: 18px; }
+.sp-probe small { color: var(--dim); font-size: 14px; }
+.sp-wurf { font-family: var(--ui); font-size: 18px; }
+.sp-optionen { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.sp-option { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; text-align: left; padding: 14px 16px; border: 1px solid #e2483a; border-radius: 8px; background: rgba(226,72,58,.07); color: var(--ink); cursor: pointer; font: inherit; }
+.sp-option:hover, .sp-option:focus-visible { background: rgba(226,72,58,.18); }
+.sp-option kbd { color: #e2483a; min-width: 32px; height: 32px; font-size: 18px; }
+.sp-option span { display: grid; gap: 5px; }
+.sp-option b { font: 700 20px var(--ui); }
+.sp-option small { font-size: 17px; color: var(--ink); }
+.sp-option em { font: 500 15px var(--ui); color: var(--dim); font-style: normal; }
+.sp-ziel { padding: 10px 12px; border: 1px solid #5fbf5a; border-radius: 8px; font-family: var(--ui); }
+.sp-verh { font-size: 17px; }
+.sp-verh td:first-child, .sp-verh th:first-child { width: 4em !important; }
+.sp-karte li.ja { color: #7fd06a; } .sp-karte li.nein { color: var(--dim); }
+.sp-seite { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-left: 1px solid var(--line); background: #17191d; min-height: 0; overflow: hidden; }
+.sp-tischkarte { position: relative; display: grid; gap: 4px; }
+.sp-tischkarte > small { font: 500 13px var(--ui); color: var(--dim); }
+.sp-tischkarte svg { width: 100%; height: auto; max-height: 46vh; display: block; border-radius: 6px; border: 1px solid var(--line); touch-action: none; user-select: none; }
+.sp-tischkarte.gross svg { max-height: calc(100vh - 230px); }
+.sp-tok { cursor: grab; }
+.sp-tok.marker { cursor: pointer; }
+.sp-tok:active { cursor: grabbing; }
+.sp-tok.tot text { text-decoration: line-through; }
+.sp-pop { position: absolute; z-index: 3; width: min(320px, 70%); display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--brass); border-radius: 8px; background: #0b0c0f; box-shadow: 0 10px 28px rgba(0,0,0,.6); font-size: 16px; }
+.sp-pop header { display: flex; gap: 8px; align-items: start; justify-content: space-between; }
+.sp-pop header b { font: 700 18px var(--ui); display: block; }
+.sp-pop header small { font: 500 14px var(--ui); color: var(--dim); }
+.sp-pop p { margin: 0; }
+.sp-aktiv { max-height: 26vh; overflow: auto; display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
+.sp-gegnerliste { display: grid; gap: 6px; align-content: start; overflow: auto; min-height: 0; padding-right: 4px; }
+.sp-gegner { display: grid; gap: 3px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); cursor: pointer; }
+.sp-gegner.markiert { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(207,167,94,.35); }
+.sp-gegner.gefallen { opacity: .55; }
+.sp-g-zeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sp-g-zeile b { font: 700 17px var(--ui); }
+.sp-g-tok { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 13px; background: #ff6a4a; color: #0b0c0f; font: 800 13px var(--ui); }
+.sp-gefallen .sp-g-tok, .sp-gegner.gefallen .sp-g-tok { background: #77736b; }
+.sp-schaedel { color: var(--t6); letter-spacing: .05em; font-size: 14px; }
+.sp-g-balken { display: inline-flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-left: auto; max-width: 120px; }
+.sp-g-balken i { width: 10px; height: 10px; border-radius: 2px; background: #3a5a36; }
+.sp-g-balken i.wunde { background: var(--t6); }
+.sp-g-knoepfe { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.sp-g-knoepfe .btn.sm { padding: 5px 9px; }
+.sp-g-zustand { display: flex; gap: 8px; align-items: baseline; font-size: 15px; }
+.sp-g-zustand em { font: 700 13px var(--ui); font-style: normal; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); white-space: nowrap; }
+.sp-g-zustand .sp-sag { font-size: 15px; }
+.sp-g-mehr { display: grid; gap: 4px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.sp-g-mehr h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-g-mehr .sp-gm { font-size: 15px; }
+.sp-unten { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg2); }
+.sp-evs, .sp-runden { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+/* Viele Aktionen (Map 2 draußen hat 13): höchstens drei Zeilen, der Rest scrollt; die Rundenknöpfe bleiben in einer Zeile */
+.sp-evs { flex: 1; min-width: 0; max-height: 118px; overflow: auto; }
+.sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; }
+.sp-runden { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 5px; justify-content: end; flex-shrink: 0; }
+@media (max-width: 1000px) { .sp-app { position: static; display: block; } .sp-mitte { grid-template-columns: 1fr; } .sp-seite { overflow: visible; } .sp-unten { flex-wrap: wrap; } }
+.sp-fenster { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.62); }
+.sp-fenster-innen { display: grid; gap: 10px; width: min(820px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 20px 24px; border: 1px solid var(--brass); border-radius: 12px; background: var(--bg); font-size: 18px; }
+.sp-fenster-innen.klein { width: min(640px, 100%); }
+.sp-fenster-innen.breit { width: min(1180px, 100%); }
+.sp-fenster-innen.karte { width: min(680px, 100%); }
+.sp-fenster-innen header { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.sp-fenster .sp-lies { font-size: 21px; }
+.sp-npc-raster, .sp-lage { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.sp-npc-raster > div, .sp-lage > section { display: grid; gap: 8px; }
+@media (max-width: 900px) { .sp-npc-raster, .sp-lage { grid-template-columns: 1fr; } }
+.sp-fragen td:first-child { width: 28% !important; }
+.sp-ziele { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.sp-ziele li.ja { color: #7fd06a; }
+.sp-regel { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
+.sp-protokoll small { color: var(--brass); margin-right: 6px; }
+.sp-kartenbox { width: 100%; }
+body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -709,6 +915,8 @@ fieldset.checks legend { margin-bottom: 6px; }
     <nav class="tabs" role="tablist" aria-label="Bereiche">
       <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Erstellen</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
+      <button type="button" role="tab" id="tab-szenarien" data-tab="szenarien" aria-selected="false" aria-controls="tabSzenarien">Szenarien</button>
+      <button type="button" role="tab" id="tab-spielen" data-tab="spielen" aria-selected="false" aria-controls="tabSpielen">Spielen</button>
       <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
       <button type="button" role="tab" id="tab-regeln" data-tab="regeln" aria-selected="false" aria-controls="tabRegeln">Regeln</button>
     </nav>
@@ -986,6 +1194,34 @@ fieldset.checks legend { margin-bottom: 6px; }
         </aside>
         <div class="g-main" id="gMain"></div>
       </div>
+    </section>
+  </div>
+
+  <div id="tabSzenarien" role="tabpanel" aria-labelledby="tab-szenarien" class="tabpanel" hidden>
+    <section aria-labelledby="h-szenarien">
+      <div class="sec-head">
+        <h2 id="h-szenarien">Szenarien</h2>
+        <p class="lede">Die Kampagne Moosgrab Map für Map, mit Tischskizze für den Esstisch und Spielleiter-Blatt, dazu gewürfelte Zusatzmissionen. Die Spieler-Ansicht lässt alles weg, was erst gefunden werden soll.</p>
+      </div>
+      <div class="gruppe">
+        <aside class="g-list">
+          <p class="sz-akt">Kampagne</p>
+          <div id="szKampagne"></div>
+          <p class="sz-akt">Gespeicherte Zusatzmissionen</p>
+          <div id="szGespeichert"></div>
+        </aside>
+        <div class="g-main" id="szMain"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabSpielen" role="tabpanel" aria-labelledby="tab-spielen" class="tabpanel" hidden>
+    <section aria-labelledby="h-spielen">
+      <div class="sec-head">
+        <h2 id="h-spielen">Spielen</h2>
+        <p class="lede">Der Laptop als Spielleiter-Schirm: Map Schritt für Schritt, Vorlesetexte, Audio-Cues, NPCs und Gegner mit verdeckten Lebenspunkten. Die Figuren bewegt ihr am Tisch.</p>
+      </div>
+      <div id="spMain"></div>
     </section>
   </div>
 

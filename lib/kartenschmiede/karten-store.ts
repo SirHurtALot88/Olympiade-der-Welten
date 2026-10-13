@@ -10,7 +10,7 @@ export const MAX_EINTRAG_BYTES = 8 * 1024 * 1024;
 export const MAX_GRUPPE_BYTES = 40 * 1024 * 1024;
 const ID_MUSTER = /^[a-z0-9-]{8,64}$/i;
 
-export type Art = "karten" | "gruppen";
+export type Art = "karten" | "gruppen" | "szenarien" | "spielstaende";
 
 export type KartenEintrag = {
   id: string;
@@ -119,6 +119,33 @@ export function listeGruppen(sammlung: string): GruppenEintrag[] {
   }));
 }
 
+export type SzenarioEintrag = { id: string; name: string; ziel: string; schauplatz: string; gespeichertVon: string | null; updatedAt: string };
+
+/** Gespeicherte Zusatzmissionen aus dem Reiter „Szenarien“ (die Kampagne selbst steht im Code). */
+export function listeSzenarien(sammlung: string): SzenarioEintrag[] {
+  return liesAlle(sammlung, "szenarien").map(({ id, daten }) => ({
+    id,
+    name: text(daten.inhalt.titel) || "Ohne Namen",
+    ziel: text(daten.inhalt.ziel, 40),
+    schauplatz: text(daten.inhalt.schauplatz, 40),
+    gespeichertVon: daten.gespeichertVon ?? null,
+    updatedAt: daten.updatedAt,
+  }));
+}
+
+export type SpielstandEintrag = { id: string; name: string; kampagne: string; gespeichertVon: string | null; updatedAt: string };
+
+/** Spielstände des Spielmodus (Reiter „Szenarien“, Kampagne spielen): Leisten, Flags, Schritt je Map. */
+export function listeSpielstaende(sammlung: string): SpielstandEintrag[] {
+  return liesAlle(sammlung, "spielstaende").map(({ id, daten }) => ({
+    id,
+    name: text(daten.inhalt.name) || "Ohne Namen",
+    kampagne: text(daten.inhalt.kampagne, 40),
+    gespeichertVon: daten.gespeichertVon ?? null,
+    updatedAt: daten.updatedAt,
+  }));
+}
+
 export function ladeEintrag(sammlung: string, art: Art, id: string): Record<string, unknown> | null {
   const pfad = dateiVon(sammlung, art, id);
   if (!fs.existsSync(pfad)) return null;
@@ -220,4 +247,63 @@ export const loescheKarte = (sammlung: string, id: string) => loescheEintrag(sam
 export function speichereKarte(sammlung: string, id: string, karte: unknown, vorschau: unknown, wer: string | null = null): KartenEintrag {
   speichereEintrag(sammlung, "karten", id, karte, vorschau, wer);
   return listeKarten(sammlung).find(e => e.id === id)!;
+}
+
+// ---------- Audio-Cues (Suno-MP3s) für den Spielmodus: eine Datei je Cue ----------
+// Liegen als Binärdatei neben den Karten (kartenschmiede/<sammlung>/audio/<id>.<endung>), dazu _audio.json mit Name,
+// Größe und Typ. Die Id ist der Cue-Schlüssel aus der Kampagne, z. B. "moosgrab-01b-4a".
+export const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
+const AUDIO_ID = /^[a-z0-9-]{1,64}$/;
+const AUDIO_TYPEN: Record<string, string> = { "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/webm": "webm" };
+export const istGueltigeAudioId = (id: string) => AUDIO_ID.test(id);
+export type AudioEintrag = { id: string; name: string; typ: string; bytes: number; gespeichertVon: string | null; updatedAt: string };
+const audioOrdner = (sammlung: string) => path.join(kartenVerzeichnis(), sammlung.replace(/[^a-z0-9_-]/gi, "_") || "lokal", "audio");
+const audioIndex = (sammlung: string) => path.join(audioOrdner(sammlung), "_audio.json");
+function liesAudioIndex(sammlung: string): Record<string, AudioEintrag> {
+  try {
+    return JSON.parse(fs.readFileSync(audioIndex(sammlung), "utf8")) as Record<string, AudioEintrag>;
+  } catch {
+    return {};
+  }
+}
+export function listeAudio(sammlung: string): AudioEintrag[] {
+  return Object.values(liesAudioIndex(sammlung)).sort((a, b) => a.id.localeCompare(b.id));
+}
+export function speichereAudio(sammlung: string, id: string, daten: Buffer, typ: string, name: string, wer: string | null = null): AudioEintrag {
+  if (!istGueltigeAudioId(id)) throw new Error("ungueltige_id");
+  const endung = AUDIO_TYPEN[typ.split(";")[0].trim().toLowerCase()];
+  if (!endung) throw new Error("kein_audio");
+  if (!daten.length) throw new Error("inhalt_fehlt");
+  if (daten.length > MAX_AUDIO_BYTES) throw new Error("zu_gross");
+  const index = liesAudioIndex(sammlung);
+  const alt = index[id];
+  if (alt) {
+    const altPfad = path.join(audioOrdner(sammlung), `${id}.${AUDIO_TYPEN[alt.typ] || "mp3"}`);
+    if (fs.existsSync(altPfad)) fs.unlinkSync(altPfad);
+  }
+  const pfad = path.join(audioOrdner(sammlung), `${id}.${endung}`);
+  fs.mkdirSync(path.dirname(pfad), { recursive: true });
+  const temp = `${pfad}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, daten);
+  fs.renameSync(temp, pfad);
+  const eintrag: AudioEintrag = { id, name: text(name, 120) || id, typ: typ.split(";")[0].trim().toLowerCase(), bytes: daten.length, gespeichertVon: wer, updatedAt: new Date().toISOString() };
+  index[id] = eintrag;
+  schreibeAtomar(audioIndex(sammlung), JSON.stringify(index, null, 1));
+  return eintrag;
+}
+export function audioDatei(sammlung: string, id: string): { pfad: string; eintrag: AudioEintrag } | null {
+  if (!istGueltigeAudioId(id)) return null;
+  const eintrag = liesAudioIndex(sammlung)[id];
+  if (!eintrag) return null;
+  const pfad = path.join(audioOrdner(sammlung), `${id}.${AUDIO_TYPEN[eintrag.typ] || "mp3"}`);
+  return fs.existsSync(pfad) ? { pfad, eintrag } : null;
+}
+export function loescheAudio(sammlung: string, id: string): boolean {
+  const datei = audioDatei(sammlung, id);
+  const index = liesAudioIndex(sammlung);
+  if (!index[id]) return false;
+  if (datei) fs.unlinkSync(datei.pfad);
+  delete index[id];
+  schreibeAtomar(audioIndex(sammlung), JSON.stringify(index, null, 1));
+  return true;
 }
