@@ -93,15 +93,44 @@ Problem aus dem Time-Trial-Punkt unten (Wertung an der Seite statt als Overlay �
 
 ## Mini-DM
 
-14. **Von reinem Reveal zu echtem 1v1v1v1-Kampf mit je einem Leben.** „Mini DM wird nur aufgedeckt
-    das dachte ich wäre der erste Step dass man die Contestants revealed und dann soll aber wie
-    beim Team DM gekämpft werden nur 1v1v1v1! und jeder hat quasi nur 1 Leben" — Chris erwartet,
-    dass nach der Vorstellungsrunde ein echter Kampf wie im Team-Deathmatch folgt, nur als
-    Free-for-all (vier Einzelkämpfer) mit je einem Leben statt Team vs. Team. Klärungsbedarf: laut
-    Task-Historie dieses Projekts gibt es bereits ein FFA-Paket für Mini-DM (P0 „FFA-Abnahme" +
-    P1 „Der letzte Stand", abgeschlossen) — ob das, was Chris im laufenden Spielstand sieht, davon
-    schon etwas enthält oder ob der sichtbare Teil wirklich nur beim Reveal aufhört, muss zuerst
-    am Code/Spielstand geprüft werden, bevor neu gebaut wird. Potenziell Klasse B/S.
+14. **Von reinem Reveal zu echtem 1v1v1v1-Kampf mit je einem Leben — geprüft, zwei getrennte
+    Blocker gefunden, Code direkt verifiziert (13.10.).** „Mini DM wird nur aufgedeckt das dachte
+    ich wäre der erste Step dass man die Contestants revealed und dann soll aber wie beim Team
+    DM gekämpft werden nur 1v1v1v1! und jeder hat quasi nur 1 Leben." Chris' Antwort auf Rückfrage:
+    „ok mini dm bitte prüfen du weißt ja wie es aussehen soll als FFA."
+    **Die gute Nachricht: der gewünschte Kampf existiert bereits fast genau so, wie Chris ihn
+    beschreibt.** Ein 4-Team-FFA mit Ein-Leben-pro-Spieler ist gebaut (`public/mockups/
+    battle-mode.engine.js`, `ARENA_ART["mini-dm"]` Z. 6104-6119: `jeSeite:4`, eigenes Rezept ohne
+    Charisma/Intelligence/Spirit — „hier fuehrt niemand, hier liest niemand — hier wird
+    geschlagen und eingesteckt"; `renderMiniDmFfa()`/`spieleMiniDmFfaEvent()` Z. 45944ff. für die
+    Rundenschau; Ein-Leben-Logik explizit bestätigt Z. 30897: „Mini-DM bleibt Ein-Leben-FFA
+    (Chris, 26.09.: 'beim Mini-DM hat jeder Spieler nur ein Leben')" — stammt sogar von Chris
+    selbst). Dazu eine eigene Rundenshow-Choreografie mit Lebensbalken, Ausscheidungen und Podest
+    (Broadcast-Paket C, PR-Historie Task #90).
+    **Zwei getrennte, unabhängige Gründe, warum Chris davon nichts sieht:**
+    1. **Mini-DM besteht die eigene Rangtreue-Abnahme nicht** (`lib/battle/arena-resolved-
+       disciplines.ts` Z. 142-143: rho 0,094 — praktisch Zufall, die mit Abstand schlechteste
+       Rangtreue aller zwanzig Disziplinen) und ist deshalb bewusst NICHT in
+       `ARENA_RESOLVED_DISCIPLINE_IDS` eingetragen (Z. 144-168) — selbst in einem Battle-Mode-
+       Spielstand würde der Motor also kein echtes Ergebnis liefern, nur Zufallsrauschen. Dasselbe
+       gilt unabhängig vom Spielmodus (anders als beim kürzlichen Staffel-O7-Fund, wo Manager
+       Mode der alleinige Grund war).
+    2. **Die reguläre Spieltags-Oberfläche zeigt Mini-DM über ein komplett anderes, rein
+       dekoratives Bauteil.** `app/foundation/discipline-stage/arena/disciplines/duelhp.tsx`
+       (Kopfkommentar Z. 1-17): 32 Team-Logos, die in einer „Pit"-Ansicht umherschwirren und beim
+       Scoren aufeinanderprallen — aber „Score bleibt Wahrheit": das Logo wächst/stürmt nur,
+       NACHDEM der Score von anderswo (der „Reveal-Engine") schon feststeht. Kein Leben, keine
+       Ausscheidung, kein 1v1v1v1 — nur eine Score-Visualisierung. Das vollständige FFA-Kampf-
+       Erlebnis (Lebensbalken, Runden, Podest) existiert nur innerhalb des separaten
+       `battle-mode.html`-Werkzeugs, erreichbar in der echten App ausschließlich über den
+       Entwickler-Reiter „Battle Arena" (`FoundationShellRouterBody.tsx`), der selbst noch als
+       „Entwurf" markiert ist — nie Teil eines normalen Spieltags.
+    **Fazit:** kein Bug, kein Blindflug von früherer Arbeit — der Kampf ist gebaut und trifft
+    Chris' Spezifikation ziemlich genau, hängt aber an zwei offenen Baustellen: (a) eine neue
+    Rangtreue-Rezeptrunde für Mini-DM (ähnlich den bereits abgeschlossenen Pp-/rho-Runden bei
+    Hockey, TDM, Staffel usw. — Ziel rho > 0,80), danach (b) die Verdrahtung in
+    `ARENA_RESOLVED_DISCIPLINE_IDS` plus Ersatz/Ergänzung von `duelhp.tsx` durch die echte
+    Kampf-Visualisierung. Klasse B, zwei Schritte, bereit für die nächste freie Rezeptrunde.
 
 ## Fechten
 
