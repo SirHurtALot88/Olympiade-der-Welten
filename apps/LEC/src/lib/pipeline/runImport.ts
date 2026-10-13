@@ -5,7 +5,7 @@ import { parseBillbeeArtikelWorkbook } from "../importers/billbeeArtikel";
 import { buildImportPlan } from "./importPlan";
 import { persistImportPlan, persistBillbeeArtikel, type PersistResult } from "./persist";
 import { loadAliasMap } from "./aliases";
-import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
+import { loadActiveCostSettings } from "../dashboard/queries";
 import type { SaleWindowKey } from "../parsing/date";
 
 export interface UploadedFile {
@@ -92,7 +92,13 @@ export async function runImport(prisma: PrismaClient, input: ImportInput): Promi
   }
 
   const aliases = await loadAliasMap(prisma);
-  const plan = buildImportPlan(billbeeResults, ebayResult, DEFAULT_COST_SETTINGS, { aliases });
+  // Die AKTIVE, in der DB gespeicherte Kostensatz-Version verwenden -- nicht die
+  // Code-Defaults. Sonst wirkt jede Aenderung auf /einstellungen zwar im Preis-
+  // Korridor der Ansichtsseiten, erreicht aber nie die beim Import berechneten
+  // und gespeicherten Werte (shippingCost, fixedCostShare, DB II) und damit
+  // weder Klassifikation noch Empfehlungen.
+  const costSettings = await loadActiveCostSettings(prisma);
+  const plan = buildImportPlan(billbeeResults, ebayResult, costSettings, { aliases });
   const persistResult: PersistResult = await persistImportPlan(prisma, plan);
 
   // Billbee-Artikelstamm (Bestand + aktiver Katalog, Chris' Ergaenzung) ist

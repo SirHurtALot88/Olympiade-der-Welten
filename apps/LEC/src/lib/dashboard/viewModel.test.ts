@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildDashboardViewModel, type ArticleAggregate, type WindowAggregate } from "./viewModel";
+import {
+  buildDashboardViewModel,
+  buildRecommendations,
+  buildSortimentRow,
+  shopVolumeFromAggregates,
+  type ArticleAggregate,
+  type WindowAggregate,
+} from "./viewModel";
 import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
 
 function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
@@ -307,3 +314,71 @@ describe("buildDashboardViewModel", () => {
     expect(rec!.effectValue).toBeLessThan(3200);
   });
 });
+
+describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)", () => {
+  /** Renner, der die shopweite Stueckzahl auf 3.400 hebt (Chris' Betriebszahl), Ø-VK 6,87. */
+  const filler = () => article("Renner", { windows: { "365": agg({ qty: 3400, revenue: 3400 * 6.87, ek: 3400 * 2, avgPrice: 6.87 }) } });
+  const cheapCard = () =>
+    article("Billigkarte", {
+      currentVk: 4.99,
+      windows: { "365": agg({ qty: 20, revenue: 20 * 4.99, ek: 20 * 0.9, avgPrice: 4.99 }) },
+    });
+
+  it("shopVolumeFromAggregates: N und N_T aus dem 365-Fenster (Fallback all)", () => {
+    const articles = [
+      article("A", { windows: { "365": agg({ qty: 10, avgPrice: 5 }) } }),
+      article("B", { windows: { "365": agg({ qty: 2, avgPrice: 35 }) } }),
+      article("C", { windows: { "30": agg({ qty: 99, avgPrice: 50 }) } }),
+    ];
+    expect(shopVolumeFromAggregates(articles, DEFAULT_COST_SETTINGS)).toEqual({
+      units365d: 12,
+      unitsAtOrAboveThreshold: 2,
+    });
+    const onlyAll = [article("A", { windows: { all: agg({ qty: 7, avgPrice: 5 }) } })];
+    expect(shopVolumeFromAggregates(onlyAll, DEFAULT_COST_SETTINGS)?.units365d).toBe(7);
+    expect(shopVolumeFromAggregates([article("Leer")], DEFAULT_COST_SETTINGS)).toBeNull();
+  });
+
+  it("reicht die shopweiten Fixkosten in den Korridor durch (Regression: fixedCostPerUnit war 0)", () => {
+    const card = article("Karte", {
+      currentVk: 10,
+      windows: { "365": agg({ qty: 10, revenue: 100, ek: 30, avgPrice: 10 }) },
+    });
+    const withShop = buildDashboardViewModel([card, filler()], DEFAULT_COST_SETTINGS).sortiment.find(
+      (r) => r.nameRaw === "Karte"
+    )!;
+    const noShop = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    const shop = shopVolumeFromAggregates([card, filler()], DEFAULT_COST_SETTINGS)!;
+    const mitShop = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, shop);
+    expect(withShop.corridor.min).toBeCloseTo(mitShop.corridor.min, 8);
+    expect(mitShop.corridor.min).toBeGreaterThan(noShop.corridor.min + 1);
+    // Fixkosten stecken auch in der Deckungsbeitrags-Grenze NICHT: sie bleibt (fast) gleich.
+    expect(mitShop.corridor.contribution - noShop.corridor.contribution).toBeLessThan(0.1);
+  });
+
+  it("EK 0,90 / VK 4,99 ist 'ziel_unerreichbar' statt dauerhaft 'unter_min'", () => {
+    const vm = buildDashboardViewModel([cheapCard(), filler()], DEFAULT_COST_SETTINGS);
+    const row = vm.sortiment.find((r) => r.nameRaw === "Billigkarte")!;
+    expect(row.priceStatus).toBe("ziel_unerreichbar");
+    expect(row.corridor.contribution).toBeLessThan(4.99);
+  });
+
+  it("'ziel_unerreichbar' taucht NICHT als 'VK anheben'-Empfehlung auf, echter Verlust schon", () => {
+    const verlust = article("Verlustkarte", {
+      currentVk: 2.5,
+      windows: { "365": agg({ qty: 20, revenue: 20 * 2.5, ek: 20 * 0.9, avgPrice: 2.5 }) },
+    });
+    const articles = [cheapCard(), verlust, filler()];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment.find((r) => r.nameRaw === "Verlustkarte")!.priceStatus).toBe("unter_min");
+    const ids = buildRecommendations(
+      articles.map((a) => ({ article: a, articleClass: "solide" as const, reason: "" })),
+      vm.sortiment
+    )
+      .filter((r) => r.kind === "preis_anpassen")
+      .map((r) => r.id);
+    expect(ids).toContain("preis_anpassen:Verlustkarte");
+    expect(ids).not.toContain("preis_anpassen:Billigkarte");
+  });
+});
+

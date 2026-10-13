@@ -1,6 +1,6 @@
 import type { ArticleAggregate } from "./viewModel";
 import type { CostSettingsValues } from "../pricing/costSettings";
-import { computeHk, computePriceCorridor } from "../pricing/costEngine";
+import { computeHk, computePriceCorridor, fixedCostPerUnit, type ShopVolume } from "../pricing/costEngine";
 import { classifyMarketStatus, computeMarketEk, type MarketStatus } from "../pricing/marketPrice";
 
 /** Minimaler Auszug eines MarketPrice-Datensatzes, den die Vergleichs-Zeile braucht. */
@@ -23,7 +23,7 @@ export interface MarketComparisonRow {
   ownVk: number;
   /** Realisierter EK/Stk (Referenz-Periode). */
   ek: number;
-  corridor: { min: number; good: number };
+  corridor: { min: number; good: number; contribution: number };
   marketFrom: number | null;
   marketTrend: number | null;
   /** Aus Markt-ab x Packgroesse + Einkaufs-Versand (KONZEPT §7.2), null ohne "ab"-Preis. */
@@ -45,18 +45,27 @@ const STALE_MS = 30 * 24 * 60 * 60 * 1000;
 export function buildMarketComparisonRow(
   a: ArticleAggregate,
   quote: LatestQuote,
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  shop: ShopVolume | null
 ): MarketComparisonRow {
   const referenceAgg = a.windows["365"] ?? a.windows.all;
   const avgVkRealized = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.avgPrice : 0;
   const ek = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.ek / referenceAgg.qty : 0;
   const ownVk = a.currentVk && a.currentVk > 0 ? a.currentVk : avgVkRealized;
 
+  // Gleiche Kostenbasis wie das Sortiment (buildSortimentRow): shopweite Fixkosten + VK-abhaengiges Einschreiben.
   const hk = computeHk(
-    { ek, kind: a.packQty > 1 ? "pack" : "single", packSize: a.packQty, fixedCostPerUnit: 0 },
+    {
+      ek,
+      kind: a.packQty > 1 ? "pack" : "single",
+      packSize: a.packQty,
+      fixedCostPerUnit: fixedCostPerUnit(shop?.units365d ?? 0, costSettings),
+      vk: ownVk > 0 ? ownVk : null,
+      shop,
+    },
     costSettings
   );
-  const corridor = computePriceCorridor(hk.total, ownVk || hk.total, costSettings);
+  const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings);
 
   const trend = quote.priceTrend ?? 0;
   const status = trend > 0 ? classifyMarketStatus(ownVk, trend) : "im_korridor";
@@ -73,7 +82,7 @@ export function buildMarketComparisonRow(
     packQty: a.packQty,
     ownVk,
     ek,
-    corridor: { min: corridor.vkMin, good: corridor.vkGood },
+    corridor: { min: corridor.vkMin, good: corridor.vkGood, contribution: corridor.vkContribution },
     marketFrom: quote.priceFrom,
     marketTrend: quote.priceTrend,
     marketEk,

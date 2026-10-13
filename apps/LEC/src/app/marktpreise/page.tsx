@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { loadArticleAggregates } from "@/lib/dashboard/queries";
+import { shopVolumeFromAggregates } from "@/lib/dashboard/viewModel";
 import { buildMarketComparisonRow } from "@/lib/dashboard/marketComparison";
 import { MarktpreisePage } from "@/components/marktpreise/MarktpreisePage";
 
@@ -14,9 +15,10 @@ export default async function Page() {
     if (!latestByArticle.has(q.articleId)) latestByArticle.set(q.articleId, q);
   }
 
+  const shop = shopVolumeFromAggregates(aggregates, costSettings);
   const rows = aggregates
     .filter((a) => latestByArticle.has(a.articleId))
-    .map((a) => buildMarketComparisonRow(a, latestByArticle.get(a.articleId)!, costSettings))
+    .map((a) => buildMarketComparisonRow(a, latestByArticle.get(a.articleId)!, costSettings, shop))
     .sort((a, b) => b.fetchedAt.getTime() - a.fetchedAt.getTime());
 
   return <MarktpreisePage rows={rows} />;
