@@ -2787,7 +2787,8 @@
     {
      "id": "gemeinde",
      "anzahl": 3,
-     "zone": "K"
+     "zone": "K",
+     "fest": true
     }
    ],
    "setzt": {
@@ -2854,7 +2855,8 @@
      "nurWenn": {
       "flag": "drei_aufgestanden",
       "ist": false
-     }
+     },
+     "fest": true
     },
     {
      "id": "gemeinde",
@@ -2863,7 +2865,8 @@
      "nurWenn": {
       "flag": "gemeinde_erloest",
       "ist": false
-     }
+     },
+     "fest": true
     },
     {
      "id": "grabgaenger",
@@ -2878,13 +2881,14 @@
    "verhalten": {
     "start": "wuetend"
    },
-   "text": "Lärm 6 oder Glocke: Alle stehen auf, gleichzeitig. Wütende Tabelle. Draußen bricht Erde: je Rundenende kommt ein Grabgänger aus Zone G, die drei stehen schon in der Spalte, auf den Tisch kommen sie einer nach dem anderen.",
+   "text": "Lärm 6 oder Glocke: Alle stehen auf, gleichzeitig. Wütende Tabelle. Draußen bricht Erde: je Rundenende kommt ein Grabgänger aus Zone G, die Grabgänger der Gegnerliste stehen schon in der Spalte, auf den Tisch kommen sie einer nach dem anderen.",
    "hinweise": [
     "Cue 02-X2 (oder 02-X3 bei der Glocke), dann Battle Cue 2 in Schleife.",
     "Lärm zählt nicht mehr. Die Leiste bleibt auf 6.",
     "Stell nur den ersten Grabgänger sofort hin, die anderen je Rundenende. Wer in der Krypta ist, ist vor ihnen sicher: sie steigen nicht hinunter.",
     "Die Gemeinde verfolgt bis zum Zaun. Wer flieht, flieht über die untere Kante (siehe Lage).",
-    "Fallen alle Gestalten der Gemeinde: Ziel erreicht. Grabgänger, die noch stehen, bleiben am Friedhof."
+    "Fallen alle Gestalten der Gemeinde: Ziel erreicht. Grabgänger, die noch stehen, bleiben am Friedhof.",
+    "Die sieben Knienden sind das Dorf und bleiben auf jeder Schwierigkeit sieben. Höhere Schwierigkeit heißt mehr Grabgänger."
    ],
    "ereignisse": [
     "laerm-nah",
@@ -2915,7 +2919,8 @@
      "nurWenn": {
       "flag": "drei_aufgestanden",
       "ist": false
-     }
+     },
+     "fest": true
     },
     {
      "id": "gemeinde",
@@ -2924,9 +2929,14 @@
      "nurWenn": {
       "flag": "gemeinde_wach",
       "ist": false
-     }
+     },
+     "fest": true
     }
    ],
+   "verstaerkung": {
+    "id": "grabgaenger",
+    "zone": "G"
+   },
    "setzt": {
     "gegner_wuetend": true
    },
@@ -2938,7 +2948,8 @@
     "Hedda, bevor sie gehen: „Das ist der Bäcker. Das ist die Müllerin. Wenn ihr das tut, tut es schnell.“ (Vorschlag)",
     "Battle Cue 2 in Schleife, wenn er da ist.",
     "Keine Grabgänger: die Gräber hören auf Glocke und Lärm, nicht auf das hier. Schlägt trotzdem jemand die Glocke: G.",
-    "Fallen alle sieben: Ziel erreicht, danach zurück zur Wahl des Wegs."
+    "Fallen alle sieben: Ziel erreicht, danach zurück zur Wahl des Wegs.",
+    "Auf höherer Schwierigkeit brechen Grabgänger aus Zone G dazu (stehen in der Gegnerliste). Sie zählen nicht zum Ziel: es reicht, dass die sieben fallen."
    ],
    "ereignisse": [
     "glocke",

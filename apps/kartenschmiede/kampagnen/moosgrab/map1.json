@@ -1508,13 +1508,12 @@
      "ist": true
     }
    },
-   "text": "2 Sporenlinge je Feindzone, Verhaltenswürfel ruhig. Sie bleiben defensiv, bis Marker 2 untersucht ist (oder ab Runde 4). Die aus Zone B stehen direkt neben der Frau: sie greifen sie nicht an, sie gehören zu ihr.",
+   "text": "Sporenlinge in beiden Feindzonen (wie viele, steht in der Gegnerliste: das richtet sich nach Heldenpunkten und Schwierigkeit), Verhaltenswürfel ruhig. Sie bleiben defensiv, bis Marker 2 untersucht ist (oder ab Runde 4). Die aus Zone B stehen direkt neben der Frau: sie greifen sie nicht an, sie gehören zu ihr.",
    "hinweise": [
     "Bedrohung ansagen, bevor jemand würfelt: die Sätze stehen an den Gegnerkarten.",
     "Die Spieler kämpfen, suchen oder laufen zur Frau. Jedes Rundenende: R (Sporenuhr −1), dann der Rundenwurf, wenn du ihn nimmst.",
     "Erreicht ein Held die Frau, solange die Uhr über 0 steht: F.",
     "Steht die Uhr auf 0 und niemand war bei ihr: die App springt von selbst zum Aufblühen.",
-    "Punkte: 4 Figuren sind 100 P. nach Karte, das Playbook sagt ≈ 50. Wenn es zu hart wird: nur eine Figur je Zone.",
     "Faden verloren? Der Kampf ist nicht der Auftrag: Marker und Frau bleiben das Ziel, das Kleinvieh steht nur im Weg."
    ],
    "ereignisse": [
@@ -1811,7 +1810,8 @@
     "Die Zusatzregeln aus der Entscheidung eben stehen an ihrer Karte und unter Lage: zögern, Dornen, nachrückende Sporenlinge, oder ihr Lieblingsziel.",
     "Wütend von Anfang an, wenn die Helden sie angegriffen haben (vorher oder beim Aufblühen). Sonst ruhig, bis Marker 2 oder Runde 4.",
     "Marker dürfen weiter untersucht werden, Marker 3 schaltet die Quelle frei.",
-    "Fällt sie: Todestext an ihrer Karte vorlesen, dann Cue 01B-5."
+    "Fällt sie: Todestext an ihrer Karte vorlesen, dann Cue 01B-5.",
+    "Auf höherer Schwierigkeit kommen Sporenlinge dazu, bis die Gegnerpunkte stimmen (stehen in der Gegnerliste). Auf ihrer Seite der Lichtung aufstellen."
    ],
    "ereignisse": [
     "marker1",

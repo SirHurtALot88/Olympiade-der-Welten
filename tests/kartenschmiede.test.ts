@@ -658,27 +658,55 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(s2.sporen.Krieger).toBe(3);
     expect(s2.inventar.Schurke).toEqual(["Heiltrank"]);
   });
-  it("macht Kämpfe größer oder kleiner und Antworten stärker oder schwächer, je nach Schwierigkeit", () => {
-    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; effektiveWerte(s: Spielstand, g: unknown): Record<string, string>; schwierigkeit(s: Spielstand): { id: string } };
+  it("gibt jedem Kampf Gegnerpunkte wie in OPR (Heldenpunkte × 25/50/75/100 %) und lässt die Werte, wie sie sind", () => {
+    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; effektiveWerte(s: Spielstand, g: unknown): Record<string, string>;
+      schwierigkeit(s: Spielstand): { id: string }; springe(s: Spielstand, id: string): void; budgetVon(s: Spielstand, id: string): { ziel: number; summe: number } | null };
+    // Jeder Gegner ohne eigene Werte kostet 25 Punkte, die Erblühte 130
+    const punkte = (w: Record<string, string>) => (w.name === "Die Erblühte" ? 130 : 25);
+    const werte = (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" };
+    const m = SM.erstelle(MAP2, { werte, punkte, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    const stufen = ["anfaenger", "fortgeschritten", "experte", "legendaer"];
+    const neu = (mm: M, st: string, hp = 340) => mm.neu({ schwierigkeit: st, heldenpunkte: hp });
+    const ids = (mm: M, s: Spielstand, id: string) => { mm.springe(s, id); return (s as unknown as { gegner: Array<{ id: string }> }).gegner.map(x => x.id); };
+    // Die Map ist für 340 Heldenpunkte auf Fortgeschritten (50 %) geschrieben. Die sieben Knienden sind das Dorf und
+    // bleiben sieben; mehr Punkte heißt mehr Grabgänger (25 Punkte je Figur)
+    const zahl = (x: string[], id: string) => x.filter(y => y === id).length;
+    const erloesen = stufen.map(st => ids(m, neu(m, st), "kampf-erloesen"));
+    expect(erloesen.map(x => zahl(x, "gemeinde"))).toEqual([7, 7, 7, 7]);
+    expect(erloesen.map(x => zahl(x, "grabgaenger"))).toEqual([0, 0, 4, 7]);
+    const gemeinde = stufen.map(st => zahl(ids(m, neu(m, st), "kampf-gemeinde"), "grabgaenger"));
+    expect(gemeinde).toEqual([0, 3, 8, 13]);
+    // Mehr Heldenpunkte, mehr Gegner – wie in OPR, wenn die Gruppe wächst
+    expect(zahl(ids(m, neu(m, "fortgeschritten", 680), "kampf-gemeinde"), "grabgaenger")).toBe(13);
+    const s = neu(m, "experte"); ids(m, s, "kampf-erloesen");
+    expect(m.budgetVon(s, "kampf-erloesen")).toMatchObject({ ziel: 263, summe: 275 });
+    // „Die drei stehen auf“ bleibt bei drei, egal auf welcher Stufe
+    for (const st of stufen) expect(ids(m, neu(m, st), "kampf-drei").length).toBe(3);
+    // Die Werte ändern sich nie
+    const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
+    for (const st of stufen) expect(m.effektiveWerte(neu(m, st), g)).toEqual(m.effektiveWerte(neu(m, "fortgeschritten"), g));
+    // Ein Boss bleibt immer; hat er Platz im Budget, füllen Begleiter den Rest
+    const m1 = SM.erstelle(MAP1, { werte, punkte, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
+    expect(ids(m1, neu(m1, "anfaenger"), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(ids(m1, neu(m1, "fortgeschritten"), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(ids(m1, neu(m1, "legendaer"), "kampf-erbluehte")).toEqual(["erbluehte", ...Array(5).fill("sporenling-klein")]);
+    // Ohne Heldenpunkte (oder ohne Punkteberechnung) bleibt alles, wie die Map es schreibt
+    expect(ids(m, m.neu({ schwierigkeit: "legendaer" }), "kampf-gemeinde").length).toBe(10);
+  });
+  it("lässt Antworten je nach Schwierigkeit stärker oder schwächer wirken und übernimmt die Stufe", () => {
+    type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; schwierigkeit(s: Spielstand): { id: string } };
     const m = SM.erstelle(MAP2, { werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
     const schonen = { leisten: { geduld: -1 } }, anhaenger = { leisten: { geduld: 1 } }, laut = { leisten: { laerm: 2 } };
-    const normal = m.neu(), schwer = m.neu({ schwierigkeit: "schwer" }), leicht = m.neu({ schwierigkeit: "leicht" }), alb = m.neu({ schwierigkeit: "albtraum" });
+    const normal = m.neu(), schwer = m.neu({ schwierigkeit: "experte" }), leicht = m.neu({ schwierigkeit: "anfaenger" }), alb = m.neu({ schwierigkeit: "legendaer" });
+    expect(m.schwierigkeit(normal).id).toBe("fortgeschritten");
     expect(m.wahlLeisten(normal, schonen)).toEqual({ geduld: -1 });
     expect(m.wahlLeisten(schwer, schonen)).toEqual({ geduld: -2 });
     expect(m.wahlLeisten(schwer, laut)).toEqual({ laerm: 3 });
     expect(m.wahlLeisten(leicht, anhaenger)).toEqual({ geduld: 2 });
     expect(m.wahlLeisten(alb, anhaenger)).toEqual({ geduld: 0 });
-    // Wie in OPR: mehr Punkte, also mehr Gegner – die Werte bleiben, wie sie sind
-    const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
-    for (const s of [leicht, schwer, alb]) expect(m.effektiveWerte(s, g)).toEqual(m.effektiveWerte(normal, g));
-    const zaehle = (mm: Motor, s: Spielstand, id: string) => { (mm as unknown as { springe(s: Spielstand, id: string): void }).springe(s, id); return (s as unknown as { gegner: Array<{ id: string }> }).gegner.map(x => x.id); };
-    expect([leicht, normal, schwer, alb].map(s => zaehle(m, s, "kampf-drei").length)).toEqual([2, 3, 4, 5]);
-    // Ein Boss allein bleibt allein, bekommt aber auf den harten Stufen Begleiter
-    const m1 = motor();
-    expect(zaehle(m1, m1.neu(), "kampf-erbluehte")).toEqual(["erbluehte"]);
-    expect(zaehle(m1, m1.neu({ schwierigkeit: "leicht" }), "kampf-erbluehte")).toEqual(["erbluehte"]);
-    expect(zaehle(m1, m1.neu({ schwierigkeit: "albtraum" }), "kampf-erbluehte")).toEqual(["erbluehte", "sporenling-klein", "sporenling-klein"]);
-    expect(m.schwierigkeit(m.neu({ uebernahme: m.uebernahme(alb) })).id).toBe("albtraum");
+    expect(m.schwierigkeit(m.neu({ uebernahme: m.uebernahme(alb) })).id).toBe("legendaer");
+    // Ältere Spielstände mit den früheren Stufennamen
+    expect(m.schwierigkeit(m.neu({ schwierigkeit: "schwer" })).id).toBe("experte");
   });
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();

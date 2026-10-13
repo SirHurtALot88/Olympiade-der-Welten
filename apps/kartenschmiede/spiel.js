@@ -116,6 +116,14 @@
     return {};
   }
   const stufeFuer = werte => (werte && werte.quality ? R.stufeFuerPunkte(R.punkte(werte).pts) : 1);
+  const punkteFuer = werte => (werte && werte.quality ? R.punkte(werte).pts : 0);
+  // Heldenpunkte für die Gegnerwellen (OPR: Gefährten zählen mit). Ohne Gruppe die vier Vorlagen-Helden
+  async function heldenpunkteVon(gruppeId) {
+    const G = window.KartenschmiedeGruppe;
+    const g = G && gruppeId ? await G.gruppe(gruppeId) : null;
+    if (g) return G.punkteVon(g);
+    return KS.VORLAGEN.filter(v => v.d.role === "hero").reduce((n, v) => n + punkteFuer(v.d), 0);
+  }
   const heldInfo = k => [k.faction, k.quality && `Qualität ${k.quality}`, k.defense && `Verteidigung ${k.defense}`, k.tough && `Zäh ${k.tough}`].filter(Boolean).join(" · ");
   async function ladeHelden() {
     helden = [];
@@ -139,11 +147,11 @@
     for (const k of Object.keys(wuerfe)) delete wuerfe[k];
     map = MAPS.find(m => String(m.map) === String(nr)) || MAPS[0];
     for (const k of Object.keys(letzteWerte)) delete letzteWerte[k];
-    motor = map ? SM.erstelle(map, { werte: werteFuer, stufe: stufeFuer }) : null;
+    motor = map ? SM.erstelle(map, { werte: werteFuer, stufe: stufeFuer, punkte: punkteFuer }) : null;
     const mp = map && (S.MOOSGRAB.maps || []).find(x => x.nr === map.map);
     karte = mp ? mp.karte : null;
   }
-  const letzteStufe = () => { try { return localStorage.getItem("kartenschmiede-stufe") || "normal"; } catch { return "normal"; } };
+  const letzteStufe = () => { try { return SM.stufeId(localStorage.getItem("kartenschmiede-stufe")) || SM.STANDARD_STUFE; } catch { return SM.STANDARD_STUFE; } };
   async function neuerAbend() {
     const nr = $("spMapWahl") ? $("spMapWahl").value : (MAPS[0] || {}).map;
     waehleMap(nr);
@@ -153,9 +161,10 @@
     if (vorher) { const alt = await ladeStand(vorher.id); if (alt && alt.map < map.map) uebernahme = alt.uebernahme || null; }
     const gruppeId = $("spGruppe") ? $("spGruppe").value || null : null;
     standId = neueId();
-    const schwierigkeit = ($("spStufe") || {}).value || "normal";
+    const schwierigkeit = ($("spStufe") || {}).value || SM.STANDARD_STUFE;
     try { localStorage.setItem("kartenschmiede-stufe", schwierigkeit); } catch { /* egal */ }
-    stand = motor.neu({ name: `${map.titel} · ${new Date().toLocaleDateString("de-DE")}`, gruppeId, uebernahme, schwierigkeit });
+    const heldenpunkte = await heldenpunkteVon(gruppeId);
+    stand = motor.neu({ name: `${map.titel} · ${new Date().toLocaleDateString("de-DE")}`, gruppeId, uebernahme, schwierigkeit, heldenpunkte });
     meldung = uebernahme ? "Leisten und Entscheidungen aus der letzten Map übernommen." : "";
     await ladeHelden();
     await speichere(); await ladeListe();
@@ -167,6 +176,8 @@
     waehleMap(s.map);
     stand = motor.migriere(Object.assign(s, { undo: [] }));
     standId = id;
+    // Die Gruppe kann seitdem Punkte dazubekommen haben: kommende Kämpfe richten sich nach dem neuen Stand
+    motor.setzeHeldenpunkte(stand, await heldenpunkteVon(stand.gruppeId));
     await ladeHelden();
     zeige();
   }
@@ -435,7 +446,7 @@
           <kbd>${esc(o.taste)}</kbd><span><b>${esc(o.kurz)}</b>${o.text ? `<small>${esc(o.text)}</small>` : ""}${folgePillen(o)}${o.folge ? `<em>${esc(o.folge)}</em>` : ""}</span></button>`).join("")}</div>`;
       case "kampf": {
         const ziel = stand.kampfZiel ? `<p class="sp-ziel">Ziel erreicht. Weiter führt zu: <b>${esc((map.schritte[stand.kampfZiel] || {}).titel || stand.kampfZiel)}</b></p>` : "";
-        return `<p class="sp-text">${symText(s.text || "")}</p>${ziel}<!--passiert-->${regie(s, s.hinweise)}${verhaltenTabelle()}`;
+        return `<p class="sp-text">${symText(s.text || "")}</p>${ziel}${budgetZeile()}<!--passiert-->${regie(s, s.hinweise)}${verhaltenTabelle()}`;
       }
       case "ende": {
         const ep = motor.epListe(stand);
@@ -706,7 +717,7 @@
             <h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
-          <section><h4>Schwierigkeit: ${esc(motor.schwierigkeit(stand).name)}</h4><p>${esc(motor.schwierigkeit(stand).text)}</p>
+          <section><h4>Schwierigkeit: ${esc(motor.schwierigkeit(stand).name)}</h4><p>Gegnerwelle ${Math.round(motor.schwierigkeit(stand).anteil * 100)} % von ${stand.heldenpunkte || "?"} Heldenpunkten. ${esc(motor.schwierigkeit(stand).text)}</p>
             <h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
             <h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
             ${rw ? `<h4>${esc(rw.name)}</h4>${gm(rw.text)}<table class="sz-tab"><tbody>${(rw.tabelle || []).map(z => `<tr><td>${esc((z.w || []).join(", "))}</td><td><b>${esc(z.titel || "")}</b> ${esc(z.gmNotiz || "")}</td></tr>`).join("")}</tbody></table>` : ""}
@@ -737,6 +748,13 @@
     const was = [...e.leisten.map(l => `${l.name} ${l.alt}→${l.neu}`), ...e.flags.slice(0, 1).map(f => f.text)].join(" · ");
     return `<button type="button" class="sp-zuletzt" data-sp="log" title="Log öffnen (P)"><span>Zuletzt</span> R${e.runde} · ${esc(e.text)}${was ? ` · <em>${esc(was)}</em>` : ""}</button>`;
   }
+  // Gegnerpunkte des Kampfs nach OPR: Heldenpunkte × Anteil der Stufe, im Verhältnis dazu, wofür die Map geschrieben ist
+  function budgetZeile() {
+    const b = motor.budgetVon(stand), st = motor.schwierigkeit(stand);
+    if (!b || !stand.heldenpunkte) return "";
+    const fest = b.summe > b.ziel * 1.15 ? " Mehr geht nicht weg: Boss und Story-Gegner bleiben immer." : "";
+    return `<p class="sp-budget" title="OPR: eine Gegnerwelle hat ${Math.round(st.anteil * 100)} % der Heldenpunkte">⚖ Gegner <b>${b.summe} P.</b> auf dem Tisch · Budget ${b.ziel} P. <small>(${st.name} ${Math.round(st.anteil * 100)} % von ${stand.heldenpunkte} Heldenpunkten; die Map ist für ${b.geschrieben} P. geschrieben)${esc(fest)}</small></p>`;
+  }
   function zeige() {
     const main = $("spMain");
     if (!main) return;
@@ -744,9 +762,10 @@
       document.body.classList.remove("sp-laeuft");
       main.innerHTML = `<div class="sp-start"><p class="lede">Wähle einen Spielstand oder starte einen neuen Abend.</p>
         <div class="row4"><label class="f">Map <select id="spMapWahl">${MAPS.map(m => `<option value="${m.map}">${esc(m.kampagne)} · Map ${m.map}: ${esc(m.titel)}</option>`).join("")}</select></label>
-        <label class="f">Schwierigkeit <select id="spStufe">${Object.entries(SM.SCHWIERIGKEITEN).map(([id, st]) => `<option value="${id}" ${id === letzteStufe() ? "selected" : ""}>${esc(st.name)}</option>`).join("")}</select></label>
+        <label class="f">Schwierigkeit <select id="spStufe">${Object.entries(SM.SCHWIERIGKEITEN).map(([id, st]) => `<option value="${id}" ${id === letzteStufe() ? "selected" : ""}>${st.stufe} · ${esc(st.name)} (${Math.round(st.anteil * 100)} %)</option>`).join("")}</select></label>
         <label class="f">Gruppe <select id="spGruppe"><option value="">Ohne Gruppe (Vorlagen-Helden)</option>${(window.__spGruppen || []).map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("")}</select></label></div>
-        <div class="sp-stufen">${Object.values(SM.SCHWIERIGKEITEN).map(st => `<p><b>${esc(st.name)}</b> ${esc(st.text)}</p>`).join("")}</div>
+        <div class="sp-stufen"><p>Wie in OPR: Jeder Kampf bekommt Gegnerpunkte nach den Heldenpunkten der Gruppe (Gefährten zählen mit) mal dem Anteil der Stufe. Die Gegnerwerte bleiben gleich, es kommen mehr oder weniger Gegner. Die Maps sind für ${SM.REFERENZ.heldenpunkte} Heldenpunkte auf Fortgeschritten geschrieben.</p>
+          ${Object.values(SM.SCHWIERIGKEITEN).map(st => `<p><b>${st.stufe} · ${esc(st.name)}</b> Gegnerwelle ${Math.round(st.anteil * 100)} % der Heldenpunkte. ${esc(st.text)}</p>`).join("")}</div>
         <div class="copyrow"><button type="button" class="btn" data-sp="neu">Neuen Abend starten</button></div>
         <p class="hint">Tipp: Im Spiel auf „Vollbild“ (am Mac Ctrl + Cmd + F). Die Seite ist für einen 15-Zoll-Laptop gebaut.</p>
         ${staende.length ? `<h4>Gespeicherte Abende</h4><div class="sp-staende">${staende.map(x => `<button type="button" class="g-item" data-stand="${esc(x.id)}"><b>${esc(x.name)}</b><small>${esc(x.kampagne)}</small></button>`).join("")}</div>` : ""}
