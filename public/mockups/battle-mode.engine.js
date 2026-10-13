@@ -5360,7 +5360,7 @@
   // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.
   const BASIS_JE_DISC={
     "tdm": {power:28,health:20,stamina:14,spirit:12,charisma:10,determination:6,intelligence:6,awareness:2,torment:2},
-    "mini-dm": {torment:24,health:20,power:16,stamina:16,will:14,dexterity:10},
+    "mini-dm": {torment:21,health:18,power:14,stamina:14,will:12,dexterity:9,intelligence:6,spirit:6},
     "battlefield": {charisma:20,intelligence:16,spirit:16,torment:12,power:10,awareness:10,health:8,determination:4,stamina:4},
     "gewichtheben": {power:28,charisma:23,health:16,determination:12,will:7,speed:6,dexterity:6,stamina:2},
     "climbing": {stamina:26,determination:16,speed:12,dexterity:12,health:10,power:8,awareness:8,will:8},
@@ -5390,10 +5390,10 @@
       {id:"breaker",label:"Breaker",text:"Bricht Widerstand mit Power und Torment.",gross:"power",klein:"stamina",last:"awareness",mueh:"high",profil:{power:35,health:17.7,stamina:15.4,spirit:7.7,intelligence:6.3,charisma:6.2,determination:6.1,awareness:2.8,torment:2.8}}
     ],
     "mini-dm":[
-      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:25.4,torment:20.6,power:19.4,stamina:13.8,will:12.1,dexterity:8.7}},
-      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:29.4,health:17.3,power:13.9,stamina:13.9,dexterity:13.4,will:12.1}},
-      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:21.5,health:17.9,will:17.4,dexterity:14.4,power:14.4,stamina:14.4}},
-      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:24.5,stamina:22,health:19.4,power:16.3,will:14.3,dexterity:3.5}}
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schließt Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:19,health:16.3,will:15.4,dexterity:13,power:12.7,stamina:12.7,intelligence:5.5,spirit:5.5}},
+      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:20.4,stamina:18.9,health:16.7,power:13.7,will:11.7,intelligence:8,spirit:8,dexterity:2.8}}
     ],
     "battlefield":[
       {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
@@ -6123,7 +6123,46 @@
               VER:{health:44,stamina:30,will:26},
               LP:{health:42,stamina:32,will:26},
               TMP:{dexterity:40,stamina:32,torment:28},
-              AUS:{stamina:48,will:32,health:20}}
+              AUS:{stamina:48,will:32,health:20}},
+      // DER SCHLAGWECHSEL DES 4-TEAM-FFA (13.10., s. Kopfkommentar bei mdffaSchlagwechsel()).
+      // Das ist das Format, das gespielt wird; `rezept` darueber speist nur noch das
+      // 4-gegen-4 (MOTOREN["mini-dm"], Entwickler-Arena). KEINE eigene Gewichtung: welches
+      // Attribut wie viel zaehlt, kommt allein aus BASIS_JE_DISC["mini-dm"] (Chris' Override,
+      // lib/player-generator/spiel-eignung-overrides.ts). Hier steht nur, WIE eine Mechanik
+      // gebaut ist — und `hebel`, wie stark sie auf die Wertung durchschlaegt, damit am Ende
+      // jedes Attribut mit seinem Gewicht ankommt (Budget-Methode, Pp ≤ 25, zwei Saatstroeme).
+      //
+      // KALIBRIERT (13.10., scripts/miss-mini-dm-ffa-abnahme.mjs, kaderfest: zehn echte Kader,
+      // 210 Vierergruppen x 6 Events, zwei Saatstroeme; die Sweep-Tabelle steht in der PR):
+      //   kappa 0,3 -> 0,12  Der groesste Hebel. Je mehr das Profil statt der Eignung die
+      //                      Grundkanaele treibt, desto mehr misst die Runde Begegnungen von
+      //                      Profilen statt der Summe (Nachtkonzept 1.5, „Verlust 1"): rho je
+      //                      Runde 0,745 (0,3) -> 0,805 (0,15) -> 0,82 (0,12), Pp 18 -> 9.
+      //   kappaWege 0,4      Die WEGE (Finisher setzen/halten, Schwachstelle, Positionierung,
+      //                      Buendnis) lesen das Profil staerker — dort soll man sehen, wer was
+      //                      kann. Kostet gegen kappaWege = kappa rund 0,007 rho je Runde.
+      //   spreizung 1 -> 3   Mehr Eignungssignal gegen den Wuerfel; ueber 3 flach (Klemmen).
+      //   Intelligence       Schwachstelle + Positionierung HEBEN die Rangtreue (ohne beide:
+      //                      0,771 statt 0,805 je Runde) — wer liest, wer wackelt, macht das FFA
+      //                      gerechter, nicht lauter.
+      //   Spirit             Das Buendnis kostet Rangtreue (es jagt den Fuehrenden, der meist
+      //                      der Beste ist): ohne Buendnis 0,824, mit 0,812 je Runde. Deshalb
+      //                      Grundchance 0,15 statt 0,30, und Zange/Deckung/Beute wachsen mit dem
+      //                      Spirit der Verbuendeten — sonst laese Spirit im Pp nur ueber die
+      //                      Eignung, nicht ueber die eigene Mechanik (gemessen: ohne Skalierung
+      //                      Rohgewinn 1,26 gegen 1,24 ohne Buendnis, mit Skalierung 1,51).
+      ffa:{
+        takte:12, mitte:50, kappa:0.12, kappaWege:0.4, spreizung:3,
+        stand:100, wucht:11, treffer:0.70, bruchpunkt:0.30, vergeltung:0.3, muedigkeit:0.04,
+        nebenweg:0.6,
+        finisher:{basis:0},
+        schwachstelle:{basis:0.5, bonus:0.25},
+        position:{basis:0.25},
+        buendnis:{basis:0.15, dauer:2, zange:0.10, deckung:0.15, beute:1},
+        ring:{ab:9, stufen:[5,9,14,20]},
+        wertung:{finish:25, schaden:15, takt:2, ueberstanden:4},
+        hebel:{stand:6.5, wucht:5, treffer:4, ausdauer:5, finisher:5, schwachstelle:3, position:3, buendnis:15}
+      }
     },
 
     // FECHTEN AUSGEZOGEN, CHASSIS-WECHSEL AUF DIE BUeHNE (03.09., Recherche
@@ -46578,57 +46617,54 @@
 
   // ===================================================================================
   // MINI-DM ALS 4-TEAM-FREE-FOR-ALL — Chris' Sonderregel (06.09.), recherchiert in
-  // docs/design/mini-dm-4-team-ffa-recherche-06-09.md, hier als eigenstaendiger,
-  // testbarer Mechanismus umgesetzt (KEINE Spielplan-/Fixture-Integration, s. Abschnitt 5
-  // der Recherche — die bleibt ausdruecklich ein spaeterer, separater Durchgang).
+  // docs/design/mini-dm-4-team-ffa-recherche-06-09.md: vier Teams, je ein Kaempfer, vier
+  // Runden (eine je Rolle), ein Leben, Rundenpunkte 4-3-2-1, Liga 2-1-0-0.
   //
-  // WEG 1 AUS DER RECHERCHE (Abschnitt 4.2), nicht Weg 2: eine Runde ist eine ECHTE
-  // Simulation mit vier Einheiten (u.side 0..3), keine Werteverglecihung ohne Kampf.
-  // gegner()/eigene() sind seit PR #671 bereits N-way-fest (Kommentar bei live(0)/live(1)
-  // oben); der Sieg-Check direkt darueber ist es seit dieser Aenderung ebenfalls. Was neu
-  // dazukommt, ist reine Geometrie: vier Startpunkte statt zwei Feldhaelften (die
-  // Recherche nennt genau das den "einzigen echten Motor-Aufwand", Abschnitt 4.2/6).
+  // DIE RUNDE IST SEIT 13.10. EIN SCHLAGWECHSEL, KEIN GERANGEL AUF DEM SANDPLATZ MEHR.
+  // Bis hierher lief jede FFA-Runde ueber denselben stepSimStumm-Takt wie das 4-gegen-4
+  // (Laufwege, Ecken, Rueckstoss, Kit-Skills, Mana). Gemessen (docs/design/
+  // mini-dm-nachtkonzept-03-10.md Abschnitt 1.3/1.5, und neu in scripts/miss-mini-dm-ffa-
+  // abnahme.mjs): rho je Runde 0,40, der Eignungsbeste gewinnt seine Runde in der Haelfte der
+  // Faelle. Die Ursache sitzt im Aufbau, nicht in einem Rezeptgewicht:
+  //   1. PROFIL STATT SUMME. Der Nahkampf traf Profile aufeinander (mein ANG gegen dein VER),
+  //      nicht die gewichtete Summe, die die Matrix verlangt; aufEignung() normiert nur LP,
+  //      ANG und VER, Tempo/Ausdauer/Mana liegen ausserhalb (Fechten/TDM/Battlefield-Befund).
+  //   2. GEOMETRIE ALS LOTTERIE. Ecke, Rueckzugsrichtung (`u.side===0`, s. Spiegeltest) und
+  //      Laufwege entschieden mit, wer wen zuerst trifft — Varianz ohne Bezug zur Eignung.
+  //   3. EIN EIGENES SYSTEM NEBEN DER MATRIX. Chris am 13.10., woertlich: „auch das FFA soll
+  //      nach den gewichtungen geschehen die vorgegeben sind! weil du schreibst eigenes
+  //      system, nirgendwo soll ein 'EIGENES' system genutzt werden sondern die vorgegebene
+  //      Verteilung! Intelligenz kann dabei ja auch für schwachstellen genutzt werden oder
+  //      positionierung, spirit für kurzfristiges zusammenarbeiten mit anderen kontrahenten
+  //      um ggf. zu gewinnen".
   //
-  // BEWUSST NICHT GENERALISIERT (Recherche-Fund 1.2, unveraendert wahr): `own`/die
-  // MID-Klammern in chooseTarget, die Formations-/Flankenziele (gx/gy) und die
-  // Rueckzugsrichtung bleiben binaer und behandeln Seite 1, 2 UND 3 gleich ("die andere
-  // Haelfte"). Das ist fuer eine Vierergruppe unschoen, aber ungefaehrlich: die vier
-  // Slots dieser Disziplin tragen keinen `ord`-Sondereintrag (s. SLOT_ZUSATZ oben,
-  // frontliner/finisher/trickfighter/ironguard fehlen dort komplett), jede Einheit laeuft
-  // also mit dem Standardbefehl "mitlinie" — kein `decken` (das einzige, was `own`
-  // ueberhaupt liest) und kein `flanke`. Bei GENAU EINEM Kaempfer je Seite gibt es zudem
-  // keine Formation, die diese Klammern haetten schuetzen muessen (die Recherche nennt das
-  // explizit: "Formation/Reihe entfaellt komplett"). NACHGEMESSEN statt vermutet
-  // (scripts/miss-mini-dm-ffa-spiegel.mjs, vier byte-identische Kaempfer, 1600 Runden):
-  // nach dem Ecken-Lotterie-Fix (s. baueMiniDmFfaRunde) liegt die groesste Platz-1-
-  // Abweichung von 25 % noch bei 6,0 Prozentpunkten (Team an der Ecke mit dem Team-Index 0
-  // gewinnt 31,0 % statt 25 % UND landet ueberdurchschnittlich oft auf Platz 4 — ein
-  // zweigipfliges statt ein flaches Muster). Der wahrscheinlichste Rest-Taeter ist genau
-  // diese Zeile: die Rueckzugsrichtung nach einem Rueckstoss haengt an `u.side===0`
-  // (Team-Index, NICHT an der ausgewuerfelten Ecke), zieht Seite 0 also immer in
-  // dieselbe Richtung relativ zu ihrem eigenen Zuhause, waehrend 1/2/3 die gespiegelte
-  // Richtung nehmen. Bewusst NICHT gefixt: die Formel speist sich aus `u.hx` (Bildschirm-
-  // X), nicht aus einem Vektor zum Feldzentrum — fuer die bestehenden Zwei-Seiten-Disziplinen
-  // (Heim links, Gast rechts) ist "Richtung MID-/MID+" identisch mit "weg vom Zentrum", fuer
-  // die Vierergruppe (Ecken auf einem Kreis, nicht nur links/rechts) waere das nur eine
-  // Naeherung — eine echte Korrektur muesste die Formel auf einen echten Zentrums-Vektor
-  // umstellen und wuerde damit automatisch auch TDM/Battlefield/das normale 4-gegen-4
-  // Mini-DM veraendern (deren Heimatpunkte liegen nicht exakt auf der Mittellinie, s.
-  // homeFor: `y` variiert je Formationsreihe). Genau die Geometriearbeit, die die
-  // Recherche (Abschnitt 6, Punkt 3) als eigenen, separaten Prototyp vor jeder
-  // Produktivsetzung fordert — hier bewusst nicht mitgemacht, um kein bereits
-  // scharf vermessenes Chassis (TDM 54,2 Pp, Battlefield 12,0 Pp, ...) anzufassen.
+  // DER NEUE KERN (Nachtkonzept „Der letzte Stand", Abschnitt 3, plus Chris' zwei neue Wege):
+  // jede Runde sind hoechstens MDFFA.takte Takte; in jedem Takt waehlt jeder Stehende ein
+  // Ziel und schlaegt einmal zu. JEDES der acht Gewichte aus BASIS_JE_DISC["mini-dm"] (das ist
+  // lib/player-generator/spiel-eignung-overrides.ts, nicht von Hand) hat GENAU EINEN benannten
+  // Kanal, und seine Staerke ist sein Gewicht (s. mdffaKanaele unten) — es gibt keine zweite
+  // Gewichtung neben der vorgegebenen:
   //
-  // SPAWNPUNKTE: ein Quadrat um die Feldmitte, ein Kaempfer je Ecke, 90 Grad auseinander
-  // (Recherche Abschnitt 4.2: "ein Kreis mit vier Startpositionen bei 0/90/180/270 Grad").
-  // Seite 0 oben, danach im Uhrzeigersinn — reine Konvention, keine Seite ist dadurch naeher
-  // an einer anderen als die uebrigen (jeder Abstand Ecke-zu-Ecke ist gleich lang oder die
-  // Diagonale, symmetrisch fuer alle vier).
-  function miniDmFfaSpawn(side){
-    const cx=MID, cy=H/2, r=Math.min(W,H)*0.30;
-    const winkel=(-90+side*90)*Math.PI/180;
-    return {x:cx+r*Math.cos(winkel), y:cy+r*Math.sin(winkel)};
-  }
+  //   torment 21  Wucht je Treffer, Primaerweg beim Finisher setzen
+  //   health  18  Stand (wie viel einer einstecken kann), Nebenweg beim Finisher ueberstehen
+  //   power   14  Wucht je Treffer, Nebenweg beim Finisher setzen
+  //   stamina 14  Ausdauer: wie wenig die Wucht ab Takt 5 nachlaesst, wie wenig der Ring frisst
+  //   will    12  Standhalten: Primaerweg beim Finisher ueberstehen
+  //   dexterity 9 Treffer landen
+  //   intelligence 6  SCHWACHSTELLE (liest, wer wackelt, und schlaegt dorthin) und
+  //                   POSITIONIERUNG (stellt sich so, dass von zwei Angreifern nur einer ankommt)
+  //   spirit  6   ZWECKBUENDNIS: zwei Nicht-Fuehrende tun sich fuer zwei Takte gegen den
+  //               Fuehrenden zusammen (greifen sich nicht an, nehmen ihn in die Zange)
+  //
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL — dasselbe Prinzip wie aufEignung(), hier aber
+  // fuer ALLE Kanaele: jeder Kanal liest `E + kappa·(a − E)`, E ist die Mini-DM-Eignung des
+  // Kaempfers (mit Slot-Aufschlag, Formkarte, Mutator, genau wie in baueEinheit()), a das
+  // effektive Attribut. Ein Golem bleibt zaeh, ein Peiniger bleibt hart — WIE VIEL einer
+  // insgesamt ist, sagt die vorgegebene Verteilung.
+  //
+  // BEWUSST NICHT ANGEFASST: das 4-gegen-4-Chassis (build()/stepSim(), MOTOREN["mini-dm"],
+  // TDM, Battlefield) — das FFA hat jetzt eine eigene Runden-Funktion daneben, kein geteilter
+  // Code wird umgebaut. Rollen, Rundenpunkte, Ligapunkte und Event-Tiebreak unveraendert.
 
   // Die vier festen Rollen dieser Disziplin, in der Reihenfolge aus SLOTS_JE_DISC["mini-dm"]
   // (Frontliner, Finisher, Trick Fighter, Iron Guard) — das IST N=4 aus Chris' Auftrag,
@@ -46680,13 +46716,302 @@
     return {punkte,platz};
   }
 
-  // EINE RUNDE: vier Solo-Kaempfer, einer je Team, alle in derselben Rolle. Echte
-  // Simulation ueber denselben stepSimStumm-Takt wie MOTOREN["mini-dm"].lauf() (120 s
-  // Budget, kein Rendering) — kein Wert-Vergleich, s. Kopfkommentar. `vierSpieler` ist ein
-  // Array der Laenge 4 im ArenaSpieler-Format (arena-kader-adapter.ts): Team-Index i
-  // bekommt u.side===i. Rueckgabe: Rundenrang 1-4 je Team, nach `beitragVon` am Kampfende
-  // (Recherche Abschnitt 4.2: "Rang 1-4 nach Punktestand am Rundenende") mit
-  // Gleichstand-Teilung, PLUS die vollen Boxscore-Felder je Kaempfer fuer eine Abnahme.
+  // PARAMETER DES SCHLAGWECHSELS: Grundwerte in ARENA_ART["mini-dm"].ffa (EINE Quelle, s.
+  // dort). MDFFA ist die laufende Kopie — umstellen darf sie nur eine Mess-Sonde
+  // (window.__arena.miniDmFfaParameter), im Spielbetrieb ist sie immer gleich dem Grundwert.
+  const mdffaGrund=()=>JSON.parse(JSON.stringify(ARENA_ART["mini-dm"].ffa));
+  let MDFFA=mdffaGrund();
+
+  // ZUFALL JE (SAAT, KAEMPFER, TAKT, ZWECK) aus einem Hash statt aus der laufenden rr()-Kette.
+  // Jede Entscheidung bekommt IHRE Zahl, egal was davor passiert ist: hebt die Pp-Messung bei
+  // einem Kaempfer ein Attribut, sehen alle uebrigen Wuerfe derselben Runde dieselben Zahlen —
+  // der Vergleich bleibt gepaart, statt dass ein einziger zusaetzlicher Wurf die ganze Kette
+  // verschiebt (dieselbe Methode wie im Konzeptmodell, Nachtkonzept Anhang A Punkt 4).
+  // `wer` ist der Team-Index (side 0..3), nicht die Ecke — ohne Geometrie gibt es keine Ecke,
+  // die bevorzugt sein koennte, und vier gleiche Kaempfer bleiben vollkommen symmetrisch.
+  const mdffaMisch=(h)=>{h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return h>>>0;};
+  function mdffaZufall(saat,wer,takt,zweck){
+    let h=mdffaMisch((saat>>>0)^0x9e3779b9);
+    h=mdffaMisch(h^Math.imul(wer+1,0x27d4eb2f));
+    h=mdffaMisch(h^Math.imul(takt+1,0x165667b1));
+    h=mdffaMisch(h^Math.imul(zweck+1,0x61c88647));
+    return h/4294967296;
+  }
+  // Zwecke — feste Nummern, damit ein neuer Wurf nie die Zahl eines alten verschiebt.
+  const MDFFA_ZWECK={buendnis:1, schwachstelle:2, vergeltung:3, ziel:4, position:5, positionWahl:6,
+    treffer:7, finisher:8, reihenfolge:9};
+
+  // DIE KANAELE EINES KAEMPFERS. Eignung und effektive Attribute entstehen Zeile fuer Zeile wie
+  // in baueEinheit() (Slot-Aufschlag haengt an der Rolle, Formkarte/Stufe trifft jeden gleich,
+  // Mutator ueber gehoben()/eigMutator(), Messhebel ueber hebungRoh()/eigHebung()) — dieselbe
+  // Eignung, die auch die 4-gegen-4-Abnahme und `disziplinProbe` als `eig` melden.
+  //
+  // Jeder Kanal liest `c = E + kappa·(a − E)` (Menge aus der Eignung, Form aus dem Profil) und
+  // daraus die Abweichung `dv = (c − R)/R` von der Mitte R. Ein Kanal wirkt mit
+  //     1 + spreizung · hebel_kanal · Σ (gewicht_X/100) · dv_X     (ueber seine Attribute X)
+  // — die Gewichte sind die aus BASIS_JE_DISC, also die vorgegebene Verteilung. `hebel` gleicht
+  // nur aus, wie stark eine Mechanik ueberhaupt auf die Wertung durchschlaegt (ein Treffer-
+  // prozent wirkt anders als ein Lebenspunkt); kalibriert per Budget-Methode, s.
+  // ARENA_ART["mini-dm"].ffa.
+  function mdffaKaempfer(p,side,slotId){
+    const d="mini-dm";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false),d);
+    const P=MDFFA, R=P.mitte, W=BASIS_JE_DISC[d]||{};
+    // Zwei Formanteile: `kappa` fuer die Grundkanaele (Stand, Wucht, Treffer, Ausdauer), wo
+    // jedes Profil-Zuviel die Rangtreue kostet, und `kappaWege` fuer die WEGE (Finisher setzen/
+    // halten, Schwachstelle, Positionierung, Zweckbuendnis) — dort soll das Profil sichtbar
+    // entscheiden, wer welchen Weg geht (Chris' Mehrwege-Leitlinie, CLAUDE.md).
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    return {
+      side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      // Kanalwerte (fertig gerechnet, damit die Runde nur noch wuerfelt)
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["torment","power"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["dexterity"]),0.15,0.97),
+      // Ausdauer: 1 = Durchschnitt, kleiner = ermuedet langsamer (Wuchtverlust ab Takt 5, Ring)
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      // Finisher: Primaerweg und Nebenweg (Chris' Mehrwege-Leitlinie): wer setzt, nimmt den
+      // besseren seiner zwei Wege, Torment voll oder Power gedaempft; wer steht, Will voll
+      // oder Health gedaempft.
+      setzen:Math.max(weg(H.finisher,["torment"]),P.nebenweg*weg(H.finisher,["power"])),
+      halten:Math.max(weg(H.finisher,["will"]),P.nebenweg*weg(H.finisher,["health"])),
+      // Intelligence: Schwachstelle lesen (Zielwahl) und Positionierung (Ausweichen vor dem
+      // Doppelangriff) — zwei Wege desselben Kopfes.
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      position:klemme(P.position.basis+weg(H.position,["intelligence"]),0,0.95),
+      // Spirit: Bereitschaft zum kurzfristigen Zweckbuendnis.
+      geist:weg(H.buendnis,["spirit"]),
+      // Laufzustand
+      raus:false, rausTakt:null, rausArt:null, angeschlagen:false, wert:0, letzterAngreifer:null,
+      st:{treffer:0, schlaege:0, wucht:0, finishes:0, kos:0, ueberstanden:0, schwachstellen:0,
+          ausgewichen:0, buendnisse:0, beute:0, bruch:null}
+    };
+  }
+
+  // Wie viel einer aus einem Zweckbuendnis macht: 1 = Mitte, 0 = gar nichts, hoechstens 2.
+  const mdffaGeistFaktor=(k)=>Math.max(0,Math.min(2,1+k.geist));
+
+  // EINE RUNDE ALS SCHLAGWECHSEL. `kaempfer` sind vier mdffaKaempfer() (Index = side), `saat`
+  // die Rundensaat. Rueckgabe: die Kaempfer (mit Wertung `wert`) und das Takt-Protokoll fuer
+  // Ticker und Anzeige (`takte[i].ereignisse`, `takte[i].stand`). Kein rr(), kein Zustand
+  // ausserhalb der Argumente — dieselben Eingaben liefern bitgleich dieselbe Runde.
+  function mdffaSchlagwechsel(kaempfer,saat){
+    const P=MDFFA, Z=MDFFA_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const takte=[];
+    let pakt=null; // {a,b,gegen,bis}
+    let gespielt=0;
+    const stehend=()=>kaempfer.filter(k=>!k.raus);
+    for(let t=1;t<=P.takte;t++){
+      const ereignisse=[];
+      const vorn=stehend();
+      if(vorn.length<=1)break;
+      gespielt=t;
+      // 1) ZWECKBUENDNIS (Spirit). Ein laufender Pakt endet nach seiner Dauer, sobald der
+      // Gejagte oder ein Partner faellt — „kurzfristig", wie Chris es sagt.
+      if(pakt&&(t>pakt.bis||kaempfer[pakt.gegen].raus||kaempfer[pakt.a].raus||kaempfer[pakt.b].raus)){
+        ereignisse.push({typ:"buendnis-ende",a:pakt.a,b:pakt.b,gegen:pakt.gegen});
+        pakt=null;
+      }
+      if(!pakt&&t>=2&&vorn.length>=3){
+        // Der Fuehrende ist, wer nach Kampfrichterwertung vorn liegt (Gleichstand: mehr Stand,
+        // dann Team-Index) — das Ziel, gegen das sich zwei andere zusammentun koennen.
+        const fuehrer=vorn.slice().sort((x,y)=>y.wert-x.wert||y.stand-x.stand||x.side-y.side)[0];
+        const rest=vorn.filter(k=>k!==fuehrer).sort((x,y)=>y.geist-x.geist||x.side-y.side);
+        if(rest.length>=2&&fuehrer.wert>0){
+          const [a,b]=rest;
+          const chance=Math.max(0,Math.min(0.9,P.buendnis.basis+(a.geist+b.geist)/2));
+          if(wurf(a.side*4+b.side,t,Z.buendnis)<chance){
+            pakt={a:a.side,b:b.side,gegen:fuehrer.side,bis:t+P.buendnis.dauer-1};
+            a.st.buendnisse++; b.st.buendnisse++;
+            ereignisse.push({typ:"buendnis",a:a.side,b:b.side,gegen:fuehrer.side});
+          }
+        }
+      }
+      const partnerVon=(k)=>!pakt?null:(k.side===pakt.a?pakt.b:k.side===pakt.b?pakt.a:null);
+      // 2) ZIELWAHL — Bindung an den Pakt, sonst Schwachstelle (Intelligence), sonst
+      // Vergeltung, sonst Zufall. Alle Wuerfe auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of vorn){
+        const partner=partnerVon(A);
+        let ziel=null, schwach=false, zange=false;
+        if(partner!=null&&!kaempfer[pakt.gegen].raus){ ziel=kaempfer[pakt.gegen]; zange=true; }
+        else{
+          const feinde=vorn.filter(k=>k!==A&&k.side!==partner);
+          if(!feinde.length)continue;
+          if(wurf(A.side,t,Z.schwachstelle)<A.schwach){
+            ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.side-y.side)[0];
+            schwach=true; A.st.schwachstellen++;
+          }else if(A.letzterAngreifer!=null&&feinde.includes(kaempfer[A.letzterAngreifer])
+                   &&wurf(A.side,t,Z.vergeltung)<P.vergeltung){
+            ziel=kaempfer[A.letzterAngreifer];
+          }else{
+            ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.side,t,Z.ziel)*feinde.length))];
+          }
+        }
+        angriffe.push({A,ziel,schwach,zange,aktiv:true});
+      }
+      // 3) POSITIONIERUNG (Intelligence): wer von mindestens zwei zugleich angegangen wird,
+      // stellt sich mit seiner Positionierungs-Chance so, dass nur EINER ankommt.
+      for(const Zk of vorn){
+        const auf=angriffe.filter(x=>x.ziel===Zk);
+        if(auf.length<2)continue;
+        if(wurf(Zk.side,t,Z.position)<Zk.position){
+          const bleibt=Math.min(auf.length-1,Math.floor(wurf(Zk.side,t,Z.positionWahl)*auf.length));
+          auf.forEach((x,i)=>{ if(i!==bleibt)x.aktiv=false; });
+          Zk.st.ausgewichen++;
+          ereignisse.push({typ:"position",wer:Zk.side,gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.side)});
+        }
+      }
+      // 4) SCHLAEGE, gleichzeitig auf dem Stand vom Taktbeginn. Reihenfolge nur fuer die
+      // Gutschrift, falls zwei Finisher denselben Gegner im selben Takt treffen.
+      const schadenJe=new Map(), aufgegebenVon=new Map();
+      const wuchtFaktor=(k)=>t>=5?Math.max(0.3,1-P.muedigkeit*(t-4)*k.ermuedung):1;
+      const reihe=angriffe.map(x=>({x,r:wurf(x.A.side,t,Z.reihenfolge)})).sort((u,v)=>u.r-v.r).map(u=>u.x);
+      for(const x of reihe){
+        const {A,ziel}=x;
+        A.st.schlaege++;
+        if(!x.aktiv){ ereignisse.push({typ:"leer",wer:A.side,ziel:ziel.side}); continue; }
+        // Zange: die Verbuendeten treffen den Gejagten leichter. Deckung: der Gejagte trifft
+        // einen der beiden schwerer, solange der andere ihm im Ruecken steht. Beides umso mehr,
+        // je besser der Verbuendete zusammenarbeiten kann (sein Spirit-Kanal `geist`).
+        const gedeckt=pakt&&A.side===pakt.gegen&&(ziel.side===pakt.a||ziel.side===pakt.b);
+        const p=Math.max(0.05,Math.min(0.98,A.treffer
+          +(x.zange?P.buendnis.zange*mdffaGeistFaktor(A):0)
+          -(gedeckt?P.buendnis.deckung*mdffaGeistFaktor(ziel):0)));
+        if(wurf(A.side,t,Z.treffer)>=p){ ereignisse.push({typ:"daneben",wer:A.side,ziel:ziel.side}); continue; }
+        A.st.treffer++;
+        ziel.letzterAngreifer=A.side;
+        if(ziel.angeschlagen&&!aufgegebenVon.has(ziel)){
+          // FINISHER-DUELL: setzt der Angreifer nach (Torment/Power) oder beisst sich der
+          // Angeschlagene durch (Will/Health)?
+          const logit=P.finisher.basis+A.setzen-ziel.halten;
+          const chance=1/(1+Math.exp(-logit));
+          if(wurf(A.side*4+ziel.side,t,Z.finisher)<chance){
+            aufgegebenVon.set(ziel,A);
+            ereignisse.push({typ:"finisher",wer:A.side,ziel:ziel.side});
+            continue;
+          }
+          ziel.st.ueberstanden++; ziel.wert+=P.wertung.ueberstanden;
+          ereignisse.push({typ:"uebersteht",wer:ziel.side,von:A.side});
+        }
+        const dmg=A.wucht*wuchtFaktor(A)*(x.schwach?1+P.schwachstelle.bonus:1);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:x.schwach?"schwachstelle":x.zange?"zange":"treffer",wer:A.side,ziel:ziel.side,wucht:+dmg.toFixed(1)});
+      }
+      // 5) DER RING (Fables M-4, Nachtkonzept K5): ab Takt `ring.ab` frisst er Stand, gedaempft
+      // durch Ausdauer — erzwingt ein Ende in fester Sendezeit.
+      const ringI=t-P.ring.ab;
+      if(ringI>=0){
+        const roh=P.ring.stufen[Math.min(P.ring.stufen.length-1,ringI)];
+        for(const k of vorn){ k.stand-=roh*k.ermuedung; }
+        ereignisse.push({typ:"ring",schaden:roh});
+      }
+      // 6) WER GEHT? Aufgabe nach Finisher, Aufgabe durch Schaden (Gutschrift an den, der in
+      // diesem Takt am meisten Schaden an ihm gemacht hat), Bruchpunkt.
+      for(const k of vorn){
+        // GETEILTE BEUTE: faellt der Gejagte, solange das Zweckbuendnis steht, schreiben die
+        // Kampfrichter den Bonus BEIDEN Verbuendeten gut — der Grund, ueberhaupt ein Buendnis
+        // einzugehen („um ggf. zu gewinnen").
+        const beute=(A,bonus)=>{
+          if(pakt&&k.side===pakt.gegen&&(A.side===pakt.a||A.side===pakt.b)){
+            const B=kaempfer[A.side===pakt.a?pakt.b:pakt.a];
+            if(!B.raus||B.rausTakt===t){ B.wert+=bonus*P.buendnis.beute*mdffaGeistFaktor(B); B.st.beute++; }
+          }
+        };
+        if(aufgegebenVon.has(k)){
+          const A=aufgegebenVon.get(k);
+          k.raus=true; k.rausTakt=t; k.rausArt="finisher";
+          A.wert+=P.wertung.finish; A.st.finishes++; beute(A,P.wertung.finish);
+        }else if(k.stand<=0){
+          k.raus=true; k.rausTakt=t; k.rausArt="schaden";
+          const m=schadenJe.get(k);
+          if(m){
+            let bester=null,bw=-1;
+            for(const [A,w] of m)if(w>bw||(w===bw&&A.side<bester.side)){bester=A;bw=w;}
+            bester.wert+=P.wertung.schaden; bester.st.kos++; beute(bester,P.wertung.schaden);
+            ereignisse.push({typ:"ko",wer:bester.side,ziel:k.side});
+          }else{
+            k.rausArt="ring";
+            ereignisse.push({typ:"ring-aus",ziel:k.side});
+          }
+        }else if(!k.angeschlagen&&k.stand<P.bruchpunkt*k.stand0){
+          k.angeschlagen=true; k.st.bruch=t;
+          ereignisse.push({typ:"bruchpunkt",wer:k.side});
+        }
+        if(k.stand<0)k.stand=0;
+      }
+      for(const k of vorn)if(!k.raus)k.wert+=P.wertung.takt;
+      takte.push({t, ereignisse, stand:kaempfer.map(k=>({side:k.side, stand:Math.round(k.stand),
+        max:Math.round(k.stand0), raus:k.raus, angeschlagen:k.angeschlagen, wert:+k.wert.toFixed(1)})),
+        pakt:pakt?{...pakt}:null});
+    }
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte — sonst bestrafte ein schneller
+    // Sieg den Sieger um genau die Taktpunkte, die er sich erkaempft hat.
+    const uebrig=stehend();
+    if(uebrig.length===1&&gespielt<P.takte)uebrig[0].wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, takte, gespielt};
+  }
+
+  // TICKERZEILEN EINES TAKTS — reine Textabbildung des fertigen Protokolls (mdffaSchlagwechsel()
+  // hat den Takt laengst gerechnet), damit die Rundenshow, die Testschnittstelle und ein spaeterer
+  // Ticker in der Spieltagsbuehne dieselben Saetze sagen. `name(side)` liefert den Anzeigenamen.
+  // Gewoehnliche Treffer und Fehlschlaege stehen NICHT im Ticker (zwoelf bis zwanzig je Runde),
+  // sondern als Schadenszahl an der Eckkarte; hier stehen die Ereignisse, die den Kampf drehen.
+  function mdffaTaktZeilen(takt,name){
+    const z=[];
+    for(const e of takt.ereignisse||[]){
+      switch(e.typ){
+        case "buendnis": z.push({typ:e.typ, text:"Zweckbündnis: "+name(e.a)+" und "+name(e.b)+" tun sich gegen "+name(e.gegen)+" zusammen."}); break;
+        case "buendnis-ende": z.push({typ:e.typ, text:"Das Bündnis von "+name(e.a)+" und "+name(e.b)+" ist vorbei."}); break;
+        case "position": z.push({typ:e.typ, text:name(e.wer)+" stellt sich klug — "+(e.gegen.length>1?e.gegen.length+" Angriffe laufen":"ein Angriff läuft")+" ins Leere."}); break;
+        case "bruchpunkt": z.push({typ:e.typ, text:name(e.wer)+" ist angeschlagen."}); break;
+        case "finisher": z.push({typ:e.typ, text:name(e.wer)+" setzt den Finisher — "+name(e.ziel)+" gibt auf."}); break;
+        case "uebersteht": z.push({typ:e.typ, text:name(e.wer)+" übersteht den Finisher von "+name(e.von)+"."}); break;
+        case "ko": z.push({typ:e.typ, text:name(e.ziel)+" geht zu Boden — K.o. durch "+name(e.wer)+"."}); break;
+        case "ring": z.push({typ:e.typ, text:"Der Ring zieht sich zu: −"+e.schaden+" Stand für alle, die noch stehen."}); break;
+        case "ring-aus": z.push({typ:e.typ, text:name(e.ziel)+" bleibt im Ring liegen."}); break;
+        default: break;
+      }
+    }
+    return z;
+  }
+  // Was eine Eckkarte je Takt zeigt: erlittene Wucht und ob der Kaempfer in diesem Takt eine
+  // Schwachstelle getroffen hat — aus denselben Ereignissen, keine zweite Rechnung.
+  function mdffaTaktBilanz(takt){
+    const erlitten=[0,0,0,0], schwach=[false,false,false,false];
+    for(const e of takt.ereignisse||[]){
+      if(e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="zange")erlitten[e.ziel]+=e.wucht||0;
+      if(e.typ==="schwachstelle")schwach[e.wer]=true;
+    }
+    return {erlitten:erlitten.map(x=>Math.round(x)), schwach};
+  }
+
+  // EINE RUNDE: vier Solo-Kaempfer, einer je Team, alle in derselben Rolle, als Schlagwechsel
+  // (s. Kopfkommentar oben und mdffaSchlagwechsel()). `vierSpieler` ist ein Array der Laenge 4
+  // im ArenaSpieler-Format (arena-kader-adapter.ts): Team-Index i ist side i. Rueckgabe:
+  // Rundenrang 1-4 je Team nach Kampfrichterwertung (`beitrag`, Gleichstand-Teilung), dazu die
+  // Boxscore-Felder je Kaempfer und das Takt-Protokoll `takte` fuer Ticker und Anzeige.
+  //
+  // FELDER WIE BISHER, BEDEUTUNG ANGEPASST: `beitrag` ist jetzt die Kampfrichterwertung (Wucht
+  // der Treffer + Finish-/K.o.-Bonus + Taktpunkte), `hp`/`max` der Stand am Rundenende bzw. zu
+  // Beginn, `dauer` die Zahl der gespielten Takte (vorher Sekunden), `down` wer aufgegeben hat.
+  // Ruehrt keinen globalen Kampfzustand an (kein U, kein seed, kein disc) — anders als die
+  // Sandplatz-Fassung kann diese Funktion deshalb auch mitten in einer laufenden Partie fuer
+  // eine Sonde aufgerufen werden, ohne sie zu stoeren.
   function baueMiniDmFfaRunde(vierSpieler,slotId,saat){
     if(!Array.isArray(vierSpieler)||vierSpieler.length!==4){
       throw new Error("baueMiniDmFfaRunde: braucht genau 4 Spieler (einen je Team), bekam "+
@@ -46696,65 +47021,17 @@
       throw new Error("baueMiniDmFfaRunde: unbekannte Mini-DM-Rolle \""+slotId+"\" — erwartet "+
         "eine von "+MINI_DM_FFA_ROLLEN.join(", ")+".");
     }
-    KFOKUS=null; KFOKUS_CD=0;
-    disc="mini-dm";
-    seed=normalisiereSaat(saat); U=[]; floats.length=0; t=0; done=false;
-    freigabe=[false,false,false,false]; pfeile=[]; MESS={}; PLAN=null;
-    // ECKEN-LOTTERIE, SEED-BESTIMMT (Spiegeltest-Fund, s. PR-Beschreibung): Nahkampf hier ist
-    // VOLLSTAENDIG deterministisch — kein rr()-Wurf im ganzen Kampf ausser Fernkampf-Streuung
-    // (unsere vier Rollen sind alle Nahkaempfer), s. chooseTarget-Kommentar "Keine Wuerfe, kein
-    // Zufall". Die Standard-Zielwahl ("bedrohung", PERSZIEL.duellant) loest einen Gleichstand
-    // (am Rundenanfang haben alle drei Gegner Bedrohung 0) ueber das ERSTE Element von
-    // gegner(u) auf — und das ist schlicht die EINFUEGEREIHENFOLGE in U. Baut man U immer in
-    // Team-Reihenfolge 0,1,2,3, sehen Team 1/2/3 als ihren ersten Gleichstand-Kandidaten IMMER
-    // Team 0 zuerst, Team 0 dagegen IMMER Team 1 — eine strukturelle Schieflage (drei greifen
-    // Team 0 zuerst an, Team 0 nur einen), nicht im Mittel, sondern in JEDER Runde mit
-    // vergleichbar starken Kaempfern. Nachgemessen (scripts/miss-mini-dm-ffa-spiegel.mjs, vier
-    // byte-identische Kaempfer, 384 Runden): Team 1 gewann 50 % aller Runden, Team 3 0 % — eine
-    // Eckenlotterie statt eines Kampfes. Fix: WELCHES Team auf welcher Ecke steht (und damit an
-    // welcher Stelle in U/gegner()) wird selbst ausgewuerfelt, mit derselben Saat wie der Rest
-    // der Runde (reproduzierbar, Fisher-Yates ueber das schon vorhandene rr()) — der
-    // Team-Index (u.side) bleibt fuer die Punktezaehlung unveraendert, nur die Ecke wechselt.
-    const eckenReihenfolge=[0,1,2,3];
-    for(let i=eckenReihenfolge.length-1;i>0;i--){
-      const j=Math.floor(rr()*(i+1));
-      const tmp=eckenReihenfolge[i]; eckenReihenfolge[i]=eckenReihenfolge[j]; eckenReihenfolge[j]=tmp;
-    }
-    let id=0;
-    // P1-PERSOENLICHKEITS-HANDWERK GILT HIER NICHT (07.10.): `persHandwerk:["z"]` ist nur fuer das
-    // gemessene 4-gegen-4 abgenommen (rho/Pp, arena-zielwahl-opus-empfehlung-02-10.md Abschnitt
-    // 10). Das FFA vergibt Ligapunkte und ist mit der Aenderung NICHT gemessen — es baut seine
-    // Einheiten deshalb mit der unveraenderten PERSDEF-Grundstellung (bit-identisch zu vorher),
-    // bis eine FFA-Sonde es abnimmt.
-    const handwerkVorher=ARENA_ART["mini-dm"].persHandwerk;
-    ARENA_ART["mini-dm"].persHandwerk=[];
-    try{
-      for(let ecke=0; ecke<4; ecke++){
-        const side=eckenReihenfolge[ecke];
-        const p=vierSpieler[side];
-        const einheit=baueEinheit(p,side,0,0,1,id++,slotId,slotOrd(slotId),
-          zielOf[p.n]||PERSZIEL[persOf[p.n]||"duellant"],"mini-dm");
-        const spawn=miniDmFfaSpawn(ecke);
-        einheit.x=einheit.hx=spawn.x; einheit.y=einheit.hy=spawn.y;
-        U.push(einheit);
-      }
-    }finally{
-      ARENA_ART["mini-dm"].persHandwerk=handwerkVorher;
-    }
-    // U bleibt WAEHREND DES KAMPFES in der ausgewuerfelten Eckenreihenfolge (das ist der
-    // Fix von oben — gegner() muss die Ecken-Lotterie sehen, sonst greift sie nicht). Fuer
-    // die Rueckgabe wird trotzdem nach Team-Index sortiert, reine Lesbarkeit — jeder Eintrag
-    // traegt sein `side`-Feld ohnehin explizit, ein Aufrufer darf sich NICHT auf Array-
-    // Position statt auf `side` verlassen (s. spieleMiniDmFfaEvent unten, das genau deshalb
-    // ueber `.find(t=>t.side===side)` liest, nicht ueber Index).
-    let g=0; while(!done&&g<120){ stepSimStumm(1/60); g+=1/60; }
-    const beitraege=U.map(u=>beitragVon(u));
+    const s=normalisiereSaat(saat);
+    const kaempfer=vierSpieler.map((p,side)=>mdffaKaempfer(p,side,slotId));
+    const {takte,gespielt}=mdffaSchlagwechsel(kaempfer,s);
+    const beitraege=kaempfer.map(k=>k.wert);
     const {punkte,platz}=verteilePlatzierungspunkte(beitraege,MINI_DM_FFA_RUNDENPUNKTE);
-    const teams=U.map((u,i)=>({side:u.side,n:u.n,eig:+u.eig.toFixed(2),beitrag:+beitraege[i].toFixed(2),
-      rundenPlatz:platz[i], rundenPunkte:punkte[i], hp:Math.round(u.hp),
-      max:Math.round(u.max), down:!!u.down}));
-    teams.sort((a,b)=>a.side-b.side);
-    return {slotId, seed, dauer:+t.toFixed(2), teams};
+    const teams=kaempfer.map((k,i)=>({side:k.side,n:k.n,eig:+k.eig.toFixed(2),
+      eigOhneMutator:+k.eigOhneMutator.toFixed(2),beitrag:+beitraege[i].toFixed(2),
+      rundenPlatz:platz[i], rundenPunkte:punkte[i], hp:Math.round(Math.max(0,k.stand)),
+      max:Math.round(k.stand0), down:!!k.raus, rausTakt:k.rausTakt, rausArt:k.rausArt,
+      st:{...k.st, wucht:+k.st.wucht.toFixed(1)}}));
+    return {slotId, seed:s, dauer:gespielt, takte, teams};
   }
 
   // DAS GANZE EVENT: vier Runden (eine je Rolle, s. MINI_DM_FFA_ROLLEN), Rundenpunkte
@@ -46805,6 +47082,104 @@
         eventPlatz:eventPlatz[side], ligaPunkte:ligaPunkte[side]
       }))
     };
+  }
+
+  // ===================================================================================
+  // DIE FFA-ABNAHME (Nachtkonzept-Paket P0, 13.10. gebaut): gemessen wird das Format, das
+  // gespielt wird — nicht das 4-gegen-4 aus MOTOREN["mini-dm"]. Zwei Sonden, beide reine
+  // Lesezugriffe auf baueMiniDmFfaRunde()/spieleMiniDmFfaEvent(); Formkarten, Mutatoren und
+  // der Messhebel werden danach exakt so zurueckgestellt, wie sie vorher standen.
+  //
+  // FORMKARTEN FUER ALLE SECHZEHN. zieheFormkarten() zieht nur fuer SQUAD/OPP — im FFA stehen
+  // aber vier Kader. Die Sonde zieht deshalb je Event fuer jeden der vier Kader mit derselben
+  // Hohe-Bits-Regel und denselben Werten [0,2,4,8] (s. zieheFormkarten()).
+  function mdffaFormkartenFuer(teams,saat){
+    let z=saat>>>0;
+    const r=(n)=>{z=(Math.imul(z,1103515245)+12345)&0x7fffffff;return (z>>>16)%n;};
+    for(const kader of teams)for(const p of kader)FORMKARTE[p.n]=FORMWERTE[r(FORMWERTE.length)];
+  }
+  // Eine Event-Saat je (Gruppe, Lauf), dieselbe Bauart wie disziplinProbe/einflussVon.
+  const mdffaEventSaat=(g,i,versatz)=>(7001+(versatz||0)+g*7919+i*104729)>>>0;
+  function mdffaVorbereiten(teams,g,i,versatz,mutatorModus){
+    mdffaFormkartenFuer(teams,(20260823+(versatz||0)+g*7919+i*104729)>>>0);
+    if((mutatorModus||"je-spiel")==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel((20260823+(versatz||0)+g*7919+i*15485863)>>>0);
+    else if(mutatorModus==="aus")MUTATOREN=[];
+  }
+
+  // RANGTREUE-SONDE. `kader` = Liste von Team-Kadern (ArenaSpieler[], `d["mini-dm"]` gesetzt),
+  // `opt.gruppen` = Liste von Vierergruppen (Indizes in `kader`), `opt.n` Laeufe je Gruppe,
+  // `opt.versatz` Saatstrom. Liefert je Event die vier Runden mit {n, side, eig, wert} — eig
+  // OHNE Mutator (wie disziplinProbe: der Mutator weicht absichtlich von der Eignung ab, die
+  // Abnahme soll das sehen) — und den Event-Ausgang. Die Statistik rechnet das Skript.
+  function miniDmFfaSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      FORMKARTE={...FORMKARTE};
+      (o.gruppen||[]).forEach((gr,g)=>{
+        const teams=gr.map(ix=>mitKit(kader[ix]));
+        for(let i=0;i<n;i++){
+          mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
+          const ev=spieleMiniDmFfaEvent(teams,mdffaEventSaat(g,i,versatz));
+          events.push({gruppe:g, lauf:i, teamsIx:gr,
+            runden:ev.runden.map(r=>({slotId:r.slotId, takte:r.dauer,
+              teilnehmer:r.teams.map(t=>({n:t.n, side:t.side, eig:t.eigOhneMutator, wert:t.beitrag,
+                platz:t.rundenPlatz, raus:t.down, st:o.mitStatistik?t.st:undefined}))})),
+            teams:ev.teams.map(t=>({side:t.side, eventPlatz:t.eventPlatz, ligaPunkte:t.ligaPunkte,
+              rundenPunkte:t.rundenPunkteSumme}))});
+        }
+      });
+    }finally{ FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {events, parameter:JSON.parse(JSON.stringify(MDFFA))};
+  }
+
+  // PP-SONDE NACH DER BUDGET-METHODE, auf dem FFA: je Runde, Kaempfer und Attribut +plus (bei
+  // 100 gedeckelt, Eignung um Gewicht·plus/100 mit — derselbe Hebel ATTR_HEBUNG wie
+  // einflussVon()), dieselbe Rundensaat, dieselben Formkarten und Mutatoren, Gewinn im
+  // ANTEIL an der Rundenwertung (dasselbe Mass wie MOTOREN[...].wert()). Normiert wie
+  // einflussVon(), Abweichung gegen BASIS_JE_DISC["mini-dm"].
+  function miniDmFfaEinfluss(kader,opt){
+    const o=opt||{}, n=o.n||3, versatz=o.versatz||0, hoehe=o.plus||15;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN, hebungVorher=ATTR_HEBUNG;
+    const summe={}; let proben=0;
+    for(const at of EINFLUSS_ATTR)summe[at]=0;
+    const anteile=(r)=>{const g=r.teams.reduce((a,t)=>a+t.beitrag,0)||1; return r.teams.map(t=>t.beitrag/g*100);};
+    try{
+      FORMKARTE={...FORMKARTE};
+      (o.gruppen||[]).forEach((gr,g)=>{
+        const teams=gr.map(ix=>mitKit(kader[ix]));
+        const sortiert=teams.map(k=>[...k].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0)));
+        for(let i=0;i<n;i++){
+          mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
+          const saatBasis=normalisiereSaat(mdffaEventSaat(g,i,versatz));
+          MINI_DM_FFA_ROLLEN.forEach((slotId,ri)=>{
+            const vier=sortiert.map(k=>k[ri%k.length]);
+            const rs=(saatBasis*2654435761+ri*40503)>>>0;
+            ATTR_HEBUNG=null;
+            const grund=anteile(baueMiniDmFfaRunde(vier,slotId,rs));
+            vier.forEach((p,side)=>{
+              for(const at of EINFLUSS_ATTR){
+                ATTR_HEBUNG={wer:p.n, attribut:at, plus:hoehe};
+                const neu=anteile(baueMiniDmFfaRunde(vier,slotId,rs));
+                summe[at]+=neu[side]-grund[side];
+              }
+              proben++;
+            });
+            ATTR_HEBUNG=null;
+          });
+        }
+      });
+    }finally{ FORMKARTE=formVorher; MUTATOREN=mutVorher; ATTR_HEBUNG=hebungVorher; }
+    const roh=EINFLUSS_ATTR.map(at=>({attribut:at, gewinn:+(summe[at]/Math.max(1,proben)).toFixed(4)}));
+    const pos=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+    const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/pos*1000)/10}))
+                    .sort((a,b)=>b.gewinn-a.gewinn);
+    const W=BASIS_JE_DISC["mini-dm"]||{};
+    const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
+      s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    return {disziplin:"mini-dm-ffa", proben, anhebung:hoehe, saatVersatz:versatz,
+      abweichungPp:Math.round(abweichung*10)/10, reihen};
   }
 
   // ===================================================================================
@@ -46899,7 +47274,12 @@
     const paarungenBox=document.getElementById("mdffaPaarungen");
     const rundenbanner=document.getElementById("mdffaRundenbanner");
     const endstandKopf=document.getElementById("mdffaEndstandKopf");
+    // TAKT-TICKER (13.10., Schlagwechsel): die Ereignisse, die eine Runde drehen — Buendnis,
+    // Positionierung, Bruchpunkt, Finisher, K.o., Ring —, Takt fuer Takt aus dem fertigen
+    // Protokoll (mdffaTaktZeilen()). Fehlt das Element (aelteres Markup), laeuft die Schau ohne.
+    const tickerBox=document.getElementById("mdffaTicker");
     if(!teamsBox||!rundenBox||!endstandBox)return;
+    if(tickerBox){tickerBox.textContent="";tickerBox.hidden=true;}
     if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     const eintraege=mdffaTeamEintraege();
@@ -46971,6 +47351,14 @@
       karte.appendChild(hpwrap);
       const hplabel=el("div","mdffa-hplabel",""); hplabel.hidden=true;
       karte.appendChild(hplabel);
+      // WER GERADE IM RING STEHT (13.10.): Name des Kaempfers der laufenden Runde und sein
+      // Zustand im Schlagwechsel (Buendnis/gejagt/angeschlagen), erst ab Rundenbeginn gefuellt.
+      const kaempfer=el("div","mdffa-kaempfer",""); kaempfer.hidden=true;
+      karte.appendChild(kaempfer);
+      const status=el("div","mdffa-status",""); status.hidden=true;
+      karte.appendChild(status);
+      const delta=el("div","mdffa-delta","");
+      karte.appendChild(delta);
       teamsBox.appendChild(karte);
       return karte;
     });
@@ -47003,14 +47391,14 @@
       const tr=document.createElement("tr");
       tr.className=(t.rundenPlatz===1?"mdffa-r1":"")+(t.down?" mdffa-down":"");
       const tdName=el("td",null,t.n+" ("+eintraege[t.side].name+")");
-      const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Beitrag");
+      const tdBeitrag=el("td","n",Math.round(t.beitrag)+" Wertung");
       const tdPunkte=document.createElement("td");
       tdPunkte.className="n mdffa-pop";
       tdPunkte.textContent=t.rundenPunkte+" Pkt.";
       const tdHp=document.createElement("td");
       tdHp.className="n";
       if(t.down)tdHp.appendChild(el("span","mdffa-stempel","Ausgeschaltet"));
-      else tdHp.textContent=Math.round(t.hp)+"/"+t.max+" HP";
+      else tdHp.textContent="Stand "+Math.round(t.hp)+"/"+t.max;
       tr.appendChild(tdName);tr.appendChild(tdBeitrag);tr.appendChild(tdPunkte);tr.appendChild(tdHp);
       return tr;
     }
@@ -47068,8 +47456,73 @@
         if(hpwrap)hpwrap.hidden=false;
         if(label)label.hidden=false;
         if(bar)bar.style.width=Math.max(0,Math.min(100,(t.hp/Math.max(1,t.max))*100))+"%";
-        if(label)label.textContent=(t.down?"ausgeschaltet":Math.round(t.hp)+"/"+t.max+" HP")+" — Endstand der Runde";
+        if(label)label.textContent=(t.down?"ausgeschaltet":"Stand "+Math.round(t.hp)+"/"+t.max)+" — Ende der Runde";
         karte.classList.toggle("mdffa-down",!!t.down);
+        karte.classList.remove("mdffa-wackelt");
+      });
+    }
+
+    // TAKT-ANZEIGE (13.10.). `nameIn(runde)` liefert „Kaempfer (Team)" je side dieser Runde.
+    const nameIn=(runde)=>(side)=>{
+      const t=runde.teams.find(tt=>tt.side===side);
+      return (t?t.n:"?")+" ("+eintraege[side].name+")";
+    };
+    function tickerKopf(runde,rundenNr){
+      if(!tickerBox)return;
+      tickerBox.hidden=false;
+      const kopf=el("div","mdffa-tickerkopf","Runde "+rundenNr+" · "+mdffaRollenLabel(runde.slotId));
+      tickerBox.insertBefore(kopf,tickerBox.firstChild);
+    }
+    function tickerZeile(t,zeile){
+      if(!tickerBox)return;
+      const z=el("div","mdffa-tickerzeile mdffa-t-"+zeile.typ);
+      z.appendChild(el("b",null,"T"+t));
+      z.appendChild(document.createTextNode(" "+zeile.text));
+      tickerBox.insertBefore(z,tickerBox.firstChild);
+      while(tickerBox.childNodes.length>60)tickerBox.removeChild(tickerBox.lastChild);
+    }
+    function setzeKaempfer(runde,rundenNr){
+      tickerKopf(runde,rundenNr);
+      runde.teams.forEach(t=>{
+        const karte=eckKarten[t.side];
+        karte.classList.remove("mdffa-down","mdffa-wackelt");
+        const k=karte.querySelector(".mdffa-kaempfer"); if(k){k.hidden=false;k.textContent=t.n;}
+        const st=karte.querySelector(".mdffa-status"); if(st){st.hidden=true;st.textContent="";}
+        const hpwrap=karte.querySelector(".mdffa-hpwrap"); if(hpwrap)hpwrap.hidden=false;
+        const bar=karte.querySelector(".mdffa-hpbar"); if(bar)bar.style.width="100%";
+        const label=karte.querySelector(".mdffa-hplabel");
+        if(label){label.hidden=false;label.textContent="Stand "+t.max+"/"+t.max;}
+      });
+    }
+    function zeigeTakt(runde,tk){
+      const bilanz=mdffaTaktBilanz(tk);
+      for(const z of mdffaTaktZeilen(tk,nameIn(runde)))tickerZeile(tk.t,z);
+      tk.stand.forEach(s=>{
+        const karte=eckKarten[s.side];
+        const bar=karte.querySelector(".mdffa-hpbar");
+        if(bar)bar.style.width=Math.max(0,Math.min(100,s.stand/Math.max(1,s.max)*100))+"%";
+        const label=karte.querySelector(".mdffa-hplabel");
+        const t=runde.teams.find(tt=>tt.side===s.side);
+        if(label)label.textContent=s.raus
+          ?(t&&t.rausArt==="finisher"?"gibt auf (Finisher)":t&&t.rausArt==="ring"?"im Ring liegen geblieben":"K.o.")+" · Takt "+(t?t.rausTakt:tk.t)
+          :"Stand "+s.stand+"/"+s.max+" · Takt "+tk.t;
+        karte.classList.toggle("mdffa-down",!!s.raus);
+        karte.classList.toggle("mdffa-wackelt",!s.raus&&!!s.angeschlagen);
+        const st=karte.querySelector(".mdffa-status");
+        if(st){
+          const p=tk.pakt;
+          const text=s.raus?"":p&&(s.side===p.a||s.side===p.b)?"Zweckbündnis":p&&s.side===p.gegen?"wird gejagt"
+            :s.angeschlagen?"angeschlagen":"";
+          st.textContent=text; st.hidden=!text;
+        }
+        const d=karte.querySelector(".mdffa-delta");
+        if(d){
+          const teile=[];
+          if(bilanz.erlitten[s.side]>0)teile.push("−"+bilanz.erlitten[s.side]);
+          if(bilanz.schwach[s.side])teile.push("Schwachstelle");
+          d.textContent=teile.join(" · ");
+          d.classList.remove("mdffa-delta-neu"); void d.offsetWidth; if(teile.length)d.classList.add("mdffa-delta-neu");
+        }
       });
     }
 
@@ -47219,7 +47672,8 @@
       mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     }
 
-    // SCHRITT-KETTE EINER RUNDE (C1/C2): Titelkarte -> (Pause) -> Lebensbalken -> Rundentafel
+    // SCHRITT-KETTE EINER RUNDE (C1/C2, seit 13.10. mit dem Kampf selbst): Titelkarte -> (Pause)
+    // -> DER SCHLAGWECHSEL TAKT FUER TAKT (Stand-Balken, Schadenszahlen, Ticker) -> Rundentafel
     // PLATZ 4->1 EINZELN ENTHUELLT -> Rundensieger -> (Pause) -> Eckkarten-Summe+Umsortierung
     // -> (Pause) -> naechste Runde. `mdffaNaechsteRunde` zeigt IMMER auf dieses `naechsteRunde`
     // der aktuell sichtbaren Schau -- der Start-Knopf (weiter unten verdrahtet) ruft nur
@@ -47230,6 +47684,19 @@
       zeigeTitelkarte(i+1,mdffaRollenLabel(runde.slotId));
       mdffaOffenbarungsTimer=setTimeout(()=>{
         if(titelkarte)titelkarte.hidden=true;
+        setzeKaempfer(runde,i+1);
+        spieleTakte(runde,0,()=>tafelUndSumme(runde,i));
+      },ms(1500));
+    }
+    // DER KAMPF SELBST (13.10.): Takt fuer Takt die Staende, Schadenszahlen und Ticker-Zeilen aus
+    // `runde.takte` — dem Protokoll, das baueMiniDmFfaRunde() schon vollstaendig gerechnet hat.
+    function spieleTakte(runde,ti,fertig){
+      if(ti>=runde.takte.length){ fertig(); return; }
+      zeigeTakt(runde,runde.takte[ti]);
+      mdffaOffenbarungsTimer=setTimeout(()=>spieleTakte(runde,ti+1,fertig),ms(800));
+    }
+    function tafelUndSumme(runde,i){
+      {
         const tbody=starteRundentafelGestaffelt(runde);
         // PLATZ 4 ZUERST, PLATZ 1 ZULETZT (Auftrag: "Platzierung 4->1 nacheinander
         // enthuellen") -- enthuelleRundenzeile() fuegt jede neue Zeile GANZ OBEN ein, eine
@@ -47257,7 +47724,7 @@
           mdffaOffenbarungsTimer=setTimeout(()=>enthuelleSchritt(idx+1),ms(550));
         }
         enthuelleSchritt(0);
-      },ms(1500));
+      }
     }
 
     // "ALLES ZEIGEN" (C1): identischer Endzustand wie am Ende eines vollstaendig
@@ -47267,8 +47734,14 @@
       if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
       if(titelkarte)titelkarte.hidden=true;
       rundenBox.textContent="";
+      if(tickerBox){tickerBox.textContent="";}
+      // Von vorn summieren: „Alles zeigen" kann mitten in der Schau kommen, nachdem schon ein
+      // paar Runden in laufendeSumme stehen — sonst zaehlten diese doppelt.
+      laufendeSumme.fill(0);
       for(let i=0;i<ereignis.runden.length;i++){
         const runde=ereignis.runden[i];
+        tickerKopf(runde,i+1);
+        for(const tk of runde.takte)for(const z of mdffaTaktZeilen(tk,nameIn(runde)))tickerZeile(tk.t,z);
         aktualisiereHpBalken(runde);
         schreibeRundentafelSofort(runde);
         runde.teams.forEach(t=>{ laufendeSumme[t.side]+=t.rundenPunkte; });
@@ -48652,6 +49125,22 @@
     miniDmFfaRollen:()=>[...MINI_DM_FFA_ROLLEN],
     miniDmFfaLigapunkte:()=>[...MINI_DM_FFA_LIGAPUNKTE],
     miniDmFfaRundenpunkte:()=>[...MINI_DM_FFA_RUNDENPUNKTE],
+    // FFA-ABNAHME (13.10.): Rangtreue- und Pp-Sonde auf dem gespielten Format, s. miniDmFfaSonde()/
+    // miniDmFfaEinfluss(). `miniDmFfaParameter()` liest die Schlagwechsel-Parameter, mit einem
+    // Objekt setzt es sie fuer eine Messung um (tief gemischt), mit "grund" stellt es sie auf
+    // ARENA_ART["mini-dm"].ffa zurueck. Im Spielbetrieb ruft das niemand.
+    miniDmFfaSonde:(kader,opt)=>miniDmFfaSonde(kader,opt),
+    miniDmFfaEinfluss:(kader,opt)=>miniDmFfaEinfluss(kader,opt),
+    // Tickertexte eines Takts (dieselbe Funktion wie die Rundenshow), `namen` je side.
+    miniDmFfaTaktZeilen:(takt,namen)=>mdffaTaktZeilen(takt,(side)=>namen[side]),
+    miniDmFfaParameter:(neu)=>{
+      if(neu==="grund")MDFFA=mdffaGrund();
+      else if(neu&&typeof neu==="object"){
+        const misch=(ziel,q)=>{for(const k in q){if(q[k]&&typeof q[k]==="object"&&!Array.isArray(q[k])){ziel[k]=ziel[k]||{};misch(ziel[k],q[k]);}else ziel[k]=q[k];}};
+        misch(MDFFA,neu);
+      }
+      return JSON.parse(JSON.stringify(MDFFA));
+    },
     zielansageLauf,
     // Zielansage, read-only: WER gerade angesagt ist und wie lange noch gesperrt ist
     // (Name statt roher id, damit sich ein Klick in der UI von aussen abnehmen laesst).
