@@ -658,7 +658,7 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(s2.sporen.Krieger).toBe(3);
     expect(s2.inventar.Schurke).toEqual(["Heiltrank"]);
   });
-  it("macht Kämpfe und Antworten nach Schwierigkeit härter oder leichter", () => {
+  it("macht Kämpfe größer oder kleiner und Antworten stärker oder schwächer, je nach Schwierigkeit", () => {
     type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; effektiveWerte(s: Spielstand, g: unknown): Record<string, string>; schwierigkeit(s: Spielstand): { id: string } };
     const m = SM.erstelle(MAP2, { werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as M;
     const schonen = { leisten: { geduld: -1 } }, anhaenger = { leisten: { geduld: 1 } }, laut = { leisten: { laerm: 2 } };
@@ -668,10 +668,16 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(m.wahlLeisten(schwer, laut)).toEqual({ laerm: 3 });
     expect(m.wahlLeisten(leicht, anhaenger)).toEqual({ geduld: 2 });
     expect(m.wahlLeisten(alb, anhaenger)).toEqual({ geduld: 0 });
+    // Wie in OPR: mehr Punkte, also mehr Gegner – die Werte bleiben, wie sie sind
     const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
-    expect(m.effektiveWerte(schwer, g).quality).toBe("4+");
-    expect(m.effektiveWerte(normal, g).quality).toBe("5+");
-    expect(m.effektiveWerte(leicht, g).tough).toBe("2");
+    for (const s of [leicht, schwer, alb]) expect(m.effektiveWerte(s, g)).toEqual(m.effektiveWerte(normal, g));
+    const zaehle = (mm: Motor, s: Spielstand, id: string) => { (mm as unknown as { springe(s: Spielstand, id: string): void }).springe(s, id); return (s as unknown as { gegner: Array<{ id: string }> }).gegner.map(x => x.id); };
+    expect([leicht, normal, schwer, alb].map(s => zaehle(m, s, "kampf-drei").length)).toEqual([2, 3, 4, 5]);
+    // Ein Boss allein bleibt allein, bekommt aber auf den harten Stufen Begleiter
+    const m1 = motor();
+    expect(zaehle(m1, m1.neu(), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(zaehle(m1, m1.neu({ schwierigkeit: "leicht" }), "kampf-erbluehte")).toEqual(["erbluehte"]);
+    expect(zaehle(m1, m1.neu({ schwierigkeit: "albtraum" }), "kampf-erbluehte")).toEqual(["erbluehte", "sporenling-klein", "sporenling-klein"]);
     expect(m.schwierigkeit(m.neu({ uebernahme: m.uebernahme(alb) })).id).toBe("albtraum");
   });
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {

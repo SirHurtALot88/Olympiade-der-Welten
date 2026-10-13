@@ -1786,6 +1786,10 @@
      "zone": "B"
     }
    ],
+   "verstaerkung": {
+    "id": "sporenling-klein",
+    "zone": "B"
+   },
    "verhalten": {
     "start": "ruhig",
     "wuetendWenn": {

@@ -19,17 +19,19 @@
   const MAX_UNDO = 80;
   const VERGLEICH = { "<=": (a, b) => a <= b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, ">": (a, b) => a > b, "==": (a, b) => a === b };
 
-  // Schwierigkeit: wirkt auf Kämpfe (Gegnerwerte, Gruppengröße) und darauf, wie stark Antworten Leisten bewegen.
+  // Schwierigkeit wie in OPR: mehr Punkte heißt mehr Gegner, die Gegnerwerte bleiben unverändert.
+  // punkte: Faktor auf die Zahl der gewöhnlichen Gegner eines Kampfs (Gegner mit eigenen Werten, also Bosse, zählen
+  // nicht mit). begleiter: so viele Gegner der Art `verstaerkung` stellen sich zu einem Boss, der sonst allein kämpft.
   // rp.schlecht/rp.gut: so viel stärker (+) oder schwächer (−) wirkt eine Antwort, die eine Leiste in die schlechte bzw.
   // gute Richtung bewegt (Richtung je Leiste im Feld `schlecht`: "hoch" oder "runter"). Namenlose NPCs bleiben schwach.
   const SCHWIERIGKEITEN = {
-    leicht: { name: "Leicht", gegner: { tough: -1 }, anzahl: 0.75, rp: { gut: 1, schlecht: 0 },
-      text: "Gegner haben 1 Zäh weniger, große Gruppen sind kleiner. Gute Antworten wirken stärker." },
-    normal: { name: "Normal", gegner: {}, anzahl: 1, rp: { gut: 0, schlecht: 0 }, text: "So, wie die Map geschrieben ist." },
-    schwer: { name: "Schwer", gegner: { quality: 1 }, anzahl: 1, rp: { gut: 0, schlecht: 1 },
-      text: "Gegner treffen besser (Qualität eine Stufe besser). Schlechte Antworten wirken stärker." },
-    albtraum: { name: "Albtraum", gegner: { quality: 1, tough: 1 }, anzahl: 1.25, rp: { gut: -1, schlecht: 1 },
-      text: "Gegner treffen besser, halten mehr aus, größere Gruppen. Schlechte Antworten wirken stärker, gute schwächer." },
+    leicht: { name: "Leicht", punkte: 0.75, begleiter: 0, rp: { gut: 1, schlecht: 0 },
+      text: "Ein Viertel weniger Gegner. Gute Antworten wirken stärker." },
+    normal: { name: "Normal", punkte: 1, begleiter: 0, rp: { gut: 0, schlecht: 0 }, text: "So, wie die Map geschrieben ist." },
+    schwer: { name: "Schwer", punkte: 1.25, begleiter: 1, rp: { gut: 0, schlecht: 1 },
+      text: "Ein Viertel mehr Gegner, ein Boss bekommt einen Begleiter. Schlechte Antworten wirken stärker." },
+    albtraum: { name: "Albtraum", punkte: 1.5, begleiter: 2, rp: { gut: -1, schlecht: 1 },
+      text: "Die Hälfte mehr Gegner, ein Boss bekommt zwei Begleiter. Schlechte Antworten wirken stärker, gute schwächer." },
   };
 
   // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, zufall() → 0..1 }
@@ -187,6 +189,7 @@
     function spawne(state, schrittId) {
       const s = map.schritte[schrittId];
       if (!s || s.typ !== "kampf") return;
+      const offen = [];
       (s.gegner || []).forEach((e, i) => {
         const schluessel = `${schrittId}:${i}`;
         if (state.gespawnt[schluessel]) return;
@@ -194,10 +197,30 @@
         if (!def) return;
         if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
         state.gespawnt[schluessel] = true;
-        const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
-          + (+((state.typMod || {})[e.id] || {}).tough || 0) + (+vonStufe(state, e.id).tough || 0));
-        for (let n = 0; n < anzahlNach(state, e.anzahl); n++) state.gegner.push({ uid: `${schluessel}:${n}`, id: e.id, zone: e.zone || "", wunden: 0, zaeh, weg: false });
+        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, boss: !!def.werte });
       });
+      const stufe = stufeVon(state), haufen = offen.filter(e => !e.boss);
+      verteile(haufen, Math.round(haufen.reduce((n, e) => n + e.anzahl, 0) * stufe.punkte));
+      const v = s.verstaerkung;
+      if (v && stufe.begleiter && offen.length && !haufen.length && map.gegner[v.id] && !state.gespawnt[`${schrittId}:v`]) {
+        state.gespawnt[`${schrittId}:v`] = true;
+        offen.push({ schluessel: `${schrittId}:v`, id: v.id, zone: v.zone || "", anzahl: stufe.begleiter });
+      }
+      for (const e of offen) {
+        const def = map.gegner[e.id];
+        const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
+          + (+((state.typMod || {})[e.id] || {}).tough || 0));
+        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: 0, zaeh, weg: false });
+      }
+    }
+    // Gruppen auf eine neue Gesamtzahl bringen: reihum eins dazu, bei weniger zuerst von der größten Gruppe weg.
+    // Mindestens ein Gegner bleibt stehen
+    function verteile(gruppen, ziel) {
+      if (!gruppen.length) return;
+      let ist = gruppen.reduce((n, e) => n + e.anzahl, 0);
+      ziel = Math.max(1, ziel);
+      for (let i = 0; ist < ziel; i++, ist++) gruppen[i % gruppen.length].anzahl++;
+      while (ist > ziel) { gruppen.reduce((a, b) => (b.anzahl > a.anzahl ? b : a)).anzahl--; ist--; }
     }
     // ---------- Gegner stärken und schwächen ----------
     const ZAHL_FELDER = ["quality", "defense", "tough", "attacks"];
@@ -212,11 +235,9 @@
     const leer = m => !m || (!ZAHL_FELDER.some(k => m[k]) && !(m.passives || []).length);
     // Alles, was gerade auf diesen Gegner wirkt: Zusatzregeln aus Entscheidungen, Anpassungen des Typs, eigene
     const stufeVon = state => SCHWIERIGKEITEN[state.schwierigkeit] || SCHWIERIGKEITEN.normal;
-    const vonStufe = (state, id) => (String(id).startsWith("npc-") ? {} : stufeVon(state).gegner);
-    const anzahlNach = (state, n) => Math.max(1, Math.floor((n || 1) * stufeVon(state).anzahl + 0.25));
     function modVon(state, g) {
       const def = map.gegner[g.id] || {};
-      let m = summe({}, vonStufe(state, g.id));
+      let m = {};
       for (const z of zusaetze(state, def)) if (z.werte) m = summe(m, z.werte);
       m = summe(m, (state.typMod || {})[g.id]);
       return summe(m, g.mod);
@@ -274,7 +295,7 @@
       if (def && !map.gegner[id]) { state.extraGegner[id] = def; registriere(state); }
       const d = map.gegner[id];
       if (!d) return [];
-      const zaeh = Math.max(1, zaehVon(werteVon(d)) + (+((state.typMod || {})[id] || {}).tough || 0) + (+vonStufe(state, id).tough || 0));
+      const zaeh = Math.max(1, zaehVon(werteVon(d)) + (+((state.typMod || {})[id] || {}).tough || 0));
       const neu = [];
       for (let n = 0; n < (anzahl || 1); n++) {
         state.extraNr = (state.extraNr || 0) + 1;
@@ -665,6 +686,7 @@
       for (const e of s.ende || []) if (!istSchritt(e.ziel)) fehler.push(`${id}: ende → ${e.ziel} fehlt`);
       for (const e of s.ereignisse || []) if (!(map.ereignisse || {})[e]) fehler.push(`${id}: Ereignis ${e} fehlt`);
       for (const g of s.gegner || []) if (!(map.gegner || {})[g.id]) fehler.push(`${id}: Gegner ${g.id} fehlt`);
+      if (s.verstaerkung && !(map.gegner || {})[s.verstaerkung.id]) fehler.push(`${id}: Verstärkung ${s.verstaerkung.id} fehlt`);
       if (s.cue && !(map.audio || {})[s.cue]) fehler.push(`${id}: Cue ${s.cue} fehlt`);
       if (s.figur && !(map.figuren || {})[s.figur]) fehler.push(`${id}: Figur ${s.figur} fehlt`);
       if (s.typ === "wahl" && !(s.optionen || []).length) fehler.push(`${id}: Wahl ohne Optionen`);
