@@ -308,3 +308,8 @@ footer { color: var(--faint); font-size: 11.5px; margin-top: 22px; display: flex
 .cardthumb { width: 26px; height: 38px; flex: none; border-radius: 3px; object-fit: cover; background: var(--line); cursor: zoom-in; }
 .cardthumb.none { cursor: default; opacity: .35; }
 .cardpreview { position: fixed; z-index: 50; width: 260px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.55); pointer-events: none; background: var(--line); }
+
+/* Sortiment: Filter-Beschriftung, Zaehler, VK-Quelle */
+.filterrow .flabel { font-size: 11px; font-weight: 700; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; margin-right: 2px; cursor: help; }
+.chipn { opacity: .65; font-variant-numeric: tabular-nums; margin-left: 3px; }
+.vksrc { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--good); margin-left: 5px; vertical-align: middle; }

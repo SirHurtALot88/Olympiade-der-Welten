@@ -1,4 +1,5 @@
 import type { SaleWindowKey } from "../parsing/date";
+import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
 import {
   computeHk,
@@ -44,9 +45,16 @@ export interface ArticleAggregate {
    * (Repricing-Frage), nicht den historischen Durchschnitt.
    */
   currentVk: number | null;
+  /** Woher `currentVk` stammt: eBay-Shop (live, Vorrang) oder Billbee-Artikelstamm. */
+  vkSource?: "ebay" | "billbee" | null;
+  /** Stand des eBay-Preises, nur bei vkSource "ebay". */
+  vkAt?: Date | null;
   currentEk: number | null;
-  /** Cardmarket-Preistrend aus dem juengsten MarketPrice-Datensatz, sonst null ("—"). */
+  /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack-Menge) aus dem juengsten MarketPrice-Datensatz,
+   * sonst null ("—"), auch bei mehrdeutiger Seltenheit. */
   latestMarketTrend: number | null;
+  /** Juengster Cardmarket-Datensatz, fuer Zielspanne und Urteil vs. Markt (marketComparison.ts). */
+  marketQuote?: LatestQuote | null;
   windows: Partial<Record<SaleWindowKey, WindowAggregate>>;
 }
 
@@ -141,8 +149,31 @@ export interface SortimentRow {
   potentialRevenue: number | null;
   /** Bestandsreichweite in Monaten (Stk / Verkaeufe pro Monat aus 90T), null ohne Bestand/Velocity. */
   stockMonthsCover: number | null;
-  /** Cardmarket-Preistrend (aus MarketPrice), null wenn noch nicht erfasst -> "—". */
+  /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack), null wenn nicht zugeordnet oder mehrdeutig -> "—". */
   priceTrend: number | null;
+  /** Woher `listingVk` stammt und wie frisch er ist: eBay-Shop (live) oder Billbee-Artikelstamm. */
+  listingVkSource: "ebay" | "billbee" | null;
+  listingVkAt: string | null;
+  /** Cardmarket-Marktwert, Zielspanne (25-33 % Deckungsbeitrag) und Urteil. Null ohne Datensatz. */
+  market: SortimentMarket | null;
+}
+
+export interface SortimentMarket {
+  /** Marktwert des Artikels; null, wenn mehrdeutig (dann `range`). */
+  value: number | null;
+  range: { min: number; max: number; variants: number } | null;
+  /** VK fuer 25 % (min) bis 33 % (opt) Deckungsbeitrags-Marge bei Marktwert-EK, mindestens 4,99 €. */
+  targetMin: number | null;
+  targetOpt: number | null;
+  /** Deckungsbeitrags-Marge des heutigen VK bei Nachkauf zum Marktwert. */
+  margin: number | null;
+  status: "zu_guenstig" | "im_korridor" | "zu_teuer";
+  /** Nur ein Urteil, wenn Marktwert (oder bei Spanne: fuer alle Varianten gleiches Urteil) vorliegt. */
+  rated: boolean;
+  quality: string | null;
+  how: string | null;
+  ekAboveMarket: boolean;
+  fetchedAt: string;
 }
 
 export interface OperatingQuotas {
@@ -497,6 +528,26 @@ export function buildSortimentRow(
   const velocityPerMonth = monthlyVelocity(a);
   const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
 
+  // Cardmarket-Marktwert und Zielspanne: dieselbe Zeile wie auf /marktpreise (eine Rechnung, keine zweite).
+  let marketInfo: SortimentMarket | null = null;
+  if (a.marketQuote) {
+    const m = buildMarketComparisonRow(a, a.marketQuote, costSettings, shop);
+    marketInfo = {
+      value: m.marketValue,
+      range: m.marketRange,
+      targetMin: m.targetMin,
+      targetOpt: m.targetOpt,
+      margin: m.marginAtMarket,
+      status: m.status,
+      // Urteil nur mit Marktwert; bei Spanne nur, wenn die Ampel fuer JEDE Variante anschlaegt.
+      rated: m.marketValue !== null || (m.marketRange !== null && m.status !== "im_korridor"),
+      quality: m.matchQuality,
+      how: m.how,
+      ekAboveMarket: m.ekAboveMarket,
+      fetchedAt: m.fetchedAt.toISOString(),
+    };
+  }
+
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
@@ -523,6 +574,9 @@ export function buildSortimentRow(
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
     priceTrend: a.latestMarketTrend,
+    listingVkSource: a.currentVk !== null && a.currentVk > 0 ? (a.vkSource ?? null) : null,
+    listingVkAt: a.vkAt ? a.vkAt.toISOString() : null,
+    market: marketInfo,
   };
 }
 

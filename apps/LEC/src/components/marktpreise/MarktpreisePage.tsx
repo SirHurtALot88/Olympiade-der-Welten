@@ -8,9 +8,9 @@ import { Corridor } from "@/components/dashboard/SortimentTable";
 import { MarketComparisonTable } from "./MarketComparisonTable";
 
 const STATUS_TILE: Record<MarketComparisonRow["status"], { cls: string; label: string }> = {
-  zu_guenstig: { cls: "p-warn", label: "zu günstig ggü. Markt" },
-  im_korridor: { cls: "p-good", label: "im Korridor" },
-  zu_teuer: { cls: "p-crit", label: "zu teuer ggü. Markt" },
+  zu_guenstig: { cls: "p-crit", label: "zu günstig ggü. Markt" },
+  im_korridor: { cls: "p-good", label: "im Rahmen" },
+  zu_teuer: { cls: "p-mkt", label: "zu teuer ggü. Markt" },
 };
 
 interface Props {

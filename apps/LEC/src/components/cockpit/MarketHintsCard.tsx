@@ -22,10 +22,10 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
         ) : (
           <>
             <div className="ck-facts" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-              <Fact label="Zu günstig" value={m.tooCheap} tone="crit" sub={`≈ ${eur(m.tooCheapEffect)} liegen gelassen (Lücke × Bestand/90-T-Absatz)`} />
-              <Fact label="Im Korridor" value={m.inCorridor} tone="good" sub="innerhalb 25–33 % Marge (±3 %)" />
-              <Fact label="Zu teuer" value={m.tooExpensive} tone="warn" sub="über dem 33-%-Preis — Markt gefallen oder Preis zu hoch" />
-              <Fact label="EK über Markt" value={m.ekAboveMarket} tone="warn" sub="eigener EK > 150 % des Marktwerts" />
+              <Fact href="/sortiment?markt=zu_guenstig" label="Zu günstig" value={m.tooCheap} tone="crit" sub={`≈ ${eur(m.tooCheapEffect)} liegen gelassen (Lücke × Bestand/90-T-Absatz)`} />
+              <Fact href="/sortiment?markt=im_korridor" label="Im Rahmen" value={m.inCorridor} tone="good" sub="innerhalb 25–33 % Marge (±3 %)" />
+              <Fact href="/sortiment?markt=zu_teuer" label="Zu teuer" value={m.tooExpensive} tone="warn" sub="über dem 33-%-Preis — Markt gefallen oder Preis zu hoch" />
+              <Fact href="/sortiment?markt=ek_ueber" label="EK über Markt" value={m.ekAboveMarket} tone="warn" sub="eigener EK > 150 % des Marktwerts" />
               <Fact
                 label="Abdeckung"
                 value={`${pct(m.coverage)}`}
@@ -39,7 +39,7 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
           </>
         )}
         <p className="ck-note">
-          Marktwert = Cardmarket-Trend (sonst 30-T-Schnitt) × Packgröße; mehrdeutige Zuordnungen werden nur bewertet, wenn das Urteil für jede
+          Marktwert = Cardmarket-7-Tage-Schnitt (sonst 30-T-Schnitt, sonst Trend) × Packgröße; mehrdeutige Zuordnungen werden nur bewertet, wenn das Urteil für jede
           Variante gilt. Keine erfundenen Preise: ohne Marktwert kein Urteil.
         </p>
       </div>
@@ -47,17 +47,25 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
   );
 }
 
-function Fact({ label, value, sub, tone }: { label: string; value: number | string; sub: string; tone?: "good" | "warn" | "crit" }) {
+function Fact({ label, value, sub, tone, href }: { label: string; value: number | string; sub: string; tone?: "good" | "warn" | "crit"; href?: string }) {
   const color = tone === "good" ? "var(--good)" : tone === "warn" ? "var(--warn)" : tone === "crit" ? "var(--crit)" : undefined;
-  return (
-    <div className="ck-fact">
+  const body = (
+    <>
       <div className="ck-fl">{label}</div>
       <div className="ck-fv" style={color ? { color } : undefined}>
         {typeof value === "number" ? value.toLocaleString("de-DE") : value}
         {typeof value === "number" && <small>Artikel</small>}
       </div>
       <div className="ck-fs">{sub}</div>
-    </div>
+    </>
+  );
+  // Mit Link: die Kachel oeffnet das Sortiment mit dem passenden Filter (VK vs. Markt).
+  return href ? (
+    <a className="ck-fact" href={href} style={{ textDecoration: "none", color: "inherit" }} title="Im Sortiment anzeigen">
+      {body}
+    </a>
+  ) : (
+    <div className="ck-fact">{body}</div>
   );
 }
 
@@ -83,7 +91,7 @@ function HintList({ title, entries, tone }: { title: string; entries: MarketHint
                 )}
               </div>
               <div className="ck-nm">
-                <a href={`/marktpreise?q=${encodeURIComponent(e.setCode ?? e.nameRaw)}`}>{shortName(e.nameRaw)}</a>
+                <a href={`/sortiment?q=${encodeURIComponent(e.setCode ?? e.nameRaw)}`}>{shortName(e.nameRaw)}</a>
               </div>
               <div className="ck-rv">{eur(e.effect)}</div>
               <div className="ck-mt">

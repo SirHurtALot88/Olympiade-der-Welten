@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { MARKET_FILTER_LABEL, MARKET_FILTER_ORDER, matchesMarketFilter, type MarketFilter, type MarketVerdict } from "@/lib/dashboard/marketFilter";
 import type { MarketComparisonRow } from "@/lib/dashboard/marketComparison";
 import { formatEuroCents, formatPercent } from "@/lib/format";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
@@ -21,11 +23,27 @@ const COLS: ColumnDef<ColId>[] = [
 
 const STORAGE_KEY = "lec.marktpreise.colWidths.v3";
 
+// Dieselben Farben wie die Ampel im Sortiment: zu guenstig = Marge unter 25 % (rot), zu teuer = ueber der Spanne (blau).
 export const STATUS_PILL: Record<MarketComparisonRow["status"], { cls: string; label: string }> = {
-  zu_guenstig: { cls: "p-warn", label: "zu günstig" },
-  im_korridor: { cls: "p-good", label: "passt" },
-  zu_teuer: { cls: "p-crit", label: "zu teuer" },
+  zu_guenstig: { cls: "p-crit", label: "zu günstig" },
+  im_korridor: { cls: "p-good", label: "im Rahmen" },
+  zu_teuer: { cls: "p-mkt", label: "zu teuer" },
 };
+
+type Filter = "alle" | MarketFilter;
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "alle", label: "alle" },
+  ...MARKET_FILTER_ORDER.map((k) => ({ key: k as Filter, label: MARKET_FILTER_LABEL[k] })),
+];
+
+/** Urteil der Zeile in der gemeinsamen Filter-Sprache (siehe lib/dashboard/marketFilter.ts). */
+function verdictOf(r: MarketComparisonRow): MarketVerdict {
+  return { rated: r.marketValue !== null || (r.marketRange !== null && r.status !== "im_korridor"), status: r.status, ekAboveMarket: r.ekAboveMarket };
+}
+
+function matches(r: MarketComparisonRow, f: Filter): boolean {
+  return f === "alle" || matchesMarketFilter(verdictOf(r), new Set([f]));
+}
 
 const eur = (v: number) => `${formatEuroCents(v)} €`;
 
@@ -42,19 +60,29 @@ interface Props {
 /** Vergleichstabelle (PAGES_CONCEPT §3): resizable, wie alle anderen Tabellen. */
 export function MarketComparisonTable({ rows, selectedArticleId, onSelectRow }: Props) {
   const { widths, total, startResize, resetWidths } = useColumnWidths(COLS, STORAGE_KEY);
+  const [filter, setFilter] = useState<Filter>("alle");
+  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, rows.filter((r) => matches(r, f.key)).length])) as Record<Filter, number>, [rows]);
+  const shown = useMemo(() => rows.filter((r) => matches(r, filter)), [rows, filter]);
 
   return (
     <section className="card">
       <h3>
-        Vergleich <span className="r">{rows.length} Artikel mit Cardmarket-Wert · Handlungsbedarf zuerst</span>
+        Vergleich <span className="r">{shown.length} von {rows.length} Artikeln mit Cardmarket-Wert · Handlungsbedarf zuerst</span>
         <ResetColumnsButton onClick={resetWidths} />
       </h3>
+      <div className="filterrow" style={{ padding: "0 16px 10px" }}>
+        {FILTERS.map((f) => (
+          <button key={f.key} type="button" className={`chip${filter === f.key ? " on" : ""}`} onClick={() => setFilter(f.key)}>
+            {f.label} <span className="chipn">{counts[f.key]}</span>
+          </button>
+        ))}
+      </div>
       <div className="tablewrap">
         <table className="resizable" style={{ tableLayout: "fixed", width: total, minWidth: total }}>
           <ResizableColgroup cols={COLS} widths={widths} />
           <ResizableThead cols={COLS} startResize={startResize} />
           <tbody>
-            {rows.map((row) => {
+            {shown.map((row) => {
               const pill = STATUS_PILL[row.status];
               return (
                 <tr
@@ -124,10 +152,10 @@ export function MarketComparisonTable({ rows, selectedArticleId, onSelectRow }: 
                 </tr>
               );
             })}
-            {rows.length === 0 && (
+            {shown.length === 0 && (
               <tr>
                 <td colSpan={COLS.length} style={{ padding: "20px 12px", color: "var(--faint)", textAlign: "center" }}>
-                  Noch keine Marktwerte — die Cardmarket-Preisliste wird automatisch täglich geladen.
+                  Keine Artikel für diesen Filter.
                 </td>
               </tr>
             )}

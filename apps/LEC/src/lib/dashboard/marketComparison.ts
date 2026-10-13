@@ -26,6 +26,25 @@ export interface LatestQuote {
   priceMin?: number | null;
   priceMax?: number | null;
   variants?: number | null;
+  /** Wie der Marktwert zugeordnet wurde: "seltenheit" | "einzige_variante" (eindeutig). */
+  how?: string | null;
+}
+
+/**
+ * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
+ * (3er-Pack = 3 Karten). 7-Tage-Schnitt (wie Cardcluster), sonst 30-Tage-Schnitt, sonst Trend.
+ * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
+ */
+export function marketValueOf(quote: LatestQuote, packQty: number): number | null {
+  if (quote.matchQuality === "mehrdeutig") return null;
+  const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
+  return perCard === null ? null : perCard * Math.max(1, packQty);
+}
+
+export function marketRangeOf(quote: LatestQuote, packQty: number): { min: number; max: number; variants: number } | null {
+  if (quote.matchQuality !== "mehrdeutig" || quote.priceMin == null || quote.priceMax == null) return null;
+  const pack = Math.max(1, packQty);
+  return { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 };
 }
 
 export interface MarketComparisonRow {
@@ -59,6 +78,8 @@ export interface MarketComparisonRow {
   /** Eigener EK deutlich (>50 %) ueber dem Marktwert: teuer eingekauft oder Markt gefallen. */
   ekAboveMarket: boolean;
   matchQuality: string | null;
+  /** Zuordnung des Marktwerts: "seltenheit" (ueber die Seltenheit im Titel), "einzige_variante", sonst null. */
+  how: string | null;
   /** Aus Markt-ab x Packgroesse + Einkaufs-Versand (KONZEPT §7.2), null ohne "ab"-Preis. */
   marketEk: number | null;
   /** Abstand zur naechsten Spannengrenze: unter min negativ, ueber opt positiv, in der Spanne 0. Null ohne Marktwert. */
@@ -105,12 +126,8 @@ export function buildMarketComparisonRow(
   const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings, { kind, packSize: a.packQty, shop });
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
-  const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
-  const marketValue = quote.matchQuality === "mehrdeutig" || perCard === null ? null : perCard * pack;
-  const marketRange =
-    quote.matchQuality === "mehrdeutig" && quote.priceMin != null && quote.priceMax != null
-      ? { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 }
-      : null;
+  const marketValue = marketValueOf(quote, pack);
+  const marketRange = marketRangeOf(quote, pack);
 
   const rangeFor = (marketPerUnit: number): TargetRange =>
     computeTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
@@ -166,6 +183,7 @@ export function buildMarketComparisonRow(
     marginAtOwnEk,
     ekAboveMarket,
     matchQuality: quote.matchQuality ?? null,
+    how: quote.how ?? null,
     marketEk,
     deltaPercent,
     status,
