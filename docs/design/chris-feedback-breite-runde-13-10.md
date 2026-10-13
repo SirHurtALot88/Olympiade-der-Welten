@@ -180,7 +180,124 @@ Problem aus dem Time-Trial-Punkt unten (Wertung an der Seite statt als Overlay �
     als Eröffnungsspielzug (ähnlich dem bereits gebauten „Anpfiff-Countdown" A4 aus dem
     Broadcast-Paket, aber discipline-spezifisch für Basketball). Klasse A/B, Präsentation.
 
+## Basketball (Fortsetzung, zweite Nachricht)
+
+22. **Zu wenig Tempowechsel, zu wenig Passspiel, Spieler ballen sich zusammen statt sich zu
+    verteilen.** „beim basketball wird zu wenig mal tempo raus genommen, gepasst, in den raum
+    gelaufen usw, spieler bieten sich nicht an, alle laufen immernoch auf einem haufen sehr viel
+    rum!" — ergänzt Punkt 21 (Sprungball) um eine grundsätzlichere Beobachtung zum laufenden Spiel:
+    fehlendes Freilaufen/Anbieten, fehlende Tempo-Variation, Spieler bleiben zu sehr geklumpt.
+    Klasse B, betrifft die Bewegungs-/Entscheidungslogik im Feldspiel-Chassis.
+
+## Football
+
+23. **Richtiger Kickoff mit Animation fehlt; Grundmechanik wirkt wie reines Gerangel.** „Football
+    benötigt auch einen richtigen Kickoff mit Animationen etc! bisher wird da nur gerangelt, es
+    geht gar nicht richtig voran, der quarterback muss ja normal den ball bekommen, die anderen
+    spieler vom gegner wollen hin und die defender blocken -> da muss auch mal geworfen werden
+    oder dass es diese goalkicks gibt - die kenne ich die regeln nicht! bitte anpassen" — Chris
+    kennt die genauen Football-Regeln selbst nicht vollständig (meint mit „Goalkicks" vermutlich
+    Punts oder Field Goals), aber der Kernpunkt ist klar: der QB soll den Snap regulär bekommen,
+    Pässe sollen tatsächlich geworfen werden, Verteidiger sollen blocken statt dass alles im
+    Gerangel steckenbleibt. Braucht zuerst eine Regel-/Mechanik-Recherche (ähnlich den früheren
+    Football-Rezeptrunden, s. `docs/design/football-rezept-kalibrierung.md`), dann Anpassung.
+    Klasse B, möglicherweise größerer Umbau der Spielzug-Engine.
+
+## Eishockey
+
+24. **Bully (Face-off) in der Mitte als Start fehlt; vermutlich zu wenig Passspiel.** „Eishockey
+    ebenso das muss in der mitte mit dem bully anfangen! und auch dort wird wahrscheinlich mehr
+    gepasst als es das bei uns wird - bitte prüfen und ggf. anpassen" — (a) jeder
+    Spielabschnitt/jedes Anspiel soll mit einem Bully in der Mitte starten (wie der bereits
+    gebaute Basketball-Sprungball, Punkt 21, bzw. das noch zu bauende Football-Kickoff, Punkt 23),
+    (b) Passhäufigkeit gegen echtes Eishockey validieren. Klasse A/B.
+
+## Tennis
+
+25. **Auch nacheinander (1v1) statt Hin-und-Her-Switchen zeigen; Ballflug/Schlagvielfalt näher ans
+    echte Tenniserlebnis; optische Bugs.** „tennis ist cool, bitte aber auch NACHEINANDER machen!
+    also 1v1 wird gezeigt nicht immer das hin und her was du immer machst und die bälle sollen
+    nicht immer in die mitte fliegen, verschiedene schläge, spielbälle etc sollen gespielt werden,
+    der ball muss anders fliegen, auch mal ins aus, spieler in bewegung, mal erreichen sie den
+    ball mal nicht, bitte mehr ans ECHTE tennis erlebnis anpassen! optisch auch noch einige bugs
+    die gefixt werden müssen!" — dieselbe Sequenzialisierungs-Anforderung wie Fechten/Showcase/
+    Eiskunstlauf (Punkte 15/17/18), hier für Tennis, plus eine eigene, umfangreichere
+    Präsentations-/Ballphysik-Wunschliste (Schlagvielfalt, Ball ins Aus, variable Ballwege,
+    Lauf-/Erreichbarkeits-Varianz) und unbenannte visuelle Bugs. Klasse B.
+
+## Schach
+
+26. **Auch 1v1 nacheinander zeigen.** „schach bitte auch im 1v1 nacheinander zeigen!" — dieselbe
+    Sequenzialisierungs-Anforderung (s. Punkte 15/17/18/25) für Schach. Klasse A/B.
+
+## Cross-Disziplin: Spieler-Historie (Konkretisierung von Punkt 2)
+
+27. **Kampf-Spielerprofil/Laufbahn-Panel als Vorbild für alle Disziplinen, mehrere Saisons
+    getrackt, speichereffizient.** Chris hängte das bestehende Kampf-Spielerprofil an (Reiter
+    „SPIELERPROFIL" mit „KAMPFWERTE" links — LP/ANG/VER/TMP/AUS, Veranlagung — und „LAUFBAHN"
+    rechts — Einsätze, Ausschaltungen, Ausgefallen, Verhältnis, Schaden ausgeteilt/genommen,
+    Assists, Verletzungen, Spieler des Spieltags, dazu „STÄRKSTE DISZIPLINEN"; die UI trägt bereits
+    den Hinweis „Laufbahn-Zahlen sind Beispiele — die Erfassung gibt es noch nicht"). Wörtlich:
+    „Habe noch mal das kampf spielerprofil angehangen, sowas hätt ich gern im drawer für JEDE
+    disziplin wenn das geht müsste natürlich über mehrere seasons dann getrackt werden, überlege
+    mal bitte wie das speicherplatz spart aber wir trotzdem auf die Daten zugreifen können, dann
+    auch im normalen season flow in seinem Spielerprofil wenn man die Diszis anklickt zb dass dann
+    so ein Stat Panel einklappbar ausfährt" — konkretisiert Punkt 2 (Cross-Disziplin:
+    Spieler-Historie) deutlich: (a) Vorbild ist das bestehende Kampf-Laufbahn-Panel, (b) muss
+    über mehrere Saisons persistiert werden, (c) braucht ein speicherplatzschonendes Datenmodell
+    (z. B. Aggregate statt Einzelereignisse — zu entscheiden), (d) Zugriffspunkt ist ein
+    ausklappbares Stat-Panel im normalen Spielerprofil bei Disziplin-Klick, nicht nur ein
+    Vorstellungs-Overlay. Größtes Cross-Cutting-Feature der ganzen Liste, Klasse S.
+
+## I-Spy
+
+28. **Spieler-Interaktion, Gedanken-/Tätigkeits-Icons, exklusive Fundorte, Zuschauer-Transparenz
+    über Hinweisstärke, offener statt gezonter Raum.** „bei I Spy wäre es noch gut wenn die
+    Spieler miteinander interagieren können und müssen, wenn man mit ner Lupe überm kopf sieht
+    dass sie gerade analysieren oder suchen Also dass man wie so sprechblasen verschiedene Icons
+    hat um zu sehen was der Spieler gerade denkt und tun will! und dass an jedem Ort wo man suchen
+    kann nur 1 Spieler stehen darf, wenn ein gegner hin will muss er ihn weg schubsen oder warten
+    bis der fertig ist Für den Zuschauer sollte erkennbar sein, wo die fettesten Hinweise sind
+    damit man mitfiebern kann welche Geheimnisse stark sind und welche vllt ein dickes Schloss
+    haben aber wenig bringen - und man müsste erkennen welcher Main Skill benötigt wird Der Raum
+    sollte nicht getrennt sein und alle Spieler können sich ÜBERALL hin bewegen!" — fünf Teile:
+    (a) sprechblasenartige Zustands-/Absichtsicons je Spieler (z. B. Lupe = analysiert/sucht),
+    (b) Fundorte exklusiv — nur 1 Spieler gleichzeitig, Verdrängung durch Wegschubsen oder Warten,
+    (c) Zuschauer sehen die Stärke/den Ertrag eines Hinweises vorab (Spannungsaufbau: dickes
+    Schloss kann trotzdem wenig bringen), (d) Zuschauer sehen den benötigten Main-Skill je
+    Hinweis, (e) der Raum ist aktuell offenbar in Zonen getrennt — soll stattdessen durchgängig
+    begehbar sein. Mehrteilige Mechanik-Erweiterung, Klasse B, eigene Konzeptrunde sinnvoll (I-Spy
+    hatte schon mehrere verworfene Mechanik-Versuche, s. Abschnitt 7 in `stand-aller-disziplinen.md`).
+
+## Formkarten — zwei mögliche Korrektheitsfragen (höhere Priorität als der Rest dieser Liste)
+
+29. **Vorschau zeigt unterschiedliche NOMINALWERTE je Spieler bei derselben Formkarte — möglicher
+    Anzeige-Bug.** „bei der vorschau steht, dass manche spieler +4 form und manche +8 form haben.
+    das kann nicht sein! Wenn man eine +4 als team spielt wird das genauso berechnet wie bisher
+    auch! also mal hat einer dann +2,6 und einer +5,4 oder so das geht! aber nicht mal +4 mal +8
+    usw" — natürliche Streuung der REALISIERTEN Werte um den Kartenwert ist laut Chris
+    ausdrücklich in Ordnung; unterschiedliche NOMINALE Basiswerte (als kämen zwei verschiedene
+    Karten zum Einsatz) sind es nicht. Muss am Code der Formkarten-Vorschau verifiziert werden,
+    ob hier tatsächlich zwei unterschiedliche Kartenwerte statt eines gemeinsamen vermischt
+    werden, oder ob die Anzeige nur missverständlich ist.
+30. **Flacher Attribut-Bonus vs. gleichmäßiger Eignungs-Bonus — MUSS GEMESSEN WERDEN.** „was die
+    Attribute angeht müssten die so gesteigert werden dass in der Eignung eine +4 raus kommt wenn
+    der Spieler +4 hat. Das ist nicht das gleiche wie alle Attribute +4 Da weiß ich bisher nicht
+    wie du das handhabst. nicht dass die Eignung dann höher da steht aber die simulation das nicht
+    berücksichtigt Das müsstest du mal messen!" — Chris' Sorge direkt aus der gesperrten
+    Eignungsmatrix abgeleitet: weil jede Disziplin die zwölf Attribute unterschiedlich gewichtet,
+    ergibt ein GLEICHMÄSSIGER Bonus auf alle zwölf Rohattribute KEINEN gleichmäßigen Eignungsbonus
+    über alle Disziplinen hinweg. Die Sorge: die Formkarten-UI zeigt einen sauberen „+4" auf die
+    Eignung (s. Screenshot „WIE SICH 55,7 ZUSAMMENSETZT … Form +4,0 — Formkarte des Spieltags"),
+    aber wenn die eigentliche Simulation (je nach Disziplin-Chassis) die Rohattribute liest statt
+    der aggregierten Eignungszahl, könnte der tatsächlich simulierte Effekt vom angezeigten
+    abweichen — dieselbe Fehlerklasse, die in diesem Projekt schon einmal in allen vier
+    Bahn-Chassis gefunden wurde (s. CLAUDE.md, „Dieselbe Eignungslücke saß in ALLEN VIER
+    Chassis"). **Eine Recherche dazu läuft bereits** (Agent `a5979fad5e3ba18e9`, 13.10.) — Ergebnis
+    wird hier nachgetragen, sobald es da ist.
+
 ---
 
-**Nächster Schritt:** keiner davon ist gestartet. Wenn Chris eine Reihenfolge vorgibt oder die
-nächste freie Rezeptrunde ansteht, hier nachschlagen statt neu nachfragen.
+**Nächster Schritt:** keiner davon ist gestartet (außer der laufenden Formkarten-Recherche zu
+Punkt 30). Wenn Chris eine Reihenfolge vorgibt oder die nächste freie Rezeptrunde ansteht, hier
+nachschlagen statt neu nachfragen.
