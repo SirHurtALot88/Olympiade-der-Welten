@@ -2040,6 +2040,9 @@ export default function DisciplineStageArena({
           missingLineup: t.missingLineup,
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
+          // Task #116 (Fechten sequenziell/Reveal): Gegner-Team-ID aus dem Arena-Duell, sonst
+          // null -- treibt die paarweise Board-Sequenz + Matchup-Reveal (prim === "lamps").
+          opponentTeamId: t.opponentTeamId,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           //
           // POSITIONSGETREU, NICHT DICHT — Ticket #35 (Chris): „wenn ich in 5 + 6 Slot die spieler
@@ -2075,6 +2078,8 @@ export default function DisciplineStageArena({
           missingLineup: false,
           // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
           captainName: null as string | null,
+          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Task #116).
+          opponentTeamId: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
