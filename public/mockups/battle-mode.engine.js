@@ -16881,6 +16881,46 @@
   const SCHACH_ANSAGE={rechnen:{zeit:1.30,erfolg:0.04}, normal:{zeit:1,erfolg:0}, blitzen:{zeit:0.72,erfolg:-0.04}};
   const SCHACH_ZEITNOT_ABZUG=0.10, SCHACH_ZEITNOT_SKALA=1.6;
   const SCHACH_KI_RAND_S=25;
+  // S-F1 -- REMIS ALS MANNSCHAFTSTAKTIK (Fable-Ideen Buehne-Duell 30.09., docs/design/
+  // fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F1", Klasse B). Remis kam bisher nur ueber
+  // den reinen Punktgleichstand vor (`vorteil===0`, 0,24 % aller Bretter, CLAUDE.md) -- real ist
+  // Remis im Mannschaftskampf eine ECHTE ENTSCHEIDUNG: wer im Endspiel ausgeglichen steht UND
+  // dessen Team den Kampf schon fuehrt, nimmt das Remis; wer zurueckliegt, spielt weiter. Zwei
+  // Konstanten, dieselbe Kalibrier-Methode wie ueberall im Motor (gemessen, nicht geraten):
+  //
+  //   SCHACH_REMIS_AB_ZUG       "ab Zug 8" (Dokument woertlich) -- `art.rundenN` ist 10, das
+  //                             Endspiel ist also nur das letzte Drittel der Partie.
+  //   SCHACH_REMIS_SCHWELLE     "nahe ausgeglichen" -- kalibriert an der echten Verteilung von
+  //                             |verlauf[7]| ueber 1800 Bretter (live-save-Kaderfamilie, 300
+  //                             Spiele): 2,9 % aller Bretter liegen dort unter 10, 5,2 % unter
+  //                             15, 6,4 % unter 20, 9,0 % unter 25. 20 trifft echte Endspiel-
+  //                             Naehe (deutlich unter dem Median-Zugwert von ~60-90 Punkten),
+  //                             ohne so breit zu greifen, dass jedes mittelknappe Brett
+  //                             remisiert wuerde.
+  //   SCHACH_REMIS_TEAM_TOLERANZ s.u.
+  //
+  // DIE MANNSCHAFTS-BEDINGUNG ("das Team dieses Bretts fuehrt oder gleichauf liegt"): ein Remis
+  // braucht IMMER beide Seiten -- presst ein Team von hinten, nimmt es keinen Ausgleich an, egal
+  // wie ausgeglichen die Stellung objektiv ist (das Dokument woertlich: "wer zurueckliegt,
+  // spielt weiter"). Symmetrisch gelesen (keine Seite darf objektiv im Nachteil sein) heisst
+  // das im Kern: unter den BEREITS ENTSCHIEDENEN anderen Brettern (voll enthuellt ODER von S-F2
+  // als "vorzeitig entschieden" geflaggt) darf KEINE Seite klar zurueckliegen, s. stepBuehne()-
+  // Kommentar unten fuer die volle Herleitung.
+  //
+  // EXAKTER GLEICHSTAND WAERE DIE REINSTE LESART, TRIFFT ABER PRAKTISCH NIE (gemessen, nicht
+  // geraten, s. PR-Beschreibung): dieser Motor ist stark eignungsdominiert (derselbe Befund wie
+  // Hockeys "58 % Rang 1", CLAUDE.md) -- das staerkere Team gewinnt meist MEHRERE Bretter
+  // zusammenhaengend, ein exakter Teampunkte-Gleichstand unter den bereits entschiedenen
+  // Brettern kam in der Kalibrierstichprobe nur in 2,5 % der remis-waehlbaren Faelle vor
+  // (1 von 40 Stichproben, typischer Abstand sonst 2-5 Brettpunkte). `SCHACH_REMIS_TEAM_TOLERANZ`
+  // ist das kleinste Zugestaendnis, das daraus wieder eine BEOBACHTBARE Mechanik macht, ohne die
+  // Bedingung aufzuweichen: hoechstens EIN Brettpunkt Rueckstand zaehlt noch als "im Rennen", nicht
+  // als "presst von hinten" -- bei nur sechs Brettern ist ein Rueckstand von 1 Punkt unter den
+  // bisher entschiedenen Brettern (oft nur 1-2 von 6) noch keine klare Niederlageserie. Mit
+  // Toleranz 1 stieg die gemessene Remisquote von 0,13 % auf 1,83 % aller Bretter (9,4 % aller
+  // Spiele mit mindestens einem Remis-Brett, 500 Spiele) -- real genug, um sichtbar zu sein, ohne
+  // jedes knappe Brett zu remisieren.
+  const SCHACH_REMIS_AB_ZUG=8, SCHACH_REMIS_SCHWELLE=20, SCHACH_REMIS_TEAM_TOLERANZ=1;
   // Untergrenze 0,5: ein TEMPO ueber 72 wuerde die Zugzeit sonst unter die Haelfte druecken —
   // im Kader praktisch unerreichbar, nur ein Sicherheitsnetz gegen negative Zugzeiten.
   const schachTempoFaktor=(L)=>Math.max(0.5,1+(50-L.TEMPO)*SCHACH_TEMPO_K);
@@ -16910,6 +16950,29 @@
     if(u.zeitSieg!=null)return u.zeitSieg;
     return u.vorteil>0;
   }
+  // S-F1 -- BRETTPUNKT STATT NACKTEM SIEG/NIEDERLAGE-BOOLEAN (Fable-Ideen Buehne-Duell 30.09.,
+  // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F1", Klasse B, NUR Speed-Schach
+  // -- Tennis/Fechten kennen kein echtes Remis und bleiben ueber diese Funktion bit-identisch zu
+  // `duellBrettSieg()?1:0`, s.u.). Liefert den ECHTEN Brettpunkt (1 / ½ / 0) statt eines reinen
+  // Siegerbooleans -- Chris' Dokument-Vorgabe woertlich: "Teamstand wird auf echte Brettpunkte
+  // umgestellt. Sieg bei über der Hälfte der Brettpunkte". `u.schachRemis` ist das neue Flag aus
+  // stepBuehne()s S-F1-Zweig (s. dortiger Kommentar) -- ein Remis, das die Mannschaftstaktik
+  // (nicht der nackte Punktestand) erzwingt. OHNE das Flag (jede andere Duell-Disziplin, oder
+  // ein Schachbrett, das es nie gesetzt bekam) bleibt die Funktion exakt die alte Zweiwertigkeit,
+  // nur um den bisher stillschweigend uebergangenen ECHTEN Punktgleichstand (`u.vorteil===0`,
+  // 0,24 % aller Bretter, CLAUDE.md) auf ½ statt auf eine fuer beide Seiten verlorene 0
+  // korrigiert -- ein Randfall, der vorher nirgends als Remis gezaehlt wurde, obwohl er einer
+  // war. `u.vorteil`/`u.verlauf`/`u.summe` bleiben in JEDEM Fall unangetastet (s. bauBuehne()/
+  // stepBuehne()-Kommentare) -- nur WELCHE Groesse als Brettergebnis fuer die Mannschaftswertung
+  // zaehlt, aendert sich hier.
+  function duellBrettPunkte(art,u){
+    if(art.schach){
+      if(u.zeitSieg!=null)return u.zeitSieg?1:0;
+      if(u.schachRemis)return 0.5;
+      return u.vorteil>0?1:u.vorteil<0?0:0.5;
+    }
+    return duellBrettSieg(art,u)?1:0;
+  }
   // EINE ZAEHLUNG FUER ALLE FUeNF STELLEN (T-F2, Fable-Ideen Buehne-Duell 30.09., Abschnitt
   // T-F2, Paket 5 "Davis Cup"): bisher zaehlte jede der fuenf oben genannten Stellen
   // `TEILNEHMER.filter(u=>u.side===s&&...&&duellBrettSieg(art,u)).length` -- ein Teilnehmer,
@@ -16922,8 +16985,11 @@
   // Teilnehmer -- Gruppengroesse 1, Zaehlung bit-identisch zu vorher) und zaehlt eine Gruppe
   // nur, wenn ALLE ihre Mitglieder den optionalen `fertigPred` erfuellen (sonst wuerde die
   // Live-Enthuellung ein Doppel-Rubber als gewonnen zeigen, bevor beide Doppelpartner fertig
-  // enthuellt sind) und wenn `duellBrettSieg()` fuer die Gruppe zutrifft (bei einem echten
-  // Doppel teilen sich beide Partner `.vorteil`, die Abfrage liefert fuer beide dasselbe).
+  // enthuellt sind). WERT (S-F1, 13.10.): summiert `duellBrettPunkte()` ueber die Gruppe statt
+  // nur `duellBrettSieg()` zu pruefen -- fuer Tennis/Fechten/jede andere Disziplin ist das
+  // bit-identisch (duellBrettPunkte liefert dort immer 1/0, s. dortiger Kommentar), nur Schach
+  // kann hier echte 0,5-Schritte liefern (ein Schachbrett bildet nie eine rubberIdx-Gruppe
+  // >1, s. `.rubberIdx` -- nur Tennis-Doppel setzt dieses Feld).
   function duellBretterGewonnen(art,seite,fertigPred){
     const gruppen=new Map();
     for(const u of TEILNEHMER){
@@ -16936,7 +17002,7 @@
     let n=0;
     for(const arr of gruppen.values()){
       if(fertigPred&&!arr.every(fertigPred))continue;
-      if(duellBrettSieg(art,arr[0]))n++;
+      n+=duellBrettPunkte(art,arr[0]);
     }
     return n;
   }
@@ -16953,6 +17019,12 @@
         return {vorteil:a.vorteil, fa:!!a.geflaggt, fb:!!b.geflaggt,
           zeitSieg:a.zeitSieg??null, gegen:!!a.zeitGegenVorteil, kippt:!!a.zeitKippt,
           sa:duellBrettSieg(art,a), sb:duellBrettSieg(art,b),
+          // S-F1 (nur Schach): echter Brettpunkt (1/½/0) statt des nackten Booleans oben --
+          // `pa+pb` summiert sich bei jedem Brett auf genau 1 (s. duellBrettPunkte()-Kommentar),
+          // `remis` macht ein durch S-F1 ERZWUNGENES Remis von einem natuerlichen
+          // Punktgleichstand (`vorteil===0`) unterscheidbar, ohne an der Zaehlung selbst etwas
+          // zu aendern (beide zaehlen 0,5).
+          pa:duellBrettPunkte(art,a), pb:duellBrettPunkte(art,b), remis:!!a.schachRemis,
           ansageA:a.ansage||null, ansageB:b.ansage||null,
           zeitnotA:a.zeitnotZug!=null, zeitnotB:b.zeitnotZug!=null,
           tempoA:a.TEMPO??null, tempoB:b.TEMPO??null};
@@ -20595,6 +20667,60 @@
               buehneBahnGrossDrosseln(true,true),undefined,"entschieden");
           }
         }
+        // S-F1 -- REMIS ALS MANNSCHAFTSTAKTIK (Fable-Ideen Buehne-Duell 30.09., Abschnitt 4
+        // "S-F1", Klasse B, NUR Speed-Schach -- s. SCHACH_REMIS_AB_ZUG/-SCHWELLE/-TEAM_TOLERANZ-
+        // Kommentar oben fuer Herleitung und Kalibrierung aller drei Konstanten). Ab Zug
+        // SCHACH_REMIS_AB_ZUG prueft dieser Zweig, ob der laufende Vorteil nahe ausgeglichen ist
+        // UND der Teampunktestand (echte Brettpunkte 1/½/0, s. duellBrettPunkte()) unter den
+        // BEREITS ENTSCHIEDENEN anderen Brettern (voll enthuellt ODER von S-F2 direkt oberhalb
+        // als "vorzeitig entschieden" geflaggt) innerhalb SCHACH_REMIS_TEAM_TOLERANZ beieinander
+        // liegt -- "gleichauf" im Sinn von "noch nicht klar abgehaengt", nicht zwingend Ziffer
+        // fuer Ziffer identisch (Begruendung der Toleranz: s. Konstanten-Kommentar oben).
+        //
+        // WARUM "NICHT KLAR ABGEHAENGT" UND NICHT "FUEHRT ODER GLEICHAUF" (Dokument woertlich,
+        // aber zweideutig bei zwei Teams): ein Remis braucht IMMER beide Seiten. Liest man den
+        // Satz je Seite ("mein Team fuehrt oder liegt gleichauf -> ich nehme das Remis"), ist er
+        // fuer die fuehrende Seite IMMER wahr und fuer die zurueckliegende NIE — das Remis haenge
+        // dann an nur EINER Zustimmung, obwohl das Dokument an derselben Stelle sagt: "wer
+        // zurueckliegt, spielt weiter" (verweigert also die Zustimmung). Symmetrisch gelesen
+        // (KEINE Seite darf klar im Nachteil sein, sonst presst sie) bleibt nur ein beidseitig
+        // knapper Punktestand — die einzige Lesart, die fuer beide Seiten gleichzeitig zutrifft
+        // und damit seitenneutral bleibt (kein `u`/`gegner`-Bias trotz des Enthuellungs-Gates
+        // unten, s. dessen Kommentar).
+        //
+        // `u.schachRemis` (auf BEIDEN Seiten gesetzt) ist das neue Mannschaftswertungs-Flag,
+        // gelesen von duellBrettPunkte() (s. dort) -- genau wie bei S-F2 bleiben `u.vorteil`/
+        // `u.verlauf`/`u.summe` unangetastet: das Brett wird unveraendert bis zum letzten Zug
+        // durchgerechnet (`rr()`/wert() unberuehrt), nur WELCHE Groesse als Brettergebnis fuer
+        // die Mannschaftswertung zaehlt, aendert sich. Gate wie bei S-F2/vorteilKipptBig direkt
+        // oberhalb: nur die Seite, deren Gegner diesen Zugindex ebenfalls schon erreicht hat,
+        // darf pruefen/setzen -- sonst wuerde jede Seite unabhaengig pruefen und doppelt feuern.
+        // `u.zeitSieg==null` schliesst ein bereits auf Zeit entschiedenes Brett aus (ein
+        // gefallenes Blaettchen ist keine Mannschaftstaktik-Entscheidung); `!u.vizSchachAufgegeben`
+        // ist ein reines Sicherheitsnetz (die beiden Schwellen -- "nahe ausgeglichen" hier,
+        // "uneinholbar vorn" bei S-F2 -- schliessen sich der Groessenordnung nach ohnehin aus).
+        if(BB().schach&&gegner&&u.zeitSieg==null&&!u.schachRemis&&!u.vizSchachAufgegeben
+           &&u.aktuell+1>=SCHACH_REMIS_AB_ZUG&&gegner.aktuell>=u.aktuell
+           &&Math.abs(v)<SCHACH_REMIS_SCHWELLE){
+          let team0=0,team1=0;
+          for(const x of TEILNEHMER){
+            if(x.side!==0||x.brett==null||x.brett===u.brett)continue;
+            const y=TEILNEHMER.find(z=>z.side===1&&z.brett===x.brett);
+            if(!y)continue;
+            const entschieden=(x.aktuell+1>=BB().rundenN&&y.aktuell+1>=BB().rundenN)
+              ||x.vizSchachAufgegeben||x.schachRemis;
+            if(!entschieden)continue;
+            const px=duellBrettPunkte(BB(),x);
+            team0+=px; team1+=(1-px);
+          }
+          if(Math.abs(team0-team1)<=SCHACH_REMIS_TEAM_TOLERANZ){
+            u.schachRemis=true; gegner.schachRemis=true;
+            feed(0,"Brett "+((u.brett??0)+1)+" endet Remis — ausgeglichenes Endspiel, und die "
+              +"Mannschaftswertung steht nach den bereits entschiedenen Brettern gleichauf: beide "
+              +"Seiten sichern den halben Punkt.",
+              buehneBahnGrossDrosseln(true,true),undefined,"remis");
+          }
+        }
         // TREFFERSTAND (Option 2, s. der grosse Kommentar bei BUEHNE_ART.fechten oben):
         // additiv, nur fuer Fechten befuellt, zaehlt jeden erfolgWort-Durchgang genau
         // einmal. Fliesst nirgends in v/u.vorteil/u.summe oder MOTOREN[...].wert() ein —
@@ -23024,6 +23150,9 @@
     // FECHTEN LIEST `gefechtSieg` (F1, 26.09.), NICHT `vorteil>0` — der Trefferstand
     // entscheidet das Brett, nicht die interne Punktdifferenz (s. "F1"-Kommentar bei
     // `art.duell` in bauBuehne()). Speed-Schach/Tennis bleiben bei `vorteil>0`.
+    // S-F1 (nur Schach): `duellBretterGewonnen()` summiert jetzt `duellBrettPunkte()` (echte
+    // Brettpunkte 1/½/0) statt nur `duellBrettSieg()` zu pruefen, s. dortiger Kommentar. Fuer
+    // Tennis/Fechten bit-identisch zu vorher (`duellBrettSieg()?1:0`, immer ganzzahlig).
     const bretter=(s)=>duellBretterGewonnen(BB(),s,u=>u.aktuell+1>=u.runden.length);
     // PUNKT 18 (Broadcast-Audit Runde 2, 30.09.): "Tennis/Fechten/Schach zeigen 0:0 fast
     // das ganze Match" -- `bretter()` zaehlt nur ENTHUELLTE, ABGESCHLOSSENE Bretter, und
@@ -28045,7 +28174,14 @@
           // AUF ZEIT ENTSCHIEDEN (Speed-Schach Stufe 1, nur mit BUEHNE_FLAGS.speedSchachUhr):
           // `u.zeitSieg` schlaegt den Vorteil, ⌛ macht den Grund lesbar (Konzept 3.2: "die
           // Wertungstabelle bekommt in ‚Stand' ein ⌛ neben + / −"). Ohne Flag nie gesetzt.
+          //
+          // S-F1 (nur Schach): `u.schachRemis` schlaegt den Vorteil VOR der normalen
+          // Vorzeichenpruefung -- ein durch die Mannschaftstaktik erzwungenes Remis zeigt "="
+          // auch dann, wenn `verlauf[rundenN-1]` selbst nicht exakt 0 ist (Vorteil/Verlauf
+          // bleiben unangetastet, s. stepBuehne()-Kommentar). Reihenfolge wie bisher sonst
+          // unveraendert: zuerst Zeit, dann Remis, zuletzt der rohe Vorzeichenfall.
           wert:z=>!z.fertig?"…":(z.u.zeitSieg!=null?(z.u.zeitSieg?"+⌛":"−⌛")
+            :(art.schach&&z.u.schachRemis)?"="
             :(z.u.verlauf[art.rundenN-1]>0?"+":z.u.verlauf[art.rundenN-1]<0?"−":"=")),
           farbe:v=>v[0]==="+"?"var(--ok)":v[0]==="−"?"var(--crit)":null},
         {id:"leist",kopf:"Leist", titel:"Beitrag gegen Erwartung", wert:z=>leistungBuehne(z.u), fmt:v=>v+" %",
@@ -28956,7 +29092,12 @@
     // (updateHudBuehne()s BB().duell-Zweig) -- zwei identische Zahlen uebereinander. `gew()`
     // bleibt als reine Ableitung stehen: die Sieger-Kennung unten (SIEG-Rahmen/-Text) braucht
     // sie weiterhin.
-    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y)&&duellBrettSieg(BB(),s===0?x:y))n++;}return n;};
+    //
+    // S-F1: `duellBrettPunkte()` statt `duellBrettSieg()` -- `gew()` summiert jetzt echte
+    // Brettpunkte (1/½/0) statt gewonnener Bretter zu zaehlen, sonst wuerde ein Remis fuer
+    // BEIDE Seiten verschwinden (0 statt ½), und 2 Siege + 2 Remis + 2 Niederlagen zeigte
+    // "2:2" statt der korrekten "3:3".
+    const gew=(s)=>{let n=0;for(let i=0;i<bretter;i++){const [x,y]=paar(i); if(x&&y&&fertig(x)&&fertig(y))n+=duellBrettPunkte(BB(),s===0?x:y);}return n;};
     ctx.textAlign="center";ctx.textBaseline="middle";
     // Opus-Review-Fund (06.09.): dass die Regie gerade ABGESCHALTET ist, war nirgends zu
     // sehen — der gelbe Rahmen unten wird nur an Mini-Brettern gezeichnet, und das
@@ -29120,8 +29261,12 @@
       if(!pa||!pb)return {fertig:false,text:"–",farbVar:null,fokus:i===fb};
       const brettFertig=fertig(pa)&&fertig(pb);
       if(brettFertig){
-        const wert=pa.vorteil||0;
-        return {fertig:true,text:wert>0?"1":wert<0?"0":"½",farbVar:wert>0?"--home":wert<0?"--away":null,fokus:i===fb};
+        // S-F1: `duellBrettPunkte()` statt des rohen `pa.vorteil`-Vorzeichens -- deckt neben
+        // dem seltenen echten Punktgleichstand jetzt auch ein durch die Mannschaftstaktik
+        // erzwungenes Remis (`u.schachRemis`) und ein auf Zeit entschiedenes Brett
+        // (`u.zeitSieg`) ab, statt nur den internen `vorteil` zu lesen.
+        const pkt=duellBrettPunkte(art,pa);
+        return {fertig:true,text:pkt>0.5?"1":pkt<0.5?"0":"½",farbVar:pkt>0.5?"--home":pkt<0.5?"--away":null,fokus:i===fb};
       }
       const vLauf=(pa.aktuell>=0&&pa.verlauf)?pa.verlauf[pa.aktuell]:0;
       return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===fb};
@@ -46531,6 +46676,9 @@
       const a=duelle(0),b=duelle(1); return {a,b,text:a+" : "+b};
     }
     if(art.duell){
+      // S-F1 (nur Schach): `duellBretterGewonnen()` summiert echte Brettpunkte (1/½/0) statt
+      // nur Siege zu zaehlen, s. dortiger Kommentar. Fuer Tennis/Fechten bit-identisch zu
+      // vorher (immer ganzzahlig).
       const bretter=(s)=>duellBretterGewonnen(art,s,u=>u.aktuell+1>=u.runden.length);
       const a=bretter(0),b=bretter(1); return {a,b,text:a+" : "+b};
     }
@@ -50160,7 +50308,15 @@
       // bleiben unangetastet -- der Spielerwert fuer rho ist weiterhin die eigene Punktsumme
       // (`MOTOREN[bd].wert()`, liest `u.summe`). Speed-Schach/Tennis bleiben bei `vorteil>0`.
       // TENNIS-DOPPEL (T-F2) ZAEHLT HIER PER `duellBretterGewonnen()` ALS EIN RUBBER, NICHT
-      // ALS ZWEI: s. Kommentar dort.
+      // ALS ZWEI: s. Kommentar dort. S-F1 (nur Schach, Fable-Ideen Buehne-Duell 30.09.,
+      // Abschnitt 4): dieselbe Funktion traegt jetzt auch echte Brettpunkte (1/½/0) statt
+      // einer reinen Sieg-Zaehlung. `M.lauf()` oben faehrt `stepBuehne()` bis `done` (s.
+      // MOTOREN[bd].lauf), setzt also jedes `u.schachRemis`-Flag genauso, wie es ein live
+      // beobachtetes Spiel am Ende haette -- derselbe Weg, auf dem `u.zeitSieg` (Speed-Schach
+      // Stufe 1) schon laenger in den Arena-Seitenstand einfliesst. `arenaTeamPointsForFixture()`
+      // (lib/resolve/battle-mode-arena-team-points.ts) vergleicht `seiten` nur mit `===`/`>`,
+      // Floats mit 0,5-Schritten sind dafuer exakt und verlustfrei. Fuer Tennis/Fechten
+      // bit-identisch zu vorher (`duellBrettSieg()?1:0`, immer ganzzahlig).
       const bretter=(s)=>duellBretterGewonnen(BUEHNE_ART[bd],s);
       const seiten=[bretter(0),bretter(1)];
       M.zurueck(g);
