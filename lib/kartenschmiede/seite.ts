@@ -60,6 +60,8 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("generator.js").toString("utf8")),
     skript(lies("app.js").toString("utf8")),
     skript(lies("gruppe.js").toString("utf8")),
+    skript(lies("szenarien.js").toString("utf8")),
+    skript(lies("szenarien-ui.js").toString("utf8")),
     skript(lies("datenbank.js").toString("utf8")),
     skript(lies("charaktere.js").toString("utf8")),
   ].join("\n");

@@ -13,6 +13,7 @@ import {
   ladeKarte,
   listeGruppen,
   listeKarten,
+  listeSzenarien,
   loescheKarte,
   speichereEintrag,
   speichereFaehigkeiten,
@@ -327,7 +328,8 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(rumpf).toContain("window.KARTENSCHMIEDE_SERVER=true");
     expect(rumpf).toContain("Kartenschmiede");
     expect(rumpf).toContain("KartenschmiedeCharaktere");
-    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente", "rueckBox", "simCheck"]) expect(rumpf).toContain(`id="${id}"`);
+    for (const id of ["tabRegeln", "charaktere", "formModus", "bauModus", "elemente", "rueckBox", "simCheck", "tabSzenarien", "szKampagne", "szMain"]) expect(rumpf).toContain(`id="${id}"`);
+    expect(rumpf).toContain("KartenschmiedeSzenarien");
     // Gegner werden als Postkarte gedruckt: Querformat im Verhältnis 3:2 und eine eigene Seitengröße 15 × 10 cm
     expect(kopf + rumpf).toContain(".card.land { aspect-ratio: 3 / 2;");
     expect(kopf + rumpf).toContain("@page postkarte-quer { size: 150mm 100mm;");
@@ -381,8 +383,86 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
     expect(listeKarten("gemeinsam").map(k => k.id)).toEqual(["karte-abcdef12"]);
   });
 
+  it("speichert und listet Zusatzmissionen", () => {
+    speichereEintrag("gemeinsam", "szenarien", "szenario-1234abcd", { titel: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }, null, "Chris");
+    expect(listeSzenarien("gemeinsam")).toMatchObject([{ id: "szenario-1234abcd", name: "Das Nest", ziel: "saeubern", schauplatz: "waldrand" }]);
+    expect(ladeEintrag("gemeinsam", "szenarien", "szenario-1234abcd")).toMatchObject({ titel: "Das Nest" });
+  });
+
   it("lässt keine Pfade als Karten-ID durch", () => {
     expect(istGueltigeKartenId("../../etc/passwd")).toBe(false);
     expect(() => speichereKarte("gemeinsam", "../boese", { name: "x" }, null)).toThrow();
+  });
+});
+
+type Karte = { tisch: string; b: number; t: number; aufstellung: { x: number; y: number; w: number; h: number };
+  gelaende: Array<{ art: string; x: number; y: number; w: number; h: number; label?: string; geheim?: boolean }>;
+  marker: Array<{ typ: string; x?: number; y?: number; label?: string; geheim?: boolean; kante?: boolean }> };
+type Map = { nr: number; empfohlen: string; titel: string; einleitung: string; hauptziel: string; nebenziel: string; spezial: string[]; belohnung: string;
+  konsequenzen: string[]; hinweis: string; karte: Karte; teile: Array<{ name: string; ausloeser: string }>; spieler?: Partial<Map> };
+const S = laden("../apps/kartenschmiede/szenarien.js") as {
+  TISCHE: Array<{ id: string; b: number; t: number }>;
+  GELAENDE: Record<string, unknown>;
+  SCHAUPLAETZE: Array<{ id: string; gelaende: string[]; ereignisse: string[] }>;
+  ZIELE: Array<{ id: string; marker: Array<{ anzahl: number }> }>;
+  MOOSGRAB: { maps: Map[] };
+  erzeuge(o: Record<string, unknown>): { ziel: string; karte: Karte; ep: { haupt: number; neben: number } };
+  wellenPunkte(sz: unknown, p: number): Array<{ punkte: number }>;
+  skaliereKarte(k: Karte, tisch: string): Karte;
+};
+const imTisch = (k: Karte) => k.gelaende.every(g => g.x >= 0 && g.y >= 0 && g.x + g.w <= k.b + 0.01 && g.y + g.h <= k.t + 0.01);
+
+describe("Kartenschmiede – Szenarien", () => {
+  it("würfelt mit derselben Saat dasselbe Szenario, mit allen Markern und Gelände auf jedem Tisch", () => {
+    expect(JSON.stringify(S.erzeuge({ seed: 42 }))).toBe(JSON.stringify(S.erzeuge({ seed: 42 })));
+    for (let seed = 1; seed <= 300; seed++) for (const t of S.TISCHE) {
+      const sz = S.erzeuge({ seed, tisch: t.id });
+      const soll = S.ZIELE.find(z => z.id === sz.ziel)!.marker.reduce((n, m) => n + m.anzahl, 0);
+      expect(sz.karte.marker.filter(m => m.typ !== "feind" && m.typ !== "truhe").length, `${seed}/${t.id}`).toBe(soll);
+      expect(imTisch(sz.karte), `${seed}/${t.id}`).toBe(true);
+      // Kleines Geländebudget: auch auf 120 × 80 höchstens ein Dutzend Stücke
+      expect(sz.karte.gelaende.length).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it("rechnet Wellen nach OPR aus den Heldenpunkten", () => {
+    const sz = S.erzeuge({ seed: 7, ziel: "bergen", schwierigkeit: 2 });
+    expect(S.wellenPunkte(sz, 345).map(w => w.punkte)).toEqual([Math.round(345 * 0.5 * 0.8), Math.round(345 * 0.5 * 0.35)]);
+    expect(sz.ep).toEqual({ haupt: 4, neben: 2 });
+  });
+
+  it("kennt jedes Gelände, das Schauplätze und Kampagne verwenden", () => {
+    for (const s of S.SCHAUPLAETZE) { for (const a of s.gelaende) expect(S.GELAENDE[a], s.id).toBeTruthy(); expect(s.ereignisse).toHaveLength(6); }
+    for (const m of S.MOOSGRAB.maps) for (const g of m.karte.gelaende) expect(S.GELAENDE[g.art], `Map ${m.nr}`).toBeTruthy();
+  });
+
+  it("hat fünf vollständige Moosgrab-Maps, die auf jeden Tisch passen", () => {
+    expect(S.MOOSGRAB.maps.map(m => m.nr)).toEqual([1, 2, 3, 4, 5]);
+    for (const m of S.MOOSGRAB.maps) {
+      for (const feld of ["titel", "einleitung", "hauptziel", "nebenziel", "belohnung", "hinweis"] as const) expect(m[feld], `Map ${m.nr} ${feld}`).toBeTruthy();
+      expect(m.spezial.length).toBeGreaterThan(0);
+      expect(m.konsequenzen.length).toBeGreaterThan(0);
+      expect(m.teile.length).toBeGreaterThan(0);
+      expect(S.TISCHE.map(t => t.id)).toContain(m.empfohlen);
+      expect(imTisch(m.karte), `Map ${m.nr}`).toBe(true);
+      for (const t of S.TISCHE) expect(imTisch(S.skaliereKarte(m.karte, t.id)), `Map ${m.nr} auf ${t.id}`).toBe(true);
+    }
+  });
+
+  it("verrät in der Spieler-Ansicht nichts, was erst gefunden werden soll", () => {
+    // Was die Spieler je Map noch nicht wissen dürfen (docs/KAMPAGNEN_UEBERGABE.md: keine Spoiler)
+    const verboten: Record<number, string[]> = {
+      1: ["Kupferanhänger", "verwandel", "Erblühte", "mutiert"],
+      2: ["Hedda", "Krypta", "Falltür", "Gemeinde", "Kellerschlüssel"],
+      3: ["Schmied und", "Harm", "befallenen Häuser", "Station"],
+      4: ["Erkennungsmarke", "Protokoll", "Probe", "Soldat", "Erwachen", "Labor", "Metall"],
+      5: ["Probe", "Epilog"],
+    };
+    for (const m of S.MOOSGRAB.maps) {
+      const v = { ...m, ...(m.spieler || {}) };
+      const sichtbar = [v.titel, v.einleitung, v.hauptziel, v.nebenziel, v.belohnung, ...v.spezial,
+        ...m.karte.gelaende.filter(g => !g.geheim).map(g => g.label || ""), ...m.karte.marker.filter(x => !x.geheim).map(x => x.label || "")].join(" | ");
+      for (const wort of verboten[m.nr]) expect(sichtbar, `Map ${m.nr}: ${wort}`).not.toContain(wort);
+    }
   });
 });

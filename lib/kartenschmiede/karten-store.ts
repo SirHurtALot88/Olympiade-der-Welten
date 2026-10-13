@@ -10,7 +10,7 @@ export const MAX_EINTRAG_BYTES = 8 * 1024 * 1024;
 export const MAX_GRUPPE_BYTES = 40 * 1024 * 1024;
 const ID_MUSTER = /^[a-z0-9-]{8,64}$/i;
 
-export type Art = "karten" | "gruppen";
+export type Art = "karten" | "gruppen" | "szenarien";
 
 export type KartenEintrag = {
   id: string;
@@ -114,6 +114,20 @@ export function listeGruppen(sammlung: string): GruppenEintrag[] {
     id,
     name: text(daten.inhalt.name) || "Ohne Namen",
     mitglieder: Array.isArray(daten.inhalt.mitglieder) ? daten.inhalt.mitglieder.length : 0,
+    gespeichertVon: daten.gespeichertVon ?? null,
+    updatedAt: daten.updatedAt,
+  }));
+}
+
+export type SzenarioEintrag = { id: string; name: string; ziel: string; schauplatz: string; gespeichertVon: string | null; updatedAt: string };
+
+/** Gespeicherte Zusatzmissionen aus dem Reiter „Szenarien“ (die Kampagne selbst steht im Code). */
+export function listeSzenarien(sammlung: string): SzenarioEintrag[] {
+  return liesAlle(sammlung, "szenarien").map(({ id, daten }) => ({
+    id,
+    name: text(daten.inhalt.titel) || "Ohne Namen",
+    ziel: text(daten.inhalt.ziel, 40),
+    schauplatz: text(daten.inhalt.schauplatz, 40),
     gespeichertVon: daten.gespeichertVon ?? null,
     updatedAt: daten.updatedAt,
   }));

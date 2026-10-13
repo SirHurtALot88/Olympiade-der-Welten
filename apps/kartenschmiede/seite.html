@@ -589,6 +589,62 @@ fieldset.checks legend { margin-bottom: 6px; }
 .heldenbogen .hb-faeh p { margin: 0 0 2.5mm; break-inside: avoid; }
 .heldenbogen .hb-faeh .tico svg { width: 4mm; height: 4mm; }
 .heldenbogen .hb-faeh .elem { width: 4.6mm; height: 4.6mm; }
+/* ---------- Szenarien ---------- */
+.sz-akt { font: 700 13px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--brass); margin: 14px 0 4px; }
+.sz-leiste-oben { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.sz-leiste-oben label.f { min-width: 180px; }
+.sz-leiste-oben .hint { flex-basis: 100%; }
+.sz-gen .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.sz-gen summary { cursor: pointer; list-style: none; }
+.sz-gen summary::-webkit-details-marker { display: none; }
+.sz-gen summary h3::after { content: " ▾"; color: var(--dim); font-size: 16px; }
+.sz-gen[open] summary h3::after { content: " ▴"; }
+.sz-blatt { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.sz-kopf { display: grid; gap: 4px; }
+.sz-titel { font-size: clamp(26px, 3.4vw, 34px); }
+.sz-meta { font-family: var(--ui); color: var(--dim); font-size: 15px; }
+.sz-vorlesen { font-style: italic; font-size: 19px; border-left: 3px solid var(--brass); padding-left: 14px; max-width: 75ch; }
+.sz-raster { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .sz-raster { grid-template-columns: 1fr; } }
+.sz-unten { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.sz-karte { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+.sz-kartenspalte { display: grid; gap: 10px; }
+.sz-text, .sz-teil { display: grid; gap: 8px; align-content: start; }
+.sz-text section, .sz-unten section { display: grid; gap: 6px; }
+.sz-blatt h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sz-blatt ul, .sz-blatt ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sz-teil { border-top: 1px solid var(--line); padding-top: 14px; }
+.sz-ausl { font-family: var(--ui); color: var(--dim); }
+.sz-legende { font-size: 15px; list-style: none; padding: 0 !important; }
+.sz-legende small { color: var(--dim); font-family: var(--ui); }
+.sz-marker { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 14px var(--ui); color: var(--dim); max-width: none; }
+.sz-marker span { display: inline-flex; gap: 6px; align-items: center; }
+.sz-marker i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #1b1509; font-size: 12px; font-weight: 800; }
+.sz-tab { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+.sz-tab th:first-child, .sz-tab td:first-child { width: 34%; }
+.sz-unten .sz-tab th:first-child, .sz-unten .sz-tab td:first-child { width: 3em; }
+.sz-text section, .sz-unten section, .sz-teil { min-width: 0; }
+.sz-tab th { text-align: left; font: 700 13px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td, .sz-tab th { white-space: normal; }
+.sz-tab td { overflow-wrap: anywhere; vertical-align: top; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td:first-child { font-family: var(--ui); font-weight: 600; }
+.sz-leiste { list-style: none; padding: 0 !important; display: flex !important; flex-wrap: wrap; gap: 4px !important; }
+.sz-leiste li { display: grid; place-items: center; min-width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 4px; font: 700 14px var(--ui); }
+.sz-leiste li.start { border-color: var(--t3); }
+.sz-leiste li.ende { border-color: var(--t6); color: var(--t6); }
+.sz-w6 { font-size: 15px; }
+.sz-wellen { list-style: none; padding: 0 !important; }
+.print-area .sz-seite { page: a4-hoch; width: 210mm; box-sizing: border-box; padding: 10mm; background: #fff; color: #1b1509; }
+.print-area .sz-blatt { background: #fff; border: 0; padding: 0; color: #1b1509; gap: 10px; font-size: 12px; }
+.print-area .sz-blatt h4, .print-area .sz-blatt .eyebrow { color: #7a5a1e; }
+.print-area .sz-raster { grid-template-columns: 105mm 1fr; gap: 6mm; }
+.print-area .sz-unten { grid-template-columns: repeat(3, 1fr); }
+.print-area .sz-vorlesen { font-size: 13px; }
+.print-area .sz-tab { font-size: 11px; }
+.print-area .sz-tab th, .print-area .sz-tab td { border-color: #ccc; padding: 3px 5px; }
+.print-area .sz-teil { border-color: #ccc; break-inside: avoid; }
+.print-area .sz-legende, .print-area .sz-w6 { font-size: 11px; }
+.print-area .sz-meta, .print-area .sz-ausl, .print-area .hint, .print-area .sz-legende small { color: #555; }
 @page postkarte-quer { size: 150mm 100mm; margin: 0; }
 @page postkarte-hoch { size: 100mm 150mm; margin: 0; }
 @page a4-hoch { size: A4 portrait; margin: 0; }
@@ -709,6 +765,7 @@ fieldset.checks legend { margin-bottom: 6px; }
     <nav class="tabs" role="tablist" aria-label="Bereiche">
       <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Erstellen</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
+      <button type="button" role="tab" id="tab-szenarien" data-tab="szenarien" aria-selected="false" aria-controls="tabSzenarien">Szenarien</button>
       <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
       <button type="button" role="tab" id="tab-regeln" data-tab="regeln" aria-selected="false" aria-controls="tabRegeln">Regeln</button>
     </nav>
@@ -985,6 +1042,24 @@ fieldset.checks legend { margin-bottom: 6px; }
           <div id="gListe"></div>
         </aside>
         <div class="g-main" id="gMain"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabSzenarien" role="tabpanel" aria-labelledby="tab-szenarien" class="tabpanel" hidden>
+    <section aria-labelledby="h-szenarien">
+      <div class="sec-head">
+        <h2 id="h-szenarien">Szenarien</h2>
+        <p class="lede">Die Kampagne Moosgrab Map für Map, mit Tischskizze für den Esstisch und Spielleiter-Blatt, dazu gewürfelte Zusatzmissionen. Die Spieler-Ansicht lässt alles weg, was erst gefunden werden soll.</p>
+      </div>
+      <div class="gruppe">
+        <aside class="g-list">
+          <p class="sz-akt">Kampagne</p>
+          <div id="szKampagne"></div>
+          <p class="sz-akt">Gespeicherte Zusatzmissionen</p>
+          <div id="szGespeichert"></div>
+        </aside>
+        <div class="g-main" id="szMain"></div>
       </div>
     </section>
   </div>

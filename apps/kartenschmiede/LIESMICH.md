@@ -12,6 +12,8 @@ Läuft in der App unter **`/kartenschmiede`** (hinter demselben Login wie das Sp
 | `datenbank.js` | Reiter „Datenbank“: Suche, Typ- und Tag-Filter, Generator, eigene Einträge |
 | `app.js` | Reiter „Karten“: Werkstatt, Baukasten, Fähigkeiten-Datenbank, Simulator, Speichern, Karte als Text |
 | `gruppe.js` | Reiter „Gruppe“: Helden-Lineups mit Budget, Fähigkeiten je Mitglied, Wellengröße, Druck |
+| `szenarien.js` | Reiter „Szenarien“: Kampagne Moosgrab (Map 1–5 mit Tischskizze, Spielleiter-Blatt, Folgen), Zusatzmissionen aus Schauplatz × Ziel × Komplikation mit Alarmstufe, Gelände nach OPR, Tische bis 120 × 80 cm. Ohne DOM, getestet |
+| `szenarien-ui.js` | Oberfläche dazu: Spieler- und Spielleiter-Ansicht (ohne Spoiler), Tischkarte als SVG, Wellenpunkte aus einer Gruppe, A4-Druckbogen, Speichern unter `kartenschmiede/szenarien/` |
 | `charaktere.js` | Tabelle „Fertige Charaktere“ unter dem Erstellen: Vorlagen und gespeicherte Karten, sortier- und filterbar |
 | `assets/`, `fonts/` | Beispielbilder aus Chris' Einheiten-Tabelle, Schriften (SIL OFL, über Fontsource) |
 | `vendor/html-to-image.js` | PNG-Export (MIT, Version 1.11.11) |
