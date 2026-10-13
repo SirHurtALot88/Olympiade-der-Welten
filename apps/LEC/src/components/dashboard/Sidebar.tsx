@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 type NavKey =
   | "dashboard"
+  | "cockpit"
   | "sortiment"
   | "topflop"
   | "marktpreise"
@@ -13,6 +14,7 @@ type NavKey =
 
 const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: "dashboard", label: "Dashboard", href: "/" },
+  { key: "cockpit", label: "Cockpit (neu)", href: "/cockpit" },
   { key: "sortiment", label: "Sortiment", href: "/sortiment" },
   { key: "topflop", label: "Top / Flop", href: "/top-flop" },
   { key: "marktpreise", label: "Marktpreise", href: "/marktpreise" },
@@ -27,6 +29,7 @@ const NAV_ITEMS_STEUERUNG: { key: NavKey; label: string; href: string }[] = [
 /** Ordnet die aktuelle Route dem Sidebar-Eintrag zu (aktiver Zustand aus der Route). */
 function navKeyForPath(pathname: string): NavKey {
   if (pathname === "/") return "dashboard";
+  if (pathname.startsWith("/cockpit")) return "cockpit";
   if (pathname.startsWith("/sortiment")) return "sortiment";
   if (pathname.startsWith("/top-flop")) return "topflop";
   if (pathname.startsWith("/marktpreise")) return "marktpreise";
