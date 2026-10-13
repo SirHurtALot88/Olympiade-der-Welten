@@ -3848,10 +3848,21 @@
         const hoeheKopfV=effUV.hoehe||[56,34];
         zeichnePartikelEffekt(x,y-hoeheKopfV[0]*Z,y-hoeheKopfV[1]*Z,streuungKopfV*Z,effUV.typ);
       }
-      // Riss mittig auf der Brust (y-26..y-2, dieselbe Spanne wie im normalen Zeichenpfad
-      // unten statt der fruehreren y-42..y-4 — die reichte bis fast an den Kopf/Hals und
-      // war das "verschoben", das Chris live sah), skaliert mit Z wie alles andere hier.
-      if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,11*Z);
+      // Riss auf Herzhoehe (y-30..y-18, dieselbe Spanne wie im normalen Zeichenpfad unten
+      // statt der frueheren y-26..y-2 — die reichte von der Rumpfmitte fast bis zu den
+      // Beinen/zum Bauch und war Chris' Fund live in der Arena, 13.10.: "der Riss in rot
+      // vor lava golem ist zb auch zu gross, da der eher auf seiner herz höhe wäre". Per
+      // Anatomie-Anker im selben File nachgerechnet statt geschaetzt: Schultern beginnen
+      // bei y-33*Z (s. Kommentar bei b.energiekern/zeichneAugen, nativ y=13 am golem_walk-
+      // Kopfansatz), der "Brustkern" (b.gluehenderKern/b.energiekern, s. zeichneKern-Aufruf
+      // direkt darunter) sitzt bei y-24*Z, der Bauch bei y-9*Z. Die Herzgegend (oberer
+      // Brustkorb, knapp unter den Schultern, um den Brustkern zentriert) liegt dazwischen —
+      // y-30..y-18 zentriert genau auf y-24 und trifft das, halb so hohe Spanne wie vorher
+      // (12 statt 24 Z). Breite dabei von 11*Z auf 6*Z verkleinert: bei halber Hoehe wirkte
+      // der Zickzack mit der alten Breite quadratisch/geduckt statt wie ein Riss (per
+      // renderProbe-Vergleich gegen genau diese Fassung verworfen), 6*Z haelt die vorherige
+      // laengliche Proportion.
+      if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-30*Z,y-18*Z,6*Z);
       // b.leuchtenderBauch (04.09., noch von keiner Vollbild-Kreatur genutzt, aber dieselbe
       // Koordinatenlogik wie im normalen Zeichenpfad unten — fuer einen spaeteren
       // aufgedunsenen Vollbild-Koerper mitverdrahtet statt es dort nachzuruesten).
@@ -4407,10 +4418,14 @@
     }
     // Riss ueber der fertigen Ruestung/Haut, aus demselben Grund wie b.effekt zuletzt
     // gezeichnet wird (s. Kommentar oben): sonst verdeckt Ruestung/Helm/Haar ihn wieder.
-    // Bewusst auf Brust/Rumpf begrenzt (y-26..y-2 statt bis in den Kopf) — der Kopf hat
-    // schon sein eigenes feuereffekt-Glimmen (b.effekt.pos==="kopf"), der Riss gehoert auf
-    // den Panzer/Torso (Bildbefund "geschuppte Magmahaut"), nicht mitten durchs Gesicht.
-    if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-26*Z,y-2*Z,7*Z);
+    // Auf Herzhoehe begrenzt (y-30..y-18, vorher y-26..y-2 — s. ausfuehrliche Herleitung
+    // beim Vollbild-Aufruf oben, Chris live in der Arena 13.10.: "der eher auf seiner
+    // herz höhe wäre" statt fast bis zu den Beinen) — der Kopf hat schon sein eigenes
+    // feuereffekt-Glimmen (b.effekt.pos==="kopf"), der Riss gehoert auf den oberen
+    // Panzer/Torso (Bildbefund "geschuppte Magmahaut"), nicht mitten durchs Gesicht und
+    // nicht bis in Bauch/Beine. Breite 7*Z->4*Z aus demselben Proportionsgrund wie beim
+    // Vollbild-Aufruf oben (halbe Hoehe, sonst wirkt der Zickzack geduckt statt laenglich).
+    if(b.gluehenderRiss&&!u.down)zeichneRiss(x,y-30*Z,y-18*Z,4*Z);
     // b.leuchtenderBauch (04.09., s. Kommentar bei zeichneLeuchtenderBauch oben): tiefer als
     // der Riss-Bereich (y-26..y-2, "Brust/Rumpf") sitzt der BAUCH direkt darueber der Beine —
     // Mittelpunkt y-9*Z, Radius 11*Z (per renderProbe-Vorher/Nachher-Screenshot gegen
