@@ -187,7 +187,8 @@
   const kampfOffen = s => s && s.typ === "kampf" && !stand.kampfZiel;
   const weiter = () => tue(() => motor.weiter(stand));
   const zurueck = () => tue(() => motor.zurueck(stand));
-  const runde = () => tue(() => { const r = motor.runde(stand); melde(`Runde ${stand.runde} beendet.${r.texte.length ? ` ${r.texte.join(" ")}` : ""}${map.rundenwurf ? " Jetzt würfeln: Taste W." : ""}`); });
+  const runde = () => tue(() => {
+    for (const k of Object.keys(verhWurf)) delete verhWurf[k]; const r = motor.runde(stand); melde(`Runde ${stand.runde} beendet.${r.texte.length ? ` ${r.texte.join(" ")}` : ""}${map.rundenwurf ? " Jetzt würfeln: Taste W." : ""}`); });
   const rundenwurf = wurf => tue(() => motor.rundenwurf(stand, wurf));
   const probe = (index, wurf) => tue(() => motor.probe(stand, index, wurf));
   const offeneProbe = () => (stand.letzte || []).findIndex(e => e.probe && !e.probe.wurf);
@@ -234,7 +235,18 @@
 
   // ---------- Uhr und Antreiber ----------
   const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
-  const uhrHtml = () => `<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>`;
+  const abendHtml = () => { const m = motor.minutenSeit(stand.abendSeit); return `<span class="sp-uhr" title="So lange läuft der Abend schon">Abend ${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}</span>`; };
+  // Abwechselnde Initiative: wer diese Runde schon dran war und wer als Nächstes aktiviert
+  function zugHtml() {
+    if (!stand.rundenAktiv) return "";
+    const akt = stand.aktiviert || {}, gegner = stand.gegner.filter(g => !g.weg && g.wunden < g.zaeh);
+    const h = helden.filter(x => akt[`held:${x.name}`]).length, g = gegner.filter(x => akt[`g:${x.uid}`]).length;
+    if (!gegner.length) return "";
+    const heldenFertig = h >= helden.length, gegnerFertig = g >= gegner.length;
+    const dran = heldenFertig && gegnerFertig ? "Runde beenden (R)" : heldenFertig ? "Gegner" : gegnerFertig ? "Helden" : h <= g ? "Helden" : "Gegner";
+    return `<span class="sp-pill sp-zug" title="Abwechselnd aktivieren. Haken setzen: Heldenchip ✓ oder ✓ am Gegner"><b>Zug</b> Helden ${h}/${helden.length} · Gegner ${g}/${gegner.length} <em>→ ${dran}</em></span>`;
+  };
+  const uhrHtml = () => `${abendHtml()}<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>`;
   let antreiberNr = 0, antreiberZu = null;
   function antreiberHtml(immer) {
     const liste = motor.antreiber(stand);
@@ -276,7 +288,7 @@
     const laeuft = [spieler.haupt, spieler.schleife].filter(a => !a.paused).map(a => a.dataset.cue);
     el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><small>${esc(map.titel)} · Schritt ${pos}/${ids.length}</small></div>
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
-        <span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
+        ${zugHtml()}<span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
       <div class="sp-kopfknoepfe">${uhrHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
         <button type="button" class="btn ghost sm" data-sp="log">Log ${taste("P")}</button>
@@ -508,8 +520,11 @@
     }
     const inhalt = svg.replace(/^<svg class="sz-karte"/, `<svg class="sp-svg" data-b="${karte.b}" data-t="${karte.t}"`).replace("</svg>", `${teile.join("")}</svg>`);
     // Heldenchips: Name und Beute auf einen Blick, Klick öffnet Infos und Inventar
-    const chips = opt.gross ? "" : `<div class="sp-helden">${helden.map(h => { const n = ((stand.inventar || {})[h.name] || []).length;
-      return `<button type="button" class="sp-heldchip ${popup && popup.tok === `held:${h.name}` ? "an" : ""}" data-chip="held:${esc(h.name)}">${esc(h.name)}${n ? ` <i>🎒${n}</i>` : ""}</button>`; }).join("")}</div>`;
+    const chips = opt.gross ? "" : `<div class="sp-helden">${helden.map(h => {
+      const n = ((stand.inventar || {})[h.name] || []).length, sp = (stand.sporen || {})[h.name] || 0, b = motor.befall(sp), dran = (stand.aktiviert || {})[`held:${h.name}`];
+      return `<span class="sp-heldchip ${popup && popup.tok === `held:${h.name}` ? "an" : ""} ${dran ? "dran" : ""} ${b.stufe ? "befallen" : ""}">
+        <button type="button" data-chip="held:${esc(h.name)}" title="${esc(h.name)}${b.stufe ? `: ${b.stufe}, ${b.wuerfel} Aktionswürfel` : ""}">${esc(h.name)}${sp ? ` <i>🍄${sp}</i>` : ""}${n ? ` <i>🎒${n}</i>` : ""}</button>
+        ${stand.rundenAktiv ? `<button type="button" class="sp-hak" data-akt="held:${esc(h.name)}" title="War diese Runde dran">${dran ? "✓" : "○"}</button>` : ""}</span>`; }).join("")}</div>`;
     const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort." : "Raster: eine Kartenlänge · Figuren anklicken für Infos, ziehen zum Verschieben";
     return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? popupHtml() : ""}</div>`;
   }
@@ -520,7 +535,12 @@
     let kopf = "", inhalt = "";
     if (art === "held") {
       const h = helden.find(x => x.name === id);
-      kopf = `<b>${esc(id)}</b><small>Held</small>`; inhalt = `<p>${esc((h && h.info) || "")}</p><h5>Beute</h5>${inventarHtml(id)}`;
+      const sp = (stand.sporen || {})[id] || 0, b = motor.befall(sp);
+      kopf = `<b>${esc(id)}</b><small>Held${b.stufe ? ` · ${b.stufe}` : ""}</small>`;
+      inhalt = `<p>${esc((h && h.info) || "")}</p>
+        <h5>Sporenpunkte</h5><p class="sp-sporen"><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="-1">−</button><b>${sp}</b><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="1">+</button>
+          <small>${b.stufe ? `${b.stufe}: würfelt ${b.wuerfel} statt 4 Aktionswürfel, Gegner greifen ihn bevorzugt an` : "ab 3 befallen, ab 5 schwer befallen"}</small></p>
+        <h5>Beute</h5>${inventarHtml(id)}`;
     } else if (art === "f") {
       const f = map.figuren[id] || {};
       kopf = `<b>${esc(f.name || id)}</b><small>NPC</small>`;
@@ -541,6 +561,9 @@
   }
 
   // ---------- Gegnerliste ----------
+  // Verhaltenswürfe dieser Runde (nur Anzeige) und zuletzt gezeigte Zustände: Ein neuer Zustand leuchtet einmal auf
+  const verhWurf = {}, letzterZustand = {};
+  function neuerZustand(g, id) { const alt = letzterZustand[g.uid]; letzterZustand[g.uid] = id; return alt !== undefined && alt !== id; }
   function gegnerListe() {
     const aktiv = stand.gegner.filter(g => !g.weg);
     if (!aktiv.length) return `<p class="hint">Noch keine Gegner am Tisch.</p>`;
@@ -549,10 +572,11 @@
       const mods = motor.modText(stand, g);
       const zusatz = motor.zusaetze(stand, def);
       return `<div class="sp-gegner ${offen ? "markiert" : ""} ${z.id === "gefallen" ? "gefallen" : ""}" data-gegner="${esc(g.uid)}">
-        <div class="sp-g-zeile"><span class="sp-g-tok">${esc(gegnerKuerzel(g))}</span><b>${esc(def.name || g.id)}</b><span class="sp-schaedel" title="Bedrohung">${"☠".repeat(b.schaedel)}</span>
+        <div class="sp-g-zeile">${stand.rundenAktiv && z.id !== "gefallen" ? `<button type="button" class="sp-hak" data-akt="g:${esc(g.uid)}" title="War diese Runde dran">${(stand.aktiviert || {})[`g:${g.uid}`] ? "✓" : "○"}</button>` : ""}<span class="sp-g-tok">${esc(gegnerKuerzel(g))}</span><b>${esc(def.name || g.id)}</b><span class="sp-schaedel" title="Bedrohung">${"☠".repeat(b.schaedel)}</span>
           <span class="sp-g-balken">${Array.from({ length: g.zaeh }, (_, i) => `<i class="${i < g.wunden ? "wunde" : ""}"></i>`).join("")}</span>
           <span class="sp-g-knoepfe">${z.id === "gefallen" ? `<button type="button" class="btn ghost sm" data-weg="1">vom Tisch</button>` : `<button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button>`}<button type="button" class="btn ghost sm" data-dmg="-1">−1</button></span></div>
-        <div class="sp-g-zustand"><em class="z-${esc(z.id.replace(/\s+/g, "-"))}">${esc(z.id)}</em> ${sag(z.satz)}</div>
+        <div class="sp-g-zustand ${neuerZustand(g, z.id) ? "neu" : ""}"><em class="z-${esc(z.id.replace(/\s+/g, "-"))}">${esc(z.id)}</em> ${sag(z.satz)}</div>
+        ${stand.rundenAktiv && z.id !== "gefallen" ? `<p class="sp-verhwurf">${verhWurf[g.uid] ? `🎲 <b>${verhWurf[g.uid].wurf}</b> ${esc(verhWurf[g.uid].text)} <small>(${verhWurf[g.uid].art === "wuetend" ? "wütend" : "ruhig"})</small>` : `<button type="button" class="btn ghost sm" data-verh="${esc(g.uid)}" title="Verhaltenswurf für diesen Gegner (setzt den Haken)">🎲 Verhalten</button>`}</p>` : ""}
         ${mods.length ? `<p class="sp-mods">${mods.map(m => `<i class="${m.staerker ? "plus" : "minus"}">${esc(m.text)}</i>`).join("")}</p>` : ""}
         ${offen ? `<div class="sp-g-mehr">${g.wunden === 0 && b.satz ? `<h5>Bedrohung ansagen</h5>${sag(b.satz)}` : ""}${zusatz.length ? `<h5>Gilt gerade</h5>${zusatz.map(x => `${gm(x.text)}${x.ansage ? sag(x.ansage) : ""}`).join("")}` : ""}
           <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button>
@@ -739,7 +763,7 @@
             : `<span class="hint">Als Nächstes: <b>${esc(nachTitel)}</b></span>`}</footer>
         </section>
         ${schubladeHtml()}
-        ${!mitSeite(s) ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner <button type="button" class="btn ghost sm" data-sp="gegner-neu" title="Gegner dazuholen (auch einen NPC, der kämpft)">＋ Gegner</button></h4>${gegnerListe()}</div></aside>`}
+        ${!mitSeite(s) ? "" : `<aside class="sp-seite ${s.typ === "kampf" ? "kampf" : ""}">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner <button type="button" class="btn ghost sm" data-sp="gegner-neu" title="Gegner dazuholen (auch einen NPC, der kämpft)">＋ Gegner</button></h4>${gegnerListe()}</div></aside>`}
       </div>
       <footer class="sp-unten">${aktionsLeiste(s)}</footer>
     </div>${fensterHtml()}`;
@@ -803,6 +827,9 @@
       const t = e.target.closest("button, [data-gegner]");
       if (!t) return;
       const g = t.closest("[data-gegner]");
+      if (t.dataset.akt) { motor.aktiviere(stand, t.dataset.akt); spaeter(); zeige(); return; }
+      if (t.dataset.verh) { verhWurf[t.dataset.verh] = motor.verhaltenWurf(stand); motor.aktiviere(stand, `g:${t.dataset.verh}`, true); spaeter(); zeige(); return; }
+      if (t.dataset.sporen) { tue(() => motor.sporen(stand, t.dataset.sporen, +t.dataset.d)); return; }
       if (t.dataset.mod && g) {
         const uid = g.dataset.gegner, alle = ($(`spAlle-${uid}`) || {}).checked, k = t.dataset.mod;
         const gg = stand.gegner.find(x => x.uid === uid);
@@ -894,6 +921,7 @@
       if (k === "w" || k === "W") { if (map.rundenwurf && stand.rundenAktiv) rundenwurf(0); return; }
       if (k === "l" || k === "L") { fenster = "lage"; zeige(); return; }
       if (k === "p" || k === "P") { fenster = "log"; zeige(); return; }
+      if (k === "x" || k === "X") { antreiberZu = stand.schritt; zeige(); return; }
       if (k === "a" || k === "A") { if (s && s.cue) spiele(s.cue); return; }
       if (k === "s" || k === "S") { stoppe(); zeige(); return; }
       if (k === "n" || k === "N") { if (fenster && fenster.startsWith("npc")) fenster = null; else if ([...stand.verlauf].some(id => (map.schritte[id] || {}).typ === "npc")) fenster = "npc"; zeige(); return; }

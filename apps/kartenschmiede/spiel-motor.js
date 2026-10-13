@@ -35,13 +35,14 @@
       const ueber = opt.uebernahme || {};
       for (const [k, v] of Object.entries(ueber.leisten || {})) if (leisten[k] && map.leisten[k].gilt === "kampagne") leisten[k].wert = v;
       Object.assign(flags, ueber.flags || {});
+      const mitgebracht = { inventar: kopie(ueber.inventar || {}), sporen: kopie(ueber.sporen || {}) };
       const state = {
         version: 1, kampagne: map.kampagne, map: map.map, name: opt.name || `${map.titel}`,
         schritt: null, verlauf: [], flags, leisten, runde: 0, rundenAktiv: false,
         gegner: [], gespawnt: {}, ereignisse: {}, angewendet: {}, wahlen: {}, checks: {}, kampfZiel: null,
         letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
         schwellen: {}, tote: {}, pos: {}, sprung: null, log: [], inventar: {}, schrittSeit: jetzt(), typMod: {},
-        extraGegner: {}, npcKampf: {}, extraNr: 0,
+        extraGegner: {}, npcKampf: {}, extraNr: 0, aktiviert: {}, abendSeit: jetzt(), ...mitgebracht,
       };
       betrete(state, map.start);
       return state;
@@ -62,7 +63,8 @@
     }
     // Ältere Spielstände kennen die neueren Felder noch nicht
     const migriere = state => {
-      for (const k of ["schwellen", "tote", "pos", "inventar", "typMod", "extraGegner", "npcKampf"]) if (!state[k]) state[k] = {};
+      for (const k of ["schwellen", "tote", "pos", "inventar", "typMod", "extraGegner", "npcKampf", "aktiviert", "sporen"]) if (!state[k]) state[k] = {};
+      if (!state.abendSeit) state.abendSeit = jetzt();
       if (!state.extraNr) state.extraNr = 0;
       registriere(state);
       if (!state.log) state.log = [];
@@ -490,6 +492,7 @@
     function runde(state) {
       merke(state);
       state.runde += 1;
+      state.aktiviert = {};
       const texte = [];
       let sprung = null;
       for (const r of map.rundenende || []) {
@@ -565,6 +568,26 @@
     // Aufträge der Spieler: was sie wissen und tun sollen (aktiv = bekannt und nicht erledigt)
     const auftraege = state => (map.auftraege || []).filter(a => gilt(state, a.ab)).map(a => ({ ...a, erledigtJetzt: !!(a.erledigt && gilt(state, a.erledigt)) }));
 
+    // Abwechselnde Initiative: wer in dieser Runde schon aktiviert hat (Helden „held:Name“, Gegner „g:uid“)
+    const aktiviere = (state, schluessel, an) => { state.aktiviert = state.aktiviert || {}; state.aktiviert[schluessel] = an === undefined ? !state.aktiviert[schluessel] : !!an; };
+    // Sporenpunkte je Held (Namensregel): ab 3 befallen (3 Aktionswürfel), ab 5 schwer befallen (2)
+    function sporen(state, held, delta) {
+      merke(state);
+      const alt = (state.sporen || {})[held] || 0, neu = Math.max(0, alt + delta);
+      state.sporen = { ...(state.sporen || {}), [held]: neu };
+      notiere(state, `${held}: Sporenpunkte ${alt} → ${neu}`);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "sporen", text: `${held}: Sporenpunkte ${alt} → ${neu}`, leisten: [], flags: [] });
+    }
+    const befall = n => (n >= 5 ? { stufe: "schwer befallen", wuerfel: 2 } : n >= 3 ? { stufe: "befallen", wuerfel: 3 } : { stufe: "", wuerfel: 4 });
+    // Verhaltenswurf für einen Gegner: W6 auf die gerade gültige Tabelle (ruhig oder wütend)
+    function verhaltenWurf(state) {
+      const art = wuetend(state) ? "wuetend" : "ruhig", tab = (map.verhalten || {})[art] || [];
+      const w = 1 + Math.floor(zufall() * 6);
+      const zeile = tab.find(([b]) => String(b).split(/[–-]/).map(Number).reduce((ok, n, i, a) => ok || (a.length === 1 ? w === n : w >= a[0] && w <= a[1]), false));
+      return { wurf: w, art, text: zeile ? zeile[1] : "" };
+    }
+    const minutenSeit = t => Math.max(0, Math.floor((jetzt() - (t ?? jetzt())) / 60000));
+
     // Wo eine Figur auf der Tischkarte steht (nur Anzeige, keine Spielregel; kein Rückgängig)
     const setzePos = (state, schluessel, x, y) => { state.pos = state.pos || {}; state.pos[schluessel] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }; };
     const figurenAmTisch = state => Object.entries(map.figuren || {}).filter(([id, f]) => f.tisch && !(state.npcKampf || {})[id] && gilt(state, f.tisch.ab) && !(f.tisch.bis && gilt(state, f.tisch.bis))).map(([id, f]) => ({ id, ...f }));
@@ -580,6 +603,8 @@
     }
     // Was die nächste Map übernimmt
     const uebernahme = state => ({
+      inventar: kopie(state.inventar || {}),
+      sporen: kopie(state.sporen || {}),
       leisten: Object.fromEntries(Object.entries(state.leisten).filter(([k]) => (map.leisten[k] || {}).gilt === "kampagne").map(([k, l]) => [k, l.wert])),
       flags: Object.fromEntries(Object.entries(state.flags).filter(([k]) => /map[2-9]/.test((map.flags[k] || {}).wirktIn || ""))),
     });
@@ -589,6 +614,7 @@
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
       effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, zufallsNpc, auftraege,
+      aktiviere, sporen, befall, verhaltenWurf, minutenSeit,
       schritt: state => map.schritte[state.schritt] || null,
       naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
     };

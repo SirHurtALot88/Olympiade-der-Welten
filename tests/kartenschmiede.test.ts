@@ -627,6 +627,15 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(MAP2.kampagne).toBe(MAP1.kampagne);
     expect(MAP2.map).toBe(2);
   });
+  it("nimmt Sporenpunkte und Beute der Helden in die nächste Map mit", () => {
+    const m1 = motor() as unknown as Motor & { sporen(s: Spielstand, h: string, d: number): void; gibBeute(s: Spielstand, h: string, x: string): void };
+    const s1 = m1.neu();
+    m1.sporen(s1, "Krieger", 1); m1.sporen(s1, "Krieger", 2);
+    m1.gibBeute(s1, "Schurke", "Heiltrank");
+    const s2 = motor2().neu({ uebernahme: m1.uebernahme(s1) }) as unknown as { sporen: Record<string, number>; inventar: Record<string, string[]> };
+    expect(s2.sporen.Krieger).toBe(3);
+    expect(s2.inventar.Schurke).toEqual(["Heiltrank"]);
+  });
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();
     s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;
@@ -678,6 +687,19 @@ const MINI = {
   },
 };
 describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  it("zählt Aktivierungen je Runde, würfelt Verhalten und stuft Befall ab", () => {
+    const m = mini() as unknown as Motor2 & { aktiviere(s: Stand2, k: string, an?: boolean): void; verhaltenWurf(s: Stand2): { wurf: number; text: string }; befall(n: number): { stufe: string; wuerfel: number } };
+    const s = m.neu() as Stand2 & { aktiviert: Record<string, boolean> };
+    m.aktiviere(s, "held:Krieger");
+    m.aktiviere(s, "g:x");
+    expect(s.aktiviert).toEqual({ "held:Krieger": true, "g:x": true });
+    m.aktiviere(s, "g:x");
+    expect(s.aktiviert["g:x"]).toBe(false);
+    m.runde(s);
+    expect(s.aktiviert).toEqual({});
+    expect(m.verhaltenWurf(s).wurf).toBe(1);
+    expect([m.befall(2).wuerfel, m.befall(3).wuerfel, m.befall(5).wuerfel]).toEqual([4, 3, 2]);
+  });
   it("stärkt und schwächt Gegner, holt Gegner dazu und lässt NPCs kämpfen", () => {
     type G = { uid: string; id: string; zaeh: number };
     const m = SM.erstelle(JSON.parse(JSON.stringify(MINI)), { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2 & {

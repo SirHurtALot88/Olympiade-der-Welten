@@ -869,6 +869,23 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
 .sp-protokoll small { color: var(--brass); margin-right: 6px; }
 .sp-kartenbox { width: 100%; }
+/* Zug, Haken, Verhaltenswurf, Sporen */
+.sp-zug em { font-size: 14px; color: var(--brass); }
+.sp-hak { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font: 800 13px var(--ui); cursor: pointer; flex-shrink: 0; }
+.sp-heldchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 0; border-radius: 999px; border: 1px solid #6fb0ff; background: rgba(111,176,255,.1); }
+.sp-heldchip > button[data-chip] { background: none; border: 0; color: var(--ink); font: 700 14px var(--ui); cursor: pointer; padding: 2px 4px 2px 10px; }
+.sp-heldchip.an { background: #6fb0ff; } .sp-heldchip.an > button[data-chip] { color: #0b0c0f; }
+.sp-heldchip.dran { opacity: .6; } .sp-heldchip.dran .sp-hak { color: #7fd06a; border-color: #5fbf5a; }
+.sp-heldchip.befallen { border-color: #a3b83a; }
+.sp-gegner .sp-hak { margin-right: 2px; }
+.sp-verhwurf { margin: 0; font: 600 14px var(--ui); max-width: none; }
+.sp-verhwurf small { color: var(--dim); }
+.sp-sporen { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+.sp-sporen b { font: 800 18px var(--ui); min-width: 20px; text-align: center; }
+.sp-sporen small { color: var(--dim); flex-basis: 100%; }
+.sp-g-zustand.neu { animation: sp-neu 1.2s ease-out; border-radius: 6px; }
+@keyframes sp-neu { 0% { background: rgba(207,167,94,.45); } 100% { background: transparent; } }
+.sp-seite.kampf .sp-tischkarte svg { max-height: 220px; }
 /* Auftrag der Spieler, dauerhaft über der Schrittkarte */
 .sp-auftrag { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--brass); border-radius: 8px; background: rgba(207,167,94,.07); font-family: var(--ui); font-size: 16px; }
 .sp-auftrag > span { font: 700 12px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
@@ -919,8 +936,6 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-nicht { color: var(--dim); font-size: 16px; }
 /* Heldenchips unter der Tischkarte */
 .sp-helden { display: flex; flex-wrap: wrap; gap: 5px; }
-.sp-heldchip { padding: 4px 10px; border-radius: 999px; border: 1px solid #6fb0ff; background: rgba(111,176,255,.1); color: var(--ink); font: 700 14px var(--ui); cursor: pointer; }
-.sp-heldchip.an { background: #6fb0ff; color: #0b0c0f; }
 .sp-heldchip i { font-style: normal; font-weight: 600; }
 /* Leisten blitzen bei Änderung */
 .sp-pill { position: relative; }
