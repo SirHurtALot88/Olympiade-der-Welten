@@ -174,6 +174,84 @@
    }
   ]
  },
+ "antreiben": [
+  {
+   "titel": "Der Wald atmet",
+   "vorlesen": "Hinter euch, im Moos, hebt und senkt sich etwas. Langsam. Wie ein Atem, der näher kommt.",
+   "gmNotiz": "Nur Stimmung. Wenn sie weiter zögern: der nächste Marker ist eine Kartenlänge entfernt, sag es ihnen.",
+   "schritte": [
+    "spieler-erste-bewegung",
+    "spieler-runde1"
+   ]
+  },
+  {
+   "titel": "Der Schrei, noch einmal",
+   "vorlesen": "Noch einmal der Schrei. Näher. Links, vom Waldrand her.",
+   "gmNotiz": "Zeigt die Richtung der Frau (linke Kante). Noch keine Uhr, kein Gegner.",
+   "wenn": {
+    "flag": "frau_sichtbar",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-erste-bewegung"
+   ]
+  },
+  {
+   "titel": "Die Wurzeln wachsen",
+   "vorlesen": "Sie steht noch. Die Arme von sich gestreckt, als wären sie nicht ihre. Und die Wurzeln sind länger als eben.",
+   "gmNotiz": "Tipp auf den Zählstein der Sporenuhr. Nicht sagen, was bei null passiert.",
+   "wenn": {
+    "leisteAktiv": "sporenuhr"
+   },
+   "schritte": [
+    "spieler-runde1",
+    "kampf-sporenlinge"
+   ]
+  },
+  {
+   "titel": "Das Kleinvieh wartet nicht",
+   "vorlesen": "Im Moos raschelt es. Das Kleinvieh hat euch längst gehört. Es wartet nur, bis ihr stehen bleibt.",
+   "gmNotiz": "Wer länger als einen Zug überlegt, bekommt den nächsten Verhaltenswürfel laut angesagt. Kein Extragegner.",
+   "schritte": [
+    "kampf-sporenlinge",
+    "kampf-erbluehte"
+   ]
+  },
+  {
+   "titel": "Sie will etwas sagen",
+   "vorlesen": "Sie öffnet den Mund. Schließt ihn wieder. Die Wurzeln an den Armen sind in der kurzen Zeit einen Fingerbreit gewachsen.",
+   "gmNotiz": "Die Spieler sollen sich entscheiden: beruhigen, vorstellen, ausfragen oder Abstand. Dann sofort wählen.",
+   "schritte": [
+    "npc-frau",
+    "wahl-frau"
+   ]
+  },
+  {
+   "titel": "Das Licht pulst",
+   "vorlesen": "Oben, zwischen den Steinen der Ruine, wird das Grün für einen Atemzug heller. Dann wieder dunkler. Als hätte etwas eingeatmet.",
+   "gmNotiz": "Zeigt den Weg nach oben. Marker 3 liegt in der Wolke rechts unten, die Spuren führen zur Ruine.",
+   "wenn": {
+    "flag": "oben_aufgebaut",
+    "ist": true
+   }
+  },
+  {
+   "titel": "Der Anhänger im Moos",
+   "vorlesen": "Im Moos neben ihrer Hand glänzt es kupfern. Das Moos schiebt sich schon darüber.",
+   "gmNotiz": "Die Wahl steht: nehmen, zudecken, liegen lassen, verbrennen. Nicht sagen, was er öffnet.",
+   "schritte": [
+    "wahl-anhaenger"
+   ]
+  },
+  {
+   "titel": "Die Nacht wird länger",
+   "vorlesen": "Es ist dunkler geworden. Der Wald atmet lauter als vorhin.",
+   "gmNotiz": "Jeder Marker jetzt: Atemzug +1. Entscheidung einfordern: alle, einer oder keiner.",
+   "schritte": [
+    "wahl-nachsuche"
+   ]
+  }
+ ],
  "tischplan": {
   "helden": {
    "x": 12,
@@ -437,40 +515,63 @@
     },
     "zeichen": "F"
    },
-   "wer": "Jung, barfuß, Kleid voller Erde. Wurzeln wachsen aus den Ärmeln, sie hält die Arme von sich weg. Sie wollte zur Ruine, weil das Licht sie gerufen hat, und ist umgekehrt, als es wehtat.",
-   "stimme": "Leise, zitternd, Pausen mitten im Satz. Sie sieht die Helden nicht lange an. Höchstens drei Minuten, dann weiter.",
+   "wer": "Lene, die Tochter der Dorfältesten; ihren Namen sagt sie nur, wenn man sie ruhig danach fragt. Jung, barfuß, Kleid voller Erde, Wurzeln aus den Ärmeln, die Arme hält sie von sich weg. Sie wollte zum grünen Licht in der Ruine und ist umgekehrt, als es wehtat.",
+   "stimme": "Leise, zitternd, Pausen mitten im Satz. Blick weicht aus, die Arme weg vom Körper, als gehörten sie ihr nicht.",
    "motiv": "Nach Hause. Zu ihrer Mutter. Sie hat Angst, dass sie den Weg nicht mehr findet.",
    "ziel": "In dieser Szene will sie nur eins: dass jemand ihrer Mutter etwas ausrichtet. Sie weiß, dass sie selbst nicht mehr ankommt, ohne es sagen zu können.",
    "kern": [
-    "„Da … das grüne Licht, zwischen den Steinen. Da wollte ich hin. Geht nicht … geht nicht hin.“",
-    "„Es ist so warm. Alles ist so warm.“",
-    "„Ich hab den Weg nicht gefunden. Nach Hause. Ich hab ihn nicht gefunden.“"
+    "„Das Licht. Das grüne, zwischen den Steinen … da wollte ich hin. Geht nicht hin.“",
+    "„Es ist so warm. Alles ist so warm. Ich auch.“",
+    "„Ich hab den Weg nicht gefunden. Nach Hause. Ich hab ihn nicht gefunden.“",
+    "„Hört ihr das? Es singt. Es singt immer noch.“"
+   ],
+   "weiss": [
+    {
+     "info": "„Lene. Ich bin … Lene.“ Beim Namen zucken die Wurzeln an ihren Armen.",
+     "wie": "Ruhig beruhigen und nach ihr fragen (Wahl 1). Wer stattdessen seinen eigenen Namen nennt, bekommt ihn wiederholt und startet Map 2 mit 1 Sporenpunkt."
+    },
+    {
+     "info": "„Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden.“",
+     "wie": "Nach ihrer Mutter fragen oder Hilfe versprechen (Wahl 1 oder 2). Das Versprechen öffnet in Map 2 die Falltür ohne Lärm."
+    },
+    {
+     "info": "„Es fing mit dem Brunnen an. Vierzig Winter kalt, und dann warm.“",
+     "wie": "Sachlich fragen, woher das kommt, was im Dorf los ist (Wahl 3). Hedda bestätigt den Satz in Map 2."
+    },
+    {
+     "info": "„Alle knien. In der Kapelle. Alle flüstern.“",
+     "wie": "Nach dem Dorf fragen. Mehr sagt sie dazu nicht."
+    },
+    {
+     "info": "„Es hat gesungen. Dann hat es wehgetan.“ Sie zeigt zur Ruine.",
+     "wie": "Nach dem Licht fragen. Ihr einziger fester Hinweis: der Weg nach oben."
+    },
+    {
+     "info": "„Er ist vorgegangen. Er hat gesagt, er hört es rufen.“",
+     "wie": "Nach dem Mann im Moos fragen (Marker 2) oder ihn erwähnen. Seinen Namen weiß sie nicht mehr."
+    },
+    {
+     "info": "Wurzeln, keine Wunden. „Tut nicht weh. Es ist nur warm.“",
+     "wie": "Fragen, ob sie verletzt ist. Sie hebt die Arme, mehr Antwort gibt es nicht."
+    }
    ],
    "nichtWissen": [
-    "Was mit ihr geschieht. Sie spürt nur die Wärme.",
-    "Was unter dem Dorf liegt. Sie kennt nur den Brunnen, der plötzlich warm war.",
-    "Die Namen der Helden. Wenn ein Held seinen sagt, wiederholt sie ihn, und die Wurzeln an ihren Armen zucken."
+    "Was mit ihr geschieht: sie spürt nur die Wärme.",
+    "Was unter dem Dorf liegt: nur, dass der Brunnen plötzlich warm war.",
+    "Die Namen der Helden: sagt einer seinen, wiederholt sie ihn, und die Wurzeln zucken."
    ],
    "wennSieFragen": [
     [
-     "nach dem Dorf",
-     "„Alle knien. In der Kapelle. Alle flüstern.“ Mehr sagt sie nicht."
+     "ob sie mitkommt",
+     "„Ich kann nicht. Die Füße … die Füße sind schon drin.“"
     ],
     [
-     "nach ihrer Mutter",
-     "„Sie wartet. Sie wartet immer.“ Sie zeigt nicht in eine Richtung, sie weiß sie nicht mehr."
+     "wer ihr das angetan hat",
+     "Sie schüttelt den Kopf. „Niemand. Es hat gerufen. Ich bin gegangen.“"
     ],
     [
-     "nach dem Licht",
-     "Sie schließt die Augen. „Es hat gesungen. Dann hat es wehgetan.“"
-    ],
-    [
-     "ob sie verletzt ist",
-     "Sie hebt die Arme. Wurzeln, keine Wunden. „Tut nicht weh. Es ist nur warm.“"
-    ],
-    [
-     "nach dem Mann im Moos (Marker 2)",
-     "„Er ist vorgegangen. Er hat gesagt, er hört es rufen.“ Sie weiß seinen Namen nicht mehr."
+     "nach ihrem Namen, drängend",
+     "Sie zögert. Nur wer ruhig bleibt, bekommt ihn (Wahl 1)."
     ]
    ]
   }
@@ -847,6 +948,8 @@
  "ereignisse": {
   "marker1": {
    "name": "Suchmarker 1 (oben links)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 1",
    "taste": "1",
    "marker": "1",
    "einmal": true,
@@ -877,6 +980,8 @@
   },
   "marker2": {
    "name": "Suchmarker 2 (Mitte)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 2",
    "taste": "2",
    "marker": "2",
    "einmal": true,
@@ -909,6 +1014,8 @@
   },
   "marker3": {
    "name": "Suchmarker 3 (rechts unten, in der Sporenwolke)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 3",
    "taste": "3",
    "marker": "3",
    "einmal": true,
@@ -940,12 +1047,16 @@
   },
   "mitte": {
    "name": "Ein Held überschreitet die Tischmitte",
+   "gruppe": "Bewegen",
+   "kurz": "Tischmitte",
    "taste": "M",
    "einmal": true,
    "springe": "aufbau-oben"
   },
   "frau-erreicht": {
    "name": "Ein Held erreicht die Frau",
+   "gruppe": "Story",
+   "kurz": "Frau erreicht",
    "taste": "F",
    "einmal": true,
    "nurWenn": {
@@ -963,6 +1074,8 @@
   },
   "quelle-zerstoert": {
    "name": "Die Quelle ist zerstört",
+   "gruppe": "Kampf",
+   "kurz": "Quelle zerstört",
    "taste": "Q",
    "einmal": true,
    "nurWenn": {
@@ -1085,6 +1198,7 @@
   "spieler-erste-bewegung": {
    "typ": "spieler",
    "titel": "Die Spieler sind dran",
+   "zeitlimit": 3,
    "runden": false,
    "text": "Sobald sich der erste Held bewegt: weiter.",
    "hinweise": [
@@ -1125,6 +1239,7 @@
   "spieler-runde1": {
    "typ": "spieler",
    "titel": "Runde 1",
+   "zeitlimit": 6,
    "runden": true,
    "text": "Die Spieler spielen Runde 1. Sie bewegen sich, suchen oder laufen zur Frau. Am Ende der Runde: R.",
    "hinweise": [
@@ -1278,14 +1393,16 @@
   "npc-frau": {
    "typ": "npc",
    "titel": "Du spielst die Frau",
+   "zeitlimit": 3,
    "figur": "frau",
-   "einstieg": "Da … das grüne Licht, zwischen den Steinen. Da wollte ich hin. Geht nicht … geht nicht hin.",
+   "einstieg": "Das Licht. Das grüne, zwischen den Steinen … da wollte ich hin. Geht nicht hin.",
    "gmNotiz": "Leise und zitternd. Sie zeigt zur Ruine oben. Das ist ihr einziger fester Hinweis. Hier kannst du stattdessen deinen Suno-Text von 01B-4A sprechen oder laufen lassen, die Sätze oben sind der Ersatz dafür. Dann hör zu, was die Spieler sagen, und wähle im nächsten Schritt die Antwort, die am nächsten kommt.",
    "weiter": "wahl-frau"
   },
   "wahl-frau": {
    "typ": "wahl",
    "titel": "Was tun die Helden mit der Frau?",
+   "zeitlimit": 3,
    "frage": "Wähle, was dem am nächsten kommt, was die Spieler sagen oder tun.",
    "optionen": [
     {
@@ -1377,6 +1494,7 @@
   "wahl-aufbluehen": {
    "typ": "wahl",
    "titel": "Was tun die Helden, während sie sich verwandelt?",
+   "zeitlimit": 2,
    "ansage": "Die Wurzeln an ihren Armen schießen in die Erde. Ihr Rücken biegt sich, und am Hals geht etwas auf, langsam, wie eine Blüte. Sie steht noch. Ihr habt einen Atemzug. Was tut ihr?",
    "frage": "Wähle, was dem am nächsten kommt. Jede Antwort ändert, wie der Kampf beginnt.",
    "optionen": [
@@ -1549,6 +1667,7 @@
   "wahl-anhaenger": {
    "typ": "wahl",
    "titel": "Der Anhänger und was von ihr blieb",
+   "zeitlimit": 3,
    "frage": "Im Moos liegt ein Kupferanhänger mit dem Zeichen der Kapelle. Was tun die Helden?",
    "optionen": [
     {
@@ -1649,6 +1768,7 @@
   "wahl-nachsuche": {
    "typ": "wahl",
    "titel": "Noch suchen?",
+   "zeitlimit": 2,
    "wenn": {
     "flag": "alle_marker",
     "ist": false

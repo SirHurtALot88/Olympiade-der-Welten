@@ -43,7 +43,13 @@
   const lokal = () => { try { return JSON.parse(localStorage.getItem(LOKAL) || "[]"); } catch { return []; } };
   // Die letzte Meldung überlebt das Neuzeichnen; ein neuer Schritt räumt sie weg
   let meldung = "";
-  const melde = t => { meldung = t; const m = $("spMsg"); if (m) m.textContent = t; };
+  // Meldungen erscheinen als Toast links unten und verschwinden nach 6 s; Fehler bleiben bis zur nächsten Aktion
+  let meldungTakt = null;
+  const melde = (t, bleibt) => {
+    meldung = t; const m = $("spMsg"); if (m) m.textContent = t;
+    clearTimeout(meldungTakt);
+    if (!bleibt && t) meldungTakt = setTimeout(() => { meldung = ""; const x = $("spMsg"); if (x) x.textContent = ""; }, 6000);
+  };
   async function ladeListe() {
     if (!KS.SERVER) { staende = lokal().map(x => ({ id: x.id, name: x.name, kampagne: x.kampagne })); return; }
     const r = await fetch(API_STAND, { credentials: "same-origin" });
@@ -65,7 +71,7 @@
     const r = await fetch(`${API_STAND}/${encodeURIComponent(standId)}`, { method: "PUT", credentials: "same-origin",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inhalt }) });
     // Erfolg bleibt still, sonst überschreibt jedes Speichern die eigentliche Meldung
-    if (!r.ok) melde("Speichern fehlgeschlagen. Bist du noch eingeloggt?");
+    if (!r.ok) melde("Speichern fehlgeschlagen. Bist du noch eingeloggt?", true);
   }
   const spaeter = () => { clearTimeout(speicherTakt); speicherTakt = setTimeout(speichere, 700); };
 
@@ -132,6 +138,7 @@
   function waehleMap(nr) {
     for (const k of Object.keys(wuerfe)) delete wuerfe[k];
     map = MAPS.find(m => String(m.map) === String(nr)) || MAPS[0];
+    for (const k of Object.keys(letzteWerte)) delete letzteWerte[k];
     motor = map ? SM.erstelle(map, { werte: werteFuer, stufe: stufeFuer }) : null;
     const mp = map && (S.MOOSGRAB.maps || []).find(x => x.nr === map.map);
     karte = mp ? mp.karte : null;
@@ -170,7 +177,7 @@
     if (stand.letzte !== vorherLetzte || stand.schritt !== vorher) for (const k of Object.keys(wuerfe)) if (k !== "ende") delete wuerfe[k];
     const s = motor.schritt(stand);
     if (s && s.typ === "ende") stand.uebernahme = motor.uebernahme(stand);
-    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; }
+    if (s && stand.schritt !== vorher) { markiert = null; popup = null; meldung = ""; antreiberNr = 0; antreiberZu = null; if (s.stoppt) stoppe(s.stoppt); if (s.typ === "npc") fenster = "npc"; else if (fenster && fenster.startsWith("npc")) fenster = null; }
     spaeter();
     zeige();
   }
@@ -202,6 +209,20 @@
     else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen().catch(() => melde("Vollbild ging nicht. Am Mac: Ctrl + Cmd + F."));
   }
 
+  // ---------- Beute ----------
+  // Ein Beutewurf wie „Heiltrank“ wird über den Katalog zum Gegenstand mit Regeltext und lässt sich einem Helden geben
+  const gegenstand = text => ((window.Katalog || {}).GRUNDBESTAND || []).filter(x => x.typ === "gegenstand").find(x => String(text || "").includes(x.name)) || null;
+  function beuteHtml(wurf) {
+    if (!wurf) return "";
+    const g = gegenstand(wurf.text);
+    return `<b>${wurf.wurf}</b> · ${esc(wurf.text)}${g ? `<span class="sp-beute"><small>${symText(g.text)}</small><span>Geben an: ${helden.map(h => `<button type="button" class="btn ghost sm" data-sp="geben" data-held="${esc(h.name)}" data-sache="${esc(g.name)}">${esc(h.name)}</button>`).join("")}</span></span>` : ""}`;
+  }
+  const inventarHtml = name => {
+    const liste = (stand.inventar || {})[name] || [];
+    if (!liste.length) return `<p class="hint">Keine Beute.</p>`;
+    return `<ul class="sp-inventar">${liste.map((x, i) => { const g = gegenstand(x); return `<li><b>${esc(x)}</b>${g ? ` <small>${symText(g.text)}</small>` : ""} <button type="button" class="btn ghost sm" data-sp="benutzen" data-held="${esc(name)}" data-i="${i}">benutzt</button></li>`; }).join("")}</ul>`;
+  };
+
   // ---------- Bausteine ----------
   const symText = t => (KS.symText ? KS.symText(t) : esc(t));
   const liste = (punkte, cls = "") => punkte && punkte.length ? `<ul class="${cls}">${punkte.map(p => `<li>${esc(p)}</li>`).join("")}</ul>` : "";
@@ -211,48 +232,133 @@
   const gm = text => text ? `<p class="sp-gm">${esc(text)}</p>` : "";
   const taste = t => t ? `<kbd>${esc(t)}</kbd>` : "";
 
+  // ---------- Uhr und Antreiber ----------
+  const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
+  const uhrHtml = () => `<span class="sp-uhr ${ueberzogen() ? "spaet" : ""}" title="So lange läuft dieser Schritt schon${motor.zeitlimit(stand) ? `; nach ${motor.zeitlimit(stand)} Minuten schlägt die App Antreiber vor` : ""}">⏱ ${motor.minuten(stand)} min</span>`;
+  let antreiberNr = 0, antreiberZu = null;
+  function antreiberHtml(immer) {
+    const liste = motor.antreiber(stand);
+    if (!liste.length || (!immer && (!ueberzogen() || antreiberZu === stand.schritt))) return "";
+    const a = liste[antreiberNr % liste.length];
+    return `<div class="sp-antreiber"><header><b>⏳ ${immer ? "Antreiben" : "Die Szene zieht sich"}: ${esc(a.titel || "")}</b>
+      <span>${liste.length > 1 ? `<button type="button" class="btn ghost sm" data-sp="antreiber-naechster">Anderer (${(antreiberNr % liste.length) + 1}/${liste.length})</button>` : ""}<button type="button" class="btn ghost sm" data-sp="antreiber-zu">✕</button></span></header>
+      ${vorlesen(a.vorlesen)}${gm(a.gmNotiz)}</div>`;
+  }
+
   // ---------- Kopfleiste ----------
+  // Zuletzt gezeigte Leistenwerte: Ändert sich eine Leiste, blitzt ihre Pille auf und zeigt 3 s lang „↑1“
+  const letzteWerte = {}, blitz = {};
   function zeigeKopf() {
     const el = $("spKopf");
     if (!el || !stand) return;
     const s = motor.schritt(stand), runden = stand.rundenAktiv && s && s.typ !== "ende";
     const ids = Object.keys(map.schritte), pos = ids.indexOf(stand.schritt) + 1;
     const leisten = Object.entries(map.leisten).filter(([k]) => stand.leisten[k] && stand.leisten[k].aktiv).map(([k, def]) => {
-      const l = stand.leisten[k];
-      return `<span class="sp-pill" title="${esc(def.text || "")}"><b>${esc(def.name)}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
+      const l = stand.leisten[k], alt = letzteWerte[k], d = alt === undefined ? 0 : l.wert - alt;
+      letzteWerte[k] = l.wert;
+      if (d) blitz[k] = { d, bis: Date.now() + 3000 };
+      const b = blitz[k] && blitz[k].bis > Date.now() ? blitz[k] : null;
+      return `<span class="sp-pill ${b ? (b.d > 0 ? "blitz-hoch" : "blitz-runter") : ""}" title="${esc(def.text || "")}">${b ? `<sup>${b.d > 0 ? "↑" : "↓"}${Math.abs(b.d)}</sup>` : ""}<b>${esc(def.name)}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
     }).join("");
     const laeuft = [spieler.haupt, spieler.schleife].filter(a => !a.paused).map(a => a.dataset.cue);
     el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><small>${esc(map.titel)} · Schritt ${pos}/${ids.length}</small></div>
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         <span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
-      <div class="sp-kopfknoepfe"><button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
-        <button type="button" class="btn ghost sm" data-sp="vollbild" title="Am Mac auch Ctrl + Cmd + F">Vollbild</button>
+      <div class="sp-kopfknoepfe">${uhrHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
+        <button type="button" class="btn ghost sm" data-sp="log">Log ${taste("P")}</button>
+        <button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
+        <button type="button" class="btn ghost sm" data-sp="vollbild" title="Vollbild (am Mac auch Ctrl + Cmd + F)">⛶</button>
         <button type="button" class="btn ghost sm" data-sp="schliessen">Menü</button></div>`;
   }
 
   // ---------- Aktionsleiste unten ----------
+  const GRUPPEN = ["Untersuchen", "Bewegen", "Wege", "Story", "Fragen", "Lärm", "Kampf", "Aktionen"];
+  // Ohne Angabe in den Daten: aus dem Ereignis erraten (Probe/Marker = Untersuchen, Lärm-Leiste = Lärm …)
+  function gruppeVon(e) {
+    if (e.gruppe) return e.gruppe;
+    if (e.leisten && Object.keys(e.leisten).some(k => /laerm/.test(k))) return "Lärm";
+    if (e.marker || e.probe || e.beutewurf) return "Untersuchen";
+    if (/^Frage|fragen/i.test(e.name || "")) return "Fragen";
+    return "Aktionen";
+  }
   // In der Leiste nur der Kern des Namens: Ortsangaben in Klammern stehen im Tooltip und auf der Tischkarte, „(+1)“ bleibt
   const kurzName = e => e.kurz || String(e.name || "").replace(/\s*\((?![+−-]\d)[^)]*\)/g, "").trim();
   function aktionsLeiste(s) {
     // Was noch nicht möglich ist (z. B. die Quelle vor Marker 3), bleibt ausgeblendet; Erledigtes bleibt mit ✓ stehen
-    const ids = (s.ereignisse || []).filter(id => map.ereignisse[id] && !map.ereignisse[id].intern && (stand.ereignisse[id] || motor.ereignisErlaubt(stand, id)));
-    const evs = ids.map(id => {
+    const npcOffen = fenster && fenster.startsWith("npc");
+    const ids = (s.ereignisse || []).filter(id => map.ereignisse[id] && !map.ereignisse[id].intern && (stand.ereignisse[id] || motor.ereignisErlaubt(stand, id)))
+      // Ist die NPC-Schublade offen, stehen die Fragen dort und nicht unten
+      .filter(id => !(npcOffen && gruppeVon(map.ereignisse[id]) === "Fragen"));
+    const knopf = id => {
       const e = map.ereignisse[id], ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
       return `<button type="button" class="btn ghost sm ${ok ? "" : "aus"} ${schon ? "erledigt" : ""}" data-ev="${esc(id)}" ${ok ? "" : "disabled"} title="${esc([e.name, e.kosten].filter(Boolean).join(" · "))}">${taste(e.taste)} ${esc(kurzName(e))}${schon ? " ✓" : ""}</button>`;
-    }).join("");
+    };
+    // Nach Gruppen gegliedert (Untersuchen, Wege, Lärm …); Erledigtes rutscht ans Ende seiner Gruppe
+    const gruppen = new Map();
+    for (const id of ids) { const g = gruppeVon(map.ereignisse[id]); if (!gruppen.has(g)) gruppen.set(g, []); gruppen.get(g).push(id); }
+    const laerm = stand.leisten.laerm && stand.leisten.laerm.aktiv ? stand.leisten.laerm.wert : null;
+    const evs = [...gruppen.entries()].sort((a, b) => GRUPPEN.indexOf(a[0]) - GRUPPEN.indexOf(b[0]))
+      .map(([g, liste]) => {
+        const sortiert = [...liste.filter(id => !stand.ereignisse[id]), ...liste.filter(id => stand.ereignisse[id])];
+        return `<div class="sp-gruppe g-${esc(g.toLowerCase().replace(/[^a-zäöü]/g, ""))}" data-gruppe="${esc(g)}"><span>${esc(g)}${g === "Lärm" && laerm !== null ? ` ${laerm}` : ""}</span>${sortiert.map(knopf).join("")}</div>`;
+      }).join("");
     const rw = map.rundenwurf && motor.gilt(stand, map.rundenwurf.wenn) && stand.rundenAktiv && s.typ !== "ende";
     const rwFaellig = rw && stand.runde > 0 && stand.rundenwurfRunde !== stand.runde;
     const runden = stand.rundenAktiv && s.typ !== "ende";
-    const vor = s.typ !== "wahl" && motor.naechsterId(stand);
-    return `<div class="sp-evs">${evs || `<span class="hint">In diesem Schritt gibt es keine Sonderaktionen.</span>`}</div>
-      <div class="sp-runden">${rw ? `<button type="button" class="btn sm ${rwFaellig ? "faellig" : "ghost"}" data-sp="rundenwurf" title="${esc(map.rundenwurf.text || "")}">🎲 ${esc(map.rundenwurf.name)} ${taste("W")}</button>` : ""}
+    const naechster = s.typ !== "wahl" && motor.naechsterId(stand);
+    // „Weiter“ steht immer ganz rechts unten, auch wenn es gerade nicht geht (dann sagt es, warum)
+    const weiterKnopf = s.typ === "wahl" ? `<button type="button" class="btn sm weiter ghost" disabled>Antwort 1–${s.optionen.length} wählen</button>`
+      : !naechster ? `<button type="button" class="btn sm weiter ghost" disabled>Ende der Map</button>`
+      : kampfOffen(s) ? `<button type="button" class="btn sm weiter ghost" data-sp="weiter" title="Der Kampf läuft noch. Nur klicken, wenn er ohne Ziel endet.">Weiter ohne Ziel →</button>`
+      : `<button type="button" class="btn sm weiter" data-sp="weiter">Weiter → ${taste("Leertaste")}</button>`;
+    return `<div class="sp-zeile1"><div class="sp-evs">${evs || `<span class="hint">In diesem Schritt gibt es keine Sonderaktionen.</span>`}</div></div>
+      <div class="sp-zeile2"><p class="sp-toast" id="spMsg" role="status">${esc(meldung)}</p>
+        <div class="sp-runden">${rw ? `<button type="button" class="btn sm ${rwFaellig ? "faellig" : "ghost"}" data-sp="rundenwurf" title="${esc(map.rundenwurf.text || "")}">🎲 ${esc(map.rundenwurf.name)} ${taste("W")}</button>` : ""}
         ${runden ? `<button type="button" class="btn sm" data-sp="runde">Runde beenden ${taste("R")}</button>` : ""}
         <button type="button" class="btn ghost sm" data-sp="zurueck" ${stand.undo.length ? "" : "disabled"}>← Zurück ${taste("⌫")}</button>
-        ${vor ? `<button type="button" class="btn sm ${kampfOffen(s) ? "ghost" : "weiter"}" data-sp="weiter">Weiter → ${kampfOffen(s) ? "" : taste("Leertaste")}</button>` : ""}</div>`;
+        ${weiterKnopf}</div></div>`;
+  }
+  // Passt Zeile 1 nicht in die Breite, klappen Gruppen ihre letzten Knöpfe in ein „▴ n weitere“ (Story zuerst, Lärm zuletzt)
+  function kuerzeLeiste() {
+    const evs = document.querySelector(".sp-evs");
+    if (!evs) return;
+    const zuViel = () => evs.scrollWidth > evs.clientWidth + 2;
+    const reihenfolge = ["Story", "Aktionen", "Fragen", "Untersuchen", "Wege", "Bewegen", "Kampf", "Lärm"];
+    const kuerze = gruppe => {
+      const knoepfe = [...gruppe.querySelectorAll(":scope > button")];
+      let mehr = gruppe.querySelector(":scope > .sp-mehrknoepfe");
+      if (!mehr) {
+        mehr = document.createElement("details");
+        mehr.className = "sp-mehrknoepfe";
+        mehr.innerHTML = `<summary></summary><div class="sp-dropup"></div>`;
+        gruppe.appendChild(mehr);
+      }
+      const k = knoepfe.find(b => b.classList.contains("erledigt")) || knoepfe[knoepfe.length - 1];
+      mehr.querySelector(".sp-dropup").prepend(k);
+      mehr.querySelector("summary").textContent = `▴ ${mehr.querySelectorAll("button").length} weitere`;
+    };
+    for (const behalte of [3, 2, 1]) {
+      for (const name of reihenfolge) {
+        const gruppe = evs.querySelector(`.sp-gruppe[data-gruppe="${name}"]`);
+        while (gruppe && zuViel() && gruppe.querySelectorAll(":scope > button").length > behalte) kuerze(gruppe);
+        if (!zuViel()) return;
+      }
+    }
   }
 
   // ---------- Schrittkarte ----------
+  // Was eine Antwort bewirkt, als Pillen: Leisten rauf/runter, Entscheidungen, die in einer späteren Map nachwirken
+  function folgePillen(o) {
+    const pillen = Object.entries(o.leisten || {}).map(([k, d]) => `<i class="${d > 0 ? "plus" : "minus"}">${esc((map.leisten[k] || {}).name || k)} ${d > 0 ? "+" : "−"}${Math.abs(d)}</i>`);
+    const spaeter = new Set();
+    for (const k of Object.keys(o.setzt || {})) { const m = ((map.flags[k] || {}).wirktIn || "").match(/map(\d)/); if (m && +m[1] > map.map) spaeter.add(+m[1]); }
+    for (const n of spaeter) pillen.push(`<i class="spaeter">wirkt in Map ${n}</i>`);
+    if (o.eingabe) pillen.push(`<i>fragt: ${esc(o.eingabe.frage || "")}</i>`);
+    return pillen.length ? `<span class="sp-pillen">${pillen.join("")}</span>` : "";
+  }
+  // Regie-Hinweise: beim ersten Besuch offen, danach eingeklappt
+  const regie = (s, punkte) => !punkte || !punkte.length ? "" : `<details class="sp-regie" ${stand.verlauf.filter(x => x === stand.schritt).length <= 1 ? "open" : ""}><summary>Regie · ${punkte.length}</summary>${liste(punkte, "sp-hinweise")}</details>`;
   function cueKnopf(cue, gross) {
     const def = map.audio[cue] || {};
     const da = hatAudio(cue);
@@ -287,22 +393,23 @@
       case "cue": return `${cueKnopf(s.cue, true)}${gm(s.notiz || s.gmNotiz)}${s.optional && !hatAudio(s.cue) ? `<p class="sp-gm">Kein Track da: einfach weiter, du spielst die Szene live.</p>` : ""}${s.text ? vorlesen(s.text) : ""}`;
       case "vorlesen": return `${vorlesen(s.text, s.als && map.figuren[s.als] ? map.figuren[s.als].name : "")}${gm(s.gmNotiz)}`;
       case "regel": return `${vorlesen(s.text)}${gm(s.gmNotiz)}`;
-      case "spieler": return `<p class="sp-text">${esc(s.text || "")}</p>${liste(s.hinweise, "sp-hinweise")}`;
+      case "spieler": return `<p class="sp-text">${esc(s.text || "")}</p><!--passiert-->${regie(s, s.hinweise)}`;
       case "npc": {
         const f = map.figuren[s.figur] || {};
-        return `${vorlesen(s.einstieg, f.name)}${gm(s.gmNotiz)}<button type="button" class="btn ghost sm" data-sp="npc">NPC-Karte öffnen ${taste("N")}</button>`;
+        return `${vorlesen(s.einstieg, f.name)}<!--passiert-->${gm(s.gmNotiz)}<button type="button" class="btn ghost sm" data-sp="npc">NPC-Schublade öffnen ${taste("N")}</button>`;
       }
-      case "wahl": return `${s.ansage ? vorlesen(s.ansage) : ""}<p class="sp-text">${esc(s.frage || "")}</p>
-        <div class="sp-optionen">${s.optionen.map(o => `<button type="button" class="sp-option" data-wahl="${esc(o.taste)}">
-          <kbd>${esc(o.taste)}</kbd><span><b>${esc(o.kurz)}</b>${o.text ? `<small>${esc(o.text)}</small>` : ""}<em>Folge: ${esc(o.folge || "–")}</em></span></button>`).join("")}</div>`;
+      case "wahl": return `${s.ansage ? vorlesen(s.ansage) : ""}<p class="sp-anleitung">${esc(s.frage || "Wähle, was dem am nächsten kommt, was die Spieler sagen.")}</p>
+        <div class="sp-optionen n${Math.min(4, s.optionen.length)}">${s.optionen.map(o => `<button type="button" class="sp-option" data-wahl="${esc(o.taste)}" title="${esc(o.folge || "")}">
+          <kbd>${esc(o.taste)}</kbd><span><b>${esc(o.kurz)}</b>${o.text ? `<small>${esc(o.text)}</small>` : ""}${folgePillen(o)}${o.folge ? `<em>${esc(o.folge)}</em>` : ""}</span></button>`).join("")}</div>`;
       case "kampf": {
         const ziel = stand.kampfZiel ? `<p class="sp-ziel">Ziel erreicht. Weiter führt zu: <b>${esc((map.schritte[stand.kampfZiel] || {}).titel || stand.kampfZiel)}</b></p>` : "";
-        return `<p class="sp-text">${symText(s.text || "")}</p>${liste(s.hinweise, "sp-hinweise")}${ziel}${verhaltenTabelle()}`;
+        return `<p class="sp-text">${symText(s.text || "")}</p>${ziel}<!--passiert-->${regie(s, s.hinweise)}${verhaltenTabelle()}`;
       }
       case "ende": {
         const ep = motor.epListe(stand);
         return `<h4>Erfahrung</h4><ul>${ep.map(e => `<li class="${e.erreicht ? "ja" : "nein"}">${e.erreicht ? "✓" : "✗"} ${esc(e.text)}: ${e.ep} EP</li>`).join("")}</ul>
-          <h4>Beute</h4>${liste(s.beute)}<p><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${wuerfe.ende ? `<b>${wuerfe.ende.wurf}</b> · ${esc(wuerfe.ende.text)}` : ""}</p>
+          <h4>Beute</h4>${liste(s.beute)}<p class="sp-beutezeile"><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${beuteHtml(wuerfe.ende)}</p>
+          <h4>Inventar der Helden</h4><div class="sp-inventare">${helden.map(h => `<div><b>${esc(h.name)}</b>${inventarHtml(h.name)}</div>`).join("")}</div>
           <h4>Folgen für die nächste Map</h4>${liste(motor.folgen(stand), "sp-folgen")}
           <h4>Notieren</h4>${liste(s.notieren)}<p class="sp-gm">${esc((s.zuruecksetzen || []).join(", "))} zurücksetzen. Der Spielstand ist gespeichert; die nächste Map übernimmt Leisten und Entscheidungen.</p>`;
       }
@@ -320,7 +427,7 @@
   // Was gerade passiert ist: Ereignisse, Proben, Schwellen, gefallene Gegner, Rundenwurf
   function letzteEreignisse() {
     if (!stand.letzte || !stand.letzte.length) return "";
-    return `<div class="sp-letzte"><h4>Gerade passiert</h4>${stand.letzte.map((e, i) => {
+    const eintrag = (e, i) => {
       const p = e.probe, def = map.ereignisse[e.id] || {};
       const probeHtml = !p ? "" : p.wurf
         ? `<p class="sp-wurf">🎲 Wurf <b>${p.wurf}</b>${p.stufen.length ? "" : " · nichts weiter"}</p>${p.stufen.map(st => `${vorlesen(st.vorlesen, `ab ${st.ab}`)}${gm(st.gmNotiz)}`).join("")}`
@@ -328,8 +435,13 @@
             <button type="button" class="btn ghost sm" data-probe="${i}" data-w="0">App würfelt</button></div>
             <small>${esc(((def.probe || {}).stufen || []).map(st => `ab ${st.ab}`).join(" · "))} · Tasten 1–6</small></div>`;
       return `<div class="sp-ev ${e.art ? `art-${e.art}` : ""}"><h4>${esc(e.name)}</h4>${vorlesen(e.vorlesen)}${gm(e.gmNotiz)}${probeHtml}
-        ${e.beutewurf ? `<p>${wuerfe[i] ? `<b>Beutewurf: ${wuerfe[i].wurf}</b> · ${esc(wuerfe[i].text)}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
-    }).join("")}</div>`;
+        ${e.beutewurf ? `<p class="sp-beutezeile">${wuerfe[i] ? `Beutewurf: ${beuteHtml(wuerfe[i])}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
+    };
+    // Neueste zuerst; eine offene Probe bleibt immer oben offen, ältere klappen zu einer Zeile zusammen
+    const alle = stand.letzte.map((e, i) => [e, i]).reverse();
+    const offen = alle.filter(([e], n) => n < 2 || (e.probe && !e.probe.wurf)), alt = alle.filter(x => !offen.includes(x));
+    return `<div class="sp-letzte"><h4>Gerade passiert</h4>${offen.map(([e, i]) => eintrag(e, i)).join("")}
+      ${alt.length ? `<details class="sp-frueher"><summary>+${alt.length} frühere</summary>${alt.map(([e, i]) => eintrag(e, i)).join("")}</details>` : ""}</div>`;
   }
 
   // ---------- Tischkarte mit Figuren ----------
@@ -382,8 +494,11 @@
       }
     }
     const inhalt = svg.replace(/^<svg class="sz-karte"/, `<svg class="sp-svg" data-b="${karte.b}" data-t="${karte.t}"`).replace("</svg>", `${teile.join("")}</svg>`);
+    // Heldenchips: Name und Beute auf einen Blick, Klick öffnet Infos und Inventar
+    const chips = opt.gross ? "" : `<div class="sp-helden">${helden.map(h => { const n = ((stand.inventar || {})[h.name] || []).length;
+      return `<button type="button" class="sp-heldchip ${popup && popup.tok === `held:${h.name}` ? "an" : ""}" data-chip="held:${esc(h.name)}">${esc(h.name)}${n ? ` <i>🎒${n}</i>` : ""}</button>`; }).join("")}</div>`;
     const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort." : "Raster: eine Kartenlänge · Figuren anklicken für Infos, ziehen zum Verschieben";
-    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${!opt.gross ? popupHtml() : ""}</div>`;
+    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? popupHtml() : ""}</div>`;
   }
   // Infokarte zu einer angeklickten Figur oder einem Marker
   function popupHtml() {
@@ -392,7 +507,7 @@
     let kopf = "", inhalt = "";
     if (art === "held") {
       const h = helden.find(x => x.name === id);
-      kopf = `<b>${esc(id)}</b><small>Held</small>`; inhalt = `<p>${esc((h && h.info) || "")}</p>`;
+      kopf = `<b>${esc(id)}</b><small>Held</small>`; inhalt = `<p>${esc((h && h.info) || "")}</p><h5>Beute</h5>${inventarHtml(id)}`;
     } else if (art === "f") {
       const f = map.figuren[id] || {};
       kopf = `<b>${esc(f.name || id)}</b><small>NPC</small>`;
@@ -423,7 +538,7 @@
         <div class="sp-g-zeile"><span class="sp-g-tok">${esc(gegnerKuerzel(g))}</span><b>${esc(def.name || g.id)}</b><span class="sp-schaedel" title="Bedrohung">${"☠".repeat(b.schaedel)}</span>
           <span class="sp-g-balken">${Array.from({ length: g.zaeh }, (_, i) => `<i class="${i < g.wunden ? "wunde" : ""}"></i>`).join("")}</span>
           <span class="sp-g-knoepfe">${z.id === "gefallen" ? `<button type="button" class="btn ghost sm" data-weg="1">vom Tisch</button>` : `<button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button>`}<button type="button" class="btn ghost sm" data-dmg="-1">−1</button></span></div>
-        <div class="sp-g-zustand"><em>${esc(z.id)}</em> ${sag(z.satz)}</div>
+        <div class="sp-g-zustand"><em class="z-${esc(z.id.replace(/\s+/g, "-"))}">${esc(z.id)}</em> ${sag(z.satz)}</div>
         ${offen ? `<div class="sp-g-mehr">${g.wunden === 0 && b.satz ? `<h5>Bedrohung ansagen</h5>${sag(b.satz)}` : ""}${zusatz.length ? `<h5>Gilt gerade</h5>${zusatz.map(x => `${gm(x.text)}${x.ansage ? sag(x.ansage) : ""}`).join("")}` : ""}
           <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button></div>` : ""}
       </div>`;
@@ -433,23 +548,62 @@
   function aktiveRegeln() {
     const bedingt = ((map.lage || {}).sonderregeln || []).filter(r => r.wenn && motor.gilt(stand, r.wenn));
     if (!bedingt.length) return "";
-    return `<div class="sp-aktiv"><h4>Gilt jetzt</h4>${bedingt.map(r => `<p><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}</p>`).join("")}</div>`;
+    return `<details class="sp-aktiv" open><summary>Gilt jetzt · ${bedingt.length}</summary>${bedingt.map(r => `<p title="${esc(r.text || "")}"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}</p>`).join("")}</details>`;
+  }
+
+  // Jeder aktive Zähler mit Wert, was er bedeutet und welche Schwellen schon ausgelöst haben
+  function zaehlerHtml() {
+    const aktiv = Object.entries(map.leisten || {}).filter(([k]) => stand.leisten[k] && stand.leisten[k].aktiv);
+    if (!aktiv.length) return `<p class="hint">Keine.</p>`;
+    return aktiv.map(([k, def]) => {
+      const w = stand.leisten[k].wert;
+      const sw = (def.schwellen || []).map(x => `<li class="${stand.schwellen[`${k}:${x.ab}`] ? "ja" : ""}">${stand.schwellen[`${k}:${x.ab}`] ? "✓" : "○"} ab ${x.ab}: ${esc(x.titel || "")}</li>`).join("");
+      return `<div class="sp-regel"><b>${esc(def.name)}: ${w}</b> <small>(${def.min}–${def.max})</small> ${esc(def.text || "")}${sw ? `<ul class="sp-schwellen">${sw}</ul>` : ""}</div>`;
+    }).join("");
+  }
+
+  // ---------- NPC-Schublade ----------
+  // Schiebt sich über die Schrittkarte; Tischkarte, Gegner und Aktionsleiste bleiben bedienbar.
+  // Die Fragen an den NPC stehen hier als Knöpfe (mit Tasten), die letzte Antwort direkt darüber.
+  function schubladeHtml() {
+    if (!fenster || !fenster.startsWith("npc")) return "";
+    const id = fenster.startsWith("npc:") ? fenster.slice(4) : ([...stand.verlauf].reverse().map(x => map.schritte[x]).find(x => x && x.typ === "npc") || {}).figur;
+    const f = id && map.figuren[id];
+    if (!f) return "";
+    const s = motor.schritt(stand);
+    const alleFragen = (s.ereignisse || []).filter(e => map.ereignisse[e] && !map.ereignisse[e].intern && gruppeVon(map.ereignisse[e]) === "Fragen");
+    // Alle Fragen zeigen (gesperrte ausgegraut); teilen sich zwei die Taste (lang/knapp), nur die gerade passende
+    const zaehlt = e => motor.ereignisErlaubt(stand, e) || stand.ereignisse[e];
+    const fragen = alleFragen.filter(e => {
+      const gleich = alleFragen.filter(x => map.ereignisse[x].taste && map.ereignisse[x].taste === map.ereignisse[e].taste);
+      return gleich.length < 2 || zaehlt(e) || (!gleich.some(zaehlt) && gleich[0] === e);
+    });
+    const antwort = [...(stand.letzte || [])].reverse().find(e => fragen.includes(e.id));
+    const stimme = Array.isArray(f.stimme) ? f.stimme : String(f.stimme || "").split(/;\s*|\.\s+(?=[A-ZÄÖÜ„])/).filter(Boolean);
+    const geduld = stand.leisten.geduld && stand.leisten.geduld.aktiv ? stand.leisten.geduld.wert : null;
+    return `<aside class="sp-schublade" role="dialog" aria-label="${esc(f.name)}">
+      <header><h3>${esc(f.name)}</h3>${geduld !== null ? `<span class="sp-pill"><b>Geduld</b> <em>${geduld}</em></span>` : ""}<button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+      <div class="sp-npc-oben">
+        <div class="sp-npc-steckbrief"><h4>So spricht ${f.anzeige === "er" ? "er" : "sie"}</h4>${liste(stimme.map(x => x.replace(/\.$/, "")))}
+          ${f.ziel ? `<p class="sp-will"><b>Will jetzt:</b> ${esc(f.ziel)}</p>` : ""}${f.motiv ? `<p class="sp-will"><b>Motiv:</b> ${esc(f.motiv)}</p>` : ""}</div>
+        <div class="sp-npc-kern"><h4>🗣️ Sätze, die immer kommen</h4>${(f.kern || []).map(k => vorlesen(k)).join("")}</div>
+      </div>
+      <div class="sp-npc-unten">
+        <section><h4>Was ${f.anzeige === "er" ? "er" : "sie"} weiß · herauskitzeln</h4>
+          ${antwort ? `<div class="sp-antwort"><small>Antwort auf: ${esc(antwort.name)}</small>${vorlesen(antwort.vorlesen)}${gm(antwort.gmNotiz)}</div>` : ""}
+          ${fragen.length ? `<div class="sp-fragen-knoepfe">${fragen.map(e => { const ev = map.ereignisse[e], ok = motor.ereignisErlaubt(stand, e), schon = stand.ereignisse[e];
+            return `<button type="button" class="btn ghost sm ${schon ? "erledigt" : ""}" data-ev="${esc(e)}" ${ok ? "" : "disabled"} title="${esc(ev.name)}">${taste(ev.taste)} ${esc(kurzName(ev))}${schon ? " ✓" : ""}</button>`; }).join("")}</div>` : ""}
+          ${(f.weiss || []).length ? `<table class="sz-tab sp-weiss"><tbody>${f.weiss.map(w => `<tr><td>${esc(w.info)}</td><td>${esc(w.wie || "")}</td></tr>`).join("")}</tbody></table>`
+            : f.wennSieFragen ? `<table class="sz-tab sp-weiss"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(b)}</td><td>${esc(a)}</td></tr>`).join("")}</tbody></table>` : ""}</section>
+        <section><h4>Was ${f.anzeige === "er" ? "er" : "sie"} nicht weiß</h4>${liste(f.nichtWissen, "sp-nicht")}
+          ${f.wer ? `<details class="sp-mehr"><summary>Wer ${f.anzeige === "er" ? "er" : "sie"} ist</summary><p>${esc(f.wer)}</p></details>` : ""}
+          ${(f.weiss || []).length && f.wennSieFragen ? `<details class="sp-mehr"><summary>Wenn sie fragen …</summary><table class="sz-tab sp-fragen"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></details>` : ""}</section>
+      </div>
+    </aside>`;
   }
 
   // ---------- Fenster ----------
   function fensterHtml() {
-    if (fenster === "npc" || (fenster && fenster.startsWith("npc:"))) {
-      const id = fenster.startsWith("npc:") ? fenster.slice(4) : ([...stand.verlauf].reverse().map(x => map.schritte[x]).find(x => x && x.typ === "npc") || {}).figur;
-      const f = id && map.figuren[id];
-      if (!f) return "";
-      return `<div class="sp-fenster" role="dialog" aria-label="${esc(f.name)}"><div class="sp-fenster-innen breit">
-        <header><h3>${esc(f.name)}</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
-        <div class="sp-npc-raster"><div><p>${esc(f.wer || "")}</p>${f.stimme ? `<p><b>So spricht sie:</b> ${esc(f.stimme)}</p>` : ""}${f.motiv ? `<p><b>Motiv:</b> ${esc(f.motiv)}</p>` : ""}${f.ziel ? `<p><b>Will in dieser Szene:</b> ${esc(f.ziel)}</p>` : ""}
-          <h4>Was sie nicht weiß</h4>${liste(f.nichtWissen)}</div>
-        <div><h4>Sätze, die immer kommen</h4>${(f.kern || []).map(k => vorlesen(k)).join("")}</div></div>
-        ${f.wennSieFragen ? `<h4>Wenn sie fragen …</h4><table class="sz-tab sp-fragen"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table>` : ""}
-      </div></div>`;
-    }
     if (fenster === "eingabe" && eingabeFuer) {
       const e = eingabeFuer.eingabe;
       const auswahl = e.aus === "offene-marker" ? motor.offeneMarker(stand).map(id => [id, map.ereignisse[id].name]) : helden.map(h => [h.name, h.name]);
@@ -457,6 +611,17 @@
         <header><h3>${esc(e.frage)}</h3><button type="button" class="btn ghost sm" data-sp="zu">Abbrechen</button></header>
         <div class="sp-optionen">${auswahl.map(([w, n], i) => `<button type="button" class="sp-option" data-eingabe="${esc(w)}"><kbd>${i + 1}</kbd><span><b>${esc(n)}</b></span></button>`).join("")}</div>
         ${e.aus === "gruppe" ? `<label class="f">Oder Name eintippen <input type="text" id="spEingabeFrei" placeholder="Name des Helden"></label><button type="button" class="btn sm" data-sp="eingabe-frei">Übernehmen</button>` : ""}
+      </div></div>`;
+    }
+    if (fenster === "log") {
+      const ICON = { wahl: "🟥", ereignis: "⚡", probe: "🎲", runde: "⟳", rundenwurf: "🎲", schritt: "→", tod: "☠", beute: "🎁" };
+      const eintraege = (stand.log || []).slice().reverse();
+      const chips = e => [...e.leisten.map(l => `<span class="sp-chip ${l.neu > l.alt ? "hoch" : "runter"}">${esc(l.name)} ${l.alt} → ${l.neu}</span>`),
+        ...e.flags.map(f => `<span class="sp-chip flag ${f.spaeter ? "spaeter" : ""}" title="${esc(f.id)}">${f.spaeter ? `<i>→ Map ${f.spaeter}</i> ` : ""}${esc(f.text)}${f.wert ? `: ${esc(f.wert)}` : ""}</span>`)].join("");
+      return `<div class="sp-fenster" role="dialog" aria-label="Log"><div class="sp-fenster-innen breit">
+        <header><h3>Log · Entscheidungen und Leisten</h3><button type="button" class="btn ghost sm" data-sp="zu">Schließen ${taste("Esc")}</button></header>
+        <p class="hint">Nur für dich. Neueste oben. Gezeigt wird alles, was eine Leiste oder eine Entscheidung verändert hat, dazu jede Antwortwahl. Mit „→ Map“ markiert ist, was in einer späteren Map nachwirkt.</p>
+        ${eintraege.length ? `<ol class="sp-log">${eintraege.map(e => `<li class="art-${esc(e.art)}"><span class="sp-log-r">R${e.runde}</span><span class="sp-log-i">${ICON[e.art] || "•"}</span><div><b>${esc(e.text)}</b><small>${esc((map.schritte[e.schritt] || {}).titel || "")}</small>${chips(e) ? `<div class="sp-chips">${chips(e)}</div>` : ""}</div></li>`).join("")}</ol>` : `<p class="hint">Noch nichts passiert.</p>`}
       </div></div>`;
     }
     if (fenster === "lage") {
@@ -467,7 +632,8 @@
           <section><h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
-          <section><h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
+          <section><h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
+            <h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
             ${rw ? `<h4>${esc(rw.name)}</h4>${gm(rw.text)}<table class="sz-tab"><tbody>${(rw.tabelle || []).map(z => `<tr><td>${esc((z.w || []).join(", "))}</td><td><b>${esc(z.titel || "")}</b> ${esc(z.gmNotiz || "")}</td></tr>`).join("")}</tbody></table>` : ""}
             <h4>Protokoll</h4><ol class="sp-protokoll">${stand.protokoll.slice(-14).reverse().map(p => `<li><small>R${p.runde}</small> ${esc(p.text)}</li>`).join("")}</ol></section>
         </div></div></div>`;
@@ -486,6 +652,14 @@
   }
 
   // ---------- Hauptanzeige ----------
+  const mitPassiert = (inhalt, passiert) => inhalt.includes("<!--passiert-->") ? inhalt.replace("<!--passiert-->", passiert) : inhalt + passiert;
+  // Fuß der Schrittkarte: der letzte Log-Eintrag als Erinnerung, Klick öffnet das Log
+  function zuletztHtml() {
+    const e = (stand.log || [])[stand.log.length - 1];
+    if (!e) return "";
+    const was = [...e.leisten.map(l => `${l.name} ${l.alt}→${l.neu}`), ...e.flags.slice(0, 1).map(f => f.text)].join(" · ");
+    return `<button type="button" class="sp-zuletzt" data-sp="log" title="Log öffnen (P)"><span>Zuletzt</span> R${e.runde} · ${esc(e.text)}${was ? ` · <em>${esc(was)}</em>` : ""}</button>`;
+  }
   function zeige() {
     const main = $("spMain");
     if (!main) return;
@@ -512,18 +686,19 @@
       <div class="sp-mitte ${mitSeite(s) ? "" : "ohne-seite"}">
         <section class="sp-karte typ-${farbe}">
           <header><span class="sp-typ">${zeichen} ${esc(etikett)}</span><h3>${esc(s.titel || "")}</h3></header>
-          ${schrittInhalt(s)}
-          ${letzteEreignisse()}
-          <footer>${s.typ === "wahl" ? `<span class="hint">Wähle die Antwort, die am nächsten an dem ist, was die Spieler sagen (1–${s.optionen.length}).</span>` : !naechster ? `<span class="hint">Ende der Map.</span>`
+          ${antreiberHtml(antreiberZu === `zeigen:${stand.schritt}`)}
+          ${mitPassiert(schrittInhalt(s), letzteEreignisse())}
+          <footer>${zuletztHtml()}${s.typ === "wahl" ? "" : !naechster ? `<span class="hint">Ende der Map.</span>`
             : kampfOffen(s) ? `<span class="hint">Der Kampf läuft. Er endet von selbst, wenn das Ziel erreicht ist. Weiter ohne Ziel führt zu: ${esc(nachTitel)}.</span>`
-            : `<span class="hint">Als Nächstes: ${esc(nachTitel)}</span>`}
-            <p class="hint sp-msg" id="spMsg" role="status">${esc(meldung)}</p></footer>
+            : `<span class="hint">Als Nächstes: <b>${esc(nachTitel)}</b></span>`}</footer>
         </section>
+        ${schubladeHtml()}
         ${!mitSeite(s) ? "" : `<aside class="sp-seite">${tischKarte()}${aktiveRegeln()}<div class="sp-gegnerliste"><h4>Gegner</h4>${gegnerListe()}</div></aside>`}
       </div>
       <footer class="sp-unten">${aktionsLeiste(s)}</footer>
     </div>${fensterHtml()}`;
     zeigeKopf();
+    kuerzeLeiste();
     if (gleich) { const k = main.querySelector(".sp-karte"); if (k) k.scrollTop = scrollAlt; }
     const kartenbox = main.querySelector(".sp-kartenbox");
     if (kartenbox) requestAnimationFrame(() => KS.passeAn(kartenbox));
@@ -573,6 +748,8 @@
     tab.addEventListener("pointermove", ziehe);
     tab.addEventListener("pointerup", ziehEnde);
     tab.addEventListener("click", async e => {
+      const chip = e.target.closest("[data-chip]");
+      if (chip) { popup = popup && popup.tok === chip.dataset.chip ? null : { tok: chip.dataset.chip, x: 3, y: 40 }; zeige(); return; }
       const marker = e.target.closest(".sp-tok.marker");
       if (marker && !marker.closest(".gross")) { oeffnePopup(marker.dataset.tok, marker.closest("svg"), e); return; }
       const t = e.target.closest("button, [data-gegner]");
@@ -601,6 +778,12 @@
         case "lage": fenster = "lage"; zeige(); break;
         case "vollbild": vollbild(); break;
         case "popzu": popup = null; zeige(); break;
+        case "antreiben": if (!motor.antreiber(stand).length) { melde("Für diesen Schritt gibt es keine Antreiber. Weiter mit der Leertaste bringt die Szene voran."); break; } antreiberZu = `zeigen:${stand.schritt}`; zeige(); break;
+        case "antreiber-naechster": antreiberNr++; zeige(); break;
+        case "antreiber-zu": antreiberZu = stand.schritt; zeige(); break;
+        case "log": fenster = "log"; zeige(); break;
+        case "geben": tue(() => motor.gibBeute(stand, t.dataset.held, t.dataset.sache)); break;
+        case "benutzen": tue(() => motor.benutze(stand, t.dataset.held, +t.dataset.i)); break;
         case "zu": fenster = null; eingabeFuer = null; zeige(); break;
         case "eingabe-frei": { const v = ($("spEingabeFrei") || {}).value; if (v && v.trim()) eingabeFertig(v.trim()); break; }
         case "schliessen": await speichere(); stand = null; standId = null; popup = null; fenster = null; stoppe(); if (document.fullscreenElement) document.exitFullscreen(); await ladeListe(); zeige(); break;
@@ -622,7 +805,7 @@
         if (knopf) eingabeFertig(knopf.dataset.eingabe);
         e.preventDefault(); return;
       }
-      if (fenster) { if (k === "l" || k === "L") { fenster = null; zeige(); } return; }
+      if (fenster && !fenster.startsWith("npc")) { if ((k === "l" || k === "L") && fenster === "lage") { fenster = null; zeige(); } if ((k === "p" || k === "P") && fenster === "log") { fenster = null; zeige(); } return; }
       // Eine offene Probe nimmt die Ziffern zuerst: Der Spieler hat gerade gewürfelt
       const offen = offeneProbe();
       if (offen >= 0 && /^[1-6]$/.test(k)) { probe(offen, +k); return; }
@@ -641,9 +824,10 @@
       if (k === "r" || k === "R") { if (stand.rundenAktiv) runde(); return; }
       if (k === "w" || k === "W") { if (map.rundenwurf && stand.rundenAktiv) rundenwurf(0); return; }
       if (k === "l" || k === "L") { fenster = "lage"; zeige(); return; }
+      if (k === "p" || k === "P") { fenster = "log"; zeige(); return; }
       if (k === "a" || k === "A") { if (s && s.cue) spiele(s.cue); return; }
       if (k === "s" || k === "S") { stoppe(); zeige(); return; }
-      if (k === "n" || k === "N") { if ([...stand.verlauf].some(id => (map.schritte[id] || {}).typ === "npc")) { fenster = "npc"; zeige(); } return; }
+      if (k === "n" || k === "N") { if (fenster && fenster.startsWith("npc")) fenster = null; else if ([...stand.verlauf].some(id => (map.schritte[id] || {}).typ === "npc")) fenster = "npc"; zeige(); return; }
       if (k === "Tab") {
         const aktiv = stand.gegner.filter(g => !g.weg);
         if (!aktiv.length) return;
@@ -655,6 +839,15 @@
       if (markiert && markiert.startsWith("g:") && (k === "+" || k === "-" || k === "*")) tue(() => motor.schaden(stand, markiert.slice(2), k === "+" ? 1 : k === "*" ? 2 : -1));
     });
   }
+
+  // Die Uhr läuft weiter, auch wenn niemand klickt; überschreitet ein Schritt sein Zeitlimit, erscheint der Antreiber
+  let warSpaet = false;
+  setInterval(() => {
+    if (!stand || $("tabSpielen").hidden) return;
+    const spaet = ueberzogen();
+    if (spaet && !warSpaet && !fenster) zeige(); else zeigeKopf();
+    warSpaet = spaet;
+  }, 30000);
 
   window.KartenschmiedeSpiel = {
     async zeigen() {

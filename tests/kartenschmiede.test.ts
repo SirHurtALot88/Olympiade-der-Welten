@@ -659,10 +659,11 @@ type Motor2 = {
 const MINI = {
   kampagne: "Test", map: 9, titel: "Mini", start: "a",
   leisten: { laerm: { name: "Lärm", min: 0, max: 6, start: 0, schwellen: [{ ab: 3, titel: "Sie drehen sich um", setzt: { umgedreht: true } }, { ab: 6, titel: "Alle wach", springe: "kampf" }] } },
-  flags: { angegriffen: { start: false }, umgedreht: { start: false }, gefunden: { start: false } },
+  flags: { angegriffen: { start: false, text: "Angegriffen" }, umgedreht: { start: false }, gefunden: { start: false, text: "Gefunden" } },
   figuren: { frau: { name: "Die Frau", tisch: { x: 2, y: 2, ab: { flag: "umgedreht" }, bis: { flag: "angegriffen" } } } },
   tischplan: { aufdecken: { "falltuer:F": { flag: "gefunden" } } },
   lage: { sonderregeln: [{ titel: "Immer" }, { titel: "Nach Angriff", wenn: { flag: "angegriffen" } }], ziele: [{ art: "Hauptziel", text: "finden", erreicht: { flag: "gefunden" } }] },
+  antreiben: [{ titel: "Ein Ast knackt", vorlesen: "Hinter euch knackt ein Ast." }, { titel: "Nur im Kampf", schritte: ["kampf"] }],
   rundenwurf: { name: "Wald", tabelle: [{ w: [1], titel: "Wind", setzt: { gefunden: true } }, { w: [2, 3, 4, 5, 6], titel: "Nichts" }] },
   ereignisse: {
     marker: { name: "Marker", taste: "1", vorlesen: "Ein Reh.", marker: "1", probe: { stufen: [{ ab: 3, vorlesen: "Pilze." }, { ab: 5, vorlesen: "Die Tiere zuerst.", setzt: { gefunden: true } }] } },
@@ -671,12 +672,37 @@ const MINI = {
   },
   gegner: { boss: { name: "Boss", werte: { tough: "3" }, zusatz: [{ wenn: { flag: "angegriffen" }, text: "Wütend", zaeh: 2 }], tod: { vorlesen: "Sie sackt zusammen.", setzt: { boss_tot: true } } } },
   schritte: {
-    a: { typ: "spieler", titel: "A", ereignisse: ["marker", "laut", "angriff"], runden: true, weiter: "kampf" },
+    a: { typ: "spieler", titel: "A", ereignisse: ["marker", "laut", "angriff"], runden: true, zeitlimit: 5, weiter: "kampf" },
     kampf: { typ: "kampf", titel: "Kampf", gegner: [{ id: "boss", anzahl: 1 }], ende: [{ wenn: { gegnerGefallen: "boss" }, ziel: "ende" }], weiter: "ende" },
     ende: { typ: "ende", titel: "Ende" },
   },
 };
 describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
+  it("führt ein Log mit Leisten- und Entscheidungsänderungen, ein Inventar und Antreiber nach Zeitlimit", () => {
+    let uhr = 0;
+    const m = SM.erstelle(MINI, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0, jetzt: () => uhr }) as unknown as Motor2 & {
+      gibBeute(s: Stand2, h: string, x: string): void; benutze(s: Stand2, h: string, i: number): void; antreiber(s: Stand2): Array<{ titel: string }>; zeitlimit(s: Stand2): number; minuten(s: Stand2): number;
+    };
+    const s = m.neu() as Stand2 & { log: Array<{ art: string; text: string; leisten: Array<{ name: string; alt: number; neu: number }>; flags: Array<{ text: string }> }>; inventar: Record<string, string[]> };
+    m.ereignis(s, "laut");
+    m.ereignis(s, "angriff");
+    expect(s.log.map(e => e.text)).toEqual(["Laut", "Angriff"]);
+    expect(s.log[0].leisten).toEqual([{ id: "laerm", name: "Lärm", alt: 0, neu: 2 }]);
+    expect(s.log[1].flags.map(f => f.text)).toEqual(["Angegriffen"]);
+    m.gibBeute(s, "Krieger", "Heiltrank");
+    expect(s.inventar.Krieger).toEqual(["Heiltrank"]);
+    m.benutze(s, "Krieger", 0);
+    expect(s.inventar.Krieger).toEqual([]);
+    expect(s.log.filter(e => e.art === "beute")).toHaveLength(2);
+    expect(m.zeitlimit(s)).toBe(5);
+    uhr = 6 * 60000;
+    expect(m.minuten(s)).toBe(6);
+    expect(m.antreiber(s).map(a => a.titel)).toEqual(["Ein Ast knackt"]);
+    m.weiter(s);
+    expect(m.minuten(s)).toBe(0);
+    expect(m.zeitlimit(s)).toBe(0);
+    expect(m.antreiber(s).map(a => a.titel)).toEqual(["Ein Ast knackt", "Nur im Kampf"]);
+  });
   const mini = () => SM.erstelle(MINI, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Motor2;
   it("hat in der Testmap keine kaputten Verweise", () => {
     expect(SM.pruefe(MINI)).toEqual([]);

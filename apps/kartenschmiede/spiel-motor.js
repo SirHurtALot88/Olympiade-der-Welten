@@ -19,6 +19,7 @@
   // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, zufall() → 0..1 }
   function erstelle(map, hilfen = {}) {
     const zufall = hilfen.zufall || Math.random;
+    const jetzt = hilfen.jetzt || Date.now;
     const werteVon = def => (hilfen.werte ? hilfen.werte(def) : def.werte) || def.werte || {};
     const zaehVon = werte => Math.max(1, (parseFloat(werte.tough) || 1) * (parseInt(werte.size, 10) || 1));
 
@@ -36,7 +37,7 @@
         schritt: null, verlauf: [], flags, leisten, runde: 0, rundenAktiv: false,
         gegner: [], gespawnt: {}, ereignisse: {}, angewendet: {}, wahlen: {}, checks: {}, kampfZiel: null,
         letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
-        schwellen: {}, tote: {}, pos: {}, sprung: null,
+        schwellen: {}, tote: {}, pos: {}, sprung: null, log: [], inventar: {}, schrittSeit: jetzt(),
       };
       betrete(state, map.start);
       return state;
@@ -57,11 +58,37 @@
     }
     // Ältere Spielstände kennen die neueren Felder noch nicht
     const migriere = state => {
-      for (const k of ["schwellen", "tote", "pos"]) if (!state[k]) state[k] = {};
+      for (const k of ["schwellen", "tote", "pos", "inventar"]) if (!state[k]) state[k] = {};
+      if (!state.log) state.log = [];
       if (state.sprung === undefined) state.sprung = null;
+      // Ein wieder geöffneter Abend fängt die Uhr des Schritts neu an
+      state.schrittSeit = jetzt();
       return state;
     };
     const notiere = (state, text) => { state.protokoll.push({ runde: state.runde + 1, schritt: state.schritt, text }); if (state.protokoll.length > 500) state.protokoll.shift(); };
+
+    // ---------- Logbuch ----------
+    // Vergleicht den Stand nach einer Aktion mit dem Schnappschuss davor und hält fest, was sich an Leisten und
+    // Entscheidungen (Flags) geändert hat. Eine Antwortwahl kommt immer hinein, alles andere nur mit Änderung.
+    function logge(state, art, text) {
+      const vorher = state.undo[state.undo.length - 1];
+      if (!vorher) return;
+      const leisten = [], flags = [];
+      for (const [k, l] of Object.entries(state.leisten)) {
+        const alt = (vorher.leisten[k] || {}).wert;
+        if (alt !== undefined && alt !== l.wert) leisten.push({ id: k, name: ((map.leisten || {})[k] || {}).name || k, alt, neu: l.wert });
+      }
+      for (const [k, v] of Object.entries(state.flags)) {
+        const def = (map.flags || {})[k] || {};
+        // spaeter: die Entscheidung wirkt in einer späteren Map nach (z. B. "map3")
+        const spaeter = ((def.wirktIn || "").match(/map(\d)/) || [])[1];
+        if (vorher.flags[k] !== v && v !== null && v !== false && def.text) flags.push({ id: k, text: def.text, wert: v === true ? null : v, spaeter: spaeter && +spaeter > map.map ? +spaeter : null });
+      }
+      if (art !== "wahl" && !leisten.length && !flags.length) return;
+      state.log = state.log || [];
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art, text, leisten, flags });
+      if (state.log.length > 300) state.log.shift();
+    }
 
     // ---------- Bedingungen ----------
     function gilt(state, w) {
@@ -170,6 +197,7 @@
       }
       pruefeKampf(state);
       nachwirken(state);
+      if (state.tote[uid]) logge(state, "tod", `${anzeigeName(g)} fällt`);
       return g;
     }
     function entferne(state, uid) {
@@ -219,6 +247,7 @@
       if (s.wenn && !gilt(state, s.wenn)) return betrete(state, ziel(state, s.weiter), tiefe + 1);
       state.schritt = id;
       state.verlauf.push(id);
+      state.schrittSeit = jetzt();
       state.kampfZiel = null;
       if (!state.angewendet[id]) {
         state.angewendet[id] = true;
@@ -238,7 +267,9 @@
       if (!naechster) return null;
       merke(state);
       state.letzte = [];
-      return betrete(state, naechster);
+      const r = betrete(state, naechster);
+      logge(state, "schritt", (map.schritte[state.schritt] || {}).titel || state.schritt);
+      return r;
     }
     function springe(state, id) {
       merke(state);
@@ -276,6 +307,7 @@
       merke(state);
       const r = loeseAus(state, id, false);
       nachwirken(state);
+      if (r) logge(state, "ereignis", r.name);
       return r;
     }
     // Probe zu einem gerade ausgelösten Ereignis: wurf 1–6 (vom Tisch eingegeben oder gewürfelt)
@@ -296,6 +328,7 @@
       pruefeSpawns(state);
       pruefeKampf(state);
       nachwirken(state);
+      logge(state, "probe", `${e.name}: Wurf ${w}`);
       return eintrag.probe;
     }
 
@@ -322,6 +355,7 @@
       betrete(state, o.ziel || ziel(state, s.weiter));
       state.letzte = gefunden;
       nachwirken(state);
+      logge(state, "wahl", `${s.titel}: ${o.kurz}${eingabe ? ` (${eingabe})` : ""}`);
       return o;
     }
 
@@ -345,6 +379,7 @@
       state.letzte = schwellen;
       if (sprung) betrete(state, sprung);
       nachwirken(state);
+      logge(state, "runde", `Runde ${state.runde} beendet`);
       return { texte, sprung };
     }
     // Der Wurf am Rundenende: Was passiert gerade auf der Map? (wurf leer = die App würfelt)
@@ -361,6 +396,7 @@
       state.letzte.push({ id: `rundenwurf:${state.runde}`, name: `${rw.name}: ${w}${zeile.titel ? ` · ${zeile.titel}` : ""}`, vorlesen: zeile.vorlesen || "", gmNotiz: zeile.gmNotiz || "", art: "rundenwurf" });
       pruefeSpawns(state);
       nachwirken(state);
+      logge(state, "rundenwurf", `${rw.name}: ${w}${zeile.titel ? ` · ${zeile.titel}` : ""}`);
       return { wurf: w, ...zeile };
     }
 
@@ -373,6 +409,32 @@
         ziele: (l.ziele || []).map(z => ({ ...z, ist: z.erreicht ? gilt(state, z.erreicht) : false })),
       };
     }
+    // Beute im Inventar eines Helden (Heiltrank, Feuertopf …); verbraucht wird sie mit benutze
+    function gibBeute(state, held, sache) {
+      if (!held || !sache) return;
+      merke(state);
+      (state.inventar[held] = state.inventar[held] || []).push(sache);
+      notiere(state, `${held} bekommt ${sache}`);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text: `${held} bekommt ${sache}`, leisten: [], flags: [] });
+    }
+    function benutze(state, held, index) {
+      const liste = state.inventar[held];
+      if (!liste || !liste[index]) return;
+      merke(state);
+      const [sache] = liste.splice(index, 1);
+      notiere(state, `${held} benutzt ${sache}`);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text: `${held} benutzt ${sache}`, leisten: [], flags: [] });
+    }
+    // Antreiber gegen Leerlauf: die passenden für den aktuellen Schritt (Map-weite und eigene des Schritts)
+    function antreiber(state) {
+      const s = map.schritte[state.schritt] || {};
+      const alle = [...(s.antreiben || []), ...(map.antreiben || [])];
+      return alle.filter(a => gilt(state, a.wenn) && (!a.schritte || a.schritte.includes(state.schritt)));
+    }
+    // Wie lange eine Szene laufen darf, bevor die App Antreiber anbietet (Kämpfe nie von selbst)
+    const zeitlimit = state => { const s = map.schritte[state.schritt] || {}; return s.zeitlimit || (["spieler", "npc", "wahl"].includes(s.typ) ? 8 : 0); };
+    const minuten = state => Math.max(0, Math.floor((jetzt() - (state.schrittSeit ?? jetzt())) / 60000));
+
     // Wo eine Figur auf der Tischkarte steht (nur Anzeige, keine Spielregel; kein Rückgängig)
     const setzePos = (state, schluessel, x, y) => { state.pos = state.pos || {}; state.pos[schluessel] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }; };
     const figurenAmTisch = state => Object.entries(map.figuren || {}).filter(([, f]) => f.tisch && gilt(state, f.tisch.ab) && !(f.tisch.bis && gilt(state, f.tisch.bis))).map(([id, f]) => ({ id, ...f }));
@@ -395,7 +457,7 @@
     return {
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
-      probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere,
+      probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
       schritt: state => map.schritte[state.schritt] || null,
       naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
     };
