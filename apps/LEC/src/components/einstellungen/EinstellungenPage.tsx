@@ -11,6 +11,7 @@ import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
 import { parseGermanNumber } from "@/lib/parsing/number";
 import { AppShell } from "@/components/shell/AppShell";
 import { ImportHistoryCard, type ImportBatchRow } from "./ImportHistoryCard";
+import { ImageSyncCard } from "./ImageSyncCard";
 
 type Unit = "eur" | "percent" | "x" | "count";
 
@@ -393,6 +394,8 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
           </div>
 
           <ImportHistoryCard batches={importBatches} />
+
+          <ImageSyncCard />
 
           <div className="card" style={{ padding: "15px 16px 16px" }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 10 }}>Konto</div>

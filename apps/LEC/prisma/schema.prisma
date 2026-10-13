@@ -32,6 +32,15 @@ model Article {
   currentEk      Float?
   /// false = herausgefiltert (Privatverkauf/Nicht-Karte)
   isCard         Boolean  @default(true)
+  /// Kartenbild aus Chris' eigenem eBay-Shop (siehe src/lib/images/). Einmal
+  /// gefunden und abgelegt, danach nur neu geladen, wenn sich das Angebotsbild aendert.
+  ebayItemId     String?
+  imageGuid      String?
+  /// Dateiname im Bildordner neben der SQLite (Volume lec-data), null = kein Bild.
+  imageFile      String?
+  /// "item_id" | "name" | "alias" — wie das Angebot dem Artikel zugeordnet wurde.
+  imageMatchedBy String?
+  imageFetchedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

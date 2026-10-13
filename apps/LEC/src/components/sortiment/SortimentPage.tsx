@@ -49,7 +49,7 @@ type ColId =
   | "trend";
 
 const COLS: ColumnDef<ColId>[] = [
-  { id: "artikel", label: "Artikel", def: 240, min: 140 },
+  { id: "artikel", label: "Artikel", def: 276, min: 170 },
   { id: "rank", label: "Rank", def: 62, min: 50, align: "r" },
   { id: "verkaeufe", label: "Verkäufe", def: 84, min: 60, align: "r" },
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
@@ -105,6 +105,12 @@ interface Props {
   activeCount: number;
   discontinuedCount: number;
   ladenhueterCount: number;
+  /** articleId -> Bildkennung; fehlt ein Artikel, gibt es (noch) kein Bild. */
+  imageVersions: Record<string, string>;
+}
+
+function imageSrc(articleId: string, version: string): string {
+  return `/api/article-image/${encodeURIComponent(articleId)}?v=${encodeURIComponent(version)}`;
 }
 
 function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): number {
@@ -147,7 +153,8 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
   }
 }
 
-export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount }: Props) {
+export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions }: Props) {
+  const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -355,15 +362,36 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                 return (
                   <tr key={row.articleId}>
                     <td>
-                      <div className="artname" style={{ maxWidth: "100%" }} title={row.nameRaw}>
-                        {row.nameRaw}
-                        {!row.active && (
-                          <span className="rank-badge" title="Nur in der Verkaufshistorie, nicht mehr im aktuellen Artikelstamm">
-                            ausgelaufen
-                          </span>
+                      <div className="artcell">
+                        {imageVersions[row.articleId] ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className="cardthumb"
+                            src={imageSrc(row.articleId, imageVersions[row.articleId])}
+                            alt=""
+                            loading="lazy"
+                            onMouseEnter={(e) => {
+                              const r = e.currentTarget.getBoundingClientRect();
+                              const y = Math.max(8, Math.min(r.top - 60, window.innerHeight - 390));
+                              setPreview({ src: e.currentTarget.src, x: r.right + 12, y });
+                            }}
+                            onMouseLeave={() => setPreview(null)}
+                          />
+                        ) : (
+                          <span className="cardthumb none" title="Kein Bild gefunden" />
                         )}
+                        <div className="arttext">
+                          <div className="artname" style={{ maxWidth: "100%" }} title={row.nameRaw}>
+                            {row.nameRaw}
+                            {!row.active && (
+                              <span className="rank-badge" title="Nur in der Verkaufshistorie, nicht mehr im aktuellen Artikelstamm">
+                                ausgelaufen
+                              </span>
+                            )}
+                          </div>
+                          {row.setCode && <div className="code">{row.setCode}</div>}
+                        </div>
                       </div>
-                      {row.setCode && <div className="code">{row.setCode}</div>}
                     </td>
                     <td className="r num">{w?.rank ?? "—"}</td>
                     <td className="r">
@@ -433,6 +461,10 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </div>
         )}
       </section>
+      {preview && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="cardpreview" src={preview.src} alt="" style={{ left: preview.x, top: preview.y }} />
+      )}
     </AppShell>
   );
 }

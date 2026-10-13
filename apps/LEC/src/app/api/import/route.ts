@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma } from "@/lib/db/client";
+import { prisma, resolveImageDir } from "@/lib/db/client";
+import { startImageSync } from "@/lib/images/runner";
 import { runImport, type UploadedFile } from "@/lib/pipeline/runImport";
 
 export const runtime = "nodejs";
@@ -53,6 +54,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const summary = await runImport(prisma, { billbeeFiles, ebayFile, billbeeArtikelFile });
+    // Neue Artikel bekommen ihr Bild im Hintergrund; bestehende werden nicht neu geladen.
+    // Ausserhalb der Produktion nicht automatisch, damit Tests und lokale Laeufe nicht ins Netz gehen.
+    if (process.env.NODE_ENV === "production") startImageSync(prisma, resolveImageDir());
     return NextResponse.json({ ok: true, summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Import fehlgeschlagen.";

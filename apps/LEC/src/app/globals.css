@@ -301,3 +301,10 @@ footer { color: var(--faint); font-size: 11.5px; margin-top: 22px; display: flex
   .grid-2 { grid-template-columns: 1fr; }
   .pricegrid { grid-template-columns: 1fr 1fr; }
 }
+
+/* Kartenbilder (src/lib/images/) */
+.artcell { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.artcell > .arttext { min-width: 0; flex: 1; }
+.cardthumb { width: 26px; height: 38px; flex: none; border-radius: 3px; object-fit: cover; background: var(--line); cursor: zoom-in; }
+.cardthumb.none { cursor: default; opacity: .35; }
+.cardpreview { position: fixed; z-index: 50; width: 260px; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.55); pointer-events: none; background: var(--line); }
