@@ -716,25 +716,25 @@ fieldset.checks legend { margin-bottom: 6px; }
    oben die Leisten, links die Schrittkarte, rechts Tischkarte und Gegner, unten die Aktionen. */
 .sp-start { display: grid; gap: 14px; max-width: 900px; }
 .sp-start .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
-.sp-start h4, .sp-karte h4, .sp-seite h4, .sp-fenster h4 { margin: 4px 0 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-start h4, .sp-karte h4, .sp-seite h4, .sp-fenster h4, .sp-schublade h4 { margin: 4px 0 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
 .sp-staende { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .sp-app { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--bg); font-size: 19px; }
-.sp-oben { display: flex; gap: 14px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+.sp-oben { display: flex; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
 .sp-titel { display: grid; line-height: 1.15; font-family: var(--ui); }
 .sp-titel b { font-size: 16px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-titel small { font-size: 14px; color: var(--dim); }
-.sp-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex: 1; }
+.sp-pills { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; align-items: center; flex: 1; }
 .sp-kopfknoepfe { display: flex; gap: 6px; }
-.sp-pill { display: inline-flex; gap: 6px; align-items: center; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; font: 600 16px var(--ui); background: var(--bg); }
-.sp-pill b { letter-spacing: .06em; text-transform: uppercase; font-size: 13px; color: var(--dim); }
+.sp-pill { display: inline-flex; gap: 5px; align-items: center; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; font: 600 15px var(--ui); background: var(--bg); white-space: nowrap; }
+.sp-pill b { letter-spacing: .05em; text-transform: uppercase; font-size: 12px; color: var(--dim); }
 .sp-pill em { font-style: normal; font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
-.sp-pill i { display: inline-block; width: 11px; height: 16px; border: 1px solid var(--dim); border-radius: 2px; }
+.sp-pill i { display: inline-block; width: 8px; height: 14px; border: 1px solid var(--dim); border-radius: 2px; }
 .sp-pill i.an { background: var(--t5); border-color: var(--t5); }
 .sp-runde { border-color: var(--brass); }
 .sp-verhalten.wuetend { border-color: var(--t6); color: var(--t6); background: rgba(255,74,54,.12); }
 .sp-verhalten.wuetend b { color: var(--t6); }
 .sp-ton { border-color: #a26bff; }
-.sp-mitte { display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 34vw, 560px); min-height: 0; }
+.sp-mitte { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 34vw, 560px); min-height: 0; }
 .sp-karte { --typ: var(--line); display: grid; gap: 14px; align-content: start; padding: 18px 26px 24px; overflow: auto; border-left: 8px solid var(--typ); min-height: 0; }
 .sp-karte.typ-blau { --typ: #4f8fe8; } .sp-karte.typ-lila { --typ: #a26bff; } .sp-karte.typ-messing { --typ: var(--brass); }
 .sp-karte.typ-gelb { --typ: #e8c63a; } .sp-karte.typ-rot { --typ: #e2483a; } .sp-karte.typ-orange { --typ: #f08a2a; } .sp-karte.typ-gruen { --typ: #5fbf5a; }
@@ -749,6 +749,9 @@ fieldset.checks legend { margin-bottom: 6px; }
 .sp-gm { font-family: var(--ui); font-size: 17px; color: var(--dim); max-width: 75ch; }
 .sp-gm::before { content: "Nur für dich: "; font-weight: 700; color: #6fb0ff; }
 .sp-sag { font-style: italic; font-size: 17px; color: var(--ink); margin: 0; max-width: none; }
+.sp-aktiv summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--t6); }
+.sp-aktiv p { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: none; }
+.sp-aktiv[open] p:hover { -webkit-line-clamp: unset; }
 .sp-sag::before { content: "🗣️ "; font-style: normal; }
 .sp-text { font-size: 21px; max-width: 65ch; }
 .sp-hinweise { color: var(--dim); }
@@ -803,7 +806,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-seite { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-left: 1px solid var(--line); background: #17191d; min-height: 0; overflow: hidden; }
 .sp-tischkarte { position: relative; display: grid; gap: 4px; }
 .sp-tischkarte > small { font: 500 13px var(--ui); color: var(--dim); }
-.sp-tischkarte svg { width: 100%; height: auto; max-height: 46vh; display: block; border-radius: 6px; border: 1px solid var(--line); touch-action: none; user-select: none; }
+.sp-tischkarte svg { width: 100%; height: auto; max-height: 300px; display: block; border-radius: 6px; border: 1px solid var(--line); touch-action: none; user-select: none; }
 .sp-tischkarte.gross svg { max-height: calc(100vh - 230px); }
 .sp-tok { cursor: grab; }
 .sp-tok.marker { cursor: pointer; }
@@ -814,7 +817,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-pop header b { font: 700 18px var(--ui); display: block; }
 .sp-pop header small { font: 500 14px var(--ui); color: var(--dim); }
 .sp-pop p { margin: 0; }
-.sp-aktiv { max-height: 26vh; overflow: auto; display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
+.sp-aktiv { max-height: 150px; overflow: auto; display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
 .sp-gegnerliste { display: grid; gap: 6px; align-content: start; overflow: auto; min-height: 0; padding-right: 4px; }
 .sp-gegner { display: grid; gap: 3px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); cursor: pointer; }
 .sp-gegner.markiert { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(207,167,94,.35); }
@@ -835,12 +838,19 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-g-mehr { display: grid; gap: 4px; padding-top: 4px; border-top: 1px dashed var(--line); }
 .sp-g-mehr h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-g-mehr .sp-gm { font-size: 15px; }
-.sp-unten { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--bg2); }
-.sp-evs, .sp-runden { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-/* Viele Aktionen (Map 2 draußen hat 13): höchstens drei Zeilen, der Rest scrollt; die Rundenknöpfe bleiben in einer Zeile */
-.sp-evs { flex: 1; min-width: 0; max-height: 136px; overflow: auto; }
-.sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; }
-.sp-runden { display: grid; grid-auto-flow: column; grid-template-rows: auto auto; gap: 5px; justify-content: end; flex-shrink: 0; }
+/* Aktionsleiste: Zeile 1 die Ereignisse in Gruppen (eine Zeile, Überlauf als „▴ n weitere“), Zeile 2 fest: Toast links, Navigation rechts */
+.sp-unten { display: grid; gap: 6px; padding: 6px 16px 8px; border-top: 1px solid var(--line); background: var(--bg2); }
+.sp-zeile1 { min-width: 0; }
+.sp-evs { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; min-width: 0; overflow: visible; }
+.sp-zeile2 { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.sp-toast { margin: 0; font: 600 15px var(--ui); color: var(--ink); min-height: 20px; max-width: none; flex: 1; }
+.sp-runden { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.btn.weiter { min-width: 210px; justify-content: center; }
+.sp-mehrknoepfe { position: relative; }
+.sp-mehrknoepfe summary { list-style: none; cursor: pointer; font: 700 13px var(--ui); color: var(--gf, var(--brass)); padding: 5px 8px; border: 1px dashed var(--gf, var(--line)); border-radius: 6px; white-space: nowrap; }
+.sp-mehrknoepfe summary::-webkit-details-marker { display: none; }
+.sp-dropup { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40; display: grid; gap: 4px; padding: 8px; min-width: 220px; border: 1px solid var(--gf, var(--brass)); border-radius: 8px; background: #0b0c0f; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
+.sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; white-space: nowrap; }
 @media (max-width: 1000px) { .sp-app { position: static; display: block; } .sp-mitte { grid-template-columns: 1fr; } .sp-seite { overflow: visible; } .sp-unten { flex-wrap: wrap; } }
 .sp-fenster { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.62); }
 .sp-fenster-innen { display: grid; gap: 10px; width: min(820px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 20px 24px; border: 1px solid var(--brass); border-radius: 12px; background: var(--bg); font-size: 18px; }
@@ -859,9 +869,52 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
 .sp-protokoll small { color: var(--brass); margin-right: 6px; }
 .sp-kartenbox { width: 100%; }
+/* Antworten: Spalten nach Anzahl, Folgen als Pillen */
+.sp-anleitung { font: 500 17px var(--ui); color: var(--dim); max-width: none; }
+.sp-optionen.n1, .sp-optionen.n2 { grid-template-columns: 1fr; }
+.sp-optionen.n3, .sp-optionen.n4 { grid-template-columns: 1fr 1fr; }
+.sp-option kbd { min-width: 40px; height: 40px; font-size: 20px; }
+.sp-option small { font-style: normal; }
+.sp-option span.sp-pillen { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-pillen i { font: 700 13px var(--ui); font-style: normal; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
+.sp-pillen i.plus { border-color: #5fbf5a; color: #7fd06a; } .sp-pillen i.minus { border-color: #e2483a; color: #ff8a7a; } .sp-pillen i.spaeter { border-color: #a26bff; color: #c9a8ff; }
+/* Regie einklappbar, frühere Ereignisse eingeklappt, „Zuletzt“ im Fuß */
+.sp-regie summary, .sp-frueher summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: #6fb0ff; }
+.sp-regie .sp-hinweise { font-family: var(--ui); font-size: 17px; margin-top: 6px; }
+.sp-frueher { display: grid; gap: 8px; }
+.sp-zuletzt { display: block; text-align: left; background: none; border: 0; padding: 0; color: var(--ink); font: 500 15px var(--ui); cursor: pointer; }
+.sp-zuletzt span { font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); margin-right: 6px; }
+.sp-zuletzt em { font-style: normal; color: #ffb070; }
+/* NPC-Schublade über der Schrittkarte */
+.sp-schublade { position: absolute; top: 0; bottom: 0; left: 0; width: calc(100% - clamp(400px, 34vw, 560px)); z-index: 20; display: grid; align-content: start; gap: 12px; padding: 16px 22px; overflow: auto; background: var(--bg); border-right: 1px solid var(--brass); border-left: 8px solid var(--brass); box-shadow: 12px 0 30px rgba(0,0,0,.5); }
+.sp-mitte.ohne-seite .sp-schublade { width: 100%; }
+.sp-schublade > header { display: flex; gap: 12px; align-items: center; }
+.sp-schublade > header h3 { flex: 1; font-size: 30px; }
+.sp-schublade .sp-npc-steckbrief ul { padding-left: 20px; font-size: 18px; }
+.sp-will { font-size: 17px; }
+.sp-antwort { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #a26bff; border-radius: 8px; }
+.sp-antwort small { font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: #c9a8ff; }
+.sp-fragen-knoepfe { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-nicht { color: var(--dim); font-size: 16px; }
+/* Heldenchips unter der Tischkarte */
+.sp-helden { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-heldchip { padding: 4px 10px; border-radius: 999px; border: 1px solid #6fb0ff; background: rgba(111,176,255,.1); color: var(--ink); font: 700 14px var(--ui); cursor: pointer; }
+.sp-heldchip.an { background: #6fb0ff; color: #0b0c0f; }
+.sp-heldchip i { font-style: normal; font-weight: 600; }
+/* Leisten blitzen bei Änderung */
+.sp-pill { position: relative; }
+.sp-pill sup { position: absolute; top: -9px; right: -4px; font: 800 12px var(--ui); padding: 0 4px; border-radius: 6px; background: var(--bg); }
+.sp-pill.blitz-hoch { animation: sp-blitz-hoch .6s ease-out 2; } .sp-pill.blitz-hoch sup { color: #ff8a1f; }
+.sp-pill.blitz-runter { animation: sp-blitz-runter .6s ease-out 2; } .sp-pill.blitz-runter sup { color: #7fd06a; }
+@keyframes sp-blitz-hoch { 0% { box-shadow: 0 0 0 4px rgba(255,138,31,.7); } 100% { box-shadow: 0 0 0 0 rgba(255,138,31,0); } }
+@keyframes sp-blitz-runter { 0% { box-shadow: 0 0 0 4px rgba(127,208,106,.7); } 100% { box-shadow: 0 0 0 0 rgba(127,208,106,0); } }
+/* Gegnerzustand als farbiges Etikett, größere Schadenknöpfe */
+.sp-g-zustand em { padding: 1px 7px; border-radius: 4px; border: 1px solid currentColor; }
+.sp-g-zustand em.z-unverletzt { color: #7fd06a; } .sp-g-zustand em.z-angekratzt { color: #f2cf4a; } .sp-g-zustand em.z-verwundet { color: #ff8a1f; }
+.sp-g-zustand em.z-schwer-verwundet, .sp-g-zustand em.z-am-Ende { color: #ff4a36; } .sp-g-zustand em.z-gefallen { color: #77736b; }
+.sp-g-knoepfe .btn.sm { min-width: 40px; min-height: 36px; font-size: 15px; }
 /* Aktionsleiste: nach Gruppen gegliedert, jede Gruppe mit Etikett und Farbstreifen */
-.sp-evs { gap: 6px 10px; }
-.sp-gruppe { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 3px 6px 3px 0; border-left: 3px solid var(--gf, var(--line)); padding-left: 6px; }
+.sp-gruppe { display: inline-flex; flex-wrap: nowrap; flex-shrink: 0; gap: 4px; align-items: center; padding: 3px 6px 3px 0; border-left: 3px solid var(--gf, var(--line)); padding-left: 6px; }
 .sp-gruppe > span { font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--gf, var(--dim)); margin-right: 2px; }
 .sp-gruppe.g-untersuchen { --gf: #f2cf4a; } .sp-gruppe.g-bewegen { --gf: #6fb0ff; } .sp-gruppe.g-wege { --gf: #9fb4ff; }
 .sp-gruppe.g-story { --gf: #cfa75e; } .sp-gruppe.g-fragen { --gf: #a26bff; } .sp-gruppe.g-lärm { --gf: #ff8a1f; } .sp-gruppe.g-kampf { --gf: #ff4a36; }
