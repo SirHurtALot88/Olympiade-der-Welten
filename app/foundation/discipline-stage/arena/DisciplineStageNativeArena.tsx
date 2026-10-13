@@ -108,10 +108,11 @@ export type NativeStageTeam = {
    */
   captainName?: string | null;
   /**
-   * Task #116 (Fechten sequenziell/Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU
-   * diesem Zwei-Team-Arena-Duell (nur gesetzt, wenn die Disziplin arena-aufgeloest ist, sonst
-   * `null`/`undefined`). Treibt für `prim === "lamps"` die paarweise Board-für-Board-Sequenz +
-   * den Matchup-Reveal (`advance()` unten) -- jede andere Disziplin ignoriert das Feld.
+   * Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal, Chris 13.10.): die Team-ID
+   * des Gegners in GENAU diesem Zwei-Team-Arena-Duell (nur gesetzt, wenn die Disziplin
+   * arena-aufgeloest ist, sonst `null`/`undefined`). Treibt für `prim === "lamps"` (Fechten) UND
+   * `"klassen"` (Tennis/Speed-Schach) die paarweise Board-für-Board-Sequenz + den Matchup-Reveal
+   * (`advance()` unten) -- jede andere Disziplin ignoriert das Feld.
    */
   opponentTeamId?: string | null;
 };
@@ -987,6 +988,9 @@ export const STAR_MIN = 80;
 // Reveal", Chris 13.10.) -- lang genug zum Lesen von Namen + Eignung, kurz genug, um nicht den
 // Fluss der Runde zu bremsen.
 export const FECHT_REVEAL_MS = 1100;
+// Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): dieselbe Karte für `prim === "klassen"`,
+// analog zu Fechtens Reveal oben.
+export const KLASSEN_REVEAL_MS = 1100;
 // Staffel/track: eine Reveal-Runde dauert ~5 s (langsam, folgbar). Innerhalb einer
 // Runde peilen ALLE Token gleichzeitig ihre Runden-Endposition an und gleiten
 // simultan dorthin (dur = ROUND_MS). Score bleibt Wahrheit; nur die Token-POSITION
@@ -1373,8 +1377,9 @@ export type RT = {
   // Highlight-Zooms und Farbgeber des Puls-Rings (rot statt Medaillenfarbe).
   stageInjured: boolean;
   glowUntil: number;
-  // Task #116: s. `NativeStageTeam.opponentTeamId` -- 1:1 durchgereicht, hier zusätzlich gegen
-  // `null` statt `undefined` normalisiert (einfacherer Vergleich in der Paar-Bildung unten).
+  // Tasks #116/#126/#127: s. `NativeStageTeam.opponentTeamId` -- 1:1 durchgereicht, hier
+  // zusätzlich gegen `null` statt `undefined` normalisiert (einfacherer Vergleich in der
+  // Paar-Bildung unten).
   opponentTeamId: string | null;
 };
 
@@ -1671,6 +1676,22 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
     slotLbl: string;
   } | null>(null);
+  /**
+   * Tasks #126/#127 (Tennis/Schach sequenziell+Reveal, Chris 13.10. — docs/design/
+   * chris-feedback-breite-runde-13-10.md Abschnitt "Tennis" Punkt 25 / "Schach" Punkt 26):
+   * „tennis […] bitte aber auch NACHEINANDER machen! also 1v1 wird gezeigt nicht immer das hin
+   * und her was du immer machst" / „schach bitte auch im 1v1 nacheinander zeigen!" — dieselbe
+   * Sequenzialisierungs-Anforderung wie Fechten (Task #116, geteiltes `prim === "klassen"`
+   * zwischen Tennis UND Speed-Schach, s. `NATIVE_PRIMITIVE` in DisciplineStageArena.tsx).
+   *
+   * NUR für `prim === "klassen"` befüllt — analog zu Fechtens `lamps`-Reveal oben (nicht Teil
+   * dieser Aufgabe: Tennis' eigene Ballphysik-/Bug-Wunschliste, Punkt 25 (b)/(c), bleibt separat).
+   */
+  const [klassenDuel, setKlassenDuel] = useState<{
+    a: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    b: { code: string; name: string; logoUrl: string | null; isOwn: boolean; player: NativeStagePlayer | null };
+    slotLbl: string;
+  } | null>(null);
   // Geteilter 5s-Zeitstrahl (Feld↔Tabelle-Sync): animScore rampt roundStartScore→
   // displayScore, treibt Feldposition UND Ranglisten-Sortierung. + Highlight-Zoom.
   const [zoom, setZoom] = useState<{ ox: number; oy: number; scale: number } | null>(null);
@@ -1883,6 +1904,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setHandoffTs(0);
     setPhotoFinish(false);
     setFechtDuel(null); // Task #116: keine stehengebliebene Matchup-Karte nach „↻ Neu"
+    setKlassenDuel(null); // Tasks #126/#127: dasselbe für klassen
     setStageCrown(null);
     stageCrownRef.current = { list: [], stage: 0, label: null };
     setDemandKg(null);
@@ -2941,8 +2963,40 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       pairStartIdx = starts;
       pairPartnerAtIdx = partners;
     }
+    /**
+     * Tasks #126/#127: für klassen (Tennis/Speed-Schach) `order` nach Gegner-Paaren
+     * umgruppieren, nach demselben Muster wie oben für lamps. Eng auf `"klassen"` beschränkt
+     * (analog Fechtens `"lamps"`-Zweig), damit sich das vom parallelen `"stage"`-Umbau
+     * (Showcase/Eiskunstlauf) nicht überlappt.
+     */
+    let klassenPairStartIdx: Set<number> | null = null;
+    let klassenPairPartnerAtIdx: Map<number, RT> | null = null;
+    if (prim === "klassen") {
+      const byTeamId = new Map(rt.filter((t) => t.teamId).map((t) => [t.teamId as string, t]));
+      const used = new Set<number>();
+      const pairedOrder: RT[] = [];
+      const starts = new Set<number>();
+      const partners = new Map<number, RT>();
+      for (const t of order) {
+        if (used.has(t.idx)) continue;
+        used.add(t.idx);
+        const opp = t.opponentTeamId ? byTeamId.get(t.opponentTeamId) ?? null : null;
+        starts.add(pairedOrder.length);
+        pairedOrder.push(t);
+        if (opp && opp.idx !== t.idx && !used.has(opp.idx)) {
+          used.add(opp.idx);
+          partners.set(pairedOrder.length - 1, opp);
+          pairedOrder.push(opp);
+        }
+      }
+      order.length = 0;
+      order.push(...pairedOrder);
+      klassenPairStartIdx = starts;
+      klassenPairPartnerAtIdx = partners;
+    }
     let i = 0;
-    const revealShownAt = new Set<number>(); // Paar-Start-Indizes, deren Reveal-Karte schon lief
+    const revealShownAt = new Set<number>(); // Paar-Start-Indizes, deren Reveal-Karte schon lief (lamps)
+    const klassenRevealShownAt = new Set<number>(); // dasselbe für klassen
     const doOne = () => {
       // Hover-Pause: re-pollen ohne order[i] zu konsumieren (genau ein Timer,
       // busyRef bleibt true → Reihenfolge/Choreografie unverändert). Gleiches gilt für
@@ -2970,6 +3024,27 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             setFechtDuel(null);
             doOne();
           }, FECHT_REVEAL_MS);
+          return;
+        }
+      }
+      // Tasks #126/#127: Matchup-Reveal vor jedem neuen klassen-Paar (nur klassen, nur echte
+      // Paare mit aufgelöstem Gegner) -- "wer gegen wen" + Eignung (NativeStagePlayer.val) für
+      // GENAU dieses Board, bevor das Paar enthüllt. Einzelteams ohne Partner (kein
+      // `klassenPairPartnerAtIdx`-Eintrag) bekommen keine Karte und laufen wie bisher durch.
+      if (klassenPairStartIdx?.has(i) && !klassenRevealShownAt.has(i) && i < order.length) {
+        const partner = klassenPairPartnerAtIdx?.get(i) ?? null;
+        if (partner) {
+          klassenRevealShownAt.add(i);
+          const home = order[i]!;
+          setKlassenDuel({
+            a: { code: home.code, name: home.name, logoUrl: home.logoUrl, isOwn: home.isOwn, player: home.players[r] ?? null },
+            b: { code: partner.code, name: partner.name, logoUrl: partner.logoUrl, isOwn: partner.isOwn, player: partner.players[r] ?? null },
+            slotLbl: slots[r] ?? `Board ${r + 1}`,
+          });
+          later(() => {
+            setKlassenDuel(null);
+            doOne();
+          }, KLASSEN_REVEAL_MS);
           return;
         }
       }
@@ -3197,6 +3272,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       setBanner(null);
       setHandoffTs(0);
       setPhotoFinish(false);
+      setKlassenDuel(null); // Tasks #126/#127: Sprung-Zielbild ohne Kaskade zeigt keine stehende Matchup-Karte
       setStageCrown(null);
       // A2 (Befund, docs/MULTIPLAYER_VOLLAUSBAU_PLAN.md): vorher fehlten hier genau die Felder, die
       // `reset()` (Knopf/Mount) laengst raeumt — podium/flash/shake/hover/stageCrownRef/demandKg/
@@ -3455,6 +3531,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     setBanner(null);
     setHandoffTs(0);
     setPhotoFinish(false);
+    setKlassenDuel(null); // Tasks #126/#127: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
     setStageCrown(null);
     setFechtDuel(null); // Task #116: Quick-Sim landet direkt auf dem Endstand, keine Kaskade mehr offen
     // Jede laufende Pause (Leertaste/Hover ODER eine Perioden-Pause, Feature „Viertel/
@@ -4279,6 +4356,57 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             ))}
             <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
               {fechtDuel.slotLbl}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): Matchup-Karte vor jedem klassen-
+            Paar-Board -- "wer gegen wen" + Eignung (NativeStagePlayer.val, derselbe Basiswert wie
+            die Simulation). Nur klassen, nur wenn ein echtes Gegner-Paar aufgelöst werden konnte.
+            Analog zu Fechtens lamps-Reveal (Task #116) oben. */}
+        {prim === "klassen" && klassenDuel ? (
+          <div
+            className="oly-anim"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 14,
+              padding: "10px 16px",
+              marginBottom: 10,
+              borderRadius: 12,
+              border: "1.5px solid var(--nl-warn)",
+              background: "color-mix(in srgb, var(--nl-warn) 10%, var(--nl-panel))",
+            }}
+          >
+            {([klassenDuel.a, klassenDuel.b] as const).map((side, sideIdx) => (
+              <Fragment key={sideIdx}>
+                {sideIdx === 1 ? (
+                  <div style={{ flex: "none", fontWeight: 900, fontSize: 15, letterSpacing: "0.06em", color: "var(--nl-warn)" }}>⚔ VS</div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                  <PlayerMark
+                    src={side.player?.portraitUrl ?? null}
+                    alt={side.player?.name ?? side.code}
+                    size={34}
+                    isOwn={side.isOwn}
+                    starTier={getPlayerStarTier(side.player?.ovrRank)}
+                  />
+                  <div style={{ minWidth: 0, textAlign: sideIdx === 1 ? "right" : "left" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, flexDirection: sideIdx === 1 ? "row-reverse" : "row" }}>
+                      <TeamMark src={side.logoUrl} alt={side.name} size={15} radius={4} isOwn={side.isOwn} placeholderColor={teamPrimaryColor(side.code)} placeholderLabel={side.code} />
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.04em", color: side.isOwn ? "var(--nl-accent)" : "var(--nl-mut)" }}>{side.code}</span>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: 14, whiteSpace: "nowrap" }}>{side.player?.name ?? "—"}</div>
+                    <div style={{ fontSize: 11, color: "var(--nl-mut)" }}>
+                      Eignung {side.player ? fmt1(side.player.val) : "–"}
+                    </div>
+                  </div>
+                </div>
+              </Fragment>
+            ))}
+            <div style={{ flex: "none", marginLeft: 6, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--nl-mut)", whiteSpace: "nowrap" }}>
+              {klassenDuel.slotLbl}
             </div>
           </div>
         ) : null}

@@ -144,7 +144,7 @@ export function buildDisciplineStageTeamsFromBookedResult(
       missingLineup: eigene.length === 0,
       captainPlayerId: null,
       captainName: null,
-      // Das gebuchte Ergebnis trägt keine Gegner-Team-ID (Task #116) -- die Bühne fällt für
+      // Das gebuchte Ergebnis trägt keine Gegner-Team-ID (Tasks #116/#126/#127) -- die Bühne fällt für
       // bereits gewertete/historische Disziplinen auf die ungepaarte Enthüllung zurück, exakt wie
       // sie das für Fatigue/Captain/Mutator-Mods oben im Dateikopf-Kommentar schon tut.
       opponentTeamId: null,
