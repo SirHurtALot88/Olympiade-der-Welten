@@ -22136,8 +22136,10 @@
   // TEAM-FEIER-ADAPTER GEWICHTHEBEN (Konzept 3.1), aufgerufen aus stepHeben() am Uebergang
   // zug -> hoch|ablage. Reines Lesen (r.gueltig/r.kuehn/r.punktesieg/u.duellGewonnen sind in
   // diesem Moment enthuellt und sichtbar), schreibt nur ueber teamFeierAusloesen() in
-  // `teamFeiern`. Bei `stumm` sofort zurueck (stepHeben laeuft ueber buehnenBewegung() auch im
-  // Messpfad mit).
+  // `teamFeiern`. Bei `stumm` sofort zurueck -- das ist NICHT der rho/Pp-Messpfad (disziplinProbe()/
+  // miss-alle-disziplinen.mjs laesst `stumm` fuer Gewichtheben/Buehne unberuehrt, s. Kopfkommentar
+  // bei teamFeierAusloesen weiter unten), sondern dasselbe strukturelle No-Op wie dort: `stumm`
+  // ist nur bei stepSimStumm/bahnLauf/staffelPaarProbe/spieleBahn true, keiner davon rendert.
   //   Duell entschieden (beide fertig, Gegner-Urteil schon gezeigt) -> gross fuer den Sieger
   //   Kuehner Versuch geglueckt (Punktesieg)                        -> mittel fuer u.side
   //   Gueltiger Versuch                                             -> klein fuer u.side
@@ -23210,10 +23212,23 @@
   // Math.random(), kein Schreibzugriff auf u.summe/u.runden/u.aktuell/u.vorteil/u.zweikampf/
   // u.lunge/u.pos/u.v/buehneAkt/buehneZeiger/done -- und ueberhaupt auf kein Feld an `u` (die
   // Jubelpose geht ueber ein Stellvertreter-Objekt an zeichneSprite(), s. teamFeierSpriteArg).
-  // teamFeierAusloesen() kehrt bei `stumm` SOFORT zurueck (stepSimStumm/disziplinProbe/
-  // einflussVon setzen es fuer jede Rangtreue-/Pp-Messung) -- der Messpfad sieht dieses Modul
-  // gar nicht, `teamFeiern` bleibt dort leer, und jede Zeichen-/Haltungsfunktion unten ist
-  // bei leerer Liste ein No-Op (Huepfer 0, keine Effekte, kein Wackeln).
+  // teamFeierAusloesen() kehrt bei `stumm` SOFORT zurueck. KORRIGIERT (13.10., Task #101 --
+  // die fruehere Fassung dieses Kommentars behauptete, `stumm` stehe "fuer jede Rangtreue-/
+  // Pp-Messung"; nachgemessen stimmt das nur fuer EINEN von vier Chassis): gesetzt wird es an
+  // GENAU vier Stellen -- stepSimStumm() (die Kampf/TDM-Variante von MOTOREN[...].lauf()),
+  // bahnLauf() (Alternativ-Rechner/Opus-Plansonde), staffelPaarProbe() (O7-Sonde) und
+  // spieleBahn() (Produktions-Resolve ueber lib/battle/arena-headless-runner.ts, Playwright
+  // ohne Zuschauer). disziplinProbe()/einflussVon() -- die Funktionen HINTER miss-alle-
+  // disziplinen.mjs/messe-arena-einfluss.mjs -- setzen `stumm` NICHT selbst: fuer Buehne/
+  // Bahn-Disziplinen ruft MOTOREN[bd].lauf() dort stepBuehne()/stepSpurt() direkt, ohne
+  // stepSimStumm dazwischen. Nachgemessen (Playwright-Sonde gegen disziplinProbe): waehrend
+  // einer echten gewichtheben-/breaking-/staffel-Messung feuert teamFeierAusloesen() TATSAECHLICH
+  // ungemutet (173/30/36 Aufrufe in je drei Spielen, keiner davon stumm). Das ist trotzdem
+  // folgenlos fuer rho/Pp -- nicht wegen `stumm`, sondern strukturell: dieses Modul liest/
+  // schreibt ausschliesslich `teamFeiern` (oben), nie rr()/Math.random()/u.*/wert() (s. HARTER
+  // VERTRAG oben). Wo `stumm` wirklich true ist (die vier Stellen oben), ist `teamFeiern`
+  // leer und jede Zeichen-/Haltungsfunktion unten bei leerer Liste ein No-Op (Huepfer 0, keine
+  // Effekte, kein Wackeln) -- das bleibt richtig, nur eben nicht fuer disziplinProbe/einflussVon.
   //
   // UHR = jetztMs() (Befund B3): buehneT friert bei `done` ein und ist ueber ZEIT_DEHNUNG
   // gedehnt; jetztMs() zaehlt echte Millisekunden und ist im Sonden-Modus an sondenSimMs
@@ -23263,7 +23278,7 @@
   // (Konzept 3.3: die patzende Seite "sackt ueber `sackt`", die Gegenseite feiert klein);
   // ohne den Schalter bliebe die patzende Seite dort regungslos, weil "klein" kein Raunen kennt.
   function teamFeierAusloesen(seite,stufe,anker,opt){
-    if(stumm)return;                                   // Messpfad: nie
+    if(stumm)return;      // stepSimStumm/bahnLauf/staffelPaarProbe/spieleBahn: nie (s. Kopfkommentar oben)
     if(seite!==0&&seite!==1)return;                     // Remis/unklar: keine Feier
     if(!TEAM_FEIER_STUFEN[stufe])return;
     const jetzt=jetztMs();
@@ -41685,9 +41700,12 @@
   // VERTRAG (Klasse A, Konzept Abschnitt 4): REINE ANZEIGE. Kein rr(), kein Math.random(),
   // kein Schreibzugriff auf irgendein Feld an `u`/`naechster` -- gelesen werden nur
   // u.seite/u.gestolpert/u.fertig/u.bein und Bildschirmpositionen ueber laeuferXY(). Beide
-  // Funktionen kehren bei `stumm` SOFORT zurueck (stepStaffel laeuft ueber bahnBewegung() auch
-  // im Messpfad, s. Vertrag am stepStaffel-Kopf), noch bevor laeuferXY() fuer den Anker
-  // gerufen wird -- der Messpfad sieht dieses Modul also gar nicht.
+  // Funktionen kehren bei `stumm` SOFORT zurueck, noch bevor laeuferXY() fuer den Anker gerufen
+  // wird -- NICHT, weil der rho/Pp-Messpfad (disziplinProbe()/miss-alle-disziplinen.mjs) hier
+  // stumm waere (nachgemessen: ist er fuer Staffel nicht, `stumm` bleibt dort false, s.
+  // Kopfkommentar bei teamFeierAusloesen weiter oben), sondern weil `stumm` an den vier
+  // Stellen, an denen es wirklich true ist (stepSimStumm/bahnLauf/staffelPaarProbe/spieleBahn),
+  // dasselbe strukturell folgenlose No-Op ist wie ueberall sonst in diesem Baukasten.
   // KONFETTI-ANKER (Konzept: laeuferXY() des ausloesenden Laeufers) -- mit EINER Abweichung,
   // gefunden in der Sichtprobe: die Ziellinie und die ganze Zielgerade liegen im oberen
   // Leinwand-Drittel, und genau dort liegt im Spiel das Bahn-HUD (#bahnHud mit "AKTUELL/
