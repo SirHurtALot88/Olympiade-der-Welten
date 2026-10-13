@@ -55,10 +55,8 @@ Problem aus dem Time-Trial-Punkt unten (Wertung an der Seite statt als Overlay �
 
 7. **Animationen überarbeiten, 3D-Effekt wirkt unangenehm.** „Wenn es geht bessere Animationen vom
    Klettern im Climbing, der leicht angehauchte 3D-Effekt beim Klettern wirkt komisch - da könnte
-   einem beim Zuschauen schlecht werden, dann evtl lieber doch in 2D bleiben" — Rückfrage/Option:
-   eventuell komplett zurück zu 2D statt des aktuellen leichten 3D-Looks. Präsentation, Klasse A,
-   aber Geschmacksfrage, die vor der Umsetzung kurz mit Chris abgestimmt werden sollte (2D vs.
-   besseres 3D).
+   einem beim Zuschauen schlecht werden, dann evtl lieber doch in 2D bleiben" — **Chris' Entscheidung
+   13.10.: „climbing -> 2d"** — zurück zu 2D, keine weitere Rückfrage nötig. Präsentation, Klasse A.
 8. **Spieler-Interaktion beim Klettern (herunterziehen, aneinander vorbeiziehen, Wehren).**
    „bisher gibt es dort keine Interaktion mit anderen Spielern dass man versucht sie runter zu
    ziehen etc. dafür müssten die Spieler aber auch enger zusammen klettern aber trotzdem auch noch
