@@ -41,6 +41,10 @@ model Article {
   /// "item_id" | "name" | "alias" — wie das Angebot dem Artikel zugeordnet wurde.
   imageMatchedBy String?
   imageFetchedAt DateTime?
+  /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
+  /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
+  ebayPrice      Float?
+  ebayPriceAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -200,6 +204,7 @@ model CostSettings {
   adFeeRateSingle             Float    @default(0.09)
   adFeeRateMin                Float    @default(0.09)
   adFeeRateGood               Float    @default(0.10)
+  /// UNGENUTZT seit 13.10.2026: der Korridor ist 25-33 % Deckungsbeitrags-Marge (src/lib/pricing/costEngine.ts).
   marginMinMultiplier         Float    @default(1.33)
   marginGoodMultiplier        Float    @default(1.66)
   createdAt                   DateTime @default(now())

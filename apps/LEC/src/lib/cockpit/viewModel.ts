@@ -6,7 +6,7 @@ import {
   type DashboardViewModel,
 } from "../dashboard/viewModel";
 import type { CostSettingsValues } from "../pricing/costSettings";
-import { totalFixedYearly } from "../pricing/costEngine";
+import { DB_MARGIN_MIN, DB_MARGIN_OPT, totalFixedYearly } from "../pricing/costEngine";
 import { computeRunRateBands, type RunRateBands } from "./bands";
 import { buildBridge, type Bridge } from "./bridge";
 import { computeCapital, type CapitalFacts } from "./capital";
@@ -63,12 +63,11 @@ export interface CockpitViewModel {
   planwerte: Planwerte;
   fixedYearly: number;
   /**
-   * Maßstab der Preis-Ampel = MIN/GUT-Korridor aus costEngine (`computePriceCorridor`):
-   * VK-MIN = Basis × marginMinMultiplier, VK-GUT = Basis × marginGoodMultiplier. Die zugehoerige
-   * Vollkosten-Marge ist 1 − 1/Multiplikator (1,33 → 24,8 %, Chris' "25 % Minimum"). Nur zur
-   * Beschriftung -- die Einstufung selbst kommt aus `SortimentRow.priceStatus`.
+   * Maßstab der Preis-Ampel = Zielspanne aus costEngine (`computePriceCorridor`): 25 % (Minimum)
+   * bis 33 % (Optimum) Deckungsbeitrags-Marge vor Fixkosten (Chris, 13.10.). Nur zur Beschriftung --
+   * die Einstufung selbst kommt aus `SortimentRow.priceStatus`.
    */
-  corridor: { minMultiplier: number; goodMultiplier: number; minMargin: number; goodMargin: number };
+  corridor: { minMargin: number; goodMargin: number };
   imports: ImportStatus[];
   totals: { articles: number; active: number };
 }
@@ -121,12 +120,7 @@ export function buildCockpitViewModel(input: CockpitInputs): CockpitViewModel {
     market: computeMarketHints(aggregates, input.quotes ?? new Map(), costSettings, images),
     planwerte,
     fixedYearly: totalFixedYearly(costSettings),
-    corridor: {
-      minMultiplier: costSettings.marginMinMultiplier,
-      goodMultiplier: costSettings.marginGoodMultiplier,
-      minMargin: 1 - 1 / costSettings.marginMinMultiplier,
-      goodMargin: 1 - 1 / costSettings.marginGoodMultiplier,
-    },
+    corridor: { minMargin: DB_MARGIN_MIN, goodMargin: DB_MARGIN_OPT },
     imports: input.imports ?? [],
     totals: { articles: aggregates.length, active: aggregates.filter((a) => a.active).length },
   };

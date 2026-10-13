@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { CostSettingsValues } from "@/lib/pricing/costSettings";
-import { totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
+import { DB_MARGIN_MIN, DB_MARGIN_OPT, totalFixedYearly, type PriceStatus, type ShopVolume } from "@/lib/pricing/costEngine";
 import { PREVIEW_EXAMPLES, buildCostPreview, deriveCostFacts, type CostPreview } from "@/lib/pricing/costPreview";
 import { formatEuroCents } from "@/lib/format";
 import { STATUS_PILL } from "@/components/dashboard/SortimentTable";
@@ -126,13 +126,6 @@ const GROUPS: Group[] = [
       },
     ],
   },
-  {
-    title: "Margen-Ziele",
-    fields: [
-      { key: "marginMinMultiplier", label: "MIN-Multiplikator", unit: "x" },
-      { key: "marginGoodMultiplier", label: "GUT-Multiplikator", unit: "x" },
-    ],
-  },
 ];
 
 function toDisplay(value: number, unit: Unit): string {
@@ -180,9 +173,6 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
     }
   }
 
-  const minMarginPct = ((parsed.marginMinMultiplier - 1) / parsed.marginMinMultiplier) * 100;
-  const goodMarginPct = ((parsed.marginGoodMultiplier - 1) / parsed.marginGoodMultiplier) * 100;
-
   return (
     <AppShell
       title="Einstellungen"
@@ -212,12 +202,6 @@ export function EinstellungenPage({ costSettings, importBatches, authEnabled, sh
                 ))}
               </div>
               {g.note && <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>{g.note(parsed)}</div>}
-              {g.title === "Margen-Ziele" && (
-                <div style={{ marginTop: 10, fontSize: 11.5, color: "var(--muted)" }}>
-                  MIN ≈ {minMarginPct.toFixed(0)} % Gewinnmarge · GUT ≈ {goodMarginPct.toFixed(0)} % Gewinnmarge
-                  (Klartext-Ableitung aus den Multiplikatoren).
-                </div>
-              )}
             </div>
           ))}
 
@@ -381,11 +365,11 @@ function PreviewColumn({ pv, parsed }: { pv: CostPreview; parsed: CostSettingsVa
         <span>{eur(corridor.vkContribution)}</span>
       </div>
       <div className="row tot" style={{ color: "var(--good)" }}>
-        <span>VK-Preis MIN (× {parsed.marginMinMultiplier.toFixed(2).replace(".", ",")}, Vollkosten)</span>
+        <span>VK-Preis MIN ({pct(DB_MARGIN_MIN)} Deckungsbeitrag)</span>
         <span>{eur(corridor.vkMin)}</span>
       </div>
       <div className="row tot" style={{ color: "var(--accent-ink)" }}>
-        <span>VK-Preis GUT (× {parsed.marginGoodMultiplier.toFixed(2).replace(".", ",")}, Vollkosten)</span>
+        <span>VK-Preis GUT ({pct(DB_MARGIN_OPT)} Deckungsbeitrag)</span>
         <span>{eur(corridor.vkGood)}</span>
       </div>
       <div style={{ marginTop: 8 }}>

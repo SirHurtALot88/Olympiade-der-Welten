@@ -3,20 +3,13 @@ import type { CostSettingsValues } from "../pricing/costSettings";
 import {
   computeHk,
   computePriceCorridor,
+  computeTargetRange,
   contributionMarginForPrice,
   fixedCostPerUnit,
-  targetPriceForMargin,
   type ShopVolume,
-} from "../pricing/costEngine";
-import {
-  DB_MARGIN_MIN,
-  DB_MARGIN_OPT,
-  PRICE_FLOOR,
-  classifyAgainstRange,
-  computeMarketEk,
-  type MarketStatus,
   type TargetRange,
-} from "../pricing/marketPrice";
+} from "../pricing/costEngine";
+import { classifyAgainstRange, computeMarketEk, type MarketStatus } from "../pricing/marketPrice";
 
 /** Minimaler Auszug eines MarketPrice-Datensatzes, den die Vergleichs-Zeile braucht. */
 export interface LatestQuote {
@@ -108,7 +101,8 @@ export function buildMarketComparisonRow(
     },
     costSettings
   );
-  const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings);
+  const kind = a.packQty > 1 ? "pack" : "single";
+  const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings, { kind, packSize: a.packQty, shop });
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
   const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
@@ -118,13 +112,8 @@ export function buildMarketComparisonRow(
       ? { min: quote.priceMin * pack, max: quote.priceMax * pack, variants: quote.variants ?? 0 }
       : null;
 
-  const kind = a.packQty > 1 ? "pack" : "single";
-  const rangeFor = (marketPerUnit: number): TargetRange => {
-    const input = { ek: marketPerUnit, kind, packSize: a.packQty, shop } as const;
-    const min = targetPriceForMargin(input, DB_MARGIN_MIN, costSettings.adFeeRateMin, costSettings);
-    const opt = targetPriceForMargin(input, DB_MARGIN_OPT, costSettings.adFeeRateGood, costSettings);
-    return { min: Math.max(PRICE_FLOOR, min ?? PRICE_FLOOR), opt: Math.max(PRICE_FLOOR, opt ?? PRICE_FLOOR) };
-  };
+  const rangeFor = (marketPerUnit: number): TargetRange =>
+    computeTargetRange(marketPerUnit, { kind, packSize: a.packQty, shop }, costSettings);
 
   let target: TargetRange | null = null;
   let status: MarketStatus = "im_korridor";

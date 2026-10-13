@@ -24,7 +24,7 @@ const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", "faellt
 /** SortimentRow.priceStatus statt costEngine.PriceStatus (FIX 1): enthaelt zusaetzlich
  * "kein_ek" fuer Artikel ohne jeden EK-Anhaltspunkt. */
 type RowPriceStatus = SortimentRow["priceStatus"];
-const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "ziel_unerreichbar", "im_korridor", "ueber_gut", "kein_ek"];
+const STATUS_ORDER: RowPriceStatus[] = ["unter_min", "im_korridor", "ueber_gut", "kein_ek"];
 
 type ColId =
   | "artikel"
@@ -408,7 +408,6 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                         min={row.corridor.min}
                         good={row.corridor.good}
                         contribution={row.corridor.contribution}
-                        status={row.priceStatus}
                         vk={vkForCorridor}
                         marketValue={row.priceTrend}
                       />

@@ -61,7 +61,7 @@ export function buildCostPreview(
     },
     settings
   );
-  const corridor = computePriceCorridor(hk, example.vk, settings);
+  const corridor = computePriceCorridor(hk, example.vk, settings, { kind: example.kind, shop });
   return {
     example,
     hk,

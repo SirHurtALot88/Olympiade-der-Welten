@@ -1,3 +1,5 @@
+import { RANGE_TOLERANCE, type TargetRange } from "./costEngine";
+
 /**
  * Marktpreis-Provider-Interface (KONZEPT.md §7.1). v1 = Provider B: Chris hat
  * keine Cardmarket-API, deshalb werden Preisdaten manuell/halbautomatisch
@@ -93,31 +95,7 @@ export function classifyMarketStatus(ownVk: number, trend: number): MarketStatus
   return "im_korridor";
 }
 
-/**
- * Zielspanne des Verkaufspreises (Chris, 13.10.): Deckungsbeitrags-Marge (vor Fixkosten)
- * mindestens 25 %, optimal 33 %. Gerechnet wird mit dem heutigen Cardmarket-Marktwert als
- * EK plus dem anteiligen Einkaufs-Versand, also dem, was der Nachkauf heute kosten wuerde.
- */
-export const DB_MARGIN_MIN = 0.25;
-export const DB_MARGIN_OPT = 0.33;
-
-/**
- * Untergrenze 4,99 € (seit September): Billigkarten sind bewusst Warenkorb-Fueller.
- * Ein Artikel, der auf der Untergrenze steht, ist damit "im Rahmen", auch wenn die
- * reine Margenrechnung weniger verlangen wuerde.
- */
-export const PRICE_FLOOR = 4.99;
-
-/** Toleranz gegen x,99-Rundung: knapp neben der Spanne ist noch keine Abweichung. */
-export const RANGE_TOLERANCE = 0.03;
-
-export interface TargetRange {
-  /** VK fuer 25 % Deckungsbeitrags-Marge, mindestens PRICE_FLOOR. */
-  min: number;
-  /** VK fuer 33 %, mindestens PRICE_FLOOR. */
-  opt: number;
-}
-
+/** Ampel gegen die Zielspanne (25 % bis 33 % Deckungsbeitrag, siehe costEngine.computeTargetRange). */
 export function classifyAgainstRange(ownVk: number, range: TargetRange): MarketStatus {
   if (!(ownVk > 0)) return "im_korridor";
   if (ownVk < range.min * (1 - RANGE_TOLERANCE)) return "zu_guenstig";

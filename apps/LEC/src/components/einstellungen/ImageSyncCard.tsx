@@ -12,6 +12,8 @@ interface Report {
   failed: { articleId: string; source: string; error: string }[];
   unmatchedSample: string[];
   unmatchedCount: number;
+  priced: number;
+  delisted: number;
   fallbackMissSample: string[];
   fallbackMissCount: number;
   finishedAt: string;
@@ -63,7 +65,7 @@ export function ImageSyncCard() {
 
   return (
     <div className="card" style={{ padding: "15px 16px 16px" }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Kartenbilder</div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Kartenbilder und Angebotspreise</div>
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
         Zuerst deine eigenen Fotos aus dem eBay-Shop, für alles, was dort gerade nicht gelistet ist, das Kartenbild von
         YGOPRODeck über den Set-Code. Jedes Bild wird einmal geladen und auf dem Server abgelegt. Läuft automatisch beim
@@ -87,6 +89,8 @@ export function ImageSyncCard() {
         <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
           Letzter Lauf {fmtTime(r.finishedAt)}: {r.listings} eBay-Angebote auf {r.pages} Seiten gelesen
           {r.emptyPages.length > 0 && <span className="down"> ({r.emptyPages.length} Seiten blieben leer — später erneut laufen lassen)</span>}.
+          <br />
+          Preise gesetzt: {r.priced}{r.delisted > 0 ? `, nicht mehr gelistet: ${r.delisted}` : ""}.
           <br />
           Zugeordnet: {r.matchedBy.item_id} über eBay-Nummer, {r.matchedBy.name} über Namen, {r.matchedBy.alias} über Alias,{" "}
           {r.matchedBy.set_code} über YGOPRODeck. Neu geladen {r.downloaded}, unverändert {r.unchanged}

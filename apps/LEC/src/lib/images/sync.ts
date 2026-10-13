@@ -50,6 +50,10 @@ export interface SyncReport {
   /** Angebote ohne passenden Artikel (Stichprobe, max. 50). */
   unmatchedSample: string[];
   unmatchedCount: number;
+  /** Artikel, deren aktueller eBay-Preis in diesem Lauf gesetzt wurde. */
+  priced: number;
+  /** Artikel, die nicht mehr im Shop stehen (eBay-Preis geleert). */
+  delisted: number;
   /** Artikel mit Set-Code, die auch YGOPRODeck nicht kennt (Stichprobe). */
   fallbackMissSample: string[];
   fallbackMissCount: number;
@@ -71,6 +75,8 @@ interface Job {
   url: string;
   matchedBy: ImageSourceKind;
   ebayItemId: string | null;
+  /** Aktueller Angebotspreis laut Shopseite (nur eBay-Jobs). */
+  price: number | null;
 }
 
 export async function crawlStore(
@@ -137,6 +143,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     url: ebayImageUrl(a.listing.imageGuid),
     matchedBy: a.matchedBy,
     ebayItemId: a.listing.itemId,
+    price: a.listing.price,
   }));
 
   // --- 2. YGOPRODeck fuer den Rest -------------------------------------------
@@ -159,7 +166,7 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
         fallbackMisses.push(a.setCode!);
         continue;
       }
-      jobs.push({ articleId: a.id, guid: `ygo:${cardId}`, url: ygoImageUrl(cardId), matchedBy: "set_code", ebayItemId: null });
+      jobs.push({ articleId: a.id, guid: `ygo:${cardId}`, url: ygoImageUrl(cardId), matchedBy: "set_code", ebayItemId: null, price: null });
     }
   }
 
@@ -169,6 +176,26 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
   const failed: SyncReport["failed"] = [];
   let downloaded = 0;
   let unchanged = 0;
+
+  // Aktuelle Angebotspreise zuerst und unabhaengig vom Bild: ein haengender Bilder-Abruf darf den VK nicht veralten lassen.
+  const now = new Date();
+  const priced = jobs.filter((j) => j.ebayItemId && j.price !== null);
+  await runLimited(priced, 8, async (job) => {
+    await prisma.article.update({
+      where: { id: job.articleId },
+      data: { ebayItemId: job.ebayItemId, ebayPrice: job.price, ebayPriceAt: now },
+    });
+  });
+  // Nicht mehr gelistet (und der Abruf war vollstaendig): kein aktueller eBay-Preis mehr.
+  // Bei Drosselluecken (leere Seiten) oder einem auffaellig kleinen Abruf nichts loeschen.
+  let delisted = 0;
+  if (emptyPages.length === 0 && priced.length > 0) {
+    const res = await prisma.article.updateMany({
+      where: { ebayPrice: { not: null }, id: { notIn: priced.map((j) => j.articleId) } },
+      data: { ebayPrice: null, ebayPriceAt: null },
+    });
+    delisted = res.count;
+  }
 
   await runLimited(jobs, 4, async (job) => {
     const art = current.get(job.articleId)!;
@@ -201,7 +228,6 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     await prisma.article.update({
       where: { id: job.articleId },
       data: {
-        ...(job.ebayItemId ? { ebayItemId: job.ebayItemId } : {}),
         imageGuid: job.guid,
         imageFile: fileName,
         imageMatchedBy: job.matchedBy,
@@ -222,6 +248,8 @@ export async function syncArticleImages(prisma: PrismaClient, options: SyncOptio
     failed,
     unmatchedSample: unmatched.slice(0, 50).map((l) => l.title),
     unmatchedCount: unmatched.length,
+    priced: priced.length,
+    delisted,
     fallbackMissSample: fallbackMisses.slice(0, 50),
     fallbackMissCount: fallbackMisses.length,
     articlesWithImage,

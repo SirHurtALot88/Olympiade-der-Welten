@@ -149,8 +149,7 @@ describe("buildMarketComparisonRow", () => {
     expect(row.marketEk).toBeCloseTo(0.59 * 3 + 1.15 * 0.5);
   });
 
-  it("reicht die shopweiten Fixkosten in den Korridor durch (nicht 0)", () => {
-    // Regression: marketComparison uebergab fixedCostPerUnit: 0 -> Korridor ohne Fixkosten.
+  it("Shop-Volumen geht ueber das Einschreiben in die Spanne ein, Fixkosten nicht (Deckungsbeitrag)", () => {
     const a = article({
       currentVk: 9.99,
       windows: {
@@ -160,10 +159,12 @@ describe("buildMarketComparisonRow", () => {
     const shop = { units365d: 3400, unitsAtOrAboveThreshold: 60 };
     const ohne = buildMarketComparisonRow(a, quote(), DEFAULT_COST_SETTINGS, null);
     const mit = buildMarketComparisonRow(a, quote(), DEFAULT_COST_SETTINGS, shop);
-    const fixedPerUnit = 4229 / 3400;
-    const einschreiben = registeredRateBelowThreshold(shop, DEFAULT_COST_SETTINGS); // VK 9,99 liegt unter der Schwelle
-    // VK-MIN = (HK + Gebuehren) x 1,33 -> Fixkosten und Einschreiben-Anteil gehen mit Faktor 1,33 ein.
-    expect(mit.corridor.min - ohne.corridor.min).toBeCloseTo((fixedPerUnit + einschreiben) * 1.33, 5);
+    const einschreiben = registeredRateBelowThreshold(shop, DEFAULT_COST_SETTINGS); // VK-MIN liegt unter der Schwelle
+    // VK-MIN = (0,35 + HK ohne Fixkosten) / (1 - (0,11 + 0,09) x 1,19 - 0,25) = ... / 0,512
+    expect(mit.corridor.min - ohne.corridor.min).toBeCloseTo(einschreiben / 0.512, 5);
+    // Fixkosten (4.229 € -> hier verdoppelt) aendern die Spanne nicht.
+    const teurerShop = { ...DEFAULT_COST_SETTINGS, fixedYearlyOther: DEFAULT_COST_SETTINGS.fixedYearlyOther * 2 };
+    expect(buildMarketComparisonRow(a, quote(), teurerShop, shop).corridor.min).toBeCloseTo(mit.corridor.min, 8);
   });
 
   it("markiert einen Datensatz aelter als 30 Tage als veraltet", () => {

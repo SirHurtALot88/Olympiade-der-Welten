@@ -67,7 +67,7 @@ export function CockpitPage({ vm }: { vm: CockpitViewModel }) {
           scope="aktive Artikel · Listen-VK vs. Korridor"
           distribution={vm.priceStatus}
           classPrefix="ck-p"
-          note={`Aktueller Listen-VK gegen den Vollkosten-Korridor aus den Kostensätzen: MIN = Basis × ${vm.corridor.minMultiplier.toLocaleString("de-DE")} (≈ ${pct(vm.corridor.minMargin)} Marge), GUT = Basis × ${vm.corridor.goodMultiplier.toLocaleString("de-DE")} (≈ ${pct(vm.corridor.goodMargin)}). „Kein EK“ = ohne Einkaufspreis ist kein Korridor berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist.`}
+          note={`Aktueller Listen-VK gegen die Zielspanne: ${pct(vm.corridor.minMargin)} (Minimum) bis ${pct(vm.corridor.goodMargin)} (Optimum) Deckungsbeitrags-Marge vor Fixkosten, gerechnet mit dem EK des Artikels, mindestens 4,99 €. „Kein EK“ = ohne Einkaufspreis ist keine Spanne berechenbar — der Anteil zeigt, wie viel vom Sortiment preislich blind ist.`}
         />
       </div>
 

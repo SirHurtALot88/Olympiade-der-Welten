@@ -9,12 +9,11 @@ import { LABELS_DE, type SortimentRow } from "../dashboard/viewModel";
 export const CLASS_ORDER: ArticleClass[] = ["champion", "solide", "beobachten", "faellt_ab", "low_runner", "ladenhueter"];
 
 export type PriceStatusKey = SortimentRow["priceStatus"];
-export const PRICE_STATUS_ORDER: PriceStatusKey[] = ["ueber_gut", "im_korridor", "ziel_unerreichbar", "unter_min", "kein_ek"];
+export const PRICE_STATUS_ORDER: PriceStatusKey[] = ["ueber_gut", "im_korridor", "unter_min", "kein_ek"];
 export const PRICE_STATUS_LABELS: Record<PriceStatusKey, string> = {
-  ueber_gut: "über GUT",
+  ueber_gut: "zu teuer",
   im_korridor: "im Korridor",
-  ziel_unerreichbar: "Ziel unerreichbar",
-  unter_min: "unter MIN",
+  unter_min: "zu günstig",
   kein_ek: "kein EK",
 };
 

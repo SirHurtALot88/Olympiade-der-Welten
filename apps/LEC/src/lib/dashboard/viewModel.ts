@@ -464,7 +464,7 @@ export function buildSortimentRow(
     },
     costSettings
   );
-  const corridor = computePriceCorridor(hk, vkForCorridor || hk.total, costSettings);
+  const corridor = computePriceCorridor(hk, vkForCorridor || hk.total, costSettings, { kind, packSize: a.packQty, shop });
   const ekMissing = hasNoEkData(a);
   // FIX 1: Ohne EK ist der Korridor auf Basis EK=0 winzig (HK enthaelt praktisch nur
   // Versand/Gebuehren) -- der reale VK liegt dann fast immer "im Korridor" oder "ueber

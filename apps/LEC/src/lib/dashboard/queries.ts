@@ -41,8 +41,6 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
     adFeeRateSingle: active.adFeeRateSingle,
     adFeeRateMin: active.adFeeRateMin,
     adFeeRateGood: active.adFeeRateGood,
-    marginMinMultiplier: active.marginMinMultiplier,
-    marginGoodMultiplier: active.marginGoodMultiplier,
   };
 }
 
@@ -113,7 +111,8 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
-      currentVk: article.currentVk,
+      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
+      currentVk: article.ebayPrice ?? article.currentVk,
       currentEk: article.currentEk,
       latestMarketTrend: latestTrendByArticle.get(article.id) ?? null,
       windows,

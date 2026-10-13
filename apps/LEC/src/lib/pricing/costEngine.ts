@@ -220,11 +220,42 @@ export function computeMargin(
   return { vk, ebayFees, hk, profit, marginPct };
 }
 
+/**
+ * Zielspanne des VK (Chris, 13.10.): Deckungsbeitrags-Marge — also VOR Fixkosten — mindestens
+ * 25 %, optimal 33 %. Ein Maßstab fuer das ganze Board (Sortiment-Korridor, Marktpreise, Cockpit).
+ */
+export const DB_MARGIN_MIN = 0.25;
+export const DB_MARGIN_OPT = 0.33;
+
+/**
+ * Untergrenze 4,99 € (seit September): Billigkarten sind bewusst Warenkorb-Fueller. Ein Artikel,
+ * der auf der Untergrenze steht, ist "im Rahmen", auch wenn die reine Margenrechnung weniger
+ * verlangen wuerde.
+ */
+export const PRICE_FLOOR = 4.99;
+
+/** Toleranz gegen x,99-Rundung: knapp neben der Spanne ist noch keine Abweichung. */
+export const RANGE_TOLERANCE = 0.03;
+
+export interface TargetContext {
+  kind: ItemKind;
+  packSize?: number;
+  /** Shopweite Mengen fuer den Einschreiben-Satz. `null` = unbekannt. */
+  shop: ShopVolume | null;
+}
+
+export interface TargetRange {
+  /** VK fuer 25 % Deckungsbeitrags-Marge, mindestens PRICE_FLOOR. */
+  min: number;
+  /** VK fuer 33 %, mindestens PRICE_FLOOR. */
+  opt: number;
+}
+
 export interface PriceCorridor {
-  /** Vollkosten-HK (inkl. shopweitem Fixkostenanteil). */
+  /** Vollkosten-HK (inkl. shopweitem Fixkostenanteil), nur zur Anzeige der Vollkosten-Marge. */
   hk: number;
   currentVkFees: EbayFeeBreakdown;
-  /** Vollkosten-Korridor: VK-MIN / VK-GUT (inkl. Fixkosten). */
+  /** Zielspanne: VK-MIN (25 %) / VK-GUT (33 %) Deckungsbeitrags-Marge, mindestens 4,99 €. */
   vkMin: number;
   vkGood: number;
   /** HK OHNE Fixkostenanteil (Basis der Deckungsbeitrags-Rechnung). */
@@ -235,7 +266,7 @@ export interface PriceCorridor {
    * werden nicht mehr gedeckt) — unabhaengig davon, wie die Fixkosten verteilt werden.
    */
   vkContribution: number;
-  /** Ziel-Marge der MIN-Linie, abgeleitet aus dem Multiplikator: 1 - 1/1,33 = 24,8 % (~25 %). */
+  /** Ziel-Marge der MIN-Linie: 25 % Deckungsbeitrag. */
   targetMargin: number;
   /** Lineares Gebuehrenmodell fuer den Korridor-Ad-Satz: Gebuehr(VK) = feeFixed + VK x feeRate. */
   feeFixed: number;
@@ -243,12 +274,23 @@ export interface PriceCorridor {
 }
 
 /**
- * Preis-Korridor MIN/GUT (KONZEPT §7.3) plus Deckungsbeitrags-Grenze:
- * Basis = HK + VK-Kosten des aktuellen VK (fuer die Korridor-Zielrechnung wird
- * die Ziel-Ad-Rate "gut" = 10 % verwendet).
- * VK-MIN  = (HK + VK-Kosten) x 1,33  (~25% Marge, Vollkosten)
- * VK-GUT  = (HK + VK-Kosten) x 1,66  (~35% Marge, Vollkosten)
- * VK-DB   = (HK ohne Fixkosten + 0,35) / (1 - Gebuehrensatz)  (Gewinn vor Fixkosten = 0)
+ * Zielspanne zu einem EK der Verkaufseinheit: VK fuer 25 % bis 33 % Deckungsbeitrags-Marge
+ * (Anzeigen-Satz MIN bzw. GUT), mindestens PRICE_FLOOR. Eine Quelle fuer Sortiment-Korridor
+ * (EK = eigener EK) und Marktpreise/Cockpit (EK = Cardmarket-Marktwert).
+ */
+export function computeTargetRange(ek: number, ctx: TargetContext, settings: CostSettingsValues): TargetRange {
+  const input = { ek, kind: ctx.kind, packSize: ctx.packSize, shop: ctx.shop };
+  const min = targetPriceForMargin(input, DB_MARGIN_MIN, settings.adFeeRateMin, settings);
+  const opt = targetPriceForMargin(input, DB_MARGIN_OPT, settings.adFeeRateGood, settings);
+  return { min: Math.max(PRICE_FLOOR, min ?? PRICE_FLOOR), opt: Math.max(PRICE_FLOOR, opt ?? PRICE_FLOOR) };
+}
+
+/**
+ * Preis-Korridor MIN/GUT plus Deckungsbeitrags-Grenze (Chris, 13.10.: 25 % Deckungsbeitrags-
+ * Marge als Minimum, 33 % als Optimum):
+ * VK-MIN = VK fuer 25 % Marge vor Fixkosten, VK-GUT = VK fuer 33 %, jeweils mit dem EK des
+ * Artikels, den Gebuehren AM ZIELPREIS (geschlossene Form) und mindestens 4,99 €.
+ * VK-DB  = (HK ohne Fixkosten + 0,35) / (1 - Gebuehrensatz)  (Gewinn vor Fixkosten = 0)
  *
  * Der HK wird als HkBreakdown uebergeben (nicht nur als Summe), weil die
  * Deckungsbeitrags-Linie den Fixkostenanteil herausrechnen muss.
@@ -256,21 +298,22 @@ export interface PriceCorridor {
 export function computePriceCorridor(
   hk: HkBreakdown,
   currentVk: number,
-  settings: CostSettingsValues
+  settings: CostSettingsValues,
+  ctx: TargetContext
 ): PriceCorridor {
   const currentVkFees = computeEbayFees(currentVk, settings.adFeeRateGood, settings);
-  const basis = hk.total + currentVkFees.total;
   const feeRate = (settings.ebayCommissionRate + settings.adFeeRateGood) * (1 + settings.ebayCommissionVat);
   const feeFixed = settings.ebayCommissionFixed;
   const hkContribution = hk.total - hk.fixedCostShare;
+  const range = computeTargetRange(hk.ek, ctx, settings);
   return {
     hk: hk.total,
     currentVkFees,
-    vkMin: basis * settings.marginMinMultiplier,
-    vkGood: basis * settings.marginGoodMultiplier,
+    vkMin: range.min,
+    vkGood: range.opt,
     hkContribution,
     vkContribution: feeRate < 1 ? (hkContribution + feeFixed) / (1 - feeRate) : Infinity,
-    targetMargin: 1 - 1 / settings.marginMinMultiplier,
+    targetMargin: DB_MARGIN_MIN,
     feeFixed,
     feeRate,
   };
@@ -292,25 +335,17 @@ export function fullCostMarginAt(vk: number, corridor: PriceCorridor): number {
   return (vk - corridor.feeFixed - vk * corridor.feeRate - corridor.hk) / vk;
 }
 
-export type PriceStatus = "unter_min" | "ziel_unerreichbar" | "im_korridor" | "ueber_gut";
+export type PriceStatus = "unter_min" | "im_korridor" | "ueber_gut";
 
 /**
- * Status "zu guenstig / Ziel unerreichbar / im Korridor / zu teuer" fuer den Ampel-Pill.
- *
- * Unterhalb von VK-MIN gibt es zwei Faelle:
- * - `ziel_unerreichbar`: Schon die Marge VOR Fixkosten liegt bei diesem VK unter dem
- *   MIN-Ziel (z. B. EK 0,90 bei VK 4,99: Obergrenze ~22 % statt 25 %). Das Ziel ist mit
- *   diesem VK nicht erreichbar, egal wie die Fixkosten verteilt werden — kein "zu
- *   guenstig"-Alarm, sondern ein struktureller Befund (Preis oder EK muessen sich aendern).
- * - `unter_min`: das Ziel waere bei diesem VK erreichbar (Marge vor Fixkosten >= Ziel), die
- *   Fixkosten fressen es aber auf — oder der VK liegt unter der Deckungsbeitrags-Grenze und
- *   Chris verliert pro Verkauf echtes Geld. Letzteres bleibt IMMER `unter_min`.
+ * Status "zu guenstig / im Korridor / zu teuer" fuer den Ampel-Pill: unter VK-MIN (25 %
+ * Deckungsbeitrag, minus Toleranz) = unter_min, ueber VK-GUT (33 %, plus Toleranz) = ueber_gut.
+ * Liegt der VK sogar unter der Deckungsbeitrags-Grenze, verliert jeder Verkauf echtes Geld —
+ * das ist ebenfalls `unter_min`, steht aber ueber `vkContribution` ablesbar im Korridor.
  */
 export function classifyPriceStatus(vk: number, corridor: PriceCorridor): PriceStatus {
-  if (vk > corridor.vkGood) return "ueber_gut";
-  if (vk >= corridor.vkMin) return "im_korridor";
-  if (vk < corridor.vkContribution) return "unter_min";
-  if (contributionMarginAt(vk, corridor) < corridor.targetMargin) return "ziel_unerreichbar";
+  if (vk > corridor.vkGood * (1 + RANGE_TOLERANCE)) return "ueber_gut";
+  if (vk >= corridor.vkMin * (1 - RANGE_TOLERANCE)) return "im_korridor";
   return "unter_min";
 }
 

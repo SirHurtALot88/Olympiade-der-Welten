@@ -1,3 +1,4 @@
+import { registeredRateBelowThreshold } from "../pricing/costEngine";
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardViewModel,
@@ -340,7 +341,7 @@ describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)",
     expect(shopVolumeFromAggregates([article("Leer")], DEFAULT_COST_SETTINGS)).toBeNull();
   });
 
-  it("reicht die shopweiten Fixkosten in den Korridor durch (Regression: fixedCostPerUnit war 0)", () => {
+  it("Shop-Volumen geht ueber das Einschreiben in den Korridor ein, Fixkosten nicht (Deckungsbeitrag)", () => {
     const card = article("Karte", {
       currentVk: 10,
       windows: { "365": agg({ qty: 10, revenue: 100, ek: 30, avgPrice: 10 }) },
@@ -352,19 +353,21 @@ describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)",
     const shop = shopVolumeFromAggregates([card, filler()], DEFAULT_COST_SETTINGS)!;
     const mitShop = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, shop);
     expect(withShop.corridor.min).toBeCloseTo(mitShop.corridor.min, 8);
-    expect(mitShop.corridor.min).toBeGreaterThan(noShop.corridor.min + 1);
-    // Fixkosten stecken auch in der Deckungsbeitrags-Grenze NICHT: sie bleibt (fast) gleich.
+    // Einschreiben-Anteil je Stueck (100 Marken x 2,35 € auf 3.410 Stueck) / 0,512 (25 % + Gebuehren)
+    const einschreiben = registeredRateBelowThreshold(shop, DEFAULT_COST_SETTINGS);
+    expect(mitShop.corridor.min - noShop.corridor.min).toBeCloseTo(einschreiben / 0.512, 5);
+    // Die 4.229 € Fixkosten stecken weder in der Spanne noch in der Deckungsbeitrags-Grenze.
     expect(mitShop.corridor.contribution - noShop.corridor.contribution).toBeLessThan(0.1);
   });
 
-  it("EK 0,90 / VK 4,99 ist 'ziel_unerreichbar' statt dauerhaft 'unter_min'", () => {
+  it("EK 0,90 / VK 4,99 steht auf der Untergrenze und ist im Korridor (kein Dauer-Alarm mehr)", () => {
     const vm = buildDashboardViewModel([cheapCard(), filler()], DEFAULT_COST_SETTINGS);
     const row = vm.sortiment.find((r) => r.nameRaw === "Billigkarte")!;
-    expect(row.priceStatus).toBe("ziel_unerreichbar");
+    expect(row.priceStatus).toBe("im_korridor");
     expect(row.corridor.contribution).toBeLessThan(4.99);
   });
 
-  it("'ziel_unerreichbar' taucht NICHT als 'VK anheben'-Empfehlung auf, echter Verlust schon", () => {
+  it("Billigkarte auf der Untergrenze taucht NICHT als 'VK anheben'-Empfehlung auf, echter Verlust schon", () => {
     const verlust = article("Verlustkarte", {
       currentVk: 2.5,
       windows: { "365": agg({ qty: 20, revenue: 20 * 2.5, ek: 20 * 0.9, avgPrice: 2.5 }) },
