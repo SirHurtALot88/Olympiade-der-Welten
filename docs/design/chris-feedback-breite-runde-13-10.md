@@ -269,35 +269,70 @@ Problem aus dem Time-Trial-Punkt unten (Wertung an der Seite statt als Overlay �
     begehbar sein. Mehrteilige Mechanik-Erweiterung, Klasse B, eigene Konzeptrunde sinnvoll (I-Spy
     hatte schon mehrere verworfene Mechanik-Versuche, s. Abschnitt 7 in `stand-aller-disziplinen.md`).
 
-## Formkarten — zwei mögliche Korrektheitsfragen (höhere Priorität als der Rest dieser Liste)
+## Formkarten — zwei Korrektheitsfragen, beide jetzt geklärt (13.10., Code direkt verifiziert)
 
-29. **Vorschau zeigt unterschiedliche NOMINALWERTE je Spieler bei derselben Formkarte — möglicher
-    Anzeige-Bug.** „bei der vorschau steht, dass manche spieler +4 form und manche +8 form haben.
-    das kann nicht sein! Wenn man eine +4 als team spielt wird das genauso berechnet wie bisher
-    auch! also mal hat einer dann +2,6 und einer +5,4 oder so das geht! aber nicht mal +4 mal +8
-    usw" — natürliche Streuung der REALISIERTEN Werte um den Kartenwert ist laut Chris
-    ausdrücklich in Ordnung; unterschiedliche NOMINALE Basiswerte (als kämen zwei verschiedene
-    Karten zum Einsatz) sind es nicht. Muss am Code der Formkarten-Vorschau verifiziert werden,
-    ob hier tatsächlich zwei unterschiedliche Kartenwerte statt eines gemeinsamen vermischt
-    werden, oder ob die Anzeige nur missverständlich ist.
-30. **Flacher Attribut-Bonus vs. gleichmäßiger Eignungs-Bonus — MUSS GEMESSEN WERDEN.** „was die
-    Attribute angeht müssten die so gesteigert werden dass in der Eignung eine +4 raus kommt wenn
-    der Spieler +4 hat. Das ist nicht das gleiche wie alle Attribute +4 Da weiß ich bisher nicht
-    wie du das handhabst. nicht dass die Eignung dann höher da steht aber die simulation das nicht
-    berücksichtigt Das müsstest du mal messen!" — Chris' Sorge direkt aus der gesperrten
-    Eignungsmatrix abgeleitet: weil jede Disziplin die zwölf Attribute unterschiedlich gewichtet,
-    ergibt ein GLEICHMÄSSIGER Bonus auf alle zwölf Rohattribute KEINEN gleichmäßigen Eignungsbonus
-    über alle Disziplinen hinweg. Die Sorge: die Formkarten-UI zeigt einen sauberen „+4" auf die
-    Eignung (s. Screenshot „WIE SICH 55,7 ZUSAMMENSETZT … Form +4,0 — Formkarte des Spieltags"),
-    aber wenn die eigentliche Simulation (je nach Disziplin-Chassis) die Rohattribute liest statt
-    der aggregierten Eignungszahl, könnte der tatsächlich simulierte Effekt vom angezeigten
-    abweichen — dieselbe Fehlerklasse, die in diesem Projekt schon einmal in allen vier
-    Bahn-Chassis gefunden wurde (s. CLAUDE.md, „Dieselbe Eignungslücke saß in ALLEN VIER
-    Chassis"). **Eine Recherche dazu läuft bereits** (Agent `a5979fad5e3ba18e9`, 13.10.) — Ergebnis
-    wird hier nachgetragen, sobald es da ist.
+29. **„+4 vs +8" in der Vorschau — KEIN Bug, erwarteter Jitter.** „bei der vorschau steht, dass
+    manche spieler +4 form und manche +8 form haben. das kann nicht sein! Wenn man eine +4 als
+    team spielt wird das genauso berechnet wie bisher auch! also mal hat einer dann +2,6 und
+    einer +5,4 oder so das geht! aber nicht mal +4 mal +8 usw" — am Code verifiziert
+    (`distributePerPlayerFormShares`/`seededFormJitter`, `lib/lineups/legacy-lineup-modifiers.ts`
+    Z. 872-941): jeder Spieler bekommt den flachen Kartenwert PLUS einen deterministischen
+    (seed-basierten) Jitter von bewusst bis zu **±4** („Der Jitter ist bewusst NICHT zero-sum").
+    Bei einer „+4"-Karte reicht die mögliche Spanne also rechnerisch von 0 bis +8 — ein Spieler
+    am oberen Rand dieser Spanne zeigt eben „+8", obwohl die Karte „+4" war. Das ist exakt
+    dieselbe Mechanik, die Chris selbst als in Ordnung beschreibt („+2,6 und +5,4"), nur an den
+    äußeren Rändern der Spanne, die bis zu doppelt so hoch wie der Kartenwert reichen kann — kein
+    zweiter, falsch vermischter Kartenwert. Falls dir die Spanne zu groß/verwirrend vorkommt, ist
+    das kein Bug-Fix, sondern eine Balancing-Frage (`jitterMax` ist ein einstellbarer Parameter,
+    Standard 4).
+30. **Flacher Attribut-Bonus vs. gleichmäßiger Eignungs-Bonus — geklärt, echte Lücke in VIER
+    Chassis bestätigt, in DREI bereits geschlossen.** „was die Attribute angeht müssten die so
+    gesteigert werden dass in der Eignung eine +4 raus kommt wenn der Spieler +4 hat. Das ist
+    nicht das gleiche wie alle Attribute +4 […] Das müsstest du mal messen!" — Chris' Sorge ist
+    berechtigt, aber nur für einen Teil der Disziplinen, und steht im Code bereits explizit als
+    offene Frage an ihn (`battle-mode.engine.js`, Kommentar bei der Staffel-Kopplung: „Spurt/
+    Zeitfahren behalten ihre alte Kopplung 'Rezept gibt Form UND Menge, Eignung nur Anzeige',
+    das ist eine offene Frage an Chris (Bericht Teil 6, Frage 1)", plus ein zweiter, ausführlicher
+    Kommentarblock „ZWEI KOPPLUNGEN, BEIDE VERTRETBAR" direkt daneben — ebenda bei `bauBuehne`
+    und `bauFeldspiel`: „DIESELBE LUECKE WIE IM FELDSPIEL, hier nie geschlossen").
+    **Bereits reconciled (Simulation liefert nachweislich einen zur Eignung proportionalen
+    Effekt):** Arena/TDM (`aufEignung()` skaliert die Kampfwerte proportional zur Eignung — der
+    Mechanismus, der extra dafür gebaut wurde, um genau diese Doppelzählung zu vermeiden),
+    Staffel und Takeshi's Castle (beide haben ein eigenes `f=eigW/m`-Rescaling, siehe
+    `art.staffel`/`art.mengeAusEignung` im Code — für Staffel Teil der O7-Pp-Rezeptrunde,
+    für Takeshi aus der Recherche vom 05.09. mit echter Messung: 0,697→0,689 **wenn man naiv
+    koppelt** (schlechter!), aber 0,896 mit der richtigen Kopplungsart plus nachgezogenen
+    Budgets, s. `docs/design/staffel-offene-fragen-plus-takeshis-castle-05-09.md`).
+    **Nicht reconciled, Chris' Sorge trifft hier zu:** Feldspiel (alle Mannschaftssport-
+    Disziplinen) und Bühne (alle sieben Bühnen-Disziplinen) — ihre Durchgangspunkte entstehen
+    laut Code-Kommentar „aus den Sub-Skills (R2), nicht aus `eig`"; Zeitfahren und Climbing —
+    dieselbe alte Kopplung wie Spurt vor seinem Hindernislauf-Umbau. **Für Spurt selbst
+    unklar:** sein rho-Problem wurde 2026-09 durch einen Mechanik-Umbau gelöst (nicht durch
+    diese Kopplung), das sagt aber nichts darüber, ob speziell der Formkarten-Anteil dort
+    matrixtreu ankommt — nie isoliert gemessen.
+    **Wichtig, am Code nachvollzogen:** der Formbonus geht nicht einfach „verloren" in diesen vier
+    Chassis — er fließt über `mitAufschlag()` tatsächlich in die Rohattribute, die die Simulation
+    liest, nur eben nicht über eine zur Eignung proportionale Skalierung, sondern direkt auf eine
+    disziplinspezifische Teilmenge der Attribute (`betroffeneAttribute()`). Ob diese Teilmenge im
+    Ergebnis näherungsweise matrixtreu ist oder nicht, lässt sich nicht aus dem Code allein sagen
+    — das ist der Teil, der laut Projekt-Konvention (nie eine quantitative Behauptung nur aus dem
+    Code ableiten) tatsächlich **gemessen** werden muss: `messe-arena-einfluss.mjs` je Disziplin,
+    mit isoliertem Formkarten-Delta (ein Spieler +4, sonst alles gleich), für Feldspiel, Bühne,
+    Zeitfahren, Climbing und zum Vergleich Spurt — gegen Arena/Staffel/Takeshi als bereits
+    bestätigt funktionierende Referenz. **Das ist eine Design-Entscheidung, keine reine
+    Bugfrage** — der Code behandelt die fehlende Kopplung ausdrücklich NICHT als Fehler
+    („Das ist kein Fehler: die Eignung ist selbst eine gewichtete Summe derselben Attribute. Wer
+    sie [...] zusätzlich anlegte, zählte sie doppelt."), sondern als bewusste Alternative mit
+    einer eigenen Konsequenz: auf der Bahn/im Feldspiel/auf der Bühne entscheidet dann nicht der
+    Disziplinrang (Eignung), sondern nur die Rohattribute, aus denen er entsteht — zwei Spieler
+    mit identischen Attributen performen dort gleich, selbst wenn einer in der Diszi-Eignung auf
+    Rang 6 und der andere auf Rang 20 steht. Chris muss entscheiden, ob er das für Feldspiel/
+    Bühne/Zeitfahren/Climbing genauso will wie für Arena/Staffel/Takeshi, oder ob der aktuelle
+    Unterschied bewusst bleibt.
 
 ---
 
-**Nächster Schritt:** keiner davon ist gestartet (außer der laufenden Formkarten-Recherche zu
-Punkt 30). Wenn Chris eine Reihenfolge vorgibt oder die nächste freie Rezeptrunde ansteht, hier
-nachschlagen statt neu nachfragen.
+**Nächster Schritt:** keiner davon ist gestartet. Punkt 30 (Formkarten-Kopplung) ist die einzige
+Design-Entscheidung in dieser Liste, die Chris' Wahl zwischen zwei vertretbaren Optionen braucht,
+nicht nur Umsetzung — s. Chat vom 13.10. Wenn Chris eine Reihenfolge vorgibt oder die nächste
+freie Rezeptrunde ansteht, hier nachschlagen statt neu nachfragen.
