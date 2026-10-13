@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
 
@@ -67,7 +68,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           <div>
             <h3>{clean.name || row.nameRaw}</h3>
             <div className="bd-sub">
-              {row.setCode && <span className="bd-code">{row.setCode}</span>}
+              {row.setCode && <CopyCode setCode={row.setCode} withIcon />}
               {rarity && <span className="bd-rar">{rarity}</span>}
               {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
               {!row.active && <span className="bd-rar">ausgelaufen</span>}

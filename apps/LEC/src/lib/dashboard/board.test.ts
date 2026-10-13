@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SortimentMarket, SortimentRow } from "./viewModel";
-import { boardGap, boardVk, cleanTitle, sortBoard } from "./board";
+import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
@@ -66,5 +66,17 @@ describe("cleanTitle", () => {
   });
   it("laesst Kartennamen mit Seltenheits-Woertern in der Mitte unberuehrt", () => {
     expect(cleanTitle("Yu-Gi-Oh! XXXX-DE001 Super Polymerisation Super Rare NM 1st").name).toBe("Super Polymerisation");
+  });
+});
+
+describe("cardmarketCode", () => {
+  it("entfernt das Sprachkuerzel", () => {
+    expect(cardmarketCode("MAMA-DE047")).toBe("MAMA-047");
+    expect(cardmarketCode("ra04-en094")).toBe("RA04-094");
+    expect(cardmarketCode("CORI-DE022")).toBe("CORI-022");
+  });
+  it("laesst Unbekanntes stehen", () => {
+    expect(cardmarketCode("MAMA-047")).toBe("MAMA-047");
+    expect(cardmarketCode(" XYZ ")).toBe("XYZ");
   });
 });

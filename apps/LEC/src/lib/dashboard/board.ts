@@ -113,3 +113,12 @@ export function cleanTitle(nameRaw: string): CleanTitle {
   t = t.replace(/\s+(?:25th\s+|25\s+)?(?:QCSR|QCSCR|PSR|CR|SR|UR|SecR|ScR|UtR|UltiR|PlatSecR|PlatSR|Plat SecR|Platinum SecR|Platinum SR|QCentury)\s*$/i, "");
   return { name: t.replace(/\s+/g, " ").trim(), pack, edition };
 }
+
+/**
+ * Suchcode fuer Cardmarket: ohne Sprachkuerzel. Cardmarket findet "MAMA-DE047" nicht,
+ * "MAMA-047" sofort. Nicht erkennbare Codes bleiben unveraendert.
+ */
+export function cardmarketCode(setCode: string): string {
+  const m = setCode.trim().toUpperCase().match(/^([A-Z0-9]+)-(?:DE|EN|FR|IT|PT|ES|SP|JP|KR)([A-Z]?\d+)$/);
+  return m ? `${m[1]}-${m[2]}` : setCode.trim();
+}

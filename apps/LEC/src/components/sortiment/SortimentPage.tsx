@@ -19,7 +19,7 @@ import { formatEuro, formatEuroCents, formatPercent } from "@/lib/format";
 import { AppShell } from "@/components/shell/AppShell";
 import { PreisBoard } from "./PreisBoard";
 import { ArtikelDetail } from "./ArtikelDetail";
-import { PreisUeberblick, type BandPoint } from "./PreisUeberblick";
+import { PreisUeberblick, type BandPoint, type ClassPick } from "./PreisUeberblick";
 import { BOARD_SORT_LABEL, sortBoard, type BoardSortKey } from "@/lib/dashboard/board";
 import { useColumnWidths, type ColumnDef } from "@/components/table/useColumnWidths";
 import { ResizableColgroup, ResizableThead, ResetColumnsButton } from "@/components/table/ResizableTable";
@@ -220,6 +220,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     const raw = searchParams.get("markt");
     return raw ? new Set(raw.split(",").filter((m): m is MarketFilter => MARKET_FILTER_ORDER.includes(m as MarketFilter))) : new Set();
   });
+  // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
+  const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
@@ -277,6 +279,12 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     setVisibleCount(PAGE_SIZE);
   }
 
+  function pickClass(p: ClassPick) {
+    setValueRange({ lo: p.lo, hi: p.hi, label: p.label });
+    setMarketFilter(new Set([p.verdict]));
+    setVisibleCount(PAGE_SIZE);
+  }
+
   function handleSort(colId: ColId) {
     setSort((prev) =>
       prev.colId === colId ? { colId, dir: prev.dir === "desc" ? "asc" : "desc" } : { colId, dir: "desc" }
@@ -304,6 +312,12 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (marketFilter.size > 0) {
       result = result.filter((r) => matchesMarketFilter(r.market, marketFilter));
     }
+    if (valueRange) {
+      result = result.filter((r) => {
+        const v = r.market?.value;
+        return v != null && v >= valueRange.lo && v < valueRange.hi;
+      });
+    }
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
@@ -311,7 +325,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, onlyLadenhueter, showDiscontinued]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyLadenhueter, showDiscontinued]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -464,8 +478,14 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         <section className="bd-card-list">
           <details className="bd-over">
             <summary>Überblick: Grafiken zur Auswahl</summary>
-            <PreisUeberblick rows={filtered} band={band} />
+            <PreisUeberblick rows={filtered} band={band} onOpen={setDetailId} onPick={pickClass} />
           </details>
+          {valueRange && (
+            <span className="bd-rangechip">
+              Marktwert {valueRange.label}
+              <button type="button" onClick={() => setValueRange(null)} aria-label="Eingrenzung aufheben">×</button>
+            </span>
+          )}
           <div className="bd-toolbar">
             <label>
               Sortierung

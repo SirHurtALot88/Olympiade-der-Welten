@@ -2,6 +2,7 @@
 
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { boardGap, boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
 
@@ -133,7 +134,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                         {clean.name || row.nameRaw}
                       </div>
                       <div className="bd-sub">
-                        {row.setCode && <span className="bd-code">{row.setCode}</span>}
+                        {row.setCode && <CopyCode setCode={row.setCode} />}
                         {rarity && <span className="bd-rar">{rarity}</span>}
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}

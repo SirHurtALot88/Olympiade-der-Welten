@@ -460,3 +460,21 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 .bd-dt-t td { padding: 5px 0; border-top: 1px solid var(--line); }
 .bd-dt-t .r { text-align: right; font-variant-numeric: tabular-nums; }
 .bd-dt-sum { font-size: 12.5px; margin: 0 0 6px; font-weight: 600; }
+
+/* ---- Code kopieren / Diagramm-Zoom ---- */
+button.bd-copy { border: 0; background: none; padding: 0; cursor: copy; font: inherit; color: inherit; }
+button.bd-copy:hover { color: var(--text, inherit); text-decoration: underline dotted; }
+button.bd-copy.is-done { color: var(--good); text-decoration: none; }
+.bd-svg { touch-action: none; cursor: grab; user-select: none; }
+.bd-svg.is-drag { cursor: grabbing; }
+.bd-svg.is-hit { cursor: pointer; }
+.bd-fig-tools { display: flex; gap: 6px; margin: 0 0 6px; align-items: center; font-size: 11.5px; color: var(--faint); flex-wrap: wrap; }
+.bd-fig-tools button { background: var(--panel2); border: 1px solid var(--line); color: var(--muted); border-radius: 7px; padding: 3px 9px; cursor: pointer; font-size: 12px; }
+.bd-fig-tools button:hover { color: inherit; }
+.bd-plot { position: relative; }
+.bd-tip { position: absolute; pointer-events: none; z-index: 5; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 11.5px; line-height: 1.4; box-shadow: 0 6px 20px rgba(0,0,0,.3); max-width: 240px; }
+.bd-tip b { display: block; font-size: 12px; }
+button.bd-bar-seg { border: 0; padding: 0; cursor: pointer; display: block; height: 100%; }
+button.bd-bar-seg:hover { filter: brightness(1.2); }
+.bd-rangechip { display: inline-flex; gap: 8px; align-items: center; margin: 0 0 10px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; }
+.bd-rangechip button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
