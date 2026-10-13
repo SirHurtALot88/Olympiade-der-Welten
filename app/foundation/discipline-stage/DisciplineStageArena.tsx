@@ -2063,9 +2063,10 @@ export default function DisciplineStageArena({
           missingLineup: t.missingLineup,
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
-          // Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal): Gegner-Team-ID aus
-          // dem Arena-Duell, sonst null -- treibt die paarweise Board-Sequenz + Matchup-Reveal in
-          // DisciplineStageNativeArena.tsx (`prim === "lamps"`/`"klassen"`).
+          // Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+          // sequenziell+Reveal): Gegner-Team-ID aus dem Arena-Duell, sonst null -- treibt die
+          // paarweise Board-Sequenz + Matchup-Reveal in DisciplineStageNativeArena.tsx
+          // (`prim === "lamps"`/`"klassen"`/`"stage"`).
           opponentTeamId: t.opponentTeamId,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           //
@@ -2105,7 +2106,8 @@ export default function DisciplineStageArena({
           missingLineup: false,
           // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
           captainName: null as string | null,
-          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Tasks #116/#126/#127).
+          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Tasks
+          // #116/#118/#119/#126/#127).
           opponentTeamId: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,

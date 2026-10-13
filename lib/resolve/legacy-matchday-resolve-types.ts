@@ -140,10 +140,11 @@ export type DisciplineTeamResolvePreview = {
    */
   momente?: ArenaMomentEintrag[] | null;
   /**
-   * Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal, Chris 13.10.): wie
-   * `arenaMatchSeed` nur gesetzt, wenn `resolutionSource === "arena"` -- die Team-ID des Gegners
-   * in diesem Zwei-Team-Duell. Treibt die paarweise Board-Sequenz + den Matchup-Reveal auf der
-   * Bühne (`prim === "lamps"`/`"klassen"`); für jede andere Disziplin ungenutzt.
+   * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+   * sequenziell+Reveal, Chris 13.10.): wie `arenaMatchSeed` nur gesetzt, wenn
+   * `resolutionSource === "arena"` -- die Team-ID des Gegners in diesem Zwei-Team-Duell. Treibt
+   * die paarweise Board-Sequenz + den Matchup-Reveal auf der Bühne (`prim === "lamps"` /
+   * `"klassen"` / `"stage"`); für jede andere Disziplin ungenutzt.
    */
   opponentTeamId?: string | null;
   warnings: string[];

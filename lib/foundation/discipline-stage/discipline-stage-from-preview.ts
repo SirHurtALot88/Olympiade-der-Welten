@@ -75,12 +75,13 @@ export type StagePreviewTeam = {
   captainPlayerId: string | null;
   captainName: string | null;
   /**
-   * Tasks #116/#126/#127 (Fechten/Tennis/Schach sequenziell+Reveal, Chris 13.10.): Gegner-Team-ID
-   * aus genau diesem Zwei-Team-Arena-Duell (`resolutionSource === "arena"`), sonst `null`. Treibt
-   * die Board-für-Board-Paar-Sequenz + den Matchup-Reveal auf der Bühne (`prim === "lamps"`/
-   * `"klassen"`). Optional (statt eines Pflichtfelds), damit bestehende Testfixtures, die
-   * `StagePreviewTeam` ohne dieses Feld bauen, nicht brechen — `?? null` am Lesepunkt deckt das
-   * Fehlen ab.
+   * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+   * sequenziell+Reveal, Chris 13.10.): Gegner-Team-ID aus genau diesem Zwei-Team-Arena-Duell
+   * (`resolutionSource === "arena"`), sonst `null`. Treibt die Board-für-Board-Paar-Sequenz + den
+   * Matchup-Reveal auf der Bühne für jede arena-aufgelöste Disziplin (`prim === "lamps"` /
+   * `"klassen"` / `"stage"`). Optional (statt eines Pflichtfelds), damit bestehende
+   * Testfixtures, die `StagePreviewTeam` ohne dieses Feld bauen, nicht brechen — `?? null` am
+   * Lesepunkt deckt das Fehlen ab.
    */
   opponentTeamId?: string | null;
 };

@@ -36411,17 +36411,31 @@
     // 5. BAEUME: nur auf Wiese und Wald, nie auf Route, See, Hof, Burgzone oder Tuempel —
     //    Fuss UND Krone werden geprueft, sonst haengt eine Krone ueber dem Weg.
     const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
-    const nahe=(x,y)=>{ let m=1e9; for(let i=0;i<R.pts.length;i+=2){const d=Math.hypot(R.pts[i].x-x,R.pts[i].y-y); if(d<m)m=d;} return m; };
-    const wald_=[];
-    for(let i=0;i<130;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
-      if(nahe(x,y)<breite*0.5+22||nahe(x,y-30)<breite*0.5+22)continue;
-      if(x>W*0.42&&y<H*0.36)continue;                                   // Platz fuer die Burg
-      if(inEll(hSee,x,y,1.2)||inEll(hSee,x,y-30,1.2)||inEll(hHof,x,y,1.05)||inEll(hHof,x,y-30,1.05))continue;
-      if((BA().tuempel||[]).some(([fx,fy,rx,ry])=>Math.hypot((x-fx*W)/(rx+12),(y-fy*H)/(ry+12))<1
-        ||Math.hypot((x-fx*W)/(rx+12),(y-30-fy*H)/(ry+12))<1))continue;
-      if(inEll(hHang,x,y,1.0)&&bodenSaat(i+800)<0.7)continue;           // am Hang nur wenige
-      wald_.push({x,y,i}); }
-    wald_.sort((a,b)=>a.y-b.y);
+    // GECACHT (Task #9, 13.10.): `wald_` haengt nur an `R` (routeTabelle()) und `breite` —
+    // beide stehen fuer die Dauer eines Rennens fest (routeCache wird erst in reset() neu
+    // gezogen). Vorher lief die 130-Punkte-Kandidatenliste MIT ihren `nahe()`-Abstands-
+    // messungen bei jedem draw()-Aufruf erneut, obwohl das Ergebnis nie wechselt — s.
+    // docs/design/takeshi-performance-diagnose-13-10.md (CPU-Profil: `nahe()` groesster
+    // Einzelposten im Takeshi-Draw). Reiner Darstellungs-Cache, keine Simulationslogik
+    // beruehrt: `wald_` fliesst nur ins Zeichnen der Baumkronen (Schritt "Baeume zuletzt"
+    // unten), nie in rr()/wert()/Boxscore.
+    let wald_;
+    if(waldCache&&waldCache.R===R&&waldCache.breite===breite){
+      wald_=waldCache.wald_;
+    } else {
+      const nahe=(x,y)=>{ let m=1e9; for(let i=0;i<R.pts.length;i+=2){const d=Math.hypot(R.pts[i].x-x,R.pts[i].y-y); if(d<m)m=d;} return m; };
+      wald_=[];
+      for(let i=0;i<130;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
+        if(nahe(x,y)<breite*0.5+22||nahe(x,y-30)<breite*0.5+22)continue;
+        if(x>W*0.42&&y<H*0.36)continue;                                   // Platz fuer die Burg
+        if(inEll(hSee,x,y,1.2)||inEll(hSee,x,y-30,1.2)||inEll(hHof,x,y,1.05)||inEll(hHof,x,y-30,1.05))continue;
+        if((BA().tuempel||[]).some(([fx,fy,rx,ry])=>Math.hypot((x-fx*W)/(rx+12),(y-fy*H)/(ry+12))<1
+          ||Math.hypot((x-fx*W)/(rx+12),(y-30-fy*H)/(ry+12))<1))continue;
+        if(inEll(hHang,x,y,1.0)&&bodenSaat(i+800)<0.7)continue;           // am Hang nur wenige
+        wald_.push({x,y,i}); }
+      wald_.sort((a,b)=>a.y-b.y);
+      waldCache={R,breite,wald_};
+    }
     // 6. DAS TOR am Sammelplatz: zwei Palisadenstuecke, Startlinie quer zur Route.
     { const r=routeXY(0);
       if(aDa("hind_wand"))for(const sg of [-1,1])ctx.drawImage(aBild.hind_wand,Math.round(r.x+sg*r.nx*(breite/2+10)-16),Math.round(r.y+sg*r.ny*(breite/2+10)-58));
@@ -39084,6 +39098,16 @@
   // damit `s` gleichmaessig ueber die Strecke laeuft und nicht ueber den Kurvenparameter
   // (sonst waeren die Laeufer in engen Kurven langsamer als auf den Geraden).
   let routeCache=null;
+  // WALDCACHE (Task #9, Takeshi-Performance-Diagnose, 13.10.): die Waldpunkte unten
+  // (bodenTakeshiRoute) haengen AUSSCHLIESSLICH an `R`(=routeTabelle()) und `breite` ab —
+  // beide sind je Rennen fest, wie `routeCache` selbst. Vorher wurde die 130-Punkte-
+  // Kandidatenliste MIT ihren je bis zu 260 `nahe()`-Abstandsmessungen (O(130*|R.pts|))
+  // bei JEDEM draw()-Aufruf (also jedem Frame, nicht nur jedem Tick) komplett neu
+  // berechnet, obwohl das Ergebnis zwischen zwei Frames nie wechselt. CPU-Profil (s.
+  // docs/design/takeshi-performance-diagnose-13-10.md) wies `nahe()` als teuersten
+  // Einzelposten im Takeshi-Draw aus. Gleiches Cache-Muster wie `routeCache`: gueltig
+  // nur solange dieselbe Routen-Tabelle (`R`) UND dieselbe `breite` gelten.
+  let waldCache=null;
   function routeTabelle(){
     const A=BA(); if(!A.route)return null;
     if(routeCache&&routeCache.W===W&&routeCache.H===H&&routeCache.src===A.route)return routeCache;
@@ -39648,7 +39672,7 @@
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
     // beim Kurswechsel nicht auf der alten Kurve zeichnet.
-    routeCache=null;
+    routeCache=null; waldCache=null;
     if(BA().route){ const r0=routeXY(0); camR={x:r0.x,y:r0.y}; }
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
@@ -48692,7 +48716,7 @@
       staffelWechselAnzeige, staffelVerlauf, staffelBeinMarken, staffelAnkerGezeigt,
       staffelBeinDuellGemeldet, spurtStationBest, spurtFotofinishGezeigt,
       spurtStationStats, cam, camR, bahnWahl, bahnFokus, bahnFokusAuto, ttPanelSig,
-      routeCache};
+      routeCache, waldCache};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
@@ -48711,6 +48735,7 @@
     spurtFotofinishGezeigt=a.spurtFotofinishGezeigt; spurtStationStats=a.spurtStationStats;
     cam=a.cam; camR=a.camR; bahnWahl=a.bahnWahl; bahnFokus=a.bahnFokus;
     bahnFokusAuto=a.bahnFokusAuto; ttPanelSig=a.ttPanelSig; routeCache=a.routeCache;
+    waldCache=a.waldCache;
   }
   // JEDE BAHN-DISZIPLIN MELDET SICH SELBST AN. Sie teilen sich einen Motor, also teilen
   // sie sich auch die Messung — was hier steht, gilt fuer Spurt genauso wie fuer das

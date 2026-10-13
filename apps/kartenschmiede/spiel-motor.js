@@ -19,7 +19,26 @@
   const MAX_UNDO = 80;
   const VERGLEICH = { "<=": (a, b) => a <= b, ">=": (a, b) => a >= b, "<": (a, b) => a < b, ">": (a, b) => a > b, "==": (a, b) => a === b };
 
-  // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, zufall() → 0..1 }
+  // Schwierigkeit wie in OPR (Age of Fantasy Quest, Campaign Builder): Eine Gegnerwelle hat 25/50/75/100 % der
+  // Heldenpunkte. Die Kämpfe einer Map sind für eine Bezugsgruppe geschrieben (`referenz`: Heldenpunkte und Anteil,
+  // ohne Angabe 340 P. auf Fortgeschritten). Jeder Kampf bekommt so viele Gegnerpunkte, wie die Map vorsieht, mal
+  // (Heldenpunkte × Anteil) / (Bezugspunkte × Bezugsanteil). Die Gegnerwerte bleiben, wie sie sind; es ändert sich
+  // nur, wie viele Gegner kommen. Bosse (Gegner mit eigenen Werten) und Einträge mit `fest` bleiben, wie geschrieben.
+  // rp.schlecht/rp.gut: so viel stärker (+) oder schwächer (−) wirkt eine Antwort, die eine Leiste in die schlechte bzw.
+  // gute Richtung bewegt (Richtung je Leiste im Feld `schlecht`: "hoch" oder "runter"). Namenlose NPCs bleiben schwach.
+  const SCHWIERIGKEITEN = {
+    anfaenger: { stufe: 1, name: "Anfänger", anteil: 0.25, rp: { gut: 1, schlecht: 0 }, text: "Gute Antworten wirken stärker." },
+    fortgeschritten: { stufe: 2, name: "Fortgeschritten", anteil: 0.5, rp: { gut: 0, schlecht: 0 }, text: "Antworten wirken, wie die Map sie schreibt." },
+    experte: { stufe: 3, name: "Experte", anteil: 0.75, rp: { gut: 0, schlecht: 1 }, text: "Schlechte Antworten wirken stärker." },
+    legendaer: { stufe: 4, name: "Legendär", anteil: 1, rp: { gut: -1, schlecht: 1 }, text: "Schlechte Antworten wirken stärker, gute schwächer." },
+  };
+  const STANDARD_STUFE = "fortgeschritten";
+  // Frühere Namen der Stufen (vor dem Umstieg auf die OPR-Stufen)
+  const ALTE_STUFEN = { leicht: "anfaenger", normal: "fortgeschritten", schwer: "experte", albtraum: "legendaer" };
+  const stufeId = id => (SCHWIERIGKEITEN[id] ? id : ALTE_STUFEN[id] || null);
+  const REFERENZ = { heldenpunkte: 340, anteil: 0.5 };
+
+  // hilfen: { werte(gegnerDef) → Kartenwerte, stufe(werte) → 1–6, punkte(werte) → OPR-Punkte, zufall() → 0..1 }
   function erstelle(map, hilfen = {}) {
     const zufall = hilfen.zufall || Math.random;
     const jetzt = hilfen.jetzt || Date.now;
@@ -35,13 +54,16 @@
       const ueber = opt.uebernahme || {};
       for (const [k, v] of Object.entries(ueber.leisten || {})) if (leisten[k] && map.leisten[k].gilt === "kampagne") leisten[k].wert = v;
       Object.assign(flags, ueber.flags || {});
+      const mitgebracht = { inventar: kopie(ueber.inventar || {}), sporen: kopie(ueber.sporen || {}) };
+      const schwierigkeit = stufeId(opt.schwierigkeit) || stufeId(ueber.schwierigkeit) || STANDARD_STUFE;
       const state = {
         version: 1, kampagne: map.kampagne, map: map.map, name: opt.name || `${map.titel}`,
         schritt: null, verlauf: [], flags, leisten, runde: 0, rundenAktiv: false,
         gegner: [], gespawnt: {}, ereignisse: {}, angewendet: {}, wahlen: {}, checks: {}, kampfZiel: null,
         letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
         schwellen: {}, tote: {}, pos: {}, sprung: null, log: [], inventar: {}, schrittSeit: jetzt(), typMod: {},
-        extraGegner: {}, npcKampf: {}, extraNr: 0,
+        extraGegner: {}, npcKampf: {}, extraNr: 0, aktiviert: {}, abendSeit: jetzt(), ...mitgebracht, schwierigkeit,
+        heldenpunkte: +opt.heldenpunkte || null, budgets: {},
       };
       betrete(state, map.start);
       return state;
@@ -62,7 +84,10 @@
     }
     // Ältere Spielstände kennen die neueren Felder noch nicht
     const migriere = state => {
-      for (const k of ["schwellen", "tote", "pos", "inventar", "typMod", "extraGegner", "npcKampf"]) if (!state[k]) state[k] = {};
+      for (const k of ["schwellen", "tote", "pos", "inventar", "typMod", "extraGegner", "npcKampf", "aktiviert", "sporen"]) if (!state[k]) state[k] = {};
+      if (!state.abendSeit) state.abendSeit = jetzt();
+      state.schwierigkeit = stufeId(state.schwierigkeit) || STANDARD_STUFE;
+      if (!state.budgets) state.budgets = {};
       if (!state.extraNr) state.extraNr = 0;
       registriere(state);
       if (!state.log) state.log = [];
@@ -170,6 +195,7 @@
     function spawne(state, schrittId) {
       const s = map.schritte[schrittId];
       if (!s || s.typ !== "kampf") return;
+      const offen = [];
       (s.gegner || []).forEach((e, i) => {
         const schluessel = `${schrittId}:${i}`;
         if (state.gespawnt[schluessel]) return;
@@ -177,10 +203,61 @@
         if (!def) return;
         if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
         state.gespawnt[schluessel] = true;
+        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!(def.werte || e.fest) });
+      });
+      const b = budget(state, schrittId, offen, s.verstaerkung), alt = state.budgets[schrittId];
+      if (b) state.budgets[schrittId] = alt ? { ...b, geschrieben: alt.geschrieben + b.geschrieben, ziel: alt.ziel + b.ziel, summe: alt.summe + b.summe } : b;
+      for (const e of offen) {
+        const def = map.gegner[e.id];
         const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
           + (+((state.typMod || {})[e.id] || {}).tough || 0));
-        for (let n = 0; n < (e.anzahl || 1); n++) state.gegner.push({ uid: `${schluessel}:${n}`, id: e.id, zone: e.zone || "", wunden: 0, zaeh, weg: false });
-      });
+        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: 0, zaeh, weg: false });
+      }
+    }
+    // ---------- Gegnerpunkte nach OPR ----------
+    // Faktor, um den die Gegnerpunkte jedes Kampfs wachsen oder schrumpfen. 1 = so, wie die Map geschrieben ist
+    function punkteFaktor(state) {
+      const ref = { ...REFERENZ, ...(map.referenz || {}) };
+      if (!state.heldenpunkte || !hilfen.punkte) return 1;
+      return (state.heldenpunkte * stufeVon(state).anteil) / (ref.heldenpunkte * ref.anteil);
+    }
+    const punkteVon = id => Math.max(1, +hilfen.punkte(werteVon(map.gegner[id] || {})) || 0);
+    // Bringt die Gegner eines Kampfs auf das Punktebudget: Bosse und feste Einträge bleiben, die übrigen Gruppen wachsen
+    // oder schrumpfen im Verhältnis, wie die Map sie mischt. Kämpft ein Boss allein, füllt `verstaerkung` den Rest auf.
+    // Rückgabe: was die Map schreibt, das Budget und was am Ende auf dem Tisch steht (für die Anzeige)
+    function budget(state, schrittId, offen, verstaerkung) {
+      if (!offen.length || !hilfen.punkte) return null;
+      const f = punkteFaktor(state);
+      const geschrieben = offen.reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0);
+      const ziel = Math.round(geschrieben * f);
+      if (f !== 1) {
+        let gruppen = offen.filter(e => !e.fest);
+        const fest = offen.filter(e => e.fest).reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0);
+        if (!gruppen.length && verstaerkung && map.gegner[verstaerkung.id] && f > 1) {
+          const v = { schluessel: `${schrittId}:v`, id: verstaerkung.id, zone: verstaerkung.zone || "", anzahl: 0 };
+          if (!state.gespawnt[v.schluessel]) { state.gespawnt[v.schluessel] = true; offen.push(v); gruppen = [v]; }
+        }
+        if (gruppen.length) fuelle(gruppen, ziel - fest, !offen.some(e => e.fest));
+      }
+      return { geschrieben, ziel, summe: offen.reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0), faktor: f };
+    }
+    // Gruppen im Verhältnis ihrer geschriebenen Punkte auf das Budget bringen, so nah dran wie möglich.
+    // Ohne Boss oder festen Eintrag bleibt mindestens ein Gegner stehen
+    function fuelle(gruppen, rest, mindestensEiner) {
+      const gewicht = gruppen.map(e => e.anzahl * punkteVon(e.id));
+      const summeGewicht = gewicht.reduce((a, b) => a + b, 0);
+      const anteil = gruppen.map((e, i) => (summeGewicht ? gewicht[i] / summeGewicht : 1 / gruppen.length) * Math.max(0, rest));
+      for (const e of gruppen) e.anzahl = 0;
+      let summe = 0;
+      for (;;) {
+        // Als Nächstes die Gruppe, die ihrem Anteil am weitesten hinterherhinkt
+        let beste = -1, luecke = -Infinity;
+        gruppen.forEach((e, i) => { const l = anteil[i] - e.anzahl * punkteVon(e.id); if (l > luecke) { luecke = l; beste = i; } });
+        const p = punkteVon(gruppen[beste].id);
+        if (Math.abs(summe + p - rest) >= Math.abs(summe - rest)) break;
+        gruppen[beste].anzahl++; summe += p;
+      }
+      if (mindestensEiner && !summe) gruppen[0].anzahl = 1;
     }
     // ---------- Gegner stärken und schwächen ----------
     const ZAHL_FELDER = ["quality", "defense", "tough", "attacks"];
@@ -194,6 +271,7 @@
     }
     const leer = m => !m || (!ZAHL_FELDER.some(k => m[k]) && !(m.passives || []).length);
     // Alles, was gerade auf diesen Gegner wirkt: Zusatzregeln aus Entscheidungen, Anpassungen des Typs, eigene
+    const stufeVon = state => SCHWIERIGKEITEN[stufeId(state.schwierigkeit) || STANDARD_STUFE];
     function modVon(state, g) {
       const def = map.gegner[g.id] || {};
       let m = {};
@@ -458,6 +536,18 @@
     }
 
     // ---------- Antwortwahl ----------
+    // Was eine Antwort an Leisten bewegt, nach Schwierigkeit verstärkt oder abgeschwächt (nie über die Null hinaus)
+    function wahlLeisten(state, o) {
+      const rp = stufeVon(state).rp, r = {};
+      for (const [k, d] of Object.entries(o.leisten || {})) {
+        const richtung = ((map.leisten || {})[k] || {}).schlecht;
+        if (!richtung || !d) { r[k] = d; continue; }
+        const schlecht = (richtung === "hoch" && d > 0) || (richtung === "runter" && d < 0);
+        const extra = schlecht ? rp.schlecht : rp.gut, neu = Math.abs(d) + extra;
+        r[k] = neu <= 0 ? 0 : Math.sign(d) * neu;
+      }
+      return r;
+    }
     const offeneMarker = state => Object.entries(map.ereignisse || {}).filter(([id, e]) => e.beutewurf && e.einmal && !state.ereignisse[id]).map(([id]) => id);
     function waehle(state, taste, eingabe) {
       const s = map.schritte[state.schritt];
@@ -470,7 +560,7 @@
       setze(state, o.setzt, eingabe);
       wendeGegnerModAn(state, o.gegnerMod);
       holeAlle(state, o.gegnerHinzu);
-      aendere(state, o.leisten);
+      aendere(state, wahlLeisten(state, o));
       notiere(state, `${s.titel}: ${o.kurz}${eingabe ? ` (${eingabe})` : ""}`);
       // Nachsuche: offene Marker kosten je einen Strich Atemzug
       const marker = o.wirkung === "offene-marker-alle" ? offeneMarker(state) : o.wirkung === "offene-marker-einer" && eingabe ? [eingabe] : [];
@@ -490,6 +580,7 @@
     function runde(state) {
       merke(state);
       state.runde += 1;
+      state.aktiviert = {};
       const texte = [];
       let sprung = null;
       for (const r of map.rundenende || []) {
@@ -565,6 +656,26 @@
     // Aufträge der Spieler: was sie wissen und tun sollen (aktiv = bekannt und nicht erledigt)
     const auftraege = state => (map.auftraege || []).filter(a => gilt(state, a.ab)).map(a => ({ ...a, erledigtJetzt: !!(a.erledigt && gilt(state, a.erledigt)) }));
 
+    // Abwechselnde Initiative: wer in dieser Runde schon aktiviert hat (Helden „held:Name“, Gegner „g:uid“)
+    const aktiviere = (state, schluessel, an) => { state.aktiviert = state.aktiviert || {}; state.aktiviert[schluessel] = an === undefined ? !state.aktiviert[schluessel] : !!an; };
+    // Sporenpunkte je Held (Namensregel): ab 3 befallen (3 Aktionswürfel), ab 5 schwer befallen (2)
+    function sporen(state, held, delta) {
+      merke(state);
+      const alt = (state.sporen || {})[held] || 0, neu = Math.max(0, alt + delta);
+      state.sporen = { ...(state.sporen || {}), [held]: neu };
+      notiere(state, `${held}: Sporenpunkte ${alt} → ${neu}`);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "sporen", text: `${held}: Sporenpunkte ${alt} → ${neu}`, leisten: [], flags: [] });
+    }
+    const befall = n => (n >= 5 ? { stufe: "schwer befallen", wuerfel: 2 } : n >= 3 ? { stufe: "befallen", wuerfel: 3 } : { stufe: "", wuerfel: 4 });
+    // Verhaltenswurf für einen Gegner: W6 auf die gerade gültige Tabelle (ruhig oder wütend)
+    function verhaltenWurf(state) {
+      const art = wuetend(state) ? "wuetend" : "ruhig", tab = (map.verhalten || {})[art] || [];
+      const w = 1 + Math.floor(zufall() * 6);
+      const zeile = tab.find(([b]) => String(b).split(/[–-]/).map(Number).reduce((ok, n, i, a) => ok || (a.length === 1 ? w === n : w >= a[0] && w <= a[1]), false));
+      return { wurf: w, art, text: zeile ? zeile[1] : "" };
+    }
+    const minutenSeit = t => Math.max(0, Math.floor((jetzt() - (t ?? jetzt())) / 60000));
+
     // Wo eine Figur auf der Tischkarte steht (nur Anzeige, keine Spielregel; kein Rückgängig)
     const setzePos = (state, schluessel, x, y) => { state.pos = state.pos || {}; state.pos[schluessel] = { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }; };
     const figurenAmTisch = state => Object.entries(map.figuren || {}).filter(([id, f]) => f.tisch && !(state.npcKampf || {})[id] && gilt(state, f.tisch.ab) && !(f.tisch.bis && gilt(state, f.tisch.bis))).map(([id, f]) => ({ id, ...f }));
@@ -580,6 +691,9 @@
     }
     // Was die nächste Map übernimmt
     const uebernahme = state => ({
+      schwierigkeit: state.schwierigkeit || STANDARD_STUFE,
+      inventar: kopie(state.inventar || {}),
+      sporen: kopie(state.sporen || {}),
       leisten: Object.fromEntries(Object.entries(state.leisten).filter(([k]) => (map.leisten[k] || {}).gilt === "kampagne").map(([k, l]) => [k, l.wert])),
       flags: Object.fromEntries(Object.entries(state.flags).filter(([k]) => /map[2-9]/.test((map.flags[k] || {}).wirktIn || ""))),
     });
@@ -589,6 +703,10 @@
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
       effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, zufallsNpc, auftraege,
+      aktiviere, sporen, befall, verhaltenWurf, minutenSeit, wahlLeisten,
+      schwierigkeit: state => ({ id: state.schwierigkeit || STANDARD_STUFE, ...stufeVon(state) }),
+      punkteFaktor, budgetVon: (state, id) => (state.budgets || {})[id || state.schritt] || null,
+      setzeHeldenpunkte: (state, p) => { state.heldenpunkte = +p || null; },
       schritt: state => map.schritte[state.schritt] || null,
       naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
     };
@@ -607,6 +725,7 @@
       for (const e of s.ende || []) if (!istSchritt(e.ziel)) fehler.push(`${id}: ende → ${e.ziel} fehlt`);
       for (const e of s.ereignisse || []) if (!(map.ereignisse || {})[e]) fehler.push(`${id}: Ereignis ${e} fehlt`);
       for (const g of s.gegner || []) if (!(map.gegner || {})[g.id]) fehler.push(`${id}: Gegner ${g.id} fehlt`);
+      if (s.verstaerkung && !(map.gegner || {})[s.verstaerkung.id]) fehler.push(`${id}: Verstärkung ${s.verstaerkung.id} fehlt`);
       if (s.cue && !(map.audio || {})[s.cue]) fehler.push(`${id}: Cue ${s.cue} fehlt`);
       if (s.figur && !(map.figuren || {})[s.figur]) fehler.push(`${id}: Figur ${s.figur} fehlt`);
       if (s.typ === "wahl" && !(s.optionen || []).length) fehler.push(`${id}: Wahl ohne Optionen`);
@@ -629,7 +748,7 @@
     return fehler;
   }
 
-  const SpielMotor = { erstelle, pruefe };
+  const SpielMotor = { erstelle, pruefe, SCHWIERIGKEITEN, STANDARD_STUFE, REFERENZ, stufeId };
   if (typeof module !== "undefined" && module.exports) module.exports = SpielMotor;
   else root.SpielMotor = SpielMotor;
 })(typeof globalThis !== "undefined" ? globalThis : this);
