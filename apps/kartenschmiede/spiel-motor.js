@@ -235,7 +235,9 @@
         offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!((def.werte && !e.skaliert && !def.skaliert) || e.fest), wunden: e.wunden || 0 });
       });
       // Verbündete (seite: "freund") kommen, wie geschrieben; das Punktebudget gilt nur für die Gegner
-      const feinde = offen.filter(e => !istFreund(e.id)), freunde = offen.filter(e => istFreund(e.id));
+      // Was nicht kämpft (die Adern am Herz, `budget: false`), zählt nicht ins Punktebudget, kommt aber auf den Tisch
+      const zaehlt = e => !istFreund(e.id) && (map.gegner[e.id] || {}).budget !== false;
+      const feinde = offen.filter(zaehlt), freunde = offen.filter(e => !zaehlt(e));
       const b = budget(state, schrittId, feinde, s.verstaerkung), alt = state.budgets[schrittId];
       if (b) state.budgets[schrittId] = alt ? { ...b, geschrieben: alt.geschrieben + b.geschrieben, ziel: alt.ziel + b.ziel, summe: alt.summe + b.summe } : b;
       for (const e of [...feinde, ...freunde]) {
@@ -249,8 +251,17 @@
     // Faktor, um den die Gegnerpunkte jedes Kampfs wachsen oder schrumpfen. 1 = so, wie die Map geschrieben ist
     function punkteFaktor(state) {
       const ref = { ...REFERENZ, ...(map.referenz || {}) };
-      if (!state.heldenpunkte || !hilfen.punkte) return 1;
-      return (state.heldenpunkte * stufeVon(state).anteil) / (ref.heldenpunkte * ref.anteil);
+      // Eine Map mit `stufePlus` (das Finale) kämpft eine Stufe über der gewählten, auch ohne gewählte Gruppe
+      const hp = state.heldenpunkte || (map.stufePlus ? ref.heldenpunkte : 0);
+      if (!hp || !hilfen.punkte) return 1;
+      return (hp * kampfStufe(state).anteil) / (ref.heldenpunkte * ref.anteil);
+    }
+    // Die Stufe, mit der die Kämpfe dieser Map rechnen: die gewählte, beim Finale eine höher (über Albtraum: +25 % je Stufe)
+    function kampfStufe(state) {
+      const ids = Object.keys(SCHWIERIGKEITEN), i = ids.indexOf(stufeId(state.schwierigkeit) || STANDARD_STUFE) + (+map.stufePlus || 0);
+      if (i < ids.length) return { ...SCHWIERIGKEITEN[ids[Math.max(0, i)]], plus: +map.stufePlus || 0 };
+      const letzte = SCHWIERIGKEITEN[ids[ids.length - 1]];
+      return { ...letzte, name: `${letzte.name}+`, anteil: letzte.anteil + 0.25 * (i - ids.length + 1), plus: +map.stufePlus || 0 };
     }
     const punkteVon = id => Math.max(1, +hilfen.punkte(werteVon(map.gegner[id] || {})) || 0);
     // Bringt die Gegner eines Kampfs auf das Punktebudget: Bosse und feste Einträge bleiben, die übrigen Gruppen wachsen
@@ -871,7 +882,7 @@
     }
 
     return {
-      abschliessen, optionen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
+      abschliessen, optionen, kampfStufe, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,

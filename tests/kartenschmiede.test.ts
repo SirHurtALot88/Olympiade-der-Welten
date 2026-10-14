@@ -1097,3 +1097,62 @@ describe("Kartenschmiede – Hedda stirbt nicht im Gewühl (Map 2 und 3)", () =>
     expect(s.flags.wirtin_vertraut).toBe(false);
   });
 });
+
+describe("Kartenschmiede – Moosgrab-Finale: Boss, Rast, wer die Glut hält", () => {
+  type FS = Stand5 & { leisten: Record<string, { wert: number; aktiv: boolean }>; verlauf: string[] };
+  type FM = Kette & { betrete(s: FS, id: string): unknown; kampfStufe(s: FS): { name: string; anteil: number; plus: number }; budgetVon(s: FS, id: string): { ziel: number; summe: number } | null };
+  const R = laden("../apps/kartenschmiede/regeln.js") as { punkte(w: Record<string, string>): { pts: number } };
+  const finale = () => SM.erstelle(MAPS[4], { punkte: (w: Record<string, string>) => R.punkte(w).pts, werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "1", quality: "5+", defense: "5+", size: "1" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as FM;
+  const bis = (m: FM, s: FS, id: string, taste = "2") => { for (let i = 0; i < 40 && s.schritt !== id; i++) { if (m.schritt(s).typ === "wahl") m.waehle(s, m.optionen(s).find(o => o.taste === taste)?.taste || m.optionen(s)[0].taste, "Krieger"); else m.weiter(s); } return s.schritt; };
+  it("kämpft eine Stufe über der gewählten, und die Adern zählen nicht ins Budget", () => {
+    const m = finale(), s = m.neu({ schwierigkeit: "fortgeschritten" }) as FS;
+    expect(m.kampfStufe(s).name).toBe("Schwer");
+    bis(m, s, "kampf-herz");
+    const b = m.budgetVon(s, "kampf-herz")!;
+    expect(b.ziel).toBeGreaterThan(240);
+    expect(b.ziel).toBeLessThan(290);
+    expect(s.gegner.filter(g => g.id === "ruestung").length).toBe(2);
+  });
+  it("lässt erst nach dem Rufer überladen, und der Überlebende hält dann die Glut", () => {
+    const m = finale(), s = m.neu({ uebernahme: { flags: { ueberlebender_dabei: true } } }) as FS;
+    expect(bis(m, s, "rast-vorher")).toBe("rast-vorher");
+    m.waehle(s, "1");
+    expect(s.flags.rast_vorher).toBe(true);
+    bis(m, s, "kampf-herz");
+    expect(s.gegner.find(g => g.id === "ueberlebender")!.wunden).toBe(1);
+    for (const g of s.gegner.filter(x => x.id === "ader")) m.schaden(s, g.uid, g.zaeh);
+    expect(m.ereignisErlaubt(s, "ueberladen-ueberlebender")).toBe(false);
+    const rufer = s.gegner.find(g => g.id === "rufer")!;
+    m.schaden(s, rufer.uid, rufer.zaeh);
+    expect(s.flags.ruestungen_ruhig).toBe(true);
+    m.ereignis(s, "ueberladen-ueberlebender");
+    m.probe(s, s.letzte.findIndex(e => e.probe && !e.probe.wurf), 4);
+    bis(m, s, "wahl-probe"); m.waehle(s, "1");
+    bis(m, s, "wahl-halten");
+    expect(m.optionen(s).map(o => o.taste)).toEqual(["1", "2"]);
+    m.waehle(s, "1");
+    expect(s.flags.ueberlebender_opfert).toBe(true);
+    bis(m, s, "kampf-flucht");
+    expect(s.gegner.some(g => g.id === "glutleib")).toBe(true);
+    m.ereignis(s, "im-schacht");
+    bis(m, s, "ende-map5");
+    expect(s.flags.epilog).toBe("C");
+  });
+  it("ohne den Überlebenden bleibt ein Held oder die kurze Lunte mit nur drei Runden", () => {
+    const m = finale(), s = m.neu() as FS;
+    m.betrete(s, "wahl-halten");
+    expect(m.optionen(s).map(o => o.taste)).toEqual(["2", "3"]);
+    m.waehle(s, "3");
+    expect(s.flags.lunte).toBe(true);
+    expect(s.leisten.glut.wert).toBe(2);
+  });
+  it("lässt die Helden vor dem Herz umkehren: kein Kampf, das Bad Ending", () => {
+    const m = finale(), s = m.neu({ uebernahme: { flags: { ueberlebender_dabei: true } } }) as FS;
+    bis(m, s, "wahl-durchbruch");
+    m.waehle(s, "3");
+    bis(m, s, "ende-map5");
+    expect(s.verlauf).toContain("umkehren-allein");
+    expect(s.verlauf).not.toContain("kampf-herz");
+    expect(s.flags.epilog).toBe("X");
+  });
+});
