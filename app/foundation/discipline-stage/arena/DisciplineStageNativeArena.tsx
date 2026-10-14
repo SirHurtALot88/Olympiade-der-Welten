@@ -2789,6 +2789,13 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
   );
 
   const pushTicker = useCallback((t: RT, slot: number, res: { player: NativeStagePlayer; net: number }, impact: Impact, _rt: RT[]) => {
+    // W-V2 (Wettessen-Rework, Chris 13.10.: "fliegen unten die Zahlen einfach nur so rein"):
+    // für platter bleibt die rohe Minuten-/Gang-Zahl jetzt dem Zähltafel-Flip am Esser selbst
+    // vorbehalten (platter.tsx) — der Ticker unten nennt nur noch ECHTE Ereignisse. "tick" ist
+    // genau der Fall ohne besonderen `impact.cause` (kein Rekord/Führungswechsel/Sprung/
+    // Verletzung/Star) — reiner UI-Filter auf eine bereits vorhandene Klassifizierung
+    // (`noteReveal`), keine neue Logik, kein Eingriff in Score/Reihenfolge/`rr()`.
+    if (prim === "platter" && impact.cause === "tick") return;
     const p = res.player;
     // Ticker-Slot-Rang MUSS mit dem Medaillen-Rang übereinstimmen: beide lesen den
     // vorab bestimmten roundSlotRank (Ties → eindeutig via seasonRank), nicht slotRankOf
@@ -2828,7 +2835,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       slot,
     };
     setTicker((rows) => [row, ...rows].slice(0, TICKER_MAX));
-  }, [slots]);
+  }, [slots, prim]);
 
   const roundSummary = useCallback((rnd: number, rt: RT[]) => {
     const jumps = rt
@@ -4017,6 +4024,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [ladderMaxH, ladderHeadH, N],
   );
   const ladderRows = trackLadder ? [...rtRef.current].sort((a, b) => a.seasonRank - b.seasonRank) : ladderList;
+
+  // ---- W-V1 (Wettessen-Rework, Chris 13.10.: "keine Übersicht wer gerade führt") ----
+  // Reiner Leser auf shownScore()/teamId — ändert nichts an score/rank/rr(), deshalb bleibt
+  // `miss-alle-disziplinen.mjs 24 wettessen` bit-identisch. platterTeamSeq vergibt jedem
+  // teamId einen stabilen laufenden Index (Reihenfolge der Rangliste) als Basis für den
+  // Team-Farbbalken (W-V1 "Teamfarbe als Balken") — unabhängig von `rel` (ally/rival/own),
+  // das nur für EIN Team gesetzt ist und die übrigen Esser ungefärbt ließe.
+  const platterTeamSeq = new Map<string, number>();
+  if (prim === "platter") {
+    sorted.forEach((t) => {
+      if (t.teamId && !platterTeamSeq.has(t.teamId)) platterTeamSeq.set(t.teamId, platterTeamSeq.size);
+    });
+  }
+  // "Teller-Stand A : B" (Chris'/Fables wörtliches Beispiel "41 : 37"): links die Führung,
+  // rechts das eigene Team — oder, falls das eigene Team selbst führt (oder kein eigenes
+  // Team im Feld steht, Zuschauer-Ansicht), der aktuelle Zweite. Beantwortet "wer führt"
+  // UND "wie weit bin ich dahinter" in einer Zahl, ohne eine zweite Wertung einzuführen.
+  const platterLeader = prim === "platter" ? sorted[0] ?? null : null;
+  const platterMine = prim === "platter" ? sorted.find((t) => t.isOwn) ?? null : null;
+  const platterRight =
+    prim === "platter"
+      ? platterMine && platterLeader && platterMine.code !== platterLeader.code
+        ? platterMine
+        : sorted[1] ?? null
+      : null;
 
   // Basketball-Court: Treffer/Fehlwurf-Schwelle = Feld-Median der bereits geworfenen
   // Scores; Hot-Hand = deutlich über dem Median. Nur für prim === "court" berechnet.
@@ -5358,6 +5390,22 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           <span>{prim === "barbell" ? (done ? "Endstand" : "Rangliste · live") : done ? "Endstand" : "Rundenstand — live"}</span>
           {prim === "barbell" && !done ? <span style={{ marginLeft: "auto", fontFamily: "ui-monospace, monospace", fontSize: 9, color: "var(--nl-mut)", fontWeight: 700 }}>{barbellLive} im Wettkampf</span> : null}
         </div>
+        {/* W-V1 "Teller-Stand": Führung gegen eigenes Team (oder P2), auf einen Blick —
+            genau die Zahl, die Chris' Klage "keine Übersicht wer gerade führt" beantwortet. */}
+        {prim === "platter" && platterLeader && platterRight ? (
+          <div
+            data-testid="arena-ladder-platter-stand"
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "4px 6px 8px", fontSize: 11, fontWeight: 800, color: "var(--nl-mut)", letterSpacing: "0.03em" }}
+          >
+            <span style={{ textTransform: "uppercase", fontSize: 9, opacity: 0.75 }}>Teller-Stand</span>
+            <span style={{ color: "var(--nl-warn)", fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{fmt1(shownScore(platterLeader))}</span>
+            <span style={{ opacity: 0.5 }}>:</span>
+            <span style={{ color: platterRight.isOwn ? "var(--nl-accent)" : "var(--nl-ink)", fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{fmt1(shownScore(platterRight))}</span>
+            <span style={{ fontSize: 9, opacity: 0.75 }}>
+              ({platterLeader.code}{platterRight.code !== platterLeader.code ? ` · ${platterRight.code}` : ""})
+            </span>
+          </div>
+        ) : null}
         {/* Spaltenköpfe — sonst rät man, was die Zahlen bedeuten. */}
         {animField ? (
           <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 6px 5px", marginLeft: 40, fontSize: 8.5, letterSpacing: "0.03em", textTransform: "uppercase", color: "var(--nl-mut-2)", fontWeight: 800 }}>
@@ -5426,6 +5474,11 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           const bPrevKg = prim === "barbell" && barbellInfo ? (barbellPrevDemandRef.current == null ? barbellInfo.axTop : Math.min(barbellPrevDemandRef.current, barbellEndKgOf(t.code))) : 0;
           const bGain = prim === "barbell" && !bOut ? Math.max(0, bKg - Math.round(bPrevKg)) : 0;
           const bLifter = prim === "barbell" ? t.players[barbellTry]?.name ?? "" : "";
+          // W-V1 "Teamfarbe als Balken": jedes teamId bekommt eine stabile Farbe (platterTeamSeq
+          // oben), unabhängig von `rel` (das nur EIN Team färbt) — Esser desselben Teams sind so
+          // in der senkrechten Liste auf einen Blick gruppierbar. Top 3 der Rangliste groß (W-V1).
+          const plColor = prim === "platter" && t.teamId ? `hsl(${hueForIdx(platterTeamSeq.get(t.teamId) ?? 0)} 65% 55%)` : null;
+          const plBig = prim === "platter" && dispRank <= 3;
           return (
           <div
             key={t.code}
@@ -5446,8 +5499,8 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               }
             }}
             title={teamClickable ? "Team-Karte öffnen" : undefined}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, overflow: "hidden" as const, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
-            <span style={{ width: 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(dispRank), fontSize: 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : dispRank}`}</span>
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: plBig ? "3px 6px" : "1.5px 6px", borderRadius: 8, fontVariantNumeric: "tabular-nums", cursor: teamClickable ? "pointer" : "default", opacity: bOut ? 0.55 : 1, background: t.isOwn ? "color-mix(in srgb, var(--nl-accent) 14%, transparent)" : bChamp ? "color-mix(in srgb, var(--nl-warn) 16%, transparent)" : rc ? `color-mix(in srgb, ${rc} 9%, transparent)` : "transparent", boxShadow: plColor ? `inset 4px 0 0 ${plColor}` : rc ? `inset 3px 0 0 ${rc}` : undefined, ...(trackLadder ? { position: "absolute" as const, left: 0, right: 0, height: LADDER_ROW_H, overflow: "hidden" as const, transform: `translateY(${(dispRank - 1) * LADDER_ROW_H}px)`, transition: reduced.current ? "none" : "transform .35s cubic-bezier(.45,0,.2,1)" } : null) }}>
+            <span style={{ width: plBig ? 30 : 26, textAlign: "right", fontWeight: 800, color: prim === "barbell" ? (bChamp ? "var(--nl-warn)" : ampel(bRank)) : ampel(dispRank), fontSize: plBig ? 15 : 12.5 }}>{bChamp ? "🏆" : `#${prim === "barbell" ? bRank : dispRank}`}</span>
             {prim === "barbell" ? (
               <span aria-hidden title="Rang-Änderung seit letzter Runde" style={{ width: 14, fontSize: 10, fontWeight: 800, textAlign: "left", color: bArrow > 0 ? "var(--nl-good)" : bArrow < 0 ? "var(--nl-risk)" : "var(--nl-mut)" }}>
                 {bArrow > 0 ? "▲" : bArrow < 0 ? "▼" : ""}
@@ -5470,7 +5523,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </span>
             ) : (
               <>
-                <span style={{ width: 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: 12.5 }}>{t.code}</span>
+                <span style={{ width: plBig ? 50 : 44, fontWeight: 800, color: t.isOwn ? "var(--nl-accent)" : "inherit", fontSize: plBig ? 14 : 12.5 }}>{t.code}</span>
                 {t.rel && !t.isOwn ? (
                   <span
                     title={
@@ -5511,7 +5564,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
                 {bOut ? "raus" : bGain > 0 ? `+${bGain}` : "—"}
               </span>
             ) : null}
-            <span style={{ fontWeight: 800, fontSize: 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(dispScore)}</span>
+            <span style={{ fontWeight: 800, fontSize: plBig ? 14.5 : 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(dispScore)}</span>
             {/* Gewichtheben: der kg-Wert ist die Inszenierung, der Gesamtscore die Wertung.
                 Im Endstand stehen beide nebeneinander — vorher blieb der Score unsichtbar. */}
             {prim === "barbell" && done ? (

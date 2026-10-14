@@ -8,9 +8,10 @@
 // =====================================================================================
 "use client";
 
-import { useRef, useEffect, type ReactNode } from "react";
+import { useRef, useState, useEffect, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
+import { fmt1 } from "../../stage-format";
 
 export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -42,6 +43,18 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   const stackRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const gorgeRef = useRef<SVGRectElement | null>(null);
   const forkRef = useRef<SVGTextElement | null>(null);
+
+  // W-V2 (Wettessen-Rework, Chris 13.10.: "fliegen unten die Zahlen einfach nur so rein ...
+  // keine Übersicht"): die Zähltafel gehört jetzt dem Esser, nicht dem Bildschirmrand. Jede
+  // Tafel zeigt "+Δ · Gesamt" und klappt EINMAL je Runde hoch — alle zwölf im selben Takt,
+  // wie der Helfer mit dem Schild bei Nathan's. Reiner Leser auf `t.displayScore`
+  // (derselbe Wert, den Stapel/Gorge-Meter oben schon lesen): `displayScore` wird für ALLE
+  // Esser GEMEINSAM beim Rundenstart gesetzt (Host-Kommentar bei `advance()`), bevor die
+  // sequenzielle Ticker-Cascade überhaupt losläuft — genau der synchrone Zeitpunkt, der
+  // "im selben Takt" statt gestaffelt ermöglicht. Schreibt nichts, rundet nur fürs Display.
+  const prevDisplayRef = useRef<Map<number, number>>(new Map());
+  const [boards, setBoards] = useState<Map<number, { delta: number; total: number }>>(new Map());
+  const [flipTick, setFlipTick] = useState(0);
 
   // Banquet-Geometrie: Tisch-Bereich (oben/unten), Magen-Meter (unten)
   const top = layout.top ?? 18;
@@ -108,6 +121,30 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreSig, top, laneH, xStart, finalMax, fieldW]);
+
+  // W-V2 — Zähltafel-Flip: dieselbe scoreSig-Signatur wie oben, aber EIGENER Effekt (kein
+  // Eingriff auf den bestehenden Stapel/Gorge-Effekt). Erkennt pro Esser, ob `displayScore`
+  // seit dem letzten Signatur-Wechsel gestiegen ist (Rundenstart), und hält "+Δ · Gesamt"
+  // in React-State, damit die Tafel das auch rendert (SVG-Attribute reichen für Text nicht).
+  // Der erste Mount legt nur die Ausgangswerte fest (noch keine Tafel — es gab noch keine
+  // Runde) — sonst klappte beim Laden sofort "+<Startscore>" hoch, ohne dass eine Runde lief.
+  useEffect(() => {
+    let changed = false;
+    const next = new Map(boards);
+    rt.forEach((t) => {
+      const prevVal = prevDisplayRef.current.get(t.idx);
+      if (prevVal != null && Math.abs(t.displayScore - prevVal) > 1e-9) {
+        next.set(t.idx, { delta: Math.round((t.displayScore - prevVal) * 10) / 10, total: t.displayScore });
+        changed = true;
+      }
+      prevDisplayRef.current.set(t.idx, t.displayScore);
+    });
+    if (changed) {
+      setBoards(next);
+      setFlipTick((n) => n + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoreSig]);
 
   // Feld-Kunst: Banquet-Tisch mit rot-weiß Karierung, Neon-Schild, Dekoration
   const renderBanquetArt = (): React.ReactNode => {
@@ -424,6 +461,37 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                   />
                 ))}
               </g>
+
+              {/* W-V2 "Die Zahl gehört zum Esser": Zähltafel klappt minütlich/je Gang hoch
+                  ("+7 · 31"), direkt über dem Esser statt am Bildschirmrand — alle zwölf im
+                  selben Takt (key trägt flipTick: neuer key → React remounted → CSS-Flip
+                  spielt erneut). Kein Board vor der ersten Runde (noch nichts zu zeigen). */}
+              {(() => {
+                const board = boards.get(t.idx);
+                if (!board) return null;
+                const positive = board.delta >= 0;
+                return (
+                  <g
+                    key={`board-${t.code}-${flipTick}`}
+                    data-testid="platter-flip-board"
+                    transform={`translate(0 ${-r - 16})`}
+                    style={{
+                      transformOrigin: "center bottom",
+                      animation: reducedMotion ? "none" : "wettessenFlip .5s cubic-bezier(.22,.9,.3,1)",
+                    }}
+                    pointerEvents="none"
+                  >
+                    <rect x={-22} y={-12} width={44} height={15} rx={3} fill="rgba(16,9,6,.88)" stroke="#f2c14e" strokeWidth={0.7} opacity={0.95} />
+                    <line x1={0} y1={-10} x2={0} y2={2} stroke="rgba(242,193,78,.55)" strokeWidth={0.8} />
+                    <text x={-19} y={-1.5} fontSize={6.6} fontWeight={800} fill={positive ? "#86e08a" : "#f06a52"} textAnchor="start">
+                      {positive ? `+${fmt1(board.delta)}` : fmt1(board.delta)}
+                    </text>
+                    <text x={19} y={-1.5} fontSize={6.6} fontWeight={800} fill="#f2ede2" textAnchor="end">
+                      {fmt1(board.total)}
+                    </text>
+                  </g>
+                );
+              })()}
             </g>
           );
         })}
@@ -436,6 +504,10 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
           <stop offset="100%" stopColor="#f2ede2" />
         </linearGradient>
       </defs>
+
+      {/* W-V2: Flip-Keyframes der Zähltafel — scaleY-Klappe von oben, wie ein mechanisches
+          Tafelschild. Eigener Name (wettessenFlip), kollidiert mit keinem anderen Feld. */}
+      <style>{`@keyframes wettessenFlip{0%{opacity:0;transform:scaleY(.08)}55%{opacity:1;transform:scaleY(1.12)}100%{opacity:1;transform:scaleY(1)}}`}</style>
     </>
   );
 }
