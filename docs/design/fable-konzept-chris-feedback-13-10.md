@@ -1035,7 +1035,7 @@ Jede Frage einmal, mit meiner Empfehlung. Alles andere in diesem Papier läuft o
 | **E5** | Time-Trial mit Einzelstarts: Startfolge **umkehren** (Favorit zuletzt, J1) — trotz „So lassen" vom 04.10.? | Ja. Ohne J1 ist ein echtes Einzelzeitfahren nach dem ersten Zieleinlauf entschieden (Hot-Seat-Wechsel Median 0). |
 | **E6** | Showcase: Casting-Montage (S-F1) streichen zugunsten der Matchup-Folge? | Ja — Chris' Satz vom 13.10. ist die jüngere Entscheidung. |
 | **E7** | Football: NFL-Modell bleibt (Fable F4)? | Ja, NFL. Punts/Field Goals existieren schon; sie müssen sichtbar werden. |
-| **E8** | Breaking: wie drastisch darf der Verfall aussehen (stilisiert vs. deutlich)? | Stilisiert, Pixel-Blut, kein Gore. |
+| **E8** | Breaking: wie drastisch darf der Verfall aussehen (stilisiert vs. deutlich)? | Stilisiert, Pixel-Blut, kein Gore. **Ueberholt (14.10.):** Chris' tatsaechliche Antwort war „stilisiert + gore" — beides zugleich, nicht eins statt des anderen. Stufe 4 (Gore) in `breaking.tsx` ist Folge-PR zu #1207. |
 | **E9** | Formkarten-Jitter ±4 zu breit? | Auf ±2 senken, wenn die „+8"-Anzeige stört — reine Einstellung. |
 | **E10** | Formkarten eignungsproportional auch in Feldspiel/Bühne/Zeitfahren/Climbing? | Erst messen (isoliertes +4), dann entscheiden. |
 
