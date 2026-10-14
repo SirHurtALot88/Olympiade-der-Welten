@@ -1636,3 +1636,28 @@ die Referenz wird unabhaengig vom Schalter statisch importiert — sie und `BUEH
 muessen GEMEINSAM live gehen; mit Flag aus gegen die neue Referenz waere Wettessen ueberbewertet. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
 Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
 ohne Grundgeruest entscheidet immer die KI-Vorgabe.
+
+**Climbing-Kontakt (14.10., Produktions-PR, Konzept `docs/design/climbing-kontakt-konzept-14-10.md`
+Anhang A).** Chris' Freigabe fuer E4, woertlich: „ja möchte ich, unsere oly ist ja ein brutalerer
+sport als das normale climbing" — dreht sein eigenes Veto vom 24.09. (G-1 abgelehnt) fuer eine
+gedeckelte, „kein Sturz, nur Balance/Zeit"-Form um. Gebaut: zwei Kreuzungsgriffe je Routenpaar
+(Index 4/7 der zehn `hindernisse`), an denen der fuehrende Duellpartner den aufholenden
+herunterziehen kann (Zugstaerke aus WUCHT, Widerstand aus GLEICHGEWICHT+Balance), mit einem
+eigenen Wehren-Gegenwurf, der den Balanceverlust bei Erfolg auf einen kleinen Rest drueckt.
+Schreibt ausschliesslich `u.balance` des Gezogenen — kein Kanal aendert `u.hoch`, einen Sturz
+oder einen Rang direkt ("kein Zug durch fremde Hand").
+
+Patch 1:1 aus dem Konzeptpapier (`kreuzungsPos`-Block in `BAHN_ART.climbing`, Kontakt-Block in
+`stepSpurt()` vor der HUERDEN-Schleife, Diagnosefelder in `wandProbe()`), diesmal gegen die
+PRODUKTIONSDATEI gemessen statt gegen eine disposable Kopie — frisch verifiziert, nicht nur aus
+dem Konzeptpapier kopiert:
+
+| Kennzahl | Strom 1 (1337/7919) | Strom 2 (424242/6089) | Ziel |
+|---|---:|---:|---|
+| rho je Spiel (kaderfest) | 0,833 | 0,816 | > 0,80 |
+| Pp-Abweichung (n=48) | 12,0 | 9,5 | ≤ 25 |
+
+Ereignisse/Rennen 3,83, 93 % der Rennen mit ≥ 1 Ereignis, Wehr-Erfolgsquote 49,3 %, Ziehender von
+Heimseite 53,0 % (wandProbe, n=300) — alle vier Werte reproduzieren das Konzeptpapier exakt, kein
+Drift gegenueber dem Stand vom 14.10. `node --check`/`eslint` auf der Engine: 0 neue Fehler/
+Warnungen gegenueber der Basislinie.

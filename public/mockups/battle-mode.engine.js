@@ -38206,6 +38206,18 @@
       // das realistischere Bild (fester Gegner auf der gespiegelten Route statt "bester
       // Nachbar im Feld"). Pp-Abweichung unveraendert (16,9 gegen 17,0 mit "feld").
       druckQuelle:"duell", druckSchwelle:0.10, druckMax:0.6, druckGrad:0.02,
+      // KREUZUNGSGRIFFE / HERUNTERZIEHEN / WEHREN (Climbing-Kontakt-Bau, 14.10.,
+      // climbing-kontakt-konzept-14-10.md Anhang A, Chris' Freigabe E4 am 14.10.: "ja
+      // möchte ich, unsere oly ist ja ein brutalerer sport als das normale climbing").
+      // Zwei der zehn bestehenden `hindernisse`-Positionen (Index 4/7, siehe Konzept
+      // Abschnitt 3 fuer die Begruendung der Indexwahl) werden zu Kreuzungsgriffen: der an
+      // diesem Griff fuehrende Duellpartner kann den aufholenden herunterziehen, wenn beide
+      // innerhalb von `zugSchwelle` beieinander sind. `zugBasis`/`zugDeckel` begrenzen den
+      // Balanceverlust, `zugDeckelGewehrt` den Rest bei erfolgreichem Wehren. Reine
+      // climbing-eigene Felder (gated hinter `kreuzungsPos` im Kontakt-Block unten) — jede
+      // andere Bahn liest sie nicht und bleibt bit-identisch.
+      kreuzungsPos:[0.44,0.71], zugSchwelle:0.02, zugBasis:0.30, zugDeckel:0.15,
+      zugDeckelGewehrt:0.03, zugZeitAngriff:0.5, zugZeitWehr:0.25,
       // ZEITLIMIT (Gegencheck 3.5/PR-0-Nulllinie): geeicht auf eine Top-out-Quote von
       // 40-55 %, NICHT auf 1,6x Siegerzeit (das waere auf der Nulllinie 99,4 % Top-out
       // gewesen, s. climbing-nulllinie-24-09.md). Kalibriert gegen das FERTIGE Rezept
@@ -41121,6 +41133,50 @@
           if(druck>0)u.balance=Math.max(0,(u.balance??1)
             -(BA().druckGrad??0.02)*druck*(1-0.8*(u.GLEICHGEWICHT||0)/100)*dt);
         }
+      }
+      // KREUZUNGSGRIFFE: HERUNTERZIEHEN / WEHREN (Climbing-Kontakt-Bau, 14.10.,
+      // climbing-kontakt-konzept-14-10.md Anhang A, Chris' Freigabe E4). Gated hinter
+      // `kreuzungsPos` (nur Climbing setzt es) — jede andere Bahn bleibt bit-identisch.
+      // Derselbe Uebergangs-Check wie bei den Zwischenzeiten (`vor<cp&&u.pos>=cp`), einmal
+      // je Griff und Duell (`u.zugAusgeloest`). Nur wer an diesem Griff VORN liegt, kann
+      // ziehen — er verteidigt seinen Vorsprung gegen den aufholenden Partner. Schreibt
+      // AUSSCHLIESSLICH die eigene Balance des Gezogenen (Regel "kein Zug durch fremde
+      // Hand", CLAUDE.md) — kein Kanal aendert `u.hoch`, einen Sturz oder einen Rang
+      // direkt; ein erfolgreicher Zug wirkt nur indirekt ueber `balanceAbzugGrad` auf die
+      // naechste eigene Fehlgriffchance des Gezogenen.
+      if(BA().kreuzungsPos){
+        u.zugAusgeloest=u.zugAusgeloest||{};
+        BA().kreuzungsPos.forEach((cp,ki)=>{
+          if(u.zugAusgeloest[ki]||!(vor<cp&&u.pos>=cp))return;
+          u.zugAusgeloest[ki]=true;
+          const partner=LAEUFER.find(o=>o!==u&&o.seite!==u.seite&&o.fertig==null
+            &&Math.floor(o.bahnZ/2)===Math.floor(u.bahnZ/2));
+          if(!partner)return;
+          const abstand=Math.abs(u.pos-partner.pos);
+          if(abstand>(BA().zugSchwelle??0.05))return;
+          if(u.pos<=partner.pos)return;   // nur wer vorn liegt, verteidigt den Vorsprung
+          const ziehender=u, gezogener=partner;
+          ziehender.huerde=Math.max(ziehender.huerde||0, BA().zugZeitAngriff??0.5);
+          ziehender.zugVersuchCount=(ziehender.zugVersuchCount||0)+1;
+          const zugStaerke=(ziehender.WUCHT||0)/100;
+          const widerstandBasis=0.6*((gezogener.GLEICHGEWICHT||0)/100)+0.4*(gezogener.balance??1);
+          const wehrChance=Math.max(0.05,Math.min(0.85,
+            0.5+((gezogener.WUCHT||0)-(ziehender.WUCHT||0))/200
+              +((gezogener.GLEICHGEWICHT||0)-50)/300));
+          const gewehrt=rr()<wehrChance;
+          if(gewehrt){
+            gezogener.huerde=Math.max(gezogener.huerde||0, BA().zugZeitWehr??0.25);
+            gezogener.balance=Math.max(0,(gezogener.balance??1)-(BA().zugDeckelGewehrt??0.03));
+            gezogener.wehrCount=(gezogener.wehrCount||0)+1;
+            feedRoutine(gezogener.seite,gezogener.n+" wehrt sich gegen "+ziehender.n+" am Kreuzungsgriff.");
+          } else {
+            const verlust=Math.min(BA().zugDeckel??0.15,
+              (BA().zugBasis??0.30)*Math.max(0,zugStaerke-widerstandBasis));
+            gezogener.balance=Math.max(0,(gezogener.balance??1)-verlust);
+            gezogener.gezogenCount=(gezogener.gezogenCount||0)+1;
+            feedEreignis(ziehender.seite,ziehender.n+" zieht "+gezogener.n+" am Kreuzungsgriff herunter.");
+          }
+        });
       }
 
       // HUERDEN. Wer Technik hat, nimmt sie im Lauf; wer keine hat, verliert Zeit.
@@ -51836,7 +51892,9 @@
           const laeufer=LAEUFER.map(u=>({n:u.n,fertig:u.fertig,pos:u.pos,hoch:u.hoch??u.pos,
             gestolpert:u.gestolpert||0, durchbruch:u.durchbruch||0, reserve:u.reserve,
             abgerutscht:u.abgerutscht||0, umgesetzt:u.umgesetzt||0, rastCount:u.rastCount||0,
-            balance:u.balance}));
+            balance:u.balance,
+            gezogen:u.gezogenCount||0, wehr:u.wehrCount||0,
+            zugVersuch:u.zugVersuchCount||0, seite:u.seite, bahnZ:u.bahnZ}));
           const angekommen=laeufer.filter(z=>z.fertig!=null);
           const sieger=angekommen.length?Math.min(...angekommen.map(z=>z.fertig)):null;
           rennen.push({sieger, laeufer});
@@ -51889,7 +51947,18 @@
         umgesetztJeKopf:runden(alle.reduce((s,z)=>s+z.umgesetzt,0)/alle.length,2),
         rastenJeKopf:runden(alle.reduce((s,z)=>s+z.rastCount,0)/alle.length,2),
         balanceAmEndeMedian:runden(median(alle.map(z=>z.balance).filter(v=>v!=null)),3),
-        hoehAmEndeMedian:runden(median(alle.map(z=>z.hoch)),3)
+        hoehAmEndeMedian:runden(median(alle.map(z=>z.hoch)),3),
+        // KREUZUNGSGRIFFE-DIAGNOSE (Climbing-Kontakt-Bau, 14.10.) — reine Anzeige, kein
+        // neuer rr()-Verbrauch gegenueber dem Kontakt-Block selbst.
+        gezogenJeKopf:runden(alle.reduce((s,z)=>s+z.gezogen,0)/alle.length,2),
+        wehrJeKopf:runden(alle.reduce((s,z)=>s+z.wehr,0)/alle.length,2),
+        ereignisseJeRennen:runden(rennen.reduce((s,r)=>s+r.laeufer.reduce((a,z)=>a+z.gezogen+z.wehr,0),0)/n,2),
+        rennenMitEreignisAnteil:runden(100*rennen.filter(r=>r.laeufer.some(z=>z.gezogen+z.wehr>0)).length/n,1),
+        wehrErfolgsquote:(()=>{ const wehr=alle.reduce((s,z)=>s+z.wehr,0), zug=alle.reduce((s,z)=>s+z.gezogen,0);
+          const ges=wehr+zug; return ges?runden(100*wehr/ges,1):null; })(),
+        ziehenderHeimAnteil:(()=>{ const gesamt=alle.reduce((s,z)=>s+z.zugVersuch,0);
+          const heim=alle.filter(z=>z.seite===0).reduce((s,z)=>s+z.zugVersuch,0);
+          return gesamt?runden(100*heim/gesamt,1):null; })()
       };
     },
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
