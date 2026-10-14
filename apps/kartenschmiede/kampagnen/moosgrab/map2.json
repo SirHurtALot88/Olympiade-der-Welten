@@ -114,6 +114,42 @@
     },
     "text": "Ein Held hat Hedda angegriffen: Sie ist jetzt ein Gegner an ihrer Stelle (Brotmesser, Zäh 3) und weicht nach jedem Zug eine Kartenbreite zwischen die Särge zurück. Jeder Nahkampf gegen sie: Lärm +1 (Taste L), die Gemeinde oben hört es durch die Platte. Sie sagt nichts mehr, und sie gibt nichts mehr.",
     "ansage": "Das Messer kommt hoch. Diesmal nicht als Warnung."
+   },
+   {
+    "titel": "Der Anhänger ist verpestet",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "anhaenger",
+       "ist": true
+      },
+      {
+       "flag": "anhaenger_zurueck",
+       "ist": false
+      },
+      {
+       "eine": [
+        {
+         "flag": "gemeinde_wach",
+         "ist": true
+        },
+        {
+         "flag": "drei_aufgestanden",
+         "ist": true
+        },
+        {
+         "flag": "hedda_angegriffen",
+         "ist": true
+        },
+        {
+         "flag": "grab_kampf",
+         "ist": true
+        }
+       ]
+      }
+     ]
+    },
+    "text": "Am Ende jeder Kampfrunde würfelt der Träger einen W6 (Taste U). Bei 1 führst du ihn bei seiner nächsten Aktivierung: er greift die nächste Figur an, Freund oder Hedda. Nicht verraten, wofür gewürfelt wird. Gibt er den Anhänger Hedda zurück, ist es vorbei."
    }
   ],
   "ziele": [
@@ -415,8 +451,24 @@
    "max": 6,
    "start": 1,
    "richtung": "hoch",
-   "text": "Aus Map 1 übernommen. Nach jeder Map +1. Im Finale bestimmt die Leiste den Nachschub pro Runde.",
-   "schlecht": "hoch"
+   "text": "Aus Map 1 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. +1 nach jeder Map. Jeder Strich: eine Feindzone wächst oder ein verseuchtes Feld kommt dazu. Bei 6 atmet es aus (Nachschub, dann zurück auf 4). Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch",
+   "jeStrich": {
+    "titel": "Der Wald rückt näher",
+    "gmNotiz": "Ein Feld Moos (Filz) mehr auf dem Friedhof oder in der Kapelle, oder ein Grab mehr bricht auf. Nichts dazu sagen, nur hinlegen."
+   },
+   "schwellen": [
+    {
+     "ab": 6,
+     "wiederholt": true,
+     "titel": "Es atmet aus",
+     "vorlesen": "Unter dem Friedhof hebt sich die Erde, einmal, langsam, wie eine Brust. Dann sinkt sie wieder, und zwei Gräber sind offen.",
+     "gmNotiz": "Mitten im Kampf: zwei Grabgänger aus Zone G (unten „＋ Gegner“). Außerhalb eines Kampfs: der nächste Kampf beginnt mit zwei Grabgängern mehr. Die Leiste fällt auf 4.",
+     "leisten": {
+      "atemzug": -2
+     }
+    }
+   ]
   },
   "laerm": {
    "name": "Lärm",
@@ -715,6 +767,11 @@
    "start": false,
    "text": "Mutter Hedda ist tot. Map 3: kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte; niemand begleitet die Helden zum Dorfrand; die Wirtin fragt nach der Ältesten.",
    "wirktIn": "map3"
+  },
+  "grab_kampf": {
+   "start": false,
+   "text": "Die Helden kämpfen gegen das zuckende Grab.",
+   "wirktIn": "map2"
   }
  },
  "audio": {
@@ -780,7 +837,7 @@
    "datei": "audio/moosgrab/02/battle-2.mp3",
    "schleife": true,
    "optional": true,
-   "notiz": "Orgel und Chor. Schleife, läuft ab Lärm 6 oder Glocke. Fehlt noch."
+   "notiz": "Orgel und Chor. Im Kampf starten (Knopf im Kampfschritt, Taste A), Schleife. Fehlt noch."
   }
  },
  "figuren": {
@@ -903,7 +960,8 @@
       "hedda_tot": true,
       "hedda_schweigt": true
      }
-    }
+    },
+    "anblick": "Eine alte Frau, die seit zwei Tagen nicht geschlafen hat. Das Messer hält sie, wie man ein Brot hält, nicht wie eine Waffe."
    }
   }
  },
@@ -946,7 +1004,8 @@
       "quality": 1
      }
     }
-   ]
+   ],
+   "anblick": "Ein Mensch aus dem Dorf, noch in seinen Kleidern. Die Lippen bewegen sich ohne Pause, und aus dem Kragen wächst weißes Moos bis unter das Kinn."
   },
   "grab": {
    "name": "Das zuckende Grab",
@@ -985,7 +1044,8 @@
     "setzt": {
      "grab_still": true
     }
-   }
+   },
+   "anblick": "Ein Arm, grau bis zum Ellenbogen, am Finger ein Ehering. Die Hand dreht sich jedes Mal dorthin, wo jemand auftritt."
   },
   "grabgaenger": {
    "name": "Grabgänger",
@@ -1005,7 +1065,8 @@
    "tod": {
     "vorlesen": "Es fällt, und wo es fällt, bleibt es liegen, flach, als wäre es nie aufgestanden. Aus dem Leichentuch steigt eine Wolke Sporen, kniehoch.",
     "gmNotiz": "Figur vom Tisch. Effekt: Wer in Kontakt stand, macht einen Qualitätstest (Sporennebel), misslungen −1 auf Treffen bis Ende der nächsten Runde."
-   }
+   },
+   "anblick": "Erde in den Augenhöhlen, Wurzeln statt Sehnen. Es geht, wie man im Schlaf geht: langsam, und ohne anzuhalten."
   }
  },
  "fog": {
@@ -1763,6 +1824,37 @@
    },
    "vorlesen": "Sie schüttelt den Kopf. „Genug. Fragt den Brunnen.“ Dann, leiser: „Sagt keine Namen.“",
    "gmNotiz": "Mehr kommt nicht. Weiter zum Weg."
+  },
+  "anhaenger-fluestert": {
+   "name": "Der Anhänger flüstert (Träger würfelt)",
+   "gruppe": "Kampf",
+   "kurz": "Anhänger",
+   "taste": "U",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Am Ende jeder Kampfrunde, solange der Träger ihn hat. Nicht sagen, wofür gewürfelt wird.",
+   "gmNotiz": "Der Anhänger ist verpestet, ohne dass die Spieler es wissen. Der Träger würfelt einen W6.",
+   "probe": {
+    "frage": "Der Träger des Anhängers würfelt einen W6. Sag nicht, wofür.",
+    "stufen": [
+     {
+      "bis": 1,
+      "vorlesen": "Der Anhänger an deinem Hals ist warm. Dann heiß. Und für einen Atemzug hörst du eine Stimme, ganz nah, eine junge Stimme: „Bleib. Es ist so warm hier.“",
+      "gmNotiz": "Gesteuert: Bei seiner nächsten Aktivierung führst du den Träger. Er greift die nächste Figur an, Freund oder Hedda, oder geht einen Schritt auf das zuckende Grab zu. Danach ist er wieder er selbst. +1 Sporenpunkt für ihn (am Heldenchip)."
+     }
+    ]
+   }
   }
  },
  "schritte": {
@@ -1797,13 +1889,13 @@
    "typ": "vorbereitung",
    "titel": "Was aus Map 1 mitkommt",
    "checkliste": [
-    "Atemzug-Leiste aus dem Stand übernommen (die App hat sie gesetzt, prüfen)",
     "Lärm-Leiste auf 0, Zählstein auf den Tisch",
-    "Sporenpunkte aller Helden auf 0, außer dem Helden, der der Frau seinen Namen gesagt hat (steht in den nächsten Schritten)",
+    "Sporenpunkte stehen an den Heldenchips (die App hat sie übernommen); am Tisch dieselben Zahlen",
     "Wunden und Power der Helden zurückgesetzt"
    ],
    "hinweis": "Die nächsten Schritte zeigen nur, was in Map 1 wirklich passiert ist. Was nicht passiert ist, wird übersprungen.",
-   "weiter": "vorb-anhaenger-ja"
+   "weiter": "vorb-anhaenger-ja",
+   "uebernahme": true
   },
   "vorb-anhaenger-ja": {
    "typ": "vorbereitung",
@@ -1814,7 +1906,8 @@
    },
    "checkliste": [
     "Der Spieler mit dem Zettel „Kupferanhänger“ hat ihn dabei (Träger steht im Stand unter anhaenger_traeger)",
-    "Merken: An der Falltür öffnet der Anhänger leise. Hedda erkennt ihn sofort."
+    "Merken: An der Falltür öffnet der Anhänger leise. Hedda erkennt ihn sofort.",
+    "Nur für dich: Der Anhänger ist verpestet. In jedem Kampf würfelt der Träger am Rundenende (Taste U, die App erinnert dich in „Gilt jetzt“). Bei 1 steuerst du ihn einmal."
    ],
    "hinweis": "Nicht daran erinnern, dass er wichtig ist. Die Spieler sollen selbst darauf kommen.",
    "weiter": "vorb-anhaenger-nein"
@@ -2075,7 +2168,6 @@
    },
    "text": "Ein Arm aus der Erde. Greift nur an, wer in Kontakt steht. Bewegt sich nicht. Kein Verhaltenswürfel nötig: es greift jede Runde an, wenn jemand da ist.",
    "hinweise": [
-    "Bedrohung ansagen: „Ein Arm. Nur ein Arm. Aber er weiß, wo ihr steht.“",
     "Jeder Nahkampf gegen das Grab: L (+1 Lärm). Fernkampf: Z (+2).",
     "Wer einfach weggeht, ist raus: es folgt niemandem. Dann „Ohne Ziel weiter“.",
     "Fällt es: Todestext an der Karte vorlesen."
@@ -2086,7 +2178,8 @@
     "marker1",
     "marker2",
     "fenster",
-    "turm"
+    "turm",
+    "anhaenger-fluestert"
    ],
    "ende": [
     {
@@ -2099,7 +2192,10 @@
      "ziel": "nach-kampf"
     }
    ],
-   "weiter": "nach-kampf"
+   "weiter": "nach-kampf",
+   "setzt": {
+    "grab_kampf": true
+   }
   },
   "cue-02-2": {
    "typ": "cue",
@@ -2349,7 +2445,10 @@
    "setzt": {
     "hedda_getroffen": true
    },
-   "weiter": "wahl-hedda-ansprache"
+   "weiter": "wahl-hedda-ansprache",
+   "ereignisse": [
+    "anhaenger-fluestert"
+   ]
   },
   "wahl-hedda-ansprache": {
    "typ": "wahl",
@@ -2665,7 +2764,8 @@
     "frage-zuviel",
     "kniende-angreifen",
     "laerm-nah",
-    "laerm-fern"
+    "laerm-fern",
+    "anhaenger-fluestert"
    ],
    "weiter": "hedda-weg"
   },
@@ -2811,7 +2911,7 @@
    },
    "text": "Lärm 4: Die drei, die sich umgedreht hatten, stehen auf und greifen an. Die anderen vier knien weiter. Ruhige Tabelle, bis die Leiste 6 zeigt.",
    "hinweise": [
-    "Bedrohung ansagen: „Das war einer aus dem Dorf. Jetzt ist es etwas, das seine Hände benutzt.“ Den Bäcker nennst du nur, wenn ihm jemand ins Gesicht gesehen hat (Taste 1) oder Hedda ihn genannt hat.",
+    "Den Bäcker nennst du nur, wenn ihm jemand ins Gesicht gesehen hat (Taste 1) oder Hedda ihn genannt hat.",
     "Lärm weiter zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2. Bei 6 erwacht der Rest: die App springt um.",
     "Die vier Knienden greifen nicht ein, solange niemand sie berührt. Greift ein Held eine an: B (sie steht auf, +1 Lärm).",
     "Fallen alle drei: weiter, dann ist es wieder still."
@@ -2823,7 +2923,8 @@
     "laerm-tuer",
     "glocke",
     "altar",
-    "hinhoeren"
+    "hinhoeren",
+    "anhaenger-fluestert"
    ],
    "ende": [
     {
@@ -2883,7 +2984,7 @@
    },
    "text": "Lärm 6 oder Glocke: Alle stehen auf, gleichzeitig. Wütende Tabelle. Draußen bricht Erde: je Rundenende kommt ein Grabgänger aus Zone G, die Grabgänger der Gegnerliste stehen schon in der Spalte, auf den Tisch kommen sie einer nach dem anderen.",
    "hinweise": [
-    "Cue 02-X2 (oder 02-X3 bei der Glocke), dann Battle Cue 2 in Schleife.",
+    "Cue 02-X2 (oder 02-X3 bei der Glocke). Kampfmusik oben im Kampf (Taste A), Schleife.",
     "Lärm zählt nicht mehr. Die Leiste bleibt auf 6.",
     "Stell nur den ersten Grabgänger sofort hin, die anderen je Rundenende. Wer in der Krypta ist, ist vor ihnen sicher: sie steigen nicht hinunter.",
     "Die Gemeinde verfolgt bis zum Zaun. Wer flieht, flieht über die untere Kante (siehe Lage).",
@@ -2894,7 +2995,8 @@
     "laerm-nah",
     "laerm-fern",
     "altar",
-    "sakristei"
+    "sakristei",
+    "anhaenger-fluestert"
    ],
    "ende": [
     {
@@ -2904,7 +3006,8 @@
      "ziel": "nach-kampf-gemeinde"
     }
    ],
-   "weiter": "kampf-abgebrochen"
+   "weiter": "kampf-abgebrochen",
+   "musik": "BATTLE-2"
   },
   "kampf-erloesen": {
    "typ": "kampf",
@@ -2946,14 +3049,15 @@
    "text": "Die Helden greifen die Knienden an. Wer getroffen wird, steht auf; die anderen stehen auf, sobald der Erste fällt. Wütende Tabelle. Lärm zählt nicht mehr.",
    "hinweise": [
     "Hedda, bevor sie gehen: „Das ist der Bäcker. Das ist die Müllerin. Wenn ihr das tut, tut es schnell.“ (Vorschlag)",
-    "Battle Cue 2 in Schleife, wenn er da ist.",
+    "Kampfmusik oben im Kampf (Taste A), Schleife, wenn die Datei da ist.",
     "Keine Grabgänger: die Gräber hören auf Glocke und Lärm, nicht auf das hier. Schlägt trotzdem jemand die Glocke: G.",
     "Fallen alle sieben: Ziel erreicht, danach zurück zur Wahl des Wegs.",
     "Auf höherer Schwierigkeit brechen Grabgänger aus Zone G dazu (stehen in der Gegnerliste). Sie zählen nicht zum Ziel: es reicht, dass die sieben fallen."
    ],
    "ereignisse": [
     "glocke",
-    "sakristei"
+    "sakristei",
+    "anhaenger-fluestert"
    ],
    "ende": [
     {
@@ -2963,7 +3067,8 @@
      "ziel": "nach-kampf-gemeinde"
     }
    ],
-   "weiter": "kampf-abgebrochen"
+   "weiter": "kampf-abgebrochen",
+   "musik": "BATTLE-2"
   },
   "nach-kampf": {
    "typ": "vorlesen",

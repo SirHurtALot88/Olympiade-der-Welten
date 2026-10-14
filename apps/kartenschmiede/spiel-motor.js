@@ -63,7 +63,9 @@
         letzte: [], protokoll: [], undo: [], gruppeId: opt.gruppeId || null,
         schwellen: {}, tote: {}, pos: {}, sprung: null, log: [], inventar: {}, schrittSeit: jetzt(), typMod: {},
         extraGegner: {}, npcKampf: {}, extraNr: 0, aktiviert: {}, abendSeit: jetzt(), ...mitgebracht, schwierigkeit,
-        heldenpunkte: +opt.heldenpunkte || null, budgets: {},
+        heldenpunkte: +opt.heldenpunkte || null, budgets: {}, erfahren: {}, fertig: false,
+        uebernommen: opt.uebernahme ? { ...(ueber.von || {}), leisten: kopie(ueber.leisten || {}), flags: Object.keys(ueber.flags || {}).length,
+          inventar: kopie(ueber.inventar || {}), sporen: kopie(ueber.sporen || {}) } : null,
       };
       betrete(state, map.start);
       return state;
@@ -88,6 +90,7 @@
       if (!state.abendSeit) state.abendSeit = jetzt();
       state.schwierigkeit = stufeId(state.schwierigkeit) || STANDARD_STUFE;
       if (!state.budgets) state.budgets = {};
+      if (!state.erfahren) state.erfahren = {};
       if (!state.extraNr) state.extraNr = 0;
       registriere(state);
       if (!state.log) state.log = [];
@@ -165,6 +168,10 @@
         if (!l || !def) continue;
         const vorher = l.wert;
         l.wert = Math.max(def.min ?? -Infinity, Math.min(def.max ?? Infinity, l.wert + d));
+        // Eine Schwelle mit `wiederholt` kann wieder auslösen, sobald die Leiste unter sie gefallen ist
+        if (l.wert < vorher) for (const sw of def.schwellen || []) if (sw.wiederholt && l.wert < sw.ab) delete state.schwellen[`${k}:${sw.ab}`];
+        // jeStrich: was jeder neue Strich am Tisch bewirkt (Atemzug: eine Feindzone wächst)
+        if (l.wert > vorher && def.jeStrich) state.letzte.push({ id: `${k}:strich:${l.wert}`, name: `${def.name} ${l.wert}: ${def.jeStrich.titel || ""}`, vorlesen: def.jeStrich.vorlesen || "", gmNotiz: def.jeStrich.gmNotiz || "", art: "schwelle" });
         if (l.wert > vorher) schwelle(state, k, def, vorher, l.wert);
       }
     }
@@ -177,6 +184,8 @@
         setze(state, sw.setzt);
         notiere(state, `${def.name} ${sw.ab}: ${sw.titel || ""}`);
         state.letzte.push({ id: schluessel, name: `${def.name} ${sw.ab}${sw.titel ? `: ${sw.titel}` : ""}`, vorlesen: sw.vorlesen || "", gmNotiz: sw.gmNotiz || "", art: "schwelle" });
+        holeAlle(state, sw.gegnerHinzu);
+        aendere(state, sw.leisten);
         if (sw.springe && !state.angewendet[sw.springe]) state.sprung = sw.springe;
       }
     }
@@ -522,8 +531,9 @@
       const w = Math.max(1, Math.min(6, +wurf || 1 + Math.floor(zufall() * 6)));
       eintrag.probe.wurf = w;
       for (const st of e.probe.stufen || []) {
-        if (w < st.ab) continue;
-        eintrag.probe.stufen.push({ ab: st.ab, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
+        // ab: ab diesem Wurf; bis: höchstens dieser Wurf (für Stufen, die bei einem schlechten Wurf greifen)
+        if (w < (st.ab || 1) || w > (st.bis || 6)) continue;
+        eintrag.probe.stufen.push({ ab: st.ab, bis: st.bis, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
         setze(state, st.setzt);
         aendere(state, st.leisten);
       }
@@ -691,6 +701,7 @@
     }
     // Was die nächste Map übernimmt
     const uebernahme = state => ({
+      von: { name: state.name, map: state.map, fertig: !!state.fertig },
       schwierigkeit: state.schwierigkeit || STANDARD_STUFE,
       inventar: kopie(state.inventar || {}),
       sporen: kopie(state.sporen || {}),
@@ -698,7 +709,65 @@
       flags: Object.fromEntries(Object.entries(state.flags).filter(([k]) => /map[2-9]/.test((map.flags[k] || {}).wirktIn || ""))),
     });
 
+    // ---------- Map abschließen ----------
+    // Hält fest, was die nächste Map übernimmt, und markiert den Abend als fertig (wieder öffnen geht trotzdem)
+    function abschliessen(state) {
+      const s = map.schritte[state.schritt];
+      if (!s || s.typ !== "ende") return null;
+      merke(state);
+      state.fertig = true;
+      state.uebernahme = uebernahme(state);
+      notiere(state, "Map abgeschlossen");
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "ende", text: `Map ${map.map} abgeschlossen`, leisten: [], flags: [] });
+      return state.uebernahme;
+    }
+
+    // ---------- Was ein NPC verrät ----------
+    // Chris hakt ab, was die Helden herausgekitzelt haben. Hat der Eintrag `setzt`, wirkt das wie eine Entscheidung
+    // (später in Folgen, Sonderregeln, der nächsten Map). Ist das Flag schon durch eine Wahl gesetzt, steht der Haken.
+    const wissenSchluessel = (figur, i) => `${figur}:${i}`;
+    function wissen(state, figur) {
+      const f = map.figuren[figur] || {};
+      return (f.weiss || []).map((w, i) => {
+        const k = wissenSchluessel(figur, i);
+        if (state.erfahren[k] !== undefined) return !!state.erfahren[k];
+        const setzt = Object.entries(w.setzt || {}).filter(([, v]) => !String(v).startsWith("@"));
+        return setzt.length > 0 && setzt.every(([fl, v]) => state.flags[fl] === v);
+      });
+    }
+    function erfahre(state, figur, i, an) {
+      const w = ((map.figuren[figur] || {}).weiss || [])[i];
+      if (!w) return null;
+      merke(state);
+      state.erfahren[wissenSchluessel(figur, i)] = !!an;
+      if (an) { setze(state, w.setzt); aendere(state, w.leisten); }
+      else for (const k of Object.keys(w.setzt || {})) { const st = (map.flags[k] || {}).start; state.flags[k] = st === undefined ? null : st; }
+      const text = `${an ? "Herausgefunden" : "Doch nicht"}: ${w.kurz || w.info}`;
+      notiere(state, text);
+      logge(state, "wissen", text);
+      pruefeSpawns(state);
+      nachwirken(state);
+      return w;
+    }
+
+    // ---------- Vorschau ----------
+    // Welche Gegner ein Kampf auf den Tisch bringt, ohne ihn zu betreten: zum Bereitlegen, während noch ein Cue läuft
+    function vorschauGegner(state, schrittId) {
+      const s = map.schritte[schrittId];
+      if (!s || s.typ !== "kampf") return [];
+      const probe = kopie({ ...state, undo: [] }), vorher = probe.gegner.length;
+      spawne(probe, schrittId);
+      const neu = {};
+      for (const g of probe.gegner.slice(vorher)) {
+        const k = `${g.id}|${g.zone}`;
+        neu[k] = neu[k] || { id: g.id, name: (map.gegner[g.id] || {}).name || g.id, zone: g.zone, anzahl: 0 };
+        neu[k].anzahl++;
+      }
+      return Object.values(neu);
+    }
+
     return {
+      abschliessen, wissen, erfahre, vorschauGegner,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,

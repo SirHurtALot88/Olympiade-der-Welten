@@ -101,7 +101,7 @@
     { id: "betaeubung", tags: ["betaeubung"], feind: true, basis: 15, sg: "{X}", pl: "{X}", namen: ["Donnerhall", "Lähmfluch", "Schockwelle", "Nervenstoß"] },
     { id: "gift", tags: ["gift"], feind: true, basis: 8, sg: "{A2} mit Gift", pl: "{A2} mit Gift", namen: ["Giftwolke", "Natternkuss", "Fäulnis", "Sporenhauch"] },
     { id: "furcht", tags: ["furcht"], feind: true, basis: 7, sg: "sofort Moralprobe", pl: "sofort Moralprobe", namen: ["Schreckensruf", "Grabesstimme", "Albtraum"] },
-    { id: "stoss", tags: ["bewegung"], feind: true, basis: 5, sg: "W3+1\" zurückgestoßen", pl: "W3+1\" zurückgestoßen", namen: ["Sturmstoß", "Druckwelle", "Titanenfaust"] },
+    { id: "stoss", tags: ["bewegung"], feind: true, basis: 5, sg: "½W6+1\" zurückgestoßen", pl: "½W6+1\" zurückgestoßen", namen: ["Sturmstoß", "Druckwelle", "Titanenfaust"] },
     { id: "schwaechung", tags: ["schwaechung"], feind: true, basis: 8, sg: "{T-1} bis zur nächsten Aktivierung", pl: "{T-1} bis zur nächsten Aktivierung", namen: ["Fluch der Schwäche", "Nebelschleier", "Störsignal"] },
     { id: "heilung", tags: ["heilung"], feind: false, basis: 10, sg: "{HW3}", pl: "{HW3}", namen: ["Lebensfunke", "Heilende Hände", "Mondtau", "Regenerationsschub"] },
     { id: "schutz", tags: ["schutz"], feind: false, basis: 8, sg: "{V+1} bis zur nächsten Aktivierung", pl: "{V+1} bis zur nächsten Aktivierung", namen: ["Eisenhaut", "Schutzkreis", "Kraftfeld", "Wächtersegen"] },

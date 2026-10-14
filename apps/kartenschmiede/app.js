@@ -153,11 +153,17 @@
     X: { icon: "spiral", name: "Betäubt", zeige: () => "", tip: () => "betäubt: darf sich bei der nächsten Aktivierung nur bewegen" },
     D: { icon: "dice", name: "Wurf", zeige: w => w + "+", tip: w => `bei einem Wurf von ${w}+` },
   };
-  const SYMBOL_MUSTER = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}/g;
-  const symbol = (k, w) => { const d = SYMBOLTEXT[k], z = d.zeige(w); return `<span class="sym" data-tip="${esc(d.tip(w))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`; };
+  const SYMBOL_MUSTER = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+\-]*)\}/g;
+  // Am Tisch gibt es nur W6: ein W3 wird als ½W6 gezeigt (W6 würfeln, halbieren, aufrunden), W6−2 heißt mindestens 1
+  const nurW6 = t => String(t).replace(/W3/g, "½W6").replace(/(W6)-(\d)/g, "$1−$2");
+  const wuerfelHinweis = w => [/W3/.test(w) ? "½W6: W6 würfeln, halbieren, aufrunden (1–2 → 1, 3–4 → 2, 5–6 → 3)" : "", /W\d[-−]\d/.test(w) ? "mindestens 1" : ""].filter(Boolean).join("; ");
+  const symbol = (k, w) => {
+    const d = SYMBOLTEXT[k], z = nurW6(d.zeige(w)), extra = wuerfelHinweis(w);
+    return `<span class="sym" data-tip="${esc(nurW6(d.tip(w)) + (extra ? ` (${extra})` : ""))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`;
+  };
   const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
   // Für Stellen ohne Symbole (Prompt, Suche): Klartext
-  const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => SYMBOLTEXT[k].tip(w));
+  const klarText = text => String(text || "").replace(SYMBOL_MUSTER, (_, k, w) => nurW6(SYMBOLTEXT[k].tip(w)));
   // Nötiger Aktionswürfel vor dem Regeltext, wenn er nicht schon als Symbol drinsteht ({P1} …)
   const energieSym = f => { const e = R.energieVon(f); return e && !/\{P\d\}/.test(String(f.text || "")) ? symbol("P", String(e)) + " " : ""; };
 

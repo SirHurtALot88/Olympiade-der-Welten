@@ -42,7 +42,7 @@ Zäh 1) und fallen beim ersten Treffer.
 | Familie Harm (am Abendbrottisch) | 3 | 3 | Giftmade | |
 | Der Schmied (Elite, Hammer) | 3 | 1 | Myzel-Seuchenbringer (120 P.) | |
 | Gestalten in Rüstungen ohne Nähte (Myzel-Soldaten) | 4, 5 | 5–6 | Seuchenbringer, 2 Frostklauen-Pirscher, 2 Säurelauerer | |
-| Nachschub-Sporenhüllen | 4 | W3 je Runde | Sporenhülle | |
+| Nachschub-Sporenhüllen | 4 | ½W6 je Runde | Sporenhülle | |
 | Das Herz (greift nicht an) und 3 Adern | 5 | 1 + 3 | eigene Werte | |
 
 ## Was sich zusammenlegen lässt

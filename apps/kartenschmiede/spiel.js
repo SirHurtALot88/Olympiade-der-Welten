@@ -13,6 +13,8 @@
   const MAPS = window.SPIELMODUS_MAPS || [];
   const API_STAND = "/api/kartenschmiede/spielstaende", API_AUDIO = "/api/kartenschmiede/audio";
   const LOKAL = "kartenschmiede-spielstaende";
+  // Welcher Abend gerade offen ist (übersteht das Neuladen) und eine Sicherung des letzten Stands samt Zurück-Stapel
+  const OFFEN = "kartenschmiede-spiel-offen", SICHERUNG = "kartenschmiede-spiel-sicherung";
 
   // Farbe und Etikett je Schritttyp (dieselben Zeichen wie im Playbook)
   const TYP = {
@@ -50,8 +52,19 @@
     clearTimeout(meldungTakt);
     if (!bleibt && t) meldungTakt = setTimeout(() => { meldung = ""; const x = $("spMsg"); if (x) x.textContent = ""; }, 6000);
   };
+  const merkeOffen = id => { try { if (id) localStorage.setItem(OFFEN, id); else localStorage.removeItem(OFFEN); } catch { /* egal */ } };
+  const offenGemerkt = () => { try { return localStorage.getItem(OFFEN); } catch { return null; } };
+  const sicherung = () => { try { return JSON.parse(localStorage.getItem(SICHERUNG) || "null"); } catch { return null; } };
+  function sichereLokal(inhalt) {
+    // Mit den letzten Zurück-Schritten; passt das nicht in den Browser-Speicher, dann ohne
+    for (const undo of [stand.undo.slice(-10), []]) {
+      try { localStorage.setItem(SICHERUNG, JSON.stringify({ id: standId, inhalt, undo })); return; } catch { /* zu groß */ }
+    }
+  }
+  // Zuletzt gespeichert: Zeit oder Fehler, für die Anzeige in der Kopfleiste
+  let gespeichert = null;
   async function ladeListe() {
-    if (!KS.SERVER) { staende = lokal().map(x => ({ id: x.id, name: x.name, kampagne: x.kampagne })); return; }
+    if (!KS.SERVER) { staende = lokal().map(x => ({ id: x.id, name: x.name, kampagne: x.kampagne, map: x.map, fertig: !!x.fertig, updatedAt: x.gespeichertUm })); return; }
     const r = await fetch(API_STAND, { credentials: "same-origin" });
     staende = r.ok ? (await r.json()).spielstaende : [];
   }
@@ -62,18 +75,43 @@
   }
   async function speichere() {
     if (!stand) return;
-    // Den Undo-Stapel nicht mitspeichern: Er ist groß und gilt nur für diesen Abend am Laptop
-    const inhalt = { ...stand, undo: [], id: standId };
+    clearTimeout(speicherTakt); speicherTakt = null;
+    // Den Undo-Stapel nicht mitspeichern: Er ist groß und gilt nur für diesen Abend am Laptop (er steht in der Sicherung)
+    const inhalt = { ...stand, undo: [], id: standId, gespeichertUm: new Date().toISOString() };
+    sichereLokal(inhalt);
     if (!KS.SERVER) {
-      try { localStorage.setItem(LOKAL, JSON.stringify(lokal().filter(x => x.id !== standId).concat(inhalt))); } catch { melde("Browser-Speicher voll."); }
+      try { localStorage.setItem(LOKAL, JSON.stringify(lokal().filter(x => x.id !== standId).concat(inhalt))); gespeichert = { ok: true, zeit: new Date() }; }
+      catch { gespeichert = { ok: false }; melde("Browser-Speicher voll."); }
+      zeigeKopf();
       return;
     }
-    const r = await fetch(`${API_STAND}/${encodeURIComponent(standId)}`, { method: "PUT", credentials: "same-origin",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inhalt }) });
-    // Erfolg bleibt still, sonst überschreibt jedes Speichern die eigentliche Meldung
-    if (!r.ok) melde("Speichern fehlgeschlagen. Bist du noch eingeloggt?", true);
+    let ok = false;
+    try {
+      const r = await fetch(`${API_STAND}/${encodeURIComponent(standId)}`, { method: "PUT", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ inhalt }) });
+      ok = r.ok;
+    } catch { ok = false; }
+    // Erfolg zeigt nur die Kopfleiste; ein Fehler meldet sich, die lokale Sicherung hält den Stand bis zum nächsten Versuch
+    gespeichert = ok ? { ok: true, zeit: new Date() } : { ok: false };
+    if (!ok) melde("Speichern auf dem Server fehlgeschlagen. Der Stand ist im Browser gesichert; die nächste Aktion versucht es erneut.", true);
+    zeigeKopf();
   }
   const spaeter = () => { clearTimeout(speicherTakt); speicherTakt = setTimeout(speichere, 700); };
+
+  // Der Laptop soll mitten im Abend nicht in den Ruhezustand gehen
+  let wachSperre = null;
+  async function wachHalten(an) {
+    try {
+      if (an && !wachSperre && navigator.wakeLock && document.visibilityState === "visible") {
+        wachSperre = await navigator.wakeLock.request("screen");
+        wachSperre.addEventListener("release", () => { wachSperre = null; });
+      }
+      if (!an && wachSperre) { await wachSperre.release(); wachSperre = null; }
+    } catch { wachSperre = null; }
+  }
+  document.addEventListener("visibilitychange", () => { if (stand && document.visibilityState === "visible") wachHalten(true); });
+  // Seite wird geschlossen oder neu geladen: was noch nicht gespeichert ist, landet sofort in der lokalen Sicherung
+  window.addEventListener("pagehide", () => { if (stand && speicherTakt) { clearTimeout(speicherTakt); sichereLokal({ ...stand, undo: [], id: standId, gespeichertUm: new Date().toISOString() }); } });
 
   // ---------- Audio ----------
   const audioId = cue => `${map.kampagne}-${String(cue).toLowerCase().replace(/[^a-z0-9-]/g, "-")}`;
@@ -147,35 +185,56 @@
     for (const k of Object.keys(wuerfe)) delete wuerfe[k];
     map = MAPS.find(m => String(m.map) === String(nr)) || MAPS[0];
     for (const k of Object.keys(letzteWerte)) delete letzteWerte[k];
+    for (const k of Object.keys(blitz)) delete blitz[k];
     motor = map ? SM.erstelle(map, { werte: werteFuer, stufe: stufeFuer, punkte: punkteFuer }) : null;
     const mp = map && (S.MOOSGRAB.maps || []).find(x => x.nr === map.map);
     karte = mp ? mp.karte : null;
   }
   const letzteStufe = () => { try { return SM.stufeId(localStorage.getItem("kartenschmiede-stufe")) || SM.STANDARD_STUFE; } catch { return SM.STANDARD_STUFE; } };
-  async function neuerAbend() {
-    const nr = $("spMapWahl") ? $("spMapWahl").value : (MAPS[0] || {}).map;
+  // Woher die Kampagnen-Werte kommen: der passende Stand derselben Kampagne mit einer früheren Map, abgeschlossene
+  // und spätere Maps zuerst. Ist er nicht abgeschlossen, rechnet die App die Übernahme mit dessen Map nach.
+  async function findeUebernahme(ziel) {
+    const kandidaten = staende.filter(x => x.kampagne === ziel.kampagne && (x.map == null || x.map < ziel.map))
+      .sort((a, b) => (b.fertig === true) - (a.fertig === true) || (b.map || 0) - (a.map || 0) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")));
+    for (const k of kandidaten.slice(0, 8)) {
+      const alt = await ladeStand(k.id).catch(() => null);
+      if (!alt || !(alt.map < ziel.map)) continue;
+      if (alt.uebernahme) return { ...alt.uebernahme, von: { ...(alt.uebernahme.von || {}), name: alt.name, map: alt.map } };
+      const altMap = MAPS.find(m => m.kampagne === alt.kampagne && m.map === alt.map);
+      if (altMap) { const m = SM.erstelle(altMap, {}); return m.uebernahme(m.migriere(alt)); }
+    }
+    return null;
+  }
+  // opt (für „nächste Map starten“): map, uebernahme, gruppeId, schwierigkeit; sonst gilt, was auf dem Startbildschirm steht
+  async function neuerAbend(opt = {}) {
+    const nr = opt.map || ($("spMapWahl") ? $("spMapWahl").value : (MAPS[0] || {}).map);
     waehleMap(nr);
-    // Kampagnen-Leisten und Flags aus dem zuletzt gespeicherten Stand derselben Kampagne übernehmen
-    let uebernahme = null;
-    const vorher = staende.find(x => x.kampagne === map.kampagne);
-    if (vorher) { const alt = await ladeStand(vorher.id); if (alt && alt.map < map.map) uebernahme = alt.uebernahme || null; }
-    const gruppeId = $("spGruppe") ? $("spGruppe").value || null : null;
+    // Kampagnen-Leisten, Entscheidungen, Beute und Sporenpunkte aus der letzten Map übernehmen
+    const uebernahme = opt.uebernahme !== undefined ? opt.uebernahme : await findeUebernahme(map);
+    const gruppeId = opt.gruppeId !== undefined ? opt.gruppeId : ($("spGruppe") ? $("spGruppe").value || null : null);
     standId = neueId();
-    const schwierigkeit = ($("spStufe") || {}).value || SM.STANDARD_STUFE;
+    const schwierigkeit = opt.schwierigkeit || ($("spStufe") || {}).value || SM.STANDARD_STUFE;
     try { localStorage.setItem("kartenschmiede-stufe", schwierigkeit); } catch { /* egal */ }
     const heldenpunkte = await heldenpunkteVon(gruppeId);
     stand = motor.neu({ name: `${map.titel} · ${new Date().toLocaleDateString("de-DE")}`, gruppeId, uebernahme, schwierigkeit, heldenpunkte });
-    meldung = uebernahme ? "Leisten und Entscheidungen aus der letzten Map übernommen." : "";
+    meldung = uebernahme ? `Aus „${(uebernahme.von || {}).name || "der letzten Map"}“ übernommen: Leisten, Entscheidungen, Beute und Sporenpunkte.` : "";
+    merkeOffen(standId); wachHalten(true);
     await ladeHelden();
     await speichere(); await ladeListe();
     zeige();
   }
   async function oeffne(id) {
-    const s = await ladeStand(id);
-    if (!s) { melde("Spielstand nicht gefunden."); return; }
+    let s = await ladeStand(id).catch(() => null);
+    // Ist die Sicherung im Browser neuer (Server war nicht erreichbar oder die Seite ging zu schnell zu), gilt sie
+    const b = sicherung(), ausSicherung = b && b.id === id && b.inhalt && (!s || String(b.inhalt.gespeichertUm || "") > String(s.gespeichertUm || ""));
+    if (ausSicherung) s = b.inhalt;
+    if (!s) { merkeOffen(null); melde("Spielstand nicht gefunden."); return; }
     waehleMap(s.map);
-    stand = motor.migriere(Object.assign(s, { undo: [] }));
+    stand = motor.migriere(Object.assign(s, { undo: b && b.id === id && Array.isArray(b.undo) ? b.undo : [] }));
     standId = id;
+    merkeOffen(id); wachHalten(true);
+    gespeichert = s.gespeichertUm ? { ok: true, zeit: new Date(s.gespeichertUm) } : null;
+    if (ausSicherung) { melde("Der Stand aus dem Browser war neuer als der auf dem Server und ist übernommen."); speichere(); }
     // Die Gruppe kann seitdem Punkte dazubekommen haben: kommende Kämpfe richten sich nach dem neuen Stand
     motor.setzeHeldenpunkte(stand, await heldenpunkteVon(stand.gruppeId));
     await ladeHelden();
@@ -246,10 +305,12 @@
   const sag = text => text ? `<p class="sp-sag">„${esc(String(text).replace(/^[„"]|[“"]$/g, ""))}“</p>` : "";
   const gm = text => text ? `<p class="sp-gm">${esc(text)}</p>` : "";
   const taste = t => t ? `<kbd>${esc(t)}</kbd>` : "";
+  // Probe-Stufe: „ab 5“ oder, für schlechte Würfe, „bei 1“ / „bei 1–2“
+  const stufeName = st => (st.bis ? `bei ${st.bis === 1 ? "1" : `1–${st.bis}`}` : `ab ${st.ab}`);
 
   // ---------- Uhr und Antreiber ----------
   const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
-  const abendHtml = () => { const m = motor.minutenSeit(stand.abendSeit); return `<span class="sp-uhr" title="So lange läuft der Abend schon">Abend ${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}</span>`; };
+  const abendHtml = () => { const m = motor.minutenSeit(stand.abendSeit); return `<span class="sp-uhr" title="So lange läuft der Abend schon">🌙 ${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}</span>`; };
   // Abwechselnde Initiative: wer diese Runde schon dran war und wer als Nächstes aktiviert
   function zugHtml() {
     if (!stand.rundenAktiv) return "";
@@ -285,6 +346,20 @@
   }
 
   // ---------- Kopfleiste ----------
+  // Wo im Verlauf der Kampagne: ein Abschnitt je Map, der aktuelle füllt sich mit den Schritten
+  function fortschrittHtml(pos, gesamt) {
+    const k = (S.KAMPAGNEN || []).find(x => x.id === map.kampagne) || S.MOOSGRAB || {}, zahl = Math.max(+map.map, (k.maps || []).length || 0);
+    if (zahl < 2) return "";
+    const teile = Array.from({ length: zahl }, (_, i) => { const n = i + 1, w = n < map.map ? 100 : n > map.map ? 0 : Math.round(pos / gesamt * 100);
+      return `<i title="Map ${n}${(k.maps || [])[i] && k.maps[i].titel ? `: ${esc(k.maps[i].titel)}` : ""}"><u style="width:${w}%"></u></i>`; }).join("");
+    const prozent = Math.round(((map.map - 1) + pos / gesamt) / zahl * 100);
+    return `<span class="sp-fortschritt" title="Kampagne: Map ${map.map} von ${zahl}, etwa ${prozent} % geschafft">${teile}<em>${prozent} %</em></span>`;
+  }
+  const speicherHtml = () => {
+    const g = gespeichert;
+    const zeit = g && g.zeit ? `${g.zeit.getHours()}:${String(g.zeit.getMinutes()).padStart(2, "0")}` : "";
+    return `<button type="button" class="btn ghost sm sp-gespeichert ${g && !g.ok ? "fehler" : ""}" data-sp="speichern" title="${g && g.ok ? `Gespeichert um ${zeit}. ` : ""}Die App speichert nach jeder Aktion von selbst; beim Neuladen geht es hier weiter. Klick oder Cmd + S speichert sofort.">${g && !g.ok ? "⚠ Speichern" : g ? "💾 ✓" : "💾"}</button>`;
+  };
   // Zuletzt gezeigte Leistenwerte: Ändert sich eine Leiste, blitzt ihre Pille auf und zeigt 3 s lang „↑1“
   const letzteWerte = {}, blitz = {};
   function zeigeKopf() {
@@ -300,11 +375,11 @@
       return `<span class="sp-pill ${b ? (b.d > 0 ? "blitz-hoch" : "blitz-runter") : ""}" title="${esc(`${def.name}: ${def.text || ""}`)}">${b ? `<sup>${b.d > 0 ? "↑" : "↓"}${Math.abs(b.d)}</sup>` : ""}<b>${esc(String(def.name).replace(/-Leiste$/, "").replace(/^Heddas /, ""))}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
     }).join("");
     const laeuft = [spieler.haupt, spieler.schleife].filter(a => !a.paused).map(a => a.dataset.cue);
-    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><small>${esc(map.titel)} · Schritt ${pos}/${ids.length} · <span class="sp-stufe st-${esc(motor.schwierigkeit(stand).id)}" title="${esc(motor.schwierigkeit(stand).text)}">${esc(motor.schwierigkeit(stand).name)}</span></small></div>
+    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><span class="sp-zeile-uhr">${fortschrittHtml(pos, ids.length)}${uhrHtml()}</span><small>${esc(map.titel)} · Schritt ${pos}/${ids.length} · <span class="sp-stufe st-${esc(motor.schwierigkeit(stand).id)}" title="${esc(motor.schwierigkeit(stand).text)}">${esc(motor.schwierigkeit(stand).name)}</span></small></div>
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         ${zugHtml()}<span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
-      <div class="sp-kopfknoepfe">${uhrHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
+      <div class="sp-kopfknoepfe">${speicherHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
         <button type="button" class="btn ghost sm" data-sp="log">Log ${taste("P")}</button>
         <button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
         <button type="button" class="btn ghost sm" data-sp="vollbild" title="Vollbild (am Mac auch Ctrl + Cmd + F)">⛶</button>
@@ -348,6 +423,7 @@
     const naechster = s.typ !== "wahl" && motor.naechsterId(stand);
     // „Weiter“ steht immer ganz rechts unten, auch wenn es gerade nicht geht (dann sagt es, warum)
     const weiterKnopf = s.typ === "wahl" ? `<button type="button" class="btn sm weiter ghost" disabled>Antwort 1–${s.optionen.length} wählen</button>`
+      : !naechster && s.typ === "ende" ? endeKnopf()
       : !naechster ? `<button type="button" class="btn sm weiter ghost" disabled>Ende der Map</button>`
       : kampfOffen(s) ? `<button type="button" class="btn sm weiter ghost" data-sp="weiter" title="Der Kampf läuft noch. Nur klicken, wenn er ohne Ziel endet.">Weiter ohne Ziel →</button>`
       : `<button type="button" class="btn sm weiter" data-sp="weiter">Weiter → ${taste("Leertaste")}</button>`;
@@ -357,6 +433,14 @@
         ${runden ? `<button type="button" class="btn sm" data-sp="runde">Runde beenden ${taste("R")}</button>` : ""}
         <button type="button" class="btn ghost sm" data-sp="zurueck" ${stand.undo.length ? "" : "disabled"}>← Zurück ${taste("⌫")}</button>
         ${weiterKnopf}</div></div>`;
+  }
+  // Am Ende der Map: erst abschließen (hält fest, was mitkommt), dann die nächste Map mit allem Übernommenen starten
+  const naechsteMap = () => MAPS.find(m => m.kampagne === map.kampagne && +m.map === +map.map + 1) || null;
+  function endeKnopf() {
+    if (!stand.fertig) return `<button type="button" class="btn sm weiter" data-sp="abschliessen">Map abschließen ✓ ${taste("Leertaste")}</button>`;
+    const nm = naechsteMap();
+    return nm ? `<button type="button" class="btn sm weiter" data-sp="naechste-map">Map ${nm.map} starten →</button>`
+      : `<button type="button" class="btn sm weiter ghost" disabled>Abgeschlossen ✓</button>`;
   }
   // Passt Zeile 1 nicht in die Breite, klappen Gruppen ihre letzten Knöpfe in ein „▴ n weitere“ (Story zuerst, Lärm zuletzt)
   function kuerzeLeiste() {
@@ -402,15 +486,33 @@
   }
   // Regie-Hinweise: beim ersten Besuch offen, danach eingeklappt
   const regie = (s, punkte) => !punkte || !punkte.length ? "" : `<details class="sp-regie" ${stand.verlauf.filter(x => x === stand.schritt).length <= 1 ? "open" : ""}><summary>Regie · ${punkte.length}</summary>${liste(punkte, "sp-hinweise")}</details>`;
+  // gross: im eigenen Schritt (mit Taste A und dem Text des Tracks); sonst kleine Zeile in der Datei-Liste (nur Probe hören)
   function cueKnopf(cue, gross) {
     const def = map.audio[cue] || {};
     const da = hatAudio(cue);
     const laeuft = [spieler.haupt, spieler.schleife].some(a => a.dataset.cue === cue && !a.paused);
     return `<div class="sp-cue ${gross ? "gross" : ""}">
-      <button type="button" class="btn ${da ? "" : "ghost"}" data-cue="${esc(cue)}" ${da ? "" : "disabled"}>${laeuft ? "❚❚ Pause" : "▶ Abspielen"}${gross ? ` ${taste("A")}` : ""}</button>
-      <span><b>${esc(cue)}</b> ${esc(def.titel || "")}${def.schleife ? " · Schleife" : ""}${def.dauer ? ` · ${esc(def.dauer)}` : ""}</span>
+      <button type="button" class="btn ${da ? "" : "ghost"}" data-cue="${esc(cue)}" ${da ? "" : "disabled"}>${laeuft ? "❚❚ Pause" : gross ? "▶ Abspielen" : "▶ Probe"}${gross ? ` ${taste("A")}` : ""}</button>
+      <span><b>${esc(cue)}</b> ${esc(def.titel || "")}${def.schleife ? " · Schleife" : ""}${def.dauer ? ` · ${esc(def.dauer)}` : ""}${da ? "" : ` · <em class="fehlt">Datei fehlt</em>`}</span>
       <label class="btn ghost sm sp-upload">${da ? "Ersetzen" : "MP3 hochladen"}<input type="file" accept="audio/*" data-hoch="${esc(cue)}" hidden></label>
-    </div>`;
+    </div>${gross && def.text ? `<details class="sp-tracktext"><summary>Was im Track gesagt wird</summary><p>${esc(def.text)}</p></details>` : ""}`;
+  }
+  // Während ein Cue läuft schon bereitlegen: was der nächste Aufbau braucht und welche Gegner der nächste Kampf bringt
+  function bereitlegenHtml() {
+    const teile = [];
+    let id = motor.naechsterId(stand);
+    for (let i = 0; i < 3 && id && map.schritte[id]; i++) {
+      const n = map.schritte[id];
+      if (n.typ === "aufbau" && (n.tisch || []).length) teile.push(`<h5>${esc(n.titel)}</h5>${liste(n.tisch)}`);
+      if (n.typ === "kampf") {
+        const g = motor.vorschauGegner(stand, id);
+        if (g.length) teile.push(`<h5>Gleich im Kampf: ${esc(n.titel)}</h5><ul>${g.map(x => `<li><b>${x.anzahl} ×</b> ${esc(x.name)}${x.zone ? ` <small>Zone ${esc(x.zone)}</small>` : ""}</li>`).join("")}</ul>`);
+        break;
+      }
+      if (n.typ === "cue" || n.typ === "aufbau" || n.typ === "vorlesen") { id = Array.isArray(n.weiter) ? null : n.weiter; continue; }
+      break;
+    }
+    return teile.length ? `<div class="sp-bereit"><h4>Schon jetzt bereitlegen, während der Track läuft</h4>${teile.join("")}</div>` : "";
   }
   // Was auf den Tisch muss: Gelände durchnummeriert wie auf der Karte, dazu die Marker
   function aufbauLegende() {
@@ -418,22 +520,27 @@
     const MARKER = window.KartenschmiedeSzenarien.MARKER || {}, nummern = new Map();
     for (const g of karte.gelaende) { const n = g.label || (S.GELAENDE[g.art] || {}).name || g.art; if (!nummern.has(n)) nummern.set(n, nummern.size + 1); }
     const auf = motor.aufgedeckt(stand);
-    const marker = karte.marker.filter(m => !m.geheim || auf.includes(m.label) || auf.includes(`${m.typ}:${m.label}`));
+    // Alle Marker, auch die verdeckten: Chris muss wissen, was offen hinkommt und was er sich nur merkt
+    const marker = karte.marker.filter(m => m.typ !== "ausgang");
     return `<div class="sp-legende"><div><h4>Gelände (frei hinstellen)</h4><ul class="sp-gel">${[...nummern.keys()].map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
-      <div><h4>Marker (genau dort)</h4><ul>${marker.map(m => { const [z, f, name] = MARKER[m.typ] || ["•", "#fff", m.typ]; return `<li><i style="background:${f}">${esc(m.label && m.label.length <= 2 ? m.label : z || "▲")}</i>${esc(name)}</li>`; }).join("")}</ul></div></div>`;
+      <div><h4>Marker (genau dort)</h4><ul class="sp-markerliste">${marker.map(m => {
+        const [z, f, name] = MARKER[m.typ] || ["•", "#fff", m.typ], ev = markerEreignis(m), zu = markerVerdeckt(m, auf);
+        const wof = (ev && ev[1].wofuer) || markerInfo(m);
+        return `<li class="${zu ? "zu" : ""}"><i style="background:${f}">${esc(m.label && m.label.length <= 2 ? m.label : z || "▲")}</i><span><b>${esc(name)}</b> <em>${zu ? "🔒 verdeckt: nicht hinlegen" : "👁 offen hinlegen"}</em>${wof ? `<small>${esc(wof)}</small>` : ""}</span></li>`;
+      }).join("")}</ul></div></div>`;
   }
   function schrittInhalt(s) {
     switch (s.typ) {
       case "vorbereitung": return `<ul class="sp-check">${(s.checkliste || []).map((c, i) => {
         const k = `${stand.schritt}:${i}`;
         return `<li><label><input type="checkbox" data-check="${esc(k)}" ${stand.checks[k] ? "checked" : ""}> ${esc(c)}</label></li>`;
-      }).join("")}</ul>${gm(s.hinweis)}${stand.schritt === "vorb-stand" ? audioListe() : ""}`;
+      }).join("")}</ul>${s.uebernahme ? uebernahmeHtml() : ""}${gm(s.hinweis)}${s.audio || stand.schritt === "vorb-stand" ? audioListe() : ""}`;
       case "aufbau": {
         const text = `${liste(s.tisch, "sp-tisch")}${s.regel ? `<h4>Sag an</h4>${vorlesen(s.regel)}` : ""}${gm(s.hinweis)}`;
         if (mitSeite(s)) return text;
         return `<div class="sp-aufbau"><div>${text}</div><div class="sp-aufbaukarte">${tischKarte({ gross: true, skizze: s.skizze })}${aufbauLegende()}</div></div>`;
       }
-      case "cue": return `${cueKnopf(s.cue, true)}${gm(s.notiz || s.gmNotiz)}${s.optional && !hatAudio(s.cue) ? `<p class="sp-gm">Kein Track da: einfach weiter, du spielst die Szene live.</p>` : ""}${s.text ? vorlesen(s.text) : ""}`;
+      case "cue": return `${cueKnopf(s.cue, true)}${gm(s.notiz || s.gmNotiz)}${s.optional && !hatAudio(s.cue) ? `<p class="sp-gm">Kein Track da: einfach weiter, du spielst die Szene live.</p>` : ""}${s.text ? vorlesen(s.text) : ""}${bereitlegenHtml()}`;
       case "vorlesen": return `${vorlesen(s.text, s.als && map.figuren[s.als] ? map.figuren[s.als].name : "")}${gm(s.gmNotiz)}`;
       case "regel": return `${vorlesen(s.text)}${gm(s.gmNotiz)}`;
       case "spieler": return `<p class="sp-text">${esc(s.text || "")}</p><!--passiert-->${regie(s, s.hinweise)}`;
@@ -446,18 +553,37 @@
           <kbd>${esc(o.taste)}</kbd><span><b>${esc(o.kurz)}</b>${o.text ? `<small>${esc(o.text)}</small>` : ""}${folgePillen(o)}${o.folge ? `<em>${esc(o.folge)}</em>` : ""}</span></button>`).join("")}</div>`;
       case "kampf": {
         const ziel = stand.kampfZiel ? `<p class="sp-ziel">Ziel erreicht. Weiter führt zu: <b>${esc((map.schritte[stand.kampfZiel] || {}).titel || stand.kampfZiel)}</b></p>` : "";
-        return `<p class="sp-text">${symText(s.text || "")}</p>${ziel}${budgetZeile()}<!--passiert-->${regie(s, s.hinweise)}${verhaltenTabelle()}`;
+        return `${s.musik ? `<div class="sp-musik"><span>Kampfmusik</span>${cueKnopf(s.musik, false)}</div>` : ""}<p class="sp-text">${symText(s.text || "")}</p>${ziel}${budgetZeile()}<!--passiert-->${regie(s, s.hinweise)}${verhaltenTabelle()}`;
       }
       case "ende": {
         const ep = motor.epListe(stand);
-        return `<h4>Erfahrung</h4><ul>${ep.map(e => `<li class="${e.erreicht ? "ja" : "nein"}">${e.erreicht ? "✓" : "✗"} ${esc(e.text)}: ${e.ep} EP</li>`).join("")}</ul>
+        const nm = naechsteMap();
+        const fertig = stand.fertig
+          ? `<div class="sp-uebernahme"><b>✓ Map abgeschlossen</b><span>${nm ? `Unten „Map ${nm.map} starten“: die neue Map übernimmt automatisch ${esc(uebernahmeText(stand.uebernahme || motor.uebernahme(stand)))}.` : `Die Kampagne geht mit Map ${map.map + 1} weiter; die ist im Reiter Spielen noch nicht angelegt. Der Stand ist gespeichert, die Übernahme steht bereit.`}</span></div>`
+          : `<div class="sp-uebernahme offen"><b>Noch nicht abgeschlossen</b><span>Beute verteilen, dann unten „Map abschließen“ (oder Leertaste).</span></div>`;
+        return `${fertig}<h4>Erfahrung</h4><ul>${ep.map(e => `<li class="${e.erreicht ? "ja" : "nein"}">${e.erreicht ? "✓" : "✗"} ${esc(e.text)}: ${e.ep} EP</li>`).join("")}</ul>
           <h4>Beute</h4>${liste(s.beute)}<p class="sp-beutezeile"><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${beuteHtml(wuerfe.ende)}</p>
           <h4>Inventar der Helden</h4><div class="sp-inventare">${helden.map(h => `<div><b>${esc(h.name)}</b>${inventarHtml(h.name)}</div>`).join("")}</div>
           <h4>Folgen für die nächste Map</h4>${liste(motor.folgen(stand), "sp-folgen")}
-          <h4>Notieren</h4>${liste(s.notieren)}<p class="sp-gm">${esc((s.zuruecksetzen || []).join(", "))} zurücksetzen. Der Spielstand ist gespeichert; die nächste Map übernimmt Leisten und Entscheidungen.</p>`;
+          <h4>Notieren</h4>${liste(s.notieren)}<p class="sp-gm">${esc((s.zuruecksetzen || []).join(", "))} zurücksetzen.</p>`;
       }
       default: return "";
     }
+  }
+  // Was aus der letzten Map gekommen ist (die App übernimmt es selbst; hier steht es nur zum Nachsehen)
+  function uebernahmeText(u) {
+    if (!u) return "";
+    const leisten = Object.entries(u.leisten || {}).map(([k, v]) => `${String((map.leisten[k] || {}).name || k).replace(/-Leiste$/, "")} ${v}`);
+    const inv = Object.entries(u.inventar || {}).filter(([, l]) => (l || []).length).map(([h, l]) => `${h}: ${l.join(", ")}`);
+    const sp = Object.entries(u.sporen || {}).filter(([, n]) => n).map(([h, n]) => `${h} ${n}`);
+    const flags = typeof u.flags === "number" ? u.flags : Object.keys(u.flags || {}).length;
+    return [...leisten, flags ? `${flags} Entscheidungen` : "", inv.length ? `Beute (${inv.join(" · ")})` : "", sp.length ? `Sporenpunkte (${sp.join(", ")})` : ""].filter(Boolean).join(", ");
+  }
+  function uebernahmeHtml() {
+    const u = stand.uebernommen;
+    if (!u && +map.map <= 1) return `<div class="sp-uebernahme"><b>Erste Map der Kampagne</b><span>Alle Leisten stehen auf ihrem Startwert. Spätere Maps übernehmen Leisten, Entscheidungen, Beute und Sporenpunkte von selbst.</span></div>`;
+    if (!u) return `<div class="sp-uebernahme offen"><b>Nichts übernommen</b><span>Kein Spielstand aus Map ${map.map - 1} gefunden: Leisten auf Startwerten, Entscheidungen der letzten Map fehlen.</span></div>`;
+    return `<div class="sp-uebernahme"><b>✓ Automatisch übernommen aus „${esc(u.name || `Map ${u.map}`)}“${u.fertig ? "" : " (nicht abgeschlossen)"}</b><span>${esc(uebernahmeText(u) || "Keine Kampagnen-Werte.")}</span></div>`;
   }
   function verhaltenTabelle() {
     const art = motor.wuetend(stand) ? "wuetend" : "ruhig";
@@ -465,7 +591,7 @@
     return `<table class="sz-tab sp-verh"><thead><tr><th>W6</th><th>Gegner ${art === "wuetend" ? "wütend" : "ruhig"}</th></tr></thead><tbody>${zeilen.map(([w, t]) => `<tr><td>${esc(w)}</td><td>${esc(t)}</td></tr>`).join("")}</tbody></table>${gm(map.verhalten && map.verhalten.notiz)}`;
   }
   function audioListe() {
-    return `<h4>Audio-Cues dieser Map</h4><div class="sp-audioliste">${Object.keys(map.audio).map(c => cueKnopf(c, false)).join("")}</div>`;
+    return `<h4>Audio-Dateien prüfen <small>(hier nur nachsehen, ob alles da ist; abgespielt wird jeder Cue an seiner Stelle)</small></h4><div class="sp-audioliste">${Object.keys(map.audio).map(c => cueKnopf(c, false)).join("")}</div>`;
   }
   // Was gerade passiert ist: Ereignisse, Proben, Schwellen, gefallene Gegner, Rundenwurf
   function letzteEreignisse() {
@@ -473,10 +599,10 @@
     const eintrag = (e, i) => {
       const p = e.probe, def = map.ereignisse[e.id] || {};
       const probeHtml = !p ? "" : p.wurf
-        ? `<p class="sp-wurf">🎲 Wurf <b>${p.wurf}</b>${p.stufen.length ? "" : " · nichts weiter"}</p>${p.stufen.map(st => `${vorlesen(st.vorlesen, `ab ${st.ab}`)}${gm(st.gmNotiz)}`).join("")}`
+        ? `<p class="sp-wurf">🎲 Wurf <b>${p.wurf}</b>${p.stufen.length ? "" : " · nichts weiter"}</p>${p.stufen.map(st => `${vorlesen(st.vorlesen, stufeName(st))}${gm(st.gmNotiz)}`).join("")}`
         : `<div class="sp-probe"><p>🎲 ${esc(p.frage)}</p><div>${[1, 2, 3, 4, 5, 6].map(w => `<button type="button" class="btn sm" data-probe="${i}" data-w="${w}">${w}</button>`).join("")}
             <button type="button" class="btn ghost sm" data-probe="${i}" data-w="0">App würfelt</button></div>
-            <small>${esc(((def.probe || {}).stufen || []).map(st => `ab ${st.ab}`).join(" · "))} · Tasten 1–6</small></div>`;
+            <small>${esc(((def.probe || {}).stufen || []).map(st => stufeName(st)).join(" · "))} · Tasten 1–6</small></div>`;
       return `<div class="sp-ev ${e.art ? `art-${e.art}` : ""}"><h4>${esc(e.name)}</h4>${vorlesen(e.vorlesen)}${gm(e.gmNotiz)}${probeHtml}
         ${e.beutewurf ? `<p class="sp-beutezeile">${wuerfe[i] ? `Beutewurf: ${beuteHtml(wuerfe[i])}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
     };
@@ -503,6 +629,15 @@
     for (const f of motor.figurenAmTisch(stand)) pos[`f:${f.id}`] = { x: f.tisch.x, y: f.tisch.y };
     return pos;
   }
+  const markerVerdeckt = (m, aufgedeckt) => !!m.geheim && !aufgedeckt.includes(m.label) && !aufgedeckt.includes(`${m.typ}:${m.label}`);
+  // Was Chris zu einem Marker wissen muss: liegt er offen, wofür steht er
+  const markerInfo = m => { const info = (map.tischplan || {}).info || {}; return info[`${m.typ}:${m.label}`] || info[m.label] || ""; };
+  function sichtbarHtml(m) {
+    if (!m) return "";
+    if (!m.geheim) return `<p class="sp-sicht offen">👁 Liegt offen: die Spieler sehen ihn von Anfang an.</p>`;
+    return markerVerdeckt(m, motor.aufgedeckt(stand)) ? `<p class="sp-sicht zu">🔒 Verdeckt: nicht hinlegen, nur du weißt davon. Die App deckt ihn auf, sobald er gefunden ist.</p>`
+      : `<p class="sp-sicht offen">👁 Aufgedeckt: jetzt auf den Tisch legen.</p>`;
+  }
   const markerEreignis = m => Object.entries(map.ereignisse || {}).find(([, e]) => e.marker && (e.marker === m.label || e.marker === `${m.typ}:${m.label}`));
   function tischKarte(opt = {}) {
     if (!karte || !window.KartenschmiedeSzenarien) return "";
@@ -515,12 +650,18 @@
       const decke = opt.skizze === "unten" ? [[0, 0, karte.b, karte.t / 2]] : (opt.skizze.decke || []);
       for (const [x, y, w, h] of decke) teile.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#000" opacity=".62" pointer-events="none"/>`);
     }
-    // Suchmarker und andere Marker mit Ereignis: Ring zeigt „schon untersucht“, Klick öffnet die Infos
+    // Jeder Marker ist anklickbar. Mit Ereignis (Suchmarker, Türen …): Ring zeigt „schon untersucht“.
+    // Verdeckte Marker sieht nur Chris: gestrichelt mit Schloss, bis sie im Spiel aufgedeckt sind
     for (const m of karte.marker) {
-      const ev = markerEreignis(m);
-      if (!ev || (m.geheim && !aufgedeckt.includes(m.label) && !aufgedeckt.includes(`${m.typ}:${m.label}`))) continue;
+      if (m.typ === "ausgang") continue;
+      const ev = markerEreignis(m), verdeckt = markerVerdeckt(m, aufgedeckt), tok = ev ? `m:${ev[0]}` : `z:${m.typ}:${m.label || ""}`;
+      if (verdeckt) {
+        teile.push(`<g class="sp-tok marker verdeckt" data-tok="${esc(tok)}"><title>verdeckt: nur du siehst ihn</title><circle cx="${m.x}" cy="${m.y}" r="1.1" fill="#ffffff12" stroke="#9aa0a8" stroke-width=".15" stroke-dasharray=".35 .25"/><text x="${m.x}" y="${m.y + .45}" font-size="1.1" text-anchor="middle">🔒</text></g>`);
+        continue;
+      }
+      if (!ev) { teile.push(`<g class="sp-tok marker" data-tok="${esc(tok)}"><circle cx="${m.x}" cy="${m.y}" r="${m.typ === "zone" ? (m.radius || 4) : 1.4}" fill="transparent"/></g>`); continue; }
       const fertig = stand.ereignisse[ev[0]];
-      teile.push(`<g class="sp-tok marker" data-tok="m:${esc(ev[0])}"><circle cx="${m.x}" cy="${m.y}" r="1.55" fill="transparent" stroke="${fertig ? "#7fd06a" : "#f2cf4a"}" stroke-width=".22" ${fertig ? "" : `stroke-dasharray=".5 .3"`}/>${fertig ? `<text x="${m.x + 1.3}" y="${m.y - .9}" font-size="1.3" fill="#7fd06a" font-weight="800">✓</text>` : ""}</g>`);
+      teile.push(`<g class="sp-tok marker" data-tok="${esc(tok)}"><circle cx="${m.x}" cy="${m.y}" r="1.55" fill="transparent" stroke="${fertig ? "#7fd06a" : "#f2cf4a"}" stroke-width=".22" ${fertig ? "" : `stroke-dasharray=".5 .3"`}/>${fertig ? `<text x="${m.x + 1.3}" y="${m.y - .9}" font-size="1.3" fill="#7fd06a" font-weight="800">✓</text>` : ""}</g>`);
     }
     const token = (schluessel, x, y, farbe, text, titel, extra = "") => {
       const aktiv = markiert === schluessel || (popup && popup.tok === schluessel);
@@ -543,8 +684,30 @@
       return `<span class="sp-heldchip ${popup && popup.tok === `held:${h.name}` ? "an" : ""} ${dran ? "dran" : ""} ${b.stufe ? "befallen" : ""}">
         <button type="button" data-chip="held:${esc(h.name)}" title="${esc(h.name)}${b.stufe ? `: ${b.stufe}, ${b.wuerfel} Aktionswürfel` : ""}">${esc(h.name)}${sp ? ` <i>🍄${sp}</i>` : ""}${n ? ` <i>🎒${n}</i>` : ""}</button>
         ${stand.rundenAktiv ? `<button type="button" class="sp-hak" data-akt="held:${esc(h.name)}" title="War diese Runde dran">${dran ? "✓" : "○"}</button>` : ""}</span>`; }).join("")}</div>`;
-    const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort." : "Raster: eine Kartenlänge · Figuren anklicken für Infos, ziehen zum Verschieben";
-    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? popupHtml() : ""}</div>`;
+    const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort. Marker anklicken: wofür sie stehen." : "Raster: eine Kartenlänge · Figuren und Marker anklicken für Infos, Figuren ziehen zum Verschieben";
+    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? werIstWer() : ""}${popupHtml()}</div>`;
+  }
+  // Wer ist wer am Tisch: je Gegnerart die Kürzel und ein kleines Kartenbild (Klick: große Karte), dazu NPC-Figuren
+  const miniKarten = {};
+  function miniKarte(id) {
+    if (miniKarten[id] === undefined) {
+      const w = werteFuer(map.gegner[id]);
+      miniKarten[id] = w && w.quality ? KS.renderCard(w, stufeFuer(w), {}) : "";
+    }
+    return miniKarten[id];
+  }
+  function werIstWer() {
+    const arten = new Map();
+    for (const g of stand.gegner.filter(x => !x.weg)) { if (!arten.has(g.id)) arten.set(g.id, []); arten.get(g.id).push(g); }
+    const figuren = motor.figurenAmTisch(stand);
+    if (!arten.size && !figuren.length) return "";
+    const eintraege = [...arten.entries()].map(([id, liste]) => {
+      const def = map.gegner[id] || {}, offen = liste.filter(g => motor.zustand(g).id !== "gefallen");
+      return `<button type="button" class="sp-wer" data-karte-art="${esc(id)}" title="Klick: Karte groß zeigen"><span class="cw sp-mini">${miniKarte(id)}</span>
+        <span><b>${esc(def.name || id)}</b><small>${liste.map(g => `<i class="${motor.zustand(g).id === "gefallen" ? "tot" : ""}">${esc(gegnerKuerzel(g))}</i>`).join("")}</small><em>${offen.length} von ${liste.length} stehen</em></span></button>`;
+    });
+    for (const f of figuren) eintraege.push(`<button type="button" class="sp-wer figur" data-chip="f:${esc(f.id)}"><span class="sp-mini leer">${esc(f.tisch.zeichen || f.name[0])}</span><span><b>${esc(f.name)}</b><em>NPC</em></span></button>`);
+    return `<div class="sp-werliste">${eintraege.join("")}</div>`;
   }
   // Infokarte zu einer angeklickten Figur oder einem Marker
   function popupHtml() {
@@ -568,12 +731,20 @@
       if (!g) return "";
       const def = map.gegner[g.id] || {}, z = motor.zustand(g);
       kopf = `<b>${esc(gegnerKuerzel(g))} · ${esc(def.name || g.id)}</b><small>${esc(z.id)}${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</small>`;
-      inhalt = `${def.info ? `<p>${esc(def.info)}</p>` : ""}${sag(z.satz)}${motor.zusaetze(stand, def).map(x => gm(x.text)).join("")}
+      inhalt = `${def.info ? `<p>${esc(def.info)}</p>` : ""}${sag(z.satz)}${def.anblick ? `<h5>Wenn sie genauer hinsehen</h5>${sag(def.anblick)}` : ""}${motor.zusaetze(stand, def).map(x => gm(x.text)).join("")}
         <div class="sp-g-knoepfe" data-gegner="${esc(g.uid)}"><button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button><button type="button" class="btn ghost sm" data-dmg="-1">−1</button><button type="button" class="btn ghost sm" data-karte="1">Karte</button></div>`;
     } else if (art === "m") {
       const e = map.ereignisse[id] || {}, ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
-      kopf = `<b>${esc(e.name || id)}</b><small>${schon ? "untersucht" : "noch nicht untersucht"}</small>`;
-      inhalt = `${e.probe && !schon ? `<p class="hint">Mit Probe: ${esc((e.probe.stufen || []).map(st => `ab ${st.ab}`).join(" · "))}</p>` : ""}${ok ? `<button type="button" class="btn sm" data-ev="${esc(id)}">${schon ? "Nochmal" : "Untersuchen"} ${taste(e.taste)}</button>` : ""}`;
+      const mk = karte.marker.find(x => e.marker === x.label || e.marker === `${x.typ}:${x.label}`);
+      kopf = `<b>${esc(e.name || id)}</b><small>${schon ? "✓ untersucht" : "noch nicht untersucht"}</small>`;
+      inhalt = `${e.wofuer ? `<p class="sp-wofuer">${esc(e.wofuer)}</p>` : ""}${mk ? gm(markerInfo(mk)) : ""}${sichtbarHtml(mk)}${e.kosten ? `<p class="hint">${esc(e.kosten)}</p>` : ""}
+        ${e.probe && !schon ? `<p class="hint">Mit Probe: ${esc((e.probe.stufen || []).map(st => stufeName(st)).join(" · "))}</p>` : ""}${ok ? `<button type="button" class="btn sm" data-ev="${esc(id)}">${schon ? "Nochmal" : "Untersuchen"} ${taste(e.taste)}</button>` : ""}`;
+    } else if (art === "z") {
+      const [typ, ...l] = id.split(":"), label = l.join(":");
+      const mk = karte.marker.find(x => x.typ === typ && (x.label || "") === label);
+      const [, , name] = (window.KartenschmiedeSzenarien.MARKER || {})[typ] || ["", "", typ];
+      kopf = `<b>${esc(name)}${label && label.length <= 2 ? ` ${esc(label)}` : ""}</b><small>Marker</small>`;
+      inhalt = `${mk ? gm(markerInfo(mk)) : ""}${sichtbarHtml(mk)}`;
     }
     return `<div class="sp-pop" style="left:${popup.x}%;top:${popup.y}%"><header>${kopf}<button type="button" class="btn ghost sm" data-sp="popzu" aria-label="Schließen">✕</button></header>${inhalt}</div>`;
   }
@@ -596,7 +767,7 @@
         <div class="sp-g-zustand ${neuerZustand(g, z.id) ? "neu" : ""}"><em class="z-${esc(z.id.replace(/\s+/g, "-"))}">${esc(z.id)}</em> ${sag(z.satz)}</div>
         ${stand.rundenAktiv && z.id !== "gefallen" ? `<p class="sp-verhwurf">${verhWurf[g.uid] ? `🎲 <b>${verhWurf[g.uid].wurf}</b> ${esc(verhWurf[g.uid].text)} <small>(${verhWurf[g.uid].art === "wuetend" ? "wütend" : "ruhig"})</small>` : `<button type="button" class="btn ghost sm" data-verh="${esc(g.uid)}" title="Verhaltenswurf für diesen Gegner (setzt den Haken)">🎲 Verhalten</button>`}</p>` : ""}
         ${mods.length ? `<p class="sp-mods">${mods.map(m => `<i class="${m.staerker ? "plus" : "minus"}">${esc(m.text)}</i>`).join("")}</p>` : ""}
-        ${offen ? `<div class="sp-g-mehr">${g.wunden === 0 && b.satz ? `<h5>Bedrohung ansagen</h5>${sag(b.satz)}` : ""}${zusatz.length ? `<h5>Gilt gerade</h5>${zusatz.map(x => `${gm(x.text)}${x.ansage ? sag(x.ansage) : ""}`).join("")}` : ""}
+        ${offen ? `<div class="sp-g-mehr">${def.anblick ? `<h5>Wenn sie genauer hinsehen</h5>${sag(def.anblick)}` : ""}${zusatz.length ? `<h5>Gilt gerade</h5>${zusatz.map(x => `${gm(x.text)}${x.ansage ? sag(x.ansage) : ""}`).join("")}` : ""}
           <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button>
           ${anpassenHtml(g)}</div>` : ""}
       </div>`;
@@ -661,13 +832,19 @@
           ${antwort ? `<div class="sp-antwort"><small>Antwort auf: ${esc(antwort.name)}</small>${vorlesen(antwort.vorlesen)}${gm(antwort.gmNotiz)}</div>` : ""}
           ${fragen.length ? `<div class="sp-fragen-knoepfe">${fragen.map(e => { const ev = map.ereignisse[e], ok = motor.ereignisErlaubt(stand, e), schon = stand.ereignisse[e];
             return `<button type="button" class="btn ghost sm ${schon ? "erledigt" : ""}" data-ev="${esc(e)}" ${ok ? "" : "disabled"} title="${esc(ev.name)}">${taste(ev.taste)} ${esc(kurzName(ev))}${schon ? " ✓" : ""}</button>`; }).join("")}</div>` : ""}
-          ${(f.weiss || []).length ? `<table class="sz-tab sp-weiss"><tbody>${f.weiss.map(w => `<tr><td>${esc(w.info)}</td><td>${esc(w.wie || "")}</td></tr>`).join("")}</tbody></table>`
-            : f.wennSieFragen ? `<table class="sz-tab sp-weiss"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(b)}</td><td>${esc(a)}</td></tr>`).join("")}</tbody></table>` : ""}</section>
-        <section><h4>Was ${f.anzeige === "er" ? "er" : "sie"} nicht weiß</h4>${liste(f.nichtWissen, "sp-nicht")}
-          ${f.wer ? `<details class="sp-mehr"><summary>Wer ${f.anzeige === "er" ? "er" : "sie"} ist</summary><p>${esc(f.wer)}</p></details>` : ""}
-          ${(f.weiss || []).length && f.wennSieFragen ? `<details class="sp-mehr"><summary>Wenn sie fragen …</summary><table class="sz-tab sp-fragen"><tbody>${f.wennSieFragen.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></details>` : ""}</section>
+          ${(f.weiss || []).length ? wissenHtml(id, f) : ""}</section>
+        <section>${f.wennSieFragen ? `<h4>Wenn sie fragen …</h4><div class="sp-fragen">${f.wennSieFragen.map(([a, b]) => `<p><small>… ${esc(a)}</small>${esc(b)}</p>`).join("")}</div>` : ""}
+          <h4>Was ${f.anzeige === "er" ? "er" : "sie"} nicht weiß</h4>${liste(f.nichtWissen, "sp-nicht")}
+          ${f.wer ? `<details class="sp-mehr"><summary>Wer ${f.anzeige === "er" ? "er" : "sie"} ist</summary><p>${esc(f.wer)}</p></details>` : ""}</section>
       </div>
     </aside>`;
+  }
+
+  // Herausgekitzelt: abhaken, was die Helden erfahren haben. Hat ein Eintrag eine Folge, tritt sie später von selbst ein
+  function wissenHtml(id, f) {
+    const an = motor.wissen(stand, id);
+    return `<div class="sp-wissen">${f.weiss.map((w, i) => `<label class="${an[i] ? "an" : ""}"><input type="checkbox" data-wissen="${esc(id)}" data-i="${i}" ${an[i] ? "checked" : ""}>
+      <span>${w.kurz ? `<b>${esc(w.kurz)}</b>` : ""}${vorlesen(w.info)}${w.wie ? `<small>Wie: ${esc(w.wie)}</small>` : ""}${w.folge ? `<em>${an[i] ? "✓ Wirkt: " : "Folge: "}${esc(w.folge)}</em>` : ""}</span></label>`).join("")}</div>`;
   }
 
   // ---------- Fenster ----------
@@ -803,6 +980,21 @@
     if (kartenbox) requestAnimationFrame(() => KS.passeAn(kartenbox));
   }
 
+  // Drüberfahren über „Wer ist wer“: die Karte groß neben der Seitenspalte (die Spalte scrollt und schneidet sonst ab)
+  function vorschau(e) {
+    let el = $("spVorschau");
+    const wer = e.target.closest && e.target.closest(".sp-wer[data-karte-art]");
+    if (!wer || !stand) { if (el) el.hidden = true; return; }
+    const html = miniKarte(wer.dataset.karteArt);
+    if (!html) return;
+    if (!el) { el = document.createElement("div"); el.id = "spVorschau"; el.className = "cw sp-vorschau"; document.body.appendChild(el); }
+    if (el.dataset.art !== wer.dataset.karteArt) { el.innerHTML = html; el.dataset.art = wer.dataset.karteArt; }
+    const r = wer.getBoundingClientRect(), b = 240;
+    el.style.left = `${Math.max(8, r.left - b - 10)}px`;
+    el.style.top = `${Math.max(8, Math.min(window.innerHeight - b * 1.5 - 8, r.top - 40))}px`;
+    el.hidden = false;
+  }
+
   // ---------- Figuren ziehen und anklicken ----------
   let zug = null;
   function svgPunkt(svg, e) {
@@ -846,13 +1038,15 @@
     tab.addEventListener("pointerdown", ziehStart);
     tab.addEventListener("pointermove", ziehe);
     tab.addEventListener("pointerup", ziehEnde);
+    tab.addEventListener("mouseover", vorschau);
+    tab.addEventListener("mouseleave", () => { const el = $("spVorschau"); if (el) el.hidden = true; });
     tab.addEventListener("click", async e => {
       // Eingabefelder (Regel, Häkchen) dürfen den Gegner nicht zuklappen
       if (e.target.closest("input, select, textarea, label")) return;
       const chip = e.target.closest("[data-chip]");
       if (chip) { popup = popup && popup.tok === chip.dataset.chip ? null : { tok: chip.dataset.chip, x: 3, y: 40 }; zeige(); return; }
       const marker = e.target.closest(".sp-tok.marker");
-      if (marker && !marker.closest(".gross")) { oeffnePopup(marker.dataset.tok, marker.closest("svg"), e); return; }
+      if (marker) { oeffnePopup(marker.dataset.tok, marker.closest("svg"), e); return; }
       const t = e.target.closest("button, [data-gegner]");
       if (!t) return;
       const g = t.closest("[data-gegner]");
@@ -870,6 +1064,7 @@
       }
       if (t.dataset.dmg && g) { markiert = `g:${g.dataset.gegner}`; tue(() => motor.schaden(stand, g.dataset.gegner, +t.dataset.dmg)); return; }
       if (t.dataset.karte && g) { fenster = `karte:${g.dataset.gegner}`; zeige(); return; }
+      if (t.dataset.karteArt) { const g1 = stand.gegner.find(x => x.id === t.dataset.karteArt && !x.weg); if (g1) { fenster = `karte:${g1.uid}`; zeige(); } return; }
       if (t.dataset.weg && g) { tue(() => motor.entferne(stand, g.dataset.gegner)); return; }
       if (t.matches("[data-gegner]")) { markiert = markiert === `g:${t.dataset.gegner}` ? null : `g:${t.dataset.gegner}`; zeige(); return; }
       if (t.dataset.wahl) { waehle(t.dataset.wahl); return; }
@@ -890,6 +1085,9 @@
       if (t.dataset.stand) { await oeffne(t.dataset.stand); return; }
       switch (t.dataset.sp) {
         case "neu": await neuerAbend(); break;
+        case "abschliessen": tue(() => motor.abschliessen(stand)); melde("Map abgeschlossen. Die nächste Map übernimmt alles von selbst."); break;
+        case "naechste-map": { const nm = naechsteMap(); if (!nm) break; await speichere(); const u = stand.uebernahme || motor.uebernahme(stand); stoppe(); await neuerAbend({ map: nm.map, uebernahme: u, gruppeId: stand.gruppeId, schwierigkeit: stand.schwierigkeit }); break; }
+        case "speichern": await speichere(); if (gespeichert && gespeichert.ok) melde("Gespeichert."); break;
         case "weiter": weiter(); break;
         case "zurueck": zurueck(); break;
         case "runde": runde(); break;
@@ -911,15 +1109,17 @@
         case "benutzen": tue(() => motor.benutze(stand, t.dataset.held, +t.dataset.i)); break;
         case "zu": fenster = null; eingabeFuer = null; zeige(); break;
         case "eingabe-frei": { const v = ($("spEingabeFrei") || {}).value; if (v && v.trim()) eingabeFertig(v.trim()); break; }
-        case "schliessen": await speichere(); stand = null; standId = null; popup = null; fenster = null; stoppe(); if (document.fullscreenElement) document.exitFullscreen(); await ladeListe(); zeige(); break;
+        case "schliessen": await speichere(); merkeOffen(null); wachHalten(false); stand = null; standId = null; popup = null; fenster = null; stoppe(); if (document.fullscreenElement) document.exitFullscreen(); await ladeListe(); zeige(); break;
       }
     });
     tab.addEventListener("change", e => {
       if (e.target.dataset.check && stand) { stand.checks[e.target.dataset.check] = e.target.checked; spaeter(); }
+      if (e.target.dataset.wissen && stand) { const t = e.target; tue(() => motor.erfahre(stand, t.dataset.wissen, +t.dataset.i, t.checked)); }
       if (e.target.dataset.hoch && e.target.files && e.target.files[0]) ladeHoch(e.target.dataset.hoch, e.target.files[0]);
     });
     document.addEventListener("keydown", e => {
       if ($("tabSpielen").hidden || !stand) return;
+      if ((e.metaKey || e.ctrlKey) && (e.key === "s" || e.key === "S")) { e.preventDefault(); speichere().then(() => { if (gespeichert && gespeichert.ok) melde("Gespeichert."); }); return; }
       if (e.target.closest && e.target.closest("input, textarea, select")) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const s = motor.schritt(stand);
@@ -937,6 +1137,7 @@
       if (k === " " || k === "Enter") {
         e.preventDefault();
         if (kampfOffen(s)) melde("Der Kampf läuft noch. Ziel per Aktion oder Schaden erreichen, oder unten „Weiter“ klicken.");
+        else if (s && s.typ === "ende" && !motor.naechsterId(stand)) { if (!stand.fertig) { tue(() => motor.abschliessen(stand)); melde("Map abgeschlossen. Die nächste Map übernimmt alles von selbst."); } }
         else weiter();
         return;
       }
@@ -951,7 +1152,7 @@
       if (k === "l" || k === "L") { fenster = "lage"; zeige(); return; }
       if (k === "p" || k === "P") { fenster = "log"; zeige(); return; }
       if (k === "x" || k === "X") { antreiberZu = stand.schritt; zeige(); return; }
-      if (k === "a" || k === "A") { if (s && s.cue) spiele(s.cue); return; }
+      if (k === "a" || k === "A") { if (s && (s.cue || s.musik)) spiele(s.cue || s.musik); return; }
       if (k === "s" || k === "S") { stoppe(); zeige(); return; }
       if (k === "n" || k === "N") { if (fenster && fenster.startsWith("npc")) fenster = null; else if ([...stand.verlauf].some(id => (map.schritte[id] || {}).typ === "npc")) fenster = "npc"; zeige(); return; }
       if (k === "Tab") {
@@ -982,6 +1183,9 @@
         try { await ladeListe(); } catch { staende = []; }
         try { await ladeAudio(); } catch { audio = {}; }
         try { window.__spGruppen = window.KartenschmiedeGruppe ? await window.KartenschmiedeGruppe.gruppen() : []; } catch { window.__spGruppen = []; }
+        // Neu geladen mitten im Abend: dort weitermachen, wo zuletzt gespielt wurde
+        const offen = offenGemerkt();
+        if (offen && !stand) { try { await oeffne(offen); if (stand) melde("Weiter, wo du warst. Die App speichert nach jeder Aktion."); } catch { merkeOffen(null); } }
       }
       zeige();
     },

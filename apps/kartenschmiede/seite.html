@@ -723,7 +723,7 @@ fieldset.checks legend { margin-bottom: 6px; }
 .sp-titel { display: grid; line-height: 1.15; font-family: var(--ui); }
 .sp-titel b { font-size: 16px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-titel small { font-size: 14px; color: var(--dim); }
-.sp-pills { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; align-items: center; flex: 1; }
+.sp-pills { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; align-items: center; flex: 1; }
 .sp-kopfknoepfe { display: flex; gap: 6px; }
 .sp-pill { display: inline-flex; gap: 5px; align-items: center; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; font: 600 15px var(--ui); background: var(--bg); white-space: nowrap; }
 .sp-pill b { letter-spacing: .05em; text-transform: uppercase; font-size: 12px; color: var(--dim); }
@@ -873,6 +873,52 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-stufen b { color: var(--ink); margin-right: 6px; }
 .sp-stufe { font-weight: 700; } .sp-stufe.st-anfaenger { color: #7fd06a; } .sp-stufe.st-experte { color: #ff8a1f; } .sp-stufe.st-legendaer { color: var(--t6); }
 .sp-budget { font-family: var(--ui); font-size: 15px; color: var(--dim); margin: 6px 0; } .sp-budget b { color: var(--ink); }
+/* Kampagnenfortschritt im Kopf: ein Abschnitt je Map */
+.sp-fortschritt { display: inline-flex; align-items: center; gap: 3px; margin: 2px 0; }
+.sp-fortschritt i { width: 26px; height: 6px; border-radius: 3px; background: #2c2e36; overflow: hidden; display: block; }
+.sp-fortschritt u { display: block; height: 100%; background: var(--brass); text-decoration: none; }
+.sp-fortschritt em { font: 700 12px var(--ui); color: var(--dim); font-style: normal; margin-left: 4px; }
+/* Wer ist wer: unter der Tischkarte je Gegnerart Kartenbild, Kürzel und wie viele noch stehen */
+.sp-werliste { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sp-wer { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border: 1px solid #34363e; border-radius: 8px; background: #1a1b20; color: var(--ink); text-align: left; cursor: pointer; font-family: var(--ui); }
+.sp-wer:hover { border-color: var(--brass); }
+.sp-wer b { display: block; font-size: 15px; } .sp-wer em { display: block; font-size: 12px; color: var(--dim); font-style: normal; }
+.sp-wer small { display: flex; flex-wrap: wrap; gap: 3px; margin: 2px 0; }
+.sp-wer small i { font: 800 12px var(--ui); font-style: normal; background: #ff6a4a; color: #0b0c0f; border-radius: 9px; padding: 0 5px; }
+.sp-wer small i.tot { background: #77736b; text-decoration: line-through; }
+.sp-mini { width: 46px; flex: none; pointer-events: none; } .sp-mini .card { box-shadow: none; }
+/* Drüberfahren: die Karte groß daneben, ohne zu klicken */
+.sp-wer { position: relative; }
+.sp-vorschau { position: fixed; width: 240px; z-index: 60; pointer-events: none; }
+.sp-vorschau[hidden] { display: none; } .sp-vorschau .card { box-shadow: 0 12px 40px rgba(0,0,0,.7); }
+.sp-mini.leer { height: 46px; border-radius: 50%; background: #f2cf4a; color: #0b0c0f; display: grid; place-items: center; font: 800 18px var(--ui); }
+/* Marker: offen oder verdeckt, wofür sie stehen */
+.sp-sicht { font: 600 14px var(--ui); margin: 4px 0; } .sp-sicht.offen { color: #9fe08f; } .sp-sicht.zu { color: #c9ccd2; }
+.sp-wofuer { font: 600 15px var(--ui); color: var(--ink); margin: 2px 0 6px; }
+.sp-markerliste li { display: flex; gap: 8px; align-items: flex-start; } .sp-markerliste li span { display: grid; }
+.sp-markerliste em { font-style: normal; font-size: 13px; color: #9fe08f; } .sp-markerliste li.zu em { color: #c9ccd2; }
+.sp-markerliste small { font-size: 13px; color: var(--dim); }
+.sp-tok.marker.verdeckt { opacity: .8; }
+/* Während des Tracks bereitlegen, Kampfmusik, Text des Tracks */
+.sp-bereit { margin: 14px 0; padding: 10px 14px; border: 1px dashed #5a4a8a; border-radius: 8px; background: #1c1a26; font-family: var(--ui); }
+.sp-bereit h4 { margin: 0 0 4px; color: #c9b6ff; } .sp-bereit h5 { margin: 8px 0 2px; font-size: 14px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.sp-bereit ul { margin: 0; padding-left: 20px; font-size: 16px; } .sp-bereit small { color: var(--dim); }
+.sp-musik { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; } .sp-musik > span { font: 700 13px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: #c9b6ff; }
+.sp-tracktext { margin: 8px 0; font-family: var(--ui); } .sp-tracktext summary { cursor: pointer; color: var(--dim); font-size: 14px; }
+.sp-tracktext p { white-space: pre-line; font-family: var(--serif, Georgia, serif); font-size: 17px; line-height: 1.5; color: var(--ink); margin: 6px 0 0; max-width: 70ch; }
+.sp-cue em.fehlt { color: #ff8a1f; font-style: normal; }
+/* NPC: was die Helden herausgekitzelt haben (abhaken), Antworten auf ihre Fragen */
+.sp-wissen { display: grid; gap: 6px; } .sp-wissen label { display: flex; gap: 10px; align-items: flex-start; padding: 6px 8px; border: 1px solid #2e3038; border-radius: 8px; cursor: pointer; }
+.sp-wissen label.an { border-color: #3f6a3a; background: #17251a; } .sp-wissen input { margin-top: 6px; width: 18px; height: 18px; flex: none; }
+.sp-wissen span { display: grid; gap: 2px; } .sp-wissen b { font: 700 15px var(--ui); } .sp-wissen .sp-lies { margin: 2px 0; font-size: 16px; }
+.sp-wissen small { font: 13px var(--ui); color: var(--dim); } .sp-wissen em { font: 600 13px var(--ui); color: var(--brass); font-style: normal; } .sp-wissen label.an em { color: #9fe08f; }
+.sp-fragen p { margin: 0 0 8px; font-size: 16px; } .sp-fragen small { display: block; font: 13px var(--ui); color: var(--dim); }
+.sp-zeile-uhr { display: flex; align-items: center; gap: 4px; } .sp-zeile-uhr .sp-uhr { padding: 0 4px; font-size: 13px; }
+.sp-gespeichert { font-variant-numeric: tabular-nums; } .sp-gespeichert.fehler { color: #ff8a1f; border-color: #ff8a1f; }
+/* Was aus der letzten Map übernommen wurde / ob die Map abgeschlossen ist */
+.sp-uebernahme { display: grid; gap: 2px; margin: 10px 0; padding: 10px 14px; border: 1px solid #3f6a3a; border-radius: 8px; background: #17251a; font-family: var(--ui); }
+.sp-uebernahme b { color: #9fe08f; font-size: 16px; } .sp-uebernahme span { color: var(--ink); font-size: 15px; }
+.sp-uebernahme.offen { border-color: #6a5a2a; background: #2a2416; } .sp-uebernahme.offen b { color: var(--brass); }
 /* Zug, Haken, Verhaltenswurf, Sporen */
 .sp-zug em { font-size: 14px; color: var(--brass); }
 .sp-hak { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font: 800 13px var(--ui); cursor: pointer; flex-shrink: 0; }
