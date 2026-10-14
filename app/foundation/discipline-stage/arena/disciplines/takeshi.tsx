@@ -18,11 +18,31 @@
 // Mockup. Die Laeufer faechern breiter quer zur Route (`lane`), damit sie bei aehnlichem
 // Fortschritt nicht mehr aufeinander stapeln.
 // =====================================================================================
+//
+// K2 (Konzeptrunde 14.10., Task #111/Punkt 10, `docs/design/takeshi-uebersicht-konzept-
+// 14-10.md`): Chris, 13.10., "bisher wirkt es sehr unübersichtlich mit den ganzen
+// Teilnehmern ... nacheinander ist auch doof". Zwei der drei dort geprüften Wege, beide
+// Klasse A (reine Anzeige, kein `rr()`, kein neues Sim-Feld, rho bit-identisch):
+//
+//   T-Ü3 STRECKENBAND: ein schmales Band über dem Bild zeigt die Strecke als gerade
+//   Linie mit den zehn Fallen-Positionen und jeden Läufer als Punkt in Teamfarbe — die
+//   Gesamtlage bleibt auch dann lesbar, wenn das Hauptbild irgendwann einmal ein
+//   Ausschnitt ist (T-Ü1/T-Ü2, noch nicht gebaut, s. Konzeptpapier).
+//
+//   T-Ü1 HAUPTDARSTELLER (statischer Teil, OHNE Kamera-Schnitt/Crop — der bleibt offen,
+//   s. Konzeptpapier Frage 1): drei bis vier Läufer (Führender, eigener Bester, wer
+//   gerade an einer Falle hängt, wer die Burg erreicht hat) bekommen einen dauerhaften
+//   Namens-Schriftzug; alle anderen werden kleiner und entsättigt gezeichnet (Figur in
+//   Teamfarbe bleibt sichtbar, tritt aber zurück). `tokenRankScale` (benchmark.tsx)
+//   skaliert zwar schon nach Rang, unterscheidet aber nicht nach ERZÄHL-Rolle (wer
+//   gerade an einer Falle hängt, kann weit hinten liegen) — das holt diese Auswahl nach.
+// =====================================================================================
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT, Vec2 } from "./types";
 import { useTokenGlide, tokenRef, GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
+import { teamPrimaryColor } from "@/lib/foundation/team-colors";
 
 // Deterministischer Hash fuer prozedurale Deko (Zuschauer/Wimpel/Boeden) — EINE Quelle
 // statt der frueher doppelten Inline-Kopie in crowd()/bunting().
@@ -70,6 +90,12 @@ const FALLEN: { typ: string; label: string }[] = [
   { typ: "raeder", label: "High Rollers" },
   { typ: "spitzen", label: "Final Fall" },
 ];
+
+// Die zehn Fallen-Bogenlängen-Bruchteile als EIN Array (vorher zweimal inline dieselbe
+// Formel: einmal in der fallenPunkte-Berechnung, einmal in der gluehIdx-Schleife). Reiner
+// Bruchteil 0…1, unabhängig vom gezeichneten Pfad — darum auch fürs Streckenband (T-Ü3,
+// s. Kopfkommentar) nutzbar, ohne auf den Mess-Pfad (pathRef/getPointAtLength) zu warten.
+const FALLEN_FRACS: number[] = FALLEN.map((_, i) => 0.05 + (i / (FALLEN.length - 1)) * 0.9);
 
 type PfadPunkt = Vec2 & { nx: number; ny: number };
 
@@ -177,7 +203,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
     // Zehn Fallenpositionen, gleichmaessig ueber die Route verteilt (5 %…95 % Laenge,
     // damit keine auf Start/Ziel selbst faellt).
     const fallen = FALLEN.map((_, i) => {
-      const frac = 0.05 + (i / (FALLEN.length - 1)) * 0.9;
+      const frac = FALLEN_FRACS[i]!;
       const L = frac * PER;
       const p = path.getPointAtLength(L);
       const p2 = path.getPointAtLength(Math.min(PER, L + 2));
@@ -197,10 +223,49 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
   let gluehIdx = -1;
   if (fallenPunkte.length) {
     for (let i = 0; i < FALLEN.length; i++) {
-      const frac = 0.05 + (i / (FALLEN.length - 1)) * 0.9;
+      const frac = FALLEN_FRACS[i]!;
       if (frac <= fuehrenderFrac + 0.015) gluehIdx = i;
     }
   }
+
+  // ---- T-Ü1 (statisch) — welche drei bis vier Läufer sind "Hauptdarsteller"? ---------
+  // Konzeptpapier 14.10., T-Ü1: Führender, eigener Bester, wer an einer Falle hängt, wer
+  // die Burg erreicht hat. Reine Ableitung aus bereits vorhandenen Großen (animScore,
+  // isOwn, FALLEN_FRACS) — kein neuer Zufallszug, nichts davon fließt in `score`/`rank`
+  // zurück (die Auswahl LIEST nur, schreibt nie). `sorted`-Reihenfolge macht die Auswahl
+  // bei Gleichstand deterministisch.
+  const trackFrac = (t: RT): number => normVonScore(t.animScore);
+  const leadIdxs = new Set<number>();
+  if (sorted[0]) leadIdxs.add(sorted[0].idx); // Führender
+  const ownBest = sorted.find((t) => t.isOwn);
+  if (ownBest) leadIdxs.add(ownBest.idx); // eigener Bester
+  // Wer haengt gerade an einer Falle? Kleinster positiver Abstand zur naechsten NOCH
+  // NICHT passierten Falle — "haengen" heisst: kurz davor, nicht laengst durch.
+  let obstacleBest: { idx: number; gap: number } | null = null;
+  for (const t of sorted) {
+    if (leadIdxs.has(t.idx)) continue;
+    const frac = trackFrac(t);
+    if (frac >= 0.98) continue; // schon auf dem Weg zur Burg, zaehlt unten
+    let gap = Infinity;
+    for (const f of FALLEN_FRACS) if (f > frac) gap = Math.min(gap, f - frac);
+    if (gap !== Infinity && (!obstacleBest || gap < obstacleBest.gap)) obstacleBest = { idx: t.idx, gap };
+  }
+  if (obstacleBest) leadIdxs.add(obstacleBest.idx);
+  // Wer hat die Burg erreicht (am weitesten vorn jenseits der letzten Falle)?
+  const castleArrived = sorted.find((t) => !leadIdxs.has(t.idx) && trackFrac(t) >= 0.98);
+  if (castleArrived) leadIdxs.add(castleArrived.idx);
+
+  // T-Ü3 Streckenband — Geometrie der geraden Übersichtslinie (s. Kopfkommentar).
+  const bandX0 = 56;
+  const bandX1 = W - 56;
+  const bandY = 8;
+
+  // T-Ü1 Zeichenreihenfolge: wie bisher Rang 1 zuletzt (oben), Hauptdarsteller zusätzlich
+  // ganz ans Ende, damit sie nie von der (jetzt kleineren) Masse überdeckt werden.
+  const reihenfolgeToken = sorted.slice().reverse();
+  const tokenMasse = reihenfolgeToken.filter((t) => !leadIdxs.has(t.idx));
+  const tokenHauptdarsteller = reihenfolgeToken.filter((t) => leadIdxs.has(t.idx));
+  const tokenZeichenreihenfolge = [...tokenMasse, ...tokenHauptdarsteller];
 
   // Hilfsfunktionen für Course-Artwork
   const crowd = (): string => {
@@ -475,6 +540,50 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
         </text>
       ) : null}
 
+      {/* T-Ü3 STRECKENBAND (s. Kopfkommentar): die Strecke als GERADE Linie (Bruchteil
+          0…1 aus FALLEN_FRACS/animScore, nicht der gezeichnete Serpentinen-Pfad) über dem
+          Bild — jeder Läufer ein Punkt in Teamfarbe, die zehn Fallen als Striche. Zeigt die
+          Gesamtlage unabhängig davon, wo die Kamera gerade hinschaut/wie eng sie zeigt;
+          deshalb absolut positioniert (kein `translate(0 -24)`) und NACH dem Parcours,
+          aber VOR den Läufer-Tokens gezeichnet — die Burg (oben rechts im Hauptbild) bleibt
+          frei, s. Q5-Regel „Overlay darf die Strecke nicht verdecken". Reine Ableitung aus
+          bereits vorhandenen Großen, kein `rr()`, nichts davon fließt zurück in score/rank. */}
+      <g aria-label="Streckenübersicht">
+        <rect x={0} y={0} width={W} height={16} fill="rgba(8,11,16,.4)" />
+        <line x1={bandX0} y1={bandY} x2={bandX1} y2={bandY} stroke="rgba(255,255,255,.5)" strokeWidth={1.4} />
+        <text x={bandX0 - 8} y={bandY + 3.5} textAnchor="end" fontSize={9} fill="rgba(255,255,255,.7)">
+          🏁
+        </text>
+        <text x={bandX1 + 10} y={bandY + 3.5} textAnchor="start" fontSize={9}>
+          🏯
+        </text>
+        {/* Fallen-Striche — die geglühte (gerade passierte) etwas kräftiger. */}
+        {FALLEN_FRACS.map((f, i) => (
+          <line
+            key={`bandfalle-${i}`}
+            x1={bandX0 + f * (bandX1 - bandX0)}
+            y1={bandY - 4.5}
+            x2={bandX0 + f * (bandX1 - bandX0)}
+            y2={bandY + 4.5}
+            stroke={i === gluehIdx ? "#7ee089" : "rgba(255,255,255,.55)"}
+            strokeWidth={i === gluehIdx ? 2.4 : 1.4}
+          />
+        ))}
+        {/* Jeder Läufer als Punkt — ALLE `rt`, nicht nur die Hauptdarsteller: das
+            Band ist das Rückgrat ("wer liegt wo"), die Masse bleibt hier sichtbar. */}
+        {rt.map((t) => (
+          <circle
+            key={`banddot-${t.code}`}
+            cx={bandX0 + trackFrac(t) * (bandX1 - bandX0)}
+            cy={bandY}
+            r={t.isOwn ? 3 : 2}
+            fill={teamPrimaryColor(t.code)}
+            stroke={t.isOwn ? "#fff" : "rgba(10,12,18,.65)"}
+            strokeWidth={t.isOwn ? 1.4 : 0.8}
+          />
+        ))}
+      </g>
+
       {/* Ghost + Läufer im selben −24-Versatz wie die Strecke (sonst laufen sie neben dem Band). */}
       <g transform="translate(0 -24)">
       {/* Ghost der Vorrunde (Benchmark) — VOR den Läufern. */}
@@ -482,35 +591,60 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
 
       {/* Tokens: 32 Läufer auf dem Pfad — Position via rAF (animScore, Benchmark-Sync).
           Requisiten: keine Kosmetikwaffen — TokenChrome (benchmark.tsx) zeichnet nur Logo/
-          Rahmen/Ringe/Rang-Badge, keine Waffenebene; dieses Feld fuegt selbst keine hinzu. */}
-      {sorted
-        .slice()
-        .reverse()
-        .map((t) => {
-          const r = tokenRadius(t, geo);
-          const glowing = t.glowUntil > now;
-          return (
-            <g
-              key={t.code}
-              data-token-code={t.code}
-              ref={tokenRef(gRefs, t, localTokenPos)}
-              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
-              onMouseEnter={() => openHover(t.idx)}
-              onMouseLeave={scheduleHoverClose}
-              onClick={() => {
-                if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
-              }}
-            >
-              {/* Führungs-/Glow-Puls (bespoke FX) */}
-              {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
-              {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge + 🏆.
-                  Etikett (Rang-Badge) zeigt TokenChrome bereits nur fuer eigenes Team/Top-3/
-                  Hover — bei 32 Laeufern also fuer die wenigsten, keine zusaetzliche Aenderung
-                  hier noetig (s. Kommentar `showBadge` in benchmark.tsx). */}
-              <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} />
-            </g>
-          );
-        })}
+          Rahmen/Ringe/Rang-Badge, keine Waffenebene; dieses Feld fuegt selbst keine hinzu.
+
+          T-Ü1 (statisch, s. Kopfkommentar): die vier Hauptdarsteller (leadIdxs) bleiben in
+          normaler Chrome-Größe und bekommen zusätzlich einen Namens-Schriftzug; alle
+          anderen werden kleiner (0,62×) UND entsättigt (CSS-Filter, wirkt auf Logo+Rahmen
+          gleichermassen) gezeichnet — reine Darstellungs-Props, `score`/`rank` unberührt.
+          Zusätzlich an das Ende der Zeichenreihenfolge verschoben, damit kein Hauptdarsteller
+          von der (jetzt kleineren) Masse überdeckt wird, unabhängig vom eigenen Rang. */}
+      {tokenZeichenreihenfolge.map((t) => {
+        const isLead = leadIdxs.has(t.idx);
+        const chromeRadius = isLead ? undefined : geo.r * 0.62;
+        const r = tokenRadius(t, geo, chromeRadius);
+        const glowing = t.glowUntil > now;
+        return (
+          <g
+            key={t.code}
+            data-token-code={t.code}
+            data-lead={isLead ? "1" : undefined}
+            ref={tokenRef(gRefs, t, localTokenPos)}
+            style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default", opacity: isLead ? 1 : 0.6, filter: isLead ? undefined : "saturate(0.35) brightness(0.92)" }}
+            onMouseEnter={() => openHover(t.idx)}
+            onMouseLeave={scheduleHoverClose}
+            onClick={() => {
+              if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
+            }}
+          >
+            {/* Führungs-/Glow-Puls (bespoke FX) */}
+            {glowing ? <circle r={r + 8} fill="none" stroke="var(--nl-warn)" strokeWidth={4} style={{ animation: reducedMotion ? "none" : "olyGlowPulse 1.1s ease-in-out infinite" }} /> : null}
+            {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge + 🏆.
+                Etikett (Rang-Badge) zeigt TokenChrome bereits nur fuer eigenes Team/Top-3/
+                Hover — bei 32 Laeufern also fuer die wenigsten, keine zusaetzliche Aenderung
+                hier noetig (s. Kommentar `showBadge` in benchmark.tsx). */}
+            <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} radius={chromeRadius} />
+            {/* Hauptdarsteller-Namensschriftzug (T-Ü1) — dauerhaft, nicht nur bei Hover,
+                klar oberhalb von Pokal(-(r+9))/Rel-Label(-(r+7))/Rang-Badge(r+13) platziert. */}
+            {isLead ? (
+              <text
+                data-testid="hauptdarsteller-name"
+                y={-(r + 22)}
+                textAnchor="middle"
+                fontFamily="ui-monospace,Menlo,monospace"
+                fontSize={10.5}
+                fontWeight={800}
+                fill="#fff"
+                stroke="rgba(10,12,18,.85)"
+                strokeWidth={2.6}
+                paintOrder="stroke"
+              >
+                {t.name.length > 16 ? `${t.name.slice(0, 15)}…` : t.name}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
       </g>
     </>
   );
