@@ -797,7 +797,7 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     const m = motor2(), s = m.neu();
     for (let i = 0; i < 120 && s.schritt !== "ende-map2"; i++) {
       const st = (MAP2.schritte as Record<string, { typ: string; optionen?: Array<{ taste: string; eingabe?: unknown }> }>)[s.schritt];
-      if (st.typ === "wahl") { const o = st.optionen!.find(x => !x.eingabe) || st.optionen![0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
+      if (st.typ === "wahl") { const opts = (m as unknown as { optionen(s: Spielstand): Array<{ taste: string; eingabe?: unknown }> }).optionen(s); const o = opts.find(x => !x.eingabe) || opts[0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
     }
     expect(s.schritt).toBe("ende-map2");
     expect(s.gegner.filter(g => (g as { id: string }).id === "gemeinde")).toHaveLength(0);

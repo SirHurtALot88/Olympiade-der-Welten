@@ -1127,7 +1127,8 @@
       if (t.dataset.stand) { await oeffne(t.dataset.stand); return; }
       switch (t.dataset.sp) {
         case "neu": await neuerAbend(); break;
-        case "abschliessen": tue(() => motor.abschliessen(stand)); melde("Map abgeschlossen. Die nächste Map übernimmt alles von selbst."); break;
+        // Der Abschluss geht sofort auf den Server, nicht erst nach der kurzen Pause wie andere Änderungen
+        case "abschliessen": tue(() => motor.abschliessen(stand)); await speichere(); melde(naechsteMap() ? "Map abgeschlossen. Die nächste Map übernimmt alles von selbst." : "Map abgeschlossen und gespeichert."); break;
         case "naechste-map": { const nm = naechsteMap(); if (!nm) break; await speichere(); const u = stand.uebernahme || motor.uebernahme(stand); stoppe(); await neuerAbend({ map: nm.map, uebernahme: u, gruppeId: stand.gruppeId, schwierigkeit: stand.schwierigkeit }); break; }
         case "speichern": await speichere(); if (gespeichert && gespeichert.ok) melde("Gespeichert."); break;
         case "weiter": weiter(); break;
@@ -1180,7 +1181,7 @@
       if (k === " " || k === "Enter") {
         e.preventDefault();
         if (kampfOffen(s)) melde("Der Kampf läuft noch. Ziel per Aktion oder Schaden erreichen, oder unten „Weiter“ klicken.");
-        else if (s && s.typ === "ende" && !motor.naechsterId(stand)) { if (!stand.fertig) { tue(() => motor.abschliessen(stand)); melde("Map abgeschlossen. Die nächste Map übernimmt alles von selbst."); } }
+        else if (s && s.typ === "ende" && !motor.naechsterId(stand)) { if (!stand.fertig) { tue(() => motor.abschliessen(stand)); speichere(); melde(naechsteMap() ? "Map abgeschlossen. Die nächste Map übernimmt alles von selbst." : "Map abgeschlossen und gespeichert."); } }
         else weiter();
         return;
       }

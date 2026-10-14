@@ -2377,7 +2377,19 @@
       "anhaenger_gezeigt": true
      },
      "folge": "Die Tür geht auf, kein Lärm. Hedda hat den Anhänger gesehen: Geduld +1.",
-     "ziel": "falltuer-anhaenger"
+     "ziel": "falltuer-anhaenger",
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "nicht": true
+       }
+      ]
+     }
     },
     {
      "taste": "2",
@@ -2559,7 +2571,19 @@
       "geduld": 1
      },
      "folge": "Sie erkennt ihn sofort. Geduld +1. Sie will trotzdem erst hören, was im Wald war, bevor sie ihn nimmt.",
-     "ziel": "hedda-ansprache-3"
+     "ziel": "hedda-ansprache-3",
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "nicht": true
+       }
+      ]
+     }
     },
     {
      "taste": "4",
@@ -2651,7 +2675,19 @@
       "geduld": 1
      },
      "folge": "Sie versteht ohne Worte. Kellerschlüssel des Gemeindehauses (Zettel). Zählt als Wahrheit: Schmied und Harms bekannt. Geduld +1. Der Anhänger ist weg.",
-     "ziel": "hedda-tochter-3"
+     "ziel": "hedda-tochter-3",
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "nicht": true
+       }
+      ]
+     }
     },
     {
      "taste": "4",
@@ -2948,7 +2984,23 @@
       "atemzug": 1
      },
      "folge": "Kampf gegen sieben. Atemzug +1 (es dauert). Map 3: keine Verfolger, aber der Sohn des Bäckers fragt nach seinem Vater. Danach wieder diese Wahl.",
-     "ziel": "aufbau-kampf-erloesen"
+     "ziel": "aufbau-kampf-erloesen",
+     "wenn": {
+      "alle": [
+       {
+        "flag": "gemeinde_erloest",
+        "nicht": true
+       },
+       {
+        "flag": "gemeinde_wach",
+        "nicht": true
+       },
+       {
+        "flag": "gemeinde_tot",
+        "nicht": true
+       }
+      ]
+     }
     },
     {
      "taste": "4",
