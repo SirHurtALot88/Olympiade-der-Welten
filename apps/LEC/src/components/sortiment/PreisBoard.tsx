@@ -1,7 +1,7 @@
 "use client";
 
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardGap, boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks, formatQty } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -111,6 +111,10 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
         <thead>
           <tr>
             <th>Artikel</th>
+            <th className="r" title="Lagerbestand in Stück">Bestand</th>
+            <th className="r" title="Verkaufte Stück in 365 Tagen (darunter 90 Tage)">Verkäufe</th>
+            <th className="r" title="Durchschnittlicher Einkaufspreis je Stück laut Verkäufen (365 T)">Ø EK</th>
+            <th className="r" title="Durchschnittlicher Verkaufspreis je Stück (365 T)">Ø VK</th>
             <th className="r">Dein VK</th>
             <th>Empfohlener VK</th>
             <th className="r">Marktwert</th>
@@ -128,7 +132,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
             const v = imageVersions[row.articleId];
             return (
               <tr key={row.articleId} onClick={() => onOpen(row.articleId)}>
-                <td>
+                <td className="bd-c-art">
                   <div className="bd-art">
                     {v ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -168,25 +172,38 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                     </div>
                   </div>
                 </td>
-                <td data-label="Dein VK" className="r bd-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
+                <td data-label="Bestand" className="r bd-num bd-c-stock">
+                  {row.stock > 0 ? formatQty(row.stock) : <span className="bd-none">0</span>}
+                </td>
+                <td data-label="Verkäufe 365 T" className="r bd-num bd-c-sales" title="Verkäufe in 365 Tagen, darunter in 90 Tagen">
+                  {formatQty(row.windows["365"]?.qty ?? 0)}
+                  <small className="bd-sub90"> · 90 T: {formatQty(row.windows["90"]?.qty ?? 0)}</small>
+                </td>
+                <td data-label="Ø EK" className="r bd-num bd-c-ek">
+                  {row.ek > 0 ? eur(row.ek) : <span className="bd-none">—</span>}
+                </td>
+                <td data-label="Ø VK" className="r bd-num bd-c-avg">
+                  {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
+                </td>
+                <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
                   <EbayLink row={row} />
                 </td>
-                <td data-label="Empfohlener VK">
+                <td data-label="Empfohlener VK" className="bd-c-rec">
                   <PriceRange row={row} />
                 </td>
-                <td data-label="Marktwert" className="r bd-num" title={m ? marketTitle(m) : undefined}>
+                <td data-label="Marktwert" className="r bd-num bd-c-mk" title={m ? marketTitle(m) : undefined}>
                   {m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${formatEuroCents(m.range.max)} €` : <span className="bd-none">—</span>}
                 </td>
                 <td
                   data-label="Marge bei Nachkauf"
-                  className="r bd-num"
+                  className="r bd-num bd-c-margin"
                   style={{ color: m?.margin == null ? undefined : m.margin < 0 ? "var(--crit)" : m.margin < 0.25 ? "var(--warn)" : "var(--good)" }}
                 >
                   {m?.margin != null ? `${formatPercent(m.margin)} %` : <span className="bd-none">—</span>}
                 </td>
-                <td data-label="Urteil">
+                <td data-label="Urteil" className="bd-c-verdict">
                   <VerdictBadge row={row} />
                 </td>
               </tr>
@@ -194,7 +211,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
           })}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={6} className="bd-empty">
+              <td colSpan={10} className="bd-empty">
                 Keine Artikel für diese Auswahl.
               </td>
             </tr>

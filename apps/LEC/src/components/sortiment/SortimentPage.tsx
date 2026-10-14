@@ -231,6 +231,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
   const [showDiscontinued, setShowDiscontinued] = useState(false);
+  // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
+  // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
+  const [showNoStock, setShowNoStock] = useState(false);
+  const stockKnown = useMemo(() => rows.some((r) => r.stock > 0), [rows]);
+  const stockFilter = !showNoStock && stockKnown;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [sort, setSort] = useState<{ colId: ColId; dir: "asc" | "desc" }>({ colId: "verkaeufe", dir: "desc" });
 
@@ -328,8 +333,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (!showDiscontinued) {
       result = result.filter((r) => r.active);
     }
+    if (stockFilter) {
+      result = result.filter((r) => r.stock > 0);
+    }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -341,11 +349,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   }, [filtered, sort, selectedWindow]);
 
   // Zaehler je Markt-Filter ueber die aktiven Artikel (ohne die anderen Filter), damit man sieht, wie viele es sind.
-  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active).map((r) => r.market)), [rows]);
+  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -475,6 +483,19 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         >
           Name ≠ Code
         </button>
+        {stockKnown && (
+          <button
+            type="button"
+            className={`chip${showNoStock ? " on" : ""}`}
+            onClick={() => {
+              setShowNoStock((v) => !v);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            title="Standard: nur Artikel mit Bestand. Einschalten, um auch Artikel ohne Bestand zu sehen."
+          >
+            auch ohne Bestand
+          </button>
+        )}
         <button
           type="button"
           className={`chip${showDiscontinued ? " on" : ""}`}

@@ -394,11 +394,13 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
   table.bd tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
   table.bd td { padding: 0; border: 0; text-align: left !important; }
   table.bd td::before { content: attr(data-label); display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); margin-bottom: 3px; }
-  table.bd td:nth-child(1) { grid-column: 1 / -1; order: 0; }
-  table.bd td:nth-child(1)::before { display: none; }
-  table.bd td:nth-child(3) { grid-column: 1 / -1; order: 1; }
-  table.bd td:nth-child(2) { order: 2; } table.bd td:nth-child(4) { order: 3; }
-  table.bd td:nth-child(5) { order: 4; } table.bd td:nth-child(6) { order: 5; }
+  table.bd td.bd-c-art { grid-column: 1 / -1; order: 0; }
+  table.bd td.bd-c-art::before { display: none; }
+  table.bd td.bd-c-rec { grid-column: 1 / -1; order: 1; }
+  table.bd td.bd-c-vk { order: 2; } table.bd td.bd-c-mk { order: 3; }
+  table.bd td.bd-c-margin { order: 4; } table.bd td.bd-c-verdict { order: 5; }
+  table.bd td.bd-c-stock { order: 6; } table.bd td.bd-c-sales { order: 7; }
+  table.bd td.bd-c-ek { order: 8; } table.bd td.bd-c-avg { order: 9; }
   .bd-range { max-width: none; min-width: 0; width: 100%; }
   .bd-track { width: 100%; }
   .bd-art { min-width: 0; }
@@ -491,3 +493,17 @@ button.bd-bar-seg:hover { filter: brightness(1.2); }
 .bd-dt-warn { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
 .bd-dt-good { background: var(--good-bg); color: var(--good); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; margin: 12px 0 0; }
 .bd-dt-note { background: var(--panel2); color: var(--muted); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; margin: 12px 0 0; }
+
+.bd-sub90 { display: block; font-size: 10.5px; color: var(--faint); font-weight: 400; }
+
+/* ---- Board straffen, damit mit den Zahlenspalten nichts abgeschnitten wird (ab Handy-Breite unveraendert) ---- */
+@media (min-width: 761px) {
+  table.bd th { padding: 10px 8px; }
+  table.bd td { padding: 10px 8px; }
+  .bd-art { min-width: 170px; gap: 10px; }
+  .bd-name { max-width: 190px; }
+  .bd-range { min-width: 150px; max-width: 200px; }
+  .bd-vk { font-size: 13.5px; }
+  .bd-ebay { margin-left: 4px; padding: 0 4px; }
+  .bd-c-stock, .bd-c-sales, .bd-c-ek, .bd-c-avg { font-size: 12.5px; }
+}

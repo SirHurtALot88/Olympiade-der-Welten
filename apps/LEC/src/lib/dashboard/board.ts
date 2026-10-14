@@ -30,13 +30,15 @@ export function boardGap(row: SortimentRow): BoardGap | null {
   return { euro: 0, percent: 0, target: null };
 }
 
-export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "name";
+export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "name";
 
 export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   abweichung: "Größte Abweichung",
   marktwert: "Marktwert",
   vk: "Dein VK",
   marge: "Marge bei Nachkauf",
+  verkaeufe: "Verkäufe (365 T)",
+  bestand: "Bestand",
   name: "Name",
 };
 
@@ -68,6 +70,10 @@ export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): Sor
         return boardVk(b) - boardVk(a) || byName(a, b);
       case "marge":
         return (a.market?.margin ?? 9) - (b.market?.margin ?? 9) || byName(a, b);
+      case "verkaeufe":
+        return (b.windows["365"]?.qty ?? 0) - (a.windows["365"]?.qty ?? 0) || byName(a, b);
+      case "bestand":
+        return b.stock - a.stock || byName(a, b);
       case "name":
         return byName(a, b);
     }
@@ -143,4 +149,9 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
     revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
     search: `${SHOP}?_nkw=${encodeURIComponent(term)}`,
   };
+}
+
+/** Mengen ohne Nachkommastellen, wenn ganz; sonst auf zwei Stellen (krumme Mengen sollen auffallen). */
+export function formatQty(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(".", ",");
 }
