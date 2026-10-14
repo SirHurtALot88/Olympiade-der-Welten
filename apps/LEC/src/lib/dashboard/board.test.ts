@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SortimentMarket, SortimentRow } from "./viewModel";
-import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks } from "./board";
+import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks, formatQty } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
@@ -97,5 +97,19 @@ describe("ebayLinks", () => {
     const l = ebayLinks({ ebayItemId: "abc", setCode: null, nameRaw: "Karte & Co" });
     expect(l.view).toBeNull();
     expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=Karte%20%26%20Co");
+  });
+});
+
+describe("Verkaeufe, Bestand, Mengen", () => {
+  const r = (name: string, qty365: number, stock: number) =>
+    ({ nameRaw: name, stock, windows: { "365": { qty: qty365 } }, listingVk: 1, avgVkRealized: 0, market: null }) as unknown as SortimentRow;
+  it("sortiert nach Verkaeufen (365 T) und nach Bestand absteigend, bei Gleichstand nach Name", () => {
+    const rows = [r("B", 5, 1), r("A", 51, 0), r("C", 5, 9)];
+    expect(sortBoard(rows, "verkaeufe").map((x) => x.nameRaw)).toEqual(["A", "B", "C"]);
+    expect(sortBoard(rows, "bestand").map((x) => x.nameRaw)).toEqual(["C", "B", "A"]);
+  });
+  it("formatQty zeigt ganze Mengen ohne, krumme mit zwei Nachkommastellen", () => {
+    expect(formatQty(51)).toBe("51");
+    expect(formatQty(2762.67)).toBe("2762,67");
   });
 });
