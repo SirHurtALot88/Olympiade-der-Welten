@@ -57,7 +57,7 @@
    },
    {
     "titel": "Nachschub",
-    "text": "Am Ende jeder Runde, solange das Herz atmet: so viele Sporenlinge, wie die Atemzug-Leiste Striche hat, höchstens 6, verteilt auf A, B und C (auf Normal höchstens vier Mal). Dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei, auch auf der Flucht). Die App setzt alles in die Gegnerliste."
+    "text": "Am Ende jeder Runde, solange das Herz atmet: so viele Sporenlinge, wie die Atemzug-Leiste Striche hat, höchstens 4, verteilt auf A, B und C (auf Normal höchstens drei Mal). Dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei, auch auf der Flucht). Die App setzt alles in die Gegnerliste."
    },
    {
     "titel": "Verseuchte Fläche",
@@ -396,7 +396,7 @@
    "max": 6,
    "start": 4,
    "richtung": "hoch",
-   "text": "Aus Map 4 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. Im Finale bestimmt die Leiste den Nachschub (so viele Sporenlinge je Runde, höchstens 6) und wie leicht das Herz ausatmet (W6 kleiner oder gleich der Leiste). +1 nach der Map.",
+   "text": "Aus Map 4 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. Im Finale bestimmt die Leiste den Nachschub (so viele Sporenlinge je Runde, höchstens 4) und wie leicht das Herz ausatmet (W6 kleiner oder gleich der Leiste). +1 nach der Map.",
    "schlecht": "hoch",
    "jeStrich": {
     "titel": "Das Herz schlägt lauter",
@@ -918,7 +918,7 @@
    "karte": "v:giftmade",
    "kurz": "s",
    "info": "Kleinvieh aus dem Geflecht, so groß wie ein Hund. Das Herz atmet sie aus, so viele, wie die Atemzug-Leiste zeigt.",
-   "notiz": "Platzhalter Giftmade (25 P.). Nachschub am Rundenende, solange das Herz schlägt: so viele wie Striche auf der Atemzug-Leiste, höchstens 6 je Runde (mit zerstörter Quelle aus Map 1 höchstens 3), verteilt auf A, B und C. Ist die Glut überladen, kommen keine mehr.",
+   "notiz": "Platzhalter Giftmade (25 P.). Nachschub am Rundenende, solange das Herz schlägt: so viele wie Striche auf der Atemzug-Leiste, höchstens 4 je Runde (mit zerstörter Quelle aus Map 1 höchstens 2), auf Normal drei Runden lang, verteilt auf A, B und C. Ist die Glut überladen, kommen keine mehr.",
    "anblick": "Ein Klumpen aus Moos und Wurzeln auf sechs dünnen Beinen. Vorn ein Loch, das sich öffnet und schließt, im Takt des Herzens.",
    "zustandSaetze": {
     "unverletzt": "Es zuckt nicht einmal.",
@@ -1231,14 +1231,14 @@
      "anzahl": {
       "leiste": "atemzug",
       "min": 0,
-      "max": 6
+      "max": 4
      },
      "zone": "A"
     }
    ],
-   "hoechstens": 4,
+   "hoechstens": 3,
    "skaliert": true,
-   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt (höchstens 6). Verteile sie auf die Feindzonen A, B und C."
+   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt (höchstens 4). Verteile sie auf die Feindzonen A, B und C."
   },
   {
    "wenn": {
@@ -1267,14 +1267,14 @@
      "anzahl": {
       "leiste": "atemzug",
       "min": 0,
-      "max": 3
+      "max": 2
      },
      "zone": "A"
     }
    ],
-   "hoechstens": 4,
+   "hoechstens": 3,
    "skaliert": true,
-   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt, ohne die Quelle aber höchstens 3. Verteile sie auf die Feindzonen A, B und C."
+   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt, ohne die Quelle aber höchstens 2. Verteile sie auf die Feindzonen A, B und C."
   },
   {
    "wenn": {
@@ -1767,7 +1767,10 @@
       "setzt": {
        "glut_ueberladen": true,
        "ueberladen_von": "held"
-      }
+      },
+      "leistenAn": [
+       "glut"
+      ]
      }
     ]
    }
@@ -1821,7 +1824,10 @@
       "setzt": {
        "glut_ueberladen": true,
        "ueberladen_von": "ueberlebender"
-      }
+      },
+      "leistenAn": [
+       "glut"
+      ]
      }
     ]
    }
@@ -1937,7 +1943,7 @@
     "Die leeren Rüstungen: 5 Figuren (Rubric Marines der Thousand Sons passen), dazu der Rufer (Sorcerer). Zwei Rüstungen und der Rufer stehen am Anfang, die anderen kommen je Rundenende",
     "Der Überlebende, falls die Folgen unten ihn nennen: eine große Figur in schwerer Rüstung (ein Space Marine passt)",
     "Das Herz: ein großes Stück Gelände (Wurzeln, Stein, was du hast), in der Mitte etwas Rotes oder ein Licht für die Glut, davor 3 Adern (Wurzelstücke oder Marker)",
-    "Sporenlinge: bis zu 6 je Runde, über den Abend eher 12 bis 20 (Platzhalter Giftmade)",
+    "Sporenlinge: bis zu 4 je Runde, über den Abend höchstens 12 bis 14 (Platzhalter Giftmade)",
     "2 Figuren für Befallene aus dem Gemeindehaus, falls die Folgen unten sie nennen",
     "Filz für verseuchte Flächen: die Herzkammer und mehr, denn das Herz atmet aus",
     "Gelände: 2 Wurzelwände, eine glatte Wand, Werktisch, Glastank, Trümmer, Pilze. Frei hinstellen, wichtig sind Herz, Adern, Zonen, Trümmer, Schacht und Start",
@@ -2073,7 +2079,7 @@
      "text": "Die Helden kennen Lenes Namen. Wenn das Herz schlägt, flüstert es ihn zwischen ihren eigenen. Nur Stimmung."
     },
     {
-     "text": "Die Atemzug-Leiste aus Map 4 zählt in diesem Kampf: so viele Sporenlinge kommen je Runde nach (höchstens 6), und so leicht atmet das Herz aus (W6 kleiner oder gleich der Leiste)."
+     "text": "Die Atemzug-Leiste aus Map 4 zählt in diesem Kampf: so viele Sporenlinge kommen je Runde nach (höchstens 4), und so leicht atmet das Herz aus (W6 kleiner oder gleich der Leiste)."
     },
     {
      "wenn": {
@@ -2301,7 +2307,7 @@
    "hinweise": [
     "Gegnerzug: vor jeder Gegnergruppe G. 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn: die Helden); ein befallener Held (ab 3 Sporenpunkten) schon bei 4. Dann Verhaltenswürfel, wütende Tabelle.",
     "Rundenende: R, dann gleich H. Ausatmen: W6 kleiner oder gleich der Atemzug-Leiste, dann ist alles innerhalb einer Kartenbreite um das Herz verseucht, und jeder Held darin macht einen Qualitätstest (misslungen eine Kartenbreite auf das Herz zu).",
-    "Nachschub steht nach R in der Gegnerliste: Sporenlinge (so viele wie die Atemzug-Leiste, höchstens 6, verteilt auf A, B und C), dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei), am Ende von Runde 2 zwei Befallene aus dem Schacht, falls in Map 3 einer im Keller war.",
+    "Nachschub steht nach R in der Gegnerliste: Sporenlinge (so viele wie die Atemzug-Leiste, höchstens 4, verteilt auf A, B und C), dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei), am Ende von Runde 2 zwei Befallene aus dem Schacht, falls in Map 3 einer im Keller war.",
     "Adern: je Verteidigung 4+, Zäh 4; Feuertopf an eine Ader: F, +1 Treffer. Sind alle drei durch, liegt die Glutkammer offen (die App sagt es).",
     "Überladen: ein Held in Kontakt mit dem Herz, eine Aktion, X (W6 ab 5); der Überlebende Y (ab 3). Mit Protokoll +1 auf den Wurf. Misslungen: ein Treffer Hitze für den, der es versucht hat.",
     "Protokoll: vom Überlebenden gelesen (Taste 2) oder von einem Helden studiert (K, W6 ab 4): DS +1 gegen die Adern, an den Karten schon eingerechnet.",

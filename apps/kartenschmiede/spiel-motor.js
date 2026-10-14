@@ -568,6 +568,7 @@
         eintrag.probe.stufen.push({ ab: st.ab, bis: st.bis, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
         setze(state, st.setzt);
         aendere(state, st.leisten);
+        schalte(state, st.leistenAn, true);
         // Beute nur bei diesem Wurf (z. B. das Werkzeug, wenn der Griff gelingt)
         if (st.beute) eintrag.beute = [...(eintrag.beute || []), ...st.beute];
       }
