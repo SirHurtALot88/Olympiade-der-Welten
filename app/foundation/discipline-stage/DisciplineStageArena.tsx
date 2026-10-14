@@ -43,6 +43,7 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
+import { ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import type { DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 // PERF: Der Drawer (~1.300 Zeilen) zeigt bis zum ersten Team-/Spieler-Klick nichts an
@@ -697,6 +698,28 @@ export default function DisciplineStageArena({
     const map = new Map<string, string>();
     for (const player of gameState?.players ?? []) {
       map.set(player.id, player.name);
+    }
+    return map;
+  }, [gameState?.players]);
+
+  /**
+   * Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully, Chris 13.10. — docs/design/
+   * chris-feedback-breite-runde-13-10.md Abschnitt "Basketball" Punkt 21 / "Eishockey" Punkt
+   * 24): „die 2 größten Spieler oder die 'Centers'" sollen den Sprungball/Bully ausführen —
+   * dafür braucht die Arena eine Körpergröße je Spieler. `attributeSheetStats.height` ist bei
+   * vielen (insb. älteren) Spielern noch `null` (echte Werte kommen erst später von Chris, s.
+   * `lib/player-generator/provisional-height.ts`); `ermittleSpielerHoehe` ist dafür der EINZIGE
+   * vorgesehene sichere Zugriffspfad (echte Height, sonst Rasse/Subklassen-Schätzung) — betrifft
+   * NICHT die gesperrte Eignungsmatrix (`official-discipline-weights.ts`), height ist dort kein
+   * Attribut.
+   */
+  const playerHeightById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const player of gameState?.players ?? []) {
+      map.set(
+        player.id,
+        ermittleSpielerHoehe(player.attributeSheetStats?.height ?? null, player.race, player.subclasses),
+      );
     }
     return map;
   }, [gameState?.players]);
@@ -2068,6 +2091,9 @@ export default function DisciplineStageArena({
             // nicht nur den Team-Anteil.
             mutatorPpsBonus: p.mutatorPpsBonus,
             ovrRank: p.playerId ? ratingByPlayerId.get(p.playerId)?.ovrRank ?? null : null,
+            // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): Körpergröße für die
+            // "2 größten Spieler/Centers"-Auswahl in DisciplineStageNativeArena.tsx.
+            height: p.playerId ? playerHeightById.get(p.playerId) ?? null : null,
           })),
         }))
       : model.teams.map((t) => ({
@@ -2099,6 +2125,8 @@ export default function DisciplineStageArena({
             // bleibt konsequent null, wie pointsAwarded direkt darüber.
             mutatorPpsBonus: null as number | null,
             ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
+            // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): s. Engine-Zweig oben.
+            height: s.playerId ? playerHeightById.get(s.playerId) ?? null : null,
           })),
         }));
     /**
@@ -2159,6 +2187,7 @@ export default function DisciplineStageArena({
     endedDisciplineIds,
     ratingByPlayerId,
     computeStageSlotCount,
+    playerHeightById,
   ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
@@ -2209,6 +2238,9 @@ export default function DisciplineStageArena({
                 portraitUrl: p.portraitUrl,
                 mods: p.mods,
                 pointsAwarded: p.pointsAwarded,
+                // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): 1:1 durchgereicht aus
+                // der oben gebauten `teams`-Zwischenstufe → NativeStagePlayer.height.
+                height: p.height ?? null,
               },
         ),
       })),
