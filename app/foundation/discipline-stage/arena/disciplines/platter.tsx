@@ -35,6 +35,8 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
     openHover,
     scheduleHoverClose,
     onOpenTeam,
+    done,
+    glow,
   } = props;
 
   const trioSet = new Set(highlightIdxs ?? []);
@@ -55,6 +57,47 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
   const prevDisplayRef = useRef<Map<number, number>>(new Map());
   const [boards, setBoards] = useState<Map<number, { delta: number; total: number }>>(new Map());
   const [flipTick, setFlipTick] = useState(0);
+
+  // W-V8 "Die Zählung und der Gürtel" (Wettessen-Rework Politur, Chris 13.10., Fable-Konzept
+  // Abschnitt 6.3): nach Minute 10 drehen sich die Tafeln ein letztes Mal, langsam, in
+  // Reihenfolge der Rangliste von HINTEN nach VORN (statt alle zwölf im selben Takt wie bei
+  // W-V2) — dann bekommt der Beste den Gürtel. Reiner Leser auf `t.rank`/`done`, schreibt
+  // nichts. Das Host-Podest deckt das Feld ~3s nach Rundenende ab (s.
+  // DisciplineStageNativeArena.tsx, `later(showPodium, …)`) — dieses Zeitfenster ist genau
+  // die Bühne für die Zählung.
+  const finalSeqStartedRef = useRef(false);
+  const finalTimersRef = useRef<number[]>([]);
+  const [finalRevealed, setFinalRevealed] = useState<Set<number>>(new Set());
+  const [beltCode, setBeltCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!done || finalSeqStartedRef.current) return;
+    finalSeqStartedRef.current = true;
+    // Von hinten nach vorn (letzter Platz zuerst) — "die Jury zählt nach", nicht "alle auf
+    // einmal". Gesamtdauer bewusst roesterunabhängig auf ~2,6s gezielt (deckungsgleich mit
+    // dem ~3s-Puffer, den der Host vor dem Podest einräumt), damit sie bei zwölf Essern
+    // genauso fertig wird wie bei einem größeren Mock-Kader im Dev-Arena-Test.
+    const order = [...rt].sort((a, b) => b.rank - a.rank); // letzter Platz zuerst
+    const stepMs = reducedMotion || order.length === 0 ? 0 : Math.max(90, Math.min(260, 2600 / order.length));
+    order.forEach((t, i) => {
+      const id = window.setTimeout(() => {
+        setFinalRevealed((prev) => {
+          const next = new Set(prev);
+          next.add(t.idx);
+          return next;
+        });
+        setFlipTick((n) => n + 1);
+        glow(t);
+        if (t.rank === 1) setBeltCode(t.code);
+      }, i * stepMs);
+      finalTimersRef.current.push(id);
+    });
+    return () => {
+      finalTimersRef.current.forEach((id) => window.clearTimeout(id));
+      finalTimersRef.current = [];
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done]);
 
   // Banquet-Geometrie: Tisch-Bereich (oben/unten), Magen-Meter (unten)
   const top = layout.top ?? 18;
@@ -465,8 +508,12 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
               {/* W-V2 "Die Zahl gehört zum Esser": Zähltafel klappt minütlich/je Gang hoch
                   ("+7 · 31"), direkt über dem Esser statt am Bildschirmrand — alle zwölf im
                   selben Takt (key trägt flipTick: neuer key → React remounted → CSS-Flip
-                  spielt erneut). Kein Board vor der ersten Runde (noch nichts zu zeigen). */}
+                  spielt erneut). Kein Board vor der ersten Runde (noch nichts zu zeigen).
+                  Sobald der Wettkampf vorbei ist (`done`), übernimmt die W-V8-Zählung unten
+                  dieselbe Tafel-Stelle — die Runden-Tafel verschwindet dann, sonst zeigen
+                  beide gleichzeitig Zahlen übereinander. */}
               {(() => {
+                if (done) return null;
                 const board = boards.get(t.idx);
                 if (!board) return null;
                 const positive = board.delta >= 0;
@@ -492,6 +539,40 @@ export default function PlatterField(props: DisciplineFieldProps): ReactNode {
                   </g>
                 );
               })()}
+
+              {/* W-V8 "Die Zählung": nach Minute 10 klappt jede Tafel ein letztes Mal, aber
+                  LANGSAM und von hinten nach vorn (s. Effekt oben) — zeigt nur noch den
+                  Endstand, keine Delta-Zahl mehr. */}
+              {done && finalRevealed.has(t.idx) ? (
+                <g
+                  key={`final-${t.code}-${flipTick}`}
+                  data-testid="platter-final-board"
+                  transform={`translate(0 ${-r - 16})`}
+                  style={{
+                    transformOrigin: "center bottom",
+                    animation: reducedMotion ? "none" : "wettessenFlip 1.1s cubic-bezier(.22,.9,.3,1)",
+                  }}
+                  pointerEvents="none"
+                >
+                  <rect x={-24} y={-13} width={48} height={17} rx={3} fill="rgba(16,9,6,.92)" stroke="#f2c14e" strokeWidth={0.9} opacity={0.97} />
+                  <text x={0} y={-1} fontSize={8.5} fontWeight={900} fill="#f2c14e" textAnchor="middle">
+                    {fmt1(t.score)}
+                  </text>
+                </g>
+              ) : null}
+
+              {/* W-V8 "Der Gürtel": der Champion bekommt ihn umgelegt, sobald die Zählung bei
+                  ihm angekommen ist (letzter Schritt der Sequenz, s. Effekt oben). Seitlich
+                  gesetzt (nicht oben/unten) — oben sitzt die Zähltafel, unten wächst der
+                  Tellerstapel bis auf ~16px, beide Plätze sind also schon belegt. */}
+              {done && beltCode === t.code ? (
+                <g key={`belt-${t.code}`} data-testid="platter-belt" transform={`translate(${r + 30} 0)`} pointerEvents="none">
+                  <rect x={-25} y={-7} width={50} height={14} rx={7} fill="rgba(16,9,6,.9)" stroke="#f2c14e" strokeWidth={1} />
+                  <text x={0} y={3} fontSize={8} fontWeight={900} fill="#f2c14e" textAnchor="middle">
+                    🏅 GÜRTEL
+                  </text>
+                </g>
+              ) : null}
             </g>
           );
         })}
