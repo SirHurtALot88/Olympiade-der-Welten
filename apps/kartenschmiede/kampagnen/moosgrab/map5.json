@@ -2199,7 +2199,7 @@
    "typ": "regel",
    "titel": "Regeln für diese Map",
    "text": "Das Ziel ist das Herz, nicht die Gegner. Am Ende jeder Runde atmet es aus. Wer dann nah am Herzen steht, hört seinen Namen. Und eine Rast gibt es hier unten nicht.",
-   "gmNotiz": "Nicht ansagen, nur für dich: Erst die drei Adern, dann überladen (Held W6 ab 5, der Überlebende ab 3, Protokoll +1), dann läuft die Glut-Leiste: sechs Runden bis zum Schacht. Vor dem Zug jeder Gegnergruppe würfelst du, wen sie angreift (Taste G): 1 bis 3 Helden, 4 bis 6 der Überlebende, befallene Helden schon bei 4. Rundenende: R, dann H (Ausatmen gegen die Atemzug-Leiste), der Nachschub kommt von selbst. Wer seinen Zug auf verseuchter Fläche beendet: Qualitätstest, misslungen −1 auf Treffen bis Ende der nächsten Runde (wie in Map 1). Führt ein Spieler den Überlebenden, sag es ihm jetzt.",
+   "gmNotiz": "Nicht ansagen, nur für dich: Erst die drei Adern, dann überladen (Held W6 ab 5, der Überlebende ab 3, Protokoll +1), dann läuft die Glut-Leiste: sechs Runden bis zum Schacht. Vor dem Zug jeder Gegnergruppe würfelst du, wen sie angreift (Taste G): 1 bis 3 Helden, 4 bis 6 der Überlebende, befallene Helden schon bei 4. Rundenende: R. Das Ausatmen (W6 gegen die Atemzug-Leiste) und der Nachschub kommen von selbst. Wer seinen Zug auf verseuchter Fläche beendet: Qualitätstest, misslungen −1 auf Treffen bis Ende der nächsten Runde (wie in Map 1). Führt ein Spieler den Überlebenden, sag es ihm jetzt.",
    "weiter": "herz-schlaegt"
   },
   "herz-schlaegt": {
@@ -2297,7 +2297,7 @@
    "verhalten": {
     "start": "wuetend"
    },
-   "text": "Erst die drei Adern, dann die Glut überladen. Jede Gegnergruppe: erst G (wen sie angreift), dann Verhaltenswürfel. Rundenende: R, dann H (Ausatmen); der Nachschub kommt von selbst.",
+   "text": "Erst die drei Adern, dann die Glut überladen. Jede Gegnergruppe: erst G (wen sie angreift), dann Verhaltenswürfel. Rundenende: R; Ausatmen und Nachschub kommen von selbst.",
    "hinweise": [
     "Gegnerzug: vor jeder Gegnergruppe G. 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn: die Helden); ein befallener Held (ab 3 Sporenpunkten) schon bei 4. Dann Verhaltenswürfel, wütende Tabelle.",
     "Rundenende: R, dann gleich H. Ausatmen: W6 kleiner oder gleich der Atemzug-Leiste, dann ist alles innerhalb einer Kartenbreite um das Herz verseucht, und jeder Held darin macht einen Qualitätstest (misslungen eine Kartenbreite auf das Herz zu).",

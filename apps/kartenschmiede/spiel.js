@@ -308,7 +308,13 @@
   const gm = text => text ? `<p class="sp-gm">${esc(text)}</p>` : "";
   const taste = t => t ? `<kbd>${esc(t)}</kbd>` : "";
   // Probe-Stufe: „ab 5“ oder, für schlechte Würfe, „bei 1“ / „bei 1–2“
-  const stufeName = st => (st.bis ? `bei ${st.bis === 1 ? "1" : `1–${st.bis}`}` : `ab ${st.ab}`);
+  // Wann eine Probenstufe greift: ab einem Wurf, bis zu einem Wurf, oder bis zum Stand einer Leiste (Ausatmen gegen Atemzug)
+  const stufeName = st => {
+    const bis = st.bisLeiste ? ((stand.leisten || {})[st.bisLeiste] || {}).wert || 0 : st.bis;
+    const name = st.bisLeiste ? ` (${((map.leisten || {})[st.bisLeiste] || {}).name || st.bisLeiste})` : "";
+    if (st.bisLeiste && !bis) return `nie${name}`;
+    return bis ? `bei ${bis === 1 ? "1" : `1–${bis}`}${name}` : `ab ${st.ab || 1}`;
+  };
 
   // ---------- Uhr und Antreiber ----------
   const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
