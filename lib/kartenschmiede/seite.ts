@@ -64,6 +64,7 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("app.js").toString("utf8")),
     skript(lies("gruppe.js").toString("utf8")),
     skript(lies("szenarien.js").toString("utf8")),
+    skript(lies("vendor", "gelaende-symbole.js").toString("utf8")),
     skript(lies("szenarien-ui.js").toString("utf8")),
     skript(lies("spiel-motor.js").toString("utf8")),
     skript(`window.SPIELMODUS_MAPS=${JSON.stringify(SPIELMODUS_MAPS.map(datei => JSON.parse(lies("kampagnen", ...datei.split("/")).toString("utf8"))))};`),

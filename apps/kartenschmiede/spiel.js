@@ -30,7 +30,7 @@
     ["eine Kartenlänge", "Lange Seite einer Gegnerkarte, 15 cm (etwa 6 Zoll). So weit geht eine normale Bewegung."],
     ["zwei Kartenlängen", "30 cm (etwa 12 Zoll): Sprint, kurze Fernkampf-Reichweite."],
   ];
-  const FARBE = { held: "#6fb0ff", gegner: "#ff6a4a", figur: "#f2cf4a", tot: "#77736b" };
+  const FARBE = { held: "#6fb0ff", gegner: "#ff6a4a", freund: "#4fd1a5", figur: "#f2cf4a", tot: "#77736b" };
 
   let map = null, motor = null, stand = null, standId = null, karte = null;
   let staende = [], audio = {}, helden = [];
@@ -316,7 +316,7 @@
   // Abwechselnde Initiative: wer diese Runde schon dran war und wer als Nächstes aktiviert
   function zugHtml() {
     if (!stand.rundenAktiv) return "";
-    const akt = stand.aktiviert || {}, gegner = stand.gegner.filter(g => !g.weg && g.wunden < g.zaeh);
+    const akt = stand.aktiviert || {}, gegner = stand.gegner.filter(g => !g.weg && g.wunden < g.zaeh && !motor.istFreund(g.id));
     const h = helden.filter(x => akt[`held:${x.name}`]).length, g = gegner.filter(x => akt[`g:${x.uid}`]).length;
     if (!gegner.length) return "";
     const heldenFertig = h >= helden.length, gegnerFertig = g >= gegner.length;
@@ -697,7 +697,7 @@
       for (const f of motor.figurenAmTisch(stand)) { const p = pos[`f:${f.id}`]; if (p) teile.push(token(`f:${f.id}`, p.x, p.y, FARBE.figur, f.tisch.zeichen || f.name[0], f.name)); }
       for (const g of stand.gegner.filter(x => !x.weg)) {
         const p = pos[`g:${g.uid}`], z = motor.zustand(g);
-        if (p) teile.push(token(`g:${g.uid}`, p.x, p.y, z.id === "gefallen" ? FARBE.tot : FARBE.gegner, gegnerKuerzel(g), `${motor.anzeigeName(g)} · ${z.id}`, z.id === "gefallen" ? "tot" : ""));
+        if (p) teile.push(token(`g:${g.uid}`, p.x, p.y, z.id === "gefallen" ? FARBE.tot : motor.istFreund(g.id) ? FARBE.freund : FARBE.gegner, gegnerKuerzel(g), `${motor.anzeigeName(g)}${motor.istFreund(g.id) ? " (verbündet)" : ""} · ${z.id}`, z.id === "gefallen" ? "tot" : ""));
       }
     }
     const inhalt = svg.replace(/^<svg class="sz-karte"/, `<svg class="sp-svg" data-b="${karte.b}" data-t="${karte.t}"`).replace("</svg>", `${teile.join("")}</svg>`);
@@ -708,7 +708,7 @@
         <button type="button" data-chip="held:${esc(h.name)}" title="${esc(h.name)}${b.stufe ? `: ${b.stufe}, ${b.wuerfel} Aktionswürfel` : ""}">${esc(h.name)}${sp ? ` <i>🍄${sp}</i>` : ""}${n ? ` <i>🎒${n}</i>` : ""}${motor.heldenInfo(stand, h.name).length ? ` <i title="${esc(motor.heldenInfo(stand, h.name).map(x => x.name).join(", "))}">📿</i>` : ""}</button>
         ${stand.rundenAktiv ? `<button type="button" class="sp-hak" data-akt="held:${esc(h.name)}" title="War diese Runde dran">${dran ? "✓" : "○"}</button>` : ""}</span>`; }).join("")}</div>`;
     const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort. Marker anklicken: wofür sie stehen." : "Raster: eine Kartenlänge · Figuren und Marker anklicken für Infos, Figuren ziehen zum Verschieben";
-    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? werIstWer() : ""}${popupHtml()}</div>`;
+    return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}${opt.gross ? " · Symbole: game-icons.net (CC BY 3.0)" : ""}</small>${chips}${!opt.gross ? werIstWer() : ""}${popupHtml()}</div>`;
   }
   // Wer ist wer am Tisch: je Gegnerart die Kürzel und ein kleines Kartenbild (Klick: große Karte), dazu NPC-Figuren
   const miniKarten = {};
@@ -726,7 +726,7 @@
     if (!arten.size && !figuren.length) return "";
     const eintraege = [...arten.entries()].map(([id, liste]) => {
       const def = map.gegner[id] || {}, offen = liste.filter(g => motor.zustand(g).id !== "gefallen");
-      return `<button type="button" class="sp-wer" data-karte-art="${esc(id)}" title="Klick: Karte groß zeigen"><span class="cw sp-mini">${miniKarte(id)}</span>
+      return `<button type="button" class="sp-wer ${motor.istFreund(id) ? "freund" : ""}" data-karte-art="${esc(id)}" title="Klick: Karte groß zeigen"><span class="cw sp-mini">${miniKarte(id)}</span>
         <span><b>${esc(def.name || id)}</b><small>${liste.map(g => `<i class="${motor.zustand(g).id === "gefallen" ? "tot" : ""}">${esc(gegnerKuerzel(g))}</i>`).join("")}</small><em>${offen.length} von ${liste.length} stehen</em></span></button>`;
     });
     for (const f of figuren) eintraege.push(`<button type="button" class="sp-wer figur" data-chip="f:${esc(f.id)}"><span class="sp-mini leer">${esc(f.tisch.zeichen || f.name[0])}</span><span><b>${esc(f.name)}</b><em>NPC</em></span></button>`);
@@ -781,13 +781,17 @@
   const verhWurf = {}, letzterZustand = {};
   function neuerZustand(g, id) { const alt = letzterZustand[g.uid]; letzterZustand[g.uid] = id; return alt !== undefined && alt !== id; }
   function gegnerListe() {
-    const aktiv = stand.gegner.filter(g => !g.weg);
-    if (!aktiv.length) return `<p class="hint">Noch keine Gegner am Tisch.</p>`;
-    return aktiv.map(g => {
+    const alle = stand.gegner.filter(g => !g.weg), feinde = alle.filter(g => !motor.istFreund(g.id)), freunde = alle.filter(g => motor.istFreund(g.id));
+    if (!alle.length) return `<p class="hint">Noch keine Gegner am Tisch.</p>`;
+    return `${feinde.length ? feinde.map(gegnerZeile).join("") : `<p class="hint">Keine Gegner am Tisch.</p>`}
+      ${freunde.length ? `<h4 class="sp-freunde-titel">Verbündete <small>(führen die Spieler oder du)</small></h4>${freunde.map(gegnerZeile).join("")}` : ""}`;
+  }
+  function gegnerZeile(g) {
+    {
       const def = map.gegner[g.id] || {}, z = motor.zustand(g), b = motor.bedrohung(def, motor.effektiveWerte(stand, g)), offen = markiert === `g:${g.uid}`;
       const mods = motor.modText(stand, g);
       const zusatz = motor.zusaetze(stand, def);
-      return `<div class="sp-gegner ${offen ? "markiert" : ""} ${z.id === "gefallen" ? "gefallen" : ""}" data-gegner="${esc(g.uid)}">
+      return `<div class="sp-gegner ${offen ? "markiert" : ""} ${z.id === "gefallen" ? "gefallen" : ""} ${motor.istFreund(g.id) ? "freund" : ""}" data-gegner="${esc(g.uid)}">
         <div class="sp-g-zeile">${stand.rundenAktiv && z.id !== "gefallen" ? `<button type="button" class="sp-hak" data-akt="g:${esc(g.uid)}" title="War diese Runde dran">${(stand.aktiviert || {})[`g:${g.uid}`] ? "✓" : "○"}</button>` : ""}<span class="sp-g-tok">${esc(gegnerKuerzel(g))}</span><b>${esc(def.name || g.id)}</b><span class="sp-schaedel" title="Bedrohung">${"☠".repeat(b.schaedel)}</span>
           <span class="sp-g-balken">${Array.from({ length: g.zaeh }, (_, i) => `<i class="${i < g.wunden ? "wunde" : ""}"></i>`).join("")}</span>
           <span class="sp-g-knoepfe">${z.id === "gefallen" ? `<button type="button" class="btn ghost sm" data-weg="1">vom Tisch</button>` : `<button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button>`}<button type="button" class="btn ghost sm" data-dmg="-1">−1</button></span></div>
@@ -798,7 +802,7 @@
           <p class="hint">${g.wunden}/${g.zaeh} Wunden${g.zone ? ` · Zone ${esc(g.zone)}` : ""}</p><button type="button" class="btn ghost sm" data-karte="1">Karte zeigen</button>
           ${anpassenHtml(g)}</div>` : ""}
       </div>`;
-    }).join("");
+    }
   }
   // Von Hand stärken oder schwächen: wirkt sofort auf Karte, Bedrohung und (bei Zäh) die Wundleiste
   const ANPASSEN = [["quality", "Qualität"], ["defense", "Verteidigung"], ["tough", "Zäh"], ["attacks", "Angriffe"]];

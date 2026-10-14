@@ -72,6 +72,8 @@
       // sporenFuer: ein Flag, das einen Heldennamen trägt (z. B. name_verraten); der Held bekommt 1 Sporenpunkt
       for (const b of map.beimStart || []) {
         if (b.wenn && !gilt(state, b.wenn)) continue;
+        // zufall: { flag, aus: [...] } zieht beim Start einen Wert (z. B. welcher Überlebende befallen ist)
+        if (b.zufall && (b.zufall.aus || []).length) state.flags[b.zufall.flag] = b.zufall.aus[Math.floor(zufall() * b.zufall.aus.length)];
         setze(state, b.setzt);
         aendere(state, b.leisten);
         const held = b.sporenFuer && state.flags[b.sporenFuer];
@@ -214,6 +216,7 @@
     const schalte = (state, namen, an) => { for (const n of namen || []) if (state.leisten[n]) state.leisten[n].aktiv = an; };
 
     // ---------- Gegner ----------
+    const istFreund = id => (map.gegner[id] || {}).seite === "freund";
     function spawne(state, schrittId) {
       const s = map.schritte[schrittId];
       if (!s || s.typ !== "kampf") return;
@@ -227,9 +230,11 @@
         state.gespawnt[schluessel] = true;
         offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!(def.werte || e.fest) });
       });
-      const b = budget(state, schrittId, offen, s.verstaerkung), alt = state.budgets[schrittId];
+      // Verbündete (seite: "freund") kommen, wie geschrieben; das Punktebudget gilt nur für die Gegner
+      const feinde = offen.filter(e => !istFreund(e.id)), freunde = offen.filter(e => istFreund(e.id));
+      const b = budget(state, schrittId, feinde, s.verstaerkung), alt = state.budgets[schrittId];
       if (b) state.budgets[schrittId] = alt ? { ...b, geschrieben: alt.geschrieben + b.geschrieben, ziel: alt.ziel + b.ziel, summe: alt.summe + b.summe } : b;
-      for (const e of offen) {
+      for (const e of [...feinde, ...freunde]) {
         const def = map.gegner[e.id];
         const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
           + (+((state.typMod || {})[e.id] || {}).tough || 0));
@@ -396,7 +401,15 @@
       return g;
     }
     // gegnerHinzu an Ereignissen und Antworten: [{ id: "gemeinde", anzahl: 1, zone: "K" }]
-    const holeAlle = (state, liste) => { for (const x of liste || []) holeGegner(state, x.id, x.anzahl, x.zone); };
+    // anzahl: Zahl, "W6", "½W6" (W6 halbiert, aufgerundet) oder { leiste, min, max } (so viele wie die Leiste zeigt)
+    function anzahlVon(state, a) {
+      if (typeof a === "number") return a;
+      if (a === "W6") return 1 + Math.floor(zufall() * 6);
+      if (a === "½W6") return Math.ceil((1 + Math.floor(zufall() * 6)) / 2);
+      if (a && a.leiste) { const w = ((state.leisten[a.leiste] || {}).wert) || 0; return Math.max(a.min ?? 0, Math.min(a.max ?? Infinity, w)); }
+      return 1;
+    }
+    const holeAlle = (state, liste) => { for (const x of liste || []) { const n = anzahlVon(state, x.anzahl); if (n > 0) holeGegner(state, x.id, n, x.zone); } };
 
     // Zusatzregeln eines Gegners, die frühere Entscheidungen freigeschaltet haben
     const zusaetze = (state, def) => ((def && def.zusatz) || []).filter(z => gilt(state, z.wenn));
@@ -546,7 +559,8 @@
       eintrag.probe.wurf = w;
       for (const st of e.probe.stufen || []) {
         // ab: ab diesem Wurf; bis: höchstens dieser Wurf (für Stufen, die bei einem schlechten Wurf greifen)
-        if (w < (st.ab || 1) || w > (st.bis || 6)) continue;
+        const bis = st.bisLeiste ? ((state.leisten[st.bisLeiste] || {}).wert || 0) : (st.bis || 6);
+        if (w < (st.ab || 1) || w > bis) continue;
         eintrag.probe.stufen.push({ ab: st.ab, bis: st.bis, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
         setze(state, st.setzt);
         aendere(state, st.leisten);
@@ -826,7 +840,7 @@
     }
 
     return {
-      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal,
+      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
