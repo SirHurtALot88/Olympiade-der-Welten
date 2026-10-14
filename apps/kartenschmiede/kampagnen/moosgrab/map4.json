@@ -1483,7 +1483,7 @@
    "setzt": {
     "fund_probe": true
    },
-   "gmNotiz": "Zettel „Probe“ an den Helden, der sie herausholt (1 Aktion). Wer sie trägt, ist langsamer: je Bewegung nur eine Kartenbreite weit statt einer Kartenlänge (steht unter Lage). Weitergeben geht wie bei jedem Gegenstand. Zählt nicht als Suchmarker, weckt nichts.",
+   "gmNotiz": "„Probe“ dem Helden geben, der sie herausholt (1 Aktion; Knopf unten, dazu den Zettel). Wer sie trägt, ist langsamer: je Bewegung nur eine Kartenbreite weit statt einer Kartenlänge (steht unter Lage). Weitergeben geht wie bei jedem Gegenstand. Zählt nicht als Suchmarker, weckt nichts.",
    "wofuer": "Die lebende Probe (Fundstück). Map 5: Der Überlebende will ein Stück davon. Ihr Träger ist langsamer."
   },
   "tank-still": {
@@ -1537,7 +1537,7 @@
    "setzt": {
     "fund_marke": true
    },
-   "gmNotiz": "Zettel „Erkennungsmarke“ an den Helden, der sie abnimmt: Die Kette reißt leicht. Kein Erwachen, solange niemand zuschlägt. Zählt nicht als Suchmarker.",
+   "gmNotiz": "„Erkennungsmarke“ dem Helden geben, der sie abnimmt (Knopf unten, dazu den Zettel): Die Kette reißt leicht. Kein Erwachen, solange niemand zuschlägt. Zählt nicht als Suchmarker.",
    "wofuer": "Wandnische mit einer Gestalt in Rüstung. Ansehen gibt die Erkennungsmarke (Fundstück, Map 5: der Überlebende vertraut den Helden, wenn sie sie ihm zeigen). Zuschlagen weckt die Halle (F)."
   },
   "licht": {
@@ -1786,7 +1786,7 @@
    "setzt": {
     "fund_marke": true
    },
-   "gmNotiz": "Der Nebenweg zur Erkennungsmarke: mitten im Kampf, teurer, aber derselbe Fund. Zettel geben."
+   "gmNotiz": "Der Nebenweg zur Erkennungsmarke: mitten im Kampf, teurer, aber derselbe Fund. „Erkennungsmarke“ dem Helden geben (Knopf unten, dazu den Zettel)."
   }
  },
  "schritte": {
@@ -2047,7 +2047,7 @@
     "Suchmarker 3 auf dem Werktisch: das Protokoll. Ist es der dritte untersuchte Suchmarker (die Leiste zeigt dann 3), erwacht die Halle.",
     "Glastank trüb (7): die lebende Probe, ihr Träger ist langsamer. Glastank still (8): die tote Probe. Eine Gestalt ansehen (9): die Erkennungsmarke. Nichts davon weckt die Halle.",
     "Das Erwachen kommt bei: Licht berühren (0), Schuss, Zauber oder ein Schlag gegen eine Gestalt (F), in den Schacht steigen (H), dem dritten Suchmarker, oder am Ende der dritten Runde in der Halle. Danach Weiter.",
-    "Fundstücke: Gib den Zettel dem Helden, der etwas nimmt. Die App merkt sich den Fund für Map 5.",
+    "Fundstücke: Über die Geben-Knöpfe ins Inventar des Helden, der etwas nimmt (dazu den Zettel). Die App merkt sich den Fund für Map 5.",
     "Hinter dem rechten Werktisch atmet jemand (Antreiber „Ein Atemzug“). Wer nachsieht: V, dann Weiter zum Gespräch. Schließt er sich an, steht er unter Verbündete. Versorgen: E.",
     "Faden verloren? „Ganz hinten blinkt ein kleines Licht, immer im selben Takt.“ Oder: „Auf den Tischen liegt etwas, das erklärt, was hier unten ist.“"
    ],
