@@ -228,7 +228,7 @@
         if (!def) return;
         if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
         state.gespawnt[schluessel] = true;
-        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!(def.werte || e.fest) });
+        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!((def.werte && !e.skaliert && !def.skaliert) || e.fest), wunden: e.wunden || 0 });
       });
       // Verbündete (seite: "freund") kommen, wie geschrieben; das Punktebudget gilt nur für die Gegner
       const feinde = offen.filter(e => !istFreund(e.id)), freunde = offen.filter(e => istFreund(e.id));
@@ -238,7 +238,7 @@
         const def = map.gegner[e.id];
         const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
           + (+((state.typMod || {})[e.id] || {}).tough || 0));
-        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: 0, zaeh, weg: false });
+        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: Math.min(e.wunden || 0, zaeh - 1), zaeh, weg: false });
       }
     }
     // ---------- Gegnerpunkte nach OPR ----------
@@ -532,7 +532,7 @@
       aendere(state, e.leisten);
       schalte(state, e.leistenAus, false);
       if (!e.intern) notiere(state, e.name);
-      const ergebnis = { id, name: e.name, vorlesen: e.vorlesen || "", gmNotiz: e.gmNotiz || "", beutewurf: !!e.beutewurf,
+      const ergebnis = { id, name: e.name, vorlesen: e.vorlesen || "", gmNotiz: e.gmNotiz || "", beutewurf: !!e.beutewurf, beute: e.beute || [],
         probe: e.probe ? { frage: e.probe.frage || "Der Spieler würfelt einen W6.", wurf: null, stufen: [] } : null };
       if (!still && !e.intern) state.letzte.push(ergebnis);
       if (e.danach) loeseAus(state, e.danach, true);

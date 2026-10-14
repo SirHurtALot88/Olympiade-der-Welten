@@ -505,9 +505,10 @@
         karte: { tisch: "60x60", b: 24, t: 24, aufstellung: { x: 9, y: 21, w: 6, h: 3 },
           gelaende: [g("wurzeln", 6, 13, 1.5, 9, "Wurzelwand"), g("wurzeln", 16.5, 13, 1.5, 9, "Wurzelwand"), g("wurzeln", 0, 16, 5, 1.5, "Wurzelwand"), g("wurzeln", 19, 18, 5, 1.5, "Wurzelwand"),
             g("pilze", 10, 15, 2, 2, "Leuchtpilze"), g("metall", 0, 11, 9, 1.5, "Glatte Wand"), g("metall", 15, 11, 9, 1.5, "Glatte Wand"),
-            g("labortisch", 3, 4, 4, 2, "Werktisch", true), g("labortisch", 16, 6, 4, 2, "Werktisch", true), g("tank", 10, 2, 3, 3, "Glastank", true), g("tank", 20, 1, 2.5, 2.5, "Glastank", true), g("sporenwolke", 9, 6, 5, 4, "Myzelteppich", true)],
+            g("labortisch", 3, 4, 4, 2, "Werktisch", true), g("labortisch", 16, 6, 4, 2, "Werktisch", true), g("tank", 10, 2, 3, 3, "Glastank", true), g("tank", 20, 1, 2.5, 2.5, "Glastank", true), g("sporenwolke", 9, 6, 5, 4, "Geflecht", true)],
           marker: [m("suche", 3, 19, "1"), m("suche", 21, 15, "2"), m("suche", 5, 5, "3", true), m("licht", 11.5, 1.2, "L", true), m("schacht", 22.5, 9.5, "↑", true), m("feind", 1, 14, "A"), m("feind", 23, 22, "B"),
-            m("nische", 1, 2, "N", true), m("nische", 1, 8, "N", true), m("nische", 7, 0.8, "N", true), m("nische", 15, 0.8, "N", true), m("nische", 23, 4, "N", true), m("nische", 13, 9.5, "N", true)] },
+            m("nische", 1, 2, "N", true), m("nische", 1, 8, "N", true), m("nische", 7, 0.8, "N", true), m("nische", 15, 0.8, "N", true), m("nische", 23, 4, "N", true), m("nische", 13, 9.5, "N", true),
+            m("tank", 11.5, 3.5, "T1", true), m("tank", 21.25, 2.25, "T2", true), m("ueberlebender", 21, 8.6, "V", true)] },
         teile: [
           { name: "Die Wurzelgänge", cue: "04-1 (neu)", ausloeser: "Spielbeginn", sehen: "Wurzeln wie Taue, warme Luft von unten, Leuchtpilze in den Ritzen. Weiter vorn wird der Fels glatt.", tisch: "Nur die untere Hälfte bis zu den Metallwänden.",
             aktionen: [["Suchmarker 1", "Ein Stiefel mit fremder Sohle, ohne Naht, voller Moos."], ["Suchmarker 2", "Beutewurf, dazu Kratzspuren: jemand hat hier Striche gezählt, sehr viele."], ["Eine Metallwand berühren", "Kalt, glatt, ohne Fugen. Darunter summt etwas. Jetzt die Halle aufbauen (Cue 04-2)."]], weiter: "ein Held die Metallwand berührt oder durch die Lücke geht." },
