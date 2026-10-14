@@ -576,62 +576,35 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
         {!newGameWizardOpen ? (
           <p className="nl-newgame-collapsed-hint muted">
-            <strong>Der einzige Weg zu einem neuen Spielstand.</strong> Hier tippst du die Klubs an,
-            die du selbst steuerst — alle übrigen übernimmt die KI — und legst damit ein komplett
-            neues Spiel mit frischer Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt
-            erhalten, ist danach aber nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel
-            beginnen soll.
+            <strong>Der einzige Weg zu einem neuen Spielstand.</strong> Hier beantwortest du zuerst,
+            ob der neue Spielstand im <strong>Manager Mode</strong> (Standard, eine gemeinsame
+            Tabelle) oder im <strong>Battle Mode</strong> (zwei getrennte Ligen) läuft — das lässt
+            sich danach nicht mehr ändern. Danach tippst du die Klubs an, die du selbst steuerst —
+            alle übrigen übernimmt die KI — und legst damit ein komplett neues Spiel mit frischer
+            Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt erhalten, ist danach aber
+            nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel beginnen soll.
           </p>
         ) : null}
 
         {newGameWizardOpen ? (
         <>
-        {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. */}
-        <div className="nl-newgame-hero">
-          <div className="nl-newgame-hero-lead">
-            <span className="nl-newgame-hero-eyebrow">Dein Klub-Portfolio</span>
-            <p className="nl-newgame-hero-headline">
-              Du steuerst{" "}
-              <NlCountUpValue
-                className="nl-newgame-hero-count nl-tnum"
-                value={newGameChrisTeamIds.length}
-                format={(value) => String(Math.round(value))}
-              />{" "}
-              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
-            </p>
-            <span className="nl-newgame-hero-hint">
-              {newGameChrisTeamIds.length === 0
-                ? "Wähle 1 bis 4 Klubs, die du selbst managst — alle übrigen laufen unter KI-Kontrolle."
-                : `${newGameChrisTeamIds.length === 1 ? "1 Klub" : `${newGameChrisTeamIds.length} Klubs`} unter deiner Kontrolle · bis zu 4 möglich`}
-            </span>
-          </div>
-          <StatChipRow className="nl-newgame-hero-chips" aria-label="Setup-Übersicht">
-            <StatChip
-              label="Deine Teams"
-              value={`${newGameChrisTeamIds.length}/4`}
-              tone={newGameChrisTeamIds.length > 0 ? "good" : "neutral"}
-              sub="du steuerst"
-            />
-            <StatChip
-              label="KI-Teams"
-              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
-              sub="automatisch"
-            />
-            {newGameFrankyTeamIds.length > 0 ? (
-              <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
-            ) : null}
-          </StatChipRow>
-        </div>
-
         {/*
-          Moduswahl (docs/design/battle-mode-spielmodus-plan.md, 3.1): die erste Entscheidung des
-          Assistenten, noch vor dem Klub-Raster. Sie gilt fuer den neuen Save DAUERHAFT — es gibt
-          bewusst kein UI, den Modus eines laufenden Spielstands nachtraeglich zu drehen (neue
-          Idee, neuer Spielstand). Genau EIN Bedienelement, nach demselben Grundsatz wie das
-          Klub-Raster darunter.
+          Moduswahl (docs/design/battle-mode-spielmodus-plan.md, 3.1): die ERSTE Frage des
+          Assistenten — bewusst noch vor dem Portfolio-Hero UND dem Klub-Raster, nicht nur
+          irgendwo dazwischen. Sie gilt fuer den neuen Save DAUERHAFT — es gibt bewusst kein UI,
+          den Modus eines laufenden Spielstands nachtraeglich zu drehen (neue Idee, neuer
+          Spielstand). Genau EIN Bedienelement, nach demselben Grundsatz wie das Klub-Raster
+          darunter.
+
+          GEMELDET VON CHRIS (fable-konzept-chris-feedback-13-10.md, E1): „ich habe es versucht
+          aber wenn ich ein neues spiel starte werde ich nicht gefragt ob das im battle mode sein
+          soll". Die Kacheln selbst gab es seit PR #689 schon — nur verschwanden sie zwischen dem
+          Portfolio-Hero und dem Klub-Raster inmitten einer langen Settings-Seite, ohne als
+          FRAGE zu wirken. Jetzt: erstes sichtbares Element nach dem Öffnen, mit einer echten
+          Frageformulierung statt einer bloßen Beschriftung.
         */}
         <div className="nl-newgame-pickerhead">
-          <strong>Wähle deinen Spielmodus</strong>
+          <strong>Manager Mode oder Battle Mode — in welchem soll dieser Spielstand laufen?</strong>
           <span className="nl-teamsettings-hint">
             gilt dauerhaft für diesen Spielstand · später nicht mehr umstellbar
           </span>
@@ -683,6 +656,44 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               auch dort die Punkteformel.
             </span>
           </button>
+        </div>
+
+        {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. Sitzt bewusst NACH der
+            Moduswahl oben — die Frage "welcher Modus" kommt vor der Frage "welche Klubs". */}
+        <div className="nl-newgame-hero">
+          <div className="nl-newgame-hero-lead">
+            <span className="nl-newgame-hero-eyebrow">Dein Klub-Portfolio</span>
+            <p className="nl-newgame-hero-headline">
+              Du steuerst{" "}
+              <NlCountUpValue
+                className="nl-newgame-hero-count nl-tnum"
+                value={newGameChrisTeamIds.length}
+                format={(value) => String(Math.round(value))}
+              />{" "}
+              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
+            </p>
+            <span className="nl-newgame-hero-hint">
+              {newGameChrisTeamIds.length === 0
+                ? "Wähle 1 bis 4 Klubs, die du selbst managst — alle übrigen laufen unter KI-Kontrolle."
+                : `${newGameChrisTeamIds.length === 1 ? "1 Klub" : `${newGameChrisTeamIds.length} Klubs`} unter deiner Kontrolle · bis zu 4 möglich`}
+            </span>
+          </div>
+          <StatChipRow className="nl-newgame-hero-chips" aria-label="Setup-Übersicht">
+            <StatChip
+              label="Deine Teams"
+              value={`${newGameChrisTeamIds.length}/4`}
+              tone={newGameChrisTeamIds.length > 0 ? "good" : "neutral"}
+              sub="du steuerst"
+            />
+            <StatChip
+              label="KI-Teams"
+              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+              sub="automatisch"
+            />
+            {newGameFrankyTeamIds.length > 0 ? (
+              <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
+            ) : null}
+          </StatChipRow>
         </div>
 
         {/* Kompakte Optionen: Save-Name + Sandbox (Bindings/Titel unverändert). */}
