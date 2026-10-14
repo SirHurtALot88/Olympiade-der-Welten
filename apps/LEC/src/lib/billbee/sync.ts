@@ -5,7 +5,7 @@ import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
 import { loadActiveCostSettings } from "../dashboard/queries";
 import { BillbeeClient, type BillbeeConfig } from "./client";
 import { loadBillbeeConfig } from "./credentials";
-import { LOOKBACK_DAYS, extractSales, mapOrders, mapProduct, type MasterProduct } from "./map";
+import { LOOKBACK_DAYS, dedupeOrders, diagnoseOrders, extractSales, mapOrders, mapProduct, type MasterProduct, type OrderDiagnostics } from "./map";
 
 /**
  * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der letzten 365 Tage aus der Billbee-API
@@ -32,6 +32,8 @@ export interface BillbeeSyncReport {
   /** Einzelverkaeufe (Bestellpositionen), die gespeichert wurden. */
   sales: number;
   windows: { window: string; articles: number; units: number }[];
+  /** Auffaelligkeiten in den gelieferten Bestellungen (Doppelte, gebrochene Mengen, Spitzenreiter). */
+  diagnostics: OrderDiagnostics;
   startedAt: string;
   finishedAt: string;
 }
@@ -64,10 +66,11 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
 
   // 2. Bestellungen der letzten 365 Tage
   const since = new Date(now.getTime() - LOOKBACK_DAYS * 86_400_000);
-  const orders = await client.getAll<Record<string, unknown>>("/orders", {
+  const fetched = await client.getAll<Record<string, unknown>>("/orders", {
     minOrderDate: since.toISOString().slice(0, 10),
     maxOrderDate: now.toISOString().slice(0, 10),
   });
+  const { orders, duplicates } = dedupeOrders(fetched);
   const results = mapOrders(orders, masters, { now, excludeStates: opts.excludeStates ?? excludeStatesFromEnv() });
 
   // 3. Plan + Schreiben ueber die bestehende Pipeline
@@ -114,6 +117,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     deactivated,
     orders: orders.length,
     sales: saleRows.length,
+    diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,
     finishedAt: new Date().toISOString(),

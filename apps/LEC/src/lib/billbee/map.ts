@@ -83,6 +83,80 @@ const WINDOW_DAYS: { key: SaleWindowKey; days: number }[] = [
 
 export const LOOKBACK_DAYS = 365;
 
+/** Billbee-Bestellnummer/-Id; Grundlage, um doppelt gelieferte Bestellungen zu erkennen. */
+function orderKey(o: Json): string | null {
+  const k = o.BillBeeOrderId ?? o.Id ?? o.OrderNumber;
+  return k !== undefined && k !== null ? String(k) : null;
+}
+
+/**
+ * Billbee blaettert nach Datum; kommt zwischen zwei Seiten eine Bestellung dazu, rutscht eine
+ * Bestellung auf die naechste Seite und wird doppelt geliefert. Jede Bestellung zaehlt nur einmal.
+ */
+export function dedupeOrders(orders: Json[]): { orders: Json[]; duplicates: number } {
+  const seen = new Set<string>();
+  const out: Json[] = [];
+  for (const o of orders) {
+    const k = orderKey(o);
+    if (k !== null) {
+      if (seen.has(k)) continue;
+      seen.add(k);
+    }
+    out.push(o);
+  }
+  return { orders: out, duplicates: orders.length - out.length };
+}
+
+/** Versandkosten- und Gutschein-Positionen sind keine verkauften Artikel. */
+function isSaleItem(item: Json, product: Json): boolean {
+  if (item.IsCoupon === true) return false;
+  const type = num(product.Type);
+  return type === null || type !== 3;
+}
+
+export interface OrderDiagnostics {
+  duplicates: number;
+  /** Positionen mit gebrochener Menge (z. B. 2,5) -- sollte es bei Karten nicht geben. */
+  fractionalItems: number;
+  fractionalSamples: { name: string; qty: number; order: string | null }[];
+  /** Artikel mit den meisten Stueck in 365 Tagen, mit Bestellungen und groesster Menge je Position. */
+  top: { name: string; units: number; orders: number; maxLine: number }[];
+}
+
+export function diagnoseOrders(orders: Json[], duplicates: number, opts: { excludeStates?: number[] } = {}): OrderDiagnostics {
+  const exclude = new Set(opts.excludeStates ?? []);
+  const byName = new Map<string, { name: string; units: number; orders: Set<string>; maxLine: number }>();
+  const samples: OrderDiagnostics["fractionalSamples"] = [];
+  let fractionalItems = 0;
+  orders.forEach((order, idx) => {
+    const state = num(order.State ?? order.OrderStateId);
+    if (state !== null && exclude.has(state)) return;
+    const ref = String(order.OrderNumber ?? order.BillBeeOrderId ?? idx);
+    for (const item of Array.isArray(order.OrderItems) ? (order.OrderItems as Json[]) : []) {
+      const product = (item.Product && typeof item.Product === "object" ? item.Product : {}) as Json;
+      if (!isSaleItem(item, product)) continue;
+      const name = titleOf(product.Title) || titleOf(item.Title ?? item.Name);
+      const qty = num(item.Quantity) ?? 0;
+      if (!name || qty <= 0) continue;
+      if (!Number.isInteger(qty)) {
+        fractionalItems++;
+        if (samples.length < 5) samples.push({ name: name.slice(0, 60), qty, order: ref });
+      }
+      const key = normalizeArticleName(name).normalized;
+      const e = byName.get(key) ?? { name: name.slice(0, 60), units: 0, orders: new Set<string>(), maxLine: 0 };
+      e.units += qty;
+      e.orders.add(ref);
+      e.maxLine = Math.max(e.maxLine, qty);
+      byName.set(key, e);
+    }
+  });
+  const top = [...byName.values()]
+    .sort((a, b) => b.units - a.units)
+    .slice(0, 8)
+    .map((e) => ({ name: e.name, units: e.units, orders: e.orders.size, maxLine: e.maxLine }));
+  return { duplicates, fractionalItems, fractionalSamples: samples, top };
+}
+
 export interface OrderMapOptions {
   now: Date;
   /** Bestellstatus-IDs, die nicht zaehlen (storniert u. a.). */
@@ -119,6 +193,7 @@ export function mapOrders(orders: Json[], masters: MasterProduct[], opts: OrderM
 
     for (const item of items) {
       const product = (item.Product && typeof item.Product === "object" ? item.Product : {}) as Json;
+      if (!isSaleItem(item, product)) continue;
       const nameRaw = titleOf(product.Title) || titleOf(item.Title ?? item.Name);
       if (!nameRaw) continue;
       const qty = num(item.Quantity) ?? 0;
@@ -185,6 +260,7 @@ export function extractSales(orders: Json[], opts: { excludeStates?: number[] } 
     const items = Array.isArray(order.OrderItems) ? (order.OrderItems as Json[]) : [];
     for (const item of items) {
       const product = (item.Product && typeof item.Product === "object" ? item.Product : {}) as Json;
+      if (!isSaleItem(item, product)) continue;
       const nameRaw = titleOf(product.Title) || titleOf(item.Title ?? item.Name);
       const qty = num(item.Quantity) ?? 0;
       if (!nameRaw || qty <= 0) continue;

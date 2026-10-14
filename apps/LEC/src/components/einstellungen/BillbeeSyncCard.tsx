@@ -12,6 +12,12 @@ interface Status {
     deactivated: number;
     orders: number;
     windows: { window: string; articles: number; units: number }[];
+    diagnostics?: {
+      duplicates: number;
+      fractionalItems: number;
+      fractionalSamples: { name: string; qty: number; order: string | null }[];
+      top: { name: string; units: number; orders: number; maxLine: number }[];
+    };
     finishedAt: string;
   } | null;
 }
@@ -144,6 +150,17 @@ export function BillbeeSyncCard() {
           {r.deactivated > 0 ? `, ${r.deactivated} als ausgelaufen markiert` : ""}.
           <br />
           {r.windows.map((w) => `${w.window} Tage: ${w.units.toLocaleString("de-DE")} Stück bei ${w.articles.toLocaleString("de-DE")} Artikeln`).join(" · ")}
+          {r.diagnostics && (
+            <>
+              <br />
+              Datenprüfung: {r.diagnostics.duplicates} doppelt gelieferte Bestellungen entfernt, {r.diagnostics.fractionalItems} Positionen mit gebrochener Menge.
+              {r.diagnostics.fractionalSamples.length > 0 && (
+                <> Beispiele: {r.diagnostics.fractionalSamples.map((s) => `${s.name} (${s.qty}x, Bestellung ${s.order})`).join("; ")}.</>
+              )}
+              <br />
+              Meistverkauft (365 T): {r.diagnostics.top.map((t) => `${t.name}: ${t.units} Stück in ${t.orders} Bestellungen (max. ${t.maxLine} je Position)`).join(" · ")}
+            </>
+          )}
         </div>
       )}
 
