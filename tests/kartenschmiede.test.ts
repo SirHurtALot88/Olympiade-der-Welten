@@ -703,10 +703,14 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     const erloesen = stufen.map(st => ids(m, neu(m, st), "kampf-erloesen"));
     expect(erloesen.map(x => zahl(x, "gemeinde"))).toEqual([7, 7, 7, 7]);
     expect(erloesen.map(x => zahl(x, "grabgaenger"))).toEqual([0, 0, 4, 7]);
+    // Die Gemeinde erwacht: auf Normal die sieben, die Grabgänger kommen erst je Rundenende nach (höchstens 3)
     const gemeinde = stufen.map(st => zahl(ids(m, neu(m, st), "kampf-gemeinde"), "grabgaenger"));
-    expect(gemeinde).toEqual([0, 3, 8, 13]);
+    expect(gemeinde).toEqual([0, 0, 4, 7]);
+    const sn = neu(m, "fortgeschritten"); ids(m, sn, "kampf-gemeinde");
+    for (let r = 0; r < 5; r++) m.runde(sn);
+    expect(zahl((sn as unknown as { gegner: Array<{ id: string }> }).gegner.map(g => g.id), "grabgaenger")).toBe(3);
     // Mehr Heldenpunkte, mehr Gegner – wie in OPR, wenn die Gruppe wächst
-    expect(zahl(ids(m, neu(m, "fortgeschritten", 680), "kampf-gemeinde"), "grabgaenger")).toBe(13);
+    expect(zahl(ids(m, neu(m, "fortgeschritten", 680), "kampf-gemeinde"), "grabgaenger")).toBe(7);
     const s = neu(m, "experte"); ids(m, s, "kampf-erloesen");
     expect(m.budgetVon(s, "kampf-erloesen")).toMatchObject({ ziel: 263, summe: 275 });
     // „Die drei stehen auf“ bleibt bei drei, egal auf welcher Stufe
@@ -720,7 +724,7 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(ids(m1, neu(m1, "fortgeschritten"), "kampf-erbluehte")).toEqual(["erbluehte"]);
     expect(ids(m1, neu(m1, "legendaer"), "kampf-erbluehte")).toEqual(["erbluehte", ...Array(5).fill("sporenling-klein")]);
     // Ohne Heldenpunkte (oder ohne Punkteberechnung) bleibt alles, wie die Map es schreibt
-    expect(ids(m, m.neu({ schwierigkeit: "legendaer" }), "kampf-gemeinde").length).toBe(10);
+    expect(ids(m, m.neu({ schwierigkeit: "legendaer" }), "kampf-gemeinde").length).toBe(7);
   });
   it("lässt Antworten je nach Schwierigkeit stärker oder schwächer wirken und übernimmt die Stufe", () => {
     type M = Motor & { wahlLeisten(s: Spielstand, o: unknown): Record<string, number>; schwierigkeit(s: Spielstand): { id: string } };
@@ -737,6 +741,50 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     // Ältere Spielstände mit den früheren Stufennamen
     expect(m.schwierigkeit(m.neu({ schwierigkeit: "schwer" })).id).toBe("experte");
   });
+  it("zieht die Folgen aus Map 1 selbst, baut nur für Kämpfe auf und gibt dem Anhängerträger einen Sporenpunkt", () => {
+    type M = Motor & { folgen(s: Spielstand): string[]; springe(s: Spielstand, id: string): void; heldenInfo(s: Spielstand, h: string): unknown[] };
+    const m = motor2() as unknown as M;
+    const s = m.neu({ uebernahme: { leisten: { atemzug: 2 }, flags: { anhaenger: true, anhaenger_traeger: "Krieger", hinweis_brunnen: true, name_verraten: "Schurke" }, sporen: { Krieger: 1 } } });
+    expect((s as unknown as { sporen: Record<string, number> }).sporen).toEqual({ Krieger: 2, Schurke: 1 });
+    expect(s.leisten.geduld.wert).toBeGreaterThan(MAP2.leisten.geduld.start || 0);
+    expect(m.heldenInfo(s, "Krieger").length).toBe(1);
+    bisTyp(m, s, "vorb-aus-map1");
+    expect(m.folgen(s).join(" ")).toContain("Krieger trägt ihn");
+    // Keine Fragen-Schritte mehr zwischen Übernahme und Friedhof
+    m.weiter(s);
+    expect(s.schritt).toBe("aufbau-aussen");
+    // Die Glocke: erst Friedhof, dann Kapelle aufbauen, dann der Kampf
+    bisTyp(m, s, "spieler-draussen");
+    m.ereignis(s, "glocke");
+    expect(s.schritt).toBe("aufbau-kampf-gemeinde-friedhof");
+    m.weiter(s);
+    expect(s.schritt).toBe("aufbau-kampf-gemeinde-innen");
+    m.weiter(s);
+    expect(s.schritt).toBe("kampf-gemeinde");
+  });
+
+  it("lässt Beute vom Grab fallen und Gegenstände wie den Anhänger zwischen Helden wandern", () => {
+    type M = Motor & { springe(s: Spielstand, id: string): void; reiche(s: Spielstand, v: string, i: number, a: string): void; reicheMerkmal(s: Spielstand, f: string, a: string): void;
+      gibBeute(s: Spielstand, h: string, x: string): void; heldenInfo(s: Spielstand, h: string): unknown[] };
+    const m = motor2() as unknown as M;
+    const s = m.neu({ uebernahme: { leisten: {}, flags: { anhaenger: true, anhaenger_traeger: "Krieger" } } });
+    m.springe(s, "kampf-grab");
+    const grab = (s as unknown as { gegner: Array<{ id: string; uid: string; zaeh: number }> }).gegner.find(g => g.id === "grab")!;
+    m.schaden(s, grab.uid, grab.zaeh);
+    const tod = s.letzte.find(e => e.id === `tod:${grab.uid}`) as unknown as { beutewurf: boolean; beute: string[] };
+    expect(tod.beutewurf).toBe(true);
+    expect(tod.beute).toEqual(["Ehering vom zuckenden Grab"]);
+    m.gibBeute(s, "Schurke", tod.beute[0]);
+    m.reiche(s, "Schurke", 0, "Kleriker");
+    const inv = (s as unknown as { inventar: Record<string, string[]> }).inventar;
+    expect(inv.Schurke).toEqual([]);
+    expect(inv.Kleriker).toEqual(["Ehering vom zuckenden Grab"]);
+    m.reicheMerkmal(s, "anhaenger_traeger", "Waldläufer");
+    expect(s.flags.anhaenger_traeger).toBe("Waldläufer");
+    expect(m.heldenInfo(s, "Krieger").length).toBe(0);
+    expect(m.heldenInfo(s, "Waldläufer").length).toBe(1);
+  });
+
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();
     s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;

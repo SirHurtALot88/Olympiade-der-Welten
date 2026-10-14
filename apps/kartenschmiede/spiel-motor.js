@@ -21,16 +21,17 @@
 
   // Schwierigkeit wie in OPR (Age of Fantasy Quest, Campaign Builder): Eine Gegnerwelle hat 25/50/75/100 % der
   // Heldenpunkte. Die Kämpfe einer Map sind für eine Bezugsgruppe geschrieben (`referenz`: Heldenpunkte und Anteil,
-  // ohne Angabe 340 P. auf Fortgeschritten). Jeder Kampf bekommt so viele Gegnerpunkte, wie die Map vorsieht, mal
+  // ohne Angabe 340 P. auf Normal, OPR Fortgeschritten). Jeder Kampf bekommt so viele Gegnerpunkte, wie die Map vorsieht, mal
   // (Heldenpunkte × Anteil) / (Bezugspunkte × Bezugsanteil). Die Gegnerwerte bleiben, wie sie sind; es ändert sich
   // nur, wie viele Gegner kommen. Bosse (Gegner mit eigenen Werten) und Einträge mit `fest` bleiben, wie geschrieben.
   // rp.schlecht/rp.gut: so viel stärker (+) oder schwächer (−) wirkt eine Antwort, die eine Leiste in die schlechte bzw.
   // gute Richtung bewegt (Richtung je Leiste im Feld `schlecht`: "hoch" oder "runter"). Namenlose NPCs bleiben schwach.
   const SCHWIERIGKEITEN = {
-    anfaenger: { stufe: 1, name: "Anfänger", anteil: 0.25, rp: { gut: 1, schlecht: 0 }, text: "Gute Antworten wirken stärker." },
-    fortgeschritten: { stufe: 2, name: "Fortgeschritten", anteil: 0.5, rp: { gut: 0, schlecht: 0 }, text: "Antworten wirken, wie die Map sie schreibt." },
-    experte: { stufe: 3, name: "Experte", anteil: 0.75, rp: { gut: 0, schlecht: 1 }, text: "Schlechte Antworten wirken stärker." },
-    legendaer: { stufe: 4, name: "Legendär", anteil: 1, rp: { gut: -1, schlecht: 1 }, text: "Schlechte Antworten wirken stärker, gute schwächer." },
+    // name: so heißt die Stufe am Tisch; opr: der Name im OPR Campaign Builder. Geplant und geschrieben wird auf Normal
+    anfaenger: { stufe: 1, name: "Leicht", opr: "Anfänger", anteil: 0.25, rp: { gut: 1, schlecht: 0 }, text: "Gute Antworten wirken stärker." },
+    fortgeschritten: { stufe: 2, name: "Normal", opr: "Fortgeschritten", anteil: 0.5, rp: { gut: 0, schlecht: 0 }, text: "So, wie die Maps geplant sind. Damit fangt ihr an." },
+    experte: { stufe: 3, name: "Schwer", opr: "Experte", anteil: 0.75, rp: { gut: 0, schlecht: 1 }, text: "Schlechte Antworten wirken stärker." },
+    legendaer: { stufe: 4, name: "Albtraum", opr: "Legendär", anteil: 1, rp: { gut: -1, schlecht: 1 }, text: "Schlechte Antworten wirken stärker, gute schwächer." },
   };
   const STANDARD_STUFE = "fortgeschritten";
   // Frühere Namen der Stufen (vor dem Umstieg auf die OPR-Stufen)
@@ -67,6 +68,16 @@
         uebernommen: opt.uebernahme ? { ...(ueber.von || {}), leisten: kopie(ueber.leisten || {}), flags: Object.keys(ueber.flags || {}).length,
           inventar: kopie(ueber.inventar || {}), sporen: kopie(ueber.sporen || {}) } : null,
       };
+      // Was aus der letzten Map folgt, verbucht die App selbst (beimStart: [{ wenn, leisten, setzt, sporenFuer }]).
+      // sporenFuer: ein Flag, das einen Heldennamen trägt (z. B. name_verraten); der Held bekommt 1 Sporenpunkt
+      for (const b of map.beimStart || []) {
+        if (b.wenn && !gilt(state, b.wenn)) continue;
+        setze(state, b.setzt);
+        aendere(state, b.leisten);
+        const held = b.sporenFuer && state.flags[b.sporenFuer];
+        if (held && typeof held === "string") state.sporen[held] = (state.sporen[held] || 0) + (b.sporen || 1);
+      }
+      state.letzte = [];
       betrete(state, map.start);
       return state;
     }
@@ -194,6 +205,8 @@
       const z = state.sprung;
       if (!z) return;
       state.sprung = null;
+      // Hat dieselbe Aktion das Ziel schon betreten (Glocke springt, Lärm 6 springt zum selben Ort), nicht zweimal
+      if (state.angewendet[z]) return;
       const gefunden = state.letzte;
       betrete(state, z);
       state.letzte = gefunden;
@@ -402,7 +415,8 @@
         if (def.tod) {
           setze(state, def.tod.setzt);
           aendere(state, def.tod.leisten);
-          state.letzte.push({ id: `tod:${uid}`, name: `${anzeigeName(g)} fällt`, vorlesen: def.tod.vorlesen || "", gmNotiz: def.tod.gmNotiz || "", art: "tod" });
+          state.letzte.push({ id: `tod:${uid}`, name: `${anzeigeName(g)} fällt`, vorlesen: def.tod.vorlesen || "", gmNotiz: def.tod.gmNotiz || "", art: "tod",
+            beutewurf: !!def.tod.beutewurf, beute: def.tod.beute || [] });
         }
       }
       pruefeKampf(state);
@@ -597,6 +611,13 @@
         if (!gilt(state, r.wenn)) continue;
         // Eine Regel, die nur Flags setzt, die schon stehen (ab Runde 4 wütend), meldet sich nur beim ersten Mal
         const neuGesetzt = Object.entries(r.setzt || {}).some(([k, v]) => state.flags[k] !== v);
+        // Nachschub am Rundenende, höchstens so oft wie angegeben (mit `skaliert` nach Heldenpunkten und Stufe)
+        if (r.gegnerHinzu) {
+          const k = `rundenende:${(map.rundenende || []).indexOf(r)}`, schon = (state.nachschub || {})[k] || 0;
+          const max = r.hoechstens ? Math.max(1, Math.round(r.hoechstens * (r.skaliert ? punkteFaktor(state) : 1))) : Infinity;
+          if (schon < max) { holeAlle(state, r.gegnerHinzu); state.nachschub = { ...(state.nachschub || {}), [k]: schon + 1 }; texte.push(r.text); }
+          continue;
+        }
         aendere(state, r.leisten);
         setze(state, r.setzt);
         if (r.springe && !sprung && !state.angewendet[r.springe]) sprung = r.springe;
@@ -645,6 +666,28 @@
       notiere(state, `${held} bekommt ${sache}`);
       state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text: `${held} bekommt ${sache}`, leisten: [], flags: [] });
     }
+    // Ein Held gibt einem anderen etwas aus seinem Inventar
+    function reiche(state, von, index, an) {
+      const liste = state.inventar[von];
+      if (!liste || !liste[index] || !an || an === von) return;
+      merke(state);
+      const [sache] = liste.splice(index, 1);
+      (state.inventar[an] = state.inventar[an] || []).push(sache);
+      const text = `${von} gibt ${sache} an ${an}`;
+      notiere(state, text);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text, leisten: [], flags: [] });
+    }
+    // Was ein Held an sich trägt (heldenInfo, z. B. der Anhänger) wandert zu einem anderen: das Flag zeigt dann auf ihn
+    function reicheMerkmal(state, flag, an) {
+      const h = (map.heldenInfo || []).find(x => x.flag === flag);
+      if (!h || !h.weitergeben || !an) return;
+      merke(state);
+      const von = state.flags[flag];
+      state.flags[flag] = an;
+      const text = `${von} gibt ${h.name} an ${an}`;
+      notiere(state, text);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text, leisten: [], flags: [flag] });
+    }
     function benutze(state, held, index) {
       const liste = state.inventar[held];
       if (!liste || !liste[index]) return;
@@ -676,7 +719,19 @@
       notiere(state, `${held}: Sporenpunkte ${alt} → ${neu}`);
       state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "sporen", text: `${held}: Sporenpunkte ${alt} → ${neu}`, leisten: [], flags: [] });
     }
-    const befall = n => (n >= 5 ? { stufe: "schwer befallen", wuerfel: 2 } : n >= 3 ? { stufe: "befallen", wuerfel: 3 } : { stufe: "", wuerfel: 4 });
+    // Je Stufe: wie man es sieht (dem Spieler sagen, wenn jemand hinsieht), wie es sich anfühlt und was nach den Regeln gilt
+    const SPOREN = [
+      { ab: 0, stufe: "", wuerfel: 4, aussehen: "", koerper: "", regel: "Keine Sporen." },
+      { ab: 1, stufe: "gezeichnet", wuerfel: 4, aussehen: "Unter einem Fingernagel ein feiner grüner Rand. Wer nah herangeht, riecht nassen Brotteig.",
+        koerper: "Die Haut ist warm, ohne Fieber. Manchmal hört er ein Flüstern, wo keines ist.", regel: "Noch keine Regel, nur erzählen." },
+      { ab: 2, stufe: "gezeichnet", wuerfel: 4, aussehen: "Weißer Flaum hinter den Ohren und in den Handlinien, wie Schimmel auf Brot.",
+        koerper: "Er schläft schlecht und träumt von Wurzeln. Die Hände sind wärmer, als sie sein sollten.", regel: "Noch keine Regel. Beim nächsten Punkt ist er befallen." },
+      { ab: 3, stufe: "befallen", wuerfel: 3, aussehen: "Feine Fäden unter der Haut am Hals und an den Unterarmen, grün, wenn Licht darauf fällt. Der Atem riecht nach Erde.",
+        koerper: "Die Glieder sind schwer, die Finger gehorchen einen Takt zu spät.", regel: "Würfelt 3 statt 4 Aktionswürfel. Gegner greifen ihn bevorzugt an: sie riechen es." },
+      { ab: 5, stufe: "schwer befallen", wuerfel: 2, aussehen: "Moos im Mundwinkel und im Nagelbett, die Augen haben einen grünen Rand.",
+        koerper: "Er spürt die Wärme unter dem Dorf wie einen Herzschlag und antwortet manchmal auf ein Flüstern, ohne es zu wollen.", regel: "Würfelt 2 statt 4 Aktionswürfel. Gegner greifen ihn bevorzugt an." },
+    ];
+    const befall = n => [...SPOREN].reverse().find(x => (+n || 0) >= x.ab);
     // Verhaltenswurf für einen Gegner: W6 auf die gerade gültige Tabelle (ruhig oder wütend)
     function verhaltenWurf(state) {
       const art = wuetend(state) ? "wuetend" : "ruhig", tab = (map.verhalten || {})[art] || [];
@@ -693,7 +748,11 @@
 
     // ---------- Abschluss ----------
     const epListe = state => ((map.schritte[state.schritt] || {}).ep || []).map(e => ({ ...e, erreicht: gilt(state, e.wenn) }));
-    const folgen = state => ((map.schritte[state.schritt] || {}).folgen || []).filter(f => gilt(state, f.wenn)).map(f => f.text);
+    // {flag} im Text wird durch den Wert ersetzt (z. B. {anhaenger_traeger} → der Held, der den Anhänger trägt)
+    const fuelleText = (state, t) => String(t || "").replace(/\{(\w+)\}/g, (_, k) => (state.flags[k] == null ? "?" : String(state.flags[k])));
+    const folgen = state => ((map.schritte[state.schritt] || {}).folgen || []).filter(f => gilt(state, f.wenn)).map(f => fuelleText(state, f.text));
+    // Was ein Held gerade bei sich hat oder an sich trägt (map.heldenInfo: Flag mit dem Heldennamen, Bedingung, Text)
+    const heldenInfo = (state, held) => (map.heldenInfo || []).filter(h => state.flags[h.flag] === held && (!h.wenn || gilt(state, h.wenn)));
     function wuerfle(tabelle) {
       const w = 1 + Math.floor(zufall() * 6);
       const zeile = (tabelle || map.beutewurf || []).find(([n]) => n === w);
@@ -767,12 +826,12 @@
     }
 
     return {
-      abschliessen, wissen, erfahre, vorschauGegner,
+      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
       effektiveWerte, modText, passeGegnerAn, fuegeGegnerHinzu, npcAlsGegner, zufallsNpc, auftraege,
-      aktiviere, sporen, befall, verhaltenWurf, minutenSeit, wahlLeisten,
+      aktiviere, sporen, befall, SPOREN, verhaltenWurf, minutenSeit, wahlLeisten,
       schwierigkeit: state => ({ id: state.schwierigkeit || STANDARD_STUFE, ...stufeVon(state) }),
       punkteFaktor, budgetVon: (state, id) => (state.budgets || {})[id || state.schritt] || null,
       setzeHeldenpunkte: (state, p) => { state.heldenpunkte = +p || null; },

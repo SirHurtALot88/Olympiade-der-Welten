@@ -31,6 +31,16 @@ Nicht gefunden: eine offizielle Blackstone-Fortress- oder Silver-Tower-Companion
 5. **Audio sagt „ihr".** Cues sprechen die Gruppe an; Heldennamen kommen nur vom Tisch.
 6. **Flags statt Pfade.** Jede Wahl setzt Flags; spätere Schritte und Maps fragen sie ab (`wenn`). So bleibt eine Map ein linearer Abend mit Abzweigen, die sich wieder treffen.
 
+### Leitlinien von Chris (14.10.), gelten für jede Map
+
+7. **Aufgebaut wird nur, wenn gekämpft wird.** Story-Orte (Friedhof, Kapelle, Krypta, Dorf) erzählt Chris; die App zeigt ihm die Skizze nur zur Orientierung (`nurErzaehlen` am Aufbauschritt). Erst wenn ein Kampf beginnt, kommt ein Aufbauschritt mit dem, was auf den Tisch muss (Kampfaufbau vor jedem Kampfschritt, mit `wenn`, damit nichts doppelt aufgebaut wird). Ausnahme: Maps, die von Anfang an ein Kampf sind (Map 1), stehen vor dem Intro.
+8. **Keine Fragen an Chris, was in der letzten Map war.** Alles, was aus früheren Maps folgt, zieht die App aus dem Spielstand: Folgen als fertige Liste (`folgen` am Vorbereitungsschritt), Wirkungen verbucht (`beimStart`: Leisten, Sporenpunkte).
+9. **Geplant wird auf Normal** (OPR Fortgeschritten, 50 % der Heldenpunkte je Welle, Bezug 340 Heldenpunkte). Kämpfe ohne Rast dazwischen rechnen zusammen: die Helden sind dann schon angeschlagen. Ein Kampf startet höchstens mit etwa einer Welle; was darüber hinausgeht, kommt als Nachschub am Rundenende (`rundenende.gegnerHinzu` mit `hoechstens`).
+10. **Rast nur, wo die Geschichte Ruhe hergibt.** Nach jeder Map gibt es nur die OPR-Erholung: 3 Wunden und 3 Power je Held, Zustände und Verletzungen bleiben, Atemzug +1. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort (Map 2: die Krypta), einmal, Atemzug +1. Wo die Zeit drängt oder der Ort verseucht ist (Map 1), steht „Keine Rast“ in der Lage.
+11. **Aufträge verraten nichts.** „Findet heraus, ob noch jemand lebt“, nicht „erfahrt von ihm“. Kein Auftrag nimmt vorweg, wer oder was die Helden erwartet.
+12. **Sporenpunkte haben ein Gesicht.** Jede Stufe sagt, woran man es sieht, wie es sich anfühlt und was nach den Regeln gilt (Heldeninfo und Lage). Der Träger des Kupferanhängers bekommt bei jedem Mapwechsel einen Sporenpunkt; der Anhänger lässt sich weitergeben.
+13. **Beute landet beim Helden.** Was ein Gegner fallen lässt (Ehering am Grab), steht mit Beutewurf und „Geben an“ im Todestext. Gegenstände lassen sich zwischen Helden weitergeben; was nicht weitergegeben werden kann, sagt die Heldeninfo.
+
 ## 3. Bildschirme
 
 ### (a) Map-Vorbereitung

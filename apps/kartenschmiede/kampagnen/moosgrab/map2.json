@@ -150,12 +150,16 @@
      ]
     },
     "text": "Am Ende jeder Kampfrunde würfelt der Träger einen W6 (Taste U). Bei 1 führst du ihn bei seiner nächsten Aktivierung: er greift die nächste Figur an, Freund oder Hedda. Nicht verraten, wofür gewürfelt wird. Gibt er den Anhänger Hedda zurück, ist es vorbei."
+   },
+   {
+    "titel": "Rast",
+    "text": "Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort. Hier: die Krypta, einmal, solange oben niemand wach ist (Taste V). Alle Wunden und alle Power zurück, Atemzug +1. Auf dem Friedhof und in der Kapelle rastet niemand."
    }
   ],
   "ziele": [
    {
     "art": "Hauptziel",
-    "text": "Herausfinden, wer in der Kapelle noch lebt, und erfahren, was in Moosgrab geschehen ist.",
+    "text": "Herausfinden, ob in der Kapelle noch jemand lebt, und erfahren, was in Moosgrab geschehen ist.",
     "erreicht": {
      "flag": "ep_haupt",
      "ist": true
@@ -183,8 +187,8 @@
   {
    "id": "kapelle",
    "art": "Haupt",
-   "titel": "Wer lebt noch in der Kapelle?",
-   "spieler": "Findet heraus, wer in der Kapelle noch lebt, und erfahrt von ihm, was mit Moosgrab geschehen ist.",
+   "titel": "Was ist in der Kapelle?",
+   "spieler": "Findet heraus, ob in der Kapelle noch jemand lebt und was mit Moosgrab geschehen ist.",
    "quelle": "Der Auftrag aus dem Wald: Lenes Bitte oder das Zeichen auf dem Anhänger (Schritt „Warum ihr hier seid“)",
    "vorlesen": "Von drinnen Flüstern, durch die Mauer. Wer flüstert, lebt. Oder hat gelebt. Das herauszufinden seid ihr hier.",
    "erledigt": {
@@ -310,7 +314,7 @@
  "antreiben": [
   {
    "titel": "Der Auftrag",
-   "vorlesen": "Ihr seid hier, um herauszufinden, wer noch lebt, und was mit dem Dorf geschehen ist. Drinnen flüstert jemand. Draußen wartet niemand auf euch.",
+   "vorlesen": "Ihr seid hier, um herauszufinden, ob noch jemand lebt, und was mit dem Dorf geschehen ist. Drinnen flüstert jemand. Draußen wartet niemand auf euch.",
    "gmNotiz": "Wenn die Spieler am Friedhof hängen bleiben: Der Auftrag steht oben in der App. Marker sind Beiwerk, die Kapelle ist das Ziel.",
    "wenn": {
     "flag": "drinnen",
@@ -441,6 +445,9 @@
     "flag": "sakristei_schluessel",
     "ist": true
    }
+  },
+  "info": {
+   "G": "Das zuckende Grab. Da Map 2 erzählt wird, legst du es selbst fest: Es ist das Grab, zu dem die Helden zuerst gehen (Taste 3 ansehen, Taste 4, wenn einer direkt daneben steht). Alle anderen Gräber bleiben still (Taste 7)."
   }
  },
  "leisten": {
@@ -493,14 +500,14 @@
      "titel": "Sie stehen auf",
      "vorlesen": "Die drei stehen auf. Ohne die Hände zu benutzen, als zöge man sie an Fäden hoch. Sie flüstern weiter, während sie kommen.",
      "gmNotiz": "Kampf gegen die drei. Die anderen vier knien weiter, bis die Leiste 6 zeigt.",
-     "springe": "kampf-drei"
+     "springe": "aufbau-kampf-drei"
     },
     {
      "ab": 6,
      "titel": "Die Gemeinde erwacht",
      "vorlesen": "Alle stehen auf. Gleichzeitig. Draußen bricht Erde.",
      "gmNotiz": "Cue 02-X2, dann Battle Cue 2. Alle erwachen, draußen kommt pro Runde ein Grabgänger aus den Gräbern.",
-     "springe": "kampf-gemeinde"
+     "springe": "aufbau-kampf-gemeinde-friedhof"
     }
    ],
    "schlecht": "hoch"
@@ -750,7 +757,7 @@
   },
   "auftrag_kapelle": {
    "start": false,
-   "text": "Der Auftrag dieser Map ist ausgesprochen: herausfinden, wer in der Kapelle noch lebt.",
+   "text": "Der Auftrag dieser Map ist ausgesprochen: herausfinden, ob in der Kapelle noch jemand lebt.",
    "wirktIn": "map2"
   },
   "nachricht_ausgerichtet": {
@@ -771,6 +778,21 @@
   "grab_kampf": {
    "start": false,
    "text": "Die Helden kämpfen gegen das zuckende Grab.",
+   "wirktIn": "map2"
+  },
+  "friedhof_steht": {
+   "start": false,
+   "text": "Der Friedhof steht auf dem Tisch (es wird dort gekämpft).",
+   "wirktIn": "map2"
+  },
+  "innen_steht": {
+   "start": false,
+   "text": "Das Innere der Kapelle steht auf dem Tisch (es wird dort gekämpft).",
+   "wirktIn": "map2"
+  },
+  "fenster_gesehen": {
+   "start": false,
+   "text": "Jemand hat durchs Fenster in die Kapelle gesehen.",
    "wirktIn": "map2"
   }
  },
@@ -1040,10 +1062,14 @@
    },
    "tod": {
     "vorlesen": "Die Hand öffnet sich und bleibt offen. Der Ring rutscht vom Finger und fällt in die lockere Erde. Dann ist es still, und ihr seht, dass die Erde um das Grab von innen aufgeworfen ist, nicht von außen.",
-    "gmNotiz": "Figur vom Tisch. Kein Effekt. Der Ring ist Beute (Vorschlag: ein Beutewurf, oder den Ring als Erinnerung für Map 3 geben, dort sucht die Wirtin ihren Mann). Jeder Nahkampf hier hat Lärm gekostet: Leiste prüfen.",
+    "gmNotiz": "Figur vom Tisch. Beute: ein Beutewurf, und der Ehering geht an einen Helden (Knöpfe unten). In Map 3 sucht die Wirtin ihren Mann: der Ring ist sein. Jeder Nahkampf hier hat Lärm gekostet: Leiste prüfen.",
     "setzt": {
      "grab_still": true
-    }
+    },
+    "beutewurf": true,
+    "beute": [
+     "Ehering vom zuckenden Grab"
+    ]
    },
    "anblick": "Ein Arm, grau bis zum Ellenbogen, am Finger ein Ehering. Die Hand dreht sich jedes Mal dorthin, wo jemand auftritt."
   },
@@ -1199,7 +1225,16 @@
     "flag": "gemeinde_wach",
     "ist": true
    },
-   "text": "Nachschub: der nächste Grabgänger kommt aus den Gräbern (Zone G). Figur aufstellen, solange welche übrig sind."
+   "gegnerHinzu": [
+    {
+     "id": "grabgaenger",
+     "anzahl": 1,
+     "zone": "G"
+    }
+   ],
+   "hoechstens": 3,
+   "skaliert": true,
+   "text": "Nachschub: ein Grabgänger kommt aus den Gräbern (Zone G). Steht schon in der Gegnerliste."
   }
  ],
  "ereignisse": {
@@ -1258,7 +1293,7 @@
    "gmNotiz": "Zettel „Schlüssel zur Sakristei“ übergeben. Die Sakristei-Tür liegt an der rechten Seite der Kapelle (Marker S wird aufgedeckt): leise, direkt neben dem Altar."
   },
   "grab": {
-   "name": "Das zuckende Grab ansehen (Tischmitte)",
+   "name": "Das zuckende Grab ansehen",
    "gruppe": "Untersuchen",
    "kurz": "Grab ansehen",
    "taste": "3",
@@ -1279,7 +1314,8 @@
       "gmNotiz": "Hinweis auf die Grabgänger bei Lärm 6. Nichts erklären."
      }
     ]
-   }
+   },
+   "wofuer": "Das zuckende Grab: ein Arm aus der Erde, greift, wer direkt daneben steht. Welches Grab es ist, entscheidest du: das, zu dem die Helden zuerst gehen."
   },
   "grab-angriff": {
    "name": "Ein Held steht direkt neben dem zuckenden Grab",
@@ -1293,12 +1329,13 @@
    },
    "vorlesen": "Die Hand schnappt zu. Sie hat auf einen Schritt gewartet.",
    "gmNotiz": "Kampf gegen das Grab. Wer einfach weitergeht, kämpft nicht: es folgt niemandem. Jeder Nahkampf dagegen: Taste L (+1 Lärm).",
-   "springe": "kampf-grab"
+   "springe": "aufbau-kampf-grab",
+   "marker": "G"
   },
   "fenster": {
    "name": "Durchs Fenster spähen (linke Seite der Kapelle)",
    "gruppe": "Untersuchen",
-   "kurz": "Fenster spähen",
+   "kurz": "Fenster: hineinsehen",
    "taste": "5",
    "marker": "fenster:F",
    "einmal": true,
@@ -1318,8 +1355,11 @@
      }
     ]
    },
-   "gmNotiz": "Jetzt das Innere aufbauen (die App springt zum Aufbau und danach zurück nach draußen).",
-   "springe": "aufbau-innen"
+   "gmNotiz": "Was drinnen ist (für dich, nichts aufbauen): sieben Kniende in zwei Reihen mit dem Rücken zur Haupttür, vorn der Altar mit einer Kerze, Bänke links und rechts, rechts neben dem Altar die Sakristei-Tür. Jetzt entscheiden die Spieler: hinein durch die Tür (H), durchs Fenster (E), mit Schlüssel durch die Sakristei (K), oder draußen weiter.",
+   "setzt": {
+    "inneres_aufgebaut": true,
+    "fenster_gesehen": true
+   }
   },
   "turm": {
    "name": "Den Glockenturm ansehen (rechts oben)",
@@ -1352,8 +1392,8 @@
    "marker": "T",
    "einmal": true,
    "kosten": "Held in Kontakt mit der Tür, eine Bewegung",
-   "vorlesen": "Die Tür knarrt. Laut. Drinnen setzt das Flüstern für einen Atemzug aus. Dann geht es weiter, als wäre nichts.",
-   "gmNotiz": "Lärm +1. Danach Cue 02-2 und das Innere aufbauen, falls es noch nicht steht.",
+   "vorlesen": "Die Tür knarrt. Laut. Drinnen setzt das Flüstern für einen Atemzug aus, sieben Rücken werden steif. Dann geht es weiter, als wäre nichts.",
+   "gmNotiz": "Lärm +1. Wer durch die Tür kommt, steht hinter allen, mit Abstand: im ersten Zug drinnen kein Lärm extra. Danach Cue 02-2.",
    "leisten": {
     "laerm": 1
    },
@@ -1365,17 +1405,21 @@
   "fenster-einstieg": {
    "name": "Durchs zerbrochene Fenster hinein",
    "gruppe": "Wege",
-   "kurz": "Fenster",
+   "kurz": "Fenster: einsteigen",
    "taste": "E",
    "marker": "fenster:F",
    "einmal": true,
    "kosten": "Held in Kontakt mit der Wand, die ganze Bewegung (schwieriges Gelände)",
-   "vorlesen": "Glas knirscht unter dem Stiefel, aber leise. Drinnen riecht es nach nassem Brot und kalter Kerze.",
-   "gmNotiz": "Kein Lärm. Wer hier durchsteigt, braucht seine ganze Bewegung dafür. Danach Cue 02-2.",
+   "vorlesen": "Glas knirscht unter dem Stiefel, aber leise. Ihr steigt über das Sims und steht zwischen den Bänken, eine Armlänge hinter der letzten Reihe. Eine der Gestalten dreht den Kopf zur Seite, zu dem Geräusch. Dann flüstert sie weiter.",
+   "gmNotiz": "Kein Lärm, aber ihr seid mitten unter ihnen: Wer durchs Fenster kommt, steht im schwierigen Gelände (Bänke) direkt hinter der letzten Reihe. Wer hier im ersten Zug läuft oder kämpft: +1 Lärm extra. Danach Cue 02-2.",
    "setzt": {
     "drinnen": true
    },
-   "springe": "cue-02-2"
+   "springe": "cue-02-2",
+   "nurWenn": {
+    "flag": "fenster_gesehen",
+    "ist": true
+   }
   },
   "sakristei": {
    "name": "Durch die Sakristei hinein (mit Schlüssel)",
@@ -1390,7 +1434,7 @@
    },
    "kosten": "Held in Kontakt mit der Sakristei-Tür, eine Bewegung",
    "vorlesen": "Der Schlüssel dreht sich ohne Widerstand. Ein schmaler Raum, Talare an Haken, ein Vorhang. Dahinter, direkt daneben, der Altar, und davor, mit dem Rücken zu euch, sieben kniende Gestalten. Sie flüstern.",
-   "gmNotiz": "Kein Lärm. Der Held steht direkt neben dem Altar. Danach Cue 02-2.",
+   "gmNotiz": "Kein Lärm. Der Held steht direkt neben dem Altar, vor den Knienden: Sie sehen ihn nicht, solange er nicht vor sie tritt. Danach Cue 02-2.",
    "setzt": {
     "drinnen": true
    },
@@ -1411,7 +1455,7 @@
    "setzt": {
     "glocke_geschlagen": true
    },
-   "springe": "kampf-gemeinde"
+   "springe": "aufbau-kampf-gemeinde-friedhof"
   },
   "laerm-nah": {
    "name": "Lärm: Nahkampf (+1)",
@@ -1477,7 +1521,7 @@
    "einmal": false,
    "kosten": "Held in Kontakt, 1 Aktion. Nahkampf: der Lärm ist hier schon verbucht (+1), kein L dazu.",
    "vorlesen": "Die Gestalt bricht das Flüstern ab. Mitten im Wort. Der Kopf dreht sich zu euch, langsam, auf dem Hals, als säße er nicht fest. Dann steht sie auf, ohne die Hände zu benutzen.",
-   "gmNotiz": "Eine der knienden Figuren ist ab jetzt dieser Gegner (Karte erscheint in der Spalte, Zone K). Die anderen knien weiter, bis die Lärm-Leiste sie weckt: dieser Angriff zählt +1, das ist schon verbucht. Mit der ersten Attacke des Helden abrechnen, dann greift die Gestalt jede Runde an, wer sie berührt (ruhige Tabelle, verfolgt nicht). Steht die Gemeinde später ganz auf, kommen nur noch so viele Karten dazu, wie noch knien: die App zählt das nicht mit, nimm dann eine Karte weniger.",
+   "gmNotiz": "Eine der knienden Figuren ist ab jetzt dieser Gegner (Karte erscheint in der Spalte, Zone K). Die anderen knien weiter, bis die Lärm-Leiste sie weckt: dieser Angriff zählt +1, das ist schon verbucht. Mit der ersten Attacke des Helden abrechnen, dann greift die Gestalt jede Runde an, wer sie berührt (ruhige Tabelle, verfolgt nicht). Steht die Gemeinde später ganz auf, kommen nur noch so viele Karten dazu, wie noch knien: die App zählt das nicht mit, nimm dann eine Karte weniger. Kämpft ihr drinnen und das Innere steht noch nicht: jetzt aufbauen (Altar, Bänke, die Knienden in zwei Reihen, die angegriffene steht auf).",
    "leisten": {
     "laerm": 1
    },
@@ -1487,7 +1531,10 @@
      "anzahl": 1,
      "zone": "K"
     }
-   ]
+   ],
+   "setzt": {
+    "innen_steht": true
+   }
   },
   "hinhoeren": {
    "name": "Hinhören, was sie flüstern",
@@ -1855,6 +1902,41 @@
      }
     ]
    }
+  },
+  "rast-krypta": {
+   "name": "Rast in der Krypta (Atemzug +1)",
+   "gruppe": "Story",
+   "kurz": "Rasten",
+   "taste": "V",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "gemeinde_wach",
+      "ist": false
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Nur einmal, nur solange oben niemand wach ist. Kostet Zeit: Atemzug +1.",
+   "vorlesen": "Die Krypta ist der einzige Ort in Moosgrab, an dem niemand flüstert. Ihr lehnt euch an die Särge. Für eine Stunde ist es still, nur die Kerze knistert. Oben flüstern sie weiter.",
+   "gmNotiz": "Echte Rast an einem sicheren Ort: Jeder Held heilt alle Wunden und bekommt alle Power zurück. Zustände und Verletzungen bleiben. Atemzug +1 ist verbucht.",
+   "leisten": {
+    "atemzug": 1
+   }
+  },
+  "graeber-still": {
+   "name": "Ein anderes Grab ansehen (dort passiert nichts)",
+   "gruppe": "Untersuchen",
+   "kurz": "Stilles Grab",
+   "taste": "7",
+   "einmal": false,
+   "kosten": "Keine Aktion. So oft du willst: für jedes Grab, das nicht das zuckende ist.",
+   "vorlesen": "Ein alter Stein, der Name verwittert, Moos in den Buchstaben. Die Erde liegt still. Hier rührt sich nichts. Noch nicht.",
+   "gmNotiz": "Nur Stimmung. Kein Lärm, kein Kampf."
   }
  },
  "schritte": {
@@ -1889,161 +1971,110 @@
    "typ": "vorbereitung",
    "titel": "Was aus Map 1 mitkommt",
    "checkliste": [
-    "Lärm-Leiste auf 0, Zählstein auf den Tisch",
-    "Sporenpunkte stehen an den Heldenchips (die App hat sie übernommen); am Tisch dieselben Zahlen",
-    "Wunden und Power der Helden zurückgesetzt"
+    "Wunden und Power: Am Ende von Map 1 hat jeder Held 3 Wunden und 3 Power zurückbekommen (OPR), nicht alles. Heldenbögen prüfen",
+    "Zählstein Lärm auf 0 vor die Spieler legen"
    ],
-   "hinweis": "Die nächsten Schritte zeigen nur, was in Map 1 wirklich passiert ist. Was nicht passiert ist, wird übersprungen.",
-   "weiter": "vorb-anhaenger-ja",
-   "uebernahme": true
-  },
-  "vorb-anhaenger-ja": {
-   "typ": "vorbereitung",
-   "titel": "Der Anhänger ist dabei",
-   "wenn": {
-    "flag": "anhaenger",
-    "ist": true
-   },
-   "checkliste": [
-    "Der Spieler mit dem Zettel „Kupferanhänger“ hat ihn dabei (Träger steht im Stand unter anhaenger_traeger)",
-    "Merken: An der Falltür öffnet der Anhänger leise. Hedda erkennt ihn sofort.",
-    "Nur für dich: Der Anhänger ist verpestet. In jedem Kampf würfelt der Träger am Rundenende (Taste U, die App erinnert dich in „Gilt jetzt“). Bei 1 steuerst du ihn einmal."
-   ],
-   "hinweis": "Nicht daran erinnern, dass er wichtig ist. Die Spieler sollen selbst darauf kommen.",
-   "weiter": "vorb-anhaenger-nein"
-  },
-  "vorb-anhaenger-nein": {
-   "typ": "vorbereitung",
-   "titel": "Kein Anhänger",
-   "wenn": {
-    "flag": "anhaenger",
-    "ist": false
-   },
-   "checkliste": [
-    "Die Helden haben den Anhänger im Moos gelassen. Die Falltür geht nur mit Gewalt, mit einem Namen oder mit Reden auf.",
-    "Hedda bekommt keinen Anhänger zurück: Kellerschlüssel nur, wenn Lene zugedeckt wurde."
-   ],
-   "weiter": "vorb-name"
-  },
-  "vorb-name": {
-   "typ": "vorbereitung",
-   "titel": "Das Moos kennt einen Namen",
-   "wenn": {
-    "flag": "name_verraten",
-    "nicht": null
-   },
-   "checkliste": [
-    "Der Held, der der Frau seinen Namen gesagt hat (Stand: name_verraten), startet mit 1 Sporenpunkt",
-    "Bei der Regel-Ansage zu ihm: „Das Moos hat deinen Namen gehört.“ Nicht erklären."
-   ],
-   "weiter": "vorb-brunnen"
-  },
-  "vorb-brunnen": {
-   "typ": "vorbereitung",
-   "titel": "Die Frau hat den Brunnen erwähnt",
-   "wenn": {
-    "flag": "hinweis_brunnen",
-    "ist": true
-   },
-   "checkliste": [
-    "Die Helden dürfen Hedda direkt nach dem Brunnen fragen: Heddas Geduld +1 (die App hat es verbucht)"
-   ],
-   "leisten": {
-    "geduld": 1
-   },
-   "weiter": "vorb-versprechen"
-  },
-  "vorb-versprechen": {
-   "typ": "vorbereitung",
-   "titel": "Das Versprechen an die Mutter",
-   "wenn": {
-    "flag": "versprechen_mutter",
-    "ist": true
-   },
-   "checkliste": [
-    "Die Helden haben Lene versprochen, der Mutter etwas auszurichten: „Sagt ihr, ich hab den Weg nicht gefunden.“",
-    "Hedda hört zu, bevor sie urteilt: Geduld +1 (verbucht). An der Falltür reicht Reden, wenn sie das Versprechen erwähnen.",
-    "Richten sie den Satz aus, gibt es einen eigenen Schritt dafür."
-   ],
-   "leisten": {
-    "geduld": 1
-   },
-   "weiter": "vorb-priester"
-  },
-  "vorb-priester": {
-   "typ": "vorbereitung",
-   "titel": "Die Helden wissen, wo der Priester liegt",
-   "wenn": {
-    "flag": "priester_gefunden",
-    "ist": true
-   },
-   "checkliste": [
-    "Der Tote an Marker 2 in Map 1 trug das Zeichen der Kapelle. Sagen die Helden Hedda, dass er tot im Moos liegt, glaubt sie ihnen eher: Geduld +1 (verbucht)"
-   ],
-   "leisten": {
-    "geduld": 1
-   },
-   "weiter": "vorb-begraben"
-  },
-  "vorb-begraben": {
-   "typ": "vorbereitung",
-   "titel": "Lene wurde zugedeckt",
-   "wenn": {
-    "flag": "frau_begraben",
-    "ist": true
-   },
-   "checkliste": [
-    "Erzählen die Helden Hedda, dass sie ihre Tochter zugedeckt haben, gibt sie den Kellerschlüssel auch ohne Anhänger (eigener Schritt im Gespräch)"
-   ],
-   "weiter": "vorb-verbrannt"
-  },
-  "vorb-verbrannt": {
-   "typ": "vorbereitung",
-   "titel": "Lene wurde verbrannt",
-   "wenn": {
-    "flag": "leiche_verbrannt",
-    "ist": true
-   },
-   "checkliste": [
-    "Erfährt Hedda, dass die Helden ihre Tochter verbrannt haben, zieht sie sich zurück: nur noch die drei Kernsätze. Die App fragt im Gespräch, ob sie es sagen."
-   ],
-   "weiter": "vorb-angegriffen"
-  },
-  "vorb-angegriffen": {
-   "typ": "vorbereitung",
-   "titel": "Die Helden haben Lene angegriffen",
-   "wenn": {
-    "eine": [
-     {
-      "flag": "frau_angegriffen",
+   "hinweis": "Alles darunter hat die App aus dem Spielstand von Map 1 gezogen und schon verbucht (Geduld, Sporenpunkte). Du musst nichts nachfragen und nichts nachtragen.",
+   "weiter": "aufbau-aussen",
+   "uebernahme": true,
+   "folgen": [
+    {
+     "wenn": {
+      "flag": "anhaenger",
       "ist": true
      },
-     {
-      "flag": "aufbluehen_angriff",
+     "text": "Der Kupferanhänger ist dabei, {anhaenger_traeger} trägt ihn. An der Falltür öffnet er leise, Hedda erkennt ihn sofort. Nicht daran erinnern: die Spieler sollen selbst darauf kommen."
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
       "ist": true
-     }
-    ]
-   },
-   "checkliste": [
-    "Vor dem Aufblühen oder währenddessen. Sagen sie Hedda die Wahrheit darüber, zieht sie sich zurück: nur noch die drei Kernsätze. Die App fragt im Gespräch, ob sie es sagen."
-   ],
-   "weiter": "vorb-bonus"
-  },
-  "vorb-bonus": {
-   "typ": "vorbereitung",
-   "titel": "Bonus-Beute",
-   "wenn": {
-    "flag": "alle_marker",
-    "ist": true
-   },
-   "checkliste": [
-    "Alle drei Marker in Map 1 gesichert: am Ende dieser Map ein Beutewurf zusätzlich"
-   ],
-   "weiter": "aufbau-aussen"
+     },
+     "text": "Nur für dich: Der Anhänger ist verpestet. In jedem Kampf würfelt der Träger am Rundenende (Taste U). Bei 1 steuerst du ihn einmal."
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     "text": "Der Anhänger hat {anhaenger_traeger} auf dem Weg hierher 1 Sporenpunkt gekostet (verbucht, am Heldenchip). Nicht sagen, woher. Wie sich Sporenpunkte zeigen und was sie bewirken: Heldenchip anklicken (oder Lage)."
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
+      "ist": false
+     },
+     "text": "Kein Anhänger: Er liegt im Moos. Die Falltür geht nur mit Gewalt, einem Namen oder Reden auf; den Kellerschlüssel gibt Hedda nur, wenn Lene zugedeckt wurde."
+    },
+    {
+     "wenn": {
+      "flag": "name_verraten",
+      "nicht": null
+     },
+     "text": "{name_verraten} hat der Frau seinen Namen gesagt: 1 Sporenpunkt (verbucht, am Heldenchip). Sag es ihm bei der Regel-Ansage: „Das Moos hat deinen Namen gehört.“ Wie sich das zeigt und was es bewirkt: Heldenchip anklicken (oder Lage)."
+    },
+    {
+     "wenn": {
+      "flag": "hinweis_brunnen",
+      "ist": true
+     },
+     "text": "Die Frau hat den Brunnen erwähnt: Die Helden dürfen Hedda direkt danach fragen. Heddas Geduld +1 (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "versprechen_mutter",
+      "ist": true
+     },
+     "text": "Die Helden haben Lene versprochen, der Mutter auszurichten: „Ich hab den Weg nicht gefunden.“ Hedda hört zu, bevor sie urteilt: Geduld +1 (verbucht). An der Falltür reicht Reden, wenn sie das Versprechen erwähnen."
+    },
+    {
+     "wenn": {
+      "flag": "priester_gefunden",
+      "ist": true
+     },
+     "text": "Die Helden kennen den toten Priester (Map 1, Marker 2). Erzählen sie Hedda davon, glaubt sie ihnen eher: Geduld +1 (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "frau_begraben",
+      "ist": true
+     },
+     "text": "Lene wurde zugedeckt: Erzählen die Helden es Hedda, gibt sie den Kellerschlüssel auch ohne Anhänger."
+    },
+    {
+     "wenn": {
+      "flag": "leiche_verbrannt",
+      "ist": true
+     },
+     "text": "Lene wurde verbrannt: Erfährt Hedda das, zieht sie sich zurück. Die App fragt im Gespräch, ob sie es sagen."
+    },
+    {
+     "wenn": {
+      "eine": [
+       {
+        "flag": "frau_angegriffen",
+        "ist": true
+       },
+       {
+        "flag": "aufbluehen_angriff",
+        "ist": true
+       }
+      ]
+     },
+     "text": "Die Helden haben Lene angegriffen: Sagen sie Hedda die Wahrheit, zieht sie sich zurück. Die App fragt im Gespräch, ob sie es sagen."
+    },
+    {
+     "wenn": {
+      "flag": "alle_marker",
+      "ist": true
+     },
+     "text": "Alle drei Marker in Map 1 gesichert: am Ende dieser Map ein Beutewurf zusätzlich."
+    }
+   ]
   },
   "aufbau-aussen": {
    "typ": "aufbau",
-   "titel": "Friedhof und Außenseite",
+   "titel": "Der Friedhof",
    "skizze": {
     "decke": [
      [
@@ -2056,17 +2087,16 @@
     "text": "Das Innere der Kapelle bleibt leer, bis jemand hineinschaut."
    },
    "tisch": [
-    "Heldenstart unten an der Tischkante, Mitte",
-    "Kapelle an die obere Kante, Mitte, mit der Haupttür zu den Helden. Innen bleibt sie leer",
-    "Glockenturm in die rechte obere Ecke, neben der Kapelle; das Seil hängt außen",
-    "Gräber verteilen: ein paar links, ein paar in der Mitte, ein paar rechts. Zäune an die linke und rechte Kante",
-    "Die Linde in die linke untere Ecke, Suchmarker 1 darunter",
-    "Grab der Familie Harm rechts auf halber Höhe, Suchmarker 2 daneben",
-    "Das zuckende Grab in die Tischmitte, etwas nach links",
-    "Zählstein Lärm auf 0, gut sichtbar"
+    "Die Kapelle oben in der Mitte, Haupttür zu den Helden, links ein zerbrochenes Fenster",
+    "Der Glockenturm rechts daneben; das Seil erwähnst du erst, wenn jemand den Turm ansieht",
+    "Die Linde links unten, darunter Suchmarker 1",
+    "Das Grab der Familie Harm rechts, daneben Suchmarker 2",
+    "Das zuckende Grab in der Mitte, etwas nach links"
    ],
-   "hinweis": "Innen kommt erst auf den Tisch, wenn jemand durchs Fenster schaut oder hineingeht. Die Falltür wird nie gezeigt, bevor jemand den Altar untersucht hat.",
-   "weiter": "regel-laerm"
+   "hinweis": "Gekämpft wird hier nur, wenn das Grab zuschnappt oder die Gemeinde erwacht. Dann zeigt dir die App, was auf den Tisch kommt. Die Spieler sagen, wohin sie gehen; du beschreibst, was sie sehen.",
+   "weiter": "regel-laerm",
+   "nurErzaehlen": true,
+   "text": "Vor euch der Friedhof der Kapelle. Links eine alte Linde, darunter ein Grab ohne Stein. Rechts der Grabstein einer Familie, daneben frische Erde. Zwischen den Gräbern ist die Erde an einer Stelle aufgeworfen. Oben die Kapelle, die Tür geschlossen, links ein zerbrochenes Fenster, rechts der Glockenturm."
   },
   "regel-laerm": {
    "typ": "regel",
@@ -2089,7 +2119,7 @@
     "flag": "versprechen_mutter",
     "ist": true
    },
-   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. „Sagt meiner Mutter, ich hab den Weg nicht gefunden“, hat die Frau am Waldrand gesagt. „Sie ist in der Kapelle. Alle sind in der Kapelle.“ Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Findet ihre Mutter. Und erfahrt, was mit dem Dorf geschehen ist.",
+   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. „Sagt meiner Mutter, ich hab den Weg nicht gefunden“, hat die Frau am Waldrand gesagt. „Sie ist in der Kapelle. Alle sind in der Kapelle.“ Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, ob hier noch jemand lebt. Findet ihre Mutter. Und erfahrt, was mit dem Dorf geschehen ist.",
    "gmNotiz": "Der Auftrag für die Spieler, laut und deutlich: Lenes Mutter finden, herausfinden, was in Moosgrab los ist. Nicht sagen, wer flüstert, nicht sagen, wo die Mutter ist. Den Namen Lene sagst du nur, wenn die Spieler ihn kennen (Stand: frau_name); nach Antwort 2 in Map 1 kennen sie ihn nicht. Dann Weiter: die Spieler sind dran.",
    "setzt": {
     "auftrag_kapelle": true
@@ -2103,8 +2133,8 @@
     "flag": "versprechen_mutter",
     "ist": false
    },
-   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. Hier fängt der Weg ins Dorf an, und hier ist der erste Ort, an dem noch jemand sein könnte. Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, wer hier noch lebt. Und erfahrt, was mit dem Dorf geschehen ist.",
-   "gmNotiz": "Die Helden haben Lene nicht nach ihrer Mutter gefragt (oder sie nicht erreicht): nur das Zeichen führt sie her. Der Auftrag für die Spieler, laut und deutlich: herausfinden, wer in der Kapelle noch lebt und was in Moosgrab los ist. Dann Weiter: die Spieler sind dran.",
+   "text": "Die Kapelle vor Moosgrab. Über der Tür ein Turm mit einer Glocke, dasselbe Zeichen wie auf dem Kupfer im Moos. Hier fängt der Weg ins Dorf an, und hier ist der erste Ort, an dem noch jemand sein könnte. Von drinnen kommt Flüstern, viele Stimmen. Findet heraus, ob hier noch jemand lebt. Und erfahrt, was mit dem Dorf geschehen ist.",
+   "gmNotiz": "Die Helden haben Lene nicht nach ihrer Mutter gefragt (oder sie nicht erreicht): nur das Zeichen führt sie her. Der Auftrag für die Spieler, laut und deutlich: herausfinden, ob in der Kapelle noch jemand lebt und was in Moosgrab los ist. Dann Weiter: die Spieler sind dran.",
    "setzt": {
     "auftrag_kapelle": true
    },
@@ -2112,14 +2142,15 @@
   },
   "spieler-draussen": {
    "typ": "spieler",
-   "titel": "Draußen",
+   "titel": "Draußen auf dem Friedhof",
    "zeitlimit": 12,
    "runden": true,
    "text": "Die Spieler erkunden den Friedhof. Sie suchen, schauen, wählen ihren Weg hinein. Du zählst Lärm. Rundenende: R.",
    "hinweise": [
     "Marker 1 und 2, das Grab, das Fenster und der Turm: jeweils Grundtext, dann würfelt der Spieler, dann die Stufen.",
-    "Wege hinein: Haupttür H (+1 Lärm), Fenster E (leise, aber die ganze Bewegung), Sakristei K (nur mit Schlüssel von Marker 2, leise, direkt neben dem Altar).",
+    "Erst schauen, dann gehen: Fenster hineinsehen (5) zeigt das Innere, danach erst einsteigen (E, leise, aber mitten unter ihnen). Haupttür H (+1 Lärm, hinter allen), Sakristei K (nur mit Schlüssel von Marker 2, leise, direkt neben dem Altar).",
     "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T Tür aufbrechen +2. Das Grab greift nur an, wer direkt daneben steht (Taste 4).",
+    "Drei Gruppen Gräber, ein zuckendes: Es ist das, zu dem die Helden zuerst gehen. Bei allen anderen passiert nichts (Taste 7, nur Stimmung).",
     "Das Glockenseil erwähnst du, wenn jemand den Turm ansieht. Du bietest es nicht an. Zieht jemand: G.",
     "Rundenwurf „Was flüstert die Gemeinde?“ am Rundenende, wenn du ihn nimmst.",
     "Faden verloren? „Drinnen flüstert jemand. Wer flüstert, lebt. Das herauszufinden seid ihr hier.“ Der Friedhof ist Beiwerk, die Kapelle das Ziel."
@@ -2129,6 +2160,7 @@
     "marker2",
     "grab",
     "grab-angriff",
+    "graeber-still",
     "fenster",
     "turm",
     "haupttuer",
@@ -2151,6 +2183,26 @@
      "ziel": "cue-02-2"
     }
    ]
+  },
+  "aufbau-kampf-grab": {
+   "typ": "aufbau",
+   "titel": "Kampf am Grab: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "friedhof_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Friedhof: Gräber links, in der Mitte und rechts, Zäune an die linke und rechte Kante, die Linde links unten, das Grab Harm rechts",
+    "Die Kapelle an die obere Kante, Mitte (Haupttür zu den Helden), Glockenturm rechts daneben",
+    "Das zuckende Grab in die Tischmitte, etwas nach links",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind"
+   ],
+   "hinweis": "Gekämpft wird nur am Grab. Die Kapelle reicht als Umriss.",
+   "setzt": {
+    "friedhof_steht": true
+   },
+   "weiter": "kampf-grab"
   },
   "kampf-grab": {
    "typ": "kampf",
@@ -2209,39 +2261,25 @@
   },
   "aufbau-innen": {
    "typ": "aufbau",
-   "titel": "Das Innere der Kapelle",
-   "wenn": {
-    "flag": "inneres_aufgebaut",
-    "ist": false
-   },
+   "titel": "Drinnen in der Kapelle",
    "skizze": "alles",
    "tisch": [
-    "7 kniende Gestalten in die Kapelle, in zwei Reihen, mit dem Rücken zur Haupttür",
-    "Altar an die Rückwand, Mitte, mit einer Kerze darauf",
-    "Bänke links und rechts (schwieriges Gelände), Taufstein neben der Tür",
-    "Die Sakristei-Tür rechts neben dem Altar, nur wenn die Helden den Schlüssel haben",
-    "Nichts, was auf eine Falltür hindeutet. Kein Marker, kein Wort."
+    "7 kniende Gestalten in zwei Reihen, mit dem Rücken zur Haupttür",
+    "Vorn der Altar, darauf eine Kerze",
+    "Bänke links und rechts, ein Taufstein neben der Tür",
+    "Rechts neben dem Altar die Tür zur Sakristei",
+    "Nichts, was auf eine Falltür hindeutet. Kein Wort davon."
    ],
    "setzt": {
     "inneres_aufgebaut": true
    },
-   "hinweis": "Die Gestalten bleiben Figuren ohne Karte, bis sie aufstehen. Die Gegnerkarten erscheinen erst im Kampf.",
-   "weiter": [
-    {
-     "wenn": {
-      "flag": "drinnen",
-      "ist": true
-     },
-     "ziel": "spieler-drinnen"
-    },
-    {
-     "ziel": "spieler-draussen"
-    }
-   ]
+   "hinweis": "Nichts aufbauen, solange niemand kämpft. Die Spieler sagen, wo sie hingehen; du beschreibst es. Laut wird es über die Lärm-Tasten.",
+   "weiter": "spieler-drinnen",
+   "nurErzaehlen": true
   },
   "spieler-drinnen": {
    "typ": "spieler",
-   "titel": "Drinnen",
+   "titel": "Drinnen in der Kapelle",
    "zeitlimit": 8,
    "runden": true,
    "text": "Die Spieler sind in der Kapelle. Sie schleichen, schauen, hören hin, untersuchen den Altar. Du zählst Lärm. Rundenende: R.",
@@ -2765,7 +2803,8 @@
     "kniende-angreifen",
     "laerm-nah",
     "laerm-fern",
-    "anhaenger-fluestert"
+    "anhaenger-fluestert",
+    "rast-krypta"
    ],
    "weiter": "hedda-weg"
   },
@@ -2854,7 +2893,7 @@
       "atemzug": 1
      },
      "folge": "Kampf gegen sieben. Atemzug +1 (es dauert). Map 3: keine Verfolger, aber der Sohn des Bäckers fragt nach seinem Vater. Danach wieder diese Wahl.",
-     "ziel": "kampf-erloesen"
+     "ziel": "aufbau-kampf-erloesen"
     },
     {
      "taste": "4",
@@ -2863,6 +2902,9 @@
      "folge": "Zurück zum Fragen-Schritt.",
      "ziel": "npc-hedda-fragen"
     }
+   ],
+   "ereignisse": [
+    "rast-krypta"
    ]
   },
   "weg-krypta": {
@@ -2878,6 +2920,25 @@
    "text": "Ihr steigt die Stufen hinauf, an den Knienden vorbei. Sie flüstern. Die Tür, der Friedhof, der Zaun, der Weg. Hedda geht hinter euch bis zum letzten Grabstein. Dort bleibt sie stehen. „Nicht weiter.“ Vor euch liegt das Dorf, dunkel, und irgendwo schlägt ein Hammer.",
    "gmNotiz": "Ist die Gemeinde wach, flüstert sie nicht: sie steht und sieht den Helden nach. Der Hammer ist der Schmied, nichts erklären.",
    "weiter": "cue-02-6"
+  },
+  "aufbau-kampf-drei": {
+   "typ": "aufbau",
+   "titel": "Sie stehen auf: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "innen_steht",
+    "ist": false
+   },
+   "tisch": [
+    "In die Kapelle: Altar an die Rückwand mit der Kerze, Bänke links und rechts (schwieriges Gelände)",
+    "Die knienden Gestalten in zwei Reihen, mit dem Rücken zur Haupttür (wer schon gefallen ist, fehlt)",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind",
+    "Die drei, die sich umgedreht hatten, stehen auf. Ihre Karten kommen gleich in die Gegnerliste"
+   ],
+   "setzt": {
+    "innen_steht": true
+   },
+   "weiter": "kampf-drei"
   },
   "kampf-drei": {
    "typ": "kampf",
@@ -2932,7 +2993,7 @@
       "leiste": "laerm",
       ">=": 6
      },
-     "ziel": "kampf-gemeinde"
+     "ziel": "aufbau-kampf-gemeinde-friedhof"
     },
     {
      "wenn": {
@@ -2942,6 +3003,44 @@
     }
    ],
    "weiter": "kampf-abgebrochen"
+  },
+  "aufbau-kampf-gemeinde-friedhof": {
+   "typ": "aufbau",
+   "titel": "Die Gemeinde erwacht: Friedhof aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "friedhof_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Friedhof: Gräber links, in der Mitte und rechts, Zäune an die linke und rechte Kante, die Linde links unten, das Grab Harm rechts",
+    "Die Kapelle an die obere Kante, Mitte (Haupttür zu den Helden), Glockenturm rechts daneben",
+    "Das zuckende Grab in die Tischmitte, etwas nach links",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind",
+    "Grabgänger bereitlegen: je Rundenende kommt einer aus den Gräbern"
+   ],
+   "setzt": {
+    "friedhof_steht": true
+   },
+   "weiter": "aufbau-kampf-gemeinde-innen"
+  },
+  "aufbau-kampf-gemeinde-innen": {
+   "typ": "aufbau",
+   "titel": "Die Gemeinde erwacht: Kapelle aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "innen_steht",
+    "ist": false
+   },
+   "tisch": [
+    "In die Kapelle: Altar an die Rückwand mit der Kerze, Bänke links und rechts (schwieriges Gelände)",
+    "Die knienden Gestalten in zwei Reihen, mit dem Rücken zur Haupttür (wer schon gefallen ist, fehlt)",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind"
+   ],
+   "setzt": {
+    "innen_steht": true
+   },
+   "weiter": "kampf-gemeinde"
   },
   "kampf-gemeinde": {
    "typ": "kampf",
@@ -2968,11 +3067,6 @@
       "ist": false
      },
      "fest": true
-    },
-    {
-     "id": "grabgaenger",
-     "anzahl": 3,
-     "zone": "G"
     }
    ],
    "setzt": {
@@ -2982,7 +3076,7 @@
    "verhalten": {
     "start": "wuetend"
    },
-   "text": "Lärm 6 oder Glocke: Alle stehen auf, gleichzeitig. Wütende Tabelle. Draußen bricht Erde: je Rundenende kommt ein Grabgänger aus Zone G, die Grabgänger der Gegnerliste stehen schon in der Spalte, auf den Tisch kommen sie einer nach dem anderen.",
+   "text": "Lärm 6 oder Glocke: Alle stehen auf, gleichzeitig. Wütende Tabelle. Draußen bricht Erde: je Rundenende kommt ein Grabgänger aus Zone G dazu (die App setzt ihn in die Gegnerliste), auf Normal höchstens drei.",
    "hinweise": [
     "Cue 02-X2 (oder 02-X3 bei der Glocke). Kampfmusik oben im Kampf (Taste A), Schleife.",
     "Lärm zählt nicht mehr. Die Leiste bleibt auf 6.",
@@ -3007,7 +3101,29 @@
     }
    ],
    "weiter": "kampf-abgebrochen",
-   "musik": "BATTLE-2"
+   "musik": "BATTLE-2",
+   "verstaerkung": {
+    "id": "grabgaenger",
+    "zone": "G"
+   }
+  },
+  "aufbau-kampf-erloesen": {
+   "typ": "aufbau",
+   "titel": "Die Gemeinde erlösen: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "innen_steht",
+    "ist": false
+   },
+   "tisch": [
+    "In die Kapelle: Altar an die Rückwand mit der Kerze, Bänke links und rechts (schwieriges Gelände)",
+    "Die knienden Gestalten in zwei Reihen, mit dem Rücken zur Haupttür (wer schon gefallen ist, fehlt)",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind"
+   ],
+   "setzt": {
+    "innen_steht": true
+   },
+   "weiter": "kampf-erloesen"
   },
   "kampf-erloesen": {
    "typ": "kampf",
@@ -3253,9 +3369,7 @@
    "leisten": {
     "atemzug": 1
    },
-   "zuruecksetzen": [
-    "Wunden und Power aller Helden"
-   ],
+   "zuruecksetzen": [],
    "folgen": [
     {
      "wenn": {
@@ -3393,8 +3507,7 @@
     }
    ],
    "notieren": [
-    "Atemzug-Leiste (Stand nach +1)",
-    "Sporenpunkte je Held (Namen an der Falltür, Lene nachgesprochen, Name aus Map 1)",
+    "Sporenpunkte stehen an den Heldenchips (die App trägt sie in Map 3 mit)",
     "Welcher Weg: Krypta-Gang oder Hauptweg",
     "Glocke, Lärm 3, Gemeinde wach oder gefallen",
     "Wahrheit, geschont oder belogen; Kellerschlüssel ja oder nein",
@@ -3402,7 +3515,81 @@
     "Hedda: lebt, angegriffen oder tot"
    ],
    "weiter": null,
-   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ins Dorf. Zum Brunnen. Er ist zugenagelt, Werkzeug gibt es in der Schmiede. Und keine Namen.“ Mit Kellerschlüssel: „Wer noch lebt, gehört in den Keller unter dem Gemeindehaus.“"
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ins Dorf. Zum Brunnen. Er ist zugenagelt, Werkzeug gibt es in der Schmiede. Und keine Namen.“ Mit Kellerschlüssel: „Wer noch lebt, gehört in den Keller unter dem Gemeindehaus.“",
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, gilt als gefallen: Er ist in der nächsten Map wieder dabei, würfelt aber auf der Verletzungstabelle. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort."
   }
- }
+ },
+ "beimStart": [
+  {
+   "wenn": {
+    "flag": "hinweis_brunnen",
+    "ist": true
+   },
+   "leisten": {
+    "geduld": 1
+   }
+  },
+  {
+   "wenn": {
+    "flag": "versprechen_mutter",
+    "ist": true
+   },
+   "leisten": {
+    "geduld": 1
+   }
+  },
+  {
+   "wenn": {
+    "flag": "priester_gefunden",
+    "ist": true
+   },
+   "leisten": {
+    "geduld": 1
+   }
+  },
+  {
+   "wenn": {
+    "flag": "name_verraten",
+    "nicht": null
+   },
+   "sporenFuer": "name_verraten"
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "sporenFuer": "anhaenger_traeger"
+  }
+ ],
+ "heldenInfo": [
+  {
+   "flag": "anhaenger_traeger",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "name": "Kupferanhänger",
+   "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt; in Map-2-Kämpfen würfelt er am Rundenende (Taste U).",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: der Sporenpunkt beim Mapwechsel und der Wurf in Kämpfen gehen auf ihn über."
+  }
+ ]
 }
