@@ -44,6 +44,11 @@ model Article {
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?
+  /// Kartenname laut Set-Code (YGOPRODeck), zum Pruefen der Titel; siehe src/lib/market/names.ts.
+  codeNameEn      String?
+  codeNameDe      String?
+  /// Set-Codes, die zum Namen im Titel passen (nur wenn Name und Code nicht zusammenpassen).
+  codeHint        String?
   ebayPriceAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

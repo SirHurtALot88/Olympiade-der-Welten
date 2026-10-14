@@ -1,4 +1,6 @@
 import type { SaleWindowKey } from "../parsing/date";
+import { cleanTitle } from "./board";
+import { titleNameMismatch } from "../market/names";
 import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
 import {
@@ -51,6 +53,10 @@ export interface ArticleAggregate {
   vkAt?: Date | null;
   /** eBay-Artikelnummer des Angebots (Shop-Abruf, sonst Verkaufsbericht), fuer den Link zum Angebot. */
   ebayItemId?: string | null;
+  /** Kartenname laut Set-Code (YGOPRODeck), zum Pruefen des Titels. */
+  codeNameEn?: string | null;
+  codeNameDe?: string | null;
+  codeHint?: string | null;
   currentEk: number | null;
   /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack-Menge) aus dem juengsten MarketPrice-Datensatz,
    * sonst null ("—"), auch bei mehrdeutiger Seltenheit. */
@@ -158,6 +164,8 @@ export interface SortimentRow {
   listingVkAt: string | null;
   /** eBay-Artikelnummer fuer den Link zum Angebot, null wenn unbekannt. */
   ebayItemId: string | null;
+  /** Kartenname laut Set-Code; `mismatch` = der Titel nennt einen anderen Namen (Titel pruefen). */
+  codeName: { en: string | null; de: string | null; mismatch: boolean; hint: string | null } | null;
   /** Cardmarket-Marktwert, Zielspanne (25-33 % Deckungsbeitrag) und Urteil. Null ohne Datensatz. */
   market: SortimentMarket | null;
 }
@@ -587,6 +595,15 @@ export function buildSortimentRow(
     listingVkSource: a.currentVk !== null && a.currentVk > 0 ? (a.vkSource ?? null) : null,
     listingVkAt: a.vkAt ? a.vkAt.toISOString() : null,
     ebayItemId: a.ebayItemId ?? null,
+    codeName:
+      a.codeNameEn || a.codeNameDe
+        ? {
+            en: a.codeNameEn ?? null,
+            de: a.codeNameDe ?? null,
+            hint: a.codeHint ?? null,
+            mismatch: titleNameMismatch(cleanTitle(a.nameRaw).name, { en: a.codeNameEn ?? null, de: a.codeNameDe ?? null }),
+          }
+        : null,
     market: marketInfo,
   };
 }

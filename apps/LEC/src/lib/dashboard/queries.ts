@@ -145,6 +145,9 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
       ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
+      codeNameEn: article.codeNameEn,
+      codeNameDe: article.codeNameDe,
+      codeHint: article.codeHint,
       // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
       latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
       marketQuote: quote ?? null,

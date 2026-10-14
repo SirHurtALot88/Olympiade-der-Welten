@@ -1,5 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
-import { YGO_CARDINFO_URL } from "../images/ygoprodeck";
+import { YGO_CARDINFO_URL, toEnglishSetCode } from "../images/ygoprodeck";
+import { buildCodeNames, buildNameIndex, suggestCodes, titleNameMismatch } from "./names";
+import { cleanTitle } from "../dashboard/board";
+import { rarityCandidates, rarityFromTitle } from "./rarity";
 import rarityMapData from "./rarityMap.json";
 import {
   CM_PRICE_GUIDE_URL,
@@ -42,11 +45,15 @@ async function getJson<T>(fetchFn: typeof fetch, url: string): Promise<T> {
  */
 export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fetch = fetch): Promise<MarketSyncReport> {
   const startedAt = new Date().toISOString();
-  const [guide, products, ygo] = await Promise.all([
+  const [guide, products, ygo, ygoDe] = await Promise.all([
     getJson<{ createdAt?: string; priceGuides: CmPrice[] }>(fetchFn, CM_PRICE_GUIDE_URL),
     getJson<{ products: CmProduct[] }>(fetchFn, CM_PRODUCTS_URL),
-    getJson<{ data?: { name?: string; card_sets?: { set_code?: string }[] }[] }>(fetchFn, YGO_CARDINFO_URL),
+    getJson<{ data?: { id?: number; name?: string; card_sets?: { set_code?: string }[] }[] }>(fetchFn, YGO_CARDINFO_URL),
+    // Deutsche Kartennamen nur zum Pruefen der Titel: faellt der Abruf aus, laeuft der Marktwert trotzdem.
+    getJson<{ data?: { id?: number; name?: string }[] }>(fetchFn, `${YGO_CARDINFO_URL}?language=de`).catch(() => null),
   ]);
+  const codeNames = buildCodeNames(ygo.data ?? [], ygoDe?.data ?? null);
+  const nameIndex = buildNameIndex(ygo.data ?? [], ygoDe?.data ?? null);
   const index = buildCatalogIndex(ygo.data ?? [], products.products, guide.priceGuides);
   const fetchedAt = guide.createdAt ? new Date(guide.createdAt) : new Date();
 
@@ -99,6 +106,20 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
     } else {
       report.keiner[r.reason]++;
     }
+  }
+
+  // Kartenname laut Set-Code je Artikel (auch ohne Marktwert), damit falsche Titel auffallen.
+  for (const a of articles) {
+    const n = a.setCode ? codeNames.get(toEnglishSetCode(a.setCode)) : undefined;
+    let codeHint: string | null = null;
+    if (n) {
+      const titleName = cleanTitle(a.nameRaw).name;
+      if (titleNameMismatch(titleName, n)) {
+        const rarity = rarityFromTitle(a.nameRaw);
+        codeHint = suggestCodes(nameIndex, titleName, rarity ? rarityCandidates(rarity) : [])?.join(", ") ?? null;
+      }
+    }
+    await prisma.article.update({ where: { id: a.id }, data: { codeNameEn: n?.en ?? null, codeNameDe: n?.de ?? null, codeHint } });
   }
 
   // Ein Datensatz je Artikel und Quelle: alten Stand ersetzen, nicht stapeln.

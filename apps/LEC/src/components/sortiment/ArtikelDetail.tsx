@@ -77,6 +77,22 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </div>
         </header>
 
+        {row.codeName?.mismatch && (
+          <div className="bd-dt-warn">
+            <b>Name und Set-Code passen nicht zusammen.</b>
+            <br />
+            Der Code {row.setCode} gehört zu <b>{row.codeName.de ?? row.codeName.en}</b>
+            {row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}. Der Titel nennt einen anderen Namen.
+            {row.codeName.hint && (
+              <>
+                <br />
+                Zum Namen im Titel passt: <b>{row.codeName.hint}</b>
+              </>
+            )}
+            <br />
+            Eines von beiden ist falsch. Der Marktwert hier gilt für die Karte zum Code. Titel oder Code in Billbee und bei eBay korrigieren.
+          </div>
+        )}
         <EbayActions row={row} />
 
         <section className="bd-dt-grid">

@@ -156,6 +156,14 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}
+                        {row.codeName?.mismatch && (
+                          <span
+                            className="bd-rar bd-namewarn"
+                            title={`Name und Set-Code passen nicht zusammen. Der Code ${row.setCode} gehört zu: ${row.codeName.de ?? row.codeName.en}${row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}.${row.codeName.hint ? ` Zum Namen im Titel passt: ${row.codeName.hint}.` : ""} Eines von beiden ist falsch, in Billbee und bei eBay prüfen.`}
+                          >
+                            Code ≠ Name
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
