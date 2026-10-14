@@ -775,6 +775,11 @@
    "text": "Mutter Hedda ist tot. Map 3: kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte; niemand begleitet die Helden zum Dorfrand; die Wirtin fragt nach der Ältesten.",
    "wirktIn": "map3"
   },
+  "hedda_geflohen": {
+   "start": false,
+   "text": "Mutter Hedda ist verwundet ins Dunkel geflohen, durch den Gang zum Eiskeller. Map 3: Sie zeigt sich an der Luke, sagt einen Satz und schließt sie wieder; die Wirtin hat von ihr gehört und traut den Helden nicht.",
+   "wirktIn": "map3"
+  },
   "grab_kampf": {
    "start": false,
    "text": "Die Helden kämpfen gegen das zuckende Grab.",
@@ -965,25 +970,35 @@
      "hedda_angegriffen": true,
      "hedda_schweigt": true
     },
-    "info": "Lenes Mutter, die Älteste von Moosgrab. Wird sie angegriffen, wehrt sie sich mit dem Brotmesser und sagt kein Wort mehr.",
+    "info": "Lenes Mutter, die Älteste von Moosgrab. Wird sie angegriffen, wehrt sie sich mit dem Brotmesser und sagt kein Wort mehr. Beim letzten Treffer stirbt sie nicht: die Kerze fällt, und sie flieht ins Dunkel.",
     "bedrohungSatz": "Eine alte Frau mit einem Brotmesser. Sie trifft euch nicht. Aber sie ist das Einzige hier, das noch reden kann.",
     "zustandSaetze": {
      "unverletzt": "Sie weicht zurück, das Messer vor sich, die Kerze hinter sich. Sie sagt nichts.",
      "angekratzt": "Ein Schnitt am Arm. Sie sieht nicht hin. Das Messer bleibt oben.",
      "verwundet": "Sie stützt sich an einem Sarg ab. Die Kerze zittert jetzt.",
      "schwer verwundet": "Sie sitzt. Mit dem Rücken an der Wand, das Messer mit beiden Händen.",
-     "am Ende": "Ein Treffer noch. Sie weiß es, und sie sieht euch an, als wüsste sie noch mehr.",
-     "gefallen": "Die Kerze fällt zuerst."
+     "am Ende": "Ein Treffer noch. Sie sieht nicht euch an, sondern die Rückwand, das schwarze Loch dahinter.",
+     "gefallen": "Die Kerze fällt, und sie ist fort."
     },
     "tod": {
      "vorlesen": "Die Kerze fällt zuerst. Sie geht aus, bevor sie den Boden erreicht. Hedda sinkt zwischen die Särge, das Messer noch in der Hand, und sagt nichts mehr. Oben, durch die Platte, flüstert die Gemeinde weiter, kein bisschen leiser.",
-     "gmNotiz": "Hedda ist tot. Alles, was sie noch nicht gesagt hat, bleibt ungesagt: keine Fragen mehr, kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte, niemand begleitet die Helden zum Dorfrand. Beide Wege ins Dorf bleiben: das Loch in der Rückwand und die Treppe. Für die Kampagne: Map 3 ohne Hedda am Dorfrand; die Wirtin fragt nach der Ältesten, und die Antwort entscheidet, ob das Dorf den Helden noch aufmacht (Vorschlag). Das Gemeindehaus muss ohne Schlüssel aufgebrochen werden (+2 Lärm). Hat sie ihre Sätze (Cue 02-5) noch nicht gesagt, ist das Hauptziel verfehlt. Danach „Springen“ zu „Der Weg ins Dorf, ohne Hedda“ (hedda-weg-tot): aus den Gesprächsschritten führt kein Weiter mehr sinnvoll weiter.",
+     "gmNotiz": "Hedda ist tot. Alles, was sie noch nicht gesagt hat, bleibt ungesagt: keine Fragen mehr, kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte, niemand begleitet die Helden zum Dorfrand. Beide Wege ins Dorf bleiben: das Loch in der Rückwand und die Treppe. Für die Kampagne: Map 3 ohne Hedda am Dorfrand; die Wirtin fragt nach der Ältesten, und die Antwort entscheidet, ob das Dorf den Helden noch aufmacht (Vorschlag). Das Gemeindehaus muss ohne Schlüssel aufgebrochen werden (+2 Lärm). Hat sie ihre Sätze (Cue 02-5) noch nicht gesagt, ist das Hauptziel verfehlt. Die App geht von selbst zum Weg ins Dorf.",
      "setzt": {
       "hedda_tot": true,
       "hedda_schweigt": true
-     }
+     },
+     "springe": "hedda-weg-tot"
     },
-    "anblick": "Eine alte Frau, die seit zwei Tagen nicht geschlafen hat. Das Messer hält sie, wie man ein Brot hält, nicht wie eine Waffe."
+    "anblick": "Eine alte Frau, die seit zwei Tagen nicht geschlafen hat. Das Messer hält sie, wie man ein Brot hält, nicht wie eine Waffe.",
+    "flieht": {
+     "vorlesen": "Die Kerze fällt. Sie geht aus, bevor sie den Boden erreicht. Im Dunkeln ein Scharren, ein Atem, Schritte zwischen den Särgen, schnell für eine alte Frau. Als ihr wieder seht, ist sie fort. Nur das Messer liegt noch da, und hinten an der Rückwand, wo das Loch ist, schwingt eine Spinnwebe.",
+     "gmNotiz": "Hedda stirbt nicht, sie flieht durch das Loch in der Rückwand, den Gang zum Eiskeller. Sie sagt den Helden nie wieder freiwillig etwas: keine Fragen mehr, kein Kellerschlüssel, falls sie ihn noch nicht gegeben hatte. Die App geht zum Weg ins Dorf. Wollen die Helden ihr nachsetzen, ist das die Taste N dort (dann stirbt sie wirklich). Map 3: Sie taucht an der Luke des Eiskellers auf, und die Wirtin hat von ihr gehört.",
+     "setzt": {
+      "hedda_geflohen": true,
+      "hedda_schweigt": true
+     },
+     "springe": "hedda-weg-tot"
+    }
    }
   }
  },
@@ -1937,6 +1952,31 @@
    "kosten": "Keine Aktion. So oft du willst: für jedes Grab, das nicht das zuckende ist.",
    "vorlesen": "Ein alter Stein, der Name verwittert, Moos in den Buchstaben. Die Erde liegt still. Hier rührt sich nichts. Noch nicht.",
    "gmNotiz": "Nur Stimmung. Kein Lärm, kein Kampf."
+  },
+  "hedda-nachsetzen": {
+   "name": "Hedda nachsetzen, durch das Loch in der Rückwand",
+   "gruppe": "Bewegen",
+   "kurz": "Nachsetzen",
+   "taste": "N",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "hedda_geflohen",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Nur, wenn ein Held ihr wirklich hinterhergeht. Wer sie gehen lässt, drückt nichts.",
+   "vorlesen": "Der Gang ist eng, ihr kriecht mehr, als ihr geht. Nach zwanzig Schritten liegt sie da, an die Wand gelehnt, die Hand auf dem Arm, wo das Blut ist. Sie sieht euch kommen. Sie sagt nichts. Und dann sagt sie nie wieder etwas.",
+   "gmNotiz": "Hedda ist jetzt tot. Map 3 ohne sie: niemand an der Luke, die Wirtin fragt nach der Ältesten. Lärm zählt nicht, der Gang ist weit weg von der Gemeinde.",
+   "setzt": {
+    "hedda_tot": true
+   }
   }
  },
  "schritte": {
@@ -2833,6 +2873,10 @@
      {
       "flag": "hedda_tot",
       "ist": false
+     },
+     {
+      "flag": "hedda_geflohen",
+      "ist": false
      }
     ]
    },
@@ -2844,15 +2888,26 @@
    "typ": "vorlesen",
    "titel": "Der Weg ins Dorf, ohne Hedda",
    "wenn": {
-    "flag": "hedda_tot",
-    "ist": true
+    "eine": [
+     {
+      "flag": "hedda_tot",
+      "ist": true
+     },
+     {
+      "flag": "hedda_geflohen",
+      "ist": true
+     }
+    ]
    },
    "text": "Niemand sagt euch mehr, wohin. Aber ihr wisst es: Es fing mit dem Brunnen an. An der Rückwand das Loch, schwarz, in das man gebückt hineinkäme. Und hinter euch die Treppe nach oben, zu denen, die knien.",
-   "gmNotiz": "Hedda ist tot. Der Auftrag kommt vom Erzähler: ins Dorf, zum Brunnen, keine Namen (alles aus Cue 02-5, falls er lief; sonst sag es jetzt). Beide Wege stehen offen, niemand begleitet sie.",
+   "gmNotiz": "Hedda ist tot oder ins Dunkel geflohen. Der Auftrag kommt vom Erzähler: ins Dorf, zum Brunnen, keine Namen (alles aus Cue 02-5, falls er lief; sonst sag es jetzt). Beide Wege stehen offen, niemand begleitet sie. Ist sie geflohen und will ein Held ihr nach: Taste N.",
    "setzt": {
     "brunnen_bekannt": true
    },
-   "weiter": "wahl-weg"
+   "weiter": "wahl-weg",
+   "ereignisse": [
+    "hedda-nachsetzen"
+   ]
   },
   "wahl-weg": {
    "typ": "wahl",
@@ -2904,7 +2959,8 @@
     }
    ],
    "ereignisse": [
-    "rast-krypta"
+    "rast-krypta",
+    "hedda-nachsetzen"
    ]
   },
   "weg-krypta": {
@@ -3497,6 +3553,21 @@
       "ist": true
      },
      "text": "Hedda ist tot: niemand am Dorfrand, kein Kellerschlüssel (falls nicht vorher gegeben), die Wirtin fragt nach der Ältesten. Das Gemeindehaus muss aufgebrochen werden, falls der Schlüssel fehlt."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "hedda_geflohen",
+        "ist": true
+       },
+       {
+        "flag": "hedda_tot",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Hedda ist verwundet ins Dunkel geflohen: niemand am Dorfrand, kein Kellerschlüssel (falls nicht vorher gegeben). Sie zeigt sich an der Luke des Eiskellers, sagt einen Satz und schließt sie wieder. Die Wirtin hat von ihr gehört und traut den Helden nicht."
     },
     {
      "wenn": {

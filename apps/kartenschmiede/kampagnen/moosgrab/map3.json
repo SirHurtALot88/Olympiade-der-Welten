@@ -724,6 +724,11 @@
    "text": "Aus Map 2: Hedda ist tot.",
    "wirktIn": "map3"
   },
+  "hedda_geflohen": {
+   "start": false,
+   "text": "Aus Map 2: Hedda ist verwundet ins Dunkel geflohen.",
+   "wirktIn": "map3"
+  },
   "hedda_angegriffen": {
    "start": false,
    "text": "Aus Map 2: Ein Held hat Hedda angegriffen.",
@@ -3365,6 +3370,21 @@
     },
     {
      "wenn": {
+      "alle": [
+       {
+        "flag": "hedda_geflohen",
+        "ist": true
+       },
+       {
+        "flag": "hedda_tot",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Hedda ist in Map 2 ins Dunkel geflohen: Sie steht nicht am Dorfrand, sondern zeigt sich an der Luke des Eiskellers (oder sitzt darin, wenn die Helden durch den Gang kommen). Die Wirtin hat von ihr gehört und traut den Helden nicht."
+    },
+    {
+     "wenn": {
       "flag": "anhaenger",
       "ist": true
      },
@@ -3451,6 +3471,58 @@
    },
    "text": "Der Gang endet an einer Luke. Dahinter Stroh, Eis und Dunkelheit. Ihr schiebt sie auf und steht am Rand des Dorfplatzes.",
    "gmNotiz": "Die Helden stehen am Eiskeller (Marker E), links vom Brunnen. Heldenchips auf der Tischkarte dorthin ziehen.",
+   "weiter": "hedda-luke"
+  },
+  "hedda-luke": {
+   "typ": "vorlesen",
+   "titel": "An der Luke",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "weg",
+      "nicht": "krypta"
+     },
+     {
+      "flag": "hedda_geflohen",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
+   },
+   "text": "Links vom Brunnen, am alten Eiskeller, hebt sich ein Deckel, eine Handbreit. Kerzenlicht. Ein graues Gesicht, ein Arm in einem blutigen Tuch. Hedda. Sie sieht euch an, lange, und die Kerze zittert nicht. „Der Brunnen.“ Dann fällt der Deckel zu, und von innen schiebt sich ein Riegel vor.",
+   "gmNotiz": "Hedda ist in Map 2 vor den Helden geflohen, durch den Gang zur Luke (Marker E). Mehr sagt sie nicht, und sie macht nicht wieder auf, egal was die Helden rufen. Ruft jemand dabei einen Namen: Lärm +1 wie immer. Den Brunnen kennen die Helden jetzt.",
+   "setzt": {
+    "brunnen_bekannt": true
+   },
+   "weiter": "hedda-spuren"
+  },
+  "hedda-spuren": {
+   "typ": "vorlesen",
+   "titel": "Spuren im Gang",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "weg",
+      "ist": "krypta"
+     },
+     {
+      "flag": "hedda_geflohen",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
+   },
+   "text": "Auf den Stufen zur Luke Wachs, frisch, in Tropfen. An der Wand ein Handabdruck, braun, in der Höhe einer alten Frau. Der Riegel der Luke ist schon zurückgeschoben. Wer vor euch hier war, ist schon draußen. Zwischen dem Stroh im Eiskeller, ganz hinten, brennt eine Kerze. Niemand rührt sich.",
+   "gmNotiz": "Hedda sitzt hinten im Eiskeller und schweigt. Sprechen die Helden sie an, sagt sie nur: „Der Brunnen.“ und dreht sich weg. Greift sie jemand an, wehrt sie sich nicht mehr: dann ist die Älteste von Moosgrab tot. Die Wirtin weiß davon nichts.",
+   "setzt": {
+    "brunnen_bekannt": true
+   },
    "weiter": "wahl-knechte"
   },
   "wahl-knechte": {
@@ -3884,13 +3956,44 @@
    "titel": "Hedda",
    "als": "wirtin",
    "wenn": {
-    "flag": "hedda_tot",
-    "ist": false
+    "alle": [
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     },
+     {
+      "flag": "hedda_geflohen",
+      "ist": false
+     }
+    ]
    },
    "text": "„Hedda.“ Die Armbrust sinkt, eine Handbreit. „Lebt sie?“ Sie wartet die Antwort nicht ab. „Natürlich lebt sie. Die überlebt uns alle.“ Dann legt sie die Armbrust auf den Tresen, ohne sie loszulassen. „Wenn Hedda euch schickt, seid ihr die Ersten seit drei Tagen, die von draußen kommen und noch reden können.“",
    "gmNotiz": "Haben die Helden Hedda angegriffen und sagen es: kein Vertrauen. Zurück drücken und Antwort 4 nehmen.",
    "setzt": {
     "wirtin_vertraut": true
+   },
+   "weiter": "wirtin-hedda-geflohen"
+  },
+  "wirtin-hedda-geflohen": {
+   "typ": "vorlesen",
+   "titel": "Hedda war hier",
+   "als": "wirtin",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "hedda_geflohen",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     }
+    ]
+   },
+   "text": "„Hedda.“ Die Armbrust bleibt, wo sie ist. „Die war hier. Vor einer Stunde, an meiner Hintertür, mit einem Arm voller Blut.“ Sie sieht von einem zum anderen. „Sie hat nur eins gesagt: Macht ihnen nicht auf.“ Eine lange Pause. „Ich hab aufgemacht. Also redet.“",
+   "gmNotiz": "Die Wirtin traut den Helden nicht: kein Vertrauen aus dieser Antwort. Vertrauen gibt es nur noch über den Ehering oder ruhiges Reden (Antwort 4 zurück drücken).",
+   "setzt": {
+    "wirtin_vertraut": false
    },
    "weiter": "wirtin-hedda-tot"
   },
