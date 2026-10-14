@@ -22733,6 +22733,23 @@
   // Grundstellungs-Wipper (zeichneTennis() liest ihn als vizSchlagBob), damit ein wartender
   // Spieler nie als Standbild einfriert.
   const TENNIS_AUSHOL_T=0.12, TENNIS_FLUG_T=0.26, TENNIS_ERHOL_T=0.12;
+  // T-B3 -- SCHLAGARTEN ALS ANIMATIONSVARIANTEN (Ballwechsel-als-Bild, 14.10., K8/Punkt 25b:
+  // "verschiedene schläge, spielbälle etc sollen gespielt werden"). Rein kosmetisch: `bogen`
+  // skaliert die Flugkurvenhoehe (s. flugPunkt() in zeichneTennis()), `dauerMul` die
+  // Flugdauer (TENNIS_FLUG_T*dauerMul, s. u.vizFlugDauer unten) -- keins von beiden ruehrt
+  // punkte/erfolg/wert() an. Aufschlag ist immer die Schlagart des Aufschlaegers (ein
+  // zweiter Aufschlag-Fehler gehoert nicht in dieses Paket, s. PR-Beschreibung); die vier
+  // uebrigen Namen sind die, die Chris nennt ("verschiedene schläge"), gewaehlt per
+  // kuerHash() (s. Kommentar an der Aufrufstelle), nicht rr().
+  const TENNIS_SCHLAG_STIL={
+    aufschlag: {bogen:0.55,dauerMul:0.85},
+    grundlinie:{bogen:1.00,dauerMul:1.00},
+    slice:     {bogen:0.65,dauerMul:0.92},
+    volley:    {bogen:0.40,dauerMul:0.62},
+    lob:       {bogen:2.10,dauerMul:1.35},
+    stopp:     {bogen:0.85,dauerMul:0.58},
+  };
+  const TENNIS_SCHLAG_NAMEN=["grundlinie","slice","volley","lob","stopp"];
   function stepTennis(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild: stepFechten()s u.vizFechtAktuell-Vergleich).
@@ -22745,27 +22762,89 @@
         u.vizSchlagAktuell=u.aktuell;
         u.vizSchlagPhase="ausholen"; u.vizSchlagT=0;
         const r=u.runden[u.aktuell];
-        const treffer=!!r&&r.ereignis===art.erfolgWort;
+        // T-B3 -- WIRKLICHER PUNKTGEWINNER STATT EIGENER ROLLE (Ballwechsel-als-Bild,
+        // 14.10., K8/Punkt 25b): bisher entschied NUR die eigene, unabhaengige Rolle dieser
+        // Seite (r.ereignis===art.erfolgWort), ob der Ball hier als Treffer oder Fehlschlag
+        // lief -- das kann dem wirklichen Punktgewinner (r.punktGewinner, T-F1a/PR #1135)
+        // widersprechen: eine Seite konnte ihren eigenen Ballwechsel als Treffer zeigen,
+        // obwohl sie laut Nullsummen-Vergleich den Punkt verlor (und umgekehrt), weil keiner
+        // der beiden Werte den anderen kannte -- einer der "optischen Bugs", die Chris ohne
+        // Beleg nannte. Jetzt liest dieselbe Stelle den schon berechneten ECHTEN Vergleich,
+        // gespeichert auf `u.vizPunktGewonnen` (von der Phasen-Uhr unten weitergelesen, s.
+        // dortiger Kommentar), statt ihn aus `ereignis` zu raten.
+        const gegnerBrett=TEILNEHMER.find(x=>x.brett===u.brett&&x.side!==u.side);
+        const rg=gegnerBrett?gegnerBrett.runden[u.aktuell]:null;
+        const serverSeite=r?r.aufschlag:null;
+        const warGewinner=!!r&&r.punktGewinner===u.side;
+        const serviert=serverSeite!=null&&serverSeite===u.side;
+        u.vizPunktGewonnen=warGewinner;
         // Alle drei Ereignisse feuern hier, im Enthuellungs-Frame -- derselbe Zeitpunkt, zu
         // dem stepFechten() seine sfx()-Aufrufe abfeuert, obwohl die zugehoerige Ausfall-
         // Animation dort ebenfalls erst danach ablaeuft (s. Vertrags-Kommentar oben).
         sfx("tennis","aufschlag");
-        if(treffer)sfx("tennis","ass"); else sfx("tennis","netz");
-        // T-B2 -- NETZ ODER AUS STATT IMMER "HALBE STRECKE" (Broadcast-Optik-Dokument 27-09,
-        // Abschnitt 6, Prioritaet 2): "Die Wahl ueber einen Hash aus u.id und Durchgang --
-        // NICHT rr(), sonst verschiebt sich der Zufallsstrom der Messung." `kuerHash()`
-        // ist genau diese bereits vorhandene, deterministische Sinus-Hash-Funktion
-        // (s. dortiger Kommentar) -- hier mit `u.aktuell` gesalzen, damit jeder Ballwechsel
-        // desselben Spielers einen eigenen, aber reproduzierbaren Ausgang bekommt.
-        // `vizFlugFrac` ist der Zielpunkt als Anteil der Strecke von `von` nach `nach`
-        // (zeichneTennis() liest ihn fuer den LIVE-Flug UND fuer die nachleuchtende
-        // Aufsprungmarke -- eine einzige Quelle statt zweier Ad-hoc-Berechnungen):
-        // 1 = trifft den Gegner (treffer), 0.5 = haelt am Netz (Fehlschlag "Netz"), 1.12 =
-        // fliegt knapp hinter den Gegner hinaus (Fehlschlag "Aus").
-        if(treffer){ u.vizFlugMode="treffer"; u.vizFlugFrac=1; u.vizFlugKipp=false; }
-        else if(kuerHash(u.id,u.aktuell)<0.45){ u.vizFlugMode="netz"; u.vizFlugFrac=0.5; u.vizFlugKipp=false; }
-        else {
-          u.vizFlugMode="aus"; u.vizFlugFrac=1.12;
+        if(warGewinner)sfx("tennis","ass"); else sfx("tennis","netz");
+        // ZIEL AUS DEM AUSGANG RUeCKWAeRTS KONSTRUIERT (Fable-Konzept 5.8, woertlich: "ein
+        // Winner geht in die Ecke, ein Fehler ins Aus"). `vorsprung` ist EXAKT derselbe
+        // Vergleich wie bauBuehne()s art.duell-Block (":17589" ff., TENNIS_AUFSCHLAG_H nur
+        // im Vergleich, nicht im Wurf) -- rein lesend, kein zweiter Wurf, keine neue
+        // Konstante. Je groesser der Abstand, desto entschiedener der Punkt (Ass/Winner statt
+        // knapper Kampfpunkt); `r.knapp` (derselbe Wurf wie in setz()) unterscheidet bei
+        // einem verlorenen Punkt den eigenen Netzfehler (knapp daneben) vom klaren Aus
+        // (deutlich geschlagen). Alle vier Werte sind Felder, die der Rundeneintrag laut
+        // Konzept "schon trägt" -- kein neuer rr()-Aufruf.
+        const eigenePunkte=(r?r.punkte:0)+(serviert?TENNIS_AUFSCHLAG_H:0);
+        const gegnerPunkte=(rg?rg.punkte:eigenePunkte)+(!serviert&&serverSeite!=null?TENNIS_AUFSCHLAG_H:0);
+        const vorsprung=Math.abs(eigenePunkte-gegnerPunkte);
+        const geometrie=tennisPlatzGeometrie();
+        const gegnerSeite=1-u.side; // 0=oben/topY, 1=unten/botY (s. zeichneTennis() fyOben/fyUnten)
+        const cornerHash=kuerHash(u.id,u.aktuell*7+2), stilHash=kuerHash(u.id,u.aktuell*7+5);
+        let modus,zielY,zielFrac;
+        if(warGewinner){
+          modus=(serviert&&vorsprung>=TENNIS_AUFSCHLAG_H+6)?"ass":(vorsprung>=12?"winner":"kampf");
+        } else {
+          modus=(r&&r.knapp)?"netz":"aus";
+        }
+        if(modus==="netz"){
+          // Eigener unerzwungener Fehler: der Ball stirbt am Netz, meist nahe der Mitte.
+          zielY=geometrie.netY; zielFrac=0.30+cornerHash*0.4-0.2;
+        } else if(modus==="aus"){
+          // Deutlich geschlagen oder selbst daneben: der Ball fliegt UeBER die gegnerische
+          // Grundlinie hinaus -- bisher gab es diesen Fall optisch gar nicht (vizFlugFrac
+          // blieb bei 0.5/1, nie darueber hinaus auf der Gegnerseite), genau Chris' "auch
+          // mal ins aus".
+          const tiefe=gegnerSeite===0?(geometrie.netY-geometrie.topY):(geometrie.botY-geometrie.netY);
+          zielY=geometrie.netY+(gegnerSeite===0?-1:1)*tiefe*1.22;
+          zielFrac=0.78+cornerHash*0.5; // oft, aber nicht immer, auch seitlich im Aus
+          if(cornerHash<0.5)zielFrac=-zielFrac;
+        } else {
+          // "ass"/"winner"/"kampf": der Ball landet IM Feld der Gegenseite. Ass/Winner nahe
+          // der Linie in einer Ecke (Primaerweg aus dem Konzept: "ein Winner geht in die
+          // Ecke"), ein Kampfpunkt zentraler auf dem Platz.
+          const tiefeAnteil=modus==="kampf"?(0.25+cornerHash*0.35):(0.62+cornerHash*0.3);
+          const tiefeIn=gegnerSeite===0?(geometrie.netY-geometrie.topY):(geometrie.botY-geometrie.netY);
+          zielY=geometrie.netY+(gegnerSeite===0?-1:1)*tiefeIn*tiefeAnteil;
+          zielFrac=modus==="kampf"?(cornerHash*0.8-0.4):(0.58+cornerHash*0.35);
+          if(stilHash<0.5)zielFrac=-zielFrac;
+        }
+        const breite=geometrie.breiteBei(zielY)*geometrie.einzugAussen;
+        u.vizZielX=W/2+zielFrac*breite;
+        u.vizZielY=zielY;
+        u.vizFlugModus=modus;
+        // Aufschlaeger schlaegt immer auf, sonst eine der vier Rest-Schlagarten aus Chris'
+        // Liste -- reine Animationsvariante (TENNIS_SCHLAG_STIL), beeinflusst nur Bogen/
+        // Flugdauer, nie punkte/erfolg.
+        const stil=serviert?"aufschlag":TENNIS_SCHLAG_NAMEN[Math.min(TENNIS_SCHLAG_NAMEN.length-1,Math.floor(stilHash*TENNIS_SCHLAG_NAMEN.length))];
+        u.vizSchlagArt=stil;
+        u.vizFlugBogen=TENNIS_SCHLAG_STIL[stil].bogen;
+        u.vizFlugDauer=TENNIS_FLUG_T*TENNIS_SCHLAG_STIL[stil].dauerMul;
+        // "MAL ERREICHEN SIE DEN BALL MAL NICHT" (Chris, woertlich): wer einen Punkt klar
+        // verliert (Ass/Winner GEGEN diese Seite), kommt nur noch halb heran -- ein eigener
+        // Netzfehler oder ein knapper Kampfpunkt ist dagegen "erreicht, nur daneben/zu spaet"
+        // und bleibt bei voller Reichweite. zeichneTennis() liest dieses Feld fuer den
+        // seitlichen Vorbewegungs-Versatz der Spielerfigur (kein neuer Bewegungs-Zustand wie
+        // u.x/u.y -- rein additiv auf dem bestehenden festen Nahansicht-Platz).
+        u.vizReichweite=(warGewinner||modus==="netz"||vorsprung<12)?1:0.4;
+        if(modus==="aus"){
           // T-B2 -- HAWK-EYE-INSET NUR BEI EINEM "AUS", DAS DAS VORZEICHEN DES VORTEILS
           // KIPPT (Dokument: "derselbe seltene Moment wie vorteilKipptBig") -- dieselbe
           // Bedingung wie der Fuehrungswechsel-Highlight in stepBuehne()s feed()-Kommentar
@@ -22774,7 +22853,7 @@
           const vN=(u.aktuell>=0&&u.verlauf)?u.verlauf[u.aktuell]:0;
           const vP=(u.aktuell>0&&u.verlauf)?u.verlauf[u.aktuell-1]:0;
           u.vizFlugKipp=u.aktuell>0&&Math.sign(vN)!==Math.sign(vP);
-        }
+        } else u.vizFlugKipp=false;
       }
     }
     // PHASEN-UHREN. Getrennt von der Erkennungs-Schleife oben, damit ein frisch auf
@@ -22787,18 +22866,19 @@
       if(phase==="ausholen"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
         if(u.vizSchlagT>=TENNIS_AUSHOL_T){
-          const r=u.vizSchlagAktuell>=0?u.runden[u.vizSchlagAktuell]:null;
-          const treffer=!!r&&r.ereignis===art.erfolgWort;
-          u.vizSchlagPhase=treffer?"treffer":"fehlschlag"; u.vizSchlagT=0;
+          // T-B3: liest jetzt `u.vizPunktGewonnen` (der echte T-F1a-Punktgewinner, von der
+          // Erkennungs-Schleife oben gesetzt), nicht mehr die eigene `ereignis`-Rolle -- s.
+          // Kommentar dort.
+          u.vizSchlagPhase=u.vizPunktGewonnen?"treffer":"fehlschlag"; u.vizSchlagT=0;
         }
       } else if(phase==="treffer"||phase==="fehlschlag"){
         u.vizSchlagT=(u.vizSchlagT||0)+dt;
-        if(u.vizSchlagT>=TENNIS_FLUG_T){
+        if(u.vizSchlagT>=(u.vizFlugDauer||TENNIS_FLUG_T)){
           u.vizSchlagPhase="erholen"; u.vizSchlagT=0;
           // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und
           // verblasst" -- gesetzt genau am Ende des Flugs (derselbe Zeitpunkt, an dem der
-          // Ball in zeichneTennis() verschwindet), liest `vizFlugMode`/`vizFlugFrac` von
-          // oben weiter, bis dieser Timer abgelaufen ist.
+          // Ball in zeichneTennis() verschwindet), liest `vizFlugModus`/`vizZielX`/
+          // `vizZielY` von oben weiter, bis dieser Timer abgelaufen ist.
           u.vizBallMarkT=2.5;
         }
       } else if(phase==="erholen"){
@@ -23835,6 +23915,24 @@
   // bodenShowcase()/bodenWettessen() daneben, falls wir GERADE von einer
   // Publikums-Loop-Buehne kommen. Belag fest Hartplatz blau (offene Frage 3 im Dokument,
   // Voreinstellung Chris: "fest Hartplatz blau; Belag bleibt reine Optik").
+  // T-B3 -- GEMEINSAME PLATZ-GEOMETRIE (Ballwechsel-als-Bild, 14.10., K8/Punkt 25b im Fable-
+  // Konzept, docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt 5.8): bodenTennis()
+  // hielt topY/botY/netY/breiteBei()/einzugAussen bisher NUR lokal -- die Ballwechsel-Logik
+  // (stepTennis()/zeichneTennis()) kannte den Platz selbst gar nicht und liess den Ball
+  // deshalb immer entlang der EINEN festen Linie zwischen den beiden Spielerpunkten fliegen,
+  // nie zu einer Ecke, nie wirklich ins Aus -- genau Chris' Befund ("die bälle sollen nicht
+  // immer in die mitte fliegen ... auch mal ins aus"). Eine Quelle fuer die Linien wie
+  // kuerFlaeche()/RINK() bei den anderen Baeuden, damit Zeichnung und Ballphysik nie
+  // auseinanderlaufen.
+  function tennisPlatzGeometrie(){
+    // topY/botY liegen knapp ausserhalb der Spieler-Positionen aus zeichneTennis()
+    // (fyOben=H*0.23/fyUnten=H*0.56), damit beide Kontrahenten sichtbar INNERHALB des
+    // Platzes stehen.
+    const topY=H*0.17, botY=H*0.615, netY=(topY+botY)/2;
+    const topHalfAus=W*0.145, botHalfAus=W*0.30;
+    const breiteBei=(y)=>topHalfAus+(botHalfAus-topHalfAus)*(y-topY)/(botY-topY);
+    return {topY,botY,netY,breiteBei,einzugAussen:0.86}; // einzugAussen: Einzel-Seitenlinie als Anteil der Aussenlinie (Doppelgasse)
+  }
   function bodenTennis(){
     if(hebenPublikumAn){ tonLoopStop(); hebenPublikumAn=false; }
     if(schachPublikumAn){ tonLoopStop(); schachPublikumAn=false; }
@@ -23850,13 +23948,9 @@
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
     // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
-    // eine echte Grundlinien-Uebertragung. topY/botY liegen knapp ausserhalb der Spieler-
-    // Positionen aus zeichneTennis() (fyOben=H*0.23/fyUnten=H*0.56), damit beide Kontrahenten
-    // sichtbar INNERHALB des Platzes stehen.
-    const topY=H*0.17, botY=H*0.615, netY=(topY+botY)/2;
-    const topHalfAus=W*0.145, botHalfAus=W*0.30;
-    const breiteBei=(y)=>topHalfAus+(botHalfAus-topHalfAus)*(y-topY)/(botY-topY);
-    const einzugAussen=0.86; // Einzel-Seitenlinie als Anteil der Aussenlinie (Doppelgasse)
+    // eine echte Grundlinien-Uebertragung. Linien jetzt aus tennisPlatzGeometrie() (s.
+    // Kommentar dort), nicht mehr lokal dupliziert.
+    const {topY,botY,netY,breiteBei,einzugAussen}=tennisPlatzGeometrie();
 
     // Gruener Auslauf, dann blauer Hartplatz obendrauf (US-Open-Palette).
     ctx.fillStyle="#1c5c3a";
@@ -25399,10 +25493,19 @@
       const w=fokusDruck?fokusDruck.w:0.5;
       punkteText+=" · Siegchance "+tennisProzent(w,true)+" : "+tennisProzent(1-w,true);
     }
+    // OPTISCHER BUG (Bug-Sichtung 14.10., eigener Screenshot-Durchlauf fuer diese PR, s.
+    // PR-Beschreibung): diese Zeile stand bisher bei H*0.12 -- deutlich ueber der fuer die
+    // Buehne bereits NACHGEMESSENEN und dokumentierten Sicherheitsgrenze des HTML-Score-Bugs
+    // (.bbug/.bbugcallout, s. Kommentar bei stepKuer() oben: "15% Leinwandhoehe raeumt dem
+    // Bug in jeder getesteten Groesse Platz", derselbe Fund, den Chris am 13.09. fuer
+    // Eiskunstlauf meldete). Am 1300px-Teststand lag der zentrierte Punktestand-Callout
+    // genau ueber dieser Zeile, "Ballwechsel"/"Aufschlag"/"Siegchance" waren dahinter
+    // unleserlich. H*0.16 raeumt dem Bug Platz, ohne die Mannschafts-Leiste direkt darunter
+    // zu verschieben.
     ctx.fillText("Platz "+(tennisFokus+1)+" von "+bretter
       +(fa?" · Ballwechsel "+Math.min(art.rundenN,fa.aktuell+1)+"/"+art.rundenN:"")
       +(schlagzahl!=null?" · "+schlagzahl+" Schläge":"")
-      +punkteText,W/2,H*0.12);
+      +punkteText,W/2,H*0.16);
 
     // Q2 -- MANNSCHAFTS-LEISTE (Broadcast-Optik-Dokument 27-09, Abschnitt 3): laufend der
     // Vorteil des Heim-Spielers ("+12"), fertig ein Haekchen in Teamfarbe (Dokument: "Haekchen
@@ -25426,22 +25529,42 @@
       return {fertig:false,text:(vLauf>0?"+":"")+vLauf,farbVar:null,fokus:i===tennisFokus,
         spannung:dr?dr.imp:startSpannung};
     });
-    zeichneMannschaftsLeiste(W/2,H*0.145,Math.min(W-40,bretter*50),leisteBoxen);
+    // Verschoben von H*0.145 auf H*0.185, zusammen mit der Info-Zeile direkt darueber (s.
+    // deren Kommentar, Bug-Sichtung 14.10.) -- sonst stuende die Leiste jetzt UeBER der
+    // Zeile, die sie erklaert.
+    zeichneMannschaftsLeiste(W/2,H*0.185,Math.min(W-40,bretter*50),leisteBoxen);
 
     // EIN SPIELER, GROSS ODER KLEIN — gemeinsame Zeichenroutine fuer die grosse Nahansicht
     // UND die Mini-Reihe der uebrigen Plaetze, nur mit anderem `scale`/`voll`. `voll`
     // schaltet die dritte Textzeile (Vorteil) ab, damit die Mini-Chips nicht kollidieren.
     const zeichneSpieler=(u,side,x,y,scale,voll)=>{
       if(!u)return;
-      posMap.set(u.id,{x,y});
+      posMap.set(u.id,{x,y}); // Basisplatz bleibt stabil -- Ball/Label-Lookups rechnen weiter mit dieser Stelle.
       const c=side===0?css("--home"):css("--away");
-      ctx.save(); ctx.translate(x,y); ctx.scale(scale,scale); ctx.translate(-x,-y);
+      // T-B3 -- SPIELER IN BEWEGUNG (Ballwechsel-als-Bild, 14.10., K8/Punkt 25b, Chris
+      // woertlich: "spieler in bewegung, mal erreichen sie den ball mal nicht"). Bisher
+      // standen beide Kontrahenten fuer die ganze Nahansicht bewegungslos auf demselben
+      // festen Punkt -- nur der Schlaeger schwang. Waehrend der eigene Schlag laeuft, lehnt
+      // sich die Figur seitlich (Bildschirm-X, dieselbe Achse wie die Platzbreite) in
+      // Richtung ihres eigenen Ziels (`vizZielX`, reverskonstruiert in stepTennis()); wie
+      // weit, entscheidet `vizReichweite` -- bei einem Ass/Winner GEGEN diese Seite nur
+      // knapp die Haelfte (die Figur "kommt nicht mehr ganz heran"), sonst voll. Nur ein
+      // Bild-Offset auf dem ohnehin festen Nahansicht-Platz, keine neue Positionslogik, kein
+      // rr(), posMap haelt weiterhin die BASIS-Koordinate (Ball/Labels bleiben unberuehrt).
+      let swayX=0;
+      if(tennisSchlagAktiv(u)&&u.vizZielX!=null){
+        const fortschritt=u.vizSchlagPhase==="ausholen"?Math.min(1,(u.vizSchlagT||0)/TENNIS_AUSHOL_T):1;
+        const richtung=u.vizZielX>x?1:-1;
+        swayX=richtung*Math.min(14,Math.abs(u.vizZielX-x)*0.10)*(u.vizReichweite??1)*fortschritt;
+      }
+      const sx=x+swayX;
+      ctx.save(); ctx.translate(sx,y); ctx.scale(scale,scale); ctx.translate(-sx,-y);
       ctx.fillStyle=c; ctx.globalAlpha=0.20;
-      ctx.beginPath(); ctx.ellipse(x,y+19,16,6,0,0,6.3); ctx.fill(); ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.ellipse(sx,y+19,16,6,0,0,6.3); ctx.fill(); ctx.globalAlpha=1;
       // `true` schaltet den istTennis()-Requisitenblock in zeichneSprite() frei (Schlaeger
       // an der Hand) und waehlt bei tennisSchlagAktiv(u) die "shoot"-Ueberkopf-Pose statt
       // eines unbewaffneten Faustschlags — dasselbe Muster wie Heben/Schach/vorher.
-      zeichneSprite(ctx,u,x,y,true);
+      zeichneSprite(ctx,u,sx,y,true);
       ctx.restore();
       const schrift=(txt,dy,farbe,groesse)=>{
         ctx.font="400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
@@ -25503,64 +25626,80 @@
     // einer eigenen posVon() — dieselben Koordinaten, ob der Ballwechsel auf dem Fokus-Platz
     // oder einem Mini-Platz laeuft (aktivFn oben laesst den Fokus ohnehin meist sofort dorthin
     // springen, aber ein Restrahmen bleibt fuer den Wechsel selbst).
-    // T-B2 -- ZIELPUNKT aus stepTennis()s `vizFlugMode`/`vizFlugFrac` (s. dortiger
-    // Kommentar): 1 = trifft den Gegner, 0.5 = haelt am Netz, 1.12 = fliegt knapp hinter
-    // den Gegner hinaus ("Aus"). `flugPunkt()` ist reine Ableitung aus u01 -- dieselbe
+    // T-B3 -- ZIELPUNKT ABSOLUT AUF DEM PLATZ, NICHT MEHR NUR ANTEIL DER STRECKE SPIELER-
+    // ZU-SPIELER (Ballwechsel-als-Bild, 14.10., K8/Punkt 25b): `stepTennis()` legt
+    // `u.vizZielX`/`u.vizZielY` jetzt direkt in Platzkoordinaten ab (reverskonstruiert aus
+    // dem echten Ausgang, s. dortiger Kommentar) -- vorher flog der Ball IMMER entlang der
+    // EINEN Linie zwischen den beiden festen Spielerpunkten (Chris' Befund: "die bälle
+    // sollen nicht immer in die mitte fliegen"), jetzt zu einer Ecke, ins Netz oder deutlich
+    // ueber die Grundlinie hinaus. `vizFlugBogen` (TENNIS_SCHLAG_STIL) variiert zusaetzlich
+    // die Bogenhoehe je Schlagart. `flugPunkt()` bleibt reine Ableitung aus u01 -- dieselbe
     // Funktion liefert hier den LIVE-Ball UND (bei kleineren u01) die Hawk-Eye-Spur, ohne
     // einen eigenen Ringpuffer/Zustand.
-    const flugPunkt=(von,nach,frac,u01)=>{
-      const zielX=von.x+(nach.x-von.x)*frac, zielY=von.y+(nach.y-von.y)*frac;
-      return {x:von.x+(zielX-von.x)*u01, y:von.y+(zielY-von.y)*u01-Math.sin(Math.min(1,u01)*Math.PI)*22};
-    };
-    const schlaeger=TEILNEHMER.find(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
+    const flugPunkt=(von,ziel,bogen,u01)=>({
+      x:von.x+(ziel.x-von.x)*u01,
+      y:von.y+(ziel.y-von.y)*u01-Math.sin(Math.min(1,u01)*Math.PI)*22*(bogen??1),
+    });
+    // ECHTER PUNKTGEWINNER STATT ERSTER TREFFER IN ARRAY-REIHENFOLGE: bisher nahm `.find()`
+    // schlicht den ERSTEN aktiven Schlag in TEILNEHMER-Reihenfolge (immer erst alle
+    // Heim-, dann alle Gast-Spieler, s. `mine.forEach`/`gegner.forEach` in bauBuehne()) --
+    // ueberschnitten sich beide Seiten eines Punktes kurz (beide gleichzeitig
+    // tennisSchlagAktiv), gewann IMMER die Heimseite den sichtbaren Ball, unabhaengig davon,
+    // wer den Punkt wirklich gewann. Jetzt wird unter mehreren aktiven Schlaegen der
+    // tatsaechliche Punktgewinner (`vizPunktGewonnen`) bevorzugt, sonst (beide verlieren
+    // ihren eigenen Punkt bzw. nur einer ist aktiv) der erste wie bisher.
+    const aktiveSchlaeger=TEILNEHMER.filter(u=>tennisSchlagAktiv(u)&&u.vizSchlagAktuell>=0);
+    const schlaeger=aktiveSchlaeger.find(u=>u.vizPunktGewonnen)||aktiveSchlaeger[0];
     if(schlaeger){
-      const gegner=TEILNEHMER.find(x=>x.side!==schlaeger.side&&x.brett===schlaeger.brett);
-      const von=posMap.get(schlaeger.id), nach=gegner&&posMap.get(gegner.id);
-      if(gegner&&von&&nach){
+      const von=posMap.get(schlaeger.id);
+      const ziel={x:schlaeger.vizZielX,y:schlaeger.vizZielY};
+      if(von&&ziel.x!=null&&ziel.y!=null){
         // Fortschritt AUS stepTennis()s Zustandsmaschine: 0 waehrend "ausholen" (Ball noch in
-        // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer TENNIS_FLUG_T) — ersetzt
-        // die alte lineare Ableitung aus u.lunge (":16122" vorher: "1-schlaeger.lunge/0.5").
-        const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/TENNIS_FLUG_T));
-        const frac=schlaeger.vizFlugFrac??1;
+        // der Hand), 0->1 waehrend "treffer"/"fehlschlag" (Flugdauer `vizFlugDauer`, je nach
+        // Schlagart, s. TENNIS_SCHLAG_STIL) — ersetzt die alte lineare Ableitung aus u.lunge
+        // (":16122" vorher: "1-schlaeger.lunge/0.5").
+        const dauer=schlaeger.vizFlugDauer||TENNIS_FLUG_T;
+        const u01=schlaeger.vizSchlagPhase==="ausholen"?0:Math.min(1,Math.max(0,(schlaeger.vizSchlagT||0)/dauer));
+        const bogen=schlaeger.vizFlugBogen??1;
         // HAWK-EYE-SPUR (Dokument Abschnitt 6): "die letzten ~8 Ballpositionen als
         // verblassende gelbe Punkte" -- sechs nachlaufende Punkte, aus derselben
         // `flugPunkt()`-Funktion bei kleineren u01-Werten, kein eigener Zustand.
         if(u01>0){
           for(let k=6;k>=1;k--){
             const u01k=u01-k*0.045; if(u01k<=0)continue;
-            const p=flugPunkt(von,nach,frac,u01k);
+            const p=flugPunkt(von,ziel,bogen,u01k);
             ctx.globalAlpha=(1-k/7)*0.5; ctx.fillStyle="#f0ff7a";
             ctx.beginPath(); ctx.arc(p.x,p.y,2.4,0,Math.PI*2); ctx.fill();
           }
           ctx.globalAlpha=1;
         }
-        const ballPos=flugPunkt(von,nach,frac,u01);
+        const ballPos=flugPunkt(von,ziel,bogen,u01);
         ctx.fillStyle="#f0ff7a"; ctx.strokeStyle="#b8d426"; ctx.lineWidth=1;
         ctx.beginPath();ctx.arc(ballPos.x,ballPos.y,4,0,Math.PI*2);ctx.fill();ctx.stroke();
       }
     }
-    // T-B2 -- AUFSPRUNGMARKE (Dokument Abschnitt 6): "bleibt 2,5s liegen und verblasst" --
-    // JEDER Teilnehmer mit einem noch laufenden `vizBallMarkT` (stepTennis() setzt ihn beim
-    // Flugende, s. dortiger Kommentar), unabhaengig davon, ob sein Ballwechsel gerade der
-    // fokussierte ist -- ein spaeterer Ballwechsel auf einem ANDEREN Platz darf die Marke
-    // des vorherigen nicht verschlucken. "Treffer" neutral (Hawk-Eye-Gelb), "Netz"/"Aus"
-    // in den echten Farben (Q4, zweite Ausnahme von der Teamfarben-Regel neben den
-    // Fechtlampen: IN/OUT haengt an einem festen Punkt am Boden, nie an einer Figur).
+    // T-B3 -- AUFSPRUNGMARKE AM ECHTEN ZIELPUNKT (Dokument Abschnitt 6: "bleibt 2,5s liegen
+    // und verblasst") -- JEDER Teilnehmer mit einem noch laufenden `vizBallMarkT`
+    // (stepTennis() setzt ihn beim Flugende, s. dortiger Kommentar), unabhaengig davon, ob
+    // sein Ballwechsel gerade der fokussierte ist -- ein spaeterer Ballwechsel auf einem
+    // ANDEREN Platz darf die Marke des vorherigen nicht verschlucken. Fuenf Ausgaenge statt
+    // vorher drei: "Ass"/"Winner" bekommen jetzt ebenfalls ein kurzes Label (vorher gab es
+    // fuer einen klaren Punktgewinn GAR KEIN Wort auf dem Platz, nur die neutrale gelbe
+    // Marke) — "Kampf" (knapper, laufender Punkt) bleibt bewusst wortlos, sonst wuerde jeder
+    // Punkt kommentiert.
     for(const u of TEILNEHMER){
       if(!(u.vizBallMarkT>0))continue;
-      const gegner=TEILNEHMER.find(x=>x.side!==u.side&&x.brett===u.brett);
-      const von=posMap.get(u.id), nach=gegner&&posMap.get(gegner.id);
-      if(!von||!nach)continue;
-      const frac=u.vizFlugFrac??1;
-      const mp={x:von.x+(nach.x-von.x)*frac,y:von.y+(nach.y-von.y)*frac};
+      if(u.vizZielX==null||u.vizZielY==null)continue;
+      const mp={x:u.vizZielX,y:u.vizZielY};
       const leben=Math.max(0,Math.min(1,u.vizBallMarkT/2.5));
-      const farbe=u.vizFlugMode==="netz"?"#c7ccd6":u.vizFlugMode==="aus"?"#e0463c":"#f0ff7a";
+      const modus=u.vizFlugModus;
+      const farbe=modus==="netz"?"#c7ccd6":modus==="aus"?"#e0463c":modus==="ass"?"#f6c750":modus==="winner"?"#7fe0a0":"#f0ff7a";
       ctx.save(); ctx.globalAlpha=leben*0.85;
       ctx.fillStyle=farbe; ctx.beginPath(); ctx.ellipse(mp.x,mp.y+4,7,3,0,0,Math.PI*2); ctx.fill();
-      if(u.vizFlugMode==="netz"||u.vizFlugMode==="aus"){
+      if(modus==="netz"||modus==="aus"||modus==="ass"||modus==="winner"){
         ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.textAlign="center";
         ctx.lineWidth=2; ctx.strokeStyle="rgba(8,10,14,.85)";
-        const wort=u.vizFlugMode==="netz"?"NETZ":"AUS";
+        const wort=modus==="netz"?"NETZ":modus==="aus"?"AUS":modus==="ass"?"ASS":"WINNER";
         ctx.strokeText(wort,mp.x,mp.y-8); ctx.fillText(wort,mp.x,mp.y-8);
       }
       ctx.restore();
@@ -25571,7 +25710,7 @@
     // Vereinfachung ggue. dem Dokument-Vorschlag ("Ausschnitt 3x vergroessert"): eine feste
     // Einblendung statt einer echten Zoom-Kamera, gleiche Aussage (IN/OUT-Farbe, "OUT"),
     // weniger neuer Zustand.
-    const kippAus=TEILNEHMER.find(u=>u.vizFlugMode==="aus"&&u.vizFlugKipp&&u.vizBallMarkT>0);
+    const kippAus=TEILNEHMER.find(u=>u.vizFlugModus==="aus"&&u.vizFlugKipp&&u.vizBallMarkT>0);
     if(kippAus){
       const leben=Math.max(0,Math.min(1,kippAus.vizBallMarkT/2.5));
       // UNTER dem Team-Namens-Kaestchen oben rechts (DOM `#bbug`/Score-Bug-Bereich, s.
