@@ -29,6 +29,8 @@ export interface LatestQuote {
   variants?: number | null;
   /** Wie der Marktwert zugeordnet wurde: "seltenheit" | "einzige_variante" (eindeutig). */
   how?: string | null;
+  /** Set-Code, nach dem der Marktwert gesucht wurde, wenn er vom Code im Titel abweicht (Name gilt). */
+  usedCode?: string | null;
 }
 
 /**

@@ -44,17 +44,36 @@ export function buildCodeNames(en: YgoCardLite[], de: YgoCardLite[] | null): Map
   return out;
 }
 
+/** Aehnlichkeit zweier Namensschluessel (Dice-Koeffizient auf Buchstabenpaaren), 0..1. */
+export function nameSimilarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const grams = (s: string) => {
+    const m = new Map<string, number>();
+    for (let i = 0; i < s.length - 1; i++) m.set(s.slice(i, i + 2), (m.get(s.slice(i, i + 2)) ?? 0) + 1);
+    return m;
+  };
+  const ga = grams(a);
+  const gb = grams(b);
+  let common = 0;
+  for (const [g, n] of ga) common += Math.min(n, gb.get(g) ?? 0);
+  return (2 * common) / (a.length - 1 + (b.length - 1));
+}
+
+/** Ab dieser Aehnlichkeit gilt ein Titelname als derselbe Name (Schreibvarianten, Kommas, Abkuerzungen). */
+export const NAME_MATCH_THRESHOLD = 0.62;
+
 /**
- * true = der Titel nennt weder den deutschen noch den englischen Namen der Karte zum Code.
- * Ohne bekannten Namen oder ohne Namen im Titel: false (kein Urteil, kein falscher Alarm).
+ * true = der Titel nennt einen anderen Namen als die Karte zum Code. Verglichen wird NUR, wenn der
+ * deutsche Kartenname bekannt ist (die Titel sind deutsch; gegen den englischen Namen wuerde fast alles
+ * als Fehler gelten). Ohne deutschen Namen oder mit zu kurzem Titel: false, kein Urteil.
  */
 export function titleNameMismatch(titleName: string, name: { en: string | null; de: string | null }): boolean {
   const title = nameKey(titleName);
-  if (title.length < 3) return false;
-  const known = [name.en, name.de].filter((n): n is string => !!n).map(nameKey).filter((k) => k.length >= 3);
+  if (title.length < 3 || !name.de) return false;
+  const known = [name.de, name.en].filter((n): n is string => !!n).map(nameKey).filter((k) => k.length >= 3);
   if (known.length === 0) return false;
-  // Titel enthaelt den Namen, oder der Name den Titel (gekuerzte Titel wie "Dimensionsgefaengnis").
-  return !known.some((k) => title.includes(k) || k.includes(title));
+  return !known.some((k) => title.includes(k) || k.includes(title) || nameSimilarity(title, k) >= NAME_MATCH_THRESHOLD);
 }
 
 export interface NameIndexEntry {

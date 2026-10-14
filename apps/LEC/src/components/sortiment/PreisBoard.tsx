@@ -159,7 +159,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                         {row.codeName?.mismatch && (
                           <span
                             className="bd-rar bd-namewarn"
-                            title={`Name und Set-Code passen nicht zusammen. Der Code ${row.setCode} gehört zu: ${row.codeName.de ?? row.codeName.en}${row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}.${row.codeName.hint ? ` Zum Namen im Titel passt: ${row.codeName.hint}.` : ""} Eines von beiden ist falsch, in Billbee und bei eBay prüfen.`}
+                            title={`Name und Set-Code passen nicht zusammen. Der Code ${row.setCode} gehört zu: ${row.codeName.de ?? row.codeName.en}${row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}.${row.codeName.hint ? ` Zum Namen im Titel passt: ${row.codeName.hint}.` : ""} ${row.codeName.usedCode ? `Der Marktwert gilt für ${row.codeName.usedCode} (Name wird als richtig angenommen).` : "Ohne eindeutigen Code kein Marktwert."} Code in Billbee und bei eBay korrigieren.`}
                           >
                             Code ≠ Name
                           </span>

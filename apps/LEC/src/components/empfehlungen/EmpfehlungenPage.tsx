@@ -7,7 +7,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { RECOMMENDATION_ICONS, RECOMMENDATION_CHIPS } from "@/components/dashboard/Recommendations";
 
 type Kind = Recommendation["kind"];
-const KIND_ORDER: Kind[] = ["ek_pflegen", "auslisten", "preis_anpassen", "nachkaufen", "lot_bilden"];
+const KIND_ORDER: Kind[] = ["ek_pflegen", "daten_pruefen", "auslisten", "preis_anpassen", "nachkaufen", "lot_bilden"];
 const DISMISSED_KEY = "lec.empfehlungen.dismissed.v1";
 const PAGE_SIZE = 100;
 

@@ -1,5 +1,6 @@
 import type { SaleWindowKey } from "../parsing/date";
 import { cleanTitle } from "./board";
+import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
 import { titleNameMismatch } from "../market/names";
 import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
@@ -165,7 +166,7 @@ export interface SortimentRow {
   /** eBay-Artikelnummer fuer den Link zum Angebot, null wenn unbekannt. */
   ebayItemId: string | null;
   /** Kartenname laut Set-Code; `mismatch` = der Titel nennt einen anderen Namen (Titel pruefen). */
-  codeName: { en: string | null; de: string | null; mismatch: boolean; hint: string | null } | null;
+  codeName: { en: string | null; de: string | null; mismatch: boolean; hint: string | null; usedCode: string | null } | null;
   /** Cardmarket-Marktwert, Zielspanne (25-33 % Deckungsbeitrag) und Urteil. Null ohne Datensatz. */
   market: SortimentMarket | null;
 }
@@ -213,7 +214,7 @@ export interface RecommendationLotItem {
 export interface Recommendation {
   /** Stabile ID fuer clientseitiges "Ausblenden" (localStorage, /empfehlungen). */
   id: string;
-  kind: "ek_pflegen" | "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
+  kind: "ek_pflegen" | "daten_pruefen" | "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
   title: string;
   detail: string;
   effect: string;
@@ -601,6 +602,7 @@ export function buildSortimentRow(
             en: a.codeNameEn ?? null,
             de: a.codeNameDe ?? null,
             hint: a.codeHint ?? null,
+            usedCode: a.marketQuote?.usedCode ?? null,
             mismatch: titleNameMismatch(cleanTitle(a.nameRaw).name, { en: a.codeNameEn ?? null, de: a.codeNameDe ?? null }),
           }
         : null,
@@ -647,6 +649,7 @@ export const LABELS_DE: Record<ArticleClass, string> = {
 
 const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
   ek_pflegen: -1,
+  daten_pruefen: -1,
   auslisten: 0,
   preis_anpassen: 1,
   nachkaufen: 2,
@@ -697,6 +700,60 @@ export function buildRecommendations(
     });
   }
 
+  // Daten pruefen: Auffaelligkeiten, die eher ein Eingabefehler sind als ein echtes Preisproblem.
+  // Sie stehen vor den €-Empfehlungen, weil sie deren Urteil verfaelschen (Chris: ein falscher Code
+  // macht aus einer 0,32-€-Karte eine 27-€-Karte und damit eine "krass zu guenstige" Abweichung).
+  for (const s of sortiment) {
+    if (!s.active) continue;
+    const revenue90 = s.windows["90"]?.revenue ?? 0;
+    const qty365 = s.windows["365"]?.qty ?? 0;
+    if (s.codeName?.mismatch) {
+      const was = s.codeName.de ?? s.codeName.en ?? "eine andere Karte";
+      recommendations.push({
+        id: `daten_pruefen:code:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: Name und Code passen nicht zusammen.`,
+        detail:
+          `Der Code ${s.setCode ?? "?"} gehört zu „${was}“.` +
+          (s.codeName.hint ? ` Zum Namen im Titel passt: ${s.codeName.hint}.` : "") +
+          (s.codeName.usedCode ? ` Marktwert gilt für ${s.codeName.usedCode} (Name wird als richtig angenommen).` : " Ohne eindeutigen Code gibt es keinen Marktwert und kein Preisurteil."),
+        effect: "Code in Billbee und bei eBay korrigieren",
+        effectValue: Math.max(1, revenue90),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+      continue;
+    }
+    // Topseller mit negativer Marge: nicht auslisten, sondern EK/Preis pruefen.
+    if (qty365 >= HIGH_SELLER_QTY_365 && s.dbIIPercent < 0) {
+      recommendations.push({
+        id: `daten_pruefen:marge:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: ${qty365} Verkäufe im Jahr, aber negative Marge.`,
+        detail: `DB II ${(s.dbIIPercent * 100).toFixed(0)} % bei Ø-VK ${s.avgVkRealized.toFixed(2)} € und EK ${(s.ek).toFixed(2)} €. Ein Bestseller macht selten Verlust: EK im Artikelstamm und Preis prüfen, nicht auslisten.`,
+        effect: `DB II ≈ ${(s.dbIIPerUnit * qty365).toFixed(0)} € in 365 T`,
+        effectValue: Math.max(1, Math.abs(s.dbIIPerUnit * qty365)),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+      continue;
+    }
+    // Stueckzahlen, die keine ganzen Zahlen sind, kommen bei Einzelkarten nicht vor.
+    const fractional = (["30", "90", "365"] as const).some((w) => {
+      const q = s.windows[w]?.qty;
+      return q !== undefined && Math.abs(q - Math.round(q)) > 1e-9;
+    });
+    if (fractional) {
+      recommendations.push({
+        id: `daten_pruefen:menge:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: krumme Stückzahl in den Verkäufen.`,
+        detail: "Eine Karte wird nicht in Bruchteilen verkauft. Bestellungen oder Pack-Zuordnung in Billbee prüfen.",
+        effect: "Verkaufszahlen unsicher",
+        effectValue: Math.max(1, revenue90),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+    }
+  }
+
   // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
   // effectValue = |Lebenszeit-DB II| -- bereits eine "€ gesamt"-Groesse (Fix 4 unveraendert).
   for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
@@ -729,6 +786,10 @@ export function buildRecommendations(
     const gap = s.corridor.min - alertVk;
     const qty90 = s.windows["90"]?.qty ?? 0;
     const lever = Math.max(s.stock, qty90);
+    // Nur wo es Nachfrage (mind. 3 Verkaeufe im Jahr oder 1 im Quartal) oder Bestand gibt: bei hunderten
+    // "zu guenstig"-Karten ohne Verkaeufe und ohne Bestand waere das reines Rauschen.
+    const qty365 = s.windows["365"]?.qty ?? 0;
+    if (!(qty365 >= 3 || s.stock >= 1 || qty90 >= 1) || s.codeName?.mismatch) continue;
     const effectValue = gap * lever;
     recommendations.push({
       id: `preis_anpassen:${s.articleId}`,
@@ -806,6 +867,10 @@ export function buildRecommendations(
     const aIsEkPflegen = a.kind === "ek_pflegen";
     const bIsEkPflegen = b.kind === "ek_pflegen";
     if (aIsEkPflegen !== bIsEkPflegen) return aIsEkPflegen ? -1 : 1;
+    // Daten pruefen (Eingabefehler) vor den €-Empfehlungen, untereinander nach Umsatz-Gewicht.
+    const aIsData = a.kind === "daten_pruefen";
+    const bIsData = b.kind === "daten_pruefen";
+    if (aIsData !== bIsData) return aIsData ? -1 : 1;
     const diff = Math.abs(b.effectValue) - Math.abs(a.effectValue);
     if (diff !== 0) return diff;
     return RECOMMENDATION_KIND_PRIORITY[a.kind] - RECOMMENDATION_KIND_PRIORITY[b.kind];

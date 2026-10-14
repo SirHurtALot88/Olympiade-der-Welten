@@ -90,7 +90,15 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </>
             )}
             <br />
-            Eines von beiden ist falsch. Der Marktwert hier gilt für die Karte zum Code. Titel oder Code in Billbee und bei eBay korrigieren.
+            {row.codeName.usedCode ? (
+              <>
+                Der Marktwert gilt für <b>{row.codeName.usedCode}</b>, den eindeutigen Code zum Namen (der Name wird als richtig angenommen).
+              </>
+            ) : (
+              <>Es gibt keinen eindeutigen Code zum Namen, darum steht hier kein Marktwert und kein Urteil.</>
+            )}
+            <br />
+            Den Code in Billbee und bei eBay korrigieren.
           </div>
         )}
         <EbayActions row={row} />

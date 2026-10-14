@@ -28,6 +28,8 @@ export interface MarketSyncReport {
   /** Mehrdeutig, aufgeschluesselt nach Grund. */
   mehrdeutigGrund: Record<string, number>;
   keiner: Record<"kein_set_code" | "set_code_unbekannt" | "kein_produkt", number>;
+  /** Titel nennt einen anderen Namen als der Code: Marktwert nach dem Namen (eindeutiger Code) oder keiner. */
+  nameCodeKonflikt: { korrigiert: number; ohneMarktwert: number };
   startedAt: string;
   finishedAt: string;
 }
@@ -66,13 +68,43 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
     mehrdeutig: 0,
     mehrdeutigGrund: {},
     keiner: { kein_set_code: 0, set_code_unbekannt: 0, kein_produkt: 0 },
+    nameCodeKonflikt: { korrigiert: 0, ohneMarktwert: 0 },
     startedAt,
     finishedAt: "",
   };
 
+  // Kartenname laut Set-Code je Artikel (auch ohne Marktwert). Nennt der Titel einen anderen Namen, gilt
+  // der NAME (Chris: die Codes sind es, die falsch eingetippt sind, z. B. RA04 statt ALIN): der
+  // Marktwert wird dann fuer den eindeutigen Code zum Namen gesucht, sonst gibt es keinen.
+  const effectiveCode = new Map<string, string | null>();
+  for (const a of articles) {
+    const n = a.setCode ? codeNames.get(toEnglishSetCode(a.setCode)) : undefined;
+    let codeHint: string | null = null;
+    let hintCodes: string[] = [];
+    let mismatch = false;
+    if (n) {
+      const titleName = cleanTitle(a.nameRaw).name;
+      mismatch = titleNameMismatch(titleName, n);
+      if (mismatch) {
+        const rarity = rarityFromTitle(a.nameRaw);
+        hintCodes = suggestCodes(nameIndex, titleName, rarity ? rarityCandidates(rarity) : []) ?? [];
+        codeHint = hintCodes.join(", ") || null;
+      }
+    }
+    effectiveCode.set(a.id, mismatch ? (hintCodes.length === 1 ? hintCodes[0] : null) : a.setCode);
+    await prisma.article.update({ where: { id: a.id }, data: { codeNameEn: n?.en ?? null, codeNameDe: n?.de ?? null, codeHint } });
+  }
+
   const rows = [];
   for (const a of articles) {
-    const r = resolveMarket(index, a.setCode, a.nameRaw, RARITY_MAP);
+    const code = effectiveCode.get(a.id) ?? null;
+    const corrected = code !== a.setCode;
+    if (corrected && code === null) {
+      report.nameCodeKonflikt.ohneMarktwert++;
+      continue;
+    }
+    if (corrected) report.nameCodeKonflikt.korrigiert++;
+    const r = resolveMarket(index, code, a.nameRaw, RARITY_MAP);
     if (r.quality === "eindeutig") {
       report.eindeutig++;
       if (r.how === "seltenheit") report.perSeltenheit++;
@@ -83,7 +115,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         idProduct: r.idProduct,
         priceFrom: r.price.low,
         priceTrend: r.price.trend,
-        raw: JSON.stringify({ how: r.how }),
+        raw: JSON.stringify({ how: r.how, ...(corrected ? { code } : {}) }),
         priceAvg30: r.price.avg30,
         priceAvg7: r.price.avg7,
         priceAvg1: r.price.avg1,
@@ -97,7 +129,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         articleId: a.id,
         source: MARKET_SOURCE,
         matchQuality: "mehrdeutig",
-        raw: JSON.stringify({ why: r.why }),
+        raw: JSON.stringify({ why: r.why, ...(corrected ? { code } : {}) }),
         priceMin: r.trendMin,
         priceMax: r.trendMax,
         variants: r.variants,
@@ -106,20 +138,6 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
     } else {
       report.keiner[r.reason]++;
     }
-  }
-
-  // Kartenname laut Set-Code je Artikel (auch ohne Marktwert), damit falsche Titel auffallen.
-  for (const a of articles) {
-    const n = a.setCode ? codeNames.get(toEnglishSetCode(a.setCode)) : undefined;
-    let codeHint: string | null = null;
-    if (n) {
-      const titleName = cleanTitle(a.nameRaw).name;
-      if (titleNameMismatch(titleName, n)) {
-        const rarity = rarityFromTitle(a.nameRaw);
-        codeHint = suggestCodes(nameIndex, titleName, rarity ? rarityCandidates(rarity) : [])?.join(", ") ?? null;
-      }
-    }
-    await prisma.article.update({ where: { id: a.id }, data: { codeNameEn: n?.en ?? null, codeNameDe: n?.de ?? null, codeHint } });
   }
 
   // Ein Datensatz je Artikel und Quelle: alten Stand ersetzen, nicht stapeln.

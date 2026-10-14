@@ -76,8 +76,11 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
   for (const mp of latestMarketPrices) {
     if (latestQuoteByArticle.has(mp.articleId)) continue;
     let how: string | null = null;
+    let usedCode: string | null = null;
     try {
-      how = (mp.raw ? (JSON.parse(mp.raw) as { how?: string }).how : null) ?? null;
+      const parsed = mp.raw ? (JSON.parse(mp.raw) as { how?: string; code?: string }) : null;
+      how = parsed?.how ?? null;
+      usedCode = parsed?.code ?? null;
     } catch {
       how = null;
     }
@@ -94,6 +97,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       priceMax: mp.priceMax,
       variants: mp.variants,
       how,
+      usedCode,
     });
   }
 

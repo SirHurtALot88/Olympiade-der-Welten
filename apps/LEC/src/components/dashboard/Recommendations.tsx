@@ -3,6 +3,7 @@ import type { Recommendation } from "@/lib/dashboard/viewModel";
 /** Icon/Chip-Zuordnung je Empfehlungstyp -- wiederverwendet von /empfehlungen. */
 export const RECOMMENDATION_ICONS: Record<Recommendation["kind"], { cls: string; icon: string }> = {
   ek_pflegen: { cls: "p-warn", icon: "⚠" },
+  daten_pruefen: { cls: "p-warn", icon: "?" },
   auslisten: { cls: "p-crit", icon: "↓" },
   preis_anpassen: { cls: "p-warn", icon: "€" },
   nachkaufen: { cls: "p-good", icon: "↑" },
@@ -11,6 +12,7 @@ export const RECOMMENDATION_ICONS: Record<Recommendation["kind"], { cls: string;
 
 export const RECOMMENDATION_CHIPS: Record<Recommendation["kind"], { cls: string; label: string }> = {
   ek_pflegen: { cls: "c-warn", label: "EK pflegen" },
+  daten_pruefen: { cls: "c-warn", label: "Daten prüfen" },
   auslisten: { cls: "c-crit", label: "Auslisten" },
   preis_anpassen: { cls: "c-warn", label: "Preis anpassen" },
   nachkaufen: { cls: "c-good", label: "Nachkaufen" },
@@ -30,7 +32,7 @@ export function Recommendations({ recommendations, totalCount }: Props) {
   return (
     <div className="card" style={{ padding: "6px 14px 8px" }}>
       <h3 style={{ padding: "12px 4px 6px" }}>
-        KI-Empfehlungen <span className="r">regelbasiert · Stufe 1</span>
+        Das lohnt sich anzusehen <span className="r">nach Wirkung sortiert</span>
         {showMoreLink && (
           <a href="/empfehlungen" className="col-reset" style={{ textDecoration: "none", marginLeft: 10 }}>
             Alle {totalCount} ansehen →

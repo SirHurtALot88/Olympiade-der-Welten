@@ -38,6 +38,13 @@ describe("titleNameMismatch", () => {
   it("gibt keinen Alarm ohne Urteilsgrundlage", () => {
     expect(titleNameMismatch("Mitsurugi Magatama", { en: null, de: null })).toBe(false);
     expect(titleNameMismatch("", code)).toBe(false);
+    // ohne deutschen Namen kein Urteil (der Titel ist deutsch, der englische Name passt nie)
+    expect(titleNameMismatch("Phara die Urgöttin", { en: "Phara the Primordial God", de: null })).toBe(false);
+  });
+  it("toleriert Schreibvarianten (Kommas, Umlaute, kleine Abweichungen)", () => {
+    expect(titleNameMismatch("Endloskette Mahdrescher", { en: "Endless Chain", de: "Endloskette Mähdrescher" })).toBe(false);
+    expect(titleNameMismatch("Blaster Drachenherrscher des Untergangs", { en: "Blaster, Dragon Ruler of Infernos", de: "Blaster, Drachenherrscher des Untergangs" })).toBe(false);
+    expect(titleNameMismatch("Dimensionsverschieber", { en: "Soul of the Magicians", de: "Seelen der Magier" })).toBe(true);
   });
   it("nimmt gekuerzte Titel nicht als Fehler", () => {
     expect(titleNameMismatch("Dimensionsgefängnis", { en: "Dimensional Prison", de: "Dimensionsgefängnis des Zorns" })).toBe(false);
