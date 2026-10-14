@@ -167,13 +167,26 @@ describe("buildDashboardViewModel", () => {
     const articles: ArticleAggregate[] = [
       article("Verlustbringer", {
         windows: {
-          all: agg({ qty: 10, revenue: 100, dbII: -50 }),
-          "365": agg({ qty: 10, revenue: 100, dbII: -50 }),
+          all: agg({ qty: 6, revenue: 60, dbII: -30 }),
+          "365": agg({ qty: 6, revenue: 60, dbII: -30 }),
         },
       }),
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(true);
+  });
+
+  it("empfiehlt bei einem Topseller (51 Verkaeufe) mit negativer DB II KEIN Auslisten", () => {
+    const articles: ArticleAggregate[] = [
+      article("Topseller", {
+        windows: {
+          all: agg({ qty: 51, revenue: 510, dbII: -100 }),
+          "365": agg({ qty: 51, revenue: 510, dbII: -100 }),
+        },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(false);
   });
 
   it("erzeugt fuer JEDEN Low-Runner eine eigene Auslisten-Empfehlung (nicht nur den schlimmsten)", () => {

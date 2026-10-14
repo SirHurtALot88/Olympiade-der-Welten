@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { formatEuro, formatEuroCents } from "@/lib/format";
 import { RANGE_TOLERANCE } from "@/lib/pricing/costEngine";
@@ -25,22 +25,65 @@ export const STATUS_PILL: Record<SortimentRow["priceStatus"], { cls: string; lab
   kein_ek: { cls: "p-warn", label: "kein EK" },
 };
 
-type ColId = "artikel" | "velocity" | "umsatz" | "vk" | "korridor" | "klasse" | "status";
+type ColId = "artikel" | "velocity" | "umsatz30" | "umsatz90" | "umsatz" | "vk" | "korridor" | "klasse" | "status";
 
 const COLS: ColumnDef<ColId>[] = [
   { id: "artikel", label: "Artikel", def: 250, min: 120 },
   { id: "velocity", label: "Velocity 30·90·365", def: 178, min: 110 },
-  { id: "umsatz", label: "Umsatz 365 T", def: 132, min: 90, align: "r" },
+  { id: "umsatz30", label: "Umsatz 30 T", def: 112, min: 80, align: "r" },
+  { id: "umsatz90", label: "Umsatz 90 T", def: 112, min: 80, align: "r" },
+  { id: "umsatz", label: "Umsatz 365 T", def: 122, min: 80, align: "r" },
   { id: "vk", label: "VK", def: 88, min: 70, align: "r" },
   { id: "korridor", label: "Preis-Korridor", def: 182, min: 120 },
   { id: "klasse", label: "Klasse", def: 108, min: 80 },
   { id: "status", label: "Status", def: 120, min: 90 },
 ];
 
-const STORAGE_KEY = "lec.sortiment.colWidths.v1";
+const STORAGE_KEY = "lec.sortiment.colWidths.v2";
+
+/** Alle Spalten sind sortierbar. */
+const SORTABLE: ColId[] = COLS.map((c) => c.id);
+
+const STATUS_ORDER: Record<SortimentRow["priceStatus"], number> = { unter_min: 4, ueber_gut: 3, kein_ek: 2, im_korridor: 1 };
+
+function sortValue(row: SortimentRow, col: ColId): number | string {
+  switch (col) {
+    case "artikel":
+      return row.nameRaw.toLowerCase();
+    case "velocity":
+      return row.velocity[1];
+    case "umsatz30":
+      return row.windows["30"]?.revenue ?? 0;
+    case "umsatz90":
+      return row.windows["90"]?.revenue ?? 0;
+    case "umsatz":
+      return row.revenue365;
+    case "vk":
+      return row.listingVk ?? row.avgVkRealized;
+    case "korridor":
+      return row.corridor.min;
+    case "klasse":
+      return row.classLabel;
+    case "status":
+      return STATUS_ORDER[row.priceStatus];
+  }
+}
 
 export function SortimentTable({ rows, limit, headerExtra }: Props) {
-  const shown = limit ? rows.slice(0, limit) : rows;
+  const [sort, setSort] = useState<{ colId: ColId | null; dir: "asc" | "desc" }>({ colId: null, dir: "desc" });
+  const sorted = useMemo(() => {
+    if (!sort.colId) return rows;
+    const col = sort.colId;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const x = sortValue(a, col);
+      const y = sortValue(b, col);
+      const d = typeof x === "string" || typeof y === "string" ? String(x).localeCompare(String(y), "de") : x - y;
+      return sort.dir === "asc" ? d : -d;
+    });
+    return copy;
+  }, [rows, sort]);
+  const shown = limit ? sorted.slice(0, limit) : sorted;
   const maxVelocity = Math.max(1, ...shown.flatMap((r) => r.velocity));
 
   const columnWidths = useColumnWidths(COLS, STORAGE_KEY);
@@ -51,7 +94,7 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
       <h3>
         Sortiment{" "}
         <span className="r">
-          VK vs. Preis-Korridor (MIN 25 % … GUT 35 %)
+          VK vs. Zielspanne (25–33 % Marge)
           <ResetColumnsButton onClick={resetWidths} />
           {headerExtra}
         </span>
@@ -59,7 +102,16 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
       <div className="tablewrap">
         <table className="resizable" style={{ tableLayout: "fixed", width: total, minWidth: total }}>
           <ResizableColgroup cols={COLS} widths={widths} />
-          <ResizableThead cols={COLS} startResize={startResize} />
+          <ResizableThead
+            cols={COLS}
+            startResize={startResize}
+            sortableCols={SORTABLE}
+            sort={{
+              colId: sort.colId,
+              dir: sort.dir,
+              onSort: (id) => setSort((prev) => (prev.colId === id ? { colId: id, dir: prev.dir === "desc" ? "asc" : "desc" } : { colId: id, dir: id === "artikel" || id === "klasse" ? "asc" : "desc" })),
+            }}
+          />
           <tbody>
             {shown.map((row) => {
               const pill = STATUS_PILL[row.priceStatus];
@@ -78,6 +130,8 @@ export function SortimentTable({ rows, limit, headerExtra }: Props) {
                   <td>
                     <MicroVelocity values={row.velocity} max={maxVelocity} />
                   </td>
+                  <td className="r num">{row.windows["30"] ? `€ ${formatEuro(row.windows["30"].revenue)}` : "—"}</td>
+                  <td className="r num">{row.windows["90"] ? `€ ${formatEuro(row.windows["90"].revenue)}` : "—"}</td>
                   <td className="r num">€ {formatEuro(row.revenue365)}</td>
                   <td className="r num">{vkForDisplay > 0 ? `${formatEuroCents(vkForDisplay)} €` : "—"}</td>
                   <td>

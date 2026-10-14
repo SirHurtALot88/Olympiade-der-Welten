@@ -48,6 +48,9 @@ const LABELS: Record<ArticleClass, string> = {
   ladenhueter: "Ladenhüter",
 };
 
+/** Ab so vielen Verkaeufen in 365 Tagen gilt ein Artikel mit Verlust nicht mehr als Auslist-Kandidat. */
+export const HIGH_SELLER_QTY_365 = 10;
+
 /**
  * @param input Kennzahlen des Artikels.
  */
@@ -72,7 +75,18 @@ export function classifyArticle(input: ClassificationInput): ClassificationResul
     };
   }
 
-  // Low-Runner: verkauft sich, aber mit klarem Verlust.
+  // Verkauft sich gut, aber die (Lebenszeit-)DB II ist negativ: das ist ein PREIS- oder EK-Problem,
+  // kein Grund auszulisten (Chris, 14.10.: ein Topseller mit 51 Verkaeufen darf nicht "auslisten"
+  // heissen). Der Vorschlag lautet dann: Preis/EK pruefen, siehe "VK anheben" bzw. Marktpreis.
+  if (dbIIPercent < 0 && qty365d >= HIGH_SELLER_QTY_365) {
+    return {
+      articleClass: "beobachten",
+      label: LABELS.beobachten,
+      reason: `Verkauft sich gut (${qty365d} Stk in 365 T), aber DB II ${(dbIIPercent * 100).toFixed(1)} % — Preis oder EK prüfen, nicht auslisten.`,
+    };
+  }
+
+  // Low-Runner: verkauft sich kaum UND mit klarem Verlust.
   if (dbIIPercent < 0) {
     return {
       articleClass: "low_runner",

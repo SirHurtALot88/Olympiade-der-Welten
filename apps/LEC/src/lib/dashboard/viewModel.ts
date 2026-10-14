@@ -700,6 +700,10 @@ export function buildRecommendations(
   // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
   // effectValue = |Lebenszeit-DB II| -- bereits eine "€ gesamt"-Groesse (Fix 4 unveraendert).
   for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
+    // Deckt der AKTUELLE Preis die Kosten (VK ueber der Deckungsbeitrags-Grenze), war der Verlust
+    // historisch (alter Preis oder alter EK): kein Auslisten empfehlen.
+    const row = sortimentByArticleId.get(c.article.articleId);
+    if (row && row.listingVk !== null && row.listingVk >= row.corridor.contribution) continue;
     const dbIILifetime = c.article.windows.all?.dbII ?? 0;
     recommendations.push({
       id: `auslisten:${c.article.articleId}`,
