@@ -49441,6 +49441,66 @@
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
 
   // =====================================================================================
+  // E9-SONDE: WIRKT SICH DIE FORMKARTE SPUERBAR AUS? (Fable-Feedback 13.10., Abschnitt 9,
+  // E9. Chris woertlich: "und funktioniert das mit der form sauber? wirkt es sich
+  // spuerbar aus? Konntest du das schon messen?") Reine Messsonde, zero Wirkung auf ein
+  // echtes Spiel — sie zieht Formkarten wie gewohnt (zieheFormkarten) und erzwingt danach
+  // NUR FUER EINEN NAMENTLICH BENANNTEN SPIELER einen festen Kartenwert, genau wie
+  // ATTR_HEBUNG ein Attribut nur fuer einen Spieler erzwingt. Gepaart wie einflussVon():
+  // derselbe Lauf i liefert fuer "neutral" (Formkarte 0) und "stark" (Formkarte +hoehe)
+  // denselben Mutatoren-/Gegner-Wurf, nur der eine Wert unterscheidet sich — der Unterschied
+  // im Ergebnis ist deshalb ausschliesslich der Formkarte zuzuschreiben, nicht Rauschen.
+  function formEinflussVon(dId,n,formPlus,saatVersatz){
+    const M=MOTOREN[dId];
+    if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",spieler:[]};
+    const hoehe=formPlus==null?8:formPlus;
+    const versatz=saatVersatz||0;
+    const gesichert=M.sichern(); const formVorher=FORMKARTE; const mutatorenVorher=MUTATOREN;
+    if(M.vorher)M.vorher();
+
+    // EIN LAUF: zieht die Formkarten wie im Spiel, zwingt danach (falls gesetzt) `wer` auf
+    // `erzwinge`, zieht die Mutatoren wie im Spiel (gepaart ueber i, s. einflussVon), baut
+    // und spielt. Liefert `wert()` (das Mass, an dem auch die Pp-Abnahme haengt) UND den
+    // RANG von `wer` im Feld (1 = bester), weil ein kleiner Prozentwert-Unterschied in
+    // einer engen Partie trotzdem einen Rangplatz kosten/gewinnen kann.
+    const durchlauf=(wer,erzwinge)=>{
+      let wertSumme=0, rangSumme=0;
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+versatz+i*104729);
+        if(wer!=null&&erzwinge!=null)FORMKARTE[wer]=erzwinge;
+        MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+        M.bau(1337+versatz+i*7919);
+        M.lauf();
+        const e=M.wert();
+        wertSumme+=(e[wer]||0);
+        if(wer!=null){
+          const feld=Object.entries(e).sort((a,b)=>b[1]-a[1]);
+          rangSumme+=1+feld.findIndex(([k])=>k===wer);
+        }
+      }
+      return {wert:wertSumme/n, rang:wer!=null?rangSumme/n:null};
+    };
+
+    M.bau(1337);
+    const namen=M.namen();
+    const spieler=namen.map(wer=>{
+      const neutral=durchlauf(wer,0);
+      const stark=durchlauf(wer,hoehe);
+      return {spieler:wer,
+        wertNeutral:+neutral.wert.toFixed(3), wertStark:+stark.wert.toFixed(3),
+        delta:+(stark.wert-neutral.wert).toFixed(3),
+        rangNeutral:+neutral.rang.toFixed(2), rangStark:+stark.rang.toFixed(2),
+        rangDelta:+(stark.rang-neutral.rang).toFixed(2)};
+    });
+
+    FORMKARTE=formVorher; MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    const meanDelta=spieler.reduce((s,r)=>s+r.delta,0)/Math.max(1,spieler.length);
+    const meanRangDelta=spieler.reduce((s,r)=>s+r.rangDelta,0)/Math.max(1,spieler.length);
+    return {disziplin:dId, laeufe:n, formPlus:hoehe, saatVersatz:versatz,
+      meanDelta:+meanDelta.toFixed(3), meanRangDelta:+meanRangDelta.toFixed(3), spieler};
+  }
+
+  // =====================================================================================
   // SANDSACK-FINALE-PFLICHTSONDE (Paket 1, Opus-Nebenbefund 1, docs/design/gewichtheben-
   // sandsack-rennen-opus-konzept-03-10.md Abschnitt 7.2/11.1): einflussVon() oben ist fuer
   // einen Teampunkt AUSSERHALB von `wert()` blind — es liest `M.wert()`, und das Finale
@@ -49990,7 +50050,7 @@
     } finally { M.zurueck(g); }
   }
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, boxscoreSerie,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, formEinflussVon, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
