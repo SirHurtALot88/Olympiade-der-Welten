@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -11,6 +11,7 @@ import { formatEuroCents, formatPercent } from "@/lib/format";
 
 interface Detail {
   purchases: { date: string; qty: number; unitEk: number; buyShipping: number; source: string }[];
+  sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
 }
@@ -77,14 +78,58 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </div>
         </header>
 
+        {row.codeName?.mismatch && (
+          <div className="bd-dt-warn">
+            <b>Name und Set-Code passen nicht zusammen.</b>
+            <br />
+            Der Code {row.setCode} gehört zu <b>{row.codeName.de ?? row.codeName.en}</b>
+            {row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}. Der Titel nennt einen anderen Namen.
+            {row.codeName.hint && (
+              <>
+                <br />
+                Zum Namen im Titel passt: <b>{row.codeName.hint}</b>
+              </>
+            )}
+            <br />
+            {row.codeName.usedCode ? (
+              <>
+                Der Marktwert gilt für <b>{row.codeName.usedCode}</b>, den eindeutigen Code zum Namen (der Name wird als richtig angenommen).
+              </>
+            ) : (
+              <>Es gibt keinen eindeutigen Code zum Namen, darum steht hier kein Marktwert und kein Urteil.</>
+            )}
+            <br />
+            Den Code in Billbee und bei eBay korrigieren.
+          </div>
+        )}
+        <EbayActions row={row} />
+
         <section className="bd-dt-grid">
           <Stat label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Cardmarket Ø 7 Tage" />
-          <Stat label="Marge bei Nachkauf" value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"} />
+          <Stat
+            label="Marge bei Wiederbeschaffung"
+            value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
+            hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
+          />
+          <Stat
+            label="Marge zum letzten EK"
+            value={m?.marginLastEk != null ? `${formatPercent(m.marginLastEk)} %` : "—"}
+            hint={m?.lastEk != null ? `zuletzt gekauft für ${eur(m.lastEk)}` : "kein EK bekannt"}
+          />
           <Stat label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
           <Stat label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
+
+        {m?.soldAt && (
+          <p className={m.provenByDemand ? "bd-dt-good" : "bd-dt-note"}>
+            <b>
+              {m.soldAt.qty} {m.soldAt.qty === 1 ? "Verkauf" : "Verkäufe"} in {m.soldAt.days} Tagen im Schnitt für {eur(m.soldAt.avg)}
+            </b>{" "}
+            – {m.provenByDemand ? "der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : "Preis wird gezahlt."}
+          </p>
+        )}
 
         <h4>Verkäufe</h4>
         <table className="bd-dt-t">
@@ -119,6 +164,31 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <tr><td>DB III (mit Fixkosten)</td><td className="r">{eur(row.dbIIIPerUnit)} · {formatPercent(row.dbIIIPercent)} %</td></tr>
           </tbody>
         </table>
+
+        {detail && detail.sales.length > 0 && (
+          <>
+            <h4>Letzte Verkäufe</h4>
+            <table className="bd-dt-t">
+              <thead>
+                <tr>
+                  <th>Datum</th>
+                  <th className="r">Stück</th>
+                  <th className="r">Preis je Stück</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.sales.slice(0, 15).map((x, i) => (
+                  <tr key={i}>
+                    <td>{day(x.soldAt)}</td>
+                    <td className="r">{x.qty}</td>
+                    <td className="r">{eur(x.unitPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} Verkäufen der letzten 365 Tage.</p>}
+          </>
+        )}
 
         <h4>Einkäufe</h4>
         {failed && <p className="bd-none">Details konnten nicht geladen werden.</p>}
@@ -192,6 +262,22 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       <span>{label}</span>
       <b>{value}</b>
       {hint && <small>{hint}</small>}
+    </div>
+  );
+}
+
+function EbayActions({ row }: { row: SortimentRow }) {
+  const l = ebayLinks(row);
+  return (
+    <div className="bd-dt-actions">
+      {l.revise && (
+        <a className="chip bd-dt-primary" href={l.revise} target="_blank" rel="noopener noreferrer" title="Öffnet das Bearbeiten-Formular des Angebots bei eBay">
+          Preis bei eBay ändern ↗
+        </a>
+      )}
+      <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
+        {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
+      </a>
     </div>
   );
 }

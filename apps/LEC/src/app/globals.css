@@ -478,3 +478,16 @@ button.bd-bar-seg { border: 0; padding: 0; cursor: pointer; display: block; heig
 button.bd-bar-seg:hover { filter: brightness(1.2); }
 .bd-rangechip { display: inline-flex; gap: 8px; align-items: center; margin: 0 0 10px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; }
 .bd-rangechip button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+
+/* ---- eBay-Links ---- */
+.bd-ebay { margin-left: 8px; font-size: 11px; color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.bd-ebay:hover { color: inherit; border-color: var(--muted); }
+.bd-dt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.bd-dt-actions .chip { text-decoration: none; display: inline-block; }
+.bd-dt-primary { border-color: var(--market) !important; color: var(--market) !important; }
+
+/* ---- Titel passt nicht zum Set-Code ---- */
+.bd-namewarn { background: var(--warn-bg) !important; color: var(--warn) !important; }
+.bd-dt-warn { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
+.bd-dt-good { background: var(--good-bg); color: var(--good); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; margin: 12px 0 0; }
+.bd-dt-note { background: var(--panel2); color: var(--muted); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.5; margin: 12px 0 0; }

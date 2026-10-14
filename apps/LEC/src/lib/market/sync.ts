@@ -1,5 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
-import { YGO_CARDINFO_URL } from "../images/ygoprodeck";
+import { YGO_CARDINFO_URL, toEnglishSetCode } from "../images/ygoprodeck";
+import { buildCodeNames, buildNameIndex, suggestCodes, titleNameMismatch } from "./names";
+import { cleanTitle } from "../dashboard/board";
+import { rarityCandidates, rarityFromTitle } from "./rarity";
 import rarityMapData from "./rarityMap.json";
 import {
   CM_PRICE_GUIDE_URL,
@@ -25,6 +28,8 @@ export interface MarketSyncReport {
   /** Mehrdeutig, aufgeschluesselt nach Grund. */
   mehrdeutigGrund: Record<string, number>;
   keiner: Record<"kein_set_code" | "set_code_unbekannt" | "kein_produkt", number>;
+  /** Titel nennt einen anderen Namen als der Code: Marktwert nach dem Namen (eindeutiger Code) oder keiner. */
+  nameCodeKonflikt: { korrigiert: number; ohneMarktwert: number };
   startedAt: string;
   finishedAt: string;
 }
@@ -42,11 +47,15 @@ async function getJson<T>(fetchFn: typeof fetch, url: string): Promise<T> {
  */
 export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fetch = fetch): Promise<MarketSyncReport> {
   const startedAt = new Date().toISOString();
-  const [guide, products, ygo] = await Promise.all([
+  const [guide, products, ygo, ygoDe] = await Promise.all([
     getJson<{ createdAt?: string; priceGuides: CmPrice[] }>(fetchFn, CM_PRICE_GUIDE_URL),
     getJson<{ products: CmProduct[] }>(fetchFn, CM_PRODUCTS_URL),
-    getJson<{ data?: { name?: string; card_sets?: { set_code?: string }[] }[] }>(fetchFn, YGO_CARDINFO_URL),
+    getJson<{ data?: { id?: number; name?: string; card_sets?: { set_code?: string }[] }[] }>(fetchFn, YGO_CARDINFO_URL),
+    // Deutsche Kartennamen nur zum Pruefen der Titel: faellt der Abruf aus, laeuft der Marktwert trotzdem.
+    getJson<{ data?: { id?: number; name?: string }[] }>(fetchFn, `${YGO_CARDINFO_URL}?language=de`).catch(() => null),
   ]);
+  const codeNames = buildCodeNames(ygo.data ?? [], ygoDe?.data ?? null);
+  const nameIndex = buildNameIndex(ygo.data ?? [], ygoDe?.data ?? null);
   const index = buildCatalogIndex(ygo.data ?? [], products.products, guide.priceGuides);
   const fetchedAt = guide.createdAt ? new Date(guide.createdAt) : new Date();
 
@@ -59,13 +68,43 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
     mehrdeutig: 0,
     mehrdeutigGrund: {},
     keiner: { kein_set_code: 0, set_code_unbekannt: 0, kein_produkt: 0 },
+    nameCodeKonflikt: { korrigiert: 0, ohneMarktwert: 0 },
     startedAt,
     finishedAt: "",
   };
 
+  // Kartenname laut Set-Code je Artikel (auch ohne Marktwert). Nennt der Titel einen anderen Namen, gilt
+  // der NAME (Chris: die Codes sind es, die falsch eingetippt sind, z. B. RA04 statt ALIN): der
+  // Marktwert wird dann fuer den eindeutigen Code zum Namen gesucht, sonst gibt es keinen.
+  const effectiveCode = new Map<string, string | null>();
+  for (const a of articles) {
+    const n = a.setCode ? codeNames.get(toEnglishSetCode(a.setCode)) : undefined;
+    let codeHint: string | null = null;
+    let hintCodes: string[] = [];
+    let mismatch = false;
+    if (n) {
+      const titleName = cleanTitle(a.nameRaw).name;
+      mismatch = titleNameMismatch(titleName, n);
+      if (mismatch) {
+        const rarity = rarityFromTitle(a.nameRaw);
+        hintCodes = suggestCodes(nameIndex, titleName, rarity ? rarityCandidates(rarity) : []) ?? [];
+        codeHint = hintCodes.join(", ") || null;
+      }
+    }
+    effectiveCode.set(a.id, mismatch ? (hintCodes.length === 1 ? hintCodes[0] : null) : a.setCode);
+    await prisma.article.update({ where: { id: a.id }, data: { codeNameEn: n?.en ?? null, codeNameDe: n?.de ?? null, codeHint } });
+  }
+
   const rows = [];
   for (const a of articles) {
-    const r = resolveMarket(index, a.setCode, a.nameRaw, RARITY_MAP);
+    const code = effectiveCode.get(a.id) ?? null;
+    const corrected = code !== a.setCode;
+    if (corrected && code === null) {
+      report.nameCodeKonflikt.ohneMarktwert++;
+      continue;
+    }
+    if (corrected) report.nameCodeKonflikt.korrigiert++;
+    const r = resolveMarket(index, code, a.nameRaw, RARITY_MAP);
     if (r.quality === "eindeutig") {
       report.eindeutig++;
       if (r.how === "seltenheit") report.perSeltenheit++;
@@ -76,7 +115,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         idProduct: r.idProduct,
         priceFrom: r.price.low,
         priceTrend: r.price.trend,
-        raw: JSON.stringify({ how: r.how }),
+        raw: JSON.stringify({ how: r.how, ...(corrected ? { code } : {}) }),
         priceAvg30: r.price.avg30,
         priceAvg7: r.price.avg7,
         priceAvg1: r.price.avg1,
@@ -90,7 +129,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         articleId: a.id,
         source: MARKET_SOURCE,
         matchQuality: "mehrdeutig",
-        raw: JSON.stringify({ why: r.why }),
+        raw: JSON.stringify({ why: r.why, ...(corrected ? { code } : {}) }),
         priceMin: r.trendMin,
         priceMax: r.trendMax,
         variants: r.variants,

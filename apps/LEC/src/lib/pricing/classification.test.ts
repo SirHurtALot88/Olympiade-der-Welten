@@ -22,11 +22,18 @@ describe("classifyArticle", () => {
     expect(result.articleClass).toBe("ladenhueter");
   });
 
-  it("erkennt Low-Runner (negative DB II) trotz Verkaeufen", () => {
-    const result = classifyArticle(
-      input({ qty30d: 3, qty90d: 10, qty365d: 25, qtyAllTime: 25, dbIIPercent: -0.47 })
-    );
+  it("erkennt Low-Runner: wenige Verkaeufe und negative DB II", () => {
+    const result = classifyArticle(input({ qty30d: 1, qty90d: 3, qty365d: 6, qtyAllTime: 6, dbIIPercent: -0.47 }));
     expect(result.articleClass).toBe("low_runner");
+  });
+
+  it("listet einen Topseller mit negativer DB II NICHT aus (Preis/EK pruefen)", () => {
+    const result = classifyArticle(input({ qty30d: 8, qty90d: 20, qty365d: 51, qtyAllTime: 51, dbIIPercent: -0.2 }));
+    expect(result.articleClass).toBe("beobachten");
+    expect(result.reason).toContain("nicht auslisten");
+    // Grenze: 9 Verkaeufe bleiben Auslist-Kandidat, 10 nicht
+    expect(classifyArticle(input({ qty30d: 1, qty90d: 3, qty365d: 9, qtyAllTime: 9, dbIIPercent: -0.2 })).articleClass).toBe("low_runner");
+    expect(classifyArticle(input({ qty30d: 1, qty90d: 3, qty365d: 10, qtyAllTime: 10, dbIIPercent: -0.2 })).articleClass).toBe("beobachten");
   });
 
   it("erkennt 'Faellt ab' fuer eingebrochene Bundle-Renner (KONZEPT §2 Beispiel)", () => {

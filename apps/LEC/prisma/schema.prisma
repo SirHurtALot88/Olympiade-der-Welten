@@ -44,6 +44,11 @@ model Article {
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?
+  /// Kartenname laut Set-Code (YGOPRODeck), zum Pruefen der Titel; siehe src/lib/market/names.ts.
+  codeNameEn      String?
+  codeNameDe      String?
+  /// Set-Codes, die zum Namen im Titel passen (nur wenn Name und Code nicht zusammenpassen).
+  codeHint        String?
   ebayPriceAt    DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -51,6 +56,7 @@ model Article {
   aliases      ArticleAlias[]
   saleWindows  SaleWindow[]
   purchases    Purchase[]
+  sales        Sale[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -172,6 +178,21 @@ model MarketPrice {
   variants     Int?
 
   @@index([articleId, source])
+}
+
+/// Einzelverkauf (eine Bestellposition) aus der Billbee-API: Datum, Menge, Preis je Stueck (brutto).
+/// Wird je Abruf fuer die letzten 365 Tage ersetzt (source "billbee-api").
+model Sale {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  soldAt    DateTime
+  qty       Float
+  unitPrice Float
+  orderRef  String?
+  source    String
+
+  @@index([articleId, soldAt])
 }
 
 /// Zugangsdaten zu Fremddiensten (Billbee), verschluesselt (AES-256-GCM, Schluessel aus LEC_AUTH_SECRET).

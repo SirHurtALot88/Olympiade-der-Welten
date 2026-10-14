@@ -29,6 +29,8 @@ export interface LatestQuote {
   variants?: number | null;
   /** Wie der Marktwert zugeordnet wurde: "seltenheit" | "einzige_variante" (eindeutig). */
   how?: string | null;
+  /** Set-Code, nach dem der Marktwert gesucht wurde, wenn er vom Code im Titel abweicht (Name gilt). */
+  usedCode?: string | null;
 }
 
 /**
@@ -80,6 +82,13 @@ export interface MarketComparisonRow {
   marginAtMarket: number | null;
   /** Deckungsbeitrags-Marge des heutigen VK mit dem tatsaechlichen EK (null ohne EK). */
   marginAtOwnEk: number | null;
+  /** Letzter Einkaufspreis je Stueck (Billbee-Artikelstamm, sonst realisierter EK), null ohne EK. */
+  lastEk: number | null;
+  /** Deckungsbeitrags-Marge des heutigen VK mit dem letzten Einkaufspreis. */
+  marginAtLastEk: number | null;
+  /** Der Artikel hat sich zu (fast) diesem VK bereits mehrfach verkauft: der Markt nimmt den Preis. */
+  provenByDemand: boolean;
+  soldAtVk: { qty: number; avg: number; days: 90 | 365 } | null;
   /** Eigener EK deutlich (>50 %) ueber dem Marktwert: teuer eingekauft oder Markt gefallen. */
   ekAboveMarket: boolean;
   matchQuality: string | null;
@@ -159,8 +168,27 @@ export function buildMarketComparisonRow(
     else if (classifyAgainstRange(ownVk, hi) === "zu_teuer") status = "zu_teuer";
   }
 
-  let deltaPercent: number | null = null;
-  if (target !== null && ownVk > 0) {
+  // Nachfrage-Beweis (Chris, 14.10.): Ein Preis, zu dem sich der Artikel schon mehrfach verkauft hat,
+  // ist nicht "zu teuer", egal was der Marktwert rechnerisch hergibt. Nur "zu teuer" wird so entkraeftet;
+  // "zu guenstig" bleibt (dort liegt Geld auf dem Tisch).
+  const w90 = a.windows["90"];
+  const w365 = a.windows["365"];
+  const soldAtVk: MarketComparisonRow["soldAtVk"] =
+    ownVk > 0
+      ? w90 && w90.qty >= 2 && w90.avgPrice >= ownVk * 0.95
+        ? { qty: w90.qty, avg: w90.avgPrice, days: 90 }
+        : w365 && w365.qty >= 5 && w365.avgPrice >= ownVk * 0.95
+          ? { qty: w365.qty, avg: w365.avgPrice, days: 365 }
+          : null
+      : null;
+  let provenByDemand = false;
+  if (status === "zu_teuer" && soldAtVk) {
+    status = "im_korridor";
+    provenByDemand = true;
+  }
+
+  let deltaPercent: number | null = provenByDemand ? 0 : null;
+  if (target !== null && ownVk > 0 && !provenByDemand) {
     deltaPercent = ownVk < target.min ? (ownVk - target.min) / target.min : ownVk > target.opt ? (ownVk - target.opt) / target.opt : 0;
   }
   const marginAtMarket =
@@ -170,6 +198,11 @@ export function buildMarketComparisonRow(
   const marginAtOwnEk =
     ek > 0 && ownVk > 0
       ? contributionMarginForPrice(ownVk, { ek, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
+      : null;
+  const lastEk = (a.currentEk ?? 0) > 0 ? (a.currentEk as number) : realizedEk > 0 ? realizedEk : null;
+  const marginAtLastEk =
+    lastEk !== null && ownVk > 0
+      ? contributionMarginForPrice(ownVk, { ek: lastEk, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
       : null;
   const ekAboveMarket = marketValue !== null && marketValue > 0 && ek > marketValue * 1.5;
 
@@ -195,6 +228,10 @@ export function buildMarketComparisonRow(
     marginReachable,
     marginAtMarket,
     marginAtOwnEk,
+    lastEk,
+    marginAtLastEk,
+    provenByDemand,
+    soldAtVk,
     ekAboveMarket,
     matchQuality: quote.matchQuality ?? null,
     how: quote.how ?? null,

@@ -1,7 +1,7 @@
 "use client";
 
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardGap, boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -59,6 +59,23 @@ export function PriceRange({ row }: { row: SortimentRow }) {
   );
 }
 
+/** Kleiner Link zum eBay-Angebot (oeffnet in neuem Tab); ohne Artikelnummer die Suche im eigenen Shop. */
+export function EbayLink({ row }: { row: SortimentRow }) {
+  const l = ebayLinks(row);
+  return (
+    <a
+      className="bd-ebay"
+      href={l.view ?? l.search}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={l.view ? "Angebot bei eBay öffnen" : "Im eigenen eBay-Shop suchen (Artikelnummer unbekannt)"}
+    >
+      eBay ↗
+    </a>
+  );
+}
+
 export function VerdictBadge({ row }: { row: SortimentRow }) {
   const m = row.market;
   if (!m || !m.rated) return <span className="bd-none">{m ? "ohne Urteil" : "—"}</span>;
@@ -66,9 +83,9 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
   const gap = boardGap(row);
   return (
     <div className="bd-verdict">
-      <span className={`bd-pill ${v.cls}`}>
+      <span className={`bd-pill ${v.cls}`} title={m.provenByDemand && m.soldAt ? `${m.soldAt.qty} Verkäufe in ${m.soldAt.days} Tagen im Schnitt für ${eur(m.soldAt.avg)}: der Markt nimmt den Preis` : undefined}>
         <i />
-        {v.label}
+        {m.provenByDemand ? "verkauft sich so" : v.label}
       </span>
       {gap && gap.target !== null && (
         <span className="bd-delta">
@@ -139,6 +156,14 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                         {clean.pack > 1 && <span className="bd-rar bd-pack">{clean.pack}er-Pack</span>}
                         {clean.edition && <span className="bd-ed">{clean.edition}</span>}
                         {!row.active && <span className="bd-rar">ausgelaufen</span>}
+                        {row.codeName?.mismatch && (
+                          <span
+                            className="bd-rar bd-namewarn"
+                            title={`Name und Set-Code passen nicht zusammen. Der Code ${row.setCode} gehört zu: ${row.codeName.de ?? row.codeName.en}${row.codeName.de && row.codeName.en ? ` (${row.codeName.en})` : ""}.${row.codeName.hint ? ` Zum Namen im Titel passt: ${row.codeName.hint}.` : ""} ${row.codeName.usedCode ? `Der Marktwert gilt für ${row.codeName.usedCode} (Name wird als richtig angenommen).` : "Ohne eindeutigen Code kein Marktwert."} Code in Billbee und bei eBay korrigieren.`}
+                          >
+                            Code ≠ Name
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -146,6 +171,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                 <td data-label="Dein VK" className="r bd-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
+                  <EbayLink row={row} />
                 </td>
                 <td data-label="Empfohlener VK">
                   <PriceRange row={row} />

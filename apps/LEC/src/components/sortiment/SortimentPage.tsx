@@ -223,6 +223,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
+  const [onlyNameCheck, setOnlyNameCheck] = useState(false);
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
   const [boardSort, setBoardSort] = useState<BoardSortKey>("abweichung");
@@ -318,6 +319,9 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         return v != null && v >= valueRange.lo && v < valueRange.hi;
       });
     }
+    if (onlyNameCheck) {
+      result = result.filter((r) => r.codeName?.mismatch);
+    }
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
@@ -325,7 +329,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyLadenhueter, showDiscontinued]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -341,7 +345,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
+  const extraFiltersActive = onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -459,6 +463,17 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           }}
         >
           nur Ladenhüter
+        </button>
+        <button
+          type="button"
+          className={`chip${onlyNameCheck ? " on" : ""}`}
+          onClick={() => {
+            setOnlyNameCheck((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Artikel, bei denen Name und Set-Code im Titel nicht zusammenpassen (eines von beiden ist falsch)"
+        >
+          Name ≠ Code
         </button>
         <button
           type="button"

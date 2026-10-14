@@ -162,3 +162,41 @@ export function mapOrders(orders: Json[], masters: MasterProduct[], opts: OrderM
 
   return windows.map((w) => ({ window: w.key, windowFrom: w.from, windowTo: to, rows: [...w.byName.values()] }));
 }
+
+export interface SaleRow {
+  nameNormalized: string;
+  soldAt: Date;
+  qty: number;
+  /** Preis je Stueck, brutto (Positionssumme / Menge). */
+  unitPrice: number;
+  orderRef: string | null;
+}
+
+/** Einzelverkaeufe (eine Zeile je Bestellposition) der Bestellungen; Stornos ausgenommen. */
+export function extractSales(orders: Json[], opts: { excludeStates?: number[] } = {}): SaleRow[] {
+  const exclude = new Set(opts.excludeStates ?? []);
+  const out: SaleRow[] = [];
+  for (const order of orders) {
+    const state = num(order.State ?? order.OrderStateId);
+    if (state !== null && exclude.has(state)) continue;
+    const soldAt = new Date(String(order.CreatedAt ?? order.OrderDate ?? ""));
+    if (Number.isNaN(soldAt.getTime())) continue;
+    const ref = order.OrderNumber ?? order.BillBeeOrderId;
+    const items = Array.isArray(order.OrderItems) ? (order.OrderItems as Json[]) : [];
+    for (const item of items) {
+      const product = (item.Product && typeof item.Product === "object" ? item.Product : {}) as Json;
+      const nameRaw = titleOf(product.Title) || titleOf(item.Title ?? item.Name);
+      const qty = num(item.Quantity) ?? 0;
+      if (!nameRaw || qty <= 0) continue;
+      const lineTotal = num(item.TotalPrice) ?? (num(item.UnitPrice) ?? 0) * qty;
+      out.push({
+        nameNormalized: normalizeArticleName(nameRaw).normalized,
+        soldAt,
+        qty,
+        unitPrice: lineTotal / qty,
+        orderRef: ref !== undefined && ref !== null ? String(ref) : null,
+      });
+    }
+  }
+  return out;
+}

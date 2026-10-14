@@ -167,13 +167,53 @@ describe("buildDashboardViewModel", () => {
     const articles: ArticleAggregate[] = [
       article("Verlustbringer", {
         windows: {
-          all: agg({ qty: 10, revenue: 100, dbII: -50 }),
-          "365": agg({ qty: 10, revenue: 100, dbII: -50 }),
+          all: agg({ qty: 6, revenue: 60, dbII: -30 }),
+          "365": agg({ qty: 6, revenue: 60, dbII: -30 }),
         },
       }),
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(true);
+  });
+
+  it("empfiehlt bei einem Topseller (51 Verkaeufe) mit negativer DB II KEIN Auslisten", () => {
+    const articles: ArticleAggregate[] = [
+      article("Topseller", {
+        windows: {
+          all: agg({ qty: 51, revenue: 510, dbII: -100 }),
+          "365": agg({ qty: 51, revenue: 510, dbII: -100 }),
+        },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(false);
+  });
+
+  it("meldet 'Daten pruefen' bei Name/Code-Konflikt, Topseller mit Verlust und krummer Stueckzahl", () => {
+    const articles: ArticleAggregate[] = [
+      article("Falscher Code", {
+        setCode: "RA04-DE094",
+        codeNameEn: "Lightning Storm",
+        codeNameDe: "Blitzsturm",
+        codeHint: "ALIN-DE094",
+        windows: { "90": agg({ qty: 4, revenue: 18 }), "365": agg({ qty: 4, revenue: 18 }) },
+      }),
+      article("Topseller", {
+        windows: { all: agg({ qty: 51, revenue: 510, dbII: -100 }), "365": agg({ qty: 51, revenue: 510, dbII: -100 }) },
+      }),
+      article("Krumm", { windows: { "365": agg({ qty: 2.67, revenue: 20, dbII: 5 }) } }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const ids = vm.recommendations.filter((r) => r.kind === "daten_pruefen").map((r) => r.id);
+    expect(ids).toContain("daten_pruefen:code:Falscher Code");
+    expect(ids).toContain("daten_pruefen:marge:Topseller");
+    expect(ids).toContain("daten_pruefen:menge:Krumm");
+    // Name/Code-Konflikt erzeugt keine Preis-Empfehlung auf einem falschen Marktwert
+    expect(vm.recommendations.some((r) => r.id === "preis_anpassen:Falscher Code")).toBe(false);
+    // Datenfehler stehen vor den €-Empfehlungen
+    const firstEuro = vm.recommendations.findIndex((r) => r.kind !== "ek_pflegen" && r.kind !== "daten_pruefen");
+    const lastData = vm.recommendations.map((r) => r.kind).lastIndexOf("daten_pruefen");
+    if (firstEuro !== -1) expect(lastData).toBeLessThan(firstEuro);
   });
 
   it("erzeugt fuer JEDEN Low-Runner eine eigene Auslisten-Empfehlung (nicht nur den schlimmsten)", () => {

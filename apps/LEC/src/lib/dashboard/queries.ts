@@ -52,7 +52,7 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
  * nicht jede Seite ihre eigene Prisma-Query schreibt.
  */
 export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -61,15 +61,26 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       orderBy: { fetchedAt: "desc" },
     }),
     loadActiveCostSettings(prisma),
+    // eBay-Artikelnummern aus den Verkaufsberichten: Rueckfall, wenn der Shop-Abruf sie nicht geliefert hat.
+    prisma.ebayListingFact.findMany({
+      where: { articleId: { not: null } },
+      select: { articleId: true, ebayItemId: true },
+      orderBy: { reportTo: "desc" },
+    }),
   ]);
+  const factItemByArticle = new Map<string, string>();
+  for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
 
   // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
   const latestQuoteByArticle = new Map<string, LatestQuote>();
   for (const mp of latestMarketPrices) {
     if (latestQuoteByArticle.has(mp.articleId)) continue;
     let how: string | null = null;
+    let usedCode: string | null = null;
     try {
-      how = (mp.raw ? (JSON.parse(mp.raw) as { how?: string }).how : null) ?? null;
+      const parsed = mp.raw ? (JSON.parse(mp.raw) as { how?: string; code?: string }) : null;
+      how = parsed?.how ?? null;
+      usedCode = parsed?.code ?? null;
     } catch {
       how = null;
     }
@@ -86,6 +97,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       priceMax: mp.priceMax,
       variants: mp.variants,
       how,
+      usedCode,
     });
   }
 
@@ -136,6 +148,10 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
       vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
+      ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
+      codeNameEn: article.codeNameEn,
+      codeNameDe: article.codeNameDe,
+      codeHint: article.codeHint,
       // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
       latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
       marketQuote: quote ?? null,

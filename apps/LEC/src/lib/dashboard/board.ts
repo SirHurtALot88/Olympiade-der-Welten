@@ -122,3 +122,25 @@ export function cardmarketCode(setCode: string): string {
   const m = setCode.trim().toUpperCase().match(/^([A-Z0-9]+)-(?:DE|EN|FR|IT|PT|ES|SP|JP|KR)([A-Z]?\d+)$/);
   return m ? `${m[1]}-${m[2]}` : setCode.trim();
 }
+
+export interface EbayLinks {
+  /** Das Angebot ansehen. */
+  view: string | null;
+  /** Das Angebot im Verkaeufer-Formular bearbeiten (Preis aendern). */
+  revise: string | null;
+  /** Suche im eigenen Shop, wenn die Artikelnummer unbekannt ist. */
+  search: string;
+}
+
+const SHOP = "https://www.ebay.de/str/lordenterichcards";
+
+/** Links zu eBay: direkt zum Angebot, sonst Suche im eigenen Shop ueber den Cardmarket-Code (ohne DE/EN). */
+export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "nameRaw">): EbayLinks {
+  const id = row.ebayItemId && /^\d{9,14}$/.test(row.ebayItemId) ? row.ebayItemId : null;
+  const term = row.setCode ? cardmarketCode(row.setCode) : row.nameRaw;
+  return {
+    view: id ? `https://www.ebay.de/itm/${id}` : null,
+    revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
+    search: `${SHOP}?_nkw=${encodeURIComponent(term)}`,
+  };
+}
