@@ -902,20 +902,17 @@
    "info": "Eine Rüstung ohne Naht, groß wie ein Schrank, und niemand darin: nur Staub und Moos. Sie geht langsam, sie hört nicht auf, und sie schießt mit etwas, das glüht.",
    "werte": {
     "name": "Leere Rüstung",
-    "faction": "Urwild",
-    "praegung": [
-     "gift"
-    ],
+    "faction": "Die Leeren",
     "size": "1",
     "quality": "4+",
-    "defense": "3+",
-    "tough": "4",
+    "defense": "2+",
+    "tough": "3",
     "role": "enemy",
-    "weapons": "Glutrohr | 24\" | A1 | DS(1)\nRüstungsfaust | Nahkampf | A1 | ",
-    "passives": "Furchtlos, Langsam",
-    "flavor": "Keiner drin. Nur Staub und Moos, und es geht trotzdem."
+    "weapons": "Glutgewehr | 18 | A1 | DS(1)\nPanzerfaust | Nahkampf | A1 | ",
+    "passives": "Langsam, Furchtlos",
+    "flavor": "Versiegelt. Darin rieselt etwas, wenn es geht."
    },
-   "notiz": "Eigene Werte, 45 P. (Q4+ D3+ Z4, Langsam, Glutrohr A1 DS 1). Miniatur: Rubric Marine (Thousand Sons), leere Rüstungen voller Staub, hier mit Moos in den Fugen. Zwei stehen am Anfang erstarrt vor den Zonen A und B, eine weitere kommt je Rundenende dazu (auf Normal höchstens drei). Vor den Spielern: die leeren Rüstungen, die Rüstungsmänner.",
+   "notiz": "Eigene Werte wie der Rüstungsmann aus Map 4, 55 P. (Q4+ D2+ Z3, Glutgewehr A1 DS 1, Panzerfaust A1, Langsam, Furchtlos). Miniatur: Rubric Marine (Thousand Sons), leere Rüstungen voller Staub, hier mit Moos in den Fugen. Zwei stehen am Anfang erstarrt vor den Zonen A und B, eine weitere kommt je Rundenende dazu (auf Normal höchstens drei). Vor den Spielern: die leeren Rüstungen, die Rüstungsmänner.",
    "anblick": "Die Rüstung hat keine Naht, keine Schnalle, kein Scharnier. Hinter dem Visier ist nichts, nur Dunkel, und daraus rieselt Staub, jedes Mal, wenn sie einen Schritt macht. In den Fugen wächst Moos.",
    "zustandSaetze": {
     "unverletzt": "Die Klinge rutscht an der Rüstung ab. Sie hat es nicht einmal bemerkt.",
@@ -1178,7 +1175,7 @@
     "bossName": "Er forscht am Herz",
     "bossText": "Solange er steht, hält er seine schützende Hand über die Adern: Jeder Angriff auf eine Ader trifft erst ab 5+ statt wie sonst (sein Zauber liegt auf ihnen). Fällt er, sind sie wieder verwundbar.",
     "flavor": "Er liest noch immer. Nur nicht mehr in Büchern.",
-    "passives": "Furchtlos, Zauberer"
+    "passives": "Furchtlos, Langsam, Zauberer"
    },
    "notiz": "Zweiter Magier, eigene Werte 110 P. (Q3+ D2+ Z5, Blaues Feuer zwei Kartenlängen A1 Explosion 3, Runenstab A2 DS 1, Furchtlos, Zauberer). Miniatur: ein zweiter Sorcerer der Thousand Sons (ist der aus Map 4 gefallen, ist es ein anderer). Er steht am Werktisch und forscht am Herz: Solange er steht, treffen Angriffe auf die Adern erst ab 5+. Erst ihn, oder mit viel Geduld.",
    "zustandSaetze": {
@@ -2132,7 +2129,7 @@
    "typ": "vorbereitung",
    "titel": "Bereitlegen",
    "checkliste": [
-    "Die Thousand Sons: der Rufer (Sorcerer, der Boss), ein zweiter Sorcerer (der Gelehrte) und bis zu 5 leere Rüstungen (Rubric Marines). Rufer, Gelehrter und zwei Rüstungen stehen am Anfang, weitere kommen je Rundenende (wie viele, zeigt die Gegnerliste)",
+    "Die Thousand Sons: der Rufer (Sorcerer, der Boss), ein zweiter Sorcerer (der Gelehrte) und bis zu 5 leere Rüstungen (Rubric Marines). Rufer, Gelehrter und eine Rüstung stehen am Anfang (auf höherer Stufe mehr), weitere kommen je Rundenende (wie viele, zeigt die Gegnerliste)",
     "Der Glutleib für die Flucht: das größte Monster, das du hast",
     "Der Überlebende, falls die Folgen unten ihn nennen: eine große Figur in schwerer Rüstung (ein Space Marine passt)",
     "Das Herz: ein großes Stück Gelände (Wurzeln, Stein, was du hast), in der Mitte etwas Rotes oder ein Licht für die Glut, davor 3 Adern (Wurzelstücke oder Marker)",
@@ -2338,7 +2335,7 @@
     "Wurzelwände links und rechts der Herzkammer, eine glatte Wand an der linken Kante, halbe Höhe",
     "Werktisch links oben, Glastank rechts, Pilze verstreut. Trümmer rechts unten (M), daneben der Schacht nach oben (↑): der einzige Weg hinaus",
     "Feindzonen A (links oben), B (rechts oben) und C (links unten) hinlegen",
-    "Erstarrt aufstellen, die Helme gesenkt: der Rufer direkt vor dem Herz, der Gelehrte am Werktisch links oben (W), je eine leere Rüstung vor Zone A und vor Zone B, zwei Sporenlinge in Zone C (wie viele genau, zeigt die Gegnerliste)",
+    "Erstarrt aufstellen, die Helme gesenkt: der Rufer direkt vor dem Herz, der Gelehrte am Werktisch links oben (W), eine leere Rüstung vor Zone A, zwei Sporenlinge in Zone C. Wie viele es auf eurer Stufe genau sind, zeigt die Gegnerliste",
     "Der Überlebende an die Trümmer (M), falls er dabei ist",
     "Heldenstart links unten: die Spieler stellen ihre Helden auf",
     "Bereitlegen, nicht hinstellen: weitere leere Rüstungen, Sporenlinge, die zwei Befallenen (falls die Folgen sie nennen), den Zählstein für die Glut"
@@ -2510,12 +2507,6 @@
      "skaliert": true
     },
     {
-     "id": "ruestung",
-     "anzahl": 1,
-     "zone": "B",
-     "skaliert": true
-    },
-    {
      "id": "sporenling",
      "anzahl": 2,
      "zone": "C"
@@ -2594,7 +2585,7 @@
     "Ist die Glut überladen: Weiter zu Cue 05-2. Fallen alle Helden oder fliehen sie vorher durch den Schacht: unten Weiter, dann bestätigen (das Herz schlägt weiter).",
     "Faden verloren? „Die Stränge. Dann die Glut. Dann lauft.“",
     "Nur für dich: Miniaturen Rubric Marines und ein Sorcerer der Thousand Sons; vor den Spielern nur „die leeren Rüstungen“ und „der mit dem Stab“. Das Finale rechnet eine Stufe höher als gewählt (auf Normal wie Schwer): mehr Rüstungen und öfter Nachschub; der Überlebende bleibt, wie er ist.",
-    "Das Budget rechnet den Überlebenden zur Gruppe: Ist er dabei, stehen mehr Gegner am Tisch (auf Normal rund 415 P. am Anfang gegen 340 Heldenpunkte plus seine 145)."
+    "Das Budget rechnet den Überlebenden zur Gruppe: Ist er dabei, stehen mehr Gegner am Tisch (auf Normal rund 380 P. am Anfang gegen 340 Heldenpunkte plus seine 145, eine Welle Schwer)."
    ],
    "ereignisse": [
     "gegnerwahl",
@@ -2901,7 +2892,8 @@
      "ziel": "flucht-ende"
     }
    ],
-   "weiter": "glut-bricht"
+   "weiter": "glut-bricht",
+   "budgetFrei": "Flucht, kein Kampf zum Gewinnen: der Glutleib ist ein einzelner Verfolger und bleibt auf jeder Stufe gleich."
   },
   "glut-bricht": {
    "typ": "vorlesen",

@@ -713,8 +713,8 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(zahl(ids(m, neu(m, "fortgeschritten", 680), "kampf-gemeinde"), "grabgaenger")).toBe(7);
     const s = neu(m, "experte"); ids(m, s, "kampf-erloesen");
     expect(m.budgetVon(s, "kampf-erloesen")).toMatchObject({ ziel: 263, summe: 275 });
-    // „Die drei stehen auf“ bleibt bei drei, egal auf welcher Stufe
-    for (const st of stufen) expect(ids(m, neu(m, st), "kampf-drei").length).toBe(3);
+    // „Die drei stehen auf“: drei bis Normal, auf Schwer und Albtraum stehen mehr auf (die Stufe gilt auch hier)
+    expect(stufen.map(st => ids(m, neu(m, st), "kampf-drei").length)).toEqual([3, 3, 5, 6]);
     // Die Werte ändern sich nie
     const g = { uid: "t", id: "gemeinde", wunden: 0, zaeh: 3 };
     for (const st of stufen) expect(m.effektiveWerte(neu(m, st), g)).toEqual(m.effektiveWerte(neu(m, "fortgeschritten"), g));
@@ -1110,10 +1110,10 @@ describe("Kartenschmiede – Moosgrab-Finale: Boss, Rast, wer die Glut hält", (
     bis(m, s, "kampf-herz");
     const b = m.budgetVon(s, "kampf-herz") as { ziel: number; summe: number; verbuendete: number };
     expect(b.verbuendete).toBe(145);
-    expect(b.ziel).toBeGreaterThan(380);
+    expect(b.ziel).toBeGreaterThan(330);
     const ids = s.gegner.map(g => g.id);
     expect(ids.filter(id => id === "rufer" || id === "gelehrter")).toEqual(["rufer", "gelehrter"]);
-    expect(ids.filter(id => id === "ruestung").length).toBeGreaterThanOrEqual(2);
+    expect(ids.filter(id => id === "ruestung").length).toBeGreaterThanOrEqual(1);
     expect(ids.filter(id => id === "sporenling").length).toBeGreaterThanOrEqual(2);
     // Ohne den Überlebenden schrumpft der Kampf, die beiden Magier bleiben
     const m2 = finale(), s2 = m2.neu({ schwierigkeit: "fortgeschritten" }) as FS;
@@ -1163,4 +1163,34 @@ describe("Kartenschmiede – Moosgrab-Finale: Boss, Rast, wer die Glut hält", (
     expect(s.verlauf).not.toContain("kampf-herz");
     expect(s.flags.epilog).toBe("X");
   });
+});
+
+// Balancing: Jeder Kampf hält sich an die gewählte Stufe (OPR: eine Welle hat 25/50/75/100 % der Heldenpunkte).
+// Auf Normal steht nicht mehr am Tisch als das Budget erlaubt (Bosse und Story-Gegner ausgenommen),
+// und auf Schwer wächst jeder Kampf mit, der dafür Platz hat. `budgetFrei` am Schritt nimmt einen Kampf mit Begründung aus.
+describe("Kartenschmiede – Moosgrab-Balancing über alle fünf Maps", () => {
+  const R = laden("../apps/kartenschmiede/regeln.js") as { punkte(w: Record<string, string>): { pts: number } };
+  const GIFTMADE = { quality: "5+", defense: "6+", tough: "3", size: "1", weapons: "Biss | Nahkampf | A2 | Gift" };
+  type BM = Kette & { betrete(s: Stand5, id: string): unknown; budgetVon(s: Stand5, id: string): { ziel: number; summe: number } | null };
+  type KMap = { schritte: Record<string, unknown>; gegner: Record<string, { werte?: unknown; skaliert?: boolean; seite?: string }> };
+  const budgetBei = (map: KMap, id: string, stufe: string) => {
+    const m = SM.erstelle(map, { punkte: (w: Record<string, string>) => R.punkte(w).pts, werte: (d: { werte?: Record<string, string> }) => d.werte || GIFTMADE, stufe: () => 2, zufall: () => 0.5 }) as unknown as BM;
+    const s = m.neu({ schwierigkeit: stufe, heldenpunkte: 340 });
+    m.betrete(s, id);
+    return { b: m.budgetVon(s, id), fest: s.gegner.filter(g => !m.istFreund(g.id)).every(g => { const d = map.gegner[g.id] || {}; return !!d.werte && !d.skaliert; }) };
+  };
+  for (const [i, map] of MAPS.entries()) {
+    const kaempfe = Object.entries(map.schritte as Record<string, { typ: string; budgetFrei?: string; gegner?: Array<{ id: string }> }>)
+      .filter(([, s]) => s.typ === "kampf" && !s.budgetFrei && (s.gegner || []).some(g => (map.gegner[g.id] || {}).seite !== "freund"));
+    it(`map${i + 1}: Normal bleibt im Budget, Schwer wächst mit`, () => {
+      for (const [id] of kaempfe) {
+        const normal = budgetBei(map, id, "fortgeschritten"), schwer = budgetBei(map, id, "experte");
+        if (!normal.b || !schwer.b) continue;
+        if (!normal.fest) expect(normal.b.summe, `${id} auf Normal`).toBeLessThanOrEqual(Math.ceil(normal.b.ziel * 1.15));
+        // Auf Schwer mindestens so viel wie auf Normal; ist das Budget deutlich größer, muss auch mehr am Tisch stehen
+        expect(schwer.b.summe, `${id} auf Schwer`).toBeGreaterThanOrEqual(normal.b.summe);
+        if (schwer.b.ziel >= normal.b.summe + 30) expect(schwer.b.summe, `${id} wächst auf Schwer nicht mit`).toBeGreaterThan(normal.b.summe);
+      }
+    });
+  }
 });
