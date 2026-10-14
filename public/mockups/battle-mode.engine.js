@@ -19387,6 +19387,15 @@
 
   const ISPY_PUNKTWERT={1:10,2:25,3:60};
   const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
+  // KURZ-BESCHRIFTUNG DESSELBEN SUB-SKILLS (28c/d, Task #129 Punkt 28, Chris 13.10.: "man
+  // müsste erkennen welcher Main Skill benötigt wird") — reine Anzeige-Ableitung aus
+  // ISPY_RAETSEL_SUBSKILL direkt darueber, auf Badge-Breite gekuerzt (die vollen Namen
+  // MENSCHENKENNTNIS/FINGERFERTIGKEIT sprengen ein Fundort-Label). Dieselbe Quelle wie die
+  // Erfolgsformel (ispyBesterWeg(), s. deren eigene Kommentare) liest -- kein zweites,
+  // divergierendes Wort fuer denselben Sub-Skill. Genutzt von ispyFundortBadge() (Fundort,
+  // 28c/d) UND ispySprechblase() (Spieler-Ikone, 28a) -- derselbe Text an beiden Stellen,
+  // damit ein Zuschauer den Spieler am Fundort erkennt, auf den er zusteuert.
+  const ISPY_SKILL_KUERZEL={LOGIK:"LOGIK",MENSCHENKENNTNIS:"MENSCH",FINGERFERTIGKEIT:"FINGER"};
   // KNACKEN-FORMEL (Konzept 1.4): p = clamp(0,08; 0,95; 0,15 + K·0,011 − (Stufe−1)·0,22 +
   // Fortschritt). Bei K=30/60/85 liefert das fuer Stufe 1/2/3 exakt die im Konzept
   // nachgerechnete Tabelle (0,48/0,26/0,08 bzw. 0,95/0,86/0,645 vor Rundung).
@@ -22894,6 +22903,11 @@
             ?ISPY_VIZ_SUCHE_STARK_ENDE:ISPY_VIZ_SUCHE_SCHWACH_ENDE;
           u.vizIspyErfolg=r.ereignis===art.erfolgWort;
           u.vizIspyStufe=r.stufe||1;
+          // WELCHEN SUB-SKILL DIESER ZUG BRAUCHT (28a, Task #129 Punkt 28): reines
+          // Lesefeld fuer die Sprechblasen-Ikone in zeichneSchatzsuche() -- derselbe `skill`
+          // zwei Zeilen darueber, nur auf `u` gemerkt statt nur lokal verwendet. Kein neuer
+          // Wert, keine zweite Berechnung.
+          u.vizIspySkill=skill||null;
           // REAGIEREN (Konzept 5.2, "Tick-Beginn, wenn r.reaktion aus PR 2 gesetzt ist"):
           // r.reaktion ist ein reines Lesefeld aus baueSchatzsuche() (PR 2, ":14654"/
           // ":14661") — markiert einen Laeufer, der auf ein sichtbares gegnerisches
@@ -22913,6 +22927,7 @@
           u.vizIspyZielX=u.vizX; u.vizIspyZielY=u.vizY;
           u.vizIspySuchEnde=ISPY_VIZ_SUCHE_SCHWACH_ENDE;
           u.vizIspyErfolg=false; u.vizIspyStufe=0; u.vizIspyReaktion=false;
+          u.vizIspySkill=null;
           u.vizPhase="idle";
         }
         u.vizIspyT=0;
@@ -24122,6 +24137,60 @@
     ctx.textAlign="center"; ctx.textBaseline="alphabetic";
     ctx.fillText("★".repeat(Math.max(1,Math.min(3,stufe||1))),cx,cy);
   }
+  // FUNDORT-BADGE (28c/d, Task #129 Punkt 28, Chris 13.10.: "Für den Zuschauer sollte
+  // erkennbar sein, wo die fettesten Hinweise sind ... und man müsste erkennen welcher Main
+  // Skill benötigt wird"). Reine Referenzdaten-Anzeige — liest NUR `f`/ISPY_SKILL_KUERZEL/
+  // ISPY_PUNKTWERT (statische Konstanten, s. deren Kopfkommentare), nie `u.runden`/`rr()`.
+  // Das ist die "dramatische Ironie" aus dem Konzept: der Zuschauer sieht, was eine Truhe
+  // BRAUCHT und WERT ist, bevor irgendjemand sie erreicht — nicht, wer sie knacken wird.
+  // STERNE (ispySterne, direkt darueber) zeigen bereits die Stufe/den Ertrag (1★=10,
+  // 2★=60, 3★=60 ueber ISPY_PUNKTWERT, s. dessen Kopfkommentar) — dieses Badge ergaenzt nur
+  // den fehlenden zweiten Teil von Chris' Wunsch: WELCHER Sub-Skill. Zweite, kleinere Zeile
+  // nur fuer die beiden Mehrwege-Tresore (`f.neben`, Konzept 1.6): der Nebenweg-Skill in
+  // gedaempfter Farbe — "geht auch, zahlt aber weniger" (ISPY_NEBENWEG_PUNKTFAKTOR), nicht
+  // gleichwertig zum Primaerweg, deshalb bewusst kleiner/stumpfer statt gleich groß.
+  function ispyFundortBadge(cx,cy,f,stufeAnzeige){
+    const primaerSkill=ISPY_RAETSEL_SUBSKILL[f.art];
+    const primaerKuerzel=ISPY_SKILL_KUERZEL[primaerSkill]||primaerSkill||"?";
+    const wert=ISPY_PUNKTWERT[stufeAnzeige||f.stufe]||ISPY_PUNKTWERT[1];
+    ctx.save();
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.font="700 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.fillStyle="rgba(232,226,208,.88)";
+    ctx.fillText(primaerKuerzel+" · "+wert,cx,cy);
+    if(f.neben){
+      const nebenKuerzel=ISPY_SKILL_KUERZEL[f.neben]||f.neben;
+      ctx.font="700 5.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle="rgba(190,180,150,.62)";
+      ctx.fillText("o. "+nebenKuerzel,cx,cy+7);
+    }
+    ctx.restore();
+  }
+  // SPRECHBLASE (28a, Q8, Task #129 Punkt 28, Chris 13.10.: "wie so sprechblasen
+  // verschiedene Icons hat um zu sehen was der Spieler gerade denkt und tun will"). Erster
+  // Einsatz des in `fable-konzept-chris-feedback-13-10.md` Abschnitt 3.8 (Q8) skizzierten
+  // Bausteins — hier bewusst NUR fuer I-Spy verdrahtet (Klasse A, diese PR), nicht als
+  // cross-Chassis-Baustein ausgerollt (das bliebe einer spaeteren, eigenen Runde fuer
+  // Breaking/Climbing/Battlefield vorbehalten, s. Konzept). Reine Praesentation: liest
+  // ausschliesslich bereits vorhandene viz*-Felder, schreibt nichts zurueck, kein rr().
+  // Kleine Pille mit Zeiger nach unten (Richtung Kopf), Text/Glyph zentriert.
+  function ispySprechblase(cx,cy,text,farbe){
+    ctx.save();
+    ctx.font="700 7px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    const tw=ctx.measureText(text).width;
+    const w=Math.max(14,tw+7), h=11;
+    const bx=cx-w/2, by=cy-h/2;
+    ctx.fillStyle="rgba(10,8,5,.82)"; ctx.strokeStyle=farbe; ctx.lineWidth=1;
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(bx,by,w,h,3); else ctx.rect(bx,by,w,h);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx-3,by+h-0.5); ctx.lineTo(cx,by+h+4); ctx.lineTo(cx+3,by+h-0.5); ctx.closePath();
+    ctx.fillStyle="rgba(10,8,5,.82)"; ctx.fill();
+    ctx.fillStyle=farbe; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(text,cx,cy+0.5);
+    ctx.restore();
+  }
   // FUeNF MOeBEL-PRIMITIVE, ~18-30px, im selben Massstab wie zeichneHantel()/FOLTER_GERAETE
   // (s. Kopfkommentar dort: "zehn Geraete als einfache Primitive ZEICHNEN, im selben
   // Massstab wie die vorhandenen Requisiten"). Jede Funktion arbeitet in einem bereits
@@ -24358,6 +24427,9 @@
           ctx.globalAlpha=1;
           ctx.restore();
           ispySterne(p.x,p.y-26,stufeAnzeige);
+          // 28c/d (s. ispyFundortBadge()-Kopfkommentar): Skill+Punktwert-Badge ueber den
+          // Sternen, bei beiden Tresoren mit der Nebenweg-Zeile darunter.
+          ispyFundortBadge(p.x,p.y-37,f,stufeAnzeige);
           if(z&&!z.offen){
             ctx.font="700 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(255,120,90,.9)";
             ctx.textAlign="center"; ctx.textBaseline="alphabetic";
@@ -25902,6 +25974,32 @@
           ctx.fillStyle="rgba(200,225,255,.30)"; ctx.strokeStyle="#e8e2d0"; ctx.lineWidth=1.4;
           ctx.beginPath(); ctx.arc(-3,-2,6.5,0,Math.PI*2); ctx.fill(); ctx.stroke();
           ctx.restore();
+        }
+
+        // SPRECHBLASEN-IKONEN (28a, Q8, Task #129 Punkt 28, Chris 13.10.): "verschiedene
+        // Icons ... um zu sehen was der Spieler gerade denkt und tun will" — die grosse
+        // Lupe oben beantwortet nur "er sucht etwas", nicht WELCHEN Sub-Skill. Drei
+        // Zustaende, alle reine viz*-Ablesung, kein rr():
+        //  - "suchen": Skill-Kuerzel (dieselbe Badge-Sprache wie ispyFundortBadge() am
+        //    Fundort selbst, Kuerzel aus u.vizIspySkill via ISPY_SKILL_KUERZEL) OBERHALB der
+        //    Lupe (y-70, die Lupe selbst reicht nur bis etwa y-60 -- geprueft per Screenshot-
+        //    Zoom, s. PR-Beschreibung, erster Entwurf bei x+15,y-58 ueberlappte den Lupenring)
+        //    -- der Zuschauer sieht, AN WELCHEM Fundort-Typ dieser Spieler gerade arbeitet,
+        //    ohne das Ergebnis zu verraten (ISPY_SKILL_KUERZEL/u.vizIspySkill sind beide
+        //    bereits VOR dem Wurf feststehende Referenzdaten).
+        //  - "gehen" OHNE Reaktion (die MIT Reaktion behaelt ihr eigenes "!"-Bild, s. oben):
+        //    ein Pfeil -- "will dorthin" (Q8-Tabelle, Konzept Abschnitt 3.8).
+        //  - "idle" (kein Ziel diesen Tick, Teilnehmer bleibt stehen): "…" -- derselbe
+        //    "wartet"-Fall, den die Q8-Tabelle fuer I-Spy vorsieht (dort fuer einen besetzten
+        //    Fundort gedacht, hier schon heute erreichbar, wenn kein Fundort frei/sichtbar
+        //    war — 28b/die Besetzungsregel selbst bleibt Papier, s. Konzeptdokument).
+        if(u.vizPhase==="suchen"&&u.vizIspySkill){
+          const kuerzel=ISPY_SKILL_KUERZEL[u.vizIspySkill]||u.vizIspySkill;
+          ispySprechblase(x,y-70,kuerzel,"#9fd8c2");
+        } else if(u.vizPhase==="gehen"&&!u.vizIspyReaktion){
+          ispySprechblase(x,y-46,"→","#dfe6ef");
+        } else if(u.vizPhase==="idle"){
+          ispySprechblase(x,y-46,"…","#8a93a3");
         }
 
         ctx.globalAlpha=0.20; ctx.fillStyle=c;
