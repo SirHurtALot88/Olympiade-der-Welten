@@ -2776,11 +2776,16 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     [later],
   );
 
-  // Highlight-Banner setzen (nur track): ersetzt den laufenden Pop, blendet nach
-  // ~2,6 s wieder aus. Bei reduced-motion bleibt er ohne Dauer-Animation stehen.
+  // Highlight-Banner setzen (track, und seit W-V7 auch platter): ersetzt den laufenden Pop,
+  // blendet nach ~2,6 s wieder aus. Bei reduced-motion bleibt er ohne Dauer-Animation stehen.
+  // W-V7 "Regie auf die Geschichte" (Wettessen-Rework Politur, Chris 13.10., Fable-Konzept
+  // Abschnitt 6.3): das Banner war bisher track-exklusiv — die "leader"-Meldung weiter unten
+  // (Führungswechsel) feuerte für Wettessen also schon lange, wurde aber nie sichtbar. Jetzt
+  // bekommt platter dieselbe Textzeile für dieselben, bereits klassifizierten Ereignisse.
+  // Alle anderen Primitive bleiben unverändert aussen vor (Gate bleibt sonst exakt wie vorher).
   const popBanner = useCallback(
     (text: string, kind: "gold" | "cyan" = "cyan") => {
-      if (prim !== "track") return;
+      if (prim !== "track" && prim !== "platter") return;
       const id = (bannerId.current += 1);
       setBanner({ text, kind, id });
       later(() => setBanner((b) => (b && b.id === id ? null : b)), 2600);
@@ -3265,7 +3270,14 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           busyRef.current = false;
           setBusy(false);
         }, 200);
-        if (nextRound >= slotCount) later(showPodium, 900);
+        // W-V8 "Die Zählung und der Gürtel" (Wettessen-Rework Politur, Fable-Konzept 6.3):
+        // das Podest deckt das ganze Feld ab (inset:0, zIndex 5) — die "Zählung" (Tafeln
+        // klappen nacheinander von hinten nach vorn, dann der Gürtel für den Champion, s.
+        // platter.tsx) braucht deshalb ihr eigenes Zeitfenster DAVOR, sonst verdeckt das
+        // Podest sie, bevor sie zu sehen war. ~3s Puffer, nur platter, nur ohne reduced-
+        // motion (eine abgeschaltete Animation künstlich zu verlängern wäre sinnlos). Alle
+        // anderen Primitive behalten exakt den alten Wert.
+        if (nextRound >= slotCount) later(showPodium, prim === "platter" && !reduced.current ? 900 + 3000 : 900);
         force();
         return;
       }
@@ -3284,9 +3296,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
       addPop(res.net, isMine, pos, t.code);
       addFrags(res.player, pos, t.code);
       pushTicker(t, r, { player: res.player, net: res.net }, impact, rt);
-      // Highlight-Banner (track): neue Gesamtführung schlägt Etappensieger.
+      // Highlight-Banner (track, platter): neue Gesamtführung schlägt Etappensieger.
       if (impact.cause === "leader") popBanner(`🏆 Neue Führung · ${res.player.name} (${t.code})`, "gold");
       else if (impact.cause === "best") popBanner(`🥇 Etappensieger · ${res.player.name} (${t.code})`, "gold");
+      // W-V7 "Schlussspurt-Überholung" (Wettessen-Rework Politur, Fable-Konzept 6.3): ein
+      // echter Rang-Sprung nach vorn in den letzten beiden Minuten von zehn — eigene Meldung,
+      // weil "leader" nur den Sprung auf #1 abdeckt (z.B. Platz 5→3 bliebe sonst stumm). Die
+      // Mauer als dritter W-V7-Anlass bleibt bewusst aussen vor: K1/K2 (Mauer/Haltung)
+      // erreichen die echte Bühne nicht, s. W-V3/V4-Befund (`u.haltung`/`u.mauerK` existieren
+      // nur in der Battle-Mode-Simulation, nicht in NativeStagePlayer). Nur platter, nur spät
+      // (letzte 2 Minuten), nur bei echtem Vorrücken (≥2 Plätze), nicht doppelt zur "leader"-
+      // Meldung oben.
+      else if (prim === "platter" && impact.cause !== "leader" && r >= slotCount - 2 && t.roundDelta >= 2) {
+        popBanner(`🔥 Schlussspurt-Überholung · ${res.player.name} (${t.code}) → Platz ${t.roundRankAfter}`, "cyan");
+      }
       // Sounds/Highlights nach Tier
       if (impact.tier === 2) {
         showSpotlight(
@@ -5479,6 +5502,20 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
           // in der senkrechten Liste auf einen Blick gruppierbar. Top 3 der Rangliste groß (W-V1).
           const plColor = prim === "platter" && t.teamId ? `hsl(${hueForIdx(platterTeamSeq.get(t.teamId) ?? 0)} 65% 55%)` : null;
           const plBig = prim === "platter" && dispRank <= 3;
+          // W-V6 "Hochrechnung" (Politur-Paket, Fable-Konzept 6.3): ab Minute 3 eine lineare
+          // Hochrechnung AUSSCHLIESSLICH aus den bereits gezeigten `round` Minuten — nie aus
+          // der Zukunft (genau der Anti-Spoiler-Grundsatz, den dieses Projekt an mehreren
+          // Stellen schon durchsetzt). Verschwindet im Endstand (`done`): dort steht der
+          // echte Wert, eine Hochrechnung daneben wäre nur noch verwirrend.
+          const plProjected = prim === "platter" && !done && round >= 3 ? (dispScore / round) * slotCount : null;
+          // W-V5 "Das Duell über den Tisch" — angepasst an die echte Datenlage: Wettessen hat
+          // keine feste Heim/Gast-Sitzordnung (zwölf unabhängige teamId, keine zwei Bänke, s.
+          // W-V1-Befund), also keine feste "Heim i sitzt Gast i gegenüber"-Paarung. Der
+          // Tauzieh-Strich zeigt deshalb das Duell um GENAU DIESEN Tabellenplatz: `sorted` ist
+          // rang-sortiert (Index 0 = Platz 1), `sorted[dispRank]` ist also der/die Verfolger:in
+          // auf dem nächsten Platz. Reiner Leser auf shownScore(), kein neuer Zustand.
+          const plChallenger = prim === "platter" ? sorted[dispRank] ?? null : null;
+          const plGap = plChallenger ? dispScore - shownScore(plChallenger) : null;
           return (
           <div
             key={t.code}
@@ -5565,6 +5602,31 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
               </span>
             ) : null}
             <span style={{ fontWeight: 800, fontSize: plBig ? 14.5 : 12.5, fontVariantNumeric: "tabular-nums", minWidth: 34, textAlign: "right", color: prim === "barbell" ? (bOut ? "var(--nl-mut)" : "var(--nl-warn)") : "inherit" }}>{prim === "barbell" ? bKg : fmt1(dispScore)}</span>
+            {/* W-V6 "Hochrechnung": "auf Kurs für N", nur ab Minute 3, nur live (nicht im
+                Endstand) — liest ausschließlich bereits gezeigte Minuten. */}
+            {prim === "platter" && plProjected != null ? (
+              <span
+                data-testid="platter-projection"
+                title={`Hochrechnung aus den bisherigen ${round} Minuten`}
+                style={{ fontSize: 8.5, fontWeight: 800, color: "var(--nl-mut-2)", whiteSpace: "nowrap", flex: "none" }}
+              >
+                ↗{fmt1(plProjected)}
+              </span>
+            ) : null}
+            {/* W-V5 "Das Duell über den Tisch" (angepasst, s. Kommentar oben): Tauzieh-Strich
+                für das Duell um diesen Tabellenplatz gegen den/die Verfolger:in. */}
+            {prim === "platter" && plChallenger && plGap != null ? (
+              <span
+                data-testid="platter-duel-strip"
+                title={`Duell um Platz ${dispRank}: ${t.code} vs. ${plChallenger.code} (Platz ${dispRank + 1}) · Vorsprung ${fmt1(plGap)}`}
+                style={{ display: "block", width: 28, height: 5, borderRadius: 3, background: "color-mix(in srgb, var(--nl-risk) 32%, transparent)", overflow: "hidden", flex: "none" }}
+              >
+                <span
+                  aria-hidden
+                  style={{ display: "block", height: "100%", borderRadius: 3, background: "var(--nl-good)", width: `${Math.max(8, Math.min(92, 50 + plGap * 6))}%` }}
+                />
+              </span>
+            ) : null}
             {/* Gewichtheben: der kg-Wert ist die Inszenierung, der Gesamtscore die Wertung.
                 Im Endstand stehen beide nebeneinander — vorher blieb der Score unsichtbar. */}
             {prim === "barbell" && done ? (
