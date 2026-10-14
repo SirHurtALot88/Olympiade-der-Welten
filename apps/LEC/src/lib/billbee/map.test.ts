@@ -79,3 +79,27 @@ describe("extractSales", () => {
     expect(sales[1]).toMatchObject({ qty: 1, unitPrice: 4.5 });
   });
 });
+
+describe("Bestell-Pruefung", () => {
+  const order = (id: number, qty: number, type?: number) => ({
+    Id: id,
+    CreatedAt: "2026-10-01T10:00:00Z",
+    OrderItems: [{ Quantity: qty, TotalPrice: 2 * qty, Product: { Title: "Karte A", Type: type } }],
+  });
+
+  it("zaehlt doppelt gelieferte Bestellungen nur einmal", async () => {
+    const { dedupeOrders } = await import("./map");
+    const r = dedupeOrders([order(1, 1), order(2, 1), order(1, 1)]);
+    expect(r.orders).toHaveLength(2);
+    expect(r.duplicates).toBe(1);
+  });
+
+  it("ueberspringt Versandpositionen und meldet gebrochene Mengen", async () => {
+    const { extractSales, diagnoseOrders } = await import("./map");
+    const orders = [order(1, 2), order(2, 1, 3), order(3, 1.5)];
+    expect(extractSales(orders)).toHaveLength(2);
+    const d = diagnoseOrders(orders, 0);
+    expect(d.fractionalItems).toBe(1);
+    expect(d.top[0]).toMatchObject({ units: 3.5, orders: 2, maxLine: 2 });
+  });
+});
