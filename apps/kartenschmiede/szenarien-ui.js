@@ -66,9 +66,37 @@
     fenster: ["F", "#9fb4ff", "Fenster"], sakristei: ["S", "#cfa75e", "Sakristei"], falltuer: ["F", "#ff8a1f", "Falltür"],
     ueberlebender: ["Ü", "#ffd95a", "Überlebender (verdeckt)"], eiskeller: ["E", "#7fd3ff", "Eiskeller (Krypta-Gang)"], schmied: ["S", "#ff4a36", "Der Schmied"],
     licht: ["L", "#ff4a36", "Blinkendes Licht"], schacht: ["↑", "#7fd06a", "Schacht nach oben"], nische: ["N", "#8b909b", "Wandnische"],
-    herz: ["♥", "#ff4a36", "Das Herz"], ader: ["A", "#c27a5a", "Ader"], marines: ["M", "#6fb0ff", "Verbündete"],
+    herz: ["♥", "#ff4a36", "Das Herz"], ader: ["A", "#c27a5a", "Ader"], marines: ["M", "#6fb0ff", "Verbündete"], tank: ["T", "#7fd3ff", "Glastank"], truemmer: ["M", "#6fb0ff", "Trümmer / der Überlebende"],
   };
   const SCHRIFT = `font-family="Barlow Condensed, sans-serif" font-weight="700"`;
+  // Geländesymbole (game-icons.net, CC BY 3.0, siehe vendor/gelaende-symbole.js): erst nach Beschriftung, dann nach Art
+  const SYMBOL_ART = { ruine: "ancient-ruins", haus: "house", mauer: "broken-wall", zaun: "wooden-fence", baum: "log", wald: "pine-tree",
+    sporen: "spotted-mushroom", sporenwolke: "poison-cloud", pilze: "mushroom", sumpf: "swamp", wasser: "waves", fels: "rock", grab: "tombstone",
+    gruft: "coffin", statue: "stone-bust", brunnen: "well", wurzeln: "tree-roots", metall: "metal-plate", labortisch: "round-bottom-flask",
+    tank: "vial", lava: "lava", altar: "star-altar" };
+  const SYMBOL_NAME = [[/kapelle|kirche/i, "church"], [/glocke/i, "ringing-bell"], [/linde|eiche|baum(?!.*umgest)/i, "oak"], [/schmiede/i, "anvil"],
+    [/bäcker/i, "bread"], [/wirtshaus|schenke|taverne/i, "beer-stein"], [/gemeindehaus|rathaus/i, "village"], [/keller|treppe/i, "stairs"],
+    [/schacht|bohrloch/i, "hole"], [/herz/i, "heart-beats"], [/falltür/i, "floor-hatch"], [/turm/i, "stone-tower"], [/höhle|gang/i, "cave-entrance"],
+    [/scheune|stall/i, "barn"], [/tank/i, "vial"], [/kerze/i, "candles"]];
+  function symbolFuer(g, name) {
+    const SYM = window.GELAENDE_SYMBOLE || {};
+    const n = (SYMBOL_NAME.find(([re]) => re.test(name || "")) || [])[1] || SYMBOL_ART[g.art];
+    return n && SYM[n] ? SYM[n] : "";
+  }
+  // Symbol ins Geländestück: rund und eckig einmal mittig, lang (Zaun, Mauer, Wurzeln) entlang der Länge wiederholt
+  function symbolTeile(g, form, farbe) {
+    const name = g.label || (S.GELAENDE[g.art] || {}).name || "", pfad = symbolFuer(g, name);
+    if (!pfad) return "";
+    const kurz = Math.min(g.w, g.h), lang = Math.max(g.w, g.h), groesse = form === "lang" ? kurz * 1.05 : kurz * 0.72;
+    const zahl = form === "lang" ? Math.max(1, Math.min(4, Math.floor(lang / (groesse * 1.4)))) : 1, quer = g.w >= g.h;
+    const teile = [];
+    for (let i = 0; i < zahl; i++) {
+      const t = (i + 0.5) / zahl;
+      const cx = quer ? g.x + g.w * t : g.x + g.w / 2, cy = quer ? g.y + g.h / 2 : g.y + g.h * t;
+      teile.push(`<g transform="translate(${cx - groesse / 2} ${cy - groesse / 2}) scale(${groesse / 512})" fill="${farbe}" opacity=".55" pointer-events="none">${pfad}</g>`);
+    }
+    return teile.join("");
+  }
   function karteSvg(karte, opt = {}) {
     const { druck = false, geheim = true, boden = "#1f2a1c" } = opt;
     const B = karte.b, T = karte.t;
@@ -89,6 +117,7 @@
       teile.push(art.form === "rund"
         ? `<ellipse cx="${g.x + g.w / 2}" cy="${g.y + g.h / 2}" rx="${g.w / 2}" ry="${g.h / 2}" fill="${f}88" stroke="${f}" stroke-width=".18"/>`
         : `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="${art.form === "lang" ? .5 : .3}" fill="${f}88" stroke="${f}" stroke-width=".18"/>`);
+      if (opt.symbole !== false) teile.push(symbolTeile(g, art.form, druck ? "#1b1509" : "#0f1210"));
       // namen: Gelände beschriften statt nummerieren (Reiter „Spielen“, dort verwechselt man Nummern mit Suchmarkern)
       if (opt.namen) {
         const wort = schluessel, quer = g.w >= g.h, platz = (quer ? g.w : g.h) * 1.7;
@@ -113,7 +142,7 @@
       teile.push(`<circle cx="${x}" cy="${y}" r=".95" fill="${f}" stroke="#1b1509" stroke-width=".12"${m.geheim ? ` stroke-dasharray=".3 .2"` : ""}/><text x="${x}" y="${y + .42}" font-size="1.15" text-anchor="middle" fill="#1b1509" ${SCHRIFT}>${esc(m.label && m.label.length <= 2 ? m.label : z)}</text>`);
     }
     const tischName = (S.TISCHE.find(t => t.id === karte.tisch) || {}).name || `${B}" × ${T}"`;
-    teile.push(`<text x="${B - .4}" y="${T - .4}" font-size=".85" text-anchor="end" fill="${tinte}" opacity=".7" font-family="Barlow Condensed, sans-serif">${esc(opt.fuss || `${tischName} · Raster 6" (15 cm) · Norden oben`)}</text>`);
+    teile.push(`<text x="${B - .4}" y="${T - .4}" font-size=".85" text-anchor="end" fill="${tinte}" opacity=".7" font-family="Barlow Condensed, sans-serif">${esc(opt.fuss || `${tischName} · Raster 6" (15 cm) · Norden oben · Symbole: game-icons.net (CC BY 3.0)`)}</text>`);
     return {
       svg: `<svg class="sz-karte" viewBox="0 0 ${B} ${T}" role="img" aria-label="Tischskizze ${esc(tischName)}">${teile.join("")}</svg>`,
       legende: [...legende.values()], typen: [...typen],

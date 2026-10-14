@@ -1,0 +1,5010 @@
+{
+ "version": 1,
+ "kampagne": "moosgrab",
+ "map": 3,
+ "titel": "Das Dorf bei Nacht",
+ "ton": "Schleichen, Misstrauen, Häuserkampf",
+ "tisch": "60x60",
+ "dauer": "etwa 3 Stunden",
+ "skizze": "szenarien.MOOSGRAB.maps[2].karte",
+ "start": "vorb-material",
+ "tabu": [
+  "Station",
+  "Labor",
+  "Soldat",
+  "Marines",
+  "Myzel"
+ ],
+ "lage": {
+  "flucht": {
+   "wie": "Zurück zur Kapelle geht nicht: dort ist nichts mehr, und der Weg ist offen. Wer fliehen muss, flieht in den Keller unter dem Gemeindehaus (wenn er offen ist: dort folgt niemand hinein, solange kein Befallener unten sitzt) oder hinab in den Brunnen.",
+   "folge": "Die Map endet erst unten im Brunnen. Wer in den Keller flieht, ist dort sicher, bis die Spieler wieder hinausgehen; das Dorf wartet draußen."
+  },
+  "sonderregeln": [
+   {
+    "titel": "Nacht",
+    "text": "Sicht höchstens zwei Kartenlängen. Wer die Laterne trägt (Wirtshaus, Suchmarker 4), sieht eine Kartenlänge weiter. Wer weiter weg ist, wird nicht gesehen und nicht beschossen."
+   },
+   {
+    "titel": "Lärm-Leiste 0–6",
+    "text": "Nahkampf +1 (L), Fernkampf oder Zauber +2 (Z), eine Tür aufbrechen +2 (T, Kellertür G), ein Überlebender ruft einen Namen +1 (E). Bei 3 kommen Sporenlinge aus den Gärten, bei 6 das ganze Dorf. Die App springt bei 3 und 6 von selbst in den Kampf."
+   },
+   {
+    "titel": "Namensregel",
+    "text": "Wer den Namen seines Helden laut sagt, bekommt 1 Sporenpunkt. Gilt weiter aus Map 2, nicht noch einmal ansagen. Auch der Name auf dem Brief der Harms zählt, wenn ihn jemand laut liest."
+   },
+   {
+    "titel": "Befallen: die Frau im Keller",
+    "wenn": {
+     "flag": "befallener",
+     "ist": "frau"
+    },
+    "text": "Die App hat gezogen: Die Frau im Keller ist befallen, ihre Kinder sind Menschen, die Wirtin und der Junge auch. Erkennen: Ansehen (Qualitätstest, 1 im Keller) oder die Wirtin fragen (8). Enttarnt wird sie, wenn die Helden sie stellen (2) oder im Keller rasten. Bleibt sie unentdeckt, merkt Map 5 es sich."
+   },
+   {
+    "titel": "Befallen: der Bäckerjunge",
+    "wenn": {
+     "flag": "befallener",
+     "ist": "junge"
+    },
+    "text": "Die App hat gezogen: Der Bäckerjunge ist befallen. Die Frau, ihre Kinder und die Wirtin sind Menschen. Erkennen: Ansehen (Qualitätstest, 1 in der Bäckerei) oder die Wirtin fragen (8). Enttarnt wird er, wenn die Helden ihn stellen (2) oder im Keller rasten, während er unten sitzt. Bringen sie ihn unentdeckt in den Keller, merkt Map 5 es sich."
+   },
+   {
+    "titel": "Überlebende rufen Namen",
+    "text": "Wer mit den Helden unterwegs ist (der Junge) und am Rundenende keinen Helden direkt neben sich hat, würfelt einen W6 (Taste E). Bei 1 bis 2 ruft er einen Namen: Lärm +1. Wer im Keller sitzt oder hinter seiner Tür, ruft nicht."
+   },
+   {
+    "titel": "Die Harms",
+    "wenn": {
+     "flag": "harm_wach",
+     "ist": false
+    },
+    "text": "Sie sitzen am Tisch und stehen erst auf, wenn jemand näher als eine Kartenbreite herankommt oder einen berührt (Taste 3 bei den Harms). Bei Lärm 6 kommen sie von selbst."
+   },
+   {
+    "titel": "Der Schmied folgt den Schritten",
+    "wenn": {
+     "alle": [
+      {
+       "eine": [
+        {
+         "flag": "schmied_wach",
+         "ist": true
+        },
+        {
+         "flag": "dorf_wach",
+         "ist": true
+        }
+       ]
+      },
+      {
+       "flag": "schmied_besiegt",
+       "ist": false
+      }
+     ]
+    },
+    "text": "Wer sich im eigenen Zug nicht bewegt hat, wird von ihm nicht angegriffen, solange es einen anderen gibt, der sich bewegt hat. Hammer weggeschlagen (eine 6 beim Treffen, Taste 6): nur noch A2.",
+    "ansage": "Er dreht den Kopf zu dem, der sich bewegt."
+   },
+   {
+    "titel": "Die Glocke hat geschlagen",
+    "wenn": {
+     "flag": "glocke_geschlagen",
+     "ist": true
+    },
+    "text": "Feindzone C vor dem Gemeindehaus: bei Lärm 3 kommen auch dort zwei Sporenlinge. Die zwei Knechte stehen bei den Verbündeten, wenn die Spieler sie mitgenommen haben."
+   },
+   {
+    "titel": "Die Gemeinde folgt",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "gemeinde_wach",
+       "ist": true
+      },
+      {
+       "flag": "gemeinde_tot",
+       "ist": false
+      },
+      {
+       "flag": "gemeinde_erloest",
+       "ist": false
+      }
+     ]
+    },
+    "text": "Am Ende von Runde 2 kommt die Gemeinde aus der Kapelle über den Hauptweg (Zone H, die App springt in den Kampf), danach je Rundenende zwei mehr, auf Normal höchstens sechs."
+   },
+   {
+    "titel": "Was Hedda gesagt hat",
+    "wenn": {
+     "flag": "befallene_bekannt",
+     "ist": true
+    },
+    "text": "Die Helden wissen: der Schmied und die Harms sind verloren. Sie wissen nicht, wer von den Überlebenden befallen ist."
+   },
+   {
+    "titel": "Rast",
+    "text": "Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort. Hier: der Keller unter dem Gemeindehaus, einmal, solange das Dorf nicht wach ist (Taste V im Keller). Alle Wunden und alle Power zurück, Atemzug +1. Sitzt ein Befallener unten, endet die Rast mit seiner Enttarnung."
+   },
+   {
+    "titel": "Der Kupferanhänger",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "anhaenger",
+       "ist": true
+      },
+      {
+       "flag": "anhaenger_zurueck",
+       "ist": false
+      }
+     ]
+    },
+    "text": "In jedem Kampf würfelt der Träger am Rundenende (Taste U). Nicht verraten, wofür. Bei 1 steuerst du ihn einmal."
+   }
+  ],
+  "ziele": [
+   {
+    "art": "Hauptziel",
+    "text": "Den Brunnen auf dem Dorfplatz öffnen und hinabsteigen.",
+    "erreicht": {
+     "flag": "ep_haupt",
+     "ist": true
+    }
+   },
+   {
+    "art": "Nebenziel",
+    "text": "Mindestens zwei Überlebende in den Keller unter dem Gemeindehaus bringen, die noch Menschen sind (die Frau mit den Kindern zählt als eine).",
+    "erreicht": {
+     "mindestens": 2,
+     "aus": [
+      {
+       "alle": [
+        {
+         "flag": "keller_offen",
+         "ist": true
+        },
+        {
+         "eine": [
+          {
+           "flag": "befallener",
+           "nicht": "frau"
+          },
+          {
+           "flag": "befallener_enttarnt",
+           "ist": true
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "flag": "wirtin_im_keller",
+       "ist": true
+      },
+      {
+       "alle": [
+        {
+         "flag": "junge_im_keller",
+         "ist": true
+        },
+        {
+         "flag": "befallener",
+         "nicht": "junge"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   {
+    "art": "Zusatz",
+    "text": "Den Schmied besiegen (Map 4 startet ruhiger).",
+    "erreicht": {
+     "flag": "schmied_besiegt",
+     "ist": true
+    }
+   }
+  ]
+ },
+ "auftraege": [
+  {
+   "id": "brunnen",
+   "art": "Haupt",
+   "titel": "Zum Brunnen und hinunter",
+   "spieler": "Öffnet den Brunnen in der Mitte des Dorfes und steigt hinab. Dort fing es an.",
+   "quelle": "Hedda (Map 2) oder der Erzähler bei der Ankunft (Cue 03-1)",
+   "vorlesen": "Der Brunnen in der Mitte des Platzes. Dampf steigt aus ihm in die kalte Nacht. Dort fing es an, und dort geht es weiter.",
+   "erledigt": {
+    "flag": "ep_haupt",
+    "ist": true
+   }
+  },
+  {
+   "id": "werkzeug",
+   "art": "Haupt",
+   "titel": "Etwas, das den Brunnen öffnet",
+   "spieler": "Der Brunnen ist mit Brettern, einer Kette und einem Schloss verschlossen. Findet Werkzeug, das ihn leise öffnet, oder brecht ihn auf.",
+   "quelle": "Der Blick auf den Brunnen (Taste B); Hedda nannte die Schmiede, die Wirtin auch",
+   "vorlesen": "Bretter, eine Kette, ein Schloss. Mit bloßen Händen geht das nicht leise.",
+   "ab": {
+    "eine": [
+     {
+      "flag": "brunnen_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "brunnen_bekannt",
+      "ist": true
+     }
+    ]
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "flag": "werkzeug",
+      "ist": true
+     },
+     {
+      "flag": "brunnen_offen",
+      "ist": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "keller",
+   "art": "Neben",
+   "titel": "Ein sicherer Ort",
+   "spieler": "Bringt Überlebende in den Keller unter dem Gemeindehaus, mindestens zwei. Dort sind sie sicher.",
+   "quelle": "Hedda (der Kellerschlüssel) oder die Frau im Keller. Das Häkchen zählt, wer unten sitzt; ob es Menschen sind, zählt erst am Ende.",
+   "vorlesen": "„Der Keller unter dem Gemeindehaus. Da sind sie sicher.“ Wer im Dorf noch lebt, gehört dorthin.",
+   "ab": {
+    "eine": [
+     {
+      "flag": "kellerschluessel",
+      "ist": true
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     }
+    ]
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "alle": [
+       {
+        "flag": "keller_offen",
+        "ist": true
+       },
+       {
+        "flag": "wirtin_im_keller",
+        "ist": true
+       }
+      ]
+     },
+     {
+      "alle": [
+       {
+        "flag": "keller_offen",
+        "ist": true
+       },
+       {
+        "flag": "junge_im_keller",
+        "ist": true
+       }
+      ]
+     },
+     {
+      "alle": [
+       {
+        "flag": "wirtin_im_keller",
+        "ist": true
+       },
+       {
+        "flag": "junge_im_keller",
+        "ist": true
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "mensch",
+   "art": "Neben",
+   "titel": "Wer ist noch Mensch?",
+   "spieler": "Nicht jeder, der im Dorf um Hilfe bittet, ist noch, wer er war. Seht genau hin, bevor ihr jemanden in den Keller bringt.",
+   "quelle": "Die Regel der Map (Regelschritt)",
+   "vorlesen": "Nicht jeder, der um Hilfe bittet, ist noch, wer er war.",
+   "ab": {
+    "eine": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     }
+    ]
+   },
+   "erledigt": {
+    "flag": "befallener_enttarnt",
+    "ist": true
+   }
+  },
+  {
+   "id": "mann",
+   "art": "Neben",
+   "titel": "Der Mann der Wirtin",
+   "spieler": "Die Wirtin wartet auf ihren Mann. Er ist vor sechs Tagen zur Kapelle gegangen. Findet heraus, was aus ihm wurde.",
+   "quelle": "Die Wirtin (nur, wenn das zuckende Grab in Map 2 still ist: der Ring ist bei den Helden)",
+   "vorlesen": "„Mein Mann ist zur Kapelle. Vor sechs Tagen. Er betet nicht, egal, was Hedda sagt.“",
+   "ab": {
+    "alle": [
+     {
+      "flag": "wirtin_geantwortet",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_verriegelt",
+      "ist": false
+     },
+     {
+      "eine": [
+       {
+        "hat": "Ehering vom zuckenden Grab"
+       },
+       {
+        "flag": "grab_still",
+        "ist": true
+       }
+      ]
+     }
+    ]
+   },
+   "erledigt": {
+    "flag": "ring_gezeigt",
+    "ist": true
+   }
+  }
+ ],
+ "rundenwurf": {
+  "name": "Was tut das Dorf?",
+  "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde, solange der Schmied hämmert und das Dorf schläft, würfelst du einen W6. Meistens passiert nichts.",
+  "wenn": {
+   "alle": [
+    {
+     "flag": "dorf_wach",
+     "ist": false
+    },
+    {
+     "flag": "schmied_wach",
+     "ist": false
+    },
+    {
+     "flag": "schmied_besiegt",
+     "ist": false
+    }
+   ]
+  },
+  "tabelle": [
+   {
+    "w": [
+     1
+    ],
+    "titel": "Der Hammer setzt aus",
+    "vorlesen": "Der Hammer setzt aus. Einen Atemzug lang ist es still im ganzen Dorf, so still, dass ihr den Brunnen hört. Dann schlägt er weiter.",
+    "gmNotiz": "Nur Stimmung. Wer jetzt rennt oder kämpft, wird gehört: steht die Leiste auf 2 oder höher, +1 Lärm (Vorschlag)."
+   },
+   {
+    "w": [
+     2
+    ],
+    "titel": "Ein Riegel",
+    "vorlesen": "Irgendwo wird ein Riegel zurückgeschoben. Dann, nach einer Weile, wieder vor.",
+    "gmNotiz": "Nur Stimmung. Nichts passiert."
+   },
+   {
+    "w": [
+     3,
+     4,
+     5
+    ],
+    "titel": "Nichts",
+    "gmNotiz": "Der Hammer schlägt weiter. Nichts passiert."
+   },
+   {
+    "w": [
+     6
+    ],
+    "titel": "Ein Hund im Wald",
+    "vorlesen": "Weit draußen im Wald heult etwas, das einmal ein Hund gewesen sein könnte. Das Dorf lauscht dorthin, nicht zu euch.",
+    "gmNotiz": "Lärm −1, mindestens 0.",
+    "leisten": {
+     "laerm": -1
+    }
+   }
+  ]
+ },
+ "antreiben": [
+  {
+   "titel": "Der Hammer",
+   "vorlesen": "Rechts oben schlägt der Hammer. Gleichmäßig. Er hat nicht einmal ausgesetzt, seit ihr hier seid.",
+   "gmNotiz": "Weist zur Schmiede (M, 2). Nichts erklären.",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "schmied_wach",
+      "ist": false
+     },
+     {
+      "flag": "schmied_besiegt",
+      "ist": false
+     }
+    ]
+   },
+   "schritte": [
+    "spieler-dorf"
+   ]
+  },
+  {
+   "titel": "Der Dampf",
+   "vorlesen": "Aus dem Brunnen steigt Dampf. Er riecht nach nassem Brot, und er ist warm, mitten in der kalten Nacht.",
+   "gmNotiz": "Weist zum Brunnen (B, dann Weiter).",
+   "wenn": {
+    "flag": "brunnen_offen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-dorf"
+   ]
+  },
+  {
+   "titel": "Ein Kind",
+   "vorlesen": "Irgendwo links oben weint ein Kind. Es hört sofort wieder auf, als hätte ihm jemand den Mund zugehalten.",
+   "gmNotiz": "Der Keller unter dem Gemeindehaus (1, K, G).",
+   "wenn": {
+    "flag": "keller_offen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-dorf"
+   ]
+  },
+  {
+   "titel": "Warmer Ofen",
+   "vorlesen": "Von unten rechts weht es warm herüber. Brot. Jemand hat den Ofen nicht ausgehen lassen.",
+   "gmNotiz": "Die Bäckerei (5).",
+   "wenn": {
+    "flag": "baeckerei_gesehen",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-dorf"
+   ]
+  },
+  {
+   "titel": "Das Atmen",
+   "vorlesen": "Unter den Brettern atmet es. Ein. Aus. Ihr merkt, dass ihr im selben Takt atmet.",
+   "gmNotiz": "Ohne Werkzeug: Schmiede (Suchmarker 2) oder die Wirtin. Mit Gewalt geht es auch, laut.",
+   "schritte": [
+    "spieler-brunnen"
+   ]
+  },
+  {
+   "titel": "Die Kinder",
+   "vorlesen": "Das Kleinere zupft an ihrem Ärmel. „Mama, wer ist das?“ Sie hält ihm sofort den Mund zu.",
+   "gmNotiz": "Stups, wenn im Keller zu lange überlegt wird. Rast (V), Chronik (3), oder zurück auf den Platz.",
+   "schritte": [
+    "npc-frau"
+   ]
+  },
+  {
+   "titel": "Die Armbrust",
+   "vorlesen": "Die Armbrust zittert nicht. „Ich hab nicht ewig Geduld. Und keine Bolzen zu verschenken.“",
+   "gmNotiz": "Die Antwort muss kommen: Hedda, Ring, drohen oder reden.",
+   "schritte": [
+    "wahl-wirtin",
+    "npc-wirtin"
+   ]
+  },
+  {
+   "titel": "Das Brot",
+   "vorlesen": "„Das Brot ist gleich fertig“, sagt er. Im Ofen liegt nichts.",
+   "gmNotiz": "Mitnehmen (3), in den Keller (J) oder zurück auf den Platz.",
+   "schritte": [
+    "npc-junge"
+   ]
+  },
+  {
+   "titel": "Der Takt",
+   "vorlesen": "Der Hammer fällt. Und noch einmal. Euer Herz schlägt mit, ob ihr wollt oder nicht.",
+   "gmNotiz": "Werkzeug (1), berühren (2) oder zurück auf den Platz.",
+   "wenn": {
+    "flag": "schmied_besiegt",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-schmiede"
+   ]
+  },
+  {
+   "titel": "Das Besteck",
+   "vorlesen": "Einer der drei legt den Löffel hin. Genau neben den Teller. Dann sitzt er wieder still.",
+   "gmNotiz": "Brief (1), an den Tisch (3) oder zurück auf den Platz.",
+   "wenn": {
+    "flag": "harm_wach",
+    "ist": false
+   },
+   "schritte": [
+    "spieler-harm"
+   ]
+  }
+ ],
+ "tischplan": {
+  "zonen": {
+   "W": {
+    "x": 2.5,
+    "y": 12
+   },
+   "H": {
+    "x": 12,
+    "y": 22.5
+   },
+   "Haus": {
+    "x": 12,
+    "y": 8.5
+   }
+  },
+  "aufdecken": {
+   "C": {
+    "flag": "glocke_geschlagen",
+    "ist": true
+   },
+   "schmied:S": {
+    "eine": [
+     {
+      "flag": "schmied_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "schmiede_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "schmied_wach",
+      "ist": true
+     },
+     {
+      "flag": "dorf_wach",
+      "ist": true
+     }
+    ]
+   }
+  },
+  "info": {
+   "E": "Der Eiskeller: Hier kommen die Helden heraus, wenn sie den Krypta-Gang genommen haben. Sonst nur ein Loch im Boden voll Stroh und Eis.",
+   "A": "Feindzone A: der verseuchte Garten oben in der Mitte. Bei Lärm 3 kommen hier zwei Sporenlinge.",
+   "B": "Feindzone B: die Gärten unten links. Bei Lärm 3 zwei Sporenlinge.",
+   "C": "Feindzone C vor dem Gemeindehaus, nur wenn die Glocke geschlagen hat. Bei Lärm 3 zwei Sporenlinge.",
+   "schmied:S": "Der Schmied am Amboss. Aufgedeckt, sobald jemand in die Schmiede sieht oder er kämpft.",
+   "H": "Zone H: der Hauptweg am unteren Rand. Hier kommt die Gemeinde aus der Kapelle herein, wenn sie folgt.",
+   "W": "Zone W: das Wohnhaus der Harms.",
+   "ueberlebender:F": "Die Frau mit zwei Kindern, im Keller unter dem Gemeindehaus. Ob sie befallen ist, steht in der Lage.",
+   "ueberlebender:W": "Die Wirtin hinter dem Tresen, die Armbrust auf euch gerichtet. Sie ist immer ein Mensch.",
+   "ueberlebender:J": "Der Bäckerjunge, versteckt im Mehlsack. Ob er befallen ist, steht in der Lage."
+  }
+ },
+ "leisten": {
+  "atemzug": {
+   "name": "Atemzug-Leiste",
+   "gilt": "kampagne",
+   "min": 0,
+   "max": 6,
+   "start": 2,
+   "richtung": "hoch",
+   "text": "Aus Map 2 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. +1 nach jeder Map, für die Rast im Keller und für den Brunnen mit Gewalt. Jeder Strich: eine Feindzone wächst oder ein verseuchtes Feld kommt dazu. Bei 6 atmet es aus (Nachschub, dann zurück auf 4). Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch",
+   "jeStrich": {
+    "titel": "Der Wald rückt näher",
+    "gmNotiz": "Ein Garten mehr wird grau, oder leg ein Feld Moos (Filz) auf den Platz. Nichts dazu sagen, nur hinlegen."
+   },
+   "schwellen": [
+    {
+     "ab": 6,
+     "wiederholt": true,
+     "titel": "Es atmet aus",
+     "vorlesen": "Der Brunnen atmet aus. Dampf quillt zwischen den Brettern hervor, dicker als vorher, und aus den Gärten kriecht es heraus, als hätte es nur auf diesen Atem gewartet.",
+     "gmNotiz": "Mitten im Kampf: zwei Sporenlinge aus der nächsten Feindzone (unten „＋ Gegner“). Außerhalb eines Kampfs: der nächste Kampf beginnt mit zwei Sporenlingen mehr. Die Leiste fällt auf 4.",
+     "leisten": {
+      "atemzug": -2
+     }
+    }
+   ]
+  },
+  "laerm": {
+   "name": "Lärm",
+   "gilt": "map",
+   "min": 0,
+   "max": 6,
+   "start": 0,
+   "richtung": "hoch",
+   "schlecht": "hoch",
+   "text": "Nahkampf +1, Fernkampf oder Zauber +2, Tür aufbrechen +2, ein Überlebender ruft einen Namen +1. Bei 3 kommen Sporenlinge aus den Gärten, bei 6 das ganze Dorf.",
+   "schwellen": [
+    {
+     "ab": 3,
+     "titel": "Türen gehen auf",
+     "gmNotiz": "Die App springt in den Kampf: Aufbau, dann Cue 03-X1, dann die Sporenlinge (zwei je Feindzone).",
+     "setzt": {
+      "sporen_wach": true
+     },
+     "springe": "aufbau-kampf-platz-sporen"
+    },
+    {
+     "ab": 6,
+     "titel": "Das ganze Dorf hört",
+     "gmNotiz": "Die App springt in den Kampf: Aufbau, Cue 03-X2, dann (hämmert er noch) Cue 03-3 für den Schmied. Ab jetzt zählt Lärm nicht mehr, alle Gegner wütend.",
+     "setzt": {
+      "dorf_wach": true,
+      "gegner_wuetend": true
+     },
+     "springe": "aufbau-kampf-dorf"
+    }
+   ]
+  }
+ },
+ "flags": {
+  "weg": {
+   "start": null,
+   "text": "Aus Map 2: Weg ins Dorf, krypta (Eiskeller, Lärm 0) oder hauptweg (Lärm 1).",
+   "wirktIn": "map3"
+  },
+  "glocke_geschlagen": {
+   "start": false,
+   "text": "Aus Map 2: Die Glocke hat geschlagen. Zwei Knechte, Feindzone C.",
+   "wirktIn": "map3"
+  },
+  "gemeinde_wach": {
+   "start": false,
+   "text": "Aus Map 2: Die Gemeinde ist erwacht. Sie folgt über den Hauptweg, falls sie noch steht.",
+   "wirktIn": "map3"
+  },
+  "gemeinde_tot": {
+   "start": false,
+   "text": "Aus Map 2: Die Gemeinde ist gefallen.",
+   "wirktIn": "map3"
+  },
+  "gemeinde_erloest": {
+   "start": false,
+   "text": "Aus Map 2: Die Gemeinde wurde erlöst.",
+   "wirktIn": "map3"
+  },
+  "laerm3_erreicht": {
+   "start": false,
+   "text": "Aus Map 2: Lärm 3 in der Kapelle. Map 3 startet mit Lärm +1.",
+   "wirktIn": "map3"
+  },
+  "hedda_wahrheit": {
+   "start": false,
+   "text": "Aus Map 2: Hedda kennt die Wahrheit über ihre Tochter.",
+   "wirktIn": "map3"
+  },
+  "hedda_geschont": {
+   "start": false,
+   "text": "Aus Map 2: Hedda wurde geschont.",
+   "wirktIn": "map3"
+  },
+  "hedda_belogen": {
+   "start": false,
+   "text": "Aus Map 2: Hedda wurde belogen.",
+   "wirktIn": "map3"
+  },
+  "befallene_bekannt": {
+   "start": false,
+   "text": "Aus Map 2: Die Helden wissen, dass der Schmied und die Harms verloren sind.",
+   "wirktIn": "map3"
+  },
+  "brunnen_bekannt": {
+   "start": false,
+   "text": "Aus Map 2: Die Helden wissen, dass es mit dem Brunnen anfing.",
+   "wirktIn": "map3"
+  },
+  "kellerschluessel": {
+   "start": false,
+   "text": "Aus Map 2: Heddas Kellerschlüssel für das Gemeindehaus.",
+   "wirktIn": "map3"
+  },
+  "hedda_tot": {
+   "start": false,
+   "text": "Aus Map 2: Hedda ist tot.",
+   "wirktIn": "map3"
+  },
+  "hedda_angegriffen": {
+   "start": false,
+   "text": "Aus Map 2: Ein Held hat Hedda angegriffen.",
+   "wirktIn": "map3"
+  },
+  "hedda_schweigt": {
+   "start": false,
+   "text": "Aus Map 2: Hedda hat sich zurückgezogen.",
+   "wirktIn": "map3"
+  },
+  "hedda_getroffen": {
+   "start": false,
+   "text": "Aus Map 2: Die Helden standen vor Hedda.",
+   "wirktIn": "map3"
+  },
+  "grab_still": {
+   "start": false,
+   "text": "Aus Map 2: Das zuckende Grab ist still, der Ehering ist bei einem Helden.",
+   "wirktIn": "map3"
+  },
+  "anhaenger": {
+   "start": false,
+   "text": "Die Helden tragen den Kupferanhänger (wird weitergereicht).",
+   "wirktIn": "map5"
+  },
+  "anhaenger_traeger": {
+   "start": null,
+   "text": "Name des Helden, der den Anhänger trägt (wird weitergereicht).",
+   "wirktIn": "map5"
+  },
+  "anhaenger_zurueck": {
+   "start": false,
+   "text": "Hedda hat den Anhänger zurückbekommen (wird weitergereicht).",
+   "wirktIn": "map5"
+  },
+  "frau_name": {
+   "start": null,
+   "text": "Die Helden kennen den Namen Lene (wird weitergereicht).",
+   "wirktIn": "map5"
+  },
+  "quelle_zerstoert": {
+   "start": false,
+   "text": "Die Quelle aus Map 1 ist zerstört: im Finale weniger Nachschub (wird weitergereicht).",
+   "wirktIn": "map5"
+  },
+  "schmied_besiegt": {
+   "start": false,
+   "text": "Der Schmied ist besiegt. Map 4: die Gegner starten nach dem Erwachen ruhig.",
+   "wirktIn": "map4"
+  },
+  "brunnen_gewalt": {
+   "start": false,
+   "text": "Der Brunnen wurde mit Gewalt geöffnet (Atemzug +1).",
+   "wirktIn": "map4"
+  },
+  "zwei_gerettet": {
+   "start": false,
+   "text": "Mindestens zwei Überlebende (Menschen) im Keller. Map 5: sie halten oben am Brunnen ein Seil bereit.",
+   "wirktIn": "map5"
+  },
+  "befallener_im_keller": {
+   "start": false,
+   "text": "Ein Befallener ist unentdeckt im Keller geblieben. Map 5: 2 Extra-Gegner aus dem Gemeindehaus.",
+   "wirktIn": "map5"
+  },
+  "laterne": {
+   "start": false,
+   "text": "Die Helden haben die Laterne aus dem Wirtshaus (Sicht eine Kartenlänge weiter).",
+   "wirktIn": "map4"
+  },
+  "befallener": {
+   "start": null,
+   "text": "Wer von den Überlebenden befallen ist (frau oder junge), beim Start gezogen.",
+   "wirktIn": "map3"
+  },
+  "befallener_enttarnt": {
+   "start": false,
+   "text": "Der Befallene ist enttarnt.",
+   "wirktIn": "map3"
+  },
+  "befallene_tot": {
+   "start": false,
+   "text": "Der enttarnte Befallene ist gefallen.",
+   "wirktIn": "map3"
+  },
+  "ort": {
+   "start": null,
+   "text": "In welches Haus die Helden zuletzt gegangen sind.",
+   "wirktIn": "map3"
+  },
+  "erstes_haus": {
+   "start": false,
+   "text": "Das erste Haus ist offen (Cue 03-2 gespielt).",
+   "wirktIn": "map3"
+  },
+  "brunnen_gesehen": {
+   "start": false,
+   "text": "Die Helden haben sich den Brunnen angesehen.",
+   "wirktIn": "map3"
+  },
+  "brunnen_offen": {
+   "start": false,
+   "text": "Der Brunnen ist offen.",
+   "wirktIn": "map3"
+  },
+  "werkzeug": {
+   "start": false,
+   "text": "Die Helden haben Werkzeug für den Brunnen (Schmiede oder das Brecheisen der Wirtin).",
+   "wirktIn": "map3"
+  },
+  "schmied_gesehen": {
+   "start": false,
+   "text": "Jemand hat in die Schmiede gesehen.",
+   "wirktIn": "map3"
+  },
+  "schmiede_gesehen": {
+   "start": false,
+   "text": "Die Helden waren in der Schmiede.",
+   "wirktIn": "map3"
+  },
+  "schmied_wach": {
+   "start": false,
+   "text": "Der Schmied kämpft.",
+   "wirktIn": "map3"
+  },
+  "hammer_weg": {
+   "start": false,
+   "text": "Der Schmied hat seinen Hammer verloren (A2).",
+   "wirktIn": "map3"
+  },
+  "harm_gesehen": {
+   "start": false,
+   "text": "Die Helden waren bei den Harms.",
+   "wirktIn": "map3"
+  },
+  "harm_wach": {
+   "start": false,
+   "text": "Die Harms sind aufgestanden.",
+   "wirktIn": "map3"
+  },
+  "brief": {
+   "start": false,
+   "text": "Die Helden haben den Brief an den Sohn.",
+   "wirktIn": "map3"
+  },
+  "chronik": {
+   "start": false,
+   "text": "Die Helden haben die Dorfchronik.",
+   "wirktIn": "map3"
+  },
+  "keller_offen": {
+   "start": false,
+   "text": "Die Kellertür des Gemeindehauses ist offen.",
+   "wirktIn": "map3"
+  },
+  "keller_gesehen": {
+   "start": false,
+   "text": "Die Helden waren im Keller.",
+   "wirktIn": "map3"
+  },
+  "wirtshaus_gesehen": {
+   "start": false,
+   "text": "Die Helden waren im Wirtshaus.",
+   "wirktIn": "map3"
+  },
+  "wirtin_geantwortet": {
+   "start": false,
+   "text": "Die Helden haben der Wirtin geantwortet.",
+   "wirktIn": "map3"
+  },
+  "wirtin_vertraut": {
+   "start": false,
+   "text": "Die Wirtin vertraut den Helden.",
+   "wirktIn": "map3"
+  },
+  "wirtin_verriegelt": {
+   "start": false,
+   "text": "Die Wirtin hat sich eingeschlossen.",
+   "wirktIn": "map3"
+  },
+  "wirtin_dabei": {
+   "start": false,
+   "text": "Die Wirtin geht mit den Helden.",
+   "wirktIn": "map3"
+  },
+  "wirtin_im_keller": {
+   "start": false,
+   "text": "Die Wirtin sitzt im Keller.",
+   "wirktIn": "map3"
+  },
+  "wirtin_angegriffen": {
+   "start": false,
+   "text": "Ein Held hat die Wirtin angegriffen.",
+   "wirktIn": "map3"
+  },
+  "wirtin_tot": {
+   "start": false,
+   "text": "Die Wirtin ist tot.",
+   "wirktIn": "map3"
+  },
+  "ring_gezeigt": {
+   "start": false,
+   "text": "Die Wirtin hat den Ehering ihres Mannes gesehen.",
+   "wirktIn": "map3"
+  },
+  "baeckerei_gesehen": {
+   "start": false,
+   "text": "Die Helden waren in der Bäckerei.",
+   "wirktIn": "map3"
+  },
+  "junge_dabei": {
+   "start": false,
+   "text": "Der Junge geht mit den Helden.",
+   "wirktIn": "map3"
+  },
+  "junge_im_keller": {
+   "start": false,
+   "text": "Der Junge sitzt im Keller.",
+   "wirktIn": "map3"
+  },
+  "knechte_dabei": {
+   "start": false,
+   "text": "Die zwei Knechte gehen mit den Helden.",
+   "wirktIn": "map3"
+  },
+  "platz_steht": {
+   "start": false,
+   "text": "Der Dorfplatz steht auf dem Tisch (es wird dort gekämpft).",
+   "wirktIn": "map3"
+  },
+  "harm_steht": {
+   "start": false,
+   "text": "Das Haus der Harms steht auf dem Tisch.",
+   "wirktIn": "map3"
+  },
+  "schmiede_steht": {
+   "start": false,
+   "text": "Die Schmiede steht auf dem Tisch.",
+   "wirktIn": "map3"
+  },
+  "enttarnt_steht": {
+   "start": false,
+   "text": "Der Raum der Enttarnung steht auf dem Tisch.",
+   "wirktIn": "map3"
+  },
+  "dorf_steht": {
+   "start": false,
+   "text": "Lärm 6: was für das ganze Dorf dazukommt, liegt bereit.",
+   "wirktIn": "map3"
+  },
+  "sporen_wach": {
+   "start": false,
+   "text": "Lärm 3: die Sporenlinge sind da.",
+   "wirktIn": "map3"
+  },
+  "dorf_wach": {
+   "start": false,
+   "text": "Lärm 6: das ganze Dorf ist wach.",
+   "wirktIn": "map3"
+  },
+  "gemeinde_da": {
+   "start": false,
+   "text": "Die Gemeinde aus der Kapelle ist im Dorf angekommen.",
+   "wirktIn": "map3"
+  },
+  "gegner_wuetend": {
+   "start": false,
+   "text": "Verhaltenswürfel läuft auf der wütenden Tabelle.",
+   "wirktIn": "map3"
+  },
+  "ep_haupt": {
+   "start": false,
+   "text": "Hauptziel: Brunnen geöffnet und hinabgestiegen (2 EP).",
+   "wirktIn": "gruppe"
+  },
+  "ep_neben": {
+   "start": false,
+   "text": "Nebenziel: mindestens zwei Überlebende im Keller (1 EP).",
+   "wirktIn": "gruppe"
+  }
+ },
+ "audio": {
+  "03-1": {
+   "titel": "Ankunft im Dorf",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Bis dahin liest du den Text im Cue-Schritt. Endet mit „Wohin geht ihr?“",
+   "datei": "audio/moosgrab/03/03-1.mp3"
+  },
+  "03-2": {
+   "titel": "Die Häuser",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Beim ersten geöffneten Haus.",
+   "datei": "audio/moosgrab/03/03-2.mp3"
+  },
+  "03-3": {
+   "titel": "Der Schmied",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Wenn jemand den Schmied berührt, oder bei Lärm 6, solange er hämmert. Danach Battle Cue 1.",
+   "datei": "audio/moosgrab/03/03-3.mp3"
+  },
+  "03-4": {
+   "titel": "Der Brunnen",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Sobald der Brunnen offen ist. Endet mit „Wer steigt zuerst?“",
+   "datei": "audio/moosgrab/03/03-4.mp3"
+  },
+  "03-X1": {
+   "titel": "Türen gehen auf",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Extra-Cue bei Lärm 3. Noch nicht aufgenommen.",
+   "datei": "audio/moosgrab/03/03-X1.mp3"
+  },
+  "03-X2": {
+   "titel": "Das ganze Dorf",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Extra-Cue bei Lärm 6. Noch nicht aufgenommen.",
+   "datei": "audio/moosgrab/03/03-X2.mp3"
+  },
+  "03-X3": {
+   "titel": "Ein Name",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Extra-Cue, wenn ein Überlebender als Befallener enttarnt wird. Noch nicht aufgenommen.",
+   "datei": "audio/moosgrab/03/03-X3.mp3"
+  },
+  "BATTLE-1": {
+   "titel": "Battle Cue 1",
+   "datei": "audio/moosgrab/01/battle-1.mp3",
+   "schleife": true,
+   "optional": true,
+   "notiz": "Trommeln, derselbe Track wie in Map 1 (eine Datei für beide Maps). Im Kampf starten (Taste A), Schleife."
+  }
+ },
+ "figuren": {
+  "frau": {
+   "name": "Die Frau im Keller",
+   "anzeige": "Eine Frau mit zwei Kindern",
+   "tisch": {
+    "x": 4.5,
+    "y": 4.5,
+    "ab": {
+     "flag": "keller_offen",
+     "ist": true
+    },
+    "bis": {
+     "alle": [
+      {
+       "flag": "befallener",
+       "ist": "frau"
+      },
+      {
+       "flag": "befallener_enttarnt",
+       "ist": true
+      }
+     ]
+    },
+    "zeichen": "F"
+   },
+   "wer": "Die Frau des Fuhrmanns, um die dreißig, mit ihren zwei Kindern (sechs und vier). Hedda hat sie vor drei Tagen in den Keller unter dem Gemeindehaus gebracht und von außen abgeschlossen, zu ihrem Schutz. Ihr Mann ist mit dem Wagen in den Wald und nicht zurück. Ob sie noch Mensch ist, hat die App gezogen (Lage).",
+   "stimme": [
+    "Flüstert, auch wenn es nicht nötig ist",
+    "Hält den Kindern die Ohren zu, sobald jemand spricht",
+    "Sieht auf eure Hände, nie in eure Gesichter"
+   ],
+   "motiv": "Die Kinder durch die Nacht bringen. Und dass Hedda wiederkommt, wie sie es versprochen hat.",
+   "ziel": "In dieser Szene will sie wissen, ob Hedda euch schickt, und dass niemand einen Namen sagt. Mitkommen will sie nicht: Hedda hat gesagt, im Keller bleiben.",
+   "kern": [
+    "„Bitte. Keine Namen.“",
+    "„Hedda hat gesagt, sie kommt wieder. Ist sie bei euch?“",
+    "„Wir bleiben hier unten. Hedda hat gesagt, hier unten sind wir sicher.“"
+   ],
+   "weiss": [
+    {
+     "kurz": "Hedda hat sie eingeschlossen",
+     "info": "„Hedda hat uns hier eingeschlossen. Zu unserem Schutz. Sie hat gesagt: Wer den Schlüssel hat, kommt von mir.“",
+     "wie": "Fragen, wie sie hierherkam. Haben die Helden den Kellerschlüssel benutzt, sagt sie es von selbst."
+    },
+    {
+     "kurz": "Ihr Mann ist im Wald",
+     "info": "„Mein Mann ist mit dem Wagen zum Wald. Holz holen. Vor fünf Tagen. Die Pferde sind allein zurückgekommen.“",
+     "wie": "Nach ihrem Mann fragen, oder warum sie allein ist."
+    },
+    {
+     "kurz": "Der Brunnen atmet nachts",
+     "info": "„Nachts atmet der Brunnen. Man hört es bis hier unten, durch die Wand. Ein. Aus. Die Kinder zählen mit, damit sie einschlafen.“",
+     "wie": "Nach dem Brunnen fragen."
+    },
+    {
+     "kurz": "Die Chronik",
+     "info": "„Das Buch im Regal hat Hedda heruntergebracht. Sie hat gesagt, das darf nicht verbrennen, da steht drin, wann es angefangen hat.“",
+     "wie": "Nach dem Buch im Regal fragen (Suchmarker 1)."
+    }
+   ],
+   "wennSieFragen": [
+    [
+     "nach ihrem Namen oder dem der Kinder",
+     "„Keine Namen.“ Sie hält dem Kleineren den Mund zu, bevor es antworten kann."
+    ],
+    [
+     "ob sie mitkommt",
+     "Sie schüttelt den Kopf. „Hedda hat gesagt: im Keller bleiben. Wir bleiben im Keller.“"
+    ],
+    [
+     "ob sie andere aufnimmt (den Jungen, die Wirtin)",
+     "„Wenn sie keine Namen sagen.“ Sie rückt mit den Kindern an die Wand und macht Platz."
+    ],
+    [
+     "grob, drohend, mit Waffe",
+     "Sie zieht die Kinder hinter sich und sagt nichts mehr. Greift ein Held sie an: Taste 2, nicht der Kampf-Knopf an der Figur."
+    ]
+   ],
+   "nichtWissen": [
+    "Wer im Dorf noch lebt: sie war drei Tage im Keller.",
+    "Was im Brunnen ist: nur, dass er nachts atmet.",
+    "Was mit ihr selbst ist, falls die App sie als befallen gezogen hat: sie weiß es nicht, oder sie sagt es nicht."
+   ]
+  },
+  "wirtin": {
+   "name": "Die Wirtin",
+   "anzeige": "Eine breite Frau mit Armbrust",
+   "tisch": {
+    "x": 22,
+    "y": 13.5,
+    "ab": {
+     "flag": "wirtshaus_gesehen",
+     "ist": true
+    },
+    "bis": {
+     "eine": [
+      {
+       "flag": "wirtin_dabei",
+       "ist": true
+      },
+      {
+       "flag": "wirtin_im_keller",
+       "ist": true
+      },
+      {
+       "flag": "wirtin_verriegelt",
+       "ist": true
+      }
+     ]
+    },
+    "zeichen": "W"
+   },
+   "wer": "Die Wirtin von Moosgrab, um die fünfzig, breit, laut, seit drei Nächten wach. Ihr Mann ist vor sechs Tagen zur Kapelle gegangen, um nach Hedda zu sehen, und nicht wiedergekommen. Hedda sagt, er bete. Sie glaubt es nicht und geht nicht nachsehen. Der Ehering aus dem zuckenden Grab (Map 2) ist seiner.",
+   "stimme": [
+    "Laut, auch wenn sie flüstert",
+    "Die Armbrust zeigt immer dorthin, wo gerade jemand redet",
+    "Sagt keinen Namen, auch nicht den ihres Mannes: nur „mein Mann“"
+   ],
+   "motiv": "Wissen, was mit ihrem Mann ist. Und nicht die Letzte sein, die in Moosgrab noch wach ist.",
+   "ziel": "In dieser Szene will sie zuerst wissen, wer euch schickt. Dann, ob ihr ihren Mann gesehen habt. Und dann raus aus diesem Haus, ganz gleich wohin.",
+   "kern": [
+    "„Die Harms haben am Sonntag noch gelacht. Am Montag nicht mehr.“",
+    "„Der Schmied hört nicht auf. Drei Tage. Er hört einfach nicht auf.“",
+    "„Wenn ihr zum Brunnen wollt: Hedda hat den Schlüssel nie hergegeben. Da hilft euch nur Eisen.“"
+   ],
+   "weiss": [
+    {
+     "kurz": "Der Stern",
+     "info": "„Meine Mutter sagte, er fiel ohne Geräusch. Sterne machen kein Geräusch, sagte sie. Steine schon.“",
+     "wie": "Nach dem Stern fragen."
+    },
+    {
+     "kurz": "Das Schloss am Brunnen",
+     "info": "„Das Schloss hat Hedda selbst drangehängt, vor drei Wochen, als er warm wurde. Den Schlüssel trägt sie um den Hals, oder sie hat ihn hineingeworfen. Gesehen hat ihn keiner mehr.“",
+     "wie": "Nach dem Brunnen oder dem Schlüssel fragen."
+    },
+    {
+     "kurz": "Werkzeug beim Schmied",
+     "info": "„Zange und Brecheisen hängen beim Schmied an der Wand. Neben ihm. Viel Glück.“",
+     "wie": "Fragen, wie man den Brunnen aufbekommt. Hat sie den Ring gesehen, gibt sie stattdessen das Brecheisen ihres Mannes."
+    },
+    {
+     "kurz": "Ihr Mann",
+     "info": "„Mein Mann ist vor sechs Tagen zur Kapelle. Er wollte nach Hedda sehen. Hedda sagt, er betet. Mein Mann betet nicht.“",
+     "wie": "Fragen, auf wen sie wartet, oder warum sie die Tür im Blick hat."
+    },
+    {
+     "kurz": "Wer noch lebt",
+     "info": "„Im Keller unterm Gemeindehaus sitzt die Fuhrmannsfrau mit ihren zwei. Hedda hat sie eingeschlossen. Und in der Backstube der Junge vom Bäcker, allein.“",
+     "wie": "Nach Überlebenden fragen."
+    }
+   ],
+   "wennSieFragen": [
+    [
+     "nach ihrem Namen",
+     "„Seid ihr verrückt? Hier?“ Sie zeigt mit der Armbrust zur Tür, als stünde dort jemand, der zuhört."
+    ],
+    [
+     "ob sie mitkommt (sie vertraut den Helden)",
+     "„Bis zum Brunnen. Hinunter steig ich nicht. Einer muss hier oben sein, wenn ihr wiederkommt.“ Taste 3."
+    ],
+    [
+     "ob sie in den Keller geht",
+     "„Zu der Fuhrmannsfrau? Wenn ihr mich hinbringt. Allein geh ich nicht über den Platz.“ Taste D."
+    ],
+    [
+     "wer von den anderen noch Mensch ist",
+     "Taste 8, wenn sie euch vertraut. Sonst: „Woher soll ich das wissen? Ich mach keinem auf.“"
+    ]
+   ],
+   "nichtWissen": [
+    "Was im Brunnen ist: nur, dass er warm ist und atmet.",
+    "Wer sicher befallen ist: sie hat nur einen Verdacht (Taste 8).",
+    "Dass ihr Mann tot ist, bis die Helden es ihr sagen oder den Ring zeigen."
+   ],
+   "kampf": {
+    "werte": {
+     "name": "Die Wirtin",
+     "faction": "Moosgrab",
+     "size": "1",
+     "quality": "4+",
+     "defense": "5+",
+     "tough": "3",
+     "role": "enemy",
+     "weapons": "Armbrust | 12 | A1 | DS(1)\nKüchenmesser | Nahkampf | A1 | ",
+     "passives": "",
+     "flavor": "Drei Nächte wach, und sie hat nicht vor, die vierte zu verpassen."
+    },
+    "notiz": "Keine Kämpferin, aber sie trifft: Q4+, V5+, Zäh 3, Armbrust zwei Kartenlängen. Nur drücken, wenn ein Held sie wirklich angreift. Ihr Schuss: Lärm +2 (Z).",
+    "info": "Die Wirtin. Wird sie angegriffen, schießt sie und verriegelt, was sie verriegeln kann.",
+    "setzt": {
+     "wirtin_angegriffen": true
+    },
+    "zustandSaetze": {
+     "unverletzt": "Sie lädt nach, ohne hinzusehen.",
+     "angekratzt": "Ein Kratzer. Sie flucht, laut.",
+     "verwundet": "Sie blutet und zielt trotzdem.",
+     "schwer verwundet": "Sie lehnt am Tresen und hält die Armbrust mit beiden Armen.",
+     "am Ende": "Ein Treffer noch. Sie sieht euch an wie Leute, die sie bedient hat.",
+     "gefallen": "Die Armbrust fällt zuerst."
+    },
+    "tod": {
+     "vorlesen": "Die Armbrust fällt zuerst. Dann sie, hinter den Tresen, wo ihr sie nicht mehr seht. Eine Weile hört ihr sie noch atmen.",
+     "gmNotiz": "Die Wirtin ist tot. Kein Gespräch mehr, kein Brecheisen, sie zählt nicht für den Keller.",
+     "setzt": {
+      "wirtin_tot": true
+     }
+    },
+    "anblick": "Eine breite Frau in Schürze, die Armbrust an der Schulter. Unter den Augen schwarze Ringe von drei Nächten."
+   }
+  },
+  "junge": {
+   "name": "Der Bäckerjunge",
+   "anzeige": "Ein Junge voller Mehl",
+   "tisch": {
+    "x": 20.5,
+    "y": 19.5,
+    "ab": {
+     "flag": "baeckerei_gesehen",
+     "ist": true
+    },
+    "bis": {
+     "eine": [
+      {
+       "flag": "junge_im_keller",
+       "ist": true
+      },
+      {
+       "alle": [
+        {
+         "flag": "befallener",
+         "ist": "junge"
+        },
+        {
+         "flag": "befallener_enttarnt",
+         "ist": true
+        }
+       ]
+      }
+     ]
+    },
+    "zeichen": "J"
+   },
+   "wer": "Der Sohn des Bäckers, etwa zehn. Sein Vater kniet in der Kapelle (Map 2: der Bäcker mit Mehl in den Augenbrauen). Er hat sich drei Tage im Mehlsack versteckt und den Ofen warm gehalten. Ob er noch Mensch ist, hat die App gezogen (Lage).",
+   "stimme": [
+    "Leise und sehr höflich",
+    "Fragt immer wieder nach dem Vater, mitten im Satz",
+    "Wischt sich Mehl aus den Augen, das gleich wieder da ist"
+   ],
+   "motiv": "Seinen Vater wiederfinden. Und nicht wieder allein sein.",
+   "ziel": "In dieser Szene will er wissen, wo sein Vater ist. Nimmt ihn jemand an der Hand, geht er mit, wohin auch immer.",
+   "kern": [
+    "„Habt ihr meinen Vater gesehen? Er ist zum Beten gegangen.“",
+    "„Ich hab den Ofen warm gehalten. Damit er nicht friert, wenn er kommt.“",
+    "„Er hat gesagt, ich soll keinem aufmachen, der meinen Namen weiß.“"
+   ],
+   "weiss": [
+    {
+     "kurz": "Der Vater betet",
+     "info": "„Er ist mit den anderen in die Kapelle. Vor vier Tagen. Er hat gesagt, er betet für Mama, und dann kommt er.“",
+     "wie": "Nach dem Vater fragen."
+    },
+    {
+     "kurz": "Der Brunnen drückt",
+     "info": "„Ich hab die Hand auf die Bretter gelegt. Die sind warm. Und da hat was dagegengedrückt. Von unten.“",
+     "wie": "Nach dem Brunnen fragen."
+    },
+    {
+     "kurz": "Wenn der Hammer aufhört",
+     "info": "„Papa hat gesagt: Wenn der Schmied aufhört zu hämmern, verstecken wir uns.“",
+     "wie": "Nach dem Hämmern oder dem Schmied fragen."
+    }
+   ],
+   "wennSieFragen": [
+    [
+     "was mit seinem Vater ist, und die Helden sagen es ihm (er kniet in der Kapelle, oder er ist gefallen)",
+     "Er sieht euch lange an. Dann: „Dann muss ich den Ofen nicht mehr warm halten.“ Er weint nicht."
+    ],
+    [
+     "ob er mitkommt",
+     "Er nimmt den Laib vom Blech und hält ihn an die Brust. „Für Papa.“ Taste 3."
+    ],
+    [
+     "nach seinem Namen",
+     "Er presst die Lippen zusammen und schüttelt den Kopf, ganz fest."
+    ]
+   ],
+   "nichtWissen": [
+    "Wer im Dorf noch lebt: er war drei Tage im Mehlsack.",
+    "Was mit ihm selbst ist, falls die App ihn als befallen gezogen hat: er weiß es nicht."
+   ]
+  }
+ },
+ "gegner": {
+  "sporenling": {
+   "name": "Sporenling",
+   "anzeige": "Etwas Kleines aus den Gärten",
+   "karte": "v:giftmade",
+   "info": "Klein, weich, auf zu vielen Beinen. Kriecht aus den Gärten, sobald das Dorf laut genug ist.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie in Map 1. Zwei je Feindzone bei Lärm 3. Giftspeichel gilt als Sporenhusten, eine Kartenlänge weit.",
+   "zustandSaetze": {
+    "unverletzt": "Es huscht weiter, als hätte es nichts gespürt.",
+    "angekratzt": "Ein Fetzen fliegt ab. Es quiekt nicht. Es hat keinen Mund dafür.",
+    "verwundet": "Es zieht eine Spur aus grünem Saft hinter sich her.",
+    "schwer verwundet": "Es kriecht nur noch, aber es kriecht auf euch zu.",
+    "am Ende": "Ein Treffer noch, dann ist es Brei.",
+    "gefallen": "Es platzt, leise, wie ein überreifer Pilz."
+   },
+   "tod": {
+    "vorlesen": "Es platzt, leise, wie ein überreifer Pilz. Ein Hauch Sporen steigt auf, kniehoch, dann sinkt er auf das Pflaster.",
+    "gmNotiz": "Figur vom Tisch. Wer direkt daneben stand: Qualitätstest (Sporennebel), misslungen −1 auf Treffen bis Ende der nächsten Runde."
+   },
+   "anblick": "So groß wie eine Katze, weich wie ein Pilzhut, auf zu vielen dünnen Beinen. Wo es entlangkriecht, bleibt ein heller Faden auf dem Pflaster."
+  },
+  "harm": {
+   "name": "Einer der Harms",
+   "anzeige": "Jemand vom Abendbrottisch",
+   "karte": "v:giftmade",
+   "info": "Befallen. Sitzt seit Tagen am Abendbrottisch und steht erst auf, wenn jemand an den Tisch tritt.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3). Drei Figuren: Vater, Mutter, Tochter; zusammen 75 P. (das Playbook sagt ≈85). Sie bleiben auf jeder Schwierigkeit drei (fest); auf Schwer kommen Sporenlinge aus den Gärten dazu.",
+   "zustandSaetze": {
+    "unverletzt": "Er kommt weiter, den Löffel noch in der Hand.",
+    "angekratzt": "Der Schlag sitzt. Er sieht nicht einmal hin.",
+    "verwundet": "Er schwankt. Aus der Wunde rieselt etwas Weißes wie Mehl.",
+    "schwer verwundet": "Die Fäden an den Füßen ziehen ihn zurück zum Tisch, und er wehrt sich nicht dagegen.",
+    "am Ende": "Ein Treffer noch. Er setzt sich beinahe wieder hin.",
+    "gefallen": "Er sinkt auf seinen Stuhl zurück."
+   },
+   "tod": {
+    "vorlesen": "Er sinkt auf den Stuhl zurück, auf dem er tagelang gesessen hat, und bleibt sitzen, den Kopf über dem Teller. Die weißen Fäden unter dem Tisch werden grau.",
+    "gmNotiz": "Figur vom Tisch, oder auf den Stuhl zurück. Sind alle drei gefallen, liegt der Brief auf der Kommode gefahrlos (Suchmarker 3)."
+   },
+   "anblick": "Ein Mensch im Sonntagsrock, sauber gekämmt. Unter dem Kragen wächst es weiß bis ans Kinn, und an den Schuhsohlen hängen Fäden, die er aus den Dielen gerissen hat."
+  },
+  "schmied": {
+   "name": "Der Schmied",
+   "anzeige": "Ein breiter Mann mit Hammer",
+   "karte": "eigen",
+   "ersatz": "v:seuchenbringer",
+   "info": "Elite. Hämmert seit drei Tagen auf einen leeren Amboss. Er sieht nichts mehr und findet euch trotzdem: er folgt dem Klang eurer Schritte.",
+   "werte": {
+    "name": "Der Schmied",
+    "faction": "Moosgrab",
+    "praegung": [
+     "gift"
+    ],
+    "size": "1",
+    "quality": "4+",
+    "defense": "3+",
+    "tough": "9",
+    "role": "enemy",
+    "weapons": "Schmiedehammer | Nahkampf | A4 | DS(1), Reißend",
+    "passives": "Furchtlos, Folgt den Schritten: greift nur an, wer sich in seinem eigenen Zug bewegt hat, solange es so einen gibt",
+    "flavor": "Drei Tage, ein Takt. Er hört nicht auf, bis ihn jemand berührt."
+   },
+   "notiz": "Eigene Werte, etwa 125 P. (Q4+, V3+, Zäh 9, Schmiedehammer A4 DS(1) Reißend, Furchtlos). Wenn keine eigene Karte gebaut ist: Seuchenbringer (120) als Ersatz. Startet in der Schmiede (Marker S). Hammer weggeschlagen (Taste 6, eine 6 beim Treffen): nur noch A2, steht dann an der Karte. Er greift nur an, wer sich in seinem eigenen Zug bewegt hat; hat sich keiner bewegt, den Nächsten.",
+   "zustandSaetze": {
+    "unverletzt": "Der Hammer hebt sich wieder. Er hat den Treffer nicht bemerkt.",
+    "angekratzt": "Ein Riss in der Schürze. Darunter ist kein Blut, nur Moos.",
+    "verwundet": "Er geht schwerer. Aber der Hammer fällt noch im selben Takt.",
+    "schwer verwundet": "Er stützt sich auf den Hammer. Der Takt stolpert.",
+    "am Ende": "Ein Treffer noch. Er hebt den Hammer trotzdem.",
+    "gefallen": "Der Hammer fällt zuerst."
+   },
+   "tod": {
+    "vorlesen": "Der Hammer fällt zuerst, dann er, schwer, wie ein Baum. Und dann ist es still. Nicht nur hier: im ganzen Dorf, so still, dass ihr vom Platz her den Brunnen atmen hört. Langsamer jetzt. Als hätte er den Takt verloren.",
+    "gmNotiz": "Der Schmied ist besiegt: In Map 4 starten die Gegner in der ersten Runde nach dem Erwachen ruhig (die App nimmt das mit). Ein Beutewurf. Kein Rundenwurf mehr. Zange und Brecheisen an der Wand liegen jetzt gefahrlos (Suchmarker 2).",
+    "setzt": {
+     "schmied_besiegt": true
+    },
+    "beutewurf": true
+   },
+   "zusatz": [
+    {
+     "wenn": {
+      "flag": "hammer_weg",
+      "ist": true
+     },
+     "text": "Der Hammer liegt am Boden: er schlägt nur noch mit A2 (steht an der Karte).",
+     "werte": {
+      "attacks": -2
+     }
+    }
+   ],
+   "anblick": "Ein Mann wie ein Türrahmen, die Lederschürze schwarz vom Ruß. Die Augen sind zugewachsen, weiß überzogen wie Brot mit Schimmel. Er dreht den Kopf zu jedem Geräusch, nie zu einem Gesicht."
+  },
+  "dorfbewohner": {
+   "name": "Befallener aus dem Dorf",
+   "anzeige": "Jemand aus einem der Häuser",
+   "karte": "v:giftmade",
+   "info": "Einer, der hinter seinem Riegel gewartet hat. Ab Lärm 6 kommen sie heraus, einer je Runde.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3). Nachschub am Rundenende nach Lärm 6, auf Normal höchstens vier.",
+   "zustandSaetze": {
+    "unverletzt": "Es geht weiter, ohne Eile.",
+    "angekratzt": "Getroffen. Es blutet nicht rot.",
+    "verwundet": "Es knickt ein und steht wieder auf, langsamer.",
+    "schwer verwundet": "Es kriecht, die Finger im Pflaster.",
+    "am Ende": "Ein Treffer noch.",
+    "gefallen": "Es fällt in die Tür, aus der es kam."
+   },
+   "tod": {
+    "vorlesen": "Es fällt in die Tür, aus der es kam, und das Haus dahinter bleibt dunkel.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt."
+   },
+   "anblick": "Jemand aus dem Dorf, im Nachthemd oder im Arbeitskittel, so, wie er gerade gelegen hat. Die Lippen bewegen sich. Sie flüstern Namen, und keiner davon ist seiner."
+  },
+  "gemeinde": {
+   "name": "Gestalt aus der Kapelle",
+   "anzeige": "Eine aus der Gemeinde",
+   "karte": "v:giftmade",
+   "info": "Eine der Gestalten aus der Kapelle. Sie ist euch gefolgt, über den Hauptweg, ohne Eile.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie in Map 2. Nur, wenn die Gemeinde in Map 2 wach wurde und nicht gefallen ist: Ende Runde 2 zwei, dann je Rundenende zwei mehr, auf Normal höchstens sechs.",
+   "zustandSaetze": {
+    "unverletzt": "Sie kommt weiter. Sie flüstert noch immer dasselbe Wort.",
+    "angekratzt": "Der Schlag sitzt, und sie flüstert weiter, nur schneller.",
+    "verwundet": "Sie knickt ein. Was aus der Wunde kommt, ist nicht rot.",
+    "schwer verwundet": "Sie kriecht. Der Mund formt immer noch das Wort.",
+    "am Ende": "Ein Treffer noch. Sie flüstert lauter, als wollte sie gehört werden.",
+    "gefallen": "Sie fällt nach vorn, wie beim Beten."
+   },
+   "tod": {
+    "vorlesen": "Sie fällt nach vorn, auf die Knie, dann auf das Gesicht, wie beim Beten. Hier betet niemand mit.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt."
+   },
+   "anblick": "Ein Mensch aus dem Dorf, noch in seinen Kirchenkleidern, Moos bis unter das Kinn. Die Knie sind nass von der Erde des Friedhofs, über den sie gekommen ist."
+  },
+  "befallene-frau": {
+   "name": "Die Fuhrmannsfrau",
+   "anzeige": "Die Frau aus dem Keller",
+   "karte": "v:giftmade",
+   "info": "Sie hat ihre Kinder gehalten, die ganze Zeit. Jetzt lässt sie los.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie im Playbook. Nur, wenn die App die Frau als befallen gezogen hat und sie enttarnt wurde. Die Kinder sind Menschen: sie kämpfen nicht und werden nicht angegriffen.",
+   "zustandSaetze": {
+    "unverletzt": "Sie lächelt immer noch.",
+    "angekratzt": "Der Schlag reißt ihr das Kopftuch weg. Darunter Moos, dicht wie Haar.",
+    "verwundet": "Sie sinkt in die Knie, und aus der Wunde kommt Grün.",
+    "schwer verwundet": "Sie kriecht. Nicht zu euch. Zu den Kindern.",
+    "am Ende": "Ein Treffer noch. Sie sagt den Namen noch einmal.",
+    "gefallen": "Sie fällt, viel zu leicht."
+   },
+   "tod": {
+    "vorlesen": "Sie fällt, und sie fällt leicht, viel zu leicht. In der Ecke halten sich die Kinder aneinander fest. Das Größere sagt nichts. Das Kleinere fragt, ob die Mama jetzt schläft.",
+    "gmNotiz": "Die Kinder bleiben im Keller und zählen als gerettet (eine Gruppe, Nebenziel). Kein Befallener mehr im Keller: Map 5 ohne die zwei Extra-Gegner aus dem Gemeindehaus.",
+    "setzt": {
+     "befallene_tot": true
+    }
+   },
+   "anblick": "Eine Frau aus dem Dorf, das Kopftuch verrutscht. Hinter dem Ohr ein Rand von Moos, und ihre Hände sind so ruhig, wie keine Mutter im Dunkeln ruhig ist."
+  },
+  "befallener-junge": {
+   "name": "Der Bäckerjunge",
+   "anzeige": "Der Junge aus der Backstube",
+   "karte": "v:giftmade",
+   "info": "Er hat nach seinem Vater gefragt. Er fragt immer noch.",
+   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie im Playbook. Nur, wenn die App den Jungen als befallen gezogen hat und er enttarnt wurde.",
+   "zustandSaetze": {
+    "unverletzt": "Er lacht. Es klingt wie ein Kind, das lacht.",
+    "angekratzt": "Mehl staubt von ihm ab. Darunter ist er grün.",
+    "verwundet": "Er stolpert, fängt sich, kommt wieder.",
+    "schwer verwundet": "Er setzt sich mitten auf den Boden und flüstert.",
+    "am Ende": "Ein Treffer noch. Er fragt nach seinem Vater.",
+    "gefallen": "Er fällt auf das Mehl."
+   },
+   "tod": {
+    "vorlesen": "Er fällt auf das Mehl, und das Mehl staubt auf, weiß, und legt sich langsam über ihn. Das Brot, das er für seinen Vater eingewickelt hat, rollt aus dem Tuch. Es ist innen grün.",
+    "gmNotiz": "Kein Befallener mehr, der in den Keller gelangen kann. Figur vom Tisch.",
+    "setzt": {
+     "befallene_tot": true
+    }
+   },
+   "anblick": "Ein Junge, Mehl im Haar und an den Wimpern. Unter dem Mehl, hinter dem Ohr, ein Fleck wie Moos auf einem Stein. Seine Lippen hören nicht auf, sich zu bewegen."
+  },
+  "knecht": {
+   "name": "Knecht",
+   "anzeige": "Ein Knecht mit Knüppel",
+   "seite": "freund",
+   "info": "Verbündeter. Einer der beiden, die die Glocke aus dem Heu geholt hat.",
+   "werte": {
+    "name": "Knecht",
+    "faction": "Moosgrab",
+    "size": "1",
+    "quality": "5+",
+    "defense": "5+",
+    "tough": "3",
+    "role": "companion",
+    "weapons": "Knüppel | Nahkampf | A1 | ",
+    "passives": "",
+    "flavor": "Heu im Haar und Angst in den Händen. Er bleibt trotzdem."
+   },
+   "notiz": "Verbündeter (zählt nicht ins Punktebudget): Q5+, V5+, Zäh 3, Knüppel A1, etwa 15 P. Führt ein Spieler oder du. Kommt nur mit, wenn die Glocke geschlagen hat und die Spieler sie mitnehmen.",
+   "zustandSaetze": {
+    "unverletzt": "Er hält den Knüppel mit beiden Händen und steht.",
+    "angekratzt": "Er flucht, ohne einen Namen zu sagen.",
+    "verwundet": "Er blutet am Arm und bleibt stehen.",
+    "schwer verwundet": "Er wankt. Einer muss ihn stützen.",
+    "am Ende": "Noch ein Treffer, und er fällt.",
+    "gefallen": "Er fällt, und der Knüppel rollt über das Pflaster."
+   },
+   "tod": {
+    "vorlesen": "Er fällt, und der Knüppel rollt noch ein Stück über das Pflaster, bis an den Brunnen. Der andere Knecht sieht ihn an und sagt nichts. Keinen Namen.",
+    "gmNotiz": "Ein Verbündeter weniger. Kein Sporenpunkt, niemand hat einen Namen gesagt."
+   },
+   "anblick": "Ein Knecht, Heu im Haar, die Hände groß und rissig. Er sieht sich nach jedem Geräusch um und sagt nichts."
+  },
+  "wirtin-verbuendet": {
+   "name": "Die Wirtin",
+   "anzeige": "Die Wirtin mit der Armbrust",
+   "seite": "freund",
+   "info": "Verbündete. Sie geht mit bis zum Brunnen, hinunter steigt sie nicht.",
+   "werte": {
+    "name": "Die Wirtin",
+    "faction": "Moosgrab",
+    "size": "1",
+    "quality": "4+",
+    "defense": "5+",
+    "tough": "3",
+    "role": "companion",
+    "weapons": "Armbrust | 12 | A1 | DS(1)\nKüchenmesser | Nahkampf | A1 | ",
+    "passives": "",
+    "flavor": "Drei Nächte wach. Sie trifft trotzdem."
+   },
+   "notiz": "Verbündete (zählt nicht ins Punktebudget): Q4+, V5+, Zäh 3, Armbrust zwei Kartenlängen A1 DS(1), etwa 30 P. Führt ein Spieler oder du. Ihr Schuss zählt Lärm wie jeder Fernkampf (Z).",
+   "zustandSaetze": {
+    "unverletzt": "Sie lädt nach, ohne hinzusehen.",
+    "angekratzt": "Ein Kratzer. Sie flucht laut, ohne einen Namen.",
+    "verwundet": "Sie blutet und zielt trotzdem.",
+    "schwer verwundet": "Sie lehnt an der Wand und hält die Armbrust mit beiden Armen.",
+    "am Ende": "Ein Treffer noch. Sie weiß es und schießt schneller.",
+    "gefallen": "Die Armbrust fällt zuerst."
+   },
+   "tod": {
+    "vorlesen": "Die Armbrust fällt zuerst, dann sie. Sie liegt auf dem Rücken und sieht in den Himmel über dem Brunnen. „Ich hab nicht geschlafen“, sagt sie. „Drei Nächte.“ Dann schläft sie.",
+    "gmNotiz": "Die Wirtin ist tot: sie zählt nicht mehr für den Keller.",
+    "setzt": {
+     "wirtin_tot": true
+    }
+   },
+   "anblick": "Eine breite Frau in Schürze, die Ärmel hochgekrempelt, die Armbrust im Arm wie ein Kind. Unter den Augen schwarze Ringe von drei Nächten."
+  }
+ },
+ "fog": {
+  "stufen": [
+   {
+    "id": "unverletzt",
+    "wenn": "wunden == 0",
+    "satz": "Nichts. Es hat nicht mal gezuckt."
+   },
+   {
+    "id": "angekratzt",
+    "wenn": "rest > zaeh / 2",
+    "satz": "Getroffen. Es blutet grün, mehr nicht."
+   },
+   {
+    "id": "verwundet",
+    "wenn": "rest <= zaeh / 2 && rest > zaeh / 4",
+    "satz": "Das hat gesessen. Es bewegt sich schwerer."
+   },
+   {
+    "id": "schwer verwundet",
+    "wenn": "rest <= zaeh / 4 && rest > 1",
+    "satz": "Es hängt schief, Sporen rieseln aus der Wunde."
+   },
+   {
+    "id": "am Ende",
+    "wenn": "rest == 1",
+    "satz": "Ein Treffer noch. Es weiß es."
+   },
+   {
+    "id": "gefallen",
+    "wenn": "rest <= 0",
+    "satz": "Es fällt. Figur vom Tisch."
+   }
+  ],
+  "notiz": "rest = zaeh × modelle − wunden. Spieler sehen nie Zahlen, nur den Satz."
+ },
+ "beutewurf": [
+  [
+   1,
+   "Nichts. Ein Kerzenstummel und Moos."
+  ],
+  [
+   2,
+   "Heiltrank"
+  ],
+  [
+   3,
+   "Rauchbombe"
+  ],
+  [
+   4,
+   "Heldenelixier"
+  ],
+  [
+   5,
+   "Feuertopf"
+  ],
+  [
+   6,
+   "Amulett der Abwehr"
+  ]
+ ],
+ "verhalten": {
+  "ruhig": [
+   [
+    "1",
+    "zögern, keine Aktion"
+   ],
+   [
+    "2–3",
+    "bewegen"
+   ],
+   [
+    "4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "wuetend": [
+   [
+    "1",
+    "bewegen"
+   ],
+   [
+    "2–4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "notiz": "Steht ein Gegner schon im Nahkampf und der Würfel sagt „bewegen“, greift er stattdessen an. Wach wird im Dorf nur, wer geweckt wird: die Harms am Tisch, der Schmied bei Berührung, die Sporenlinge ab Lärm 3. Ab dem Schmied oder Lärm 6 würfeln alle auf der wütenden Tabelle."
+ },
+ "rundenende": [
+  {
+   "wenn": {
+    "flag": "gemeinde_da",
+    "ist": true
+   },
+   "gegnerHinzu": [
+    {
+     "id": "gemeinde",
+     "anzahl": 2,
+     "zone": "H"
+    }
+   ],
+   "hoechstens": 2,
+   "skaliert": true,
+   "text": "Nachschub: zwei Gestalten aus der Kapelle kommen über den Hauptweg (Zone H). Stehen schon in der Gegnerliste."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "gemeinde_wach",
+      "ist": true
+     },
+     {
+      "flag": "gemeinde_tot",
+      "ist": false
+     },
+     {
+      "flag": "gemeinde_erloest",
+      "ist": false
+     },
+     {
+      "flag": "gemeinde_da",
+      "ist": false
+     },
+     {
+      "runde": ">=",
+      "wert": 2
+     }
+    ]
+   },
+   "setzt": {
+    "gemeinde_da": true
+   },
+   "springe": "aufbau-kampf-platz-gemeinde",
+   "text": "Die Gemeinde aus der Kapelle ist da: sie kommt über den Hauptweg. Die App springt in den Kampf."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "dorf_wach",
+      "ist": true
+     },
+     {
+      "flag": "harm_wach",
+      "ist": false
+     }
+    ]
+   },
+   "gegnerHinzu": [
+    {
+     "id": "harm",
+     "anzahl": 3,
+     "zone": "W"
+    }
+   ],
+   "hoechstens": 1,
+   "text": "Nachschub: die Harms stehen vom Abendbrottisch auf und kommen aus ihrem Haus (Zone W). Stehen schon in der Gegnerliste."
+  },
+  {
+   "wenn": {
+    "flag": "dorf_wach",
+    "ist": true
+   },
+   "gegnerHinzu": [
+    {
+     "id": "dorfbewohner",
+     "anzahl": 1,
+     "zone": "Haus"
+    }
+   ],
+   "hoechstens": 4,
+   "skaliert": true,
+   "text": "Nachschub: ein Befallener tritt aus einem Haus. W6: 1 Gemeindehaus, 2 Schmiede, 3 Harms, 4 Wirtshaus, 5 Bäckerei, 6 du wählst. Steht schon in der Gegnerliste."
+  }
+ ],
+ "ereignisse": {
+  "chronik": {
+   "name": "Suchmarker 1 (die Dorfchronik im Keller)",
+   "gruppe": "Untersuchen",
+   "kurz": "Chronik",
+   "taste": "3",
+   "marker": "1",
+   "einmal": true,
+   "wofuer": "Das Gemeindehaus: die Kellertür an der Seite, unten die Frau mit den Kindern und im Regal die Dorfchronik.",
+   "kosten": "Held im Keller, in Kontakt mit dem Regal, 1 Aktion, leise",
+   "vorlesen": "Im Regal, zwischen Gläsern mit Eingemachtem, ein Buch in Leder, schwer wie ein Ziegel. Die Dorfchronik. Weiter vorn, in einer alten, geraden Hand: „Im Jahr des Sterns wurde der Brunnen geweiht.“",
+   "probe": {
+    "frage": "Der Held, der liest, würfelt einen W6. Der Grundtext kommt immer, die Stufen dazu.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Zwei Seiten davor, durchgestrichen und doch lesbar: „Die Männer in den Rüstungen ohne Nähte haben nicht gefragt, ob sie graben dürfen.“"
+     },
+     {
+      "ab": 6,
+      "vorlesen": "Am Rand eine Zeichnung: ein kleiner Kreis, darunter ein großer, und Linien dazwischen wie Wurzeln. Daneben: „So tief, wie der Kirchturm hoch ist.“",
+      "gmNotiz": "Hinweis auf Map 4: unter dem Brunnen ist mehr als ein Schacht. Nichts erklären."
+     }
+    ]
+   },
+   "gmNotiz": "„Dorfchronik“ einem Helden geben (Knopf unten, dazu den Zettel).",
+   "setzt": {
+    "chronik": true
+   },
+   "beute": [
+    "Dorfchronik"
+   ]
+  },
+  "werkzeug": {
+   "name": "Suchmarker 2 (Zange und Brecheisen an der Wand)",
+   "gruppe": "Untersuchen",
+   "kurz": "Werkzeug",
+   "taste": "1",
+   "marker": "2",
+   "einmal": true,
+   "wofuer": "Die Schmiede: der Schmied am Amboss, an der Wand dahinter Zange und Brecheisen. Damit geht der Brunnen leise auf.",
+   "kosten": "Held in Kontakt mit der Wand hinter dem Schmied, 1 Aktion",
+   "vorlesen": "Zange und Brecheisen hängen an der Wand hinter der Esse, eine Armlänge hinter seinem Rücken. Der Hammer fällt, hebt sich, fällt.",
+   "probe": {
+    "frage": "Der Held, der zugreift, würfelt einen W6 (ist der Schmied schon gefallen: kein Wurf, einfach nehmen).",
+    "stufen": [
+     {
+      "bis": 1,
+      "vorlesen": "Das Brecheisen schlägt gegen die Zange. Eisen auf Eisen, hell. Der Hammer fällt weiter, aber einen Takt zu spät.",
+      "gmNotiz": "Lärm +2 ist verbucht. Der Schmied dreht sich nicht um, noch nicht. Sagt der Spieler, sein Held drückt sich an ihm vorbei oder stößt ihn an: Taste 2.",
+      "leisten": {
+       "laerm": 2
+      }
+     },
+     {
+      "ab": 2,
+      "vorlesen": "Ihr habt beides. Er hat nichts gemerkt. Oder es ist ihm gleich."
+     }
+    ]
+   },
+   "gmNotiz": "„Zange und Brecheisen“ einem Helden geben (Knopf unten, dazu den Zettel). Öffnet den Brunnen leise (Taste 1 am Brunnen) und die Kellertür des Gemeindehauses (K).",
+   "setzt": {
+    "werkzeug": true
+   },
+   "beute": [
+    "Zange und Brecheisen"
+   ]
+  },
+  "brief": {
+   "name": "Suchmarker 3 (der Brief auf der Kommode)",
+   "gruppe": "Untersuchen",
+   "kurz": "Brief",
+   "taste": "1",
+   "marker": "3",
+   "einmal": true,
+   "wofuer": "Das Wohnhaus der Harms: drei am Abendbrottisch, auf der Kommode neben der Tür ein Brief an den Sohn.",
+   "kosten": "Held in Kontakt mit der Kommode neben der Tür, 1 Aktion. Leise: die Familie rührt sich nicht, solange niemand an den Tisch tritt.",
+   "vorlesen": "Auf der Kommode neben der Tür ein Brief, gefaltet, nie abgeschickt. Oben ein Name, zweimal unterstrichen. Darunter, in großer, zittriger Schrift: „Komm nicht nach Hause. Egal, was wir dir schreiben. Komm nicht.“",
+   "gmNotiz": "„Brief an den Sohn“ einem Helden geben (Knopf unten, dazu den Zettel), der Name steht darauf (Vorschlag: Jorin). Liest ein Spieler den Namen laut vor: 1 Sporenpunkt für seinen Helden (am Heldenchip). Sag es erst danach.",
+   "setzt": {
+    "brief": true
+   },
+   "beute": [
+    "Brief an den Sohn"
+   ]
+  },
+  "wirtshaus-suche": {
+   "name": "Suchmarker 4 (die Laterne über dem Tresen)",
+   "gruppe": "Untersuchen",
+   "kurz": "Laterne",
+   "taste": "4",
+   "marker": "4",
+   "einmal": true,
+   "beutewurf": true,
+   "wofuer": "Das Wirtshaus: die Wirtin hinter dem Tresen, über ihr eine Laterne und im Fach, was Gäste vergessen haben.",
+   "kosten": "Held in Kontakt mit dem Tresen, 1 Aktion. Solange die Wirtin die Armbrust hält, nur, wenn sie es erlaubt.",
+   "vorlesen": "Am Haken über dem Tresen eine Sturmlaterne, voll Öl. Darunter im Fach, was Gäste liegen gelassen haben, die nicht mehr wiederkommen.",
+   "gmNotiz": "„Laterne“ einem Helden geben (Knopf unten, dazu den Zettel): Wer sie trägt, sieht eine Kartenlänge weiter. Dazu ein Beutewurf (Knopf).",
+   "setzt": {
+    "laterne": true
+   },
+   "beute": [
+    "Laterne"
+   ]
+  },
+  "baeckerei-suche": {
+   "name": "Suchmarker 5 (die Blechdose hinter dem Ofen)",
+   "gruppe": "Untersuchen",
+   "kurz": "Blechdose",
+   "taste": "4",
+   "marker": "5",
+   "einmal": true,
+   "beutewurf": true,
+   "wofuer": "Die Bäckerei: der Ofen noch warm, im Mehlsack der Junge, hinter dem Ofen eine Blechdose.",
+   "kosten": "Held in Kontakt mit dem Ofen, 1 Aktion, leise",
+   "vorlesen": "Hinter dem Ofen, wo es am wärmsten ist, eine Blechdose. Darin, was der Bäcker für schlechte Zeiten zurückgelegt hat.",
+   "gmNotiz": "Ein Beutewurf (Knopf). Der Junge sieht zu und sagt nichts."
+  },
+  "brunnen-ansehen": {
+   "name": "Den Brunnen ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Brunnen ansehen",
+   "taste": "B",
+   "einmal": true,
+   "kosten": "Held in Sichtweite, keine Aktion",
+   "vorlesen": "Bretter, eine Kette, ein Schloss. Die Luft darüber ist warm. Und ganz tief unten atmet etwas.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Die Bretter sind frisch genagelt, die Nägel noch blank. Die Kette ist dick wie ein Daumen, das Schloss neu. Wer das zugemacht hat, wollte nicht, dass es jemand wieder aufmacht."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Zwischen den Brettern, im Dampf, ein Licht. Ganz tief unten. Es flackert nicht, wie kein Feuer flackert, das ihr kennt.",
+      "gmNotiz": "Hinweis auf Map 4. Nichts erklären."
+     }
+    ]
+   },
+   "gmNotiz": "Einen Brunnenschlüssel gibt es nicht: Hedda hat ihn behalten. Der Kellerschlüssel passt nicht. Leise geht er mit Werkzeug auf (Schmiede, Suchmarker 2, oder das Brecheisen der Wirtin), laut mit Gewalt. Weiter: die Helden gehen zum Brunnen.",
+   "setzt": {
+    "brunnen_gesehen": true
+   }
+  },
+  "schmiede-fenster": {
+   "name": "Dem Hämmern folgen (Fenster der Schmiede)",
+   "gruppe": "Untersuchen",
+   "kurz": "Dem Hämmern folgen",
+   "taste": "M",
+   "einmal": true,
+   "kosten": "Held in Kontakt mit der Wand der Schmiede, keine Aktion",
+   "vorlesen": "Die Schmiede. Das Licht hinter dem Fenster flackert im Takt der Schläge.",
+   "probe": {
+    "frage": "Der Held, der hineinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Ein breiter Rücken am Amboss. Der Hammer fällt, hebt sich, fällt. Auf dem Amboss liegt nichts."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "An der Wand hinter der Esse hängt Werkzeug: Zangen, ein Brecheisen. Zwischen ihm und der Wand ist eine Armlänge Platz.",
+      "gmNotiz": "Hinweis auf Suchmarker 2. Nichts erklären."
+     }
+    ]
+   },
+   "gmNotiz": "Der Schmied hört erst auf, wenn ihn jemand berührt oder angreift. Der Marker S auf der Tischkarte ist jetzt aufgedeckt.",
+   "setzt": {
+    "schmied_gesehen": true
+   }
+  },
+  "lauschen": {
+   "name": "An einer Tür lauschen",
+   "gruppe": "Untersuchen",
+   "kurz": "Lauschen",
+   "taste": "H",
+   "einmal": false,
+   "kosten": "Held in Kontakt mit der Tür, 1 Aktion, leise. So oft du willst, an jeder Tür.",
+   "gmNotiz": "Sag, was zur Tür passt. Gemeindehaus (Kellertür an der Seite): „Atmen, leise. Und ein Kind, das sofort aufhört zu weinen.“ Schmiede: „Nur der Hammer. Und dazwischen ein Atem, der sich nach ihm richtet.“ Harms: „Besteck auf Tellern. Keiner kaut.“ Wirtshaus: „Nichts. Aber die Art Stille, in der jemand die Luft anhält.“ Bäckerei: „Rascheln, wie in einem Sack. Dann nichts.“"
+  },
+  "keller-schluessel": {
+   "name": "Die Kellertür des Gemeindehauses aufschließen (Heddas Schlüssel)",
+   "gruppe": "Wege",
+   "kurz": "Keller: aufschließen",
+   "taste": "1",
+   "marker": "1",
+   "einmal": true,
+   "wofuer": "Das Gemeindehaus: die Kellertür an der Seite, unten die Frau mit den Kindern.",
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "kellerschluessel",
+      "ist": true
+     },
+     {
+      "flag": "keller_offen",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held in Kontakt mit der Kellertür, 1 Aktion, leise",
+   "vorlesen": "Der Schlüssel mit dem Holzgriff passt. Er dreht sich schwer, aber leise. Dahinter führt eine Treppe hinunter ins Dunkle, und unten hält jemand den Atem an.",
+   "gmNotiz": "Kein Lärm. Weiter mit dem ersten Haus (Cue 03-2) oder direkt in den Keller.",
+   "setzt": {
+    "keller_offen": true,
+    "ort": "keller"
+   },
+   "springe": "cue-03-2"
+  },
+  "keller-hebeln": {
+   "name": "Die Kellertür aufhebeln (Werkzeug, +1)",
+   "gruppe": "Wege",
+   "kurz": "Keller: aufhebeln +1",
+   "taste": "K",
+   "marker": "1",
+   "einmal": true,
+   "wofuer": "Das Gemeindehaus: die Kellertür an der Seite, unten die Frau mit den Kindern.",
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "werkzeug",
+      "ist": true
+     },
+     {
+      "flag": "keller_offen",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held in Kontakt mit der Kellertür, 1 Aktion. Nur mit Zange und Brecheisen oder dem Brecheisen der Wirtin.",
+   "vorlesen": "Das Brecheisen greift unter das Schloss. Ein Knacken, kurz und trocken, dann gibt das Holz nach. Unten hält jemand den Atem an.",
+   "gmNotiz": "Lärm +1 ist verbucht. Der Nebenweg ohne Schlüssel, leiser als Gewalt.",
+   "leisten": {
+    "laerm": 1
+   },
+   "setzt": {
+    "keller_offen": true,
+    "ort": "keller"
+   },
+   "springe": "cue-03-2"
+  },
+  "keller-brechen": {
+   "name": "Die Kellertür aufbrechen (+2)",
+   "gruppe": "Wege",
+   "kurz": "Keller: aufbrechen +2",
+   "taste": "G",
+   "marker": "1",
+   "einmal": true,
+   "wofuer": "Das Gemeindehaus: die Kellertür an der Seite, unten die Frau mit den Kindern.",
+   "nurWenn": {
+    "flag": "keller_offen",
+    "ist": false
+   },
+   "kosten": "Held in Kontakt mit der Kellertür, 1 Aktion mit Schulter, Axt oder Stiefel",
+   "vorlesen": "Holz splittert. Unten schreit ein Kind auf, und jemand hält ihm sofort den Mund zu.",
+   "gmNotiz": "Lärm +2 ist verbucht. Steigt die Leiste dabei auf 3, springt die App zuerst in den Kampf; in den Keller geht es danach über Taste 1.",
+   "leisten": {
+    "laerm": 2
+   },
+   "setzt": {
+    "keller_offen": true,
+    "ort": "keller"
+   },
+   "springe": "cue-03-2"
+  },
+  "ins-gemeindehaus": {
+   "name": "In den Keller des Gemeindehauses",
+   "gruppe": "Wege",
+   "kurz": "In den Keller",
+   "taste": "1",
+   "marker": "1",
+   "einmal": false,
+   "wofuer": "Das Gemeindehaus: die Kellertür an der Seite, unten die Frau mit den Kindern.",
+   "nurWenn": {
+    "flag": "keller_offen",
+    "ist": true
+   },
+   "kosten": "Die Kellertür ist offen: eine Bewegung die Treppe hinunter",
+   "setzt": {
+    "ort": "keller"
+   },
+   "springe": "cue-03-2"
+  },
+  "in-schmiede": {
+   "name": "In die Schmiede",
+   "gruppe": "Wege",
+   "kurz": "Schmiede",
+   "taste": "2",
+   "marker": "2",
+   "einmal": false,
+   "wofuer": "Die Schmiede: der Schmied am Amboss, an der Wand dahinter Zange und Brecheisen.",
+   "kosten": "Die Tür steht offen, eine Bewegung",
+   "setzt": {
+    "ort": "schmiede"
+   },
+   "springe": "cue-03-2"
+  },
+  "zu-harms": {
+   "name": "Ins Wohnhaus der Harms",
+   "gruppe": "Wege",
+   "kurz": "Harms",
+   "taste": "3",
+   "marker": "3",
+   "einmal": false,
+   "wofuer": "Das Wohnhaus der Harms: drei am Abendbrottisch, auf der Kommode ein Brief.",
+   "kosten": "Die Tür ist nicht verriegelt, eine Bewegung",
+   "setzt": {
+    "ort": "harm"
+   },
+   "springe": "cue-03-2"
+  },
+  "ins-wirtshaus": {
+   "name": "Ins Wirtshaus",
+   "gruppe": "Wege",
+   "kurz": "Wirtshaus",
+   "taste": "4",
+   "marker": "4",
+   "einmal": false,
+   "wofuer": "Das Wirtshaus: die Wirtin hinter dem Tresen, die Armbrust auf die Tür.",
+   "nurWenn": {
+    "flag": "wirtin_verriegelt",
+    "ist": false
+   },
+   "kosten": "Die Tür ist nicht verriegelt, eine Bewegung",
+   "setzt": {
+    "ort": "wirtshaus"
+   },
+   "springe": "cue-03-2"
+  },
+  "in-baeckerei": {
+   "name": "In die Bäckerei",
+   "gruppe": "Wege",
+   "kurz": "Bäckerei",
+   "taste": "5",
+   "marker": "5",
+   "einmal": false,
+   "wofuer": "Die Bäckerei: der Ofen noch warm, im Mehlsack ein Junge.",
+   "kosten": "Die Tür steht einen Spalt offen, eine Bewegung",
+   "setzt": {
+    "ort": "baeckerei"
+   },
+   "springe": "cue-03-2"
+  },
+  "brunnen-werkzeug": {
+   "name": "Den Brunnen mit Werkzeug öffnen (leise)",
+   "gruppe": "Story",
+   "kurz": "Brunnen: Werkzeug",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "werkzeug",
+      "ist": true
+     },
+     {
+      "flag": "brunnen_offen",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held in Kontakt mit dem Brunnen, 1 Aktion. Zange und Brecheisen oder das Brecheisen der Wirtin.",
+   "vorlesen": "Die Zange beißt durch die Kette, das Brecheisen hebt die Bretter, eins nach dem anderen. Kein Laut, der weiter trägt als bis zum Rand. Warme Luft steigt euch ins Gesicht.",
+   "gmNotiz": "Leise, kein Lärm. Weiter: Cue 03-4. Im Kampf: der Kampf endet hier, Weiter führt zum Brunnen.",
+   "setzt": {
+    "brunnen_offen": true
+   }
+  },
+  "brunnen-gewalt": {
+   "name": "Den Brunnen mit Gewalt öffnen (+2, Atemzug +1)",
+   "gruppe": "Story",
+   "kurz": "Brunnen: Gewalt",
+   "taste": "G",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "brunnen_offen",
+    "ist": false
+   },
+   "kosten": "3 Aktionen mit 3+, auch von verschiedenen Helden. Erst drücken, wenn die dritte geschafft ist.",
+   "vorlesen": "Holz splittert, die Kette schlägt gegen den Stein, dreimal, viermal. Dann gibt das Schloss nach. Der Lärm rollt über den Platz, und in mehr als einem Haus wird ein Riegel zurückgeschoben.",
+   "gmNotiz": "Lärm +2 und Atemzug +1 sind verbucht. Steigt Lärm dabei auf 3 oder 6, springt die App in den Kampf: der Brunnen ist dann schon offen, Weiter führt hinab, sobald die Helden es wollen.",
+   "leisten": {
+    "laerm": 2,
+    "atemzug": 1
+   },
+   "setzt": {
+    "brunnen_offen": true,
+    "brunnen_gewalt": true
+   }
+  },
+  "brunnen-schluessel": {
+   "name": "Den Kellerschlüssel am Brunnenschloss probieren",
+   "gruppe": "Untersuchen",
+   "kurz": "Kellerschlüssel probieren",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "kellerschluessel",
+    "ist": true
+   },
+   "kosten": "Keine Aktion",
+   "vorlesen": "Er passt nicht. Nicht einmal halb hinein. Das Schloss ist neuer als alles andere auf diesem Platz.",
+   "gmNotiz": "Einen Brunnenschlüssel gibt es nicht im Spiel: Hedda hat ihn behalten. Werkzeug oder Gewalt."
+  },
+  "brunnen-horchen": {
+   "name": "Am Brunnen horchen",
+   "gruppe": "Untersuchen",
+   "kurz": "Hinunterhorchen",
+   "taste": "3",
+   "einmal": true,
+   "kosten": "Held in Kontakt mit dem Brunnen, keine Aktion, leise",
+   "vorlesen": "Ihr legt das Ohr an die Bretter. Sie sind warm wie ein Rücken. Darunter atmet es. Ein. Aus. Langsam.",
+   "probe": {
+    "frage": "Der Held, der horcht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Das Atmen kommt im Takt des Hammers aus der Schmiede. Oder der Hammer im Takt des Atmens."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Unter dem Atmen ein zweites Geräusch, viel tiefer: ein Summen, gleichmäßig, wie kein Tier summt und kein Wind.",
+      "gmNotiz": "Hinweis auf Map 4. Nichts erklären."
+     }
+    ]
+   }
+  },
+  "brunnen-fragen": {
+   "name": "Einen Überlebenden nach dem Brunnen fragen",
+   "gruppe": "Fragen",
+   "kurz": "Überlebende fragen",
+   "taste": "4",
+   "einmal": true,
+   "nurWenn": {
+    "eine": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_vertraut",
+      "ist": true
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     }
+    ]
+   },
+   "kosten": "Ein Überlebender ist dabei oder in Rufweite, keine Aktion",
+   "vorlesen": "„Der Brunnen war kalt, vierzig Jahre lang. Hedda wollte nie, dass jemand hineinschaut.“"
+  },
+  "frau-ansehen-m": {
+   "name": "Die Frau genau ansehen (Qualitätstest)",
+   "gruppe": "Untersuchen",
+   "kurz": "Frau ansehen",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "nicht": "frau"
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     }
+    ]
+   },
+   "kosten": "Held direkt neben ihr, 1 Aktion",
+   "vorlesen": "Sie hält die Kinder so fest, dass sie sich nicht rühren können. Sie sieht euch nicht an, nur eure Hände.",
+   "probe": {
+    "frage": "Qualitätstest: Der Held würfelt einen W6. Ab 4 sieht er etwas, bei 6 mehr.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Ihre Hände sind warm und rissig vom Waschen. Als ihr sie berührt, zuckt sie zurück, wie jeder zurückzuckt, der Angst hat."
+     },
+     {
+      "ab": 6,
+      "vorlesen": "Sie hat den Kindern die Ohren zugehalten, die ganze Zeit. Damit sie keine Namen hören."
+     }
+    ]
+   },
+   "gmNotiz": "Sie ist ein Mensch. Misslungen: nichts Besonderes, sie hält die Kinder fest.",
+   "marker": "ueberlebender:F"
+  },
+  "frau-ansehen-b": {
+   "name": "Die Frau genau ansehen (Qualitätstest)",
+   "gruppe": "Untersuchen",
+   "kurz": "Frau ansehen",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "ist": "frau"
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "befallener_enttarnt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held direkt neben ihr, 1 Aktion",
+   "vorlesen": "Sie hält die Kinder so fest, dass sie sich nicht rühren können. Sie sieht euch nicht an, nur eure Hände.",
+   "probe": {
+    "frage": "Qualitätstest: Der Held würfelt einen W6. Ab 4 sieht er etwas, bei 6 mehr.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Ihre Hände sind kalt. Nicht kalt wie im Keller. Kalt wie ein Stein, der nie in der Sonne lag. Hinter ihrem Ohr, unter dem Kopftuch, ein Rand von Moos."
+     },
+     {
+      "ab": 6,
+      "vorlesen": "Die Kinder halten sich an ihr fest. Sie hält die Kinder nicht. Ihre Arme liegen nur um sie herum, wie Wurzeln um einen Stein."
+     }
+    ]
+   },
+   "gmNotiz": "Sie ist befallen und weiß es nicht, oder sagt es nicht. Misslungen: nichts Besonderes. Stellen die Helden sie zur Rede oder greifen an: Taste 2.",
+   "marker": "ueberlebender:F"
+  },
+  "frau-stellen-m": {
+   "name": "Die Frau zur Rede stellen oder packen",
+   "gruppe": "Kampf",
+   "kurz": "Frau stellen",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "nicht": "frau"
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     }
+    ]
+   },
+   "kosten": "Ein Held packt sie, droht ihr oder greift sie an",
+   "vorlesen": "Sie drückt die Kinder hinter sich und hebt die Hände. „Nicht. Bitte. Nicht vor den Kindern.“ Das Kleinere weint jetzt, und keiner kann es leise machen.",
+   "gmNotiz": "Sie ist ein Mensch. Lärm +1 ist verbucht (das Kind). Sie bleibt im Keller, aber sie sieht euch nicht mehr an. Wer sie trotzdem angreift: der Kampf-Knopf an ihrer Figur, sie fällt beim ersten Treffer.",
+   "leisten": {
+    "laerm": 1
+   },
+   "marker": "ueberlebender:F"
+  },
+  "frau-stellen-b": {
+   "name": "Die Frau zur Rede stellen oder packen",
+   "gruppe": "Kampf",
+   "kurz": "Frau stellen",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "ist": "frau"
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "befallener_enttarnt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held packt sie, droht ihr oder greift sie an",
+   "vorlesen": "Sie lässt die Kinder los.",
+   "gmNotiz": "Sie ist befallen: enttarnt. Weiter mit Aufbau, Cue 03-X3 und Kampf. Die Kinder sind Menschen und bleiben in der Ecke.",
+   "setzt": {
+    "befallener_enttarnt": true
+   },
+   "springe": "aufbau-kampf-enttarnt",
+   "marker": "ueberlebender:F"
+  },
+  "rast-keller": {
+   "name": "Rast im Keller (Atemzug +1)",
+   "gruppe": "Story",
+   "kurz": "Rasten",
+   "taste": "V",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "dorf_wach",
+      "ist": false
+     },
+     {
+      "nicht": {
+       "eine": [
+        {
+         "alle": [
+          {
+           "flag": "befallener",
+           "ist": "frau"
+          },
+          {
+           "flag": "befallener_enttarnt",
+           "ist": false
+          }
+         ]
+        },
+        {
+         "alle": [
+          {
+           "flag": "befallener",
+           "ist": "junge"
+          },
+          {
+           "flag": "junge_im_keller",
+           "ist": true
+          },
+          {
+           "flag": "befallener_enttarnt",
+           "ist": false
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "kosten": "Nur einmal, nur solange das Dorf nicht wach ist. Kostet Zeit: Atemzug +1.",
+   "vorlesen": "Der Keller riecht nach Kartoffeln und Lampenöl. Oben ist das Dorf, hier unten ist eine Tür, die zugeht. Ihr lehnt euch an die Fässer. Für eine Stunde hört ihr nur die Kinder atmen.",
+   "gmNotiz": "Echte Rast an einem sicheren Ort: Jeder Held heilt alle Wunden und bekommt alle Power zurück. Zustände und Verletzungen bleiben. Atemzug +1 ist verbucht. Wer mit den Helden geht (Junge, Wirtin, Knechte), heilt auch.",
+   "leisten": {
+    "atemzug": 1
+   }
+  },
+  "rast-keller-falle": {
+   "name": "Rast im Keller (ein Befallener ist unten)",
+   "gruppe": "Story",
+   "kurz": "Rasten",
+   "taste": "V",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "dorf_wach",
+      "ist": false
+     },
+     {
+      "eine": [
+       {
+        "alle": [
+         {
+          "flag": "befallener",
+          "ist": "frau"
+         },
+         {
+          "flag": "befallener_enttarnt",
+          "ist": false
+         }
+        ]
+       },
+       {
+        "alle": [
+         {
+          "flag": "befallener",
+          "ist": "junge"
+         },
+         {
+          "flag": "junge_im_keller",
+          "ist": true
+         },
+         {
+          "flag": "befallener_enttarnt",
+          "ist": false
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Sieht aus wie die Rast. Aber der Keller ist nicht sicher, solange ein Befallener darin ist: die Rast endet mit der Enttarnung.",
+   "vorlesen": "Ihr lehnt euch an die Fässer. Die Kinder schlafen ein. Es ist still. Dann, aus der Ecke, ganz leise, summt jemand ein Lied, das ihr nicht kennt. Und hört nicht auf.",
+   "gmNotiz": "Keine Heilung, kein Atemzug. Der Befallene im Keller (Lage) wird enttarnt: Aufbau, Cue 03-X3, Kampf. Danach ist der Keller sicher und die Rast (V) noch einmal möglich.",
+   "setzt": {
+    "befallener_enttarnt": true
+   },
+   "springe": "aufbau-kampf-enttarnt"
+  },
+  "junge-ansehen-m": {
+   "name": "Den Jungen genau ansehen (Qualitätstest)",
+   "gruppe": "Untersuchen",
+   "kurz": "Junge ansehen",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "nicht": "junge"
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     }
+    ]
+   },
+   "kosten": "Held direkt neben ihm, 1 Aktion",
+   "vorlesen": "Mehl im Haar, Mehl an den Wimpern. Er hält still, als ihr ihn anseht, wie ein Kind still hält, wenn ein Erwachsener es mustert.",
+   "probe": {
+    "frage": "Qualitätstest: Der Held würfelt einen W6. Ab 4 sieht er etwas, bei 6 mehr.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Seine Hände sind warm, die Fingernägel schwarz vom Ofen. Er zittert, weil er friert, nicht weil er Angst hat."
+     },
+     {
+      "ab": 6,
+      "vorlesen": "Er schielt zur Brotkiste. Er hat seit gestern nichts gegessen und schämt sich, danach zu fragen."
+     }
+    ]
+   },
+   "gmNotiz": "Er ist ein Mensch. Misslungen: nichts Besonderes.",
+   "marker": "ueberlebender:J"
+  },
+  "junge-ansehen-b": {
+   "name": "Den Jungen genau ansehen (Qualitätstest)",
+   "gruppe": "Untersuchen",
+   "kurz": "Junge ansehen",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "ist": "junge"
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "befallener_enttarnt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held direkt neben ihm, 1 Aktion",
+   "vorlesen": "Mehl im Haar, Mehl an den Wimpern. Er hält still, als ihr ihn anseht, wie ein Kind still hält, wenn ein Erwachsener es mustert.",
+   "probe": {
+    "frage": "Qualitätstest: Der Held würfelt einen W6. Ab 4 sieht er etwas, bei 6 mehr.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Hinter seinem Ohr, unter dem Mehl, ein Fleck, grün und weich wie Moos auf einem Stein."
+     },
+     {
+      "ab": 6,
+      "vorlesen": "Seine Lippen bewegen sich, ganz wenig, während ihr ihn anseht. Er flüstert. Namen. Ihr kennt keinen davon. Noch nicht."
+     }
+    ]
+   },
+   "gmNotiz": "Er ist befallen. Misslungen: nichts Besonderes. Stellen die Helden ihn zur Rede oder packen ihn: Taste 2.",
+   "marker": "ueberlebender:J"
+  },
+  "junge-stellen-m": {
+   "name": "Den Jungen zur Rede stellen oder packen",
+   "gruppe": "Kampf",
+   "kurz": "Junge stellen",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "nicht": "junge"
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     }
+    ]
+   },
+   "kosten": "Ein Held packt ihn, droht ihm oder greift ihn an",
+   "vorlesen": "Er schreit. Nicht laut, aber hoch und dünn, und er hört nicht auf, bis ihm jemand den Mund zuhält.",
+   "gmNotiz": "Er ist ein Mensch. Lärm +1 ist verbucht. Er kommt jetzt nur noch mit, wenn ihm ein Held sagt, wo sein Vater ist (Vorschlag).",
+   "leisten": {
+    "laerm": 1
+   },
+   "marker": "ueberlebender:J"
+  },
+  "junge-stellen-b": {
+   "name": "Den Jungen zur Rede stellen oder packen",
+   "gruppe": "Kampf",
+   "kurz": "Junge stellen",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "befallener",
+      "ist": "junge"
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "befallener_enttarnt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held packt ihn, droht ihm oder greift ihn an",
+   "vorlesen": "Er schreit nicht.",
+   "gmNotiz": "Er ist befallen: enttarnt. Weiter mit Aufbau, Cue 03-X3 und Kampf.",
+   "setzt": {
+    "befallener_enttarnt": true,
+    "junge_dabei": false
+   },
+   "springe": "aufbau-kampf-enttarnt",
+   "marker": "ueberlebender:J"
+  },
+  "junge-mit": {
+   "name": "Der Junge kommt mit",
+   "gruppe": "Story",
+   "kurz": "Junge mitnehmen",
+   "taste": "3",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "junge_dabei",
+      "ist": false
+     },
+     {
+      "flag": "junge_im_keller",
+      "ist": false
+     },
+     {
+      "eine": [
+       {
+        "flag": "befallener",
+        "nicht": "junge"
+       },
+       {
+        "flag": "befallener_enttarnt",
+        "ist": false
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Ein Held nimmt ihn an der Hand oder sagt ihm, er soll mitkommen",
+   "vorlesen": "Er nimmt den Laib vom Blech, wickelt ihn in ein Tuch und drückt ihn an die Brust. „Für Papa.“ Dann steht er neben euch und fasst nach dem nächsten Mantel.",
+   "gmNotiz": "Er geht jetzt mit den Helden. Er bleibt nicht gern allein: am Rundenende E, wenn kein Held direkt neben ihm steht. In den Keller: J.",
+   "setzt": {
+    "junge_dabei": true
+   },
+   "marker": "ueberlebender:J"
+  },
+  "junge-keller": {
+   "name": "Den Jungen in den Keller bringen",
+   "gruppe": "Story",
+   "kurz": "Junge in den Keller",
+   "taste": "J",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "baeckerei_gesehen",
+      "ist": true
+     },
+     {
+      "flag": "junge_im_keller",
+      "ist": false
+     },
+     {
+      "eine": [
+       {
+        "flag": "befallener",
+        "nicht": "junge"
+       },
+       {
+        "flag": "befallener_enttarnt",
+        "ist": false
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Ein Held bringt ihn bis an die Kellertreppe",
+   "vorlesen": "Er geht die Treppe hinunter, eine Stufe nach der anderen, das Brot an der Brust. Unten sagt die Frau etwas zu ihm, ganz leise. Er setzt sich zu den Kindern.",
+   "gmNotiz": "Der Junge ist im Keller. Ist er der Befallene (Lage), sitzt jetzt ein Befallener unten: Map 5 merkt es sich, und eine Rast im Keller endet mit der Enttarnung.",
+   "setzt": {
+    "junge_im_keller": true,
+    "junge_dabei": false
+   },
+   "marker": "ueberlebender:J"
+  },
+  "junge-allein": {
+   "name": "Der Junge ist allein (W6 am Rundenende)",
+   "gruppe": "Lärm",
+   "kurz": "Junge allein",
+   "taste": "E",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "junge_dabei",
+      "ist": true
+     },
+     {
+      "flag": "junge_im_keller",
+      "ist": false
+     },
+     {
+      "eine": [
+       {
+        "flag": "befallener",
+        "nicht": "junge"
+       },
+       {
+        "flag": "befallener_enttarnt",
+        "ist": false
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Am Rundenende, wenn kein Held direkt neben ihm steht",
+   "probe": {
+    "frage": "Du würfelst einen W6 für den Jungen.",
+    "stufen": [
+     {
+      "bis": 2,
+      "vorlesen": "Aus dem Dunkel ruft eine Stimme einen Namen. Zweimal.",
+      "gmNotiz": "Lärm +1 ist verbucht. Den Namen sagst du nicht: es ist sein Vater, oder jemand, den er vermisst.",
+      "leisten": {
+       "laerm": 1
+      }
+     },
+     {
+      "ab": 3,
+      "vorlesen": "",
+      "gmNotiz": "Er bleibt still. Er drückt das Brot an sich und wartet."
+     }
+    ]
+   },
+   "marker": "ueberlebender:J"
+  },
+  "ring-zeigen": {
+   "name": "Den Ehering zeigen",
+   "gruppe": "Story",
+   "kurz": "Ehering zeigen",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "eine": [
+       {
+        "hat": "Ehering vom zuckenden Grab"
+       },
+       {
+        "flag": "grab_still",
+        "ist": true
+       }
+      ]
+     },
+     {
+      "flag": "ring_gezeigt",
+      "ist": false
+     },
+     {
+      "flag": "wirtin_tot",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Nur, wenn ein Held den Ehering vom zuckenden Grab bei sich hat (Inventar)",
+   "vorlesen": "Sie sieht den Ring in eurer Hand an und rührt sich nicht. Dann legt sie die Armbrust auf den Tresen, ganz vorsichtig, als könnte sie zerbrechen. „Den hat er nie abgenommen. Nicht beim Schlachten, nicht beim Holzhacken.“ Sie fragt nicht, wo ihr ihn gefunden habt. Sie fragt: „War er allein?“ Ihr antwortet. Sie nickt, als hätte sie es schon gewusst. Dann greift sie unter den Tresen und legt ein Brecheisen vor euch hin. „Seins. Damit hat er die Bretter auf den Brunnen genagelt, weil Hedda es wollte. Dann soll es sie auch wieder runterholen.“",
+   "gmNotiz": "Der Moment gehört ihr: nichts dazu erklären, kurz still sein lassen. Was die Helden über das zuckende Grab sagen, glaubt sie, auch das Schlimme. Den Ring nimmt sie nur, wenn ein Held ihn ihr in die Hand legt (dann im Inventar des Helden auf „benutzen“); sonst sagt sie: „Behaltet ihn. Unten braucht ihr mehr Glück als ich hier oben.“ „Brecheisen“ einem Helden geben (Knopf unten, dazu den Zettel): es öffnet den Brunnen leise, wie das Werkzeug aus der Schmiede, und die Kellertür (K). Sie vertraut den Helden jetzt: sie kommt mit (3) oder geht in den Keller (D).",
+   "setzt": {
+    "ring_gezeigt": true,
+    "wirtin_vertraut": true,
+    "werkzeug": true
+   },
+   "beute": [
+    "Brecheisen der Wirtin"
+   ],
+   "marker": "ueberlebender:W"
+  },
+  "hedda-erwaehnen": {
+   "name": "Hedda erwähnen",
+   "gruppe": "Story",
+   "kurz": "Hedda erwähnen",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "wirtin_vertraut",
+    "ist": false
+   },
+   "kosten": "Ein Held sagt, dass sie von Hedda kommen",
+   "vorlesen": "„Hedda.“ Die Armbrust sinkt, eine Handbreit. „Lebt sie?“ Sie wartet die Antwort nicht ab. „Natürlich lebt sie. Die überlebt uns alle.“ Dann legt sie die Armbrust auf den Tresen, ohne sie loszulassen. „Wenn Hedda euch schickt, seid ihr die Ersten seit drei Tagen, die von draußen kommen und noch reden können.“",
+   "gmNotiz": "Sie vertraut den Helden jetzt. Ist Hedda tot und sagen sie es: sie setzt sich, lange, dann: „Dann eben ihr.“ Haben die Helden Hedda angegriffen und sagen es: kein Vertrauen, Zurück drücken.",
+   "setzt": {
+    "wirtin_vertraut": true
+   },
+   "marker": "ueberlebender:W"
+  },
+  "wirtin-mit": {
+   "name": "Die Wirtin kommt mit",
+   "gruppe": "Story",
+   "kurz": "Wirtin mitnehmen",
+   "taste": "3",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "wirtin_vertraut",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_dabei",
+      "ist": false
+     },
+     {
+      "flag": "wirtin_im_keller",
+      "ist": false
+     },
+     {
+      "flag": "wirtin_tot",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Sie vertraut den Helden, und einer bittet sie mitzukommen",
+   "vorlesen": "Sie nimmt die Armbrust vom Tresen und einen Beutel Bolzen vom Haken. „Bis zum Brunnen. Hinunter steig ich nicht.“",
+   "gmNotiz": "Sie steht jetzt unten bei den Verbündeten (Gegnerliste): Q4+, Armbrust zwei Kartenlängen. Führt ein Spieler oder du. Ihr Schuss: Lärm +2 (Z). Ist der Keller offen, bringt ihr sie mit D hinunter; sonst bleibt sie am Ende am Brunnenrand.",
+   "gegnerHinzu": [
+    {
+     "id": "wirtin-verbuendet",
+     "anzahl": 1,
+     "zone": ""
+    }
+   ],
+   "setzt": {
+    "wirtin_dabei": true
+   },
+   "marker": "ueberlebender:W"
+  },
+  "wirtin-keller": {
+   "name": "Die Wirtin in den Keller bringen",
+   "gruppe": "Story",
+   "kurz": "Wirtin in den Keller",
+   "taste": "D",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_vertraut",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_im_keller",
+      "ist": false
+     },
+     {
+      "flag": "wirtin_tot",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held bringt sie über den Platz bis an die Kellertreppe",
+   "vorlesen": "„Gut. Einer muss da unten die Tür halten.“ Sie setzt sich auf die unterste Stufe, die Armbrust über den Knien, die Spitze zur Tür.",
+   "gmNotiz": "Die Wirtin ist im Keller. Stand sie als Verbündete am Tisch: ihre Karte „vom Tisch“.",
+   "setzt": {
+    "wirtin_im_keller": true,
+    "wirtin_dabei": false
+   },
+   "marker": "ueberlebender:W"
+  },
+  "wirtin-andere-f": {
+   "name": "Die Wirtin nach den anderen fragen",
+   "gruppe": "Fragen",
+   "kurz": "Nach den anderen",
+   "taste": "8",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "wirtin_vertraut",
+      "ist": true
+     },
+     {
+      "flag": "befallener",
+      "ist": "frau"
+     }
+    ]
+   },
+   "vorlesen": "„Die Fuhrmannsfrau? Die hat vorgestern noch bei mir Brot geholt, bevor Hedda sie weggesperrt hat. Sie hat es nicht gegessen. Sie hat es gehalten, bis es kalt war.“ Sie sieht zur Tür. „Und der Junge vom Bäcker, der frisst mir die Haare vom Kopf, wenn man ihn lässt.“",
+   "gmNotiz": "Der Nebenweg zum Erkennen: Sie verdächtigt die Frau (die ist befallen) und hält den Jungen für gesund (stimmt).",
+   "marker": "ueberlebender:W"
+  },
+  "wirtin-andere-j": {
+   "name": "Die Wirtin nach den anderen fragen",
+   "gruppe": "Fragen",
+   "kurz": "Nach den anderen",
+   "taste": "8",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "wirtin_vertraut",
+      "ist": true
+     },
+     {
+      "flag": "befallener",
+      "ist": "junge"
+     }
+    ]
+   },
+   "vorlesen": "„Der Junge vom Bäcker? Ich hab ihm Suppe gebracht. Die Schüssel stand am nächsten Morgen noch da. Voll. Er hat gesagt, er hat keinen Hunger.“ Sie senkt die Stimme. „Er hat überhaupt keinen Hunger mehr. Und die Fuhrmannsfrau, die hat geweint, als Hedda sie weggesperrt hat. Die weint noch.“",
+   "gmNotiz": "Der Nebenweg zum Erkennen: Sie verdächtigt den Jungen (der ist befallen) und hält die Frau für gesund (stimmt).",
+   "marker": "ueberlebender:W"
+  },
+  "schmied-ansehen": {
+   "name": "Den Schmied ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Schmied ansehen",
+   "taste": "3",
+   "marker": "schmied:S",
+   "einmal": true,
+   "wofuer": "Der Schmied am Amboss. Er hört erst auf, wenn ihn jemand berührt oder angreift.",
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "schmied_wach",
+      "ist": false
+     },
+     {
+      "flag": "schmied_besiegt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held in der Schmiede, keine Aktion",
+   "vorlesen": "Moos wächst aus seinen Handschuhen, bis über die Handgelenke. Die Esse glüht, und er schwitzt nicht.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Er sieht nicht hin, wohin er schlägt. Er dreht den Kopf zu jedem Geräusch: zu euren Schritten, zu eurem Atem."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Er hämmert nicht auf den Amboss. Er hämmert den Takt. Jedes Mal, wenn der Hammer fällt, zieht sich das Moos an seinen Armen zusammen, wie ein Herz.",
+      "gmNotiz": "Hinweis: wer stillsteht, ist vor ihm sicher. Nichts erklären."
+     }
+    ]
+   }
+  },
+  "schmied-wecken": {
+   "name": "Den Schmied berühren oder angreifen",
+   "gruppe": "Kampf",
+   "kurz": "Schmied berühren",
+   "taste": "2",
+   "marker": "schmied:S",
+   "einmal": true,
+   "wofuer": "Der Schmied am Amboss. Er hört erst auf, wenn ihn jemand berührt oder angreift.",
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "schmied_wach",
+      "ist": false
+     },
+     {
+      "flag": "schmied_besiegt",
+      "ist": false
+     },
+     {
+      "flag": "dorf_wach",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held berührt ihn, stößt ihn an oder greift ihn an",
+   "gmNotiz": "Kampf gegen den Schmied: Aufbau, Cue 03-3, Battle Cue 1.",
+   "setzt": {
+    "schmied_wach": true,
+    "gegner_wuetend": true
+   },
+   "springe": "aufbau-kampf-schmied"
+  },
+  "hammer-weg": {
+   "name": "Dem Schmied den Hammer weggeschlagen",
+   "gruppe": "Kampf",
+   "kurz": "Hammer weg",
+   "taste": "6",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "eine": [
+       {
+        "flag": "schmied_wach",
+        "ist": true
+       },
+       {
+        "flag": "dorf_wach",
+        "ist": true
+       }
+      ]
+     },
+     {
+      "flag": "schmied_besiegt",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held greift ihn an und würfelt beim Treffen eine 6",
+   "vorlesen": "Der Hammer fliegt ihm aus der Hand und schlägt gegen die Esse. Er bückt sich nicht danach. Er hebt die leeren Fäuste.",
+   "gmNotiz": "Ab jetzt nur noch A2 (steht an seiner Karte).",
+   "setzt": {
+    "hammer_weg": true
+   }
+  },
+  "harm-ansehen": {
+   "name": "Die Familie genauer ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Hinsehen",
+   "taste": "2",
+   "marker": "3",
+   "einmal": true,
+   "wofuer": "Das Wohnhaus der Harms: drei am Abendbrottisch, auf der Kommode ein Brief.",
+   "nurWenn": {
+    "flag": "harm_wach",
+    "ist": false
+   },
+   "kosten": "Held in der Tür, keine Aktion",
+   "vorlesen": "Drei Teller, drei Löffel, sauber. Seit Tagen hat hier niemand gegessen. Aber die drei atmen, langsam, alle im selben Zug.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Unter dem Tisch sind ihre Füße mit dem Boden verwachsen, weiße Fäden zwischen den Dielen. Sie sitzen hier nicht. Sie wachsen hier."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "An den Stiefeln des Vaters klebt Friedhofserde, frisch. Er war draußen, vor nicht langer Zeit, und hat ein Loch gegraben.",
+      "gmNotiz": "Das leere Grab neben dem Stein der Harms in Map 2: er hat es für sich geschaufelt. Nichts erklären."
+     }
+    ]
+   }
+  },
+  "harm-tisch": {
+   "name": "Jemand tritt an den Tisch der Harms",
+   "gruppe": "Kampf",
+   "kurz": "An den Tisch",
+   "taste": "3",
+   "marker": "3",
+   "einmal": true,
+   "wofuer": "Das Wohnhaus der Harms: drei am Abendbrottisch, auf der Kommode ein Brief.",
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "harm_wach",
+      "ist": false
+     },
+     {
+      "flag": "dorf_wach",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held kommt näher als eine Kartenbreite an den Tisch oder berührt einen von ihnen",
+   "vorlesen": "Drei Köpfe heben sich, gleichzeitig. Unter dem Tisch reißen die Fäden mit einem Geräusch wie nasses Tuch.",
+   "gmNotiz": "Kampf gegen die Harms: Aufbau, dann Kampf. Wer nur in der Tür steht oder die Kommode durchsucht, weckt sie nicht.",
+   "setzt": {
+    "harm_wach": true
+   },
+   "springe": "aufbau-kampf-harm"
+  },
+  "laerm-nah": {
+   "name": "Lärm: Nahkampf (+1)",
+   "gruppe": "Lärm",
+   "kurz": "Nahkampf +1",
+   "taste": "L",
+   "einmal": false,
+   "leisten": {
+    "laerm": 1
+   },
+   "gmNotiz": "Je Nahkampf-Angriff eines Helden oder Verbündeten +1, egal wie viele Treffer."
+  },
+  "laerm-fern": {
+   "name": "Lärm: Fernkampf oder Zauber (+2)",
+   "gruppe": "Lärm",
+   "kurz": "Fernkampf +2",
+   "taste": "Z",
+   "einmal": false,
+   "leisten": {
+    "laerm": 2
+   },
+   "gmNotiz": "Je Schuss oder Zauber +2, auch die Armbrust der Wirtin."
+  },
+  "laerm-tuer": {
+   "name": "Lärm: eine Tür aufbrechen (+2)",
+   "gruppe": "Lärm",
+   "kurz": "Tür +2",
+   "taste": "T",
+   "einmal": false,
+   "leisten": {
+    "laerm": 2
+   },
+   "gmNotiz": "Jede andere Tür mit Gewalt. Kellertür (G) und Brunnen (G) haben ihre eigenen Tasten."
+  },
+  "anhaenger-fluestert": {
+   "name": "Der Anhänger flüstert (Träger würfelt)",
+   "gruppe": "Kampf",
+   "kurz": "Anhänger",
+   "taste": "U",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Am Ende jeder Kampfrunde, solange der Träger ihn hat. Nicht sagen, wofür gewürfelt wird.",
+   "gmNotiz": "Der Anhänger ist verpestet, ohne dass die Spieler es wissen. Der Träger würfelt einen W6.",
+   "probe": {
+    "frage": "Der Träger des Anhängers würfelt einen W6. Sag nicht, wofür.",
+    "stufen": [
+     {
+      "bis": 1,
+      "vorlesen": "Der Anhänger an deinem Hals ist warm. Dann heiß. Und für einen Atemzug hörst du eine junge Stimme, ganz nah: „Bleib. Es ist so warm hier.“",
+      "gmNotiz": "Gesteuert: Bei seiner nächsten Aktivierung führst du den Träger. Er greift die nächste Figur an, Freund oder Überlebender, oder geht einen Schritt auf den Brunnen zu. Danach ist er wieder er selbst. +1 Sporenpunkt für ihn (am Heldenchip)."
+     }
+    ]
+   }
+  }
+ },
+ "schritte": {
+  "vorb-material": {
+   "typ": "vorbereitung",
+   "titel": "Bereitlegen",
+   "checkliste": [
+    "Häuser für den Dorfplatz (Village Ruins oder Pappe): Gemeindehaus, Schmiede, Wohnhaus, Wirtshaus, Bäckerei; ein Brunnen (Glas oder Tasse); ein Zaun, ein Holzstapel. Aufgestellt wird erst, wenn gekämpft wird",
+    "Figuren: der Schmied (groß, mit Hammer), 3 für die Harms, 6 Sporenlinge, 4 Befallene aus dem Dorf",
+    "Figuren für die Überlebenden: eine Frau mit zwei Kindern, die Wirtin mit Armbrust, ein Junge",
+    "Wenn die Gemeinde aus der Kapelle noch wach ist: bis zu 6 Figuren (Black Grail). Wenn die Glocke geschlagen hat: 2 Figuren für die Knechte",
+    "5 Suchmarker",
+    "Zettel: „Dorfchronik“, „Zange und Brecheisen“, „Brecheisen“ (das der Wirtin), „Brief an den Sohn“ mit einem Namen darauf, „Laterne“",
+    "Ein Zählstein für die Lärm-Leiste, gut sichtbar für die Spieler",
+    "Ein W6 für die Spieler (Proben) und einer für dich"
+   ],
+   "hinweis": "Kein Zollstock. Eine Bewegung ist eine Kartenlänge. Wer von den Überlebenden befallen ist, hat die App beim Start gezogen (nächster Schritt, und in der Lage): keine Plättchen nötig.",
+   "weiter": "vorb-stand"
+  },
+  "vorb-stand": {
+   "typ": "vorbereitung",
+   "titel": "Stand und Audio",
+   "checkliste": [
+    "Gruppe gewählt (Reiter Gruppe), Heldenbögen bei den Spielern",
+    "Audio: 03-1 bis 03-4 und 03-X1 bis 03-X3 sind noch nicht aufgenommen. Fehlt ein Track, liest du an seiner Stelle den Text vor, der im Cue-Schritt steht",
+    "Battle Cue 1 (Trommeln, derselbe Track wie in Map 1) liegt bereit",
+    "Lautsprecher geprüft"
+   ],
+   "hinweis": "Die App zeigt je Cue, ob die Datei auf dem Server liegt.",
+   "weiter": "vorb-aus-map2"
+  },
+  "vorb-aus-map2": {
+   "typ": "vorbereitung",
+   "titel": "Was aus Map 2 mitkommt",
+   "uebernahme": true,
+   "checkliste": [
+    "Wunden und Power: Am Ende von Map 2 hat jeder Held 3 Wunden und 3 Power zurückbekommen (OPR), nicht alles. Heldenbögen prüfen",
+    "Zählstein Lärm auf den Startwert legen (steht oben in der Leiste)"
+   ],
+   "hinweis": "Alles darunter hat die App aus dem Spielstand von Map 2 gezogen und schon verbucht (Startlärm, Sporenpunkte, wer befallen ist). Du musst nichts nachfragen und nichts nachtragen.",
+   "folgen": [
+    {
+     "wenn": {
+      "flag": "weg",
+      "ist": "krypta"
+     },
+     "text": "Krypta-Gang: Die Helden kommen aus der Luke im Eiskeller (Marker E) links vom Platz. Lärm 0. Die Heldenchips auf der Tischkarte zum Eiskeller ziehen."
+    },
+    {
+     "wenn": {
+      "flag": "weg",
+      "nicht": "krypta"
+     },
+     "text": "Hauptweg: Die Helden kommen von unten über den Weg. Lärm startet auf 1 (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "laerm3_erreicht",
+      "ist": true
+     },
+     "text": "In der Kapelle stand der Lärm auf 3 oder mehr: das Dorf hat etwas gehört. Lärm +1 (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "glocke_geschlagen",
+      "ist": true
+     },
+     "text": "Die Glocke hat geschlagen: Zwei Knechte holen die Helden gleich zu Beginn ein, die Spieler entscheiden, ob sie mitkommen. Feindzone C vor dem Gemeindehaus kommt dazu (auf der Tischkarte aufgedeckt)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "gemeinde_wach",
+        "ist": true
+       },
+       {
+        "flag": "gemeinde_tot",
+        "ist": false
+       },
+       {
+        "flag": "gemeinde_erloest",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Die Gemeinde aus der Kapelle ist wach und folgt: Am Ende von Runde 2 kommt sie über den Hauptweg (die App springt in den Kampf), danach je Rundenende zwei mehr."
+    },
+    {
+     "wenn": {
+      "eine": [
+       {
+        "flag": "gemeinde_tot",
+        "ist": true
+       },
+       {
+        "flag": "gemeinde_erloest",
+        "ist": true
+       }
+      ]
+     },
+     "text": "Die Gemeinde ist gefallen: keine Verfolger. Der Bäckerjunge fragt nach seinem Vater: der war der Bäcker in der Kapelle."
+    },
+    {
+     "wenn": {
+      "flag": "befallene_bekannt",
+      "ist": true
+     },
+     "text": "Hedda hat den Helden gesagt, wer verloren ist: der Schmied und die Harms. Das kommt nach der Ankunft als eigener Vorleseschritt."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "brunnen_bekannt",
+        "ist": true
+       },
+       {
+        "flag": "befallene_bekannt",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Die Helden wissen nur: es fing mit dem Brunnen an. Wer im Dorf verloren ist, wissen sie nicht."
+    },
+    {
+     "wenn": {
+      "flag": "brunnen_bekannt",
+      "ist": false
+     },
+     "text": "Die Helden haben Hedda nicht gehört: Vom Brunnen wissen sie nichts. Der Dampf über dem Platz (Cue 03-1) und der Auftrag zeigen ihnen den Weg."
+    },
+    {
+     "wenn": {
+      "flag": "kellerschluessel",
+      "ist": true
+     },
+     "text": "Heddas Kellerschlüssel: die Kellertür des Gemeindehauses geht leise auf (Taste 1)."
+    },
+    {
+     "wenn": {
+      "flag": "kellerschluessel",
+      "ist": false
+     },
+     "text": "Kein Kellerschlüssel: die Kellertür geht mit Werkzeug auf (K, Lärm +1) oder mit Gewalt (G, Lärm +2)."
+    },
+    {
+     "wenn": {
+      "flag": "befallener",
+      "ist": "frau"
+     },
+     "text": "Befallen ist die Frau im Keller des Gemeindehauses (die App hat gezogen). Ihre beiden Kinder sind Menschen, die Wirtin und der Junge auch. Sie weiß es nicht oder sagt es nicht."
+    },
+    {
+     "wenn": {
+      "flag": "befallener",
+      "ist": "junge"
+     },
+     "text": "Befallen ist der Bäckerjunge (die App hat gezogen). Die Frau, ihre Kinder und die Wirtin sind Menschen. Er weiß es nicht."
+    },
+    {
+     "wenn": {
+      "flag": "grab_still",
+      "ist": true
+     },
+     "text": "Das zuckende Grab ist still: Der Ehering liegt bei einem Helden (Inventar). Er gehört dem Mann der Wirtin. Zeigt ein Held ihn ihr, kommt ihre eigene Reaktion (Antwort 2 im Wirtshaus oder später Taste 1)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "weg",
+        "nicht": "krypta"
+       },
+       {
+        "flag": "hedda_getroffen",
+        "ist": true
+       },
+       {
+        "flag": "hedda_tot",
+        "ist": false
+       },
+       {
+        "flag": "hedda_angegriffen",
+        "ist": false
+       },
+       {
+        "flag": "hedda_schweigt",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Hedda geht mit bis zum Dorfrand und bleibt dort (eigener Vorleseschritt)."
+    },
+    {
+     "wenn": {
+      "flag": "hedda_tot",
+      "ist": true
+     },
+     "text": "Hedda ist tot: niemand begleitet die Helden. Die Wirtin fragt nach der Ältesten."
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     "text": "Der Kupferanhänger ist noch dabei, {anhaenger_traeger} trägt ihn. Er hat auf dem Weg hierher 1 Sporenpunkt gekostet (verbucht, am Heldenchip). Nicht sagen, woher."
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     "text": "Nur für dich: Der Anhänger ist verpestet. In jedem Kampf würfelt der Träger am Rundenende (Taste U). Bei 1 steuerst du ihn einmal."
+    },
+    {
+     "wenn": {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     },
+     "text": "Die Quelle aus Map 1 ist zerstört: wird bis ins Finale weitergereicht."
+    }
+   ],
+   "weiter": "aufbau-dorf"
+  },
+  "aufbau-dorf": {
+   "typ": "aufbau",
+   "titel": "Das Dorf",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "tisch": [
+    "Ein Platz mit einem Brunnen in der Mitte: Bretter, Kette, Schloss, und Dampf, der aus den Ritzen steigt",
+    "Oben links das Gemeindehaus, an der Seite eine Kellertür mit Schloss (Marker 1)",
+    "Oben rechts die Schmiede, Licht im Fenster, ein Hammer, der nicht aufhört (Marker 2)",
+    "Links das Wohnhaus der Harms, Licht hinter dem Vorhang (Marker 3)",
+    "Rechts das Wirtshaus, die Tür zu, kein Licht (Marker 4)",
+    "Unten rechts die Bäckerei, aus dem Schornstein noch ein Faden Rauch (Marker 5)",
+    "Zwischen Gemeindehaus und Schmiede ein Garten, in dem nichts Gesundes mehr wächst; links vom Brunnen der alte Eiskeller"
+   ],
+   "hinweis": "Gekämpft wird hier nur, wenn jemand den Schmied berührt, an den Tisch der Harms tritt, ein Befallener enttarnt wird oder der Lärm auf 3 oder 6 steigt. Dann zeigt dir die App, was auf den Tisch kommt. Die Spieler sagen, wohin sie gehen; du beschreibst, was sie sehen. Nachts sieht man zwei Kartenlängen weit.",
+   "weiter": "regel-dorf"
+  },
+  "regel-dorf": {
+   "typ": "regel",
+   "titel": "Regeln für diese Map",
+   "text": "Es ist Nacht. Ihr seht höchstens zwei Kartenlängen weit. Lärm zählt wie in der Kapelle: eine Tür aufbrechen zwei, Nahkampf eins, Fernkampf oder Zauber zwei. Ruft jemand einen Namen, eins. Und noch etwas: Nicht jeder, der hier um Hilfe bittet, ist noch, wer er war. Wer einen genau ansehen will, braucht eine Aktion und einen Qualitätstest.",
+   "gmNotiz": "Was bei 3 und 6 geschieht, sagst du nicht an. Die Leiste liegt sichtbar auf dem Tisch, das reicht. Die Namensregel gilt weiter, nicht noch einmal ansagen.",
+   "weiter": "hedda-dorfrand"
+  },
+  "hedda-dorfrand": {
+   "typ": "vorlesen",
+   "titel": "Am Dorfrand",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "weg",
+      "nicht": "krypta"
+     },
+     {
+      "flag": "hedda_getroffen",
+      "ist": true
+     },
+     {
+      "flag": "hedda_tot",
+      "ist": false
+     },
+     {
+      "flag": "hedda_angegriffen",
+      "ist": false
+     },
+     {
+      "flag": "hedda_schweigt",
+      "ist": false
+     }
+    ]
+   },
+   "text": "Am letzten Zaun bleibt Hedda stehen. Sie hebt die Kerze nicht, sie sieht nur zum Brunnen hinüber. „Weiter geh ich nicht.“ Dann, leiser: „Keine Namen.“ Als ihr euch umdreht, ist die Kerze schon zwischen den Gräbern verschwunden.",
+   "gmNotiz": "Hedda geht zurück in die Krypta. Hat sie den Kellerschlüssel gegeben, ruft sie noch: „Der Keller. Vergesst den Keller nicht.“",
+   "weiter": "ankunft-krypta"
+  },
+  "ankunft-krypta": {
+   "typ": "vorlesen",
+   "titel": "Die Luke",
+   "wenn": {
+    "flag": "weg",
+    "ist": "krypta"
+   },
+   "text": "Der Gang endet an einer Luke. Dahinter Stroh, Eis und Dunkelheit. Ihr schiebt sie auf und steht am Rand des Dorfplatzes.",
+   "gmNotiz": "Die Helden stehen am Eiskeller (Marker E), links vom Brunnen. Heldenchips auf der Tischkarte dorthin ziehen.",
+   "weiter": "wahl-knechte"
+  },
+  "wahl-knechte": {
+   "typ": "wahl",
+   "titel": "Die Knechte",
+   "wenn": {
+    "flag": "glocke_geschlagen",
+    "ist": true
+   },
+   "zeitlimit": 3,
+   "ansage": "Hinter euch Schritte, schnell, nicht wie die der Gestalten. Zwei Männer, Knechte, mit Knüppeln und Heu im Haar. „Die Glocke“, sagt der eine. „Wir haben die Glocke gehört. Wart ihr das?“ Sie sehen zum Dorf hinüber und dann zu euch.",
+   "frage": "Die Spieler entscheiden, ob die beiden mitkommen. Wähle.",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Sie kommen mit",
+     "text": "Die Helden nehmen die beiden mit. Keine Namen.",
+     "gegnerHinzu": [
+      {
+       "id": "knecht",
+       "anzahl": 2,
+       "zone": ""
+      }
+     ],
+     "setzt": {
+      "knechte_dabei": true
+     },
+     "folge": "Zwei Verbündete stehen in der Gegnerliste (Q5+, Zäh 3, Knüppel A1). Die Spieler führen sie oder du.",
+     "ziel": "wissen-hedda"
+    },
+    {
+     "taste": "2",
+     "kurz": "Zurückschicken",
+     "text": "Nach Hause, zurück in den Heuschober, nur nicht mit.",
+     "folge": "Keine Verbündeten. Sie gehen in die Nacht zurück. Feindzone C bleibt trotzdem.",
+     "ziel": "wissen-hedda"
+    }
+   ],
+   "weiter": "wissen-hedda"
+  },
+  "wissen-hedda": {
+   "typ": "vorlesen",
+   "titel": "Was Hedda gesagt hat",
+   "wenn": {
+    "flag": "befallene_bekannt",
+    "ist": true
+   },
+   "text": "Ihr wisst es von Hedda, unten in der Krypta: Der Schmied, der seit drei Tagen auf nichts hämmert. Die Harms, alle drei, vor ihren Tellern. „Geht nicht zu ihnen, wenn ihr nicht müsst.“",
+   "gmNotiz": "Erinnerung an das, was die Spieler wissen. Mehr verrätst du nicht.",
+   "weiter": "cue-03-1"
+  },
+  "cue-03-1": {
+   "typ": "cue",
+   "titel": "Ankunft im Dorf",
+   "cue": "03-1",
+   "optional": true,
+   "text": "Moosgrab liegt dunkel. Kein Hund bellt, kein Fenster steht offen. In der Mitte des Platzes der Brunnen, und aus ihm steigt Dampf in die kalte Nacht. Rechts oben schlägt ein Hammer, gleichmäßig wie ein Puls. Wohin geht ihr?",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Danach sind die Spieler am Zug. Der Auftrag (zum Brunnen) steht oben in der App.",
+   "weiter": "spieler-dorf"
+  },
+  "spieler-dorf": {
+   "typ": "spieler",
+   "titel": "Auf dem Dorfplatz",
+   "zeitlimit": 10,
+   "runden": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Die Spieler gehen über den Platz, lauschen an Türen, gehen in Häuser oder zum Brunnen. Du zählst Lärm. Rundenende: R.",
+   "hinweise": [
+    "Erst ansehen, dann entscheiden: Brunnen ansehen (B), dem Hämmern folgen (M), an einer Tür lauschen (H). Nichts davon kostet Lärm.",
+    "In ein Haus: 1 Gemeindehaus-Keller (mit Heddas Schlüssel leise; K mit Werkzeug +1; G mit Gewalt +2), 2 Schmiede, 3 Harms, 4 Wirtshaus, 5 Bäckerei. Beim ersten Haus kommt Cue 03-2.",
+    "Weiter: die Helden gehen zum Brunnen.",
+    "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T eine andere Tür aufbrechen +2. Bei 3 und 6 springt die App von selbst in den Kampf.",
+    "Geht der Junge mit: am Rundenende E, wenn kein Held direkt neben ihm steht. J und D bringen Junge und Wirtin in den Keller.",
+    "Rundenwurf „Was tut das Dorf?“ am Rundenende, solange der Schmied hämmert, wenn du ihn nimmst.",
+    "Faden verloren? „Der Brunnen. Dort fing es an.“ Der Auftrag steht oben."
+   ],
+   "ereignisse": [
+    "brunnen-ansehen",
+    "schmiede-fenster",
+    "lauschen",
+    "keller-schluessel",
+    "ins-gemeindehaus",
+    "keller-hebeln",
+    "keller-brechen",
+    "in-schmiede",
+    "zu-harms",
+    "ins-wirtshaus",
+    "in-baeckerei",
+    "junge-keller",
+    "wirtin-keller",
+    "laerm-nah",
+    "laerm-fern",
+    "laerm-tuer",
+    "junge-allein"
+   ],
+   "weiter": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "ziel": "spieler-brunnen"
+    }
+   ]
+  },
+  "spieler-brunnen": {
+   "typ": "spieler",
+   "titel": "Am Brunnen",
+   "zeitlimit": 6,
+   "runden": true,
+   "text": "Die Helden stehen am Brunnen. Bretter, Kette, Schloss. Sie öffnen ihn leise mit Werkzeug oder laut mit Gewalt. Weiter: zurück auf den Platz.",
+   "hinweise": [
+    "Primärweg: mit Werkzeug (1), leise. Werkzeug gibt es in der Schmiede (Suchmarker 2) oder von der Wirtin, wenn sie den Ehering gesehen hat.",
+    "Nebenweg: mit Gewalt (G), 3 Aktionen mit 3+, auch von verschiedenen Helden. Lärm +2 und Atemzug +1.",
+    "Der Kellerschlüssel passt nicht (2). Einen Brunnenschlüssel gibt es nicht: Hedda hat ihn behalten.",
+    "Ist der Brunnen offen: Weiter führt zu Cue 03-4 und hinab."
+   ],
+   "ereignisse": [
+    "brunnen-ansehen",
+    "brunnen-werkzeug",
+    "brunnen-gewalt",
+    "brunnen-schluessel",
+    "brunnen-horchen",
+    "brunnen-fragen",
+    "laerm-nah",
+    "laerm-fern",
+    "junge-allein"
+   ],
+   "weiter": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "ziel": "spieler-dorf"
+    }
+   ]
+  },
+  "cue-03-2": {
+   "typ": "cue",
+   "titel": "Die Häuser",
+   "cue": "03-2",
+   "optional": true,
+   "wenn": {
+    "flag": "erstes_haus",
+    "ist": false
+   },
+   "text": "Die Tür gibt nach. Drinnen riecht es nach kaltem Rauch und nassem Brot. Nichts bewegt sich. Noch nicht.",
+   "notiz": "Nur beim ersten Haus. Noch nicht aufgenommen: Text vorlesen, dann das Haus.",
+   "weiter": [
+    {
+     "wenn": {
+      "flag": "ort",
+      "ist": "keller"
+     },
+     "ziel": "aufbau-keller"
+    },
+    {
+     "wenn": {
+      "flag": "ort",
+      "ist": "schmiede"
+     },
+     "ziel": "aufbau-schmiede"
+    },
+    {
+     "wenn": {
+      "flag": "ort",
+      "ist": "harm"
+     },
+     "ziel": "aufbau-harm"
+    },
+    {
+     "wenn": {
+      "flag": "ort",
+      "ist": "wirtshaus"
+     },
+     "ziel": "aufbau-wirtshaus"
+    },
+    {
+     "wenn": {
+      "flag": "ort",
+      "ist": "baeckerei"
+     },
+     "ziel": "aufbau-baeckerei"
+    },
+    {
+     "ziel": "spieler-dorf"
+    }
+   ]
+  },
+  "aufbau-keller": {
+   "typ": "aufbau",
+   "titel": "Der Keller unter dem Gemeindehaus",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "wenn": {
+    "flag": "keller_gesehen",
+    "ist": false
+   },
+   "text": "Eine Treppe hinunter, Stufen aus Stein, ausgetreten. Unten riecht es nach Kartoffeln und Lampenöl. Hinter der letzten Tür eine Frau, zwei Kinder an sich gedrückt. Sie flüstert: „Bitte. Keine Namen.“",
+   "tisch": [
+    "Ein Kellerraum: Fässer, ein Regal mit Eingemachtem und einem dicken Buch (Suchmarker 1), Decken auf dem Boden",
+    "Die Frau mit zwei Kindern in der hinteren Ecke (Marker Ü oben links)",
+    "Eine Tür, die von innen nicht abzuschließen ist"
+   ],
+   "hinweis": "Nichts aufbauen. Der Keller ist der sichere Ort dieser Map: Rast (V), und wer hier unten sitzt, zählt fürs Nebenziel. Nicht sicher ist er, solange ein Befallener unten sitzt (Lage).",
+   "weiter": "npc-frau"
+  },
+  "npc-frau": {
+   "typ": "npc",
+   "titel": "Du spielst die Frau im Keller",
+   "figur": "frau",
+   "zeitlimit": 5,
+   "einstieg": "Bitte. Keine Namen. … Hat Hedda euch geschickt?",
+   "gmNotiz": "Leise, die Kinder fest an sich. Ihre drei Sätze kommen immer (NPC-Schublade). Ansehen (1) mit Probe, zur Rede stellen (2), die Chronik (3), Rast (V). Mitkommen will sie nicht. Wer befallen ist, steht in der Lage: spiel sie trotzdem genau gleich, die Hinweise kommen über die Probe und die Wirtin.",
+   "setzt": {
+    "keller_gesehen": true,
+    "erstes_haus": true
+   },
+   "ereignisse": [
+    "frau-ansehen-m",
+    "frau-ansehen-b",
+    "frau-stellen-m",
+    "frau-stellen-b",
+    "chronik",
+    "rast-keller",
+    "rast-keller-falle",
+    "junge-keller",
+    "wirtin-keller",
+    "laerm-nah",
+    "laerm-fern"
+   ],
+   "weiter": "spieler-dorf"
+  },
+  "aufbau-schmiede": {
+   "typ": "aufbau",
+   "titel": "Die Schmiede",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "wenn": {
+    "flag": "schmiede_gesehen",
+    "ist": false
+   },
+   "text": "Der Schmied steht am Amboss und hämmert. Der Amboss ist leer. Aus seinen Handschuhen wächst Moos. Er hört nicht auf.",
+   "tisch": [
+    "Der Amboss in der Mitte, die Esse an der Rückwand, glühend",
+    "Der Schmied am Amboss, mit dem Rücken zur Tür (Marker S)",
+    "An der Wand hinter der Esse Zange und Brecheisen (Suchmarker 2), eine Armlänge hinter ihm"
+   ],
+   "hinweis": "Nichts aufbauen. Er hört erst auf, wenn ihn jemand berührt oder angreift (Taste 2). Das Werkzeug (1) geht mit einer Probe, bei einer 1 klirrt es.",
+   "weiter": "spieler-schmiede"
+  },
+  "spieler-schmiede": {
+   "typ": "spieler",
+   "titel": "In der Schmiede",
+   "zeitlimit": 6,
+   "runden": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "setzt": {
+    "schmiede_gesehen": true,
+    "erstes_haus": true
+   },
+   "text": "Die Helden sind in der Schmiede. Sie sehen hin, greifen nach dem Werkzeug oder berühren den Schmied. Weiter: zurück auf den Platz.",
+   "hinweise": [
+    "Werkzeug nehmen (1): Probe, bei 1 klirrt es (Lärm +2). Drückt sich ein Held an ihm vorbei oder stößt ihn an: 2.",
+    "Ihn ansehen (3): er dreht den Kopf zu Geräuschen, nie zu Gesichtern.",
+    "Ist der Schmied gefallen, liegt das Werkzeug gefahrlos an der Wand: einfach nehmen, kein Wurf."
+   ],
+   "ereignisse": [
+    "werkzeug",
+    "schmied-wecken",
+    "schmied-ansehen",
+    "laerm-nah",
+    "laerm-fern",
+    "laerm-tuer"
+   ],
+   "weiter": "spieler-dorf"
+  },
+  "aufbau-harm": {
+   "typ": "aufbau",
+   "titel": "Das Wohnhaus der Harms",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "wenn": {
+    "flag": "harm_gesehen",
+    "ist": false
+   },
+   "text": "Die Familie sitzt am Tisch. Drei Teller, drei gesenkte Köpfe. Im Brot wachsen Pilze. Niemand isst.",
+   "tisch": [
+    "Ein Tisch mit drei Stühlen in der Mitte des Raums, darauf Teller und ein Brot voller Pilze",
+    "Vater, Mutter, Tochter am Tisch, die Köpfe gesenkt",
+    "Neben der Tür eine Kommode, darauf ein gefalteter Brief (Suchmarker 3)"
+   ],
+   "hinweis": "Nichts aufbauen. Sie stehen auf, wenn jemand näher als eine Kartenbreite an den Tisch tritt (Taste 3). Wer in der Tür bleibt oder nur die Kommode durchsucht, weckt sie nicht.",
+   "weiter": "spieler-harm"
+  },
+  "spieler-harm": {
+   "typ": "spieler",
+   "titel": "Bei den Harms",
+   "zeitlimit": 5,
+   "runden": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "setzt": {
+    "harm_gesehen": true,
+    "erstes_haus": true
+   },
+   "text": "Die Helden stehen in der Tür der Harms. Sie sehen hin, nehmen den Brief oder treten an den Tisch. Weiter: zurück auf den Platz.",
+   "hinweise": [
+    "Brief (1): leise, von der Kommode an der Tür. Wer den Namen darauf laut liest: 1 Sporenpunkt.",
+    "Hinsehen (2): Probe, nur Stimmung.",
+    "An den Tisch (3): näher als eine Kartenbreite, oder einen berühren. Dann Kampf.",
+    "Sind die Harms gefallen, ist das Haus still."
+   ],
+   "ereignisse": [
+    "brief",
+    "harm-ansehen",
+    "harm-tisch",
+    "laerm-nah",
+    "laerm-fern"
+   ],
+   "weiter": "spieler-dorf"
+  },
+  "aufbau-wirtshaus": {
+   "typ": "aufbau",
+   "titel": "Das Wirtshaus",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "wenn": {
+    "flag": "wirtshaus_gesehen",
+    "ist": false
+   },
+   "text": "Hinter dem Tresen eine Frau. Die Armbrust zeigt auf die Tür. Auf euch.",
+   "tisch": [
+    "Ein Schankraum, die Stühle auf den Tischen",
+    "Hinter dem Tresen die Wirtin mit gespannter Armbrust (Marker Ü rechts)",
+    "Über dem Tresen eine Sturmlaterne am Haken (Suchmarker 4)"
+   ],
+   "hinweis": "Nichts aufbauen. Sie schießt nicht zuerst. Was die Helden jetzt sagen, entscheidet der nächste Schritt.",
+   "weiter": "wahl-wirtin"
+  },
+  "wahl-wirtin": {
+   "typ": "wahl",
+   "titel": "Die Armbrust zeigt auf euch",
+   "zeitlimit": 4,
+   "wenn": {
+    "flag": "wirtin_geantwortet",
+    "ist": false
+   },
+   "setzt": {
+    "wirtshaus_gesehen": true,
+    "erstes_haus": true
+   },
+   "ansage": "„Keinen Schritt weiter.“ Die Spitze des Bolzens wandert von einem zum anderen. „Wer schickt euch? Und sagt keine Namen, sonst schieß ich zuerst und frag hinterher.“",
+   "frage": "Wähle, was dem am nächsten kommt, was die Spieler sagen oder tun.",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Von Hedda erzählen",
+     "text": "Sie sagen, dass sie von Hedda kommen, aus der Kapelle. Ohne zu lügen.",
+     "setzt": {
+      "wirtin_geantwortet": true
+     },
+     "folge": "Sie senkt die Armbrust und vertraut den Helden. Ist Hedda tot, fragt sie nach ihr.",
+     "ziel": "wirtin-hedda-lebt"
+    },
+    {
+     "taste": "2",
+     "kurz": "Den Ehering zeigen",
+     "text": "Nur, wenn ein Held den Ehering vom zuckenden Grab bei sich hat.",
+     "setzt": {
+      "wirtin_geantwortet": true,
+      "ring_gezeigt": true,
+      "wirtin_vertraut": true,
+      "werkzeug": true
+     },
+     "folge": "Ihr Mann. Ihre eigene Reaktion, ein stiller Moment. Sie vertraut den Helden und gibt ihnen sein Brecheisen.",
+     "ziel": "wirtin-ring",
+     "wenn": {
+      "eine": [
+       {
+        "hat": "Ehering vom zuckenden Grab"
+       },
+       {
+        "flag": "grab_still",
+        "ist": true
+       }
+      ]
+     }
+    },
+    {
+     "taste": "3",
+     "kurz": "Drohen, die Waffe heben",
+     "text": "Sie drohen ihr oder gehen auf sie los.",
+     "setzt": {
+      "wirtin_geantwortet": true,
+      "wirtin_verriegelt": true
+     },
+     "leisten": {
+      "laerm": 2
+     },
+     "folge": "Sie schießt einmal (A1) auf den, der droht, und verriegelt die Tür. Lärm +2. Das Wirtshaus bleibt zu.",
+     "ziel": "wirtin-droht"
+    },
+    {
+     "taste": "4",
+     "kurz": "Ruhig reden, ohne Namen",
+     "text": "Sie sagen, dass sie Fremde sind, aus dem Wald, und zum Brunnen wollen. Hedda erwähnen sie nicht.",
+     "setzt": {
+      "wirtin_geantwortet": true
+     },
+     "folge": "Sie redet, aber die Armbrust bleibt oben. Hedda oder den Ring können die Helden später noch erwähnen.",
+     "ziel": "wirtin-reden"
+    }
+   ],
+   "weiter": "npc-wirtin"
+  },
+  "wirtin-hedda-lebt": {
+   "typ": "vorlesen",
+   "titel": "Hedda",
+   "als": "wirtin",
+   "wenn": {
+    "flag": "hedda_tot",
+    "ist": false
+   },
+   "text": "„Hedda.“ Die Armbrust sinkt, eine Handbreit. „Lebt sie?“ Sie wartet die Antwort nicht ab. „Natürlich lebt sie. Die überlebt uns alle.“ Dann legt sie die Armbrust auf den Tresen, ohne sie loszulassen. „Wenn Hedda euch schickt, seid ihr die Ersten seit drei Tagen, die von draußen kommen und noch reden können.“",
+   "gmNotiz": "Haben die Helden Hedda angegriffen und sagen es: kein Vertrauen. Zurück drücken und Antwort 4 nehmen.",
+   "setzt": {
+    "wirtin_vertraut": true
+   },
+   "weiter": "wirtin-hedda-tot"
+  },
+  "wirtin-hedda-tot": {
+   "typ": "vorlesen",
+   "titel": "Hedda ist tot",
+   "als": "wirtin",
+   "wenn": {
+    "flag": "hedda_tot",
+    "ist": true
+   },
+   "text": "„Hedda?“ Die Armbrust bleibt oben. „Wenn ihr von Hedda kommt: Wie geht es ihr?“ Sie liest es in euren Gesichtern, bevor ihr antwortet. Lange sagt sie nichts. Dann senkt sie die Armbrust. „Dann ist keiner mehr da, der weiß, was zu tun ist. Dann eben ihr.“",
+   "gmNotiz": "Sagen die Helden, dass sie Hedda selbst getötet haben: kein Vertrauen. Zurück drücken und Antwort 4 nehmen.",
+   "setzt": {
+    "wirtin_vertraut": true
+   },
+   "weiter": "npc-wirtin"
+  },
+  "wirtin-ring": {
+   "typ": "vorlesen",
+   "titel": "Der Ehering",
+   "als": "wirtin",
+   "text": "Sie sieht den Ring in eurer Hand an und rührt sich nicht. Dann legt sie die Armbrust auf den Tresen, ganz vorsichtig, als könnte sie zerbrechen. „Den hat er nie abgenommen. Nicht beim Schlachten, nicht beim Holzhacken.“ Sie fragt nicht, wo ihr ihn gefunden habt. Sie fragt: „War er allein?“ Ihr antwortet. Sie nickt, als hätte sie es schon gewusst. Dann greift sie unter den Tresen und legt ein Brecheisen vor euch hin. „Seins. Damit hat er die Bretter auf den Brunnen genagelt, weil Hedda es wollte. Dann soll es sie auch wieder runterholen.“",
+   "gmNotiz": "Der Moment gehört ihr: nichts dazu erklären, kurz still sein lassen. Was die Helden über das zuckende Grab sagen, glaubt sie, auch das Schlimme. Den Ring nimmt sie nur, wenn ein Held ihn ihr in die Hand legt (dann im Inventar des Helden auf „benutzen“); sonst sagt sie: „Behaltet ihn. Unten braucht ihr mehr Glück als ich hier oben.“ Zettel „Brecheisen“ übergeben: es öffnet den Brunnen leise, wie das Werkzeug aus der Schmiede, und die Kellertür (K). Sie vertraut den Helden jetzt: sie kommt mit (3) oder geht in den Keller (D).",
+   "weiter": "npc-wirtin"
+  },
+  "wirtin-droht": {
+   "typ": "vorlesen",
+   "titel": "Der Bolzen",
+   "text": "Der Bolzen schlägt neben dem Kopf des Nächsten in den Türrahmen, so nah, dass er die Federn hört. „Raus.“ Die Tür fällt zu, und der Riegel kracht vor.",
+   "gmNotiz": "Ihr Schuss: A1 auf den, der gedroht hat, normal treffen und verteidigen. Lärm +2 ist verbucht. Das Wirtshaus bleibt zu: kein Gespräch, keine Laterne, sie kommt nicht mit. Wer die Tür aufbricht (T) und sie angreift: der Kampf-Knopf an ihrer Figur.",
+   "weiter": "spieler-dorf"
+  },
+  "wirtin-reden": {
+   "typ": "vorlesen",
+   "titel": "Fremde aus dem Wald",
+   "als": "wirtin",
+   "text": "„Fremde. Aus dem Wald.“ Die Armbrust bleibt, wo sie ist. „Dann redet. Aber von da drüben.“",
+   "gmNotiz": "Sie vertraut noch nicht: sie kommt nicht mit und nicht in den Keller. Ihre drei Sätze sagt sie trotzdem. Hedda erwähnen (2) oder den Ring zeigen (1) geht im nächsten Schritt noch.",
+   "weiter": "npc-wirtin"
+  },
+  "npc-wirtin": {
+   "typ": "npc",
+   "titel": "Du spielst die Wirtin",
+   "figur": "wirtin",
+   "zeitlimit": 5,
+   "einstieg": "Was wollt ihr? Ich hab drei Nächte nicht geschlafen, und ich hab nicht vor, heute damit anzufangen.",
+   "gmNotiz": "Laut, auch wenn sie flüstert. Ihre drei Sätze kommen immer (NPC-Schublade). Vertraut sie den Helden (Hedda erwähnt oder Ring gesehen): sie kommt mit (3) oder geht in den Keller (D, wenn er offen ist), und sie sagt, wen sie verdächtigt (8). Die Laterne (4) gibt sie, wenn jemand fragt. Ist sie gerade unterwegs oder im Keller: der Raum ist leer, nur die Laterne.",
+   "ereignisse": [
+    "ring-zeigen",
+    "hedda-erwaehnen",
+    "wirtin-mit",
+    "wirtshaus-suche",
+    "wirtin-andere-f",
+    "wirtin-andere-j",
+    "wirtin-keller",
+    "laerm-nah",
+    "laerm-fern"
+   ],
+   "weiter": "spieler-dorf"
+  },
+  "aufbau-baeckerei": {
+   "typ": "aufbau",
+   "titel": "Die Bäckerei",
+   "nurErzaehlen": true,
+   "skizze": "alles",
+   "wenn": {
+    "flag": "baeckerei_gesehen",
+    "ist": false
+   },
+   "text": "Der Ofen ist noch warm. Im Mehlsack bewegt sich etwas. Ein Junge. Er fragt: „Habt ihr meinen Vater gesehen?“",
+   "tisch": [
+    "Die Backstube: der Ofen an der Wand, noch warm, Bleche, ein Laib Brot",
+    "Mehlsäcke in der Ecke, in einem der Junge (Marker Ü unten rechts)",
+    "Hinter dem Ofen eine Blechdose (Suchmarker 5)"
+   ],
+   "hinweis": "Nichts aufbauen. Er hat drei Tage im Mehl gesessen und den Ofen warm gehalten. Sein Vater kniete in der Kapelle (der Bäcker aus Map 2).",
+   "weiter": "npc-junge"
+  },
+  "npc-junge": {
+   "typ": "npc",
+   "titel": "Du spielst den Bäckerjungen",
+   "figur": "junge",
+   "zeitlimit": 5,
+   "setzt": {
+    "baeckerei_gesehen": true,
+    "erstes_haus": true
+   },
+   "einstieg": "Habt ihr meinen Vater gesehen? Er ist zum Beten gegangen. Er hat gesagt, er kommt, wenn das Brot fertig ist.",
+   "gmNotiz": "Leise und höflich, Mehl überall. Seine drei Sätze kommen immer (NPC-Schublade). Ansehen (1) mit Probe, zur Rede stellen (2), mitnehmen (3), Blechdose (4), in den Keller (J, wenn er offen ist). Wer befallen ist, steht in der Lage: spiel ihn trotzdem genau gleich.",
+   "ereignisse": [
+    "junge-ansehen-m",
+    "junge-ansehen-b",
+    "junge-stellen-m",
+    "junge-stellen-b",
+    "junge-mit",
+    "baeckerei-suche",
+    "junge-keller",
+    "laerm-nah",
+    "laerm-fern"
+   ],
+   "weiter": "spieler-dorf"
+  },
+  "aufbau-kampf-platz-sporen": {
+   "typ": "aufbau",
+   "titel": "Lärm 3: den Platz aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "platz_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Der Brunnen in die Tischmitte, mit Brettern und Kette",
+    "Die fünf Häuser als Umrisse an ihre Plätze: Gemeindehaus oben links, Schmiede oben rechts, Wohnhaus der Harms links, Wirtshaus rechts, Bäckerei unten rechts. Türen markieren, innen bleibt leer",
+    "Der verseuchte Garten oben in der Mitte (Feindzone A), die Gärten unten links mit dem Zaun (Feindzone B); Feindzone C vor dem Gemeindehaus nur, wenn die Glocke geschlagen hat",
+    "Der Eiskeller links vom Brunnen, der Holzstapel unten links",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind; wer mit ihnen geht (Junge, Wirtin, Knechte), direkt daneben",
+    "Je zwei Sporenlinge in die Feindzonen A und B (und C, wenn die Glocke geschlagen hat)"
+   ],
+   "hinweis": "Gekämpft wird auf dem Platz. Was schon steht, bleibt stehen.",
+   "setzt": {
+    "platz_steht": true
+   },
+   "weiter": "cue-03-X1"
+  },
+  "cue-03-X1": {
+   "typ": "cue",
+   "titel": "Türen gehen auf",
+   "cue": "03-X1",
+   "optional": true,
+   "text": "Zwei Türen gehen auf, fast gleichzeitig. Die der Schmiede und die der Harms. Aus den Gärten kriecht etwas Kleines ins Licht.",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Die Türen stehen offen, mehr nicht: Schmied und Harms bleiben drinnen, bis jemand sie weckt oder Lärm 6. Ist einer von ihnen schon gefallen, lies nur den letzten Satz.",
+   "weiter": "kampf-sporen"
+  },
+  "kampf-sporen": {
+   "typ": "kampf",
+   "titel": "Sporenlinge aus den Gärten",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "sporenling",
+     "anzahl": 2,
+     "zone": "A"
+    },
+    {
+     "id": "sporenling",
+     "anzahl": 2,
+     "zone": "B"
+    },
+    {
+     "id": "sporenling",
+     "anzahl": 2,
+     "zone": "C",
+     "nurWenn": {
+      "flag": "glocke_geschlagen",
+      "ist": true
+     }
+    }
+   ],
+   "verhalten": {
+    "start": "ruhig",
+    "wuetendWenn": {
+     "flag": "gegner_wuetend",
+     "ist": true
+    }
+   },
+   "text": "Lärm 3: Aus den Gärten kommen Sporenlinge, zwei je Feindzone. Ruhige Tabelle, außer der Schmied ist schon wach. Lärm zählt weiter: bei 6 kommt das ganze Dorf.",
+   "hinweise": [
+    "Cue 03-X1, dann Kampfmusik (Taste A).",
+    "Lärm weiter zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2.",
+    "Der Brunnen geht auch jetzt auf (1 mit Werkzeug, G mit Gewalt): dann endet der Kampf, Weiter führt hinab.",
+    "Fallen alle Sporenlinge (und was sonst gerade wach ist): weiter, wieder auf den Platz."
+   ],
+   "ereignisse": [
+    "laerm-nah",
+    "laerm-fern",
+    "anhaenger-fluestert",
+    "brunnen-werkzeug",
+    "brunnen-gewalt",
+    "hammer-weg"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "eine": [
+         {
+          "flag": "sporen_wach",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "sporenling"
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "schmied_wach",
+          "ist": false
+         },
+         {
+          "flag": "schmied_besiegt",
+          "ist": true
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "harm_wach",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "harm"
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "gemeinde_da",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "gemeinde"
+         }
+        ]
+       }
+      ]
+     },
+     "ziel": "nach-kampf"
+    }
+   ],
+   "weiter": "nach-kampf"
+  },
+  "aufbau-kampf-dorf": {
+   "typ": "aufbau",
+   "titel": "Lärm 6: was dazukommt",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "dorf_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Der Platz steht schon (seit Lärm 3). Was dort steht, bleibt stehen",
+    "Hämmert der Schmied noch: ihn in die Tür der Schmiede (Marker S)",
+    "Sitzen die Harms noch am Tisch: drei Figuren neben ihr Haus legen, sie kommen am Ende der Runde",
+    "Vier Figuren für Befallene neben den Tisch legen: je Rundenende tritt einer aus einem Haus",
+    "Alle Türen auf dem Platz offen markieren"
+   ],
+   "hinweis": "Ab jetzt geht es um den Brunnen. Lärm zählt nicht mehr.",
+   "setzt": {
+    "dorf_steht": true
+   },
+   "weiter": "cue-03-X2"
+  },
+  "cue-03-X2": {
+   "typ": "cue",
+   "titel": "Das ganze Dorf",
+   "cue": "03-X2",
+   "optional": true,
+   "text": "Jetzt hört das ganze Dorf. Riegel werden zurückgeschoben, Tür um Tür. Schritte, die sich nicht beeilen.",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Hämmert der Schmied noch, kommt gleich danach sein Cue 03-3 (er gehört zu diesem Kampf). Dann Battle Cue 1.",
+   "weiter": "cue-03-3-dorf"
+  },
+  "cue-03-3-dorf": {
+   "typ": "cue",
+   "titel": "Der Schmied",
+   "cue": "03-3",
+   "optional": true,
+   "wenn": {
+    "alle": [
+     {
+      "flag": "schmied_wach",
+      "ist": false
+     },
+     {
+      "flag": "schmied_besiegt",
+      "ist": false
+     }
+    ]
+   },
+   "text": "Der Hammer hält inne. Der Schmied dreht sich um, langsam. Seine Augen sind zugewachsen, und doch findet er euch: Er hört eure Schritte.",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Er kommt aus der Schmiede und folgt dem Klang der Schritte.",
+   "weiter": "kampf-dorf"
+  },
+  "kampf-dorf": {
+   "typ": "kampf",
+   "titel": "Das ganze Dorf",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "schmied",
+     "anzahl": 1,
+     "zone": "S",
+     "nurWenn": {
+      "alle": [
+       {
+        "flag": "schmied_wach",
+        "ist": false
+       },
+       {
+        "flag": "schmied_besiegt",
+        "ist": false
+       }
+      ]
+     }
+    },
+    {
+     "id": "dorfbewohner",
+     "anzahl": 2,
+     "zone": "Haus",
+     "nurWenn": {
+      "eine": [
+       {
+        "flag": "schmied_wach",
+        "ist": true
+       },
+       {
+        "flag": "schmied_besiegt",
+        "ist": true
+       }
+      ]
+     }
+    }
+   ],
+   "setzt": {
+    "gegner_wuetend": true
+   },
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Lärm 6. Das ist kein Kampf, den ihr gewinnen sollt: Ziel ist der Brunnen. Hämmert der Schmied noch, kommt er zuerst. Am Rundenende die Harms (falls sie noch am Tisch sitzen), danach je Runde ein Befallener aus einem Haus. Wütende Tabelle für alle.",
+   "hinweise": [
+    "Den Spielern sagen, was sie sehen: Türen gehen auf, überall. Wer bleibt, wird nicht fertig.",
+    "Der Schmied folgt dem Klang der Schritte: Wer sich im eigenen Zug nicht bewegt hat, wird nicht angegriffen, solange es einen anderen gibt, der sich bewegt hat. Hammer weggeschlagen: 6.",
+    "Nachschub W6, woher: 1 Gemeindehaus, 2 Schmiede, 3 Harms, 4 Wirtshaus, 5 Bäckerei, 6 du wählst.",
+    "Brunnen öffnen: 1 mit Werkzeug, G mit Gewalt. Dann endet der Kampf, Weiter führt hinab. Lärm zählt nicht mehr.",
+    "Keine Rast mehr im Keller, solange das Dorf wach ist. Junge und Wirtin können noch hinunter (J, D)."
+   ],
+   "ereignisse": [
+    "brunnen-werkzeug",
+    "brunnen-gewalt",
+    "hammer-weg",
+    "junge-keller",
+    "wirtin-keller",
+    "anhaenger-fluestert"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    }
+   ],
+   "weiter": "nach-kampf",
+   "verstaerkung": {
+    "id": "dorfbewohner",
+    "zone": "Haus"
+   }
+  },
+  "aufbau-kampf-platz-gemeinde": {
+   "typ": "aufbau",
+   "titel": "Die Gemeinde kommt: den Platz aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "platz_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Der Brunnen in die Tischmitte, mit Brettern und Kette",
+    "Die fünf Häuser als Umrisse an ihre Plätze: Gemeindehaus oben links, Schmiede oben rechts, Wohnhaus der Harms links, Wirtshaus rechts, Bäckerei unten rechts. Türen markieren, innen bleibt leer",
+    "Der verseuchte Garten oben in der Mitte (Feindzone A), die Gärten unten links mit dem Zaun (Feindzone B); Feindzone C vor dem Gemeindehaus nur, wenn die Glocke geschlagen hat",
+    "Der Eiskeller links vom Brunnen, der Holzstapel unten links",
+    "Die Helden dorthin, wo sie in der Geschichte gerade sind; wer mit ihnen geht (Junge, Wirtin, Knechte), direkt daneben",
+    "Zwei Gestalten aus der Kapelle an den unteren Rand, auf den Hauptweg (Zone H); weitere kommen am Rundenende"
+   ],
+   "hinweis": "Gekämpft wird auf dem Platz. Was schon steht, bleibt stehen.",
+   "setzt": {
+    "platz_steht": true
+   },
+   "weiter": "gemeinde-kommt"
+  },
+  "gemeinde-kommt": {
+   "typ": "vorlesen",
+   "titel": "Vom Hauptweg her",
+   "text": "Vom Hauptweg her kommen Schritte, langsam, viele. Und ein Flüstern, das ihr kennt: ein Wort, aus vielen Mündern, leicht versetzt. Die Kapelle ist euch gefolgt.",
+   "gmNotiz": "Die Gemeinde aus Map 2. Zwei kommen jetzt, je Rundenende zwei mehr (auf Normal höchstens sechs).",
+   "weiter": "kampf-gemeinde"
+  },
+  "kampf-gemeinde": {
+   "typ": "kampf",
+   "titel": "Die Gemeinde folgt",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "gemeinde",
+     "anzahl": 2,
+     "zone": "H"
+    }
+   ],
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Die Gemeinde aus der Kapelle kommt über den Hauptweg, zwei jetzt, je Rundenende zwei mehr. Wütende Tabelle: sie sind euch gefolgt.",
+   "hinweise": [
+    "Lärm weiter zählen: L, Z. Bei 6 kommt das ganze Dorf dazu.",
+    "Der Brunnen geht auch jetzt auf (1, G): dann endet der Kampf, Weiter führt hinab.",
+    "Fallen alle (und was sonst wach ist): weiter, wieder auf den Platz."
+   ],
+   "ereignisse": [
+    "laerm-nah",
+    "laerm-fern",
+    "anhaenger-fluestert",
+    "brunnen-werkzeug",
+    "brunnen-gewalt",
+    "hammer-weg"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "eine": [
+         {
+          "flag": "sporen_wach",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "sporenling"
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "schmied_wach",
+          "ist": false
+         },
+         {
+          "flag": "schmied_besiegt",
+          "ist": true
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "harm_wach",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "harm"
+         }
+        ]
+       },
+       {
+        "eine": [
+         {
+          "flag": "gemeinde_da",
+          "ist": false
+         },
+         {
+          "gegnerGefallen": "gemeinde"
+         }
+        ]
+       }
+      ]
+     },
+     "ziel": "nach-kampf"
+    }
+   ],
+   "weiter": "nach-kampf"
+  },
+  "aufbau-kampf-harm": {
+   "typ": "aufbau",
+   "titel": "Kampf bei den Harms: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "harm_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Das Wohnhaus der Harms an die linke Kante: ein Tisch mit drei Stühlen in der Mitte, eine Kommode neben der Tür",
+    "Die drei Harms am Tisch, jetzt stehend, die Gesichter zu den Helden",
+    "Davor ein Stück Platz bis zum Brunnen (steht der Platz schon, bleibt er)",
+    "Die Helden dorthin, wo sie gerade sind: in der Tür oder schon am Tisch"
+   ],
+   "setzt": {
+    "harm_steht": true
+   },
+   "weiter": "kampf-harm"
+  },
+  "kampf-harm": {
+   "typ": "kampf",
+   "titel": "Die Harms stehen auf",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "harm",
+     "anzahl": 3,
+     "zone": "W",
+     "fest": true
+    }
+   ],
+   "verstaerkung": {
+    "id": "sporenling",
+    "zone": "B"
+   },
+   "verhalten": {
+    "start": "ruhig",
+    "wuetendWenn": {
+     "flag": "gegner_wuetend",
+     "ist": true
+    }
+   },
+   "text": "Drei Befallene vom Abendbrottisch: Vater, Mutter, Tochter. Ruhige Tabelle, außer der Schmied ist schon wach. Sie verfolgen bis auf den Platz.",
+   "hinweise": [
+    "Kampfmusik (Taste A).",
+    "Lärm zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2. Bei 3 kommen die Sporenlinge dazu, die App springt um.",
+    "Den Brief auf der Kommode kann ein Held auch jetzt nehmen (1).",
+    "Die Harms bleiben auf jeder Schwierigkeit drei; höher heißt: Sporenlinge aus den Gärten dazu."
+   ],
+   "ereignisse": [
+    "laerm-nah",
+    "laerm-fern",
+    "anhaenger-fluestert",
+    "brief"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "wenn": {
+      "gegnerGefallen": "harm"
+     },
+     "ziel": "spieler-harm"
+    }
+   ],
+   "weiter": "nach-kampf"
+  },
+  "aufbau-kampf-schmied": {
+   "typ": "aufbau",
+   "titel": "Kampf in der Schmiede: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "schmiede_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Die Schmiede oben rechts: der Amboss in der Mitte, die Esse an der Rückwand (Deckung), daneben die Werkzeugwand",
+    "Der Schmied am Amboss (Marker S), er dreht sich gerade um",
+    "Davor ein Stück Platz bis zum Brunnen (steht der Platz schon, bleibt er)",
+    "Die Helden dorthin, wo sie gerade sind"
+   ],
+   "setzt": {
+    "schmiede_steht": true
+   },
+   "weiter": "cue-03-3"
+  },
+  "cue-03-3": {
+   "typ": "cue",
+   "titel": "Der Schmied",
+   "cue": "03-3",
+   "optional": true,
+   "text": "Der Hammer hält inne. Der Schmied dreht sich um, langsam. Seine Augen sind zugewachsen, und doch findet er euch: Er hört eure Schritte.",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Danach Battle Cue 1 (Taste A im Kampf).",
+   "weiter": "kampf-schmied"
+  },
+  "kampf-schmied": {
+   "typ": "kampf",
+   "titel": "Der Schmied",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "schmied",
+     "anzahl": 1,
+     "zone": "S"
+    }
+   ],
+   "verstaerkung": {
+    "id": "sporenling",
+    "zone": "A"
+   },
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Elite. Er startet in der Schmiede und folgt dem Klang der Schritte: Wer sich im eigenen Zug nicht bewegt hat, wird nicht angegriffen, solange es einen anderen gibt, der sich bewegt hat. Wütende Tabelle ab jetzt für alle.",
+   "hinweise": [
+    "Den Spielern sagen, was sie merken, nicht die Regel: „Er dreht den Kopf zu dem, der sich bewegt.“",
+    "Hammer weggeschlagen (6): ein Held trifft ihn mit einer 6. Dann nur noch A2.",
+    "Lärm zählen: L, Z. Bei 3 Sporenlinge, bei 6 das ganze Dorf: die App springt um, der Schmied bleibt in der Liste.",
+    "Das Werkzeug an der Wand kann ein Held auch jetzt nehmen (1).",
+    "Fällt er: Todestext an der Karte, Beutewurf. Map 4 merkt sich das."
+   ],
+   "ereignisse": [
+    "laerm-nah",
+    "laerm-fern",
+    "anhaenger-fluestert",
+    "hammer-weg",
+    "werkzeug"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "wenn": {
+      "flag": "schmied_besiegt",
+      "ist": true
+     },
+     "ziel": "spieler-schmiede"
+    }
+   ],
+   "weiter": "nach-kampf"
+  },
+  "aufbau-kampf-enttarnt": {
+   "typ": "aufbau",
+   "titel": "Enttarnt: aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "enttarnt_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Nur der Raum, in dem es passiert: der Keller (Treppe, Fässer, Regal), die Backstube (Ofen, Mehlsäcke) oder der Platz",
+    "Der Befallene direkt neben dem Helden, der ihn gestellt hat",
+    "Im Keller: die Kinder in eine Ecke. Sie kämpfen nicht und werden nicht angegriffen"
+   ],
+   "setzt": {
+    "enttarnt_steht": true
+   },
+   "weiter": "cue-03-X3"
+  },
+  "cue-03-X3": {
+   "typ": "cue",
+   "titel": "Ein Name",
+   "cue": "03-X3",
+   "optional": true,
+   "text": "Ein Lächeln. Dann, ganz leise, ein Name. Deiner. Aus dem Mundwinkel rinnt Grün.",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen und dabei den Helden ansehen, der am nächsten steht. Er bekommt 1 Sporenpunkt (am Heldenchip). Der Name ist geflüstert: kein Lärm.",
+   "weiter": "kampf-enttarnt"
+  },
+  "kampf-enttarnt": {
+   "typ": "kampf",
+   "titel": "Der Befallene",
+   "runden": true,
+   "gegner": [
+    {
+     "id": "befallene-frau",
+     "anzahl": 1,
+     "zone": "",
+     "nurWenn": {
+      "flag": "befallener",
+      "ist": "frau"
+     },
+     "fest": true
+    },
+    {
+     "id": "befallener-junge",
+     "anzahl": 1,
+     "zone": "",
+     "nurWenn": {
+      "flag": "befallener",
+      "ist": "junge"
+     },
+     "fest": true
+    }
+   ],
+   "verstaerkung": {
+    "id": "sporenling",
+    "zone": "C"
+   },
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Der Überlebende, der keiner war. Einzeln schwach, aber er steht mitten unter euch. Wütende Tabelle. Keine Musik: es ist still dabei.",
+   "hinweise": [
+    "Der nächststehende Held hat 1 Sporenpunkt bekommen (Cue 03-X3), am Heldenchip eintragen.",
+    "Im Keller: die Kinder sind Menschen, sie werden nicht angegriffen.",
+    "Lärm zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2."
+   ],
+   "ereignisse": [
+    "laerm-nah",
+    "laerm-fern",
+    "anhaenger-fluestert"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "brunnen_offen",
+      "ist": true
+     },
+     "ziel": "cue-03-4"
+    },
+    {
+     "wenn": {
+      "eine": [
+       {
+        "gegnerGefallen": "befallene-frau"
+       },
+       {
+        "gegnerGefallen": "befallener-junge"
+       }
+      ]
+     },
+     "ziel": "nach-kampf"
+    }
+   ],
+   "weiter": "nach-kampf"
+  },
+  "nach-kampf": {
+   "typ": "vorlesen",
+   "titel": "Für einen Atemzug",
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Was noch steht, steht. Für einen Atemzug hört ihr nur euren eigenen Atem. Und den Brunnen.",
+   "gmNotiz": "Zurück auf den Platz. Gegner, die noch stehen, bleiben am Tisch. Waren die Helden in einem Haus: von dort aus weiter mit der Taste des Hauses (1 bis 5).",
+   "weiter": "spieler-dorf"
+  },
+  "cue-03-4": {
+   "typ": "cue",
+   "titel": "Der Brunnen",
+   "cue": "03-4",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Die Bretter sind weg, die Kette liegt im Staub. Der Schacht ist tiefer, als ein Brunnen sein dürfte. Wurzeln hängen hinab wie Seile, und ganz unten steht ein kaltes Licht, das nicht flackert. Wer steigt zuerst?",
+   "notiz": "Noch nicht aufgenommen: Text vorlesen. Laufen noch Gegner auf dem Platz: wer zuletzt steigt, bekommt einen freien Angriff ab (Vorschlag), sonst folgt niemand in den Schacht.",
+   "weiter": "abstieg"
+  },
+  "abstieg": {
+   "typ": "vorlesen",
+   "titel": "Hinab",
+   "text": "Die Wurzeln halten. Hand über Hand geht es hinab, und das Licht von unten wird nicht wärmer, nur heller. Über euch wird der Himmel ein Kreis, dann ein Punkt. Dann steht ihr unten.",
+   "gmNotiz": "Ein Held steigt zuerst, wer zurückbleibt, kommt nach. Map 4 beginnt unten. Hauptziel erreicht.",
+   "setzt": {
+    "ep_haupt": true
+   },
+   "weiter": "wirtin-bleibt"
+  },
+  "wirtin-bleibt": {
+   "typ": "vorlesen",
+   "titel": "Die Wirtin bleibt oben",
+   "als": "wirtin",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "wirtin_dabei",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_im_keller",
+      "ist": false
+     },
+     {
+      "flag": "keller_offen",
+      "ist": true
+     },
+     {
+      "flag": "wirtin_tot",
+      "ist": false
+     }
+    ]
+   },
+   "text": "„Hinunter steig ich nicht.“ Sie sieht zum Gemeindehaus hinüber. „Ich geh zu den anderen in den Keller. Einer muss die Tür halten, wenn ihr wiederkommt.“",
+   "gmNotiz": "Sie geht in den Keller und zählt fürs Nebenziel.",
+   "setzt": {
+    "wirtin_im_keller": true,
+    "wirtin_dabei": false
+   },
+   "weiter": "knechte-bleiben"
+  },
+  "knechte-bleiben": {
+   "typ": "vorlesen",
+   "titel": "Die Knechte bleiben am Rand",
+   "wenn": {
+    "flag": "knechte_dabei",
+    "ist": true
+   },
+   "text": "Die Knechte bleiben am Rand des Brunnens stehen. Einer hebt die Hand, als wollte er etwas sagen. Dann sagt er nichts, keinen Namen, und hält das Seil aus Wurzeln für den Letzten von euch.",
+   "gmNotiz": "Die Knechte steigen nicht mit hinab. Sie halten oben den Platz.",
+   "weiter": "keller-befallen"
+  },
+  "keller-befallen": {
+   "typ": "vorlesen",
+   "titel": "Aus dem Keller",
+   "wenn": {
+    "eine": [
+     {
+      "alle": [
+       {
+        "flag": "befallener",
+        "ist": "frau"
+       },
+       {
+        "flag": "befallener_enttarnt",
+        "ist": false
+       }
+      ]
+     },
+     {
+      "alle": [
+       {
+        "flag": "befallener",
+        "ist": "junge"
+       },
+       {
+        "flag": "junge_im_keller",
+        "ist": true
+       },
+       {
+        "flag": "befallener_enttarnt",
+        "ist": false
+       }
+      ]
+     }
+    ]
+   },
+   "text": "Als der Letzte von euch den Rand loslässt, hört ihr es noch, ganz leise, über den Platz: Aus dem Keller unter dem Gemeindehaus summt jemand ein Kinderlied. Die Melodie stimmt nicht ganz.",
+   "gmNotiz": "Ein Befallener ist unentdeckt im Keller geblieben (die Frau, oder der Junge, den die Helden hinuntergebracht haben). Map 5: aus dem Gemeindehaus kommen 2 zusätzliche Gegner. Nichts erklären.",
+   "setzt": {
+    "befallener_im_keller": true
+   },
+   "weiter": "keller-gerettet"
+  },
+  "keller-gerettet": {
+   "typ": "vorlesen",
+   "titel": "Wer im Keller sitzt",
+   "wenn": {
+    "mindestens": 2,
+    "aus": [
+     {
+      "alle": [
+       {
+        "flag": "keller_offen",
+        "ist": true
+       },
+       {
+        "eine": [
+         {
+          "flag": "befallener",
+          "nicht": "frau"
+         },
+         {
+          "flag": "befallener_enttarnt",
+          "ist": true
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "flag": "wirtin_im_keller",
+      "ist": true
+     },
+     {
+      "alle": [
+       {
+        "flag": "junge_im_keller",
+        "ist": true
+       },
+       {
+        "flag": "befallener",
+        "nicht": "junge"
+       }
+      ]
+     }
+    ]
+   },
+   "text": "Unter dem Gemeindehaus sitzen sie jetzt im Dunkeln und warten, die Tür von innen gehalten. Wenigstens sie.",
+   "gmNotiz": "Nebenziel: mindestens zwei Überlebende im Keller, die Menschen sind. 1 EP. Map 5: sie warten oben am Brunnen mit einem Seil, auf der Flucht kommen mehr auf einmal hinauf.",
+   "setzt": {
+    "zwei_gerettet": true,
+    "ep_neben": true
+   },
+   "weiter": "ende-map3"
+  },
+  "ende-map3": {
+   "typ": "ende",
+   "titel": "Abschluss Map 3",
+   "ep": [
+    {
+     "wenn": {
+      "flag": "ep_haupt",
+      "ist": true
+     },
+     "text": "Hauptziel: den Brunnen geöffnet und hinabgestiegen",
+     "ep": 2
+    },
+    {
+     "wenn": {
+      "flag": "ep_neben",
+      "ist": true
+     },
+     "text": "Nebenziel: mindestens zwei Überlebende im Keller (Menschen)",
+     "ep": 1
+    }
+   ],
+   "beute": [
+    "1 Beutewurf (W6, Tabelle oben)",
+    "Was die Häuser hergegeben haben, ist schon verteilt (Wirtshaus, Bäckerei, Schmied)",
+    "Zettel, die die Helden haben: Dorfchronik, Brief an den Sohn, Laterne, Werkzeug",
+    "Je geretteten Überlebenden ein Hinweis für unten (steht in den Folgen)"
+   ],
+   "leisten": {
+    "atemzug": 1
+   },
+   "zuruecksetzen": [],
+   "folgen": [
+    {
+     "wenn": {
+      "flag": "schmied_besiegt",
+      "ist": true
+     },
+     "text": "Der Schmied ist besiegt: In Map 4 hören die Gegner keinen Takt mehr. In der ersten Runde nach dem Erwachen gilt für sie die ruhige Tabelle."
+    },
+    {
+     "wenn": {
+      "flag": "zwei_gerettet",
+      "ist": true
+     },
+     "text": "Mindestens zwei Überlebende im Keller: In Map 5 warten sie oben am Brunnen mit einem Seil: auf der Flucht kommen mehr auf einmal hinauf."
+    },
+    {
+     "wenn": {
+      "flag": "befallener_im_keller",
+      "ist": true
+     },
+     "text": "Ein Befallener ist im Keller unter dem Gemeindehaus geblieben: In Map 5 kommen aus dem Gemeindehaus 2 zusätzliche Gegner."
+    },
+    {
+     "wenn": {
+      "flag": "brunnen_gewalt",
+      "ist": true
+     },
+     "text": "Der Brunnen wurde mit Gewalt geöffnet: Atemzug +1, schon verbucht."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "keller_offen",
+        "ist": true
+       },
+       {
+        "eine": [
+         {
+          "flag": "befallener",
+          "nicht": "frau"
+         },
+         {
+          "flag": "befallener_enttarnt",
+          "ist": true
+         }
+        ]
+       }
+      ]
+     },
+     "text": "Hinweis der Frau im Keller (vorlesen, wenn die Helden unten ankommen): „Hedda hat gesagt, unter dem Brunnen ist es nicht dunkel. Das ist das Schlimmste daran.“"
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "junge_im_keller",
+        "ist": true
+       },
+       {
+        "flag": "befallener",
+        "nicht": "junge"
+       }
+      ]
+     },
+     "text": "Hinweis des Jungen: „Papa hat gesagt, unten wohnt der Stern. Und dass er summt.“"
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "wirtin_im_keller",
+        "ist": true
+       },
+       {
+        "flag": "wirtin_tot",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Hinweis der Wirtin: „Die Männer in den Rüstungen ohne Nähte haben damals Kisten hinuntergetragen. Keiner hat sie wieder hochgebracht.“"
+    },
+    {
+     "wenn": {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     "text": "Der Kupferanhänger ist noch dabei ({anhaenger_traeger}): Map 4 bucht beim Start wieder 1 Sporenpunkt."
+    },
+    {
+     "wenn": {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     },
+     "text": "Quelle in Map 1 zerstört: im Finale weniger Nachschub (wird weitergereicht)."
+    }
+   ],
+   "notieren": [
+    "Sporenpunkte stehen an den Heldenchips (die App trägt sie in Map 4 mit)",
+    "Wer die Zettel trägt (Laterne, Chronik, Werkzeug)",
+    "Budget je Held +10 im Reiter Gruppe eintragen"
+   ],
+   "weiter": null,
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ihr steht am Fuß des Schachts. Was hier unten ist, seht ihr nächstes Mal.“",
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, gilt als gefallen: Er ist in der nächsten Map wieder dabei, würfelt aber auf der Verletzungstabelle. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort."
+  }
+ },
+ "beimStart": [
+  {
+   "wenn": {
+    "flag": "weg",
+    "nicht": "krypta"
+   },
+   "leisten": {
+    "laerm": 1
+   }
+  },
+  {
+   "wenn": {
+    "flag": "laerm3_erreicht",
+    "ist": true
+   },
+   "leisten": {
+    "laerm": 1
+   }
+  },
+  {
+   "zufall": {
+    "flag": "befallener",
+    "aus": [
+     "frau",
+     "junge"
+    ]
+   }
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "sporenFuer": "anhaenger_traeger"
+  }
+ ],
+ "heldenInfo": [
+  {
+   "flag": "anhaenger_traeger",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "name": "Kupferanhänger",
+   "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt; in Kämpfen würfelt er am Rundenende (Taste U).",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: der Sporenpunkt beim Mapwechsel und der Wurf in Kämpfen gehen auf ihn über."
+  }
+ ]
+}

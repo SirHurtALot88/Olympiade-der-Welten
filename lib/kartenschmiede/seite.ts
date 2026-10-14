@@ -36,7 +36,7 @@ const BILDER: Record<string, string> = {
 };
 
 /** Maps, die der Reiter „Spielen“ Schritt für Schritt abspielen kann (apps/kartenschmiede/kampagnen). */
-const SPIELMODUS_MAPS = ["moosgrab/map1.json", "moosgrab/map2.json"];
+const SPIELMODUS_MAPS = ["moosgrab/map1.json", "moosgrab/map2.json", "moosgrab/map3.json", "moosgrab/map4.json", "moosgrab/map5.json"];
 
 const lies = (...teile: string[]) => fs.readFileSync(path.join(QUELLE, ...teile));
 const alsDataUri = (typ: string, daten: Buffer) => `data:${typ};base64,${daten.toString("base64")}`;
@@ -64,6 +64,7 @@ export function baueKartenschmiedeSeite(modus: KartenschmiedeModus): { kopf: str
     skript(lies("app.js").toString("utf8")),
     skript(lies("gruppe.js").toString("utf8")),
     skript(lies("szenarien.js").toString("utf8")),
+    skript(lies("vendor", "gelaende-symbole.js").toString("utf8")),
     skript(lies("szenarien-ui.js").toString("utf8")),
     skript(lies("spiel-motor.js").toString("utf8")),
     skript(`window.SPIELMODUS_MAPS=${JSON.stringify(SPIELMODUS_MAPS.map(datei => JSON.parse(lies("kampagnen", ...datei.split("/")).toString("utf8"))))};`),

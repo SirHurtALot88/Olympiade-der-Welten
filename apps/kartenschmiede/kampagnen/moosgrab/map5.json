@@ -1,0 +1,2949 @@
+{
+ "version": 1,
+ "kampagne": "moosgrab",
+ "map": 5,
+ "kampagnenEnde": true,
+ "titel": "Das Herz von Moosgrab",
+ "ton": "Chaos-Finale, dann Flucht",
+ "tisch": "120x80",
+ "dauer": "etwa 3 Stunden, laut und schnell",
+ "skizze": "szenarien.MOOSGRAB.maps[4].karte",
+ "start": "vorb-material",
+ "tabu": [
+  "Station",
+  "Labor",
+  "Soldat",
+  "Marines",
+  "Myzel",
+  "Forschung",
+  "Experiment",
+  "Thousand Sons",
+  "Reaktor"
+ ],
+ "referenz": {
+  "heldenpunkte": 340,
+  "anteil": 0.5
+ },
+ "lage": {
+  "flucht": {
+   "wie": "Durch den Schacht (↑, rechts unten) nach oben zum Brunnen. Eine ganze Aktion, höchstens zwei Figuren je Runde. Wer drin ist, ist raus.",
+   "folge": "Vor dem Überladen: Fliehen alle Helden oder fallen alle, schlägt das Herz weiter (Epilog „Es schlägt weiter“, kein EP für das Hauptziel). Zum Beenden: im Kampf unten Weiter, dann „Alle Helden sind ausgeschaltet oder geflohen“. Nach dem Überladen ist die Flucht das Ziel: sind alle im Schacht, Taste D."
+  },
+  "sonderregeln": [
+   {
+    "titel": "Keine Rast",
+    "text": "In Map 5 gibt es keine Rast: Der Kampf beginnt mit dem Durchbruch und endet mit der Flucht, und hier unten ist nichts sicher. Am Ende gibt es nur die OPR-Erholung: 3 Wunden und 3 Power je Held."
+   },
+   {
+    "titel": "Das Ziel: Adern, Glut, Schacht",
+    "text": "Erst die drei Adern durchtrennen (je Verteidigung 4+, Zäh 4; Feuertopf +1 Treffer, Taste F). Sind alle drei durch, liegt die Glutkammer offen. Dann die Glut überladen: ein Held in Kontakt mit dem Herz, eine Aktion, W6 ab 5 (Taste X); der Überlebende ab 3 (Taste Y); mit gelesenem Protokoll +1. Misslungen: ein Treffer Hitze. Dann läuft die Glut-Leiste, sechs Runden bis zum Bruch: alle den Schacht hinauf. Nicht alle Gegner müssen fallen."
+   },
+   {
+    "titel": "Der Überlebende",
+    "wenn": {
+     "flag": "ueberlebender_dabei",
+     "ist": true
+    },
+    "text": "Der Überlebende aus Map 4 kämpft als Verbündeter mit (unter „Verbündete“, Wunden aus Map 4 eingerechnet). Ein Spieler führt ihn, sonst du. Er überlädt die Glut ab 3 statt ab 5, liest das Protokoll sofort, und auf der Flucht kann er umkehren und die Glut halten (Taste Z: Glut −2, er bleibt zurück)."
+   },
+   {
+    "titel": "Wen greifen sie an?",
+    "text": "Vor dem Zug jeder Gegnergruppe würfelst du einen W6 (Taste G): 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn die Helden). Befallene Helden (ab 3 Sporenpunkten) werden schon bei 1 bis 4 gewählt. Dann Verhaltenswürfel, wütende Tabelle."
+   },
+   {
+    "titel": "Ausatmen",
+    "text": "Am Ende jeder Runde, solange die Glut nicht überladen ist, zeigt die App nach R das Ausatmen an, und du würfelst einen W6. Kleiner oder gleich der Atemzug-Leiste: alles innerhalb einer Kartenbreite um das Herz wird verseucht, und jeder Held darin hört seinen Namen: Qualitätstest, misslungen geht er eine Kartenbreite auf das Herz zu.",
+    "ansage": "Das Herz atmet aus. Warm. Und es sagt eure Namen."
+   },
+   {
+    "titel": "Nachschub",
+    "text": "Am Ende jeder Runde, solange das Herz atmet: so viele Sporenlinge, wie die Atemzug-Leiste Striche hat, höchstens 4, verteilt auf A, B und C (auf Normal höchstens drei Mal). Dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei, auch auf der Flucht). Die App setzt alles in die Gegnerliste."
+   },
+   {
+    "titel": "Verseuchte Fläche",
+    "text": "Wer seinen Zug auf verseuchter Fläche beendet (Herzkammer und alles, was das Ausatmen dazulegt), macht einen Qualitätstest. Misslungen: −1 auf Treffen bis zum Ende der nächsten Runde (wie in Map 1)."
+   },
+   {
+    "titel": "Namensregel",
+    "text": "Wer den Namen seines Helden laut sagt, bekommt 1 Sporenpunkt, auch hier unten. Ab 3 Sporenpunkten würfelt ein Held 3 statt 4 Aktionswürfel, und die Gegner wählen ihn eher (siehe oben)."
+   },
+   {
+    "titel": "Die Glut läuft über",
+    "wenn": {
+     "flag": "glut_ueberladen",
+     "ist": true
+    },
+    "text": "Die Glut-Leiste zählt: ein Strich je Rundenende, bei 6 bricht die Glut. Schacht: eine ganze Aktion, höchstens zwei Figuren je Runde. Sind alle drin: D. Bis 3 Striche entkommen (Epilog A), 4 oder 5 knapp (B), ist einer unten geblieben: C. Ausatmen und Sporenlinge sind vorbei, die leeren Rüstungen verfolgen weiter.",
+    "ansage": "Lauft."
+   },
+   {
+    "titel": "Das Herz schlägt schneller",
+    "wenn": {
+     "flag": "sofort_angriff",
+     "ist": true
+    },
+    "text": "Die Helden haben angegriffen, ohne hinzusehen: am Ende von Runde 1 atmet das Herz sicher aus, ohne Würfel (kommt nach R von selbst). Ab Runde 2 normal."
+   },
+   {
+    "titel": "Ohne die Quelle",
+    "wenn": {
+     "flag": "quelle_zerstoert",
+     "ist": true
+    },
+    "text": "Die Quelle aus Map 1 ist zerstört: höchstens 3 Sporenlinge je Runde statt 6. Die App rechnet es schon."
+   },
+   {
+    "titel": "Aus dem Gemeindehaus",
+    "wenn": {
+     "flag": "befallener_im_keller",
+     "ist": true
+    },
+    "text": "In Map 3 war ein Befallener im Keller: am Ende von Runde 2 kommen zwei Befallene durch den Schacht (↑) herunter. Die App setzt sie dazu. Sie stehen dann im Fluchtweg."
+   },
+   {
+    "titel": "Die Schwachstelle",
+    "wenn": {
+     "flag": "protokoll_gelesen",
+     "ist": true
+    },
+    "text": "Das Protokoll ist gelesen: Angriffe auf die Adern mit DS +1 (an den Karten als Verteidigung eine Stufe schlechter eingerechnet, nicht doppelt geben), und +1 auf jeden Versuch, die Glut zu überladen.",
+    "ansage": "Ihr wisst jetzt, wo es dünn ist."
+   },
+   {
+    "titel": "Der Anhänger hört mit",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "anhaenger",
+       "ist": true
+      },
+      {
+       "flag": "anhaenger_zurueck",
+       "nicht": true
+      }
+     ]
+    },
+    "text": "Wer den Kupferanhänger trägt (steht am Heldenchip), hört beim Ausatmen seinen Namen, egal wo er steht, und macht den Qualitätstest immer mit (Vorschlag). Nicht verraten, warum."
+   },
+   {
+    "titel": "Das Seil von oben",
+    "wenn": {
+     "flag": "zwei_gerettet",
+     "ist": true
+    },
+    "text": "Die Geretteten aus Map 3 halten oben ein Seil: drei Figuren je Runde in den Schacht statt zwei."
+   }
+  ],
+  "ziele": [
+   {
+    "art": "Hauptziel",
+    "text": "Das Herz zerstören: die drei Adern durchtrennen, die Glut überladen, und lebend den Schacht hinauf.",
+    "erreicht": {
+     "flag": "glut_ueberladen",
+     "ist": true
+    }
+   },
+   {
+    "art": "Nebenziel",
+    "text": "Entscheiden, was in die Glut geht und was mit hinaufkommt. Kein EP: es ist die Geschichte.",
+    "erreicht": {
+     "flag": "probe_entschieden",
+     "ist": true
+    }
+   }
+  ]
+ },
+ "auftraege": [
+  {
+   "id": "herz",
+   "art": "Haupt",
+   "titel": "Das brennende Herz",
+   "spieler": "Findet heraus, wie man das Herz aufhält. Nicht alle Gegner müssen fallen, nur das Herz.",
+   "quelle": "Das Herz selbst (Schritt „Das brennende Herz“, Herz ansehen) und der Überlebende, wenn er dabei ist",
+   "vorlesen": "Es schlägt, und es sagt eure Namen. Drei Stränge halten das Glühen in seiner Mitte fest. Solange es schlägt, kommt immer mehr.",
+   "ab": {
+    "flag": "herz_gesehen",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "glut_ueberladen",
+    "ist": true
+   }
+  },
+  {
+   "id": "glut",
+   "art": "Haupt",
+   "titel": "Die Glut",
+   "spieler": "Die Glutkammer liegt offen. Bringt das Glühen zum Überlaufen.",
+   "quelle": "Die letzte Ader reißt (Leiste „Durchtrennte Adern“ auf 3); der Überlebende sagt es vorher, wenn er gefragt wird",
+   "vorlesen": "Wo die Stränge waren, steht eine Klappe aus Metall offen, glühend. Dahinter brennt es weiß. Es will heraus.",
+   "ab": {
+    "leiste": "adern",
+    ">=": 3
+   },
+   "erledigt": {
+    "flag": "glut_ueberladen",
+    "ist": true
+   }
+  },
+  {
+   "id": "schacht",
+   "art": "Haupt",
+   "titel": "Hinauf",
+   "spieler": "Den Schacht hinauf, alle, bevor die Glut bricht.",
+   "quelle": "Cue 05-2 und die Regel zur Flucht",
+   "vorlesen": "Sechs Schläge, vielleicht. Dann ist hier unten nichts mehr. Den Schacht hinauf. Nicht stehen bleiben.",
+   "ab": {
+    "flag": "glut_ueberladen",
+    "ist": true
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "flag": "alle_draussen",
+      "ist": true
+     },
+     {
+      "flag": "glut_gebrochen",
+      "ist": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "probe",
+   "art": "Neben",
+   "titel": "Was in die Glut geht",
+   "spieler": "Entscheidet, ob etwas vom Herz mit hinaufkommt. Die Entscheidung gehört euch.",
+   "quelle": "Die offene Glutkammer (Cue 05-2), und der Überlebende, falls er dabei ist",
+   "vorlesen": "Was ihr hineinwerft, ist weg. Was ihr behaltet, kommt mit.",
+   "ab": {
+    "flag": "probe_gefragt",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "probe_entschieden",
+    "ist": true
+   }
+  }
+ ],
+ "rundenwurf": {
+  "name": "Was tut der Fels?",
+  "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Kampfrunde ums Herz, nach dem Ausatmen, würfelst du einen W6. Meistens passiert nichts.",
+  "wenn": {
+   "alle": [
+    {
+     "flag": "kampf_laeuft",
+     "ist": true
+    },
+    {
+     "flag": "glut_ueberladen",
+     "nicht": true
+    }
+   ]
+  },
+  "tabelle": [
+   {
+    "w": [
+     1
+    ],
+    "titel": "Ein Stein fällt",
+    "vorlesen": "Von der Decke löst sich ein Stein, groß wie ein Kopf, und schlägt zwischen euch auf. Staub, dann Stille, dann wieder das Schlagen.",
+    "gmNotiz": "Die Figur, die dem Schacht am nächsten steht, Freund oder Feind: ein Treffer, normal verteidigen."
+   },
+   {
+    "w": [
+     2
+    ],
+    "titel": "Das Glühen",
+    "vorlesen": "Das Glühen im Herz wird für einen Atemzug so hell, dass ihr die Stränge davor wie Schatten seht. Drei Schatten.",
+    "gmNotiz": "Nur Stimmung. Weist auf die Adern."
+   },
+   {
+    "w": [
+     3,
+     4,
+     5
+    ],
+    "titel": "Nichts",
+    "gmNotiz": "Das Herz schlägt weiter. Nichts passiert."
+   },
+   {
+    "w": [
+     6
+    ],
+    "titel": "Das Herz stolpert",
+    "vorlesen": "Das Herz setzt einen Schlag aus. Einen einzigen. Für einen Moment hört ihr nur euren eigenen Atem.",
+    "gmNotiz": "Das Ausatmen dieser Runde fällt aus (H nicht drücken). Hast du es schon gewürfelt, gilt es für das nächste Rundenende."
+   }
+  ]
+ },
+ "antreiben": [
+  {
+   "titel": "Ein Helm hebt sich",
+   "vorlesen": "Eine der leeren Rüstungen hebt den Helm. Langsam. Zu euch.",
+   "gmNotiz": "Die Zeit läuft: sie wachen auf. Noch ein Satz, dann weiter zur Regel.",
+   "schritte": [
+    "wahl-durchbruch",
+    "npc-ueberlebender",
+    "spieler-umsehen"
+   ]
+  },
+  {
+   "titel": "Er wird ungeduldig",
+   "vorlesen": "Der Überlebende setzt den Helm auf. „Genug. Hört ihr es? Es wird schneller.“",
+   "gmNotiz": "Er drängt. Fünf Minuten sind genug: Weiter.",
+   "schritte": [
+    "npc-ueberlebender"
+   ]
+  },
+  {
+   "titel": "Die Namen",
+   "vorlesen": "Zwischen zwei Schlägen, ganz leise: eure Namen. Alle. Auch die, die ihr nie laut gesagt habt.",
+   "gmNotiz": "Nur Stimmung, kein Sporenpunkt. Erinnert daran, worum es geht.",
+   "schritte": [
+    "npc-ueberlebender",
+    "spieler-umsehen",
+    "regel-finale",
+    "herz-schlaegt"
+   ]
+  },
+  {
+   "titel": "Es schlägt schneller",
+   "vorlesen": "Das Herz schlägt schneller. Aus den Ritzen kommt warme Luft, und sie riecht nach nassem Brot.",
+   "gmNotiz": "Faden verloren im Kampf: die Stränge, dann die Glut. Alles andere steht nur im Weg.",
+   "schritte": [
+    "kampf-herz"
+   ]
+  },
+  {
+   "titel": "Das Weiß",
+   "vorlesen": "Das Weiß hinter der Klappe frisst sich in den Fels. Eure Schatten werden lang, dann kurz, dann sind sie weg.",
+   "gmNotiz": "Entscheiden, schnell. Wer zögert, verliert Zeit für den Schacht.",
+   "schritte": [
+    "wahl-probe",
+    "tote-probe",
+    "wahl-tote-probe"
+   ]
+  },
+  {
+   "titel": "Der Fels singt",
+   "vorlesen": "Der Fels singt. Ein hoher Ton, der aus allen Wänden zugleich kommt. Über euch rieselt Staub aus dem Schacht.",
+   "gmNotiz": "Treib sie zum Schacht. Wer kämpft statt zu laufen, bleibt unten.",
+   "schritte": [
+    "kampf-flucht"
+   ]
+  }
+ ],
+ "tischplan": {
+  "helden": {
+   "x": 9,
+   "y": 22
+  },
+  "zonen": {
+   "A": {
+    "x": 2,
+    "y": 3
+   },
+   "B": {
+    "x": 34,
+    "y": 3
+   },
+   "C": {
+    "x": 2,
+    "y": 17
+   },
+   "H": {
+    "x": 19,
+    "y": 5.5
+   },
+   "A1": {
+    "x": 12,
+    "y": 10
+   },
+   "A2": {
+    "x": 19,
+    "y": 10
+   },
+   "A3": {
+    "x": 26,
+    "y": 10
+   },
+   "M": {
+    "x": 24.5,
+    "y": 19
+   },
+   "S": {
+    "x": 34.5,
+    "y": 21
+   }
+  },
+  "info": {
+   "feind:A": "Feindzone A, links oben: hier steht am Anfang eine leere Rüstung, erstarrt. Sporenlinge kommen hier, in B und in C.",
+   "feind:B": "Feindzone B, rechts oben: hier steht eine leere Rüstung. Je Rundenende bricht eine weitere aus der Wand dahinter.",
+   "feind:C": "Feindzone C, links unten, nah am Heldenstart. Sporenlinge kommen auch hier.",
+   "herz:♥": "Das Herz in der Herzkammer, mit der Glut in der Mitte. Der Rufer steht direkt davor. Die Herzkammer ist verseucht, und mit jedem Ausatmen wird es mehr.",
+   "ader:A": "Die drei Adern vor dem Herz, je eine links, mittig und rechts.",
+   "truemmer:M": "Trümmer und Ausrüstung des ausgelöschten Trupps. Hier steht der Überlebende am Anfang, falls er dabei ist.",
+   "schacht:↑": "Der Schacht nach oben zum Brunnen: der einzige Weg hinaus, und der Weg der Befallenen, falls welche kommen."
+  }
+ },
+ "leisten": {
+  "atemzug": {
+   "name": "Atemzug-Leiste",
+   "gilt": "kampagne",
+   "min": 0,
+   "max": 6,
+   "start": 4,
+   "richtung": "hoch",
+   "text": "Aus Map 4 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. Im Finale bestimmt die Leiste den Nachschub (so viele Sporenlinge je Runde, höchstens 4) und wie leicht das Herz ausatmet (W6 kleiner oder gleich der Leiste). +1 nach der Map.",
+   "schlecht": "hoch",
+   "jeStrich": {
+    "titel": "Das Herz schlägt lauter",
+    "gmNotiz": "Ein Feld Filz mehr um die Herzkammer. Nichts dazu sagen, nur hinlegen. Der nächste Nachschub ist einen Sporenling größer."
+   },
+   "schwellen": [
+    {
+     "ab": 6,
+     "wiederholt": true,
+     "titel": "Es atmet aus",
+     "vorlesen": "Der ganze Fels hebt sich, einmal, langsam, wie eine Brust. Dann sinkt er wieder, und aus jeder Ritze kriecht etwas.",
+     "gmNotiz": "Mitten im Kampf: zwei Sporenlinge sofort aus Feindzone A (unten „＋ Gegner“). Die Leiste fällt auf 4, der Nachschub je Runde damit auch.",
+     "leisten": {
+      "atemzug": -2
+     }
+    }
+   ]
+  },
+  "adern": {
+   "name": "Durchtrennte Adern",
+   "gilt": "map",
+   "min": 0,
+   "max": 3,
+   "start": 0,
+   "richtung": "hoch",
+   "text": "Wie viele der drei Adern durchtrennt sind. Zählt von selbst, wenn eine Ader fällt. Bei 3 liegt die Glutkammer offen, und die Glut kann überladen werden.",
+   "schwellen": [
+    {
+     "ab": 3,
+     "titel": "Die Glutkammer liegt offen",
+     "vorlesen": "Alle drei Stränge hängen schlaff. Wo sie ins Herz gingen, klafft das Fleisch auseinander, und dahinter steht eine Klappe aus Metall, glühend. Dahinter brennt es weiß. Es will heraus.",
+     "gmNotiz": "Jetzt kann überladen werden: ein Held in Kontakt mit dem Herz, eine Aktion, Taste X (W6 ab 5), der Überlebende Taste Y (ab 3); mit Protokoll +1. Der Auftrag „Die Glut“ steht jetzt oben."
+    }
+   ]
+  },
+  "glut": {
+   "name": "Glut",
+   "gilt": "map",
+   "min": 0,
+   "max": 6,
+   "start": 0,
+   "richtung": "hoch",
+   "aktiv": false,
+   "text": "Läuft erst, wenn die Glut überladen ist: ein Strich je Rundenende. Bei 6 bricht sie, dann ist hier unten nichts mehr. Der Überlebende kann sie halten (−2).",
+   "schwellen": [
+    {
+     "ab": 3,
+     "titel": "Die Decke bricht",
+     "vorlesen": "Ein Stück Decke bricht herunter, so groß wie ein Wagen, mitten zwischen euch und dem Schacht. Staub. Dann seht ihr wieder das Weiß.",
+     "gmNotiz": "Ein Stück schwieriges Gelände zwischen Herz und Schacht hinlegen (Trümmer). Wer darunter stand: ein Treffer, normal verteidigen."
+    },
+    {
+     "ab": 5,
+     "titel": "Die letzte Runde",
+     "vorlesen": "Das Weiß ist jetzt überall. Der Fels unter euren Füßen ist heiß wie ein Herdblech.",
+     "gmNotiz": "Letzte Runde: Wer am Ende dieser Runde nicht im Schacht ist, bleibt unten."
+    },
+    {
+     "ab": 6,
+     "titel": "Die Glut bricht",
+     "gmNotiz": "Die App springt zum Ende der Flucht.",
+     "springe": "glut-bricht"
+    }
+   ]
+  }
+ },
+ "flags": {
+  "anhaenger": {
+   "start": false,
+   "text": "Aus Map 1 bis 4: Die Helden tragen den Kupferanhänger.",
+   "wirktIn": "map5"
+  },
+  "anhaenger_traeger": {
+   "start": null,
+   "text": "Name des Helden, der den Anhänger trägt.",
+   "wirktIn": "map5"
+  },
+  "anhaenger_zurueck": {
+   "start": false,
+   "text": "Aus Map 2: Hedda hat den Anhänger zurückbekommen.",
+   "wirktIn": "map5"
+  },
+  "frau_name": {
+   "start": null,
+   "text": "Aus Map 1: Die Helden kennen den Namen Lene.",
+   "wirktIn": "map5"
+  },
+  "quelle_zerstoert": {
+   "start": false,
+   "text": "Aus Map 1: Die Quelle wurde zerstört: weniger Nachschub im Finale.",
+   "wirktIn": "map5"
+  },
+  "zwei_gerettet": {
+   "start": false,
+   "text": "Aus Map 3: Mindestens zwei Gerettete warten oben am Brunnen und lassen ein Seil herab: auf der Flucht kommen drei Figuren je Runde in den Schacht statt zwei.",
+   "wirktIn": "map5"
+  },
+  "befallener_im_keller": {
+   "start": false,
+   "text": "Aus Map 3: Ein Befallener war im Keller. Zwei Befallene kommen durch den Schacht.",
+   "wirktIn": "map5"
+  },
+  "fund_marke": {
+   "start": false,
+   "text": "Aus Map 4: Die Erkennungsmarke ist dabei.",
+   "wirktIn": "map5"
+  },
+  "fund_protokoll": {
+   "start": false,
+   "text": "Aus Map 4: Das Protokoll ist dabei (Schwachstelle der Adern, wie man die Glut öffnet).",
+   "wirktIn": "map5"
+  },
+  "fund_probe": {
+   "start": false,
+   "text": "Aus Map 4: Die lebende Probe aus dem Glastank ist dabei.",
+   "wirktIn": "map5"
+  },
+  "fund_tote_probe": {
+   "start": false,
+   "text": "Aus Map 4: Die tote Probe aus dem zweiten Glastank ist dabei.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_dabei": {
+   "start": false,
+   "text": "Aus Map 4: Der Überlebende in der großen Rüstung kommt mit und kämpft als Verbündeter.",
+   "wirktIn": "map5"
+  },
+  "tisch_steht": {
+   "start": false,
+   "text": "Der Tisch steht.",
+   "wirktIn": "map5"
+  },
+  "sofort_angriff": {
+   "start": false,
+   "text": "Die Helden haben angegriffen, ohne hinzusehen: das Herz atmet am Ende von Runde 1 sicher aus.",
+   "wirktIn": "map5"
+  },
+  "marke_gezeigt": {
+   "start": false,
+   "text": "Der Überlebende hat die Erkennungsmarke gesehen und vertraut den Helden.",
+   "wirktIn": "map5"
+  },
+  "protokoll_gelesen": {
+   "start": false,
+   "text": "Das Protokoll ist gelesen: DS +1 gegen die Adern, +1 beim Überladen.",
+   "wirktIn": "map5"
+  },
+  "herz_gesehen": {
+   "start": false,
+   "text": "Die Helden haben das Herz gesehen. Der Kampf beginnt.",
+   "wirktIn": "map5"
+  },
+  "kampf_laeuft": {
+   "start": false,
+   "text": "Der Kampf ums Herz läuft.",
+   "wirktIn": "map5"
+  },
+  "rufer_gefallen": {
+   "start": false,
+   "text": "Der Rufer ist gefallen.",
+   "wirktIn": "map5"
+  },
+  "ruestungen_ruhig": {
+   "start": false,
+   "text": "Ohne den Rufer würfeln die leeren Rüstungen ruhig.",
+   "wirktIn": "map5"
+  },
+  "glut_ueberladen": {
+   "start": false,
+   "text": "Die Glut ist überladen: Hauptziel, die Flucht beginnt.",
+   "wirktIn": "kampagne"
+  },
+  "ueberladen_von": {
+   "start": null,
+   "text": "Wer die Glut überladen hat: ein Held oder der Überlebende.",
+   "wirktIn": "kampagne"
+  },
+  "herz_steht": {
+   "start": false,
+   "text": "Alle Helden sind ausgeschaltet oder geflohen, bevor die Glut überladen war.",
+   "wirktIn": "kampagne"
+  },
+  "probe_gefragt": {
+   "start": false,
+   "text": "Die Glutkammer steht offen: Entscheidung, was hineinkommt.",
+   "wirktIn": "map5"
+  },
+  "probe_entschieden": {
+   "start": false,
+   "text": "Die Helden haben entschieden, was in die Glut geht. Nebenziel.",
+   "wirktIn": "kampagne"
+  },
+  "probe_wahl": {
+   "start": null,
+   "text": "Was mit dem Stück vom Herz geschah: vernichtet, mitgenommen, ueberlebender oder tot.",
+   "wirktIn": "kampagne"
+  },
+  "probe_traeger": {
+   "start": null,
+   "text": "Der Held, der ein Stück vom Herz mit hinaufträgt.",
+   "wirktIn": "kampagne"
+  },
+  "probe_held": {
+   "start": null,
+   "text": "Der Held, der die tote Probe übergeben hat.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_getaeuscht": {
+   "start": false,
+   "text": "Der Überlebende trägt die tote Probe in seine Welt und hat es nicht gemerkt.",
+   "wirktIn": "kampagne"
+  },
+  "tote_probe_erkannt": {
+   "start": false,
+   "text": "Der Überlebende hat die tote Probe erkannt: Atemzug +1 für eine nächste Kampagne.",
+   "wirktIn": "kampagne"
+  },
+  "flucht_steht": {
+   "start": false,
+   "text": "Die Flucht hat begonnen, die Glut-Leiste läuft.",
+   "wirktIn": "map5"
+  },
+  "alle_draussen": {
+   "start": false,
+   "text": "Alle Helden sind im Schacht.",
+   "wirktIn": "map5"
+  },
+  "glut_gebrochen": {
+   "start": false,
+   "text": "Die Glut ist gebrochen.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_opfert": {
+   "start": false,
+   "text": "Der Überlebende ist unten geblieben und hat die Glut gehalten.",
+   "wirktIn": "kampagne"
+  },
+  "ueberlebender_tot": {
+   "start": false,
+   "text": "Der Überlebende ist im Kampf gefallen.",
+   "wirktIn": "kampagne"
+  },
+  "held_zurueck": {
+   "start": null,
+   "text": "Der Held, der unten geblieben ist.",
+   "wirktIn": "kampagne"
+  },
+  "epilog": {
+   "start": null,
+   "text": "Der Epilog der Kampagne: A (entkommen), B (knapp), C (jemand bleibt zurück) oder X (es schlägt weiter).",
+   "wirktIn": "kampagne"
+  }
+ },
+ "audio": {
+  "05-1": {
+   "titel": "Der Durchbruch",
+   "datei": "audio/moosgrab/05/05-1.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Endet mit „Was tut ihr?“ Bis dahin liest du den Text im Cue-Schritt."
+  },
+  "05-2": {
+   "titel": "Die Glut erwacht",
+   "datei": "audio/moosgrab/05/05-2.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen. Sobald die Glut überladen ist. Endet mit „Aber die Klappe ist noch offen.“"
+  },
+  "05-X1": {
+   "titel": "Die Ader reißt",
+   "datei": "audio/moosgrab/05/05-X1.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Extra-Cue bei jeder durchtrennten Ader. Noch nicht aufgenommen; bis dahin liest du den Todestext der Ader."
+  },
+  "05-EA": {
+   "titel": "Epilog A: Entkommen",
+   "datei": "audio/moosgrab/05/05-EA.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Alle früh genug draußen, Moosgrab ist frei."
+  },
+  "05-EB": {
+   "titel": "Epilog B: Knapp",
+   "datei": "audio/moosgrab/05/05-EB.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Gerade noch draußen, der Brunnen spuckt Feuer."
+  },
+  "05-EC": {
+   "titel": "Epilog C: Jemand bleibt zurück",
+   "datei": "audio/moosgrab/05/05-EC.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Der Überlebende hat sich geopfert, oder ein Held ist unten geblieben."
+  },
+  "05-EX": {
+   "titel": "Epilog: Es schlägt weiter",
+   "datei": "audio/moosgrab/05/05-EX.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Das Ende ohne Sieg: die Glut wurde nie überladen."
+  },
+  "BATTLE-1": {
+   "titel": "Kampfmusik",
+   "datei": "audio/moosgrab/01/battle-1.mp3",
+   "schleife": true,
+   "optional": true,
+   "notiz": "Derselbe Track wie in Map 1 (Battle Cue 1), bis der eigene für das Finale (Puls und Chor) aufgenommen ist. Im Kampf starten (Taste A), Schleife; die Epiloge stoppen ihn."
+  }
+ },
+ "figuren": {
+  "ueberlebender": {
+   "name": "Der Überlebende",
+   "anzeige": "er",
+   "tisch": {
+    "x": 23,
+    "y": 18,
+    "ab": {
+     "flag": "ueberlebender_dabei",
+     "ist": true
+    },
+    "bis": {
+     "flag": "kampf_laeuft",
+     "ist": true
+    },
+    "zeichen": "Ü"
+   },
+   "wer": "Der Letzte eines Trupps in schweren Rüstungen, der in der Tiefe ausgelöscht wurde (Map 4). Verwundet, müde, wortkarg. Sein Auftrag: den Reaktor im Herz zerstören. Vor den Spielern heißt der Reaktor nie so: für ihn und für sie ist es „die Glut“. Er weiß, wie man sie zum Überlaufen bringt, und er weiß, dass danach keiner mehr lange hier unten steht.",
+   "stimme": [
+    "Kurze Sätze, wie Befehle, aber leise",
+    "Spricht die Sprache der Helden schlecht: lässt Wörter weg, nie ein Fachwort",
+    "Sieht beim Reden auf die Glut, nicht auf die Helden",
+    "Nennt nie einen Namen, auch nicht seinen eigenen"
+   ],
+   "ziel": "Die Glut im Herz zum Überlaufen bringen, bevor das Herz ihn holt. Das, wofür seine Leute gestorben sind, zu Ende bringen.",
+   "motiv": "Er ist allein übrig. Wenn er es nicht tut, war alles umsonst.",
+   "kern": [
+    "„Da drin. Die Glut. Darum ist es gewachsen.“",
+    "„Erst die drei Stränge. Dann die Glut. Dann laufen.“",
+    "„Wenn sie überläuft, steht hier unten nichts mehr.“"
+   ],
+   "weiss": [
+    {
+     "kurz": "Was die Glut ist",
+     "info": "„Die Glut ist älter als euer Dorf. Sie kam mit dem Stern. Das Herz ist um sie herumgewachsen, wie Moos um einen warmen Stein.“",
+     "wie": "Fragen, was da im Herz brennt (Taste 4).",
+     "folge": "Nur Stimmung. Mehr Wörter hat er dafür nicht."
+    },
+    {
+     "kurz": "Seine Leute",
+     "info": "„Wir waren zwölf. Die leeren Rüstungen haben sie geholt, einen nach dem anderen. Ich war zu langsam zum Sterben.“",
+     "wie": "Nach seinen Leuten fragen, oder nach den Rüstungen (Taste 5).",
+     "folge": "Er sieht dabei die leeren Rüstungen an."
+    },
+    {
+     "kurz": "Wie man es macht",
+     "info": "„Erst die drei Stränge. Dann die Klappe in der Glut auf, und das hier hinein.“ Er zeigt auf etwas an seinem Gürtel. „Ich mache das. Ihr haltet sie mir vom Leib.“",
+     "wie": "Fragen, wie man das Herz aufhält (Taste 6).",
+     "folge": "Der Plan: Adern, dann überladen. Er kann es mit 3+, ein Held nur mit 5+."
+    },
+    {
+     "kurz": "Was danach kommt",
+     "info": "„Dann habt ihr nicht lange. Sechs Atemzüge, vielleicht. Den Schacht hinauf. Nicht stehen bleiben.“",
+     "wie": "Fragen, was passiert, wenn die Glut überläuft (Taste 7).",
+     "folge": "Die Spieler wissen dann vom Countdown, bevor er läuft."
+    },
+    {
+     "kurz": "Die Schwachstelle",
+     "info": "Er blättert, schnell, mit dem Finger auf den Zeichnungen. Er kann die Schrift lesen. „Die Stränge. Wo sie hineingehen, ist es dünn. Und hier: so öffnet man die Klappe.“",
+     "wie": "Nur mit dem Protokoll aus der Tiefe: es ihm geben (Taste 2).",
+     "folge": "DS +1 gegen die Adern, und +1 auf jeden Versuch, die Glut zu überladen.",
+     "setzt": {
+      "protokoll_gelesen": true
+     }
+    },
+    {
+     "kurz": "Die Marke",
+     "info": "Er nimmt die Marke, liest den Namen und gibt sie zurück. „Einer von uns. Von früher. Vierzig Jahre.“ Er schweigt. „Dann sind wir nicht die Ersten, die hier unten sterben.“",
+     "wie": "Nur mit der Erkennungsmarke aus der Tiefe: sie ihm zeigen (Taste 1).",
+     "folge": "Er vertraut den Helden: bei der Frage, was mit dem Stück vom Herz geschieht, glaubt er ihnen (Qualitätstest +1 mit der toten Probe).",
+     "setzt": {
+      "marke_gezeigt": true
+     }
+    }
+   ],
+   "wennSieFragen": [
+    [
+     "wer er ist, woher er kommt",
+     "„Von oben. Von weiter weg, als ihr glaubt.“ Mehr nicht."
+    ],
+    [
+     "wie er heißt",
+     "Er schüttelt den Kopf. „Hier unten nicht. Es hört zu.“"
+    ],
+    [
+     "ob er mit hinaufkommt, wenn es vorbei ist",
+     "„Wenn ich kann.“ Er sieht euch dabei nicht an."
+    ],
+    [
+     "nach der lebenden Probe, wenn sie sie zeigen",
+     "„Mein Befehl war: ein Stück mitbringen. Mein Befehl war auch: es zerstören.“ Er zuckt mit der verbrannten Schulter. „Ihr entscheidet. Nachher.“ (Taste 3)"
+    ],
+    [
+     "grob, drohend, mit Waffe",
+     "Er hebt nicht einmal das Rohr. „Ich habe heute genug Freunde verloren. Ihr seid die Letzten, die ich habe.“"
+    ]
+   ],
+   "nichtWissen": [
+    "Wer das Herz gemacht hat, oder ob es jemand gemacht hat. Er weiß nur, dass es um die Glut gewachsen ist.",
+    "Wer die leeren Rüstungen waren, bevor sie leer wurden: Männer wie er, glaubt er, vor vierzig Jahren.",
+    "Was mit dem Dorf oben geschehen ist, mit Hedda, mit Lene. Erzählen die Helden es ihm, hört er zu und sagt nichts."
+   ]
+  }
+ },
+ "gegner": {
+  "ruestung": {
+   "name": "Leere Rüstung",
+   "anzeige": "Eine Gestalt in einer Rüstung ohne Nähte",
+   "karte": "eigen",
+   "ersatz": "v:sporenhuelle",
+   "kurz": "R",
+   "info": "Eine Rüstung ohne Naht, groß wie ein Schrank, und niemand darin: nur Staub und Moos. Sie geht langsam, sie hört nicht auf, und sie schießt mit etwas, das glüht.",
+   "werte": {
+    "name": "Leere Rüstung",
+    "faction": "Urwild",
+    "praegung": [
+     "gift"
+    ],
+    "size": "1",
+    "quality": "4+",
+    "defense": "3+",
+    "tough": "4",
+    "role": "enemy",
+    "weapons": "Glutrohr | 24\" | A1 | DS(1)\nRüstungsfaust | Nahkampf | A1 | ",
+    "passives": "Furchtlos, Langsam",
+    "flavor": "Keiner drin. Nur Staub und Moos, und es geht trotzdem."
+   },
+   "notiz": "Eigene Werte, 45 P. (Q4+ D3+ Z4, Langsam, Glutrohr A1 DS 1). Miniatur: Rubric Marine (Thousand Sons), leere Rüstungen voller Staub, hier mit Moos in den Fugen. Zwei stehen am Anfang erstarrt vor den Zonen A und B, eine weitere kommt je Rundenende dazu (auf Normal höchstens drei). Vor den Spielern: die leeren Rüstungen, die Rüstungsmänner.",
+   "anblick": "Die Rüstung hat keine Naht, keine Schnalle, kein Scharnier. Hinter dem Visier ist nichts, nur Dunkel, und daraus rieselt Staub, jedes Mal, wenn sie einen Schritt macht. In den Fugen wächst Moos.",
+   "zustandSaetze": {
+    "unverletzt": "Die Klinge rutscht an der Rüstung ab. Sie hat es nicht einmal bemerkt.",
+    "angekratzt": "Ein Riss in der Rüstung. Heraus kommt Staub, kein Blut.",
+    "verwundet": "Ein Stück Panzer fehlt. Dahinter: leer. Sie geht trotzdem weiter.",
+    "schwer verwundet": "Ein Arm hängt. Sie hebt das Rohr mit dem anderen.",
+    "am Ende": "Ein Treffer noch. Aus jeder Fuge rieselt es jetzt.",
+    "gefallen": "Sie fällt in sich zusammen wie ein leerer Mantel."
+   },
+   "tod": {
+    "vorlesen": "Sie fällt in sich zusammen wie ein leerer Mantel. Der Helm rollt ein Stück und bleibt liegen, das Visier nach oben. Aus ihm steigt Staub, ein Faden nur, und dann nichts mehr.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt. Wer in den Helm sieht: leer bis auf Moos."
+   }
+  },
+  "rufer": {
+   "name": "Der Rufer",
+   "anzeige": "Eine Gestalt mit hohem Helm und Stab",
+   "karte": "eigen",
+   "ersatz": "v:seuchenbringer",
+   "kurz": "Ru",
+   "info": "Er steht vor dem Herz, einen Stab in der Hand, einen hohen Helm auf dem Kopf. Wenn er den Stab hebt, gehen die leeren Rüstungen. Wenn er spricht, brennt die Luft.",
+   "werte": {
+    "name": "Der Rufer",
+    "faction": "Urwild",
+    "praegung": [
+     "gift"
+    ],
+    "size": "1",
+    "quality": "4+",
+    "defense": "3+",
+    "tough": "5",
+    "role": "enemy",
+    "weapons": "Glutzauber | 18\" | A2 | DS(1), Explosion(2)\nStab | Nahkampf | A2 | DS(1)",
+    "passives": "Furchtlos, Zauberer",
+    "flavor": "Ein hoher Helm, ein Stab, und eine Stimme, die nicht aus der Rüstung kommt."
+   },
+   "notiz": "Eigene Werte, 90 P. (Q4+ D3+ Z5, Glutzauber eine Kartenlänge und mehr weit, A2, DS 1, Explosion 2). Miniatur: Sorcerer der Thousand Sons. Er führt die leeren Rüstungen: Fällt er, würfeln die Rüstungen ab der nächsten Runde auf der ruhigen Tabelle (Vorschlag, Taste T). Er bleibt am Herz und zieht sich nicht zurück.",
+   "anblick": "Ein hoher Helm mit einem Kamm, ein Stab, an dem Moos hängt wie nasse Wolle. Er ist der Einzige, der den Kopf bewegt, wenn er euch ansieht. Wenn er den Mund öffnet, kommt eine Stimme heraus, die nach vielen klingt.",
+   "zustandSaetze": {
+    "unverletzt": "Er hebt nur den Stab. Die Luft vor ihm flimmert.",
+    "angekratzt": "Getroffen. Er sieht an sich herunter, als hätte ihn jemand gestört.",
+    "verwundet": "Der Helm hat einen Sprung. Die Stimme darin klingt jetzt dünner.",
+    "schwer verwundet": "Er stützt sich auf den Stab. Die leeren Rüstungen drehen sich zu ihm um.",
+    "am Ende": "Ein Treffer noch. Er ruft etwas, und es klingt wie ein Name.",
+    "gefallen": "Er fällt, und alle Rüstungen im Raum zucken zugleich."
+   },
+   "tod": {
+    "vorlesen": "Er fällt. Im selben Augenblick zucken alle leeren Rüstungen im Raum, als hätte man ihnen einen Faden durchgeschnitten. Dann gehen sie weiter, aber langsamer, und keine weiß mehr genau, wohin.",
+    "gmNotiz": "Figur vom Tisch, Beutewurf für den Helden, der ihn gefällt hat. Ab der nächsten Runde würfeln die leeren Rüstungen auf der ruhigen Tabelle (Taste T, Vorschlag). Sporenlinge bleiben wütend.",
+    "beutewurf": true,
+    "setzt": {
+     "rufer_gefallen": true
+    }
+   }
+  },
+  "befallener": {
+   "name": "Befallener aus dem Gemeindehaus",
+   "anzeige": "Jemand aus dem Dorf, den ihr kennt",
+   "karte": "v:giftmade",
+   "kurz": "B",
+   "info": "Einer aus dem Keller unter dem Gemeindehaus. Er ist euch gefolgt, den Schacht hinunter, und er hat einen mitgebracht.",
+   "notiz": "Platzhalter Giftmade (25 P., Q5+ D6+ Z3). Nur, wenn in Map 3 ein Befallener im Keller war (befallener_im_keller): zwei kommen am Ende von Runde 2 aus dem Schacht (↑), der Befallene und einer, den er angesteckt hat. Auf jeder Stufe zwei. Sie stehen dann zwischen den Helden und dem Fluchtweg.",
+   "anblick": "Die Schürze, die Mütze, die Hände: ihr habt ihn selbst in den Keller gebracht. Jetzt wächst ihm Moos aus dem Kragen, und er lächelt, als freute er sich, euch wiederzusehen.",
+   "zustandSaetze": {
+    "unverletzt": "Er lächelt weiter.",
+    "angekratzt": "Er sieht auf die Wunde, dann zu euch, als hätte er eine Frage.",
+    "verwundet": "Er knickt ein. Was aus der Wunde kommt, ist nicht rot.",
+    "schwer verwundet": "Er kriecht. Er sagt etwas, und es klingt wie ein Name.",
+    "am Ende": "Ein Treffer noch.",
+    "gefallen": "Er fällt auf die Knie, dann auf die Seite, und das Lächeln bleibt."
+   },
+   "tod": {
+    "vorlesen": "Er fällt auf die Knie, dann auf die Seite. Das Lächeln bleibt. Für einen Atemzug sieht er aus wie jemand, der nur schläft.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt. Unter dem Moos ist es ein Mensch aus Moosgrab; sag das nicht, zeig es, wenn jemand hinsieht."
+   }
+  },
+  "sporenling": {
+   "name": "Sporenling",
+   "anzeige": "Etwas Kleines aus dem Geflecht",
+   "karte": "v:giftmade",
+   "kurz": "s",
+   "info": "Kleinvieh aus dem Geflecht, so groß wie ein Hund. Das Herz atmet sie aus, so viele, wie die Atemzug-Leiste zeigt.",
+   "notiz": "Platzhalter Giftmade (25 P.). Nachschub am Rundenende, solange das Herz schlägt: so viele wie Striche auf der Atemzug-Leiste, höchstens 4 je Runde (mit zerstörter Quelle aus Map 1 höchstens 2), auf Normal drei Runden lang, verteilt auf A, B und C. Ist die Glut überladen, kommen keine mehr.",
+   "anblick": "Ein Klumpen aus Moos und Wurzeln auf sechs dünnen Beinen. Vorn ein Loch, das sich öffnet und schließt, im Takt des Herzens.",
+   "zustandSaetze": {
+    "unverletzt": "Es zuckt nicht einmal.",
+    "angekratzt": "Ein Bein knickt weg. Es läuft auf den anderen weiter.",
+    "verwundet": "Es dreht sich im Kreis, als hätte es die Richtung vergessen.",
+    "schwer verwundet": "Es zieht sich über den Boden.",
+    "am Ende": "Ein Treffer noch.",
+    "gefallen": "Es platzt wie ein Bovist, und eine kleine Wolke steigt auf."
+   },
+   "tod": {
+    "vorlesen": "Es platzt wie ein Bovist. Eine kleine graue Wolke steigt auf und sinkt wieder.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt."
+   }
+  },
+  "ader": {
+   "name": "Ader",
+   "anzeige": "Ein Strang aus Wurzeln, dick wie ein Arm",
+   "karte": "eigen",
+   "kurz": "A",
+   "info": "Einer der drei Stränge, die das Herz an die Glut binden. Greift nicht an. Sind alle drei durch, liegt die Glutkammer offen.",
+   "werte": {
+    "name": "Ader",
+    "faction": "Urwild",
+    "praegung": [
+     "gift"
+    ],
+    "size": "1",
+    "quality": "6+",
+    "defense": "4+",
+    "tough": "4",
+    "role": "enemy",
+    "weapons": "",
+    "passives": "Greift nicht an, bewegt sich nicht, Furchtlos",
+    "flavor": "Warm. Sie pumpt."
+   },
+   "notiz": "Playbook: Verteidigung 4+, Zäh 4, drei Stück an den A-Markern vor dem Herz. Fällt eine, zählt die Leiste „Durchtrennte Adern“ eins hoch. Bei 3 liegt die Glutkammer offen: erst dann kann die Glut überladen werden (Reaktor der Anlage, vor den Spielern nur „die Glut“). Mit gelesenem Protokoll DS +1 gegen die Adern.",
+   "zusatz": [
+    {
+     "wenn": {
+      "flag": "protokoll_gelesen",
+      "ist": true
+     },
+     "text": "Die Schwachstelle ist bekannt (Protokoll): jeder Angriff hat DS +1. Als Verteidigung eine Stufe schlechter eingerechnet, nicht doppelt geben.",
+     "ansage": "Ihr wisst jetzt, wo es dünn ist.",
+     "werte": {
+      "defense": -1
+     }
+    }
+   ],
+   "anblick": "Ein Strang aus Wurzeln, dick wie ein Arm, läuft aus dem Fels ins Herz. Er zuckt mit jedem Schlag, und unter der Rinde sieht man es laufen, dunkel und heiß. Wo er ins Herz geht, glüht es rot.",
+   "zustandSaetze": {
+    "unverletzt": "Die Rinde hält. Der Strang pumpt weiter.",
+    "angekratzt": "Ein Schnitt. Es quillt, dann schließt es sich halb.",
+    "verwundet": "Der Strang hängt durch. Das Herz zuckt, als hätte es den Schnitt gespürt.",
+    "schwer verwundet": "Nur noch ein paar Fasern halten.",
+    "am Ende": "Eine Faser noch.",
+    "gefallen": "Die Ader reißt."
+   },
+   "tod": {
+    "vorlesen": "Die Ader reißt. Das Herz zuckt, und für einen Atemzug hört ihr nichts. Keine Namen, kein Schlagen. Dann schlägt es wieder. Schneller. Und dort, wo der Strang hineinging, wird das Rot heller.",
+    "gmNotiz": "Cue 05-X1, falls der Track da ist (Audio-Liste), sonst diesen Text. Die Leiste „Durchtrennte Adern“ zählt von selbst mit; bei 3 liegt die Glutkammer offen.",
+    "leisten": {
+     "adern": 1
+    }
+   }
+  },
+  "ueberlebender": {
+   "name": "Der Überlebende",
+   "anzeige": "Der Mann in der großen Rüstung",
+   "karte": "eigen",
+   "ersatz": "v:krieger",
+   "seite": "freund",
+   "kurz": "Ü",
+   "nurWenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "info": "Der Letzte von denen, die mit ihm hinuntergekommen sind. Er kämpft auf eurer Seite. Er will in die Glut, und er weiß, wie man sie zum Überlaufen bringt.",
+   "werte": {
+    "name": "Der Überlebende",
+    "faction": "Verbündet",
+    "size": "1",
+    "quality": "3+",
+    "defense": "3+",
+    "tough": "6",
+    "role": "hero",
+    "weapons": "Schweres Rohr | 24\" | A2 | DS(1)\nKampfmesser | Nahkampf | A2 | ",
+    "passives": "Furchtlos",
+    "flavor": "Eine Rüstung, größer als ein Mensch, zerschrammt und halb verbrannt. Er ist der Letzte von seinen Leuten."
+   },
+   "notiz": "Nur, wenn Map 4 ueberlebender_dabei gesetzt hat. Verbündeter, zählt nicht ins Punktebudget. Eigene Werte etwa 100 P. (Q3+ D3+ Z6, schweres Rohr mit DS 1). Miniatur: ein Space Marine in schwerer Rüstung, verwundet. Er kommt angeschlagen auf den Tisch: 1 Wunde, wenn er in Map 4 versorgt wurde, sonst 3 (steht schon an seiner Karte). Ein Spieler führt ihn (der, der ihn in Map 4 gefunden hat), sonst du. Er überlädt die Glut leichter (Taste Y) und kann sich auf der Flucht opfern (Taste Z).",
+   "anblick": "Eine Rüstung, größer als ein Mensch, zerschrammt, eine Seite schwarz verbrannt. Er hat den Helm abgenommen: ein Gesicht, grau vor Müdigkeit, und Augen, die nur auf das Glühen im Herz sehen.",
+   "zustandSaetze": {
+    "unverletzt": "Er steht, das Rohr ruhig, als hätte er nie etwas anderes getan.",
+    "angekratzt": "Ein Treffer an der Rüstung. Er sieht nicht einmal hin.",
+    "verwundet": "Er atmet schwer. Die verbrannte Seite der Rüstung raucht.",
+    "schwer verwundet": "Er kniet beim Schießen. Er sagt etwas in seiner Sprache, kurz, wie ein Gebet.",
+    "am Ende": "Noch ein Treffer, und er steht nicht mehr auf. Er weiß es. Er sieht zur Glut.",
+    "gefallen": "Er sinkt auf ein Knie, dann ganz."
+   },
+   "tod": {
+    "vorlesen": "Er sinkt auf ein Knie, dann ganz. Das Rohr fällt ihm aus der Hand, und er greift nicht danach. Er sieht zur Glut, bis er nichts mehr sieht.",
+    "gmNotiz": "Er ist gefallen. Überladen müssen die Helden jetzt selbst (Taste X, schwerer). Opfern kann er sich nicht mehr.",
+    "setzt": {
+     "ueberlebender_tot": true
+    }
+   }
+  }
+ },
+ "fog": {
+  "stufen": [
+   {
+    "id": "unverletzt",
+    "wenn": "wunden == 0",
+    "satz": "Nichts. Es hat nicht mal gezuckt."
+   },
+   {
+    "id": "angekratzt",
+    "wenn": "rest > zaeh / 2",
+    "satz": "Getroffen. Es blutet grün, mehr nicht."
+   },
+   {
+    "id": "verwundet",
+    "wenn": "rest <= zaeh / 2 && rest > zaeh / 4",
+    "satz": "Das hat gesessen. Es bewegt sich schwerer."
+   },
+   {
+    "id": "schwer verwundet",
+    "wenn": "rest <= zaeh / 4 && rest > 1",
+    "satz": "Es hängt schief, Sporen rieseln aus der Wunde."
+   },
+   {
+    "id": "am Ende",
+    "wenn": "rest == 1",
+    "satz": "Ein Treffer noch. Es weiß es."
+   },
+   {
+    "id": "gefallen",
+    "wenn": "rest <= 0",
+    "satz": "Es fällt. Figur vom Tisch."
+   }
+  ],
+  "bedrohung": [
+   {
+    "schaedel": [
+     1,
+     2
+    ],
+    "satz": "Kleinvieh. Ihr habt so etwas schon erlegt."
+   },
+   {
+    "schaedel": [
+     3,
+     4
+    ],
+    "satz": "Das ist ein Gegner. Nicht allein hingehen."
+   },
+   {
+    "schaedel": [
+     5
+    ],
+    "satz": "Dafür braucht ihr alle."
+   },
+   {
+    "schaedel": [
+     6
+    ],
+    "satz": "Boss."
+   }
+  ],
+  "notiz": "rest = zaeh × modelle − wunden. Spieler sehen nie Zahlen, nur den Satz."
+ },
+ "beutewurf": [
+  [
+   1,
+   "Nichts. Ein Kerzenstummel und Moos."
+  ],
+  [
+   2,
+   "Heiltrank"
+  ],
+  [
+   3,
+   "Rauchbombe"
+  ],
+  [
+   4,
+   "Heldenelixier"
+  ],
+  [
+   5,
+   "Feuertopf"
+  ],
+  [
+   6,
+   "Amulett der Abwehr"
+  ]
+ ],
+ "verhalten": {
+  "ruhig": [
+   [
+    "1",
+    "zögern, keine Aktion"
+   ],
+   [
+    "2–3",
+    "bewegen"
+   ],
+   [
+    "4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "wuetend": [
+   [
+    "1",
+    "bewegen"
+   ],
+   [
+    "2–4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "notiz": "Steht ein Gegner schon im Nahkampf und der Würfel sagt „bewegen“, greift er stattdessen an. Im ganzen Finale gilt die wütende Tabelle, vorher die Gegnerwahl (Taste G). Ist der Rufer gefallen, nimm für die leeren Rüstungen die ruhige Spalte (Vorschlag, Taste T)."
+ },
+ "rundenende": [
+  {
+   "wenn": {
+    "flag": "kampf_laeuft",
+    "ist": true
+   },
+   "gegnerHinzu": [
+    {
+     "id": "ruestung",
+     "anzahl": 1,
+     "zone": "B"
+    }
+   ],
+   "hoechstens": 3,
+   "skaliert": true,
+   "text": "Nachschub: aus der Wand hinter Feindzone B löst sich eine leere Rüstung (steht in der Gegnerliste)."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "flag": "befallener_im_keller",
+      "ist": true
+     },
+     {
+      "runde": ">=",
+      "wert": 2
+     }
+    ]
+   },
+   "gegnerHinzu": [
+    {
+     "id": "befallener",
+     "anzahl": 2,
+     "zone": "S"
+    }
+   ],
+   "hoechstens": 1,
+   "text": "Nachschub: aus dem Schacht (↑) kommen zwei Befallene aus dem Gemeindehaus. Ihr kennt sie."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "flag": "quelle_zerstoert",
+      "nicht": true
+     }
+    ]
+   },
+   "gegnerHinzu": [
+    {
+     "id": "sporenling",
+     "anzahl": {
+      "leiste": "atemzug",
+      "min": 0,
+      "max": 4
+     },
+     "zone": "A"
+    }
+   ],
+   "hoechstens": 3,
+   "skaliert": true,
+   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt (höchstens 4). Verteile sie auf die Feindzonen A, B und C."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     }
+    ]
+   },
+   "gegnerHinzu": [
+    {
+     "id": "sporenling",
+     "anzahl": {
+      "leiste": "atemzug",
+      "min": 0,
+      "max": 2
+     },
+     "zone": "A"
+    }
+   ],
+   "hoechstens": 3,
+   "skaliert": true,
+   "text": "Nachschub: so viele Sporenlinge, wie die Atemzug-Leiste zeigt, ohne die Quelle aber höchstens 2. Verteile sie auf die Feindzonen A, B und C."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "glut_ueberladen",
+      "ist": true
+     },
+     {
+      "flag": "alle_draussen",
+      "nicht": true
+     },
+     {
+      "flag": "glut_gebrochen",
+      "nicht": true
+     }
+    ]
+   },
+   "leisten": {
+    "glut": 1
+   },
+   "text": "Die Glut: ein Strich mehr. Bei 6 bricht sie."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "kampf_laeuft",
+      "ist": true
+     },
+     {
+      "flag": "glut_ueberladen",
+      "nicht": true
+     }
+    ]
+   },
+   "ereignis": [
+    "ausatmen-sofort",
+    "ausatmen"
+   ]
+  }
+ ],
+ "ereignisse": {
+  "herz-ansehen": {
+   "name": "Das Herz ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Herz ansehen",
+   "taste": "I",
+   "marker": "herz:♥",
+   "einmal": true,
+   "kosten": "Held in Sichtweite, keine Aktion",
+   "wofuer": "Das Herz mit der Glutkammer in der Mitte, Ziel der Map. Erst die drei Adern durchtrennen, dann die Glut überladen (Held 5+, der Überlebende 3+), dann zum Schacht.",
+   "vorlesen": "Wurzeln, Fleisch und Metall, ineinander gewachsen, als hätte jemand alles, was er finden konnte, zu einem Klumpen geknetet. In seiner Mitte glüht es, rot, durch die Rinde hindurch. Es schlägt.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Das Glühen ist kein Feuer. Es ist zu gleichmäßig, und es wird mit jedem Schlag heller und wieder dunkler. Das Herz ist um etwas herumgewachsen, das brennt."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Drei Stränge führen hinein, dick wie Arme. Sie halten das Glühen fest, wie Finger eine Kohle. Dazwischen, tief im Fleisch, eine Kante aus Metall. Eine Klappe.",
+      "gmNotiz": "Hinweis: die Adern zuerst, dann die Klappe zur Glut. Nichts erklären."
+     }
+    ]
+   }
+  },
+  "ader-ansehen": {
+   "name": "Eine Ader ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Ader ansehen",
+   "taste": "J",
+   "marker": "ader:A",
+   "einmal": true,
+   "kosten": "Held näher als eine Kartenlänge, keine Aktion",
+   "wofuer": "Die drei Adern: je Verteidigung 4+, Zäh 4. Sind alle drei durch, liegt die Glutkammer offen, und erst dann kann man die Glut überladen.",
+   "vorlesen": "Ein Strang aus Wurzeln läuft aus dem Fels ins Herz. Er ist heiß. Er zuckt mit jedem Schlag.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Die Rinde ist weicher als am Herzen. Eine Klinge ginge hinein wie in nasses Holz."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Wo der Strang im Fels verschwindet, ist der Fels grün. Er kommt von oben. Vom Dorf.",
+      "gmNotiz": "Nur Stimmung: die Adern kommen aus dem Brunnen."
+     }
+    ]
+   }
+  },
+  "truemmer-ansehen": {
+   "name": "Die Trümmer ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Trümmer",
+   "taste": "O",
+   "marker": "truemmer:M",
+   "einmal": true,
+   "beutewurf": true,
+   "kosten": "Held in Kontakt, 1 Aktion",
+   "wofuer": "Trümmer und Ausrüstung des ausgelöschten Trupps (Suchmarker mit Beutewurf). Ist der Überlebende dabei, steht er am Anfang hier.",
+   "vorlesen": "Zwischen den Steinen liegen Rüstungsteile, zu groß für einen Menschen, und leer. Ein Rohr, verbogen. Ein Helm, in dem Moos wächst.",
+   "gmNotiz": "Beutewurf für den Helden, der sucht (Knöpfe unten).",
+   "probe": {
+    "frage": "Der Held, der sucht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Unter einem Schulterstück: Kratzer im Fels, Striche, viele, in Fünfergruppen. Jemand hat hier lange gewartet."
+     }
+    ]
+   }
+  },
+  "schacht-ansehen": {
+   "name": "Den Schacht hinaufsehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Schacht",
+   "taste": "V",
+   "marker": "schacht:↑",
+   "einmal": true,
+   "kosten": "Held in Kontakt, keine Aktion",
+   "wofuer": "Der Schacht nach oben ins Dorf: der einzige Weg hinaus, wenn die Glut überläuft. War in Map 3 ein Befallener im Keller, kommen von hier am Ende von Runde 2 zwei Befallene herunter.",
+   "vorlesen": "Der Schacht, eng und nass, nach oben. Ganz oben ein grauer Fleck: Himmel, über dem Brunnen von Moosgrab. Kalte Luft fällt herunter.",
+   "gmNotiz": "Hinein mit einer ganzen Aktion, höchstens zwei Figuren je Runde. Wer drin ist, ist auf dem Weg nach oben und raus."
+  },
+  "marke-zeigen": {
+   "name": "Frage: die Erkennungsmarke zeigen",
+   "gruppe": "Fragen",
+   "kurz": "Erkennungsmarke",
+   "taste": "1",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "fund_marke",
+      "ist": true
+     },
+     {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     },
+     {
+      "flag": "marke_gezeigt",
+      "nicht": true
+     }
+    ]
+   },
+   "vorlesen": "Er nimmt die Marke, liest den Namen und gibt sie zurück. „Einer von uns. Von früher. Vierzig Jahre.“ Er schweigt. „Dann sind wir nicht die Ersten, die hier unten sterben.“",
+   "gmNotiz": "Er vertraut den Helden. Schieben sie ihm am Ende die tote Probe unter, glaubt er ihnen eher (+1 auf den Qualitätstest).",
+   "setzt": {
+    "marke_gezeigt": true
+   }
+  },
+  "protokoll-zeigen": {
+   "name": "Frage: ihm das Protokoll geben",
+   "gruppe": "Fragen",
+   "kurz": "Protokoll",
+   "taste": "2",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "fund_protokoll",
+      "ist": true
+     },
+     {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     },
+     {
+      "flag": "protokoll_gelesen",
+      "nicht": true
+     }
+    ]
+   },
+   "kosten": "Im Gespräch kostet es nichts, im Kampf muss der Held bei ihm stehen.",
+   "vorlesen": "Er blättert, schnell, mit dem Finger auf den Zeichnungen. Er kann die Schrift lesen. „Die Stränge. Wo sie hineingehen, ist es dünn. Und hier: so öffnet man die Klappe.“ Er gibt euch die Blätter zurück.",
+   "gmNotiz": "Protokoll gelesen: DS +1 gegen die Adern (steht an ihren Karten) und +1 auf jeden Versuch, die Glut zu überladen.",
+   "setzt": {
+    "protokoll_gelesen": true
+   }
+  },
+  "probe-zeigen": {
+   "name": "Frage: ihm die lebende Probe zeigen",
+   "gruppe": "Fragen",
+   "kurz": "Lebende Probe",
+   "taste": "3",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "fund_probe",
+      "ist": true
+     },
+     {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     }
+    ]
+   },
+   "vorlesen": "Er sieht in das Glas. Darin bewegt sich etwas, das aussieht wie Moos. „Mein Befehl war: ein Stück mitbringen. Mein Befehl war auch: es zerstören.“ Er zuckt mit der verbrannten Schulter. „Ihr entscheidet. Nachher.“",
+   "gmNotiz": "Die Entscheidung kommt, wenn die Glutkammer offen ist (Schritt „Was in die Glut geht“)."
+  },
+  "frage-glut": {
+   "name": "Frage: was da brennt",
+   "gruppe": "Fragen",
+   "kurz": "Die Glut",
+   "taste": "4",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "vorlesen": "„Die Glut ist älter als euer Dorf. Sie kam mit dem Stern. Das Herz ist um sie herumgewachsen, wie Moos um einen warmen Stein.“"
+  },
+  "frage-leute": {
+   "name": "Frage: seine Leute",
+   "gruppe": "Fragen",
+   "kurz": "Seine Leute",
+   "taste": "5",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "vorlesen": "Er sieht zu den leeren Rüstungen. „Wir waren zwölf. Die da haben sie geholt, einen nach dem anderen. Ich war zu langsam zum Sterben.“"
+  },
+  "frage-wie": {
+   "name": "Frage: wie man es aufhält",
+   "gruppe": "Fragen",
+   "kurz": "Wie aufhalten",
+   "taste": "6",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "vorlesen": "„Erst die drei Stränge. Dann die Klappe in der Glut auf, und das hier hinein.“ Er zeigt auf etwas an seinem Gürtel. „Ich mache das. Ihr haltet sie mir vom Leib.“",
+   "gmNotiz": "Der Plan für die Spieler: Adern, dann überladen, dann laufen. Steht auch im Auftrag."
+  },
+  "frage-danach": {
+   "name": "Frage: was danach kommt",
+   "gruppe": "Fragen",
+   "kurz": "Danach",
+   "taste": "7",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "vorlesen": "„Dann habt ihr nicht lange. Sechs Atemzüge, vielleicht. Den Schacht hinauf. Nicht stehen bleiben.“",
+   "gmNotiz": "Die Spieler wissen damit vom Countdown (Glut-Leiste, 6 Striche)."
+  },
+  "ausatmen": {
+   "name": "Das Herz atmet aus (W6)",
+   "gruppe": "Rundenende",
+   "kurz": "Ausatmen",
+   "marker": "herz:♥",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "runde": ">=",
+      "wert": 1
+     },
+     {
+      "nicht": {
+       "alle": [
+        {
+         "flag": "sofort_angriff",
+         "ist": true
+        },
+        {
+         "runde": "==",
+         "wert": 1
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "kosten": "Kommt von selbst nach R, solange die Glut nicht überladen ist.",
+   "vorlesen": "Das Herz zieht sich zusammen, langsam. Der ganze Fels hält die Luft an.",
+   "gmNotiz": "Ist der Wurf kleiner oder gleich der Zahl der Striche auf der Atemzug-Leiste, atmet es aus (Stufe unten). Sonst atmet es nur ein: „nichts weiter“, du sagst nichts. Hat der Rundenwurf eine 6 gebracht, fällt das Ausatmen dieser Runde aus.",
+   "probe": {
+    "frage": "Du würfelst einen W6. Kleiner oder gleich der Atemzug-Leiste: es atmet aus.",
+    "stufen": [
+     {
+      "bisLeiste": "atemzug",
+      "vorlesen": "Das Herz atmet aus. Warm. Und es sagt eure Namen.",
+      "gmNotiz": "Alles innerhalb einer Kartenbreite um das Herz ist ab jetzt verseucht (Filz dazulegen). Jeder Held darin: Qualitätstest, misslungen geht er sofort eine Kartenbreite auf das Herz zu. Wer den Kupferanhänger trägt, hört seinen Namen auch weiter weg und testet immer mit (Vorschlag). Der Überlebende hört nichts."
+     }
+    ]
+   }
+  },
+  "ausatmen-sofort": {
+   "name": "Das Herz atmet aus (Runde 1, ohne Würfel)",
+   "gruppe": "Rundenende",
+   "kurz": "Ausatmen",
+   "marker": "herz:♥",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "flag": "sofort_angriff",
+      "ist": true
+     },
+     {
+      "runde": "==",
+      "wert": 1
+     }
+    ]
+   },
+   "kosten": "Kommt von selbst nach R, solange die Glut nicht überladen ist.",
+   "vorlesen": "Das Herz schlägt schneller, seit ihr zugeschlagen habt. Jetzt atmet es aus. Warm. Und es sagt eure Namen.",
+   "gmNotiz": "Sofort angegriffen: am Ende von Runde 1 atmet es sicher aus, kein Wurf. Alles innerhalb einer Kartenbreite um das Herz ist verseucht (Filz). Jeder Held darin: Qualitätstest, misslungen eine Kartenbreite auf das Herz zu. Ab Runde 2 normal mit Würfel."
+  },
+  "gegnerwahl": {
+   "name": "Wen greift diese Gruppe an? (W6)",
+   "gruppe": "Kampf",
+   "kurz": "Wen?",
+   "taste": "G",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "kampf_laeuft",
+      "ist": true
+     },
+     {
+      "flag": "glut_gebrochen",
+      "nicht": true
+     }
+    ]
+   },
+   "kosten": "Vor dem Zug jeder Gegnergruppe. Du würfelst, dann der Verhaltenswürfel.",
+   "gmNotiz": "1 bis 3 die Helden, 4 bis 6 der Überlebende (wenn er dabei ist und steht, sonst die Helden). Ein befallener Held (ab 3 Sporenpunkten, am Heldenchip) wird schon bei 4 gewählt: sie riechen es.",
+   "probe": {
+    "frage": "Du würfelst einen W6 für die Gruppe, die gleich zieht.",
+    "stufen": [
+     {
+      "bis": 3,
+      "gmNotiz": "Die Helden: der nächste Held in Reichweite. Steht ein befallener Held in Reichweite, ist er es."
+     },
+     {
+      "ab": 4,
+      "bis": 4,
+      "gmNotiz": "Ein befallener Held (ab 3 Sporenpunkten), wenn einer in Reichweite ist. Sonst der Überlebende, sonst der nächste Held."
+     },
+     {
+      "ab": 5,
+      "gmNotiz": "Der Überlebende, wenn er dabei ist und in Reichweite steht. Sonst der nächste Held."
+     }
+    ]
+   }
+  },
+  "feuertopf": {
+   "name": "Ein Feuertopf an eine Ader",
+   "gruppe": "Kampf",
+   "kurz": "Feuertopf",
+   "taste": "F",
+   "marker": "ader:A",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "kampf_laeuft",
+        "ist": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "leiste": "adern",
+      "<": 3
+     }
+    ]
+   },
+   "kosten": "Ein Held wirft einen Feuertopf aus seinem Inventar (dort benutzen).",
+   "vorlesen": "Der Topf zerspringt an der Ader. Das Feuer läuft in die Rinde, und der Strang windet sich wie ein Seil, an dem jemand zieht.",
+   "gmNotiz": "Trifft der Wurf: ein Treffer mehr als gewürfelt, normal verteidigen. Danach den Feuertopf im Inventar des Helden benutzen."
+  },
+  "protokoll-studieren": {
+   "name": "Ein Held studiert das Protokoll (W6)",
+   "gruppe": "Kampf",
+   "kurz": "Protokoll lesen",
+   "taste": "K",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "fund_protokoll",
+      "ist": true
+     },
+     {
+      "flag": "protokoll_gelesen",
+      "nicht": true
+     },
+     {
+      "flag": "kampf_laeuft",
+      "ist": true
+     },
+     {
+      "flag": "glut_ueberladen",
+      "nicht": true
+     }
+    ]
+   },
+   "kosten": "Der Held, der die Blätter trägt, verzichtet auf seine ganze Aktivierung und steht nicht im Nahkampf.",
+   "vorlesen": "Die Schrift kann niemand von euch lesen. Aber zwischen den Zeilen sind Zeichnungen: ein Klumpen, drei Stränge, eine Klappe, Pfeile, Kreuze.",
+   "gmNotiz": "Der Nebenweg, wenn der Überlebende die Blätter nicht liest (oder nicht dabei ist). Unter 4: nichts gefunden, nächste Runde noch einmal.",
+   "probe": {
+    "frage": "Der Held würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 4,
+      "vorlesen": "Da. Wo die Stränge ins Herz gehen, ist ein Kreis gezeichnet, dreimal nachgezogen. Und neben der Klappe eine Hand, die einen Hebel nach unten drückt.",
+      "gmNotiz": "Protokoll gelesen: DS +1 gegen die Adern (an den Karten), +1 auf jeden Versuch, die Glut zu überladen.",
+      "setzt": {
+       "protokoll_gelesen": true
+      }
+     }
+    ]
+   }
+  },
+  "ueberladen-held": {
+   "name": "Ein Held überlädt die Glut (W6, ab 5)",
+   "gruppe": "Ziel",
+   "kurz": "Überladen (Held)",
+   "taste": "X",
+   "marker": "herz:♥",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "kampf_laeuft",
+      "ist": true
+     },
+     {
+      "leiste": "adern",
+      ">=": 3
+     },
+     {
+      "flag": "glut_ueberladen",
+      "nicht": true
+     }
+    ]
+   },
+   "kosten": "Held in Kontakt mit dem Herz, eine ganze Aktion. Mit gelesenem Protokoll +1 auf den Wurf (gib den Wurf plus eins ein).",
+   "vorlesen": "Ihr greift in das heiße Fleisch, dorthin, wo die Stränge waren. Die Klappe ist glühend, sie verbrennt euch die Hände durch die Handschuhe.",
+   "gmNotiz": "Der Weg ohne den Überlebenden: schwer, aber jeder Held darf es versuchen, auch mehrere in einer Runde. Misslungen: ein Treffer für den Helden (Hitze, normal verteidigen), nächster Versuch geht.",
+   "probe": {
+    "frage": "Der Held würfelt einen W6 (mit Protokoll +1).",
+    "stufen": [
+     {
+      "ab": 5,
+      "vorlesen": "Die Klappe gibt nach. Dahinter Licht, weiß, und ein Ton wie von tausend Glocken zugleich.",
+      "gmNotiz": "Die Glut ist überladen. Weiter zu Cue 05-2, die Flucht beginnt.",
+      "setzt": {
+       "glut_ueberladen": true,
+       "ueberladen_von": "held"
+      },
+      "leistenAn": [
+       "glut"
+      ]
+     }
+    ]
+   }
+  },
+  "ueberladen-ueberlebender": {
+   "name": "Der Überlebende überlädt die Glut (W6, ab 3)",
+   "gruppe": "Ziel",
+   "kurz": "Überladen (Überlebender)",
+   "taste": "Y",
+   "marker": "herz:♥",
+   "einmal": false,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "kampf_laeuft",
+      "ist": true
+     },
+     {
+      "leiste": "adern",
+      ">=": 3
+     },
+     {
+      "flag": "glut_ueberladen",
+      "nicht": true
+     },
+     {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "nicht": {
+         "gegnerGefallen": "ueberlebender"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Der Überlebende in Kontakt mit dem Herz, seine ganze Aktivierung. Mit gelesenem Protokoll +1 auf den Wurf.",
+   "vorlesen": "Er stemmt die Schulter gegen das Herz und reißt etwas von seinem Gürtel. Seine Rüstung zischt, wo sie das Fleisch berührt. Er flucht, leise, in seiner Sprache.",
+   "gmNotiz": "Er weiß, wie es geht: ab 3. Misslungen: ein Treffer für ihn (Hitze, normal verteidigen), nächste Runde noch einmal.",
+   "probe": {
+    "frage": "Würfle einen W6 für ihn (mit Protokoll +1).",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Die Klappe gibt nach. Er schiebt das Ding hinein, bis zum Ellbogen, und zieht den Arm zurück. Dahinter Licht, weiß, und ein Ton wie von tausend Glocken zugleich.",
+      "gmNotiz": "Die Glut ist überladen. Weiter zu Cue 05-2, die Flucht beginnt.",
+      "setzt": {
+       "glut_ueberladen": true,
+       "ueberladen_von": "ueberlebender"
+      },
+      "leistenAn": [
+       "glut"
+      ]
+     }
+    ]
+   }
+  },
+  "rufer-weg": {
+   "name": "Der Rufer ist gefallen: Rüstungen ruhig",
+   "gruppe": "Kampf",
+   "kurz": "Rüstungen ruhig",
+   "taste": "T",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "rufer_gefallen",
+      "ist": true
+     },
+     {
+      "flag": "ruestungen_ruhig",
+      "nicht": true
+     }
+    ]
+   },
+   "vorlesen": "Die leeren Rüstungen drehen die Helme, hierhin, dorthin. Niemand ruft sie mehr.",
+   "gmNotiz": "Vorschlag: Ab jetzt würfeln die leeren Rüstungen auf der ruhigen Tabelle (die Leiste zeigt weiter wütend; nimm für sie die ruhige Spalte). Sporenlinge und Befallene bleiben wütend.",
+   "setzt": {
+    "ruestungen_ruhig": true
+   }
+  },
+  "im-schacht": {
+   "name": "Alle, die hinauswollen, sind im Schacht",
+   "gruppe": "Flucht",
+   "kurz": "Alle draußen",
+   "taste": "D",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "glut_ueberladen",
+      "ist": true
+     },
+     {
+      "flag": "alle_draussen",
+      "nicht": true
+     },
+     {
+      "flag": "glut_gebrochen",
+      "nicht": true
+     }
+    ]
+   },
+   "kosten": "Drücken, sobald der letzte Held im Schacht ist (oder alle anderen bewusstlos mitgeschleppt werden).",
+   "vorlesen": "Der Letzte zieht sich in den Schacht. Unter euch wird das Licht weiß.",
+   "gmNotiz": "Die App schaut auf die Glut-Leiste: bis 3 Striche entkommen (Epilog A), 4 oder 5 knapp (Epilog B). Ist der Überlebende unten geblieben (Opfer), Epilog C.",
+   "setzt": {
+    "alle_draussen": true
+   }
+  },
+  "opfer": {
+   "name": "Der Überlebende bleibt und hält die Glut",
+   "gruppe": "Flucht",
+   "kurz": "Er bleibt",
+   "taste": "Z",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "alle": [
+       {
+        "flag": "glut_ueberladen",
+        "ist": true
+       },
+       {
+        "flag": "alle_draussen",
+        "nicht": true
+       },
+       {
+        "flag": "glut_gebrochen",
+        "nicht": true
+       }
+      ]
+     },
+     {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "nicht": {
+         "gegnerGefallen": "ueberlebender"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "kosten": "Er muss an der Glut stehen (oder dorthin zurückgehen). Der Spieler, der ihn führt, entscheidet, oder er tut es selbst, wenn die Helden sonst nicht hinauskommen.",
+   "vorlesen": "Er bleibt stehen. Er dreht sich um, zurück zur Glut, und stemmt sich mit beiden Händen gegen die Klappe, als könnte er sie zuhalten. „Geht.“ Mehr sagt er nicht.",
+   "gmNotiz": "Glut-Leiste −2: zwei Runden mehr für die Helden. Er kommt nicht mehr heraus: Epilog C (jemand bleibt zurück). Nimm seine Figur vom Tisch, sobald die Glut bricht.",
+   "setzt": {
+    "ueberlebender_opfert": true
+   },
+   "leisten": {
+    "glut": -2
+   }
+  }
+ },
+ "schritte": {
+  "vorb-material": {
+   "typ": "vorbereitung",
+   "titel": "Bereitlegen",
+   "checkliste": [
+    "Die leeren Rüstungen: 5 Figuren (Rubric Marines der Thousand Sons passen), dazu der Rufer (Sorcerer). Zwei Rüstungen und der Rufer stehen am Anfang, die anderen kommen je Rundenende",
+    "Der Überlebende, falls die Folgen unten ihn nennen: eine große Figur in schwerer Rüstung (ein Space Marine passt)",
+    "Das Herz: ein großes Stück Gelände (Wurzeln, Stein, was du hast), in der Mitte etwas Rotes oder ein Licht für die Glut, davor 3 Adern (Wurzelstücke oder Marker)",
+    "Sporenlinge: bis zu 4 je Runde, über den Abend höchstens 12 bis 14 (Platzhalter Giftmade)",
+    "2 Figuren für Befallene aus dem Gemeindehaus, falls die Folgen unten sie nennen",
+    "Filz für verseuchte Flächen: die Herzkammer und mehr, denn das Herz atmet aus",
+    "Gelände: 2 Wurzelwände, eine glatte Wand, Werktisch, Glastank, Trümmer, Pilze. Frei hinstellen, wichtig sind Herz, Adern, Zonen, Trümmer, Schacht und Start",
+    "Zwei Zählsteine sichtbar auf den Tisch: die Atemzug-Leiste aus Map 4 und einer für die Glut (0 bis 6), der läuft erst nach dem Überladen",
+    "Fundstücke aus Map 4 als Zettel bei den Spielern, die sie tragen (Erkennungsmarke, Protokoll, Probe)",
+    "Ein W6 für die Spieler und einer für dich (Gegnerwahl, Ausatmen, Verhalten)"
+   ],
+   "hinweis": "Der große Tisch, wenn du ihn hast. Kein Zollstock: eine Bewegung ist eine Kartenlänge, „nah am Herzen“ heißt innerhalb einer Kartenbreite. Map 5 ist laut und schnell: Gegner zügig würfeln, keine langen Pausen.",
+   "weiter": "vorb-stand"
+  },
+  "vorb-stand": {
+   "typ": "vorbereitung",
+   "titel": "Stand und Audio",
+   "checkliste": [
+    "Gruppe gewählt (Reiter Gruppe), Heldenbögen bei den Spielern",
+    "Audio: 05-1, 05-2, 05-X1 und die Epiloge sind noch nicht aufgenommen. Fehlt ein Track, liest du den Text an seiner Stelle vor",
+    "Kampfmusik: Battle Cue 1 aus Map 1, bis der eigene (Puls und Chor) da ist",
+    "Lautsprecher geprüft"
+   ],
+   "hinweis": "Die App zeigt je Cue, ob die Datei auf dem Server liegt.",
+   "weiter": "vorb-aus-map4"
+  },
+  "vorb-aus-map4": {
+   "typ": "vorbereitung",
+   "titel": "Was aus Map 4 mitkommt",
+   "uebernahme": true,
+   "checkliste": [
+    "Wunden und Power: Am Ende von Map 4 hat jeder Held 3 Wunden und 3 Power zurückbekommen (OPR), nicht alles. Heldenbögen prüfen",
+    "Wer in Map 4 bewusstlos war, würfelt jetzt auf der Verletzungstabelle",
+    "Sporenpunkte stehen an den Heldenchips (übernommen)"
+   ],
+   "hinweis": "Alles darunter hat die App aus dem Spielstand von Map 4 gezogen und schon verbucht (Atemzug, Sporenpunkte, ob der Überlebende mitkommt). Du musst nichts nachfragen.",
+   "folgen": [
+    {
+     "wenn": {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     },
+     "text": "Der Überlebende aus Map 4 ist dabei: er kämpft als Verbündeter mit (steht im Kampf unter „Verbündete“, seine Wunden aus Map 4 sind eingerechnet). Er überlädt die Glut leichter und kann sich auf der Flucht opfern. Ein Spieler führt ihn, sonst du."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_dabei",
+      "nicht": true
+     },
+     "text": "Kein Überlebender aus Map 4: die Helden sind allein. Die Glut überladen sie selbst (W6 ab 5, mit Protokoll ab 4)."
+    },
+    {
+     "wenn": {
+      "flag": "fund_marke",
+      "ist": true
+     },
+     "text": "Die Erkennungsmarke ist dabei. Zeigen die Helden sie dem Überlebenden, vertraut er ihnen (Taste 1 im Gespräch). Ohne ihn: nur ein Andenken, er war einer der Männer von vor vierzig Jahren."
+    },
+    {
+     "wenn": {
+      "flag": "fund_protokoll",
+      "ist": true
+     },
+     "text": "Das Protokoll ist dabei: es zeigt die Schwachstelle der Adern und wie man die Klappe der Glut öffnet (DS +1 gegen die Adern, +1 beim Überladen). Der Überlebende liest es sofort (Taste 2); sonst kann ein Held es im Kampf studieren (Taste K, W6 ab 4)."
+    },
+    {
+     "wenn": {
+      "flag": "fund_probe",
+      "ist": true
+     },
+     "text": "Die lebende Probe aus dem Glastank ist dabei. Wenn die Glutkammer offen ist, entscheiden die Helden, ob sie hineinkommt oder mit hinaus."
+    },
+    {
+     "wenn": {
+      "flag": "fund_tote_probe",
+      "ist": true
+     },
+     "text": "Die tote Probe aus dem zweiten Glastank ist dabei. Damit können die Helden den Überlebenden am Ende täuschen, wenn er ein Stück mitnehmen will (Qualitätstest)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "fund_marke",
+        "nicht": true
+       },
+       {
+        "flag": "fund_protokoll",
+        "nicht": true
+       },
+       {
+        "flag": "fund_probe",
+        "nicht": true
+       },
+       {
+        "flag": "fund_tote_probe",
+        "nicht": true
+       }
+      ]
+     },
+     "text": "Kein Fundstück aus Map 4: kein Vorteil, dafür Atemzug +1 (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "befallener_im_keller",
+      "ist": true
+     },
+     "text": "In Map 3 war ein Befallener im Keller: am Ende von Runde 2 kommen zwei Befallene aus dem Gemeindehaus durch den Schacht herunter (die App setzt sie dazu). Sie stehen dann im Fluchtweg."
+    },
+    {
+     "wenn": {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     },
+     "text": "Die Quelle aus Map 1 ist zerstört: weniger Nachschub, höchstens 3 Sporenlinge je Runde statt 6 (die App rechnet)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "nicht": true
+       }
+      ]
+     },
+     "text": "{anhaenger_traeger} trägt noch den Kupferanhänger: 1 Sporenpunkt auf dem Weg hierher (verbucht, am Heldenchip). Nicht sagen, woher. Nur für dich: Beim Ausatmen hört er seinen Namen, egal wo er steht (Vorschlag)."
+    },
+    {
+     "wenn": {
+      "flag": "frau_name",
+      "ist": "Lene"
+     },
+     "text": "Die Helden kennen Lenes Namen. Wenn das Herz schlägt, flüstert es ihn zwischen ihren eigenen. Nur Stimmung."
+    },
+    {
+     "text": "Die Atemzug-Leiste aus Map 4 zählt in diesem Kampf: so viele Sporenlinge kommen je Runde nach (höchstens 4), und so leicht atmet das Herz aus (W6 kleiner oder gleich der Leiste)."
+    },
+    {
+     "wenn": {
+      "flag": "zwei_gerettet",
+      "ist": true
+     },
+     "text": "Aus Map 3: Mindestens zwei Gerettete warten oben am Brunnen und lassen ein Seil herab: auf der Flucht kommen drei Figuren je Runde in den Schacht statt zwei."
+    }
+   ],
+   "weiter": "aufbau-tisch"
+  },
+  "aufbau-tisch": {
+   "typ": "aufbau",
+   "titel": "Den Tisch aufbauen",
+   "skizze": "alles",
+   "tisch": [
+    "Die Herzkammer oben in der Mitte (verseuchte Fläche, Filz). Darin das Herz mit der Glut in der Mitte, davor die drei Adern (A): links, mittig, rechts",
+    "Wurzelwände links und rechts der Herzkammer, eine glatte Wand an der linken Kante, halbe Höhe",
+    "Werktisch links oben, Glastank rechts, Pilze verstreut. Trümmer rechts unten (M), daneben der Schacht nach oben (↑): der einzige Weg hinaus",
+    "Feindzonen A (links oben), B (rechts oben) und C (links unten) hinlegen",
+    "Erstarrt aufstellen, die Helme gesenkt: der Rufer direkt vor dem Herz, je eine leere Rüstung vor Zone A und vor Zone B",
+    "Der Überlebende an die Trümmer (M), falls er dabei ist",
+    "Heldenstart links unten: die Spieler stellen ihre Helden auf",
+    "Bereitlegen, nicht hinstellen: weitere leere Rüstungen, Sporenlinge, die zwei Befallenen (falls die Folgen sie nennen), den Zählstein für die Glut"
+   ],
+   "hinweis": "Map 5 ist von Anfang an ein Kampf: der Tisch steht vor dem ersten Cue. Rufer und Rüstungen stehen schon und rühren sich noch nicht. In der Gegnerliste erscheinen sie, sobald der Kampf beginnt. Was später kommt, legst du nur bereit.",
+   "setzt": {
+    "tisch_steht": true
+   },
+   "weiter": "cue-05-1"
+  },
+  "cue-05-1": {
+   "typ": "cue",
+   "titel": "Der Durchbruch",
+   "cue": "05-1",
+   "optional": true,
+   "text": "Die Wand aus Wurzeln gibt nach. Dahinter eine Kammer, groß wie die Kapelle, und warm wie ein Backofen. In der Mitte etwas, das schlägt und dabei glüht. Davor stehen sie: Rüstungen ohne Nähte, die Helme gesenkt. Einer trägt einen hohen Helm und einen Stab. Noch rührt sich keiner. Was tut ihr?",
+   "notiz": "Noch nicht aufgenommen: bis dahin liest du den Text unten. Rufer und Rüstungen sind erstarrt, solange die Helden nicht angreifen. Der Überlebende (falls dabei) steht bei den Trümmern.",
+   "weiter": "wahl-durchbruch"
+  },
+  "wahl-durchbruch": {
+   "typ": "wahl",
+   "titel": "Was tun die Helden?",
+   "zeitlimit": 3,
+   "ansage": "Das Herz schlägt. Jedes Mal wird das Glühen darin heller und wieder dunkler. Die Rüstungen stehen still. Noch.",
+   "frage": "Die Spieler sehen sich um (und reden mit dem Überlebenden, falls er dabei ist), oder sie greifen sofort an.",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Erst hinsehen, sich beraten",
+     "text": "Sie sehen sich das Herz an, die Adern, den Schacht, und reden mit dem Überlebenden, falls er dabei ist.",
+     "folge": "Ein kurzer Moment Ruhe, höchstens fünf Minuten. Dann die Regel und der Kampf.",
+     "ziel": "npc-ueberlebender"
+    },
+    {
+     "taste": "2",
+     "kurz": "Sofort angreifen",
+     "text": "Kein Zögern: sie gehen auf die Rüstungen, die Adern oder den Rufer los.",
+     "setzt": {
+      "sofort_angriff": true
+     },
+     "folge": "Gut so. Das Herz schlägt schneller: am Ende von Runde 1 atmet es sicher aus, ohne Würfel.",
+     "ziel": "sofort-angriff"
+    }
+   ]
+  },
+  "npc-ueberlebender": {
+   "typ": "npc",
+   "titel": "Du spielst den Überlebenden",
+   "zeitlimit": 5,
+   "figur": "ueberlebender",
+   "wenn": {
+    "flag": "ueberlebender_dabei",
+    "ist": true
+   },
+   "einstieg": "Er nickt zum Herz hin, ohne den Blick davon zu lassen. „Da drin. Die Glut. Darum ist es gewachsen.“ Eine Pause. „Erst die drei Stränge. Dann die Glut. Dann laufen.“",
+   "gmNotiz": "Kurze Sätze, wie Befehle, aber leise. Höchstens fünf Minuten: die Rüstungen wachen auf, wenn es zu lange dauert (Antreiber). In der Schublade (N): Erkennungsmarke (1), Protokoll (2), lebende Probe (3), Fragen (4 bis 7). Er liest das Protokoll sofort, das ist der leichte Weg. Umsehen geht hier auch (I, J, O, V). Dann Weiter.",
+   "ereignisse": [
+    "marke-zeigen",
+    "protokoll-zeigen",
+    "probe-zeigen",
+    "frage-glut",
+    "frage-leute",
+    "frage-wie",
+    "frage-danach",
+    "herz-ansehen",
+    "ader-ansehen",
+    "truemmer-ansehen",
+    "schacht-ansehen"
+   ],
+   "weiter": "spieler-umsehen"
+  },
+  "spieler-umsehen": {
+   "typ": "spieler",
+   "titel": "Ein Atemzug Ruhe",
+   "zeitlimit": 4,
+   "wenn": {
+    "flag": "ueberlebender_dabei",
+    "nicht": true
+   },
+   "text": "Die Spieler sehen sich um, bevor es losgeht. Noch keine Runden. Sobald einer angreift oder sie bereit sind: weiter.",
+   "hinweise": [
+    "Herz ansehen (I), Ader ansehen (J), Trümmer durchsuchen (O, Beutewurf), Schacht (V): jeweils Grundtext, dann Wurf, dann Stufen.",
+    "Das Ziel sagt ihnen das Herz selbst: drei Stränge, eine Klappe, ein Glühen. Ohne den Überlebenden ist das Herz-Ansehen (I) der beste Hinweis, und das Protokoll.",
+    "Faden verloren? „Drei Stränge halten das Glühen fest. Was passiert, wenn man sie durchschneidet?“"
+   ],
+   "ereignisse": [
+    "herz-ansehen",
+    "ader-ansehen",
+    "truemmer-ansehen",
+    "schacht-ansehen"
+   ],
+   "weiter": "regel-finale"
+  },
+  "sofort-angriff": {
+   "typ": "vorlesen",
+   "titel": "Kein Zögern",
+   "text": "Ihr greift an. Im selben Augenblick heben alle Rüstungen die Helme, und der mit dem Stab hebt den Stab. Tiefer im Fels schlägt etwas schneller.",
+   "gmNotiz": "Das Herz schlägt schneller: am Ende von Runde 1 atmet es sicher aus, ohne Würfel (kommt nach R von selbst). Umsehen und Reden gehen im Kampf weiter (I, J, O, V; Protokoll 2 beim Überlebenden).",
+   "weiter": "regel-finale"
+  },
+  "regel-finale": {
+   "typ": "regel",
+   "titel": "Regeln für diese Map",
+   "text": "Das Ziel ist das Herz, nicht die Gegner. Am Ende jeder Runde atmet es aus. Wer dann nah am Herzen steht, hört seinen Namen. Und eine Rast gibt es hier unten nicht.",
+   "gmNotiz": "Nicht ansagen, nur für dich: Erst die drei Adern, dann überladen (Held W6 ab 5, der Überlebende ab 3, Protokoll +1), dann läuft die Glut-Leiste: sechs Runden bis zum Schacht. Vor dem Zug jeder Gegnergruppe würfelst du, wen sie angreift (Taste G): 1 bis 3 Helden, 4 bis 6 der Überlebende, befallene Helden schon bei 4. Rundenende: R. Das Ausatmen (W6 gegen die Atemzug-Leiste) und der Nachschub kommen von selbst. Wer seinen Zug auf verseuchter Fläche beendet: Qualitätstest, misslungen −1 auf Treffen bis Ende der nächsten Runde (wie in Map 1). Führt ein Spieler den Überlebenden, sag es ihm jetzt.",
+   "weiter": "herz-schlaegt"
+  },
+  "herz-schlaegt": {
+   "typ": "vorlesen",
+   "titel": "Das brennende Herz",
+   "text": "Tiefer im Fels schlägt es. Ein Klumpen aus Wurzeln, Fleisch und Metall, groß wie ein Wagen, und in seiner Mitte brennt etwas, das nicht ausgeht. Drei Stränge halten es fest. Jedes Mal, wenn es schlägt, hört ihr ganz leise eure Namen. Der mit dem Stab hebt den Kopf. Ihr seid am Zug.",
+   "gmNotiz": "Ab jetzt Kampf: Rufer und Rüstungen sind wach, wütende Tabelle. Kennen die Helden den Namen Lene, hören sie ihn zwischen ihren eigenen. Weiter startet Runde 1; die Kampfmusik startest du dort (Taste A).",
+   "setzt": {
+    "herz_gesehen": true
+   },
+   "weiter": "kampf-herz"
+  },
+  "kampf-herz": {
+   "typ": "kampf",
+   "titel": "Das brennende Herz",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "gegner": [
+    {
+     "id": "rufer",
+     "anzahl": 1,
+     "zone": "H"
+    },
+    {
+     "id": "ruestung",
+     "anzahl": 1,
+     "zone": "A",
+     "skaliert": true
+    },
+    {
+     "id": "ruestung",
+     "anzahl": 1,
+     "zone": "B",
+     "skaliert": true
+    },
+    {
+     "id": "ader",
+     "anzahl": 1,
+     "zone": "A1"
+    },
+    {
+     "id": "ader",
+     "anzahl": 1,
+     "zone": "A2"
+    },
+    {
+     "id": "ader",
+     "anzahl": 1,
+     "zone": "A3"
+    },
+    {
+     "id": "ueberlebender",
+     "anzahl": 1,
+     "zone": "M",
+     "wunden": 1,
+     "nurWenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "flag": "ueberlebender_versorgt",
+        "ist": true
+       }
+      ]
+     }
+    },
+    {
+     "id": "ueberlebender",
+     "anzahl": 1,
+     "zone": "M",
+     "wunden": 3,
+     "nurWenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "flag": "ueberlebender_versorgt",
+        "nicht": true
+       }
+      ]
+     }
+    }
+   ],
+   "verstaerkung": {
+    "id": "ruestung",
+    "zone": "B"
+   },
+   "setzt": {
+    "kampf_laeuft": true
+   },
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Erst die drei Adern, dann die Glut überladen. Jede Gegnergruppe: erst G (wen sie angreift), dann Verhaltenswürfel. Rundenende: R; Ausatmen und Nachschub kommen von selbst.",
+   "hinweise": [
+    "Gegnerzug: vor jeder Gegnergruppe G. 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn: die Helden); ein befallener Held (ab 3 Sporenpunkten) schon bei 4. Dann Verhaltenswürfel, wütende Tabelle.",
+    "Rundenende: R, dann gleich H. Ausatmen: W6 kleiner oder gleich der Atemzug-Leiste, dann ist alles innerhalb einer Kartenbreite um das Herz verseucht, und jeder Held darin macht einen Qualitätstest (misslungen eine Kartenbreite auf das Herz zu).",
+    "Nachschub steht nach R in der Gegnerliste: Sporenlinge (so viele wie die Atemzug-Leiste, höchstens 4, verteilt auf A, B und C), dazu je Runde eine leere Rüstung aus Zone B (auf Normal höchstens drei), am Ende von Runde 2 zwei Befallene aus dem Schacht, falls in Map 3 einer im Keller war.",
+    "Adern: je Verteidigung 4+, Zäh 4; Feuertopf an eine Ader: F, +1 Treffer. Sind alle drei durch, liegt die Glutkammer offen (die App sagt es).",
+    "Überladen: ein Held in Kontakt mit dem Herz, eine Aktion, X (W6 ab 5); der Überlebende Y (ab 3). Mit Protokoll +1 auf den Wurf. Misslungen: ein Treffer Hitze für den, der es versucht hat.",
+    "Protokoll: vom Überlebenden gelesen (Taste 2) oder von einem Helden studiert (K, W6 ab 4): DS +1 gegen die Adern, an den Karten schon eingerechnet.",
+    "Fällt der Rufer: Todestext, dann T (die Rüstungen werden ruhiger, Vorschlag).",
+    "Ist die Glut überladen: Weiter zu Cue 05-2. Fallen alle Helden oder fliehen sie vorher durch den Schacht: unten Weiter, dann bestätigen (das Herz schlägt weiter).",
+    "Faden verloren? „Die Stränge. Dann die Glut. Dann lauft.“",
+    "Nur für dich: Miniaturen Rubric Marines und ein Sorcerer der Thousand Sons; vor den Spielern nur „die leeren Rüstungen“ und „der mit dem Stab“. Auf höherer Schwierigkeit kommen mehr Rüstungen und öfter Nachschub; der Überlebende bleibt, wie er ist."
+   ],
+   "ereignisse": [
+    "gegnerwahl",
+    "feuertopf",
+    "ueberladen-held",
+    "ueberladen-ueberlebender",
+    "protokoll-studieren",
+    "protokoll-zeigen",
+    "marke-zeigen",
+    "rufer-weg",
+    "herz-ansehen",
+    "ader-ansehen",
+    "truemmer-ansehen",
+    "schacht-ansehen"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "glut_ueberladen",
+      "ist": true
+     },
+     "ziel": "cue-05-2"
+    }
+   ],
+   "weiter": "wahl-kampf-abbruch"
+  },
+  "wahl-kampf-abbruch": {
+   "typ": "wahl",
+   "titel": "Der Kampf endet, bevor die Glut überläuft?",
+   "zeitlimit": 2,
+   "frage": "Du hast Weiter gedrückt, aber die Glut ist nicht überladen. Was ist passiert?",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Doch nicht: weiterkämpfen",
+     "text": "Versehen, oder es geht noch. Zurück in den Kampf, alles bleibt, wie es war.",
+     "folge": "Zurück in den Kampf.",
+     "ziel": "kampf-herz"
+    },
+    {
+     "taste": "2",
+     "kurz": "Alle Helden sind ausgeschaltet oder geflohen",
+     "text": "Kein Held steht mehr am Herzen: alle bewusstlos, oder alle durch den Schacht nach oben.",
+     "setzt": {
+      "herz_steht": true
+     },
+     "folge": "Das Herz schlägt weiter. Hauptziel verfehlt.",
+     "ziel": "herz-steht"
+    }
+   ]
+  },
+  "herz-steht": {
+   "typ": "vorlesen",
+   "titel": "Es schlägt weiter",
+   "text": "Hinter euch schlägt es weiter. Gleichmäßig. Ihr kommt den Schacht hinauf, irgendwie, einer zieht den anderen. Oben am Brunnen ist es Nacht, und der Brunnen ist warm.",
+   "gmNotiz": "Das Herz steht: Hauptziel verfehlt. Wer bewusstlos war, wurde von den anderen hinaufgezogen (Vorschlag: niemand stirbt hier unten). Ist der Überlebende dabei und steht noch, bleibt er unten und versucht es allein: das erfährt nie jemand. Weiter: Epilog „Es schlägt weiter“.",
+   "weiter": "epilog-x"
+  },
+  "cue-05-2": {
+   "typ": "cue",
+   "titel": "Die Glut erwacht",
+   "cue": "05-2",
+   "optional": true,
+   "text": "Die Klappe steht offen. Licht, weiß, heiß, und ein Ton wie von tausend Glocken zugleich. Das Herz schreit, und es schreit mit euren Namen. Es zieht sich um die Glut zusammen, und die Glut wird heller. Ihr habt ein paar Atemzüge. Aber die Klappe ist noch offen.",
+   "notiz": "Sobald die Glut überladen ist. Kampfmusik weiterlaufen lassen. Jetzt kommt eine kurze Entscheidung: was in die Glut geht. Danach läuft die Glut-Leiste, ein Strich je Rundenende, bei 6 bricht sie.",
+   "setzt": {
+    "probe_gefragt": true
+   },
+   "weiter": "wahl-probe"
+  },
+  "wahl-probe": {
+   "typ": "wahl",
+   "titel": "Was in die Glut geht",
+   "zeitlimit": 2,
+   "ansage": "Die Klappe ist noch offen. Was ihr hineinwerft, ist weg. Was ihr behaltet, kommt mit nach oben.",
+   "frage": "Ein Stück vom Herz liegt zum Greifen da, und vielleicht tragen sie die lebende Probe. Die Spieler entscheiden, schnell.",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Alles in die Glut",
+     "text": "Nichts verlässt Moosgrab. Tragen sie die lebende Probe, fliegt sie hinterher.",
+     "setzt": {
+      "probe_entschieden": true,
+      "probe_wahl": "vernichtet"
+     },
+     "folge": "Sauber. Es wächst nirgends weiter.",
+     "ziel": "probe-vernichtet"
+    },
+    {
+     "taste": "2",
+     "kurz": "Ein Stück mitnehmen",
+     "text": "Ein Held steckt ein Stück vom Herz ein, oder behält die lebende Probe.",
+     "setzt": {
+      "probe_entschieden": true,
+      "probe_wahl": "mitgenommen",
+      "probe_traeger": "@held"
+     },
+     "eingabe": {
+      "feld": "probe_traeger",
+      "frage": "Welcher Held trägt es?",
+      "aus": "gruppe"
+     },
+     "folge": "Es kommt mit nach oben. Der Träger bekommt 1 Sporenpunkt. Anschluss für eine nächste Kampagne.",
+     "ziel": "probe-mitgenommen"
+    },
+    {
+     "taste": "3",
+     "kurz": "Es dem Überlebenden geben",
+     "text": "Nur, wenn er dabei ist und steht. Er will ein Stück für seine Leute.",
+     "setzt": {
+      "probe_entschieden": true,
+      "probe_wahl": "ueberlebender"
+     },
+     "folge": "Er steckt es ein. Kommt er hinaus, nimmt er es mit in seine Welt.",
+     "ziel": "probe-ueberlebender"
+    },
+    {
+     "taste": "4",
+     "kurz": "Ihm die tote Probe geben",
+     "text": "Nur mit der toten Probe aus dem zweiten Glastank und dem Überlebenden. Das Echte fliegt in die Glut.",
+     "setzt": {
+      "probe_entschieden": true,
+      "probe_wahl": "tot",
+      "probe_held": "@held"
+     },
+     "eingabe": {
+      "feld": "probe_held",
+      "frage": "Welcher Held übergibt die tote Probe?",
+      "aus": "gruppe"
+     },
+     "folge": "Qualitätstest dieses Helden. Gelungen: er merkt es nicht. Misslungen: er merkt es, sagt nichts, und es kostet Atemzug +1 für eine nächste Kampagne.",
+     "ziel": "tote-probe"
+    }
+   ]
+  },
+  "probe-vernichtet": {
+   "typ": "vorlesen",
+   "titel": "In die Glut",
+   "text": "Es fliegt in das Weiß und ist weg, ohne einen Laut. Für einen Atemzug riecht es nach verbranntem Brot. Dann nur noch nach heißem Stein.",
+   "gmNotiz": "Nichts kommt mit. Ist der Überlebende dabei: er nickt, einmal. Jetzt die Flucht.",
+   "weiter": "aufbau-flucht"
+  },
+  "probe-mitgenommen": {
+   "typ": "vorlesen",
+   "titel": "Es kommt mit",
+   "text": "Es ist warm in der Hand. Wärmer, als es sein dürfte. Ihr steckt es ein, und für einen Atemzug glaubt ihr, es schlägt.",
+   "gmNotiz": "Der Träger (steht im Stand) bekommt 1 Sporenpunkt (am Heldenchip eintragen). Für die Flucht: er trägt es, keine weitere Regel. Am Ende: Anschluss für eine nächste Kampagne.",
+   "weiter": "aufbau-flucht"
+  },
+  "probe-ueberlebender": {
+   "typ": "vorlesen",
+   "titel": "Für seine Leute",
+   "als": "ueberlebender",
+   "text": "Er nimmt es, ohne hinzusehen, und schiebt es unter die Rüstung, an die Brust. „Für die anderen.“ Dann: „Lauft.“",
+   "gmNotiz": "Kommt er hinaus, nimmt er es mit in seine Welt: Anschluss für eine Kampagne dort. Opfert er sich, verbrennt es mit ihm. Ist er nicht dabei oder gefallen, zählt diese Antwort wie 2 (ein Held trägt es): dann „Zurück“ und anders wählen.",
+   "weiter": "aufbau-flucht"
+  },
+  "tote-probe": {
+   "typ": "vorlesen",
+   "titel": "Das Glas aus der Tiefe",
+   "text": "Ihr gebt ihm das Glas aus der Tiefe. Darin liegt etwas, das aussieht wie Moos. Es bewegt sich nicht. Er hält es gegen das Glühen.",
+   "gmNotiz": "Qualitätstest des Helden, der übergibt (steht im Stand), mit seiner eigenen Qualität. Hat der Überlebende die Erkennungsmarke gesehen, vertraut er: +1 auf den Wurf. Dann wählen, ob es gelungen ist.",
+   "weiter": "wahl-tote-probe"
+  },
+  "wahl-tote-probe": {
+   "typ": "wahl",
+   "titel": "Merkt er es?",
+   "zeitlimit": 2,
+   "frage": "Gelingt der Qualitätstest des Helden, der die tote Probe übergibt?",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Gelungen",
+     "text": "Er merkt es nicht.",
+     "setzt": {
+      "ueberlebender_getaeuscht": true
+     },
+     "folge": "Er steckt das Glas ein. Das Echte ist in der Glut.",
+     "ziel": "tote-probe-gelungen"
+    },
+    {
+     "taste": "2",
+     "kurz": "Misslungen",
+     "text": "Er merkt es.",
+     "setzt": {
+      "tote_probe_erkannt": true
+     },
+     "leisten": {
+      "atemzug": 1
+     },
+     "folge": "„Das ist tot. Ihr wisst das.“ Er nimmt es trotzdem. Atemzug +1 für eine nächste Kampagne.",
+     "ziel": "tote-probe-erkannt"
+    }
+   ]
+  },
+  "tote-probe-gelungen": {
+   "typ": "vorlesen",
+   "titel": "Für seine Leute",
+   "als": "ueberlebender",
+   "text": "Er dreht das Glas einmal gegen das Licht und schiebt es unter die Rüstung. „Für die anderen.“ Dann: „Lauft.“",
+   "gmNotiz": "Er hat es nicht gemerkt. Das Echte ist in der Glut. Jetzt die Flucht.",
+   "weiter": "aufbau-flucht"
+  },
+  "tote-probe-erkannt": {
+   "typ": "vorlesen",
+   "titel": "Das ist tot",
+   "als": "ueberlebender",
+   "text": "Er hält das Glas gegen das Glühen. Lange, zu lange für die Zeit, die ihr habt. „Das ist tot. Ihr wisst das.“ Er steckt es trotzdem ein. „Lauft.“",
+   "gmNotiz": "Atemzug +1 ist verbucht: es zählt für eine nächste Kampagne. Er hilft trotzdem weiter. Jetzt die Flucht.",
+   "weiter": "aufbau-flucht"
+  },
+  "aufbau-flucht": {
+   "typ": "aufbau",
+   "titel": "Die Flucht",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "flucht_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Nichts umbauen: alle bleiben, wo sie sind",
+    "Den Zählstein für die Glut auf 0 neben das Herz legen, gut sichtbar",
+    "Der Schacht (↑) rechts unten ist der einzige Weg hinaus: eine ganze Aktion, höchstens zwei Figuren je Runde"
+   ],
+   "regel": "Die Glut läuft über. Ihr habt sechs Runden. Am Ende jeder Runde ein Strich, beim sechsten ist es vorbei. Den Schacht hinauf, höchstens zwei von euch je Runde. Lauft.",
+   "hinweis": "Die leeren Rüstungen verfolgen weiter, Sporenlinge kommen keine mehr: das Herz atmet nicht mehr, es brennt.",
+   "setzt": {
+    "flucht_steht": true
+   },
+   "weiter": "kampf-flucht"
+  },
+  "kampf-flucht": {
+   "typ": "kampf",
+   "titel": "Den Schacht hinauf",
+   "runden": true,
+   "musik": "BATTLE-1",
+   "leistenAn": [
+    "glut"
+   ],
+   "gegner": [
+    {
+     "id": "ruestung",
+     "anzahl": 1,
+     "zone": "B",
+     "skaliert": true
+    }
+   ],
+   "verhalten": {
+    "start": "wuetend"
+   },
+   "text": "Die Glut zählt: ein Strich je Rundenende, bei 6 bricht sie. Die Helden laufen zum Schacht (↑): hinein mit einer ganzen Aktion, höchstens zwei Figuren je Runde. Sind alle drin: D.",
+   "hinweise": [
+    "Rundenende: R. Die Glut-Leiste zählt von selbst. Bei 3 bricht die Decke ein Stück (Schwelle), bei 5 ist es die letzte Runde, bei 6 springt die App zum Ende.",
+    "Eine leere Rüstung bricht aus der Wand dazu (Zone B), weitere je Runde aus der Gegnerliste; Sporenlinge kommen keine mehr.",
+    "Wer im Schacht ist, ist auf dem Weg nach oben: Figur vom Tisch.",
+    "Sind alle Helden im Schacht (Bewusstlose, die getragen werden, zählen mit): D. Die App wählt den Epilog nach der Glut-Leiste.",
+    "Der Überlebende kann umkehren und die Glut halten: Z (Glut −2, er bleibt unten).",
+    "Gegnerwahl (G) gilt weiter. Wer im Nahkampf steht und in den Schacht will, muss sich erst lösen."
+   ],
+   "ereignisse": [
+    "gegnerwahl",
+    "im-schacht",
+    "opfer",
+    "rufer-weg",
+    "schacht-ansehen"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "alle_draussen",
+      "ist": true
+     },
+     "ziel": "flucht-ende"
+    }
+   ],
+   "weiter": "glut-bricht"
+  },
+  "glut-bricht": {
+   "typ": "vorlesen",
+   "titel": "Die Glut bricht",
+   "text": "Der sechste Schlag kommt nicht. Stattdessen Licht, weiß, aus jeder Ritze, und ein Ton, so hoch, dass ihr ihn nicht mehr hört, nur fühlt.",
+   "gmNotiz": "Die Glut-Leiste steht auf 6, oder du hast Weiter gedrückt. Wer ist noch unten? Gleich wählen.",
+   "setzt": {
+    "glut_gebrochen": true
+   },
+   "weiter": [
+    {
+     "wenn": {
+      "flag": "alle_draussen",
+      "ist": true
+     },
+     "ziel": "flucht-ende"
+    },
+    {
+     "ziel": "wahl-wer-unten"
+    }
+   ]
+  },
+  "wahl-wer-unten": {
+   "typ": "wahl",
+   "titel": "Wer ist noch unten?",
+   "zeitlimit": 2,
+   "frage": "Die Glut ist gebrochen. Wer war noch nicht im Schacht?",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Niemand: der Letzte war gerade drin",
+     "text": "Im letzten Moment, mit verbrannten Fersen.",
+     "setzt": {
+      "alle_draussen": true
+     },
+     "folge": "Knapp. Epilog B (oder C, wenn der Überlebende geblieben ist).",
+     "ziel": "flucht-ende"
+    },
+    {
+     "taste": "2",
+     "kurz": "Ein Held ist noch unten",
+     "text": "Einer hat es nicht geschafft, oder er ist geblieben.",
+     "setzt": {
+      "held_zurueck": "@held"
+     },
+     "eingabe": {
+      "feld": "held_zurueck",
+      "frage": "Welcher Held bleibt zurück?",
+      "aus": "gruppe"
+     },
+     "folge": "Epilog C: jemand bleibt zurück. Der Held ist tot; in der Gruppe als gefallen eintragen.",
+     "ziel": "epilog-c"
+    }
+   ]
+  },
+  "flucht-ende": {
+   "typ": "vorlesen",
+   "titel": "Oben",
+   "text": "Ihr fallt aus dem Brunnen ins Gras. Kalte Luft. Unter euch ein Grollen, das lange dauert.",
+   "gmNotiz": "Die App wählt den Epilog: Ist der Überlebende geblieben, C. Sonst nach der Glut-Leiste: bis 3 Striche entkommen (A), sonst knapp (B).",
+   "weiter": [
+    {
+     "wenn": {
+      "flag": "ueberlebender_opfert",
+      "ist": true
+     },
+     "ziel": "epilog-c"
+    },
+    {
+     "wenn": {
+      "leiste": "glut",
+      "<=": 3
+     },
+     "ziel": "epilog-a"
+    },
+    {
+     "ziel": "epilog-b"
+    }
+   ]
+  },
+  "epilog-a": {
+   "typ": "cue",
+   "titel": "Epilog A: Entkommen",
+   "cue": "05-EA",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Hinter euch atmet der Fels ein letztes Mal. Dann kommt das Licht, weiß, aus dem Brunnen, aus jeder Ritze im Dorfplatz, und dann nichts mehr. Über euch atmet der Wald nicht mehr. Moosgrab ist frei.",
+   "notiz": "Playbook-Cue 05-E, Fassung A (neu: alle früh genug draußen). Noch nicht aufgenommen: bis dahin liest du den Text unten. Danach Weiter zum Abschluss.",
+   "setzt": {
+    "epilog": "A"
+   },
+   "weiter": "ende-map5"
+  },
+  "epilog-b": {
+   "typ": "cue",
+   "titel": "Epilog B: Knapp",
+   "cue": "05-EB",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Die Hitze greift nach euren Fersen, als ihr aus dem Brunnen fallt. Unter euch bricht das Licht los, und der Brunnen spuckt Feuer bis über die Dächer. Dann ist es still. Ihr lebt. Gerade so. Moosgrab ist frei.",
+   "notiz": "Playbook-Cue 05-E, Fassung B (neu: knapp entkommen). Jeder Held, der als Letzter oder Vorletzter hinauskam, hat Brandspuren: nur Stimmung. Danach Weiter zum Abschluss.",
+   "setzt": {
+    "epilog": "B"
+   },
+   "weiter": "ende-map5"
+  },
+  "epilog-c": {
+   "typ": "cue",
+   "titel": "Epilog C: Jemand bleibt zurück",
+   "cue": "05-EC",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Einer ist unten geblieben. Ihr hört ihn nicht mehr, nur das Licht, das unter euch aufgeht, weiß und still. Dann schließt sich der Brunnen über ihm. Moosgrab ist frei. Es hat einen Namen gekostet, den das Herz nie gehört hat.",
+   "notiz": "Playbook-Cue 05-E, Fassung C (neu: der Überlebende hat sich geopfert, oder ein Held ist unten geblieben). Danach Weiter zum Abschluss.",
+   "setzt": {
+    "epilog": "C"
+   },
+   "weiter": "ende-map5"
+  },
+  "epilog-x": {
+   "typ": "cue",
+   "titel": "Epilog: Es schlägt weiter",
+   "cue": "05-EX",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Ihr seid draußen. Der Brunnen ist warm unter euren Händen, und tief unten schlägt es weiter, gleichmäßig, geduldig. Es kennt eure Namen. Es wird warten.",
+   "notiz": "Das Herz stand, die Glut wurde nicht überladen: das Ende ohne Sieg. Noch nicht aufgenommen. Danach Weiter zum Abschluss.",
+   "setzt": {
+    "epilog": "X"
+   },
+   "weiter": "ende-map5"
+  },
+  "ende-map5": {
+   "typ": "ende",
+   "titel": "Abschluss Map 5: Ende der Kampagne",
+   "ep": [
+    {
+     "wenn": {
+      "flag": "glut_ueberladen",
+      "ist": true
+     },
+     "text": "Hauptziel: das Herz zerstört (die Glut überladen)",
+     "ep": 3
+    },
+    {
+     "wenn": {
+      "flag": "glut_ueberladen",
+      "ist": true
+     },
+     "text": "Wer die Glut überladen oder die letzte Ader durchtrennt hat: 1 EP mehr (nur dieser Held)",
+     "ep": 1
+    }
+   ],
+   "beute": [
+    "Was der Überlebende dalässt, wenn er hinauskommt: eine legendäre Waffe oder Rüstung aus seiner Welt (in der Kartenschmiede bauen, Stufe Legendär). Opfert er sich, liegt sie oben am Brunnen, wo er sie abgelegt hat, bevor er umkehrte (steht in den Folgen)",
+    "Beute aus den Trümmern und vom Rufer (schon verteilt, wenn gefunden)"
+   ],
+   "leisten": {
+    "atemzug": 1
+   },
+   "zuruecksetzen": [],
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, würfelt auf der Verletzungstabelle. Spielt ihr mit diesen Helden in einer neuen Kampagne weiter, startet ihr so.",
+   "notieren": [
+    "Welcher Epilog: A, B, C oder „Es schlägt weiter“ (steht im Stand)",
+    "Wer die Glut überladen hat (1 EP mehr); ein Held, der unten blieb, gilt als gefallen",
+    "Wem das Geschenk gehört, und wer ein Stück vom Herz trägt",
+    "EP und Budget je Held im Reiter Gruppe eintragen"
+   ],
+   "folgen": [
+    {
+     "wenn": {
+      "flag": "epilog",
+      "ist": "A"
+     },
+     "text": "Epilog A: Alle sind entkommen. Moosgrab ist frei."
+    },
+    {
+     "wenn": {
+      "flag": "epilog",
+      "ist": "B"
+     },
+     "text": "Epilog B: Knapp entkommen. Moosgrab ist frei."
+    },
+    {
+     "wenn": {
+      "flag": "epilog",
+      "ist": "C"
+     },
+     "text": "Epilog C: Jemand ist unten geblieben. Moosgrab ist frei."
+    },
+    {
+     "wenn": {
+      "flag": "epilog",
+      "ist": "X"
+     },
+     "text": "Das Herz schlägt weiter. Moosgrab ist nicht frei; Anschluss für eine nächste Kampagne, die hier unten weitermacht."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_opfert",
+      "ist": true
+     },
+     "text": "Der Überlebende ist unten geblieben und hat die Glut gehalten. Oben am Brunnen liegt, was er vorher abgelegt hat: eine legendäre Waffe oder Rüstung aus seiner Welt. In der Kartenschmiede bauen, Stufe Legendär."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "flag": "ueberlebender_opfert",
+        "nicht": true
+       },
+       {
+        "flag": "ueberlebender_tot",
+        "nicht": true
+       },
+       {
+        "flag": "glut_ueberladen",
+        "ist": true
+       }
+      ]
+     },
+     "text": "Der Überlebende ist mit hinausgekommen. Er gibt den Helden etwas aus seiner Welt, eine legendäre Waffe oder Rüstung (Kartenschmiede, Stufe Legendär), und geht, wie er gekommen ist."
+    },
+    {
+     "wenn": {
+      "flag": "held_zurueck",
+      "ist": true
+     },
+     "text": "{held_zurueck} ist unten geblieben. In der Gruppe als gefallen eintragen."
+    },
+    {
+     "wenn": {
+      "flag": "probe_wahl",
+      "ist": "vernichtet"
+     },
+     "text": "Alles ist in der Glut verbrannt. Nichts davon wächst irgendwo weiter."
+    },
+    {
+     "wenn": {
+      "flag": "probe_wahl",
+      "ist": "mitgenommen"
+     },
+     "text": "{probe_traeger} trägt ein Stück vom Herz. Es ist warm, und manchmal schlägt es. Anschluss für eine nächste Kampagne."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "probe_wahl",
+        "ist": "ueberlebender"
+       },
+       {
+        "flag": "ueberlebender_opfert",
+        "nicht": true
+       }
+      ]
+     },
+     "text": "Der Überlebende hat ein Stück vom Herz in seine Welt mitgenommen. Irgendwo anders, weit weg, wächst es vielleicht weiter. Anschluss für eine Kampagne in seiner Welt."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_getaeuscht",
+      "ist": true
+     },
+     "text": "Der Überlebende trägt die tote Probe in seine Welt. Eines Tages merkt er es."
+    },
+    {
+     "wenn": {
+      "flag": "tote_probe_erkannt",
+      "ist": true
+     },
+     "text": "Der Überlebende hat die tote Probe erkannt: Atemzug +1 für eine nächste Kampagne (verbucht)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "nicht": true
+       }
+      ]
+     },
+     "text": "{anhaenger_traeger} trägt immer noch den Kupferanhänger. Was er hört, wenn es still ist, bleibt seine Sache."
+    }
+   ],
+   "weiter": null
+  }
+ },
+ "beimStart": [
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "nicht": true
+     }
+    ]
+   },
+   "sporenFuer": "anhaenger_traeger"
+  }
+ ],
+ "heldenInfo": [
+  {
+   "flag": "anhaenger_traeger",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "nicht": true
+     }
+    ]
+   },
+   "name": "Kupferanhänger",
+   "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
+   "gm": "verpestet. Beim Mapwechsel +1 Sporenpunkt (für Map 5 verbucht). Im Finale: beim Ausatmen hört er seinen Namen, egal wo er steht, und macht den Qualitätstest immer mit (Vorschlag).",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: der Sporenpunkt beim Mapwechsel und das Hören beim Ausatmen gehen auf ihn über."
+  },
+  {
+   "flag": "probe_traeger",
+   "wenn": {
+    "flag": "probe_wahl",
+    "ist": "mitgenommen"
+   },
+   "name": "Ein Stück vom Herz",
+   "text": "Trägt ein Stück vom Herz. Es ist warm, und manchmal schlägt es.",
+   "gm": "1 Sporenpunkt beim Einstecken (von Hand am Heldenchip). Anschluss für eine nächste Kampagne.",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer es nimmt, trägt es ab jetzt."
+  }
+ ]
+}

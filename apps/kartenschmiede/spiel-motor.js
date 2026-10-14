@@ -72,6 +72,8 @@
       // sporenFuer: ein Flag, das einen Heldennamen trägt (z. B. name_verraten); der Held bekommt 1 Sporenpunkt
       for (const b of map.beimStart || []) {
         if (b.wenn && !gilt(state, b.wenn)) continue;
+        // zufall: { flag, aus: [...] } zieht beim Start einen Wert (z. B. welcher Überlebende befallen ist)
+        if (b.zufall && (b.zufall.aus || []).length) state.flags[b.zufall.flag] = b.zufall.aus[Math.floor(zufall() * b.zufall.aus.length)];
         setze(state, b.setzt);
         aendere(state, b.leisten);
         const held = b.sporenFuer && state.flags[b.sporenFuer];
@@ -141,6 +143,10 @@
       if (Array.isArray(w)) return w.every(x => gilt(state, x));
       if (w.alle) return w.alle.every(x => gilt(state, x));
       if (w.eine) return w.eine.some(x => gilt(state, x));
+      // Mindestens n der Bedingungen ({ mindestens: 2, aus: [...] })
+      if (w.mindestens !== undefined) return (w.aus || []).filter(x => gilt(state, x)).length >= +w.mindestens;
+      // Ein Held trägt diesen Gegenstand im Inventar
+      if (w.hat) return Object.values(state.inventar || {}).some(l => (l || []).includes(w.hat));
       if (w.flag !== undefined) {
         const v = state.flags[w.flag] === undefined ? null : state.flags[w.flag];
         if ("ist" in w) return v === w.ist;
@@ -214,6 +220,7 @@
     const schalte = (state, namen, an) => { for (const n of namen || []) if (state.leisten[n]) state.leisten[n].aktiv = an; };
 
     // ---------- Gegner ----------
+    const istFreund = id => (map.gegner[id] || {}).seite === "freund";
     function spawne(state, schrittId) {
       const s = map.schritte[schrittId];
       if (!s || s.typ !== "kampf") return;
@@ -225,15 +232,17 @@
         if (!def) return;
         if ((e.nurWenn && !gilt(state, e.nurWenn)) || (def.nurWenn && !gilt(state, def.nurWenn))) return;
         state.gespawnt[schluessel] = true;
-        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!(def.werte || e.fest) });
+        offen.push({ schluessel, id: e.id, zone: e.zone || "", anzahl: e.anzahl || 1, fest: !!((def.werte && !e.skaliert && !def.skaliert) || e.fest), wunden: e.wunden || 0 });
       });
-      const b = budget(state, schrittId, offen, s.verstaerkung), alt = state.budgets[schrittId];
+      // Verbündete (seite: "freund") kommen, wie geschrieben; das Punktebudget gilt nur für die Gegner
+      const feinde = offen.filter(e => !istFreund(e.id)), freunde = offen.filter(e => istFreund(e.id));
+      const b = budget(state, schrittId, feinde, s.verstaerkung), alt = state.budgets[schrittId];
       if (b) state.budgets[schrittId] = alt ? { ...b, geschrieben: alt.geschrieben + b.geschrieben, ziel: alt.ziel + b.ziel, summe: alt.summe + b.summe } : b;
-      for (const e of offen) {
+      for (const e of [...feinde, ...freunde]) {
         const def = map.gegner[e.id];
         const zaeh = Math.max(1, zaehVon(werteVon(def)) + zusaetze(state, def).reduce((n, z) => n + (+z.zaeh || 0) + (+(z.werte || {}).tough || 0), 0)
           + (+((state.typMod || {})[e.id] || {}).tough || 0));
-        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: 0, zaeh, weg: false });
+        for (let n = 0; n < e.anzahl; n++) state.gegner.push({ uid: `${e.schluessel}:${n}`, id: e.id, zone: e.zone, wunden: Math.min(e.wunden || 0, zaeh - 1), zaeh, weg: false });
       }
     }
     // ---------- Gegnerpunkte nach OPR ----------
@@ -396,7 +405,15 @@
       return g;
     }
     // gegnerHinzu an Ereignissen und Antworten: [{ id: "gemeinde", anzahl: 1, zone: "K" }]
-    const holeAlle = (state, liste) => { for (const x of liste || []) holeGegner(state, x.id, x.anzahl, x.zone); };
+    // anzahl: Zahl, "W6", "½W6" (W6 halbiert, aufgerundet) oder { leiste, min, max } (so viele wie die Leiste zeigt)
+    function anzahlVon(state, a) {
+      if (typeof a === "number") return a;
+      if (a === "W6") return 1 + Math.floor(zufall() * 6);
+      if (a === "½W6") return Math.ceil((1 + Math.floor(zufall() * 6)) / 2);
+      if (a && a.leiste) { const w = ((state.leisten[a.leiste] || {}).wert) || 0; return Math.max(a.min ?? 0, Math.min(a.max ?? Infinity, w)); }
+      return 1;
+    }
+    const holeAlle = (state, liste) => { for (const x of liste || []) { const n = anzahlVon(state, x.anzahl); if (n > 0) holeGegner(state, x.id, n, x.zone); } };
 
     // Zusatzregeln eines Gegners, die frühere Entscheidungen freigeschaltet haben
     const zusaetze = (state, def) => ((def && def.zusatz) || []).filter(z => gilt(state, z.wenn));
@@ -519,7 +536,7 @@
       aendere(state, e.leisten);
       schalte(state, e.leistenAus, false);
       if (!e.intern) notiere(state, e.name);
-      const ergebnis = { id, name: e.name, vorlesen: e.vorlesen || "", gmNotiz: e.gmNotiz || "", beutewurf: !!e.beutewurf,
+      const ergebnis = { id, name: e.name, vorlesen: e.vorlesen || "", gmNotiz: e.gmNotiz || "", beutewurf: !!e.beutewurf, beute: e.beute || [],
         probe: e.probe ? { frage: e.probe.frage || "Der Spieler würfelt einen W6.", wurf: null, stufen: [] } : null };
       if (!still && !e.intern) state.letzte.push(ergebnis);
       if (e.danach) loeseAus(state, e.danach, true);
@@ -546,10 +563,14 @@
       eintrag.probe.wurf = w;
       for (const st of e.probe.stufen || []) {
         // ab: ab diesem Wurf; bis: höchstens dieser Wurf (für Stufen, die bei einem schlechten Wurf greifen)
-        if (w < (st.ab || 1) || w > (st.bis || 6)) continue;
+        const bis = st.bisLeiste ? ((state.leisten[st.bisLeiste] || {}).wert || 0) : (st.bis || 6);
+        if (w < (st.ab || 1) || w > bis) continue;
         eintrag.probe.stufen.push({ ab: st.ab, bis: st.bis, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
         setze(state, st.setzt);
         aendere(state, st.leisten);
+        schalte(state, st.leistenAn, true);
+        // Beute nur bei diesem Wurf (z. B. das Werkzeug, wenn der Griff gelingt)
+        if (st.beute) eintrag.beute = [...(eintrag.beute || []), ...st.beute];
       }
       notiere(state, `${e.name}: Probe ${w}`);
       pruefeSpawns(state);
@@ -573,10 +594,15 @@
       return r;
     }
     const offeneMarker = state => Object.entries(map.ereignisse || {}).filter(([id, e]) => e.beutewurf && e.einmal && !state.ereignisse[id]).map(([id]) => id);
+    // Die Antworten, die gerade gelten (eine Option mit `wenn` erscheint nur, wenn sie passt)
+    function optionen(state) {
+      const s = map.schritte[state.schritt];
+      return s && s.typ === "wahl" ? (s.optionen || []).filter(o => !o.wenn || gilt(state, o.wenn)) : [];
+    }
     function waehle(state, taste, eingabe) {
       const s = map.schritte[state.schritt];
       if (!s || s.typ !== "wahl") return null;
-      const o = s.optionen.find(x => String(x.taste) === String(taste));
+      const o = optionen(state).find(x => String(x.taste) === String(taste));
       if (!o) return null;
       merke(state);
       state.letzte = [];
@@ -607,6 +633,7 @@
       state.aktiviert = {};
       const texte = [];
       let sprung = null;
+      const ausloesen = [];
       for (const r of map.rundenende || []) {
         if (!gilt(state, r.wenn)) continue;
         // Eine Regel, die nur Flags setzt, die schon stehen (ab Runde 4 wütend), meldet sich nur beim ersten Mal
@@ -621,12 +648,17 @@
         aendere(state, r.leisten);
         setze(state, r.setzt);
         if (r.springe && !sprung && !state.angewendet[r.springe]) sprung = r.springe;
-        if (r.text && (r.leisten || r.springe || neuGesetzt)) texte.push(r.text);
+        // Ein Ereignis, das jedes Rundenende von selbst kommt (Chris muss keine Taste drücken)
+        if (r.ereignis) ausloesen.push(...[].concat(r.ereignis));
+        // Ein reiner Hinweis (ohne Leiste, Flag, Sprung) erscheint jede Runde, in der er gilt
+        const nurHinweis = !r.leisten && !r.springe && !r.setzt && !r.ereignis;
+        if (r.text && (r.leisten || r.springe || neuGesetzt || nurHinweis)) texte.push(r.text);
       }
       notiere(state, `Runde ${state.runde} beendet`);
       const schwellen = state.letzte.filter(x => x.art === "schwelle");
       state.letzte = schwellen;
       if (sprung) betrete(state, sprung);
+      else for (const id of ausloesen) loeseAus(state, id);
       nachwirken(state);
       logge(state, "runde", `Runde ${state.runde} beendet`);
       return { texte, sprung };
@@ -826,7 +858,7 @@
     }
 
     return {
-      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal,
+      abschliessen, optionen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,
@@ -836,7 +868,13 @@
       punkteFaktor, budgetVon: (state, id) => (state.budgets || {})[id || state.schritt] || null,
       setzeHeldenpunkte: (state, p) => { state.heldenpunkte = +p || null; },
       schritt: state => map.schritte[state.schritt] || null,
-      naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
+      // Wohin „Weiter“ führt: Schritte, deren `wenn` nicht gilt, überspringt betrete auch, also hier ebenso
+      naechsterId: state => {
+        const s = map.schritte[state.schritt];
+        let id = s ? state.kampfZiel || ziel(state, s.weiter) : null;
+        for (let i = 0; i < 50 && id && map.schritte[id] && map.schritte[id].wenn && !gilt(state, map.schritte[id].wenn); i++) id = ziel(state, map.schritte[id].weiter);
+        return id;
+      },
     };
   }
 

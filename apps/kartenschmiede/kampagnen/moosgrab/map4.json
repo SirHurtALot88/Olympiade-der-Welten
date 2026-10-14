@@ -1,0 +1,2630 @@
+{
+ "version": 1,
+ "kampagne": "moosgrab",
+ "map": 4,
+ "titel": "Unter dem Brunnen",
+ "ton": "Fantasy bekommt Risse, absichtlich zu viel",
+ "tisch": "60x60",
+ "dauer": "etwa 2 Stunden",
+ "skizze": "szenarien.MOOSGRAB.maps[3].karte",
+ "start": "vorb-material",
+ "tabu": [
+  "Station",
+  "Labor",
+  "Soldat",
+  "Marine",
+  "Myzel",
+  "Forschung",
+  "Experiment",
+  "Thousand Sons",
+  "Space Marine",
+  "Reaktor"
+ ],
+ "lage": {
+  "flucht": {
+   "wie": "Durch den Schacht (↑), sobald die Halle steht: ein Held je Runde, eine ganze Aktion mit 3+ (ein Held direkt daneben hilft: 2+). Zurück durch die Wurzeln zum Brunnen geht es nicht: Hinab haben sie euch getragen, hinauf tragen sie euch nicht in vier Runden.",
+   "folge": "Wer im Schacht ist, ist raus aus dem Kampf und kommt im Dorf heraus; in Map 5 steigt er von oben wieder ein. Sind alle, die noch stehen, im Schacht (Taste K), endet die Map mit dem Cliffhanger. Fliehen zählt als Hauptziel."
+  },
+  "sonderregeln": [
+   {
+    "titel": "Enge",
+    "text": "In den Wurzelgängen passen höchstens zwei Figuren nebeneinander. Fernkampf reicht dort nur zwei Kartenlängen weit. Wurzelwände sind nicht zu durchqueren, die Leuchtpilze sind schwieriges Gelände (Vorschlag)."
+   },
+   {
+    "titel": "Die Sporenlinge ruhen",
+    "wenn": {
+     "eine": [
+      {
+       "flag": "sporen_a_wach",
+       "ist": false
+      },
+      {
+       "flag": "sporen_b_wach",
+       "ist": false
+      }
+     ]
+    },
+    "text": "Ruhende Sporenlinge würfeln nicht und tun nichts. Sie wachen, wenn ein Held direkt neben ihnen stehen bleibt (innerhalb einer Kartenbreite) oder sie angreift (Taste 4 für A, 5 für B), wenn in den Gängen geschossen oder gezaubert wird (G, weckt beide), oder wenn die Halle erwacht (weckt alle). Wach würfeln sie auf der Tabelle, die gerade gilt."
+   },
+   {
+    "titel": "Was die Halle weckt",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "halle_steht",
+       "ist": true
+      },
+      {
+       "flag": "erwacht",
+       "ist": false
+      }
+     ]
+    },
+    "text": "Das Erwachen kommt, wenn ein Held das blinkende Licht berührt (0), den dritten Suchmarker untersucht (egal welchen, die Leiste zählt), in der Halle schießt, zaubert oder eine Gestalt angreift (F), in den Schacht steigt (H), oder spätestens am Ende der dritten Runde in der Halle (Leiste „Das Licht“). Glastanks und Gestalten ansehen weckt nichts."
+   },
+   {
+    "titel": "Das Erwachen",
+    "wenn": {
+     "flag": "erwacht",
+     "ist": true
+    },
+    "text": "Vier Runden durchhalten (Leiste „Runden überstanden“, die Runde des Erwachens ist Runde 1) oder durch den Schacht. Startwelle an den Nischen; am Ende von Runde 1, 2 und 3 je ½W6 Rüstungsmänner aus freien Nischen, solange der Gelehrte steht. Es ist absichtlich zu viel: Ein Sieg ist nicht vorgesehen. Nach Runde 4 erstarren alle."
+   },
+   {
+    "titel": "Ruhig in Runde 1",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "erwacht",
+       "ist": true
+      },
+      {
+       "flag": "schmied_besiegt",
+       "ist": true
+      }
+     ]
+    },
+    "text": "Der Schmied ist besiegt: In Runde 1 des Erwachens würfeln die Gegner auf der ruhigen Tabelle, ab Runde 2 wütend. Die App schaltet selbst."
+   },
+   {
+    "titel": "Wütend vom ersten Moment",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "erwacht",
+       "ist": true
+      },
+      {
+       "flag": "schmied_besiegt",
+       "nicht": true
+      }
+     ]
+    },
+    "text": "Der Schmied lebt noch, sein Takt hallt bis hier unten: Die Gegner würfeln vom Erwachen an auf der wütenden Tabelle."
+   },
+   {
+    "titel": "Deckung und Glastanks",
+    "wenn": {
+     "flag": "halle_steht",
+     "ist": true
+    },
+    "text": "Hinter Werktischen und Glastanks gilt Deckung. Wird ein Glastank getroffen (Taste B), würfelst du einen W6: Bei 1 platzt er und wird ein verseuchtes Feld, eine Kartenbreite um ihn herum."
+   },
+   {
+    "titel": "Das Geflecht",
+    "wenn": {
+     "flag": "halle_steht",
+     "ist": true
+    },
+    "text": "Der Teppich aus Geflecht in der Mitte der Halle ist ein verseuchtes Feld: Wer seinen Zug darin beendet, macht einen Qualitätstest, misslungen −1 auf Treffen bis Ende der nächsten Runde."
+   },
+   {
+    "titel": "Der Gelehrte führt sie",
+    "wenn": {
+     "flag": "erwacht",
+     "ist": true
+    },
+    "text": "Solange der Gelehrte in der gehörnten Rüstung steht, folgen ihm die Rüstungsmänner, und am Rundenende kommt Nachschub. Fällt er: ruhige Tabelle für alle und kein Nachschub mehr (die App schaltet selbst). Die Runden zählen trotzdem bis 4."
+   },
+   {
+    "titel": "Der Verwundete",
+    "wenn": {
+     "flag": "ueberlebender_dabei",
+     "ist": true
+    },
+    "text": "Er kämpft als Verbündeter (unter Verbündete, eigene Karte). Ein Spieler führt ihn zusätzlich, sonst du. Er passt nicht in den Schacht: Fliehen alle Helden, bleibt er unten. Versorgen (Taste E): Zäh +2. Fällt er, ist er in Map 5 nicht dabei."
+   },
+   {
+    "titel": "Keine EP für Kämpfe",
+    "wenn": {
+     "flag": "erwacht",
+     "ist": true
+    },
+    "text": "Gegen die Rüstungsmänner zu kämpfen bringt nichts ein: EP gibt es nur fürs Überleben und für ein Fundstück.",
+    "ansage": "Für die hier gibt es nichts. Nur fürs Überleben."
+   },
+   {
+    "titel": "Die Probe ist schwer",
+    "wenn": {
+     "flag": "fund_probe",
+     "ist": true
+    },
+    "text": "Wer die lebende Probe trägt, bewegt sich je Bewegung nur eine Kartenbreite weit statt einer Kartenlänge. Weitergeben kostet eine Aktion, beide Helden direkt nebeneinander."
+   },
+   {
+    "titel": "Namensregel",
+    "text": "Wer den Namen seines Helden laut sagt, bekommt 1 Sporenpunkt. Gilt weiter, du erinnerst nicht daran. Ab 3 Sporenpunkten würfelt ein Held 3 statt 4 Aktionswürfel."
+   },
+   {
+    "titel": "Keine Rast",
+    "text": "In Map 4 gibt es keine Rast: Unter dem Brunnen ist kein Ort sicher, und nach dem Erwachen bleibt keine Zeit. Am Ende der Map gibt es nur die OPR-Erholung: 3 Wunden und 3 Power je Held."
+   }
+  ],
+  "ziele": [
+   {
+    "art": "Hauptziel",
+    "text": "Überleben: vier Runden nach dem Erwachen durchhalten oder durch den Schacht entkommen.",
+    "erreicht": {
+     "flag": "ep_haupt",
+     "ist": true
+    }
+   },
+   {
+    "art": "Nebenziel",
+    "text": "Ein Fundstück mitnehmen: Erkennungsmarke, Protokoll, Probe oder tote Probe.",
+    "erreicht": {
+     "eine": [
+      {
+       "flag": "fund_marke",
+       "ist": true
+      },
+      {
+       "flag": "fund_protokoll",
+       "ist": true
+      },
+      {
+       "flag": "fund_probe",
+       "ist": true
+      },
+      {
+       "flag": "fund_tote_probe",
+       "ist": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "auftraege": [
+  {
+   "id": "brunnen",
+   "art": "Haupt",
+   "titel": "Was liegt unter dem Brunnen?",
+   "spieler": "Findet heraus, was unter dem Brunnen liegt. Und kommt lebend wieder hinauf.",
+   "quelle": "Map 3: der Brunnen, den die Helden geöffnet haben; davor Mutter Hedda (Map 2): „Es fing mit dem Brunnen an.“ Schritt „Warum ihr hier unten seid“.",
+   "vorlesen": "Über euch ist der Brunnen nur noch ein kleiner grauer Kreis. Was Moosgrab krank macht, kommt von hier unten.",
+   "erledigt": {
+    "flag": "halle_gesehen",
+    "ist": true
+   }
+  },
+  {
+   "id": "fundstueck",
+   "art": "Neben",
+   "titel": "Etwas mitnehmen",
+   "spieler": "Nehmt etwas mit, das erklärt, was hier unten ist.",
+   "quelle": "Die Halle (Cue 04-2): Blätter auf den Tischen, Behälter, die Gestalten an den Wänden.",
+   "vorlesen": "Blätter in einer Schrift, die keiner lesen kann. Etwas in den Behältern, das sich bewegt. Wer verstehen will, was das Dorf krank macht, nimmt etwas davon mit.",
+   "ab": {
+    "flag": "halle_gesehen",
+    "ist": true
+   },
+   "erledigt": {
+    "eine": [
+     {
+      "flag": "fund_marke",
+      "ist": true
+     },
+     {
+      "flag": "fund_protokoll",
+      "ist": true
+     },
+     {
+      "flag": "fund_probe",
+      "ist": true
+     },
+     {
+      "flag": "fund_tote_probe",
+      "ist": true
+     }
+    ]
+   }
+  },
+  {
+   "id": "ueberleben",
+   "art": "Haupt",
+   "titel": "Überleben",
+   "spieler": "Haltet vier Runden durch, oder kommt durch den Schacht nach oben.",
+   "quelle": "Das Erwachen: deine Ansage im Schritt „Die Gestalten treten heraus“.",
+   "vorlesen": "Ab jetzt zähle ich vier Runden. Haltet durch, oder kommt zum Schacht.",
+   "ab": {
+    "flag": "erwacht",
+    "ist": true
+   },
+   "erledigt": {
+    "flag": "ep_haupt",
+    "ist": true
+   }
+  }
+ ],
+ "rundenwurf": {
+  "name": "Was summt hinter dem Metall?",
+  "text": "Vorschlag, du kannst ihn weglassen. Am Ende jeder Runde, solange nichts erwacht ist. Meistens passiert nichts. Nach dem Erwachen gibt es keinen Wurf: Dann ist genug los.",
+  "wenn": {
+   "flag": "erwacht",
+   "ist": false
+  },
+  "tabelle": [
+   {
+    "w": [
+     1
+    ],
+    "titel": "Die Pilze dunkeln",
+    "vorlesen": "Die Leuchtpilze werden dunkler, alle zugleich, und dann wieder hell. Als hätte etwas geblinzelt.",
+    "gmNotiz": "Nur Stimmung. Nichts passiert."
+   },
+   {
+    "w": [
+     2
+    ],
+    "titel": "Das Moos zuckt",
+    "vorlesen": "In einer der Wände zuckt das Moos. Dann liegt es wieder still.",
+    "gmNotiz": "Nur Stimmung. Kein Sporenling wacht davon auf."
+   },
+   {
+    "w": [
+     3,
+     4,
+     5
+    ],
+    "titel": "Nichts",
+    "gmNotiz": "Das Summen bleibt gleich. Nichts passiert."
+   },
+   {
+    "w": [
+     6
+    ],
+    "titel": "Das Summen setzt aus",
+    "vorlesen": "Das Summen hinter dem Metall setzt aus. Einen Atemzug lang ist es ganz still. Dann ist es wieder da.",
+    "gmNotiz": "Nur Stimmung. Steht die Halle schon: Die Gestalten rühren sich nicht."
+   }
+  ]
+ },
+ "antreiben": [
+  {
+   "titel": "Der glatte Fels",
+   "vorlesen": "Weiter vorn glänzt der Fels im Licht der Pilze. Zu glatt für Fels. Warme Luft kommt von dort, wie aus einem Ofen, der lange aus ist.",
+   "gmNotiz": "Zeigt zu den glatten Wänden (Taste M). Die Marker sind Beiwerk.",
+   "schritte": [
+    "kampf-wurzelgaenge"
+   ]
+  },
+  {
+   "titel": "Das Moos atmet",
+   "vorlesen": "Das Moos an der linken Wand hebt sich und senkt sich. Langsam. Wie etwas, das schläft.",
+   "gmNotiz": "Warnt vor den Sporenlingen in A, ohne sie zu wecken.",
+   "wenn": {
+    "flag": "sporen_a_wach",
+    "ist": false
+   },
+   "schritte": [
+    "kampf-wurzelgaenge"
+   ]
+  },
+  {
+   "titel": "Der Takt",
+   "vorlesen": "Das kleine Licht blinkt. Immer im selben Takt. Ihr merkt, dass ihr ihm nachatmet.",
+   "gmNotiz": "Zeigt zum Licht (Taste 0), ohne es anzubieten. Spätestens nach der dritten Runde in der Halle erwacht es ohnehin.",
+   "wenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "schritte": [
+    "kampf-halle"
+   ]
+  },
+  {
+   "titel": "Die Gestalten",
+   "vorlesen": "Eine der Gestalten hat den Kopf ein wenig gesenkt. Oder hat sie schon immer so gestanden?",
+   "gmNotiz": "Nur Stimmung. Lädt ein, eine anzusehen (Taste 9).",
+   "wenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "schritte": [
+    "kampf-halle"
+   ]
+  },
+  {
+   "titel": "Was ihr mitnehmt",
+   "vorlesen": "Auf den Tischen Blätter, in den Behältern etwas, das sich bewegt. Wer das Dorf retten will, muss verstehen, was hier unten ist.",
+   "gmNotiz": "Weist auf das Nebenziel: ein Fundstück.",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "fund_marke",
+      "ist": false
+     },
+     {
+      "flag": "fund_protokoll",
+      "ist": false
+     },
+     {
+      "flag": "fund_probe",
+      "ist": false
+     },
+     {
+      "flag": "fund_tote_probe",
+      "ist": false
+     }
+    ]
+   },
+   "schritte": [
+    "kampf-halle"
+   ]
+  },
+  {
+   "titel": "Ein Atemzug",
+   "vorlesen": "Hinter dem rechten Tisch, zwischen zwei Herzschlägen: ein Atemzug. Rasselnd. Nass. Keiner von euch.",
+   "gmNotiz": "Der Verwundete. Wer nachsieht: V.",
+   "wenn": {
+    "flag": "ueberlebender_gefunden",
+    "ist": false
+   },
+   "schritte": [
+    "kampf-halle"
+   ]
+  },
+  {
+   "titel": "Kalte Luft",
+   "vorlesen": "Von rechts fällt kalte Luft herab, aus einem runden Loch in der Decke. Sie riecht nach Nacht.",
+   "gmNotiz": "Zeigt zum Schacht (Taste H). Im Erwachen ist das der Ausweg.",
+   "schritte": [
+    "kampf-halle",
+    "kampf-erwachen"
+   ]
+  },
+  {
+   "titel": "Hinter den Nischen",
+   "vorlesen": "Hinter den Gestalten, in den Nischen, ist die Wand nicht zu Ende. Dort bewegt sich noch mehr.",
+   "gmNotiz": "Erinnert daran, dass Kämpfen nichts bringt: durchhalten oder der Schacht. Kein Nachschub extra.",
+   "schritte": [
+    "kampf-erwachen"
+   ]
+  }
+ ],
+ "tischplan": {
+  "helden": {
+   "x": 12,
+   "y": 22.5
+  },
+  "zonen": {
+   "A": {
+    "x": 2,
+    "y": 13.5
+   },
+   "B": {
+    "x": 21.5,
+    "y": 20.5
+   },
+   "N1": {
+    "x": 1.5,
+    "y": 2
+   },
+   "N2": {
+    "x": 1.5,
+    "y": 8
+   },
+   "N3": {
+    "x": 7,
+    "y": 1.2
+   },
+   "N4": {
+    "x": 15,
+    "y": 1.2
+   },
+   "N5": {
+    "x": 22.5,
+    "y": 4
+   },
+   "N6": {
+    "x": 13,
+    "y": 8.5
+   },
+   "N": {
+    "x": 15,
+    "y": 1.2
+   },
+   "V": {
+    "x": 21,
+    "y": 8.3
+   }
+  },
+  "aufdecken": {
+   "3": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "licht:L": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "schacht:↑": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "nische:N": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "T1": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "T2": {
+    "flag": "halle_steht",
+    "ist": true
+   },
+   "ueberlebender:V": {
+    "flag": "ueberlebender_gefunden",
+    "ist": true
+   }
+  },
+  "info": {
+   "A": "Feindzone A, linke Kante: zwei Sporenlinge, liegend. Wie viele es auf eurer Stufe sind, zeigt die Gegnerliste. Mit Gewalt geöffneter Brunnen (Map 3): sie sind schon wach.",
+   "B": "Feindzone B, rechts unten: zwei Sporenlinge, liegend. Wie viele es auf eurer Stufe sind, zeigt die Gegnerliste.",
+   "nische:N": "Sechs Wandnischen: N1 und N2 links, N3 und N4 oben, N5 rechts über dem Schacht, N6 direkt hinter der Lücke. In jeder lehnt eine Gestalt. Nur Marker hinlegen; Figuren erst beim Erwachen, Nachschub aus freien Nischen.",
+   "schacht:↑": "Der Schacht nach oben, ins Dorf. Der einzige Weg hinaus. Der Verwundete passt nicht hinein."
+  }
+ },
+ "leisten": {
+  "atemzug": {
+   "name": "Atemzug-Leiste",
+   "gilt": "kampagne",
+   "min": 0,
+   "max": 6,
+   "start": 1,
+   "richtung": "hoch",
+   "text": "Aus Map 3 übernommen. Wie nah das, was unter Moosgrab atmet, schon ist. +1 nach jeder Map, hier noch +1, wenn niemand ein Fundstück mitnimmt. Jeder Strich: ein Feld Geflecht mehr. Bei 6 atmet es aus (Nachschub, dann zurück auf 4). Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch",
+   "jeStrich": {
+    "titel": "Das Geflecht wächst",
+    "gmNotiz": "Ein Feld Geflecht (Filz) mehr in der Halle oder in den Gängen, oder in Map 5 eines mehr am Herzen. Nichts dazu sagen, nur hinlegen."
+   },
+   "schwellen": [
+    {
+     "ab": 6,
+     "wiederholt": true,
+     "titel": "Es atmet aus",
+     "vorlesen": "Tief unter euch hebt sich etwas, einmal, langsam, wie eine Brust. Die Wände summen lauter. Dann wird es wieder leiser, aber nicht ganz.",
+     "gmNotiz": "Mitten im Kampf: zwei Rüstungsmänner aus freien Nischen (unten „＋ Gegner“). Außerhalb eines Kampfs oder am Ende der Map: Map 5 beginnt mit zwei Gegnern mehr. Die Leiste fällt auf 4.",
+     "leisten": {
+      "atemzug": -2
+     }
+    }
+   ]
+  },
+  "untersucht": {
+   "name": "Untersuchte Suchmarker",
+   "gilt": "map",
+   "min": 0,
+   "max": 3,
+   "start": 0,
+   "richtung": "hoch",
+   "text": "Suchmarker 1, 2 und 3 zählen, Glastanks und Gestalten nicht. Der dritte weckt die Halle, egal welcher es ist.",
+   "schwellen": [
+    {
+     "ab": 3,
+     "titel": "Der dritte Suchmarker",
+     "gmNotiz": "Ist die Halle noch still: An den Wänden klickt etwas, das Erwachen beginnt. Ziel erreicht, Weiter führt zu Cue 04-3. Ist sie schon wach: nichts weiter.",
+     "setzt": {
+      "erwacht": true
+     }
+    }
+   ]
+  },
+  "takt": {
+   "name": "Das Licht",
+   "gilt": "map",
+   "min": 0,
+   "max": 3,
+   "start": 0,
+   "richtung": "hoch",
+   "aktiv": false,
+   "schlecht": "hoch",
+   "text": "Runden in der Halle, ohne dass etwas erwacht ist. Bei 3 erwacht sie von selbst: So bleibt niemand ewig darin stehen. (Vorschlag)",
+   "schwellen": [
+    {
+     "ab": 3,
+     "titel": "Das Licht wird rot",
+     "vorlesen": "Das kleine Licht hört auf zu blinken. Es leuchtet rot, dauerhaft. Niemand hat es berührt.",
+     "gmNotiz": "Das Erwachen kommt von selbst: drei Runden in der Halle sind um.",
+     "setzt": {
+      "erwacht": true
+     },
+     "springe": "cue-04-3"
+    }
+   ]
+  },
+  "erwachen": {
+   "name": "Runden überstanden",
+   "gilt": "map",
+   "min": 0,
+   "max": 4,
+   "start": 0,
+   "richtung": "hoch",
+   "aktiv": false,
+   "text": "Runden seit dem Erwachen. Die Runde, in der es erwacht, ist Runde 1. Bei 4 erstarren alle Gestalten: Cliffhanger.",
+   "schwellen": [
+    {
+     "ab": 4,
+     "titel": "Sie erstarren",
+     "gmNotiz": "Vier Runden überstanden: Hauptziel. Die App springt zu Cue 04-4.",
+     "setzt": {
+      "ep_haupt": true
+     },
+     "springe": "cue-04-4"
+    }
+   ]
+  },
+  "schacht": {
+   "name": "Im Schacht",
+   "gilt": "map",
+   "min": 0,
+   "max": 4,
+   "start": 0,
+   "richtung": "hoch",
+   "aktiv": false,
+   "text": "So viele Helden sind durch den Schacht nach oben. Ein Held je Runde, eine ganze Aktion mit 3+."
+  }
+ },
+ "flags": {
+  "anhaenger": {
+   "start": false,
+   "text": "Die Helden tragen den Kupferanhänger (aus Map 1). Wird weitergereicht.",
+   "wirktIn": "map5"
+  },
+  "anhaenger_traeger": {
+   "start": null,
+   "text": "Name des Helden, der den Anhänger trägt.",
+   "wirktIn": "map5"
+  },
+  "anhaenger_zurueck": {
+   "start": false,
+   "text": "Hedda hat den Anhänger zurückbekommen (Map 2).",
+   "wirktIn": "map5"
+  },
+  "quelle_zerstoert": {
+   "start": false,
+   "text": "Die Quelle in Map 1 wurde zerstört (Finale: weniger Nachschub). Wird weitergereicht.",
+   "wirktIn": "map5"
+  },
+  "frau_name": {
+   "start": null,
+   "text": "Die Helden kennen den Namen Lene. Wird weitergereicht.",
+   "wirktIn": "map5"
+  },
+  "schmied_besiegt": {
+   "start": false,
+   "text": "Map 3: Der Schmied ist besiegt. Hier: Runde 1 des Erwachens ruhig.",
+   "wirktIn": "map5"
+  },
+  "zwei_gerettet": {
+   "start": false,
+   "text": "Map 3: Mindestens zwei Menschen im Keller. Map 5: sie halten oben am Brunnen ein Seil bereit.",
+   "wirktIn": "map5"
+  },
+  "befallener_im_keller": {
+   "start": false,
+   "text": "Map 3: Ein Befallener sitzt im Keller. Map 5: zwei Gegner mehr aus dem Gemeindehaus.",
+   "wirktIn": "map5"
+  },
+  "brunnen_gewalt": {
+   "start": false,
+   "text": "Map 3: Der Brunnen wurde mit Gewalt geöffnet. Hier: die Sporenlinge in A sind von Anfang an wach.",
+   "wirktIn": "map5"
+  },
+  "fund_marke": {
+   "start": false,
+   "text": "Fundstück Erkennungsmarke. Map 5: zeigen die Helden sie dem Überlebenden, vertraut er ihnen.",
+   "wirktIn": "map5"
+  },
+  "fund_protokoll": {
+   "start": false,
+   "text": "Fundstück Protokoll. Map 5: wer es liest, trifft Herz und Adern mit DS(+1).",
+   "wirktIn": "map5"
+  },
+  "fund_probe": {
+   "start": false,
+   "text": "Fundstück lebende Probe. Map 5: der Überlebende will ein Stück für seine Leute.",
+   "wirktIn": "map5"
+  },
+  "fund_tote_probe": {
+   "start": false,
+   "text": "Fundstück tote Probe. Map 5: damit lässt sich der Überlebende täuschen.",
+   "wirktIn": "map5"
+  },
+  "schacht_geflohen": {
+   "start": false,
+   "text": "Mindestens ein Held ist durch den Schacht ins Dorf entkommen. Map 5: er steigt von oben ein.",
+   "wirktIn": "map5"
+  },
+  "alle_im_schacht": {
+   "start": false,
+   "text": "Alle Helden, die noch standen, sind durch den Schacht entkommen.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_dabei": {
+   "start": false,
+   "text": "Der Verwundete (ein Fremder in schwerer Rüstung) lebt und ist bei den Helden.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_vertrauen": {
+   "start": null,
+   "text": "Wie die Helden den Verwundeten mitgenommen haben: hoch oder misstrauisch.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_versorgt": {
+   "start": false,
+   "text": "Der Verwundete wurde versorgt (Zäh +2).",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_tot": {
+   "start": false,
+   "text": "Der Verwundete ist gefallen.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_zurueckgelassen": {
+   "start": false,
+   "text": "Die Helden haben den Verwundeten hinter dem Werktisch liegen lassen.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_angegriffen": {
+   "start": false,
+   "text": "Ein Held hat den Verwundeten angegriffen.",
+   "wirktIn": "map5"
+  },
+  "herz_bekannt": {
+   "start": false,
+   "text": "Der Verwundete hat vom brennenden Herz erzählt: Es zu zerstören war der Auftrag seines Trupps.",
+   "wirktIn": "map5"
+  },
+  "gelehrter_gefallen": {
+   "start": false,
+   "text": "Der Gelehrte in der gehörnten Rüstung ist gefallen: ruhige Tabelle, kein Nachschub.",
+   "wirktIn": "map5"
+  },
+  "ueberlebender_gefunden": {
+   "start": false,
+   "text": "Die Helden haben den Verwundeten hinter dem Werktisch gefunden.",
+   "wirktIn": "map4"
+  },
+  "ueberlebender_gesprochen": {
+   "start": false,
+   "text": "Das Gespräch mit dem Verwundeten ist vorbei.",
+   "wirktIn": "map4"
+  },
+  "gaenge_stehen": {
+   "start": false,
+   "text": "Die Wurzelgänge stehen auf dem Tisch.",
+   "wirktIn": "map4"
+  },
+  "sporen_a_wach": {
+   "start": false,
+   "text": "Die Sporenlinge in Zone A sind wach.",
+   "wirktIn": "map4"
+  },
+  "sporen_b_wach": {
+   "start": false,
+   "text": "Die Sporenlinge in Zone B sind wach.",
+   "wirktIn": "map4"
+  },
+  "halle_offen": {
+   "start": false,
+   "text": "Ein Held hat die glatte Wand berührt: die Halle kommt.",
+   "wirktIn": "map4"
+  },
+  "halle_steht": {
+   "start": false,
+   "text": "Die Halle (obere Hälfte) steht auf dem Tisch.",
+   "wirktIn": "map4"
+  },
+  "halle_gesehen": {
+   "start": false,
+   "text": "Die Helden haben die Halle gesehen (Cue 04-2).",
+   "wirktIn": "map4"
+  },
+  "erwacht": {
+   "start": false,
+   "text": "Das Erwachen hat begonnen: vier Runden oder der Schacht.",
+   "wirktIn": "map4"
+  },
+  "erwachen_steht": {
+   "start": false,
+   "text": "Die Startwelle steht an den Nischen.",
+   "wirktIn": "map4"
+  },
+  "cliffhanger": {
+   "start": false,
+   "text": "Die Gestalten sind erstarrt (Cue 04-4).",
+   "wirktIn": "map4"
+  },
+  "ep_haupt": {
+   "start": false,
+   "text": "Hauptziel: vier Runden überstanden oder durch den Schacht entkommen (2 EP).",
+   "wirktIn": "gruppe"
+  }
+ },
+ "audio": {
+  "04-1": {
+   "titel": "Die Wurzelgänge",
+   "datei": "audio/moosgrab/04/04-1.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Noch nicht aufgenommen: Bis dahin liest du den Text am Cue-Schritt vor. Endet mit „Ihr seid am Zug.“"
+  },
+  "04-2": {
+   "titel": "Die Halle",
+   "datei": "audio/moosgrab/04/04-2.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Sobald die obere Hälfte steht. Noch nicht aufgenommen: Bis dahin liest du den Text vor. Endet mit „Was tut ihr?“"
+  },
+  "04-3": {
+   "titel": "Das Erwachen",
+   "datei": "audio/moosgrab/04/04-3.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Licht, dritter Suchmarker, Lärm in der Halle, Schacht oder drei Runden in der Halle. Noch nicht aufgenommen: Bis dahin liest du den Text vor. Danach die Kampfmusik."
+  },
+  "04-4": {
+   "titel": "Von oben",
+   "datei": "audio/moosgrab/04/04-4.mp3",
+   "schleife": false,
+   "optional": true,
+   "notiz": "Nach Runde 4 oder wenn alle im Schacht sind. Endet ohne „Ihr seid am Zug“: Hier ist Schluss für heute."
+  },
+  "BATTLE-1": {
+   "titel": "Battle Cue 1",
+   "datei": "audio/moosgrab/01/battle-1.mp3",
+   "schleife": true,
+   "optional": true,
+   "notiz": "Derselbe Track wie in Map 1 (ist er dort hochgeladen, findet ihn die App hier auch). Steht für den metallischen Puls, bis der aufgenommen ist. Im Kampf starten (Taste A), Schleife bis zum Cliffhanger."
+  }
+ },
+ "figuren": {
+  "verwundeter": {
+   "name": "Der Verwundete",
+   "anzeige": "Ein Mann in schwerer Rüstung",
+   "tisch": {
+    "x": 21,
+    "y": 8.3,
+    "ab": {
+     "flag": "ueberlebender_gefunden",
+     "ist": true
+    },
+    "bis": {
+     "eine": [
+      {
+       "flag": "ueberlebender_dabei",
+       "ist": true
+      },
+      {
+       "flag": "ueberlebender_tot",
+       "ist": true
+      }
+     ]
+    },
+    "zeichen": "V"
+   },
+   "wer": "Der letzte Lebende eines Trupps in schweren Rüstungen, der vor wenigen Tagen von oben eingedrungen ist. Seine Brüder sind tot, beim Namen gerufen, einer nach dem anderen. Er hat sich hinter den Werktisch geschleppt und es nicht in den Schacht geschafft: seine Rüstung ist zu breit. Für die Helden ist er ein Fremder, so fremd wie die Gestalten, nur lebendig.",
+   "stimme": [
+    "Heiser, kurze Stücke, ein fremder Klang in jedem Wort",
+    "Sagt nie einen Namen, auch seinen nicht",
+    "Spricht von „meinen Brüdern“, nicht von Männern"
+   ],
+   "ziel": "Überleben, bis jemand kommt, und dann zu Ende bringen, wofür sein Trupp gekommen ist: das brennende Herz unter der Halle zerstören.",
+   "motiv": "Schuld. Er hat überlebt, weil er als Letzter gerufen wurde und nicht geantwortet hat.",
+   "kern": [
+    "„Leise. Die schlafen nur.“",
+    "„Fasst das Licht nicht an.“",
+    "„Wir sollten das Herz zerstören. Tiefer, wo es brennt. Wir haben es nicht geschafft.“"
+   ],
+   "weiss": [
+    {
+     "kurz": "Sein Trupp",
+     "info": "„Wir waren zehn. Es hat uns beim Namen gerufen. Einen nach dem anderen. Wer geantwortet hat, ist hingegangen.“",
+     "wie": "Fragen, was passiert ist oder wo die anderen sind.",
+     "folge": "Die Helden wissen, warum Namen hier unten töten."
+    },
+    {
+     "kurz": "Der Auftrag: das brennende Herz",
+     "info": "„Tiefer drin, hinter dieser Halle, brennt es. Seit vierzig Jahren. Es füttert alles hier, das Moos, die da an den Wänden, euer Dorf. Wir sollten es zerstören.“",
+     "wie": "Fragen, warum er hier ist, oder was das Licht und das Summen sind.",
+     "folge": "Das Ziel für Map 5 ist ausgesprochen: das Herz.",
+     "setzt": {
+      "herz_bekannt": true
+     }
+    },
+    {
+     "kurz": "Die Leeren",
+     "info": "„Die da sind leer. Rüstungen, sonst nichts. Staub und das Moos. Wer drin war, ist lange fort. Nur der mit den Hörnern ist noch jemand. Fällt der, werden die anderen dumm.“",
+     "wie": "Nach den Gestalten an den Wänden fragen.",
+     "folge": "Die Spieler kennen den dritten Weg: den Gelehrten fällen."
+    },
+    {
+     "kurz": "Das Licht",
+     "info": "„Fasst das Licht nicht an. Und schießt hier drin nicht. Das weckt sie.“",
+     "wie": "Fragen, was das Licht ist, oder ein Held geht auf das Licht zu.",
+     "folge": "Die Spieler wissen, was die Halle weckt. Das ist gewollt: wer fragt, wird belohnt."
+    },
+    {
+     "kurz": "Der Schacht",
+     "info": "„Rechts, in der Decke. Geht nach oben, zu eurem Dorf. Ich passe nicht hinein.“",
+     "wie": "Fragen, wie man hier hinauskommt.",
+     "folge": "Der Ausweg ist bekannt. Er selbst bleibt unten, wenn alle fliehen."
+    },
+    {
+     "kurz": "Die anderen von oben",
+     "info": "„Nach uns kommen andere. Die wollen das hier nicht zerstören. Die wollen es mitnehmen.“",
+     "wie": "Fragen, ob noch mehr kommen, oder nach den Behältern fragen.",
+     "folge": "Andeutung für Map 5 (die Probe). Nichts erklären."
+    }
+   ],
+   "wennSieFragen": [
+    [
+     "nach seinem Namen",
+     "„Nein.“ Er sieht zur Decke. „Es hört zu.“"
+    ],
+    [
+     "woher er kommt",
+     "„Von weit weg. Weiter als euer Wald.“ Er sieht nach oben, nicht zur Tür."
+    ],
+    [
+     "ob er mitkommt",
+     "„Wenn ihr mich stützt, bis ich stehe. Dann halte ich mehr aus als ihr.“"
+    ],
+    [
+     "ob man ihm helfen kann",
+     "„Bindet ab, was blutet. Mehr braucht es nicht, um zu sterben, und nicht mehr, um zu leben.“ Versorgen: Taste E."
+    ],
+    [
+     "was in den Behältern ist",
+     "„Proben. Eine lebt. Nehmt sie nicht, wenn ihr klug seid.“"
+    ],
+    [
+     "grob, drohend, mit Waffe",
+     "Er hebt das Gewehr nicht. „Dann tut es leise.“ Greift ein Held wirklich an: ⚔ an seiner Figur, und die Halle erwacht (F)."
+    ]
+   ],
+   "nichtWissen": [
+    "Was das Moos ist: nur, dass es lernt, warm ist und Namen ruft.",
+    "Was mit dem Dorf geschah: Er kennt Moosgrab nur als Wort auf einer Karte.",
+    "Wie man die Leeren aufhält: Man trifft nichts, was blutet. Nur der Gehörnte zählt."
+   ],
+   "kampf": {
+    "werte": {
+     "name": "Der Verwundete",
+     "faction": "Die Fremden",
+     "size": "1",
+     "quality": "3+",
+     "defense": "2+",
+     "tough": "4",
+     "role": "enemy",
+     "weapons": "Schweres Gewehr | 24 | A2 | DS(1)\nKampfmesser | Nahkampf | A2 | ",
+     "passives": "Furchtlos, Langsam",
+     "flavor": "Er wollte nicht gegen euch kämpfen."
+    },
+    "notiz": "Nur, wenn ein Held ihn angreift. Dieselben Werte wie als Verbündeter. Jeder Schuss in der Halle weckt sie (F).",
+    "info": "Ein Fremder in schwerer Rüstung, verwundet. Wird er angegriffen, wehrt er sich.",
+    "setzt": {
+     "ueberlebender_dabei": false,
+     "ueberlebender_angegriffen": true
+    },
+    "zustandSaetze": {
+     "unverletzt": "Er schießt nicht zurück. Noch nicht.",
+     "angekratzt": "Er knurrt etwas in seiner Sprache. Jetzt zielt er.",
+     "verwundet": "Er sackt gegen den Tisch, das Gewehr bleibt oben.",
+     "schwer verwundet": "Er atmet nur noch in Stößen.",
+     "am Ende": "Ein Treffer noch. „Dann tut es“, sagt er.",
+     "gefallen": "Er sinkt gegen das Metall."
+    },
+    "tod": {
+     "vorlesen": "Er sinkt gegen das kalte Metall und bleibt sitzen. Er sieht euch an, bis er nichts mehr sieht.",
+     "gmNotiz": "Der Verwundete ist tot. Map 5 erfährt es.",
+     "setzt": {
+      "ueberlebender_dabei": false,
+      "ueberlebender_tot": true
+     }
+    }
+   }
+  }
+ },
+ "gegner": {
+  "sporenling-a": {
+   "name": "Sporenling",
+   "anzeige": "Sporenling",
+   "karte": "v:giftmade",
+   "info": "Kleines Pilzvieh aus dem Moos der Wurzelgänge, links an der Wand. Ruht, bis etwas es weckt.",
+   "notiz": "Platzhalter Giftmade (25 P.). Zone A (links). Ruht, bis Taste 4, G oder das Erwachen es weckt. Wach würfelt es auf der Tabelle, die gerade gilt.",
+   "zusatz": [
+    {
+     "wenn": {
+      "flag": "sporen_a_wach",
+      "ist": false
+     },
+     "text": "Ruht: würfelt nicht und tut nichts. Wacht auf, wenn ein Held direkt daneben stehen bleibt oder es angreift (Taste 4), bei Schuss oder Zauber in den Gängen (G) oder wenn die Halle erwacht."
+    }
+   ],
+   "anblick": "Kniehoch, nass glänzend, ohne Gesicht. Wo es liegt, leuchten die Pilze heller, als tränke es ihr Licht.",
+   "zustandSaetze": {
+    "unverletzt": "Es zuckt und kriecht weiter, als wäre nichts.",
+    "angekratzt": "Ein Stück Moos reißt ab. Darunter ist es nass.",
+    "verwundet": "Es platzt an einer Seite auf und wird langsamer.",
+    "schwer verwundet": "Es zieht sich nur noch an den Wurzeln vorwärts.",
+    "am Ende": "Ein Tritt noch.",
+    "gefallen": "Es platzt. Nur ein dampfender Fleck an der Wurzel."
+   },
+   "tod": {
+    "vorlesen": "Es platzt wie eine überreife Frucht. Grüner Saft läuft die Wurzel hinab, und die Leuchtpilze daneben werden dunkel.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt."
+   }
+  },
+  "sporenling-b": {
+   "name": "Sporenling",
+   "anzeige": "Sporenling",
+   "karte": "v:giftmade",
+   "info": "Kleines Pilzvieh aus dem Moos der Wurzelgänge, rechts unten im Gang. Ruht, bis etwas es weckt.",
+   "notiz": "Platzhalter Giftmade (25 P.). Zone B (rechts unten). Ruht, bis Taste 5, G oder das Erwachen es weckt. Wach würfelt es auf der Tabelle, die gerade gilt.",
+   "zusatz": [
+    {
+     "wenn": {
+      "flag": "sporen_b_wach",
+      "ist": false
+     },
+     "text": "Ruht: würfelt nicht und tut nichts. Wacht auf, wenn ein Held direkt daneben stehen bleibt oder es angreift (Taste 5), bei Schuss oder Zauber in den Gängen (G) oder wenn die Halle erwacht."
+    }
+   ],
+   "anblick": "Kniehoch, nass glänzend, ohne Gesicht. Wo es liegt, leuchten die Pilze heller, als tränke es ihr Licht.",
+   "zustandSaetze": {
+    "unverletzt": "Es zuckt und kriecht weiter, als wäre nichts.",
+    "angekratzt": "Ein Stück Moos reißt ab. Darunter ist es nass.",
+    "verwundet": "Es platzt an einer Seite auf und wird langsamer.",
+    "schwer verwundet": "Es zieht sich nur noch an den Wurzeln vorwärts.",
+    "am Ende": "Ein Tritt noch.",
+    "gefallen": "Es platzt. Nur ein dampfender Fleck an der Wurzel."
+   },
+   "tod": {
+    "vorlesen": "Es platzt wie eine überreife Frucht. Grüner Saft läuft die Wurzel hinab, und die Leuchtpilze daneben werden dunkel.",
+    "gmNotiz": "Figur vom Tisch. Kein Effekt."
+   }
+  },
+  "ruestungsmann": {
+   "name": "Rüstungsmann",
+   "anzeige": "Eine Gestalt in Rüstung",
+   "karte": "eigen",
+   "info": "Eine der Gestalten aus den Nischen: eine Rüstung ohne Nähte, blau unter dem Moos. Langsam, schwer zu verletzen, und sie hört nicht auf.",
+   "werte": {
+    "name": "Rüstungsmann",
+    "faction": "Die Leeren",
+    "size": "1",
+    "quality": "4+",
+    "defense": "2+",
+    "tough": "3",
+    "role": "enemy",
+    "weapons": "Glutgewehr | 18 | A1 | DS(1)\nPanzerfaust | Nahkampf | A1 | ",
+    "passives": "Langsam, Furchtlos",
+    "flavor": "Versiegelt. Darin rieselt etwas, wenn es geht."
+   },
+   "notiz": "Miniatur: Rubric Marine (Thousand Sons). Eigene Werte: Q4+ D2+ Z3, Glutgewehr (drei Kartenlängen) A1 DS(1), Panzerfaust A1, Langsam, Furchtlos = 55 P. Hart, langsam, viel Rüstung: Wer kämpft, beißt sich die Zähne aus. Innen leer, nur Staub und Moos. Startwelle einer (N5), auf höheren Stufen mehr (Verstärkung N1); Nachschub ½W6 am Ende von Runde 1, 2 und 3, solange der Gelehrte steht.",
+   "anblick": "Eine Rüstung aus einem Stück, blau unter dem Moos, mit hohem Helmkamm. Durch die Augenschlitze sieht man nichts. Gar nichts. Und auf der Brust liegt eine kleine Marke an einer Kette.",
+   "zustandSaetze": {
+    "unverletzt": "Der Treffer klingt, als schlüge man auf einen Kessel. Es geht weiter.",
+    "angekratzt": "Eine Delle in der Rüstung. Aus der Delle rieselt Staub.",
+    "verwundet": "Ein Arm hängt. Die Waffe hält es mit dem anderen, ohne zu zögern.",
+    "schwer verwundet": "Die Rüstung ist an der Brust gesprungen. Durch den Riss: kein Fleisch. Nur Dunkel und Fäden.",
+    "am Ende": "Es kniet. Ein Treffer noch. Der Helm bleibt auf euch gerichtet.",
+    "gefallen": "Die Rüstung bricht auf. Darin ist niemand."
+   },
+   "tod": {
+    "vorlesen": "Die Rüstung bricht an der Brust auf. Darin ist niemand. Nur Staub, der herausrieselt, grau wie Asche, und Moos, das sich in der Luft nach euch streckt und dann zusammensinkt.",
+    "gmNotiz": "Figur vom Tisch. Keine EP, keine Beute. Die Erkennungsmarke lässt sich ihr abnehmen, falls die Gruppe noch keine hat: 1 Aktion in Kontakt, Taste M."
+   }
+  },
+  "gelehrter": {
+   "name": "Der Gelehrte in der gehörnten Rüstung",
+   "anzeige": "Eine gehörnte Gestalt mit Stab",
+   "karte": "eigen",
+   "info": "Er steht an der Nische links neben dem Licht und ist der Einzige, der den Kopf dreht, bevor er geht. Die anderen folgen ihm.",
+   "werte": {
+    "name": "Der Gelehrte",
+    "faction": "Die Leeren",
+    "size": "1",
+    "quality": "3+",
+    "defense": "2+",
+    "tough": "5",
+    "role": "enemy",
+    "weapons": "Blaues Feuer | 12 | A1 | Explosion(3)\nRunenstab | Nahkampf | A2 | DS(1)",
+    "passives": "Furchtlos, Langsam",
+    "bossName": "Er führt sie",
+    "bossText": "Solange er steht, folgen ihm die Rüstungsmänner, und aus freien Nischen kommen neue. Fällt er, werden sie langsam und dumpf: ruhige Tabelle für alle, kein Nachschub mehr.",
+    "flavor": "Er liest noch immer. Nur nicht mehr in Büchern."
+   },
+   "notiz": "Miniatur: ein Sorcerer der Thousand Sons. Eigene Werte: Q3+ D2+ Z5, Blaues Feuer (zwei Kartenlängen) A1 Explosion(3), Runenstab A2 DS(1), Furchtlos, Langsam = 110 P. Er führt die Rüstungsmänner und ist der Hebel des Kampfs: Fällt er, ruhige Tabelle für alle und kein Nachschub mehr (die App schaltet selbst). Startet an Nische N3.",
+   "anblick": "Eine Rüstung wie die anderen, aber mit Hörnern am Helm und einem Umhang, der einmal blau war. In der Hand ein Stab mit einem Auge aus Glas, und das Auge folgt euch.",
+   "zustandSaetze": {
+    "unverletzt": "Er hebt nicht einmal den Stab. Der Treffer gleitet ab, als hätte er ihn kommen sehen.",
+    "angekratzt": "Ein Horn ist abgesplittert. Er sieht euch an, länger als vorher.",
+    "verwundet": "Er geht jetzt gebückt. Das Licht im Stab flackert.",
+    "schwer verwundet": "Der Umhang hängt in Fetzen. Darunter knistert es wie trockenes Laub.",
+    "am Ende": "Er stützt sich auf den Stab. Ein Treffer noch. Die anderen bleiben näher bei ihm.",
+    "gefallen": "Er sinkt auf die Knie, und alle anderen halten inne."
+   },
+   "tod": {
+    "vorlesen": "Er sinkt auf die Knie. Der Stab fällt, das Glasauge springt. In allen Nischen zugleich halten die Gestalten inne, einen Atemzug lang, als hätten sie vergessen, was sie wollten. Dann gehen sie weiter. Langsamer.",
+    "gmNotiz": "Der Gelehrte ist gefallen: ab jetzt ruhige Tabelle für alle, kein Nachschub mehr (die App schaltet selbst). Die Runden zählen trotzdem bis 4 weiter. Keine EP. Map 5 erfährt es.",
+    "setzt": {
+     "gelehrter_gefallen": true
+    }
+   }
+  },
+  "verwundeter": {
+   "name": "Der Verwundete",
+   "anzeige": "Ein Mann in schwerer Rüstung",
+   "seite": "freund",
+   "karte": "eigen",
+   "info": "Ein Mann in einer schweren Rüstung, groß wie ein Schrank, die Platten aufgerissen. Er lebt, anders als die Gestalten an den Wänden. Er kämpft mit euch, so gut er noch kann.",
+   "werte": {
+    "name": "Der Verwundete",
+    "faction": "Die Fremden",
+    "size": "1",
+    "quality": "3+",
+    "defense": "2+",
+    "tough": "6",
+    "role": "enemy",
+    "weapons": "Schweres Gewehr | 24 | A2 | DS(1)\nKampfmesser | Nahkampf | A2 | ",
+    "passives": "Furchtlos, Langsam",
+    "flavor": "Sein Trupp ist tot. Er nicht. Noch nicht."
+   },
+   "notiz": "Verbündeter, zählt nicht ins Budget. Miniatur: ein einzelner Space Marine. Eigene Werte: Q3+ D2+ Z6, kommt mit 2 Wunden auf den Tisch (die Karte zeigt sie schon an), Schweres Gewehr (vier Kartenlängen) A2 DS(1), Kampfmesser A2, Furchtlos, Langsam = 105 P. Versorgt (Taste E): Zäh +2. Er passt nicht in den Schacht: seine Rüstung ist zu breit. Führt ein Spieler zusätzlich (wer ihn gestützt hat), sonst du, vorsichtig.",
+   "anblick": "Die Rüstung ist der der Gestalten ähnlich und doch nicht gleich: grau, zerkratzt, mit Zeichen, die frisch gemalt sind. Unter dem Helm ein Gesicht, bärtig, grau vor Staub, und die Augen sind wach.",
+   "zustandSaetze": {
+    "unverletzt": "Er steht. Das allein ist schon viel.",
+    "angekratzt": "Er knurrt etwas in seiner Sprache und schießt weiter.",
+    "verwundet": "Er lehnt sich an den Werktisch. Das Gewehr bleibt oben.",
+    "schwer verwundet": "Blut läuft unter den Platten hervor. Er sagt nichts mehr, er zielt nur noch.",
+    "am Ende": "Er kniet. „Geht“, sagt er. „Geht schon.“",
+    "gefallen": "Er fällt nach hinten, gegen das Metall, und bleibt sitzen."
+   },
+   "tod": {
+    "vorlesen": "Er fällt nach hinten, gegen das kalte Metall, und bleibt sitzen, das Gewehr noch quer über den Knien. Seine Lippen bewegen sich. Es ist kein Name. Es ist ein Wort, das ihr nicht kennt, und dann ist er still.",
+    "gmNotiz": "Der Verwundete ist tot: In Map 5 ist er nicht dabei. Figur bleibt sitzen, wo sie ist.",
+    "setzt": {
+     "ueberlebender_dabei": false,
+     "ueberlebender_tot": true
+    }
+   }
+  }
+ },
+ "fog": {
+  "stufen": [
+   {
+    "id": "unverletzt",
+    "wenn": "wunden == 0",
+    "satz": "Nichts. Es hat nicht mal gezuckt."
+   },
+   {
+    "id": "angekratzt",
+    "wenn": "rest > zaeh / 2",
+    "satz": "Getroffen. Es blutet grün, mehr nicht."
+   },
+   {
+    "id": "verwundet",
+    "wenn": "rest <= zaeh / 2 && rest > zaeh / 4",
+    "satz": "Das hat gesessen. Es bewegt sich schwerer."
+   },
+   {
+    "id": "schwer verwundet",
+    "wenn": "rest <= zaeh / 4 && rest > 1",
+    "satz": "Es hängt schief, Sporen rieseln aus der Wunde."
+   },
+   {
+    "id": "am Ende",
+    "wenn": "rest == 1",
+    "satz": "Ein Treffer noch. Es weiß es."
+   },
+   {
+    "id": "gefallen",
+    "wenn": "rest <= 0",
+    "satz": "Es fällt. Figur vom Tisch."
+   }
+  ],
+  "bedrohung": [
+   {
+    "schaedel": [
+     1,
+     2
+    ],
+    "satz": "Kleinvieh. Ihr habt so etwas schon erlegt."
+   },
+   {
+    "schaedel": [
+     3,
+     4
+    ],
+    "satz": "Das ist ein Gegner. Nicht allein hingehen."
+   },
+   {
+    "schaedel": [
+     5
+    ],
+    "satz": "Dafür braucht ihr alle."
+   },
+   {
+    "schaedel": [
+     6
+    ],
+    "satz": "Boss."
+   }
+  ],
+  "notiz": "rest = zaeh × modelle − wunden. Spieler sehen nie Zahlen, nur den Satz."
+ },
+ "beutewurf": [
+  [
+   1,
+   "Nichts. Ein Kerzenstummel und Moos."
+  ],
+  [
+   2,
+   "Heiltrank"
+  ],
+  [
+   3,
+   "Rauchbombe"
+  ],
+  [
+   4,
+   "Heldenelixier"
+  ],
+  [
+   5,
+   "Feuertopf"
+  ],
+  [
+   6,
+   "Amulett der Abwehr"
+  ]
+ ],
+ "verhalten": {
+  "ruhig": [
+   [
+    "1",
+    "zögern, keine Aktion"
+   ],
+   [
+    "2–3",
+    "bewegen"
+   ],
+   [
+    "4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "wuetend": [
+   [
+    "1",
+    "bewegen"
+   ],
+   [
+    "2–4",
+    "bewegen und angreifen"
+   ],
+   [
+    "5–6",
+    "bewegen, angreifen und alles, was die Würfel hergeben"
+   ]
+  ],
+  "notiz": "Steht ein Gegner schon im Nahkampf und der Würfel sagt „bewegen“, greift er stattdessen an. Ruhende Sporenlinge würfeln nicht. Beim Erwachen wütend, außer der Schmied ist besiegt: dann Runde 1 ruhig."
+ },
+ "rundenende": [
+  {
+   "wenn": {
+    "alle": [
+     {
+      "leisteAktiv": "takt"
+     },
+     {
+      "flag": "erwacht",
+      "ist": false
+     }
+    ]
+   },
+   "leisten": {
+    "takt": 1
+   },
+   "text": "Das Licht blinkt weiter: noch eine Runde in der Halle. Bei 3 erwacht sie von selbst."
+  },
+  {
+   "wenn": {
+    "leisteAktiv": "erwachen"
+   },
+   "leisten": {
+    "erwachen": 1
+   },
+   "text": "Eine Runde überstanden."
+  },
+  {
+   "wenn": {
+    "alle": [
+     {
+      "leisteAktiv": "erwachen"
+     },
+     {
+      "leiste": "erwachen",
+      ">=": 1,
+      "<=": 3
+     },
+     {
+      "flag": "gelehrter_gefallen",
+      "ist": false
+     }
+    ]
+   },
+   "gegnerHinzu": [
+    {
+     "id": "ruestungsmann",
+     "anzahl": "½W6",
+     "zone": "N"
+    }
+   ],
+   "hoechstens": 3,
+   "skaliert": true,
+   "text": "Nachschub: ½W6 Rüstungsmänner treten aus freien Nischen (N). Stehen schon in der Gegnerliste."
+  }
+ ],
+ "ereignisse": {
+  "marker1": {
+   "name": "Suchmarker 1 (links unten)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 1",
+   "taste": "1",
+   "marker": "1",
+   "einmal": true,
+   "kosten": "Held in Kontakt, 1 Aktion",
+   "vorlesen": "Ein Stiefel, halb im Moos. Die Sohle ist fremd, ohne Naht, und das Leder ist kein Leder. Innen wächst es grün.",
+   "probe": {
+    "frage": "Der Held, der sucht, würfelt einen W6. Der Grundtext kommt immer, die Stufen dazu.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Der Stiefel ist nicht alt. Das Moos darin schon. Als wäre es schneller gewachsen, als ein Stiefel verrottet."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Am Schaft eine Reihe kleiner Zeichen, eingeprägt, nicht genäht. Immer dieselben, wie ein Name, den man nicht lesen kann.",
+      "gmNotiz": "Hinweis auf die Erkennungsmarken der Gestalten in der Halle. Nichts erklären."
+     }
+    ]
+   },
+   "leisten": {
+    "untersucht": 1
+   },
+   "gmNotiz": "Zählt auf der Leiste „Untersuchte Suchmarker“: Der dritte, egal welcher, weckt die Halle.",
+   "wofuer": "Ein fremder Stiefel: der erste Hinweis, dass hier unten Menschen waren, die nicht aus dem Dorf kamen. Zählt als untersuchter Suchmarker."
+  },
+  "marker2": {
+   "name": "Suchmarker 2 (rechts)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 2",
+   "taste": "2",
+   "marker": "2",
+   "einmal": true,
+   "beutewurf": true,
+   "kosten": "Held in Kontakt, 1 Aktion",
+   "vorlesen": "Kratzspuren in der Wurzel. Striche, in Fünfergruppen, so viele, dass sie die ganze Wurzel bedecken. Jemand hat hier gezählt. Sehr lange.",
+   "probe": {
+    "frage": "Der Held, der sucht, würfelt einen W6. Der Grundtext kommt immer, die Stufen dazu.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Die Striche sind nicht geritzt. Gekratzt, mit Fingernägeln. Die ersten sind tief, die letzten kaum noch zu sehen."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Unter den letzten Strichen ein Zeichen, das keines aus dem Dorf ist: ein Kreis, darin ein Stern. Darunter ist die Wurzel weich, als hätte hier jemand gelegen und wäre nicht mehr aufgestanden.",
+      "gmNotiz": "Hinweis auf den Stern, der in den Wald fiel (Heddas Geschichte). Nichts erklären."
+     }
+    ]
+   },
+   "leisten": {
+    "untersucht": 1
+   },
+   "gmNotiz": "Beutewurf für den Helden, der sucht. Zählt auf der Leiste „Untersuchte Suchmarker“.",
+   "wofuer": "Kratzspuren: Jemand war hier unten lange gefangen. Beutewurf. Zählt als untersuchter Suchmarker."
+  },
+  "wecken-a": {
+   "name": "Die Sporenlinge links wachen auf (Zone A)",
+   "gruppe": "Kampf",
+   "kurz": "A wacht",
+   "taste": "4",
+   "marker": "A",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "sporen_a_wach",
+    "ist": false
+   },
+   "kosten": "Ein Held bleibt direkt neben ihnen stehen (innerhalb einer Kartenbreite) oder greift sie an",
+   "vorlesen": "Das Moos an der Wand zuckt. Zwei kleine Körper lösen sich daraus, nass, ohne Gesicht, und drehen sich zu euch.",
+   "gmNotiz": "Die Sporenlinge in A würfeln ab jetzt (Tabelle, die gerade gilt). Hat ein Held sie angegriffen, rechnest du seinen Angriff zuerst ab.",
+   "setzt": {
+    "sporen_a_wach": true
+   },
+   "wofuer": "Feindzone A: zwei ruhende Sporenlinge. Sie wachen, wenn ein Held direkt daneben stehen bleibt, sie angreift, wenn in den Gängen geschossen oder gezaubert wird (G) oder wenn die Halle erwacht."
+  },
+  "wecken-b": {
+   "name": "Die Sporenlinge rechts wachen auf (Zone B)",
+   "gruppe": "Kampf",
+   "kurz": "B wacht",
+   "taste": "5",
+   "marker": "B",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "sporen_b_wach",
+    "ist": false
+   },
+   "kosten": "Ein Held bleibt direkt neben ihnen stehen (innerhalb einer Kartenbreite) oder greift sie an",
+   "vorlesen": "Zwischen den Wurzeln hebt sich ein Buckel aus Moos, dann ein zweiter. Sie haben keine Augen, und trotzdem drehen sie sich genau dorthin, wo ihr steht.",
+   "gmNotiz": "Die Sporenlinge in B würfeln ab jetzt (Tabelle, die gerade gilt). Hat ein Held sie angegriffen, rechnest du seinen Angriff zuerst ab.",
+   "setzt": {
+    "sporen_b_wach": true
+   },
+   "wofuer": "Feindzone B: zwei ruhende Sporenlinge. Sie wachen, wenn ein Held direkt daneben stehen bleibt, sie angreift, wenn in den Gängen geschossen oder gezaubert wird (G) oder wenn die Halle erwacht."
+  },
+  "gaenge-laerm": {
+   "name": "Schuss oder Zauber in den Wurzelgängen",
+   "gruppe": "Lärm",
+   "kurz": "Lärm in den Gängen",
+   "taste": "G",
+   "einmal": true,
+   "nurWenn": {
+    "eine": [
+     {
+      "flag": "sporen_a_wach",
+      "ist": false
+     },
+     {
+      "flag": "sporen_b_wach",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Sobald ein Held in den Gängen schießt oder zaubert",
+   "vorlesen": "Der Knall läuft durch die Gänge und kommt von den Wänden zurück, zweimal, dreimal. Links und rechts regt sich das Moos.",
+   "gmNotiz": "Alle Sporenlinge in A und B sind wach. In der Halle zählt Schießen anders: Taste F.",
+   "setzt": {
+    "sporen_a_wach": true,
+    "sporen_b_wach": true
+   }
+  },
+  "metallwand": {
+   "name": "Eine glatte Wand berühren oder durch die Lücke gehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Glatte Wand",
+   "taste": "M",
+   "einmal": true,
+   "kosten": "Held in Kontakt mit einer der glatten Wände oder in der Lücke dazwischen, keine Aktion",
+   "vorlesen": "Kalt. Glatt. Keine Fuge, kein Mörtel, kein Stein. Und darunter, ganz leise, summt etwas, gleichmäßig, wie ein Bienenstock, der schläft.",
+   "gmNotiz": "Jetzt kommt die Halle: Ziel erreicht, Weiter führt zum Aufbau der oberen Hälfte (Tuch weg). Geht ein Held durch die Lücke, ohne die Wand zu berühren: dieselbe Taste.",
+   "setzt": {
+    "halle_offen": true
+   }
+  },
+  "marker3": {
+   "name": "Suchmarker 3 (auf dem Werktisch)",
+   "gruppe": "Untersuchen",
+   "kurz": "Marker 3",
+   "taste": "3",
+   "marker": "3",
+   "einmal": true,
+   "kosten": "Held in Kontakt, 1 Aktion",
+   "vorlesen": "Blätter, glatt und kalt wie die Wände, voller Zeichen, die keiner von euch lesen kann. Dazwischen eine Zeichnung, die jeder versteht: ein Herz, mit drei Strängen daran.",
+   "probe": {
+    "frage": "Der Held, der sucht, würfelt einen W6. Der Grundtext kommt immer, die Stufen dazu.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Neben dem Herzen kleine Bilder, wie für ein Kind gemalt: ein Hund, eine Kuh, ein Mensch. Unter jedem ein Strich, unter dem Menschen drei."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Auf der Rückseite eine andere Hand, hastig: Striche in Fünfergruppen. Dieselben wie unten in der Wurzel.",
+      "gmNotiz": "Verbindet Marker 2 mit dem Protokoll: Wer unten gezählt hat, hat hier geschrieben. Nichts erklären."
+     }
+    ]
+   },
+   "beute": [
+    "Protokoll"
+   ],
+   "setzt": {
+    "fund_protokoll": true
+   },
+   "leisten": {
+    "untersucht": 1
+   },
+   "gmNotiz": "„Protokoll“ dem Helden geben, der es nimmt (Knopf unten, dazu den Zettel). Ist es der dritte untersuchte Suchmarker, erwacht die Halle: Die Leiste steht dann auf 3, Weiter führt zum Erwachen.",
+   "wofuer": "Das Protokoll (Fundstück). Map 5: Wer es in Ruhe liest, kennt die Schwachstelle des Herzens. Zählt als untersuchter Suchmarker: Der dritte weckt die Halle."
+  },
+  "tank-trueb": {
+   "name": "Den trüben Glastank untersuchen (oben Mitte)",
+   "gruppe": "Untersuchen",
+   "kurz": "Glastank, trüb",
+   "taste": "7",
+   "marker": "T1",
+   "einmal": true,
+   "kosten": "Held in Kontakt, 1 Aktion. Die Probe herausholen kostet noch 1 Aktion.",
+   "vorlesen": "Im trüben Wasser treibt etwas, das wie Moos aussieht. Es bewegt sich. Gegen die Strömung. Als ihr näher kommt, dreht es sich zu euch, wie eine Blume zur Sonne.",
+   "beute": [
+    "Probe"
+   ],
+   "setzt": {
+    "fund_probe": true
+   },
+   "gmNotiz": "Zettel „Probe“ an den Helden, der sie herausholt (1 Aktion). Wer sie trägt, ist langsamer: je Bewegung nur eine Kartenbreite weit statt einer Kartenlänge (steht unter Lage). Weitergeben geht wie bei jedem Gegenstand. Zählt nicht als Suchmarker, weckt nichts.",
+   "wofuer": "Die lebende Probe (Fundstück). Map 5: Der Überlebende will ein Stück davon. Ihr Träger ist langsamer."
+  },
+  "tank-still": {
+   "name": "Den stillen Glastank untersuchen (rechts oben)",
+   "gruppe": "Untersuchen",
+   "kurz": "Glastank, still",
+   "taste": "8",
+   "marker": "T2",
+   "einmal": true,
+   "kosten": "Held in Kontakt, 1 Aktion",
+   "vorlesen": "Derselbe trübe Behälter, dasselbe Moos darin. Aber es treibt nur. Grau, die Fäden hängen schlaff. Wer gegen das Glas klopft, sieht nichts sich regen.",
+   "beute": [
+    "Tote Probe"
+   ],
+   "setzt": {
+    "fund_tote_probe": true
+   },
+   "gmNotiz": "„Tote Probe“ einem Helden geben (Knopf unten, dazu den Zettel). Sie wiegt nichts, der Träger ist nicht langsamer. Von außen sieht sie aus wie die lebende: In Map 5 lässt sich der Überlebende damit täuschen. Zählt nicht als Suchmarker, weckt nichts.",
+   "wofuer": "Die tote Probe (Fundstück). Map 5: Damit lässt sich der Überlebende täuschen."
+  },
+  "gestalt": {
+   "name": "Eine Gestalt an der Wand ansehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Gestalt ansehen",
+   "taste": "9",
+   "marker": "nische:N",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "kosten": "Held in Kontakt mit einer Nische, 1 Aktion. Leise, solange er nur hinsieht.",
+   "vorlesen": "Unter dem Moos am Hals eine Marke an einer Kette, ein Name in fremder Schrift. Die Gestalt atmet nicht. Noch nicht.",
+   "probe": {
+    "frage": "Der Held, der hinsieht, würfelt einen W6.",
+    "stufen": [
+     {
+      "ab": 3,
+      "vorlesen": "Die Rüstung hat keine Schnallen und keine Nieten. Sie ist aus einem Stück, und das Moos wächst nicht darauf. Es wächst heraus."
+     },
+     {
+      "ab": 5,
+      "vorlesen": "Durch die Augenschlitze: kein Gesicht. Nur Dunkel, und darin Staub, der sich hebt und senkt, als atme jemand ein, der nicht da ist.",
+      "gmNotiz": "Die Rüstungen sind leer. Nur Stimmung, kein Erwachen. Wer jetzt zuschlägt: F."
+     }
+    ]
+   },
+   "beute": [
+    "Erkennungsmarke"
+   ],
+   "setzt": {
+    "fund_marke": true
+   },
+   "gmNotiz": "Zettel „Erkennungsmarke“ an den Helden, der sie abnimmt: Die Kette reißt leicht. Kein Erwachen, solange niemand zuschlägt. Zählt nicht als Suchmarker.",
+   "wofuer": "Wandnische mit einer Gestalt in Rüstung. Ansehen gibt die Erkennungsmarke (Fundstück, Map 5: der Überlebende vertraut den Helden, wenn sie sie ihm zeigen). Zuschlagen weckt die Halle (F)."
+  },
+  "licht": {
+   "name": "Das blinkende Licht berühren",
+   "gruppe": "Untersuchen",
+   "kurz": "Licht berühren",
+   "taste": "0",
+   "marker": "licht:L",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "kosten": "Held in Kontakt, keine Aktion",
+   "vorlesen": "Es hört auf zu blinken. Es leuchtet rot. Dauerhaft. Und das Summen in den Wänden setzt aus, für einen Atemzug.",
+   "gmNotiz": "Das Erwachen. Ziel erreicht: Weiter führt zu Cue 04-3.",
+   "setzt": {
+    "erwacht": true
+   },
+   "wofuer": "Das blinkende Licht: Wer es berührt, weckt die Halle."
+  },
+  "halle-laerm": {
+   "name": "Schuss, Zauber oder Schlag gegen eine Gestalt in der Halle",
+   "gruppe": "Lärm",
+   "kurz": "Lärm in der Halle",
+   "taste": "F",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "kosten": "Sobald ein Held in der Halle schießt, zaubert oder eine Gestalt in einer Nische angreift",
+   "vorlesen": "Der Laut schlägt gegen das Metall und kommt vielfach zurück. An den Wänden, in allen Nischen zugleich, knackt etwas.",
+   "gmNotiz": "Das Erwachen. Ziel erreicht: Weiter führt zu Cue 04-3. Ein Nahkampf gegen Sporenlinge in der Halle weckt sie nicht.",
+   "setzt": {
+    "erwacht": true
+   }
+  },
+  "schacht-frueh": {
+   "name": "Ein Held steigt in den Schacht, bevor etwas erwacht",
+   "gruppe": "Bewegen",
+   "kurz": "In den Schacht",
+   "taste": "H",
+   "marker": "schacht:↑",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "kosten": "Held in Kontakt, eine ganze Aktion mit 3+ (ein Held direkt daneben hilft: 2+). Taste erst, wenn der Wurf gelingt.",
+   "vorlesen": "Die Wand des Schachts ist aus demselben Metall. Der erste Griff klingt wie eine Glocke, leise, aber der Ton läuft durch die ganze Halle. An den Wänden heben sich Köpfe.",
+   "gmNotiz": "Das Metall weckt die Halle. Der Held ist im Schacht (Leiste „Im Schacht“ +1): raus aus dem Kampf, er kommt im Dorf heraus. Ziel erreicht: Weiter führt zum Erwachen.",
+   "setzt": {
+    "erwacht": true,
+    "schacht_geflohen": true
+   },
+   "leisten": {
+    "schacht": 1
+   },
+   "wofuer": "Der Schacht nach oben, ins Dorf. Eng: ein Held je Runde, eine ganze Aktion mit 3+. Wer vor dem Erwachen hineinsteigt, weckt die Halle."
+  },
+  "schacht": {
+   "name": "Ein Held steigt in den Schacht",
+   "gruppe": "Bewegen",
+   "kurz": "In den Schacht",
+   "taste": "H",
+   "marker": "schacht:↑",
+   "einmal": false,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": true
+   },
+   "kosten": "Held in Kontakt, eine ganze Aktion mit 3+ (ein Held direkt daneben hilft: 2+). Nur ein Held je Runde. Taste erst, wenn der Wurf gelingt.",
+   "vorlesen": "Hände an kaltem Metall, Füße zwischen Wurzeln. Unter euch klicken Waffen. Über euch ist es eng und dunkel, und irgendwo ganz oben riecht es nach Nacht.",
+   "gmNotiz": "Leiste „Im Schacht“ +1. Der Held ist raus aus dem Kampf: Figur vom Tisch, an die Kante neben den Schacht. Misslingt der Wurf, hängt er fest und versucht es bei seiner nächsten Aktivierung wieder. Sind alle, die noch stehen, im Schacht: K.",
+   "setzt": {
+    "schacht_geflohen": true
+   },
+   "leisten": {
+    "schacht": 1
+   },
+   "wofuer": "Der Schacht nach oben, ins Dorf. Eng: ein Held je Runde, eine ganze Aktion mit 3+. Wer drin ist, ist raus aus dem Kampf."
+  },
+  "alle-im-schacht": {
+   "name": "Alle, die noch stehen, sind im Schacht",
+   "gruppe": "Bewegen",
+   "kurz": "Alle im Schacht",
+   "taste": "K",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "erwacht",
+      "ist": true
+     },
+     {
+      "leiste": "schacht",
+      ">=": 1
+     }
+    ]
+   },
+   "kosten": "Kein Held steht mehr unten, außer denen, die gefallen sind",
+   "vorlesen": "Unter euch füllt sich die Halle. Über euch nur noch Dunkel und die eigenen Hände. Dann, ganz plötzlich, hört unten jedes Geräusch auf.",
+   "gmNotiz": "Hauptziel erreicht (geflohen). Ziel erreicht: Weiter führt zum Cliffhanger (Cue 04-4), auch wenn noch Runden fehlen. Gefallene Helden bleiben unten liegen: notieren.",
+   "setzt": {
+    "alle_im_schacht": true,
+    "ep_haupt": true
+   }
+  },
+  "tank-getroffen": {
+   "name": "Ein Glastank wird getroffen",
+   "gruppe": "Kampf",
+   "kurz": "Tank getroffen",
+   "taste": "B",
+   "einmal": false,
+   "kosten": "Ein Angriff verfehlt einen Helden, der hinter einem Glastank Deckung hat, oder jemand greift den Tank selbst an. Je Tank, bis er geplatzt ist.",
+   "gmNotiz": "Du würfelst für den Tank.",
+   "probe": {
+    "frage": "Du würfelst einen W6 für den Glastank.",
+    "stufen": [
+     {
+      "bis": 1,
+      "vorlesen": "Das Glas springt mit einem hellen Ton. Trübes Wasser schwappt über den Boden, und was darin trieb, zuckt im Freien.",
+      "gmNotiz": "Der Tank ist geplatzt: verseuchtes Feld, eine Kartenbreite um den Tank herum (Qualitätstest am Zugende, misslungen −1 auf Treffen bis Ende der nächsten Runde). Keine Deckung mehr. War die Probe noch drin, ist sie verloren."
+     },
+     {
+      "ab": 2,
+      "vorlesen": "Das Glas hält. Ein Sprung, fein wie ein Haar, mehr nicht."
+     }
+    ]
+   }
+  },
+  "verwundeter": {
+   "name": "Hinter den rechten Werktisch sehen",
+   "gruppe": "Untersuchen",
+   "kurz": "Hinter den Werktisch",
+   "taste": "V",
+   "marker": "ueberlebender:V",
+   "einmal": true,
+   "nurWenn": {
+    "flag": "erwacht",
+    "ist": false
+   },
+   "kosten": "Ein Held geht um den rechten Werktisch herum oder beugt sich darüber, keine Aktion",
+   "vorlesen": "Hinter dem Tisch sitzt eine Rüstung, an das Metall gelehnt, so groß wie die an den Wänden. Aber diese atmet. Rasselnd, nass. Eine Hand im Handschuh hebt sich, langsam, und legt sich auf ein Gewehr, das quer über den Knien liegt.",
+   "gmNotiz": "Der Verwundete ist gefunden: Figur hinter den rechten Werktisch setzen (Marker V). Er ist kein Gegner. Ziel erreicht: Weiter führt zum Gespräch. Wer zuschlägt, macht ihn zum Gegner (⚔ an seiner Figur) und weckt die Halle (F).",
+   "setzt": {
+    "ueberlebender_gefunden": true
+   },
+   "wofuer": "Hinter dem rechten Werktisch liegt der Verwundete: ein lebender Mann in schwerer Rüstung, sein Trupp ist tot. Er kann sich den Helden anschließen."
+  },
+  "verwundeter-erwachen": {
+   "name": "Hinter dem rechten Werktisch steht einer auf",
+   "gruppe": "Story",
+   "kurz": "Der Verwundete",
+   "taste": "V",
+   "marker": "ueberlebender:V",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "erwacht",
+      "ist": true
+     },
+     {
+      "flag": "ueberlebender_gefunden",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Sobald ein Held in die Nähe des rechten Werktischs kommt, oder in Runde 2 von selbst",
+   "vorlesen": "Hinter dem rechten Werktisch richtet sich eine schwere Rüstung auf, schwankend, eine Hand an der Wand. Sie atmet. Sie hebt ein Gewehr und schießt, nicht auf euch, an euch vorbei, in die Nischen. „Zu mir“, sagt eine heisere Stimme. „Hinter den Tisch.“",
+   "gmNotiz": "Der Verwundete kämpft mit euch, ohne Gespräch: Er steht ab jetzt unter Verbündete (Zone V). Reden geht später, in Map 5. Vertrauen bleibt offen.",
+   "setzt": {
+    "ueberlebender_gefunden": true,
+    "ueberlebender_gesprochen": true,
+    "ueberlebender_dabei": true
+   },
+   "wofuer": "Hinter dem rechten Werktisch liegt der Verwundete. Im Erwachen schließt er sich ohne Gespräch an."
+  },
+  "versorgen": {
+   "name": "Den Verwundeten versorgen",
+   "gruppe": "Story",
+   "kurz": "Versorgen",
+   "taste": "E",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "ueberlebender_gefunden",
+      "ist": true
+     },
+     {
+      "flag": "ueberlebender_versorgt",
+      "ist": false
+     },
+     {
+      "flag": "ueberlebender_tot",
+      "ist": false
+     },
+     {
+      "flag": "ueberlebender_zurueckgelassen",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Ein Held in Kontakt, 1 Aktion. Primärweg: ein Heilzauber (Kleriker). Nebenwege: ein Heiltrank aus dem Inventar (verbraucht), oder ein Verband mit Qualitätstest. Taste erst, wenn es gelingt.",
+   "vorlesen": "Wo die Platten aufgerissen sind, ist er warm und nass. Ihr drückt zu, bindet ab, und er lässt es geschehen, die Zähne zusammengebissen. Dann atmet er tiefer. „Gut“, sagt er. „Das reicht für eine Weile.“",
+   "gmNotiz": "Der Verwundete hält mehr aus: Zäh +2 (steht an seiner Karte). Ein verbrauchter Heiltrank: im Inventar auf benutzt. Map 5 erfährt, dass er versorgt wurde.",
+   "setzt": {
+    "ueberlebender_versorgt": true
+   },
+   "gegnerMod": [
+    {
+     "id": "verwundeter",
+     "werte": {
+      "tough": 2
+     },
+     "text": "Versorgt: Zäh +2"
+    }
+   ]
+  },
+  "marke-gefallen": {
+   "name": "Die Marke von einem gefallenen Rüstungsmann nehmen",
+   "gruppe": "Untersuchen",
+   "kurz": "Marke vom Gefallenen",
+   "taste": "M",
+   "einmal": true,
+   "nurWenn": {
+    "alle": [
+     {
+      "flag": "erwacht",
+      "ist": true
+     },
+     {
+      "flag": "fund_marke",
+      "ist": false
+     }
+    ]
+   },
+   "kosten": "Held in Kontakt mit einem gefallenen Rüstungsmann, 1 Aktion",
+   "vorlesen": "Die Kette sitzt im Staub der aufgebrochenen Rüstung fest, als wäre sie hineingewachsen. Ein Ruck, und sie gibt nach. Auf der Marke ein Name in fremder Schrift. Wer ihn trug, ist lange fort.",
+   "beute": [
+    "Erkennungsmarke"
+   ],
+   "setzt": {
+    "fund_marke": true
+   },
+   "gmNotiz": "Der Nebenweg zur Erkennungsmarke: mitten im Kampf, teurer, aber derselbe Fund. Zettel geben."
+  }
+ },
+ "schritte": {
+  "vorb-material": {
+   "typ": "vorbereitung",
+   "titel": "Bereitlegen",
+   "checkliste": [
+    "Wurzelwände: zwei lange für den Gang in der Mitte, zwei kurze für die linke und rechte Kante. Leuchtpilze (ein Stück Gelände reicht)",
+    "Zwei glatte Wände (Metall, Pappe, ein Lineal) quer über die Tischmitte, mit einer Lücke dazwischen",
+    "Für die Halle, unter einem Tuch: zwei Werktische, zwei Glastanks (Gläser oder Dosen), ein Teppich aus Geflecht (Filz)",
+    "Marker: Suchmarker 1 bis 3, Feindzonen A und B, das blinkende Licht, der Schacht, sechs Wandnischen",
+    "4 Sporenlinge (Platzhalter Giftmade). Sie liegen von Anfang an da und ruhen",
+    "Gestalten für die Nischen: Rubric Marines der Thousand Sons (bis zu 12) und ein Sorcerer als der Gelehrte. Eigene Werte stehen an den Karten in der App. Wie viele wirklich kommen, zeigt die App",
+    "Eine einzelne Figur in schwerer, zerkratzter Rüstung für den Verwundeten (ein Space Marine). Er liegt hinter dem rechten Werktisch, kommt aber erst auf den Tisch, wenn ihn jemand findet",
+    "Zettel: „Erkennungsmarke“, „Protokoll“, „Probe“, „Tote Probe“",
+    "Ein Tuch für die obere Hälfte, ein Zählstein für die Runden nach dem Erwachen, W6 für die Spieler und für dich"
+   ],
+   "hinweis": "Kein Zollstock. Eine Bewegung ist eine Kartenlänge. Gelände darfst du frei stellen, wichtig sind die Wände, die Lücke, die Marker und der Start.",
+   "weiter": "vorb-stand"
+  },
+  "vorb-stand": {
+   "typ": "vorbereitung",
+   "titel": "Stand und Audio",
+   "checkliste": [
+    "Gruppe gewählt (Reiter Gruppe), Heldenbögen bei den Spielern",
+    "Audio: 04-1 bis 04-4 sind noch nicht aufgenommen. Fehlen sie, liest du den Text am Cue-Schritt vor",
+    "Kampfmusik: Battle Cue 1 aus Map 1, bis der metallische Puls für das Erwachen aufgenommen ist",
+    "Lautsprecher geprüft"
+   ],
+   "hinweis": "Die App zeigt je Cue, ob die Datei auf dem Server liegt.",
+   "weiter": "vorb-aus-map3"
+  },
+  "vorb-aus-map3": {
+   "typ": "vorbereitung",
+   "titel": "Was aus Map 3 mitkommt",
+   "checkliste": [
+    "Wunden und Power: Am Ende von Map 3 hat jeder Held 3 Wunden und 3 Power zurückbekommen (OPR), nicht alles. Heldenbögen prüfen",
+    "Keine Rast in dieser Map: Was jetzt fehlt, fehlt bis zum Ende"
+   ],
+   "hinweis": "Alles darunter hat die App aus dem Spielstand von Map 3 gezogen und schon verbucht (Sporenpunkte, wache Sporenlinge). Du musst nichts nachfragen und nichts nachtragen.",
+   "uebernahme": true,
+   "folgen": [
+    {
+     "text": "Die Helden sind durch den Brunnen hinabgestiegen. Wer oben gezögert hat, ist nachgekommen: Alle starten unten am Heldenstart."
+    },
+    {
+     "wenn": {
+      "flag": "schmied_besiegt",
+      "ist": true
+     },
+     "text": "Der Schmied ist besiegt: Beim Erwachen würfeln die Gegner in Runde 1 auf der ruhigen Tabelle, ab Runde 2 wütend. Die App schaltet selbst."
+    },
+    {
+     "wenn": {
+      "flag": "schmied_besiegt",
+      "nicht": true
+     },
+     "text": "Der Schmied lebt noch: Sein Takt hallt bis hier unten. Beim Erwachen gilt sofort die wütende Tabelle. Die App schaltet selbst."
+    },
+    {
+     "wenn": {
+      "flag": "brunnen_gewalt",
+      "ist": true
+     },
+     "text": "Der Brunnen wurde mit Gewalt geöffnet: Der Krach ist bis in die Gänge gefallen. Die Sporenlinge links (Zone A) ruhen nicht, sie sind wach, wenn die Helden ankommen (verbucht)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "ist": false
+       }
+      ]
+     },
+     "text": "{anhaenger_traeger} trägt den Kupferanhänger noch: 1 Sporenpunkt beim Abstieg (verbucht, am Heldenchip). Nicht sagen, woher."
+    },
+    {
+     "wenn": {
+      "flag": "zwei_gerettet",
+      "ist": true
+     },
+     "text": "Mindestens zwei Menschen sitzen im Keller unter dem Gemeindehaus: Hier unten ändert das nichts. In Map 5 warten sie oben mit einem Seil: auf der Flucht kommen drei Figuren je Runde in den Schacht."
+    },
+    {
+     "wenn": {
+      "flag": "befallener_im_keller",
+      "ist": true
+     },
+     "text": "Nur für dich: Im Keller sitzt einer, der nicht mehr Mensch ist. Hier unten ändert das nichts, in Map 5 kommen zwei Gegner mehr aus dem Gemeindehaus. Nicht andeuten."
+    },
+    {
+     "wenn": {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     },
+     "text": "Die Quelle aus Map 1 ist zerstört: Das wird bis ins Finale weitergereicht (weniger Nachschub dort)."
+    }
+   ],
+   "weiter": "aufbau-tisch"
+  },
+  "aufbau-tisch": {
+   "typ": "aufbau",
+   "titel": "Den Tisch aufbauen",
+   "skizze": "unten",
+   "tisch": [
+    "Nur die untere Hälfte: Heldenstart unten in der Mitte",
+    "Zwei lange Wurzelwände links und rechts der Mitte, von der Tischmitte nach unten: ein Gang, höchstens zwei Figuren nebeneinander. Kurze Wurzelwände an der linken Kante (halbe Höhe) und an der rechten Kante (weiter unten)",
+    "Leuchtpilze in den Gang, knapp unter der Tischmitte",
+    "Die zwei glatten Wände quer über die Tischmitte, links und rechts, mit einer Lücke in der Mitte. Dahinter liegt das Tuch",
+    "Suchmarker 1 links unten, Suchmarker 2 rechts, offen",
+    "Feindzone A an die linke Kante, über die kurze Wurzelwand; Feindzone B rechts unten. Je zwei Sporenlinge, liegend oder geduckt: Sie ruhen",
+    "Die obere Hälfte bleibt unter dem Tuch. Darunter darf schon alles stehen (Werktische, Glastanks, Teppich), aber noch keine Gestalten in den Nischen"
+   ],
+   "hinweis": "Diese Map ist von Anfang an ein Kampf: Der Tisch steht, bevor der erste Cue läuft. Die Sporenlinge liegen sichtbar da, die Spieler dürfen sie sehen. Die Gestalten in der Halle kommen erst beim Erwachen auf den Tisch.",
+   "setzt": {
+    "gaenge_stehen": true
+   },
+   "weiter": "auftrag-brunnen"
+  },
+  "auftrag-brunnen": {
+   "typ": "vorlesen",
+   "titel": "Warum ihr hier unten seid",
+   "text": "Über euch ist der Brunnen nur noch ein kleiner grauer Kreis. Es fing mit dem Brunnen an, das hat man euch gesagt. Was Moosgrab krank macht, kommt von hier unten. Findet heraus, was es ist. Und kommt wieder hinauf.",
+   "gmNotiz": "Der Auftrag steht oben in der App. Danach die Regeln, dann Cue 04-1.",
+   "weiter": "regel-enge"
+  },
+  "regel-enge": {
+   "typ": "regel",
+   "titel": "Regeln für diese Map",
+   "text": "Hier unten ist es eng. Zwischen den Wurzeln passen höchstens zwei von euch nebeneinander, und Fernkampf reicht nur zwei Kartenlängen weit. Hier unten rastet niemand: Was ihr jetzt an Wunden habt, nehmt ihr mit. Und ihr wisst es: keine Namen.",
+   "gmNotiz": "Was die Sporenlinge weckt und was in der Halle wartet, sagst du nicht an. Die Spieler sehen, dass in A und B etwas liegt; das reicht als Warnung. Die Namensregel gilt weiter (1 Sporenpunkt), du erinnerst nicht mehr daran.",
+   "weiter": "cue-04-1"
+  },
+  "cue-04-1": {
+   "typ": "cue",
+   "titel": "Die Wurzelgänge",
+   "cue": "04-1",
+   "optional": true,
+   "text": "Die Wurzeln tragen euch tiefer, als ein Brunnen reichen dürfte. Warme Luft von unten, Leuchtpilze in den Ritzen, Wurzeln wie Taue an den Wänden. Weiter vorn wird der Fels glatt. Zu glatt. Ihr seid am Zug.",
+   "notiz": "Noch nicht aufgenommen: Dann liest du den Text vor. Endet mit „Ihr seid am Zug.“ Danach läuft die erste Runde.",
+   "weiter": "kampf-wurzelgaenge"
+  },
+  "kampf-wurzelgaenge": {
+   "typ": "kampf",
+   "titel": "Die Wurzelgänge",
+   "runden": true,
+   "zeitlimit": 12,
+   "gegner": [
+    {
+     "id": "sporenling-a",
+     "anzahl": 2,
+     "zone": "A"
+    },
+    {
+     "id": "sporenling-b",
+     "anzahl": 2,
+     "zone": "B"
+    }
+   ],
+   "verhalten": {
+    "start": "ruhig"
+   },
+   "text": "Die Spieler erkunden die Wurzelgänge. Die Sporenlinge in A und B ruhen (wie viele es auf eurer Stufe sind, zeigt die Gegnerliste): Sie würfeln nicht, bis etwas sie weckt. Jedes Rundenende: R, dann der Rundenwurf, wenn du ihn nimmst.",
+   "hinweise": [
+    "Marker 1 und 2: Grundtext, dann würfelt der Spieler, dann die Stufen. Marker 2 hat einen Beutewurf. Beide zählen auf der Leiste „Untersuchte Suchmarker“: Der dritte weckt später die Halle.",
+    "Was die Sporenlinge weckt: Ein Held bleibt direkt neben ihnen stehen oder greift sie an (4 für A links, 5 für B rechts). Ein Schuss oder Zauber in den Gängen weckt beide (G). Nicht ansagen.",
+    "Enge: höchstens zwei Figuren nebeneinander, Fernkampf nur zwei Kartenlängen weit. Die Wurzelwände sind nicht zu durchqueren.",
+    "Berührt ein Held eine der glatten Wände oder geht durch die Lücke: M. Dann Weiter: Die obere Hälfte wird aufgebaut.",
+    "Faden verloren? „Weiter vorn wird der Fels glatt. Zu glatt.“ Die Marker sind Beiwerk, die Wand ist das Ziel."
+   ],
+   "ereignisse": [
+    "marker1",
+    "marker2",
+    "wecken-a",
+    "wecken-b",
+    "gaenge-laerm",
+    "metallwand"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "halle_offen",
+      "ist": true
+     },
+     "ziel": "aufbau-halle"
+    }
+   ],
+   "weiter": "aufbau-halle"
+  },
+  "aufbau-halle": {
+   "typ": "aufbau",
+   "titel": "Die Halle aufbauen",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "halle_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Tuch weg. Oben links ein Werktisch, darauf Suchmarker 3 (jetzt offen hinlegen)",
+    "Rechts ein zweiter Werktisch, quer",
+    "Zwei Glastanks: einer oben in der Mitte (trüb, darin bewegt sich etwas), einer rechts oben (still)",
+    "Der Teppich aus Geflecht in der Mitte der Halle: ein verseuchtes Feld",
+    "Das blinkende Licht oben in der Mitte (Marker L), direkt über dem trüben Glastank",
+    "Der Schacht (Marker ↑) rechts, knapp über der rechten glatten Wand. Kalte Luft fällt aus der Decke",
+    "Sechs Wandnischen (Marker N): zwei an der linken Kante, zwei an der oberen, eine rechts über dem Schacht, eine direkt hinter der Lücke. In jeder lehnt eine Gestalt: Nur die Marker hinlegen, die Figuren kommen beim Erwachen",
+    "Hinter dem rechten Werktisch liegt der Verwundete (Marker V, verdeckt): noch nicht hinstellen, erst wenn ihn jemand findet (Taste V)",
+    "Die Helden bleiben, wo sie sind; Sporenlinge, die wach sind, auch"
+   ],
+   "hinweis": "Die Spieler sehen jetzt die ganze Halle. Beschreib die Gestalten so, als stünden sie da: Gesicht nach vorn, Moos über den Schultern, reglos. Wer genauer hinsieht: Taste 9. Ab jetzt zählt die Leiste „Das Licht“ die Runden in der Halle.",
+   "setzt": {
+    "halle_steht": true
+   },
+   "leistenAn": [
+    "takt",
+    "schacht"
+   ],
+   "weiter": "cue-04-2"
+  },
+  "cue-04-2": {
+   "typ": "cue",
+   "titel": "Die Halle",
+   "cue": "04-2",
+   "optional": true,
+   "text": "Ein Raum aus glattem Metall, überwachsen von Geflecht. Glasbehälter mit trübem Wasser, Tische mit Blättern in einer Schrift, die keiner von euch lesen kann. Ganz hinten blinkt ein kleines Licht, immer im selben Takt. An den Wänden lehnen Gestalten in Rüstungen ohne Nähte. Was tut ihr?",
+   "notiz": "Noch nicht aufgenommen: Dann liest du den Text vor. Endet mit „Was tut ihr?“",
+   "setzt": {
+    "halle_gesehen": true
+   },
+   "weiter": "kampf-halle"
+  },
+  "kampf-halle": {
+   "typ": "kampf",
+   "titel": "Die Halle",
+   "runden": true,
+   "zeitlimit": 12,
+   "gegner": [
+    {
+     "id": "verwundeter",
+     "anzahl": 1,
+     "zone": "V",
+     "nurWenn": {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     },
+     "wunden": 2
+    }
+   ],
+   "verhalten": {
+    "start": "ruhig"
+   },
+   "text": "Die Spieler erkunden die Halle. Die Gestalten in den Nischen rühren sich nicht, solange nichts sie weckt. Sporenlinge, die wach sind, kommen nach (ruhige Tabelle). Jedes Rundenende: R. Die Leiste „Das Licht“ zählt mit: Bei 3 erwacht die Halle von selbst.",
+   "hinweise": [
+    "Suchmarker 3 auf dem Werktisch: das Protokoll. Ist es der dritte untersuchte Suchmarker (die Leiste zeigt dann 3), erwacht die Halle.",
+    "Glastank trüb (7): die lebende Probe, ihr Träger ist langsamer. Glastank still (8): die tote Probe. Eine Gestalt ansehen (9): die Erkennungsmarke. Nichts davon weckt die Halle.",
+    "Das Erwachen kommt bei: Licht berühren (0), Schuss, Zauber oder ein Schlag gegen eine Gestalt (F), in den Schacht steigen (H), dem dritten Suchmarker, oder am Ende der dritten Runde in der Halle. Danach Weiter.",
+    "Fundstücke: Gib den Zettel dem Helden, der etwas nimmt. Die App merkt sich den Fund für Map 5.",
+    "Hinter dem rechten Werktisch atmet jemand (Antreiber „Ein Atemzug“). Wer nachsieht: V, dann Weiter zum Gespräch. Schließt er sich an, steht er unter Verbündete. Versorgen: E.",
+    "Faden verloren? „Ganz hinten blinkt ein kleines Licht, immer im selben Takt.“ Oder: „Auf den Tischen liegt etwas, das erklärt, was hier unten ist.“"
+   ],
+   "ereignisse": [
+    "marker3",
+    "tank-trueb",
+    "tank-still",
+    "gestalt",
+    "verwundeter",
+    "versorgen",
+    "licht",
+    "halle-laerm",
+    "schacht-frueh",
+    "marker1",
+    "marker2",
+    "wecken-a",
+    "wecken-b",
+    "gaenge-laerm"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "erwacht",
+      "ist": true
+     },
+     "ziel": "cue-04-3"
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_gefunden",
+        "ist": true
+       },
+       {
+        "flag": "ueberlebender_gesprochen",
+        "ist": false
+       }
+      ]
+     },
+     "ziel": "npc-verwundeter"
+    }
+   ],
+   "weiter": "cue-04-3"
+  },
+  "npc-verwundeter": {
+   "typ": "npc",
+   "titel": "Du spielst den Verwundeten",
+   "zeitlimit": 5,
+   "figur": "verwundeter",
+   "einstieg": "Nicht. Schießen. … Ihr atmet. Gut. Die da atmen nicht. … Leise. Die schlafen nur.",
+   "gmNotiz": "Heiser, in kurzen Stücken, mit einem fremden Klang in jedem Wort. Er hält das Gewehr fest, zielt aber nicht auf die Helden. Er nennt keinen Namen, und er fragt nach keinem. Was er weiß, steht in der NPC-Schublade (N): abhaken, was die Helden herauskitzeln. Höchstens fünf Minuten, die Leiste „Das Licht“ läuft weiter. Dann wählen: mitnehmen oder nicht.",
+   "setzt": {
+    "ueberlebender_gesprochen": true
+   },
+   "ereignisse": [
+    "versorgen"
+   ],
+   "weiter": "wahl-verwundeter"
+  },
+  "wahl-verwundeter": {
+   "typ": "wahl",
+   "titel": "Was machen die Helden mit dem Verwundeten?",
+   "zeitlimit": 3,
+   "frage": "Wähle, was dem am nächsten kommt, was die Spieler tun.",
+   "optionen": [
+    {
+     "taste": "1",
+     "kurz": "Ihn stützen und mitnehmen",
+     "text": "Sie helfen ihm auf, teilen Wasser oder Verband und nehmen ihn in ihre Mitte.",
+     "setzt": {
+      "ueberlebender_dabei": true,
+      "ueberlebender_vertrauen": "hoch"
+     },
+     "folge": "Er kämpft mit, als einer von ihnen. In Map 5 spricht er für die Helden.",
+     "ziel": "verwundeter-mit"
+    },
+    {
+     "taste": "2",
+     "kurz": "Mitnehmen, aber ihm nicht trauen",
+     "text": "Sie nehmen ihn mit, lassen ihn aber vorgehen, nehmen ihm das Messer ab oder behalten das Gewehr im Blick.",
+     "setzt": {
+      "ueberlebender_dabei": true,
+      "ueberlebender_vertrauen": "misstrauisch"
+     },
+     "folge": "Er kämpft mit, aber er merkt es. In Map 5 sagt er den Seinen nur, was er muss.",
+     "ziel": "verwundeter-misstrauisch"
+    },
+    {
+     "taste": "3",
+     "kurz": "Ihn liegen lassen",
+     "text": "Zu schwer, zu fremd, zu gefährlich: Sie lassen ihn hinter dem Tisch.",
+     "setzt": {
+      "ueberlebender_dabei": false,
+      "ueberlebender_zurueckgelassen": true
+     },
+     "folge": "Er bleibt, wo er ist. Was aus ihm wird, erzählt Map 5.",
+     "ziel": "verwundeter-liegen"
+    }
+   ]
+  },
+  "verwundeter-mit": {
+   "typ": "vorlesen",
+   "titel": "Er steht auf",
+   "als": "verwundeter",
+   "text": "Er nimmt die Hand, und für einen Moment ist er schwerer als ein Pferd. Dann steht er. „Danke.“ Er sagt es, als hätte er das Wort lange nicht gebraucht. „Wenn sie aufwachen, bleibt hinter mir. Ich halte mehr aus als ihr.“",
+   "gmNotiz": "Er steht jetzt unter Verbündete (Zone V, hinter dem rechten Werktisch). Ein Spieler führt ihn zusätzlich, sonst du. Weiter: zurück in die Halle.",
+   "weiter": "kampf-halle"
+  },
+  "verwundeter-misstrauisch": {
+   "typ": "vorlesen",
+   "titel": "Er geht voraus",
+   "als": "verwundeter",
+   "text": "Er sieht auf die Hände, die ihn nicht loslassen, und nickt langsam. „Klug. Ich würde mir auch nicht trauen.“ Er stemmt sich hoch, allein. „Aber wenn sie aufwachen, braucht ihr mich.“",
+   "gmNotiz": "Er steht jetzt unter Verbündete (Zone V). Er kämpft mit, aber er redet kaum noch. Weiter: zurück in die Halle.",
+   "weiter": "kampf-halle"
+  },
+  "verwundeter-liegen": {
+   "typ": "vorlesen",
+   "titel": "Er bleibt liegen",
+   "als": "verwundeter",
+   "text": "Er lehnt den Kopf zurück an das Metall. „Dann geht leise.“ Das Gewehr bleibt auf seinen Knien. Er sieht euch nicht nach.",
+   "gmNotiz": "Er bleibt hinter dem Werktisch, kein Verbündeter. Beim Erwachen gehen die Gestalten an ihm vorbei, als wäre er einer von ihnen. Ändern die Helden ihre Meinung, bevor es erwacht: Zurück (Backspace) und neu wählen. Weiter: zurück in die Halle.",
+   "weiter": "kampf-halle"
+  },
+  "cue-04-3": {
+   "typ": "cue",
+   "titel": "Das Erwachen",
+   "cue": "04-3",
+   "optional": true,
+   "text": "Die Gestalten an den Wänden heben die Köpfe. Moos reißt, Gelenke knacken, ihre Waffen klicken. Sie sehen euch.",
+   "notiz": "Noch nicht aufgenommen: Dann liest du den Text vor. Hinter den Helden, in den Gängen, stehen jetzt auch die Sporenlinge auf, die noch lagen. Liegt der Verwundete noch unentdeckt hinter dem Werktisch, steht er im Erwachen auf (Taste V). Wurde er liegen gelassen, gehen die Gestalten an ihm vorbei. Danach die Kampfmusik (Taste A im Kampf).",
+   "setzt": {
+    "erwacht": true,
+    "sporen_a_wach": true,
+    "sporen_b_wach": true
+   },
+   "leistenAus": [
+    "takt"
+   ],
+   "weiter": "aufbau-erwachen"
+  },
+  "aufbau-erwachen": {
+   "typ": "aufbau",
+   "titel": "Die Gestalten treten heraus",
+   "skizze": "alles",
+   "wenn": {
+    "flag": "erwachen_steht",
+    "ist": false
+   },
+   "tisch": [
+    "Die Figuren an die Nischen, die die Gegnerliste nennt: der Gelehrte in der gehörnten Rüstung an N3 (oben, links vom Licht), ein Rüstungsmann an N5 (rechts, über dem Schacht). Auf Schwer und Albtraum kommen an N1 (links oben) weitere dazu, die Liste zeigt sie",
+    "Der Verwundete, wenn er dabei ist, bleibt, wo er steht",
+    "Die übrigen Nischen bleiben leer: Dort tritt der Nachschub heraus",
+    "Sporenlinge, die noch in den Gängen liegen, stehen auf",
+    "Zählstein für „Runden überstanden“ auf 0, gut sichtbar: Die laufende Runde ist Runde 1"
+   ],
+   "regel": "Ab jetzt zähle ich vier Runden. Haltet durch, oder kommt zum Schacht. Und für die hier gibt es nichts. Nur fürs Überleben.",
+   "hinweis": "Absichtlich überwältigend: Sag es nicht, zeig es. Wer kämpft statt zu rennen, soll verlieren können; vier Runden in guter Deckung sind schaffbar.",
+   "setzt": {
+    "erwachen_steht": true
+   },
+   "weiter": "kampf-erwachen"
+  },
+  "kampf-erwachen": {
+   "typ": "kampf",
+   "titel": "Das Erwachen",
+   "runden": true,
+   "gegner": [
+    {
+     "id": "gelehrter",
+     "anzahl": 1,
+     "zone": "N3"
+    },
+    {
+     "id": "ruestungsmann",
+     "anzahl": 1,
+     "zone": "N5",
+     "skaliert": true
+    }
+   ],
+   "verstaerkung": {
+    "id": "ruestungsmann",
+    "zone": "N1"
+   },
+   "verhalten": {
+    "start": "ruhig",
+    "wuetendWenn": {
+     "alle": [
+      {
+       "flag": "gelehrter_gefallen",
+       "nicht": true
+      },
+      {
+       "eine": [
+        {
+         "flag": "schmied_besiegt",
+         "nicht": true
+        },
+        {
+         "leiste": "erwachen",
+         ">=": 1
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "leistenAn": [
+    "erwachen"
+   ],
+   "musik": "BATTLE-1",
+   "text": "Das Erwachen. Die Startwelle steht an den Nischen: der Gelehrte und seine Rüstungsmänner, hart, langsam, kaum zu verletzen. Es sind absichtlich zu viele: Ein Sieg ist nicht vorgesehen. Die Leiste „Runden überstanden“ zählt, die Runde, in der es erwacht ist, ist Runde 1. Nach Runde 1, 2 und 3 kommt Nachschub aus freien Nischen, solange der Gelehrte steht (die App setzt ihn in die Gegnerliste). Nach Runde 4 erstarren alle: Die App springt von selbst zum Cliffhanger.",
+   "hinweise": [
+    "Kampfmusik oben im Kampf (Taste A), Schleife. Bis der metallische Puls da ist: Battle Cue 1.",
+    "Verhalten: wütend vom ersten Moment, außer der Schmied ist besiegt. Dann Runde 1 ruhig, ab Runde 2 wütend (oben: Gegner ruhig oder WÜTEND).",
+    "Der Gelehrte führt sie. Fällt er: ruhige Tabelle für alle, kein Nachschub mehr. Das ist der dritte Weg neben Durchhalten und Schacht, aber er ist teuer (Verteidigung 2+).",
+    "Der Verwundete (Verbündete): Er passt nicht in den Schacht, seine Rüstung ist zu breit. Fliehen alle Helden, bleibt er unten und hält die Lücke. Fällt er, ist er in Map 5 nicht dabei.",
+    "Der Schacht (H): ein Held je Runde, eine ganze Aktion mit 3+, ein Held direkt daneben hilft (2+). Taste H erst, wenn der Wurf gelingt. Wer drin ist, ist raus: Figur an die Kante.",
+    "Alle, die noch stehen, sind im Schacht: K. Dann endet die Map, auch vor Runde 4.",
+    "Deckung hinter Werktischen und Glastanks. Wird ein Glastank getroffen: B (bei 1 platzt er, verseuchtes Feld).",
+    "Kämpfen bringt keine EP. Sag es einmal an: „Für die hier gibt es nichts. Nur fürs Überleben.“",
+    "Fundstücke gehen weiter: Protokoll (3), Probe (7), tote Probe (8), oder die Marke von einem Gefallenen (M).",
+    "Fallen alle Helden vor Runde 4: Weiter führt zum Cliffhanger. Die Gestalten erstarren, bevor sie zuschlagen."
+   ],
+   "ereignisse": [
+    "schacht",
+    "alle-im-schacht",
+    "tank-getroffen",
+    "marke-gefallen",
+    "verwundeter-erwachen",
+    "versorgen",
+    "marker3",
+    "tank-trueb",
+    "tank-still",
+    "marker1",
+    "marker2"
+   ],
+   "ende": [
+    {
+     "wenn": {
+      "flag": "alle_im_schacht",
+      "ist": true
+     },
+     "ziel": "cue-04-4"
+    }
+   ],
+   "weiter": "cue-04-4"
+  },
+  "cue-04-4": {
+   "typ": "cue",
+   "titel": "Von oben",
+   "cue": "04-4",
+   "optional": true,
+   "stoppt": [
+    "BATTLE-1"
+   ],
+   "text": "Alle Gestalten erstarren. Gleichzeitig heben sie die Köpfe und horchen nach oben. Von oben ein Kreischen wie Metall auf Stein, dann fällt Licht durch den Schacht. Eine Stimme, verzerrt, in einer Sprache, die keiner kennt. Und dann ein Wort, das ihr versteht: Moosgrab.",
+   "notiz": "Noch nicht aufgenommen: Dann liest du den Text vor. Er endet ohne „Ihr seid am Zug“. Spiel anhalten: Die Figuren bleiben stehen, wo sie sind (Foto vom Tisch für Map 5). Wer im Schacht hängt, sieht das Licht direkt über sich.",
+   "setzt": {
+    "cliffhanger": true
+   },
+   "leistenAus": [
+    "erwachen"
+   ],
+   "weiter": [
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "fund_marke",
+        "ist": false
+       },
+       {
+        "flag": "fund_protokoll",
+        "ist": false
+       },
+       {
+        "flag": "fund_probe",
+        "ist": false
+       },
+       {
+        "flag": "fund_tote_probe",
+        "ist": false
+       }
+      ]
+     },
+     "ziel": "schluss-leer"
+    },
+    {
+     "ziel": "schluss"
+    }
+   ]
+  },
+  "schluss-leer": {
+   "typ": "vorlesen",
+   "titel": "Schluss für heute",
+   "text": "Hier ist Schluss für heute.",
+   "gmNotiz": "Niemand hat ein Fundstück mitgenommen: Atemzug +1 extra (eben verbucht), dazu das +1 im Abschluss.",
+   "leisten": {
+    "atemzug": 1
+   },
+   "weiter": "ende-map4"
+  },
+  "schluss": {
+   "typ": "vorlesen",
+   "titel": "Schluss für heute",
+   "text": "Hier ist Schluss für heute.",
+   "gmNotiz": "Nichts erklären. Wer fragt, was da oben war: „Nächstes Mal.“",
+   "weiter": "ende-map4"
+  },
+  "ende-map4": {
+   "typ": "ende",
+   "titel": "Abschluss Map 4",
+   "ep": [
+    {
+     "wenn": {
+      "flag": "ep_haupt",
+      "ist": true
+     },
+     "text": "Hauptziel: vier Runden überstanden oder durch den Schacht entkommen",
+     "ep": 2
+    },
+    {
+     "wenn": {
+      "eine": [
+       {
+        "flag": "fund_marke",
+        "ist": true
+       },
+       {
+        "flag": "fund_protokoll",
+        "ist": true
+       },
+       {
+        "flag": "fund_probe",
+        "ist": true
+       },
+       {
+        "flag": "fund_tote_probe",
+        "ist": true
+       }
+      ]
+     },
+     "text": "Nebenziel: ein Fundstück mitgenommen",
+     "ep": 1
+    }
+   ],
+   "beute": [
+    "1 Beutewurf (W6, Tabelle oben)",
+    "Die Fundstücke, die die Helden tragen (Zettel): Erkennungsmarke, Protokoll, Probe, tote Probe"
+   ],
+   "leisten": {
+    "atemzug": 1
+   },
+   "zuruecksetzen": [],
+   "folgen": [
+    {
+     "text": "Die Rüstungsmänner bleiben stehen, wo sie erstarrt sind: So beginnt Map 5."
+    },
+    {
+     "wenn": {
+      "flag": "fund_marke",
+      "ist": true
+     },
+     "text": "Erkennungsmarke: Zeigen die Helden sie in Map 5 dem Überlebenden, erkennt er den Namen und vertraut ihnen."
+    },
+    {
+     "wenn": {
+      "flag": "fund_protokoll",
+      "ist": true
+     },
+     "text": "Protokoll: Wer es in Ruhe liest, kennt die Schwachstelle des Herzens: Angriffe auf Herz und Adern mit DS(+1)."
+    },
+    {
+     "wenn": {
+      "flag": "fund_probe",
+      "ist": true
+     },
+     "text": "Probe: In Map 5 will der Überlebende ein Stück für seine Leute. Die Gruppe kann es ihm geben, behalten oder in die Glut werfen."
+    },
+    {
+     "wenn": {
+      "flag": "fund_tote_probe",
+      "ist": true
+     },
+     "text": "Tote Probe: Damit lässt sich der Überlebende in Map 5 täuschen (Qualitätstest beim Übergeben)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "fund_marke",
+        "ist": false
+       },
+       {
+        "flag": "fund_protokoll",
+        "ist": false
+       },
+       {
+        "flag": "fund_probe",
+        "ist": false
+       },
+       {
+        "flag": "fund_tote_probe",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Kein Fundstück: Map 5 ohne Vorteil, Atemzug +1 extra (verbucht)."
+    },
+    {
+     "wenn": {
+      "flag": "schacht_geflohen",
+      "ist": true
+     },
+     "text": "Mindestens ein Held ist durch den Schacht entkommen: Er kommt im Dorf heraus und steigt in Map 5 von oben wieder ein."
+    },
+    {
+     "wenn": {
+      "flag": "alle_im_schacht",
+      "ist": true
+     },
+     "text": "Alle, die noch standen, sind im Schacht: Unten bleiben nur die Gefallenen."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_dabei",
+      "ist": true
+     },
+     "text": "Der Verwundete lebt und ist bei den Helden. Map 5: Er kämpft mit, und sein Auftrag war, das brennende Herz zu zerstören."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_vertrauen",
+      "ist": "hoch"
+     },
+     "text": "Er vertraut den Helden: In Map 5 spricht er für sie."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_vertrauen",
+      "ist": "misstrauisch"
+     },
+     "text": "Die Helden haben ihm nicht getraut: In Map 5 sagt er den Seinen nur, was er muss."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "flag": "alle_im_schacht",
+        "ist": true
+       }
+      ]
+     },
+     "text": "Alle Helden sind im Schacht, der Verwundete steht allein unten in der Lücke."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_tot",
+      "ist": true
+     },
+     "text": "Der Verwundete ist gefallen: In Map 5 ist er nicht dabei."
+    },
+    {
+     "wenn": {
+      "flag": "ueberlebender_zurueckgelassen",
+      "ist": true
+     },
+     "text": "Der Verwundete wurde hinter dem Werktisch zurückgelassen: Map 5 entscheidet, was aus ihm geworden ist."
+    },
+    {
+     "wenn": {
+      "flag": "gelehrter_gefallen",
+      "ist": true
+     },
+     "text": "Der Gelehrte in der gehörnten Rüstung ist gefallen: Die Rüstungsmänner in Map 5 sind langsam und dumpf (ruhige Tabelle)."
+    },
+    {
+     "wenn": {
+      "flag": "zwei_gerettet",
+      "ist": true
+     },
+     "text": "Zwei oder mehr Gerettete im Keller (Map 3): in Map 5 das Seil von oben (wird weitergereicht)."
+    },
+    {
+     "wenn": {
+      "flag": "befallener_im_keller",
+      "ist": true
+     },
+     "text": "Ein Befallener im Keller (Map 3): Map 5 bringt zwei Gegner mehr aus dem Gemeindehaus (wird weitergereicht)."
+    },
+    {
+     "wenn": {
+      "alle": [
+       {
+        "flag": "anhaenger",
+        "ist": true
+       },
+       {
+        "flag": "anhaenger_zurueck",
+        "ist": false
+       }
+      ]
+     },
+     "text": "Der Kupferanhänger reist mit: {anhaenger_traeger} bekommt beim Start von Map 5 wieder 1 Sporenpunkt."
+    },
+    {
+     "wenn": {
+      "flag": "quelle_zerstoert",
+      "ist": true
+     },
+     "text": "Quelle in Map 1 zerstört: im Finale weniger Nachschub (wird weitergereicht)."
+    }
+   ],
+   "notieren": [
+    "Wer ist im Schacht, wer liegt unten? Map 5 beginnt, wo sie sind",
+    "Wo stehen die Rüstungsmänner und Sporenlinge? Ein Foto vom Tisch reicht",
+    "Wer trägt welches Fundstück? Bis die App Fundstücke selbst ins Inventar legt: auf den Zettel den Heldennamen",
+    "Der Verwundete: wie viele Wunden hat er noch? (Die App trägt nur mit, ob er lebt und dabei ist)",
+    "Budget je Held +10 im Reiter Gruppe eintragen"
+   ],
+   "gmNotiz": "Der Cliffhanger ist das Ende. Bevor alle gehen, nur ein Satz: „Nächstes Mal erfahrt ihr, wer da oben euren Dorfnamen kennt.“",
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, gilt als gefallen: Er ist in der nächsten Map wieder dabei, würfelt aber auf der Verletzungstabelle. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort.",
+   "weiter": null
+  }
+ },
+ "beimStart": [
+  {
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "sporenFuer": "anhaenger_traeger"
+  },
+  {
+   "wenn": {
+    "flag": "brunnen_gewalt",
+    "ist": true
+   },
+   "setzt": {
+    "sporen_a_wach": true
+   }
+  }
+ ],
+ "heldenInfo": [
+  {
+   "flag": "anhaenger_traeger",
+   "wenn": {
+    "alle": [
+     {
+      "flag": "anhaenger",
+      "ist": true
+     },
+     {
+      "flag": "anhaenger_zurueck",
+      "ist": false
+     }
+    ]
+   },
+   "name": "Kupferanhänger",
+   "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt.",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: Der Sporenpunkt beim nächsten Mapwechsel geht auf ihn über."
+  }
+ ]
+}
