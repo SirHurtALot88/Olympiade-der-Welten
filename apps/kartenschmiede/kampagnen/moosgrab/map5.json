@@ -4,6 +4,12 @@
  "map": 5,
  "kampagnenEnde": true,
  "stufePlus": 1,
+ "verbuendeteZaehlen": true,
+ "referenz": {
+  "heldenpunkte": 485,
+  "anteil": 0.75,
+  "text": "Geschrieben für die ganze Gruppe eine Stufe über Normal: 340 Heldenpunkte plus der Überlebende (145), Anteil 75 %."
+ },
  "titel": "Das Herz von Moosgrab",
  "ton": "Chaos-Finale, dann Flucht",
  "tisch": "120x80",
@@ -21,10 +27,6 @@
   "Thousand Sons",
   "Reaktor"
  ],
- "referenz": {
-  "heldenpunkte": 340,
-  "anteil": 0.5
- },
  "lage": {
   "flucht": {
    "wie": "Durch den Schacht (↑, rechts unten) nach oben zum Brunnen. Eine ganze Aktion, höchstens zwei Figuren je Runde. Wer drin ist, ist raus.",
@@ -157,6 +159,22 @@
      ]
     },
     "text": "Er kriecht jede Aktivierung eine Kartenbreite auf den nächsten Helden zu (langsamer als sie), durch schwieriges Gelände ohne Abzug, und greift an, wen er berührt (A3 DS 1). In den Schacht folgt er nicht."
+   },
+   {
+    "titel": "Der Gelehrte forscht",
+    "wenn": {
+     "alle": [
+      {
+       "flag": "kampf_laeuft",
+       "ist": true
+      },
+      {
+       "flag": "gelehrter_tot",
+       "nicht": true
+      }
+     ]
+    },
+    "text": "Der zweite Magier am Werktisch schützt die Adern: Angriffe auf sie treffen erst ab 5+, solange er steht."
    }
   ],
   "ziele": [
@@ -401,6 +419,10 @@
    "S": {
     "x": 34.5,
     "y": 21
+   },
+   "W": {
+    "x": 6.5,
+    "y": 7.5
    }
   },
   "info": {
@@ -697,6 +719,15 @@
   "umgekehrt": {
    "start": false,
    "text": "Die Helden sind vor dem Herz umgekehrt."
+  },
+  "gelehrter_gefallen": {
+   "start": false,
+   "text": "Aus Map 4: Der Gelehrte aus der Halle ist gefallen; hier steht ein anderer.",
+   "wirktIn": "map5"
+  },
+  "gelehrter_tot": {
+   "start": false,
+   "text": "Der zweite Magier am Herz ist gefallen: keine Ader wächst mehr nach."
   }
  },
  "audio": {
@@ -871,20 +902,17 @@
    "info": "Eine Rüstung ohne Naht, groß wie ein Schrank, und niemand darin: nur Staub und Moos. Sie geht langsam, sie hört nicht auf, und sie schießt mit etwas, das glüht.",
    "werte": {
     "name": "Leere Rüstung",
-    "faction": "Urwild",
-    "praegung": [
-     "gift"
-    ],
+    "faction": "Die Leeren",
     "size": "1",
     "quality": "4+",
-    "defense": "3+",
-    "tough": "4",
+    "defense": "2+",
+    "tough": "3",
     "role": "enemy",
-    "weapons": "Glutrohr | 24\" | A1 | DS(1)\nRüstungsfaust | Nahkampf | A1 | ",
-    "passives": "Furchtlos, Langsam",
-    "flavor": "Keiner drin. Nur Staub und Moos, und es geht trotzdem."
+    "weapons": "Glutgewehr | 18 | A1 | DS(1)\nPanzerfaust | Nahkampf | A1 | ",
+    "passives": "Langsam, Furchtlos",
+    "flavor": "Versiegelt. Darin rieselt etwas, wenn es geht."
    },
-   "notiz": "Eigene Werte, 45 P. (Q4+ D3+ Z4, Langsam, Glutrohr A1 DS 1). Miniatur: Rubric Marine (Thousand Sons), leere Rüstungen voller Staub, hier mit Moos in den Fugen. Zwei stehen am Anfang erstarrt vor den Zonen A und B, eine weitere kommt je Rundenende dazu (auf Normal höchstens drei). Vor den Spielern: die leeren Rüstungen, die Rüstungsmänner.",
+   "notiz": "Eigene Werte wie der Rüstungsmann aus Map 4, 55 P. (Q4+ D2+ Z3, Glutgewehr A1 DS 1, Panzerfaust A1, Langsam, Furchtlos). Miniatur: Rubric Marine (Thousand Sons), leere Rüstungen voller Staub, hier mit Moos in den Fugen. Zwei stehen am Anfang erstarrt vor den Zonen A und B, eine weitere kommt je Rundenende dazu (auf Normal höchstens drei). Vor den Spielern: die leeren Rüstungen, die Rüstungsmänner.",
    "anblick": "Die Rüstung hat keine Naht, keine Schnalle, kein Scharnier. Hinter dem Visier ist nichts, nur Dunkel, und daraus rieselt Staub, jedes Mal, wenn sie einen Schritt macht. In den Fugen wächst Moos.",
    "zustandSaetze": {
     "unverletzt": "Die Klinge rutscht an der Rüstung ab. Sie hat es nicht einmal bemerkt.",
@@ -1018,6 +1046,14 @@
      "werte": {
       "defense": -1
      }
+    },
+    {
+     "wenn": {
+      "flag": "gelehrter_tot",
+      "nicht": true
+     },
+     "text": "Der Gelehrte schützt sie: Angriffe auf die Adern treffen erst ab 5+, solange er steht.",
+     "ansage": "Eure Klingen gleiten ab, als läge etwas darüber."
     }
    ],
    "anblick": "Ein Strang aus Wurzeln, dick wie ein Arm, läuft aus dem Fels ins Herz. Er zuckt mit jedem Schlag, und unter der Rinde sieht man es laufen, dunkel und heiß. Wo er ins Herz geht, glüht es rot.",
@@ -1121,6 +1157,44 @@
      "glutleib_tot": true
     }
    }
+  },
+  "gelehrter": {
+   "name": "Der Gelehrte in der gehörnten Rüstung",
+   "anzeige": "Eine gehörnte Gestalt mit Stab",
+   "karte": "eigen",
+   "info": "Er steht am Werktisch neben dem Herz, über eine Schale gebeugt, in der etwas Weißes zuckt. Er schreibt. Er sieht nicht auf, bis ihr nah seid. Lebt der aus der Halle unter dem Brunnen noch, ist er es: ein Horn abgesplittert.",
+   "werte": {
+    "name": "Der Gelehrte",
+    "faction": "Die Leeren",
+    "size": "1",
+    "quality": "3+",
+    "defense": "2+",
+    "tough": "5",
+    "role": "enemy",
+    "weapons": "Blaues Feuer | 12 | A1 | Explosion(3)\nRunenstab | Nahkampf | A2 | DS(1)",
+    "bossName": "Er forscht am Herz",
+    "bossText": "Solange er steht, hält er seine schützende Hand über die Adern: Jeder Angriff auf eine Ader trifft erst ab 5+ statt wie sonst (sein Zauber liegt auf ihnen). Fällt er, sind sie wieder verwundbar.",
+    "flavor": "Er liest noch immer. Nur nicht mehr in Büchern.",
+    "passives": "Furchtlos, Langsam, Zauberer"
+   },
+   "notiz": "Zweiter Magier, eigene Werte 110 P. (Q3+ D2+ Z5, Blaues Feuer zwei Kartenlängen A1 Explosion 3, Runenstab A2 DS 1, Furchtlos, Zauberer). Miniatur: ein zweiter Sorcerer der Thousand Sons (ist der aus Map 4 gefallen, ist es ein anderer). Er steht am Werktisch und forscht am Herz: Solange er steht, treffen Angriffe auf die Adern erst ab 5+. Erst ihn, oder mit viel Geduld.",
+   "zustandSaetze": {
+    "unverletzt": "Er hebt nicht einmal den Stab. Der Treffer gleitet ab, als hätte er ihn kommen sehen.",
+    "angekratzt": "Ein Horn ist abgesplittert. Er sieht euch an, länger als vorher.",
+    "verwundet": "Er geht jetzt gebückt. Das Licht im Stab flackert.",
+    "schwer verwundet": "Der Umhang hängt in Fetzen. Darunter knistert es wie trockenes Laub.",
+    "am Ende": "Er stützt sich auf den Stab. Ein Treffer noch. Die anderen bleiben näher bei ihm.",
+    "gefallen": "Er sinkt auf die Knie, und alle anderen halten inne."
+   },
+   "tod": {
+    "vorlesen": "Er fällt über seine Schale. Was darin zuckte, läuft über den Tisch und hört auf. Die Adern zittern, als hätte jemand eine Decke von ihnen gezogen.",
+    "gmNotiz": "Die Adern sind wieder verwundbar: Angriffe treffen wie sonst. Beutewurf für den Helden, der ihn gefällt hat.",
+    "beutewurf": true,
+    "setzt": {
+     "gelehrter_tot": true
+    }
+   },
+   "anblick": "Hörner am Helm, ein Umhang, der einmal blau war, und ein Stab mit einem Auge aus Glas. Er schreibt mit einem Griffel auf eine Tafel, die glüht."
   }
  },
  "fog": {
@@ -2055,10 +2129,11 @@
    "typ": "vorbereitung",
    "titel": "Bereitlegen",
    "checkliste": [
-    "Die leeren Rüstungen: 5 Figuren (Rubric Marines der Thousand Sons passen), dazu der Rufer (Sorcerer). Zwei Rüstungen und der Rufer stehen am Anfang, die anderen kommen je Rundenende",
+    "Die Thousand Sons: der Rufer (Sorcerer, der Boss), ein zweiter Sorcerer (der Gelehrte) und bis zu 5 leere Rüstungen (Rubric Marines). Rufer, Gelehrter und eine Rüstung stehen am Anfang (auf höherer Stufe mehr), weitere kommen je Rundenende (wie viele, zeigt die Gegnerliste)",
+    "Der Glutleib für die Flucht: das größte Monster, das du hast",
     "Der Überlebende, falls die Folgen unten ihn nennen: eine große Figur in schwerer Rüstung (ein Space Marine passt)",
     "Das Herz: ein großes Stück Gelände (Wurzeln, Stein, was du hast), in der Mitte etwas Rotes oder ein Licht für die Glut, davor 3 Adern (Wurzelstücke oder Marker)",
-    "Sporenlinge: bis zu 4 je Runde, über den Abend höchstens 12 bis 14 (Platzhalter Giftmade)",
+    "Kleinvieh: Sporenlinge, 2 am Anfang, dann bis zu 3 je Runde, über den Abend höchstens etwa 10 (Platzhalter Giftmade)",
     "2 Figuren für Befallene aus dem Gemeindehaus, falls die Folgen unten sie nennen",
     "Filz für verseuchte Flächen: die Herzkammer und mehr, denn das Herz atmet aus",
     "Gelände: 2 Wurzelwände, eine glatte Wand, Werktisch, Glastank, Trümmer, Pilze. Frei hinstellen, wichtig sind Herz, Adern, Zonen, Trümmer, Schacht und Start",
@@ -2202,6 +2277,20 @@
       "ist": true
      },
      "text": "Aus Map 3: Mindestens zwei Gerettete warten oben am Brunnen und lassen ein Seil herab: auf der Flucht kommen drei Figuren je Runde in den Schacht statt zwei."
+    },
+    {
+     "wenn": {
+      "flag": "gelehrter_gefallen",
+      "ist": true
+     },
+     "text": "Der Gelehrte aus der Halle ist in Map 4 gefallen: Am Herz steht ein anderer, gleich stark. Für die Spieler: wieder einer mit Hörnern am Helm."
+    },
+    {
+     "wenn": {
+      "flag": "gelehrter_gefallen",
+      "nicht": true
+     },
+     "text": "Der Gelehrte aus der Halle lebt: Er steht jetzt am Herz, ein Horn abgesplittert. Die Helden erkennen ihn."
     }
    ],
    "weiter": "rast-vorher"
@@ -2246,7 +2335,7 @@
     "Wurzelwände links und rechts der Herzkammer, eine glatte Wand an der linken Kante, halbe Höhe",
     "Werktisch links oben, Glastank rechts, Pilze verstreut. Trümmer rechts unten (M), daneben der Schacht nach oben (↑): der einzige Weg hinaus",
     "Feindzonen A (links oben), B (rechts oben) und C (links unten) hinlegen",
-    "Erstarrt aufstellen, die Helme gesenkt: der Rufer direkt vor dem Herz, je eine leere Rüstung vor Zone A und vor Zone B",
+    "Erstarrt aufstellen, die Helme gesenkt: der Rufer direkt vor dem Herz, der Gelehrte am Werktisch links oben (W), eine leere Rüstung vor Zone A, zwei Sporenlinge in Zone C. Wie viele es auf eurer Stufe genau sind, zeigt die Gegnerliste",
     "Der Überlebende an die Trümmer (M), falls er dabei ist",
     "Heldenstart links unten: die Spieler stellen ihre Helden auf",
     "Bereitlegen, nicht hinstellen: weitere leere Rüstungen, Sporenlinge, die zwei Befallenen (falls die Folgen sie nennen), den Zählstein für die Glut"
@@ -2387,8 +2476,8 @@
   "herz-schlaegt": {
    "typ": "vorlesen",
    "titel": "Das brennende Herz",
-   "text": "Tiefer im Fels schlägt es. Ein Klumpen aus Wurzeln, Fleisch und Metall, groß wie ein Wagen, und in seiner Mitte brennt etwas, das nicht ausgeht. Drei Stränge halten es fest. Jedes Mal, wenn es schlägt, hört ihr ganz leise eure Namen. Der mit dem Stab hebt den Kopf. Ihr seid am Zug.",
-   "gmNotiz": "Ab jetzt Kampf: der Rufer (der Boss) und die Rüstungen sind wach, wütende Tabelle. Solange der Rufer steht, lässt sich die Glut nicht überladen. Kennen die Helden den Namen Lene, hören sie ihn zwischen ihren eigenen. Weiter startet Runde 1; die Kampfmusik startest du dort (Taste A).",
+   "text": "Tiefer im Fels schlägt es. Ein Klumpen aus Wurzeln, Fleisch und Metall, groß wie ein Wagen, und in seiner Mitte brennt etwas, das nicht ausgeht. Drei Stränge halten es fest. Jedes Mal, wenn es schlägt, hört ihr ganz leise eure Namen. Am Werktisch schreibt einer mit Hörnern am Helm und sieht nicht auf. Der mit dem Stab vor dem Herz hebt den Kopf. Ihr seid am Zug.",
+   "gmNotiz": "Ab jetzt Kampf: der Rufer (der Boss), der Gelehrte am Werktisch, die Rüstungen und das Kleinvieh sind wach, wütende Tabelle. Solange der Rufer steht, lässt sich die Glut nicht überladen; solange der Gelehrte steht, treffen Angriffe auf die Adern erst ab 5+. Kennen die Helden den Namen Lene, hören sie ihn zwischen ihren eigenen. Weiter startet Runde 1; die Kampfmusik startest du dort (Taste A).",
    "setzt": {
     "herz_gesehen": true
    },
@@ -2404,6 +2493,23 @@
      "id": "rufer",
      "anzahl": 1,
      "zone": "H"
+    },
+    {
+     "id": "gelehrter",
+     "anzahl": 1,
+     "zone": "W",
+     "fest": true
+    },
+    {
+     "id": "ruestung",
+     "anzahl": 1,
+     "zone": "A",
+     "skaliert": true
+    },
+    {
+     "id": "sporenling",
+     "anzahl": 2,
+     "zone": "C"
     },
     {
      "id": "ader",
@@ -2467,7 +2573,7 @@
    "verhalten": {
     "start": "wuetend"
    },
-   "text": "Erst den Rufer, dazu die drei Adern, dann die Glut überladen. Jede Gegnergruppe: erst G (wen sie angreift), dann Verhaltenswürfel. Rundenende: R; Ausatmen und Nachschub kommen von selbst.",
+   "text": "Erst den Rufer (sonst kein Überladen), den Gelehrten (sonst sind die Adern geschützt) und die drei Adern, dann die Glut überladen. Jede Gegnergruppe: erst G, dann Verhaltenswürfel. Rundenende: R; Ausatmen und Nachschub kommen von selbst.",
    "hinweise": [
     "Gegnerzug: vor jeder Gegnergruppe G. 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn: die Helden); ein befallener Held (ab 3 Sporenpunkten) schon bei 4. Dann Verhaltenswürfel, wütende Tabelle.",
     "Rundenende: R, das Ausatmen kommt von selbst: W6 kleiner oder gleich der Atemzug-Leiste, dann ist alles innerhalb einer Kartenbreite um das Herz verseucht, und jeder Held darin macht einen Qualitätstest (misslungen eine Kartenbreite auf das Herz zu).",
@@ -2478,7 +2584,8 @@
     "Der Rufer ist der Boss (175 P.): Solange er steht, kein Überladen. Fällt er, werden die leeren Rüstungen ruhig (die App setzt das selbst).",
     "Ist die Glut überladen: Weiter zu Cue 05-2. Fallen alle Helden oder fliehen sie vorher durch den Schacht: unten Weiter, dann bestätigen (das Herz schlägt weiter).",
     "Faden verloren? „Die Stränge. Dann die Glut. Dann lauft.“",
-    "Nur für dich: Miniaturen Rubric Marines und ein Sorcerer der Thousand Sons; vor den Spielern nur „die leeren Rüstungen“ und „der mit dem Stab“. Das Finale rechnet eine Stufe höher als gewählt (auf Normal wie Schwer): mehr Rüstungen und öfter Nachschub; der Überlebende bleibt, wie er ist."
+    "Nur für dich: Miniaturen Rubric Marines und ein Sorcerer der Thousand Sons; vor den Spielern nur „die leeren Rüstungen“ und „der mit dem Stab“. Das Finale rechnet eine Stufe höher als gewählt (auf Normal wie Schwer): mehr Rüstungen und öfter Nachschub; der Überlebende bleibt, wie er ist.",
+    "Das Budget rechnet den Überlebenden zur Gruppe: Ist er dabei, stehen mehr Gegner am Tisch (auf Normal rund 380 P. am Anfang gegen 340 Heldenpunkte plus seine 145, eine Welle Schwer)."
    ],
    "ereignisse": [
     "gegnerwahl",
@@ -2785,7 +2892,8 @@
      "ziel": "flucht-ende"
     }
    ],
-   "weiter": "glut-bricht"
+   "weiter": "glut-bricht",
+   "budgetFrei": "Flucht, kein Kampf zum Gewinnen: der Glutleib ist ein einzelner Verfolger und bleibt auf jeder Stufe gleich."
   },
   "glut-bricht": {
    "typ": "vorlesen",

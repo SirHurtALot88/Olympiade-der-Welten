@@ -527,11 +527,12 @@
       {
         nr: 5, empfohlen: "120x80", titel: "Das Herz von Moosgrab", ton: "Finale am brennenden Herz", stand: "spielbar im Reiter Spielen",
         einleitung: "Die Wand bricht auf. Dahinter, tiefer im Fels, schlägt etwas: ein Klumpen aus Wurzeln, Fleisch und Metall, und mitten darin brennt es weiß. Das Herz ist um die Glut gewachsen.",
-        hauptziel: "Fällt den Rufer, durchtrennt die drei Adern, überladet die Glut und entkommt durch den Schacht, bevor sie bricht.",
+        hauptziel: "Fällt den Rufer, durchtrennt die drei Adern (der Gelehrte schützt sie), überladet die Glut und entkommt durch den Schacht, bevor sie bricht.",
         nebenziel: "Entscheidet, was in die Glut geht: alles, ein Stück für euch, ein Stück für den Überlebenden, oder ihr schiebt ihm die tote Probe unter.",
         spezial: [
           "Eine Stufe härter: Das Finale rechnet seine Gegnerpunkte eine Schwierigkeitsstufe über der gewählten (auf Normal wie Schwer). Davor gibt es im Schacht die einzige Rast der Map (alle Wunden und Power zurück, Atemzug +1).",
-          "Der Boss: der Rufer (Sorcerer, 175 P.). Solange er steht, hält sein Zauber die Klappe zu, und die Glut lässt sich nicht überladen. Fällt er, gehen die leeren Rüstungen ruhig.",
+          "Der Bosskampf: der Rufer (Sorcerer, 175 P.) mit dem Gelehrten (zweiter Sorcerer, 110 P.), leeren Rüstungen (Rubric Marines) und Kleinvieh. Auf Normal mit dem Überlebenden rund 415 P. am Anfang, dazu Nachschub. Das Budget rechnet den Überlebenden zur Gruppe.",
+          "Solange der Rufer steht, hält sein Zauber die Klappe zu: kein Überladen. Fällt er, gehen die leeren Rüstungen ruhig. Solange der Gelehrte am Werktisch steht, treffen Angriffe auf die Adern erst ab 5+.",
           "Der Überlebende (nur wenn er Map 4 lebend verlassen hat): ein einzelner Krieger in großer Rüstung, 145 P., verwundet noch rund 100 P. wert. Verbündeter, zählt nicht ins Punktebudget. Ein Spieler führt ihn zusätzlich. Er überlädt die Glut leichter.",
           "Wer hält die Glut: Lebt der Überlebende, bleibt er an der Klappe und gibt den Helden sechs Runden (oder ein Held bleibt an seiner Stelle). Ohne ihn bleibt ein Held, oder sie zünden die kurze Lunte: alle dürfen rennen, aber nur vier Runden.",
           "Umkehren: Beim Durchbruch können die Helden kehrtmachen, ohne zu kämpfen. Das ist das Bad Ending („Es schlägt weiter“); ist der Überlebende dabei, geht er allein hinein.",
@@ -549,7 +550,7 @@
           "Epilog „Es schlägt weiter“ (das Bad Ending): die Helden kehren vor dem Herz um, oder alle fallen oder fliehen, bevor die Glut überladen ist.",
         ],
         hinweis: "Das Ziel ist das Herz, nicht jeder Gegner. Haltet die Runden schnell. Die Entscheidung über die Probe fällt zwischen Überladen und Flucht, in einem Atemzug, nicht in Ruhe. Spielertexte nennen die Anlage nie beim Namen: es ist „die Glut“.",
-        gegner: "Der Rufer als Boss (Sorcerer), leere Rüstungen (Rubric Marines), Sporenlinge nach der Atemzug-Leiste, Befallene aus dem Gemeindehaus, auf der Flucht der Glutleib (das größte Monster, das du hast).",
+        gegner: "Der Rufer als Boss und der Gelehrte (zwei Sorcerer der Thousand Sons), leere Rüstungen (Rubric Marines), Sporenlinge als Kleinvieh, Befallene aus dem Gemeindehaus, auf der Flucht der Glutleib (das größte Monster, das du hast).",
         karte: { tisch: "90x60", b: 36, t: 24, aufstellung: { x: 4, y: 20, w: 12, h: 4 },
           gelaende: [g("sporenwolke", 15, 1, 8, 6, "Herzkammer mit der Glut (verseucht)"), g("wurzeln", 9, 3, 1.5, 7, "Wurzelwand"), g("wurzeln", 27, 3, 1.5, 7, "Wurzelwand"), g("metall", 0, 11, 10, 1.5, "Glatte Wand"),
             g("labortisch", 4, 6, 4, 2, "Werktisch"), g("tank", 30, 13, 3, 3, "Glastank"), g("ruine", 22, 14, 5, 4, "Trümmer"), g("pilze", 12, 13, 2, 2, "Pilze"), g("pilze", 31, 5, 2, 2, "Pilze")],

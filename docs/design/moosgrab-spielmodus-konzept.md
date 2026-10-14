@@ -41,6 +41,13 @@ Nicht gefunden: eine offizielle Blackstone-Fortress- oder Silver-Tower-Companion
 12. **Sporenpunkte haben ein Gesicht.** Jede Stufe sagt, woran man es sieht, wie es sich anfühlt und was nach den Regeln gilt (Heldeninfo und Lage). Der Träger des Kupferanhängers bekommt bei jedem Mapwechsel einen Sporenpunkt; der Anhänger lässt sich weitergeben.
 13. **Beute landet beim Helden.** Was ein Gegner fallen lässt (Ehering am Grab), steht mit Beutewurf und „Geben an“ im Todestext. Gegenstände lassen sich zwischen Helden weitergeben; was nicht weitergegeben werden kann, sagt die Heldeninfo.
 
+### Balancing (Chris, 14.10.)
+
+Die Stufe vom Anfang des Abends gilt für jeden Kampf: Gegnerpunkte nach OPR (25/50/75/100 % der
+Heldenpunkte), Werte bleiben. Regeln, Zahlen je Kampf und die Gegnerliste für die Miniaturen:
+`docs/design/moosgrab-balancing-und-gegner.md`. Der Balancing-Test in `tests/kartenschmiede.test.ts`
+muss für jede Map grün sein.
+
 ## 3. Bildschirme
 
 ### (a) Map-Vorbereitung

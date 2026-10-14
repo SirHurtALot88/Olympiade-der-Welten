@@ -2262,7 +2262,8 @@
    "hinweise": [
     "Jeder Nahkampf gegen das Grab: L (+1 Lärm). Fernkampf: Z (+2).",
     "Wer einfach weggeht, ist raus: es folgt niemandem. Dann „Ohne Ziel weiter“.",
-    "Fällt es: Todestext an der Karte vorlesen."
+    "Fällt es: Todestext an der Karte vorlesen.",
+    "Auf Schwer und Albtraum kriechen zusätzlich Grabgänger aus den Nachbargräbern (stehen in der Gegnerliste); auf Normal und Leicht bleibt es beim Grab."
    ],
    "ereignisse": [
     "laerm-nah",
@@ -2287,6 +2288,10 @@
    "weiter": "nach-kampf",
    "setzt": {
     "grab_kampf": true
+   },
+   "verstaerkung": {
+    "id": "grabgaenger",
+    "zone": "G"
    }
   },
   "cue-02-2": {
@@ -3083,7 +3088,8 @@
     "Den Bäcker nennst du nur, wenn ihm jemand ins Gesicht gesehen hat (Taste 1) oder Hedda ihn genannt hat.",
     "Lärm weiter zählen: L Nahkampf +1, Z Fernkampf oder Zauber +2. Bei 6 erwacht der Rest: die App springt um.",
     "Die vier Knienden greifen nicht ein, solange niemand sie berührt. Greift ein Held eine an: B (sie steht auf, +1 Lärm).",
-    "Fallen alle drei: weiter, dann ist es wieder still."
+    "Fallen alle drei: weiter, dann ist es wieder still.",
+    "Auf Schwer und Albtraum stehen mehr als drei auf: wie viele, zeigt die Gegnerliste. Die übrigen knien weiter."
    ],
    "ereignisse": [
     "kniende-angreifen",
@@ -3110,7 +3116,11 @@
      "ziel": "nach-kampf"
     }
    ],
-   "weiter": "kampf-abgebrochen"
+   "weiter": "kampf-abgebrochen",
+   "verstaerkung": {
+    "id": "gemeinde",
+    "zone": "K"
+   }
   },
   "aufbau-kampf-gemeinde-friedhof": {
    "typ": "aufbau",

@@ -1055,7 +1055,7 @@
     "tough": "5",
     "role": "enemy",
     "weapons": "Blaues Feuer | 12 | A1 | Explosion(3)\nRunenstab | Nahkampf | A2 | DS(1)",
-    "passives": "Furchtlos, Langsam",
+    "passives": "Furchtlos, Langsam, Zauberer",
     "bossName": "Er führt sie",
     "bossText": "Solange er steht, folgen ihm die Rüstungsmänner, und aus freien Nischen kommen neue. Fällt er, werden sie langsam und dumpf: ruhige Tabelle für alle, kein Nachschub mehr.",
     "flavor": "Er liest noch immer. Nur nicht mehr in Büchern."
@@ -1093,10 +1093,10 @@
     "tough": "6",
     "role": "enemy",
     "weapons": "Schweres Gewehr | 24 | A2 | DS(1)\nKampfmesser | Nahkampf | A2 | ",
-    "passives": "Furchtlos, Langsam",
+    "passives": "Furchtlos",
     "flavor": "Sein Trupp ist tot. Er nicht. Noch nicht."
    },
-   "notiz": "Verbündeter, zählt nicht ins Budget. Miniatur: ein einzelner Space Marine. Eigene Werte: Q3+ D2+ Z6, kommt mit 2 Wunden auf den Tisch (die Karte zeigt sie schon an), Schweres Gewehr (vier Kartenlängen) A2 DS(1), Kampfmesser A2, Furchtlos, Langsam = 105 P. Versorgt (Taste E): Zäh +2. Er passt nicht in den Schacht: seine Rüstung ist zu breit. Führt ein Spieler zusätzlich (wer ihn gestützt hat), sonst du, vorsichtig.",
+   "notiz": "Verbündeter, zählt nicht ins Budget. Miniatur: ein einzelner Space Marine. Eigene Werte: Q3+ D2+ Z6, kommt mit 2 Wunden auf den Tisch (die Karte zeigt sie schon an), Schweres Gewehr (vier Kartenlängen) A2 DS(1), Kampfmesser A2, Furchtlos = 145 P (derselbe wie der Überlebende in Map 5). Versorgt (Taste E): Zäh +2. Er passt nicht in den Schacht: seine Rüstung ist zu breit. Führt ein Spieler zusätzlich (wer ihn gestützt hat), sonst du, vorsichtig.",
    "anblick": "Die Rüstung ist der der Gestalten ähnlich und doch nicht gleich: grau, zerkratzt, mit Zeichen, die frisch gemalt sind. Unter dem Helm ein Gesicht, bärtig, grau vor Staub, und die Augen sind wach.",
    "zustandSaetze": {
     "unverletzt": "Er steht. Das allein ist schon viel.",
@@ -2295,7 +2295,8 @@
      "ziel": "cue-04-4"
     }
    ],
-   "weiter": "cue-04-4"
+   "weiter": "cue-04-4",
+   "budgetFrei": "Absichtlich nicht zu gewinnen: Startwelle nach Budget, der Nachschub aus den Nischen ist die Uhr (vier Runden durchhalten oder fliehen)."
   },
   "cue-04-4": {
    "typ": "cue",
