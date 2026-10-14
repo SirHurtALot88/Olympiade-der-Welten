@@ -867,7 +867,13 @@
       punkteFaktor, budgetVon: (state, id) => (state.budgets || {})[id || state.schritt] || null,
       setzeHeldenpunkte: (state, p) => { state.heldenpunkte = +p || null; },
       schritt: state => map.schritte[state.schritt] || null,
-      naechsterId: state => { const s = map.schritte[state.schritt]; return s ? state.kampfZiel || ziel(state, s.weiter) : null; },
+      // Wohin „Weiter“ führt: Schritte, deren `wenn` nicht gilt, überspringt betrete auch, also hier ebenso
+      naechsterId: state => {
+        const s = map.schritte[state.schritt];
+        let id = s ? state.kampfZiel || ziel(state, s.weiter) : null;
+        for (let i = 0; i < 50 && id && map.schritte[id] && map.schritte[id].wenn && !gilt(state, map.schritte[id].wenn); i++) id = ziel(state, map.schritte[id].weiter);
+        return id;
+      },
     };
   }
 
