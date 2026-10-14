@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { billbeeConfigFromEnv } from "./client";
+import { loadBillbeeConfig } from "./credentials";
 import { syncBillbee, type BillbeeSyncReport } from "./sync";
 
 /** Hoechstens ein Billbee-Lauf gleichzeitig je Server-Prozess (Muster wie market/runner.ts). */
@@ -20,14 +20,15 @@ function state(): BillbeeSyncState {
   return globalThis.__lecBillbeeSync;
 }
 
-export function getBillbeeSyncState(): BillbeeSyncState & { configured: boolean } {
-  return { ...state(), configured: billbeeConfigFromEnv() !== null };
+export async function getBillbeeSyncState(prisma: PrismaClient): Promise<BillbeeSyncState & { configured: boolean; source: string | null }> {
+  const { config, source } = await loadBillbeeConfig(prisma);
+  return { ...state(), configured: config !== null, source };
 }
 
 /** false = laeuft schon oder nicht eingerichtet. */
-export function startBillbeeSync(prisma: PrismaClient): boolean {
+export async function startBillbeeSync(prisma: PrismaClient): Promise<boolean> {
   const s = state();
-  if (s.running || !billbeeConfigFromEnv()) return false;
+  if (s.running || !(await loadBillbeeConfig(prisma)).config) return false;
   s.running = true;
   s.lastError = null;
   syncBillbee(prisma)

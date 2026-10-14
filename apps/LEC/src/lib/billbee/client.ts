@@ -96,7 +96,9 @@ export class BillbeeClient {
         continue;
       }
       const hint =
-        res.status === 401
+        res.status === 400
+          ? " (meist ein ungueltiger oder fehlender API-Schluessel)"
+          : res.status === 401
           ? " (Benutzer, API-Passwort oder API-Schluessel stimmen nicht)"
           : res.status === 403
             ? " (API-Zugriff fuer dieses Konto nicht freigeschaltet)"
