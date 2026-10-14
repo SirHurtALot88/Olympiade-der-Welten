@@ -133,6 +133,29 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   // gegen X"), deshalb hier derselbe Titel statt eines neu erfundenen Namens.
   const stufenAnzeige = typeof round === "number" && typeof slotCount === "number" && slotCount > 0 ? `STUFE ${Math.min(round + 1, slotCount)}/${slotCount}` : null;
 
+  // ---- VERFALL AM KOeRPER (Q8, Konzeptrunde K4, 14.10.) ----------------------------------
+  // Chris zu Breaking: „Kann man das optisch irgendwie an den Charakteren zeigen? sowas wie
+  // Erschoepfung, Blut oder so?" (fable-konzept-chris-feedback-13-10.md 3.8/5.4). Drei Stufen,
+  // rein dekorativ -- KEINE Aenderung an tokenPos/Score/normOf, derselbe Vertrag wie jede
+  // andere Feld-Komponente ("Score bleibt Wahrheit", s. types.ts-Funktionskopf).
+  //
+  // WARUM score/finalMax und nicht die rohe Engine-HP: `RT` (types.ts) fuehrt fuer KEINE der
+  // zwanzig Disziplinen ein hp-Feld -- nur `score`. Die rohe HP (`u.hp`/`hpNach` in
+  // battle-mode.engine.js's baueGauntlet()) erreicht diese Komponente nicht, und einen neuen
+  // Kanal nur fuer dieses eine Feld einzuziehen waere die groessere, nicht die Q8-Aenderung.
+  // `normOf(score)` ist in dieser Datei aber bereits die Naeher-am-Brechen-Groesse -- sie
+  // bestimmt schon den Radius UND die vier Zonen GEBROCHEN/SCHMERZGRENZE/STONE FACE/MIND
+  // FORTRESS oben. Verfall liest exakt dasselbe Signal, nur an denselben Schwellen, die Chris'
+  // Bild nennt (unter 70/40/15 %) statt an den Zonen-Grenzen (1,0/0,72/0,46/0,22) -- ein reiner
+  // Leser auf bereits bestehendem Zustand, kein neuer.
+  const verfallStufe = (score: number): 0 | 1 | 2 | 3 => {
+    const n = normOf(score);
+    if (n < 0.15) return 3; // Blut + eingesackte Haltung
+    if (n < 0.4) return 2; // + Prellungen/Risse an der Kleidung
+    if (n < 0.7) return 1; // Schweiss
+    return 0;
+  };
+
   return (
     <>
       <defs>
@@ -340,6 +363,44 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
               {/* Benchmark-Chrome: Trio/Anker/Relation/Medaille/Logo/Team-Rahmen/Rang-Badge.
                   trophy={false} — Breaking trägt seine eigene Survivor-Krone. */}
               <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
+              {/* VERFALL AM KOeRPER (Q8): Schweiss ab Stufe 1, + Prellungen/Risse ab Stufe 2,
+                  + stilisiertes Blut und eine angedeutete eingesackte Haltung ab Stufe 3 --
+                  s. verfallStufe() oben fuer Herleitung/Schwellen. pointerEvents="none", reine
+                  Pixel-Deko, ruehrt tokenPos/Hover-/Klick-Geometrie nicht an. */}
+              {(() => {
+                const stufe = verfallStufe(t.score);
+                if (stufe === 0) return null;
+                return (
+                  <g pointerEvents="none">
+                    {/* Stufe 1+: Schweiss — zwei helle Pixel-Tropfen am oberen Rand. */}
+                    <g opacity={0.82}>
+                      <rect x={-r * 0.55 - 1} y={-r - 3} width={2} height={4} fill="rgba(180,220,255,.85)" />
+                      <rect x={r * 0.5 - 1} y={-r - 1} width={2} height={4} fill="rgba(180,220,255,.7)" />
+                      {!reducedMotion ? <animate attributeName="opacity" values="0.4;0.95;0.4" dur={PULSE_DUR} repeatCount="indefinite" /> : null}
+                    </g>
+                    {/* Stufe 2+: Prellungen/Risse — stilisierte Pixel-Flecken, braun-rot. */}
+                    {stufe >= 2 ? (
+                      <g opacity={0.85}>
+                        <rect x={-r * 0.3} y={r * 0.15} width={3} height={3} fill="#8a4a3a" />
+                        <rect x={r * 0.25} y={r * 0.35} width={3} height={2} fill="#7a3f32" />
+                        <rect x={-r * 0.1} y={r * 0.55} width={2} height={3} fill="#6e392f" />
+                      </g>
+                    ) : null}
+                    {/* Stufe 3: stilisiertes Pixel-Blut (kein Gore, Grenze s. Funktionskopf
+                        Q8-Kommentar) + eine angedeutete eingesackte Haltung — ein gestauchter
+                        Schatten UNTER dem Token statt eines echten Transforms auf die
+                        Hover-/Klick-Gruppe. */}
+                    {stufe >= 3 ? (
+                      <g opacity={0.9}>
+                        <ellipse cx={0} cy={r * 0.3} rx={r * 0.9} ry={r * 0.35} fill="rgba(0,0,0,.18)" />
+                        <rect x={-2} y={r * 0.7} width={2} height={5} fill="var(--nl-risk)" />
+                        <rect x={2} y={r * 0.78} width={2} height={4} fill="var(--nl-risk)" />
+                        <rect x={-r * 0.15} y={r * 0.85} width={2} height={3} fill="var(--nl-risk)" opacity={0.75} />
+                      </g>
+                    ) : null}
+                  </g>
+                );
+              })()}
               {(isLead && done) || isLead ? (
                 <text y={-(r + 9)} textAnchor="middle" fontSize={14}>
                   👑
