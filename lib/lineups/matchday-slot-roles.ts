@@ -244,12 +244,23 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
     roleTheme("fieldread", "Field Read", "Liest Plays über Awareness und Determination.", ["awareness", "determination"], "torment", "low", ["tactician"]),
     roleTheme("ballhawk", "Ball Hawk", "Greift Chancen über Torment und Awareness.", ["torment", "awareness"], "health", "medium", ["rogue"]),
     roleTheme("redzone", "Red Zone", "Braucht Power und Torment nahe der Linie.", ["power", "torment"], "health", "high", ["hero"]),
-    // AUSGLEICHSSLOT: die LETZTE Rolle einer Disziplin traegt in buildSlotWeightProfiles das
-    // negative Summendelta aller anderen (`finalDelta`) — ihr Profil ist damit nicht frei
-    // waehlbar, sondern das, was die fuenf davor uebrig lassen. Hier sind das health/stamina
-    // (weil linepower/redzone Power ziehen und health drainen). Der Text nennt deshalb genau
-    // die zwei Attribute, die der Slot wirklich belohnt, statt ein Wunschprofil.
-    roleTheme("lockerleader", "Locker Leader", "Haelt die Einheit über Health und Stamina.", ["health", "stamina"], "torment", "low", ["bard", "hero"]),
+    // AUSGLEICHSSLOT, JETZT KICKER/PUNTER (football-kickoff-slot-plan-14-10.md Schritt 2,
+    // Chris 14.10. wörtlich: „kanst auch einen slot machen der dazu passt"): die LETZTE Rolle
+    // einer Disziplin traegt in buildSlotWeightProfiles das negative Summendelta aller anderen
+    // (`finalDelta`) — ihr Profil ist damit nicht frei waehlbar, sondern das, was die fuenf
+    // davor uebrig lassen. Hier sind das health/stamina (weil linepower/redzone Power ziehen
+    // und health drainen) — GENAU die zwei Attribute, aus denen sich der AUSDAUER-Sub-Skill
+    // zusammensetzt (stamina 67/will 33, REC.football.rezept in battle-mode.engine.js), der
+    // bis 14.10. KEINEN mechanischen Kanal hatte. Deshalb dieser Slot und kein neuer, siebter
+    // Slot-Index: football.jeSeite ist 6 und buildGeneratedSlotRoles schneidet mit
+    // `slice(0, slotCount)` — ein Index 6 würde nie gezogen. Der Slot bleibt an Position 6
+    // (Index 5), bleibt der Ausgleichsslot (keine buildGoaltenderDelta-artige Sonderbehandlung
+    // nötig, s. matchday-slot-roles.ts, Hockey-Torwart-Abschnitt), nur umbenannt und
+    // neu beschrieben — die Motor-Rückwirkung (KICKER_SLOTS/bestimmeKicker(),
+    // resolveFieldgoal()/resolvePunt() in battle-mode.engine.js) hängt an `roleId`
+    // ("kickerpunter"), nicht an diesem Datensatz selbst. Der Text nennt weiterhin genau die
+    // zwei Attribute, die der Slot wirklich belohnt, statt ein Wunschprofil.
+    roleTheme("kickerpunter", "Kicker/Punter", "Haelt die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.", ["health", "stamina"], "torment", "low", ["overseer", "hero"]),
   ],
   eiskunstlauf: [
     roleTheme("edgecontrol", "Edge Control", "Traegt Technik über Charisma und Dexterity.", ["charisma", "dexterity"], "awareness", "medium", ["rogue", "bard"]),

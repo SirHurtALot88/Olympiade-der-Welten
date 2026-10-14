@@ -6133,7 +6133,7 @@
       {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
       {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
       {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"lockerleader",label:"Locker Leader",text:"Hält die Einheit über Health und Stamina.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
+      {id:"kickerpunter",label:"Kicker/Punter",text:"Hält die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
     ],
     "eiskunstlauf":[
       {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
@@ -10275,29 +10275,57 @@
   }
   // FIELD GOAL: Stufentabelle nach Distanz statt eines linearen Fits — reales Vorbild
   // zengm `probFieldGoal` (Football-Plan A.3, aus echten NFL-Kicking-Daten abgeleitete
-  // Stufen), hier als geglaettete Formel statt einer Yard-fuer-Yard-Tabelle. KEIN
-  // Kicker-Sub-Skill (Football-Plan D: "heute kein Kicker-Slot bei sechs Feldspielern") —
-  // die Distanz allein entscheidet, PLATZHALTER wie alles hier.
+  // Stufen), hier als geglaettete Formel statt einer Yard-fuer-Yard-Tabelle. Die Distanz
+  // bleibt die Haupt-Determinante, PLATZHALTER wie alles hier.
   // STUFENTABELLE GEGEN ECHTE NFL-2024-QUOTEN (WebSearch dieser Runde, nicht mehr die
   // aeltere zengm-Tabelle aus dem Rollout-Plan A.3 — moderne Kicker treffen deutlich
   // besser): 40-49 Yards 76,9 %, 50+ Yards 71,7 % (2024-Saison), Gesamtquote ueber alle
   // Distanzen ~85 %. Unter 40 Yards gibt es keine oeffentlich zitierte Einzelzahl aus
   // dieser Suche — dort mit der allgemein bekannten, seit Jahren stabilen NFL-Grössenordnung
   // (>95 % innerhalb 30 Yards) aufgefuellt, klar so gekennzeichnet.
-  function resolveFieldgoal(spot){
+  //
+  // KICKER/PUNTER-SLOT (football-kickoff-slot-plan-14-10.md Abschnitt 3.3, Schritt 2 des
+  // Plans — vorher stand hier "KEIN Kicker-Sub-Skill … heute kein Kicker-Slot bei sechs
+  // Feldspielern", Football-Plan D, JETZT GEBAUT). Derselbe Grundmechanismus wie Hockeys
+  // Torwart (TORWART_SLOTS/bestimmeTorwaerter() oben), aber OHNE dessen Zwangslaeufigkeit:
+  // ein Kicker/Punter ist nicht strukturell Pflicht wie ein Torwart (Field Goal/Punt liefen
+  // bis heute komplett ohne Spielerbezug) — deshalb KEIN PARADE-artiger Ruecfall auf den
+  // "besten verfuegbaren" Spieler. Ohne explizite Manager-Zuweisung (`u.slotGesetzt`) bleibt
+  // `bestimmeKicker` null, und resolveFieldgoal()/resolvePunt() rechnen dann BIT-IDENTISCH
+  // zum alten Verhalten (kein Korrekturterm) — der No-Slot-Fall bricht nicht.
+  //
+  // Mit gesetztem Slot lesen beide Formeln `kicker.AUSDAUER` (Sub-Skill stamina 67/will 33,
+  // REC.football.rezept weiter unten — bis heute OHNE jeden mechanischen Kanal, genau die
+  // Luecke, die dieser Slot schliesst) als kleinen, additiven Korrekturterm UM die
+  // distanzbasierte Grundchance (Field Goal) bzw. um die feste Netto-Distanz (Punt) —
+  // Primärweg bleibt in beiden Faellen das Bestehende, AUSDAUER verschiebt nur graduell
+  // (±4 Pp bei Field Goal, ±5 Yards bei Punt bei AUSDAUER 0/100 — Bandbreiten aus dem
+  // Plandokument, "klein halten", Opus-Konzeptreview-Zitat dort).
+  const KICKER_SLOTS=new Set(["kickerpunter","kicker","punter","specialteams"]);
+  function bestimmeKicker(team){
+    if(!team)return null;
+    return team.find(u=>u.slotGesetzt&&u.slotId&&KICKER_SLOTS.has(u.slotId))||null;
+  }
+  const FG_AUSDAUER_KORREKTUR=0.0008;   // (AUSDAUER-50)*0,0008 -> ±4 Pp bei AUSDAUER 0/100
+  const PUNT_AUSDAUER_KORREKTUR=0.1;    // (AUSDAUER-50)*0,1    -> ±5 Yards bei AUSDAUER 0/100
+  function resolveFieldgoal(spot,kicker){
     const kickDistanz=spot+17;
     let chance;
     if(kickDistanz<30)chance=0.97;
     else if(kickDistanz<40)chance=0.93;
     else if(kickDistanz<50)chance=0.769;
     else chance=0.717;
+    if(kicker)chance=Math.max(0.05,Math.min(0.99,chance+(kicker.AUSDAUER-50)*FG_AUSDAUER_KORREKTUR));
     return {typ:"fg",erfolg:rr()<chance,distanz:kickDistanz};
   }
-  function resolvePunt(spot,netto){ return {typ:"punt",spot,yards:netto}; }
+  function resolvePunt(spot,netto,punter){
+    const yards=punter?netto+(punter.AUSDAUER-50)*PUNT_AUSDAUER_KORREKTUR:netto;
+    return {typ:"punt",spot,yards};
+  }
   function loeseFootballZug(spielTyp,fb){
     const off=FSTEAM[fb.side], def=FSTEAM[1-fb.side];
-    if(spielTyp==="fg")return resolveFieldgoal(fb.spot);
-    if(spielTyp==="punt")return resolvePunt(fb.spot,fb.puntNetto);
+    if(spielTyp==="fg")return resolveFieldgoal(fb.spot,bestimmeKicker(off));
+    if(spielTyp==="punt")return resolvePunt(fb.spot,fb.puntNetto,bestimmeKicker(off));
     if(spielTyp==="lauf")return resolveLauf(off,def);
     return resolvePass(off,def,fb.down,fb.toGo,spielTyp);
   }
