@@ -763,6 +763,28 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     expect(s.schritt).toBe("kampf-gemeinde");
   });
 
+  it("lässt Beute vom Grab fallen und Gegenstände wie den Anhänger zwischen Helden wandern", () => {
+    type M = Motor & { springe(s: Spielstand, id: string): void; reiche(s: Spielstand, v: string, i: number, a: string): void; reicheMerkmal(s: Spielstand, f: string, a: string): void;
+      gibBeute(s: Spielstand, h: string, x: string): void; heldenInfo(s: Spielstand, h: string): unknown[] };
+    const m = motor2() as unknown as M;
+    const s = m.neu({ uebernahme: { leisten: {}, flags: { anhaenger: true, anhaenger_traeger: "Krieger" } } });
+    m.springe(s, "kampf-grab");
+    const grab = (s as unknown as { gegner: Array<{ id: string; uid: string; zaeh: number }> }).gegner.find(g => g.id === "grab")!;
+    m.schaden(s, grab.uid, grab.zaeh);
+    const tod = s.letzte.find(e => e.id === `tod:${grab.uid}`) as unknown as { beutewurf: boolean; beute: string[] };
+    expect(tod.beutewurf).toBe(true);
+    expect(tod.beute).toEqual(["Ehering vom zuckenden Grab"]);
+    m.gibBeute(s, "Schurke", tod.beute[0]);
+    m.reiche(s, "Schurke", 0, "Kleriker");
+    const inv = (s as unknown as { inventar: Record<string, string[]> }).inventar;
+    expect(inv.Schurke).toEqual([]);
+    expect(inv.Kleriker).toEqual(["Ehering vom zuckenden Grab"]);
+    m.reicheMerkmal(s, "anhaenger_traeger", "Waldläufer");
+    expect(s.flags.anhaenger_traeger).toBe("Waldläufer");
+    expect(m.heldenInfo(s, "Krieger").length).toBe(0);
+    expect(m.heldenInfo(s, "Waldläufer").length).toBe(1);
+  });
+
   it("übernimmt Anhänger und Atemzug aus Map 1", () => {
     const m1 = motor(), s1 = m1.neu();
     s1.flags.anhaenger = true; s1.flags.anhaenger_traeger = "Krieger"; s1.leisten.atemzug.wert = 2;

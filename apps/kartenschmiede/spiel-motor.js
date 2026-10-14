@@ -415,7 +415,8 @@
         if (def.tod) {
           setze(state, def.tod.setzt);
           aendere(state, def.tod.leisten);
-          state.letzte.push({ id: `tod:${uid}`, name: `${anzeigeName(g)} fällt`, vorlesen: def.tod.vorlesen || "", gmNotiz: def.tod.gmNotiz || "", art: "tod" });
+          state.letzte.push({ id: `tod:${uid}`, name: `${anzeigeName(g)} fällt`, vorlesen: def.tod.vorlesen || "", gmNotiz: def.tod.gmNotiz || "", art: "tod",
+            beutewurf: !!def.tod.beutewurf, beute: def.tod.beute || [] });
         }
       }
       pruefeKampf(state);
@@ -665,6 +666,28 @@
       notiere(state, `${held} bekommt ${sache}`);
       state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text: `${held} bekommt ${sache}`, leisten: [], flags: [] });
     }
+    // Ein Held gibt einem anderen etwas aus seinem Inventar
+    function reiche(state, von, index, an) {
+      const liste = state.inventar[von];
+      if (!liste || !liste[index] || !an || an === von) return;
+      merke(state);
+      const [sache] = liste.splice(index, 1);
+      (state.inventar[an] = state.inventar[an] || []).push(sache);
+      const text = `${von} gibt ${sache} an ${an}`;
+      notiere(state, text);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text, leisten: [], flags: [] });
+    }
+    // Was ein Held an sich trägt (heldenInfo, z. B. der Anhänger) wandert zu einem anderen: das Flag zeigt dann auf ihn
+    function reicheMerkmal(state, flag, an) {
+      const h = (map.heldenInfo || []).find(x => x.flag === flag);
+      if (!h || !h.weitergeben || !an) return;
+      merke(state);
+      const von = state.flags[flag];
+      state.flags[flag] = an;
+      const text = `${von} gibt ${h.name} an ${an}`;
+      notiere(state, text);
+      state.log.push({ runde: state.runde + 1, schritt: state.schritt, art: "beute", text, leisten: [], flags: [flag] });
+    }
     function benutze(state, held, index) {
       const liste = state.inventar[held];
       if (!liste || !liste[index]) return;
@@ -803,7 +826,7 @@
     }
 
     return {
-      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo,
+      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,

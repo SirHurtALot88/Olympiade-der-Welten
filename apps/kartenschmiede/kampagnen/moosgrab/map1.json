@@ -114,7 +114,7 @@
    },
    {
     "titel": "Keine Rast",
-    "text": "In Map 1 gibt es keine Rast: Die Frau stirbt, wenn die Helden zögern, und die Erblühte kommt direkt nach den Sporenlingen. Erst am Ende der Map: Wunden und Power zurück, Atemzug +1."
+    "text": "In Map 1 gibt es keine Rast: Die Frau stirbt, wenn die Helden zögern, die Erblühte kommt direkt nach den Sporenlingen, und im Sporenwald schläft niemand. Am Ende der Map gibt es nur die OPR-Erholung: 3 Wunden und 3 Power je Held."
    }
   ],
   "ziele": [
@@ -2064,9 +2064,7 @@
    "leisten": {
     "atemzug": 1
    },
-   "zuruecksetzen": [
-    "Wunden und Power aller Helden"
-   ],
+   "zuruecksetzen": [],
    "folgen": [
     {
      "wenn": {
@@ -2189,16 +2187,14 @@
     }
    ],
    "notieren": [
-    "Atemzug-Leiste (Stand nach +1)",
-    "Wer trägt den Anhänger",
-    "Sporenpunkte je Held (name_verraten → 1)",
     "Budget je Held +10 im Reiter Gruppe eintragen"
    ],
    "weiter": null,
    "setzt": {
     "aufbruch_kapelle": true
    },
-   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen, damit niemand mit einem Fragezeichen nach Hause geht: „Der Weg ins Dorf führt an der Kapelle vorbei. Das Zeichen auf dem Anhänger ist ihres. Nächstes Mal steht ihr davor.“"
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen, damit niemand mit einem Fragezeichen nach Hause geht: „Der Weg ins Dorf führt an der Kapelle vorbei. Das Zeichen auf dem Anhänger ist ihres. Nächstes Mal steht ihr davor.“",
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, gilt als gefallen: Er ist in der nächsten Map wieder dabei, würfelt aber auf der Verletzungstabelle. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort."
   }
  },
  "heldenInfo": [
@@ -2210,7 +2206,9 @@
    },
    "name": "Kupferanhänger",
    "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
-   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt."
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt.",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: der Sporenpunkt beim Mapwechsel und der Wurf in Kämpfen gehen auf ihn über."
   }
  ]
 }

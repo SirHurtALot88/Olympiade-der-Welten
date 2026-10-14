@@ -153,7 +153,7 @@
    },
    {
     "titel": "Rast",
-    "text": "Rasten geht nur in der Krypta, einmal, solange oben niemand wach ist (Taste V): jeder Held 3 Wunden und 3 Power zurück, Atemzug +1. Sonst drängt die Zeit."
+    "text": "Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort. Hier: die Krypta, einmal, solange oben niemand wach ist (Taste V). Alle Wunden und alle Power zurück, Atemzug +1. Auf dem Friedhof und in der Kapelle rastet niemand."
    }
   ],
   "ziele": [
@@ -789,6 +789,11 @@
    "start": false,
    "text": "Das Innere der Kapelle steht auf dem Tisch (es wird dort gekämpft).",
    "wirktIn": "map2"
+  },
+  "fenster_gesehen": {
+   "start": false,
+   "text": "Jemand hat durchs Fenster in die Kapelle gesehen.",
+   "wirktIn": "map2"
   }
  },
  "audio": {
@@ -1057,10 +1062,14 @@
    },
    "tod": {
     "vorlesen": "Die Hand öffnet sich und bleibt offen. Der Ring rutscht vom Finger und fällt in die lockere Erde. Dann ist es still, und ihr seht, dass die Erde um das Grab von innen aufgeworfen ist, nicht von außen.",
-    "gmNotiz": "Figur vom Tisch. Kein Effekt. Der Ring ist Beute (Vorschlag: ein Beutewurf, oder den Ring als Erinnerung für Map 3 geben, dort sucht die Wirtin ihren Mann). Jeder Nahkampf hier hat Lärm gekostet: Leiste prüfen.",
+    "gmNotiz": "Figur vom Tisch. Beute: ein Beutewurf, und der Ehering geht an einen Helden (Knöpfe unten). In Map 3 sucht die Wirtin ihren Mann: der Ring ist sein. Jeder Nahkampf hier hat Lärm gekostet: Leiste prüfen.",
     "setzt": {
      "grab_still": true
-    }
+    },
+    "beutewurf": true,
+    "beute": [
+     "Ehering vom zuckenden Grab"
+    ]
    },
    "anblick": "Ein Arm, grau bis zum Ellenbogen, am Finger ein Ehering. Die Hand dreht sich jedes Mal dorthin, wo jemand auftritt."
   },
@@ -1320,12 +1329,13 @@
    },
    "vorlesen": "Die Hand schnappt zu. Sie hat auf einen Schritt gewartet.",
    "gmNotiz": "Kampf gegen das Grab. Wer einfach weitergeht, kämpft nicht: es folgt niemandem. Jeder Nahkampf dagegen: Taste L (+1 Lärm).",
-   "springe": "aufbau-kampf-grab"
+   "springe": "aufbau-kampf-grab",
+   "marker": "G"
   },
   "fenster": {
    "name": "Durchs Fenster spähen (linke Seite der Kapelle)",
    "gruppe": "Untersuchen",
-   "kurz": "Fenster spähen",
+   "kurz": "Fenster: hineinsehen",
    "taste": "5",
    "marker": "fenster:F",
    "einmal": true,
@@ -1345,8 +1355,11 @@
      }
     ]
    },
-   "gmNotiz": "Jetzt das Innere aufbauen (die App springt zum Aufbau und danach zurück nach draußen).",
-   "springe": "aufbau-innen"
+   "gmNotiz": "Was drinnen ist (für dich, nichts aufbauen): sieben Kniende in zwei Reihen mit dem Rücken zur Haupttür, vorn der Altar mit einer Kerze, Bänke links und rechts, rechts neben dem Altar die Sakristei-Tür. Jetzt entscheiden die Spieler: hinein durch die Tür (H), durchs Fenster (E), mit Schlüssel durch die Sakristei (K), oder draußen weiter.",
+   "setzt": {
+    "inneres_aufgebaut": true,
+    "fenster_gesehen": true
+   }
   },
   "turm": {
    "name": "Den Glockenturm ansehen (rechts oben)",
@@ -1379,8 +1392,8 @@
    "marker": "T",
    "einmal": true,
    "kosten": "Held in Kontakt mit der Tür, eine Bewegung",
-   "vorlesen": "Die Tür knarrt. Laut. Drinnen setzt das Flüstern für einen Atemzug aus. Dann geht es weiter, als wäre nichts.",
-   "gmNotiz": "Lärm +1. Danach Cue 02-2 und das Innere aufbauen, falls es noch nicht steht.",
+   "vorlesen": "Die Tür knarrt. Laut. Drinnen setzt das Flüstern für einen Atemzug aus, sieben Rücken werden steif. Dann geht es weiter, als wäre nichts.",
+   "gmNotiz": "Lärm +1. Wer durch die Tür kommt, steht hinter allen, mit Abstand: im ersten Zug drinnen kein Lärm extra. Danach Cue 02-2.",
    "leisten": {
     "laerm": 1
    },
@@ -1392,17 +1405,21 @@
   "fenster-einstieg": {
    "name": "Durchs zerbrochene Fenster hinein",
    "gruppe": "Wege",
-   "kurz": "Fenster",
+   "kurz": "Fenster: einsteigen",
    "taste": "E",
    "marker": "fenster:F",
    "einmal": true,
    "kosten": "Held in Kontakt mit der Wand, die ganze Bewegung (schwieriges Gelände)",
-   "vorlesen": "Glas knirscht unter dem Stiefel, aber leise. Drinnen riecht es nach nassem Brot und kalter Kerze.",
-   "gmNotiz": "Kein Lärm. Wer hier durchsteigt, braucht seine ganze Bewegung dafür. Danach Cue 02-2.",
+   "vorlesen": "Glas knirscht unter dem Stiefel, aber leise. Ihr steigt über das Sims und steht zwischen den Bänken, eine Armlänge hinter der letzten Reihe. Eine der Gestalten dreht den Kopf zur Seite, zu dem Geräusch. Dann flüstert sie weiter.",
+   "gmNotiz": "Kein Lärm, aber ihr seid mitten unter ihnen: Wer durchs Fenster kommt, steht im schwierigen Gelände (Bänke) direkt hinter der letzten Reihe. Wer hier im ersten Zug läuft oder kämpft: +1 Lärm extra. Danach Cue 02-2.",
    "setzt": {
     "drinnen": true
    },
-   "springe": "cue-02-2"
+   "springe": "cue-02-2",
+   "nurWenn": {
+    "flag": "fenster_gesehen",
+    "ist": true
+   }
   },
   "sakristei": {
    "name": "Durch die Sakristei hinein (mit Schlüssel)",
@@ -1417,7 +1434,7 @@
    },
    "kosten": "Held in Kontakt mit der Sakristei-Tür, eine Bewegung",
    "vorlesen": "Der Schlüssel dreht sich ohne Widerstand. Ein schmaler Raum, Talare an Haken, ein Vorhang. Dahinter, direkt daneben, der Altar, und davor, mit dem Rücken zu euch, sieben kniende Gestalten. Sie flüstern.",
-   "gmNotiz": "Kein Lärm. Der Held steht direkt neben dem Altar. Danach Cue 02-2.",
+   "gmNotiz": "Kein Lärm. Der Held steht direkt neben dem Altar, vor den Knienden: Sie sehen ihn nicht, solange er nicht vor sie tritt. Danach Cue 02-2.",
    "setzt": {
     "drinnen": true
    },
@@ -1906,7 +1923,7 @@
    },
    "kosten": "Nur einmal, nur solange oben niemand wach ist. Kostet Zeit: Atemzug +1.",
    "vorlesen": "Die Krypta ist der einzige Ort in Moosgrab, an dem niemand flüstert. Ihr lehnt euch an die Särge. Für eine Stunde ist es still, nur die Kerze knistert. Oben flüstern sie weiter.",
-   "gmNotiz": "Rast: Jeder Held heilt 3 Wunden und bekommt 3 Power zurück (wie am Ende einer OPR-Mission). Atemzug +1 ist verbucht.",
+   "gmNotiz": "Echte Rast an einem sicheren Ort: Jeder Held heilt alle Wunden und bekommt alle Power zurück. Zustände und Verletzungen bleiben. Atemzug +1 ist verbucht.",
    "leisten": {
     "atemzug": 1
    }
@@ -1954,7 +1971,7 @@
    "typ": "vorbereitung",
    "titel": "Was aus Map 1 mitkommt",
    "checkliste": [
-    "Wunden und Power der Helden zurückgesetzt (die Rast zwischen den Maps)",
+    "Wunden und Power: Am Ende von Map 1 hat jeder Held 3 Wunden und 3 Power zurückbekommen (OPR), nicht alles. Heldenbögen prüfen",
     "Zählstein Lärm auf 0 vor die Spieler legen"
    ],
    "hinweis": "Alles darunter hat die App aus dem Spielstand von Map 1 gezogen und schon verbucht (Geduld, Sporenpunkte). Du musst nichts nachfragen und nichts nachtragen.",
@@ -2125,13 +2142,13 @@
   },
   "spieler-draussen": {
    "typ": "spieler",
-   "titel": "Draußen",
+   "titel": "Draußen auf dem Friedhof",
    "zeitlimit": 12,
    "runden": true,
    "text": "Die Spieler erkunden den Friedhof. Sie suchen, schauen, wählen ihren Weg hinein. Du zählst Lärm. Rundenende: R.",
    "hinweise": [
     "Marker 1 und 2, das Grab, das Fenster und der Turm: jeweils Grundtext, dann würfelt der Spieler, dann die Stufen.",
-    "Wege hinein: Haupttür H (+1 Lärm), Fenster E (leise, aber die ganze Bewegung), Sakristei K (nur mit Schlüssel von Marker 2, leise, direkt neben dem Altar).",
+    "Erst schauen, dann gehen: Fenster hineinsehen (5) zeigt das Innere, danach erst einsteigen (E, leise, aber mitten unter ihnen). Haupttür H (+1 Lärm, hinter allen), Sakristei K (nur mit Schlüssel von Marker 2, leise, direkt neben dem Altar).",
     "Lärm: L Nahkampf +1, Z Fernkampf oder Zauber +2, T Tür aufbrechen +2. Das Grab greift nur an, wer direkt daneben steht (Taste 4).",
     "Drei Gruppen Gräber, ein zuckendes: Es ist das, zu dem die Helden zuerst gehen. Bei allen anderen passiert nichts (Taste 7, nur Stimmung).",
     "Das Glockenseil erwähnst du, wenn jemand den Turm ansieht. Du bietest es nicht an. Zieht jemand: G.",
@@ -2245,10 +2262,6 @@
   "aufbau-innen": {
    "typ": "aufbau",
    "titel": "Drinnen in der Kapelle",
-   "wenn": {
-    "flag": "inneres_aufgebaut",
-    "ist": false
-   },
    "skizze": "alles",
    "tisch": [
     "7 kniende Gestalten in zwei Reihen, mit dem Rücken zur Haupttür",
@@ -2261,23 +2274,12 @@
     "inneres_aufgebaut": true
    },
    "hinweis": "Nichts aufbauen, solange niemand kämpft. Die Spieler sagen, wo sie hingehen; du beschreibst es. Laut wird es über die Lärm-Tasten.",
-   "weiter": [
-    {
-     "wenn": {
-      "flag": "drinnen",
-      "ist": true
-     },
-     "ziel": "spieler-drinnen"
-    },
-    {
-     "ziel": "spieler-draussen"
-    }
-   ],
+   "weiter": "spieler-drinnen",
    "nurErzaehlen": true
   },
   "spieler-drinnen": {
    "typ": "spieler",
-   "titel": "Drinnen",
+   "titel": "Drinnen in der Kapelle",
    "zeitlimit": 8,
    "runden": true,
    "text": "Die Spieler sind in der Kapelle. Sie schleichen, schauen, hören hin, untersuchen den Altar. Du zählst Lärm. Rundenende: R.",
@@ -3367,9 +3369,7 @@
    "leisten": {
     "atemzug": 1
    },
-   "zuruecksetzen": [
-    "Wunden und Power aller Helden"
-   ],
+   "zuruecksetzen": [],
    "folgen": [
     {
      "wenn": {
@@ -3507,8 +3507,7 @@
     }
    ],
    "notieren": [
-    "Atemzug-Leiste (Stand nach +1)",
-    "Sporenpunkte je Held (Namen an der Falltür, Lene nachgesprochen, Name aus Map 1)",
+    "Sporenpunkte stehen an den Heldenchips (die App trägt sie in Map 3 mit)",
     "Welcher Weg: Krypta-Gang oder Hauptweg",
     "Glocke, Lärm 3, Gemeinde wach oder gefallen",
     "Wahrheit, geschont oder belogen; Kellerschlüssel ja oder nein",
@@ -3516,7 +3515,8 @@
     "Hedda: lebt, angegriffen oder tot"
    ],
    "weiter": null,
-   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ins Dorf. Zum Brunnen. Er ist zugenagelt, Werkzeug gibt es in der Schmiede. Und keine Namen.“ Mit Kellerschlüssel: „Wer noch lebt, gehört in den Keller unter dem Gemeindehaus.“"
+   "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen: „Ins Dorf. Zum Brunnen. Er ist zugenagelt, Werkzeug gibt es in der Schmiede. Und keine Namen.“ Mit Kellerschlüssel: „Wer noch lebt, gehört in den Keller unter dem Gemeindehaus.“",
+   "erholung": "Ende der Map, wie in OPR: Jeder Held bekommt 3 Wunden und 3 Power zurück, nicht alles. Zustände und Verletzungen bleiben. Wer jetzt bewusstlos ist, gilt als gefallen: Er ist in der nächsten Map wieder dabei, würfelt aber auf der Verletzungstabelle. Ganz heilen geht nur bei einer echten Rast an einem sicheren Ort."
   }
  },
  "beimStart": [
@@ -3587,7 +3587,9 @@
    },
    "name": "Kupferanhänger",
    "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
-   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt; in Map-2-Kämpfen würfelt er am Rundenende (Taste U)."
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt; in Map-2-Kämpfen würfelt er am Rundenende (Taste U).",
+   "weitergeben": true,
+   "weitergebenInfo": "Wer ihn nimmt, trägt ihn ab jetzt: der Sporenpunkt beim Mapwechsel und der Wurf in Kämpfen gehen auf ihn über."
   }
  ]
 }

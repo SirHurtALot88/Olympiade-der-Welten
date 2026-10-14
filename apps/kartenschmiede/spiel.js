@@ -294,7 +294,9 @@
   const inventarHtml = name => {
     const liste = (stand.inventar || {})[name] || [];
     if (!liste.length) return `<p class="hint">Keine Beute.</p>`;
-    return `<ul class="sp-inventar">${liste.map((x, i) => { const g = gegenstand(x); return `<li><b>${esc(x)}</b>${g ? ` <small>${symText(g.text)}</small>` : ""} <button type="button" class="btn ghost sm" data-sp="benutzen" data-held="${esc(name)}" data-i="${i}">benutzt</button></li>`; }).join("")}</ul>`;
+    const andere = helden.filter(h => h.name !== name);
+    return `<ul class="sp-inventar">${liste.map((x, i) => { const g = gegenstand(x); return `<li><b>${esc(x)}</b>${g ? ` <small>${symText(g.text)}</small>` : ""} <button type="button" class="btn ghost sm" data-sp="benutzen" data-held="${esc(name)}" data-i="${i}">benutzt</button>
+      ${andere.length ? `<select class="sp-reichen" data-reichen="${esc(name)}" data-i="${i}" title="An einen anderen Helden geben"><option value="">geben an …</option>${andere.map(h => `<option value="${esc(h.name)}">${esc(h.name)}</option>`).join("")}</select>` : ""}</li>`; }).join("")}</ul>`;
   };
 
   // ---------- Bausteine ----------
@@ -568,7 +570,7 @@
           <h4>Beute</h4>${liste(s.beute)}<p class="sp-beutezeile"><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${beuteHtml(wuerfe.ende)}</p>
           <h4>Inventar der Helden</h4><div class="sp-inventare">${helden.map(h => `<div><b>${esc(h.name)}</b>${inventarHtml(h.name)}</div>`).join("")}</div>
           <h4>Folgen für die nächste Map</h4>${liste(motor.folgen(stand), "sp-folgen")}
-          <h4>Notieren</h4>${liste(s.notieren)}<p class="sp-gm">${esc((s.zuruecksetzen || []).join(", "))} zurücksetzen.</p>`;
+          <h4>Notieren</h4>${liste(s.notieren)}${s.erholung ? `<h4>Erholung</h4><p class="sp-text">${esc(s.erholung)}</p>` : (s.zuruecksetzen || []).length ? `<p class="sp-gm">${esc(s.zuruecksetzen.join(", "))} zurücksetzen.</p>` : ""}`;
       }
       default: return "";
     }
@@ -613,7 +615,8 @@
             <button type="button" class="btn ghost sm" data-probe="${i}" data-w="0">App würfelt</button></div>
             <small>${esc(((def.probe || {}).stufen || []).map(st => stufeName(st)).join(" · "))} · Tasten 1–6</small></div>`;
       return `<div class="sp-ev ${e.art ? `art-${e.art}` : ""}"><h4>${esc(e.name)}</h4>${vorlesen(e.vorlesen)}${gm(e.gmNotiz)}${probeHtml}
-        ${e.beutewurf ? `<p class="sp-beutezeile">${wuerfe[i] ? `Beutewurf: ${beuteHtml(wuerfe[i])}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}</div>`;
+        ${e.beutewurf ? `<p class="sp-beutezeile">${wuerfe[i] ? `Beutewurf: ${beuteHtml(wuerfe[i])}` : `<button type="button" class="btn ghost sm" data-wurf="${i}">Beutewurf W6</button>`}</p>` : ""}
+        ${(e.beute || []).map(b => { const wer = Object.entries(stand.inventar || {}).find(([, l]) => (l || []).includes(b)); return wer ? `<p class="sp-beutezeile"><b>${esc(b)}</b> ✓ bei ${esc(wer[0])}</p>` : `<p class="sp-beutezeile"><b>${esc(b)}</b> <span class="sp-beute"><span>Geben an: ${helden.map(h => `<button type="button" class="btn ghost sm" data-sp="geben" data-held="${esc(h.name)}" data-sache="${esc(b)}">${esc(h.name)}</button>`).join("")}</span></span></p>`; }).join("")}</div>`;
     };
     // Neueste zuerst; eine offene Probe bleibt immer oben offen, ältere klappen zu einer Zeile zusammen
     const alle = stand.letzte.map((e, i) => [e, i]).reverse();
@@ -647,7 +650,18 @@
     return markerVerdeckt(m, motor.aufgedeckt(stand)) ? `<p class="sp-sicht zu">🔒 Verdeckt: nicht hinlegen, nur du weißt davon. Die App deckt ihn auf, sobald er gefunden ist.</p>`
       : `<p class="sp-sicht offen">👁 Aufgedeckt: jetzt auf den Tisch legen.</p>`;
   }
-  const markerEreignis = m => Object.entries(map.ereignisse || {}).find(([, e]) => e.marker && (e.marker === m.label || e.marker === `${m.typ}:${m.label}`));
+  const amMarker = (e, m) => e.marker && (e.marker === m.label || e.marker === `${m.typ}:${m.label}`);
+  const markerEreignis = m => Object.entries(map.ereignisse || {}).find(([, e]) => amMarker(e, m));
+  // Alles, was an diesem Marker geht, genau wie in der Leiste unten: nur was der Schritt anbietet, gesperrt, was noch nicht geht
+  function markerKnoepfe(m) {
+    const s = motor.schritt(stand), imSchritt = new Set(s && s.ereignisse || []);
+    const ids = Object.entries(map.ereignisse || {}).filter(([id, e]) => amMarker(e, m) && !e.intern && imSchritt.has(id)).map(([id]) => id)
+      .filter(id => stand.ereignisse[id] || motor.ereignisErlaubt(stand, id));
+    if (!ids.length) return `<p class="hint">In diesem Schritt gibt es hier nichts zu tun.</p>`;
+    return `<div class="sp-markeraktionen">${ids.map(id => { const e = map.ereignisse[id], ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
+      return `<div><button type="button" class="btn sm ${ok ? "" : "ghost"}" data-ev="${esc(id)}" ${ok ? "" : "disabled"}>${taste(e.taste)} ${esc(kurzName(e))}${schon ? " ✓" : ""}</button>
+        ${e.kosten ? `<small>${esc(e.kosten)}</small>` : ""}${e.probe && !schon ? `<small>Mit Probe: ${esc((e.probe.stufen || []).map(st => stufeName(st)).join(" · "))}</small>` : ""}</div>`; }).join("")}</div>`;
+  }
   function tischKarte(opt = {}) {
     if (!karte || !window.KartenschmiedeSzenarien) return "";
     const aufgedeckt = motor.aufgedeckt(stand);
@@ -731,7 +745,9 @@
         <h5>Sporenpunkte</h5><p class="sp-sporen"><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="-1">−</button><b>${sp}</b><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="1">+</button>
           <small>${b.stufe ? esc(b.stufe) : "ab 1 gezeichnet, ab 3 befallen, ab 5 schwer befallen"}</small></p>
         ${sp ? `<div class="sp-befall"><h5>Wenn jemand hinsieht</h5>${sag(b.aussehen)}<p><b>Wie es sich anfühlt:</b> ${esc(b.koerper)}</p><p><b>Regel:</b> ${esc(b.regel)}</p></div>` : ""}
-        ${motor.heldenInfo(stand, id).map(x => `<h5>${esc(x.name)}</h5><p>${esc(x.text)}</p>${gm(x.gm)}`).join("")}
+        ${motor.heldenInfo(stand, id).map(x => `<h5>${esc(x.name)}</h5><p>${esc(x.text)}</p>${gm(x.gm)}${x.weitergeben
+          ? `<p class="sp-weiter">Weitergeben an: ${helden.filter(h => h.name !== id).map(h => `<button type="button" class="btn ghost sm" data-merkmal="${esc(x.flag)}" data-an="${esc(h.name)}">${esc(h.name)}</button>`).join("")}</p>${x.weitergebenInfo ? gm(x.weitergebenInfo) : ""}`
+          : gm(x.nichtWeiter || "Kann nicht weitergegeben werden.")}`).join("")}
         <h5>Beute</h5>${inventarHtml(id)}`;
     } else if (art === "f") {
       const f = map.figuren[id] || {};
@@ -745,11 +761,11 @@
       inhalt = `${def.info ? `<p>${esc(def.info)}</p>` : ""}${sag(z.satz)}${def.anblick ? `<h5>Wenn sie genauer hinsehen</h5>${sag(def.anblick)}` : ""}${motor.zusaetze(stand, def).map(x => gm(x.text)).join("")}
         <div class="sp-g-knoepfe" data-gegner="${esc(g.uid)}"><button type="button" class="btn sm" data-dmg="1">+1</button><button type="button" class="btn sm" data-dmg="2">+2</button><button type="button" class="btn ghost sm" data-dmg="-1">−1</button><button type="button" class="btn ghost sm" data-karte="1">Karte</button></div>`;
     } else if (art === "m") {
-      const e = map.ereignisse[id] || {}, ok = motor.ereignisErlaubt(stand, id), schon = stand.ereignisse[id];
-      const mk = karte.marker.find(x => e.marker === x.label || e.marker === `${x.typ}:${x.label}`);
-      kopf = `<b>${esc(e.name || id)}</b><small>${schon ? "✓ untersucht" : "noch nicht untersucht"}</small>`;
-      inhalt = `${e.wofuer ? `<p class="sp-wofuer">${esc(e.wofuer)}</p>` : ""}${mk ? gm(markerInfo(mk)) : ""}${sichtbarHtml(mk)}${e.kosten ? `<p class="hint">${esc(e.kosten)}</p>` : ""}
-        ${e.probe && !schon ? `<p class="hint">Mit Probe: ${esc((e.probe.stufen || []).map(st => stufeName(st)).join(" · "))}</p>` : ""}${ok ? `<button type="button" class="btn sm" data-ev="${esc(id)}">${schon ? "Nochmal" : "Untersuchen"} ${taste(e.taste)}</button>` : ""}`;
+      const e = map.ereignisse[id] || {}, schon = stand.ereignisse[id];
+      const mk = karte.marker.find(x => amMarker(e, x));
+      const [, , typName] = (window.KartenschmiedeSzenarien.MARKER || {})[mk ? mk.typ : ""] || ["", "", ""];
+      kopf = `<b>${esc(typName || e.name || id)}${mk && mk.label && mk.label.length <= 2 ? ` ${esc(mk.label)}` : ""}</b><small>${schon ? "✓ schon untersucht" : "noch nicht untersucht"}</small>`;
+      inhalt = `${e.wofuer ? `<p class="sp-wofuer">${esc(e.wofuer)}</p>` : ""}${mk ? gm(markerInfo(mk)) : ""}${sichtbarHtml(mk)}${mk ? markerKnoepfe(mk) : ""}`;
     } else if (art === "z") {
       const [typ, ...l] = id.split(":"), label = l.join(":");
       const mk = karte.marker.find(x => x.typ === typ && (x.label || "") === label);
@@ -1065,6 +1081,7 @@
       if (t.dataset.akt) { motor.aktiviere(stand, t.dataset.akt); spaeter(); zeige(); return; }
       if (t.dataset.verh) { verhWurf[t.dataset.verh] = motor.verhaltenWurf(stand); motor.aktiviere(stand, `g:${t.dataset.verh}`, true); spaeter(); zeige(); return; }
       if (t.dataset.sporen) { tue(() => motor.sporen(stand, t.dataset.sporen, +t.dataset.d)); return; }
+      if (t.dataset.merkmal) { const an = t.dataset.an; popup = { ...popup, tok: `held:${an}` }; tue(() => motor.reicheMerkmal(stand, t.dataset.merkmal, an)); return; }
       if (t.dataset.mod && g) {
         const uid = g.dataset.gegner, alle = ($(`spAlle-${uid}`) || {}).checked, k = t.dataset.mod;
         const gg = stand.gegner.find(x => x.uid === uid);
@@ -1126,6 +1143,7 @@
     });
     tab.addEventListener("change", e => {
       if (e.target.dataset.check && stand) { stand.checks[e.target.dataset.check] = e.target.checked; spaeter(); }
+      if (e.target.dataset.reichen && stand && e.target.value) { const t = e.target; tue(() => motor.reiche(stand, t.dataset.reichen, +t.dataset.i, t.value)); return; }
       if (e.target.dataset.wissen && stand) { const t = e.target; tue(() => motor.erfahre(stand, t.dataset.wissen, +t.dataset.i, t.checked)); }
       if (e.target.dataset.hoch && e.target.files && e.target.files[0]) ladeHoch(e.target.dataset.hoch, e.target.files[0]);
     });
