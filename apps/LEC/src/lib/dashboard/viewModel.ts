@@ -190,6 +190,12 @@ export interface SortimentMarket {
   quality: string | null;
   how: string | null;
   ekAboveMarket: boolean;
+  /** Letzter Einkaufspreis je Stueck und die Marge des heutigen VK damit (Gegenstueck zu `margin` = Wiederbeschaffung zum Marktwert). */
+  lastEk: number | null;
+  marginLastEk: number | null;
+  /** Hat sich zu (fast) diesem VK schon mehrfach verkauft: Urteil "zu teuer" entfaellt. */
+  provenByDemand: boolean;
+  soldAt: { qty: number; avg: number; days: 90 | 365 } | null;
   fetchedAt: string;
 }
 
@@ -563,6 +569,10 @@ export function buildSortimentRow(
       quality: m.matchQuality,
       how: m.how,
       ekAboveMarket: m.ekAboveMarket,
+      lastEk: m.lastEk,
+      marginLastEk: m.marginAtLastEk,
+      provenByDemand: m.provenByDemand,
+      soldAt: m.soldAtVk,
       fetchedAt: m.fetchedAt.toISOString(),
     };
   }

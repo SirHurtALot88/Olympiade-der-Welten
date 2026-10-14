@@ -5,7 +5,7 @@ import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks } f
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
     value: 2, range: null, targetMin: 7.12, targetOpt: 8.68, capped: false, marginReachable: true, margin: 0.29, status: "im_korridor", rated: true,
-    quality: "eindeutig", how: "seltenheit", ekAboveMarket: false, fetchedAt: "2026-10-12T00:00:00.000Z", ...over,
+    quality: "eindeutig", how: "seltenheit", ekAboveMarket: false, lastEk: null, marginLastEk: null, provenByDemand: false, soldAt: null, fetchedAt: "2026-10-12T00:00:00.000Z", ...over,
   };
 }
 function row(name: string, vk: number | null, m: SortimentMarket | null): SortimentRow {

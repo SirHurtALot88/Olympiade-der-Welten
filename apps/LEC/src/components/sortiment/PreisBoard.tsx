@@ -83,9 +83,9 @@ export function VerdictBadge({ row }: { row: SortimentRow }) {
   const gap = boardGap(row);
   return (
     <div className="bd-verdict">
-      <span className={`bd-pill ${v.cls}`}>
+      <span className={`bd-pill ${v.cls}`} title={m.provenByDemand && m.soldAt ? `${m.soldAt.qty} Verkäufe in ${m.soldAt.days} Tagen im Schnitt für ${eur(m.soldAt.avg)}: der Markt nimmt den Preis` : undefined}>
         <i />
-        {v.label}
+        {m.provenByDemand ? "verkauft sich so" : v.label}
       </span>
       {gap && gap.target !== null && (
         <span className="bd-delta">

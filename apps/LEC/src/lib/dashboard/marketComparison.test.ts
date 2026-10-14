@@ -79,6 +79,32 @@ describe("buildMarketComparisonRow", () => {
     expect(buildMarketComparisonRow(article({ currentVk: 6.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("im_korridor");
   });
 
+  // Nachfrage-Beweis: 12,99 € bei Marktwert 2,00 € (Zielspanne 7,125 bis 8,684) waere "zu teuer" - hat sich der
+  // Artikel in 90 Tagen aber 3-mal im Schnitt fuer 12,99 € verkauft, nimmt der Markt den Preis.
+  it("Preis mit Verkaeufen zu genau diesem VK ist nicht 'zu teuer' (Nachfrage-Beweis)", () => {
+    const w = (qty: number, avgPrice: number) => ({ qty, revenue: qty * avgPrice, ek: qty * 4, ebayFeeTotal: 0, shippingCost: 0, dbI: 0, dbII: 0, fixedCostShare: 0, avgPrice, rank: null });
+    const ohne = buildMarketComparisonRow(article({ currentVk: 12.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(ohne.status).toBe("zu_teuer");
+    const mit = buildMarketComparisonRow(article({ currentVk: 12.99, currentEk: 4, windows: { "90": w(3, 12.99), "365": w(3, 12.99) } }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(mit.status).toBe("im_korridor");
+    expect(mit.provenByDemand).toBe(true);
+    expect(mit.soldAtVk).toEqual({ qty: 3, avg: 12.99, days: 90 });
+    expect(mit.deltaPercent).toBe(0);
+    // zwei Gegenproben: zu wenige Verkaeufe / im Schnitt deutlich unter dem heutigen VK
+    expect(buildMarketComparisonRow(article({ currentVk: 12.99, windows: { "90": w(1, 12.99) } }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_teuer");
+    expect(buildMarketComparisonRow(article({ currentVk: 12.99, windows: { "90": w(5, 8) } }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_teuer");
+    // zu guenstig bleibt zu guenstig, auch bei guten Verkaeufen (dort liegt Geld auf dem Tisch)
+    expect(buildMarketComparisonRow(article({ currentVk: 4.99, windows: { "90": w(9, 4.99) } }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_guenstig");
+  });
+
+  it("zwei Kostenbasen: Marge zum Marktwert (Wiederbeschaffung) und zum letzten EK", () => {
+    // Zuletzt guenstig gekauft (EK 1,00 €), heute Marktwert 4,00 €: gegen den letzten EK ist die Marge hoeher.
+    const row = buildMarketComparisonRow(article({ currentVk: 12.99, currentEk: 1 }), quote({ priceAvg7: 4 }), DEFAULT_COST_SETTINGS, null);
+    expect(row.lastEk).toBe(1);
+    expect(row.marginAtLastEk!).toBeGreaterThan(row.marginAtMarket!);
+    expect(row.marginAtMarket!).toBeGreaterThan(0);
+  });
+
   it("teure Karte: Marktdeckel 1,5-fach, 69,99 € bei Marktwert 47,83 € ist im Rahmen, 229,99 € bei 121,47 € ist zu teuer", () => {
     const dominus = buildMarketComparisonRow(article({ currentVk: 69.99 }), quote({ priceAvg7: 47.83 }), DEFAULT_COST_SETTINGS, null);
     expect(dominus.status).toBe("im_korridor");

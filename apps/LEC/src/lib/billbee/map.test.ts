@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapOrders, mapProduct, titleOf } from "./map";
+import { extractSales, mapOrders, mapProduct, titleOf } from "./map";
 
 const NOW = new Date("2026-10-13T12:00:00Z");
 
@@ -59,5 +59,23 @@ describe("mapOrders", () => {
     expect(by("90", B)).toMatchObject({ qty: 3, revenue: 9, ek: 4.5 });
     // 365 Tage: 2+1+4 Stk, 34,5 EUR
     expect(by("365", A)).toMatchObject({ qty: 7, revenue: 34.5, ek: 14 });
+  });
+});
+
+describe("extractSales", () => {
+  it("liefert je Bestellposition Datum, Menge und Preis je Stueck, ohne Stornos", () => {
+    const sales = extractSales(
+      [
+        { CreatedAt: "2026-10-10T08:00:00Z", State: 4, OrderNumber: "1001", OrderItems: [item(A, 2, 25.98), item(B, 1, 4.5)] },
+        { CreatedAt: "2026-10-11T08:00:00Z", State: 8, OrderItems: [item(A, 9, 99)] },
+        { CreatedAt: "kaputt", State: 4, OrderItems: [item(A, 1, 5)] },
+      ],
+      { excludeStates: [8] }
+    );
+    expect(sales).toHaveLength(2);
+    expect(sales[0]).toMatchObject({ qty: 2, orderRef: "1001" });
+    expect(sales[0].unitPrice).toBeCloseTo(12.99, 5);
+    expect(sales[0].soldAt.toISOString()).toBe("2026-10-10T08:00:00.000Z");
+    expect(sales[1]).toMatchObject({ qty: 1, unitPrice: 4.5 });
   });
 });

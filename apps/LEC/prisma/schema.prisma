@@ -56,6 +56,7 @@ model Article {
   aliases      ArticleAlias[]
   saleWindows  SaleWindow[]
   purchases    Purchase[]
+  sales        Sale[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -177,6 +178,21 @@ model MarketPrice {
   variants     Int?
 
   @@index([articleId, source])
+}
+
+/// Einzelverkauf (eine Bestellposition) aus der Billbee-API: Datum, Menge, Preis je Stueck (brutto).
+/// Wird je Abruf fuer die letzten 365 Tage ersetzt (source "billbee-api").
+model Sale {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  soldAt    DateTime
+  qty       Float
+  unitPrice Float
+  orderRef  String?
+  source    String
+
+  @@index([articleId, soldAt])
 }
 
 /// Zugangsdaten zu Fremddiensten (Billbee), verschluesselt (AES-256-GCM, Schluessel aus LEC_AUTH_SECRET).

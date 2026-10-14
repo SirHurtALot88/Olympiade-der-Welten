@@ -5,7 +5,7 @@ import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
 import { loadActiveCostSettings } from "../dashboard/queries";
 import { BillbeeClient, type BillbeeConfig } from "./client";
 import { loadBillbeeConfig } from "./credentials";
-import { LOOKBACK_DAYS, mapOrders, mapProduct, type MasterProduct } from "./map";
+import { LOOKBACK_DAYS, extractSales, mapOrders, mapProduct, type MasterProduct } from "./map";
 
 /**
  * Zieht Artikelstamm (Bestand, VK, EK) und Bestellungen der letzten 365 Tage aus der Billbee-API
@@ -29,6 +29,8 @@ export interface BillbeeSyncReport {
   /** Artikel, die der Stamm als deaktiviert fuehrt oder die gar nicht mehr darin stehen -> "ausgelaufen". */
   deactivated: number;
   orders: number;
+  /** Einzelverkaeufe (Bestellpositionen), die gespeichert wurden. */
+  sales: number;
   windows: { window: string; articles: number; units: number }[];
   startedAt: string;
   finishedAt: string;
@@ -78,6 +80,16 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     masters.map((m) => m.row)
   );
 
+  // Einzelverkaeufe (Datum, Menge, Preis): ersetzt jeden Abruf die der letzten 365 Tage.
+  const excludeStates = opts.excludeStates ?? excludeStatesFromEnv();
+  const idByName = new Map((await prisma.article.findMany({ select: { id: true, nameNormalized: true } })).map((a) => [a.nameNormalized, a.id]));
+  const saleRows = extractSales(orders, { excludeStates }).flatMap((r) => {
+    const articleId = idByName.get(r.nameNormalized);
+    return articleId ? [{ articleId, soldAt: r.soldAt, qty: r.qty, unitPrice: r.unitPrice, orderRef: r.orderRef, source: "billbee-api" }] : [];
+  });
+  await prisma.sale.deleteMany({ where: { source: "billbee-api" } });
+  for (let i = 0; i < saleRows.length; i += 500) await prisma.sale.createMany({ data: saleRows.slice(i, i + 500) });
+
   // Alles, was der Stamm nicht (mehr) aktiv fuehrt, ist ausgelaufen.
   let deactivated = 0;
   if (masters.length > 0) {
@@ -101,6 +113,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     products: masters.length,
     deactivated,
     orders: orders.length,
+    sales: saleRows.length,
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,
     finishedAt: new Date().toISOString(),

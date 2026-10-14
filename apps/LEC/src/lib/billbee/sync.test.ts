@@ -61,9 +61,18 @@ describe("syncBillbee", () => {
     const w30 = await db.prisma.saleWindow.findFirst({ where: { articleId: a.id, window: "30" } });
     expect(w30).toMatchObject({ qty: 2, revenue: 11, ek: 5, dbI: 6 });
 
+    // Einzelverkaeufe: eine Bestellposition = ein Datensatz, mit Datum und Preis je Stueck
+    expect(report.sales).toBe(1);
+    const sales = await db.prisma.sale.findMany({ where: { articleId: a.id } });
+    expect(sales).toHaveLength(1);
+    expect(sales[0]).toMatchObject({ qty: 2, source: "billbee-api" });
+    expect(sales[0].unitPrice).toBeCloseTo(5.5, 5);
+    expect(sales[0].soldAt.toISOString()).toBe("2026-10-05T10:00:00.000Z");
+
     // zweiter Lauf: idempotent, genau ein Snapshot je Fenster
     await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn: fakeBillbee([{ Id: 1, SKU: "A", Title: A, Price: 6.99, CostPrice: 2.5, StockCurrent: 3 }]) });
     expect(await db.prisma.saleWindow.count({ where: { articleId: a.id } })).toBe(3);
+    expect(await db.prisma.sale.count({ where: { articleId: a.id } })).toBe(1);
     expect((await db.prisma.article.findUnique({ where: { id: a.id } }))!.stock).toBe(3);
   });
 });
