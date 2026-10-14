@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 interface Status {
   configured: boolean;
+  source: string | null;
   running: boolean;
   lastError: string | null;
   lastReport: {
@@ -22,6 +23,9 @@ const fmtTime = (iso: string) =>
 export function BillbeeSyncCard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ user: "", password: "", apiKey: "" });
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -54,7 +58,31 @@ export function BillbeeSyncCard() {
     }
   }
 
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billbee/credentials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message ?? `HTTP ${res.status}`);
+      setForm({ user: "", password: "", apiKey: "" });
+      setEditing(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const r = status?.lastReport;
+  const showForm = status !== null && (!status.configured || editing);
+  const input = { width: "100%", padding: "8px 10px", marginTop: 4, borderRadius: 8, border: "1px solid var(--line)", background: "var(--panel2)", color: "inherit", font: "inherit" } as const;
   return (
     <div className="card" style={{ padding: "15px 16px 16px" }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Billbee: Artikel, Bestand und Verkäufe</div>
@@ -63,9 +91,48 @@ export function BillbeeSyncCard() {
         365 Tage neu. Läuft beim Start und alle 3 Stunden. Die Datei-Importe bleiben als Rückfall.
       </div>
 
-      {status && !status.configured && (
+      {showForm && (
+        <form onSubmit={save} autoComplete="off" style={{ display: "grid", gap: 10, marginBottom: 12, fontSize: 12 }}>
+          <div style={{ color: "var(--muted)", lineHeight: 1.5 }}>
+            Einmal eintragen, danach holt die App die Daten selbst. Die Werte werden vor dem Speichern bei Billbee geprüft, verschlüsselt abgelegt
+            und nie wieder angezeigt.
+          </div>
+          <label>
+            Billbee-Login (E-Mail)
+            <input style={input} type="email" required autoComplete="off" value={form.user} onChange={(e) => setForm({ ...form, user: e.target.value })} />
+          </label>
+          <label>
+            API-Passwort (Billbee: Einstellungen, Billbee API)
+            <input style={input} type="password" required autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+          </label>
+          <label>
+            API-Schlüssel (aus der Mail von Billbee)
+            <input style={input} type="password" required autoComplete="new-password" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="submit" className="chip" disabled={saving}>
+              {saving ? "Prüfe …" : "Speichern und testen"}
+            </button>
+            {editing && (
+              <button type="button" className="chip" onClick={() => setEditing(false)}>
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+      {status?.configured && !editing && (
         <div style={{ fontSize: 12, marginBottom: 10 }}>
-          Noch nicht eingerichtet: auf dem Server fehlen <code>BILLBEE_API_KEY</code>, <code>BILLBEE_USER</code> und <code>BILLBEE_PASSWORD</code>.
+          <b className="up">Verbunden</b>
+          {status.source === "env" ? " (über die Server-Umgebung)" : ""}
+          {status.source === "app" && (
+            <>
+              {" · "}
+              <button type="button" className="chip" onClick={() => setEditing(true)}>
+                Zugang ändern
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -86,7 +153,7 @@ export function BillbeeSyncCard() {
         </div>
       )}
 
-      {status?.configured && (
+      {status?.configured && !editing && (
         <button type="button" className="chip" onClick={() => void start()} disabled={status.running}>
           Jetzt aktualisieren
         </button>

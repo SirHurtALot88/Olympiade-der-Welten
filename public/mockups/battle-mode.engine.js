@@ -6130,10 +6130,10 @@
     "football":[
       {id:"linepower",label:"Line Power",text:"Gewinnt Kontakt über Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:27.4,health:21.4,speed:11.8,torment:10.2,determination:8.5,awareness:6.8,stamina:5.1,dexterity:3.5,will:2.6,spirit:2.6}},
       {id:"routeburst",label:"Route Burst",text:"Schafft Separation über Speed und Dexterity.",gross:"speed",klein:"dexterity",last:"stamina",mueh:"medium",profil:{power:20,speed:19.4,health:16.4,torment:10.9,determination:9.1,awareness:7.3,dexterity:5.8,stamina:5.5,will:2.8,spirit:2.8}},
-      {id:"fieldread",label:"Field Read",text:"Liest Plays über Awareness und Determination.",gross:"awareness",klein:"determination",last:"torment",mueh:"low",profil:{power:20.1,health:16.4,determination:13.4,speed:12.8,awareness:11.5,torment:11,stamina:5.5,dexterity:3.7,will:2.8,spirit:2.8}},
+      {id:"quarterback",label:"Quarterback",text:"Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).",gross:"power",klein:"determination",last:"torment",mueh:"low",profil:{power:27.4,health:15.6,determination:13.4,speed:12.1,torment:10.4,awareness:7,stamina:5.3,dexterity:3.5,will:2.7,spirit:2.7}},
       {id:"ballhawk",label:"Ball Hawk",text:"Greift Chancen über Torment und Awareness.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{power:19.5,torment:17.3,health:16,speed:12.4,awareness:11.4,determination:8.9,stamina:5.4,dexterity:3.6,will:2.7,spirit:2.7}},
       {id:"redzone",label:"Red Zone",text:"Braucht Power und Torment nahe der Linie.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{power:27.4,health:15.5,torment:15.4,speed:12.1,determination:8.6,awareness:6.9,stamina:5.2,dexterity:3.5,will:2.7,spirit:2.7}},
-      {id:"kickerpunter",label:"Kicker/Punter",text:"Hält die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:22.3,power:17.7,speed:15.5,determination:11.4,stamina:9.2,torment:7.2,will:4.4,spirit:4.4,awareness:4,dexterity:3.9}}
+      {id:"kickerpunter",label:"Kicker/Punter",text:"Hält die Feldstellung über Health und Stamina — seine Ausdauer entscheidet den Ausschlag bei Field Goal und Punt.",gross:"health",klein:"stamina",last:"torment",mueh:"low",profil:{health:23.2,speed:16.2,determination:11.4,power:10.3,stamina:9.5,awareness:8.5,torment:7.8,will:4.5,spirit:4.5,dexterity:4.1}}
     ],
     "eiskunstlauf":[
       {id:"edgecontrol",label:"Edge Control",text:"Trägt Technik über Charisma und Dexterity.",gross:"charisma",klein:"dexterity",last:"awareness",mueh:"medium",profil:{charisma:33.4,dexterity:21.4,spirit:13.3,awareness:11.7,speed:8.4,intelligence:6.7,determination:5.1}},
@@ -10127,6 +10127,38 @@
   const FK_LOS_KAPPA=3.4;
   const fkLos=(sp,rolle)=>gewichtetesLosNach(sp,u=>Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA));
 
+  // QB-SLOT (football-kickoff-slot-plan-14-10.md Abschnitt 3.2, Schritt 3 des Plans — Chris
+  // 14.10. woertlich: „ja soll nen QB slot geben der auch von der stat verteilung passen soll
+  // genauso wie die blocker oder runner"). Dasselbe Grundmuster wie der Kicker/Punter-Slot
+  // (KICKER_SLOTS/bestimmeKicker, unten): derselbe u.slotId/u.slotGesetzt-Lesepfad, KEIN
+  // unbedingter Rueckfall (ein QB-Slot ist nicht strukturell Pflicht wie Hockeys Torwart —
+  // ohne explizite Manager-Zuweisung bleibt bestimmeQB() null und fkLosPasser() rechnet
+  // bit-identisch zum alten fkLos(off,"PASSGENAUIGKEIT")) — ABER mit einem bewussten
+  // Unterschied: dort war der Korrekturterm additiv auf eine Wahrscheinlichkeit/Distanz, hier
+  // ist er MULTIPLIKATIV auf das Los-GEWICHT selbst (Plan Abschnitt 3.2, Punkt 3) — eine
+  // Gewichtsverstaerkung der bestehenden Passer-Lotterie, keine Identitaetsfixierung. Der
+  // bereits gescheiterte "fester Depth Chart"-Versuch (Kommentar bei waehlePlayCall oben, rho
+  // 0,167/0,280 gegen 0,277/0,413) hatte die Chance der anderen Spieler auf NULL gesetzt; hier
+  // bleibt JEDER Spieler im Feld ziehbar (gewichtetesLosNach kappt Gewichte nie auf 0, s.
+  // dort), nur der explizit zugewiesene QB bekommt eine hoehere Chance, der gezogene Passer zu
+  // sein. QB_SLOT_BONUS=1.5 (Korridor-Mitte des Plandokuments "1,3-1,6, zu kalibrieren, nicht
+  // zu raten") — kalibriert mit scripts/messe-qb-slot-einfluss.mjs (slot-bewusste Sonde, s.
+  // dort und docs/design/football-qb-slot-14-10.md): die bestehenden Mess-Werkzeuge
+  // (miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs) weisen NIE eine Aufstellung zu
+  // (`place` bleibt leer, s. football-kicker-slot-14-10.md "Was Schritt 3 braucht") und sind
+  // fuer JEDEN QB_SLOT_BONUS-Wert bit-identisch blind — genau deshalb die eigene Sonde.
+  const QB_SLOTS=new Set(["quarterback","qb"]);
+  function bestimmeQB(team){
+    if(!team)return null;
+    return team.find(u=>u.slotGesetzt&&u.slotId&&QB_SLOTS.has(u.slotId))||null;
+  }
+  const QB_SLOT_BONUS=1.5;
+  function fkLosPasser(off){
+    const qb=bestimmeQB(off);
+    return gewichtetesLosNach(off,u=>Math.pow(Math.max(1,u.PASSGENAUIGKEIT-LOS_NULLPUNKT),FK_LOS_KAPPA)
+      *(qb&&u===qb?QB_SLOT_BONUS:1));
+  }
+
   // PRD (Pseudo Random Distribution) FUER SACK/FUMBLE/INTERCEPTION/COMPLETION WURDE WIEDER
   // ENTFERNT (21.09., docs/design/football-prd-drift-befund-21-09.md). Die P1-Runde
   // ("Football-Verlaesslichkeit", PR #978) hatte hier ein WC3-artiges Konto eingefuehrt, das
@@ -10216,7 +10248,11 @@
   // EIGENEM kurve-Block (FB().kurve, s. FELDSPIEL_ART.football) — dieselben drei
   // Funktionen, die Basketball/Hockey fuer ihre Wurf-/Schusserfolgsquote nutzen.
   function resolvePass(off,def,down,toGo,spielTyp){
-    const passer=fkLos(off,"PASSGENAUIGKEIT");
+    // QB-SLOT (s. Kommentar bei fkLosPasser/QB_SLOTS oben): einzige Aenderung gegenueber
+    // vorher ist dieser Aufruf — fkLos(off,"PASSGENAUIGKEIT") wurde durch fkLosPasser(off)
+    // ersetzt, das intern dieselbe Formel faehrt und nur fuer den explizit zugewiesenen QB
+    // einen multiplikativen Gewichtsbonus einrechnet. Ohne Slot-Zuweisung bit-identisch.
+    const passer=fkLosPasser(off);
     const rusher=fkLos(def,"ABWEHR_PASS");
     // Korridor-Refit-Messung, s. fsFbLog-Kopfkommentar in bauFeldspiel — EIN Zaehler je
     // Dropback (Sack/Interception/incomplete/komplett zaehlen alle, weil derselbe gezogene
@@ -49526,6 +49562,79 @@
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
 
   // =====================================================================================
+  // SLOT-BEWUSSTE PFLICHTSONDE FUER DEN QB-SLOT (football-kickoff-slot-plan-14-10.md
+  // Schritt 3, "Was Schritt 3 braucht" in football-kicker-slot-14-10.md): einflussVon() oben
+  // ruft M.bau() ohne jede Lineup-Platzierung — `place` bleibt leer, jeder Spieler laeuft
+  // ueber den Rundlauf-Ruecfall mit `slotGesetzt:false`. bestimmeQB() (s. fkLosPasser-
+  // Kommentar) liefert dort fuer JEDEN Spieler null, unabhaengig von QB_SLOT_BONUS — exakt
+  // derselbe blinde Befund, den der Kicker/Punter-Slot (Schritt 2) schon hatte UND haben
+  // durfte (sein Bonus ist additiv/klein, "kein No-Slot-Fall darf brechen" war die einzige
+  // Auflage). Fuer den QB-Slot reicht das nicht: Chris' Auftrag verlangt ausdruecklich eine
+  // SPUERBARE Wirkung ("genauso wie die blocker oder runner"), und ein bit-identisches
+  // Ergebnis waere hier kein Beweis fuer Sicherheit, sondern ein blinder Fleck, der die
+  // Kalibrierung verdeckt. Diese Sonde ist deshalb ein eigener, kleiner Zwilling von
+  // einflussVon() (dasselbe Muster wie einflussVonSandsackFinale weiter oben) — JEDER
+  // getestete Spieler wird zusaetzlich fuer die Dauer seines eigenen Durchlaufs per
+  // `u.slotId/u.slotGesetzt` explizit in den uebergebenen Slot gezwungen (NACH M.bau(), VOR
+  // M.lauf() — dasselbe Muster wie `slotErzwingen` in feldspielProbe oben), waehrend der
+  // Grundlauf (kein Attribut gehoben) NIEMANDEN slottet. Das misst exakt das realistische
+  // Kalibrierungsszenario: "ein Manager hat seinen besten Passer-Kandidaten als QB
+  // aufgestellt — wie stark zahlt sich eine bessere Passer-Eignung jetzt aus?"
+  //
+  // KEIN Ersatz fuer die Blindmessung, eine ZWEITE Linse daneben: die Blindmessung
+  // (einflussVon) bleibt die CLAUDE.md-Pflichtzahl fuer "bricht der No-Slot-Fall nicht" (hier
+  // weiterhin bit-identisch erwartet, unabhaengig von QB_SLOT_BONUS); diese Sonde hier ist die
+  // Pflichtzahl fuer "wirkt der Slot ueberhaupt, wenn er gesetzt ist" — beide zusammen, nicht
+  // einzeln, sind die ehrliche Abnahme fuer einen Slot-Bonus, der laut Auftrag eine echte
+  // Wirkung haben soll.
+  function einflussVonMitSlot(dId,slotId,n,saatVersatz){
+    const M=MOTOREN[dId];
+    if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
+    const hoehe=15; const versatz=saatVersatz||0;
+    const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG; const mutatorenVorher=MUTATOREN;
+    if(M.vorher)M.vorher();
+
+    const erzwingeSlot=(wer)=>{
+      if(!wer)return;
+      for(const team of FSTEAM)for(const u of team)
+        if(u.n===wer){u.slotId=slotId;u.slotGesetzt=true;}
+    };
+    const durchlauf=(wer,attribut)=>{
+      ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+      const w={};
+      for(let i=0;i<n;i++){
+        zieheFormkarten(20260823+versatz+i*104729);
+        MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+        M.bau(1337+versatz+i*7919);
+        erzwingeSlot(wer); // NUR im Hebungslauf (wer!=null) -- Grundlauf bleibt ungeslottet.
+        M.lauf();
+        const e=M.wert();
+        for(const k in e)w[k]=(w[k]||0)+e[k]/n;
+      }
+      return w;
+    };
+
+    M.bau(1337);
+    const namen=M.namen();
+    const grund=durchlauf(null,null);
+    const roh=EINFLUSS_ATTR.map(at=>{
+      let summe=0;
+      for(const wer of namen)summe+=(durchlauf(wer,at)[wer]-grund[wer]);
+      return {attribut:at, gewinn:+(summe/namen.length).toFixed(3)};
+    });
+
+    ATTR_HEBUNG=hebungVorher; MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+    const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
+                    .sort((a,b)=>b.gewinn-a.gewinn);
+    const W=BASIS_JE_DISC[dId]||{};
+    const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
+      s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    return {disziplin:dId, slotId, laeufe:n, anhebung:hoehe, saatVersatz:versatz,
+      abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // =====================================================================================
   // E9-SONDE: WIRKT SICH DIE FORMKARTE SPUERBAR AUS? (Fable-Feedback 13.10., Abschnitt 9,
   // E9. Chris woertlich: "und funktioniert das mit der form sauber? wirkt es sich
   // spuerbar aus? Konntest du das schon messen?") Reine Messsonde, zero Wirkung auf ein
@@ -49880,6 +49989,21 @@
       const mutatorModus=o.mutatoren||"je-spiel";
       const mutatorSaat=o.mutatorSaat||0;
       const mutatorenVorher=MUTATOREN;
+      // SLOT-ERZWINGEN (QB-Slot-Sonde, football-kickoff-slot-plan-14-10.md Schritt 3):
+      // additiver, optionaler Haken — ohne `o.slotErzwingen` unveraendertes Verhalten, s.
+      // football-kicker-slot-14-10.md "Was Schritt 3 braucht": die bestehende, kaderfeste
+      // Rangtreue-Sonde (miss-alle-disziplinen.mjs/feldspielProbe) setzt NIE eine Aufstellung
+      // (`place` bleibt leer, jeder Spieler laeuft ueber den Rundlauf-Ruecfall mit
+      // slotGesetzt:false) und ist deshalb fuer JEDEN Slot-Bonus blind, der an
+      // u.slotGesetzt haengt (Kicker/Punter genauso wie jetzt der QB-Slot). `slotErzwingen:
+      // {wer,slot}` zwingt NACH bauFeldspiel() (das FSTEAM frisch baut) und VOR dem
+      // Simulationslauf genau EINEM benannten Spieler `u.slotId=slot,u.slotGesetzt=true` auf
+      // — ohne `place[]` anzufassen (das wuerde ueber `inDisc`/`gesetzt.length` die ganze
+      // Aufstellung auf nur die explizit platzierten Spieler zusammenziehen, s.
+      // docs/design/football-qb-slot-14-10.md). Jeder andere Spieler bleibt exakt im
+      // Rundlauf-Ruecfall, wie im unveraenderten Aufruf — die einzige Abweichung von der
+      // Blindmessung ist der eine erzwungene Slot.
+      const slotErzwingen=o.slotErzwingen||null;
       // SPIELDAUER JE DISZIPLIN. Basketball hat als einzige eine eigene Konstante (vier
       // Viertel a 1:30); die Vorab-Disziplinen brauchen nur so viel Zeit, wie ihre
       // vorberechneten Zuege zum Abspielen kosten — art.zuegeJeSeite*2 Zuege a
@@ -49920,6 +50044,12 @@
           if(mutatorModus==="je-spiel")MUTATOREN=zieheMutatorenWieSpiel(20260823+mutatorSaat+i*15485863);
           else if(mutatorModus==="aus")MUTATOREN=[];
           feldspielDisc=id; bauFeldspiel(saat0+i*schritt);
+          // s. Kommentar bei `slotErzwingen` oben: NACH dem frischen Bau, VOR dem
+          // Simulationslauf, nur fuer den einen benannten Spieler, nur wenn gesetzt.
+          if(slotErzwingen&&slotErzwingen.wer){
+            for(const team of FSTEAM)for(const u of team)
+              if(u.n===slotErzwingen.wer){u.slotId=slotErzwingen.slot;u.slotGesetzt=true;}
+          }
           const deckTicks=new Map(); // "angreiferId|verteidigerId" -> Ticks
           let ballwechsel=0, letzteSeite=fsLive?fsLive.amBall:null, guard=0;
           while(!done&&fsT<dauer&&guard<tickDeckel){
@@ -50135,7 +50265,7 @@
     } finally { M.zurueck(g); }
   }
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, formEinflussVon, boxscoreSerie,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten

@@ -241,7 +241,30 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
   football: [
     roleTheme("linepower", "Line Power", "Gewinnt Kontakt über Power und Health.", ["power", "health"], "stamina", "high", ["tank", "berserker"]),
     roleTheme("routeburst", "Route Burst", "Schafft Separation über Speed und Dexterity.", ["speed", "dexterity"], "stamina", "medium", ["sprinter"]),
-    roleTheme("fieldread", "Field Read", "Liest Plays über Awareness und Determination.", ["awareness", "determination"], "torment", "low", ["tactician"]),
+    // QUARTERBACK-SLOT (football-kickoff-slot-plan-14-10.md Abschnitt 3.2, Schritt 3 des
+    // Plans — Chris 14.10. woertlich: „ja soll nen QB slot geben der auch von der stat
+    // verteilung passen soll genauso wie die blocker oder runner"). Umgewidmet statt neu
+    // angelegt, aus demselben Platzgrund wie der Kicker/Punter-Slot (Schritt 2): football.jeSeite
+    // ist 6, buildGeneratedSlotRoles schneidet mit `slice(0, slotCount)` — ein neuer, siebter
+    // Index wuerde nie gezogen, und der einzige wirklich freie Slot (der Ausgleichsslot, Index 5)
+    // ist seit Schritt 2 schon der Kicker/Punter. Von den fuenf verbleibenden Themen ist
+    // "Field Read" (vormals awareness/determination) die engste Passung: PASSGENAUIGKEIT, der
+    // Sub-Skill, den resolvePass() tatsaechlich fuer die Passer-Lotterie liest
+    // (battle-mode.engine.js, REC.football.rezept), ist {power:40,determination:35,
+    // dexterity:25} — determination blieb stehen, awareness (hier mechanisch irrelevant fuer
+    // den Passer) wurde durch power (das schwerste Einzelgewicht) ersetzt. Dexterity (25 %)
+    // bleibt ausserhalb der zwei Fokus-Attribute (resolveThemeFocus nimmt nur `slice(0,2)`,
+    // dieselbe Begrenzung wie jedes andere Thema), steht aber in der Beschreibung, damit der
+    // Text nicht mehr verspricht als die zwei generierten Fokus-Punkte tragen, aber auch nicht
+    // verschweigt, was der Slot-Bonus in resolvePass() wirklich mitnimmt.
+    //
+    // ANDERS ALS KICKER/PUNTER AENDERT DIESE UMBENENNUNG DIE GENERIERTEN ZAHLEN: "Field Read"
+    // war KEIN Ausgleichsslot, sein Profil kommt aus buildInitialDelta(theme,baseWeights) direkt
+    // aus den Fokus-Attributen (s. dort) — der Tausch awareness->power verschiebt also sowohl
+    // dieses Slot-Profil als auch (ueber `finalDelta`) das des Kicker/Punter-Ausgleichsslots
+    // (Index 5). Nachgezogen: scripts/generiere-arena-daten.ts --schreiben, s. PR-Beschreibung
+    // fuer die genauen Vorher/Nachher-Werte.
+    roleTheme("quarterback", "Quarterback", "Liest das Feld über Power und Determination — dieselben zwei Attribute, aus denen PASSGENAUIGKEIT überwiegend besteht (dazu, unterhalb der Slot-Fokusgrenze, Dexterity).", ["power", "determination"], "torment", "low", ["tactician"]),
     roleTheme("ballhawk", "Ball Hawk", "Greift Chancen über Torment und Awareness.", ["torment", "awareness"], "health", "medium", ["rogue"]),
     roleTheme("redzone", "Red Zone", "Braucht Power und Torment nahe der Linie.", ["power", "torment"], "health", "high", ["hero"]),
     // AUSGLEICHSSLOT, JETZT KICKER/PUNTER (football-kickoff-slot-plan-14-10.md Schritt 2,

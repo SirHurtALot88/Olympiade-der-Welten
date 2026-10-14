@@ -3,7 +3,8 @@ import { loadAliasMap } from "../pipeline/aliases";
 import { buildImportPlan } from "../pipeline/importPlan";
 import { persistBillbeeArtikel, persistImportPlan } from "../pipeline/persist";
 import { loadActiveCostSettings } from "../dashboard/queries";
-import { BillbeeClient, billbeeConfigFromEnv, type BillbeeConfig } from "./client";
+import { BillbeeClient, type BillbeeConfig } from "./client";
+import { loadBillbeeConfig } from "./credentials";
 import { LOOKBACK_DAYS, mapOrders, mapProduct, type MasterProduct } from "./map";
 
 /**
@@ -35,7 +36,7 @@ export interface BillbeeSyncReport {
 
 export class BillbeeNotConfigured extends Error {
   constructor() {
-    super("Billbee-API nicht eingerichtet (BILLBEE_API_KEY, BILLBEE_USER, BILLBEE_PASSWORD fehlen).");
+    super("Billbee ist noch nicht verbunden: Zugangsdaten in den Einstellungen eintragen.");
   }
 }
 
@@ -49,7 +50,7 @@ function excludeStatesFromEnv(): number[] {
 }
 
 export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions = {}): Promise<BillbeeSyncReport> {
-  const config = opts.config === undefined ? billbeeConfigFromEnv() : opts.config;
+  const config = opts.config === undefined ? (await loadBillbeeConfig(prisma)).config : opts.config;
   if (!config) throw new BillbeeNotConfigured();
   const startedAt = new Date().toISOString();
   const now = opts.now ?? new Date();
