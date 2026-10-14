@@ -1,10 +1,18 @@
 // SICHTPRUEFUNG fuer Paket 1 "Startreihenfolge nach Ergebnis" (Fable-Ideen Buehne-Auftritt
 // 30.09., docs/design/fable-ideen-buehne-auftritt-30-09.md, Abschnitt 1/2/3): E-F1
-// (Eiskunstlauf, Kurzprogramm und Kuer) + S-F1 (Showcase, Casting und Show). Kein Teil der
-// Abnahme-Sonden (die sind miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs) -- nur Beleg,
-// dass die neue Reihenfolge im Produktionsmodus (data-theme="dark" + .im-spiel, dasselbe
-// Muster wie verify-paket1-regie-bild-01-10.mjs) ohne Seitenfehler sichtbar wirksam ist UND
-// tatsaechlich vom alten "nach Eignung sortiert"-Verhalten abweicht.
+// (Eiskunstlauf, Kurzprogramm und Kuer). Kein Teil der Abnahme-Sonden (die sind
+// miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs) -- nur Beleg, dass die neue Reihenfolge
+// im Produktionsmodus (data-theme="dark" + .im-spiel, dasselbe Muster wie
+// verify-paket1-regie-bild-01-10.mjs) ohne Seitenfehler sichtbar wirksam ist UND tatsaechlich
+// vom alten "nach Eignung sortiert"-Verhalten abweicht.
+//
+// Showcase hatte hier ursprünglich ein gleichnamiges S-F1 (Casting und Show) -- GESTRICHEN
+// (Chris' Fable-Konzept-Feedback 13.10., docs/design/fable-konzept-chris-feedback-13-10.md
+// Abschnitt 3.1.6/9 Frage E6, Antwort 14.10. "ja": die Casting-Montage wich der Matchup-Folge,
+// die Task #118 fuer Showcase bereits gebaut hatte). Showcase sortiert seine Startreihenfolge
+// seither wieder schlicht aufsteigend nach `eig`, ohne eigenen Ergebnis-Zwischenblock -- die
+// Praemisse dieser Sonde ("weicht vom alten Eignungs-Sortierverhalten ab, zwei Besuche je
+// Teilnehmer") gilt fuer Showcase deshalb nicht mehr, nur noch fuer Eiskunstlauf.
 //
 // Aufruf: node scripts/verify-buehne-startreihenfolge-paket1-01-10.mjs [ausgabeOrdner]
 import { chromium } from "playwright";
@@ -66,7 +74,7 @@ let browser;
 const ergebnis = {};
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  for (const disc of ["eiskunstlauf", "showcase"]) {
+  for (const disc of ["eiskunstlauf"]) {
     const seite = await browser.newPage({ viewport: { width: 1300, height: 900 } });
     const fehler = [];
     seite.on("pageerror", (e) => fehler.push(String(e)));
@@ -89,10 +97,10 @@ try {
     const vergleich = proben.map(({ saat, besuche }) => {
       const neu = besuche.map((b) => b.namen.join("+"));
       const alt = alteReihenfolgeNamen(besuche);
-      // Jedes Paar/jeder Act erscheint bei E-F1/S-F1 ZWEIMAL in `besuche` (Kurzprogramm+Kuer
-      // bzw. Casting+Show) -- "unveraendert" hiesse: Zahl der Besuche = Zahl der DISTINKTEN
-      // Teilnehmer/Paare (ein einziger Besuch je Teilnehmer, wie vor Paket 1) UND Reihenfolge
-      // = alte Eignungs-Reihenfolge. Beides zusammen ist der Beleg.
+      // Jedes Paar erscheint bei E-F1 ZWEIMAL in `besuche` (Kurzprogramm+Kuer) --
+      // "unveraendert" hiesse: Zahl der Besuche = Zahl der DISTINKTEN Teilnehmer/Paare (ein
+      // einziger Besuch je Teilnehmer, wie vor Paket 1) UND Reihenfolge = alte
+      // Eignungs-Reihenfolge. Beides zusammen ist der Beleg.
       const distinkt = new Set(neu).size;
       return {
         saat, besucheGesamt: besuche.length, distinkteTeilnehmerOderPaare: distinkt,
@@ -114,11 +122,11 @@ try {
     await seite.evaluate((d) => window.__arena.setDisc(d), disc);
     await seite.click("#t2");
     await seite.click("#play");
-    // Mitten im ERSTEN Block (Kurzprogramm/Casting) -- noch keine Kiss-&-Cry-Plakette.
+    // Mitten im ERSTEN Block (Kurzprogramm) -- noch keine Kiss-&-Cry-Plakette.
     await seite.evaluate(() => window.__arena.sondenLauf(240));
     await (await seite.$("#cv")).screenshot({ path: path.join(AUSGABE, `${disc}-block1.png`) });
-    // Mitten im SPIEL (fuer Eiskunstlauf: nach dem Kurzprogramm, Zwischenrang-Plakette
-    // sollte im Kiss & Cry sichtbar sein; fuer Showcase: mitten in der Show).
+    // Mitten im SPIEL (nach dem Kurzprogramm, Zwischenrang-Plakette sollte im Kiss & Cry
+    // sichtbar sein).
     await seite.evaluate(() => window.__arena.sondenLauf(900));
     await (await seite.$("#cv")).screenshot({ path: path.join(AUSGABE, `${disc}-mitte.png`) });
     // BIS ZUM ENDE.
@@ -145,4 +153,4 @@ if (nichtGeaendert.length) {
   console.error("REIHENFOLGE NICHT GEAENDERT bei:", nichtGeaendert.map(([d]) => d));
   process.exit(1);
 }
-console.log("Seitenfehler: keine -- Reihenfolge bei beiden Disziplinen und allen Saaten vom alten Eignungs-Sortierverhalten abweichend.");
+console.log("Seitenfehler: keine -- Reihenfolge bei Eiskunstlauf und allen Saaten vom alten Eignungs-Sortierverhalten abweichend.");

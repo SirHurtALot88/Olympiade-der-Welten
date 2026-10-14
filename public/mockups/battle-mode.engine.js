@@ -17186,24 +17186,27 @@
   // Eignungszahl `eig` -- ein Spoiler (der letzte Startplatz verriet, wer der Beste ist,
   // bevor irgendjemand aufgetreten war) ohne jede Erzaehlung (ein Ueberraschungssieg von
   // Startplatz 3 sah im Bild nicht anders aus als ein erwarteter von Platz 6). E-F1
-  // (Eiskunstlauf) und S-F1 (Showcase) loesen das, wie es der jeweilige echte Sport tut: ein
-  // kurzer erster Block (Kurzprogramm bzw. Casting) legt ein ERGEBNIS vor, und der zweite,
-  // laengere Block (Kuer bzw. Show) wird danach aufsteigend GEORDNET -- wer im ersten Block
-  // am meisten Eindruck gemacht hat, bekommt den Schlussplatz ("pimp slot"/letzte Kuer-
-  // Startgruppe). Beide Konstanten unten legen fest, wie viele der `rundenN` Durchgaenge auf
-  // den ersten Block entfallen.
+  // (Eiskunstlauf) loest das, wie es der echte Sport tut: ein kurzer erster Block
+  // (Kurzprogramm) legt ein ERGEBNIS vor, und der zweite, laengere Block (Kuer) wird danach
+  // aufsteigend GEORDNET -- wer im Kurzprogramm am meisten Eindruck gemacht hat, bekommt den
+  // Schlussplatz ("pimp slot"/letzte Kuer-Startgruppe). Showcase hatte hier bis zum 14.10. ein
+  // gleichnamiges "S-F1" (Casting und Show) nach demselben Muster -- GESTRICHEN (Chris'
+  // Fable-Konzept-Feedback 13.10. Frage E6, Antwort 14.10. "ja", s. Kommentar im
+  // `art.showcase`-Zweig weiter unten): Showcase sortiert seine Startreihenfolge seither
+  // wieder schlicht aufsteigend nach `eig`, ohne eigenen Ergebnis-Zwischenblock. Die Konstante
+  // unten legt nur noch fuer Eiskunstlauf fest, wie viele der `rundenN` Durchgaenge auf den
+  // Kurzprogramm-Block entfallen.
   //
   // KLASSE A, PER KONSTRUKTION RANGTREUE-NEUTRAL (Papier, Abschnitt 1, "das laesst sich ohne
   // eine einzige Punktaenderung nachbauen"): `setz()` wenige Zeilen unten rechnet ALLE
   // `rundenN` Durchgaenge eines Teilnehmers sofort und vollstaendig durch, BEVOR irgendetwas
   // von alldem enthuellt wird -- die Reihenfolge, in der `buehneQueue` diese bereits fertigen
   // `runden[]`-Eintraege spaeter freigibt, aendert nichts an WAS gewuerfelt wurde oder WIEVIEL
-  // rr() verbraucht wurde, nur WANN es sichtbar wird. Deshalb duerfen die beiden Blockgrenzen
-  // unten sogar das ERGEBNIS des ersten Blocks lesen (`runden[0..n-1]`, Zwischenstand), ohne
-  // die Messung zu beruehren: `scripts/miss-alle-disziplinen.mjs` ruft `stepBuehne()` direkt
-  // und liest `u.summe` -- bit-identisch vorher/nachher (s. PR-Beschreibung).
+  // rr() verbraucht wurde, nur WANN es sichtbar wird. Deshalb darf die Blockgrenze unten sogar
+  // das ERGEBNIS des ersten Blocks lesen (`runden[0..n-1]`, Zwischenstand), ohne die Messung zu
+  // beruehren: `scripts/miss-alle-disziplinen.mjs` ruft `stepBuehne()` direkt und liest
+  // `u.summe` -- bit-identisch vorher/nachher (s. PR-Beschreibung).
   const EISKUNSTLAUF_KURZPROGRAMM_N=4; // Elemente 1-4 = Kurzprogramm (ISU), Rest = Kuer
-  const SHOWCASE_CASTING_N=1;          // Durchgang 1 = Casting-Montage, Rest = die Show
 
   // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09.,
   // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F2", Paket 1 "Regie & Bild",
@@ -17812,54 +17815,33 @@
     // rr(). Laenge und Spieldauer bleiben identisch (12 Teilnehmer x rundenN Eintraege).
     // Deshalb liefert miss-alle-disziplinen.mjs eine bit-identische Zahl fuer Showcase.
     if(art.showcase){
-      const baueJeSeiteAufsteigend=()=>[0,1].map(seite=>
+      // S-F1 ("Casting und Show", Fable-Ideen Buehne-Auftritt 30.09., Klasse A) baute hier bis
+      // zum 14.10. zwei Bloecke -- ein kurzer, durchmischter "Casting"-Durchgang aller zwoelf
+      // Acts, dann die "Show" neu geordnet nach dessen Ergebnis. GESTRICHEN (Chris' Fable-
+      // Konzept-Feedback 13.10., docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt
+      // 3.1.6/9 Frage E6, Antwort 14.10. "ja"): genau dieser kurze, seitenverzahnte Casting-
+      // Durchgang war das "Hin-und-her" zwischen allen zwoelf Acts, das Chris mit der
+      // Matchup-Folge (Task #118, DisciplineStageNativeArena.tsx, "✨ VS"-Karte) fuer Showcase
+      // bereits abgeschafft haben wollte -- ein Act tritt jetzt wieder nur EINMAL an, mit allen
+      // `rundenN` Durchgaengen am Stueck, wie vor S-F1. Der Schlussplatz ("pimp slot") bleibt
+      // dabei verdient, nur nicht mehr aus dem Casting-Ergebnis, sondern wie VOR S-F1 aus der
+      // Aufstellung (aufsteigend nach Eignung) -- exakt die Doku-Vorgabe aus Abschnitt 3.1.6:
+      // "nicht mehr aus dem Casting verdient, sondern aus der Aufstellung". Eiskunstlaufs E-F1
+      // (Kurzprogramm/Kuer) bleibt unangetastet, s. EISKUNSTLAUF_KURZPROGRAMM_N oben -- nur das
+      // gleichnamige S-F1 fuer Showcase faellt, Chris' Antwort galt nur ihm.
+      //
+      // RANGTREUE-NEUTRAL: dieselbe Warteschlange, nur ein Block statt zwei -- `runden[]` ist
+      // laengst vollstaendig vorberechnet (s. Kommentar oben), die Reihenfolge der Enthuellung
+      // aendert nichts an `u.summe`. miss-alle-disziplinen.mjs showcase bleibt bit-identisch.
+      const jeSeiteAufsteigend=[0,1].map(seite=>
         TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>x.eig-y.eig));
-      // S-F1 (Paket 1, 30.09., Klasse A, s. Kommentar bei SHOWCASE_CASTING_N oben): CASTING
-      // UND SHOW STATT EINEM EINZIGEN AUFTRITT. `castingN<1` ist dasselbe Sicherheitsnetz
-      // wie bei E-F1 oben (heute unerreichbar, art.rundenN steht fest auf 5).
-      const castingN=Math.min(SHOWCASE_CASTING_N,art.rundenN-1);
-      if(castingN<1){
-        const jeSeiteAufsteigend=baueJeSeiteAufsteigend();
-        buehneQueue=[];
-        const maxLen=Math.max(jeSeiteAufsteigend[0].length,jeSeiteAufsteigend[1].length);
-        for(let i=0;i<maxLen;i++){
-          for(const seite of [0,1]){
-            const u=jeSeiteAufsteigend[seite][i];
-            if(!u)continue;
-            for(let r=0;r<art.rundenN;r++)buehneQueue.push(u);
-          }
-        }
-        return;
-      }
-      // BLOCK 1, CASTING: alle zwoelf Acts, Seiten verzahnt -- nur der erste der `rundenN`
-      // Durchgaenge je Act, kurz angerissen wie eine Audition-Montage. Die Ausgangsreihenfolge
-      // selbst ist hier ohne Bedeutung (ein einzelner Durchgang verraet noch keine Eignung),
-      // bleibt aber aus Konsistenzgruenden dieselbe aufsteigende Eignungs-Setzliste wie
-      // bisher.
-      const jeSeiteCasting=baueJeSeiteAufsteigend();
       buehneQueue=[];
-      const maxLenC=Math.max(jeSeiteCasting[0].length,jeSeiteCasting[1].length);
-      for(let i=0;i<maxLenC;i++){
+      const maxLen=Math.max(jeSeiteAufsteigend[0].length,jeSeiteAufsteigend[1].length);
+      for(let i=0;i<maxLen;i++){
         for(const seite of [0,1]){
-          const u=jeSeiteCasting[seite][i];
+          const u=jeSeiteAufsteigend[seite][i];
           if(!u)continue;
-          for(let r=0;r<castingN;r++)buehneQueue.push(u);
-        }
-      }
-      // BLOCK 2, SHOW: je Seite aufsteigend nach dem Casting-Ergebnis (`runden[0..castingN-1]`,
-      // bereits vollstaendig vorberechnet, hier nur GELESEN, kein rr()) statt nach der
-      // versteckten Eignung -- der "pimp slot": wer im Casting am meisten Eindruck gemacht
-      // hat, bekommt den Schlussplatz. Jeder Act laeuft seine restlichen `rundenN-castingN`
-      // Durchgaenge weiterhin am Stueck.
-      const castingSumme=(u)=>u.runden.slice(0,castingN).reduce((s,r)=>s+(r?r.punkte:0),0);
-      const jeSeiteShow=[0,1].map(seite=>
-        jeSeiteCasting[seite].slice().sort((a,b)=>castingSumme(a)-castingSumme(b)));
-      const maxLenS=Math.max(jeSeiteShow[0].length,jeSeiteShow[1].length);
-      for(let i=0;i<maxLenS;i++){
-        for(const seite of [0,1]){
-          const u=jeSeiteShow[seite][i];
-          if(!u)continue;
-          for(let r=castingN;r<art.rundenN;r++)buehneQueue.push(u);
+          for(let r=0;r<art.rundenN;r++)buehneQueue.push(u);
         }
       }
       return;
@@ -27090,16 +27072,15 @@
         u.vizAct=actVon(u).act;
         // TON-MERKER (PR S3, Konzept Abschnitt 5): vizShowcaseTonAktuell haelt den zuletzt
         // VERTONTEN Durchgang fest (Vorbild: stepFechten()s vizFechtAktuell-Vergleich).
-        // vizWarAktiv (umgebaut fuer S-F1, Paket 1, 30.09.) hielt bis dahin EINWEG fest, ob
-        // der Auftritts-Jingle schon gespielt wurde -- richtig, solange jeder Teilnehmer ueber
-        // ein ganzes Spiel GENAU EINMAL aktiv wird (buehneQueue gruppierte seine rundenN
-        // Enthuellungen zusammenhaengend, PR S0). Mit S-F1 wird ein Act jetzt ZWEIMAL aktiv
-        // (kurzer Casting-Durchgang, spaeter die zusammenhaengende Show) -- ein Einweg-Merker
-        // haette den Jingle beim Wiedereintritt in die Mitte fuer die Show verschluckt.
-        // vizWarAktiv haelt stattdessen nur den AKTIV-Zustand DES LETZTEN BILDES fest; der
-        // Jingle feuert an der steigenden Flanke (`istAktiv && !vizWarAktiv`, s.u.) -- das
-        // ist fuer den alten Einzelblock-Fall (genau eine steigende Flanke pro Spiel)
-        // dieselbe Bedingung wie vorher, und feuert mit S-F1 zusaetzlich ein zweites Mal.
+        // vizWarAktiv war waehrend S-F1 (Paket 1, 30.09.-14.10., inzwischen gestrichen, s.
+        // Kommentar bei `art.showcase` in bauBuehne()) extra auf FLANKEN- statt EINWEG-Erkennung
+        // umgestellt, weil ein Act unter S-F1 ZWEIMAL aktiv wurde (kurzer Casting-Durchgang,
+        // spaeter die zusammenhaengende Show) und ein Einweg-Merker den Jingle beim
+        // Wiedereintritt verschluckt haette. Seit S-F1 weg ist, wird jeder Act wieder genau
+        // einmal aktiv (buehneQueue gruppiert seine rundenN Enthuellungen wieder zusammenhaengend,
+        // wie vor S-F1, PR S0) -- die Flankenerkennung bleibt trotzdem stehen, weil sie fuer
+        // diesen Einzelblock-Fall dasselbe Ergebnis liefert wie ein Einweg-Merker, nur ohne
+        // Sonderfall fuer den Fall, dass ein Act doch wieder mehrfach aktiv wird.
         u.vizWarAktiv=false; u.vizShowcaseTonAktuell=-1;
         // S-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): Zaehler fuer die X-Wand dieses
         // Acts, s. Kante "frisch enthuellt" unten.
@@ -27117,10 +27098,7 @@
       // FLANKE "wird aktiv" (vor der allerersten Enthuellung zaehlt bereits der erste
       // Warteschlangeneintrag als aktiv, s. showcaseAktiver()-Kommentar, deshalb feuert der
       // Jingle fuer den allerersten Performer schon im allerersten stepShowcase()-Frame).
-      // Mit S-F1 (Paket 1, 30.09., s. vizWarAktiv-Kommentar oben) feuert er je Act zweimal:
-      // einmal beim kurzen Casting-Durchgang, ein zweites Mal beim Wiedereintritt in die
-      // Mitte fuer die Show -- im echten Talentshow-Bild zwei getrennte Auftritte, zwei
-      // Fanfaren.
+      // Feuert seit S-F1s Streichung (s. vizWarAktiv-Kommentar oben) wieder genau einmal je Act.
       if(istAktiv && !u.vizWarAktiv)sfx("showcase","auftritt");
       u.vizWarAktiv=istAktiv;
       const b=BAU[u.n]||BAU_STD;
@@ -50307,13 +50285,16 @@
     // zusammenhaengende BESUCHE (ein Besuch = eine ununterbrochene Folge von Enthuellungen
     // desselben Teilnehmers bzw. -- bei Eiskunstlauf -- desselben Paares, dasselbe Prinzip
     // wie kuerBesuchsliste() weiter oben) und gibt sie in genau der Reihenfolge zurueck, in
-    // der `bauBuehne()` sie angelegt hat. Vor E-F1/S-F1 hatte jeder Teilnehmer GENAU EINEN
-    // Besuch (die ganze alte "Startreihenfolge nach Eignung"); mit ihnen hat ein Eiskunstlauf-
-    // Paar zwei (Kurzprogramm, dann die neu geordnete Kuer) und ein Showcase-Act zwei
-    // (Casting, dann die neu geordnete Show) -- genau das macht diese Sonde sichtbar. Reine
-    // Diagnose fuer die Playwright-Abnahme (verify-buehne-startreihenfolge-paket1-...mjs),
-    // dasselbe Sicher/Bauen/Zuruecksetzen-Muster wie namenVon direkt darueber, kein rr(),
-    // kein Gameplay-Zugriff, keine Wirkung auf einen laufenden Spielstand.
+    // der `bauBuehne()` sie angelegt hat. Ohne E-F1 hat jeder Teilnehmer GENAU EINEN Besuch
+    // (die schlichte "Startreihenfolge nach Eignung"); mit E-F1 hat ein Eiskunstlauf-Paar zwei
+    // (Kurzprogramm, dann die neu geordnete Kuer) -- genau das macht diese Sonde sichtbar.
+    // Showcase hatte hier bis zum 14.10. mit dem gleichnamigen S-F1 ebenfalls zwei Besuche je
+    // Act (Casting, dann die neu geordnete Show); S-F1 ist seither gestrichen (s. Kommentar im
+    // `art.showcase`-Zweig von bauBuehne()), Showcase liefert also wieder genau einen Besuch
+    // je Act. Reine Diagnose fuer die Playwright-Abnahme
+    // (verify-buehne-startreihenfolge-paket1-...mjs), dasselbe Sicher/Bauen/Zuruecksetzen-
+    // Muster wie namenVon direkt darueber, kein rr(), kein Gameplay-Zugriff, keine Wirkung auf
+    // einen laufenden Spielstand.
     buehneReihenfolge:(dId,saat)=>{
       if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[dId])return null;
       const M=MOTOREN[dId]; if(!M)return null;
