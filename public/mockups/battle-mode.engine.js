@@ -14918,8 +14918,19 @@
   // Absichtlich NICHT vollstaendig: der Deckel laesst in echten Ballungen einen Rest
   // Ueberlappung zu — das ist der von Chris ausdruecklich erlaubte "einer steht dahinter"-
   // Fall, und die Zeichenreihenfolge unten (nach y sortiert) macht ihn lesbar.
-  const ZEICH_MIN_ABSTAND=30;   // PLATZHALTER, an der Sprite-Breite (~28px) ausgerichtet
-  const ZEICH_MAX_VERSATZ=24;   // PLATZHALTER
+  // 30->36 / 24->28 (14.10., docs/design/basketball-tempo-passing-diagnose-14-10.md): der
+  // Puffer stand seit dem 30.08. unangetastet. diagAbstaende zeigte, dass die gezeichnete
+  // Naehe (<30px, "Sprites beruehren sich") in 85,8% der Bilder auftrat, obwohl die echte
+  // Ueberlappung (<18px, ZEICH_HARTGRENZE unveraendert) mit 2,8% schon selten war — der
+  // weiche Zielabstand war also der Teil, der nachjustiert werden musste, nicht die harte
+  // Notbremse. Nachgemessen (3 Saaten, 360s): <30px sinkt auf 17,7-18,8%, <18px bleibt bei
+  // 2,0-2,3% (unveraendert/leicht besser). Eine staerkere Fassung (42/34) wurde ebenfalls
+  // gemessen (<30px auf 7-9%) und verworfen: die Luecke zum harten 18px-Deckel waechst dabei
+  // auf bis zu 16px (statt 10px hier) -- mehr Risiko eines sichtbaren Sprungs in dichten
+  // Situationen fuer wenig Zusatznutzen. rho bit-identisch (beweisbar: _zvx/_zvy werden
+  // ausschliesslich beim Zeichnen gelesen, nirgends in der Simulation).
+  const ZEICH_MIN_ABSTAND=36;   // PLATZHALTER
+  const ZEICH_MAX_VERSATZ=28;   // PLATZHALTER
   const ZEICH_NACHZIEHEN=0.3;   // PLATZHALTER, Anteil je Bild
   const ZEICH_HARTGRENZE=18;    // PLATZHALTER, s. Notbremse unten
   // Eine Runde paarweiser Relaxation auf einer Punktliste [{x,y},...] — dieselbe Formel
