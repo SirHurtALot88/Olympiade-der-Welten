@@ -133,11 +133,11 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   // gegen X"), deshalb hier derselbe Titel statt eines neu erfundenen Namens.
   const stufenAnzeige = typeof round === "number" && typeof slotCount === "number" && slotCount > 0 ? `STUFE ${Math.min(round + 1, slotCount)}/${slotCount}` : null;
 
-  // ---- VERFALL AM KOeRPER (Q8, Konzeptrunde K4, 14.10.) ----------------------------------
+  // ---- VERFALL AM KOeRPER (Q8, Konzeptrunde K4, 14.10., Gore-Erweiterung 14.10. Folge-PR) ----
   // Chris zu Breaking: „Kann man das optisch irgendwie an den Charakteren zeigen? sowas wie
-  // Erschoepfung, Blut oder so?" (fable-konzept-chris-feedback-13-10.md 3.8/5.4). Drei Stufen,
-  // rein dekorativ -- KEINE Aenderung an tokenPos/Score/normOf, derselbe Vertrag wie jede
-  // andere Feld-Komponente ("Score bleibt Wahrheit", s. types.ts-Funktionskopf).
+  // Erschoepfung, Blut oder so?" (fable-konzept-chris-feedback-13-10.md 3.8/5.4). Rein
+  // dekorativ -- KEINE Aenderung an tokenPos/Score/normOf, derselbe Vertrag wie jede andere
+  // Feld-Komponente ("Score bleibt Wahrheit", s. types.ts-Funktionskopf).
   //
   // WARUM score/finalMax und nicht die rohe Engine-HP: `RT` (types.ts) fuehrt fuer KEINE der
   // zwanzig Disziplinen ein hp-Feld -- nur `score`. Die rohe HP (`u.hp`/`hpNach` in
@@ -145,11 +145,22 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
   // Kanal nur fuer dieses eine Feld einzuziehen waere die groessere, nicht die Q8-Aenderung.
   // `normOf(score)` ist in dieser Datei aber bereits die Naeher-am-Brechen-Groesse -- sie
   // bestimmt schon den Radius UND die vier Zonen GEBROCHEN/SCHMERZGRENZE/STONE FACE/MIND
-  // FORTRESS oben. Verfall liest exakt dasselbe Signal, nur an denselben Schwellen, die Chris'
-  // Bild nennt (unter 70/40/15 %) statt an den Zonen-Grenzen (1,0/0,72/0,46/0,22) -- ein reiner
-  // Leser auf bereits bestehendem Zustand, kein neuer.
-  const verfallStufe = (score: number): 0 | 1 | 2 | 3 => {
+  // FORTRESS oben. Verfall liest exakt dasselbe Signal, nur an eigenen Schwellen (unter
+  // 70/40/15/5 %) statt an den Zonen-Grenzen (1,0/0,72/0,46/0,22) -- ein reiner Leser auf
+  // bereits bestehendem Zustand, kein neuer.
+  //
+  // STUFE 4 (NEU, Folge-PR zu #1207): PR #1207 baute Stufe 1-3 BEVOR Chris E8 beantwortet
+  // hatte (fable-konzept-chris-feedback-13-10.md Abschnitt 9) und entschied sich dort bewusst
+  // gegen Gore ("kein Gore" stand nur als EMPFEHLUNG im Papier). Chris' tatsaechliche Antwort
+  // auf E8, woertlich: „stilisiert + gore" -- ER WILL BEIDES, nicht eins statt des anderen.
+  // Stufe 1-3 bleiben darum unveraendert (sie sind der "stilisiert"-Teil); Stufe 4 ist neu und
+  // traegt den "+ gore"-Teil: eine echte Blutpfuetze, Tropfspuren und eine offene Wunde statt
+  // nur angedeutetem Blut. Bleibt dieselbe Pixel-/Retro-Bildsprache wie Stufe 1-3 (keine
+  // Fotorealitaet) und dasselbe Folter-/Survival-Vokabular aus CLAUDE.md ("Breaking ist
+  // Folter, nicht Breakdance") -- sichtbares Leiden eines Gefolterten, keine Horror-Deko.
+  const verfallStufe = (score: number): 0 | 1 | 2 | 3 | 4 => {
     const n = normOf(score);
+    if (n < 0.05) return 4; // GORE: Blutpfuetze + Tropfspuren + offene Wunde (E8, "+ gore")
     if (n < 0.15) return 3; // Blut + eingesackte Haltung
     if (n < 0.4) return 2; // + Prellungen/Risse an der Kleidung
     if (n < 0.7) return 1; // Schweiss
@@ -364,7 +375,8 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
                   trophy={false} — Breaking trägt seine eigene Survivor-Krone. */}
               <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} trophy={false} />
               {/* VERFALL AM KOeRPER (Q8): Schweiss ab Stufe 1, + Prellungen/Risse ab Stufe 2,
-                  + stilisiertes Blut und eine angedeutete eingesackte Haltung ab Stufe 3 --
+                  + stilisiertes Blut und eine angedeutete eingesackte Haltung ab Stufe 3,
+                  + Blutpfuetze/Tropfspuren/offene Wunde (Gore, E8) ab Stufe 4 --
                   s. verfallStufe() oben fuer Herleitung/Schwellen. pointerEvents="none", reine
                   Pixel-Deko, ruehrt tokenPos/Hover-/Klick-Geometrie nicht an. */}
               {(() => {
@@ -396,6 +408,31 @@ export default function BreakingField(props: DisciplineFieldProps): ReactNode {
                         <rect x={-2} y={r * 0.7} width={2} height={5} fill="var(--nl-risk)" />
                         <rect x={2} y={r * 0.78} width={2} height={4} fill="var(--nl-risk)" />
                         <rect x={-r * 0.15} y={r * 0.85} width={2} height={3} fill="var(--nl-risk)" opacity={0.75} />
+                      </g>
+                    ) : null}
+                    {/* Stufe 4: GORE (E8, "stilisiert + gore" -- s. verfallStufe()-Kommentar
+                        oben fuer Herleitung). Geht ueber Stufe 3 hinaus: eine echte, deckende
+                        Blutpfuetze statt nur eines Schlagschattens, zwei laengere Tropfspuren
+                        am Koerper hinab, eine offene Wunde (zwei uebereinanderliegende
+                        Pixel-Balken, dunkelrot/hellrot fuer Tiefe) und ein abgerissener
+                        Stofffetzen seitlich. Bleibt Pixel-Stil, bleibt pointerEvents="none",
+                        ruehrt tokenPos/Score/Hover-Geometrie nicht an -- derselbe Vertrag wie
+                        jede Stufe hier. */}
+                    {stufe >= 4 ? (
+                      <g opacity={0.95}>
+                        {/* Blutpfuetze am Boden unter dem Token -- deckendes Rot statt
+                            Schwarz-Transparenz, deutlich groesser als der Stufe-3-Schatten. */}
+                        <ellipse cx={0} cy={r * 0.82} rx={r * 1.05} ry={r * 0.32} fill="var(--nl-risk)" opacity={0.5} />
+                        <ellipse cx={0} cy={r * 0.82} rx={r * 0.55} ry={r * 0.18} fill="var(--nl-risk)" opacity={0.4} />
+                        {/* Zwei Tropfspuren vom Torso bis in die Pfuetze. */}
+                        <rect x={-r * 0.22} y={r * 0.05} width={2.5} height={r * 0.78} fill="var(--nl-risk)" opacity={0.92} />
+                        <rect x={r * 0.16} y={r * 0.15} width={2.5} height={r * 0.6} fill="var(--nl-risk)" opacity={0.85} />
+                        {/* Offene Wunde auf dem Torso -- dunkelroter Grund mit hellerem
+                            Kern fuer Tiefe, horizontaler Gash statt eines Punkts. */}
+                        <rect x={-5} y={-r * 0.14} width={10} height={3.5} fill="#5a0e0e" />
+                        <rect x={-3.5} y={-r * 0.1} width={7} height={1.6} fill="var(--nl-risk)" />
+                        {/* Abgerissener Stofffetzen seitlich am Koerper. */}
+                        <polygon points={`${r * 0.4},${r * 0.1} ${r * 0.52},${r * 0.26} ${r * 0.34},${r * 0.22}`} fill="#4a3a33" opacity={0.85} />
                       </g>
                     ) : null}
                   </g>
