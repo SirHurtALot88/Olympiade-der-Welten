@@ -4,7 +4,11 @@ Die App holt Artikelstamm (Bestand, VK, EK) und die Bestellungen der letzten 365
 Billbee. Beim Serverstart, alle 3 Stunden und per Knopf „Jetzt aktualisieren“ unter Einstellungen.
 Der Datei-Import unter `/import` bleibt als Rückfall.
 
-## Einrichten (einmalig, auf dem Server)
+## Einrichten (einmalig, im Browser)
+
+Einstellungen > Karte „Billbee: Artikel, Bestand und Verkäufe“: Login-Mail, API-Passwort und API-Schlüssel eintragen und „Speichern und testen“ klicken. Die App prüft die Werte bei Billbee, speichert sie verschlüsselt (AES-256-GCM, Schlüssel aus `LEC_AUTH_SECRET`) und startet den ersten Abruf. Die Werte werden nie wieder angezeigt.
+
+## Alternativ: auf dem Server (Umgebungsvariablen haben Vorrang)
 
 1. Billbee: Einstellungen > Billbee API aktivieren und ein API-Passwort setzen (ist bei Chris erledigt).
 2. Zusätzlich braucht Billbee einen **API-Schlüssel** (Header `X-Billbee-Api-Key`); Billbee vergibt ihn auf Anfrage.

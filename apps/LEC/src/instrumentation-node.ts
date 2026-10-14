@@ -22,11 +22,11 @@ if (process.env.NODE_ENV === "production") {
   // Kurz warten, bis der Server steht (Migrationen laufen schon vorher in start-hosted.sh).
   setTimeout(() => {
     // Billbee zuerst (legt neue Artikel an, nur wenn die Zugangsdaten gesetzt sind), dann Bilder/Preise/Marktwerte.
-    startBillbeeSync(prisma);
+    void startBillbeeSync(prisma);
     runShop();
     startMarketSync(prisma);
   }, 60_000);
   setInterval(runShop, 6 * HOUR_MS);
-  setInterval(() => startBillbeeSync(prisma), 3 * HOUR_MS);
+  setInterval(() => void startBillbeeSync(prisma), 3 * HOUR_MS);
   setInterval(() => startMarketSync(prisma), 24 * HOUR_MS);
 }
