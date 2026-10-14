@@ -1,7 +1,7 @@
 "use client";
 
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardGap, boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { boardGap, boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -56,6 +56,23 @@ export function PriceRange({ row }: { row: SortimentRow }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Kleiner Link zum eBay-Angebot (oeffnet in neuem Tab); ohne Artikelnummer die Suche im eigenen Shop. */
+export function EbayLink({ row }: { row: SortimentRow }) {
+  const l = ebayLinks(row);
+  return (
+    <a
+      className="bd-ebay"
+      href={l.view ?? l.search}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={l.view ? "Angebot bei eBay öffnen" : "Im eigenen eBay-Shop suchen (Artikelnummer unbekannt)"}
+    >
+      eBay ↗
+    </a>
   );
 }
 
@@ -146,6 +163,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                 <td data-label="Dein VK" className="r bd-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
+                  <EbayLink row={row} />
                 </td>
                 <td data-label="Empfohlener VK">
                   <PriceRange row={row} />

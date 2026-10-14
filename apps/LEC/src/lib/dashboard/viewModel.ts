@@ -49,6 +49,8 @@ export interface ArticleAggregate {
   vkSource?: "ebay" | "billbee" | null;
   /** Stand des eBay-Preises, nur bei vkSource "ebay". */
   vkAt?: Date | null;
+  /** eBay-Artikelnummer des Angebots (Shop-Abruf, sonst Verkaufsbericht), fuer den Link zum Angebot. */
+  ebayItemId?: string | null;
   currentEk: number | null;
   /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack-Menge) aus dem juengsten MarketPrice-Datensatz,
    * sonst null ("—"), auch bei mehrdeutiger Seltenheit. */
@@ -154,6 +156,8 @@ export interface SortimentRow {
   /** Woher `listingVk` stammt und wie frisch er ist: eBay-Shop (live) oder Billbee-Artikelstamm. */
   listingVkSource: "ebay" | "billbee" | null;
   listingVkAt: string | null;
+  /** eBay-Artikelnummer fuer den Link zum Angebot, null wenn unbekannt. */
+  ebayItemId: string | null;
   /** Cardmarket-Marktwert, Zielspanne (25-33 % Deckungsbeitrag) und Urteil. Null ohne Datensatz. */
   market: SortimentMarket | null;
 }
@@ -582,6 +586,7 @@ export function buildSortimentRow(
     priceTrend: a.latestMarketTrend,
     listingVkSource: a.currentVk !== null && a.currentVk > 0 ? (a.vkSource ?? null) : null,
     listingVkAt: a.vkAt ? a.vkAt.toISOString() : null,
+    ebayItemId: a.ebayItemId ?? null,
     market: marketInfo,
   };
 }

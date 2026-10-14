@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardVk, cleanTitle } from "@/lib/dashboard/board";
+import { boardVk, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { formatEuroCents, formatPercent } from "@/lib/format";
@@ -76,6 +76,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <p className="bd-dt-full">{row.nameRaw}</p>
           </div>
         </header>
+
+        <EbayActions row={row} />
 
         <section className="bd-dt-grid">
           <Stat label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
@@ -192,6 +194,22 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       <span>{label}</span>
       <b>{value}</b>
       {hint && <small>{hint}</small>}
+    </div>
+  );
+}
+
+function EbayActions({ row }: { row: SortimentRow }) {
+  const l = ebayLinks(row);
+  return (
+    <div className="bd-dt-actions">
+      {l.revise && (
+        <a className="chip bd-dt-primary" href={l.revise} target="_blank" rel="noopener noreferrer" title="Öffnet das Bearbeiten-Formular des Angebots bei eBay">
+          Preis bei eBay ändern ↗
+        </a>
+      )}
+      <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
+        {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
+      </a>
     </div>
   );
 }

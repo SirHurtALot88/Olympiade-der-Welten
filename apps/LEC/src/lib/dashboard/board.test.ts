@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SortimentMarket, SortimentRow } from "./viewModel";
-import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode } from "./board";
+import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
@@ -78,5 +78,24 @@ describe("cardmarketCode", () => {
   it("laesst Unbekanntes stehen", () => {
     expect(cardmarketCode("MAMA-047")).toBe("MAMA-047");
     expect(cardmarketCode(" XYZ ")).toBe("XYZ");
+  });
+});
+
+describe("ebayLinks", () => {
+  it("verlinkt direkt zum Angebot, wenn die Artikelnummer bekannt ist", () => {
+    const l = ebayLinks({ ebayItemId: "227444381442", setCode: "OP27-DE010", nameRaw: "x" });
+    expect(l.view).toBe("https://www.ebay.de/itm/227444381442");
+    expect(l.revise).toBe("https://www.ebay.de/lstng?mode=ReviseItem&itemId=227444381442");
+  });
+  it("faellt auf die Shop-Suche mit dem Cardmarket-Code zurueck", () => {
+    const l = ebayLinks({ ebayItemId: null, setCode: "MAMA-DE047", nameRaw: "x" });
+    expect(l.view).toBeNull();
+    expect(l.revise).toBeNull();
+    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=MAMA-047");
+  });
+  it("ignoriert unplausible Nummern und nutzt ohne Set-Code den Namen", () => {
+    const l = ebayLinks({ ebayItemId: "abc", setCode: null, nameRaw: "Karte & Co" });
+    expect(l.view).toBeNull();
+    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=Karte%20%26%20Co");
   });
 });
