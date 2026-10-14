@@ -8522,7 +8522,11 @@
     rimpressure:0, floorgeneral:1, fastbreak:2, helpdefense:3, perimeter:4, clutchshot:5
   };
   function bauFeldspiel(saat){
-    seed=normalisiereSaat(saat); fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
+    seed=normalisiereSaat(saat);
+    // Eigener Kickoff-Saatstrom, fester Versatz auf denselben Spiel-Seed (s. Kommentar bei
+    // `kickoffRr` oben) -- deterministisch reproduzierbar, aber unkorreliert zu `seed`/`rr`.
+    kickoffSeed=(normalisiereSaat(saat)+777777)>>>0;
+    fsT=0; done=false; fsZeiger=0; fsAkt=0; fsAktMax=1; fsAktuell=null;
     // ENDSTAND-OVERLAY-WAECHTER (Broadcast-Audit Runde 2, Punkt 4, 30.09.): dasselbe
     // Einmal-Melden-Muster wie `buehneEndeGemeldet`/`bahnEndeGemeldet` (s. dort) -- ohne
     // diese Bremse wuerde updateHudFeldspiel() das #endstand-Overlay bei JEDEM Frame nach
@@ -10886,14 +10890,189 @@
     // diese Funktion naechsten Tick gar nicht mehr auf).
     if(fsLive.phase==="snap"&&fsLive.snap===s)starteSnap();
   }
+  // KICKOFF-RETURN (football-kickoff-slot-plan-14-10.md Schritt 4, Abschnitt 3.1 — Chris'
+  // Q1 vom 14.10., woertlich "ja": eine echte Rueckgabemechanik soll gebaut werden). Letzter
+  // der vier Schritte aus diesem Plan (Klasse-A-Slice PR #1224, Kicker/Punter-Slot PR #1225,
+  // QB-Slot PR #1226, dieser hier) — bewusst zuletzt, weil er als einziger einen komplett
+  // neuen Spielzustand zwischen zwei Serien braucht (s. starteKickoff()-Kommentar unten).
+  //
+  // REZEPT, PRIMAERWEG/NEBENWEG (CLAUDE.md „mehrere Wege zum Erfolg", Plan 3.1): Returner
+  // ueber LAUFKRAFT (derselbe Sub-Skill, den resolveLauf() oben schon fuer Laufspielzuege
+  // zieht, power:41/health:33/speed:26, UNVERAENDERT rho 0,909 zur Eignung) — bewusst NICHT
+  // LAUFTEMPO (das ist die rein physische Lauf-Animationsformel, disziplinuebergreifend,
+  // kein fachlicher Football-Kanal, s. LAUFTEMPO-Kommentar im Rezeptblock weiter oben).
+  // Kickende Seite ueber ABWEHR_LAUF (torment:55/power:30/health:15, dieselbe Formel, die
+  // resolveLauf() fuer die Verteidigung zieht) als Nebenweg — eine Verlustchance IM
+  // Mittelwert der Rueckgabe, kein eigener Wurf. KEIN neuer Sub-Skill auf beiden Seiten.
+  //
+  // TOUCHBACK-ANTEIL FEST, NICHT ATTRIBUTABHAENGIG (Plan 3.1): ein Touchback ist eine
+  // taktische Entscheidung des Kickers (hoch/tief statt flach/kurz kicken), keine Faehigkeit
+  // des Returners — ein Kicker-Attributkanal dafuer gehoert in den Kicker/Punter-Slot
+  // (Schritt 2, PR #1225, AUSDAUER), nicht hierher. 67% real (Rueckgabequote ~32,8%,
+  // K5-Papier Abschnitt 2.1).
+  //
+  // ONSIDE KICK: ausdruecklich NICHT Teil dieser Runde (Plan 3.1, "aus Risikogruenden" —
+  // seltenstes aller Ereignisse mit dem hoechsten Rauschrisiko pro Ereignis).
+  const KICKOFF_TOUCHBACK_QUOTE=0.67;
+  const KICKOFF_CATCH_YARDLINE=8;       // Yards vor der eigenen Torlinie, an der eine Rueckgabe typischerweise beginnt (ein Hang-Time-Kick landet selten IN der Endzone, s. loeseKickoffReturn-Kommentar)
+  const KICKOFF_RETURN_BASIS=22;        // Basis-Rueckgabe-Yards — PLATZHALTER wie der Rest von Football (s. FELDSPIEL_ART.football.kurve-Kommentar "ALLE ZAHLEN HIER SIND PLATZHALTER"), grob am NFL-Mittel orientiert
+  const KICKOFF_RETURN_DIFF_SLOPE=0.14; // Verschiebung des Mittelwerts je Punkt LAUFKRAFT-ABWEHR_LAUF-Differenz
+  const KICKOFF_RETURN_SIGMA=10;        // Gauss-Streuung in Yards
+  const KICKOFF_FLUG_DAUER=1.3, KICKOFF_RETURN_DAUER=0.9, KICKOFF_NACH=0.5; // Animationsdauern, analog FK_SNAP_FORMATION/FK_SNAP_NACH
+
+  // KICKOFF-EIGENE GEWICHTETE LOTTERIE UND GAUSS-ZIEHUNG, AUF DEM UNABHAENGIGEN
+  // `kickoffRr()`-STROM (s. Kommentar dort oben bei dessen Deklaration) — bewusst NICHT
+  // `fkLos()`/`gewichtetesLosNach()` wiederverwendet, weil beide hart auf die GEMEINSAME
+  // `rr()` verdrahtet sind. `kickoffLos()` dupliziert nur die GewichtungsFORMEL aus
+  // `fkLos()` (`Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA)`, dieselben
+  // Modul-Konstanten `LOS_NULLPUNKT`/`FK_LOS_KAPPA`) — dasselbe Rezept, nur auf einer
+  // anderen Ziehungsfolge gezogen, kein neues Gewichtungsschema.
+  function kickoffLos(team,rolle){
+    const gewichte=team.map(u=>Math.max(0.01,Math.pow(Math.max(1,u[rolle]-LOS_NULLPUNKT),FK_LOS_KAPPA)));
+    const summe=gewichte.reduce((s,x)=>s+x,0);
+    let r=kickoffRr()*summe;
+    for(let i=0;i<team.length;i++){ r-=gewichte[i]; if(r<=0)return team[i]; }
+    return team[team.length-1];
+  }
+  // Einfache Box-Muller-Transformation (Plan 3.1 verlangt ausdruecklich eine echte
+  // Gauss-Verteilung fuer die Rueckgabe-Yards) — unbedenklich auf dem unabhaengigen Strom:
+  // verbraucht zwei `kickoffRr()`-Ziehungen, ruehrt die gemeinsame `rr()`-Folge nicht an.
+  function kickoffRrGauss(){
+    let u=0,v=0;
+    while(u<=0)u=kickoffRr();
+    while(v<=0)v=kickoffRr();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  // ERGEBNIS EINES KICKOFFS — reine Entscheidung, keine Animation/kein Zustand (dieselbe
+  // Trennung wie resolveLauf()/resolvePass() gegenueber vollziehFootballErgebnis()).
+  // `empfang` ist die Mannschaft, die den Kickoff annimmt (die naechste Serie beginnt),
+  // `kick` die, die gerade gekickt hat. Returner/Deckung werden NUR gezogen, wenn es
+  // ueberhaupt zu einer Rueckgabe kommt — bei einem Touchback (67%) faellt kein einziger
+  // zusaetzlicher Lotterie-Wurf an. JEDE Ziehung hier laeuft ueber `kickoffRr()`/
+  // `kickoffLos()`/`kickoffRrGauss()`, NIE ueber `rr()`/`fkLos()` (s. Kommentar bei
+  // `kickoffRr` oben fuer den gemessenen Grund: eine fruehe Fassung auf der GEMEINSAMEN
+  // `rr()`-Folge senkte rho je Spiel kaderfest auf 0,783-0,791, durchgefallen unter der
+  // 0,80-Schranke — selbst eine Variante OHNE jede echte Rueckgabe, nur mit der einen
+  // zusaetzlichen Touchback-Ziehung auf der gemeinsamen Folge, kostete bereits 0,804->0,800.
+  // Der unabhaengige Strom haelt jede Nicht-Kickoff-Ziehung dieses Spiels bit-identisch und
+  // bringt rho zurueck auf den Schritt-3-Stand (0,804, volle Zahlen in der PR-Beschreibung).
+  function loeseKickoffReturn(empfang,kick){
+    if(kickoffRr()<KICKOFF_TOUCHBACK_QUOTE)return{typ:"touchback"};
+    const returner=kickoffLos(empfang,"LAUFKRAFT");
+    const coverage=kickoffLos(kick,"ABWEHR_LAUF");
+    const diff=returner.LAUFKRAFT-coverage.ABWEHR_LAUF;
+    const meanYds=Math.max(5,Math.min(45,KICKOFF_RETURN_BASIS+diff*KICKOFF_RETURN_DIFF_SLOPE));
+    const yards=Math.max(-5,Math.round(meanYds+kickoffRrGauss()*KICKOFF_RETURN_SIGMA));
+    // Spot-Konvention wie ueberall (fkLosX-Kommentar: "spot = Yards bis zum GEGNERISCHEN
+    // Ziel der angreifenden Seite"). Geklemmt auf [1,99] — ein Rueckgabe-Touchdown ist in
+    // der realen NFL ein Ereignis von deutlich unter 1 je 100 Rueckgaben (seltener noch als
+    // der bewusst ausgeklammerte Onside Kick) und wird hier wie jeder andere Lauf-/
+    // Pass-Yardwert an den Feldrand geklemmt statt als eigener Score-Pfad modelliert.
+    const spot=Math.max(1,Math.min(99,100-(KICKOFF_CATCH_YARDLINE+yards)));
+    return{typ:"return",spieler:returner,verteidiger:coverage,yards,spot};
+  }
+
+  // KICKOFF-PHASE — eine NEUE, football-eigene Zustandsmaschine (analog zu starteSnap(), mit
+  // eigenem `stufe`-Automat: "flug" -> ggf. "return" -> "nach" -> naechster Snap). Der
+  // einzige Moment in Football, in dem kurzzeitig KEIN laufender Down/Distance-Zustand
+  // existiert (`fsLive.football` ist waehrend dieser Phase `null`, s. Plan 3.1
+  // "Risiko/Chassis") — erreicht AUSSCHLIESSLICH aus beginneFootballSerie() (football-eigen),
+  // NICHT aus dem generischen stepFeldspielLive()-Dispatcher direkt: der einzige neue Zweig
+  // dort steht hinter dem bereits bestehenden `if(istFootball())`-Block (s. dortiger
+  // Kommentar) — Basketball/Hockey/Tennis lesen `fsLive.phase==="kickoff"` nie und bleiben
+  // vollstaendig unberuehrt (git diff zeigt das).
+  function starteKickoff(seite){
+    fsLive.phase="kickoff";
+    fsLive.football=null;
+    for(const team of FSTEAM)for(const u of team)u.hatBall=false;
+    fsLive.ball.traeger=null; fsLive.ball.flug=null; fsLive.ball.frei=null;
+    const erg=loeseKickoffReturn(FSTEAM[seite],FSTEAM[1-seite]);
+    // VIZ, GROB VEREINFACHT (wie der Rest der Kick-Visualisierung, s. fkKickHoch-Kommentar):
+    // Abschlag vom Mittelfeld der kickenden Seite, Landung beim Fangpunkt der empfangenden
+    // Seite — echte Kickoff-/Deckungsformationen sind nicht Teil dieser Runde.
+    const startX=fkLosX(1-seite,50);
+    const fangSpot=Math.max(1,Math.min(99,100-KICKOFF_CATCH_YARDLINE));
+    const landeX=fkLosX(seite,fangSpot);
+    fsLive.kickoff={stufe:"flug",t:0,seite,erg,startX,landeX,zielX:null};
+    fsBall={sichtbar:true,x:startX,y:H/2,traegerId:null};
+  }
+  function stepKickoffPhase(dt){
+    const k=fsLive.kickoff; if(!k)return;
+    k.t+=dt;
+    if(k.stufe==="flug"){
+      const phase=Math.min(1,k.t/KICKOFF_FLUG_DAUER);
+      const hoch=Math.sin(phase*Math.PI)*50;
+      fsBall={sichtbar:true,x:k.startX+(k.landeX-k.startX)*phase,y:H/2-hoch,traegerId:null};
+      if(phase>=1){
+        if(k.erg.typ==="touchback"){
+          feed(k.seite,"Touchback.");
+        } else {
+          feedEreignis(k.seite,k.erg.spieler.n+" faengt den Kickoff.");
+          k.zielX=fkLosX(k.seite,k.erg.spot);
+        }
+        k.stufe=k.erg.typ==="touchback"?"nach":"return"; k.t=0;
+      }
+      return;
+    }
+    if(k.stufe==="return"){
+      const phase=Math.min(1,k.t/KICKOFF_RETURN_DAUER);
+      fsBall={sichtbar:true,x:k.landeX+(k.zielX-k.landeX)*phase,
+        y:H/2+Math.sin(phase*Math.PI*3)*12,traegerId:k.erg.spieler.id};
+      if(phase>=1){
+        // KREDIT IN laufYards, KEIN NEUES FELD (Plan 3.1: "kein neuer Sub-Skill noetig" —
+        // dasselbe gilt fuer die Box-Score-Gutschrift, s. feldspielWert()-Kommentar
+        // "passYards/25 + laufYards/10 + fangYards/10"): eine Kickoff-Rueckgabe ist
+        // mechanisch ein Laufgewinn ueber LAUFKRAFT, exakt der Kanal, den die bereits
+        // gemessene Wertformel schon kennt. NUR SICHER, WEIL DIE ZIEHUNG AUF DEM
+        // UNABHAENGIGEN `kickoffRr()`-STROM LIEGT (s. Kommentar dort oben): eine fruehe
+        // Fassung dieser PR zog Returner/Deckung/Yards noch auf der GEMEINSAMEN `rr()`,
+        // und DORT senkte derselbe Kredit rho je Spiel kaderfest auf 0,788 (durchgefallen)
+        // — nicht durch den Kredit selbst, sondern durch die Kaskade der zusaetzlichen
+        // Ziehungen auf die ganze restliche Zufallsfolge des Spiels (s. Kommentar bei
+        // `kickoffRr`). Mit dem unabhaengigen Strom GEMESSEN (node scripts/miss-alle-
+        // disziplinen.mjs 48 football): MIT Kredit 0,807, OHNE Kredit 0,805 — der Kredit
+        // selbst ist nicht nur unschaedlich, sondern minimal foerderlich.
+        k.erg.spieler.laufYards+=k.erg.yards;
+        feed(k.seite,k.erg.spieler.n+" bringt die Rueckgabe bis zur eigenen "
+          +Math.round(100-k.erg.spot)+"-Yard-Linie — "+k.erg.yards+" Yards.");
+        k.stufe="nach"; k.t=0;
+      }
+      return;
+    }
+    if(k.t<KICKOFF_NACH)return;
+    // Dieselbe Lebend-Pruefung wie am Ende von stepSnapPhase (`fsLive.snap===s`): eine
+    // neue Phase kann die alte inzwischen ersetzt haben (hier strukturell nicht erreichbar,
+    // da nichts anderes waehrend "kickoff" in fsLive.phase schreibt — Absicherung statt
+    // beobachteten Fehlers, derselbe Vorsichtsstil wie dort).
+    if(fsLive.phase==="kickoff"&&fsLive.kickoff===k){
+      const d=FB().live.downs;
+      const spot=k.erg.typ==="touchback"?d.startSpot:k.erg.spot;
+      // Touchback: wie vorher ueber spielmacherLos() (bit-identischer Ballfuehrer-Zug wie am
+      // Spielbeginn). Rueckgabe: der Returner selbst ist der Ballfuehrer, mit dem die naechste
+      // Serie beginnt — keine zweite, zusaetzliche Ballfuehrer-Ziehung noetig oder sinnvoll.
+      ballUebernehmen(k.erg.typ==="touchback"?spielmacherLos(FSTEAM[k.seite]):k.erg.spieler);
+      fsLive.football={side:k.seite,down:1,toGo:Math.min(d.distanz,spot),max:d.max,spot,puntNetto:d.puntNetto};
+      starteSnap();
+    }
+  }
+
   // SERIENSTART. `fkNaechsterSpot` (falls gesetzt, s. vollziehFootballErgebnis) gilt fuer
-  // GENAU eine Serie und wird sofort verbraucht — ein Kickoff nach einem Score faehrt
-  // immer auf den Standard-Touchback-Spot (startSpot), kein Rueckgabespiel modelliert
-  // (PLATZHALTER, wie der Rest dieser Runde).
+  // GENAU eine Serie und wird sofort verbraucht — ein Punt/Turnover/Turnover-on-Downs/
+  // verfehltes Field Goal setzt IMMER vorher einen konkreten Feldstand (`fkNaechsterSpot`,
+  // s. die fuenf Zuweisungen in vollziehFootballErgebnis), ein KICKOFF (Spielbeginn ueber den
+  // Muenzwurf, oder nach Touchdown/erfolgreichem Field Goal) dagegen nie — genau DAS ist das
+  // vorhandene, zuverlaessige Signal "hier beginnt ein Kickoff", ohne einen neuen Zustand
+  // extra mitfuehren zu muessen. `fkNaechsterSpot==null` ist deshalb der einzige
+  // Verzweigungspunkt hier; der Punt-/Turnover-Pfad bleibt BIT-IDENTISCH zum Stand vor
+  // diesem Schritt. Rueckgabemechanik: s. starteKickoff() oben (football-kickoff-slot-plan-
+  // 14-10.md Schritt 4) — bis hierher fuhr jeder Kickoff unsichtbar auf d.startSpot, kein
+  // Kick-Flug, kein Returner, keine Deckung.
   function beginneFootballSerie(seite){
+    if(fkNaechsterSpot==null){ starteKickoff(seite); return; }
     const d=FB().live.downs;
     ballUebernehmen(spielmacherLos(FSTEAM[seite]));
-    const spot=fkNaechsterSpot!=null?Math.max(1,Math.min(99,fkNaechsterSpot)):d.startSpot;
+    const spot=Math.max(1,Math.min(99,fkNaechsterSpot));
     fkNaechsterSpot=null;
     fsLive.football={side:seite,down:1,toGo:Math.min(d.distanz,spot),max:d.max,spot,puntNetto:d.puntNetto};
     starteSnap();
@@ -10954,8 +11133,10 @@
       // startet immer ohne — der Stand 0:0 kann die Bedingung ohnehin nie erfuellen.
       hockeyEndphase:null,
       // NUR FOOTBALL: Down/Distance/Feldstand, s. FOOTBALL-Block weiter unten
-      // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null.
-      football:null, snap:null};
+      // (beginneFootballSerie/starteSnap). Ausserhalb von Football immer null. `kickoff`
+      // haelt starteKickoff()s eigenen Zustand (football-kickoff-slot-plan-14-10.md
+      // Schritt 4) nur waehrend der kurzen Phase zwischen zwei Serien, sonst null.
+      football:null, snap:null, kickoff:null};
     // VORGABE OHNE KLICK, VOR DEM ERSTEN BALLBESITZ (s. berechneFokusAuto oben): nur
     // Basketball fuellt fokusZielAuto ueberhaupt (die Funktion no-opt sonst), fuer jede
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
@@ -13606,6 +13787,11 @@
     if(istFootball()){
       bewegeSpielerLive(dt);
       if(fsLive.phase==="snap")stepSnapPhase(dt);
+      // KICKOFF-RETURN (football-kickoff-slot-plan-14-10.md Schritt 4): derselbe Zweig,
+      // nur fuer die neue Phase — bleibt innerhalb des bestehenden `if(istFootball())`-
+      // Blocks, den Basketball/Hockey/Tennis nie erreichen (s. Kommentar oben), also ohne
+      // jede Wirkung ausserhalb von Football.
+      else if(fsLive.phase==="kickoff")stepKickoffPhase(dt);
       return;
     }
     // ENDPHASE-CHECK (Konzeptreview T1): einmal je Tick, reine Zustandsablesung, kein
@@ -14140,6 +14326,17 @@
         teile.push("<span class=\"torwartraus "+(fsLive.hockeyEndphase===0?"l":"r")+"\">TORWART RAUS</span>");
       return teile.join(" · ");
     }
+    // KICKOFF-DEGRADIERUNG (football-kickoff-slot-plan-14-10.md Schritt 4, offener
+    // Risikopunkt aus Plan Abschnitt 3.1: "unverifiziert, ob die Down-&-Distance-Anzeige
+    // waehrend eines Kickoffs sauber degradiert"). VORHER zeigte diese Funktion fuer
+    // `fsLive.football===null` (der Zustand WAEHREND eines Kickoffs, s. starteKickoff())
+    // schon korrekt GAR NICHTS an (der naechste Zweig unten verlangt `fsLive.football`,
+    // ohne das faellt die Funktion durch bis zum leeren String ganz unten) — kein Bug, aber
+    // auch keine Information: der Betrachter sah nur eine leere Kontextzeile, ohne zu
+    // wissen, WARUM. Dieser Zweig ersetzt das "nichts" durch ein ausdrueckliches "Kickoff",
+    // exakt das vom Plan vorgeschlagene Degradierungsmuster ("zeigt z.B. 'Kickoff' statt
+    // '1st & 10'"), im selben innerHTML-/Klassen-Muster wie `.knapp`/`.torwartraus` oben.
+    if(istFootball()&&fsLive.kickoff)return (fsLive.kickoff.seite===0?"▶":"◀")+" Kickoff";
     if(istFootball()&&fsLive.football){
       const ORD=["1st","2nd","3rd","4th"];
       const fb=fsLive.football;
@@ -31811,6 +32008,31 @@
   const FARBWURZEL=cv.closest(".oly-battle-arena")||document.body;
   const css=v=>getComputedStyle(FARBWURZEL).getPropertyValue(v).trim();
   let seed=1337;const rr=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  // EIGENER, UNABHAENGIGER SAATSTROM FUER DEN FOOTBALL-KICKOFF (football-kickoff-slot-plan-
+  // 14-10.md Schritt 4, Abschnitt 3.1) — dasselbe Grundprinzip, das dieses Modul bereits an
+  // anderer Stelle kennt ("`o.mutatorSaat`: Versatz fuer einen unabhaengigen Mutator-
+  // Saatstrom … trennt Mutator-Ziehungsrauschen von einer echten Wirkung", Kommentar bei
+  // `disziplinProbe`), hier aber als ECHTE, parallel laufende zweite Ziehungsfolge statt
+  // eines Saat-VERSATZES auf derselben Folge. GRUND, KADERFEST GEMESSEN (node scripts/
+  // miss-alle-disziplinen.mjs 48 football): ein Kickoff ist der einzige Moment in Football,
+  // der eine KOMPLETT NEUE Serie eroeffnet (Down 1, frischer Feldstand) — jede zusaetzliche
+  // `rr()`-Ziehung dort verschiebt die GESAMTE restliche Zufallsfolge dieses Spiels (jeden
+  // Sack/jede Completion/jede Interception aller folgenden Downs), nicht nur den Kickoff
+  // selbst. Erstfassung (Kickoff-Zufall auf der GEMEINSAMEN `rr()`-Folge, wie ueberall sonst
+  // in Football ueblich) senkte rho je Spiel je nach Rueckgabe-Formel auf 0,783-0,791
+  // (durchgefallen, unter der 0,80-Schranke) — selbst eine Variante, die NIE eine echte
+  // Rueckgabe auswuerfelt (Touchback-Quote testweise auf 100% gesetzt, bei UNVERAENDERTEM
+  // Spielausgang in JEDEM Fall), kostete allein durch die eine zusaetzliche Ziehung schon
+  // 0,804->0,800 — der eindeutige Beweis, dass der Schaden aus der VERSCHIEBUNG der
+  // Zufallsfolge kam, nicht aus der Mechanik selbst (dieselbe "Kaskade", vor der CLAUDE.md
+  // warnt). Mit einem eigenen, parallelen Strom bleibt jede Nicht-Kickoff-Ziehung dieses
+  // Spiels BIT-IDENTISCH zum Stand vor diesem Schritt, unabhaengig davon, ob/wie oft ein
+  // Kickoff-Touchback oder eine -Rueckgabe gezogen wird — rho kehrt damit auf 0,804 zurueck
+  // (s. PR-Beschreibung). Reseeded in bauFeldspiel() (eigener, fester Versatz auf denselben
+  // Spiel-Seed) -- weiterhin voll deterministisch/reproduzierbar je Spiel-Saat, nur
+  // UNKORRELIERT zur Hauptfolge.
+  let kickoffSeed=1337;
+  const kickoffRr=()=>{kickoffSeed=(kickoffSeed*1664525+1013904223)>>>0;return kickoffSeed/4294967296;};
   // SAAT-NORMALISIERUNG (Bug, gefunden beim Bau von Battle-Mode-PR6, 30./31.08.): alle vier
   // `seed=saat||1337`-Stellen (bauFeldspiel/bauBuehne/build/bauSpurt) erwarten eine Zahl.
   // Uebergibt man stattdessen einen Text-Seed -- genau das Format, das der Battle-Mode-Plan
