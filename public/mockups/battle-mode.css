@@ -1045,6 +1045,13 @@
   .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.l{color:var(--home)}
   .oly-battle-arena.oly-battle-arena .bbugmitte small .torwartraus.r{color:var(--away)}
 
+  /* 3RD-DOWN-HERVORHEBUNG (Football, Klasse-A-Slice, football-kickoff-slot-plan-14-10.md
+     Schritt 1): Text in feldspielKontextZusatz() eingestreut (innerHTML, wie .knapp/
+     .torwartraus oben) -- dieselbe Warnfarbe wie die Shot-Clock-/.ttstand-Warnung, weil der
+     3. Versuch real derselbe "jetzt wird's eng"-Moment ist. */
+  .oly-battle-arena.oly-battle-arena .bbugmitte small .football3rd{
+    color:var(--warn,#e0a341);font-weight:700;letter-spacing:.02em}
+
   /* B2 -- "LAUF"-GRAFIK (Basketball, A, Prio 2): eigenes Band UNTER dem Bug (nicht Teil
      von .bbugmitte, s. Bauplan "Band unter dem Bug"), sichtbar nur ab 8 Punkten in Folge
      (aktualisiereBbug() setzt/entfernt [hidden] und die Home/Away-Klasse). */
