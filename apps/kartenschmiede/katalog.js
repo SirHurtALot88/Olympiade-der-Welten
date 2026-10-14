@@ -117,7 +117,7 @@
     f("geistwolf", "zauber", "Geistwolf", "Zauber", ALLE, ["beschwoerung", "magie"], "fest", 20, "{Z5} Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf), bleibt bis Spielende."),
 
     // Gegenstände: Tränke und Bomben aus dem Quest-Kampagnenbuch (Wirkung hier als Vorschlag), dazu Ausrüstung
-    f("heiltrank", "gegenstand", "Heiltrank", "Trank", FREUNDE, ["heilung", "einmalig"], "fest", 5, "{S} Freie Aktion: {HW3+1}.", "Quest-Kampagne"),
+    f("heiltrank", "gegenstand", "Heiltrank", "Trank", FREUNDE, ["heilung", "einmalig"], "fest", 5, "{S} Freie Aktion: {HW6-2}, mindestens 1.", "Quest-Kampagne"),
     f("heldenelixier", "gegenstand", "Heldenelixier", "Trank", FREUNDE, ["staerkung", "einmalig"], "fest", 5, "{S} Bis Rundenende {T+1} und +1 auf Proben.", "Quest-Kampagne"),
     f("kraftelixier", "gegenstand", "Kraftelixier", "Trank", HELD, ["magie", "einmalig"], "fest", 5, "{S} Freie Aktion: {P+1}, ein zusätzlicher Aktionswürfel in diesem Zug.", "Quest-Kampagne"),
     f("teleporttrank", "gegenstand", "Teleporttrank", "Trank", FREUNDE, ["bewegung", "einmalig"], "fest", 5, "{S} {B12} versetzen, auch aus dem Nahkampf.", "Quest-Kampagne"),
@@ -213,7 +213,7 @@
     f("plattenruestung", "gegenstand", "Plattenrüstung", "Ausrüstung", FREUNDE, ["schutz"], "fest", 10, "{V+1}, dafür {B-1}.", "Fantasy"),
     f("ring-regeneration", "gegenstand", "Ring der Erneuerung", "Ausrüstung", FREUNDE, ["heilung", "magie"], "fest", 15, "Zu Beginn jeder Aktivierung bei {D5} {H1}.", "Fantasy"),
     // Gegenstände: Sci-Fi
-    f("medi-injektor", "gegenstand", "Medi-Injektor", "Verbrauchsgut", FREUNDE, ["heilung", "einmalig", "technik"], "fest", 5, "{S} Freie Aktion, selbst oder Verbündeter {R1}: {HW3+1}.", "Sci-Fi"),
+    f("medi-injektor", "gegenstand", "Medi-Injektor", "Verbrauchsgut", FREUNDE, ["heilung", "einmalig", "technik"], "fest", 5, "{S} Freie Aktion, selbst oder Verbündeter {R1}: {HW6-2}, mindestens 1.", "Sci-Fi"),
     f("stimpack", "gegenstand", "Stimpack", "Verbrauchsgut", FREUNDE, ["staerkung", "einmalig", "technik"], "fest", 5, "{S} Bis Rundenende Schnell und {A+1} je Nahkampfwaffe.", "Sci-Fi"),
     f("emp-granate", "gegenstand", "EMP-Granate", "Granate", FREUNDE, ["betaeubung", "flaeche", "einmalig", "technik"], "fest", 10, "{S} Punkt {R9}: Maschinen und Drohnen {F3} bei {D3} {X}, alle anderen bei {D5}.", "Sci-Fi"),
     f("energieschild", "gegenstand", "Energieschild", "Ausrüstung", FREUNDE, ["schutz", "technik"], "fest", 10, "{RU} Einen Treffer mit DS ignorieren.", "Sci-Fi"),

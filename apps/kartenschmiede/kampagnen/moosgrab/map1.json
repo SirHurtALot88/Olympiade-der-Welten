@@ -28,11 +28,11 @@
    },
    {
     "titel": "Sporenuhr",
-    "text": "Läuft ab Cue 01B-2 auf 3, sinkt am Ende jeder Runde um 1. Bei 0 blüht die Frau auf, ob jemand bei ihr ist oder nicht. Der Zählstein liegt für alle sichtbar auf dem Tisch; was bei 0 passiert, sagst du nicht."
+    "text": "Läuft ab Cue 01B-2 auf 3, sinkt am Ende jeder Runde um 1. Bei 0 blüht die Frau auf, ob jemand bei ihr ist oder nicht. Der Zählstein liegt für alle sichtbar; die Ansage beim Aufstellen deutet nur an, dass die Zeit drängt."
    },
    {
     "titel": "Die Frau",
-    "text": "Sie steht am linken Waldrand (Zone B) und bewegt sich nicht. Sie ist kein Gegner. Wer sie erreicht, solange die Uhr über 0 steht: Taste F. Wird sie angegriffen: Verteidigung 6+, Zäh 1, jede Wunde löst sofort das Aufblühen aus."
+    "text": "Sie liegt am linken Waldrand vor Zone B und bewegt sich nicht. Sie ist kein Gegner. Wer sie erreicht, solange die Uhr über 0 steht: Taste F. Wird sie angegriffen: Verteidigung 6+, Zäh 1, jede Wunde löst sofort das Aufblühen aus."
    },
    {
     "titel": "Verhaltenswürfel",
@@ -40,7 +40,7 @@
    },
    {
     "titel": "Die Quelle",
-    "text": "Das grüne Licht in der Ruine ist erst angreifbar, wenn Marker 3 untersucht ist. Es wehrt sich nicht. Zerstört: Atemzug −1, im Finale weniger Nachschub."
+    "text": "Das grüne Licht in der Ruine ist erst angreifbar, wenn Marker 3 untersucht ist oder Lene den Helden das Licht gezeigt hat. Es wehrt sich nicht. Zerstört: Atemzug −1, im Finale weniger Nachschub."
    },
    {
     "titel": "Die Erblühte zögert",
@@ -146,8 +146,8 @@
    "art": "Haupt",
    "titel": "Den Waldrand untersuchen",
    "spieler": "Seht euch die drei Stellen am Waldrand an, an denen etwas nicht stimmt, und findet heraus, was das Dorf krank macht.",
-   "quelle": "Der Fuhrmann, der euch geschickt hat (Vorschlag, Schritt „Warum ihr hier seid“)",
-   "vorlesen": "Drei Stellen am Waldrand, an denen etwas nicht stimmt. Der Fuhrmann hat gesagt: Dort fängt es an. Ihr habt noch nicht alle gesehen.",
+   "quelle": "Der Brief der Wegwacht (Schritt „Der Auftrag“)",
+   "vorlesen": "Der Brief der Wegwacht sagt: Findet heraus, was in Moosgrab geschieht. Hier am Waldrand fängt es an: drei Stellen, an denen etwas nicht stimmt. Ihr habt noch nicht alle gesehen.",
    "erledigt": {
     "flag": "ep_haupt",
     "ist": true
@@ -185,8 +185,16 @@
    "quelle": "Die Spuren an Marker 3; Lene: „Geht nicht hin.“",
    "vorlesen": "Oben zwischen den Steinen leuchtet das Grün. Dorthin führen alle Spuren. Es wehrt sich nicht.",
    "ab": {
-    "flag": "marker3",
-    "ist": true
+    "eine": [
+     {
+      "flag": "marker3",
+      "ist": true
+     },
+     {
+      "flag": "hinweis_licht",
+      "ist": true
+     }
+    ]
    },
    "erledigt": {
     "flag": "quelle_zerstoert",
@@ -256,7 +264,7 @@
  "antreiben": [
   {
    "titel": "Der Auftrag",
-   "vorlesen": "Drei Stellen auf dem Tisch, an denen etwas nicht stimmt. Ein Schrei von links. Und ein Fuhrmann, der auf Antwort wartet. Womit fangt ihr an?",
+   "vorlesen": "Drei Stellen auf dem Tisch, an denen etwas nicht stimmt. Ein Schrei von links. Und ein Brief mit Siegel, der Antworten will. Womit fangt ihr an?",
    "gmNotiz": "Wenn die Spieler nicht wissen, was sie tun sollen: Der Auftrag steht oben in der App. Marker untersuchen, zur Frau laufen, beides geht.",
    "schritte": [
     "spieler-erste-bewegung",
@@ -361,9 +369,22 @@
   },
   "aufdecken": {
    "Q": {
-    "flag": "marker3",
-    "ist": true
+    "eine": [
+     {
+      "flag": "marker3",
+      "ist": true
+     },
+     {
+      "flag": "hinweis_licht",
+      "ist": true
+     }
+    ]
    }
+  },
+  "info": {
+   "A": "Feindzone A, rechts oben: Hier kriechen Sporenlinge aus dem Wald, wenn der Kampf beginnt.",
+   "B": "Feindzone B, linke Kante: Hier kommt die Frau aus dem Wald, und hinter ihr die Sporenlinge.",
+   "Q": "Die Quelle: grünes Licht zwischen den Steinen der Ruine. Aufgedeckt durch Marker 3 oder durch Lenes Hinweis. Greift nicht an. Zerstört: Atemzug −1, die Erblühte Zäh −2."
   }
  },
  "leisten": {
@@ -374,8 +395,24 @@
    "max": 6,
    "start": 0,
    "richtung": "hoch",
-   "text": "Nach jeder Map +1. Jeder Suchmarker, der erst nach dem Kampf gesucht wird: +1. Im Finale bestimmt die Leiste den Nachschub pro Runde.",
-   "schlecht": "hoch"
+   "text": "Wie nah das, was unter Moosgrab atmet, schon ist. Gilt für die ganze Kampagne. +1: nach jeder Map, für jeden Suchmarker, der erst nach dem Bosskampf gesucht wird, und wenn die Frau aufblüht, ohne dass jemand bei ihr war. Jeder Strich: eine Feindzone wächst oder ein verseuchtes Feld kommt dazu. Bei 6 atmet es aus (Nachschub, dann zurück auf 4). Im Finale bestimmt die Leiste den Nachschub pro Runde.",
+   "schlecht": "hoch",
+   "jeStrich": {
+    "titel": "Der Wald rückt näher",
+    "gmNotiz": "Eine Feindzone wächst um eine Kartenbreite, oder leg ein neues verseuchtes Feld (Filz) an den Rand. Nichts dazu sagen, nur hinlegen."
+   },
+   "schwellen": [
+    {
+     "ab": 6,
+     "wiederholt": true,
+     "titel": "Es atmet aus",
+     "vorlesen": "Der Boden hebt sich unter euren Füßen, einmal, langsam, wie eine Brust. Dann sinkt er. Aus dem Moos ringsum kriecht es hervor.",
+     "gmNotiz": "Mitten im Kampf: zwei Sporenlinge kommen aus der nächsten Feindzone (unten „＋ Gegner“). Außerhalb eines Kampfs: der nächste Kampf beginnt mit zwei Sporenlingen mehr. Die Leiste fällt auf 4.",
+     "leisten": {
+      "atemzug": -2
+     }
+    }
+   ]
   },
   "sporenuhr": {
    "name": "Sporenuhr",
@@ -549,6 +586,11 @@
    "start": false,
    "text": "Map 1 ist zu Ende, die Helden brechen zur Kapelle auf.",
    "wirktIn": "map1"
+  },
+  "hinweis_licht": {
+   "start": false,
+   "text": "Lene hat den Helden das Licht in der Ruine gezeigt: die Quelle ist aufgedeckt und angreifbar.",
+   "wirktIn": "map1"
   }
  },
  "audio": {
@@ -556,25 +598,29 @@
    "titel": "Intro",
    "datei": "audio/moosgrab/01/E0.mp3",
    "schleife": false,
-   "notiz": "Der Tisch ist leer, wenn das Intro läuft."
+   "notiz": "Der Tisch ist leer, wenn das Intro läuft.",
+   "text": "Manche Orte sterben nicht. Sie warten.\nMoosgrab war nie ein Name, den Könige kannten. Kein Banner wehte dort. Kein Heer marschierte durch seine Straßen. Kein Lied wurde über seine Mauern gesungen.\nEs war nur ein Dorf. Ein Brunnen. Ein Friedhof. Eine Kapelle ohne Priester. Ein paar Dächer, geduckt am Rand des alten Waldes.\nDoch der Wald war älter als das Dorf. Älter als die Straße. Älter als die Gräber, in denen die Menschen ihre Toten sicher glaubten.\nVor drei Wochen hörten die Hunde auf zu bellen. Vor zwei Wochen starb das Vieh mit Erde im Maul. Vor einer Woche fanden Kinder grüne Lichter zwischen den Bäumen. Und gestern Nacht wuchsen Pilze aus Gräbern, die seit Jahren geschlossen waren.\nDie Dorfälteste sandte Boten aus. Der erste kam nicht zurück. Der zweite kam nicht zurück. Der dritte erreichte die Handelsstraße mit blutigen Füßen, kalten Händen und Augen, die nichts Menschliches mehr sahen.\nEr sagte nur einen Satz: Die Wurzeln haben Namen gelernt.\nSeitdem spricht niemand in Moosgrab lauter als nötig. Fenster bleiben geschlossen. Türen werden von innen verriegelt. Und wenn der Wind durch den Friedhof geht, antworten Stimmen aus der Erde.\nDoch heute kommen vier Helden auf der alten Straße. Sie tragen Stahl. Sie tragen Zauber. Sie tragen Hoffnung. Vielleicht reicht das. Vielleicht nicht.\nDenn unter Moosgrab liegt kein Grab. Kein Schatz. Kein vergessener König. Dort unten atmet etwas. Und jedes Mal, wenn es ausatmet, bewegt sich der Wald ein Stück näher an das Dorf.\nMoosgrab wartet. Die Wurzeln warten. Und die erste Nacht hat gerade erst begonnen."
   },
   "01B-1": {
    "titel": "Der Schrei",
    "datei": "audio/moosgrab/01/01B-1.mp3",
    "schleife": false,
-   "notiz": "Die Frau ist zu hören, nicht zu sehen."
+   "notiz": "Die Frau ist zu hören, nicht zu sehen.",
+   "text": "Der Wald war still. Zu still. Kein Vogel. Kein Wind. Nur das nasse Knacken alter Äste.\nDann kam der Schrei. Nicht weit entfernt. Nicht verborgen. Nah. Viel zu nah.\n(Schrei einer Frau in der Ferne)\nEin Mensch. Eine Frau. Und irgendetwas war hinter ihr her."
   },
   "01B-2": {
    "titel": "Die Flucht",
    "datei": "audio/moosgrab/01/01B-2.mp3",
    "schleife": false,
-   "notiz": "Die Frau stolpert aus dem Wald links."
+   "notiz": "Die Frau stolpert aus dem Wald links.",
+   "text": "(Die Frau, außer Atem, in Panik)\nHilfe! Bitte helft mir! Sie kommen!\nNein! Nein, bitte! WEG VON MIR!\nSie kommen aus dem Moos! Aus den Wurzeln! Ich kann nicht mehr!\nDa vorne! Ich sehe euch! Bitte! Hört mich jemand?\nNein! Nicht zurück! Nicht zurück!\n(Sie stürzt) Ah! … Bitte … helft mir …"
   },
   "01B-3": {
    "titel": "Die Kreaturen",
    "datei": "audio/moosgrab/01/01B-3.mp3",
    "schleife": false,
-   "notiz": "Etwas Kleines zuckt aus dem Moos."
+   "notiz": "Etwas Kleines zuckt aus dem Moos.",
+   "text": "Die Frau stürzt vor den Helden in den Schlamm. Hinter ihr reißt das Unterholz auf. Nicht wie ein Pfad. Wie ein Maul.\nKleine Körper kriechen aus dem Moos. Pilzbewachsen. Zuckend. Hungrig.\nIhre Köpfe drehen sich. Nicht zu der Frau. Zu euch.\nJetzt sehen sie euch. Und jetzt müsst ihr handeln."
   },
   "01B-4A": {
    "titel": "Die Frau aus den Wurzeln",
@@ -587,14 +633,15 @@
    "titel": "Das Aufblühen",
    "datei": "audio/moosgrab/01/01B-4B.mp3",
    "schleife": false,
-   "notiz": "Sie blüht auf."
+   "notiz": "Sie blüht auf.",
+   "text": "Zuerst verändert sich ihr Atem. Feucht. Schwer. Wie Erde in einer Lunge.\nIhre Finger krümmen sich. Nicht vor Schmerz. Vor etwas, das in ihnen wächst. Unter ihren Nägeln quillt Moos hervor. Dünn. Grün. Lebendig.\nDie Haut an ihrem Hals wird blass. Dann gelb. Dann öffnet sie sich. Nicht wie eine Wunde. Wie nasse Rinde. Darunter liegt kein Fleisch mehr. Nur Fäden. Wurzeln. Pilzgewebe.\nDie Frau versucht zu sprechen. Vielleicht Hilfe. Vielleicht ihren Namen. Doch aus ihrem Mund kommt kein Wort. Nur Sporen.\nJetzt versteht ihr, was Moosgrab verschwiegen hat. Die Menschen hier sterben nicht einfach. Sie blühen auf.\nDie Frau hebt den Kopf. Ihre Augen sind noch menschlich. Für einen letzten Atemzug. Dann reißen sie weit auf.\nWas vor euch kniet, ist nicht mehr Frau. Nicht mehr Opfer. Nicht mehr ganz Mensch.\nEs richtet sich auf. Der Wald antwortet. Und die Kreatur greift an."
   },
   "BATTLE-1": {
    "titel": "Battle Cue 1",
    "datei": "audio/moosgrab/01/battle-1.mp3",
    "schleife": true,
    "dauer": "3:15",
-   "notiz": "Schleife bis der Boss fällt."
+   "notiz": "Im Kampf gegen die Erblühte starten (Knopf im Kampfschritt, Taste A). Schleife bis der Boss fällt."
   },
   "01B-5": {
    "titel": "Was von ihr blieb",
@@ -608,8 +655,8 @@
    "name": "Die Frau aus den Wurzeln",
    "anzeige": "Eine Frau aus dem Dorf",
    "tisch": {
-    "x": 2,
-    "y": 11,
+    "x": 6,
+    "y": 12.5,
     "ab": {
      "flag": "frau_sichtbar",
      "ist": true
@@ -621,49 +668,59 @@
     "zeichen": "F"
    },
    "wer": "Lene, die Tochter der Dorfältesten; ihren Namen sagt sie nur, wenn man sie ruhig danach fragt. Jung, barfuß, Kleid voller Erde, Wurzeln aus den Ärmeln, die Arme hält sie von sich weg. Sie wollte zum grünen Licht in der Ruine und ist umgekehrt, als es wehtat.",
-   "stimme": "Leise, zitternd, Pausen mitten im Satz. Blick weicht aus, die Arme weg vom Körper, als gehörten sie ihr nicht.",
-   "motiv": "Nach Hause. Zu ihrer Mutter. Sie hat Angst, dass sie den Weg nicht mehr findet.",
-   "ziel": "In dieser Szene will sie nur eins: dass jemand ihrer Mutter etwas ausrichtet. Sie weiß, dass sie selbst nicht mehr ankommt, ohne es sagen zu können.",
+   "stimme": [
+    "Leise, zitternd, Pausen mitten im Satz",
+    "Die Arme weg vom Körper, als gehörten sie ihr nicht"
+   ],
+   "motiv": "Nach Hause, zu ihrer Mutter.",
+   "ziel": "Ihre Botschaft loswerden, bevor es zu spät ist. Sie weiß, dass sie selbst nicht mehr ankommt.",
    "kern": [
     "„Das Licht. Das grüne, zwischen den Steinen … da wollte ich hin. Geht nicht hin.“",
     "„Es ist so warm. Alles ist so warm. Ich auch.“",
-    "„Ich hab den Weg nicht gefunden. Nach Hause. Ich hab ihn nicht gefunden.“",
-    "„Hört ihr das? Es singt. Es singt immer noch.“"
+    "„Ich hab den Weg nicht gefunden. Nach Hause. Ich hab ihn nicht gefunden.“"
    ],
    "weiss": [
     {
+     "kurz": "Ihr Name: Lene",
      "info": "„Lene. Ich bin … Lene.“ Beim Namen zucken die Wurzeln an ihren Armen.",
-     "wie": "Ruhig beruhigen und nach ihr fragen (Wahl 1). Wer stattdessen seinen eigenen Namen nennt, bekommt ihn wiederholt und startet Map 2 mit 1 Sporenpunkt."
+     "wie": "Ruhig nach ihrem Namen fragen.",
+     "folge": "Map 2: Hedda erkennt den Namen sofort. Wer ihn in der Kapelle laut sagt, bekommt 1 Sporenpunkt.",
+     "setzt": {
+      "frau_name": "Lene"
+     }
     },
     {
-     "info": "„Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
-     "wie": "Nach ihrer Mutter fragen oder Hilfe versprechen (Wahl 1 oder 2). Das Versprechen öffnet in Map 2 den Weg zu Hedda ohne Lärm. Der Satz von der Kapelle gibt den Helden den nächsten Auftrag: dorthin."
+     "kurz": "Die Botschaft an die Mutter",
+     "info": "„Sagt meiner Mutter … ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf.“",
+     "wie": "Nach ihrer Familie fragen oder ihr Hilfe versprechen.",
+     "folge": "Neuer Auftrag: zur Kapelle. Map 2: Hedda hört zu, bevor sie urteilt, und erkennt den Satz.",
+     "setzt": {
+      "versprechen_mutter": true,
+      "auftrag_kapelle": true
+     }
     },
     {
+     "kurz": "Der warme Brunnen",
      "info": "„Es fing mit dem Brunnen an. Vierzig Winter kalt, und dann warm.“",
-     "wie": "Sachlich fragen, woher das kommt, was im Dorf los ist (Wahl 3). Hedda bestätigt den Satz in Map 2."
+     "wie": "Fragen, wie es angefangen hat oder was im Dorf los ist.",
+     "folge": "Map 2: Die Helden dürfen Hedda direkt nach dem Brunnen fragen.",
+     "setzt": {
+      "hinweis_brunnen": true
+     }
     },
     {
-     "info": "„Alle sind in der Kapelle. Alle. Und keiner kommt mehr raus.“",
-     "wie": "Nach dem Dorf fragen. Mehr sagt sie dazu nicht. Dass die Leute dort knien und flüstern, erfahren die Helden erst in Map 2 (Cue 02-1, Fenster): hier nicht vorwegnehmen."
-    },
-    {
-     "info": "„Es hat gesungen. Dann hat es wehgetan.“ Sie zeigt zur Ruine.",
-     "wie": "Nach dem Licht fragen. Ihr einziger fester Hinweis: der Weg nach oben."
-    },
-    {
-     "info": "„Er ist vorgegangen. Er hat gesagt, er hört es rufen.“",
-     "wie": "Nach dem Mann im Moos fragen (Marker 2) oder ihn erwähnen. Seinen Namen weiß sie nicht mehr."
-    },
-    {
-     "info": "Wurzeln, keine Wunden. „Tut nicht weh. Es ist nur warm.“",
-     "wie": "Fragen, ob sie verletzt ist. Sie hebt die Arme, mehr Antwort gibt es nicht."
+     "kurz": "Das Licht in der Ruine",
+     "info": "„Da oben. Zwischen den Steinen. Es hat gesungen, und dann hat es wehgetan.“ Sie zeigt zur Ruine.",
+     "wie": "Nach dem Licht fragen, oder was sie im Wald wollte.",
+     "folge": "Sofort: Die Quelle in der Ruine ist aufgedeckt und angreifbar, auch ohne Marker 3.",
+     "setzt": {
+      "hinweis_licht": true
+     }
     }
    ],
    "nichtWissen": [
     "Was mit ihr geschieht: sie spürt nur die Wärme.",
-    "Was unter dem Dorf liegt: nur, dass der Brunnen plötzlich warm war.",
-    "Die Namen der Helden: sagt einer seinen, wiederholt sie ihn, und die Wurzeln zucken."
+    "Was unter dem Dorf liegt: nur, dass der Brunnen plötzlich warm war."
    ],
    "wennSieFragen": [
     [
@@ -671,12 +728,12 @@
      "„Ich kann nicht. Die Füße … die Füße sind schon drin.“"
     ],
     [
-     "wer ihr das angetan hat",
-     "Sie schüttelt den Kopf. „Niemand. Es hat gerufen. Ich bin gegangen.“"
+     "ob sie verletzt ist",
+     "Sie hebt die Arme. Wurzeln, keine Wunden. „Tut nicht weh. Es ist nur warm.“"
     ],
     [
-     "nach ihrem Namen, drängend",
-     "Sie zögert. Nur wer ruhig bleibt, bekommt ihn (Wahl 1)."
+     "wer ihr das angetan hat",
+     "Sie schüttelt den Kopf. „Niemand. Es hat gerufen. Ich bin gegangen.“"
     ]
    ],
    "kampf": {
@@ -704,11 +761,12 @@
     },
     "tod": {
      "vorlesen": "Der Schlag trifft. Sie sieht nicht einmal hin. Die Wurzeln an ihren Armen schießen in die Erde, alle auf einmal, ihr Rücken biegt sich, und am Hals geht etwas auf, langsam, wie eine Blüte.",
-     "gmNotiz": "Jede Wunde löst das Aufblühen aus: Sporenuhr aus (Zählstein weg), dann „Springen“ zu Das Aufblühen (cue-01b4b). Die Wahl „Was tun die Helden, während sie sich verwandelt“ läuft normal; die Erblühte beginnt mit voller Zähigkeit und wütend (frau_angegriffen ist gesetzt). Kein Hinweis, kein Nebenziel. Map 2: erzählen sie Hedda davon, zieht sie sich zurück.",
+     "gmNotiz": "Jede Wunde löst das Aufblühen aus: Sporenuhr aus (Zählstein weg), dann „Springen“ zu Das Aufblühen (Cue 01B-4B). Die Erblühte beginnt mit voller Zähigkeit und wütend (frau_angegriffen ist gesetzt). Kein Hinweis, kein Nebenziel. Map 2: erzählen sie Hedda davon, zieht sie sich zurück.",
      "setzt": {
       "frau_angegriffen": true
      }
-    }
+    },
+    "anblick": "Barfuß, das Kleid voller Erde. Die Wurzeln an ihren Armen zittern, wenn jemand näher kommt."
    }
   }
  },
@@ -741,7 +799,8 @@
      "text": "Die Helden sind beim Aufblühen zurückgewichen: Vor Runde 1 des Bosskampfs bewegt sich dieser Sporenling, falls er noch steht, eine Kartenlänge auf den nächsten Helden zu.",
      "ansage": "Das Kleinvieh hat gemerkt, dass ihr weicht."
     }
-   ]
+   ],
+   "anblick": "Kniehoch, nass glänzend, ein Kopf ohne Gesicht. Wo es kriecht, bleibt eine helle Spur im Moos, und es riecht nach nassem Brot."
   },
   "sporenling-zaeh": {
    "name": "Sporenling (zäh)",
@@ -771,7 +830,8 @@
      "text": "Die Helden sind beim Aufblühen zurückgewichen: Vor Runde 1 des Bosskampfs bewegt sich dieser Sporenling, falls er noch steht, eine Kartenlänge auf den nächsten Helden zu.",
      "ansage": "Das Kleinvieh hat gemerkt, dass ihr weicht."
     }
-   ]
+   ],
+   "anblick": "Aufgedunsen wie ein Sack voll Wasser. Unter der Haut bewegt sich etwas, langsam, in Wellen."
   },
   "erbluehte": {
    "name": "Die Erblühte",
@@ -867,7 +927,8 @@
      "text": "Die Helden haben ihren Namen gerufen: In Runde 1 zögert sie wie bei „ruhig“.",
      "ansage": "Der Name hält sie. Einen Atemzug lang."
     }
-   ]
+   ],
+   "anblick": "Das Kleid hängt noch an ihr, in Fetzen. Aus dem Hals wächst eine Blüte, groß wie ein Kopf, und sie dreht sich mit, wohin ihr geht."
   },
   "quelle": {
    "name": "Die Quelle",
@@ -890,10 +951,18 @@
     "passives": "Greift nicht an, bewegt sich nicht",
     "flavor": "Ein Leuchten zwischen den Steinen. Es hat kein Gesicht."
    },
-   "notiz": "Vorschlag, nicht aus der Bibel: Verteidigung 4+, Zäh 6, greift nicht an. Nur angreifbar, wenn marker3 gesetzt ist. Zerstört: quelle_zerstoert, Atemzug −1.",
+   "notiz": "Vorschlag, nicht aus der Bibel: Verteidigung 4+, Zäh 6, greift nicht an. Nur angreifbar, wenn Marker 3 untersucht ist oder Lene das Licht gezeigt hat. Zerstört: quelle_zerstoert, Atemzug −1.",
    "nurWenn": {
-    "flag": "marker3",
-    "ist": true
+    "eine": [
+     {
+      "flag": "marker3",
+      "ist": true
+     },
+     {
+      "flag": "hinweis_licht",
+      "ist": true
+     }
+    ]
    },
    "bedrohungSatz": "Es wehrt sich nicht. Es wartet.",
    "zustandSaetze": {
@@ -919,7 +988,8 @@
      },
      "text": "Die Helden kennen den Takt des Lichts: Angriffe auf die Quelle treffen mit +1."
     }
-   ]
+   ],
+   "anblick": "Zwischen den Steinen pulst grünes Licht, langsam, wie ein Herz. Wer hinsieht, hört ein leises Singen."
   }
  },
  "fog": {
@@ -1117,7 +1187,8 @@
    "setzt": {
     "marker1": true
    },
-   "danach": "pruefe-alle-marker"
+   "danach": "pruefe-alle-marker",
+   "wofuer": "Totes Reh: Das Moos hat zuerst die Tiere geholt. Ab 5: Es reagiert auf Geräusche."
   },
   "marker2": {
    "name": "Suchmarker 2 (Mitte)",
@@ -1151,7 +1222,8 @@
     "gegner_wuetend": true
    },
    "gmNotiz": "Ab jetzt wütende Tabelle für alle Gegner, egal wie der Wurf ausgeht.",
-   "danach": "pruefe-alle-marker"
+   "danach": "pruefe-alle-marker",
+   "wofuer": "Toter Mann aus dem Dorf, ab 5 erkennbar als der Priester der Kapelle. Danach sind alle Gegner wütend."
   },
   "marker3": {
    "name": "Suchmarker 3 (rechts unten, in der Sporenwolke)",
@@ -1184,15 +1256,8 @@
     "marker3": true
    },
    "gmNotiz": "Die Quelle darf jetzt angegriffen werden (Gegnerkarte „Die Quelle“ erscheint in der Spalte, Marker Q wird aufgedeckt).",
-   "danach": "pruefe-alle-marker"
-  },
-  "mitte": {
-   "name": "Ein Held überschreitet die Tischmitte",
-   "gruppe": "Bewegen",
-   "kurz": "Tischmitte",
-   "taste": "M",
-   "einmal": true,
-   "springe": "aufbau-oben"
+   "danach": "pruefe-alle-marker",
+   "wofuer": "Spuren zur Ruine. Deckt die Quelle auf: ab jetzt angreifbar."
   },
   "frau-erreicht": {
    "name": "Ein Held erreicht die Frau",
@@ -1220,8 +1285,16 @@
    "taste": "Q",
    "einmal": true,
    "nurWenn": {
-    "flag": "marker3",
-    "ist": true
+    "eine": [
+     {
+      "flag": "marker3",
+      "ist": true
+     },
+     {
+      "flag": "hinweis_licht",
+      "ist": true
+     }
+    ]
    },
    "vorlesen": "Das Licht zwischen den Steinen flackert, wird weiß, und geht aus. Für einen Moment ist der Wald still. Dann atmet er wieder, aber flacher.",
    "gmNotiz": "Atemzug −1. Nur drücken, wenn die Quelle wirklich auf 0 ist. Die Erblühte verliert ohne die Quelle 2 Zäh (die App rechnet es an ihrer Karte an, auch wenn sie erst später erscheint).",
@@ -1273,10 +1346,11 @@
    "checkliste": [
     "1 Figur für die Frau",
     "1 Figur für die Erblühte (Boss)",
-    "4 Sporenlinge: 2 Giftmade, 2 Sporenhülle (oder eigene Sporenling-Karten)",
+    "Sporenlinge: so viele, wie die App im Kampf anzeigt (auf Fortgeschritten 2 Giftmade, 2 Sporenhülle)",
     "3 Suchmarker, 2 Feindzonen-Marker (A, B)",
     "1 Zählstein für die Sporenuhr (auf den Tisch, damit die Spieler sie sehen)",
     "1 Zettel „Kupferanhänger, Zeichen der Kapelle“",
+    "Der Brief der Wegwacht (optional ausdrucken, Text im Schritt „Der Auftrag“)",
     "Ein W6 für die Spieler (Suchmarker-Proben) und einer für dich (Rundenwurf, Verhaltenswürfel)",
     "Village Ruins, Filz: Ruine, 2 Sporenbüsche (lila), Sporenwolke (grün), 2 umgestürzte Bäume, Zaun. Gelände darfst du frei stellen, wichtig sind nur Marker, Zonen und Start."
    ],
@@ -1287,56 +1361,50 @@
    "typ": "vorbereitung",
    "titel": "Stand und Audio",
    "checkliste": [
-    "Atemzug-Leiste aus dem Kampagnenstand übernommen (erste Map: 0)",
     "Gruppe gewählt (Reiter Gruppe), Heldenbögen bei den Spielern",
-    "Audio: E0, 01B-1, 01B-2, 01B-3, 01B-4B, Battle Cue 1, 01B-5 hochgeladen. 01B-4A ist optional (Frau wird live gespielt)",
+    "Audio-Dateien unten geprüft: hier nur nachsehen, ob alles da ist. Abgespielt wird jeder Cue erst an seiner Stelle im Ablauf",
     "Lautsprecher geprüft, ein Cue kurz angespielt"
    ],
-   "hinweis": "Die App zeigt je Cue, ob die Datei auf dem Server liegt.",
-   "weiter": "vorb-tisch-leer"
+   "hinweis": "Die Liste unten zeigt je Cue, ob die Datei auf dem Server liegt. „Probe“ spielt zum Testen an; im Spiel kommt jeder Cue in seinem eigenen Schritt.",
+   "weiter": "aufbau-tisch",
+   "uebernahme": true
   },
-  "vorb-tisch-leer": {
+  "aufbau-tisch": {
    "typ": "aufbau",
-   "titel": "Noch nichts aufbauen",
-   "skizze": "leer",
+   "titel": "Den Tisch aufbauen",
+   "skizze": "alles",
    "tisch": [
-    "Der Tisch bleibt leer. Nur das Filztuch liegt."
+    "Gelände frei hinstellen: Ruine oben in der Mitte, Sporenbüsche oben links und knapp über der Tischmitte, Sporenwolke rechts unten, ein umgestürzter Baum rechts, einer links zwischen Heldenstart und Waldrand, Zaun rechts oben",
+    "Suchmarker 1, 2 und 3 offen hinlegen: oben links neben dem Busch, in der Tischmitte, rechts unten in der Sporenwolke",
+    "Feindzonen-Marker A (rechts oben) und B (linke Kante, halbe Höhe) hinlegen",
+    "Die Quelle (Q) in der Ruine nicht hinlegen: die kennst nur du",
+    "Heldenstart unten in der Mitte: die Spieler stellen ihre Helden auf",
+    "Bereitlegen, aber nicht auf den Tisch: Sporenlinge, die Frau, die Erblühte, Zählstein Sporenuhr. Sie kommen, wenn die App es sagt"
    ],
-   "hinweis": "Das Intro läuft über einen leeren Tisch. Erst danach kommt die untere Hälfte.",
+   "hinweis": "Alles, was liegt, sehen die Spieler. Kreaturen und die Frau kommen erst an ihrer Stelle. Danach startet das Intro über dem fertigen Tisch.",
+   "setzt": {
+    "oben_aufgebaut": true
+   },
    "weiter": "cue-e0"
   },
   "cue-e0": {
    "typ": "cue",
    "titel": "Intro",
    "cue": "E0",
-   "notiz": "Niemand redet. Wenn der Track zu Ende ist, aufbauen.",
-   "weiter": "aufbau-unten"
-  },
-  "aufbau-unten": {
-   "typ": "aufbau",
-   "titel": "Untere Tischhälfte",
-   "skizze": "unten",
-   "tisch": [
-    "Heldenstart unten an der Tischkante, in der Mitte",
-    "Sporenwolke in die rechte untere Ecke (grüner Filz, verseucht), Suchmarker 3 hineinlegen",
-    "Umgestürzter Baum links, zwischen Heldenstart und Waldrand (Deckung, schwierig)",
-    "Suchmarker 2 in die Tischmitte",
-    "Feindzone B an die linke Kante, auf halber Höhe",
-    "Die obere Hälfte bleibt leer"
-   ],
+   "notiz": "Niemand redet. Der Tisch steht schon; die Spieler dürfen ihn ansehen, während das Intro läuft.",
    "weiter": "auftrag-waldrand"
   },
   "auftrag-waldrand": {
    "typ": "vorlesen",
-   "titel": "Warum ihr hier seid",
-   "text": "Zwei Tage ist es her, dass euch der Fuhrmann angehalten hat. Seit drei Wochen kommt aus Moosgrab kein Karren mehr, kein Brief, kein Mensch. Nachts stehen Lichter im Wald, wo keine sein sollten. „Seht nach, was da los ist“, hat er gesagt. „Fangt am Waldrand an. Da fängt es an.“ Und er hat gezahlt, im Voraus, die Hälfte. Jetzt steht ihr am Waldrand vor Moosgrab. Das Moos ist zu weich, die Luft zu warm. Drei Stellen vor euch, an denen etwas nicht stimmt. Seht sie euch an. Findet heraus, was das Dorf krank macht. Der Weg ins Dorf führt hier entlang und an der Kapelle vorbei.",
-   "gmNotiz": "(Vorschlag) Der Fuhrmann ist neu erfunden, damit die Helden einen Auftrag haben, bevor der erste NPC auftaucht. Wenn dein Intro E0 schon sagt, warum die Helden hier sind, lies nur die letzten vier Sätze (ab „Jetzt steht ihr …“). Die drei Stellen sind die Suchmarker auf dem Tisch; zeig auf sie. Die Kapelle wird hier nur als Wegmarke genannt, mehr nicht.",
+   "titel": "Der Auftrag",
+   "text": "Ein Brief, gesiegelt mit dem Turm der Wegwacht, der Gilde, die die Handelsstraße schützt. „An die Überbringer. Aus Moosgrab am alten Wald kommt seit drei Wochen keine Nachricht. Die Dorfälteste hat Boten geschickt. Einer hat die Straße erreicht, und was er sagte, ergibt keinen Sinn. Reist nach Moosgrab. Findet heraus, was dort geschieht. Sucht die Dorfälteste auf. Bringt Bericht und, wo es möglich ist, Überlebende. Der Lohn wird bei eurer Rückkehr gezahlt.“ Der Fuhrmann, der euch die letzte Strecke gefahren hat, hält am Waldrand und fährt keinen Schritt weiter. Jetzt steht ihr allein vor Moosgrab. Das Moos ist zu weich, die Luft zu warm. Drei Stellen vor euch, an denen etwas nicht stimmt. Der Weg ins Dorf führt hier entlang und an der Kapelle vorbei.",
+   "gmNotiz": "Den Brief kannst du ausdrucken und Franky in die Hand geben (Text oben). Er passt zum Intro: der Bote, der die Handelsstraße erreicht hat. Die drei Stellen sind die Suchmarker; zeig auf sie. Der Fuhrmann fährt zurück, er bringt die Helden nur her.",
    "weiter": "regel-sporennebel"
   },
   "regel-sporennebel": {
    "typ": "regel",
    "titel": "Regel für diese Map",
-   "text": "Eine Regel für diese Map. Wer seinen Zug in einer verseuchten Zone beendet, macht einen Qualitätstest. Misslungen: minus eins auf Treffen bis zum Ende der nächsten Runde. Und: Wir messen heute nicht. Eine Bewegung ist eine Kartenlänge, die lange Seite einer Gegnerkarte. Was näher ist als eine Kartenbreite, ist nah.",
+   "text": "Eine Regel für diese Map. Wer seinen Zug in einer verseuchten Zone beendet, macht einen Qualitätstest. Misslungen: minus eins auf Treffen bis zum Ende der nächsten Runde. Die drei Marker, die ihr seht, könnt ihr untersuchen: hingehen, Kontakt, eine Aktion. Und: Wir messen heute nicht. Eine Bewegung ist eine Kartenlänge, die lange Seite einer Gegnerkarte. Was näher ist als eine Kartenbreite, ist nah.",
    "weiter": "cue-01b1"
   },
   "cue-01b1": {
@@ -1364,11 +1432,12 @@
    "text": "Sobald sich der erste Held bewegt: weiter.",
    "hinweise": [
     "Noch keine Gegner. Noch keine Uhr.",
-    "Wer sofort sucht: Marker 2 und 3 sind erreichbar, aber die Uhr hat noch nicht begonnen.",
+    "Alle drei Suchmarker liegen offen. Wer sucht, muss in Kontakt stehen und eine Aktion dafür nehmen.",
     "Jeder Suchmarker: Grundtext vorlesen, dann würfelt der Spieler einen W6, und du liest die Stufen dazu.",
-    "Faden verloren? Auftrag oben in der App vorlesen: drei Stellen, ein Schrei, der Fuhrmann wartet."
+    "Faden verloren? Auftrag oben in der App vorlesen: drei Stellen, ein Schrei, die Gilde will Bericht."
    ],
    "ereignisse": [
+    "marker1",
     "marker2",
     "marker3"
    ],
@@ -1378,7 +1447,7 @@
    "typ": "cue",
    "titel": "Die Flucht",
    "cue": "01B-2",
-   "notiz": "Die Frau stolpert aus dem Wald links.",
+   "notiz": "Während der Track läuft: Figur der Frau und den Zählstein bereithalten. Wenn sie im Track stürzt, stellst du sie hin.",
    "weiter": "aufbau-frau"
   },
   "aufbau-frau": {
@@ -1386,7 +1455,7 @@
    "titel": "Die Frau auf den Tisch",
    "skizze": "unten",
    "tisch": [
-    "Die Figur der Frau in Feindzone B stellen (linke Kante, halbe Höhe), mit dem Gesicht zu den Helden",
+    "Die Figur der Frau vor Feindzone B hinlegen oder hinstellen: linke Seite, halbe Höhe, mit dem Gesicht zu den Helden. Sie ist im Schlamm gestürzt",
     "Zählstein Sporenuhr auf 3, gut sichtbar"
    ],
    "setzt": {
@@ -1395,7 +1464,7 @@
    "leistenAn": [
     "sporenuhr"
    ],
-   "regel": "Die Uhr auf dem Tisch sinkt am Ende jeder Runde um eins. Was bei null passiert, sage ich nicht.",
+   "regel": "Sie liegt im Schlamm, eine Hand nach euch ausgestreckt. Aus ihrem Ärmel wachsen Wurzeln in den Boden, und mit jedem Atemzug greifen sie tiefer. Der Stein vor euch zeigt, wie lange sie sich noch halten kann.",
    "weiter": "spieler-runde1"
   },
   "spieler-runde1": {
@@ -1415,49 +1484,9 @@
     "marker1",
     "marker2",
     "marker3",
-    "mitte",
     "frau-erreicht"
    ],
-   "weiter": [
-    {
-     "wenn": {
-      "flag": "oben_aufgebaut",
-      "ist": false
-     },
-     "ziel": "aufbau-oben"
-    },
-    {
-     "ziel": "cue-01b3"
-    }
-   ]
-  },
-  "aufbau-oben": {
-   "typ": "aufbau",
-   "titel": "Obere Tischhälfte",
-   "skizze": "oben",
-   "tisch": [
-    "Ruine an die obere Kante, Mitte (Deckung, blockiert Sicht). Die Quelle leuchtet grün darin, Marker Q bleibt verdeckt",
-    "Sporenbüsche in die linke obere Ecke und knapp über der Tischmitte (lila Filz, verseucht)",
-    "Suchmarker 1 in die linke obere Ecke, neben den Busch",
-    "Feindzone A in die rechte obere Ecke",
-    "Zaun an der rechten Kante, obere Hälfte"
-   ],
-   "setzt": {
-    "oben_aufgebaut": true
-   },
-   "hinweis": "Spätestens jetzt, auch wenn noch niemand die Mitte überschritten hat: Zone A liegt oben.",
-   "weiter": [
-    {
-     "wenn": {
-      "runde": "<",
-      "wert": 1
-     },
-     "ziel": "spieler-runde1"
-    },
-    {
-     "ziel": "cue-01b3"
-    }
-   ]
+   "weiter": "cue-01b3"
   },
   "cue-01b3": {
    "typ": "cue",
@@ -1496,8 +1525,16 @@
      "anzahl": 1,
      "zone": "Q",
      "nurWenn": {
-      "flag": "marker3",
-      "ist": true
+      "eine": [
+       {
+        "flag": "marker3",
+        "ist": true
+       },
+       {
+        "flag": "hinweis_licht",
+        "ist": true
+       }
+      ]
      }
     }
    ],
@@ -1508,9 +1545,8 @@
      "ist": true
     }
    },
-   "text": "Sporenlinge in beiden Feindzonen (wie viele, steht in der Gegnerliste: das richtet sich nach Heldenpunkten und Schwierigkeit), Verhaltenswürfel ruhig. Sie bleiben defensiv, bis Marker 2 untersucht ist (oder ab Runde 4). Die aus Zone B stehen direkt neben der Frau: sie greifen sie nicht an, sie gehören zu ihr.",
+   "text": "Sporenlinge in beiden Feindzonen (wie viele, steht in der Gegnerliste: das richtet sich nach Heldenpunkten und Schwierigkeit), Verhaltenswürfel ruhig. Sie bleiben defensiv, bis Marker 2 untersucht ist (oder ab Runde 4). Die aus Zone B kommen direkt hinter der Frau aus dem Unterholz: sie greifen sie nicht an, sie gehören zu ihr.",
    "hinweise": [
-    "Bedrohung ansagen, bevor jemand würfelt: die Sätze stehen an den Gegnerkarten.",
     "Die Spieler kämpfen, suchen oder laufen zur Frau. Jedes Rundenende: R (Sporenuhr −1), dann der Rundenwurf, wenn du ihn nimmst.",
     "Erreicht ein Held die Frau, solange die Uhr über 0 steht: F.",
     "Steht die Uhr auf 0 und niemand war bei ihr: die App springt von selbst zum Aufblühen.",
@@ -1520,7 +1556,6 @@
     "marker1",
     "marker2",
     "marker3",
-    "mitte",
     "frau-erreicht",
     "quelle-zerstoert"
    ],
@@ -1539,11 +1574,14 @@
    "typ": "vorlesen",
    "titel": "Die Uhr steht auf null",
    "text": "Sie dreht sich zu euch um. Sie wollte etwas sagen. Es kommt kein Wort mehr.",
-   "gmNotiz": "Kein Hinweis, kein Nebenziel. Sofort weiter mit dem Aufblühen.",
+   "gmNotiz": "Kein Hinweis, kein Nebenziel. Der Wald hat sie bekommen: Atemzug +1. Weiter mit der Wahl, dann das Aufblühen.",
    "leistenAus": [
     "sporenuhr"
    ],
-   "weiter": "cue-01b4b"
+   "weiter": "wahl-aufbluehen",
+   "leisten": {
+    "atemzug": 1
+   }
   },
   "cue-01b4a": {
    "typ": "cue",
@@ -1559,7 +1597,7 @@
    "zeitlimit": 3,
    "figur": "frau",
    "einstieg": "Das Licht. Das grüne, zwischen den Steinen … da wollte ich hin. Geht nicht hin.",
-   "gmNotiz": "Leise und zitternd. Sie zeigt zur Ruine oben. Das ist ihr einziger fester Hinweis. Hier kannst du stattdessen deinen Suno-Text von 01B-4A sprechen oder laufen lassen, die Sätze oben sind der Ersatz dafür. Dann hör zu, was die Spieler sagen, und wähle im nächsten Schritt die Antwort, die am nächsten kommt.",
+   "gmNotiz": "Kurz halten: ein, zwei Sätze von ihr, dann wählen. Die Sporenuhr läuft, und sie blüht danach in jedem Fall auf. Was die Helden aus ihr herausbekommen, hakst du in der NPC-Schublade ab (Taste N): das wirkt später von selbst. Hast du deinen Suno-Text von 01B-4A, kannst du ihn hier sprechen oder laufen lassen.",
    "weiter": "wahl-frau"
   },
   "wahl-frau": {
@@ -1622,7 +1660,7 @@
    "titel": "Sie antwortet",
    "als": "frau",
    "text": "„Lene. Ich bin … Lene.“ Als sie den Namen sagt, zucken die Wurzeln an ihren Armen, alle auf einmal. Sie sieht hin, dann zu euch. „Sagt meiner Mutter … sagt ihr, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
-   "weiter": "cue-01b4b",
+   "weiter": "wahl-aufbluehen",
    "setzt": {
     "auftrag_kapelle": true
    },
@@ -1634,7 +1672,7 @@
    "als": "frau",
    "text": "Sie wiederholt den Namen. Langsam, als müsste sie ihn festhalten. Die Wurzeln an ihren Armen richten sich auf, alle in eure Richtung. „Das Moos hat gehört. Es … es merkt sich alles.“ Dann, leiser: „Sagt meiner Mutter, ich hab den Weg nicht gefunden. Sie ist in der Kapelle. Vor dem Dorf. Alle sind in der Kapelle.“",
    "gmNotiz": "Den Helden nicht erklären, was das heißt. Map 2 erklärt es. Wohin es weitergeht, ist jetzt klar: zur Kapelle vor dem Dorf, zu ihrer Mutter.",
-   "weiter": "cue-01b4b",
+   "weiter": "wahl-aufbluehen",
    "setzt": {
     "auftrag_kapelle": true
    }
@@ -1644,7 +1682,7 @@
    "titel": "Sie antwortet",
    "als": "frau",
    "text": "„Es fing … mit dem Brunnen an. Er war warm. Vierzig Winter kalt, und dann warm.“ Sie schüttelt den Kopf, als würde sie etwas abschütteln wollen. „Das Licht hat gesungen. Geht nicht hin. Sagt meiner Mutter, ich hab den Weg nicht gefunden. In der Kapelle. Sucht sie in der Kapelle.“",
-   "weiter": "cue-01b4b",
+   "weiter": "wahl-aufbluehen",
    "setzt": {
     "auftrag_kapelle": true
    },
@@ -1656,14 +1694,14 @@
    "als": "frau",
    "text": "Sie hebt die Arme vors Gesicht. Die Wurzeln daran sind länger geworden, seit ihr sie zuerst gesehen habt. „Nicht … ich wollte doch nur nach Hause.“",
    "gmNotiz": "Wird sie angegriffen: Verteidigung 6+, Zäh 1. Jede Wunde löst sofort das Aufblühen aus, die Erblühte beginnt mit voller Zähigkeit. Kein Hinweis auf die Kapelle: den Weg dorthin zeigt später nur das Zeichen auf dem Anhänger (und der Fuhrmann hat die Kapelle als Wegmarke genannt).",
-   "weiter": "cue-01b4b"
+   "weiter": "wahl-aufbluehen"
   },
   "cue-01b4b": {
    "typ": "cue",
    "titel": "Das Aufblühen",
    "cue": "01B-4B",
-   "notiz": "Während der Track läuft, verwandelt sie sich. Die Figur bleibt noch stehen: erst fragst du die Spieler, was sie in diesem Moment tun.",
-   "weiter": "wahl-aufbluehen"
+   "notiz": "Der Track erzählt das Aufblühen und endet mit dem Angriff. Während er läuft: die Figur der Erblühten bereithalten.",
+   "weiter": "aufbau-erbluehte"
   },
   "wahl-aufbluehen": {
    "typ": "wahl",
@@ -1724,30 +1762,30 @@
   "aufbluehen-ruhig": {
    "typ": "vorlesen",
    "titel": "Sie hört zu",
-   "text": "Sie hört euch. Ihr seht es, weil der Kopf sich zu euch dreht, während der Rest von ihr sich weiterdreht, in die andere Richtung. Dann ist die Blüte offen, und das Gesicht darunter ist nicht mehr ihres.",
-   "gmNotiz": "Zusatzregel steht am Boss: Runde 1 zögert sie.",
-   "weiter": "aufbau-erbluehte"
+   "text": "Sie hört euch. Ihr seht es, weil der Kopf sich zu euch dreht, während der Rest von ihr sich weiterdreht, in die andere Richtung.",
+   "gmNotiz": "Zusatzregel steht am Boss: Runde 1 zögert sie. Gleich danach Cue 01B-4B: der Track erzählt das Aufblühen zu Ende.",
+   "weiter": "cue-01b4b"
   },
   "aufbluehen-angriff": {
    "typ": "vorlesen",
    "titel": "Ihr schlagt zuerst",
-   "text": "Ihr trefft sie, während sie noch halb sie selbst ist. Sie schreit, und es ist noch ihre Stimme. Dann schießen die Ranken aus ihr heraus wie Nadeln, in alle Richtungen, und der Schrei wird zu etwas anderem.",
-   "gmNotiz": "Jetzt die freien Angriffe abhandeln, dann die Figur tauschen. Danach gilt: wütend von Anfang an, und Dornen. Beides steht am Boss.",
-   "weiter": "aufbau-erbluehte"
+   "text": "Ihr trefft sie, während sie noch halb sie selbst ist. Sie schreit, und es ist noch ihre Stimme.",
+   "gmNotiz": "Jetzt die freien Angriffe abhandeln, dann die Figur tauschen. Danach gilt: wütend von Anfang an, und Dornen. Beides steht am Boss. Gleich danach Cue 01B-4B: der Track erzählt das Aufblühen zu Ende.",
+   "weiter": "cue-01b4b"
   },
   "aufbluehen-rueckzug": {
    "typ": "vorlesen",
    "titel": "Ihr weicht",
-   "text": "Ihr geht rückwärts, die Augen auf ihr. Hinter euch raschelt es im Moos. Das Kleinvieh hat gemerkt, dass ihr weicht, und es kommt näher. Vor euch geht die Blüte auf.",
-   "gmNotiz": "Helden eine Kartenlänge von ihr weg stellen. Dann jeden Sporenling, der noch steht, eine Kartenlänge auf den nächsten Helden zu.",
-   "weiter": "aufbau-erbluehte"
+   "text": "Ihr geht rückwärts, die Augen auf ihr. Hinter euch raschelt es im Moos. Das Kleinvieh hat gemerkt, dass ihr weicht, und es kommt näher.",
+   "gmNotiz": "Helden eine Kartenlänge von ihr weg stellen. Dann jeden Sporenling, der noch steht, eine Kartenlänge auf den nächsten Helden zu. Gleich danach Cue 01B-4B: der Track erzählt das Aufblühen zu Ende.",
+   "weiter": "cue-01b4b"
   },
   "aufbluehen-eigenes": {
    "typ": "vorlesen",
    "titel": "Sie dreht den Kopf",
-   "text": "Sie dreht den Kopf. Zu dem, der gesprochen hat. Nur zu ihm. Die Blüte geht auf, und das Gesicht darunter sieht ihn an, als wolle es sich merken, wie er aussieht.",
-   "gmNotiz": "Zusatzregel steht am Boss: sie geht zuerst auf diesen Helden zu. Haben sie den Namen Lene gerufen: Runde 1 zögert sie außerdem. Haben sie etwas anderes gerufen oder getan, entscheide du, ob es sie einen Atemzug lang hält (Vorschlag: nur bei Dingen, die mit ihr oder ihrer Mutter zu tun haben).",
-   "weiter": "aufbau-erbluehte"
+   "text": "Sie dreht den Kopf. Zu dem, der gesprochen hat. Nur zu ihm. Sie sieht ihn an, als wolle sie sich merken, wie er aussieht.",
+   "gmNotiz": "Zusatzregel steht am Boss: sie geht zuerst auf diesen Helden zu. Haben sie den Namen Lene gerufen: Runde 1 zögert sie außerdem. Haben sie etwas anderes gerufen oder getan, entscheide du, ob es sie einen Atemzug lang hält (Vorschlag: nur bei Dingen, die mit ihr oder ihrer Mutter zu tun haben). Gleich danach Cue 01B-4B: der Track erzählt das Aufblühen zu Ende.",
+   "weiter": "cue-01b4b"
   },
   "aufbau-erbluehte": {
    "typ": "aufbau",
@@ -1756,21 +1794,12 @@
    "tisch": [
     "Die Figur der Frau vom Tisch, die Erblühte an dieselbe Stelle",
     "Zählstein Sporenuhr weg",
-    "Falls noch nicht geschehen: obere Hälfte aufbauen",
     "Je nach Entscheidung eben: Helden eine Kartenlänge zurück, Sporenlinge nachrücken, oder freie Angriffe abhandeln"
    ],
    "setzt": {
     "oben_aufgebaut": true,
     "erbluehte_am_tisch": true
    },
-   "weiter": "cue-battle1"
-  },
-  "cue-battle1": {
-   "typ": "cue",
-   "titel": "Battle Cue 1",
-   "cue": "BATTLE-1",
-   "schleife": true,
-   "notiz": "Schleife. Läuft, bis der Boss fällt.",
    "weiter": "kampf-erbluehte"
   },
   "kampf-erbluehte": {
@@ -1806,6 +1835,7 @@
    },
    "text": "Langsam, zäh. Die übrigen Sporenlinge bleiben am Tisch (Wunden übernommen). Wer am Zugende direkt neben ihr steht (innerhalb einer Kartenbreite), gilt als im Sporennebel: Qualitätstest. Ihr Sporenstoß reicht eine Kartenlänge weit.",
    "hinweise": [
+    "Kampfmusik: oben im Kampf auf ▶ (Taste A), sobald die erste Aktivierung läuft. Sie läuft in Schleife, bis der Boss fällt.",
     "Bedrohung ansagen, bevor jemand würfelt: „Das ist, wovor sie weggelaufen ist.“",
     "Die Zusatzregeln aus der Entscheidung eben stehen an ihrer Karte und unter Lage: zögern, Dornen, nachrückende Sporenlinge, oder ihr Lieblingsziel.",
     "Wütend von Anfang an, wenn die Helden sie angegriffen haben (vorher oder beim Aufblühen). Sonst ruhig, bis Marker 2 oder Runde 4.",
@@ -1831,7 +1861,8 @@
      "ziel": "cue-01b5"
     }
    ],
-   "weiter": "cue-01b5"
+   "weiter": "cue-01b5",
+   "musik": "BATTLE-1"
   },
   "cue-01b5": {
    "typ": "cue",
@@ -1915,12 +1946,13 @@
      "folge": "Atemzug −1 (Feuer tötet Sporen). Map 2: erfährt Hedda davon, schweigt sie bis auf ihre drei Kernsätze.",
      "ziel": "anhaenger-verbrannt"
     }
-   ]
+   ],
+   "gmNotiz": "Nur für dich: Der Anhänger ist verpestet. Das merkt hier niemand; in Map 2 kann er den Träger im Kampf übernehmen. Nichts andeuten außer: er ist warm."
   },
   "anhaenger-genommen": {
    "typ": "vorlesen",
    "titel": "Der Anhänger",
-   "text": "Kupfer, grün angelaufen, an einer Schnur aus Leder. Darauf ein Zeichen: ein Turm mit einer Glocke. Die Kapelle vor dem Dorf trägt dasselbe.",
+   "text": "Kupfer, grün angelaufen, an einer Schnur aus Leder. Darauf ein Zeichen: ein Turm mit einer Glocke. Die Kapelle vor dem Dorf trägt dasselbe. Er ist warm, wärmer als die Hand, die ihn hält.",
    "gmNotiz": "Zettel „Kupferanhänger, Zeichen der Kapelle“ übergeben. Wer ihn trägt, steht im Stand. Nächster Schritt für die Spieler, gerade heraus, wenn sie fragen: „Das Zeichen ist das der Kapelle vor dem Dorf. Da geht es weiter.“ Nur wenn die Frau von ihrer Mutter gesprochen hat (Antwort 1 bis 3): „Und dort ist ihre Mutter.“ Ihren Namen sagst du nicht; den kennen die Spieler nur nach Antwort 1.",
    "weiter": "wahl-nachsuche",
    "setzt": {

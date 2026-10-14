@@ -133,7 +133,17 @@ export function listeSzenarien(sammlung: string): SzenarioEintrag[] {
   }));
 }
 
-export type SpielstandEintrag = { id: string; name: string; kampagne: string; gespeichertVon: string | null; updatedAt: string };
+export type SpielstandEintrag = {
+  id: string;
+  name: string;
+  kampagne: string;
+  /** Nummer der Map, damit die nächste Map den passenden Stand übernehmen kann */
+  map: number | null;
+  /** true, sobald die Map abgeschlossen ist */
+  fertig: boolean;
+  gespeichertVon: string | null;
+  updatedAt: string;
+};
 
 /** Spielstände des Spielmodus (Reiter „Szenarien“, Kampagne spielen): Leisten, Flags, Schritt je Map. */
 export function listeSpielstaende(sammlung: string): SpielstandEintrag[] {
@@ -141,6 +151,8 @@ export function listeSpielstaende(sammlung: string): SpielstandEintrag[] {
     id,
     name: text(daten.inhalt.name) || "Ohne Namen",
     kampagne: text(daten.inhalt.kampagne, 40),
+    map: typeof daten.inhalt.map === "number" ? daten.inhalt.map : null,
+    fertig: daten.inhalt.fertig === true,
     gespeichertVon: daten.gespeichertVon ?? null,
     updatedAt: daten.updatedAt,
   }));

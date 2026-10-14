@@ -209,10 +209,14 @@
   // Fähigkeiten für den Simulator: Die Wirkung steht als Symbol im Regeltext ({A2} Treffer, {HW3} heilen,
   // {V+1} Verteidigung, {X} betäubt …), der Takt in Kürzeln wie {S}, {RU}, {P1} oder in festen Wendungen.
   // Bewusst vereinfacht: Reichweiten und Flächen zählen im Duell nicht, nur ob und wie oft eine Wirkung greift.
-  const SYMBOL = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}/g;
+  const SYMBOL = /\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+\-]*)\}/g;
+  // Würfelwerte als Schnitt: W3 = 2, W3+1 = 3, W6−2 (mindestens 1) = 2
   const symbolWert = w => {
-    const m = String(w || "").match(/^W(\d)(?:\+(\d))?$/);
-    if (m) return (+m[1] + 1) / 2 + (+m[2] || 0);
+    const m = String(w || "").replace("−", "-").match(/^W(\d)(?:([+-])(\d))?$/);
+    if (m) {
+      const seiten = +m[1], mod = (m[2] === "-" ? -1 : 1) * (+m[3] || 0);
+      return Array.from({ length: seiten }, (_, i) => Math.max(1, i + 1 + mod)).reduce((a, b) => a + b, 0) / seiten;
+    }
     return parseInt(String(w || "").replace("−", "-"), 10) || 0;
   };
   function effekteAus(s) {

@@ -150,10 +150,16 @@ describe("Kartenschmiede – Schmiede-Formel", () => {
 
   it("nutzt in Regeltexten nur bekannte Symbol-Kürzel", () => {
     // Muss zu SYMBOLTEXT in apps/kartenschmiede/app.js passen
-    const gueltig = /^\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+]*)\}$/;
+    const gueltig = /^\{(RU|DS|[PZSAVTHWRFBXD])([+\-−]?[0-9W+\-]*)\}$/;
     const texte = [...F.GRUNDBESTAND.map(f => f.text)];
     for (const typ of ["faehigkeit", "zauber", "gegenstand"]) for (let i = 1; i < 30; i++) texte.push(G.generiere(R, typ, { stufe: 1 + (i % 6), seed: i, rolle: i % 2 ? "enemy" : "hero", tag: i % 5 ? undefined : "technik" }).text);
     for (const t of texte) for (const k of t.match(/\{[^}]*\}/g) || []) expect(k, t).toMatch(gueltig);
+  });
+
+  it("rechnet Würfelwerte wie W6−2 (mindestens 1) und schreibt keinen W3 mehr in Gegenstände", () => {
+    const heiltrank = F.GRUNDBESTAND.find(f => f.id === "heiltrank")!;
+    expect(heiltrank.text).toContain("{HW6-2}");
+    expect(F.GRUNDBESTAND.filter(f => f.typ === "gegenstand").map(f => f.text).join(" ")).not.toMatch(/HW3\+1/);
   });
 
   it("würfelt Gegnerwellen nahe am Ziel, mit Stufengrenze je Schwierigkeit, höchstens einem Boss und drei Gleichen", () => {
@@ -397,8 +403,8 @@ describe("Kartenschmiede – Seite und Kartenspeicher", () => {
   });
 
   it("speichert Spielstände und Audio-Cues, und lässt nur Audio mit gültiger Id durch", () => {
-    speichereEintrag("gemeinsam", "spielstaende", "spielstand-1234abcd", { name: "Moosgrab mit Franky", kampagne: "moosgrab" }, null, "Chris");
-    expect(listeSpielstaende("gemeinsam")).toMatchObject([{ id: "spielstand-1234abcd", name: "Moosgrab mit Franky", kampagne: "moosgrab" }]);
+    speichereEintrag("gemeinsam", "spielstaende", "spielstand-1234abcd", { name: "Moosgrab mit Franky", kampagne: "moosgrab", map: 1, fertig: true }, null, "Chris");
+    expect(listeSpielstaende("gemeinsam")).toMatchObject([{ id: "spielstand-1234abcd", name: "Moosgrab mit Franky", kampagne: "moosgrab", map: 1, fertig: true }]);
     const mp3 = Buffer.from("ID3-test-daten");
     expect(speichereAudio("gemeinsam", "moosgrab-01b-1", mp3, "audio/mpeg", "Der Schrei.mp3", "Chris")).toMatchObject({ id: "moosgrab-01b-1", typ: "audio/mpeg", bytes: mp3.length });
     expect(listeAudio("gemeinsam").map(a => a.id)).toEqual(["moosgrab-01b-1"]);
@@ -518,11 +524,9 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     expect(s.schritt).toBe("vorb-material");
     expect(bisTyp(m, s, "spieler-runde1")).toBe("spieler-runde1");
     expect(s.leisten.sporenuhr).toEqual({ wert: 3, aktiv: true });
-    m.ereignis(s, "mitte");
-    expect(s.schritt).toBe("aufbau-oben");
+    // Der ganze Tisch steht schon vor dem Intro
+    expect(s.verlauf.indexOf("aufbau-tisch")).toBeLessThan(s.verlauf.indexOf("cue-e0"));
     expect(s.flags.oben_aufgebaut).toBe(true);
-    m.weiter(s); // noch Runde 1: zurück zur Runde
-    expect(s.schritt).toBe("spieler-runde1");
     m.runde(s);
     expect(s.leisten.sporenuhr.wert).toBe(2);
     m.weiter(s);
@@ -578,10 +582,31 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     expect(m.uebernahme(s).flags.name_verraten).toBe("Krieger");
   });
 
+  it("lässt Chris abhaken, was Lene verrät, und die Folgen treten ein", () => {
+    type M = Motor & { erfahre(s: Spielstand, f: string, i: number, an: boolean): unknown; wissen(s: Spielstand, f: string): boolean[]; aufgedeckt(s: Spielstand): string[] };
+    const m = motor() as unknown as M, s = m.neu();
+    bisTyp(m, s, "kampf-sporenlinge");
+    m.ereignis(s, "frau-erreicht"); m.weiter(s);
+    expect(s.schritt).toBe("npc-frau");
+    expect(m.wissen(s, "frau")).toEqual([false, false, false, false]);
+    // Das Licht in der Ruine: die Quelle ist sofort aufgedeckt und als Gegner am Tisch, ohne Marker 3
+    m.erfahre(s, "frau", 3, true);
+    expect(m.aufgedeckt(s)).toContain("Q");
+    expect(s.gegner.some(g => g.id === "quelle")).toBe(true);
+    // Der Name: wirkt wie die Antwort 1 (Map 2 kennt Lene)
+    m.erfahre(s, "frau", 0, true);
+    expect(s.flags.frau_name).toBe("Lene");
+    m.erfahre(s, "frau", 0, false);
+    expect(s.flags.frau_name).toBe(null);
+    // Was eine Wahl schon gesetzt hat, steht als Haken da
+    m.weiter(s);
+    m.waehle(s, "3");
+    expect(m.wissen(s, "frau")[2]).toBe(true);
+  });
+
   it("springt bei abgelaufener Sporenuhr von selbst zum Aufblühen, und Zurück stellt alles wieder her", () => {
     const m = motor(), s = m.neu();
     bisTyp(m, s, "spieler-runde1");
-    m.ereignis(s, "mitte"); m.weiter(s);
     m.runde(s); m.weiter(s); m.weiter(s);
     expect(s.schritt).toBe("kampf-sporenlinge");
     const g = s.gegner[0];
@@ -597,8 +622,12 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 1)", () => {
     expect(s.flags.frau_erreicht).toBe(false);
     // Ab der dritten beendeten Runde wütend
     expect(s.flags.gegner_wuetend).toBe(true);
+    // Der Wald hat sie bekommen: ein Strich Atemzug, dann zuerst die Wahl, danach der Track
+    expect(s.leisten.atemzug.wert).toBe(1);
     m.weiter(s);
-    expect(s.schritt).toBe("cue-01b4b");
+    expect(s.schritt).toBe("wahl-aufbluehen");
+    m.waehle(s, "1");
+    expect(bisTyp(m, s, "cue-01b4b")).toBe("cue-01b4b");
   });
 
   it("überspringt die Nachsuche, wenn schon alle Marker gefunden sind", () => {
