@@ -580,9 +580,9 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             ob der neue Spielstand im <strong>Manager Mode</strong> (Standard, eine gemeinsame
             Tabelle) oder im <strong>Battle Mode</strong> (zwei getrennte Ligen) läuft — das lässt
             sich danach nicht mehr ändern. Danach tippst du die Klubs an, die du selbst steuerst —
-            alle übrigen übernimmt die KI — und legst damit ein komplett neues Spiel mit frischer
-            Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt erhalten, ist danach aber
-            nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel beginnen soll.
+            alle übrigen übernimmt die KI — und legst damit ein komplett neues Spiel mit
+            frischer Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt erhalten, ist
+            danach aber nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel beginnen soll.
           </p>
         ) : null}
 
