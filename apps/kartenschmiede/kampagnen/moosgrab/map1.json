@@ -111,6 +111,10 @@
     },
     "text": "Die Quelle ist aus: Die Erblühte hat 2 Zäh weniger (steht an ihrer Karte). Was in ihr wächst, bekommt keinen Nachschub mehr.",
     "ansage": "Das Singen ist weg. Sie merkt es. Ihr auch."
+   },
+   {
+    "titel": "Keine Rast",
+    "text": "In Map 1 gibt es keine Rast: Die Frau stirbt, wenn die Helden zögern, und die Erblühte kommt direkt nach den Sporenlingen. Erst am Ende der Map: Wunden und Power zurück, Atemzug +1."
    }
   ],
   "ziele": [
@@ -2196,5 +2200,17 @@
    },
    "gmNotiz": "Bevor der Abend endet, den nächsten Schritt laut sagen, damit niemand mit einem Fragezeichen nach Hause geht: „Der Weg ins Dorf führt an der Kapelle vorbei. Das Zeichen auf dem Anhänger ist ihres. Nächstes Mal steht ihr davor.“"
   }
- }
+ },
+ "heldenInfo": [
+  {
+   "flag": "anhaenger_traeger",
+   "wenn": {
+    "flag": "anhaenger",
+    "ist": true
+   },
+   "name": "Kupferanhänger",
+   "text": "Trägt Lenes Kupferanhänger (Zeichen der Kapelle).",
+   "gm": "verpestet. Bei jedem Mapwechsel +1 Sporenpunkt."
+  }
+ ]
 }

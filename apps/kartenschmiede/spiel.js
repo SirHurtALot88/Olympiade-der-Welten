@@ -515,18 +515,18 @@
     return teile.length ? `<div class="sp-bereit"><h4>Schon jetzt bereitlegen, während der Track läuft</h4>${teile.join("")}</div>` : "";
   }
   // Was auf den Tisch muss: Gelände durchnummeriert wie auf der Karte, dazu die Marker
-  function aufbauLegende() {
+  function aufbauLegende(erzaehlen) {
     if (!karte) return "";
     const MARKER = window.KartenschmiedeSzenarien.MARKER || {}, nummern = new Map();
     for (const g of karte.gelaende) { const n = g.label || (S.GELAENDE[g.art] || {}).name || g.art; if (!nummern.has(n)) nummern.set(n, nummern.size + 1); }
     const auf = motor.aufgedeckt(stand);
     // Alle Marker, auch die verdeckten: Chris muss wissen, was offen hinkommt und was er sich nur merkt
     const marker = karte.marker.filter(m => m.typ !== "ausgang");
-    return `<div class="sp-legende"><div><h4>Gelände (frei hinstellen)</h4><ul class="sp-gel">${[...nummern.keys()].map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
-      <div><h4>Marker (genau dort)</h4><ul class="sp-markerliste">${marker.map(m => {
+    return `<div class="sp-legende"><div><h4>${erzaehlen ? "Gelände (nur beschreiben)" : "Gelände (frei hinstellen)"}</h4><ul class="sp-gel">${[...nummern.keys()].map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
+      <div><h4>${erzaehlen ? "Marker (was die Spieler sehen)" : "Marker (genau dort)"}</h4><ul class="sp-markerliste">${marker.map(m => {
         const [z, f, name] = MARKER[m.typ] || ["•", "#fff", m.typ], ev = markerEreignis(m), zu = markerVerdeckt(m, auf);
         const wof = (ev && ev[1].wofuer) || markerInfo(m);
-        return `<li class="${zu ? "zu" : ""}"><i style="background:${f}">${esc(m.label && m.label.length <= 2 ? m.label : z || "▲")}</i><span><b>${esc(name)}</b> <em>${zu ? "🔒 verdeckt: nicht hinlegen" : "👁 offen hinlegen"}</em>${wof ? `<small>${esc(wof)}</small>` : ""}</span></li>`;
+        return `<li class="${zu ? "zu" : ""}"><i style="background:${f}">${esc(m.label && m.label.length <= 2 ? m.label : z || "▲")}</i><span><b>${esc(name)}</b> <em>${zu ? (erzaehlen ? "🔒 verdeckt: nicht erwähnen" : "🔒 verdeckt: nicht hinlegen") : (erzaehlen ? "👁 sichtbar" : "👁 offen hinlegen")}</em>${wof ? `<small>${esc(wof)}</small>` : ""}</span></li>`;
       }).join("")}</ul></div></div>`;
   }
   function schrittInhalt(s) {
@@ -534,11 +534,14 @@
       case "vorbereitung": return `<ul class="sp-check">${(s.checkliste || []).map((c, i) => {
         const k = `${stand.schritt}:${i}`;
         return `<li><label><input type="checkbox" data-check="${esc(k)}" ${stand.checks[k] ? "checked" : ""}> ${esc(c)}</label></li>`;
-      }).join("")}</ul>${s.uebernahme ? uebernahmeHtml() : ""}${gm(s.hinweis)}${s.audio || stand.schritt === "vorb-stand" ? audioListe() : ""}`;
+      }).join("")}</ul>${s.uebernahme ? uebernahmeHtml() : ""}${folgenHtml(s)}${gm(s.hinweis)}${s.audio || stand.schritt === "vorb-stand" ? audioListe() : ""}`;
       case "aufbau": {
-        const text = `${liste(s.tisch, "sp-tisch")}${s.regel ? `<h4>Sag an</h4>${vorlesen(s.regel)}` : ""}${gm(s.hinweis)}`;
+        // nurErzaehlen: Story-Ort ohne Kampf. Nichts aufbauen, die Skizze ist nur für dich, du beschreibst den Ort
+        const text = s.nurErzaehlen
+          ? `<p class="sp-erzaehlen">Nichts aufbauen. Aufgebaut wird erst, wenn gekämpft wird. Beschreib den Ort, die Skizze ist nur für dich.</p>${s.text ? vorlesen(s.text) : ""}<h4>Was es dort gibt</h4>${liste(s.tisch, "sp-tisch")}${gm(s.hinweis)}`
+          : `${liste(s.tisch, "sp-tisch")}${s.regel ? `<h4>Sag an</h4>${vorlesen(s.regel)}` : ""}${gm(s.hinweis)}`;
         if (mitSeite(s)) return text;
-        return `<div class="sp-aufbau"><div>${text}</div><div class="sp-aufbaukarte">${tischKarte({ gross: true, skizze: s.skizze })}${aufbauLegende()}</div></div>`;
+        return `<div class="sp-aufbau"><div>${text}</div><div class="sp-aufbaukarte">${tischKarte({ gross: true, skizze: s.skizze })}${aufbauLegende(s.nurErzaehlen)}</div></div>`;
       }
       case "cue": return `${cueKnopf(s.cue, true)}${gm(s.notiz || s.gmNotiz)}${s.optional && !hatAudio(s.cue) ? `<p class="sp-gm">Kein Track da: einfach weiter, du spielst die Szene live.</p>` : ""}${s.text ? vorlesen(s.text) : ""}${bereitlegenHtml()}`;
       case "vorlesen": return `${vorlesen(s.text, s.als && map.figuren[s.als] ? map.figuren[s.als].name : "")}${gm(s.gmNotiz)}`;
@@ -569,6 +572,12 @@
       }
       default: return "";
     }
+  }
+  // Was aus den Entscheidungen der letzten Map folgt: nur, was wirklich passiert ist; die App hat es schon verbucht
+  function folgenHtml(s) {
+    if (!(s.folgen || []).length) return "";
+    const f = motor.folgen(stand);
+    return `<h4>Das folgt aus Map ${map.map - 1}</h4>${f.length ? `<ul class="sp-folgen-start">${f.map(t => `<li>✓ ${esc(t)}</li>`).join("")}</ul>` : `<p class="hint">Nichts Besonderes: in Map ${map.map - 1} ist nichts passiert, was hier etwas ändert.</p>`}`;
   }
   // Was aus der letzten Map gekommen ist (die App übernimmt es selbst; hier steht es nur zum Nachsehen)
   function uebernahmeText(u) {
@@ -682,7 +691,7 @@
     const chips = opt.gross ? "" : `<div class="sp-helden">${helden.map(h => {
       const n = ((stand.inventar || {})[h.name] || []).length, sp = (stand.sporen || {})[h.name] || 0, b = motor.befall(sp), dran = (stand.aktiviert || {})[`held:${h.name}`];
       return `<span class="sp-heldchip ${popup && popup.tok === `held:${h.name}` ? "an" : ""} ${dran ? "dran" : ""} ${b.stufe ? "befallen" : ""}">
-        <button type="button" data-chip="held:${esc(h.name)}" title="${esc(h.name)}${b.stufe ? `: ${b.stufe}, ${b.wuerfel} Aktionswürfel` : ""}">${esc(h.name)}${sp ? ` <i>🍄${sp}</i>` : ""}${n ? ` <i>🎒${n}</i>` : ""}</button>
+        <button type="button" data-chip="held:${esc(h.name)}" title="${esc(h.name)}${b.stufe ? `: ${b.stufe}, ${b.wuerfel} Aktionswürfel` : ""}">${esc(h.name)}${sp ? ` <i>🍄${sp}</i>` : ""}${n ? ` <i>🎒${n}</i>` : ""}${motor.heldenInfo(stand, h.name).length ? ` <i title="${esc(motor.heldenInfo(stand, h.name).map(x => x.name).join(", "))}">📿</i>` : ""}</button>
         ${stand.rundenAktiv ? `<button type="button" class="sp-hak" data-akt="held:${esc(h.name)}" title="War diese Runde dran">${dran ? "✓" : "○"}</button>` : ""}</span>`; }).join("")}</div>`;
     const unter = opt.gross ? "Raster: eine Kartenlänge (15 cm). Gelände frei hinstellen, Marker und Zonen genau dort. Marker anklicken: wofür sie stehen." : "Raster: eine Kartenlänge · Figuren und Marker anklicken für Infos, Figuren ziehen zum Verschieben";
     return `<div class="sp-tischkarte ${opt.gross ? "gross" : ""}">${inhalt}<small>${unter}</small>${chips}${!opt.gross ? werIstWer() : ""}${popupHtml()}</div>`;
@@ -720,7 +729,9 @@
       kopf = `<b>${esc(id)}</b><small>Held${b.stufe ? ` · ${b.stufe}` : ""}</small>`;
       inhalt = `<p>${esc((h && h.info) || "")}</p>
         <h5>Sporenpunkte</h5><p class="sp-sporen"><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="-1">−</button><b>${sp}</b><button type="button" class="btn ghost sm" data-sporen="${esc(id)}" data-d="1">+</button>
-          <small>${b.stufe ? `${b.stufe}: würfelt ${b.wuerfel} statt 4 Aktionswürfel, Gegner greifen ihn bevorzugt an` : "ab 3 befallen, ab 5 schwer befallen"}</small></p>
+          <small>${b.stufe ? esc(b.stufe) : "ab 1 gezeichnet, ab 3 befallen, ab 5 schwer befallen"}</small></p>
+        ${sp ? `<div class="sp-befall"><h5>Wenn jemand hinsieht</h5>${sag(b.aussehen)}<p><b>Wie es sich anfühlt:</b> ${esc(b.koerper)}</p><p><b>Regel:</b> ${esc(b.regel)}</p></div>` : ""}
+        ${motor.heldenInfo(stand, id).map(x => `<h5>${esc(x.name)}</h5><p>${esc(x.text)}</p>${gm(x.gm)}`).join("")}
         <h5>Beute</h5>${inventarHtml(id)}`;
     } else if (art === "f") {
       const f = map.figuren[id] || {};
@@ -896,6 +907,7 @@
             <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
           <section><h4>Schwierigkeit: ${esc(motor.schwierigkeit(stand).name)}</h4><p>Gegnerwelle ${Math.round(motor.schwierigkeit(stand).anteil * 100)} % von ${stand.heldenpunkte || "?"} Heldenpunkten. ${esc(motor.schwierigkeit(stand).text)}</p>
             <h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
+            <h4>Sporenpunkte: woran man es sieht, was gilt</h4><table class="sz-tab sp-sporentab"><tbody>${motor.SPOREN.filter(x => x.ab > 0).map(x => `<tr><td><b>ab ${x.ab}</b><br><small>${esc(x.stufe)}</small></td><td>${esc(x.aussehen)} <i>${esc(x.koerper)}</i><br><b>${esc(x.regel)}</b></td></tr>`).join("")}</tbody></table>
             <h4>Sonderregeln</h4>${l.sonderregeln.map(r => `<div class="sp-regel"><b>${esc(r.titel || "")}</b> ${esc(r.text || "")}${r.ansage ? sag(r.ansage) : ""}</div>`).join("") || `<p class="hint">Keine.</p>`}
             ${rw ? `<h4>${esc(rw.name)}</h4>${gm(rw.text)}<table class="sz-tab"><tbody>${(rw.tabelle || []).map(z => `<tr><td>${esc((z.w || []).join(", "))}</td><td><b>${esc(z.titel || "")}</b> ${esc(z.gmNotiz || "")}</td></tr>`).join("")}</tbody></table>` : ""}
             <h4>Protokoll</h4><ol class="sp-protokoll">${stand.protokoll.slice(-14).reverse().map(p => `<li><small>R${p.runde}</small> ${esc(p.text)}</li>`).join("")}</ol></section>
@@ -939,10 +951,10 @@
       document.body.classList.remove("sp-laeuft");
       main.innerHTML = `<div class="sp-start"><p class="lede">Wähle einen Spielstand oder starte einen neuen Abend.</p>
         <div class="row4"><label class="f">Map <select id="spMapWahl">${MAPS.map(m => `<option value="${m.map}">${esc(m.kampagne)} · Map ${m.map}: ${esc(m.titel)}</option>`).join("")}</select></label>
-        <label class="f">Schwierigkeit <select id="spStufe">${Object.entries(SM.SCHWIERIGKEITEN).map(([id, st]) => `<option value="${id}" ${id === letzteStufe() ? "selected" : ""}>${st.stufe} · ${esc(st.name)} (${Math.round(st.anteil * 100)} %)</option>`).join("")}</select></label>
+        <label class="f">Schwierigkeit <select id="spStufe">${Object.entries(SM.SCHWIERIGKEITEN).map(([id, st]) => `<option value="${id}" ${id === letzteStufe() ? "selected" : ""}>${st.stufe} · ${esc(st.name)} (OPR ${esc(st.opr)}, ${Math.round(st.anteil * 100)} %)</option>`).join("")}</select></label>
         <label class="f">Gruppe <select id="spGruppe"><option value="">Ohne Gruppe (Vorlagen-Helden)</option>${(window.__spGruppen || []).map(g => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("")}</select></label></div>
-        <div class="sp-stufen"><p>Wie in OPR: Jeder Kampf bekommt Gegnerpunkte nach den Heldenpunkten der Gruppe (Gefährten zählen mit) mal dem Anteil der Stufe. Die Gegnerwerte bleiben gleich, es kommen mehr oder weniger Gegner. Die Maps sind für ${SM.REFERENZ.heldenpunkte} Heldenpunkte auf Fortgeschritten geschrieben.</p>
-          ${Object.values(SM.SCHWIERIGKEITEN).map(st => `<p><b>${st.stufe} · ${esc(st.name)}</b> Gegnerwelle ${Math.round(st.anteil * 100)} % der Heldenpunkte. ${esc(st.text)}</p>`).join("")}</div>
+        <div class="sp-stufen"><p>Wie in OPR: Jeder Kampf bekommt Gegnerpunkte nach den Heldenpunkten der Gruppe (Gefährten zählen mit) mal dem Anteil der Stufe. Die Gegnerwerte bleiben gleich, es kommen mehr oder weniger Gegner. Die Maps sind für ${SM.REFERENZ.heldenpunkte} Heldenpunkte auf Normal geplant (OPR Fortgeschritten): damit fangt ihr an.</p>
+          ${Object.values(SM.SCHWIERIGKEITEN).map(st => `<p><b>${st.stufe} · ${esc(st.name)}</b> <small>(OPR ${esc(st.opr)})</small> Gegnerwelle ${Math.round(st.anteil * 100)} % der Heldenpunkte. ${esc(st.text)}</p>`).join("")}</div>
         <div class="copyrow"><button type="button" class="btn" data-sp="neu">Neuen Abend starten</button></div>
         <p class="hint">Tipp: Im Spiel auf „Vollbild“ (am Mac Ctrl + Cmd + F). Die Seite ist für einen 15-Zoll-Laptop gebaut.</p>
         ${staende.length ? `<h4>Gespeicherte Abende</h4><div class="sp-staende">${staende.map(x => `<button type="button" class="g-item" data-stand="${esc(x.id)}"><b>${esc(x.name)}</b><small>${esc(x.kampagne)}</small></button>`).join("")}</div>` : ""}
@@ -951,7 +963,7 @@
     }
     document.body.classList.add("sp-laeuft");
     const s = motor.schritt(stand);
-    const [zeichen, etikett, farbe] = TYP[s.typ] || ["", s.typ, ""];
+    const [zeichen, etikett, farbe] = s.nurErzaehlen ? ["🟪", "DU · Erzählen (nichts aufbauen)", "lila"] : TYP[s.typ] || ["", s.typ, ""];
     const naechster = motor.naechsterId(stand);
     const nachTitel = naechster && map.schritte[naechster] ? map.schritte[naechster].titel : "";
     const scrollAlt = (main.querySelector(".sp-karte") || {}).scrollTop || 0, gleich = main.dataset.schritt === stand.schritt;

@@ -392,7 +392,7 @@
       {
         nr: 2, empfohlen: "60x60", titel: "Die Kapelle ohne Priester", ton: "Stille, Rollenspiel", stand: "fertig (Kampagnenbibel, Tab Map 2)",
         einleitung: "Die Kapelle liegt mit dem Friedhof vor dem Dorf. Die Tür steht einen Spalt offen. Von drinnen kommt gleichmäßiges Flüstern.",
-        hauptziel: "Findet heraus, wer in der Kapelle noch lebt, und erfahrt, was in Moosgrab geschehen ist.",
+        hauptziel: "Findet heraus, ob in der Kapelle noch jemand lebt, und was in Moosgrab geschehen ist.",
         nebenziel: "Kommt bis zur Krypta, ohne die Gemeinde zu wecken.",
         spezial: ["Lärm-Leiste 0–6: Nahkampf +1, Fernkampf oder Zauber +2, Tür aufbrechen +2, Haupttür +1, Glocke sofort 6. Bei 3 drehen sich Gestalten um, bei 4 stehen sie auf, bei 6 erwacht die ganze Gemeinde.", "Namensregel ab hier."],
         belohnung: "Hinweise von Mutter Hedda, Kellerschlüssel des Gemeindehauses (wenn sie den Anhänger bekommt), Beutewurf am Grab der Linde.",
