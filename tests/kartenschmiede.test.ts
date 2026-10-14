@@ -1104,14 +1104,22 @@ describe("Kartenschmiede – Moosgrab-Finale: Boss, Rast, wer die Glut hält", (
   const R = laden("../apps/kartenschmiede/regeln.js") as { punkte(w: Record<string, string>): { pts: number } };
   const finale = () => SM.erstelle(MAPS[4], { punkte: (w: Record<string, string>) => R.punkte(w).pts, werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "1", quality: "5+", defense: "5+", size: "1" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as FM;
   const bis = (m: FM, s: FS, id: string, taste = "2") => { for (let i = 0; i < 40 && s.schritt !== id; i++) { if (m.schritt(s).typ === "wahl") m.waehle(s, m.optionen(s).find(o => o.taste === taste)?.taste || m.optionen(s)[0].taste, "Krieger"); else m.weiter(s); } return s.schritt; };
-  it("kämpft eine Stufe über der gewählten, und die Adern zählen nicht ins Budget", () => {
-    const m = finale(), s = m.neu({ schwierigkeit: "fortgeschritten" }) as FS;
+  it("kämpft eine Stufe über der gewählten, rechnet den Überlebenden zur Gruppe und lässt die Adern aus dem Budget", () => {
+    const m = finale(), s = m.neu({ schwierigkeit: "fortgeschritten", uebernahme: { flags: { ueberlebender_dabei: true } } }) as FS;
     expect(m.kampfStufe(s).name).toBe("Schwer");
     bis(m, s, "kampf-herz");
-    const b = m.budgetVon(s, "kampf-herz")!;
-    expect(b.ziel).toBeGreaterThan(240);
-    expect(b.ziel).toBeLessThan(290);
-    expect(s.gegner.filter(g => g.id === "ruestung").length).toBe(2);
+    const b = m.budgetVon(s, "kampf-herz") as { ziel: number; summe: number; verbuendete: number };
+    expect(b.verbuendete).toBe(145);
+    expect(b.ziel).toBeGreaterThan(380);
+    const ids = s.gegner.map(g => g.id);
+    expect(ids.filter(id => id === "rufer" || id === "gelehrter")).toEqual(["rufer", "gelehrter"]);
+    expect(ids.filter(id => id === "ruestung").length).toBeGreaterThanOrEqual(2);
+    expect(ids.filter(id => id === "sporenling").length).toBeGreaterThanOrEqual(2);
+    // Ohne den Überlebenden schrumpft der Kampf, die beiden Magier bleiben
+    const m2 = finale(), s2 = m2.neu({ schwierigkeit: "fortgeschritten" }) as FS;
+    bis(m2, s2, "kampf-herz");
+    expect(m2.budgetVon(s2, "kampf-herz")!.ziel).toBeLessThan(320);
+    expect(s2.gegner.some(g => g.id === "gelehrter")).toBe(true);
   });
   it("lässt erst nach dem Rufer überladen, und der Überlebende hält dann die Glut", () => {
     const m = finale(), s = m.neu({ uebernahme: { flags: { ueberlebender_dabei: true } } }) as FS;

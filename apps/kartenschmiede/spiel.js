@@ -971,7 +971,7 @@
     const b = motor.budgetVon(stand), st = motor.kampfStufe(stand);
     if (!b || !(stand.heldenpunkte || st.plus)) return "";
     const fest = b.summe > b.ziel * 1.15 ? " Mehr geht nicht weg: Boss und Story-Gegner bleiben immer." : "";
-    return `<p class="sp-budget" title="OPR: eine Gegnerwelle hat ${Math.round(st.anteil * 100)} % der Heldenpunkte">⚖ Gegner <b>${b.summe} P.</b> auf dem Tisch · Budget ${b.ziel} P. <small>(${esc(st.name)} ${Math.round(st.anteil * 100)} % von ${stand.heldenpunkte || "340 (Vorlage)"} Heldenpunkten${st.plus ? ", das Finale kämpft eine Stufe höher" : ""}; die Map ist für ${b.geschrieben} P. geschrieben)${esc(fest)}</small></p>`;
+    return `<p class="sp-budget" title="OPR: eine Gegnerwelle hat ${Math.round(st.anteil * 100)} % der Heldenpunkte">⚖ Gegner <b>${b.summe} P.</b> auf dem Tisch · Budget ${b.ziel} P. <small>(${esc(st.name)} ${Math.round(st.anteil * 100)} % von ${stand.heldenpunkte || "340 (Vorlage)"} Heldenpunkten${b.verbuendete ? ` und ${b.verbuendete} P. Verbündeten` : ""}${st.plus ? ", das Finale kämpft eine Stufe höher" : ""}; die Map ist für ${b.geschrieben} P. geschrieben)${esc(fest)}</small></p>`;
   }
   function zeige() {
     const main = $("spMain");

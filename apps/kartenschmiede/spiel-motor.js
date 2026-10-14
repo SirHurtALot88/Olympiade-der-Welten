@@ -238,7 +238,7 @@
       // Was nicht kämpft (die Adern am Herz, `budget: false`), zählt nicht ins Punktebudget, kommt aber auf den Tisch
       const zaehlt = e => !istFreund(e.id) && (map.gegner[e.id] || {}).budget !== false;
       const feinde = offen.filter(zaehlt), freunde = offen.filter(e => !zaehlt(e));
-      const b = budget(state, schrittId, feinde, s.verstaerkung), alt = state.budgets[schrittId];
+      const b = budget(state, schrittId, feinde, s.verstaerkung, freunde.filter(e => istFreund(e.id))), alt = state.budgets[schrittId];
       if (b) state.budgets[schrittId] = alt ? { ...b, geschrieben: alt.geschrieben + b.geschrieben, ziel: alt.ziel + b.ziel, summe: alt.summe + b.summe } : b;
       for (const e of [...feinde, ...freunde]) {
         const def = map.gegner[e.id];
@@ -249,12 +249,19 @@
     }
     // ---------- Gegnerpunkte nach OPR ----------
     // Faktor, um den die Gegnerpunkte jedes Kampfs wachsen oder schrumpfen. 1 = so, wie die Map geschrieben ist
-    function punkteFaktor(state) {
+    function punkteFaktor(state, neueFreunde) {
       const ref = { ...REFERENZ, ...(map.referenz || {}) };
       // Eine Map mit `stufePlus` (das Finale) kämpft eine Stufe über der gewählten, auch ohne gewählte Gruppe
-      const hp = state.heldenpunkte || (map.stufePlus ? ref.heldenpunkte : 0);
+      const hp = state.heldenpunkte || (map.stufePlus ? REFERENZ.heldenpunkte : 0);
       if (!hp || !hilfen.punkte) return 1;
-      return (hp * kampfStufe(state).anteil) / (ref.heldenpunkte * ref.anteil);
+      return ((hp + freundesPunkte(state, neueFreunde)) * kampfStufe(state).anteil) / (ref.heldenpunkte * ref.anteil);
+    }
+    // Verbündete stärken die Gruppe: Mit `verbuendeteZaehlen` an der Map rechnet das Budget ihre Punkte zu den Heldenpunkten
+    // (die schon am Tisch stehen und noch stehen, dazu die, die gerade mit diesem Kampf kommen)
+    function freundesPunkte(state, neueFreunde) {
+      if (!map.verbuendeteZaehlen || !hilfen.punkte) return 0;
+      const da = state.gegner.filter(g => istFreund(g.id) && !g.weg && g.wunden < g.zaeh).reduce((n, g) => n + punkteVon(g.id), 0);
+      return da + (neueFreunde || []).reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0);
     }
     // Die Stufe, mit der die Kämpfe dieser Map rechnen: die gewählte, beim Finale eine höher (über Albtraum: +25 % je Stufe)
     function kampfStufe(state) {
@@ -267,9 +274,9 @@
     // Bringt die Gegner eines Kampfs auf das Punktebudget: Bosse und feste Einträge bleiben, die übrigen Gruppen wachsen
     // oder schrumpfen im Verhältnis, wie die Map sie mischt. Kämpft ein Boss allein, füllt `verstaerkung` den Rest auf.
     // Rückgabe: was die Map schreibt, das Budget und was am Ende auf dem Tisch steht (für die Anzeige)
-    function budget(state, schrittId, offen, verstaerkung) {
+    function budget(state, schrittId, offen, verstaerkung, neueFreunde) {
       if (!offen.length || !hilfen.punkte) return null;
-      const f = punkteFaktor(state);
+      const f = punkteFaktor(state, neueFreunde);
       const geschrieben = offen.reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0);
       const ziel = Math.round(geschrieben * f);
       if (f !== 1) {
@@ -281,7 +288,7 @@
         }
         if (gruppen.length) fuelle(gruppen, ziel - fest, !offen.some(e => e.fest));
       }
-      return { geschrieben, ziel, summe: offen.reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0), faktor: f };
+      return { geschrieben, ziel, summe: offen.reduce((n, e) => n + e.anzahl * punkteVon(e.id), 0), faktor: f, verbuendete: freundesPunkte(state, neueFreunde) };
     }
     // Gruppen im Verhältnis ihrer geschriebenen Punkte auf das Budget bringen, so nah dran wie möglich.
     // Ohne Boss oder festen Eintrag bleibt mindestens ein Gegner stehen
