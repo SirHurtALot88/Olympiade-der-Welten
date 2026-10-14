@@ -40150,6 +40150,14 @@
       // Wer trotzdem Ziffern-Identitaet will, ersetzt `(idx*2+seite)` wieder durch `L.id`
       // — dann steht wieder die gesamte Heimseite vor der gesamten Gastseite, mit der
       // Optik, die Chris gemeldet hat.
+      //
+      // E5 UEBERHOLT DIESE ZEILE (Chris, 14.10., docs/design/fable-konzept-chris-feedback-13-10.md
+      // Abschnitt 9, woertlich: "ja favorit zuletzt -> fahrer aus den teams abwechselnd"). Die
+      // Zuweisung je Laeufer braucht die EIGNUNG aller zwoelf, die erst nach beiden forEach-
+      // Durchlaeufen vollstaendig in LAEUFER steht — deshalb hier nur ein Platzhalter (Reihenfolge
+      // wie bisher, nur eine Zwischenstufe) und die eigentliche Umkehr im Block direkt nach
+      // `gegen.forEach` unten ("E5 — STARTFOLGE 'FAVORIT ZULETZT, TEAMS IM WECHSEL'"), der jedes
+      // `L.startT` hier noch einmal ueberschreibt.
       if(art.startAbstand)L.startT=(idx*2+seite)*art.startAbstand;
       // TAGESFORM (Zeitfahren, K5, Recherche Abschnitt 3.6): EINMAL je Laeufer gezogen,
       // nicht je Tick — sonst waere es kein "Tagesform"-Rauschen, sondern ein zufaelliges
@@ -40160,6 +40168,67 @@
     };
     mine.forEach((p,i)=>setz(p,0,i*2,false,i));
     gegen.forEach((o,i)=>setz(o,1,i*2+1,true,i));
+    // E5 — STARTFOLGE "FAVORIT ZULETZT, TEAMS IM WECHSEL" (Chris, 14.10.,
+    // docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt 9, Frage E5, woertlich:
+    // "ja favorit zuletzt -> fahrer aus den teams abwechselnd"). Das dreht die bisherige
+    // Reihenfolge um — bisher startete der staerkste Fahrer je Team ZUERST (Platzhalter-Zeile
+    // oben, `idx*2+seite` mit idx=Rang je Team, 0=bester) —, ohne das eine echte Antwort auf J1
+    // (`docs/design/time-trial-nachtkonzept-03-10.md` Abschnitt 3.2) zu sein: Chris lehnte J1 am
+    // 04.10. ab ("So lassen"), die Frage wurde fuer 5a (echtes Einzelzeitfahren) am 13.10. neu
+    // gestellt und heute mit Ja plus einer Ergaenzung beantwortet, die J1 so nicht vorschlug
+    // (dort: "Seitenwechsel wird aufgegeben, weil die Sortierung ueber beide Teams laeuft") —
+    // Chris will die Teams dabei WEITER im Wechsel sehen, nicht einen reinen Gesamt-Sort.
+    //
+    // Begruendung aus der Empfehlung zu E5: "Ohne J1 ist ein echtes Einzelzeitfahren nach dem
+    // ersten Zieleinlauf entschieden (Hot-Seat-Wechsel Median 0)" — der zuerst gestartete
+    // Fahrer ist meist der Favorit und faehrt gegen eine Zeit, die noch niemand gesetzt hat;
+    // danach verlieren alle anderen nur noch. Jetzt faehrt der GESAMT-FAVORIT (hoechste `eig`
+    // ueber BEIDE Teams) als Letzter — gegen eine Bestzeit, die bereits auf der Tafel steht.
+    //
+    // ALGORITHMUS. (1) Favorit = Laeufer mit der hoechsten `eig` ueber das ganze Feld, er bekommt
+    // IMMER den letzten Startplatz. (2) Die uebrigen werden je Team aufsteigend nach `eig`
+    // sortiert (schwaechster zuerst) und dann im Teamwechsel zusammengefuehrt — abwechselnd das
+    // naechste (schwaechste verbleibende) Mitglied des Teams, das NICHT zuletzt an der Reihe war;
+    // ist dieses Team leer, bleibt nur das andere (kann bei ungleich grossen Aufstellungen
+    // vorkommen, s. `gastGesetzt`/`gesetzt` oben) — dann eben zwei Starts desselben Teams
+    // hintereinander, nicht vermeidbar. Mit den hier ueblichen 6 gegen 6 ist das irrelevant: die
+    // Abwechslung ist lueckenlos, und weil dem Favoriten vorher genau ein Startplatz (der letzte)
+    // entzogen wurde, bleiben in seinem Team nach dem Merge-Schritt eines WENIGER Namen als im
+    // anderen — der letzte Platz VOR dem Favoriten faellt dadurch immer dem ANDEREN Team zu, nie
+    // demselben Team zweimal in Folge am Ende.
+    //
+    // REINE STARTREIHENFOLGE, KEINE SIMULATIONSAENDERUNG (wie beim letzten Startfolge-Umbau
+    // 13.09., s. Kommentar am Platzhalter oben): `L.startT` ist nur der Zeitpunkt, ab dem ein
+    // Laeufer von der Rampe darf; gewertet wird `bahnZeit()` = `u.fertig-u.startT`, die GEFAHRENE
+    // Zeit. Kein Fahrer liest einen anderen (`schatten:false, tackle:false` bei Time-Trial, s.
+    // `vordermann()`), `formTag` wird oben in fester Reihenfolge gezogen, unabhaengig von
+    // `startT` — wer welchen der zwoelf exakten Werte `0, startAbstand, 2*startAbstand, ...`
+    // bekommt, aendert an dessen eigener Physik nichts. Es bleibt nur dieselbe
+    // Tick-Quantisierung am Startgatter, die der letzte Startfolge-Umbau schon auf 0,003
+    // (innerhalb der Kader-Spannweite) bezifferte — hier mit `miss-alle-disziplinen.mjs 24
+    // time-trial` vor/nach erneut nachgemessen, s. PR-Beschreibung.
+    if(art.startAbstand&&LAEUFER.length){
+      const favorit=LAEUFER.reduce((a,b)=>b.eig>a.eig?b:a);
+      const rest=LAEUFER.filter(u=>u!==favorit);
+      const jeTeam=new Map();
+      for(const u of rest){
+        if(!jeTeam.has(u.seite))jeTeam.set(u.seite,[]);
+        jeTeam.get(u.seite).push(u);
+      }
+      for(const liste of jeTeam.values())liste.sort((a,b)=>a.eig-b.eig);   // je Team schwach->stark
+      const teams=[...jeTeam.keys()];
+      const reihenfolge=[]; let letztesTeam=null;
+      while(reihenfolge.length<rest.length){
+        let kandidaten=teams.filter(t=>jeTeam.get(t).length&&t!==letztesTeam);
+        if(!kandidaten.length)kandidaten=teams.filter(t=>jeTeam.get(t).length);
+        let bestT=kandidaten[0];
+        for(const t of kandidaten)if(jeTeam.get(t)[0].eig<jeTeam.get(bestT)[0].eig)bestT=t;
+        reihenfolge.push(jeTeam.get(bestT).shift());
+        letztesTeam=bestT;
+      }
+      reihenfolge.push(favorit);
+      reihenfolge.forEach((u,i)=>{u.startT=i*art.startAbstand;});
+    }
     // STAFFEL "MARKE UND ZUG" (B3 Stufe 1): Haltungen erst NACH dem Aufbau beider Seiten,
     // weil die Marke vom Paar (Geber = Bein davor) abhaengt. Nur bei eingeschaltetem
     // QA-Schalter — sonst traegt kein Laeufer `haltung`/`marke`, s. Kopfkommentar dort.
@@ -51588,9 +51657,14 @@
           // ist, `etappenZeit`, wie lange er dafuer gebraucht hat. Erst damit laesst sich
           // pruefen, ob eine Staffel den Abschnitt misst oder den Laeufer. Ausserhalb der
           // Staffel bleiben beide null.
+          //
+          // `startT` NEU (E5, 14.10.): additiv wie `bein`/`etappe` darueber — reine
+          // Diagnose fuer die Startfolge (`u.startT`, s. "FAVORIT ZULETZT, TEAMS IM WECHSEL"
+          // oben), fuer jede Nicht-Zeitfahren-Bahn `null`. Kein neuer Wert, nur ein ohnehin
+          // vorhandenes Feld ausgelesen, veraendert keine Rangtreue.
           const eigVon=(u)=>u.eigOhneMutator!=null?u.eigOhneMutator:u.eig;
           const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:eigVon(u),
-            bein:u.bein??null, etappe:u.etappenZeit??null}))
+            bein:u.bein??null, etappe:u.etappenZeit??null, startT:u.startT??null}))
             :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:eigVon(u)}))
             // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
             // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
@@ -51624,6 +51698,7 @@
               wert:Math.round((w[u.n]||0)*100)/100,
               ...(u.bein!=null?{bein:u.bein,
                 etappe:u.etappe==null?null:Math.round(u.etappe*1000)/1000}:{}),
+              ...(u.startT!=null?{startT:Math.round(u.startT*1000)/1000}:{}),
               ...(u.reihe!=null?{reihe:u.reihe}:{}),
               ...(u.arch!=null?{arch:u.arch}:{}),
               ...(u.torwart?{torwart:true}:{}),
