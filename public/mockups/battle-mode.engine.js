@@ -10327,12 +10327,21 @@
       // ist dies reine Sichtkorrektur ohne Wirkung auf Punktestand/Down/Distance.
       const zielSpot=s.spielTyp==="fg"?0:Math.max(1,fb.spot-fb.puntNetto);
       const zielX=fkLosX(fb.side,zielSpot);
-      const hoch=Math.sin(phase*Math.PI)*(s.spielTyp==="fg"?46:60);
-      fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:H/2-hoch,traegerId:null};
+      // MOMENTUM AUS DEM SCHON AUFGELOESTEN AUSGANG (Klasse-A-Slice, football-kickoff-
+      // slot-plan-14-10.md Schritt 1, K5-Konzept Abschnitt 3.5/6): `s.vizKickHoch`/
+      // `s.vizKickDauer` werden beim Betreten der "zug"-Stufe EINMAL aus `erg.distanz`
+      // (Field Goal) bzw. `erg.yards` (Punt) abgeleitet — denselben Feldern, die
+      // resolveFieldgoal()/resolvePunt() schon zurueckgeben, kein zweiter Wurf. Fallback auf
+      // die alten festen Werte, falls die Felder (z. B. in einer aelteren Messsonde) fehlen.
+      const hoch=Math.sin(phase*Math.PI)*(s.vizKickHoch!=null?s.vizKickHoch:(s.spielTyp==="fg"?46:60));
+      // VIZ-SNAP-URSPRUNG statt fixer Line-of-Scrimmage-Koordinate (Schritt 1, Punkt 1):
+      // der Kick startet dort, wo die Formation den Holder/Punter tatsaechlich zeichnet
+      // (Slot 0, s. starteSnap), nicht an s.losX.
+      fsBall={sichtbar:true,x:s.vizSnapX+(zielX-s.vizSnapX)*phase,y:s.vizSnapY-hoch,traegerId:null};
       return;
     }
     if(erg.typ==="sack"){
-      fsBall={sichtbar:true,x:s.losX-s.zumFeld*12*Math.min(1,phase*2),y:H/2,traegerId:erg.spieler.id};
+      fsBall={sichtbar:true,x:s.vizSnapX-s.zumFeld*12*Math.min(1,phase*2),y:s.vizSnapY,traegerId:erg.spieler.id};
       return;
     }
     // SICHTBARE WURFWEITE AUCH BEI UNVOLLSTAENDIG/INTERCEPTION (Fund dieser Runde,
@@ -10351,15 +10360,17 @@
     const zielSpot=Math.max(0,Math.min(100,fb.spot-sichtYards));
     const zielX=fkLosX(fb.side,zielSpot);
     if(s.spielTyp==="lauf"){
-      fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,
-        y:H/2+Math.sin(phase*Math.PI*3)*12,traegerId:erg.spieler.id};
+      fsBall={sichtbar:true,x:s.vizSnapX+(zielX-s.vizSnapX)*phase,
+        y:s.vizSnapY+Math.sin(phase*Math.PI*3)*12,traegerId:erg.spieler.id};
       return;
     }
     // Pass: parabolischer Flug, Amplitude waechst mit der Tiefe (screen sehr flach, tief
     // hoch und lang) — beim Sack schon oben behandelt, bleibt hier immer ein echter Wurf.
     const flugHoch=s.spielTyp==="tief"?70:s.spielTyp==="mittel"?46:s.spielTyp==="kurz"?30:16;
-    const startY=H/2+(s.spielTyp==="screen"?-26:0); // Screen: erst leicht zurueck zum Receiver hinter der Line
-    fsBall={sichtbar:true,x:s.losX+(zielX-s.losX)*phase,y:startY-Math.sin(phase*Math.PI)*flugHoch,
+    // VIZ-SNAP-URSPRUNG statt s.losX (Schritt 1, Punkt 1): der Wurf startet am gezeichneten
+    // QB-/Center-Platz (Slot 0), "screen" bleibt relativ dazu leicht zurueckversetzt.
+    const startY=s.vizSnapY+(s.spielTyp==="screen"?-26:0); // Screen: erst leicht zurueck zum Receiver hinter der Line
+    fsBall={sichtbar:true,x:s.vizSnapX+(zielX-s.vizSnapX)*phase,y:startY-Math.sin(phase*Math.PI)*flugHoch,
       traegerId:(phase>=0.96&&erg.typ==="komplett")?erg.receiver.id:null};
   }
 
@@ -10728,7 +10739,18 @@
       plaetze[u.id]=fkClamp(losX+zumFeld*s.tiefe,H/2+s.breite);
     });
     fsLive.phase="snap";
-    fsLive.snap={stufe:"formation",t:0,spielTyp,formOff,formDef,losX,zumFeld,plaetze,ergebnis:null};
+    // VIZ-SNAP-URSPRUNG (Klasse-A-Slice, football-kickoff-slot-plan-14-10.md Schritt 1,
+    // K5-Konzept Abschnitt 3.3): Slot 0 ist laut SLOTS_FOOTBALL_OFF/starteSnap-Vergabe oben
+    // der QB-/Center-Platz, unabhaengig davon, wer beim Snap tatsaechlich als Passer/
+    // Laeufer ausgewuerfelt wird (das bleibt unveraendert `fkLos`-Lotterie, s. resolvePass/
+    // resolveLauf — dieser Slice ruehrt NICHT an, wer wirft, nur woher der Ball optisch
+    // startet). `plaetze[...]` steht hier schon fest (reine Geometrie, kein rr()), also rein
+    // lesend uebernommen — faellt auf losX/H/2 zurueck, falls Slot 0 je keinen Platz hat.
+    const qbSlotSpieler=FSTEAM[fb.side][0];
+    const qbSlotPlatz=qbSlotSpieler&&plaetze[qbSlotSpieler.id];
+    const vizSnapX=qbSlotPlatz?qbSlotPlatz.x:losX, vizSnapY=qbSlotPlatz?qbSlotPlatz.y:H/2;
+    fsLive.snap={stufe:"formation",t:0,spielTyp,formOff,formDef,losX,zumFeld,plaetze,
+      vizSnapX,vizSnapY,ergebnis:null};
     // DIREKT AN DEN PLATZ, NICHT HINLAUFEN LASSEN. Chris' Zusatzauftrag (Visualpruefung
     // 03.09.): mit dem normalen bewegeSpielerLive-Lauftempo (~230px/s) erreichte niemand
     // die neue Formation, BEVOR der naechste Snap (alle ~2,4-3,2s) schon wieder eine ganz
@@ -10749,12 +10771,40 @@
     fsAktuell=null;
   }
   const FK_SNAP_FORMATION=0.9, FK_SNAP_NACH=0.6;
+  // FG/PUNT-MOMENTUM AUS DER SCHON AUFGELOESTEN DISTANZ (Klasse-A-Slice, football-kickoff-
+  // slot-plan-14-10.md Schritt 1, K5-Konzept Abschnitt 3.5: "kein eigenes Momentum"). Rein
+  // lesend aus `erg.distanz` (resolveFieldgoal) bzw. `erg.yards` (resolvePunt) — beide stehen
+  // laengst fest, wenn diese Funktion laeuft (kein zweiter rr()-Aufruf, keine Rueckwirkung
+  // auf erfolg/distanz/yards selbst). NUR die Bogenhoehe (fsBall.y, reine Zeichenkoordinate)
+  // skaliert mit der Distanz, NICHT die Zug-Dauer: `FK_ZUG_DAUER[s.spielTyp]` bleibt fest,
+  // weil die Football-Snap-Phase — anders als Basketballs Freiwurf, der fsT bewusst anhaelt
+  // (s. "DIE UHR STEHT"-Kommentar oben) — die echte Spieluhr (fsT) weiterlaufen laesst
+  // (Kommentar bei starteSnap: "ein Play Clock ist Teil der echten Spielzeit"). Eine
+  // distanzabhaengige DAUER wurde hier zuerst versucht und gemessen VERWORFEN: sie
+  // verschob rho-Spannweite ueber die Kader-Familie von 0,127 auf 0,132 (node
+  // scripts/miss-alle-disziplinen.mjs 24 football, vor/nach Vergleich dieser PR) — derselbe
+  // Spielzeit-Konsum-Mechanismus, den CLAUDE.md als "mehr Ereignisse helfen fast nie"
+  // beschreibt, hier als Nebenwirkung einer eigentlich rein optischen Aenderung. Die
+  // Bogenhoehe hat denselben Effekt auf die Wahrnehmung (laengere Kicks sehen hoeher aus),
+  // ohne fsT/die Anzahl Snaps je Spiel zu beruehren — bit-identisch gemessen (PR-Beschreibung).
+  function fkKickHoch(spielTyp,erg){
+    if(spielTyp==="fg"){
+      const d=erg&&erg.distanz!=null?erg.distanz:40;
+      return 34+Math.max(0,Math.min(36,(d-20)*0.75));
+    }
+    const y=erg&&erg.yards!=null?erg.yards:40;
+    return 40+Math.max(0,Math.min(34,(y-25)*0.85));
+  }
   function stepSnapPhase(dt){
     const s=fsLive.snap, fb=fsLive.football;
     s.t+=dt;
     if(s.stufe==="formation"){
       fsBall={sichtbar:true,x:s.losX,y:H/2,traegerId:null};
-      if(s.t>=FK_SNAP_FORMATION){ s.ergebnis=loeseFootballZug(s.spielTyp,fb); s.stufe="zug"; s.t=0; }
+      if(s.t>=FK_SNAP_FORMATION){
+        s.ergebnis=loeseFootballZug(s.spielTyp,fb);
+        if(s.spielTyp==="fg"||s.spielTyp==="punt")s.vizKickHoch=fkKickHoch(s.spielTyp,s.ergebnis);
+        s.stufe="zug"; s.t=0;
+      }
       return;
     }
     if(s.stufe==="zug"){
@@ -14029,7 +14079,14 @@
     if(istFootball()&&fsLive.football){
       const ORD=["1st","2nd","3rd","4th"];
       const fb=fsLive.football;
-      return (fb.side===0?"▶":"◀")+" "+(ORD[fb.down-1]||fb.down+".")+" & "+fb.toGo;
+      const downText=(ORD[fb.down-1]||fb.down+".")+" & "+fb.toGo;
+      // 3RD-DOWN-HERVORHEBUNG (Klasse-A-Slice, football-kickoff-slot-plan-14-10.md Schritt
+      // 1, K5-Konzept Abschnitt 3.2: "Der 3. Versuch wird nicht als Wendepunkt erzaehlt" —
+      // dieselbe Stelle, dasselbe innerHTML-/Klassen-Muster wie `.knapp`/`.torwartraus`
+      // oben, reine Lesung von `fb.down`, kein neuer Zustand, keine Wirkung auf
+      // Down/Distance/Playcall selbst.
+      const downHtml=fb.down===3?"<span class=\"football3rd\">"+downText+"</span>":downText;
+      return (fb.side===0?"▶":"◀")+" "+downHtml;
     }
     return "";
   }
