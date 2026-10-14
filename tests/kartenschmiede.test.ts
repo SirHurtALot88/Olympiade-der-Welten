@@ -797,7 +797,7 @@ describe("Kartenschmiede – Spielmotor (Moosgrab Map 2)", () => {
     const m = motor2(), s = m.neu();
     for (let i = 0; i < 120 && s.schritt !== "ende-map2"; i++) {
       const st = (MAP2.schritte as Record<string, { typ: string; optionen?: Array<{ taste: string; eingabe?: unknown }> }>)[s.schritt];
-      if (st.typ === "wahl") { const o = st.optionen!.find(x => !x.eingabe) || st.optionen![0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
+      if (st.typ === "wahl") { const opts = (m as unknown as { optionen(s: Spielstand): Array<{ taste: string; eingabe?: unknown }> }).optionen(s); const o = opts.find(x => !x.eingabe) || opts[0]; m.waehle(s, o.taste, "Krieger"); } else m.weiter(s);
     }
     expect(s.schritt).toBe("ende-map2");
     expect(s.gegner.filter(g => (g as { id: string }).id === "gemeinde")).toHaveLength(0);
@@ -1065,5 +1065,35 @@ describe("Kartenschmiede – Spielmotor: Bausteine für Map 3 bis 5", () => {
     m.runde(s);
     expect(s.flags.ausgeatmet).toBe(true);
     expect(s.letzte.some(e => e.id === "atmen")).toBe(true);
+  });
+});
+
+describe("Kartenschmiede – Hedda stirbt nicht im Gewühl (Map 2 und 3)", () => {
+  type HS = Stand5 & { verlauf: string[] };
+  type HM = Kette & { npcAlsGegner(s: HS, id: string): { uid: string; zaeh: number } | null; betrete(s: HS, id: string): unknown };
+  const neuMotor = (map: unknown) => SM.erstelle(map, { werte: (d: { werte?: Record<string, string> }) => d.werte || { tough: "3" }, stufe: () => 2, zufall: () => 0.5 }) as unknown as HM;
+  it("flieht beim letzten Treffer ins Dunkel, die App geht zum Weg ins Dorf, nachsetzen tötet sie", () => {
+    const m = neuMotor(MAPS[1]), s = m.neu() as HS;
+    s.flags.falltuer_offen = true;
+    m.betrete(s, "npc-hedda");
+    const g = m.npcAlsGegner(s, "hedda")!;
+    m.schaden(s, g.uid, g.zaeh);
+    expect(s.flags.hedda_geflohen).toBe(true);
+    expect(s.flags.hedda_tot).toBe(false);
+    expect(s.gegner.find(x => x.uid === g.uid)!.weg).toBe(true);
+    expect(s.schritt).toBe("hedda-weg-tot");
+    expect(m.ereignisErlaubt(s, "hedda-nachsetzen")).toBe(true);
+    m.ereignis(s, "hedda-nachsetzen");
+    expect(s.flags.hedda_tot).toBe(true);
+  });
+  it("zeigt die geflohene Hedda in Map 3 an der Luke, und die Wirtin traut den Helden nicht", () => {
+    const m = neuMotor(MAPS[2]);
+    const s = m.neu({ uebernahme: { flags: { hedda_geflohen: true, hedda_schweigt: true, hedda_angegriffen: true, weg: "haupt" } } }) as HS;
+    for (let i = 0; i < 30 && !s.verlauf.includes("wahl-knechte"); i++) { if (m.schritt(s).typ === "wahl") m.waehle(s, m.optionen(s)[0].taste); else m.weiter(s); }
+    expect(s.verlauf).toContain("hedda-luke");
+    expect(s.verlauf).not.toContain("hedda-dorfrand");
+    m.betrete(s, "wirtin-hedda-lebt");
+    expect(s.schritt).toBe("wirtin-hedda-geflohen");
+    expect(s.flags.wirtin_vertraut).toBe(false);
   });
 });

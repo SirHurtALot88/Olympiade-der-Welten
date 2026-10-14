@@ -2429,7 +2429,19 @@
       "probe_wahl": "ueberlebender"
      },
      "folge": "Er steckt es ein. Kommt er hinaus, nimmt er es mit in seine Welt.",
-     "ziel": "probe-ueberlebender"
+     "ziel": "probe-ueberlebender",
+     "wenn": {
+      "alle": [
+       {
+        "flag": "ueberlebender_dabei",
+        "ist": true
+       },
+       {
+        "flag": "ueberlebender_tot",
+        "nicht": true
+       }
+      ]
+     }
     },
     {
      "taste": "4",
@@ -2446,7 +2458,27 @@
       "aus": "gruppe"
      },
      "folge": "Qualitätstest dieses Helden. Gelungen: er merkt es nicht. Misslungen: er merkt es, sagt nichts, und es kostet Atemzug +1 für eine nächste Kampagne.",
-     "ziel": "tote-probe"
+     "ziel": "tote-probe",
+     "wenn": {
+      "alle": [
+       {
+        "alle": [
+         {
+          "flag": "ueberlebender_dabei",
+          "ist": true
+         },
+         {
+          "flag": "ueberlebender_tot",
+          "nicht": true
+         }
+        ]
+       },
+       {
+        "flag": "fund_tote_probe",
+        "ist": true
+       }
+      ]
+     }
     }
    ]
   },

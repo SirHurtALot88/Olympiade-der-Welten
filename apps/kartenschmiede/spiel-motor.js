@@ -427,18 +427,30 @@
       notiere(state, `${anzeigeName(g)} ${delta > 0 ? "+" : ""}${delta} Wunden (${g.wunden}/${g.zaeh})`);
       // Fällt er zum ersten Mal: Todestext und Wirkung
       const def = map.gegner[g.id] || {};
+      let sprung = null, geflohen = false;
       if (g.wunden >= g.zaeh && !state.tote[uid]) {
         state.tote[uid] = true;
-        if (def.tod) {
+        // Wer `flieht` mitbringt (Hedda), stirbt beim letzten Treffer nicht: er verschwindet vom Tisch
+        if (def.flieht) {
+          geflohen = true;
+          g.weg = true;
+          setze(state, def.flieht.setzt);
+          aendere(state, def.flieht.leisten);
+          state.letzte.push({ id: `flucht:${uid}`, name: `${anzeigeName(g)} ist weg`, vorlesen: def.flieht.vorlesen || "", gmNotiz: def.flieht.gmNotiz || "", art: "tod" });
+          sprung = def.flieht.springe || null;
+        } else if (def.tod) {
           setze(state, def.tod.setzt);
           aendere(state, def.tod.leisten);
           state.letzte.push({ id: `tod:${uid}`, name: `${anzeigeName(g)} fällt`, vorlesen: def.tod.vorlesen || "", gmNotiz: def.tod.gmNotiz || "", art: "tod",
             beutewurf: !!def.tod.beutewurf, beute: def.tod.beute || [] });
+          sprung = def.tod.springe || null;
         }
       }
       pruefeKampf(state);
+      // Ein Tod oder eine Flucht, die das Gespräch beendet, führt gleich zum nächsten passenden Schritt
+      if (sprung && state.schritt !== sprung) betrete(state, sprung);
       nachwirken(state);
-      if (state.tote[uid]) logge(state, "tod", `${anzeigeName(g)} fällt`);
+      if (state.tote[uid]) logge(state, "tod", `${anzeigeName(g)} ${geflohen ? "flieht" : "fällt"}`);
       return g;
     }
     function entferne(state, uid) {
@@ -454,7 +466,8 @@
       const id = g.wunden === 0 ? "unverletzt" : rest <= 0 ? "gefallen" : rest === 1 ? "am Ende" : rest <= z / 4 ? "schwer verwundet" : rest <= z / 2 ? "verwundet" : "angekratzt";
       const def = map.gegner[g.id] || {};
       const stufe = ((map.fog || {}).stufen || []).find(s => s.id === id) || {};
-      const satz = id === "gefallen" && def.tod && def.tod.vorlesen ? def.tod.vorlesen : (def.zustandSaetze && def.zustandSaetze[id]) || stufe.satz || "";
+      const ende = def.flieht || def.tod;
+      const satz = id === "gefallen" && ende && ende.vorlesen ? ende.vorlesen : (def.zustandSaetze && def.zustandSaetze[id]) || stufe.satz || "";
       return { id, satz, rest };
     }
     function bedrohung(def, werte) {
@@ -903,6 +916,8 @@
       if (e.danach && !(map.ereignisse || {})[e.danach]) fehler.push(`Ereignis ${id}: danach → ${e.danach} fehlt`);
     }
     for (const r of map.rundenende || []) if (r.springe && !istSchritt(r.springe)) fehler.push(`Rundenende: springe → ${r.springe} fehlt`);
+    const kampfDefs = [...Object.entries(map.gegner || {}), ...Object.entries(map.figuren || {}).map(([id, f]) => [`Figur ${id}`, f.kampf || {}])];
+    for (const [id, d] of kampfDefs) for (const art of ["tod", "flieht"]) if (d[art] && d[art].springe && !istSchritt(d[art].springe)) fehler.push(`${id}: ${art} springe → ${d[art].springe} fehlt`);
     for (const [k, l] of Object.entries(map.leisten || {})) for (const sw of l.schwellen || []) if (sw.springe && !istSchritt(sw.springe)) fehler.push(`Leiste ${k}: Schwelle ${sw.ab} → ${sw.springe} fehlt`);
     for (const [id, e] of Object.entries(map.ereignisse || {})) if (e.probe && !(e.probe.stufen || []).length) fehler.push(`Ereignis ${id}: Probe ohne Stufen`);
     for (const [id, e] of Object.entries(map.ereignisse || {})) for (const x of [...(e.gegnerHinzu || []), ...(e.gegnerMod || [])]) if (!(map.gegner || {})[x.id]) fehler.push(`Ereignis ${id}: Gegner ${x.id} fehlt`);
