@@ -621,7 +621,7 @@
   },
   "zwei_gerettet": {
    "start": false,
-   "text": "Map 3: Mindestens zwei Menschen im Keller. Map 5: ein Fremder mehr.",
+   "text": "Map 3: Mindestens zwei Menschen im Keller. Map 5: sie halten oben am Brunnen ein Seil bereit.",
    "wirktIn": "map5"
   },
   "befallener_im_keller": {
@@ -636,7 +636,7 @@
   },
   "fund_marke": {
    "start": false,
-   "text": "Fundstück Erkennungsmarke. Map 5: der Anführer der Fremden ist ehrlich, ein Fremder mehr.",
+   "text": "Fundstück Erkennungsmarke. Map 5: zeigen die Helden sie dem Überlebenden, vertraut er ihnen.",
    "wirktIn": "map5"
   },
   "fund_protokoll": {
@@ -646,12 +646,12 @@
   },
   "fund_probe": {
    "start": false,
-   "text": "Fundstück lebende Probe. Map 5: die Fremden wollen sie.",
+   "text": "Fundstück lebende Probe. Map 5: der Überlebende will ein Stück für seine Leute.",
    "wirktIn": "map5"
   },
   "fund_tote_probe": {
    "start": false,
-   "text": "Fundstück tote Probe. Map 5: damit lässt sich der Anführer täuschen.",
+   "text": "Fundstück tote Probe. Map 5: damit lässt sich der Überlebende täuschen.",
    "wirktIn": "map5"
   },
   "schacht_geflohen": {
@@ -1465,7 +1465,7 @@
    "leisten": {
     "untersucht": 1
    },
-   "gmNotiz": "Zettel „Protokoll“ an den Helden, der es nimmt (die App legt Fundstücke noch nicht selbst ins Inventar: Zettel geben, auf dem Heldenbogen notieren). Ist es der dritte untersuchte Suchmarker, erwacht die Halle: Die Leiste steht dann auf 3, Weiter führt zum Erwachen.",
+   "gmNotiz": "„Protokoll“ dem Helden geben, der es nimmt (Knopf unten, dazu den Zettel). Ist es der dritte untersuchte Suchmarker, erwacht die Halle: Die Leiste steht dann auf 3, Weiter führt zum Erwachen.",
    "wofuer": "Das Protokoll (Fundstück). Map 5: Wer es in Ruhe liest, kennt die Schwachstelle des Herzens. Zählt als untersuchter Suchmarker: Der dritte weckt die Halle."
   },
   "tank-trueb": {
@@ -1484,7 +1484,7 @@
     "fund_probe": true
    },
    "gmNotiz": "Zettel „Probe“ an den Helden, der sie herausholt (1 Aktion). Wer sie trägt, ist langsamer: je Bewegung nur eine Kartenbreite weit statt einer Kartenlänge (steht unter Lage). Weitergeben geht wie bei jedem Gegenstand. Zählt nicht als Suchmarker, weckt nichts.",
-   "wofuer": "Die lebende Probe (Fundstück). Map 5: Die Fremden wollen sie. Ihr Träger ist langsamer."
+   "wofuer": "Die lebende Probe (Fundstück). Map 5: Der Überlebende will ein Stück davon. Ihr Träger ist langsamer."
   },
   "tank-still": {
    "name": "Den stillen Glastank untersuchen (rechts oben)",
@@ -1501,8 +1501,8 @@
    "setzt": {
     "fund_tote_probe": true
    },
-   "gmNotiz": "Zettel „Tote Probe“. Sie wiegt nichts, der Träger ist nicht langsamer. Von außen sieht sie aus wie die lebende: In Map 5 lässt sich der Anführer der Fremden damit täuschen. Zählt nicht als Suchmarker, weckt nichts.",
-   "wofuer": "Die tote Probe (Fundstück). Map 5: Damit lässt sich der Anführer der Fremden täuschen."
+   "gmNotiz": "„Tote Probe“ einem Helden geben (Knopf unten, dazu den Zettel). Sie wiegt nichts, der Träger ist nicht langsamer. Von außen sieht sie aus wie die lebende: In Map 5 lässt sich der Überlebende damit täuschen. Zählt nicht als Suchmarker, weckt nichts.",
+   "wofuer": "Die tote Probe (Fundstück). Map 5: Damit lässt sich der Überlebende täuschen."
   },
   "gestalt": {
    "name": "Eine Gestalt an der Wand ansehen",
@@ -1538,7 +1538,7 @@
     "fund_marke": true
    },
    "gmNotiz": "Zettel „Erkennungsmarke“ an den Helden, der sie abnimmt: Die Kette reißt leicht. Kein Erwachen, solange niemand zuschlägt. Zählt nicht als Suchmarker.",
-   "wofuer": "Wandnische mit einer Gestalt in Rüstung. Ansehen gibt die Erkennungsmarke (Fundstück, Map 5: der Anführer der Fremden ist ehrlich, ein Fremder mehr). Zuschlagen weckt die Halle (F)."
+   "wofuer": "Wandnische mit einer Gestalt in Rüstung. Ansehen gibt die Erkennungsmarke (Fundstück, Map 5: der Überlebende vertraut den Helden, wenn sie sie ihm zeigen). Zuschlagen weckt die Halle (F)."
   },
   "licht": {
    "name": "Das blinkende Licht berühren",
@@ -1873,7 +1873,7 @@
       "flag": "zwei_gerettet",
       "ist": true
      },
-     "text": "Mindestens zwei Menschen sitzen im Keller unter dem Gemeindehaus: Hier unten ändert das nichts, in Map 5 kommt ein Fremder mehr."
+     "text": "Mindestens zwei Menschen sitzen im Keller unter dem Gemeindehaus: Hier unten ändert das nichts. In Map 5 warten sie oben mit einem Seil: auf der Flucht kommen drei Figuren je Runde in den Schacht."
     },
     {
      "wenn": {
@@ -2413,7 +2413,7 @@
       "flag": "fund_marke",
       "ist": true
      },
-     "text": "Erkennungsmarke: Der Anführer der Fremden erkennt den Namen darauf. Er ist ehrlich zu euch, ein Fremder mehr in Map 5."
+     "text": "Erkennungsmarke: Zeigen die Helden sie in Map 5 dem Überlebenden, erkennt er den Namen und vertraut ihnen."
     },
     {
      "wenn": {
@@ -2427,14 +2427,14 @@
       "flag": "fund_probe",
       "ist": true
      },
-     "text": "Probe: Die Fremden wollen sie. In Map 5 kann die Gruppe sie geben, behalten oder vertauschen."
+     "text": "Probe: In Map 5 will der Überlebende ein Stück für seine Leute. Die Gruppe kann es ihm geben, behalten oder in die Glut werfen."
     },
     {
      "wenn": {
       "flag": "fund_tote_probe",
       "ist": true
      },
-     "text": "Tote Probe: Damit lässt sich der Anführer in Map 5 täuschen (Qualitätstest beim Übergeben)."
+     "text": "Tote Probe: Damit lässt sich der Überlebende in Map 5 täuschen (Qualitätstest beim Übergeben)."
     },
     {
      "wenn": {
@@ -2478,7 +2478,7 @@
       "flag": "ueberlebender_dabei",
       "ist": true
      },
-     "text": "Der Verwundete lebt und ist bei den Helden. Map 5: Er kennt die Fremden, die durchbrechen, und sein Auftrag war, das brennende Herz zu zerstören."
+     "text": "Der Verwundete lebt und ist bei den Helden. Map 5: Er kämpft mit, und sein Auftrag war, das brennende Herz zu zerstören."
     },
     {
      "wenn": {
@@ -2535,7 +2535,7 @@
       "flag": "zwei_gerettet",
       "ist": true
      },
-     "text": "Zwei oder mehr Gerettete im Keller (Map 3): ein Fremder mehr in Map 5 (wird weitergereicht)."
+     "text": "Zwei oder mehr Gerettete im Keller (Map 3): in Map 5 das Seil von oben (wird weitergereicht)."
     },
     {
      "wenn": {
