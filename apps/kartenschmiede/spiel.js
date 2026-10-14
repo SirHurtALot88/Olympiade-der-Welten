@@ -310,7 +310,7 @@
 
   // ---------- Uhr und Antreiber ----------
   const ueberzogen = () => { const g = motor.zeitlimit(stand); return g > 0 && motor.minuten(stand) >= g; };
-  const abendHtml = () => { const m = motor.minutenSeit(stand.abendSeit); return `<span class="sp-uhr" title="So lange läuft der Abend schon">Abend ${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}</span>`; };
+  const abendHtml = () => { const m = motor.minutenSeit(stand.abendSeit); return `<span class="sp-uhr" title="So lange läuft der Abend schon">🌙 ${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}</span>`; };
   // Abwechselnde Initiative: wer diese Runde schon dran war und wer als Nächstes aktiviert
   function zugHtml() {
     if (!stand.rundenAktiv) return "";
@@ -375,11 +375,11 @@
       return `<span class="sp-pill ${b ? (b.d > 0 ? "blitz-hoch" : "blitz-runter") : ""}" title="${esc(`${def.name}: ${def.text || ""}`)}">${b ? `<sup>${b.d > 0 ? "↑" : "↓"}${Math.abs(b.d)}</sup>` : ""}<b>${esc(String(def.name).replace(/-Leiste$/, "").replace(/^Heddas /, ""))}</b> ${Array.from({ length: def.max - def.min }, (_, i) => `<i class="${i < l.wert - def.min ? "an" : ""}"></i>`).join("")} <em>${l.wert}</em></span>`;
     }).join("");
     const laeuft = [spieler.haupt, spieler.schleife].filter(a => !a.paused).map(a => a.dataset.cue);
-    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b>${fortschrittHtml(pos, ids.length)}<small>${esc(map.titel)} · Schritt ${pos}/${ids.length} · <span class="sp-stufe st-${esc(motor.schwierigkeit(stand).id)}" title="${esc(motor.schwierigkeit(stand).text)}">${esc(motor.schwierigkeit(stand).name)}</span></small></div>
+    el.innerHTML = `<div class="sp-titel"><b>${esc(map.kampagne)} · Map ${map.map}</b><span class="sp-zeile-uhr">${fortschrittHtml(pos, ids.length)}${uhrHtml()}</span><small>${esc(map.titel)} · Schritt ${pos}/${ids.length} · <span class="sp-stufe st-${esc(motor.schwierigkeit(stand).id)}" title="${esc(motor.schwierigkeit(stand).text)}">${esc(motor.schwierigkeit(stand).name)}</span></small></div>
       <div class="sp-pills">${runden ? `<span class="sp-pill sp-runde"><b>Runde</b> <em>${stand.runde + 1}</em></span>` : ""}${leisten}
         ${zugHtml()}<span class="sp-pill sp-verhalten ${motor.wuetend(stand) ? "wuetend" : ""}" title="Verhaltenstabelle der Gegner"><b>Gegner</b> ${motor.wuetend(stand) ? "WÜTEND" : "ruhig"}</span>
         ${laeuft.length ? `<span class="sp-pill sp-ton">♪ ${esc(laeuft.join(", "))} <button type="button" class="btn ghost sm" data-sp="stopp">■ Stopp ${taste("S")}</button></span>` : ""}</div>
-      <div class="sp-kopfknoepfe">${uhrHtml()}${speicherHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
+      <div class="sp-kopfknoepfe">${speicherHtml()}<button type="button" class="btn ghost sm" data-sp="antreiben" title="Antreiben: Vorschläge, um die Spieler weiterzubringen">⏳</button>
         <button type="button" class="btn ghost sm" data-sp="log">Log ${taste("P")}</button>
         <button type="button" class="btn ghost sm" data-sp="lage">Lage ${(s && s.ereignisse || []).some(id => String((map.ereignisse[id] || {}).taste || "").toLowerCase() === "l") ? "" : taste("L")}</button>
         <button type="button" class="btn ghost sm" data-sp="vollbild" title="Vollbild (am Mac auch Ctrl + Cmd + F)">⛶</button>
@@ -703,7 +703,7 @@
     if (!arten.size && !figuren.length) return "";
     const eintraege = [...arten.entries()].map(([id, liste]) => {
       const def = map.gegner[id] || {}, offen = liste.filter(g => motor.zustand(g).id !== "gefallen");
-      return `<button type="button" class="sp-wer" data-karte-art="${esc(id)}" title="Klick: Karte groß zeigen"><span class="cw sp-mini">${miniKarte(id)}</span>${miniKarte(id) ? `<span class="cw sp-vorschau">${miniKarte(id)}</span>` : ""}
+      return `<button type="button" class="sp-wer" data-karte-art="${esc(id)}" title="Klick: Karte groß zeigen"><span class="cw sp-mini">${miniKarte(id)}</span>
         <span><b>${esc(def.name || id)}</b><small>${liste.map(g => `<i class="${motor.zustand(g).id === "gefallen" ? "tot" : ""}">${esc(gegnerKuerzel(g))}</i>`).join("")}</small><em>${offen.length} von ${liste.length} stehen</em></span></button>`;
     });
     for (const f of figuren) eintraege.push(`<button type="button" class="sp-wer figur" data-chip="f:${esc(f.id)}"><span class="sp-mini leer">${esc(f.tisch.zeichen || f.name[0])}</span><span><b>${esc(f.name)}</b><em>NPC</em></span></button>`);
@@ -980,6 +980,21 @@
     if (kartenbox) requestAnimationFrame(() => KS.passeAn(kartenbox));
   }
 
+  // Drüberfahren über „Wer ist wer“: die Karte groß neben der Seitenspalte (die Spalte scrollt und schneidet sonst ab)
+  function vorschau(e) {
+    let el = $("spVorschau");
+    const wer = e.target.closest && e.target.closest(".sp-wer[data-karte-art]");
+    if (!wer || !stand) { if (el) el.hidden = true; return; }
+    const html = miniKarte(wer.dataset.karteArt);
+    if (!html) return;
+    if (!el) { el = document.createElement("div"); el.id = "spVorschau"; el.className = "cw sp-vorschau"; document.body.appendChild(el); }
+    if (el.dataset.art !== wer.dataset.karteArt) { el.innerHTML = html; el.dataset.art = wer.dataset.karteArt; }
+    const r = wer.getBoundingClientRect(), b = 240;
+    el.style.left = `${Math.max(8, r.left - b - 10)}px`;
+    el.style.top = `${Math.max(8, Math.min(window.innerHeight - b * 1.5 - 8, r.top - 40))}px`;
+    el.hidden = false;
+  }
+
   // ---------- Figuren ziehen und anklicken ----------
   let zug = null;
   function svgPunkt(svg, e) {
@@ -1023,6 +1038,8 @@
     tab.addEventListener("pointerdown", ziehStart);
     tab.addEventListener("pointermove", ziehe);
     tab.addEventListener("pointerup", ziehEnde);
+    tab.addEventListener("mouseover", vorschau);
+    tab.addEventListener("mouseleave", () => { const el = $("spVorschau"); if (el) el.hidden = true; });
     tab.addEventListener("click", async e => {
       // Eingabefelder (Regel, Häkchen) dürfen den Gegner nicht zuklappen
       if (e.target.closest("input, select, textarea, label")) return;

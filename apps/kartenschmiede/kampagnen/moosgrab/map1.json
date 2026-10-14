@@ -928,7 +928,8 @@
      "ansage": "Der Name hält sie. Einen Atemzug lang."
     }
    ],
-   "anblick": "Das Kleid hängt noch an ihr, in Fetzen. Aus dem Hals wächst eine Blüte, groß wie ein Kopf, und sie dreht sich mit, wohin ihr geht."
+   "anblick": "Das Kleid hängt noch an ihr, in Fetzen. Aus dem Hals wächst eine Blüte, groß wie ein Kopf, und sie dreht sich mit, wohin ihr geht.",
+   "kurz": "E"
   },
   "quelle": {
    "name": "Die Quelle",
@@ -989,7 +990,8 @@
      "text": "Die Helden kennen den Takt des Lichts: Angriffe auf die Quelle treffen mit +1."
     }
    ],
-   "anblick": "Zwischen den Steinen pulst grünes Licht, langsam, wie ein Herz. Wer hinsieht, hört ein leises Singen."
+   "anblick": "Zwischen den Steinen pulst grünes Licht, langsam, wie ein Herz. Wer hinsieht, hört ein leises Singen.",
+   "kurz": "Q"
   }
  },
  "fog": {
@@ -1836,7 +1838,6 @@
    "text": "Langsam, zäh. Die übrigen Sporenlinge bleiben am Tisch (Wunden übernommen). Wer am Zugende direkt neben ihr steht (innerhalb einer Kartenbreite), gilt als im Sporennebel: Qualitätstest. Ihr Sporenstoß reicht eine Kartenlänge weit.",
    "hinweise": [
     "Kampfmusik: oben im Kampf auf ▶ (Taste A), sobald die erste Aktivierung läuft. Sie läuft in Schleife, bis der Boss fällt.",
-    "Bedrohung ansagen, bevor jemand würfelt: „Das ist, wovor sie weggelaufen ist.“",
     "Die Zusatzregeln aus der Entscheidung eben stehen an ihrer Karte und unter Lage: zögern, Dornen, nachrückende Sporenlinge, oder ihr Lieblingsziel.",
     "Wütend von Anfang an, wenn die Helden sie angegriffen haben (vorher oder beim Aufblühen). Sonst ruhig, bis Marker 2 oder Runde 4.",
     "Marker dürfen weiter untersucht werden, Marker 3 schaltet die Quelle frei.",

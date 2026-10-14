@@ -723,7 +723,7 @@ fieldset.checks legend { margin-bottom: 6px; }
 .sp-titel { display: grid; line-height: 1.15; font-family: var(--ui); }
 .sp-titel b { font-size: 16px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
 .sp-titel small { font-size: 14px; color: var(--dim); }
-.sp-pills { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; align-items: center; flex: 1; }
+.sp-pills { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; align-items: center; flex: 1; }
 .sp-kopfknoepfe { display: flex; gap: 6px; }
 .sp-pill { display: inline-flex; gap: 5px; align-items: center; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; font: 600 15px var(--ui); background: var(--bg); white-space: nowrap; }
 .sp-pill b { letter-spacing: .05em; text-transform: uppercase; font-size: 12px; color: var(--dim); }
@@ -889,9 +889,8 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-mini { width: 46px; flex: none; pointer-events: none; } .sp-mini .card { box-shadow: none; }
 /* Drüberfahren: die Karte groß daneben, ohne zu klicken */
 .sp-wer { position: relative; }
-.sp-vorschau { display: none; position: absolute; right: calc(100% + 8px); bottom: 0; width: 230px; z-index: 30; pointer-events: none; }
-.sp-vorschau .card { box-shadow: 0 12px 40px rgba(0,0,0,.7); }
-.sp-wer:hover .sp-vorschau, .sp-wer:focus-visible .sp-vorschau { display: block; }
+.sp-vorschau { position: fixed; width: 240px; z-index: 60; pointer-events: none; }
+.sp-vorschau[hidden] { display: none; } .sp-vorschau .card { box-shadow: 0 12px 40px rgba(0,0,0,.7); }
 .sp-mini.leer { height: 46px; border-radius: 50%; background: #f2cf4a; color: #0b0c0f; display: grid; place-items: center; font: 800 18px var(--ui); }
 /* Marker: offen oder verdeckt, wofür sie stehen */
 .sp-sicht { font: 600 14px var(--ui); margin: 4px 0; } .sp-sicht.offen { color: #9fe08f; } .sp-sicht.zu { color: #c9ccd2; }
@@ -914,6 +913,7 @@ kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; 
 .sp-wissen span { display: grid; gap: 2px; } .sp-wissen b { font: 700 15px var(--ui); } .sp-wissen .sp-lies { margin: 2px 0; font-size: 16px; }
 .sp-wissen small { font: 13px var(--ui); color: var(--dim); } .sp-wissen em { font: 600 13px var(--ui); color: var(--brass); font-style: normal; } .sp-wissen label.an em { color: #9fe08f; }
 .sp-fragen p { margin: 0 0 8px; font-size: 16px; } .sp-fragen small { display: block; font: 13px var(--ui); color: var(--dim); }
+.sp-zeile-uhr { display: flex; align-items: center; gap: 4px; } .sp-zeile-uhr .sp-uhr { padding: 0 4px; font-size: 13px; }
 .sp-gespeichert { font-variant-numeric: tabular-nums; } .sp-gespeichert.fehler { color: #ff8a1f; border-color: #ff8a1f; }
 /* Was aus der letzten Map übernommen wurde / ob die Map abgeschlossen ist */
 .sp-uebernahme { display: grid; gap: 2px; margin: 10px 0; padding: 10px 14px; border: 1px solid #3f6a3a; border-radius: 8px; background: #17251a; font-family: var(--ui); }
