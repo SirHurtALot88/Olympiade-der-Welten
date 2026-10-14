@@ -500,7 +500,7 @@ describe("Kartenschmiede – Szenarien", () => {
 });
 
 type Spielstand = { schritt: string; runde: number; flags: Record<string, unknown>; leisten: Record<string, { wert: number; aktiv: boolean }>;
-  gegner: Array<{ uid: string; id: string; wunden: number; zaeh: number }>; letzte: Array<{ id: string; vorlesen: string }>; undo: unknown[] };
+  gegner: Array<{ uid: string; id: string; wunden: number; zaeh: number }>; letzte: Array<{ id: string; vorlesen: string; art?: string }>; undo: unknown[]; verlauf: string[] };
 type Motor = {
   neu(o?: Record<string, unknown>): Spielstand; weiter(s: Spielstand): unknown; zurueck(s: Spielstand): boolean; runde(s: Spielstand): { texte: string[]; sprung: string | null };
   ereignis(s: Spielstand, id: string): unknown; waehle(s: Spielstand, taste: string, eingabe?: string): unknown; schaden(s: Spielstand, uid: string, d: number): unknown;
@@ -657,12 +657,12 @@ function lauteTexte(knoten: unknown, schluessel = "", aus: string[] = []): strin
   return aus;
 }
 describe("Kartenschmiede – Spielmodus ohne Spoiler", () => {
-  for (const datei of ["map1", "map2"]) {
+  for (const datei of ["map1", "map2", "map3", "map4", "map5"]) {
     it(`${datei}: kein Tabu-Wort in Vorlese- und Ansagetexten`, () => {
       const m = JSON.parse(fs.readFileSync(path.join(__dirname, `../apps/kartenschmiede/kampagnen/moosgrab/${datei}.json`), "utf8"));
       const texte = lauteTexte({ schritte: m.schritte, ereignisse: m.ereignisse, figuren: m.figuren, gegner: m.gegner, auftraege: m.auftraege, antreiben: m.antreiben, audio: m.audio, rundenwurf: m.rundenwurf, leisten: m.leisten });
       expect(texte.length).toBeGreaterThan(50);
-      for (const wort of ["Station", "Labor", "Soldat", "Myzel", "Marine", "Forschung", "Experiment"]) {
+      for (const wort of ["Station", "Labor", "Soldat", "Myzel", "Marine", "Forschung", "Experiment", "Thousand", "Rubric", "Sorcerer", "Reaktor"]) {
         expect(texte.filter(t => t.includes(wort)), wort).toEqual([]);
       }
       expect(texte.filter(t => /\d\s*(Zoll|")/.test(t)), "Zoll-Angaben").toEqual([]);
@@ -960,5 +960,110 @@ describe("Kartenschmiede – Spielmotor: Proben, Schwellen, Tod, Lage", () => {
     m.zurueck(s);
     expect(s.flags.gefunden).toBe(false);
     expect(s.pos["held:A"]).toEqual({ x: 3, y: 4 });
+  });
+});
+
+// Map 3 bis 5: jede Map für sich heil, und die Kampagne läuft als Kette von Map 1 bis zum Ende
+type Stand5 = { schritt: string; flags: Record<string, unknown>; inventar: Record<string, string[]>; kampfZiel: unknown; rundenAktiv: boolean;
+  letzte: Array<{ id?: string; probe?: { wurf: number | null }; beute?: string[] }>; gegner: Array<{ uid: string; id: string; wunden: number; zaeh: number; weg: boolean }> };
+type Kette = { neu(o?: Record<string, unknown>): Stand5; schritt(s: Stand5): { typ: string; ereignisse?: string[] }; optionen(s: Stand5): Array<{ taste: string; eingabe?: { aus?: string } }>;
+  waehle(s: Stand5, taste: string, eingabe?: string): unknown; weiter(s: Stand5): unknown; runde(s: Stand5): { texte: string[] }; ereignis(s: Stand5, id: string): unknown;
+  schaden(s: Stand5, uid: string, d: number): unknown; probe(s: Stand5, i: number, w: number): unknown; ereignisErlaubt(s: Stand5, id: string): boolean; istFreund(id: string): boolean;
+  abschliessen(s: Stand5): void; offeneMarker(s: Stand5): string[]; uebernahme(s: Stand5): unknown };
+const MAPS = [1, 2, 3, 4, 5].map(n => JSON.parse(fs.readFileSync(path.join(__dirname, `../apps/kartenschmiede/kampagnen/moosgrab/map${n}.json`), "utf8")));
+describe("Kartenschmiede – Spielmotor (Moosgrab Map 3 bis 5)", () => {
+  it("hat in jeder Map keine kaputten Verweise und zählt die Maps durch", () => {
+    for (const [i, m] of MAPS.entries()) {
+      expect(SM.pruefe(m), `map${i + 1}`).toEqual([]);
+      expect(m.kampagne).toBe("moosgrab");
+      expect(m.map).toBe(i + 1);
+    }
+    expect(MAPS[4].kampagnenEnde).toBe(true);
+  });
+  it("spielt die Kampagne mit Zufallsläufen von Map 1 bis zum Ende von Map 5", () => {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    let uebernahmen: unknown[] = [];
+    for (const map of MAPS) {
+      const m = SM.erstelle(map, { werte: (d: { karte: string; werte?: Record<string, string> }) => d.werte || { tough: "3", quality: "5+" }, stufe: () => 2, zufall: rnd }) as unknown as Kette;
+      const neu: typeof uebernahmen = [];
+      for (let lauf = 0; lauf < 40; lauf++) {
+        const s = m.neu({ uebernahme: uebernahmen[lauf % Math.max(1, uebernahmen.length)] || null, schwierigkeit: ["anfaenger", "fortgeschritten", "experte", "legendaer"][lauf % 4] });
+        for (let i = 0; i < 500 && m.schritt(s).typ !== "ende"; i++) {
+          const st = m.schritt(s), r = rnd();
+          const offen = s.letzte.findIndex(e => e.probe && !e.probe.wurf);
+          if (offen >= 0) { m.probe(s, offen, 1 + Math.floor(rnd() * 6)); continue; }
+          if (st.typ === "wahl") {
+            const opts = m.optionen(s), o = opts[Math.floor(rnd() * opts.length)];
+            const ein = o.eingabe ? (o.eingabe.aus === "offene-marker" ? m.offeneMarker(s)[0] : "Krieger") : undefined;
+            if (o.eingabe && !ein) m.waehle(s, opts.find(x => !x.eingabe)?.taste || o.taste, "Krieger"); else m.waehle(s, o.taste, ein);
+            continue;
+          }
+          const evs = (st.ereignisse || []).filter(id => m.ereignisErlaubt(s, id));
+          if (evs.length && r < 0.35) { m.ereignis(s, evs[Math.floor(rnd() * evs.length)]); continue; }
+          if (st.typ === "kampf") {
+            const lebend = s.gegner.filter(g => !g.weg && g.wunden < g.zaeh && !m.istFreund(g.id));
+            if (!s.kampfZiel && r < 0.55 && lebend.length) { m.schaden(s, lebend[Math.floor(rnd() * lebend.length)].uid, 2); continue; }
+            if (!s.kampfZiel && r < 0.8 && s.rundenAktiv) { m.runde(s); continue; }
+          } else if (s.rundenAktiv && r < 0.45) { m.runde(s); continue; }
+          m.weiter(s);
+        }
+        expect(m.schritt(s).typ, `map${map.map} hängt in ${s.schritt}`).toBe("ende");
+        m.abschliessen(s);
+        neu.push(m.uebernahme(s));
+      }
+      uebernahmen = neu;
+    }
+  });
+});
+
+describe("Kartenschmiede – Spielmotor: Bausteine für Map 3 bis 5", () => {
+  const KARTE = {
+    kampagne: "Test", map: 9, titel: "Bausteine", start: "w",
+    leisten: { glut: { name: "Glut", min: 0, max: 6, start: 0 } },
+    flags: { a: { start: false }, b: { start: false }, c: { start: false }, ausgeatmet: { start: false } },
+    rundenende: [{ wenn: { flag: "a", ist: true }, ereignis: "atmen" }, { text: "Nur ein Hinweis" }],
+    ereignisse: {
+      atmen: { name: "Es atmet", setzt: { ausgeatmet: true } },
+      suchen: { name: "Suchen", beute: ["Laterne"], probe: { stufen: [{ ab: 5, vorlesen: "Mehr", beute: ["Brecheisen"] }] } },
+    },
+    gegner: { freund: { name: "Freund", seite: "freund", werte: { tough: "6" } }, feind: { name: "Feind", werte: { tough: "3" } } },
+    schritte: {
+      w: { typ: "wahl", titel: "W", optionen: [{ taste: "1", kurz: "Immer" }, { taste: "2", kurz: "Mit Ring", wenn: { hat: "Ring" } },
+        { taste: "3", kurz: "Zwei von drei", wenn: { mindestens: 2, aus: [{ flag: "a" }, { flag: "b" }, { flag: "c" }] } }], weiter: "k" },
+      k: { typ: "kampf", titel: "K", ereignisse: ["suchen"], gegner: [{ id: "freund", anzahl: 1, wunden: 2 }, { id: "feind", anzahl: 1 }], weiter: "e" },
+      e: { typ: "ende", titel: "E" },
+    },
+  };
+  const bau = () => SM.erstelle(KARTE, { werte: (d: { werte: Record<string, string> }) => d.werte, stufe: () => 1, zufall: () => 0 }) as unknown as Kette;
+  it("zeigt Antworten nur, wenn ihre Bedingung passt (Gegenstand, mindestens zwei von drei)", () => {
+    const m = bau(), s = m.neu();
+    expect(m.optionen(s).map(o => o.taste)).toEqual(["1"]);
+    s.inventar.Krieger = ["Ring"];
+    s.flags.a = true; s.flags.c = true;
+    expect(m.optionen(s).map(o => o.taste)).toEqual(["1", "2", "3"]);
+    s.inventar.Krieger = [];
+    expect(m.waehle(s, "2")).toBeNull();
+  });
+  it("bringt Verbündete angeschlagen auf den Tisch und gibt Beute aus Ereignis und Probe", () => {
+    const m = bau(), s = m.neu();
+    m.waehle(s, "1");
+    const freund = s.gegner.find(g => g.id === "freund")!;
+    expect(freund.zaeh).toBe(6);
+    expect(freund.wunden).toBe(2);
+    m.ereignis(s, "suchen");
+    expect(s.letzte[0].beute).toEqual(["Laterne"]);
+    m.probe(s, 0, 6);
+    expect(s.letzte[0].beute).toEqual(["Laterne", "Brecheisen"]);
+  });
+  it("löst am Rundenende Ereignisse von selbst aus und zeigt reine Hinweise", () => {
+    const m = bau(), s = m.neu();
+    m.waehle(s, "1");
+    expect(m.runde(s).texte).toEqual(["Nur ein Hinweis"]);
+    expect(s.flags.ausgeatmet).toBe(false);
+    s.flags.a = true;
+    m.runde(s);
+    expect(s.flags.ausgeatmet).toBe(true);
+    expect(s.letzte.some(e => e.id === "atmen")).toBe(true);
   });
 });

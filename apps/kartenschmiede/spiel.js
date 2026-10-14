@@ -267,7 +267,7 @@
   const offeneProbe = () => (stand.letzte || []).findIndex(e => e.probe && !e.probe.wurf);
   function waehle(taste) {
     const s = motor.schritt(stand);
-    const o = s && s.optionen && s.optionen.find(x => String(x.taste) === String(taste));
+    const o = s && motor.optionen(stand).find(x => String(x.taste) === String(taste));
     if (!o) return;
     if (o.eingabe) { eingabeFuer = o; fenster = "eingabe"; zeige(); return; }
     tue(() => motor.waehle(stand, taste));
@@ -424,7 +424,7 @@
     const runden = stand.rundenAktiv && s.typ !== "ende";
     const naechster = s.typ !== "wahl" && motor.naechsterId(stand);
     // „Weiter“ steht immer ganz rechts unten, auch wenn es gerade nicht geht (dann sagt es, warum)
-    const weiterKnopf = s.typ === "wahl" ? `<button type="button" class="btn sm weiter ghost" disabled>Antwort 1–${s.optionen.length} wählen</button>`
+    const weiterKnopf = s.typ === "wahl" ? `<button type="button" class="btn sm weiter ghost" disabled>Antwort wählen (${motor.optionen(stand).map(o => o.taste).join(", ")})</button>`
       : !naechster && s.typ === "ende" ? endeKnopf()
       : !naechster ? `<button type="button" class="btn sm weiter ghost" disabled>Ende der Map</button>`
       : kampfOffen(s) ? `<button type="button" class="btn sm weiter ghost" data-sp="weiter" title="Der Kampf läuft noch. Nur klicken, wenn er ohne Ziel endet.">Weiter ohne Ziel →</button>`
@@ -438,11 +438,14 @@
   }
   // Am Ende der Map: erst abschließen (hält fest, was mitkommt), dann die nächste Map mit allem Übernommenen starten
   const naechsteMap = () => MAPS.find(m => m.kampagne === map.kampagne && +m.map === +map.map + 1) || null;
+  // Die letzte Map der Kampagne (in der Map gesetzt oder laut Kampagnenübersicht): danach kommt nichts mehr
+  const letzteMap = () => { const k = (S.KAMPAGNEN || []).find(x => x.id === map.kampagne) || S.MOOSGRAB || {};
+    return !!map.kampagnenEnde || ((k.maps || []).length > 0 && +map.map >= (k.maps || []).length); };
   function endeKnopf() {
     if (!stand.fertig) return `<button type="button" class="btn sm weiter" data-sp="abschliessen">Map abschließen ✓ ${taste("Leertaste")}</button>`;
     const nm = naechsteMap();
     return nm ? `<button type="button" class="btn sm weiter" data-sp="naechste-map">Map ${nm.map} starten →</button>`
-      : `<button type="button" class="btn sm weiter ghost" disabled>Abgeschlossen ✓</button>`;
+      : `<button type="button" class="btn sm weiter ghost" disabled>${letzteMap() ? "Kampagne abgeschlossen ✓" : "Abgeschlossen ✓"}</button>`;
   }
   // Passt Zeile 1 nicht in die Breite, klappen Gruppen ihre letzten Knöpfe in ein „▴ n weitere“ (Story zuerst, Lärm zuletzt)
   function kuerzeLeiste() {
@@ -554,7 +557,7 @@
         return `${vorlesen(s.einstieg, f.name)}<!--passiert-->${gm(s.gmNotiz)}<button type="button" class="btn ghost sm" data-sp="npc">NPC-Schublade öffnen ${taste("N")}</button>`;
       }
       case "wahl": return `${s.ansage ? vorlesen(s.ansage) : ""}<p class="sp-anleitung">${esc(s.frage || "Wähle, was dem am nächsten kommt, was die Spieler sagen.")}</p>
-        <div class="sp-optionen n${Math.min(4, s.optionen.length)}">${s.optionen.map(o => `<button type="button" class="sp-option" data-wahl="${esc(o.taste)}" title="${esc(o.folge || "")}">
+        <div class="sp-optionen n${Math.min(4, motor.optionen(stand).length)}">${motor.optionen(stand).map(o => `<button type="button" class="sp-option" data-wahl="${esc(o.taste)}" title="${esc(o.folge || "")}">
           <kbd>${esc(o.taste)}</kbd><span><b>${esc(o.kurz)}</b>${o.text ? `<small>${esc(o.text)}</small>` : ""}${folgePillen(o)}${o.folge ? `<em>${esc(o.folge)}</em>` : ""}</span></button>`).join("")}</div>`;
       case "kampf": {
         const ziel = stand.kampfZiel ? `<p class="sp-ziel">Ziel erreicht. Weiter führt zu: <b>${esc((map.schritte[stand.kampfZiel] || {}).titel || stand.kampfZiel)}</b></p>` : "";
@@ -564,7 +567,7 @@
         const ep = motor.epListe(stand);
         const nm = naechsteMap();
         const fertig = stand.fertig
-          ? `<div class="sp-uebernahme"><b>✓ Map abgeschlossen</b><span>${nm ? `Unten „Map ${nm.map} starten“: die neue Map übernimmt automatisch ${esc(uebernahmeText(stand.uebernahme || motor.uebernahme(stand)))}.` : `Die Kampagne geht mit Map ${map.map + 1} weiter; die ist im Reiter Spielen noch nicht angelegt. Der Stand ist gespeichert, die Übernahme steht bereit.`}</span></div>`
+          ? `<div class="sp-uebernahme"><b>✓ Map abgeschlossen</b><span>${nm ? `Unten „Map ${nm.map} starten“: die neue Map übernimmt automatisch ${esc(uebernahmeText(stand.uebernahme || motor.uebernahme(stand)))}.` : letzteMap() ? `Das war die letzte Map: die Kampagne ist zu Ende. Der Stand ist gespeichert.` : `Die Kampagne geht mit Map ${map.map + 1} weiter; die ist im Reiter Spielen noch nicht angelegt. Der Stand ist gespeichert, die Übernahme steht bereit.`}</span></div>`
           : `<div class="sp-uebernahme offen"><b>Noch nicht abgeschlossen</b><span>Beute verteilen, dann unten „Map abschließen“ (oder Leertaste).</span></div>`;
         return `${fertig}<h4>Erfahrung</h4><ul>${ep.map(e => `<li class="${e.erreicht ? "ja" : "nein"}">${e.erreicht ? "✓" : "✗"} ${esc(e.text)}: ${e.ep} EP</li>`).join("")}</ul>
           <h4>Beute</h4>${liste(s.beute)}<p class="sp-beutezeile"><button type="button" class="btn ghost sm" data-wurf="ende">Beutewurf W6</button> ${beuteHtml(wuerfe.ende)}</p>

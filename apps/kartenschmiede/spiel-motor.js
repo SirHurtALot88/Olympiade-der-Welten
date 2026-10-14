@@ -143,6 +143,10 @@
       if (Array.isArray(w)) return w.every(x => gilt(state, x));
       if (w.alle) return w.alle.every(x => gilt(state, x));
       if (w.eine) return w.eine.some(x => gilt(state, x));
+      // Mindestens n der Bedingungen ({ mindestens: 2, aus: [...] })
+      if (w.mindestens !== undefined) return (w.aus || []).filter(x => gilt(state, x)).length >= +w.mindestens;
+      // Ein Held trägt diesen Gegenstand im Inventar
+      if (w.hat) return Object.values(state.inventar || {}).some(l => (l || []).includes(w.hat));
       if (w.flag !== undefined) {
         const v = state.flags[w.flag] === undefined ? null : state.flags[w.flag];
         if ("ist" in w) return v === w.ist;
@@ -564,6 +568,8 @@
         eintrag.probe.stufen.push({ ab: st.ab, bis: st.bis, vorlesen: st.vorlesen || "", gmNotiz: st.gmNotiz || "" });
         setze(state, st.setzt);
         aendere(state, st.leisten);
+        // Beute nur bei diesem Wurf (z. B. das Werkzeug, wenn der Griff gelingt)
+        if (st.beute) eintrag.beute = [...(eintrag.beute || []), ...st.beute];
       }
       notiere(state, `${e.name}: Probe ${w}`);
       pruefeSpawns(state);
@@ -587,10 +593,15 @@
       return r;
     }
     const offeneMarker = state => Object.entries(map.ereignisse || {}).filter(([id, e]) => e.beutewurf && e.einmal && !state.ereignisse[id]).map(([id]) => id);
+    // Die Antworten, die gerade gelten (eine Option mit `wenn` erscheint nur, wenn sie passt)
+    function optionen(state) {
+      const s = map.schritte[state.schritt];
+      return s && s.typ === "wahl" ? (s.optionen || []).filter(o => !o.wenn || gilt(state, o.wenn)) : [];
+    }
     function waehle(state, taste, eingabe) {
       const s = map.schritte[state.schritt];
       if (!s || s.typ !== "wahl") return null;
-      const o = s.optionen.find(x => String(x.taste) === String(taste));
+      const o = optionen(state).find(x => String(x.taste) === String(taste));
       if (!o) return null;
       merke(state);
       state.letzte = [];
@@ -621,6 +632,7 @@
       state.aktiviert = {};
       const texte = [];
       let sprung = null;
+      const ausloesen = [];
       for (const r of map.rundenende || []) {
         if (!gilt(state, r.wenn)) continue;
         // Eine Regel, die nur Flags setzt, die schon stehen (ab Runde 4 wütend), meldet sich nur beim ersten Mal
@@ -635,12 +647,17 @@
         aendere(state, r.leisten);
         setze(state, r.setzt);
         if (r.springe && !sprung && !state.angewendet[r.springe]) sprung = r.springe;
-        if (r.text && (r.leisten || r.springe || neuGesetzt)) texte.push(r.text);
+        // Ein Ereignis, das jedes Rundenende von selbst kommt (Chris muss keine Taste drücken)
+        if (r.ereignis) ausloesen.push(...[].concat(r.ereignis));
+        // Ein reiner Hinweis (ohne Leiste, Flag, Sprung) erscheint jede Runde, in der er gilt
+        const nurHinweis = !r.leisten && !r.springe && !r.setzt && !r.ereignis;
+        if (r.text && (r.leisten || r.springe || neuGesetzt || nurHinweis)) texte.push(r.text);
       }
       notiere(state, `Runde ${state.runde} beendet`);
       const schwellen = state.letzte.filter(x => x.art === "schwelle");
       state.letzte = schwellen;
       if (sprung) betrete(state, sprung);
+      else for (const id of ausloesen) loeseAus(state, id);
       nachwirken(state);
       logge(state, "runde", `Runde ${state.runde} beendet`);
       return { texte, sprung };
@@ -840,7 +857,7 @@
     }
 
     return {
-      abschliessen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
+      abschliessen, optionen, wissen, erfahre, vorschauGegner, heldenInfo, reiche, reicheMerkmal, istFreund,
       map, neu, zurueck, gilt, weiter, springe, betrete, ereignis, ereignisErlaubt, waehle, runde, schaden, entferne,
       zustand, bedrohung, wuetend, offeneMarker, epListe, folgen, wuerfle, uebernahme, werteVon, anzeigeName,
       probe, rundenwurf, lage, zusaetze, setzePos, figurenAmTisch, aufgedeckt, migriere, gibBeute, benutze, antreiber, zeitlimit, minuten,

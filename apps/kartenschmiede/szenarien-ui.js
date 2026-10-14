@@ -66,7 +66,7 @@
     fenster: ["F", "#9fb4ff", "Fenster"], sakristei: ["S", "#cfa75e", "Sakristei"], falltuer: ["F", "#ff8a1f", "Falltür"],
     ueberlebender: ["Ü", "#ffd95a", "Überlebender (verdeckt)"], eiskeller: ["E", "#7fd3ff", "Eiskeller (Krypta-Gang)"], schmied: ["S", "#ff4a36", "Der Schmied"],
     licht: ["L", "#ff4a36", "Blinkendes Licht"], schacht: ["↑", "#7fd06a", "Schacht nach oben"], nische: ["N", "#8b909b", "Wandnische"],
-    herz: ["♥", "#ff4a36", "Das Herz"], ader: ["A", "#c27a5a", "Ader"], marines: ["M", "#6fb0ff", "Verbündete"], tank: ["T", "#7fd3ff", "Glastank"],
+    herz: ["♥", "#ff4a36", "Das Herz"], ader: ["A", "#c27a5a", "Ader"], marines: ["M", "#6fb0ff", "Verbündete"], tank: ["T", "#7fd3ff", "Glastank"], truemmer: ["M", "#6fb0ff", "Trümmer / der Überlebende"],
   };
   const SCHRIFT = `font-family="Barlow Condensed, sans-serif" font-weight="700"`;
   // Geländesymbole (game-icons.net, CC BY 3.0, siehe vendor/gelaende-symbole.js): erst nach Beschriftung, dann nach Art
