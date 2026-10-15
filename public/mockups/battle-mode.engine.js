@@ -50537,6 +50537,40 @@
   }
 
   // =====================================================================================
+  // REINE DIAGNOSE-SONDE (CLAUDE.md "Formkarten-Kopplung", Punkt 30 aus chris-feedback-
+  // breite-runde-13-10.md, Messrunde 15.10.): bewegt sich die MATRIX-GEWICHTETE Eignung
+  // (gewichtet(a,BASIS_JE_DISC[d]) -- dieselbe Formel, mit der p.d.tdm/p.d.spurt ueberhaupt
+  // erst entstanden sind, s. Kommentar bei bauSpurt) durch EXAKT den Attribut-Kanal, den die
+  // Formkarte in Feldspiel/Buehne/Zeitfahren/Climbing/Spurt nimmt (mitAufschlag ueber
+  // betroffeneAttribute(..,false)="breit"), um den erwarteten Kartenwert?
+  //
+  // Ruft NUR bestehende, reine Helferfunktionen auf (gewichtet, mitAufschlag,
+  // betroffeneAttribute, BASIS_JE_DISC, SQUAD/OPP) -- schreibt NICHTS, mutiert KEINEN
+  // Spielerzustand, ruft kein M.bau()/M.lauf() auf und hat keinen Bezug zu FORMKARTE/
+  // MUTATOREN. Rein lesend, zero Wirkung auf ein echtes Spiel -- dasselbe Versprechen wie
+  // jede andere Sonde in dieser Datei (s. z.B. formEinflussVon direkt darueber).
+  //
+  // Beantwortet NUR die halbe Frage: ob der ROHATTRIBUT-KANAL selbst matrixtreu ist. Die
+  // andere Haelfte -- ob die tatsaechliche SPIELWERTUNG (die Sub-Skill-Rezepte R2, die die
+  // jetzt veraenderten Attribute ANDERS gewichten koennen als die Matrix) denselben Effekt
+  // zeigt -- deckt formEinflussVon() ab. Beide zusammen, nicht einzeln, sind die ehrliche
+  // Abnahme fuer Punkt 30.
+  function formAttrEigSonde(dId,formPlus){
+    const hoehe=formPlus==null?4:formPlus;
+    const W=BASIS_JE_DISC[dId]||{};
+    const alle=[...SQUAD,...OPP];
+    const reihen=alle.map(p=>{
+      const vor=gewichtet(p.a,W);
+      const nach=gewichtet(mitAufschlag(p.a,hoehe,betroffeneAttribute(null,dId,false),dId),W);
+      return {spieler:p.n, eigVor:+vor.toFixed(3), eigNach:+nach.toFixed(3), delta:+(nach-vor).toFixed(3)};
+    });
+    const deltas=reihen.map(r=>r.delta);
+    const mean=deltas.reduce((s,x)=>s+x,0)/Math.max(1,deltas.length);
+    return {disziplin:dId, formPlus:hoehe, meanDelta:+mean.toFixed(3),
+      minDelta:Math.min(...deltas), maxDelta:Math.max(...deltas), reihen};
+  }
+
+  // =====================================================================================
   // SANDSACK-FINALE-PFLICHTSONDE (Paket 1, Opus-Nebenbefund 1, docs/design/gewichtheben-
   // sandsack-rennen-opus-konzept-03-10.md Abschnitt 7.2/11.1): einflussVon() oben ist fuer
   // einen Teampunkt AUSSERHALB von `wert()` blind — es liest `M.wert()`, und das Finale
@@ -51107,7 +51141,7 @@
     } finally { M.zurueck(g); }
   }
 
-  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, boxscoreSerie,
+  window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten

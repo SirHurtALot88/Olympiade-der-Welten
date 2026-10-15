@@ -1,5 +1,28 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Dreiundzwanzigster Nachtrag 15.10. — Formkarten-Kopplung (Punkt 30) gemessen, nichts gebaut.**
+`docs/design/formkarten-kopplung-messrunde-15-10.md` beantwortet die in CLAUDE.md
+("Eignungsmatrix ist gesperrt") und Punkt 30 (`chris-feedback-breite-runde-13-10.md`) offen
+gelassene Frage, wie stark sich eine isolierte +4-Formkarte in Feldspiel/Buehne/Zeitfahren/
+Climbing/Spurt tatsaechlich bewegt, gegen Arena/TDM als bereits proportional gekoppelte Referenz.
+Zwei Messebenen: (A) der reine Attribut-Kanal (`mitAufschlag`/`betroffeneAttribute`) hebt die
+matrixgewichtete Eignung (`gewichtet(a,BASIS_JE_DISC[d])`) in JEDER getesteten Disziplin —
+Feldspiel, Buehne, Zeitfahren, Climbing, Spurt UND TDM — exakt um 4,00 Punkte, algebraisch
+garantiert, keine Streuung. (B) die tatsaechliche Spielwertung (`formEinflussVon`, isoliertes
+Formkarten-Delta, ein Spieler +4, gepaarte Saat) bewegt sich dagegen sehr unterschiedlich stark:
+Climbing bewegt einen Laeufer im Schnitt um 23 % des Feldes, Spurt 14 %, Zeitfahren 8 %, Tennis/
+Basketball 6-6,5 % (jeweils bei groesserer Feldgroesse) — eine Streuung, die selbst zwischen den
+drei Bahn-Disziplinen auftritt, die Motor UND Attribut-Kanal exakt teilen, also an den
+disziplinspezifischen Sub-Skill-Rezepten liegen muss, nicht am Kanal. Fuer TDMs Spielwertung (B)
+liefert diese Runde keine live gemessene Zahl — ein gepaarter Lauf ist dort je Kampf deutlich
+teurer als Feldspiel/Buehne/Bahn und lief wiederholt ueber zehn Minuten, ohne durchzulaufen; die
+Referenz steht im Dokument analytisch (Code-Beleg: `eigWert` nimmt den Kartenwert additiv/exakt
+auf, bevor `aufEignung()` die Kampfwerte normiert). Eine neue, rein lesende
+Messsonde (`formAttrEigSonde`, `window.__arena`) und ein Treiberskript
+(`scripts/messe-formkarten-kopplung.mjs`) kamen dazu; keine Mechanik-Aenderung. Die
+Design-Entscheidung (proportionale Kopplung nachziehen oder Rohattribut-Kopplung bewusst
+behalten) bleibt unveraendert bei Chris.
+
 **Zweiundzwanzigster Nachtrag 15.10. — Eiskunstlauf: E-F2 gebaut, bei ungerader Feldgroesse laeuft
 jetzt der Star solo, nicht der Schwaechste.** Chris' Sammel-Antwort auf eine Liste offener Punkte
 ("ja ueberall D, bau weiter") deckte `docs/design/fable-ideen-buehne-auftritt-30-09.md` Abschnitt
