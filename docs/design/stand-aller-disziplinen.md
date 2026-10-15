@@ -1714,3 +1714,34 @@ Ereignisse/Rennen 3,83, 93 % der Rennen mit ≥ 1 Ereignis, Wehr-Erfolgsquote 49
 Heimseite 53,0 % (wandProbe, n=300) — alle vier Werte reproduzieren das Konzeptpapier exakt, kein
 Drift gegenueber dem Stand vom 14.10. `node --check`/`eslint` auf der Engine: 0 neue Fehler/
 Warnungen gegenueber der Basislinie.
+
+## 10. Feldspiel-Taktik-Karte: gemeinsames Fundament, Basketball P4 (15.10.)
+
+Quelle: `docs/design/feldspiel-taktik-karte-fundament-15-10.md`. Chris' Sammel-Freigabe ("ja
+ueberall D, bau weiter") auf `fable-ideen-feldspiel-30-09.md` 2.2 ("Eine Taktik-Karte, drei
+Optionssaetze"), Basketball zuerst. **Reines Fundament, Klasse A, bit-identisch gemessen** — kein
+Mechanik-Umbau. Zwei Abhaengigkeiten vorab geprueft: Task #31 ("Spiel des Tages") hat nur die
+"Drei Momente" gebaut, **nicht** den vollen Replay aus 2.1 — die Praemisse "ohne Replay ist jede
+Taktik-Karte ein Formular" bleibt fuer eine manager-seitige UI offen. Task #33 (F1/B1) hat
+Basketball P4 an keiner Stelle vorbereitet.
+
+Gebaut in `battle-mode.engine.js`: `FELDSPIEL_ART.<disziplin>.taktik`-Schema (disziplin-generisch,
+nur Basketball gefuellt), die vier P4-Schalter (Angriff/Verteidigung/Screen-Coverage/Bretter) 1:1
+aus `basketball-opus-konzeptreview-26-09.md`, eine deterministische KI-Vorgabe je Schalter (liest
+nur bestehende Rezeptwerte, kein `rr()`), und `berechneTaktikAuto`/`effektiverTaktik`/`setzeTaktik`
+nach dem Muster von `berechneFokusAuto`. Die neuen Felder (`fsLive.taktikAuto`/`taktikManuell`)
+werden von KEINER Mechanik gelesen — nachgewiesen per Grep ueber die ganze Datei.
+
+| | vorher (HEAD) | nachher (Fundament) |
+|---|---:|---:|
+| rho je Spiel (n=24, Median) | 0,795 | **0,795** |
+| rho Saison (Median) | 0,881 | 0,881 |
+
+Bit-identisch. Pp (`messe-arena-einfluss.mjs basketball 24`): **33,7 Pp**, gegen die seit 26.09.
+dokumentierte, unveraenderte Verletzung von 33,4 Pp (`gesamtstand-audit-13-10.md` Zeile 100) —
+kein neuer Schaden, nur das bekannte, hier nicht angefasste Rezeptproblem.
+
+**Bewusst nicht Teil dieser Runde:** die Mechanik-Bindung je Schalter (zwei der vier Schalter
+haengen an P1 Foul-System/P3 Pick-and-Roll, die noch nicht existieren) und die UI-Integration in
+den Matchday-/Lineup-Fluss (eigenes Vorhaben, s. `app/foundation/legacy-lineup-lab/`) — beides
+klar als naechster Schritt dokumentiert, nicht halbfertig gebaut.
