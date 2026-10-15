@@ -76,6 +76,34 @@ function formatValue(value: number | null | undefined, digits = 0) {
   }).format(value);
 }
 
+/**
+ * DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): Reihenfolge + Beschriftung
+ * der Zähler aus `PlayerDisciplineLaufbahn.career`/`.seasons[].counters`. Ein Schlüssel, den diese
+ * Liste nicht kennt (ein künftiger Zähler), wird trotzdem gezeigt — mit seinem rohen Namen statt
+ * stillschweigend zu verschwinden, s. `laufbahnCounterLabel` unten.
+ */
+const LAUFBAHN_COUNTER_ORDER: ReadonlyArray<[key: string, label: string]> = [
+  ["starts", "Einsätze"],
+  ["siege", "Beste Platzierung (Rang 1)"],
+  ["podien", "Top 3"],
+  ["bestRang", "Bester Rang"],
+  ["rangSumme", "Rang-Summe"],
+  ["bestWertung", "Beste Wertung"],
+  ["spielerDesSpieltags", "Spieler des Spieltags"],
+  ["verletzungen", "Verletzungen"],
+];
+const LAUFBAHN_COUNTER_LABELS_BY_KEY = new Map(LAUFBAHN_COUNTER_ORDER);
+function laufbahnCounterLabel(key: string) {
+  return LAUFBAHN_COUNTER_LABELS_BY_KEY.get(key) ?? key;
+}
+/** Zeigt zuerst die bekannten Zähler in fester Reihenfolge, danach jeden unbekannten Rest-Schlüssel. */
+function orderedLaufbahnCounterEntries(counters: Record<string, number>): Array<[string, number]> {
+  const known = LAUFBAHN_COUNTER_ORDER.filter(([key]) => counters[key] != null).map(([key]) => [key, counters[key]] as [string, number]);
+  const knownKeys = new Set(known.map(([key]) => key));
+  const rest = Object.entries(counters).filter(([key]) => !knownKeys.has(key));
+  return [...known, ...rest];
+}
+
 function formatPointsWithRank(points: number | null | undefined, rank: number | null | undefined) {
   if (points == null || !Number.isFinite(points)) {
     return "—";
@@ -2205,6 +2233,10 @@ export default function PlayerDetailDrawer({
     direction: TopDisciplineSortDirection;
   }>({ columnId: "value", direction: "desc" });
   const [draggedTopDisciplineColumnId, setDraggedTopDisciplineColumnId] = useState<TopDisciplineColumnId | null>(null);
+  // DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): welche Disziplin-Zeile
+  // gerade ihr Laufbahn-Panel ausgeklappt zeigt — je Disziplin-Id, nicht je Achse, damit ein Wechsel
+  // der Achsen-Karte den Zustand der anderen nicht mitreisst.
+  const [expandedLaufbahnDisciplineId, setExpandedLaufbahnDisciplineId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!data || variant === "page") {
@@ -2936,13 +2968,22 @@ export default function PlayerDetailDrawer({
                               const barPercent = disciplineStatFogged
                                 ? Math.max(0, Math.min(100, attributeTierBandValue(foggedTier) ?? 0))
                                 : Math.max(0, Math.min(100, entry.value ?? 0));
-                              return (
-                                <div key={`axis-discipline-${card.id}-${entry.id}`} className="player-drawer-axis-discipline-row">
+                              // DISZIPLIN-LAUFBAHN (Q2): nie bei verdeckten (gescouteten) Spielern anbieten —
+                              // `buildScoutedDisciplineValuesFromPlayer` liefert `laufbahn` ohnehin nie, das
+                              // `!foggedBand` ist hier nur die zweite, UI-seitige Absicherung derselben Regel.
+                              const laufbahn = !foggedBand ? entry.laufbahn ?? null : null;
+                                const laufbahnExpanded = !foggedBand && expandedLaufbahnDisciplineId === entry.id;
+                                const rowHead = (
                                   <div className="player-drawer-axis-discipline-row-head">
                                     <span className="player-drawer-axis-discipline-label">
                                       <DisciplineIcon disciplineId={entry.id} label={entry.label} className="discipline-icon-chip-inline" />
                                       {entry.playerCount != null ? (
                                         <span className="player-drawer-axis-discipline-count">({entry.playerCount})</span>
+                                      ) : null}
+                                      {laufbahn ? (
+                                        <span className="player-drawer-axis-discipline-laufbahn-chevron" aria-hidden="true">
+                                          {laufbahnExpanded ? "▾" : "▸"}
+                                        </span>
                                       ) : null}
                                     </span>
                                     <span
@@ -2967,19 +3008,75 @@ export default function PlayerDetailDrawer({
                                       ) : null}
                                     </span>
                                   </div>
-                                  <NlProgressBar
-                                    className="player-drawer-axis-discipline-progress"
-                                    value={barPercent}
-                                    tone={toNlAxisTone(card.tone)}
-                                    showValue={false}
-                                    title={
-                                      foggedBand
-                                        ? `${entry.label}: Klasse ${foggedBand}`
-                                        : `${entry.label}: ${formatValue(entry.value, 0)}`
-                                    }
-                                  />
-                                </div>
-                              );
+                                );
+                                return (
+                                  <div key={`axis-discipline-${card.id}-${entry.id}`} className="player-drawer-axis-discipline-row">
+                                    {laufbahn ? (
+                                      <button
+                                        type="button"
+                                        className="player-drawer-axis-discipline-laufbahn-toggle"
+                                        aria-expanded={laufbahnExpanded}
+                                        title={`Laufbahn in ${entry.label} aufklappen — Einsätze, Platzierungen und Saison-Verlauf aus den gebuchten Spieltagen.`}
+                                        onClick={() =>
+                                          setExpandedLaufbahnDisciplineId((previous) => (previous === entry.id ? null : entry.id))
+                                        }
+                                      >
+                                        {rowHead}
+                                      </button>
+                                    ) : (
+                                      rowHead
+                                    )}
+                                    <NlProgressBar
+                                      className="player-drawer-axis-discipline-progress"
+                                      value={barPercent}
+                                      tone={toNlAxisTone(card.tone)}
+                                      showValue={false}
+                                      title={
+                                        foggedBand
+                                          ? `${entry.label}: Klasse ${foggedBand}`
+                                          : `${entry.label}: ${formatValue(entry.value, 0)}`
+                                      }
+                                    />
+                                    {laufbahn && laufbahnExpanded ? (
+                                      <div className="player-drawer-axis-discipline-laufbahn-panel" data-testid="player-drawer-discipline-laufbahn-panel">
+                                        <div className="player-drawer-axis-discipline-laufbahn-career">
+                                          <span className="player-drawer-axis-discipline-laufbahn-heading">
+                                            Laufbahn · {laufbahn.careerAppearances} Einsätze gesamt
+                                          </span>
+                                          <div className="player-drawer-axis-discipline-laufbahn-stats">
+                                            {orderedLaufbahnCounterEntries(laufbahn.career).map(([key, value]) => (
+                                              <span key={`laufbahn-career-${entry.id}-${key}`} className="player-drawer-axis-discipline-laufbahn-stat">
+                                                <small>{laufbahnCounterLabel(key)}</small>
+                                                <strong>{formatValue(value, 1)}</strong>
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                        {laufbahn.seasons.length > 0 ? (
+                                          <div className="player-drawer-axis-discipline-laufbahn-seasons">
+                                            <span className="player-drawer-axis-discipline-laufbahn-heading">Saison für Saison</span>
+                                            {laufbahn.seasons.map((season) => (
+                                              <div
+                                                key={`laufbahn-season-${entry.id}-${season.seasonId}`}
+                                                className={`player-drawer-axis-discipline-laufbahn-season-row${season.isActiveSeason ? " is-active" : ""}`}
+                                              >
+                                                <span className="player-drawer-axis-discipline-laufbahn-season-label">
+                                                  {season.seasonName}
+                                                  {season.isActiveSeason ? <em> · laufend</em> : null}
+                                                </span>
+                                                <span className="player-drawer-axis-discipline-laufbahn-season-values">
+                                                  {season.appearances} Einsätze
+                                                  {typeof season.counters.siege === "number" ? ` · ${season.counters.siege}× Rang 1` : ""}
+                                                  {typeof season.counters.bestRang === "number" ? ` · bester Rang ${season.counters.bestRang}` : ""}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
                             })
                           ) : (
                             <span className="muted player-drawer-axis-discipline-empty">Keine Diszis</span>

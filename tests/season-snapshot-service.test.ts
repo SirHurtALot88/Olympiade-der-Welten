@@ -638,6 +638,106 @@ describe("season snapshot service", () => {
     expect(teamB?.cashEntry).toBe(30);
   });
 
+  // DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): beim Saisonabschluss
+  // einmalig aus den (schon vorhandenen) `playerDisciplinePerformances` gefaltet.
+  describe("Disziplin-Laufbahn: Zähler im disciplineBreakdown", () => {
+    it("faltet Rang- und Wertungs-Zähler je Disziplin über alle Spieltage der Saison", () => {
+      const gameState = createGameState();
+      // Ein zweiter, später gebuchter Spieltag mit einem Sieg in derselben Disziplin (pow-1) —
+      // result-2/matchday-2 existieren in der Fixture bereits als "preview_applied".
+      gameState.seasonState.playerDisciplinePerformances = [
+        ...gameState.seasonState.playerDisciplinePerformances!,
+        {
+          id: "perf-3",
+          matchdayResultId: "result-2",
+          teamId: "A-A",
+          playerId: "p1",
+          activePlayerId: "r1",
+          disciplineId: "pow-1",
+          disciplineSide: "d1",
+          slotIndex: 0,
+          baseValue: 44,
+          finalPlayerScore: 99,
+          scoreContribution: 25,
+          rankInTeam: 1,
+          rankInDiscipline: 1,
+          isTop10: true,
+          isMvpCandidate: true,
+          storyWeight: null,
+          createdAt: "2026-06-06T00:00:00.000Z",
+        },
+      ];
+
+      const snapshot = buildSeasonSnapshot(gameState);
+      const powBreakdown = snapshot.playerPerformances[0]?.disciplineBreakdown.find((entry) => entry.disciplineId === "pow-1");
+      const speBreakdown = snapshot.playerPerformances[0]?.disciplineBreakdown.find((entry) => entry.disciplineId === "spe-1");
+
+      expect(powBreakdown?.laufbahn).toEqual({
+        starts: 2,
+        siege: 1,
+        podien: 2,
+        rangSumme: 3,
+        bestRang: 1,
+        bestWertung: 99,
+        spielerDesSpieltags: 1,
+      });
+      // spe-1 hatte nur den einen Einsatz mit Rang 4 — kein Sieg, kein Top-3. Die Fixture markiert
+      // diese Zeile trotzdem als `isMvpCandidate` (unabhängig vom Rang gesetzt), darum TASTE die
+      // "Spieler des Spieltags"-Zeile mit — kein Widerspruch, `isMvpCandidate` ist absichtlich ein
+      // eigener, vom Rang unabhängiger Schalter (s. Kommentar an `laufbahn` in olyDataTypes.ts).
+      expect(speBreakdown?.laufbahn).toEqual({
+        starts: 1,
+        siege: 0,
+        podien: 0,
+        rangSumme: 4,
+        bestRang: 4,
+        bestWertung: 42,
+        spielerDesSpieltags: 1,
+      });
+    });
+
+    it("bleibt idempotent, wenn ein ÄLTERER Spieltag NACH einem bereits gebuchten neueren erneut gebucht wird (O7-Lehre)", () => {
+      // Variante A: matchday-1 zuerst, matchday-2 (der Sieg) danach — die normale Reihenfolge.
+      const gameStateNormalOrder = createGameState();
+      gameStateNormalOrder.seasonState.playerDisciplinePerformances = [
+        ...gameStateNormalOrder.seasonState.playerDisciplinePerformances!,
+        {
+          id: "perf-3",
+          matchdayResultId: "result-2",
+          teamId: "A-A",
+          playerId: "p1",
+          activePlayerId: "r1",
+          disciplineId: "pow-1",
+          disciplineSide: "d1",
+          slotIndex: 0,
+          baseValue: 44,
+          finalPlayerScore: 99,
+          scoreContribution: 25,
+          rankInTeam: 1,
+          rankInDiscipline: 1,
+          isTop10: true,
+          isMvpCandidate: true,
+          storyWeight: null,
+          createdAt: "2026-06-06T00:00:00.000Z",
+        },
+      ];
+
+      // Variante B: dieselben Endzeilen, aber so aufgebaut, als wäre matchday-1 NACH matchday-2
+      // (erneut) gebucht worden — Result-Apply ersetzt dabei immer nur die Zeilen des eigenen
+      // `matchdayResultId` (s. legacy-matchday-result-apply-service.ts), das Endergebnis ist
+      // dasselbe Array, nur in umgekehrter Einfüge-Reihenfolge zusammengesetzt.
+      const gameStateReorderedBooking = createGameState();
+      const md2Row = gameStateNormalOrder.seasonState.playerDisciplinePerformances!.find((row) => row.id === "perf-3")!;
+      const md1Rows = gameStateNormalOrder.seasonState.playerDisciplinePerformances!.filter((row) => row.matchdayResultId === "result-1");
+      gameStateReorderedBooking.seasonState.playerDisciplinePerformances = [md2Row, ...md1Rows];
+
+      const laufbahnOf = (gameState: typeof gameStateNormalOrder) =>
+        buildSeasonSnapshot(gameState).playerPerformances[0]?.disciplineBreakdown.find((entry) => entry.disciplineId === "pow-1")?.laufbahn;
+
+      expect(laufbahnOf(gameStateReorderedBooking)).toEqual(laufbahnOf(gameStateNormalOrder));
+    });
+  });
+
   // Audit S4 regression: creating a season snapshot must never silently snapshot "the active
   // save" (here the mock's getActiveSave() below returns a real, different save — exactly what
   // pre-fix code would have snapshotted) when the requested saveId cannot be resolved.

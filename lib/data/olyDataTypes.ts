@@ -2847,6 +2847,41 @@ export type SeasonSnapshotPlayerDisciplineBreakdownRecord = {
   totalContribution: number | null;
   averageContribution: number | null;
   averageFinalScore: number | null;
+  /**
+   * DISZIPLIN-LAUFBAHN (Q2, docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt 3.2,
+   * docs/design/disziplin-laufbahn-q2-15-10.md): wie `DisciplineResultRecord.momente?` und
+   * `SeasonState.staffelWechselPaare?` additiv und optional -- jeder Schnappschuss von vor dieser
+   * Aenderung hat dieses Feld nicht, jeder Leser behandelt sein Fehlen als "noch keine Laufbahn-
+   * Zaehler erfasst", nie als Fehler (kein Breaking Change am Schema, keine Migration noetig).
+   *
+   * Je Saison-Zaehler (Saison-SUMME, nie ein Einzelereignis), gefuellt aus
+   * `lib/season/player-discipline-laufbahn.ts` (`finalizeLaufbahnCounters`), beim Saisonabschluss
+   * aus den da noch vorhandenen `playerDisciplinePerformances` des Spieltags gefaltet -- NIE
+   * waehrend der laufenden Saison inkrementiert (das waere genau der O7-Fehler aus dem
+   * Achtzehnten Nachtrag: ein neu gebuchter AELTERER Spieltag koennte einen Zaehler eines
+   * NEUEREN zuruecksetzen). Bekannte Schluessel (jeder optional, fehlt ein Schluessel, gab es dazu
+   * keine Daten -- nie als "0" zu lesen):
+   *   - `starts`: Einsaetze (== `appearances` oben, hier nur der Vollstaendigkeit halber gespiegelt)
+   *   - `siege`: Spieltage mit `rankInDiscipline === 1` (ligaweiter Bestwert dieser Disziplin)
+   *   - `podien`: Spieltage mit `rankInDiscipline <= 3`
+   *   - `rangSumme`: Summe von `rankInDiscipline` ueber alle Spieltage (fuer den Mittelwert beim Lesen)
+   *   - `bestRang`: kleinster `rankInDiscipline` der Saison
+   *   - `bestWertung`: groesster `finalPlayerScore` der Saison
+   *   - `spielerDesSpieltags`: Spieltage mit `isMvpCandidate === true` -- deckt sich heute mit
+   *     `siege` (derselbe Rang-1-Wurf bestimmt beide), bleibt aber ein eigener Schluessel, falls ein
+   *     Chassis `isMvpCandidate` einmal unabhaengig vom Rang vergibt.
+   *   - `verletzungen`: Verletzungen dieser Saison, deren Spieltags-Einsatzliste (`lineupDrafts`,
+   *     ueber `resolveInjuryMatchdayDisciplines`) diese Disziplin traegt. Steht ein Spieler am
+   *     Verletzungs-Spieltag in BEIDEN Disziplinen, zaehlt die Verletzung bei beiden -- der Wurf
+   *     selbst haengt am Spieltag, nicht an einer Disziplin (`InjuryEventRecord` hat kein
+   *     `disciplineId`), es wird nichts geraten, nur nicht an EINE von zwei moeglichen verschenkt.
+   * NICHT enthalten: die disziplineigenen Zaehler aus 3.2.3 (Ausschaltungen, Schaden, Assists,
+   * Rebounds, Duelle gewonnen, ...) -- nachgemessen (s. Design-Doc) traegt heute keiner von ihnen
+   * ueber einen Boxscore bis in den Spielstand, nur ein skalarer `finalPlayerScore` plus der
+   * ligaweite `rankInDiscipline`. Erfunden wird hier nichts; was nicht aus einem bereits
+   * gespeicherten Feld kommt, faellt weg.
+   */
+  laufbahn?: Record<string, number>;
 };
 
 export type SeasonSnapshotPlayerTeamBreakdownRecord = {
