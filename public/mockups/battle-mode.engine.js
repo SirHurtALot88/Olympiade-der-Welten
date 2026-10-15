@@ -30457,8 +30457,9 @@
       if(!u)return;
       // GAUNTLET (22.09.) braucht eine vierte Zeile (HP-Balken UND Punkte/Kampf-Nummer
       // getrennt, s.u.) -- die Tafel waechst dafuer um 12px, statt die drei bestehenden
-      // Zeilen zu stauchen.
-      const bw=Math.min(190,W*0.20), bh=art.gauntlet?86:64;
+      // Zeilen zu stauchen. NOCH EINMAL UM 12PX (Q1, Konzeptrunde K4 14.10., s.u.) fuer die
+      // ANGRIFF/HALT-Zeile.
+      const bw=Math.min(190,W*0.20), bh=art.gauntlet?98:64;
       const bx=links?12:W-12-bw, by=cy-bh/2-18;
       ctx.fillStyle="rgba(10,6,14,.78)"; ctx.fillRect(bx,by,bw,bh);
       ctx.fillStyle=farbeVon(u); ctx.fillRect(bx,by,3,bh);
@@ -30510,6 +30511,28 @@
           ctx.fillStyle="#9aa4b4";
           ctx.fillText("Anschlag "+anschlagN+" · Standzeit "+mm+":"+String(ss).padStart(2,"0"),bx+12,by+72);
         }
+        // Q1 (Konzeptrunde K4, 14.10., docs/design/breaking-phasen-peiniger-konzept-14-10.md
+        // Abschnitt 6): Chris' Wunsch, Offensiv-/Defensivstaerke an den Charakteren sichtbar
+        // zu machen -- woertlich: "man muss auch sehen koennen welcher Spieler eher offensiv
+        // stark ist wie Assassinen und wer defensiv gut einstecken kann". Liest ZWEI BEREITS
+        // BESTEHENDE, produktive Kanaele derselben Disziplin-Rezeptur -- keine neue Formel,
+        // kein rr(), kein Einfluss auf gauntletRunde()/baueGauntlet()/wert():
+        //   ANGRIFF = u.SPITZENMOMENT -- der Kanal, den gauntletSchadenFaktor() (B2, "der
+        //     Peiniger wirkt", Fable 30.09.) seit dem Paket-3-Umbau bereits in echten Schaden
+        //     uebersetzt.
+        //   HALT    = Mittel aus u.TECHNIK/u.NERVEN -- dieselben beiden Kanaele, aus denen
+        //     gauntletRunde()s `mixAlt` (Grundlage der Standhalte-Chance `erfolg`) gebildet
+        //     wird.
+        // Eigenschaft des KAEMPFERS selbst, nicht der laufenden Rolle: beide Zahlen bleiben
+        // gleich, ob er gerade peinigt oder ertraegt (ein Kaempfer mit hohem ANGRIFF ist in
+        // BEIDEN Rollen ein "Assassine", s. Chris' Wortlaut). Kein Spoiler und deshalb
+        // ungegatet, anders als Stufe/HP/Anschlag oben: reine Roster-Attribute aus der
+        // laengst produktiven Rezeptur, unabhaengig vom tatsaechlichen Spielausgang dieses
+        // Kampfes.
+        const angriff=Math.round(u.SPITZENMOMENT), halt=Math.round((u.TECHNIK+u.NERVEN)/2);
+        ctx.font="700 8.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
+        ctx.fillStyle="#ff9a85"; ctx.fillText("ANGRIFF "+angriff,bx+12,by+86);
+        ctx.fillStyle="#f2d75a"; ctx.fillText("HALT "+halt,bx+bw/2+6,by+86);
       } else {
         ctx.fillText(u.summe+" Pkt  ·  Durchgang "+(u.aktuell+1)+"/"+art.rundenN,bx+12,by+50);
       }

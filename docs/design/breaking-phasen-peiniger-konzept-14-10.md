@@ -245,6 +245,69 @@ bei größerem n erneut zu messen, bevor an der Mechanik selbst gedreht wird.
   `GAUNTLET_PEINIGER_DECKEL`/`GAUNTLET_FAMILIE_GEWICHT` in `battle-mode.engine.js`
   (Abschnitt 0).
 
+---
+
+## 8. Nachtrag 15.10. — Task #120: der Q1-Vorschlag aus Abschnitt 6 ist jetzt gebaut
+
+**Auftrag:** Task #120 (`docs/design/chris-feedback-breite-runde-13-10.md`, „Breaking" Punkt
+19) verlangte eine erneute Pruefung, was von Chris' Wunsch („Phasen statt Ping-Pong" +
+„optisch zeigen wer offensiv/defensiv stark ist") schon existiert, bevor irgendetwas gebaut
+wird. Befund nach vollstaendiger Pruefung aller vier Teilfragen des Auftrags:
+
+1. **Alternierendes Rollensystem (einer greift an, der andere ertraegt)** — existiert bereits
+   seit #875 (`cypherPaar()`/`buehneQueue`) und ist seit dem Gauntlet-Umbau (22.09.) die
+   gesamte Breaking-Mechanik (`baueGauntlet()`). Nicht „hin und her springen ohne klare
+   Phasen" — die Rollen SIND klar, nur der WECHSEL kommt nach jedem einzelnen Zug (s. Punkt 2).
+2. **Phasenlaenge `rundenDauer`** — heute 0,35 s/Zug (`BUEHNE_ART.breaking`), Rollenwechsel
+   nach JEDEM Zug (`ertragenderIstX=!ertragenderIstX`). Weit von Chris' „15 Sekunden" weg.
+   **Dieser Befund bleibt unveraendert offen** (s. Abschnitt 6 oben): die Messung in diesem
+   Dokument zeigt, dass eine Mehrzug-Phase bei der heutigen Kaderfamilie-Spannweite
+   (0,25–0,33) nicht zuverlaessig von „neutral" unterscheidbar ist (Signal nur 0,03) — **nicht
+   gebaut**, braucht entweder eine robustere Messgrundlage oder Chris' bewusste Entscheidung,
+   das Risiko einzugehen (Abschnitt 6).
+3. **Sichtbare Offensiv-/Defensivstaerke-Anzeige** — war die EINE echte Luecke: B1/B2/B4/B5
+   machen „der Peiniger wirkt"/„drei Familien" seit dem 30.09. mechanisch bereits wahr, aber
+   **nirgendwo sichtbar** — weder im Canvas-Motor (`zeichneBreaking()`) noch in der
+   produktiven React-Buehne (`app/foundation/discipline-stage/arena/disciplines/
+   breaking.tsx`), beide durchsucht, beide ohne jeden Treffer auf „offensiv"/„defensiv"/
+   Statanzeige. **Jetzt gebaut**, s.u.
+4. **Optische Erschoepfungs-/Blutindikatoren** — Q8, PR #1207 + Gore-Folge-PR, bereits
+   gemerged (bestaetigt erneut: `verfallStufe()` in `breaking.tsx`, vier Stufen Schweiss bis
+   Gore). Nur in der React-Buehne, nicht im Canvas-Motor — eine bestehende Asymmetrie zwischen
+   beiden Renderern, aber kein Teil dieses Auftrags.
+
+**Was gebaut wurde (Klasse A, rein dekorativ):** die in Abschnitt 6 vorgeschlagene
+„Q1-Matchup-Karte" — auf der Seitentafel (`tafel()` in `zeichneBreaking()`) steht jetzt je
+Kaempfer eine Zeile `ANGRIFF nn · HALT nn`, gelesen aus `u.SPITZENMOMENT` (derselbe Kanal, den
+`gauntletSchadenFaktor()`/B2 bereits in echten Schaden uebersetzt) und dem Mittel aus
+`u.TECHNIK`/`u.NERVEN` (dieselben Kanaele, aus denen `gauntletRunde()`s `mixAlt` die
+Standhalte-Chance bildet). Eigenschaft des Kaempfers, nicht der laufenden Rolle — bleibt bei
+Rollenwechsel gleich, genau wie ein „Assassine" in beiden Rollen ein Assassine bleibt. Kein
+`rr()`, keine neue Formel, keine Aenderung an `gauntletRunde()`/`baueGauntlet()`/`wert()`.
+
+**Bewusst NUR im Canvas-Motor gebaut, nicht in `breaking.tsx`.** Der React-Typ `RT`
+(`DisciplineStageNativeArena.tsx`) fuehrt fuer keine der zwanzig Disziplinen ein Feld fuer
+rohe Attribut-/Kanalwerte — nur `score`. `SPITZENMOMENT`/`TECHNIK`/`NERVEN` sind im Canvas-
+Motor direkt am Teilnehmer-Objekt verfuegbar (gleicher Scope, keine neue Datenleitung), in der
+produktiven Matchday-Buehne dagegen gar nicht vorhanden. Eine Anzeige dort haette einen neuen
+Datenkanal durch `RT`/`NativeStagePlayer` gebraucht — ein Schnitt, der potenziell alle zwanzig
+Disziplinen beruehrt, also eine groessere, eigene Runde und keine Klasse-A-Praesentationsrunde
+mehr. **Offene Frage fuer eine naechste Runde:** falls Chris das auch auf der Matchday-Buehne
+sehen will (dort, wo ein echtes Saisonspiel tatsaechlich laeuft), braucht das zuerst eine
+Entscheidung ueber diese neue Datenleitung, nicht nur einen Zeichenaufruf.
+
+**Verifikation:**
+
+| Pruefung | Ergebnis |
+|---|---|
+| `node --check public/mockups/battle-mode.engine.js` | bestanden |
+| `node scripts/miss-alle-disziplinen.mjs 24 breaking` | **bit-identisch zur Baseline**: 0,801/0,944 (Abschnitt 1), „bestanden" — erwartbar, `tafel()` ist ein reiner Zeichenaufruf in `zeichneBreaking()`, `disziplinProbe()` durchlaeuft Zeichenfunktionen nie |
+| Playwright-Sichtprobe (`battle-mode.html`, Breaking, volle Buehne inkl. Zeichenpfad) | „Seitenfehler: keine" — kein JS-Fehler durch die neuen `fillText`-Aufrufe, auch im echten Browserlauf |
+| Screenshot (Breaking-Buehne nach 1,8 s Laufzeit) | zeigt beide Seitentafeln mit `ANGRIFF nn · HALT nn`, lesbar, keine Ueberlappung mit der bestehenden Anschlag-/Standzeit-Zeile |
+
+**Nicht angefasst:** `rezept`, `failAbzug`, `rundenN`, `rundenDauer`, `gauntletRunde()`,
+`baueGauntlet()`, `gauntletSchadenFaktor()`, die Eignungsmatrix, `breaking.tsx`.
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 https://claude.ai/code/session_01UYLNtXkprKr1XK4c3X2xQq
