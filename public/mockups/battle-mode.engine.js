@@ -34967,7 +34967,44 @@
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
-    reihe.forEach((u,i)=>{const p=N-i; punkte.set(u.id,p); seiten[u.seite]+=p;});
+    // MARGIN-FORMEL (Task #105, PP nach Zeit statt Platz, 15.10., Diagnose Abschnitt 2,
+    // umgesetzt nach der Stamina-Kalibrierung desselben Tages). NUR Time-Trial setzt
+    // `BA().marginAnteil` (s. BAHN_ART["time-trial"]) -- jede andere Bahn liest hier
+    // `undefined`, der Zweig unten greift dann nicht und `punkte`/`seiten` bleiben exakt
+    // die alte Zeile (reine Rangpunkte N..1), bit-identisch zu vorher.
+    //
+    // ANKER N..1 BLEIBT: bester Laeufer N Punkte, schlechtester 1 -- wie bisher, s.
+    // Variante A/D/E der Diagnose. NUR DIE ZWISCHENSCHRITTE aendern sich: statt gleicher
+    // Eins-Schritte liegt ein Laeufer linear nach seinem ZEITABSTAND ZUM FELD (relativ zur
+    // Feldspanne, bester..schlechtester Zielzeit dieses Rennens) zwischen den Ankern --
+    // ein knapper Vorsprung bleibt nah am Nachbarn, ein grosser Abstand reisst eine
+    // groessere Luecke, genau wie Chris' Befund ("manche Spieler zeitlich einen Vorsprung
+    // rausholen") es verlangt. Gemischt mit `marginAnteil` (0,20, s. dort) statt die reinen
+    // Rangpunkte zu ersetzen -- Variante D/E, nicht die ungedaempfte Variante A, die auf
+    // beiden Saatstroemen die 25-Pp-Schranke riss (Diagnose Abschnitt 2.3).
+    //
+    // NUR LAEUFER MIT ECHTER ZIELZEIT (`u.fertig!=null`) LIEFERN EINEN ZEITABSTAND. Ein
+    // Nicht-Fertiger (DNF/raus) hat keine `bahnZeit()` -- derselbe Fall, den die Sortierung
+    // oben schon ans Feldende stellt (`fa!==fb`); er faellt hier auf die reine Rangpunktzahl
+    // zurueck, keine Division durch eine nicht vorhandene Zeit.
+    const marginAnteil=BA().marginAnteil||0;
+    let zeitBest=null, zeitSpanne=0;
+    if(marginAnteil>0){
+      const fertigeZeiten=reihe.filter(u=>u.fertig!=null).map(bahnZeit);
+      if(fertigeZeiten.length){
+        zeitBest=Math.min(...fertigeZeiten);
+        zeitSpanne=Math.max(...fertigeZeiten)-zeitBest;
+      }
+    }
+    reihe.forEach((u,i)=>{
+      const rangP=N-i;
+      let p=rangP;
+      if(marginAnteil>0&&zeitSpanne>0&&u.fertig!=null){
+        const marginP=N-(bahnZeit(u)-zeitBest)/zeitSpanne*(N-1);
+        p=(1-marginAnteil)*rangP+marginAnteil*marginP;
+      }
+      punkte.set(u.id,p); seiten[u.seite]+=p;
+    });
     return {reihe,punkte,seiten};
   }
   let bahnEndeGemeldet=false;
@@ -38419,6 +38456,17 @@
       // bleibt weiter Unentschieden (unveraendert aus der 06.09.-Entscheidung, jetzt auf
       // die Zeitsumme statt auf Rangpunkte angewandt).
       wertung:"zeit",
+      // PP NACH ZEIT STATT PLATZ (Task #105, Margin-Formel, 15.10.-Umsetzung): die
+      // Diagnose in docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md Abschnitt
+      // 2 fand die Formel implementierungsreif (Variante D/E, 15-25 % Margin-Anteil,
+      // Anker N..1 wie bisher), wartete aber auf Puffer — der Stamina-Kalibrierung vom
+      // selben Tag (Zwanzigster Nachtrag, stand-aller-disziplinen.md) schuf ihn (Pp-
+      // Abweichung 22,3/24,1 -> 13,5/14,1). `bahnRangliste()` liest DIESES Feld (s. dort,
+      // "MARGIN-FORMEL"); 0 oder fehlend = unveraendertes Verhalten (reine Rangpunkte),
+      // deshalb ist das Feld NUR hier gesetzt — jede andere Bahn (Spurt/Climbing/Staffel/
+      // Takeshi's Castle) bleibt bit-identisch. 0,20 liegt in der Mitte des geprueften
+      // 15-25-%-Korridors (Variante D/E), nicht an dessen Rand.
+      marginAnteil:0.20,
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
@@ -49592,6 +49640,21 @@
             return (b.hoch??b.pos)-(a.hoch??a.pos);
           };
           const o={}; [...LAEUFER].sort(cmp).forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
+        }
+        // TIME-TRIAL: DIESELBE FORMEL WIE DIE PRODUKTIONS-PP, UEBER DENSELBEN AUFRUF
+        // (Task #105, 15.10., Diagnose Abschnitt 2.1: "eine Aenderung an der
+        // Produktions-PP allein, ohne M.wert() mitzuziehen, wuerde die Mess-Sonde von dem
+        // entkoppeln, was tatsaechlich ausgezahlt wird"). Ruft `bahnRangliste()` direkt
+        // auf, statt die Formel ein zweites Mal auszuschreiben — kein Zwillings-Code, der
+        // auseinanderlaufen kann, wenn `marginAnteil` je wieder angefasst wird. Fuer jede
+        // andere Bahn (`BA().marginAnteil` dort `undefined`) liefert `bahnRangliste()`
+        // weiterhin reine Rangpunkte, bit-identisch zum generischen Zweig unten — deshalb
+        // NUR fuer time-trial ein eigener Zweig, Spurt faellt weiter in den `else`-Pfad.
+        if(bd==="time-trial"){
+          const w=bahnRangliste();
+          const o={};
+          for(const u of LAEUFER)o[u.n]=w.punkte.get(u.id)??0;
+          return o;
         }
         // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
         // bahnRangliste (s. dort), hier fuer die Rangtreue-Messung selbst: `disziplinProbe`
