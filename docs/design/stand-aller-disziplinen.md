@@ -1,5 +1,43 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Einundzwanzigster Nachtrag 15.10. — Eiskunstlauf: E-F2 gebaut, bei ungerader Feldgroesse laeuft
+jetzt der Star solo, nicht der Schwaechste.** Chris' Sammel-Antwort auf eine Liste offener Punkte
+("ja ueberall D, bau weiter") deckte `docs/design/fable-ideen-buehne-auftritt-30-09.md` Abschnitt
+„E-F2" (Klasse C, winzig) ab: `fusioniereSeite()` (`public/mockups/battle-mode.engine.js`, DUETT-
+Block) paarte bislang von oben (Rang 1+2, 3+4, …) — bei ungerader Feldgroesse (3 oder 5 je Seite,
+zwei von fuenf Saisons laut `buildSeasonPlayerCountByDiscipline`) blieb dadurch der SCHWAECHSTE
+Laeufer als Rest solo, ein Nebeneffekt der Sortierrichtung, keine bewusste Entscheidung. Geaendert:
+Paarung beginnt jetzt ab Index `g.length % 2` statt immer bei 0, sodass bei ungerader Groesse
+`g[0]` (der Star) unberuehrt bleibt; `baueGruppenJeSeite()` (Startreihenfolge) kennt denselben
+Rest-Index, damit der Star-Solo-Auftritt nach dem `reverse()` auch tatsaechlich der letzte Starter
+seiner Seite ist ("das Duett eroeffnet, der Star schliesst ab"). Bei gerader Feldgroesse aendert
+sich nichts (`rest===0`), bit-identisch bestaetigt.
+
+**Gemessen, vorher/nachher, kaderfest (live-save-Kaderfamilie, `miss-alle-disziplinen.mjs`):**
+
+| Feldgroesse je Seite | rho je Spiel (vorher → nachher) | Spannweite | rho Saison (vorher → nachher) | Abnahme |
+|---|---:|---:|---:|---|
+| 3 (ungerade) | 0,919 → 0,905 | 0,181 → 0,262 | 1,000 → 1,000 | bestanden (beide) |
+| 5 (ungerade) | 0,843 → 0,866 | 0,111 → 0,080 | 0,976 → 0,976 | bestanden (beide) |
+| 4 (gerade, Kontrolle) | 0,849 → 0,849 | 0,159 → 0,159 | 0,976 → 0,976 | bit-identisch |
+| 6/Standard (gerade) | 0,866 → 0,866 | 0,105 → 0,105 | 0,986 → 0,986 | bit-identisch |
+
+Die einzigen Bewegungen (je-Seite 3 und 5) liegen innerhalb der eigenen Kaderrauschen-Spannweite
+der Disziplin und sind damit von Null nicht unterscheidbar — keine Regression, die Schranke
+(>0,80 je Spiel) haelt in jeder getesteten Feldgroesse vor UND nach der Aenderung.
+
+**Pp-Pflichtpruefung (`messe-arena-einfluss.mjs`, zwei unabhaengige Saatstroeme, n=24):** die
+letzte Showcase/Eiskunstlauf-Pp-Zahl im Repo war alt (Teil 2 oben, n=48, 26.09.) — diese Runde
+misst frisch nach. Standardmessung (`einflussVon` baut die Disziplin ohne `jeSeite`-Parameter,
+also mit der geraden Katalog-Feldgroesse) ist vom Rest-Index gar nicht beruehrt und deshalb
+erwartungsgemaess bit-identisch vorher/nachher: **19,9 Pp / 17,8 Pp** (beide Stroeme deutlich
+unter der 25-Pp-Schranke).
+
+**Gebaut, kein Draft:** beide Pflichtzahlen halten, in keiner getesteten Konfiguration ein
+Regress. Aenderung in `public/mockups/battle-mode.engine.js` (`fusioniereSeite()` und
+`baueGruppenJeSeite()` im Eiskunstlauf-DUETT-Block), s. Abschnitt 5b unten (Eiskunstlauf-Zeile)
+fuer die Kurzfassung in der grossen Tabelle.
+
 **Zwanzigster Nachtrag 15.10. — Time-Trial: Stamina-Ueberschuss im Rangpunkte-Rezept kalibriert
 (Budget-Methode, Climbing-Vorbild), PP-nach-Zeit-Frage bleibt ausserhalb des Scopes.**
 `docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md` Abschnitt 2.5 diagnostizierte den
@@ -1494,7 +1532,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Climbing | 48 % | 0,814 (26.09.-Nachtrag) | Steigung und Kraftbudget statt Antritt · nach PR 2 (26.09., Griffarten/Balance/Zeitlimit kalibriert) kaderfest wieder bestanden (vorher 0,790, knapp) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,906 (26.09.-Nachtrag) | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld ausser Staffel · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | Wettessen | 40 % | 0,872 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
-| Eiskunstlauf | 40 % | 0,878 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · **Nachtrag 07.09. (Fable-Recherche `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`):** stand kaderfest knapp unter der Schranke (0,792, reines Verlaesslichkeitsproblem bei exzellenter Saisonzahl 0,944) — `rundenN` 6→12, `rundenDauer` 0,85→0,425 (Spearman-Brown-Fall, keine RNG-Kaskade wie bei Hockey) hebt kaderfest auf **0,875** (Saison 0,965), die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen. Dazu die Waffenpose korrigiert: keine Waffenebene mehr beim Landen (vorher zufaellige Kampfwaffe je nach Kosmetik), rho-neutral |
+| Eiskunstlauf | 40 % | 0,878 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · **Nachtrag 07.09. (Fable-Recherche `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`):** stand kaderfest knapp unter der Schranke (0,792, reines Verlaesslichkeitsproblem bei exzellenter Saisonzahl 0,944) — `rundenN` 6→12, `rundenDauer` 0,85→0,425 (Spearman-Brown-Fall, keine RNG-Kaskade wie bei Hockey) hebt kaderfest auf **0,875** (Saison 0,965), die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen. Dazu die Waffenpose korrigiert: keine Waffenebene mehr beim Landen (vorher zufaellige Kampfwaffe je nach Kosmetik), rho-neutral · **Nachtrag 15.10. (E-F2, Einundzwanzigster Nachtrag oben):** bei ungerader Feldgroesse laeuft jetzt der Star solo statt des Schwaechsten (`fusioniereSeite()` paart ab Index `rest` statt immer ab 0) — rho je Spiel 0,919→0,905 (je-Seite 3) und 0,843→0,866 (je-Seite 5), beide Bewegungen innerhalb der Kaderrauschen-Spannweite, gerade Feldgroessen bit-identisch; Pp 19,9/17,8 (zwei Saatstroeme, unveraendert, da die Standardmessung die gerade Katalog-Feldgroesse nutzt) |
 | Breaking | 40 % | 0,833 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik · **Nachtrag 07.09. (dieselbe Recherche wie Eiskunstlauf):** stand kaderfest mit knappstem Puffer aller bestandenen Disziplinen (0,804, nur 0,004 ueber der Schranke) — `rundenN` 4→8, `rundenDauer` 1,25→0,625 hebt kaderfest auf **0,869** (Saison 0,951). Dazu dieselbe Waffenpose-Korrektur wie Eiskunstlauf, rho-neutral |
 | Showcase | 40 % | 0,896 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,874 (26.09.-Nachtrag)** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |

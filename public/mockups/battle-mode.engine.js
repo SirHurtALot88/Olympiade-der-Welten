@@ -18022,6 +18022,17 @@
     // solo (kein Trio, keine neue Mechanik) — die einfachste, am wenigsten ueberraschende
     // Loesung, deckungsgleich mit jeder anderen Ungerade-Rest-Regel dieses Projekts.
     //
+    // E-F2 (Fable-Ideen Buehne-Auftritt 30.09. Abschnitt "E-F2", Chris' Sammel-Antwort "ja
+    // ueberall D, bau weiter"): verfeinert nur WER solo bleibt, nicht OB. Bis hierhin paarte
+    // `fusioniereSeite` von oben (Rang 1+2, 3+4, …), wodurch der uebrige Rest am Ende der
+    // absteigend sortierten Liste immer der SCHWAECHSTE Laeufer war — kein bewusster Teil der
+    // Entscheidung oben, nur ein Nebeneffekt der Sortierrichtung. Ab jetzt wird von UNTEN
+    // gepaart, so dass der STAERKSTE (`g[0]`, der Star) solo laeuft: ehrlicher zur Sportart
+    // (Einzel/Paare sind getrennte Wettbewerbe, ein Team schickt seinen Besten solo) und die
+    // 80/20-Fusion glaettet ohnehin Ausreisser, was dem Star am wenigsten nuetzt. Nur die
+    // PaarungsRICHTUNG aendert sich; bei gerader Feldgroesse (`rest===0`) entstehen exakt
+    // dieselben Paare wie zuvor (bit-identisch), weil es dort keinen Rest gibt.
+    //
     // FRAGE B (dieselbe Quelle): greift Duett auch bei Feldgroesse 2 (die ganze Seite ist
     // ein einziges Paar)? Entscheidung: ja — konsistent mit "gerade Zahl -> automatisch
     // Duett", eine Ausnahme nur fuer die kleinste gerade Zahl waere eine unbegruendete
@@ -18030,7 +18041,12 @@
     if(art.duett){
       const fusioniereSeite=(seite)=>{
         const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
-        for(let i=0;i+1<g.length;i+=2){
+        // E-F2: Rest-Index `rest` statt festem Start bei 0 -- bei ungerader Feldgroesse
+        // (rest===1) bleibt `g[0]`, der Staerkste, unberuehrt und damit solo; die Paarung
+        // beginnt erst ab Index 1 (g[1]+g[2], g[3]+g[4], …). Bei gerader Feldgroesse
+        // (rest===0) unveraendert ab Index 0, bit-identisch zum alten Verhalten.
+        const rest=g.length%2;
+        for(let i=rest;i+1<g.length;i+=2){
           const a=g[i], b=g[i+1];
           a.duettN=b.n; b.duettN=a.n;
           for(let r=0;r<art.rundenN;r++){
@@ -18071,10 +18087,21 @@
       // die Gruppenliste je Seite deshalb nur umgedreht und dann seitenweise verzahnt,
       // damit kein Team geschlossen zuerst dran ist (dieselbe Absicht wie im generischen
       // Zweig unten).
+      //
+      // E-F2 (Fable-Ideen Buehne-Auftritt 30.09. Abschnitt "E-F2", Chris' Sammel-Antwort
+      // "ja ueberall D, bau weiter"): bei ungerader Feldgroesse bleibt jetzt der STAERKSTE
+      // (`g[0]`, der Star) solo statt des Schwaechsten -- s. `fusioniereSeite` oben, die
+      // denselben Rest-Index `rest` verwendet. Die Gruppenliste muss denselben Rest kennen,
+      // sonst zeigt die Startreihenfolge ein anderes Solo-Paar als tatsaechlich fusioniert
+      // wurde. Der Star-Solo-Block wird VOR der Schleife eingefuegt und bleibt nach dem
+      // `reverse()` dadurch der LETZTE Starter seiner Seite -- Star schliesst ab, wie die
+      // Doku verlangt ("ihn als letzten Starter seiner Seite setzen").
       const baueGruppenJeSeite=()=>[0,1].map(seite=>{
         const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
         const grp=[];
-        for(let i=0;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
+        const rest=g.length%2;
+        if(rest)grp.push([g[0]]);
+        for(let i=rest;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
         return grp.reverse();
       });
       // E-F1 (Paket 1, 30.09., Klasse A, s. Kommentar bei EISKUNSTLAUF_KURZPROGRAMM_N oben):
