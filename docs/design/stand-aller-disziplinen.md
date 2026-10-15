@@ -1714,3 +1714,47 @@ Ereignisse/Rennen 3,83, 93 % der Rennen mit ≥ 1 Ereignis, Wehr-Erfolgsquote 49
 Heimseite 53,0 % (wandProbe, n=300) — alle vier Werte reproduzieren das Konzeptpapier exakt, kein
 Drift gegenueber dem Stand vom 14.10. `node --check`/`eslint` auf der Engine: 0 neue Fehler/
 Warnungen gegenueber der Basislinie.
+
+## 10. I-Spy: Raumwahl (I-1) gebaut, Standard bleibt Werkstatt (15.10.)
+
+Chris' Freigabe ("ja ueberall D, bau weiter"), Spezifikation `docs/design/fable-ideen-arena-
+ispy-30-09.md` Abschnitt 6/I-1, Kontext `docs/design/i-spy-fable-empfehlung-02-10.md` Abschnitt
+8. Voller Befund: `docs/design/i-spy-raumwahl-i1-15-10.md`.
+
+Gebaut: drei Raeume (Archiv/Werkstatt/Salon) als Varianten der Fundort-Art-Verteilung — gleiche
+zwoelf Positionen, gleiche Stufenmultimenge, nur die Art-Beschriftung zweier kleiner
+Stufe-1-Bloecke wandert (Archiv 48,4/35,5/16,1 %, Werkstatt — unveraendert — 41,9/35,5/22,6 %,
+Salon 35,5/48,4/16,1 % Logik/Verhoer/Mechanik). Kein neues Attribut, kein neues Rezept. Eine
+intelligente KI-Regel (Argmax ueber das Team-Mittel der drei Knack-Sub-Skills) ist vollstaendig
+gebaut, dazu manuelle Uebersteuerung je Seite (`window.__arena.ispyRaumWahl()`, Muster wie
+`buehneHaltungTest`).
+
+**Gemessener Befund, der den Plan korrigiert hat:** die Spezifikation nahm an, die KI-Regel sei
+"per Konstruktion" rho-neutral (wie die Bahn mit ihrer Standardaufstellung). Nachgemessen
+(kaderfeste live-save-Familie) bewegt der reine Argmax als Standard rho/Spiel von 0,750 auf
+0,700 — getragen von EINER einzigen Kader-Paarung (Team-Mittel-Marge 14,9 Punkte, ihr eigenes
+rho faellt dort von 0,750 auf 0,649), kein gleichmaessiger Effekt ueber alle fuenf Paarungen.
+Kontrollmessung (beide Seiten fest auf Werkstatt) reproduziert exakt 0,750/0,177/0,881/0,210 —
+die Verdrahtung ist korrekt, der Effekt kommt ausschliesslich aus der Raum-Differenzierung
+selbst. Ein Schwellenwert-Versuch (Marge ≥8-13 vor dem Wechsel) aenderte fast nichts (0,700 →
+0,703-0,704); erst eine Schwelle praktisch ausserhalb jeder realistischen Marge naeherte sich
+wieder der Baseline an.
+
+**Entscheidung:** der echte Standard ohne jede Vorgabe ist "Werkstatt fuer beide Seiten" (bit-
+identisch zum Ist-Stand), die intelligente Wahl bleibt als explizite vierte Option (`"auto"`)
+verfuegbar, aber kein stiller Standard. Gemessen, Standardpfad:
+
+| Kennzahl | Wert |
+|---|---:|
+| rho je Spiel (kaderfest) | 0,750 (bit-identisch zum Ist-Stand) |
+| rho Saison | 0,881 |
+| Pp, Strom 1 / Strom 2 | 15,3 / 11,1 |
+| Pp je Raum (fest gewaehlt), Archiv/Werkstatt/Salon/"auto" | 19,8 / 15,3 / 14,5 / 17,7 |
+
+Alle Pp-Werte weit unter der 25er-Schranke — das Spezifikations-Risiko ("±8 Pp Art-Verschiebung
+≈ ±3 Pp Attributebene") bestaetigt sich auf der Pp-Seite vollstaendig; das einzige offene Risiko
+war die rho-Seite, dort jetzt durch den Werkstatt-Standard abgefangen. I-Spy ist nicht arena-
+aufgeloest (`lib/battle/arena-resolved-disciplines.ts`), hat deshalb keine bestehende Lineup-UI
+und bekommt vorerst nur eine Ticker-Ansage bei unterschiedlicher Raumwahl — eine echte
+Vorspiel-Auswahloberfläche ist der naheliegende naechste Schritt, sobald die Disziplin selbst
+arena-aufgeloest wird.

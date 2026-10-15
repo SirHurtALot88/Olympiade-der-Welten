@@ -15742,6 +15742,81 @@
   const qualAnzeige=(n)=>n>=1000000?(n/1000000).toFixed(1).replace(".0","")+" Mio":
     n>=1000?Math.round(n/1000)+" Tsd":String(n);
 
+  // ============ I-SPY: DREI RAEUME (I-1 "Jede Seite waehlt ihren Raum", Fable-Ideen
+  // 30.09., docs/design/fable-ideen-arena-ispy-30-09.md Abschnitt 6/I-1, aufgegriffen
+  // docs/design/i-spy-fable-empfehlung-02-10.md Abschnitt 8, gebaut 15.10. nach Chris'
+  // Sammel-Freigabe "ja ueberall D, bau weiter") ====================================
+  //
+  // WAS. Drei benannte Raeume -- Archiv, Werkstatt, Salon --, alle mit denselben zwoelf
+  // Fundort-POSITIONEN (x/y) und derselben STUFENMULTIMENGE (vier Stufe-1, sechs Stufe-2,
+  // zwei Stufe-3 je Raum -- "dieselbe Stufenmultimenge" aus der Spezifikation), aber mit
+  // verschobener ART-PUNKTMASSE: nur WELCHE Raetselart an einer Position liegt, wandert,
+  // nie wie viele Fundorte es gibt oder was sie wert sind. Kein neues Attribut, kein neues
+  // Rezept -- exakt der Spezifikations-Satz "Keins neu. Die Raumwahl verschiebt die
+  // Verteilung der bestehenden Sub-Skills, nicht ihre Formeln."
+  //
+  // WERKSTATT ist unveraendert die bisherige, einzige Fundort-Liste (ISPY_FUNDORTE_
+  // WERKSTATT ist BYTE-IDENTISCH zu `fundorte` vor dieser Aenderung) -- das haelt die
+  // bereits gemessene Baseline (rho/Spiel 0,750, Pp 16,6/12,8, Kopfkommentar beim
+  // `rezept` oben) unveraendert fuer jedes Team, das (ueber die KI-Standardwahl, s.u.)
+  // in dieser Konfiguration landet; nichts an der bestehenden Abnahme wird rueckwirkend
+  // veraendert.
+  //
+  // ARCHIV und SALON entstehen aus WERKSTATT durch Verschieben der BEIDEN STUFE-1-BLOECKE
+  // (je ein Spiegelpaar à 10+10 Punkte, ISPY_PUNKTWERT[1]=10) -- NIE die Stufe-2/3-Bloecke
+  // oder die beiden Mehrwege-Tresore (Mittelachse, `neben`-Paarung positionsgebunden, s.
+  // Kommentar bei `fundorte` unten): Logik (Bloecke 0/4) und Mechanik (Bloecke 5/9) sind
+  // die einzigen Arten mit einem SOLCHEN kleinen, verschiebbaren Block; Verhoer haelt nur
+  // einen groesseren Stufe-2-Block (50 Punkte) und waere mit ihm allein zu grob verschoben
+  // worden (16 statt ~8 Pp) -- deshalb wandert in jedem Raum ein KLEINER (20-Punkte-)Block,
+  // nie der grosse. Jede Verschiebung bleibt dadurch symmetrisch (Spiegelpaare behalten
+  // dieselbe Art auf beiden Haelften, SPIEGELSYMMETRIE bleibt gewahrt) und von aehnlicher
+  // Groesse (~6,5 Pp Art-Punktmasse je Block, 20 von 310 Gesamtpunkten) -- naeher an der
+  // in der Spezifikation genannten Groessenordnung ("±8 Pp... bedeutet grob ±3 Pp auf
+  // Attributebene") als an einem Vielfachen davon. Ergebnis (volles Feld, zwoelf aktive
+  // Fundorte, aus ispyPunktmasseAnteile()/ISPY_PUNKTWERT nachgerechnet): Archiv Logik
+  // 48,4 % / Verhoer 35,5 % / Mechanik 16,1 % -- Werkstatt (unveraendert) Logik 41,9 % /
+  // Verhoer 35,5 % / Mechanik 22,6 % -- Salon Logik 35,5 % / Verhoer 48,4 % / Mechanik
+  // 16,1 %. Mechanik ist in KEINEM Raum die groesste Art fuer sich (das waere ein viel
+  // groesserer Eingriff, s.o. "nie der grosse Block"), aber in Werkstatt klar am
+  // hoechsten VERGLICHEN MIT den beiden anderen Raeumen (22,6 % gegen 16,1 % dort) --
+  // genau das vergleicht die KI-Standardwahl unten (ispyWaehleRaumKI(), relativer
+  // Vergleich der drei Team-Mittel, nicht ein absolutes "ist Mechanik hier die groesste
+  // Art"). Alle drei Arten bleiben in jedem Raum mit positiver Masse vertreten (keine auf
+  // Null) -- Spezifikations-Pflicht "alle drei Arten bleiben in jedem Raum, nur die
+  // Gewichte wandern".
+  //
+  // PP-ABNAHME (CLAUDE.md, "die Eignungsmatrix ist gesperrt"): gemessen, nicht nur
+  // behauptet -- `node scripts/messe-arena-einfluss.mjs i-spy 24` nach dem Bau, zwei
+  // unabhaengige Saatstroeme, s. docs/design/i-spy-raumwahl-i1-15-10.md fuer die Zahlen.
+  function ispyRaumAbgeleitet(basis,ueberschreibungen){
+    return basis.map((f,idx)=>ueberschreibungen[idx]?{...f,art:ueberschreibungen[idx]}:f);
+  }
+  const ISPY_FUNDORTE_WERKSTATT=[
+    {x:0.12,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Seil"},
+    {x:0.30,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Kerzenleuchter"},
+    {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT", hinweis:"mit der Pistole"},
+    {x:0.70,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Dolch"},
+    {x:0.88,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Rohr"},
+    {x:0.20,y:0.62,art:"mechanik",stufe:1, hinweis:"im Weinkeller"},
+    {x:0.38,y:0.80,art:"verhoer", stufe:2, hinweis:"die Köchin"},
+    {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK", hinweis:"der Gärtner"},
+    {x:0.62,y:0.80,art:"verhoer", stufe:2, hinweis:"der Butler"},
+    {x:0.80,y:0.62,art:"mechanik",stufe:1, hinweis:"auf der Terrasse"},
+    {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"im Salon"},
+    {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"in der Bibliothek"}
+  ];
+  // ARCHIV: der Mechanik-Block (Positionen 5/9, Stufe 1) wird zu Logik -- Logik gewinnt
+  // einen kleinen Block, Mechanik verliert ihn, Verhoer bleibt unberuehrt.
+  const ISPY_FUNDORTE_ARCHIV=ispyRaumAbgeleitet(ISPY_FUNDORTE_WERKSTATT,{5:"logik",9:"logik"});
+  // SALON: derselbe Mechanik-Block UND der Logik-Block (Positionen 0/4, Stufe 1) werden
+  // zu Verhoer -- Verhoer gewinnt beide kleinen Bloecke, Logik und Mechanik verlieren je
+  // einen.
+  const ISPY_FUNDORTE_SALON=ispyRaumAbgeleitet(ISPY_FUNDORTE_WERKSTATT,
+    {0:"verhoer",4:"verhoer",5:"verhoer",9:"verhoer"});
+  const ISPY_RAEUME={archiv:ISPY_FUNDORTE_ARCHIV, werkstatt:ISPY_FUNDORTE_WERKSTATT, salon:ISPY_FUNDORTE_SALON};
+  const ISPY_RAUM_NAMEN={archiv:"Archiv", werkstatt:"Werkstatt", salon:"Salon"};
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -16348,20 +16423,11 @@
       // oben: Logik 5/Verhoer 3/Mechanik 4 Fundorte): LOGIK->Womit (die Tatwaffe, per
       // Deduktion), VERHOER->Wer (die/der Verdaechtige, durch Befragung), MECHANIK->Wo
       // (der Tatort, am Schloss/an der Tuer erschlossen).
-      fundorte:[
-        {x:0.12,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Seil"},
-        {x:0.30,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Kerzenleuchter"},
-        {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT", hinweis:"mit der Pistole"},
-        {x:0.70,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Dolch"},
-        {x:0.88,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Rohr"},
-        {x:0.20,y:0.62,art:"mechanik",stufe:1, hinweis:"im Weinkeller"},
-        {x:0.38,y:0.80,art:"verhoer", stufe:2, hinweis:"die Köchin"},
-        {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK", hinweis:"der Gärtner"},
-        {x:0.62,y:0.80,art:"verhoer", stufe:2, hinweis:"der Butler"},
-        {x:0.80,y:0.62,art:"mechanik",stufe:1, hinweis:"auf der Terrasse"},
-        {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"im Salon"},
-        {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"in der Bibliothek"}
-      ],
+      // `fundorte` bleibt der FALLBACK/Standardraum fuer jeden Code, der noch nichts von
+      // Raeumen weiss (identisch mit ISPY_FUNDORTE_WERKSTATT, s. Kopfkommentar "I-SPY: DREI
+      // RAEUME" oben) -- `baueSchatzsuche()` ersetzt ihn je Seite durch den TATSAECHLICH
+      // gewaehlten Raum (ISPY_RAEUME[archiv|werkstatt|salon], s. dort).
+      fundorte:ISPY_FUNDORTE_WERKSTATT,
       // WERTUNGSTABELLE (nur Woerter, wie bei Wettessen/Speed-Schach — Spalten kommen
       // unveraendert aus WERTUNG_AUFTRITT, s. Kommentar dort: "keine Aenderung an der
       // geteilten Buehnen-Punkteformel").
@@ -19946,6 +20012,13 @@
   // — je Spiel/Saat stabil, damit eine Sicht-QA denselben Seed reproduzierbar dieselbe
   // Karte zeigt, aber zwischen Spielen/Saaten sichtbar wechselt.
   let ISPY_VISUELLES_LAYOUT=null;
+  // WELCHEN RAUM JEDE SEITE GERADE SPIELT (I-1, s. Kopfkommentar "I-SPY: DREI RAEUME" bei
+  // BUEHNE_ART oben und ispyWaehleRaum() weiter unten) -- gesetzt von baueSchatzsuche() vor
+  // jedem Spiel, gelesen vom Furniture-Render-Block in bodenSchatzsuche() (jede Seite zeigt
+  // IHREN eigenen Raum, nicht zwangslaeufig denselben wie die andere) und von
+  // window.__arena.ispyRaumSonde() fuer Messung/QA. "werkstatt" (der unveraenderte
+  // Standardraum) ist der Ausgangswert, bevor das erste Spiel gebaut wurde.
+  let ISPY_RAUM_AKTIV={0:"werkstatt",1:"werkstatt"};
 
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
@@ -20045,6 +20118,75 @@
       u._letzteReaktionTick=-Infinity;
     }
     return truhen;
+  }
+
+  // RAUMWAHL (I-1 "Jede Seite waehlt ihren Raum", s. Kopfkommentar "I-SPY: DREI RAEUME" bei
+  // BUEHNE_ART oben). Jede Seite waehlt VOR dem Spiel GENAU EINEN der drei Raeume FUER SICH
+  // -- spiegelfrei (Spezifikation: "niemand waehlt gegen den Gegner, jeder waehlt fuer
+  // sich"), weil beide Seiten ohnehin vollstaendig unabhaengige Raumkopien bekommen (s.
+  // Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG" bei ispyBaueRaum() oben).
+  //
+  // ECHTER STANDARD (ohne jede Vorgabe) IST "WERKSTATT", NICHT DIE "INTELLIGENTE" WAHL
+  // WEITER UNTEN -- gemessen, nicht nur behauptet (CLAUDE.md): die Spezifikation
+  // (fable-ideen-arena-ispy-30-09.md Abschnitt I-1) nahm an, ein Raum-Argmax ueber das
+  // Team-Mittel der drei Knack-Sub-Skills sei "per Konstruktion" rho-neutral, genau wie bei
+  // der Bahn-Standardaufstellung. Gemessen (node scripts/miss-alle-disziplinen.mjs 24 i-spy,
+  // kaderfeste live-save-Familie, 15.10.) stimmt das NICHT unbedingt: der reine Argmax
+  // (ispyWaehleRaumKI() unten, ohne Schwelle) bewegt rho/Spiel von 0,750 auf 0,700 -- primaer
+  // GETRIEBEN VON EINER EINZIGEN Paarung (coldsteel-direlegion, Gast-Team: Team-Mittel
+  // Verhoer 14,9 Punkte ueber dem naechsten, wechselt in den Salon; ihr rho/Spiel faellt
+  // dort von 0,750 auf 0,649), nicht von einer gleichmaessigen Verschiebung ueber alle
+  // Paarungen. Ursache: die Raumwahl ist eine TEAM-Mittel-Entscheidung, aber die Wertung
+  // bleibt INDIVIDUELL -- ein Raum, der die Punktmasse klar zu einer Art verschiebt, kann
+  // einzelne Spezialisten eines Teams ueberproportional gegenueber ihren Mitspielern
+  // beguenstigen, auch wenn das TEAM im Schnitt davon profitiert (derselbe Interessenkonflikt,
+  // den die Pp-Abnahme auf Attributebene misst, hier auf Rangtreue-Ebene sichtbar). Der
+  // Effekt bleibt zwar kleiner als die kaderfeste Spannweite dieser Disziplin (0,177-0,224)
+  // und ist damit im Rahmen des Projekt-eigenen Kaderrauschen-Massstabs (CLAUDE.md,
+  // "kleiner als die Spannweite ist von Null nicht unterscheidbar") -- aber die Spezifikation
+  // verlangt ausdruecklich NACHMESSEN statt Behaupten, und der sichere, gemessen
+  // rho-UNVERAENDERTE Standard ist "Werkstatt fuer beide Seiten", bit-identisch zur alten
+  // Mechanik (eigene Kontrollmessung: `window.__arena.ispyRaumWahl({0:"werkstatt",
+  // 1:"werkstatt"})` reproduziert exakt 0,750/0,177/0,881/0,210).
+  //
+  // Die "intelligente" Wahl bleibt deshalb vollstaendig gebaut und verfuegbar, aber als
+  // EXPLIZITE vierte Option ("auto"), nicht als stiller Standard: eine Seite, deren
+  // Manager (Chris oder spaeter eine ausgefeiltere Gegner-KI) sich bewusst fuer "automatisch
+  // nach Staerke" entscheidet, bekommt sie; eine Seite ohne jede Vorgabe bleibt in der
+  // Werkstatt. Das ist dieselbe Unterscheidung, die `buehneHaltungTest` schon kennt (eine
+  // reine Messvorgabe aendert nichts an der echten KI-Vorgabe) -- hier nur mit einer
+  // zusaetzlichen Stufe, weil der "automatische" Pfad selbst gemessen werden musste, bevor
+  // er zum stillen Standard haette werden duerfen.
+  function ispyTeamMittel(teilnehmer,subskill){
+    if(!teilnehmer.length)return 0;
+    let s=0; for(const u of teilnehmer)s+=u[subskill]||0;
+    return s/teilnehmer.length;
+  }
+  function ispyWaehleRaumKI(teilnehmer){
+    const mLogik=ispyTeamMittel(teilnehmer,"LOGIK");
+    const mVerhoer=ispyTeamMittel(teilnehmer,"MENSCHENKENNTNIS");
+    const mMechanik=ispyTeamMittel(teilnehmer,"FINGERFERTIGKEIT");
+    if(mLogik>=mVerhoer&&mLogik>=mMechanik)return "archiv";
+    if(mVerhoer>=mMechanik)return "salon";
+    return "werkstatt";
+  }
+  // MANUELLE UEBERSTEUERUNG, dasselbe Muster wie `buehneHaltungTest` weiter oben: null/
+  // weggelassen je Seite = echter Standard ("werkstatt", s.o.), ein Raumname = genau dieser
+  // Raum, "auto" = die gemessen NICHT rho-neutrale, aber verfuegbare intelligente Wahl
+  // (ispyWaehleRaumKI() oben). Bislang NUR ueber die Test-/QA-Schnittstelle
+  // `window.__arena.ispyRaumWahl({0:"archiv",1:"auto"})` gesetzt (s. window.__arena-Objekt
+  // weiter unten), noch OHNE Host-/Lineup-Anbindung: I-Spy ist nicht arena-aufgeloest (s.
+  // lib/battle/arena-resolved-disciplines.ts) und hat deshalb noch keine Produktions-
+  // Lineup-UI, ueber die ein Team seinen Raum waehlen koennte -- s.
+  // docs/design/i-spy-raumwahl-i1-15-10.md Abschnitt "UI/Anzeige" fuer den Stand. Nie im
+  // echten Spiel gesetzt, solange das so bleibt: jede Seite spielt bis dahin ausschliesslich
+  // in der Werkstatt.
+  let ISPY_RAUM_MANUELL={0:null,1:null};
+  function ispyWaehleRaum(seite,teilnehmer){
+    const manuell=ISPY_RAUM_MANUELL[seite];
+    if(manuell==="auto")return ispyWaehleRaumKI(teilnehmer);
+    if(manuell&&ISPY_RAEUME[manuell])return manuell;
+    return "werkstatt";
   }
 
   // S-c "FREUDE UND FLUCH" (3.1): Notiz (Stufe 1) ist NIE sichtbar; eine Akte (Stufe 2) nur
@@ -20233,16 +20375,35 @@
   let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
     // SPAWN-ORT-RANDOMIZER (s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben): reines Lesen von
-    // `seed`, KEIN rr()-Aufruf — ispyBaueRaum() gleich darunter liest weiterhin
-    // ausschliesslich `art.fundorte` unveraendert, die Kartenwahl wirkt NUR auf die beiden
+    // `seed`, KEIN rr()-Aufruf. Liest bewusst weiterhin `art.fundorte` (den unveraenderten
+    // Standardraum/ISPY_FUNDORTE_WERKSTATT) statt des je Seite GEWAEHLTEN Raums weiter
+    // unten -- alle drei Raeume (I-1, s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART)
+    // haben exakt dieselben x/y-Positionen und Stufen je Index, nur die ART-Beschriftung
+    // wandert; die Geometrie-Transformation ist deshalb raumunabhaengig und braucht keine
+    // zweite, seitengetrennte Berechnung. Die Kartenwahl wirkt NUR auf die beiden
     // Zeichen-Verbraucher (bodenSchatzsuche()/stepSchatzsuche()).
     const layoutVariante=ispyWaehleLayoutVariante(seed);
     ISPY_VISUELLES_LAYOUT=art.fundorte.map(f=>layoutVariante.transform(f));
     if(window.__ISPY_LAYOUT_DEBUG)console.log("ISPY_LAYOUT_DEBUG",layoutVariante.name,seed);
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
-    const mineRaum=ispyBaueRaum(art,mineT);
-    const gegnerRaum=ispyBaueRaum(art,gegnerT);
+    // RAUMWAHL (I-1): je Seite unabhaengig voneinander, s. Kopfkommentar bei
+    // ispyWaehleRaum() oben -- echter Standard "Werkstatt" fuer beide Seiten, sofern keine
+    // Vorgabe (window.__arena.ispyRaumWahl()) gesetzt ist. `{...art,fundorte:...}` ersetzt
+    // NUR das eine Feld, das ispyBaueRaum() liest; `art.rundenN`/`art.erfolgWort`/etc.
+    // bleiben fuer beide Seiten identisch.
+    const mineRaumName=ispyWaehleRaum(0,mineT);
+    const gegnerRaumName=ispyWaehleRaum(1,gegnerT);
+    ISPY_RAUM_AKTIV={0:mineRaumName,1:gegnerRaumName};
+    const mineRaum=ispyBaueRaum({...art,fundorte:ISPY_RAEUME[mineRaumName]},mineT);
+    const gegnerRaum=ispyBaueRaum({...art,fundorte:ISPY_RAEUME[gegnerRaumName]},gegnerT);
+    // ANSAGE (I-1, "UI/Anzeige" solange es keine Vorspiel-Lineup-UI gibt, s.
+    // docs/design/i-spy-raumwahl-i1-15-10.md): nur bei VERSCHIEDENEN Raeumen je Seite
+    // ueberhaupt erwaehnenswert -- bei "beide Werkstatt" (der heutige Normalfall) bliebe die
+    // Zeile ein Rauschen, das niemand liest. Reine Ticker-Zeile, kein Einfluss auf
+    // Wertung/RNG (`feedEreignis` schreibt nur in den Anzeige-Feed).
+    if(mineRaumName!==gegnerRaumName)
+      feedEreignis(0,"Raumwahl: wir im "+ISPY_RAUM_NAMEN[mineRaumName]+", der Gegner im "+ISPY_RAUM_NAMEN[gegnerRaumName]+".");
     // FALLAKTE ZURUECKGESETZT (I-5, Task #42): reines Anlegen eines leeren Anzeige-
     // Zustands je Seite, `.gesamt` liest nur `.length` der schon gebauten Raeume (kein
     // zusaetzlicher rr()-Verbrauch, kein neuer Zufallszug) -- s. Kommentar bei
@@ -24802,10 +24963,19 @@
     // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
     // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
     // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
+    //
+    // JE SEITE IHR EIGENER RAUM (I-1): `ISPY_RAUM_AKTIV[seite]` (von baueSchatzsuche() vor
+    // dem ersten Tick gesetzt) bestimmt, AUS WELCHEM der drei Raeume diese Haelfte ihre
+    // Moebel zeichnet -- das Mehrwege-Moebel/die Stufe/die x/y-Koordinate je Index bleiben
+    // ueber alle drei Raeume gleich (s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART),
+    // nur `f.art` (Schreibtisch/Figur/Aktenschrank, ispyMoebelArt()) kann je Raum wechseln.
+    // Vor dem ersten `baueSchatzsuche()`-Aufruf (Sicht-QA) steht ISPY_RAUM_AKTIV auf
+    // "werkstatt" fuer beide Seiten, s. dessen Deklaration oben.
     if(art.fundorte){
       [0,1].forEach(seite=>{
         const zustand=ispyRaumZustand(seite);
-        art.fundorte.forEach((f,idx)=>{
+        const raumFundorte=ISPY_RAEUME[ISPY_RAUM_AKTIV[seite]]||art.fundorte;
+        raumFundorte.forEach((f,idx)=>{
           const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
           const p=ispyFundortXY(vis,seite);
           const z=zustand.get(idx);
@@ -50568,6 +50738,22 @@
         for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
       return {...buehneHaltungTest};
     },
+    // RAUMWAHL I-SPY (I-1, s. ispyWaehleRaum()/ISPY_RAUM_MANUELL weiter oben), dasselbe
+    // Muster wie buehneHaltungTest direkt darueber: {0:"archiv",1:null} usw.; null/weggelassen
+    // = echter Standard ("werkstatt"), ein Raumname (ISPY_RAEUME) = genau dieser Raum,
+    // "auto" = die gemessen NICHT rho-neutrale intelligente Wahl (s. Kommentar bei
+    // ispyWaehleRaumKI). Alles andere faellt still auf den Standard zurueck. Ohne Argument
+    // nur lesen. Kein echtes Spiel ruft das auf (noch keine Host-/Lineup-Anbindung, s.
+    // Kommentar bei ISPY_RAUM_MANUELL).
+    ispyRaumWahl:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const s of [0,1])if(s in neu)
+          ISPY_RAUM_MANUELL[s]=(neu[s]==="auto"||(neu[s]&&ISPY_RAEUME[neu[s]]))?neu[s]:null;
+      return {...ISPY_RAUM_MANUELL};
+    },
+    // REIN LESENDE SONDE: welchen Raum jede Seite im zuletzt gebauten Spiel tatsaechlich
+    // bekommen hat (KI-Wahl ODER Messvorgabe, s. ISPY_RAUM_AKTIV/baueSchatzsuche()).
+    ispyRaumSonde:()=>({...ISPY_RAUM_AKTIV}),
     // PERSOENLICHKEITS-HANDWERK (P1, 07.10., s. persDefVon()): Mess-/QA-Schnittstelle nach dem
     // Muster buehneFlags darueber. {tdm:[], "mini-dm":["z"], ...} setzt `ARENA_ART[d].persHandwerk`
     // je Arena-Disziplin (nur "z"/"b", andere Schluessel und Nicht-Arena-Disziplinen werden
