@@ -7044,6 +7044,111 @@
           abschluss:(pg,bf)=>Math.min(0.90,0.10+bf.SCHUSS_NAH*0.0045+pg.TECHNIK*0.0025),
           text:(pg,bf)=>pg.n+" wirft hoch zum Korb — "+bf.n+" steigt ab und dankt rein"
         }
+      },
+      // TAKTIK-KARTE (P4 aus basketball-opus-konzeptreview-26-09.md Abschnitt "P4 —
+      // Trainerkarte", gespiegelt in docs/design/fable-ideen-feldspiel-30-09.md 2.2:
+      // "Eine Taktik-Karte, drei Optionssaetze"). Dies ist die BASKETBALL-Auspraegung
+      // der gemeinsamen Feldspiel-Infrastruktur (s. berechneTaktikAuto/effektiverTaktik/
+      // setzeTaktik weiter unten, disziplin-generisch) — Hockey (T4) und Football
+      // (P2 "Spielplan") liefern spaeter ihren je eigenen `taktik`-Block nach demselben
+      // Schema, ohne die Engine-Funktionen anzufassen.
+      //
+      // STAND DIESER RUNDE (15.10.): reines FUNDAMENT, Klasse A. Die vier Schalter
+      // werden berechnet und in fsLive.taktikAuto/taktikManuell abgelegt, aber VON
+      // KEINER MECHANIK GELESEN — kein rr()-Aufruf, keine Bewegung, keine Wertformel
+      // liest diese Felder. Die eigentliche Bindung an den Live-Motor (Zone 3-3 als
+      // Verteidigungsformation, Screen-Coverage drop/switch/blitz, Angriffs-Tempo,
+      // Rebound-Crash) ist die groessere, eigene Mechanik-Runde aus dem Opus-Review
+      // (P1 Foul-System, P3 Pick-and-Roll als Vorbedingungen fuer Coverage/Zone) und
+      // bewusst NICHT Teil dieser Infrastruktur-Runde — s. docs/design/
+      // feldspiel-taktik-karte-fundament-15-10.md Abschnitt 3 fuer die Begruendung.
+      // Dadurch ist dieser ganze Block beweisbar rho-/Pp-neutral (bit-identisch): er
+      // fuegt nur neue, ungelesene Felder hinzu, exakt das Muster von Task #31s
+      // "Spiel des Tages"-Momenten (berechneFeldspielMomente, PR #1108).
+      //
+      // `vorgabe(eigen,gegner,kontext)` folgt dem Muster von berechneFokusAuto: liest
+      // nur bereits vorhandene Rezeptwerte der Feldspieler (u.SCHUSS_FERN/u.SCHUSS_NAH/
+      // u.LAUFTEMPO/u.AUFBAU/u.ABWEHR, alle matrixgewichtet, keine Matrixaenderung),
+      // wuerfelt nichts. `kontext.liegtZurueck` kommt aus der bestehenden liegtZurueck()
+      // (s. dort). Schwellen sind PLATZHALTER (am Rezept-Mittelwert 50 gespiegelt),
+      // keine Kalibrierung — unkritisch, weil ungelesen.
+      taktik:{
+        schalter:[
+          { id:"angriff", label:"Angriff",
+            stufen:[
+              {id:"tempo", label:"Tempo", beschreibung:"Transition suchen"},
+              {id:"halbfeld", label:"Halbfeld / Pick-and-Roll", beschreibung:"Pick-and-Roll im Halbfeld (braucht P3)"},
+              {id:"innen", label:"Innen", beschreibung:"Post, Drive"}
+            ],
+            standard:"halbfeld",
+            // Gegenmittel-Logik (Opus-Review P4): Tempo gegen langsame Teams, Innen
+            // gegen schwache Innenverteidigung, sonst Halbfeld/Pick-and-Roll.
+            vorgabe:(eigen,gegner)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const gegnerTempo=mittel(gegner,"LAUFTEMPO");
+              const gegnerInnenD=mittel(gegner,"ABWEHR");
+              const eigenInnen=mittel(eigen,"SCHUSS_NAH");
+              if(gegnerTempo<=44)return "tempo";
+              if(eigenInnen-gegnerInnenD>=8)return "innen";
+              return "halbfeld";
+            }
+          },
+          { id:"verteidigung", label:"Verteidigung",
+            stufen:[
+              {id:"mann_eng", label:"Mann eng", beschreibung:"mehr Druck, mehr Fouls"},
+              {id:"mann_tief", label:"Mann tief / Pack-Line", beschreibung:"mehr Sag, Zone zu, Dreier offener"},
+              {id:"zone_3_3", label:"Zone 3-3", beschreibung:"drei an der Dreierlinie, drei in der Zone"}
+            ],
+            standard:"mann_tief",
+            // Zone gegen schwache Schuetzen, Mann eng gegen schwache Ballfuehrer,
+            // sonst Mann tief/Pack-Line als sicherer Standard.
+            vorgabe:(eigen,gegner)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const gegnerFern=mittel(gegner,"SCHUSS_FERN");
+              const gegnerAufbau=mittel(gegner,"AUFBAU");
+              if(gegnerFern<=44)return "zone_3_3";
+              if(gegnerAufbau<=44)return "mann_eng";
+              return "mann_tief";
+            }
+          },
+          { id:"coverage", label:"Screen-Coverage",
+            stufen:[
+              {id:"drop", label:"Drop", beschreibung:"sicherer Standard, s. P3"},
+              {id:"switch", label:"Switch", beschreibung:"mehr Mismatch-Abschluesse, s. P3"},
+              {id:"blitz", label:"Blitz", beschreibung:"mehr Ballverluste, mehr offene Dreier, s. P3"}
+            ],
+            standard:"drop",
+            // VORLAEUFIG: P3 (Pick-and-Roll-Rollen) ist noch nicht gebaut, die
+            // Gegenmittel-Logik des Reviews ("s. P3") hat deshalb noch kein Gegenueber.
+            // Platzhalter-Heuristik aus der EIGENEN Verteidigung (switch nur mit
+            // beweglichen, grossen Verteidigern; blitz nur mit druckstarken) bis P3
+            // die eigentliche Logik liefert.
+            vorgabe:(eigen)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const beweglich=mittel(eigen,"LAUFTEMPO");
+              const druck=mittel(eigen,"ABWEHR");
+              if(beweglich>=56)return "switch";
+              if(druck>=56)return "blitz";
+              return "drop";
+            }
+          },
+          { id:"bretter", label:"Bretter",
+            stufen:[
+              {id:"angreifen", label:"Angreifen", beschreibung:"2 Spieler zum Offensiv-Rebound"},
+              {id:"zurueck", label:"Zurueck", beschreibung:"Transition-D"}
+            ],
+            standard:"zurueck",
+            // Angreifen, wenn man zurueckliegt oder im Rebound-Profil (SCHUSS_NAH/
+            // ABWEHR als Groessen-Proxy) klar groesser ist.
+            vorgabe:(eigen,gegner,kontext)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const eigenGroesse=(mittel(eigen,"SCHUSS_NAH")+mittel(eigen,"ABWEHR"))/2;
+              const gegnerGroesse=(mittel(gegner,"SCHUSS_NAH")+mittel(gegner,"ABWEHR"))/2;
+              if((kontext&&kontext.liegtZurueck)||eigenGroesse-gegnerGroesse>=8)return "angreifen";
+              return "zurueck";
+            }
+          }
+        ]
       }
     },
     football:{
@@ -8313,6 +8418,69 @@
     if(!fsLive)return null;
     if(seite===0)return fsLive.fokusManuell?fsLive.fokusZiel:fsLive.fokusZielAuto[0];
     return fsLive.fokusZielAuto[1];
+  }
+
+  // ===================================================================================
+  // TAKTIK-KARTE: gemeinsame Infrastruktur fuer alle Feldspiel-Disziplinen (Basketball
+  // P4, kuenftig Hockey T4 und Football P2 "Spielplan" — docs/design/fable-ideen-
+  // feldspiel-30-09.md 2.2, "Eine Taktik-Karte, drei Optionssaetze"). DISZIPLIN-
+  // GENERISCH: liest nur `FB().taktik.schalter` (leer/undefined ausserhalb Basketball in
+  // dieser Runde -> no-op, exakt das Muster, mit dem berechneFokusAuto schon heute jede
+  // Nicht-Basketball-Disziplin unberuehrt laesst). Eine Disziplin, die spaeter einen
+  // eigenen `taktik`-Block bekommt, braucht KEINE Aenderung an diesen drei Funktionen.
+  //
+  // Aufgerufen an denselben zwei Zeitpunkten wie berechneFokusAuto (Spielaufbau,
+  // initFeldspielLive; jeder Viertel-/Periodenwechsel, starteViertelpause) — derselbe
+  // Rhythmus, falls eine kuenftige Mechanik "neu bestimmt bei jedem Viertelwechsel"
+  // braucht, wie Chris es fuer den Fokus vorgegeben hat.
+  //
+  // STAND 15.10.: reines Fundament (Klasse A). `berechneTaktikAuto` schreibt nur in
+  // `fsLive.taktikAuto`/`taktikManuell` — Felder, die AUSSERHALB dieser drei Funktionen
+  // nirgends gelesen werden (nachgewiesen: Suche nach `taktikAuto`/`taktikManuell`/
+  // `effektiverTaktik` im Rest der Datei liefert ausser hier nur die Initialisierung in
+  // initFeldspielLive und die beiden Aufrufstellen). Kein rr()-Aufruf, keine Bewegung,
+  // keine Wertformel betroffen — bit-identisch per Konstruktion, wie Task #31s
+  // "Drei Momente" (PR #1108) und wie in docs/design/feldspiel-taktik-karte-
+  // fundament-15-10.md Abschnitt 2 gemessen.
+  function berechneTaktikAuto(){
+    if(!fsLive)return;
+    const art=FB();
+    if(!art||!art.taktik||!art.taktik.schalter||!art.taktik.schalter.length)return;
+    for(let seite=0;seite<2;seite++){
+      const eigen=FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const gegner=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const kontext={seite, liegtZurueck:typeof liegtZurueck==="function"?liegtZurueck(seite):false};
+      const auto={};
+      for(const schalter of art.taktik.schalter){
+        let stufe=schalter.standard;
+        if(typeof schalter.vorgabe==="function"){
+          try{ stufe=schalter.vorgabe(eigen,gegner,kontext)||schalter.standard; }
+          catch(e){ stufe=schalter.standard; }
+        }
+        auto[schalter.id]=stufe;
+      }
+      fsLive.taktikAuto[seite]=auto;
+    }
+  }
+  // Der WIRKSAME Schalterstand: eine manuelle Wahl (fsLive.taktikManuell[seite], noch
+  // von keiner UI gesetzt in dieser Runde, s. Fundament-Dokument Abschnitt 4) geht vor
+  // der automatischen Vorgabe — exakt die effektiverFokus-Reihenfolge.
+  function effektiverTaktik(seite,schalterId){
+    if(!fsLive)return null;
+    const manuell=fsLive.taktikManuell&&fsLive.taktikManuell[seite];
+    if(manuell&&manuell[schalterId]!=null)return manuell[schalterId];
+    const auto=fsLive.taktikAuto&&fsLive.taktikAuto[seite];
+    return (auto&&auto[schalterId])||null;
+  }
+  // Manuelle Uebersteuerung (Manager-Wahl oder, bis die UI steht, die Mess-Sonde ueber
+  // `--taktik=<id>:<stufe>`, s. Fundament-Dokument Abschnitt 4). Setzt NUR das Datenfeld
+  // — ohne eine lesende Mechanik (s. oben) ist ein Aufruf dieser Funktion heute wirkungs-
+  // los auf die Simulation, aber bereits das richtige Scharnier fuer beides.
+  function setzeTaktik(seite,schalterId,stufeId){
+    if(!fsLive)return;
+    if(!fsLive.taktikManuell)fsLive.taktikManuell=[{},{}];
+    if(!fsLive.taktikManuell[seite])fsLive.taktikManuell[seite]={};
+    fsLive.taktikManuell[seite][schalterId]=stufeId;
   }
 
   // ===================================================================================
@@ -11124,6 +11292,12 @@
       // startet ohne manuelle Wahl — berechneFokusAuto() gleich unten fuellt fokusZielAuto,
       // bevor der erste Ballbesitz beginnt.
       fokusZielAuto:[null,null], fokusManuell:false,
+      // TAKTIK-KARTE (s. berechneTaktikAuto/effektiverTaktik/setzeTaktik oben):
+      // taktikAuto[seite] = {schalterId: stufeId}, von berechneTaktikAuto() gefuellt;
+      // taktikManuell[seite] = {schalterId: stufeId} fuer eine Uebersteuerung, leer bis
+      // eine UI oder Sonde sie setzt. Ausserhalb von Disziplinen mit `taktik`-Block
+      // (aktuell nur Basketball) bleibt taktikAuto leer — berechneTaktikAuto() no-opt.
+      taktikAuto:[{},{}], taktikManuell:[{},{}],
       viertel:1, viertelpause:null,
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
@@ -11142,6 +11316,9 @@
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
     // effektiverFokus() ueberall null — bit-identisch zum bisherigen Verhalten.
     berechneFokusAuto();
+    // TAKTIK-KARTE, VORGABE VOR DEM ERSTEN BALLBESITZ (s. berechneTaktikAuto oben):
+    // analog zu berechneFokusAuto, no-opt ausserhalb von Disziplinen mit `taktik`-Block.
+    berechneTaktikAuto();
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     // FOOTBALL STARTET NICHT UEBER ballUebernehmen()/spielmacherLos() — ein Empfangsteam
@@ -11350,6 +11527,10 @@
     // gemessenen Rho-Schaden, den ein vorgezogenes zuordneDeckung(true) hier auslöste
     // (naechster Kommentar) — diese Funktion ruft zuordneDeckung nicht auf.
     berechneFokusAuto();
+    // TAKTIK-KARTE, NEU BESTIMMT BEI JEDEM VIERTELWECHSEL (s. berechneTaktikAuto oben):
+    // derselbe Rhythmus wie der Fokus, fuer eine kuenftige Mechanik, die auf eine
+    // Rotation/einen Foulausstieg reagieren soll.
+    berechneTaktikAuto();
     // BEWUSST KEIN zuordneDeckung(true) hier, obwohl Chris' Formulierung beide Funktionen
     // nennt: der Wiederanpfiff (naechsterAngriff(...,true) im "viertelpause"-Zweig von
     // stepBasketballLive) laeuft ueber ballUebernehmen(), das zuordneDeckung(true) ohnehin
@@ -50792,6 +50973,24 @@
       return Object.fromEntries(Object.keys(ARENA_ART).map(d=>[d,[...(ARENA_ART[d].persHandwerk||[])]]));
     },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
+    // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
+    // setzeTaktik oben, docs/design/feldspiel-taktik-karte-fundament-15-10.md): die
+    // Sonden-Entsprechung zu Fables Vorschlag "ein Parameter --taktik=<id>:<stufe> fuer
+    // alle drei" (fable-ideen-feldspiel-30-09.md 2.2) — hier als Funktionsaufruf statt
+    // CLI-Flag, weil die Headless-Sonden (miss-alle-disziplinen.mjs/messe-arena-
+    // einfluss.mjs) ohnehin ueber window.__arena fahren. Muss NACH dem jeweiligen
+    // bau()/bauFeldspiel()-Aufruf fuer dieses Spiel aufgerufen werden (fsLive wird dort
+    // neu gebaut). Heute ohne Wirkung auf rr()/Wertformel (s. Kommentar bei
+    // berechneTaktikAuto) — die Schnittstelle existiert, bevor die Mechanik es tut.
+    taktikSetzen:(seite,schalterId,stufeId)=>setzeTaktik(seite,schalterId,stufeId),
+    taktikLesen:(seite,schalterId)=>effektiverTaktik(seite,schalterId),
+    taktikSchalterVon:(dId)=>{
+      const art=(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[dId])||null;
+      return art&&art.taktik&&art.taktik.schalter
+        ?art.taktik.schalter.map(s=>({id:s.id,label:s.label,standard:s.standard,
+            stufen:s.stufen.map(st=>({id:st.id,label:st.label,beschreibung:st.beschreibung}))}))
+        :[];
+    },
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
     // aus -- dasselbe Prinzip wie calloutProbe darueber. Die Stufe "finale" hat seit 07.10.
     // einen organischen Ausloeser (Endstand-Nachlauf 2.6, endstandVormerken()); die Sonde
