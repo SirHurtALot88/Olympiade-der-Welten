@@ -49,11 +49,30 @@ type GP = {
   prevDrawn: number | null;
   wPh: number; // Idle-Roll-Phase
   queue: number; // Start-Grid-Stagger
+  // ZF2: EINZELSTART-OPTIK (Chris 13.10., "im Time Trial sollen die Spieler NACHEINANDER
+  // antreten wie beim Zeitfahren"). `holdDelayMs` ist die rAF-eigene `nowT`-Schwelle, ab der
+  // dieser Fahrer die Startrampe verlassen darf — nach `t.laneIdx` gestaffelt, derselben
+  // dichten, deterministischen Reihenfolge, die `queue` (Start-Grid) bereits nutzt. Bis dahin
+  // zeichnet `dx` (s. rAF unten) ihn unabhängig von seiner wahren Score-Position an der Rampe;
+  // `releaseEase` blendet danach weich zur wahren Position auf (kein Teleport). Reine Anzeige:
+  // `st.x`/`t.score`/`t.displayScore`/`t.rank` laufen unveraendert, NUR `dx` (das, was
+  // tatsaechlich gezeichnet wird) haengt waehrend der Rampe vom Fortschritt `releaseEase` ab,
+  // nie von Score. `releaseEase` startet bei 1 (kein Halt), wenn der Fahrer beim Mounten schon
+  // sichtbar unterwegs ist (Seitenaufruf mitten im Rennen) — gated in der Init-Stelle unten.
+  holdDelayMs: number;
+  releaseEase: number;
   // ZF1: letzte tatsächlich GEZEICHNETE Position (nach Windschatten/Bob) — Grundlage für den
   // Profil-Positionsmarker (ZF1.3) UND den Kamerafokus (ZF1.5). Reine Anzeige, kein Score-Feld.
   drawnX: number;
   drawnY: number;
 };
+
+// ZF2: Abstand zwischen zwei Startrampen-Freigaben (ms, rAF-Zeit — unabhängig von
+// TRACK_ROUND_MS/Host-Rundentakt, ein reiner Optik-Parameter dieser Komponente). Bei bis zu
+// 12 Fahrern (BAHN_ART["time-trial"].jeSeite 6, zwei Seiten) ergibt das knapp über vier
+// Sekunden Gesamt-Spreizung bis der letzte losfährt — sichtbar nacheinander, ohne dass der
+// Zuschauer lange auf den fernsten Fahrer warten muss.
+const START_STAGGER_MS = 360;
 
 export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const {
@@ -323,11 +342,18 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         const tgt = tp(t, t.displayScore);
         let st = g.get(t.idx);
         if (!st) {
+          // ZF2: nur staffeln, wenn dieser Fahrer beim Mounten noch sichtbar auf der Rampe
+          // steht (Score=Wahrheit ist noch an/nahe X0) — ein Seitenaufruf mitten im Rennen
+          // (Reload, spaeter Einstieg) zeigt jeden sofort an seiner echten Position, ohne ihn
+          // kuenstlich zurueckzuhalten.
+          const onRamp = tgt.x - X0 < (X1 - X0) * 0.03;
           st = {
             x: tgt.x, fromX: tgt.x, toX: tgt.x, glideT: 1, target: tgt.x,
             y: tgt.y, yTo: tgt.y, baseOff: tgt.y - roadC, comp: 1,
             draft: 0, draftTo: 0, pack: false, sw: 8, prevDrawn: null,
             wPh: h01(t.code + "wp") * 6.283, queue: t.laneIdx % 4,
+            holdDelayMs: onRamp ? t.laneIdx * START_STAGGER_MS : 0,
+            releaseEase: onRamp && !reduce ? 0 : 1,
             drawnX: tgt.x, drawnY: tgt.y,
           };
           g.set(t.idx, st);
@@ -412,8 +438,18 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
           st.x = tp(t, t.animScore).x;
           st.draft += (st.draftTo - st.draft) * 0.045;
           st.y += (st.yTo - st.y) * 0.028;
+          // ZF2: Startrampen-Freigabe — erst NACH `holdDelayMs` beginnt das weiche Aufschließen
+          // zur wahren Position (500ms linear, kein Teleport). Bis dahin bleibt `releaseEase`
+          // bei 0, s. drawX()/dx unten.
+          if (st.releaseEase < 1 && nowT >= st.holdDelayMs) {
+            st.releaseEase = Math.min(1, st.releaseEase + dt / 500);
+          }
         }
-        const dx = drawX(st, reduce);
+        const trueDx = drawX(st, reduce);
+        // Waehrend der Rampe (releaseEase < 1) bleibt die GEZEICHNETE Position bei X0, ganz
+        // gleich, wie weit `st.x`/Score schon ist — nur `dx` (das Transform) haengt daran, nie
+        // `st.x` selbst oder irgendein Score-/Rang-Feld.
+        const dx = st.releaseEase >= 1 ? trueDx : X0 + (trueDx - X0) * st.releaseEase;
         const dy = st.y + (reduce ? 0 : Math.cos(nowT * 0.0013 + st.wPh * 1.7) * 1.2);
         const el = gRefs.current.get(t.idx);
         if (el) el.setAttribute("transform", `translate(${dx} ${dy})`);
