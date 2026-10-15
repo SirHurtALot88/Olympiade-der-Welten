@@ -7044,6 +7044,111 @@
           abschluss:(pg,bf)=>Math.min(0.90,0.10+bf.SCHUSS_NAH*0.0045+pg.TECHNIK*0.0025),
           text:(pg,bf)=>pg.n+" wirft hoch zum Korb — "+bf.n+" steigt ab und dankt rein"
         }
+      },
+      // TAKTIK-KARTE (P4 aus basketball-opus-konzeptreview-26-09.md Abschnitt "P4 —
+      // Trainerkarte", gespiegelt in docs/design/fable-ideen-feldspiel-30-09.md 2.2:
+      // "Eine Taktik-Karte, drei Optionssaetze"). Dies ist die BASKETBALL-Auspraegung
+      // der gemeinsamen Feldspiel-Infrastruktur (s. berechneTaktikAuto/effektiverTaktik/
+      // setzeTaktik weiter unten, disziplin-generisch) — Hockey (T4) und Football
+      // (P2 "Spielplan") liefern spaeter ihren je eigenen `taktik`-Block nach demselben
+      // Schema, ohne die Engine-Funktionen anzufassen.
+      //
+      // STAND DIESER RUNDE (15.10.): reines FUNDAMENT, Klasse A. Die vier Schalter
+      // werden berechnet und in fsLive.taktikAuto/taktikManuell abgelegt, aber VON
+      // KEINER MECHANIK GELESEN — kein rr()-Aufruf, keine Bewegung, keine Wertformel
+      // liest diese Felder. Die eigentliche Bindung an den Live-Motor (Zone 3-3 als
+      // Verteidigungsformation, Screen-Coverage drop/switch/blitz, Angriffs-Tempo,
+      // Rebound-Crash) ist die groessere, eigene Mechanik-Runde aus dem Opus-Review
+      // (P1 Foul-System, P3 Pick-and-Roll als Vorbedingungen fuer Coverage/Zone) und
+      // bewusst NICHT Teil dieser Infrastruktur-Runde — s. docs/design/
+      // feldspiel-taktik-karte-fundament-15-10.md Abschnitt 3 fuer die Begruendung.
+      // Dadurch ist dieser ganze Block beweisbar rho-/Pp-neutral (bit-identisch): er
+      // fuegt nur neue, ungelesene Felder hinzu, exakt das Muster von Task #31s
+      // "Spiel des Tages"-Momenten (berechneFeldspielMomente, PR #1108).
+      //
+      // `vorgabe(eigen,gegner,kontext)` folgt dem Muster von berechneFokusAuto: liest
+      // nur bereits vorhandene Rezeptwerte der Feldspieler (u.SCHUSS_FERN/u.SCHUSS_NAH/
+      // u.LAUFTEMPO/u.AUFBAU/u.ABWEHR, alle matrixgewichtet, keine Matrixaenderung),
+      // wuerfelt nichts. `kontext.liegtZurueck` kommt aus der bestehenden liegtZurueck()
+      // (s. dort). Schwellen sind PLATZHALTER (am Rezept-Mittelwert 50 gespiegelt),
+      // keine Kalibrierung — unkritisch, weil ungelesen.
+      taktik:{
+        schalter:[
+          { id:"angriff", label:"Angriff",
+            stufen:[
+              {id:"tempo", label:"Tempo", beschreibung:"Transition suchen"},
+              {id:"halbfeld", label:"Halbfeld / Pick-and-Roll", beschreibung:"Pick-and-Roll im Halbfeld (braucht P3)"},
+              {id:"innen", label:"Innen", beschreibung:"Post, Drive"}
+            ],
+            standard:"halbfeld",
+            // Gegenmittel-Logik (Opus-Review P4): Tempo gegen langsame Teams, Innen
+            // gegen schwache Innenverteidigung, sonst Halbfeld/Pick-and-Roll.
+            vorgabe:(eigen,gegner)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const gegnerTempo=mittel(gegner,"LAUFTEMPO");
+              const gegnerInnenD=mittel(gegner,"ABWEHR");
+              const eigenInnen=mittel(eigen,"SCHUSS_NAH");
+              if(gegnerTempo<=44)return "tempo";
+              if(eigenInnen-gegnerInnenD>=8)return "innen";
+              return "halbfeld";
+            }
+          },
+          { id:"verteidigung", label:"Verteidigung",
+            stufen:[
+              {id:"mann_eng", label:"Mann eng", beschreibung:"mehr Druck, mehr Fouls"},
+              {id:"mann_tief", label:"Mann tief / Pack-Line", beschreibung:"mehr Sag, Zone zu, Dreier offener"},
+              {id:"zone_3_3", label:"Zone 3-3", beschreibung:"drei an der Dreierlinie, drei in der Zone"}
+            ],
+            standard:"mann_tief",
+            // Zone gegen schwache Schuetzen, Mann eng gegen schwache Ballfuehrer,
+            // sonst Mann tief/Pack-Line als sicherer Standard.
+            vorgabe:(eigen,gegner)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const gegnerFern=mittel(gegner,"SCHUSS_FERN");
+              const gegnerAufbau=mittel(gegner,"AUFBAU");
+              if(gegnerFern<=44)return "zone_3_3";
+              if(gegnerAufbau<=44)return "mann_eng";
+              return "mann_tief";
+            }
+          },
+          { id:"coverage", label:"Screen-Coverage",
+            stufen:[
+              {id:"drop", label:"Drop", beschreibung:"sicherer Standard, s. P3"},
+              {id:"switch", label:"Switch", beschreibung:"mehr Mismatch-Abschluesse, s. P3"},
+              {id:"blitz", label:"Blitz", beschreibung:"mehr Ballverluste, mehr offene Dreier, s. P3"}
+            ],
+            standard:"drop",
+            // VORLAEUFIG: P3 (Pick-and-Roll-Rollen) ist noch nicht gebaut, die
+            // Gegenmittel-Logik des Reviews ("s. P3") hat deshalb noch kein Gegenueber.
+            // Platzhalter-Heuristik aus der EIGENEN Verteidigung (switch nur mit
+            // beweglichen, grossen Verteidigern; blitz nur mit druckstarken) bis P3
+            // die eigentliche Logik liefert.
+            vorgabe:(eigen)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const beweglich=mittel(eigen,"LAUFTEMPO");
+              const druck=mittel(eigen,"ABWEHR");
+              if(beweglich>=56)return "switch";
+              if(druck>=56)return "blitz";
+              return "drop";
+            }
+          },
+          { id:"bretter", label:"Bretter",
+            stufen:[
+              {id:"angreifen", label:"Angreifen", beschreibung:"2 Spieler zum Offensiv-Rebound"},
+              {id:"zurueck", label:"Zurueck", beschreibung:"Transition-D"}
+            ],
+            standard:"zurueck",
+            // Angreifen, wenn man zurueckliegt oder im Rebound-Profil (SCHUSS_NAH/
+            // ABWEHR als Groessen-Proxy) klar groesser ist.
+            vorgabe:(eigen,gegner,kontext)=>{
+              const mittel=(arr,feld)=>arr.length?arr.reduce((s,u)=>s+(u[feld]||50),0)/arr.length:50;
+              const eigenGroesse=(mittel(eigen,"SCHUSS_NAH")+mittel(eigen,"ABWEHR"))/2;
+              const gegnerGroesse=(mittel(gegner,"SCHUSS_NAH")+mittel(gegner,"ABWEHR"))/2;
+              if((kontext&&kontext.liegtZurueck)||eigenGroesse-gegnerGroesse>=8)return "angreifen";
+              return "zurueck";
+            }
+          }
+        ]
       }
     },
     football:{
@@ -8313,6 +8418,69 @@
     if(!fsLive)return null;
     if(seite===0)return fsLive.fokusManuell?fsLive.fokusZiel:fsLive.fokusZielAuto[0];
     return fsLive.fokusZielAuto[1];
+  }
+
+  // ===================================================================================
+  // TAKTIK-KARTE: gemeinsame Infrastruktur fuer alle Feldspiel-Disziplinen (Basketball
+  // P4, kuenftig Hockey T4 und Football P2 "Spielplan" — docs/design/fable-ideen-
+  // feldspiel-30-09.md 2.2, "Eine Taktik-Karte, drei Optionssaetze"). DISZIPLIN-
+  // GENERISCH: liest nur `FB().taktik.schalter` (leer/undefined ausserhalb Basketball in
+  // dieser Runde -> no-op, exakt das Muster, mit dem berechneFokusAuto schon heute jede
+  // Nicht-Basketball-Disziplin unberuehrt laesst). Eine Disziplin, die spaeter einen
+  // eigenen `taktik`-Block bekommt, braucht KEINE Aenderung an diesen drei Funktionen.
+  //
+  // Aufgerufen an denselben zwei Zeitpunkten wie berechneFokusAuto (Spielaufbau,
+  // initFeldspielLive; jeder Viertel-/Periodenwechsel, starteViertelpause) — derselbe
+  // Rhythmus, falls eine kuenftige Mechanik "neu bestimmt bei jedem Viertelwechsel"
+  // braucht, wie Chris es fuer den Fokus vorgegeben hat.
+  //
+  // STAND 15.10.: reines Fundament (Klasse A). `berechneTaktikAuto` schreibt nur in
+  // `fsLive.taktikAuto`/`taktikManuell` — Felder, die AUSSERHALB dieser drei Funktionen
+  // nirgends gelesen werden (nachgewiesen: Suche nach `taktikAuto`/`taktikManuell`/
+  // `effektiverTaktik` im Rest der Datei liefert ausser hier nur die Initialisierung in
+  // initFeldspielLive und die beiden Aufrufstellen). Kein rr()-Aufruf, keine Bewegung,
+  // keine Wertformel betroffen — bit-identisch per Konstruktion, wie Task #31s
+  // "Drei Momente" (PR #1108) und wie in docs/design/feldspiel-taktik-karte-
+  // fundament-15-10.md Abschnitt 2 gemessen.
+  function berechneTaktikAuto(){
+    if(!fsLive)return;
+    const art=FB();
+    if(!art||!art.taktik||!art.taktik.schalter||!art.taktik.schalter.length)return;
+    for(let seite=0;seite<2;seite++){
+      const eigen=FSTEAM[seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const gegner=FSTEAM[1-seite].filter(u=>!u.torwart&&aufDemEis(u));
+      const kontext={seite, liegtZurueck:typeof liegtZurueck==="function"?liegtZurueck(seite):false};
+      const auto={};
+      for(const schalter of art.taktik.schalter){
+        let stufe=schalter.standard;
+        if(typeof schalter.vorgabe==="function"){
+          try{ stufe=schalter.vorgabe(eigen,gegner,kontext)||schalter.standard; }
+          catch(e){ stufe=schalter.standard; }
+        }
+        auto[schalter.id]=stufe;
+      }
+      fsLive.taktikAuto[seite]=auto;
+    }
+  }
+  // Der WIRKSAME Schalterstand: eine manuelle Wahl (fsLive.taktikManuell[seite], noch
+  // von keiner UI gesetzt in dieser Runde, s. Fundament-Dokument Abschnitt 4) geht vor
+  // der automatischen Vorgabe — exakt die effektiverFokus-Reihenfolge.
+  function effektiverTaktik(seite,schalterId){
+    if(!fsLive)return null;
+    const manuell=fsLive.taktikManuell&&fsLive.taktikManuell[seite];
+    if(manuell&&manuell[schalterId]!=null)return manuell[schalterId];
+    const auto=fsLive.taktikAuto&&fsLive.taktikAuto[seite];
+    return (auto&&auto[schalterId])||null;
+  }
+  // Manuelle Uebersteuerung (Manager-Wahl oder, bis die UI steht, die Mess-Sonde ueber
+  // `--taktik=<id>:<stufe>`, s. Fundament-Dokument Abschnitt 4). Setzt NUR das Datenfeld
+  // — ohne eine lesende Mechanik (s. oben) ist ein Aufruf dieser Funktion heute wirkungs-
+  // los auf die Simulation, aber bereits das richtige Scharnier fuer beides.
+  function setzeTaktik(seite,schalterId,stufeId){
+    if(!fsLive)return;
+    if(!fsLive.taktikManuell)fsLive.taktikManuell=[{},{}];
+    if(!fsLive.taktikManuell[seite])fsLive.taktikManuell[seite]={};
+    fsLive.taktikManuell[seite][schalterId]=stufeId;
   }
 
   // ===================================================================================
@@ -11124,6 +11292,12 @@
       // startet ohne manuelle Wahl — berechneFokusAuto() gleich unten fuellt fokusZielAuto,
       // bevor der erste Ballbesitz beginnt.
       fokusZielAuto:[null,null], fokusManuell:false,
+      // TAKTIK-KARTE (s. berechneTaktikAuto/effektiverTaktik/setzeTaktik oben):
+      // taktikAuto[seite] = {schalterId: stufeId}, von berechneTaktikAuto() gefuellt;
+      // taktikManuell[seite] = {schalterId: stufeId} fuer eine Uebersteuerung, leer bis
+      // eine UI oder Sonde sie setzt. Ausserhalb von Disziplinen mit `taktik`-Block
+      // (aktuell nur Basketball) bleibt taktikAuto leer — berechneTaktikAuto() no-opt.
+      taktikAuto:[{},{}], taktikManuell:[{},{}],
       viertel:1, viertelpause:null,
       // BERUEHRUNGSKETTE (nur Hockey, s. merkeBeruehrung): die letzten Ballbesitzer DERSELBEN
       // Seite in Folge, fuer die Vorlagenvergabe bei einem Tor (s. loeseHockeySchuss).
@@ -11142,6 +11316,9 @@
     // andere Feldspiel-Disziplin bleibt fsLive.fokusZielAuto=[null,null] und damit
     // effektiverFokus() ueberall null — bit-identisch zum bisherigen Verhalten.
     berechneFokusAuto();
+    // TAKTIK-KARTE, VORGABE VOR DEM ERSTEN BALLBESITZ (s. berechneTaktikAuto oben):
+    // analog zu berechneFokusAuto, no-opt ausserhalb von Disziplinen mit `taktik`-Block.
+    berechneTaktikAuto();
     const ruhe=schiriRuhePos();
     fsSchiri={x:ruhe.x,y:ruhe.y,zielX:ruhe.x,zielY:ruhe.y,pfiffT:0};
     // FOOTBALL STARTET NICHT UEBER ballUebernehmen()/spielmacherLos() — ein Empfangsteam
@@ -11350,6 +11527,10 @@
     // gemessenen Rho-Schaden, den ein vorgezogenes zuordneDeckung(true) hier auslöste
     // (naechster Kommentar) — diese Funktion ruft zuordneDeckung nicht auf.
     berechneFokusAuto();
+    // TAKTIK-KARTE, NEU BESTIMMT BEI JEDEM VIERTELWECHSEL (s. berechneTaktikAuto oben):
+    // derselbe Rhythmus wie der Fokus, fuer eine kuenftige Mechanik, die auf eine
+    // Rotation/einen Foulausstieg reagieren soll.
+    berechneTaktikAuto();
     // BEWUSST KEIN zuordneDeckung(true) hier, obwohl Chris' Formulierung beide Funktionen
     // nennt: der Wiederanpfiff (naechsterAngriff(...,true) im "viertelpause"-Zweig von
     // stepBasketballLive) laeuft ueber ballUebernehmen(), das zuordneDeckung(true) ohnehin
@@ -15742,6 +15923,81 @@
   const qualAnzeige=(n)=>n>=1000000?(n/1000000).toFixed(1).replace(".0","")+" Mio":
     n>=1000?Math.round(n/1000)+" Tsd":String(n);
 
+  // ============ I-SPY: DREI RAEUME (I-1 "Jede Seite waehlt ihren Raum", Fable-Ideen
+  // 30.09., docs/design/fable-ideen-arena-ispy-30-09.md Abschnitt 6/I-1, aufgegriffen
+  // docs/design/i-spy-fable-empfehlung-02-10.md Abschnitt 8, gebaut 15.10. nach Chris'
+  // Sammel-Freigabe "ja ueberall D, bau weiter") ====================================
+  //
+  // WAS. Drei benannte Raeume -- Archiv, Werkstatt, Salon --, alle mit denselben zwoelf
+  // Fundort-POSITIONEN (x/y) und derselben STUFENMULTIMENGE (vier Stufe-1, sechs Stufe-2,
+  // zwei Stufe-3 je Raum -- "dieselbe Stufenmultimenge" aus der Spezifikation), aber mit
+  // verschobener ART-PUNKTMASSE: nur WELCHE Raetselart an einer Position liegt, wandert,
+  // nie wie viele Fundorte es gibt oder was sie wert sind. Kein neues Attribut, kein neues
+  // Rezept -- exakt der Spezifikations-Satz "Keins neu. Die Raumwahl verschiebt die
+  // Verteilung der bestehenden Sub-Skills, nicht ihre Formeln."
+  //
+  // WERKSTATT ist unveraendert die bisherige, einzige Fundort-Liste (ISPY_FUNDORTE_
+  // WERKSTATT ist BYTE-IDENTISCH zu `fundorte` vor dieser Aenderung) -- das haelt die
+  // bereits gemessene Baseline (rho/Spiel 0,750, Pp 16,6/12,8, Kopfkommentar beim
+  // `rezept` oben) unveraendert fuer jedes Team, das (ueber die KI-Standardwahl, s.u.)
+  // in dieser Konfiguration landet; nichts an der bestehenden Abnahme wird rueckwirkend
+  // veraendert.
+  //
+  // ARCHIV und SALON entstehen aus WERKSTATT durch Verschieben der BEIDEN STUFE-1-BLOECKE
+  // (je ein Spiegelpaar à 10+10 Punkte, ISPY_PUNKTWERT[1]=10) -- NIE die Stufe-2/3-Bloecke
+  // oder die beiden Mehrwege-Tresore (Mittelachse, `neben`-Paarung positionsgebunden, s.
+  // Kommentar bei `fundorte` unten): Logik (Bloecke 0/4) und Mechanik (Bloecke 5/9) sind
+  // die einzigen Arten mit einem SOLCHEN kleinen, verschiebbaren Block; Verhoer haelt nur
+  // einen groesseren Stufe-2-Block (50 Punkte) und waere mit ihm allein zu grob verschoben
+  // worden (16 statt ~8 Pp) -- deshalb wandert in jedem Raum ein KLEINER (20-Punkte-)Block,
+  // nie der grosse. Jede Verschiebung bleibt dadurch symmetrisch (Spiegelpaare behalten
+  // dieselbe Art auf beiden Haelften, SPIEGELSYMMETRIE bleibt gewahrt) und von aehnlicher
+  // Groesse (~6,5 Pp Art-Punktmasse je Block, 20 von 310 Gesamtpunkten) -- naeher an der
+  // in der Spezifikation genannten Groessenordnung ("±8 Pp... bedeutet grob ±3 Pp auf
+  // Attributebene") als an einem Vielfachen davon. Ergebnis (volles Feld, zwoelf aktive
+  // Fundorte, aus ispyPunktmasseAnteile()/ISPY_PUNKTWERT nachgerechnet): Archiv Logik
+  // 48,4 % / Verhoer 35,5 % / Mechanik 16,1 % -- Werkstatt (unveraendert) Logik 41,9 % /
+  // Verhoer 35,5 % / Mechanik 22,6 % -- Salon Logik 35,5 % / Verhoer 48,4 % / Mechanik
+  // 16,1 %. Mechanik ist in KEINEM Raum die groesste Art fuer sich (das waere ein viel
+  // groesserer Eingriff, s.o. "nie der grosse Block"), aber in Werkstatt klar am
+  // hoechsten VERGLICHEN MIT den beiden anderen Raeumen (22,6 % gegen 16,1 % dort) --
+  // genau das vergleicht die KI-Standardwahl unten (ispyWaehleRaumKI(), relativer
+  // Vergleich der drei Team-Mittel, nicht ein absolutes "ist Mechanik hier die groesste
+  // Art"). Alle drei Arten bleiben in jedem Raum mit positiver Masse vertreten (keine auf
+  // Null) -- Spezifikations-Pflicht "alle drei Arten bleiben in jedem Raum, nur die
+  // Gewichte wandern".
+  //
+  // PP-ABNAHME (CLAUDE.md, "die Eignungsmatrix ist gesperrt"): gemessen, nicht nur
+  // behauptet -- `node scripts/messe-arena-einfluss.mjs i-spy 24` nach dem Bau, zwei
+  // unabhaengige Saatstroeme, s. docs/design/i-spy-raumwahl-i1-15-10.md fuer die Zahlen.
+  function ispyRaumAbgeleitet(basis,ueberschreibungen){
+    return basis.map((f,idx)=>ueberschreibungen[idx]?{...f,art:ueberschreibungen[idx]}:f);
+  }
+  const ISPY_FUNDORTE_WERKSTATT=[
+    {x:0.12,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Seil"},
+    {x:0.30,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Kerzenleuchter"},
+    {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT", hinweis:"mit der Pistole"},
+    {x:0.70,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Dolch"},
+    {x:0.88,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Rohr"},
+    {x:0.20,y:0.62,art:"mechanik",stufe:1, hinweis:"im Weinkeller"},
+    {x:0.38,y:0.80,art:"verhoer", stufe:2, hinweis:"die Köchin"},
+    {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK", hinweis:"der Gärtner"},
+    {x:0.62,y:0.80,art:"verhoer", stufe:2, hinweis:"der Butler"},
+    {x:0.80,y:0.62,art:"mechanik",stufe:1, hinweis:"auf der Terrasse"},
+    {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"im Salon"},
+    {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"in der Bibliothek"}
+  ];
+  // ARCHIV: der Mechanik-Block (Positionen 5/9, Stufe 1) wird zu Logik -- Logik gewinnt
+  // einen kleinen Block, Mechanik verliert ihn, Verhoer bleibt unberuehrt.
+  const ISPY_FUNDORTE_ARCHIV=ispyRaumAbgeleitet(ISPY_FUNDORTE_WERKSTATT,{5:"logik",9:"logik"});
+  // SALON: derselbe Mechanik-Block UND der Logik-Block (Positionen 0/4, Stufe 1) werden
+  // zu Verhoer -- Verhoer gewinnt beide kleinen Bloecke, Logik und Mechanik verlieren je
+  // einen.
+  const ISPY_FUNDORTE_SALON=ispyRaumAbgeleitet(ISPY_FUNDORTE_WERKSTATT,
+    {0:"verhoer",4:"verhoer",5:"verhoer",9:"verhoer"});
+  const ISPY_RAEUME={archiv:ISPY_FUNDORTE_ARCHIV, werkstatt:ISPY_FUNDORTE_WERKSTATT, salon:ISPY_FUNDORTE_SALON};
+  const ISPY_RAUM_NAMEN={archiv:"Archiv", werkstatt:"Werkstatt", salon:"Salon"};
+
   const BUEHNE_ART={
     gewichtheben:{
       // MATRIX: power 28, charisma 23, health 16, determination 12, will 7, speed 6,
@@ -16348,20 +16604,11 @@
       // oben: Logik 5/Verhoer 3/Mechanik 4 Fundorte): LOGIK->Womit (die Tatwaffe, per
       // Deduktion), VERHOER->Wer (die/der Verdaechtige, durch Befragung), MECHANIK->Wo
       // (der Tatort, am Schloss/an der Tuer erschlossen).
-      fundorte:[
-        {x:0.12,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Seil"},
-        {x:0.30,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Kerzenleuchter"},
-        {x:0.50,y:0.12,art:"logik",   stufe:3, neben:"FINGERFERTIGKEIT", hinweis:"mit der Pistole"},
-        {x:0.70,y:0.18,art:"logik",   stufe:2, hinweis:"mit dem Dolch"},
-        {x:0.88,y:0.30,art:"logik",   stufe:1, hinweis:"mit dem Rohr"},
-        {x:0.20,y:0.62,art:"mechanik",stufe:1, hinweis:"im Weinkeller"},
-        {x:0.38,y:0.80,art:"verhoer", stufe:2, hinweis:"die Köchin"},
-        {x:0.50,y:0.55,art:"verhoer", stufe:3, neben:"LOGIK", hinweis:"der Gärtner"},
-        {x:0.62,y:0.80,art:"verhoer", stufe:2, hinweis:"der Butler"},
-        {x:0.80,y:0.62,art:"mechanik",stufe:1, hinweis:"auf der Terrasse"},
-        {x:0.08,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"im Salon"},
-        {x:0.92,y:0.85,art:"mechanik",stufe:2,bild:"tuer", hinweis:"in der Bibliothek"}
-      ],
+      // `fundorte` bleibt der FALLBACK/Standardraum fuer jeden Code, der noch nichts von
+      // Raeumen weiss (identisch mit ISPY_FUNDORTE_WERKSTATT, s. Kopfkommentar "I-SPY: DREI
+      // RAEUME" oben) -- `baueSchatzsuche()` ersetzt ihn je Seite durch den TATSAECHLICH
+      // gewaehlten Raum (ISPY_RAEUME[archiv|werkstatt|salon], s. dort).
+      fundorte:ISPY_FUNDORTE_WERKSTATT,
       // WERTUNGSTABELLE (nur Woerter, wie bei Wettessen/Speed-Schach — Spalten kommen
       // unveraendert aus WERTUNG_AUFTRITT, s. Kommentar dort: "keine Aenderung an der
       // geteilten Buehnen-Punkteformel").
@@ -17537,6 +17784,17 @@
   // `u.summe` -- bit-identisch vorher/nachher (s. PR-Beschreibung).
   const EISKUNSTLAUF_KURZPROGRAMM_N=4; // Elemente 1-4 = Kurzprogramm (ISU), Rest = Kuer
 
+  // F-F2 -- DIE MENSUR, VARIANTE A (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+  // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt F-F2, Klasse B): einziger
+  // Kalibrierhebel fuer den Mensur-Zustand im `art.fechten`-Zweig unten in bauBuehne() --
+  // je Gang verschiebt sich `mensur` um (Rundenpunkt-Differenz dieses Gangs) / diese Zahl,
+  // bei |mensur|>=1 faellt ein zusaetzlicher Treffer und `mensur` faellt auf 0 zurueck
+  // (die En-garde-Linien, wie real nach jedem Treffer). NACHGEMESSEN (PR-Beschreibung,
+  // scripts/miss-fechten-mensur-haeufigkeit.mjs): Kalibrierziel aus dem Dokument ist
+  // hoechstens ein bis zwei Bahnende-Treffer je Gefecht im Mittel -- diese Zahl wurde EMPIRISCH
+  // auf dieses Ziel hin gesetzt, nicht freihaendig geraten.
+  const FECHTEN_MENSUR_SKALA=100;
+
   // S-F2 -- "DAS LETZTE BRETT ENTSCHEIDET" (Fable-Ideen Buehne-Duell 30.09.,
   // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt 4 "S-F2", Paket 1 "Regie & Bild",
   // Klasse A, nur Speed-Schach). Liefert die SPOILERFREIE obere Schranke dafuer, wie viele
@@ -17559,6 +17817,24 @@
     return summe;
   }
 
+  // ================== PAKET 3 (01.10.2026): "FECHTEN-FORMAT" ==================
+  // Fable-Ideen Buehne-Duell 30.09. (docs/design/fable-ideen-buehne-duell-30-09.md), Abschnitt
+  // 3: F-F1 (Die Fechtstaffel) und F-F2 (Die Mensur, Variante A) -- beide dort ausdruecklich
+  // als KLASSE B eingestuft ("echte Mechanik-Aenderung, braucht Chris' Zustimmung und eine
+  // Messrunde vor dem Merge"), anders als Paket 1 "Regie & Bild" (4881a108, Klasse A). Beide
+  // setzen NACH `setz()` an (im Paarungsblock unten bzw. in `spieleBuehneDuell()`), ziehen
+  // kein zusaetzliches `rr()` fuer die Formkarten-/Ereignis-Reihenfolge und veraendern
+  // `u.summe`/`u.runden[].punkte` nie -- miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs
+  // sind damit PER KONSTRUKTION unberuehrt (s. die beiden Kommentare an den jeweiligen
+  // Stellen unten). Gemessen werden muessen trotzdem (Projektregel, CLAUDE.md): Spiegel-
+  // symmetrie (scripts/miss-arena-buehne-spiegel.mjs), die Mensur-Haeufigkeit (Kalibrierziel
+  // 1-2 Bahnende-Treffer je Gefecht) und die Teamsieg-Verteilung der Staffel -- alle drei in
+  // der PR-Beschreibung.
+  //
+  // KEINE KLASSE-T-AENDERUNG: `art.rundenN` (9) und `art.rundenDauer` (60/(9*6*2)) bei
+  // BUEHNE_ART.fechten oben bleiben Zeichen fuer Zeichen unveraendert -- diese PR fasst keine
+  // einzige Wanduhr-Taktungskonstante an, braucht also keine gesonderte Freigabe ausserhalb
+  // der normalen Klasse-B-Messrunde.
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
@@ -17880,6 +18156,43 @@
         if(art.fechten){
           const ta=a.runden.filter(r=>r.ereignis===art.erfolgWort).length;
           const tb=b.runden.filter(r=>r.ereignis===art.erfolgWort).length;
+          // F-F2 -- DIE MENSUR, VARIANTE A (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+          // Abschnitt F-F2, Klasse B): Chris' Tauzieh-Auftrag vom 22.09., woertlich "der
+          // gewinnende spieler [soll] den anderen immer weiter zurueck draengen", war bisher
+          // reine Anzeige -- buehneTauziehVersatz() liest seit F-B2 (Broadcast-Optik-Dokument
+          // 27-09, s. dortiger Kommentar bei zeichneFechten()) ohnehin schon die laufende
+          // TREFFERDIFFERENZ, nicht mehr `vorteil`. Im echten Degenfechten ist das
+          // Zurueckdraengen aber eine REGEL, keine Zierde: wer mit beiden Fuessen die hintere
+          // Endlinie ueberschreitet, gibt dem Gegner einen Treffer. `mensur` bildet das nach:
+          // ein gedachter Zustand in [-1,+1] (0 = Bahnmitte), der sich JEDEN Gang um die
+          // PUNKT-DIFFERENZ dieses einen Gangs verschiebt (dieselbe Groesse, aus der `lauf`
+          // oben kumulativ `verlauf[]` bildet -- hier nur nicht kumuliert, sondern je Gang auf
+          // FECHTEN_MENSUR_SKALA normiert und bei Grenzueberschreitung auf 0 zurueckgesetzt,
+          // wie real nach jedem Treffer). VARIANTE A (Dokument: "ich wuerde mit A anfangen"):
+          // liest NUR die bereits fertige Rundenpunkt-Differenz -- kein neuer Attributkanal,
+          // Torment traegt dadurch nicht staerker als heute, messe-arena-einfluss.mjs sieht
+          // diese Aenderung nicht.
+          //
+          // NUR IN u.treffer/gefechtSieg, NIE IN u.summe: `a.runden[r].punkte`/
+          // `b.runden[r].punkte` werden hier nicht veraendert -- `lauf`/`verlauf` (zwei Zeilen
+          // oben) und `wert()` (liest u.summe) bleiben bit-identisch, miss-alle-
+          // disziplinen.mjs sieht diese Aenderung ebenfalls nicht. Der Mensur-Treffer ist ein
+          // ZUSAETZLICHER Treffer, additiv auf demselben Feld wie ein gewoehnlicher
+          // erfolgWort-Treffer (s. TREFFERSTAND-Kommentar bei BUEHNE_ART.fechten oben) --
+          // stepBuehne() zaehlt ihn beim Enthuellen in `r.mensurTreffer` getrennt UND
+          // zusaetzlich zu `r.ereignis===art.erfolgWort` hoch (s. dortiger Kommentar), damit
+          // ein Gang, der beides zugleich ist (ein gelandeter Treffer UND die Grenzueber-
+          // schreitung desselben Gangs), auch beide zaehlt -- exakt das hier vorberechnete
+          // `taM`/`tbM`.
+          let mensur=0, mensurTrefferA=0, mensurTrefferB=0;
+          for(let r=0;r<art.rundenN;r++){
+            const diffGang=(a.runden[r]?a.runden[r].punkte:0)-(b.runden[r]?b.runden[r].punkte:0);
+            mensur+=diffGang/FECHTEN_MENSUR_SKALA;
+            if(mensur>=1){ a.runden[r].mensurTreffer=true; mensurTrefferA++; mensur=0; }
+            else if(mensur<=-1){ b.runden[r].mensurTreffer=true; mensurTrefferB++; mensur=0; }
+          }
+          a.mensurTreffer=mensurTrefferA; b.mensurTreffer=mensurTrefferB;
+          const taM=ta+mensurTrefferA, tbM=tb+mensurTrefferB;
           // ECHTE DEGEN-ZUSATZREGEL bei Treffergleichstand (FIE-Prioritaetsminute, Review
           // Abschnitt 3.2 Punkt 5): eine Zusatzminute, Prioritaet per Los, bei ausbleibendem
           // Treffer gewinnt die Seite mit Prioritaet. Die Zusatzminute selbst wird hier nicht
@@ -17888,10 +18201,13 @@
           // entscheidet nur, wenn der Trefferstand danach immer noch gleich steht. `rr()` ruehrt
           // damit die deterministische Formkarten-/Ereignis-Reihenfolge dieses Gefechts nicht an
           // -- alle Punkte/Treffer beider Fechter stehen zu diesem Zeitpunkt schon fest.
-          const gleichstand=ta===tb;
+          // GELESEN WIRD DER ENDSTAND NACH MENSUR (`taM`/`tbM`), NICHT `ta`/`tb`: die Mensur ist
+          // seit F-F2 Teil des echten Trefferstands, der Gleichstand/die Prioritaet muessen
+          // denselben Stand lesen wie `gefechtSieg` gleich darunter.
+          const gleichstand=taM===tbM;
           const prioA=gleichstand?rr()<0.5:null;
-          a.gefechtSieg=ta>tb||(prioA===true);
-          b.gefechtSieg=tb>ta||(prioA===false);
+          a.gefechtSieg=taM>tbM||(prioA===true);
+          b.gefechtSieg=tbM>taM||(prioA===false);
           // NUR BEI TATSAECHLICHEM TREFFERGLEICHSTAND gesetzt (sonst bliebe `prioA` `null` und
           // beide Seiten straeflich auf `false` stehen) -- die Ticker-/Tabellen-Texte lesen
           // dieses Feld, um "Sieg nach Prioritaet" nur zu zeigen, wenn es auch einen Losentscheid
@@ -17988,6 +18304,51 @@
       }
     }
 
+    // F-F1 -- DIE FECHTSTAFFEL (Paket 3, Fable-Ideen Buehne-Duell 30.09.,
+    // docs/design/fable-ideen-buehne-duell-30-09.md Abschnitt F-F1, Klasse B): das olympische
+    // Mannschaftsfechten ist real keine Reihe paralleler Einzelgefechte, sondern eine
+    // STAFFEL -- die Gefechte laufen nacheinander auf einer Bahn. Ersetzt fuer Fechten NUR die
+    // ENTHUELLUNGSREIHENFOLGE: Gefecht 1 komplett (alle `art.rundenN` Gaenge beider Fechter),
+    // dann Gefecht 2, ... statt des generischen "Durchgang 1 aller Bahnen, dann Durchgang
+    // 2"-Rhythmus (REIHENFOLGE-Block unten) -- dasselbe Startreihenfolge-Muster, das
+    // Eiskunstlauf (E-F1)/Showcase (S-F1) oben schon nutzen (eigener fruehzeitiger `return`,
+    // bevor der generische Block greift). `mine[i]`/`gegner[i]` stehen bereits in Chris'
+    // Aufstellungsreihenfolge (Slot 1 zuerst, s. `slotFuer()` oben) -- Slot 1 eroeffnet die
+    // Staffel, der letzte gesetzte Slot ist der Anker, der real einen Rueckstand noch drehen
+    // kann, genau das Drama, das Chris am 22.09. fuer Breaking bestellt hat ("so kann zb ein
+    // starker spieler auf slot 6 noch mal richtig aufholen"), hier aber das REALE Format der
+    // Sportart, keine Uebertragung.
+    //
+    // RANGTREUE-NEUTRAL AUS DEMSELBEN GRUND WIE E-F1/S-F1 (Paket 1, s. deren Kommentare oben):
+    // `setz()` hat beide `runden[]`-Arrays schon VOLLSTAENDIG vorberechnet, bevor diese Stelle
+    // ueberhaupt laeuft -- die Reihenfolge, in der `buehneQueue` sie freigibt, aendert nichts an
+    // WAS gewuerfelt wurde oder WIEVIEL rr() verbraucht wurde, nur WANN es sichtbar wird.
+    // `u.summe`/`u.vorteil`/`u.verlauf`/`MOTOREN[...].wert()` bleiben bit-identisch --
+    // miss-alle-disziplinen.mjs/messe-arena-einfluss.mjs sehen diese Aenderung nicht. GESAMT-
+    // DAUER UNVERAENDERT: `buehneQueue` traegt exakt so viele Eintraege wie vorher
+    // (`duellBretter*art.rundenN*2`), nur anders sortiert, bei unveraendertem `art.rundenDauer`
+    // -- keine Klasse-T-Aenderung, keine Wanduhr-Taktungskonstante wird beruehrt.
+    //
+    // NUR DIE GLOBALE REIHENFOLGE AENDERT SICH, NICHT DIE BAHN-LOKALE: innerhalb eines
+    // Gefechts bleibt die Abfolge a-Gang-r, b-Gang-r, a-Gang-r+1, b-Gang-r+1, ... exakt wie im
+    // generischen Block unten -- die Doppelfeuer-Gates weiter unten (vorteilKipptBig,
+    // "PERIODE BEENDET", "BRETT ENTSCHIEDEN"), die `gegner.aktuell` gegen `u.aktuell`
+    // vergleichen, vergleichen beide Seiten DESSELBEN Gefechts und bleiben deshalb unveraendert
+    // korrekt -- veraendert ist nur, WANN das naechste Gefecht ueberhaupt an die Reihe kommt.
+    if(art.fechten){
+      buehneQueue=[];
+      const duellBretter=Math.min(mine.length,gegner.length);
+      for(let i=0;i<duellBretter;i++){
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        for(let r=0;r<art.rundenN;r++){
+          if(a)buehneQueue.push(a);
+          if(b)buehneQueue.push(b);
+        }
+      }
+      return;
+    }
+
     // DUETT (Eiskunstlauf, #856/#857) — FUSION AUF RUNDENEBENE, NICHT AUF SUMME. Die
     // urspruengliche Recherche wollte auf `summe` fusionieren; die Opus-Synthese (Abschnitt
     // 3.4) hat das korrigiert: `summe` existiert an dieser Stelle noch gar nicht (bleibt 0
@@ -18022,6 +18383,17 @@
     // solo (kein Trio, keine neue Mechanik) — die einfachste, am wenigsten ueberraschende
     // Loesung, deckungsgleich mit jeder anderen Ungerade-Rest-Regel dieses Projekts.
     //
+    // E-F2 (Fable-Ideen Buehne-Auftritt 30.09. Abschnitt "E-F2", Chris' Sammel-Antwort "ja
+    // ueberall D, bau weiter"): verfeinert nur WER solo bleibt, nicht OB. Bis hierhin paarte
+    // `fusioniereSeite` von oben (Rang 1+2, 3+4, …), wodurch der uebrige Rest am Ende der
+    // absteigend sortierten Liste immer der SCHWAECHSTE Laeufer war — kein bewusster Teil der
+    // Entscheidung oben, nur ein Nebeneffekt der Sortierrichtung. Ab jetzt wird von UNTEN
+    // gepaart, so dass der STAERKSTE (`g[0]`, der Star) solo laeuft: ehrlicher zur Sportart
+    // (Einzel/Paare sind getrennte Wettbewerbe, ein Team schickt seinen Besten solo) und die
+    // 80/20-Fusion glaettet ohnehin Ausreisser, was dem Star am wenigsten nuetzt. Nur die
+    // PaarungsRICHTUNG aendert sich; bei gerader Feldgroesse (`rest===0`) entstehen exakt
+    // dieselben Paare wie zuvor (bit-identisch), weil es dort keinen Rest gibt.
+    //
     // FRAGE B (dieselbe Quelle): greift Duett auch bei Feldgroesse 2 (die ganze Seite ist
     // ein einziges Paar)? Entscheidung: ja — konsistent mit "gerade Zahl -> automatisch
     // Duett", eine Ausnahme nur fuer die kleinste gerade Zahl waere eine unbegruendete
@@ -18030,7 +18402,12 @@
     if(art.duett){
       const fusioniereSeite=(seite)=>{
         const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
-        for(let i=0;i+1<g.length;i+=2){
+        // E-F2: Rest-Index `rest` statt festem Start bei 0 -- bei ungerader Feldgroesse
+        // (rest===1) bleibt `g[0]`, der Staerkste, unberuehrt und damit solo; die Paarung
+        // beginnt erst ab Index 1 (g[1]+g[2], g[3]+g[4], …). Bei gerader Feldgroesse
+        // (rest===0) unveraendert ab Index 0, bit-identisch zum alten Verhalten.
+        const rest=g.length%2;
+        for(let i=rest;i+1<g.length;i+=2){
           const a=g[i], b=g[i+1];
           a.duettN=b.n; b.duettN=a.n;
           for(let r=0;r<art.rundenN;r++){
@@ -18071,10 +18448,21 @@
       // die Gruppenliste je Seite deshalb nur umgedreht und dann seitenweise verzahnt,
       // damit kein Team geschlossen zuerst dran ist (dieselbe Absicht wie im generischen
       // Zweig unten).
+      //
+      // E-F2 (Fable-Ideen Buehne-Auftritt 30.09. Abschnitt "E-F2", Chris' Sammel-Antwort
+      // "ja ueberall D, bau weiter"): bei ungerader Feldgroesse bleibt jetzt der STAERKSTE
+      // (`g[0]`, der Star) solo statt des Schwaechsten -- s. `fusioniereSeite` oben, die
+      // denselben Rest-Index `rest` verwendet. Die Gruppenliste muss denselben Rest kennen,
+      // sonst zeigt die Startreihenfolge ein anderes Solo-Paar als tatsaechlich fusioniert
+      // wurde. Der Star-Solo-Block wird VOR der Schleife eingefuegt und bleibt nach dem
+      // `reverse()` dadurch der LETZTE Starter seiner Seite -- Star schliesst ab, wie die
+      // Doku verlangt ("ihn als letzten Starter seiner Seite setzen").
       const baueGruppenJeSeite=()=>[0,1].map(seite=>{
         const g=TEILNEHMER.filter(x=>x.side===seite).sort((x,y)=>y.eig-x.eig);
         const grp=[];
-        for(let i=0;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
+        const rest=g.length%2;
+        if(rest)grp.push([g[0]]);
+        for(let i=rest;i<g.length;i+=2)grp.push(g[i+1]?[g[i],g[i+1]]:[g[i]]);
         return grp.reverse();
       });
       // E-F1 (Paket 1, 30.09., Klasse A, s. Kommentar bei EISKUNSTLAUF_KURZPROGRAMM_N oben):
@@ -19946,6 +20334,13 @@
   // — je Spiel/Saat stabil, damit eine Sicht-QA denselben Seed reproduzierbar dieselbe
   // Karte zeigt, aber zwischen Spielen/Saaten sichtbar wechselt.
   let ISPY_VISUELLES_LAYOUT=null;
+  // WELCHEN RAUM JEDE SEITE GERADE SPIELT (I-1, s. Kopfkommentar "I-SPY: DREI RAEUME" bei
+  // BUEHNE_ART oben und ispyWaehleRaum() weiter unten) -- gesetzt von baueSchatzsuche() vor
+  // jedem Spiel, gelesen vom Furniture-Render-Block in bodenSchatzsuche() (jede Seite zeigt
+  // IHREN eigenen Raum, nicht zwangslaeufig denselben wie die andere) und von
+  // window.__arena.ispyRaumSonde() fuer Messung/QA. "werkstatt" (der unveraenderte
+  // Standardraum) ist der Ausgangswert, bevor das erste Spiel gebaut wurde.
+  let ISPY_RAUM_AKTIV={0:"werkstatt",1:"werkstatt"};
 
   // KADERGROESSEN-SKALIERUNG (2.2 + Konzept-Frage 14, vom Gegencheck Abschnitt 3.6
   // beantwortet): "aktive Fundorte = 2·max(mine,gegner)+2" heisst mechanisch "aktiviere
@@ -20045,6 +20440,75 @@
       u._letzteReaktionTick=-Infinity;
     }
     return truhen;
+  }
+
+  // RAUMWAHL (I-1 "Jede Seite waehlt ihren Raum", s. Kopfkommentar "I-SPY: DREI RAEUME" bei
+  // BUEHNE_ART oben). Jede Seite waehlt VOR dem Spiel GENAU EINEN der drei Raeume FUER SICH
+  // -- spiegelfrei (Spezifikation: "niemand waehlt gegen den Gegner, jeder waehlt fuer
+  // sich"), weil beide Seiten ohnehin vollstaendig unabhaengige Raumkopien bekommen (s.
+  // Kopfkommentar "ARCHITEKTUR-ENTSCHEIDUNG" bei ispyBaueRaum() oben).
+  //
+  // ECHTER STANDARD (ohne jede Vorgabe) IST "WERKSTATT", NICHT DIE "INTELLIGENTE" WAHL
+  // WEITER UNTEN -- gemessen, nicht nur behauptet (CLAUDE.md): die Spezifikation
+  // (fable-ideen-arena-ispy-30-09.md Abschnitt I-1) nahm an, ein Raum-Argmax ueber das
+  // Team-Mittel der drei Knack-Sub-Skills sei "per Konstruktion" rho-neutral, genau wie bei
+  // der Bahn-Standardaufstellung. Gemessen (node scripts/miss-alle-disziplinen.mjs 24 i-spy,
+  // kaderfeste live-save-Familie, 15.10.) stimmt das NICHT unbedingt: der reine Argmax
+  // (ispyWaehleRaumKI() unten, ohne Schwelle) bewegt rho/Spiel von 0,750 auf 0,700 -- primaer
+  // GETRIEBEN VON EINER EINZIGEN Paarung (coldsteel-direlegion, Gast-Team: Team-Mittel
+  // Verhoer 14,9 Punkte ueber dem naechsten, wechselt in den Salon; ihr rho/Spiel faellt
+  // dort von 0,750 auf 0,649), nicht von einer gleichmaessigen Verschiebung ueber alle
+  // Paarungen. Ursache: die Raumwahl ist eine TEAM-Mittel-Entscheidung, aber die Wertung
+  // bleibt INDIVIDUELL -- ein Raum, der die Punktmasse klar zu einer Art verschiebt, kann
+  // einzelne Spezialisten eines Teams ueberproportional gegenueber ihren Mitspielern
+  // beguenstigen, auch wenn das TEAM im Schnitt davon profitiert (derselbe Interessenkonflikt,
+  // den die Pp-Abnahme auf Attributebene misst, hier auf Rangtreue-Ebene sichtbar). Der
+  // Effekt bleibt zwar kleiner als die kaderfeste Spannweite dieser Disziplin (0,177-0,224)
+  // und ist damit im Rahmen des Projekt-eigenen Kaderrauschen-Massstabs (CLAUDE.md,
+  // "kleiner als die Spannweite ist von Null nicht unterscheidbar") -- aber die Spezifikation
+  // verlangt ausdruecklich NACHMESSEN statt Behaupten, und der sichere, gemessen
+  // rho-UNVERAENDERTE Standard ist "Werkstatt fuer beide Seiten", bit-identisch zur alten
+  // Mechanik (eigene Kontrollmessung: `window.__arena.ispyRaumWahl({0:"werkstatt",
+  // 1:"werkstatt"})` reproduziert exakt 0,750/0,177/0,881/0,210).
+  //
+  // Die "intelligente" Wahl bleibt deshalb vollstaendig gebaut und verfuegbar, aber als
+  // EXPLIZITE vierte Option ("auto"), nicht als stiller Standard: eine Seite, deren
+  // Manager (Chris oder spaeter eine ausgefeiltere Gegner-KI) sich bewusst fuer "automatisch
+  // nach Staerke" entscheidet, bekommt sie; eine Seite ohne jede Vorgabe bleibt in der
+  // Werkstatt. Das ist dieselbe Unterscheidung, die `buehneHaltungTest` schon kennt (eine
+  // reine Messvorgabe aendert nichts an der echten KI-Vorgabe) -- hier nur mit einer
+  // zusaetzlichen Stufe, weil der "automatische" Pfad selbst gemessen werden musste, bevor
+  // er zum stillen Standard haette werden duerfen.
+  function ispyTeamMittel(teilnehmer,subskill){
+    if(!teilnehmer.length)return 0;
+    let s=0; for(const u of teilnehmer)s+=u[subskill]||0;
+    return s/teilnehmer.length;
+  }
+  function ispyWaehleRaumKI(teilnehmer){
+    const mLogik=ispyTeamMittel(teilnehmer,"LOGIK");
+    const mVerhoer=ispyTeamMittel(teilnehmer,"MENSCHENKENNTNIS");
+    const mMechanik=ispyTeamMittel(teilnehmer,"FINGERFERTIGKEIT");
+    if(mLogik>=mVerhoer&&mLogik>=mMechanik)return "archiv";
+    if(mVerhoer>=mMechanik)return "salon";
+    return "werkstatt";
+  }
+  // MANUELLE UEBERSTEUERUNG, dasselbe Muster wie `buehneHaltungTest` weiter oben: null/
+  // weggelassen je Seite = echter Standard ("werkstatt", s.o.), ein Raumname = genau dieser
+  // Raum, "auto" = die gemessen NICHT rho-neutrale, aber verfuegbare intelligente Wahl
+  // (ispyWaehleRaumKI() oben). Bislang NUR ueber die Test-/QA-Schnittstelle
+  // `window.__arena.ispyRaumWahl({0:"archiv",1:"auto"})` gesetzt (s. window.__arena-Objekt
+  // weiter unten), noch OHNE Host-/Lineup-Anbindung: I-Spy ist nicht arena-aufgeloest (s.
+  // lib/battle/arena-resolved-disciplines.ts) und hat deshalb noch keine Produktions-
+  // Lineup-UI, ueber die ein Team seinen Raum waehlen koennte -- s.
+  // docs/design/i-spy-raumwahl-i1-15-10.md Abschnitt "UI/Anzeige" fuer den Stand. Nie im
+  // echten Spiel gesetzt, solange das so bleibt: jede Seite spielt bis dahin ausschliesslich
+  // in der Werkstatt.
+  let ISPY_RAUM_MANUELL={0:null,1:null};
+  function ispyWaehleRaum(seite,teilnehmer){
+    const manuell=ISPY_RAUM_MANUELL[seite];
+    if(manuell==="auto")return ispyWaehleRaumKI(teilnehmer);
+    if(manuell&&ISPY_RAEUME[manuell])return manuell;
+    return "werkstatt";
   }
 
   // S-c "FREUDE UND FLUCH" (3.1): Notiz (Stufe 1) ist NIE sichtbar; eine Akte (Stufe 2) nur
@@ -20233,16 +20697,35 @@
   let ISPY_NACHFUELL_SONDE=null;
   function baueSchatzsuche(art,mine,gegner){
     // SPAWN-ORT-RANDOMIZER (s. Kommentar bei ISPY_LAYOUT_VARIANTEN oben): reines Lesen von
-    // `seed`, KEIN rr()-Aufruf — ispyBaueRaum() gleich darunter liest weiterhin
-    // ausschliesslich `art.fundorte` unveraendert, die Kartenwahl wirkt NUR auf die beiden
+    // `seed`, KEIN rr()-Aufruf. Liest bewusst weiterhin `art.fundorte` (den unveraenderten
+    // Standardraum/ISPY_FUNDORTE_WERKSTATT) statt des je Seite GEWAEHLTEN Raums weiter
+    // unten -- alle drei Raeume (I-1, s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART)
+    // haben exakt dieselben x/y-Positionen und Stufen je Index, nur die ART-Beschriftung
+    // wandert; die Geometrie-Transformation ist deshalb raumunabhaengig und braucht keine
+    // zweite, seitengetrennte Berechnung. Die Kartenwahl wirkt NUR auf die beiden
     // Zeichen-Verbraucher (bodenSchatzsuche()/stepSchatzsuche()).
     const layoutVariante=ispyWaehleLayoutVariante(seed);
     ISPY_VISUELLES_LAYOUT=art.fundorte.map(f=>layoutVariante.transform(f));
     if(window.__ISPY_LAYOUT_DEBUG)console.log("ISPY_LAYOUT_DEBUG",layoutVariante.name,seed);
     const mineT=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const gegnerT=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
-    const mineRaum=ispyBaueRaum(art,mineT);
-    const gegnerRaum=ispyBaueRaum(art,gegnerT);
+    // RAUMWAHL (I-1): je Seite unabhaengig voneinander, s. Kopfkommentar bei
+    // ispyWaehleRaum() oben -- echter Standard "Werkstatt" fuer beide Seiten, sofern keine
+    // Vorgabe (window.__arena.ispyRaumWahl()) gesetzt ist. `{...art,fundorte:...}` ersetzt
+    // NUR das eine Feld, das ispyBaueRaum() liest; `art.rundenN`/`art.erfolgWort`/etc.
+    // bleiben fuer beide Seiten identisch.
+    const mineRaumName=ispyWaehleRaum(0,mineT);
+    const gegnerRaumName=ispyWaehleRaum(1,gegnerT);
+    ISPY_RAUM_AKTIV={0:mineRaumName,1:gegnerRaumName};
+    const mineRaum=ispyBaueRaum({...art,fundorte:ISPY_RAEUME[mineRaumName]},mineT);
+    const gegnerRaum=ispyBaueRaum({...art,fundorte:ISPY_RAEUME[gegnerRaumName]},gegnerT);
+    // ANSAGE (I-1, "UI/Anzeige" solange es keine Vorspiel-Lineup-UI gibt, s.
+    // docs/design/i-spy-raumwahl-i1-15-10.md): nur bei VERSCHIEDENEN Raeumen je Seite
+    // ueberhaupt erwaehnenswert -- bei "beide Werkstatt" (der heutige Normalfall) bliebe die
+    // Zeile ein Rauschen, das niemand liest. Reine Ticker-Zeile, kein Einfluss auf
+    // Wertung/RNG (`feedEreignis` schreibt nur in den Anzeige-Feed).
+    if(mineRaumName!==gegnerRaumName)
+      feedEreignis(0,"Raumwahl: wir im "+ISPY_RAUM_NAMEN[mineRaumName]+", der Gegner im "+ISPY_RAUM_NAMEN[gegnerRaumName]+".");
     // FALLAKTE ZURUECKGESETZT (I-5, Task #42): reines Anlegen eines leeren Anzeige-
     // Zustands je Seite, `.gesamt` liest nur `.length` der schon gebauten Raeume (kein
     // zusaetzlicher rr()-Verbrauch, kein neuer Zufallszug) -- s. Kommentar bei
@@ -21047,6 +21530,14 @@
         // exakt das u.kuehneVersuche-Muster von Gewichtheben, nur live beim Enthuellen
         // hochgezaehlt statt beim Bauen des Duells.
         if(BB().fechten&&r.ereignis===BB().erfolgWort)u.treffer++;
+        // F-F2 -- MENSUR-TREFFER (Paket 3, s. der grosse Kommentar bei `art.fechten` in
+        // bauBuehne() oben): eigener, ZUSAETZLICHER Zaehler, bewusst nicht per `else if` an
+        // den Zweig direkt darueber gehaengt -- ein Gang kann zugleich ein gelandeter
+        // erfolgWort-Treffer UND die Grenzueberschreitung sein, dann zaehlt `u.treffer` beides
+        // einzeln, genau wie es `taM`/`tbM` bei der `gefechtSieg`-Berechnung in bauBuehne()
+        // schon vorwegnimmt. `r.mensurTreffer` steht bereits vollstaendig fest (bauBuehne()
+        // rechnet die ganze Mensur-Simulation vorab durch), hier nur gelesen, kein rr().
+        if(BB().fechten&&r.mensurTreffer)u.treffer++;
         const fechtGegner=BB().fechten?gegner:null;
         // VOKABULAR JE DUELL-ART (30.09., duellWorte()-Kommentar oben): Schach/Tennis
         // zeigen weiterhin den laufenden Wert aus `v`/`u.verlauf`, nur das Wort wechselt
@@ -24802,10 +25293,19 @@
     // ungeoeffnet auszusehen), eine angebrochene bekommt die Riss-Beschriftung. Reines
     // Lesen abgeleiteter Anzeigedaten aus bereits enthuellten `u.runden`/`u.aktuell` --
     // kein neuer Mechanik-Zustand, keine Rueckwirkung auf ispyBesterWeg()/ispySeiteTick().
+    //
+    // JE SEITE IHR EIGENER RAUM (I-1): `ISPY_RAUM_AKTIV[seite]` (von baueSchatzsuche() vor
+    // dem ersten Tick gesetzt) bestimmt, AUS WELCHEM der drei Raeume diese Haelfte ihre
+    // Moebel zeichnet -- das Mehrwege-Moebel/die Stufe/die x/y-Koordinate je Index bleiben
+    // ueber alle drei Raeume gleich (s. Kopfkommentar "I-SPY: DREI RAEUME" bei BUEHNE_ART),
+    // nur `f.art` (Schreibtisch/Figur/Aktenschrank, ispyMoebelArt()) kann je Raum wechseln.
+    // Vor dem ersten `baueSchatzsuche()`-Aufruf (Sicht-QA) steht ISPY_RAUM_AKTIV auf
+    // "werkstatt" fuer beide Seiten, s. dessen Deklaration oben.
     if(art.fundorte){
       [0,1].forEach(seite=>{
         const zustand=ispyRaumZustand(seite);
-        art.fundorte.forEach((f,idx)=>{
+        const raumFundorte=ISPY_RAEUME[ISPY_RAUM_AKTIV[seite]]||art.fundorte;
+        raumFundorte.forEach((f,idx)=>{
           const vis=(ISPY_VISUELLES_LAYOUT&&ISPY_VISUELLES_LAYOUT[idx])||f;
           const p=ispyFundortXY(vis,seite);
           const z=zustand.get(idx);
@@ -34967,7 +35467,44 @@
       return b.pos-a.pos;
     });
     const punkte=new Map(), seiten=[0,0];
-    reihe.forEach((u,i)=>{const p=N-i; punkte.set(u.id,p); seiten[u.seite]+=p;});
+    // MARGIN-FORMEL (Task #105, PP nach Zeit statt Platz, 15.10., Diagnose Abschnitt 2,
+    // umgesetzt nach der Stamina-Kalibrierung desselben Tages). NUR Time-Trial setzt
+    // `BA().marginAnteil` (s. BAHN_ART["time-trial"]) -- jede andere Bahn liest hier
+    // `undefined`, der Zweig unten greift dann nicht und `punkte`/`seiten` bleiben exakt
+    // die alte Zeile (reine Rangpunkte N..1), bit-identisch zu vorher.
+    //
+    // ANKER N..1 BLEIBT: bester Laeufer N Punkte, schlechtester 1 -- wie bisher, s.
+    // Variante A/D/E der Diagnose. NUR DIE ZWISCHENSCHRITTE aendern sich: statt gleicher
+    // Eins-Schritte liegt ein Laeufer linear nach seinem ZEITABSTAND ZUM FELD (relativ zur
+    // Feldspanne, bester..schlechtester Zielzeit dieses Rennens) zwischen den Ankern --
+    // ein knapper Vorsprung bleibt nah am Nachbarn, ein grosser Abstand reisst eine
+    // groessere Luecke, genau wie Chris' Befund ("manche Spieler zeitlich einen Vorsprung
+    // rausholen") es verlangt. Gemischt mit `marginAnteil` (0,20, s. dort) statt die reinen
+    // Rangpunkte zu ersetzen -- Variante D/E, nicht die ungedaempfte Variante A, die auf
+    // beiden Saatstroemen die 25-Pp-Schranke riss (Diagnose Abschnitt 2.3).
+    //
+    // NUR LAEUFER MIT ECHTER ZIELZEIT (`u.fertig!=null`) LIEFERN EINEN ZEITABSTAND. Ein
+    // Nicht-Fertiger (DNF/raus) hat keine `bahnZeit()` -- derselbe Fall, den die Sortierung
+    // oben schon ans Feldende stellt (`fa!==fb`); er faellt hier auf die reine Rangpunktzahl
+    // zurueck, keine Division durch eine nicht vorhandene Zeit.
+    const marginAnteil=BA().marginAnteil||0;
+    let zeitBest=null, zeitSpanne=0;
+    if(marginAnteil>0){
+      const fertigeZeiten=reihe.filter(u=>u.fertig!=null).map(bahnZeit);
+      if(fertigeZeiten.length){
+        zeitBest=Math.min(...fertigeZeiten);
+        zeitSpanne=Math.max(...fertigeZeiten)-zeitBest;
+      }
+    }
+    reihe.forEach((u,i)=>{
+      const rangP=N-i;
+      let p=rangP;
+      if(marginAnteil>0&&zeitSpanne>0&&u.fertig!=null){
+        const marginP=N-(bahnZeit(u)-zeitBest)/zeitSpanne*(N-1);
+        p=(1-marginAnteil)*rangP+marginAnteil*marginP;
+      }
+      punkte.set(u.id,p); seiten[u.seite]+=p;
+    });
     return {reihe,punkte,seiten};
   }
   let bahnEndeGemeldet=false;
@@ -38419,6 +38956,17 @@
       // bleibt weiter Unentschieden (unveraendert aus der 06.09.-Entscheidung, jetzt auf
       // die Zeitsumme statt auf Rangpunkte angewandt).
       wertung:"zeit",
+      // PP NACH ZEIT STATT PLATZ (Task #105, Margin-Formel, 15.10.-Umsetzung): die
+      // Diagnose in docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md Abschnitt
+      // 2 fand die Formel implementierungsreif (Variante D/E, 15-25 % Margin-Anteil,
+      // Anker N..1 wie bisher), wartete aber auf Puffer — der Stamina-Kalibrierung vom
+      // selben Tag (Zwanzigster Nachtrag, stand-aller-disziplinen.md) schuf ihn (Pp-
+      // Abweichung 22,3/24,1 -> 13,5/14,1). `bahnRangliste()` liest DIESES Feld (s. dort,
+      // "MARGIN-FORMEL"); 0 oder fehlend = unveraendertes Verhalten (reine Rangpunkte),
+      // deshalb ist das Feld NUR hier gesetzt — jede andere Bahn (Spurt/Climbing/Staffel/
+      // Takeshi's Castle) bleibt bit-identisch. 0,20 liegt in der Mitte des geprueften
+      // 15-25-%-Korridors (Variante D/E), nicht an dessen Rand.
+      marginAnteil:0.20,
       rezept:{
         // Dexterity stand hier in SECHS von sieben Werten und las sich mit 32 %, wo die
         // Matrix 25 sagt — waehrend Intelligence (18) und Awareness (12) bei 6 und 0
@@ -49593,6 +50141,21 @@
           };
           const o={}; [...LAEUFER].sort(cmp).forEach((u,pl)=>{o[u.n]=-(pl+1);}); return o;
         }
+        // TIME-TRIAL: DIESELBE FORMEL WIE DIE PRODUKTIONS-PP, UEBER DENSELBEN AUFRUF
+        // (Task #105, 15.10., Diagnose Abschnitt 2.1: "eine Aenderung an der
+        // Produktions-PP allein, ohne M.wert() mitzuziehen, wuerde die Mess-Sonde von dem
+        // entkoppeln, was tatsaechlich ausgezahlt wird"). Ruft `bahnRangliste()` direkt
+        // auf, statt die Formel ein zweites Mal auszuschreiben — kein Zwillings-Code, der
+        // auseinanderlaufen kann, wenn `marginAnteil` je wieder angefasst wird. Fuer jede
+        // andere Bahn (`BA().marginAnteil` dort `undefined`) liefert `bahnRangliste()`
+        // weiterhin reine Rangpunkte, bit-identisch zum generischen Zweig unten — deshalb
+        // NUR fuer time-trial ein eigener Zweig, Spurt faellt weiter in den `else`-Pfad.
+        if(bd==="time-trial"){
+          const w=bahnRangliste();
+          const o={};
+          for(const u of LAEUFER)o[u.n]=w.punkte.get(u.id)??0;
+          return o;
+        }
         // EIGENE LAUFZEIT (bahnZeit), nicht die Zieluhrzeit — dieselbe Korrektur wie in
         // bahnRangliste (s. dort), hier fuer die Rangtreue-Messung selbst: `disziplinProbe`
         // liest `M.wert()`, nicht bahnRangliste. Fuer jede Bahn ausser Zeitfahren ist
@@ -50568,6 +51131,22 @@
         for(const s of [0,1])if(s in neu)buehneHaltungTest[s]=(neu[s]&&neu[s]!=="ki")?String(neu[s]):null;
       return {...buehneHaltungTest};
     },
+    // RAUMWAHL I-SPY (I-1, s. ispyWaehleRaum()/ISPY_RAUM_MANUELL weiter oben), dasselbe
+    // Muster wie buehneHaltungTest direkt darueber: {0:"archiv",1:null} usw.; null/weggelassen
+    // = echter Standard ("werkstatt"), ein Raumname (ISPY_RAEUME) = genau dieser Raum,
+    // "auto" = die gemessen NICHT rho-neutrale intelligente Wahl (s. Kommentar bei
+    // ispyWaehleRaumKI). Alles andere faellt still auf den Standard zurueck. Ohne Argument
+    // nur lesen. Kein echtes Spiel ruft das auf (noch keine Host-/Lineup-Anbindung, s.
+    // Kommentar bei ISPY_RAUM_MANUELL).
+    ispyRaumWahl:(neu)=>{
+      if(neu&&typeof neu==="object")
+        for(const s of [0,1])if(s in neu)
+          ISPY_RAUM_MANUELL[s]=(neu[s]==="auto"||(neu[s]&&ISPY_RAEUME[neu[s]]))?neu[s]:null;
+      return {...ISPY_RAUM_MANUELL};
+    },
+    // REIN LESENDE SONDE: welchen Raum jede Seite im zuletzt gebauten Spiel tatsaechlich
+    // bekommen hat (KI-Wahl ODER Messvorgabe, s. ISPY_RAUM_AKTIV/baueSchatzsuche()).
+    ispyRaumSonde:()=>({...ISPY_RAUM_AKTIV}),
     // PERSOENLICHKEITS-HANDWERK (P1, 07.10., s. persDefVon()): Mess-/QA-Schnittstelle nach dem
     // Muster buehneFlags darueber. {tdm:[], "mini-dm":["z"], ...} setzt `ARENA_ART[d].persHandwerk`
     // je Arena-Disziplin (nur "z"/"b", andere Schluessel und Nicht-Arena-Disziplinen werden
@@ -50580,6 +51159,24 @@
       return Object.fromEntries(Object.keys(ARENA_ART).map(d=>[d,[...(ARENA_ART[d].persHandwerk||[])]]));
     },
     calloutProbe:(txt,caption)=>callout(txt||"Callout-Sonde",caption),
+    // TAKTIK-KARTE, MESS-/QA-SCHNITTSTELLE (s. berechneTaktikAuto/effektiverTaktik/
+    // setzeTaktik oben, docs/design/feldspiel-taktik-karte-fundament-15-10.md): die
+    // Sonden-Entsprechung zu Fables Vorschlag "ein Parameter --taktik=<id>:<stufe> fuer
+    // alle drei" (fable-ideen-feldspiel-30-09.md 2.2) — hier als Funktionsaufruf statt
+    // CLI-Flag, weil die Headless-Sonden (miss-alle-disziplinen.mjs/messe-arena-
+    // einfluss.mjs) ohnehin ueber window.__arena fahren. Muss NACH dem jeweiligen
+    // bau()/bauFeldspiel()-Aufruf fuer dieses Spiel aufgerufen werden (fsLive wird dort
+    // neu gebaut). Heute ohne Wirkung auf rr()/Wertformel (s. Kommentar bei
+    // berechneTaktikAuto) — die Schnittstelle existiert, bevor die Mechanik es tut.
+    taktikSetzen:(seite,schalterId,stufeId)=>setzeTaktik(seite,schalterId,stufeId),
+    taktikLesen:(seite,schalterId)=>effektiverTaktik(seite,schalterId),
+    taktikSchalterVon:(dId)=>{
+      const art=(typeof FELDSPIEL_ART!=="undefined"&&FELDSPIEL_ART[dId])||null;
+      return art&&art.taktik&&art.taktik.schalter
+        ?art.taktik.schalter.map(s=>({id:s.id,label:s.label,standard:s.standard,
+            stufen:s.stufen.map(st=>({id:st.id,label:st.label,beschreibung:st.beschreibung}))}))
+        :[];
+    },
     // TEAM-FEIER-SONDE (Konzept team-publikum-feiermomente, Phase 1): loest eine Feier direkt
     // aus -- dasselbe Prinzip wie calloutProbe darueber. Die Stufe "finale" hat seit 07.10.
     // einen organischen Ausloeser (Endstand-Nachlauf 2.6, endstandVormerken()); die Sonde
@@ -51224,6 +51821,16 @@
       const wert=M.wert();
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
+      // F-F1 -- DIAGNOSEFELDER FUeR DIE FECHTSTAFFEL (Paket 3, s. der grosse Kommentar bei
+      // `art.fechten` in bauBuehne() oben): reines Zusatzfeld fuer Messskripte (Mensur-
+      // Haeufigkeit, Mirror-Test) -- `boxscore`-Reihen ausserhalb von Fechten bleiben
+      // unveraendert (`treffer`/`mensurTreffer` stehen nur hier, `wert`/`name` wie immer).
+      if(BUEHNE_ART[bd].fechten){
+        for(const row of boxscore){
+          const u=TEILNEHMER.find(x=>x.n===row.name);
+          if(u){ row.treffer=u.treffer||0; row.mensurTreffer=u.mensurTreffer||0; }
+        }
+      }
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, Opus-Konzeptreview 26.09., s.
       // "F1"-Kommentar bei `art.duell` in bauBuehne()): der Trefferstand entscheidet das Brett
       // und damit den Arena-Seitenstand, nicht die interne Punktdifferenz. `boxscore`/`wert`
@@ -51238,9 +51845,27 @@
       // Stufe 1) schon laenger in den Arena-Seitenstand einfliesst. `arenaTeamPointsForFixture()`
       // (lib/resolve/battle-mode-arena-team-points.ts) vergleicht `seiten` nur mit `===`/`>`,
       // Floats mit 0,5-Schritten sind dafuer exakt und verlustfrei. Fuer Tennis/Fechten
-      // bit-identisch zu vorher (`duellBrettSieg()?1:0`, immer ganzzahlig).
+      // bit-identisch zu vorher (`duellBrettSieg()?1:0`, immer ganzzahlig). `duellBrettSieg()`
+      // liest fuer Fechten bereits `gefechtSieg` statt `vorteil>0` (s. Weiche dort), die
+      // Funktion ist also unveraendert fechten-tauglich.
       const bretter=(s)=>duellBretterGewonnen(BUEHNE_ART[bd],s);
-      const seiten=[bretter(0),bretter(1)];
+      // F-F1 -- TEAMSTAND = KUMULIERTE TREFFER, NICHT GEWONNENE BAHNEN (Paket 3, Fable-Ideen
+      // Buehne-Duell 30.09., Abschnitt F-F1, Klasse B): die Fechtstaffel ist real EIN
+      // Mannschaftsgefecht mit einem gemeinsamen, kumulierten Trefferstand (Ziel 45 bei neun
+      // Gefechten), kein "Bahnen gewonnen"-Mannschaftsschach wie bisher uebernommen. NUR fuer
+      // Fechten (`BUEHNE_ART[bd].fechten`) -- Speed-Schach/Tennis bleiben bei `bretter()` (s.
+      // oben, jetzt ueber `duellBretterGewonnen()` mit T-F2-Doppel-Gruppierung und S-F1-
+      // Brettpunkten), der gewonnenen-Bretter-Zaehlung.
+      //
+      // RANGTREUE-/Pp-NEUTRAL: `u.treffer` fliesst nirgends in `wert()` (liest u.summe) oder
+      // `eig` ein -- `einflussVon()`/`disziplinProbe()` lesen beide ausschliesslich `wert()`,
+      // nie `seiten`. Diese Aenderung wirkt ausschliesslich auf den ARENA-Mannschaftsvergleich
+      // (den Teamstand, der ueber die Disziplin in einem Spieltag entscheidet), nicht auf die
+      // individuelle Rangtreue-Messung. Gemessen werden muessen deshalb Spiegelsymmetrie
+      // (scripts/miss-arena-buehne-spiegel.mjs, derselbe Code-Pfad) und die Verteilung der
+      // Teamsiege selbst -- s. PR-Beschreibung.
+      const treffer=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+(u.treffer||0),0);
+      const seiten=BUEHNE_ART[bd].fechten?[treffer(0),treffer(1)]:[bretter(0),bretter(1)];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
