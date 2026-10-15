@@ -15156,6 +15156,105 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: #f98a8a;
 }
 
+/* DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): einklappbares Panel
+   unter der Disziplin-Zeile, Vorbild battle-mode.html#p3 (KAMPFWERTE + LAUFBAHN), aber mit echten
+   gebuchten Zahlen statt Beispielwerten. */
+.player-drawer-axis-discipline-laufbahn-toggle {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.player-drawer-axis-discipline-laufbahn-toggle:focus-visible {
+  outline: 2px solid rgba(124, 196, 255, 0.65);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.player-drawer-axis-discipline-laufbahn-chevron {
+  flex: 0 0 auto;
+  color: rgba(214, 223, 241, 0.55);
+  font-size: 0.7em;
+}
+
+.player-drawer-axis-discipline-laufbahn-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(124, 196, 255, 0.06);
+  border: 1px solid rgba(124, 196, 255, 0.18);
+}
+
+.player-drawer-axis-discipline-laufbahn-heading {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(230, 237, 249, 0.72);
+}
+
+.player-drawer-axis-discipline-laufbahn-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 2px;
+}
+
+.player-drawer-axis-discipline-laufbahn-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.player-drawer-axis-discipline-laufbahn-stat small {
+  font-size: 0.62rem;
+  color: rgba(214, 223, 241, 0.6);
+}
+
+.player-drawer-axis-discipline-laufbahn-stat strong {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: #f7fbff;
+}
+
+.player-drawer-axis-discipline-laufbahn-seasons {
+  display: grid;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.player-drawer-axis-discipline-laufbahn-season-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.68rem;
+  color: rgba(214, 223, 241, 0.78);
+}
+
+.player-drawer-axis-discipline-laufbahn-season-row.is-active {
+  color: #f7fbff;
+  font-weight: 700;
+}
+
+.player-drawer-axis-discipline-laufbahn-season-label em {
+  font-style: normal;
+  color: #6ee7a8;
+}
+
+.player-drawer-axis-discipline-laufbahn-season-values {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
 .player-drawer-discipline-forecast {
   margin-top: 10px;
 }

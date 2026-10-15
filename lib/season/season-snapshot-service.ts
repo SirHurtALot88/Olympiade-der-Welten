@@ -29,6 +29,13 @@ import {
   resolveSeasonSnapshotTeamRecords,
   type SeasonSnapshotAllTimeRow,
 } from "@/lib/season/season-snapshot-helpers";
+import {
+  buildSeasonInjuryDisciplineCounts,
+  finalizeLaufbahnCounters,
+  foldLaufbahnEntry,
+  initLaufbahnAccumulator,
+  type LaufbahnAccumulator,
+} from "@/lib/season/player-discipline-laufbahn";
 export { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 export const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
@@ -327,6 +334,10 @@ function buildSeasonSnapshotRecord(
     });
 
   const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
+  // DISZIPLIN-LAUFBAHN (Q2): einmal je Saison vorberechnet, nicht je Performance-Zeile —
+  // `resolveInjuryMatchdayDisciplines` liest die Einsatzliste des betroffenen Spieltags, das lohnt
+  // sich nicht pro Zeile neu. S. `lib/season/player-discipline-laufbahn.ts`.
+  const seasonInjuryDisciplineCounts = buildSeasonInjuryDisciplineCounts(gameState, seasonId);
   const playerPerformances: SeasonSnapshotPlayerPerformanceRecord[] = Array.from(
     seasonPlayerPerformances.reduce((map, entry) => {
       const player = playerById.get(entry.playerId) ?? null;
@@ -349,7 +360,10 @@ function buildSeasonSnapshotRecord(
         bestDisciplineLabel: null as string | null,
         bestDisciplineScore: null as number | null,
         teamBreakdown: new Map<string, { teamId: string | null; teamCode: string | null; teamName: string | null; appearances: number; totalPoints: number }>(),
-        disciplineBreakdown: new Map<string, { disciplineId: string; disciplineName: string; appearances: number; totalContribution: number; totalFinalScore: number }>(),
+        disciplineBreakdown: new Map<
+          string,
+          { disciplineId: string; disciplineName: string; appearances: number; totalContribution: number; totalFinalScore: number; laufbahn: LaufbahnAccumulator }
+        >(),
       };
       const normalizedPoints = seasonPointsLedger.pointEntriesByPerformanceId.get(entry.id)?.points ?? entry.scoreContribution;
 
@@ -371,10 +385,12 @@ function buildSeasonSnapshotRecord(
         appearances: 0,
         totalContribution: 0,
         totalFinalScore: 0,
+        laufbahn: initLaufbahnAccumulator(),
       };
       breakdown.appearances += 1;
       breakdown.totalContribution += normalizedPoints;
       breakdown.totalFinalScore += entry.finalPlayerScore;
+      breakdown.laufbahn = foldLaufbahnEntry(breakdown.laufbahn, entry);
       current.disciplineBreakdown.set(entry.disciplineId, breakdown);
 
       const teamBreakdownKey = entry.teamId ?? "unknown-team";
@@ -410,7 +426,10 @@ function buildSeasonSnapshotRecord(
       bestDisciplineLabel: string | null;
       bestDisciplineScore: number | null;
       teamBreakdown: Map<string, { teamId: string | null; teamCode: string | null; teamName: string | null; appearances: number; totalPoints: number }>;
-      disciplineBreakdown: Map<string, { disciplineId: string; disciplineName: string; appearances: number; totalContribution: number; totalFinalScore: number }>;
+      disciplineBreakdown: Map<
+        string,
+        { disciplineId: string; disciplineName: string; appearances: number; totalContribution: number; totalFinalScore: number; laufbahn: LaufbahnAccumulator }
+      >;
     }>()).values(),
   )
     .map((entry) => {
@@ -479,6 +498,13 @@ function buildSeasonSnapshotRecord(
             totalContribution: roundValue(discipline.totalContribution, 1),
             averageContribution: roundValue(discipline.totalContribution / discipline.appearances, 1),
             averageFinalScore: roundValue(discipline.totalFinalScore / discipline.appearances, 1),
+            // DISZIPLIN-LAUFBAHN (Q2): einmalig beim Saisonabschluss gefaltet, nie waehrend der
+            // Saison inkrementiert -- s. Kommentar an `LaufbahnAccumulator`-Nutzung oben und an
+            // `SeasonSnapshotPlayerDisciplineBreakdownRecord.laufbahn`.
+            laufbahn: finalizeLaufbahnCounters(
+              discipline.laufbahn,
+              seasonInjuryDisciplineCounts.get(entry.playerId)?.get(discipline.disciplineId),
+            ),
           }))
           .sort((left, right) => (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY)),
         warnings: entry.teamId == null ? ["player_team_missing_in_snapshot"] : [],

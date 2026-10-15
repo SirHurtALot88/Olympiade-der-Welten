@@ -6,6 +6,10 @@ import {
   type PlayerBoardTrustRenewalPolicy,
 } from "@/lib/ai/player-board-trust-service";
 import { buildPlayerSeasonAwards, type PlayerSeasonAward } from "@/lib/foundation/player-season-awards";
+import {
+  buildPlayerDisciplineLaufbahn,
+  type PlayerDisciplineLaufbahn,
+} from "@/lib/season/player-discipline-laufbahn";
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -459,6 +463,14 @@ export type PlayerDetailDrawerData = {
     rank: number | null;
     playerCount: number | null;
     scoutedTier?: TransfermarktRatingTier | null;
+    /**
+     * DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): `null` heißt „keine
+     * Laufbahn-Daten für diese Disziplin" (kein einziger gebuchter Einsatz) — nie mit einem
+     * leeren `{}` verwechseln, das wäre „Einsätze, aber (noch) keine Zähler". Nur im nicht
+     * gescouteten Pfad gesetzt (`buildDisciplineValuesFromPlayer`); der gescoutete Pfad
+     * (`buildScoutedDisciplineValuesFromPlayer`, Fog of War) liefert sie nie.
+     */
+    laufbahn?: PlayerDisciplineLaufbahn | null;
   }>;
   progressionForecast: PlayerProgressionForecast | null;
   projectedClassPreview: {
@@ -1212,6 +1224,10 @@ function buildDisciplineValuesFromPlayer(
     }
   }
 
+  // DISZIPLIN-LAUFBAHN (Q2): einmal je Spieler vorberechnet, nicht je Disziplin — dieselbe
+  // Rechenstelle wie `buildPlayerSeasonAwards`, s. `lib/season/player-discipline-laufbahn.ts`.
+  const laufbahnByDisciplineId = gameState ? buildPlayerDisciplineLaufbahn(gameState, player.id) : null;
+
   const resultById = new Map((gameState?.seasonState.matchdayResults ?? []).map((entry) => [entry.id, entry] as const));
   for (const entry of gameState?.seasonState.playerDisciplinePerformances ?? []) {
     if (entry.playerId !== player.id) continue;
@@ -1293,6 +1309,7 @@ function buildDisciplineValuesFromPlayer(
         currentDisciplineValues: current,
         disciplineDelta: delta,
         playerCount: seasonPlayerCountByDisciplineId?.get(discipline.id) ?? discipline.playerCount ?? null,
+        laufbahn: laufbahnByDisciplineId?.get(discipline.id) ?? null,
       };
     })
     .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
