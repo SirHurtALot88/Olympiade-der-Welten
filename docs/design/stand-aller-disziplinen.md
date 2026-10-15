@@ -1,5 +1,58 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Zwanzigster Nachtrag 15.10. — Time-Trial: Stamina-Ueberschuss im Rangpunkte-Rezept kalibriert
+(Budget-Methode, Climbing-Vorbild), PP-nach-Zeit-Frage bleibt ausserhalb des Scopes.**
+`docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md` Abschnitt 2.5 diagnostizierte den
+Auftrag: Stamina trug im Rangpunkte-Rezept auf JEDEM gemessenen Saatstrom rund +9 Pp zu viel
+(`messe-arena-einfluss.mjs time-trial 24`, zwei unabhaengige Stroeme `--saat-versatz=0`/
+`10000000`), weil STEHEN **und** ENDTEMPO beide `u.STEHEN`/Stamina streckenweit (nicht nur
+zonenweit) lesen (`mued`/`KRAFT_VON`/`leer`/`pusteRegen` in `tempoVon()`/`stepSpurt()`) — derselbe
+Fehler, den die Climbing-Kalibrierrunde (16.09., `climbing-kalibrierung-16-09.md`) schon einmal
+gefunden hatte: ein Attribut sitzt in zu vielen Kanaelen gleichzeitig und gewinnt strukturell.
+
+**Baseline (vor dieser Runde, n=24, zwei Saatstroeme):** Abweichung zur Matrix 22,3/24,1 Pp,
+Stamina +8,8/+10,3 (groesster Einzelposten auf beiden Stroemen), Dexterity (Matrix 25, das
+schwerste Attribut) -4,4/-4,1 das groesste Loch. rho je Spiel 0,923, Spannweite 0,064, Saison
+0,902 (bestand die 0,80-Schranke bereits deutlich, aber die 23.09.-Pp-Fixrunde hatte keinen Puffer
+mehr fuer die Task-#105-Margin-PP uebrig gelassen).
+
+**Kalibriert (ein Hebel, zwei Messschritte, wie bei Climbing):** nur
+`BAHN_ART["time-trial"].rezept.STEHEN` geaendert (Kommentar am Code, `public/mockups/
+battle-mode.engine.js`), ANTRITT/ENDTEMPO/TECHNIK/WENDIGKEIT/WUCHT/ROBUST/GESPUER unveraendert.
+Schritt 1: `{stamina:34,intelligence:26,awareness:32,dexterity:8}` → `{stamina:18,…,dexterity:24}`
+schloss das Dexterity-Loch fast vollstaendig (-4,4 → -0,1 bei n=24), liess Stamina bei +5,1 Pp
+stehen. Schritt 2: ein kleiner Torment-Anteil (Matrix nur 3, aber durch WUCHTs auf die Berg-Zonen
+begrenzten Kanal praktisch tot, 0,4-0,7 %) auf weitere Kosten von Stamina
+(`{stamina:10,intelligence:26,awareness:32,dexterity:24,torment:8}`) senkte Stamina auf +3,5/+4,2
+Pp — **unter die Haelfte des Ausgangswerts auf BEIDEN Stroemen**, ohne Dexterity erneut zu
+verschieben (-0,7/-0,9 nach Schritt 2, weiterhin nah an der Matrix).
+
+| Groesse | Strom 0 | Strom 10 000 000 |
+|---|---:|---:|
+| Abweichung zur Matrix (vorher → nachher) | 22,3 → 13,5 Pp | 24,1 → 14,1 Pp |
+| Stamina (vorher → nachher) | +8,8 → +3,5 Pp | +10,3 → +4,2 Pp |
+| Dexterity (vorher → nachher) | -4,4 → -0,7 Pp | -4,1 → -0,9 Pp |
+| rho je Spiel (Median, kaderfest, n=24) | 0,923 → **0,943** | — |
+| Spannweite | 0,064 → 0,049 | — |
+| rho Saison (Median) | 0,902 → **0,951** | — |
+
+rho **verbessert sich, statt nur gehalten zu werden** — kein Zielkonflikt zwischen rho und
+Pp-Abweichung in dieser Runde, anders als bei den im 15.10.-Dokument geprueften PP-nach-Zeit-
+Prototypen. **Isolation geprueft:**
+`node scripts/miss-alle-disziplinen.mjs 24 staffel spurt time-trial takeshis-castle climbing` —
+Staffel 0,937, Spurt 0,910, Takeshi's Castle 0,898, Climbing 0,833, alle vier unveraendert
+gegenueber ihrem eigenen Stand (jede Bahn-Disziplin fuehrt ihr eigenes, getrenntes `rezept`-Objekt
+in `BAHN_ART`; nur der `STEHEN`-Eintrag unter `"time-trial"` wurde angefasst).
+
+**Scope-Grenze, bewusst eingehalten:** diese Runde aendert NICHTS an `bahnRangliste()`,
+`MOTOREN["time-trial"].wert()`, der Zeitsumme (`wertung:"zeit"`) oder der PPS-Referenz — nur die
+`rezept`-Gewichte, die die bestehende Rangpunkte-Wertung durchreicht. Die PP-nach-Zeit-Frage
+(Task #105, margin-basierte Individual-PP) bleibt unveraendert Abschnitt 2 des 15.10.-Dokuments:
+nicht gebaut, jetzt mit mehr Puffer fuer einen spaeteren Anlauf, aber ein eigener, separater
+Auftrag.
+
+---
+
 **Neunzehnter Nachtrag 13.10. — Mini-DM FFA: Chris' Override (Intelligence/Spirit) gebaut, neuer
 Schlagwechsel ersetzt den alten Sandplatz-Takt, rho/Pp auf dem GESPIELTEN FORMAT bestehen —
 nicht in echte Spieltagsergebnisse verdrahtet.** Chris' Auftrag 13.10., wörtlich: „auch das FFA
@@ -933,7 +986,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 
 | Disziplin | Chassis | rho je Spiel (Median) | Spannweite | rho Saison (Median) | Abnahme |
 |---|---|---:|---:|---:|---|
-| Time-Trial | Bahn | 0,929 | 0,072 | 0,902 | bestanden |
+| Time-Trial | Bahn | 0,943 (15.10.-Nachtrag, Stamina-Kalibrierung; Baseline unmittelbar davor 0,923, die alte 0,929 war bereits Dokumentationsrueckstand) | 0,049 | 0,951 | bestanden |
 | Speed-Schach | Buehne | 0,906 | 0,057 | 0,979 | bestanden |
 | Spurt | Bahn | 0,906 | 0,144 | 0,964 | bestanden |
 | Staffel | Bahn | 0,899 | 0,100 | 0,951 | bestanden |
@@ -1436,7 +1489,7 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Hockey | 71 % | 0,725 (Feldspieler) / 0,686 (alle 12), 26.09.-Nachtrag | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Fechten | 48 % | 0,825 (26.09.-Nachtrag) | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf, bewusst NICHT in dieser Runde umgebaut (Puffer 0,016 kleiner als das eigene Kaderrauschen 0,192 — Beobachtungspunkt fuer die naechste Neumessung, s. Sechster Nachtrag) · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · **Nachtrag 07.09.:** Waffenschwung-Pose zeigt jetzt IMMER eine Schwertwaffenebene statt der zufaelligen Kosmetik-Waffe, rho bit-identisch bestaetigt · nicht im echten Spielstand |
 | Tennis | 48 % | 0,821 (26.09.-Nachtrag) | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · nicht im echten Spielstand · **Nachtrag 07.09. (Tennis-eigene Rezeptkalibrierung, s. `battle-mode.engine.js` Kommentar bei `BUEHNE_ART.tennis`):** das Rezept war bis hierher tatsaechlich 1:1 aus dem alten Feldspiel-Rezept uebernommen, nie gegen Tennis' eigene MATRIX gefittet (`docs/pm-briefings/pm-gesamtstand-07-09.md` Abschnitt 6 Punkt 5) — dieselbe Luecke wie bei Gewichtheben/Breaking vor deren NACHGEZOGEN-Korrekturen: TECHNIK (der Rollenkanal mit dem groessten Erfolgs-Koeffizienten) trug determination (Matrixgewicht 6) statt dexterity (12), und PUBLIKUM (der rauschaermste Kanal, reiner Festzuschlag) trug charisma (Matrixgewicht 4, das niedrigste der ganzen Matrix) mit 45 % Rollengewicht statt awareness (20). Nach dem #820-Symmetriefix war Tennis kaderfest bei 0,786 durchgefallen (s. PR #840, Nebenfund); mit der Rezeptkorrektur (nur `rezept`-Attributgewichte geaendert, keine Aenderung an der gemeinsamen Buehnen-Punkteformel) jetzt kaderfest 0,786 -> 0,825 (n=24, Saison 0,846 -> 0,839) — die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen (`node scripts/miss-alle-disziplinen.mjs 24 gewichtheben showcase eiskunstlauf breaking wettessen speed-schach i-spy tennis fechten`). Ein Review-Anlauf hatte AUSDAUER testweise auf stamina:55/spirit:30/determination:15 verschoben (nicht Matrix-proportional: spirit (18) ist in Tennis' Matrix schwerer als stamina (12), die Verschiebung machte stamina aber noch dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der Schranke), AUSDAUER blieb deshalb unveraendert. Aspiratives 0,85-Ziel nicht erreicht — dafuer fehlt der Buehne weiterhin das Sinkhorn-Rezeptwerkzeug aus Recherche-Teil F.2. |
-| Time-Trial | 55 % | 0,929 (26.09.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis · **Nachtrag 04.10.:** J2 Live-Ampel (stille Messpunkte, Kipppunkt-Ticker, Regie) gebaut, bit-identisch; J1 nach Chris' Entscheidung nicht gebaut, s. Sechzehnter Nachtrag |
+| Time-Trial | 55 % | 0,943 (15.10.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis · **Nachtrag 04.10.:** J2 Live-Ampel (stille Messpunkte, Kipppunkt-Ticker, Regie) gebaut, bit-identisch; J1 nach Chris' Entscheidung nicht gebaut, s. Sechzehnter Nachtrag · **Nachtrag 15.10. (Stamina-Kalibrierung, s. Zwanzigster Nachtrag oben):** STEHEN nachgezogen (Climbing-Budget-Methode) — Stamina-Ueberschuss 22.09.-Rezept +8,8/+10,3 Pp (zwei Saatstroeme) → +3,5/+4,2 Pp, Dexterity-Loch -4,4/-4,1 → -0,7/-0,9, rho 0,923 → 0,943 (verbessert, nicht nur gehalten), Saison 0,902 → 0,951 · Isolation gegen die anderen vier Bahn-Disziplinen bestaetigt |
 | Gewichtheben | 70 % | 0,843 (26.09.-Nachtrag) | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 07.09. (kuehner Versuch, `docs/design/gewichtheben-risiko-versuch-recherche-06-09.md`):** freiwilliger Zuschlag ueber das Ausgleichskilo im dritten Versuch, deterministisch aus ANSAGE, mit Verletzungsrisiko bei Misslingen und "Punktesieg"-Auszeichnung bei Gelingen — Belohnung bewusst NICHT in `u.summe`/`u.zweikampf`, sondern reines Ticker-/Boxscore-Ereignis (s. Recherche Abschnitt 2.5). #840 zog die Basislinie nach der #813/#820-Bisektion auf 0,847 zurueck; die frische Neumessung dieser Runde (07.09., an `main` `7a70413e`) bestaetigt seither **0,854** — Bewegung liegt innerhalb der eigenen Kaderrauschen-Spannweite (~0,21) und ist damit nicht von Null unterscheidbar, keine neue Rezeptaenderung. |
 | Climbing | 48 % | 0,814 (26.09.-Nachtrag) | Steigung und Kraftbudget statt Antritt · nach PR 2 (26.09., Griffarten/Balance/Zeitlimit kalibriert) kaderfest wieder bestanden (vorher 0,790, knapp) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,906 (26.09.-Nachtrag) | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld ausser Staffel · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |

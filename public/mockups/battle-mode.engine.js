@@ -38443,7 +38443,30 @@
         ENDTEMPO:   {speed:32,stamina:26,intelligence:24,dexterity:18},
         TECHNIK:    {intelligence:40,dexterity:34,awareness:26},
         WENDIGKEIT: {dexterity:44,awareness:38,speed:18},
-        STEHEN:     {stamina:34,intelligence:26,awareness:32,dexterity:8},
+        // STEHEN NACHGEZOGEN (Stamina-Kalibrierrunde, 15.10., docs/design/
+        // time-trial-sequenzieller-start-pp-zeit-15-10.md Abschnitt 2.5, Ansatzpunkt "dieselbe
+        // Budget-Methode wie bei Climbing 16.09."). STEHEN und ENDTEMPO sind die beiden
+        // STRECKENWEITEN Stamina-Kanaele (mued/KRAFT_VON/leer/pusteRegen lesen u.STEHEN ueber
+        // das GANZE Rennen, s. tempoVon/stepSpurt) — Stamina sass deshalb doppelt und
+        // ueberzeichnete strukturell: Basislinie (messe-arena-einfluss.mjs time-trial 24, zwei
+        // Saatstroeme) Stamina +8,8/+10,3 Pp, der groesste Einzelposten auf JEDEM Strom, bei
+        // Dexterity (Matrix 25, das schwerste Attribut) als groesstem Loch (-4,4/-4,1).
+        // STEHEN war vorher {stamina:34,intelligence:26,awareness:32,dexterity:8} — derselbe
+        // Fehler wie Climbings vorreformiertes STEHEN (ein ueberzeichneter Kanal haelt ein
+        // zonengebundenes Attribut knapp). Zwei Schritte, wie bei Climbing einzeln gemessen:
+        // (1) dexterity 8->24 auf Kosten von stamina 34->18 schloss das Dexterity-Loch fast
+        // vollstaendig (n=24: -4,4 -> -0,1), liess Stamina aber noch bei +5,1 Pp stehen; (2)
+        // ein zusaetzlicher, kleiner Torment-Anteil (Matrix nur 3, aber auf 0,4-0,7 % tot,
+        // weil sein einziger Kanal WUCHT nur in den Berg-Zonen wirkt) auf weitere Kosten von
+        // Stamina (18->10) senkte Stamina auf +3,5/+4,2 Pp — unter die Haelfte des
+        // Ausgangswerts auf BEIDEN Stroemen, ohne Dexterity erneut zu verschieben.
+        // ROBUST/ANTRITT/TECHNIK/WENDIGKEIT/WUCHT/GESPUER unveraendert — ein Hebel (STEHEN),
+        // zwei Messschritte, um Ursache und Wirkung sauber zuzuordnen, exakt wie beim
+        // Climbing-Vorbild. rho je Spiel (kaderfest, n=24) 0,923 -> 0,943 (verbessert, nicht
+        // nur gehalten), Spannweite 0,064 -> 0,049. Isolationsnachweis:
+        // `miss-alle-disziplinen.mjs 24 staffel spurt time-trial takeshis-castle climbing`
+        // — alle vier anderen Bahn-Disziplinen unveraendert (eigene, getrennte rezept-Dicts).
+        STEHEN:     {stamina:10,intelligence:26,awareness:32,dexterity:24,torment:8},
         WUCHT:      {torment:40,dexterity:32,awareness:28},
         ROBUST:     {awareness:30,dexterity:26,stamina:24,intelligence:20},
         // GESPUER: reiner Dexterity/Awareness-Kanal, s. Kommentar bei `gespuerSkill` oben.
