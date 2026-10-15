@@ -1714,3 +1714,89 @@ Ereignisse/Rennen 3,83, 93 % der Rennen mit ≥ 1 Ereignis, Wehr-Erfolgsquote 49
 Heimseite 53,0 % (wandProbe, n=300) — alle vier Werte reproduzieren das Konzeptpapier exakt, kein
 Drift gegenueber dem Stand vom 14.10. `node --check`/`eslint` auf der Engine: 0 neue Fehler/
 Warnungen gegenueber der Basislinie.
+
+## 7. Basketball — Option D (Viertellaenge erneut anheben), 15.10., NICHT umgesetzt
+
+Chris' Antwort auf die Frage aus `docs/design/basketball-tempo-passing-diagnose-14-10.md`
+Abschnitt 5/6: **Option D** — die Viertellaenge erneut anheben, um mehr Tempowechsel/Passspiel/
+Possessions zu bekommen (sein eigentliches Ziel hinter der "Spieler ballen sich zusammen/zu wenig
+Passspiel"-Beschwerde). Ergebnis dieser Runde: **nichts gebaut** — jede getestete Stufe haelt rho
+zwar formal ueber 0,80, aber keine mit einem Puffer, der groesser ist als das Kaderrauschen
+(0,06-0,085) — exakt der Fall, den der Auftrag selbst als "nicht sicher genug" vorgesehen hat.
+
+**Vorab-Befund, der jede weitere Basketball-Zeitrunde betrifft:** `VIERTEL_DAUER_BASKETBALL`
+(`battle-mode.engine.js:7886`) ist fuer die tatsaechlich gespielte Partie **toter Code**. Der
+Code-Kommentar an dieser Stelle (s. `basketball-tempo-passing-diagnose-14-10.md` Abschnitt 3.3)
+nennt sie "DIE EINE Konstante, die Chris gehoert" — das stimmt nicht mehr. Die Live-Simulation
+liest die Viertellaenge ausschliesslich aus `FELDSPIEL_ART.basketball.live.periodenDauer`
+(`:7020`, hartkodiert `90`); `LIVE()` (`:7590`) liefert fuer Basketball nie `null`, also greift
+der `VIERTEL_DAUER_BASKETBALL`-Fallback in `naechsterAngriff()` (`:11299`) nie. Nachgewiesen: eine
+Aenderung von `VIERTEL_DAUER_BASKETBALL` 90→105 allein ergab bit-identisches rho (0,795/0,085,
+n=24) gegen die Baseline — erst das Nachziehen von `periodenDauer` in der `live`-Zeile bewegte
+irgendetwas. Jede kuenftige Runde, die an dieser Stellschraube dreht, muss **beide** Stellen
+aendern, sonst misst sie sich selbst eine wirkungslose Aenderung vor.
+
+**Baseline (90s/Viertel, 360s Gesamt, origin/main, frisch nachgemessen statt nur zitiert):**
+
+| Groesse | Wert |
+|---|---:|
+| rho je Spiel (Median, n=24, Kader-Familie live-save) | 0,795 (Spannweite 0,085) |
+| Pp-Abweichung, Strom 1 / Strom 2 (n=24, Saatversatz 10.000.000) | 33,7 / 35,1 Pp |
+| Possessions/Spiel (Mittel, 10 Saaten) | 72,3 |
+| Paesse/Spiel | 169,9 (2,35/Possession) |
+| Feldwurfversuche/Spiel | 79,6 (1,10/Possession) |
+
+Pp-Zahl deckt sich mit der 14.10.-Diagnose (33,7 Pp) — vorbestehender, von dieser Runde
+unabhaengiger Rezeptzustand (analog Football), nicht Teil dieses Auftrags.
+
+**Drei Stufen (beide Konstanten synchron angehoben, je n=24 fuer rho, 10 Saaten fuer Possessions/
+Paesse/FGA; Pp nur am Endstand als Stichprobe, s.u.):**
+
+| Viertellaenge | Gesamtspielzeit | rho je Spiel (Median) | Spannweite | Marge ueber 0,80 | Possessions | Paesse | FGA |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 90s (Basis) | 360s | 0,795 | 0,085 | −0,005 | 72,3 | 169,9 | 79,6 |
+| 105s | 420s | **0,804** | 0,061 | **+0,004** | 84,7 (+17 %) | 205,3 (+21 %) | 92,0 (+16 %) |
+| 120s | 480s | **0,817** | 0,072 | **+0,017** | 96,2 (+33 %) | 231,1 (+36 %) | 103,3 (+30 %) |
+
+**Pp bei 120s (ein Saatstrom, Sanitycheck):** 31,5 Pp — gegenueber 33,7/35,1 Pp der Baseline nicht
+schlechter, eher leicht besser; bestaetigt die Erwartung, dass eine reine Zeitaenderung die
+Attributgewichtung nicht verschiebt. Kein zweiter Strom gefahren, weil nichts gebaut wird (s.u.) —
+bei einer kuenftigen Umsetzung waere der zweite Strom vor dem Merge Pflicht.
+
+**Lesart.** Der praktische Effekt, den Chris wollte, ist eindeutig da: Possessions, Paesse und
+Feldwurfversuche steigen bei jeder Stufe deutlich und monoton (120s: +33 %/+36 %/+30 % gegenueber
+heute). Die rho-Zahl bewegt sich dabei NICHT in die gefuerchtete Richtung — anders als die alte,
+nicht direkt uebertragbare 180→120s-Gesamtspielzeit-Regression aus der Vor-Viertel-Aera
+(rho 0,785→0,718, s. `basketball-tempo-passing-diagnose-14-10.md` Abschnitt 3.3), steigt rho hier
+mit laengeren Vierteln leicht an (0,795→0,804→0,817) statt zu fallen. Das Risiko "laenger macht
+rho kaputt" bestaetigt sich also nicht.
+
+Trotzdem ist keine der drei Stufen **sicher**: die Marge ueber der 0,80-Schranke (+0,004 bei 105s,
++0,017 bei 120s) bleibt in beiden Faellen kleiner als die Spannweite des Kaderrauschens bei
+UNVERAENDERTER Mechanik (0,06-0,085, gemessen an genau dieser Kader-Familie). Eine Verbesserung,
+die kleiner ist als das Rauschen, ist von Zufall nicht unterscheidbar (`docs/design/
+messgrundlage-kaderfest.md`) — bei 120s koennte die naechste Kader-Ziehung ebenso gut wieder unter
+0,80 fallen. Damit ist auch die hoechste der drei getesteten, moderaten Stufen kein belastbares
+"haelt rho sicher", nur ein "haelt rho im selben knappen Fenster wie heute, eher an dessen guenstigem
+Rand".
+
+**Entscheidung dieser Runde:** nichts committet. `VIERTEL_DAUER_BASKETBALL`/`periodenDauer` bleiben
+bei 90, keine Mechanik-Aenderung in `battle-mode.engine.js`. Grund: der Auftrag verlangte
+ausdruecklich eine Stufe mit **echtem** Puffer ("nicht knapp"), nicht nur eine, die formal ueber
+0,80 liegt — und keine der drei bietet den. Basketballs rho steht ohnehin seit dem 14.10. im
+selben knappen Fenster um 0,79-0,82; eine Zeitaenderung allein hebt es nicht verlaesslich heraus.
+
+**Fuer eine kuenftige Runde:** die Richtung (laenger = mehr Possessions, rho tendenziell nicht
+schlechter) ist jetzt durch drei unabhaengige Messpunkte belegt, nicht nur vermutet. Wer Option D
+spaeter umsetzen will, hat zwei ehrliche Wege: (a) eine groessere Stichprobe (mehr Kader-Varianten
+oder ein zweiter unabhaengiger Kader-Pool) um zu pruefen, ob die Mehrheit der Varianten bei 120s
+wirklich ueber 0,80 bleibt, statt nur der Median einer Familie, oder (b) zuerst Option E (Validitaet
+sichern, s. Diagnose-Dokument Abschnitt 6) fahren, damit die Basislinie selbst einen echten Puffer
+hat, bevor eine Zeitaenderung drauf aufbaut.
+
+Gemessene/geaenderte Dateien dieser Runde: nur dieser Abschnitt (`docs/design/
+stand-aller-disziplinen.md`). `battle-mode.engine.js` wurde fuer die Messung temporaer editiert
+(`VIERTEL_DAUER_BASKETBALL`, `FELDSPIEL_ART.basketball.live.periodenDauer`, sowie ein
+Possession/Pass-Zaehler in `passeAb()`/`naechsterAngriff()` analog zur 14.10.-Runde) und vor dem
+Commit vollstaendig zurueckgesetzt — `git diff` gegen `origin/main` zeigt fuer diese Datei keine
+Aenderung.
