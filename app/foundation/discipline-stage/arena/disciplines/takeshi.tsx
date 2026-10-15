@@ -97,6 +97,60 @@ const FALLEN: { typ: string; label: string }[] = [
 // s. Kopfkommentar) nutzbar, ohne auf den Mess-Pfad (pathRef/getPointAtLength) zu warten.
 const FALLEN_FRACS: number[] = FALLEN.map((_, i) => 0.05 + (i / (FALLEN.length - 1)) * 0.9);
 
+// ---- T-Ü1 Namensschild-Kollisionsvermeidung (Option D, Konzeptpapier 15.10. Abschnitt 3.4) -
+// Das 14.10.-Papier maß selbst: liegen zwei Hauptdarsteller horizontal nah beieinander,
+// überlappen ihre Namensschilder (0,0 → 0,3 Kollisions-Paare/Frame je Messlauf), weil Namen
+// breiter sind als die vorher genutzten reinen Rang-Badges. Reparatur: eine einfache Stapel-/
+// Ausweichlogik auf bereits vorhandenen Positionsdaten (`localTokenPos`, dieselbe Größe wie
+// T-Ü1/T-Ü3 schon nutzen) — kein neuer `rr()`-Aufruf, kein neues Zufalls-/Sim-Feld, kein
+// Einfluss auf `score`/`rank`. Nur WO der bereits gezeigte Name gezeichnet wird, ändert sich.
+//
+// Textbreite wird geschätzt (Zeichenzahl × fester Glyphenbreite für die monospace-Schrift),
+// nicht per DOM-`measureText` gemessen — das wäre nicht deterministisch zwischen SSR/Client/
+// Test und bräuchte ein gemountetes <text>-Element, das es zum Zeitpunkt der Positionsberechnung
+// noch nicht gibt. Für eine Kollisions-SCHÄTZUNG (keine Pixel-genaue Typografie) reicht das.
+export const NAMENSSCHILD_ZEICHENBREITE = 6.3; // ≈ 0,6 × fontSize 10.5 (ui-monospace/Menlo)
+export const NAMENSSCHILD_MINDESTABSTAND = 6; // Mindestlücke zwischen zwei Schildern, px
+export const NAMENSSCHILD_STAPEL_SCHRITT = 13; // vertikaler Versatz je zusätzlicher Stapel-Ebene, px
+
+// Dieselbe Kürzungsregel, die bisher inline im Text-Rendering stand — jetzt EINE Quelle, damit
+// Kollisionsschätzung (Breite) und tatsächlich gezeichneter Text nie auseinanderlaufen.
+export function kuerzeNamensschild(name: string): string {
+  return name.length > 16 ? `${name.slice(0, 15)}…` : name;
+}
+
+export function schaetzeNamensschildBreite(label: string): number {
+  return label.length * NAMENSSCHILD_ZEICHENBREITE;
+}
+
+/**
+ * Weist jedem Hauptdarsteller-Namensschild eine Stapel-EBENE zu (0 = Normalposition neben der
+ * Figur, 1/2/… = je eine Zeile höher). `eintraege` muss bereits in Prioritätsreihenfolge stehen
+ * (Führender zuerst — dieselbe Reihenfolge, in der `leadIdxs` befüllt wird): wer zuerst kommt,
+ * bleibt unten; wer mit einem bereits platzierten Schild horizontal näher läge als die
+ * kombinierte (halbe) Textbreite plus Mindestabstand, weicht eine Ebene höher aus, statt sich
+ * zu überlappen. Rein geometrisch und deterministisch — liest nur x-Positionen und Namenslängen,
+ * schreibt nichts zurück.
+ */
+export function versetzeKollidierendeHauptdarstellerNamen(
+  eintraege: { idx: number; x: number; label: string }[],
+): Map<number, number> {
+  const ebenen = new Map<number, number>();
+  const platziert: { x: number; halbbreite: number; ebene: number }[] = [];
+  for (const e of eintraege) {
+    const halbbreite = schaetzeNamensschildBreite(e.label) / 2;
+    let ebene = 0;
+    for (const p of platziert) {
+      const abstand = Math.abs(e.x - p.x);
+      const mindest = halbbreite + p.halbbreite + NAMENSSCHILD_MINDESTABSTAND;
+      if (abstand < mindest) ebene = Math.max(ebene, p.ebene + 1);
+    }
+    ebenen.set(e.idx, ebene);
+    platziert.push({ x: e.x, halbbreite, ebene });
+  }
+  return ebenen;
+}
+
 type PfadPunkt = Vec2 & { nx: number; ny: number };
 
 export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
@@ -254,6 +308,18 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
   // Wer hat die Burg erreicht (am weitesten vorn jenseits der letzten Falle)?
   const castleArrived = sorted.find((t) => !leadIdxs.has(t.idx) && trackFrac(t) >= 0.98);
   if (castleArrived) leadIdxs.add(castleArrived.idx);
+
+  // Namensschild-Ausweichen (Option D, Konzeptpapier 15.10. Abschnitt 3.4): dieselbe Position
+  // (`localTokenPos`), die auch das Token selbst setzt, liefert hier die x-Koordinate für die
+  // Kollisionsschätzung — `leadIdxs` iteriert bereits in Prioritätsreihenfolge (Führender zuerst),
+  // s. Aufbau oben, also bleibt bei einer Kollision immer der WICHTIGERE Hauptdarsteller unten.
+  const namensschildEintraege = [...leadIdxs].flatMap((idx) => {
+    const t = sorted.find((x) => x.idx === idx);
+    if (!t) return [];
+    const { x } = localTokenPos(t, t.animScore);
+    return [{ idx, x, label: kuerzeNamensschild(t.name) }];
+  });
+  const namensschildEbenen = versetzeKollidierendeHauptdarstellerNamen(namensschildEintraege);
 
   // T-Ü3 Streckenband — Geometrie der geraden Übersichtslinie (s. Kopfkommentar).
   const bandX0 = 56;
@@ -625,11 +691,15 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
                 hier noetig (s. Kommentar `showBadge` in benchmark.tsx). */}
             <TokenChrome t={t} prim={prim} geo={geo} trioSet={trioSet} hoverIdx={hoverIdx} reducedMotion={reducedMotion} radius={chromeRadius} />
             {/* Hauptdarsteller-Namensschriftzug (T-Ü1) — dauerhaft, nicht nur bei Hover,
-                klar oberhalb von Pokal(-(r+9))/Rel-Label(-(r+7))/Rang-Badge(r+13) platziert. */}
+                klar oberhalb von Pokal(-(r+9))/Rel-Label(-(r+7))/Rang-Badge(r+13) platziert.
+                Option D (15.10.): liegt ein weiteres Hauptdarsteller-Schild zu nah daneben
+                (`namensschildEbenen`), wandert dieses hier um je eine Stapel-Ebene höher,
+                statt sich mit dem Nachbarschild zu überlappen. */}
             {isLead ? (
               <text
                 data-testid="hauptdarsteller-name"
-                y={-(r + 22)}
+                data-namensschild-ebene={namensschildEbenen.get(t.idx) ?? 0}
+                y={-(r + 22 + (namensschildEbenen.get(t.idx) ?? 0) * NAMENSSCHILD_STAPEL_SCHRITT)}
                 textAnchor="middle"
                 fontFamily="ui-monospace,Menlo,monospace"
                 fontSize={10.5}
@@ -639,7 +709,7 @@ export default function TakeshiField(props: DisciplineFieldProps): ReactNode {
                 strokeWidth={2.6}
                 paintOrder="stroke"
               >
-                {t.name.length > 16 ? `${t.name.slice(0, 15)}…` : t.name}
+                {kuerzeNamensschild(t.name)}
               </text>
             ) : null}
           </g>
