@@ -497,6 +497,59 @@
     cctx.beginPath();cctx.moveTo(griffX,griffY);cctx.lineTo(klingeX,klingeY);cctx.stroke();
   }
 
+  // RING-/VOID-GESICHT-REQUISITE (16.10., Sprite-Fit-Zweistern-Runde A, Lady Mournvale:
+  // Portrait zeigt eine viktorianisch gekleidete Frau OHNE Gesicht — an dessen Stelle ein
+  // elfenbeinfarbener, geriffelter Ring sitzt, durch den nur vollkommene Schwaerze zu sehen
+  // ist, s. public/portraits/lady-mournvale.jpg) — FUENFTE Requisite nach demselben Muster
+  // wie Kamera/Zwiebel/Becher/Kuchen oben: kein Sprite im Baukasten zeigt ein leeres
+  // Ring-Gesicht (strukturelle Grenze, ausdruecklich im Auftrag als moeglicher Fall
+  // benannt), rein aus Formen. Blickdicht wie Zwiebel/Kuchen (der Ring ERSETZT das Gesicht
+  // komplett, kein durchscheinendes Material wie beim Becher). Drei konzentrische Rillen
+  // naehern die geriffelte Metall-/Knochenstruktur aus dem Bild an, der schwarze Kern in
+  // der Mitte ist die namensgebende Leere.
+  function zeichneRinggesicht(cctx,cx,cy,s){
+    const rx=8.5*s, ry=9.5*s;
+    cctx.fillStyle="#d9cdb0";
+    cctx.beginPath();cctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);cctx.fill();
+    cctx.strokeStyle="#a8966a";cctx.lineWidth=Math.max(0.6,0.5*s);
+    for(const f of [0.88,0.68,0.5]){
+      cctx.beginPath();cctx.ellipse(cx,cy,rx*f,ry*f,0,0,Math.PI*2);cctx.stroke();
+    }
+    cctx.fillStyle="#070509";
+    cctx.beginPath();cctx.ellipse(cx,cy,rx*0.38,ry*0.42,0,0,Math.PI*2);cctx.fill();
+  }
+
+  // UEBERGROSSER PUPPENKOPF-REQUISITE (16.10., Sprite-Fit-Zweistern-Runde A, Lys
+  // Puppenkopf: Portrait zeigt ein kleines Maedchen, ueber dem ein riesiger, bleicher,
+  // rissiger Puppenkopf mit hohlen dunklen Augen schwebt, aus denen dunkle Traenenspuren
+  // laufen, s. public/portraits/lys-puppenkopf.jpg) — SECHSTE Requisite nach demselben
+  // Muster: kein Sprite im Baukasten zeigt einen uebergrossen Puppenkopf (strukturelle
+  // Grenze, ausdruecklich im Auftrag als moeglicher Fall benannt), rein aus Formen. Anders
+  // als Zwiebel/Kuchen/Ring bewusst GROESSER als die anderen Kopf-Requisiten (rx/ry ueber
+  // dem normalen Kopfmass), weil das genau der Bildbefund ist ("der Kopf ist groesser als
+  // der Koerper") — blickdicht, ersetzt den Kopf komplett. Zwei hohle Augenhoehlen mit
+  // jeweils einer dunklen Tropflinie nach unten (die "tropfenden Augen"), duenne Risslinien
+  // im bleichen Porzellanton, ein kleiner geschlossener Mund.
+  function zeichnePuppenKopf(cctx,cx,cy,s){
+    const rx=11*s, ry=12*s;
+    cctx.fillStyle="#ece3d6";
+    cctx.beginPath();cctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);cctx.fill();
+    cctx.strokeStyle="#b7a898";cctx.lineWidth=Math.max(0.5,0.4*s);
+    cctx.beginPath();cctx.moveTo(cx-rx*0.3,cy-ry*0.7);cctx.lineTo(cx-rx*0.1,cy-ry*0.1);cctx.stroke();
+    cctx.beginPath();cctx.moveTo(cx+rx*0.5,cy-ry*0.3);cctx.lineTo(cx+rx*0.3,cy+ry*0.3);cctx.stroke();
+    const ey=cy-ry*0.1, eoff=rx*0.33;
+    for(const seite of [-1,1]){
+      const ex=cx+seite*eoff;
+      cctx.fillStyle="#1a1410";
+      cctx.beginPath();cctx.ellipse(ex,ey,rx*0.18,ry*0.22,0,0,Math.PI*2);cctx.fill();
+      cctx.strokeStyle="#241c14";cctx.lineWidth=Math.max(0.8,0.6*s);
+      cctx.beginPath();cctx.moveTo(ex,ey+ry*0.2);cctx.lineTo(ex,cy+ry*1.6);cctx.stroke();
+      cctx.beginPath();cctx.arc(ex,cy+ry*1.6,Math.max(0.8,0.7*s),0,Math.PI*2);cctx.fillStyle="#241c14";cctx.fill();
+    }
+    cctx.strokeStyle="#8a6a5a";cctx.lineWidth=Math.max(0.6,0.5*s);
+    cctx.beginPath();cctx.moveTo(cx-rx*0.18,cy+ry*0.55);cctx.lineTo(cx+rx*0.18,cy+ry*0.55);cctx.stroke();
+  }
+
   // HOCKEYSCHLAEGER (02.09., Chris: "Hockeyschlaeger in die Haende der Figuren"). Reine
   // Zeichenfunktion, dieselbe Idee wie zeichneKameraKopf/zeichneReiherMech oben: kein
   // Sprite-Layer, sondern Formen aus Canvas-Befehlen, aus denselben zwei Gruenden — kein
@@ -1549,7 +1602,16 @@
     // noetigen Kontrast zur hellen Haut hat. effekt:"feuer" am Kopf (s. EFFEKT_ARTEN,
     // bereits bei Gram verwendet) NEU ergaenzt als Naeherung an den feuerspeienden
     // Geisterdrachen im Hintergrund des Portraits.
-    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel",schild:true,effekt:{typ:"feuer",pos:"kopf",streuung:2,hoehe:[38,28]}},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Sprite-Fit-Bewertung bemaengelte
+    // trotz Helm+Hoerner+Axt+Schild+Kopf-Feuereffekt weiterhin einen "wie ein Roboter-Visier"
+    // wirkenden Kopf und eine nicht erkennbar "stachelige schwarze Ruestung" (s.
+    // public/portraits/draco.jpg: geborstene schwarze Platten mit sichtbaren Gluehrissen vor
+    // Feuerhintergrund). gluehenderRiss:true (bereits bei Lava Golem/Gram/Burster verwendet,
+    // s. EFFEKT_ARTEN/Kommentar dort) NEU ergaenzt: zieht die rot gluehende Rissader quer
+    // ueber den Torso, die dieselbe "aus brennendem Gestein geborstene" Textur andeutet wie
+    // beim Drachen im Hintergrund — unterscheidet die Ruestung jetzt sichtbar von einem
+    // glatten Metall-/Roboter-Visier, ohne eine neue Ebene anzulegen.
+    "Draco":              {kopf:"human",haut:"light",ruest:"plate",helm:true,hoerner:true,waffe:"axt",ruestTon:"dunkel",schild:true,effekt:{typ:"feuer",pos:"kopf",streuung:2,hoehe:[38,28]},gluehenderRiss:true},
     // Bild: gehoernter, unbewaffneter Feuer-/Lavakoloss mit geborstener Magmahaut, kaempft
     // mit blossen Faeusten. Frueher "orc" als Kopf-Naeherung (der animierbare Baukasten kennt
     // keinen Lavakoloss-Kopf) — 24.08. ECHTES Vollbild nachgezogen: public/sprites/monster/
@@ -1827,7 +1889,17 @@
     "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"dark_brown"},
     // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
     // schwebende Faeden mit erhobenen Haenden.
-    "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder_frau",geschlecht:"w"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt eine Telepathin
+    // mit einem DURCHSICHTIGEN Glaskolben ueber dem Kopf, darin ein leuchtendes Gehirn, dazu
+    // Blitz-/Energie-Faeden, die aus ihrer erhobenen Hand laufen (s.
+    // public/portraits/mindtamer.jpg). helm:true zeichnete bislang einen UNDURCHSICHTIGEN
+    // grauen Ritterhelm — das genaue Gegenteil eines glaesernen Kolbens, s. Sprite-Fit-
+    // Bewertung. helm entfernt (kein Glasgefaess-Primitiv im Baukasten, aber ein blickdichtes
+    // Metallvisier war die FALSCHE Richtung, nicht nur eine ungenaue Naeherung). Stattdessen
+    // effekt:{typ:"arkan",pos:"kopf"} (funkelndes Violett/Pink/Gold, s. EFFEKT_ARTEN) als
+    // Naeherung an das leuchtende Gehirn/die Energie-Faeden direkt am Kopf, wo im Bild der
+    // Glaskolben sitzt. haut "lavender" (blass lila) bleibt fuer den psionischen Hautton.
+    "Mindtamer":          {kopf:"human",haut:"lavender",ruest:"leder_frau",geschlecht:"w",effekt:{typ:"arkan",pos:"kopf"}},
     // Bild: kleines freundliches Wesen aus Rinde und Moos, keine Waffe, keine Ruestung —
     // bloss der Hautton uebernimmt das Gruen.
     // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/tsubaki-cleaning.jpg) zeigt
@@ -1927,7 +1999,22 @@
     // Piratenschiffs natuerlichem Holz, damit die beiden Schiffscharaktere trotz
     // gemeinsamer Bildquelle nicht identisch aussehen — kein perfekter Ersatz fuer
     // "Kranarme"/"Antriebsduesen", aber naeher dran als der vorherige Orc.
-    "Aegirion":           {vollbild:"schiff_pirat",vollbildFarbe:"#6b4a2f"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Sprite-Fit-Bewertung bemaengelte
+    // den warmen Holzbraunton und die fehlende Rost-/Industrie-Anmutung des Portraits
+    // (riesiges rostiges Frachtschiff mit Schornsteinen/Kranarmen, schwebt auf gluehenden
+    // Antriebsduesen, s. public/portraits/aegirion.jpg und quellen.json-Recherche oben: KEIN
+    // besseres Schiffs-Asset existiert trotz ausfuehrlicher Suche — "pirat_schiff.png" bleibt
+    // der einzige real lizenzierte Kandidat, Regel "unvollstaendige Naeherung schlaegt
+    // keinen Fix"). vollbildFarbe von warmem Holzbraun (#6b4a2f) auf kuehles, verwittertes
+    // Rost-/Stahlgrau (#4a4139) umgestellt — naeher am "rostigen Industrieschiff" als am
+    // "hoelzernen Piratenschiff". effekt:{typ:"feuer",pos:"koerper"} NEU ergaenzt fuer Rauch/
+    // Gluehen aus Schornsteinen und Antriebsduesen (dieselbe Palette, die sonst fuer Feuer/
+    // Glut steht, hier als Annaeherung an Rauch+gluehende Duesen), gluehenderRiss:true fuer
+    // einen zusaetzlichen gluehenden Riss ueber den Rumpf (Naeherung an die im Bild sichtbaren
+    // gluehenden Rohr-/Kabelverbindungen). Totenkopf-Segel/Kapitaensfigur aus dem Rohblatt
+    // bleiben unveraendert sichtbar (keine Moeglichkeit, Teile eines Standbilds auszublenden)
+    // — dokumentierte Luecke, s. Sprite-Fit-Bewertung.
+    "Aegirion":           {vollbild:"schiff_pirat",vollbildFarbe:"#4a4139",effekt:{typ:"feuer",pos:"koerper"},gluehenderRiss:true},
     // Bild: elfische Zauberin, schwarz-goldene Robe, Kristallstab, goldene
     // Sternzeichen-Ringe. Kein Stab im animierbaren Satz (nur B_FIGUR kennt t_stab);
     // "leder" vertritt die Robe.
@@ -2317,7 +2404,17 @@
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
     "Emphi":              {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"raven",geschlecht:"w",waffe:"stab"},
-    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"raven",ruestTon:"dunkel"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt eine viktorianisch
+    // gekleidete Frau OHNE Gesicht — an dessen Stelle ein geriffelter elfenbeinfarbener Ring
+    // sitzt, durch den nur Schwaerze zu sehen ist (s. public/portraits/lady-mournvale.jpg).
+    // Genau das namensgebende, komplett praegende Merkmal fehlte bisher komplett (gewoehnliches
+    // Gesicht) — strukturelle Grenze wie im Auftrag vermerkt: kein Sprite im Baukasten zeigt
+    // ein leeres Ring-Gesicht. ringgesicht:true (zeichneRinggesicht, s. Kommentar dort) ERSETZT
+    // den Kopf prozedural, nach demselben Muster wie Byrnjas kuchenkopf/Byrds zwiebelkopf.
+    // Dunkle Robe (ruest "leder_frau"/"dunkel") und dunkles Haar (haarTon "raven") bleiben
+    // unveraendert, da bereits passend (Bewertung: "dunkle Kleidung passt zur viktorianischen
+    // Robe").
+    "Lady Mournvale":     {kopf:"human",haut:"light",ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"raven",ruestTon:"dunkel",ringgesicht:true},
     // 26.08., NEU: koerper:"zombie" ergaenzt (koerper_zombie_*, s. quellen.json) — derselbe
     // Menschenkoerper-Fehler unter dem verifizierten Zombie-Kopf wie bei Bloater/Burster.
     // haut gestrichen: das Blatt traegt seine eigene Verwesungsfarbe. haar/haarTon (bereits
@@ -2376,7 +2473,19 @@
     // Koepfe), Wolf bleibt die naechstliegende Raubtier-Silhouette. haut von "fur_grey" auf
     // "fur_white" (existiert als Rampe, s. HAUT) — trifft den WEISSEN Kopf des Adlers
     // deutlich naeher als Grau.
-    "Falcon":             {kopf:"wolf",haut:"fur_white",ruest:"plate",ruestTon:"dunkel"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): FUND beim erneuten Pruefen —
+    // "fur_white" ist entgegen dem Kommentar oben ("existiert als Rampe, s. HAUT") GAR KEINE
+    // gueltige HAUT-Rampe (die vollstaendige Liste, s. const HAUT oben, kennt nur light/green/
+    // bright_green/dark_green/blue/olive/brown/fur_grey/fur_brown/lavender/black/amber/pink).
+    // faerbe() faellt bei einem unbekannten Ton auf das UNGEFAERBTE Originalbild zurueck (s.
+    // Kommentar bei faerbe()) — der 13.10.-Fix war dadurch ein stiller No-Op, der Wolfskopf
+    // blieb in seiner dunklen Originalfarbe statt weiss zu werden, was die Sprite-Fit-
+    // Bewertung weiterhin zu Recht bemaengelte. Echter Fix: "fur_grey" (existiert, hellstes
+    // Rampenende #B8BBBC, ein helles Grauweiss) statt des nicht-existenten "fur_white" — trifft
+    // den WEISSEN/hellen Adlerkopf jetzt tatsaechlich an, nicht nur dem Namen nach. kopf bleibt
+    // "wolf" (kein Vogel-/Schnabelkopf im Baukasten vorhanden, s. Kommentar unten bei der
+    // vollstaendigen Kopf-Liste) — dokumentierte Baukasten-Luecke, keine Einzelfall-Schwaeche.
+    "Falcon":             {kopf:"wolf",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel"},
     // Bild: fotorealistische TAUBE mit einer kaputten/verwitterten Ueberwachungskamera ALS
     // KOPF (schwarzes Kameragehaeuse, tropft Fluessigkeit). Der bisherige Bauplan (grauer
     // Alien-Humanoid) hatte damit nichts zu tun — 1-Stern-Fall, s. sprite-fit-bewertung.json.
@@ -2439,7 +2548,20 @@
     // bei b.fluegel/Brobot oben). NEU effekt:"gift" (gruen wabernd, bereits bei Bloater
     // fuer gruenen Biolumineszenz-Schein verwendet, s. EFFEKT_ARTEN) fuer die gruen
     // leuchtenden Augen/den bedrohlichen Bio-Schein — bislang kein Effekt gesetzt.
-    "Harbinger":          {kopf:"alien",haut:"black",ruest:"plate",ruestTon:"dunkel",fluegel:true,waffe:"pistole",effekt:{typ:"gift",pos:"koerper"}},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Sprite-Fit-Bewertung bemaengelte
+    // einen "kleinen braunen Fledermaus-Imp" statt eines bedrohlichen Alien-Soeldners (s.
+    // public/portraits/harbinger.jpg: breitschultriger dunkler bio-mechanischer Panzer, gruen
+    // leuchtende Augen, Pistole + leuchtend blaue Energieklinge). FUND: haut "black" (Rampe
+    // #000000->#7F4C31, s. const HAUT oben) endet am hellen Ende in einem warmen BRAUNTON, nicht
+    // in Schwarz/Grau — genau dieser helle Braun-Abschluss faerbt die Glanzlichter am Alien-Kopf
+    // und erzeugt den "brauner Imp"-Eindruck. "fur_grey" (Rampe bis #B8BBBC, neutrales Grauweiss
+    // ohne Braunstich) trifft eine dunkle bio-mechanische Panzerung naeher. effekt von pos
+    // "koerper" auf "kopf" verschoben, damit der gruene "gift"-Schimmer (s. EFFEKT_ARTEN) sich
+    // auf die gruen leuchtenden Augen konzentriert statt sich ueber die ganze Silhouette zu
+    // verteilen. skala:1.1 fuer die im Bild breitere, bedrohlichere Statur. Die zweite Waffe
+    // (Energieklinge) bleibt unrepresentiert — ein b.waffe-Feld kennt nur eine Waffe, keine
+    // zweite Nahkampfwaffe gleichzeitig zur Feuerwaffe, dokumentierte Luecke.
+    "Harbinger":          {kopf:"alien",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",fluegel:true,waffe:"pistole",effekt:{typ:"gift",pos:"kopf"},skala:1.1},
     // War byte-identisch mit Babuschinka/Dr Ironmind/Gralakar (s. sprite-fit-ergebnisse.md);
     // von den vieren ist Bana die einzige, deren Bild (gelbe Kapuzen-Streetwear) zum
     // gemeinsamen Kapuzen-Bauplan ueberhaupt passt (bereits ★★★, s. sprite-fit-bewertung.json)
@@ -2498,7 +2620,16 @@
     // s. Kommentar oben) — nur die Requisiten (Kreuz/Stethoskop/Tasche) und die Kopf-Silhouette
     // bleiben strukturelle Luecken, kein Einzelfehler mehr auf einer Korrektur zu buendeln.
     "Medibull":           {kopf:"minotaur",haut:"brown",ruest:"leder",ruestTon:"dunkel"},
-    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt ein kleines
+    // Maedchen in dunkelblauem Kleid, ueber dem ein riesiger, bleicher, rissiger Puppenkopf
+    // mit tropfenden dunklen Augen schwebt (s. public/portraits/lys-puppenkopf.jpg). Genau
+    // das namensgebende, komplett praegende Merkmal fehlte bisher komplett (gewoehnlicher
+    // menschlicher Kopf) — strukturelle Grenze wie im Auftrag vermerkt: kein Sprite im
+    // Baukasten zeigt einen uebergrossen Puppenkopf. puppenkopf:true (zeichnePuppenKopf, s.
+    // Kommentar dort) ERSETZT den Kopf prozedural, nach demselben Muster wie Byrnjas
+    // kuchenkopf. ruestTon "violett" NEU (kuehler Blau-Violett-Ton, s. RUEST_TON) statt des
+    // Standard-Lederbrauns, naeher am dunkelblauen Kleid als unveraendertes Leder.
+    "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w",ruestTon:"violett",puppenkopf:true},
     // Sprite-Fit-Nachlieferung Batch B (16.10.), geprueft und UNVERAENDERT gelassen: Portrait
     // zeigt eine Augenbinde und zwei gefuehrte Dolche (s. public/portraits/phantomblade.jpg).
     // waffe:"schwert" ist bereits die im Projekt etablierte Naeherung fuer Dolche (kein
@@ -2515,7 +2646,19 @@
     // eindeutig sichtbare Axt, bislang das falsche Waffenbild. UNVOLLSTAENDIGE NAEHERUNG:
     // kein Pelzumhang-Layer und kein Begleiter-/Haustier-Slot im Baukasten (beide bleiben
     // offen, kein Requisiten-Aequivalent vorhanden).
-    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"sandy",geschlecht:"w",waffe:"axt"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Sprite-Fit-Bewertung bemaengelte
+    // eine "gewoehnliche Dorfbewohnerin" statt einer winterlichen Wikinger-Kriegerin (s.
+    // public/portraits/brunhilde.jpg: weisser Pelzumhang/-kapuze, Lederruestung mit bronzenen
+    // Rundbeschlaegen, Kriegsaxt, weisser Wolfsbegleiter, Schneelandschaft). waffe "axt" war
+    // bereits korrekt gesetzt (s. unten, Kriegsaxt). NEU: kapuze:true als Naeherung an den
+    // Pelzumhang/die Pelzkapuze (keine eigene Pelz-Ebene im Baukasten — kapuze ist die
+    // naechstliegende Kopfbedeckungs-Ebene), ruestTon "bronze" fuer die bronzenen Rundbeschlaege/
+    // Medaillons auf der Lederruestung (statt natuerlichem Lederbraun), haarTon von "sandy" auf
+    // "white" (helles Silberblond statt sandfarben, naeher am Portrait) und
+    // effekt:{typ:"frost",pos:"koerper"} fuer die eisig-winterliche Umgebung (hellblaue
+    // schwebende Kristalle, s. EFFEKT_ARTEN.frost). Der weisse Wolfsbegleiter bleibt
+    // unrepresentiert — kein Begleittier-System im Baukasten, dokumentierte Luecke.
+    "Brunhilde":          {kopf:"human",haut:"light",ruest:"leder_frau",kapuze:true,haar:"haar_lang",haarTon:"white",geschlecht:"w",waffe:"axt",ruestTon:"bronze",effekt:{typ:"frost",pos:"koerper"}},
     // 26.08., NEU: kopf:"skeleton" sass bislang auf dem normalen Menschenkoerper, dazu
     // haut:"olive" — ein Skelett hat keinen Hautton, den olive faerbte da nichts sinnvoll um.
     // Jetzt koerper:"skelett" (koerper_skelett_*, s. quellen.json) fuer einen durchgehenden
@@ -2608,7 +2751,19 @@
     // s. oben/Brobot) — naehert den violetten Metallton an. effekt:"arkan" (lila-rosa-gold
     // funkelnd, s. EFFEKT_ARTEN) ergaenzt fuer die leuchtenden Kabel/Fugen-Akzente.
     "Ciacia":             {kopf:"wolf",haut:"fur_grey",ruest:"plate_frau",hose:"beine_frau",ruestTon:"violett",geschlecht:"w",ohren:"katze",schwanz:"katze",effekt:{typ:"arkan",pos:"koerper"}},
-    "Kento":              {kopf:"human",haut:"light",kapuze:true,ruest:"leder",waffe:"schwert",ruestTon:"dunkel"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Sprite-Fit-Bewertung bemaengelte
+    // eine helle statt schwarze Kapuze (s. public/portraits/kento.jpg: durchgehend schwarz
+    // maskierter Ninja). FUND: b.kapuze wird in zeichneSprite/der Kader-Ikone OHNE Ton-
+    // Argument gezeichnet (zeichne("kapuze_"+ani,64,0,0,null) bzw. setz("kapuze_walk",null))
+    // — anders als b.helm (zeichneR(...,b.ruestTon)) wird die Kapuze NIE eingefaerbt und
+    // bleibt immer beim hellen Rohton des Blatts, unabhaengig von ruestTon. Das ist eine
+    // strukturelle Engine-Luecke (betrifft jede Figur mit kapuze:true), keine fuer Kento
+    // behebbare Ein-Zeilen-Korrektur am Rezept. Naeherung: kapuze gegen helm getauscht —
+    // helm_* WIRD ueber ruestTon eingefaerbt und deckt den ganzen Kopf blickdicht ab (passender
+    // Ersatz fuer "durchgehend schwarz maskiert" als eine ungefaerbte helle Kapuze). ruestTon
+    // "dunkel" bleibt fuer die komplett schwarze Lederruestung+den jetzt ebenfalls schwarzen
+    // Kopf.
+    "Kento":              {kopf:"human",haut:"light",helm:true,ruest:"leder",waffe:"schwert",ruestTon:"dunkel"},
     // Bild: gefluegelte Lichtgestalt, haelt einen langen goldenen Stab mit rundem
     // Sigill/Halo-Kopf in der rechten Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
@@ -3035,7 +3190,23 @@
     // public/portraits/crumbsage.jpg). effekt:"frost" (helles Eisblau/Weiss, s.
     // EFFEKT_ARTEN) ergaenzt fuer den blau-weissen Energie-Schein — naechstliegende
     // verfuegbare Palette zum "weiss gluehenden Augen/blauer Wirbel"-Bildbefund.
-    "Crumbsage":          {kopf:"orc",haut:"brown",effekt:{typ:"frost",pos:"koerper"}},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt einen humanoiden
+    // Golem aus gestapelten Keksen/Keksboeden mit gluehend weissen Augenhoehlen, schwebenden
+    // Keks-/Lichtkugeln und funkelnden Energieboegen (s. public/portraits/crumbsage.jpg).
+    // kopf:"orc" lieferte nur einen braeunlichen Humanoid-Kopf ohne jede Keks-/Golem-Form,
+    // UND effekt "frost" (hellblau/eisig) widersprach der warmen, goldbraunen Bildstimmung
+    // komplett. Jetzt vollbild:"golem" (dieselbe massige, blockige Koerperform, die schon bei
+    // Lava Golem/Krolach/Rhyx'Tal die "Koloss aus gestapeltem Material"-Silhouette traegt) mit
+    // vollbildFarbe "#b9793f" (warmer Keksteig-Goldbraun statt des Rohblatts) statt eines
+    // Humanoiden. energiekern:true (rote/orange gluehende Augen+Brustkern, s. Kommentar bei
+    // Krolach) naehert die gluehend weissen Augenhoehlen an (keine weisse Variante verfuegbar,
+    // naechstliegende vorhandene Glueh-Palette). effekt von "frost" auf
+    // {typ:"arkan",pos:"koerper"} (funkelndes Violett/Pink/Gold, "das haerteste, 'funkelndste'
+    // der Bewegungsmuster", s. EFFEKT_ARTEN.arkan) umgestellt — trifft die schwebenden
+    // Lichtkugeln/Energieboegen im Bild deutlich naeher als ein Frost-Schimmer. Schokostueckchen/
+    // gestapelte Keks-Textur bleiben unrepresentiert (kein Textur-Layer im Baukasten dafuer),
+    // dokumentierte Luecke.
+    "Crumbsage":          {vollbild:"golem",vollbildFarbe:"#b9793f",effekt:{typ:"arkan",pos:"koerper"},energiekern:true},
     "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
     // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/steel-sinister.jpg) zeigt
     // GESCHWUNGENE Hoerner am Helm, nicht die geraden Standardhoerner — hoerner von true auf
@@ -3055,11 +3226,41 @@
     // Hoerner). NEU effekt:{typ:"feuer",pos:"koerper"} (orange, s. EFFEKT_ARTEN) als
     // Naeherung an die gluehend-orangenen Energie-Adern/-Kugeln — kein zusaetzlicher Arm-
     // Layer verfuegbar (sechsarmig ist strukturell ausserhalb des Baukastens).
-    "Eldara":             {kopf:"human",haut:"light",hoerner:true,geschlecht:"w",ruest:"leder_frau",effekt:{typ:"feuer",pos:"koerper"}},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt einen bipedalen
+    // Natur-Elementar aus heller Rinden-/Birkenholz-Textur, mit einem dritten Auge auf der
+    // Stirn, einer Geweih-Kronen aus Zweigen mit Kirschblueten und warm golden gluehenden
+    // Gelenk-/Brust-Rissen (s. public/portraits/eldara.jpg). ruest "leder_frau" verdeckte den
+    // Koerper komplett mit normaler Lederruestung statt der freiliegenden Rinden-Textur —
+    // entfernt, damit der Hautton den ganzen sichtbaren Koerper traegt. haut dabei von
+    // "light" auf "brown" umgestellt (Testrender bestaetigt: "light" liess auch die Hoerner
+    // in nahezu derselben blassen Tonung verschwinden, b.hoerner wird ueber b.haut eingefaerbt
+    // -- "brown" gibt sowohl dem Koerper einen holzig-rindenartigen Ton ALS AUCH den Hoernern
+    // sichtbaren Kontrast). hoerner:true bleibt als Geweih-Krone-Naeherung. effekt von "feuer"
+    // (flackerndes Orange, falsches Bewegungsmuster fuer ruhig gluehende Astadern) auf
+    // {typ:"heilig",pos:"kopf",streuung:9} umgestellt — "heilig"/modus "strahlend" zeichnet laut
+    // eigener Implementierung (zeichnePartikelEffekt) einen Ring NAHE DER KOPFOBERKANTE
+    // (bottomY), nicht ueber die Koerperflaeche verteilt wie die anderen Muster — pos "koerper"
+    // waere fuer diesen Modus unbrauchbar platziert (renderProbe-Testrender bestaetigt), pos
+    // "kopf" (wie bei jedem bisherigen heilig-Nutzer: Inefinna/Enforcer/Elyon/Xylaris/Sister
+    // Ilora) liefert den sichtbaren, ruhig atmenden Goldschein als Naeherung an die goldenen
+    // Astadern/das dritte Auge.
+    // Drittes Auge/sechs Baumstamm-Arme bleiben unrepresentiert (kein Mehrarm-/Stirnaugen-
+    // Layer im Baukasten), dokumentierte Luecke.
+    "Eldara":             {kopf:"human",haut:"brown",hoerner:true,geschlecht:"w",effekt:{typ:"heilig",pos:"kopf",streuung:9}},
     // Bild: "mehrere Wurfmesser quer ueber der Brust gegürtet" — kein Schwertkampf, keine
     // geführte Klinge (Bildbefund). 25.08.: waffe:"schwert" gestrichen statt durch eine
     // falsche Waffe ersetzt — eine Wurfklingen-Ebene existiert im Baukasten nicht.
-    "Lucky":              {kopf:"human",haut:"light",haar:"haar_mop",haarTon:"dark_brown",ruest:"leder"},
+    // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt einen Gluecksspieler/
+    // Dieb in SCHWARZER Lederjacke mit Wurfmesser-Bandolieren und einer Handvoll Muenzen (s.
+    // public/portraits/lucky.jpg). ruest "leder" stand bisher ohne ruestTon — lieferte die
+    // natuerliche braune Lederrampe statt Schwarz. NEU: ruestTon "dunkel" fuer die schwarze
+    // Lederjacke. Kein waffe-Feld gesetzt (bewusst, nicht vergessen): die verfuegbaren
+    // Nahkampfwaffen (schwert/axt/zweihaender/stab) sind alle grosse, sichtbar gefuehrte
+    // Hiebwaffen — ein Langschwert in der Hand wuerde den Wurfmesser-/Taschendieb-Charakter
+    // aktiv VERFAELSCHEN, keine Naeherung an Wurfmesser oder Muenzen darstellen. Bandoliere/
+    // Muenzen bleiben unrepresentiert (kein Requisiten-Layer im Baukasten dafuer, und kein
+    // passendes Wurfmesser unter den vier Nahkampfwaffen), dokumentierte Luecke.
+    "Lucky":              {kopf:"human",haut:"light",haar:"haar_mop",haarTon:"dark_brown",ruest:"leder",ruestTon:"dunkel"},
     // Bild: gehoernter Fels-/Lavakoloss mit gluehenden Rissen, muskulose Steinsilhouette,
     // unbewaffnet — praktisch dasselbe Motiv wie Lava Golem. Frueher orc+amber als Naeherung
     // (keine Ruestung, kein Kopftyp trifft die Fels-Silhouette) — 24.08. ECHTES Vollbild wie
@@ -5574,6 +5775,10 @@
       // Kuchen-Requisite (Byrnja, s. zeichneKuchenKopf-Kommentar oben) — ersetzt den Kopf
       // wie der Zwiebelkopf, gleiche cy-Naeherung.
       if(b.kuchenkopf)zeichneKuchenKopf(ctx,x,y-30*Z,Z);
+      // Ring-/Void-Gesicht (Lady Mournvale) und uebergrosser Puppenkopf (Lys Puppenkopf,
+      // s. beide Kommentare oben) — gleiche cy-Naeherung wie Zwiebel/Eimer/Kuchen.
+      if(b.ringgesicht)zeichneRinggesicht(ctx,x,y-30*Z,Z);
+      if(b.puppenkopf)zeichnePuppenKopf(ctx,x,y-30*Z,Z);
     }
     if(b.schwanz==="katze")zeichne("katzenschwanzfg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
@@ -32411,6 +32616,10 @@
       if(b.zwiebelkopf)zeichneZwiebelKopf(x,20,12.5,0.78);
       if(b.eimerkopf)zeichneEimerKopf(x,20,12.5,0.78);
       if(b.kuchenkopf)zeichneKuchenKopf(x,20,12.5,0.78);
+      // Ring-/Void-Gesicht und Puppenkopf auch in der Kader-/Board-Ikone (s. Kommentare in
+      // zeichneSprite), gleiche Umrechnung wie Zwiebel/Eimer/Kuchen.
+      if(b.ringgesicht)zeichneRinggesicht(x,20,12.5,0.78);
+      if(b.puppenkopf)zeichnePuppenKopf(x,20,12.5,0.78);
       if(b.schwanz==="katze")setz("katzenschwanzfg_walk",null);
       else if(b.schwanz)setz("schwanzfg_walk",b.haut);
       // BOGEN — anders als alle anderen Waffen NICHT Spalte 0. bogen_shoot hat 13 Spalten,

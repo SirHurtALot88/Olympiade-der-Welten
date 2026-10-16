@@ -9,9 +9,9 @@
  {
   "name": "Aegirion",
   "slug": "aegirion",
-  "sterne": 2,
-  "begruendung": "Die Sprite-Szene zeigt immerhin ein Schiff, aber ein generisches hölzernes Piratenschiff mit Totenkopf-Segeln statt des rostigen Industrie-Flugschiffs aus dem Portrait - falsches Material, falsche Epoche, falsche Farbgebung.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Bleibt dasselbe pirat_schiff.png-Vollbild (ausfuehrlich recherchiert, s. public/sprites/schiff/quellen.json: kein anderes lizenzfreies Schiffs-Sprite existiert), aber vollbildFarbe von warmem Holzbraun auf kuehles Rost-/Stahlgrau umgestellt und ein Rauch-/Gluheffekt (Schornsteine, Antriebsduesen) samt gluehendem Riss ergaenzt - naeher am 'rostigen Industrie-Frachtschiff' als am hoelzernen Piratenschiff. Totenkopf-Segel und die kleine Kapitaensfigur aus dem Rohblatt bleiben sichtbar (Teile eines Einzelbilds lassen sich nicht ausblenden), die Rumpfform bleibt ein Segelschiffskiel statt eines Industrietankers - mehrere Baustellen bleiben trotz Farb-/Effekt-Korrektur.",
+  "fehlendesDetail": "Die Schiffsform selbst (hoelzerner Segelschiffsrumpf statt Industrie-Frachter mit Schornsteinen/Kranarmen) sowie Totenkopf-Segel/Kapitaensfigur aus dem Rohblatt bleiben falsch - kein anderes lizenzfreies Schiffs-Sprite verfuegbar."
  },
  {
   "name": "Aeon Flux",
@@ -107,9 +107,9 @@
  {
   "name": "Brunhilde",
   "slug": "brunhilde",
-  "sterne": 2,
-  "begruendung": "Menschliche Kriegerin-Kategorie korrekt, aber Kriegsaxt, Pelzumhang, Rüstung und Wolfsbegleiter aus dem winterlichen Wikinger-Konzept fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Menschliche Kriegerin-Kategorie weiterhin korrekt, jetzt zusaetzlich mit Kriegsaxt (bereits vorher gesetzt), pelzkapuzen-naeherndem kapuze:true, bronzenen Ruestungsbeschlaegen (ruestTon:\"bronze\"), hellem/silbrigem Haar (haarTon:\"white\") und einem eisig-schwebenden Frost-Effekt fuer die winterliche Szenerie. Grundidentitaet und die meisten Details stimmen jetzt; es bleibt EIN klar benennbarer Rest: der weisse Wolfsbegleiter, fuer den es kein Begleittier-System im Baukasten gibt.",
+  "fehlendesDetail": "Der weisse Wolfsbegleiter aus dem Portrait fehlt - kein Begleittier-/Pet-System im Baukasten vorhanden."
  },
  {
   "name": "Burster",
@@ -184,9 +184,9 @@
  {
   "name": "Crumbsage",
   "slug": "crumbsage",
-  "sterne": 2,
-  "begruendung": "Nur die bräunliche Farbe erinnert entfernt an Keksteig; die namensgebende gestapelte Kekse-Textur, Schokostückchen und der schwebende Kristall des Cookie-Golems fehlen komplett - wirkt wie ein generisches braunes Monster.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Von kopf:\"orc\" mit widerspruechlichem Frost-Effekt auf vollbild:\"golem\" (dieselbe massige, gestapelte Koloss-Silhouette wie Lava Golem/Krolach) mit warmem Keksteig-Goldbraun (vollbildFarbe), gluehenden Augen (energiekern) und funkelndem Arkan-Effekt (Naeherung an schwebende Lichtkugeln/Energieboegen) umgestellt. Die Golem-Kategorie und die Goldbraun-Farbfamilie stimmen jetzt gut; es bleibt EIN klar benennbarer Rest: die gestapelte-Kekse-Textur mit Schokostueckchen, fuer die es keinen Textur-Layer gibt.",
+  "fehlendesDetail": "Die gestapelte-Kekse-Textur mit sichtbaren Schokostueckchen fehlt - kein Textur-/Muster-Layer fuer Vollbild-Kreaturen im Baukasten."
  },
  {
   "name": "Cyrn",
@@ -212,9 +212,9 @@
  {
   "name": "Draco",
   "slug": "draco",
-  "sterne": 2,
-  "begruendung": "Armierte dunkle Silhouette passt vom Ton her, aber Dämonenhörner, Drachenkopf-Waffe und die stachelige schwarze Rüstung fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines Ritterhelms mit Drachen-Thematik.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Helm+Hoerner+Axt+Schild+Kopf-Feuereffekt blieben unveraendert (bereits vor dieser Runde gesetzt), NEU gluehenderRiss:true fuer eine rot gluehende Rissader quer ueber den Torso als Naeherung an die geborstene, feuerdurchzogene Ruestungstextur aus dem Bild. Der Effekt ist bei 64px-Vorschaugroesse nur schwach sichtbar (deutlicher in der vollskalierten Arena, s. Kommentar bei Lava Golem zu demselben Flag), der Topfhelm bleibt bei dieser Groesse kaum von einem glatten Visier zu unterscheiden, und eine Drachenkopf-Waffe gibt es nicht - mehrere Baustellen bleiben.",
+  "fehlendesDetail": "Die stachelige, geborstene Ruestungstextur ist nur als schwacher Rissglimmer angedeutet, eine Drachenkopf-Waffe fehlt (Axt vertritt sie nur grob), und der Topfhelm liest sich bei kleiner Groesse weiterhin visierartig statt gehoernt-drachenartig."
  },
  {
   "name": "Drop Dead",
@@ -247,9 +247,9 @@
  {
   "name": "Eldara",
   "slug": "eldara",
-  "sterne": 2,
-  "begruendung": "Die Grundhaltung ist noch bipedal-humanoid, aber die namensgebende Rinden-Textur, das dritte Auge, die Geweih-Krone und vor allem die zusätzlichen Baumstamm-Arme fehlen komplett - wirkt wie ein generisches Kind statt eines Natur-Elementars.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "ruest entfernt (vorher verdeckte normale Lederruestung die ganze Rinden-Textur-Idee komplett), haut von \"light\" auf \"brown\" umgestellt (holzig-rindenartiger Ton, der auch die b.haut-gefaerbten Hoerner sichtbar macht - mit \"light\" verschwanden Hoerner und Koerper nahezu in derselben blassen Tonung, per Testrender bestaetigt), effekt von fackelndem \"feuer\" auf ruhig strahlendes \"heilig\" (pos \"kopf\") fuer einen warmen Goldschein. Die bipedale Elementar-Kategorie und jetzt auch Hautton/Hoerner/Glanz passen besser; das dritte Auge und die sechs Baumstamm-Arme bleiben unrepresentiert.",
+  "fehlendesDetail": "Das dritte Auge auf der Stirn und die sechs zusaetzlichen Baumstamm-Arme aus dem Portrait fehlen - kein Mehrarm-/Stirnaugen-Layer im Baukasten."
  },
  {
   "name": "Elyon",
@@ -289,9 +289,9 @@
  {
   "name": "Falcon",
   "slug": "falcon",
-  "sterne": 2,
-  "begruendung": "Anthro-Silhouette mit dunkler Kleidung passt zum Konzept, aber der Kopf ist ein Wolf/Kanide statt eines weißköpfigen Adlers - kein Schnabel, keine Federkrone, keine Schulterrüstung.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "FUND beim erneuten Pruefen: haut \"fur_white\" aus der vorherigen Nachlieferung (13.10.) existiert gar nicht als HAUT-Rampe (vollstaendige Liste: light/green/bright_green/dark_green/blue/olive/brown/fur_grey/fur_brown/lavender/black/amber/pink) - faerbe() faellt bei unbekanntem Ton auf das ungefaerbte Original zurueck, der alte 'Fix' war ein stiller No-Op. Echter Fix: haut \"fur_grey\" (existiert, helles Grauweiss) faerbt den Kopf jetzt tatsaechlich hell statt im dunklen Rohton zu bleiben. Anthro-Silhouette und dunkler Anzug stimmen, und nach dem Farbfix bleibt nur noch EIN klar benennbarer Rest: kein Vogel-/Schnabelkopf im Baukasten (23 Kopf-Typen durchgezaehlt: alien/boarman/frankenstein/goblin/human/humanw/jack/lizard/minotaur/mouse/orc/orc_frau/pig/rabbit/rat/sheep/skeleton/troll/vampire/wartotaur/wolf/wolf_frau/zombie - kein einziger avian), wolf bleibt die naechstliegende Raubtier-Silhouette.",
+  "fehlendesDetail": "Kein Adler-/Schnabelkopf im Baukasten vorhanden (23 Kopf-Typen durchgezaehlt, keiner avian) - wolf bleibt die naechstliegende verfuegbare Kopfform."
  },
  {
   "name": "Galactus",
@@ -352,9 +352,9 @@
  {
   "name": "Harbinger",
   "slug": "harbinger",
-  "sterne": 2,
-  "begruendung": "Ein Flügel und eine Pistole als Requisite passen thematisch zum bewaffneten Kämpfer, aber die schwarze bio-mechanische Rüstung, grün leuchtenden Augen und die bedrohliche Statur fehlen - wirkt wie ein kleiner brauner Fledermaus-Imp statt eines Alien-Söldners.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "FUND: haut \"black\" endet am hellen Rampen-Ende in einem warmen Braunton (#7F4C31), nicht in Schwarz/Grau - genau das erzeugte den 'brauner Fledermaus-Imp'-Eindruck. Jetzt haut \"fur_grey\" (neutrales Grauweiss ohne Braunstich), effekt \"gift\" (gruen) von pos \"koerper\" auf \"kopf\" verschoben, damit sich der gruene Schimmer auf die Augen konzentriert statt sich zu verteilen, skala:1.1 fuer die breitere Statur aus dem Bild. Alien-Kopf+dunkle Platte+Fluegel+Pistole+gruener Kopfschimmer stimmen jetzt besser; die zweite Waffe (leuchtende Energieklinge) und die bio-mechanische Stachel-/Plattentextur bleiben unrepresentiert.",
+  "fehlendesDetail": "Die zweite Waffe (leuchtend blaue Energieklinge, b.waffe kennt nur eine Waffe gleichzeitig) und die bio-mechanische Stachel-/Plattentextur der Ruestung fehlen."
  },
  {
   "name": "Hellvoice",
@@ -422,9 +422,9 @@
  {
   "name": "Kento",
   "slug": "kento",
-  "sterne": 2,
-  "begruendung": "Dunkle Beinkleidung erinnert entfernt an den Ninja, aber keine Maske, keine Schwerter, keine durchgehend schwarze Kleidung - die Kapuze ist zudem hell statt schwarz.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "FUND: b.kapuze wird in der Engine OHNE Ton-Argument gezeichnet (anders als b.helm) und bleibt deshalb IMMER beim hellen Rohton des Blatts, unabhaengig von ruestTon - eine strukturelle Engine-Luecke, die jede Figur mit kapuze:true betrifft, keine Kento-spezifische Ein-Zeilen-Korrektur. Kapuze gegen helm getauscht (helm_* wird ueber ruestTon eingefaerbt und deckt den Kopf blickdicht ab) - jetzt durchgehend schwarze Kleidung UND ein verdecktes Gesicht wie im Portrait. Einzig verbleibender Rest: ein Topfhelm statt einer Stoff-Ninja-Maske, eine Formfrage, keine Farbfrage mehr.",
+  "fehlendesDetail": "Der Kopf ist jetzt vollstaendig schwarz verdeckt, aber als Metallhelm statt als Stoff-Maske/-Kapuze geformt - keine eingefaerbte Stoffkapuze im Baukasten verfuegbar (b.kapuze wird nie getoent, s. Begruendung)."
  },
  {
   "name": "King Arlen Morgolor",
@@ -471,9 +471,9 @@
  {
   "name": "Lady Mournvale",
   "slug": "lady-mournvale",
-  "sterne": 2,
-  "begruendung": "Dunkle Kleidung passt zur viktorianischen Robe, aber das namensgebende leere, ringförmige Void-Gesicht - das komplett prägende Merkmal des Portraits - fehlt völlig; die Figur hat ein gewöhnliches Gesicht.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Portrait zeigt eine viktorianisch gekleidete Frau OHNE Gesicht - an dessen Stelle ein geriffelter elfenbeinfarbener Ring, durch den nur Schwaerze zu sehen ist. Keine vorhandene Baukasten-Ebene bildet das ab (strukturelle Grenze, s. Auftrag), deshalb NEU die Requisitenfunktion zeichneRinggesicht (ringgesicht:true) nach demselben Muster wie Byrnjas Kuchenkopf/Byrds Zwiebelkopf: ersetzt den Kopf komplett durch einen dreifach gerillten Ring um einen pechschwarzen Kern. Dunkle Robe und dunkles Haar passten bereits. Wie beim Vigil-Kamera-Praezedenzfall (ebenfalls volle prozedurale Kopf-Requisite statt echtem Sprite, landete dort bei 4 statt 5) bleibt es eine handgezeichnete Form-Naeherung statt eines lizenzierten Assets - der gruene Brosche/Edelstein-Akzent aus dem Bild fehlt zudem.",
+  "fehlendesDetail": "Der gruene Brosche-/Edelstein-Akzent am Kragen fehlt; der Ring selbst ist eine handgezeichnete Formen-Naeherung, kein lizenziertes Sprite-Asset."
  },
  {
   "name": "Lady Yueqin",
@@ -506,9 +506,9 @@
  {
   "name": "Lucky",
   "slug": "lucky",
-  "sterne": 2,
-  "begruendung": "Menschliche männliche Grundform passt, aber die schwarze Lederjacke, die Wurfmesser-Bandoliere und die Münzen des Glücksspielers/Diebes fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "ruestTon \"dunkel\" neu ergaenzt (vorher ungetoent, also im natuerlichen Lederbraun statt der schwarzen Lederjacke aus dem Portrait). Bewusst KEIN waffe-Feld gesetzt: die vier verfuegbaren Nahkampfwaffen (schwert/axt/zweihaender/stab) sind grosse, sichtbar gefuehrte Hiebwaffen - ein Langschwert wuerde den Wurfmesser-/Taschendieb-Charakter aktiv verfaelschen statt ihn anzunaehern. Menschliche Grundform und jetzt die schwarze Jacke stimmen; Wurfmesser-Bandoliere und Muenzen bleiben unrepresentiert.",
+  "fehlendesDetail": "Wurfmesser-Bandoliere und Muenzen aus dem Portrait fehlen - kein passendes Requisiten-/Kleinwaffen-Layer im Baukasten (die vier Nahkampfwaffen sind alle grosse Hiebwaffen, keine Wurfmesser)."
  },
  {
   "name": "Lulu",
@@ -534,9 +534,9 @@
  {
   "name": "Lys Puppenkopf",
   "slug": "lys-puppenkopf",
-  "sterne": 2,
-  "begruendung": "Ein menschliches Mädchen als Basis ist vorhanden, aber der namensgebende, übergroße gruselige Puppenkopf mit tropfenden Augen - das komplett prägende Element des Portraits - fehlt vollständig.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Portrait zeigt ein kleines Maedchen, ueber dem ein riesiger, bleicher, rissiger Puppenkopf mit tropfenden dunklen Augen schwebt - keine vorhandene Baukasten-Ebene bildet das ab (strukturelle Grenze, s. Auftrag), deshalb NEU die Requisitenfunktion zeichnePuppenKopf (puppenkopf:true) nach demselben Muster wie Byrnjas Kuchenkopf: ersetzt den Kopf durch einen UEBERGROSSEN bleichen Kopf mit zwei hohlen Augen und Tropflinien, bewusst groesser als die anderen Kopf-Requisiten (Bildbefund: 'der Kopf ist groesser als der Koerper'). ruestTon \"violett\" neu fuer das dunkelblaue Kleid statt Standard-Lederbraun. Wie beim Vigil-Kamera-Praezedenzfall (volle prozedurale Kopf-Requisite, landete dort bei 4 statt 5) bleibt es eine handgezeichnete Form-Naeherung statt eines lizenzierten Assets.",
+  "fehlendesDetail": "Der Puppenkopf ist eine handgezeichnete Formen-Naeherung, kein lizenziertes Sprite-Asset; feine Risse/Textur des 'Porzellans' sind nur angedeutet."
  },
  {
   "name": "Mavra",
@@ -562,9 +562,9 @@
  {
   "name": "Mindtamer",
   "slug": "mindtamer",
-  "sterne": 2,
-  "begruendung": "Der kugelige verkleidete Kopf erinnert entfernt an den Glaskolben mit sichtbarem Gehirn, aber es ist ein grauer Roboter-Helm statt einer durchsichtigen Kugel, und die Blitz-/Energie-Fäden fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "helm:true entfernt - zeichnete bislang einen UNDURCHSICHTIGEN grauen Ritterhelm, das genaue Gegenteil des durchsichtigen Glaskolbens mit sichtbarem Gehirn aus dem Portrait (keine Naeherung, sondern ein Widerspruch). Kein Glasgefaess-Primitiv im Baukasten vorhanden, deshalb stattdessen effekt:{typ:\"arkan\",pos:\"kopf\"} (funkelndes Violett/Pink/Gold) als Naeherung an das leuchtende Gehirn/die Energie-Faeden. Lavender-Hautton blieb unveraendert. Der aktiv falsche Helm ist weg, aber der durchsichtige Glaskolben selbst bleibt unrepresentiert - der Kopf ist jetzt neutral statt falsch, nicht positiv korrekt.",
+  "fehlendesDetail": "Der durchsichtige Glaskolben mit dem sichtbaren leuchtenden Gehirn fehlt (kein Glas-/Transparenz-Requisiten-Layer im Baukasten); die Energie-Faeden aus der erhobenen Hand sind unrepresentiert."
  },
  {
   "name": "Moonveil",
