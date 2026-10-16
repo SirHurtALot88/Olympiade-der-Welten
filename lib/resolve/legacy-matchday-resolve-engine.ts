@@ -27,8 +27,14 @@ import {
   findeSpieltagsFixtures,
   outcomeAusPunkten,
 } from "@/lib/resolve/battle-mode-pps-duell";
+// SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
+// Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
+// der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
+// wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
+  ArenaAusfall,
   DisciplineHighlightCandidate,
   DisciplineResolvePreview,
   DisciplineTeamResolvePreview,
@@ -340,7 +346,12 @@ export function buildLegacyMatchdayResolvePreview(
     captainMode: options?.captainMode ?? "selected_captain",
     arenaTeamPointsByDisciplineId: options?.arenaTeamPointsByDisciplineId ?? null,
     arenaIndividualBoxscorePpsByDisciplineId: options?.arenaIndividualBoxscorePpsByDisciplineId ?? null,
+    arenaAusfallByDisciplineId: options?.arenaAusfallByDisciplineId ?? null,
   };
+  // SICHTBARE ARENA-AUSFÄLLE: EIN Zeitstempel fuer die ganze Vorschau (statt je Team neu
+  // `new Date().toISOString()` zu rufen) -- rein kosmetisch (Log/Tooltip), aber so bekommen nicht
+  // 32 Zeilen derselben Disziplin 32 leicht verschiedene Millisekunden-Zeitstempel.
+  const nichtAusgefuehrtZeitpunkt = new Date().toISOString();
   const base = contexts[0];
   /**
    * SICHERHEITSRAHMEN Battle Mode PR7, seit WEG B disziplin-bewusst statt Basketball-fest: eine
@@ -798,6 +809,12 @@ export function buildLegacyMatchdayResolvePreview(
       isBattleModeArenaEligible
         ? resolveOptions.arenaTeamPointsByDisciplineId?.get(disciplineId) ?? null
         : null;
+    // SICHTBARE ARENA-AUSFÄLLE (Plan Abschnitt 3.2 Punkt 4): ein von einem Aufrufer EXPLIZIT
+    // erklärter Ausfallgrund für genau diese Disziplin (z.B. künftig der Arena-Vorlauf-Service,
+    // PR 3 — "Chromium ist abgestürzt"). Kein heutiger Aufrufer setzt das; ohne ihn greift unten
+    // die Engine-eigene Strukturprüfung.
+    const erklaerterArenaAusfallFuerDiesesDisziplin =
+      isBattleModeArenaEligible ? resolveOptions.arenaAusfallByDisciplineId?.get(disciplineId) ?? null : null;
     // BOXSCORE-AN-PPS: dieselbe Sperre wie oben — s. docs/design/boxscore-an-pps.md.
     const arenaIndividualPpsForThisDiscipline =
       isBattleModeArenaEligible
@@ -846,15 +863,31 @@ export function buildLegacyMatchdayResolvePreview(
       // Ein Battle-Save ohne Duell fuer diese Seite (kein Fixture im Spielplan) bekommt KEINE
       // Rangtabellen-Punkte mehr, sondern `null` + Warnung — laut statt still falsch.
       const battleOhneDuell = isBattleModeArenaEligible && !arenaOverride && !ppsDuell;
+      // SICHTBARE ARENA-AUSFÄLLE (Plan Abschnitt 3.2 Punkt 4, harte Auflage der Projektaufsicht):
+      // ein Arena-Override macht jeden Ausfall gegenstandslos (die Arena lief ja). Sonst gilt ein
+      // vom Aufrufer erklärter Grund. Liegt WEDER ein Override NOCH ein erklärter Grund vor, UND
+      // ist diese Disziplin arena-aufgelöst (`ARENA_RESOLVED_DISCIPLINE_IDS`), markiert die Engine
+      // das SELBST als `"nicht_ausgefuehrt"` — genau der heutige K1-Zustand (Auto-Run ruft die
+      // Arena nie auf, Plan Abschnitt 1.1): bis PR 3 den Arena-Vorlauf anbindet, trägt JEDE
+      // gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund. Das
+      // ändert NICHTS an `teamPoints`/`resolutionSource`/`pointSource` unten — die PPS-Duell-
+      // Brücke rechnet unverändert weiter, die Zeile ist nur zusätzlich markiert.
+      const arenaAusfall: ArenaAusfall | null = arenaOverride
+        ? null
+        : erklaerterArenaAusfallFuerDiesesDisziplin ??
+          (isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
+            ? { grund: "nicht_ausgefuehrt", zeitpunkt: nichtAusgefuehrtZeitpunkt, versuch: 1 }
+            : null);
       return {
         ...item,
         rank,
         warnings:
-          duellVerhaeltnis?.warnings.length || battleOhneDuell
+          duellVerhaeltnis?.warnings.length || battleOhneDuell || arenaAusfall
             ? [
                 ...item.warnings,
                 ...(duellVerhaeltnis?.warnings ?? []),
                 ...(battleOhneDuell ? [`battle_mode_ohne_duell:${disciplineId}`] : []),
+                ...(arenaAusfall ? [`arena_ausgefallen:${arenaAusfall.grund}`] : []),
               ]
             : item.warnings,
         teamPoints: arenaOverride
@@ -889,6 +922,10 @@ export function buildLegacyMatchdayResolvePreview(
         // sequenzieren statt alle Teams im Gleichschritt zu enthüllen (s.
         // DisciplineStageNativeArena.tsx, `prim === "lamps"`/`"klassen"`/`"stage"`).
         opponentTeamId: arenaOverride?.opponentTeamId ?? ppsDuell?.opponentTeamId ?? null,
+        // SICHTBARE ARENA-AUSFÄLLE: additiv wie `momente`/`arenaMatchSeed` -- nur gesetzt, nie
+        // außerhalb von Battle Mode bzw. außerhalb arena-aufgelöster Disziplinen (Manager-Mode-
+        // Vorschauen bleiben dadurch byte-identisch zum Stand vor dieser Ergänzung).
+        ...(arenaAusfall ? { arenaAusfall } : {}),
         // PUNKTEVERHAELTNIS: nur an Duell-Zeilen — ausserhalb von Battle Mode entstehen hier keine
         // neuen Schluessel (Manager-Mode-Vorschauen bleiben byte-identisch).
         ...(duellVerhaeltnis

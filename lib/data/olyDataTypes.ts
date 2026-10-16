@@ -3,7 +3,9 @@ import type { LeagueTier } from "@/lib/season/league-split";
 // `import type` -- rein typseitig, erzeugt keine Laufzeit-Zirkularitaet trotz des
 // Rueckimports von GameState/Player aus dieser Datei in arena-headless-runner.ts (s. dort).
 import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
-// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
+// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner. Derselbe
+// Grund gilt fuer `ArenaAusfall` -- s. dort fuer die Begruendung des Rueckimports.
+import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 
@@ -2609,6 +2611,15 @@ export type DisciplineResultRecord = {
    * lib/battle/arena-headless-runner.ts.
    */
   momente?: ArenaMomentEintrag[] | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (Plan docs/design/battle-arena-auto-run-anbindung-plan-16-10.md
+   * Abschnitt 3.2 Punkt 3, PR 1): additiv und optional wie `momente` -- aeltere Zeilen (vor dieser
+   * Aenderung geschrieben) haben dieses Feld nicht, jeder Leser behandelt sein Fehlen als "kein
+   * Ausfall bekannt", nie als Fehler (kein Breaking Change am Schema). Durchgereicht aus
+   * `DisciplineTeamResolvePreview.arenaAusfall` (legacy-matchday-resolve-types.ts), das dieses
+   * Feld schon 1:1 traegt.
+   */
+  arenaAusfall?: ArenaAusfall | null;
 };
 
 export type PlayerDisciplinePerformanceRecord = {

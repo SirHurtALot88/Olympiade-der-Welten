@@ -19,6 +19,7 @@ import type {
 // diese Datei importiert (derselbe Grund, aus dem `seedZuZahl`/`buildArenaMatchSeed` als
 // LAUFZEIT-Funktionen eigens nach arena-seed.ts verschoben wurden -- hier reicht der Typ).
 import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
+import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 
 export type DisciplineSide = "d1" | "d2";
 
@@ -630,4 +631,14 @@ export type LegacyResolvePreviewOptions = {
    * `undefined`/leer/fehlender Eintrag aendert nichts.
    */
   arenaIndividualBoxscorePpsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, number>> | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+   * Abschnitt 3.2 Punkt 4, PR 1): ein explizit ÜBERGEBENER Ausfallgrund je Disziplin — so kann ein
+   * Aufrufer (z.B. der künftige Arena-Vorlauf-Service, PR 3) "Chromium ist abgestürzt" melden,
+   * statt dass die Engine das stillschweigend als `"nicht_ausgefuehrt"` liest. Kein heutiger
+   * Aufrufer setzt dieses Feld (die Engine-Strukturprüfung greift deshalb ÜBERALL, wo eine
+   * arena-aufgelöste Disziplin kein Arena-Ergebnis UND keinen expliziten Grund hat — genau die
+   * heutige K1-Lücke). `undefined`/leer/kein Eintrag für die aktuelle Disziplin aendert nichts.
+   */
+  arenaAusfallByDisciplineId?: ReadonlyMap<string, ArenaAusfall> | null;
 };

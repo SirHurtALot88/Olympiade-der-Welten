@@ -91,6 +91,36 @@ export type DisciplineHighlightCandidate = {
  */
 export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell";
 
+/**
+ * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+ * Abschnitt 3.1, PR 1 — harte Auflage der Projektaufsicht): Grund, warum eine arena-aufgelöste
+ * Disziplin (`ARENA_RESOLVED_DISCIPLINE_IDS`) in dieser Zeile KEIN Arena-Ergebnis trägt, sondern
+ * über die PPS-Duell-Brücke läuft. `"nicht_ausgefuehrt"` ist die Engine-Strukturprüfung selbst
+ * (Abschnitt 3.2 Punkt 4) — sie greift immer dann, wenn weder ein Arena-Override noch einer der
+ * anderen, explizit übergebenen Gründe vorliegt. Das ist GENAU der heutige K1-Zustand (der
+ * Auto-Run ruft die Arena nie auf, s. Plan Abschnitt 1.1): bis PR 3 den Arena-Vorlauf anbindet,
+ * bekommt JEDE gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund
+ * — bewusst und laut statt, wie bisher, nur über `console.warn` (Befund F2).
+ */
+export type ArenaAusfallGrund =
+  | "chromium_start" // Launch scheitert: Binary fehlt, Abhaengigkeit fehlt (E1)
+  | "timeout" // seitenTimeoutMs oder Gesamt-Timeout
+  | "absturz" // Target/Page closed, Renderer crash, OOM
+  | "liga_fehlgeschlagen" // eine Liga warf, die andere lief (Teil-Ausfall)
+  | "ergebnis_unvollstaendig" // arena_matchday_missing_result: Team ohne Duell-Ergebnis
+  | "abgebrochen_neustart" // in_progress aelter als 5 min (erst ab PR 3 relevant)
+  | "deaktiviert" // arenaModus "aus" (Tests/Notschalter, erst ab PR 3 relevant)
+  | "nicht_ausgefuehrt"; // Engine-Strukturpruefung: gewertet, aber nie versucht (die K1-Klasse)
+
+export type ArenaAusfall = {
+  grund: ArenaAusfallGrund;
+  /** gekuerzte Fehlermeldung, max. 200 Zeichen, nur fuer Log/Tooltip. */
+  detail?: string | null;
+  leagueTier?: string | null;
+  zeitpunkt: string;
+  versuch: number;
+};
+
 export type DisciplineTeamResolvePreview = {
   teamId: string;
   teamName: string;
@@ -168,6 +198,14 @@ export type DisciplineTeamResolvePreview = {
    * `"klassen"` / `"stage"`); für jede andere Disziplin ungenutzt.
    */
   opponentTeamId?: string | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (s. `ArenaAusfall` oben): nur gesetzt, wenn diese Zeile eine
+   * arena-aufgelöste Disziplin ohne Arena-Ergebnis ist — nie bei `resolutionSource === "arena"`
+   * (dort lief die Arena ja) und nie außerhalb von Battle Mode bzw. außerhalb
+   * `ARENA_RESOLVED_DISCIPLINE_IDS` (Manager-Mode-Zeilen bekommen diesen Schlüssel nie, bleiben
+   * also byte-identisch zum Stand vor dieser Ergänzung).
+   */
+  arenaAusfall?: ArenaAusfall | null;
   warnings: string[];
   missingLineup: boolean;
   missingPlayers: number;
