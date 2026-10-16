@@ -48,7 +48,7 @@ Rechnungen. Baut auf `docs/design/fatigue-saisonlaenge-plan.md` (26.08., Chris-E
 | PR4 | Halbserien, `repeat: 2` | gebaut (#930) | unverändert |
 | PR5 | Doppel-Rundenplan (30 Runden) | offen | **gebaut**, nur für > 15 Spieltage aktiv; bis 15 bit-identisch |
 | PR6 | 20 Spieltage für neue Battle-Saves | offen | **gebaut** (Abschnitt 5) |
-| PR7/PR8 | Aufräumen, UI-Kapazität, Live-E2E | offen | teilweise (B2-Fallback, Verkaufstext); Rest offen (Abschnitt 7) |
+| PR7/PR8 | Aufräumen, UI-Kapazität, Live-E2E | offen | teilweise (B2-Fallback); Rest offen (Abschnitt 7) |
 
 ---
 
@@ -188,7 +188,7 @@ Alle Leser hängen an dieser einen Funktion: Wurf, Apply, Replay-Rücknahme, Ein
 | E4 Neuaufbau `getSeasonDisciplineSchedule` | stutzte auf 10 | repeat-bewusst für Doppelsaisons |
 | F1 `lib/season/season-fixture-schedule.ts` | Modulo-Wrap über 15 Runden (Spieltag 16 = Spieltag 1, gleiche Seite) | ab > 15 Spieltagen Doppel-Rundenplan (30 Runden), Fenster 20: jeder gegen jeden, fünf Rückspiele mit getauschter Seite; ≤ 15 bit-identisch |
 | B2 `lib/foundation/game-flow-controller.ts` | `totalMatchdays ?? 10` | `?? matchdayIds.length` |
-| Text `transfer-sell-view-labels.ts` | „nach Spieltag 10“ | „nach dem letzten Spieltag“ |
+| Text `transfer-sell-view-labels.ts` | „nach Spieltag 10“ | **unverändert** — ein Test hält den Manager-Text fest; der modusabhängige Text gehört zur Anzeige-Welle W4 (Abschnitt 7.4) |
 
 Manager Mode: 10 Spieltage, kein `repeat`, keine `occurrenceInSeason`, keine aktive Erholung —
 per Test (`new-game-setup-service.test.ts`) und am Live-Abbild (Abschnitt 6) festgehalten.
@@ -227,7 +227,8 @@ jüngste Save `new-game-1791961407272-ct2a54` (Saison 1, angelegt 14.10.).
    reißen — eine Übernahme dort ist eine eigene Entscheidung, nicht Teil dieses Umbaus.
 4. **Nicht in diesem Branch** (W4/W5 der Recherche 06.09., Konzept 16.10. Gruppen 2/3): die neun
    Anzeige-Konsumenten „eine Kadergröße je Saison“ (Kaderprofil zeigt das nächste offene
-   Vorkommen, nicht beide), Spielplan-Tab mit 20 Zeilen (Layout ungeprüft), Captain-Slots (3 von
+   Vorkommen, nicht beide), Spielplan-Tab mit 20 Zeilen (Layout ungeprüft), Verkaufsfenster-Text
+   „nach Spieltag 10“ (im Battle-Save falsch), Captain-Slots (3 von
    20), Formkarten je Spieler, Sponsor-Event-Frequenz, Award-Schwellen, Punkteverhältnis,
    PPS-Duell-Brücke, Auf-/Abstieg. Ein Battle-Save mit 20 Spieltagen ist spielbar, aber diese
    Punkte sind dort sichtbar unfertig.
