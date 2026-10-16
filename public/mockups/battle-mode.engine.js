@@ -1850,7 +1850,25 @@
     // einen schweren Holzknueppel in der Hand — kein Knueppel/Keulen-Layer im Baukasten,
     // das Schwert vertritt ihn als naechstliegende gefuehrte Waffe, dasselbe Prinzip wie
     // bei Draco/Mavra, wo eine Axt durchs Schwert vertreten wird).
-    "Roddox Harthelm":    {kopf:"minotaur",haut:"brown",ruest:"leder",waffe:"schwert"},
+    // 16.10., Minotaurus/Zentaur-Cluster-Runde: waffe "schwert" auf "stab" umgestellt — der
+    // allererste Bildbefund oben ("stuetzt sich auf einen Holzstab") war naeher dran als die
+    // 13.10.-Revision: t_stab_bg/fg (schon bei Jorund im Einsatz) ist ein schlichter runder
+    // Holzstab/-stock, kein Klingenwaffen-Umriss wie das Schwert — die naechstliegende
+    // verfuegbare Form fuer einen gefuehrten Knueppel/Stab, s. Bewertung.
+    // GEGENGEPRUEFT (actVon()/SHOWCASE_ACT_PUNKTE.bauWaffe liest `waffe` ebenfalls, fuer die
+    // Showcase-Act-Zuteilung — "stab" liegt dort auf zaubershow statt kampfkunst wie
+    // "schwert"): actVon() ist laut eigenem Kommentar dort ("liest eig/wert()/rr() nirgends
+    // und fliesst nirgends dorthin zurueck") eine rein kosmetische Pose-/Kategorie-Anzeige
+    // ohne Rueckwirkung auf Runden-/Score-Aufloesung — kein echtes Rezept-Risiko, nur eine
+    // andere Showcase-Auftritts-Kategorie fuer diesen Charakter, falls er je in einem Showcase
+    // antritt (aktuell in keiner Test-/Mess-Kaderfamilie vorhanden).
+    // kopf:"minotaur" bleibt unveraendert die naechstliegende Kopf-Annaeherung — dieselbe
+    // Sonderpalette wie bei Medibull/Tartarus (0-4 % Rampentreffer, s. Kommentar oben bei
+    // B_KOERPER_RAMPEN), KEIN Hautton faerbt diesen Kopf um, und die Seitenansicht liest eher
+    // "Reh" als "massiger Stier" — keine bessere Kopf-Alternative im Baukasten (kopf_wartotaur
+    // geprueft: wirkt eher wolfs-/daemonenartig als bovin, keine Verbesserung, s. Score-
+    // Begruendung). Strukturelle Baukasten-Luecke, nicht Einzelfall-Schwaeche.
+    "Roddox Harthelm":    {kopf:"minotaur",haut:"brown",ruest:"leder",waffe:"stab"},
     // Bild-schlaegt-Tags-Fund (04.09., Sprite-Cluster-Runde 1): der Kommentar hier ("riesiges
     // bruellendes Reptilwesen mit gehoerntem Kamm") passt zu KEINEM der beiden Bilder, die je
     // unter diesem Namen liefen — public/portraits/ironhoof.jpg zeigt tatsaechlich einen
@@ -2217,8 +2235,23 @@
     // Blatts eher "Reh" als "massiger Stier" liest (keine bessere Kopf-Alternative im
     // Baukasten verfuegbar, s. Score-Begruendung). Sanitaeter-Ausruestung (Rotes-Kreuz-
     // Armbinde, Verbandtasche, Stethoskop) bleibt eine dokumentierte Luecke — kein
-    // passendes Requisiten-Layer im Baukasten.
-    "Medibull":           {kopf:"minotaur",haut:"brown",ruest:"leder"},
+    // passendes Requisiten-Layer im Baukasten. Nachgeprueft (16.10., Minotaurus/Zentaur-
+    // Cluster-Runde): kopf_wartotaur (die einzige zweite gehoernte/tierische Kopf-Alternative)
+    // wirkt wolfs-/daemonenartig (Reisszaehne, Spitzohren) statt bovin — keine Verbesserung
+    // gegenueber kopf_minotaur. "binde" liegt zwar als PNG im Baukasten, ist aber in keinem
+    // b.<feld>-Zweig der Zeichenfunktion verdrahtet (kein Requisiten-Layer, s. Baukasten-
+    // README) — ein Einbau wuerde neue Engine-Logik brauchen, die dieser Auftrag ausdruecklich
+    // ausschliesst (nur Rekombination vorhandener Felder). hose:"beine" wurde geprueft und
+    // verworfen: das Blatt ist eine graue METALL-Beinschiene (Ritter-Look), keine Stoffhose —
+    // mit Medibulls Sanitaeter-Cargohose hat sie nichts gemein, haette den Treffer eher
+    // verschlechtert. Einzige vertretbare Feinkorrektur: ruestTon:"dunkel" statt der
+    // unveraenderten "leder"-Grundfarbe — ein gedecktes Grau-Schwarz statt warmes Lederbraun,
+    // naeher an einer taktischen Sanitaeter-Weste als an zivilem Leder (dieselbe Ramp, die
+    // z.B. bei Steel Sinister/Node fuer "Ausruestung statt Schmuck" steht). Die Stier-Sanitaeter-
+    // KATEGORIE selbst stimmt unveraendert (zweibeiniger Bauplan ist fuer dieses Bild korrekt,
+    // s. Kommentar oben) — nur die Requisiten (Kreuz/Stethoskop/Tasche) und die Kopf-Silhouette
+    // bleiben strukturelle Luecken, kein Einzelfehler mehr auf einer Korrektur zu buendeln.
+    "Medibull":           {kopf:"minotaur",haut:"brown",ruest:"leder",ruestTon:"dunkel"},
     "Lys Puppenkopf":     {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
     // Sprite-Fit-Nachlieferung Batch B (16.10.), geprueft und UNVERAENDERT gelassen: Portrait
     // zeigt eine Augenbinde und zwei gefuehrte Dolche (s. public/portraits/phantomblade.jpg).
@@ -2379,7 +2412,17 @@
     // Threnox/Burster (Tank/Charger, kein Klassen-Praezedenzfall, deshalb dort unbewaffnet
     // gelassen, s.u.).
     "Knochenrichter":     {kopf:"skeleton",koerper:"skelett",ruest:"leder",ruestTon:"dunkel",waffe:"schwert"},
-    "Kora":               {kopf:"minotaur",haut:"brown",schwanz:true,ruest:"leder_frau",waffe:"schwert",geschlecht:"w"},
+    // 16.10., Minotaurus/Zentaur-Cluster-Runde: waffe "schwert" auf "axt" umgestellt — das
+    // Portrait (public/portraits/kora.jpg) zeigt einen schweren, dorn-/klauenbesetzten
+    // Kriegshammer/Streitkeulenkopf auf langem Stiel ueber der Schulter getragen; die
+    // gebogene Axtklinge (axt_bg/fg, schon bei Ironhoof im Einsatz) trifft die Silhouette
+    // "schwere Waffe auf einem Stiel" sichtbar naeher als die duenne Schwertklinge. Kein
+    // Hammer-/Keulen-Layer im Baukasten, dieselbe Vertretungslogik wie bei Draco/Mavra
+    // (Axt vertritt den Hammer). kopf:"minotaur" bleibt unveraendert (Sonderpalette, s.
+    // Kommentar bei Roddox/Medibull oben) — Gesichtsform liest "Reh" statt "Stier", keine
+    // bessere Kopf-Alternative verfuegbar (kopf_wartotaur geprueft, wirkt wolfs-/daemonenartig,
+    // keine Verbesserung).
+    "Kora":               {kopf:"minotaur",haut:"brown",schwanz:true,ruest:"leder_frau",waffe:"axt",geschlecht:"w"},
     // Nachlieferung (13.10., Sprite-Fit): Portrait zeigt einen kauernden Obsidian-/Stein-
     // Koloss mit schweren Ketten und gluehenden Lava-Traenen aus Augen/Mund (s.
     // public/portraits/grieving-colossus.jpg) — exakt dasselbe Motiv wie Lava Golem/Vorrak/
@@ -2396,7 +2439,44 @@
     // (kein kauernder/vierbeiniger Frame im Blatt). Bestaetigt unveraendert strukturell
     // unloesbar ohne neue Zeichenarbeit.
     "Grieving Colossus":  {vollbild:"golem",vollbildFarbe:"#15141a",gluehenderRiss:true,effekt:{typ:"feuer",pos:"kopf",streuung:2,hoehe:[38,28]}},
-    "Tartarus":           {kopf:"minotaur",haut:"black",ruest:"plate",ruestTon:"dunkel",waffe:"schwert"},
+    // 16.10., Minotaurus/Zentaur-Cluster-Runde: Bild (public/portraits/tartarus.jpg) zeigt
+    // einen schwarzen Daemon-Zentauren mit riesigen, nach hinten gebogenen, an den Spitzen
+    // gluehenden Hoernern, einer schweren Kriegsaxt und einem im Dunkel liegenden
+    // vierbeinigen Unterkoerper vor Vollmond — kein reiner Minotaurus.
+    // kopf:"minotaur" auf kopf:"orc" umgestellt: der Minotaurus-Kopf traegt eine Sonderpalette
+    // (s. Kommentar bei quellRampe()/faerbe() oben, "minotaur 4") — jeder haut-Wert LAEUFT INS
+    // LEERE, der Kopf blieb trotz haut:"black" sichtbar BRAUN (derselbe Fund wie bei Medibull/
+    // Roddox). kopf:"orc" dagegen trifft seine eigene Quellrampe zu hohem Prozentsatz (s.
+    // Kommentar, "green ... orc 95") und FAERBT sich tatsaechlich um.
+    // haut "black" ANGESEHEN UND VERWORFEN (per renderProbe-Sichtprobe, nicht nur angenommen):
+    // HAUT.black (die hier, in der animierten Live-Ansicht, tatsaechlich gelesene Rampe — zu
+    // unterscheiden von der GROESSEREN B_PAL-Tabelle der separaten Kader-/Figur-Karten-Ansicht,
+    // die zusaetzlich ein "fur_black" fuehrt, das es in HAUT schlicht NICHT GIBT) ist eine
+    // HAUTTON-Rampe (dunkle MENSCHLICHE Haut-Schattierung), deren hellste Stufen (#7F4C31/
+    // #603429) deutlich braun bleiben — exakt der Fund, den Dyrths eigene Bewertung schon
+    // nennt ("wirkt wie ein kleiner brauner Imp" trotz haut:"black"). haut "fur_grey"
+    // (#0F0F11.."#B8BBBC, reines Kohle-/Anthrazit-Grau ohne jede Braun-Stufe) trifft die im
+    // Portrait gezeigte schwarze Farbe per Sichtprobe sichtbar naeher als "black" — Kopf UND
+    // Hoerner (die denselben b.haut-Wert bekommen, s. zeichneSprite) liegen jetzt einheitlich
+    // dunkelgrau statt braun. Kein reines Schwarz (das fehlt in HAUT komplett), aber die
+    // naechstliegende verfuegbare Annaeherung.
+    // hoerner:"gebogen" (statt kein hoerner-Flag) ergaenzt die grossen RUECKWAERTS gebogenen
+    // Hoerner direkt am Kopf — derselbe Layer wie bei Dyrth/Ironhoof. effekt:"feuer"/"kopf"
+    // (s. EFFEKT_ARTEN, bereits bei Draco fuer Hoerner-in-Flammen verwendet) naehert die an
+    // den Spitzen gluehenden Hoerner an. waffe "schwert" auf "axt" umgestellt (Portrait zeigt
+    // eindeutig eine zweihaendig gefuehrte Kriegsaxt, keine Klinge). schwanz:true als schwache
+    // Annaeherung an den vierbeinigen Unterkoerper — derselbe Kompromiss wie bei Ironhoof
+    // (s. dortiger Kommentar/sprite-cluster-runde-1.md): ein echter Zentauren-Koerper
+    // (vierbeinig) ist im LPC-Baukasten STRUKTURELL NICHT BAUBAR, kein passender Koerpertyp.
+    // Das Sprite bleibt deshalb zweibeinig — eine Baukasten-Luecke, keine Einzelfall-Schwaeche,
+    // und der Grund, warum dieser Charakter trotz jetzt stimmiger Farbe/Hoerner/Waffe NICHT
+    // auf 5 Sterne steigt (dieselbe Kategorie-Grenze wie bei Ironhoof).
+    // GEGENGEPRUEFT: `effekt` (neu, vorher gar kein Feld) fliesst wie `waffe` zusaetzlich in
+    // actVon()/SHOWCASE_ACT_PUNKTE.bauEffekt (zaubershow:3) — dieselbe rein kosmetische
+    // Showcase-Pose-/Kategorie-Anzeige wie beim waffe-Kommentar bei Roddox Harthelm oben, ohne
+    // Rueckwirkung auf Runden-/Score-Aufloesung (s. actVon()-Kommentar: "fliesst nirgends dorthin
+    // zurueck"). Kein Rezept-Risiko.
+    "Tartarus":           {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",hoerner:"gebogen",waffe:"axt",schwanz:true,effekt:{typ:"feuer",pos:"kopf"}},
     // Bild: riesige Baumkreatur (viel groesser als jeder Humanoid im Baukasten), am Arm ein
     // gruen gluehendes rundes Etwas, umringt von winzigen leuchtenden Waldwesen — kein Ork,
     // keine Ruestung. 01.09., Sprite-Galerie-Fund: treant.png (Reemax, CC-BY 3.0, s.

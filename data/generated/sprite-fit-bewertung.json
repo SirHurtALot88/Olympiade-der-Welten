@@ -444,8 +444,8 @@
   "name": "Kora",
   "slug": "kora",
   "sterne": 3,
-  "begruendung": "Hörner, braunes Fell und Schwanz treffen die Beastfolk-Kategorie, aber das Gesicht wirkt eher wie ein Reh als ein Stier, und die Kriegskeule sowie die Lederrüstung fehlen.",
-  "fehlendesDetail": "Bullen-Gesicht statt Reh-Gesicht, dazu fehlen Kriegskeule und Lederrüstung"
+  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: waffe \"schwert\" auf \"axt\" umgestellt - das Portrait zeigt einen schweren, dorn-/klauenbesetzten Kriegshammer/Streitkeulenkopf auf langem Stiel, den die gebogene Axtklinge (axt_bg/fg) als Silhouette \"schwere Waffe auf einem Stiel\" sichtbar naeher trifft als die duenne Schwertklinge. Hoerner, brauner Fellton, Schwanz und Lederruestung (leder_frau) treffen die Beastfolk-Kategorie bereits; mit der Waffenkorrektur ist das kein blosser generischer Vertreter ihrer Kategorie mehr, sondern traegt jetzt auch die im Bild auffaelligste Requisite korrekt. Es bleibt die Kopf-Seitenansicht, die eher \"Reh\" als \"massiger Stier\" liest (Sonderpalette ohne Rekolorierung, keine bessere Kopf-Alternative im Baukasten verfuegbar) sowie die Guertel-/Beutel-Details aus dem Bild, die keine Entsprechung im Baukasten haben - zwei unabhaengige Luecken, deshalb weiterhin 3 statt 4 Sterne.",
+  "fehlendesDetail": null
  },
  {
   "name": "Krag'Zul",
@@ -548,9 +548,9 @@
  {
   "name": "Medibull",
   "slug": "medibull",
-  "sterne": 2,
-  "begruendung": "Gehörnter brauner Kopf als grobe Analogie zum Bullen-Sanitäter vorhanden, aber die Gesichtsform wirkt wie ein Reh statt eines Stiers, und die Sanitäter-Ausrüstung (Rotes-Kreuz-Armbinde, Verbandtasche, Stethoskop) fehlt komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: ruestTon \"dunkel\" ergaenzt (gedecktes Grau-Schwarz statt warmes Lederbraun, naeher an einer taktischen Sanitaeter-Weste). Die Stier-Sanitaeter-KATEGORIE stimmt (zweibeiniger Bauplan ist fuer dieses Bild strukturell korrekt, anders als beim Zentauren Ironhoof), Hoerner und brauner Fellton sind vorhanden - das ist mehr als ein blosser Kopf-Tausch auf einem Standard-Menschen. Es fehlen aber weiterhin MEHRERE eigenstaendige Details (Rotes-Kreuz-Armbinde, Verbandtasche, Stethoskop, gruene Cargo-Hose), dazu liest die Kopf-Seitenansicht eher \"Reh\" als \"massiger Stier\" - keine bessere Kopf-Alternative im Baukasten verfuegbar (kopf_wartotaur geprueft, wirkt wolfs-/daemonenartig statt bovin), kein Requisiten-Layer fuer Sanitaeter-Ausruestung vorhanden (binde.png liegt zwar im Baukasten, ist aber in keinem Zeichenpfad verdrahtet - Einbau braeuchte neue Engine-Logik).",
+  "fehlendesDetail": "Rotes-Kreuz-Armbinde, Verbandtasche und Stethoskop fehlen komplett; Kopf liest 'Reh' statt 'Stier'"
  },
  {
   "name": "Melody",
@@ -737,8 +737,8 @@
  {
   "name": "Roddox Harthelm",
   "slug": "roddox-harthelm",
-  "sterne": 2,
-  "begruendung": "Gehörnter brauner Kopf als grobe Analogie zum Minotaurus vorhanden, aber das Gesicht wirkt eher wie ein Reh als ein Stier, und der Holzknüppel sowie die Fell-Textur fehlen.",
+  "sterne": 3,
+  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: waffe \"schwert\" auf \"stab\" umgestellt - t_stab_bg/fg (schon bei Jorund im Einsatz) ist ein schlichter Holzstab/-stock ohne Klingenform und trifft den im Portrait sichtbaren schweren Holzknueppel/Stab sichtbar naeher als die vorherige Schwertklinge. Die Minotaurus-KATEGORIE stimmt (gehoernter Stierkopf auf zweibeinigem Koerper ist fuer dieses Bild strukturell korrekt), der benannte Requisiten-Fehlpunkt (Holzknueppel) ist damit behoben. Es bleiben aber weiterhin ZWEI unabhaengige, nicht mit einer einzelnen Korrektur zu behebende Luecken: die Kopf-Seitenansicht liest eher \"Reh\" als \"massiger Stier\" (Sonderpalette ohne Rekolorierung, keine bessere Kopf-Alternative im Baukasten - kopf_wartotaur geprueft, wirkt wolfs-/daemonenartig), und die satte Fell-Textur des Portraits hat keine Entsprechung im glatten Lederbraun des Baukastens.",
   "fehlendesDetail": null
  },
  {
@@ -849,9 +849,9 @@
  {
   "name": "Tartarus",
   "slug": "tartarus",
-  "sterne": 2,
-  "begruendung": "Gehörnter Kopf als grobe Analogie zum Dämon-Zentauren vorhanden, aber die schwarze Farbe, der zentaurische Unterkörper und die Kriegsaxt fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: kopf \"minotaur\" auf \"orc\" umgestellt, weil der Minotaurus-Kopf eine Sonderpalette traegt, die KEIN haut-Wert faerbt (Kopf blieb trotz haut:\"black\" sichtbar braun) - kopf:\"orc\" faerbt sich dagegen tatsaechlich um (dasselbe Verfahren wie bei Omniclops/Dyrth). haut \"fur_grey\" (reines Anthrazit-Grau, keine Braun-Stufe) statt \"black\" (das Dyrths eigene Bewertung schon als 'brauner Imp statt schwarz' notiert hat) - per renderProbe gegengeprueft: Kopf und Hoerner liegen jetzt einheitlich dunkelgrau. Kein reines Schwarz (das fehlt im Baukasten komplett), aber sichtbar naeher an der im Portrait gezeigten dunklen Farbe als das vorherige warme Minotaurus-Braun. hoerner:\"gebogen\" ergaenzt die grossen rueckwaerts gebogenen Hoerner, effekt:\"feuer\"/kopf naehert die an den Spitzen gluehenden Hoernerenden an, waffe \"schwert\" auf \"axt\" umgestellt (Portrait zeigt eindeutig eine Kriegsaxt). Drei der vier urspruenglich benannten Luecken (dunkle Farbe, Hoernerform, Kriegsaxt) sind damit angegangen. Der vierbeinige Zentauren-Unterkoerper aus dem Bild bleibt im LPC-Baukasten STRUKTURELL NICHT BAUBAR (kein passender Koerpertyp, dieselbe Baukasten-Luecke wie bei Ironhoof) - schwanz:true bleibt die einzige verfuegbare Annaeherung, das Sprite bleibt zweibeinig statt vierbeinig und bekommt deshalb trotz der behobenen Details keine 5 Sterne, sondern denselben Deckel wie Ironhoof.",
+  "fehlendesDetail": "Der vierbeinige Zentauren-Unterkoerper fehlt strukturell; nur die Oberkoerper-Details (Hoerner, Farbe, Axt) sind nachgeruestet."
  },
  {
   "name": "Taryn",
