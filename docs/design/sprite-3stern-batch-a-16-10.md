@@ -218,17 +218,28 @@ Enforcer, Gralakar — 17 PNGs geändert; Bombblitzer trägt keine Rezeptänderu
 Neubewertung, PNG unverändert). Arachna, Caldor, Erna Wellenlaut (reine Neubewertungen ohne
 Rezeptänderung) sowie die 14 unveränderten ★★★-Charaktere behalten ihr bestehendes PNG.
 
-## Merge-Konflikt-Hinweis für den Koordinator
+## Merge gegen `origin/main` — tatsächlich durchgeführt, nicht nur angekündigt
 
-Diese Runde lief parallel zu Sprite-3-Stern-Batch B und C auf denselben zwei Dateien
-(`public/mockups/battle-mode.engine.js`, `data/generated/sprite-fit-bewertung.json`),
-disjunkte Charakternamen. `data/generated/sprite-fit-bewertung.json` wurde mit
-`JSON.stringify(data, null, 1)` geschrieben (1-Leerzeichen-Einzug, verifiziert: Zeile 2 ist
-` {`). Vor dem Öffnen des PRs wird `origin/main` neu geholt und gemergt; ein Konflikt in den
-beiden gemeinsamen Dateien wird nach demselben Muster wie in früheren Runden heute gelöst
-(disjunkte Pro-Charakter-Hunks kombinieren; ein reiner Formatierungskonflikt in der JSON-Datei
-wird mit dem korrekten 1-Leerzeichen-Einzug neu geschrieben). Die neuen `RUEST_TON`/`HAUT`-
-Tabelleneinträge (`gruen`, `eis`, `rot`, `schwarz`) könnten mit einer unabhängig von Batch B/C
-hinzugefügten, gleichnamigen Rampe kollidieren — in diesem Fall beide Einträge inhaltlich
-vergleichen und nur EINEN behalten (gleiche Farbwerte erwartet, falls beide dieselbe
-Portrait-Lücke unabhängig gefunden haben).
+`origin/main` war beim PR-Vorbereiten bereits einen Commit weiter (#1257, "Sprite-Fit
+2-Sterne-Batch A") als der Fork-Punkt dieser Branch. `git merge origin/main` lief, zwei
+Konflikte in `public/mockups/battle-mode.engine.js` traten auf (die JSON-Datei mergte sauber
+automatisch):
+
+1. **Emphi/Lady Mournvale** — rein räumlich benachbarte, inhaltlich disjunkte Hunks (meine
+   Emphi-Zeile, ihre neue Lady-Mournvale-Zeile direkt darunter) — beide kombiniert.
+2. **Ciacia/Kento** — dieselbe räumliche Nachbarschaft, aber mit einem echten Fund: die
+   2-Sterne-Batch-A-Runde hatte Kento geändert (kapuze→helm, weil `b.kapuze` nachweislich NIE
+   einfärbbar ist — **bestätigt unabhängig genau denselben Befund, den diese Runde bei Bana
+   gemacht hat**), Ciacia selbst blieb auf der `origin/main`-Seite unverändert (nur meine
+   Seite hatte die Bronze-/Frost-Korrektur). Kein echter Doppel-Edit desselben Charakters,
+   beide Zeilen unverändert kombiniert.
+
+Nach dem Merge: `node --check` erneut OK, keine verbliebenen Konfliktmarker (grep-bestätigt),
+keine doppelten `BAU`-Einträge (grep-bestätigt je Name), alle 17 geänderten Vorschau-PNGs
+gegen die gemergte Datei neu erzeugt — identisch zu den vor dem Merge erzeugten (der Merge
+betraf nur benachbarte Kommentare/fremde Charaktere, keinen meiner 30 inhaltlich).
+`data/generated/sprite-fit-bewertung.json` bleibt nach dem Merge bei 145 Einträgen, keine
+Duplikate, Zeile 2 weiterhin ` {` (1-Leerzeichen-Einzug).
+
+Ein zweiter `git fetch origin main` direkt vor dem Push bestätigte: keine weiteren Commits
+zwischenzeitlich gelandet. Branch ist konfliktfrei gegen den aktuellen `origin/main`-Stand.
