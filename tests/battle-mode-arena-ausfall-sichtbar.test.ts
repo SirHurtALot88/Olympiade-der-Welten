@@ -203,7 +203,7 @@ describe("Engine-Strukturprüfung · arena-aufgelöste Disziplin ohne Arena-Erge
 });
 
 describe("Ledger-Feld · arenaAusfall kommt im DisciplineResultWritePayload an", () => {
-  it("wird aus der Preview-Zeile 1:1 in den Schreib-Payload übernommen", async () => {
+  it("wird aus der Preview-Zeile additiv in den Schreib-Payload übernommen — NICHT als `null`-Schlüssel auf jeder Zeile", async () => {
     const { mapLegacyMatchdayResolvePreviewToResultPayload } = await import("@/lib/resolve/legacy-matchday-result-mapper");
     const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
     const bundle = mapLegacyMatchdayResolvePreviewToResultPayload({
@@ -215,11 +215,29 @@ describe("Ledger-Feld · arenaAusfall kommt im DisciplineResultWritePayload an",
     for (const zeile of gewichthebenZeilen) {
       expect(zeile.arenaAusfall).toMatchObject({ grund: "nicht_ausgefuehrt" });
     }
+    // REGRESSION (Opus-Review): `arenaAusfall: teamResult.arenaAusfall ?? null` hätte den
+    // Schlüssel auch auf JEDER Battlefield-Zeile (nicht arena-aufgelöst) als `null` angelegt --
+    // additiv heißt: der Schlüssel fehlt dort komplett, nicht nur sein Wert ist null.
     const battlefieldZeilen = bundle.disciplineResultPayloads.filter((p) => p.disciplineId === D2_NICHT_ARENA);
+    expect(battlefieldZeilen.length).toBeGreaterThan(0);
     for (const zeile of battlefieldZeilen) {
-      expect(zeile.arenaAusfall ?? null).toBeNull();
+      expect(Object.prototype.hasOwnProperty.call(zeile, "arenaAusfall")).toBe(false);
     }
   });
+
+  it(
+    "Manager-Save: der geschriebene Payload (nicht nur die Preview) bekommt den Schlüssel arenaAusfall nie — " +
+      "deckt genau die Stelle ab, die der Bit-Identitäts-Hash (nur Preview/Ledger-Lesung/Nachbuchung) NICHT prüft",
+    async () => {
+      const { mapLegacyMatchdayResolvePreviewToResultPayload } = await import("@/lib/resolve/legacy-matchday-result-mapper");
+      const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("manager")));
+      const bundle = mapLegacyMatchdayResolvePreviewToResultPayload({ preview, sourceVersion: "test" });
+      expect(bundle.disciplineResultPayloads.length).toBeGreaterThan(0);
+      for (const zeile of bundle.disciplineResultPayloads) {
+        expect(Object.prototype.hasOwnProperty.call(zeile, "arenaAusfall")).toBe(false);
+      }
+    },
+  );
 });
 
 describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, kein konstruierter Context)", () => {

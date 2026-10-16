@@ -239,7 +239,13 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
           momente: teamResult.momente,
-          arenaAusfall: teamResult.arenaAusfall ?? null,
+          // SICHTBARE ARENA-AUSFÄLLE: additiv wie `verhaeltnis` zwei Zeilen weiter unten -- der
+          // Schlüssel erscheint nur, wenn die Preview-Zeile tatsächlich einen Ausfall trägt. Ein
+          // unbedingtes `arenaAusfall: teamResult.arenaAusfall ?? null` (wie zuvor hier) hätte
+          // AUCH Manager-Mode-Zeilen (dort ist `arenaAusfall` nie gesetzt) ein neues Feld
+          // `arenaAusfall: null` eingeschrieben -- widerspricht dem Muster direkt darunter
+          // ("nur Duell-Zeilen tragen die Felder, Manager-Mode bleibt unveraendert").
+          ...(teamResult.arenaAusfall ? { arenaAusfall: teamResult.arenaAusfall } : {}),
           // PUNKTEVERHAELTNIS: nur Duell-Zeilen tragen die Felder (Manager-Mode-Zeilen bleiben unveraendert).
           ...(teamResult.verhaeltnis != null
             ? {
