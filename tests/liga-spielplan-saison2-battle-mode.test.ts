@@ -4,6 +4,8 @@ import type { Discipline, Fixture, GameState, Player, Team } from "@/lib/data/ol
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { createPlayerBaselineFromPlayer } from "@/lib/players/player-baseline-service";
 import type { LeagueTier } from "@/lib/season/league-split";
+import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
+import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
 
 const {
   applyPreSeasonNextSeasonSetupLightweight,
@@ -131,9 +133,14 @@ const DISCIPLINES: Discipline[] = [
  * `seasonState.leagueByTeamId` gesetzt oder leer -- alles andere ist identisch, damit die
  * Gegenprobe wirklich nur den einen Schalter testet, den `isLeagueSplitActive()` liest.
  */
-function buildSeasonOneEndSave(options: { withLeagueSplit: boolean }): PersistedSaveGame {
+function buildSeasonOneEndSave(options: {
+  withLeagueSplit: boolean;
+  /** W2: eine 20-Spieltage-Battle-Saison (Battle-Save, 20 Disziplinen, 20 Spieltage). */
+  doubledBattleSeason?: boolean;
+}): PersistedSaveGame {
   const { teams, leagueByTeamId } = buildLeagueTeams();
-  const matchdayIds = Array.from({ length: MATCHDAY_COUNT }, (_, index) => `md-${index + 1}`);
+  const matchdayCount = options.doubledBattleSeason ? 20 : MATCHDAY_COUNT;
+  const matchdayIds = Array.from({ length: matchdayCount }, (_, index) => `md-${index + 1}`);
   const players = [createPlayer(), createPlayer({ id: "p-ai", name: "AI Player", className: "Mage" })];
   const standings: GameState["seasonState"]["standings"] = Object.fromEntries(
     teams.map((team, index) => [team.teamId, { points: teams.length - index, rank: index + 1 }]),
@@ -141,7 +148,10 @@ function buildSeasonOneEndSave(options: { withLeagueSplit: boolean }): Persisted
 
   const gameState: GameState = {
     gamePhase: "season_review",
-    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: MATCHDAY_COUNT, matchdayIds },
+    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: matchdayCount, matchdayIds },
+    ...(options.doubledBattleSeason
+      ? { scenarioMeta: { gameMode: "battle" } as unknown as GameState["scenarioMeta"] }
+      : {}),
     seasonState: {
       seasonId: "season-1",
       schedule: [{ id: "fixture-season-1-1", homeTeamId: "L1-01", awayTeamId: "L1-02", matchdayId: "md-1", status: "resolved" }],
@@ -206,7 +216,7 @@ function buildSeasonOneEndSave(options: { withLeagueSplit: boolean }): Persisted
     playerBaselines: players.map((player) =>
       createPlayerBaselineFromPlayer(player, { source: "seed", createdAt: "2026-06-11T00:00:00.000Z" }),
     ),
-    disciplines: DISCIPLINES,
+    disciplines: options.doubledBattleSeason ? foundationSeedDisciplines : DISCIPLINES,
     rosters: [
       { id: "r-human", teamId: "L1-01", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, roleTag: "starter", joinedSeasonId: "season-1" },
       { id: "r-ai", teamId: "L2-01", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, roleTag: "bench", joinedSeasonId: "season-1" },
@@ -353,5 +363,55 @@ describe("liga-spielplan ab saison 2 (battle mode)", () => {
 
     expect(finalGameState.seasonState.schedule).toEqual(expectedFixtures);
     expect(finalGameState.seasonState.schedule.every((fixture) => fixture.leagueTier === undefined)).toBe(true);
+  });
+
+  it("W2: eine 20-Spieltage-Battle-Saison vererbt 20 Spieltage, beide Halbserien und den Doppel-Rundenplan an Saison 2", () => {
+    const sourceSave = buildSeasonOneEndSave({ withLeagueSplit: true, doubledBattleSeason: true });
+    expect(isFatigueActiveRecoveryEnabled(sourceSave.gameState)).toBe(true);
+    let nextGameState: GameState | null = null;
+    const previous = process.env.OLY_TRANSFER_PIPELINE_FAST;
+    process.env.OLY_TRANSFER_PIPELINE_FAST = "1";
+    try {
+      const persistence = {
+        bootstrapSingleplayerSave: () => ({ save: sourceSave, createdFromSeed: false }),
+        getActiveSave: () => sourceSave,
+        getSaveById: () => sourceSave,
+        saveSingleplayerState: (saveId: string, gameState: GameState) => {
+          nextGameState = gameState;
+          return { ...sourceSave, saveId, gameState };
+        },
+      } as unknown as PersistenceService;
+      const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+      expect(applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence).applied).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.OLY_TRANSFER_PIPELINE_FAST;
+      else process.env.OLY_TRANSFER_PIPELINE_FAST = previous;
+    }
+    if (!nextGameState) throw new Error("Expected season transition to persist a game state.");
+    const saison2: GameState = nextGameState;
+
+    expect(saison2.season.id).toBe("season-2");
+    expect(saison2.season.matchdayIds).toHaveLength(20);
+    const plan = saison2.seasonState.disciplineSchedule ?? [];
+    expect(plan).toHaveLength(20);
+    const zaehler = new Map<string, number[]>();
+    for (const entry of plan) {
+      for (const slot of [entry.discipline1, entry.discipline2]) {
+        expect(slot?.disciplineId).toBeTruthy();
+        zaehler.set(slot!.disciplineId, [...(zaehler.get(slot!.disciplineId) ?? []), entry.matchdayIndex]);
+      }
+    }
+    expect(zaehler.size).toBe(20);
+    for (const indizes of zaehler.values()) {
+      expect(indizes).toHaveLength(2);
+      expect(Math.min(...indizes)).toBeLessThanOrEqual(10);
+      expect(Math.max(...indizes)).toBeGreaterThanOrEqual(11);
+    }
+    // 2 Ligen * 20 Spieltage * 8 Paarungen, ohne Rundenwrap-Warnung.
+    expect(saison2.seasonState.schedule).toHaveLength(320);
+    const auditLog = saison2.seasonState.preSeasonWorkflowLogs?.[0];
+    expect((auditLog?.warnings ?? []).some((warning) => warning.includes("exceeds_rounds"))).toBe(false);
+    // Die aktive Erholung bleibt in der Folgesaison scharf.
+    expect(isFatigueActiveRecoveryEnabled(saison2)).toBe(true);
   });
 });

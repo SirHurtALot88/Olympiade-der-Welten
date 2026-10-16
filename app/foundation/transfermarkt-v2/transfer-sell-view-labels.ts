@@ -299,7 +299,7 @@ export type SellPreviewIssue = {
 
 const SELL_WINDOW_CLOSED_BY_PHASE: Record<string, { message: string; hint: string }> = {
   season_active: {
-    message: "Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach Spieltag 10.",
+    message: "Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach dem letzten Spieltag.",
     hint: "Bis dahin kannst du hier alles prüfen: Marktwert und Verkaufspreis siehst du im Kader und auf dem Transfermarkt.",
   },
   season_completed: {

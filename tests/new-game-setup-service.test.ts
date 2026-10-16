@@ -7,6 +7,7 @@ import {
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -113,6 +114,17 @@ describe("new-game-setup-service", () => {
     // unangetastet (der alte, saveunabhaengige Dummy-Platzhalter aus dem Seed), nicht die
     // 160-Fixture-Liga-Split-Paarung.
     expect(gameState.seasonState.schedule).not.toHaveLength(160);
+    // W2 bleibt Battle-only: Manager Mode behält 10 Spieltage, jede Disziplin einmal, und KEINE
+    // aktive Erholung (Chris' laufender Manager-Save darf davon nicht berührt werden).
+    expect(gameState.season.matchdayIds).toHaveLength(10);
+    expect(gameState.seasonState.disciplineSchedule).toHaveLength(10);
+    expect(
+      (gameState.seasonState.disciplineSchedule ?? []).every(
+        (entry) => entry.discipline1?.occurrenceInSeason === undefined && entry.discipline2?.occurrenceInSeason === undefined,
+      ),
+    ).toBe(true);
+    expect(isFatigueActiveRecoveryEnabled(gameState)).toBe(false);
+    expect(preview.seasonSetup.matchdayCount).toBe(10);
   }, 120_000);
 
   it("sets Season 1 setup and LEAGUE-LOCAL start ranks for a Battle Mode game (gameMode: \"battle\")", () => {
@@ -139,10 +151,40 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.standings["R-R"]?.rank).toBe(16);
     expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
     expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
+    // W2 (16.10.): ein Battle-Save hat 20 Spieltage, jede Disziplin genau zweimal — einmal je
+    // Saisonhälfte, die zweite Kadergröße nie gleich der ersten (Chris 06.09.).
+    expect(gameState.season.matchdayIds).toHaveLength(20);
+    expect(gameState.season.matchdayIds[19]).toBe("matchday-20");
+    expect(gameState.seasonState.disciplineSchedule).toHaveLength(20);
+    const vorkommen = new Map<string, Array<{ index: number; size: number | null | undefined; occ?: number }>>();
+    for (const entry of gameState.seasonState.disciplineSchedule ?? []) {
+      for (const slot of [entry.discipline1, entry.discipline2]) {
+        if (!slot?.disciplineId) continue;
+        vorkommen.set(slot.disciplineId, [
+          ...(vorkommen.get(slot.disciplineId) ?? []),
+          { index: entry.matchdayIndex, size: slot.playerCount, occ: slot.occurrenceInSeason },
+        ]);
+      }
+    }
+    expect(vorkommen.size).toBe(20);
+    for (const [disciplineId, eintraege] of vorkommen) {
+      expect(eintraege, disciplineId).toHaveLength(2);
+      const [erstes, zweites] = [...eintraege].sort((a, b) => a.index - b.index);
+      expect(erstes!.index).toBeLessThanOrEqual(10);
+      expect(zweites!.index).toBeGreaterThanOrEqual(11);
+      expect(erstes!.occ).toBe(1);
+      expect(zweites!.occ).toBe(2);
+      if (disciplineId !== "mini-dm") {
+        expect(zweites!.size, disciplineId).not.toBe(erstes!.size);
+      }
+    }
+    // ... und die aktive Erholung greift in genau dieser Saison (Fatigue-Plan Teil C).
+    expect(isFatigueActiveRecoveryEnabled(gameState)).toBe(true);
+    expect(preview.seasonSetup.matchdayCount).toBe(20);
     // Echter Spielplan der ersten Saison statt der Dummy-Paarung (Plan-Abschnitt 5): 2 Ligen *
-    // 10 Spieltage * 8 Paarungen = 160 Fixtures, jedes Team genau 1 Fixture pro Spieltag, alle
-    // Paarungen liga-intern.
-    expect(gameState.seasonState.schedule).toHaveLength(160);
+    // 20 Spieltage * 8 Paarungen = 320 Fixtures (Doppel-Rundenplan), jedes Team genau 1 Fixture
+    // pro Spieltag, alle Paarungen liga-intern.
+    expect(gameState.seasonState.schedule).toHaveLength(320);
     const md1Fixtures = gameState.seasonState.schedule.filter(
       (fixture) => fixture.matchdayId === gameState.season.matchdayIds[0],
     );

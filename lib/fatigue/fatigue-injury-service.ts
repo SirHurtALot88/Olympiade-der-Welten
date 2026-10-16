@@ -22,6 +22,7 @@ import {
 } from "@/lib/fatigue/fatigue-calibration";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { slimInjuryEvent } from "@/lib/persistence/save-payload-slimming";
+import { isDoubledBattleSeason } from "@/lib/season/season-discipline-schedule";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
@@ -211,46 +212,87 @@ export const BASE_MATCHDAY_RECOVERY = envNumber("OLY_FATIGUE_RECOVERY", 28);
  * verbraucht. Rotation SENKT die Fatigue weiterhin (Bank bleibt 5,6× stärker als der Normal-Load
  * netto), statt sie nur langsamer steigen zu lassen.
  *
+ * (Das war die PLAN-Rechnung mit 11. Vermessen an einer Liga trägt 11 Chris' Verletzungskorridor
+ * nicht — der gültige Wert ist 4,5, die Tabelle wird damit +7,5 / +11,5 / +17,9 / −28. Begründung
+ * und Messung an `MATCHDAY_ACTIVE_RECOVERY` unten.)
+ *
  * WARUM DER BANK-BONUS ABGELEITET IST statt eingetippt: `BASE_MATCHDAY_RECOVERY` hängt an
  * `OLY_FATIGUE_RECOVERY`. Stünde hier eine feste 17, würde jede ENV-Verstellung der Basis die
  * Summe auseinanderlaufen lassen und die Bank-Erholung still verändern. So bleibt
  * `aktiv + bank-bonus === BASE_MATCHDAY_RECOVERY` per Konstruktion, egal wie getunt wird.
  *
  * ZWEI ÄHNLICHE ENV-NAMEN, ZWEI VERSCHIEDENE DINGE:
- *   OLY_FATIGUE_ACTIVE_RECOVERY        — der SCHALTER (an/aus), siehe unten. Default AUS.
- *   OLY_FATIGUE_ACTIVE_RECOVERY_VALUE  — die ZAHL (11), zum Nachtunen ohne Code-Änderung.
+ *   OLY_FATIGUE_ACTIVE_RECOVERY        — der SCHALTER, siehe unten. Ohne ENV entscheidet der
+ *                                        Spielstand (AN nur in einer 20-Spieltage-Battle-Saison).
+ *   OLY_FATIGUE_ACTIVE_RECOVERY_VALUE  — die ZAHL (4,5, vermessen), zum Nachtunen ohne Code-Änderung.
+ */
+/**
+ * 11 -> 4,5 — VERMESSEN, NICHT GESETZT (Fatigue-Plan PR2, `docs/design/fatigue-aktive-erholung-
+ * korridor-16-10.md`, Werkzeug `scripts/messe-erholungskorridor.ts`).
+ *
+ * Die 11 aus dem Plan (B.4) war eine Rechnung am DAUERSTARTER, nie eine Messung an einer Liga. In
+ * der Basisfall-Liga (32 Kader wie im Live-Spielstand, echter Spielplan, Rotation „niedrigste
+ * Fatigue zuerst") drückt sie die Verletzungen einer 20-Spieltage-Saison auf 2 — Chris hat aber am
+ * 30.08. entschieden (Plan E.1): „gleiche absolute Zielzahl 150-200 je Saison, auch bei 20
+ * Spieltagen". Gemessen, Basisfall, zwei unabhängige Saatstämme à 16 Spielpläne:
+ *
+ *   aktiv      10 Spieltage     20 Spieltage
+ *   (aus)      112 / 106        482 / 461     <- ohne aktive Erholung: Faktor 4,3 statt 2
+ *    11          0 /   0          2 /   2
+ *     5         25 /  23        135 / 130
+ *   4,5         30 /  28        159 / 154     <- hier: mitten in 150-200
+ *     4         35 /  32        184 / 181
+ *
+ * Gilt NUR, wo der Schalter greift — heute ausschliesslich in einer Battle-Mode-Saison mit 20
+ * Spieltagen (`isFatigueActiveRecoveryEnabled`). Für jeden Manager-Spielstand und jede laufende
+ * 10-Spieltage-Saison bleibt die Zahl ungenutzt, und die Bank-Erholung (Summe beider Teile) ist
+ * ohnehin unverändert 28.
  */
 export const MATCHDAY_ACTIVE_RECOVERY = Math.min(
   BASE_MATCHDAY_RECOVERY,
-  envNumber("OLY_FATIGUE_ACTIVE_RECOVERY_VALUE", 11),
+  envNumber("OLY_FATIGUE_ACTIVE_RECOVERY_VALUE", 4.5),
 );
 
 /** Der Rotations-Aufschlag: was ein Bank-/Verletzten-Spieltag ÜBER die aktive Erholung hinaus gibt. */
 export const MATCHDAY_BENCH_BONUS_RECOVERY = round(BASE_MATCHDAY_RECOVERY - MATCHDAY_ACTIVE_RECOVERY);
 
-function envFlag(name: string) {
+/** Dreiwertig: explizit an, explizit aus, oder nicht gesetzt (dann entscheidet der Spielstand). */
+function envSwitch(name: string): boolean | null {
   const raw = process.env[name];
-  if (typeof raw !== "string") return false;
+  if (typeof raw !== "string") return null;
   const value = raw.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "on" || value === "yes";
+  if (value === "1" || value === "true" || value === "on" || value === "yes") return true;
+  if (value === "0" || value === "false" || value === "off" || value === "no") return false;
+  return null;
 }
 
 /**
- * DER SCHALTER — Default AUS, und das ist Absicht.
+ * DER SCHALTER — an genau dort, wo die Saison doppelt so lang ist, sonst nirgends.
  *
- * Solange `OLY_FATIGUE_ACTIVE_RECOVERY` nicht gesetzt ist, verhält sich das Spiel exakt wie vorher:
- * Einsatz-Spieler bekommen keine Erholung, jede bestehende Saison rechnet unverändert weiter. Die
- * Umstellung des Defaults ist ein eigener Schritt (PR3 im Designplan), NACHDEM der
- * Verletzungs-Korridor für das neue Modell neu vermessen wurde (PR2) — die heutige Kalibrierung
- * „150-200 Verletzungen je Saison" ist wörtlich für die Ratchet-Formel oben gemessen und gilt für
- * das neue Modell nicht mehr.
+ * Fatigue-Plan Teil C: 20 Spieltage dürfen nicht ohne aktive Erholung laufen (ohne sie: 482 statt
+ * 112 Verletzungen, Faktor 4,3 — siehe `MATCHDAY_ACTIVE_RECOVERY`). Umgekehrt darf die aktive
+ * Erholung KEINE laufende Saison verändern: auf dem Server läuft Chris' Manager-Spielstand mitten in
+ * einer 10-Spieltage-Saison, deren Verletzungsmodell auf die Ratchet-Formel kalibriert ist.
  *
- * Bewusst eine FUNKTION statt einer Modul-Konstante: sie liest die Umgebung bei jedem Aufruf, damit
- * ein Test (und ein Mess-Skript) beide Welten in EINEM Lauf gegeneinanderstellen kann, ohne das
- * Modul neu laden zu müssen.
+ * Deshalb kein globaler Default-Wechsel, sondern dasselbe Muster wie Liga-Split und Spielmodus
+ * (`isLeagueSplitActive`, `isBattleModeSave`): der Spielstand entscheidet. AN genau dann, wenn
+ * `isDoubledBattleSeason(gameState)` — Battle-Mode-Save UND die laufende Saison trägt 20
+ * Spieltage. Eine solche Saison entsteht nur bei Anlage eines neuen Battle-Saves (und erbt sich
+ * von dort in die Folgesaisons); sie trägt die aktive Erholung vom ersten Spieltag an. Jeder
+ * Manager-Spielstand und jede Battle-Saison mit 10 Spieltagen (Alt-Saves) bleibt bit-identisch.
+ *
+ * `OLY_FATIGUE_ACTIVE_RECOVERY` bleibt als Mess-/Notschalter: „1" erzwingt AN, „0" erzwingt AUS
+ * (beides für jeden Spielstand), nicht gesetzt = der Spielstand entscheidet.
+ *
+ * Bewusst eine FUNKTION, die die Umgebung bei jedem Aufruf liest, damit Test und Mess-Skript beide
+ * Welten in EINEM Lauf gegeneinanderstellen können.
  */
-export function isFatigueActiveRecoveryEnabled() {
-  return envFlag("OLY_FATIGUE_ACTIVE_RECOVERY");
+export function isFatigueActiveRecoveryEnabled(
+  gameState?: Pick<GameState, "scenarioMeta" | "season" | "disciplines"> | null,
+) {
+  const forced = envSwitch("OLY_FATIGUE_ACTIVE_RECOVERY");
+  if (forced !== null) return forced;
+  return gameState ? isDoubledBattleSeason(gameState) : false;
 }
 
 /**
@@ -719,7 +761,7 @@ export function getPlayerActiveRecoveryCredit(
   teamId: string,
   trainingMode: PlayerTrainingMode | null | undefined,
 ) {
-  if (!isFatigueActiveRecoveryEnabled()) {
+  if (!isFatigueActiveRecoveryEnabled(gameState)) {
     return 0;
   }
   return calculatePlayerRecovery(gameState, teamId, trainingMode).activeRecovery;

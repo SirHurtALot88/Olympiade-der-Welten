@@ -42,6 +42,32 @@ export function getSeasonDisciplineRepeatCount(gameState: Pick<GameState, "scena
   return isBattleModeSave(gameState) ? 2 : 1;
 }
 
+/**
+ * Trägt DIESE Saison schon die doppelte Länge (jede Disziplin zweimal)? Battle-Mode-Save UND
+ * `season.matchdayIds` mindestens so lang wie ein Plan mit `repeat: 2` (20 bei 20 Disziplinen).
+ *
+ * Das ist bewusst NICHT `getSeasonDisciplineRepeatCount` allein: ein Battle-Save, der vor der
+ * Umstellung mit 10 Spieltagen angelegt wurde, bleibt bei 10 (keine stille Migration, Recherche
+ * 06.09. Frage 10) — seine Saisons sind keine Doppelsaisons, und nichts, was an der doppelten
+ * Länge hängt (Halbserien beim Neuaufbau, aktive Erholung), darf ihn mitten in der Saison
+ * erreichen. Nur ein Save, dessen Saison WIRKLICH 20 Spieltage trägt, bekommt `true`.
+ */
+export function isDoubledBattleSeason(gameState: Pick<GameState, "scenarioMeta" | "season" | "disciplines">): boolean {
+  if (getSeasonDisciplineRepeatCount(gameState) !== 2) return false;
+  const disciplines = gameState.disciplines ?? [];
+  const single = getRequiredSeasonDisciplineMatchdayCount(disciplines, 1);
+  const doubled = getRequiredSeasonDisciplineMatchdayCount(disciplines, 2);
+  if (doubled <= single) return false;
+  return (gameState.season?.matchdayIds?.length ?? 0) >= doubled;
+}
+
+/** `repeat` der LAUFENDEN Saison: 2 nur in einer echten Doppelsaison, sonst 1 (siehe oben). */
+export function getActiveSeasonDisciplineRepeatCount(
+  gameState: Pick<GameState, "scenarioMeta" | "season" | "disciplines">,
+): 1 | 2 {
+  return isDoubledBattleSeason(gameState) ? 2 : 1;
+}
+
 function toScheduleSlot(
   discipline: Discipline | null,
   playerCountOverride?: number | null,
@@ -586,10 +612,14 @@ function buildResolvedSeasonDisciplineSchedule(
   gameState: GameState,
   saveId = "normalized-local-save",
 ): SeasonDisciplineScheduleEntry[] {
+  // W2: in einer echten 20-Spieltage-Battle-Saison baut der Neuaufbau die zwei Halbserien, statt
+  // die Saison auf 10 Spieltage zu stutzen. Für jeden anderen Save ist `repeat` 1 — unverändert.
+  const repeat = getActiveSeasonDisciplineRepeatCount(gameState);
   const matchdayIds = buildNormalizedMatchdayIds({
     seasonId: gameState.season.id,
     disciplines: gameState.disciplines,
     matchdayIds: gameState.season.matchdayIds,
+    repeat,
   });
   return buildSeasonSeededDisciplineSchedule({
     saveId,
@@ -597,6 +627,7 @@ function buildResolvedSeasonDisciplineSchedule(
     disciplines: gameState.disciplines,
     matchdayIds,
     matchdayCount: matchdayIds.length,
+    ...(repeat === 2 ? { repeat } : {}),
   }).entries;
 }
 
@@ -617,6 +648,8 @@ export function getSeasonDisciplineSchedule(gameState: GameState, options?: { sa
       disciplines: gameState.disciplines,
       disciplineSchedule: stored,
       seasonId: gameState.season.id,
+      // 1 für jeden Manager- und jeden 10-Spieltage-Battle-Save — bit-identisch zum Stand davor.
+      repeat: getActiveSeasonDisciplineRepeatCount(gameState),
     })
   ) {
     const activeSchedule = sortScheduleEntries(stored.filter((entry) => entry.seasonId === gameState.season.id));

@@ -12,7 +12,10 @@ import {
   runSeasonEndProgressionBatch,
   type SeasonEndProgressionBatchResult,
 } from "@/lib/progression/season-end-progression-batch";
-import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonSeededDisciplineSchedule,
+  getActiveSeasonDisciplineRepeatCount,
+} from "@/lib/season/season-discipline-schedule";
 import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
 import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
@@ -545,11 +548,21 @@ function buildNextSeasonGameState(
     : saveNachVertragsalterung;
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
+  /**
+   * W2 — DIE FOLGESAISON ERBT DIE LÄNGE, UND MIT IHR DIE HALBSERIEN. War die abgelaufene Saison eine
+   * 20-Spieltage-Battle-Saison (`isDoubledBattleSeason`), wird auch die neue mit `repeat: 2` gebaut —
+   * sonst bekäme sie 20 `matchdayIds`, aber nur 20 Disziplin-Slots für 40 (zehn leere Spieltage).
+   * Jeder Manager-Save und jeder 10-Spieltage-Battle-Save (Alt-Save, keine Migration) bleibt bei
+   * `repeat` 1 und damit beim exakt gleichen Aufruf wie vorher.
+   */
+  const seasonRepeat = getActiveSeasonDisciplineRepeatCount(save.gameState);
+  const repeatOption = seasonRepeat === 2 ? { repeat: seasonRepeat } : {};
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
     saveId: save.saveId,
     seasonId: nextSeasonId,
     disciplines: save.gameState.disciplines,
     matchdayCount: save.gameState.season.matchdayIds.length || 10,
+    ...repeatOption,
   });
   let scheduleRerollCount = 0;
   while (
@@ -564,6 +577,7 @@ function buildNextSeasonGameState(
       disciplines: save.gameState.disciplines,
       matchdayCount: save.gameState.season.matchdayIds.length || 10,
       scheduleVersion: `season-setup-v2-reroll-${scheduleRerollCount}`,
+      ...repeatOption,
     });
   }
   const matchdayIds = schedulePlan.matchdayIds;
