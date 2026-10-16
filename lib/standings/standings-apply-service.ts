@@ -314,6 +314,9 @@ function writeLocalStandingsApply(input: {
       rank: item.projectedRank,
       matchdayBaselinePoints: baselinePoints,
       matchdayBaselineId: matchdayId,
+      // PUNKTEVERHAELTNIS: nur wenn der Preview eins traegt (Battle-Duelle), sonst bleibt der
+      // Datensatz byte-identisch.
+      ...(item.projectedVerhaeltnis != null ? { verhaeltnis: item.projectedVerhaeltnis } : {}),
     };
   }
 

@@ -313,6 +313,13 @@ export type StandingRecord = {
    */
   matchdayBaselinePoints?: number | null;
   matchdayBaselineId?: string | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): Saisonsumme der
+   * ±D-Werte aller gebuchten Battle-Duelle — Tiebreaker nach `points`, KEINE Zusatzpunkte. Nur in
+   * Battle-Saves gesetzt; wird bei jeder Buchung aus `DisciplineResultRecord.verhaeltnis` neu
+   * summiert (idempotent, keine eigene Baseline noetig), s. lib/standings/standings-verhaeltnis.ts.
+   */
+  verhaeltnis?: number | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;
@@ -2579,8 +2586,21 @@ export type DisciplineResultRecord = {
    */
   teamPoints?: number | null;
   pointSource?: string;
-  resolutionSource?: "pps" | "arena";
+  /** `"pps_duell"` seit der PPS-Duell-Bruecke (16.10.), s. `DisciplineResolutionSource` in legacy-matchday-resolve-types.ts. */
+  resolutionSource?: "pps" | "arena" | "pps_duell";
   arenaMatchSeed?: string | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): additiv und
+   * optional wie `momente`, nur an Battle-Duell-Zeilen gesetzt. `marge` = roher Abstand beider
+   * Seiten, `verhaeltnis` = ±D (0..10) aus Sicht dieses Teams, `margeM90` = die verwendete
+   * Bezugsgroesse (`null` = Rueckfall-D), `duellSeiten` = Rohwerte [dieses Team, Gegner]. Rohwerte
+   * UND D werden gespeichert, damit eine Nachjustierung der Formel keine neue Simulation braucht.
+   */
+  opponentTeamId?: string | null;
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
   /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
    * Klasse A): wie `arenaMatchSeed` additiv und optional -- aeltere Zeilen (vor dieser Aenderung

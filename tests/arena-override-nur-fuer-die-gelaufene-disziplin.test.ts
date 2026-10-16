@@ -38,9 +38,9 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS, ARENA_TEAM_POINTS } from "@/lib/resolve/
  * tragen koennen, ohne sich zu ueberschreiben (der eigentliche Weg-B-Fall).
  */
 
-const D1_ARENA = "basketball";
+const D1_ARENA = "speed-schach";
 /** Zweite, EBENFALLS arena-aufgeloeste Disziplin -- genau der Fall, um den es hier geht. */
-const D2_AUCH_ARENA = "hockey";
+const D2_AUCH_ARENA = "gewichtheben"; // bis 16.10. "hockey" — Hockey ist ohne frische Pp-Messung nicht mehr gewertet
 
 describe("Vorbedingung", () => {
   it("beide Testdisziplinen sind arena-aufgeloest -- sonst prueft dieser Test nichts", () => {

@@ -1,0 +1,1761 @@
+{
+ "hinweis": "M90 (90. Perzentil des rohen Duell-Abstands m) je Quelle, Disziplin und Feldgroesse fuer das Punkteverhaeltnis D = max(1, round(10*min(1, m/M90))). Gelesen von resolveMargeReferenz() in lib/resolve/battle-mode-pps-duell.ts. Quelle 'pps' = |PPS-Score Heim - Gast| ueber buildLegacyMatchdayResolvePreview() mit der KI-Aufstellung des Spiels (scripts/ziehe-verhaeltnis-referenz.ts, --aufstellung=ki, 3 Spieltage, je Disziplin und Feldgroesse 96 Fixtures, zwei Laeufe mit je zehn Disziplinen); Quelle 'arena' = |Seitenstand Heim - Gast| des Arena-Duells (scripts/ziehe-verhaeltnis-referenz-arena.ts, 48 Fixtures je Feldgroesse; Staffel/Time-Trial ohne Eintrag, dort gilt D = 5 je Sieg mit Warnung verhaeltnis_referenz_fehlt). Neu ziehen nach jeder Aenderung, die die Score- bzw. Seitenstand-Skala verschiebt.",
+ "provenienz": {
+  "arena": {
+   "gezogenAm": "2026-10-16T17:19:04.156Z",
+   "repoCommit": "ace4306288cc444121dc48bacd9e6714ff59cbcb",
+   "motorSha1": "19ad335e0af36f9dcccedac5f7d9828a06c308fa",
+   "quelle": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45"
+   },
+   "mechanismus": "runArenaFixtures gegen echte Liga-Kader (buildArenaTeam), beste n nach Eignung, Paarung innerhalb der (nachgebildeten) Liga, 3 Runden je Feldgroesse; Staffel/Time-Trial bewusst ohne Eintrag (seiten 1:0)"
+  },
+  "pps": {
+   "gezogenAm": "2026-10-16T17:39:02.391Z",
+   "repoCommit": "ace4306288cc444121dc48bacd9e6714ff59cbcb",
+   "quelle": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "seasonId": "season-2",
+    "spieltage": 3
+   },
+   "mechanismus": "KI-Aufstellung des Spiels (buildAiLegacyLineupPreviewWithModifiers), buildLegacyMatchdayResolvePreview(), Paarung innerhalb der Liga (buildInitialLeagueAssignment nachgebildet), 2 Zufallspaarungen je Liga und Spieltag",
+   "vorschauen": 75
+  }
+ },
+ "quellen": {
+  "pps": {
+   "basketball": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 69.6,
+      "median": 19.95,
+      "p75": 50.05,
+      "p95": 88.75,
+      "max": 130.7,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 80.55,
+      "median": 30.3,
+      "p75": 52.58,
+      "p95": 100.2,
+      "max": 113.6,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 112.3,
+      "median": 37.65,
+      "p75": 77.05,
+      "p95": 138.82,
+      "max": 149.7,
+      "remisAnteil": 0.01
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 109,
+      "median": 50.7,
+      "p75": 81.3,
+      "p95": 141.9,
+      "max": 203,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 140.45,
+      "median": 66.6,
+      "p75": 110.4,
+      "p95": 184.8,
+      "max": 297.1,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "battlefield": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 81.45,
+      "median": 23.4,
+      "p75": 47.75,
+      "p95": 90.9,
+      "max": 128.4,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 94.5,
+      "median": 32.9,
+      "p75": 62.53,
+      "p95": 108.8,
+      "max": 135,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 120.25,
+      "median": 45.65,
+      "p75": 70.97,
+      "p95": 143.55,
+      "max": 170.4,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 131.25,
+      "median": 51.35,
+      "p75": 91.03,
+      "p95": 163.45,
+      "max": 238.7,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 136.15,
+      "median": 53.5,
+      "p75": 102.88,
+      "p95": 153.65,
+      "max": 191.5,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "breaking": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 95.05,
+      "median": 37.2,
+      "p75": 74.93,
+      "p95": 105.18,
+      "max": 140.8,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 110.2,
+      "median": 46.35,
+      "p75": 86.5,
+      "p95": 119.88,
+      "max": 160.8,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 130.7,
+      "median": 52.55,
+      "p75": 105.13,
+      "p95": 149.93,
+      "max": 168.5,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 131.6,
+      "median": 49.75,
+      "p75": 94.33,
+      "p95": 156.45,
+      "max": 194.2,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 159.15,
+      "median": 63.3,
+      "p75": 114.95,
+      "p95": 191.3,
+      "max": 263.1,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "climbing": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 61.3,
+      "median": 28.3,
+      "p75": 42.45,
+      "p95": 70.18,
+      "max": 125.1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 84.85,
+      "median": 36.95,
+      "p75": 60.37,
+      "p95": 89.98,
+      "max": 152.5,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 92.45,
+      "median": 40.9,
+      "p75": 73.82,
+      "p95": 121.9,
+      "max": 196.6,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 110.5,
+      "median": 46.45,
+      "p75": 73.8,
+      "p95": 126.83,
+      "max": 168.9,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 98.35,
+      "median": 49.1,
+      "p75": 78.47,
+      "p95": 121.48,
+      "max": 171.3,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "eiskunstlauf": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 87.65,
+      "median": 32.9,
+      "p75": 56.08,
+      "p95": 102.65,
+      "max": 119,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 96.2,
+      "median": 35.85,
+      "p75": 64.05,
+      "p95": 108.1,
+      "max": 145,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 113.25,
+      "median": 41,
+      "p75": 68.65,
+      "p95": 143.48,
+      "max": 182.5,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 157.9,
+      "median": 65.45,
+      "p75": 95.6,
+      "p95": 167.83,
+      "max": 238.1,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 165.55,
+      "median": 61.9,
+      "p75": 108.73,
+      "p95": 203.97,
+      "max": 322.8,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "fechten": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 71.1,
+      "median": 30.7,
+      "p75": 52.6,
+      "p95": 93.05,
+      "max": 110.7,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 90.5,
+      "median": 34.25,
+      "p75": 68.12,
+      "p95": 105.03,
+      "max": 132.3,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 94.15,
+      "median": 41.1,
+      "p75": 73.45,
+      "p95": 110.18,
+      "max": 154.1,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 133.3,
+      "median": 62.1,
+      "p75": 99.55,
+      "p95": 156.67,
+      "max": 261.7,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 157.55,
+      "median": 61.6,
+      "p75": 106.23,
+      "p95": 183.58,
+      "max": 341.9,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "football": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 59.9,
+      "median": 26.2,
+      "p75": 49.13,
+      "p95": 70.08,
+      "max": 95.5,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 89.65,
+      "median": 38.9,
+      "p75": 66.55,
+      "p95": 111.65,
+      "max": 166.6,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 133.65,
+      "median": 61.65,
+      "p75": 90.03,
+      "p95": 149.6,
+      "max": 194,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 142.6,
+      "median": 54.05,
+      "p75": 107.33,
+      "p95": 174.6,
+      "max": 239.9,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 199.4,
+      "median": 81.4,
+      "p75": 135.88,
+      "p95": 232.73,
+      "max": 292.7,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "gewichtheben": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 78.15,
+      "median": 32.35,
+      "p75": 55.68,
+      "p95": 91.5,
+      "max": 127.3,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 122.6,
+      "median": 45.55,
+      "p75": 73.63,
+      "p95": 147.93,
+      "max": 182.6,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 157.2,
+      "median": 67.05,
+      "p75": 114.33,
+      "p95": 166.25,
+      "max": 233.2,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 179.3,
+      "median": 86.6,
+      "p75": 131.32,
+      "p95": 209.95,
+      "max": 279,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 198.3,
+      "median": 78.4,
+      "p75": 125.4,
+      "p95": 236.53,
+      "max": 316.2,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "hockey": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 48.2,
+      "median": 23.95,
+      "p75": 38.08,
+      "p95": 59.13,
+      "max": 82.6,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 76.7,
+      "median": 30.75,
+      "p75": 56.73,
+      "p95": 83.3,
+      "max": 123.5,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 92.95,
+      "median": 44.5,
+      "p75": 70.82,
+      "p95": 112.25,
+      "max": 155.1,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 116.75,
+      "median": 37.45,
+      "p75": 76,
+      "p95": 135.73,
+      "max": 175.5,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 148.7,
+      "median": 61.45,
+      "p75": 109.33,
+      "p95": 181.9,
+      "max": 234.3,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "i-spy": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 64.95,
+      "median": 25,
+      "p75": 46.9,
+      "p95": 89.12,
+      "max": 114,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 85.55,
+      "median": 26.45,
+      "p75": 50.15,
+      "p95": 96.15,
+      "max": 130.8,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 112.8,
+      "median": 45.8,
+      "p75": 73.65,
+      "p95": 146.92,
+      "max": 220.6,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 150.9,
+      "median": 50.35,
+      "p75": 90.45,
+      "p95": 185.33,
+      "max": 235,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 159.35,
+      "median": 63.55,
+      "p75": 108.75,
+      "p95": 175.85,
+      "max": 295.9,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "mini-dm": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 42.1,
+      "median": 15.25,
+      "p75": 29.85,
+      "p95": 52.58,
+      "max": 78.9,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 35.9,
+      "median": 10.65,
+      "p75": 23.08,
+      "p95": 50.05,
+      "max": 87.8,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 29.9,
+      "median": 12.25,
+      "p75": 22.5,
+      "p95": 33.8,
+      "max": 105.6,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 30.9,
+      "median": 10.25,
+      "p75": 21.47,
+      "p95": 47.1,
+      "max": 92.9,
+      "remisAnteil": 0.01
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 29.8,
+      "median": 12.1,
+      "p75": 22.17,
+      "p95": 38.25,
+      "max": 99.8,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "showcase": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 92.65,
+      "median": 33.45,
+      "p75": 67.08,
+      "p95": 103.32,
+      "max": 149.2,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 119.55,
+      "median": 40.25,
+      "p75": 72.43,
+      "p95": 144.63,
+      "max": 176.1,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 120.3,
+      "median": 42.2,
+      "p75": 79.82,
+      "p95": 151.5,
+      "max": 207.5,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 163.2,
+      "median": 56.85,
+      "p75": 109.13,
+      "p95": 189.45,
+      "max": 244.5,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 223.8,
+      "median": 82.4,
+      "p75": 148.28,
+      "p95": 262.8,
+      "max": 298.1,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "speed-schach": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 92.35,
+      "median": 40.4,
+      "p75": 64.77,
+      "p95": 102.4,
+      "max": 132.7,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 106,
+      "median": 49.65,
+      "p75": 77.38,
+      "p95": 124.68,
+      "max": 183,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 128.95,
+      "median": 44.2,
+      "p75": 106.88,
+      "p95": 151.65,
+      "max": 180.9,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 164.95,
+      "median": 67.7,
+      "p75": 121.07,
+      "p95": 188.48,
+      "max": 235.7,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 214.7,
+      "median": 94.45,
+      "p75": 149.72,
+      "p95": 239.25,
+      "max": 316.6,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "spurt": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 59.5,
+      "median": 23.5,
+      "p75": 41.8,
+      "p95": 76.5,
+      "max": 105.1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 65.55,
+      "median": 31.35,
+      "p75": 52.68,
+      "p95": 77.3,
+      "max": 147.9,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 89.05,
+      "median": 37.1,
+      "p75": 66.8,
+      "p95": 121.17,
+      "max": 193.9,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 108.7,
+      "median": 54.15,
+      "p75": 76.2,
+      "p95": 123.23,
+      "max": 184.9,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 131.85,
+      "median": 64,
+      "p75": 101.1,
+      "p95": 145.7,
+      "max": 182.8,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "staffel": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 68.25,
+      "median": 30.55,
+      "p75": 49.13,
+      "p95": 72.3,
+      "max": 102.7,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 78.8,
+      "median": 36,
+      "p75": 55.3,
+      "p95": 94.45,
+      "max": 126.9,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 89.6,
+      "median": 47,
+      "p75": 72.77,
+      "p95": 103.15,
+      "max": 158.1,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 128.85,
+      "median": 57.7,
+      "p75": 98.5,
+      "p95": 157.38,
+      "max": 256.9,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 168.3,
+      "median": 64.6,
+      "p75": 108.75,
+      "p95": 195.33,
+      "max": 280.6,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "takeshis-castle": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 48.1,
+      "median": 17.15,
+      "p75": 31.38,
+      "p95": 56.35,
+      "max": 106.7,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 55.85,
+      "median": 23.65,
+      "p75": 39.63,
+      "p95": 74.75,
+      "max": 149.3,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 75.75,
+      "median": 28.55,
+      "p75": 53.3,
+      "p95": 94.25,
+      "max": 204.7,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 123.2,
+      "median": 62.35,
+      "p75": 90.75,
+      "p95": 140.82,
+      "max": 259.4,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 130.7,
+      "median": 44.6,
+      "p75": 86.7,
+      "p95": 144.73,
+      "max": 206.7,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "tdm": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 75,
+      "median": 30.7,
+      "p75": 52.1,
+      "p95": 85.75,
+      "max": 132.1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 103.4,
+      "median": 43.35,
+      "p75": 61.25,
+      "p95": 133.13,
+      "max": 200.2,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 120.9,
+      "median": 56.05,
+      "p75": 94.12,
+      "p95": 195.18,
+      "max": 230.4,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 189.3,
+      "median": 70,
+      "p75": 126.57,
+      "p95": 207.03,
+      "max": 308.9,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 190.15,
+      "median": 76.95,
+      "p75": 130.12,
+      "p95": 281.65,
+      "max": 394.3,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "tennis": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 74.25,
+      "median": 23.9,
+      "p75": 49.08,
+      "p95": 83.73,
+      "max": 129.8,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 87.55,
+      "median": 45.15,
+      "p75": 71,
+      "p95": 106.3,
+      "max": 130.1,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 134.7,
+      "median": 50.3,
+      "p75": 79.8,
+      "p95": 151.85,
+      "max": 203.1,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 184.25,
+      "median": 72.9,
+      "p75": 124.32,
+      "p95": 215.95,
+      "max": 283.1,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 203.3,
+      "median": 93.45,
+      "p75": 158.82,
+      "p95": 240.95,
+      "max": 329,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "time-trial": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 71.15,
+      "median": 35.45,
+      "p75": 50.22,
+      "p95": 83.03,
+      "max": 106.1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 92.8,
+      "median": 36.2,
+      "p75": 64.8,
+      "p95": 117.25,
+      "max": 172.2,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 113,
+      "median": 41.5,
+      "p75": 74.75,
+      "p95": 131.77,
+      "max": 172.3,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 148.8,
+      "median": 64.5,
+      "p75": 113.1,
+      "p95": 165.9,
+      "max": 209.6,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 207.9,
+      "median": 68,
+      "p75": 133.28,
+      "p95": 229.55,
+      "max": 301.3,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "wettessen": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 96,
+      "m90": 63.45,
+      "median": 22.7,
+      "p75": 39.85,
+      "p95": 68.6,
+      "max": 102.4,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 96,
+      "m90": 99.55,
+      "median": 40.2,
+      "p75": 69.28,
+      "p95": 136.93,
+      "max": 174.9,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 96,
+      "m90": 117.25,
+      "median": 55.65,
+      "p75": 92.57,
+      "p95": 143.63,
+      "max": 217,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 96,
+      "m90": 134.8,
+      "median": 45.95,
+      "p75": 89.05,
+      "p95": 163.57,
+      "max": 205.2,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 96,
+      "m90": 170.75,
+      "median": 66.75,
+      "p75": 117.53,
+      "p95": 217.3,
+      "max": 255.3,
+      "remisAnteil": 0
+     }
+    }
+   }
+  },
+  "arena": {
+   "gewichtheben": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 2,
+      "median": 2,
+      "p75": 2,
+      "p95": 2,
+      "max": 2,
+      "remisAnteil": 0.33
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 3,
+      "p95": 3,
+      "max": 3,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 4,
+      "median": 2,
+      "p75": 4,
+      "p95": 4,
+      "max": 4,
+      "remisAnteil": 0.17
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 5,
+      "median": 3,
+      "p75": 3.5,
+      "p95": 5,
+      "max": 5,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 4.6,
+      "median": 2,
+      "p75": 4,
+      "p95": 6,
+      "max": 6,
+      "remisAnteil": 0.19
+     }
+    }
+   },
+   "tennis": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 1,
+      "median": 1,
+      "p75": 1,
+      "p95": 1,
+      "max": 1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 2,
+      "median": 0,
+      "p75": 2,
+      "p95": 2,
+      "max": 2,
+      "remisAnteil": 0.58
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 3,
+      "p95": 3,
+      "max": 3,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 4,
+      "median": 2,
+      "p75": 2,
+      "p95": 4,
+      "max": 4,
+      "remisAnteil": 0.35
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 3,
+      "p95": 3,
+      "max": 5,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "fechten": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 9,
+      "median": 4,
+      "p75": 6.25,
+      "p95": 10,
+      "max": 17,
+      "remisAnteil": 0.06
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 12.3,
+      "median": 4,
+      "p75": 8,
+      "p95": 14,
+      "max": 22,
+      "remisAnteil": 0.1
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 14,
+      "median": 5,
+      "p75": 10,
+      "p95": 15.65,
+      "max": 18,
+      "remisAnteil": 0.08
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 12.3,
+      "median": 4.5,
+      "p75": 8.25,
+      "p95": 17.25,
+      "max": 21,
+      "remisAnteil": 0.1
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 15.6,
+      "median": 6,
+      "p75": 10,
+      "p95": 17,
+      "max": 20,
+      "remisAnteil": 0.02
+     }
+    }
+   },
+   "takeshis-castle": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 13.13,
+      "median": 8.15,
+      "p75": 11.4,
+      "p95": 15.74,
+      "max": 21.5,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 20.9,
+      "median": 8.45,
+      "p75": 14.25,
+      "p95": 23.62,
+      "max": 27.6,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 29.28,
+      "median": 13.85,
+      "p75": 22.1,
+      "p95": 35.27,
+      "max": 40.7,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 38.56,
+      "median": 14.6,
+      "p75": 29.53,
+      "p95": 44.75,
+      "max": 55.7,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 45.67,
+      "median": 24.5,
+      "p75": 33.05,
+      "p95": 48.92,
+      "max": 60,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "spurt": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 4,
+      "median": 2,
+      "p75": 4,
+      "p95": 5.3,
+      "max": 6,
+      "remisAnteil": 0.35
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 7,
+      "median": 3,
+      "p75": 5,
+      "p95": 7,
+      "max": 9,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 12,
+      "median": 5,
+      "p75": 8.5,
+      "p95": 12,
+      "max": 16,
+      "remisAnteil": 0.06
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 15.6,
+      "median": 6.5,
+      "p75": 11,
+      "p95": 19,
+      "max": 25,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 22,
+      "median": 10,
+      "p75": 16,
+      "p95": 24,
+      "max": 32,
+      "remisAnteil": 0.04
+     }
+    }
+   },
+   "climbing": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 4,
+      "median": 2,
+      "p75": 4,
+      "p95": 4,
+      "max": 4,
+      "remisAnteil": 0.21
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 9,
+      "median": 3,
+      "p75": 5.5,
+      "p95": 9,
+      "max": 9,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 12,
+      "median": 4,
+      "p75": 8,
+      "p95": 13.3,
+      "max": 16,
+      "remisAnteil": 0.17
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 15,
+      "median": 6,
+      "p75": 9,
+      "p95": 19,
+      "max": 25,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 23.2,
+      "median": 8,
+      "p75": 14.5,
+      "p95": 27.3,
+      "max": 30,
+      "remisAnteil": 0.1
+     }
+    }
+   },
+   "hockey": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 14.3,
+      "median": 5,
+      "p75": 9,
+      "p95": 19.3,
+      "max": 25,
+      "remisAnteil": 0.02
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 11,
+      "median": 5,
+      "p75": 8.25,
+      "p95": 11.65,
+      "max": 22,
+      "remisAnteil": 0.04
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 9,
+      "median": 4,
+      "p75": 7,
+      "p95": 10,
+      "max": 18,
+      "remisAnteil": 0.08
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 8.3,
+      "median": 5,
+      "p75": 6,
+      "p95": 10,
+      "max": 12,
+      "remisAnteil": 0.02
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 9.3,
+      "median": 4,
+      "p75": 7,
+      "p95": 12.65,
+      "max": 15,
+      "remisAnteil": 0.06
+     }
+    }
+   },
+   "speed-schach": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 2,
+      "median": 1,
+      "p75": 2,
+      "p95": 2,
+      "max": 2,
+      "remisAnteil": 0.31
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 1.25,
+      "p95": 3,
+      "max": 3,
+      "remisAnteil": 0.19
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 2,
+      "p95": 3.65,
+      "max": 4,
+      "remisAnteil": 0.27
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 3,
+      "median": 1,
+      "p75": 3,
+      "p95": 3,
+      "max": 3,
+      "remisAnteil": 0.19
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 4,
+      "median": 2,
+      "p75": 3.25,
+      "p95": 4,
+      "max": 6,
+      "remisAnteil": 0.25
+     }
+    }
+   },
+   "showcase": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 210.2,
+      "median": 97,
+      "p75": 139.75,
+      "p95": 269.2,
+      "max": 323,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 323.5,
+      "median": 111.5,
+      "p75": 219.5,
+      "p95": 364.95,
+      "max": 443,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 357.8,
+      "median": 128,
+      "p75": 239.75,
+      "p95": 400.8,
+      "max": 462,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 398.5,
+      "median": 238,
+      "p75": 312,
+      "p95": 413.75,
+      "max": 747,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 524,
+      "median": 222.5,
+      "p75": 429,
+      "p95": 670.15,
+      "max": 1051,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "eiskunstlauf": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 578.8,
+      "median": 242.5,
+      "p75": 401,
+      "p95": 756.65,
+      "max": 922,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 787.1,
+      "median": 311,
+      "p75": 488,
+      "p95": 938.45,
+      "max": 1106,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 915.4,
+      "median": 315.5,
+      "p75": 780.75,
+      "p95": 1042.8,
+      "max": 1421,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 1367.9,
+      "median": 568.5,
+      "p75": 955.75,
+      "p95": 1527.15,
+      "max": 1656,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 1221.6,
+      "median": 502,
+      "p75": 967.25,
+      "p95": 1510.15,
+      "max": 2278,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "breaking": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 1,
+      "median": 1,
+      "p75": 1,
+      "p95": 1,
+      "max": 1,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 1,
+      "median": 1,
+      "p75": 1,
+      "p95": 1,
+      "max": 1,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 1,
+      "median": 1,
+      "p75": 1,
+      "p95": 1,
+      "max": 2,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 2,
+      "median": 1,
+      "p75": 1,
+      "p95": 2,
+      "max": 2,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 2,
+      "median": 1,
+      "p75": 1,
+      "p95": 2,
+      "max": 2,
+      "remisAnteil": 0
+     }
+    }
+   },
+   "wettessen": {
+    "feldgroessen": {
+     "2": {
+      "n": 2,
+      "fixtures": 48,
+      "m90": 548.8,
+      "median": 240.5,
+      "p75": 408.75,
+      "p95": 702.3,
+      "max": 796,
+      "remisAnteil": 0
+     },
+     "3": {
+      "n": 3,
+      "fixtures": 48,
+      "m90": 779.2,
+      "median": 359.5,
+      "p75": 579.25,
+      "p95": 811.65,
+      "max": 1076,
+      "remisAnteil": 0
+     },
+     "4": {
+      "n": 4,
+      "fixtures": 48,
+      "m90": 775,
+      "median": 404.5,
+      "p75": 547.25,
+      "p95": 850.65,
+      "max": 1167,
+      "remisAnteil": 0
+     },
+     "5": {
+      "n": 5,
+      "fixtures": 48,
+      "m90": 950.6,
+      "median": 411,
+      "p75": 714.75,
+      "p95": 1002.25,
+      "max": 1042,
+      "remisAnteil": 0
+     },
+     "6": {
+      "n": 6,
+      "fixtures": 48,
+      "m90": 903.1,
+      "median": 542.5,
+      "p75": 736.25,
+      "p95": 1083.9,
+      "max": 1362,
+      "remisAnteil": 0
+     }
+    }
+   }
+  }
+ }
+}

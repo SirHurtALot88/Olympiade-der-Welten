@@ -198,7 +198,16 @@ async function fuehreArenaMatchdayApplyAus(input: {
     // legacy-lineup-types.ts.
     const arenaTeamPointsByDisciplineId = new Map<
       string,
-      Map<string, { teamPoints: number; arenaMatchSeed: string; opponentTeamId?: string }>
+      Map<
+        string,
+        {
+          teamPoints: number;
+          arenaMatchSeed: string;
+          opponentTeamId?: string;
+          seiten?: readonly [number, number];
+          outcome?: "win" | "draw" | "loss";
+        }
+      >
     >();
     const arenaIndividualBoxscorePpsByDisciplineId = new Map<string, Map<string, number>>();
     const alleWarnungen: string[] = [];

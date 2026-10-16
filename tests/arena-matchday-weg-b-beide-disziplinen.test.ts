@@ -74,8 +74,8 @@ function createInMemoryPersistence(gameState: GameState): PersistenceService {
   } as unknown as PersistenceService;
 }
 
-/** D1 = basketball, D2 = gewichtheben — BEIDE arena-aufgeloest, absichtlich die Weg-B-Konstellation. */
-const D1_ARENA = "basketball";
+/** D1 = speed-schach (bis 16.10. basketball, s. disziplin-abnahme.json), D2 = gewichtheben — BEIDE arena-aufgeloest, absichtlich die Weg-B-Konstellation. */
+const D1_ARENA = "speed-schach";
 const D2_ARENA = "gewichtheben";
 /** Kontroll-Fixture (Abschnitt "eine arena-faehige Disziplin bleibt unveraendert"): D2 nicht arena-faehig. */
 const D2_NICHT_ARENA = "football";

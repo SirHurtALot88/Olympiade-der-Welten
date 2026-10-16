@@ -10,7 +10,7 @@ import {
   type ArenaFixtureResult,
 } from "@/lib/battle/arena-headless-runner";
 import {
-  ARENA_RESOLVED_DISCIPLINE_IDS,
+  ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS,
   ARENA_TEAM_POINTS,
   BASKETBALL_INDIVIDUAL_PPS_MAX,
   BASKETBALL_PPS_ANTEIL_MITTE,
@@ -75,13 +75,16 @@ describe("arenaTeamPointsForFixture", () => {
   });
 });
 
-describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
+// Seit der PPS-Duell-Bruecke (16.10.) pruefen diese Tests die ANGESCHLOSSENE Menge (Chassis/Referenz/
+// Konfig). Welche davon in Battle Mode tatsaechlich gewertet werden, haelt
+// tests/disziplin-abnahme-guard.test.ts gegen data/generated/disziplin-abnahme.json fest.
+describe("ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS", () => {
   it("enthaelt Basketball, Gewichtheben, Hockey, Speed-Schach und Showcase (Produktivierungswelle 1)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("basketball")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("speed-schach")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("showcase")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("basketball")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("gewichtheben")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("hockey")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("speed-schach")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("showcase")).toBe(true);
   });
 
   /**
@@ -92,11 +95,11 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * kaderfest bestanden (0,875 / 0,869 / 0,845 / 0,825 / 0,816).
    */
   it("enthaelt Eiskunstlauf, Breaking, Wettessen, Tennis und Fechten (Produktivierungswelle 2)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("eiskunstlauf")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("breaking")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("wettessen")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("tennis")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("fechten")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("eiskunstlauf")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("breaking")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("wettessen")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("tennis")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("fechten")).toBe(true);
   });
 
   /**
@@ -112,9 +115,9 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * seit Produktionsanbindung 14.09.).
    */
   it("enthaelt Staffel, Takeshi's Castle und Time-Trial (Bahn-Produktivierung, 10.09.)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("staffel")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("takeshis-castle")).toBe(true);
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("time-trial")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("staffel")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("takeshis-castle")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("time-trial")).toBe(true);
   });
 
   /**
@@ -130,7 +133,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * anderen neunzehn Disziplinen bit-identisch nachgemessen.
    */
   it("enthaelt Climbing (eigene Rezeptkalibrierung hebt rho ueber die Schranke, 16.09.)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("climbing")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("climbing")).toBe(true);
   });
 
   /**
@@ -144,7 +147,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * verankert. Rangtreue bestand die 0,80-Schranke schon vorher klar (rho 0,871).
    */
   it("enthaelt Spurt (Feldgroessen-Fix jeSeite 4->6, Produktionsanbindung 14.09.)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("spurt")).toBe(true);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("spurt")).toBe(true);
   });
 
   /**
@@ -158,7 +161,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    * absichtlich rot und ist DANN mit der neuen Zahl zu aktualisieren.
    */
   it("enthaelt NICHT I-Spy (traegt zwar duell:true, besteht aber die Rangtreue-Schranke nicht)", () => {
-    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(false);
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(false);
   });
 
   /**
@@ -180,7 +183,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
       ARENA_BAHN_DISCIPLINE_IDS,
     ]) {
       for (const disziplinId of menge) {
-        expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)).toBe(true);
+        expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has(disziplinId)).toBe(true);
       }
     }
   });
@@ -197,7 +200,7 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS", () => {
    */
   it("jede arena-aufgeloeste Disziplin hat eine EIGENE PPS-Referenz, keinen stillen Basketball-Rueckfall", () => {
     const basketball = resolveArenaPpsReferenz("basketball", 6).referenz;
-    for (const disziplinId of ARENA_RESOLVED_DISCIPLINE_IDS) {
+    for (const disziplinId of ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS) {
       const referenz = resolveArenaPpsReferenz(disziplinId, 6).referenz;
       expect(referenz.iKrass).toBeGreaterThan(0);
       expect(referenz.iKrass).toBeGreaterThan(referenz.iMittel);

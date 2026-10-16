@@ -603,6 +603,15 @@ export type LegacyResolvePreviewOptions = {
          * Teams im Gleichschritt zu enthüllen (`prim === "lamps"` / `"klassen"` / `"stage"`).
          */
         opponentTeamId?: string;
+        /**
+         * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): der
+         * Seitenstand [dieses Team, Gegner] und der Ausgang des Arena-Duells — durchgereicht aus
+         * `ArenaTeamPointsOverride.seiten`/`outcome`, das beide Felder schon immer trug ("fuer
+         * Anzeige/Tie-Breaking"). Daraus rechnet der Resolve `marge`/`verhaeltnis`. Fehlt `seiten`,
+         * gibt es fuer diese Zeile kein Verhaeltnis (0), die Punkte bleiben unberuehrt.
+         */
+        seiten?: readonly [number, number];
+        outcome?: "win" | "draw" | "loss";
       }
     >
   > | null;
