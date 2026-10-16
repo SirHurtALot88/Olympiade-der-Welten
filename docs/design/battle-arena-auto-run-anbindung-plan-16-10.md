@@ -239,8 +239,11 @@ Begründung:
 Gemessen am 16.10. in dieser Sitzung: frischer Battle-Save (`applyNewGameSetup`, Liga-Draft, alle
 Teams KI), Spieltag 1 mit 16 Fixtures (8 je Liga), `runBattleModeArenaMatchday()` mit echtem
 Playwright-Chromium (lokal Revision 1194), je Disziplin nacheinander. Umgebung: 4 Kerne, 16 GB.
-Messskript (nicht eingecheckt):
-`/tmp/claude-0/-home-user-Olympiade-der-Welten/e6571a3e-fed1-521c-a49f-0f3b2e7cb9a4/scratchpad/miss-arena-spieltag.ts`.
+Messskript: `scripts/messe-arena-spieltag.ts` (bei der Planung noch im Scratchpad, jetzt
+eingecheckt, damit der Live-Test in Abschnitt 6.3 dasselbe Werkzeug nutzen kann). **Wichtig:** das
+ist eine EINZELNE lokale Stichprobe auf 4 Kernen — die CX23-Zahlen unten (Faktor 1,5–2) sind eine
+Hochrechnung, nicht gemessen. Vor dem Live-Test in 6.3 lohnt sich ein zweiter lokaler Lauf, um die
+Streuung zwischen Disziplinen (10,2–17,8 s) von echter Server-Varianz zu trennen.
 
 | Disziplin | ms (beide Ligen) | | Disziplin | ms |
 |---|---:|---|---|---:|
@@ -638,3 +641,44 @@ ist der Zustand wenigstens sichtbar statt still.
    Chromium. Das gehört nicht in diesen Plan, macht aber E1, 4.4 und Teile von 5.2 überflüssig. Vor
    allem deshalb soll der Vorlauf-Service hinter einer Schnittstelle stehen
    (`runArenaFixturesImpl`), die später gegen einen Node-Motor tauschbar ist.
+
+---
+
+## 9. Auflagen der Projektaufsicht (16.10., nach Prüfung dieses Plans)
+
+Der Plan ist freigegeben, Umsetzung kann beginnen — mit sechs Ergänzungen, die vor bzw. während des
+jeweiligen PRs einzuarbeiten sind:
+
+1. **Timeout aus der CX23-Messung ableiten, nicht raten.** `seitenTimeoutMs` (`arena-headless-runner.ts:65`,
+   heute 20s) muss klären, ob er Seitenladen oder den ganzen `evaluate` über 8 Fixtures abdeckt. Liegt
+   der Live-Lauf einer Liga nahe am Timeout, fällt live systematisch alles mit `grund: "timeout"` auf
+   die Brücke — sichtbar, aber ein Totalausfall. Auflage: Timeout als Budget aus der 6.3-Messung
+   ableiten, mindestens 3× Puffer auf den Median je Liga, per ENV konfigurierbar.
+2. **`arenaEingabeHash` beim Buchen aktiv prüfen, nicht nur diagnostisch speichern.** Weicht der beim
+   Buchen neu berechnete Hash vom Vorlauf-Hash ab, wird KEINE Arena gebucht, der Vorlauf läuft neu —
+   sichtbar statt eine stille Divergenz. Vor dem Bau nachweisen, dass die Signatur wirklich alle
+   Arena-Eingaben abdeckt: Formkarten (seit 15.10. gekoppelt), Mutator-Wurf, Teilaufstellungen, und ob
+   der Vorlauf wie `fuehreArenaMatchdayApplyAus()` `attachMatchdayInjuryPerformanceToContexts()` vor
+   dem Preview anhängt.
+3. **`/api/health` darf nicht bei jedem Aufruf Chromium starten.** Der Selbsttest läuft einmal beim
+   Start, das Ergebnis wird gecacht; `/api/health` liefert nur den Cache.
+4. **Die App muss während des Vorlaufs reagieren.** Chromium teilt sich zwei vCPU mit App/LEC/Caddy.
+   Im Live-Test (6.3) zusätzlich messen: Antwortzeit von `/api/health` o.ä. während ein Vorlauf läuft.
+   Erwägen: Browser mit niedrigerer Priorität starten (`nice`-Wrapper als `executablePath`).
+5. **Sandbox und Netz im E1-PR offenlegen.** Dokumentieren, ob Chromium als User `oly` mit oder ohne
+   `--no-sandbox` läuft, und dass die Seite nur lokale Motor-Dateien lädt
+   (`ARENA_NETZWERK_ABRIEGELUNG_ARGS`) — bewusste, dokumentierte Entscheidung, nicht implizit.
+6. **Die Abnahmetabelle hängt an der Chromium-Revision.** `data/generated/disziplin-abnahme.json` ist
+   mit Revision 1194 gemessen. Zeigt der Goldentest (5.2) Abweichungen zwischen 1194 und 1223, muss
+   die Tabelle für Produktion neu gemessen werden, bevor PR 3 live geht.
+
+**Reihenfolge/Freigaben:**
+- **PR 0** (Invarianten-Vitest #164 + Chromium-Versionswächter) **und PR 1** (Sichtbarkeit:
+  `arenaAusfall` + Engine-Check `nicht_ausgefuehrt`): **sofort freigegeben**, bauen. Für PR 1 die
+  übliche Bit-Identität von Manager-Saves am Abbild nachweisen. Nach dem Merge zeigt main 832 Zeilen
+  rot markiert (`nicht_ausgefuehrt`) — gewollt, vorher Chris ankündigen.
+- **PR 2** (Image): bauen ja, **mergen erst nach Chris' Messung aus Abschnitt 4.5** (df -h/free -m).
+  Unter 5GB frei oder unter 1GB RAM-Reserve → nicht mergen, erst aufräumen/vergrößern.
+- **PR 3** (Vorlauf): bauen ja, **mergen erst nach Chris' Antwort zu Frage 1** (Wartezeit, Abschnitt 8)
+  — das ist die einzige Frage, die das Design ändern könnte. Fragen 2+3 sind Einzeiler-Bestätigungen.
+- **PR 4:** nach PR 3.
