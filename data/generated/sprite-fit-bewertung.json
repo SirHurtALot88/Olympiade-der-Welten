@@ -332,8 +332,8 @@
   "name": "Grieving Colossus",
   "slug": "grieving-colossus",
   "sterne": 4,
-  "begruendung": "vollbild von Orc-Kopf+schwarzer Haut auf \"golem\" umgestellt (dieselbe Familie wie Lava Golem/Vorrak/Krag'Zul) mit sehr dunkler Obsidian-Faerbung, gluehenderRiss:true und effekt:\"feuer\" am Kopf fuer die Lava-Traenen - der gluehende Feuer-Akzent ist im Kontrast zum fast schwarzen Koerper klar sichtbar, trifft Kategorie (Stein-Koloss) und Farbfamilie jetzt deutlich.",
-  "fehlendesDetail": "Schwere Ketten und die kauernde Vierbeiner-Haltung aus dem Bild fehlen (kein Ketten-Layer, golem_walk.png zeigt nur eine aufrechte Pose)."
+  "begruendung": "vollbild von Orc-Kopf+schwarzer Haut auf \"golem\" umgestellt (dieselbe Familie wie Lava Golem/Vorrak/Krag'Zul) mit sehr dunkler Obsidian-Faerbung, gluehenderRiss:true und effekt:\"feuer\" am Kopf fuer die Lava-Traenen. Sprite-Fit-Nachlieferung Batch B (16.10.), nachgeprueft statt vermutet: kein Ketten-/Fessel-Asset an irgendeiner Stelle im Repo (repo-weite Suche ohne Treffer), golem_walk.png bestaetigt nur eine aufrechte Pose (kein kauernder/vierbeiniger Frame im Blatt). Bestaetigt strukturell unloesbar ohne neue Zeichenarbeit, kein \"evtl.\" mehr.",
+  "fehlendesDetail": "Schwere Ketten und die kauernde Vierbeiner-Haltung aus dem Bild fehlen weiterhin (bestaetigt: kein Ketten-Layer im Baukasten, golem_walk.png zeigt nur eine aufrechte Pose)."
  },
  {
   "name": "Grizz",
@@ -604,23 +604,23 @@
  {
   "name": "Nahli-Ke",
   "slug": "nahli-ke",
-  "sterne": 4,
-  "begruendung": "Graue Haut und der große kahle Alien-Kopf mit dunklen Augen treffen das 'Grey Alien'-Konzept sehr gut.",
-  "fehlendesDetail": "Nur die Kleidung (brauner Overall) ist zu erdig/rüstungsartig statt der nackten, schlanken Alien-Silhouette - sonst passt der Kopf ausgezeichnet."
+  "sterne": 5,
+  "begruendung": "Sprite-Fit-Nachlieferung Batch B (16.10.): ruest:\"leder_frau\" (brauner, kastenfoermiger Brustharnisch) entfernt - der nackte, schlanke Alien-Koerper in \"lavender\" ist jetzt direkt sichtbar, genau die Silhouette aus dem Portrait, statt von einer erdigen Ruestung verdeckt zu werden. Kopf traf schon vorher ausgezeichnet. Per renderProbe bestaetigt (sichtbar nackte, graublaue Laeuferin).",
+  "fehlendesDetail": null
  },
  {
   "name": "Nelchael",
   "slug": "nelchael",
   "sterne": 4,
-  "begruendung": "13.10.: kopf/koerper von zombie (pralle Verwesungshaut) auf skeleton/skelett umgestellt - das ausgezehrte, hagere Skelettgesicht mit weissem Haar trifft jetzt direkt die Untoten-Hexe aus dem Portrait.",
-  "fehlendesDetail": "Das Kraeuter-/Stockbuendel in den Haenden fehlt."
+  "begruendung": "Skelett-Kopf/Koerper und weisses Haar treffen die Untoten-Hexe sehr gut. Sprite-Fit-Nachlieferung Batch B (16.10.): waffe:\"stab\" ergaenzt (naechstliegende Requisite-in-der-Hand-Ebene fuer das Kraeuter-/Stockbuendel aus dem Portrait, kein eigener Buendel-Layer im Baukasten). Nahkampfwaffen haben im Baukasten nur ein Angriffsblatt, kein Steh-/Laufblatt (s. public/sprites/baukasten/README.md) - die Rute ist in der GESPEICHERTEN Steh-Pose-Vorschau (renderProbe ohne ani-Argument) deshalb unsichtbar - derselbe Code-Pfad (setzWaffe/schwertbg/fg-Technik), der bei bereits verifizierten Faellen (Jorund, Ironhoof) die Waffe im Angriffsframe korrekt zeichnet. Bleibt dieselbe strukturelle Vorschau-Grenze wie bei jedem Nahkampf-Charakter.",
+  "fehlendesDetail": "Der Stab (Naeherung fuer das Kraeuter-/Stockbuendel) ist jetzt im Rezept, zeigt sich aber nur im Angriffsframe, nicht in der gespeicherten Steh-Pose-Vorschau."
  },
  {
   "name": "Nhyra-Vel",
   "slug": "nhyra-vel",
   "sterne": 4,
-  "begruendung": "Die graue Alien-Kopfform und blaue Hautfarbe treffen das kosmische Wesen gut.",
-  "fehlendesDetail": "Das Sternenglühen/die Nebel-Textur auf der Haut fehlt (Sprite hat einfarbige Haut statt der funkelnden Sternenmuster)."
+  "begruendung": "Graue Alien-Kopfform und blaue Hautfarbe treffen das kosmische Wesen gut. Sprite-Fit-Nachlieferung Batch B (16.10.): effekt:{typ:\"arkan\",pos:\"koerper\"} ergaenzt (Modus \"funkelnd\", fuer einen Sternenhimmel-Look entworfen, s. EFFEKT_ARTEN/Starflame) als Naeherung an das funkelnde Sternenmuster. Per renderProbe nachgemessen: in der GESPEICHERTEN Steh-Pose-Vorschau (fester Zeitpunkt t=0) zeigt sich davon nur ein einzelner, vereinzelter Partikel (derselbe Befund wie bei allen bereits bestehenden effekt-Faellen im Repo, z.B. Ciacia/Grizz, deren gespeicherte Vorschauen ebenfalls keine sichtbaren Partikel zeigen) - im laufenden Spiel (animierte Zeit) funkelt der Effekt sichtbar ueber den ganzen Koerper, in der statischen Vorschau aber kaum. Farbe zusaetzlich nur eine Naeherung (Lila/Pink/Gold statt des blau-weissen Sternenhimmels im Portrait, keine Effektfarbe ist echtes Blau/Weiss).",
+  "fehlendesDetail": "Effekt ergaenzt, aber in der gespeicherten Steh-Pose-Vorschau kaum sichtbar (Partikel-Alpha ist zeitabhaengig); Farbe ausserdem nur eine Naeherung (Lila/Pink/Gold statt Blau/Weiss)."
  },
  {
   "name": "Nimri",
@@ -654,8 +654,8 @@
   "name": "Orakelpfropf",
   "slug": "orakelpfropf",
   "sterne": 4,
-  "begruendung": "Zweite Nachbesserung (13.10., Chris' direkte Korrektur der ersten Fassung: 'fuer orakelpropf muesstest du eine katze als base modell nehmen und ihr dann ein glas oder so auf den kopf setzen'). Der bipedale Humanoid-Bauplan (kopf:'wolf',ohren:'katze',schwanz:'katze') ist komplett ersetzt durch vollbild:'katze' - ein echtes Katzen-Vierbeiner-Sheet ('[LPC] Cats and Dogs', bluecarrot16, CC-BY 3.0, s. public/sprites/katze/quellen.json), in einer eigens zusammengesetzten, dauerhaft liegenden/kauernden Pose statt eines Gehzyklus - trifft die stationaere Portrait-Haltung direkt. Die halbtransparente Becher-Requisite (zeichneEimerKopf) sitzt jetzt, am tatsaechlichen Katzenkopf des neuen Sprites nachgemessen (nicht mehr am alten Humanoid-Kopf), sichtbar korrekt auf dem Kopf. Koerpertyp/Rasse/Silhouette/Pose und die zentrale Requisite stimmen jetzt alle. Fehlt weiterhin: die Tigerstreifen-/Tabby-Musterung im Fell (Sprite zeigt reine Flaechenfarbe 'gold'/tan ohne Streifenzeichnung, s. Farbvergleich in quellen.json) - ein einzelnes, klar benennbares Detail, kein struktureller Fehler mehr.",
-  "fehlendesDetail": "Tigerstreifen-/Tabby-Musterung im Fell (Sprite ist einfarbig tan, keine Streifentextur verfuegbar)"
+  "begruendung": "Zweite Nachbesserung (13.10., Chris' direkte Korrektur der ersten Fassung: 'fuer orakelpropf muesstest du eine katze als base modell nehmen und ihr dann ein glas oder so auf den kopf setzen'). Der bipedale Humanoid-Bauplan (kopf:'wolf',ohren:'katze',schwanz:'katze') ist komplett ersetzt durch vollbild:'katze' - ein echtes Katzen-Vierbeiner-Sheet ('[LPC] Cats and Dogs', bluecarrot16, CC-BY 3.0, s. public/sprites/katze/quellen.json), in einer eigens zusammengesetzten, dauerhaft liegenden/kauernden Pose statt eines Gehzyklus - trifft die stationaere Portrait-Haltung direkt. Die halbtransparente Becher-Requisite (zeichneEimerKopf) sitzt jetzt, am tatsaechlichen Katzenkopf des neuen Sprites nachgemessen (nicht mehr am alten Humanoid-Kopf), sichtbar korrekt auf dem Kopf. Koerpertyp/Rasse/Silhouette/Pose und die zentrale Requisite stimmen jetzt alle. Sprite-Fit-Nachlieferung Batch B (16.10.), nachgeprueft statt vermutet: katze_referenz.png fuehrt laut quellen.json nur VIER einfarbige Varianten (weiss/gold-tan/braun/schwarz), keine getigerte/Tabby-Spalte; repo-weite Suche nach einem Tiger-Sprite ergab keinen Treffer. Bestaetigt strukturell unloesbar ohne neue Zeichenarbeit, kein \"evtl.\" mehr.",
+  "fehlendesDetail": "Tigerstreifen-/Tabby-Musterung im Fell (bestaetigt: keine Streifentextur im Katzen-Sheet verfuegbar, nur vier einfarbige Varianten)"
  },
  {
   "name": "Orichalcos",
@@ -675,8 +675,8 @@
   "name": "Phantomblade",
   "slug": "phantomblade",
   "sterne": 4,
-  "begruendung": "Silberhaar und schwarze Lederkleidung treffen die blinde Assassinin farblich sehr gut.",
-  "fehlendesDetail": "Die charakteristische Augenbinde und die Zwillingsdolche fehlen."
+  "begruendung": "Silberhaar und schwarze Lederkleidung treffen die blinde Assassinin farblich sehr gut, waffe:\"schwert\" ist die im Projekt etablierte Naeherung fuer die gefuehrten Dolche (kein Dolch-Layer im Baukasten, s. Jihanna/Lilly). Sprite-Fit-Nachlieferung Batch B (16.10.), geprueft: kein Requisiten-Slot fuer eine schmale Augenbinde - kapuze/helm sind beides vollflaechige Kopfbedeckungen, die das korrekt treffende weisse Haar komplett verdecken wuerden (Verschlechterung statt Verbesserung). Keine punktuelle Korrektur verfuegbar.",
+  "fehlendesDetail": "Die charakteristische Augenbinde fehlt weiterhin (kein passender Requisiten-Slot); Zwillingsdolche bleiben ueber waffe:\"schwert\" angenaehert (keine Dolch-Ebene im Baukasten)."
  },
  {
   "name": "Pinkypie",
@@ -773,8 +773,8 @@
   "name": "Serena",
   "slug": "serena",
   "sterne": 4,
-  "begruendung": "Krone, silbergraues Haar und die graue Rüstungsfarbe treffen die Silber-Königin sehr gut.",
-  "fehlendesDetail": "Das erhobene Schwert fehlt."
+  "begruendung": "Krone, silbergraues Haar und die graue Ruestungsfarbe treffen die Silber-Koenigin sehr gut. Sprite-Fit-Nachlieferung Batch B (16.10.), Befund statt Korrektur: waffe:\"schwert\" steht bereits im Rezept (seit der urspruenglichen Einfuehrung, nicht erst jetzt) und nutzt denselben Code-Pfad, der bei bereits verifizierten Faellen (Jorund, Ironhoof) die Waffe im Angriffsframe korrekt zeichnet. Die GESPEICHERTE Vorschau (renderProbe ohne ani-Argument, reine Steh-/Lauf-Pose) zeigt bei KEINER der vier Nahkampfwaffen (Schwert/Axt/Stab/Zweihaender) ueberhaupt ein Blatt (s. public/sprites/baukasten/README.md) - selbst der eigene 5-Sterne-Anker King Arlen Morgolor traegt deshalb bewusst gar kein waffe-Feld. Keine Rezept-Luecke, sondern eine Grenze der Vorschau-Generierung, die fuer jeden Nahkampf-Charakter gleich gilt.",
+  "fehlendesDetail": "Das Schwert ist im Rezept vorhanden und im Angriffsframe sichtbar korrekt, zeigt sich aber strukturell nicht in der gespeicherten Steh-Pose-Vorschau (gilt fuer jeden Nahkampf-Charakter gleichermassen, keine Serena-spezifische Luecke)."
  },
  {
   "name": "Shadowsage",
@@ -787,8 +787,8 @@
   "name": "Shield",
   "slug": "shield",
   "sterne": 4,
-  "begruendung": "13.10.: schild:true ergaenzt (dieselbe Schild-Ebene wie bei Draco/Johanna) - der namensgebende, bildfuellende Rundschild ist jetzt da und dominiert die Silhouette wie im Portrait.",
-  "fehlendesDetail": "Der Kriegshammer fehlt (die gefuehrte Waffe bleibt ein Schwert, kein Hammer-Layer im Baukasten)."
+  "begruendung": "13.10.: schild:true ergaenzt (dieselbe Schild-Ebene wie bei Draco/Johanna) - der namensgebende, bildfuellende Rundschild ist jetzt da und dominiert die Silhouette wie im Portrait. Sprite-Fit-Nachlieferung Batch B (16.10.), nachgeprueft: axt und zweihaender (die beiden einzigen Alternativ-Nahkampfwaffen) sind beide gekruemmte Klingen (Pixelbild-Vergleich), keine naeher an einem Kriegshammer als das bisherige Schwert - kein Tausch vorgenommen, waere eine gleich unpassende Naeherung. Bestaetigt: kein Hammer-/Blunt-Layer im Baukasten.",
+  "fehlendesDetail": "Der Kriegshammer fehlt weiterhin (bestaetigt: kein Hammer-/Blunt-Layer im Baukasten, axt/zweihaender sind beide Klingenwaffen und keine bessere Naeherung als das bisherige Schwert)."
  },
  {
   "name": "Shroomgator",
@@ -808,8 +808,8 @@
   "name": "Skittermind",
   "slug": "skittermind",
   "sterne": 4,
-  "begruendung": "Blaugraue Schuppenhaut, gelbe Augen und die reptilienartige Kopfform treffen die Kreatur sehr gut.",
-  "fehlendesDetail": "Die Waffen am Boden (charakteristischer Dietrich-Dieb-Aspekt) und eine kräftigere türkis-grüne statt graue Farbtönung fehlen für die volle 5."
+  "begruendung": "Reptilienartige Kopfform und gelbe Augen treffen die Kreatur sehr gut. Sprite-Fit-Nachlieferung Batch B (16.10.): haut \"blue\" (blasses Graublau) -> \"green\" (satteres Gruen, z.B. #39AA4E) ergaenzt - von den zwoelf verfuegbaren Hauttoenen die naechste Annaeherung an die kraeftige tuerkis-gruene Portrait-Haut (echtes Tuerkis gibt es in der Palette nicht). Per renderProbe bestaetigt sichtbar gruen statt grau-blau.",
+  "fehlendesDetail": "Die am Boden verstreuten Dietrich-/Diebeswerkzeuge (der namensgebende Dieb-Aspekt) fehlen weiterhin - kein Requisiten-Slot fuer am Boden liegende Objekte im Baukasten."
  },
  {
   "name": "Starbound",
@@ -843,8 +843,8 @@
   "name": "Sweet Dreams",
   "slug": "sweet-dreams",
   "sterne": 4,
-  "begruendung": "Krone, dunkles Haar und goldene Farbgebung treffen die Blumenkönigin sehr gut.",
-  "fehlendesDetail": "Das Zepter/der Dreizack und der violette Farbakzent im Gewand fehlen."
+  "begruendung": "Krone, dunkles Haar und goldene Farbgebung treffen die Blumenkoenigin sehr gut. Sprite-Fit-Nachlieferung Batch B (16.10.): waffe \"schwert\"->\"stab\" - die lange Stangenform trifft die Zepter-/Dreizack-Silhouette aus dem Portrait sichtbar naeher als eine Kurzklinge (kein echter Dreizack-Layer im Baukasten). Wie bei jeder Nahkampf-/Stangenwaffe (s. Serena-Befund) zeigt sich das nicht in der gespeicherten Steh-Pose-Vorschau, nur im Angriffsframe, ueber denselben Code-Pfad wie bei Jorund/Ironhoof. Violetter Farbakzent im Gewand bleibt unloesbar: ruestTon faerbt die GESAMTE Ruestung einheitlich, Gold (fuer die Metallteile korrekt) und ein zweiter violetter Stoffakzent sind nicht gleichzeitig darstellbar.",
+  "fehlendesDetail": "Violetter Farbakzent im Gewand fehlt weiterhin (nur eine Ruestungsfarbe gleichzeitig moeglich); Zepter/Dreizack jetzt ueber waffe:\"stab\" angenaehert, aber nur im Angriffsframe sichtbar, nicht in der gespeicherten Steh-Pose-Vorschau."
  },
  {
   "name": "Tartarus",
@@ -878,15 +878,15 @@
   "name": "Threnox",
   "slug": "threnox",
   "sterne": 4,
-  "begruendung": "Die knochenweiße Skelett-Figur trifft die Kategorie der Geistergestalt sehr gut.",
-  "fehlendesDetail": "Die namensgebende Rippenkäfig-Harfe (das Instrument, das er spielt) fehlt komplett."
+  "begruendung": "Die knochenweisse Skelett-Figur trifft die Kategorie der Geistergestalt sehr gut. Sprite-Fit-Nachlieferung Batch B (16.10.), nachgeprueft: kein Instrumenten-/Requisiten-Layer im Baukasten (waffe kennt nur axt/bogen/stab/schwert/zweihaender/pistole, keines davon liest sich als Harfe; kein genereller \"Requisite in der Hand\"-Slot wie bei Kamera-/Eimer-/Zwiebelkopf, die alle den KOPF ersetzen, nicht die Haende). Keine punktuelle Korrektur verfuegbar.",
+  "fehlendesDetail": "Die namensgebende Rippenkaefig-Harfe (das Instrument) fehlt weiterhin - bestaetigt: kein Instrumenten-/Requisiten-Slot im Baukasten."
  },
  {
   "name": "Tidesinger",
   "slug": "tidesinger",
   "sterne": 4,
-  "begruendung": "Die Krone und der angedeutete Schwanz/Flosse am unteren Körper treffen die Meerjungfrauen-Königin überraschend gut.",
-  "fehlendesDetail": "Die kräftige türkisblaue Schuppen-Farbe (statt Grau) und der Wasser-Magie-Wirbel in der Hand fehlen."
+  "begruendung": "Die Krone und der angedeutete Schwanz/Flosse am unteren Koerper treffen die Meerjungfrauen-Koenigin gut. Sprite-Fit-Nachlieferung Batch B (16.10.): effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt (hellblau/weiss, Modus \"schwebend\") als Naeherung an Tuerkis UND fuer den Wasser-Magie-Wirbel - per renderProbe bestaetigt zeigt sich jetzt ein sichtbares, kristallartiges Partikel nahe der Hand, auch in der gespeicherten Steh-Pose-Vorschau (anders als bei den \"funkelnd\"-Effekten/Waffen ist \"schwebend\" bei t=0 nicht durchgehend auf Null). Die Grundhautfarbe bleibt \"blue\" (blasses Graublau) - keine echte Tuerkis-Hautrampe im Baukasten, der Effekt gleicht das nur teilweise aus.",
+  "fehlendesDetail": "Die kraeftige tuerkisblaue Schuppen-Farbe fehlt weiterhin (keine Tuerkis-Hautrampe im Baukasten); der Wasser-Magie-Wirbel ist jetzt ueber effekt:\"frost\" sichtbar angenaehert."
  },
  {
   "name": "Tidesprinter",
@@ -934,8 +934,8 @@
   "name": "Vargan",
   "slug": "vargan",
   "sterne": 4,
-  "begruendung": "Die weiße Pelzkapuze und der Bart treffen den arktischen Krieger gut.",
-  "fehlendesDetail": "Der Speer fehlt (sonst passt die pelzige Kapuzen-Silhouette gut)."
+  "begruendung": "Die weisse Pelzkapuze und der Bart treffen den arktischen Krieger gut. Sprite-Fit-Nachlieferung Batch B (16.10.): waffe \"schwert\"->\"stab\" - die lange gerade Stangenform trifft die Speer-Silhouette aus dem Portrait deutlich naeher als ein Schwert (kein eigener Speer-/Polearm-Layer im Baukasten). Wie bei jeder Stangenwaffe (s. Serena-Befund) zeigt sich das nicht in der gespeicherten Steh-Pose-Vorschau, nur im Angriffsframe, ueber denselben Code-Pfad wie bei Jorund/Ironhoof.",
+  "fehlendesDetail": "Der Speer ist jetzt ueber waffe:\"stab\" angenaehert (naechstliegende lange Stangenform im Baukasten), zeigt sich aber nur im Angriffsframe, nicht in der gespeicherten Steh-Pose-Vorschau."
  },
  {
   "name": "Velkin",
@@ -954,9 +954,9 @@
  {
   "name": "Vigil",
   "slug": "vigil",
-  "sterne": 4,
-  "begruendung": "Echte Taube mit Überwachungskamera als Kopf jetzt getroffen (01.09.-Umbau, prozedurale Kamera-Requisite deckt den kompletten Kopf, echtes 4-Richtungs-Taubensprite): Federkörper, Beine, Kamera-Gehäuse mit Objektiv und roter Aufnahme-LED sind da, im Profil zeigt das Objektiv sogar seitlich in Laufrichtung statt frontal.",
-  "fehlendesDetail": "Der tropfende Flüssigkeitsfaden am Kamera-Gehäuse aus dem Portrait fehlt."
+  "sterne": 5,
+  "begruendung": "Echte Taube mit Ueberwachungskamera als Kopf (01.09.-Umbau): Federkoerper, Beine, Kamera-Gehaeuse mit Objektiv und roter Aufnahme-LED sind da. Sprite-Fit-Nachlieferung Batch B (16.10.): der Tropf-Faden war technisch schon seit 01.09. im Code, aber in dunklem Olivgruen (#232f23) auf fast gleich dunklem Gehaeuse (#26262a) - am renderProbe-Abbild praktisch unsichtbar (per 8x-Nachvergroesserung bestaetigt). Farbe auf helles Blaugrau mit kleinem Glanzpunkt angehoben (echtes 'nasses' Glitzern statt dunkler Silhouette, reine Farbkorrektur) - der tropfende Fluessigkeitsfaden ist jetzt deutlich sichtbar, per renderProbe vorher/nachher bestaetigt.",
+  "fehlendesDetail": null
  },
  {
   "name": "Vorrak",
@@ -990,22 +990,22 @@
   "name": "Xelara",
   "slug": "xelara",
   "sterne": 4,
-  "begruendung": "Graue Alien-Haut, großer Kopf mit dunklen Augen und die dunkle Kleidung mit Gürtelschnalle treffen die Diplomatin hervorragend.",
-  "fehlendesDetail": "Der hohe, kantige Uniformkragen fehlt (Sprite hat einen einfachen runden Ausschnitt) - ein kleines Detail für die volle 5."
+  "begruendung": "Graue Alien-Haut, grosser Kopf mit dunklen Augen und die dunkle Kleidung mit Guertelschnalle treffen die Diplomatin hervorragend. Sprite-Fit-Nachlieferung Batch B (16.10.), geprueft: ein Jacken-/Kragen-Blatt liegt zwar als Datei vor (public/sprites/baukasten/anzug_jacke*.png), ist aber nie ins Spiel eingebunden (kein Eintrag in B_SPRITES, ruest:\"anzug_jacke\" liesse die Ruestung komplett verschwinden statt einen Kragen zu zeigen) und fuehrt ohnehin kein slash-Blatt. Einbinden waere neue Engine-Verdrahtung, kein punktueller Rezept-Tausch - nicht angefasst.",
+  "fehlendesDetail": "Der hohe, kantige Uniformkragen fehlt weiterhin (kein eingebundener Kragen-/Jacken-Layer im Baukasten, vorhandenes Blatt ist nicht verdrahtet)."
  },
  {
   "name": "Xerathis",
   "slug": "xerathis",
   "sterne": 4,
-  "begruendung": "Graue Alien-Kopfform und dunkle Kleidung treffen das Konzept gut.",
-  "fehlendesDetail": "Die leuchtend türkisen Akzentlinien auf dem Anzug fehlen."
+  "begruendung": "Graue Alien-Kopfform und dunkle Kleidung treffen das Konzept gut. Sprite-Fit-Nachlieferung Batch B (16.10.): effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt als Naeherung an die leuchtend tuerkisen Energieadern aus dem Portrait (keine echte Tuerkis-Effektfarbe vorhanden). Per renderProbe nachgemessen: in der gespeicherten Steh-Pose-Vorschau (t=0) tragen die Partikel fuer diese Figur kaum sichtbar bei (anders als bei Tidesinger) - im laufenden Spiel sichtbar, im statischen Abbild kaum.",
+  "fehlendesDetail": "Effekt als Naeherung an die tuerkisen Energieadern ergaenzt, traegt in der gespeicherten Steh-Pose-Vorschau aber kaum sichtbar bei (zeitabhaengige Partikel-Alpha)."
  },
  {
   "name": "Xylaris",
   "slug": "xylaris",
   "sterne": 4,
-  "begruendung": "13.10.: fluegel von generisch (braunes Fledermaus-Fremdbild) auf \"federn\" (solide weiss) umgestellt, dazu effekt:{typ:heilig,pos:kopf} ergaenzt - weisse Federfluegel, weisses Haar UND ein sichtbarer goldener Heiligenschein ueber dem Kopf treffen jetzt direkt den Erzengel-Look.",
-  "fehlendesDetail": "Die gruen-goldene Robenfaerbung (bleibt braunes Leder) und das sichtbare Heiligenschein-Symbol am Stab fehlen."
+  "begruendung": "fluegel \"federn\" (weisse Federfluegel), weisses Haar UND effekt:{typ:heilig,pos:kopf} (sichtbarer goldener Heiligenschein) treffen den Erzengel-Look bereits gut (13.10.). Sprite-Fit-Nachlieferung Batch B (16.10.): ruestTon \"gold\" ergaenzt - die Robe faerbt sich jetzt golden statt im unveraenderten Lederbraun, per renderProbe bestaetigt sichtbar. Gruenanteil der Robe bleibt offen (nur eine Ruestungsfarbe gleichzeitig moeglich, keine Gruen-Gold-Mischrampe in RUEST_TON), ebenso das Heiligenschein-SYMBOL AM STAB (effekt kennt nur pos \"kopf\"/\"koerper\", keine Position \"waffe\" - der bestehende Heiligenschein ueber dem Kopf bleibt die naechstliegende Annaeherung).",
+  "fehlendesDetail": "Die gruene Haelfte der Robenfaerbung fehlt weiterhin (nur Gold moeglich, keine Gruen-Gold-Mischrampe); das Heiligenschein-Symbol speziell AM STAB bleibt unloesbar (effekt kennt keine Position \"waffe\")."
  },
  {
   "name": "Yuko",
