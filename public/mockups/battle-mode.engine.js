@@ -1502,6 +1502,39 @@
     return sprGefaerbt[id];
   }
 
+  // WAFFEN-EINFAERBUNG per Flat-Color (16.10., Chris' Fund: Aeon Flux traegt laut Portrait ein
+  // ROSA leuchtendes Energieschwert, s. public/portraits/aeon-flux.jpg — der bisherige
+  // "arkan"-Partikel-Effekt faerbt nur die Luft NEBEN der Klinge, nicht die Klinge selbst).
+  // sprite()/faerbe() oben sind RAMPEN-Tausch (suchen eine bekannte Quellfarbfolge im Bild und
+  // ersetzen sie 1:1) — fuer ein ungefaerbtes Stahlschwert, das komplett in einer Zielfarbe
+  // LEUCHTEN soll, ist das die falsche Technik (keine passende Quellrampe zu suchen). Stattdessen
+  // dieselbe Flat-Color-Technik wie bHolEingefaerbt() (s. dort, Zeile ~193: "color"/"multiply"-
+  // Blend ueber das ganze Blatt plus destination-in als Silhouetten-Maske) — hier nur auf
+  // sprBild (den ueber sprite()/zeichne() geladenen Baukasten-Bestand) statt bBild angewendet,
+  // weil Schwert/Bogen aus SPRITES/sprBild kommen, nicht aus B_SPRITES/bBild (s. zeichneB-
+  // Kommentar weiter unten: Axt/Stab/Zweihaender liegen dagegen in bBild und nutzen
+  // bHolEingefaerbt() direkt, unveraendert).
+  const sprGefaerbtFlaeche={};
+  function sprEingefaerbt(key,farbe,modus){
+    if(!farbe)return sprite(key,null);
+    const id="farbe|"+key+"|"+farbe+"|"+(modus||"farbe");
+    if(!sprGefaerbtFlaeche[id]){
+      const im=sprBild[key];
+      if(!im||!im.complete||!im.width)return im;
+      const c=document.createElement("canvas");c.width=im.width;c.height=im.height;
+      const cx=c.getContext("2d");
+      cx.drawImage(im,0,0);
+      cx.globalCompositeOperation=modus==="multiply"?"multiply":"color";
+      cx.fillStyle=farbe;
+      cx.fillRect(0,0,c.width,c.height);
+      cx.globalCompositeOperation="destination-in";
+      cx.drawImage(im,0,0);
+      cx.globalCompositeOperation="source-over";
+      sprGefaerbtFlaeche[id]=c;
+    }
+    return sprGefaerbtFlaeche[id];
+  }
+
   // HAAR-/BART-EINFAERBUNG fuer die animierte Ansicht — dieselbe Idee wie spriteRuest,
   // nur gegen B_HAAR (bereits fuer die Kader-Vorschau vorhanden) statt HAUT/RUEST_TON.
   // Erkennt die Quellrampe im Blatt automatisch (wie quellRampe() fuer Haut), statt sie
@@ -1950,17 +1983,29 @@
     // Bild: weiblicher Cyborg, schwarze Techruestung, spitze Antennenohren, pinke
     // Energieklinge. Keine Techruestung im Baukasten: "plate" in "dunkel" vertritt sie,
     // die Energieklinge vertritt das Schwert.
-    // 16.10., Sprite-Fit 3-Sterne-Batch A: Chris' Live-Fund ("ein pinkes Laserschwert,
-    // bitte auch auf solche Details achten") — effekt:{typ:"arkan",pos:"koerper"} ergaenzt
-    // (EFFEKT_ARTEN.arkan hat Pink in der Palette, #ff8ce0, "funkelnd") als naechstliegende
-    // Naeherung an die violette Lichtklinge; KEIN reines Pink (Mehrfarben-Palette
-    // violett/pink/gold), dokumentiert statt verschwiegen. haarTon von "dark_brown" auf
-    // "black" (Portrait zeigt fast schwarzes Haar, s. public/portraits/aeon-flux.jpg).
-    // waffe:"schwert" war schon gesetzt (nur in der Angriffs-Pose sichtbar, Engine-weite
-    // Einschraenkung, s. renderProbe-Befund, kein Rezeptfehler). Verbleibende Luecke: die
-    // Ruestungs-SILHOUETTE ist weiterhin mittelalterliche Platte statt schlanker
-    // Sci-Fi-Ruestung — kein Sci-Fi-Blatt im Baukasten.
-    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"black",effekt:{typ:"arkan",pos:"koerper"}},
+    // NACHGEBESSERT (16.10., zweite Runde — Chris' Korrektur: "aeon flux ist weiblich und hat
+    // n rosa Laserschwert! du musst mehr bei den Gegenstaenden und Farben sensibilisiert
+    // sein!!!"). Die erste Fassung hatte effekt:{typ:"arkan"} als Annaeherung gesetzt — das
+    // faerbt nur eine lose Partikelwolke NEBEN der Klinge violett/pink/gold, nicht die Klinge
+    // selbst, und blieb damit klar hinter dem Bildbefund zurueck (ein glatter, durchgehend
+    // ROSA leuchtender Balken, s. public/portraits/aeon-flux.jpg). Gruendlich nachgesucht, ob
+    // es eine echte Loesung gibt, statt die Naeherung nur zu dokumentieren: es gibt keinen
+    // eigenen Laserschwert-/Lichtschwert-Sprite im Baukasten, ABER es gibt bereits eine
+    // generische Flat-Color-Einfaerbetechnik fuer Vollbild-Blaetter (bHolEingefaerbt(), 02.09./
+    // 13.10.) — "color"-Blend + destination-in-Maske, behaelt die Original-Schattierung als
+    // Hell-Dunkel-Verlauf, faerbt aber das GANZE Blatt in eine Zielfarbe um. Dieselbe Technik
+    // jetzt NEU auch fuer Waffenblaetter nachgebaut (sprEingefaerbt(), s. dort) und als
+    // generisches BAU-Feld waffeTon:"#rrggbb" verdrahtet (zeichneWaffe/zeichneWaffeB/
+    // waffenBild, s. zeichneSprite) — kein Aeon-Flux-Spezialfall, jeder kuenftige Charakter mit
+    // einer farbigen Energiewaffe kann dasselbe Feld nutzen. waffeTon:"#ff33cc" ist direkt aus
+    // dem Portrait abgetastet (Python/PIL-Pixelscan auf die Klinge: helle Glanzlichter liegen
+    // bei ~RGB(250,190,245), der mittlere Klingenrand bei ~RGB(196,147,212) — #ff33cc liegt
+    // zwischen beiden, ein klares, kraeftiges Pink statt eines blassen Mittelwerts). haarTon
+    // von "dark_brown" auf "black" (Portrait zeigt fast schwarzes Haar). waffe:"schwert" war
+    // schon gesetzt (jetzt auch in der Ruhepose sichtbar, s. PR #1259). Verbleibende Luecke:
+    // die Ruestungs-SILHOUETTE ist weiterhin mittelalterliche Platte statt schlanker
+    // Sci-Fi-Ruestung — kein Sci-Fi-Blatt im Baukasten (unveraendert, keine Loesung gefunden).
+    "Aeon Flux":          {kopf:"human",haut:"light",ohren:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",waffe:"schwert",waffeTon:"#ff33cc",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
     // Bild: Frau mit glaesernem Helm ueber leuchtendem Gehirn, unbewaffnet, kontrolliert
     // schwebende Faeden mit erhobenen Haenden.
     // Nachlieferung (16.10., Sprite-Fit-Zweistern-Runde A): Portrait zeigt eine Telepathin
@@ -2650,18 +2695,25 @@
     // Layer im Baukasten) — eine einzelne Rute statt eines ganzen Buendels, aber naeher an
     // "haelt etwas Stabfoermiges in der Hand" als die bisherige leere Hand.
     "Nelchael":           {kopf:"skeleton",koerper:"skelett",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w",waffe:"stab"},
-    // 16.10., Sprite-Fit 3-Sterne-Batch A: Chris' Live-Fund ("Akali hat ja 2 Katana auf
-    // ihrem Original-Bild, die sollte man hier auch sehen") — nachrecherchiert: KEIN
-    // Katana-Blatt im Baukasten (grep auf "katana" ueber alle Sprites: null Treffer), und
-    // b.waffe kennt nur EINEN Wert — kein Dual-Wield-Feld. waffe:"schwert" (generisches
-    // LPC-Einzelschwert) bleibt die einzig verfuegbare Naeherung, beide Luecken (Katana-Form,
-    // Zweitwaffe) sind damit echte strukturelle Grenzen, kein Fix verfuegbar. ruestTon:
-    // "dunkel" NEU ergaenzt (Portrait zeigt schwarze Ninja-Ruestung statt des bisherigen
-    // unveraenderten braunen Leders, s. public/portraits/akali.jpg) — behebt die Farbe.
-    // Gesichtsmaske bleibt ebenfalls ohne Requisiten-Slot. Macht Akali zu drei strukturell
-    // unerreichbaren Details (Maske, Dual-Katana) statt vier (Farbe jetzt korrekt) — bleibt
-    // unter der 4-Sterne-Schwelle (mehrere, nicht EINE benennbare Luecke).
-    "Akali":              {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"black",waffe:"schwert",geschlecht:"w"},
+    // NACHGEBESSERT (16.10., zweite Runde — Chris' Korrektur: "akali hat auf dem Bild nur 1
+    // Waffe statt 2 und es ist n Schwert kein Katana"). Die erste Fassung hatte nur EIN
+    // generisches Schwert gesetzt und behauptete, Dual-Wield sei eine echte strukturelle
+    // Grenze (kein zweites Waffenfeld in b.*) — zu frueh aufgegeben, ohne die naheliegende
+    // Loesung zu pruefen: jedes Waffenblatt wird bereits ZENTRIERT um die Spielerposition
+    // gezeichnet (128px-Zelle, ox=-32 -> Zielrechteck symmetrisch um x), ein horizontaler
+    // Spiegel um dieselbe Achse liefert deshalb eine zweite, plausibel in der anderen Hand
+    // sitzende Klinge aus genau demselben echten Asset — kein Fremdbild, keine neue Form
+    // erfunden (s. maleGespiegelt/zeichneZweitwaffe-Kommentar bei den Zeichenfunktionen).
+    // Neues generisches BAU-Feld b.zweitwaffe:true (aktuell fuer Schwert verdrahtet, s.
+    // Aufrufstellen in zeichneSprite) macht genau das. Kein Katana-Blatt im Baukasten (grep
+    // auf "katana" ueber alle Sprites: weiterhin null Treffer) — bleibt eine echte Formluecke
+    // (das LPC-Einzelschwert bleibt gerade statt gebogen), aber ZWEI Schwerter statt einem
+    // trifft den Bildbefund (zwei gerade, verzierte Klingen, kein gebogenes Katana) deutlich
+    // naeher als vorher behauptet. ruestTon:"dunkel" (Portrait zeigt schwarze Ninja-Ruestung
+    // statt braunem Leder, s. public/portraits/akali.jpg) unveraendert von der ersten Runde.
+    // Gesichtsmaske bleibt ohne Requisiten-Slot — die einzige verbleibende, einzeln benennbare
+    // Luecke (Klingenform gerade statt gebogen zaehlt nicht separat, s.o.).
+    "Akali":              {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"black",waffe:"schwert",zweitwaffe:true,geschlecht:"w"},
     // Sprite-Fit-Nachlieferung Batch B (16.10.): Portrait zeigt eine nackte, schlanke
     // Grey-Alien-Laeuferin (s. public/portraits/nahli-ke.jpg) — kein Stoff/keine Ruestung
     // am Koerper, nur die Alien-Silhouette selbst. ruest:"leder_frau" malte bislang einen
@@ -5982,6 +6034,39 @@
     // Spalte f (0..5) und Zeile r*zell — identisch zur Schwert-Mechanik unten, nur mit
     // bHol() statt sprite() als Bildquelle (keine Hautfaerbung noetig).
     const zeichneB=(key,zell,ox,oy)=>male(bHol(key,null),zell,ox,oy);
+    // WAFFEN-EINFAERBUNG (16.10., s. ausfuehrlicher Kommentar bei sprEingefaerbt() weiter oben):
+    // b.waffeTon:"#rrggbb" faerbt die jeweils aktive Waffe komplett um, generisch fuer alle fuenf
+    // Waffenarten — Schwert/Bogen kommen aus sprBild (sprEingefaerbt), Axt/Stab/Zweihaender aus
+    // bBild (das schon bestehende bHolEingefaerbt() fuer Vollbild-Blaetter, unveraendert
+    // wiederverwendet). waffenBild() waehlt nur die Bildquelle, male() zeichnet wie gehabt.
+    const waffenBild=(key,ausBBild)=>{
+      if(b.waffeTon)return ausBBild?bHolEingefaerbt(key,b.waffeTon,"farbe"):sprEingefaerbt(key,b.waffeTon,"farbe");
+      return ausBBild?bHol(key,null):sprite(key,null);
+    };
+    const zeichneWaffe=(key,zell,ox,oy)=>male(waffenBild(key,false),zell,ox,oy);
+    const zeichneWaffeB=(key,zell,ox,oy)=>male(waffenBild(key,true),zell,ox,oy);
+    // ZWEITWAFFE / DUAL-WIELD (16.10., Chris' Fund: Akali haelt laut Portrait ZWEI Schwerter,
+    // eins je Hand, s. public/portraits/akali.jpg — es gibt weder ein zweites Waffenfeld in b.*
+    // noch ein eigenes Dual-Wield-Blatt im Baukasten, grep auf "katana"/dual* im gesamten
+    // public/sprites: null Treffer, echte strukturelle Grenze). Jedes Waffenblatt (128px-Zelle)
+    // wird bereits ZENTRIERT um die Spielerposition x gezeichnet (ox=-32, zell=128 -> Zielrechteck
+    // x-64*Z..x+64*Z, symmetrisch um x) — ein horizontaler Spiegel um exakt dieselbe Achse x
+    // liefert deshalb ohne jede Offset-Korrektur eine zweite, plausibel in der anderen Hand
+    // sitzende Klinge aus demselben echten Asset (kein Fremdbild, keine neue Form erfunden).
+    // b.zweitwaffe:true (generisches BAU-Feld, aktuell nur fuer Schwert verdrahtet, s.
+    // Aufrufstellen unten) spiegelt male() um dieselbe Achse.
+    const maleGespiegelt=(im,zell,ox,oy)=>{
+      if(!im||!im.width)return;
+      const reihen=Math.max(1,Math.round((im.height||zell*4)/zell));
+      const sp=(r%reihen)*zell;
+      try{
+        ctx.save();
+        ctx.translate(x,0);ctx.scale(-1,1);ctx.translate(-x,0);
+        ctx.drawImage(im,f*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);
+        ctx.restore();
+      }catch(e){}
+    };
+    const zeichneZweitwaffe=(key,zell,ox,oy)=>{if(b.zweitwaffe)maleGespiegelt(waffenBild(key,false),zell,ox,oy);};
     // Dasselbe, nur ueber die Ruestungsrampe statt der Hautrampe.
     const zeichneR=(key,ton)=>male(spriteRuest(key,ton),64,0,0);
     // Dasselbe, nur ueber die HAAR-Rampe (spriteHaar, s. unten) — Chris' Fund: Haar/Bart/
@@ -6079,12 +6164,28 @@
       const sp=(r%reihen)*zell;
       try{ctx.drawImage(im,spalte*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);}catch(e){}
     };
-    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
-    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
-    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
-    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
-    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk")zeichneWaffeRuhend(sprite("schwertbg_slash",null),128,-32,-32,0);
-    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(bHol("axt_bg",null),192,-64,-64,0);
+    // Gespiegelte Idle-Haltepose fuer die Zweitwaffe (s. zeichneZweitwaffe-Kommentar bei
+    // maleGespiegelt weiter oben) — dasselbe Spiegel-um-x-Prinzip, nur mit fester Spalte statt
+    // der laufenden Animationsspalte f, analog zum Verhaeltnis zeichneWaffeRuhend/male.
+    const zeichneWaffeRuhendZweitwaffe=(key,zell,ox,oy,spalte)=>{
+      if(!b.zweitwaffe)return;
+      const im=waffenBild(key,false);
+      if(!im||!im.width)return;
+      const reihen=Math.max(1,Math.round((im.height||zell*4)/zell));
+      const sp=(r%reihen)*zell;
+      try{
+        ctx.save();
+        ctx.translate(x,0);ctx.scale(-1,1);ctx.translate(-x,0);
+        ctx.drawImage(im,spalte*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);
+        ctx.restore();
+      }catch(e){}
+    };
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash"){zeichneWaffe("schwertbg_slash",128,-32,-32);zeichneZweitwaffe("schwertbg_slash",128,-32,-32);}
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneWaffeB("axt_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneWaffeB("t_stab_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneWaffeB("zweihaender_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk"){zeichneWaffeRuhend(waffenBild("schwertbg_slash",false),128,-32,-32,0);zeichneWaffeRuhendZweitwaffe("schwertbg_slash",128,-32,-32,0);}
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(waffenBild("axt_bg",true),192,-64,-64,0);
     // Stab -- NICHT Spalte 0 (anders als Axt/Zweihaender/Schwert direkt oberhalb): im Profil
     // (links/rechts, die vom Standard-renderProbe()-Aufruf gezeigte Ansicht) ist das
     // t_stab_bg/fg-Blatt bei Spalte 0 LEER (per Pixel-Scan nachgemessen: alpha-Bounding-Box
@@ -6095,8 +6196,8 @@
     // ruhigste der sichtbaren Spalten (2-7 zeigen nur noch einen abgerissenen kurzen
     // Knauf-Rest, s. Frame-Explorer-Vergleich). Deshalb bg hier weiterhin Spalte 0 (bleibt
     // wirkungslos, s.o.) -- der sichtbare Teil kommt vollstaendig aus dem fg-Aufruf unten.
-    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(bHol("t_stab_bg",null),192,-64,-64,0);
-    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(bHol("zweihaender_bg",null),192,-64,-64,0);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(waffenBild("t_stab_bg",true),192,-64,-64,0);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(waffenBild("zweihaender_bg",true),192,-64,-64,0);
     // Schild aus im Football (Sichtbefund bei der Verdrahtung, 05.09.: Johanna/Draco
     // trugen ihren Ritterschild weiterhin unterm Trikot mit — passt zu keiner Football-
     // Montur, dieselbe Suppression wie Krone/Hoerner/Bart/Kapuze oben).
@@ -6251,10 +6352,10 @@
     }
     if(b.schwanz==="katze")zeichne("katzenschwanzfg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
-    if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
+    if(bogen&&ani==="shoot")zeichneWaffe("bogen_shoot",64,0,0);
     // Idle-Haltepose fuer den Bogen (s. ausfuehrlichen Kommentar bei zeichneWaffeRuhend
     // weiter oben) -- Spalte 10, additiv neben der bestehenden shoot-Zeile direkt darueber.
-    if(bogen&&ani==="walk")zeichneWaffeRuhend(sprite("bogen_shoot",null),64,0,0,10);
+    if(bogen&&ani==="walk")zeichneWaffeRuhend(waffenBild("bogen_shoot",false),64,0,0,10);
     // Feuerwaffe bleibt in der Hand, solange der Kaempfer steht (Chris' Vorbild: ein Soldat
     // legt seine Waffe nicht ab) — anders als Schwert/Bogen, die nur waehrend ihres eigenen
     // Angriffs-Frames erscheinen, weil ihre Blaetter genau darauf zugeschnitten sind.
@@ -6263,17 +6364,17 @@
     // auf den letzten Frames des Waffen-Zyklus (angenaeherter Abzugsmoment — das Blatt selbst
     // traegt keine Frame-genaue Blitz-Markierung, s. quellen.json).
     if(feuerwaffe&&ani==="shoot"&&!u.down&&waffenF>=WAFFEN_N-3)zeichneWaffenbild("muendungsfeuer_walk");
-    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash")zeichne("schwertfg_slash",128,-32,-32,null);
-    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
-    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
-    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash"){zeichneWaffe("schwertfg_slash",128,-32,-32);zeichneZweitwaffe("schwertfg_slash",128,-32,-32);}
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneWaffeB("axt_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneWaffeB("t_stab_fg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneWaffeB("zweihaender_fg",192,-64,-64);
     // fg-Gegenstueck zur bg-Idle-Haltepose oben (s. Kommentar bei zeichneWaffeRuhend) --
     // gleiche Spalte 0, additiv neben den vier slash-Zeilen direkt darueber.
-    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk")zeichneWaffeRuhend(sprite("schwertfg_slash",null),128,-32,-32,0);
-    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(bHol("axt_fg",null),192,-64,-64,0);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk"){zeichneWaffeRuhend(waffenBild("schwertfg_slash",false),128,-32,-32,0);zeichneWaffeRuhendZweitwaffe("schwertfg_slash",128,-32,-32,0);}
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(waffenBild("axt_fg",true),192,-64,-64,0);
     // Spalte 1, nicht 0 -- s. ausfuehrliche Begruendung beim bg-Aufruf weiter oben.
-    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(bHol("t_stab_fg",null),192,-64,-64,1);
-    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(bHol("zweihaender_fg",null),192,-64,-64,0);
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(waffenBild("t_stab_fg",true),192,-64,-64,1);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(waffenBild("zweihaender_fg",true),192,-64,-64,0);
     if(b.schild&&!footballGear)zeichneSchild("schild_fg");
     if(b.umhang&&!footballGear)zeichneSchild("umhang_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
