@@ -5587,10 +5587,60 @@
     // beide bleiben in der bestehenden if(b.schwanz)-Pruefung wahr (JS-Truthiness).
     if(b.schwanz==="katze")zeichne("katzenschwanzbg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzbg_"+ani,64,0,0,b.haut);
+    // IDLE-HALTEPOSE FUER NAHKAMPFWAFFEN/BOGEN (16.10., Chris' Fund an Akali/Aeon Flux in der
+    // Sprite-Fit-Vorschaugalerie: beide tragen b.waffe:"schwert" und waren im statischen
+    // Steh-Bild trotzdem unbewaffnet). Grund: der komplette Waffen-Overlay-Block unten (bg
+    // UND fg) griff bislang NUR fuer ani==="slash"/"shoot" (den Angriffsframe, u.lunge>0) —
+    // in jedem Steh-/Gehbild (ani==="walk", u.lunge===0 — der EINZIGE Zustand, den
+    // renderProbe() ohne Zusatzargumente zeichnet, genau das, was erzeuge-sprite-
+    // vorschauen.mjs fuer alle 145 Vorschau-PNGs aufruft) war die Waffe komplett
+    // unsichtbar, unabhaengig von b.waffe. Feuerwaffen haben dieses Problem nicht
+    // (zeichneWaffenbild() unten zeichnet ihr eigenes "_walk"-Blatt in JEDEM Steh-/Gehbild,
+    // s. dortiger Kommentar) — das hier zieht Schwert/Axt/Stab/Zweihaender/Bogen auf
+    // dasselbe Prinzip nach: WAFFE IMMER IN DER HAND, der Angriffsschwung bleibt ein
+    // zusaetzlicher Effekt obendrauf, nicht die einzige Gelegenheit, die Waffe ueberhaupt
+    // zu zeigen.
+    //
+    // zeichneWaffeRuhend() ist dasselbe Low-Level-drawImage() wie male() (s. dort), nur mit
+    // einer FESTEN Spalte statt der laufenden Animationsspalte f -- keine der vier
+    // Nahkampfwaffen/der Bogen hat ein eigenes Steh-/Laufblatt, alle vier Sechserraster sind
+    // reine Angriffs-Zyklen (slash/thrust). Spaltenwahl per Frame-Explorer (Vorschaugalerie,
+    // renderProbe() ohne Angriffsframe, alle Spalten nebeneinandergestellt):
+    // Schwert/Axt/Zweihaender -> Spalte 0 (die Waffe ruhig VOR dem Ausholen, genau die
+    // Spalte, die figur()/setzWaffe weiter unten in dieser Datei fuer die Kader-Icon-Ansicht
+    // aus demselben Grund schon seit dem 01.09. benutzt, s. dortiger Kommentar "WARUM SPALTE
+    // 0"). Stab -> Spalte 0 im bg-Aufruf, aber Spalte 1 im fg-Aufruf -- EIGENE Begruendung
+    // beim jeweiligen Aufruf unten, weil Spalte 0 dort anders als bei den anderen drei
+    // Nahkampfwaffen im Profil (links/rechts) komplett unsichtbar ist. Bogen -> Spalte 10
+    // (bogen_shoot hat 13 Spalten; 0 zeigt nur einen Splitter, 1 die Sehne quer ueber die
+    // Brust -- dieselbe Spalte 10, die figur()/setzIm2 schon fuer die Kader-Icon-Ansicht
+    // gewaehlt hat, s. dortiger "BOGEN"-Kommentar fuer die volle Spalten-Durchsicht).
+    // ADDITIV: die vier slash/shoot-Zeilen bleiben unveraendert, hier kommt nur der neue
+    // ani==="walk"-Fall hinzu.
+    const zeichneWaffeRuhend=(im,zell,ox,oy,spalte)=>{
+      if(!im||!im.width)return;
+      const reihen=Math.max(1,Math.round((im.height||zell*4)/zell));
+      const sp=(r%reihen)*zell;
+      try{ctx.drawImage(im,spalte*zell,sp,zell,zell,x-32*Z+ox*Z,y-46*Z+oy*Z,zell*Z,zell*Z);}catch(e){}
+    };
     if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="slash")zeichne("schwertbg_slash",128,-32,-32,null);
     if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_bg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_bg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_bg",192,-64,-64);
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk")zeichneWaffeRuhend(sprite("schwertbg_slash",null),128,-32,-32,0);
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(bHol("axt_bg",null),192,-64,-64,0);
+    // Stab -- NICHT Spalte 0 (anders als Axt/Zweihaender/Schwert direkt oberhalb): im Profil
+    // (links/rechts, die vom Standard-renderProbe()-Aufruf gezeigte Ansicht) ist das
+    // t_stab_bg/fg-Blatt bei Spalte 0 LEER (per Pixel-Scan nachgemessen: alpha-Bounding-Box
+    // bei Spalte 0/Zeile rechts fehlt im fg-Layer ganz, der bg-Layer traegt dort nur ein
+    // winziges, vom Koerper komplett verdecktes Fragment -- Jorund blieb mit Spalte 0 trotz
+    // dieses Blocks weiterhin unbewaffnet). Ab Spalte 1 liegt der Stab sichtbar VOR dem
+    // Koerper (fg, nicht bg) -- Spalte 1 gewaehlt: Knauf plus durchgehender Schaft, die
+    // ruhigste der sichtbaren Spalten (2-7 zeigen nur noch einen abgerissenen kurzen
+    // Knauf-Rest, s. Frame-Explorer-Vergleich). Deshalb bg hier weiterhin Spalte 0 (bleibt
+    // wirkungslos, s.o.) -- der sichtbare Teil kommt vollstaendig aus dem fg-Aufruf unten.
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(bHol("t_stab_bg",null),192,-64,-64,0);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(bHol("zweihaender_bg",null),192,-64,-64,0);
     // Schild aus im Football (Sichtbefund bei der Verdrahtung, 05.09.: Johanna/Draco
     // trugen ihren Ritterschild weiterhin unterm Trikot mit — passt zu keiner Football-
     // Montur, dieselbe Suppression wie Krone/Hoerner/Bart/Kapuze oben).
@@ -5733,6 +5783,9 @@
     if(b.schwanz==="katze")zeichne("katzenschwanzfg_"+ani,64,0,0,null);
     else if(b.schwanz)zeichne("schwanzfg_"+ani,64,0,0,b.haut);
     if(bogen&&ani==="shoot")zeichne("bogen_shoot",64,0,0,null);
+    // Idle-Haltepose fuer den Bogen (s. ausfuehrlichen Kommentar bei zeichneWaffeRuhend
+    // weiter oben) -- Spalte 10, additiv neben der bestehenden shoot-Zeile direkt darueber.
+    if(bogen&&ani==="walk")zeichneWaffeRuhend(sprite("bogen_shoot",null),64,0,0,10);
     // Feuerwaffe bleibt in der Hand, solange der Kaempfer steht (Chris' Vorbild: ein Soldat
     // legt seine Waffe nicht ab) — anders als Schwert/Bogen, die nur waehrend ihres eigenen
     // Angriffs-Frames erscheinen, weil ihre Blaetter genau darauf zugeschnitten sind.
@@ -5745,6 +5798,13 @@
     if(!feldspiel&&waffeEffektiv==="axt"&&ani==="slash")zeichneB("axt_fg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="stab"&&ani==="slash")zeichneB("t_stab_fg",192,-64,-64);
     if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="slash")zeichneB("zweihaender_fg",192,-64,-64);
+    // fg-Gegenstueck zur bg-Idle-Haltepose oben (s. Kommentar bei zeichneWaffeRuhend) --
+    // gleiche Spalte 0, additiv neben den vier slash-Zeilen direkt darueber.
+    if(!feldspiel&&waffeEffektiv==="schwert"&&ani==="walk")zeichneWaffeRuhend(sprite("schwertfg_slash",null),128,-32,-32,0);
+    if(!feldspiel&&waffeEffektiv==="axt"&&ani==="walk")zeichneWaffeRuhend(bHol("axt_fg",null),192,-64,-64,0);
+    // Spalte 1, nicht 0 -- s. ausfuehrliche Begruendung beim bg-Aufruf weiter oben.
+    if(!feldspiel&&waffeEffektiv==="stab"&&ani==="walk")zeichneWaffeRuhend(bHol("t_stab_fg",null),192,-64,-64,1);
+    if(!feldspiel&&waffeEffektiv==="zweihaender"&&ani==="walk")zeichneWaffeRuhend(bHol("zweihaender_fg",null),192,-64,-64,0);
     if(b.schild&&!footballGear)zeichneSchild("schild_fg");
     if(b.umhang&&!footballGear)zeichneSchild("umhang_fg");
     if(b.fluegel==="federn")zeichne("fluegel_federn_fg_"+ani,64,0,0,null);
