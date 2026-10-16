@@ -423,8 +423,8 @@
   "name": "Kento",
   "slug": "kento",
   "sterne": 4,
-  "begruendung": "FUND: b.kapuze wird in der Engine OHNE Ton-Argument gezeichnet (anders als b.helm) und bleibt deshalb IMMER beim hellen Rohton des Blatts, unabhaengig von ruestTon - eine strukturelle Engine-Luecke, die jede Figur mit kapuze:true betrifft, keine Kento-spezifische Ein-Zeilen-Korrektur. Kapuze gegen helm getauscht (helm_* wird ueber ruestTon eingefaerbt und deckt den Kopf blickdicht ab) - jetzt durchgehend schwarze Kleidung UND ein verdecktes Gesicht wie im Portrait. Einzig verbleibender Rest: ein Topfhelm statt einer Stoff-Ninja-Maske, eine Formfrage, keine Farbfrage mehr.",
-  "fehlendesDetail": "Der Kopf ist jetzt vollstaendig schwarz verdeckt, aber als Metallhelm statt als Stoff-Maske/-Kapuze geformt - keine eingefaerbte Stoffkapuze im Baukasten verfuegbar (b.kapuze wird nie getoent, s. Begruendung)."
+  "begruendung": "FUND: b.kapuze wurde in der Engine urspruenglich OHNE Ton-Argument gezeichnet (anders als b.helm) und blieb deshalb IMMER beim hellen Rohton des Blatts, unabhaengig von ruestTon. Kapuze gegen helm getauscht (helm_* wird ueber ruestTon eingefaerbt und deckt den Kopf blickdicht ab) - jetzt durchgehend schwarze Kleidung UND ein verdecktes Gesicht wie im Portrait. 16.10., Sprite-Fit 3-Sterne-Batch C (zeitgleich, anderer Loesungsweg): dieselbe strukturelle Luecke wurde dort generisch behoben, indem b.kapuze jetzt selbst ueber spriteRuest()/ruestTon eingefaerbt wird (s. BAU-Kommentar bei \"if(b.kapuze)\") - fuer Kento bleibt aber der hier bereits vollzogene Tausch auf helm die bessere Loesung (blickdichter Topfhelm statt halbhoher Stoffkapuze, naeher am maskierten Ninja-Portrait), deshalb unveraendert beibehalten statt auf kapuze zurueckgebaut. Einzig verbleibender Rest: ein Topfhelm statt einer Stoff-Ninja-Maske, eine Formfrage, keine Farbfrage mehr.",
+  "fehlendesDetail": "Der Kopf ist jetzt vollstaendig schwarz verdeckt, aber als Metallhelm statt als Stoff-Maske/-Kapuze geformt - keine eingefaerbte Stoffmaske im Baukasten verfuegbar."
  },
  {
   "name": "King Arlen Morgolor",
@@ -711,14 +711,14 @@
   "slug": "raven",
   "sterne": 3,
   "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - solide schwarze Fluegel (vorher braun/rotstichig) treffen jetzt die Farbe der riesigen, bildfuellenden schwarzen Schwingen aus dem Portrait. \"federn\" wurde probiert, rendert aber immer weiss statt schwarz (s. Code-Kommentar) und waere eine neue, andere Farbabweichung gewesen.",
-  "fehlendesDetail": null
+  "fehlendesDetail": "Kein Raben-/Vogelkopf im Baukasten vorhanden - kopf:\"wolf\" bleibt die generische Tier-Kopf-Annaeherung ohne Schnabel, strukturell nicht nachruestbar."
  },
  {
   "name": "Reefstrike",
   "slug": "reefstrike",
   "sterne": 3,
   "begruendung": "13.10.: Hautfarbe von blue auf fur_grey umgestellt - der Kopf ist jetzt sichtbar grau statt blau, deutlich naeher an der Haihaut aus dem Portrait. kopf:wolf bleibt die naechstliegende Kaniden-Annaeherung, ein echter Hai-Kopf fehlt im Baukasten.",
-  "fehlendesDetail": null
+  "fehlendesDetail": "Kein Hai-Kopf im Baukasten vorhanden - kopf:\"wolf\" bleibt die naechstliegende Kaniden-Annaeherung (kein Schnauzen-/Kiemen-Layer); auch keine Ruecken-/Schwanzflosse verfuegbar."
  },
  {
   "name": "Rhyx'Tal",
@@ -730,23 +730,23 @@
  {
   "name": "Riley Le Rogue",
   "slug": "riley-le-rogue",
-  "sterne": 3,
-  "begruendung": "Blondes Haar und goldbraune Farbgebung passen, aber die Plattenrüstung und das große Schwert der Kriegerin fehlen.",
-  "fehlendesDetail": "Plattenrüstung und großes Schwert fehlen"
+  "sterne": 4,
+  "begruendung": "Blondes Haar und ruestTon:\"bronze\" auf plate_frau treffen die goldbraune Ritterin-Ruestung aus dem Portrait bereits direkt - die fruehere Bewertung (\"Plattenruestung fehlt\") war veraltet, das Rezept hatte plate_frau schon. waffe:\"schwert\" ist ebenso korrekt gesetzt. 16.10.: gegengeprueft per renderProbe/Vorschau-PNG - im Ruhe-/Idle-Frame erscheint das Schwert nicht, weil Nahkampfwaffen nur im Schlag-Frame (ani===\"slash\") gezeichnet werden (bestaetigte, separat laufende Engine-Luecke, s. Koordinator-Hinweis 16.10.), kein Rezeptfehler.",
+  "fehlendesDetail": "Das Schwert ist im Rezept korrekt gesetzt (waffe:\"schwert\"), erscheint aber im Ruhe-/Idle-Vorschaubild noch nicht (bekannte, separat behobene Engine-Luecke: Nahkampfwaffen zeichnen nur im Angriffs-/Schlag-Frame) - sobald das gefixt ist, ist nichts Charakteristisches mehr offen."
  },
  {
   "name": "Roddox Harthelm",
   "slug": "roddox-harthelm",
   "sterne": 3,
   "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: waffe \"schwert\" auf \"stab\" umgestellt - t_stab_bg/fg (schon bei Jorund im Einsatz) ist ein schlichter Holzstab/-stock ohne Klingenform und trifft den im Portrait sichtbaren schweren Holzknueppel/Stab sichtbar naeher als die vorherige Schwertklinge. Die Minotaurus-KATEGORIE stimmt (gehoernter Stierkopf auf zweibeinigem Koerper ist fuer dieses Bild strukturell korrekt), der benannte Requisiten-Fehlpunkt (Holzknueppel) ist damit behoben. Es bleiben aber weiterhin ZWEI unabhaengige, nicht mit einer einzelnen Korrektur zu behebende Luecken: die Kopf-Seitenansicht liest eher \"Reh\" als \"massiger Stier\" (Sonderpalette ohne Rekolorierung, keine bessere Kopf-Alternative im Baukasten - kopf_wartotaur geprueft, wirkt wolfs-/daemonenartig), und die satte Fell-Textur des Portraits hat keine Entsprechung im glatten Lederbraun des Baukastens.",
-  "fehlendesDetail": null
+  "fehlendesDetail": "Die Kopf-Seitenansicht liest eher als Reh denn als massiger Stier (Sonderpalette ohne bessere Alternative, s. begruendung), und die satte Fell-Textur aus dem Portrait hat keine Entsprechung im glatten Leder-Braun des Baukastens - zwei unabhaengige Luecken, keine einzelne Korrektur."
  },
  {
   "name": "Rok Kyl",
   "slug": "rok-kyl",
   "sterne": 3,
-  "begruendung": "Die reptilienartige Kopfform und das gelbe Auge passen zur Kategorie, aber die vielen Hörner/Stacheln, die riesigen Fangzähne und die dunkle, bedrohliche Farbe fehlen - wirkt deutlich zu freundlich für den Horden-Boss.",
-  "fehlendesDetail": "Mehrere Hörner/Stacheln, große Fangzähne und dunklere Farbe fehlen"
+  "begruendung": "16.10., Sprite-Fit 3-Sterne-Batch C: haut von \"brown\" auf \"black\" umgestellt - die \"black\"-Rampe (#000000..#7F4C31) ist eine Schwarz-zu-Dunkelbraun-Stufenfolge, deutlich naeher an der fast schwarzen Horden-Boss-Haut im Portrait als das vorherige helle \"brown\". Die reptilienartige Kopfform und das gelbe Auge passten schon zur Kategorie, hoerner:true gibt ein Hornpaar.",
+  "fehlendesDetail": "Mehrere Hoerner/Stacheln ueber Kopf und Ruecken sowie die riesigen Fangzaehne aus dem Portrait haben weiterhin keinen eigenen Baukasten-Slot (nur ein Hornpaar via hoerner:true verfuegbar) - zwei unabhaengige Luecken trotz der jetzt deutlich dunkleren Haut."
  },
  {
   "name": "Rootheart",
@@ -759,15 +759,15 @@
   "name": "Sanctrix",
   "slug": "sanctrix",
   "sterne": 3,
-  "begruendung": "Das markante blaue Haar passt hervorragend, aber die weißen Federflügel (statt Fledermausflügel), die kybernetischen Rüstungsteile und die teal-goldene Robe fehlen alle.",
-  "fehlendesDetail": "Weiße Federflügel und kybernetische Rüstungsteile fehlen"
+  "begruendung": "Das markante blaue Haar passt. 16.10., Sprite-Fit 3-Sterne-Batch C: fluegel von true (generisch, braunes Fremdbild) auf \"federn\" umgestellt - \"federn\" rendert solide WEISS (s. Kommentar bei b.fluegel), trifft die grossen weissen Engelsfluegel aus dem Portrait jetzt direkt statt der vorherigen braunen Naeherung.",
+  "fehlendesDetail": "Die kybernetischen Ruestungsteile (mechanischer Arm, leuchtende Technik-Adern im Gesicht) und die teal-goldene Robenfarbe (leder_frau bleibt naturbraun, kein Teal/Gold-Ton fuer Leder im Baukasten) fehlen weiterhin - zwei unabhaengige Luecken trotz der jetzt korrekten weissen Federfluegel."
  },
  {
   "name": "Seraph-11",
   "slug": "seraph-11",
   "sterne": 3,
   "begruendung": "Nach dem Reiher-Umbau (01.09., rein prozedural aus Formen statt eines Sprites) stimmt die Grundform jetzt: langer Hals, lange dünne Beine, vogelartige Silhouette, leuchtender Energiekern am Kopf als Auge. Es bleibt aber eine grobe geometrische Näherung statt einer detaillierten Vogelgestalt: Farbe zu hell/blaugrau statt des fast schwarzen Portraits, keine Gefieder-/Federtextur, der Schnabel ist nur im Profil sichtbar.",
-  "fehlendesDetail": null
+  "fehlendesDetail": "Die Farbe ist zu hell/blaugrau statt des fast schwarzen Portraits, es fehlt jede Gefieder-/Federtextur, und der Schnabel ist nur im Profil sichtbar - mehrere unabhaengige Luecken trotz der strukturell bereits richtigen Reiher-Silhouette."
  },
  {
   "name": "Serena",
@@ -779,9 +779,9 @@
  {
   "name": "Shadowsage",
   "slug": "shadowsage",
-  "sterne": 3,
-  "begruendung": "13.10.: kopf von human auf skeleton umgestellt - unter der Kapuze ist jetzt ein echtes Skelettgesicht sichtbar statt eines menschlichen, die Lich-Identitaet aus dem Portrait wird direkt erkennbar. effekt:void (violett) liefert einen schwachen violetten Schimmer passend zur 'violetten Farbgebung'.",
-  "fehlendesDetail": "Die durchgehend violette Robenfaerbung und der sichtbare leuchtende Stab fehlen - leder bleibt naturfarben, der Stab zeigt sich nur waehrend eines Schlag-Frames."
+  "sterne": 4,
+  "begruendung": "13.10.: kopf von human auf skeleton umgestellt - unter der Kapuze ist ein echtes Skelettgesicht sichtbar, die Lich-Identitaet wird direkt erkennbar. effekt:void (violett, wabernd) liefert ein violettes Glühen passend zur violetten Farbgebung. 16.10., Sprite-Fit 3-Sterne-Batch C: ruestTon \"violett\" ergaenzt - Portrait zeigt eine durchgehend violette Robe, \"leder\" trug bisher naturbraun; seit derselben Runde faerbt spriteRuest() auch die Kapuze um (s. Kommentar bei b.kapuze), Robe UND Kapuze sind jetzt einheitlich violett.",
+  "fehlendesDetail": "Der leuchtende Stab ist im Rezept gesetzt (waffe:\"stab\"), erscheint im Ruhe-/Idle-Vorschaubild aber nicht (Nahkampfwaffen zeichnen nur im Schlag-Frame, bestaetigte separate Engine-Luecke, s. Koordinator-Hinweis 16.10.) - das ist der einzige verbleibende sichtbare Unterschied zum Portrait."
  },
  {
   "name": "Shield",
@@ -801,8 +801,8 @@
   "name": "Sister Ilora",
   "slug": "sister-ilora",
   "sterne": 3,
-  "begruendung": "13.10.: effekt:{typ:heilig,pos:kopf} ergaenzt - ein sichtbarer goldener Glühring ueber dem Kopf steht jetzt fuer die leuchtenden Augen/Heilenergie der Kampf-Priesterin, auch wenn die Farbe warmes Gold statt des im Portrait gezeigten Orange ist.",
-  "fehlendesDetail": null
+  "begruendung": "Blondes Haar passt. 13.10.: effekt:{typ:\"heilig\",pos:\"kopf\"} ergaenzt - ein goldener Gluehring steht naeherungsweise fuer Augenglühen/Heilenergie der Kampf-Priesterin. 16.10., Sprite-Fit 3-Sterne-Batch C, Bildbefund praezisiert: das Portrait zeigt keine Ruestung, sondern ein zerrissenes weisses Hemd einer Feldsanitaeterin, und die Augen/Handenergie sind kuehl blauweiss/orange, nicht golden - leder_frau bleibt die einzig verfuegbare Koerperbedeckung (kein Zivilkleidungs-Layer), die Gold-Naeherung bleibt eine Naeherung.",
+  "fehlendesDetail": "Kein Zivilkleidungs-Layer fuer das zerrissene weisse Hemd (leder_frau-Ruestung ersetzt es nur grob), und die goldene Gluehring-Farbe trifft die kuehlere blauweisse Augen-/orange Handenergie aus dem Bild nicht exakt - zwei unabhaengige Luecken."
  },
  {
   "name": "Skittermind",
@@ -821,9 +821,9 @@
  {
   "name": "Starflame",
   "slug": "starflame",
-  "sterne": 3,
-  "begruendung": "Silbernes Haar passt gut zur kosmischen Elfen-Zauberin, aber die dunkle Robe mit Astrologie-Symbolen, Spitzohren und der Stab fehlen.",
-  "fehlendesDetail": "Dunkle Robe mit Symbolen und Stab fehlen"
+  "sterne": 4,
+  "begruendung": "Silbernes/weisses Haar und Spitzohren (ohren:true) passen zur kosmischen Elfen-Zauberin, ebenso waffe:\"stab\" und effekt:\"arkan\" (lila-pink-gold funkelnd) fuer den Sternenhimmel-Glanz. 16.10., Sprite-Fit 3-Sterne-Batch C: ruestTon \"dunkel\" ergaenzt - Portrait zeigt eine dunkle Robe mit goldenen Sternzeichen-Symbolen, \"leder_frau\" trug bisher naturbraun; \"dunkel\" trifft den Robenton jetzt direkt.",
+  "fehlendesDetail": "Die exakten goldenen Sternzeichen-/Konstellationssymbole auf der Robe sind eine Textur ohne eigenen Baukasten-Slot - der einzige verbleibende Punkt, seit die Robe jetzt die richtige dunkle Farbe traegt."
  },
  {
   "name": "Steel Sinister",
@@ -835,9 +835,9 @@
  {
   "name": "Sunny",
   "slug": "sunny",
-  "sterne": 3,
-  "begruendung": "Blondes Haar passt zur Walküre, aber die weißen Federflügel (statt Fledermausflügel), die goldene Rüstung und die Streitaxt fehlen.",
-  "fehlendesDetail": "Weiße Federflügel, goldene Rüstung und Streitaxt fehlen"
+  "sterne": 4,
+  "begruendung": "Blondes Haar passte schon, ebenso ruest:\"plate_frau\" (die fruehere Bewertung \"Ruestung fehlt\" war veraltet). 16.10., Sprite-Fit 3-Sterne-Batch C: fluegel von true (generisch, braunes Fremdbild) auf \"federn\" umgestellt (rendert solide weiss, trifft die grossen weissen Walkueren-Schwingen direkt), waffe von \"schwert\" auf \"axt\" (Portrait zeigt eindeutig eine zweischneidige Streitaxt), ruestTon \"dunkel\" ergaenzt (Portrait zeigt dunkle, fast schwarze Plattenruestung statt des hellen Stahl-Grundtons).",
+  "fehlendesDetail": "Die Streitaxt ist im Rezept korrekt gesetzt (waffe:\"axt\"), erscheint im Ruhe-/Idle-Vorschaubild aber nicht (bekannte, separat behobene Engine-Luecke: Nahkampfwaffen zeichnen nur im Schlag-Frame) - seit den weissen Federfluegeln und der dunklen Ruestungsfarbe ist das der einzige verbleibende Unterschied."
  },
  {
   "name": "Sweet Dreams",
@@ -856,23 +856,23 @@
  {
   "name": "Taryn",
   "slug": "taryn",
-  "sterne": 3,
-  "begruendung": "Die dunkle untere Kleidung passt zur Assassinin, aber die helle statt dunkelgraue Kapuze, die Gesichtsmaske und die Dolche fehlen.",
-  "fehlendesDetail": "Dunklere Kapuze, Gesichtsmaske und Dolche fehlen"
+  "sterne": 4,
+  "begruendung": "Die dunkle untere Kleidung und kapuze:true passen zur Assassinin. 16.10., Sprite-Fit 3-Sterne-Batch C: seit der projektweiten Kapuzen-Umfaerbung (spriteRuest() statt ton:null, s. Kommentar bei b.kapuze in zeichneSprite) faerbt sich die Kapuze jetzt tatsaechlich nach ruestTon:\"dunkel\" ein - die vorher helle/naturfarbene Kapuze ist jetzt korrekt dunkel wie im Portrait.",
+  "fehlendesDetail": "Eine eigene Gesichtsmaske/Stoffbinde gibt es nicht - kapuze:true deckt nur den oberen Kopf, nicht die untere Gesichtshaelfte wie im Portrait. Die Dolche bleiben ueber waffe:\"schwert\" angenaehert (projektweit etablierte Konvention fuer Dolche ohne eigenen Layer, s. Jihanna/Lilly/Phantomblade) - das zaehlt nicht als eigene Luecke."
  },
  {
   "name": "Tavascron",
   "slug": "tavascron",
-  "sterne": 3,
-  "begruendung": "Von mech_transformer_walk.png (dessen Standard-QA-Profilpose selbst als \"schwer lesbare Haltung\" dokumentiert war) auf mech_gross_walk.png umgehaengt (dieselbe Quelle wie Robofighter, keine Asset-Exklusivitaet) + Stahlblau-Tint: jetzt aus allen vier Richtungen ein klar lesbarer, aufrechter Kampfmech mit Schulterkanone und blauem Grundton statt eines unklaren Klumpens.",
-  "fehlendesDetail": "Transformer-Doppelfaust-Silhouette und das kraeftige Neon-Leuchten (Visier/Gelenke) aus dem Portrait fehlen noch, dazu mehrere kleinere Detail-Abweichungen (Kopfform, Waffenzahl) - generischer schwerer Mech statt des spezifischen Transformers."
+  "sterne": 4,
+  "begruendung": "Von mech_transformer_walk.png auf mech_gross_walk.png umgehaengt (dieselbe Quelle wie Robofighter, keine Asset-Exklusivitaet) + Stahlblau-Tint - ein klar lesbarer, aufrechter Kampfmech mit Schulterkanone statt eines unklaren Klumpens. 16.10., Sprite-Fit 3-Sterne-Batch C: effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt (hellblau-weiss, schwebend) - naehert das kraeftige Cyan-Neon-Leuchten an Visier/Gelenken aus dem Portrait an, das vollbildFarbe allein nicht lieferte.",
+  "fehlendesDetail": "Die Transformer-Doppelfaust-Silhouette aus dem Portrait braucht ein anderes Blatt als mech_gross_walk.png (ein genereller schwerer Kampfmech, keine Doppelfaust-Formensprache) - der einzige verbleibende Punkt, seit effekt:\"frost\" das Neon-Leuchten ergaenzt."
  },
  {
   "name": "Terradon",
   "slug": "terradon",
-  "sterne": 3,
-  "begruendung": "Die Steingolem-Form passt zur Kategorie, aber die hellgraue statt dunkelgraue/schwarze Farbe und vor allem die durchgehenden glühend-orangenen Lavaadern (nur ein kleiner Fleck am Fuß) fehlen für ein stimmigeres Bild.",
-  "fehlendesDetail": "Dunklere Farbe und durchgehende Lavaadern am ganzen Körper fehlen"
+  "sterne": 5,
+  "begruendung": "16.10., Sprite-Fit 3-Sterne-Batch C: vollbildFarbe \"#2b2724\" (dunkles Basalt-Anthrazit statt des nativen Hellgrau von golem_walk.png) + gluehenderRiss (Herzhoehe) + vier zusaetzliche risse an Armen/Beinen ergaenzt (dieselbe generalisierte Technik wie bei Lava Golem, 4-Sterne-Batch A, selber Tag) - dunkles Vulkangestein mit durchgehend gluehend-orangenen Rissen ueber fast den ganzen Koerper trifft jetzt den Bildbefund vollstaendig, Koerpertyp/Silhouette (kauernder Steinkoloss) stimmten bereits vorher.",
+  "fehlendesDetail": null
  },
  {
   "name": "Threnox",
@@ -891,9 +891,9 @@
  {
   "name": "Tidesprinter",
   "slug": "tidesprinter",
-  "sterne": 3,
-  "begruendung": "13.10.: vollbild von froschmensch (kauernder Frosch) auf meerjungfrau_aal umgestellt - jetzt eine aufrechte Wassermann-Figur mit Schuppenschwanz, wallendem Haar und einer nach vorn ausgestreckten leuchtenden Waffe (ein Aal statt Dreizack). Kategorie und Pose treffen jetzt deutlich naeher, aber Hautton (braun statt tuerkis) und die exakte Dreizack-Requisite bleiben falsch.",
-  "fehlendesDetail": "Hautfarbe muesste tuerkis statt braun sein, und die Waffe ein Dreizack statt eines Aals."
+  "sterne": 4,
+  "begruendung": "13.10.: vollbild von froschmensch (kauernder Frosch) auf meerjungfrau_aal umgestellt - aufrechte Wassermann-Figur mit Schuppenschwanz, wallendem Haar und ausgestreckter leuchtender Waffe (ein Aal statt Dreizack), Kategorie und Pose treffen seitdem deutlich naeher. 16.10., Sprite-Fit 3-Sterne-Batch C: vollbildFarbe \"#2fb3a8\" (vollbildFarbeModus:\"farbe\") ergaenzt - das native Blatt ist braunhaeutig, das Portrait zeigt eindeutig tuerkise Haut; jetzt korrekt tuerkis.",
+  "fehlendesDetail": "Die Waffe bleibt ein Aal statt eines Dreizacks (meerjungfrau_aal.png haelt strukturell einen Aal, kein Dreizack-Requisit im Baukasten) - der einzige verbleibende Punkt, seit vollbildFarbe die Hautfarbe auf Tuerkis korrigiert hat."
  },
  {
   "name": "Timantha",
@@ -926,9 +926,9 @@
  {
   "name": "Umbra",
   "slug": "umbra",
-  "sterne": 3,
-  "begruendung": "13.10.: waffe von bogen (klar falsch) ueber schwert auf \"pistole\" umgestellt (echter b.waffe-Wert aus Skorpio's SciFi Sprite Pack, als Feuerwaffe DAUERHAFT sichtbar, nicht nur in einem Schlag-Frame) - die Figur haelt jetzt tatsaechlich eine Pistole wie im Portrait. effekt:voidRot am Kopf liefert einen sichtbaren roten Glühpunkt nahe dem Gesicht, passend zu den rot leuchtenden Maskenaugen.",
-  "fehlendesDetail": "Die schwarze Mantelfarbe der Kapuze (natur-/cremefarben statt schwarz, strukturelle Engine-Grenze, s. Code-Kommentar) und die genaue Vogel-/Schnabelmaske fehlen."
+  "sterne": 4,
+  "begruendung": "13.10.: waffe auf \"pistole\" umgestellt (echte Feuerwaffe, dauerhaft sichtbar statt nur im Schlag-Frame), effekt:voidRot am Kopf fuer die rot leuchtenden Maskenaugen. 16.10., Sprite-Fit 3-Sterne-Batch C: seit der projektweiten Kapuzen-Umfaerbung (spriteRuest() statt ton:null, s. Kommentar bei b.kapuze) faerbt sich die Kapuze jetzt nach ruestTon:\"dunkel\" ein - der schwarze Mantel aus dem Portrait ist jetzt korrekt schwarz statt naturfarben/creme.",
+  "fehlendesDetail": "Die genaue Vogel-/Schnabelmaske aus dem Portrait hat keine Entsprechung im Baukasten (kein Masken-Layer) - der einzige verbleibende Punkt, seit die Kapuze korrekt schwarz statt naturfarben ist."
  },
  {
   "name": "Vargan",
@@ -947,9 +947,9 @@
  {
   "name": "Verla Compliance",
   "slug": "verla-compliance",
-  "sterne": 3,
-  "begruendung": "Silbernes Haar und dunkle Kleidung passen zur Geister-Sekretärin, aber die Geist-Wirbel/Nebel-Effekte und das Dokument in der Hand fehlen.",
-  "fehlendesDetail": "Geist-Wirbel-Effekte und das Dokument fehlen"
+  "sterne": 4,
+  "begruendung": "Silbernes/weisses Haar und dunkle Kleidung (ruestTon:\"dunkel\") passten zur Geister-Sekretaerin. 16.10., Sprite-Fit 3-Sterne-Batch C: geist:true ergaenzt (ctx.globalAlpha=0.6, s. Kommentar bei b.geist) - die Figur ist jetzt sichtbar halbtransparent mit erkennbaren Nebel-/Wirbel-Schlieren, statt voll deckend dazustehen wie zuvor.",
+  "fehlendesDetail": "Das Dokument/Papier in ihrer Hand hat keinen Requisiten-Slot im Baukasten - der einzige verbleibende Punkt, seit geist:true die halbtransparente Geistererscheinung ergaenzt."
  },
  {
   "name": "Vigil",
@@ -969,8 +969,8 @@
   "name": "Whispra",
   "slug": "whispra",
   "sterne": 3,
-  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - die Fluegel sind jetzt solide SCHWARZ statt braun, naeher an der namensgebenden Rabenfarbe (fluegel_federn wurde probiert, rendert aber immer weiss statt schwarz, s. Code-Kommentar). Hautfarbe black war schon korrekt.",
-  "fehlendesDetail": "Die Kapuze bleibt naturfarben/creme statt schwarz (strukturelle Engine-Grenze), Schnabel und Totenkopf-Trophaeen am Guertel fehlen."
+  "begruendung": "13.10.: fluegel auf \"fledermaus\" umgestellt - solide schwarze Fluegel treffen die namensgebende Rabenfarbe direkt (federn rendert immer weiss). Hautfarbe black war schon korrekt. 16.10., Sprite-Fit 3-Sterne-Batch C: seit der projektweiten Kapuzen-Umfaerbung (spriteRuest() statt ton:null) faerbt sich die Kapuze jetzt nach ruestTon:\"dunkel\" ein - vorher naturfarben/creme, jetzt korrekt schwarz. Bild-schlaegt-Tags-Hinweis bleibt bestehen: das Portrait zeigt strukturell eher eine vierbeinige Rabenkreatur mit Krallenfuessen (aehnlich Seraph-11s Heron-Umbau) als den humanoiden Koerper, den dieses Rezept baut - eine groessere strukturelle Ueberarbeitung, ausserhalb des Umfangs dieser Nachlieferungsrunde.",
+  "fehlendesDetail": "Die Kapuze ist jetzt korrekt schwarz statt naturfarben; es bleiben aber Schnabel und Totenkopf-Trophaeen am Guertel unbaubar (kein Schnabel-/Requisiten-Layer), UND das Portrait zeigt eher eine vierbeinige Vogelkreatur mit Krallenfuessen als den humanoiden Koerper, den das Rezept baut - mehrere unabhaengige Luecken."
  },
  {
   "name": "Wingless",
@@ -1010,8 +1010,8 @@
  {
   "name": "Yuko",
   "slug": "yuko",
-  "sterne": 3,
-  "begruendung": "Dunkles Haar und dunkle Kleidung passen zum Cyborg-Look, aber die blau leuchtenden Anzug-Akzente und die namensgebenden holografischen Schmetterlingsflügel fehlen.",
-  "fehlendesDetail": "Blaue Anzug-Akzente und holografische Schmetterlingsflügel fehlen"
+  "sterne": 4,
+  "begruendung": "Dunkles Haar und dunkle Kleidung (ruestTon:\"dunkel\") passten zum Cyborg-Look. 16.10., Sprite-Fit 3-Sterne-Batch C, Bild-schlaegt-Tags-Fund: fluegel:true ENTFERNT - das Portrait zeigt keine an Yukos Ruecken angewachsenen Fluegel, sondern einen separaten frei schwebenden hologramm-blauen Schmetterling neben ihrer Hand; das bisherige fluegel:true (generisches braunes Fremdbild-Fluegelpaar) war schlicht falsch. NEU effekt:{typ:\"frost\",pos:\"koerper\"} als Naeherung an die blau leuchtenden Anzug-Akzente.",
+  "fehlendesDetail": "Der freischwebende holografische Schmetterling-Begleiter hat keinen Requisiten-/Haustier-Layer im Baukasten - der einzige verbleibende Punkt, seit die faelschlich angewachsenen Fluegel entfernt und effekt:\"frost\" als Naeherung an die blauen Anzug-Akzente ergaenzt wurden."
  }
 ]

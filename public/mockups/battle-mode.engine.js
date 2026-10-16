@@ -1837,7 +1837,12 @@
     // Begruendung) — aufrechte Haltung, Schuppenschwanz, wallendes Haar und eine nach vorn
     // ausgestreckte leuchtende Waffe treffen das Bild naeher, auch wenn Hautton (braun statt
     // tuerkis) und Requisite (Aal statt Dreizack) nicht exakt sind.
-    "Tidesprinter":       {vollbild:"meerjungfrau"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: vollbildFarbe ergaenzt (meerjungfrau_aal.png
+    // nativ braun-haeutig, s. VOLLBILD/meerjungfrau-Kommentar oben) — Portrait zeigt klar
+    // TUERKISE/blaugruene Haut, nicht Braun. #2fb3a8 aus dem Portrait abgetastet (gleiche
+    // Vorgehensweise wie Tropfinas #3fcbc2). Der Dreizack bleibt die dokumentierte,
+    // unbaubare Luecke (Blatt haelt stattdessen einen Aal in der Hand, s. fehlendesDetail).
+    "Tidesprinter":       {vollbild:"meerjungfrau",vollbildFarbe:"#2fb3a8",vollbildFarbeModus:"farbe"},
     // Bild: dunkle, MECHANISCHE Reiher-/Storch-Kreatur — langer duenner Hals, sehr langer
     // spitzer Schnabel, lange duenne Beine, metallisch-dunkles Gefieder, leuchtender oranger
     // Energiekern mittig im Brustkorb, unter Vollmond. Chris' Korrektur (01.09.): "Seraph ist
@@ -2053,7 +2058,13 @@
     // in zeichneSprite).
     // 25.08.: waffe:"stab" ergaenzt (t_stab_bg/fg, s. zeichneB) — der Kristallstab aus dem
     // Bild war bislang nirgends verdrahtet, weder in B_FIGUR noch in der animierten Ansicht.
-    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",geschlecht:"w",haar:"haar_lang",haarTon:"white",effekt:{typ:"arkan",pos:"kopf"},waffe:"stab"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: ruestTon "dunkel" ergaenzt — Portrait zeigt eine
+    // DUNKLE Robe mit goldenen Sternzeichen-Symbolen, "leder_frau" trug bisher naturbraun.
+    // "dunkel" (Schwarz/Grau-Rampe, s. RUEST_TON) trifft den Robenton direkt; effekt:"arkan"
+    // (lila-pink-gold funkelnd) bleibt als Naeherung an die goldenen Symbole/den
+    // Sternenhimmel-Glanz bestehen. Die genauen Konstellations-Symbole selbst bleiben eine
+    // Textur ohne Baukasten-Slot.
+    "Starflame":          {kopf:"human",haut:"light",ohren:true,ruest:"leder_frau",ruestTon:"dunkel",geschlecht:"w",haar:"haar_lang",haarTon:"white",effekt:{typ:"arkan",pos:"kopf"},waffe:"stab"},
     // Bild: kolossales kristallines Sternenwesen, wirbelnde Energieringe — dieselbe Wahl
     // wie Krag'Zul (auch ein Kristallkoloss): "alien"/"lavender"/"plate" plus Hoerner fuer
     // die Zacken.
@@ -2234,7 +2245,15 @@
     "Babuschinka":        {kopf:"human",haut:"light",geschlecht:"w",haar:"haar_lang",haarTon:"gray",ruest:"leder_frau",ruestTon:"dunkel",effekt:{typ:"frost",pos:"kopf"}},
     // Bild: gehoerntes reptilienartiges Monster, unbewaffnet — bereits als Widerspruch
     // vorgelegt (BILDBEFUNDE, weder Servant- noch Monk-Motiv im Bild).
-    "Rok Kyl":            {kopf:"lizard",haut:"brown",hoerner:true},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: haut von "brown" auf "black" umgestellt — die
+    // "black"-Rampe (#000000..#7F4C31, s. HAUT-Tabelle) ist tatsaechlich eine Schwarz-zu-
+    // Dunkelbraun-Stufenfolge, deutlich naeher an der fast schwarzen Horden-Boss-Haut im
+    // Portrait als das helle "brown". hoerner:true bleibt EIN Hornpaar — die vielen
+    // zusaetzlichen Stacheln/Dornen am ganzen Kopf/Ruecken aus dem Bild und die riesigen
+    // sichtbaren Fangzaehne haben weiterhin keinen eigenen Baukasten-Slot (kein Multi-Horn-
+    // Layer, keine Zahn-Textur-Ebene) — zwei unabhaengige, nicht einzeln benennbare
+    // Luecken, deshalb trotz der Farbkorrektur weiterhin kein 4-Stern-Fall.
+    "Rok Kyl":            {kopf:"lizard",haut:"black",hoerner:true},
     // Bild: massiger gehoernter Daemon mit violett leuchtender Brust, aggressiv.
     // effekt "void"/"koerper" (26.08., Ausbau ueber Feuer hinaus, Bildbefund oben:
     // "Massiger gehoernter Daemon mit VIOLETT leuchtender Brust" — praktisch dieselbe
@@ -2747,7 +2766,14 @@
     // treffende) weisse Haar komplett verdecken wuerden, also eine Verschlechterung statt
     // einer Verbesserung. Keine punktuelle Korrektur verfuegbar, hier dokumentiert.
     "Phantomblade":       {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",waffe:"schwert",haar:"haar_mop",haarTon:"white",geschlecht:"w"},
-    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: geist:true ergaenzt (ctx.globalAlpha=0.6, s.
+    // Kommentar bei b.geist in zeichneSprite) — Portrait zeigt eine halbdurchsichtige
+    // GEISTER-Sekretaerin mit sichtbaren Nebel-/Wirbel-Schlieren um den Koerper; die
+    // bestehende dunkle Kleidung/weisses Haar bleiben unveraendert richtig, nur die
+    // Transparenz fehlte bisher komplett (die Figur stand voll deckend da). Das Dokument
+    // in ihrer Hand bleibt die dokumentierte, unbaubare Luecke (kein Requisiten-Slot fuer
+    // ein Blatt Papier).
+    "Verla Compliance":   {kopf:"human",haut:"light",ruest:"leder_frau",haar:"haar_lang",haarTon:"white",geschlecht:"w",ruestTon:"dunkel",geist:true},
     // Nachlieferung (13.10., Sprite-Fit): Portrait zeigt eine Wikinger-Kriegerin mit
     // KRIEGSAXT (nicht Schwert), Pelzumhang, weissem Wolfsbegleiter, Schneelandschaft (s.
     // public/portraits/brunhilde.jpg). waffe von "schwert" auf "axt" — trifft die im Bild
@@ -2872,7 +2898,18 @@
     // Schaerpe bleiben die dokumentierte, strukturell unbaubare Luecke: kein Masken-Layer und
     // keine zweite, separat einfaerbbare Stoff-Ebene fuer eine Schaerpe im Baukasten.
     "Orichalcos":         {kopf:"human",haut:"light",ruest:"leder",ruestTon:"blau",kapuze:true,waffe:"schwert",effekt:{typ:"frost",pos:"koerper"}},
-    "Sunny":              {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",waffe:"schwert",fluegel:true,haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: fluegel von true (generisch, braunes Fremdbild)
+    // auf "federn" umgestellt — Portrait zeigt grosse WEISSE Engels-/Walkueren-Schwingen,
+    // "federn" rendert solide WEISS (s. Kommentar bei b.fluegel==="federn"/"fledermaus"),
+    // trifft das direkt, "fledermaus" (schwarz) waere falsch. waffe von "schwert" auf
+    // "axt" umgestellt — Portrait zeigt eindeutig eine zweischneidige Streitaxt, kein
+    // Schwert. ruestTon "dunkel" neu ergaenzt — Portrait zeigt dunkle, fast schwarze
+    // Plattenruestung, "plate_frau" ohne Ton war bisher naturhell/stahlfarben. Die Axt
+    // selbst ist (Stand 16.10., separater Engine-Fix in Arbeit) im Ruhe-/Idle-Frame des
+    // renderProbe()-Vorschaubilds noch nicht sichtbar — Nahkampfwaffen zeichnen nur im
+    // Schlag-Frame (ani==="slash"), kein Rezeptfehler, s. Chris' Hinweis/Koordinator-
+    // Nachricht 16.10.
+    "Sunny":              {kopf:"human",haut:"light",ruest:"plate_frau",ruestTon:"dunkel",hose:"beine_frau",waffe:"axt",fluegel:"federn",haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
     // Bild (25.08.): ein mechanischer Panther, spitze Katzenohren und ein langer geschwungener
     // Schwanz klar im Kartenbild. ohren/schwanz "katze" statt der Echsen-Variante.
     // Nachlieferung (13.10., Sprite-Fit): Portrait zeigt einen robotischen Cyberpunk-Panther
@@ -3198,7 +3235,17 @@
     // komplett zugunsten eines dunklen, fast schwarzen Panzertons, effekt:"voidRot" (rot
     // wabernd, s. EFFEKT_ARTEN) naehert die gluehend roten Augen/Lava-Klauen an.
     "Galactus":           {vollbild:"kraken",vollbildFarbe:"#26262c",vollbildFarbeModus:"farbe",effekt:{typ:"voidRot",pos:"koerper"}},
-    "Yuko":               {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",fluegel:true,haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: fluegel:true ENTFERNT — Bild-schlaegt-Tags-Fund:
+    // das Portrait zeigt KEINE an Yukos Ruecken angewachsenen Fluegel, sondern einen
+    // separaten, frei schwebenden hologram-blauen Schmetterling neben ihrer Hand. Das
+    // bisherige fluegel:true (generisches braunes Fremdbild-Flugelpaar am Ruecken) war
+    // schlicht falsch, kein Naeherungsfall. NEU effekt:{typ:"frost",pos:"koerper"} (hell-
+    // blau/weiss, s. EFFEKT_ARTEN) als Naeherung an die blau LEUCHTENDEN Akzente/Lichter
+    // im schwarzen Techno-Anzug (ruestTon:"dunkel" bleibt fuer den schwarzen Grundanzug
+    // richtig, der Glow sitzt nur an einzelnen Punkten/Fugen). Der freischwebende
+    // holografische Schmetterling selbst bleibt die dokumentierte, unbaubare Luecke (kein
+    // Begleiter-/Haustier-Layer im Baukasten).
+    "Yuko":               {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",haar:"haar_lang",haarTon:"dark_brown",geschlecht:"w",effekt:{typ:"frost",pos:"koerper"}},
     // 13.10., Sprite-Fit-Nachlieferung Batch 2: Portrait ist ein Lich (Skelettgesicht unter
     // der Kapuze, violettes Glühen, leuchtender Stab) — kopf:"human" traf weder das
     // skelettartige Gesicht noch die violette Faerbung. Auf kopf:"skeleton" umgestellt
@@ -3207,7 +3254,13 @@
     // Knochenfarbe, b.haut faerbt dort nichts Sinnvolles um), waffe:"stab" fuer den
     // leuchtenden Stab, effekt "void" (violett, wabernd) fuer das Glühen passend zur
     // "violetten Farbgebung" aus dem eigenen Bildbefund.
-    "Shadowsage":         {kopf:"skeleton",kapuze:true,ruest:"leder",waffe:"stab",effekt:{typ:"void",pos:"koerper"}},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: ruestTon "violett" ergaenzt (RUEST_TON seit
+    // 13.10./Brobot vorhanden) — Portrait zeigt eine durchgehend VIOLETTE Robe mit
+    // violettem Zierbesatz, "leder" trug bisher naturbraun. Seit derselben Runde faerbt
+    // spriteRuest() auch die Kapuze um (s. Kommentar bei "if(b.kapuze)" oben) — Robe UND
+    // Kapuze sind jetzt einheitlich violett, nicht nur die Robe. Der leuchtende Stab
+    // bleibt die dokumentierte Luecke (nur im Schlag-Frame sichtbar, s. fehlendesDetail).
+    "Shadowsage":         {kopf:"skeleton",kapuze:true,ruest:"leder",ruestTon:"violett",waffe:"stab",effekt:{typ:"void",pos:"koerper"}},
     // Bild (public/portraits/dr-ironmind.jpg): alte Feldaerztin in braunem Kopftuch/Umhang in
     // einem Kriegszelt, versorgt einen blutig verbundenen Patienten, haelt ein leuchtend
     // BLAUES medizinisches Geraet mit Symbolen. War bislang byte-identisch mit
@@ -3363,7 +3416,14 @@
     // gestapelte Keks-Textur bleiben unrepresentiert (kein Textur-Layer im Baukasten dafuer),
     // dokumentierte Luecke.
     "Crumbsage":          {vollbild:"golem",vollbildFarbe:"#b9793f",effekt:{typ:"arkan",pos:"koerper"},energiekern:true},
-    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: fluegel von true (generisch, braunes Fremdbild)
+    // auf "federn" umgestellt — Portrait zeigt grosse WEISSE Engels-Federfluegel (keine
+    // Fledermausfluegel), "federn" rendert solide weiss (s. Kommentar bei
+    // b.fluegel==="federn"/"fledermaus"), trifft das direkt. Das blaue Haar war schon
+    // korrekt. Die kybernetischen Ruestungsteile (mechanischer Arm, Technik-Adern im
+    // Gesicht) und die teal-goldene Robe bleiben unbaubar — kein Cyborg-Arm-Layer, "leder_
+    // frau" bleibt naturbraun statt teal/gold, zwei unabhaengige Luecken.
+    "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:"federn",haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
     // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/steel-sinister.jpg) zeigt
     // GESCHWUNGENE Hoerner am Helm, nicht die geraden Standardhoerner — hoerner von true auf
     // "gebogen" (dieselbe Ebene, die Ironhoof schon fuer seine gebogenen Widderhoerner nutzt,
@@ -3437,7 +3497,18 @@
     // Fels-/Lavakoloss mit gluehenden Rissen ... praktisch dasselbe Motiv wie Lava
     // Golem"): Terradon teilt sich das Vollbild-Blatt mit Lava Golem, hatte den Glut-
     // Effekt aber nie bekommen, obwohl der Bildbefund identisch ist.
-    "Terradon":           {vollbild:"golem",effekt:{typ:"feuer",pos:"koerper"}},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: bisher ohne vollbildFarbe (golem_walk.png nativ
+    // silbrig-hellgrau) und nur dem einen zentralen gluehenderRiss — Portrait zeigt aber
+    // DUNKLES, fast schwarzes Vulkangestein mit durchgehenden gluehend-orangenen Rissen
+    // ueber FAST DEN GANZEN KOERPER (Arme, Beine, Torso, Kopf), nicht nur einen Fleck am
+    // Fuss. Dasselbe Muster wie Lava Golem (16.10., 4-Sterne-Batch A, s. dortiger
+    // Kommentar) — vollbildFarbe dunkles Basalt-Anthrazit (statt Lava Golems roetlicherem
+    // Stein, Terradons Portrait zeigt klar GRAU/SCHWARZ, kein Rotstich), gluehenderRiss
+    // (Herzhoehe) + vier weitere risse an Armen/Beinen (dieselben Anatomie-Anker-
+    // Koordinaten wie bei Lava Golem, generischer vollbild-Golem-Mechanismus).
+    "Terradon":           {vollbild:"golem",vollbildFarbe:"#2b2724",effekt:{typ:"feuer",pos:"koerper"},gluehenderRiss:true,
+                           risse:[{dx:-14,top:-28,bot:-14,breite:3},{dx:14,top:-28,bot:-14,breite:3},
+                                  {dx:-7,top:-2,bot:12,breite:3},{dx:7,top:-2,bot:12,breite:3}]},
     // Nachlieferung (13.10., Sprite-Fit 1-Stern-Anker): Portrait zeigt ein anthropomorphes
     // Gemuese-Wesen mit roter ZWIEBEL als Kopf, Schutzbrille, gelb-senfgoldenem
     // Cardigan/Umhang und Perlenkette, faltiger Koerper, kehrt Zwiebelschalen zusammen
@@ -3526,7 +3597,15 @@
     // NAEHERUNG, nicht liegengelassen: kein echtes "Transformer"-Silhouette-Detail
     // (Doppelfaeuste/Transformer-Formensprache aus dem Portrait), nur ein genereller
     // schwerer Kampfmech mit blauem Lichtakzent — fuer die naechste Iteration offen.
-    "Tavascron":          {vollbild:"mech_gross",vollbildFarbe:"#5c84ab"},
+    // 16.10., Sprite-Fit 3-Sterne-Batch C: effekt "frost"/"koerper" ergaenzt (hellblau-
+    // weiss, schwebend, s. EFFEKT_ARTEN) — Portrait zeigt kraeftiges CYAN-NEON-Leuchten an
+    // Visier, Gelenken und Schulterwaffen ueber den ganzen Mech verteilt; das Stahlblau-
+    // Grundcolorit (vollbildFarbe) traf schon den Farbton, aber keinerlei Leuchten selbst.
+    // "frost" ist die naechstliegende der bestehenden Effekt-Paletten (hellblau/weiss,
+    // s. Clara/Xerathis). Die Transformer-Doppelfaust-Silhouette bleibt die eine
+    // verbliebene, nicht per Recolor/Effekt behebbare Luecke (anderes Blatt noetig, s.
+    // Kommentar oben) — damit genau EIN benennbarer Rest-Punkt statt mehrerer.
+    "Tavascron":          {vollbild:"mech_gross",vollbildFarbe:"#5c84ab",effekt:{typ:"frost",pos:"koerper"}},
     // Bild: "Blonde Kriegerin in goldener Plattenruestung, schwingt einen grossen
     // Kriegshammer ueber dem Kopf, Vogel-Wappenschild an der Seite" (subclass-archetypes.ts).
     // ruest:"plate" war die MAENNLICHE Platten-Ebene — der Baukasten hatte bislang JEDE
@@ -5926,7 +6005,20 @@
       if(b.hoerner==="gebogen")zeichne("hoerner_gebogen_"+ani,64,0,0,b.haut);
       else if(b.hoerner)zeichne("hoerner_"+ani,64,0,0,b.haut);
       if(b.krone)zeichne("krone_"+zubehoerAni,64,0,0,null);
-      if(b.kapuze)zeichne("kapuze_"+ani,64,0,0,null);
+      // 16.10., Sprite-Fit 3-Sterne-Batch C: ton frueher IMMER null (Kapuze strukturell
+      // nicht umfaerbbar, s. Kommentar bei Whispra/Umbra "kapuze bleibt naturfarben").
+      // zeichne()/sprite() nutzen aber dieselbe generische faerbe()-Funktion wie JEDE
+      // andere Ebene — spriteRuest() (fuer ruest/hose) erkennt die Quellrampe nur VORHER
+      // explizit ueber quellRampeRuest()/RUEST_QUELLEN. b.ruestTon durchreichen reicht
+      // deshalb nicht automatisch; kapuze_walk nutzt denselben Leder-Rohton wie ruest:
+      // "leder"/"leder_frau" (gleiches Asset-Set), spriteRuest() erkennt das ueber
+      // dieselbe 50%-Pixelvergleichsschwelle wie bei jeder anderen Leder-Ebene — KEIN
+      // neuer RUEST_QUELLEN-Eintrag noetig, reine Wiederverwendung der bestehenden
+      // Erkennung. Per renderProbe gegengeprueft (Umbra/Whispra/Shadowsage/Taryn): faerbt
+      // jetzt tatsaechlich um, wenn b.ruestTon gesetzt ist; bei allen anderen Kapuzen-
+      // Traegern ohne ruestTon (Myrkos, Vargan, Bana, Kento, ...) bleibt ton===undefined,
+      // also exakt das alte Verhalten (keine Regression).
+      if(b.kapuze)male(spriteRuest("kapuze_"+ani,b.ruestTon),64,0,0);
       // Zwiebelkopf (Byrd, s. zeichneZwiebelKopf-Kommentar oben): ERSETZT den Kopf optisch,
       // deshalb NACH dem Kopf-Sprite gezeichnet (verdeckt ihn), genau wie Kamera bei Vigil.
       // cy=y-30*Z naehert die Kopfmitte eines 64px-Standardkoerpers an (Kopf-Box startet bei
@@ -32773,7 +32865,10 @@
       if(b.hoerner==="gebogen")setz("hoerner_gebogen_walk",b.haut);
       else if(b.hoerner)setz("hoerner_walk",b.haut);
       if(b.krone)setz("krone_walk",null);
-      if(b.kapuze)setz("kapuze_walk",null);
+      // 16.10., Sprite-Fit 3-Sterne-Batch C: dieselbe Umfaerbung wie in zeichneSprite
+      // (s. Kommentar dort) auch fuer die Kader-/Board-Ikone, damit Arena und Kaderleiste
+      // nicht auseinanderlaufen.
+      if(b.kapuze)setzR("kapuze_walk",b.ruestTon);
       // Zwiebelkopf auch in der Kader-/Board-Ikone (Byrd, s. zeichneZwiebelKopf-Kommentar in
       // zeichneSprite). Umrechnung Arena->Ikone nach derselben Formel wie beim
       // Hockeyschlaeger-Griffpunkt oben (F=50/64): Kopf-Mitte im 64x64-Arena-Rahmen bei
