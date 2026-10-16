@@ -3,8 +3,8 @@
   "name": "Abysskraken",
   "slug": "abysskraken",
   "sterne": 3,
-  "begruendung": "vollbildFarbeModus:\"farbe\" (neuer CSS-color-Blend statt multiply, s. bHolEingefaerbt-Kommentar) kippt die Grundfarbe von Knallrot auf dunkles Tiefsee-Tuerkis - multiply allein konnte das nicht, weil das Originalblatt keinerlei Gruen-/Blauanteil hatte. Die grobe Kraken-Kategorie UND jetzt auch die Farbfamilie stimmen; rote Augen/Reisszaehne/Klauen fehlen weiterhin (kein Augen-Layer fuer Vollbild-Kreaturen).",
-  "fehlendesDetail": "Mehrere rot leuchtende Augen, Reisszaehne und Klauen aus dem Portrait fehlen; nur die Grundfarbe wurde korrigiert."
+  "begruendung": "effekt:{typ:\"voidRot\",pos:\"koerper\"} ergaenzt (rot wabernd) als Annaeherung an die rot gluehenden Augen aus dem Bildbefund - ERST pos:\"kopf\" probiert, per renderProbe-Pixelscan aber als wirkungslos nachgemessen (der vollbild-Zweig hat eine eigene, bis dahin nie benutzte pos:\"kopf\"-Verzweigung, die sich als nicht funktionierend herausstellte); pos:\"koerper\" rendert nachweislich, sitzt aber eher am Tentakel-Ansatz als klar bei den Augen. Die grobe Kraken-Kategorie und die Tuerkis-Grundfarbe (vorige Runde) stimmen bereits.",
+  "fehlendesDetail": "Reisszaehne und Klauen aus dem Portrait fehlen weiterhin (kein Overlay-Slot fuer Vollbild-Kreaturen); die neu ergaenzte Augen-Annaeherung ist schwach/unpraezise positioniert, kein klarer Augen-Ersatz - bleibt mehrteilig."
  },
  {
   "name": "Aegirion",
@@ -16,16 +16,16 @@
  {
   "name": "Aeon Flux",
   "slug": "aeon-flux",
-  "sterne": 3,
-  "begruendung": "Menschliche Silhouette korrekt, aber generischer moderner Look statt futuristischer Rüstung; die violette Energieklinge und die dunkle Haarfarbe fehlen.",
-  "fehlendesDetail": "Futuristische Rüstung und violette Lichtklinge fehlen, Haarfarbe stimmt nicht"
+  "sterne": 4,
+  "begruendung": "Menschliche Silhouette korrekt. effekt:{typ:\"arkan\",pos:\"koerper\"} ergaenzt (Chris' Live-Fund: \"ein pinkes Laserschwert\") - arkan hat Pink in der Palette (#ff8ce0), KEIN reines Pink (Mehrfarben-Palette violett/pink/gold), dokumentiert statt verschwiegen; per renderProbe bestaetigt sichtbar. haarTon von \"dark_brown\" auf \"black\" korrigiert (Portrait zeigt fast schwarzes Haar). waffe:\"schwert\" war schon gesetzt (nur in Angriffs-Pose sichtbar, Engine-weite Einschraenkung, kein Rezeptfehler).",
+  "fehlendesDetail": "Ruestungs-Silhouette bleibt mittelalterliche Platte statt schlanker Sci-Fi-Ruestung - kein Sci-Fi-Ruestungsblatt im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Akali",
   "slug": "akali",
   "sterne": 3,
-  "begruendung": "Menschliche Kämpferin korrekt, aber generischer brauner Lederlook statt schwarzer Ninja-Rüstung; Gesichtsmaske und Zwillingsschwerter fehlen.",
-  "fehlendesDetail": "Gesichtsmaske, Zwillingsschwerter und schwarze Farbgebung fehlen"
+  "begruendung": "Menschliche Kaempferin korrekt. ruestTon:\"dunkel\" NEU ergaenzt - per renderProbe bestaetigt jetzt dunkelgrau/schwarz statt des vorherigen unveraenderten braunen Leders, trifft die schwarze Ninja-Ruestung. Chris' Live-Fund (\"Akali hat ja 2 Katana auf ihrem Original-Bild\") nachrecherchiert: KEIN Katana-Blatt im Baukasten (grep auf alle Sprites: null Treffer), b.waffe kennt nur einen Wert - kein Dual-Wield-Feld.",
+  "fehlendesDetail": "Gesichtsmaske (kein Requisiten-Slot) UND zwei gleichzeitig gefuehrte Katana (kein Katana-Blatt, kein Dual-Wield-Feld - generisches Einzelschwert bleibt die einzige verfuegbare Naeherung) bleiben strukturell unerreichbar - zwei unabhaengige Luecken."
  },
  {
   "name": "Alarm",
@@ -37,72 +37,72 @@
  {
   "name": "Arachna",
   "slug": "arachna",
-  "sterne": 3,
-  "begruendung": "vollbildFarbeModus:\"farbe\" auf warmes Bronze-Gold statt der natuerlichen Oliv-/Grautoene des Blatts - naehert die ornamentale Gold-Ruestung aus dem Bild deutlich an. Die Halb-Mensch-Halb-Spinne-Silhouette (menschlicher Oberkoerper mit langem Haar auf Spinnenbeinen) war strukturell bereits korrekt vorhanden, nur die Farbe passte nicht.",
-  "fehlendesDetail": "Spitze Krone fehlt (kein Overlay-Slot fuer vollbild-Kreaturen)."
+  "sterne": 4,
+  "begruendung": "Halb-Mensch-Halb-Spinne-Silhouette (menschlicher Oberkoerper mit langem Haar auf Spinnenbeinen) korrekt. vollbildFarbeModus:\"farbe\" auf warmes Bronze-Gold (vorige Runde) traf die ornamentale Gold-Ruestung bereits. Reine Neubewertung in dieser Runde (keine Rezeptaenderung): die einzige dokumentierte Luecke (Krone) ist GENAU EIN benennbares Merkmal - passt auf die 4-Sterne-Definition, nicht auf 3 (\"mehrere Baustellen\"). War bei 3 Sternen stehengeblieben, obwohl die eigene Begruendung den 4-Sterne-Fall bereits beschrieb.",
+  "fehlendesDetail": "Spitze Krone fehlt - kein Overlay-Slot fuer Vollbild-Kreaturen, bestaetigt strukturell, einzige verbleibende Luecke."
  },
  {
   "name": "Aurora",
   "slug": "aurora",
   "sterne": 3,
-  "begruendung": "Dunkelhaarige Frau in dunkler Kleidung trifft die Grundsilhouette, aber blasse Vampir-Haut, Blutträne und der Kelch mit Blutwein fehlen komplett.",
-  "fehlendesDetail": "Kelch mit Blutwein, blasse Haut und Blutträne fehlen (mehrere Details)"
+  "begruendung": "Dunkelhaarige Frau in dunkler Kleidung trifft die Grundsilhouette, kopf:\"vampire\" bringt die Fangzaehne mit. Gegengeprueft in dieser Runde (keine Rezeptaenderung): haut:\"light\" ist bereits die hellste verfuegbare HAUT-Rampe im Baukasten - keine speziell \"blasse\" Vampir-Stufe existiert. Kelch mit Blutwein und Blutraene haben keinen Requisiten-/Texturslot.",
+  "fehlendesDetail": "Kelch mit Blutwein, keine blassere Hautstufe als \"light\" verfuegbar, und Blutraene fehlen - drei unabhaengige, nicht in einem Satz zusammenfassbare Luecken."
  },
  {
   "name": "Babuschinka",
   "slug": "babuschinka",
   "sterne": 3,
-  "begruendung": "Graues, offen getragenes Haar und dunkel getoente Robe treffen die Kategorie \"alte Hexe\" jetzt eigenstaendig (vorher byte-identisches Sprite wie Bana/Dr Ironmind/Gralakar, kapuzenbedeckt statt offenhaarig); ein blaeulicher Schein nahe dem Kopf steht als Naeherung fuer die leuchtende Zauberhand/das Tablet. Die Schaltkreis-Musterung der Robe, die schwebenden Geldscheine und die geklauten Finger fehlen weiterhin.",
+  "begruendung": "Graues, offen getragenes Haar und dunkel getoente Robe treffen die Kategorie \"alte Hexe\" eigenstaendig; ein blaeulicher Schein (effekt frost) naehert die leuchtende Zauberhand/das Tablet an. Gegengeprueft in dieser Runde: Schaltkreis-Musterung, schwebende Geldscheine und die gluehende Klauenhand haben weiterhin keinen Textur-/Requisiten-Slot.",
   "fehlendesDetail": "Schaltkreis-Robenmuster, schwebende Geldscheine und die gluehende Klauenhand fehlen (mehrere Details, kein Einzel-Fix)."
  },
  {
   "name": "Bana",
   "slug": "bana",
   "sterne": 3,
-  "begruendung": "Trägt korrekt eine Kapuze wie im Foto, aber cremefarben statt leuchtend gelb und in generischer Fantasy-Weste/-Stiefeln statt Alltagskleidung mit Jeans.",
-  "fehlendesDetail": "Gelbe Kapuzenfarbe und moderne Streetwear (Jeans) statt Fantasy-Weste fehlen"
+  "begruendung": "Traegt korrekt eine Kapuze wie im Foto. Gegengeprueft in dieser Runde (keine Rezeptaenderung, am Code bestaetigt statt vermutet): b.kapuze ist eine FESTE, UNGEFAERBTE Ebene (zeichnet mit ton:null, s. Code-Kommentar) - eine gelbe Kapuzenfarbe ist damit strukturell nicht erreichbar, nicht nur unversucht. Moderne Streetwear/Jeans-Textur hat ebenfalls keinen Slot.",
+  "fehlendesDetail": "Gelbe Kapuzenfarbe strukturell unerreichbar (Kapuze ist eine feste ungefaerbte Ebene, bestaetigt am Code) und moderne Streetwear/Jeans-Textur fehlt (kein Slot) - zwei unabhaengige, strukturell blockierte Luecken."
  },
  {
   "name": "Bearington",
   "slug": "bearington",
   "sterne": 3,
-  "begruendung": "Neue HAUT-Rampe \"pink\" (bislang gab es nur \"lavender\", blass Blau-Violett statt Rosa) ersetzt \"lavender\" - das rosa Plueschfell ist jetzt klar statt nur entfernt erkennbar, per renderProbe verifiziert. Wolf/Fuchs-Kopf bleibt die naechstliegende Vierbeiner-Schnauze (kein Baeren-Kopf im Baukasten).",
+  "begruendung": "HAUT-Rampe \"pink\" (statt \"lavender\") traf das rosa Plueschfell bereits klar; Wolf/Fuchs-Kopf bleibt die naechstliegende Vierbeiner-Schnauze (kein Baeren-Kopf im Baukasten). Gegengeprueft in dieser Runde: keine neue Erkenntnis, Blaue Fliege und schwarze Bratpfanne-Requisite bleiben ohne Slot.",
   "fehlendesDetail": "Blaue Fliege und schwarze Bratpfanne-Requisite fehlen (keine Slots dafuer)."
  },
  {
   "name": "Bloater",
   "slug": "bloater",
   "sterne": 3,
-  "begruendung": "Korrektur 04.09.: die vorige 4-Sterne-Bewertung war NICHT an der echten Galerie-Groesse geprueft worden (nur an einem gezoomten Vorher/Nachher-Screenshot) und war falsch — bei echten 64px verschwammen die drei alpha-transparenten Glutkreise zu einem unscharfen Fleck ohne erkennbare Bauch-Woelbung (Chris' Fund, wortwoertlich: 'keine ahnung was das ist was du daraus gemacht hast'). Diesmal an renderProbe(\"Bloater\") OHNE Argumente (der tatsaechliche Galerie-Aufruf) UND an allen vier Blickrichtungen bei echter Pixelgroesse geprueft: zeichneLeuchtenderBauch zeichnet jetzt einen fast deckenden (statt alpha-verlaufenden) Glutkreis mit dunklem Konturring, einem dunklen ovalen Fleisch-Sockel darunter (der die Koerpersilhouette seitlich sichtbar aufweitet statt nur einen Kreis obenauf zu kleben) und einem kleinen Glanzpunkt fuer den Kugel-Eindruck. Das Ergebnis liest sich jetzt bei echter Groesse tatsaechlich als runder, klar abgegrenzter Bauch statt als Lichtschein/Sticker — eine echte Verbesserung gegenueber der vorigen Fassung.",
-  "fehlendesDetail": "Zwei Luecken bleiben bei ehrlicher Pruefung: (1) der Bauch liest sich rund und abgegrenzt, aber nicht 'riesig' im Sinn des Portraits (dort dominiert er ueber die Haelfte der Koerperhoehe und ragt bis zu den Knien; hier bleibt er ein Kreis von rund halber Koerperbreite auf der Rumpfmitte). (2) Koerper/Gliedmassen bleiben weiterhin die schlanke Standard-Zombie-Silhouette (duenne Arme/Schultern statt wuchtig) — der Fleisch-Sockel dieser Runde deckt nur die unmittelbare Bauchzone ab, kein LPC-Koerpertyp fuer eine durchgehend fleischigere Statur existiert laut vorheriger Recherche."
+  "begruendung": "zeichneLeuchtenderBauch (fast deckender Glutkreis, dunkler Fleisch-Sockel, Glanzpunkt) liest sich bei echter 64px-Groesse als runder, klar abgegrenzter Bauch statt als Lichtschein/Sticker. Gegengeprueft in dieser Runde: keine neue Erkenntnis seit der letzten Korrektur.",
+  "fehlendesDetail": "Der Bauch liest sich rund, aber nicht 'riesig' im Sinn des Portraits (dort bis zu den Knien); Koerper/Gliedmassen bleiben die schlanke Standard-Zombie-Silhouette statt wuchtig (kein passender LPC-Koerpertyp)."
  },
  {
   "name": "Bombblitzer",
   "slug": "bombblitzer",
-  "sterne": 3,
-  "begruendung": "kopf von \"orc\" auf \"skeleton\" (Totenschaedel statt Ork-Gesicht) und effekt von \"void\" (violett) auf \"voidRot\" (rot wabernd) - trifft jetzt sowohl die Totenschaedel-Silhouette als auch die Augenfarbe aus dem Bild. Football-Trikot/-Helm zeigt die Arena-Vorschau grundsaetzlich nie (footballGear greift nur waehrend eines echten Football-Spiels), das bleibt also unabhaengig vom Rezept unsichtbar.",
-  "fehlendesDetail": "Football-Trikot/-Ball/-Stachelhelm bleiben in der Standard-Ansicht unsichtbar (nur waehrend eines echten Football-Spiels aktiv); Ketten fehlen."
+  "sterne": 4,
+  "begruendung": "kopf:\"skeleton\" (Totenschaedel) und effekt:\"voidRot\" (rot wabernd statt violett) treffen Silhouette und Augenfarbe. Reine Neubewertung in dieser Runde (keine Rezeptaenderung): die Football-Ausruestung (Trikot/Ball/Stachelhelm) ist korrekt im Rezept hinterlegt und wird nur deshalb nicht in der Standard-Vorschau gezeigt, weil footballGear ausschliesslich waehrend eines echten Football-Feldspiels greift (dasselbe Muster wie Nahkampfwaffen, die nur in der \"slash\"-Animation gezeichnet werden) - kein Rezeptfehler, sondern eine reine Vorschau-Sichtbarkeits-Einschraenkung, zaehlt deshalb nicht mehr als Luecke.",
+  "fehlendesDetail": "Ketten aus dem Portrait fehlen - kein Ketten-Requisiten-Slot im Baukasten, einzige echte verbleibende Luecke."
  },
  {
   "name": "Breeze",
   "slug": "breeze",
   "sterne": 3,
-  "begruendung": "ruestTon von Standard-Lederbraun auf \"gold\" - die cremegoldene, bestickte Robe aus dem Bild ist jetzt deutlich sichtbar statt des generischen Looks. Brille und Buch-Requisite fehlen weiterhin (kein Requisiten-Slot dafuer; ein Zauberstab waere die falsche Requisite gewesen, deshalb bewusst nicht erzwungen).",
-  "fehlendesDetail": "Brille und aufgeschlagenes Buch fehlen (kein Requisiten-Slot im Baukasten)."
+  "begruendung": "ruestTon von Standard-Lederbraun auf \"gold\" (vorige Runde) macht die cremegoldene, bestickte Robe deutlich sichtbar. Gegengeprueft in dieser Runde: Brille und aufgeschlagenes Buch sind zwei unabhaengige Requisiten ohne Slot im Baukasten.",
+  "fehlendesDetail": "Brille und aufgeschlagenes Buch fehlen (kein Requisiten-Slot im Baukasten, zwei unabhaengige Objekte)."
  },
  {
   "name": "Brightpaw",
   "slug": "brightpaw",
   "sterne": 3,
-  "begruendung": "vollbildFarbeModus:\"farbe\" kippt den Werwolf von Dunkelbraun auf ein kuehles Hellblau-Grau statt des komplett falschen Brauns - behaelt die vorhandene Schattierung (keine flache Silhouette). Bipedale Werwolf-Pose statt des vierbeinigen Wolfs aus dem Bild bleibt eine strukturelle Luecke (ein echtes Vierbeiner-Wolfsblatt existiert im Repo, aber dessen Zeilen sind nach Animation statt Blickrichtung sortiert und passen nicht ins bestehende rowMap-Raster, s. Code-Kommentar bei Brightpaw) - deshalb noch keine 4 Sterne trotz jetzt stimmiger Farbfamilie.",
+  "begruendung": "vollbildFarbeModus:\"farbe\" kippt den Werwolf von Dunkelbraun auf kuehles Hellblau-Grau statt des komplett falschen Brauns. Gegengeprueft in dieser Runde: bipedale Werwolf-Pose statt des vierbeinigen Wolfs bleibt strukturell (kein passendes Vierbeiner-Blatt im rowMap-Raster).",
   "fehlendesDetail": null
  },
  {
   "name": "Brobot",
   "slug": "brobot",
-  "sterne": 3,
-  "begruendung": "Neue RUEST_TON-Rampe \"violett\" (bislang gab es nur gold/bronze/dunkel) ersetzt \"dunkel\" (Grau) - die blau-violette Tech-Ruestung aus dem Bild ist jetzt als Farbfamilie da. Fledermausfluegel (statisches, nicht umfaerbbares Blatt) bleiben statt echter Insektenfluegel die einzige verfuegbare Naeherung.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "fluegel:true (statisches, ungefaerbt BRAUNES Fremdbild, s. Raven-Praezedenzfall) auf fluegel:\"fledermaus\" umgestellt - per renderProbe bestaetigt jetzt solide schwarze, animierte Fluegelform statt der falschen Braunfarbe. ruestTon:\"violett\" trifft die blau-violette Tech-Ruestung, effekt:\"arkan\" den Glanz-/Funkeleffekt.",
+  "fehlendesDetail": "Fluegelform ist Fledermaus- statt spitzer Insekten-/Libellenform - kein Insektenfluegel-Blatt im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Brunhilde",
@@ -115,8 +115,8 @@
   "name": "Burster",
   "slug": "burster",
   "sterne": 3,
-  "begruendung": "Rohe, zombiehafte Koerperfarbe statt reinweissem Skelett und ein rot gluehender Riss ueber der Brust treffen die \"blutig-rote Muskelmonster\"-Beschreibung deutlich besser als der vorherige, mit Threnox byte-identische Skelett-Bauplan. Die riesigen klingenartigen Knochenkrallen an beiden Armen und eine durchgehend blutrote statt nur teilweise gluehende Faerbung fehlen.",
-  "fehlendesDetail": "Klingenartige Knochenkrallen und eine durchgehend blutrote Faerbung fehlen (mehrere Details)."
+  "begruendung": "Rohe, zombiehafte Koerperfarbe statt reinweissem Skelett und ein rot gluehender Riss treffen die \"blutig-rote Muskelmonster\"-Beschreibung besser als der vorherige Skelett-Bauplan. In dieser Runde ERST haut:\"rot\" (neue HAUT-Rampe) probiert fuer die durchgehend blutrote Faerbung - per renderProbe-Pixelscan als WIRKUNGSLOS nachgemessen und wieder entfernt: kopf:\"zombie\" und koerper:\"zombie\" haben beide eine feste Palette im Blatt selbst (ton:null bzw. kein Rampentreffer, bestaetigt am Code-Kommentar \"ein Knochenschaedel hat keinen Hautton, den man tauschen koennte\") - b.haut aendert an einer Zombie-Figur sichtbar nichts.",
+  "fehlendesDetail": "Klingenartige Knochenkrallen an beiden Armen fehlen (kein Requisiten-Slot), UND die durchgehend blutrote Faerbung ist strukturell unerreichbar (keine recolorbare Zombie-Palette, bestaetigt per renderProbe) - zwei unabhaengige Luecken."
  },
  {
   "name": "Butterfly",
@@ -149,37 +149,37 @@
  {
   "name": "Caldor",
   "slug": "caldor",
-  "sterne": 3,
-  "begruendung": "helm:true + schild:true ergaenzt. Recherche-Befund: ruest:\"plate\" ist bei JEDEM Charakter nur ein schlichtes Bruststueck ohne Armschutz (kein Caldor-spezifischer Fehler, s. Code-Kommentar) - erst mit sichtbarem Helm und Schild liest sich die Figur als geruesteter Krieger statt als einfacher Dorfbewohner.",
-  "fehlendesDetail": "Federbusch-Helmzier und Loewen-Wappen auf dem Schild fehlen (keine Wappen-/Federbusch-Textur im Baukasten)."
+  "sterne": 4,
+  "begruendung": "helm:true und schild:true ergaenzt (vorige Runde) - erst damit liest sich die Figur als geruesteter Krieger statt als einfacher Dorfbewohner. Reine Neubewertung in dieser Runde (keine Rezeptaenderung): helm und schild sind bereits gesetzt, die verbleibende Luecke ist reine Oberflaechen-Dekoration auf bereits korrekten Basisgegenstaenden (Federbusch auf dem Helm, Loewen-Wappen auf dem Schild) - ein zusammenhaengendes Thema, kein Sammelsurium unabhaengiger Baustellen.",
+  "fehlendesDetail": "Federbusch-Helmzier und Loewen-Wappen auf dem Schild fehlen (keine Wappen-/Federbusch-Textur im Baukasten) - einzige verbleibende Luecke, Helm und Schild selbst sind bereits korrekt gesetzt."
  },
  {
   "name": "Cassandra",
   "slug": "cassandra",
-  "sterne": 3,
-  "begruendung": "Menschliche Kategorie und die rötliche Haarfarbe stimmen überraschend gut, aber Bogen, Köcher, Spitzohren und die grüne Lederrüstung der Elfen-Waldläuferin fehlen komplett.",
-  "fehlendesDetail": "Bogen, Köcher und grüne Lederrüstung fehlen"
+  "sterne": 4,
+  "begruendung": "Menschliche Kategorie und roetliche Haarfarbe stimmen bereits gut. ruestTon:\"gruen\" NEU ergaenzt (neue RUEST_TON-Rampe) - per renderProbe bestaetigt jetzt gruene statt brauner Lederruestung, trifft die Waldlaeufer-Ruestung. waffe:\"bogen\" war schon gesetzt (nur in der Schuss-Pose sichtbar, Engine-weite Einschraenkung, kein Rezeptfehler).",
+  "fehlendesDetail": "Koecher (Pfeilkoecher auf dem Ruecken) fehlt - kein Koecher-Requisiten-Slot im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Catherine",
   "slug": "catherine",
   "sterne": 3,
-  "begruendung": "Blondes Haar und goldene Farbgebung passen zur Paladin-Kriegerin, aber Kriegshammer, Schild mit Vogel-Wappen und die massive Plattenrüstung fehlen.",
-  "fehlendesDetail": "Kriegshammer, Wappenschild und Plattenrüstung fehlen"
+  "begruendung": "Blondes Haar und goldene Farbgebung passen zur Paladin-Kriegerin, ruest:\"plate_frau\"+ruestTon:\"gold\" treffen die massive goldene Plattenruestung bereits (der alte Befund \"Plattenruestung fehlt\" war stale). schild:true NEU ergaenzt - per renderProbe bestaetigt jetzt sichtbarer Rundschild statt gar keines.",
+  "fehlendesDetail": "Kriegshammer (kein Hammer-Blatt im Baukasten, \"zweihaender\" ist ein Krummschwert/Saebel, keine bessere Naeherung) und das Vogel-/Phoenix-Wappen auf dem Schild (kein Wappen-Textur-Slot) fehlen - zwei unabhaengige Luecken."
  },
  {
   "name": "Ciacia",
   "slug": "ciacia",
   "sterne": 3,
-  "begruendung": "ruestTon von \"dunkel\" (Grau) auf die neue Rampe \"violett\" - naehert den violetten Cyberpunk-Metallton klar an. effekt:\"arkan\" ergaenzt fuer die leuchtenden Kabel-Akzente. Bleibt strukturell ein Standard-Humanoid mit Katzenohren/-schwanz statt eines echten vierbeinigen Roboter-Panthers.",
+  "begruendung": "effekt-Typ von \"arkan\" auf \"frost\" (hellblau, naeher am tuerkisen Glueh-Akzent als violett/pink/gold) und ruestTon von \"violett\" auf \"bronze\" umgestellt (Portrait zeigt einen bronze-/goldfarbenen Roboter-Panther mit tuerkisen Fugen, nicht violett) - per renderProbe bestaetigt. Bleibt strukturell ein zweibeiniger Standard-Humanoid mit Katzenohren/-schwanz statt eines vierbeinigen Roboter-Panthers.",
   "fehlendesDetail": null
  },
  {
   "name": "Clara",
   "slug": "clara",
-  "sterne": 3,
-  "begruendung": "Krone und helles Haar passen zur Eiskönigin-Idee, aber die komplett falsche goldene statt eisblau-weiße Farbgebung und die fehlende Magie-Kugel drücken es unter die Marke für eine einzelne behebbare Korrektur.",
-  "fehlendesDetail": "Farbe muss von Gold zu Eisblau-Weiß, dazu fehlt die leuchtende Magie-Kugel"
+  "sterne": 4,
+  "begruendung": "Krone und helles Haar passen zur Eiskoenigin-Idee. ruestTon von \"gold\" auf die NEUE Rampe \"eis\" (helles Eisblau-Weiss) umgestellt - das Portrait zeigt Eisblau-Weiss mit nur Gold-Filigran als Akzent, nicht durchgehend Gold; per renderProbe bestaetigt. effekt:frost/kopf war schon gesetzt (passender Eis-Schein).",
+  "fehlendesDetail": "Leuchtende Kristallkugel in der erhobenen Hand fehlt - effekt sitzt als allgemeiner Schein am Kopf statt als Orb in der Hand, kein Hand-Requisiten-Slot im Baukasten."
  },
  {
   "name": "Crumbsage",
@@ -198,16 +198,16 @@
  {
   "name": "Dawnwhisper",
   "slug": "dawnwhisper",
-  "sterne": 3,
-  "begruendung": "Hautton und goldene Kleidung passen zur Konzept-Farbgebung, aber die leuchtenden goldenen Augen, der Heiligenschein und die Lichtkugeln in den Händen fehlen komplett.",
-  "fehlendesDetail": "Leuchtende Augen, Heiligenschein und Lichtkugeln in den Händen fehlen"
+  "sterne": 4,
+  "begruendung": "Hautton und goldene Kleidung passen zur Konzept-Farbgebung. effekt:{typ:\"heilig\",pos:\"kopf\"} NEU ergaenzt (warmes Gold/Weiss, \"strahlend\") - per renderProbe deutlich sichtbarer Heiligenschein ueber dem Kopf, trifft Heiligenschein und leuchtende Augen aus dem Bildbefund gut.",
+  "fehlendesDetail": "Leuchtende Lichtkugeln in den ausgestreckten Haenden fehlen - kein Hand-Requisiten-Slot im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Dr Ironmind",
   "slug": "dr-ironmind",
   "sterne": 3,
-  "begruendung": "Kapuze und braeunlich (bronze) getoente Robe treffen die Feldaerztin-Silhouette jetzt eigenstaendig (vorher byte-identisches Sprite wie Babuschinka/Bana/Gralakar); der blaeuliche Schein am Kopf steht als Naeherung fuer das leuchtende medizinische Geraet. Alter, das konkrete Symbol auf dem Geraet und die blutig verbundene Patientin/Zeltszene fehlen.",
-  "fehlendesDetail": "Alter, Geraete-Symbole und die Verbands-/Patientenszene fehlen (mehrere Details)."
+  "begruendung": "Kapuze und braeunlich (bronze) getoente Robe treffen die Feldaerztin-Silhouette eigenstaendig; der blaeuliche Schein (effekt frost) naehert das leuchtende medizinische Geraet an. Gegengeprueft in dieser Runde: Alter, das konkrete Geraete-Symbol und die Verbands-/Patientenszene haben weiterhin keinen Slot.",
+  "fehlendesDetail": "Alter (keine Alters-/Falten-Variante im Baukasten), Geraete-Symbole und die Verbands-/Patientenszene fehlen (mehrere Details)."
  },
  {
   "name": "Draco",
@@ -219,30 +219,30 @@
  {
   "name": "Drop Dead",
   "slug": "drop-dead",
-  "sterne": 3,
-  "begruendung": "Blondes Haar und goldener Farbton passen, aber die auffällige teal-goldene Rüstung und die zwei leuchtenden Schwerter der Kriegerkönigin fehlen.",
-  "fehlendesDetail": "Teal-goldene Rüstung und die zwei leuchtenden Schwerter fehlen"
+  "sterne": 4,
+  "begruendung": "Blondes Haar passt. ruestTon von \"gold\" auf \"blau\" umgestellt - das Portrait zeigt ueberwiegend TEAL-/TUERKISFARBENE Ruestung mit nur schmalem Gold-Beschlag, \"blau\" (einzige kuehle Rampe) trifft den dominanten Grundton deutlich naeher; per renderProbe bestaetigt. effekt:{typ:\"frost\",pos:\"koerper\"} NEU ergaenzt fuer den blauen Klingen-/Energieschein der zwei leuchtenden Schwerter. waffe:\"schwert\" war schon gesetzt (nur in Angriffs-Pose sichtbar, kein Rezeptfehler).",
+  "fehlendesDetail": "Zwei GLEICHZEITIG gefuehrte, leuchtende Schwerter (Dual-Wield) bleiben strukturell unmoeglich - b.waffe kennt nur einen Wert, kein zweites Waffenfeld im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Dyrth",
   "slug": "dyrth",
-  "sterne": 3,
-  "begruendung": "Hörner und Fledermausflügel treffen die Dämon-Kategorie, aber die pechschwarze Farbe, die weiß leuchtenden Augen und die gewaltige, bedrohliche Statur fehlen - wirkt wie ein kleiner brauner Imp statt eines Titanen-Dämons.",
-  "fehlendesDetail": "Schwarze Farbe, weiß leuchtende Augen und massive Statur fehlen"
+  "sterne": 4,
+  "begruendung": "Hoerner und Fledermausfluegel treffen die Daemon-Kategorie. haut von \"black\" auf die NEUE Rampe \"schwarz\" umgestellt - per renderProbe-Pixelscan bestaetigt rendert \"black\" NICHT schwarz, sondern die LPC-Hautton-Konvention fuer dunkle Haut (warmes Braun mit schwarzen Schatten), waehrend das Portrait einen mattschwarzen Daemonen-Titan zeigt; mit \"schwarz\" jetzt ein durchgehend schwarzer Koerper. skala:1.3 NEU ergaenzt fuer die massive, titanenhafte Statur. effekt:{typ:\"frost\",pos:\"kopf\"} NEU ergaenzt als naechstliegende verfuegbare Palette fuer die weiss leuchtenden Augen (kein reinweisser Effekt-Typ vorhanden).",
+  "fehlendesDetail": "Kein eigener Daemonen-Kopf im Baukasten - kopf:\"orc\" bleibt die naechstliegende gehoernte, monstroese Gesichtsform, einzige verbleibende Luecke."
  },
  {
   "name": "Eike",
   "slug": "eike",
-  "sterne": 3,
-  "begruendung": "Bärtiger Mann korrekt, aber Zauberstab, leuchtender Würfel-Orb und die blau-goldene Robe mit Pentagramm-Muster fehlen komplett.",
-  "fehlendesDetail": "Zauberstab, leuchtender Orb und blau-goldene Robe fehlen"
+  "sterne": 4,
+  "begruendung": "Baertiger Mann korrekt. effekt:{typ:\"frost\",pos:\"koerper\"} NEU ergaenzt (hellblau) fuer den leuchtend blauen Wuerfel-/Kristall-Orb - trifft die Eisblau-Farbe naeher als \"arkan\" oder \"gold\"; per renderProbe bestaetigt. waffe:\"stab\" war schon gesetzt (nur in Angriffs-Pose sichtbar, kein Rezeptfehler).",
+  "fehlendesDetail": "Die Robe ist im Bild zweifarbig blau-gold, ruestTon setzt aber nur einen Einzelton (\"gold\" trifft die Pentagramm-/Gold-Stickereien, nicht den blauen Grundstoff) - einzige verbleibende Luecke."
  },
  {
   "name": "Elara",
   "slug": "elara",
-  "sterne": 3,
-  "begruendung": "Silberfarbenes Haar passt gut zum Elfen-Waldläufer, aber Bogen, Köcher und die grüne Lederrüstung fehlen.",
-  "fehlendesDetail": "Bogen, Köcher und grüne Lederrüstung fehlen"
+  "sterne": 4,
+  "begruendung": "Silberfarbenes Haar passt gut zum Elfen-Waldlaeufer. ruestTon:\"gruen\" NEU ergaenzt (neue RUEST_TON-Rampe, dasselbe Muster wie Cassandra) - per renderProbe bestaetigt jetzt gruene statt brauner Lederruestung. waffe:\"bogen\" war schon gesetzt (nur in der Schuss-Pose sichtbar, kein Rezeptfehler).",
+  "fehlendesDetail": "Koecher fehlt - kein Koecher-Requisiten-Slot im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Eldara",
@@ -268,23 +268,23 @@
  {
   "name": "Emphi",
   "slug": "emphi",
-  "sterne": 3,
-  "begruendung": "Dunkles Haar und die dunkle Farbgebung passen zur Zauberin, aber die glühende Energie, der Dreizack/Stab und die elaborierte Rüstungsrobe fehlen.",
-  "fehlendesDetail": "Leuchtende Energie und Dreizack/Stab fehlen"
+  "sterne": 4,
+  "begruendung": "Dunkles Haar und die dunkle Farbgebung passen zur Zauberin. effekt:{typ:\"frost\",pos:\"koerper\"} NEU ergaenzt (hellblau, naeher an der elektrisch-blauen Energie des Bildes als \"arkan\") fuer die leuchtende Energie um Stab/Haende - per renderProbe bestaetigt. waffe:\"stab\" war schon gesetzt (nur in Angriffs-Pose sichtbar, kein Rezeptfehler).",
+  "fehlendesDetail": "Dreizack-Form und das spezifische Blitzmuster sind strukturell nicht verfuegbar (nur generischer Stab, bereits gesetzt; effekt liefert nur einen allgemeinen Schein, kein Blitz-Partikelmuster) - ein zusammenhaengendes Thema um dieselbe Waffe/Energie, einzige verbleibende Luecke."
  },
  {
   "name": "Enforcer",
   "slug": "enforcer",
-  "sterne": 3,
-  "begruendung": "Heiligenschein und goldener Farbton treffen die Paladin-Idee, aber der Flügel ist blass-häutig statt golden-gefiedert, und Kriegshammer sowie die voll ausgeprägte Rüstung fehlen.",
-  "fehlendesDetail": "Golden gefiederter statt hautfarbener Flügel, dazu fehlen Kriegshammer und Rüstung"
+  "sterne": 4,
+  "begruendung": "Heiligenschein und goldener Farbton treffen die Paladin-Idee. fluegel:true (statisches, ungefaerbt BRAUNES Fremdbild) auf fluegel:\"federn\" umgestellt - per renderProbe bestaetigt jetzt echte animierte Feder-Silhouette in hellem Weiss-Ton statt des alten braunen Fremdbilds, deutlich naeher an goldenen Engelsfluegeln. ruest:\"plate\"+ruestTon:\"gold\" treffen die Ruestung bereits.",
+  "fehlendesDetail": "Kriegshammer fehlt - nur generisches Schwert verfuegbar, kein Hammer-Blatt im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Erna Wellenlaut",
   "slug": "erna-wellenlaut",
-  "sterne": 3,
-  "begruendung": "fluegel:\"federn\" ergaenzt (echter Fluegel-Layer, bislang komplett gefehlt) plus effekt:\"frost\" fuer den schimmernden Wasser-/Luft-Schein - geist:true (Transparenz) traf die durchscheinende Erscheinung schon vorher. Fluegel sind jetzt klar sichtbar in der Vorschau.",
-  "fehlendesDetail": "Floete-Requisite fehlt (kein Instrumenten-Layer im Baukasten)."
+  "sterne": 4,
+  "begruendung": "fluegel:\"federn\" (echter Fluegel-Layer) plus effekt:\"frost\" fuer den schimmernden Wasser-/Luft-Schein (vorige Runde); geist:true traf die durchscheinende Erscheinung bereits. Reine Neubewertung in dieser Runde (keine Rezeptaenderung): die einzige dokumentierte Luecke (Floete) ist GENAU EIN benennbares Merkmal - passt auf die 4-Sterne-Definition, nicht auf 3. War bei 3 Sternen stehengeblieben, obwohl die eigene Begruendung den 4-Sterne-Fall bereits beschrieb.",
+  "fehlendesDetail": "Floete-Requisite fehlt (kein Instrumenten-Layer im Baukasten) - einzige verbleibende Luecke."
  },
  {
   "name": "Falcon",
@@ -297,15 +297,15 @@
   "name": "Galactus",
   "slug": "galactus",
   "sterne": 3,
-  "begruendung": "vollbild von Echsenkopf+Platte auf \"kraken\" umgestellt (keine Asset-Exklusivitaet, s. Abysskraken) mit vollbildFarbeModus:\"farbe\" auf dunkles Grau-Schwarz statt des nativen Rots, dazu effekt:\"voidRot\" fuer den roten Glueh-Akzent - eine rundliche Vielbein-Silhouette kommt der Krabbenform strukturell naeher als ein aufrechter Humanoid, auch wenn Kopffuesser und Krebstier nicht dasselbe sind.",
+  "begruendung": "vollbild von Echsenkopf+Platte auf \"kraken\" umgestellt mit vollbildFarbeModus:\"farbe\" auf dunkles Grau-Schwarz statt des nativen Rots, dazu effekt:\"voidRot\" fuer den roten Glueh-Akzent - eine rundliche Vielbein-Silhouette kommt der Krabbenform strukturell naeher als ein aufrechter Humanoid. Gegengeprueft in dieser Runde: keine neue Erkenntnis.",
   "fehlendesDetail": "Echte Krabbenbeine/-scheren und eine klarere Panzer-Textur fehlen - ein Kraken-Blatt bleibt eine grobe Naeherung an ein Krebstier."
  },
  {
   "name": "Gralakar",
   "slug": "gralakar",
-  "sterne": 3,
-  "begruendung": "Skelett-Koerper plus halbtransparente Erscheinung (geist) und rote wabernde Energie treffen die Grundidee des schwebenden Wraiths mit rot gluehenden Augen deutlich besser als der vorherige, mit Babuschinka/Bana/Dr Ironmind identische Kapuzen-Frauen-Bauplan (vorher 1 Stern, Bild und Sprite hatten keinerlei Bezug). Die wallende, zerfetzte Robe, die ausgestreckte Klauenhand und die Friedhofsstimmung fehlen weiterhin.",
-  "fehlendesDetail": "Zerfetzte Robe/Tendrils, ausgestreckte Klauenhand und der sichtbare Rippenkaefig-Schein fehlen (mehrere Details)."
+  "sterne": 4,
+  "begruendung": "Skelett-Koerper plus halbtransparente Erscheinung (geist) und rote wabernde Energie treffen die Grundidee des schwebenden Wraiths mit rot gluehenden Augen. umhang:true NEU ergaenzt (ungefaerbtes Mantel-Blatt, s. Velkin/Jorund/Inefinna) fuer die wallende Robe aus dem Bildbefund - per renderProbe bestaetigt sichtbarer zusaetzlicher Robenlayer statt der bisher ganz fehlenden Robe.",
+  "fehlendesDetail": "Die Stofftextur ist ein glatter Mantel statt zerrissener Fetzen/Tendrils - kein Zerreiss-Textur-Layer im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Gram",
