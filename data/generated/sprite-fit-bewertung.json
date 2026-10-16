@@ -590,9 +590,9 @@
  {
   "name": "Myrkos",
   "slug": "myrkos",
-  "sterne": 2,
-  "begruendung": "Kapuze passt lose zur Wanderer-Silhouette, aber die namensgebende tentakelartige Kreatur auf dem Rücken und der postapokalyptische Gasmasken-Look fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Kapuze passt weiterhin lose zur Wanderer-Silhouette, jetzt ergaenzt um waffe:\"stab\" als Gehstock (im Portrait deutlich sichtbar) und schwanz:true als grobe Silhouetten-Naeherung fuer die vom Ruecken haengenden Tentakel-Arme der namensgebenden Kreatur. Bild zeigt KEINE Gasmaske (Gesicht frei, nur Fellhaube und hochgeschobene Brille) - der urspruengliche Hinweis auf eine fehlende Gasmaske widerspricht dem Portrait, das Bild gilt (Grundsatz \"Bild schlaegt Tags\"). Die eigentliche namensgebende Ruecken-Kreatur bleibt strukturell unbaubar: kein Ruecken-Kreatur-Layer im Baukasten, der Schwanz wird zudem in Hautfarbe statt in der braun-roetlichen Tentakel-Farbe eingefaerbt.",
+  "fehlendesDetail": "Die tentakelartige Kreatur auf dem Ruecken ist nur als schlichter, hautfarbener Schwanz angenaehert statt als eigenes Rueckenwesen; eine Fliegerbrille fehlt ebenfalls (kein Requisiten-Slot)."
  },
  {
   "name": "Nachtschatten",
@@ -660,16 +660,16 @@
  {
   "name": "Orichalcos",
   "slug": "orichalcos",
-  "sterne": 2,
-  "begruendung": "Kapuze als grobe Analogie zur Vermummung vorhanden, aber die goldene Vogel-Maske, das blaue Robe mit rotem Schärpe und der leuchtende Runenkreis fehlen komplett - identisches Sprite wie bei Myrkos (völlig anderes Konzept) wiederverwendet.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Kapuze bleibt die grobe Vermummungs-Analogie, effekt \"frost\" weiterhin als Naeherung an den tuerkisfarben gluehenden Runenkreis, waffe:\"schwert\" korrekt. NEU: ruestTon:\"blau\" (neue Rampe, s. RUEST_TON) faerbt die Robe jetzt tatsaechlich dunkelblau statt im unbestimmten Standard-Lederton - trifft einen der vier genannten fehlenden Punkte direkt. Goldene Vogel-Maske und rote Schaerpe bleiben strukturell unbaubar: kein Masken-Layer und keine zweite, separat einfaerbbare Stoff-Ebene im Baukasten.",
+  "fehlendesDetail": "Goldene Vogel-Maske und rote Schaerpe fehlen weiterhin (kein Masken-/Zweitstoff-Layer im Baukasten); die Robe ist jetzt korrekt dunkelblau statt braun."
  },
  {
   "name": "Othrama",
   "slug": "othrama",
-  "sterne": 2,
-  "begruendung": "Flügel als Ansatz vorhanden, aber schwarze Chitin-Farbe, grün leuchtende Augen, Fühler und die langen Insekten-Gliedmaßen fehlen - wirkt wie ein brauner Fledermaus-Imp statt eines Insekten-Dämons.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Schwarze Chitin-Farbe (haut:\"black\") war schon korrekt. NEU: fluegel von generischem true auf \"fledermaus\" umgestellt (duenne Membranfluegel treffen die insektoiden Fluegel aus dem Portrait naeher als die Standardform) und effekt {typ:\"gift\",pos:\"kopf\"} ergaenzt (gruen wabernd, einzige echte Gruen-Palette in EFFEKT_ARTEN) als Naeherung fuer die gruen leuchtenden Augen und den gruenen Leuchtpunkt am Brustkorb. Fuehler und die langen, duennen Insekten-Gliedmassen bleiben strukturell unbaubar: der Humanoid-Koerper kennt keine Fuehler-Ebene und keine abweichende Gliedmassen-Proportion, mehrere unabhaengige Luecken bleiben also offen.",
+  "fehlendesDetail": "Fuehler und die langen, duennen Insekten-Gliedmassen bleiben strukturell unbaubar (starre Humanoid-Proportion); die gruenen Augen sind nur als allgemeiner Kopf-Schein statt als isoliertes Augenpaar angenaehert."
  },
  {
   "name": "Phantomblade",
@@ -681,16 +681,16 @@
  {
   "name": "Pinkypie",
   "slug": "pinkypie",
-  "sterne": 2,
-  "begruendung": "Menschliche Form korrekt, aber der spitze Hexenhut, das dunkelblaue Ornat und das Zauberbuch fehlen komplett - wirkt wie eine gewöhnliche Dorfbewohnerin.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Menschliche Form weiterhin korrekt, waffe:\"stab\" und effekt \"arkan\" geben schon die magische Note. NEU: ruestTon:\"blau\" (neue Rampe, s. RUEST_TON) faerbt das Ornat jetzt tatsaechlich dunkelblau statt im unbestimmten Standard-Lederton - trifft einen der drei genannten Punkte direkt. Spitzer Hexenhut und Zauberbuch bleiben strukturell unbaubar: kein Hut-Layer und kein Buch-Requisit im Baukasten.",
+  "fehlendesDetail": "Spitzer Hexenhut und Zauberbuch fehlen weiterhin (kein Hut-/Buch-Layer im Baukasten); das Ornat ist jetzt korrekt dunkelblau statt braun."
  },
  {
   "name": "PixiKat",
   "slug": "pixikat",
-  "sterne": 2,
-  "begruendung": "Katzenohren und Schwanz als Andeutung vorhanden, aber die pinke Farbe, der namensgebende Retro-Bildschirm-Kopf und die Tastatur fehlen - die Farbe ist zudem komplett falsch (blau-grau statt pink).",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Katzenohren und -schwanz waren schon als Andeutung vorhanden. NEU: haut von \"lavender\" (blaugrau) auf \"pink\" umgestellt - \"pink\" existiert als eigener Hautton und trifft die dominante, laut Bewertungstext \"komplett falsche\" Farbe jetzt direkt. Der namensgebende Retro-Bildschirm-Kopf samt Tastatur-Requisit bleibt strukturell unbaubar: kein TV-/Bildschirm-Kopf-Layer und kein Requisiten-Slot fuer eine Tastatur im Baukasten. Ein Helm/Visier wurde bewusst NICHT als Ersatz probiert - ein Ritterhelm ueber dem Alien-Gesicht waere keine bessere Naeherung an eine kastige Roehrenfernseher-Silhouette, eher eine irrefuehrende. Die Kategorie (Technik-Kopf-Identitaet) bleibt deshalb verfehlt, aehnlich wie bei Ironhoofs Zentauren-Unterkoerper - trotz jetzt korrekter Farbe.",
+  "fehlendesDetail": "Der namensgebende Retro-Bildschirm-Kopf samt Tastatur fehlt strukturell komplett (kein TV-Kopf-Layer, kein Requisiten-Slot) - die Fellfarbe ist jetzt korrekt pink."
  },
  {
   "name": "Puschelix",
@@ -814,9 +814,9 @@
  {
   "name": "Starbound",
   "slug": "starbound",
-  "sterne": 2,
-  "begruendung": "Nur eine entfernte außerirdische Kopfform erinnert an ein nicht-menschliches Wesen, aber die namensgebende dunkle Kristallzacken-Form, das innere Glühen und die imposante Titanen-Statur fehlen komplett.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Der bisherige humanoide kopf:\"alien\"-Ansatz (Mensch mit Alien-Kopf und Platte) traf die namensgebende dunkle Kristallzacken-Form nicht. Starbounds Konzept (\"kolossales kristallines Sternenwesen\") ist fast wortgleich mit Krag'Zuls (\"Riesiger Koloss aus Kristallschollen, violette Energie\"), der bereits vollbild:\"golem\" nutzt - dieselbe Loesung uebernommen (Grundsatz \"keine Asset-Exklusivitaet\"): vollbild:\"golem\" mit sehr dunkler, fast schwarzer vollbildFarbe (#1b0f2e) fuer die dunkle Kristallform, effekt \"arkan\" (violett/pink/gold, funkelnd) bleibt fuer die wirbelnden Energieringe. Koerpertyp, Farbfamilie und Gluehen stimmen jetzt; nur die literale Zackenschaerfe der Kristalloberflaeche ist eine Naeherung.",
+  "fehlendesDetail": "golem.png zeigt Ruestungsplatten statt literal scharfer Kristallschneiden - dieselbe dokumentierte Grenze wie bei Krag'Zul, der Rest (Koloss-Form, dunkle Farbe, Energieglueh) trifft jetzt."
  },
  {
   "name": "Starflame",
@@ -828,9 +828,9 @@
  {
   "name": "Steel Sinister",
   "slug": "steel-sinister",
-  "sterne": 2,
-  "begruendung": "Dunkle Rüstungsfarbe passt zum Ton, aber die geschwungenen Hörner am Helm und die leuchtende grüne Orb-Kugel in der Klauenhand fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines dämonischen Ritterhelms.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Dunkle Ruestungsfarbe und Helm waren schon korrekt. NEU: hoerner von generischem true auf \"gebogen\" umgestellt (dieselbe Ebene, die Ironhoof schon fuer seine gebogenen Widderhoerner nutzt, s. sprite-cluster-runde-1.md) - trifft die geschwungenen Helm-Hoerner aus dem Portrait jetzt direkt. effekt {typ:\"gift\",pos:\"koerper\"} ergaenzt (gruen wabernd, einzige echte Gruen-Palette) als Naeherung fuer die leuchtend gruene Orb-Kugel in der Klauenhand.",
+  "fehlendesDetail": "Die gruene Orb-Kugel ist als allgemeiner Koerperschein statt als isoliertes Leuchten in der Klauenhand umgesetzt (kein Hand-Positions-Slot fuer effekt) - Hoerner und Grundform stimmen jetzt."
  },
  {
   "name": "Sunny",
@@ -898,9 +898,9 @@
  {
   "name": "Timantha",
   "slug": "timantha",
-  "sterne": 2,
-  "begruendung": "Die verkleidete Silhouette passt lose zur Astronautin, aber die dunkelgraue statt silberweiße Farbe und die blau leuchtenden Energie-Punkte am Anzug fehlen - der Kopf wirkt wie ein Roboter-Visier statt eines Raumfahrer-Helms.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Die verkleidete Silhouette (Raumanzug-Form mit Helm) passte schon zur Astronautin. Bild zeigt eine bronze-/beige-metallische Ruestung mit blau leuchtenden Energiepunkten - NICHT Silberweiss und NICHT Dunkelgrau wie der urspruengliche Bewertungstext behauptete (Bild schlaegt Tags: das Bild gilt). ruestTon von \"dunkel\" auf \"bronze\" umgestellt (trifft den warmen Metallton direkt) und effekt {typ:\"frost\",pos:\"koerper\"} ergaenzt (helles Eisblau/Weiss als naechstliegende Palette zu den blauen Leuchtpunkten).",
+  "fehlendesDetail": "Die blauen Energiepunkte sitzen als allgemeine Partikelwolke um den Koerper statt als feste Punkte an den einzelnen Gelenken - Farbe und Grundform (Astronautenanzug) stimmen jetzt."
  },
  {
   "name": "Treantos",
@@ -919,9 +919,9 @@
  {
   "name": "Tsubaki Cleaning",
   "slug": "tsubaki-cleaning",
-  "sterne": 2,
-  "begruendung": "Braune Farbe passt entfernt zur Zweig-Kreatur, aber die großen niedlichen Augen, Zweig-Antennen und vor allem die Sprühflasche als charakteristisches Requisit fehlen - wirkt wie ein aggressives braunes Monster statt einer niedlichen Garten-Fee.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Portrait zeigt eine BRAUNE Zweig-/Rinden-Kreatur mit Moos-Akzenten, kein durchgaengiges Gruen - haut von \"green\" auf \"brown\" umgestellt (Bild schlaegt Tags/alte Naeherung). hoerner:true bleibt als grobe Zweig-Antennen-Andeutung. NEU waffe:\"pistole\" als Naeherung fuer die charakterpraegende Spruehflasche: kein Requisiten-Slot fuer eine Spruehflasche im Baukasten, aber die Pistolenhaltung (Griff + kurzer vorstehender Lauf) trifft die Silhouette einer Pump-Spruehflasche naeher als jede andere Waffen-Ebene. Grosse runde Kulleraugen und die genaue Zweigform der Antennen bleiben unbaubar.",
+  "fehlendesDetail": "Grosse runde Kulleraugen fehlen (kein Augengroessen-Slot) und die Spruehflasche ist nur grob als Pistolenhaltung angenaehert statt als eigenes Requisit; die Farbe ist jetzt korrekt braun."
  },
  {
   "name": "Umbra",
@@ -940,9 +940,9 @@
  {
   "name": "Velkin",
   "slug": "velkin",
-  "sterne": 2,
-  "begruendung": "Dunkles Haar passt, aber die zerrissene schwarze Robe, die blutigen Fangzähne und der wilde bedrohliche Ausdruck fehlen - wirkt wie ein gewöhnlicher Dorfbewohner statt eines wilden Vampirs.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "Dunkles Haar und kopf:\"vampire\" (bringt die Fangzaehne bereits mit, s. Kommentar \"Fangzaehne-Kopf\") waren schon korrekt, umhang:true ebenso. NEU: ruestTon:\"dunkel\" ergaenzt - \"leder\" trug bisher keinen Ton (natuerliches Braun), das Portrait zeigt aber eine SCHWARZE Robe. \"dunkel\" (Schwarz/Grau-Rampe) trifft die Farbe jetzt direkt. Zerrissene Stofftextur, Blutspritzer und die wilde, bedrohliche Mimik sind Asset-/Textur-Details ohne eigenen Baukasten-Slot und bleiben offen - mehrere unabhaengige Luecken, keine einzelne punktuelle Korrektur.",
+  "fehlendesDetail": "Zerrissene Stofftextur, Blutspritzer und die wilde Mimik sind Asset-Details ohne eigenen Baukasten-Slot; die Robe ist jetzt korrekt schwarz statt braun."
  },
  {
   "name": "Verla Compliance",
@@ -961,9 +961,9 @@
  {
   "name": "Vorrak",
   "slug": "vorrak",
-  "sterne": 2,
-  "begruendung": "Die wuchtige gepanzerte Silhouette passt in der Grobform, aber es ist eine raue Fels-/Kristall-Textur statt glatten dunklen Metalls, die rote Kern-Glut fehlt (nur ein schwacher violetter Punkt), und die Schulterkanone fehlt komplett.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "Die wuchtige gepanzerte Silhouette passte schon in der Grobform, aber \"golem\" (dasselbe Blatt wie Lava Golem/Krolach/Krag'Zul) ist strukturell ein Fels-/Kristall-Koloss, dessen Textur auch mit jeder Faerbung rau/zerklueftet bleibt - genau der bemaengelte Punkt. vollbild von \"golem\" auf \"mech_gross\" umgestellt (Skorpio SciFi Pack, dasselbe Blatt wie Robofighter: \"der grosse Kampf-Mech traegt eine eingebaute Schulterkanone\") - loest Textur UND die fehlende Schulterkanone strukturell in einem Schritt, nicht nur per Farbe. vollbildFarbe auf dunkles, warmes Schwarzgrau (#201c18) fuer \"glattes dunkles Metall\" statt des vorherigen mittleren Grau. effekt \"voidRot\" (rot-orange wabernd) bleibt fuer die gluehend rote Kern-/Augenfarbe (vorher nur ein schwacher violetter Punkt, jetzt deutlich rot).",
+  "fehlendesDetail": "Der rote Energiekern/die Augen sind als allgemeine wabernde Aura statt als feste Punkte umgesetzt (energiekern ist auf golem.png kalibriert, nicht auf mech_gross uebertragbar) - Textur, Form (inkl. Schulterkanone) und Grundfarbe stimmen jetzt direkt."
  },
  {
   "name": "Whispra",
