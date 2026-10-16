@@ -101,6 +101,21 @@ export function buildCircleRounds(teamIds: readonly string[]): RoundPairing[][] 
   return rounds;
 }
 
+/**
+ * DOPPEL-RUNDENPLAN — Hin- und Rückrunde: die n-1 Circle-Runden, dann dieselben Runden mit
+ * getauschter Heim/Auswärts-Seite (2·(n-1) = 30 Runden bei 16 Teams). Konzept 16.10. Abschnitt 2.2,
+ * Variante C; Fatigue-Plan PR5; Recherche 06.09. F1/W3.
+ *
+ * `buildCircleRounds` bleibt unverändert (Mini-DM-Pods hängen daran).
+ */
+export function buildDoubleRoundRobin(teamIds: readonly string[]): RoundPairing[][] {
+  const rounds = buildCircleRounds(teamIds);
+  return [
+    ...rounds,
+    ...rounds.map((pairs) => pairs.map((pair) => ({ homeTeamId: pair.awayTeamId, awayTeamId: pair.homeTeamId }))),
+  ];
+}
+
 export type BuildSeasonFixtureScheduleInput = {
   saveId: string;
   seasonId: string;
@@ -133,7 +148,16 @@ export function buildSeasonFixtureSchedule(input: BuildSeasonFixtureScheduleInpu
 
     const seed = `${input.saveId}:${input.seasonId}:fixtures-v1:${tier}`;
     const permutedTeamIds = shuffleSeeded(teamIds, `${seed}:teams`);
-    const rounds = buildCircleRounds(permutedTeamIds);
+    const singleRounds = buildCircleRounds(permutedTeamIds);
+    /**
+     * Mehr Spieltage als Einfach-Runden (Battle Mode, 20 Spieltage bei 15 Runden): Doppel-Rundenplan
+     * statt Modulo-Wrap. Ein Fenster von 20 aufeinanderfolgenden der 30 Runden enthält jede Paarung
+     * mindestens einmal und genau fünf ein zweites Mal — mit GETAUSCHTER Heim/Auswärts-Seite, nie als
+     * exakte Wiederholung. Bis 15 Spieltage (jeder heutige Save) bleibt alles bit-identisch: dieselbe
+     * Saat, dieselbe Offset-Ziehung über die 15 Einfach-Runden.
+     */
+    const rounds =
+      input.matchdayIds.length > singleRounds.length ? buildDoubleRoundRobin(permutedTeamIds) : singleRounds;
     const totalRounds = rounds.length;
     if (totalRounds === 0) {
       continue;

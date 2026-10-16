@@ -131,18 +131,21 @@ describe("Netto pro Spieltag je Stufe — sobald die aktive Erholung greift", ()
   });
 
   it("die Bank bleibt das stärkste Werkzeug — Rotation SENKT die Fatigue, statt sie zu bremsen", () => {
-    // Chris' dritte Anforderung: „Rotation lohnt sich spürbar". Ein Bank-Spieltag muss deutlich
-    // mehr abbauen, als ein normaler Einsatz netto aufbaut.
-    expect(BASE_MATCHDAY_RECOVERY).toBeGreaterThan(netto("normal") * 4);
+    // Chris' dritte Anforderung: „Rotation lohnt sich spürbar". Ein Bank-Spieltag muss mehr als
+    // zwei normale Einsätze netto tilgen (vermessener Wert 4,5: 28 gegen 11,5). Der Plan hatte mit
+    // 11 aktiv „mehr als vier" — das trug Chris' Verletzungskorridor nicht (2 statt 150-200 je
+    // 20-Spieltage-Saison, docs/design/fatigue-aktive-erholung-korridor-16-10.md).
+    expect(BASE_MATCHDAY_RECOVERY).toBeGreaterThan(netto("normal") * 2);
   });
 
-  it("die Kappungsgrenze wird über eine ganze Saison gestreckt, nicht in ihrem ersten Drittel erreicht", () => {
-    // DAS war der Befund: brutto steht ein Dauerstarter nach ⌈100/16⌉ = 7 Spieltagen an der
-    // 100er-Kappung — bei 10 Spieltagen die letzten drei durchgehend im Maximalrisiko-Band.
+  it("die Kappungsgrenze kommt netto später als brutto — aber der Korridor, nicht der Dauerstarter, setzt die Zahl", () => {
+    // Brutto steht ein Dauerstarter nach ⌈100/16⌉ = 7 Spieltagen an der 100er-Kappung. Netto (4,5
+    // aktiv) nach ⌈100/11,5⌉ = 9. Die Plan-Zahl 11 (Kappung erst nach 20) ist gemessen mit Chris'
+    // Korridor-Entscheidung (E.1, 150-200 je Saison auch bei 20 Spieltagen) nicht vereinbar.
     const bruttoSpieltage = Math.ceil(100 / MATCHDAY_FATIGUE_LOAD);
     const nettoSpieltage = Math.ceil(100 / netto("normal"));
     expect(bruttoSpieltage).toBeLessThanOrEqual(7);
-    expect(nettoSpieltage).toBeGreaterThanOrEqual(bruttoSpieltage * 2);
+    expect(nettoSpieltage).toBeGreaterThan(bruttoSpieltage);
   });
 });
 

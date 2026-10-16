@@ -9,7 +9,11 @@ import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
 import { loadSeasonManagementReferenceRows, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
-import { buildSeasonSeededDisciplineSchedule, buildMatchdaysFromSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import {
+  buildMatchdaysFromSeasonDisciplineSchedule,
+  buildSeasonSeededDisciplineSchedule,
+  getRequiredSeasonDisciplineMatchdayCount,
+} from "@/lib/season/season-discipline-schedule";
 import type {
   Contract,
   Discipline,
@@ -115,6 +119,7 @@ function createSeasonState(
   disciplines: Discipline[],
   matchdayIds: string[],
   scheduleSeedId: string,
+  repeat: 1 | 2 = 1,
 ): SeasonState {
   return {
     seasonId,
@@ -125,6 +130,8 @@ function createSeasonState(
       disciplines,
       matchdayIds,
       matchdayCount: matchdayIds.length,
+      // Ohne Doppelsaison exakt der Aufruf von vorher (kein `repeat`-Feld).
+      ...(repeat === 2 ? { repeat } : {}),
     }).entries,
     lineupDrafts: [],
     playerGeneratorDrafts: [],
@@ -468,8 +475,41 @@ export function loadFreshSeasonOneSeedData(): OlySeedData {
   };
 }
 
-export function createGameStateFromSeed(input: OlySeedData = loadSeedData(), options?: { scheduleSeedId?: string }): GameState {
-  const data = structuredClone(input);
+/**
+ * Die Spieltags-IDs der ersten Saison bei `repeat`-facher Disziplin-Wiederholung — W2 aus
+ * `docs/design/battle-mode-20-spieltage-recherche-06-09.md`. Der Seed (`foundationSeedSeason`)
+ * bleibt bei seinen 10 für jeden Manager-Spielstand; eine Battle-Saison mit `repeat: 2` setzt
+ * dieselbe Namensreihe `matchday-N` bis zur doppelten Länge fort (20 bei 20 Disziplinen).
+ */
+export function buildSeasonOneMatchdayIds(disciplines: Discipline[], baseMatchdayIds: string[], repeat: 1 | 2) {
+  if (repeat === 1) return baseMatchdayIds;
+  const required = getRequiredSeasonDisciplineMatchdayCount(disciplines, repeat);
+  return Array.from({ length: Math.max(required, baseMatchdayIds.length) }, (_, index) => baseMatchdayIds[index] ?? `matchday-${index + 1}`);
+}
+
+export function createGameStateFromSeed(
+  input: OlySeedData = loadSeedData(),
+  options?: {
+    scheduleSeedId?: string;
+    /**
+     * 2 = Battle-Mode-Doppelsaison (20 Spieltage, jede Disziplin zweimal, Halbserien mit Derangement
+     * der Kadergrößen). Ohne Angabe 1 — exakt der Seed von vorher, für jeden Manager-Spielstand.
+     */
+    seasonDisciplineRepeat?: 1 | 2;
+  },
+): GameState {
+  const repeat = options?.seasonDisciplineRepeat === 2 ? 2 : 1;
+  const seedData = structuredClone(input);
+  const data =
+    repeat === 2
+      ? {
+          ...seedData,
+          season: {
+            ...seedData.season,
+            matchdayIds: buildSeasonOneMatchdayIds(seedData.disciplines, seedData.season.matchdayIds, repeat),
+          },
+        }
+      : seedData;
   const scheduleSeedId = options?.scheduleSeedId ?? "local-game-state";
   const hydrated = hydrateGameStateMedia({
     season: data.season,
@@ -481,6 +521,7 @@ export function createGameStateFromSeed(input: OlySeedData = loadSeedData(), opt
         data.disciplines,
         data.season.matchdayIds,
         scheduleSeedId,
+        repeat,
       ),
       teamControlSettings: buildTeamControlSettingsMap(data.teams),
       teamStrategyProfiles: buildTeamStrategyProfileMap(data.teams, data.teamIdentities),

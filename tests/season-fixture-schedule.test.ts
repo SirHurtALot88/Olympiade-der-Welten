@@ -166,20 +166,74 @@ describe("buildSeasonFixtureSchedule", () => {
     expect(fixtures.every((fixture) => fixture.leagueTier === "liga2")).toBe(true);
   });
 
-  it("warns when more matchdays are requested than rounds exist, without crashing", () => {
+  it("20 Spieltage: Doppel-Rundenplan — jeder gegen jeden, fünf Rückspiele mit getauschter Seite, keine Warnung", () => {
+    // Konzept 16.10. Abschnitt 2.2, Variante C. Vorher: Modulo-Wrap über 15 Runden, Spieltage
+    // 16-20 wiederholten Spieltage 1-5 mit DERSELBEN Heim/Auswärts-Seite, plus Warnung.
+    for (let seed = 0; seed < 200; seed += 1) {
+      const { fixtures, warnings } = buildSeasonFixtureSchedule({
+        saveId: `save-${seed}`,
+        seasonId: "season-1",
+        matchdayIds: buildMatchdayIds(20),
+        leagueTeamIds: buildLeagueTeamIds(),
+      });
+      expect(warnings).toEqual([]);
+      expect(fixtures.length).toBe(2 * 20 * 8);
+      for (const matchdayId of buildMatchdayIds(20)) {
+        const teamsThisMatchday = fixtures
+          .filter((fixture) => fixture.matchdayId === matchdayId)
+          .flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]);
+        expect(new Set(teamsThisMatchday).size).toBe(32);
+      }
+      for (const tier of ["liga1", "liga2"] as const) {
+        const ligaFixtures = fixtures.filter((fixture) => fixture.leagueTier === tier);
+        const byPair = new Map<string, Array<{ home: string }>>();
+        for (const fixture of ligaFixtures) {
+          const key = [fixture.homeTeamId, fixture.awayTeamId].sort().join("::");
+          byPair.set(key, [...(byPair.get(key) ?? []), { home: fixture.homeTeamId }]);
+        }
+        // 16 Teams: C(16,2) = 120 Paare, alle mindestens einmal.
+        expect(byPair.size).toBe(120);
+        const doppelt = [...byPair.values()].filter((meetings) => meetings.length === 2);
+        expect(doppelt.length).toBe(40);
+        expect([...byPair.values()].every((meetings) => meetings.length <= 2)).toBe(true);
+        for (const meetings of doppelt) {
+          expect(meetings[0]!.home).not.toBe(meetings[1]!.home);
+        }
+      }
+    }
+  });
+
+  it("bis 15 Spieltage bit-identisch zum Einfach-Rundenplan (jeder heutige Save)", () => {
+    const zehn = buildSeasonFixtureSchedule({
+      saveId: "save-a",
+      seasonId: "season-1",
+      matchdayIds: buildMatchdayIds(10),
+      leagueTeamIds: buildLeagueTeamIds(),
+    });
+    // Referenz: Rundenindex (offset + i) % 15 über die 15 Einfach-Runden — die ersten 10 Spieltage
+    // eines 15er-Plans mit derselben Saat sind exakt die 10 eines 10er-Plans.
+    const fuenfzehn = buildSeasonFixtureSchedule({
+      saveId: "save-a",
+      seasonId: "season-1",
+      matchdayIds: buildMatchdayIds(15),
+      leagueTeamIds: buildLeagueTeamIds(),
+    });
+    const ersteZehn = new Set(buildMatchdayIds(10));
+    expect(fuenfzehn.fixtures.filter((fixture) => ersteZehn.has(fixture.matchdayId))).toEqual(zehn.fixtures);
+  });
+
+  it("warns when more matchdays are requested than the double round robin holds, without crashing", () => {
     const { fixtures, warnings } = buildSeasonFixtureSchedule({
       saveId: "save-a",
       seasonId: "season-1",
-      matchdayIds: buildMatchdayIds(20),
+      matchdayIds: buildMatchdayIds(32),
       leagueTeamIds: buildLeagueTeamIds(),
     });
 
-    expect(warnings.some((warning) => warning.startsWith("fixture_schedule_matchday_count_exceeds_rounds:liga1:20:15"))).toBe(
+    expect(warnings.some((warning) => warning.startsWith("fixture_schedule_matchday_count_exceeds_rounds:liga1:32:30"))).toBe(
       true,
     );
-    // Ueber 15 Runden hinaus wiederholen sich Paarungen zwangslaeufig (wrap-around) -- das darf
-    // passieren (mit Warnung), aber weiterhin exakt ein Fixture pro Team und Spieltag geben.
-    for (const matchdayId of buildMatchdayIds(20)) {
+    for (const matchdayId of buildMatchdayIds(32)) {
       const teamsThisMatchday = fixtures
         .filter((fixture) => fixture.matchdayId === matchdayId)
         .flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]);

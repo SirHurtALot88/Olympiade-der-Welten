@@ -14,6 +14,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { LEAGUE_SIZE, buildInitialLeagueAssignment, type LeagueTier } from "@/lib/season/league-split";
 import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
+import { getSeasonDisciplineRepeatCount } from "@/lib/season/season-discipline-schedule";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -289,7 +290,20 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // is seeded per-save rather than reusing the shared "local-game-state" default. Preview-only
   // calls (no saveId yet) still fall back to the default seed, which is fine since previews are
   // never persisted.
-  const baseGameState = createFreshSeasonOneGameState(input.saveId);
+  /**
+   * W2 — 20 SPIELTAGE NUR FÜR BATTLE-MODE-SAVES (Recherche 06.09., Abschnitt 2; Konzept 16.10.,
+   * Abschnitt 2.3). Der Spielmodus wird hier, VOR dem Aufbau der ersten Saison, entschieden, damit
+   * Spielplan (zwei Halbserien, `repeat: 2`), `matchdayIds` (20) und Liga-Spielplan aus EINER Länge
+   * entstehen. Manager Mode: `repeat` 1, der 10er-Seed unverändert. Die aktive Erholung, ohne die
+   * 20 Spieltage laut Fatigue-Plan Teil C nicht laufen dürfen, hängt an genau dieser Doppelsaison
+   * (`isFatigueActiveRecoveryEnabled` → `isDoubledBattleSeason`) und ist damit ab Spieltag 1 scharf.
+   */
+  const gameMode: GameMode = input.gameMode === "battle" ? "battle" : "manager";
+  const isBattleMode = gameMode === "battle";
+  const baseGameState = createFreshSeasonOneGameState(
+    input.saveId,
+    isBattleMode ? { seasonDisciplineRepeat: getSeasonDisciplineRepeatCount({ scenarioMeta: { gameMode } } as Pick<GameState, "scenarioMeta">) } : undefined,
+  );
   const validTeamIds = new Set(baseGameState.teams.map((team) => team.teamId));
   const preset = getPreset(input.presetId);
   const chrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);
@@ -357,9 +371,6 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
    * oben (`startRankByTeamId`, dieselbe Sortierung wie `buildInitialLeagueAssignment`) — kein
    * zweites Mal sortieren, keine zweite Rangquelle.
    */
-  const gameMode: GameMode = input.gameMode === "battle" ? "battle" : "manager";
-  const isBattleMode = gameMode === "battle";
-
   const leagueByTeamId = isBattleMode ? buildInitialLeagueAssignment(baseGameState.teams) : {};
   const leagueTeamIds: Record<LeagueTier, string[]> = { liga1: [], liga2: [] };
   if (isBattleMode) {

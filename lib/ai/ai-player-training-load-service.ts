@@ -3,7 +3,11 @@ import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
-import { MATCHDAY_FATIGUE_LOAD, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
+import {
+  MATCHDAY_FATIGUE_LOAD,
+  getInjuryRiskPercent,
+  getPlayerActiveRecoveryCredit,
+} from "@/lib/fatigue/fatigue-injury-service";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
@@ -178,11 +182,19 @@ function projectedFatigueAfterMode(input: {
   mode: PlayerTrainingMode;
   recoveryReductionPct: number;
   likelyStarter: boolean;
+  /**
+   * Aktive Erholung je Einsatz für diesen Trainingsmodus (`getPlayerActiveRecoveryCredit`) — die KI
+   * soll mit derselben NETTO-Last rechnen, die gebucht wird (Fatigue-Plan E.1: „die KI muss die
+   * schnellere Auf-/Abbau-Dynamik verstehen"). Ohne Angabe 0: bit-identisch, und genau das liefert
+   * der Schalter für jeden Spielstand ausserhalb einer 20-Spieltage-Battle-Saison.
+   */
+  activeRecoveryCreditForMode?: (mode: PlayerTrainingMode) => number;
 }) {
   const trainingLoad = FATIGUE_LOAD_BY_MODE[input.mode] * (1 - input.recoveryReductionPct / 100);
   let projected = input.fatigue + trainingLoad;
   if (input.likelyStarter) {
-    projected += MATCHDAY_FATIGUE_LOAD;
+    const credit = input.activeRecoveryCreditForMode?.(input.mode) ?? 0;
+    projected += credit === 0 ? MATCHDAY_FATIGUE_LOAD : MATCHDAY_FATIGUE_LOAD - credit;
   }
   return clampFatigue(projected);
 }
@@ -212,6 +224,8 @@ function resolveModeForPlayer(input: {
   restFloor?: number;
   /** Deterministic seed per (player, matchday) for the stable rest roll. */
   restSeed?: string;
+  /** Siehe `projectedFatigueAfterMode` — aktive Erholung je Modus, 0 wo der Schalter aus ist. */
+  activeRecoveryCreditForMode?: (mode: PlayerTrainingMode) => number;
 }): Pick<AiPlayerTrainingLoadPlan, "selectedMode" | "projectedInjuryRiskPercent" | "needsLineupRest" | "reasons"> {
   const fatigue = input.player.fatigue ?? 0;
   const currentRisk = getInjuryRiskPercent(fatigue);
@@ -255,6 +269,7 @@ function resolveModeForPlayer(input: {
             mode: "leicht",
             recoveryReductionPct: input.recoveryReductionPct,
             likelyStarter,
+            activeRecoveryCreditForMode: input.activeRecoveryCreditForMode,
           }),
         ),
         needsLineupRest: true,
@@ -273,6 +288,7 @@ function resolveModeForPlayer(input: {
           mode: "leicht",
           recoveryReductionPct: input.recoveryReductionPct,
           likelyStarter,
+          activeRecoveryCreditForMode: input.activeRecoveryCreditForMode,
         }),
       ),
       needsLineupRest: true,
@@ -287,6 +303,7 @@ function resolveModeForPlayer(input: {
         mode,
         recoveryReductionPct: input.recoveryReductionPct,
         likelyStarter,
+        activeRecoveryCreditForMode: input.activeRecoveryCreditForMode,
       }),
     );
 
@@ -520,6 +537,7 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
         restDepthLean,
         restFloor,
         restSeed: `${player.id}:${restMatchdayId}:fatigue-rest`,
+        activeRecoveryCreditForMode: (mode) => getPlayerActiveRecoveryCredit(input.gameState, input.teamId, mode),
       });
       const fatigue = player.fatigue ?? 0;
       return {
