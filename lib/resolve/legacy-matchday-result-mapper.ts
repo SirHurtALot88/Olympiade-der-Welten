@@ -1,4 +1,5 @@
 import type {
+  ArenaAusfall,
   DisciplineHighlightCandidate,
   DisciplineResolutionSource,
   LegacyMatchdayResolvePreview,
@@ -75,6 +76,8 @@ export type DisciplineResultWritePayload = {
   arenaMatchSeed?: string | null;
   /** "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A) -- s. Kommentar an `DisciplineTeamResolvePreview.momente`. */
   momente?: ArenaMomentEintrag[] | null;
+  /** SICHTBARE ARENA-AUSFÄLLE -- s. Kommentar an `DisciplineTeamResolvePreview.arenaAusfall`. */
+  arenaAusfall?: ArenaAusfall | null;
   /**
    * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): nur an
    * Duell-Zeilen gesetzt, s. `DisciplineTeamResolvePreview.marge`/`verhaeltnis`/`margeM90`.
@@ -236,6 +239,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
           momente: teamResult.momente,
+          arenaAusfall: teamResult.arenaAusfall ?? null,
           // PUNKTEVERHAELTNIS: nur Duell-Zeilen tragen die Felder (Manager-Mode-Zeilen bleiben unveraendert).
           ...(teamResult.verhaeltnis != null
             ? {
