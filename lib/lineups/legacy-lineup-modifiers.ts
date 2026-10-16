@@ -450,6 +450,28 @@ export function toBattleArenaOrganicMutatorResult<
   };
 }
 
+/**
+ * PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): eine Battle-Seite,
+ * die ueber das PPS-Duell gewertet wird (kein Arena-Ergebnis, aber ein Fixture), behaelt den
+ * Score-Anteil des Mutators (+Score — er entscheidet das Duell mit, es gibt keine Simulation, in die
+ * er als Attributbonus eingehen koennte), verliert aber den flachen PP-Nachschlag: der landete sonst
+ * ueber `mutatorPpsBonus` als Zusatzpunkt NEBEN 2/1/0 in der Tabelle (`standings-preview-engine.ts`,
+ * `season-points-ledger.ts`). Die arena-aufgeloesten Seiten verlieren ihn bereits ueber
+ * `toBattleArenaOrganicMutatorResult()` — damit ist eine Battle-Tabelle wieder reines 2/1/0.
+ */
+export function toBattleDuellMutatorResult<
+  T extends {
+    playerMutatorPpsBonuses: Record<string, number>;
+    mutatorSlots: LegacyMutatorSlotEffect[];
+  },
+>(result: T): T {
+  return {
+    ...result,
+    playerMutatorPpsBonuses: {},
+    mutatorSlots: result.mutatorSlots.map((slot) => ({ ...slot, playerPpsModifier: 0 })),
+  };
+}
+
 export function getDisciplineTextMutatorSourceSummary(mutator1: string | null, mutator2: string | null): LegacyModifierSourceSummary {
   if (!mutator1?.trim() && !mutator2?.trim()) {
     return {

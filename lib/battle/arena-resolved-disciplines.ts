@@ -1,4 +1,18 @@
 /**
+ * ZWEI MENGEN SEIT DER PPS-DUELL-BRUECKE (16.10., docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md):
+ *
+ *  - `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` (weiter unten, frueher `ARENA_RESOLVED_DISCIPLINE_IDS`):
+ *    die Disziplinen, deren Motor an die Arena-Pipeline ANGESCHLOSSEN ist — Chassis-Dispatch im
+ *    Headless-Runner, PPS-Referenz, Impact-Konfig. Die gesamte Herleitung unten (Wellen,
+ *    Kalibrierungen) beschreibt diese Menge.
+ *  - `ARENA_RESOLVED_DISCIPLINE_IDS` (ganz unten): die Teilmenge, deren Arena-Ergebnis in einem
+ *    Battle-Save TATSAECHLICH zaehlt. Nur wer die Pflichtabnahme aus CLAUDE.md besteht (rho je Spiel
+ *    > 0,80 UND Pp-Abweichung ≤ 25 in zwei Saatstroemen, Tabelle data/generated/disziplin-abnahme.json)
+ *    oder auf Chris' ausdruecklicher Ausnahmeliste steht (`ARENA_ABNAHME_AUSNAHMEN`), darf hier stehen
+ *    — `tests/disziplin-abnahme-guard.test.ts` schlaegt sonst fehl. Jede angeschlossene, aber nicht
+ *    abgenommene Disziplin laeuft in Battle Mode ueber die PPS-Duell-Bruecke (2/1/0 aus dem
+ *    PPS-Score desselben Fixtures), nie mehr ueber die Rangtabelle.
+ *
  * ARENA_RESOLVED_DISCIPLINE_IDS — eigene Datei ohne Fremd-Importe (A3-Nachtrag, docs/pm-
  * briefings/projektmanager-plan-kampfmodell-umsetzung-20-09.md §3.2), aus demselben Grund wie
  * `arena-seed.ts` daneben: `FoundationBattleArenaHost.tsx` ("use client", Browser-Bundle) muss
@@ -142,7 +156,7 @@
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
  *    (0,251/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
-export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
   "gewichtheben",
   "hockey",
@@ -167,4 +181,44 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // Schranke -- Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
   // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer Balance-Runde,
   // s. Kommentar oben.
+]);
+
+/**
+ * CHRIS' AUSDRUECKLICH BESTAETIGTE AUSNAHMEN von der Pflichtabnahme — eine Disziplin hier darf in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` stehen, obwohl sie laut data/generated/disziplin-abnahme.json
+ * nicht besteht. Nur mit Zitat/Quelle. Neue Eintraege NUR mit Chris' Bestaetigung.
+ */
+export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, string> = new Map([
+  [
+    "hockey",
+    "CLAUDE.md, Abschnitt 'Die Abnahme jeder Disziplin': Chris hat die Feldspieler-Rangtreue von Hockey " +
+      "ausdruecklich abgenommen (Star Rang 1 in 58 %, erste zwei 78 %, kaderfest; docs/design/hockey-opus-review-nhl.md 5.3).",
+  ],
+]);
+
+/**
+ * DIE DISZIPLINEN, DEREN ARENA-ERGEBNIS IN EINEM BATTLE-SAVE ZAEHLT (s. Kopfkommentar). Jeder
+ * Eintrag MUSS in `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` stehen UND laut
+ * data/generated/disziplin-abnahme.json bestehen (oder in `ARENA_ABNAHME_AUSNAHMEN` stehen) —
+ * erzwungen von tests/disziplin-abnahme-guard.test.ts. Stand 16.10.: Messwerte und Begruendung je
+ * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3.
+ */
+export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "hockey", // Chris-Ausnahme, s. ARENA_ABNAHME_AUSNAHMEN
+  "gewichtheben",
+  "speed-schach",
+  "showcase",
+  "eiskunstlauf",
+  "breaking",
+  "wettessen",
+  "tennis",
+  "fechten",
+  "staffel",
+  "takeshis-castle",
+  "time-trial",
+  "spurt",
+  "climbing",
+  // BASKETBALL BEWUSST NICHT HIER (16.10.): rho je Spiel 0,795 (Median, kaderfest, 24 Spiele) — unter
+  // der 0,80-Schranke. Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in
+  // Battle Mode zahlt es bis zur bestandenen Abnahme ueber die PPS-Duell-Bruecke.
 ]);

@@ -119,7 +119,7 @@
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   runArenaFixtures,
@@ -185,7 +185,10 @@ import climbingPpsReferenzJson from "@/data/generated/climbing-pps-referenz.json
  * Bundle zu ziehen. Re-Export hier, damit bestehende Importe von hier unveraendert weiterlaufen.
  * Die volle Herleitung (welche Disziplin warum drin/draussen ist) steht dort, nicht mehr hier.
  */
-export { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+export {
+  ARENA_RESOLVED_DISCIPLINE_IDS,
+  ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS,
+} from "@/lib/battle/arena-resolved-disciplines";
 
 /**
  * QUERPRUEFUNG (Review-Fund PR #776, erweitert in Produktivierungswelle 1): jede Buehnen-
@@ -209,10 +212,12 @@ for (const [mengenName, menge] of [
   ["ARENA_BAHN_DISCIPLINE_IDS", ARENA_BAHN_DISCIPLINE_IDS],
 ] as const) {
   for (const disziplinId of menge) {
-    if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(disziplinId)) {
+    // Seit der PPS-Duell-Bruecke (16.10.) gegen die ANGESCHLOSSENE Menge: eine Chassis-Disziplin,
+    // die die Abnahme (noch) nicht besteht, bleibt angeschlossen und wird nur nicht gewertet.
+    if (!ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has(disziplinId)) {
       throw new Error(
         `battle-mode-arena-team-points: "${disziplinId}" steht in ${mengenName} ` +
-          "(arena-headless-runner.ts), aber NICHT in ARENA_RESOLVED_DISCIPLINE_IDS -- jede Buehnen-" +
+          "(arena-headless-runner.ts), aber NICHT in ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS -- jede Buehnen-" +
           "Chassis-Disziplin muss auch arena-aufgeloest sein, sonst faellt der Chassis-Dispatch still " +
           "auf den falschen Pfad.",
       );
@@ -804,10 +809,11 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
  * echten Saison. Deshalb hier derselbe Fail-Fast beim Modul-Laden wie oben, statt sich auf den
  * Kommentar "sollte nie vorkommen" zu verlassen.
  */
-for (const disziplinId of ARENA_RESOLVED_DISCIPLINE_IDS) {
+// Seit der PPS-Duell-Bruecke (16.10.) ueber die ANGESCHLOSSENE Menge (Obermenge der gewerteten).
+for (const disziplinId of ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS) {
   if (!ARENA_IMPACT_KONFIG_JE_DISZIPLIN.has(disziplinId)) {
     throw new Error(
-      `battle-mode-arena-team-points: "${disziplinId}" steht in ARENA_RESOLVED_DISCIPLINE_IDS, ` +
+      `battle-mode-arena-team-points: "${disziplinId}" steht in ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS, ` +
         "aber NICHT in ARENA_IMPACT_KONFIG_JE_DISZIPLIN -- ohne eigenen Eintrag faellt " +
         "loeseArenaImpactKonfigAuf() still auf Basketballs Referenz zurueck und vergibt auf einer " +
         "fremden Rohwert-Skala jedem Spieler die volle Hoechstpunktzahl. Eigene PPS-Referenz " +

@@ -1,5 +1,6 @@
 import type {
   DisciplineHighlightCandidate,
+  DisciplineResolutionSource,
   LegacyMatchdayResolvePreview,
   PlayerPerformancePreview,
   ResolveHighlightType,
@@ -70,10 +71,19 @@ export type DisciplineResultWritePayload = {
    */
   teamPoints: number | null;
   pointSource: string;
-  resolutionSource?: "pps" | "arena";
+  resolutionSource?: DisciplineResolutionSource;
   arenaMatchSeed?: string | null;
   /** "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A) -- s. Kommentar an `DisciplineTeamResolvePreview.momente`. */
   momente?: ArenaMomentEintrag[] | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): nur an
+   * Duell-Zeilen gesetzt, s. `DisciplineTeamResolvePreview.marge`/`verhaeltnis`/`margeM90`.
+   */
+  opponentTeamId?: string | null;
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -226,6 +236,16 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
           momente: teamResult.momente,
+          // PUNKTEVERHAELTNIS: nur Duell-Zeilen tragen die Felder (Manager-Mode-Zeilen bleiben unveraendert).
+          ...(teamResult.verhaeltnis != null
+            ? {
+                opponentTeamId: teamResult.opponentTeamId ?? null,
+                marge: teamResult.marge ?? null,
+                verhaeltnis: teamResult.verhaeltnis,
+                margeM90: teamResult.margeM90 ?? null,
+                duellSeiten: teamResult.duellSeiten ?? null,
+              }
+            : {}),
         };
       }),
   );

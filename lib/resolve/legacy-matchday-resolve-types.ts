@@ -81,6 +81,16 @@ export type DisciplineHighlightCandidate = {
   payload: Record<string, unknown>;
 };
 
+/**
+ * Woher `teamPoints` einer Disziplin-Zeile stammt:
+ *  - `"pps"`: Manager-Mode-Rangtabelle (`getRankToPointsValue()`), Standard ausserhalb von Battle Mode.
+ *  - `"arena"`: Battle Mode, 2/1/0 aus einem echten Arena-Duell.
+ *  - `"pps_duell"`: Battle Mode, 2/1/0 aus dem PPS-Score beider Seiten desselben Fixtures
+ *    (PPS-Duell-Bruecke, lib/resolve/battle-mode-pps-duell.ts) — der verbindliche Rueckfall ohne
+ *    Arena-Ergebnis.
+ */
+export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell";
+
 export type DisciplineTeamResolvePreview = {
   teamId: string;
   teamName: string;
@@ -124,7 +134,18 @@ export type DisciplineTeamResolvePreview = {
    * Arena-Duell, s. lib/resolve/battle-mode-arena-team-points.ts). Fehlt das Feld (aeltere
    * Preview-Objekte), gilt der Default `"pps"` — kein Verhalten aendert sich dadurch.
    */
-  resolutionSource?: "pps" | "arena";
+  resolutionSource?: DisciplineResolutionSource;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): nur bei einem
+   * Duell-Ergebnis (`resolutionSource` `"arena"` oder `"pps_duell"`) gesetzt, sonst `null`/fehlend.
+   * `marge` = roher Abstand beider Seiten, `verhaeltnis` = ±D (0..10) aus Sicht dieses Teams,
+   * `margeM90` = die verwendete Bezugsgroesse (`null` = Rueckfall-D ohne gezogene Referenz).
+   * `duellSeiten` = Rohwerte [dieses Team, Gegner] (PPS-Scores bzw. Arena-Seitenstand).
+   */
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
   /**
    * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
    * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau

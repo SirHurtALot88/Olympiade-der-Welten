@@ -13,6 +13,13 @@ export type StandingsTieBreakItem = {
   currentPoints: number | null;
   matchdayRank: number | null;
   cash: number | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): Saisonsumme der
+   * ±D-Werte aller Battle-Duelle dieses Teams. Erster Tiebreaker NACH den Punkten, VOR `totalScore`.
+   * Optional und fuer jeden Manager-Save `null`/fehlend — dann wird die Stufe uebersprungen und die
+   * Sortierung ist bit-identisch zum Stand davor.
+   */
+  verhaeltnis?: number | null;
 };
 
 export type StandingTieGroup = {
@@ -39,9 +46,22 @@ function compareNullableNumbersAsc(left: number | null, right: number | null) {
   return (left ?? Number.POSITIVE_INFINITY) - (right ?? Number.POSITIVE_INFINITY);
 }
 
+/**
+ * Verhaeltnis-Stufe: nur wenn mindestens eine Seite einen Wert traegt (Battle-Save). Beide
+ * `null`/fehlend (Manager-Save) -> 0, die Stufe ist dann wirkungslos. Ein fehlender Wert gegen einen
+ * vorhandenen zaehlt als 0 (noch kein Duell gespielt), nicht als −Unendlich.
+ */
+function compareVerhaeltnisDesc(left: StandingsTieBreakItem, right: StandingsTieBreakItem) {
+  if (left.verhaeltnis == null && right.verhaeltnis == null) return 0;
+  return (right.verhaeltnis ?? 0) - (left.verhaeltnis ?? 0);
+}
+
 function sortForProjectedPoints(left: StandingsTieBreakItem, right: StandingsTieBreakItem) {
   const projectedDelta = compareNullableNumbersDesc(left.projectedPoints, right.projectedPoints);
   if (projectedDelta !== 0) return projectedDelta;
+
+  const verhaeltnisDelta = compareVerhaeltnisDesc(left, right);
+  if (verhaeltnisDelta !== 0) return verhaeltnisDelta;
 
   const totalScoreDelta = compareNullableNumbersDesc(left.totalScore, right.totalScore);
   if (totalScoreDelta !== 0) return totalScoreDelta;
@@ -67,6 +87,7 @@ function isProjectedPointsTieAfterScoreTieBreak(left: StandingsTieBreakItem, rig
     left.totalScore != null &&
     right.totalScore != null &&
     left.projectedPoints === right.projectedPoints &&
+    compareVerhaeltnisDesc(left, right) === 0 &&
     left.totalScore === right.totalScore;
 }
 

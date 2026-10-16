@@ -10,6 +10,7 @@ import {
   calculateMutatorModifierForSide,
   buildMatchdayMutatorTraitsBySide,
   toBattleArenaOrganicMutatorResult,
+  toBattleDuellMutatorResult,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
@@ -19,6 +20,13 @@ import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-perf
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { isBattleModeSave } from "@/lib/season/game-mode";
+import {
+  baueFixtureIndex,
+  berechneDuellVerhaeltnis,
+  berechnePpsDuellOverrides,
+  findeSpieltagsFixtures,
+  outcomeAusPunkten,
+} from "@/lib/resolve/battle-mode-pps-duell";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   DisciplineHighlightCandidate,
@@ -345,6 +353,25 @@ export function buildLegacyMatchdayResolvePreview(
    * defensiv beim bisherigen PPS-Pfad.
    */
   const isBattleModeArenaEligible = Boolean(base.gameState && isBattleModeSave(base.gameState));
+  /**
+   * PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): in einem
+   * Battle-Save ist das Fixture des Spieltags die Einheit JEDER Disziplin. Wer an diesem Spieltag
+   * gegen wen spielt, steht schon vor dem Scoring fest — der Index wird einmal gebaut. `null` ausserhalb
+   * von Battle Mode: dort aendert sich nichts.
+   */
+  const duellFixtureIndex = isBattleModeArenaEligible
+    ? baueFixtureIndex(findeSpieltagsFixtures(base.gameState, base.matchdayId))
+    : null;
+  const kontextTeamIds = new Set(contexts.map((context) => context.team.id));
+  const hatArenaErgebnis = (disciplineId: string, teamId: string) =>
+    isBattleModeArenaEligible && (resolveOptions.arenaTeamPointsByDisciplineId?.get(disciplineId)?.has(teamId) ?? false);
+  /** Wird diese Seite ueber das PPS-Duell gewertet (Fixture vorhanden, Gegner geladen, kein Arena-Ergebnis)? */
+  const istPpsDuellSeite = (disciplineId: string, teamId: string) => {
+    const fixture = duellFixtureIndex?.get(teamId);
+    if (!fixture) return false;
+    const gegnerId = fixture.homeTeamId === teamId ? fixture.awayTeamId : fixture.homeTeamId;
+    return kontextTeamIds.has(gegnerId) && !hatArenaErgebnis(disciplineId, teamId) && !hatArenaErgebnis(disciplineId, gegnerId);
+  };
   const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
     saveId: base.saveId,
     seasonId: base.seasonId,
@@ -517,8 +544,13 @@ export function buildLegacyMatchdayResolvePreview(
                   rosterPlayers: context.rosterPlayers,
                   matchdayMutatorTraits: matchdayMutatorTraitsBySide[meta.disciplineSide],
                 });
+          // PPS-DUELL-BRUECKE: eine per PPS-Duell gewertete Battle-Seite behaelt den Score-Anteil des
+          // Mutators, verliert aber den flachen PP-Nachschlag (sonst Zusatzpunkte neben 2/1/0 in der
+          // Tabelle), s. `toBattleDuellMutatorResult()`.
           const mutatorResult = arenaSimuliertDieseSeite
             ? toBattleArenaOrganicMutatorResult(rohMutatorResult)
+            : istPpsDuellSeite(meta.disciplineId, context.team.id)
+            ? toBattleDuellMutatorResult(rohMutatorResult)
             : rohMutatorResult;
           const effectiveMutatorModifier =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
@@ -771,6 +803,23 @@ export function buildLegacyMatchdayResolvePreview(
       isBattleModeArenaEligible
         ? resolveOptions.arenaIndividualBoxscorePpsByDisciplineId?.get(disciplineId) ?? null
         : null;
+    // PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md, Konzept
+    // battle-mode-20-spieltage-liga-mechanik-16-10.md Abschnitt 5): jede Battle-Seite OHNE
+    // Arena-Ergebnis, die ein Fixture hat, wird aus dem PPS-Score beider Seiten als Duell gewertet
+    // (2/1/0). Das ist der VERBINDLICHE Rueckfall — fuer nicht arena-aufgeloeste Disziplinen, fuer
+    // arena-aufgeloeste, deren Lauf scheiterte, und fuer solche, die die Abnahme nicht bestehen.
+    // Der Score ist derselbe, nach dem unten gerankt wird (nach Team-Power-Debuffs).
+    const legacyScorePlayerCountForThisDiscipline =
+      bucket.find((entry) => entry.legacyScorePlayerCount != null)?.legacyScorePlayerCount ?? null;
+    const ppsDuellOverridesForThisDiscipline = duellFixtureIndex
+      ? berechnePpsDuellOverrides({
+          fixtures: [...new Set(duellFixtureIndex.values())],
+          scoreByTeamId: new Map(teamResultsAfterPowers.map((result) => [result.teamId, result.score] as const)),
+          disciplineId,
+          playerCount: legacyScorePlayerCountForThisDiscipline,
+          ausgeschlosseneTeamIds: new Set(arenaOverridesForThisDiscipline?.keys() ?? []),
+        })
+      : null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
@@ -778,11 +827,42 @@ export function buildLegacyMatchdayResolvePreview(
       base.gameState,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => {
       const arenaOverride = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      const ppsDuell = arenaOverride ? null : ppsDuellOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      // Verhaeltnis eines Arena-Duells aus seinem Seitenstand (Ausgang aus den gebuchten Punkten,
+      // damit ein kg-Tiebreak-Sieg bei Duellgleichstand als knappster Sieg D = 1 zaehlt).
+      const arenaVerhaeltnis =
+        arenaOverride?.seiten != null
+          ? berechneDuellVerhaeltnis({
+              quelle: "arena",
+              disciplineId,
+              playerCount: legacyScorePlayerCountForThisDiscipline,
+              seiten: arenaOverride.seiten,
+              outcome:
+                arenaOverride.outcome ??
+                outcomeAusPunkten(arenaOverride.teamPoints, 2 - arenaOverride.teamPoints),
+            })
+          : null;
+      const duellVerhaeltnis = arenaVerhaeltnis ?? ppsDuell;
+      // Ein Battle-Save ohne Duell fuer diese Seite (kein Fixture im Spielplan) bekommt KEINE
+      // Rangtabellen-Punkte mehr, sondern `null` + Warnung — laut statt still falsch.
+      const battleOhneDuell = isBattleModeArenaEligible && !arenaOverride && !ppsDuell;
       return {
         ...item,
         rank,
+        warnings:
+          duellVerhaeltnis?.warnings.length || battleOhneDuell
+            ? [
+                ...item.warnings,
+                ...(duellVerhaeltnis?.warnings ?? []),
+                ...(battleOhneDuell ? [`battle_mode_ohne_duell:${disciplineId}`] : []),
+              ]
+            : item.warnings,
         teamPoints: arenaOverride
           ? arenaOverride.teamPoints
+          : ppsDuell
+          ? ppsDuell.teamPoints
+          : battleOhneDuell
+          ? null
           : getRankToPointsValue(
               // REVIEW-FIX (PR #930, 14.09.): `legacyScorePlayerCount` statt `score.requiredPlayers`
               // -- fuer Mini-DM ist `requiredPlayers` seit dieser PR fest 1 (Kader-/Pod-Zweck),
@@ -792,8 +872,14 @@ export function buildLegacyMatchdayResolvePreview(
                 ?.legacyScorePlayerCount ?? item.entries.length,
               rank,
             ),
-        pointSource: arenaOverride ? "battle_mode_arena_win_draw_loss" : "rank_to_points_final_score_share",
-        resolutionSource: arenaOverride ? "arena" : "pps",
+        pointSource: arenaOverride
+          ? "battle_mode_arena_win_draw_loss"
+          : ppsDuell
+          ? "battle_mode_pps_duell_win_draw_loss"
+          : battleOhneDuell
+          ? "battle_mode_ohne_duell"
+          : "rank_to_points_final_score_share",
+        resolutionSource: arenaOverride ? "arena" : ppsDuell ? "pps_duell" : "pps",
         arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
         // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): s. `ArenaMomentEintrag`-Kommentar.
         momente: arenaOverride?.momente ?? null,
@@ -802,7 +888,19 @@ export function buildLegacyMatchdayResolvePreview(
         // `resolutionSource === "arena"` -- die Bühne braucht sie, um Boards paarweise zu
         // sequenzieren statt alle Teams im Gleichschritt zu enthüllen (s.
         // DisciplineStageNativeArena.tsx, `prim === "lamps"`/`"klassen"`/`"stage"`).
-        opponentTeamId: arenaOverride?.opponentTeamId ?? null,
+        opponentTeamId: arenaOverride?.opponentTeamId ?? ppsDuell?.opponentTeamId ?? null,
+        // PUNKTEVERHAELTNIS: nur an Duell-Zeilen — ausserhalb von Battle Mode entstehen hier keine
+        // neuen Schluessel (Manager-Mode-Vorschauen bleiben byte-identisch).
+        ...(duellVerhaeltnis
+          ? {
+              marge: duellVerhaeltnis.marge,
+              verhaeltnis: duellVerhaeltnis.verhaeltnis,
+              margeM90: duellVerhaeltnis.margeM90,
+              duellSeiten: arenaOverride?.seiten
+                ? ([arenaOverride.seiten[0], arenaOverride.seiten[1]] as [number, number])
+                : ppsDuell?.seiten ?? null,
+            }
+          : {}),
       };
     });
 
@@ -838,7 +936,9 @@ export function buildLegacyMatchdayResolvePreview(
         // von oben — `distributeRankPointsToPlayers()` liefert hier trotzdem noch die individuellen
         // PPS-basierten `pointsAwarded` je Spieler, nur der TEAM-Wert darf nicht ueberschrieben
         // werden.
-        if (rankedTeam.resolutionSource !== "arena") {
+        // PPS-DUELL-BRUECKE: dasselbe gilt fuer ein PPS-Duell (`"pps_duell"`) — und in einem
+        // Battle-Save ueberhaupt fuer JEDE Zeile: dort darf die Rangtabelle nie Team-Punkte setzen.
+        if (rankedTeam.resolutionSource === "pps" && !isBattleModeArenaEligible) {
           rankedTeam.pointSource = distributedPoints.pointSource;
           rankedTeam.teamPoints = distributedPoints.teamPoints;
         }

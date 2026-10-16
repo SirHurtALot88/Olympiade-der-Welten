@@ -40,6 +40,7 @@ import {
   DEFAULT_STANDINGS_TIEBREAKER_MODE,
   resolveProjectedRankWithTiePolicy,
 } from "@/lib/standings/standings-tiebreaker-policy";
+import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
 
 /** Kleiner als das, und es ist Rundung statt Befund — die Punkte stehen auf einer Nachkommastelle. */
 const TOLERANZ = 0.05;
@@ -100,6 +101,11 @@ export function zieheSaisonstandPunkteNach(
     ]),
   );
 
+  // PUNKTEVERHAELTNIS (16.10.): derselbe Tiebreaker wie in der Buchung (`standings-preview-engine.ts`),
+  // sonst vergaebe diese Nachbuchung die Raenge nach einer anderen Regel als die Buchung selbst.
+  // `null` fuer jeden Save ohne Duell-Verhaeltnis -> unveraendertes Verhalten.
+  const verhaeltnisJeTeam = summiereSaisonVerhaeltnis(gameState, seasonId);
+
   const rangJeTeam = resolveProjectedRankWithTiePolicy(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
@@ -110,6 +116,7 @@ export function zieheSaisonstandPunkteNach(
       currentPoints: standings[team.teamId]?.points ?? null,
       matchdayRank: null,
       cash: team.cash ?? null,
+      verhaeltnis: verhaeltnisJeTeam ? verhaeltnisJeTeam.get(team.teamId) ?? 0 : null,
     })),
     DEFAULT_STANDINGS_TIEBREAKER_MODE,
   );
@@ -124,7 +131,15 @@ export function zieheSaisonstandPunkteNach(
     const rangNachher = rangJeTeam.get(team.teamId) ?? null;
     const rangVorher = typeof vorher?.rank === "number" ? vorher.rank : null;
 
-    if (punkteVorher != null && Math.abs(punkteVorher - punkteNachher) < TOLERANZ && rangVorher === rangNachher) {
+    const verhaeltnisNachher = verhaeltnisJeTeam ? verhaeltnisJeTeam.get(team.teamId) ?? 0 : null;
+    const verhaeltnisUnveraendert = verhaeltnisNachher == null || vorher?.verhaeltnis === verhaeltnisNachher;
+
+    if (
+      punkteVorher != null &&
+      Math.abs(punkteVorher - punkteNachher) < TOLERANZ &&
+      rangVorher === rangNachher &&
+      verhaeltnisUnveraendert
+    ) {
       continue;
     }
 
@@ -132,6 +147,7 @@ export function zieheSaisonstandPunkteNach(
       ...(vorher ?? { points: 0, rank: null }),
       points: punkteNachher,
       rank: rangNachher,
+      ...(verhaeltnisNachher != null ? { verhaeltnis: verhaeltnisNachher } : {}),
       // `matchdayBaselinePoints` gehoert zum zuletzt gebuchten Spieltag und wird um genau die
       // Korrektur mitverschoben — sonst rechnete ein `forceReplace` desselben Spieltags die
       // Nachbuchung wieder heraus.

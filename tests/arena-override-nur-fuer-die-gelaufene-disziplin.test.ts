@@ -38,7 +38,7 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS, ARENA_TEAM_POINTS } from "@/lib/resolve/
  * tragen koennen, ohne sich zu ueberschreiben (der eigentliche Weg-B-Fall).
  */
 
-const D1_ARENA = "basketball";
+const D1_ARENA = "speed-schach";
 /** Zweite, EBENFALLS arena-aufgeloeste Disziplin -- genau der Fall, um den es hier geht. */
 const D2_AUCH_ARENA = "hockey";
 

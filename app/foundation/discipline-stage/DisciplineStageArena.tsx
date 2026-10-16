@@ -43,6 +43,7 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
+import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
 import { ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import type { DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
@@ -1078,6 +1079,13 @@ export default function DisciplineStageArena({
       const engineTeamPoints = new Map(
         (dp.teamResults ?? []).map((tr) => [tr.teamId, Number.isFinite(tr.teamPoints ?? NaN) ? (tr.teamPoints as number) : null] as const),
       );
+      // BATTLE-DUELLE (Arena oder PPS-Duell-Bruecke, 16.10.): die Engine hat 2/1/0 je Fixture
+      // gebucht — die Rangtabelle hier wuerde stattdessen bis 19,9 Punkte fuer Rang 1 anzeigen.
+      // Dann zeigt die Buehne GENAU die gebuchte Zahl.
+      if ((dp.teamResults ?? []).some((tr) => istDuellWertung(tr))) {
+        for (const tr of dp.teamResults ?? []) map.set(tr.teamId, engineTeamPoints.get(tr.teamId) ?? 0);
+        return map;
+      }
       const scoring = (dp.teamResults ?? [])
         .map((tr) => ({ teamId: tr.teamId, score: Number.isFinite(tr.score) ? tr.score : 0 }))
         .filter((tr) => tr.score > 0)

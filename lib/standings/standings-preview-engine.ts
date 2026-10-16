@@ -19,6 +19,8 @@ import { db } from "@/src/server/db";
 import { resolveTeamMutatorPpsBonus } from "@/lib/foundation/player-points-total";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
+import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
 
 export type StandingsPreviewSource = "sqlite" | "prisma";
 export type StandingsPreviewResultStatus =
@@ -52,6 +54,12 @@ export type StandingsPreviewItem = {
   resultStatus: StandingsPreviewResultStatus;
   warnings: string[];
   blockedRules: string[];
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): Saisonsumme der
+   * ±D-Werte NACH diesem Spieltag (Tiebreaker nach den Punkten). Nur bei Battle-Duell-Ergebnissen
+   * gesetzt, sonst fehlt das Feld.
+   */
+  projectedVerhaeltnis?: number | null;
 };
 
 export type StandingsPreviewTieGroup = {
@@ -354,13 +362,15 @@ function resolveDisciplinePoints(input: {
    * vor dem Fix gebuchte Saves, oder `"arena"` ohne `teamPoints`) faellt exakt auf das bisherige
    * Verhalten zurueck. Das haelt die sieben nicht-arena-aufgeloesten Disziplinen unveraendert.
    */
-  resolutionSource?: "pps" | "arena";
+  resolutionSource?: "pps" | "arena" | "pps_duell";
   teamPoints?: number | null;
 }): DisciplinePointsLookup {
   const warnings: string[] = [];
 
-  if (input.resolutionSource === "arena" && input.teamPoints != null) {
-    return { points: input.teamPoints, playerCount: input.playerCount, warnings };
+  // PPS-DUELL-BRUECKE (16.10.): ein PPS-Duell (`"pps_duell"`) bucht wie ein Arena-Duell seine
+  // feste 2/1/0-Punktzahl, nie die Rangtabelle — s. `istDuellWertung()`.
+  if (istDuellWertung(input)) {
+    return { points: input.teamPoints ?? null, playerCount: input.playerCount, warnings };
   }
 
   if (input.playerCount == null || input.rank == null) {
@@ -533,6 +543,12 @@ export async function buildStandingsPreview(
       disciplineByTeam.set(row.teamId, current);
     }
 
+    // PUNKTEVERHAELTNIS: Saisonsumme inklusive dieses Spieltags, aus den gebuchten Zeilen neu
+    // summiert (idempotent). `null` fuer jeden Save ohne Duell-Verhaeltnis -> keine neue Spalte.
+    const verhaeltnisByTeamId = summiereSaisonVerhaeltnis(scope.save.gameState, scope.seasonId, {
+      zusaetzlicheMatchdayResultId: matchdayResult?.id ?? null,
+    });
+
     const itemsBase: StandingsPreviewWorkingItem[] = scope.save.gameState.teams.map((team) => {
       const resultRow = disciplineByTeam.get(team.teamId) ?? null;
       const standingRecord = standings[team.teamId];
@@ -610,6 +626,7 @@ export async function buildStandingsPreview(
         rankToPointsKey: LOCAL_RESULT_DISCIPLINE_SIDE_COUNT,
         hasStoredResult,
         isIncomplete,
+        ...(verhaeltnisByTeamId ? { projectedVerhaeltnis: verhaeltnisByTeamId.get(team.teamId) ?? 0 } : {}),
       };
     });
 
@@ -657,6 +674,7 @@ export async function buildStandingsPreview(
           currentPoints: item.currentPoints,
           matchdayRank: item.matchdayRank,
           cash: item.cash,
+          verhaeltnis: item.projectedVerhaeltnis ?? null,
         })),
       ).map((group) => resolveProjectedRankWithTiePolicy(group, DEFAULT_STANDINGS_TIEBREAKER_MODE)),
     );
@@ -671,6 +689,7 @@ export async function buildStandingsPreview(
         currentPoints: item.currentPoints,
         matchdayRank: item.matchdayRank,
         cash: item.cash,
+        verhaeltnis: item.projectedVerhaeltnis ?? null,
       })),
     ).flatMap((group) => detectStandingTieGroups(group)) as StandingsPreviewTieGroup[];
     const tieTeamIds = new Set(tieGroups.flatMap((group) => group.affectedTeams.map((team) => team.teamId)));
@@ -706,6 +725,7 @@ export async function buildStandingsPreview(
         ]),
       ),
       blockedRules,
+      ...(item.projectedVerhaeltnis != null ? { projectedVerhaeltnis: item.projectedVerhaeltnis } : {}),
     }));
 
     return {
