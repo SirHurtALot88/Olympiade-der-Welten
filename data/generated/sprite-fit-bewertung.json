@@ -17,15 +17,15 @@
   "name": "Aeon Flux",
   "slug": "aeon-flux",
   "sterne": 4,
-  "begruendung": "Menschliche Silhouette korrekt. effekt:{typ:\"arkan\",pos:\"koerper\"} ergaenzt (Chris' Live-Fund: \"ein pinkes Laserschwert\") - arkan hat Pink in der Palette (#ff8ce0), KEIN reines Pink (Mehrfarben-Palette violett/pink/gold), dokumentiert statt verschwiegen; per renderProbe bestaetigt sichtbar. haarTon von \"dark_brown\" auf \"black\" korrigiert (Portrait zeigt fast schwarzes Haar). waffe:\"schwert\" war schon gesetzt (nur in Angriffs-Pose sichtbar, Engine-weite Einschraenkung, kein Rezeptfehler).",
+  "begruendung": "Menschliche Silhouette korrekt. NACHGEBESSERT (16.10., zweite Runde, Chris' Korrektur \"ein rosa Laserschwert\"): effekt:{typ:\"arkan\"} ersetzt durch das generische Feld waffeTon:\"#ff33cc\" (neue Flat-Color-Einfaerbung fuer Waffenblaetter, s. sprEingefaerbt() in der Engine) - faerbt die Klinge SELBST durchgehend rosa statt nur eine Partikelwolke daneben; Farbe direkt per Pixelscan aus dem Portrait abgetastet. Per renderProbe ueber alle vier Blickrichtungen UND den Angriffsframe bestaetigt sichtbar. haarTon von \"dark_brown\" auf \"black\" korrigiert. waffe:\"schwert\" jetzt auch in der Ruhepose sichtbar (PR #1259).",
   "fehlendesDetail": "Ruestungs-Silhouette bleibt mittelalterliche Platte statt schlanker Sci-Fi-Ruestung - kein Sci-Fi-Ruestungsblatt im Baukasten, einzige verbleibende Luecke."
  },
  {
   "name": "Akali",
   "slug": "akali",
-  "sterne": 3,
-  "begruendung": "Menschliche Kaempferin korrekt. ruestTon:\"dunkel\" NEU ergaenzt - per renderProbe bestaetigt jetzt dunkelgrau/schwarz statt des vorherigen unveraenderten braunen Leders, trifft die schwarze Ninja-Ruestung. Chris' Live-Fund (\"Akali hat ja 2 Katana auf ihrem Original-Bild\") nachrecherchiert: KEIN Katana-Blatt im Baukasten (grep auf alle Sprites: null Treffer), b.waffe kennt nur einen Wert - kein Dual-Wield-Feld.",
-  "fehlendesDetail": "Gesichtsmaske (kein Requisiten-Slot) UND zwei gleichzeitig gefuehrte Katana (kein Katana-Blatt, kein Dual-Wield-Feld - generisches Einzelschwert bleibt die einzige verfuegbare Naeherung) bleiben strukturell unerreichbar - zwei unabhaengige Luecken."
+  "sterne": 4,
+  "begruendung": "Menschliche Kaempferin korrekt. NACHGEBESSERT (16.10., zweite Runde, Chris' Korrektur \"nur 1 Waffe statt 2\"): neues generisches Feld zweitwaffe:true spiegelt das Schwert-Blatt horizontal um die Spielerachse (jedes Waffenblatt wird schon zentriert um die Figur gezeichnet, ein Spiegel um dieselbe Achse braucht keine Offset-Korrektur) - zeigt jetzt zwei Klingen aus demselben echten Asset statt einer, per renderProbe ueber alle vier Blickrichtungen UND den Angriffsframe bestaetigt (von hinten wie jede Nahkampfwaffe unsichtbar, keine Regression). ruestTon:\"dunkel\" unveraendert von der ersten Runde. Chris selbst korrigierte \"Katana\" zu \"Schwert\" - die Klingenform (gerade statt gebogen) zaehlt deshalb nicht mehr als eigene Luecke.",
+  "fehlendesDetail": "Gesichtsmaske (kein Requisiten-Slot im Baukasten) bleibt die einzige verbleibende, einzeln benennbare Luecke."
  },
  {
   "name": "Alarm",
