@@ -1,5 +1,8 @@
 {
- "hinweis": "Pflichtabnahme je Disziplin (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80 UND Pp-Abweichung <= 25 in zwei Saatstroemen. Gelesen von tests/disziplin-abnahme-guard.test.ts gegen ARENA_RESOLVED_DISCIPLINE_IDS (lib/battle/arena-resolved-disciplines.ts). Neu messen und hier eintragen, bevor eine Disziplin in die Arena-Wertung aufgenommen wird; ein Eintrag, der nicht mehr besteht, nimmt sie heraus (sie zahlt dann ueber die PPS-Duell-Bruecke). 'frisch: true' = am angegebenen Datum/Commit mit dem genannten Befehl gemessen; 'frisch: false' = aus der Doku uebernommen.",
+ "hinweis": "Pflichtabnahme je Disziplin (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80 UND Pp-Abweichung <= 25 in zwei Saatstroemen. Gelesen von tests/disziplin-abnahme-guard.test.ts gegen ARENA_RESOLVED_DISCIPLINE_IDS (lib/battle/arena-resolved-disciplines.ts). Neu messen und hier eintragen, bevor eine Disziplin in die Arena-Wertung aufgenommen wird; ein Eintrag, der nicht mehr besteht, nimmt sie heraus (sie zahlt dann ueber die PPS-Duell-Bruecke). Frische JE MESSGROESSE: 'rhoFrisch'/'ppFrisch' true = am angegebenen Datum/Commit mit dem genannten Befehl gemessen; false = aus der Doku uebernommen bzw. nicht gemessen. Der Waechter zaehlt nur frische Werte.",
+ "beobachtungsliste": {
+  "breaking": "rho 0,801 bei Kaderspannweite 0,289 — genau auf der Schranke; bei der naechsten Nachmessung zuerst pruefen. Die Schranke selbst bleibt unveraendert."
+ },
  "schranken": {
   "rhoJeSpielUeber": 0.8,
   "ppHoechstens": 25,
@@ -32,7 +35,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true,
+   "rhoFrisch": true,
+   "ppFrisch": false,
    "anmerkung": "Pp am 16.10. abgebrochen (Feldspiel-Messung dauert Stunden) — nicht noetig: rho 0,795 verfehlt die Schranke bereits; Basketball spielt in Battle Mode ueber die PPS-Duell-Bruecke."
   },
   "hockey": {
@@ -56,9 +60,10 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true,
+   "rhoFrisch": true,
+   "ppFrisch": false,
    "rhoJeSpielNurFeldspieler": 0.676,
-   "anmerkung": "Chris-Ausnahme (CLAUDE.md), Pp NICHT frisch gemessen."
+   "anmerkung": "Chris-Ausnahme deckt NUR rho (CLAUDE.md, vor der Pp-Pflicht vom 21.09.). Pp NICHT frisch gemessen (Doku-Wert, n=6) — Hockey ist deshalb nicht arena-gewertet, bis eine frische Pp-Messung (>= 24 Laeufe, zwei Saatstroeme, <= 25) vorliegt oder Chris die Pp-Ausnahme gibt."
   },
   "gewichtheben": {
    "chassis": "buehne",
@@ -88,7 +93,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "speed-schach": {
    "chassis": "buehne",
@@ -118,7 +124,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "showcase": {
    "chassis": "buehne",
@@ -148,7 +155,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "eiskunstlauf": {
    "chassis": "buehne",
@@ -178,7 +186,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "breaking": {
    "chassis": "buehne",
@@ -208,7 +217,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "wettessen": {
    "chassis": "buehne",
@@ -238,7 +248,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "tennis": {
    "chassis": "buehne",
@@ -268,7 +279,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "fechten": {
    "chassis": "buehne",
@@ -298,7 +310,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "staffel": {
    "chassis": "bahn",
@@ -328,7 +341,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "takeshis-castle": {
    "chassis": "bahn",
@@ -358,7 +372,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "time-trial": {
    "chassis": "bahn",
@@ -388,7 +403,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "spurt": {
    "chassis": "bahn",
@@ -418,7 +434,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "climbing": {
    "chassis": "bahn",
@@ -448,7 +465,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true
+   "rhoFrisch": true,
+   "ppFrisch": true
   },
   "football": {
    "rhoJeSpiel": 0.818,
@@ -457,7 +475,8 @@
    ],
    "datum": "2026-09-26",
    "quelle": "docs/design/gesamtstand-audit-13-10.md",
-   "frisch": false,
+   "rhoFrisch": false,
+   "ppFrisch": false,
    "commit": "unbekannt",
    "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
   },
@@ -468,7 +487,8 @@
    ],
    "datum": "2026-10-15",
    "quelle": "docs/design/stand-aller-disziplinen.md",
-   "frisch": false,
+   "rhoFrisch": false,
+   "ppFrisch": false,
    "commit": "unbekannt",
    "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
   },
@@ -480,7 +500,8 @@
    ],
    "datum": "2026-10-15",
    "quelle": "docs/design/battle-mode-20-spieltage-liga-mechanik-16-10.md Fund 11",
-   "frisch": false,
+   "rhoFrisch": false,
+   "ppFrisch": false,
    "commit": "unbekannt",
    "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
   },
@@ -491,7 +512,8 @@
    ],
    "datum": "2026-10-07",
    "quelle": "docs/design/gesamtstand-audit-13-10.md",
-   "frisch": false,
+   "rhoFrisch": false,
+   "ppFrisch": false,
    "commit": "unbekannt",
    "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
   },
@@ -533,7 +555,8 @@
    },
    "datum": "2026-10-16",
    "commit": "ace43062",
-   "frisch": true,
+   "rhoFrisch": true,
+   "ppFrisch": false,
    "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); gebuchte Einheit waere der Event-Platz — s. docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 4."
   }
  }

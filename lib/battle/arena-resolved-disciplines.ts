@@ -8,7 +8,7 @@
  *  - `ARENA_RESOLVED_DISCIPLINE_IDS` (ganz unten): die Teilmenge, deren Arena-Ergebnis in einem
  *    Battle-Save TATSAECHLICH zaehlt. Nur wer die Pflichtabnahme aus CLAUDE.md besteht (rho je Spiel
  *    > 0,80 UND Pp-Abweichung ≤ 25 in zwei Saatstroemen, Tabelle data/generated/disziplin-abnahme.json)
- *    oder auf Chris' ausdruecklicher Ausnahmeliste steht (`ARENA_ABNAHME_AUSNAHMEN`), darf hier stehen
+ *    oder fuer das verfehlte Kriterium auf Chris' Ausnahmeliste steht (`ARENA_ABNAHME_AUSNAHMEN`, je Kriterium), darf hier stehen
  *    — `tests/disziplin-abnahme-guard.test.ts` schlaegt sonst fehl. Jede angeschlossene, aber nicht
  *    abgenommene Disziplin laeuft in Battle Mode ueber die PPS-Duell-Bruecke (2/1/0 aus dem
  *    PPS-Score desselben Fixtures), nie mehr ueber die Rangtabelle.
@@ -183,16 +183,36 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   // s. Kommentar oben.
 ]);
 
+/** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,80) und Budget-Methode (Pp ≤ 25). */
+export type AbnahmeKriterium = "rho" | "pp";
+
+export type AbnahmeAusnahme = {
+  /** GENAU die Kriterien, die Chris abgenommen hat — jedes andere prueft der Waechter normal weiter. */
+  deckt: readonly AbnahmeKriterium[];
+  begruendung: string;
+};
+
 /**
- * CHRIS' AUSDRUECKLICH BESTAETIGTE AUSNAHMEN von der Pflichtabnahme — eine Disziplin hier darf in
- * `ARENA_RESOLVED_DISCIPLINE_IDS` stehen, obwohl sie laut data/generated/disziplin-abnahme.json
- * nicht besteht. Nur mit Zitat/Quelle. Neue Eintraege NUR mit Chris' Bestaetigung.
+ * CHRIS' AUSDRUECKLICH BESTAETIGTE AUSNAHMEN von der Pflichtabnahme, JE KRITERIUM (Projektaufsicht
+ * 16.10.): eine Ausnahme deckt nur das, was Chris tatsaechlich abgenommen hat. Nur mit Zitat/Quelle,
+ * neue Eintraege und neue Kriterien NUR mit Chris' Bestaetigung.
+ *
+ * HOCKEY: Chris hat die Rangtreue abgenommen — vor dem 21.09., also bevor die Pp-Pruefung Pflicht
+ * wurde. Eine Pp-Ausnahme gibt es nicht, und Hockeys Pp (39,4) ist weder frisch noch mit genug Laeufen
+ * gemessen (n=6, Chromium-Abstuerze). Hockey steht deshalb NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS`
+ * und spielt ueber die PPS-Duell-Bruecke, bis eine frische Pp-Messung (≥ 24 Laeufe, zwei Saatstroeme,
+ * ≤ 25) vorliegt oder Chris die Pp-Ausnahme ausdruecklich gibt.
  */
-export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, string> = new Map([
+export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new Map([
   [
     "hockey",
-    "CLAUDE.md, Abschnitt 'Die Abnahme jeder Disziplin': Chris hat die Feldspieler-Rangtreue von Hockey " +
-      "ausdruecklich abgenommen (Star Rang 1 in 58 %, erste zwei 78 %, kaderfest; docs/design/hockey-opus-review-nhl.md 5.3).",
+    {
+      deckt: ["rho"],
+      begruendung:
+        "CLAUDE.md, Abschnitt 'Die Abnahme jeder Disziplin': Chris hat die Feldspieler-Rangtreue von Hockey " +
+        "ausdruecklich abgenommen (Star Rang 1 in 58 %, erste zwei 78 %, kaderfest; docs/design/hockey-opus-review-nhl.md 5.3). " +
+        "Gilt NUR fuer rho — eine Pp-Ausnahme hat Chris nie gegeben.",
+    },
   ],
 ]);
 
@@ -204,7 +224,6 @@ export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, string> = new Map([
  * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3.
  */
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
-  "hockey", // Chris-Ausnahme, s. ARENA_ABNAHME_AUSNAHMEN
   "gewichtheben",
   "speed-schach",
   "showcase",
@@ -218,6 +237,9 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "time-trial",
   "spurt",
   "climbing",
+  // HOCKEY BEWUSST NICHT HIER (16.10., Projektaufsicht): Chris' Ausnahme deckt nur rho, Hockeys Pp
+  // ist nicht frisch gemessen (39,4 aus der Doku, n=6) — s. ARENA_ABNAHME_AUSNAHMEN. Bis zur frischen
+  // Pp-Messung oder Chris' Pp-Freigabe ueber die PPS-Duell-Bruecke.
   // BASKETBALL BEWUSST NICHT HIER (16.10.): rho je Spiel 0,795 (Median, kaderfest, 24 Spiele) — unter
   // der 0,80-Schranke. Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in
   // Battle Mode zahlt es bis zur bestandenen Abnahme ueber die PPS-Duell-Bruecke.

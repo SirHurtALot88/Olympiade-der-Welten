@@ -23,8 +23,10 @@ Alles, was hier als Zahl steht, ist heute gemessen — die Befehle stehen jeweil
 3. **Zwei Mengen statt einer.** `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` (15, Motor angeschlossen)
    und `ARENA_RESOLVED_DISCIPLINE_IDS` (die, deren Arena-Ergebnis zählt). Die zweite wird von
    `tests/disziplin-abnahme-guard.test.ts` gegen `data/generated/disziplin-abnahme.json`
-   geprüft: wer nicht besteht und nicht auf Chris' Ausnahmeliste steht (nur Hockey), fliegt raus
-   und spielt über die Brücke.
+   geprüft — je Kriterium und nur mit frisch gemessenen Werten: wer ein Kriterium verfehlt, das
+   keine Chris-Ausnahme deckt, fliegt raus und spielt über die Brücke. Heute gewertet: **12 klar
+   bestanden plus Breaking genau auf der Schranke** (Beobachtungsliste). Draußen: Basketball (rho)
+   und Hockey (Chris' Ausnahme deckt nur rho, Pp nicht frisch gemessen).
 4. **Mini-DM bleibt auf der Brücke** (Begründung in Abschnitt 4) — Pod-Resolve ist Folge-Task.
 5. **Manager-Saves bit-identisch**, nachgewiesen an allen acht Saves des heutigen Live-Abbilds
    (80 Spieltags-Vorschauen, Ledger, Saisonstand-Nachbuchung; Abschnitt 5).
@@ -63,7 +65,7 @@ Wann greift was, in einem Battle-Save:
 |---|---|
 | Disziplin in `ARENA_RESOLVED_DISCIPLINE_IDS`, Arena-Lauf ok | Arena 2/1/0 |
 | dieselbe, Arena-Lauf für eine Liga gescheitert / Team ohne Ergebnis | PPS-Duell 2/1/0 |
-| angeschlossen, aber Abnahme nicht bestanden (Basketball, rho 0,795) | PPS-Duell 2/1/0 (kein Arena-Lauf mehr) |
+| angeschlossen, aber Abnahme nicht bestanden (Basketball: rho 0,795; Hockey: Pp nicht frisch, Ausnahme deckt nur rho) | PPS-Duell 2/1/0 (kein Arena-Lauf mehr) |
 | nicht angeschlossen (Football, I-Spy, Battlefield, TDM, Mini-DM) | PPS-Duell 2/1/0 |
 | synchroner Pfad / Auto-Run (kein Arena-Lauf) | PPS-Duell 2/1/0 |
 | Team ohne Fixture | `null` + Warnung, nie Rangpunkte |
@@ -94,8 +96,9 @@ bei 3:3 → 1, Remis → 0, ohne Referenz → 5 mit Warnung `verhaeltnis_referen
   bleibt als Schalter.
 - Quelle `arena`, `scripts/ziehe-verhaeltnis-referenz-arena.ts`: `runArenaFixtures()` wie die
   PPS-Referenz-Skripte, m = |Seitenstand-Differenz|, 3 Runden × 16 Paarungen = 48 Fixtures je
-  Feldgröße. Gezogen für alle zwölf gewerteten Arena-Disziplinen mit echtem Seitenstand; Basketball (derzeit
-  nicht gewertet) fehlt — bei Wiederaufnahme mitziehen.
+  Feldgröße. Gezogen für zwölf Arena-Disziplinen mit echtem Seitenstand (die elf gewerteten außer Staffel/
+  Time-Trial plus Hockey, vorsorglich); Basketball (derzeit nicht gewertet) fehlt — bei
+  Wiederaufnahme mitziehen.
 - **Abweichung vom Konzept 3.4, bewusst:** eigene Datei statt eines `margeReferenz`-Felds in den
   `*-pps-referenz.json`. Diese neu zu ziehen hätte iMittel/iKrass mitbewegt (Motor seit der letzten
   Ziehung verändert) und damit die individuellen PPs aller Arena-Disziplinen still verschoben.
@@ -140,9 +143,9 @@ widersprachen sich. Deshalb heute alle 15 angeschlossenen Disziplinen **frisch**
 | Showcase | 0,835 (0,148) | 11,1 / 12,7 | besteht | ja |
 | Climbing | 0,833 (0,135) | 12,0 / 9,5 | besteht | ja |
 | Tennis | 0,813 (0,199) | 6,9 / 4,4 | besteht | ja |
-| Breaking | 0,801 (0,289) | 14,3 / 13,9 | besteht (knapp, große Spannweite) | ja |
+| Breaking | 0,801 (0,289) | 14,3 / 13,9 | **genau auf der Schranke** (Beobachtungsliste) | ja |
 | **Basketball** | **0,795** (0,085) | nicht gemessen (rho entscheidet bereits) | **rho unter 0,80** | **nein → Brücke** |
-| Hockey | 0,640 (0,222), nur Feldspieler 0,676 | 39,4 (Doku, n=6) | nicht bestanden | ja — **Chris-Ausnahme** |
+| **Hockey** | 0,640 (0,222), nur Feldspieler 0,676 | 39,4 (Doku, n=6, **nicht frisch**) | rho: Chris-Ausnahme; **Pp offen** | **nein → Brücke** |
 
 **Tennis und Takeshi, die widersprüchlichen Fälle:** beide bestehen heute klar (Tennis Pp 6,9/4,4
 statt der 53,9/56,4 im Audit vom 13.10.; Takeshi 18,9/17,7 statt 36,4). Auch Gewichtheben (29,1 →
@@ -152,23 +155,38 @@ bzw. 20,9 — dieselbe Größenordnung. Zwischen den Audit-Zahlen und heute lieg
 genau dieser Disziplinen (Gewichtheben-Pp-Kalibrierung #1148 am 04.10., Tennis T-F2 #1192 am 13.10.,
 Fechten-Format #1111 am 15.10.); die älteren Zahlen sind veraltet, nicht falsch gemessen.
 
-**Folge für die Menge:** einzig Basketball fällt heraus (rho 0,795 bei 24 Spielen; das Audit
-nannte 0,756). Es bleibt angeschlossen, zahlt in Battle Mode aber über die Brücke, bis eine Runde
-rho über 0,80 hebt oder Chris es wie Hockey abnimmt. Climbing (0,833) und Breaking (0,801) bestehen
-— Breaking nur knapp und mit 0,289 Kaderspannweite; eine Rezeptänderung dort muss neu abgenommen
-werden.
+**Ergebnis: 12 klar bestanden, plus Breaking genau auf der Schranke** (rho 0,801 bei
+Kaderspannweite 0,289). Breaking bleibt gewertet, steht aber in der Tabelle auf der
+`beobachtungsliste` und wird bei der nächsten Nachmessung zuerst geprüft; die Schranke selbst wird
+nicht angepasst.
+
+**Folge für die Menge (13 gewertet):**
+- **Basketball** fällt heraus (rho 0,795 bei 24 Spielen; das Audit nannte 0,756). Es bleibt
+  angeschlossen, zahlt in Battle Mode aber über die Brücke, bis eine Runde rho über 0,80 hebt oder
+  Chris es ausdrücklich abnimmt.
+- **Hockey** fällt ebenfalls heraus (Projektaufsicht 16.10.): Chris hat nur Hockeys Rangtreue
+  abgenommen, vor dem 21.09., also bevor die Pp-Prüfung Pflicht wurde. Eine Pp-Ausnahme hat er nie
+  gegeben, und Hockeys Pp ist nur der Doku-Wert 39,4 (n = 6, nach Chromium-Abstürzen), nicht frisch
+  mit zwei Strömen gemessen. Die Ausnahme trägt deshalb `deckt: ["rho"]`, der Wächter prüft Pp
+  weiter. Hockey kommt zurück, sobald eine frische Pp-Messung (≥ 24 Läufe, zwei Ströme, ≤ 25)
+  vorliegt oder Chris die Pp-Ausnahme ausdrücklich gibt. Eine Feldspiel-Pp-Messung dauert Stunden
+  (die Basketball-Messung wurde heute deshalb abgebrochen) und war in dieser Runde nicht machbar.
 
 **Tabelle und Wächter.** `data/generated/disziplin-abnahme.json` hält je Disziplin rho, Spannweite,
-Saison-rho, beide Pp-Ströme, Befehl, Läufe/Spiele, Datum, Commit und `frisch` (true = heute
-gemessen; false = aus der Doku, nur bei den fünf nicht angeschlossenen und Hockeys Pp).
+Saison-rho, beide Pp-Ströme, Befehl, Läufe/Spiele, Datum, Commit und die Frische **je Messgröße**:
+`rhoFrisch`/`ppFrisch` (true = heute mit dem genannten Befehl gemessen; false = aus der Doku
+übernommen bzw. nicht gemessen — bei den fünf nicht angeschlossenen, bei Hockeys und Mini-DMs Pp und
+bei Basketballs abgebrochener Pp-Messung). Dazu die `beobachtungsliste` (Breaking).
 `tests/disziplin-abnahme-guard.test.ts` prüft:
 
 1. jede Disziplin in `ARENA_RESOLVED_DISCIPLINE_IDS` ist angeschlossen und besteht laut Tabelle
-   (rho > 0,80, zwei Pp-Ströme ≤ 25) — oder steht in `ARENA_ABNAHME_AUSNAHMEN` (nur Hockey, mit
-   Quelle);
+   **je Kriterium mit frischen Werten** (rho > 0,80; zwei Pp-Ströme ≤ 25). Eine Ausnahme in
+   `ARENA_ABNAHME_AUSNAHMEN` deckt nur die Kriterien in ihrem `deckt`-Feld (heute: Hockey,
+   `deckt: ["rho"]`) — alle übrigen prüft der Wächter normal weiter;
 2. umgekehrt: eine angeschlossene Disziplin, die besteht, aber nicht gewertet wird, ist ein Fehler
    (Menge und Tabelle müssen zusammen nachgezogen werden);
-3. Mini-DM steht nicht in der Menge.
+3. Mini-DM steht nicht in der Menge; Hockey steht ohne frische Pp-Messung nicht in der Menge;
+   Breaking steht auf der Beobachtungsliste.
 
 Die Querprüfungen beim Modul-Laden (`battle-mode-arena-team-points.ts`: Chassis-Menge ⊂ Menge,
 Menge → Impact-Konfig) laufen jetzt gegen die ANGESCHLOSSENE Menge — Basketball bleibt dort
@@ -271,12 +289,12 @@ ohne neue Simulation neu rechnen, sobald echte Battle-Saisons vorliegen (Offene 
   **Invariante** „jede Battle-Zeile mit Fixture zahlt 0/1/2 und nie `rank_to_points_*`“ auch bei
   ausgefallenem Arena-Lauf einer arena-fähigen Disziplin, Arena sticht Brücke, Battle ohne Fixture →
   `null` + Warnung, Manager-Save ohne neue Schlüssel, Tiebreaker-Reihenfolge, Saisonsumme,
-  Referenzdatei vollständig) und `tests/disziplin-abnahme-guard.test.ts` (7 Tests, Abschnitt 3).
+  Referenzdatei vollständig) und `tests/disziplin-abnahme-guard.test.ts` (9 Tests, Abschnitt 3).
 - angepasst: `battle-mode-arena-matchday-resolve-e2e.test.ts` (die D2-Kontrolldisziplin zahlt jetzt
   2/1/0 als PPS-Duell statt Rangpunkte — genau die gewollte Änderung, mit echtem Chromium-Lauf),
   `battle-mode-arena-team-points.test.ts` (Verdrahtungstests prüfen die angeschlossene Menge),
   `arena-matchday-weg-b-beide-disziplinen.test.ts`/`arena-override-nur-fuer-die-gelaufene-disziplin.test.ts`
-  (Basketball → Speed-Schach als gewertete Testdisziplin).
+  (Basketball → Speed-Schach, Hockey → Gewichtheben als gewertete Testdisziplinen).
 - **Volle Suite** (`npx vitest run --testTimeout=180000`, 1047 Dateien): 8362 grün, 23 übersprungen,
   1 rot — `matchday-auto-run-service.test.ts` „persists the same-day injury malus …“ mit seinem fest
   eingebauten 40-s-Timeout unter Vollast; dieselbe Datei allein: 9/9 grün.
@@ -301,7 +319,10 @@ Jede hier ist als begründete Standardannahme gebaut, nichts blockiert.
    Battle-Disziplinen behalten das bisherige System“) stammt aus der Rang-Ökonomie; ob er für 2/1/0
    weiter gelten soll, muss Chris sagen.
 4. **Basketball fällt aus der Arena-Wertung** (rho je Spiel 0,795, Median, 24 Spiele, kaderfest), bis eine Kalibrierrunde rho über 0,80
-   hebt — oder Chris nimmt es wie Hockey ausdrücklich ab (Eintrag in `ARENA_ABNAHME_AUSNAHMEN`).
+   hebt — oder Chris nimmt es ausdrücklich ab (Eintrag in `ARENA_ABNAHME_AUSNAHMEN` mit `deckt: ["rho"]`).
+4a. **Hockey: Pp-Ausnahme oder Messung?** Chris' Abnahme deckt nur rho. Hockey läuft über die
+   Brücke, bis entweder eine frische Pp-Messung ≤ 25 vorliegt oder Chris ausdrücklich auch Pp
+   ausnimmt (`deckt: ["rho", "pp"]`).
 5. **Konzept-Frage 7.4 ist damit faktisch beantwortet**: jede Disziplin zahlt im Battle Mode sofort
    2/1/0, auch vor ihrer Arena-Abnahme. Das ist Chris' „beides gibt normal 2 Punkte“ wörtlich; der
    alte Zustand (bis 19,9 für Rang 1) ist in keinem Battle-Save mehr erreichbar.
