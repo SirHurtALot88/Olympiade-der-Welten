@@ -912,9 +912,9 @@
  {
   "name": "Tropfina",
   "slug": "tropfina",
-  "sterne": 2,
-  "begruendung": "Grüne Farbe passt entfernt, aber die namensgebende Blatt-Form, das Leuchten und die Wassertropfen fehlen - wirkt wie ein generischer grüner Humanoid statt eines zarten Pflanzengeists.",
-  "fehlendesDetail": null
+  "sterne": 3,
+  "begruendung": "16.10., Sprite-Fit-Nachlieferung \"Wald-Riesen-Cluster\": kopf:\"human\"/haut:\"green\" (Standard-Mensch mit grüner Haut) auf vollbild:\"dryade\" umgestellt (neu verdrahtetes, bislang ungenutztes Standbild aus public/sprites/pflanze/, s. VOLLBILD/quellen.json) mit vollbildFarbeModus:\"farbe\" auf einen aus dem Portrait abgetasteten Türkiston (#3fcbc2) - trifft jetzt die richtige Kategorie (Pflanzenwesen statt Standard-Humanoid) UND die namensgebende Farbe. Bewusst OHNE effekt belassen: b.effekt wird nicht nur gezeichnet, sondern auch von actVon()/SHOWCASE_ACT_PUNKTE.bauEffekt für die Showcase-Act-Vergabe gelesen (anders als vollbildFarbe) - ein effekt:\"frost\" für das Leuchten hätte Tropfinas Showcase-Mechanik mitverändert, außerhalb des Auftragsumfangs dieser reinen Sprite-Fit-Runde.",
+  "fehlendesDetail": "Die namensgebende fächerartige Blattform, die gedrehte Rankenstamm-Silhouette, das Leuchten/die Wassertropfen an den Blattspitzen und der leuchtende Wasserring am Fuß fehlen weiterhin - die Dryade trägt zudem Arme/Beine wie ein Humanoid, während Tropfina im Bild keine sichtbaren Gliedmaßen hat."
  },
  {
   "name": "Tsubaki Cleaning",
