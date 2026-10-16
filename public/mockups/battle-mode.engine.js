@@ -1809,6 +1809,13 @@
     // 13.10.-Revision: t_stab_bg/fg (schon bei Jorund im Einsatz) ist ein schlichter runder
     // Holzstab/-stock, kein Klingenwaffen-Umriss wie das Schwert — die naechstliegende
     // verfuegbare Form fuer einen gefuehrten Knueppel/Stab, s. Bewertung.
+    // GEGENGEPRUEFT (actVon()/SHOWCASE_ACT_PUNKTE.bauWaffe liest `waffe` ebenfalls, fuer die
+    // Showcase-Act-Zuteilung — "stab" liegt dort auf zaubershow statt kampfkunst wie
+    // "schwert"): actVon() ist laut eigenem Kommentar dort ("liest eig/wert()/rr() nirgends
+    // und fliesst nirgends dorthin zurueck") eine rein kosmetische Pose-/Kategorie-Anzeige
+    // ohne Rueckwirkung auf Runden-/Score-Aufloesung — kein echtes Rezept-Risiko, nur eine
+    // andere Showcase-Auftritts-Kategorie fuer diesen Charakter, falls er je in einem Showcase
+    // antritt (aktuell in keiner Test-/Mess-Kaderfamilie vorhanden).
     // kopf:"minotaur" bleibt unveraendert die naechstliegende Kopf-Annaeherung — dieselbe
     // Sonderpalette wie bei Medibull/Tartarus (0-4 % Rampentreffer, s. Kommentar oben bei
     // B_KOERPER_RAMPEN), KEIN Hautton faerbt diesen Kopf um, und die Seitenansicht liest eher
@@ -2332,6 +2339,11 @@
     // Das Sprite bleibt deshalb zweibeinig — eine Baukasten-Luecke, keine Einzelfall-Schwaeche,
     // und der Grund, warum dieser Charakter trotz jetzt stimmiger Farbe/Hoerner/Waffe NICHT
     // auf 5 Sterne steigt (dieselbe Kategorie-Grenze wie bei Ironhoof).
+    // GEGENGEPRUEFT: `effekt` (neu, vorher gar kein Feld) fliesst wie `waffe` zusaetzlich in
+    // actVon()/SHOWCASE_ACT_PUNKTE.bauEffekt (zaubershow:3) — dieselbe rein kosmetische
+    // Showcase-Pose-/Kategorie-Anzeige wie beim waffe-Kommentar bei Roddox Harthelm oben, ohne
+    // Rueckwirkung auf Runden-/Score-Aufloesung (s. actVon()-Kommentar: "fliesst nirgends dorthin
+    // zurueck"). Kein Rezept-Risiko.
     "Tartarus":           {kopf:"orc",haut:"fur_grey",ruest:"plate",ruestTon:"dunkel",hoerner:"gebogen",waffe:"axt",schwanz:true,effekt:{typ:"feuer",pos:"kopf"}},
     // Bild: riesige Baumkreatur (viel groesser als jeder Humanoid im Baukasten), am Arm ein
     // gruen gluehendes rundes Etwas, umringt von winzigen leuchtenden Waldwesen — kein Ork,

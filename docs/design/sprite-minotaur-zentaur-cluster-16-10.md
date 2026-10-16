@@ -190,6 +190,33 @@ andere Zufallsstichprobe), aber in Kombination mit dem Isolationsnachweis oben h
 geänderten Felder (`kopf`/`haut`/`ruest`/`ruestTon`/`hoerner`/`waffe`/`schwanz`/`effekt`) sind reine
 Zeichen-Parameter, die an keiner Stelle in die Eignungsrechnung einfließen.
 
+**Showcase-Act-Zuteilung (`actVon()`) gesondert geprüft.** Review-Einwand während dieser Runde: vier
+der geänderten BAU-Felder (`waffe`, `effekt`, dazu generell `vollbild`/`fluegel`) werden nicht nur
+beim Zeichnen gelesen, sondern auch von `actVon()`/`SHOWCASE_ACT_PUNKTE` — der Funktion, die in der
+Disziplin Showcase bestimmt, welchen "Act" (Kampfkunst/Zaubershow/Kraftakt/...) ein Teilnehmer
+zeigt. Konkret: Tartarus bekam mit `effekt` ein Feld, das vorher komplett fehlte
+(`SHOWCASE_ACT_PUNKTE.bauEffekt = {zaubershow:3}`), und Roddox Harthelms Wechsel `waffe:"schwert"`
+auf `"stab"` wechselt dort die Punktkategorie (`schwert`→`kampfkunst:3`, `stab`→`zaubershow:3`,
+anders als z. B. `axt`, das wie `schwert` auf `kampfkunst:3` liegt). Zwei Funde dazu:
+
+1. **Keiner der sechs Cluster-Charaktere taucht in einer Mess-/Test-Kaderfamilie auf.** Weder in
+   `data/generated/kaderfamilie-live-save.json` (110 eindeutige Namen, die reale Kaderfest-Quelle
+   für `miss-alle-disziplinen.mjs`) noch im hartkodierten `SQUAD`/`OPP`-Testkader (`showcaseActProbe`-
+   Grundlage) kommt einer der Namen Medibull/Roddox Harthelm/Tartarus/Kora/Omniclops/Ironhoof vor
+   (beide Listen durchsucht, 0 Treffer). `actVon()` wird nur für tatsächliche Kader-Teilnehmer
+   aufgerufen — keiner der gemessenen rho/Pp-Werte in diesem oder einem früheren Dokument kann also
+   durch diese Änderung beeinflusst worden sein.
+2. **`actVon()` ist ohnehin rein kosmetisch, laut eigenem Code-Kommentar an Ort und Stelle:** "liest
+   `eig`/`wert()`/`rr()` nirgends und fliesst nirgends dorthin zurueck" — die Funktion wählt nur eine
+   Pose/einen Partikel-/Sound-Effekt und eine Anzeige-Kategorie für den Showcase-Auftritt, ohne auf
+   die Runden-/Score-Auflösung zurückzuwirken, die rho/Pp tatsächlich speist. Ein verschobener
+   `actVon()`-Output ändert also auch dann nichts an der Abnahmezahl, wenn einer dieser Charaktere
+   später doch in einem gezogenen Kader auftaucht.
+
+Beide Felder (`waffe:"stab"` bei Roddox Harthelm, `effekt` bei Tartarus) bleiben deshalb unverändert
+stehen — sie sind die jeweils bessere visuelle Näherung und bergen kein Rezept-Risiko. Beide
+BAU-Einträge tragen seitdem einen Kommentar, der das für künftige Agenten festhält.
+
 **Screenshots:** `public/sprites/preview/medibull.png` und `public/sprites/preview/tartarus.png`
 wurden mit `scripts/erzeuge-sprite-vorschauen.mjs` neu erzeugt (Standardpose, dieselbe die die
 QA-Galerie zeigt) und geändert sich sichtbar gegenüber dem vorherigen Stand (dunklere Ausrüstung
