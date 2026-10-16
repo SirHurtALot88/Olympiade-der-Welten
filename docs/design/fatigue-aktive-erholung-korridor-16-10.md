@@ -170,8 +170,10 @@ Warum nicht nur „Battle Mode“: ein Battle-Save, der vor dieser Umstellung mi
 angelegt wurde, bleibt bei 10 (keine Migration, Recherche 06.09. Frage 10). Seine laufende Saison
 darf ihr Verletzungsmodell nicht wechseln. Eine 20-Spieltage-Saison entsteht nur bei Anlage eines
 neuen Battle-Saves und erbt sich von dort weiter — sie hat die aktive Erholung vom ersten
-Spieltag an. Damit gilt die Regel der Projektaufsicht wörtlich: kein Manager-Spielstand und keine
-laufende Saison sind betroffen.
+Spieltag an. Damit gilt die Auflage der Projektaufsicht (16.10.) wörtlich: keine laufende Saison
+wechselt mitten drin ihr Verletzungsmodell. Dass Manager-Spielstände heute gar nicht betroffen sind,
+ist die Folge dieses Gates, keine Entscheidung gegen die aktive Erholung im Manager Mode — die ist
+offen (Abschnitt 7.3).
 
 Alle Leser hängen an dieser einen Funktion: Wurf, Apply, Replay-Rücknahme, Einsatzlisten-Anzeige
 (über `getPlayerActiveRecoveryCredit`), KI-Projektion, Saison-Fatigue-Statistik.
@@ -209,6 +211,50 @@ sind Manager-Saves, das Gate ist für alle AUS, **alle Fingerabdrücke und der G
 identisch** — darunter Chris' aktiver Save `new-game-1787123325719-swnjlk` (Saison 2) und der
 jüngste Save `new-game-1791961407272-ct2a54` (Saison 1, angelegt 14.10.).
 
+### 6.1 Smoke über die echte Pipeline (Auflage der Projektaufsicht, 16.10.)
+
+`scripts/multi-season-smoke.ts` hat dafür die Option `--game-mode=battle` bekommen: der Save
+entsteht über `applyNewGameSetup({ presetId: "solo_1", gameMode: "battle" })` — denselben Pfad wie
+der Wizard —, danach eine volle Saison über `runLocalMatchdayAutoRun` (KI-Aufstellungen, Resolve,
+Buchung inkl. Trainingsschicht, KI-Rotation, Gebäude, Transfers) und der Übergang in Saison 2
+(`applyPreSeasonNextSeasonSetupLightweight`). Je Lauf ein frischer Save mit eigener Zufalls-ID.
+
+```sh
+OLY_APP_SQLITE_PATH=<leere-kopie> npx tsx scripts/multi-season-smoke.ts --seasons=1 --game-mode=battle
+```
+
+**Struktur — in jedem der drei Battle-Läufe identisch, Saison 1 UND Saison 2:**
+
+| Prüfung | Ergebnis |
+|---|---|
+| Spieltage | 20 (Saison 2 erbt 20, `repeat` bleibt) |
+| Disziplin-Vorkommen | jede der 20 genau 2× (min = max = 2), je einmal in Spieltag 1–10 und 11–20 |
+| Kadergröße Rückrunde ≠ Hinrunde | 19 von 19 Disziplinen; Mini-DM bleibt formatbedingt bei 1 je Team (Vierer-Pods) |
+| Fixtures je Liga | 160 / 160 |
+| Exakte Wiederholung (gleiche Heim/Auswärts-Seite) | 0 / 0 |
+| Warnung `fixture_schedule_matchday_count_exceeds_rounds` | keine (Anlage-Warnungen Saison 1: leer; Übergangs-Warnungen Saison 2 ohne Spielplan-Warnung) |
+| aktive Erholung (Gate) | an in Saison 1 und 2 |
+
+**Verletzungen je Saison, echte Pipeline** (Einzelstichproben, je ein frischer Save):
+
+| Lauf | Spieltage | aktive Erholung | Verletzungen |
+|---|---:|---|---:|
+| Battle | 20 | an (Gate) | **129** · **205** |
+| Battle | 20 | per ENV erzwungen aus | 479 |
+| Manager | 10 | aus (Branch-Code) | 165 |
+| Manager | 10 | aus (`main`-Code, versehentlich mitgelaufen, gleichwertige Stichprobe) | 129 |
+
+Lesart, ohne mehr hineinzulesen als n = 2 hergibt:
+- **Ohne aktive Erholung bestätigt die echte Pipeline den Ratchet**: 479 bei 20 Spieltagen, das
+  3,3-Fache der beiden Manager-Saisons (Mittel 147) — dieselbe Größenordnung wie die Simulation
+  (Faktor 4,3).
+- **Mit aktiver Erholung** liegen die zwei Saisons bei 129 und 205, Mittel 167 — das 1,1-Fache der
+  Manager-Saisons. Die Streuung zwischen zwei Saves ist groß (Kader, KI-Käufe, Würfe).
+- Die Simulation mit Trainingsschicht erwartete ~205–210 (Abschnitt 3.2). Die echte Pipeline liegt
+  im Mittel darunter, weil sie mehr tut als der Basisfall: KI-Teams kaufen auf (Ø 11,8–12,6 Spieler
+  statt 10,6), rotieren aktiv nach Fatigue und bauen Gebäude. Ob Chris' Korridor im echten Spiel
+  mit 4,5 oder 5,5 getroffen wird, ist mit zwei Stichproben nicht zu entscheiden — siehe 7.2.
+
 ---
 
 ## 7. Offen — Chris-Entscheidungen und Folgearbeit
@@ -218,13 +264,25 @@ jüngste Save `new-game-1791961407272-ct2a54` (Saison 1, angelegt 14.10.).
    Dauerstarters ab Spieltag 9. Wer die Plan-Idee „Kappung erst am Saisonende“ will, braucht eine
    flachere Risikokurve oberhalb 25 — das ist eine Kurven-, keine Erholungsfrage, und Chris hat
    die Kurve zweimal selbst gesetzt. Umstellen ohne Code: `OLY_FATIGUE_ACTIVE_RECOVERY_VALUE`.
-2. **Korridor mit oder ohne Trainingsschicht?** Basisfall 159/154, mit Trainingsschicht „mittel“
-   209/205. Der bestehende Wächter misst ohne; falls Chris „mit“ meint, gemessen (Trainingsschicht
-   an, Stamm A/B): 5 → 179/175, **5,5 → 153/148**. Dann wäre 5,5 der Wert (Basisfall dort
-   unter den 135/130 von Wert 5 — nicht gesondert gemessen, und damit unter dem Wächter-Korridor).
-3. **Manager Mode bekommt die aktive Erholung nicht** (Projektaufsicht, 16.10.). Bei 10 Spieltagen
-   würde sie die Verletzungen auf ein Viertel drücken (112 → 30) und damit Chris' Korridor
-   reißen — eine Übernahme dort ist eine eigene Entscheidung, nicht Teil dieses Umbaus.
+2. **Welche Zahl meint „150–200“ — die im echten Spiel oder der isolierte Basisfall?** Im echten
+   Spiel läuft die Trainingsschicht JEDEN Spieltag mit (Default „mittel“). Die Simulation MIT
+   Trainingsschicht erwartet bei 4,5 deshalb **~205–210** Verletzungen je 20er-Saison (209/205,
+   Stamm A/B) — über seinem Korridor —, nicht die 159/154 des isolierten Basisfall-Wächters ohne
+   Training. Die echte Pipeline (6.1) lag in zwei Saisons bei 129 und 205: KI-Rotation und
+   größere Kader drücken die Zahl, die Streuung ist groß. Die Frage an Chris, konkret: *„Deine 150–200 — ist
+   das die Zahl, die du im echten Spiel siehst? Dann muss der Wert 5,5 sein (gemessen mit
+   Trainingsschicht 153/148). Oder ist es der isolierte Basisfall-Wächter ohne Training? Dann
+   bleibt 4,5.“* Zwischenwert 5 mit Trainingsschicht: 179/175. Umstellen ohne Code über
+   `OLY_FATIGUE_ACTIVE_RECOVERY_VALUE`; im Code ist die Zahl eine Konstante mit Messkommentar.
+   Die echte Pipeline (Abschnitt 6.1) zeigte mit 4,5 zwei Saisons bei 129 und 205 — eine liegt im
+   Korridor, eine knapp darüber; zwei Stichproben entscheiden die Frage nicht.
+3. **Bekommt Manager Mode die aktive Erholung?** Offene Chris-Entscheidung. Die Projektaufsicht hat
+   am 16.10. nur festgelegt, dass keine laufende Saison mitten drin umgestellt werden darf — nicht,
+   dass Manager Mode sie nie bekommt. Das Gate dieses Branches lässt Manager-Spielstände
+   unberührt, weil die vermessene Zahl für 20 Spieltage gilt: bei 10 Spieltagen drückt 4,5 die
+   Verletzungen auf ein Viertel (112 → 30) und risse damit Chris' Korridor. Eine Übernahme dort
+   bräuchte eine eigene Messung für 10 Spieltage und ginge, wenn gewünscht, über einen
+   Saisonstart-Marker (neue Saison an, laufende unverändert).
 4. **Nicht in diesem Branch** (W4/W5 der Recherche 06.09., Konzept 16.10. Gruppen 2/3): die neun
    Anzeige-Konsumenten „eine Kadergröße je Saison“ (Kaderprofil zeigt das nächste offene
    Vorkommen, nicht beide), Spielplan-Tab mit 20 Zeilen (Layout ungeprüft), Verkaufsfenster-Text
