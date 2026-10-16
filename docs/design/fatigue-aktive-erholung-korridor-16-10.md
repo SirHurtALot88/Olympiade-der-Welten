@@ -211,6 +211,14 @@ sind Manager-Saves, das Gate ist für alle AUS, **alle Fingerabdrücke und der G
 identisch** — darunter Chris' aktiver Save `new-game-1787123325719-swnjlk` (Saison 2) und der
 jüngste Save `new-game-1791961407272-ct2a54` (Saison 1, angelegt 14.10.).
 
+**Wiederholt (16.10., 18:20-Abbild):** auf Nachfrage der Projektaufsicht (geteiltes Scratchpad,
+gleicher Dateiname `abbild.sqlite` bei mehreren Agenten) einmal frisch gespiegelt
+(`live-save` `bdaa877c`, 18:20 UTC, SHA-256 der entpackten Datei `a7f69117…2be89`), in einen
+eigenen Unterordner gelegt, je eine Kopie für `main` und Branch (beide mit demselben SHA-256),
+Vergleich wiederholt: **bit-identisch, Gesamt-Hash wieder `f70c5cbae0582bc4`**, alle acht Saves
+mit denselben Teil-Hashes wie im ersten Lauf. Die Fingerabdrücke sind verkürzte SHA-1-Hashes über
+die Strukturen, keine SHA-256-Hashes.
+
 ### 6.1 Smoke über die echte Pipeline (Auflage der Projektaufsicht, 16.10.)
 
 `scripts/multi-season-smoke.ts` hat dafür die Option `--game-mode=battle` bekommen: der Save
@@ -243,6 +251,11 @@ OLY_APP_SQLITE_PATH=<leere-kopie> npx tsx scripts/multi-season-smoke.ts --season
 | Battle | 20 | per ENV erzwungen aus | 479 |
 | Manager | 10 | aus (Branch-Code) | 165 |
 | Manager | 10 | aus (`main`-Code, versehentlich mitgelaufen, gleichwertige Stichprobe) | 129 |
+
+**Herkunft der Zahlen:** jede Zahl ist Saison 1 eines EIGENEN, frisch angelegten Saves. 129 und
+205 sind also zwei verschiedene Saves, nicht Saison 1 und 2 desselben Saves — die Saison 2 wurde in
+jedem Lauf nur angelegt (Struktur geprüft), nicht gespielt. Über einen Anstieg von Saison zu Saison
+sagen diese Läufe deshalb nichts; dafür bräuchte es `--seasons=2` oder mehr.
 
 Lesart, ohne mehr hineinzulesen als n = 2 hergibt:
 - **Ohne aktive Erholung bestätigt die echte Pipeline den Ratchet**: 479 bei 20 Spieltagen, das
