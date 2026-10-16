@@ -1136,7 +1136,15 @@
     // gold/bronze/dunkel(grau), kein kuehler Blau-Violett-Ton fuer Ruestung/Hose. Rein
     // additiv (neuer Schluessel, keine bestehende Ramp angetastet), gleiche 6-Stufen-Struktur
     // dunkel->hell wie die anderen drei Rampen.
-    violett:["#140B28","#2B1850","#432878","#5F3EA0","#8560C8","#B494E8"]
+    violett:["#140B28","#2B1850","#432878","#5F3EA0","#8560C8","#B494E8"],
+    // Nachgetragen (16.10., Sprite-2-Stern-Batch B): Orichalcos (dunkelblaue Robe mit roter
+    // Schaerpe, s. public/portraits/orichalcos.jpg) und Pinkypie (dunkelblaues Hexen-Ornat,
+    // s. public/portraits/pinkypie.jpg) brauchen beide einen kuehlen Navy-Ton, den es bisher
+    // nicht gab (gold/bronze/dunkel(grau)/violett, aber kein reines Blau) — dieselbe additive
+    // Erweiterung wie "violett" fuer Brobot (13.10.), kein neuer Layer, nur eine sechste
+    // Rampe in derselben Tabelle, sofort fuer beliebig viele weitere Charaktere wiederverwendbar
+    // (Grundsatz "keine Asset-Exklusivitaet", s. sprite-fit-bewertungssystem.md).
+    blau:  ["#0A1228","#152450","#203878","#2C4FA2","#4A74C8","#86AEEA"]
   };
   const ruestGefaerbt={};
   function spriteRuest(key,ton){
@@ -1680,10 +1688,29 @@
     "Mindtamer":          {kopf:"human",haut:"lavender",helm:true,ruest:"leder_frau",geschlecht:"w"},
     // Bild: kleines freundliches Wesen aus Rinde und Moos, keine Waffe, keine Ruestung —
     // bloss der Hautton uebernimmt das Gruen.
-    "Tsubaki Cleaning":   {kopf:"orc",haut:"green",hoerner:true},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/tsubaki-cleaning.jpg) zeigt
+    // eine BRAUNE Zweig-/Rinden-Kreatur mit Moos-Akzenten, kein durchgaengiges Gruen — haut
+    // von "green" auf "brown" (Bild schlaegt Tags/alte Naeherung, s. sprite-fit-bewertungssystem.
+    // md). hoerner:true bleibt als grobe Zweig-Antennen-Andeutung stehen. NEU waffe:"pistole"
+    // als Naeherung fuer die charakterpraegende Spruehflasche: kein Requisiten-Slot fuer eine
+    // Spruehflasche im Baukasten, aber die Pistolenhaltung (Griff + kurzer vorstehender Lauf)
+    // trifft die Silhouette einer Pump-Spruehflasche naeher als jede andere Waffen-Ebene.
+    // UNVOLLSTAENDIGE NAEHERUNG, nicht liegengelassen (Grundsatz "eine unvollstaendige
+    // Naeherung schlaegt immer keinen Fix"): grosse runde Kulleraugen und die genaue
+    // Zweigform der Antennen bleiben unbaubar (kein Augengroessen-/Astform-Slot).
+    "Tsubaki Cleaning":   {kopf:"orc",haut:"brown",hoerner:true,waffe:"pistole"},
     // Bild: insektoides schwarzes Wesen mit Klauen und Fluegeln, unbewaffnet. Kein
     // Insektenkopf im Baukasten; "wolf" steht fuer das tierisch-monstroese Auftreten.
-    "Othrama":            {kopf:"alien",haut:"black",fluegel:true},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/othrama.jpg) zeigt einen
+    // schwarzen Chitin-Daemon mit duennen, geaderten Fluegeln, gruen leuchtenden Augen und
+    // einem gruenen Leuchtpunkt am Brustkorb — fluegel von generischem true auf "fledermaus"
+    // (duenne Membranfluegel treffen die insektoiden Fluegel naeher als die Standardform) und
+    // effekt {typ:"gift",pos:"kopf"} ergaenzt (gruen wabernd, s. EFFEKT_ARTEN.gift) als
+    // Naeherung fuer die gruen leuchtenden Augen/den Brust-Leuchtpunkt — keine der Effektfarben
+    // trifft ein isoliertes Augenpaar, "gift" ist die einzige echt gruene Palette. Fuehler und
+    // die langen, duennen Insekten-Gliedmassen bleiben strukturell unbaubar: der Humanoid-
+    // Koerper kennt keine Fuehler-Ebene und keine abweichende Gliedmassen-Proportion.
+    "Othrama":            {kopf:"alien",haut:"black",fluegel:"fledermaus",effekt:{typ:"gift",pos:"kopf"}},
     // Bild: kosmischer Drache mit sternenuebersaeten Fluegeln — kein Drachenkopf, keine
     // Fluegel im animierbaren Satz. "lizard" fuer die Schuppenform, "lavender" fuer den
     // Sternenschimmer. PLATZHALTER: das Bild ist in BILDBEFUNDE bereits als Widerspruch
@@ -1700,7 +1727,17 @@
     "Butterfly":          {vollbild:"drache_gold",effekt:{typ:"arkan",pos:"koerper"}},
     // Bild: Mann mit Fliegerhaube, Tentakel-Parasit im Gesicht, stuetzt sich auf einen
     // Gehstock (keine Waffe) — die Haube wird zur Kapuze.
-    "Myrkos":             {kopf:"human",haut:"light",kapuze:true,ruest:"leder"},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/myrkos.jpg) zeigt klarer eine
+    // GROSSE tentakelartige Kreatur, die ueber Schulter/Ruecken gelegt ist (nicht nur ein
+    // "Parasit im Gesicht" — kein Gasmasken-Befund im Bild, das Gesicht ist frei, nur Fellhaube
+    // und hochgeschobene Flieger-Brille; Bewertungstext und Bild widersprechen sich an dieser
+    // Stelle leicht, s. Grundsatz "Bild schlaegt Tags" — das Bild gilt). NEU waffe:"stab" als
+    // Gehstock-Naeherung (im Bild deutlich sichtbar) und schwanz:true als grobe Silhouetten-
+    // Naeherung fuer die vom Ruecken haengenden Tentakel-Arme. UNVOLLSTAENDIGE NAEHERUNG: kein
+    // Ruecken-Kreatur-Layer im Baukasten, schwanzbg/-fg wird in b.haut (hier "light") statt in
+    // der braun-roetlichen Tentakel-Farbe eingefaerbt — die Form (ein haengendes Anhaengsel am
+    // Ruecken) stimmt, die Farbe nicht. Keine Brille/Goggles-Ebene vorhanden, ebenfalls Gap.
+    "Myrkos":             {kopf:"human",haut:"light",kapuze:true,ruest:"leder",schwanz:true,waffe:"stab"},
     // Bild: Orkin mit Streitaxt. Keine Axt im Baukasten; das Schwert vertritt sie, wie
     // schon bei Draco.
     // 26.08., NEU: dieselbe Rassen-Luecke wie bei Bearington, nur fuer Orc statt Wolf
@@ -1750,7 +1787,17 @@
     // Koerper statt nur den Kopf, weil das Bild den ganzen Koloss umkreist zeigt, nicht nur
     // den Kopf; anders als Krag'Zul KEIN "void", weil hier ausdruecklich Sterne/Kristall
     // statt violetter Energie beschrieben sind).
-    "Starbound":          {kopf:"alien",haut:"lavender",ruest:"plate",hoerner:true,effekt:{typ:"arkan",pos:"koerper"}},
+    // 16.10., Sprite-2-Stern-Batch B: der bisherige humanoide kopf:"alien"-Ansatz trifft die
+    // namensgebende DUNKLE KRISTALLZACKEN-FORM nicht — ein Mensch mit Alien-Kopf und Platte
+    // bleibt ein Mensch. Starbounds Konzept ("kolossales kristallines Sternenwesen") ist fast
+    // wortgleich mit Krag'Zuls ("Riesiger Koloss aus Kristallschollen"), der bereits
+    // vollbild:"golem" nutzt — dieselbe Loesung uebernommen: vollbild:"golem" (zackige
+    // Plattensilhouette liest sich naeher als Kristallfacetten als jeder Humanoid) mit sehr
+    // dunkler, fast schwarzer vollbildFarbe fuer den Bildbefund "dunkle Kristallzacken".
+    // effekt "arkan" (violett/pink/gold, funkelnd) bleibt fuer die wirbelnden Energieringe.
+    // UNVOLLSTAENDIGE NAEHERUNG: golem.png zeigt Ruestungsplatten, keine literal scharfen
+    // Kristallschneiden — dieselbe dokumentierte Grenze wie bei Krag'Zul.
+    "Starbound":          {vollbild:"golem",vollbildFarbe:"#1b0f2e",effekt:{typ:"arkan",pos:"koerper"}},
     // Bild: weisser Geisterwolf mit leuchtend blauen Runen, drittem Auge, unbewaffnet, auf
     // allen Vieren. Frueher kopf:"wolf" auf menschlichem Koerper (der einzige Fall, wo der
     // Baukasten den woertlichen Kopf hatte) — 24.08. ECHTES Vollbild: public/sprites/monster/
@@ -1930,7 +1977,11 @@
     // waffe:"stab" (passend zur Subclass "archmage", s. Kader-Zuordnung) und effekt
     // "arkan" (violett/pink/gold, funkelnd) geben wenigstens die magische Note, die der
     // bisherige unbewaffnete Dorfbewohner-Look komplett vermissen liess.
-    "Pinkypie":           {kopf:"human",haut:"light",ruest:"leder_frau",ohren:true,haar:"haar_lang",haarTon:"chestnut",geschlecht:"w",waffe:"stab",effekt:{typ:"arkan",pos:"kopf"}},
+    // 16.10., Sprite-2-Stern-Batch B: ruestTon:"blau" ergaenzt (neue Rampe, s. RUEST_TON oben)
+    // — trifft das dunkelblaue, gold bestickte Ornat deutlich naeher als der vorherige
+    // unbestimmte Standard-Lederton. Hut und Buch bleiben die dokumentierte, strukturell
+    // unbaubare Luecke (kein Hut-/Buch-Layer im Baukasten, s. Kommentar oben).
+    "Pinkypie":           {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"blau",ohren:true,haar:"haar_lang",haarTon:"chestnut",geschlecht:"w",waffe:"stab",effekt:{typ:"arkan",pos:"kopf"}},
     // Bild: "haelt zwei blutverschmierte Dolche im Rueckhandgriff" — bewaffnete Klingenkaempferin,
     // bislang ganz ohne Waffe. 25.08.: waffe:"schwert" als naechstliegende Klingen-Ebene ergaenzt
     // (Naeherung — eine Dolch-Ebene existiert im Baukasten nicht).
@@ -2032,7 +2083,21 @@
     // nur (destination-in/multiply, s. dort), ein zu dunkler Wert ertraenkt die Schattierung
     // des Blatts komplett in einer Silhouette (per renderProbe nachgemessen, #3a3a40 lief
     // sichtbar zu dunkel).
-    "Vorrak":             {vollbild:"golem",vollbildFarbe:"#6b6f78",effekt:{typ:"voidRot",pos:"koerper"}},
+    // 16.10., Sprite-2-Stern-Batch B: eigener Sprite-Fit-Fund — "golem" (dasselbe Blatt wie
+    // Lava Golem/Krolach/Krag'Zul) ist strukturell ein FELS-/KRISTALL-Koloss, dessen Textur
+    // auch mit jeder Faerbung rau/zerklueftet bleibt. Vorraks Portrait (public/portraits/
+    // vorrak.jpg) zeigt dagegen glatte, genietete dunkle METALL-Platten UND eine eingebaute
+    // Schulterkanone — exakt das, was "mech_gross" (Skorpio SciFi Pack, s. Robofighter: "der
+    // grosse Kampf-Mech traegt eine eingebaute Schulterkanone") schon liefert. vollbild von
+    // "golem" auf "mech_gross" umgestellt (loest den Texturfehler strukturell, nicht nur die
+    // Farbe) plus vollbildFarbe auf ein dunkles, warmes Schwarzgrau (statt des bisherigen
+    // mittleren Grau) fuer den "glattes dunkles Metall"-Bildbefund. effekt "voidRot" (rot-
+    // orange wabernd) bleibt unveraendert fuer die gluehend rote Kern-/Augenfarbe. b.energiekern
+    // (feste Augen-/Kernpunkte) ist bewusst NICHT gesetzt: die Koordinaten dort sind auf
+    // golem_walk.png kalibriert (s. Kommentar bei Krolach/b.energiekern) und treffen auf
+    // mech_gross' abweichendem Raster nicht — die generische Partikelwolke bleibt die ehrlichere
+    // Naeherung, bis eine eigene mech_gross-Vermessung existiert.
+    "Vorrak":             {vollbild:"mech_gross",vollbildFarbe:"#201c18",effekt:{typ:"voidRot",pos:"koerper"}},
     // Bild (25.08., Katzenohren/-schwanz-Fund): eine ECHTE getigerte Katze mit Eimer auf
     // dem Kopf — das feline Motiv im Kartenbild ist eindeutiger als bei jedem anderen
     // Eintrag hier. ohren/schwanz jetzt "katze" statt der Echsen-Variante (s. zeichneSprite).
@@ -2347,7 +2412,12 @@
     // gluehenden Runenkreis in den Haenden (keine der fuenf Effektfarben ist echtes
     // Tuerkis, frost kommt dem am naechsten). waffe:"schwert" (Schwert an der Huefte im
     // Bild) blieb unveraendert korrekt.
-    "Orichalcos":         {kopf:"human",haut:"light",ruest:"leder",kapuze:true,waffe:"schwert",effekt:{typ:"frost",pos:"koerper"}},
+    // 16.10., Sprite-2-Stern-Batch B: ruestTon:"blau" ergaenzt (neue Rampe, s. RUEST_TON oben)
+    // — trifft die dunkelblaue Robe aus dem Portrait (public/portraits/orichalcos.jpg) deutlich
+    // naeher als der vorherige unbestimmte Standard-Lederton. Goldene Vogel-Maske und rote
+    // Schaerpe bleiben die dokumentierte, strukturell unbaubare Luecke: kein Masken-Layer und
+    // keine zweite, separat einfaerbbare Stoff-Ebene fuer eine Schaerpe im Baukasten.
+    "Orichalcos":         {kopf:"human",haut:"light",ruest:"leder",ruestTon:"blau",kapuze:true,waffe:"schwert",effekt:{typ:"frost",pos:"koerper"}},
     "Sunny":              {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",waffe:"schwert",fluegel:true,haar:"haar_lang",haarTon:"blonde",geschlecht:"w"},
     // Bild (25.08.): ein mechanischer Panther, spitze Katzenohren und ein langer geschwungener
     // Schwanz klar im Kartenbild. ohren/schwanz "katze" statt der Echsen-Variante.
@@ -2675,7 +2745,16 @@
     // fuer "rot gluehende Augen" verwendet) — trifft die Augenfarbe aus dem Bild, violett tat
     // das nicht. hoerner:true bleibt (Dornen/Stacheln-Andeutung).
     "Bombblitzer":        {kopf:"skeleton",haut:"black",ruest:"plate",ruestTon:"dunkel",hoerner:true,effekt:{typ:"voidRot",pos:"koerper"}},
-    "Timantha":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"dunkel",helm:true,geschlecht:"w"},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/timantha.jpg) zeigt eine
+    // bronze-/beige-metallische Raumanzug-Ruestung mit blau leuchtenden Energie-Punkten an
+    // Gelenken/Torso — KEIN Silberweiss und kein Dunkelgrau (Bewertungstext und Bild
+    // widersprechen sich an dieser Stelle, s. Grundsatz "Bild schlaegt Tags": das Bild gilt).
+    // ruestTon von "dunkel" auf "bronze" (trifft den warmen Metallton direkt) und effekt
+    // {typ:"frost",pos:"koerper"} ergaenzt (helles Eisblau/Weiss als naechstliegende Palette
+    // zu den blauen Leuchtpunkten) — UNVOLLSTAENDIGE NAEHERUNG: die Punkte sitzen als
+    // allgemeine Partikelwolke um den Koerper, nicht als feste Punkte an den einzelnen Gelenken
+    // (kein Mehrfach-Lichtpunkt-Slot im Baukasten).
+    "Timantha":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"bronze",helm:true,geschlecht:"w",effekt:{typ:"frost",pos:"koerper"}},
     "Holzfaust":          {kopf:"orc",haut:"green",ohren:true,ruest:"leder",haar:"haar_mop",haarTon:"black"},
     // Bild: nackte, kauernde Engelsgestalt, nur von den eigenen Fluegeln umhuellt (Bildbefund,
     // Fable-Runde 25.08.-Sweep) — DER einzige menschliche Baukasten-Charakter unter allen 138
@@ -2703,7 +2782,15 @@
     // Bild (25.08.): rosa Katzenwesen mit deutlich sichtbaren Katzenohren und dichtem Fell
     // von Kopf bis Fuss — ohren war hier schon true (Elfen-Ohr-Naeherung), jetzt "katze"
     // (das echte Blatt) plus ein Katzenschwanz fuer denselben Fell-Look.
-    "PixiKat":            {kopf:"alien",haut:"lavender",ohren:"katze",schwanz:"katze",geschlecht:"w"},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/pixikat.jpg) zeigt ein KNALL-
+    // PINKES Fellwesen — haut von "lavender" (blaugrau) auf "pink" (existiert als eigener
+    // Hautton, s. HAUT-Liste), trifft die dominante, bislang "komplett falsche" Farbe jetzt
+    // direkt. Der namensgebende Retro-Bildschirm-Kopf samt Tastatur-Requisit bleibt die
+    // dokumentierte, strukturell unbaubare Luecke: kein TV-/Bildschirm-Kopf-Layer und kein
+    // Requisiten-Slot fuer eine Tastatur im Baukasten (kein Helm/Visier probiert — ein
+    // Ritterhelm-Layer ueber dem Alien-Gesicht waere KEINE bessere Naeherung an eine kastige
+    // Roehrenfernseher-Silhouette als das jetzige freie Gesicht, eher eine irrefuehrende).
+    "PixiKat":            {kopf:"alien",haut:"pink",ohren:"katze",schwanz:"katze",geschlecht:"w"},
     // Chris' Fund: ein Vampir-Kopf ("kopf_vampire_walk.png") lag im Baukasten, war nur
     // nie eingebettet — Fangzaehne/Krallen-Motiv jetzt echt statt der menschlichen
     // Naeherung.
@@ -2713,7 +2800,14 @@
     // die Seitenansicht dadurch wie ein "gewoehnlicher Dorfbewohner" (exakt Chris' eigene
     // alte Kritik im Score). ohren:true entfernt (keine Stuetze im Bild), umhang:true
     // ergaenzt (s. Kommentar bei zeichneSprite fuer die volle Begruendung/Fund).
-    "Velkin":             {kopf:"vampire",haut:"light",ruest:"leder",haar:"haar_mop",haarTon:"black",umhang:true},
+    // 16.10., Sprite-2-Stern-Batch B: ruestTon:"dunkel" ergaenzt — "leder" traegt bisher keinen
+    // Ton (natuerliches Braun), das Portrait (public/portraits/velkin.jpg) zeigt aber eine
+    // SCHWARZE, zerrissene Robe. "dunkel" (Schwarz/Grau-Rampe, s. RUEST_TON oben) trifft die
+    // Farbe direkt; kopf:"vampire" bringt die Fangzaehne bereits mit (s. Kommentar oben, "Fang-
+    // zaehne-Kopf"). UNVOLLSTAENDIGE NAEHERUNG: zerrissene Stofftextur, Blutspritzer und die
+    // wilde, bedrohliche Mimik sind Asset-/Textur-Details ohne eigenen Baukasten-Slot und
+    // bleiben dokumentiert offen.
+    "Velkin":             {kopf:"vampire",haut:"light",ruest:"leder",ruestTon:"dunkel",haar:"haar_mop",haarTon:"black",umhang:true},
     // Nachlieferung (13.10., Sprite-Fit): Portrait zeigt einen blau-violett leuchtenden
     // Cyber-Insekten-Krieger mit duennen Insektenfluegeln (s. public/portraits/brobot.jpg).
     // Kein Insektenfluegel-Blatt im Baukasten (nur fluegel:"federn"/"fledermaus", s.
@@ -2730,7 +2824,16 @@
     // verfuegbare Palette zum "weiss gluehenden Augen/blauer Wirbel"-Bildbefund.
     "Crumbsage":          {kopf:"orc",haut:"brown",effekt:{typ:"frost",pos:"koerper"}},
     "Sanctrix":           {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:true,haar:"haar_lang",haarTon:"blue",geschlecht:"w"},
-    "Steel Sinister":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:true},
+    // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/steel-sinister.jpg) zeigt
+    // GESCHWUNGENE Hoerner am Helm, nicht die geraden Standardhoerner — hoerner von true auf
+    // "gebogen" (dieselbe Ebene, die Ironhoof schon fuer seine gebogenen Widderhoerner nutzt,
+    // s. sprite-cluster-runde-1.md — Grundsatz "keine Asset-Exklusivitaet"). effekt
+    // {typ:"gift",pos:"koerper"} ergaenzt (gruen wabernd, einzige echt gruene Palette, s.
+    // EFFEKT_ARTEN) als Naeherung fuer die leuchtend gruene Orb-Kugel in der Klauenhand —
+    // UNVOLLSTAENDIGE NAEHERUNG: es gibt keine Hand-/Requisiten-Position fuer effekt (nur
+    // "kopf"/"koerper"), die Kugel wird deshalb als allgemeiner gruener Koerperschein statt
+    // als isoliertes Leuchten in der Hand sichtbar.
+    "Steel Sinister":     {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,hoerner:"gebogen",effekt:{typ:"gift",pos:"koerper"}},
     "Isuzu":              {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",waffe:"schwert",geschlecht:"w"},
     // Nachlieferung (13.10., Sprite-Fit): Portrait zeigt ein weisses Rinden-/Dryaden-Wesen
     // mit Geweih-Krone, drittem Auge und glimmend-orangenen Energie-Adern/-Kugeln am Torso,
