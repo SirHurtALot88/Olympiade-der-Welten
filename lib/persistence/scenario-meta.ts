@@ -103,6 +103,19 @@ export function buildScenarioMeta(input: {
     ...(input.saveCategory ?? input.gameState.scenarioMeta?.saveCategory
       ? { saveCategory: input.saveCategory ?? input.gameState.scenarioMeta?.saveCategory }
       : {}),
+    /**
+     * BEFUND (16.10., Battle-Mode-Untersuchung): `gameMode` fehlte hier komplett, obwohl
+     * `lib/season/game-mode.ts` es ausdruecklich als "bei Anlage entschieden, aendert sich nie
+     * mehr" dokumentiert. `saveGameState()` (lib/persistence/save-repository.ts) ruft diese
+     * Funktion bei JEDEM Schreiben unbedingt auf und ersetzt `scenarioMeta` komplett durch ihr
+     * Ergebnis -- ohne diese Zeile verlor jeder einzelne Save-Schreibvorgang (schon der ALLERERSTE,
+     * direkt beim Anlegen ueber den New-Game-Wizard) ein einmal gesetztes `gameMode: "battle"`
+     * wieder, und `isBattleModeSave()` las fortan "manager". Live nachgestellt: drei ueber den
+     * Wizard angelegte Battle-Mode-Saves traegen nach dem ersten Schreibvorgang alle
+     * `scenarioMeta.gameMode === undefined`, `leagueByTeamId` bleibt leer -- der komplette
+     * Liga-Split-/Battle-Mode-Stack blieb seit PR #689 faktisch nie erreichbar.
+     */
+    ...(input.gameState.scenarioMeta?.gameMode ? { gameMode: input.gameState.scenarioMeta.gameMode } : {}),
     isStableTestPoint: input.isStableTestPoint ?? input.gameState.scenarioMeta?.isStableTestPoint ?? false,
     allowTestWrites: input.allowTestWrites ?? input.gameState.scenarioMeta?.allowTestWrites ?? false,
     containsFinalStandings:
