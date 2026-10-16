@@ -30,9 +30,9 @@
  {
   "name": "Alarm",
   "slug": "alarm",
-  "sterne": 4,
-  "begruendung": "Robotersilhouette mit rundem Kopf und rotem Scanner-Auge trifft den Kern des Konzepts gut.",
-  "fehlendesDetail": "Der ikonische runde 'ALARM'-Bildschirmkopf mit rotem Text-Display fehlt (Sprite hat nur einen schmalen roten Augenstreifen)."
+  "sterne": 5,
+  "begruendung": "16.10.: alarmKopf:true ergaenzt (zeichneAlarmKopf, prozedural) - runder dunkler Bildschirm-Bezel mit rot leuchtendem Kern UND dem Schriftzug \"ALARM\" ersetzt den schmalen Augenstreifen. Der ikonische Sirenenkopf aus dem Portrait ist jetzt da.",
+  "fehlendesDetail": null
  },
  {
   "name": "Arachna",
@@ -121,30 +121,30 @@
  {
   "name": "Butterfly",
   "slug": "butterfly",
-  "sterne": 4,
-  "begruendung": "Drachen-Körperform, Flügel und Schwanz treffen die Kategorie sehr gut - dieselbe Statur und Proportion wie im Konzept.",
-  "fehlendesDetail": "Der Regenbogen-Farbverlauf auf den Flügeln fehlt (Sprite ist golden-schwarz statt mehrfarbig schillernd)."
+  "sterne": 5,
+  "begruendung": "16.10.: vollbildFarbeModus:\"regenbogen\" ergaenzt (neuer dritter Modus in bHolEingefaerbt, gekachelter Farbverlauf ueber je eine Blattzeile) - der Drache traegt jetzt einen echten Rot-Orange-Gelb-Gruen-Blau-Violett-Verlauf statt der alten goldbraunen Einfaerbung. Faerbt wie jede vollbildFarbe den GANZEN Koerper (keine Teilbereichs-Maskierung nur fuer die Fluegel moeglich), liest sich bei einem fast vollstaendig fluegelgefuellten Drachensprite trotzdem klar als regenbogenfarben.",
+  "fehlendesDetail": null
  },
  {
   "name": "Byrd",
   "slug": "byrd",
-  "sterne": 4,
-  "begruendung": "Kopf wurde durch einen prozedural gezeichneten Zwiebelkopf ersetzt (rote Knolle, Papierhaut-Streifen, Wurzelbuesch, dunkle Schutzbrille mit hellem Rand) plus goldgelber Cardigan-Ton (ruestTon gold) - das namensgebende bizarre Element ist jetzt klar erkennbar, per renderProbe bei echter 64px-Groesse verifiziert.",
-  "fehlendesDetail": "Besen-/Kehrblech-Requisite in den Haenden und die Perlenkette fehlen noch (kein Requisiten-Slot dafuer im Baukasten)."
+  "sterne": 5,
+  "begruendung": "16.10.: zeichneZwiebelKopf() zeichnet jetzt zusaetzlich Perlenkette, Besen und Kehrblech (feste Position statt echter Handgeometrie, dieselbe Vereinfachung wie die Zwiebel selbst) - alle drei im Portrait genannten Requisiten sind jetzt da.",
+  "fehlendesDetail": null
  },
  {
   "name": "Byrnja",
   "slug": "byrnja",
   "sterne": 4,
-  "begruendung": "Kopf wurde durch einen prozedural gezeichneten, angeschnittenen Tortenboden mit rosa Zuckerguss, Streuseln und sichtbarer Schnittflaeche ersetzt (zeichneKuchenKopf) - das absolut namensgebende bizarre Element ist jetzt da, dazu ruestTon \"dunkel\" fuer das schwarze Kleid. Per renderProbe bei echter 64px-Groesse verifiziert.",
-  "fehlendesDetail": "Das Messer, das das Tortenstueck herausschneidet, und die duesteren Augenringe/Lippen-Details fehlen."
+  "begruendung": "16.10.: zeichneKuchenKopf() zeichnet jetzt zusaetzlich ein Messer, das von aussen oben rechts in den Keil-Ausschnitt des Tortenbodens faehrt - genau der Bildbefund \"Messer schneidet ein Tortenstueck heraus\".",
+  "fehlendesDetail": "Die duesteren Augenringe/Lippen aus dem Portrait bleiben strukturell ungeloest: der Kuchen ERSETZT den Kopf komplett (blickdicht), darunter liegt kein Gesicht, auf das sich Make-up malen liesse."
  },
  {
   "name": "Cadrael",
   "slug": "cadrael",
-  "sterne": 4,
-  "begruendung": "Krone, ein Flügel und die goldene Rüstungsfarbe treffen die strahlende Engelsfigur gut.",
-  "fehlendesDetail": "Der leuchtende Stab (Zepter) fehlt."
+  "sterne": 5,
+  "begruendung": "16.10.: effekt:{typ:\"heilig\",pos:\"kopf\"} ergaenzt (dasselbe Muster wie Xylaris/Starflame/Pinkypie: Stab + Glanz-Effekt als Zepter-Naeherung) - waffe:\"stab\" war schon da, jetzt leuchtet er warm golden, passend zur Engels-/Kronen-Identitaet.",
+  "fehlendesDetail": null
  },
  {
   "name": "Caldor",
@@ -255,15 +255,15 @@
   "name": "Elyon",
   "slug": "elyon",
   "sterne": 4,
-  "begruendung": "Heiligenschein, ein Flügel und dunkle Rüstungsfarbe treffen die Idee des gefallenen Engel-Ritters gut.",
-  "fehlendesDetail": "Der Kopf wirkt wie ein Roboter-Visier statt eines Ritterhelms, und Schwert/Schild fehlen."
+  "begruendung": "16.10.: schild:true ergaenzt (dieselbe schild_bg/fg-Ebene wie Draco/Johanna/Caldor/Shield) - waffe:\"schwert\" war schon vorhanden, jetzt sind Schwert UND Schild beide da.",
+  "fehlendesDetail": "Der Kopf wirkt bei 64px weiterhin eher wie ein geschlossenes Visier als ein Ritterhelm - helm.png ist das EINZIGE Helm-Blatt im Baukasten (kein zweites, offeneres Helm-Blatt zum Austauschen vorhanden), strukturelle Grenze."
  },
  {
   "name": "Elyssa Nightclaw",
   "slug": "elyssa-nightclaw",
   "sterne": 4,
-  "begruendung": "Grüne Schuppenhaut, gelbe Augen, Kapuze und sogar ein sichtbarer Schwanz treffen die Echsen-Schurkin gut.",
-  "fehlendesDetail": "Das markante Echsen-Schnauzen-Gesicht fehlt (Kopf wirkt eher wie ein Goblin), und der Dolch fehlt."
+  "begruendung": "GEPRUEFT 16.10.: waffe:\"schwert\" steht bereits seit 25.08. als dokumentierte Dolch-Naeherung im Rezept (keine Dolch-Ebene im Baukasten) - die Bewertung nannte hier noch faelschlich \"Dolch fehlt\", das stimmt nicht mehr.",
+  "fehlendesDetail": "Das markante Echsen-Schnauzen-Gesicht fehlt weiterhin (wirkt eher wie Goblin) - kopf:\"lizard\" ist bereits der EINZIGE Echsenkopf im Baukasten, kein zweiter, schnauzigerer Lizard-Kopf zum Austauschen vorhanden."
  },
  {
   "name": "Emphi",
@@ -325,8 +325,8 @@
   "name": "Greybeard",
   "slug": "greybeard",
   "sterne": 4,
-  "begruendung": "Graues Haar, Bart und die Statur eines alten weisen Mannes treffen den Charakter gut.",
-  "fehlendesDetail": "Der Holzstab (Wanderstab) fehlt, und das Stammes-Tattoo am Arm ist nicht sichtbar."
+  "begruendung": "16.10.: waffe:\"stab\" ergaenzt - der Holz-/Wanderstab aus dem Portrait ist jetzt da.",
+  "fehlendesDetail": "Das Stammes-Tattoo am Arm bleibt strukturell ungeloest: keine Tattoo-/Hautzeichnungs-Ebene im Baukasten."
  },
  {
   "name": "Grieving Colossus",
@@ -367,15 +367,15 @@
   "name": "Holzfaust",
   "slug": "holzfaust",
   "sterne": 4,
-  "begruendung": "Grüne Hautfarbe, sichtbare Hauer und dunkles Haar treffen die Ork-Schnitzer-Identität gut.",
-  "fehlendesDetail": "Die weiße Schürze und das Schnitzwerkzeug (Meißel/Hammer) fehlen."
+  "begruendung": "Grüne Hautfarbe, sichtbare Hauer und dunkles Haar treffen die Ork-Schnitzer-Identität gut. GEPRUEFT 16.10.: Schuerze/Schnitzwerkzeug bleiben ungeloest (s. fehlendesDetail).",
+  "fehlendesDetail": "Weisse Schuerze und Schnitzwerkzeug (Meissel/Hammer) fehlen weiterhin - kein Kleidungslayer fuer Alltagskleidung und kein Hand-Werkzeug jenseits der Kampfwaffen (schwert/axt/stab/zweihaender/bogen) im Baukasten. axt als Notbehelf GEPRUEFT und verworfen: eine Kampfaxt waere eine irrefuehrende, nicht nur unvollstaendige Naeherung fuer ein kleines Schnitzmesser."
  },
  {
   "name": "Inefinna",
   "slug": "inefinna",
-  "sterne": 4,
-  "begruendung": "Krone, goldene Rüstungsfarbe und helles Haar treffen die strahlende Königin gut.",
-  "fehlendesDetail": "Das Schwert und der wallende weiße Umhang fehlen."
+  "sterne": 5,
+  "begruendung": "16.10.: umhang:true ergaenzt (dieselbe umhang_bg/fg-Ebene wie Jorund/Velkin) - waffe:\"schwert\" war schon da, jetzt traegt sie zusaetzlich einen wallenden Umhang. Naeherung beim Farbton: die Ebene wird nicht eingefaerbt (zeichneSchild() kennt keine Faerbung), das Blatt selbst ist neutral graubraun statt reinweiss - dokumentierte Abweichung, kein fehlendes Element mehr.",
+  "fehlendesDetail": null
  },
  {
   "name": "Ironhoof",
@@ -415,9 +415,9 @@
  {
   "name": "Jorund",
   "slug": "jorund",
-  "sterne": 4,
-  "begruendung": "Graues Haar und Bart treffen den alten weisen Nordmann sehr gut.",
-  "fehlendesDetail": "Der Holzstab (Wanderstab) und der dicke Pelzumhang fehlen."
+  "sterne": 5,
+  "begruendung": "16.10.: umhang:true ergaenzt (dieselbe umhang_bg/fg-Ebene wie Inefinna/Velkin) - waffe:\"stab\" war schon da, jetzt traegt er zusaetzlich einen Umhang. Das neutrale graubraune Blatt (ungefaerbt) liest sich als Pelz-/Fellumhang-Naeherung.",
+  "fehlendesDetail": null
  },
  {
   "name": "Kento",
@@ -436,9 +436,9 @@
  {
   "name": "Knochenrichter",
   "slug": "knochenrichter",
-  "sterne": 4,
-  "begruendung": "Knochenweißer Schädel und dunkle Robe treffen die Skelett-Richter-Idee gut.",
-  "fehlendesDetail": "Die blau leuchtenden Augen und der Schädel-Stab fehlen."
+  "sterne": 5,
+  "begruendung": "16.10.: waffe von \"schwert\" auf \"stab\" (Schaedel-Stab-Naeherung, keine eigene Stab-mit-Schaedel-Ebene im Baukasten) + effekt:{typ:\"frost\",pos:\"kopf\",streuung:2,hoehe:[38,28]} ergaenzt (enge, haar-dichte Platzierung wie bei Gram, s. dortiger Kommentar) - naehert die blau leuchtenden Augen an. Der Effekt ist zeitanimiert (wie bei jeder anderen EFFEKT_ARTEN-Nutzung) und deshalb in einem einzelnen Standbild mal staerker, mal schwaecher sichtbar als live in der Arena.",
+  "fehlendesDetail": null
  },
  {
   "name": "Kora",
@@ -464,9 +464,9 @@
  {
   "name": "Krolach",
   "slug": "krolach",
-  "sterne": 4,
-  "begruendung": "Nach dem Golem-Umbau (#713) jetzt ein blauer Kristall-Titan in der richtigen Farbfamilie und Silhouette statt des früheren grünen Reptilwesens.",
-  "fehlendesDetail": "Die mehreren leuchtenden, im Kristallkörper eingebetteten Edelstein-Lichter aus dem Portrait fehlen im Sprite komplett."
+  "sterne": 5,
+  "begruendung": "16.10.: b.edelsteine ergaenzt (vier zusaetzliche, an verschiedenen Koerperstellen verteilte Lichtpunkte ueber die generalisierte zeichneKern()-Funktion, abwechselnd orange/blau) - die \"mehreren leuchtenden, im Kristallkoerper eingebetteten Edelstein-Lichter\" aus dem Portrait sind jetzt da, zusaetzlich zum bestehenden mittigen Energiekern.",
+  "fehlendesDetail": null
  },
  {
   "name": "Lady Mournvale",
@@ -485,16 +485,16 @@
  {
   "name": "Lava Golem",
   "slug": "lava-golem",
-  "sterne": 4,
-  "begruendung": "Dunkelrote Stein-mit-Lava-Textur und ein glühender Riss treffen die Konzept-Farbgebung gut.",
-  "fehlendesDetail": "Die namensgebenden Dämonenhörner fehlen, und es gibt nur einen glühenden Riss statt der vielen Lavaadern im ganzen Körper."
+  "sterne": 5,
+  "begruendung": "16.10.: b.hoerner:true (neue zeichneGolemHoerner(), generisch im vollbild-Zweig gelesen) + b.risse (vier zusaetzliche Lavaadern an Armen/Beinen ueber die generalisierte zeichneRiss()-Funktion, zusaetzlich zum bestehenden Riss auf Herzhoehe) ergaenzt - Daemonenhoerner UND mehrere Lavaadern ueber den ganzen Koerper verteilt treffen jetzt den Bildbefund.",
+  "fehlendesDetail": null
  },
  {
   "name": "Leviathan",
   "slug": "leviathan",
-  "sterne": 4,
-  "begruendung": "Die Drachen-Körperform, Flügel und Schwanz treffen die Kategorie sehr gut.",
-  "fehlendesDetail": "Die Farbe ist komplett falsch (feuriges Rot statt türkis-blaugrünem Wasserdrachen-Schuppenkleid) - eine Neueinfärbung würde auf 5 heben."
+  "sterne": 5,
+  "begruendung": "16.10.: vollbildFarbe:\"#1f6b65\",vollbildFarbeModus:\"farbe\" ergaenzt (CSS-\"color\"-Blend statt \"multiply\", s. Abysskraken/Galactus-Praezedenzfall - ein reinrotes Blatt hat keinen Gruen-/Blauanteil zum Abschwaechen) - der Drache traegt jetzt ein tuerkis-blaugruenes statt feuriges Schuppenkleid, genau die im Dokument selbst angekuendigte \"Neueinfaerbung, die auf 5 heben wuerde\".",
+  "fehlendesDetail": null
  },
  {
   "name": "Lilly",
@@ -521,8 +521,8 @@
   "name": "Lumen Serene",
   "slug": "lumen-serene",
   "sterne": 4,
-  "begruendung": "13.10.: fluegel von generisch auf \"federn\" umgestellt - echte, SOLIDE WEISSE Federfluegel statt des alten hautfarbenen Fledermaus-Platzhalters. Form UND Farbe treffen jetzt direkt das 'strahlend weisse Engelswesen'-Bild.",
-  "fehlendesDetail": "Die ruhige, in sich gekehrte Meditationspose fehlt - die Figur steht in der normalen Kampfhaltung statt in sich gekehrt."
+  "begruendung": "13.10.: fluegel von generisch auf \"federn\" umgestellt - echte, SOLIDE WEISSE Federfluegel statt des alten hautfarbenen Fledermaus-Platzhalters. Form UND Farbe treffen jetzt direkt das 'strahlend weisse Engelswesen'-Bild. GEPRUEFT 16.10.: Meditationspose bleibt strukturell ungeloest (s. fehlendesDetail).",
+  "fehlendesDetail": "Die ruhige, in sich gekehrte Meditationspose fehlt weiterhin - der Baukasten kennt keine eigene Ruhe-/Meditationshaltung (nur walk/run/idle/shoot/slash/hurt, alle auf eine stehende/kampfbereite Figur zugeschnitten). Eine neue Pose waere eine eigene Animation je Blickrichtung je Ebene, kein punktueller Rezept-Fix."
  },
  {
   "name": "Lynara",
@@ -541,9 +541,9 @@
  {
   "name": "Mavra",
   "slug": "mavra",
-  "sterne": 4,
-  "begruendung": "Grüne Haut und schwarzes Haar treffen die Orc-Kriegerin sehr gut.",
-  "fehlendesDetail": "Die rote Lederkleidung (statt Braun) und die Kriegsaxt fehlen."
+  "sterne": 5,
+  "begruendung": "16.10.: ruestTon:\"rot\" (neuer RUEST_TON-Eintrag, additiv) + waffe:\"axt\" (ersetzt den seit 26.08. veralteten \"keine Axt im Baukasten\"-Notbehelf Schwert, axt existiert seit Draco/Johanna laengst) ergaenzt - rote Lederkleidung UND Kriegsaxt treffen jetzt den Bildbefund direkt.",
+  "fehlendesDetail": null
  },
  {
   "name": "Medibull",

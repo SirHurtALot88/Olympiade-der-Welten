@@ -178,17 +178,54 @@
   // "color" uebernimmt Farbton+Saettigung der Zielfarbe komplett, behaelt aber die
   // Original-LUMINANZ (Hell-Dunkel-Verlauf) als Schattierung bei — damit faerbt sich auch
   // ein komplett falsch-farbiges Blatt in die Zielfarbe um, nicht nur eine Tonung davon.
-  function bHolEingefaerbt(key,farbe,modus){
+  function bHolEingefaerbt(key,farbe,modus,zellH){
     if(!farbe)return bHol(key,null);
-    const id="vb|"+key+"|"+farbe+"|"+(modus||"multiply");
+    const id="vb|"+key+"|"+farbe+"|"+(modus||"multiply")+"|"+(zellH||0);
     if(!bGefaerbt[id]){
       const im=bBild["b_"+key];
       if(!im||!im.complete||!im.width)return im;
       const c=document.createElement("canvas");c.width=im.width;c.height=im.height;
       const x=c.getContext("2d");
       x.drawImage(im,0,0);
-      x.globalCompositeOperation=modus==="farbe"?"color":"multiply";
-      x.fillStyle=farbe;
+      // Dritter Modus "regenbogen" (16.10., Sprite-Fit 4-Sterne-Batch A, Butterfly: Portrait
+      // zeigt einen Drachen mit einem ROT-ORANGE-GELB-GRUEN-BLAU-VIOLETT-Farbverlauf auf den
+      // Fluegeln statt der bisherigen goldbraunen Einfaerbung, s. public/portraits/
+      // butterfly.jpg). "multiply"/"farbe" oben nehmen beide nur EINE Zielfarbe — fuer einen
+      // echten Regenbogen braucht es einen Gradienten statt eines Flat-Fills. Technik bleibt
+      // dieselbe (Fuellung ueber "color"-Blend, dann destination-in als Silhouetten-Maske),
+      // nur die Fuellung selbst ist ein CanvasGradient statt eines Hex-Strings. Faerbt wie
+      // jede vollbildFarbe das GANZE Blatt (keine Teilbereichs-Maskierung fuer "nur die
+      // Fluegel" moeglich, dasselbe Preis wie bei jedem anderen vollbildFarbe-Fix).
+      // zellH (neu, 16.10.): ein Vollbild-Blatt ist ein ganzes Raster aus mehreren Zeilen
+      // (eine je Blickrichtung) uebereinander — ein einziger Gradient ueber die GESAMTE
+      // Bildhoehe (erster Entwurf) zeigt in einer einzelnen 64-128px hohen Zeile deshalb nur
+      // einen schmalen Ausschnitt der sieben Farben, nicht den vollen Regenbogen (nachgeprueft
+      // per renderProbe: Butterfly wirkte fast einfarbig gruen statt regenbogenfarben). Mit
+      // zellH (die Zeilenhoehe des Blatts, von aussen uebergeben, s. Aufrufer) wird der
+      // Gradient stattdessen auf ein 1px breites, zellH hohes Hilfscanvas gezeichnet und per
+      // "repeat"-Pattern gekachelt — jede Zeile des Blatts bekommt dadurch denselben vollen
+      // Verlauf von oben nach unten, unabhaengig davon, welche Blickrichtung/Zeile gerade
+      // gezeichnet wird. Ohne zellH (Aufrufer kennt die Zeilenhoehe nicht) faellt die Funktion
+      // auf den alten Vollbild-Gradienten zurueck, statt zu brechen.
+      if(modus==="regenbogen"){
+        x.globalCompositeOperation="color";
+        const bogen=["#ff3b30","#ff9500","#ffd400","#34c759","#30b0ff","#5e5ce6","#c837ab"];
+        if(zellH){
+          const kachel=document.createElement("canvas");kachel.width=1;kachel.height=zellH;
+          const kx=kachel.getContext("2d");
+          const kg=kx.createLinearGradient(0,0,0,zellH);
+          bogen.forEach((ton,i)=>kg.addColorStop(i/(bogen.length-1),ton));
+          kx.fillStyle=kg;kx.fillRect(0,0,1,zellH);
+          x.fillStyle=x.createPattern(kachel,"repeat");
+        }else{
+          const g=x.createLinearGradient(0,0,0,c.height);
+          bogen.forEach((ton,i)=>g.addColorStop(i/(bogen.length-1),ton));
+          x.fillStyle=g;
+        }
+      }else{
+        x.globalCompositeOperation=modus==="farbe"?"color":"multiply";
+        x.fillStyle=farbe;
+      }
       x.fillRect(0,0,c.width,c.height);
       x.globalCompositeOperation="destination-in";
       x.drawImage(im,0,0);
@@ -311,6 +348,49 @@
     }
     cctx.strokeStyle="#c9b87a";cctx.lineWidth=Math.max(0.8,0.7*s);
     cctx.beginPath();cctx.moveTo(cx-bo+rx*0.33,by);cctx.lineTo(cx+bo-rx*0.33,by);cctx.stroke();
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt Byrd zusaetzlich mit
+    // einem Besen UND einem Kehrblech in den Haenden sowie einer Perlenkette um den Hals
+    // (s. public/portraits/byrd.jpg) — kein eigener Requisiten-/Haltepunkt-Slot fuer
+    // Vierbeiner- oder Zusatz-Gegenstaende im Baukasten vorhanden (nachgeprueft, s. auch
+    // HOCKEY_HAND/HEBEN_HAND oben: beide Tabellen sind je EIN Requisit fuer den STANDARD-
+    // Koerper, keine zwei gleichzeitigen Requisiten, kein generischer Slot). Statt die Luecke
+    // unausgefuellt zu lassen (Grundsatz "eine unvollstaendige Naeherung schlaegt immer
+    // keinen Fix", docs/design/sprite-fit-bewertungssystem.md), EIN festes Bild fuer alle
+    // Blickrichtungen wie bei der Zwiebel selbst: Perlenkette als Punktreihe am Hals (direkt
+    // unterhalb der Knolle, wo im Bild der Kragen sitzt) plus Besen schraeg an der rechten
+    // Seite, nicht an eine echte Handposition verankert (dieselbe Vereinfachung wie beim
+    // Zwiebelkopf selbst, der auch nicht blickwinkelspezifisch gezeichnet wird).
+    // Perlen MIT dunklem Rand statt reiner Fuellung (Nachbesserung): per renderProbe
+    // gegengeprueft wirkten reine helle Punkte ohne Kontur auf dem goldenen Cardigan direkt
+    // darunter kaum sichtbar (aehnliche Helligkeit, verschwimmt beim Downscaling auf 64px) —
+    // ein dunkler Rand haelt die Perlenkette als eigene Form erkennbar, unabhaengig vom
+    // Hintergrundton.
+    const halsY=cy+ry*1.1;
+    for(let i=0;i<=6;i++){
+      const a=0.15*Math.PI+(0.7*Math.PI)*(i/6);
+      const px=cx+Math.cos(a)*rx*0.7, py=halsY-1.5*s+Math.sin(a)*rx*0.7;
+      cctx.beginPath();cctx.arc(px,py,Math.max(0.9,0.85*s),0,Math.PI*2);
+      cctx.fillStyle="#fff6e4";cctx.fill();
+      cctx.lineWidth=Math.max(0.5,0.4*s);cctx.strokeStyle="#4a2a20";cctx.stroke();
+    }
+    // Besen: Stiel schraeg von der Schulter nach unten rechts, Borsten als Faecher am Ende.
+    const stielX0=cx+rx*0.95, stielY0=halsY+1*s, stielX1=cx+rx*2.3, stielY1=halsY+ry*2.1;
+    cctx.strokeStyle="#8a6a3a";cctx.lineWidth=Math.max(0.9,0.8*s);cctx.lineCap="round";
+    cctx.beginPath();cctx.moveTo(stielX0,stielY0);cctx.lineTo(stielX1,stielY1);cctx.stroke();
+    cctx.strokeStyle="#d9c878";cctx.lineWidth=Math.max(0.6,0.5*s);
+    for(const spread of [-2.2,-1.1,0,1.1,2.2]){
+      cctx.beginPath();cctx.moveTo(stielX1,stielY1);
+      cctx.lineTo(stielX1+spread*s,stielY1+3.2*s);cctx.stroke();
+    }
+    // Kehrblech: flaches Trapez links, dunkles Metall mit hellem Rand — liegt an statt
+    // gegriffen, dieselbe feste Vereinfachung wie der Besen.
+    const kbY=halsY+ry*1.7, kbX=cx-rx*2.1;
+    cctx.fillStyle="#9aa2ab";
+    cctx.beginPath();
+    cctx.moveTo(kbX-2.6*s,kbY);cctx.lineTo(kbX+2.6*s,kbY);
+    cctx.lineTo(kbX+1.6*s,kbY+3.4*s);cctx.lineTo(kbX-1.6*s,kbY+3.4*s);
+    cctx.closePath();cctx.fill();
+    cctx.strokeStyle="#5f666d";cctx.lineWidth=Math.max(0.6,0.5*s);cctx.stroke();
   }
 
   // EIMER-/BECHER-KOPF-REQUISITE (13.10., Sprite-Fit-Nachlieferung, Orakelpfropf: Portrait
@@ -396,6 +476,25 @@
       cctx.fillStyle=streuselFarben[i%streuselFarben.length];
       cctx.beginPath();cctx.arc(cx+dx*rx*1.4,topY+dy*ry*1.4,Math.max(0.6,0.55*s),0,Math.PI*2);cctx.fill();
     }
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt eine fremde Hand, die
+    // mit einem Messer genau das fehlende Tortenstueck herausschneidet (s. public/portraits/
+    // byrnja.jpg) — der Keil-Ausschnitt oben naehert den SCHNITT an, aber das Messer selbst
+    // fehlte bislang. Blatt zeigt genau zum Keil (Mittelwinkel aus keilA/keilB oben), von
+    // aussen oben rechts kommend, wie im Bild. Eigene duestere Augenringe/Lippen bleiben
+    // dokumentiert UNGELOEST: der Kuchen ERSETZT den Kopf komplett (s. Funktionskommentar
+    // oben, "blickdicht wie die Zwiebel"), darunter liegt kein Gesicht, auf das sich Augen-
+    // ringe/Lippen malen liessen, ohne die Kopf-Ersetzung selbst aufzugeben — eine zweite,
+    // groessere Aenderung als dieser punktuelle Nachtrag.
+    const keilMitte=(keilA+keilB)/2;
+    const spitzeX=cx+Math.cos(keilMitte)*rx*0.8, spitzeY=topY+Math.sin(keilMitte)*rx*0.8;
+    const griffX=cx+rx*2.7, griffY=topY-ry*2.0;
+    const klingeX=griffX-(griffX-spitzeX)*0.28, klingeY=griffY-(griffY-spitzeY)*0.28;
+    cctx.strokeStyle="#9aa2ab";cctx.lineWidth=Math.max(1.1,1.1*s);cctx.lineCap="round";
+    cctx.beginPath();cctx.moveTo(klingeX,klingeY);cctx.lineTo(spitzeX,spitzeY);cctx.stroke();
+    cctx.strokeStyle="#e4eaef";cctx.lineWidth=Math.max(0.5,0.45*s);
+    cctx.beginPath();cctx.moveTo(klingeX,klingeY);cctx.lineTo(spitzeX,spitzeY);cctx.stroke();
+    cctx.strokeStyle="#2a241f";cctx.lineWidth=Math.max(1.4,1.5*s);
+    cctx.beginPath();cctx.moveTo(griffX,griffY);cctx.lineTo(klingeX,klingeY);cctx.stroke();
   }
 
   // HOCKEYSCHLAEGER (02.09., Chris: "Hockeyschlaeger in die Haende der Figuren"). Reine
@@ -1137,6 +1236,12 @@
     // additiv (neuer Schluessel, keine bestehende Ramp angetastet), gleiche 6-Stufen-Struktur
     // dunkel->hell wie die anderen drei Rampen.
     violett:["#140B28","#2B1850","#432878","#5F3EA0","#8560C8","#B494E8"],
+    // Nachgetragen (16.10., Sprite-Fit 4-Sterne-Batch A, Mavra: Portrait zeigt ein ROTES
+    // Lederoberteil mit dunklen Riemen, s. public/portraits/mavra.jpg — der Sprite trug
+    // bislang die unveraenderte "leder_frau"-Grundrampe, also natuerliches Braun, nie Rot).
+    // Rein additiv wie "violett" oben (neuer Schluessel, keine bestehende Rampe angetastet),
+    // gleiche 6-Stufen-Struktur dunkel->hell.
+    rot:   ["#2A0A08","#5A1410","#8A1F18","#B32A20","#D94A38","#F08068"],
     // Nachgetragen (16.10., Sprite-2-Stern-Batch B): Orichalcos (dunkelblaue Robe mit roter
     // Schaerpe, s. public/portraits/orichalcos.jpg) und Pinkypie (dunkelblaues Hexen-Ornat,
     // s. public/portraits/pinkypie.jpg) brauchen beide einen kuehlen Navy-Ton, den es bisher
@@ -1466,7 +1571,19 @@
     // rot/schwarze Ruestung traegt, weil er ist ja ein Lava Golem, kein silberner
     // Construct-Dings — einfaerben waere gut"): golem_walk.png selbst ist silbrig-blaugrau,
     // keine der Ruestungs-Rampen trifft. Generisches Flag, s. bHolEingefaerbt.
-    "Lava Golem":         {vollbild:"golem",vollbildFarbe:"#7a1f1f",effekt:{typ:"feuer",pos:"koerper"},gluehenderRiss:true},
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt zusaetzlich deutliche
+    // Daemonenhoerner am Kopf UND viele Lavaadern ueber den GANZEN Koerper verteilt, nicht
+    // nur den einen Riss auf Herzhoehe (s. public/portraits/lava-golem.jpg). hoerner:true
+    // (neu im vollbild-Zweig gelesen, s. zeichneGolemHoerner-Kommentar in zeichneSprite) +
+    // risse (vier weitere, an Armen/Beinen verteilte Risse zusaetzlich zum bestehenden
+    // gluehenderRiss auf Herzhoehe) — Koordinaten an denselben Anatomie-Ankern wie der
+    // bestehende Riss orientiert (Schultern y-33*Z, Huefte/Bauch y-9*Z, s. dortiger
+    // Kommentar), dx grob auf Arm-/Beinbreite eines 64px-Golem-Rahmens geschaetzt (kein
+    // eigener Pixel-Scan je Gliedmasse, anders als der Brustkern/die Augen oben — vier
+    // kleine Zusatzrisse vertragen eine Naeherung eher als ein einzelner zentraler Punkt).
+    "Lava Golem":         {vollbild:"golem",vollbildFarbe:"#7a1f1f",effekt:{typ:"feuer",pos:"koerper"},gluehenderRiss:true,hoerner:true,
+                           risse:[{dx:-14,top:-28,bot:-14,breite:3},{dx:14,top:-28,bot:-14,breite:3},
+                                  {dx:-7,top:-2,bot:12,breite:3},{dx:7,top:-2,bot:12,breite:3}]},
     // 01.09., Chris' Fund: Bildbefund (s. subclass-archetypes.ts) ist "Steinerner
     // Elementarkoloss aus Fels, Wasserfaellen und EIS, orange und blaue Kristalle im Rumpf
     // eingelassen" — der bisherige kopf:"troll"-Humanoid (grosse gruene Haut, Hoerner) traf
@@ -1492,7 +1609,16 @@
     // (zeichneKern, dieselbe Funktion/Palette wie bei Seraph-11 — kein zweites Rezept) MITTIG
     // auf dem Rumpf plus zwei KONSTANT leuchtende rote Punkte am Kopf (zeichneAugen, neu,
     // s. dort fuer die Begruendung "konstant statt gepulst"), s. zeichneSprite/figur().
-    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"},energiekern:true},
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): "mehrere leuchtende, im Kristallkoerper
+    // eingebettete Edelstein-Lichter" aus dem Portrait (s. public/portraits/krolach.jpg)
+    // fehlten komplett — der eine mittige Energiekern oben ist etwas anderes (EIN Punkt, EIN
+    // Ton). edelsteine: vier zusaetzliche kleine Lichtpunkte an verschiedenen Koerperstellen,
+    // abwechselnd orange (EFFEKT_ARTEN.feuer-Palette, Default von zeichneKern) und blau
+    // (eigene Palette, trifft den alten Bildbefund "orange und blaue Kristalle im Rumpf
+    // eingelassen" direkt) — s. zeichneKern-/b.edelsteine-Kommentar in zeichneSprite.
+    "Krolach":            {vollbild:"golem",vollbildFarbe:"#5f8fa3",effekt:{typ:"frost",pos:"koerper"},energiekern:true,
+                           edelsteine:[{dx:-9,dy:-6,r:2.4},{dx:8,dy:-3,r:2.2,farben:["#1e6fd9","#5db3ff","#eaf6ff"]},
+                                       {dx:-6,dy:9,r:2.2,farben:["#1e6fd9","#5db3ff","#eaf6ff"]},{dx:7,dy:12,r:2.4}]},
     // schild:true (04.09., s. Kommentar bei Draco oben fuer die volle Begruendung/den
     // Fund) — dieselbe Ergaenzung, Chris wollte beide.
     "Johanna":            {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"sandy",ruestTon:"dunkel",schild:true},
@@ -1559,7 +1685,13 @@
     // (die stand hier nur als Behelf, solange Haar nicht animiert werden konnte).
     // 25.08.: waffe:"stab" ergaenzt (t_stab_bg/fg, s. zeichneB) — der Holzstab aus dem
     // Bildbefund stand bislang nur in der Kader-Vorschau (B_FIGUR), nie in der animierten Ansicht.
-    "Jorund":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",bart:true,haarTon:"gray",waffe:"stab"},
+    // umhang:true (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt einen dicken
+    // Pelzumhang um die Schultern (s. public/portraits/jorund.jpg) — waffe:"stab" (Holzstab)
+    // war schon da, nur der Umhang fehlte. umhang_bg/fg (s. Velkin) ist ein ungefaerbtes
+    // graubraunes Blatt (zeichneSchild() faerbt nicht um, s. dortiger Kommentar) — keine
+    // reine Pelztextur, aber eine neutrale Fell-/Stoff-Naeherung, die naeher an "dick und
+    // pelzig" liegt als KEIN Umhang.
+    "Jorund":             {kopf:"human",haut:"light",ruest:"leder",haar:"haar_lang",bart:true,haarTon:"gray",waffe:"stab",umhang:true},
     // Bild: Priesterin mit Strahlenkranz, betend, KEINE Kapuze — der Heiligenschein braucht
     // den freien Kopf. "leder" bleibt als naechstliegender Ersatz fuer die golddurchwirkte
     // Robe stehen (eine echte Robe gibt es im Baukasten nicht). Das Schwert im Bild ist eine
@@ -1572,7 +1704,12 @@
     // Platten-Ebene, jetzt ruest:"plate_frau" (r_frau.png) + hose:"beine_frau" fuer eine
     // Kriegerin, die laut Bildbefund oben "aufwendige silber-goldene Plattenruestung mit
     // Schulterpanzern" traegt statt eines Manner-Torsos mit weiblichem Kopf drauf.
-    "Inefinna":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",geschlecht:"w",ruestTon:"gold",krone:true,haar:"haar_lang",haarTon:"white",waffe:"schwert",effekt:{typ:"heilig",pos:"kopf",streuung:9}},
+    // umhang:true (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund "wallender weisser
+    // Umhang" (s. public/portraits/inefinna.jpg) — waffe:"schwert" war schon da. Dieselbe
+    // umhang_bg/fg-Ebene wie bei Jorund/Velkin, ungefaerbt (graubraunes Blatt statt des
+    // gewuenschten Weiss, s. Kommentar bei Jorund) — die beste verfuegbare Naeherung, da
+    // zeichneSchild() keine Einfaerbung kennt.
+    "Inefinna":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",geschlecht:"w",ruestTon:"gold",krone:true,haar:"haar_lang",haarTon:"white",waffe:"schwert",effekt:{typ:"heilig",pos:"kopf",streuung:9},umhang:true},
     // Bild: unbewaffnete Waldnymphe, leichte Wickelkleidung, keine Kapuze — sitzt barfuss im
     // Wald. Kapuze war falsch (Chris' Fund); "leder" bleibt als naechstliegender Ersatz fuer
     // die leichte Kleidung stehen.
@@ -1675,6 +1812,11 @@
     // komplett. haarTon bleibt "white" (blonder Bob passt zum hellen Haaransatz unter dem
     // Kuchen). ruestTon NEU "dunkel" (statt natuerlichem Lederbraun) fuer das schwarze
     // Kleid.
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): das fehlende Messer ist jetzt Teil von
+    // zeichneKuchenKopf() selbst nachgeruestet (s. Funktionskommentar dort) — kein neues
+    // Flag noetig, kuchenkopf:true zeichnet die Klinge automatisch mit. Duestere Augenringe/
+    // Lippen bleiben dokumentiert UNGELOEST (derselbe Kommentar dort): der Kuchen ersetzt
+    // den Kopf komplett, darunter liegt kein Gesicht zum Bemalen.
     "Byrnja":             {kopf:"human",haut:"light",ruest:"leder_frau",ruestTon:"dunkel",geschlecht:"w",haar:"haar_mop",haarTon:"white",kuchenkopf:true},
     // Bild: Elfe mit Langbogen, Koecher, gruenem Umhang, leichter Ruestung — deckungsgleich
     // mit Cassandras Bauplan (Bogen, keine Armbrust).
@@ -1724,7 +1866,13 @@
     // Sternenmotivik wie Starflame/Xandrix, hier ueber das ganze Vollbild statt nur den
     // Kopf, weil die Sterne laut Bild auf den FLUEGELN sitzen, nicht am Kopf): pos "koerper"
     // ist im Vollbild-Zweig ohnehin die einzige unterstuetzte Position, s. zeichneSprite.
-    "Butterfly":          {vollbild:"drache_gold",effekt:{typ:"arkan",pos:"koerper"}},
+    // vollbildFarbe/-Modus:"regenbogen" (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund
+    // zeigt einen Regenbogen-Farbverlauf auf den Fluegeln statt des bisherigen golden-
+    // schwarzen Originaltons des Blattes (s. public/portraits/butterfly.jpg, s. auch
+    // bHolEingefaerbt-Kommentar fuer die Technik). vollbildFarbe selbst ist bei diesem Modus
+    // UNBENUTZT (der Gradient ist fest verdrahtet) — bleibt trotzdem gesetzt, weil
+    // bHolEingefaerbt() bei leerem/falsy farbe fruehzeitig auf "kein Einfaerben" zurueckfaellt.
+    "Butterfly":          {vollbild:"drache_gold",vollbildFarbe:"#c837ab",vollbildFarbeModus:"regenbogen",effekt:{typ:"arkan",pos:"koerper"}},
     // Bild: Mann mit Fliegerhaube, Tentakel-Parasit im Gesicht, stuetzt sich auf einen
     // Gehstock (keine Waffe) — die Haube wird zur Kapuze.
     // 16.10., Sprite-2-Stern-Batch B: Portrait (public/portraits/myrkos.jpg) zeigt klarer eine
@@ -1742,7 +1890,12 @@
     // schon bei Draco.
     // 26.08., NEU: dieselbe Rassen-Luecke wie bei Bearington, nur fuer Orc statt Wolf
     // (kopf_orc_frau, s. quellen.json) — weiblicher Orkkopf statt des bisherigen maennlichen.
-    "Mavra":              {kopf:"orc_frau",haut:"green",ruest:"leder_frau",waffe:"schwert",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt ein ROTES Lederoberteil
+    // (nicht das unveraenderte Natur-Braun der "leder_frau"-Grundrampe) UND eine Kriegsaxt
+    // statt des bisherigen "Keine Axt im Baukasten"-Notbehelfs von 26.08. — axt existiert
+    // seit Draco/Johanna laengst als echter waffe-Wert, der alte Kommentar war seitdem
+    // stehengeblieben. ruestTon:"rot" neu in RUEST_TON (s. dort, rein additiv).
+    "Mavra":              {kopf:"orc_frau",haut:"green",ruest:"leder_frau",ruestTon:"rot",waffe:"axt",geschlecht:"w",haar:"haar_lang",haarTon:"black"},
     // Bild: Sumpfmonster aus Moos und Faeulnis, unbewaffnet.
     "Murky":              {kopf:"orc",haut:"dark_green"},
     // Bild: gewaltiger oestlicher Drache mit goldener Maehne, an Ketten gelegt. Kein
@@ -1752,7 +1905,13 @@
     // Ketten gelegt..." public/sprites/monster/drache_zweikopf_rot.png (Flying Dragon
     // Rework, Stendhal, 432x512 = 3x4 zu 144x128) wird laut quellen.json ausdruecklich als
     // Kandidat fuer Leviathan/Hydra genannt.
-    "Leviathan":          {vollbild:"drache_hydra"},
+    // vollbildFarbe/-Modus:"farbe" (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt
+    // ein tuerkis-blaugruenes Wasserdrachen-Schuppenkleid, der Sprite bisher feuriges Rot
+    // (natives drache_hydra-Blatt, s. public/portraits/leviathan.jpg). "farbe" (CSS-"color"-
+    // Blend, s. bHolEingefaerbt-Kommentar) statt "multiply": ein reinrotes Blatt hat keinen
+    // Gruen-/Blauanteil zum Abschwaechen, "multiply" bliebe deshalb rot-schwarz (derselbe
+    // Abysskraken-/Galactus-Fund, s. dort) — "farbe" uebernimmt Farbton+Saettigung komplett.
+    "Leviathan":          {vollbild:"drache_hydra",vollbildFarbe:"#1f6b65",vollbildFarbeModus:"farbe"},
     // Bild: schlanker Cyborg mit Bildschirmkopf, cyanfarbene Energieschlieren, unbewaffnet.
     // Kein Roboterkopf im Baukasten; "fur_grey" fuer den metallischen Ton, wie bei
     // Seraph-11.
@@ -1854,7 +2013,11 @@
     "Kreischende Kogge":  {vollbild:"schiff_pirat"},
     // Bild: alter, muskuloeser baertiger Mann mit Stammestaetowierungen, stuetzt sich auf
     // einen Wanderstab (keine Waffe). Kein Bart im animierbaren Satz.
-    "Greybeard":          {kopf:"human",haut:"light",haar:"haar_lang",bart:true,haarTon:"white",ruest:"leder"},
+    // waffe:"stab" (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt einen Holz-/
+    // Wanderstab (s. public/portraits/greybeard.jpg) — bislang unbewaffnet. Das
+    // Stammes-Tattoo am Arm bleibt dokumentiert UNGELOEST: keine Tattoo-/Textur-Ebene im
+    // Baukasten fuer Hautzeichnungen, strukturelle Luecke, keine punktuelle Korrektur.
+    "Greybeard":          {kopf:"human",haut:"light",haar:"haar_lang",bart:true,haarTon:"white",ruest:"leder",waffe:"stab"},
     // Bild: leuchtende tuerkis-cyane Pflanze (grosse faecherartige Blaetter, gedrehter
     // Rankenstamm, Wassertropfen an den Blattspitzen, ein leuchtender Wasserring am Fuss) —
     // kein humanoider Koerper, s. sprite-fit-ergebnisse.md "Wald-Riese"-Musterproblem, hier
@@ -2052,7 +2215,11 @@
     // (subclass-archetypes.ts). Bisher eine graue Orkin in Platte — jetzt der Mech aus
     // public/sprites/monster/roboter_walk.png (Skorpio SciFi Pack, laut quellen.json
     // ausdruecklich "fuer die 'bots' im Kader" beschafft, lag aber unverdrahtet).
-    "Alarm":              {vollbild:"roboter"},
+    // alarmKopf:true (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund "runder, rot
+    // leuchtender Sirenenkopf mit der Aufschrift ALARM" — roboter_walk.png traegt nativ nur
+    // einen schmalen roten Augenstreifen (s. zeichneAlarmKopf-Kommentar in zeichneSprite
+    // fuer die Pixel-Vermessung).
+    "Alarm":              {vollbild:"roboter",alarmKopf:true},
     // Bild (subclass-archetypes.ts): "Blasse Frau in schwarzer Spitzenrobe, blutige Traene
     // im Gesicht, haelt einen Kelch mit rotem Wein/Blut in der Hand" — Unterklassen Vampire
     // UND Undead. kopf:"vampire" (Fangzaehne-Kopf, s. Velkin) war hier nicht gesetzt —
@@ -2066,7 +2233,14 @@
     // Gefluegelten). 26.08., NEU: fluegel:"federn" (fluegel_federn_bg/fg, animiert, 4 Phasen,
     // s. quellen.json "Angel/Divine-Fluegel als ANIMIERTE Ebene") — passt naeher zu einem
     // fliegenden Engelsritter als ein starres Einzelbild.
-    "Elyon":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,fluegel:"federn",waffe:"schwert",effekt:{typ:"heilig",pos:"kopf",streuung:9}},
+    // schild:true (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund haelt einen Schild in der
+    // linken Hand (s. public/portraits/elyon.jpg) — waffe:"schwert" war schon da, nur der
+    // Schild fehlte (dieselbe schild_bg/fg-Ebene wie Draco/Johanna/Caldor/Shield). Die
+    // zweite Kritik "Kopf wirkt wie Roboter-Visier statt Ritterhelm" bleibt dokumentiert
+    // UNGELOEST: helm.png ist das einzige Helm-Blatt im Baukasten (Frontalpose zeigt ein
+    // geschlossenes Kreuzvisier, strukturell eher ein Grosshelm als ein Visier) — kein
+    // zweites Helm-Blatt zum Austauschen vorhanden.
+    "Elyon":              {kopf:"human",haut:"light",ruest:"plate",ruestTon:"dunkel",helm:true,fluegel:"federn",waffe:"schwert",effekt:{typ:"heilig",pos:"kopf",streuung:9},schild:true},
     // Bild: dunkler Kriegsgolem mit Schulterkanonen, geballte Metallfaeuste OHNE Handwaffe —
     // waffe:"bogen" war ein Fehlgriff (25.08. korrigiert; der Bildbefund-Text schliesst eine
     // gefuehrte Waffe ausdruecklich aus).
@@ -2130,6 +2304,13 @@
     // Bild: "haelt einen kleinen Wurfdolch" — bewaffnete Klingenkaempferin, bislang ganz ohne
     // Waffe. 25.08.: waffe:"schwert" als naechstliegende Klingen-Ebene ergaenzt (Naeherung,
     // gleiches Muster wie bei Lilly/Jihanna — eine Dolch-Ebene existiert im Baukasten nicht).
+    // GEPRUEFT (16.10., Sprite-Fit 4-Sterne-Batch A): die Sprite-Fit-Bewertung nannte noch
+    // "Dolch fehlt" — stimmt nicht mehr, waffe:"schwert" steht hier bereits seit 25.08. als
+    // dokumentierte Dolch-Naeherung (s. Kommentar direkt darueber, "eine Dolch-Ebene
+    // existiert im Baukasten nicht"). Die verbleibende Kritik "Echsen-Schnauzen-Gesicht
+    // fehlt, wirkt wie Goblin" bleibt dokumentiert UNGELOEST: kopf:"lizard" ist bereits der
+    // EINZIGE Echsenkopf im Baukasten (kein zweiter, "schnauzigerer" Lizard-Kopf zum
+    // Austauschen vorhanden) und steht hier schon.
     "Elyssa Nightclaw":   {kopf:"lizard",haut:"dark_green",ruest:"leder_frau",kapuze:true,geschlecht:"w",schwanz:true,waffe:"schwert"},
     // Bild: dunkle Zauberin in schwarzer Ruestung, haelt einen langen Stab mit blauem
     // Blitz-/Energieschein in der rechten Hand, linke Hand wirkt zusaetzlich Magie.
@@ -2481,7 +2662,20 @@
     // "Cleric" (richtender Geistlicher ueber die Undead-Subclass) passt — anders als bei
     // Threnox/Burster (Tank/Charger, kein Klassen-Praezedenzfall, deshalb dort unbewaffnet
     // gelassen, s.u.).
-    "Knochenrichter":     {kopf:"skeleton",koerper:"skelett",ruest:"leder",ruestTon:"dunkel",waffe:"schwert"},
+    // waffe:"stab"+effekt (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund zeigt blau
+    // leuchtende Augen UND einen Schaedel-Stab, nicht ein Schwert (s. public/portraits/
+    // knochenrichter.jpg). Keine Schaedel-Stab-Ebene im Baukasten; waffe:"stab" (Wanderstab)
+    // ist die naechstliegende Stab-Form, naeher dran als das bisherige Schwert — derselbe
+    // Austausch wie bei jeder anderen "kein exaktes Requisit"-Naeherung. effekt pos:"kopf"
+    // mit der hellblauen frost-Palette (EFFEKT_ARTEN.frost) naehert den blauen Augen-Schein
+    // an — kein "Augen"-Primitive fuer kopf-basierte Figuren (zeichneAugen ist an den
+    // vollbild-Golem-Kopfpunkt gebunden), ein enger Kopf-Schein ist die naechste verfuegbare
+    // Annaeherung. hoehe/streuung EXPLIZIT eng (wie bei Gram, "wirklich dezent, als waeren es
+    // seine Haare" — s. Kommentar an effU oben): der DEFAULT [56,34] sitzt deutlich UEBER dem
+    // Kopf (wie eine Aura), per renderProbe gegengeprueft wirkte das als ferner Funke statt
+    // als Augenschein. [38,28] mit streuung 2 zieht die Partikelwolke eng an die
+    // Schaedeloberflaeche, naeher an "leuchtende Augen" als ein hoch schwebender Lichtpunkt.
+    "Knochenrichter":     {kopf:"skeleton",koerper:"skelett",ruest:"leder",ruestTon:"dunkel",waffe:"stab",effekt:{typ:"frost",pos:"kopf",streuung:2,hoehe:[38,28]}},
     // 16.10., Minotaurus/Zentaur-Cluster-Runde: waffe "schwert" auf "axt" umgestellt — das
     // Portrait (public/portraits/kora.jpg) zeigt einen schweren, dorn-/klauenbesetzten
     // Kriegshammer/Streitkeulenkopf auf langem Stiel ueber der Schulter getragen; die
@@ -2657,7 +2851,11 @@
     // leuchtender Kugel in der rechten Hand.
     // waffe:"stab" (01.09., Waffen-Nachtrag zur Sprite-Galerie-Stichprobe): eindeutig
     // sichtbare Stangenwaffe, bislang ganz ohne Waffen-Ebene.
-    "Cadrael":            {kopf:"human",haut:"light",fluegel:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",krone:true,geschlecht:"w",waffe:"stab"},
+    // effekt (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund "leuchtender Stab (Zepter)" —
+    // waffe:"stab" war schon da, aber ohne Glanz. Dasselbe Muster wie Xylaris/Starflame/
+    // Pinkypie (Stab + effekt pos "kopf" als Glanz-Naeherung, s. dort): "heilig" (warmes
+    // Gold/Weiss) passt zu Cadraels Engels-/Kronen-Identitaet besser als das kuehlere "arkan".
+    "Cadrael":            {kopf:"human",haut:"light",fluegel:true,ruest:"plate_frau",hose:"beine_frau",ruestTon:"gold",haar:"haar_lang",haarTon:"blonde",krone:true,geschlecht:"w",waffe:"stab",effekt:{typ:"heilig",pos:"kopf"}},
     // Portrait: dunkler Lederrock/Wickel mit Guertel um die Huefte (Bildbefund, Fable-Runde
     // 25.08.) — bislang ganz ohne `ruest`, Beine liefen nackt/hautfarben.
     // 13.10., Sprite-Fit-Nachlieferung Batch 2: fluegel:true (generisches z_fluegel-
@@ -2755,6 +2953,14 @@
     // allgemeine Partikelwolke um den Koerper, nicht als feste Punkte an den einzelnen Gelenken
     // (kein Mehrfach-Lichtpunkt-Slot im Baukasten).
     "Timantha":           {kopf:"human",haut:"light",ruest:"plate_frau",hose:"beine_frau",ruestTon:"bronze",helm:true,geschlecht:"w",effekt:{typ:"frost",pos:"koerper"}},
+    // GEPRUEFT (16.10., Sprite-Fit 4-Sterne-Batch A): "weisse Schuerze und Schnitzwerkzeug
+    // fehlen" bleibt dokumentiert UNGELOEST — kein Schuerzen-/Kleidungslayer im Baukasten
+    // (ruest-Ebenen sind alle Kampfruestungen, keine Alltagskleidung), kein Hand-Werkzeug
+    // fuer Meissel/Hammer (waffe kennt nur Kampfwaffen: schwert/axt/stab/zweihaender/bogen/
+    // Feuerwaffen). axt als Notbehelf GEPRUEFT und verworfen: eine grosse Kampfaxt ist eine
+    // irrefuehrende Naeherung fuer ein kleines Schnitzmesser, naeher an "falsch" als an
+    // "unvollstaendig richtig" — anders als Schwert-fuer-Dolch (gleiche Waffenkategorie,
+    // nur andere Groesse) waere das keine Annaeherung, sondern ein neues, falsches Detail.
     "Holzfaust":          {kopf:"orc",haut:"green",ohren:true,ruest:"leder",haar:"haar_mop",haarTon:"black"},
     // Bild: nackte, kauernde Engelsgestalt, nur von den eigenen Fluegeln umhuellt (Bildbefund,
     // Fable-Runde 25.08.-Sweep) — DER einzige menschliche Baukasten-Charakter unter allen 138
@@ -2769,6 +2975,13 @@
     // 13.10., Sprite-Fit-Nachlieferung Batch 2: fluegel:true auf fluegel:"federn"
     // umgestellt — echte weisse Federfluegel (die vorgesehene Angel/Divine-Variante,
     // s. Kommentar bei fluegel_federn in zeichneSprite) statt des alten starren Fremdbilds.
+    // GEPRUEFT (16.10., Sprite-Fit 4-Sterne-Batch A): "ruhige, in sich gekehrte
+    // Meditationspose fehlt" bleibt dokumentiert UNGELOEST — der Baukasten kennt keine
+    // eigene Ruhe-/Meditationshaltung (nur walk/run/idle/shoot/slash/hurt je Ebene, alle auf
+    // eine stehende/kampfbereite Figur zugeschnitten, s. public/sprites/baukasten/
+    // README.md). Eine neue Pose waere eine eigene Animation je Blickrichtung je Ebene, kein
+    // punktueller Rezept-Fix (Layer/Farbe/Requisit) wie bei den anderen 16 Charakteren
+    // dieser Runde — strukturelle Grenze, keine spaetere Runde loest das ohne neue Blaetter.
     "Lumen Serene":       {kopf:"human",haut:"light",ruest:"leder_frau",fluegel:"federn",haar:"haar_mop",haarTon:"dark_brown",geschlecht:"w"},
     // Sprite-Fit-Nachlieferung Batch B (16.10.): Portrait zeigt kraeftig tuerkisblaue
     // Schuppen UND einen leuchtenden Wasser-Magie-Wirbel in der erhobenen Hand (s.
@@ -2875,6 +3088,12 @@
     // #F0C858 kommen dem Mantel-Gelb am naechsten). UNVOLLSTAENDIGE NAEHERUNG: Besen/
     // Kehrblech-Requisite und die Perlenkette fehlen (kein Requisiten-Slot dafuer, s.
     // sprite-fit-bewertung.json) — fuer eine spaetere Runde offen.
+    // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A): Besen, Kehrblech und Perlenkette sind
+    // jetzt Teil von zeichneZwiebelKopf() selbst nachgeruestet (s. Funktionskommentar dort,
+    // "kein eigener Requisiten-Slot im Baukasten geprueft und weiterhin keiner da") — kein
+    // neues Flag noetig, zwiebelkopf:true zeichnet alle drei automatisch mit, fest
+    // positioniert statt an eine echte Handgeometrie gebunden (dieselbe Vereinfachung wie
+    // die Zwiebel selbst).
     "Byrd":               {kopf:"human",haut:"brown",geschlecht:"w",zwiebelkopf:true,ruest:"leder_frau",ruestTon:"gold"},
     // effekt "frost"/"kopf" (25.08., Ausbau ueber Feuer hinaus, Bildbefund oben in
     // subclass-archetypes.ts: "Eiskoenigin ... haelt eine leuchtend blaue Eiskugel in der
@@ -4387,9 +4606,16 @@
     // (orange/gelb/rotorange trifft den Bildbefund direkt) statt einer eigenen Kopie.
     // b.gluehenderKern:true schaltet ihn ein, unabhaengig von b.effekt kombinierbar — genau
     // wie b.gluehenderRiss bei Lava Golem.
-    const zeichneKern=(cx,cy,radius)=>{
+    // farben (16.10., Sprite-Fit 4-Sterne-Batch A, Krolach-Nachtrag): optionaler vierter
+    // Parameter, Rueckfall auf die bisherige Feuer-Palette, wenn weggelassen — ALLE
+    // bestehenden Aufrufe (b.gluehenderKern, b.energiekern) bleiben dadurch unveraendert.
+    // Grund s. b.edelsteine weiter unten: Krolachs fehlende "mehrere leuchtende, im
+    // Kristallkoerper eingebettete Edelstein-Lichter" (Bildbefund) brauchen MEHRERE, bunt
+    // gemischte Kernpunkte statt eines einzelnen orangen Feuer-Kerns — dieselbe Funktion,
+    // nur mehrfach mit verschiedener Palette/Position aufgerufen statt kopiert.
+    const zeichneKern=(cx,cy,radius,farbenParam)=>{
       const puls=0.55+0.45*Math.sin(t*2.0+u.id*1.7);
-      const farben=EFFEKT_ARTEN.feuer.farben;
+      const farben=farbenParam||EFFEKT_ARTEN.feuer.farben;
       ctx.globalAlpha=puls*0.22;ctx.fillStyle=farben[0];
       ctx.beginPath();ctx.arc(cx,cy,radius*(1.6+puls*0.3),0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=puls*0.5;ctx.fillStyle=farben[1];
@@ -4423,6 +4649,59 @@
         ctx.beginPath();ctx.arc(ex,cy,radius*0.5,0,Math.PI*2);ctx.fill();
       }
       ctx.globalAlpha=1;
+    };
+    // ALARM-BILDSCHIRMKOPF (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund "Riesiger
+    // Kampfroboter mit rot leuchtendem Sirenenkopf und der Aufschrift ALARM" (s. BAU-
+    // Kommentar bei Alarm, public/portraits/alarm.jpg) — b.vollbild:"roboter"
+    // (roboter_walk.png) traegt nativ nur einen schmalen roten Augenstreifen im Kopfblock
+    // (per Pixel-Scan nachgemessen: rote Pixel bei nativ y=8..10, x zentriert ~31,5 der
+    // 64x64-Zelle in der Front-Reihe — genau der "schmale Augenstreifen" aus der Bewertung),
+    // kein rundes Bildschirm-Element und keine Schrift. Dieselbe Lage wie Kamera/Zwiebel/
+    // Becher/Kuchen oben: kein Sprite im Baukasten zeigt ein rundes Text-Display, also rein
+    // aus Formen. Umrechnung Zelle->Bildschirm wie bei Krolachs Augen (s. zeichneAugen-
+    // Kommentar/b.energiekern bei BAU/Krolach): Bildmitte liegt bei y-46*Z, nativ y=9 (Mitte
+    // des Augenstreifens) ergibt also y-37*Z — der Aufrufer unten liefert genau das.
+    // "ALARM" als echter Canvas-Text statt Formen (einziges Mal im Baukasten) — bei 64px
+    // nicht einzeln lesbar, liest sich aber als helle Schrift-Textur auf rotem Rund-Display,
+    // naeher am Bildbefund als gar keine Schrift (Grundsatz "unvollstaendige Naeherung
+    // schlaegt immer keinen Fix").
+    const zeichneAlarmKopf=(cctx,cx,cy,s)=>{
+      const r=9*s;
+      const puls=0.7+0.3*Math.sin(t*1.6+u.id*1.3);
+      cctx.beginPath();cctx.arc(cx,cy,r*1.2,0,Math.PI*2);
+      cctx.fillStyle="#1a1a1e";cctx.fill();
+      const grad=cctx.createRadialGradient(cx,cy,0,cx,cy,r);
+      grad.addColorStop(0,"#ff6a4a");grad.addColorStop(0.55,"#c8241e");grad.addColorStop(1,"#4a0c0a");
+      cctx.globalAlpha=0.65+0.35*puls;
+      cctx.beginPath();cctx.arc(cx,cy,r,0,Math.PI*2);cctx.fillStyle=grad;cctx.fill();
+      cctx.globalAlpha=1;
+      cctx.lineWidth=Math.max(0.8,0.9*s);cctx.strokeStyle="#55555e";cctx.stroke();
+      cctx.fillStyle="#fff4e0";
+      cctx.font="bold "+Math.max(3,3.4*s)+"px monospace";
+      cctx.textAlign="center";cctx.textBaseline="middle";
+      cctx.fillText("ALARM",cx,cy+0.2*s);
+    };
+    // GOLEM-HOERNER (16.10., Sprite-Fit 4-Sterne-Batch A): Bildbefund Lava Golem zeigt
+    // deutliche, gebogene Daemonenhoerner am Kopf (s. BAU-Kommentar bei Lava Golem,
+    // public/portraits/lava-golem.jpg) — golem_walk.png (b.vollbild:"golem", gemeinsames
+    // Blatt mit Krolach/Vorrak/Krag'Zul) traegt KEINE Hoerner, und b.hoerner (die normale
+    // Helm-Ebene fuer kopf-basierte Figuren) wird im vollbild-Zweig bislang nirgends
+    // gelesen (kein Sprite-Layer passt auf ein Fremdblatt). Dieselbe Requisiten-Bauart wie
+    // zeichneAugen/zeichneKern oben: zwei feste, gespiegelte Formen am selben Kopfansatz-
+    // Punkt (y-36*Z, s. Kommentar bei b.energiekern/zeichneAugen fuer die Pixel-Vermessung
+    // von golem_walk.png), damit sie automatisch bei JEDER golem-Vollbild-Figur mit
+    // b.hoerner:true passen, nicht nur bei Lava Golem.
+    const zeichneGolemHoerner=(cctx,cx,cy,s)=>{
+      cctx.fillStyle="#2a1310";
+      for(const seite of [-1,1]){
+        const bx=cx+seite*3.6*s, by=cy-1*s;
+        cctx.beginPath();
+        cctx.moveTo(bx,by);
+        cctx.quadraticCurveTo(bx+seite*4.2*s,by-5.5*s,bx+seite*2.6*s,by-9.5*s);
+        cctx.quadraticCurveTo(bx+seite*1.6*s,by-5*s,bx-seite*0.6*s,by);
+        cctx.closePath();cctx.fill();
+        cctx.strokeStyle="#5a2a1c";cctx.lineWidth=Math.max(0.5,0.45*s);cctx.stroke();
+      }
     };
     // Seraph-11: mechanischer Reiher-/Kranich-KOERPER, rein prozedural aus Formen gebaut
     // (01.09., Chris' Fund: "das ist jetzt nur noch ein Licht [der Gluehkern], braucht aber
@@ -4573,7 +4852,7 @@
     }
     if(b.vollbild){
       const spec=VOLLBILD[b.vollbild];
-      const im=bHolEingefaerbt(spec.key,b.vollbildFarbe,b.vollbildFarbeModus);
+      const im=bHolEingefaerbt(spec.key,b.vollbildFarbe,b.vollbildFarbeModus,spec.ch);
       const r0=blickAus(u);
       if(im&&im.width){
         const row=vollbildRow(spec,r0);
@@ -4795,6 +5074,45 @@
         zeichneKern(x,y-24*Z,6*Z);
         zeichneAugen(x,y-36*Z,3*Z,1.4*Z);
       }
+      // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A, Krolach): "mehrere leuchtende, im
+      // Kristallkoerper eingebettete Edelstein-Lichter" (Bildbefund, s. BAU-Kommentar) sind
+      // etwas anderes als der eine mittige Energiekern oben — MEHRERE kleine Lichtpunkte an
+      // VERSCHIEDENEN Koerperstellen, in verschiedenen Farben (Portrait zeigt orange UND
+      // blaue Lichter, passend zum alten Bildbefund "orange und blaue Kristalle im Rumpf
+      // eingelassen"). b.edelsteine: Liste aus {dx,dy,r,farben} relativ zu x/y-24*Z (derselbe
+      // Brustkern-Anker wie b.gluehenderKern/b.energiekern), ruft zeichneKern (jetzt mit
+      // optionalem farben-Parameter, s. dort) mehrfach an verschiedenen Punkten auf statt
+      // eine neue Zeichenfunktion zu bauen — GENERISCH fuer jede vollbild-Golem-Figur, nicht
+      // Krolach-spezifisch verdrahtet.
+      if(b.edelsteine&&!u.down){
+        for(const g of b.edelsteine){
+          zeichneKern(x+g.dx*Z,y-24*Z+g.dy*Z,(g.r||3)*Z,g.farben);
+        }
+      }
+      // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A, Lava Golem): "Daemonenhoerner fehlen"
+      // (Bildbefund, s. BAU-Kommentar) — b.hoerner existiert als Flag laengst (normale Helm-
+      // Ebene bei kopf-basierten Figuren, s. weiter unten im normalen Zeichenpfad), wurde im
+      // vollbild-Zweig aber nie gelesen (kein Sprite-Layer passt auf ein Fremdblatt). Hier
+      // GENERISCH nachgezogen wie b.edelsteine oben — jede vollbild-Golem-Figur mit
+      // b.hoerner:true bekommt die Hoerner am selben Kopfansatz-Punkt wie Krolachs Augen
+      // (y-36*Z, s. dortiger Pixel-Scan-Kommentar).
+      if(b.hoerner&&!u.down)zeichneGolemHoerner(ctx,x,y-36*Z,Z);
+      // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A, Lava Golem): "nur EIN gluehender Riss
+      // statt der vielen Lavaadern im ganzen Koerper" (Bildbefund) — b.gluehenderRiss oben
+      // bleibt die eine Riss-auf-Herzhoehe (unveraendert fuer alle bestehenden Nutzer), neu
+      // b.risse: eine Liste weiterer Risse an anderen Koerperstellen (Arme/Beine), dieselbe
+      // zeichneRiss-Funktion, nur an mehr Punkten aufgerufen statt kopiert — GENERISCH fuer
+      // jede vollbild-Figur, die mehrere verteilte Risse statt eines einzelnen braucht.
+      if(b.risse&&!u.down){
+        for(const rs of b.risse){
+          zeichneRiss(x+rs.dx*Z,y+rs.top*Z,y+rs.bot*Z,(rs.breite||4)*Z);
+        }
+      }
+      // NACHTRAG (16.10., Sprite-Fit 4-Sterne-Batch A, Alarm): "runder 'ALARM'-Bildschirmkopf
+      // mit rotem Text-Display fehlt" (Bildbefund, s. BAU-Kommentar/zeichneAlarmKopf-
+      // Funktionskommentar oben) — y-37*Z trifft die Mitte des nativ bei y=8..10 liegenden
+      // Augenstreifens von roboter_walk.png (s. dort fuer die Pixel-Vermessung).
+      if(b.alarmKopf&&!u.down)zeichneAlarmKopf(ctx,x,y-37*Z,Z);
       // Kamera-Requisite (Vigil) ERSETZT den Kopf, sitzt nicht mehr NUR obendrauf (Chris'
       // Korrektur 01.09.: "Vigil müsste die Kamera statt dem Gesicht sein" — die erste
       // Fassung liess Auge/Schnabel der Taube unter der Kamera weiter sichtbar). Position
@@ -31850,7 +32168,7 @@
       }
       if(b.vollbild){
         const spec=VOLLBILD[b.vollbild];
-        const im=bHolEingefaerbt(spec.key,b.vollbildFarbe,b.vollbildFarbeModus);
+        const im=bHolEingefaerbt(spec.key,b.vollbildFarbe,b.vollbildFarbeModus,spec.ch);
         if(im&&im.width){
           const row=vollbildRow(spec,2);
           const dh=50, dw=spec.cw*(dh/spec.ch);
