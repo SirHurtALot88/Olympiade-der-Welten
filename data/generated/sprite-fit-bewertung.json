@@ -310,9 +310,9 @@
  {
   "name": "Gram",
   "slug": "gram",
-  "sterne": 3,
-  "begruendung": "Die reptilienartige Kopfform mit einem kleinen Leuchtpunkt passt zur Kategorie, aber die schwarz-lava-orange Farbgebung, der Flammenkamm und Axt/Rüstung fehlen - wirkt zu freundlich-braun für den Lava-Drachenkrieger.",
-  "fehlendesDetail": "Schwarz-Lava-Farbe, Flammenkamm und Axt fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: waffe von \"schwert\" auf \"axt\" umgestellt - das Portrait zeigt eine schwere, gebogene Doppelklinge am Stiel (eindeutig eine Axt-Silhouette, keine Schwertklinge), bislang falsch als Schwert gebaut. Schwarze Haut, Feuer-Effekt am Kopf (Flammenkamm-Naeherung) und gluehenderRiss (Lava-Risse) trafen die Farbgebung bereits vorher korrekt - die alte Bewertung (\"Farbe/Flammenkamm/Axt fehlen\") war hier teilweise stale.",
+  "fehlendesDetail": "Schulter-Edelstein-Verzierung (rotes Juwel) und Knochen-/Zahnkette am Hals fehlen (kein Schmuck-/Requisiten-Layer im Baukasten)."
  },
  {
   "name": "Greenkraut",
@@ -339,15 +339,15 @@
   "name": "Grizz",
   "slug": "grizz",
   "sterne": 3,
-  "begruendung": "helm:true entfernt - derselbe Roboter-Visier-Helm wie bei Draco/Steel Sinister verdeckte das gruene Ork-Gesicht komplett, obwohl das Portrait nur eine hochgeschobene Brille zeigt (keinen Vollhelm). Das Ork-Gesicht ist jetzt klar sichtbar, effekt:\"frost\" ergaenzt fuer die blauen Zahnrad-Lichter.",
-  "fehlendesDetail": null
+  "begruendung": "helm:true entfernt - derselbe Roboter-Visier-Helm wie bei Draco/Steel Sinister verdeckte das gruene Ork-Gesicht komplett, obwohl das Portrait nur eine hochgeschobene Brille zeigt (keinen Vollhelm). Das Ork-Gesicht ist jetzt klar sichtbar, effekt:\"frost\" ergaenzt fuer die blauen Zahnrad-Lichter. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): kein weiterer Fix moeglich - die zahlreichen Zahnraeder/Rohre auf der gesamten Ruestung und die Schutzbrille selbst bleiben strukturell unbaubar.",
+  "fehlendesDetail": "Die zahlreichen Zahnraeder/Rohre auf Ruestung und Handschuh sowie die hochgeschobene Schutzbrille auf der Stirn bleiben strukturell unbaubar (kein Zahnrad-Textur-Layer, keine Brillen-Requisite im Baukasten) - zwei unabhaengige Luecken."
  },
  {
   "name": "Gronkslime",
   "slug": "gronkslime",
-  "sterne": 3,
-  "begruendung": "Die grüne Farbe und aggressive Monster-Optik passen gut, aber die schleimig-tropfende Textur und der leuchtende Kern in der Brust fehlen - wirkt wie ein fester grüner Ork statt einer Schleim-Kreatur.",
-  "fehlendesDetail": "Tropfende Schleim-Textur und leuchtender Brustkern fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: effekt:{typ:\"gift\",pos:\"koerper\"} ergaenzt (einzige echte Gruen-Palette in EFFEKT_ARTEN) als Naeherung fuer den leuchtenden gelbgruenen Brustkern - trifft eines der beiden urspruenglich genannten Details direkt. Die gruene Farbe und die aggressive Monster-Silhouette passten bereits vorher gut.",
+  "fehlendesDetail": "Die tropfend-schleimige Oberflaechentextur ueber dem ganzen Koerper fehlt (kein Textur-/Tropf-Layer im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Harbinger",
@@ -360,8 +360,8 @@
   "name": "Hellvoice",
   "slug": "hellvoice",
   "sterne": 3,
-  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - jetzt echte, solide schwarze Lederschwingen statt des alten braunen Platzhalters, naeher am Succubus-/Daemon-Look. Hoerner und Ohren bleiben, Hautfarbe amber ist die naechstliegende Annaeherung an Teufelsrot.",
-  "fehlendesDetail": null
+  "begruendung": "13.10.: fluegel von generisch (braunes Fremdbild) auf \"fledermaus\" umgestellt - jetzt echte, solide schwarze Lederschwingen statt des alten braunen Platzhalters, naeher am Succubus-/Daemon-Look. Hoerner und Ohren bleiben, Hautfarbe amber ist die naechstliegende Annaeherung an Teufelsrot. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): die Gitarre - sein zentrales, namensgebendes Requisit als Musiker - fehlt komplett und bleibt strukturell unbaubar (kein Instrumenten-Layer im Baukasten). Bewusst bei 3 statt 4 Sternen belassen, obwohl es die einzige benennbare Luecke ist: ein fehlendes signature-Requisit wiegt schwerer als generische Korrekturen (Chris, 16.10., \"make or break\").",
+  "fehlendesDetail": "Die Gitarre fehlt komplett (kein Instrumenten-/Requisiten-Layer im Baukasten, der waffe-Slot kennt nur Schwert/Axt/Stab/Zweihaender/Bogen) - sein zentrales, namensgebendes Erkennungsmerkmal."
  },
  {
   "name": "Holzfaust",
@@ -387,30 +387,30 @@
  {
   "name": "Issyria",
   "slug": "issyria",
-  "sterne": 3,
-  "begruendung": "Graues Haar und die dunkle Kleidung passen zur Weisen, aber die zwei glühenden Magie-Orbs, Spitzohren und das hohe Alter fehlen komplett.",
-  "fehlendesDetail": "Zwei leuchtende Magie-Orbs und Spitzohren fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: effekt:{typ:\"arkan\",pos:\"koerper\"} ergaenzt (naechstliegende Mehrfarb-Palette lila/pink/gold) als Naeherung fuer die zwei leuchtenden Magie-Orbs in ihren erhobenen Haenden. Graues Haar, dunkle Kleidung und Spitzohren (ohren:true) waren bereits vorher korrekt - die alte Bewertung (\"Spitzohren fehlen\") war stale, ohren:true stand schon im Rezept.",
+  "fehlendesDetail": "Zwei getrennte, unterschiedlich gefaerbte Magie-Orbs (blau/orange) sind nicht gleichzeitig darstellbar - der Effekt-Kanal kennt nur EINEN Partikelsatz je Figur; effekt:arkan naehert sich als einzelner Mehrfarb-Schein an - die einzige verbleibende Luecke."
  },
  {
   "name": "Isuzu",
   "slug": "isuzu",
-  "sterne": 3,
-  "begruendung": "Blondes Haar und goldene Farbgebung passen zur Feuer-Göttin, aber Speer und der lodernde Feuer-Explosionseffekt fehlen.",
-  "fehlendesDetail": "Speer und Feuer-Explosionseffekt fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: waffe von \"schwert\" auf \"stab\" umgestellt (kein Speer-Typ im waffe-Slot, \"stab\" trifft die lange gerade Stangen-Silhouette deutlich naeher als die vorherige kurze Schwertklinge) und effekt:{typ:\"feuer\",pos:\"koerper\"} ergaenzt fuer die lodernde Feuer-Explosionsaura. Blondes Haar und goldene Farbgebung passten bereits vorher zur Feuer-Goettin.",
+  "fehlendesDetail": "Eine echte Speerspitze fehlt - waffe:\"stab\" bleibt ein Rundstab ohne Klingenkopf, die naechstliegende verfuegbare Naeherung an die Stangenwaffe - die einzige verbleibende Luecke."
  },
  {
   "name": "Jihanna",
   "slug": "jihanna",
   "sterne": 3,
-  "begruendung": "Blondes Haar und lederbraune Farbgebung passen zur Kriegerin, aber Spitzohren und die zwei Klingen fehlen.",
-  "fehlendesDetail": "Spitzohren und zwei Klingen fehlen"
+  "begruendung": "Blondes Haar und lederbraune Farbgebung passen zur Kriegerin. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): die alte Bewertung nannte \"Spitzohren fehlen\" - stimmt nicht mehr, ohren:true steht bereits im Rezept. Verbleibende Luecke: zwei getrennte Klingen (Dual-Wield) sind strukturell nicht darstellbar - die Engine zeichnet nur eine Nahkampfwaffe je Figur, eine grundsaetzlich andere Bauweise statt einer punktuellen Korrektur.",
+  "fehlendesDetail": "Zwei getrennte Klingen (Dual-Wield) sind strukturell nicht darstellbar - die Engine zeichnet nur eine Nahkampfwaffe je Figur; waffe:schwert bleibt die naechstliegende Einzelwaffen-Naeherung."
  },
  {
   "name": "Johanna",
   "slug": "johanna",
-  "sterne": 3,
-  "begruendung": "Blondes Haar und dunkle Farbgebung passen grob zur Rüstung, aber Kriegshammer, Wappenschild und der Pelzbesatz fehlen alle.",
-  "fehlendesDetail": "Kriegshammer, Wappenschild und Pelzbesatz fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: waffe von \"schwert\" auf \"axt\" umgestellt - das Portrait zeigt einen schweren Kriegshammer (Steinkopf auf langem Stiel), keine Schwertklinge. Kein Hammer-Typ im waffe-Slot (nur schwert/axt/stab/zweihaender/bogen) - axt ist die naechstliegende Naeherung, weil sie wie der Hammer einen abgesetzten Kopf an einem Haft zeigt. schild:true (Wappenschild) war bereits vorher korrekt gesetzt - die alte Bewertung (\"Kriegshammer, Wappenschild... fehlen\") war beim Schild stale.",
+  "fehlendesDetail": "Der Pelzbesatz am Schulterstueck fehlt (kein Fell-/Pelz-Layer im Baukasten) - die einzige verbleibende Luecke; waffe:axt bleibt die naechstliegende Hammer-Naeherung."
  },
  {
   "name": "Jorund",
@@ -444,22 +444,22 @@
   "name": "Kora",
   "slug": "kora",
   "sterne": 3,
-  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: waffe \"schwert\" auf \"axt\" umgestellt - das Portrait zeigt einen schweren, dorn-/klauenbesetzten Kriegshammer/Streitkeulenkopf auf langem Stiel, den die gebogene Axtklinge (axt_bg/fg) als Silhouette \"schwere Waffe auf einem Stiel\" sichtbar naeher trifft als die duenne Schwertklinge. Hoerner, brauner Fellton, Schwanz und Lederruestung (leder_frau) treffen die Beastfolk-Kategorie bereits; mit der Waffenkorrektur ist das kein blosser generischer Vertreter ihrer Kategorie mehr, sondern traegt jetzt auch die im Bild auffaelligste Requisite korrekt. Es bleibt die Kopf-Seitenansicht, die eher \"Reh\" als \"massiger Stier\" liest (Sonderpalette ohne Rekolorierung, keine bessere Kopf-Alternative im Baukasten verfuegbar) sowie die Guertel-/Beutel-Details aus dem Bild, die keine Entsprechung im Baukasten haben - zwei unabhaengige Luecken, deshalb weiterhin 3 statt 4 Sterne.",
-  "fehlendesDetail": null
+  "begruendung": "16.10., Minotaurus/Zentaur-Cluster-Runde: waffe \"schwert\" auf \"axt\" umgestellt - das Portrait zeigt einen schweren, dorn-/klauenbesetzten Kriegshammer/Streitkeulenkopf auf langem Stiel, den die gebogene Axtklinge (axt_bg/fg) als Silhouette \"schwere Waffe auf einem Stiel\" sichtbar naeher trifft als die duenne Schwertklinge. Hoerner, brauner Fellton, Schwanz und Lederruestung (leder_frau) treffen die Beastfolk-Kategorie bereits; mit der Waffenkorrektur ist das kein blosser generischer Vertreter ihrer Kategorie mehr, sondern traegt jetzt auch die im Bild auffaelligste Requisite korrekt. GEPRUEFT (16.10., Folgerunde, kein weiterer Fix moeglich): die Kopf-Seitenansicht liest weiterhin eher \"Reh\" als \"massiger Stier\" (keine bessere Kopf-Alternative im Baukasten, kopf_wartotaur wirkt wolfs-/daemonenartig statt bovin), und die Guertel-/Beutel-Details aus dem Bild haben keine Entsprechung (kein Requisiten-Layer) - zwei unabhaengige Luecken, deshalb weiterhin 3 statt 4 Sterne.",
+  "fehlendesDetail": "Zwei unabhaengige Luecken: der Kopf liest 'Reh' statt 'massiger Stier' (keine bessere Kopf-Alternative im Baukasten), und die Guertel-/Beutel-Details aus dem Bild haben keine Entsprechung (kein Requisiten-Layer)."
  },
  {
   "name": "Krag'Zul",
   "slug": "krag-zul",
-  "sterne": 3,
-  "begruendung": "Dunkle Steinfarbe und die kegelförmige Kristallspitze am Kopf passen zum Kristall-Golem, aber die vielen scharfkantigen Kristallzacken am ganzen Körper und das durchgehende violette Glühen fehlen - wirkt eher wie ein generischer Stein-Golem.",
-  "fehlendesDetail": "Durchgehende Kristallzacken am ganzen Körper und mehr violettes Glühen fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: effekt.streuung von (Default 9) auf 18 erhoeht - das Portrait zeigt violettes Gluehen, das grossflaechig ueber den ganzen Koerper verteilt ist, nicht nur punktuell im Rumpf; die hoehere Streuung laesst die Partikelwolke sichtbar weiter seitlich/ueber mehr Koerperflaeche streuen. Dunkle Steinfarbe und die kegelfoermige Kristallspitze am Kopf passten bereits vorher zum Kristall-Golem.",
+  "fehlendesDetail": "Die durchgehenden, scharfkantigen Kristallzacken am ganzen Koerper fehlen (kein Zacken-Textur-Layer im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Kreischende Kogge",
   "slug": "kreischende-kogge",
-  "sterne": 3,
-  "begruendung": "Kategorie (Schiff) und das Totenkopf-Motiv auf den Segeln passen zum Geisterschiff-Konzept, aber das gruselige Glühen (giftgrüner Nebel, leuchtende Skelettaugen) und der morsche, zerfetzte Geisterschiff-Look fehlen - wirkt wie ein normales Piratenschiff statt eines Geisterschiffs.",
-  "fehlendesDetail": "Gruseliges grünes Glühen und zerfetzter Geisterschiff-Look fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt. Die alte Bewertung nannte \"giftgruener Nebel\" als fehlendes Detail - stimmt nicht mit dem Bild ueberein, das eindeutig CYAN/BLAU gluehende Totenkopf-Segel und blaue Geisterflammen am Wasserspiegel zeigt, kein Gruen (Grundsatz \"Bild schlaegt Tags\"). frost (hellblau/weiss) ist die naheliegende Farbfamilie dafuer. Kategorie (Schiff) und Totenkopf-Motiv passten bereits vorher.",
+  "fehlendesDetail": "Der zerfetzte, morsche Geisterschiff-Look (statt des intakten \"Pirate Ship\"-Rumpfes) fehlt strukturell (keine beschaedigte Schiffs-Textur-Variante im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Krolach",
@@ -478,9 +478,9 @@
  {
   "name": "Lady Yueqin",
   "slug": "lady-yueqin",
-  "sterne": 3,
-  "begruendung": "Silbernes Haar passt gut, aber die smaragdgrüne Robe, der Wanderstab und die schwimmenden Fische fehlen; wirkt jünger als im Portrait.",
-  "fehlendesDetail": "Grüne Robe, Wanderstab und Fisch-Motiv fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: waffe:\"stab\" ergaenzt (der Wanderstab war die auffaelligste fehlende Requisite, bislang ganz ohne Waffen-Ebene) und ruestTon:\"tuerkis\" ergaenzt (neue Rampe in RUEST_TON, additiv wie violett/rot/blau zuvor) - faerbt die Robe jetzt jadegruen statt im unbestimmten Standard-Lederton. Silbernes Haar passte bereits vorher.",
+  "fehlendesDetail": "Die schwimmenden Fische um sie herum fehlen strukturell (kein Tier-Begleiter-/Requisiten-Layer im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Lava Golem",
@@ -499,9 +499,9 @@
  {
   "name": "Lilly",
   "slug": "lilly",
-  "sterne": 3,
-  "begruendung": "Braunes Haar und lederbraune Kleidung passen zur Söldnerin, aber die Augenklappe und das blutige Messer - die auffälligsten Merkmale - fehlen.",
-  "fehlendesDetail": "Augenklappe und blutiges Messer fehlen"
+  "sterne": 4,
+  "begruendung": "Braunes Haar und lederbraune Kleidung passen zur Soeldnerin. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): die alte Bewertung nannte auch \"blutiges Messer fehlt\" - stimmt nicht mehr, waffe:\"schwert\" steht hier bereits als naechstliegende Einzelklingen-Naeherung (keine eigene Dolch-/Messer-Ebene im Baukasten, dasselbe dokumentierte Muster wie bei Jihanna und anderen Dolch-Trägerinnen).",
+  "fehlendesDetail": "Die schwarze Augenklappe - ihr markantestes Erkennungsmerkmal - fehlt komplett (kein Augenklappen-/Masken-Layer im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Lucky",
@@ -528,8 +528,8 @@
   "name": "Lynara",
   "slug": "lynara",
   "sterne": 3,
-  "begruendung": "Krone/Kopfschmuck und goldene Farbgebung passen zur Elfen-Gelehrten, aber Schriftrolle, Spitzohren und die zweifarbige Weiß-Gold-Robe fehlen.",
-  "fehlendesDetail": "Schriftrolle und Spitzohren fehlen"
+  "begruendung": "Krone/Kopfschmuck (krone:true) und goldene Farbgebung passen zur Elfen-Gelehrten. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): die alte Bewertung nannte auch \"Spitzohren fehlen\" - stimmt nicht mehr, ohren:true steht bereits im Rezept. Zwei unabhaengige Luecken bleiben offen: die Schriftrolle/Feder (kein Requisiten-Layer im Baukasten) und die zweifarbige Weiss-Gold-Robe (ruestTon faerbt die gesamte Ruestung einheitlich, ein zweiter Stoffakzent ist nicht gleichzeitig darstellbar - derselbe Kanal-Engpass wie bei Sweet Dreams).",
+  "fehlendesDetail": "Zwei unabhaengige Luecken: die Schriftrolle/Feder fehlt (kein Requisiten-Layer), und die zweifarbige Weiss-Gold-Robe ist nicht darstellbar (ruestTon faerbt nur einheitlich)."
  },
  {
   "name": "Lys Puppenkopf",
@@ -556,8 +556,8 @@
   "name": "Melody",
   "slug": "melody",
   "sterne": 3,
-  "begruendung": "Das markante pinke Haar passt hervorragend, aber die schwarze Kleidung, die Gitarre und die kleine Krone/Tiara fehlen alle - mehrere Details offen für nur eine 4.",
-  "fehlendesDetail": "Schwarze Kleidung, Gitarre und Tiara fehlen"
+  "begruendung": "Das markante pinke Haar passt hervorragend. 16.10.: ruestTon:\"dunkel\" ergaenzt (faerbt die Robe jetzt schwarz statt im unbestimmten Standard-Lederton) und krone:true ergaenzt (Tiara-Naeherung - Form/Position passt, Farbe gold statt schwarz, eine unvollstaendige Naeherung schlaegt immer keinen Fix). Die Gitarre - ihr zentrales, namensgebendes Requisit als Musikerin - fehlt komplett und bleibt strukturell unbaubar (kein Instrumenten-Layer im Baukasten). Bewusst bei 3 statt 4 Sternen belassen, obwohl es nach den beiden Korrekturen die einzige verbleibende Luecke ist: ein fehlendes signature-Requisit wiegt schwerer als generische Ton-/Farbkorrekturen (Chris' Prioritaet, 16.10., \"make or break\").",
+  "fehlendesDetail": "Die Gitarre fehlt komplett (kein Instrumenten-Layer im Baukasten) - ihr zentrales, namensgebendes Erkennungsmerkmal."
  },
  {
   "name": "Mindtamer",
@@ -569,9 +569,9 @@
  {
   "name": "Moonveil",
   "slug": "moonveil",
-  "sterne": 3,
-  "begruendung": "Goldene Farbgebung passt zur Mondkönigin-Rüstung, aber Silberhaar, Mondsichel-Schmuck und der leuchtende Stab fehlen alle.",
-  "fehlendesDetail": "Silberhaar, Mondsichel-Schmuck und Stab fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: ruestTon von \"gold\" auf \"blau\" umgestellt (Bildbefund zeigt eine dunkelblaue/navy Robe mit Gold-Stickerei als Akzent, nicht eine durchgehend goldene Ruestung - \"gold\" faerbte bisher die gesamte Flaeche falsch) und effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt als Naeherung an das kuehle Mondlicht-Gluehen. Silberhaar (haarTon:\"platinum\") und waffe:\"stab\" (Stab-Zepter) standen bereits korrekt im Rezept - die alte Bewertung (\"Silberhaar... und Stab fehlen alle\") war hier komplett stale.",
+  "fehlendesDetail": "Der Mondsichel-Anhaenger/-Haarschmuck fehlt strukturell (kein Schmuck-/Requisiten-Layer im Baukasten) - die einzige verbleibende Luecke."
  },
  {
   "name": "Murky",
@@ -598,8 +598,8 @@
   "name": "Nachtschatten",
   "slug": "nachtschatten",
   "sterne": 3,
-  "begruendung": "Dunkles Haar und schwarze Kleidung passen zur nächtlichen Diebin, aber die Maske, Spitzohren und das spinnennetzartige Verzierungsmuster fehlen.",
-  "fehlendesDetail": "Maske, Spitzohren und Netzmuster fehlen"
+  "begruendung": "Dunkles Haar und schwarze Kleidung passen zur naechtlichen Diebin. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B): die alte Bewertung nannte auch \"Spitzohren fehlen\" - stimmt nicht mehr, ohren:true steht bereits im Rezept. Zwei unabhaengige Luecken bleiben offen: die Augenmaske (kein Masken-Layer im Baukasten) und das spinnennetzartige Verzierungsmuster auf dem Anzug (kein Textur-/Stickmuster-Layer).",
+  "fehlendesDetail": "Zwei unabhaengige Luecken: die Augenmaske fehlt (kein Masken-Layer), und das spinnennetzartige Verzierungsmuster auf dem Anzug fehlt (kein Textur-/Stickmuster-Layer)."
  },
  {
   "name": "Nahli-Ke",
@@ -625,30 +625,30 @@
  {
   "name": "Nimri",
   "slug": "nimri",
-  "sterne": 3,
-  "begruendung": "13.10.: fluegel von generisch (braunes Fledermaus-Fremdbild) auf \"federn\" umgestellt - echte weisse Federfluegel lesen sich naeher an den zarten, lichten Schmetterlings-/Feenschwingen des Portraits. Blaue Hautfarbe bleibt eine passable Annaeherung an das Tuerkis.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: fluegel von generisch (braunes Fledermaus-Fremdbild) auf \"federn\" umgestellt - echte weisse Federfluegel lesen sich naeher an den zarten, lichten Schmetterlings-/Feenschwingen des Portraits. 16.10.: geist:true ergaenzt - das Portrait zeigt einen vollstaendig DURCHSCHEINENDEN Kristall-/Wasserkoerper, geist:true (globalAlpha 0.6, bereits bei Erna Wellenlaut/Gralakar etabliert) trifft diese Transluzenz direkt. Blaue Hautfarbe bleibt eine passable Annaeherung an das Tuerkis.",
+  "fehlendesDetail": "Der Zweifarb-Verlauf der Fluegel (tuerkis zu rosa) ist nicht darstellbar (eine Flaeche = eine Farbe je Ebene) - die einzige verbleibende Luecke."
  },
  {
   "name": "Nocture",
   "slug": "nocture",
-  "sterne": 3,
-  "begruendung": "Die gruselige Kapuzen-Gestalt mit spitzen Zähnen trifft die unheimliche Schatten-Wesen-Idee im Ton, aber Farbe (oliv-weiß statt rauchig-schwarz) und die rote Glut-Aura fehlen.",
-  "fehlendesDetail": "Rauchig-schwarze Farbe und rote Glut-Aura fehlen"
+  "sterne": 4,
+  "begruendung": "Die gruselige Kapuzen-/Schattengestalt mit dem \"geist\"-Vollbild trifft die unheimliche Schatten-Wesen-Idee im Ton bereits. 16.10.: vollbildFarbe:\"#1f1b1a\" OHNE vollbildFarbeModus ergaenzt - das Blatt lief bisher UNGEFAERBT (per renderProbe nachgemessen: hell-gruenlich-weisses Standard-Leichentuch statt der rauchig-schwarzen Gestalt aus dem Bild). GEPRUEFT: modus:\"farbe\" (behaelt Original-Luminanz bei) aenderte bei einem fast-schwarzen Fuellton praktisch nichts am hellen Blatt - der Default \"multiply\" (kann eine Zielfarbe nur SCHWAECHEN) multipliziert das helle Blatt dagegen sichtbar auf einen rauchig-dunklen Ton herunter, per renderProbe vorher/nachher bestaetigt. effekt:voidRot (rot, wabernd) lieferte die rotgluehende Energie bereits vorher. Beide vorher einzeln benannten Luecken (Farbe, Gluehen) sind damit behoben.",
+  "fehlendesDetail": "Die klauenartige, tentakelfoermige Silhouette aus dem Bild zeigt das generische \"geist\"-Blatt (rundlicher Umhang-Umriss) strukturell nicht nach - die einzige verbleibende Luecke."
  },
  {
   "name": "Node",
   "slug": "node",
-  "sterne": 3,
-  "begruendung": "Die dunkle Roboter-Silhouette passt zur Kategorie, aber der Bildschirm-Kopf mit Störbild-Anzeige (statt eines Helm-Visiers) und die blauen Energie-Schweife fehlen.",
-  "fehlendesDetail": "Bildschirm-Kopf und blaue Energie-Schweife fehlen"
+  "sterne": 4,
+  "begruendung": "16.10.: effekt:{typ:\"frost\",pos:\"koerper\"} ergaenzt - kein echter Cyan-Effekttyp in EFFEKT_ARTEN vorhanden (nur frost=hellblau/weiss, arkan=lila/pink/gold, void=lila, feuer=orange), frost liegt mit seiner hellblau-weissen Palette am naechsten an den cyanfarbenen Energieschlieren im Bild. Die dunkle Roboter-Silhouette passte bereits vorher zur Kategorie.",
+  "fehlendesDetail": "Der Bildschirm-Kopf mit Stoerbild-Anzeige fehlt strukturell (kein Monitor-/Bildschirm-Kopf-Layer im Baukasten, helm:true zeigt stattdessen ein generisches Visier) - die einzige verbleibende Luecke."
  },
  {
   "name": "Omniclops",
   "slug": "omniclops",
-  "sterne": 3,
-  "begruendung": "13.10.: Hautfarbe von brown auf black umgestellt - der Kopf wirkt jetzt sichtbar dunkler/rindenschwarz statt warm braun, naeher am 'dunkles Rindengestein'-Bild. effekt:void (violett) am Koerper trifft den gluehenden Brustriss bereits gut.",
-  "fehlendesDetail": null
+  "sterne": 4,
+  "begruendung": "13.10.: Hautfarbe von brown auf black umgestellt - der Kopf wirkt jetzt sichtbar dunkler/rindenschwarz statt warm braun, naeher am 'dunkles Rindengestein'-Bild. effekt:void (violett) am Koerper trifft den gluehenden Brustriss bereits gut. GEPRUEFT (16.10., Sprite-Fit 3-Sterne-Batch B, kein weiterer Code-Aenderungsbedarf): Hoerner, schwarze Haut, dunkle Ruestung und der violette Brust-Riss-Effekt treffen inzwischen alle vier im urspruenglichen Bildbefund genannten Merkmale.",
+  "fehlendesDetail": "Die grobe, rissige Rinden-/Steintextur der Haut fehlt (kein Textur-Layer im Baukasten, nur einfarbige Hauttoene) - die einzige verbleibende Luecke."
  },
  {
   "name": "Orakelpfropf",
