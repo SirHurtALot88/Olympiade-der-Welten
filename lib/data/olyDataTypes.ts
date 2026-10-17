@@ -2678,6 +2678,50 @@ export type DisciplineHighlightRecord = {
  * gerechnet — ein Snapshot darf niemals ein Ergebnis zu einer Aufstellung liefern, die
  * so gar nicht mehr antritt.
  */
+/**
+ * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+ * Abschnitt 2.2): Status des Hintergrundlaufs, der die Arena-Duelle eines Battle-Spieltags
+ * VOR der Buehne rechnet und in den `MatchdayResolveSnapshotRecord` schreibt. JE SPIELTAG
+ * statt des alten saveweiten Einzelfelds `seasonState.arenaMatchdayResolveStatus` (Befund F5:
+ * das alte Feld kennt weder Spieltag noch Zeitstempel und blieb nach einem Container-Neustart
+ * fuer immer "in_progress"). `"ready"` UND `"failed"` sind beide TERMINAL — "failed" heisst nur
+ * "mindestens eine Disziplin ist ohne Arena-Ergebnis auf die PPS-Duell-Bruecke gefallen", nicht
+ * "nichts wurde gebucht": der Auto-Run bucht in beiden Faellen den Snapshot, nur sein Inhalt
+ * unterscheidet sich (reines Arena-Ergebnis vs. eine mit `arenaAusfall` markierte Bruecke).
+ */
+export type ArenaVorlaufStatus = "in_progress" | "ready" | "failed";
+
+export type ArenaVorlaufDisziplinEintrag = {
+  status: "arena" | "ausgefallen";
+  ausfall?: ArenaAusfall | null;
+  dauerMs?: number | null;
+  /**
+   * OPUS-AUFLAGE B2 (Plan Abschnitt 9, Punkt 2): Fingerabdruck ueber Saat, Kader, Aufstellung,
+   * Mutator-Wurf und Motor-Datei-Hash fuer GENAU diese Disziplin dieses Spieltags — berechnet von
+   * `berechneArenaEingabeHash()` (`lib/battle/arena-eingabe-hash.ts`). Nicht nur diagnostisch:
+   * `resolveMatchdayPreviewToBook()` (`lib/foundation/matchday-resolve-snapshot.ts`) berechnet ihn
+   * beim Buchen ERNEUT und verwirft den Snapshot fuers Buchen, wenn er nicht mehr passt — sichtbar
+   * (Warnung, neuer Vorlauf) statt eine stille Divergenz zwischen Vorlauf- und Buchungszustand zu
+   * buchen.
+   */
+  eingabeHash?: string | null;
+};
+
+export type ArenaVorlaufRecord = {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  /** `buildMatchdayResolveSignature()` beim Start — passt sie beim Schreiben nicht mehr, wird verworfen. */
+  signature: string;
+  status: ArenaVorlaufStatus;
+  startedAt: string;
+  finishedAt?: string | null;
+  /** Wievielter Versuch fuer diese Signatur (Wiederholung nach `absturz`/`timeout`/`chromium_start`). */
+  versuch: number;
+  /** je arena-aufgeloester Disziplin dieses Spieltags (D1 und/oder D2, s. WEG B). */
+  disziplinen: Record<string, ArenaVorlaufDisziplinEintrag>;
+};
+
 export type MatchdayResolveSnapshotRecord = {
   id: string;
   saveId: string;
@@ -2731,6 +2775,12 @@ export type MatchdayResolveSnapshotRecord = {
   /** Das Ergebnis, in das diese Rechnung gebucht wurde. Zusammen mit `bookedAt` der Beleg. */
   bookedMatchdayResultId?: string | null;
   createdAt: string;
+  /**
+   * ARENA-VORLAUF (PR 3, K1): `null`/fehlend, solange kein Vorlauf fuer diesen Spieltag lief oder
+   * er noch gar nicht anwendbar ist (Manager Mode, keine arena-aufgeloeste Disziplin an D1/D2).
+   * Additiv wie `bookedAt` — ein Snapshot ohne dieses Feld verhaelt sich wie vor PR 3.
+   */
+  arenaVorlauf?: ArenaVorlaufRecord | null;
 };
 
 export type ResultAuditLogRecord = {

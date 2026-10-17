@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   // es nicht (Manager Mode, jede andere Disziplin, ein reiner Dry-Run-Preview), liefert es
   // `{ applicable: false }` und der bisherige synchrone Pfad laeuft unveraendert weiter.
   if (execute && source === "sqlite") {
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence: createPersistenceService(),
       saveId,
       seasonId,
@@ -83,7 +83,9 @@ export async function POST(request: Request) {
       allowIncompleteOverride: body.allowIncompleteOverride ?? false,
       logPrefix: "[legacy-matchday-apply]",
     });
-    if (kickoff.applicable) {
+    if (kickoff.applicable && !kickoff.booked) {
+      // Vorlauf laeuft noch (oder wurde gerade erst angestossen, Plan 2.8) — GENAUSO wie vorher:
+      // kein Chromium in diesem Request, die UI pollt ueber den Status weiter.
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
         action: "matchday_apply",
@@ -97,10 +99,49 @@ export async function POST(request: Request) {
         source,
         dryRun: false,
         applied: false,
-        arenaMatchdayResolveStatus: "in_progress",
+        arenaMatchdayResolveStatus: kickoff.status,
         previewStatus: null,
         summary: null,
         warnings: writeAuth.warnings,
+      });
+    }
+    if (kickoff.applicable && kickoff.booked) {
+      // Der Vorlauf war schon fertig — gebucht wurde SYNCHRON aus dem Snapshot, ohne Chromium in
+      // diesem Request (Plan 2.8/F3).
+      const result = kickoff.result;
+      if (!result.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: result.error,
+            source: result.source,
+            previewStatus: result.previewStatus ?? null,
+            canApply: result.canApply ?? false,
+            blockingReasons: result.blockingReasons ?? [],
+          },
+          // Dieser Zweig laeuft nur innerhalb von `source === "sqlite"` (s. umschliessende
+          // Bedingung oben) — anders als beim allgemeinen Fehlerpfad unten ist `source` hier also
+          // nie `"prisma"`, deshalb fest 422 statt der (sonst toten) Fallunterscheidung.
+          { status: 422 },
+        );
+      }
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        action: "matchday_apply",
+        eventType: "matchday_applied",
+        affectedViews: ["home", "season", "matchday", "arena", "standings"],
+        dryRun: false,
+        success: result.applied === true,
+      });
+      return NextResponse.json({
+        success: true,
+        source,
+        dryRun: result.dryRun,
+        applied: result.applied,
+        arenaMatchdayResolveStatus: "ready",
+        previewStatus: result.previewStatus,
+        summary: result,
+        warnings: [...writeAuth.warnings, ...result.blockingReasons],
       });
     }
   }

@@ -17,6 +17,7 @@ import {
   getTopPlayerNameForTeam,
 } from "@/lib/resolve/legacy-resolve-lab";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 
 export type LegacyMatchdayResolvePreviewPayload = {
   source: "sqlite" | "prisma";
@@ -63,6 +64,14 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
    * bleibt das Verhalten unverändert.
    */
   gameState?: GameState | null;
+  /**
+   * PR 3 (K1, Plan Abschnitt 2.2): der Arena-Vorlauf reicht hier seine Ergebnis-Maps durch
+   * (`arenaTeamPointsByDisciplineId`/`arenaIndividualBoxscorePpsByDisciplineId`/
+   * `arenaAusfallByDisciplineId`), damit DER SNAPSHOT selbst — und damit die Buehne — Arena-
+   * Zeilen zeigt, statt dass die Arena nur beim Buchen live dazukommt (genau das war Fund F3).
+   * Weggelassen (jeder heutige Aufrufer ausser dem Vorlauf) aendert nichts.
+   */
+  resolveOptions?: LegacyResolvePreviewOptions | null;
 }): LegacyMatchdayResolvePreviewPayload | null {
   const warnings = input.contextResults.flatMap((result) => result.warnings);
   const contexts = input.contextResults.flatMap((result) => (result.ok ? [result.context] : []));
@@ -87,7 +96,7 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
 
   const readinessRows = contexts.map((context) => buildLegacyMatchdayReadiness(context));
   const readinessByTeamId = new Map(readinessRows.map((row) => [row.teamId, row]));
-  const preview = buildLegacyMatchdayResolvePreview(contexts);
+  const preview = buildLegacyMatchdayResolvePreview(contexts, input.resolveOptions ?? undefined);
   const summary = buildResolveLabSummary(preview, contexts, readinessByTeamId);
   const teamDetails = buildResolveLabTeamDetails(contexts, preview, readinessByTeamId);
   const topPlayers = buildResolveLabTopPlayersBySide(preview, contexts);

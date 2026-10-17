@@ -1,16 +1,25 @@
 import { createHash } from "node:crypto";
 
-import type { GameState, MatchdayResolveSnapshotRecord } from "@/lib/data/olyDataTypes";
+import type {
+  ArenaVorlaufDisziplinEintrag,
+  ArenaVorlaufRecord,
+  GameState,
+  MatchdayResolveSnapshotRecord,
+} from "@/lib/data/olyDataTypes";
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
 import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import { istKoopSchreibkonflikt } from "@/lib/persistence/koop-schreibkonflikt";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
   buildLegacyMatchdayResolvePreviewPayload,
   type LegacyMatchdayResolvePreviewPayload,
 } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
+import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { berechneArenaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 
 export type MatchdayResolveScope = {
   saveId: string;
@@ -288,7 +297,66 @@ export function resolveMatchdayPreviewToBook(input: {
 }): MatchdayPreviewToBook {
   const snapshot = readMatchdayResolveSnapshot(input.gameState, input.scope);
   if (!snapshot) return { preview: input.livePreview, source: "live" };
+  // OPUS-AUFLAGE B2 (Plan Abschnitt 9, Punkt 2): `arenaEingabeHash` wird hier AKTIV geprueft, nicht
+  // nur diagnostisch gespeichert. Trug der Vorlauf ein Arena-Ergebnis fuer eine Disziplin ein, aber
+  // der jetzt (beim Buchen) neu berechnete Fingerabdruck weicht ab — Kader, Aufstellung oder
+  // Mutator-Wurf haben sich seit dem Vorlauf-Lauf geaendert, ohne dass die (groebere)
+  // Aufstellungs-Signatur selbst schon gekippt ist —, wird DIESER Snapshot NICHT gebucht. Der
+  // Aufrufer faellt auf die Live-Rechnung zurueck (die die Engine-Strukturpruefung korrekt als
+  // `nicht_ausgefuehrt` markiert, s. legacy-matchday-resolve-engine.ts) und ein neuer Vorlauf wird
+  // unten angestossen -- sichtbar statt eine stille Divergenz zu buchen.
+  const divergenz = findeArenaEingabeHashDivergenz(input.gameState, input.scope, snapshot.record.arenaVorlauf ?? null);
+  if (divergenz.length > 0) {
+    console.error(
+      `[arena-vorlauf] arenaEingabeHash-Divergenz beim Buchen (${input.scope.saveId}/${input.scope.matchdayId}): ${divergenz.join(", ")} — Snapshot wird NICHT gebucht, Vorlauf muss neu laufen.`,
+    );
+    return { preview: input.livePreview, source: "live" };
+  }
   return { preview: snapshot.payload.preview, source: "snapshot" };
+}
+
+/**
+ * Welche Disziplinen des gespeicherten Vorlaufs ihren beim Buchen neu berechneten
+ * `arenaEingabeHash` NICHT mehr bestaetigen (nur solche mit `status: "arena"` -- eine bereits als
+ * `"ausgefallen"` markierte Disziplin hat ohnehin kein Arena-Ergebnis zu verwerfen).
+ */
+function findeArenaEingabeHashDivergenz(
+  gameState: GameState,
+  scope: MatchdayResolveScope,
+  vorlauf: ArenaVorlaufRecord | null,
+): string[] {
+  if (!vorlauf) return [];
+  const spieltag = (gameState.seasonState.disciplineSchedule ?? []).find(
+    (eintrag) => eintrag.matchdayId === scope.matchdayId,
+  ) as { discipline1?: { disciplineId?: string } | null; discipline2?: { disciplineId?: string } | null } | undefined;
+  const d1DisciplineId = spieltag?.discipline1?.disciplineId ?? null;
+  const d2DisciplineId = spieltag?.discipline2?.disciplineId ?? null;
+  const abweichend: string[] = [];
+  for (const [disciplineId, eintrag] of Object.entries(vorlauf.disziplinen)) {
+    if (eintrag.status !== "arena" || !eintrag.eingabeHash) continue;
+    // Der Mutator-Wurf ist (saveId, seasonId, matchdayId, disciplineId)-deterministisch -- hier
+    // GENAUSO neu gezogen wie beim Vorlauf selbst (`resolveMatchdayMutatorTraitsForDiscipline`),
+    // damit beide Hashes bei unveraendertem Zustand exakt uebereinstimmen.
+    const mutatoren =
+      resolveMatchdayMutatorTraitsForDiscipline({
+        saveId: scope.saveId,
+        seasonId: scope.seasonId,
+        matchdayId: scope.matchdayId,
+        d1DisciplineId,
+        d2DisciplineId,
+        disciplineId,
+      }) ?? [];
+    const aktuellerHash = berechneArenaEingabeHash({
+      gameState,
+      saveId: scope.saveId,
+      seasonId: scope.seasonId,
+      matchdayId: scope.matchdayId,
+      disciplineId,
+      mutatoren,
+    });
+    if (aktuellerHash !== eintrag.eingabeHash) abweichend.push(disciplineId);
+  }
+  return abweichend;
 }
 
 /**
@@ -448,6 +516,9 @@ export function markMatchdayResolveSnapshotAsBooked(input: {
     bookedAt,
     bookedMatchdayResultId: matchdayResultId,
     createdAt: bestehend?.createdAt ?? bookedAt,
+    // ARENA-VORLAUF (PR 3): bleibt am gebuchten Datensatz stehen, damit Ledger-Ansichten nach dem
+    // Buchen weiterhin sehen koennen, welche Disziplinen ueber die Arena liefen.
+    arenaVorlauf: bestehend?.arenaVorlauf ?? null,
   };
 
   return {
@@ -478,4 +549,179 @@ export function ensureMatchdayResolveSnapshot(
   if (getBookedMatchdaySides(save.gameState, scope).size > 0) return null;
   if (!isMatchdayFieldComplete(save.gameState, scope)) return null;
   return writeMatchdayResolveSnapshot(scope, persistence);
+}
+
+function findStoredSnapshotRecord(
+  gameState: GameState,
+  scope: MatchdayResolveScope,
+): MatchdayResolveSnapshotRecord | null {
+  return (
+    (gameState.seasonState.matchdayResolveSnapshots ?? []).find(
+      (entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId,
+    ) ?? null
+  );
+}
+
+/**
+ * ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.2/2.7). Liest den rohen Vorlauf-Status, UNABHAENGIG
+ * davon, ob die Signatur (noch) zum aktuellen Feldstand passt (anders als
+ * `readMatchdayResolveSnapshot`) — der Aufrufer braucht hier "laeuft gerade etwas / ist etwas
+ * fertig", nicht "ist diese Vorberechnung noch gueltig".
+ *
+ * ABGEBROCHENER NEUSTART (Befund-Gegenstueck zu F5, Plan Abschnitt 2.7): ein `"in_progress"`,
+ * dessen `startedAt` aelter als 5 Minuten ist, kann kein echter laufender Prozess mehr sein — der
+ * Node-Prozess, der ihn gestartet hat, waere laengst fertig oder abgestuerzt. Diese Funktion gibt
+ * ihn dann als `"failed"` (`abgebrochen_neustart`) zurueck, OHNE das selbst zu persistieren (rein
+ * lesend) — der naechste `kickoffArenaVorlauf()` schreibt den echten, neuen Stand.
+ */
+export function readArenaVorlaufRecord(gameState: GameState, scope: MatchdayResolveScope): ArenaVorlaufRecord | null {
+  const vorlauf = findStoredSnapshotRecord(gameState, scope)?.arenaVorlauf ?? null;
+  if (!vorlauf) return null;
+  if (vorlauf.status === "in_progress") {
+    const gestartetVor = Date.now() - Date.parse(vorlauf.startedAt);
+    if (Number.isFinite(gestartetVor) && gestartetVor > 5 * 60_000) {
+      return {
+        ...vorlauf,
+        status: "failed",
+        finishedAt: vorlauf.finishedAt ?? new Date().toISOString(),
+        disziplinen: Object.fromEntries(
+          Object.entries(vorlauf.disziplinen).map(([disciplineId, eintrag]) => [
+            disciplineId,
+            eintrag.status === "arena"
+              ? eintrag
+              : {
+                  ...eintrag,
+                  status: "ausgefallen" as const,
+                  ausfall: eintrag.ausfall ?? {
+                    grund: "abgebrochen_neustart" as const,
+                    zeitpunkt: new Date().toISOString(),
+                    versuch: vorlauf.versuch,
+                  },
+                },
+          ]),
+        ),
+      };
+    }
+  }
+  return vorlauf;
+}
+
+/**
+ * MARKIERT DEN START eines Arena-Vorlaufs am BESTEHENDEN Snapshot (der Aufrufer hat vorher
+ * `ensureMatchdayResolveSnapshot()` gerufen -- ohne Snapshot gibt es nichts, an das sich der
+ * Vorlauf haengen koennte, deshalb `null` in diesem Fall). Koop-Schreibkonflikt: bis zu drei
+ * Versuche, GENAU das Muster aus `schreibeArenaMatchdayResolveStatus()`
+ * (arena-matchday-resolve-service.ts).
+ */
+export function beginArenaVorlauf(
+  scope: MatchdayResolveScope,
+  input: { signature: string; disciplineIds: string[] },
+  persistence: PersistenceService = createPersistenceService(),
+): ArenaVorlaufRecord | null {
+  for (let versuch = 1; versuch <= 3; versuch += 1) {
+    const { save } = requireLocalPersistedSave(persistence, scope.saveId);
+    const existing = findStoredSnapshotRecord(save.gameState, scope);
+    if (!existing) return null;
+    const vorherigerVersuch = existing.arenaVorlauf?.signature === input.signature ? existing.arenaVorlauf.versuch : 0;
+    const record: ArenaVorlaufRecord = {
+      saveId: scope.saveId,
+      seasonId: scope.seasonId,
+      matchdayId: scope.matchdayId,
+      signature: input.signature,
+      status: "in_progress",
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      versuch: vorherigerVersuch + 1,
+      disziplinen: Object.fromEntries(input.disciplineIds.map((id) => [id, { status: "ausgefallen" as const }])),
+    };
+    const nextGameState: GameState = {
+      ...save.gameState,
+      seasonState: {
+        ...save.gameState.seasonState,
+        matchdayResolveSnapshots: [{ ...existing, arenaVorlauf: record }],
+      },
+    };
+    try {
+      persistence.saveSingleplayerState(save.saveId, nextGameState);
+      return record;
+    } catch (error) {
+      if (!istKoopSchreibkonflikt(error)) throw error;
+    }
+  }
+  return null;
+}
+
+/**
+ * SCHREIBT DAS ERGEBNIS eines Arena-Vorlaufs zurueck — nur wenn die Aufstellungs-Signatur beim
+ * Schreiben noch dieselbe ist, mit der er GESTARTET wurde (Plan Abschnitt 2.7: "Weicht sie ab, wird
+ * das Ergebnis verworfen und ein neuer Vorlauf mit der neuen Signatur angestossen"). `resolveOptionsForPreview`
+ * baut den Snapshot-Payload NEU (mit den Arena-Maps), damit die Buehne danach Arena-Zeilen zeigt --
+ * weggelassen (z.B. bei einem Totalausfall ohne jedes Arena-Ergebnis) bleibt der alte PPS-Payload
+ * stehen, nur mit den `arenaAusfall`-Markern aus der Engine-Strukturpruefung (PR1).
+ */
+export function finishArenaVorlauf(
+  scope: MatchdayResolveScope,
+  input: {
+    signature: string;
+    status: "ready" | "failed";
+    versuch: number;
+    startedAt: string;
+    disziplinen: Record<string, ArenaVorlaufDisziplinEintrag>;
+    resolveOptionsForPreview?: LegacyResolvePreviewOptions | null;
+  },
+  persistence: PersistenceService = createPersistenceService(),
+): { written: boolean; verworfen: boolean; record: ArenaVorlaufRecord | null } {
+  for (let versuch = 1; versuch <= 3; versuch += 1) {
+    const { save } = requireLocalPersistedSave(persistence, scope.saveId);
+    const existing = findStoredSnapshotRecord(save.gameState, scope);
+    if (!existing) return { written: false, verworfen: false, record: null };
+
+    const aktuelleSignatur = buildMatchdayResolveSignature(save.gameState, scope);
+    if (aktuelleSignatur !== input.signature) {
+      // SIGNATURWECHSEL WAEHREND DES LAUFS (Plan Abschnitt 2.7): das Ergebnis passt nicht mehr zum
+      // Feldstand (Aufstellung wurde zwischenzeitlich geaendert) -- verworfen, kein Schreiben. Der
+      // Aufrufer der naechsten Lineup-Aenderung stoesst ohnehin schon einen neuen Vorlauf an.
+      return { written: false, verworfen: true, record: existing.arenaVorlauf ?? null };
+    }
+
+    let nextPayload: LegacyMatchdayResolvePreviewPayload | null = existing.payload as LegacyMatchdayResolvePreviewPayload | null;
+    if (input.resolveOptionsForPreview) {
+      const contextResults = loadAllLocalLegacyLineupContexts(scope, persistence);
+      const rebuilt = buildLegacyMatchdayResolvePreviewPayload({
+        source: "sqlite",
+        params: scope,
+        contextResults,
+        gameState: save.gameState,
+        resolveOptions: input.resolveOptionsForPreview,
+      });
+      if (rebuilt) nextPayload = rebuilt;
+    }
+    if (!nextPayload) return { written: false, verworfen: false, record: null };
+
+    const record: ArenaVorlaufRecord = {
+      saveId: scope.saveId,
+      seasonId: scope.seasonId,
+      matchdayId: scope.matchdayId,
+      signature: input.signature,
+      status: input.status,
+      startedAt: input.startedAt,
+      finishedAt: new Date().toISOString(),
+      versuch: input.versuch,
+      disziplinen: input.disziplinen,
+    };
+    const nextGameState: GameState = {
+      ...save.gameState,
+      seasonState: {
+        ...save.gameState.seasonState,
+        matchdayResolveSnapshots: [{ ...existing, payload: nextPayload, previewStatus: nextPayload.preview.status, arenaVorlauf: record }],
+      },
+    };
+    try {
+      persistence.saveSingleplayerState(save.saveId, nextGameState);
+      return { written: true, verworfen: false, record };
+    } catch (error) {
+      if (!istKoopSchreibkonflikt(error)) throw error;
+    }
+  }
+  return { written: false, verworfen: false, record: null };
 }

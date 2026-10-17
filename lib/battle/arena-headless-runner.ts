@@ -62,7 +62,22 @@ import { seedZuZahl } from "@/lib/battle/arena-seed";
  */
 
 const STANDARD_CHROMIUM_EXECUTABLE_PATH = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
+
+/**
+ * TIMEOUT-BUDGET AUS DER MESSUNG ABLEITEN, NICHT RATEN (Opus-Auflage, Plan Abschnitt 9 Punkt 1).
+ * Deckt NUR das Warten auf `window.__arena` ab — einmal beim Seitenaufbau, dann je weiterem
+ * Fixture nach dem Neu-Einhaengen des Motors (s. `wartenAufMotor()` in
+ * `simuliereFixturesImBrowser()` unten). Die eigentliche Simulation (`spieleFeldspiel()`/...) ist
+ * SYNCHRONER Browser-JS ohne eigenes Timeout -- dieser Wert begrenzt also "startet/laedt der Motor
+ * ueberhaupt", nicht "wie lange darf das ganze Batch dauern". Per ENV konfigurierbar, damit die
+ * echte CX23-Zahl aus der Live-Abnahme (Plan Abschnitt 6.3) ohne Deploy-Wartezeit eingetragen
+ * werden kann, bevor sie im Code als neuer Standard landet.
+ */
+const STANDARD_SEITEN_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_SEITEN_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 20_000;
+})();
 
 /**
  * FUND (nachgemessen, nicht vermutet): `spieleFeldspiel(fd, saat)` reicht `saat` unveraendert an
@@ -391,11 +406,32 @@ type VorbereitetesFixture = {
  * aufloesen (sofortiges ECONNREFUSED statt DNS-/Tunnel-Wartezeit). `file://`-Navigation
  * (die einzige, die dieser Runner macht) ist von beidem unberuehrt.
  */
-const ARENA_NETZWERK_ABRIEGELUNG_ARGS = ["--proxy-server=direct://", "--host-resolver-rules=MAP * 0.0.0.0"];
+// DOCKER-/dev-shm-ABSICHERUNG (E1, Plan Abschnitt 4.1/F11): Dockers Standard-`/dev/shm` ist 64 MB,
+// bekanntermassen zu knapp fuer Chromium (Crash statt sauberer Fehlermeldung). Das Produktions-
+// Compose setzt zusaetzlich `shm_size: "256m"` (doppelte Absicherung, PR E1) -- dieses Flag hier
+// greift unabhaengig davon auch lokal/in CI, wo niemand `shm_size` setzt.
+const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
+  "--proxy-server=direct://",
+  "--host-resolver-rules=MAP * 0.0.0.0",
+  "--disable-dev-shm-usage",
+];
 
-function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
-  const kandidat = executablePathOverride ?? STANDARD_CHROMIUM_EXECUTABLE_PATH;
-  if (existsSync(kandidat)) {
+/**
+ * Exportiert (PR 3, K1): der Chromium-Selbsttest (`lib/battle/arena-chromium-selftest.ts`, Opus-
+ * Auflage "`/api/health` darf nicht bei jedem Aufruf Chromium starten") braucht GENAU dieselben
+ * Launch-Optionen wie der echte Arena-Lauf — sonst koennte der Selbsttest "ok" melden, waehrend
+ * der echte Lauf an einer anderen Pfad-/Argument-Kombination scheitert, oder umgekehrt.
+ *
+ * REIHENFOLGE DER PFAD-ERMITTLUNG (E1, Plan Abschnitt 4.1): `executablePathOverride` (explizite
+ * Test-/Messskript-Injektion) VOR `OLY_ARENA_CHROMIUM_EXECUTABLE` (die Umgebungsvariable, die das
+ * Produktions-Image setzt, sobald Chromium dort unter der von Playwright 1.60 erwarteten Revision
+ * 1223 statt der hier hartkodierten lokalen 1194 liegt) VOR dem hartkodierten lokalen Standard.
+ * Ohne eine der beiden faellt `existsSync()` unten durch und `channel: "chromium"` greift (CI-
+ * Runner-Fall, unveraendert).
+ */
+export function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
+  const kandidat = executablePathOverride || process.env.OLY_ARENA_CHROMIUM_EXECUTABLE || STANDARD_CHROMIUM_EXECUTABLE_PATH;
+  if (kandidat && existsSync(kandidat)) {
     return { headless: true, executablePath: kandidat, args: ARENA_NETZWERK_ABRIEGELUNG_ARGS };
   }
   // Ohne festen Pfad (z.B. auf dem CI-Runner) loest Playwright den Standard-"chromium"-
