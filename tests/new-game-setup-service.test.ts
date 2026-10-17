@@ -263,4 +263,53 @@ describe("new-game-setup-service", () => {
       expect(contract?.seasonId).toBe(gameState.season.id);
     }
   }, 120_000);
+
+  /**
+   * TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert (Wizard-Filter): ein Liga-2-Team
+   * darf als Chris-/Franky-Team niemals in einem Battle-Mode-Save ankommen, auch nicht über einen
+   * direkten Aufruf, der die UI-Sperre umgeht. R-R ist laut dem Battle-Mode-Test oben verlässlich
+   * Liga 2 (Budget-Rang 32 global, `leagueByTeamId["R-R"] === "liga2"`).
+   */
+  it("filtert ein Liga-2-Team aus chrisTeamIds im Battle Mode heraus und blockiert ohne verbleibendes Team", () => {
+    const { gameState, preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
+    expect(preview.chrisTeamIds).toEqual([]);
+    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+    expect(preview.blockers).toContain("new_game_requires_at_least_one_chris_team");
+    // R-R landet stattdessen bei der KI, nicht als humanControlled-Team.
+    expect(preview.aiTeamIds).toContain("R-R");
+    expect(gameState.teams.find((team) => team.teamId === "R-R")?.humanControlled).toBe(false);
+  }, 120_000);
+
+  it("behält ein Liga-1-Team und verwirft nur das Liga-2-Team, wenn beide als chrisTeamIds übergeben werden", () => {
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M", "R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.chrisTeamIds).toEqual(["M-M"]);
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  it("lässt Liga-2-Teams im Manager Mode unangetastet wählbar (keine Liga-2-Sperre ohne Battle Mode)", () => {
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "manager",
+      chrisTeamIds: ["R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
 });

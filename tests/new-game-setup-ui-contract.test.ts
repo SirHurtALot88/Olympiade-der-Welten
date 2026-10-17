@@ -163,6 +163,27 @@ describe("new game setup UI contract", () => {
     expect(pageTypesSource).toContain('["M-S", "P-C", "C-S", "G-G"]');
   });
 
+  /**
+   * TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert (Wizard-Filter): das Klub-Raster
+   * blendet Liga-2-Klubs im Battle-Mode-Schritt aus der Auswahl aus, und der Wechsel in den Battle
+   * Mode wirft bereits gewählte Liga-2-Teams aus Chris'/Frankys Auswahl. Der Wert-Nachweis am
+   * Spielstand (gefilterte chrisTeamIds, Warnung, AI-Übernahme) steht in
+   * tests/new-game-setup-service.test.ts.
+   */
+  it("blendet Liga-2-Klubs im Battle-Mode-Schritt des Klub-Rasters aus", () => {
+    const newLookSource = fs.readFileSync(teamSettingsNewLookPath, "utf8");
+    const scopeSource = fs.readFileSync(shellRouterBodyScopePath, "utf8");
+
+    expect(newLookSource).toContain("buildInitialLeagueAssignment");
+    expect(newLookSource).toContain("isNewGameTeamSelectable");
+    expect(newLookSource).toMatch(/filter\(\(team\) => isNewGameTeamSelectable\(team\.teamId\)\)/);
+    // Die Sperre greift beim Wechsel in den Battle Mode (bereits gewählte Liga-2-Teams werden
+    // verworfen) UND beim Klick selbst (toggleNewGameTeam verweigert Liga-2-Teams im Battle Mode).
+    expect(scopeSource).toContain("buildInitialLeagueAssignment");
+    expect(scopeSource).toMatch(/function selectNewGameMode[\s\S]*?isLiga2TeamId[\s\S]*?setNewGameChrisTeamIds/);
+    expect(scopeSource).toMatch(/function toggleNewGameTeam[\s\S]*?newGameMode === "battle"[\s\S]*?liga2/);
+  });
+
   it("lets the season briefing complete and continue the setup flow", () => {
     const shellRouterBodyText = fs.readFileSync(shellRouterBodyPath, "utf8");
     const scopeSource = fs.readFileSync(shellRouterBodyScopePath, "utf8");
