@@ -1143,7 +1143,7 @@ function renderTopDisciplineCell(
             label={row.label}
             className={`discipline-icon-chip-inline player-drawer-discipline-area-chip ${areaClass}`}
           />
-          {row.playerCount != null ? ` (${row.playerCount})` : ""}
+          {row.playerCountLabel != null ? ` (${row.playerCountLabel})` : ""}
         </>
       );
     }
@@ -2977,8 +2977,8 @@ export default function PlayerDetailDrawer({
                                   <div className="player-drawer-axis-discipline-row-head">
                                     <span className="player-drawer-axis-discipline-label">
                                       <DisciplineIcon disciplineId={entry.id} label={entry.label} className="discipline-icon-chip-inline" />
-                                      {entry.playerCount != null ? (
-                                        <span className="player-drawer-axis-discipline-count">({entry.playerCount})</span>
+                                      {entry.playerCountLabel != null ? (
+                                        <span className="player-drawer-axis-discipline-count">({entry.playerCountLabel})</span>
                                       ) : null}
                                       {laufbahn ? (
                                         <span className="player-drawer-axis-discipline-laufbahn-chevron" aria-hidden="true">
