@@ -771,7 +771,9 @@ export default function SeasonStandingsNewLook({
       return;
     }
     setSpieltagMatchdayId((current) =>
-      current != null && spieltage.overviewByMatchdayId[current] != null ? current : spieltage.defaultMatchdayId,
+      current != null && spieltage.matchdayOptions.some((option) => option.id === current)
+        ? current
+        : spieltage.defaultMatchdayId,
     );
   }, [spieltage]);
 
@@ -808,11 +810,15 @@ export default function SeasonStandingsNewLook({
   // dieselben Zeilen, die Board/Daten/Vereine schon zeigen.
   const standingsRowByTeamId = useMemo(() => new Map(boardRows.map((row) => [row.teamId, row] as const)), [boardRows]);
 
+  // PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.): `getUebersicht` baut die teure volle
+  // Paarungs-Uebersicht lazy, NUR für diesen einen Spieltag — `spieltage` bekommt vom Host nur
+  // bei echter `gameState`-Aenderung eine neue Referenz, dieses Memo entspricht also effektiv
+  // `[gameState, spieltagMatchdayId]`, ohne dass diese Komponente selbst `gameState` braucht.
   const activeSpieltagUebersicht = useMemo(() => {
     if (!spieltage?.verfuegbar || spieltagMatchdayId == null) {
       return null;
     }
-    return spieltage.overviewByMatchdayId[spieltagMatchdayId] ?? null;
+    return spieltage.getUebersicht(spieltagMatchdayId);
   }, [spieltage, spieltagMatchdayId]);
 
   const spieltagPaarungen = useMemo(() => {

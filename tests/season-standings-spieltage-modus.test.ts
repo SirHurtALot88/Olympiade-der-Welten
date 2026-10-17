@@ -100,7 +100,7 @@ describe("SeasonStandingsNewLook — Modus 'Spieltage' (Task #159 Punkt 2)", () 
   });
 
   it("spieltage.verfuegbar === false (z. B. explizit durchgereicht): kein Reiter", () => {
-    const html = render({ verfuegbar: false, matchdayOptions: [], defaultMatchdayId: null, overviewByMatchdayId: {} });
+    const html = render({ verfuegbar: false, matchdayOptions: [], defaultMatchdayId: null, getUebersicht: () => null });
     expect(html).not.toContain(">Spieltage<");
   });
 
@@ -109,13 +109,8 @@ describe("SeasonStandingsNewLook — Modus 'Spieltage' (Task #159 Punkt 2)", () 
       verfuegbar: true,
       matchdayOptions: [{ id: "md1", index: 0, label: "Spieltag 1", gespielt: true }],
       defaultMatchdayId: "md1",
-      overviewByMatchdayId: {
-        md1: {
-          matchdayId: "md1",
-          matchdayIndex: 0,
-          paarungen: [],
-        },
-      },
+      getUebersicht: (matchdayId: string) =>
+        matchdayId === "md1" ? { matchdayId: "md1", matchdayIndex: 0, paarungen: [] } : null,
     });
     expect(html).toContain(">Spieltage<");
   });
@@ -126,7 +121,8 @@ describe("SeasonStandingsNewLook — Modus 'Spieltage' (Task #159 Punkt 2)", () 
       verfuegbar: true,
       matchdayOptions: [{ id: "md1", index: 0, label: "Spieltag 1", gespielt: true }],
       defaultMatchdayId: "md1",
-      overviewByMatchdayId: { md1: { matchdayId: "md1", matchdayIndex: 0, paarungen: [] } },
+      getUebersicht: (matchdayId: string) =>
+        matchdayId === "md1" ? { matchdayId: "md1", matchdayIndex: 0, paarungen: [] } : null,
     });
     // Beide starten im "Daten"-Modus (SSR-deterministisch) -- der einzige Unterschied darf der
     // zusaetzliche Subtab-Button selbst sein, nicht die Tabelle/das restliche Markup.

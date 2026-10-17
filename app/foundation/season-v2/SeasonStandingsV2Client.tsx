@@ -12,15 +12,23 @@ import type { TitleRaceResult } from "@/lib/season/title-race";
 import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
 
 /**
- * Task #159 Punkt 2 ("Spieltage"-Modus): fertige Builder-Ergebnisse je Spieltag der laufenden
- * Saison, vom Host einmal gebaut (`use-foundation-shell-router-body-scope.tsx`). `verfuegbar:
- * false` (Manager-Save oder kein Fixture-Plan) heißt: der Modus wird gar nicht erst angeboten.
+ * Task #159 Punkt 2 ("Spieltage"-Modus): Daten für den Host (`use-foundation-shell-router-
+ * body-scope.tsx`). `verfuegbar: false` (Manager-Save oder kein Fixture-Plan) heißt: der Modus
+ * wird gar nicht erst angeboten.
+ *
+ * PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.): `matchdayOptions`/`defaultMatchdayId`
+ * kommen aus einem BILLIGEN Index (ein Durchlauf über `disciplineResults`, kein Builder-Aufruf).
+ * Die TEURE volle Paarungs-Übersicht (`buildSpieltagsUebersicht`, u. a. die Rückspiel-Suche über
+ * den ganzen Spielplan) wird NICHT für alle Spieltage vorgebaut — `getUebersicht` ist eine LAZY
+ * Funktion, die sie erst auf Abruf für GENAU EINEN Spieltag baut. Davor baute der Host sie für
+ * ALLE 20 Spieltage bei JEDER `gameState`-Änderung, auch wenn der Saisonstand gar nicht offen
+ * war (Speichern, Polling-Reload, Koop-Benachrichtigung — bis zu 1280 Ergebniszeilen umsonst).
  */
 export type SeasonV2SpieltageBundle = {
   verfuegbar: boolean;
   matchdayOptions: Array<{ id: string; index: number; label: string; gespielt: boolean }>;
   defaultMatchdayId: string | null;
-  overviewByMatchdayId: Record<string, SpieltagsUebersicht | null>;
+  getUebersicht: (matchdayId: string) => SpieltagsUebersicht | null;
 };
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";

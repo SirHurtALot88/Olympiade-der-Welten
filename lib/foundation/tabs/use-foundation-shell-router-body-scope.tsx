@@ -11200,33 +11200,53 @@ export function useFoundationShellRouterBodyScope({
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
   /**
-   * Task #159 Punkt 2 ("Spieltage"-Modus): je Spieltag der laufenden Saison eine fertige
-   * Paarungs-Uebersicht (reiner Builder, `buildSpieltagsUebersicht`) — NUR bei Battle-Saves mit
-   * echtem Fixture-Plan (`istSpieltagsModusVerfuegbar`), sonst `verfuegbar: false` und die UI
-   * zeigt den Modus gar nicht an (Manager-Saves mit Dummy-Paarungen bleiben unberuehrt).
+   * Task #159 Punkt 2 ("Spieltage"-Modus) — NUR bei Battle-Saves mit echtem Fixture-Plan
+   * (`istSpieltagsModusVerfuegbar`), sonst `verfuegbar: false` und die UI zeigt den Modus gar
+   * nicht an (Manager-Saves mit Dummy-Paarungen bleiben unberuehrt).
    *
-   * Bewusst ALLE Spieltage auf einmal (max. 20, reine In-Memory-Projektion ueber bereits
-   * geladene `gameState`-Arrays) statt pro Klick neu zu bauen — die Spieltag-Navigation ist damit
-   * ein reiner State-Wechsel im Client, ohne weiteren Build-Aufruf.
+   * PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.) — vorher baute dieses Memo die VOLLE
+   * Paarungs-Uebersicht (`buildSpieltagsUebersicht`, inkl. Rueckspiel-Suche über den gesamten
+   * Spielplan) für ALLE 20 Spieltage, bei JEDER `gameState`-Aenderung — auch wenn der
+   * Saisonstand gar nicht offen war (Speichern, Polling-Reload, Koop-Benachrichtigung), macht
+   * also gegen Saisonende bis zu 1280 Ergebniszeilen pro Aufruf umsonst nach. Jetzt zweigeteilt:
+   *  1) `matchdayIdByResultId` einmal indexiert (billig, ein Durchlauf).
+   *  2) `matchdayOptions`/`defaultMatchdayId` (die "gespielt ja/nein"-Liste für die Navigation)
+   *     kommen aus einem zweiten billigen Durchlauf über `disciplineResults`
+   *     (`gespieltByMatchdayId`), NICHT aus der vollen Uebersicht.
+   *  3) Die teure volle Uebersicht wird NIE hier gebaut — `getUebersicht` ist eine LAZY Funktion,
+   *     die sie erst auf Abruf für GENAU EINEN Spieltag liefert. Der Konsument
+   *     (SeasonStandingsNewLook.tsx) ruft sie in einem eigenen Memo auf `[spieltage,
+   *     spieltagMatchdayId]` auf — effektiv `[gameState, selectedMatchdayId]`, weil `spieltage`
+   *     selbst nur bei echter `gameState`-Aenderung eine neue Referenz bekommt — UND nur,
+   *     während die Komponente überhaupt gemountet ist (`FoundationSeasonV2Panel`s `active`-Gate).
    *
    * Scope bewusst nur die LAUFENDE Saison (Opus/Coordinator 17.10.) — ein Archiv-Rueckblick ist
    * ein separater Folgeschritt.
    */
   const seasonV2Spieltage = useMemo(() => {
     if (!istSpieltagsModusVerfuegbar(gameState)) {
-      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, overviewByMatchdayId: {} };
+      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, getUebersicht: () => null };
     }
-    const overviewByMatchdayId: Record<string, ReturnType<typeof buildSpieltagsUebersicht>> = {};
-    const matchdayOptions = gameState.season.matchdayIds.map((matchdayId, index) => {
-      const uebersicht = buildSpieltagsUebersicht(gameState, matchdayId);
-      overviewByMatchdayId[matchdayId] = uebersicht;
-      return {
-        id: matchdayId,
-        index,
-        label: `Spieltag ${index + 1}`,
-        gespielt: uebersicht?.paarungen.some((paarung) => paarung.gespielt) ?? false,
-      };
-    });
+    const matchdayIdByResultId = new Map<string, string>();
+    for (const result of gameState.seasonState.matchdayResults ?? []) {
+      matchdayIdByResultId.set(result.id, result.matchdayId);
+    }
+    const gespieltByMatchdayId = new Set<string>();
+    for (const row of gameState.seasonState.disciplineResults ?? []) {
+      if (row.teamPoints == null) {
+        continue;
+      }
+      const matchdayId = matchdayIdByResultId.get(row.matchdayResultId);
+      if (matchdayId) {
+        gespieltByMatchdayId.add(matchdayId);
+      }
+    }
+    const matchdayOptions = gameState.season.matchdayIds.map((matchdayId, index) => ({
+      id: matchdayId,
+      index,
+      label: `Spieltag ${index + 1}`,
+      gespielt: gespieltByMatchdayId.has(matchdayId),
+    }));
     // Default = letzter GESPIELTER Spieltag; ohne jede Wertung (Saisonstart) der erste.
     let defaultMatchdayId: string | null = matchdayOptions[0]?.id ?? null;
     for (let i = matchdayOptions.length - 1; i >= 0; i -= 1) {
@@ -11235,7 +11255,12 @@ export function useFoundationShellRouterBodyScope({
         break;
       }
     }
-    return { verfuegbar: true as const, matchdayOptions, defaultMatchdayId, overviewByMatchdayId };
+    return {
+      verfuegbar: true as const,
+      matchdayOptions,
+      defaultMatchdayId,
+      getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId),
+    };
   }, [gameState]);
   const seasonV2PpRows = useMemo(
     () =>
