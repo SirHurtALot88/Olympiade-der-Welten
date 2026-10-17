@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Discipline, DisciplineCategory, GameState } from "@/lib/data/olyDataTypes";
 import {
+  buildSeasonDisciplinePlayerCountDisplayMap,
   buildSeasonSeededDisciplineSchedule,
   getRequiredSeasonDisciplineMatchdayCount,
   getSeasonDisciplinePlayerCounts,
@@ -339,5 +340,63 @@ describe("getSeasonDisciplinePlayerCounts", () => {
     expect(occurrences[0].occurrenceInSeason).toBe(1);
     expect(occurrences[1].occurrenceInSeason).toBe(2);
     expect(occurrences[0].playerCount).not.toBe(occurrences[1].playerCount);
+  });
+});
+
+// W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): die neue
+// Anzeige-Funktion fuer die Konsumenten, die beide Saison-Vorkommen zeigen wollen statt nur das
+// naechste offene.
+describe("buildSeasonDisciplinePlayerCountDisplayMap", () => {
+  function buildGameStateFromSchedule(entries: ReturnType<typeof buildSeasonSeededDisciplineSchedule>["entries"]): GameState {
+    return {
+      season: { id: "season-x", name: "Season X", year: 1, currentMatchday: 1, matchdayIds: entries.map((entry) => entry.matchdayId) },
+      seasonState: { seasonId: "season-x", schedule: [], disciplineSchedule: entries, standings: {} },
+      matchdayState: { matchdayId: entries[0]?.matchdayId, status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+      disciplines: DISCIPLINES,
+      teams: [],
+    } as unknown as GameState;
+  }
+
+  it("liefert fuer repeat=1 (Manager-/Alt-Save) ein Label identisch zum einfachen Wert", () => {
+    const { entries } = buildSeasonSeededDisciplineSchedule({
+      saveId: "counts-display-save",
+      seasonId: "season-x",
+      disciplines: DISCIPLINES,
+    });
+    const gameState = buildGameStateFromSchedule(entries);
+
+    const displayMap = buildSeasonDisciplinePlayerCountDisplayMap(gameState);
+    for (const discipline of DISCIPLINES) {
+      const display = displayMap.get(discipline.id);
+      expect(display?.value).not.toBeNull();
+      expect(display?.label).toBe(String(display?.value));
+    }
+  });
+
+  it("liefert fuer repeat=2 ein 'Hinrunde · Rueckrunde'-Label, wenn beide Vorkommen bekannt und unterschiedlich sind", () => {
+    const { entries } = buildRepeatTwoSchedule("season-x");
+    const gameState = buildGameStateFromSchedule(entries);
+
+    const displayMap = buildSeasonDisciplinePlayerCountDisplayMap(gameState);
+    let sawDualLabel = false;
+    for (const discipline of DISCIPLINES) {
+      const occurrences = getSeasonDisciplinePlayerCounts(gameState, discipline.id);
+      expect(occurrences).toHaveLength(2);
+      const display = displayMap.get(discipline.id);
+      // `value` bleibt identisch zu `buildSeasonDisciplinePlayerCountMap` (naechstes offenes
+      // Vorkommen) -- diese Funktion erweitert nur um das Anzeige-Label, aendert `value` nicht.
+      expect(display?.value).toBe(occurrences[0].playerCount);
+      if (occurrences[0].playerCount !== occurrences[1].playerCount) {
+        // Regelfall (Plan 3b: Haelfte 2 ist ein Derangement von Haelfte 1) -- beide Zahlen
+        // sichtbar statt nur die naechste.
+        expect(display?.label).toBe(`${occurrences[0].playerCount} · ${occurrences[1].playerCount}`);
+        sawDualLabel = true;
+      } else {
+        // Ausnahme (z. B. Mini-DM, formatbedingt immer 1): beide Vorkommen gleich -> ein
+        // einfacher Wert wie bei repeat=1, kein redundantes "1 · 1".
+        expect(display?.label).toBe(String(occurrences[0].playerCount));
+      }
+    }
+    expect(sawDualLabel).toBe(true);
   });
 });

@@ -150,9 +150,12 @@ describe("transfermarkt v2 performance contract", () => {
     const source = readMarketSource();
 
     expect(source).toContain("getNlDisciplineAbbreviation");
-    expect(source).toContain("entry.playerCount");
+    // W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): das Label
+    // zeigt im Battle Mode mit zwei unterschiedlichen Saison-Vorkommen "4 · 6" statt nur die
+    // eine Zahl -- deshalb `playerCountLabel` statt der rohen `playerCount`-Zahl.
+    expect(source).toContain("entry.playerCountLabel");
     expect(source).toContain("Top-Disziplinen (gescoutet)");
-    expect(source).toContain("${entry.abbr} (${entry.playerCount})");
+    expect(source).toContain("${entry.abbr} (${entry.playerCountLabel})");
   });
 
   it("opens the player profile from a candidate name click", () => {
