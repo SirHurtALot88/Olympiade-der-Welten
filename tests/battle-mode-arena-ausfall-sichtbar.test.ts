@@ -251,6 +251,7 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
       const { fuehreLigaSetupDraftAus } = await import("@/lib/game/league-setup-draft-service");
       const { applyGameModeOwnership } = await import("@/lib/foundation/team-control-settings");
       const { runLocalMatchdayAutoRun, MATCHDAY_AUTO_RUN_CONFIRM_TOKEN } = await import("@/lib/season/matchday-auto-run-service");
+      const { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } = await import("@/lib/season/matchday-progress-service");
 
       const persistence = createPersistenceService();
       persistence.bootstrapSingleplayerSave();
@@ -272,30 +273,83 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
         applyGameModeOwnership(nachDraft.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
       );
 
-      const aktuell = persistence.getSaveById(saveId)!;
-      const seasonId = aktuell.gameState.season.id;
-      const matchdayId = aktuell.gameState.matchdayState.matchdayId;
-      // GENAU der Pfad, den Bühne/Cockpit/Skripte heute nehmen -- OHNE arenaModus-Option, OHNE
-      // irgendeinen Arena-Vorlauf (der existiert erst mit PR 3). Das IST die K1-Lücke.
-      const lauf = await runLocalMatchdayAutoRun(
-        {
-          saveId,
-          seasonId,
-          matchdayId,
-          source: "sqlite",
-          execute: true,
-          dryRun: false,
-          confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
-          options: { includeWarningLineups: true, overwriteExistingLineups: true, stopOnTie: false, advanceAfterCashApply: false },
-        },
-        persistence,
-      );
-      expect(lauf.ok, lauf.blockingReasons.join(" | ")).toBe(true);
+      const seasonId = persistence.getSaveById(saveId)!.gameState.season.id;
 
-      const ende = persistence.getSaveById(saveId)!;
-      const zeilen = (ende.gameState.seasonState.disciplineResults ?? []).filter((z) => z.matchdayResultId && z.disciplineId);
-      const arenaDisziplinenZeilen = zeilen.filter((z) => ARENA_RESOLVED_DISCIPLINE_IDS.has(z.disciplineId));
-      expect(arenaDisziplinenZeilen.length).toBeGreaterThan(0);
+      /**
+       * NICHT-DETERMINISMUS DES SPIELPLANS, BEHOBEN STATT TOLERIERT (Opus-Root-Cause-Fund,
+       * 17.10., blockierte vorher PR #1270/#1271 mit ~11% Fehlquote -- s. CI-Runs 39054721770 und
+       * 39056390593: SELBER Testfile, SELBE Assertion, auf zwei voellig unabhaengigen PRs ohne
+       * jede Beruehrung von Standings oder Disziplin-Scheduling rot, weil `saveId` (und damit der
+       * Spielplan-Seed in `buildSeasonSeededDisciplineSchedule`) pro Testlauf zufaellig ist.
+       * Spieltag 1 war deshalb NICHT garantiert eine arena-aufgeloeste Disziplin.
+       *
+       * BEWEIS, DASS 4 VERSUCHE GENUEGEN (kein Zufall, keine Wahrscheinlichkeit): von 20
+       * Disziplinen sind NUR 7 nicht arena-aufgeloest (tdm, mini-dm, battlefield, hockey,
+       * basketball, football, i-spy, s. ARENA_RESOLVED_DISCIPLINE_IDS). Jeder Spieltag zieht 2
+       * Disziplinen. Aus 7 Nicht-Arena-Disziplinen lassen sich hoechstens 3 Spieltage bilden, die
+       * BEIDE Disziplinen nicht-arena ziehen (3 Paare = 6 Stueck) -- die siebte, uebrige
+       * Nicht-Arena-Disziplin MUSS mit einer Arena-Disziplin auf einem weiteren Spieltag paaren.
+       * Unter den ersten 4 Spieltagen (8 gezogene Disziplinen) steckt also, egal wie der Shuffle-
+       * Seed faellt, IMMER mindestens eine Arena-Disziplin -- ein Zaehlargument (Schubfach-
+       * prinzip), keine Haeufigkeitsmessung. In Battle Mode (Saison mit `repeat: 2`, zwei
+       * unabhaengige Halbserien-Shuffles von je allen 20 Disziplinen) gilt das Argument fuer die
+       * erste Halbserie, also fuer Spieltag 1 der Saison, identisch.
+       *
+       * Findet die Schleife nach 4 Spieltagen trotzdem keine Arena-Zeile, ist NICHT Pech am Werk,
+       * sondern entweder der Spielplan-Generator hat sich geaendert (eine neue Disziplin kam dazu/
+       * eine Arena-Disziplin verschwand aus der Menge) oder etwas anderes ist strukturell kaputt
+       * -- in jedem Fall soll der Test DANN laut scheitern, nicht lautlos bis zum Zeitlimit
+       * weiterlaufen.
+       */
+      const MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN = 4;
+      let arenaDisziplinenZeilen: ReturnType<typeof filtereArenaZeilen> = [];
+      let zeilen: ReturnType<typeof filtereArenaZeilen> = [];
+
+      function filtereArenaZeilen(gameState: GameState) {
+        return (gameState.seasonState.disciplineResults ?? []).filter((z) => z.matchdayResultId && z.disciplineId);
+      }
+
+      for (let versuch = 1; versuch <= MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN; versuch += 1) {
+        const aktuell = persistence.getSaveById(saveId)!;
+        const matchdayId = aktuell.gameState.matchdayState.matchdayId;
+        // GENAU der Pfad, den Bühne/Cockpit/Skripte heute nehmen -- OHNE arenaModus-Option, OHNE
+        // irgendeinen Arena-Vorlauf (der existiert erst mit PR 3). Das IST die K1-Lücke.
+        const lauf = await runLocalMatchdayAutoRun(
+          {
+            saveId,
+            seasonId,
+            matchdayId,
+            source: "sqlite",
+            execute: true,
+            dryRun: false,
+            confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
+            options: { includeWarningLineups: true, overwriteExistingLineups: true, stopOnTie: false, advanceAfterCashApply: false },
+          },
+          persistence,
+        );
+        expect(lauf.ok, `Spieltag ${versuch} (${matchdayId}): ${lauf.blockingReasons.join(" | ")}`).toBe(true);
+
+        zeilen = filtereArenaZeilen(persistence.getSaveById(saveId)!.gameState);
+        arenaDisziplinenZeilen = zeilen.filter((z) => ARENA_RESOLVED_DISCIPLINE_IDS.has(z.disciplineId));
+        if (arenaDisziplinenZeilen.length > 0) break;
+        if (versuch === MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN) break;
+
+        const vorschub = await executeMatchdayAdvance(
+          { saveId, seasonId, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
+          persistence,
+        );
+        expect(vorschub.ok && vorschub.applied, `Spieltagswechsel nach ${matchdayId}: ${vorschub.blockingReasons?.join(" | ") ?? ""}`).toBe(
+          true,
+        );
+      }
+
+      expect(
+        arenaDisziplinenZeilen.length,
+        `keine Arena-Disziplin in den ersten ${MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN} Spieltagen gefunden -- das widerspricht dem ` +
+          "Schubfach-Beweis oben (7 Nicht-Arena-Disziplinen reichen nur fuer 3 reine Nicht-Arena-Spieltage). " +
+          "Hat sich ARENA_RESOLVED_DISCIPLINE_IDS oder die Gesamtzahl der Disziplinen geaendert? Dann muss " +
+          "MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN hier neu hergeleitet werden, statt den Test nur laenger laufen zu lassen.",
+      ).toBeGreaterThan(0);
 
       const unmarkiert = arenaDisziplinenZeilen.filter((z) => (z.arenaAusfall as ArenaAusfall | null | undefined)?.grund !== "nicht_ausgefuehrt");
       expect(unmarkiert, JSON.stringify(unmarkiert.slice(0, 3))).toHaveLength(0);
@@ -306,12 +360,20 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
         expect(zeile.resolutionSource).toBe("pps_duell");
       }
 
-      // Gegenprobe: eine NICHT arena-aufgeloeste Disziplin desselben Spieltags bleibt unmarkiert.
+      // Gegenprobe: eine NICHT arena-aufgeloeste Disziplin (egal auf welchem der gelaufenen
+      // Spieltage) bleibt unmarkiert.
       const nichtArenaZeilen = zeilen.filter((z) => !ARENA_RESOLVED_DISCIPLINE_IDS.has(z.disciplineId));
       for (const zeile of nichtArenaZeilen) {
         expect(zeile.arenaAusfall ?? null).toBeNull();
       }
     },
-    240_000,
+    // ZEITGRENZE, GEMESSEN STATT GERATEN (17.10.): der Worst Case (alle 4 Spieltage gebraucht, s.
+    // Schubfach-Beweis oben) wurde lokal zweimal durch bewussten Zwang (Fruehausstieg kurzzeitig
+    // abgeschaltet) nachgestellt -- 315s und 265s fuer Liga-Draft (32 Teams) + 4x Auto-Run + 3x
+    // Spieltagswechsel. CI laeuft fuer denselben Wizard-/Draft-/Auto-Run-Pfad nachweislich ~1,4x
+    // langsamer als lokal (Task #164, `tests/battle-mode-auto-run-invarianten.test.ts`-Kommentar:
+    // 11m20s lokal / 16m13s CI fuer die volle Suite). 315s x 1,4 ≈ 440s -- 600s geben darauf noch
+    // gut 35 % Reserve, statt eine Zahl zu raten.
+    600_000,
   );
 });
