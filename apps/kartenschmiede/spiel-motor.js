@@ -349,7 +349,7 @@
       const def = map.gegner[g.id] || {}, basis = werteVon(def), m = modVon(state, g), t = [];
       if (m.quality) t.push({ text: `Qualität ${basis.quality} → ${stufe(basis.quality, m.quality)}`, staerker: m.quality > 0 });
       if (m.defense) t.push({ text: `Verteidigung ${basis.defense} → ${stufe(basis.defense, m.defense)}`, staerker: m.defense > 0 });
-      if (m.tough) t.push({ text: `Zäh ${m.tough > 0 ? "+" : ""}${m.tough}`, staerker: m.tough > 0 });
+      if (m.tough) t.push({ text: `LP ${m.tough > 0 ? "+" : ""}${m.tough}`, staerker: m.tough > 0 });
       if (m.attacks) t.push({ text: `Angriffe ${m.attacks > 0 ? "+" : ""}${m.attacks}`, staerker: m.attacks > 0 });
       for (const r of m.passives || []) t.push({ text: r, staerker: true });
       return t;

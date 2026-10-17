@@ -132,7 +132,7 @@
      "flag": "ueberlebender_dabei",
      "ist": true
     },
-    "text": "Er kämpft als Verbündeter (unter Verbündete, eigene Karte). Ein Spieler führt ihn zusätzlich, sonst du. Er passt nicht in den Schacht: Fliehen alle Helden, bleibt er unten. Versorgen (Taste E): Zäh +2. Fällt er, ist er in Map 5 nicht dabei."
+    "text": "Er kämpft als Verbündeter (unter Verbündete, eigene Karte). Ein Spieler führt ihn zusätzlich, sonst du. Er passt nicht in den Schacht: Fliehen alle Helden, bleibt er unten. Versorgen (Taste E): LP +2. Fällt er, ist er in Map 5 nicht dabei."
    },
    {
     "titel": "Keine EP für Kämpfe",
@@ -676,7 +676,7 @@
   },
   "ueberlebender_versorgt": {
    "start": false,
-   "text": "Der Verwundete wurde versorgt (Zäh +2).",
+   "text": "Der Verwundete wurde versorgt (LP +2).",
    "wirktIn": "map5"
   },
   "ueberlebender_tot": {
@@ -1096,7 +1096,7 @@
     "passives": "Furchtlos",
     "flavor": "Sein Trupp ist tot. Er nicht. Noch nicht."
    },
-   "notiz": "Verbündeter, zählt nicht ins Budget. Miniatur: ein einzelner Space Marine. Eigene Werte: Q3+ D2+ Z6, kommt mit 2 Wunden auf den Tisch (die Karte zeigt sie schon an), Schweres Gewehr (vier Kartenlängen) A2 DS(1), Kampfmesser A2, Furchtlos = 145 P (derselbe wie der Überlebende in Map 5). Versorgt (Taste E): Zäh +2. Er passt nicht in den Schacht: seine Rüstung ist zu breit. Führt ein Spieler zusätzlich (wer ihn gestützt hat), sonst du, vorsichtig.",
+   "notiz": "Verbündeter, zählt nicht ins Budget. Miniatur: ein einzelner Space Marine. Eigene Werte: Q3+ D2+ Z6, kommt mit 2 Wunden auf den Tisch (die Karte zeigt sie schon an), Schweres Gewehr (vier Kartenlängen) A2 DS(1), Kampfmesser A2, Furchtlos = 145 P (derselbe wie der Überlebende in Map 5). Versorgt (Taste E): LP +2. Er passt nicht in den Schacht: seine Rüstung ist zu breit. Führt ein Spieler zusätzlich (wer ihn gestützt hat), sonst du, vorsichtig.",
    "anblick": "Die Rüstung ist der der Gestalten ähnlich und doch nicht gleich: grau, zerkratzt, mit Zeichen, die frisch gemalt sind. Unter dem Helm ein Gesicht, bärtig, grau vor Staub, und die Augen sind wach.",
    "zustandSaetze": {
     "unverletzt": "Er steht. Das allein ist schon viel.",
@@ -1746,7 +1746,7 @@
    },
    "kosten": "Ein Held in Kontakt, 1 Aktion. Primärweg: ein Heilzauber (Kleriker). Nebenwege: ein Heiltrank aus dem Inventar (verbraucht), oder ein Verband mit Qualitätstest. Taste erst, wenn es gelingt.",
    "vorlesen": "Wo die Platten aufgerissen sind, ist er warm und nass. Ihr drückt zu, bindet ab, und er lässt es geschehen, die Zähne zusammengebissen. Dann atmet er tiefer. „Gut“, sagt er. „Das reicht für eine Weile.“",
-   "gmNotiz": "Der Verwundete hält mehr aus: Zäh +2 (steht an seiner Karte). Ein verbrauchter Heiltrank: im Inventar auf benutzt. Map 5 erfährt, dass er versorgt wurde.",
+   "gmNotiz": "Der Verwundete hält mehr aus: LP +2 (steht an seiner Karte). Ein verbrauchter Heiltrank: im Inventar auf benutzt. Map 5 erfährt, dass er versorgt wurde.",
    "setzt": {
     "ueberlebender_versorgt": true
    },
@@ -1756,7 +1756,7 @@
      "werte": {
       "tough": 2
      },
-     "text": "Versorgt: Zäh +2"
+     "text": "Versorgt: LP +2"
     }
    ]
   },

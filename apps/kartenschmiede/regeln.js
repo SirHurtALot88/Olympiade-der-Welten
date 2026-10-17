@@ -452,7 +452,7 @@
   }
 
   // Preis-Check einer Fähigkeit: Standardeinheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür so viel
-  // Zäh bekommt, dass beide gleich viele Punkte kosten. Um 50 % Siege heißt: Der Preis passt.
+  // LP bekommt, dass beide gleich viele Punkte kosten. Um 50 % Siege heißt: Der Preis passt.
   const CHECK_EINHEIT = { quality: "4+", defense: "4+", tough: "6", size: "1", weapons: "Klinge | Nahkampf | A3 |\nBogen | 18\" | A1 |", passives: "", role: "hero" };
   function faehigkeitsCheck(faehigkeit, opt = {}) {
     const extra = /zauber/i.test(faehigkeit.typ || "") ? "Zauberer(1)" : "";
@@ -461,7 +461,7 @@
     const ziel = punkte(mit).roh;
     const gegner = { ...ohne };
     for (let t = 6; t < 60 && punkte(gegner).roh < ziel; t++) gegner.tough = String(t + 1);
-    // Zwischen zwei Zäh-Stufen: die nähere nehmen
+    // Zwischen zwei LP-Stufen: die nähere nehmen
     const kleiner = { ...gegner, tough: String(Math.max(1, +gegner.tough - 1)) };
     const g = Math.abs(punkte(kleiner).roh - ziel) < Math.abs(punkte(gegner).roh - ziel) ? kleiner : gegner;
     const r = simuliere(mit, g, { kaempfe: opt.kaempfe || 800, seed: opt.seed || 11, abstand: 18 });

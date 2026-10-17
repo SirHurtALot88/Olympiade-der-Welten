@@ -1129,7 +1129,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
       <select id="preset" aria-label="Vorlage laden"></select>
       <button type="button" class="btn ghost sm" id="bNewHero">+ Held</button>
       <button type="button" class="btn ghost sm" id="bNewEnemy">+ Gegner</button>
-      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, Zäh +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
+      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, LP +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
       <div class="seg" id="modus" role="group" aria-label="Bearbeiten mit">
         <button type="button" data-m="form" aria-pressed="true" data-tip="Alle Werte als Felder: schnell für fertige Einheiten und Vorschläge aus dem Chat.">Formular</button>
         <button type="button" data-m="bau" aria-pressed="false" data-tip="Werte mit + und −, neben jedem Knopf steht, was er kostet. Helden haben ein festes Budget.">Baukasten</button>
@@ -1156,7 +1156,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
               <label class="f">Modelle <input type="text" id="size"></label>
               <label class="f">Qualität <input type="text" id="quality"></label>
               <label class="f">Verteid. <input type="text" id="defense"></label>
-              <label class="f">Zäh <input type="text" id="tough" title="Zäh je Modell"></label>
+              <label class="f">LP <input type="text" id="tough" title="LP je Modell"></label>
             </div>
             <div class="calc" id="calc" aria-live="polite"></div>
           </fieldset>
@@ -1307,7 +1307,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
         <div class="copyrow">
           <button type="button" class="btn" id="simRun">Würfeln</button>
           <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
-          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an Zäh bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
+          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an LP bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
       </div>
@@ -1328,7 +1328,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
           <dt>Trefferchance</dt><dd>Qualität 2+ 0,83 · 3+ 0,67 · 4+ 0,5 · 5+ 0,33 · 6+ 0,17. Zuverlässig zählt wie 2+</dd>
           <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Zerfleischen ×1,15 · Zersetzen ×1,35 · Stoß ×1,1 · Tödlich ×2 · Explosion(X) ×(1 + X/6) · Präzise ×1,25 · Indirekt ×1,15 · Zielsuchend ×1,05 · Überhitzen ×0,85 · Elemente ×1 (kosten nichts)</dd>
           <dt>Reichweite</dt><dd>Nahkampf ×1 · 6" ×0,68 · 12" ×0,8 · 18" ×0,9 · 24" ×1,0 · 30" ×1,1. Mit dem Duell-Simulator so abgestimmt, dass Fern- und Nahkampf bei gleichen Punkten gleich oft gewinnen</dd>
-          <dt>Ausdauer</dt><dd>Zäh × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
+          <dt>Ausdauer</dt><dd>LP × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
           <dt>Boni</dt><dd>+5 % Geländeläufer, Späher, Tarnung, Fliegen, Furchtlos, Rasend, Held · +10 % Schnell, Hinterhalt, Wucht · +15 % Furcht · +20 % Ausweichen · +25 % Regeneration · −10 % Langsam · −15 % An Beschwörer gebunden</dd>
           <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Skills, Zauber und Gegenstände aus der Datenbank mit ihren festen Punkten</dd>
           <dt>Prozent</dt><dd>Sonderregeln der Gegner aus der Datenbank als Aufschlag auf die Boni</dd>
@@ -1350,7 +1350,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
           </tbody>
         </table></div>
         <h3>Normal und Elite</h3>
-        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
+        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, LP plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
         <p>Jeder Gegner kann ein Gefährte werden. Der Spielleiter schaltet ihn für eine Gruppe frei, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>

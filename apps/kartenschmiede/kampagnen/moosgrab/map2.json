@@ -112,7 +112,7 @@
      "flag": "hedda_angegriffen",
      "ist": true
     },
-    "text": "Ein Held hat Hedda angegriffen: Sie ist jetzt ein Gegner an ihrer Stelle (Brotmesser, Zäh 3) und weicht nach jedem Zug eine Kartenbreite zwischen die Särge zurück. Jeder Nahkampf gegen sie: Lärm +1 (Taste L), die Gemeinde oben hört es durch die Platte. Sie sagt nichts mehr, und sie gibt nichts mehr.",
+    "text": "Ein Held hat Hedda angegriffen: Sie ist jetzt ein Gegner an ihrer Stelle (Brotmesser, LP 3) und weicht nach jedem Zug eine Kartenbreite zwischen die Särge zurück. Jeder Nahkampf gegen sie: Lärm +1 (Taste L), die Gemeinde oben hört es durch die Platte. Sie sagt nichts mehr, und sie gibt nichts mehr.",
     "ansage": "Das Messer kommt hoch. Diesmal nicht als Warnung."
    },
    {
@@ -965,7 +965,7 @@
      "passives": "Weicht zurück: nach jedem Zug eine Kartenbreite zwischen die Särge; greift nur an, wer sie erreicht",
      "flavor": "Zwei Tage Krypta, eine Kerze, ein Messer. Sie hat nicht vor, hier zu sterben."
     },
-    "notiz": "Mini: (offen, Chris sucht aus). Keine Kämpferin, aber zäh und verzweifelt: Qualität 5+, Verteidigung 5+, Zäh 3, ein Brotmesser mit einer Attacke, etwa 20 Punkte. Jeder Nahkampf gegen sie kostet Lärm (Taste L). Nur drücken, wenn ein Held sie wirklich angreift oder packt; Drohen allein ist die Antwort 4 im Gespräch.",
+    "notiz": "Mini: (offen, Chris sucht aus). Keine Kämpferin, aber zäh und verzweifelt: Qualität 5+, Verteidigung 5+, LP 3, ein Brotmesser mit einer Attacke, etwa 20 Punkte. Jeder Nahkampf gegen sie kostet Lärm (Taste L). Nur drücken, wenn ein Held sie wirklich angreift oder packt; Drohen allein ist die Antwort 4 im Gespräch.",
     "setzt": {
      "hedda_angegriffen": true,
      "hedda_schweigt": true
@@ -1008,7 +1008,7 @@
    "anzeige": "Eine Gestalt aus der Gemeinde",
    "karte": "v:giftmade",
    "info": "Ein befallener Dorfbewohner, kniet und flüstert. Greift erst nach Lärm an. Platzhalter Giftmade, Figur: Black Grail.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3) für die Black-Grail-Figuren aus Trench Crusade. Sieben Stück zusammen ≈ 175 P., das Playbook sagt ≈ 155. Giftspeichel gilt als Sporenhusten mit kurzer Reichweite (eine Kartenlänge). Wenn eine eigene Befallenen-Karte da ist: hier eintragen.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3) für die Black-Grail-Figuren aus Trench Crusade. Sieben Stück zusammen ≈ 175 P., das Playbook sagt ≈ 155. Giftspeichel gilt als Sporenhusten mit kurzer Reichweite (eine Kartenlänge). Wenn eine eigene Befallenen-Karte da ist: hier eintragen.",
    "bedrohungSatz": "Das war einer aus dem Dorf. Jetzt ist es etwas, das seine Hände benutzt. Einzeln kein Gegner. Zu siebt schon.",
    "zustandSaetze": {
     "unverletzt": "Es kniet. Es flüstert. Es hat euch noch nicht einmal angesehen.",
@@ -1065,7 +1065,7 @@
     "passives": "Bewegt sich nicht, Furchtlos",
     "flavor": "Am Finger ein Ehering. Er tastet."
    },
-   "notiz": "Vorschlag: Qualität 5+, Verteidigung 5+, Zäh 2, etwa 15 P. Greift nur an, wer in Kontakt steht. Jeder Nahkampf dagegen: +1 Lärm (Taste L).",
+   "notiz": "Vorschlag: Qualität 5+, Verteidigung 5+, LP 2, etwa 15 P. Greift nur an, wer in Kontakt steht. Jeder Nahkampf dagegen: +1 Lärm (Taste L).",
    "bedrohungSatz": "Ein Arm. Nur ein Arm. Aber er weiß, wo ihr steht.",
    "zustandSaetze": {
     "unverletzt": "Die Hand tastet weiter, als hätte sie nichts gemerkt.",
@@ -1093,8 +1093,8 @@
    "anzeige": "Etwas aus einem Grab",
    "karte": "v:sporenhuelle",
    "info": "Nachschub aus den Gräbern, nur nach Lärm 6 oder Glocke. Einer je Runde. Platzhalter Sporenhülle.",
-   "notiz": "Platzhalter Sporenhülle (≈35 P., Zäh 4). Das Playbook sagt: pro Runde 1 Gegner aus den Gräbern, ≈35 P. Die drei Figuren erscheinen in der App auf einmal, auf den Tisch kommen sie einer je Rundenende aus Zone G.",
-   "bedrohungSatz": "Das hat in der Erde gelegen, bis die Erde es nicht mehr halten wollte. Langsam. Zäh.",
+   "notiz": "Platzhalter Sporenhülle (≈35 P., LP 4). Das Playbook sagt: pro Runde 1 Gegner aus den Gräbern, ≈35 P. Die drei Figuren erscheinen in der App auf einmal, auf den Tisch kommen sie einer je Rundenende aus Zone G.",
+   "bedrohungSatz": "Das hat in der Erde gelegen, bis die Erde es nicht mehr halten wollte. Langsam. LP.",
    "zustandSaetze": {
     "unverletzt": "Erde fällt ab. Sonst nichts.",
     "angekratzt": "Ein Stück Leichentuch reißt. Es kommt weiter.",

@@ -222,7 +222,7 @@
               <div class="stat"><span>Modelle</span><b>${esc(s.size)}</b></div>
               <div class="stat"><span>Qualität</span><b>${esc(s.quality)}</b></div>
               <div class="stat"><span>Verteid.</span><b>${esc(s.defense)}</b></div>
-              <div class="stat"><span>Zäh</span><b>${esc(s.tough)}</b></div>
+              <div class="stat"><span>LP</span><b>${esc(s.tough)}</b></div>
             </div>
             ${waffen.length ? `<div class="weps"><div class="block-t">Waffen</div>${waffen.map(w => {
               const nah = w.reichweite === 0;
@@ -432,7 +432,7 @@
     let html = `<div class="b-group"><h4>Grundwerte</h4><div class="stp-grid">
       ${stufe("q", "Qualität", m.q + "+", x => x.q < 6 ? (x.q++, true) : false, x => x.q > 2 ? (x.q--, true) : false, "trifft auf diesen Wurf")}
       ${stufe("d", "Verteidigung", m.d + "+", x => x.d < 6 ? (x.d++, true) : false, x => x.d > 2 ? (x.d--, true) : false, "rettet auf diesen Wurf")}
-      ${stufe("t", "Zäh", m.t, x => x.t > 1 ? (x.t--, true) : false, x => x.t < 72 ? (x.t++, true) : false, "Lebenspunkte je Modell")}
+      ${stufe("t", "LP", m.t, x => x.t > 1 ? (x.t--, true) : false, x => x.t < 72 ? (x.t++, true) : false, "Lebenspunkte je Modell")}
       ${held ? "" : stufe("n", "Modelle", m.n, x => x.n > 1 ? (x.n--, true) : false, x => x.n < 10 ? (x.n++, true) : false, "Größe der Einheit")}
     </div></div>`;
     m.waffen.forEach((w, i) => {
@@ -566,7 +566,7 @@
         .map(f => ({ f, ...R.faehigkeitsCheck(f, { kaempfe: 600 }) }))
         .sort((a, b) => (b.messbar - a.messbar) || (b.sieg - a.sieg));
       const urteil = z => !z.messbar ? ["", "im Duell nicht messbar"] : z.sieg >= 0.6 ? ["hi", "eher zu billig"] : z.sieg <= 0.4 ? ["lo", "eher zu teuer"] : ["ok", "passt"];
-      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an Zäh bekommt. 50 % heißt: Preis passt.</p>
+      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an LP bekommt. 50 % heißt: Preis passt.</p>
         <div class="tbl-wrap"><table><thead><tr><th>Fähigkeit</th><th class="num">Kosten</th><th class="num">Siege</th><th>Einschätzung</th></tr></thead><tbody class="static">${zeilen.map(z => {
           const [cls, txt] = urteil(z);
           return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
@@ -705,7 +705,7 @@
         <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
         <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
         <h3>Aktionswürfel (${R.AKTIONSWUERFEL} pro Zug)</h3>${kaestchen(R.AKTIONSWUERFEL, true)}<p class="hb-unter">Bewegen 6" (höchstens 2×), Angreifen, Helfen: jeder Würfel · 2. Angriff: ${R.ZWEITER_ANGRIFF}+ · Fähigkeiten: Wurf wie angegeben</p>
-        <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
+        <h3>Wunden (LP ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
         <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
         <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
       </div>
@@ -882,7 +882,7 @@
     const { karte, neu, weg } = KAT.skaliere(state, t, alleFaehigkeiten());
     state = Object.assign(state, karte);
     bModell = null; insFormular(); alles(); simOptionen();
-    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, Zäh ${state.tough}.`
+    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, LP ${state.tough}.`
       + (neu.length ? ` Neu: ${neu.join(", ")}.` : "") + (weg.length ? ` Entfernt: ${weg.join(", ")}.` : "");
   };
   // Gegner und Gefährten im Querformat (Platz für mehrere Fähigkeiten), Helden im Hochformat
