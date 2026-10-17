@@ -4677,13 +4677,17 @@ export function useFoundationShellRouterBodyScope({
   }
 
   // OPUS-REVIEW B4 (PR 3, K1): wie lange/oft die Buehne auf einen laufenden Arena-Vorlauf wartet,
-  // bevor sie es doch als Fehler zeigt. 40 x 3s = 120s deckt die geschaetzte CX23-Wartezeit
-  // (20-70s je Spieltag mit zwei Arena-Disziplinen, Plan Abschnitt 8) mit Puffer -- B1/B2 im
-  // Server selbst (genau eine automatische Wiederholung, Gesamt-Timeout) sorgen dafuer, dass ein
-  // echt kaputter Vorlauf nicht endlos "in_progress" bleibt, diese Schranke ist nur die
-  // Client-seitige Entsprechung, damit die Buehne nicht ebenfalls endlos pollt.
+  // bevor sie es doch als Fehler zeigt. DIESES Budget muss den SERVERSEITIGEN Worst Case decken,
+  // nicht nur die geschaetzte Normalzeit (20-70s je Spieltag, Plan Abschnitt 8) -- sonst zeigt die
+  // Buehne "Punkte nicht gebucht", WAEHREND der Server (B1: genau eine automatische Wiederholung,
+  // B2: Gesamt-Timeout `OLY_ARENA_GESAMT_TIMEOUT_MS`, Standard 180s) noch legitim an einem zweiten
+  // Versuch arbeitet -- ein Fehlalarm kurz vor dem eigentlichen Erfolg. Worst Case: 2 Versuche x
+  // 180s x bis zu 2 arena-aufgeloeste Disziplinen (WEG B, seriell hinter demselben Chromium-
+  // Semaphor) = 720s. 300 x 3s = 900s deckt das mit Reserve -- B1/B2 im Server selbst sorgen
+  // dafuer, dass ein echt kaputter Vorlauf nicht endlos "in_progress" bleibt, diese Schranke hier
+  // ist nur die Client-seitige Entsprechung, damit die Buehne nicht ebenfalls endlos pollt.
   const ARENA_VORLAUF_POLL_INTERVAL_MS = 3_000;
-  const ARENA_VORLAUF_POLL_MAX_VERSUCHE = 40;
+  const ARENA_VORLAUF_POLL_MAX_VERSUCHE = 300;
 
   async function commitArenaDiscipline(
     side: "d1" | "d2",
