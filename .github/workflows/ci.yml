@@ -316,3 +316,51 @@ jobs:
       - name: PPS-Referenz-Frische (informativ, blockiert den Merge nicht)
         continue-on-error: true
         run: npm run ci:pps-referenz-frische
+
+  # E1 -- BILDGROESSE UND CHROMIUM-STARTBARKEIT DES PRODUKTIONS-IMAGES (Plan
+  # docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4/6.2 Punkt 8/9.5).
+  #
+  # Zweck ist vor allem die ZAHL, die Chris' Platzmessung (Plan 4.5, `df -h`/`free -m`)
+  # einordnet: ohne diesen Job gibt es nur die SCHAETZUNG aus Abschnitt 4.2 (+0,6-0,75 GB je
+  # Image), nie die echte Groesse DIESES Images. Dazu ein bewusst MINIMALER Chromium-Start
+  # (nicht die volle `runArenaFixtures`-Abnahme aus Plan 6.2 Punkt 8 -- die braucht echte
+  # Kader-/Aufstellungsdaten aus lib/ und gehoert in den Battle-Smoke von PR 3, nicht in eine
+  # reine Image-Probe dieses PRs): `chromium.launch()` + eine leere Seite, als User `oly`, mit
+  # `--init` und `--shm-size=256m` (dieselben Compose-Werte wie `deploy/hetzner/
+  # docker-compose.yml`). Das ist der erste ECHTE Test, ob Chromiums Sandbox (Plan 9.5: KEIN
+  # `--no-sandbox` in `arena-headless-runner.ts`, unveraendert) innerhalb eines Containers
+  # ueberhaupt startet -- dieser Agent hat das bewusst NICHT lokal getestet (Resourcenregel
+  # dieses PRs: kein eigener Chromium-Lauf lokal, waehrend ein paralleler Agent moeglicherweise
+  # selbst welche faehrt); hier laeuft es auf einem isolierten GitHub-Runner.
+  #
+  # BEWUSST NICHT BLOCKIEREND (`continue-on-error: true`), wie `pps-referenz-frische` oben:
+  # ein neuer, bildgroessen-/sandbox-bezogener Check soll den Merge nicht aufhalten, bevor ihn
+  # jemand eine Weile beobachtet hat -- aber seine Zahl und ein etwaiger Sandbox-Fehler muessen
+  # SICHTBAR im Log stehen, bevor Chris anhand von Plan 4.5 ueber den Merge entscheidet.
+  arena-image-chromium-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Produktions-Image bauen (mit Chromium, E1)
+        run: docker build -t oly-arena-probe:ci .
+      - name: Bildgroesse ausgeben (die Zahl fuer Chris' Platzmessung)
+        run: docker image ls oly-arena-probe:ci --format '{{.Repository}}:{{.Tag}}  {{.Size}}'
+      - name: Chromium-Start als User oly (Sandbox aktiv, kein --no-sandbox)
+        continue-on-error: true
+        run: |
+          docker run --rm --init --shm-size=256m --user oly oly-arena-probe:ci \
+            node -e "
+              const { chromium } = require('playwright');
+              (async () => {
+                const browser = await chromium.launch({
+                  headless: true,
+                  channel: 'chromium',
+                  args: ['--proxy-server=direct://', '--host-resolver-rules=MAP * 0.0.0.0'],
+                });
+                const page = await browser.newPage();
+                await page.goto('about:blank');
+                console.log('chromium ok (sandbox aktiv, User oly, --init, shm_size=256m)');
+                await browser.close();
+              })().catch((err) => { console.error(err); process.exit(1); });
+            "

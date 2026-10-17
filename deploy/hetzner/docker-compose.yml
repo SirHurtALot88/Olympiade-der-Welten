@@ -12,6 +12,25 @@ services:
         NEXT_PUBLIC_OLY_BUILD_SHA: ${NEXT_PUBLIC_OLY_BUILD_SHA:-}
         NEXT_PUBLIC_OLY_BUILD_DATE: ${NEXT_PUBLIC_OLY_BUILD_DATE:-}
     restart: unless-stopped
+    # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
+    # Chromium braucht beides, nicht nur eins von beiden.
+    #
+    # `init: true` haengt Dockers Mini-Init (tini) als PID 1 ein, STATT `npm run start`
+    # direkt. Ohne das laeuft `npm` selbst als PID 1 (`scripts/start-hosted.sh`) -- und PID 1
+    # ist der EINZIGE Prozess, der verwaiste Kindprozesse per `wait()` einsammelt. Stuerzt ein
+    # Chromium-Kindprozess ab (Renderer-Crash, OOM), bleibt er ohne Init als Zombie stehen.
+    # Node/npm raeumen das nicht von selbst auf.
+    #
+    # `shm_size: "256m"` ersetzt Dockers Standard-`/dev/shm` von NUR 64 MB. Chromium legt dort
+    # seine Tab-/Renderer-Shared-Memory-Segmente ab und stuerzt bei zu wenig Platz bekanntlich
+    # ab (das klassische "Chromium in Docker"-Problem). 256m ist reichlich bemessen fuer EINEN
+    # Browser mit einer Seite (on demand, Plan 4.3/4.4) -- bewusst OHNE das zusaetzliche
+    # Launch-Flag `--disable-dev-shm-usage` (das waere eine lib/-Aenderung in
+    # `arena-headless-runner.ts`, nicht Teil dieses PRs; die Kombination beider waere die
+    # vom Plan vorgeschlagene doppelte Absicherung, hier reicht die Compose-Seite als erster
+    # Schritt).
+    init: true
+    shm_size: "256m"
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -29,6 +48,13 @@ services:
       OLY_AUTH_SECRET: ${OLY_AUTH_SECRET:-}
       OLY_USER_CHRIS_PASSWORD: ${OLY_USER_CHRIS_PASSWORD:-}
       OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
+      # E1, Plan Abschnitt 4.1/9.5: Platzhalter fuer einen expliziten Chromium-Pfad-Override
+      # (Fund F7, Revision 1194 lokal vs. 1223 in CI/Prod). Leer = kein Override, der Runner
+      # faellt automatisch auf die im Image installierte Revision zurueck (s. Dockerfile-
+      # Kommentar bei `PLAYWRIGHT_BROWSERS_PATH`). `lib/battle/arena-headless-runner.ts` liest
+      # diese Variable HEUTE NOCH NICHT -- das ist bewusst nicht Teil dieses PRs, s.
+      # PR-Beschreibung.
+      OLY_ARENA_CHROMIUM_EXECUTABLE: ${OLY_ARENA_CHROMIUM_EXECUTABLE:-}
     volumes:
       - oly-data:/app/data/persistence
       # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach
