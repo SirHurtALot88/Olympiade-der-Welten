@@ -1,9 +1,9 @@
 {
-  "name": "Ritter des Schwarzen Grals",
+  "name": "Ritterin des Schwarzen Grals",
   "status": "wartet auf Bild",
   "mini": "Trench-Crusade-Figur (eine Frau) aus der Black-Grail-Warband von Chris (17.10.): türkise Schuppenrüstung, rot-kupferne Schulterplatten, runder Helm mit nach vorn ragendem Stachel, blaues zerfetztes Cape, nur eine Waffe: blutverschmierte Speer-Hellebarde mit Gabelklinge. Rüstung voller Dreck und Rost, Hände blutig.",
   "karte": {
-    "name": "Ritter des Schwarzen Grals",
+    "name": "Ritterin des Schwarzen Grals",
     "role": "enemy",
     "faction": "Schwarzer Gral",
     "praegung": [
