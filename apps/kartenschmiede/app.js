@@ -105,8 +105,8 @@
     5: "powerful and dangerous, low camera angle, strong warm backlight outlining the silhouette",
     6: "overwhelming boss presence, very low camera angle looking up, deep red backlight outlining the silhouette, the creature fills the frame and the viewer should feel small",
   };
-  // Stil wie die Olympiade-Bilder: Standbild aus einem Realfilm, dunkel, warmes Licht, genau ein leuchtender Akzent
-  const STIL = "a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the creature is a real, physical being made with practical effects (real skin, fur, scales, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.";
+  // Stil wie die Olympiade-Bilder: Filmstandbild mitten in einer Szene, dunkel, genau ein leuchtender Akzent. Ausdrücklich keine Mini, sonst liefert Gemini eine Spielzeug-Makroaufnahme
+  const STIL = "a dramatic still frame from a big-budget live-action dark fantasy film with a subtle science-fiction edge, the kind of shot that ends up on the poster. Photorealistic and cinematic: anamorphic lens, shallow depth of field, strong directional light with deep shadows, volumetric haze, fine film grain, a muted, slightly desaturated colour grade.\n\nThis is a real scene, not a model: the creature is a full-size living being, made with practical effects (real skin, fur, scales, cloth, metal, dirt), with real weight and wear. Never a miniature, figurine, action figure, toy or painted model.";
   // Der eine leuchtende Akzent folgt der Prägung, damit Bild und Element-Symbol zusammenpassen
   const AKZENT = {
     feuer: "glowing orange lava cracks", frost: "pale blue frost glowing in the cracks of its skin or armour", natur: "faint green bioluminescent veins",
@@ -284,9 +284,11 @@
     return [
       `Create one image: ${STIL}`,
       ``,
-      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep its pose, silhouette, proportions, paint colours and distinctive details (weapons, chains, armour) clearly recognisable, but show it as a living creature, not a figure. Do not show the plastic base, the table or the room from the photo.`,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep the design, colours and distinctive details (weapons, chains, armour) recognisable, but give it realistic anatomy and life-size scale instead of the miniature's stylised proportions, and real materials instead of plastic and paint. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
+      ``,
+      `The moment: show it in action inside a scene, not posing: moving, about to strike or turning towards the camera, wind in cloth and hair, rain, ash or dust in the air, as if something is happening just outside the frame.`,
       ``,
       `Mood and camera: ${STIMMUNG[s.tier]}.`,
       ``,
@@ -296,7 +298,7 @@
       ``,
       `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
       ``,
-      `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
+      `Not wanted: miniature, figurine, action figure, toy, tabletop diorama, macro or tilt-shift photography, plastic or painted-model look, a static figure simply standing in a landscape. Also no digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
   }
 
