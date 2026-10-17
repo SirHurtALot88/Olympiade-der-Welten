@@ -76,9 +76,13 @@ describe("Spieler-Tabelle: Achsen- und Disziplin-Spalten", () => {
 
     // Kadergröße wird durchgereicht und in Klammern hinter dem Namen gezeigt.
     expect(roster).toContain("playerCount:");
-    expect(panel).toContain('<span className="selected-roster-pps-diszi-item-count"> ({discipline.playerCount})</span>');
+    // W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): das Badge
+    // zeigt `playerCountLabel`, nicht die rohe `playerCount`-Zahl -- im Battle Mode mit zwei
+    // unterschiedlichen Saison-Vorkommen steht dort "4 · 6" statt nur eine der beiden Zahlen.
+    expect(roster).toContain("playerCountLabel:");
+    expect(panel).toContain('<span className="selected-roster-pps-diszi-item-count"> ({discipline.playerCountLabel})</span>');
     // Ohne Katalogwert bleibt die Klammer weg statt eine Zahl zu erfinden.
-    expect(panel).toContain("discipline.playerCount != null ? (");
+    expect(panel).toContain("discipline.playerCountLabel != null ? (");
   });
 
   it("macht die Achsen-Spalte schmaler und die Spur hoch genug für die Zahl", () => {

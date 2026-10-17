@@ -729,17 +729,19 @@ function FoundationTeamsDetailPanel({
                     key={discipline.id}
                     className="selected-roster-pps-diszi-item"
                     title={
-                      discipline.playerCount != null
-                        ? `${discipline.name}: ${discipline.playerCount} Spieler pro Team treten in dieser Disziplin an`
+                      discipline.playerCountLabel != null
+                        ? `${discipline.name}: ${discipline.playerCountLabel} Spieler pro Team treten in dieser Disziplin an`
                         : discipline.name
                     }
                   >
                     <span className="selected-roster-pps-diszi-item-name">
                       {discipline.name}
                       {/* Kadergröße der Disziplin. Gedämpft und in Klammern, damit sie den
-                          Namen ergänzt statt mit dem PPs-Wert rechts zu konkurrieren. */}
-                      {discipline.playerCount != null ? (
-                        <span className="selected-roster-pps-diszi-item-count"> ({discipline.playerCount})</span>
+                          Namen ergänzt statt mit dem PPs-Wert rechts zu konkurrieren. Bei zwei
+                          unterschiedlichen Saison-Vorkommen (Battle Mode, repeat=2) zeigt das
+                          Label beide, z.B. "(4 · 6)" statt nur die naechste Zahl (W4). */}
+                      {discipline.playerCountLabel != null ? (
+                        <span className="selected-roster-pps-diszi-item-count"> ({discipline.playerCountLabel})</span>
                       ) : null}
                     </span>
                     <span className="selected-roster-pps-diszi-item-value nl-tnum">{formatPpsValue(discipline.pps)}</span>

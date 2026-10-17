@@ -35,7 +35,10 @@ import {
 import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference, resolveArchivedSeasonPlayerMarketValue } from "@/lib/foundation/player-display-market-value";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
-import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonDisciplinePlayerCountDisplayMap,
+  buildSeasonDisciplinePlayerCountMap,
+} from "@/lib/season/season-discipline-schedule";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -462,6 +465,12 @@ export type PlayerDetailDrawerData = {
     disciplineDelta: number | null;
     rank: number | null;
     playerCount: number | null;
+    /**
+     * Anzeige-Text zu `playerCount` (W4): bei einem Saison-Vorkommen identisch zur Zahl, bei zwei
+     * unterschiedlichen Vorkommen (Battle Mode, repeat=2) „4 · 6" (Hinrunde · Rückrunde) —
+     * s. `buildSeasonDisciplinePlayerCountDisplayMap`.
+     */
+    playerCountLabel: string | null;
     scoutedTier?: TransfermarktRatingTier | null;
     /**
      * DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): `null` heißt „keine
@@ -1041,6 +1050,23 @@ function getGameStateScoutingSeed(gameState: GameState) {
   ].find((value) => typeof value === "string" && value.trim().length > 0) ?? "player-drawer-scouting";
 }
 
+/**
+ * Anzeige-Label zur Kadergroesse einer Disziplin (W4,
+ * docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): zuerst das Label aus
+ * `buildSeasonDisciplinePlayerCountDisplayMap` (bei zwei unterschiedlichen Saison-Vorkommen
+ * "4 · 6"), sonst der reine Zahlenwert als Text, sonst nichts.
+ */
+function resolveDisciplinePlayerCountLabel(
+  display: { value: number | null; label: string | null } | undefined,
+  numerischerRueckfall: number | null,
+): string | null {
+  if (display?.label) {
+    return display.label;
+  }
+  const wert = display?.value ?? numerischerRueckfall;
+  return wert != null ? String(wert) : null;
+}
+
 function buildScoutedDisciplineValuesFromPlayer(input: {
   gameState: GameState;
   player: Player;
@@ -1049,6 +1075,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
 }): PlayerDetailDrawerData["disciplineValues"] {
   const disciplineById = new Map(input.gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
   const seasonPlayerCountByDisciplineId = buildSeasonDisciplinePlayerCountMap(input.gameState);
+  const seasonPlayerCountDisplayById = buildSeasonDisciplinePlayerCountDisplayMap(input.gameState);
   return buildScoutedDisciplineTiers({
     saveId: getGameStateScoutingSeed(input.gameState),
     playerId: input.player.id,
@@ -1088,6 +1115,10 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
       disciplineDelta: null,
       rank: index + 1,
       playerCount: seasonPlayerCountByDisciplineId.get(entry.disciplineId) ?? discipline?.playerCount ?? null,
+      playerCountLabel: resolveDisciplinePlayerCountLabel(
+        seasonPlayerCountDisplayById.get(entry.disciplineId),
+        discipline?.playerCount ?? null,
+      ),
       scoutedTier: entry.scoreTier,
     };
   });
@@ -1197,6 +1228,7 @@ function buildDisciplineValuesFromPlayer(
   const currentDetailsByDisciplineId = new Map<string, PlayerDisciplineDrawerDetail>();
   const currentSeasonId = gameState?.season.id ?? performance?.seasonId ?? null;
   const seasonPlayerCountByDisciplineId = gameState ? buildSeasonDisciplinePlayerCountMap(gameState) : null;
+  const seasonPlayerCountDisplayById = gameState ? buildSeasonDisciplinePlayerCountDisplayMap(gameState) : null;
 
   if (gameState) {
     for (const snapshot of schnappschuesseFuerSpielerhistorie(gameState)) {
@@ -1309,6 +1341,10 @@ function buildDisciplineValuesFromPlayer(
         currentDisciplineValues: current,
         disciplineDelta: delta,
         playerCount: seasonPlayerCountByDisciplineId?.get(discipline.id) ?? discipline.playerCount ?? null,
+        playerCountLabel: resolveDisciplinePlayerCountLabel(
+          seasonPlayerCountDisplayById?.get(discipline.id),
+          discipline.playerCount ?? null,
+        ),
         laufbahn: laufbahnByDisciplineId?.get(discipline.id) ?? null,
       };
     })
@@ -3173,6 +3209,12 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             currentDisciplineValues: entry.score,
             disciplineDelta: null,
             playerCount: (discipline as { playerCount?: number | null } | null)?.playerCount ?? null,
+            // Kein GameState in diesem Zweig (reiner Katalog-Fallback ohne Saisonbezug) -- hier
+            // gibt es kein Saison-Vorkommen zum Anzeigen, nur den Katalogwert als Text.
+            playerCountLabel:
+              (discipline as { playerCount?: number | null } | null)?.playerCount != null
+                ? String((discipline as { playerCount?: number | null } | null)?.playerCount)
+                : null,
           };
         })
         .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
