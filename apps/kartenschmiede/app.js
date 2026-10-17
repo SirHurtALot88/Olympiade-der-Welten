@@ -106,7 +106,7 @@
     6: "overwhelming boss presence, very low camera angle looking up, deep red backlight outlining the silhouette, the creature fills the frame and the viewer should feel small",
   };
   // Stil wie die Olympiade-Bilder: Filmstandbild mitten in einer Szene, dunkel, genau ein leuchtender Akzent. Ausdrücklich keine Mini, sonst liefert Gemini eine Spielzeug-Makroaufnahme
-  const STIL = "a dramatic still frame from a big-budget live-action dark fantasy film with a subtle science-fiction edge, the kind of shot that ends up on the poster. Photorealistic and cinematic: anamorphic lens, shallow depth of field, strong directional light with deep shadows, volumetric haze, fine film grain, a muted, slightly desaturated colour grade.\n\nThis is a real scene, not a model: the creature is a full-size living being, made with practical effects (real skin, fur, scales, cloth, metal, dirt), with real weight and wear. Never a miniature, figurine, action figure, toy or painted model.";
+  const STIL = "a dramatic still frame from a big-budget live-action dark fantasy film with a subtle science-fiction edge, the kind of shot that ends up on the poster. Photorealistic and cinematic: anamorphic lens, shallow depth of field, strong directional light with deep shadows, volumetric haze, fine film grain, a muted, slightly desaturated colour grade.\n\nThis is a real scene, not a model: the creature is a full-size living being, made with practical effects (real skin, fur, scales, cloth, metal, dirt), with real weight and wear, matte surfaces with no plastic sheen and a natural stance with the weight on one leg. Never a miniature, figurine, action figure, toy or painted model.";
   // Der eine leuchtende Akzent folgt der Prägung, damit Bild und Element-Symbol zusammenpassen
   const AKZENT = {
     feuer: "glowing orange lava cracks", frost: "pale blue frost glowing in the cracks of its skin or armour", natur: "faint green bioluminescent veins",
@@ -286,7 +286,7 @@
       ``,
       `Style: ${STIL}`,
       ``,
-      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Recreate this exact character: same pose, same armour, same weapons (including chains), same colours. Change only the materials (real skin, metal and cloth instead of plastic and paint) and give it life-size scale. Do not invent a different design. Do not show the plastic base, the table or the room from the photo.`,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Recreate this exact character: same pose, same armour, same weapons (including chains), same colours, same sex and body shape (a female figure stays clearly female, including the shape of her armour). Add no weapons the miniature does not carry. Change only the materials (real skin, metal and cloth instead of plastic and paint) and give it life-size scale. Do not invent a different design. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
       ``,
