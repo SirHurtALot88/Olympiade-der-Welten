@@ -9,6 +9,27 @@ import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-c
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { TitleRaceResult } from "@/lib/season/title-race";
+import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
+
+/**
+ * Task #159 Punkt 2 ("Spieltage"-Modus): Daten für den Host (`use-foundation-shell-router-
+ * body-scope.tsx`). `verfuegbar: false` (Manager-Save oder kein Fixture-Plan) heißt: der Modus
+ * wird gar nicht erst angeboten.
+ *
+ * PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.): `matchdayOptions`/`defaultMatchdayId`
+ * kommen aus einem BILLIGEN Index (ein Durchlauf über `disciplineResults`, kein Builder-Aufruf).
+ * Die TEURE volle Paarungs-Übersicht (`buildSpieltagsUebersicht`, u. a. die Rückspiel-Suche über
+ * den ganzen Spielplan) wird NICHT für alle Spieltage vorgebaut — `getUebersicht` ist eine LAZY
+ * Funktion, die sie erst auf Abruf für GENAU EINEN Spieltag baut. Davor baute der Host sie für
+ * ALLE 20 Spieltage bei JEDER `gameState`-Änderung, auch wenn der Saisonstand gar nicht offen
+ * war (Speichern, Polling-Reload, Koop-Benachrichtigung — bis zu 1280 Ergebniszeilen umsonst).
+ */
+export type SeasonV2SpieltageBundle = {
+  verfuegbar: boolean;
+  matchdayOptions: Array<{ id: string; index: number; label: string; gespielt: boolean }>;
+  defaultMatchdayId: string | null;
+  getUebersicht: (matchdayId: string) => SpieltagsUebersicht | null;
+};
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
 
@@ -275,6 +296,8 @@ export type SeasonStandingsV2ClientProps = {
   onOpenRanks?: (() => void) | null;
   onOpenPrize?: (() => void) | null;
   isLoading?: boolean;
+  /** Task #159 Punkt 2: Daten für den 4. Modus "Spieltage". `null`/fehlend ⇒ Modus bleibt verborgen. */
+  spieltage?: SeasonV2SpieltageBundle | null;
 };
 
 const seasonV2TeamTagColorMap: Record<string, { bg: string; border: string; text: string; glow: string }> = {

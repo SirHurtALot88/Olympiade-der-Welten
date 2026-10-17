@@ -363,3 +363,141 @@
 .is-new-look .nl-standings-liga-card .nl-standings-table-shell {
   margin: 0;
 }
+
+/* ------------------------------------------------------------------ *
+ * TASK #159 PUNKT 2 — Modus "Spieltage": Navigation + Paarungs-Karten.
+ * Nur sichtbar bei Battle-Saves mit echtem Fixture-Plan (kein Markup ohne
+ * `spieltage.verfuegbar`, s. SeasonStandingsNewLook.tsx).
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-spieltage {
+  display: grid;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-spieltage-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-standings-spieltage-navbtn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-size: var(--nl-fs-lg);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.is-new-look .nl-standings-spieltage-navbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.is-new-look .nl-standings-spieltage-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nl-s1);
+  font-size: var(--nl-fs-sm);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-spieltage-select select {
+  font-size: var(--nl-fs-md);
+  color: var(--nl-ink);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  padding: 4px 8px;
+}
+
+.is-new-look .nl-standings-spieltage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-standings-spieltage-card {
+  display: grid;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-spieltage-card-teams {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+  font-weight: 700;
+  font-size: var(--nl-fs-md);
+}
+
+.is-new-look .nl-standings-spieltage-card-vs {
+  color: var(--nl-mut-2);
+  font-weight: 400;
+}
+
+.is-new-look .nl-standings-spieltage-rueckspiel {
+  margin: 0;
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-spieltage-disziplinen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-standings-spieltage-disziplin {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: var(--nl-s2);
+  padding: var(--nl-s1) 0;
+  border-top: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-standings-spieltage-disziplin:first-child {
+  border-top: none;
+}
+
+.is-new-look .nl-standings-spieltage-disziplin-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-spieltage-durchgang {
+  color: var(--nl-mut-2);
+  font-size: var(--nl-fs-xs);
+}
+
+.is-new-look .nl-standings-spieltage-ergebnis {
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-spieltage-verhaeltnis {
+  font-size: var(--nl-fs-sm);
+  min-width: 2.4em;
+  text-align: right;
+}
+
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-pos {
+  color: var(--nl-good);
+}
+
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-neg {
+  color: var(--nl-risk);
+}
+
+.is-new-look .nl-standings-spieltage-quelle {
+  grid-column: 1 / -1;
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut-2);
+}
