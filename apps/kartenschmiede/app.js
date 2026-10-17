@@ -162,9 +162,9 @@
   // Am Tisch gibt es nur W6: ein W3 wird als ½W6 gezeigt (W6 würfeln, halbieren, aufrunden), W6−2 heißt mindestens 1
   const nurW6 = t => String(t).replace(/W3/g, "½W6").replace(/(W6)-(\d)/g, "$1−$2");
   const wuerfelHinweis = w => [/W3/.test(w) ? "½W6: W6 würfeln, halbieren, aufrunden (1–2 → 1, 3–4 → 2, 5–6 → 3)" : "", /W\d[-−]\d/.test(w) ? "mindestens 1" : ""].filter(Boolean).join("; ");
-  const symbol = (k, w) => {
+  const symbol = (k, w, icon) => {
     const d = SYMBOLTEXT[k], z = nurW6(d.zeige(w)), extra = wuerfelHinweis(w);
-    return `<span class="sym" data-tip="${esc(nurW6(d.tip(w)) + (extra ? ` (${extra})` : ""))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`;
+    return `<span class="sym" data-tip="${esc(nurW6(d.tip(w)) + (extra ? ` (${extra})` : ""))}">${ico(icon || d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`;
   };
   const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
   // Für Stellen ohne Symbole (Prompt, Suche): Klartext
@@ -228,9 +228,10 @@
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
               const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${r.element && TAG[r.element] ? tagIco(r.element) : ""}${esc(t)}</span>` : esc(t); };
-              const werte = symText(`${nah ? "" : `{R${w.reichweite}} `}{A${w.a}}${w.ds ? ` {DS${w.ds}}` : ""}`);
+              // Attacken mit Bogen-Symbol bei Fernkampf, Schwert bei Nahkampf: das Symbol sagt, wie angegriffen wird
+              const werte = [nah ? "" : symbol("R", String(w.reichweite)), symbol("A", String(w.a), nah ? "sword" : "bow"), w.ds ? symbol("DS", String(w.ds)) : ""].filter(Boolean).join(" ");
               const unter = [werte].concat(regeln.split(",").map(t => t.trim()).filter(t => t && !/^(DS|AP)\s*\(/i.test(t)).map(mitTip)).join(" ");
-              return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
+              return `<div class="wep">${ico(nah ? "sword" : "bow")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nah" : "Fern"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
             ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${energieSym(k)}${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${energieSym({ typ: "faehigkeit", text: s.bossText })}${symText(s.bossText)}</p>` : ""}</div>` : ""}
