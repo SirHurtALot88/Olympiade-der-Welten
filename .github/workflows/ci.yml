@@ -322,21 +322,33 @@ jobs:
   #
   # Zweck ist vor allem die ZAHL, die Chris' Platzmessung (Plan 4.5, `df -h`/`free -m`)
   # einordnet: ohne diesen Job gibt es nur die SCHAETZUNG aus Abschnitt 4.2 (+0,6-0,75 GB je
-  # Image), nie die echte Groesse DIESES Images. Dazu ein bewusst MINIMALER Chromium-Start
-  # (nicht die volle `runArenaFixtures`-Abnahme aus Plan 6.2 Punkt 8 -- die braucht echte
-  # Kader-/Aufstellungsdaten aus lib/ und gehoert in den Battle-Smoke von PR 3, nicht in eine
-  # reine Image-Probe dieses PRs): `chromium.launch()` + eine leere Seite, als User `oly`, mit
+  # Image), nie die echte Groesse DIESES Images. Dazu ein MINIMALER Chromium-Start (nicht die
+  # volle `runArenaFixtures`-Abnahme aus Plan 6.2 Punkt 8 -- die braucht echte Kader-/
+  # Aufstellungsdaten aus lib/ und gehoert in den Battle-Smoke von PR 3, nicht in eine reine
+  # Image-Probe dieses PRs): `chromium.launch()` + eine leere Seite, als User `oly`, mit
   # `--init` und `--shm-size=256m` (dieselben Compose-Werte wie `deploy/hetzner/
-  # docker-compose.yml`). Das ist der erste ECHTE Test, ob Chromiums Sandbox (Plan 9.5: KEIN
-  # `--no-sandbox` in `arena-headless-runner.ts`, unveraendert) innerhalb eines Containers
-  # ueberhaupt startet -- dieser Agent hat das bewusst NICHT lokal getestet (Resourcenregel
-  # dieses PRs: kein eigener Chromium-Lauf lokal, waehrend ein paralleler Agent moeglicherweise
-  # selbst welche faehrt); hier laeuft es auf einem isolierten GitHub-Runner.
+  # docker-compose.yml`).
   #
-  # BEWUSST NICHT BLOCKIEREND (`continue-on-error: true`), wie `pps-referenz-frische` oben:
-  # ein neuer, bildgroessen-/sandbox-bezogener Check soll den Merge nicht aufhalten, bevor ihn
-  # jemand eine Weile beobachtet hat -- aber seine Zahl und ein etwaiger Sandbox-Fehler muessen
-  # SICHTBAR im Log stehen, bevor Chris anhand von Plan 4.5 ueber den Merge entscheidet.
+  # ERSTER ECHTER LAUF (Run 39054117220, Job 117458469085, 17.10.): Bildgroesse **3,83 GB**
+  # (`docker image ls`-Ausgabe im Log, keine Schaetzung). Der Chromium-Start SCHEITERTE beim
+  # ersten Mal -- `chrome_crashpad_handler: --database is required` + `recvmsg: Connection
+  # reset by peer`, SIGTRAP sofort nach dem Start. `continue-on-error: true` auf genau diesem
+  # Schritt hat das damals verdeckt (der JOB stand gruen, der SCHRITT war rot) -- das war ein
+  # Fehler in diesem Kommentar/dieser Einstellung, keine echte Bestaetigung. Ursache gefunden:
+  # `adduser --system` legt fuer `oly` kein Home-Verzeichnis an, `docker run --user oly` setzt
+  # `$HOME` deshalb nicht automatisch auf einen beschreibbaren Pfad, und Chromiums
+  # Crashpad-Handler braucht ein beschreibbares `$HOME` fuer seine Crash-Datenbank (gefixt:
+  # eigenes `/home/oly`-Verzeichnis + `ENV HOME=/home/oly` im Dockerfile). Auch gemessen:
+  # Playwright haengt beim `channel: "chromium"`-Start selbst bereits `--no-sandbox` an die
+  # Kommandozeile (gesehen im `<launching>`-Log), UNABHAENGIG von den eigenen
+  # `ARENA_NETZWERK_ABRIEGELUNG_ARGS` -- vermutlich Containererkennung in Playwright/Chromium
+  # selbst. Die "Sandbox bleibt aktiv"-Aussage in der PR-Beschreibung bezieht sich auf das, was
+  # DIESES PR an den Launch-Flags AENDERT (nichts), nicht auf das, was am Ende tatsaechlich auf
+  # der Kommandozeile steht.
+  #
+  # PFLICHT-CHECK (kein `continue-on-error: true` mehr, auf keinem der drei Schritte): sobald
+  # der Chromium-Start wirklich funktioniert (s. oben, HOME-Fix), soll ein Rueckfall sofort rot
+  # sein, nicht nur eine still verschluckte Warnung.
   arena-image-chromium-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -346,8 +358,7 @@ jobs:
         run: docker build -t oly-arena-probe:ci .
       - name: Bildgroesse ausgeben (die Zahl fuer Chris' Platzmessung)
         run: docker image ls oly-arena-probe:ci --format '{{.Repository}}:{{.Tag}}  {{.Size}}'
-      - name: Chromium-Start als User oly (Sandbox aktiv, kein --no-sandbox)
-        continue-on-error: true
+      - name: Chromium-Start als User oly (--no-sandbox kommt von Playwright selbst, s. Kommentar oben)
         run: |
           docker run --rm --init --shm-size=256m --user oly oly-arena-probe:ci \
             node -e "
@@ -360,7 +371,7 @@ jobs:
                 });
                 const page = await browser.newPage();
                 await page.goto('about:blank');
-                console.log('chromium ok (sandbox aktiv, User oly, --init, shm_size=256m)');
+                console.log('chromium ok (User oly, HOME=/home/oly, --init, shm_size=256m)');
                 await browser.close();
               })().catch((err) => { console.error(err); process.exit(1); });
             "
