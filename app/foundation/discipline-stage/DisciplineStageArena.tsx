@@ -1109,6 +1109,25 @@ export default function DisciplineStageArena({
     };
     const d1PointsByTeam = placementPointsForSide(d1, "d1");
     const d2PointsByTeam = placementPointsForSide(d2, "d2");
+    // B4 (Opus-Review, PR 3/K1): „PPS-Wertung — Arena ausgefallen: <Grund>" je Team UND
+    // Disziplin-Seite -- PR1 setzt `arenaAusfall` direkt auf dem TeamResult DER AUSGEFALLENEN
+    // Disziplin (legacy-matchday-resolve-engine.ts), nicht auf dem aggregierten
+    // `preview.teamResults`. Dieselbe `disciplinePreviews`-Suche wie `placementPointsForSide`,
+    // nur fuer dieses eine Feld statt fuer die Punkte.
+    const arenaAusfallGrundForSide = (
+      discipline: { disciplineId: string; displayName: string } | null,
+    ): Map<string, string> => {
+      const map = new Map<string, string>();
+      if (!discipline) return map;
+      const dp = (preview.disciplinePreviews ?? []).find((entry) => entry.disciplineId === discipline.disciplineId);
+      if (!dp) return map;
+      for (const tr of dp.teamResults ?? []) {
+        if (tr.arenaAusfall?.grund) map.set(tr.teamId, tr.arenaAusfall.grund);
+      }
+      return map;
+    };
+    const d1ArenaAusfallByTeam = arenaAusfallGrundForSide(d1);
+    const d2ArenaAusfallByTeam = arenaAusfallGrundForSide(d2);
     const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
       // `?? null` statt `?? 0`: liefert die Disziplin ueberhaupt kein Team-Ergebnis
       // (kein `disciplinePreview` zu dieser Disziplin — z. B. weil d1/d2 nur aus dem
@@ -1142,6 +1161,8 @@ export default function DisciplineStageArena({
         d2Points,
         totalPoints: (d1Points ?? 0) + (d2Points ?? 0),
         missingLineup: r.missingLineup,
+        d1ArenaAusfallGrund: d1ArenaAusfallByTeam.get(r.teamId) ?? null,
+        d2ArenaAusfallGrund: d2ArenaAusfallByTeam.get(r.teamId) ?? null,
       };
     });
     // Captain-/Formkarten-Einsatz je Team — 1:1 aus derselben Preview, damit die
