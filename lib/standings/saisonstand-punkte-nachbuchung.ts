@@ -39,8 +39,51 @@ import { spieltageMitDisziplinErgebnissen } from "@/lib/foundation/season-matchd
 import {
   DEFAULT_STANDINGS_TIEBREAKER_MODE,
   resolveProjectedRankWithTiePolicy,
+  type StandingsTieBreakItem,
 } from "@/lib/standings/standings-tiebreaker-policy";
 import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+
+/**
+ * LIGA-LOKALER RANG BEI DER NACHBUCHUNG (16.10., Befund aus dem 2-Liga-Smoke-Test): ohne diesen
+ * Wrapper vergab `resolveProjectedRankWithTiePolicy` einen gemeinsamen Rang 1..32 ueber BEIDE Ligen,
+ * weil die Funktion selbst kein Liga-Wissen hat. Dasselbe Muster wie `partitionTeamsByLeague` +
+ * `mergeRankMaps` in `standings-preview-engine.ts` bzw. `buildScopedRankMap` in
+ * `team-discipline-rank-engine.ts`: Teams VOR dem Ranking nach Liga gruppieren, je Gruppe getrennt
+ * 1..N vergeben, danach wieder zu einer Map zusammenfuehren. Sortierkriterien (Punkte ->
+ * Verhaeltnis -> totalScore, PR #1266) bleiben unveraendert — nur die Gruppierung davor ist neu.
+ *
+ * OHNE AKTIVEN SPLIT (`isLeagueSplitActive() === false`, jeder heutige Manager-Save UND jeder
+ * Battle-Save vor dem Liga-Split) bleibt GENAU EINE Gruppe mit allen Teams uebrig — bit-identisch
+ * zum bisherigen direkten Aufruf von `resolveProjectedRankWithTiePolicy`.
+ */
+function resolveProjectedRankScopedByLeague(
+  gameState: GameState,
+  items: StandingsTieBreakItem[],
+): Map<string, number | null> {
+  if (!isLeagueSplitActive(gameState)) {
+    return resolveProjectedRankWithTiePolicy(items, DEFAULT_STANDINGS_TIEBREAKER_MODE);
+  }
+
+  const liga1: StandingsTieBreakItem[] = [];
+  const liga2: StandingsTieBreakItem[] = [];
+  const unassigned: StandingsTieBreakItem[] = [];
+  for (const item of items) {
+    const tier = getLeagueOf(gameState, item.teamId);
+    if (tier === "liga1") liga1.push(item);
+    else if (tier === "liga2") liga2.push(item);
+    else unassigned.push(item);
+  }
+
+  const merged = new Map<string, number | null>();
+  for (const group of [liga1, liga2, unassigned]) {
+    if (group.length === 0) continue;
+    for (const [teamId, rank] of resolveProjectedRankWithTiePolicy(group, DEFAULT_STANDINGS_TIEBREAKER_MODE)) {
+      merged.set(teamId, rank);
+    }
+  }
+  return merged;
+}
 
 /** Kleiner als das, und es ist Rundung statt Befund — die Punkte stehen auf einer Nachkommastelle. */
 const TOLERANZ = 0.05;
@@ -106,7 +149,11 @@ export function zieheSaisonstandPunkteNach(
   // `null` fuer jeden Save ohne Duell-Verhaeltnis -> unveraendertes Verhalten.
   const verhaeltnisJeTeam = summiereSaisonVerhaeltnis(gameState, seasonId);
 
-  const rangJeTeam = resolveProjectedRankWithTiePolicy(
+  // LIGA-SPLIT (16.10., Befund aus dem 2-Liga-Smoke-Test): Raenge je Liga getrennt vergeben, statt
+  // einen gemeinsamen Rang 1..32 ueber beide Ligen zu ziehen. Ohne aktiven Split (jeder heutige
+  // Manager-Save) bleibt das Verhalten bit-identisch, s. `resolveProjectedRankScopedByLeague` oben.
+  const rangJeTeam = resolveProjectedRankScopedByLeague(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       teamName: team.name,
@@ -118,7 +165,6 @@ export function zieheSaisonstandPunkteNach(
       cash: team.cash ?? null,
       verhaeltnis: verhaeltnisJeTeam ? verhaeltnisJeTeam.get(team.teamId) ?? 0 : null,
     })),
-    DEFAULT_STANDINGS_TIEBREAKER_MODE,
   );
 
   const geaenderteTeams: SaisonstandPunkteAenderung[] = [];
