@@ -346,18 +346,50 @@ jobs:
   # DIESES PR an den Launch-Flags AENDERT (nichts), nicht auf das, was am Ende tatsaechlich auf
   # der Kommandozeile steht.
   #
-  # PFLICHT-CHECK (kein `continue-on-error: true` mehr, auf keinem der drei Schritte): sobald
-  # der Chromium-Start wirklich funktioniert (s. oben, HOME-Fix), soll ein Rueckfall sofort rot
-  # sein, nicht nur eine still verschluckte Warnung.
+  # ZWEITER ECHTER LAUF (Run 39055283007, Job 117461974845, 17.10., Commit a7efc8c4 -- derselbe
+  # Commit, der das npm-12-bereinigte Lockfile traegt): Bildgroesse **3,72 GB**, Chromium-Start
+  # **echt gruen** (Exit-Code 0 des Schritts selbst, kein `continue-on-error` mehr). Dieser Lauf
+  # beweist nebenbei auch, dass `npm ci` MIT DEM IN `node:22-bookworm-slim` GEBUENDELTEN npm
+  # (10.9.x, nicht dem npm 12, mit dem das Lockfile lokal neu erzeugt wurde) das bereinigte
+  # Lockfile klaglos akzeptiert -- der Docker-Build dieses Laufs durchlief die `deps`-Stage
+  # (`RUN npm ci`) vollstaendig, sonst waere der ganze Build schon dort abgebrochen.
+  #
+  # PFLICHT-CHECK, ABER PRAEZISE FORMULIERT: kein `continue-on-error: true` mehr auf irgendeinem
+  # Schritt -- ein Ruecktritt ist jetzt sofort rot, nicht nur eine still verschluckte Warnung.
+  # "Pflicht" heisst hier nur "ehrlich rot/gruen", NICHT automatisch "blockiert den Merge". Ob
+  # ein gruener Status hier wirklich Voraussetzung fuer einen Merge auf `main` ist, entscheidet
+  # ausschliesslich der Branch-Schutz von `main` in den Repo-Settings (Settings -> Branches ->
+  # Regel fuer `main` -> Require status checks to pass), und den kann nur Chris selbst setzen --
+  # ein Agent kommt da nicht heran (derselbe Vorbehalt gilt schon fuer `persistenz-suiten` oben
+  # und fuer `rangtreue-schranke` in `ci-nightly.yml`). Ohne diesen Haken ist dieser Job zwar
+  # sichtbar, haelt aber nichts auf.
+  #
+  # DELTA GEGEN DAS HEUTIGE PRODUKTIONS-IMAGE (Opus-Auflage, Punkt 3): 3,7-3,8 GB ist die
+  # GESAMTgroesse, nicht der Zuwachs durch Chromium. Die beiden Schritte unten bauen zusaetzlich
+  # das unveraenderte `main`-Dockerfile (ohne Chromium-Schicht) als Baseline und geben die
+  # Differenz aus -- das ist die Zahl, die zur Plan-Schaetzung (Abschnitt 4.2: +0,6-0,75 GB)
+  # passt, nicht die 3,7-3,8 GB fuer sich allein.
   arena-image-chromium-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Baseline-Image bauen (main, OHNE Chromium -- fuer den Delta-Vergleich)
+        run: |
+          git fetch origin main
+          git worktree add /tmp/oly-main-baseline origin/main
+          docker build -t oly-arena-probe:baseline /tmp/oly-main-baseline
+          git worktree remove /tmp/oly-main-baseline --force
       - name: Produktions-Image bauen (mit Chromium, E1)
         run: docker build -t oly-arena-probe:ci .
-      - name: Bildgroesse ausgeben (die Zahl fuer Chris' Platzmessung)
-        run: docker image ls oly-arena-probe:ci --format '{{.Repository}}:{{.Tag}}  {{.Size}}'
+      - name: Bildgroesse + Delta ausgeben (die Zahlen fuer Chris' Platzmessung)
+        run: |
+          BASE_BYTES=$(docker image inspect oly-arena-probe:baseline --format '{{.Size}}')
+          CI_BYTES=$(docker image inspect oly-arena-probe:ci --format '{{.Size}}')
+          DELTA_BYTES=$((CI_BYTES - BASE_BYTES))
+          echo "baseline (main, ohne Chromium): $(docker image ls oly-arena-probe:baseline --format '{{.Size}}')  (${BASE_BYTES} Bytes)"
+          echo "mit Chromium (dieser PR):       $(docker image ls oly-arena-probe:ci --format '{{.Size}}')  (${CI_BYTES} Bytes)"
+          echo "Delta (Chromium-Zuwachs):       $(awk -v b="$DELTA_BYTES" 'BEGIN{printf "%.2f GB", b/1000/1000/1000}')  (${DELTA_BYTES} Bytes)"
       - name: Chromium-Start als User oly (--no-sandbox kommt von Playwright selbst, s. Kommentar oben)
         run: |
           docker run --rm --init --shm-size=256m --user oly oly-arena-probe:ci \
@@ -375,3 +407,37 @@ jobs:
                 await browser.close();
               })().catch((err) => { console.error(err); process.exit(1); });
             "
+
+  # LOCKFILE-LIBC-WAECHTER (Opus-Review auf PR 1270, Punkt 2, woertlich: "Jeder spaetere Agent
+  # mit npm 10, der den Lockfile anfasst, wirft die `libc`-Felder wieder raus."). Befund aus
+  # genau diesem PR: npm 10.9.x (sowohl das lokal zufaellig installierte 10.9.7 als auch das in
+  # `node:22-bookworm-slim` gebuendelte 10.9.9) laesst beim Neu-Erzeugen des Lockfiles die
+  # `"libc": ["glibc"|"musl"]`-Unterscheidung an ueber vierzig optionalen nativen Paketen
+  # (Next/SWC, rolldown, lightningcss, `@img/sharp-libvips-*`, esbuild) STILLSCHWEIGEND weg,
+  # obwohl die npm-Registry das Feld weiterhin ausliefert -- erst npm >= 12 schreibt es
+  # korrekt. Ohne diese Felder kann `npm ci` auf dem glibc-basierten Produktions-Image die
+  # falsche (oder beide) nativen Varianten installieren -- ein stiller Server-Build-Bruch, der
+  # erst beim Deploy auffaellt.
+  #
+  # Deshalb: EIGENER, SCHNELLER, PFLICHT-Check (kein Docker, keine Minute Laufzeit) --
+  # mindestens 40 `"libc"`-Vorkommen in `package-lock.json` (Stand nach diesem PR: genau 40,
+  # selbst nachgezaehlt). Sinkt die Zahl, hat jemand das Lockfile mit einem npm < 12
+  # neu erzeugt -- rot, bevor es den langsamen Image-Build ueberhaupt erreicht.
+  #
+  # AUFTRAG FUER ALLE KUENFTIGEN AGENTEN: `package-lock.json` nur mit npm >= 12 neu erzeugen
+  # (z. B. `npm install -g npm@12` vor `npm install`/`npm install --package-lock-only`), sonst
+  # wirft genau dieser Check es wieder raus.
+  lockfile-libc-waechter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: "libc-Felder in package-lock.json: mindestens 40"
+        run: |
+          COUNT=$(grep -c '"libc"' package-lock.json)
+          echo "libc-Vorkommen: ${COUNT}"
+          if [ "$COUNT" -lt 40 ]; then
+            echo "::error::Nur ${COUNT} \"libc\"-Felder in package-lock.json (erwartet >= 40)."
+            echo "::error::Das Lockfile wurde wahrscheinlich mit npm < 12 neu erzeugt -- bitte mit npm >= 12 neu generieren (npm install -g npm@12 && npm install --package-lock-only)."
+            exit 1
+          fi
