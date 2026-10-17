@@ -67,7 +67,10 @@ import {
   applyTransferBudgetSpend,
   resolveMarketSpendableCashForPlanner,
 } from "@/lib/ai/ai-manager-apply-service";
-import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonDisciplinePlayerCountDisplayMap,
+  buildSeasonDisciplinePlayerCountMap,
+} from "@/lib/season/season-discipline-schedule";
 import { getTransfermarktTierFromPoints, type TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
@@ -622,6 +625,10 @@ function getTopDisciplineScores(input: {
   saveId: string;
   disciplinesById: Map<string, string>;
   disciplinePlayerCountById?: Map<string, number | null>;
+  // W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): Anzeige-Label
+  // dazu -- bei zwei unterschiedlichen Saison-Vorkommen (Battle Mode, repeat=2) "4 · 6" statt nur
+  // die eine Zahl aus `disciplinePlayerCountById`.
+  disciplinePlayerCountLabelById?: Map<string, string | null>;
   teamDisciplineRankById?: Map<string, number | null>;
   player: Player;
   scoutingLevel?: number | null;
@@ -636,15 +643,21 @@ function getTopDisciplineScores(input: {
       score,
     })),
     topN: 5,
-  }).map((entry) => ({
-    disciplineId: entry.disciplineId,
-    disciplineName: entry.disciplineName,
-    scoreTier: entry.scoreTier,
-    displayedScore: entry.displayedScore,
-    ppsLastSeason: null,
-    playerCount: input.disciplinePlayerCountById?.get(entry.disciplineId) ?? null,
-    teamRank: input.teamDisciplineRankById?.get(entry.disciplineId) ?? null,
-  }));
+  }).map((entry) => {
+    const playerCount = input.disciplinePlayerCountById?.get(entry.disciplineId) ?? null;
+    return {
+      disciplineId: entry.disciplineId,
+      disciplineName: entry.disciplineName,
+      scoreTier: entry.scoreTier,
+      displayedScore: entry.displayedScore,
+      ppsLastSeason: null,
+      playerCount,
+      playerCountLabel:
+        input.disciplinePlayerCountLabelById?.get(entry.disciplineId) ??
+        (playerCount != null ? String(playerCount) : null),
+      teamRank: input.teamDisciplineRankById?.get(entry.disciplineId) ?? null,
+    };
+  });
 }
 
 function buildLocalTeamDisciplineRankMap(gameState: GameState, teamId: string) {
@@ -1609,6 +1622,13 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const playerMin = selectedTeamContext?.playerMin ?? null;
   const playerOpt = selectedTeamContext?.playerOpt ?? null;
   const seasonDisciplinePlayerCountById = buildSeasonDisciplinePlayerCountMap(gameState);
+  // W4: dieselbe Vorbedingung, nur die Anzeige-Variante (Hinrunde/Rückrunde-Label).
+  const seasonDisciplinePlayerCountLabelById = new Map(
+    [...buildSeasonDisciplinePlayerCountDisplayMap(gameState)].map(([disciplineId, display]) => [
+      disciplineId,
+      display.label,
+    ]),
+  );
   const soldPlayerBanIds = new Set(buildSoldPlayerSeasonBans(gameState, gameState.season.id).keys());
 
   const browseIndexCacheKey = `${cacheKey}:browse_index`;
@@ -1755,6 +1775,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
           saveId: save.saveId,
           disciplinesById,
           disciplinePlayerCountById: seasonDisciplinePlayerCountById,
+          disciplinePlayerCountLabelById: seasonDisciplinePlayerCountLabelById,
           player,
           scoutingLevel: 0,
         }),
@@ -1836,6 +1857,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     : 0;
   const selectedNeeds = selectedTeam ? evaluateAiNeeds(gameState, selectedTeam.teamId) : null;
   const disciplinePlayerCountById = seasonDisciplinePlayerCountById;
+  const disciplinePlayerCountLabelById = seasonDisciplinePlayerCountLabelById;
   const teamDisciplineRankById = selectedTeam ? buildLocalTeamDisciplineRankMap(gameState, selectedTeam.teamId) : new Map<string, number | null>();
   const selectedAxisAverages = selectedRosterPlayers.length
     ? {
@@ -1874,6 +1896,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             saveId: save.saveId,
             disciplinesById,
             disciplinePlayerCountById,
+            disciplinePlayerCountLabelById,
             teamDisciplineRankById,
             player,
             scoutingLevel: playerScoutingLevel,
@@ -2015,6 +2038,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             saveId: save.saveId,
             disciplinesById,
             disciplinePlayerCountById,
+            disciplinePlayerCountLabelById,
             teamDisciplineRankById,
             player,
             scoutingLevel: playerScoutingLevel,

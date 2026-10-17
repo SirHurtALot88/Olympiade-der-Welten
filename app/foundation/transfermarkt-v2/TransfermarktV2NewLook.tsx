@@ -2173,8 +2173,9 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                 })()}
 
                 {/* #69 — Top-Disziplinen als Balken-Chart. Nur real freigegebene Exakt-Scores (displayedScore).
-                    Kurzcode statt abgeschnittenem Namen + Teilnehmerzahl (entry.playerCount, gleiche Quelle
-                    wie im Spielerprofil über buildSeasonDisciplinePlayerCountMap). */}
+                    Kurzcode statt abgeschnittenem Namen + Teilnehmerzahl (entry.playerCountLabel, gleiche
+                    Quelle wie im Spielerprofil über buildSeasonDisciplinePlayerCountDisplayMap — im Battle
+                    Mode mit zwei unterschiedlichen Saison-Vorkommen "4 · 6" statt nur eine Zahl, W4). */}
                 {(() => {
                   const scoutedTopDisciplines = selectedPlayer.topDisciplineScores
                     .filter(
@@ -2184,7 +2185,7 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                     .map((entry) => ({
                       abbr: getNlDisciplineAbbreviation(entry.disciplineId, entry.disciplineName),
                       name: entry.disciplineName,
-                      playerCount: entry.playerCount,
+                      playerCountLabel: entry.playerCountLabel,
                       displayedScore: entry.displayedScore as number,
                     }));
                   if (scoutedTopDisciplines.length > 0) {
@@ -2194,8 +2195,8 @@ export default function TransfermarktV2NewLook(props: TransfermarktV2NewLookProp
                         <NlBarChart
                           bars={scoutedTopDisciplines.map((entry) => ({
                             label:
-                              typeof entry.playerCount === "number" && Number.isFinite(entry.playerCount)
-                                ? `${entry.abbr} (${entry.playerCount})`
+                              entry.playerCountLabel != null
+                                ? `${entry.abbr} (${entry.playerCountLabel})`
                                 : entry.abbr,
                             value: entry.displayedScore,
                             tone: "accent" as NlTone,
