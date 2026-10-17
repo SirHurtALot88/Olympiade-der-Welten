@@ -44,6 +44,20 @@ ENV OLY_APP_SQLITE_PATH=/app/data/persistence/oly-app.sqlite
 # +1/+2-Verschiebung) wechselt automatisch zwischen MEZ/MESZ.
 ENV TZ=Europe/Berlin
 
+# E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F7/F8):
+# fester Ablagepfad fuer die Playwright-Browser, damit Build-Layer und Laufzeit dieselbe
+# Installation sehen. `OLY_ARENA_CHROMIUM_EXECUTABLE` ist absichtlich SCHON HIER deklariert
+# (leer = kein Override) und wird an den Container durchgereicht -- `lib/battle/
+# arena-headless-runner.ts` liest die Variable heute noch NICHT (das waere ein lib/-Umbau,
+# bewusst NICHT Teil dieses PRs, s. PR-Beschreibung "Vorschlag fuer den naechsten Agenten").
+# Ohne gesetzten Override faellt der Runner schon heute automatisch auf `channel: "chromium"`
+# zurueck, weil sein hartkodierter Pfad `/opt/pw-browsers/chromium-1194/...` in diesem Image
+# nicht existiert -- und Playwright loest "chromium" ueber genau `PLAYWRIGHT_BROWSERS_PATH`
+# auf. Damit laeuft die Revision aus diesem Image (1223) ohne Codeaenderung, der ENV-Name ist
+# nur fuer einen spaeteren expliziten Override vorbereitet.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV OLY_ARENA_CHROMIUM_EXECUTABLE=""
+
 # `git` MUSS mit ins Laufzeit-Image.
 #
 # GEFUNDEN IM SERVER-LOG, alle 180 Sekunden, seit dem ersten Tag:
@@ -65,6 +79,62 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/* \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 oly
+
+# E1-NACHTRAG, GEMESSEN im neuen CI-Job `arena-image-chromium-probe` (erster echter
+# `chromium.launch()`-Versuch, als User `oly`): der Lauf STUERZT AB --
+# `chrome_crashpad_handler: --database is required` + `recvmsg: Connection reset by peer`,
+# SIGTRAP direkt nach dem Start. `adduser --system` legt fuer `oly` BEWUSST kein Home-
+# Verzeichnis an ("Not creating `/nonexistent`." im Build-Log) -- `docker run --user oly`
+# setzt $HOME deshalb nicht automatisch auf einen beschreibbaren Pfad, und Chromiums
+# Crashpad-Handler braucht $HOME, um seine Crash-Datenbank anzulegen, selbst mit
+# `--disable-breakpad` (das schaltet nur den alten Breakpad-Mechanismus ab, nicht Crashpad).
+# Ohne beschreibbares $HOME bricht der Start ab. Der Ablauf hier legt deshalb ein echtes,
+# `oly`-eigenes Home-Verzeichnis an und setzt `$HOME` explizit.
+RUN mkdir -p /home/oly && chown oly:nodejs /home/oly
+ENV HOME=/home/oly
+
+# E1 -- VOLLES Chromium fuer die Battle Arena (docs/design/
+# battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4, Fund F8). Ohne dieses Image hat
+# der Server KEIN Chromium: `playwright` ist im Laufzeit-Image heute nur zufaellig vorhanden,
+# weil `npm ci` ohne `--omit=dev` laeuft und `builder` das ganze `/app` inklusive
+# `node_modules` kopiert (das transitive `@playwright/test`-devDependency bringt zwar das
+# `playwright`-NPM-Paket mit, aber KEIN Browser-Binary -- das installiert ausschliesslich
+# dieser Schritt).
+#
+# EIGENE, CACHEBARE SCHICHT, VOR `COPY --from=builder`: ein reiner App-Code-Commit (die
+# weitaus haeufigste Deploy-Ursache) aendert an dieser Zeile nichts, Docker nutzt den
+# Layer-Cache, und `auto-deploy.sh` muss die ~370 MB Chromium + ~200-350 MB Systempakete
+# NICHT bei jedem Push neu herunterladen. Invalidiert wird die Schicht nur, wenn sich die
+# Versionszeile selbst aendert (also bewusst, bei einem Playwright-Upgrade).
+#
+# VERSION MUSS der in package.json/package-lock.json entsprechen (PR 0 hat den
+# CI-Waechter `tests/arena-chromium-revision-goldentest.test.ts` dafuer eingefuehrt; ein
+# echter Versions-MISMATCH zwischen dieser Zeile und dem Lockfile wuerde der Goldentest aber
+# nur LOKAL auffangen, wenn beide Revisionen vorhanden sind -- hier zaehlt vor allem die
+# Disziplin, beide Stellen gemeinsam zu pflegen).
+#
+# `--no-shell`: Der Rueckfall in `ermittleChromiumLaunchOptions()`
+# (`arena-headless-runner.ts:396-408`) erzwingt `channel: "chromium"`, also IMMER das volle
+# Binary, nie die separate "Chromium Headless Shell" -- die waere hier also nur
+# verschwendeter Platz (zusaetzlich ~260 MB, Plan 4.2).
+#
+# SANDBOX/NETZ, Opus-Auflage (Plan Abschnitt 9.5): dieser Schritt installiert Chromium nur,
+# er AENDERT NICHTS an den Launch-Flags -- die stehen in
+# `ARENA_NETZWERK_ABRIEGELUNG_ARGS`/`ermittleChromiumLaunchOptions()`
+# (`lib/battle/arena-headless-runner.ts`, nicht Teil dieses PRs) und tragen weiterhin KEIN
+# `--no-sandbox`. Chromiums eigene Sandbox bleibt also aktiv, Chromium laeuft spaeter als
+# Nicht-Root-User `oly` (uid 1001, `USER oly` unten), und die einzige Navigation ist
+# `file://` auf die im Image mitgelieferten Motor-Dateien -- kein Netzwerkzugriff dafuer
+# noetig (`--proxy-server=direct://` + `--host-resolver-rules=MAP * 0.0.0.0` kappen jeden
+# Versuch). Einzelheiten, inklusive der offenen Frage, ob Chromiums interne Sandbox innerhalb
+# eines Docker-Containers ueberhaupt startet (das ist container-spezifisch und wurde in dieser
+# Sitzung bewusst NICHT per echtem `chromium.launch()` getestet, um keinen lokalen
+# Chromium-Lauf parallel zu einem anderen Agenten zu starten), stehen in der PR-Beschreibung.
+# Der neue CI-Job `arena-image-chromium-probe` (.github/workflows/ci.yml) ist der erste
+# echte Test davon.
+RUN npx -y playwright@1.60.0 install --with-deps --no-shell chromium \
+  && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH" \
+  && rm -rf /var/lib/apt/lists/* /root/.npm
 
 COPY --from=builder --chown=oly:nodejs /app ./
 
