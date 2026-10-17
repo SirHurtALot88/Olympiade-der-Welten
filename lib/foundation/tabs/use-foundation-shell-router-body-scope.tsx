@@ -264,6 +264,7 @@ import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { buildSeasonDisciplinePlayerCountMap, getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { getLeagueOf } from "@/lib/season/league-split";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
 import {
   CANONICAL_PROGRESS_TRAITS,
@@ -11100,6 +11101,9 @@ export function useFoundationShellRouterBodyScope({
           rank: row.rank ?? null,
           rankDiff: row.rankDiff ?? null,
           points: row.points ?? null,
+          // Task #159: Punkteverhältnis-Spalte — `null` außerhalb von Battle-Saves (dann ist die
+          // Spalte in der Daten-Tabelle gar nicht erst zu sehen, s. SeasonStandingsNewLook.tsx).
+          verhaeltnis: row.verhaeltnis ?? null,
           pps: row.ppsTotal ?? null,
           pow: row.ppsPow ?? null,
           spe: row.ppsSpe ?? null,
@@ -11187,6 +11191,9 @@ export function useFoundationShellRouterBodyScope({
           // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
           // kein Live-Delta (sonst irreführend) → null.
           fieldRaceRankDelta: isViewingArchivedSeason ? null : resolveMatchdayRankDelta(row.teamId),
+          // Task #159: `null` im Legacy-32er-Modus (jeder heutige/laufende Save vor dem
+          // Liga-Split) — die Tabelle rendert dann unveraendert eine einzige 32-Zeilen-Liste.
+          leagueTier: getLeagueOf(gameState, row.teamId),
         };
       }),
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
