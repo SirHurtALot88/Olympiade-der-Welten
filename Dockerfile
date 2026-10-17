@@ -80,6 +80,19 @@ RUN apt-get update \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 oly
 
+# E1-NACHTRAG, GEMESSEN im neuen CI-Job `arena-image-chromium-probe` (erster echter
+# `chromium.launch()`-Versuch, als User `oly`): der Lauf STUERZT AB --
+# `chrome_crashpad_handler: --database is required` + `recvmsg: Connection reset by peer`,
+# SIGTRAP direkt nach dem Start. `adduser --system` legt fuer `oly` BEWUSST kein Home-
+# Verzeichnis an ("Not creating `/nonexistent`." im Build-Log) -- `docker run --user oly`
+# setzt $HOME deshalb nicht automatisch auf einen beschreibbaren Pfad, und Chromiums
+# Crashpad-Handler braucht $HOME, um seine Crash-Datenbank anzulegen, selbst mit
+# `--disable-breakpad` (das schaltet nur den alten Breakpad-Mechanismus ab, nicht Crashpad).
+# Ohne beschreibbares $HOME bricht der Start ab. Der Ablauf hier legt deshalb ein echtes,
+# `oly`-eigenes Home-Verzeichnis an und setzt `$HOME` explizit.
+RUN mkdir -p /home/oly && chown oly:nodejs /home/oly
+ENV HOME=/home/oly
+
 # E1 -- VOLLES Chromium fuer die Battle Arena (docs/design/
 # battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4, Fund F8). Ohne dieses Image hat
 # der Server KEIN Chromium: `playwright` ist im Laufzeit-Image heute nur zufaellig vorhanden,
