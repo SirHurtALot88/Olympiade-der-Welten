@@ -1,0 +1,32 @@
+{
+  "name": "Ritter des Schwarzen Grals",
+  "status": "wartet auf Bild",
+  "mini": "Trench-Crusade-Figur aus der Black-Grail-Warband von Chris (17.10.): türkise Schuppenrüstung, rot-kupferne Schulterplatten, Helm mit Stachelkamm, blaues zerfetztes Cape, Speer mit Gabelklinge, Sichelklingen an den Unterarmen.",
+  "karte": {
+    "name": "Ritter des Schwarzen Grals",
+    "role": "enemy",
+    "faction": "Schwarzer Gral",
+    "praegung": [
+      "gift"
+    ],
+    "size": "1",
+    "quality": "3+",
+    "defense": "3+",
+    "tough": "6",
+    "weapons": "Gralsspeer | Nahkampf | A2 | DS(1), Stoß\nSichelklingen | Nahkampf | A2 | Reißend",
+    "passives": "Furchtlos",
+    "skills": [
+      {
+        "id": "seuchenstich"
+      }
+    ],
+    "flavor": "Sein Speer trocknet nie.",
+    "look": "a plague knight in teal scaled armour with rust-red pauldrons, spiked helmet crest, tattered blue cloak and a forked bloody spear"
+  },
+  "punkte": 120,
+  "neueFaehigkeiten": [
+    "seuchenstich",
+    "schwarzer-gral (Fraktion)"
+  ],
+  "prompt": "Create one image: a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the knight is a real, physical being made with practical effects (real skin, fungus, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.\n\nReference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep its pose, silhouette, proportions, paint colours and distinctive details (spear, wrist blades, helmet, cloak) clearly recognisable, but show it as a living warrior, not a figure. Do not show the plastic base, the table or the room from the photo.\n\nSubject: a knight of the Black Grail, a plague knight from a war-torn trench world. Corroded teal-green scaled armour over a black undersuit, rust-red pauldrons and breastplate, a dark steel helmet with a long spiked crest at the front, a tattered moth-eaten deep blue cloak, curved hook blades on both wrists, and a long black spear with a forked rust-red blade dripping blood.\n\nMood and camera: confident, threatening stance, low camera, warm golden key light from one side.\n\nGlowing accent: exactly one, the fresh blood on the spear blade catching a dim red light. Nothing else in the image glows.\n\nBackground: simple, dark and out of focus: churned mud of a trench, a few broken wooden stakes and coils of rusted barbed wire. No buildings, towers, moons, ships, floating objects or second figures.\n\nComposition: landscape 3:2 (it is printed as a 15 x 10 cm postcard), the knight on the right half, head and spear in the upper half, left half dark and calm because the stat panel covers it.\n\nNot wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface."
+}

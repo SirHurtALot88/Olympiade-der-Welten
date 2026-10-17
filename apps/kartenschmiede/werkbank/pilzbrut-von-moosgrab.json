@@ -1,0 +1,33 @@
+{
+  "name": "Pilzbrut von Moosgrab",
+  "status": "wartet auf Bild",
+  "mini": "Drei Pilzwesen von Chris (17.10.): Konsolenpilz-Kopf mit gelöcherter Armplatte, brauner Pilzhut-Kopf, Fliegenpilz-Träger mit roten Hüten (Anführer). Ein Trupp, gleiche Werte.",
+  "karte": {
+    "name": "Pilzbrut von Moosgrab",
+    "role": "enemy",
+    "faction": "Urwild",
+    "praegung": [
+      "gift"
+    ],
+    "size": "3",
+    "quality": "5+",
+    "defense": "5+",
+    "tough": "2",
+    "weapons": "Krallen | Nahkampf | A1 | Gift",
+    "passives": "",
+    "skills": [
+      {
+        "id": "rauschsporen"
+      }
+    ],
+    "bossName": "Fliegenpilz-Träger",
+    "bossText": "Nur das Modell mit den roten Pilzen hat Rauschsporen. Stirbt es, enden sie.",
+    "flavor": "Kleine Körper kriechen aus dem Moos. Pilzbewachsen. Zuckend. Hungrig.",
+    "look": "a pack of three fungal creatures, one with red fly agaric caps leading"
+  },
+  "punkte": 45,
+  "neueFaehigkeiten": [
+    "rauschsporen"
+  ],
+  "prompt": "Create one image: a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the creatures are real, physical beings made with practical effects (real skin, fungus, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.\n\nReference: the attached photos show my three hand-painted tabletop miniatures. Use them only as the design reference. Keep their poses, silhouettes, proportions, paint colours and distinctive details clearly recognisable, but show them as living creatures, not figures. Do not show the plastic bases, the table or the room from the photos.\n\nSubject: a pack of three fungal creatures that were once people, the Pilzbrut of Moosgrab. Their bodies are pale ochre-yellow ridged fungal tissue with brown shading, long limbs and clawed hands. One is tall and gangly with a head of layered brown bracket fungi and a porous yellow plate on one arm. One has a wide brown mushroom cap as a head and clusters of small brown mushrooms on its shoulder. In front stands the leader, hunched and covered in red fly agaric caps with white spots, clearly the most dangerous of the three.\n\nMood and camera: they advance together out of the dark, low camera, cold dim light with one warm practical light from the side.\n\nGlowing accent: exactly one, a faint sickly yellow-green haze of spores drifting from the red-capped leader. Nothing else in the image glows.\n\nBackground: simple, dark and out of focus: a wet forest floor with moss, roots and a few small pale mushrooms. No buildings, towers, moons, ships, floating objects or other creatures.\n\nComposition: landscape 3:2 (it is printed as a 15 x 10 cm postcard), the three creatures on the right half, the red-capped leader slightly in front, heads in the upper half, left half dark and calm because the stat panel covers it.\n\nNot wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface."
+}
