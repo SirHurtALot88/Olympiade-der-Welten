@@ -282,9 +282,11 @@
     const s = state;
     const quer = s.orient === "land";
     return [
-      `Create one image: ${STIL}`,
+      `Create one image in ${quer ? "portrait format 4:5 (if 4:5 is not available, use 2:3)" : "portrait format 2:3"}.`,
       ``,
-      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep the design, colours and distinctive details (weapons, chains, armour) recognisable, but give it realistic anatomy and life-size scale instead of the miniature's stylised proportions, and real materials instead of plastic and paint. Do not show the plastic base, the table or the room from the photo.`,
+      `Style: ${STIL}`,
+      ``,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Recreate this exact character: same pose, same armour, same weapons (including chains), same colours. Change only the materials (real skin, metal and cloth instead of plastic and paint) and give it life-size scale. Do not invent a different design. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
       ``,
@@ -296,9 +298,9 @@
       ``,
       `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      `Composition: ${quer ? "portrait 4:5 (if 4:5 is not available, use 2:3), the card shows the image as a tall panel next to the stats. The creature centred and filling most of the frame, head in the upper third, weapons fully inside the frame, a little dark, calm space near the top right corner for the points badge" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
       ``,
-      `Not wanted: miniature, figurine, action figure, toy, tabletop diorama, macro or tilt-shift photography, plastic or painted-model look, a static figure simply standing in a landscape. Also no digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
+      `Not wanted: landscape format, miniature, figurine, action figure, toy, tabletop diorama, macro or tilt-shift photography, plastic or painted-model look, a static figure simply standing in a landscape. Also no digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
   }
 
