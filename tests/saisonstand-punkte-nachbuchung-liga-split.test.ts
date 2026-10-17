@@ -19,7 +19,7 @@
  * `summary.totalPoints = result.totalScore`). Das Fixture nutzt genau diesen Zweig -- keine
  * Spieler/Performances noetig, nur ein `DisciplineResultRecord` je Team.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { zieheSaisonstandPunkteNach } from "@/lib/standings/saisonstand-punkte-nachbuchung";
@@ -200,5 +200,49 @@ describe("Saisonstand-Nachbuchung: Manager-Mode / Legacy-Saves ohne Liga-Split b
 
     const alleRaenge = [...rangByTeamId.values()].sort((a, b) => (a ?? 0) - (b ?? 0));
     expect(alleRaenge).toEqual(Array.from({ length: 32 }, (_, index) => index + 1));
+  });
+});
+
+describe("Saisonstand-Nachbuchung: Team ohne Liga bei aktivem Split warnt (Opus-Review-Fund, PR #1271)", () => {
+  /**
+   * Die `unassigned`-Gruppe in `resolveProjectedRankScopedByLeague` rankt still ihre eigenen
+   * Plaetze 1..k. Bei aktivem Split darf sie nicht vorkommen -- kommt sie doch vor (z.B. ein Team
+   * ohne `leagueByTeamId`-Eintrag), entstehen doppelte Rang-1-Plaetze ohne Hinweis. Dieser Test
+   * prueft nur, DASS gewarnt wird -- nicht, dass die Nummerierung dadurch "repariert" wuerde
+   * (das ist explizit kein Ziel dieser kleinen Ergaenzung).
+   */
+  it("warnt mit `liga_split_team_ohne_liga:<teamId>`, wenn ein Team bei aktivem Split keiner Liga zugeordnet ist", () => {
+    const { gameState } = buildTeamsAndResults(true);
+    delete (gameState.seasonState as { leagueByTeamId?: Record<string, string> }).leagueByTeamId!["L1-01"];
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      zieheSaisonstandPunkteNach(gameState, SEASON_ID);
+      expect(warnSpy).toHaveBeenCalledWith("liga_split_team_ohne_liga:L1-01");
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("warnt NICHT, wenn jedes Team bei aktivem Split einer Liga zugeordnet ist", () => {
+    const { gameState } = buildTeamsAndResults(true);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      zieheSaisonstandPunkteNach(gameState, SEASON_ID);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("warnt NICHT ohne aktiven Split (Manager-Mode) -- die `unassigned`-Pruefung greift nur bei `isLeagueSplitActive()`", () => {
+    const { gameState } = buildTeamsAndResults(false);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      zieheSaisonstandPunkteNach(gameState, SEASON_ID);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

@@ -75,6 +75,17 @@ function resolveProjectedRankScopedByLeague(
     else unassigned.push(item);
   }
 
+  // OPUS-REVIEW-FUND (PR #1271, 17.10.): die `unassigned`-Gruppe rankt still ihre eigenen Plaetze
+  // 1..k. Bei aktivem Split darf sie nicht vorkommen -- jedes Team hat dann ein `leagueByTeamId`.
+  // Kommt sie doch vor (z.B. ein neu aufgestiegenes Team ohne Zuordnung), entstehen doppelte
+  // Rang-1-Plaetze ohne Hinweis (Liga 1 Rang 1, Liga 2 Rang 1, UND `unassigned` Rang 1). Diese
+  // Warnung macht das sichtbar, statt es lautlos durchlaufen zu lassen.
+  if (unassigned.length > 0) {
+    for (const item of unassigned) {
+      console.warn(`liga_split_team_ohne_liga:${item.teamId}`);
+    }
+  }
+
   const merged = new Map<string, number | null>();
   for (const group of [liga1, liga2, unassigned]) {
     if (group.length === 0) continue;
