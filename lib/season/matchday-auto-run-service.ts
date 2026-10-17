@@ -18,6 +18,7 @@ import {
   type LegacyMatchdayCommitThroughSide,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
+import { kickoffArenaVorlauf, stelleArenaVorlaufSicher, type ArenaModus } from "@/lib/battle/arena-vorlauf-service";
 import { buildResolveLabSummary } from "@/lib/resolve/legacy-resolve-lab";
 import {
   buildLegacyMatchdayResolvePreview,
@@ -36,6 +37,7 @@ export const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 export type MatchdayAutoRunStepKey =
   | "ai_lineups"
   | "resolve_preview"
+  | "arena_vorlauf"
   | "result_apply"
   | "standings_preview"
   | "standings_apply"
@@ -100,6 +102,17 @@ export type MatchdayAutoRunParams = {
      * Schirm gelaufen sind. Ohne Angabe (Cockpit) bleibt es beim frisch gerechneten Ergebnis.
      */
     submittedPreview?: LegacyMatchdayResolvePreview | null;
+    /**
+     * PR 3 (K1, Plan Abschnitt 2.4): wie der Arena-Vorlauf angestossen wird, wenn ein Battle-
+     * Spieltag eine offene arena-aufgeloeste Disziplin hat. `"hintergrund"` (die HTTP-Route setzt
+     * das fest, Plan Abschnitt 2.3): stoesst den Vorlauf nur an (idempotent) und antwortet mit dem
+     * Schritt `arena_vorlauf` auf `"blocked"`, solange er laeuft — KEIN `result_apply` in diesem
+     * Aufruf, die UI pollt weiter. `"inline"` (Default hier, fuer Skripte -- Smoke-Tests, Admin-
+     * Simulation, Bootstrap, s. Plan Abschnitt 1.1): wartet synchron auf den Vorlauf. `"aus"`:
+     * kein Vorlauf, die Engine markiert jede offene Arena-Disziplin selbst als
+     * `arena_ausgefallen:nicht_ausgefuehrt` (Notschalter/Tests ohne Chromium).
+     */
+    arenaModus?: ArenaModus;
   };
 };
 
@@ -926,6 +939,164 @@ export async function runLocalMatchdayAutoRun(
     appliedWrites: 0,
     auditId: null,
   });
+
+  // ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.4): zwischen `resolve_preview` und `result_apply`.
+  // Nur relevant fuer einen ausfuehrenden (nicht dry-run) Battle-Spieltag, dessen Lineups bereits
+  // `"ready"` sind -- ein Vorlauf fuer ein noch unvollstaendiges Feld waere verschwendete Arbeit,
+  // die ohnehin verworfen wuerde (Signaturpruefung in `finishArenaVorlauf()`).
+  if (!dryRun && activeResolve.preview.status === "ready") {
+    const arenaModus: ArenaModus = params.options?.arenaModus ?? "inline";
+    if (arenaModus !== "aus") {
+      const vorlaufErgebnis =
+        arenaModus === "inline"
+          ? await stelleArenaVorlaufSicher(scope, {}, persistence)
+          : kickoffArenaVorlauf(scope, {}, persistence);
+      // `applicable: false` (Manager Mode oder kein arena-aufgeloester Spieltag): GAR KEIN
+      // Schritt, unveraendertes Verhalten -- derselbe Sicherheitsrahmen wie im Kickoff-Mantel.
+      if (!vorlaufErgebnis.applicable) {
+        // kein Schritt
+      } else if (vorlaufErgebnis.status === "in_progress") {
+        // HTTP-Pfad (Plan 2.3): wartet NIE auf Chromium — Vorlauf angestossen (idempotent),
+        // dieser Aufruf endet hier OHNE `result_apply`. Die UI pollt weiter.
+        addStep(result, {
+          key: "arena_vorlauf",
+          label: "Arena-Vorlauf",
+          status: "blocked",
+          dryRun: false,
+          canContinue: false,
+          warnings: [],
+          blockingReasons: ["arena_vorlauf_laeuft"],
+          metrics: { arenaModus },
+          plannedWrites: 0,
+          appliedWrites: 0,
+          auditId: null,
+        });
+        result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
+        result.warnings = Array.from(new Set(result.warnings));
+        result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_vorlauf_laeuft"]));
+        result.ok = false;
+        result.status = "blocked";
+        return result;
+      } else if (vorlaufErgebnis.status === null) {
+        // KEIN Snapshot vorhanden (Feld unvollstaendig -- sollte an dieser Stelle nicht
+        // vorkommen, da `activeResolve.preview.status === "ready"` oben schon vollstaendige
+        // Lineups verlangt, aber defensiv behandelt statt endlos zu blockieren): es LAEUFT
+        // nichts und wird auch nichts anlaufen, solange das Feld so bleibt -- kein
+        // `result_apply`-Block dafuer, einfach OHNE Arena-Daten weiterbuchen (Bruecke/
+        // Engine-Strukturpruefung greifen wie gewohnt, `activeResolve.preview` bleibt unveraendert).
+        addStep(result, {
+          key: "arena_vorlauf",
+          label: "Arena-Vorlauf",
+          status: "skipped",
+          dryRun: false,
+          canContinue: true,
+          warnings: ["arena_vorlauf_kein_snapshot"],
+          blockingReasons: [],
+          metrics: { arenaModus },
+          plannedWrites: 0,
+          appliedWrites: 0,
+          auditId: null,
+        });
+      } else if (vorlaufErgebnis.applicable) {
+        // "ready" ODER "failed" sind beide TERMINAL (Plan 2.1/2.5) — der Vorlauf hat den Snapshot
+        // bereits ersetzt. Preview jetzt NEU aus ihm lesen, damit `result_apply` gleich dieselben
+        // Arena-Zeilen bucht, die die Buehne zeigt ("Was du siehst, wird gebucht").
+        const nachVorlauf = resolveLocalSave(persistence, scope.saveId);
+        let nachVorlaufPreview = resolveMatchdayPreviewToBook({
+          gameState: nachVorlauf.gameState,
+          scope,
+          livePreview: activeResolve.preview,
+        });
+        // OPUS-REVIEW B3 (kritisch): ein als "ready" gespeicherter Vorlauf, dessen
+        // `arenaEingabeHash` beim Buchen nicht mehr passt, darf NICHT als Bruecke gebucht werden
+        // (Plan 2.4: "source==='live' darf ... nicht gebucht werden, solange kein gueltiger
+        // Vorlauf zu dieser Signatur fertig ist"). Statt stillschweigend die Bruecke zu buchen,
+        // wird hier EIN frischer Versuch erzwungen (`erzwingeNeuenVersuch` uebersteuert das sonst
+        // sticky "ready", s. `arena-vorlauf-service.ts`) -- `"inline"` wartet darauf, `"hintergrund"`
+        // blockiert wie bei einem laufenden Vorlauf.
+        if (nachVorlaufPreview.arenaEingabeDivergenz) {
+          const erneuterVersuch =
+            arenaModus === "inline"
+              ? await stelleArenaVorlaufSicher(scope, { erzwingeNeuenVersuch: true }, persistence)
+              : kickoffArenaVorlauf(scope, { erzwingeNeuenVersuch: true }, persistence);
+          if (arenaModus !== "inline" || erneuterVersuch.status === "in_progress" || erneuterVersuch.status === null) {
+            addStep(result, {
+              key: "arena_vorlauf",
+              label: "Arena-Vorlauf",
+              status: "blocked",
+              dryRun: false,
+              canContinue: false,
+              warnings: [],
+              blockingReasons: ["arena_eingabe_divergenz"],
+              metrics: { arenaModus },
+              plannedWrites: 0,
+              appliedWrites: 0,
+              auditId: null,
+            });
+            result.warnings = Array.from(new Set(result.warnings));
+            result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_eingabe_divergenz"]));
+            result.ok = false;
+            result.status = "blocked";
+            return result;
+          }
+          // Inline UND der erzwungene Versuch ist schon fertig ("ready"/"failed") -- einmal neu
+          // pruefen. Divergiert es DANACH immer noch (seltener Grenzfall: der Zustand aendert
+          // sich weiterhin waehrend des Vorlaufs), wird NICHT gebucht -- lieber blockiert als die
+          // Bruecke stillschweigend buchen.
+          const nachErneutemVersuch = resolveLocalSave(persistence, scope.saveId);
+          nachVorlaufPreview = resolveMatchdayPreviewToBook({
+            gameState: nachErneutemVersuch.gameState,
+            scope,
+            livePreview: activeResolve.preview,
+          });
+          if (nachVorlaufPreview.arenaEingabeDivergenz) {
+            addStep(result, {
+              key: "arena_vorlauf",
+              label: "Arena-Vorlauf",
+              status: "blocked",
+              dryRun: false,
+              canContinue: false,
+              warnings: [],
+              blockingReasons: ["arena_eingabe_divergenz"],
+              metrics: { arenaModus },
+              plannedWrites: 0,
+              appliedWrites: 0,
+              auditId: null,
+            });
+            result.warnings = Array.from(new Set(result.warnings));
+            result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_eingabe_divergenz"]));
+            result.ok = false;
+            result.status = "blocked";
+            return result;
+          }
+        }
+        activeResolve = { ...activeResolve, preview: nachVorlaufPreview.preview };
+        const disziplinenGesamt = vorlaufErgebnis.record ? Object.keys(vorlaufErgebnis.record.disziplinen).length : 0;
+        const disziplinenAusgefallen = vorlaufErgebnis.record
+          ? Object.values(vorlaufErgebnis.record.disziplinen).filter((d) => d.status === "ausgefallen").length
+          : 0;
+        addStep(result, {
+          key: "arena_vorlauf",
+          label: "Arena-Vorlauf",
+          status: vorlaufErgebnis.status === "failed" ? "warning" : "ready",
+          dryRun: false,
+          canContinue: true,
+          warnings: vorlaufErgebnis.status === "failed" ? ["arena_vorlauf_teilausfall"] : [],
+          blockingReasons: [],
+          metrics: {
+            arenaModus,
+            vorlaufStatus: vorlaufErgebnis.status,
+            disziplinenGesamt,
+            disziplinenAusgefallen,
+            previewQuelle: nachVorlaufPreview.source,
+          },
+          plannedWrites: 0,
+          appliedWrites: 0,
+          auditId: null,
+        });
+      }
+    }
+  }
 
   if (dryRun) {
     result.summary.resultApplyAllowed = activeResolve.preview.status === "ready";

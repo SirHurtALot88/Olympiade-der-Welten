@@ -242,8 +242,10 @@ describe("Ledger-Feld · arenaAusfall kommt im DisciplineResultWritePayload an",
 
 describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, kein konstruierter Context)", () => {
   it(
-    "jede gebuchte Zeile einer arena-aufgelösten Disziplin trägt arenaAusfall:nicht_ausgefuehrt — " +
-      "keine unmarkierte Brücken-Zeile für eine gewertete Arena-Disziplin (Opus-Review-Auflage)",
+    "PR 3 (K1 geschlossen): jede gebuchte Zeile einer arena-aufgelösten Disziplin trägt " +
+      "ENTWEDER resolutionSource:\"arena\" ODER arenaAusfall — nie weder/noch " +
+      "(vor PR 3 war hier IMMER nicht_ausgefuehrt; dieser Test lief ohne arenaModus-Option, nutzt " +
+      "also den Service-Default \"inline\" und damit den ECHTEN Arena-Vorlauf mit echtem Chromium)",
     async () => {
       process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-ausfall-k1-${Math.random().toString(36).slice(2)}.sqlite`;
       const { createPersistenceService } = await import("@/lib/persistence/persistence-service");
@@ -312,8 +314,10 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
       for (let versuch = 1; versuch <= MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN; versuch += 1) {
         const aktuell = persistence.getSaveById(saveId)!;
         const matchdayId = aktuell.gameState.matchdayState.matchdayId;
-        // GENAU der Pfad, den Bühne/Cockpit/Skripte heute nehmen -- OHNE arenaModus-Option, OHNE
-        // irgendeinen Arena-Vorlauf (der existiert erst mit PR 3). Das IST die K1-Lücke.
+        // GENAU der Pfad, den Bühne/Cockpit/Skripte nehmen -- OHNE arenaModus-Option. Vor PR 3
+        // bedeutete das "kein Arena-Vorlauf existiert" (die K1-Lücke). Seit PR 3 greift der
+        // Service-Default `"inline"` (Plan Abschnitt 2.4) -- derselbe Aufruf fährt jetzt einen
+        // ECHTEN Arena-Vorlauf mit echtem Chromium.
         const lauf = await runLocalMatchdayAutoRun(
           {
             saveId,
@@ -351,13 +355,20 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
           "MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN hier neu hergeleitet werden, statt den Test nur laenger laufen zu lassen.",
       ).toBeGreaterThan(0);
 
-      const unmarkiert = arenaDisziplinenZeilen.filter((z) => (z.arenaAusfall as ArenaAusfall | null | undefined)?.grund !== "nicht_ausgefuehrt");
-      expect(unmarkiert, JSON.stringify(unmarkiert.slice(0, 3))).toHaveLength(0);
+      // ENTWEDER "arena" ODER arenaAusfall -- nie weder/noch (das waere wieder die K1-Luecke).
+      const wederNoch = arenaDisziplinenZeilen.filter(
+        (z) => z.resolutionSource !== "arena" && !(z.arenaAusfall as ArenaAusfall | null | undefined),
+      );
+      expect(wederNoch, JSON.stringify(wederNoch.slice(0, 3))).toHaveLength(0);
+      const arenaZeilen = arenaDisziplinenZeilen.filter((z) => z.resolutionSource === "arena");
+      const ausfallZeilen = arenaDisziplinenZeilen.filter((z) => z.arenaAusfall);
+      console.log(`[arena-ausfall-k1-pr3] arena=${arenaZeilen.length} ausfall=${ausfallZeilen.length} gesamt=${arenaDisziplinenZeilen.length}`);
+      // KEIN `nicht_ausgefuehrt` mehr unter echtem Chromium -- das waere wieder die K1-Luecke.
+      const nichtAusgefuehrt = ausfallZeilen.filter((z) => (z.arenaAusfall as ArenaAusfall).grund === "nicht_ausgefuehrt");
+      expect(nichtAusgefuehrt, JSON.stringify(nichtAusgefuehrt.slice(0, 3))).toHaveLength(0);
       for (const zeile of arenaDisziplinenZeilen) {
-        expect(zeile.warnings).toContain("arena_ausgefallen:nicht_ausgefuehrt");
-        // Die Brücke bucht trotzdem gueltige 0/1/2 -- die Markierung aendert keine Punkte.
+        // Ob ueber die Arena oder die Bruecke -- beide buchen gueltige 0/1/2.
         expect([0, 1, 2]).toContain(zeile.teamPoints);
-        expect(zeile.resolutionSource).toBe("pps_duell");
       }
 
       // Gegenprobe: eine NICHT arena-aufgeloeste Disziplin (egal auf welchem der gelaufenen
@@ -374,6 +385,11 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
     // langsamer als lokal (Task #164, `tests/battle-mode-auto-run-invarianten.test.ts`-Kommentar:
     // 11m20s lokal / 16m13s CI fuer die volle Suite). 315s x 1,4 ≈ 440s -- 600s geben darauf noch
     // gut 35 % Reserve, statt eine Zahl zu raten.
+    //
+    // PR 3: dieser Lauf faehrt jetzt ECHTES Chromium inline (bis zu zwei Arena-Disziplinen je
+    // Spieltag, WEG B) zusaetzlich zum oben bereits eingepreisten Worst-Case-Pfad -- die 600s
+    // Grenze bleibt (keine neue, nur angenommene Zahl), die gemessenen Vollzeiten unten (Abnahme-
+    // Check #1) bestaetigen, dass das Budget auch mit Arena-Vorlauf reicht.
     600_000,
   );
 });

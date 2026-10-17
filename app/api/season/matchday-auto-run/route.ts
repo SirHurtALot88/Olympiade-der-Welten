@@ -109,10 +109,30 @@ export async function POST(request: Request) {
         advanceAfterCashApply: body.options?.advanceAfterCashApply ?? true,
         commitThroughSide: body.options?.commitThroughSide === "d1" ? "d1" : "d2",
         submittedPreview: body.options?.submittedPreview ?? null,
+        // PR 3 (K1, Plan Abschnitt 2.3/2.4): der HTTP-Pfad wartet NIE auf Chromium — fest verdrahtet,
+        // nicht vom Request-Body ueberschreibbar. Skripte (Smoke, Admin-Simulation) rufen
+        // `runLocalMatchdayAutoRun()` direkt und nutzen dafuer den Service-Default `"inline"`.
+        arenaModus: "hintergrund",
       },
     });
 
     if (!result.ok) {
+      // ARENA-VORLAUF LAEUFT NOCH (Plan Abschnitt 2.3/2.4): kein Fehler, sondern "bitte gleich
+      // nochmal fragen" — 202 statt 422, damit die UI das von einer echten Blockade (fehlende
+      // Aufstellung o.ae.) unterscheiden kann.
+      if (result.blockingReasons.includes("arena_vorlauf_laeuft")) {
+        return NextResponse.json(
+          {
+            success: true,
+            summary: result,
+            dryRun: result.dryRun,
+            executed: false,
+            arenaVorlauf: { status: "in_progress" },
+            warnings: [...writeAuth.warnings, ...result.warnings],
+          },
+          { status: 202 },
+        );
+      }
       return NextResponse.json(
         {
           success: false,

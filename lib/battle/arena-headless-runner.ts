@@ -62,7 +62,40 @@ import { seedZuZahl } from "@/lib/battle/arena-seed";
  */
 
 const STANDARD_CHROMIUM_EXECUTABLE_PATH = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
+
+/**
+ * TIMEOUT-BUDGET AUS DER MESSUNG ABLEITEN, NICHT RATEN (Opus-Auflage, Plan Abschnitt 9 Punkt 1).
+ * Deckt NUR das Warten auf `window.__arena` ab — einmal beim Seitenaufbau, dann je weiterem
+ * Fixture nach dem Neu-Einhaengen des Motors (s. `wartenAufMotor()` in
+ * `simuliereFixturesImBrowser()` unten). Die eigentliche Simulation (`spieleFeldspiel()`/...) ist
+ * SYNCHRONER Browser-JS ohne eigenes Timeout -- dieser Wert begrenzt also "startet/laedt der Motor
+ * ueberhaupt", nicht "wie lange darf das ganze Batch dauern". Per ENV konfigurierbar, damit die
+ * echte CX23-Zahl aus der Live-Abnahme (Plan Abschnitt 6.3) ohne Deploy-Wartezeit eingetragen
+ * werden kann, bevor sie im Code als neuer Standard landet.
+ */
+const STANDARD_SEITEN_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_SEITEN_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 20_000;
+})();
+
+/**
+ * OPUS-REVIEW B2 (kritisch): GESAMT-TIMEOUT fuer den ganzen Lauf, nicht nur fuer das Warten auf
+ * `window.__arena` (`STANDARD_SEITEN_TIMEOUT_MS` deckt wie oben dokumentiert NUR das Laden/
+ * Neueinhaengen des Motors ab, NICHT das synchrone `spieleFeldspiel()`/... selbst, das danach ohne
+ * jedes eigene Timeout rechnet). Haengt eine Simulation (Motor-Bug, Endlosschleife im Rezept),
+ * blieb das zugehoerige Promise in `runArenaFixtures()` fuer immer offen -- und mit ihm der globale
+ * Chromium-Semaphor (`arena-vorlauf-service.ts`), der JEDEN weiteren Vorlauf ALLER Saves blockiert,
+ * nicht nur den haengenden. Das Gesamt-Budget ist deshalb grosszuegig (Plan 3.1 nennt es explizit
+ * "Gesamt-Timeout"), per ENV konfigurierbar, bis die echte CX23-Messung (Plan 6.3) eine engere Zahl
+ * liefert -- 180s deckt selbst eine Liga mit 16 Fixtures bei einem Vielfachen der lokal gemessenen
+ * 10-18s je Disziplin (beide Ligen) komfortabel ab.
+ */
+const STANDARD_GESAMT_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_GESAMT_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 180_000;
+})();
 
 /**
  * FUND (nachgemessen, nicht vermutet): `spieleFeldspiel(fd, saat)` reicht `saat` unveraendert an
@@ -342,6 +375,13 @@ export type RunArenaFixturesOptions = {
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
   seitenTimeoutMs?: number;
   /**
+   * OPUS-REVIEW B2: GESAMT-Budget fuer den kompletten Lauf (Laden + ALLE Fixtures synchron
+   * gerechnet) -- anders als `seitenTimeoutMs` deckt das auch eine haengende Simulation ab, nicht
+   * nur das Laden. Ueberschreitung schliesst den Browser hart und wirft, der Aufrufer
+   * (`battle-mode-arena-team-points.ts`) fuer Warnungen/`arena-vorlauf-service.ts` fuer `ArenaAusfall`.
+   */
+  gesamtTimeoutMs?: number;
+  /**
    * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
    * dieser Disziplin-Seite (`rollMatchdayMutatorTraitsForSide()`, zwei Traits aus dem 36er-Pool,
    * fuer alle Teams gleich). Er faehrt als `window.__olyArenaKader.mutatoren` in die Engine, die
@@ -391,11 +431,32 @@ type VorbereitetesFixture = {
  * aufloesen (sofortiges ECONNREFUSED statt DNS-/Tunnel-Wartezeit). `file://`-Navigation
  * (die einzige, die dieser Runner macht) ist von beidem unberuehrt.
  */
-const ARENA_NETZWERK_ABRIEGELUNG_ARGS = ["--proxy-server=direct://", "--host-resolver-rules=MAP * 0.0.0.0"];
+// DOCKER-/dev-shm-ABSICHERUNG (E1, Plan Abschnitt 4.1/F11): Dockers Standard-`/dev/shm` ist 64 MB,
+// bekanntermassen zu knapp fuer Chromium (Crash statt sauberer Fehlermeldung). Das Produktions-
+// Compose setzt zusaetzlich `shm_size: "256m"` (doppelte Absicherung, PR E1) -- dieses Flag hier
+// greift unabhaengig davon auch lokal/in CI, wo niemand `shm_size` setzt.
+const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
+  "--proxy-server=direct://",
+  "--host-resolver-rules=MAP * 0.0.0.0",
+  "--disable-dev-shm-usage",
+];
 
-function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
-  const kandidat = executablePathOverride ?? STANDARD_CHROMIUM_EXECUTABLE_PATH;
-  if (existsSync(kandidat)) {
+/**
+ * Exportiert (PR 3, K1): der Chromium-Selbsttest (`lib/battle/arena-chromium-selftest.ts`, Opus-
+ * Auflage "`/api/health` darf nicht bei jedem Aufruf Chromium starten") braucht GENAU dieselben
+ * Launch-Optionen wie der echte Arena-Lauf — sonst koennte der Selbsttest "ok" melden, waehrend
+ * der echte Lauf an einer anderen Pfad-/Argument-Kombination scheitert, oder umgekehrt.
+ *
+ * REIHENFOLGE DER PFAD-ERMITTLUNG (E1, Plan Abschnitt 4.1): `executablePathOverride` (explizite
+ * Test-/Messskript-Injektion) VOR `OLY_ARENA_CHROMIUM_EXECUTABLE` (die Umgebungsvariable, die das
+ * Produktions-Image setzt, sobald Chromium dort unter der von Playwright 1.60 erwarteten Revision
+ * 1223 statt der hier hartkodierten lokalen 1194 liegt) VOR dem hartkodierten lokalen Standard.
+ * Ohne eine der beiden faellt `existsSync()` unten durch und `channel: "chromium"` greift (CI-
+ * Runner-Fall, unveraendert).
+ */
+export function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
+  const kandidat = executablePathOverride || process.env.OLY_ARENA_CHROMIUM_EXECUTABLE || STANDARD_CHROMIUM_EXECUTABLE_PATH;
+  if (kandidat && existsSync(kandidat)) {
     return { headless: true, executablePath: kandidat, args: ARENA_NETZWERK_ABRIEGELUNG_ARGS };
   }
   // Ohne festen Pfad (z.B. auf dem CI-Runner) loest Playwright den Standard-"chromium"-
@@ -591,10 +652,38 @@ export async function runArenaFixtures(
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
   }
   const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const gesamtTimeoutMs = options.gesamtTimeoutMs ?? STANDARD_GESAMT_TIMEOUT_MS;
   const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
 
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
-  try {
+  // OPUS-REVIEW B2: `schliesseEinmal()` ist von AUSSEN (dem Timeout-Wettlauf unten) UND von INNEN
+  // (dem `finally` des eigentlichen Laufs) erreichbar -- der Schutz verhindert einen doppelten
+  // `browser.close()`-Aufruf, wenn beide fast gleichzeitig greifen.
+  let browserGeschlossen = false;
+  const schliesseEinmal = async () => {
+    if (browserGeschlossen) return;
+    browserGeschlossen = true;
+    await schliesseBrowserHart(browser).catch(() => {
+      // Ein Fehler beim (zweiten) Schliessen ist hier kein neuer Befund -- der Browser ist in
+      // jedem Fall nicht mehr erreichbar, genau das war das Ziel.
+    });
+  };
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const gesamtTimeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      void schliesseEinmal().then(() => {
+        reject(
+          new Error(
+            `arena-headless-runner: Gesamt-Timeout (${gesamtTimeoutMs}ms) ueberschritten fuer "${disziplin}" -- Browser hart geschlossen, kein haengender Prozess.`,
+          ),
+        );
+      });
+    }, gesamtTimeoutMs);
+  });
+
+  const lauf = (async (): Promise<ArenaFixtureResult[]> => {
+    try {
     const page: Page = await browser.newPage();
     // TSX/ESBUILD-KOMPATIBILITAET (PPS-Skalierung, 03.09., gefunden beim Bau von
     // scripts/ziehe-basketball-pps-referenz.ts): `tsx` -- der Loader, mit dem JEDES Skript in
@@ -717,9 +806,13 @@ export async function runArenaFixtures(
         ...(momente ? { momente } : {}),
       };
     });
-  } finally {
-    await schliesseBrowserHart(browser);
-  }
+    } finally {
+      await schliesseEinmal();
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  })();
+
+  return Promise.race([lauf, gesamtTimeoutPromise]);
 }
 
 /**
