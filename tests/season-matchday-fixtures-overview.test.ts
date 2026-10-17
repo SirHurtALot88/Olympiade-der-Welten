@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { DisciplineResultRecord, GameState, MatchdayResultRecord } from "@/lib/data/olyDataTypes";
-import { buildSpieltagsUebersicht, istSpieltagsModusVerfuegbar } from "@/lib/foundation/season-matchday-fixtures-overview";
+import {
+  arenaAusfallGrundLabel,
+  buildSpieltagsUebersicht,
+  istSpieltagsModusVerfuegbar,
+  resolveSpielquelleLabel,
+} from "@/lib/foundation/season-matchday-fixtures-overview";
 
 /**
  * SPIELTAGS-UEBERSICHT — reiner Builder-Test (Fixtures + disciplineResults zusammenfuehren),
@@ -186,6 +191,46 @@ describe("buildSpieltagsUebersicht", () => {
           expect((disziplin.verhaeltnisHeim ?? 0) + (disziplin.verhaeltnisGast ?? 0)).toBe(0);
         }
       }
+    }
+  });
+});
+
+describe("resolveSpielquelleLabel / arenaAusfallGrundLabel", () => {
+  it("ungespielt liefert einen leeren String", () => {
+    expect(resolveSpielquelleLabel({ gespielt: false, resolutionSource: null, arenaAusfall: null })).toBe("");
+    expect(resolveSpielquelleLabel({ gespielt: true, resolutionSource: null, arenaAusfall: null })).toBe("");
+  });
+
+  it("Arena und reines PPS-Duell", () => {
+    expect(resolveSpielquelleLabel({ gespielt: true, resolutionSource: "arena", arenaAusfall: null })).toBe("Arena");
+    expect(resolveSpielquelleLabel({ gespielt: true, resolutionSource: "pps_duell", arenaAusfall: null })).toBe("PPS-Duell");
+  });
+
+  it("PPS-Duell MIT Arena-Ausfall traegt den lesbaren Grund im Hinweis", () => {
+    const label = resolveSpielquelleLabel({
+      gespielt: true,
+      resolutionSource: "pps_duell",
+      arenaAusfall: { grund: "chromium_start", zeitpunkt: "2026-10-17T00:00:00.000Z", versuch: 1 } as never,
+    });
+    expect(label).toBe("PPS-Duell — Arena ausgefallen: Browser konnte nicht starten");
+  });
+
+  it("jeder ArenaAusfallGrund hat eine nicht-leere, lesbare Beschriftung", () => {
+    const gruende = [
+      "chromium_start",
+      "timeout",
+      "absturz",
+      "liga_fehlgeschlagen",
+      "ergebnis_unvollstaendig",
+      "abgebrochen_neustart",
+      "deaktiviert",
+      "nicht_ausgefuehrt",
+    ] as const;
+    for (const grund of gruende) {
+      const label = arenaAusfallGrundLabel(grund);
+      expect(label.length, grund).toBeGreaterThan(0);
+      // Keine Rohschluessel-Lecks (Unterstrich) in der UI-Beschriftung.
+      expect(label).not.toContain("_");
     }
   });
 });

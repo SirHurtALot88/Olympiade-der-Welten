@@ -75,6 +75,8 @@ import {
   POINTS_PER_PARTICIPATING_PLAYER,
 } from "@/lib/season/title-race";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
+import { resolveSpielquelleLabel, type SpieltagsPaarung } from "@/lib/foundation/season-matchday-fixtures-overview";
+import type { LeagueTier } from "@/lib/season/league-split";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -106,7 +108,7 @@ import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfz
  * beiden Größen unterscheidbar bleiben.
  */
 
-export type NlStandingsMode = "board" | "daten" | "vereine";
+export type NlStandingsMode = "board" | "daten" | "vereine" | "spieltage";
 
 /**
  * Reihenfolge = Angebotsreihenfolge: „Daten" ist der Standard-Einstieg, „Board"
@@ -130,6 +132,17 @@ export const NL_STANDINGS_MODE_ITEMS: Array<{ id: NlStandingsMode; label: string
 export const NL_STANDINGS_DEFAULT_MODE: NlStandingsMode = "daten";
 
 /**
+ * Task #159 Punkt 2: der 4. Modus "Spieltage" kommt NUR dazu, wenn der Save ihn trägt
+ * (Battle-Save mit echtem Fixture-Plan, `spieltage.verfuegbar`) — `NL_STANDINGS_MODE_ITEMS`
+ * selbst bleibt deshalb unverändert (die Vertragsprüfung in
+ * tests/season-standings-v2-ui-contract.test.ts gilt weiter 1:1), diese Funktion hängt den
+ * vierten Reiter nur bedingt an.
+ */
+export function buildStandingsModeItems(spieltageVerfuegbar: boolean): Array<{ id: NlStandingsMode; label: string }> {
+  return spieltageVerfuegbar ? [...NL_STANDINGS_MODE_ITEMS, { id: "spieltage", label: "Spieltage" }] : NL_STANDINGS_MODE_ITEMS;
+}
+
+/**
  * Merkzettel für die zuletzt genutzte Saisonstand-Ansicht. Der Schlüssel hängt
  * am eigenen Team, damit bei mehreren menschlichen Managern auf demselben
  * Rechner (Solo-4 / Online) nicht einer die Präferenz des anderen überschreibt.
@@ -140,7 +153,7 @@ function getStandingsModeStorageKey(teamId: string | null | undefined): string {
 }
 
 function isStandingsMode(value: unknown): value is NlStandingsMode {
-  return value === "board" || value === "daten" || value === "vereine";
+  return value === "board" || value === "daten" || value === "vereine" || value === "spieltage";
 }
 
 function readStoredStandingsMode(teamId: string | null | undefined): NlStandingsMode | null {
@@ -695,6 +708,7 @@ export default function SeasonStandingsNewLook({
   onOpenRanks,
   onOpenPrize,
   isLoading = false,
+  spieltage,
 }: SeasonStandingsV2ClientProps) {
   const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
   /**
@@ -735,6 +749,32 @@ export default function SeasonStandingsNewLook({
     setMode(stored ?? NL_STANDINGS_DEFAULT_MODE);
   }, [modeScopeTeamId]);
 
+  // Task #159 Punkt 2 ("Spieltage"-Modus): nur bei Battle-Saves mit echtem Fixture-Plan
+  // angeboten; Manager-Saves (`spieltage` fehlt/`verfuegbar: false`) bleiben unberührt — kein
+  // vierter Reiter, bit-identisches Verhalten zu vorher.
+  const spieltageVerfuegbar = spieltage?.verfuegbar ?? false;
+  const standingsModeItems = useMemo(() => buildStandingsModeItems(spieltageVerfuegbar), [spieltageVerfuegbar]);
+  // Gespeicherte Präferenz könnte "spieltage" sein, obwohl der aktuelle Save das gar nicht
+  // anbietet (z. B. Teamwechsel zu einem Manager-Save) — dann ehrlich auf den Standard zurück,
+  // statt eine leere Ansicht zu zeigen.
+  const effectiveMode: NlStandingsMode = mode === "spieltage" && !spieltageVerfuegbar ? NL_STANDINGS_DEFAULT_MODE : mode;
+
+  const [spieltagMatchdayId, setSpieltagMatchdayId] = useState<string | null>(null);
+  const [spieltagLeagueFilter, setSpieltagLeagueFilter] = useState<LeagueTier | "alle">("alle");
+
+  // Default = letzter gespielter/aktueller Spieltag (vom Host vorgerechnet). Zieht nach, wenn
+  // der Save wechselt oder noch keine Auswahl getroffen wurde — überschreibt aber NICHT, sobald
+  // der Spieler selbst schon navigiert hat (Referenz bleibt stabil, solange derselbe Save aktiv ist).
+  useEffect(() => {
+    if (!spieltage?.verfuegbar) {
+      setSpieltagMatchdayId(null);
+      return;
+    }
+    setSpieltagMatchdayId((current) =>
+      current != null && spieltage.overviewByMatchdayId[current] != null ? current : spieltage.defaultMatchdayId,
+    );
+  }, [spieltage]);
+
   const handleModeChange = useCallback(
     (next: NlStandingsMode) => {
       setMode(next);
@@ -763,6 +803,25 @@ export default function SeasonStandingsNewLook({
    * vorher).
    */
   const hasVerhaeltnis = useMemo(() => boardRows.some((row) => row.verhaeltnis != null), [boardRows]);
+
+  // Task #159 Punkt 2: Team-Name/-Logo für die Spieltage-Paarungskarten — keine neuen Daten,
+  // dieselben Zeilen, die Board/Daten/Vereine schon zeigen.
+  const standingsRowByTeamId = useMemo(() => new Map(boardRows.map((row) => [row.teamId, row] as const)), [boardRows]);
+
+  const activeSpieltagUebersicht = useMemo(() => {
+    if (!spieltage?.verfuegbar || spieltagMatchdayId == null) {
+      return null;
+    }
+    return spieltage.overviewByMatchdayId[spieltagMatchdayId] ?? null;
+  }, [spieltage, spieltagMatchdayId]);
+
+  const spieltagPaarungen = useMemo(() => {
+    const alle = activeSpieltagUebersicht?.paarungen ?? [];
+    if (spieltagLeagueFilter === "alle") {
+      return alle;
+    }
+    return alle.filter((paarung) => paarung.leagueTier === spieltagLeagueFilter);
+  }, [activeSpieltagUebersicht, spieltagLeagueFilter]);
 
   /**
    * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
@@ -2616,6 +2675,144 @@ export default function SeasonStandingsNewLook({
     );
   }
 
+  /**
+   * Task #159 Punkt 2 — der Spieltage-Modus: Navigation durch die Spieltage der laufenden
+   * Saison, Liga-1/Liga-2-Umschalter, Paarungs-Karten mit Ergebnis je Disziplin, Quellen-Label
+   * (Arena/PPS-Duell/Ausfall-Hinweis) und Rückspiel-Hinweis ("Hinspiel: Spieltag 4").
+   *
+   * NUR bei Battle-Saves mit echtem Fixture-Plan erreichbar (`spieltageVerfuegbar`) — der Reiter
+   * existiert sonst gar nicht (`standingsModeItems`), diese Funktion läuft dann nie.
+   */
+  function renderSpieltageMode() {
+    if (!spieltage?.verfuegbar) {
+      return null;
+    }
+    const activeOption = spieltage.matchdayOptions.find((option) => option.id === spieltagMatchdayId) ?? null;
+    const activeIndex = activeOption?.index ?? 0;
+    const canGoPrev = activeIndex > 0;
+    const canGoNext = activeIndex < spieltage.matchdayOptions.length - 1;
+    const goToIndex = (index: number) => {
+      const target = spieltage.matchdayOptions[index];
+      if (target) {
+        setSpieltagMatchdayId(target.id);
+      }
+    };
+
+    const teamLabel = (teamId: string) => standingsRowByTeamId.get(teamId)?.teamName ?? teamId;
+
+    return (
+      <div className="nl-standings-spieltage">
+        <div className="nl-standings-spieltage-nav">
+          <button
+            type="button"
+            className="nl-standings-spieltage-navbtn"
+            onClick={() => goToIndex(activeIndex - 1)}
+            disabled={!canGoPrev}
+            aria-label="Vorheriger Spieltag"
+          >
+            ‹
+          </button>
+          <label className="nl-standings-spieltage-select">
+            <span>Spieltag</span>
+            <select
+              value={spieltagMatchdayId ?? ""}
+              onChange={(event) => setSpieltagMatchdayId(event.target.value)}
+            >
+              {spieltage.matchdayOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                  {option.gespielt ? "" : " (ausstehend)"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="nl-standings-spieltage-navbtn"
+            onClick={() => goToIndex(activeIndex + 1)}
+            disabled={!canGoNext}
+            aria-label="Nächster Spieltag"
+          >
+            ›
+          </button>
+          {hasLeagueSplit ? (
+            <NlSubTabs
+              items={[
+                { id: "alle", label: "Beide Ligen" },
+                { id: "liga1", label: "Liga 1" },
+                { id: "liga2", label: "Liga 2" },
+              ]}
+              activeId={spieltagLeagueFilter}
+              onSelect={(id) => setSpieltagLeagueFilter(id as LeagueTier | "alle")}
+              aria-label="Liga wählen"
+              className="nl-standings-spieltage-ligatabs"
+            />
+          ) : null}
+        </div>
+
+        {spieltagPaarungen.length === 0 ? (
+          <NlCard className="nl-standings-empty-card">
+            <p className="nl-standings-empty-text">Für diesen Spieltag liegen keine Paarungen vor.</p>
+          </NlCard>
+        ) : (
+          <div className="nl-standings-spieltage-grid" data-testid="nl-standings-spieltage-grid">
+            {spieltagPaarungen.map((paarung) => renderSpieltagPaarungCard(paarung, teamLabel))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /**
+   * Eine Paarungskarte. `teilnehmer` wird für die Kopfzeile durchlaufen (statt fest
+   * `homeTeamId`/`awayTeamId` zu adressieren) — Mini-DM-Vorbereitung: ein künftiges
+   * 4-Team-Pod-Format bekäme hier einfach vier Einträge, ohne diese Funktion umzubauen, auch
+   * wenn die Ergebnis-Spalten selbst (Heim/Gast) erst mit dem Builder mitwachsen müssten.
+   */
+  function renderSpieltagPaarungCard(paarung: SpieltagsPaarung, teamLabel: (teamId: string) => string) {
+    return (
+      <NlCard key={paarung.fixtureId} className="nl-standings-spieltage-card" data-testid="nl-standings-spieltage-card">
+        <div className="nl-standings-spieltage-card-teams">
+          {paarung.teilnehmer.map((teilnehmer, index) => (
+            <Fragment key={teilnehmer.teamId}>
+              {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
+              <span className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}>{teamLabel(teilnehmer.teamId)}</span>
+            </Fragment>
+          ))}
+        </div>
+        {paarung.istRueckspiel ? (
+          <p className="nl-standings-spieltage-rueckspiel">
+            Rückspiel gegen {teamLabel(paarung.awayTeamId)}
+            {paarung.hinspielMatchdayLabel ? ` — Hinspiel: ${paarung.hinspielMatchdayLabel}` : ""}
+          </p>
+        ) : null}
+        <ul className="nl-standings-spieltage-disziplinen">
+          {paarung.disziplinen.map((disziplin) => (
+            <li key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin">
+              <span className="nl-standings-spieltage-disziplin-name">
+                {disziplin.disciplineName}
+                {disziplin.occurrenceInSeason != null ? (
+                  <span className="nl-standings-spieltage-durchgang"> · {disziplin.occurrenceInSeason}. Durchgang</span>
+                ) : null}
+              </span>
+              <span className="nl-standings-spieltage-ergebnis nl-tnum">
+                {disziplin.gespielt ? `${disziplin.punkteHeim}:${disziplin.punkteGast}` : "—"}
+              </span>
+              {disziplin.gespielt ? (
+                <span className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}>
+                  {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
+                </span>
+              ) : (
+                <span className="nl-standings-spieltage-verhaeltnis" />
+              )}
+              <span className="nl-standings-spieltage-quelle">{resolveSpielquelleLabel(disziplin)}</span>
+            </li>
+          ))}
+        </ul>
+      </NlCard>
+    );
+  }
+
   function renderVereineMode() {
     // T-098: Alle vier Vereine-Blöcke rendern immer — GM-Büro, Disziplin-
     // Rekordhalter und Archiv zeigen bei fehlenden Daten einen eigenen
@@ -2735,8 +2932,8 @@ export default function SeasonStandingsNewLook({
       >
         <div className="nl-standings-header-row">
           <NlSubTabs
-            items={NL_STANDINGS_MODE_ITEMS}
-            activeId={mode}
+            items={standingsModeItems}
+            activeId={effectiveMode}
             onSelect={(id) => handleModeChange(id as NlStandingsMode)}
             aria-label="Saisonstand Ansicht"
             className="nl-standings-subtabs"
@@ -2778,7 +2975,7 @@ export default function SeasonStandingsNewLook({
                 onClick={() => openRankingDrawer("mw", selectedTeamSummary.teamId)}
                 title="Marktwert-Rangliste"
               />
-              {mode !== "vereine" ? (
+              {effectiveMode !== "vereine" && effectiveMode !== "spieltage" ? (
                 <StatChip
                   label="Team"
                   value="Springen"
@@ -2816,7 +3013,7 @@ export default function SeasonStandingsNewLook({
         <NlCard className="nl-standings-empty-card">
           <p className="nl-standings-empty-text">Für diese Saison liegen noch keine Tabellendaten vor.</p>
         </NlCard>
-      ) : mode === "board" ? (
+      ) : effectiveMode === "board" ? (
         <>
           {renderPodium()}
           {renderTopPlayersStrip()}
@@ -2825,8 +3022,10 @@ export default function SeasonStandingsNewLook({
             {displayBoardRows.map((row, index) => renderBoardRow(row, index))}
           </ol>
         </>
-      ) : mode === "vereine" ? (
+      ) : effectiveMode === "vereine" ? (
         renderVereineMode()
+      ) : effectiveMode === "spieltage" ? (
+        renderSpieltageMode()
       ) : (
         renderDatenMode()
       )}

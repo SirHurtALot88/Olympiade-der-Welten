@@ -121,6 +121,59 @@ export type SpieltagsUebersicht = {
 };
 
 /**
+ * Lesbarer Grund für einen ausgefallenen Arena-Lauf (`ArenaAusfallGrund`, PR #1269/K1) — es gab
+ * dafür noch KEINE Beschriftung im Projekt (nachgesehen: kein Treffer außerhalb von
+ * `legacy-matchday-resolve-types.ts` selbst). Der "Spieltage"-Modus ist die erste Stelle, die
+ * `arenaAusfall` überhaupt sichtbar macht.
+ */
+export function arenaAusfallGrundLabel(grund: ArenaAusfall["grund"]): string {
+  switch (grund) {
+    case "chromium_start":
+      return "Browser konnte nicht starten";
+    case "timeout":
+      return "Zeitüberschreitung";
+    case "absturz":
+      return "Absturz";
+    case "liga_fehlgeschlagen":
+      return "Liga-Lauf fehlgeschlagen";
+    case "ergebnis_unvollstaendig":
+      return "Ergebnis unvollständig";
+    case "abgebrochen_neustart":
+      return "abgebrochen (Neustart)";
+    case "deaktiviert":
+      return "deaktiviert";
+    case "nicht_ausgefuehrt":
+      return "noch nicht ausgeführt";
+    default:
+      return grund;
+  }
+}
+
+/**
+ * Die dezente Quellen-Markierung je Disziplin, die Chris in der UI sehen soll: "Arena",
+ * "PPS-Duell" oder "PPS-Duell mit Hinweis 'Arena ausgefallen: <Grund>'" — macht PR #1269s
+ * `arenaAusfall` (bisher nur in Rohdaten sichtbar) hier erstmals für den Spieler lesbar.
+ * Leerer String, solange die Disziplin nicht gewertet ist.
+ */
+export function resolveSpielquelleLabel(disziplin: Pick<SpieltagsDuellDisziplin, "gespielt" | "resolutionSource" | "arenaAusfall">): string {
+  if (!disziplin.gespielt || disziplin.resolutionSource == null) {
+    return "";
+  }
+  if (disziplin.resolutionSource === "arena") {
+    return "Arena";
+  }
+  if (disziplin.resolutionSource === "pps_duell") {
+    if (disziplin.arenaAusfall != null) {
+      return `PPS-Duell — Arena ausgefallen: ${arenaAusfallGrundLabel(disziplin.arenaAusfall.grund)}`;
+    }
+    return "PPS-Duell";
+  }
+  // "pps": der alte Rangtabellen-Pfad -- im Spieltage-Modus (nur Battle-Saves) nicht erwartet,
+  // aber kein Fehlerwurf an einer reinen Lese-/Anzeigefunktion.
+  return "Rangtabelle";
+}
+
+/**
  * NUR bei Battle-Saves mit echtem Fixture-Plan sichtbar (Auftrag: Manager-Saves mit
  * Dummy-Paarungen — `buildSeasonFixtures()` in preseason-workflow-service.ts, ein `i % n`-
  * Rundenlauf ohne Liga-/Duell-Bedeutung — zeigen diesen Modus gar nicht).

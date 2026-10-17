@@ -1,6 +1,7 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
 import { buildInitialLeagueAssignment } from "@/lib/season/league-split";
+import { buildSpieltagsUebersicht, istSpieltagsModusVerfuegbar } from "@/lib/foundation/season-matchday-fixtures-overview";
 import {
   springeZuElement,
   springeZuPosition,
@@ -11198,6 +11199,44 @@ export function useFoundationShellRouterBodyScope({
       }),
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
+  /**
+   * Task #159 Punkt 2 ("Spieltage"-Modus): je Spieltag der laufenden Saison eine fertige
+   * Paarungs-Uebersicht (reiner Builder, `buildSpieltagsUebersicht`) — NUR bei Battle-Saves mit
+   * echtem Fixture-Plan (`istSpieltagsModusVerfuegbar`), sonst `verfuegbar: false` und die UI
+   * zeigt den Modus gar nicht an (Manager-Saves mit Dummy-Paarungen bleiben unberuehrt).
+   *
+   * Bewusst ALLE Spieltage auf einmal (max. 20, reine In-Memory-Projektion ueber bereits
+   * geladene `gameState`-Arrays) statt pro Klick neu zu bauen — die Spieltag-Navigation ist damit
+   * ein reiner State-Wechsel im Client, ohne weiteren Build-Aufruf.
+   *
+   * Scope bewusst nur die LAUFENDE Saison (Opus/Coordinator 17.10.) — ein Archiv-Rueckblick ist
+   * ein separater Folgeschritt.
+   */
+  const seasonV2Spieltage = useMemo(() => {
+    if (!istSpieltagsModusVerfuegbar(gameState)) {
+      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, overviewByMatchdayId: {} };
+    }
+    const overviewByMatchdayId: Record<string, ReturnType<typeof buildSpieltagsUebersicht>> = {};
+    const matchdayOptions = gameState.season.matchdayIds.map((matchdayId, index) => {
+      const uebersicht = buildSpieltagsUebersicht(gameState, matchdayId);
+      overviewByMatchdayId[matchdayId] = uebersicht;
+      return {
+        id: matchdayId,
+        index,
+        label: `Spieltag ${index + 1}`,
+        gespielt: uebersicht?.paarungen.some((paarung) => paarung.gespielt) ?? false,
+      };
+    });
+    // Default = letzter GESPIELTER Spieltag; ohne jede Wertung (Saisonstart) der erste.
+    let defaultMatchdayId: string | null = matchdayOptions[0]?.id ?? null;
+    for (let i = matchdayOptions.length - 1; i >= 0; i -= 1) {
+      if (matchdayOptions[i].gespielt) {
+        defaultMatchdayId = matchdayOptions[i].id;
+        break;
+      }
+    }
+    return { verfuegbar: true as const, matchdayOptions, defaultMatchdayId, overviewByMatchdayId };
+  }, [gameState]);
   const seasonV2PpRows = useMemo(
     () =>
       sortedPpAreaRows.map((row) => ({
@@ -13020,6 +13059,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2PlayerRows,
     seasonV2PressureTeam,
     seasonV2SelectedTeamSummary,
+    seasonV2Spieltage,
     seasonV2StandingsRows,
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
