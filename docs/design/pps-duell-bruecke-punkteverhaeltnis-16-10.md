@@ -350,3 +350,191 @@ Jede hier ist als begründete Standardannahme gebaut, nichts blockiert.
    (`getSharedLineupContextBase`) schlüsselt nicht nach dem Disziplin-Spielplan — für das
    Referenzskript relevant (dort mit Reset gelöst), im Spiel nur, wenn sich der Spielplan eines
    Spieltags nachträglich ändert. Beobachten, nicht dringend.
+
+---
+
+## 8. Nachtrag 17.10.: Abnahme der Brücke selbst
+
+Bis hierher war rho/Pp **für die Brücke** nur behauptet, nie nachgewiesen — die Projektaufsicht
+hat das angemahnt, obwohl die Brücke am 16.10. schon faktisch alle 20 Disziplinen jeder
+Battle-Saison trägt (Arena läuft noch nicht im Auto-Run, K1) und dauerhaft mindestens die fünf nie
+arena-angeschlossenen Disziplinen (Football, I-Spy, Battlefield, TDM, Mini-DM) tragen wird. Dieser
+Abschnitt holt das nach, gemessen an `6a003097` (main, PR 0 + PR 1), Werkzeug
+`scripts/miss-pps-duell-bruecke-abnahme.ts`.
+
+### 8.1 Was eigentlich zu messen ist
+
+Die Brücke selbst hat keine Attribut-Logik — `outcomeAusPunkten()` vergleicht zwei fertige
+Team-Scores und verteilt 2/1/0. Der Score kommt aus dem alten, Arena-unabhängigen „legacy
+PPS"-Pfad (`scoreLegacyLineupDisciplineSide()`, gefüttert aus `calculateRawDisciplineScore()`) —
+demselben Kanal, über den vor der Arena schon die Rangtabelle lief. Daraus zwei getrennte Fragen:
+
+- **rho**: trifft „höhere Eignung gewinnt/bekommt mehr" zu — auf **Spieler-Ebene**, wie CLAUDE.md
+  es für jede Disziplin verlangt ("Stat 80 → einer der Top-Leute"), nicht nur auf Team-Ebene?
+- **Pp**: überdeckt ein anderer Kanal (Slot-Rolle, Trait/Mutator, Formkarte, Kapitän,
+  Verletzungsleistung, Team-Power-Debuff) im **echten Spiel** die Matrixgewichte zusätzlich?
+
+Eine erste Fassung dieser Messung (16.10.) maß Team-Eignung gegen den binären Duell-Ausgang und
+Teil B mit neutralen Modifikatoren — beides beantwortete die CLAUDE.md-Frage nicht genau genug und
+wurde durch die Fassung unten ersetzt, nicht nur ergänzt (Projektaufsicht-Korrektur 17.10.).
+
+### 8.2 Teil A: Spieler-rho (jetzt die Abnahmezahl)
+
+Methodik: echter Live-Save-Kader (`swnjlk`), echte KI-Aufstellung
+(`buildAiLegacyLineupPreviewWithModifiers()`, dieselbe Funktion wie der Auto-Run),
+`buildLegacyMatchdayResolvePreview()`, Feldgröße 6, 6 Spieltage, Paarung innerhalb der Liga (2
+Zufallspaarungen je Spieltag und Liga) — derselbe Mechanismus wie
+`scripts/ziehe-verhaeltnis-referenz.ts`. Je Team-Seite einer Disziplin an einem Spieltag (= **ein
+Spiel**, analog einem Boxscore) Spearman-rho zwischen `entries[].baseValue` (p.d, matrixgewichtete
+Eignung) und `entries[].pointsAwarded` (die tatsächlich im Battle-Save vergebene individuelle PP,
+aus `distributeRankPointsToPlayers()` — unverändert durch die Brücke, die nur den TEAM-Wert
+tauscht). Median + Spannweite über alle gemessenen Team-Seiten, zwei Saatströme.
+
+| Disziplin | Spieler-rho Median (Strom 0 / Strom 10 000 000) | Spannweite | n (Team-Seiten) | Paartreue ≥15 Pkt |
+|---|---:|---:|---:|---:|
+| Football | 0,886 / 0,886 | 0,571 | 192 | 83–88 % |
+| I-Spy | 0,900 / 0,900 | 1,200 | 178 | 91–93 % |
+| Battlefield | 0,829 / 0,829 | 1,500 | 192 | 88–90 % |
+| TDM | 0,886 / 0,886 | 1,200 | 186 | 90–91 % |
+| Basketball | 0,900 / 0,900 | 2,000 | 187 | 87–88 % |
+| Hockey | 0,900 / 0,900 | 0,900 | 184 | 88–90 % |
+| Fechten | 0,829 / 0,829 | 1,500 | 184 | 88–92 % |
+| **Mini-DM** | **n. a.** (n=0, s. 8.4) | — | 0 | 97–100 % (Team-Ebene) |
+
+**Ergebnis: alle sieben messbaren Disziplinen bestehen rho > 0,80 auf Spieler-Ebene, deutlich.**
+Auch die Paartreue ab 15 Eignungspunkten Abstand liegt überall zwischen 83 % und 93 % — in der
+Größenordnung der kaderfesten Hockey-Referenz aus CLAUDE.md (58 %/78 % für den Star, hier aber über
+ALLE Paare ab 15 Punkten, nicht nur Rang-1-Fragen, deshalb nicht direkt vergleichbar, aber
+plausibel in derselben Richtung). Die Streuung (Median je Strom identisch, weil derselbe
+Spieltags-/Paarungs-Seed für beide Ströme nur den Pp-Perturbationsteil, nicht die
+Grundgesamtheit der Fixtures ändert — s. 8.5) ist erwartbar hoch (0,57–2,0), weil einzelne
+Team-Seiten mit sehr kleinen Eignungsunterschieden zwischen ihren sechs Spielern messen — genau
+die CLAUDE.md-Beobachtung „was rho drückt, sind Paare unter zwei Punkten Abstand, die kein Motor
+der Welt ordnen soll".
+
+Die Team-vs-Team-Sicht der ersten Fassung bleibt als **zweite** Kennzahl, jetzt als Paartreue nach
+Team-Eignungsabstand (statt Korrelation mit einem ternären Ergebnis): bei ≥15 Punkten Abstand
+83–100 % richtig geordnet über alle acht Disziplinen, bei <2 Punkten dagegen nahe Zufall (0–100 %
+je nach winziger Stichprobe, n teils <5) — exakt das erwartete Bild einer fairen, aber bei engen
+Paaren verrauschten Mechanik.
+
+### 8.3 Teil B: Pp unter echten Bedingungen
+
+Methodik: derselbe, bereits vom echten Spieltag gezogene Kontext (reale Formkarten, reale
+Mutator-Slots, reale Team-Power, realer Kapitän, reale Fatigue/Verletzung/Moral) — nur die
+`disciplineScores`-Zahl **eines bereits gefelderten Spielers** wird für ein Attribut um +15
+angehoben, über die echte Liga-Rangabbildung (`buildCompetitionRanks` + `mapRankToDisciplineStat`
+— derselbe Mechanismus, der p.d im Spiel erzeugt). Lineup-Auswahl, Formkarten, Mutatoren,
+Team-Power, Kapitän bleiben unverändert (keine Verwechslungsgefahr durch eine andere Aufstellung).
+Gemessen wird die Änderung von `pointsAwarded`, 8 Team-Seiten-Ziehungen × 12 Attribute je
+Disziplin und Strom (96 Läufe), zwei Saatströme.
+
+| Disziplin | Pp Strom 0 | Pp Strom 10 000 000 | Bestanden (≤25)? |
+|---|---:|---:|---|
+| Football | **64,4** | **55,8** | **Nein** |
+| I-Spy | 7,9 | 18,2 | Ja |
+| Battlefield | 8,8 | 11,8 | Ja |
+| TDM | 7,0 | 11,4 | Ja |
+| Basketball | 10,1 | 10,9 | Ja |
+| Hockey | 7,4 | 6,3 | Ja |
+| Fechten | 15,0 | 18,6 | Ja |
+| Mini-DM | 100 / 100 | — | **Methode nicht anwendbar, s. 8.4** |
+
+**Sechs von acht bestehen klar.** Die Zahlen liegen durchweg höher als die deterministische
+Formel-Wächter-Messung (dort exakt 0, s. 8.5) — erwartbar, weil jetzt Form-Jitter, Slot-Rollen,
+Mutator-Zufall und Team-Power echt mitwirken und Rauschen UND echte Verzerrung gemeinsam in die
+Zahl eingehen. Bei n=8 Ziehungen ist das kein präziser Schätzer (`messe-arena-einfluss.mjs`
+dokumentiert selbst, dass n=12 „systematisch zu günstig" ist); die Größenordnung (einstellig bis
+knapp unter 20) ist aber bei sechs von acht Disziplinen über beide Ströme stabil genug, um sie
+nicht für Zufall zu halten.
+
+**Football besteht NICHT** (64,4 / 55,8, beide Ströme deutlich über der Schranke und in derselben
+Größenordnung — kein Zufallsausschlag). Aufgeschlüsselt (Top-Abweichungen, Strom 0): `power`
+(Matrix/Override 22 %, gemessen 9,4 %, −12,6 Pp), `health` (18 % → 8,9 %, −9,1 Pp), `intelligence`
+und `charisma` (Override je 0 %, aber gemessen je 7,8 % — zwei Attribute, die laut Football-Override
+GAR NICHT zählen sollen, tragen im echten Spiel trotzdem spürbar zum vergebenen PP bei). Das ist
+ein eigenständiger, neuer Befund: die Brücke selbst verzerrt nichts (sie vergleicht nur zwei fertige
+Scores), aber der Kanal, den sie für Football konsumiert, tut es unter echten Bedingungen — vermutlich
+über slot-/formkartengebundene Modifikatoren, die bei Football anders greifen als beim Rest des
+Feldes. **Nicht Teil dieses Auftrags, aber zur Weitergabe:** welcher Modifikator genau (Slot-Rolle,
+Formkarte, Mutator) das verursacht, ist eine eigene Untersuchung; dieser Befund zeigt nur, DASS es
+ihn gibt, nicht WAS ihn verursacht.
+
+**Football-Klärung** (Projektaufsicht-Frage 17.10.): `calculateRawDisciplineScore()` ruft
+`resolveDisciplineWeightProfile(dId)`, die bei vorhandenem Override
+(`lib/player-generator/spiel-eignung-overrides.ts`) GENAU DIESEN statt der offiziellen Matrix
+liefert. Football hat einen solchen Override (Chris' Bestätigung, E3). Der legacy-PPS-Kanal — und
+damit die Brücke — liest für Football also den **Override**, nicht die rohe Matrix; oben wird
+entsprechend gegen den Override gerechnet.
+
+### 8.4 Mini-DM: die Methode selbst ist hier nicht übertragbar
+
+Beide Teile scheitern für Mini-DM nicht an der Zahl, sondern an der Methode — ehrlich berichtet statt
+erzwungen genau genommen:
+
+- **Teil A**: 0 messbare Team-Seiten-Spiele. Mini-DMs Spieltags-Slot hat `playerCount` 1 (Kader-/
+  Pod-Konvention, s. Abschnitt 4 oben); jede Team-Seite feldet damit genau einen Spieler, und
+  Spearman-rho braucht mindestens drei Punkte. Die Team-Ebene (Paartreue) bleibt messbar und zeigt
+  97–100 % bei ≥15 Punkten Abstand — kein Hinweis auf ein Problem, nur ein Hinweis, dass die
+  Spieler-Ebene hier die falsche Granularität ist.
+- **Teil B**: Pp = exakt 100 in beiden Strömen, und zwar weil die gemessene Einflusssumme exakt 0
+  ist (kein einziges der 96 Läufe zeigte irgendeine Änderung von `pointsAwarded`) — nicht, weil
+  irgendein Attribut überproportional zählt. Mit nur einem gefelderten Spieler bekommt dieser
+  immer 100 % der Team-Summe (`distributeByValues` über ein Element); ob sich die Summe selbst
+  ändert, hängt davon ab, ob die +15-Anhebung den TEAM-RANG unter 32 Teams verschiebt — das tat sie
+  in keinem der 96 Läufe. Das ist kein Nachweis, dass Mini-DM „bestanden" oder „durchgefallen" ist,
+  sondern ein Nachweis, dass diese Messmethode für ein Format mit `playerCount` 1 keine Aussage
+  treffen kann.
+
+Das deckt sich mit Abschnitt 4 oben: Mini-DMs eigentliche Abnahme ist die dort beschriebene
+Event-/Pod-Messung (`scripts/miss-mini-dm-ffa-abnahme.mjs`, rho 0,80 am Median, `data/generated/
+disziplin-abnahme.json`), nicht diese Brücken-Sonde. Mini-DM bleibt aus genau den dort genannten
+Gründen auf der Brücke, und diese Messung ändert daran nichts — sie zeigt nur, dass die
+Brücken-Perspektive für dieses eine Format strukturell nichts beisteuert.
+
+### 8.5 Der deterministische Formel-Wächter bleibt — ist aber nicht die Abnahmezahl
+
+`tests/pps-duell-bruecke-score-kanal.test.ts` (8/8 grün) zeigt, dass der Score-Kanal bei
+**neutralen** Modifikatoren exakt linear/matrixproportional ist — das ist eine Eigenschaft der
+Formel (gewichtete Summe), kein Messergebnis, und bleibt als Regressions-Wächter stehen: er wird
+rot, wenn jemand `calculateRawDisciplineScore`/`resolveDisciplineWeightProfile`/
+`scoreLegacyLineupDisciplineSide` so ändert, dass die lineare Durchreichung selbst kaputtgeht. Die
+eigentliche Abnahmezahl ist aber Teil B oben (echte Bedingungen) — der Formel-Wächter allein hätte
+den Football-Befund NICHT gefunden, weil er genau die Kanäle (Slot/Form/Mutator) ausschaltet, in
+denen der Befund sitzt.
+
+### 8.6 Einordnung und Zweiter Guard-Test
+
+**rho: bestanden** für alle sieben messbaren Disziplinen (0,829–0,900, beide Ströme), Mini-DM
+methodisch nicht zu dieser Messung gehörig (s. 8.4). **Pp: bestanden für sechs von acht**
+(I-Spy, Battlefield, TDM, Basketball, Hockey, Fechten), **nicht bestanden für Football** (neuer,
+eigenständiger Befund — nicht an die Brücke selbst, sondern an den von ihr konsumierten Kanal
+unter echten Bedingungen), **methodisch nicht anwendbar für Mini-DM**.
+
+Weil rho klar und über alle messbaren Disziplinen stabil besteht, lohnt sich ein Regressions-Wächter
+auf genau diese Zahl — `tests/pps-duell-bruecke-player-rho-guard.test.ts` (neu) prüft die
+gespeicherte `data/generated/pps-duell-bruecke-abnahme.json` gegen die CLAUDE.md-Schranke (rho >
+0,80, Median, beide Ströme) für jede Disziplin, für die Teil A überhaupt eine Zahl liefert, und
+führt Mini-DM explizit als „strukturell nicht gemessen" statt es zu ignorieren. Für Pp wird
+**kein** blind bestehender Wächter gebaut (das würde den Football-Befund verschweigen oder einen
+willkürlichen Freifahrtschein für IHN brauchen) — der Test hält den Football-Befund stattdessen als
+expliziten, benannten, dokumentierten Fall fest (mit Verweis auf diesen Abschnitt), prüft die
+übrigen sechs normal gegen ≤25 und schlägt Alarm, wenn die Ausnahmeliste unbemerkt wächst. Das ist
+dieselbe Grundidee wie `ARENA_ABNAHME_AUSNAHMEN` (lib/battle/arena-resolved-disciplines.ts), aber
+als eigene, von der Disziplin-Abnahmetabelle getrennte Datenstruktur — die Brücke ist kein
+Kippschalter mit Alternative, deshalb gehört ihr Wächter nicht in `tests/
+disziplin-abnahme-guard.test.ts` (ausführlich begründet in `tests/
+pps-duell-bruecke-score-kanal.test.ts`, oben).
+
+**Für das Hauptprojekt, nicht Teil dieses Auftrags:** der Football-Befund (Pp 64,4/55,8 unter
+echten Bedingungen, obwohl der reine Score-Kanal linear ist) sollte unabhängig von der Brücke
+untersucht werden, weil derselbe legacy-PPS-Kanal (inklusive seiner Slot-/Form-/Mutator-Schicht)
+auch für jede ARENA-angeschlossene Disziplin greift, sobald ihr Arena-Lauf ausfällt oder ihre
+Abnahme nicht besteht (s. Fall 2 und 3 der Tabelle in Abschnitt 1) — Football ist aktuell nur die
+Disziplin, bei der es sich am stärksten zeigt, nicht notwendigerweise die einzige.
+
+**Messbefehl:**
+```sh
+OLY_APP_SQLITE_PATH=<abbild> npx tsx scripts/miss-pps-duell-bruecke-abnahme.ts \
+  [--disziplinen=a,b,...] [--spieltage=6] [--pp-trials-je-seite=8]
+```
