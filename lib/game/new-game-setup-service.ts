@@ -306,15 +306,48 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   );
   const validTeamIds = new Set(baseGameState.teams.map((team) => team.teamId));
   const preset = getPreset(input.presetId);
-  const chrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);
-  const frankyTeamIds = uniqueTeamIds(input.frankyTeamIds ?? preset.frankyTeamIds, validTeamIds).filter(
-    (teamId) => !chrisTeamIds.includes(teamId),
+  const rawChrisTeamIds = uniqueTeamIds(input.chrisTeamIds ?? preset.chrisTeamIds, validTeamIds);
+  const rawFrankyTeamIds = uniqueTeamIds(input.frankyTeamIds ?? preset.frankyTeamIds, validTeamIds).filter(
+    (teamId) => !rawChrisTeamIds.includes(teamId),
   );
+
+  /**
+   * TASK #155 — LIGA 2 IST IM BATTLE MODE KOMPLETT KI-GESTEUERT (WIZARD-FILTER).
+   *
+   * Die Liga-Zuordnung (`buildInitialLeagueAssignment`, s.o.) wird hier VORGEZOGEN, bevor
+   * `chrisTeamIds`/`frankyTeamIds` feststehen — nicht erst danach bei `leagueByTeamId` weiter
+   * unten. Grund: ein Liga-2-Team darf ein Battle-Mode-Save beim ANLEGEN gar nicht erst als
+   * Chris-/Franky-Team erreichen. Die UI (`FoundationTeamSettingsNewLook.tsx`, Klub-Raster) blendet
+   * Liga-2-Klubs im Battle-Mode-Schritt bereits aus der Auswahl aus — das hier ist die zweite
+   * Verteidigungslinie für jeden direkten `/api/new-game`-Aufruf ohne UI (Skript, altes
+   * gespeichertes Preset, Test). Manager Mode kennt keine Liga 2, also bleibt dort jedes Team
+   * wählbar wie bisher.
+   *
+   * GILT AUSSCHLIESSLICH FÜR DIESE ERSTANLAGE, NICHT ALS DAUERHAFTE SPERRE (Chris' Klarstellung
+   * zu Task #155, wörtlich: „du musst liga 2 nicht standardmäßig IMMER simulieren, es ist ja
+   * möglich dass jemand ein team aus liga 2 übernimmt und spielen kann dann läuft es ganz normal").
+   * Dieser Filter sitzt NUR in `buildNewGameStateFromBaseline` (Neuanlage). Die spätere
+   * Teamübernahme eines bereits laufenden Saves läuft über `applyGameModeOwnership`
+   * (`lib/foundation/team-control-settings.ts`, erreicht über `/api/team-settings/ownership` —
+   * "auch im laufenden Raum") und kennt `leagueByTeamId` überhaupt nicht: ein Liga-2-Team lässt
+   * sich dort jederzeit wie jedes andere Team auf Chris/Franky umstellen und läuft danach normal
+   * ohne jede Liga-Sonderbehandlung (Nachweis: `tests/game-mode-ownership.test.ts`, "laesst ein
+   * Liga-2-Team nach Saisonstart (Battle Mode) ganz normal uebernehmen").
+   */
+  const leagueAssignmentForNewGame = isBattleMode ? buildInitialLeagueAssignment(baseGameState.teams) : null;
+  const isLiga2TeamId = (teamId: string) => leagueAssignmentForNewGame?.[teamId] === "liga2";
+  const chrisTeamIds = rawChrisTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
+  const frankyTeamIds = rawFrankyTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
+  const droppedLiga2HumanTeamIds = [...rawChrisTeamIds, ...rawFrankyTeamIds].filter(isLiga2TeamId);
+
   const humanTeamIds = new Set([...chrisTeamIds, ...frankyTeamIds]);
   const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
   const warnings: string[] = [];
   const blockers: string[] = [];
 
+  if (droppedLiga2HumanTeamIds.length > 0) {
+    warnings.push(...droppedLiga2HumanTeamIds.map((teamId) => `battle_mode_liga2_team_not_selectable:${teamId}`));
+  }
   if (chrisTeamIds.length === 0) {
     blockers.push("new_game_requires_at_least_one_chris_team");
   }
@@ -370,8 +403,12 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
    * Der liga-lokale Rang 1..LEAGUE_SIZE folgt REIN ARITHMETISCH aus dem globalen Budget-Startrang
    * oben (`startRankByTeamId`, dieselbe Sortierung wie `buildInitialLeagueAssignment`) — kein
    * zweites Mal sortieren, keine zweite Rangquelle.
+   *
+   * Dieselbe Zuordnung wie `leagueAssignmentForNewGame` oben (Task #155, Liga-2-Filter) — hier
+   * wiederverwendet statt ein zweites Mal berechnet, damit „wer ist Liga 2" garantiert an EINER
+   * Stelle entschieden wird.
    */
-  const leagueByTeamId = isBattleMode ? buildInitialLeagueAssignment(baseGameState.teams) : {};
+  const leagueByTeamId = leagueAssignmentForNewGame ?? {};
   const leagueTeamIds: Record<LeagueTier, string[]> = { liga1: [], liga2: [] };
   if (isBattleMode) {
     for (const team of baseGameState.teams) {

@@ -14,6 +14,8 @@ type SeasonStandingsFeedItem = {
   teamId: string;
   rank: number | null;
   points: number | null;
+  /** Task #159: Punkteverhältnis — `null` außerhalb von Battle-Saves, s. `foundation-page-types.ts`. */
+  verhaeltnis: number | null;
   cash: number | null;
   cashFc: number | null;
   startplatz: number | null;
@@ -100,6 +102,7 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
         {
           rank: item.rank,
           points: item.points,
+          verhaeltnis: item.verhaeltnis,
           cash: item.cash,
           cashFc: item.cashFc,
           startplatz: item.startplatz,

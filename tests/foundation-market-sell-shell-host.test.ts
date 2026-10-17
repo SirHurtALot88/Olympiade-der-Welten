@@ -395,10 +395,19 @@ describe("describeSellPreviewIssue — Einordnung der Preview-Fehler", () => {
     }
   });
 
-  it("nennt beim laufenden Spielbetrieb das Saisonende als Öffnungszeitpunkt", () => {
+  it("nennt beim laufenden Spielbetrieb das Saisonende als Öffnungszeitpunkt (Manager Mode, ohne Argument)", () => {
     const issue = describeSellPreviewIssue("phase_blocked:sell_players:season_active");
     expect(issue.message).toContain("Saisonende");
     expect(issue.message).toContain("Spieltag 10");
+  });
+
+  // W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.5/5): im Battle Mode
+  // mit 20 Spieltagen muss der Hinweis "Spieltag 20" nennen, nicht hart "10".
+  it("nennt beim laufenden Spielbetrieb die echte Saisonlaenge (Battle Mode, 20 Spieltage)", () => {
+    const issue = describeSellPreviewIssue("phase_blocked:sell_players:season_active", 20);
+    expect(issue.message).toContain("Saisonende");
+    expect(issue.message).toContain("Spieltag 20");
+    expect(issue.message).not.toContain("Spieltag 10");
   });
 
   it("lässt ausformulierte Fehlermeldungen unverändert und liefert einen nächsten Schritt", () => {

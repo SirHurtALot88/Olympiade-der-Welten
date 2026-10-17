@@ -297,9 +297,16 @@ export type SellPreviewIssue = {
   hint: string | null;
 };
 
-const SELL_WINDOW_CLOSED_BY_PHASE: Record<string, { message: string; hint: string }> = {
+/**
+ * W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.5/5): der Hinweis zum
+ * laufenden Spielbetrieb nannte hart "Spieltag 10" -- in einer Battle-Mode-Saison mit 20
+ * Spieltagen (`isDoubledBattleSeason`) ist das falsch. `totalMatchdays` default 10 haelt JEDEN
+ * bestehenden Aufruf ohne das Argument (Manager Mode, jeder Alt-Save) bit-identisch.
+ */
+function buildSellWindowClosedByPhase(totalMatchdays: number): Record<string, { message: string; hint: string }> {
+  return {
   season_active: {
-    message: "Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach Spieltag 10.",
+    message: `Die Saison läuft noch — verkauft wird im Verkaufsfenster am Saisonende, nach Spieltag ${totalMatchdays}.`,
     hint: "Bis dahin kannst du hier alles prüfen: Marktwert und Verkaufspreis siehst du im Kader und auf dem Transfermarkt.",
   },
   season_completed: {
@@ -330,12 +337,18 @@ const SELL_WINDOW_CLOSED_BY_PHASE: Record<string, { message: string; hint: strin
     message: "Die neue Saison steht bereit — das Verkaufsfenster öffnet wieder am Saisonende.",
     hint: "Starte die Saison, verkauft wird an ihrem Ende.",
   },
-};
+  };
+}
 
-export function describeSellPreviewIssue(error: string): SellPreviewIssue {
+/**
+ * `totalMatchdays` (Standard 10, Manager Mode/Alt-Save): die tatsaechliche Saisonlaenge fuer den
+ * "nach Spieltag N"-Hinweis -- Battle-Mode-Saves mit 20 Spieltagen (Fatigue-Plan, W2/W4) geben
+ * hier `gameState.season.matchdayIds.length` durch. Ohne das Argument bit-identisch zu vorher.
+ */
+export function describeSellPreviewIssue(error: string, totalMatchdays = 10): SellPreviewIssue {
   if (error.startsWith("phase_blocked:sell_players:")) {
     const phase = error.slice("phase_blocked:sell_players:".length);
-    const copy = SELL_WINDOW_CLOSED_BY_PHASE[phase] ?? {
+    const copy = buildSellWindowClosedByPhase(totalMatchdays)[phase] ?? {
       message: "Das Verkaufsfenster ist gerade geschlossen — verkauft wird am Saisonende.",
       hint: "Du kannst die Vorschau später im Verkaufsfenster erneut öffnen.",
     };

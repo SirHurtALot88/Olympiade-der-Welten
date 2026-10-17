@@ -78,6 +78,16 @@ export function formatGameFlowBlocker(reason: string) {
     return "Mindestens ein Team hat noch keinen berechenbaren Cash-nachher-Wert.";
   }
 
+  // TASK #155 — ohne Label fiele das auf `reason.replaceAll("_", " ")` zurück
+  // ("battle mode liga2 team not selectable:R-R"), lesbar genug um den Code zu erkennen, aber
+  // nicht, um zu verstehen, was zu tun ist. Gilt NUR für den New-Game-Wizard: ein Liga-2-Team
+  // startet bei der Neuanlage unter KI-Kontrolle, bleibt aber nach Saisonstart ganz normal
+  // übernehmbar (s. Kommentar in `lib/game/new-game-setup-service.ts`).
+  if (reason.startsWith("battle_mode_liga2_team_not_selectable:")) {
+    const teamId = reason.slice("battle_mode_liga2_team_not_selectable:".length);
+    return `Team ${teamId} liegt in Liga 2 und startet deshalb unter KI-Kontrolle — Liga 2 ist bei der Neuanlage nicht als eigenes Team wählbar.`;
+  }
+
   // Kaufen und Verkaufen liegen in VERSCHIEDENEN Fenstern (`transfer-window-policy.ts`): am
   // Saisonende wird verkauft und verlaengert, gekauft wird in der neuen Saison vor dem ersten
   // Spieltag. Beide Meldungen sagten vorher pauschal „im Transferfenster" — das half genau dann

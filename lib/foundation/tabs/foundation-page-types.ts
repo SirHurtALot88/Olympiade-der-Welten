@@ -2561,6 +2561,13 @@ export type FoundationSeasonStandingsOverviewItem = {
   teamCode: string | null;
   rank: number | null;
   points: number | null;
+  /**
+   * PUNKTEVERHAELTNIS (Task #159, docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md):
+   * Saisonsumme der ±D-Werte aller gebuchten Battle-Duelle, Tiebreaker nach `points`. Nur in
+   * Battle-Saves gesetzt (`StandingRecord.verhaeltnis`, seit PR #1266) — in jedem Manager-Save
+   * und in jedem Archiv-Snapshot (der die Zahl nicht kennt) bleibt dieses Feld `null`.
+   */
+  verhaeltnis: number | null;
   cash: number | null;
   cashFc: number | null;
   startplatz: number | null;

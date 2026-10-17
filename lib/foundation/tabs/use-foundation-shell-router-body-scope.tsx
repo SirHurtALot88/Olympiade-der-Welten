@@ -1,5 +1,6 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
+import { buildInitialLeagueAssignment } from "@/lib/season/league-split";
 import {
   springeZuElement,
   springeZuPosition,
@@ -263,6 +264,7 @@ import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { buildSeasonDisciplinePlayerCountMap, getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { getLeagueOf } from "@/lib/season/league-split";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
 import {
   CANONICAL_PROGRESS_TRAITS,
@@ -6365,9 +6367,28 @@ export function useFoundationShellRouterBodyScope({
    * neue Save mit Liga-Split (`leagueByTeamId`) angelegt wird, also beschreibt eine vor dem
    * Wechsel geprüfte Vorschau danach ein anderes Spiel. Der `confirmToken` aus dieser Vorschau
    * darf nicht in ein Anlegen mit dem neuen Modus durchrutschen.
+   *
+   * TASK #155 — beim Wechsel AUF Battle Mode werden bereits gewählte Liga-2-Teams aus Chris'/
+   * Frankys Auswahl geworfen: Liga 2 startet im Battle Mode unter KI-Kontrolle, ist im Anlege-
+   * Assistenten nicht wählbar. Die Klub-Raster blenden Liga-2-Klubs im Battle-Mode-Schritt zwar
+   * schon aus, aber eine Auswahl, die noch aus dem Manager-Mode-Schritt (oder einem Preset)
+   * stammt, muss hier bereinigt werden — sonst bliebe ein unsichtbar gewordenes Liga-2-Team in der
+   * Auswahl stehen.
+   *
+   * GILT NUR FÜR DIESEN ASSISTENTEN. Ein bereits laufender Battle-Mode-Save lässt ein Liga-2-Team
+   * weiterhin ganz normal auf Chris/Franky umstellen — das läuft über `toggleGameModeOwnershipTeam`
+   * / `applyGameModeOwnership` (`lib/foundation/team-control-settings.ts`) und kennt keine
+   * Liga-Sperre (Chris' Klarstellung zu Task #155: „es ist ja möglich dass jemand ein team aus
+   * liga 2 übernimmt … dann läuft es ganz normal").
    */
   function selectNewGameMode(mode: GameMode) {
     setNewGameMode(mode);
+    if (mode === "battle") {
+      const leagueAssignment = buildInitialLeagueAssignment(gameState.teams);
+      const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
+      setNewGameChrisTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+      setNewGameFrankyTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+    }
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6382,6 +6403,17 @@ export function useFoundationShellRouterBodyScope({
   }
 
   function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
+    // TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert, nicht wählbar. Die Klub-Raster
+    // rendern Liga-2-Karten im Battle-Mode-Schritt schon gar nicht als anklickbar; diese Sperre
+    // ist die zweite Verteidigungslinie, falls dieser Handler je anders aufgerufen wird. Ein
+    // Abwählen (Team ist bereits in der Liste) bleibt immer erlaubt.
+    if (newGameMode === "battle") {
+      const alreadySelected =
+        owner === "chris" ? newGameChrisTeamIds.includes(teamId) : newGameFrankyTeamIds.includes(teamId);
+      if (!alreadySelected && buildInitialLeagueAssignment(gameState.teams)[teamId] === "liga2") {
+        return;
+      }
+    }
     const limits = getGameModeOwnershipLimits(newGamePresetId);
     setNewGamePreview(null);
     setNewGameError(null);
@@ -11096,6 +11128,9 @@ export function useFoundationShellRouterBodyScope({
           rank: row.rank ?? null,
           rankDiff: row.rankDiff ?? null,
           points: row.points ?? null,
+          // Task #159: Punkteverhältnis-Spalte — `null` außerhalb von Battle-Saves (dann ist die
+          // Spalte in der Daten-Tabelle gar nicht erst zu sehen, s. SeasonStandingsNewLook.tsx).
+          verhaeltnis: row.verhaeltnis ?? null,
           pps: row.ppsTotal ?? null,
           pow: row.ppsPow ?? null,
           spe: row.ppsSpe ?? null,
@@ -11183,6 +11218,9 @@ export function useFoundationShellRouterBodyScope({
           // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
           // kein Live-Delta (sonst irreführend) → null.
           fieldRaceRankDelta: isViewingArchivedSeason ? null : resolveMatchdayRankDelta(row.teamId),
+          // Task #159: `null` im Legacy-32er-Modus (jeder heutige/laufende Save vor dem
+          // Liga-Split) — die Tabelle rendert dann unveraendert eine einzige 32-Zeilen-Liste.
+          leagueTier: getLeagueOf(gameState, row.teamId),
         };
       }),
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
