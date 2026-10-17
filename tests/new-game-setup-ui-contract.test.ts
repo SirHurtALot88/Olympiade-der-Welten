@@ -182,6 +182,12 @@ describe("new game setup UI contract", () => {
     expect(scopeSource).toContain("buildInitialLeagueAssignment");
     expect(scopeSource).toMatch(/function selectNewGameMode[\s\S]*?isLiga2TeamId[\s\S]*?setNewGameChrisTeamIds/);
     expect(scopeSource).toMatch(/function toggleNewGameTeam[\s\S]*?newGameMode === "battle"[\s\S]*?liga2/);
+    // Opus-Review zu PR #1272: die Warnung (z.B. wenn Frankys Preset komplett in Liga 2 fällt)
+    // muss lesbar in der Vorschau ankommen, nicht als Rohcode — die Preview-Warnungsliste läuft
+    // deshalb durch `formatCockpitReason`, nicht durch ein blosses `.join(" · ")` der Rohcodes.
+    expect(newLookSource).toMatch(
+      /newGamePreview\.warnings\.map\(\(reason: string\) => formatCockpitReason\(reason\)\)\.join\(" · "\)/,
+    );
   });
 
   it("lets the season briefing complete and continue the setup flow", () => {

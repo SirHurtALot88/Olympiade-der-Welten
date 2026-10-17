@@ -8,6 +8,7 @@ import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mod
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { isLeagueSplitActive } from "@/lib/season/league-split";
 import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
+import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -311,5 +312,51 @@ describe("new-game-setup-service", () => {
     expect(preview.chrisTeamIds).toEqual(["R-R"]);
     expect(preview.blockers).toEqual([]);
     expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  /**
+   * TASK #155 — OPUS-REVIEW ZU PR #1272, FRANKY-EDGE-CASE: fallen BEIDE Preset-Teams von Franky
+   * in Liga 2, wird `frankyTeamIds` komplett leer, aber nur der Chris-Null-Teams-Fall hat einen
+   * Blocker — Franky stünde (im seltenen Fall, dass sein Preset komplett Liga-2-Teams trifft) ohne
+   * eigenes Team da, nur durch die Warnung sichtbar. Opus: kein Blocker nötig (Presets
+   * normalisieren sich im Wizard ohnehin auf "custom"), aber die Warnung muss tatsächlich
+   * ankommen — und zwar lesbar, nicht als Rohcode (dafür `formatGameFlowBlocker`,
+   * s. `tests/game-flow-blocker-incomplete-result-label.test.ts`).
+   *
+   * Die betroffenen Liga-2-Team-IDs werden hier bewusst aus der echten Zuordnung gelesen statt
+   * hart codiert — welche Team-IDs Liga 2 sind, hängt an den Startbudgets, nicht an festen Codes.
+   */
+  it("Franky-Edge-Case: fallen beide Franky-Teams in Liga 2, bleibt es ein Hinweis (kein Blocker), aber sichtbar und lesbar", () => {
+    const probe = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+    const liga2TeamIds = Object.entries(probe.gameState.seasonState.leagueByTeamId ?? {})
+      .filter(([, tier]) => tier === "liga2")
+      .map(([teamId]) => teamId);
+    expect(liga2TeamIds.length).toBeGreaterThanOrEqual(2);
+    const frankyLiga2Pick = liga2TeamIds.slice(0, 2);
+
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: frankyLiga2Pick,
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.frankyTeamIds).toEqual([]);
+    // Kein Blocker -- Chris hat sein Team, das reicht laut heutiger Regel zum Starten.
+    expect(preview.blockers).toEqual([]);
+    for (const teamId of frankyLiga2Pick) {
+      expect(preview.warnings).toContain(`battle_mode_liga2_team_not_selectable:${teamId}`);
+      // Und lesbar, nicht nur als Code -- das ist die eigentliche Opus-Anforderung: die Warnung
+      // darf nicht lautlos im internen Array verschwinden.
+      const label = formatGameFlowBlocker(`battle_mode_liga2_team_not_selectable:${teamId}`);
+      expect(label).toContain(teamId);
+      expect(label).toMatch(/liga 2/i);
+    }
   }, 120_000);
 });

@@ -1000,7 +1000,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               </table>
             </div>
             {newGamePreview.warnings.length > 0 ? (
-              <p className="nl-teamsettings-note">Hinweise: {newGamePreview.warnings.join(" · ")}</p>
+              // Lesbar statt Rohcode (TASK #155): u.a. "battle_mode_liga2_team_not_selectable:R-R"
+              // wurde sonst nur zu "battle mode liga2 team not selectable:R-R" -- erkennbar, aber
+              // nicht erklärend. `formatCockpitReason` kennt den Code (s.
+              // `lib/foundation/game-flow-blocker-labels.ts`) und fällt für jeden anderen,
+              // unbekannten Hinweis auf denselben "_"→" "-Rohtext zurück wie vorher.
+              <p className="nl-teamsettings-note">
+                Hinweise: {newGamePreview.warnings.map((reason: string) => formatCockpitReason(reason)).join(" · ")}
+              </p>
             ) : null}
             {newGamePreview.blockers.length > 0 ? (
               <p className="nl-teamsettings-msg is-risk">Blocker: {newGamePreview.blockers.join(" · ")}</p>
