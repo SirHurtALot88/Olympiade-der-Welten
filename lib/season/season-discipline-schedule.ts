@@ -787,29 +787,14 @@ export function buildSeasonDisciplinePlayerCountDisplayMap(
   gameState: GameState,
 ): Map<string, SeasonDisciplinePlayerCountDisplay> {
   const valueByDisciplineId = buildSeasonDisciplinePlayerCountMap(gameState);
-  const occurrencesByDisciplineId = new Map<string, SeasonDisciplinePlayerCountOccurrence[]>();
-  for (const entry of getSeasonDisciplineSchedule(gameState)) {
-    for (const slot of [entry.discipline1, entry.discipline2]) {
-      if (!slot?.disciplineId) {
-        continue;
-      }
-      const occurrences = occurrencesByDisciplineId.get(slot.disciplineId) ?? [];
-      occurrences.push({
-        matchdayId: entry.matchdayId,
-        matchdayIndex: entry.matchdayIndex,
-        playerCount: slot.playerCount ?? null,
-        occurrenceInSeason: slot.occurrenceInSeason ?? null,
-      });
-      occurrencesByDisciplineId.set(slot.disciplineId, occurrences);
-    }
-  }
 
   const result = new Map<string, SeasonDisciplinePlayerCountDisplay>();
   for (const discipline of gameState.disciplines ?? []) {
     const value = valueByDisciplineId.get(discipline.id) ?? null;
-    const occurrences = (occurrencesByDisciplineId.get(discipline.id) ?? []).sort(
-      (left, right) => left.matchdayIndex - right.matchdayIndex,
-    );
+    // EINE Quelle fuer die Vorkommen statt sie hier ein zweites Mal aus dem Spielplan zu
+    // sammeln -- sonst laufen diese Funktion und `getSeasonDisciplinePlayerCounts` bei der
+    // naechsten Spielplan-Aenderung auseinander (Review-Hinweis, 17.10.).
+    const occurrences = getSeasonDisciplinePlayerCounts(gameState, discipline.id);
     const distinctKnownCounts = new Set(
       occurrences
         .map((occurrence) => occurrence.playerCount)
