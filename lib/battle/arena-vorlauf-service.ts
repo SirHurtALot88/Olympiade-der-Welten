@@ -282,6 +282,45 @@ function laufSchluessel(scope: MatchdayResolveScope, signature: string) {
   return `${scope.saveId}|${scope.seasonId}|${scope.matchdayId}|${signature}`;
 }
 
+/**
+ * OPUS-REVIEW B1 (kritisch): GENAU EINE automatische Wiederholung (Plan Abschnitt 3.4) --
+ * `versuch 1` scheitert, `versuch 2` (die automatische Wiederholung) darf noch anlaufen. Scheitert
+ * AUCH die, ist diese Signatur ENDGUELTIG `"failed"`: kein dritter automatischer Versuch mehr, egal
+ * wie oft `kickoffArenaVorlauf()`/`stelleArenaVorlaufSicher()` noch gerufen werden (Buehne pollt,
+ * Lineup-Routen, Auto-Run). OHNE diese Schranke startete jeder Aufruf bei kaputtem/fehlendem
+ * Chromium einen neuen Versuch -- CPU-Sturm, UND der Auto-Run sah nie etwas anderes als
+ * "in_progress"/"arena_vorlauf_laeuft" und buchte NIE, selbst die PPS-Duell-Bruecke nicht. Das war
+ * schlimmer als die K1-Luecke selbst (die legte nur die Arena lahm, nicht den ganzen Spieltag).
+ */
+const MAX_AUTOMATISCHE_VERSUCHE = 2;
+
+/**
+ * Entscheidet, ob ein NEUER Versuch anlaufen darf. `vorhandenerRecord` ist `null` bei der allerersten
+ * Anfrage zu dieser Signatur (immer ja). Bei `"in_progress"` nie (ein Lauf laeuft schon -- der
+ * Aufrufer haengt sich stattdessen an `laufendeVorlaeufe`/liest den Record). Bei `"ready"` nie
+ * (fertig, nichts zu tun). Bei `"failed"` nur, wenn `versuch < MAX_AUTOMATISCHE_VERSUCHE` ODER der
+ * Aufrufer explizit `erzwingeNeuenVersuch` setzt (der geplante "Arena erneut versuchen"-Knopf, Plan
+ * Abschnitt 3.4).
+ */
+function duerfeNeuenVersuchStarten(
+  vorhandenerRecord: ArenaVorlaufRecord | null,
+  signature: string,
+  erzwingeNeuenVersuch: boolean,
+): boolean {
+  if (!vorhandenerRecord || vorhandenerRecord.signature !== signature) return true;
+  // "in_progress" nie uebersteuerbar -- ein zweiter Lauf zur selben Signatur waere eine Rennbedingung.
+  if (vorhandenerRecord.status === "in_progress") return false;
+  // OPUS-REVIEW B3: `erzwingeNeuenVersuch` uebersteuert auch ein "ready" -- der Aufrufer
+  // (`resolveMatchdayPreviewToBook()`s arenaEingabeDivergenz-Signal) hat festgestellt, dass der
+  // ALS "ready" gespeicherte Vorlauf trotzdem nicht mehr zu den echten Arena-Eingaben passt (ein
+  // feinerer Fingerabdruck als die Signatur selbst, s. `arena-eingabe-hash.ts`) -- ein "ready" ist
+  // in diesem Fall KEIN Grund mehr, nichts zu tun.
+  if (erzwingeNeuenVersuch) return true;
+  if (vorhandenerRecord.status === "ready") return false;
+  // status === "failed"
+  return vorhandenerRecord.versuch < MAX_AUTOMATISCHE_VERSUCHE;
+}
+
 const laufendeVorlaeufe = new Map<string, Promise<ArenaVorlaufRecord | null>>();
 
 function starteOderTeileVorlauf(input: {
@@ -341,6 +380,12 @@ export type ArenaVorlaufOptions = {
    * (32 Teams, eine nach der anderen) verfrueht einen Arena-Lauf anstossen.
    */
   allowIncompleteField?: boolean;
+  /**
+   * OPUS-REVIEW B1: der geplante "Arena erneut versuchen"-Knopf (Plan 3.4) -- umgeht die
+   * `MAX_AUTOMATISCHE_VERSUCHE`-Schranke fuer EINEN weiteren, von einem Menschen angestossenen
+   * Versuch zu DERSELBEN Signatur. Kein automatischer Ausloeser setzt das.
+   */
+  erzwingeNeuenVersuch?: boolean;
 };
 
 /**
@@ -374,9 +419,24 @@ export function kickoffArenaVorlauf(
 
   const vorhandenerRecord = readArenaVorlaufRecord(anwendbarkeit.gameState, scope);
   const signature = buildMatchdayResolveSignature(anwendbarkeit.gameState, scope);
-  if (vorhandenerRecord && vorhandenerRecord.signature === signature && vorhandenerRecord.status !== "failed") {
-    // "ready" ODER noch echt "in_progress" (nicht der 5-Minuten-Verfall) -- nichts Neues anstossen.
-    return { applicable: true, status: vorhandenerRecord.status, record: vorhandenerRecord };
+
+  // REVIEW-FUND (Opus/CI #1273): der In-Prozess-Lauf (`laufendeVorlaeufe`) MUSS VOR dem
+  // persistierten Record geprueft werden, nicht danach. Vorher las diese Funktion nur den
+  // Record -- stand der schon auf "in_progress" (von genau diesem oder einem parallelen Aufruf
+  // geschrieben), kam sie nie bis zum Map-Check. Fuer `kickoffArenaVorlauf()` selbst aendert das
+  // am Ergebnis nichts (es wird ohnehin nie abgewartet) -- fuer die Konsistenz mit
+  // `stelleArenaVorlaufSicher()` (die DASSELBE `laufendeVorlaeufe` nutzt) ist die Reihenfolge
+  // trotzdem die maßgebliche Wahrheit: "laeuft gerade etwas HIER im Prozess" schlaegt eine
+  // moeglicherweise schon ueberholte DB-Lesung.
+  const schluessel = laufSchluessel(scope, signature);
+  if (laufendeVorlaeufe.has(schluessel)) {
+    return { applicable: true, status: "in_progress", record: vorhandenerRecord };
+  }
+
+  if (!duerfeNeuenVersuchStarten(vorhandenerRecord, signature, options.erzwingeNeuenVersuch ?? false)) {
+    // "ready", noch echt "in_progress" (nicht der 5-Minuten-Verfall) ODER "failed" mit bereits
+    // ausgeschoepfter automatischer Wiederholung (Opus-Review B1) -- nichts Neues anstossen.
+    return { applicable: true, status: vorhandenerRecord!.status, record: vorhandenerRecord };
   }
 
   void starteOderTeileVorlauf({
@@ -417,24 +477,45 @@ export async function stelleArenaVorlaufSicher(
 
   const vorhandenerRecord = readArenaVorlaufRecord(anwendbarkeit.gameState, scope);
   const signature = buildMatchdayResolveSignature(anwendbarkeit.gameState, scope);
-  if (vorhandenerRecord && vorhandenerRecord.signature === signature && vorhandenerRecord.status !== "in_progress") {
-    return { applicable: true, status: vorhandenerRecord.status, record: vorhandenerRecord };
-  }
 
+  // REVIEW-FUND (Opus/CI #1273, "Koop/Doppellauf"-Test lieferte unterschiedliche Status fuer
+  // zwei fast gleichzeitige Aufrufe): der In-Prozess-Lauf MUSS VOR dem persistierten Record
+  // geprueft werden. Vorher konnte ein zweiter, nahezu gleichzeitiger Aufruf den von EINEM
+  // ersten Aufruf gerade geschriebenen "in_progress"-Record lesen und SOFORT damit zurueckkehren
+  // (`duerfeNeuenVersuchStarten` verweigert bei "in_progress" jeden neuen Versuch) -- OHNE je bei
+  // `laufendeVorlaeufe` nachzusehen, ob genau dieser Lauf schon faehrt und abwartbar ist. Ergebnis:
+  // zwei Aufrufer derselben Signatur bekamen verschiedene Antworten (einer wartete echt auf
+  // "ready"/"failed", der andere kehrte mit einem veralteten "in_progress" sofort zurueck) --
+  // genau das widerspricht dem Zweck von `stelleArenaVorlaufSicher()` ("wartet auf das Ergebnis").
   const schluessel = laufSchluessel(scope, signature);
   const bestehenderLauf = laufendeVorlaeufe.get(schluessel);
-  const record = bestehenderLauf
-    ? await bestehenderLauf
-    : await starteOderTeileVorlauf({
-        persistence,
-        scope,
-        signature,
-        arenaDisciplineIds: anwendbarkeit.arenaDisciplineIds,
-        mutatorTraitsByDisciplineId: anwendbarkeit.mutatorTraitsByDisciplineId,
-        versuch: (vorhandenerRecord?.signature === signature ? vorhandenerRecord.versuch : 0) + 1,
-        runArenaFixturesImpl: options.runArenaFixturesImpl,
-        runArenaFixturesOptions: options.runArenaFixturesOptions,
-      });
+  if (bestehenderLauf) {
+    const record = await bestehenderLauf;
+    return { applicable: true, status: record?.status ?? null, record };
+  }
+
+  // VORHER (Opus-Review B1): dieser Zweig griff bei JEDEM "failed" sofort und gab den alten
+  // Record OHNE jemals automatisch neu zu versuchen zurueck -- der Inline-Pfad (Skripte,
+  // `arenaModus: "inline"`) retryte also NIE, selbst beim ersten Ausfall nicht. Jetzt dieselbe
+  // Entscheidung wie im Hintergrund-Pfad: "ready"/"in_progress" nie neu, "failed" nur innerhalb des
+  // Wiederholungs-Budgets (bzw. mit `erzwingeNeuenVersuch`). Greift erst HIER, NACH dem
+  // `laufendeVorlaeufe`-Check oben (s. Review-Fund) -- ein echt "in_progress" aus einer ANDEREN
+  // Prozess-Instanz (Container-Neustart, s. `readArenaVorlaufRecord()`s 5-Minuten-Verfall) landet
+  // trotzdem hier, weil es dafuer keinen lokalen `laufendeVorlaeufe`-Eintrag gibt.
+  if (!duerfeNeuenVersuchStarten(vorhandenerRecord, signature, options.erzwingeNeuenVersuch ?? false)) {
+    return { applicable: true, status: vorhandenerRecord!.status, record: vorhandenerRecord };
+  }
+
+  const record = await starteOderTeileVorlauf({
+    persistence,
+    scope,
+    signature,
+    arenaDisciplineIds: anwendbarkeit.arenaDisciplineIds,
+    mutatorTraitsByDisciplineId: anwendbarkeit.mutatorTraitsByDisciplineId,
+    versuch: (vorhandenerRecord?.signature === signature ? vorhandenerRecord.versuch : 0) + 1,
+    runArenaFixturesImpl: options.runArenaFixturesImpl,
+    runArenaFixturesOptions: options.runArenaFixturesOptions,
+  });
   return { applicable: true, status: record?.status ?? null, record };
 }
 

@@ -80,6 +80,24 @@ const STANDARD_SEITEN_TIMEOUT_MS = (() => {
 })();
 
 /**
+ * OPUS-REVIEW B2 (kritisch): GESAMT-TIMEOUT fuer den ganzen Lauf, nicht nur fuer das Warten auf
+ * `window.__arena` (`STANDARD_SEITEN_TIMEOUT_MS` deckt wie oben dokumentiert NUR das Laden/
+ * Neueinhaengen des Motors ab, NICHT das synchrone `spieleFeldspiel()`/... selbst, das danach ohne
+ * jedes eigene Timeout rechnet). Haengt eine Simulation (Motor-Bug, Endlosschleife im Rezept),
+ * blieb das zugehoerige Promise in `runArenaFixtures()` fuer immer offen -- und mit ihm der globale
+ * Chromium-Semaphor (`arena-vorlauf-service.ts`), der JEDEN weiteren Vorlauf ALLER Saves blockiert,
+ * nicht nur den haengenden. Das Gesamt-Budget ist deshalb grosszuegig (Plan 3.1 nennt es explizit
+ * "Gesamt-Timeout"), per ENV konfigurierbar, bis die echte CX23-Messung (Plan 6.3) eine engere Zahl
+ * liefert -- 180s deckt selbst eine Liga mit 16 Fixtures bei einem Vielfachen der lokal gemessenen
+ * 10-18s je Disziplin (beide Ligen) komfortabel ab.
+ */
+const STANDARD_GESAMT_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_GESAMT_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 180_000;
+})();
+
+/**
  * FUND (nachgemessen, nicht vermutet): `spieleFeldspiel(fd, saat)` reicht `saat` unveraendert an
  * den internen PRNG durch (`seed=(seed*1664525+1013904223)>>>0`, battle-mode.engine.js Z. 7646).
  * Das ist eine Linear-Congruential-Formel, die einen NUMERISCHEN Startwert braucht. Ein
@@ -357,6 +375,13 @@ export type RunArenaFixturesOptions = {
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
   seitenTimeoutMs?: number;
   /**
+   * OPUS-REVIEW B2: GESAMT-Budget fuer den kompletten Lauf (Laden + ALLE Fixtures synchron
+   * gerechnet) -- anders als `seitenTimeoutMs` deckt das auch eine haengende Simulation ab, nicht
+   * nur das Laden. Ueberschreitung schliesst den Browser hart und wirft, der Aufrufer
+   * (`battle-mode-arena-team-points.ts`) fuer Warnungen/`arena-vorlauf-service.ts` fuer `ArenaAusfall`.
+   */
+  gesamtTimeoutMs?: number;
+  /**
    * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
    * dieser Disziplin-Seite (`rollMatchdayMutatorTraitsForSide()`, zwei Traits aus dem 36er-Pool,
    * fuer alle Teams gleich). Er faehrt als `window.__olyArenaKader.mutatoren` in die Engine, die
@@ -627,10 +652,38 @@ export async function runArenaFixtures(
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
   }
   const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const gesamtTimeoutMs = options.gesamtTimeoutMs ?? STANDARD_GESAMT_TIMEOUT_MS;
   const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
 
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
-  try {
+  // OPUS-REVIEW B2: `schliesseEinmal()` ist von AUSSEN (dem Timeout-Wettlauf unten) UND von INNEN
+  // (dem `finally` des eigentlichen Laufs) erreichbar -- der Schutz verhindert einen doppelten
+  // `browser.close()`-Aufruf, wenn beide fast gleichzeitig greifen.
+  let browserGeschlossen = false;
+  const schliesseEinmal = async () => {
+    if (browserGeschlossen) return;
+    browserGeschlossen = true;
+    await schliesseBrowserHart(browser).catch(() => {
+      // Ein Fehler beim (zweiten) Schliessen ist hier kein neuer Befund -- der Browser ist in
+      // jedem Fall nicht mehr erreichbar, genau das war das Ziel.
+    });
+  };
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const gesamtTimeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      void schliesseEinmal().then(() => {
+        reject(
+          new Error(
+            `arena-headless-runner: Gesamt-Timeout (${gesamtTimeoutMs}ms) ueberschritten fuer "${disziplin}" -- Browser hart geschlossen, kein haengender Prozess.`,
+          ),
+        );
+      });
+    }, gesamtTimeoutMs);
+  });
+
+  const lauf = (async (): Promise<ArenaFixtureResult[]> => {
+    try {
     const page: Page = await browser.newPage();
     // TSX/ESBUILD-KOMPATIBILITAET (PPS-Skalierung, 03.09., gefunden beim Bau von
     // scripts/ziehe-basketball-pps-referenz.ts): `tsx` -- der Loader, mit dem JEDES Skript in
@@ -753,9 +806,13 @@ export async function runArenaFixtures(
         ...(momente ? { momente } : {}),
       };
     });
-  } finally {
-    await schliesseBrowserHart(browser);
-  }
+    } finally {
+      await schliesseEinmal();
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  })();
+
+  return Promise.race([lauf, gesamtTimeoutPromise]);
 }
 
 /**

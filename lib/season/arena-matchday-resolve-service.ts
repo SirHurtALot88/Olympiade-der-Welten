@@ -151,6 +151,68 @@ export async function kickoffArenaMatchdayApply(
   const liveFallbackPreview = buildLegacyMatchdayResolvePreview(contexts);
   const previewToBook = resolveMatchdayPreviewToBook({ gameState: refreshed.gameState, scope, livePreview: liveFallbackPreview });
 
+  // OPUS-REVIEW B3 (kritisch): GENAU wie im Auto-Run (`matchday-auto-run-service.ts`) -- ein als
+  // "ready" gespeicherter Vorlauf, dessen `arenaEingabeHash` beim Buchen nicht mehr passt, wird
+  // NICHT als Bruecke gebucht. Ein frischer Versuch wird erzwungen und synchron abgewartet (der
+  // Kickoff-Pfad ist ohnehin schon async/wartend, anders als der HTTP-"hintergrund"-Modus des
+  // Auto-Run); divergiert es danach immer noch, bleibt es bei "in_progress" statt zu buchen.
+  if (previewToBook.arenaEingabeDivergenz) {
+    console.error(`${logPrefix} Arena-Matchday-Apply: arenaEingabeHash-Divergenz beim Buchen -- erzwinge frischen Vorlauf statt die Bruecke zu buchen.`);
+    const erneuterVersuch = await stelleArenaVorlaufSicher(
+      scope,
+      { runArenaFixturesImpl: input.runArenaFixturesImpl, runArenaFixturesOptions: input.runArenaFixturesOptions, erzwingeNeuenVersuch: true },
+      persistence,
+    );
+    const markedInProgress = schreibeArenaMatchdayResolveStatus(persistence, saveId, erneuterVersuch.status === "ready" ? "ready" : "in_progress");
+    const nachErneutemVersuch = persistence.getSaveById(saveId);
+    const previewNachErneutemVersuch = nachErneutemVersuch
+      ? resolveMatchdayPreviewToBook({ gameState: nachErneutemVersuch.gameState, scope, livePreview: liveFallbackPreview })
+      : previewToBook;
+    if (previewNachErneutemVersuch.arenaEingabeDivergenz || !nachErneutemVersuch) {
+      // Divergiert immer noch (oder der Save verschwand) -- NICHT buchen, Aufrufer pollt weiter.
+      return { applicable: true, booked: false, status: "in_progress", save: markedInProgress ?? refreshed };
+    }
+    return bucheArenaSnapshot({
+      persistence,
+      saveId,
+      seasonId,
+      matchdayId,
+      contexts,
+      preview: previewNachErneutemVersuch.preview,
+      forceReplace: input.forceReplace,
+      allowIncompleteOverride: input.allowIncompleteOverride,
+      logPrefix,
+      refreshed: nachErneutemVersuch,
+    });
+  }
+
+  return bucheArenaSnapshot({
+    persistence,
+    saveId,
+    seasonId,
+    matchdayId,
+    contexts,
+    preview: previewToBook.preview,
+    forceReplace: input.forceReplace,
+    allowIncompleteOverride: input.allowIncompleteOverride,
+    logPrefix,
+    refreshed,
+  });
+}
+
+async function bucheArenaSnapshot(input: {
+  persistence: PersistenceService;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  contexts: ReturnType<typeof determineArenaDisciplineContexts>["contexts"];
+  preview: ReturnType<typeof buildLegacyMatchdayResolvePreview>;
+  forceReplace?: boolean;
+  allowIncompleteOverride?: boolean;
+  logPrefix: string;
+  refreshed: PersistedSaveGame;
+}): Promise<ArenaMatchdayApplyKickoffResult> {
+  const { persistence, saveId, seasonId, matchdayId, contexts, preview, logPrefix, refreshed } = input;
   const service = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
   const result = await service.applyLegacyMatchdayResult({
     saveId,
@@ -163,7 +225,7 @@ export async function kickoffArenaMatchdayApply(
     forceReplace: input.forceReplace,
     allowIncompleteOverride: input.allowIncompleteOverride,
     preloadedContexts: contexts,
-    preloadedPreview: previewToBook.preview,
+    preloadedPreview: preview,
   });
 
   if (!result.ok || !result.applied) {

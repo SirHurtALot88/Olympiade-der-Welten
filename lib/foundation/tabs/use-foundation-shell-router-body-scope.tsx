@@ -4674,9 +4674,19 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  // OPUS-REVIEW B4 (PR 3, K1): wie lange/oft die Buehne auf einen laufenden Arena-Vorlauf wartet,
+  // bevor sie es doch als Fehler zeigt. 40 x 3s = 120s deckt die geschaetzte CX23-Wartezeit
+  // (20-70s je Spieltag mit zwei Arena-Disziplinen, Plan Abschnitt 8) mit Puffer -- B1/B2 im
+  // Server selbst (genau eine automatische Wiederholung, Gesamt-Timeout) sorgen dafuer, dass ein
+  // echt kaputter Vorlauf nicht endlos "in_progress" bleibt, diese Schranke ist nur die
+  // Client-seitige Entsprechung, damit die Buehne nicht ebenfalls endlos pollt.
+  const ARENA_VORLAUF_POLL_INTERVAL_MS = 3_000;
+  const ARENA_VORLAUF_POLL_MAX_VERSUCHE = 40;
+
   async function commitArenaDiscipline(
     side: "d1" | "d2",
     shownPreview: LegacyMatchdayResolvePreview | null = null,
+    pollVersuch = 0,
   ) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -4733,6 +4743,23 @@ export function useFoundationShellRouterBodyScope({
         ...(result?.blockingReasons ?? []),
         ...(result?.steps ?? []).flatMap((step) => step.blockingReasons ?? []),
       ];
+      // ARENA-VORLAUF LAEUFT NOCH (PR 3, K1 — Opus-Review B4): kein Fehler, sondern "bitte kurz
+      // warten" — der Vorlauf rechnet im Hintergrund (Plan Abschnitt 2.4), es gibt JETZT nichts zu
+      // buchen, aber gleich etwas. Statt eines Fehlerbanners samt `DisciplineCommitBlockedError`
+      // wartet die Buehne kurz und versucht automatisch erneut, bis der Vorlauf fertig ist (oder
+      // die Versuchsgrenze erreicht ist -- ein echt haengender Vorlauf ist serverseitig durch B1
+      // (genau eine automatische Wiederholung) und B2 (Gesamt-Timeout) begrenzt, diese Schranke
+      // hier ist nur die Client-Entsprechung, damit die Seite nicht ebenfalls endlos pollt).
+      const vorlaufLaeuftNoch = blockers.includes("arena_vorlauf_laeuft") || blockers.includes("arena_eingabe_divergenz");
+      if (vorlaufLaeuftNoch && pollVersuch < ARENA_VORLAUF_POLL_MAX_VERSUCHE) {
+        setFoundationActionFeedback({
+          tone: "info",
+          title: "Arena-Duelle werden ausgetragen …",
+          detail: "Die Punkte werden automatisch gebucht, sobald der Vorlauf fertig ist.",
+        });
+        await new Promise((resolve) => setTimeout(resolve, ARENA_VORLAUF_POLL_INTERVAL_MS));
+        return commitArenaDiscipline(side, shownPreview, pollVersuch + 1);
+      }
       const detail =
         blockers.length > 0
           ? [...new Set(blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")

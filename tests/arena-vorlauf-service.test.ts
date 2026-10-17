@@ -21,66 +21,74 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { ensureMatchdayResolveSnapshot, readArenaVorlaufRecord, resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { kickoffArenaVorlauf, stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaFixtureResult, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
-/** Baut einen frischen Battle-Save mit vollstaendig befuelltem Feld fuer Spieltag 1. */
+/**
+ * Baut einen frischen Battle-Save mit vollstaendig befuelltem Feld fuer Spieltag 1.
+ *
+ * REVIEW-FUND (#1273, CI-Flake): WELCHE Disziplin an Spieltag 1 steht, ist zufaellig
+ * (Formkarten-/Spielplan-Saat je Save) -- gemessen ~11 % der Saves ohne JEDE arena-aufgeloeste
+ * Disziplin an Spieltag 1. Ein einzelner Versuch liess den Test deshalb gelegentlich an einer
+ * Vorbedingung scheitern, die nichts mit dem eigentlich geprueften Verhalten zu tun hat. Bis zu
+ * drei frische Saves werden deshalb versucht (je ~89 % Erfolgswahrscheinlichkeit -> <0,2 %
+ * Restausfall bei drei Versuchen), bevor der Test tatsaechlich als "kein passender Save"
+ * fehlschlaegt.
+ */
 async function bauFrischenBattleSaveMitVollemFeld() {
-  process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-service-${Math.random().toString(36).slice(2)}.sqlite`;
-  const persistence = createPersistenceService();
-  persistence.bootstrapSingleplayerSave();
-  const input = { presetId: "solo_1" as const, gameMode: "battle" as const };
-  const preview = previewNewGameSetup(input);
-  const angelegt = applyNewGameSetup({ ...input, confirmToken: preview.confirmToken }, persistence, { ownerId: null });
-  const saveId = angelegt.save.saveId;
-  await fuehreLigaSetupDraftAus({
-    persistence,
-    saveId,
-    seasonId: persistence.getSaveById(saveId)!.gameState.season.id,
-    callerWritableTeamIds: null,
-    excludeTeamIds: [],
-    logPrefix: "[arena-vorlauf-service-test]",
-  });
-  const nachDraft = persistence.getSaveById(saveId)!;
-  persistence.saveSingleplayerState(
-    saveId,
-    applyGameModeOwnership(nachDraft.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
-  );
-  const aktuell = persistence.getSaveById(saveId)!;
-  const seasonId = aktuell.gameState.season.id;
-  // Der volle Saison-Spielplan (alle 20 Spieltage) steht schon nach `applyNewGameSetup` --
-  // unabhaengig davon, welcher Spieltag gerade "aktiv" ist. 13 von 20 Disziplinen sind
-  // arena-aufgeloest, aber WELCHE Disziplin an Spieltag 1 steht, ist zufaellig (Formkarten-/
-  // Spielplan-Saat je Save) -- deshalb den ERSTEN Spieltag mit einer arena-aufgeloesten
-  // Disziplin suchen, statt sich auf Spieltag 1 zu verlassen (gemessen: Spieltag 1 trifft es
-  // nicht immer, ~11 % der Saves haben dort weder D1 noch D2 arena-aufgeloest).
-  const schedule = aktuell.gameState.seasonState.disciplineSchedule ?? [];
-  let matchdayId: string | null = null;
-  let arenaDisciplineId: string | null = null;
-  for (const eintrag of schedule) {
-    const kandidat = [eintrag.discipline1?.disciplineId, eintrag.discipline2?.disciplineId].find(
-      (id): id is string => Boolean(id) && ARENA_RESOLVED_DISCIPLINE_IDS.has(id as string),
+  for (let versuch = 1; versuch <= 3; versuch += 1) {
+    process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-service-${Math.random().toString(36).slice(2)}.sqlite`;
+    const persistence = createPersistenceService();
+    persistence.bootstrapSingleplayerSave();
+    const input = { presetId: "solo_1" as const, gameMode: "battle" as const };
+    const preview = previewNewGameSetup(input);
+    const angelegt = applyNewGameSetup({ ...input, confirmToken: preview.confirmToken }, persistence, { ownerId: null });
+    const saveId = angelegt.save.saveId;
+    await fuehreLigaSetupDraftAus({
+      persistence,
+      saveId,
+      seasonId: persistence.getSaveById(saveId)!.gameState.season.id,
+      callerWritableTeamIds: null,
+      excludeTeamIds: [],
+      logPrefix: "[arena-vorlauf-service-test]",
+    });
+    const nachDraft = persistence.getSaveById(saveId)!;
+    persistence.saveSingleplayerState(
+      saveId,
+      applyGameModeOwnership(nachDraft.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
     );
-    if (kandidat) {
-      matchdayId = eintrag.matchdayId;
-      arenaDisciplineId = kandidat;
-      break;
+    const aktuell = persistence.getSaveById(saveId)!;
+    const seasonId = aktuell.gameState.season.id;
+    // `applyAiLegacyLineupBatchLocally()` darf NUR fuer den gerade AKTIVEN Spieltag aufgerufen
+    // werden (`lineup_matchday_is_not_active`, nachgemessen -- s. Review-Fund #1273: ein
+    // frueherer Versuch scannte vorwaerts im Spielplan auf der Suche nach "genau einer
+    // arena-aufgeloesten Disziplin" und traf dabei oft einen SPAeTEREN, noch nicht aktiven
+    // Spieltag). Deshalb bleibt es bei Spieltag 1 (dem einzig aktiven auf einem frischen Save).
+    const matchdayId = aktuell.gameState.matchdayState.matchdayId;
+    const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
+    const d1 = spieltag?.discipline1?.disciplineId;
+    const d2 = spieltag?.discipline2?.disciplineId;
+    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    if (arenaDisciplineIds.length === 0) {
+      continue; // dieser Save: Spieltag 1 ohne arena-aufgeloeste Disziplin -- neuer Versuch
     }
+    // Alle 32 Teams fuer DIESEN (aktiven) Spieltag aufstellen (KI-Batch), damit
+    // `isMatchdayFieldComplete()` zutrifft.
+    const batch = applyAiLegacyLineupBatchLocally(
+      { saveId, seasonId, matchdayId, dryRun: false, includeWarningTeams: true, overwriteExisting: true },
+      persistence,
+    );
+    expect(batch.summary.blockingReasons, batch.summary.blockingReasons.join(" | ")).toEqual([]);
+    const scope = { saveId, seasonId, matchdayId };
+    // Die Anzahl arena-aufgeloester Disziplinen (1 oder 2, WEG B gemessen ~41 % der Spieltage)
+    // wird mit zurueckgegeben, statt sie wegzudefinieren -- abhaengige Tests leiten ihre
+    // Aufruf-Obergrenzen daraus ab, statt "genau eine" anzunehmen.
+    return { persistence, scope, arenaDisciplineId: arenaDisciplineIds[0]!, arenaDisciplineCount: arenaDisciplineIds.length };
   }
-  expect(matchdayId, "Kein Spieltag dieser Saison hat ueberhaupt eine arena-aufgeloeste Disziplin -- unerwartet").not.toBeNull();
-  expect(arenaDisciplineId).not.toBeNull();
-  // Alle 32 Teams fuer DIESEN Spieltag aufstellen (KI-Batch), damit `isMatchdayFieldComplete()`
-  // zutrifft -- unabhaengig davon, ob es der aktuell aktive Spieltag ist.
-  const batch = applyAiLegacyLineupBatchLocally(
-    { saveId, seasonId, matchdayId: matchdayId!, dryRun: false, includeWarningTeams: true, overwriteExisting: true },
-    persistence,
-  );
-  expect(batch.summary.blockingReasons, batch.summary.blockingReasons.join(" | ")).toEqual([]);
-  const scope = { saveId, seasonId, matchdayId: matchdayId! };
-  return { persistence, scope, arenaDisciplineId: arenaDisciplineId! };
+  throw new Error("bauFrischenBattleSaveMitVollemFeld: drei Saves hintereinander ohne arena-aufgeloeste Disziplin an Spieltag 1 -- statistisch extrem unwahrscheinlich, Setup pruefen.");
 }
 
 describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () => {
@@ -116,7 +124,7 @@ describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () =>
         expect(team.arenaAusfall).toBeTruthy();
       }
     },
-    180_000,
+    420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
 });
 
@@ -124,7 +132,7 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
   it(
     "zwei fast gleichzeitige Vorlauf-Anstoesse mit derselben Signatur rufen den Runner nur einmal je Liga auf",
     async () => {
-      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      const { persistence, scope, arenaDisciplineCount } = await bauFrischenBattleSaveMitVollemFeld();
       ensureMatchdayResolveSnapshot(scope, persistence);
 
       let aufrufe = 0;
@@ -156,12 +164,146 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
       // Beide liefern dasselbe Endergebnis (dieselbe Promise bzw. derselbe fertige Record).
       expect(ergebnisA.status).toBe(ergebnisB.status);
 
-      // Der Runner wurde NICHT doppelt aufgerufen: hoechstens einmal je Liga mit Fixtures an
-      // diesem Spieltag (1 oder 2 Ligen) -- NIE das Doppelte davon (waere der Fall ohne
-      // In-Prozess-Entdopplung).
+      // Der Runner wurde NICHT doppelt aufgerufen: hoechstens einmal je Liga (1 oder 2) UND je
+      // arena-aufgeloester Disziplin dieses Spieltags (1 bei "normal", 2 bei WEG B) -- NIE das
+      // Doppelte davon (waere der Fall ohne In-Prozess-Entdopplung).
       expect(aufrufe).toBeGreaterThan(0);
-      expect(aufrufe).toBeLessThanOrEqual(2);
+      expect(aufrufe).toBeLessThanOrEqual(arenaDisciplineCount * 2);
     },
-    180_000,
+    420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
+  );
+});
+
+describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): genau eine automatische Wiederholung", () => {
+  it(
+    "ein durchgehend werfender Runner wird ueber den Hintergrund-Pfad (kickoffArenaVorlauf) hoechstens 2x je Liga aufgerufen -- danach endgueltig failed, kein CPU-Sturm",
+    async () => {
+      const { persistence, scope, arenaDisciplineCount } = await bauFrischenBattleSaveMitVollemFeld();
+      ensureMatchdayResolveSnapshot(scope, persistence);
+
+      let aufrufeGesamt = 0;
+      const werfenderRunner = async (): Promise<ArenaFixtureResult[]> => {
+        aufrufeGesamt += 1;
+        throw new Error("Chromium kaputt (Testinjektion, B1)");
+      };
+
+      // 10x hintereinander ueber den DETACHED Pfad anstossen -- genau das Muster, das Buehne,
+      // Lineup-Routen und Auto-Run-"hintergrund" bei jedem Request/Poll tun wuerden, wenn
+      // Chromium auf dem Server kaputt ist. Zwischen den Anstoessen wird auf den jeweils
+      // laufenden (detachten) Versuch gewartet, sonst wuerde derselbe In-Prozess-Lauf mehrfach
+      // "getroffen" statt wirklich mehrere Anlaeufe zu erzeugen.
+      for (let i = 0; i < 10; i += 1) {
+        kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+        for (let warten = 0; warten < 300; warten += 1) {
+          const aktuellerStand = persistence.getSaveById(scope.saveId)!.gameState;
+          const record = readArenaVorlaufRecord(aktuellerStand, scope);
+          if (record && record.status !== "in_progress") break;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+      }
+
+      // Hoechstens 2 automatische Versuche (MAX_AUTOMATISCHE_VERSUCHE), je bis zu 2 Ligen UND je
+      // arena-aufgeloester Disziplin dieses Spieltags -- NIE 10 (einer je Schleifendurchlauf, der
+      // Bug-Zustand vor dem Fix) und NIE unbegrenzt viele.
+      expect(aufrufeGesamt).toBeGreaterThan(0);
+      expect(aufrufeGesamt).toBeLessThanOrEqual(arenaDisciplineCount * 2 * 2);
+
+      const endstand = persistence.getSaveById(scope.saveId)!.gameState;
+      const endgueltigerRecord = readArenaVorlaufRecord(endstand, scope);
+      expect(endgueltigerRecord?.status).toBe("failed");
+      expect(endgueltigerRecord?.versuch).toBeLessThanOrEqual(2);
+
+      // Ein weiterer Anstoss (z. B. die Buehne pollt noch einmal) loest KEINEN dritten Versuch
+      // mehr aus -- die Zahl der Aufrufe bleibt stehen.
+      const aufrufeVorher = aufrufeGesamt;
+      const nochEinAnstoss = kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(nochEinAnstoss.status).toBe("failed");
+      expect(aufrufeGesamt).toBe(aufrufeVorher);
+
+      // Der Auto-Run/Kickoff kann mit diesem endgueltig "failed" Vorlauf jetzt die PPS-Duell-
+      // Bruecke buchen, statt fuer immer auf "in_progress" zu stehen (das war B1s eigentliche
+      // Gefahr: der Spieltag haette NIE gebucht werden koennen).
+      const previewToBook = resolveMatchdayPreviewToBook({
+        gameState: endstand,
+        scope,
+        livePreview: (await import("@/lib/resolve/legacy-matchday-resolve-engine")).buildLegacyMatchdayResolvePreview(
+          (await import("@/lib/lineups/legacy-lineup-local-service")).loadAllLocalLegacyLineupContexts(scope, persistence).flatMap((r) => (r.ok ? [r.context] : [])),
+        ),
+      });
+      expect(previewToBook.source).toBe("snapshot");
+    },
+    420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
+  );
+});
+
+describe("Arena-Vorlauf-Service · B3 (Opus-Review, kritisch): arenaEingabeHash-Divergenz", () => {
+  it(
+    "ein Snapshot, dessen Arena-Eingaben sich nach einem erfolgreichen Vorlauf geaendert haben, wird beim Buchen als Divergenz erkannt (nicht als stille Bruecke gebucht)",
+    async () => {
+      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      ensureMatchdayResolveSnapshot(scope, persistence);
+
+      const erfolgreicherRunner = async (
+        _gameState: GameState,
+        fixtures: { homeTeamId: string; awayTeamId: string; seed: string | number }[],
+      ): Promise<ArenaFixtureResult[]> =>
+        fixtures.map((fixture) => ({
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          seiten: [1, 0] as [number, number],
+          boxscore: [],
+        }));
+
+      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: erfolgreicherRunner }, persistence);
+      expect(ergebnis.status).toBe("ready");
+
+      const vorStand = persistence.getSaveById(scope.saveId)!.gameState;
+      const previewVorMutation = resolveMatchdayPreviewToBook({ gameState: vorStand, scope, livePreview: vorStand as never });
+      // Noch KEINE Divergenz direkt nach dem Vorlauf.
+      expect(previewVorMutation.arenaEingabeDivergenz).toBeUndefined();
+      expect(previewVorMutation.source).toBe("snapshot");
+
+      // EINE Spieler-Attribut-Aenderung, die `arenaEingabeHash` (voller Kader-JSON) trifft, aber
+      // NICHT `buildMatchdayResolveSignature()` (nur Aufstellungen/Verfuegbarkeit) -- GENAU die
+      // Luecke, die B2/arenaEingabeHash zusaetzlich zur groeberen Signatur abdecken soll. Der
+      // mutierte Spieler MUSS auf einem der beiden Teams eines Fixtures DIESES Spieltags stehen
+      // (`buildArenaTeam()` baut den Kader-JSON nur aus den rostierten Spielern der am Fixture
+      // beteiligten Teams) -- sonst wuerde die Mutation den Hash gar nicht beruehren.
+      const fixtureAnDiesemSpieltag = (vorStand.seasonState.schedule ?? []).find(
+        (f) => f.matchdayId === scope.matchdayId && f.homeTeamId && f.awayTeamId,
+      );
+      expect(fixtureAnDiesemSpieltag, "kein Fixture an diesem Spieltag -- Testaufbau unerwartet unvollstaendig").toBeDefined();
+      const rosterEintrag = vorStand.rosters.find((r) => r.teamId === fixtureAnDiesemSpieltag!.homeTeamId);
+      expect(rosterEintrag, "homeTeamId dieses Fixtures hat keinen rostierten Spieler -- Testaufbau unerwartet unvollstaendig").toBeDefined();
+      const zuMutierenderSpielerId = rosterEintrag!.playerId;
+      // FELDNAME (Test-Fund): `attributeSheetStats` fuehrt das Attribut als `power`, nicht `pow`
+      // (s. `zuArenaSpieler()`, lib/foundation/battle-arena/arena-kader-adapter.ts) -- ein
+      // frueherer Versuch mit `pow` traf kein tatsaechlich gelesenes Feld und zeigte deshalb nie
+      // eine Divergenz (Testfehler, keine Produktionsluecke).
+      const mutierterStand: GameState = {
+        ...vorStand,
+        players: vorStand.players.map((spieler) =>
+          spieler.id === zuMutierenderSpielerId
+            ? {
+                ...spieler,
+                attributeSheetStats: {
+                  ...(spieler.attributeSheetStats ?? {}),
+                  power: ((spieler.attributeSheetStats as { power?: number } | undefined)?.power ?? 50) + 25,
+                } as typeof spieler.attributeSheetStats,
+              }
+            : spieler,
+        ),
+      };
+      persistence.saveSingleplayerState(scope.saveId, mutierterStand);
+
+      const nachMutation = persistence.getSaveById(scope.saveId)!.gameState;
+      const previewNachMutation = resolveMatchdayPreviewToBook({ gameState: nachMutation, scope, livePreview: nachMutation as never });
+      // OPUS-REVIEW B3: Divergenz MUSS jetzt erkannt werden, UND die Bruecke darf nicht
+      // stillschweigend als Buchungsgrundlage zurueckkommen (`source !== "snapshot"`).
+      expect(previewNachMutation.arenaEingabeDivergenz).toBe(true);
+      expect(previewNachMutation.source).toBe("live");
+    },
+    420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
 });

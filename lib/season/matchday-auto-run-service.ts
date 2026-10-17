@@ -1002,11 +1002,74 @@ export async function runLocalMatchdayAutoRun(
         // bereits ersetzt. Preview jetzt NEU aus ihm lesen, damit `result_apply` gleich dieselben
         // Arena-Zeilen bucht, die die Buehne zeigt ("Was du siehst, wird gebucht").
         const nachVorlauf = resolveLocalSave(persistence, scope.saveId);
-        const nachVorlaufPreview = resolveMatchdayPreviewToBook({
+        let nachVorlaufPreview = resolveMatchdayPreviewToBook({
           gameState: nachVorlauf.gameState,
           scope,
           livePreview: activeResolve.preview,
         });
+        // OPUS-REVIEW B3 (kritisch): ein als "ready" gespeicherter Vorlauf, dessen
+        // `arenaEingabeHash` beim Buchen nicht mehr passt, darf NICHT als Bruecke gebucht werden
+        // (Plan 2.4: "source==='live' darf ... nicht gebucht werden, solange kein gueltiger
+        // Vorlauf zu dieser Signatur fertig ist"). Statt stillschweigend die Bruecke zu buchen,
+        // wird hier EIN frischer Versuch erzwungen (`erzwingeNeuenVersuch` uebersteuert das sonst
+        // sticky "ready", s. `arena-vorlauf-service.ts`) -- `"inline"` wartet darauf, `"hintergrund"`
+        // blockiert wie bei einem laufenden Vorlauf.
+        if (nachVorlaufPreview.arenaEingabeDivergenz) {
+          const erneuterVersuch =
+            arenaModus === "inline"
+              ? await stelleArenaVorlaufSicher(scope, { erzwingeNeuenVersuch: true }, persistence)
+              : kickoffArenaVorlauf(scope, { erzwingeNeuenVersuch: true }, persistence);
+          if (arenaModus !== "inline" || erneuterVersuch.status === "in_progress" || erneuterVersuch.status === null) {
+            addStep(result, {
+              key: "arena_vorlauf",
+              label: "Arena-Vorlauf",
+              status: "blocked",
+              dryRun: false,
+              canContinue: false,
+              warnings: [],
+              blockingReasons: ["arena_eingabe_divergenz"],
+              metrics: { arenaModus },
+              plannedWrites: 0,
+              appliedWrites: 0,
+              auditId: null,
+            });
+            result.warnings = Array.from(new Set(result.warnings));
+            result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_eingabe_divergenz"]));
+            result.ok = false;
+            result.status = "blocked";
+            return result;
+          }
+          // Inline UND der erzwungene Versuch ist schon fertig ("ready"/"failed") -- einmal neu
+          // pruefen. Divergiert es DANACH immer noch (seltener Grenzfall: der Zustand aendert
+          // sich weiterhin waehrend des Vorlaufs), wird NICHT gebucht -- lieber blockiert als die
+          // Bruecke stillschweigend buchen.
+          const nachErneutemVersuch = resolveLocalSave(persistence, scope.saveId);
+          nachVorlaufPreview = resolveMatchdayPreviewToBook({
+            gameState: nachErneutemVersuch.gameState,
+            scope,
+            livePreview: activeResolve.preview,
+          });
+          if (nachVorlaufPreview.arenaEingabeDivergenz) {
+            addStep(result, {
+              key: "arena_vorlauf",
+              label: "Arena-Vorlauf",
+              status: "blocked",
+              dryRun: false,
+              canContinue: false,
+              warnings: [],
+              blockingReasons: ["arena_eingabe_divergenz"],
+              metrics: { arenaModus },
+              plannedWrites: 0,
+              appliedWrites: 0,
+              auditId: null,
+            });
+            result.warnings = Array.from(new Set(result.warnings));
+            result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_eingabe_divergenz"]));
+            result.ok = false;
+            result.status = "blocked";
+            return result;
+          }
+        }
         activeResolve = { ...activeResolve, preview: nachVorlaufPreview.preview };
         const disziplinenGesamt = vorlaufErgebnis.record ? Object.keys(vorlaufErgebnis.record.disziplinen).length : 0;
         const disziplinenAusgefallen = vorlaufErgebnis.record

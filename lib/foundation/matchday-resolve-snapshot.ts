@@ -259,6 +259,16 @@ export type MatchdayPreviewToBook = {
   preview: LegacyMatchdayResolvePreview;
   /** `snapshot`: die Vorberechnung der Arena. `live`: frisch gerechnet, weil keine gueltige vorlag. */
   source: "snapshot" | "live";
+  /**
+   * OPUS-REVIEW B3: `true` NUR, wenn `source === "live"` GENAU WEIL der `arenaEingabeHash` nicht
+   * mehr passt (nicht, weil nie ein Snapshot vorlag). Dieses Feld selbst stoesst KEINEN neuen
+   * Vorlauf an (zirkulaer -- `arena-vorlauf-service.ts` importiert von HIER, nicht umgekehrt) --
+   * der Aufrufer (Auto-Run/Kickoff-Mantel, die den Vorlauf-Service ohnehin schon importieren) MUSS
+   * bei `true` einen frischen Vorlauf anstossen und darf das `live`-Ergebnis NICHT buchen (Plan
+   * 2.4: "source==='live' darf in einem Battle-Save mit Arena-Disziplin nicht gebucht werden,
+   * solange kein gueltiger Vorlauf zu dieser Signatur fertig ist").
+   */
+  arenaEingabeDivergenz?: boolean;
 };
 
 /**
@@ -310,7 +320,7 @@ export function resolveMatchdayPreviewToBook(input: {
     console.error(
       `[arena-vorlauf] arenaEingabeHash-Divergenz beim Buchen (${input.scope.saveId}/${input.scope.matchdayId}): ${divergenz.join(", ")} — Snapshot wird NICHT gebucht, Vorlauf muss neu laufen.`,
     );
-    return { preview: input.livePreview, source: "live" };
+    return { preview: input.livePreview, source: "live", arenaEingabeDivergenz: true };
   }
   return { preview: snapshot.payload.preview, source: "snapshot" };
 }
