@@ -62516,6 +62516,28 @@ button.foundation-team-portrait-card {
   color: var(--nl-bad, #dc6357);
 }
 
+/* Task #159: Spalte „Verh." (Punkteverhältnis, nur Battle-Saves) — gleiche Optik wie die
+   Formkarten-/Finanz-Spalten daneben (+21 grün, −7 rot, 0 neutral, Tabellenziffern). */
+.is-new-look .nl-standings-th-verhaeltnis {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-verhaeltnis {
+  text-align: right;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-verhaeltnis.is-pos {
+  color: var(--nl-good, #6ec97e);
+}
+
+.is-new-look .nl-standings-td-verhaeltnis.is-neg {
+  color: var(--nl-bad, #dc6357);
+}
+
 /* Finanz-Spalten im Daten-Modus: Cash · Gehälter · Gebäude · GuV */
 .is-new-look .nl-standings-th-fin {
   text-align: right;

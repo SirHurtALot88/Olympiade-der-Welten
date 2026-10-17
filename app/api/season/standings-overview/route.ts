@@ -448,6 +448,10 @@ export async function GET(request: Request) {
                 teamCode: team.shortCode,
                 rank: displayRank,
                 points: hasCurrentPoints ? standing?.points ?? null : null,
+                // Task #159: Punkteverhältnis-Spalte — nur in Battle-Saves gesetzt
+                // (`StandingRecord.verhaeltnis`), dieselbe `hasCurrentPoints`-Torwache wie bei
+                // `points` (vor dem ersten gewerteten Spieltag kein erfundener Wert).
+                verhaeltnis: hasCurrentPoints ? standing?.verhaeltnis ?? null : null,
                 cash: team.cash,
                 cashFc: standing?.cashFc ?? prizeSummary?.cashForecast ?? null,
                 startplatz: startRank,
@@ -518,6 +522,9 @@ export async function GET(request: Request) {
                 teamCode: row.teamCode,
                 rank: row.rank,
                 points: row.points,
+                // Task #159: die Sheet-Zuordnung kennt kein Battle-Punkteverhältnis — ehrlich
+                // `null` statt eines erfundenen Werts (dieselbe Regel wie bei `form` oben).
+                verhaeltnis: null,
                 cash: row.resolvedTeamId ? (teamStateById.get(row.resolvedTeamId)?.cash ?? row.cash) : row.cash,
                 cashFc: row.cashFc,
                 startplatz: row.startplatz,

@@ -344,3 +344,22 @@
   color: var(--nl-mut);
   max-width: 72ch;
 }
+
+/* ------------------------------------------------------------------ *
+ * TASK #159 — Saisonstand-UI: getrennte Liga-1/Liga-2-Tabellen statt
+ * einer gemeinsamen 32er-Tabelle, nur bei aktivem Liga-Split sichtbar
+ * (`.nl-standings-liga-split` kommt nur aus dem entsprechenden Render-
+ * Zweig in SeasonStandingsNewLook.tsx, nie zusammen mit der Legacy-
+ * Einzeltabelle). Jede Liga-Karte traegt ihre eigene `.nl-standings-
+ * table-shell`/`<table>` unveraendert, nur gestapelt statt nebeneinander
+ * (zwei 16-Zeilen-Tabellen sind schmal genug fuer Mobile, nebeneinander
+ * waere das zweite Tabellenblatt ausserhalb des Viewports).
+ * ------------------------------------------------------------------ */
+.is-new-look .nl-standings-liga-split {
+  display: grid;
+  gap: var(--nl-s4);
+}
+
+.is-new-look .nl-standings-liga-card .nl-standings-table-shell {
+  margin: 0;
+}
