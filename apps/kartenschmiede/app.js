@@ -537,8 +537,37 @@
     const opts = [`<option value="aktuell">Aktuelle Karte (${esc(state.name || "")})</option>`]
       .concat(VORLAGEN.map(v => `<option value="${v.key}">${esc(v.d.name)} · ${R.punkte(v.d).pts} P.</option>`));
     ["simA", "simB"].forEach((id, i) => { const el = $(id), alt = el.value; el.innerHTML = opts.join(""); el.value = alt || (i ? "sporenhuelle" : "aktuell"); });
+    if ($("grpAdd0")) gruppenZeigen();
   }
   const simEinheit = key => key === "aktuell" ? state : (VORLAGEN.find(v => v.key === key) || VORLAGEN[0]).d;
+  // Gruppenkampf: je Seite eine Liste von Vorlagen-Schlüsseln (oder „aktuell“)
+  const HELDEN = () => VORLAGEN.filter(v => v.d.role === "hero").map(v => v.key);
+  const gruppen = [["aktuell"], HELDEN()];
+  function gruppenZeigen() {
+    const opts = [`<option value="">Einheit wählen …</option>`, `<option value="aktuell">Aktuelle Karte (${esc(state.name || "")})</option>`]
+      .concat(VORLAGEN.map(v => `<option value="${v.key}">${esc(v.d.name)} · ${R.punkte(v.d).pts} P.</option>`)).join("");
+    [0, 1].forEach(s => {
+      $("grpAdd" + s).innerHTML = opts;
+      const summe = gruppen[s].reduce((a, k) => a + R.punkte(simEinheit(k)).pts, 0);
+      $("grpListe" + s).innerHTML = gruppen[s].map((k, i) => `<button type="button" class="chip-f" data-grp="${s}" data-i="${i}" data-tip="Entfernen">${esc(simEinheit(k).name || "Einheit")} ×</button>`).join("")
+        + `<small class="hint">${gruppen[s].length ? `${summe} Punkte` : "leer"}</small>`;
+    });
+  }
+  function gruppenStart() {
+    if (!gruppen[0].length || !gruppen[1].length) { $("simOut").innerHTML = `<p class="verdict">Beide Seiten brauchen mindestens eine Einheit.</p>`; return; }
+    const a = gruppen[0].map(simEinheit), b = gruppen[1].map(simEinheit);
+    const r = R.simuliereGruppe(a, b, { kaempfe: +$("simN").value, abstand: +$("simDist").value, deckung: +$("simCover").value, seed: Date.now() % 100000 });
+    const pa = a.reduce((x, e) => x + R.punkte(e).pts, 0), pb = b.reduce((x, e) => x + R.punkte(e).pts, 0);
+    const name = l => l.map(e => esc(e.name || "Einheit")).join(" + ");
+    const entsch = r.a + r.b, anteilA = entsch ? r.a / entsch : .5;
+    $("simOut").innerHTML = `
+      <div class="sim-legend"><span><b>${prozent(r.a)}</b> Seite A (${pa} P.)</span><span><b>${prozent(r.u)}</b> Unentschieden</span><span><b>${prozent(r.b)}</b> Seite B (${pb} P.)</span></div>
+      <div class="bar" role="img" aria-label="Siege A ${prozent(r.a)}, Unentschieden ${prozent(r.u)}, Siege B ${prozent(r.b)}">
+        <span class="a" style="width:${r.a * 100}%">${r.a > .08 ? prozent(r.a) : ""}</span><span class="d" style="width:${r.u * 100}%">${r.u > .08 ? prozent(r.u) : ""}</span><span class="b" style="width:${r.b * 100}%">${r.b > .08 ? prozent(r.b) : ""}</span>
+      </div>
+      <p class="verdict">Seite A: ${name(a)}. Seite B: ${name(b)}. A hat ${prozent(pa / (pa + pb))} der Punkte und gewinnt ${prozent(anteilA)} der entschiedenen Kämpfe.</p>
+      <p class="hint">Im Schnitt ${zahl(r.runden)} Runden. Am Ende stehen im Schnitt noch ${prozent(r.ueberlebtA)} der Einheiten von A und ${prozent(r.ueberlebtB)} von B.</p>`;
+  }
   function simStart() {
     const a = simEinheit($("simA").value), b = simEinheit($("simB").value);
     const r = R.simuliere(a, b, { kaempfe: +$("simN").value, abstand: +$("simDist").value, deckung: +$("simCover").value, seed: Date.now() % 100000 });
@@ -954,6 +983,10 @@
   $("bNewEnemy").addEventListener("click", () => frisch("enemy"));
   $("bElite").addEventListener("click", eliteVersion);
   $("simRun").addEventListener("click", simStart);
+  [0, 1].forEach(s => $("grpAdd" + s).addEventListener("change", e => { if (e.target.value) gruppen[s].push(e.target.value); gruppenZeigen(); }));
+  ["grpListe0", "grpListe1"].forEach(id => $(id).addEventListener("click", e => { const b = e.target.closest("[data-grp]"); if (!b) return; gruppen[+b.dataset.grp].splice(+b.dataset.i, 1); gruppenZeigen(); }));
+  $("grpHelden").addEventListener("click", () => { gruppen[1] = HELDEN(); gruppenZeigen(); });
+  $("grpRun").addEventListener("click", gruppenStart);
   $("simFair").textContent = "Balance-Test: Fern gegen Nah";
   $("simFair").addEventListener("click", balance);
   $("simCheck").addEventListener("click", preisCheck);

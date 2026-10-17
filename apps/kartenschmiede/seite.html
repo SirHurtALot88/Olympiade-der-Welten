@@ -493,6 +493,8 @@ table.charaktere tbody tr { cursor: default; }
 @media (max-width: 880px) { .sim { grid-template-columns: 1fr; } }
 .sim-ctl { display: grid; gap: 14px; }
 .sim-out { display: grid; gap: 14px; font-family: var(--ui); }
+.sim-gruppe-kopf { margin: 10px 0 0; font: 700 15px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); }
+.sim-gruppe { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; min-height: 34px; }
 .bar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); font-weight: 800; font-size: 16px; }
 .bar span { display: grid; place-items: center; min-width: 0; overflow: hidden; white-space: nowrap; color: #14100a; }
 .bar .a { background: #d9b25f; } .bar .d { background: #4a4f58; color: var(--ink); } .bar .b { background: #7fb0e6; }
@@ -1310,6 +1312,20 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
           <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an LP bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
+        <h3 class="sim-gruppe-kopf">Gruppenkampf</h3>
+        <div class="row">
+          <label class="f">Seite A: hinzufügen <select id="grpAdd0"></select></label>
+          <label class="f">Seite B: hinzufügen <select id="grpAdd1"></select></label>
+        </div>
+        <div class="row">
+          <div class="sim-gruppe" id="grpListe0" aria-label="Seite A"></div>
+          <div class="sim-gruppe" id="grpListe1" aria-label="Seite B"></div>
+        </div>
+        <div class="copyrow">
+          <button type="button" class="btn" id="grpRun">Gruppen würfeln</button>
+          <button type="button" class="btn ghost sm" id="grpHelden" data-tip="Seite B: die vier Helden-Vorlagen">Seite B: vier Helden</button>
+        </div>
+        <p class="hint">Aktivierung abwechselnd wie bei OPR, jede Einheit nimmt sich den nächsten Feind vor, nur das Ziel schlägt zurück. Auren wie Rauschsporen treffen jeden Feind in Reichweite. Startabstand, Kämpfe und Gelände wie oben, höchstens 10 Runden. Schicksalswürfel zählen nicht mit.</p>
       </div>
       <div class="sim-out" id="simOut" aria-live="polite"></div>
     </div>
