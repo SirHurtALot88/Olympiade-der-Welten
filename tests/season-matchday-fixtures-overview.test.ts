@@ -13,16 +13,18 @@ const DISCIPLINE_SCHEDULE_MD1 = {
   seasonId: "s1",
   matchdayId: "md1",
   matchdayIndex: 0,
-  discipline1: { disciplineId: "basketball", displayName: "Basketball", order: 1, playerCount: 2, category: "tactics" },
-  discipline2: { disciplineId: "battlefield", displayName: "Battlefield", order: 2, playerCount: 2, category: "power" },
+  discipline1: { disciplineId: "basketball", displayName: "Basketball", order: 1, playerCount: 2, category: "tactics", occurrenceInSeason: 1 },
+  discipline2: { disciplineId: "battlefield", displayName: "Battlefield", order: 2, playerCount: 2, category: "power", occurrenceInSeason: 1 },
 };
 
 const DISCIPLINE_SCHEDULE_MD2 = {
   seasonId: "s1",
   matchdayId: "md2",
   matchdayIndex: 1,
-  discipline1: { disciplineId: "basketball", displayName: "Basketball", order: 1, playerCount: 2, category: "tactics" },
-  discipline2: { disciplineId: "battlefield", displayName: "Battlefield", order: 2, playerCount: 2, category: "power" },
+  // Zweiter Durchgang derselben beiden Disziplinen -- der ehrliche Ort fuer "2. Durchgang" ist
+  // HIER (je Disziplin), nicht an der Paarung (s. Praezisierung im Dateikommentar des Builders).
+  discipline1: { disciplineId: "basketball", displayName: "Basketball", order: 1, playerCount: 2, category: "tactics", occurrenceInSeason: 2 },
+  discipline2: { disciplineId: "battlefield", displayName: "Battlefield", order: 2, playerCount: 2, category: "power", occurrenceInSeason: 2 },
 };
 
 function zeile(
@@ -119,12 +121,13 @@ describe("buildSpieltagsUebersicht", () => {
     expect(f1.gespielt).toBe(true);
     expect(f1.istRueckspiel).toBe(false);
     expect(f1.hinspielMatchdayId).toBeNull();
+    expect(f1.hinspielMatchdayLabel).toBeNull();
     expect(f1.disziplinen).toHaveLength(2);
 
     const basketball = f1.disziplinen.find((d) => d.disciplineId === "basketball")!;
-    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: [70, 15], verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell" });
+    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: [70, 15], verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell", occurrenceInSeason: 1 });
     const battlefield = f1.disziplinen.find((d) => d.disciplineId === "battlefield")!;
-    expect(battlefield).toMatchObject({ punkteHeim: 1, punkteGast: 1, verhaeltnisHeim: 0, verhaeltnisGast: 0, resolutionSource: "arena" });
+    expect(battlefield).toMatchObject({ punkteHeim: 1, punkteGast: 1, verhaeltnisHeim: 0, verhaeltnisGast: 0, resolutionSource: "arena", occurrenceInSeason: 1 });
 
     const f2 = uebersicht!.paarungen.find((p) => p.fixtureId === "f2")!;
     expect(f2.leagueTier).toBe("liga2");
@@ -144,6 +147,11 @@ describe("buildSpieltagsUebersicht", () => {
     expect(f3.awayTeamId).toBe("A");
     expect(f3.istRueckspiel).toBe(true);
     expect(f3.hinspielMatchdayId).toBe("md1");
+    expect(f3.hinspielMatchdayLabel).toBe("Spieltag 1");
+    // Je DISZIPLIN steht trotzdem der 2. Durchgang -- getrennt von der Rueckspiel-Markierung der Paarung.
+    for (const d of f3.disziplinen) {
+      expect(d.occurrenceInSeason).toBe(2);
+    }
   });
 
   it("Liga-Filter grenzt auf eine Liga ein", () => {

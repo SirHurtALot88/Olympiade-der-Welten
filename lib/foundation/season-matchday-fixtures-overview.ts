@@ -34,6 +34,15 @@
  * DIESES Team-Paar schon eine frühere Begegnung mit getauschten Seiten gab, und markiert nur
  * dann "Rückspiel gegen X".
  *
+ * PRÄZISIERUNG (Opus, 17.10., bestätigt gegen Konzeptdoc 16.10. Abschnitt 2.1 — Hin-/Rückrunde ist
+ * dort selbst als Begriff der DISZIPLIN definiert, nicht der Gegner): die beiden Konzepte bleiben
+ * getrennt und werden an UNTERSCHIEDLICHEN Stellen ausgegeben. Je PAARUNG: `istRueckspiel`/
+ * `hinspielMatchdayId`/`hinspielMatchdayLabel` NUR, wenn `findeFruehereBegegnung()` tatsächlich
+ * ein früheres Treffen mit getauschten Seiten findet — mit konkretem Verweis ("Hinspiel: Spieltag
+ * 4"), kein generisches Badge. Je DISZIPLIN: `occurrenceInSeason` (1|2) direkt aus dem
+ * Rotationsplan-Slot — das ist der ehrliche Ort für "1./2. Durchgang", weil jede Disziplin genau
+ * zweimal in der Saison läuft, mit eigener Kadergröße je Durchgang.
+ *
  * MINI-DM-VORBEREITUNG (nur vorbereiten, nicht bauen): `SpieltagsPaarungTeilnehmer[]` ist
  * bewusst eine LISTE statt eines festen `{home, away}`-Paars — heute immer genau zwei Einträge
  * mit `rolle: "heim"|"gast"`. Ein künftiges 4-Team-Pod-Format (Mini-DM, Platz 1..4) könnte hier
@@ -77,6 +86,14 @@ export type SpieltagsDuellDisziplin = {
   /** `null`, solange nicht gewertet. */
   resolutionSource: "pps" | "arena" | "pps_duell" | null;
   arenaAusfall: ArenaAusfall | null;
+  /**
+   * PRÄZISIERUNG (Opus, 17.10.): Hin-/Rückrunde ist ein Begriff der DISZIPLIN (jede läuft genau
+   * zweimal in der Saison, mit eigener Kadergröße je Durchgang), NICHT der Paarung — s.
+   * Dateikommentar. Hier der ehrliche Ort dafür, roh aus dem Disziplin-Rotationsplan
+   * (`SeasonDisciplineScheduleSlot.occurrenceInSeason`). Die UI macht daraus z. B. "2. Durchgang";
+   * `null` bei Alt-Saves/Manager-Mode ohne diese Markierung.
+   */
+  occurrenceInSeason: 1 | 2 | null;
 };
 
 export type SpieltagsPaarung = {
@@ -93,6 +110,8 @@ export type SpieltagsPaarung = {
   istRueckspiel: boolean;
   /** Spieltag der früheren Begegnung, nur gesetzt wenn `istRueckspiel`. */
   hinspielMatchdayId: string | null;
+  /** Lesbares Label dazu (z. B. "Spieltag 4"), für den direkten UI-Hinweis "Hinspiel: Spieltag 4". */
+  hinspielMatchdayLabel: string | null;
 };
 
 export type SpieltagsUebersicht = {
@@ -219,6 +238,7 @@ export function buildSpieltagsUebersicht(
         verhaeltnisGast: gespielt ? awayRow?.verhaeltnis ?? null : null,
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,
         arenaAusfall: homeRow?.arenaAusfall ?? awayRow?.arenaAusfall ?? null,
+        occurrenceInSeason: slot.occurrenceInSeason ?? null,
       };
     });
 
@@ -238,6 +258,11 @@ export function buildSpieltagsUebersicht(
       disziplinen,
       istRueckspiel: fruehereBegegnung != null,
       hinspielMatchdayId: fruehereBegegnung?.matchdayId ?? null,
+      // Dieselbe Konvention wie an jeder anderen Spieltag-Label-Stelle im Projekt (z. B.
+      // legacy-lineup-local-service.ts, game-inbox-service.ts): 1-basiert aus dem Schedule-Index.
+      hinspielMatchdayLabel: fruehereBegegnung
+        ? `Spieltag ${(matchdayIndexById.get(fruehereBegegnung.matchdayId) ?? 0) + 1}`
+        : null,
     };
   });
 
