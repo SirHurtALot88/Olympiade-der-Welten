@@ -107,8 +107,9 @@ describe("Arena-Vorlauf-Service · Was-du-siehst-wird-gebucht-Parität (Opus-Rev
         allowIncompleteOverride: true,
         logPrefix: "[arena-vorlauf-parity-test]",
       });
-      expect(gebucht.applicable).toBe(true);
-      expect(gebucht.booked, JSON.stringify(gebucht)).toBe(true);
+      if (!gebucht.applicable || !gebucht.booked) {
+        throw new Error(`Arena-Matchday-Apply nicht gebucht: ${JSON.stringify(gebucht)}`);
+      }
 
       const nachBuchung = persistence.getSaveById(scope.saveId)!;
       const gebuchteZeilen = (nachBuchung.gameState.seasonState.disciplineResults ?? []).filter(

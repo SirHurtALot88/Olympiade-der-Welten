@@ -23,6 +23,7 @@ import {
   writeMatchdayResolveSnapshot,
   type MatchdayResolveScope,
 } from "@/lib/foundation/matchday-resolve-snapshot";
+import { mitChromiumSemaphor } from "@/lib/battle/arena-chromium-semaphor";
 
 /**
  * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
@@ -113,24 +114,6 @@ function ermittleAnwendbarkeit(persistence: PersistenceService, scope: MatchdayR
     return { applicable: false as const, gameState: save.gameState };
   }
   return { applicable: true as const, gameState: save.gameState, arenaDisciplineIds, mutatorTraitsByDisciplineId };
-}
-
-/**
- * GLOBALER CHROMIUM-SEMAPHOR (Plan Abschnitt 2.7/4.4): hoechstens EIN Chromium-Lauf gleichzeitig
- * im gesamten Node-Prozess — ueber ALLE Saves, ALLE Disziplinen. Einfache Promise-Kette statt einer
- * Bibliothek: jeder Aufrufer haengt sich ans Ende, die Kette reisst auch bei einem Fehler nicht ab
- * (der `.catch` unten faengt ihn fuer die Kette selbst, der eigentliche Fehler geht unveraendert an
- * den Aufrufer von `mitChromiumSemaphor()` zurueck).
- */
-let chromiumKette: Promise<void> = Promise.resolve();
-function mitChromiumSemaphor<T>(aufgabe: () => Promise<T>): Promise<T> {
-  const wartenAufVorherige = chromiumKette;
-  const ergebnis = wartenAufVorherige.then(aufgabe, aufgabe);
-  chromiumKette = ergebnis.then(
-    () => undefined,
-    () => undefined,
-  );
-  return ergebnis;
 }
 
 /** Grob kategorisiert eine Fehlermeldung/Warnung in einen `ArenaAusfallGrund` (Plan Abschnitt 3.1). */
