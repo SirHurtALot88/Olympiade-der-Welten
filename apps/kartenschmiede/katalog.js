@@ -73,6 +73,7 @@
     fr("saurier", "Saurier", "fang", "Echsenkrieger und urzeitliche Riesen."),
     fr("wilde-jagd", "Wilde Jagd", "moon", "Werwölfe und Jäger, die mit dem Mond kommen."),
     fr("frostvolk", "Frostvolk", "snow", "Eisriesen und Wanderer des ewigen Winters.", ["frost"]),
+    fr("schwarzer-gral", "Schwarzer Gral", "drop", "Seuchenritter und Pilger der Fäulnis (Trench Crusade).", ["gift"]),
   ];
 
   const f = (id, typ, name, art, fuer, tags, kostenTyp, wert, text, quelle = "Quest") =>
@@ -219,6 +220,12 @@
     f("energieschild", "gegenstand", "Energieschild", "Ausrüstung", FREUNDE, ["schutz", "technik"], "fest", 10, "{RU} Einen Treffer mit DS ignorieren.", "Sci-Fi"),
     f("sprungmodul", "gegenstand", "Sprungmodul", "Ausrüstung", FREUNDE, ["bewegung", "technik"], "fest", 10, "{RU} Statt zu gehen {B12} springen, auch über Gelände und Feinde.", "Sci-Fi"),
     f("scanner-visier", "gegenstand", "Scanner-Visier", "Ausrüstung", FREUNDE, ["fernkampf", "technik"], "fest", 5, "Feinde mit Tarnung verlieren ihren Vorteil gegen diesen Helden.", "Sci-Fi"),
+
+    // ---------- Aus Chris' bemalten Minis (Moosgrab, Schwarzer Gral) ----------
+    { ...f("umranken", "faehigkeit", "Umranken", "Sonderregel", GEGNER, ["schwaechung", "nahkampf", "reaktion"], "prozent", 15, "{RU} Trifft es im Nahkampf: Das Ziel ist umrankt und darf bei seiner nächsten Aktivierung nur einen Aktionswürfel nutzen, um sich loszureißen.", "Moosgrab"), energie: 0 },
+    f("rauschsporen", "faehigkeit", "Rauschsporen", "Sonderregel", GEGNER, ["gift", "aura", "schwaechung"], "prozent", 15, "Feinde {F3} um es {T-1}.", "Moosgrab"),
+    f("sporenstoss", "faehigkeit", "Sporenstoß", "Sonderregel", GEGNER, ["gift", "fernkampf", "flaeche"], "prozent", 10, "{RU} Feind {R6}: {A2} mit Gift. Das Feld um das Ziel ist bis Rundenende verseucht.", "Moosgrab"),
+    f("seuchenstich", "faehigkeit", "Seuchenstich", "Sonderregel", GEGNER, ["gift", "nahkampf", "reaktion"], "prozent", 10, "Verursacht es im Nahkampf eine Wunde: Das Ziel erleidet am Rundenende bei {D4} {W1}.", "Schwarzer Gral"),
   ];
 
   const STAERKEN = [
