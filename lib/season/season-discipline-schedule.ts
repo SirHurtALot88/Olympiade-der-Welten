@@ -758,6 +758,74 @@ export function getSeasonDisciplinePlayerCounts(
   return occurrences.sort((left, right) => left.matchdayIndex - right.matchdayIndex);
 }
 
+export type SeasonDisciplinePlayerCountDisplay = {
+  /**
+   * Fuer Sortierung/Vergleiche: identisch zu `buildSeasonDisciplinePlayerCountMap` — das naechste
+   * noch offene Vorkommen, am Saisonende (oder fuer repeat=1/Alt-Saves ohnehin) das einzige bzw.
+   * letzte.
+   */
+  value: number | null;
+  /**
+   * Fuer die Anzeige direkt neben dem Disziplinnamen: bei EINEM Vorkommen (jeder Manager-Save,
+   * jeder Alt-Save, repeat=1) identisch zu `value` als Text — bit-identische Anzeige zu vorher.
+   * Tragen die zwei Saison-Vorkommen einer Disziplin (Battle Mode, repeat=2) unterschiedliche,
+   * beide bekannte Kadergroessen (laut Plan 3b der Regelfall, weil Haelfte 2 als Derangement von
+   * Haelfte 1 gezogen wird), steht hier „Hinrunde · Rueckrunde" als „4 · 6" — sonst faellt eine
+   * der beiden Zahlen unter den Tisch (Recherche-Abschnitt 1.8, W4).
+   */
+  label: string | null;
+};
+
+/**
+ * W4 (`docs/design/battle-mode-20-spieltage-recherche-06-09.md` Abschnitt 1.8/5): Datenfunktion
+ * fuer die Konsumenten, die bislang nur `buildSeasonDisciplinePlayerCountMap` (eine Zahl) kannten
+ * und tatsaechlich eine Anzeige-Zeile bauen (nicht nur sortieren) — die uebrigen Konsumenten
+ * dieser Recherche sortieren nur nach der Zahl und bleiben bei `buildSeasonDisciplinePlayerCountMap`,
+ * weil deren „naechstes offenes Vorkommen" fuer eine Reihenfolge genau richtig ist.
+ */
+export function buildSeasonDisciplinePlayerCountDisplayMap(
+  gameState: GameState,
+): Map<string, SeasonDisciplinePlayerCountDisplay> {
+  const valueByDisciplineId = buildSeasonDisciplinePlayerCountMap(gameState);
+  const occurrencesByDisciplineId = new Map<string, SeasonDisciplinePlayerCountOccurrence[]>();
+  for (const entry of getSeasonDisciplineSchedule(gameState)) {
+    for (const slot of [entry.discipline1, entry.discipline2]) {
+      if (!slot?.disciplineId) {
+        continue;
+      }
+      const occurrences = occurrencesByDisciplineId.get(slot.disciplineId) ?? [];
+      occurrences.push({
+        matchdayId: entry.matchdayId,
+        matchdayIndex: entry.matchdayIndex,
+        playerCount: slot.playerCount ?? null,
+        occurrenceInSeason: slot.occurrenceInSeason ?? null,
+      });
+      occurrencesByDisciplineId.set(slot.disciplineId, occurrences);
+    }
+  }
+
+  const result = new Map<string, SeasonDisciplinePlayerCountDisplay>();
+  for (const discipline of gameState.disciplines ?? []) {
+    const value = valueByDisciplineId.get(discipline.id) ?? null;
+    const occurrences = (occurrencesByDisciplineId.get(discipline.id) ?? []).sort(
+      (left, right) => left.matchdayIndex - right.matchdayIndex,
+    );
+    const distinctKnownCounts = new Set(
+      occurrences
+        .map((occurrence) => occurrence.playerCount)
+        .filter((count): count is number => count != null),
+    );
+    const label =
+      occurrences.length === 2 && distinctKnownCounts.size === 2
+        ? `${occurrences[0].playerCount} · ${occurrences[1].playerCount}`
+        : value != null
+          ? String(value)
+          : null;
+    result.set(discipline.id, { value, label });
+  }
+  return result;
+}
+
 export function withNormalizedSeasonDisciplineSchedule(gameState: GameState, saveId?: string | null): GameState {
   const normalizedSchedule = getSeasonDisciplineSchedule(gameState, { saveId });
   const normalizedMatchdayIds = normalizedSchedule.map((entry) => entry.matchdayId);
