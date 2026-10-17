@@ -7,7 +7,10 @@ import { getTeamLogoModel } from "@/lib/data/mediaAssets";
 import { resolvePlayerDisciplinePoints } from "@/lib/foundation/discipline-points-source";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonDisciplinePlayerCountDisplayMap,
+  buildSeasonDisciplinePlayerCountMap,
+} from "@/lib/season/season-discipline-schedule";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
 import {
@@ -65,8 +68,14 @@ export type RosterAxisDisciplinePps = {
   axis: SeasonDisciplineAreaId;
   label: string;
   axisPps: number | null;
-  /** `playerCount` = Kadergröße der Disziplin (wie viele Spieler pro Team antreten). */
-  disciplines: Array<{ id: string; name: string; pps: number; playerCount: number | null }>;
+  /**
+   * `playerCount` = Kadergröße der Disziplin (wie viele Spieler pro Team antreten; fürs Sortieren
+   * — das nächste noch offene Saison-Vorkommen). `playerCountLabel` ist der Anzeige-Text dazu:
+   * bei einem Saison-Vorkommen identisch zu `playerCount`, bei zwei unterschiedlichen Vorkommen
+   * (Battle Mode, repeat=2) „4 · 6" (Hinrunde · Rückrunde) statt nur eine der beiden Zahlen
+   * (W4, docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8).
+   */
+  disciplines: Array<{ id: string; name: string; pps: number; playerCount: number | null; playerCountLabel: string | null }>;
 };
 
 export type FoundationRosterTableRow = {
@@ -216,6 +225,20 @@ function resolveAngezeigteKadergroesse(...kandidaten: Array<number | null | unde
   return null;
 }
 
+/**
+ * Erstes nicht-leeres Anzeige-Label gewinnt (ausgelostes Label vor dem reinen Zahlenwert als
+ * Text) — W4, s. `RosterAxisDisciplinePps`-Kommentar oben.
+ */
+function resolveAngezeigteKadergroesseLabel(
+  label: string | null | undefined,
+  numerischerRueckfall: number | null,
+): string | null {
+  if (typeof label === "string" && label.length > 0) {
+    return label;
+  }
+  return numerischerRueckfall != null ? String(numerischerRueckfall) : null;
+}
+
 export function buildRosterDisciplinePpsByAxis(input: {
   disciplines: GameState["disciplines"];
   /**
@@ -234,6 +257,12 @@ export function buildRosterDisciplinePpsByAxis(input: {
    * Karte, bleibt der Katalog der Rueckfall.
    */
   seasonPlayerCountByDisciplineId?: Map<string, number | null> | null;
+  /**
+   * Das Anzeige-Label dazu (W4) — bei zwei unterschiedlichen Saison-Vorkommen „4 · 6" statt nur
+   * `seasonPlayerCountByDisciplineId`s nächstes offenes Vorkommen. Optional wie die Zahlen-Map;
+   * fehlt sie, fällt die Anzeige auf den reinen Zahlenwert zurück (bit-identisch zu vorher).
+   */
+  seasonPlayerCountLabelByDisciplineId?: Map<string, string | null> | null;
   pointsByDiscipline: Record<string, number> | null | undefined;
   pointsByArea: Record<string, number | null | undefined> | null | undefined;
   axisTotals: Record<SeasonDisciplineAreaId, number | null>;
@@ -263,6 +292,10 @@ export function buildRosterDisciplinePpsByAxis(input: {
         .filter((discipline) => discipline.category === category)
         .map((discipline) => {
           const raw = input.pointsByDiscipline?.[discipline.id];
+          const playerCount = resolveAngezeigteKadergroesse(
+            input.seasonPlayerCountByDisciplineId?.get(discipline.id),
+            discipline.playerCount,
+          );
           return {
             id: discipline.id,
             name: discipline.name,
@@ -271,9 +304,12 @@ export function buildRosterDisciplinePpsByAxis(input: {
             // sagt, wie viele Spieler pro Team hier antreten. Zuerst die für DIESE Saison
             // ausgeloste Zahl (s. `seasonPlayerCountByDisciplineId` oben), erst dann der
             // Katalogwert. Fehlt beides, bleibt die Klammer weg statt eine Zahl zu erfinden.
-            playerCount: resolveAngezeigteKadergroesse(
-              input.seasonPlayerCountByDisciplineId?.get(discipline.id),
-              discipline.playerCount,
+            playerCount,
+            // W4: bei zwei unterschiedlichen Saison-Vorkommen zeigt das Label beide ("4 · 6"),
+            // sonst denselben Wert wie `playerCount` als Text.
+            playerCountLabel: resolveAngezeigteKadergroesseLabel(
+              input.seasonPlayerCountLabelByDisciplineId?.get(discipline.id),
+              playerCount,
             ),
           };
         }),
@@ -454,6 +490,15 @@ export function useFoundationCrossTabTeamsRoster(input: {
       input.gameState.season?.id != null && input.gameState.seasonState
         ? buildSeasonDisciplinePlayerCountMap(input.gameState)
         : null;
+    // W4: dieselbe Vorbedingung, nur die Anzeige-Variante (Hinrunde/Rückrunde-Label statt einer
+    // einzelnen Zahl) — s. `RosterAxisDisciplinePps`-Kommentar.
+    const seasonPlayerCountDisplayById =
+      input.gameState.season?.id != null && input.gameState.seasonState
+        ? buildSeasonDisciplinePlayerCountDisplayMap(input.gameState)
+        : null;
+    const seasonPlayerCountLabelByDisciplineId = seasonPlayerCountDisplayById
+      ? new Map([...seasonPlayerCountDisplayById].map(([disciplineId, display]) => [disciplineId, display.label]))
+      : null;
     return [...input.rosterPlayers]
       .map(({ entry, player }) => {
         const playerRating = input.playerRatingsById.get(player.id) ?? null;
@@ -494,6 +539,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
             return buildRosterDisciplinePpsByAxis({
               disciplines: input.gameState.disciplines,
               seasonPlayerCountByDisciplineId: seasonPlayerCountByDisciplineId,
+              seasonPlayerCountLabelByDisciplineId,
               pointsByDiscipline,
               // Achsen-Gesamtwert bleibt am Ledger: ist der leer, fällt
               // `buildRosterDisciplinePpsByAxis` auf `ppPow`/`ppSpe`… zurück —
