@@ -742,6 +742,16 @@ export default function SeasonStandingsNewLook({
   const boardRows = useMemo(() => [...standingsRows].sort(compareBoardRows), [standingsRows]);
 
   /**
+   * Task #159 (Saisonstand-UI, 2×16 Bundesliga-Stil): `true`, sobald IRGENDEINE Zeile einer
+   * Liga zugeordnet ist (`leagueTier` gesetzt, siehe `isLeagueSplitActive`/`getLeagueOf` in
+   * `lib/season/league-split.ts` — hier bewusst ohne eigenen Import, die Information kommt
+   * schon fertig in den Zeilen an). Legacy-32er-Saves (jeder heutige Manager-Save, jeder
+   * Battle-Save vor dem Liga-Split) liefern durchgehend `leagueTier: null` und bleiben damit
+   * exakt beim bisherigen Verhalten — eine einzige Tabelle, unveraendert.
+   */
+  const hasLeagueSplit = useMemo(() => boardRows.some((row) => row.leagueTier != null), [boardRows]);
+
+  /**
    * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
    * Vor Spieltag 1 ist `row.points` überall `null` — die Ränge 1–32 sind dann
    * der ENDSTAND DER VORSAISON (deckungsgleich mit der Ewigen Tabelle), also
@@ -1635,7 +1645,12 @@ export default function SeasonStandingsNewLook({
     );
   }
 
-  function renderDatenTable() {
+  /**
+   * Task #159: EINE Tabelle für eine gegebene Zeilenmenge — byte-identisches Markup zu vorher,
+   * nur auf eine `rows`-Liste statt fest auf `sortedTableRows` umgestellt, damit dieselbe
+   * Funktion sowohl die Legacy-32er-Tabelle als auch je eine 16er-Tabelle pro Liga bauen kann.
+   */
+  function renderDatenTableForRows(rows: SeasonV2StandingsRow[]) {
     return (
       <div className="nl-standings-table-shell">
         <table className="nl-standings-table is-compact nl-tnum">
@@ -1668,8 +1683,68 @@ export default function SeasonStandingsNewLook({
               <th className="nl-standings-th-fin">{renderTableSortHeader("guv", "GuV")}</th>
             </tr>
           </thead>
-          <tbody>{sortedTableRows.map((row) => renderTableRow(row))}</tbody>
+          <tbody>{rows.map((row) => renderTableRow(row))}</tbody>
         </table>
+      </div>
+    );
+  }
+
+  /**
+   * Task #159 (Saisonstand-UI, Bundesliga-Stil): BEI AKTIVEM LIGA-SPLIT zwei getrennte
+   * 16-Team-Tabellen statt einer gemeinsamen 32er-Tabelle — genau wie bei echten
+   * zweigleisigen Liga-Apps. `rank` ist seit PR #1271 je Zeile schon der LIGA-LOKALE Rang
+   * 1..16 (`saisonstand-punkte-nachbuchung.ts`/`standings-preview-engine.ts`); ohne diese
+   * Trennung stünden zwei Teams mit Rang 1 (je ein Liga-1- und ein Liga-2-Spitzenreiter)
+   * nebeneinander in EINER Liste, ohne dass die Doppelung erklärt wäre.
+   *
+   * OHNE AKTIVEN SPLIT (Legacy-32er, `hasLeagueSplit === false`, jeder heutige Save) bleibt es
+   * bei genau EINER Tabelle, bit-identisch zum bisherigen `renderDatenTable()`.
+   *
+   * Bewusst NICHT angefasst: Auf-/Abstiegszonen farblich markieren — das ist Task #158, dessen
+   * Mechanik (und Chris' Finanzentscheidung #161 dazu) heute noch gar nicht existiert. Ebenso
+   * bewusst NICHT gesplittet: „Board“- und „Vereine“-Modus (separate Ansichten, nicht die
+   * „Daten“-Tabelle, um die es hier geht) — eigenständige Folgearbeit, falls gewünscht.
+   */
+  function renderDatenTable() {
+    if (!hasLeagueSplit) {
+      return renderDatenTableForRows(sortedTableRows);
+    }
+
+    const liga1Rows = sortedTableRows.filter((row) => row.leagueTier === "liga1");
+    const liga2Rows = sortedTableRows.filter((row) => row.leagueTier === "liga2");
+    // Ein Team ohne Zuordnung (Opus-Review-Fund PR #1271: z. B. ein frisch aufgestiegenes Team
+    // ohne `leagueByTeamId`-Eintrag) darf nicht lautlos verschwinden — eigene dritte Tabelle
+    // statt stillschweigend ausgefiltert.
+    const unassignedRows = sortedTableRows.filter((row) => row.leagueTier == null);
+
+    return (
+      <div className="nl-standings-liga-split">
+        <NlCard
+          className="nl-standings-liga-card"
+          eyebrow="Saisonstand"
+          title="Liga 1"
+          data-testid="nl-standings-liga1-card"
+        >
+          {renderDatenTableForRows(liga1Rows)}
+        </NlCard>
+        <NlCard
+          className="nl-standings-liga-card"
+          eyebrow="Saisonstand"
+          title="Liga 2"
+          data-testid="nl-standings-liga2-card"
+        >
+          {renderDatenTableForRows(liga2Rows)}
+        </NlCard>
+        {unassignedRows.length > 0 ? (
+          <NlCard
+            className="nl-standings-liga-card"
+            eyebrow="Saisonstand"
+            title="Ohne Liga-Zuordnung"
+            data-testid="nl-standings-liga-unassigned-card"
+          >
+            {renderDatenTableForRows(unassignedRows)}
+          </NlCard>
+        ) : null}
       </div>
     );
   }

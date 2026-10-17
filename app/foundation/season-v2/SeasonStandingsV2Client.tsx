@@ -7,6 +7,7 @@ import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { LeagueTier } from "@/lib/season/league-split";
 import type { TitleRaceResult } from "@/lib/season/title-race";
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
@@ -48,6 +49,15 @@ export type SeasonV2StandingsRow = {
   logoInitials: string;
   rank: number | null;
   rankDiff: number | null;
+  /**
+   * Task #159 (Saisonstand-UI, 2×16): Liga-Zugehörigkeit dieses Teams, `null` im
+   * Legacy-32er-Modus oder solange `seasonState.leagueByTeamId` fehlt (siehe
+   * `isLeagueSplitActive`/`getLeagueOf` in `lib/season/league-split.ts`). `rank` bleibt dabei der
+   * LIGA-LOKALE Rang 1..16 (seit PR #1271, `saisonstand-punkte-nachbuchung.ts` bzw.
+   * `standings-preview-engine.ts`), nicht mehr 1..32 — dieses Feld sagt der Tabelle nur noch,
+   * WELCHE der beiden Tabellen eine Zeile zeigen soll.
+   */
+  leagueTier?: LeagueTier | null;
   /**
    * Wave D · D4 Rang-Movement: Δ Gesamtrang gegenüber dem letzten Spieltag
    * (Feld-Rennen-Ledger, `rankDeltaVsPrev`). >0 = Plätze gutgemacht (▲),
