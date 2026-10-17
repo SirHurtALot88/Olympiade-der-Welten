@@ -66,6 +66,13 @@ export type SeasonV2StandingsRow = {
    */
   fieldRaceRankDelta?: number | null;
   points: number | null;
+  /**
+   * Task #159: PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md) —
+   * Saisonsumme der ±D-Werte aller gebuchten Battle-Duelle, Tiebreaker nach `points`. `null`
+   * außerhalb von Battle-Saves (Manager Mode, jeder Save vor PR #1266) — die Spalte "Verh."
+   * erscheint dann in der Daten-Tabelle gar nicht erst.
+   */
+  verhaeltnis?: number | null;
   pps: number | null;
   pow: number | null;
   spe: number | null;

@@ -11101,6 +11101,9 @@ export function useFoundationShellRouterBodyScope({
           rank: row.rank ?? null,
           rankDiff: row.rankDiff ?? null,
           points: row.points ?? null,
+          // Task #159: Punkteverhältnis-Spalte — `null` außerhalb von Battle-Saves (dann ist die
+          // Spalte in der Daten-Tabelle gar nicht erst zu sehen, s. SeasonStandingsNewLook.tsx).
+          verhaeltnis: row.verhaeltnis ?? null,
           pps: row.ppsTotal ?? null,
           pow: row.ppsPow ?? null,
           spe: row.ppsSpe ?? null,

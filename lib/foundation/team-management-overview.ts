@@ -15,6 +15,8 @@ import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-hel
 type TeamManagementSnapshotStanding = {
   rank: number | null;
   points: number | null;
+  /** Task #159: Punkteverhältnis — nur in Battle-Saves gesetzt, sonst `undefined`/`null`. */
+  verhaeltnis?: number | null;
   cash: number | null;
   cashFc?: number | null;
   startplatz?: number | null;
@@ -134,6 +136,8 @@ export type TeamManagementSnapshotRow = {
   generalManagerInfluencePct: number | null;
   rank: number | null;
   points: number | null;
+  /** Task #159: Punkteverhältnis-Spalte im Saisonstand — `null` außerhalb von Battle-Saves. */
+  verhaeltnis: number | null;
   rosterCount: number;
   salaryTotal: number;
   avgContractLength: number | null;
@@ -581,6 +585,9 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
       generalManagerInfluencePct: generalManager?.assignment.influencePct ?? null,
       rank: activeRank,
       points: currentVisiblePoints,
+      // Task #159: dieselbe Sichtbarkeits-Torwache wie bei `points` — kein erfundener Wert vor
+      // dem ersten gewerteten Spieltag.
+      verhaeltnis: currentVisiblePoints == null ? null : standing?.verhaeltnis ?? null,
       rosterCount: roster.length > 0 ? roster.length : usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
       salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? normalizeEconomyMoney(standing?.salaryTotal) ?? salaryTotal : salaryTotal,
       avgContractLength,
@@ -823,6 +830,7 @@ export function buildLightweightTeamSeasonStandRows(input: {
         generalManagerInfluencePct: generalManager?.assignment.influencePct ?? null,
         rank: standing?.rank ?? null,
         points: standing?.points ?? null,
+        verhaeltnis: standing?.verhaeltnis ?? null,
         rosterCount: standing?.rosterCount ?? roster.length,
         salaryTotal: standing?.salaryTotal ?? salaryTotal,
         avgContractLength,

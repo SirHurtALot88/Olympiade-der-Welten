@@ -46,6 +46,7 @@ import {
   StatChipRow,
   formatNlNumber,
   formatNlMoney,
+  formatNlSignedNumber,
   nlToneClass,
   type NlBarChartBar,
   type NlRankingDrawerRow,
@@ -178,6 +179,7 @@ type NlTableSortKey =
   | "rank"
   | "team"
   | "points"
+  | "verhaeltnis"
   | "bonus"
   | SeasonDisciplineAreaId
   | "formCards"
@@ -211,6 +213,8 @@ function getTableSortValue(
       return row.teamName;
     case "points":
       return row.points != null && Number.isFinite(row.points) ? row.points : Number.NEGATIVE_INFINITY;
+    case "verhaeltnis":
+      return row.verhaeltnis != null && Number.isFinite(row.verhaeltnis) ? row.verhaeltnis : Number.NEGATIVE_INFINITY;
     case "bonus": {
       const bonus = row.disciplineValues.bonuspunkte;
       return bonus != null && Number.isFinite(bonus) ? bonus : Number.NEGATIVE_INFINITY;
@@ -750,6 +754,15 @@ export default function SeasonStandingsNewLook({
    * exakt beim bisherigen Verhalten — eine einzige Tabelle, unveraendert.
    */
   const hasLeagueSplit = useMemo(() => boardRows.some((row) => row.leagueTier != null), [boardRows]);
+
+  /**
+   * Task #159 ("Tabelle wie in der Bundesliga MIT Punkteverhältnis", Chris): `true`, sobald
+   * IRGENDEINE Zeile ein `verhaeltnis` trägt. Das Feld ist nur in Battle-Saves gesetzt
+   * (`StandingRecord.verhaeltnis`, seit PR #1266) — jeder Manager-Save liefert durchgehend
+   * `null` und zeigt die neue "Verh."-Spalte dann gar nicht erst (bit-identisches Markup zu
+   * vorher).
+   */
+  const hasVerhaeltnis = useMemo(() => boardRows.some((row) => row.verhaeltnis != null), [boardRows]);
 
   /**
    * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
@@ -1660,6 +1673,15 @@ export default function SeasonStandingsNewLook({
               <th className="nl-standings-th-rank">{renderTableSortHeader("rank", "Rang")}</th>
               <th className="nl-standings-th-team">{renderTableSortHeader("team", "Team")}</th>
               <th>{renderTableSortHeader("points", "Punkte")}</th>
+              {hasVerhaeltnis ? (
+                <th className="nl-standings-th-verhaeltnis">
+                  {renderTableSortHeader(
+                    "verhaeltnis",
+                    "Verh.",
+                    "Punkteverhältnis — Saisonsumme der ±D-Werte aller Battle-Duelle, Tiebreaker nach Punkten",
+                  )}
+                </th>
+              ) : null}
               <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
@@ -1935,6 +1957,14 @@ export default function SeasonStandingsNewLook({
             </StandingsKaderHover>
           </td>
           <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
+          {hasVerhaeltnis ? (
+            <td
+              className={`nl-standings-td-verhaeltnis nl-tnum${nlMoneySignClass(row.verhaeltnis)}`}
+              title="Punkteverhältnis — Saisonsumme der ±D-Werte aller Battle-Duelle"
+            >
+              {formatNlSignedNumber(row.verhaeltnis, 0)}
+            </td>
+          ) : null}
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
           {renderFormCardLeftCell(row)}
