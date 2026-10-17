@@ -36,6 +36,7 @@ type Regeln = {
   faehigkeitsCheck(f: unknown, o?: Record<string, unknown>): { sieg: number; messbar: boolean };
   elementWirkung(element: string | null, praegung: string[]): number;
   simuliere(a: Einheit, b: Einheit, o: Record<string, unknown>): { a: number; b: number; u: number };
+  simuliereGruppe(a: Einheit[], b: Einheit[], o: Record<string, unknown>): { a: number; b: number; u: number };
   balanceTest(o: Record<string, unknown>): { paare: number; fern: number };
   energieVon(f: Record<string, unknown>): number;
   preisVon(f: Record<string, unknown>): number;
@@ -302,6 +303,34 @@ describe("Kartenschmiede – Aktionswürfel", () => {
     expect(zwei).toBeLessThan(frei - 0.05);
     expect(drei).toBeLessThan(zwei - 0.05);
     expect(drei).toBeGreaterThan(ohne + 0.1);
+  });
+});
+
+describe("Kartenschmiede – Gruppen-Simulator", () => {
+  const krieger = einheit(4, 3, 7, "Schwert | Nahkampf | A3 |");
+  const schuetze = einheit(4, 5, 5, "Bogen | 18\" | A3 |\nMesser | Nahkampf | A2 |");
+
+  it("ist bei gleichen Seiten ausgeglichen", () => {
+    const r = R.simuliereGruppe([krieger, schuetze], [krieger, schuetze], { kaempfe: 3000, seed: 3 });
+    expect(Math.abs(r.a - r.b)).toBeLessThan(0.05);
+  });
+
+  it("lässt die Überzahl fast immer gewinnen", () => {
+    expect(R.simuliereGruppe([krieger], [krieger, krieger], { kaempfe: 1000, seed: 3 }).b).toBeGreaterThan(0.9);
+  });
+
+  it("rechnet Wunden aus „Verursacht es im Nahkampf eine Wunde“ am Rundenende mit", () => {
+    const stich = { id: "s", typ: "faehigkeit", text: "Verursacht es im Nahkampf eine Wunde: Das Ziel erleidet am Rundenende bei {D2} {W1}.", kosten: { typ: "prozent", wert: 0 } };
+    const mit = { ...krieger, skills: [stich] } as unknown as Einheit;
+    const r = R.simuliereGruppe([mit], [krieger], { kaempfe: 2000, seed: 5 });
+    expect(r.a).toBeGreaterThan(r.b + 0.15);
+  });
+
+  it("lässt eine Aura mit {T-1} gegen jeden Feind in Reichweite wirken", () => {
+    const sporen = { id: "a", typ: "faehigkeit", text: "Feinde {F3} um es {T-1}.", kosten: { typ: "prozent", wert: 0 } };
+    const mit = { ...krieger, skills: [sporen] } as unknown as Einheit;
+    const ohne = R.simuliereGruppe([krieger, krieger], [krieger, krieger], { kaempfe: 2000, seed: 6 }).a;
+    expect(R.simuliereGruppe([mit, krieger], [krieger, krieger], { kaempfe: 2000, seed: 6 }).a).toBeGreaterThan(ohne + 0.08);
   });
 });
 

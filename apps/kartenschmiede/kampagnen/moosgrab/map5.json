@@ -39,7 +39,7 @@
    },
    {
     "titel": "Das Ziel: Adern, Glut, Schacht",
-    "text": "Erst die drei Adern durchtrennen (je Verteidigung 4+, Zäh 4; Feuertopf +1 Treffer, Taste F). Sind alle drei durch, liegt die Glutkammer offen. Solange der Rufer steht, hält sein Zauber die Klappe zu: Erst wenn er fällt, lässt sich die Glut überladen: ein Held in Kontakt mit dem Herz, eine Aktion, W6 ab 5 (Taste X); der Überlebende ab 3 (Taste Y); mit gelesenem Protokoll +1. Misslungen: ein Treffer Hitze. Dann läuft die Glut-Leiste, sechs Runden bis zum Bruch: alle den Schacht hinauf. Nicht alle Gegner müssen fallen."
+    "text": "Erst die drei Adern durchtrennen (je Verteidigung 4+, LP 4; Feuertopf +1 Treffer, Taste F). Sind alle drei durch, liegt die Glutkammer offen. Solange der Rufer steht, hält sein Zauber die Klappe zu: Erst wenn er fällt, lässt sich die Glut überladen: ein Held in Kontakt mit dem Herz, eine Aktion, W6 ab 5 (Taste X); der Überlebende ab 3 (Taste Y); mit gelesenem Protokoll +1. Misslungen: ein Treffer Hitze. Dann läuft die Glut-Leiste, sechs Runden bis zum Bruch: alle den Schacht hinauf. Nicht alle Gegner müssen fallen."
    },
    {
     "titel": "Der Überlebende",
@@ -1034,7 +1034,7 @@
     "passives": "Greift nicht an, bewegt sich nicht, Furchtlos",
     "flavor": "Warm. Sie pumpt."
    },
-   "notiz": "Playbook: Verteidigung 4+, Zäh 4, drei Stück an den A-Markern vor dem Herz. Fällt eine, zählt die Leiste „Durchtrennte Adern“ eins hoch. Bei 3 liegt die Glutkammer offen: erst dann kann die Glut überladen werden (Reaktor der Anlage, vor den Spielern nur „die Glut“). Mit gelesenem Protokoll DS +1 gegen die Adern.",
+   "notiz": "Playbook: Verteidigung 4+, LP 4, drei Stück an den A-Markern vor dem Herz. Fällt eine, zählt die Leiste „Durchtrennte Adern“ eins hoch. Bei 3 liegt die Glutkammer offen: erst dann kann die Glut überladen werden (Reaktor der Anlage, vor den Spielern nur „die Glut“). Mit gelesenem Protokoll DS +1 gegen die Adern.",
    "zusatz": [
     {
      "wenn": {
@@ -1532,7 +1532,7 @@
    "marker": "ader:A",
    "einmal": true,
    "kosten": "Held näher als eine Kartenlänge, keine Aktion",
-   "wofuer": "Die drei Adern: je Verteidigung 4+, Zäh 4. Sind alle drei durch, liegt die Glutkammer offen, und erst dann kann man die Glut überladen.",
+   "wofuer": "Die drei Adern: je Verteidigung 4+, LP 4. Sind alle drei durch, liegt die Glutkammer offen, und erst dann kann man die Glut überladen.",
    "vorlesen": "Ein Strang aus Wurzeln läuft aus dem Fels ins Herz. Er ist heiß. Er zuckt mit jedem Schlag.",
    "probe": {
     "frage": "Der Held, der hinsieht, würfelt einen W6.",
@@ -2578,7 +2578,7 @@
     "Gegnerzug: vor jeder Gegnergruppe G. 1 bis 3 die Helden, 4 bis 6 der Überlebende (ohne ihn: die Helden); ein befallener Held (ab 3 Sporenpunkten) schon bei 4. Dann Verhaltenswürfel, wütende Tabelle.",
     "Rundenende: R, das Ausatmen kommt von selbst: W6 kleiner oder gleich der Atemzug-Leiste, dann ist alles innerhalb einer Kartenbreite um das Herz verseucht, und jeder Held darin macht einen Qualitätstest (misslungen eine Kartenbreite auf das Herz zu).",
     "Nachschub steht nach R in der Gegnerliste: Sporenlinge (so viele wie die Atemzug-Leiste, höchstens 3, verteilt auf A, B und C, auf Normal etwa drei Mal), dazu je Runde eine leere Rüstung aus Zone B (auf Normal etwa drei), am Ende von Runde 2 zwei Befallene aus dem Schacht, falls in Map 3 einer im Keller war.",
-    "Adern: je Verteidigung 4+, Zäh 4; Feuertopf an eine Ader: F, +1 Treffer. Sind alle drei durch, liegt die Glutkammer offen (die App sagt es).",
+    "Adern: je Verteidigung 4+, LP 4; Feuertopf an eine Ader: F, +1 Treffer. Sind alle drei durch, liegt die Glutkammer offen (die App sagt es).",
     "Überladen (erst wenn der Rufer gefallen ist, sein Zauber hält die Klappe zu): ein Held in Kontakt mit dem Herz, eine Aktion, X (W6 ab 5); der Überlebende Y (ab 3). Mit Protokoll +1 auf den Wurf. Misslungen: ein Treffer Hitze für den, der es versucht hat.",
     "Protokoll: vom Überlebenden gelesen (Taste 2) oder von einem Helden studiert (K, W6 ab 4): DS +1 gegen die Adern, an den Karten schon eingerechnet.",
     "Der Rufer ist der Boss (175 P.): Solange er steht, kein Überladen. Fällt er, werden die leeren Rüstungen ruhig (die App setzt das selbst).",

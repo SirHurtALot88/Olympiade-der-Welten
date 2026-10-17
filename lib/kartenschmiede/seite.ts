@@ -25,6 +25,7 @@ const SCHRIFTEN: Array<[familie: string, datei: string, gewicht: number, stil: "
 const BILDER: Record<string, string> = {
   werwolf: "werwolf-mini.jpg",
   sporenhuelle: "sporenhuelle-mini.jpg",
+  ritterin: "ritterin-schwarzer-gral.jpg",
   einheit1: "einheit-1.jpg",
   einheit2: "einheit-2.jpg",
   einheit3: "einheit-3.jpg",

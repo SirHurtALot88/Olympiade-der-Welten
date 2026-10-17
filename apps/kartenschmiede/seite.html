@@ -493,6 +493,8 @@ table.charaktere tbody tr { cursor: default; }
 @media (max-width: 880px) { .sim { grid-template-columns: 1fr; } }
 .sim-ctl { display: grid; gap: 14px; }
 .sim-out { display: grid; gap: 14px; font-family: var(--ui); }
+.sim-gruppe-kopf { margin: 10px 0 0; font: 700 15px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); }
+.sim-gruppe { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; min-height: 34px; }
 .bar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); font-weight: 800; font-size: 16px; }
 .bar span { display: grid; place-items: center; min-width: 0; overflow: hidden; white-space: nowrap; color: #14100a; }
 .bar .a { background: #d9b25f; } .bar .d { background: #4a4f58; color: var(--ink); } .bar .b { background: #7fb0e6; }
@@ -1075,6 +1077,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 9.5 10.5 4 20 4c0 9.5-5.5 15-15 15zM5 19l8.5-8.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.2 6.2 0 0 0 10 10z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-sword" viewBox="0 0 24 24"><path d="M20 4l-10.5 10.5M20 4v4.5M20 4h-4.5M6.5 11.5l6 6M8.5 15.5L4 20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+    <symbol id="i-bow" viewBox="0 0 24 24"><path d="M5 3.5c8 0 15.5 7.5 15.5 15.5M5 3.5L20.5 19M4 20L17 7M17 7h-4M17 7v4M4 20l.5-3M4 20l3-.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.9"/></symbol>
     <symbol id="i-boot" viewBox="0 0 24 24"><path d="M7.5 3h5.5v10h3.2c2.2 0 3.8 1.3 3.8 3.3V20H4v-3.8l3.5-3.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-wing" viewBox="0 0 24 24"><path d="M3 19c7 0 13-4.5 18-15-3.2 1.2-6.2 1.6-9 3.4.8-1.4 1-2.6 1-4-4 1.8-7.4 6-8.4 10.6.9-.6 1.8-.9 2.8-.9C5.5 14.5 3.8 16.6 3 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -1129,7 +1132,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
       <select id="preset" aria-label="Vorlage laden"></select>
       <button type="button" class="btn ghost sm" id="bNewHero">+ Held</button>
       <button type="button" class="btn ghost sm" id="bNewEnemy">+ Gegner</button>
-      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, Zäh +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
+      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, LP +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
       <div class="seg" id="modus" role="group" aria-label="Bearbeiten mit">
         <button type="button" data-m="form" aria-pressed="true" data-tip="Alle Werte als Felder: schnell für fertige Einheiten und Vorschläge aus dem Chat.">Formular</button>
         <button type="button" data-m="bau" aria-pressed="false" data-tip="Werte mit + und −, neben jedem Knopf steht, was er kostet. Helden haben ein festes Budget.">Baukasten</button>
@@ -1156,7 +1159,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
               <label class="f">Modelle <input type="text" id="size"></label>
               <label class="f">Qualität <input type="text" id="quality"></label>
               <label class="f">Verteid. <input type="text" id="defense"></label>
-              <label class="f">Zäh <input type="text" id="tough" title="Zäh je Modell"></label>
+              <label class="f">LP <input type="text" id="tough" title="LP je Modell"></label>
             </div>
             <div class="calc" id="calc" aria-live="polite"></div>
           </fieldset>
@@ -1307,9 +1310,23 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
         <div class="copyrow">
           <button type="button" class="btn" id="simRun">Würfeln</button>
           <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
-          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an Zäh bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
+          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an LP bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
+        <h3 class="sim-gruppe-kopf">Gruppenkampf</h3>
+        <div class="row">
+          <label class="f">Seite A: hinzufügen <select id="grpAdd0"></select></label>
+          <label class="f">Seite B: hinzufügen <select id="grpAdd1"></select></label>
+        </div>
+        <div class="row">
+          <div class="sim-gruppe" id="grpListe0" aria-label="Seite A"></div>
+          <div class="sim-gruppe" id="grpListe1" aria-label="Seite B"></div>
+        </div>
+        <div class="copyrow">
+          <button type="button" class="btn" id="grpRun">Gruppen würfeln</button>
+          <button type="button" class="btn ghost sm" id="grpHelden" data-tip="Seite B: die vier Helden-Vorlagen">Seite B: vier Helden</button>
+        </div>
+        <p class="hint">Aktivierung abwechselnd wie bei OPR, jede Einheit nimmt sich den nächsten Feind vor, nur das Ziel schlägt zurück. Auren wie Rauschsporen treffen jeden Feind in Reichweite. Startabstand, Kämpfe und Gelände wie oben, höchstens 10 Runden. Schicksalswürfel zählen nicht mit.</p>
       </div>
       <div class="sim-out" id="simOut" aria-live="polite"></div>
     </div>
@@ -1328,7 +1345,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
           <dt>Trefferchance</dt><dd>Qualität 2+ 0,83 · 3+ 0,67 · 4+ 0,5 · 5+ 0,33 · 6+ 0,17. Zuverlässig zählt wie 2+</dd>
           <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Zerfleischen ×1,15 · Zersetzen ×1,35 · Stoß ×1,1 · Tödlich ×2 · Explosion(X) ×(1 + X/6) · Präzise ×1,25 · Indirekt ×1,15 · Zielsuchend ×1,05 · Überhitzen ×0,85 · Elemente ×1 (kosten nichts)</dd>
           <dt>Reichweite</dt><dd>Nahkampf ×1 · 6" ×0,68 · 12" ×0,8 · 18" ×0,9 · 24" ×1,0 · 30" ×1,1. Mit dem Duell-Simulator so abgestimmt, dass Fern- und Nahkampf bei gleichen Punkten gleich oft gewinnen</dd>
-          <dt>Ausdauer</dt><dd>Zäh × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
+          <dt>Ausdauer</dt><dd>LP × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
           <dt>Boni</dt><dd>+5 % Geländeläufer, Späher, Tarnung, Fliegen, Furchtlos, Rasend, Held · +10 % Schnell, Hinterhalt, Wucht · +15 % Furcht · +20 % Ausweichen · +25 % Regeneration · −10 % Langsam · −15 % An Beschwörer gebunden</dd>
           <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Skills, Zauber und Gegenstände aus der Datenbank mit ihren festen Punkten</dd>
           <dt>Prozent</dt><dd>Sonderregeln der Gegner aus der Datenbank als Aufschlag auf die Boni</dd>
@@ -1350,7 +1367,7 @@ body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
           </tbody>
         </table></div>
         <h3>Normal und Elite</h3>
-        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
+        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, LP plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
         <p>Jeder Gegner kann ein Gefährte werden. Der Spielleiter schaltet ihn für eine Gruppe frei, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>

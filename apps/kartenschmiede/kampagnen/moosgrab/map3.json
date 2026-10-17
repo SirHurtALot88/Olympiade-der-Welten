@@ -1256,7 +1256,7 @@
      "passives": "",
      "flavor": "Drei Nächte wach, und sie hat nicht vor, die vierte zu verpassen."
     },
-    "notiz": "Keine Kämpferin, aber sie trifft: Q4+, V5+, Zäh 3, Armbrust zwei Kartenlängen. Nur drücken, wenn ein Held sie wirklich angreift. Ihr Schuss: Lärm +2 (Z).",
+    "notiz": "Keine Kämpferin, aber sie trifft: Q4+, V5+, LP 3, Armbrust zwei Kartenlängen. Nur drücken, wenn ein Held sie wirklich angreift. Ihr Schuss: Lärm +2 (Z).",
     "info": "Die Wirtin. Wird sie angegriffen, schießt sie und verriegelt, was sie verriegeln kann.",
     "setzt": {
      "wirtin_angegriffen": true
@@ -1367,7 +1367,7 @@
    "anzeige": "Etwas Kleines aus den Gärten",
    "karte": "v:giftmade",
    "info": "Klein, weich, auf zu vielen Beinen. Kriecht aus den Gärten, sobald das Dorf laut genug ist.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie in Map 1. Zwei je Feindzone bei Lärm 3. Giftspeichel gilt als Sporenhusten, eine Kartenlänge weit.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3), wie in Map 1. Zwei je Feindzone bei Lärm 3. Giftspeichel gilt als Sporenhusten, eine Kartenlänge weit.",
    "zustandSaetze": {
     "unverletzt": "Es huscht weiter, als hätte es nichts gespürt.",
     "angekratzt": "Ein Fetzen fliegt ab. Es quiekt nicht. Es hat keinen Mund dafür.",
@@ -1387,7 +1387,7 @@
    "anzeige": "Jemand vom Abendbrottisch",
    "karte": "v:giftmade",
    "info": "Befallen. Sitzt seit Tagen am Abendbrottisch und steht erst auf, wenn jemand an den Tisch tritt.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3). Drei Figuren: Vater, Mutter, Tochter; zusammen 75 P. (das Playbook sagt ≈85). Sie bleiben auf jeder Schwierigkeit drei (fest); auf Schwer kommen Sporenlinge aus den Gärten dazu.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3). Drei Figuren: Vater, Mutter, Tochter; zusammen 75 P. (das Playbook sagt ≈85). Sie bleiben auf jeder Schwierigkeit drei (fest); auf Schwer kommen Sporenlinge aus den Gärten dazu.",
    "zustandSaetze": {
     "unverletzt": "Er kommt weiter, den Löffel noch in der Hand.",
     "angekratzt": "Der Schlag sitzt. Er sieht nicht einmal hin.",
@@ -1423,7 +1423,7 @@
     "passives": "Furchtlos, Folgt den Schritten: greift nur an, wer sich in seinem eigenen Zug bewegt hat, solange es so einen gibt",
     "flavor": "Drei Tage, ein Takt. Er hört nicht auf, bis ihn jemand berührt."
    },
-   "notiz": "Eigene Werte, etwa 125 P. (Q4+, V3+, Zäh 9, Schmiedehammer A4 DS(1) Reißend, Furchtlos). Wenn keine eigene Karte gebaut ist: Seuchenbringer (120) als Ersatz. Startet in der Schmiede (Marker S). Hammer weggeschlagen (Taste 6, eine 6 beim Treffen): nur noch A2, steht dann an der Karte. Er greift nur an, wer sich in seinem eigenen Zug bewegt hat; hat sich keiner bewegt, den Nächsten.",
+   "notiz": "Eigene Werte, etwa 125 P. (Q4+, V3+, LP 9, Schmiedehammer A4 DS(1) Reißend, Furchtlos). Wenn keine eigene Karte gebaut ist: Seuchenbringer (120) als Ersatz. Startet in der Schmiede (Marker S). Hammer weggeschlagen (Taste 6, eine 6 beim Treffen): nur noch A2, steht dann an der Karte. Er greift nur an, wer sich in seinem eigenen Zug bewegt hat; hat sich keiner bewegt, den Nächsten.",
    "zustandSaetze": {
     "unverletzt": "Der Hammer hebt sich wieder. Er hat den Treffer nicht bemerkt.",
     "angekratzt": "Ein Riss in der Schürze. Darunter ist kein Blut, nur Moos.",
@@ -1459,7 +1459,7 @@
    "anzeige": "Jemand aus einem der Häuser",
    "karte": "v:giftmade",
    "info": "Einer, der hinter seinem Riegel gewartet hat. Ab Lärm 6 kommen sie heraus, einer je Runde.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3). Nachschub am Rundenende nach Lärm 6, auf Normal höchstens vier.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3). Nachschub am Rundenende nach Lärm 6, auf Normal höchstens vier.",
    "zustandSaetze": {
     "unverletzt": "Es geht weiter, ohne Eile.",
     "angekratzt": "Getroffen. Es blutet nicht rot.",
@@ -1479,7 +1479,7 @@
    "anzeige": "Eine aus der Gemeinde",
    "karte": "v:giftmade",
    "info": "Eine der Gestalten aus der Kapelle. Sie ist euch gefolgt, über den Hauptweg, ohne Eile.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie in Map 2. Nur, wenn die Gemeinde in Map 2 wach wurde und nicht gefallen ist: Ende Runde 2 zwei, dann je Rundenende zwei mehr, auf Normal höchstens sechs.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3), wie in Map 2. Nur, wenn die Gemeinde in Map 2 wach wurde und nicht gefallen ist: Ende Runde 2 zwei, dann je Rundenende zwei mehr, auf Normal höchstens sechs.",
    "zustandSaetze": {
     "unverletzt": "Sie kommt weiter. Sie flüstert noch immer dasselbe Wort.",
     "angekratzt": "Der Schlag sitzt, und sie flüstert weiter, nur schneller.",
@@ -1499,7 +1499,7 @@
    "anzeige": "Die Frau aus dem Keller",
    "karte": "v:giftmade",
    "info": "Sie hat ihre Kinder gehalten, die ganze Zeit. Jetzt lässt sie los.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie im Playbook. Nur, wenn die App die Frau als befallen gezogen hat und sie enttarnt wurde. Die Kinder sind Menschen: sie kämpfen nicht und werden nicht angegriffen.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3), wie im Playbook. Nur, wenn die App die Frau als befallen gezogen hat und sie enttarnt wurde. Die Kinder sind Menschen: sie kämpfen nicht und werden nicht angegriffen.",
    "zustandSaetze": {
     "unverletzt": "Sie lächelt immer noch.",
     "angekratzt": "Der Schlag reißt ihr das Kopftuch weg. Darunter Moos, dicht wie Haar.",
@@ -1522,7 +1522,7 @@
    "anzeige": "Der Junge aus der Backstube",
    "karte": "v:giftmade",
    "info": "Er hat nach seinem Vater gefragt. Er fragt immer noch.",
-   "notiz": "Platzhalter Giftmade (25 P., Zäh 3), wie im Playbook. Nur, wenn die App den Jungen als befallen gezogen hat und er enttarnt wurde.",
+   "notiz": "Platzhalter Giftmade (25 P., LP 3), wie im Playbook. Nur, wenn die App den Jungen als befallen gezogen hat und er enttarnt wurde.",
    "zustandSaetze": {
     "unverletzt": "Er lacht. Es klingt wie ein Kind, das lacht.",
     "angekratzt": "Mehl staubt von ihm ab. Darunter ist er grün.",
@@ -1557,7 +1557,7 @@
     "passives": "",
     "flavor": "Heu im Haar und Angst in den Händen. Er bleibt trotzdem."
    },
-   "notiz": "Verbündeter (zählt nicht ins Punktebudget): Q5+, V5+, Zäh 3, Knüppel A1, etwa 15 P. Führt ein Spieler oder du. Kommt nur mit, wenn die Glocke geschlagen hat und die Spieler sie mitnehmen.",
+   "notiz": "Verbündeter (zählt nicht ins Punktebudget): Q5+, V5+, LP 3, Knüppel A1, etwa 15 P. Führt ein Spieler oder du. Kommt nur mit, wenn die Glocke geschlagen hat und die Spieler sie mitnehmen.",
    "zustandSaetze": {
     "unverletzt": "Er hält den Knüppel mit beiden Händen und steht.",
     "angekratzt": "Er flucht, ohne einen Namen zu sagen.",
@@ -1589,7 +1589,7 @@
     "passives": "",
     "flavor": "Drei Nächte wach. Sie trifft trotzdem."
    },
-   "notiz": "Verbündete (zählt nicht ins Punktebudget): Q4+, V5+, Zäh 3, Armbrust zwei Kartenlängen A1 DS(1), etwa 30 P. Führt ein Spieler oder du. Ihr Schuss zählt Lärm wie jeder Fernkampf (Z).",
+   "notiz": "Verbündete (zählt nicht ins Punktebudget): Q4+, V5+, LP 3, Armbrust zwei Kartenlängen A1 DS(1), etwa 30 P. Führt ein Spieler oder du. Ihr Schuss zählt Lärm wie jeder Fernkampf (Z).",
    "zustandSaetze": {
     "unverletzt": "Sie lädt nach, ohne hinzusehen.",
     "angekratzt": "Ein Kratzer. Sie flucht laut, ohne einen Namen.",
@@ -3550,7 +3550,7 @@
      "setzt": {
       "knechte_dabei": true
      },
-     "folge": "Zwei Verbündete stehen in der Gegnerliste (Q5+, Zäh 3, Knüppel A1). Die Spieler führen sie oder du.",
+     "folge": "Zwei Verbündete stehen in der Gegnerliste (Q5+, LP 3, Knüppel A1). Die Spieler führen sie oder du.",
      "ziel": "wissen-hedda"
     },
     {

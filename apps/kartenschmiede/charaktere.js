@@ -42,7 +42,7 @@
     treffer.sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * (sortierung.ab ? -1 : 1); });
     const kopf = (key, text, cls = "") => `<th class="${cls}" ${key ? `data-sort="${key}" aria-sort="${sortierung.spalte === key ? (sortierung.ab ? "descending" : "ascending") : "none"}"` : ""}>${text}${sortierung.spalte === key ? (sortierung.ab ? " ▾" : " ▴") : ""}</th>`;
     tabelle.innerHTML = `<thead><tr>${kopf("", "")}${kopf("name", "Name")}${kopf("rolle", "Rolle")}${kopf("stufe", "Stufe")}${kopf("punkte", "Punkte", "num")}
-      ${kopf("q", "Qual.", "num")}${kopf("v", "Vert.", "num")}${kopf("t", "Zäh", "num")}${kopf("", "Waffen")}${kopf("", "Fähigkeiten")}${kopf("", "")}</tr></thead>
+      ${kopf("q", "Qual.", "num")}${kopf("v", "Vert.", "num")}${kopf("t", "LP", "num")}${kopf("", "Waffen")}${kopf("", "Fähigkeiten")}${kopf("", "")}</tr></thead>
       <tbody class="static">${treffer.map(z => {
         const fr = z.d.faction || "";
         return `<tr>
