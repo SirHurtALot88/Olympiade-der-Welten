@@ -8,7 +8,7 @@ import {
   deriveBlockedBreakdownFromReasons,
 } from "@/lib/ai/ai-action-breakdown";
 import type { AiPreseasonAutomationRunRecord, MappingWarning } from "@/lib/data/olyDataTypes";
-import { LEAGUE_SIZE } from "@/lib/season/league-split";
+import { LEAGUE_SIZE, buildInitialLeagueAssignment } from "@/lib/season/league-split";
 
 import {
   NlCard,
@@ -551,6 +551,19 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         ? getBusyActionReason("Das New-Game-Setup")
         : null;
 
+    /**
+     * TASK #155 — LIGA 2 IST IM BATTLE MODE KOMPLETT KI-GESTEUERT (WIZARD-FILTER).
+     *
+     * Dieselbe reine Funktion wie im Server (`lib/game/new-game-setup-service.ts`,
+     * `buildInitialLeagueAssignment`) — bewusst hier im Client noch einmal auf `gameState.teams`
+     * angewendet, NICHT auf eine zweite, eigene Sortierung: Budget-Startrang 1..16 → Liga 1,
+     * 17..32 → Liga 2, exakt dieselbe Zuordnung, die ein Battle-Mode-Save beim Anlegen bekommt.
+     * Nur im Battle-Mode-Schritt relevant — Manager Mode kennt keine Liga 2 und zeigt weiterhin
+     * jeden Klub.
+     */
+    const newGameLeagueAssignment = newGameMode === "battle" ? buildInitialLeagueAssignment(gameState.teams) : null;
+    const isNewGameTeamSelectable = (teamId: string) => newGameLeagueAssignment?.[teamId] !== "liga2";
+
     return (
       <section
         className={`nl-teamsettings-subpanel nl-newgame${newGameWizardOpen ? "" : " is-eingeklappt"}`}
@@ -740,10 +753,16 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         {/* Club-Picker: die ganze Karte ist der Auswahl-Toggle. */}
         <div className="nl-newgame-pickerhead">
           <strong>Wähle deine Klubs</strong>
-          <span className="nl-teamsettings-hint">Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI</span>
+          <span className="nl-teamsettings-hint">
+            Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI
+            {newGameMode === "battle"
+              ? ` · Liga 2 (Rang ${LEAGUE_SIZE + 1}–${gameState.teams.length}) startet unter KI-Kontrolle — hier nicht wählbar, später im laufenden Spiel übernehmbar — nur Liga 1 startet wählbar`
+              : ""}
+          </span>
         </div>
         <div className="nl-newgame-clubgrid" data-testid="new-game-ownership-picker">
           {[...gameState.teams]
+            .filter((team) => isNewGameTeamSelectable(team.teamId))
             .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
             .map((team) => {
               const isChris = newGameChrisTeamIds.includes(team.teamId);
@@ -825,6 +844,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </div>
           <div className="nl-teamsettings-team-grid">
             {[...gameState.teams]
+              .filter((team) => isNewGameTeamSelectable(team.teamId))
               .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
               .map((team) => {
                 const isChris = newGameChrisTeamIds.includes(team.teamId);
@@ -980,7 +1000,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               </table>
             </div>
             {newGamePreview.warnings.length > 0 ? (
-              <p className="nl-teamsettings-note">Hinweise: {newGamePreview.warnings.join(" · ")}</p>
+              // Lesbar statt Rohcode (TASK #155): u.a. "battle_mode_liga2_team_not_selectable:R-R"
+              // wurde sonst nur zu "battle mode liga2 team not selectable:R-R" -- erkennbar, aber
+              // nicht erklärend. `formatCockpitReason` kennt den Code (s.
+              // `lib/foundation/game-flow-blocker-labels.ts`) und fällt für jeden anderen,
+              // unbekannten Hinweis auf denselben "_"→" "-Rohtext zurück wie vorher.
+              <p className="nl-teamsettings-note">
+                Hinweise: {newGamePreview.warnings.map((reason: string) => formatCockpitReason(reason)).join(" · ")}
+              </p>
             ) : null}
             {newGamePreview.blockers.length > 0 ? (
               <p className="nl-teamsettings-msg is-risk">Blocker: {newGamePreview.blockers.join(" · ")}</p>

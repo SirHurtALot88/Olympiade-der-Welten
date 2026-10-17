@@ -49,3 +49,31 @@ describe("Blocker-Labels fuer blockierte Ergebniszeilen", () => {
     );
   });
 });
+
+/**
+ * TASK #155 — Liga 2 komplett KI-gesteuert (Wizard-Filter). Opus-Review zu PR #1272: der New-
+ * Game-Wizard liess ein herausgefiltertes Liga-2-Team bisher nur als Rohcode
+ * ("battle_mode_liga2_team_not_selectable:R-R") in `preview.warnings` auftauchen — sichtbar in der
+ * UI, aber nicht erklärend. Derselbe Nachweis-Stil wie bei `incomplete_result` oben: lesbar UND
+ * das betroffene Team benannt.
+ */
+describe("Blocker-Label fuer den Liga-2-Filter im New-Game-Wizard", () => {
+  it("nennt das betroffene Team und erklärt, warum es bei der Neuanlage nicht wählbar ist", () => {
+    const label = formatGameFlowBlocker("battle_mode_liga2_team_not_selectable:R-R");
+
+    expect(label).toContain("R-R");
+    expect(label).toMatch(/liga 2/i);
+    expect(label).not.toContain("battle_mode_liga2_team_not_selectable");
+    expect(label).not.toContain("battle mode liga2 team not selectable");
+  });
+
+  it("haelt mehrere betroffene Teams (z.B. Frankys komplette Preset-Auswahl) auseinander", () => {
+    const label = formatGameFlowBlockerList([
+      "battle_mode_liga2_team_not_selectable:D-P",
+      "battle_mode_liga2_team_not_selectable:V-W",
+    ]);
+
+    expect(label).toContain("D-P");
+    expect(label).toContain("V-W");
+  });
+});
