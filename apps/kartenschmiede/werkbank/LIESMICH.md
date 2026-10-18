@@ -16,3 +16,11 @@ Karten zu Chris' bemalten Minis, die noch auf ihr Bild warten. Eine JSON-Datei p
 
 Ist das Bild da: Bild nach `../assets/`, Karte als Vorlage in `app.js`, Status auf „fertig“.
 Ablauf im Detail: `docs/KAMPAGNEN_UEBERGABE.md`, Abschnitt „Arbeitsweise“.
+
+Bildformat: auch für Gegnerkarten (Postkarte quer) ein **Hochformat 4:5** bestellen. Die Querkarte zeigt
+das Bild nur als hohe Spalte rechts neben den Werten, ein Querbild wird dort auf ein Drittel zugeschnitten.
+Den Prompt nah an der Mini halten: Pose, Rüstung, Helm und Geschlecht genau benennen, sonst erfindet das
+Bildmodell eine andere Figur.
+Ausdrücklich nennen, was die Bildmodelle sonst falsch machen (gelernt an der Ritterin, 17.10.): Geschlecht
+samt weiblich geformtem Brustpanzer, nur die Waffen der Mini (keine dazuerfundenen Klingen), matte Oberflächen
+ohne Plastikglanz und ein natürlicher Stand mit Gewicht auf einem Bein, sonst bleibt es eine Spielfigur.

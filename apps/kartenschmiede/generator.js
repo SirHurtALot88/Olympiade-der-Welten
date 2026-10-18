@@ -12,7 +12,7 @@
   const gross = s => s.charAt(0).toUpperCase() + s.slice(1);
 
   // ---------- Waffen ----------
-  // Standard-Held zum Bepreisen: Qualität 4+, Verteidigung 5+, Zäh 5, eine Faust als Grundwaffe
+  // Standard-Held zum Bepreisen: Qualität 4+, Verteidigung 5+, LP 5, eine Faust als Grundwaffe
   const REFERENZ = { quality: "4+", defense: "5+", tough: "5", size: "1", passives: "", role: "enemy" };
   const GRUNDWAFFE = "Faust | Nahkampf | A1 |";
   function waffenPreis(R, zeile) {
@@ -108,7 +108,7 @@
     { id: "staerkung", tags: ["staerkung"], feind: false, basis: 8, sg: "{T+1} bis zum Ende der nächsten Aktivierung", pl: "{T+1} bis zum Ende der nächsten Aktivierung", namen: ["Kriegsruf", "Blutdurst", "Zielsucher", "Kampfrausch"] },
     { id: "sprung", tags: ["bewegung"], selbst: true, basis: 6, sg: "{B6} in beliebige Richtung", pl: "", namen: ["Phasensprung", "Blinzeln", "Sprungdüse", "Schattensprung"] },
     { id: "tarnung", tags: ["tarnung"], selbst: true, basis: 6, sg: "bis zur nächsten Aktivierung nur aus 9\" oder näher beschießbar", pl: "", namen: ["Schattenmantel", "Tarnfeld", "Nebelgestalt"] },
-    { id: "beschwoerung", tags: ["beschwoerung"], selbst: true, basis: 20, sg: "Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf), bleibt bis Spielende", pl: "", namen: ["Ruf der Wildnis", "Seelenbeschwörung", "Portalriss"] },
+    { id: "beschwoerung", tags: ["beschwoerung"], selbst: true, basis: 20, sg: "Geistwolf {R3} aufstellen (Q4+ V5+ LP 3, A2 Nahkampf), bleibt bis Spielende", pl: "", namen: ["Ruf der Wildnis", "Seelenbeschwörung", "Portalriss"] },
   ];
   // {R} wird zu {R6} (Reichweite), {F} zu {F6} (alle im Umkreis) – Symbole siehe app.js SYMBOLTEXT
   const ZIELE_FEIND = [{ t: "Feind {R}", m: 1 }, { t: "Alle Feinde {F}", m: 1.8, tag: "flaeche", pl: true, flaeche: true }];
@@ -170,7 +170,7 @@
     const sf = opt.tag === "technik";
     const zielText = wk.id === "beschwoerung" ? "" : zi.t.replace("{R}", `{R${rw.z}}`).replace("{F}", `{F${rw.z}}`) + ":";
     let satz = `${nu.t} ${zielText} ${zi.pl ? wk.pl : wk.sg}.`.replace(/\s+/g, " ");
-    if (sf) satz = satz.replace("Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf)", "Kampfdrohne {R3} aufstellen (Q4+ V5+ Zäh 3, Laser 12\" A1)");
+    if (sf) satz = satz.replace("Geistwolf {R3} aufstellen (Q4+ V5+ LP 3, A2 Nahkampf)", "Kampfdrohne {R3} aufstellen (Q4+ V5+ LP 3, Laser 12\" A1)");
     // Sci-Fi und Magie schließen sich aus: Psi-Kräfte sind Technik, keine Magie
     const tags = [...new Set([...wk.tags, zi.tag, nu.tag, typ === "zauber" && !sf ? "magie" : null, sf ? "technik" : null].filter(Boolean))].filter(t => !sf || t !== "magie");
     const namen = sf && SF_NAMEN[wk.id] ? SF_NAMEN[wk.id] : wk.namen;

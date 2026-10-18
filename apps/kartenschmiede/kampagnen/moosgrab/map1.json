@@ -32,7 +32,7 @@
    },
    {
     "titel": "Die Frau",
-    "text": "Sie liegt am linken Waldrand vor Zone B und bewegt sich nicht. Sie ist kein Gegner. Wer sie erreicht, solange die Uhr über 0 steht: Taste F. Wird sie angegriffen: Verteidigung 6+, Zäh 1, jede Wunde löst sofort das Aufblühen aus."
+    "text": "Sie liegt am linken Waldrand vor Zone B und bewegt sich nicht. Sie ist kein Gegner. Wer sie erreicht, solange die Uhr über 0 steht: Taste F. Wird sie angegriffen: Verteidigung 6+, LP 1, jede Wunde löst sofort das Aufblühen aus."
    },
    {
     "titel": "Verhaltenswürfel",
@@ -109,7 +109,7 @@
      "flag": "quelle_zerstoert",
      "ist": true
     },
-    "text": "Die Quelle ist aus: Die Erblühte hat 2 Zäh weniger (steht an ihrer Karte). Was in ihr wächst, bekommt keinen Nachschub mehr.",
+    "text": "Die Quelle ist aus: Die Erblühte hat 2 LP weniger (steht an ihrer Karte). Was in ihr wächst, bekommt keinen Nachschub mehr.",
     "ansage": "Das Singen ist weg. Sie merkt es. Ihr auch."
    },
    {
@@ -388,7 +388,7 @@
   "info": {
    "A": "Feindzone A, rechts oben: Hier kriechen Sporenlinge aus dem Wald, wenn der Kampf beginnt.",
    "B": "Feindzone B, linke Kante: Hier kommt die Frau aus dem Wald, und hinter ihr die Sporenlinge.",
-   "Q": "Die Quelle: grünes Licht zwischen den Steinen der Ruine. Aufgedeckt durch Marker 3 oder durch Lenes Hinweis. Greift nicht an. Zerstört: Atemzug −1, die Erblühte Zäh −2."
+   "Q": "Die Quelle: grünes Licht zwischen den Steinen der Ruine. Aufgedeckt durch Marker 3 oder durch Lenes Hinweis. Greift nicht an. Zerstört: Atemzug −1, die Erblühte LP −2."
   }
  },
  "leisten": {
@@ -753,7 +753,7 @@
      "passives": "Bewegt sich nicht, wehrt sich nur, wenn sie angegriffen wird; jede Wunde löst das Aufblühen aus",
      "flavor": "Sie wollte nach Hause. Die Füße sind schon drin."
     },
-    "notiz": "Mini: (offen, Chris sucht aus). Halb verwandelt: die Wurzeln an den Armen schlagen zurück, mehr nicht. Verteidigung 6+, Zäh 1 wie in der Sonderregel „Die Frau“: die erste Wunde ist zugleich das Aufblühen. Nur drücken, wenn ein Held sie wirklich angreift.",
+    "notiz": "Mini: (offen, Chris sucht aus). Halb verwandelt: die Wurzeln an den Armen schlagen zurück, mehr nicht. Verteidigung 6+, LP 1 wie in der Sonderregel „Die Frau“: die erste Wunde ist zugleich das Aufblühen. Nur drücken, wenn ein Held sie wirklich angreift.",
     "setzt": {
      "frau_angegriffen": true
     },
@@ -860,8 +860,8 @@
     "bossText": "Wer seinen Zug direkt neben ihr beendet (innerhalb einer Kartenbreite), steht im Sporennebel: Qualitätstest, misslungen −1 auf Treffen bis Ende der nächsten Runde.",
     "flavor": "Sie wollte nach Hause. Jetzt ist sie überall."
    },
-   "notiz": "Zielwert etwa 225 Punkte (Stufe Boss). Wenn die Schmiede-Formel höher oder niedriger liegt, Zäh anpassen. Wenn nicht gebaut: Frostfang (280) als Ersatz, dann Zäh auf 10 drücken. Sporenstoß reicht eine Kartenlänge weit.",
-   "bedrohungSatz": "Das ist, wovor sie weggelaufen ist. Langsam. Zäh. Und sie hört nicht auf.",
+   "notiz": "Zielwert etwa 225 Punkte (Stufe Boss). Wenn die Schmiede-Formel höher oder niedriger liegt, LP anpassen. Wenn nicht gebaut: Frostfang (280) als Ersatz, dann LP auf 10 drücken. Sporenstoß reicht eine Kartenlänge weit.",
+   "bedrohungSatz": "Das ist, wovor sie weggelaufen ist. Langsam. LP. Und sie hört nicht auf.",
    "zustandSaetze": {
     "unverletzt": "Die Wurzeln schließen sich über dem Schnitt, als wäre nichts.",
     "angekratzt": "Grüner Saft. Sie merkt es kaum.",
@@ -956,7 +956,7 @@
     "passives": "Greift nicht an, bewegt sich nicht",
     "flavor": "Ein Leuchten zwischen den Steinen. Es hat kein Gesicht."
    },
-   "notiz": "Vorschlag, nicht aus der Bibel: Verteidigung 4+, Zäh 6, greift nicht an. Nur angreifbar, wenn Marker 3 untersucht ist oder Lene das Licht gezeigt hat. Zerstört: quelle_zerstoert, Atemzug −1.",
+   "notiz": "Vorschlag, nicht aus der Bibel: Verteidigung 4+, LP 6, greift nicht an. Nur angreifbar, wenn Marker 3 untersucht ist oder Lene das Licht gezeigt hat. Zerstört: quelle_zerstoert, Atemzug −1.",
    "nurWenn": {
     "eine": [
      {
@@ -1303,7 +1303,7 @@
     ]
    },
    "vorlesen": "Das Licht zwischen den Steinen flackert, wird weiß, und geht aus. Für einen Moment ist der Wald still. Dann atmet er wieder, aber flacher.",
-   "gmNotiz": "Atemzug −1. Nur drücken, wenn die Quelle wirklich auf 0 ist. Die Erblühte verliert ohne die Quelle 2 Zäh (die App rechnet es an ihrer Karte an, auch wenn sie erst später erscheint).",
+   "gmNotiz": "Atemzug −1. Nur drücken, wenn die Quelle wirklich auf 0 ist. Die Erblühte verliert ohne die Quelle 2 LP (die App rechnet es an ihrer Karte an, auch wenn sie erst später erscheint).",
    "setzt": {
     "quelle_zerstoert": true
    },
@@ -1316,7 +1316,7 @@
      "werte": {
       "tough": -2
      },
-     "text": "Ohne die Quelle wächst nichts nach: Zäh −2"
+     "text": "Ohne die Quelle wächst nichts nach: LP −2"
     }
    ]
   },
@@ -1699,7 +1699,7 @@
    "titel": "Sie weicht zurück",
    "als": "frau",
    "text": "Sie hebt die Arme vors Gesicht. Die Wurzeln daran sind länger geworden, seit ihr sie zuerst gesehen habt. „Nicht … ich wollte doch nur nach Hause.“",
-   "gmNotiz": "Wird sie angegriffen: Verteidigung 6+, Zäh 1. Jede Wunde löst sofort das Aufblühen aus, die Erblühte beginnt mit voller Zähigkeit. Kein Hinweis auf die Kapelle: den Weg dorthin zeigt später nur das Zeichen auf dem Anhänger (und der Fuhrmann hat die Kapelle als Wegmarke genannt).",
+   "gmNotiz": "Wird sie angegriffen: Verteidigung 6+, LP 1. Jede Wunde löst sofort das Aufblühen aus, die Erblühte beginnt mit voller Zähigkeit. Kein Hinweis auf die Kapelle: den Weg dorthin zeigt später nur das Zeichen auf dem Anhänger (und der Fuhrmann hat die Kapelle als Wegmarke genannt).",
    "weiter": "wahl-aufbluehen"
   },
   "cue-01b4b": {

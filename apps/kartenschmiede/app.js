@@ -78,6 +78,11 @@
     { key: "seuchenbringer", label: "Myzel-Seuchenbringer", eigen: true, d: { ...basis, name: "Myzel-Seuchenbringer", faction: "Urwild", quality: "4+", defense: "3+", tough: "6",
       weapons: "Dornenklauen | Nahkampf | A3 | DS(1), Reißend\nDornenstoß | 6\" | A2 | DS(1), Explosion(3)", passives: "Langsam, Furchtlos", skills: sk("strahlende-aura"),
       look: "a hulking fungal brute covered in mushroom caps and spines, glowing yellow-green belly, radioactive spores", art: "einheit8", ay: 30 } },
+    { key: "ritterin", label: "Ritterin des Schwarzen Grals (Mini)", eigen: true, d: { ...basis, name: "Ritterin des Schwarzen Grals", faction: "Schwarzer Gral", praegung: ["gift"],
+      quality: "3+", defense: "3+", tough: "6", weapons: "Gralsspeer | Nahkampf | A3 | DS(1), Stoß, Reißend", passives: "Furchtlos", skills: sk("seuchenstich", "blutrausch"),
+      flavor: "Ihr Speer trocknet nie.",
+      look: "a slim female plague knight in rusted, filthy teal scale armour with a fluted rust-red breastplate, a perforated rust-red helmet mask with a long forward steel spike, two tattered bright blue cloak strips, blood-red gauntlets and a blood-coated forked polearm",
+      art: "ritterin", ay: 30 } },
     { key: "schurke", label: "Held: Schurke", eigen: true, d: { ...basis, role: "hero", name: "Schurke", faction: "Helden", quality: "4+", defense: "5+", tough: "5",
       weapons: "Krummklingen | Nahkampf | A4 | Reißend\nWurfmesser | 6\" | A1 |", passives: "Tarnung", skills: sk("schattenschritt", "schwachstelle") } },
     { key: "krieger", label: "Held: Krieger", eigen: true, d: { ...basis, role: "hero", name: "Krieger", faction: "Helden", quality: "4+", defense: "3+", tough: "7",
@@ -105,8 +110,8 @@
     5: "powerful and dangerous, low camera angle, strong warm backlight outlining the silhouette",
     6: "overwhelming boss presence, very low camera angle looking up, deep red backlight outlining the silhouette, the creature fills the frame and the viewer should feel small",
   };
-  // Stil wie die Olympiade-Bilder: Standbild aus einem Realfilm, dunkel, warmes Licht, genau ein leuchtender Akzent
-  const STIL = "a single frame from a live-action dark fantasy movie with a subtle science-fiction edge. Photorealistic: the creature is a real, physical being made with practical effects (real skin, fur, scales, cloth, metal), shot on a full-frame cinema camera with an 85mm lens at f/2, shallow depth of field, dark and moody low-key lighting with warm practical light, haze and a little floating dust, natural film colour grade, slightly desaturated.";
+  // Stil wie die Olympiade-Bilder: Filmstandbild mitten in einer Szene, dunkel, genau ein leuchtender Akzent. Ausdrücklich keine Mini, sonst liefert Gemini eine Spielzeug-Makroaufnahme
+  const STIL = "a dramatic still frame from a big-budget live-action dark fantasy film with a subtle science-fiction edge, the kind of shot that ends up on the poster. Photorealistic and cinematic: anamorphic lens, shallow depth of field, strong directional light with deep shadows, volumetric haze, fine film grain, a muted, slightly desaturated colour grade.\n\nThis is a real scene, not a model: the creature is a full-size living being, made with practical effects (real skin, fur, scales, cloth, metal, dirt), with real weight and wear, matte surfaces with no plastic sheen and a natural stance with the weight on one leg. Never a miniature, figurine, action figure, toy or painted model.";
   // Der eine leuchtende Akzent folgt der Prägung, damit Bild und Element-Symbol zusammenpassen
   const AKZENT = {
     feuer: "glowing orange lava cracks", frost: "pale blue frost glowing in the cracks of its skin or armour", natur: "faint green bioluminescent veins",
@@ -157,9 +162,9 @@
   // Am Tisch gibt es nur W6: ein W3 wird als ½W6 gezeigt (W6 würfeln, halbieren, aufrunden), W6−2 heißt mindestens 1
   const nurW6 = t => String(t).replace(/W3/g, "½W6").replace(/(W6)-(\d)/g, "$1−$2");
   const wuerfelHinweis = w => [/W3/.test(w) ? "½W6: W6 würfeln, halbieren, aufrunden (1–2 → 1, 3–4 → 2, 5–6 → 3)" : "", /W\d[-−]\d/.test(w) ? "mindestens 1" : ""].filter(Boolean).join("; ");
-  const symbol = (k, w) => {
+  const symbol = (k, w, icon) => {
     const d = SYMBOLTEXT[k], z = nurW6(d.zeige(w)), extra = wuerfelHinweis(w);
-    return `<span class="sym" data-tip="${esc(nurW6(d.tip(w)) + (extra ? ` (${extra})` : ""))}">${ico(d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`;
+    return `<span class="sym" data-tip="${esc(nurW6(d.tip(w)) + (extra ? ` (${extra})` : ""))}">${ico(icon || d.icon)}${z ? `<b>${esc(z)}</b>` : ""}</span>`;
   };
   const symText = text => esc(text || "").replace(SYMBOL_MUSTER, (_, k, w) => symbol(k, w));
   // Für Stellen ohne Symbole (Prompt, Suche): Klartext
@@ -217,15 +222,16 @@
               <div class="stat"><span>Modelle</span><b>${esc(s.size)}</b></div>
               <div class="stat"><span>Qualität</span><b>${esc(s.quality)}</b></div>
               <div class="stat"><span>Verteid.</span><b>${esc(s.defense)}</b></div>
-              <div class="stat"><span>Zäh</span><b>${esc(s.tough)}</b></div>
+              <div class="stat"><span>LP</span><b>${esc(s.tough)}</b></div>
             </div>
             ${waffen.length ? `<div class="weps"><div class="block-t">Waffen</div>${waffen.map(w => {
               const nah = w.reichweite === 0;
               const regeln = w.regeln && w.regeln !== "–" && w.regeln !== "-" ? w.regeln : "";
               const mitTip = t => { const r = R.regelnVon(t)[0]; return r ? `<span data-tip="${esc(`<b>${r.name}</b>${r.text}`)}">${r.element && TAG[r.element] ? tagIco(r.element) : ""}${esc(t)}</span>` : esc(t); };
-              const werte = symText(`${nah ? "" : `{R${w.reichweite}} `}{A${w.a}}${w.ds ? ` {DS${w.ds}}` : ""}`);
+              // Attacken mit Bogen-Symbol bei Fernkampf, Schwert bei Nahkampf: das Symbol sagt, wie angegriffen wird
+              const werte = [nah ? "" : symbol("R", String(w.reichweite)), symbol("A", String(w.a), nah ? "sword" : "bow"), w.ds ? symbol("DS", String(w.ds)) : ""].filter(Boolean).join(" ");
               const unter = [werte].concat(regeln.split(",").map(t => t.trim()).filter(t => t && !/^(DS|AP)\s*\(/i.test(t)).map(mitTip)).join(" ");
-              return `<div class="wep">${ico(nah ? "sword" : "target")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nahkampf" : "Fernkampf"}</span></div>`;
+              return `<div class="wep">${ico(nah ? "sword" : "bow")}<div><h4>${esc(w.name)}</h4><p>${unter}</p></div><span class="tag">${nah ? "Nah" : "Fern"}</span></div>`;
             }).join("")}</div>` : ""}
             ${passiv.length ? `<div class="chips">${passiv.map(p => `<span class="chip">${ico(symbolFuer(p))}${esc(p)}</span>`).join("")}</div>` : ""}
             ${skills.length || eigeneRegel ? `<div class="boss"><h4>${ico(tier === 6 ? "crown" : "rune")}${sonderTitel}</h4>${skills.map(k => `<p data-tip="${esc(tipText(k))}"><b>${esc(k.name)}.</b> ${energieSym(k)}${symText(k.text)}</p>`).join("")}${eigeneRegel ? `<p><b>${esc(s.bossName || "Sonderregel")}.</b> ${energieSym({ typ: "faehigkeit", text: s.bossText })}${symText(s.bossText)}</p>` : ""}</div>` : ""}
@@ -282,11 +288,15 @@
     const s = state;
     const quer = s.orient === "land";
     return [
-      `Create one image: ${STIL}`,
+      `Create one image in ${quer ? "portrait format 4:5 (if 4:5 is not available, use 2:3)" : "portrait format 2:3"}.`,
       ``,
-      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Keep its pose, silhouette, proportions, paint colours and distinctive details (weapons, chains, armour) clearly recognisable, but show it as a living creature, not a figure. Do not show the plastic base, the table or the room from the photo.`,
+      `Style: ${STIL}`,
+      ``,
+      `Reference: the attached photo shows my hand-painted tabletop miniature. Use it only as the design reference. Recreate this exact character: same pose, same armour, same weapons (including chains), same colours, same sex and body shape (a female figure stays clearly female, including the shape of her armour). Add no weapons the miniature does not carry. Change only the materials (real skin, metal and cloth instead of plastic and paint) and give it life-size scale. Do not invent a different design. Do not show the plastic base, the table or the room from the photo.`,
       ``,
       `Subject: ${s.name || "the creature"}${s.faction ? ` of the ${s.faction}` : ""}. ${s.look || ""}`.trim(),
+      ``,
+      `The moment: show it in action inside a scene, not posing: moving, about to strike or turning towards the camera, wind in cloth and hair, rain, ash or dust in the air, as if something is happening just outside the frame.`,
       ``,
       `Mood and camera: ${STIMMUNG[s.tier]}.`,
       ``,
@@ -294,9 +304,9 @@
       ``,
       `Background: simple, dark and out of focus, only the ground and surroundings suggested by the miniature's base (snow, stone, ash, forest floor). No buildings, towers, moons, ships, floating objects or second creatures.`,
       ``,
-      `Composition: ${quer ? "landscape 3:2 (it is printed as a 15 x 10 cm postcard), creature on the right half, head and weapons in the upper half, left half dark and calm because the stat panel covers it" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
+      `Composition: ${quer ? "portrait 4:5 (if 4:5 is not available, use 2:3), the card shows the image as a tall panel next to the stats. The creature centred and filling most of the frame, head in the upper third, weapons fully inside the frame, a little dark, calm space near the top right corner for the points badge" : "portrait 2:3 (it is printed as a 10 x 15 cm postcard), head and weapons in the upper half of the frame, the lower 40 percent dark and calm, because the card's stat panel covers it"}.`,
       ``,
-      `Not wanted: digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
+      `Not wanted: landscape format, miniature, figurine, action figure, toy, tabletop diorama, macro or tilt-shift photography, plastic or painted-model look, a static figure simply standing in a landscape. Also no digital painting, illustration, concept art, trading-card art, visible brush strokes, over-sharpened detail, oversaturated colours, fire or light effects all over the frame. No text, lettering, numbers, logos, card frame, border or user interface.`,
     ].join("\n");
   }
 
@@ -423,7 +433,7 @@
     let html = `<div class="b-group"><h4>Grundwerte</h4><div class="stp-grid">
       ${stufe("q", "Qualität", m.q + "+", x => x.q < 6 ? (x.q++, true) : false, x => x.q > 2 ? (x.q--, true) : false, "trifft auf diesen Wurf")}
       ${stufe("d", "Verteidigung", m.d + "+", x => x.d < 6 ? (x.d++, true) : false, x => x.d > 2 ? (x.d--, true) : false, "rettet auf diesen Wurf")}
-      ${stufe("t", "Zäh", m.t, x => x.t > 1 ? (x.t--, true) : false, x => x.t < 72 ? (x.t++, true) : false, "Lebenspunkte je Modell")}
+      ${stufe("t", "LP", m.t, x => x.t > 1 ? (x.t--, true) : false, x => x.t < 72 ? (x.t++, true) : false, "Lebenspunkte je Modell")}
       ${held ? "" : stufe("n", "Modelle", m.n, x => x.n > 1 ? (x.n--, true) : false, x => x.n < 10 ? (x.n++, true) : false, "Größe der Einheit")}
     </div></div>`;
     m.waffen.forEach((w, i) => {
@@ -528,8 +538,37 @@
     const opts = [`<option value="aktuell">Aktuelle Karte (${esc(state.name || "")})</option>`]
       .concat(VORLAGEN.map(v => `<option value="${v.key}">${esc(v.d.name)} · ${R.punkte(v.d).pts} P.</option>`));
     ["simA", "simB"].forEach((id, i) => { const el = $(id), alt = el.value; el.innerHTML = opts.join(""); el.value = alt || (i ? "sporenhuelle" : "aktuell"); });
+    if ($("grpAdd0")) gruppenZeigen();
   }
   const simEinheit = key => key === "aktuell" ? state : (VORLAGEN.find(v => v.key === key) || VORLAGEN[0]).d;
+  // Gruppenkampf: je Seite eine Liste von Vorlagen-Schlüsseln (oder „aktuell“)
+  const HELDEN = () => VORLAGEN.filter(v => v.d.role === "hero").map(v => v.key);
+  const gruppen = [["aktuell"], HELDEN()];
+  function gruppenZeigen() {
+    const opts = [`<option value="">Einheit wählen …</option>`, `<option value="aktuell">Aktuelle Karte (${esc(state.name || "")})</option>`]
+      .concat(VORLAGEN.map(v => `<option value="${v.key}">${esc(v.d.name)} · ${R.punkte(v.d).pts} P.</option>`)).join("");
+    [0, 1].forEach(s => {
+      $("grpAdd" + s).innerHTML = opts;
+      const summe = gruppen[s].reduce((a, k) => a + R.punkte(simEinheit(k)).pts, 0);
+      $("grpListe" + s).innerHTML = gruppen[s].map((k, i) => `<button type="button" class="chip-f" data-grp="${s}" data-i="${i}" data-tip="Entfernen">${esc(simEinheit(k).name || "Einheit")} ×</button>`).join("")
+        + `<small class="hint">${gruppen[s].length ? `${summe} Punkte` : "leer"}</small>`;
+    });
+  }
+  function gruppenStart() {
+    if (!gruppen[0].length || !gruppen[1].length) { $("simOut").innerHTML = `<p class="verdict">Beide Seiten brauchen mindestens eine Einheit.</p>`; return; }
+    const a = gruppen[0].map(simEinheit), b = gruppen[1].map(simEinheit);
+    const r = R.simuliereGruppe(a, b, { kaempfe: +$("simN").value, abstand: +$("simDist").value, deckung: +$("simCover").value, seed: Date.now() % 100000 });
+    const pa = a.reduce((x, e) => x + R.punkte(e).pts, 0), pb = b.reduce((x, e) => x + R.punkte(e).pts, 0);
+    const name = l => l.map(e => esc(e.name || "Einheit")).join(" + ");
+    const entsch = r.a + r.b, anteilA = entsch ? r.a / entsch : .5;
+    $("simOut").innerHTML = `
+      <div class="sim-legend"><span><b>${prozent(r.a)}</b> Seite A (${pa} P.)</span><span><b>${prozent(r.u)}</b> Unentschieden</span><span><b>${prozent(r.b)}</b> Seite B (${pb} P.)</span></div>
+      <div class="bar" role="img" aria-label="Siege A ${prozent(r.a)}, Unentschieden ${prozent(r.u)}, Siege B ${prozent(r.b)}">
+        <span class="a" style="width:${r.a * 100}%">${r.a > .08 ? prozent(r.a) : ""}</span><span class="d" style="width:${r.u * 100}%">${r.u > .08 ? prozent(r.u) : ""}</span><span class="b" style="width:${r.b * 100}%">${r.b > .08 ? prozent(r.b) : ""}</span>
+      </div>
+      <p class="verdict">Seite A: ${name(a)}. Seite B: ${name(b)}. A hat ${prozent(pa / (pa + pb))} der Punkte und gewinnt ${prozent(anteilA)} der entschiedenen Kämpfe.</p>
+      <p class="hint">Im Schnitt ${zahl(r.runden)} Runden. Am Ende stehen im Schnitt noch ${prozent(r.ueberlebtA)} der Einheiten von A und ${prozent(r.ueberlebtB)} von B.</p>`;
+  }
   function simStart() {
     const a = simEinheit($("simA").value), b = simEinheit($("simB").value);
     const r = R.simuliere(a, b, { kaempfe: +$("simN").value, abstand: +$("simDist").value, deckung: +$("simCover").value, seed: Date.now() % 100000 });
@@ -557,7 +596,7 @@
         .map(f => ({ f, ...R.faehigkeitsCheck(f, { kaempfe: 600 }) }))
         .sort((a, b) => (b.messbar - a.messbar) || (b.sieg - a.sieg));
       const urteil = z => !z.messbar ? ["", "im Duell nicht messbar"] : z.sieg >= 0.6 ? ["hi", "eher zu billig"] : z.sieg <= 0.4 ? ["lo", "eher zu teuer"] : ["ok", "passt"];
-      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an Zäh bekommt. 50 % heißt: Preis passt.</p>
+      $("simOut").innerHTML = `<p class="verdict">Jede Fähigkeit gegen dieselbe Einheit ohne, die gleich viele Punkte an LP bekommt. 50 % heißt: Preis passt.</p>
         <div class="tbl-wrap"><table><thead><tr><th>Fähigkeit</th><th class="num">Kosten</th><th class="num">Siege</th><th>Einschätzung</th></tr></thead><tbody class="static">${zeilen.map(z => {
           const [cls, txt] = urteil(z);
           return `<tr data-tip="${esc(tipText(z.f))}"><td>${tagIcons(z.f.tags, false)}${esc(z.f.name)}</td><td class="num">${esc(kostenText(z.f))}</td><td class="num">${z.messbar ? prozent(z.sieg) : "–"}</td><td><span class="dev ${cls}">${txt}</span></td></tr>`;
@@ -696,7 +735,7 @@
         <p class="hb-unter">${esc(k.faction || "Helden")} · ${R.punkte(k).pts} Punkte · Stand ${new Date().toLocaleDateString("de-DE")}</p>
         <h3>Erfahrung${ep > 20 ? ` (${ep})` : ""}</h3>${kaestchen(20, false, Math.min(ep, 20))}
         <h3>Aktionswürfel (${R.AKTIONSWUERFEL} pro Zug)</h3>${kaestchen(R.AKTIONSWUERFEL, true)}<p class="hb-unter">Bewegen 6" (höchstens 2×), Angreifen, Helfen: jeder Würfel · 2. Angriff: ${R.ZWEITER_ANGRIFF}+ · Fähigkeiten: Wurf wie angegeben</p>
-        <h3>Wunden (Zäh ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
+        <h3>Wunden (LP ${zaeh})</h3>${kaestchen(Math.min(zaeh, 40))}
         <h3>Ausrüstung und Beute</h3><div class="linien">${zeilen(beute, Math.max(5, beute.length))}</div>
         <h3>Notizen und Verlauf</h3><div class="linien">${zeilen(verlauf, 6)}</div>
       </div>
@@ -873,7 +912,7 @@
     const { karte, neu, weg } = KAT.skaliere(state, t, alleFaehigkeiten());
     state = Object.assign(state, karte);
     bModell = null; insFormular(); alles(); simOptionen();
-    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, Zäh ${state.tough}.`
+    $("saveMsg").textContent = `Auf ${STUFEN[state.tier]} angepasst: ${state.points} Punkte, Qualität ${state.quality}, Verteidigung ${state.defense}, LP ${state.tough}.`
       + (neu.length ? ` Neu: ${neu.join(", ")}.` : "") + (weg.length ? ` Entfernt: ${weg.join(", ")}.` : "");
   };
   // Gegner und Gefährten im Querformat (Platz für mehrere Fähigkeiten), Helden im Hochformat
@@ -945,6 +984,10 @@
   $("bNewEnemy").addEventListener("click", () => frisch("enemy"));
   $("bElite").addEventListener("click", eliteVersion);
   $("simRun").addEventListener("click", simStart);
+  [0, 1].forEach(s => $("grpAdd" + s).addEventListener("change", e => { if (e.target.value) gruppen[s].push(e.target.value); gruppenZeigen(); }));
+  ["grpListe0", "grpListe1"].forEach(id => $(id).addEventListener("click", e => { const b = e.target.closest("[data-grp]"); if (!b) return; gruppen[+b.dataset.grp].splice(+b.dataset.i, 1); gruppenZeigen(); }));
+  $("grpHelden").addEventListener("click", () => { gruppen[1] = HELDEN(); gruppenZeigen(); });
+  $("grpRun").addEventListener("click", gruppenStart);
   $("simFair").textContent = "Balance-Test: Fern gegen Nah";
   $("simFair").addEventListener("click", balance);
   $("simCheck").addEventListener("click", preisCheck);
