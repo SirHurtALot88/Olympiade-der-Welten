@@ -12,6 +12,7 @@ import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
+import { buildArenaHostSpielquelleHinweise } from "@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -346,6 +347,20 @@ export default function FoundationBattleArenaHost({
     return karte;
   }, [saveId, gameState.season?.id, gameState.matchdayState?.matchdayId, gameState.seasonState?.disciplineSchedule]);
 
+  /**
+   * ARENA-HOST-HINWEIS ("gewertet per PPS-Duell, Arena nur Vorschau") — Task #159 Punkt 3,
+   * eigener kleiner Posten, s. PR #1276s Beschreibung. Der Header-Text oben ("noch keine
+   * offizielle Wertung … fließt nirgends in die Tabelle ein") gilt pauschal für JEDE Disziplin,
+   * zu jeder Zeit — dieser Hinweis ist präziser: er sagt für die an DIESEM Spieltag gebuchten
+   * Disziplinen, ob die ECHTE Wertung (die in die Tabelle fließt) überhaupt über die Arena
+   * läuft, oder über die PPS-Duell-Brücke. Reine Logik + eigener Unit-Test in
+   * `lib/foundation/battle-arena/arena-host-spielquelle-hinweis.ts` — hier nur der Aufruf.
+   */
+  const spielquelleHinweise = useMemo(
+    () => buildArenaHostSpielquelleHinweise(gameState, heimTeamId),
+    [gameState, heimTeamId],
+  );
+
   const keineTeams = teams.length === 0;
   // "Vollstaendig geladen, aber leer" (Team hat wirklich keinen Spieler mit Attribut-Bogen)
   // nur waehrend NICHT gerade nachgeladen wird — sonst zeigt buildArenaTeam() eine falsche
@@ -671,6 +686,21 @@ export default function FoundationBattleArenaHost({
             <strong>{miniDmFfaTeams[3]!.name}</strong> automatisch mit dabei
             (nur in der Mini-DM-Ansicht der Arena unten, ohne Auswirkung auf
             die übrigen Disziplinen).
+          </p>
+        ) : null}
+        {spielquelleHinweise.length > 0 ? (
+          <p
+            className="muted"
+            data-testid="oly-arena-spielquelle-hinweis"
+            style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
+          >
+            {spielquelleHinweise.map((hinweis, index) => (
+              <span key={hinweis.disciplineId}>
+                {index > 0 ? " · " : ""}
+                <strong>{hinweis.disciplineName}</strong> {hinweis.text}
+              </span>
+            ))}{" "}
+            — die Arena hier ist in jedem Fall nur Vorschau.
           </p>
         ) : null}
 
