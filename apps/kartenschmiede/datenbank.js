@@ -34,7 +34,7 @@
     const waffen = R.leseWaffen(d.weapons).map(w => w.name).join(", ");
     return { typ: "einheit", id, name: d.name, art: ROLLEN[d.role || "enemy"], fuer: [d.role || "enemy"], tags: einheitTags(d),
       kosten: { typ: "fest", wert: pts }, stufe: R.stufeFuerPunkte(pts), bild, quelle, karte: d,
-      text: `${d.faction || ""} · Qualität ${d.quality} · Verteidigung ${d.defense} · Zäh ${d.tough}${waffen ? " · " + waffen : ""}` };
+      text: `${d.faction || ""} · Qualität ${d.quality} · Verteidigung ${d.defense} · LP ${d.tough}${waffen ? " · " + waffen : ""}` };
   }
   function eintraege() {
     const einheiten = KS.VORLAGEN.map(v => einheitEintrag(v.d, "v:" + v.key, KS.IMG[v.d.art] || null, "Vorlage"))
@@ -53,7 +53,7 @@
   // ---------- Anzeige ----------
   const preisVon = e => e.typ === "einheit" ? `${e.kosten.wert} P.` : e.typ === "fraktion" ? "" : e.typ === "waffe" ? `${G.waffenPreis(R, e.waffe)} P.` : KS.kostenText(e);
   const PREIS_TIP = {
-    waffe: "Fester Preis der Waffe, gemessen an einem Standard-Helden (Qualität 4+, Verteidigung 5+, Zäh 5). Auf der Karte zählt die Waffe mit der Qualität der Einheit: Wer besser trifft, zahlt etwas mehr.",
+    waffe: "Fester Preis der Waffe, gemessen an einem Standard-Helden (Qualität 4+, Verteidigung 5+, LP 5). Auf der Karte zählt die Waffe mit der Qualität der Einheit: Wer besser trifft, zahlt etwas mehr.",
     fest: "Feste Punkte, die auf die Karte obendrauf kommen.",
     prozent: "Aufschlag auf die Punkte der Einheit – je stärker die Einheit, desto teurer die Regel.",
     einheit: "Punkte nach der Schmiede-Formel.",

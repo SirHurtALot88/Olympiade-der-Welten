@@ -34,7 +34,7 @@ Chris spielt mit Freunden (Franky, Ramona) OPR Age of Fantasy Quest mit selbst b
 
 ## Regelwerk am Tisch (Stand: gemergt in PR #1152)
 
-Basis ist OPR Age of Fantasy: Qualität, Verteidigung, Zäh und Waffenzeilen. Dazu kommen:
+Basis ist OPR Age of Fantasy: Qualität, Verteidigung, LP und Waffenzeilen. Dazu kommen:
 
 - **4 Aktionswürfel pro Zug** (nach Warhammer Quest: Blackstone Fortress), für Helden und Gegner gleich.
   - Bewegen 6" (höchstens 2×), Angreifen und Helfen gehen mit jedem Würfel.

@@ -115,7 +115,7 @@
     f("heilendes-licht", "zauber", "Heilendes Licht", "Zauber", FREUNDE, ["heilung", "magie", "licht"], "fest", 10, "{Z4} Verbündeter {R12}: {HW3}."),
     f("schutzkreis", "zauber", "Schutzkreis", "Zauber", ALLE, ["schutz", "aura", "magie", "licht"], "fest", 15, "{Z5} Verbündete {F6}: {V+1} bis zur nächsten Runde."),
     f("laehmungsfluch", "zauber", "Lähmungsfluch", "Zauber", ALLE, ["betaeubung", "magie", "schatten"], "fest", 15, "{Z5} Feind {R12}: {X}."),
-    f("geistwolf", "zauber", "Geistwolf", "Zauber", ALLE, ["beschwoerung", "magie"], "fest", 20, "{Z5} Geistwolf {R3} aufstellen (Q4+ V5+ Zäh 3, A2 Nahkampf), bleibt bis Spielende."),
+    f("geistwolf", "zauber", "Geistwolf", "Zauber", ALLE, ["beschwoerung", "magie"], "fest", 20, "{Z5} Geistwolf {R3} aufstellen (Q4+ V5+ LP 3, A2 Nahkampf), bleibt bis Spielende."),
 
     // Gegenstände: Tränke und Bomben aus dem Quest-Kampagnenbuch (Wirkung hier als Vorschlag), dazu Ausrüstung
     f("heiltrank", "gegenstand", "Heiltrank", "Trank", FREUNDE, ["heilung", "einmalig"], "fest", 5, "{S} Freie Aktion: {HW6-2}, mindestens 1.", "Quest-Kampagne"),
@@ -173,11 +173,11 @@
     f("schlachtruf", "faehigkeit", "Schlachtruf", "Skill", HELD, ["aura", "staerkung", "nahkampf"], "fest", 10, "{P1} Verbündete {F6}: Nahkampf {T+1} bis Rundenende.", "Fantasy"),
     f("gezielter-schuss", "faehigkeit", "Gezielter Schuss", "Skill", HELD, ["fernkampf", "staerkung"], "fest", 10, "{P1} Nächster Fernkampfangriff: Präzise und {DS+1}.", "Fantasy"),
     f("ausweichrolle", "faehigkeit", "Ausweichrolle", "Skill", HELD, ["bewegung", "reaktion"], "fest", 5, "{P1} Reaktion auf einen Nahkampfangriff: {B3} weg.", "Fantasy"),
-    f("tiergefaehrte", "faehigkeit", "Ruf der Wildnis", "Skill", HELD, ["beschwoerung", "natur"], "fest", 15, "{P2} Wolf {R3} aufstellen (Q4+ V5+ Zäh 2, A2 Nahkampf). Höchstens einer.", "Fantasy"),
+    f("tiergefaehrte", "faehigkeit", "Ruf der Wildnis", "Skill", HELD, ["beschwoerung", "natur"], "fest", 15, "{P2} Wolf {R3} aufstellen (Q4+ V5+ LP 2, A2 Nahkampf). Höchstens einer.", "Fantasy"),
     // Fähigkeiten der Helden: Sci-Fi
     f("tarnfeld", "faehigkeit", "Tarnfeld", "Skill", HELD, ["tarnung", "schutz", "technik"], "fest", 10, "{P1} Bis zur nächsten Aktivierung {T-1} gegen diesen Helden.", "Sci-Fi"),
     f("zielerfassung", "faehigkeit", "Zielerfassung", "Skill", HELD, ["fernkampf", "staerkung", "technik"], "fest", 10, "{P1} Feind {R24} markieren: Fernkampf gegen ihn ist bis Rundenende Zielsuchend.", "Sci-Fi"),
-    f("kampfdrohne", "faehigkeit", "Kampfdrohne", "Skill", HELD, ["beschwoerung", "fernkampf", "technik"], "fest", 15, "{P2} Kampfdrohne {R3} aufstellen (Q4+ V5+ Zäh 1, Fliegen, Laser 12\" A1). Höchstens eine.", "Sci-Fi"),
+    f("kampfdrohne", "faehigkeit", "Kampfdrohne", "Skill", HELD, ["beschwoerung", "fernkampf", "technik"], "fest", 15, "{P2} Kampfdrohne {R3} aufstellen (Q4+ V5+ LP 1, Fliegen, Laser 12\" A1). Höchstens eine.", "Sci-Fi"),
     f("ueberladung", "faehigkeit", "Überladung", "Skill", HELD, ["staerkung", "technik"], "fest", 5, "{P1} Eine Fernkampfwaffe: {A+1} und Überhitzen für einen Angriff.", "Sci-Fi"),
     f("hacken", "faehigkeit", "System hacken", "Skill", HELD, ["betaeubung", "technik"], "fest", 10, "{P1} Maschine oder Drohne {R12}: bei {D4} {X}.", "Sci-Fi"),
 
@@ -198,7 +198,7 @@
     f("kettenblitz", "zauber", "Kettenblitz", "Zauber", ALLE, ["fernkampf", "flaeche", "magie"], "fest", 15, "{Z5} Feind {R18}: {A2}, jeder weitere Feind {F3} um ihn {A1}.", "Fantasy"),
     f("wurzelgriff", "zauber", "Wurzelgriff", "Zauber", ALLE, ["betaeubung", "schwaechung", "magie", "natur"], "fest", 10, "{Z4} Feind {R12}: keine Bewegung bei seiner nächsten Aktivierung.", "Fantasy"),
     f("unsichtbarkeit", "zauber", "Unsichtbarkeit", "Zauber", FREUNDE, ["tarnung", "schutz", "magie"], "fest", 10, "{Z4} Verbündeter {R6}: bis zur nächsten Runde nur aus 12\" oder näher beschießbar.", "Fantasy"),
-    f("totenerweckung", "zauber", "Totenerweckung", "Zauber", ALLE, ["beschwoerung", "magie", "furcht", "schatten"], "fest", 15, "{Z5} Skelett {R3} aufstellen (Q5+ V5+ Zäh 1, A1 Nahkampf).", "Fantasy"),
+    f("totenerweckung", "zauber", "Totenerweckung", "Zauber", ALLE, ["beschwoerung", "magie", "furcht", "schatten"], "fest", 15, "{Z5} Skelett {R3} aufstellen (Q5+ V5+ LP 1, A1 Nahkampf).", "Fantasy"),
     f("blutpakt", "zauber", "Blutpakt", "Zauber", ALLE, ["staerkung", "magie", "schatten"], "fest", 10, "{Z4} Der Zauberer {W1}, ein Verbündeter {R6}: {A+1} je Waffe bis Rundenende.", "Fantasy"),
     // Zauber: Sci-Fi (Psi-Kräfte)
     f("psiblitz", "zauber", "Psi-Blitz", "Psi-Kraft", ALLE, ["fernkampf", "technik"], "fest", 10, "{Z4} Feind {R18}: {A2} {DS2}.", "Sci-Fi"),
@@ -263,7 +263,7 @@
 
   // ---------- Auf eine Seltenheit skalieren ----------
   // Ein Klick auf „Gewöhnlich“ … „Boss“ passt die Einheit an: erst die Zahl der Fähigkeiten (ein Boss kann mehr
-  // als ein Grunzer), dann Qualität, Verteidigung, Zäh und Attacken reihum, bis die Punkte in der Stufe liegen.
+  // als ein Grunzer), dann Qualität, Verteidigung, LP und Attacken reihum, bis die Punkte in der Stufe liegen.
   const FAEHIGKEITEN_JE_STUFE = [0, 0, 1, 1, 2, 3, 4];
   const ZIEL_JE_STUFE = [0, 25, 60, 85, 130, 190, 260];
   const zahl = (x, d) => parseInt(x, 10) || d;
@@ -313,7 +313,7 @@
     }
     // Werte reihum verschieben, damit keiner allein ausreißt
     const pts = x => Regeln.punkte(x).pts;
-    // Qualität und Verteidigung 2+ nur für Legendär und Boss, 6+ auf Treffer nie; Zäh und Attacken tragen die großen Sprünge
+    // Qualität und Verteidigung 2+ nur für Legendär und Boss, 6+ auf Treffer nie; LP und Attacken tragen die großen Sprünge
     // Qualität und Verteidigung wandern höchstens eine Stufe vom Ausgangswert, damit der Charakter erkennbar bleibt
     const q0 = zahl(s.quality, 4), d0 = zahl(s.defense, 5);
     const qMin = Math.max(stufe >= 5 ? 2 : 3, q0 - 1), qMax = Math.min(5, Math.max(q0, q0 + 1));

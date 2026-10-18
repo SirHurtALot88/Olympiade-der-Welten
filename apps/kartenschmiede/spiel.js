@@ -162,7 +162,7 @@
     if (g) return G.punkteVon(g);
     return KS.VORLAGEN.filter(v => v.d.role === "hero").reduce((n, v) => n + punkteFuer(v.d), 0);
   }
-  const heldInfo = k => [k.faction, k.quality && `Qualität ${k.quality}`, k.defense && `Verteidigung ${k.defense}`, k.tough && `Zäh ${k.tough}`].filter(Boolean).join(" · ");
+  const heldInfo = k => [k.faction, k.quality && `Qualität ${k.quality}`, k.defense && `Verteidigung ${k.defense}`, k.tough && `LP ${k.tough}`].filter(Boolean).join(" · ");
   async function ladeHelden() {
     helden = [];
     const G = window.KartenschmiedeGruppe;
@@ -813,8 +813,8 @@
       </div>`;
     }
   }
-  // Von Hand stärken oder schwächen: wirkt sofort auf Karte, Bedrohung und (bei Zäh) die Wundleiste
-  const ANPASSEN = [["quality", "Qualität"], ["defense", "Verteidigung"], ["tough", "Zäh"], ["attacks", "Angriffe"]];
+  // Von Hand stärken oder schwächen: wirkt sofort auf Karte, Bedrohung und (bei LP) die Wundleiste
+  const ANPASSEN = [["quality", "Qualität"], ["defense", "Verteidigung"], ["tough", "LP"], ["attacks", "Angriffe"]];
   function anpassenHtml(g) {
     const name = (map.gegner[g.id] || {}).name || g.id;
     return `<details class="sp-anpassen"><summary>Anpassen: stärker oder schwächer</summary>
@@ -909,7 +909,7 @@
         <div class="row4"><label class="f">Anzahl <input type="number" id="spNeuAnzahl" min="1" max="12" value="1"></label>
           <label class="f">Zone <select id="spNeuZone"><option value="">Tischmitte</option>${zonen.map(z => `<option>${esc(z)}</option>`).join("")}</select></label></div>
         <h4>NPC kämpft</h4><div class="sp-neu-liste">${npcs.map(([id, f]) => `<button type="button" class="btn sm" data-npc-kampf="${esc(id)}" title="${f.kampf ? "Haupt-NPC mit eigenen Kampfwerten" : "Ohne eigene Werte: schwache Grundwerte"}">⚔ ${esc(f.name)}${f.kampf ? "" : " (schwach)"}</button>`).join("")}
-          <button type="button" class="btn ghost sm" data-sp="npc-namenlos" title="Passant, Gehilfe, Dorfbewohner: Qualität 6+, Verteidigung 6+, Zäh 1">⚔ Namenloser NPC</button></div>
+          <button type="button" class="btn ghost sm" data-sp="npc-namenlos" title="Passant, Gehilfe, Dorfbewohner: Qualität 6+, Verteidigung 6+, LP 1">⚔ Namenloser NPC</button></div>
         <h4>Aus dieser Map</h4><div class="sp-neu-liste">${ausMap.map(([id, d]) => `<button type="button" class="btn ghost sm" data-neu="${esc(id)}">${esc(d.name || id)}</button>`).join("")}</div>
         <h4>Aus den Vorlagen</h4><div class="sp-neu-liste">${vorlagen.map(v => `<button type="button" class="btn ghost sm" data-vorlage="${esc(v.key)}">${esc(v.d.name)}</button>`).join("")}</div>
       </div></div>`;
