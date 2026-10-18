@@ -165,12 +165,38 @@ export async function kickoffArenaMatchdayApply(
     );
     const markedInProgress = schreibeArenaMatchdayResolveStatus(persistence, saveId, erneuterVersuch.status === "ready" ? "ready" : "in_progress");
     const nachErneutemVersuch = persistence.getSaveById(saveId);
-    const previewNachErneutemVersuch = nachErneutemVersuch
+    let previewNachErneutemVersuch = nachErneutemVersuch
       ? resolveMatchdayPreviewToBook({ gameState: nachErneutemVersuch.gameState, scope, livePreview: liveFallbackPreview })
       : previewToBook;
-    if (previewNachErneutemVersuch.arenaEingabeDivergenz || !nachErneutemVersuch) {
-      // Divergiert immer noch (oder der Save verschwand) -- NICHT buchen, Aufrufer pollt weiter.
+    if (!nachErneutemVersuch) {
+      // Der Save verschwand waehrend des erzwungenen Vorlaufs -- NICHT buchen, Aufrufer pollt weiter.
       return { applicable: true, booked: false, status: "in_progress", save: markedInProgress ?? refreshed };
+    }
+    // OPUS-REVIEW (Nachtrag 18.10., B3-Instabilitaets-Fix): divergiert es DANACH IMMER NOCH zur
+    // SELBEN Signatur, ist der Eingabe-Fingerabdruck instabil -- s. ausfuehrliche Begruendung am
+    // Pendant in matchday-auto-run-service.ts. Ein DRITTER erzwungener Vorlauf wuerde nur eine
+    // Endlosschleife anstossen; stattdessen wird jetzt sichtbar `"eingabe_instabil"` markiert und
+    // die PPS-Duell-Bruecke gebucht.
+    if (previewNachErneutemVersuch.arenaEingabeDivergenz) {
+      const betroffeneDisziplinen = previewNachErneutemVersuch.arenaEingabeDivergentDisciplineIds ?? [];
+      console.error(
+        `${logPrefix} arenaEingabeHash bleibt instabil fuer dieselbe Signatur (${saveId}/${matchdayId}): ${betroffeneDisziplinen.join(", ")} -- PPS-Duell-Bruecke wird mit "eingabe_instabil" gebucht, kein dritter Vorlauf.`,
+      );
+      const arenaAusfallByDisciplineId = new Map(
+        betroffeneDisziplinen.map((disciplineId) => [
+          disciplineId,
+          {
+            grund: "eingabe_instabil" as const,
+            detail: `arenaEingabeHash weicht beim Buchen zweimal in Folge ab (Disziplin ${disciplineId}).`,
+            zeitpunkt: new Date().toISOString(),
+            versuch: 1,
+          },
+        ]),
+      );
+      previewNachErneutemVersuch = {
+        preview: buildLegacyMatchdayResolvePreview(contexts, { arenaAusfallByDisciplineId }),
+        source: "live",
+      };
     }
     return bucheArenaSnapshot({
       persistence,

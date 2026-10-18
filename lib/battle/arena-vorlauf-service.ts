@@ -173,6 +173,31 @@ type FuehreVorlaufAusInput = {
   runArenaFixturesOptions?: RunArenaFixturesOptions;
 };
 
+/**
+ * OPUS-REVIEW B1 (kritisch), NACHTRAG 18.10. (Design-Fix "Wiederholung gehoert in den Vorlauf
+ * selbst"): GENAU EINE automatische Wiederholung je Disziplin (Plan Abschnitt 3.4) -- Versuch 1
+ * scheitert, Versuch 2 (die automatische Wiederholung) darf SOFORT, noch INNERHALB desselben
+ * `fuehreVorlaufAus()`-Laufs anlaufen. Scheitert AUCH die, ist diese Disziplin (und damit die
+ * ganze Signatur) ENDGUELTIG `"failed"`, bevor ueberhaupt etwas geschrieben wird -- kein
+ * dritter automatischer Versuch mehr, egal wie oft `kickoffArenaVorlauf()`/
+ * `stelleArenaVorlaufSicher()` DANACH noch gerufen werden (Buehne pollt, Lineup-Routen,
+ * Auto-Run): `duerfeNeuenVersuchStarten()` sieht ab dem Schreiben nur noch ein bereits
+ * endgueltiges `"failed"`. OHNE diese Schranke startete jeder Aufruf bei kaputtem/fehlendem
+ * Chromium einen neuen Versuch -- CPU-Sturm, UND der Auto-Run sah nie etwas anderes als
+ * "in_progress"/"arena_vorlauf_laeuft" und buchte NIE, selbst die PPS-Duell-Bruecke nicht. Das war
+ * schlimmer als die K1-Luecke selbst (die legte nur die Arena lahm, nicht den ganzen Spieltag).
+ */
+const MAX_AUTOMATISCHE_VERSUCHE = 2;
+
+/**
+ * NUR DIESE drei Gruende sind technische/Infrastruktur-Flackern, das ein sofortiger zweiter
+ * Versuch plausibel beheben kann (kaputter Start, zu langsam, abgestuerzt). `ergebnis_unvollstaendig`
+ * (ein Team ohne Duell-Ergebnis trotz erfolgreichem Lauf) ist dagegen ein DATENPROBLEM -- dieselbe
+ * Eingabe wuerde beim Wiederholen deterministisch wieder dasselbe fehlende Ergebnis liefern, eine
+ * Wiederholung waere verschwendete Zeit (und ein zweiter, unnoetiger Chromium-Lauf).
+ */
+const RETRYBARE_AUSFALL_GRUENDE: ReadonlySet<ArenaAusfallGrund> = new Set(["absturz", "timeout", "chromium_start"]);
+
 async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorlaufRecord | null> {
   const scope: MatchdayResolveScope = { saveId: input.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId };
   const current = input.persistence.getSaveById(input.saveId);
@@ -191,52 +216,86 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   // anderen, und der globale Semaphor serialisiert zusaetzlich gegen JEDEN anderen Vorlauf im
   // Prozess (anderer Save, anderer Spieltag).
   for (const disziplinId of input.arenaDisciplineIds) {
-    const start = Date.now();
+    const gesamtStart = Date.now();
+    // OPUS-REVIEW (Nachtrag 18.10., Design-Fix): die automatische Wiederholung bei einem
+    // RETRYBAREN technischen Ausfall (`absturz`/`timeout`/`chromium_start` -- NICHT
+    // `ergebnis_unvollstaendig`, das ist ein Datenproblem, kein Chromium-Flackern, und wuerde beim
+    // Wiederholen deterministisch genauso wieder scheitern) passiert jetzt HIER, SOFORT, noch
+    // UNTER DEMSELBEN Semaphor-Griff -- nicht mehr erst beim naechsten, externen Aufruf
+    // (Buchung/Buehnen-Poll/Lineup-Speichern). Vorher persistierte ein erster Fehlschlag sofort
+    // als `"failed"`, und irgendein SPAeTERER Aufrufer loeste den zweiten Versuch aus -- das liess
+    // den Zustand fuer den Spieler flackern ("ausgefallen" -> kurz danach wieder "laeuft") UND
+    // machte "failed" zweideutig (endgueltig ODER "gleich kommt noch ein Versuch", je nachdem WER
+    // als naechstes fragt). Jetzt wird NUR NOCH das ENDGUELTIGE Ergebnis geschrieben -- "failed"
+    // ist ab dem Schreiben immer terminal, kein Leser muss das Zwei-Zustaende-Raetsel mehr loesen.
     await mitChromiumSemaphor(async () => {
-      try {
-        const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
-          gameState: current.gameState,
-          saveId: input.saveId,
-          seasonId: input.seasonId,
-          matchdayId: input.matchdayId,
-          disciplineId: disziplinId,
-          runArenaFixturesImpl: input.runArenaFixturesImpl,
-          matchdayMutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
-          runArenaFixturesOptions: {
-            seitenTimeoutMs: resolveArenaSeitenTimeoutMs(),
-            ...input.runArenaFixturesOptions,
-          },
-        });
-        arenaTeamPointsByDisciplineId.set(disziplinId, overridesByTeamId);
-        arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, individualBoxscorePpsByPlayerId);
-        const ausfall = ableiteArenaAusfall(warnings, input.versuch);
-        if (ausfall) {
-          arenaAusfallByDisciplineId.set(disziplinId, ausfall);
-          gesamtStatus = "failed";
-          disziplinen[disziplinId] = { status: "ausgefallen", ausfall, dauerMs: Date.now() - start };
-        } else {
-          const eingabeHash = berechneArenaEingabeHash({
+      let erfolg: { overridesByTeamId: Map<string, ArenaTeamPointsOverride>; individualBoxscorePpsByPlayerId: Map<string, number> } | null = null;
+      let letzterAusfall: ArenaAusfall | null = null;
+      let versucheIntern = 0;
+      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+        versucheIntern = lokalerVersuch;
+        try {
+          const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
             gameState: current.gameState,
             saveId: input.saveId,
             seasonId: input.seasonId,
             matchdayId: input.matchdayId,
             disciplineId: disziplinId,
-            mutatoren: input.mutatorTraitsByDisciplineId.get(disziplinId) ?? [],
+            runArenaFixturesImpl: input.runArenaFixturesImpl,
+            matchdayMutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
+            // JEDER Versuch bekommt dasselbe volle Gesamt-Budget (Opus: "demselben Gesamt-Budget
+            // je Versuch") -- keine Aufteilung eines gemeinsamen Budgets ueber beide Versuche.
+            runArenaFixturesOptions: {
+              seitenTimeoutMs: resolveArenaSeitenTimeoutMs(),
+              ...input.runArenaFixturesOptions,
+            },
           });
-          disziplinen[disziplinId] = { status: "arena", dauerMs: Date.now() - start, eingabeHash };
+          const ausfall = ableiteArenaAusfall(warnings, lokalerVersuch);
+          if (!ausfall) {
+            erfolg = { overridesByTeamId, individualBoxscorePpsByPlayerId };
+            letzterAusfall = null;
+            break;
+          }
+          letzterAusfall = ausfall;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) break;
+          console.warn(
+            `[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}) -- sofortige Wiederholung, noch nicht persistiert.`,
+          );
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const ausfall: ArenaAusfall = {
+            grund: leiteGrundAusText(detail),
+            detail: detail.slice(0, 200),
+            zeitpunkt: new Date().toISOString(),
+            versuch: lokalerVersuch,
+          };
+          letzterAusfall = ausfall;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
+            console.error(`[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+            break;
+          }
+          console.warn(
+            `[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}: ${detail}) -- sofortige Wiederholung, noch nicht persistiert.`,
+          );
         }
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        const ausfall: ArenaAusfall = {
-          grund: leiteGrundAusText(detail),
-          detail: detail.slice(0, 200),
-          zeitpunkt: new Date().toISOString(),
-          versuch: input.versuch,
-        };
-        arenaAusfallByDisciplineId.set(disziplinId, ausfall);
+      }
+
+      if (erfolg) {
+        arenaTeamPointsByDisciplineId.set(disziplinId, erfolg.overridesByTeamId);
+        arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, erfolg.individualBoxscorePpsByPlayerId);
+        const eingabeHash = berechneArenaEingabeHash({
+          gameState: current.gameState,
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          disciplineId: disziplinId,
+          mutatoren: input.mutatorTraitsByDisciplineId.get(disziplinId) ?? [],
+        });
+        disziplinen[disziplinId] = { status: "arena", dauerMs: Date.now() - gesamtStart, eingabeHash, versucheIntern };
+      } else {
+        arenaAusfallByDisciplineId.set(disziplinId, letzterAusfall!);
         gesamtStatus = "failed";
-        disziplinen[disziplinId] = { status: "ausgefallen", ausfall, dauerMs: Date.now() - start };
-        console.error(`[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) ausgefallen: ${detail}`);
+        disziplinen[disziplinId] = { status: "ausgefallen", ausfall: letzterAusfall!, dauerMs: Date.now() - gesamtStart, versucheIntern };
       }
     });
   }
@@ -266,24 +325,21 @@ function laufSchluessel(scope: MatchdayResolveScope, signature: string) {
 }
 
 /**
- * OPUS-REVIEW B1 (kritisch): GENAU EINE automatische Wiederholung (Plan Abschnitt 3.4) --
- * `versuch 1` scheitert, `versuch 2` (die automatische Wiederholung) darf noch anlaufen. Scheitert
- * AUCH die, ist diese Signatur ENDGUELTIG `"failed"`: kein dritter automatischer Versuch mehr, egal
- * wie oft `kickoffArenaVorlauf()`/`stelleArenaVorlaufSicher()` noch gerufen werden (Buehne pollt,
- * Lineup-Routen, Auto-Run). OHNE diese Schranke startete jeder Aufruf bei kaputtem/fehlendem
- * Chromium einen neuen Versuch -- CPU-Sturm, UND der Auto-Run sah nie etwas anderes als
- * "in_progress"/"arena_vorlauf_laeuft" und buchte NIE, selbst die PPS-Duell-Bruecke nicht. Das war
- * schlimmer als die K1-Luecke selbst (die legte nur die Arena lahm, nicht den ganzen Spieltag).
- */
-const MAX_AUTOMATISCHE_VERSUCHE = 2;
-
-/**
  * Entscheidet, ob ein NEUER Versuch anlaufen darf. `vorhandenerRecord` ist `null` bei der allerersten
  * Anfrage zu dieser Signatur (immer ja). Bei `"in_progress"` nie (ein Lauf laeuft schon -- der
- * Aufrufer haengt sich stattdessen an `laufendeVorlaeufe`/liest den Record). Bei `"ready"` nie
- * (fertig, nichts zu tun). Bei `"failed"` nur, wenn `versuch < MAX_AUTOMATISCHE_VERSUCHE` ODER der
- * Aufrufer explizit `erzwingeNeuenVersuch` setzt (der geplante "Arena erneut versuchen"-Knopf, Plan
- * Abschnitt 3.4).
+ * Aufrufer haengt sich stattdessen an `laufendeVorlaeufe`/liest den Record).
+ *
+ * OPUS-REVIEW (Nachtrag 18.10., Design-Fix): `"ready"` UND `"failed"` sind jetzt BEIDE OHNE
+ * AUSNAHME terminal (ausser `erzwingeNeuenVersuch`) -- die automatische Wiederholung bei
+ * `absturz`/`timeout`/`chromium_start` passiert seit diesem Fix INNERHALB von
+ * `fuehreVorlaufAus()`, BEVOR irgendetwas geschrieben wird (s. `RETRYBARE_AUSFALL_GRUENDE`/
+ * `MAX_AUTOMATISCHE_VERSUCHE` dort). Ein persistiertes `"failed"` hat diese Wiederholung also
+ * bereits hinter sich -- ein weiterer automatischer Versuch hier wuerde nur den vorher behobenen
+ * K1-CPU-Sturm (jeder Aufruf startet einen neuen Versuch, nie wird gebucht) wieder einfuehren.
+ * VORHER liess genau diese Zeile (`vorhandenerRecord.versuch < MAX_AUTOMATISCHE_VERSUCHE`) ein
+ * bereits als `"failed"` persistiertes Ergebnis durch EINEN SPAeTEREN, externen Aufruf (Buchung,
+ * Buehnen-Poll, Lineup-Speichern) erneut anlaufen -- das liess den Zustand fuer den Spieler
+ * flackern (kurz "ausgefallen", dann wieder "laeuft") und machte `"failed"` zweideutig.
  */
 function duerfeNeuenVersuchStarten(
   vorhandenerRecord: ArenaVorlaufRecord | null,
@@ -299,9 +355,8 @@ function duerfeNeuenVersuchStarten(
   // feinerer Fingerabdruck als die Signatur selbst, s. `arena-eingabe-hash.ts`) -- ein "ready" ist
   // in diesem Fall KEIN Grund mehr, nichts zu tun.
   if (erzwingeNeuenVersuch) return true;
-  if (vorhandenerRecord.status === "ready") return false;
-  // status === "failed"
-  return vorhandenerRecord.versuch < MAX_AUTOMATISCHE_VERSUCHE;
+  // "ready" UND "failed" sind sonst beide terminal.
+  return false;
 }
 
 const laufendeVorlaeufe = new Map<string, Promise<ArenaVorlaufRecord | null>>();
@@ -365,8 +420,10 @@ export type ArenaVorlaufOptions = {
   allowIncompleteField?: boolean;
   /**
    * OPUS-REVIEW B1: der geplante "Arena erneut versuchen"-Knopf (Plan 3.4) -- umgeht die
-   * `MAX_AUTOMATISCHE_VERSUCHE`-Schranke fuer EINEN weiteren, von einem Menschen angestossenen
-   * Versuch zu DERSELBEN Signatur. Kein automatischer Ausloeser setzt das.
+   * terminale `"ready"`/`"failed"`-Sperre in `duerfeNeuenVersuchStarten()` fuer EINEN weiteren,
+   * von einem Menschen angestossenen Versuch zu DERSELBEN Signatur (der wiederum intern bis zu
+   * `MAX_AUTOMATISCHE_VERSUCHE` automatische Wiederholungen bekommt, s. `fuehreVorlaufAus()`).
+   * Kein automatischer Ausloeser setzt das.
    */
   erzwingeNeuenVersuch?: boolean;
 };

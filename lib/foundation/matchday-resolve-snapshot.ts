@@ -269,6 +269,8 @@ export type MatchdayPreviewToBook = {
    * solange kein gueltiger Vorlauf zu dieser Signatur fertig ist").
    */
   arenaEingabeDivergenz?: boolean;
+  /** Welche Disziplin(en) genau abweichen, s. `arenaEingabeDivergenz` -- nur gesetzt, wenn dieses true ist. */
+  arenaEingabeDivergentDisciplineIds?: string[];
 };
 
 /**
@@ -320,7 +322,11 @@ export function resolveMatchdayPreviewToBook(input: {
     console.error(
       `[arena-vorlauf] arenaEingabeHash-Divergenz beim Buchen (${input.scope.saveId}/${input.scope.matchdayId}): ${divergenz.join(", ")} — Snapshot wird NICHT gebucht, Vorlauf muss neu laufen.`,
     );
-    return { preview: input.livePreview, source: "live", arenaEingabeDivergenz: true };
+    // OPUS-REVIEW (Nachtrag 18.10., B3-Instabilitaets-Fix): die betroffenen Disziplin-IDs werden
+    // mitgegeben, damit ein Aufrufer, der DIESELBE Divergenz ein zweites Mal zur selben Signatur
+    // sieht, gezielt NUR diese Disziplinen als `"eingabe_instabil"` markieren kann, statt blind
+    // alles zu verwerfen oder (schlimmer) einen dritten, nutzlosen Vorlauf anzustossen.
+    return { preview: input.livePreview, source: "live", arenaEingabeDivergenz: true, arenaEingabeDivergentDisciplineIds: divergenz };
   }
   return { preview: snapshot.payload.preview, source: "snapshot" };
 }

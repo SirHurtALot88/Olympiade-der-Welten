@@ -1040,34 +1040,43 @@ export async function runLocalMatchdayAutoRun(
             return result;
           }
           // Inline UND der erzwungene Versuch ist schon fertig ("ready"/"failed") -- einmal neu
-          // pruefen. Divergiert es DANACH immer noch (seltener Grenzfall: der Zustand aendert
-          // sich weiterhin waehrend des Vorlaufs), wird NICHT gebucht -- lieber blockiert als die
-          // Bruecke stillschweigend buchen.
+          // pruefen.
           const nachErneutemVersuch = resolveLocalSave(persistence, scope.saveId);
           nachVorlaufPreview = resolveMatchdayPreviewToBook({
             gameState: nachErneutemVersuch.gameState,
             scope,
             livePreview: activeResolve.preview,
           });
+          // OPUS-REVIEW (Nachtrag 18.10., B3-Instabilitaets-Fix): divergiert es DANACH IMMER
+          // NOCH zur SELBEN Signatur, ist der Eingabe-Fingerabdruck instabil (z. B. Fatigue, ein
+          // von der KI neu gespeichertes Lineup mit gleicher Belegung, eine Zeitstempel-/Map-
+          // Reihenfolge-Abhaengigkeit in buildArenaTeam()/buildArenaAufstellungBeide()) -- ein
+          // DRITTER erzwungener Vorlauf wuerde nur eine Endlosschleife anstossen (Vorlauf
+          // "ready" -> Divergenz -> neuer Vorlauf -> "ready" -> Divergenz -> ...), NIE buchen,
+          // Chromium im Dauerlauf. Statt zu blockieren: die betroffenen Disziplinen werden JETZT
+          // sichtbar als `"eingabe_instabil"` markiert und die PPS-Duell-Bruecke dafuer gebucht --
+          // "Was du siehst, wird gebucht" bleibt gewahrt, weil genau das markierte Bruecken-
+          // Ergebnis gezeigt UND gebucht wird, keine Arena-Zahl mehr.
           if (nachVorlaufPreview.arenaEingabeDivergenz) {
-            addStep(result, {
-              key: "arena_vorlauf",
-              label: "Arena-Vorlauf",
-              status: "blocked",
-              dryRun: false,
-              canContinue: false,
-              warnings: [],
-              blockingReasons: ["arena_eingabe_divergenz"],
-              metrics: { arenaModus },
-              plannedWrites: 0,
-              appliedWrites: 0,
-              auditId: null,
-            });
-            result.warnings = Array.from(new Set(result.warnings));
-            result.blockingReasons = Array.from(new Set([...result.blockingReasons, "arena_eingabe_divergenz"]));
-            result.ok = false;
-            result.status = "blocked";
-            return result;
+            const betroffeneDisziplinen = nachVorlaufPreview.arenaEingabeDivergentDisciplineIds ?? [];
+            console.error(
+              `[arena-vorlauf] arenaEingabeHash bleibt instabil fuer dieselbe Signatur (${scope.saveId}/${scope.matchdayId}): ${betroffeneDisziplinen.join(", ")} -- PPS-Duell-Bruecke wird mit "eingabe_instabil" gebucht, kein dritter Vorlauf.`,
+            );
+            const arenaAusfallByDisciplineId = new Map(
+              betroffeneDisziplinen.map((disciplineId) => [
+                disciplineId,
+                {
+                  grund: "eingabe_instabil" as const,
+                  detail: `arenaEingabeHash weicht beim Buchen zweimal in Folge ab (Disziplin ${disciplineId}).`,
+                  zeitpunkt: new Date().toISOString(),
+                  versuch: 1,
+                },
+              ]),
+            );
+            nachVorlaufPreview = {
+              preview: buildLegacyMatchdayResolvePreview(currentContexts, { arenaAusfallByDisciplineId }),
+              source: "live",
+            };
           }
         }
         activeResolve = { ...activeResolve, preview: nachVorlaufPreview.preview };

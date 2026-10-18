@@ -174,9 +174,62 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
   );
 });
 
-describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): genau eine automatische Wiederholung", () => {
+/**
+ * B1 (Opus-Review, kritisch), NEU GEFASST nach dem Design-Fix vom 18.10. ("Wiederholung gehoert in
+ * den Vorlauf selbst", s. arena-vorlauf-service.ts): die automatische Wiederholung bei einem
+ * retrybaren Ausfall (absturz/timeout/chromium_start) passiert jetzt INNERHALB EINES
+ * `stelleArenaVorlaufSicher()`/`kickoffArenaVorlauf()`-Aufrufs, BEVOR irgendetwas geschrieben wird.
+ * Persistiert wird nur noch das ENDGUELTIGE Ergebnis -- kein Leser sieht je ein Zwischen-"failed",
+ * das in Wahrheit noch einen zweiten Versuch vor sich hat (das alte Flacker-Problem: die Buehne
+ * zeigte kurz "ausgefallen" und sprang dann wieder auf "laeuft").
+ */
+describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wiederholung INNERHALB des Vorlaufs", () => {
   it(
-    "ein durchgehend werfender Runner wird ueber den Hintergrund-Pfad (kickoffArenaVorlauf) hoechstens 2x je Liga aufgerufen -- danach endgueltig failed, kein CPU-Sturm",
+    "ein Runner, der beim ERSTEN Aufruf wirft und danach klappt, endet in EINEM Aufruf als 'ready' -- nie wird ein 'failed' persistiert",
+    async () => {
+      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      ensureMatchdayResolveSnapshot(scope, persistence);
+
+      let aufrufe = 0;
+      const einmalWerfenderRunner = async (
+        _gameState: GameState,
+        fixtures: { homeTeamId: string; awayTeamId: string; seed: string | number }[],
+      ): Promise<ArenaFixtureResult[]> => {
+        aufrufe += 1;
+        if (aufrufe === 1) {
+          throw new Error("Chromium kaputt (Testinjektion, B1, nur beim allerersten Aufruf)");
+        }
+        return fixtures.map((fixture) => ({
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          seiten: [1, 0] as [number, number],
+          boxscore: [],
+        }));
+      };
+
+      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: einmalWerfenderRunner }, persistence);
+      expect(ergebnis.applicable).toBe(true);
+      // DAS Versprechen dieses Fixes: EIN einziger externer Aufruf liefert bereits das
+      // ENDGUELTIGE Ergebnis -- die interne Wiederholung ist fuer den Aufrufer unsichtbar.
+      expect(ergebnis.status).toBe("ready");
+      // Die Wiederholung hat tatsaechlich stattgefunden (mehr als ein Aufruf des Runners).
+      expect(aufrufe).toBeGreaterThan(1);
+
+      // Genau EIN Schreibvorgang fuer diese Signatur -- und der zeigt schon das Endergebnis, nie
+      // ein Zwischen-"failed", das ein spaeterer Leser faelschlich fuer endgueltig halten koennte.
+      const stand = persistence.getSaveById(scope.saveId)!.gameState;
+      const record = readArenaVorlaufRecord(stand, scope);
+      expect(record?.status).toBe("ready");
+      for (const eintrag of Object.values(record?.disziplinen ?? {})) {
+        expect(eintrag.status).toBe("arena");
+        expect(eintrag.ausfall).toBeFalsy();
+      }
+    },
+    420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
+  );
+
+  it(
+    "ein durchgehend werfender Runner endet NACH der internen Wiederholung endgueltig als 'failed' -- 10 weitere Aufrufe (Kickoff/Auto-Run/Buehne) loesen KEINEN weiteren Runner-Aufruf mehr aus und buchen stattdessen die markierte Bruecke",
     async () => {
       const { persistence, scope, arenaDisciplineCount } = await bauFrischenBattleSaveMitVollemFeld();
       ensureMatchdayResolveSnapshot(scope, persistence);
@@ -184,42 +237,33 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): genau eine automa
       let aufrufeGesamt = 0;
       const werfenderRunner = async (): Promise<ArenaFixtureResult[]> => {
         aufrufeGesamt += 1;
-        throw new Error("Chromium kaputt (Testinjektion, B1)");
+        throw new Error("Chromium kaputt (Testinjektion, B1, durchgehend)");
       };
 
-      // 10x hintereinander ueber den DETACHED Pfad anstossen -- genau das Muster, das Buehne,
-      // Lineup-Routen und Auto-Run-"hintergrund" bei jedem Request/Poll tun wuerden, wenn
-      // Chromium auf dem Server kaputt ist. Zwischen den Anstoessen wird auf den jeweils
-      // laufenden (detachten) Versuch gewartet, sonst wuerde derselbe In-Prozess-Lauf mehrfach
-      // "getroffen" statt wirklich mehrere Anlaeufe zu erzeugen.
-      for (let i = 0; i < 10; i += 1) {
-        kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
-        for (let warten = 0; warten < 300; warten += 1) {
-          const aktuellerStand = persistence.getSaveById(scope.saveId)!.gameState;
-          const record = readArenaVorlaufRecord(aktuellerStand, scope);
-          if (record && record.status !== "in_progress") break;
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        }
-      }
+      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+      expect(ergebnis.applicable).toBe(true);
+      expect(ergebnis.status).toBe("failed");
 
-      // Hoechstens 2 automatische Versuche (MAX_AUTOMATISCHE_VERSUCHE), je bis zu 2 Ligen UND je
-      // arena-aufgeloester Disziplin dieses Spieltags -- NIE 10 (einer je Schleifendurchlauf, der
-      // Bug-Zustand vor dem Fix) und NIE unbegrenzt viele.
-      expect(aufrufeGesamt).toBeGreaterThan(0);
-      expect(aufrufeGesamt).toBeLessThanOrEqual(arenaDisciplineCount * 2 * 2);
+      // Hoechstens 2 interne Versuche (MAX_AUTOMATISCHE_VERSUCHE) je Liga UND je arena-aufgeloester
+      // Disziplin dieses Spieltags -- NIE unbegrenzt viele, schon innerhalb DIESES EINEN Aufrufs.
+      const aufrufeNachErstemLauf = aufrufeGesamt;
+      expect(aufrufeNachErstemLauf).toBeGreaterThan(0);
+      expect(aufrufeNachErstemLauf).toBeLessThanOrEqual(arenaDisciplineCount * 2 * 2);
 
       const endstand = persistence.getSaveById(scope.saveId)!.gameState;
       const endgueltigerRecord = readArenaVorlaufRecord(endstand, scope);
       expect(endgueltigerRecord?.status).toBe("failed");
-      expect(endgueltigerRecord?.versuch).toBeLessThanOrEqual(2);
 
-      // Ein weiterer Anstoss (z. B. die Buehne pollt noch einmal) loest KEINEN dritten Versuch
-      // mehr aus -- die Zahl der Aufrufe bleibt stehen.
-      const aufrufeVorher = aufrufeGesamt;
-      const nochEinAnstoss = kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+      // 10x weiter anstossen (genau das Muster, das Buehne, Lineup-Routen und Auto-Run-
+      // "hintergrund" bei jedem Request/Poll taeten) -- KEIN einziger weiterer Runner-Aufruf
+      // mehr, weil "failed" seit dem Design-Fix ohne Ausnahme terminal ist (ausser
+      // `erzwingeNeuenVersuch`, das hier niemand setzt).
+      for (let i = 0; i < 10; i += 1) {
+        const nochEinAnstoss = kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+        expect(nochEinAnstoss.status).toBe("failed");
+      }
       await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(nochEinAnstoss.status).toBe("failed");
-      expect(aufrufeGesamt).toBe(aufrufeVorher);
+      expect(aufrufeGesamt).toBe(aufrufeNachErstemLauf);
 
       // Der Auto-Run/Kickoff kann mit diesem endgueltig "failed" Vorlauf jetzt die PPS-Duell-
       // Bruecke buchen, statt fuer immer auf "in_progress" zu stehen (das war B1s eigentliche

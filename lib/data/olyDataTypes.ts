@@ -2705,6 +2705,20 @@ export type ArenaVorlaufDisziplinEintrag = {
    * buchen.
    */
   eingabeHash?: string | null;
+  /**
+   * OPUS-REVIEW (Nachtrag 18.10., Design-Fix "Wiederholung gehoert in den Vorlauf selbst"): wie
+   * viele INTERNE Versuche diese Disziplin innerhalb EINES `fuehreVorlaufAus()`-Laufs brauchte
+   * (1 oder 2, s. `MAX_AUTOMATISCHE_VERSUCHE` in arena-vorlauf-service.ts) — NICHT dasselbe wie
+   * `ArenaVorlaufRecord.versuch` (das zaehlt EXTERNE Neustarts derselben Signatur: erzwungen durch
+   * den geplanten "Arena erneut versuchen"-Knopf oder eine neue Signatur, nie automatisch). Vor
+   * diesem Fix persistierte ein erster Fehlschlag sofort als `"failed"`, und erst ein SPAeTERER,
+   * externer Aufrufer (Buchung, Buehnen-Poll, Lineup-Speichern) stiess den automatischen zweiten
+   * Versuch an -- das liess den Zustand fuer den Spieler flackern ("ausgefallen" -> kurz danach
+   * wieder "laeuft") und machte "failed" zweideutig (endgueltig ODER "gleich kommt noch ein
+   * Versuch"). Jetzt passiert die Wiederholung SOFORT, noch VOR dem Schreiben -- persistiert wird
+   * nur noch das ENDGUELTIGE Ergebnis, "failed" ist ab dann immer terminal.
+   */
+  versucheIntern?: number;
 };
 
 export type ArenaVorlaufRecord = {
@@ -2716,7 +2730,14 @@ export type ArenaVorlaufRecord = {
   status: ArenaVorlaufStatus;
   startedAt: string;
   finishedAt?: string | null;
-  /** Wievielter Versuch fuer diese Signatur (Wiederholung nach `absturz`/`timeout`/`chromium_start`). */
+  /**
+   * Wievielter EXTERNER Neustart fuer diese Signatur -- NICHT die automatische Wiederholung bei
+   * `absturz`/`timeout`/`chromium_start` (die passiert seit dem Design-Fix vom 18.10. INTERN
+   * innerhalb EINES Laufs, s. `ArenaVorlaufDisziplinEintrag.versucheIntern`, und persistiert nie
+   * ein Zwischenergebnis). Steigt nur bei einem `erzwingeNeuenVersuch` (der geplante "Arena
+   * erneut versuchen"-Knopf, oder eine arenaEingabeHash-Divergenz beim Buchen) oder bei einer
+   * neuen Signatur -- im automatischen Normalfall bleibt dieses Feld bei 1.
+   */
   versuch: number;
   /** je arena-aufgeloester Disziplin dieses Spieltags (D1 und/oder D2, s. WEG B). */
   disziplinen: Record<string, ArenaVorlaufDisziplinEintrag>;
