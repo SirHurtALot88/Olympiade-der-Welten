@@ -3,15 +3,16 @@ import { describe, expect, it } from "vitest";
 import abnahme from "@/data/generated/pps-duell-bruecke-abnahme.json";
 
 /**
- * ABNAHME DER PPS-DUELL-BRUECKE SELBST, TEIL A/B ALS WAECHTER (docs/design/
- * pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 8, Projektaufsicht-Korrektur 17.10.).
+ * ABNAHME DER PPS-DUELL-BRUECKE SELBST, FINALER WAECHTER (docs/design/
+ * pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 8, final nach vier
+ * Opus-Praezisierungsrunden 17.-18.10.).
  *
  * Misst: scripts/miss-pps-duell-bruecke-abnahme.ts. Dieser Wächter liest NUR die eingecheckte,
  * frisch gemessene Ausgabe (`data/generated/pps-duell-bruecke-abnahme.json`) — er führt die
  * Simulation nicht selbst aus (die braucht ein echtes Live-Save-Abbild per
- * `OLY_APP_SQLITE_PATH`, ~2h Laufzeit, s. Skript-Header). Das ist dasselbe Prinzip wie
- * `tests/disziplin-abnahme-guard.test.ts` gegen `data/generated/disziplin-abnahme.json`: neu
- * messen und committen, bevor sich am Score-Kanal/den Modifikatoren etwas ändert, das die Zahl
+ * `OLY_APP_SQLITE_PATH`, insgesamt mehrere Stunden fuer Teil A + Teil B zusammen). Das ist dasselbe
+ * Prinzip wie `tests/disziplin-abnahme-guard.test.ts` gegen `data/generated/disziplin-abnahme.json`:
+ * neu messen und committen, bevor sich am Score-Kanal/den Modifikatoren etwas ändert, das die Zahl
  * bewegen könnte.
  *
  * WARUM EIN EIGENER WAECHTER, NICHT tests/disziplin-abnahme-guard.test.ts: jener prüft
@@ -22,26 +23,35 @@ import abnahme from "@/data/generated/pps-duell-bruecke-abnahme.json";
  * Wächter schaltet nichts ab; er ist ein Regressions-Wächter auf den von der Brücke konsumierten
  * Kanal (ausführlicher begründet in tests/pps-duell-bruecke-score-kanal.test.ts).
  *
- * rho (Teil A, Spieler-Ebene): bekommt einen vollen Wächter -- besteht heute klar und stabil für
- * alle sieben messbaren Disziplinen (0,829–0,900, zwei Saatströme). Mini-DM liefert hier
- * STRUKTURELL keine Zahl (playerCount 1 je Seite, Spearman braucht n>=3 -- Abschnitt 8.4 der Doku)
- * und wird deshalb explizit als "nicht messbar", nicht als "bestanden" oder "durchgefallen",
- * geführt.
+ * WARUM NUR FELDGROESSE 6 GEPRUEFT WIRD (rho): Spearman bei n=3/4 kennt nur wenige diskrete Werte
+ * (n=3: {1,0; 0,5; -0,5; -1,0}; n=4: {1,0; 0,8; 0,6; ...}) -- ein einziger Rangtausch landet bei
+ * n=4 exakt AUF der 0,80-Schranke, nie "darüber". "Über 0,80" ist dort keine zulässige Aussage
+ * (Opus, Abschnitt 8.2 der Doku). Feldgröße 6 ist robust und frei von diesem Artefakt.
  *
- * Pp (Teil B, echte Bedingungen): KEIN blinder "<=25 für alle"-Wächter -- Football verfehlt die
- * Schranke heute klar und eigenständig (64,4/55,8, Abschnitt 8.3 der Doku), und ein Wächter, der
- * das stillschweigend akzeptiert, würde den Befund verschlucken. PPS_BEKANNTE_AUSNAHMEN hält genau
- * die zwei begründeten Sonderfälle (Football: Pp-Befund, Mini-DM: Methode nicht übertragbar) --
- * jede andere Disziplin in der Tabelle MUSS die Schranke in beiden Strömen bestehen, und die
- * Ausnahmeliste selbst wird gegen unbemerktes Wachsen geprüft (dasselbe Muster wie
- * `ARENA_ABNAHME_AUSNAHMEN`, lib/battle/arena-resolved-disciplines.ts).
+ * WARUM DIE FIXTURE-EBENE / "ÜBER SEITEN"-PAARTREUE HIER NICHT GEPRÜFT WIRD: beide spiegeln einen
+ * vorbestehenden, strukturellen Befund am legacy-PPS-Pfad (Team-Rang-Topf statt individueller
+ * Liga-Relation, s. Task #176 und Abschnitt 8.2 der Doku) -- nicht die Qualität der Brücke selbst.
+ * Ein Wächter darauf wäre bis zur Behebung von Task #176 dauerhaft rot oder bräuchte eine
+ * willkürliche Schranke. Die "selbe Seite"-Paartreue (reiner Eignungsvergleich, ohne den
+ * Team-Rang-Topf-Effekt) wird dagegen geprüft -- sie zeigt an, ob der Kanal grundsätzlich noch
+ * funktioniert.
+ *
+ * Pp (Teil B, echte Bedingungen): eine erste Fassung dieser Messung hatte einen Baseline-Mismatch-
+ * Fehler (Basiswert aus der SQLite vs. frisch neu hergeleiteter Wert verglichen), der Football
+ * fälschlich auf 64,4/55,8 Pp las. Nach dem Fix (Basislinie und Anhebung über denselben Rechenweg,
+ * s. tests/pps-duell-bruecke-score-kanal.test.ts) liest Football 5,9/12,5 -- kein eigenständiger
+ * Befund mehr. PP_BEKANNTE_AUSNAHMEN hält nur noch Mini-DM (30,5/30,5, kleine Grundgesamtheit,
+ * playerCount 1 je Seite, s. Abschnitt 8.4 der Doku).
  */
 
 type TeilAZeile = {
   strom: number;
-  spielerRhoMedian: number | null;
-  spielerRhoSpannweite: number | null;
-  spielerRhoSpiele: number;
+  spielerRhoJeFeldgroesse: Record<string, {
+    median: number | null;
+    n: number;
+    paartreueAb15SelbeSeitePct: number | null;
+    paartreueAb15SelbeSeiteN: number;
+  }>;
 };
 
 type TeilBZeile = { strom: number; laeufe: number; ppAbweichung: number };
@@ -53,64 +63,76 @@ const TABELLE = abnahme as unknown as {
 
 const RHO_SCHRANKE = 0.8;
 const PP_SCHRANKE = 25;
+const ROBUSTE_FELDGROESSE = "6";
 
-/** Disziplinen, deren Teil-A-rho hier strukturell nicht gemessen werden kann (nicht "bestanden"/"durchgefallen"). */
+/** Disziplinen, deren Teil-A-rho auf Seiten-/selbe-Seite-Ebene hier strukturell nicht gemessen werden kann. */
 const RHO_NICHT_MESSBAR = new Set(["mini-dm"]);
 
 /** Begründete, benannte Ausnahmen von der Pp-Schranke -- je eine, s. Doku-Abschnitt 8.3/8.4. */
 const PP_BEKANNTE_AUSNAHMEN: ReadonlyMap<string, string> = new Map([
   [
-    "football",
-    "Pp 64,4/55,8 unter echten Bedingungen (Slot-Rolle/Formkarte/Mutator überdecken die Matrix bzw. " +
-      "den Override) -- eigenständiger, neuer Befund am legacy-PPS-Kanal, nicht an der Brücke selbst " +
-      "(docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 8.3). Ungelöst; an das " +
-      "Hauptprojekt weitergegeben, nicht Teil dieses Auftrags.",
-  ],
-  [
     "mini-dm",
-    "Methode nicht übertragbar: playerCount 1 je Seite, jeder Lauf zeigte 0 messbare Änderung von " +
-      "pointsAwarded (Abschnitt 8.4). Mini-DMs echte Abnahme ist die Event-/Pod-Messung " +
+    "Pp 30,5/30,5 (beide Ströme exakt gleich -- Hinweis auf eine sehr kleine, wenig divers " +
+      "streuende Grundgesamtheit, playerCount 1 je Seite, 8 Ziehungen, Abschnitt 8.4 der Doku) " +
+      "statt einer praezisen Zahl. Mini-DMs echte Abnahme ist die Event-/Pod-Messung " +
       "(scripts/miss-mini-dm-ffa-abnahme.mjs, data/generated/disziplin-abnahme.json).",
   ],
 ]);
 
-describe("PPS-Duell-Brücke, Teil A: Spieler-rho je Disziplin (die Abnahmezahl)", () => {
-  it("jede gemessene Disziplin besteht rho > 0,80 (Median, beide Ströme)", () => {
+describe("PPS-Duell-Brücke, Teil A: rho bei Feldgröße 6 (robust, ohne Diskretisierungsartefakte)", () => {
+  it("jede messbare Disziplin besteht Seiten-rho > 0,80 bei Feldgröße 6 (Median, beide Ströme)", () => {
     const verfehlte: string[] = [];
     for (const [disziplin, zeilen] of Object.entries(TABELLE.teilA)) {
       if (RHO_NICHT_MESSBAR.has(disziplin)) continue;
       for (const zeile of zeilen) {
-        if (zeile.spielerRhoMedian == null || zeile.spielerRhoMedian <= RHO_SCHRANKE) {
-          verfehlte.push(`${disziplin}/Strom ${zeile.strom}: rho=${zeile.spielerRhoMedian}`);
+        const v = zeile.spielerRhoJeFeldgroesse[ROBUSTE_FELDGROESSE];
+        if (!v || v.median == null || v.median <= RHO_SCHRANKE) {
+          verfehlte.push(`${disziplin}/Strom ${zeile.strom}: rho=${v?.median}`);
         }
       }
     }
     expect(verfehlte).toEqual([]);
   });
 
-  it("jede gemessene Disziplin hat genug Team-Seiten für eine belastbare Aussage (n >= 30 je Strom)", () => {
+  it("jede messbare Disziplin hat bei Feldgröße 6 genug Team-Seiten für eine belastbare Aussage (n >= 30 je Strom)", () => {
     for (const [disziplin, zeilen] of Object.entries(TABELLE.teilA)) {
       if (RHO_NICHT_MESSBAR.has(disziplin)) continue;
       for (const zeile of zeilen) {
-        expect(zeile.spielerRhoSpiele, `${disziplin}/Strom ${zeile.strom}`).toBeGreaterThanOrEqual(30);
+        const v = zeile.spielerRhoJeFeldgroesse[ROBUSTE_FELDGROESSE];
+        expect(v?.n, `${disziplin}/Strom ${zeile.strom}`).toBeGreaterThanOrEqual(30);
       }
     }
   });
 
-  it("Mini-DM ist als 'strukturell nicht messbar' geführt, nicht als bestanden", () => {
+  it("Paartreue ab 15 Punkten DERSELBEN Seite bleibt nahe am Ideal (>=0,90) -- reiner Eignungsvergleich funktioniert", () => {
+    const verfehlte: string[] = [];
+    for (const [disziplin, zeilen] of Object.entries(TABELLE.teilA)) {
+      if (RHO_NICHT_MESSBAR.has(disziplin)) continue;
+      for (const zeile of zeilen) {
+        const v = zeile.spielerRhoJeFeldgroesse[ROBUSTE_FELDGROESSE];
+        if (!v || v.paartreueAb15SelbeSeitePct == null || v.paartreueAb15SelbeSeitePct < 0.9) {
+          verfehlte.push(`${disziplin}/Strom ${zeile.strom}: selbeSeite=${v?.paartreueAb15SelbeSeitePct}`);
+        }
+      }
+    }
+    expect(verfehlte).toEqual([]);
+  });
+
+  it("Mini-DM bleibt auf Seiten-Ebene strukturell nicht messbar (playerCount 1 je Seite, n=0)", () => {
     for (const disziplin of RHO_NICHT_MESSBAR) {
       const zeilen = TABELLE.teilA[disziplin];
       expect(zeilen, disziplin).toBeDefined();
       for (const zeile of zeilen!) {
-        expect(zeile.spielerRhoSpiele, disziplin).toBe(0);
-        expect(zeile.spielerRhoMedian, disziplin).toBeNull();
+        const v = zeile.spielerRhoJeFeldgroesse[ROBUSTE_FELDGROESSE];
+        expect(v?.n, disziplin).toBe(0);
+        expect(v?.median, disziplin).toBeNull();
       }
     }
   });
 });
 
-describe("PPS-Duell-Brücke, Teil B: Pp unter echten Bedingungen", () => {
-  it("jede Disziplin OHNE begründete Ausnahme besteht Pp <= 25 (beide Ströme)", () => {
+describe("PPS-Duell-Brücke, Teil B: Pp unter echten Bedingungen (nach dem Baseline-Mismatch-Fix)", () => {
+  it("jede Disziplin OHNE begründete Ausnahme besteht Pp <= 25 (beide Ströme) -- Football eingeschlossen", () => {
     const verfehlte: string[] = [];
     for (const [disziplin, eintrag] of Object.entries(TABELLE.teilB)) {
       if (PP_BEKANNTE_AUSNAHMEN.has(disziplin)) continue;
@@ -124,15 +146,24 @@ describe("PPS-Duell-Brücke, Teil B: Pp unter echten Bedingungen", () => {
     expect(verfehlte).toEqual([]);
   });
 
-  it("die Ausnahmeliste ist klein, begründet und wächst nicht unbemerkt (aktuell: Football, Mini-DM)", () => {
-    expect([...PP_BEKANNTE_AUSNAHMEN.keys()].sort()).toEqual(["football", "mini-dm"]);
+  it("Football ist NICHT mehr in der Ausnahmeliste (bestanden nach dem Fix)", () => {
+    expect(PP_BEKANNTE_AUSNAHMEN.has("football")).toBe(false);
+    const zeilen = TABELLE.teilB.football;
+    expect(Array.isArray(zeilen)).toBe(true);
+    for (const zeile of zeilen as TeilBZeile[]) {
+      expect(zeile.ppAbweichung, `Strom ${zeile.strom}`).toBeLessThanOrEqual(PP_SCHRANKE);
+    }
+  });
+
+  it("die Ausnahmeliste ist klein, begründet und wächst nicht unbemerkt (aktuell nur: Mini-DM)", () => {
+    expect([...PP_BEKANNTE_AUSNAHMEN.keys()]).toEqual(["mini-dm"]);
     for (const begruendung of PP_BEKANNTE_AUSNAHMEN.values()) {
       expect(begruendung.length).toBeGreaterThan(40);
     }
   });
 
-  it("Football verfehlt die Schranke heute nachweislich (kein Platzhalter-Eintrag, sondern ein echter Befund)", () => {
-    const zeilen = TABELLE.teilB.football;
+  it("Mini-DM verfehlt die Schranke heute nachweislich (kein Platzhalter, ein echter, wenn auch unsicherer Wert)", () => {
+    const zeilen = TABELLE.teilB["mini-dm"];
     expect(Array.isArray(zeilen)).toBe(true);
     for (const zeile of zeilen as TeilBZeile[]) {
       expect(zeile.ppAbweichung, `Strom ${zeile.strom}`).toBeGreaterThan(PP_SCHRANKE);

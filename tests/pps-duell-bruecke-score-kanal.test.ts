@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateRawDisciplineScore } from "@/lib/player-formulas/discipline-rating-engine";
+import { calculateRawDisciplineScore, buildCompetitionRanks, mapRankToDisciplineStat } from "@/lib/player-formulas/discipline-rating-engine";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
 import { playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
@@ -83,6 +83,65 @@ describe("PPS-Duell-Bruecke: der konsumierte Score-Kanal reicht Matrixgewichte u
         // Abweichung ist hier physikalisch moeglich.
         expect(Math.abs(matrixPct - gemessenPct), `${disziplinId}/${attr}`).toBeLessThan(2);
       }
+    },
+  );
+
+  it.each(["football", "fechten", "battlefield", "tdm"] as const)(
+    "%s: PLAUSIBILITAETS-SELBSTTEST der Teil-B-Methodik -- ein Attribut mit Gewicht 0 liefert ueber die " +
+      "Liga-Rangabbildung (buildCompetitionRanks + mapRankToDisciplineStat) EXAKT Delta 0, nie einen " +
+      "Baseline-Mismatch-Sprung",
+    (disziplinId) => {
+      // Fund 17.10. (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 8.5): die
+      // erste Fassung von Teil B verglich den NEU HERGELEITETEN (ueber calculateRawDisciplineScore +
+      // buildCompetitionRanks + mapRankToDisciplineStat) Wert einer Anhebung gegen einen
+      // HISTORISCHEN, aus der SQLite gelesenen Basiswert -- schon die blosse Differenz zwischen
+      // "historisch" und "frisch neu hergeleitet" erzeugte einen Sprung, auch bei einem Attribut mit
+      // Gewicht 0 (das die Formel komplett ignoriert). Dieser Test haelt die KORREKTE Methodik fest
+      // (Basislinie UND Anhebung ueber DENSELBEN Rechenweg, nur das Delta zaehlt) als dauerhaften
+      // Regressions-Waechter -- derselbe Plausibilitaetstest laeuft auch LIVE in
+      // scripts/miss-pps-duell-bruecke-abnahme.ts und bricht dort die Messung ab, statt still
+      // falsch zu messen.
+      const profil = resolveDisciplineWeightProfile(disziplinId);
+      const matrixSumme = Object.values(profil).reduce((s, w) => s + Math.max(0, w ?? 0), 0);
+      if (matrixSumme <= 0) return;
+
+      // Kleine synthetische Liga (40 Spieler), damit buildCompetitionRanks einen echten Rang
+      // liefert -- die genauen Attribute sind irrelevant, nur die STREUUNG muss echt sein.
+      const liga = Array.from({ length: 40 }, (_, i) =>
+        Object.fromEntries(playerGeneratorAttributeKeys.map((k, j) => [k, 10 + ((i * 7 + j * 13) % 85)])),
+      );
+      const zielIndex = 20;
+      const alleRaw = liga.map((attrs, i) => ({
+        playerId: `p${i}`,
+        score: calculateRawDisciplineScore(attrs as never, disziplinId as OfficialDisciplineWeightId),
+      }));
+
+      const deltaFuer = (attr: string) => {
+        const basisAttrs = liga[zielIndex]!;
+        const basisRoh = calculateRawDisciplineScore(basisAttrs as never, disziplinId as OfficialDisciplineWeightId)!;
+        const angehoben = { ...basisAttrs, [attr]: Math.min(99, (basisAttrs as Record<string, number>)[attr]! + 15) };
+        const liftRoh = calculateRawDisciplineScore(angehoben as never, disziplinId as OfficialDisciplineWeightId)!;
+        const rangVon = (roh: number) => {
+          const rawMit = alleRaw.map((e, i) => (i === zielIndex ? { ...e, score: roh } : e));
+          return buildCompetitionRanks(rawMit).get(`p${zielIndex}`)!;
+        };
+        const statBasis = mapRankToDisciplineStat(rangVon(basisRoh))!;
+        const statLift = mapRankToDisciplineStat(rangVon(liftRoh))!;
+        return statLift - statBasis;
+      };
+
+      let mindestensEinNichtNullGewichtGeprueft = false;
+      for (const attr of playerGeneratorAttributeKeys) {
+        const gewicht = (profil as Record<string, number>)[attr] ?? 0;
+        const delta = deltaFuer(attr);
+        if (gewicht <= 0) {
+          expect(delta, `${disziplinId}/${attr} (Gewicht ${gewicht})`).toBe(0);
+        } else {
+          mindestensEinNichtNullGewichtGeprueft = true;
+          expect(delta, `${disziplinId}/${attr} (Gewicht ${gewicht})`).toBeGreaterThanOrEqual(0);
+        }
+      }
+      expect(mindestensEinNichtNullGewichtGeprueft).toBe(true);
     },
   );
 
