@@ -274,6 +274,34 @@ Ereignisdichte, dann das Impact-Maß, dann das Rezept.
   13 × 12 × n volle Spiele; Basketball bei n=48 hat einmal das Sitzungsbudget gesprengt
   (Hockey-Plan G.1). Deshalb ist die Abnahme dort n=48, n=96 nur als Bestätigung ohne
   Zeitdruck (H.6).
+- **Basiswert und Anhebung MÜSSEN über denselben Rechenweg im selben Lauf gehen — nie
+  über einen gespeicherten/historischen Basiswert.** Fund am 17.10. bei der PPS-Duell-
+  Brücken-Abnahme (`scripts/miss-pps-duell-bruecke-abnahme.ts`,
+  `docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md` Abschnitt 8.5): die erste
+  Fassung verglich einen frisch über `calculateRawDisciplineScore` +
+  `buildCompetitionRanks` + `mapRankToDisciplineStat` NEU hergeleiteten Wert gegen den
+  ECHTEN, aus der SQLite gelesenen (historisch geschriebenen) Basiswert. Schon die blosse
+  Differenz zwischen „historisch" und „frisch neu hergeleitet" erzeugte einen Sprung —
+  und zwar für JEDES Attribut gleich, auch für eines mit Matrix-/Override-Gewicht 0 (das
+  die Formel komplett ignorieren muss). Football las dadurch 64,4 Pp statt der echten
+  ~6–9 Pp — ein Mess-Artefakt, kein Befund am Spiel. Der Fix: Basislinie UND Anhebung
+  über DIESELBE Neuherleitung im selben Lauf rechnen, nur das DELTA additiv auf den
+  echten Basiswert legen. Der dauerhafte Selbsttest dafür: ein Attribut mit Gewicht 0
+  MUSS |Delta| ≈ 0 liefern, sonst bricht die Messung ab statt still falsch zu messen
+  (eingebaut in besagtem Skript; als Regressions-Wächter zusätzlich in
+  `tests/pps-duell-bruecke-score-kanal.test.ts`). **Geprüft, NICHT betroffen:**
+  `messe-arena-einfluss.mjs`/`einflussVon()` — dort laufen Basis- und Hebungslauf beide
+  FRISCH im selben Simulationslauf durch die Arena-Engine, nie gegen einen gespeicherten
+  Wert. Das Werkzeug hat allerdings eine VERWANDTE, bereits dokumentierte Schwachstelle
+  (`battle-mode.engine.js:9545`ff., Basketball-Wurfbonus-Runde): Basis- und Hebungslauf
+  teilen sich denselben Seed und dieselbe rr()-Aufrufzahl je Tick — ein neuer, bedingter
+  rr()-Aufruf (Foul-/Freiwurf-Würfel), der in beiden Läufen zu unterschiedlichen
+  Zeitpunkten fällt, verschiebt die nachfolgende Zufallsfolge und erzeugt ebenfalls ein
+  Pp-Artefakt (dort schon als solches erkannt und mit `GEO_BONUS`/`schussSkillFuer`
+  umgangen, nicht behoben). Dieselbe Familie von Risiko — Basislinie und Anhebung
+  driften aus einem von der Attribut-Anhebung UNABHÄNGIGEN Grund auseinander — also bei
+  jedem neuen Messskript als Erstes ausschließen: **"liefert ein Attribut mit
+  Gewicht/Einfluss 0 exakt 0, oder nur ungefähr?"**
 
 ### 3.3 Zur Rangtreue: warum ein Spiel, nicht eine Saison
 
