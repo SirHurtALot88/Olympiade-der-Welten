@@ -86,6 +86,35 @@ async function main() {
   console.log("Verhaeltnis-Summe je Liga:", verhSumme("liga1"), verhSumme("liga2"));
   const ohneRang = standings.filter((s) => s.rank == null).length;
   console.log("Teams ohne Rang (block_on_tie):", ohneRang);
+
+  // TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Auflage 18.10., Punkt 2): Summe der
+  // INDIVIDUELLEN Spieler-PPs je Spieltag UND Saison -- `scoreContribution` trägt hier den
+  // tatsaechlich vergebenen `pointsAwarded`-Wert (s. legacy-matchday-result-mapper.ts:
+  // `scoreContribution: player.pointsAwarded ?? player.scoreContribution`). Fuer einen Vorher-
+  // /Nachher-Vergleich dieses Skript einmal auf dem Stand VOR und einmal NACH der Aenderung laufen
+  // lassen (je gegen eine eigene Kopie derselben Ausgangs-SQLite, damit derselbe Save/Spielplan/
+  // dieselben Formkarten-Wuerfe gelten).
+  const perfs = ende.gameState.seasonState.playerDisciplinePerformances ?? [];
+  const ppSummeJeSpieltag = new Map<string, number>();
+  let ppSummeGesamt = 0;
+  for (const p of perfs) {
+    const wert = p.scoreContribution ?? 0;
+    ppSummeJeSpieltag.set(p.matchdayResultId, (ppSummeJeSpieltag.get(p.matchdayResultId) ?? 0) + wert);
+    ppSummeGesamt += wert;
+  }
+  console.log(
+    "PP-Summe je Spieltag:",
+    [...ppSummeJeSpieltag.entries()].map(([md, s]) => `${md}=${s.toFixed(1)}`).join("  "),
+  );
+  console.log("PP-Summe GESAMT (Saison bis hierhin):", ppSummeGesamt.toFixed(1), `(${perfs.length} Spieler-Zeilen)`);
+  const duellZeilenKey = new Set(
+    zeilen
+      .filter((z) => z.resolutionSource === "pps_duell" || z.resolutionSource === "arena")
+      .map((z) => `${z.matchdayResultId}|${z.disciplineId}|${z.teamId}`),
+  );
+  const duellZeilen = perfs.filter((p) => duellZeilenKey.has(`${p.matchdayResultId}|${p.disciplineId}|${p.teamId}`));
+  const ppSummeDuell = duellZeilen.reduce((s, p) => s + (p.scoreContribution ?? 0), 0);
+  console.log("davon ueber Duell-Zeilen (arena/pps_duell):", ppSummeDuell.toFixed(1), `(${duellZeilen.length} Spieler-Zeilen)`);
 }
 
 void main().catch((e) => { console.error(e); process.exitCode = 1; });

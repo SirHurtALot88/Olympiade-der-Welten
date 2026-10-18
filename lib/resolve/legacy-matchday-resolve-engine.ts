@@ -22,6 +22,7 @@ import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import {
   baueFixtureIndex,
+  berechneDuellIndividualPpsFuerSeite,
   berechneDuellVerhaeltnis,
   berechnePpsDuellOverrides,
   findeSpieltagsFixtures,
@@ -957,6 +958,32 @@ export function buildLegacyMatchdayResolvePreview(
       }));
       const rankedTeam = teamResultsRanked.find((entry) => entry.teamId === context.team.id && entry.disciplineSide === side);
 
+      // TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Befund 18.10., hoechste Prioritaet, s.
+      // battle-mode-pps-duell.ts Dateikopf-Kommentar): fuer eine ueber die Bruecke gewertete Seite
+      // (`resolutionSource === "pps_duell"`) kommen die individuellen PPs NICHT mehr aus
+      // `distributeRankPointsToPlayers()`s team-rang-gebundenem Pool (`rank: rankedTeam.rank`,
+      // s. unten), sondern aus `ppsAusDuellWert()` -- derselben Impact-Kurve, die die Arena schon
+      // fuer ihre Disziplinen nutzt (`ppsAusArenaImpact()`), nur gegen die PPS-Score-Referenz.
+      // `null`, wenn fuer diese Disziplin/Feldgroesse noch keine Referenz gezogen wurde -- dann
+      // greift unveraendert der Pfad darunter (`distributedPoints`), mit einer sichtbaren Warnung
+      // statt still falsch.
+      const duellIndividualPps =
+        rankedTeam?.resolutionSource === "pps_duell"
+          ? berechneDuellIndividualPpsFuerSeite({
+              disciplineId,
+              playerCount: legacyScorePlayerCount ?? score.requiredPlayers ?? rankedWithinTeam.length,
+              entries: rankedWithinTeam.map(({ entry }) => ({
+                playerId: entry.playerId,
+                wert: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
+              })),
+            })
+          : null;
+      if (rankedTeam?.resolutionSource === "pps_duell" && !duellIndividualPps) {
+        rankedTeam.warnings = Array.from(
+          new Set([...rankedTeam.warnings, `pps_duell_individual_referenz_fehlt:${disciplineId}`]),
+        );
+      }
+
       const distributedPoints = distributeRankPointsToPlayers({
         // REVIEW-FIX (PR #930, 14.09.): s. Kommentar an der `teamPoints`-Zuweisung oben.
         playerCount: legacyScorePlayerCount ?? score.requiredPlayers ?? rankedWithinTeam.length,
@@ -996,10 +1023,19 @@ export function buildLegacyMatchdayResolvePreview(
           // einzelner nicht zuordenbarer Mitspieler faellt fuer sich selbst auf PPS zurueck, ohne
           // seine Teamkollegen zu beruehren).
           const arenaPps = arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null;
+          // TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE: zweite Prioritaet nach einem echten
+          // Arena-Boxscore-Wert (disjunkte Mengen -- eine Seite ist nie beides), vor dem alten
+          // team-rang-gebundenen `pointsByPlayerId`. `duellIndividualPpsApplied` NUR per
+          // bedingtem Spread gesetzt (nie als unconditional `false`) -- Manager-Mode-Zeilen
+          // (`duellPps` dort immer `null`) bekommen das Feld dadurch GAR NICHT, bit-identisch zum
+          // Stand vor dieser Aenderung (anders als `arenaBoxscoreImpactApplied`, das schon vor
+          // dieser PR unconditional in jeder Zeile stand und deshalb auf beiden Seiten gleich ist).
+          const duellPps = duellIndividualPps?.ppsByPlayerId.get(entry.playerId) ?? null;
           return {
             ...entry,
-            pointsAwarded: arenaPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
+            pointsAwarded: arenaPps ?? duellPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
             arenaBoxscoreImpactApplied: arenaPps != null,
+            ...(duellPps != null ? { duellIndividualPpsApplied: true } : {}),
           };
         });
       }
@@ -1027,11 +1063,19 @@ export function buildLegacyMatchdayResolvePreview(
         teamPowerShare: entry.teamPowerShare ?? null,
         finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
-        pointsAwarded: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? distributedPoints.entries[index]?.points ?? null,
+        pointsAwarded:
+          arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ??
+          duellIndividualPps?.ppsByPlayerId.get(entry.playerId) ??
+          distributedPoints.entries[index]?.points ??
+          null,
         pointSource: distributedPoints.pointSource,
         // BOXSCORE-AN-PPS: nur informativ (Debug/Anzeige) -- `pointsAwarded` oben ist die einzige
         // Stelle, an der der Boxscore-Impact tatsaechlich Punkte vergibt.
         arenaBoxscoreImpactApplied: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+        // TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE: ebenso nur informativ -- bedingter Spread
+        // statt unconditional `false`, s. Kommentar oben an der anderen Zuweisungsstelle
+        // (Bit-Identitaet Manager Mode).
+        ...(duellIndividualPps?.ppsByPlayerId.get(entry.playerId) != null ? { duellIndividualPpsApplied: true } : {}),
         rankInTeam,
         rankInDiscipline: 0,
         isTop10: false,
