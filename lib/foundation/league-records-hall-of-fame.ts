@@ -90,6 +90,14 @@ export type SeasonChampionEntry = {
   goldTeamName: string;
   silverTeamName: string | null;
   bronzeTeamName: string | null;
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8): der Liga-2-Erste
+   * dieser Saison, als EIGENER, von `goldTeamId` getrennter Titel ("Zweitliga-Meister"). `null`
+   * für jede Saison ohne aktiven Liga-Split (jeder Manager-Mode-/Legacy-Save, und jede Battle-Save-
+   * Saison vor Task #158).
+   */
+  liga2ChampionTeamId: string | null;
+  liga2ChampionTeamName: string | null;
 };
 
 export type LeagueRecordsHallOfFame = {
@@ -181,18 +189,26 @@ export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecord
     }));
 
   // --- Season-für-Season-Meister (Trophäenschrank) ----------------------
+  //
+  // TASK #158/#161, liga-split-plan.md 10.8: bei aktivem Liga-Split (mind. ein Team mit
+  // `leagueTier`) trägt `finalStandings` ZWEI Teams mit `rank === 1` (Liga-1- UND Liga-2-Erster,
+  // weil `rank` seit der Liga-lokalen Nachbuchung pro Liga 1..LEAGUE_SIZE zählt). `isGold`
+  // (`season-snapshot-service.ts`) ist deshalb die richtige Quelle für den GESAMT-/Liga-1-Sieger,
+  // nicht `rank === 1` roh — ohne Split (`leagueTier` immer `null`) ist `isGold` ohnehin dasselbe
+  // wie `rank === 1`, also bit-identisch zu vor dieser Änderung.
   const seasonChampions: SeasonChampionEntry[] = [...snapshots]
     .reverse()
     .map((snapshot) => {
       const standings = [...(snapshot.finalStandings ?? [])].sort(
         (left, right) => (left.rank ?? Number.POSITIVE_INFINITY) - (right.rank ?? Number.POSITIVE_INFINITY),
       );
-      const gold = standings.find((row) => row.rank === 1) ?? standings[0] ?? null;
+      const gold = standings.find((row) => row.isGold ?? row.rank === 1) ?? standings[0] ?? null;
       if (!gold) {
         return null;
       }
       const silver = standings.find((row) => row.rank === 2) ?? null;
       const bronze = standings.find((row) => row.rank === 3) ?? null;
+      const liga2Champion = standings.find((row) => row.isLiga2Champion === true) ?? null;
       return {
         seasonId: snapshot.seasonId,
         seasonLabel: seasonLabelOf(snapshot),
@@ -201,6 +217,8 @@ export function buildLeagueRecordsHallOfFame(gameState: GameState): LeagueRecord
         goldTeamName: gold.teamName,
         silverTeamName: silver?.teamName ?? null,
         bronzeTeamName: bronze?.teamName ?? null,
+        liga2ChampionTeamId: liga2Champion?.teamId ?? null,
+        liga2ChampionTeamName: liga2Champion?.teamName ?? null,
       } satisfies SeasonChampionEntry;
     })
     .filter((entry): entry is SeasonChampionEntry => entry != null);

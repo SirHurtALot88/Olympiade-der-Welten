@@ -36,6 +36,9 @@ import {
   startSeasonTransition,
   type SeasonTransitionPreview,
 } from "@/lib/season/season-transition-service";
+import { applyLeagueMovement, type LeagueMovementResult } from "@/lib/season/league-movement-service";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { randomUUID } from "@/lib/utils/random-id";
 
 export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 
@@ -56,6 +59,7 @@ export type SeasonCompletionStep = {
     | "insolvency_backstop"
     | "relationships"
     | "snapshot"
+    | "league_movement"
     | "transition"
     | "ai_audit";
   label: string;
@@ -82,6 +86,8 @@ export type SeasonCompletionResult = {
   relationships: TeamRelationshipEventApplyResult;
   transition: SeasonTransitionPreview;
   aiSeasonAudit: SeasonAiLineupAudit;
+  /** Auf-/Abstieg (Task #158) — `applicable: false` für jeden Manager-Mode-/Legacy-Save. */
+  leagueMovement: LeagueMovementResult;
   warnings: string[];
   blockingReasons: string[];
 };
@@ -664,10 +670,75 @@ async function runLocalSeasonCompletionUnsafe(
   );
 
   const afterSnapshotSave = resolveLocalSave(persistence, initialSave.saveId);
+
+  /**
+   * LEAGUE_MOVEMENT (Task #158) — Auf-/Abstieg, NACH dem Snapshot (der die Endtabelle der
+   * ABGESCHLOSSENEN Saison mit der ALTEN Liga-Zuordnung einfriert) und VOR der Transition (die den
+   * Save auf "season_review" stellt). Nur fuer Battle-Mode-Saves mit aktivem Liga-Split
+   * (`isLeagueSplitActive`) — jeder Manager-Mode-/Legacy-Save bleibt unangetastet.
+   *
+   * Schreibt die neue `leagueByTeamId`-Zuordnung direkt in den persistierten Save — alles danach
+   * (Sponsorvertrags-Reroll, Apron, der Spielplan der naechsten Saison in
+   * `preseason-workflow-service.ts`) liest dieses Feld frisch und sieht die neue Liga automatisch,
+   * ohne einen zweiten Uebergabe-Pfad.
+   */
+  const leagueSplitActive = isLeagueSplitActive(afterSnapshotSave.gameState);
+  const existingLeagueMovementLog = leagueSplitActive
+    ? (afterSnapshotSave.gameState.seasonState.leagueMovementLogs ?? []).find((log) => log.seasonId === seasonId) ?? null
+    : null;
+  const leagueMovementPreview = leagueSplitActive
+    ? applyLeagueMovement(afterSnapshotSave.gameState).result
+    : ({ applicable: false, leagueByTeamId: null, promoted: [], relegated: [], warnings: [] } as LeagueMovementResult);
+  const shouldApplyLeagueMovement =
+    !dryRun && blockingReasons.size === 0 && leagueSplitActive && !existingLeagueMovementLog && leagueMovementPreview.applicable;
+  let leagueMovementApplied = false;
+  if (shouldApplyLeagueMovement) {
+    const { gameState: movedGameState } = applyLeagueMovement(afterSnapshotSave.gameState);
+    const logRecord = {
+      id: `league-movement:${seasonId}:${randomUUID()}`,
+      saveId: afterSnapshotSave.saveId,
+      seasonId,
+      createdAt: new Date().toISOString(),
+      promotedTeamIds: leagueMovementPreview.promoted.map((team) => team.teamId),
+      relegatedTeamIds: leagueMovementPreview.relegated.map((team) => team.teamId),
+    };
+    const nextGameState = {
+      ...movedGameState,
+      seasonState: {
+        ...movedGameState.seasonState,
+        leagueMovementLogs: [logRecord, ...(movedGameState.seasonState.leagueMovementLogs ?? [])],
+      },
+    };
+    persistence.saveSingleplayerState(afterSnapshotSave.saveId, nextGameState);
+    leagueMovementApplied = true;
+  }
+  addStep(
+    steps,
+    {
+      key: "league_movement",
+      label: "Auf-/Abstieg",
+      status: !leagueSplitActive
+        ? "skipped"
+        : existingLeagueMovementLog
+          ? "already_done"
+          : leagueMovementApplied
+            ? "applied"
+            : leagueMovementPreview.applicable
+              ? "planned"
+              : "skipped",
+      warnings: leagueMovementPreview.warnings,
+      blockingReasons: [],
+      auditId: existingLeagueMovementLog?.id ?? null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterLeagueMovementSave = leagueMovementApplied ? resolveLocalSave(persistence, initialSave.saveId) : afterSnapshotSave;
   const transition =
-    !dryRun && blockingReasons.size === 0 && afterSnapshotSave.gameState.gamePhase !== "season_review"
-      ? startSeasonTransition(afterSnapshotSave, persistence)
-      : buildSeasonTransitionPreview(afterSnapshotSave);
+    !dryRun && blockingReasons.size === 0 && afterLeagueMovementSave.gameState.gamePhase !== "season_review"
+      ? startSeasonTransition(afterLeagueMovementSave, persistence)
+      : buildSeasonTransitionPreview(afterLeagueMovementSave);
   if (!transition.ok) {
     transition.blockingReasons.forEach((reason) => blockingReasons.add(reason));
   }
@@ -734,6 +805,7 @@ async function runLocalSeasonCompletionUnsafe(
     relationships: relationshipApply,
     transition,
     aiSeasonAudit,
+    leagueMovement: leagueMovementPreview,
     warnings: warningList,
     blockingReasons: blockingList,
   };

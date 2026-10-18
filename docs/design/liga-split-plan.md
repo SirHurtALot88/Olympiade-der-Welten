@@ -141,12 +141,12 @@ Migrationsmarker `seasonState.leagueSplitMigrationVersion` nach bestehendem Must
 
 1. **10 Spieltage ⇒ 5 von 15 möglichen Gegnern werden pro Saison verpasst** (rotiert über Saisons via Seed). Akzeptabel, oder sollen es 15 Spieltage werden (würde Disziplinen-Wiederholungen in einer Saison bedeuten)?
 2. **Bedeutung der Paarung**: rein informativ/Anzeige (spricht für "Formel identisch"), oder soll das Duell später auch Punkte/Boni geben?
-3. **Sponsor-Topfgröße je Liga**: 50/50, gehaltsproportional, oder bewusst asymmetrisch (z. B. 60/40), damit Aufstieg sich finanziell lohnt?
-4. **Apron pro Liga rechnen** (empfohlen) — bestätigen?
-5. **Zuordnungs-Kriterium für Bestands-Saves** (inkl. Live-Save): sportlicher Endrang der letzten Saison statt Startbudget?
-6. **Mehrjahres-Sponsorverträge über einen Auf-/Abstieg hinweg**: Leiter beim Reroll auf neue Liga umbauen (Vorschlag), oder Ausstiegsklausel bei Abstieg?
-7. **Punkte-Inflation vs. Historie**: Ränge 1–16 zahlen im Schnitt mehr Punkte als 1–32 — Ewige Tabelle/Rekorde nicht mehr 1:1 vergleichbar. Hinnehmen (Ära-Markierung) oder kalibrieren?
-8. **"Meister"-Begriff**: zwei Liga-Sieger, aber ein Gesamt-Meister (Liga 1)? Zählt Liga-2-Platz-1 als "Titel" für Achievements?
+3. ✅ **BEANTWORTET (Chris, 18.10., Task #161):** Sponsor-Topfgröße je Liga — **asymmetrisch 60/40**: Liga 1 bekommt 60 % des bisherigen, auf einen 32er-Rangraum kalibrierten `SPONSOR_WERTUNGSTOPF`, Liga 2 40 %. Umgesetzt in Task #158 (`SPONSOR_TOPF_FAKTOR_JE_LIGA`, `lib/sponsor/sponsor-liga-leiter.ts`).
+4. ✅ **BEANTWORTET (Chris, 18.10., Task #161):** Apron pro Liga rechnen — **ja**, bestätigt. Umgesetzt in Task #158 (`apronLinesSnapshotByLeague`, `lib/season/apron-service.ts` + `apron-settlement-service.ts`).
+5. **Zuordnungs-Kriterium für Bestands-Saves** (inkl. Live-Save): sportlicher Endrang der letzten Saison statt Startbudget? — gegenstandslos, s. `docs/design/auf-abstieg-konzept-vorbereitung-17-10-2026.md` Abschnitt 2: keine Bestands-Battle-Saves vorhanden, neue Saves bekommen ihre Zuordnung bereits nach Budget-Startrang (`buildInitialLeagueAssignment`).
+6. ✅ **BEANTWORTET (Chris, 18.10., Task #161):** Mehrjahres-Sponsorverträge über einen Auf-/Abstieg hinweg — **Option (a), Leiter beim Reroll auf neue Liga umbauen**. Umgesetzt in Task #158: kein neuer Code nötig, `rerollSponsorV3TermsForNewSeason` liest das neue `leagueTier` automatisch, sobald `league_movement` `seasonState.leagueByTeamId` vor dem Saisonwechsel aktualisiert hat (s. `lib/season/league-movement-service.ts`).
+7. **Punkte-Inflation vs. Historie**: Ränge 1–16 zahlen im Schnitt mehr Punkte als 1–32 — Ewige Tabelle/Rekorde nicht mehr 1:1 vergleichbar. Hinnehmen (Ära-Markierung) oder kalibrieren? — weiterhin offen, nicht Teil von Task #158/#161.
+8. ✅ **BEANTWORTET (Chris, 18.10., Task #161, Bonus-Frage):** "Meister"-Begriff — Liga-2-Platz-1 zählt als **eigenständiger Titel** ("Zweitliga-Meister"), getrennt vom Liga-1-/Gesamt-Meister ausgewiesen. Umgesetzt in Task #158 (`isLiga2Champion`, `SeasonChampionEntry.liga2ChampionTeamId`, Achievement „Zweitliga-Meister").
 9. **32er-kalibrierte Sponsor-Parameter** (Stärkeklassen-Wahrscheinlichkeiten, Anker-Sigma, Kurvenformen) übernehmen wir proportional — nach 1–2 Split-Saisons am Live-Abbild nachmessen, ok?
 10. **KI-Schwellwerte** ("Top 8", "Rang ≤ 20" in diversen `lib/ai/`-Services) sind teils 32er-geeicht — eigener Sweep nötig, in dieser Recherche nicht vollständig erfasst.
 11. **Multiplayer-Interessenkonflikt** (ein Mensch mit Teams in beiden Ligen im Auf-/Abstiegsrennen): empfohlen zuzulassen, aber bewusst abnicken.
