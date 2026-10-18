@@ -56,8 +56,9 @@ const DISCIPLINE_SCHEDULE = {
   discipline2: { disciplineId: "fechten", displayName: "Fechten", order: 2, playerCount: 2, category: "duell" },
 };
 
-function buildGameState(disciplineResults: DisciplineResultRecord[]): GameState {
+function buildGameState(disciplineResults: DisciplineResultRecord[], gameMode: "battle" | "manager" = "battle"): GameState {
   return {
+    scenarioMeta: { gameMode },
     matchdayState: { matchdayId: "md1" },
     seasonState: {
       disciplineSchedule: [DISCIPLINE_SCHEDULE],
@@ -68,13 +69,22 @@ function buildGameState(disciplineResults: DisciplineResultRecord[]): GameState 
 }
 
 describe("buildArenaHostSpielquelleHinweise", () => {
+  it("Manager-Save: KEINE Hinweise, auch nicht fuer eine Disziplin ausserhalb der Arena-Menge (Opus-Review zu PR #1282 -- echter Fehler, kein Stilpunkt: Manager Mode wertet ueber die Rangtabelle, es gibt dort weder Duell noch Bruecke)", () => {
+    const hinweise = buildArenaHostSpielquelleHinweise(buildGameState([], "manager"), "A");
+    expect(hinweise).toEqual([]);
+  });
+
   it("ohne matchdayId/heimTeamId: keine Hinweise", () => {
-    expect(buildArenaHostSpielquelleHinweise({ matchdayState: {}, seasonState: {} } as never, "A")).toEqual([]);
+    expect(buildArenaHostSpielquelleHinweise({ scenarioMeta: { gameMode: "battle" }, matchdayState: {}, seasonState: {} } as never, "A")).toEqual([]);
     expect(buildArenaHostSpielquelleHinweise(buildGameState([]), "")).toEqual([]);
   });
 
   it("ohne gebuchten Spieltag (kein disciplineSchedule-Eintrag fuer diesen Matchday): nur die immer-Bruecke-Disziplin", () => {
-    const gs = { matchdayState: { matchdayId: "md-unbekannt" }, seasonState: { disciplineSchedule: [DISCIPLINE_SCHEDULE] } } as unknown as GameState;
+    const gs = {
+      scenarioMeta: { gameMode: "battle" },
+      matchdayState: { matchdayId: "md-unbekannt" },
+      seasonState: { disciplineSchedule: [DISCIPLINE_SCHEDULE] },
+    } as unknown as GameState;
     expect(buildArenaHostSpielquelleHinweise(gs, "A")).toEqual([]);
   });
 

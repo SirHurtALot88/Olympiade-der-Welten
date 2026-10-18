@@ -694,13 +694,16 @@ export default function FoundationBattleArenaHost({
             data-testid="oly-arena-spielquelle-hinweis"
             style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
           >
+            {/* Opus-Review zu PR #1282 (17.10.): der "nur Vorschau"-Zusatz muss je Disziplin
+                stehen, nicht als EIN Schlusssatz hinter allen Hinweisen — sonst liest sich das
+                an einem Spieltag mit einer echt per Arena UND einer per Brücke gewerteten
+                Disziplin so, als wäre auch die Arena-Disziplin nur Vorschau. */}
             {spielquelleHinweise.map((hinweis, index) => (
               <span key={hinweis.disciplineId}>
                 {index > 0 ? " · " : ""}
-                <strong>{hinweis.disciplineName}</strong> {hinweis.text}
+                <strong>{hinweis.disciplineName}</strong> {hinweis.text} — hier nur Vorschau.
               </span>
-            ))}{" "}
-            — die Arena hier ist in jedem Fall nur Vorschau.
+            ))}
           </p>
         ) : null}
 

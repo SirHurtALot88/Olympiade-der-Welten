@@ -1,6 +1,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { arenaAusfallGrundLabel, findeDisziplinErgebnis } from "@/lib/foundation/season-matchday-fixtures-overview";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 
 /**
  * ARENA-HOST-HINWEIS ("gewertet per PPS-Duell, Arena nur Vorschau") — Task #159 Punkt 3, eigener
@@ -21,6 +22,13 @@ import { arenaAusfallGrundLabel, findeDisziplinErgebnis } from "@/lib/foundation
  *     (Spieltag noch nicht gewertet) wird NICHTS behauptet — kein Raten, ob der kommende Lauf
  *     klappt.
  *
+ * BATTLE-MODE-GATE (Opus-Review zu PR #1282, 17.10. — echter Fehler, kein Stilpunkt): der Arena-
+ * Host ist ein GLOBALER Tab, erscheint also auch in Manager-Saves (z. B. Chris' laufender
+ * Spielstand). Dort wertet die Rangtabelle, es gibt weder Duell noch Brücke — Fall 1 hätte dort
+ * fälschlich "wird per PPS-Duell gewertet" behauptet, obwohl in Manager-Saves schlicht gar keine
+ * Brücke existiert. Darum ganz vorne `isBattleModeSave`-Gate: Manager-Saves bekommen grundsätzlich
+ * keine Hinweise aus diesem Builder.
+ *
  * Nutzt dieselben reinen Helfer wie der "Spieltage"-Modus (season-matchday-fixtures-overview.ts,
  * Task #159 Punkt 2) — keine zweite Beschriftung für `arenaAusfall` im Projekt.
  */
@@ -31,9 +39,12 @@ export type ArenaHostSpielquelleHinweis = {
 };
 
 export function buildArenaHostSpielquelleHinweise(
-  gameState: Pick<GameState, "matchdayState" | "seasonState">,
+  gameState: Pick<GameState, "scenarioMeta" | "matchdayState" | "seasonState">,
   heimTeamId: string,
 ): ArenaHostSpielquelleHinweis[] {
+  if (!isBattleModeSave(gameState)) {
+    return [];
+  }
   const matchdayId = gameState.matchdayState?.matchdayId;
   if (!matchdayId || !heimTeamId) {
     return [];
