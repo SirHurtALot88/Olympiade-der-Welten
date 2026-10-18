@@ -72,10 +72,12 @@ const RHO_NICHT_MESSBAR = new Set(["mini-dm"]);
 const PP_BEKANNTE_AUSNAHMEN: ReadonlyMap<string, string> = new Map([
   [
     "mini-dm",
-    "Pp 30,5/30,5 (beide Ströme exakt gleich -- Hinweis auf eine sehr kleine, wenig divers " +
-      "streuende Grundgesamtheit, playerCount 1 je Seite, 8 Ziehungen, Abschnitt 8.4 der Doku) " +
-      "statt einer praezisen Zahl. Mini-DMs echte Abnahme ist die Event-/Pod-Messung " +
-      "(scripts/miss-mini-dm-ffa-abnahme.mjs, data/generated/disziplin-abnahme.json).",
+    "Pp 30,5/30,5 -- NICHT belastbar, nicht einfach 'durchgefallen': zwei eigentlich unabhaengige " +
+      "Saatstroeme liefern exakt denselben Wert, dasselbe Rotflaggen-Muster wie der fruehere " +
+      "Bit-identische-Mediane-Bug (Abschnitt 8.1 Punkt 2 der Doku) -- Hinweis auf playerCount 1 " +
+      "je Seite und nur 8 Ziehungen, nicht auf eine praezise Zahl. Offen bis Chris' " +
+      "Pod-Format-Entscheidung (Abschnitt 8.4); Mini-DMs echte Abnahme ist bis dahin die " +
+      "Event-/Pod-Messung (scripts/miss-mini-dm-ffa-abnahme.mjs, data/generated/disziplin-abnahme.json).",
   ],
 ]);
 
@@ -162,7 +164,7 @@ describe("PPS-Duell-Brücke, Teil B: Pp unter echten Bedingungen (nach dem Basel
     }
   });
 
-  it("Mini-DM verfehlt die Schranke heute nachweislich (kein Platzhalter, ein echter, wenn auch unsicherer Wert)", () => {
+  it("Mini-DM liegt heute über der Schranke, aber NICHT belastbar (kein Platzhalter, aber ein unsicherer Wert)", () => {
     const zeilen = TABELLE.teilB["mini-dm"];
     expect(Array.isArray(zeilen)).toBe(true);
     for (const zeile of zeilen as TeilBZeile[]) {

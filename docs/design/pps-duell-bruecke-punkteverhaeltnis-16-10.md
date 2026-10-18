@@ -364,6 +364,14 @@ Abschnitt holt das nach, gemessen an `6a003097` (main, PR 0 + PR 1) → Commit d
 über vier Präzisierungsrunden der Projektaufsicht; **dies ist der finale Stand**, zwei frühere
 Fassungen (16.–17.10.) sind ausdrücklich überholt und werden hier nicht als gültig berichtet.
 
+> **Kernaussage zuerst, ungeschönt:** **Die Brücke besteht die Einzelspiel-rho-Abnahme auf
+> Fixture-Ebene derzeit nicht.** Mittel 0,61–0,78, nur 27–51 % der Fixtures ≥ 0,80 bei Feldgröße 6.
+> Ursache ist der Team-Rang-Topf (Paartreue gleiche Seite 97–100 %, über beide Seiten 76–89 %). Fix
+> in Task #176. Die Seiten-Ebene (alle sieben messbaren Disziplinen > 0,80 bei Feldgröße 6) und Pp
+> (7 von 8 bestehen) kommen weiter unten als **Zusatzgrößen**, nicht als Eröffnung — sie beantworten
+> eine andere, engere Frage (individuelle Eignung vs. vergebene PP innerhalb einer Teamseite bzw.
+> Verzerrung des Score-Kanals) und dürfen die Fixture-Ebene-Aussage oben nicht verdecken.
+
 ### 8.1 Was eigentlich zu messen ist
 
 Die Brücke selbst hat keine Attribut-Logik — `outcomeAusPunkten()` vergleicht zwei fertige
@@ -496,7 +504,7 @@ Team-Seiten-Ziehungen × 12 Attribute je Disziplin und Strom (96 Läufe), Feldgr
 | Basketball | 10,1 | 9,0 | Ja |
 | Hockey | 7,4 | 8,2 | Ja |
 | Fechten | 15,0 | 9,1 | Ja |
-| Mini-DM | 30,5 | 30,5 | **Nein**, s. 8.4 |
+| Mini-DM | 30,5 | 30,5 | **Nicht belastbar**, s. 8.4 |
 
 **Sieben von acht bestehen klar, einstellig bis knapp unter 18.** Football bestand in der ersten
 Fassung dieser Runde NICHT (64,4/55,8) — das war der Baseline-Mismatch-Fehler aus 8.1 Punkt 3, kein
@@ -505,18 +513,21 @@ echter Befund am Spiel. Mit dem Fix liest Football 5,9/12,5, in derselben Größ
 untersuchen** — eine eigens dafür vorgesehene Diagnose-Aufgabe wurde aus genau diesem Grund
 zurückgestellt, bevor sie Ressourcen bekam.
 
-**Football gegen Matrix UND Override** (Chris muss beide Zahlen kennen, auch wenn Football
-bestanden hat): `calculateRawDisciplineScore()` ruft `resolveDisciplineWeightProfile(dId)`, die bei
-vorhandenem Override (`lib/player-generator/spiel-eignung-overrides.ts`, Chris' Bestätigung E3)
-GENAU DIESEN statt der offiziellen Matrix liefert — der legacy-PPS-Kanal liest für Football also
-den Override, nicht die Matrix, und die Tabelle oben rechnet entsprechend gegen den Override. Gegen
-die ROHE MATRIX gerechnet (dieselben gemessenen Prozentsätze, andere Vergleichsbasis) liest Football
-dagegen **83,3 / 80,4 Pp** — weit über der Schranke. Hauptursache: `spirit` wiegt in der Matrix 25 %
-(das schwerste Einzelgewicht), im Override nur 3 % (von Chris bewusst so entschieden, E3) und im
-Spiel gemessen nur 2–3 %. Das ist **keine Verzerrung, sondern die erwartete, gewollte Folge des
-Overrides** — die große Lücke zur Matrix ist der Override selbst, nicht ein neuer Fehler.
+**Football gegen Matrix UND Override — eine offene Entscheidung für Chris, kein Nebenbefund.**
+`calculateRawDisciplineScore()` ruft `resolveDisciplineWeightProfile(dId)`, die bei vorhandenem
+Override (`lib/player-generator/spiel-eignung-overrides.ts`, Chris' Bestätigung E3) GENAU DIESEN
+statt der offiziellen Matrix liefert — der legacy-PPS-Kanal liest für Football also den Override,
+nicht die Matrix, und die Tabelle oben rechnet entsprechend gegen den Override (5,9/12,5, bestanden).
+Gegen die ROHE MATRIX gerechnet (dieselben gemessenen Prozentsätze, andere Vergleichsbasis) liest
+Football dagegen **83,3 / 80,4 Pp** — weit über der Schranke. Hauptursache: `spirit` wiegt in der
+Matrix 25 % (das schwerste Einzelgewicht), im Override nur 3 % (von Chris bewusst so entschieden,
+E3) und im Spiel gemessen nur 2–3 %. Das ist keine neue Verzerrung — die Lücke zur Matrix IST der
+Override, genau wie E3 ihn beschlossen hat. **Offene Frage an Chris, explizit, nicht als Fußnote:
+Football — Anzeige nach Override statt Matrix ausrichten, ja oder nein?** (gegen Override: 5,9/12,5;
+gegen Matrix: 83,3/80,4). Eine „Ja"-Antwort bestätigt nur den bereits gültigen E3-Beschluss für die
+Anzeige/Kaufseite; ein „Nein" wäre eine neue, bisher nicht gestellte Grundsatzfrage.
 
-### 8.4 Mini-DM: die Methode ist auf Spieler-Ebene nicht übertragbar, auf Teil B grenzwertig
+### 8.4 Mini-DM: Teil A auf Spieler-Ebene nicht übertragbar, Teil B nicht belastbar
 
 - **Teil A, Seiten-Ebene**: 0 messbare Team-Seiten-Spiele bei jeder Feldgröße. Mini-DMs
   Spieltags-Slot hat `playerCount` 1 (Kader-/Pod-Konvention, s. Abschnitt 4 oben); jede Team-Seite
@@ -525,12 +536,14 @@ Overrides** — die große Lücke zur Matrix ist der Override selbst, nicht ein 
   gesundes Bild — Star Rang 1 82–88 %, Star Top 2 immer 100 %, Paartreue ≥15 Punkte 98–100 %
   (ausschließlich „über Seiten", da es keine zwei Spieler derselben Seite gibt). Kein Hinweis auf
   ein Problem auf dieser Ebene.
-- **Teil B**: mit dem Baseline-Mismatch-Fix jetzt ein ECHTER, von Null verschiedener Wert — **30,5
-  Pp in BEIDEN Strömen, exakt gleich.** Über der 25er-Schranke, aber die exakte Gleichheit zwischen
-  den Strömen ist selbst ein Hinweis auf eine sehr kleine, wenig divers streuende Grundgesamtheit
-  (nur 1 gefelderter Spieler je Seite, 8 Ziehungen) statt auf eine präzise, replizierbare Zahl — zu
-  behandeln als „über der Schranke, aber mit größerer Unsicherheit als bei den anderen sieben", nicht
-  als scheingenaue 30,5.
+- **Teil B: NICHT BELASTBAR, nicht „durchgefallen"** — mit dem Baseline-Mismatch-Fix ein von Null
+  verschiedener Wert, aber **30,5 Pp in BEIDEN Strömen, exakt gleich.** Zwei eigentlich unabhängige
+  Saatströme, die exakt denselben Wert liefern, sind **dasselbe Rotflaggen-Muster wie der frühere
+  Bug mit bit-identischen Medianen** (s. 8.1 Punkt 2) — ein Hinweis darauf, dass die Messung bei
+  `playerCount` 1 und nur 8 Ziehungen vermutlich keine echte, voneinander unabhängige Streuung
+  zeigt, nicht darauf, dass 30,5 eine belastbare, präzise Zahl ist. **Offen, bis Chris' Entscheidung
+  über das Pod-Format vorliegt** (Abschnitt 4/8.4, Folge-Task Mini-DM-Pod-Resolve) — danach lohnt
+  sich eine Messung mit einer dafür passenden Methode, nicht diese Sonde.
 
 Das deckt sich mit Abschnitt 4 oben: Mini-DMs eigentliche Abnahme ist die dort beschriebene
 Event-/Pod-Messung (`scripts/miss-mini-dm-ffa-abnahme.mjs`, rho 0,80 am Median, `data/generated/
@@ -555,14 +568,22 @@ Keines von beiden ist die Abnahmezahl selbst — die ist Teil B (8.3) und Teil A
 
 ### 8.6 Einordnung und Guard-Test
 
-**rho (Seiten-Ebene): bestanden** für alle sieben messbaren Disziplinen bei Feldgröße 6 (0,829–
-0,921, beide Ströme) und für sechs von sieben bei Feldgröße 5 (eine Berührung der Schranke,
-Battlefield Strom 0). **Feldgröße 3/4 sind Diskretisierungsartefakte, keine Aussage „bestanden"
-oder „durchgefallen".** **rho (Fixture-Ebene): bei JEDER Feldgröße nur mäßig** (0,61–0,78 Mittel) —
-größtenteils erklärt durch den vorbestehenden Team-Rang-Topf-Effekt (8.2, Task #176), nicht primär
-durch die Feldgröße. **Pp: bestanden für sieben von acht** (alle außer Mini-DM), **Football nach
-dem Baseline-Mismatch-Fix klar bestanden** (kein eigenständiger Befund mehr), **Mini-DM
-grenzwertig durchgefallen** (30,5/30,5, kleine Grundgesamtheit).
+**Die Einzelspiel-rho-Abnahme auf Fixture-Ebene besteht die Brücke derzeit NICHT** (0,61–0,78
+Mittel, nur 27–51 % der Fixtures ≥0,80 bei Feldgröße 6 — größtenteils erklärt durch den
+vorbestehenden Team-Rang-Topf-Effekt, 8.2, Task #176, nicht primär durch die Feldgröße). Das ist
+die Kernaussage dieses Abschnitts (s. Kasten zu Beginn von Abschnitt 8) und wird hier nicht
+beschönigt.
+
+Als **Zusatzgrößen**, die eine andere, engere Frage beantworten: **rho (Seiten-Ebene) besteht** für
+alle sieben messbaren Disziplinen bei Feldgröße 6 (0,829–0,921, beide Ströme) und für sechs von
+sieben bei Feldgröße 5 (eine Berührung der Schranke, Battlefield Strom 0) — **Feldgröße 3/4 sind
+Diskretisierungsartefakte, keine Aussage „bestanden" oder „durchgefallen".** **Pp besteht für
+sieben von acht** (alle außer Mini-DM), **Football nach dem Baseline-Mismatch-Fix klar bestanden**
+(kein eigenständiger Befund mehr, offene Entscheidung bleibt nur noch die Anzeige-Frage Matrix vs.
+Override, s. 8.3). **Mini-DMs Pp (30,5/30,5) ist NICHT BELASTBAR**, nicht „durchgefallen" — die
+exakte Gleichheit zwischen zwei eigentlich unabhängigen Saatströmen ist dasselbe Rotflaggen-Muster
+wie der frühere Bit-identische-Mediane-Bug (8.1 Punkt 2), kein verlässlicher Beleg für einen Wert
+über oder unter der Schranke. Offen bis Chris' Pod-Format-Entscheidung (s. 8.4).
 
 `tests/pps-duell-bruecke-player-rho-guard.test.ts` prüft die gespeicherte
 `data/generated/pps-duell-bruecke-abnahme.json` gegen die CLAUDE.md-Schranke:
@@ -583,10 +604,12 @@ willkürliche, nicht aussagekräftige Schranke brauchen.
 **Für das Hauptprojekt, nicht Teil dieses Auftrags:**
 - **Task #176** (Brücken-PPs: Team-Rang-Topf statt Liga-Relation entkoppeln, NUR Battle Mode,
   Lösungsrichtung Impact-Kurve wie Arena, nach PR3 — Konzeptrunde/battle-mode-spielmodus-plan.md
-  5.1 entspricht Chris' eigener Entscheidung, keine neue Grundsatzfrage).
-- Mini-DMs Pp bei 30,5/30,5 — eine frische, auf mehr Ziehungen gestützte Messung wäre nötig, bevor
-  man daraus eine belastbare Aussage macht; die Zahl wird hier unbeschönigt berichtet, nicht
-  geglättet.
+  5.1 entspricht Chris' eigener Entscheidung, keine neue Grundsatzfrage). **Das ist die eigentliche
+  Baustelle hinter der Fixture-Ebene-Kernaussage oben — nicht die Brücke selbst.**
+- **Offene Frage an Chris, explizit (s. 8.3): Football — Anzeige nach Override statt Matrix
+  ausrichten, ja oder nein?** (gegen Override: 5,9/12,5 Pp, bestanden; gegen Matrix: 83,3/80,4 Pp).
+- Mini-DMs Pp bei 30,5/30,5 ist NICHT belastbar (Rotflaggen-Muster, s. 8.4) — offen bis Chris' Pod-
+  Format-Entscheidung; danach eine Messung mit einer dafür passenden Methode, nicht diese Sonde.
 
 **Messbefehl:**
 ```sh
