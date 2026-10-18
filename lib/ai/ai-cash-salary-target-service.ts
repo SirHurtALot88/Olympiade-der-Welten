@@ -4,7 +4,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
-import { getTeamApronSalaryBase, resolveSeasonApronLines, type ApronLines } from "@/lib/season/apron-service";
+import { getTeamApronSalaryBase, resolveSeasonApronLinesForTeam, type ApronLines } from "@/lib/season/apron-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -139,7 +139,7 @@ export function resolveTeamApronSalaryCeiling(gameState: GameState, teamId: stri
   // Kaderbaus die mitwandernde Linie, ab dem ersten abgerechneten Spieltag die eingefrorene.
   // Wichtig gerade hier — die KI kauft in genau dieser Aufbauphase, und vorher rechnete sie gegen
   // eine Grenze, die ihre eigenen Käufe längst überholt hatten.
-  const lines: ApronLines = resolveSeasonApronLines(gameState);
+  const lines: ApronLines = resolveSeasonApronLinesForTeam(gameState, teamId);
   const ambition = resolveTeamApronAmbition(gameState, teamId);
   if (ambition >= 8) return lines.line2;
   if (ambition >= 6) return lines.line1 + (lines.line2 - lines.line1) * 0.4;

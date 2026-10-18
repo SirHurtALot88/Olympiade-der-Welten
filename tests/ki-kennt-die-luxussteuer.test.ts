@@ -355,8 +355,14 @@ describe("Die Kauf-Schranke rechnet die Abgabe mit", () => {
 
   it("der Grenzpreis entsteht je Kandidat aus der Differenz zweier Abgaben", () => {
     expect(rumpf).toContain("const apronLevy = round2(");
-    expect(rumpf).toContain("estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded + (candidate.salary ?? 0))");
-    expect(rumpf).toContain("estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded)");
+    // `input.team.teamId` (Task #158/#161, liga-split-plan.md 10.4): beide Aufrufe MUESSEN das
+    // Team mitgeben, sonst rechnet die Kauf-Schranke bei aktivem Liga-Split gegen die globalen
+    // 32er-Apron-Linien statt gegen die liga-eigenen (`estimateApronLevyAtSalary` liest nur MIT
+    // `teamId` ueber `resolveSeasonApronLinesForTeam`, sonst den alten globalen Pfad).
+    expect(rumpf).toContain(
+      "estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded + (candidate.salary ?? 0), undefined, input.team.teamId)",
+    );
+    expect(rumpf).toContain("estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded, undefined, input.team.teamId)");
   });
 
   it("das Gehalt der bereits gewählten Zugänge läuft mit", () => {

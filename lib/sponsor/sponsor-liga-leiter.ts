@@ -79,27 +79,34 @@ export const SPONSOR_WERTUNG_KURVE = 1.35;
 export const SPONSOR_BODEN = 43 * SPONSOR_AUSSCHUETTUNG;
 
 /**
- * LIGA-SPLIT PR4 (docs/design/liga-split-plan.md, Abschnitt 3 + Chris' Entscheidung): der
- * GESAMTAUSSCHUETTUNGSTOPF der Sponsoren fällt in Liga 2 auf 80 % dessen, was ein identisches
- * Liga-1-Szenario ausschütten würde — „wenn Liga 1 1000 ausschüttet, sind es in Liga 2 ca. 800,
- * bitte einfach als Faktor-Abschlag einbauen", präzisiert: „Der 0,8-Abschlag gilt für die
- * GESAMTAUSSCHÜTTUNG der Sponsoren! Wie das verteilt wird, ist davon weiterhin unabhängig, bitte so
- * handhaben wie bisher."
+ * TASK #158/#161, Chris' Entscheidung vom 18.10. (`docs/design/liga-split-plan.md`, Abschnitt 10,
+ * Frage 10.3 — "Wie groß ist der Sponsor-Topf je Liga?"): **Asymmetrisch 60/40.** Liga 1 bekommt
+ * 60 % des bisherigen, auf EINEN 32er-Rangraum kalibrierten `SPONSOR_WERTUNGSTOPF`, Liga 2 40 %.
+ *
+ * DAS ERSETZT die vorherige PR4-Regel (liga1: 1, liga2: 0,8, "Liga 2 zahlt 80 % eines identischen
+ * Liga-1-Szenarios"): die alte Regel liess JEDE Liga ihren eigenen, nur leicht rabattierten Topf
+ * ziehen — bei zwei 16er-Ligen zahlte das Spiel dadurch INSGESAMT fast das Doppelte eines einzigen
+ * 32er-Topfs aus (1,0 + 0,8 = 1,8×), genau das Problem, das 10.3 beheben sollte (siehe
+ * `docs/design/auf-abstieg-konzept-vorbereitung-17-10-2026.md` Abschnitt 2, 10.3: „sonst zahlt das
+ * Spiel doppelt aus"). Mit 0,6 + 0,4 = 1,0 ziehen beide Ligen ZUSAMMEN wieder exakt den einen,
+ * ursprünglich kalibrierten Topf — nur aufgeteilt, nicht verdoppelt.
+ *
+ * `FACILITY_INCOME_FAKTOR_JE_LIGA` (`lib/facilities/facility-effects.ts`) ist davon NICHT betroffen
+ * und bleibt bei 0,8 — das war schon vor dieser Änderung ein eigener, unabhängiger Konstanten-Wert
+ * (kein Import von hier) für eine andere Frage (Gebäudeeinnahmen, nicht Teil von Frage 10.3) und
+ * wurde hier nur zufällig an derselben Zahl gespiegelt.
  *
  * DER FAKTOR WIRKT AUSSCHLIESSLICH AUF `SPONSOR_WERTUNGSTOPF` — also auf den TOPF, BEVOR die
  * bestehende Verteilungsformel (Rang-Gewichte, Kurvenform, Anker) ihn auf die Sprossen der Leiter
  * verteilt. Der SOCKEL (`sponsorSockelFuerStartrang`) bleibt für beide Ligen unangetastet: er ist
- * die planbare Absicherung nach Startrang, kein Teil des "Wertungstopfs", und Chris' Vorgabe nennt
- * ausdrücklich nur die Ausschüttung, nicht die Verteilungsmechanik. Deshalb ist die Liga-2-Gesamt-
- * ausschüttung (Sockel-Summe + 0,8×Topf) nur NAEHERUNGSWEISE 80 % der Liga-1-Summe — exakt trifft
- * es der Wertungstopf selbst (siehe tests/sponsor-liga-leiter.test.ts).
+ * die planbare Absicherung nach Startrang, kein Teil des "Wertungstopfs".
  *
- * Nur wirksam, wenn ein Aufrufer explizit `leagueTier: "liga2"` übergibt — ohne dieses Feld (jeder
- * heutige Aufrufer) ist der Faktor 1 und das Verhalten bit-identisch zu vor diesem PR.
+ * Nur wirksam, wenn ein Aufrufer explizit `leagueTier` übergibt — ohne dieses Feld (jeder
+ * Legacy-/Manager-Mode-Aufrufer) ist der Faktor 1 und das Verhalten bit-identisch zu vor PR4.
  */
 export const SPONSOR_TOPF_FAKTOR_JE_LIGA: Readonly<Record<LeagueTier, number>> = {
-  liga1: 1,
-  liga2: 0.8,
+  liga1: 0.6,
+  liga2: 0.4,
 };
 
 /**

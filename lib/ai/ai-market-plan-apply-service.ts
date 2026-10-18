@@ -694,8 +694,8 @@ function buildFinalBuyGate(input: {
     const apronLevy = round2(
       Math.max(
         0,
-        estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded + (candidate.salary ?? 0)) -
-          estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded),
+        estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded + (candidate.salary ?? 0), undefined, input.team.teamId) -
+          estimateApronLevyAtSalary(input.gameState, apronBaseSalary + apronSalaryAdded, undefined, input.team.teamId),
       ),
     );
     // Was der Zugang wirklich kostet. Vorher prüfte der Puffer gegen den nackten Kaufpreis und sah

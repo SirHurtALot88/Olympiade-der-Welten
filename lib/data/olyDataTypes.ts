@@ -1844,6 +1844,22 @@ export type ApronSettlementLogRecord = {
   createdAt: string;
 };
 
+/**
+ * TASK #158 — Idempotenz-/Audit-Marker für den `league_movement`-Schritt (Saisonende, Battle-Mode
+ * mit aktivem Liga-Split). Analog zu `ApronSettlementLogRecord`/`SponsorPayoutLogRecord`: ein
+ * Eintrag je Saison verhindert, dass der Schritt bei einem erneuten Aufruf (z. B. ein wiederholter
+ * `runLocalSeasonCompletion`-Dry-Run/Execute) die bereits neu zugeordnete Liga ein zweites Mal
+ * gegen sich selbst auswertet.
+ */
+export type LeagueMovementLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  createdAt: string;
+  promotedTeamIds: string[];
+  relegatedTeamIds: string[];
+};
+
 export type LoanLenderType = "bank" | "team"; // "team" erst Phase 3
 
 export type LoanRecord = {
@@ -2869,6 +2885,19 @@ export type SeasonSnapshotTeamRecord = {
   isTop5?: boolean;
   isTop10?: boolean;
   avgRankContribution?: number | null;
+  /**
+   * TASK #158/#161, liga-split-plan.md 10.8: Liga-Zugehoerigkeit DIESES Teams IN DIESER Saison
+   * (eingefroren beim Snapshot, bevor `league_movement` sie fuer die naechste Saison aendert).
+   * `undefined`/fehlend fuer jeden Manager-Mode-/Legacy-Save ohne aktiven Liga-Split.
+   */
+  leagueTier?: LeagueTier | null;
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8): Liga-2-Rang-1 zaehlt
+   * als EIGENER, von `isGold` getrennter Titel ("Zweitliga-Meister") — nicht derselbe
+   * "Meistertitel" wie der Liga-1-/Gesamt-Sieger. `isGold` bedeutet seitdem bei aktivem Split
+   * ausschliesslich "Liga-1-Meister" (s. `season-snapshot-service.ts`).
+   */
+  isLiga2Champion?: boolean;
 };
 
 export type SeasonSnapshotPlayerDisciplineBreakdownRecord = {
@@ -3528,6 +3557,15 @@ export type SeasonState = {
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
   /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */
   apronLinesSnapshot?: ApronLinesSnapshot;
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.4): „Ja, Apron künftig
+   * pro Liga rechnen". Nur bei aktivem Liga-Split (`isLeagueSplitActive`) befüllt — je Liga EIN
+   * eigener Median-Snapshot statt des einen globalen `apronLinesSnapshot` über alle 32 Teams.
+   * `apronLinesSnapshot` bleibt daneben bestehen (auf den Liga-1-Scope berechnet) für Leser, die
+   * noch keine Liga kennen (s. `ensureSeasonApronLinesFrozen`, `resolveSeasonApronLinesForTeam`).
+   * Legacy-/Manager-Mode-Saves ohne Split befüllen dieses Feld nie.
+   */
+  apronLinesSnapshotByLeague?: Partial<Record<LeagueTier, ApronLinesSnapshot>>;
   /** Ledger der Apron-Abgaben/Ausschüttungen — Idempotenz-Marker + Audit-Trail, analog sponsorPayoutLogs. */
   apronSettlementLogs?: ApronSettlementLogRecord[];
   /**
@@ -3644,6 +3682,12 @@ export type SeasonState = {
    * also ein Saison-Fakt wie `standings`, nicht Team-Identitaet.
    */
   leagueByTeamId?: Record<string, LeagueTier>;
+  /**
+   * TASK #158 — Idempotenz-/Audit-Ledger des `league_movement`-Schritts (Saisonende). Siehe
+   * `LeagueMovementLogRecord`, `lib/season/league-movement-service.ts`. Optional und nur bei
+   * Battle-Mode-Saves mit aktivem Liga-Split befüllt.
+   */
+  leagueMovementLogs?: LeagueMovementLogRecord[];
   /**
    * Migrationsmarker fuer den Liga-Split, nach dem Muster von `sponsorLadderMigrationVersion` oben
    * (Plan-Abschnitt 8). Optional, von keinem heutigen Code gesetzt oder gelesen.

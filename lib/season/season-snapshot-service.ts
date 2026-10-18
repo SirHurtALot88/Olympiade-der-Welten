@@ -9,6 +9,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { isSeasonCoverageComplete } from "@/lib/season/season-completion-state";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
@@ -212,9 +213,14 @@ function buildSeasonSnapshotRecord(
     warnings.push(`Missing cash apply logs for: ${coverage.missingCashMatchdayIds.join(", ")}.`);
   }
 
+  // TASK #158/#161, liga-split-plan.md 10.8: ohne aktiven Liga-Split (jeder Manager-Mode-/
+  // Legacy-Save) `leagueTier` immer `null` -- `isGold`/`isLiga2Champion` unten bleiben dann
+  // bit-identisch zu vor dieser Aenderung (`isGold: rank === 1`, `isLiga2Champion` immer `false`).
+  const leagueSplitActiveForSnapshot = isLeagueSplitActive(gameState);
   const finalStandings: SeasonSnapshotTeamRecord[] = [...gameState.teams]
     .map((team) => {
       const standing = gameState.seasonState.standings[team.teamId] ?? null;
+      const leagueTier = leagueSplitActiveForSnapshot ? getLeagueOf(gameState, team.teamId) : null;
       const roster = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const teamResults = seasonDisciplineResults.filter((entry) => entry.teamId === team.teamId);
       const teamTransfers = seasonTransfers.filter(
@@ -316,12 +322,23 @@ function buildSeasonSnapshotRecord(
             ? roundValue(standing.sponsorTotal - salaryEnd, 2)
             : null),
         cashTotal: standing?.cashTotal ?? team.cash ?? null,
-        isGold: rank === 1,
+        // TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8, wörtlich Option
+        // (a) "Liga-2-Platz-1 ist ein eigenständiger Titel, getrennt von Liga 1 ausgewiesen"): bei
+        // aktivem Liga-Split ist `rank` LIGA-LOKAL (1..LEAGUE_SIZE je Liga, s. saisonstand-punkte-
+        // nachbuchung.ts) — ohne diese Unterscheidung waeren ZWEI Teams (Liga-1- UND Liga-2-Erster)
+        // `isGold`. `isGold` bedeutet deshalb seitdem ausschliesslich "Liga-1-/Gesamt-Meister";
+        // der Liga-2-Erste bekommt den eigenen, getrennten Titel `isLiga2Champion`
+        // ("Zweitliga-Meister"). `isSilver`/`isBronze` sind von Chris' Entscheidung NICHT betroffen
+        // (10.8 spricht ausdrücklich nur von Rang 1/"Titel") und bleiben unveraendert rang-basiert.
+        // Ohne Split (`leagueTier` immer `null`) ist alles hier bit-identisch zu vorher.
+        isGold: rank === 1 && leagueTier !== "liga2",
+        isLiga2Champion: rank === 1 && leagueTier === "liga2",
         isSilver: rank === 2,
         isBronze: rank === 3,
         isTop5: rank != null ? rank <= 5 : false,
         isTop10: rank != null ? rank <= 10 : false,
         avgRankContribution: rank,
+        leagueTier,
       };
     })
     .sort((left, right) => {

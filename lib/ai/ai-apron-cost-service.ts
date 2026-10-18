@@ -35,6 +35,7 @@ import {
   resolveApronDecisionSalaryFactor,
   resolveApronSalaryFactor,
   resolveSeasonApronLines,
+  resolveSeasonApronLinesForTeam,
 } from "@/lib/season/apron-service";
 import { resolveTeamApronSalaryCeiling } from "@/lib/ai/ai-cash-salary-target-service";
 
@@ -52,9 +53,19 @@ function round2(value: number): number {
  * heisst „laufende Saison", und das ist für den KAUF der richtige Wert: gekauft wird ausschliesslich
  * in der bereits gestarteten neuen Saison (`isEarlySeasonTransferSetup`), deren Abgabe an ihrem Ende
  * gebucht wird. Kein zweiter Lesepfad und keine zweite Formel — nur ein durchgereichter Faktor.
+ *
+ * `teamId` (Task #158/#161, liga-split-plan.md 10.4): weggelassen liest sie die alten, globalen
+ * Linien (`resolveSeasonApronLines`) — bit-identisch zu vor dieser Aenderung. Mit `teamId` liest
+ * sie die LIGA-EIGENEN Linien des Teams (`resolveSeasonApronLinesForTeam`), relevant nur bei
+ * aktivem Liga-Split.
  */
-export function estimateApronLevyAtSalary(gameState: GameState, salary: number, salaryFactor?: number): number {
-  const lines = resolveSeasonApronLines(gameState);
+export function estimateApronLevyAtSalary(
+  gameState: GameState,
+  salary: number,
+  salaryFactor?: number,
+  teamId?: string,
+): number {
+  const lines = teamId ? resolveSeasonApronLinesForTeam(gameState, teamId) : resolveSeasonApronLines(gameState);
   return apronLevyForSalary({
     salary,
     line1: lines.line1,
@@ -80,8 +91,8 @@ export function estimateMarginalApronLevy(
   const zusatz = Number(additionalSalary ?? 0);
   if (!Number.isFinite(zusatz) || zusatz <= 0) return 0;
   const basis = getTeamApronSalaryBase(gameState, teamId);
-  const vorher = estimateApronLevyAtSalary(gameState, basis);
-  const nachher = estimateApronLevyAtSalary(gameState, basis + zusatz);
+  const vorher = estimateApronLevyAtSalary(gameState, basis, undefined, teamId);
+  const nachher = estimateApronLevyAtSalary(gameState, basis + zusatz, undefined, teamId);
   return round2(Math.max(0, nachher - vorher));
 }
 
@@ -123,8 +134,8 @@ export function estimateApronReliefFromShedding(
   const zielBasis = Math.max(basis - weg, decke);
   if (zielBasis >= basis) return 0;
   const { factor } = resolveApronDecisionSalaryFactor(gameState);
-  const vorher = estimateApronLevyAtSalary(gameState, basis, factor);
-  const nachher = estimateApronLevyAtSalary(gameState, zielBasis, factor);
+  const vorher = estimateApronLevyAtSalary(gameState, basis, factor, teamId);
+  const nachher = estimateApronLevyAtSalary(gameState, zielBasis, factor, teamId);
   return round2(Math.max(0, vorher - nachher));
 }
 

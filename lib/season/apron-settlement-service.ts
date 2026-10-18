@@ -28,6 +28,7 @@ import {
   type ApronTeamRow,
   getTeamApronSalaryBase,
 } from "@/lib/season/apron-service";
+import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 
 function roundCash(value: number): number {
   return Number(value.toFixed(1));
@@ -77,21 +78,54 @@ export function ensureSeasonApronLinesFrozen(
   if (areSeasonApronLinesFrozen(gameState)) {
     return gameState;
   }
+  const seasonId = gameState.season.id;
+  const frozenAtMatchdayId = gameState.matchdayState?.matchdayId ?? "";
+  const createdAt = new Date().toISOString();
+  const buildSnapshot = (lines: ApronLines) => ({
+    seasonId,
+    frozenAtMatchdayId,
+    createdAt,
+    frozenAtEvent,
+    medianSalary: lines.medianSalary,
+    line1: lines.line1,
+    line2: lines.line2,
+    usedReferenceSalary: lines.usedReferenceSalary,
+  });
+
+  // TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.4): „Ja, Apron künftig
+  // pro Liga rechnen" — je 16er-Liga EIN eigener Median, nicht ein globaler Median ueber alle 32
+  // Teams. Ohne aktiven Split (jeder Manager-Mode-/Legacy-Save) bleibt dieser Zweig unbenutzt, der
+  // unten stehende globale Pfad bit-identisch zu vor dieser Aenderung.
+  if (isLeagueSplitActive(gameState)) {
+    const liga1TeamIds = getLeagueTeamIds(gameState, "liga1");
+    const liga2TeamIds = getLeagueTeamIds(gameState, "liga2");
+    const byLeague: Partial<Record<LeagueTier, ReturnType<typeof buildSnapshot>>> = {};
+    if (liga1TeamIds.length > 0) {
+      byLeague.liga1 = buildSnapshot(computeApronLines(gameState, liga1TeamIds));
+    }
+    if (liga2TeamIds.length > 0) {
+      byLeague.liga2 = buildSnapshot(computeApronLines(gameState, liga2TeamIds));
+    }
+    if (byLeague.liga1 || byLeague.liga2) {
+      return {
+        ...gameState,
+        seasonState: {
+          ...gameState.seasonState,
+          // Liga-1-Scope bleibt zusaetzlich im alten, globalen Feld stehen — fuer Leser, die noch
+          // keine Liga kennen (s. `resolveSeasonApronLinesForTeam`-Kommentar in apron-service.ts).
+          apronLinesSnapshot: byLeague.liga1 ?? byLeague.liga2,
+          apronLinesSnapshotByLeague: byLeague,
+        },
+      };
+    }
+  }
+
   const lines = computeApronLines(gameState);
   return {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      apronLinesSnapshot: {
-        seasonId: gameState.season.id,
-        frozenAtMatchdayId: gameState.matchdayState?.matchdayId ?? "",
-        createdAt: new Date().toISOString(),
-        frozenAtEvent,
-        medianSalary: lines.medianSalary,
-        line1: lines.line1,
-        line2: lines.line2,
-        usedReferenceSalary: lines.usedReferenceSalary,
-      },
+      apronLinesSnapshot: buildSnapshot(lines),
     },
   };
 }
@@ -118,63 +152,149 @@ function hasSeasonEndApronLog(gameState: GameState, seasonId: string): boolean {
 }
 
 /**
+ * Baut die Abrechnung EINER Gruppe (eine Liga, oder — ohne Split — die ganze Liga): dieselbe
+ * Bemessungsgrundlage (`getTeamApronSalaryBase`) und derselbe `apronWertungsanteil`-Aufruf wie vor
+ * dieser Aenderung, nur jetzt mit dem RICHTIGEN `leagueSize` fuer die Gewichtstabelle — ein
+ * Liga-2-Team auf Rang 16 (seiner eigenen 16er-Liga) bekam vorher das Gewicht von Rang 16 EINER
+ * 32er-Tabelle (spuerbar ungleich null, statt des korrekten "letzter Platz, kein Wertungsanteil").
+ */
+function buildApronSettlementForGroup(
+  gameState: GameState,
+  teamIds: readonly string[],
+  lines: ApronLines,
+  leagueSize: number,
+  rankByTeamId: ReadonlyMap<string, number | null>,
+  salaryFactor: number,
+  warnings: string[],
+) {
+  const teams = teamIds.map((teamId) => {
+    const team = gameState.teams.find((entry) => entry.teamId === teamId);
+    const finalRank = rankByTeamId.get(teamId) ?? null;
+    if (finalRank == null) {
+      warnings.push(`${team?.shortCode ?? teamId}:apron_rank_missing`);
+    }
+    return {
+      teamId,
+      // DIE Bemessungsgrundlage — dieselbe Funktion, aus der auch `computeApronLines` den Median
+      // zieht. Kein zweiter Direktgriff auf irgendeine Gehaltssumme: Abrechnung, Linien,
+      // Hochrechnung und KI MUESSEN dieselbe Zahl lesen, sonst bucht das Saisonende gegen eine
+      // andere Basis, als die KI vorher bepreist hat.
+      salary: getTeamApronSalaryBase(gameState, teamId),
+      rankShare: apronWertungsanteil(finalRank ?? leagueSize, salaryFactor, leagueSize),
+    };
+  });
+  return computeApronSettlement({ lines, salaryFactor, teams });
+}
+
+/**
  * Baut die Vorschau der Apron-Abrechnung. Braucht eingefrorene Linien (`ensureSeasonApronLinesFrozen`
  * muss schon gelaufen sein) — ohne Snapshot gibt es keine Grenze, gegen die gemessen werden könnte,
  * und die Vorschau bleibt leer statt eine Grenze ad hoc am Saisonende zu erfinden.
+ *
+ * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.4): ohne aktiven Split
+ * unveraendert EIN Topf ueber alle Teams (bit-identisch zu vor dieser Aenderung). MIT aktivem Split
+ * laeuft die Abrechnung JE LIGA getrennt — eigene Linien, eigener Topf, eigene Rang-Gewichtstabelle
+ * (16 statt 32 Sprossen) — und wird danach nur noch zur Anzeige zusammengefuehrt. Ohne diese
+ * Trennung wuerde Liga-1-Geld in die Liga-2-Ausschüttung fliessen und umgekehrt, obwohl jede Liga
+ * ihre eigenen Linien hat.
  */
 export function previewApronSettlement(gameState: GameState): ApronSettlementPreview {
   const seasonId = gameState.season.id;
   const warnings: string[] = [];
   const blockingReasons: string[] = [];
-  const lines = gameState.seasonState.apronLinesSnapshot?.seasonId === seasonId ? gameState.seasonState.apronLinesSnapshot : null;
   const alreadyApplied = hasSeasonEndApronLog(gameState, seasonId);
+  const overviewRows = buildTeamSeasonOverviewRows({ gameState });
+  const rankByTeamId = new Map(overviewRows.map((row) => [row.teamId, row.rank] as const));
+  const salaryFactor = resolveApronSalaryFactor(gameState);
+  const globalLines =
+    gameState.seasonState.apronLinesSnapshot?.seasonId === seasonId ? gameState.seasonState.apronLinesSnapshot : null;
 
-  if (!lines) {
-    blockingReasons.push("apron_lines_not_frozen");
+  if (!isLeagueSplitActive(gameState)) {
+    if (!globalLines) {
+      blockingReasons.push("apron_lines_not_frozen");
+      return { seasonId, lines: null, rows: [], topf: 0, zahlerCount: 0, empfaengerCount: 0, canApply: false, blockingReasons, warnings, alreadyApplied };
+    }
+    const settlement = buildApronSettlementForGroup(
+      gameState,
+      gameState.teams.map((team) => team.teamId),
+      globalLines,
+      32,
+      rankByTeamId,
+      salaryFactor,
+      warnings,
+    );
     return {
       seasonId,
-      lines: null,
-      rows: [],
-      topf: 0,
-      zahlerCount: 0,
-      empfaengerCount: 0,
-      canApply: false,
+      lines: globalLines,
+      rows: settlement.rows,
+      topf: settlement.topf,
+      zahlerCount: settlement.zahlerCount,
+      empfaengerCount: settlement.empfaengerCount,
+      canApply: !alreadyApplied && settlement.rows.some((row) => row.nettoDelta !== 0),
       blockingReasons,
       warnings,
       alreadyApplied,
     };
   }
 
-  const overviewRows = buildTeamSeasonOverviewRows({ gameState });
-  const rankByTeamId = new Map(overviewRows.map((row) => [row.teamId, row.rank] as const));
-  const salaryFactor = resolveApronSalaryFactor(gameState);
+  const byLeague = gameState.seasonState.apronLinesSnapshotByLeague;
+  const assignedTeamIds = new Set<string>();
+  let rows: ApronTeamRow[] = [];
+  let topf = 0;
+  let zahlerCount = 0;
+  let empfaengerCount = 0;
+  let primaryLines: ApronLines | null = null;
 
-  const teams = gameState.teams.map((team) => {
-    const finalRank = rankByTeamId.get(team.teamId) ?? null;
-    if (finalRank == null) {
-      warnings.push(`${team.shortCode}:apron_rank_missing`);
+  for (const tier of ["liga1", "liga2"] as const) {
+    const teamIds = getLeagueTeamIds(gameState, tier);
+    teamIds.forEach((teamId) => assignedTeamIds.add(teamId));
+    if (teamIds.length === 0) continue;
+    const tierLines = byLeague?.[tier]?.seasonId === seasonId ? byLeague[tier]! : null;
+    if (!tierLines) {
+      blockingReasons.push(`apron_lines_not_frozen:${tier}`);
+      continue;
     }
-    return {
-      teamId: team.teamId,
-      // DIE Bemessungsgrundlage — dieselbe Funktion, aus der auch `computeApronLines` den Median
-      // zieht. Kein zweiter Direktgriff auf irgendeine Gehaltssumme: Abrechnung, Linien,
-      // Hochrechnung und KI MUESSEN dieselbe Zahl lesen, sonst bucht das Saisonende gegen eine
-      // andere Basis, als die KI vorher bepreist hat.
-      salary: getTeamApronSalaryBase(gameState, team.teamId),
-      rankShare: apronWertungsanteil(finalRank ?? 32, salaryFactor),
-    };
-  });
+    primaryLines = primaryLines ?? tierLines;
+    const settlement = buildApronSettlementForGroup(gameState, teamIds, tierLines, teamIds.length, rankByTeamId, salaryFactor, warnings);
+    rows = rows.concat(settlement.rows);
+    topf += settlement.topf;
+    zahlerCount += settlement.zahlerCount;
+    empfaengerCount += settlement.empfaengerCount;
+  }
 
-  const settlement = computeApronSettlement({ lines, salaryFactor, teams });
+  // Teams ohne Liga-Zuordnung (sollte bei aktivem Split nicht vorkommen, s. Warnung in
+  // `saisonstand-punkte-nachbuchung.ts`) fallen auf den alten, globalen Topf zurueck — besser eine
+  // Abrechnung nach der alten Regel als gar keine.
+  const unassigned = gameState.teams.map((team) => team.teamId).filter((teamId) => !assignedTeamIds.has(teamId));
+  if (unassigned.length > 0) {
+    if (!globalLines) {
+      blockingReasons.push("apron_lines_not_frozen:unassigned");
+    } else {
+      primaryLines = primaryLines ?? globalLines;
+      const settlement = buildApronSettlementForGroup(gameState, unassigned, globalLines, 32, rankByTeamId, salaryFactor, warnings);
+      rows = rows.concat(settlement.rows);
+      topf += settlement.topf;
+      zahlerCount += settlement.zahlerCount;
+      empfaengerCount += settlement.empfaengerCount;
+    }
+  }
+
+  if (!primaryLines) {
+    if (blockingReasons.length === 0) blockingReasons.push("apron_lines_not_frozen");
+    return { seasonId, lines: null, rows: [], topf: 0, zahlerCount: 0, empfaengerCount: 0, canApply: false, blockingReasons, warnings, alreadyApplied };
+  }
 
   return {
     seasonId,
-    lines,
-    rows: settlement.rows,
-    topf: settlement.topf,
-    zahlerCount: settlement.zahlerCount,
-    empfaengerCount: settlement.empfaengerCount,
-    canApply: !alreadyApplied && settlement.rows.some((row) => row.nettoDelta !== 0),
+    // Anzeige-Kompromiss: EIN `lines`-Feld fuer Leser, die noch keine Liga kennen — Liga 1, wenn
+    // vorhanden (gleiche Reihenfolge wie `apronLinesSnapshot` oben). Die tatsaechliche Abrechnung
+    // je Zeile (`rows`) rechnet immer gegen die LIGA-EIGENEN Linien, unabhaengig von diesem Feld.
+    lines: primaryLines,
+    rows,
+    topf,
+    zahlerCount,
+    empfaengerCount,
+    canApply: !alreadyApplied && blockingReasons.length === 0 && rows.some((row) => row.nettoDelta !== 0),
     blockingReasons,
     warnings,
     alreadyApplied,

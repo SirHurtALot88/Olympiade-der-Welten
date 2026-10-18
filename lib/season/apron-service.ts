@@ -87,7 +87,7 @@ import {
   getSeasonEconomyFactorWindow,
   isBeforeSeasonEconomyFactorAdvance,
 } from "@/lib/season/season-economy-factors";
-import { getLeagueOf, getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
+import { getLeagueOf, getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 
 export { SPONSOR_V3_REFERENCE_SALARY_PER_TEAM };
 
@@ -555,9 +555,14 @@ export function areSeasonApronLinesFrozen(gameState: GameState): boolean {
  * damals galten (auf Chris' Spielstand 1,10/1,25 aus der Zeit vor dem Umbau auf 1,25/1,6) — wer die
  * Linien selbst uebernaehme, schleppte die alte Steuer in die neue Saison. Der Median ist die
  * gemessene Groesse, die Faktoren sind die Regel; die Regel gilt immer in ihrer heutigen Fassung.
+ *
+ * `tier` (Task #158/#161, liga-split-plan.md 10.4): schaut zuerst in den liga-eigenen Snapshot der
+ * VORSAISON (`apronLinesSnapshotByLeague`), bevor er auf den einen globalen Snapshot zurueckfaellt.
+ * Weggelassen (jeder Aufrufer vor dieser Aenderung, und jeder Legacy-/Manager-Mode-Aufruf) bleibt
+ * das Verhalten bit-identisch — der Fallback ist derselbe globale Snapshot wie vorher.
  */
-function vorsaisonMedianAnker(gameState: GameState): number | null {
-  const snapshot = gameState.seasonState?.apronLinesSnapshot;
+function vorsaisonMedianAnker(gameState: GameState, tier?: LeagueTier | null): number | null {
+  const snapshot = (tier && gameState.seasonState?.apronLinesSnapshotByLeague?.[tier]) || gameState.seasonState?.apronLinesSnapshot;
   if (!snapshot) return null;
   // Ein Snapshot der LAUFENDEN Saison ist kein Anker — dann greift ohnehin `areSeasonApronLinesFrozen`.
   if (snapshot.seasonId === gameState.season?.id) return null;
@@ -613,6 +618,45 @@ export function resolveSeasonApronLines(gameState: GameState, teamIds?: readonly
   }
   const live = computeApronLines(gameState, teamIds);
   const anker = vorsaisonMedianAnker(gameState);
+  if (anker === null || anker <= live.medianSalary) return live;
+  const medianSalary = round1(anker);
+  return {
+    medianSalary,
+    line1: round1(medianSalary * APRON_LINE_1_MEDIAN_FACTOR),
+    line2: round1(medianSalary * APRON_LINE_2_MEDIAN_FACTOR),
+    usedReferenceSalary: live.usedReferenceSalary,
+  };
+}
+
+/**
+ * DIESELBEN LINIEN, ABER FUER EIN BESTIMMTES TEAM AUFGELOEST (Task #158/#161, Chris' Entscheidung
+ * vom 18.10., liga-split-plan.md 10.4: „Ja, Apron künftig pro Liga rechnen").
+ *
+ * Ohne aktiven Split, oder wenn das Team keiner Liga zugeordnet ist, identisch zu
+ * `resolveSeasonApronLines(gameState)` — bit-identisch zu vor dieser Aenderung.
+ *
+ * MIT aktivem Split: solange das Kauffenster offen ist, rechnet sie LIVE nur ueber die eigene
+ * 16er-Liga (`resolveApronTeamScope`) — das konnte man vorher schon per `teamIds`-Parameter
+ * erreichen. NEU ist der eingefrorene Fall: statt des EINEN globalen Snapshots (der nach dem
+ * Einfrieren vorher fuer JEDES Team zurueckkam, auch fuer Liga 2) liest sie den liga-EIGENEN
+ * Snapshot aus `apronLinesSnapshotByLeague` — genau die Datenmodell-Erweiterung, die der Kommentar
+ * bei `resolveSeasonApronLines` oben als "spätere Aktivierungs-PR" ankündigte.
+ */
+export function resolveSeasonApronLinesForTeam(gameState: GameState, teamId: string): ApronLines {
+  const tier = isLeagueSplitActive(gameState) ? getLeagueOf(gameState, teamId) : null;
+  if (!tier) return resolveSeasonApronLines(gameState);
+
+  if (areSeasonApronLinesFrozen(gameState)) {
+    const frozen = gameState.seasonState?.apronLinesSnapshotByLeague?.[tier];
+    // Fallback fuer einen Split-Save, dessen Liga-Snapshot (noch) nie geschrieben wurde (z. B. ein
+    // vor dieser Aenderung eingefrorener Stand) — dann lieber der alte, globale Wert als ein Riss.
+    if (frozen) return frozen;
+    return resolveSeasonApronLines(gameState);
+  }
+
+  const scope = getLeagueTeamIds(gameState, tier);
+  const live = computeApronLines(gameState, scope.length > 0 ? scope : undefined);
+  const anker = vorsaisonMedianAnker(gameState, tier);
   if (anker === null || anker <= live.medianSalary) return live;
   const medianSalary = round1(anker);
   return {

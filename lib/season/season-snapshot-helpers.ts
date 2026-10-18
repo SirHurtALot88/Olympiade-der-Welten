@@ -5,9 +5,14 @@ export type SeasonSnapshotAllTimeRow = {
   teamCode: string;
   teamName: string;
   seasonsPlayed: number;
+  /** Liga-1-/Gesamt-Meisterschaften — bei Battle-Mode-Saves mit Liga-Split NICHT mehr dasselbe wie
+   * "Rang 1", s. `goldLiga2` (Task #158/#161, liga-split-plan.md 10.8). */
   gold: number;
   silver: number;
   bronze: number;
+  /** TASK #158/#161, liga-split-plan.md 10.8: Zweitliga-Meisterschaften (Liga-2-Rang-1), getrennt
+   * von `gold` ausgewiesen. Immer 0 für jeden Manager-Mode-/Legacy-Save ohne Liga-Split. */
+  goldLiga2: number;
   top5: number;
   top10: number;
   avgRank: number | null;
@@ -67,7 +72,11 @@ export function buildAllTimeTableFromSnapshots(
         teamCode: team.teamCode,
         teamName: team.teamName,
         seasonsPlayed: standings.length,
-        gold: standings.filter((entry) => entry.rank === 1).length,
+        // `isGold ?? rank === 1`-Fallback: Altstaende/Fixtures ohne das Feld verhalten sich wie vor
+        // Task #158 (bit-identisch). Saves MIT dem Feld (liga-split-aware) zaehlen hier NICHT mehr
+        // den Liga-2-Ersten mit — der bekommt `goldLiga2` statt `gold` (s. Typkommentar oben).
+        gold: standings.filter((entry) => entry.isGold ?? entry.rank === 1).length,
+        goldLiga2: standings.filter((entry) => entry.isLiga2Champion === true).length,
         silver: standings.filter((entry) => entry.rank === 2).length,
         bronze: standings.filter((entry) => entry.rank === 3).length,
         top5: standings.filter((entry) => entry.rank != null && entry.rank <= 5).length,
