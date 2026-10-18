@@ -24,8 +24,29 @@ import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch
 import { ensureMatchdayResolveSnapshot, readArenaVorlaufRecord, resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { kickoffArenaVorlauf, stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
+
+/**
+ * CI-OOM-FUND (18.10., root-caused per Heap-Snapshot-Diff -- NICHT per Vermutung): dieser Datei
+ * allein reichten 4 unabhaengige, volle 32-Team-Battle-Saves in EINEM Prozess, um den Node-Heap
+ * zu sprengen ("JavaScript heap out of memory", sowohl im isolierten `arena-chromium-tests`-Job
+ * als auch mitten in der 200+-Datei-`persistenz-suiten`-Invocation -- immer an genau dieser
+ * Datei). ZWEI vorherige Fix-Kandidaten (save-session-cache invalidieren, resetDatabaseForTests()
+ * fuer echte DB-Isolation) wurden beide GEMESSEN WIDERLEGT -- der Heap wuchs identisch weiter.
+ * Der tatsaechliche Taeter, gefunden per Top-Retainer-Analyse eines echten Heap-Snapshots:
+ * `lib/market/transfermarkt-local-service.ts`s `localMarketContextCache` ist ein UNGEBUNDENER
+ * `Map<string, LocalMarketContext>` (kein Count-Cap wie bei anderen Caches im Projekt) -- sein Key
+ * ist ein mehrere-MB-grosser String (`getPlayerPotentialCacheSignature()` dumpt ALLE Spieler als
+ * "id:score:confidence:source", gejoint). Jeder einzigartige, frische Save (genau das, was
+ * `bauFrischenBattleSaveMitVollemFeld()` unten viermal tut) erzeugt einen NEUEN, nie entfernten
+ * Eintrag -- Key UND Value bleiben fuer die Prozesslebensdauer. Das ist generische, VORHANDENE
+ * Markt-Infrastruktur ausserhalb des K1-Scopes dieses PRs (nicht selbst angefasst) -- die dafuer
+ * schon exportierte Aufraeumfunktion `invalidateLocalTransfermarktCachesForSave(saveId)` reicht als
+ * Fix hier aus, gemessen bestaetigt (4 Builds vorher: Crash vor Build 3; danach: alle 4 durch, 419
+ * -> 725 -> 1033 -> 1339 MB statt 923 -> 1735 MB -> Crash).
+ */
 
 /**
  * Baut einen frischen Battle-Save mit vollstaendig befuelltem Feld fuer Spieltag 1.
@@ -73,6 +94,9 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const d2 = spieltag?.discipline2?.disciplineId;
     const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
     if (arenaDisciplineIds.length === 0) {
+      // Verworfener Versuch -- ohne dieses Aufraeumen bleibt der (mehrere MB grosse) Markt-
+      // Kontext-Cache-Eintrag dieses Saves fuer immer im Prozess stehen (s. Kopfkommentar).
+      invalidateLocalTransfermarktCachesForSave(saveId);
       continue; // dieser Save: Spieltag 1 ohne arena-aufgeloeste Disziplin -- neuer Versuch
     }
     // Alle 32 Teams fuer DIESEN (aktiven) Spieltag aufstellen (KI-Batch), damit
@@ -123,6 +147,7 @@ describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () =>
         expect(team.resolutionSource).toBe("pps_duell");
         expect(team.arenaAusfall).toBeTruthy();
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. Kopfkommentar: CI-OOM-Fix
     },
     420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
@@ -169,6 +194,7 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
       // Doppelte davon (waere der Fall ohne In-Prozess-Entdopplung).
       expect(aufrufe).toBeGreaterThan(0);
       expect(aufrufe).toBeLessThanOrEqual(arenaDisciplineCount * 2);
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. Kopfkommentar: CI-OOM-Fix
     },
     420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
@@ -224,6 +250,7 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
         expect(eintrag.status).toBe("arena");
         expect(eintrag.ausfall).toBeFalsy();
       }
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. Kopfkommentar: CI-OOM-Fix
     },
     420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
@@ -276,6 +303,7 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
         ),
       });
       expect(previewToBook.source).toBe("snapshot");
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. Kopfkommentar: CI-OOM-Fix
     },
     420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
@@ -347,6 +375,7 @@ describe("Arena-Vorlauf-Service · B3 (Opus-Review, kritisch): arenaEingabeHash-
       // stillschweigend als Buchungsgrundlage zurueckkommen (`source !== "snapshot"`).
       expect(previewNachMutation.arenaEingabeDivergenz).toBe(true);
       expect(previewNachMutation.source).toBe("live");
+      invalidateLocalTransfermarktCachesForSave(scope.saveId); // s. Kopfkommentar: CI-OOM-Fix
     },
     420_000, // bis zu 3 Setup-Versuche (Review-Fund #1273) + echtes Chromium
   );
