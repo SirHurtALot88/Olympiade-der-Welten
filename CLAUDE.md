@@ -274,3 +274,14 @@ Branch auf GitHub klein), der aber lokal sofort zum "dangling object" wird und n
 verschwindet. `deploy/hetzner/git-repo-aufraeumen.sh` raeumt das per `git gc --prune=now` weg und
 laeuft seitdem woechentlich (sonntags 04:10) als dritter Cron neben den beiden Push-Crons, s.
 `install-live-save-cron.sh`.
+
+## CI-Weiche für Moosgrab / Kartenschmiede
+
+Chris am 18.10.: Moosgrab soll nicht jedes Mal die Oly-CI fahren. Ein Push oder PR, der **nur**
+Kartenschmiede-Dateien ändert (`apps/kartenschmiede/`, `lib/kartenschmiede/`,
+`tests/kartenschmiede*.test.ts`, `scripts/kartenschmiede-*`, `docs/design/moosgrab-*.md`), fährt
+statt Build, Browser-Smokes, voller Suite, Persistenz-Suiten und Rangtreue-Schranke nur den Job
+`kartenschmiede` (Vitest, eslint, Typen der Kartenschmiede, Seitenbau). Die Liste steht in
+`scripts/ci-nur-kartenschmiede.sh`; liegt auch nur eine Datei außerhalb (auch die Routen unter
+`app/`), läuft die volle CI. Website und Deploy bleiben unverändert: der Server baut jeden neuen
+`main`-Commit wie bisher.
