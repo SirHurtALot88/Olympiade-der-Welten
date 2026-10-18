@@ -81,16 +81,7 @@ import type { Discipline, GameState, Player, SeasonDisciplineScheduleSlot } from
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// `--feldgroesse=5|6` (18.10.): die Abnahme muss laut CLAUDE.md fuer BEIDE mandatierten
-// Feldgroessen stehen -- Default unveraendert 6 (Ruckwaertskompatibilitaet mit PR #1277). Eigener
-// Dateiname je Feldgroesse ausser 6 (Ruckwaertskompatibilitaet: der Standardname bleibt belegt).
-const FELDGROESSE = Number(
-  process.argv.slice(2).find((a) => a.startsWith("--feldgroesse="))?.split("=")[1] ?? 6,
-);
-const AUSGABE = path.join(
-  WURZEL,
-  FELDGROESSE === 6 ? "data/generated/pps-duell-bruecke-abnahme.json" : `data/generated/pps-duell-bruecke-abnahme-n${FELDGROESSE}.json`,
-);
+const FELDGROESSE = 6;
 const PAARUNGEN_JE_SPIELTAG = 2;
 const SAATSTROEME = [0, 10_000_000] as const;
 
@@ -100,6 +91,26 @@ const args = new Map(
     return [k!, v ?? "1"] as const;
   }),
 );
+// Ueberschreibbar (--ausgabe=<pfad>), damit zwei parallele Teilmessungen (z.B. ein reiner Teil-A-
+// Feldgroessen-Sweep mit --skip-teil-b neben einer Teil-B-Nachmessung) sich nicht gegenseitig die
+// Ausgabedatei ueberschreiben.
+const AUSGABE = args.get("ausgabe") ? path.resolve(args.get("ausgabe")!) : path.join(WURZEL, "data/generated/pps-duell-bruecke-abnahme.json");
+
+// OPUS-PRAEZISIERUNG 17.10. (Nachtrag zu PR #1277): Spearman auf einer Teamseite mit n=2 ist
+// mathematisch IMMER ±1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- ohne Erkenntniswert
+// und wird ueber den n>=3-Filter in spearman() bereits ausgeschlossen. Um das nicht nur zu
+// behaupten, sondern zu zeigen, misst Teil A jetzt ZUSAETZLICH ueber mehrere Feldgroessen
+// (3/4/5/6, dieselbe Konvention wie scripts/ziehe-verhaeltnis-referenz.ts) statt nur bei der einen
+// gewaehlten Groesse 6 -- Feldgroesse 2 wird bewusst NICHT simuliert (das Ergebnis ist analytisch
+// vorhersagbar: immer |rho|=1, kein Lauf noetig) und im Bericht nur als Hinweis gefuehrt.
+const FELDGROESSEN_TEIL_A = (args.get("feldgroessen")?.split(",").map(Number) ?? [3, 4, 5, 6]).filter((n) => Number.isInteger(n) && n >= 3);
+// Teil B (Pp unter echten Bedingungen) bleibt bei EINER Feldgroesse (6) -- er fragt nicht "haengt
+// rho von der Feldgroesse ab", sondern "verzerrt ein anderer Kanal die Matrix", und das macht man
+// nicht guenstiger, indem man es bei mehreren Feldgroessen wiederholt.
+const PP_FELDGROESSE = 6;
+// Fuer einen reinen Feldgroessen-Sweep (Teil A) kann Teil B ganz ausgelassen werden (teuer, siehe
+// Kopfkommentar) -- additiv, ohne den Schalter unveraendertes Verhalten.
+const TEIL_B_UEBERSPRINGEN = args.has("skip-teil-b");
 
 const STANDARD_DISZIPLINEN = ["football", "i-spy", "battlefield", "tdm", "mini-dm", "basketball", "hockey", "fechten"];
 const DISZIPLINEN = (args.get("disziplinen")?.split(",") ?? STANDARD_DISZIPLINEN).filter(Boolean);
@@ -175,6 +186,10 @@ function median(werte: readonly number[]): number | null {
   return sortiert.length % 2 ? sortiert[mid]! : (sortiert[mid - 1]! + sortiert[mid]!) / 2;
 }
 
+function mean(werte: readonly number[]): number | null {
+  return werte.length ? werte.reduce((s, v) => s + v, 0) / werte.length : null;
+}
+
 function slotFuer(discipline: Discipline, n: number): SeasonDisciplineScheduleSlot {
   const istMiniDm = discipline.id === MINI_DM_DISCIPLINE_ID;
   return {
@@ -202,19 +217,6 @@ function attrsOf(player: Player | undefined): Record<string, number> | null {
 
 type FixtureRow = { eignungDiff: number; korrektGeordnet: boolean | null; absEignungDiff: number };
 
-// TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Befund 18.10., docs/design/
-// pps-duell-bruecke-individuelle-pps-18-10.md): TEIL A oben (gameRhos) misst Spieler-rho NUR
-// INNERHALB einer Team-Seite -- das ist nicht die CLAUDE.md-Abnahmezahl fuer "ein Spiel", weil ein
-// Battle-Fixture ZWEI Team-Seiten hat. Die folgenden zwei Kennzahlen schliessen die Luecke:
-//  - `fixtureRho`: Spearman-rho zwischen Eignung (baseValue) und vergebener PP, UEBER BEIDE SEITEN
-//    EINES synthetischen Fixtures zusammen -- die EIGENTLICHE Einzelspiel-rho aus CLAUDE.md, wenn
-//    "ein Spiel" ein Zwei-Team-Duell ist.
-//  - `crossTeamPaartreue`: dieselbe Paartreue-nach-Eignungsabstand-Logik wie unten (<2/2..15/>=15),
-//    aber auf SPIELER-PAARE verschiedener Teams angewandt (nicht auf Team-Aggregate) -- zeigt direkt,
-//    ob ein Star in einem schwachen Team gegen einen Mittelmass-Spieler in einem starken Team richtig
-//    geordnet wird.
-type FixturePlayerPaar = { eignungDiff: number; korrektGeordnet: boolean | null; absEignungDiff: number };
-
 function main() {
   const persistence = createPersistenceService();
   const saveId = args.get("save") ?? "new-game-1787123325719-swnjlk";
@@ -222,7 +224,19 @@ function main() {
   if (!save) throw new Error(`Save ${saveId} nicht im Abbild.`);
   const basis = save.gameState;
   const seasonId = basis.season.id;
-  const spieltage = (basis.season.matchdayIds ?? []).slice(0, SPIELTAGE_LIMIT);
+  // ZWEI UNABHAENGIGE SAATSTROEME, AUCH FUER TEIL A (Projektaufsicht-Fund 17.10., gegenueber der
+  // ersten Fassung dieses Abschnitts): ein Team-Seiten-"Spiel" (baseValue/pointsAwarded fuer Teil
+  // A) haengt nicht von der Zufalls-PAARUNG ab, sondern NUR von (Team, Disziplin, Spieltag) -- mit
+  // DEMSELBEN Spieltags-Pool fuer beide Stroeme waere der Spieler-rho-Median also fuer beide
+  // Stroeme bit-identisch (nur die Paarungs-abhaengige Team-Paartreue und Teil Bs Perturbations-
+  // Ziehung haetten echte Streuung gehabt) -- keine echte zweite, unabhaengige Messung. Die
+  // Spieltage werden deshalb in zwei DISJUNKTE Fenster geteilt, je ein Fenster pro Saatstrom:
+  // echte, nicht ueberlappende reale Spieltage statt zweimal derselben Stichprobe.
+  const matchdayPool = basis.season.matchdayIds ?? [];
+  const fensterGroesse = Math.max(1, Math.min(SPIELTAGE_LIMIT, Math.floor(matchdayPool.length / SAATSTROEME.length)));
+  const spieltageJeStrom = new Map(
+    SAATSTROEME.map((strom, i) => [strom, matchdayPool.slice(i * fensterGroesse, i * fensterGroesse + fensterGroesse)] as const),
+  );
   const alleDisziplinen = basis.disciplines;
   const gewaehlt = DISZIPLINEN.map((id) => alleDisziplinen.find((d) => d.id === id)).filter((d): d is Discipline => Boolean(d));
   const fehlend = DISZIPLINEN.filter((id) => !alleDisziplinen.find((d) => d.id === id));
@@ -258,34 +272,32 @@ function main() {
 
   const gameRhosJeDisziplinUndStrom = new Map<string, number[]>();
   const fixturesJeDisziplinUndStrom = new Map<string, FixtureRow[]>();
-  // TEAM-RANG-ENTKOPPLUNG (18.10.): fixtureRho (Einzelspiel-rho ueber BEIDE Seiten) + crossTeamPaartreue.
-  const fixtureRhosJeDisziplinUndStrom = new Map<string, number[]>();
-  const crossTeamPaarenJeDisziplinUndStrom = new Map<string, FixturePlayerPaar[]>();
+  const fixtureRhoJeDisziplinUndStrom = new Map<string, number[]>();
+  // OPUS-AUFLAGE 17.10. (dritte Runde, Task #175 ausgelagert -- hier nur die billige
+  // Zusatzgroesse fuer #1277 selbst): CLAUDE.md-Hockey-Methodik auf FIXTURE-Ebene (2n Spieler) --
+  // Star auf Rang 1 / unter den ersten zwei (nach vergebener PP, Eignungs-Spitzenreiter ohne
+  // Bindung), und Paartreue bei Eignungsabstand >= 15 unter ALLEN 2n Spielern eines Fixtures.
+  const starJeDisziplinUndStrom = new Map<string, { n: number; rang1: number; top2: number }>();
+  const paar15JeDisziplinUndStrom = new Map<string, { n: number; korrekt: number }>();
   // Teil B: Einfluss je (Disziplin, Strom, Attribut) -- Summe der positiven pointsAwarded-Deltas.
   const einflussJeDisziplinUndStrom = new Map<string, Record<string, number>>();
   const einflussLaeufeJeDisziplinUndStrom = new Map<string, number>();
 
   for (const strom of SAATSTROEME) {
     const ppRnd = mulberry32(strom + 777);
+    const spieltage = spieltageJeStrom.get(strom)!;
+    // Teil-B-Feldgroesse IMMER mitlaufen lassen (sonst gaebe es nie eine Pp-Messung), zusaetzlich
+    // jede angefragte Teil-A-Feldgroesse -- ohne Dopplung, falls 6 schon in der Liste steht.
+    const feldgroessenDieserLauf = Array.from(new Set([...FELDGROESSEN_TEIL_A, PP_FELDGROESSE]));
+    for (const n of feldgroessenDieserLauf) {
     for (const [a, b] of paare) {
       for (const [mi, matchdayId] of spieltage.entries()) {
         const gs: GameState = {
           ...basis,
-          // GEFUNDENER MESSFEHLER (18.10., beim Nachmessen fuer die Team-Rang-Entkopplung
-          // entdeckt): OHNE diesen Override bleibt `scenarioMeta.gameMode` beim Wert des
-          // zugrundeliegenden Saves ("manager", da alle Saves im Live-Save-Abbild Manager-Mode-
-          // Saves sind) -- `isBattleModeSave()`/`isBattleModeArenaEligible`
-          // (legacy-matchday-resolve-engine.ts) bleiben damit FALSE, `resolutionSource` jeder
-          // Disziplin-Zeile bleibt "pps" statt "pps_duell", und die gesamte Messung lief bisher
-          // unbemerkt ueber den normalen Manager-Mode-Rangpfad statt ueber die PPS-Duell-Bruecke
-          // selbst -- obwohl der Spielplan schon korrekt auf Fixtures/Feldgroesse umgebogen wurde.
-          // Erklaert, warum eine erste Messung VOR und NACH der Team-Rang-Entkopplung (dieser PR)
-          // byte-identische Zahlen lieferte: die Bruecke wurde nie wirklich durchlaufen.
-          scenarioMeta: { ...basis.scenarioMeta, gameMode: "battle" } as GameState["scenarioMeta"],
           seasonState: {
             ...basis.seasonState,
             disciplineSchedule: (basis.seasonState.disciplineSchedule ?? []).map((zeile) =>
-              zeile.matchdayId === matchdayId ? { ...zeile, discipline1: slotFuer(a, FELDGROESSE), discipline2: slotFuer(b, FELDGROESSE) } : zeile,
+              zeile.matchdayId === matchdayId ? { ...zeile, discipline1: slotFuer(a, n), discipline2: slotFuer(b, n) } : zeile,
             ),
             lineupDrafts: (basis.seasonState.lineupDrafts ?? []).filter((draft) => draft.matchdayId !== matchdayId),
           },
@@ -311,8 +323,9 @@ function main() {
         const preview = buildLegacyMatchdayResolvePreview(contexts);
 
         for (const dp of preview.disciplinePreviews) {
-          // --- TEIL A, Spieler-Ebene: je Team-Seite EIN "Spiel" (Boxscore). ---
-          const gameRhoKey = `${dp.disciplineId}::${strom}`;
+          // --- TEIL A, Spieler-Ebene: je Team-Seite EIN "Spiel" (Boxscore), JE FELDGROESSE. ---
+          const gameRhoKey = `${dp.disciplineId}::${strom}::${n}`;
+          const fixtureKey = `${dp.disciplineId}::${strom}`;
           const gameRhos = gameRhosJeDisziplinUndStrom.get(gameRhoKey) ?? [];
           for (const teamResult of dp.teamResults) {
             const eignungen: number[] = [];
@@ -329,18 +342,34 @@ function main() {
 
           // --- TEIL A, Team-Ebene (Paartreue nach Eignungsabstand): wie zuvor, Fixture-basiert. ---
           const eignungByTeam = new Map<string, number>();
+          const entriesByTeam = new Map<string, { eig: number[]; pp: number[] }>();
           for (const teamResult of dp.teamResults) {
             const summe = teamResult.entries.reduce((s, e) => s + (e.baseValue ?? 0), 0);
             eignungByTeam.set(teamResult.teamId, summe);
+            const eig: number[] = [], pp: number[] = [];
+            for (const entry of teamResult.entries) {
+              if (entry.baseValue == null || entry.pointsAwarded == null) continue;
+              eig.push(entry.baseValue);
+              pp.push(entry.pointsAwarded);
+            }
+            entriesByTeam.set(teamResult.teamId, { eig, pp });
           }
           const scoreByTeam = new Map(dp.teamResults.map((tr) => [tr.teamId, tr.score] as const));
-          const entriesByTeam = new Map(dp.teamResults.map((tr) => [tr.teamId, tr.entries] as const));
-          const fixListe = fixturesJeDisziplinUndStrom.get(gameRhoKey) ?? [];
-          const fixtureRhoListe = fixtureRhosJeDisziplinUndStrom.get(gameRhoKey) ?? [];
-          const crossTeamPaarListe = crossTeamPaarenJeDisziplinUndStrom.get(gameRhoKey) ?? [];
+          const fixListe = fixturesJeDisziplinUndStrom.get(fixtureKey) ?? [];
+          // OPUS-PRAEZISIERUNG 17.10. (zweite Runde): rho JE TEAM-SEITE ist bei kleiner Feldgroesse
+          // (3/4) zu grob -- Spearman kennt dort nur die diskreten Werte 1,0/0,5/-0,5/-1,0 (n=3) bzw.
+          // 1,0/0,8/0,6/... (n=4), und ein einziger Rang-Tausch landet exakt auf der Schranke selbst
+          // (0,8 bei n=4) statt "darueber". Zusaetzliche, feinere Groesse: rho auf FIXTURE-EBENE
+          // ueber BEIDE Seiten (2n Spieler, also 6 bzw. 8 bei n=3/4) -- entspricht genau Chris' Frage
+          // ("wer am eignungsstaerksten ist, holt auch uebers Duell hinweg die meisten Punkte") und
+          // der miss-alle-disziplinen.mjs-Methodik (ALLE Teilnehmer eines Spiels, nicht nur eine
+          // Seite). Dieselbe Paarung/derselbe Seed wie die Paartreue direkt unten -- kein zweiter,
+          // unabhaengiger Zufallszug noetig.
+          const fixtureRhoKey = `${dp.disciplineId}::${strom}::${n}`;
+          const fixtureRhos = fixtureRhoJeDisziplinUndStrom.get(fixtureRhoKey) ?? [];
           for (let p = 0; p < PAARUNGEN_JE_SPIELTAG; p += 1) {
             for (const [li, liga] of ligen.entries()) {
-              const seed = strom + FELDGROESSE * 1_000_003 + mi * 7919 + p * 104_729 + li * 13 + dp.disciplineId.length;
+              const seed = strom + n * 1_000_003 + mi * 7919 + p * 104_729 + li * 13 + dp.disciplineId.length;
               const reihe = gemischt(liga, seed);
               for (let i = 0; i + 1 < reihe.length; i += 2) {
                 const heimId = reihe[i]!, gastId = reihe[i + 1]!;
@@ -353,36 +382,66 @@ function main() {
                 const korrektGeordnet = sieger == null || absDiff < 1e-9 ? null : (eignungDiff > 0 && sieger) || (eignungDiff < 0 && !sieger);
                 fixListe.push({ eignungDiff, korrektGeordnet, absEignungDiff: absDiff });
 
-                // --- NEU (18.10.): fixtureRho + crossTeamPaartreue, UEBER BEIDE SEITEN dieses
-                // synthetischen Fixtures, auf SPIELER-Ebene (nicht Team-Aggregat). ---
-                const heimEntries = (entriesByTeam.get(heimId) ?? []).filter((e) => e.baseValue != null && e.pointsAwarded != null);
-                const gastEntries = (entriesByTeam.get(gastId) ?? []).filter((e) => e.baseValue != null && e.pointsAwarded != null);
-                if (heimEntries.length > 0 && gastEntries.length > 0) {
-                  const eignungenBeide = [...heimEntries, ...gastEntries].map((e) => e.baseValue!);
-                  const ppBeide = [...heimEntries, ...gastEntries].map((e) => e.pointsAwarded!);
-                  const fixtureRho = spearman(eignungenBeide, ppBeide);
-                  if (fixtureRho != null) fixtureRhoListe.push(fixtureRho);
-                  // Alle Spieler-Paare (ein Spieler Heim, ein Spieler Gast): ist die PP-Ordnung
-                  // konsistent mit der Eignungs-Ordnung ueber die Team-Grenze hinweg?
-                  for (const h of heimEntries) {
-                    for (const g of gastEntries) {
-                      const eDiff = h.baseValue! - g.baseValue!;
-                      const eAbs = Math.abs(eDiff);
-                      if (eAbs < 1e-9) continue;
-                      const ppGleich = h.pointsAwarded === g.pointsAwarded;
-                      const korrekt = ppGleich ? null : (eDiff > 0 && h.pointsAwarded! > g.pointsAwarded!) || (eDiff < 0 && h.pointsAwarded! < g.pointsAwarded!);
-                      crossTeamPaarListe.push({ eignungDiff: eDiff, korrektGeordnet: korrekt, absEignungDiff: eAbs });
+                const heimEntries = entriesByTeam.get(heimId), gastEntries = entriesByTeam.get(gastId);
+                if (heimEntries && gastEntries) {
+                  const fixtureRho = spearman([...heimEntries.eig, ...gastEntries.eig], [...heimEntries.pp, ...gastEntries.pp]);
+                  if (fixtureRho != null) fixtureRhos.push(fixtureRho);
+
+                  const kombiniert = [
+                    ...heimEntries.eig.map((eig, i) => ({ eig, pp: heimEntries.pp[i]!, seite: "heim" as const })),
+                    ...gastEntries.eig.map((eig, i) => ({ eig, pp: gastEntries.pp[i]!, seite: "gast" as const })),
+                  ];
+                  if (kombiniert.length >= 2) {
+                    const maxEig = Math.max(...kombiniert.map((k) => k.eig));
+                    const starKandidaten = kombiniert.filter((k) => k.eig === maxEig);
+                    const star = starJeDisziplinUndStrom.get(fixtureRhoKey) ?? { n: 0, rang1: 0, top2: 0 };
+                    // Nur ein EINDEUTIGER Star (keine Eignungs-Bindung an der Spitze) zaehlt --
+                    // sonst waere "Rang 1" unter mehreren Gleichauf-Fuehrenden nicht sinnvoll definiert.
+                    if (starKandidaten.length === 1) {
+                      const ppRang = 1 + kombiniert.filter((k) => k.pp > starKandidaten[0]!.pp).length; // Competition-Ranking
+                      star.n += 1;
+                      if (ppRang === 1) star.rang1 += 1;
+                      if (ppRang <= 2) star.top2 += 1;
                     }
+                    starJeDisziplinUndStrom.set(fixtureRhoKey, star);
+
+                    // OPUS-AUFLAGE 17.10. (vierte Runde): nach SEITE aufgeschluesselt -- Paare
+                    // DERSELBEN Seite (beide heim ODER beide gast) vs. Paare UEBER BEIDE Seiten.
+                    // Verdacht: haengt pointsAwarded (ueber den Teamrang) staerker an einem
+                    // schlechten Duell-Ausgang, faellt die Fehlordnung ueberwiegend bei
+                    // Seiten-uebergreifenden Paaren auf -- waere dann KEIN Messartefakt, sondern ein
+                    // Verstoss gegen Chris' 30.08.-Entscheidung (PP vollstaendig von Team-Punkten
+                    // entkoppelt, battle-mode-spielmodus-plan.md 5.1).
+                    const key = `${fixtureRhoKey}::selbeSeite`;
+                    const keyUeber = `${fixtureRhoKey}::ueberSeiten`;
+                    const paar15 = paar15JeDisziplinUndStrom.get(fixtureRhoKey) ?? { n: 0, korrekt: 0 };
+                    const paar15SelbeSeite = paar15JeDisziplinUndStrom.get(key) ?? { n: 0, korrekt: 0 };
+                    const paar15UeberSeiten = paar15JeDisziplinUndStrom.get(keyUeber) ?? { n: 0, korrekt: 0 };
+                    for (let a = 0; a < kombiniert.length; a += 1) {
+                      for (let b = a + 1; b < kombiniert.length; b += 1) {
+                        const diff = Math.abs(kombiniert[a]!.eig - kombiniert[b]!.eig);
+                        if (diff < 15 || kombiniert[a]!.pp === kombiniert[b]!.pp) continue; // PP-Gleichstand ist inschluessig
+                        const korrekt = (kombiniert[a]!.eig > kombiniert[b]!.eig) === (kombiniert[a]!.pp > kombiniert[b]!.pp);
+                        paar15.n += 1;
+                        if (korrekt) paar15.korrekt += 1;
+                        const bucket = kombiniert[a]!.seite === kombiniert[b]!.seite ? paar15SelbeSeite : paar15UeberSeiten;
+                        bucket.n += 1;
+                        if (korrekt) bucket.korrekt += 1;
+                      }
+                    }
+                    paar15JeDisziplinUndStrom.set(fixtureRhoKey, paar15);
+                    paar15JeDisziplinUndStrom.set(key, paar15SelbeSeite);
+                    paar15JeDisziplinUndStrom.set(keyUeber, paar15UeberSeiten);
                   }
                 }
               }
             }
           }
-          fixturesJeDisziplinUndStrom.set(gameRhoKey, fixListe);
-          fixtureRhosJeDisziplinUndStrom.set(gameRhoKey, fixtureRhoListe);
-          crossTeamPaarenJeDisziplinUndStrom.set(gameRhoKey, crossTeamPaarListe);
+          fixturesJeDisziplinUndStrom.set(fixtureKey, fixListe);
+          fixtureRhoJeDisziplinUndStrom.set(fixtureRhoKey, fixtureRhos);
 
-          // --- TEIL B, echte Bedingungen: je Team-Seite ein paar Spieler ziehen, je Attribut neu scoren. ---
+          // --- TEIL B, echte Bedingungen: NUR bei der einen gewaehlten Feldgroesse (s. Kopfkommentar). ---
+          if (n !== PP_FELDGROESSE || TEIL_B_UEBERSPRINGEN) continue;
           const profil = resolveDisciplineWeightProfile(dp.disciplineId);
           const matrixSumme = Object.values(profil).reduce((s, w) => s + Math.max(0, w ?? 0), 0);
           if (matrixSumme <= 0) continue;
@@ -405,14 +464,55 @@ function main() {
             if (!basisEntry) continue;
 
             for (const attr of playerGeneratorAttributeKeys) {
+              // BASELINE-MISMATCH-FIX (Fund beim Nachrechnen des Football-Befunds, 17.10.): der
+              // ECHTE Kontext liest disciplineScores aus der SQLite (historisch geschrieben, ggf.
+              // mit anderer Tabellen-/Trainingsversion), waehrend diese Messung p.d selbst ueber
+              // calculateRawDisciplineScore + buildCompetitionRanks + mapRankToDisciplineStat NEU
+              // herleitet. Wird der ABSOLUTE neu hergeleitete Wert eingesetzt (wie in der ersten
+              // Fassung), erzeugt schon die blosse Differenz zwischen "historisch" und "neu
+              // hergeleitet" einen MESSBAREN Sprung -- und zwar fuer JEDES Attribut gleich, auch
+              // fuer ein mit Gewicht 0 angehobenes (per Konstruktion exakt wirkungslos). Genau das
+              // erklaert den auffaelligen naeherungsweise FLACHEN ~7-11%-Einfluss ueber alle zwoelf
+              // Attribute hinweg (inkl. Football-Override-Nullen charisma/intelligence) in der
+              // ersten Fassung dieser Messung -- ein Mess-Artefakt, kein Befund am Spiel. Fix: BEIDE
+              // Seiten (Basislinie UND Anhebung) ueber DIESELBE Neuherleitung rechnen und nur das
+              // DELTA additiv auf den echten, historischen Basiswert legen. Ein Attribut mit Gewicht
+              // 0 liefert dann exakt Delta = 0, nicht mehr den Mismatch-Sprung.
+              const basisRoh = calculateRawDisciplineScore(attrsBasis as never, dp.disciplineId as OfficialDisciplineWeightId);
               const angehoben = { ...attrsBasis, [attr]: Math.min(99, attrsBasis[attr]! + 15) };
-              const neuerRoh = calculateRawDisciplineScore(angehoben as never, dp.disciplineId as OfficialDisciplineWeightId);
-              if (neuerRoh == null) continue;
-              const rawMitPerturbation = alleRaw.map((e) => (e.playerId === ziel.playerId ? { ...e, score: neuerRoh } : e));
-              const rankMap = buildCompetitionRanks(rawMitPerturbation);
-              const neuerRang = rankMap.get(ziel.playerId);
-              const neuerStat = neuerRang != null ? mapRankToDisciplineStat(neuerRang) : null;
-              if (neuerStat == null) continue;
+              const liftRoh = calculateRawDisciplineScore(angehoben as never, dp.disciplineId as OfficialDisciplineWeightId);
+              if (basisRoh == null || liftRoh == null) continue;
+              const rangVon = (roh: number) => {
+                const rawMit = alleRaw.map((e) => (e.playerId === ziel.playerId ? { ...e, score: roh } : e));
+                return buildCompetitionRanks(rawMit).get(ziel.playerId);
+              };
+              const rangBasislinie = rangVon(basisRoh);
+              const rangLift = rangVon(liftRoh);
+              const statBasislinie = rangBasislinie != null ? mapRankToDisciplineStat(rangBasislinie) : null;
+              const statLift = rangLift != null ? mapRankToDisciplineStat(rangLift) : null;
+              if (statBasislinie == null || statLift == null) continue;
+              const deltaStat = statLift - statBasislinie;
+
+              // PLAUSIBILITAETS-SELBSTTEST, DAUERHAFT EINGEBAUT (Opus-Auflage 17.10., Folgerung 1
+              // zum Baseline-Mismatch-Fix oben): ein Attribut mit Gewicht 0 im TATSAECHLICH
+              // GENUTZTEN Profil (resolveDisciplineWeightProfile -- das ist Override ODER Matrix,
+              // je nachdem was calculateRawDisciplineScore wirklich liest) MUSS Delta = 0 liefern,
+              // weil die Formel das Attribut komplett ignoriert. Jede Abweichung zeigt denselben
+              // Fehler wieder, den die erste Fassung dieser Messung hatte (Basiswert und Anhebung
+              // ueber verschiedene Rechenwege) -- also Abbruch statt stiller Fehlmessung.
+              const aktuellesGewicht = (profil as Record<string, number>)[attr] ?? 0;
+              if (aktuellesGewicht <= 0 && Math.abs(deltaStat) > 1e-6) {
+                throw new Error(
+                  `PLAUSIBILITAETS-SELBSTTEST FEHLGESCHLAGEN: ${dp.disciplineId}/${attr} hat Gewicht ` +
+                    `${aktuellesGewicht} im genutzten Profil, aber deltaStat=${deltaStat} (Strom ${strom}, ` +
+                    `Team ${teamResult.teamId}, Spieler ${ziel.playerId}) -- das ist derselbe Baseline-` +
+                    `Mismatch-Fehler, der am 17.10. den falschen Football-Pp-Befund erzeugt hat ` +
+                    `(docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 8.5). Basiswert ` +
+                    `und Anhebung muessen ueber DENSELBEN Rechenweg im selben Lauf gehen.`,
+                );
+              }
+
+              const neuerStat = (basisEntry.score ?? 0) + deltaStat;
 
               const perturbierterContext: LegacyLineupLoadedContext = {
                 ...context,
@@ -435,7 +535,8 @@ function main() {
         }
       }
     }
-    console.error(`[strom ${strom}] fertig.`);
+    console.error(`[strom ${strom}] Feldgroesse ${n} fertig.`);
+    }
   }
 
   // ---------------------------------------------------------------------------------
@@ -444,58 +545,93 @@ function main() {
   const teilA: Record<string, unknown> = {};
   for (const d of gewaehlt) {
     const proStrom = SAATSTROEME.map((strom) => {
-      const key = `${d.id}::${strom}`;
-      const gameRhos = gameRhosJeDisziplinUndStrom.get(key) ?? [];
-      const fix = fixturesJeDisziplinUndStrom.get(key) ?? [];
+      const fixKey = `${d.id}::${strom}`;
+      const fix = fixturesJeDisziplinUndStrom.get(fixKey) ?? [];
       const bucket = (lo: number, hi: number) => fix.filter((f) => f.absEignungDiff >= lo && f.absEignungDiff < hi && f.korrektGeordnet != null);
       const paartreue = (zeilen: FixtureRow[]) => (zeilen.length ? zeilen.filter((z) => z.korrektGeordnet).length / zeilen.length : null);
       const klein = bucket(0, 2), mittel = bucket(2, 15), gross = fix.filter((f) => f.absEignungDiff >= 15 && f.korrektGeordnet != null);
-      // TEAM-RANG-ENTKOPPLUNG (18.10.): fixtureRho (die EIGENTLICHE CLAUDE.md-Einzelspiel-rho fuer
-      // ein Zwei-Team-Duell) + crossTeamPaartreue (dieselbe Eignungsabstand-Logik, aber auf
-      // Spieler-Paare VERSCHIEDENER Teams statt Team-Aggregate).
-      const fixtureRhos = fixtureRhosJeDisziplinUndStrom.get(key) ?? [];
-      const crossPaare = crossTeamPaarenJeDisziplinUndStrom.get(key) ?? [];
-      const crossBucket = (lo: number, hi: number) => crossPaare.filter((f) => f.absEignungDiff >= lo && f.absEignungDiff < hi && f.korrektGeordnet != null);
-      const crossPaartreue = (zeilen: FixturePlayerPaar[]) => (zeilen.length ? zeilen.filter((z) => z.korrektGeordnet).length / zeilen.length : null);
-      const crossKlein = crossBucket(0, 2), crossMittel = crossBucket(2, 15);
-      const crossGross = crossPaare.filter((f) => f.absEignungDiff >= 15 && f.korrektGeordnet != null);
+
+      // OPUS-PRAEZISIERUNG 17.10.: rho JE FELDGROESSE (3/4/5/6, n>=3 durch spearman() bereits
+      // erzwungen) UND gepoolt ueber alle simulierten Feldgroessen -- damit sichtbar ist, ob der
+      // Median von einer einzelnen Groesse getragen wird oder ueber alle stabil bleibt.
+      const jeFeldgroesse: Record<string, {
+        median: number | null; spannweite: number | null; n: number;
+        fixtureRhoMittel: number | null; fixtureRhoAnteilAb08: number | null; fixtureRhoN: number;
+        starRang1Pct: number | null; starTop2Pct: number | null; starN: number;
+        paartreueAb15Pct: number | null; paartreueAb15N: number;
+        paartreueAb15SelbeSeitePct: number | null; paartreueAb15SelbeSeiteN: number;
+        paartreueAb15UeberSeitenPct: number | null; paartreueAb15UeberSeitenN: number;
+      }> = {};
+      const alleRhos: number[] = [];
+      for (const n of FELDGROESSEN_TEIL_A) {
+        const rhos = gameRhosJeDisziplinUndStrom.get(`${d.id}::${strom}::${n}`) ?? [];
+        alleRhos.push(...rhos);
+        // OPUS-PRAEZISIERUNG 17.10. (zweite Runde): rho JE SEITE ist bei n=3/4 zu grob (nur die
+        // diskreten Werte 1,0/0,5/-0,5/-1,0 bzw. 1,0/0,8/0,6/... moeglich, ein Rang-Tausch landet
+        // bei n=4 exakt AUF der 0,80-Schranke statt darueber) -- die FIXTURE-Ebene (2n Spieler
+        // beider Seiten) ist die aussagekraeftigere Groesse fuer kleine Feldgroessen, Mittelwert UND
+        // Anteil ab 0,80 statt eines zu groben Medians.
+        const key = `${d.id}::${strom}::${n}`;
+        const fixtureRhos = fixtureRhoJeDisziplinUndStrom.get(key) ?? [];
+        const star = starJeDisziplinUndStrom.get(key) ?? { n: 0, rang1: 0, top2: 0 };
+        const paar15 = paar15JeDisziplinUndStrom.get(key) ?? { n: 0, korrekt: 0 };
+        const paar15SelbeSeite = paar15JeDisziplinUndStrom.get(`${key}::selbeSeite`) ?? { n: 0, korrekt: 0 };
+        const paar15UeberSeiten = paar15JeDisziplinUndStrom.get(`${key}::ueberSeiten`) ?? { n: 0, korrekt: 0 };
+        jeFeldgroesse[String(n)] = {
+          median: median(rhos),
+          spannweite: rhos.length ? Math.max(...rhos) - Math.min(...rhos) : null,
+          n: rhos.length,
+          fixtureRhoMittel: mean(fixtureRhos),
+          fixtureRhoAnteilAb08: fixtureRhos.length ? fixtureRhos.filter((r) => r >= 0.8).length / fixtureRhos.length : null,
+          fixtureRhoN: fixtureRhos.length,
+          // OPUS-AUFLAGE 17.10. (dritte Runde, Task #175 ausgelagert): CLAUDE.md-Hockey-Methodik auf
+          // Fixture-Ebene (2n Spieler) -- Entscheidungsgrundlage fuer Chris, ob kuenftig diese
+          // Kennzahlen statt nacktem rho fuer kleine Feldgroessen gelten sollen.
+          starRang1Pct: star.n ? star.rang1 / star.n : null,
+          starTop2Pct: star.n ? star.top2 / star.n : null,
+          starN: star.n,
+          paartreueAb15Pct: paar15.n ? paar15.korrekt / paar15.n : null,
+          paartreueAb15N: paar15.n,
+          // OPUS-AUFLAGE 17.10. (vierte Runde): dieselbe Paartreue, aufgeschluesselt nach Seite --
+          // s. Kommentar an der Erhebung oben. Unterscheidet Messartefakt (beide Eimer aehnlich
+          // niedrig) von einem echten Verstoss gegen die PP-Team-Entkopplung (nur "ueberSeiten"
+          // niedrig).
+          paartreueAb15SelbeSeitePct: paar15SelbeSeite.n ? paar15SelbeSeite.korrekt / paar15SelbeSeite.n : null,
+          paartreueAb15SelbeSeiteN: paar15SelbeSeite.n,
+          paartreueAb15UeberSeitenPct: paar15UeberSeiten.n ? paar15UeberSeiten.korrekt / paar15UeberSeiten.n : null,
+          paartreueAb15UeberSeitenN: paar15UeberSeiten.n,
+        };
+      }
+
       return {
         strom,
-        spielerRhoMedian: median(gameRhos),
-        spielerRhoSpannweite: gameRhos.length ? Math.max(...gameRhos) - Math.min(...gameRhos) : null,
-        spielerRhoSpiele: gameRhos.length,
+        spielerRhoMedianGesamt: median(alleRhos),
+        spielerRhoSpannweiteGesamt: alleRhos.length ? Math.max(...alleRhos) - Math.min(...alleRhos) : null,
+        spielerRhoSpieleGesamt: alleRhos.length,
+        spielerRhoJeFeldgroesse: jeFeldgroesse,
+        feldgroesse2Hinweis: "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
         paartreueNachEignungsabstand: {
           "<2": { pct: paartreue(klein), n: klein.length },
           "2..15": { pct: paartreue(mittel), n: mittel.length },
           ">=15": { pct: paartreue(gross), n: gross.length },
-        },
-        fixtureRhoMedian: median(fixtureRhos),
-        fixtureRhoSpannweite: fixtureRhos.length ? Math.max(...fixtureRhos) - Math.min(...fixtureRhos) : null,
-        fixtureRhoFixtures: fixtureRhos.length,
-        crossTeamPaartreueNachEignungsabstand: {
-          "<2": { pct: crossPaartreue(crossKlein), n: crossKlein.length },
-          "2..15": { pct: crossPaartreue(crossMittel), n: crossMittel.length },
-          ">=15": { pct: crossPaartreue(crossGross), n: crossGross.length },
         },
       };
     });
     teilA[d.id] = proStrom;
   }
 
-  console.log("\n=== TEIL A: Spieler-rho (Eignung vs. vergebene PP), Feldgroesse", FELDGROESSE, "===");
+  console.log("\n=== TEIL A: Spieler-rho (Eignung vs. vergebene PP), Feldgroessen", FELDGROESSEN_TEIL_A.join("/"), "===");
   for (const d of gewaehlt) {
     const zeilen = teilA[d.id] as any[];
-    console.log(d.id.padEnd(14), zeilen.map((z) =>
-      `Strom ${z.strom}: Median=${z.spielerRhoMedian?.toFixed(3)} Spannweite=${z.spielerRhoSpannweite?.toFixed(3)} (n=${z.spielerRhoSpiele}) | Paartreue <2:${(z.paartreueNachEignungsabstand["<2"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand["<2"].n}) 2-15:${(z.paartreueNachEignungsabstand["2..15"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand["2..15"].n}) >=15:${(z.paartreueNachEignungsabstand[">=15"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand[">=15"].n})`
-    ).join("  ||  "));
-  }
-
-  console.log("\n=== TEIL A (NEU 18.10.): fixtureRho (UEBER BEIDE SEITEN) + crossTeamPaartreue, Feldgroesse", FELDGROESSE, "===");
-  for (const d of gewaehlt) {
-    const zeilen = teilA[d.id] as any[];
-    console.log(d.id.padEnd(14), zeilen.map((z) =>
-      `Strom ${z.strom}: fixtureRho Median=${z.fixtureRhoMedian?.toFixed(3)} Spannweite=${z.fixtureRhoSpannweite?.toFixed(3)} (n=${z.fixtureRhoFixtures}) | crossTeamPaartreue <2:${((z.crossTeamPaartreueNachEignungsabstand["<2"].pct ?? 0)*100).toFixed(0)}%(n${z.crossTeamPaartreueNachEignungsabstand["<2"].n}) 2-15:${((z.crossTeamPaartreueNachEignungsabstand["2..15"].pct ?? 0)*100).toFixed(0)}%(n${z.crossTeamPaartreueNachEignungsabstand["2..15"].n}) >=15:${((z.crossTeamPaartreueNachEignungsabstand[">=15"].pct ?? 0)*100).toFixed(0)}%(n${z.crossTeamPaartreueNachEignungsabstand[">=15"].n})`
-    ).join("  ||  "));
+    for (const z of zeilen) {
+      const jeN = Object.entries(z.spielerRhoJeFeldgroesse).map(([n, v]: [string, any]) =>
+        `n=${n}: Seite=${v.median?.toFixed(3) ?? "–"}(${v.n}) Fixture=${v.fixtureRhoMittel?.toFixed(3) ?? "–"}/${v.fixtureRhoAnteilAb08 != null ? (v.fixtureRhoAnteilAb08*100).toFixed(0)+"%" : "–"}(${v.fixtureRhoN}) Star1=${v.starRang1Pct != null ? (v.starRang1Pct*100).toFixed(0)+"%" : "–"} StarTop2=${v.starTop2Pct != null ? (v.starTop2Pct*100).toFixed(0)+"%" : "–"}(${v.starN}) Paar15=${v.paartreueAb15Pct != null ? (v.paartreueAb15Pct*100).toFixed(0)+"%" : "–"}(${v.paartreueAb15N}) [selbeSeite=${v.paartreueAb15SelbeSeitePct != null ? (v.paartreueAb15SelbeSeitePct*100).toFixed(0)+"%" : "–"}(${v.paartreueAb15SelbeSeiteN}) ueberSeiten=${v.paartreueAb15UeberSeitenPct != null ? (v.paartreueAb15UeberSeitenPct*100).toFixed(0)+"%" : "–"}(${v.paartreueAb15UeberSeitenN})]`,
+      ).join(" | ");
+      console.log(
+        d.id.padEnd(14),
+        `Strom ${z.strom}: Median(gepoolt)=${z.spielerRhoMedianGesamt?.toFixed(3)} Spannweite=${z.spielerRhoSpannweiteGesamt?.toFixed(3)} (Spiele=${z.spielerRhoSpieleGesamt}) | je Feldgroesse: ${jeN} | Paartreue <2:${(z.paartreueNachEignungsabstand["<2"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand["<2"].n}) 2-15:${(z.paartreueNachEignungsabstand["2..15"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand["2..15"].n}) >=15:${(z.paartreueNachEignungsabstand[">=15"].pct*100).toFixed(0)}%(n${z.paartreueNachEignungsabstand[">=15"].n})`,
+      );
+    }
   }
 
   const teilB: Record<string, unknown> = {};
@@ -534,11 +670,12 @@ function main() {
   })();
 
   const ausgabe = {
-    hinweis: "Abnahme der PPS-Duell-Bruecke selbst (v3, Team-Rang-Entkopplung 18.10. -- vorher v2, Projektaufsicht-Korrektur 17.10.). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), Median+Spannweite ueber viele Team-Seiten, am echten Live-Save-Kader mit echter KI-Aufstellung. Zusaetzlich Paartreue nach Team-Eignungsabstand. NEU (18.10.): fixtureRhoMedian/-Spannweite -- dieselbe Spearman-Messung, aber UEBER BEIDE SEITEN EINES synthetischen Fixtures zusammen (die EIGENTLICHE CLAUDE.md-Einzelspiel-rho fuer ein Zwei-Team-Duell, ZIEL > 0,80 bei Feldgroesse 5/6) -- plus crossTeamPaartreueNachEignungsabstand (dieselbe <2/2..15/>=15-Logik wie paartreueNachEignungsabstand, aber auf Spieler-PAARE VERSCHIEDENER Teams statt Team-Aggregate: zeigt direkt, ob ein Star in einem schwachen Team gegen einen Mittelmass-Spieler in einem starken Team richtig geordnet wird). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung). Zwei Saatstroeme je Teil. `--feldgroesse=5|6` waehlt die gemessene Feldgroesse (Default 6).",
+    hinweis: "Abnahme der PPS-Duell-Bruecke selbst (v3, Opus-Praezisierung 17.10. zu PR #1277). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), n>=3 erzwungen (spearman() verwirft kleinere Seiten), gemessen JE FELDGROESSE (3/4/5/6) UND gepoolt, am echten Live-Save-Kader mit echter KI-Aufstellung; Feldgroesse 2 analytisch (immer |rho|=1) statt simuliert. Zusaetzlich Paartreue nach Team-Eignungsabstand (sekundaere Teamgroesse, NICHT die Abnahmezahl). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung), NUR bei Feldgroesse 6. Zwei unabhaengige Saatstroeme je Teil, fuer Teil A zusaetzlich ueber DISJUNKTE Spieltags-Fenster (sonst waere der Spieler-rho-Median fuer beide Stroeme bit-identisch, da er nicht von der Zufallspaarung abhaengt).",
     commit,
     datum: new Date().toISOString(),
-    feldgroesse: FELDGROESSE,
-    spieltage: spieltage.length,
+    feldgroessenTeilA: FELDGROESSEN_TEIL_A,
+    ppFeldgroesse: PP_FELDGROESSE,
+    spieltageFensterJeStrom: Object.fromEntries(SAATSTROEME.map((s) => [s, spieltageJeStrom.get(s) ?? []])),
     ppTrialsJeSeite: PP_TRIALS_JE_SEITE,
     saatStroeme: SAATSTROEME,
     teilA, teilB,
