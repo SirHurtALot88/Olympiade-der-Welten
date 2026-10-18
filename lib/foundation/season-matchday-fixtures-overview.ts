@@ -185,9 +185,12 @@ export function istSpieltagsModusVerfuegbar(gameState: Pick<GameState, "scenario
   return (gameState.seasonState.schedule?.length ?? 0) > 0;
 }
 
-/** teamId -> seine DisciplineResultRecord-Zeilen AN DIESEM SPIELTAG, nach disciplineId. */
-function buildTeamDisciplineRowsAtMatchday(
-  gameState: GameState,
+/**
+ * teamId -> seine DisciplineResultRecord-Zeilen AN DIESEM SPIELTAG, nach disciplineId.
+ * EXPORTIERT (ursprünglich privat) für `findeDisziplinErgebnis` — s. dort.
+ */
+export function buildTeamDisciplineRowsAtMatchday(
+  gameState: Pick<GameState, "seasonState">,
   matchdayId: string,
 ): Map<string, Map<string, DisciplineResultRecord>> {
   const matchdayIdByResultId = new Map<string, string>();
@@ -210,6 +213,20 @@ function buildTeamDisciplineRowsAtMatchday(
     byDiscipline.set(row.disciplineId, row);
   }
   return byTeam;
+}
+
+/**
+ * Die Ergebniszeile EINES Teams, EINER Disziplin, AN EINEM Spieltag — `null`, solange nicht
+ * gewertet. Dünner Wrapper um `buildTeamDisciplineRowsAtMatchday` für Aufrufer, die nur EINEN
+ * Punkt brauchen (z. B. der Arena-Host-Hinweis), ohne die volle Paarungs-Übersicht zu bauen.
+ */
+export function findeDisziplinErgebnis(
+  gameState: Pick<GameState, "seasonState">,
+  matchdayId: string,
+  teamId: string,
+  disciplineId: string,
+): DisciplineResultRecord | null {
+  return buildTeamDisciplineRowsAtMatchday(gameState, matchdayId).get(teamId)?.get(disciplineId) ?? null;
 }
 
 /**
