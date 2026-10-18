@@ -10076,6 +10076,27 @@
   // aus dem Zuspiel, ein bis zwei Dribblings). Laenger waere kein Assist mehr, sondern nur
   // noch "hat den Ball irgendwann mal beruehrt".
   const ASSIST_FENSTER=1.6;         // Sekunden Spielzeit, s. frischerPassBis
+  // GIVE-AND-GO-SCHNEIDEN (Option B, docs/design/basketball-tempo-passing-diagnose-14-10.md
+  // Abschnitt 6, 18.10.): "zu wenig Passspiel" einzeln geprueft (Abschnitt 3.2) fand jede
+  // naheliegende Stellschraube bereits gebaut/gemessen/verworfen (passChance-Mittel,
+  // Zonen-Anker, Schussuhr) — Option B ist der einzige dort NICHT versuchte Hebel: nach
+  // einem erfolgreichen Zuspiel schneidet der Passgeber kurz zum Korb, statt sofort in
+  // seinen Slot zurueckzulaufen. Exakt dasselbe Bewegungsziel wie das bestehende Roll-
+  // Fenster (u.rollBis, s. bewegeSpielerLive) — bewusst ein ZWEITES Feld (u.cutBis) statt
+  // desselben, weil der Ausloeser ein anderes Ereignis ist (abgeschlossener Pass statt
+  // abgeschlossener Screen) und beide Fenster unabhaengig voneinander laufen/ablaufen
+  // muessen (ein Spieler kann z.B. kurz nach einem Zuspiel noch zum Screen gerufen werden).
+  // Dauer identisch zum bestehenden Roll-Fenster uebernommen (1,5s, s. "u.rollBis=fsT+1.5"
+  // weiter unten) statt einer neuen Zahl — dieselbe Groessenordnung wie die anderen
+  // Bewegungsfenster dieser Datei (Screen 1,2s, Ausbruch AUSBRUCH_FENSTER=3s). PLATZHALTER,
+  // noch nicht gegen Alternativen durchgemessen (s. Bericht).
+  const GIVE_AND_GO_CUT_DAUER=1.5;
+  // Passgewicht-Bonus fuer den Schneider, solange sein Fenster laeuft — sonst ist das
+  // Schneiden reine Optik ohne Wirkung auf das Passspiel, das die Beschwerde eigentlich
+  // meint (s. offensterMitspieler unten). Identisch zum bestehenden Roll-Bonus (3), weil es
+  // dieselbe Belohnungsfigur ist: "wer sich gerade frei in den Korbraum bewegt hat, ist eine
+  // naheliegende Anspielstation".
+  const GIVE_AND_GO_PASS_MUL=3;
   // Dribbel-Animation (Fables Animations-Runde, 25.08.): der gehaltene Ball sass bisher
   // auf fester Handhoehe (traeger.y+18, s. fsBall dort) — kein Auf-und-Ab, keine
   // Dribbel-Bewegung zu sehen. Kurze Recherche zum ueblichen Muster (gamedev.net/
@@ -10785,7 +10806,7 @@
     // beschreibt). startFastbreak wird bewusst NACH zuordneSlots gerufen und setzt ein
     // frisches Fenster, falls die Lage eines hergibt. Das Sichtverlust-Fenster faellt aus
     // demselben Grund mit weg: die Zuteilung wird gleich ohnehin neu gemacht.
-    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.screenRuf=0; u.rangeSeit=null;
+    for(const t of FSTEAM)for(const u of t){ u.screent=null; u.rollBis=0; u.cutBis=0; u.screenRuf=0; u.rangeSeit=null;
       u.ausbruchBis=0; u.verlorenBis=0; u.letzteSicht=null; }
   }
 
@@ -12758,7 +12779,7 @@
       // `traeger`, solange der Ball fliegt — dieselbe Sperre steckte schon in reevBall.
       Object.assign(u,{hatBall:false,deckt:null,reevDeckung:0,reevBall:0,stealCd:0,hop:0,
         wobbleY:0,frischerPassVon:null,frischerPassBis:0,frischerPassGeometrie:null,frischerPassAbwehr:50,
-        slotIdx:0,slotSeit:0,screent:null,rollBis:0,
+        slotIdx:0,slotSeit:0,screent:null,rollBis:0,cutBis:0,
         screenRuf:0,rangeSeit:null,
         // BEWEGUNGS-DYNAMIK (s. Konstantenblock oben): Ausbruchsfenster des Angreifers,
         // Mismatch-Abstaende und Sichtverlust-Fenster des Verteidigers. Alle vier sind
@@ -13336,9 +13357,14 @@
     // Aenderung unten (schwelle) bleibt stehen, hat gemessen aber ohnehin keine Wirkung,
     // weil technikGate bei normalen Werten weit ueber jeder erreichbaren Schwelle liegt
     // (derselbe Befund wie im Rollout-Plan zu TECHNIK in Basketball).
+    // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_PASS_MUL oben): derselbe Bonus-WERT
+    // wie der bestehende Roll-Bonus (3, unveraendert), aber ueber `||` auf ein eigenes
+    // Ereignis (cutBis) erweitert statt den bestehenden rollBis-Zweig umzuwidmen — beide
+    // Fenster koennen sich zeitlich ueberlappen (ein Schneider, der danach noch zum
+    // Screen gerufen wird), ohne dass sich der Bonus verdoppelt.
     return gewichtetesLosNach(mitspieler,m=>
       losGewicht(m.ABSCHLUSS,USAGE_KAPPA)*Math.pow(qualitaet(m),2)
-      *offenheitFuerPass(von,m)*abwehrTeiler(m)*(m.rollBis>fsT?3:1)
+      *offenheitFuerPass(von,m)*abwehrTeiler(m)*((m.rollBis>fsT||m.cutBis>fsT)?GIVE_AND_GO_PASS_MUL:1)
       *(m===ausbrecher&&fsT<(m.ausbruchBis||0)?AUSBRUCH_PASS_MUL:1));
   }
 
@@ -14045,7 +14071,7 @@
     // Laufende Spielzuege aufloesen: ein Screen/Roll aus dem Angriff davor wuerde sonst
     // waehrend der Standphase weiterlaufen (dieselbe Aufraeumung wie in zuordneSlots).
     for(const team of FSTEAM)for(const u of team){
-      u.hatBall=false; u.screent=null; u.rollBis=0; u.hilfeBis=0; u.frischerPassVon=null;
+      u.hatBall=false; u.screent=null; u.rollBis=0; u.cutBis=0; u.hilfeBis=0; u.frischerPassVon=null;
     }
     fsAktuell={spieler:schuetze,verteidiger:verteidiger||null,passgeber:null,rebounder:null};
     schiriPfeift(schuetze,verteidiger);
@@ -14768,6 +14794,13 @@
       flug.ziel.hatBall=true; fsLive.ball.traeger=flug.ziel;
       merkeBeruehrung(flug.ziel);
       flug.ziel.reevBall=0.2; // PLATZHALTER — kurze, feste Pause nach Ballannahme
+      // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_CUT_DAUER oben): nur Basketball,
+      // nur bei einem ECHTEN Zuspiel (dieser Zweig — die beiden `return`s oben fangen
+      // Interception/Fehlpass vorher ab) — der Passgeber bewegt sich jetzt fuer das
+      // Cut-Fenster zum Korb statt sofort in seinen Slot (s. bewegeSpielerLive) und ist
+      // fuer dieselbe Dauer ein bevorzugtes Passziel (s. offensterMitspieler), exakt die
+      // Give-and-Go-Belohnung aus dem Diagnose-Dokument.
+      if(feldspielDisc==="basketball")flug.passgeber.cutBis=fsT+GIVE_AND_GO_CUT_DAUER;
       // Merkt sich den Passgeber fuer ASSIST_FENSTER Sekunden (s. dort und
       // entscheideBallaktion) — sonst gibt es beim normalen Pass nie einen Assist, weil
       // `wirf` den Passgeber sonst nicht kennt (Opus-Review-Fund).
@@ -15056,6 +15089,14 @@
         // Korb (Roll) statt in seinen Slot zurueckzulaufen — Zielscheibe fuer den Pass,
         // der Alley-Oop eingeschlossen (Passgewicht dafuer in offensterMitspieler/
         // gewichtetesLosNach fuer den Spielzug-Kandidaten).
+        zx=korbX; zy=H/2;
+      } else if(u.cutBis>fsT){
+        // GIVE-AND-GO-SCHNEIDEN (Option B, s. GIVE_AND_GO_CUT_DAUER oben): derselbe
+        // Zielpunkt wie beim Roll zwei Zeilen drueber — bewusst, der "offene Raum" nach
+        // einem abgegebenen Pass IST der Korbraum, in dem die eigene Deckung gerade nicht
+        // mehr steht, weil sie den Ball sucht. Kein neues Zielfindungsverfahren, exakt
+        // dieselbe Formel, nur ueber ein anderes Ereignis (abgeschlossenes Zuspiel statt
+        // abgeschlossener Screen) ausgeloest.
         zx=korbX; zy=H/2;
       } else if(ballSeite===u.side){
         // Angriff ohne Ball: rollenbasierte Slots (zuordneSlots) statt einer fixen
@@ -54070,7 +54111,7 @@
             spieler:[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,side:u.side,
               x:Math.round(u.x),y:Math.round(u.y),hatBall:!!u.hatBall,
               slotIdx:u.slotIdx,deckt:u.deckt?u.deckt.n:null,
-              screent:!!(u.screent&&fsT<u.screent.bis),rollBis:u.rollBis>fsT}))});
+              screent:!!(u.screent&&fsT<u.screent.bis),rollBis:u.rollBis>fsT,cutBis:u.cutBis>fsT}))});
           naechster+=0.5;
         }
       }
