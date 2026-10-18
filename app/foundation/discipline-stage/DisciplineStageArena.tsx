@@ -903,27 +903,55 @@ export default function DisciplineStageArena({
       includeDetails: true,
       lineupRevision,
     });
-    const query = new URLSearchParams({ saveId, seasonId, matchdayId, teamId: ownTeamId ?? "", source: "sqlite", includeDetails: "1" });
+    const basisParams = { saveId, seasonId, matchdayId, teamId: ownTeamId ?? "", source: "sqlite" };
+    // OPUS-REVIEW PR #1290: der STATUS-Poll fragt OHNE Details (`arenaVorlauf` liefert die Route
+    // unabhaengig davon) -- waehrend genau dieser Wartezeit rechnen auf dem 2-vCPU-CX23 bis zu zwei
+    // Chromium-Prozesse, und ein voller Detail-Payload (Resolve-Vorschau 32 Teams + Tabelle) alle 4s
+    // je offenem Tab nimmt ihnen nur CPU weg. Die Details holt GENAU EIN Abruf, sobald der Vorlauf
+    // terminal ist.
+    const statusQuery = new URLSearchParams({ ...basisParams, includeDetails: "0" });
+    const detailQuery = new URLSearchParams({ ...basisParams, includeDetails: "1" });
+    const holeJson = async (query: URLSearchParams) => {
+      const res = await fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal });
+      // OPUS-REVIEW PR #1290: eine Nicht-OK-Antwort (502 waehrend eines Deploys, 500 unter Last)
+      // ist VORUEBERGEHEND, kein terminaler Zustand -- vorher wurde sie wie "Server kennt keinen
+      // Vorlauf" behandelt und beendete den Poll fuer immer; die Arena-Zeilen kamen dann nie.
+      if (!res.ok) throw new Error(`arena-base ${res.status}`);
+      return res.json();
+    };
+    const naechsterVersuchOderAufgeben = () => {
+      if (versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
+        timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+      } else {
+        // Worst-Case-Budget ausgeschoepft -- server-seitig B1/B2 (arena-vorlauf-service.ts)
+        // haetten den Lauf laengst terminal gemacht. Aufgeben statt endlos weiterzufragen; der
+        // Hinweis-Badge verschwindet damit ebenfalls (vorher blieb er im Fehlerzweig stehen).
+        setArenaVorlaufStatus(null);
+      }
+    };
 
     const pollEinmal = async () => {
       versuch += 1;
       try {
-        const res = await fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal });
-        const payloadJson = res.ok ? await res.json() : null;
+        const statusJson = await holeJson(statusQuery);
         if (controller.signal.aborted) return;
-        const nextStatus: ArenaVorlaufStatus | null = payloadJson?.arenaVorlauf?.status ?? null;
+        const nextStatus: ArenaVorlaufStatus | null = statusJson?.arenaVorlauf?.status ?? null;
         if (nextStatus === "in_progress") {
-          if (versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
-            timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
-          } else {
-            // Worst-Case-Budget ausgeschoepft -- server-seitig B1/B2 (arena-vorlauf-service.ts)
-            // haetten den Lauf laengst terminal gemacht. Aufgeben statt endlos weiterzufragen.
-            setArenaVorlaufStatus(null);
-          }
+          naechsterVersuchOderAufgeben();
           return;
         }
         // Fertig ("ready"/"failed") ODER der Server kennt gar keinen Vorlauf mehr (z. B. nach
         // einer Buchung, die den Record abgeloest hat) -- genau EIN leiser Uebernahme-Schritt.
+        const payloadJson = await holeJson(detailQuery);
+        if (controller.signal.aborted) return;
+        const detailStatus: ArenaVorlaufStatus | null = payloadJson?.arenaVorlauf?.status ?? null;
+        if (detailStatus === "in_progress") {
+          // Zwischen den zwei Abrufen ist ein NEUER Vorlauf angelaufen (z. B. erzwungener Versuch
+          // nach einer Eingabe-Divergenz). Weiter pollen -- ein `setArenaVorlaufStatus("in_progress")`
+          // waere hier ein No-op ohne Re-Render, der Effekt liefe nie wieder an.
+          naechsterVersuchOderAufgeben();
+          return;
+        }
         if (payloadJson?.context) {
           setMatchdayArenaBaseBundle(sessionKey, payloadJson);
         }
@@ -933,13 +961,12 @@ export default function DisciplineStageArena({
           setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
           setStandingsItems(Array.isArray(payloadJson?.standingsPreview?.items) ? payloadJson.standingsPreview.items : []);
         }
-        setArenaVorlaufStatus(nextStatus);
+        setArenaVorlaufStatus(detailStatus);
       } catch {
-        // Netzwerk-/Abbruch-Fehler: nicht hart scheitern lassen, der naechste Tick versucht es
+        // Netzwerk-/HTTP-Fehler: nicht hart scheitern lassen, der naechste Tick versucht es
         // erneut -- die bereits gezeigte Vorschau bleibt in jedem Fall stehen.
-        if (!controller.signal.aborted && versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
-          timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
-        }
+        if (controller.signal.aborted) return;
+        naechsterVersuchOderAufgeben();
       }
     };
 
@@ -3105,10 +3132,13 @@ export default function DisciplineStageArena({
       ) : null}
 
       {/* LATENZ-FIX 18.10.: nicht-blockierender Hinweis, solange der Arena-Vorlauf im Hintergrund
-          rechnet (`arenaVorlaufStatus`, Poll-Effekt oben). Die Buehne zeigt schon jetzt die
-          PPS-Duell-Wertung (die tatsaechlich gezaehlten Punkte, s. Task #159 Punkt 3) -- dieser
-          Badge sagt nur, dass die Arena-Duell-ANSICHT noch nachkommt, OHNE irgendetwas zu
-          blockieren. Verschwindet von selbst, sobald der Poll "ready"/"failed" meldet. */}
+          rechnet (`arenaVorlaufStatus`, Poll-Effekt oben). Die Buehne zeigt bis dahin die
+          PPS-Duell-Bruecke. OPUS-REVIEW PR #1290: das ist NICHT die endgueltige Wertung -- laeuft der
+          Vorlauf durch, bucht der Resolve fuer diese Disziplin das ARENA-Ergebnis
+          (`arenaTeamPointsByDisciplineId`, legacy-matchday-resolve-engine.ts), das andere Sieger
+          haben kann; nur bei einem Arena-Ausfall bleibt die Bruecke stehen. Der Text sagt deshalb
+          "vorlaeufig" statt (vorher) "die Wertung oben steht schon fest". Verschwindet von selbst,
+          sobald der Poll "ready"/"failed" meldet. */}
       {!devMode && arenaVorlaufStatus === "in_progress" ? (
         <div
           role="status"
@@ -3126,7 +3156,7 @@ export default function DisciplineStageArena({
               background: "color-mix(in srgb, var(--nl-accent) 12%, transparent)",
             }}
           >
-            ⏳ Arena-Duelle werden im Hintergrund vorbereitet — die Wertung oben steht schon fest
+            ⏳ Arena-Duelle werden im Hintergrund berechnet — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
           </span>
         </div>
       ) : null}

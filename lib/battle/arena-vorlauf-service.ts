@@ -250,6 +250,12 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             disciplineId: disziplinId,
             runArenaFixturesImpl: input.runArenaFixturesImpl,
             matchdayMutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
+            // OPUS-REVIEW PR #1290: die automatische Wiederholung faehrt die Liga-Stufen SERIELL (ein
+            // Browser zur Zeit). War Versuch 1 mit zwei gleichzeitigen Browsern zu schwer fuer den
+            // Server (Absturz/Timeout unter Speicher- oder CPU-Druck), wuerde ein zweiter paralleler
+            // Versuch genau daran wieder scheitern -- seriell ist der bewaehrte Pfad von vor dem
+            // Latenz-Fix. Versuch 1 entscheidet `entscheideArenaTierParallel()` (ENV + RAM-Guard).
+            tierParallel: lokalerVersuch === 1 ? undefined : false,
             // JEDER Versuch bekommt dasselbe volle Gesamt-Budget (Opus: "demselben Gesamt-Budget
             // je Versuch") -- keine Aufteilung eines gemeinsamen Budgets ueber beide Versuche.
             runArenaFixturesOptions: {

@@ -116,6 +116,8 @@
  * von `spieleBuehneHeben()` im Motor). Fuer jede Disziplin OHNE `gesamtKg` (Basketball) bleibt
  * ein Punktegleichstand ein echtes Unentschieden -- unveraendertes Basketball-Verhalten.
  */
+import { freemem } from "node:os";
+
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
@@ -1271,6 +1273,15 @@ export type RunBattleModeArenaMatchdayInput = {
    * kein Mutator.
    */
   matchdayMutatorTraits?: readonly string[] | null;
+  /**
+   * OPUS-REVIEW PR #1290: `false` erzwingt fuer DIESEN Aufruf die alte sequenzielle Liga-Stufen-
+   * Reihenfolge (ein Browser zur Zeit), unabhaengig von ENV und RAM-Guard. Der Vorlauf-Service setzt
+   * das fuer die automatische WIEDERHOLUNG nach einem Ausfall -- ist Versuch 1 mit zwei Browsern
+   * abgestuerzt (z. B. Speicherdruck), soll Versuch 2 nicht dieselbe Spitzenlast noch einmal
+   * fahren. Weggelassen/`true` -> `entscheideArenaTierParallel()` entscheidet (ENV + RAM-Guard);
+   * `true` kann weder den Notschalter noch den RAM-Guard uebersteuern.
+   */
+  tierParallel?: boolean;
 };
 
 /**
@@ -1342,6 +1353,47 @@ export function resolveArenaTierParallelEnabled(): boolean {
   return raw !== "0" && raw !== "false";
 }
 
+/**
+ * RAM-GUARD (Opus-Review PR #1290): der Notschalter oben ist ein MANUELLES Netz -- er hilft erst,
+ * nachdem jemand den OOM/Swap-Sturm bemerkt hat. Der CX23 hat 4 GB fuer Next-Server, LEC-App,
+ * Caddy UND die Chromium-Prozesse; zwei Browser kosten lokal gemessen ~2 GB. Dieser Guard faellt
+ * deshalb AUTOMATISCH auf seriell zurueck, wenn das Betriebssystem beim Start des Laufs weniger als
+ * diese Menge als verfuegbar meldet (`os.freemem()` liest unter Linux `MemAvailable`, Node >= 20).
+ * Standard 2048 MB (= zwei Browser a ~1 GB, die lokale Messung), per
+ * `OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB` einstellbar, sobald die echte CX23-Zahl (Plan 6.3) vorliegt;
+ * `0` schaltet den Guard ab.
+ */
+export function resolveArenaTierParallelMindestFreiMb(): number {
+  const raw = process.env.OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB;
+  const parsed = raw != null && raw.trim() !== "" ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 2048;
+}
+
+export type ArenaTierParallelEntscheidung = {
+  parallel: boolean;
+  grund: "parallel" | "nur_eine_stufe" | "aufrufer_seriell" | "notschalter" | "ram_guard";
+  freiMb: number | null;
+};
+
+/**
+ * EINE Stelle, die entscheidet, ob die Liga-Stufen eines Laufs gleichzeitig laufen. Exportiert fuer
+ * Tests; `freiMbImpl` ist der Injektionspunkt fuer den RAM-Guard.
+ */
+export function entscheideArenaTierParallel(input: {
+  anzahlStufen: number;
+  tierParallel?: boolean;
+  freiMbImpl?: () => number;
+}): ArenaTierParallelEntscheidung {
+  if (input.anzahlStufen < 2) return { parallel: false, grund: "nur_eine_stufe", freiMb: null };
+  if (input.tierParallel === false) return { parallel: false, grund: "aufrufer_seriell", freiMb: null };
+  if (!resolveArenaTierParallelEnabled()) return { parallel: false, grund: "notschalter", freiMb: null };
+  const mindestFreiMb = resolveArenaTierParallelMindestFreiMb();
+  if (mindestFreiMb <= 0) return { parallel: true, grund: "parallel", freiMb: null };
+  const freiMb = Math.round((input.freiMbImpl ?? (() => freemem() / (1024 * 1024)))());
+  if (freiMb < mindestFreiMb) return { parallel: false, grund: "ram_guard", freiMb };
+  return { parallel: true, grund: "parallel", freiMb };
+}
+
 export async function runBattleModeArenaMatchday(
   input: RunBattleModeArenaMatchdayInput,
 ): Promise<RunBattleModeArenaMatchdayResult> {
@@ -1386,7 +1438,9 @@ export async function runBattleModeArenaMatchday(
   //
   // `OLY_ARENA_TIER_PARALLEL=0` schaltet auf das alte sequenzielle Verhalten zurueck (Notschalter,
   // falls der CX23 die ~2 GB Spitzenlast nicht mitmacht) -- Standard ist AN, s. Messung im PR.
-  const tierParallel = resolveArenaTierParallelEnabled();
+  // Zusaetzlich (Opus-Review PR #1290) faellt `entscheideArenaTierParallel()` unten AUTOMATISCH
+  // auf seriell zurueck, wenn zu wenig RAM frei ist oder der Aufrufer es verlangt (Wiederholung
+  // nach einem Ausfall, s. `tierParallel`).
 
   const tierLaeufe = LEAGUE_TIERS.map((tier) => {
     const fixtures = findLeagueFixturesForMatchday(gameState, tier, matchdayId);
@@ -1406,6 +1460,14 @@ export async function runBattleModeArenaMatchday(
     });
     return { tier, fixtures, seedByFixtureKey, fixtureInputs };
   }).filter((lauf): lauf is NonNullable<typeof lauf> => lauf !== null);
+
+  const tierEntscheidung = entscheideArenaTierParallel({ anzahlStufen: tierLaeufe.length, tierParallel: input.tierParallel });
+  if (tierEntscheidung.grund === "ram_guard") {
+    console.warn(
+      `[arena-matchday] ${disciplineId} an ${matchdayId}: nur ${tierEntscheidung.freiMb} MB frei (< ${resolveArenaTierParallelMindestFreiMb()} MB) -- Liga-Stufen laufen seriell statt parallel.`,
+    );
+  }
+  const tierParallel = tierEntscheidung.parallel;
 
   const fuehreTierAus = async (lauf: NonNullable<(typeof tierLaeufe)[number]>) => {
     try {

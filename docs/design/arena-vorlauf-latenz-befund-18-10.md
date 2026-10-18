@@ -164,3 +164,53 @@ per Konstruktion identisch zum Stand vor diesem Fix.
   `OLY_ARENA_TIER_PARALLEL` im Dauerbetrieb verlässt. Der Notschalter (`=0`) ist dafür da.
 - Dieser Fix ändert NICHTS an der Eignungsmatrix, an rho- oder Pp-Abnahmen — reines
   Latenz-/UI-Thema, keine Disziplin-Mechanik berührt.
+
+## Nachtrag: Opus-Review (18.10.)
+
+Chris' Auflage: „zeig das aber vorher opus der soll das reviewen und dann ordentlich machen der
+motor darf ja nicht kaputt gehen".
+
+**Motor unberührt, nachgeprüft am Diff:** `public/mockups/battle-mode.engine.js`,
+`lib/battle/arena-headless-runner.ts` (inkl. `haengeMotorNeuEin()`) und
+`FoundationBattleArenaHost.tsx` haben 0 geänderte Zeilen. Jede Liga-Stufe läuft in einem eigenen
+Browser-Prozess mit eigenem Profil; der Node-seitige Teil (`bereiteFixturesVor()`) ist synchron
+und läuft vor dem ersten `await`, die zwei Stufen können sich in Node also nicht verschränken.
+Die Motor-Pfade, die `Math.random()`/`performance.now()` lesen, sind reine Anzeige (Ton-Rauschen,
+HUD, Finale-Tempo) — die Headless-Simulation hängt nicht an der Wanduhr, CPU-Konkurrenz zwischen
+zwei Browsern kann das Ergebnis nicht verschieben. Geschrieben wird erst nach beiden Stufen, an
+genau einer Stelle (`finishArenaVorlauf()`), wie vorher.
+
+**Bit-Identität transitiv nachgeprüft** (nicht nur `grep ^import`): esbuild-Metafile beider
+Sonden (`pruefe-resolve-bit-identitaet.ts`, 176 Module; `pruefe-mapper-bit-identitaet.ts`,
+173 Module) enthält keine der geänderten Dateien.
+
+**Messmethodik — was die Zahlen oben NICHT sagen:**
+
+- Gemessen auf 4 Kernen. Der CX23 hat 2 vCPU, die sich die zwei Browser mit dem Next-Server
+  (der in dieser Zeit auch die Poll-Anfragen der Bühne beantwortet), der LEC-App und Caddy teilen.
+  Faktor 2,0 ist dort eine Obergrenze, kein Erwartungswert.
+- „~1 GB je Browser" ist eine lokale Summe über die Chromium-Prozesse; ob der CX23 die ~2 GB
+  zusätzlich hergibt, ist offen. Mit 4 GB Swap (`bootstrap.sh`) ist das wahrscheinlichere
+  Fehlerbild kein OOM-Kill, sondern Swappen → Seiten-Timeout (20 s) → Ausfall → Brücke.
+
+**Ergänzt in dieser Runde:**
+
+1. **RAM-Guard** (`entscheideArenaTierParallel()`): parallel nur, wenn beim Start mindestens
+   `OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB` (Standard 2048) als verfügbar gemeldet werden
+   (`os.freemem()` = `MemAvailable`), sonst automatisch seriell.
+2. **Wiederholung seriell**: die automatische zweite Runde nach einem Ausfall fährt die
+   Liga-Stufen mit einem Browser zur Zeit (`tierParallel: false`) statt dieselbe Spitzenlast
+   noch einmal.
+3. **Notschalter erreichbar gemacht**: `deploy/hetzner/docker-compose.yml` reichte
+   `OLY_ARENA_TIER_PARALLEL` nicht in den Container durch — ein Eintrag in `.env` wirkte nie.
+4. **Bühne**: eine Nicht-OK-Antwort beendete den Poll für immer (jetzt: neuer Versuch); der
+   Status-Poll fragt ohne Details, die Details holt ein einziger Abruf am Ende; der Hinweis-Text
+   behauptete „die Wertung oben steht schon fest", obwohl beim Buchen das Arena-Ergebnis die
+   PPS-Duell-Brücke ersetzt.
+5. **CI-Rotfall** in `tests/battle-mode-auto-run-invarianten.test.ts` („expected 0 to be greater
+   than 0"): kein Motor- oder Parallelisierungsfehler, sondern ein Zufallsspielplan. Die Zählung
+   dort filtert nur nach Disziplin-ID — eine arena-aufgelöste Disziplin bucht IMMER Zeilen
+   (Arena, oder Brücke mit `arenaAusfall`), unabhängig davon, ob die Arena lief. Null Zeilen heißt
+   deshalb: an den zwei gespielten Spieltagen stand gar keine solche Disziplin im Plan. Über 3000
+   zufällige saveIds nachgerechnet: 0,83 % aller frischen Battle-Saves. Der Test spielt jetzt
+   weiter, bis ein arena-aufgelöster Slot gespielt wurde (höchstens 6 Spieltage).

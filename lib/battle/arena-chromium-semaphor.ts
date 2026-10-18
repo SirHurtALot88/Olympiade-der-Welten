@@ -7,8 +7,12 @@
  * Funktion, nicht den ganzen (GameState-/Persistenz-schweren) Vorlauf-Service -- ein Import von
  * dort wuerde den Health-Route-Bundle unnoetig aufblaehen.
  *
- * EIN einziger Chromium-Prozess im gesamten Node-Prozess — ueber ALLE Saves, ALLE Disziplinen, UND
- * den Selbsttest. Einfache Promise-Kette statt einer Bibliothek: jeder Aufrufer haengt sich ans
+ * EIN einziger Semaphor-Halter im gesamten Node-Prozess — ueber ALLE Saves, ALLE Disziplinen, UND
+ * den Selbsttest. SEIT DEM LATENZ-FIX 18.10. (PR #1290) heisst das NICHT mehr "ein Chromium-Prozess":
+ * ein Halter (eine Disziplin eines Arena-Vorlaufs) darf intern seine ZWEI Liga-Stufen gleichzeitig
+ * fahren, also bis zu ZWEI Browser (`runBattleModeArenaMatchday()`, Notschalter
+ * `OLY_ARENA_TIER_PARALLEL=0`, automatischer RAM-Guard `OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB`). Die
+ * Obergrenze projektweit ist damit zwei Browser, nie mehr. Einfache Promise-Kette statt einer Bibliothek: jeder Aufrufer haengt sich ans
  * Ende, die Kette reisst auch bei einem Fehler nicht ab (der `.catch` unten faengt ihn fuer die
  * Kette selbst, der eigentliche Fehler geht unveraendert an den Aufrufer von
  * `mitChromiumSemaphor()` zurueck).
