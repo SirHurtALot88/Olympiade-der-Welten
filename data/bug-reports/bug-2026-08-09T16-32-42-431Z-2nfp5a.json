@@ -1,0 +1,41 @@
+{
+  "note": "im bereich Top Disziplinen fehlen noch die verbesserungen die oben drin sind alsoi Staffel 91 (+2) sind dort nicht zu sehen",
+  "view": "playerProfile",
+  "path": "/foundation",
+  "tab": "details",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=playerProfile&tab=details&playerId=player-2200-veloria-spinblade&team=S-C&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2560,
+    "height": 1271
+  },
+  "clientTime": "2026-08-09T16:32:46.864Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-09T16-32-42-431Z-2nfp5a",
+  "createdAt": "2026-08-09T16:32:42.431Z",
+  "page": {
+    "path": "/foundation",
+    "view": "playerProfile",
+    "tab": "details",
+    "label": "Team · Spieler"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 4,
+    "matchdayId": "season-2-matchday-4",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

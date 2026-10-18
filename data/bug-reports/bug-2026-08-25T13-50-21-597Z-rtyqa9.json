@@ -1,0 +1,41 @@
+{
+  "note": "Sound in der Battle Arena funktioniert gar nicht bei mir - die coolen neuen profile die wir bei basketball erarbeitet haben für die einsatzliste fehlen auch noch",
+  "view": "battleArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=battleArena&team=V-W&saveId=new-game-1787123325719-swnjlk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1186
+  },
+  "clientTime": "2026-08-25T13:50:22.383Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-25T13-50-21-597Z-rtyqa9",
+  "createdAt": "2026-08-25T13:50:21.597Z",
+  "page": {
+    "path": "/foundation",
+    "view": "battleArena",
+    "tab": null,
+    "label": "Spieltag · Battle Arena"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 10,
+    "matchdayId": "season-2-matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}
