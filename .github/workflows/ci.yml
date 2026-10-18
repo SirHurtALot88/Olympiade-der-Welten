@@ -28,7 +28,52 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
 jobs:
+  # DIE WEICHE: Moosgrab/Kartenschmiede braucht die Oly-CI nicht (Chris, 18.10.).
+  #
+  # Die Kartenschmiede ist eine eigenständige HTML-Seite (apps/kartenschmiede), die der Oly-Code nicht
+  # liest. Ändert ein Push NUR ihre Dateien, laufen statt Build, Browser-Smokes, voller Suite und
+  # Persistenz-Suiten nur die Kartenschmiede-Prüfungen (Job `kartenschmiede` unten, wenige Minuten).
+  # Welche Pfade zählen, steht in scripts/ci-nur-kartenschmiede.sh; im Zweifel läuft alles.
+  # Übersprungene Jobs gelten als bestanden, Pflicht-Checks blockieren den Merge also nicht. Stirbt
+  # die Weiche selbst, laufen die Oly-Jobs trotzdem (`!cancelled()` statt stillem Überspringen).
+  weiche:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      nur_kartenschmiede: ${{ steps.pruefe.outputs.nur_kartenschmiede }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pruefe
+        env:
+          BASIS: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event_name == 'push' && github.event.before || '' }}
+        run: echo "nur_kartenschmiede=$(bash scripts/ci-nur-kartenschmiede.sh "$BASIS")" | tee -a "$GITHUB_OUTPUT"
+
+  kartenschmiede:
+    needs: weiche
+    if: needs.weiche.outputs.nur_kartenschmiede == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:import-exists
+      - run: npx vitest run tests/kartenschmiede.test.ts
+      - run: npx eslint --quiet apps/kartenschmiede lib/kartenschmiede tests/kartenschmiede.test.ts scripts/kartenschmiede-eigenstaendig.ts --ignore-pattern "apps/kartenschmiede/vendor/**"
+      # Das Projekt hat Altlasten im Typcheck (nicht null Fehler), deshalb zählen hier nur die der Kartenschmiede.
+      - name: Typen der Kartenschmiede
+        run: |
+          npx tsc --noEmit -p . > "$RUNNER_TEMP/tsc.txt" 2>&1 || true
+          if grep -i "kartenschmiede" "$RUNNER_TEMP/tsc.txt"; then exit 1; fi
+      - name: Seite baut sich zusammen
+        run: npx tsx scripts/kartenschmiede-eigenstaendig.ts "$RUNNER_TEMP/kartenschmiede.html"
+
   test-and-smoke:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
     # ZEITGRENZE AUF 40 MINUTEN — nachgemessen, nicht geraten (04.09., mehrere unabhaengige Laeufe
     # auf main und offenen PRs). Bei 30 Minuten lag der Job praktisch immer knapp DARUNTER statt
@@ -234,6 +279,8 @@ jobs:
   # KEIN `npm run build`, KEIN Chromium: die Suite ist reines Node — sie braucht nur die
   # Importdaten (deshalb `ci:import-exists`) und einen eigenen SQLite-Pfad.
   full-test-suite:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -269,6 +316,8 @@ jobs:
   # ZUM ANHAKEN: Settings -> Branches -> Regel fuer `main` -> Require status checks to pass ->
   # `persistenz-suiten` dazu. Ohne diesen Klick laeuft der Job zwar, haelt aber nichts auf.
   persistenz-suiten:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -304,6 +353,8 @@ jobs:
   # laengere Zeit gruen-bis-auf-eine-Zeile-fuer-dieselbe-Disziplin, ist das ein staerkeres Signal
   # als ein pauschales Rot bei jedem Motor-Commit.
   pps-referenz-frische:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
