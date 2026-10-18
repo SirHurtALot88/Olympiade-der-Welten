@@ -45,10 +45,12 @@
  * sein Team insgesamt schlechter abschnitt. Fuer die Arena-Disziplinen ist genau dieses Problem
  * schon geloest (`ppsAusArenaImpact()`, battle-mode-arena-team-points.ts: individueller Impact-Wert
  * gegen eine FESTE, ligaweit gezogene Referenzkurve, kein Team-Bezug). `ppsAusDuellWert()` unten ist
- * das BRUECKEN-ANALOGON derselben Kurve — bewusst eine EIGENSTAENDIGE, duenne Kopie der Formel statt
- * eines Imports aus `battle-mode-arena-team-points.ts`: jene Datei zieht ueber
+ * das BRUECKEN-ANALOGON derselben Kurve — seit Opus-Auflage 18.10. ("Code-Dopplung aufloesen")
+ * dieselbe FORMEL aus `lib/battle/impact-kurve.ts`, nicht mehr eine eigenstaendige Kopie. Kein
+ * Import aus `battle-mode-arena-team-points.ts` selbst: jene Datei zieht ueber
  * `arena-headless-runner.ts` Playwright/`node:fs` mit (s. Dateikopf-Kommentar dort), die diese Datei
- * laut ihrem eigenen Kopfkommentar NICHT mitziehen darf. Die Referenz (`iMittel`/`iKrass` je
+ * laut ihrem eigenen Kopfkommentar NICHT mitziehen darf — `impact-kurve.ts` hat dafuer, als einzige
+ * Datei in dieser Kette, UEBERHAUPT KEINE Importe. Die Referenz (`iMittel`/`iKrass` je
  * Disziplin UND Feldgroesse, UEBER BEIDE LIGEN GEMEINSAM — Chris' Entscheidung 31.08.,
  * docs/design/battle-mode-pps-modell-plan.md Abschnitt 7 Punkt 2) kommt aus
  * `data/generated/pps-duell-bruecke-individuell-referenz.json`, gezogen von
@@ -67,6 +69,9 @@
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import verhaeltnisReferenzJson from "@/data/generated/verhaeltnis-referenz.json";
 import duellIndividuellReferenzJson from "@/data/generated/pps-duell-bruecke-individuell-referenz.json";
+// `lib/battle/impact-kurve.ts` hat KEINE eigenen Importe (ihr einziger Zweck) — ihr Import hier
+// verletzt die Playwright-Grenze oben deshalb nicht, s. dortiger Dateikopf-Kommentar.
+import { ppsAusImpact } from "@/lib/battle/impact-kurve";
 
 /** Dieselben Werte wie `ARENA_TEAM_POINTS` (battle-mode-arena-team-points.ts) — ein Test haelt beide gleich. */
 export const DUELL_TEAM_PUNKTE = { win: 2, draw: 1, loss: 0 } as const;
@@ -334,13 +339,12 @@ export function resolveDuellIndividualPpsReferenz(
 }
 
 /**
- * DIE IMPACT-KURVE DER BRUECKE — bewusst dieselbe Formel wie `ppsAusArenaImpact()`
- * (battle-mode-arena-team-points.ts Abschnitt "DIE IMPACT-KURVE"), nur eigenstaendig kopiert (s.
- * Dateikopf-Kommentar fuer die Playwright-Importgrenze, die den Grund dafuer nennt):
- * `PPs = MAX * min(1, (max(0,I)/I_krass)^gamma)`, `gamma = ln(a_mitte) / ln(I_mittel/I_krass)`. Der
- * Rohwert `I` ist hier `PlayerPerformancePreview.finalPlayerScore` (bzw. der bereits team-power-
- * skalierte Wert, den der Aufrufer uebergibt) statt eines Arena-Boxscore-Werts — derselbe Kanal,
- * den `distributeRankPointsToPlayers()` bisher team-rang-gebunden verteilt hat.
+ * DIE IMPACT-KURVE DER BRUECKE — seit Opus-Auflage 18.10. (PR #1284-Review, "Code-Dopplung
+ * aufloesen") dieselbe FORMEL wie `ppsAusArenaImpact()`, aus `lib/battle/impact-kurve.ts`
+ * importiert statt eigenstaendig kopiert zu sein (die EINZIGE Zeile dort ohne Fremd-Importe, darf
+ * deshalb hier importiert werden, ohne die Playwright-Grenze aus dem Dateikopf-Kommentar zu
+ * verletzen). Nur `max`/`anteilMitte` (Bruecken-eigene Regler) und die Referenz-Beschaffung
+ * bleiben hier — die Mathematik selbst steht jetzt an EINER Stelle.
  */
 export function ppsAusDuellWert(
   wert: number,
@@ -348,12 +352,7 @@ export function ppsAusDuellWert(
   max: number = PPS_DUELL_INDIVIDUAL_PPS_MAX,
   anteilMitte: number = PPS_DUELL_PPS_ANTEIL_MITTE,
 ): number {
-  const { iMittel, iKrass } = referenz;
-  if (!(iKrass > 0) || !(iMittel > 0) || iMittel >= iKrass) return 0;
-  const gamma = Math.log(anteilMitte) / Math.log(iMittel / iKrass);
-  const basis = Math.max(0, wert) / iKrass;
-  const anteil = basis <= 0 ? 0 : Math.min(1, Math.pow(basis, gamma));
-  return Math.round(max * anteil * 100) / 100;
+  return ppsAusImpact(wert, referenz, max, anteilMitte);
 }
 
 /**

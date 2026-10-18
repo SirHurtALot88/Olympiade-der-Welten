@@ -120,6 +120,7 @@ import type { LeagueTier } from "@/lib/season/league-split";
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
 import { ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { ppsAusImpact } from "@/lib/battle/impact-kurve";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   runArenaFixtures,
@@ -1089,29 +1090,15 @@ export function findLeagueFixturesForMatchday(
   );
 }
 
-function roundPps(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
 /**
- * DIE IMPACT-KURVE (Opus-Dokument Abschnitt 4.1): `PPs = MAX * min(1, (max(0,I)/I_krass)^gamma)`,
- * mit `gamma = ln(a_mitte) / ln(I_mittel/I_krass)`. Die Kurve geht per Konstruktion durch zwei
- * benannte Anker — `I_mittel -> a_mitte*MAX` ("ein mittelmaessiger Auftritt") und
- * `I_krass -> MAX` ("ein krasser Auftritt") — beide aus der gezogenen Referenz, keine dritte,
- * frei getunte Zahl. `min(1, …)` ist ein DECKEL, keine Asymptote: wer `I_krass` erreicht oder
- * ueberschreitet, bekommt die volle Punktzahl, nicht nur eine Annaeherung (Chris' "max 5-6"
- * woertlich genommen). `max(0, I)` ist derselbe Boden bei 0 wie in `distributeByValues()`
- * (`rank-to-points.ts`) — ein negativer Impact (real gemessen, s. Opus-Dokument Abschnitt 1.2)
- * gibt 0 PPs, nie negative.
- *
- * Eine entartete Referenz (`iKrass <= iMittel`, koennte nur bei einer kaputten/leeren Ziehung
- * vorkommen, s. `resolveArenaPpsReferenz()`) liefert 0 statt NaN/Infinity durchzureichen —
- * defensiv, sollte an einer echten gezogenen Referenz nie greifen.
- *
- * GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `max`/`anteilMitte` sind jetzt
- * Parameter statt fest verdrahteter Basketball-Konstanten — die Formel selbst ist UNVERAENDERT.
- * `ppsAusBasketballImpact()`/`ppsAusGewichthebenImpact()` darunter sind duenne, disziplinfeste
- * Wrapper (Testkompatibilitaet, unveraendertes Basketball-Verhalten).
+ * DIE IMPACT-KURVE (Opus-Dokument Abschnitt 4.1) — seit Opus-Auflage 18.10. (PR #1284-Review,
+ * "Code-Dopplung aufloesen") in `lib/battle/impact-kurve.ts` gezogen: EINE Formel statt einer
+ * zweiten, wortgleichen Kopie in `battle-mode-pps-duell.ts`s `ppsAusDuellWert()`. Beide Dateien
+ * importieren jetzt von dort, statt bei einer kuenftigen Kalibrierung unabhaengig
+ * auseinanderlaufen zu koennen. `ppsAusArenaImpact()` bleibt als benannter, Disziplin-Regler-
+ * nehmender Wrapper erhalten (Testkompatibilitaet, unveraendertes Verhalten): `PPs = MAX *
+ * min(1, (max(0,I)/I_krass)^gamma)`, `gamma = ln(a_mitte)/ln(I_mittel/I_krass)` — volle Herleitung
+ * jetzt im Dateikopf-Kommentar von `impact-kurve.ts`.
  */
 export function ppsAusArenaImpact(
   impact: number,
@@ -1119,12 +1106,7 @@ export function ppsAusArenaImpact(
   max: number,
   anteilMitte: number,
 ): number {
-  const { iMittel, iKrass } = referenz;
-  if (!(iKrass > 0) || !(iMittel > 0) || iMittel >= iKrass) return 0;
-  const gamma = Math.log(anteilMitte) / Math.log(iMittel / iKrass);
-  const basis = Math.max(0, impact) / iKrass;
-  const anteil = basis <= 0 ? 0 : Math.min(1, Math.pow(basis, gamma));
-  return roundPps(max * anteil);
+  return ppsAusImpact(impact, referenz, max, anteilMitte);
 }
 
 /** BASKETBALL-WRAPPER, unveraendertes Verhalten: `ppsAusArenaImpact()` mit Basketballs Reglern. */
