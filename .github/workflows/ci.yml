@@ -291,15 +291,39 @@ jobs:
       - name: Install Chromium for Playwright
         run: timeout 360 npx playwright install chromium --with-deps || npx playwright install chromium
       - run: npm run ci:import-exists
-      - name: Arena-Vorlauf-Tests mit echtem Chromium (Chromium ist hier Pflicht, s. oben)
+      # VIER GETRENNTE AUFRUFE, NICHT EINER (CI-Fund, 18.10., Root Cause fuer den OOM-Absturz
+      # "JavaScript heap out of memory" nach ~12 Minuten im ersten Lauf dieses Jobs): Code-Review
+      # von `arena-headless-runner.ts`/`arena-chromium-selftest.ts` zeigt, dass JEDER
+      # `chromium.launch()` ueber ein `finally` (bzw. einen "nur einmal schliessen"-Schutz, auch
+      # auf dem B2-Hart-Timeout-Pfad) mit `browser.close()` beantwortet wird, und das
+      # In-Prozess-Dedup (`laufendeVorlaeufe`) raeumt sich ebenfalls per `.finally()` auf -- KEIN
+      # Hinweis auf nicht geschlossene Browser-/Page-Handles in diesem PR. Der echte Grund: diese
+      # vier Dateien sind die SCHWERSTEN im Repo (echtes Chromium, volle 32-Team-Spielstaende mit
+      # hunderten Spielerobjekten, teils mehrere Spieltage/Vorlaeufe je Test) -- und `vitest.config.ts`
+      # setzt KEINE `pool`/`poolOptions`, Vitests Default-Scheduling teilt mehrere Dateien auf
+      # denselben geforkten Node-Prozess, wenn die Runner-CPU-Zahl kleiner ist als die Dateizahl.
+      # Dann summiert sich der Speicher ALLER vier Dateien in EINEM V8-Heap, statt dass jede Datei
+      # einen frischen Prozess bekommt. Ein eigener `npx vitest run`-Aufruf JE Datei erzwingt genau
+      # das: jede Zeile unten startet einen komplett neuen Node-Prozess, der beim Beenden seinen
+      # gesamten Speicher (Chromium-Objekte, Spielstaende, SQLite-Verbindungen) garantiert freigibt,
+      # bevor die naechste Datei beginnt -- ohne an `--max-old-space-size` zu raten oder
+      # Pool-Internals zu vertrauen, deren Verhalten von der Runner-CPU-Zahl abhaengt.
+      - name: "Arena-Vorlauf-Test 1/4: Parity (echtes Chromium)"
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
-        run: >
-          npx vitest run
-          tests/arena-vorlauf-parity.test.ts
-          tests/arena-vorlauf-service.test.ts
-          tests/battle-mode-arena-ausfall-sichtbar.test.ts
-          tests/battle-mode-auto-run-invarianten.test.ts
+        run: npx vitest run tests/arena-vorlauf-parity.test.ts
+      - name: "Arena-Vorlauf-Test 2/4: Service/B1/B3 (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/arena-vorlauf-service.test.ts
+      - name: "Arena-Vorlauf-Test 3/4: Ausfall sichtbar/K1 (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/battle-mode-arena-ausfall-sichtbar.test.ts
+      - name: "Arena-Vorlauf-Test 4/4: Auto-Run-Invarianten (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/battle-mode-auto-run-invarianten.test.ts
 
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #
