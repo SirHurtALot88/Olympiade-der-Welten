@@ -294,6 +294,11 @@ function main() {
       for (const [mi, matchdayId] of spieltage.entries()) {
         const gs: GameState = {
           ...basis,
+          // BATTLE-GATE-KORREKTUR (18.10., Opus-Review zu PR #1284): OHNE diesen Override bleibt
+          // `scenarioMeta.gameMode` beim Wert des zugrundeliegenden Saves ("manager") -- diese
+          // Messung lief dadurch ueber den normalen Manager-Mode-Rangpfad, nie ueber die Bruecke
+          // selbst. S. separater Korrektur-PR zu PR #1277 fuer die volle Herleitung.
+          scenarioMeta: { ...basis.scenarioMeta, gameMode: "battle" } as GameState["scenarioMeta"],
           seasonState: {
             ...basis.seasonState,
             disciplineSchedule: (basis.seasonState.disciplineSchedule ?? []).map((zeile) =>
