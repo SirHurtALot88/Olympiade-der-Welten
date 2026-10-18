@@ -1995,3 +1995,46 @@ stand-aller-disziplinen.md`). `battle-mode.engine.js` wurde fuer die Messung tem
 Possession/Pass-Zaehler in `passeAb()`/`naechsterAngriff()` analog zur 14.10.-Runde) und vor dem
 Commit vollstaendig zurueckgesetzt — `git diff` gegen `origin/main` zeigt fuer diese Datei keine
 Aenderung.
+
+---
+
+## 13. Pp-Rauschboden: einflussVon() auf RNG-Rauschen geprueft, Schranke haelt (Task #174, 18.10.)
+
+Hintergrund: `docs/design/neue-disziplin-handbuch.md` Abschnitt 3.2 hatte als „verwandten, noch
+offenen" Befund notiert, dass Basis- und Hebungslauf in `einflussVon()` sich Seed UND
+rr()-Aufrufzahl teilen (`battle-mode.engine.js:9545`ff., Basketball-Wurfbonus-Runde) — jeder
+zusaetzliche bedingte Wuerfel-Aufruf verschiebt die Zufallsfolge und kann ein Pp-Artefakt
+erzeugen, das nichts mit echtem Attributeinfluss zu tun hat. Auftrag dieser Runde: wie gross ist
+dieser Rauschboden tatsaechlich, und haelt die ≤25-Pp-Schranke mit genuegend Abstand darueber?
+
+**Mechanismus am Code bestaetigt.** `rr()` (`battle-mode.engine.js:34053`) ist ein LCG mit einem
+globalen `seed`, den `M.bau(saat)` je Durchlauf auf `saat` zuruecksetzt. Zwei frische Proben:
+
+| Probe | Disziplin | n | Befund |
+|---|---|---:|---|
+| Kontrolle ohne bedingte Wuerfel | Spurt (reine Rennmechanik) | 48 | intelligence/charisma/spirit (Matrix 0) lesen EXAKT 0,0 % — kein Rauschen, weil keine Verzweigung |
+| rr()-Zaehlung je Spiel (instrumentierte Kopie, nicht im Repo) | Basketball (6v6, Feldspiel-Live) | 1 | health/determination/will (Matrix 0, nirgends gelesen) exakt Delta 0 bei allen 12 Spielern; die neun lebenden Attribute verschieben die rr()-Aufrufzahl um bis zu −292/+227 (≈ 9 % von 3306) |
+
+**Ergebnis.** Ein Gewicht-0-Attribut, das (wie an beiden Proben gemessen) auch mechanisch toter
+Code ist, liest in `einflussVon()` exakt null — kein Rauschen, kein Risiko fuer die Schranke. Das
+reale Risiko sitzt bei den lebenden Attributen, deren rr()-Verschiebung sich mit dem echten
+Effekt mischt. Ob n=24/48 das ausmittelt, zeigt die bestehende Messhistorie: zwei unabhaengige
+Saatstroeme schwankten um 1,4–2,2 Pp (17,2/19,4 fruehe Rezeptstufe PR #680; 33,7/35,1 Abschnitt 12
+oben, 15.10.) — 6–9 % der 25-Pp-Schranke, also ein kleiner Rauschboden gegen eine Schranke mit
+echtem Puffer. **Keine Code-Aenderung noetig — die Schranke haelt.** Basketballs aktuelle
+33,7/35,1 Pp liegen zwar selbst schon ueber 25, das ist aber der vorbestehende Rezeptbefund aus
+Abschnitt 12, nicht dieses Rauschen.
+
+**Werkzeuggrenze.** Ein frischer `einflussVon("basketball",12)`-Lauf blieb in dieser Sitzung
+zweimal unzuverlaessig (einmal > 15 Minuten ohne Ausgabe, einmal > 35 Minuten haengend ohne
+Fehlermeldung) — vermutlich derselbe Speicherdruck, den der Skriptkopf von
+`messe-arena-einfluss.mjs` schon fuer n=48 beschreibt, hier vermutlich verschaerft durch mehrere
+`einflussVon()`-Aufrufe in EINER Playwright-Seite ohne Reload. Empfehlung fuer kuenftige
+Basketball-Pp-Messungen: pro Saatstrom einen frischen Prozess starten (wie das Standard-Skript es
+ohnehin tut), keine Mehrfachaufrufe in einer Seite verketten.
+
+Ausfuehrlicher Mechanismus, Zahlen und Code-Zitate: `docs/design/neue-disziplin-handbuch.md`
+Abschnitt 3.2 (Nachtrag 18.10.). Gemessene/geaenderte Dateien dieser Runde: nur Dokumentation
+(dieser Abschnitt + Handbuch-Nachtrag); keine Aenderung an `battle-mode.engine.js` oder sonstigem
+Produktionscode — die fuer die rr()-Zaehlung instrumentierte Engine-Kopie lag ausserhalb des
+Repos, in einer temporaeren Sandbox-Kopie, und wurde nicht committet.
