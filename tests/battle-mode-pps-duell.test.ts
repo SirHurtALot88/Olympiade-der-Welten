@@ -7,12 +7,16 @@ import { ARENA_TEAM_POINTS } from "@/lib/resolve/battle-mode-arena-team-points";
 import {
   DUELL_TEAM_PUNKTE,
   VERHAELTNIS_RUECKFALL_D,
+  berechneDuellIndividualPpsFuerSeite,
   berechneDuellVerhaeltnis,
   berechnePpsDuellOverrides,
   berechneVerhaeltnisBetrag,
   istDuellWertung,
+  ppsAusDuellWert,
+  resolveDuellIndividualPpsReferenz,
   resolveMargeReferenz,
 } from "@/lib/resolve/battle-mode-pps-duell";
+import { distributeRankPointsToPlayers } from "@/lib/resolve/rank-to-points";
 import { resolveProjectedRankWithTiePolicy, type StandingsTieBreakItem } from "@/lib/standings/standings-tiebreaker-policy";
 import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
 
@@ -270,8 +274,123 @@ describe("INVARIANTE: Battle-Save, jede Zeile mit Fixture zahlt 0/1/2 — nie di
         for (const schluessel of ["marge", "verhaeltnis", "margeM90", "duellSeiten"]) {
           expect(Object.prototype.hasOwnProperty.call(team, schluessel)).toBe(false);
         }
+        // TEAM-RANG-ENTKOPPLUNG (18.10.): `duellIndividualPpsApplied` ist additiv (bedingter
+        // Spread) -- ein Manager-Save darf dieses Feld NIE bekommen, sonst waere die Preview-JSON
+        // nicht mehr bit-identisch zum Stand vor dieser Aenderung (s.
+        // scripts/pruefe-resolve-bit-identitaet.ts).
+        for (const entry of team.entries) {
+          expect(Object.prototype.hasOwnProperty.call(entry, "duellIndividualPpsApplied")).toBe(false);
+        }
       }
     }
+  });
+});
+
+describe("TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Befund 18.10.)", () => {
+  // Basketball@6 ist in der (gezogenen) Referenzdatei garantiert vorhanden -- s.
+  // data/generated/pps-duell-bruecke-individuell-referenz.json.
+  const REFERENZ_DISZIPLIN = "basketball";
+  const N = 6;
+
+  it("resolveDuellIndividualPpsReferenz liefert eine gueltige Referenz fuer eine gezogene Disziplin, null fuer eine nicht gezogene", () => {
+    const referenz = resolveDuellIndividualPpsReferenz(REFERENZ_DISZIPLIN, N);
+    expect(referenz).not.toBeNull();
+    expect(referenz!.referenz.iKrass).toBeGreaterThan(referenz!.referenz.iMittel);
+    expect(referenz!.referenz.iMittel).toBeGreaterThan(0);
+    expect(resolveDuellIndividualPpsReferenz("disziplin-gibt-es-nicht", N)).toBeNull();
+  });
+
+  it("Feldgroesse 2..4 bleibt BEWUSST null (Task #175) — KEIN Nearest-Match auf 5/6, keine Extrapolation in ungemessenes Gebiet", () => {
+    for (const n of [2, 3, 4]) {
+      expect(resolveDuellIndividualPpsReferenz(REFERENZ_DISZIPLIN, n), `n=${n}`).toBeNull();
+    }
+    // 5 und 6 sind die einzigen gezogenen/unterstuetzten Groessen.
+    expect(resolveDuellIndividualPpsReferenz(REFERENZ_DISZIPLIN, 6)).not.toBeNull();
+  });
+
+  it("ppsAusDuellWert ist monoton steigend, bei I_krass gedeckelt, bei entarteter Referenz 0", () => {
+    const referenz = resolveDuellIndividualPpsReferenz(REFERENZ_DISZIPLIN, N)!.referenz;
+    const niedrig = ppsAusDuellWert(10, referenz);
+    const mittel = ppsAusDuellWert(referenz.iMittel, referenz);
+    const hoch = ppsAusDuellWert(referenz.iKrass, referenz);
+    const ueberKrass = ppsAusDuellWert(referenz.iKrass * 2, referenz);
+    expect(niedrig).toBeLessThan(mittel);
+    expect(mittel).toBeLessThan(hoch);
+    expect(hoch).toBeCloseTo(5.5, 1);
+    expect(ueberKrass).toBe(hoch); // Deckel, kein weiteres Wachstum
+    expect(ppsAusDuellWert(-5, referenz)).toBe(0); // Boden bei 0
+    expect(ppsAusDuellWert(50, { iMittel: 0, iKrass: 10 })).toBe(0); // entartete Referenz
+    expect(ppsAusDuellWert(50, { iMittel: 10, iKrass: 5 })).toBe(0); // iKrass <= iMittel
+  });
+
+  it("DIE REGRESSION: ein Star in einem SCHWACHEN Team bekam beim alten Team-Rang-Topf WENIGER PP als ein Mittelmass-Spieler in einem STARKEN Team — mit der Kurve ist es umgekehrt", () => {
+    const starWert = 90; // Teamkollegen sind alle schwach (Summe = 120, Team-Rang folglich schlecht)
+    const mittelmassWert = 50; // Teamkollegen sind alle genauso stark (Summe = 300, Team-Rang folglich gut)
+
+    // ALTER PFAD (distributeRankPointsToPlayers, rank-gebundener Pool): Rang 1 (bestes Team) vs.
+    // Rang 32 (schlechtestes Team) in einer 32-Team-Liga, playerCount 6 (rank-to-points.json).
+    const starAlt = distributeRankPointsToPlayers({
+      playerCount: N,
+      rank: 32,
+      entries: [
+        { baseValue: starWert, finalPlayerScore: starWert, scoreContribution: starWert / 120 },
+        ...Array.from({ length: 5 }, () => ({ baseValue: 5, finalPlayerScore: 5, scoreContribution: 5 / 120 })),
+      ],
+    }).entries[0]!.points!;
+    const mittelmassAlt = distributeRankPointsToPlayers({
+      playerCount: N,
+      rank: 1,
+      entries: Array.from({ length: 6 }, () => ({ baseValue: mittelmassWert, finalPlayerScore: mittelmassWert, scoreContribution: mittelmassWert / 300 })),
+    }).entries[0]!.points!;
+    // DER BUG: der Star (90, schwaches Team) bekommt WENIGER als der Mittelmass-Spieler (50, starkes Team).
+    expect(starAlt).toBeLessThan(mittelmassAlt);
+
+    // NEUER PFAD (ppsAusDuellWert gegen die ligaweite Referenz, KEIN Team-Bezug): beide Spieler
+    // werden gegen DIESELBE Referenz gemessen, unabhaengig vom Team-Rang.
+    const ergebnis = berechneDuellIndividualPpsFuerSeite({
+      disciplineId: REFERENZ_DISZIPLIN,
+      playerCount: N,
+      entries: [
+        { playerId: "star-schwaches-team", wert: starWert },
+        { playerId: "mittelmass-starkes-team", wert: mittelmassWert },
+      ],
+    });
+    expect(ergebnis).not.toBeNull();
+    const starNeu = ergebnis!.ppsByPlayerId.get("star-schwaches-team")!;
+    const mittelmassNeu = ergebnis!.ppsByPlayerId.get("mittelmass-starkes-team")!;
+    // DER FIX: der Star bekommt jetzt MEHR als der Mittelmass-Spieler — unabhaengig vom Team-Rang.
+    expect(starNeu).toBeGreaterThan(mittelmassNeu);
+  });
+
+  it("berechneDuellIndividualPpsFuerSeite liefert null (statt leerer Map) fuer eine nicht gezogene Disziplin — Aufrufer faellt auf den alten Pfad zurueck", () => {
+    expect(
+      berechneDuellIndividualPpsFuerSeite({
+        disciplineId: "disziplin-gibt-es-nicht",
+        playerCount: 6,
+        entries: [{ playerId: "p1", wert: 50 }],
+      }),
+    ).toBeNull();
+  });
+
+  it("END-TO-END via buildLegacyMatchdayResolvePreview: pps_duell-Zeilen einer gezogenen Disziplin tragen duellIndividualPpsApplied, Arena-Zeilen nicht beruehrt", () => {
+    const gs = gameState("battle");
+    const contextFuer = (teamId: string, d1Scores: number[]) => createContext({ teamId, d1Scores, d2Scores: [1, 1], gameState: gs });
+    const preview = buildLegacyMatchdayResolvePreview([
+      contextFuer("A", [90, 5, 5, 5, 5, 5]),
+      contextFuer("B", [50, 50, 50, 50, 50, 50]),
+    ]);
+    const basketball = preview.disciplinePreviews.find((d) => d.disciplineId === REFERENZ_DISZIPLIN)!;
+    expect(basketball.teamResults.every((t) => t.resolutionSource === "pps_duell")).toBe(true);
+    for (const teamResult of basketball.teamResults) {
+      for (const entry of teamResult.entries) {
+        expect(entry.duellIndividualPpsApplied).toBe(true);
+      }
+    }
+    const starEntry = basketball.teamResults.find((t) => t.teamId === "A")!.entries.find((e) => e.baseValue === 90)!;
+    const mittelmassEntry = basketball.teamResults.find((t) => t.teamId === "B")!.entries[0]!;
+    // Dieselbe Regression wie oben, jetzt durch die GESAMTE Resolve-Pipeline (Team-Power,
+    // Formkarten etc. sind in diesem Fixture neutral/leer).
+    expect(starEntry.pointsAwarded ?? 0).toBeGreaterThan(mittelmassEntry.pointsAwarded ?? 0);
   });
 });
 

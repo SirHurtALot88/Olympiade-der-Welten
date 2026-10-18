@@ -1,0 +1,1712 @@
+{
+ "hinweis": "Abnahme der PPS-Duell-Bruecke selbst (v3, Team-Rang-Entkopplung 18.10. -- vorher v2, Projektaufsicht-Korrektur 17.10.). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), Median+Spannweite ueber viele Team-Seiten, am echten Live-Save-Kader mit echter KI-Aufstellung. Zusaetzlich Paartreue nach Team-Eignungsabstand. NEU (18.10.): fixtureRhoMedian/-Spannweite -- dieselbe Spearman-Messung, aber UEBER BEIDE SEITEN EINES synthetischen Fixtures zusammen (die EIGENTLICHE CLAUDE.md-Einzelspiel-rho fuer ein Zwei-Team-Duell, ZIEL > 0,80 bei Feldgroesse 5/6) -- plus crossTeamPaartreueNachEignungsabstand (dieselbe <2/2..15/>=15-Logik wie paartreueNachEignungsabstand, aber auf Spieler-PAARE VERSCHIEDENER Teams statt Team-Aggregate: zeigt direkt, ob ein Star in einem schwachen Team gegen einen Mittelmass-Spieler in einem starken Team richtig geordnet wird). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung). Zwei Saatstroeme je Teil. `--feldgroesse=5|6` waehlt die gemessene Feldgroesse (Default 6).",
+ "commit": "4d47011fb20a51ffe25c1f369b0a07678a308237",
+ "datum": "2026-10-18T10:39:01.027Z",
+ "feldgroesse": 5,
+ "spieltage": 4,
+ "ppTrialsJeSeite": 2,
+ "saatStroeme": [
+  0,
+  10000000
+ ],
+ "teilA": {
+  "football": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.9,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.16666666666666666,
+      "n": 6
+     },
+     "2..15": {
+      "pct": 0.5555555555555556,
+      "n": 27
+     },
+     ">=15": {
+      "pct": 0.8947368421052632,
+      "n": 95
+     }
+    },
+    "fixtureRhoMedian": 0.7515151515151515,
+    "fixtureRhoSpannweite": 1.006060606060606,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5085324232081911,
+      "n": 293
+     },
+     "2..15": {
+      "pct": 0.6195014662756598,
+      "n": 1364
+     },
+     ">=15": {
+      "pct": 0.8262849707221861,
+      "n": 1537
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.9,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.2,
+      "n": 5
+     },
+     "2..15": {
+      "pct": 0.84,
+      "n": 25
+     },
+     ">=15": {
+      "pct": 0.9081632653061225,
+      "n": 98
+     }
+    },
+    "fixtureRhoMedian": 0.7636363636363637,
+    "fixtureRhoSpannweite": 1.212803839040412,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5266903914590747,
+      "n": 281
+     },
+     "2..15": {
+      "pct": 0.5980465815176559,
+      "n": 1331
+     },
+     ">=15": {
+      "pct": 0.8587713742875237,
+      "n": 1579
+     }
+    }
+   }
+  ],
+  "i-spy": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.8,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.25,
+      "n": 4
+     },
+     "2..15": {
+      "pct": 0.8333333333333334,
+      "n": 18
+     },
+     ">=15": {
+      "pct": 0.9150943396226415,
+      "n": 106
+     }
+    },
+    "fixtureRhoMedian": 0.7818181818181819,
+    "fixtureRhoSpannweite": 1.0303030303030303,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5874439461883408,
+      "n": 223
+     },
+     "2..15": {
+      "pct": 0.6144697720515362,
+      "n": 1009
+     },
+     ">=15": {
+      "pct": 0.8802153432032301,
+      "n": 1486
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.8,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.8,
+      "n": 5
+     },
+     "2..15": {
+      "pct": 0.5882352941176471,
+      "n": 17
+     },
+     ">=15": {
+      "pct": 0.9339622641509434,
+      "n": 106
+     }
+    },
+    "fixtureRhoMedian": 0.7575757575757576,
+    "fixtureRhoSpannweite": 1.0188311688311689,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5662100456621004,
+      "n": 219
+     },
+     "2..15": {
+      "pct": 0.6159695817490495,
+      "n": 1052
+     },
+     ">=15": {
+      "pct": 0.8650904033379694,
+      "n": 1438
+     }
+    }
+   }
+  ],
+  "battlefield": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.8,
+    "spielerRhoSpannweite": 1.5,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6666666666666666,
+      "n": 3
+     },
+     "2..15": {
+      "pct": 0.3157894736842105,
+      "n": 19
+     },
+     ">=15": {
+      "pct": 0.9333333333333333,
+      "n": 105
+     }
+    },
+    "fixtureRhoMedian": 0.7465891820905124,
+    "fixtureRhoSpannweite": 1.1307359307359308,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.4977973568281938,
+      "n": 227
+     },
+     "2..15": {
+      "pct": 0.6658749010292954,
+      "n": 1263
+     },
+     ">=15": {
+      "pct": 0.889198606271777,
+      "n": 1435
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.8,
+    "spielerRhoSpannweite": 1.5,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.75,
+      "n": 4
+     },
+     "2..15": {
+      "pct": 0.42105263157894735,
+      "n": 19
+     },
+     ">=15": {
+      "pct": 0.9134615384615384,
+      "n": 104
+     }
+    },
+    "fixtureRhoMedian": 0.7696969696969697,
+    "fixtureRhoSpannweite": 0.8363636363636363,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5062240663900415,
+      "n": 241
+     },
+     "2..15": {
+      "pct": 0.6524879614767255,
+      "n": 1246
+     },
+     ">=15": {
+      "pct": 0.8940027894002789,
+      "n": 1434
+     }
+    }
+   }
+  ],
+  "tdm": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.9,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0,
+      "n": 2
+     },
+     "2..15": {
+      "pct": 0.6363636363636364,
+      "n": 11
+     },
+     ">=15": {
+      "pct": 0.9304347826086956,
+      "n": 115
+     }
+    },
+    "fixtureRhoMedian": 0.7845238095238095,
+    "fixtureRhoSpannweite": 0.9212121212121213,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5631578947368421,
+      "n": 190
+     },
+     "2..15": {
+      "pct": 0.6369230769230769,
+      "n": 975
+     },
+     ">=15": {
+      "pct": 0.8862206975414523,
+      "n": 1749
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 0.9,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": null,
+      "n": 0
+     },
+     "2..15": {
+      "pct": 0.9444444444444444,
+      "n": 18
+     },
+     ">=15": {
+      "pct": 0.9090909090909091,
+      "n": 110
+     }
+    },
+    "fixtureRhoMedian": 0.793939393939394,
+    "fixtureRhoSpannweite": 0.9878787878787879,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5656565656565656,
+      "n": 198
+     },
+     "2..15": {
+      "pct": 0.6107784431137725,
+      "n": 1002
+     },
+     ">=15": {
+      "pct": 0.8772647574517826,
+      "n": 1711
+     }
+    }
+   }
+  ],
+  "mini-dm": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": null,
+    "spielerRhoSpannweite": null,
+    "spielerRhoSpiele": 0,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6153846153846154,
+      "n": 13
+     },
+     "2..15": {
+      "pct": 0.7391304347826086,
+      "n": 46
+     },
+     ">=15": {
+      "pct": 0.9855072463768116,
+      "n": 69
+     }
+    },
+    "fixtureRhoMedian": null,
+    "fixtureRhoSpannweite": null,
+    "fixtureRhoFixtures": 0,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6923076923076923,
+      "n": 13
+     },
+     "2..15": {
+      "pct": 0.717391304347826,
+      "n": 46
+     },
+     ">=15": {
+      "pct": 0.9130434782608695,
+      "n": 69
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": null,
+    "spielerRhoSpannweite": null,
+    "spielerRhoSpiele": 0,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5714285714285714,
+      "n": 14
+     },
+     "2..15": {
+      "pct": 0.8,
+      "n": 50
+     },
+     ">=15": {
+      "pct": 1,
+      "n": 64
+     }
+    },
+    "fixtureRhoMedian": null,
+    "fixtureRhoSpannweite": null,
+    "fixtureRhoFixtures": 0,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6428571428571429,
+      "n": 14
+     },
+     "2..15": {
+      "pct": 0.78,
+      "n": 50
+     },
+     ">=15": {
+      "pct": 1,
+      "n": 64
+     }
+    }
+   }
+  ],
+  "basketball": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1.1,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.25,
+      "n": 4
+     },
+     "2..15": {
+      "pct": 0.6818181818181818,
+      "n": 22
+     },
+     ">=15": {
+      "pct": 0.8529411764705882,
+      "n": 102
+     }
+    },
+    "fixtureRhoMedian": 0.7010700638192859,
+    "fixtureRhoSpannweite": 0.861038961038961,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5277777777777778,
+      "n": 216
+     },
+     "2..15": {
+      "pct": 0.6058394160583942,
+      "n": 1233
+     },
+     ">=15": {
+      "pct": 0.8198258539852645,
+      "n": 1493
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1.1,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6666666666666666,
+      "n": 3
+     },
+     "2..15": {
+      "pct": 0.6666666666666666,
+      "n": 15
+     },
+     ">=15": {
+      "pct": 0.8272727272727273,
+      "n": 110
+     }
+    },
+    "fixtureRhoMedian": 0.7253493868140993,
+    "fixtureRhoSpannweite": 1.0005066979376787,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.47706422018348627,
+      "n": 218
+     },
+     "2..15": {
+      "pct": 0.6059356966199505,
+      "n": 1213
+     },
+     ">=15": {
+      "pct": 0.8387524883875249,
+      "n": 1507
+     }
+    }
+   }
+  ],
+  "hockey": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 1,
+      "n": 3
+     },
+     "2..15": {
+      "pct": 0.48484848484848486,
+      "n": 33
+     },
+     ">=15": {
+      "pct": 0.967391304347826,
+      "n": 92
+     }
+    },
+    "fixtureRhoMedian": 0.7951478280801392,
+    "fixtureRhoSpannweite": 1.142260659488473,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5766129032258065,
+      "n": 248
+     },
+     "2..15": {
+      "pct": 0.6647887323943662,
+      "n": 1065
+     },
+     ">=15": {
+      "pct": 0.8253182461103253,
+      "n": 1414
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5,
+      "n": 2
+     },
+     "2..15": {
+      "pct": 0.5666666666666667,
+      "n": 30
+     },
+     ">=15": {
+      "pct": 0.8854166666666666,
+      "n": 96
+     }
+    },
+    "fixtureRhoMedian": 0.7666666666666667,
+    "fixtureRhoSpannweite": 1.1636363636363636,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5059760956175299,
+      "n": 251
+     },
+     "2..15": {
+      "pct": 0.6452205882352942,
+      "n": 1088
+     },
+     ">=15": {
+      "pct": 0.8432355046528275,
+      "n": 1397
+     }
+    }
+   }
+  ],
+  "fechten": [
+   {
+    "strom": 0,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1.5,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0,
+      "n": 3
+     },
+     "2..15": {
+      "pct": 0.5555555555555556,
+      "n": 18
+     },
+     ">=15": {
+      "pct": 0.8679245283018868,
+      "n": 106
+     }
+    },
+    "fixtureRhoMedian": 0.7696969696969697,
+    "fixtureRhoSpannweite": 1.5666666666666667,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5,
+      "n": 186
+     },
+     "2..15": {
+      "pct": 0.5847639484978541,
+      "n": 932
+     },
+     ">=15": {
+      "pct": 0.8348794063079777,
+      "n": 1617
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "spielerRhoMedian": 0.9,
+    "spielerRhoSpannweite": 1.5,
+    "spielerRhoSpiele": 128,
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.25,
+      "n": 4
+     },
+     "2..15": {
+      "pct": 0.625,
+      "n": 24
+     },
+     ">=15": {
+      "pct": 0.84,
+      "n": 100
+     }
+    },
+    "fixtureRhoMedian": 0.7818181818181819,
+    "fixtureRhoSpannweite": 1.2857142857142856,
+    "fixtureRhoFixtures": 128,
+    "crossTeamPaartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5180722891566265,
+      "n": 166
+     },
+     "2..15": {
+      "pct": 0.6258278145695364,
+      "n": 906
+     },
+     ">=15": {
+      "pct": 0.8521634615384616,
+      "n": 1664
+     }
+    }
+   }
+  ]
+ },
+ "teilB": {
+  "football": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 62,
+    "anteile": {
+     "power": {
+      "matrixPct": 22,
+      "gemessenPct": 8,
+      "deltaPp": 14
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 8.9,
+      "deltaPp": 9.1
+     },
+     "determination": {
+      "matrixPct": 10,
+      "gemessenPct": 8.9,
+      "deltaPp": 1.1
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 8.2,
+      "deltaPp": 2.2
+     },
+     "speed": {
+      "matrixPct": 14,
+      "gemessenPct": 9.7,
+      "deltaPp": 4.3
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 7.9,
+      "deltaPp": 3.9
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 8.6,
+      "deltaPp": 0.6
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 7.4,
+      "deltaPp": 7.4
+     },
+     "will": {
+      "matrixPct": 3,
+      "gemessenPct": 7.8,
+      "deltaPp": 4.8
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 7.4,
+      "deltaPp": 7.4
+     },
+     "spirit": {
+      "matrixPct": 3,
+      "gemessenPct": 7.8,
+      "deltaPp": 4.8
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 9.5,
+      "deltaPp": 2.5
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 34.5,
+    "anteile": {
+     "power": {
+      "matrixPct": 22,
+      "gemessenPct": 16.9,
+      "deltaPp": 5.1
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 13.4,
+      "deltaPp": 4.6
+     },
+     "determination": {
+      "matrixPct": 10,
+      "gemessenPct": 8.9,
+      "deltaPp": 1.1
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 7.1,
+      "deltaPp": 1.1
+     },
+     "speed": {
+      "matrixPct": 14,
+      "gemessenPct": 10.2,
+      "deltaPp": 3.8
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 6.7,
+      "deltaPp": 2.7
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 8.5,
+      "deltaPp": 0.5
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 3.6,
+      "deltaPp": 3.6
+     },
+     "will": {
+      "matrixPct": 3,
+      "gemessenPct": 5.8,
+      "deltaPp": 2.8
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 3.6,
+      "deltaPp": 3.6
+     },
+     "spirit": {
+      "matrixPct": 3,
+      "gemessenPct": 5.8,
+      "deltaPp": 2.8
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 9.4,
+      "deltaPp": 2.6
+     }
+    }
+   }
+  ],
+  "i-spy": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 4.6,
+    "anteile": {
+     "power": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "health": {
+      "matrixPct": 2,
+      "gemessenPct": 2,
+      "deltaPp": 0
+     },
+     "determination": {
+      "matrixPct": 8,
+      "gemessenPct": 8.3,
+      "deltaPp": 0.3
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 8,
+      "gemessenPct": 8.3,
+      "deltaPp": 0.3
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 8.3,
+      "deltaPp": 0.3
+     },
+     "awareness": {
+      "matrixPct": 5,
+      "gemessenPct": 5.3,
+      "deltaPp": 0.3
+     },
+     "intelligence": {
+      "matrixPct": 18,
+      "gemessenPct": 18.5,
+      "deltaPp": 0.5
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 12.3,
+      "deltaPp": 0.3
+     },
+     "charisma": {
+      "matrixPct": 9,
+      "gemessenPct": 9.2,
+      "deltaPp": 0.2
+     },
+     "spirit": {
+      "matrixPct": 13,
+      "gemessenPct": 10.7,
+      "deltaPp": 2.3
+     },
+     "torment": {
+      "matrixPct": 17,
+      "gemessenPct": 17.4,
+      "deltaPp": 0.4
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 15.5,
+    "anteile": {
+     "power": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "health": {
+      "matrixPct": 2,
+      "gemessenPct": 3.4,
+      "deltaPp": 1.4
+     },
+     "determination": {
+      "matrixPct": 8,
+      "gemessenPct": 9.4,
+      "deltaPp": 1.4
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 8,
+      "gemessenPct": 9.4,
+      "deltaPp": 1.4
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 9.4,
+      "deltaPp": 1.4
+     },
+     "awareness": {
+      "matrixPct": 5,
+      "gemessenPct": 5.9,
+      "deltaPp": 0.9
+     },
+     "intelligence": {
+      "matrixPct": 18,
+      "gemessenPct": 17.1,
+      "deltaPp": 0.9
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 5.2,
+      "deltaPp": 6.8
+     },
+     "charisma": {
+      "matrixPct": 9,
+      "gemessenPct": 9.8,
+      "deltaPp": 0.8
+     },
+     "spirit": {
+      "matrixPct": 13,
+      "gemessenPct": 13.5,
+      "deltaPp": 0.5
+     },
+     "torment": {
+      "matrixPct": 17,
+      "gemessenPct": 16.9,
+      "deltaPp": 0.1
+     }
+    }
+   }
+  ],
+  "battlefield": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 8.5,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 10.5,
+      "deltaPp": 0.5
+     },
+     "health": {
+      "matrixPct": 8,
+      "gemessenPct": 8.6,
+      "deltaPp": 0.6
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 4.2,
+      "deltaPp": 0.2
+     },
+     "stamina": {
+      "matrixPct": 4,
+      "gemessenPct": 4.2,
+      "deltaPp": 0.2
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 10,
+      "gemessenPct": 10.5,
+      "deltaPp": 0.5
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 17,
+      "deltaPp": 1
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 20,
+      "gemessenPct": 20.6,
+      "deltaPp": 0.6
+     },
+     "spirit": {
+      "matrixPct": 16,
+      "gemessenPct": 11.7,
+      "deltaPp": 4.3
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 12.7,
+      "deltaPp": 0.7
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 12.8,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 8.5,
+      "deltaPp": 1.5
+     },
+     "health": {
+      "matrixPct": 8,
+      "gemessenPct": 7.4,
+      "deltaPp": 0.6
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 3.3,
+      "deltaPp": 0.7
+     },
+     "stamina": {
+      "matrixPct": 4,
+      "gemessenPct": 3.3,
+      "deltaPp": 0.7
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 10,
+      "gemessenPct": 7.6,
+      "deltaPp": 2.4
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 18.7,
+      "deltaPp": 2.7
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 20,
+      "gemessenPct": 20.3,
+      "deltaPp": 0.3
+     },
+     "spirit": {
+      "matrixPct": 16,
+      "gemessenPct": 15.6,
+      "deltaPp": 0.4
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 15.4,
+      "deltaPp": 3.4
+     }
+    }
+   }
+  ],
+  "tdm": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 11.3,
+    "anteile": {
+     "power": {
+      "matrixPct": 28,
+      "gemessenPct": 26.5,
+      "deltaPp": 1.5
+     },
+     "health": {
+      "matrixPct": 20,
+      "gemessenPct": 17.5,
+      "deltaPp": 2.5
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 5.2,
+      "deltaPp": 0.8
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 13.9,
+      "deltaPp": 0.1
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 2,
+      "gemessenPct": 3.4,
+      "deltaPp": 1.4
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 5.2,
+      "deltaPp": 0.8
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 10,
+      "gemessenPct": 12.1,
+      "deltaPp": 2.1
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 12.7,
+      "deltaPp": 0.7
+     },
+     "torment": {
+      "matrixPct": 2,
+      "gemessenPct": 3.4,
+      "deltaPp": 1.4
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 7.3,
+    "anteile": {
+     "power": {
+      "matrixPct": 28,
+      "gemessenPct": 24.6,
+      "deltaPp": 3.4
+     },
+     "health": {
+      "matrixPct": 20,
+      "gemessenPct": 20.5,
+      "deltaPp": 0.5
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 6.1,
+      "deltaPp": 0.1
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 15.4,
+      "deltaPp": 1.4
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 2,
+      "gemessenPct": 2,
+      "deltaPp": 0
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 6.1,
+      "deltaPp": 0.1
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 10,
+      "gemessenPct": 10.8,
+      "deltaPp": 0.8
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 12.8,
+      "deltaPp": 0.8
+     },
+     "torment": {
+      "matrixPct": 2,
+      "gemessenPct": 1.8,
+      "deltaPp": 0.2
+     }
+    }
+   }
+  ],
+  "mini-dm": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 100,
+    "anteile": {
+     "power": {
+      "matrixPct": 14,
+      "gemessenPct": 0,
+      "deltaPp": 14
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 0,
+      "deltaPp": 18
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 0,
+      "deltaPp": 14
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 9,
+      "gemessenPct": 0,
+      "deltaPp": 9
+     },
+     "awareness": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 0,
+      "deltaPp": 6
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 0,
+      "deltaPp": 12
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 6,
+      "gemessenPct": 0,
+      "deltaPp": 6
+     },
+     "torment": {
+      "matrixPct": 21,
+      "gemessenPct": 0,
+      "deltaPp": 21
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 100,
+    "anteile": {
+     "power": {
+      "matrixPct": 14,
+      "gemessenPct": 0,
+      "deltaPp": 14
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 0,
+      "deltaPp": 18
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 0,
+      "deltaPp": 14
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 9,
+      "gemessenPct": 0,
+      "deltaPp": 9
+     },
+     "awareness": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 0,
+      "deltaPp": 6
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 0,
+      "deltaPp": 12
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 6,
+      "gemessenPct": 0,
+      "deltaPp": 6
+     },
+     "torment": {
+      "matrixPct": 21,
+      "gemessenPct": 0,
+      "deltaPp": 21
+     }
+    }
+   }
+  ],
+  "basketball": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 9.7,
+    "anteile": {
+     "power": {
+      "matrixPct": 7,
+      "gemessenPct": 6.2,
+      "deltaPp": 0.8
+     },
+     "health": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 5.4,
+      "deltaPp": 0.6
+     },
+     "speed": {
+      "matrixPct": 10,
+      "gemessenPct": 7.8,
+      "deltaPp": 2.2
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 7.2,
+      "deltaPp": 0.8
+     },
+     "awareness": {
+      "matrixPct": 14,
+      "gemessenPct": 15.5,
+      "deltaPp": 1.5
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 17.8,
+      "deltaPp": 1.8
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 11,
+      "gemessenPct": 11.4,
+      "deltaPp": 0.4
+     },
+     "spirit": {
+      "matrixPct": 22,
+      "gemessenPct": 23.2,
+      "deltaPp": 1.2
+     },
+     "torment": {
+      "matrixPct": 6,
+      "gemessenPct": 5.4,
+      "deltaPp": 0.6
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 21.8,
+    "anteile": {
+     "power": {
+      "matrixPct": 7,
+      "gemessenPct": 9.5,
+      "deltaPp": 2.5
+     },
+     "health": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 8.8,
+      "deltaPp": 2.8
+     },
+     "speed": {
+      "matrixPct": 10,
+      "gemessenPct": 11,
+      "deltaPp": 1
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 9.9,
+      "deltaPp": 1.9
+     },
+     "awareness": {
+      "matrixPct": 14,
+      "gemessenPct": 13.1,
+      "deltaPp": 0.9
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 12.8,
+      "deltaPp": 3.2
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 11,
+      "gemessenPct": 10.3,
+      "deltaPp": 0.7
+     },
+     "spirit": {
+      "matrixPct": 22,
+      "gemessenPct": 15.9,
+      "deltaPp": 6.1
+     },
+     "torment": {
+      "matrixPct": 6,
+      "gemessenPct": 8.8,
+      "deltaPp": 2.8
+     }
+    }
+   }
+  ],
+  "hockey": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 8.3,
+    "anteile": {
+     "power": {
+      "matrixPct": 18,
+      "gemessenPct": 20,
+      "deltaPp": 2
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 20,
+      "deltaPp": 2
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 3.6,
+      "deltaPp": 0.4
+     },
+     "stamina": {
+      "matrixPct": 10,
+      "gemessenPct": 8.9,
+      "deltaPp": 1.1
+     },
+     "speed": {
+      "matrixPct": 12,
+      "gemessenPct": 12.1,
+      "deltaPp": 0.1
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 3.6,
+      "deltaPp": 0.4
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 7.4,
+      "deltaPp": 0.6
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "will": {
+      "matrixPct": 4,
+      "gemessenPct": 3.6,
+      "deltaPp": 0.4
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 12.1,
+      "deltaPp": 0.1
+     },
+     "torment": {
+      "matrixPct": 10,
+      "gemessenPct": 8.9,
+      "deltaPp": 1.1
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 26.6,
+    "anteile": {
+     "power": {
+      "matrixPct": 18,
+      "gemessenPct": 11.3,
+      "deltaPp": 6.7
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 13.7,
+      "deltaPp": 4.3
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 4.2,
+      "deltaPp": 0.2
+     },
+     "stamina": {
+      "matrixPct": 10,
+      "gemessenPct": 7.7,
+      "deltaPp": 2.3
+     },
+     "speed": {
+      "matrixPct": 12,
+      "gemessenPct": 15.5,
+      "deltaPp": 3.5
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 4.2,
+      "deltaPp": 0.2
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 10.3,
+      "deltaPp": 2.3
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "will": {
+      "matrixPct": 4,
+      "gemessenPct": 4.2,
+      "deltaPp": 0.2
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 15.5,
+      "deltaPp": 3.5
+     },
+     "torment": {
+      "matrixPct": 10,
+      "gemessenPct": 13.6,
+      "deltaPp": 3.6
+     }
+    }
+   }
+  ],
+  "fechten": [
+   {
+    "strom": 0,
+    "laeufe": 2,
+    "ppAbweichung": 8.6,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 10.1,
+      "deltaPp": 0.1
+     },
+     "health": {
+      "matrixPct": 4,
+      "gemessenPct": 3,
+      "deltaPp": 1
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 4.9,
+      "deltaPp": 1.1
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 16,
+      "gemessenPct": 15.3,
+      "deltaPp": 0.7
+     },
+     "dexterity": {
+      "matrixPct": 20,
+      "gemessenPct": 20.6,
+      "deltaPp": 0.6
+     },
+     "awareness": {
+      "matrixPct": 15,
+      "gemessenPct": 14.5,
+      "deltaPp": 0.5
+     },
+     "intelligence": {
+      "matrixPct": 4,
+      "gemessenPct": 3,
+      "deltaPp": 1
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "torment": {
+      "matrixPct": 25,
+      "gemessenPct": 28.6,
+      "deltaPp": 3.6
+     }
+    }
+   },
+   {
+    "strom": 10000000,
+    "laeufe": 2,
+    "ppAbweichung": 12.1,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 10.1,
+      "deltaPp": 0.1
+     },
+     "health": {
+      "matrixPct": 4,
+      "gemessenPct": 4.9,
+      "deltaPp": 0.9
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 7.6,
+      "deltaPp": 1.6
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 16,
+      "gemessenPct": 17,
+      "deltaPp": 1
+     },
+     "dexterity": {
+      "matrixPct": 20,
+      "gemessenPct": 21.5,
+      "deltaPp": 1.5
+     },
+     "awareness": {
+      "matrixPct": 15,
+      "gemessenPct": 15,
+      "deltaPp": 0
+     },
+     "intelligence": {
+      "matrixPct": 4,
+      "gemessenPct": 4.9,
+      "deltaPp": 0.9
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "torment": {
+      "matrixPct": 25,
+      "gemessenPct": 19,
+      "deltaPp": 6
+     }
+    }
+   }
+  ]
+ }
+}

@@ -32,9 +32,46 @@
  *
  * Rein, synchron, keine Playwright-/`node:fs`-Importe — `legacy-matchday-resolve-engine.ts` darf
  * diese Datei importieren (anders als `battle-mode-arena-team-points.ts`).
+ *
+ * TEAM-RANG-ENTKOPPLUNG DER INDIVIDUELLEN PPS (Opus-Befund 18.10., hoechste Prioritaet, docs/design/
+ * pps-duell-bruecke-individuelle-pps-18-10.md): bis hierher buchte die Bruecke nur den TEAM-Wert neu
+ * (2/1/0) — die INDIVIDUELLEN Spieler-PPs liefen unveraendert weiter ueber
+ * `distributeRankPointsToPlayers()` (`rank-to-points.ts`) MIT `rank: rankedTeam.rank`, dem
+ * TEAM-RANG innerhalb der Liga (`rankWithinLeagueScope()`, legacy-matchday-resolve-engine.ts) — exakt
+ * so im urspruenglichen Konzept dokumentiert (Abschnitt 1 dort: "Individuelle Spieler-PPs bleiben...
+ * beim bisherigen PPS-Anteil"), eine zum damaligen Zeitpunkt bewusste Vereinfachung, die Opus jetzt
+ * als Bug einstuft: ein Star-Spieler in einem schwachen Team bekam dadurch WENIGER PP als ein
+ * mittelmaessiger Spieler in einem starken Team — nicht weil er schlechter spielte, sondern weil
+ * sein Team insgesamt schlechter abschnitt. Fuer die Arena-Disziplinen ist genau dieses Problem
+ * schon geloest (`ppsAusArenaImpact()`, battle-mode-arena-team-points.ts: individueller Impact-Wert
+ * gegen eine FESTE, ligaweit gezogene Referenzkurve, kein Team-Bezug). `ppsAusDuellWert()` unten ist
+ * das BRUECKEN-ANALOGON derselben Kurve — seit Opus-Auflage 18.10. ("Code-Dopplung aufloesen")
+ * dieselbe FORMEL aus `lib/battle/impact-kurve.ts`, nicht mehr eine eigenstaendige Kopie. Kein
+ * Import aus `battle-mode-arena-team-points.ts` selbst: jene Datei zieht ueber
+ * `arena-headless-runner.ts` Playwright/`node:fs` mit (s. Dateikopf-Kommentar dort), die diese Datei
+ * laut ihrem eigenen Kopfkommentar NICHT mitziehen darf — `impact-kurve.ts` hat dafuer, als einzige
+ * Datei in dieser Kette, UEBERHAUPT KEINE Importe. Die Referenz (`iMittel`/`iKrass` je
+ * Disziplin UND Feldgroesse, UEBER BEIDE LIGEN GEMEINSAM — Chris' Entscheidung 31.08.,
+ * docs/design/battle-mode-pps-modell-plan.md Abschnitt 7 Punkt 2) kommt aus
+ * `data/generated/pps-duell-bruecke-individuell-referenz.json`, gezogen von
+ * `scripts/ziehe-pps-duell-individuell-referenz.ts` (reiner Node-Code, kein Browser — der PPS-Pfad
+ * braucht keinen) gegen den echten Live-Save-Kader, NUR fuer Feldgroesse 5/6 (die CLAUDE.md-
+ * Abnahmegroessen; Feldgroesse 2..4 ist Task #175, separat offen, s. dortiger Kommentar).
+ *
+ * FEHLT DIE REFERENZ FUER EINE DISZIPLIN (noch nicht gezogen): `resolveDuellIndividualPpsReferenz()`
+ * liefert `null` statt zu werfen — die Bruecke ist der Battle-Mode-Standardpfad fuer praktisch jede
+ * Disziplin, solange PR3 (Arena-Vorlauf-Anbindung) nicht gelandet ist; ein Fail-Fast hier wuerde
+ * JEDEN Battle-Spieltag fuer eine nicht gezogene Disziplin crashen lassen. `legacy-matchday-
+ * resolve-engine.ts` faellt fuer GENAU diese Disziplin/Feldgroesse auf das bisherige (team-rang-
+ * gebundene) Verhalten zurueck, mit einer sichtbaren Warnung statt still falsch — "laut statt still
+ * falsch", derselbe Grundsatz wie bei `verhaeltnis_referenz_fehlt` oben.
  */
 import type { Fixture, GameState } from "@/lib/data/olyDataTypes";
 import verhaeltnisReferenzJson from "@/data/generated/verhaeltnis-referenz.json";
+import duellIndividuellReferenzJson from "@/data/generated/pps-duell-bruecke-individuell-referenz.json";
+// `lib/battle/impact-kurve.ts` hat KEINE eigenen Importe (ihr einziger Zweck) — ihr Import hier
+// verletzt die Playwright-Grenze oben deshalb nicht, s. dortiger Dateikopf-Kommentar.
+import { ppsAusImpact } from "@/lib/battle/impact-kurve";
 
 /** Dieselben Werte wie `ARENA_TEAM_POINTS` (battle-mode-arena-team-points.ts) — ein Test haelt beide gleich. */
 export const DUELL_TEAM_PUNKTE = { win: 2, draw: 1, loss: 0 } as const;
@@ -218,4 +255,124 @@ export function berechnePpsDuellOverrides(input: {
  */
 export function istDuellWertung(row: { resolutionSource?: string | null; teamPoints?: number | null }): boolean {
   return (row.resolutionSource === "arena" || row.resolutionSource === "pps_duell") && row.teamPoints != null;
+}
+
+// =====================================================================================
+// INDIVIDUELLE PPS DER BRUECKE — Team-Rang-Entkopplung (Opus-Befund 18.10.), s. Dateikopf-Kommentar.
+// =====================================================================================
+
+/**
+ * DIESELBEN BEIDEN REGLER WIE DIE ARENA-IMPACT-KURVE (`BASKETBALL_INDIVIDUAL_PPS_MAX`/
+ * `BASKETBALL_PPS_ANTEIL_MITTE`, battle-mode-arena-team-points.ts): Chris' Rahmen "max 5-6" und die
+ * an 352 echten Duellen entschiedene Kurvenform (04.09., docs/design/pps-skalierung-umsetzung.md
+ * Abschnitt 9) sind Aussagen ueber die KURVE selbst, disziplinuebergreifend — nicht ueber
+ * Basketball-spezifische Zahlen. Was disziplin-/kanal-spezifisch ist, steckt vollstaendig in der
+ * gezogenen Referenz (`iMittel`/`iKrass`), nicht in diesen beiden Werten. EIGENE Konstanten statt
+ * eines Imports aus `battle-mode-arena-team-points.ts` (s. Dateikopf-Kommentar, Playwright-Grenze).
+ */
+export const PPS_DUELL_INDIVIDUAL_PPS_MAX = 5.5;
+export const PPS_DUELL_PPS_ANTEIL_MITTE = 0.25;
+
+type DuellIndividualReferenzFeldgroesse = { iMittel: number; iKrass: number };
+type DuellIndividuellReferenzJson = {
+  feldgroessen?: number[];
+  saatStroeme?: number[];
+  disziplinen?: Record<
+    string,
+    { feldgroessen?: Record<string, { stroeme?: Record<string, { iMittel?: number; iKrass?: number }> }> }
+  >;
+};
+
+const DUELL_INDIVIDUELL_REFERENZ = duellIndividuellReferenzJson as unknown as DuellIndividuellReferenzJson;
+
+/**
+ * Baut JE DISZIPLIN UND FELDGROESSE EINEN Referenzwert aus den (mindestens einem, i.d.R. zwei)
+ * gezogenen Saatstroemen — das arithmetische Mittel von `iMittel` bzw. `iKrass` ueber alle Stroeme.
+ * Die zwei Stroeme in der JSON-Datei sind eine MESSWIEDERHOLUNG zur Absicherung der Ziehung
+ * (Provenienz-Pflicht der Projektaufsicht), keine zwei zur Laufzeit gleichzeitig gueltigen Werte.
+ * Gecached, weil die JSON-Datei pro Prozesslauf unveraendert bleibt.
+ */
+const duellReferenzCache = new Map<string, ReadonlyMap<number, DuellIndividualReferenzFeldgroesse>>();
+
+function ladeDuellReferenzFeldgroessen(disciplineId: string): ReadonlyMap<number, DuellIndividualReferenzFeldgroesse> {
+  const cached = duellReferenzCache.get(disciplineId);
+  if (cached) return cached;
+  const feldgroessen = DUELL_INDIVIDUELL_REFERENZ.disziplinen?.[disciplineId]?.feldgroessen ?? {};
+  const result = new Map<number, DuellIndividualReferenzFeldgroesse>();
+  for (const [nRaw, eintrag] of Object.entries(feldgroessen)) {
+    const n = Number(nRaw);
+    const stroeme = Object.values(eintrag?.stroeme ?? {}).filter(
+      (s): s is { iMittel: number; iKrass: number } =>
+        typeof s?.iMittel === "number" && Number.isFinite(s.iMittel) && typeof s?.iKrass === "number" && Number.isFinite(s.iKrass),
+    );
+    if (!Number.isFinite(n) || stroeme.length === 0) continue;
+    const iMittel = stroeme.reduce((sum, s) => sum + s.iMittel, 0) / stroeme.length;
+    const iKrass = stroeme.reduce((sum, s) => sum + s.iKrass, 0) / stroeme.length;
+    if (iMittel > 0 && iKrass > iMittel) result.set(n, { iMittel, iKrass });
+  }
+  duellReferenzCache.set(disciplineId, result);
+  return result;
+}
+
+/**
+ * Loest die Referenz EINER Disziplin fuer EXAKT die angefragte Feldgroesse auf — ANDERS als
+ * `resolveArenaPpsReferenz()` BEWUSST OHNE Rueckfall auf die naechstgelegene gezogene Feldgroesse.
+ * Grund: die Arena-Referenz deckt ALLE fuenf Feldgroessen (2..6) ab, ein Nearest-Match extrapoliert
+ * dort also nur innerhalb bereits gemessener Nachbarn. Die Bruecken-Referenz deckt ABSICHTLICH NUR
+ * {5,6} ab (die CLAUDE.md-Abnahmegroessen) — Feldgroesse 2..4 ist Task #175, ein separat offener
+ * Punkt, den dieser Fix NICHT verschlimmern darf. Ein Nearest-Match wuerde z.B. Feldgroesse 2 auf
+ * die n=5-Referenz zerren, eine UNGEMESSENE Extrapolation genau in dem Bereich, den der Auftrag
+ * ausdruecklich nicht anfassen soll. Liefert deshalb `null` fuer jede Feldgroesse ausser 5/6 (und
+ * fuer jede Disziplin ohne gezogene Referenz ueberhaupt) — der Aufrufer faellt dann unveraendert
+ * auf das bisherige, team-rang-gebundene Verhalten zurueck, mit Warnung.
+ */
+export function resolveDuellIndividualPpsReferenz(
+  disciplineId: string,
+  playerCount: number | null | undefined,
+): { referenz: DuellIndividualReferenzFeldgroesse; feldgroesseGenutzt: number } | null {
+  if (typeof playerCount !== "number" || !Number.isFinite(playerCount)) return null;
+  const n = Math.round(playerCount);
+  const feldgroessen = ladeDuellReferenzFeldgroessen(disciplineId);
+  const referenz = feldgroessen.get(n);
+  if (!referenz) return null;
+  return { referenz, feldgroesseGenutzt: n };
+}
+
+/**
+ * DIE IMPACT-KURVE DER BRUECKE — seit Opus-Auflage 18.10. (PR #1284-Review, "Code-Dopplung
+ * aufloesen") dieselbe FORMEL wie `ppsAusArenaImpact()`, aus `lib/battle/impact-kurve.ts`
+ * importiert statt eigenstaendig kopiert zu sein (die EINZIGE Zeile dort ohne Fremd-Importe, darf
+ * deshalb hier importiert werden, ohne die Playwright-Grenze aus dem Dateikopf-Kommentar zu
+ * verletzen). Nur `max`/`anteilMitte` (Bruecken-eigene Regler) und die Referenz-Beschaffung
+ * bleiben hier — die Mathematik selbst steht jetzt an EINER Stelle.
+ */
+export function ppsAusDuellWert(
+  wert: number,
+  referenz: DuellIndividualReferenzFeldgroesse,
+  max: number = PPS_DUELL_INDIVIDUAL_PPS_MAX,
+  anteilMitte: number = PPS_DUELL_PPS_ANTEIL_MITTE,
+): number {
+  return ppsAusImpact(wert, referenz, max, anteilMitte);
+}
+
+/**
+ * Baut die individuellen PPs ALLER Spieler EINER Team-Seite, die ueber die Bruecke gewertet wird —
+ * EINE Stelle fuer `legacy-matchday-resolve-engine.ts`, statt die Kurve dort pro Spieler inline
+ * aufzurufen. Liefert `null` (statt einer leeren Map), wenn fuer diese Disziplin/Feldgroesse KEINE
+ * Referenz vorliegt — der Aufrufer unterscheidet "kein Duell" (leere Map waere dasselbe wie "alle 0")
+ * nicht von "keine Referenz, alter Pfad greift weiter".
+ */
+export function berechneDuellIndividualPpsFuerSeite(input: {
+  disciplineId: string;
+  playerCount: number | null | undefined;
+  entries: ReadonlyArray<{ playerId: string; wert: number | null | undefined }>;
+}): { ppsByPlayerId: Map<string, number>; feldgroesseGenutzt: number } | null {
+  const referenz = resolveDuellIndividualPpsReferenz(input.disciplineId, input.playerCount);
+  if (!referenz) return null;
+  const ppsByPlayerId = new Map<string, number>();
+  for (const entry of input.entries) {
+    if (entry.wert == null || !Number.isFinite(entry.wert)) continue;
+    ppsByPlayerId.set(entry.playerId, ppsAusDuellWert(entry.wert, referenz.referenz));
+  }
+  return { ppsByPlayerId, feldgroesseGenutzt: referenz.feldgroesseGenutzt };
 }

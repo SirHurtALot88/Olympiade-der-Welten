@@ -62,6 +62,14 @@ export type PlayerPerformancePreview = {
    * Verhaltensunterschied.
    */
   arenaBoxscoreImpactApplied?: boolean;
+  /**
+   * TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Befund 18.10., docs/design/
+   * pps-duell-bruecke-individuelle-pps-18-10.md): true NUR wenn `pointsAwarded` oben aus
+   * `ppsAusDuellWert()` (lib/resolve/battle-mode-pps-duell.ts) kam — der Impact-Kurve der Bruecke,
+   * analog zu `arenaBoxscoreImpactApplied` fuer die Arena. Rein informativ (Debug/Anzeige); fehlt
+   * es (aeltere Preview-Objekte), gilt der Default "false" — kein Verhaltensunterschied.
+   */
+  duellIndividualPpsApplied?: boolean;
   rankInTeam: number;
   rankInDiscipline: number;
   isTop10: boolean;
@@ -241,6 +249,13 @@ export type DisciplineTeamResolvePreview = {
      * Formel. Rein informativ; fehlt es (aeltere Preview-Objekte), gilt der Default "false".
      */
     arenaBoxscoreImpactApplied?: boolean;
+    /**
+     * TEAM-RANG-ENTKOPPLUNG DER PPS-DUELL-BRUECKE (Opus-Befund 18.10.): true NUR wenn
+     * `pointsAwarded` oben aus `ppsAusDuellWert()` (lib/resolve/battle-mode-pps-duell.ts) kam —
+     * analog zu `arenaBoxscoreImpactApplied`, nur fuer die Bruecke statt der Arena. Rein
+     * informativ; fehlt es, gilt der Default "false".
+     */
+    duellIndividualPpsApplied?: boolean;
     isCaptain: boolean;
     warnings: string[];
   }>;
