@@ -1322,9 +1322,26 @@ export type RunBattleModeArenaMatchdayResult = {
  * Berechnung der individuellen PPs (V2, s. Dateikopf-Kommentar).
  *
  * Startet/schliesst pro Aufruf einen eigenen Chromium-Browser (on-demand, s. PR6/Plan 5.4) — bei
- * zwei Ligen also zwei Browser-Starts nacheinander, nicht parallel (haelt den Speicherbedarf auf
- * einen Browser zur selben Zeit begrenzt).
+ * zwei Ligen SEIT DEM LATENZ-FIX 18.10. zwei Browser-Starts GLEICHZEITIG (`Promise.all` weiter
+ * unten), nicht mehr nacheinander. Vorher begrenzte das den Speicherbedarf auf einen Browser zur
+ * selben Zeit; der Root-Cause-Befund dieser Runde zeigt aber, dass der Browser selbst (und sein
+ * `page.goto()`) nur einen kleinen Bruchteil der Laufzeit ausmacht — der Loewenanteil ist das
+ * Neu-Einhaengen des Motors ZWISCHEN den Fixtures EINER Liga-Stufe (s. Kommentar an der
+ * Aufrufstelle unten), und das profitiert vom Parallelisieren der zwei UNABHAENGIGEN Liga-Stufen.
+ * `OLY_ARENA_TIER_PARALLEL=0` schaltet zurueck auf sequenziell (ein Browser zur Zeit).
  */
+/**
+ * NOTSCHALTER fuer den Latenz-Fix 18.10. (Promise.all ueber die Liga-Stufen, s. Dateikopf-
+ * Kommentar an `runBattleModeArenaMatchday()`): `"0"`/`"false"` schaltet auf das alte sequenzielle
+ * Verhalten zurueck, falls der echte CX23-Container die kurzzeitig ~2 GB Chrome-RSS (zwei Browser
+ * gleichzeitig, gemessen ~1 GB je Prozess lokal) nicht mitmacht. Standard AN — s. Vorher/Nachher-
+ * Messung im PR, die den Normalfall (4 GB RAM, 2 vCPU laut `deploy/hetzner/README.md`) abdeckt.
+ */
+export function resolveArenaTierParallelEnabled(): boolean {
+  const raw = process.env.OLY_ARENA_TIER_PARALLEL?.trim().toLowerCase();
+  return raw !== "0" && raw !== "false";
+}
+
 export async function runBattleModeArenaMatchday(
   input: RunBattleModeArenaMatchdayInput,
 ): Promise<RunBattleModeArenaMatchdayResult> {
@@ -1342,12 +1359,38 @@ export async function runBattleModeArenaMatchday(
       : [...(input.matchdayMutatorTraits ?? [])];
   const runOptions: RunArenaFixturesOptions = { ...input.runArenaFixturesOptions, mutatoren };
 
-  for (const tier of LEAGUE_TIERS) {
-    const fixtures = findLeagueFixturesForMatchday(gameState, tier, matchdayId);
-    if (fixtures.length === 0) {
-      continue;
-    }
+  // LIGA-STUFEN GLEICHZEITIG, NICHT MEHR NACHEINANDER (Latenz-Fix 18.10., Chris' Top-Prio-Meldung
+  // "20 Minuten warten"): der ROOT-CAUSE-Befund dieser Runde (echter Chromium, instrumentiert,
+  // `docs/design/arena-vorlauf-latenz-befund-18-10.md` Abschnitt 2) zeigt, dass weder der
+  // Browser-Start (gemessen 130-470ms) noch `page.goto()` (gemessen 550-950ms) den Grossteil der
+  // Zeit fressen, sondern das Neu-Einhaengen des 7,7-MB-Motors ZWISCHEN JEDEM Fixture
+  // (`haengeMotorNeuEin()`, arena-headless-runner.ts) -- gemessen 520-900ms je Fixture, >85% der
+  // Gesamtzeit einer Liga-Stufe. Das laesst sich NICHT risikofrei abschalten: der Host-Kommentar
+  // `FoundationBattleArenaHost.tsx:450` haelt ausdruecklich fest, dass der Motor "zu viel mutablen
+  // Zustand fuer ein In-place-Update" trage -- ein Entfernen des Neu-Einhaengens waere ein Griff in
+  // 20 Disziplinen x 4 Chassis ohne Audit, genau die Art Risiko, die die rho/Pp-Abnahmen dieses
+  // Projekts verbieten.
+  //
+  // Was SICH risikofrei parallelisieren laesst: die ZWEI Liga-Stufen selbst sind voneinander
+  // unabhaengig (eigener Browser-Prozess, eigene Fixtures, eigene Saat) -- nichts, was eine der
+  // beiden tut, kann die andere beeinflussen. Bisher liefen sie trotzdem NACHEINANDER (Kommentar
+  // vorher: "bei zwei Ligen also zwei Browser-Starts nacheinander, nicht parallel"), nur um
+  // hoechstens einen Browserprozess GLEICHZEITIG zu halten. Jetzt laufen sie als `Promise.all`
+  // gleichzeitig -- das verdoppelt den Spitzen-RAM-Bedarf DIESES EINEN Vorlaufs (gemessen ~1 GB
+  // Chrome-RSS je Browser, lokal) auf bis zu ~2 GB fuer seine Dauer, aendert aber NICHTS an der
+  // Semaphor-Garantie "hoechstens ein ARENA-VORLAUF (oder Selbsttest) gleichzeitig projektweit"
+  // (`arena-chromium-semaphor.ts`) -- die haelt weiterhin genau EINEN Aufrufer auf einmal draussen,
+  // dieser eine Aufrufer darf jetzt nur INTERN zwei Browser statt einem nutzen. Cross-Save-Schutz
+  // (Chris + Franky in getrennten Spielstaenden) UND die Selbsttest-Exklusivitaet
+  // (`tests/arena-chromium-selftest.test.ts`) bleiben dadurch unangetastet.
+  //
+  // `OLY_ARENA_TIER_PARALLEL=0` schaltet auf das alte sequenzielle Verhalten zurueck (Notschalter,
+  // falls der CX23 die ~2 GB Spitzenlast nicht mitmacht) -- Standard ist AN, s. Messung im PR.
+  const tierParallel = resolveArenaTierParallelEnabled();
 
+  const tierLaeufe = LEAGUE_TIERS.map((tier) => {
+    const fixtures = findLeagueFixturesForMatchday(gameState, tier, matchdayId);
+    if (fixtures.length === 0) return null;
     const seedByFixtureKey = new Map<string, string>();
     const fixtureInputs: ArenaFixtureInput[] = fixtures.map((fixture) => {
       const seed = buildArenaMatchSeed({
@@ -1361,28 +1404,46 @@ export async function runBattleModeArenaMatchday(
       seedByFixtureKey.set(`${fixture.homeTeamId}::${fixture.awayTeamId}`, seed);
       return { homeTeamId: fixture.homeTeamId, awayTeamId: fixture.awayTeamId, seed };
     });
+    return { tier, fixtures, seedByFixtureKey, fixtureInputs };
+  }).filter((lauf): lauf is NonNullable<typeof lauf> => lauf !== null);
 
-    let fixtureResults: ArenaFixtureResult[];
+  const fuehreTierAus = async (lauf: NonNullable<(typeof tierLaeufe)[number]>) => {
     try {
-      fixtureResults = await runImpl(gameState, fixtureInputs, disciplineId, runOptions);
+      const fixtureResults = await runImpl(gameState, lauf.fixtureInputs, disciplineId, runOptions);
+      return { lauf, fixtureResults, fehler: null as string | null };
     } catch (error) {
-      warnings.push(
-        `arena_matchday_league_failed:${tier}:${error instanceof Error ? error.message : String(error)}`,
-      );
+      return { lauf, fixtureResults: null, fehler: error instanceof Error ? error.message : String(error) };
+    }
+  };
+
+  // Reihenfolge der ERGEBNISSE bleibt die FESTE Liga-Reihenfolge (`LEAGUE_TIERS`), unabhaengig
+  // davon, welche Stufe im Parallel-Fall zuerst fertig wird -- Warnungen/Logs bleiben damit
+  // deterministisch lesbar, wie vorher.
+  const tierErgebnisse = tierParallel
+    ? await Promise.all(tierLaeufe.map(fuehreTierAus))
+    : await (async () => {
+        const out: Awaited<ReturnType<typeof fuehreTierAus>>[] = [];
+        for (const lauf of tierLaeufe) out.push(await fuehreTierAus(lauf));
+        return out;
+      })();
+
+  for (const { lauf, fixtureResults, fehler } of tierErgebnisse) {
+    if (fehler !== null || !fixtureResults) {
+      warnings.push(`arena_matchday_league_failed:${lauf.tier}:${fehler}`);
       continue;
     }
 
     alleFixtureErgebnisse.push(...fixtureResults);
 
-    const tierOverrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, seedByFixtureKey);
+    const tierOverrides = computeArenaTeamPointsFromFixtureResults(fixtureResults, lauf.seedByFixtureKey);
     for (const [teamId, override] of tierOverrides) {
       overridesByTeamId.set(teamId, override);
     }
 
-    const expectedTeamIds = new Set(fixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
+    const expectedTeamIds = new Set(lauf.fixtures.flatMap((fixture) => [fixture.homeTeamId, fixture.awayTeamId]));
     for (const teamId of expectedTeamIds) {
       if (!tierOverrides.has(teamId)) {
-        warnings.push(`arena_matchday_missing_result:${tier}:${teamId}`);
+        warnings.push(`arena_matchday_missing_result:${lauf.tier}:${teamId}`);
       }
     }
   }
