@@ -160,7 +160,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl } = buildMockRunner({ [D1_ARENA]: [80, 70], [D2_ARENA]: [60, 90] });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -173,7 +173,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
     // der Kern von Fund B1: der gesamte Spieltag fiel auf PPS zurueck, obwohl beide Disziplinen
     // arena-faehig sind.
     expect(kickoff.applicable).toBe(true);
-    if (kickoff.applicable) {
+    if (kickoff.applicable && !kickoff.booked) {
       expect(kickoff.save.gameState.seasonState.arenaMatchdayResolveStatus).toBe("in_progress");
     }
 
@@ -190,7 +190,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
       [D2_ARENA]: [60, 90],
     });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -227,7 +227,7 @@ describe("Unveraendert: ein Spieltag mit NUR EINER arena-faehigen Disziplin", ()
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl, aufrufeJeDisziplin } = buildMockRunner({ [D1_ARENA]: [80, 70] });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -247,12 +247,12 @@ describe("Unveraendert: ein Spieltag mit NUR EINER arena-faehigen Disziplin", ()
 });
 
 describe("Unveraendert: kein arena-aufgeloester Spieltag", () => {
-  it("bleibt applicable:false, wenn weder D1 noch D2 arena-faehig sind", () => {
+  it("bleibt applicable:false, wenn weder D1 noch D2 arena-faehig sind", async () => {
     const gameState = buildMinimalBattleModeGameState({ d1: "football", d2: "mini-dm" });
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl } = buildMockRunner({});
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",

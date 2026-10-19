@@ -110,7 +110,22 @@ export type ArenaAusfallGrund =
   | "ergebnis_unvollstaendig" // arena_matchday_missing_result: Team ohne Duell-Ergebnis
   | "abgebrochen_neustart" // in_progress aelter als 5 min (erst ab PR 3 relevant)
   | "deaktiviert" // arenaModus "aus" (Tests/Notschalter, erst ab PR 3 relevant)
-  | "nicht_ausgefuehrt"; // Engine-Strukturpruefung: gewertet, aber nie versucht (die K1-Klasse)
+  | "nicht_ausgefuehrt" // Engine-Strukturpruefung: gewertet, aber nie versucht (die K1-Klasse)
+  /**
+   * OPUS-REVIEW (Nachtrag 18.10., B3-Instabilitaets-Fix): der `arenaEingabeHash` weicht beim
+   * Buchen ZWEIMAL IN FOLGE fuer dieselbe Aufstellungs-Signatur ab, obwohl die Signatur selbst
+   * (`buildMatchdayResolveSignature()`, Slots/Formkarten/Verfuegbarkeit) unveraendert blieb --
+   * etwas, das NUR der feinere Fingerabdruck sieht (z. B. Fatigue, ein von der KI neu
+   * gespeichertes Lineup mit identischer Belegung, oder eine Zeitstempel-/Map-Reihenfolge-
+   * Abhaengigkeit in `buildArenaTeam()`/`buildArenaAufstellungBeide()`), aendert sich zwischen
+   * Vorlauf und Buchung immer wieder. OHNE diesen Grund haette ein dritter erzwungener
+   * Vorlauf-Neustart eine Endlosschleife ausgeloest (Vorlauf "ready" -> Divergenz -> neuer
+   * Vorlauf -> "ready" -> Divergenz -> ...) -- NIE eine Buchung, Chromium im Dauerlauf. Nach der
+   * ZWEITEN Divergenz zur selben Signatur wird stattdessen sofort die PPS-Duell-Bruecke gebucht,
+   * mit diesem Grund sichtbar markiert statt eines generischen `"nicht_ausgefuehrt"` (die Arena
+   * LIEF ja, zweimal sogar -- nur ihr Ergebnis passte beim Buchen nicht mehr zur Eingabe).
+   */
+  | "eingabe_instabil";
 
 export type ArenaAusfall = {
   grund: ArenaAusfallGrund;

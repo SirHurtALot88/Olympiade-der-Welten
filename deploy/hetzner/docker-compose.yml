@@ -29,6 +29,12 @@ services:
       OLY_AUTH_SECRET: ${OLY_AUTH_SECRET:-}
       OLY_USER_CHRIS_PASSWORD: ${OLY_USER_CHRIS_PASSWORD:-}
       OLY_USER_FRANKY_PASSWORD: ${OLY_USER_FRANKY_PASSWORD:-}
+      # Arena-Vorlauf (Latenz-Fix 18.10., PR #1290): ohne diese Durchreichung erreichte ein Wert in
+      # deploy/hetzner/.env den Container NIE (Compose nimmt .env nur zur Interpolation dieser Datei)
+      # -- der Notschalter waere nur per Code-Aenderung schaltbar gewesen. Leer = Code-Standard
+      # (parallel AN, RAM-Guard 2048 MB). Siehe deploy/hetzner/.env.example.
+      OLY_ARENA_TIER_PARALLEL: ${OLY_ARENA_TIER_PARALLEL:-}
+      OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: ${OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB:-}
     volumes:
       - oly-data:/app/data/persistence
       # Bug-Meldungen MUESSEN ein eigenes Volume haben. Ohne dieses Mount schreibt die Flagge nach

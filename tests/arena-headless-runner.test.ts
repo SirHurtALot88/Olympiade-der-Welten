@@ -520,8 +520,25 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
       for (const eintrag of ergebnis.boxscore) {
         expect(eintrag.wert).toBeGreaterThanOrEqual(0);
       }
+
+      // GOLDEN-TEST-ERWEITERUNG (Opus-Review, Merge-Bedingung PR 3/K1): derselbe Determinismus-/
+      // Seed-Sensitivitaets-Beweis wie oben fuer das Feldspiel-Chassis (Basketball), jetzt auch
+      // fuer das Buehnen-Duell-Chassis -- bisher nur strukturell geprueft (Form, Wertebereich),
+      // nie bitgenau wiederholt.
+      const [wiederholung] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "speed-schach-chassis-abnahme" }],
+        "speed-schach",
+      );
+      expect(wiederholung).toEqual(ergebnis);
+      const [andererSeed] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "speed-schach-chassis-abnahme-anderer-seed" }],
+        "speed-schach",
+      );
+      expect(andererSeed).not.toEqual(ergebnis);
     },
-    LAUF_TIMEOUT_MS,
+    LAUF_TIMEOUT_MS * 3,
   );
 
   /**
@@ -556,8 +573,23 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
       const summeBoxscore = ergebnis.boxscore.reduce((a, e) => a + e.wert, 0);
       const summeSeiten = ergebnis.seiten[0] + ergebnis.seiten[1];
       expect(summeSeiten).toBeCloseTo(summeBoxscore, 5);
+
+      // GOLDEN-TEST-ERWEITERUNG (Opus-Review, Merge-Bedingung PR 3/K1): Determinismus-/
+      // Seed-Sensitivitaets-Beweis jetzt auch fuer das Buehnen-Auftritt-Chassis.
+      const [wiederholung] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "showcase-chassis-abnahme" }],
+        "showcase",
+      );
+      expect(wiederholung).toEqual(ergebnis);
+      const [andererSeed] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "showcase-chassis-abnahme-anderer-seed" }],
+        "showcase",
+      );
+      expect(andererSeed).not.toEqual(ergebnis);
     },
-    LAUF_TIMEOUT_MS,
+    LAUF_TIMEOUT_MS * 3,
   );
 
   /**
@@ -599,8 +631,23 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runArenaFixtures", () => {
       for (const eintrag of ergebnis.boxscore) {
         expect(eintrag.wert).toBeGreaterThanOrEqual(0);
       }
+
+      // GOLDEN-TEST-ERWEITERUNG (Opus-Review, Merge-Bedingung PR 3/K1): Determinismus-/
+      // Seed-Sensitivitaets-Beweis jetzt auch fuer das Buehnen-Gauntlet-Chassis.
+      const [wiederholung] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "breaking-gauntlet-chassis-abnahme" }],
+        "breaking",
+      );
+      expect(wiederholung).toEqual(ergebnis);
+      const [andererSeed] = await runArenaFixtures(
+        gameState,
+        [{ homeTeamId: "team-heim", awayTeamId: "team-gast", seed: "breaking-gauntlet-chassis-abnahme-anderer-seed" }],
+        "breaking",
+      );
+      expect(andererSeed).not.toEqual(ergebnis);
     },
-    LAUF_TIMEOUT_MS,
+    LAUF_TIMEOUT_MS * 3,
   );
 
   /**

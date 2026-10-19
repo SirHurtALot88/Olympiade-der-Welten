@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { kickoffArenaVorlauf } from "@/lib/battle/arena-vorlauf-service";
 import { describeLineupCommitment } from "@/lib/lineups/matchday-lineup-lock";
 import {
   getLocalLegacyLineupDraft,
@@ -206,6 +207,16 @@ export async function PUT(request: Request) {
         seasonId: params.seasonId,
         matchdayId: params.matchdayId,
       });
+    } catch {
+      // bewusst geschluckt, siehe oben
+    }
+
+    // ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.3): genau der Moment, in dem die "eine Rechnung"
+    // oben steht, ist auch der richtige Moment, den Arena-Vorlauf anzustossen (detached, kein
+    // Chromium in diesem Request). Battle Mode ohne arena-aufgeloeste Disziplin an D1/D2 liefert
+    // `applicable: false` und tut nichts — unveraendertes Verhalten dort.
+    try {
+      kickoffArenaVorlauf({ saveId: params.saveId, seasonId: params.seasonId, matchdayId: params.matchdayId });
     } catch {
       // bewusst geschluckt, siehe oben
     }

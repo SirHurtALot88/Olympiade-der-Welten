@@ -12,6 +12,7 @@ import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
+import { baueFixtureIndex, findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaHostSpielquelleHinweise } from "@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis";
 
 /**
@@ -275,15 +276,24 @@ export default function FoundationBattleArenaHost({
   // Import von dort). Keine zweite Implementierung, kein zweiter Pfad — nur ein zweiter
   // Aufrufer derselben Funktionen mit denselben Argumenten.
   //
-  // Ein Eintrag entsteht NUR fuer eine Disziplin, die an DIESEM Spieltag (`disciplineSchedule`)
-  // als D1 ODER D2 gebucht UND arena-aufgeloest ist (`ARENA_RESOLVED_DISCIPLINE_IDS`, dieselbe
-  // Menge, die `runBattleModeArenaMatchday()` fuer die echte Wertung prueft) — jede andere vom
-  // eingebetteten Motor waehlbare Disziplin (inklusive des Standard-Tabs "tdm", der ueberhaupt
-  // keine gewertete Olympiade-Disziplin ist) hat hier bewusst KEINEN Eintrag und faellt im Motor
-  // unveraendert auf die bisherige Ersatzsaat 1337 zurueck (s. `gebuchteSaatFuerAktuelleDisziplin()`
-  // in battle-mode.engine.js) — GENAUSO, wenn Chris hier zwei beliebige Teams zum Erkunden waehlt,
-  // die an diesem Spieltag gar nicht gegeneinander gebucht sind: fuer sie wurde nie ein echtes
-  // Ergebnis gezaehlt, es gibt also keine Saat zum Nachstellen.
+  // F9-FIX (PR 3, K1 — Plan Abschnitt 5.2 "Host-Orientierung"): bis hierher baute dieser Block die
+  // Saat IMMER aus `heimTeamId`/`gastTeamId` — also aus der UI-AUSWAHL, nicht aus dem tatsaechlich
+  // gebuchten Fixture. Waehlt der Spieler das Paar verkehrt herum, hiess der Seed-String
+  // `...:<away>:<home>` statt `...:<home>:<away>`, ergab eine ANDERE Saat, und es wurde nie
+  // geprueft, ob das Paar an diesem Spieltag ueberhaupt ein Fixture ist (der Kommentar oben
+  // behauptete einen Rueckfall auf 1337 fuer Nicht-Fixture-Paare, den dieser Code nie hatte). Der
+  // Fix: `findeSpieltagsFixtures()`/`baueFixtureIndex()` (`lib/resolve/battle-mode-pps-duell.ts`,
+  // bewusst ohne Fremd-Importe, s. dortiger Kommentar) sucht das ECHTE Fixture dieses Spieltags zu
+  // `heimTeamId`. Nur wenn es existiert UND sein Gegner GENAU `gastTeamId` ist (in beliebiger
+  // Reihenfolge), wird die Saat aus `fixture.homeTeamId`/`fixture.awayTeamId` gebaut — ORIENTIERUNGS-
+  // UNABHAENGIG von der UI-Auswahl, also bitgleich mit dem, was der zaehlende Lauf verwendet hat.
+  // Jedes andere Paar (kein Fixture / falscher Gegner) bekommt weiterhin KEINEN Eintrag und faellt
+  // im Motor auf die Ersatzsaat 1337 zurueck — jetzt tatsaechlich wahr, nicht nur behauptet.
+  const spieltagFixtures = useMemo(
+    () => findeSpieltagsFixtures(gameState, gameState.matchdayState?.matchdayId ?? ""),
+    [gameState, gameState.matchdayState?.matchdayId],
+  );
+  const spieltagFixtureIndex = useMemo(() => baueFixtureIndex(spieltagFixtures), [spieltagFixtures]);
   const arenaSeedByDisciplineId = useMemo(() => {
     const karte: Record<string, number> = {};
     const seasonId = gameState.season?.id;
@@ -299,20 +309,31 @@ export default function FoundationBattleArenaHost({
     ) {
       return karte;
     }
+    const echtesFixture = spieltagFixtureIndex.get(heimTeamId);
+    const istDasGewaehltePaar =
+      echtesFixture &&
+      ((echtesFixture.homeTeamId === heimTeamId && echtesFixture.awayTeamId === gastTeamId) ||
+        (echtesFixture.homeTeamId === gastTeamId && echtesFixture.awayTeamId === heimTeamId));
+    if (!istDasGewaehltePaar || !echtesFixture) {
+      // Kein Fixture dieses Spieltags fuer dieses Paar -- kein Eintrag, Motor faellt auf 1337.
+      return karte;
+    }
     const spieltag = gameState.seasonState?.disciplineSchedule?.find(
       (eintrag) => eintrag.matchdayId === matchdayId,
     );
     if (!spieltag) return karte;
     for (const slot of [spieltag.discipline1, spieltag.discipline2]) {
       if (!slot || !ARENA_RESOLVED_DISCIPLINE_IDS.has(slot.disciplineId)) continue;
+      // IMMER `echtesFixture.homeTeamId`/`.awayTeamId`, NIE `heimTeamId`/`gastTeamId` direkt --
+      // orientierungsunabhaengig von der UI-Auswahl, s. Kommentar oben.
       karte[slot.disciplineId] = seedZuZahl(
         buildArenaMatchSeed({
           saveId,
           seasonId,
           matchdayId,
           disciplineId: slot.disciplineId,
-          homeTeamId: heimTeamId,
-          awayTeamId: gastTeamId,
+          homeTeamId: echtesFixture.homeTeamId,
+          awayTeamId: echtesFixture.awayTeamId,
         }),
       );
     }
@@ -324,6 +345,7 @@ export default function FoundationBattleArenaHost({
     gameState.seasonState?.disciplineSchedule,
     heimTeamId,
     gastTeamId,
+    spieltagFixtureIndex,
   ]);
 
   // MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf

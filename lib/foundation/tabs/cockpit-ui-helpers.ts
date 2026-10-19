@@ -102,6 +102,13 @@ export function formatCockpitReason(reason: string) {
   if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal prüfen.";
   if (reason === "early_season_setup_allowed_before_first_result") return "Früher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
   if (reason === "concurrent_save_write_conflict") return "Ein anderer Mitspieler hat währenddessen gespeichert. Bitte neu laden und erneut versuchen.";
+  // PR 3 (K1, Opus-Review B4): werden nur noch sichtbar, wenn die Client-seitige Wartezeit
+  // (`commitArenaDiscipline`, `use-foundation-shell-router-body-scope.tsx`) ausgeschoepft ist --
+  // im Normalfall bucht der Lauf automatisch, sobald der Vorlauf fertig ist.
+  if (reason === "arena_vorlauf_laeuft") return "Die Arena-Duelle werden noch ausgetragen — bitte kurz warten und erneut versuchen.";
+  if (reason === "arena_eingabe_divergenz") return "Die Aufstellung hat sich seit dem Arena-Vorlauf geändert — ein neuer Vorlauf läuft, bitte kurz warten.";
+  if (reason === "arena_vorlauf_teilausfall") return "Mindestens eine Arena-Disziplin ist ausgefallen und wird über die PPS-Wertung gebucht.";
+  if (reason === "arena_vorlauf_kein_snapshot") return "Für diesen Spieltag liegt noch keine Arena-Vorberechnung vor.";
 
   /**
    * BEFUND F9 (Aufgabe #44): die Codes des Server-Write-Guards kannte diese Funktion nicht. Sie

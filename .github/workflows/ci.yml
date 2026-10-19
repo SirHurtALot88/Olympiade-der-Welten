@@ -295,6 +295,83 @@ jobs:
       - run: npm run ci:import-exists
       - run: npm test
 
+  # ARENA-CHROMIUM-TESTS (PR 3/K1, Opus-Review 18.10.) — der einzige Job, der die paar Tests
+  # faehrt, die ECHTES Chromium brauchen, UM ETWAS ZU BEWEISEN (nicht nur, um es zu tolerieren).
+  #
+  # WARUM EIN EIGENER JOB: `full-test-suite`/`persistenz-suiten` installieren bewusst KEIN
+  # Chromium (s. deren Kommentare) — der Arena-Vorlauf faellt dort korrekt auf die PPS-Duell-
+  # Bruecke zurueck, und die bestehenden Tests dort (Task #164, K1-Simulation) tolerieren das
+  # ausdruecklich ("entweder arena ODER erklaerter Ausfall"). GENAU DESHALB bewiesen diese drei
+  # Jobs zusammen NIE, dass die Arena-SEITE des Versprechens "was du siehst, wird gebucht"
+  # tatsaechlich stimmt — nur ein lokaler/manueller Lauf tat das, und ein lokaler Lauf ist kein
+  # CI-Tor. `test-and-smoke` installiert zwar Chromium, faehrt aber nur `ci:flow-smoke`s feste
+  # 18-Datei-Liste, die keine dieser Dateien enthaelt.
+  #
+  # WAS HIER LAEUFT: genau die vier Dateien, die den Arena-Vorlauf tatsaechlich mit echtem
+  # Chromium durchspielen — Vorlauf-Service (inkl. B1: genau eine automatische Wiederholung),
+  # die Arena-Pfad-Paritaet ("was du siehst, wird gebucht"), der K1-Simulationstest und der
+  # Task-#164-Invariantentest (2 Spieltage).
+  #
+  # `OLY_ARENA_CHROMIUM_PFLICHT=1`: macht ein fehlendes Chromium in DIESEM Job zu einem LAUTEN
+  # Testfehler statt eines stillen Skips (s. `describe.skipIf` in arena-vorlauf-parity.test.ts) —
+  # sonst wuerde ein kaputter Install-Schritt diesen Job einfach leise gruen durchlaufen lassen,
+  # und genau das Versprechen, das dieser Job beweisen soll, bliebe wieder unbewiesen.
+  #
+  # NICHT PFLICHT-CHECK (bewusst, vorerst): neu und noch nicht ueber mehrere Laeufe als stabil
+  # bestaetigt. Nach ein paar gruenen Laeufen gehoert er auf Chris' Branch-Schutz-Liste (Settings
+  # -> Branches -> Require status checks), genau wie `persistenz-suiten` es vorher war.
+  arena-chromium-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set CI SQLite path
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-arena-chromium.sqlite" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      # Derselbe Deckel wie in `test-and-smoke` (s. dortiger Kommentar): `--with-deps` kann an
+      # einem haengenden apt-Mirror festlaufen, der Fallback ohne Systempakete haelt den Job am
+      # Leben, auch wenn das dann als klarer Browser-Fehler statt eines stillen Haengers auffiele.
+      - name: Install Chromium for Playwright
+        run: timeout 360 npx playwright install chromium --with-deps || npx playwright install chromium
+      - run: npm run ci:import-exists
+      # VIER GETRENNTE AUFRUFE, NICHT EINER (CI-Fund, 18.10., Root Cause fuer den OOM-Absturz
+      # "JavaScript heap out of memory" nach ~12 Minuten im ersten Lauf dieses Jobs): Code-Review
+      # von `arena-headless-runner.ts`/`arena-chromium-selftest.ts` zeigt, dass JEDER
+      # `chromium.launch()` ueber ein `finally` (bzw. einen "nur einmal schliessen"-Schutz, auch
+      # auf dem B2-Hart-Timeout-Pfad) mit `browser.close()` beantwortet wird, und das
+      # In-Prozess-Dedup (`laufendeVorlaeufe`) raeumt sich ebenfalls per `.finally()` auf -- KEIN
+      # Hinweis auf nicht geschlossene Browser-/Page-Handles in diesem PR. Der echte Grund: diese
+      # vier Dateien sind die SCHWERSTEN im Repo (echtes Chromium, volle 32-Team-Spielstaende mit
+      # hunderten Spielerobjekten, teils mehrere Spieltage/Vorlaeufe je Test) -- und `vitest.config.ts`
+      # setzt KEINE `pool`/`poolOptions`, Vitests Default-Scheduling teilt mehrere Dateien auf
+      # denselben geforkten Node-Prozess, wenn die Runner-CPU-Zahl kleiner ist als die Dateizahl.
+      # Dann summiert sich der Speicher ALLER vier Dateien in EINEM V8-Heap, statt dass jede Datei
+      # einen frischen Prozess bekommt. Ein eigener `npx vitest run`-Aufruf JE Datei erzwingt genau
+      # das: jede Zeile unten startet einen komplett neuen Node-Prozess, der beim Beenden seinen
+      # gesamten Speicher (Chromium-Objekte, Spielstaende, SQLite-Verbindungen) garantiert freigibt,
+      # bevor die naechste Datei beginnt -- ohne an `--max-old-space-size` zu raten oder
+      # Pool-Internals zu vertrauen, deren Verhalten von der Runner-CPU-Zahl abhaengt.
+      - name: "Arena-Vorlauf-Test 1/4: Parity (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/arena-vorlauf-parity.test.ts
+      - name: "Arena-Vorlauf-Test 2/4: Service/B1/B3 (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/arena-vorlauf-service.test.ts
+      - name: "Arena-Vorlauf-Test 3/4: Ausfall sichtbar/K1 (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/battle-mode-arena-ausfall-sichtbar.test.ts
+      - name: "Arena-Vorlauf-Test 4/4: Auto-Run-Invarianten (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/battle-mode-auto-run-invarianten.test.ts
+
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #
   # DER ZWECK: `full-test-suite` daneben ist kein Pflicht-Check, und die Einstellung dafuer liegt
