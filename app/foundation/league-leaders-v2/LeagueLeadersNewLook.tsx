@@ -247,11 +247,20 @@ function LeaderAvatar({
   name,
   className,
   starTier = null,
+  eager = false,
 }: {
   playerId: string;
   name: string;
   className: string;
   starTier?: PlayerStarTier | null;
+  /**
+   * Opus-Review PR #1295 (Chris, Punkt A "Spielerbilder fehlen"): die Leaders-Kacheln stehen in
+   * einem Raster, dessen untere Reihe (PP SOC/MVS/OVR) auf einem normalen Bildschirm unterhalb der
+   * Falz liegt — `BudgetedMediaImage` laedt dort erst beim Hineinscrollen und zeigt bis dahin die
+   * Initialen. Fuer die festen Top-5 je Kategorie (ein paar Dutzend Thumbnails, durch das
+   * Ladebudget ohnehin gedrosselt) sofort laden; lange Listen (Drawer, All-Time) bleiben lazy.
+   */
+  eager?: boolean;
 }) {
   const portraitSrc = getPlayerPortraitBrowserUrl(playerId, null, null, { variant: "thumb" });
   const initials = getLeaderInitials(name);
@@ -265,9 +274,10 @@ function LeaderAvatar({
             alt={name}
             width={44}
             height={44}
-            loading="lazy"
+            loading={eager ? "eager" : "lazy"}
             fetchPriority="low"
             fallback={initials}
+            eager={eager}
           />
         ) : (
           initials
@@ -828,6 +838,7 @@ export default function LeagueLeadersNewLook({
                     name={leader.name}
                     className="nl-leaders-hero-avatar"
                     starTier={getLeaderStarTier(leader.ovrRank)}
+                    eager
                   />
                   <span className="nl-leaders-hero-copy">
                     <span className="nl-leaders-hero-rankline">
@@ -867,6 +878,7 @@ export default function LeagueLeadersNewLook({
                         name={entry.name}
                         className="nl-leaders-row-avatar"
                         starTier={getLeaderStarTier(entry.ovrRank)}
+                        eager
                       />
                       <span className="nl-leaders-row-player">
                         <strong>{entry.name}</strong>
@@ -1910,10 +1922,17 @@ function AllTimeDisciplineLeadersPanel({
                 <tr key={row.playerId}>
                   <td className="is-align-right nl-tnum">{index + 1}</td>
                   <td>
-                    <button type="button" className="nl-alltime-player-link" onClick={() => onOpenPlayer(row.playerId)}>
-                      {row.playerName}
-                    </button>
-                    <span className="nl-alltime-player-team">{row.teamCode ?? row.teamName ?? "—"}</span>
+                    {/* Opus-Review PR #1295 (Chris, Punkt A): Portrait wie in der Legenden-Tabelle
+                        nebenan (`LeaderAvatar`, `nl-legends-table-avatar`) — vorher nur Name/Team. */}
+                    <span className="nl-alltime-player-cell">
+                      <LeaderAvatar playerId={row.playerId} name={row.playerName} className="nl-legends-table-avatar" />
+                      <span>
+                        <button type="button" className="nl-alltime-player-link" onClick={() => onOpenPlayer(row.playerId)}>
+                          {row.playerName}
+                        </button>
+                        <span className="nl-alltime-player-team">{row.teamCode ?? row.teamName ?? "—"}</span>
+                      </span>
+                    </span>
                   </td>
                   <td className="is-align-right nl-tnum">{formatNlNumber(row.seasonsPlayed, 0)}</td>
                   {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => (

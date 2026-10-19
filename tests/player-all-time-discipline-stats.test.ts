@@ -338,7 +338,6 @@ describe("player-all-time-discipline-stats", () => {
             teamName: team.name,
             appearances: 1,
             totalContribution: 5,
-            totalFinalScore: 0,
             averageContribution: 5,
             averageFinalScore: 0,
             top10Count: 0,

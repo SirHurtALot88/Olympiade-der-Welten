@@ -70143,6 +70143,12 @@ span.nl-facility-ampel-chip {
   opacity: 0.4;
 }
 
+.is-new-look .nl-alltime-player-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .is-new-look .nl-alltime-player-link {
   display: block;
   background: none;
