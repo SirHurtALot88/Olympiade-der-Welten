@@ -75,7 +75,11 @@ import {
   POINTS_PER_PARTICIPATING_PLAYER,
 } from "@/lib/season/title-race";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
-import { resolveSpielquelleLabel, type SpieltagsPaarung } from "@/lib/foundation/season-matchday-fixtures-overview";
+import {
+  resolveSpielquelleLabel,
+  type SpieltagsPaarung,
+  type SpieltagsPaarungTeilnehmer,
+} from "@/lib/foundation/season-matchday-fixtures-overview";
 import type { LeagueTier } from "@/lib/season/league-split";
 
 /**
@@ -313,6 +317,24 @@ function getAreaRankBandClass(rank: number | undefined): string {
   if (rank <= 10) {
     return "nl-rankband-risk";
   }
+  return "";
+}
+
+/**
+ * Modernisierung Saisonstand (Chris: "wie bei NBA oder in der Bundesliga ... dass wir die
+ * Tabelle mal hübsch bekommen"): Rang-Chip-Zusatzklasse für die Top-3-Medaillenfarbe —
+ * dieselben Tokens wie Podium/NlMedalBadge, nicht neu erfunden. Gilt sowohl für die
+ * Rang-Spalte der Daten-Tabelle als auch für die Rang-Chips der Spieltage-Paarungskarten
+ * (renderSpieltagTeamRank/renderSpieltagPrematchStandings) — eine Quelle für "wie sieht ein
+ * Tabellenplatz aus", in beiden Ansichten gleich.
+ */
+function nlRankTierClass(rank: number | null | undefined): string {
+  if (rank == null || !Number.isFinite(rank)) {
+    return "";
+  }
+  if (rank === 1) return " is-rank-1";
+  if (rank === 2) return " is-rank-2";
+  if (rank === 3) return " is-rank-3";
   return "";
 }
 
@@ -709,6 +731,7 @@ export default function SeasonStandingsNewLook({
   onOpenPrize,
   isLoading = false,
   spieltage,
+  currentMatchdayId = null,
 }: SeasonStandingsV2ClientProps) {
   const isRivalTeam = (teamId: string) => rivalTeamIds?.has(teamId) ?? false;
   /**
@@ -1747,7 +1770,7 @@ export default function SeasonStandingsNewLook({
                   )}
                 </th>
               ) : null}
-              <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
+              <th className="nl-standings-th-bonus">{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
               {/* Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
@@ -1761,7 +1784,7 @@ export default function SeasonStandingsNewLook({
                   {renderTableSortHeader(group.id, group.label)}
                 </th>
               ))}
-              <th>{renderTableSortHeader("mw", "MW")}</th>
+              <th className="nl-standings-th-mw">{renderTableSortHeader("mw", "MW")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("cash", "Cash")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("sponsor", "Sponsoren")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("salary", "Gehälter")}</th>
@@ -1811,6 +1834,7 @@ export default function SeasonStandingsNewLook({
           eyebrow="Saisonstand"
           title="Liga 1"
           data-testid="nl-standings-liga1-card"
+          actions={<span className="nl-standings-liga-count nl-tnum">{liga1Rows.length} Teams</span>}
         >
           {renderDatenTableForRows(liga1Rows)}
         </NlCard>
@@ -1819,6 +1843,7 @@ export default function SeasonStandingsNewLook({
           eyebrow="Saisonstand"
           title="Liga 2"
           data-testid="nl-standings-liga2-card"
+          actions={<span className="nl-standings-liga-count nl-tnum">{liga2Rows.length} Teams</span>}
         >
           {renderDatenTableForRows(liga2Rows)}
         </NlCard>
@@ -1986,7 +2011,7 @@ export default function SeasonStandingsNewLook({
             </button>
           </td>
           <td className="nl-standings-td-rank">
-            <span className="nl-tnum">{row.rank ?? "—"}</span>
+            <span className={`nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}>{row.rank ?? "—"}</span>
             {renderRankMovementChip(row)}
           </td>
           <td className="nl-standings-td-team">
@@ -2021,7 +2046,9 @@ export default function SeasonStandingsNewLook({
             </button>
             </StandingsKaderHover>
           </td>
-          <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
+          <td className="nl-standings-td-points">
+            <span className="nl-standings-points-chip nl-tnum">{formatNlNumber(row.points, 1)}</span>
+          </td>
           {hasVerhaeltnis ? (
             <td
               className={`nl-standings-td-verhaeltnis nl-tnum${nlMoneySignClass(row.verhaeltnis)}`}
@@ -2705,6 +2732,11 @@ export default function SeasonStandingsNewLook({
     };
 
     const teamLabel = (teamId: string) => standingsRowByTeamId.get(teamId)?.teamName ?? teamId;
+    const isViewingCurrentMatchday = currentMatchdayId != null && activeOption?.id === currentMatchdayId;
+    const currentMatchdayOption =
+      currentMatchdayId != null
+        ? spieltage.matchdayOptions.find((option) => option.id === currentMatchdayId) ?? null
+        : null;
 
     return (
       <div className="nl-standings-spieltage">
@@ -2727,7 +2759,10 @@ export default function SeasonStandingsNewLook({
               {spieltage.matchdayOptions.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
-                  {option.gespielt ? "" : " (ausstehend)"}
+                  {/* Auftrag (Chris): der eigene Spieltag soll klar als "aktuell"/"nächster" markiert
+                      sein — dieselbe matchdayId, mit der der Spielplan-Reiter seine "läuft"-Karte
+                      markiert (s. FoundationDiszisNewLook.tsx), nicht neu erfunden. */}
+                  {option.id === currentMatchdayId ? " · läuft" : option.gespielt ? "" : " (ausstehend)"}
                 </option>
               ))}
             </select>
@@ -2741,6 +2776,17 @@ export default function SeasonStandingsNewLook({
           >
             ›
           </button>
+          {!isViewingCurrentMatchday && currentMatchdayOption ? (
+            <button
+              type="button"
+              className="nl-standings-spieltage-jumpcurrent"
+              onClick={() => goToIndex(currentMatchdayOption.index)}
+              data-testid="nl-standings-spieltage-jumpcurrent"
+              title={`Zu ${currentMatchdayOption.label} springen — der laufende Spieltag`}
+            >
+              Aktueller Spieltag
+            </button>
+          ) : null}
           {hasLeagueSplit ? (
             <NlSubTabs
               items={[
@@ -2762,9 +2808,83 @@ export default function SeasonStandingsNewLook({
           </NlCard>
         ) : (
           <div className="nl-standings-spieltage-grid" data-testid="nl-standings-spieltage-grid">
-            {spieltagPaarungen.map((paarung) => renderSpieltagPaarungCard(paarung, teamLabel))}
+            {spieltagPaarungen.map((paarung) =>
+              renderSpieltagPaarungCard(paarung, teamLabel, isViewingCurrentMatchday),
+            )}
           </div>
         )}
+      </div>
+    );
+  }
+
+  /** "liga1"/"liga2" → "Liga 1"/"Liga 2", für Rang-Tooltips in der Paarungskarte. */
+  function spieltagLigaLabel(leagueTier: LeagueTier | null | undefined): string | null {
+    if (leagueTier === "liga1") return "Liga 1";
+    if (leagueTier === "liga2") return "Liga 2";
+    return null;
+  }
+
+  /**
+   * Tabellenplatz EINES Teams, so wie `renderRankSuffix` ihn in der Daten-Tabelle zeigt — hier
+   * direkt neben dem Teamnamen der Paarungskarte. `standingsRowByTeamId` ist der aktuelle
+   * Saisonstand (liga-lokaler Rang seit PR #1271, s. `renderDatenTable`-Kommentar oben); bei einer
+   * noch nicht gespielten Begegnung IST das exakt der Stand vor diesem Spiel — kein späterer
+   * Spieltag kann ihn bis dahin noch verändert haben.
+   */
+  function renderSpieltagTeamRank(teamId: string) {
+    const row = standingsRowByTeamId.get(teamId);
+    if (row?.rank == null || !Number.isFinite(row.rank)) {
+      return null;
+    }
+    const ligaLabel = spieltagLigaLabel(row.leagueTier);
+    return (
+      <span
+        className={`nl-standings-spieltage-card-rank nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}
+        title={`Tabellenplatz${ligaLabel ? ` (${ligaLabel})` : ""}: Rang ${row.rank}`}
+      >
+        #{row.rank}
+      </span>
+    );
+  }
+
+  /**
+   * Auftrag (Chris, wörtlich): „die aktuelle platzierung der teams vor dem match" — bisher
+   * nirgends im Spiel sichtbar (s. Dateikommentar `season-matchday-fixtures-overview.ts`). Nur bei
+   * einer noch nicht gewerteten Begegnung: danach ist „aktueller Stand" nicht mehr dasselbe wie
+   * „Stand vor DIESEM Spiel" (spätere Spieltage haben ihn seither verändert), und ein stiller
+   * Bedeutungswechsel wäre irreführender als gar keine Anzeige.
+   */
+  function renderSpieltagPrematchStandings(paarung: SpieltagsPaarung, teamLabel: (teamId: string) => string) {
+    if (paarung.gespielt) {
+      return null;
+    }
+    const rows = paarung.teilnehmer
+      .map((teilnehmer) => ({ teilnehmer, row: standingsRowByTeamId.get(teilnehmer.teamId) ?? null }))
+      .filter((entry): entry is { teilnehmer: SpieltagsPaarungTeilnehmer; row: SeasonV2StandingsRow } => entry.row != null);
+    if (rows.length === 0) {
+      return null;
+    }
+    return (
+      <div className="nl-standings-spieltage-prematch" data-testid="nl-standings-spieltage-prematch">
+        <span className="nl-standings-spieltage-prematch-label">Tabellenplatz vor diesem Spiel</span>
+        <div className="nl-standings-spieltage-prematch-teams">
+          {rows.map(({ teilnehmer, row }, index) => (
+            <Fragment key={teilnehmer.teamId}>
+              {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
+              <span className="nl-standings-spieltage-prematch-team">
+                <span
+                  className={`nl-standings-spieltage-prematch-rank nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}
+                >
+                  {row.rank != null ? `#${row.rank}` : "—"}
+                </span>
+                <span className="nl-standings-spieltage-prematch-name">{teamLabel(teilnehmer.teamId)}</span>
+                <span className="nl-standings-spieltage-prematch-points nl-tnum">
+                  {row.points != null ? `${formatNlNumber(row.points, 1)} Pkt.` : "—"}
+                </span>
+              </span>
+            </Fragment>
+          ))}
+        </div>
       </div>
     );
   }
@@ -2775,16 +2895,37 @@ export default function SeasonStandingsNewLook({
    * 4-Team-Pod-Format bekäme hier einfach vier Einträge, ohne diese Funktion umzubauen, auch
    * wenn die Ergebnis-Spalten selbst (Heim/Gast) erst mit dem Builder mitwachsen müssten.
    */
-  function renderSpieltagPaarungCard(paarung: SpieltagsPaarung, teamLabel: (teamId: string) => string) {
+  function renderSpieltagPaarungCard(
+    paarung: SpieltagsPaarung,
+    teamLabel: (teamId: string) => string,
+    isCurrentMatchday: boolean,
+  ) {
     return (
-      <NlCard key={paarung.fixtureId} className="nl-standings-spieltage-card" data-testid="nl-standings-spieltage-card">
+      <NlCard
+        key={paarung.fixtureId}
+        className={`nl-standings-spieltage-card${isCurrentMatchday ? " is-current" : ""}`}
+        data-testid="nl-standings-spieltage-card"
+      >
         <div className="nl-standings-spieltage-card-teams">
           {paarung.teilnehmer.map((teilnehmer, index) => (
             <Fragment key={teilnehmer.teamId}>
               {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
-              <span className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}>{teamLabel(teilnehmer.teamId)}</span>
+              <span
+                className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}
+                style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(teilnehmer.teamId)?.teamCode) as CSSProperties}
+              >
+                <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
+                {teamLabel(teilnehmer.teamId)}
+                {renderSpieltagTeamRank(teilnehmer.teamId)}
+              </span>
             </Fragment>
           ))}
+          {isCurrentMatchday ? (
+            <span className="nl-standings-spieltage-card-current-tag">
+              <span className="nl-standings-spieltage-live-dot" aria-hidden="true" />
+              Läuft
+            </span>
+          ) : null}
         </div>
         {paarung.istRueckspiel ? (
           <p className="nl-standings-spieltage-rueckspiel">
@@ -2792,6 +2933,7 @@ export default function SeasonStandingsNewLook({
             {paarung.hinspielMatchdayLabel ? ` — Hinspiel: ${paarung.hinspielMatchdayLabel}` : ""}
           </p>
         ) : null}
+        {renderSpieltagPrematchStandings(paarung, teamLabel)}
         <ul className="nl-standings-spieltage-disziplinen">
           {paarung.disziplinen.map((disziplin) => (
             <li key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin">

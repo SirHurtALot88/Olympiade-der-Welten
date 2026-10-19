@@ -298,6 +298,15 @@ export type SeasonStandingsV2ClientProps = {
   isLoading?: boolean;
   /** Task #159 Punkt 2: Daten für den 4. Modus "Spieltage". `null`/fehlend ⇒ Modus bleibt verborgen. */
   spieltage?: SeasonV2SpieltageBundle | null;
+  /**
+   * Spielplan/Ergebnisse-Auftrag (Chris, wörtlich: "wo man die ergebnisse sieht und die aktuelle
+   * platzierung der teams vor dem match"): die Spieltag-ID, die GERADE läuft
+   * (`gameState.matchdayState.matchdayId`) — derselbe Wert, mit dem der Spielplan-Reiter
+   * (`FoundationDiszisNewLook`) seine "läuft"-Markierung setzt. Nur für die Beschriftung im
+   * Spieltage-Modus (welcher Eintrag "läuft" statt nur "ausstehend" ist); `null`/fehlend ⇒ keine
+   * Markierung, der Modus funktioniert unverändert.
+   */
+  currentMatchdayId?: string | null;
 };
 
 const seasonV2TeamTagColorMap: Record<string, { bg: string; border: string; text: string; glow: string }> = {
