@@ -343,6 +343,8 @@ import type { FoundationStateContextValue } from "@/lib/foundation/foundation-st
 import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
@@ -11376,6 +11378,24 @@ export function useFoundationShellRouterBodyScope({
     () => buildSeasonFormCardBonusByTeamId(gameState, seasonOverviewSeasonId),
     [gameState, seasonOverviewSeasonId],
   );
+  /**
+   * DIESELBE FEHLERKLASSE, DRITTER UND VIERTER FALL (Saisonstand-Auftrag Chris, 19.10., Punkte 5+6):
+   * Achsen-Punkteverhaeltnis (Klammerwert POW/SPE/MEN/SOC) und Staerke-Rang im Spieltage-Modus
+   * wurden zuerst nur im (nirgends gerenderten) `FoundationSeasonV2Host` gebaut — exakt derselbe
+   * Fehler wie bei `seasonV2TeamTopPlayersByColumn`/`seasonV2FormCardBonusByTeamId` oben, erst beim
+   * Chromium-Verifikationslauf an der leeren Klammer bzw. am fehlenden "Stärke #"-Chip bemerkt statt
+   * an einem Typfehler, weil beide Props an `SeasonStandingsV2Client` optional sind. Archiv-Sonderfall
+   * wie bei `areaVerhaeltnisByTeamId` oben in `FoundationSeasonV2Host`: nur die LIVE-Saison traegt
+   * sinnvolle Werte.
+   */
+  const seasonV2AreaVerhaeltnisByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : summiereSaisonVerhaeltnisProBereich(gameState, seasonOverviewSeasonId)),
+    [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
+  );
+  const seasonV2TeamStrengthRankByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.totalRank] as const));
+  }, [gameState]);
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
@@ -13119,6 +13139,8 @@ export function useFoundationShellRouterBodyScope({
     seasonV2StandingsRows,
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
+    seasonV2AreaVerhaeltnisByTeamId,
+    seasonV2TeamStrengthRankByTeamId,
     seasonV2TopPlayers,
     selectNewGameMode,
     selectTeamSettingsTeam,
