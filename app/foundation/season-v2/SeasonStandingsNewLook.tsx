@@ -78,7 +78,6 @@ import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfz
 import {
   resolveSpielquelleLabel,
   type SpieltagsPaarung,
-  type SpieltagsPaarungTeilnehmer,
 } from "@/lib/foundation/season-matchday-fixtures-overview";
 import type { LeagueTier } from "@/lib/season/league-split";
 
@@ -324,9 +323,9 @@ function getAreaRankBandClass(rank: number | undefined): string {
  * Modernisierung Saisonstand (Chris: "wie bei NBA oder in der Bundesliga ... dass wir die
  * Tabelle mal hübsch bekommen"): Rang-Chip-Zusatzklasse für die Top-3-Medaillenfarbe —
  * dieselben Tokens wie Podium/NlMedalBadge, nicht neu erfunden. Gilt sowohl für die
- * Rang-Spalte der Daten-Tabelle als auch für die Rang-Chips der Spieltage-Paarungskarten
- * (renderSpieltagTeamRank/renderSpieltagPrematchStandings) — eine Quelle für "wie sieht ein
- * Tabellenplatz aus", in beiden Ansichten gleich.
+ * Rang-Spalte der Daten-Tabelle als auch für den Rang-Chip der Spieltage-Paarungszeile
+ * (`renderSpieltagTeamRank`) — eine Quelle für "wie sieht ein Tabellenplatz aus", in beiden
+ * Ansichten gleich.
  */
 function nlRankTierClass(rank: number | null | undefined): string {
   if (rank == null || !Number.isFinite(rank)) {
@@ -724,6 +723,8 @@ export default function SeasonStandingsNewLook({
   titleRace,
   teamTopPlayersByColumn,
   teamFormCardBonusByTeamId,
+  areaVerhaeltnisByTeamId,
+  teamStrengthRankByTeamId,
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
@@ -783,7 +784,16 @@ export default function SeasonStandingsNewLook({
   const effectiveMode: NlStandingsMode = mode === "spieltage" && !spieltageVerfuegbar ? NL_STANDINGS_DEFAULT_MODE : mode;
 
   const [spieltagMatchdayId, setSpieltagMatchdayId] = useState<string | null>(null);
-  const [spieltagLeagueFilter, setSpieltagLeagueFilter] = useState<LeagueTier | "alle">("alle");
+  /**
+   * Auftrag Chris (19.10.) Punkt 2: Default = NUR Liga 1, nicht "Beide Ligen" — lazy-init direkt
+   * aus der rohen `standingsRows`-Prop (vor `hasLeagueSplit`/`boardRows`, die erst weiter unten
+   * entstehen), damit der erste Render schon richtig startet statt erst nach einem Re-Render
+   * umzuspringen. Ein Legacy-32er-Save (`leagueTier` überall `null`) bleibt bei "alle" — "liga1"
+   * würde dort jede Paarung herausfiltern, weil keine einzige `leagueTier: "liga1"` trägt.
+   */
+  const [spieltagLeagueFilter, setSpieltagLeagueFilter] = useState<LeagueTier | "alle">(() =>
+    standingsRows.some((row) => row.leagueTier != null) ? "liga1" : "alle",
+  );
 
   // Default = letzter gespielter/aktueller Spieltag (vom Host vorgerechnet). Zieht nach, wenn
   // der Save wechselt oder noch keine Auswahl getroffen wurde — überschreibt aber NICHT, sobald
@@ -820,6 +830,15 @@ export default function SeasonStandingsNewLook({
    */
   const hasLeagueSplit = useMemo(() => boardRows.some((row) => row.leagueTier != null), [boardRows]);
 
+  // Rettungsanker fuer den Lazy-Init oben: wechselt der Save (z. B. auf ein Legacy-32er-Save ohne
+  // Liga-Split), waehrend "liga1" noch aktiv ist, faellt der Filter zurueck auf "alle" — sonst
+  // bliebe die Spieltage-Liste nach so einem Wechsel leer (keine Paarung traegt "liga1").
+  useEffect(() => {
+    if (!hasLeagueSplit && spieltagLeagueFilter !== "alle") {
+      setSpieltagLeagueFilter("alle");
+    }
+  }, [hasLeagueSplit, spieltagLeagueFilter]);
+
   /**
    * Task #159 ("Tabelle wie in der Bundesliga MIT Punkteverhältnis", Chris): `true`, sobald
    * IRGENDEINE Zeile ein `verhaeltnis` trägt. Das Feld ist nur in Battle-Saves gesetzt
@@ -829,7 +848,7 @@ export default function SeasonStandingsNewLook({
    */
   const hasVerhaeltnis = useMemo(() => boardRows.some((row) => row.verhaeltnis != null), [boardRows]);
 
-  // Task #159 Punkt 2: Team-Name/-Logo für die Spieltage-Paarungskarten — keine neuen Daten,
+  // Task #159 Punkt 2: Team-Name/-Logo für die Spieltage-Paarungszeilen — keine neuen Daten,
   // dieselben Zeilen, die Board/Daten/Vereine schon zeigen.
   const standingsRowByTeamId = useMemo(() => new Map(boardRows.map((row) => [row.teamId, row] as const)), [boardRows]);
 
@@ -2069,6 +2088,10 @@ export default function SeasonStandingsNewLook({
             // schlechtesten gemeinsamen Rang (buildValueRanks-Kommentar) — keine
             // Hinterlegung ohne echten Unterschied.
             const bandClass = row.points == null ? "" : getAreaRankBandClass(areaRanksByTeam[group.id]?.get(row.teamId));
+            // Auftrag Chris (19.10.) Punkt 5: Punkteverhältnis DIESER Achse in Klammern neben der
+            // Hauptpunktzahl — nur bei Battle-Saves mit mindestens einer gewerteten Zeile dieser
+            // Achse (`summiereSaisonVerhaeltnisProBereich`), sonst keine Klammer (kein erfundenes "(0)").
+            const areaVerhaeltnis = areaVerhaeltnisByTeamId?.get(row.teamId)?.[group.id] ?? null;
             return (
               <td
                 key={group.id}
@@ -2082,6 +2105,14 @@ export default function SeasonStandingsNewLook({
                   entries={teamTopPlayersByColumn?.get(row.teamId)?.[group.id]}
                 >
                   {formatSeasonAreaValue(row, areaValue, 1)}
+                  {areaVerhaeltnis != null && row.points != null ? (
+                    <span
+                      className="nl-standings-area-verhaeltnis"
+                      title={`Punkteverhältnis ${group.label}: Saisonsumme der ±D-Werte aller Battle-Duelle dieser Achse`}
+                    >
+                      ({formatNlSignedNumber(areaVerhaeltnis, 0)})
+                    </span>
+                  ) : null}
                 </StandingsTopPlayersHover>
               </td>
             );
@@ -2709,9 +2740,44 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 1: Spieltag + Disziplinen stehen EINMAL in einer
+   * Kopfzeile ("Spieltag 6 · Breaking, Gewichtheben"), nicht mehr auf jeder Paarungszeile
+   * wiederholt — jede Paarung AM SELBEN Spieltag spielt dieselben ein bis zwei Disziplinen
+   * (`scheduleEntry.discipline1/discipline2` ist pro Spieltag fest, s.
+   * `buildSpieltagsUebersicht`), die Wiederholung je Zeile war reine Redundanz. Quelle: die
+   * Disziplinliste der ERSTEN Paarung dieses Spieltags (ungefiltert nach Liga — die Disziplinen
+   * sind ligaübergreifend identisch).
+   */
+  function renderSpieltageHeadline(activeOption: { label: string } | null) {
+    const disziplinen = activeSpieltagUebersicht?.paarungen[0]?.disziplinen ?? [];
+    if (disziplinen.length === 0) {
+      return null;
+    }
+    return (
+      <div className="nl-standings-spieltage-headline" data-testid="nl-standings-spieltage-headline">
+        <span className="nl-standings-spieltage-headline-matchday">{activeOption?.label ?? "Spieltag"}</span>
+        <span className="nl-standings-spieltage-headline-sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="nl-standings-spieltage-headline-disz">
+          {disziplinen.map((disziplin, index) => (
+            <Fragment key={disziplin.disciplineId}>
+              {index > 0 ? ", " : ""}
+              {disziplin.disciplineName}
+              {disziplin.occurrenceInSeason != null ? ` (${disziplin.occurrenceInSeason}. Durchgang)` : ""}
+            </Fragment>
+          ))}
+        </span>
+      </div>
+    );
+  }
+
+  /**
    * Task #159 Punkt 2 — der Spieltage-Modus: Navigation durch die Spieltage der laufenden
-   * Saison, Liga-1/Liga-2-Umschalter, Paarungs-Karten mit Ergebnis je Disziplin, Quellen-Label
-   * (Arena/PPS-Duell/Ausfall-Hinweis) und Rückspiel-Hinweis ("Hinspiel: Spieltag 4").
+   * Saison, Liga-1/Liga-2-Umschalter, eine kompakte Paarungs-LISTE (Auftrag Chris, 19.10. Punkt 2:
+   * "kompakt die Matchups untereinander", kein Kachelraster mehr) mit Ergebnis je Disziplin,
+   * Quellen-Hinweis (Arena/PPS-Duell/Ausfall, jetzt als Tooltip statt eigener Zeile) und
+   * Rückspiel-Hinweis ("Hinspiel: Spieltag 4").
    *
    * NUR bei Battle-Saves mit echtem Fixture-Plan erreichbar (`spieltageVerfuegbar`) — der Reiter
    * existiert sonst gar nicht (`standingsModeItems`), diese Funktion läuft dann nie.
@@ -2802,22 +2868,24 @@ export default function SeasonStandingsNewLook({
           ) : null}
         </div>
 
+        {renderSpieltageHeadline(activeOption)}
+
         {spieltagPaarungen.length === 0 ? (
           <NlCard className="nl-standings-empty-card">
             <p className="nl-standings-empty-text">Für diesen Spieltag liegen keine Paarungen vor.</p>
           </NlCard>
         ) : (
-          <div className="nl-standings-spieltage-grid" data-testid="nl-standings-spieltage-grid">
+          <ul className="nl-standings-spieltage-list" data-testid="nl-standings-spieltage-grid">
             {spieltagPaarungen.map((paarung) =>
-              renderSpieltagPaarungCard(paarung, teamLabel, isViewingCurrentMatchday),
+              renderSpieltagPaarungRow(paarung, teamLabel, isViewingCurrentMatchday),
             )}
-          </div>
+          </ul>
         )}
       </div>
     );
   }
 
-  /** "liga1"/"liga2" → "Liga 1"/"Liga 2", für Rang-Tooltips in der Paarungskarte. */
+  /** "liga1"/"liga2" → "Liga 1"/"Liga 2", für Rang-Tooltips in der Paarungszeile. */
   function spieltagLigaLabel(leagueTier: LeagueTier | null | undefined): string | null {
     if (leagueTier === "liga1") return "Liga 1";
     if (leagueTier === "liga2") return "Liga 2";
@@ -2826,10 +2894,13 @@ export default function SeasonStandingsNewLook({
 
   /**
    * Tabellenplatz EINES Teams, so wie `renderRankSuffix` ihn in der Daten-Tabelle zeigt — hier
-   * direkt neben dem Teamnamen der Paarungskarte. `standingsRowByTeamId` ist der aktuelle
+   * direkt neben dem Teamnamen der Paarungszeile. `standingsRowByTeamId` ist der aktuelle
    * Saisonstand (liga-lokaler Rang seit PR #1271, s. `renderDatenTable`-Kommentar oben); bei einer
    * noch nicht gespielten Begegnung IST das exakt der Stand vor diesem Spiel — kein späterer
-   * Spieltag kann ihn bis dahin noch verändert haben.
+   * Spieltag kann ihn bis dahin noch verändert haben (Auftrag Chris, wörtlich: „die aktuelle
+   * platzierung der teams vor dem match"). Deckt damit denselben Fall ab, den früher ein
+   * zusätzlicher, separater "Tabellenplatz vor diesem Spiel"-Block zeigte — der entfiel als reine
+   * Dopplung (Auftrag Chris, 19.10.: "mehr will man ja gar nicht wissen" als Team/Ergebnis/Rang).
    */
   function renderSpieltagTeamRank(teamId: string) {
     const row = standingsRowByTeamId.get(teamId);
@@ -2848,65 +2919,86 @@ export default function SeasonStandingsNewLook({
   }
 
   /**
-   * Auftrag (Chris, wörtlich): „die aktuelle platzierung der teams vor dem match" — bisher
-   * nirgends im Spiel sichtbar (s. Dateikommentar `season-matchday-fixtures-overview.ts`). Nur bei
-   * einer noch nicht gewerteten Begegnung: danach ist „aktueller Stand" nicht mehr dasselbe wie
-   * „Stand vor DIESEM Spiel" (spätere Spieltage haben ihn seither verändert), und ein stiller
-   * Bedeutungswechsel wäre irreführender als gar keine Anzeige.
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang ("Staffel-Rang") NEBEN dem
+   * Tabellenrang — Chris' Beispiel wörtlich: „Black Panthers sind in der Staffel Platz 4,
+   * aktueller Tabellenrang ist aber 16", analog zu „Bayern gegen Schalke". Quelle:
+   * `teamStrengthRankByTeamId` (vom Host aus `buildTeamDisciplineRankRowsFromGameState` gebaut,
+   * reine Kaderstärke, unabhängig vom bisherigen Saisonverlauf). Optional — ohne den Prop (z. B.
+   * ältere Host-Version) bleibt die Zeile unverändert, nur ohne diesen zweiten Rang-Chip.
    */
-  function renderSpieltagPrematchStandings(paarung: SpieltagsPaarung, teamLabel: (teamId: string) => string) {
-    if (paarung.gespielt) {
-      return null;
-    }
-    const rows = paarung.teilnehmer
-      .map((teilnehmer) => ({ teilnehmer, row: standingsRowByTeamId.get(teilnehmer.teamId) ?? null }))
-      .filter((entry): entry is { teilnehmer: SpieltagsPaarungTeilnehmer; row: SeasonV2StandingsRow } => entry.row != null);
-    if (rows.length === 0) {
+  function renderSpieltagForecastRank(teamId: string) {
+    const rank = teamStrengthRankByTeamId?.get(teamId);
+    if (rank == null || !Number.isFinite(rank)) {
       return null;
     }
     return (
-      <div className="nl-standings-spieltage-prematch" data-testid="nl-standings-spieltage-prematch">
-        <span className="nl-standings-spieltage-prematch-label">Tabellenplatz vor diesem Spiel</span>
-        <div className="nl-standings-spieltage-prematch-teams">
-          {rows.map(({ teilnehmer, row }, index) => (
-            <Fragment key={teilnehmer.teamId}>
-              {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
-              <span className="nl-standings-spieltage-prematch-team">
-                <span
-                  className={`nl-standings-spieltage-prematch-rank nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}
-                >
-                  {row.rank != null ? `#${row.rank}` : "—"}
-                </span>
-                <span className="nl-standings-spieltage-prematch-name">{teamLabel(teilnehmer.teamId)}</span>
-                <span className="nl-standings-spieltage-prematch-points nl-tnum">
-                  {row.points != null ? `${formatNlNumber(row.points, 1)} Pkt.` : "—"}
-                </span>
-              </span>
-            </Fragment>
-          ))}
-        </div>
-      </div>
+      <span
+        className="nl-standings-spieltage-forecast-rank nl-tnum"
+        title="Stärke-Rang: reine Kaderstärke dieser Saison, unabhängig vom bisherigen Tabellenverlauf"
+      >
+        Stärke #{rank}
+      </span>
     );
   }
 
   /**
-   * Eine Paarungskarte. `teilnehmer` wird für die Kopfzeile durchlaufen (statt fest
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 3: das ECHTE, disziplinspezifische Ergebnis statt des
+   * Team-Punkte-Schemas (2/1/0, bisher immer als "2:0"/"1:1"/"0:2" dargestellt — für jeden Sieg
+   * identisch). `disziplin.seiten` trägt bereits das echte native Ergebnis: bei
+   * `resolutionSource === "arena"` der Punktestand/die Rohgröße direkt aus der Arena-Simulation
+   * (`ArenaFixtureResult.seiten`, z. B. ein echter Basketball-Endstand), bei `"pps_duell"` das
+   * Rohwerte-Paar der PPS-Duell-Brücke VOR der 2/1/0-Rundung (`battle-mode-pps-duell.ts`,
+   * `duellSeiten`). Beides läuft über denselben Kanal bis in `SpieltagsDuellDisziplin.seiten`
+   * (`season-matchday-fixtures-overview.ts`) — nichts Neues berechnet, nur das bereits
+   * durchgereichte Feld jetzt auch angezeigt. Auf ganze Zahlen gerundet fürs Auge, wie ein echtes
+   * Sport-Ergebnis (Auftrag: "wie beim Fußball … steht nicht jedes Mal 2 zu 0"). Rückfall auf das
+   * alte Team-Punkte-Schema NUR, falls `seiten` ausnahmsweise fehlt (sollte an einem echten
+   * Battle-Duell nicht vorkommen, s. Dateikommentar `legacy-matchday-resolve-engine.ts`).
+   */
+  function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number]) {
+    const kuerzel =
+      SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
+      disziplin.disciplineName.slice(0, 3).toUpperCase();
+    const quelle = resolveSpielquelleLabel(disziplin);
+    const ergebnisText = !disziplin.gespielt
+      ? "—"
+      : disziplin.seiten
+      ? `${formatNlNumber(disziplin.seiten[0], 0)}:${formatNlNumber(disziplin.seiten[1], 0)}`
+      : `${disziplin.punkteHeim}:${disziplin.punkteGast}`;
+    const titleParts = [disziplin.disciplineName];
+    if (quelle) titleParts.push(quelle);
+    return (
+      <span key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin-ergebnis" title={titleParts.join(" — ")}>
+        <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
+        <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
+        {disziplin.gespielt ? (
+          <span className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}>
+            {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
+
+  /**
+   * Eine Paarungszeile der kompakten Spieltage-Liste (Auftrag Chris, 19.10. Punkt 2 — Liste statt
+   * Kachelraster). `teilnehmer` wird für die Kopfzeile durchlaufen (statt fest
    * `homeTeamId`/`awayTeamId` zu adressieren) — Mini-DM-Vorbereitung: ein künftiges
    * 4-Team-Pod-Format bekäme hier einfach vier Einträge, ohne diese Funktion umzubauen, auch
    * wenn die Ergebnis-Spalten selbst (Heim/Gast) erst mit dem Builder mitwachsen müssten.
    */
-  function renderSpieltagPaarungCard(
+  function renderSpieltagPaarungRow(
     paarung: SpieltagsPaarung,
     teamLabel: (teamId: string) => string,
     isCurrentMatchday: boolean,
   ) {
     return (
-      <NlCard
+      <li
         key={paarung.fixtureId}
-        className={`nl-standings-spieltage-card${isCurrentMatchday ? " is-current" : ""}`}
-        data-testid="nl-standings-spieltage-card"
+        className={`nl-card nl-standings-spieltage-row${isCurrentMatchday ? " is-current" : ""}`}
+        data-testid="nl-standings-spieltage-row"
       >
-        <div className="nl-standings-spieltage-card-teams">
+        <div className="nl-standings-spieltage-row-teams">
           {paarung.teilnehmer.map((teilnehmer, index) => (
             <Fragment key={teilnehmer.teamId}>
               {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
@@ -2917,6 +3009,7 @@ export default function SeasonStandingsNewLook({
                 <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
                 {teamLabel(teilnehmer.teamId)}
                 {renderSpieltagTeamRank(teilnehmer.teamId)}
+                {renderSpieltagForecastRank(teilnehmer.teamId)}
               </span>
             </Fragment>
           ))}
@@ -2933,31 +3026,10 @@ export default function SeasonStandingsNewLook({
             {paarung.hinspielMatchdayLabel ? ` — Hinspiel: ${paarung.hinspielMatchdayLabel}` : ""}
           </p>
         ) : null}
-        {renderSpieltagPrematchStandings(paarung, teamLabel)}
-        <ul className="nl-standings-spieltage-disziplinen">
-          {paarung.disziplinen.map((disziplin) => (
-            <li key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin">
-              <span className="nl-standings-spieltage-disziplin-name">
-                {disziplin.disciplineName}
-                {disziplin.occurrenceInSeason != null ? (
-                  <span className="nl-standings-spieltage-durchgang"> · {disziplin.occurrenceInSeason}. Durchgang</span>
-                ) : null}
-              </span>
-              <span className="nl-standings-spieltage-ergebnis nl-tnum">
-                {disziplin.gespielt ? `${disziplin.punkteHeim}:${disziplin.punkteGast}` : "—"}
-              </span>
-              {disziplin.gespielt ? (
-                <span className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}>
-                  {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
-                </span>
-              ) : (
-                <span className="nl-standings-spieltage-verhaeltnis" />
-              )}
-              <span className="nl-standings-spieltage-quelle">{resolveSpielquelleLabel(disziplin)}</span>
-            </li>
-          ))}
-        </ul>
-      </NlCard>
+        <div className="nl-standings-spieltage-row-ergebnisse">
+          {paarung.disziplinen.map((disziplin) => renderSpieltagDisziplinErgebnis(disziplin))}
+        </div>
+      </li>
     );
   }
 

@@ -6,6 +6,21 @@
  * gewinnen.
  */
 
+/*
+ * ACHSEN-PUNKTEVERHÄLTNIS IN KLAMMERN (Auftrag Chris, 19.10. Punkt 5): "6 (+12)" neben der
+ * Hauptpunktzahl der POW/SPE/MEN/SOC-Spalten der Daten-Tabelle. Bewusst klein & gedämpft, analog
+ * zum bestehenden Liga-Rang-Suffix hinter MW/Gehalt (`.nl-standings-rank-suffix` in
+ * app/globals.css) — die Hauptpunktzahl bleibt die größte Zahl der Zelle.
+ */
+.is-new-look .nl-standings-area-verhaeltnis {
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  opacity: 0.85;
+  vertical-align: baseline;
+}
+
 /* ------------------------------------------------------------------ *
  * FINDING B — GM-Büro: kein ultra-breiter Horizontal-Scroll mehr.
  * Statt des flex-Streifens (`.nl-standings-players`) reflowt das GM-Büro
@@ -415,19 +430,57 @@
   padding: 4px 8px;
 }
 
-.is-new-look .nl-standings-spieltage-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--nl-s3);
+/*
+ * KOPFZEILE "Spieltag N · Disziplin 1, Disziplin 2" (Auftrag Chris, 19.10. Punkt 1) — ersetzt die
+ * frühere Wiederholung von Spieltag/Disziplinname auf JEDER Paarungszeile.
+ */
+.is-new-look .nl-standings-spieltage-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nl-s1);
+  padding: var(--nl-s2) var(--nl-s3);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
 }
 
-.is-new-look .nl-standings-spieltage-card {
+.is-new-look .nl-standings-spieltage-headline-matchday {
+  font-weight: 700;
+  font-size: var(--nl-fs-md);
+}
+
+.is-new-look .nl-standings-spieltage-headline-sep {
+  color: var(--nl-mut-2);
+}
+
+.is-new-look .nl-standings-spieltage-headline-disz {
+  color: var(--nl-mut);
+  font-size: var(--nl-fs-sm);
+}
+
+/*
+ * KOMPAKTE LISTE statt Kachelraster (Auftrag Chris, 19.10. Punkt 2): Matchups stehen
+ * UNTEREINANDER, eine Zeile je Paarung. `nl-card` auf jeder Zeile (s. Komponente) liefert Fläche/
+ * Rahmen/Radius aus den globalen Regeln, hier nur die listentypischen Resets plus engerer
+ * Innenabstand als eine volle Karte — je Zeile soll wenig Platz verbraucht werden.
+ */
+.is-new-look .nl-standings-spieltage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: grid;
   gap: var(--nl-s2);
 }
 
-.is-new-look .nl-standings-spieltage-card-teams {
+.is-new-look .nl-standings-spieltage-row {
+  padding: var(--nl-s2) var(--nl-s3);
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-standings-spieltage-row-teams {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--nl-s1);
   font-weight: 700;
@@ -445,37 +498,29 @@
   color: var(--nl-mut);
 }
 
-.is-new-look .nl-standings-spieltage-disziplinen {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--nl-s1);
-}
-
-.is-new-look .nl-standings-spieltage-disziplin {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: baseline;
+/* Die Ergebnis-Chips je Disziplin — kompakt nebeneinander statt eigener Zeilen je Disziplin
+   (Auftrag Chris, 19.10. Punkt 1: Disziplinname nur noch einmal in der Kopfzeile). */
+.is-new-look .nl-standings-spieltage-row-ergebnisse {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--nl-s2);
-  padding: var(--nl-s1) 0;
-  border-top: 1px solid var(--nl-line);
 }
 
-.is-new-look .nl-standings-spieltage-disziplin:first-child {
-  border-top: none;
+.is-new-look .nl-standings-spieltage-disziplin-ergebnis {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
 }
 
-.is-new-look .nl-standings-spieltage-disziplin-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.is-new-look .nl-standings-spieltage-durchgang {
-  color: var(--nl-mut-2);
+.is-new-look .nl-standings-spieltage-disziplin-kuerzel {
   font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+  letter-spacing: 0.02em;
 }
 
 .is-new-look .nl-standings-spieltage-ergebnis {
@@ -496,10 +541,13 @@
   color: var(--nl-risk);
 }
 
-.is-new-look .nl-standings-spieltage-quelle {
-  grid-column: 1 / -1;
+/* Stärke-Rang-Chip neben dem Tabellenrang (Auftrag Chris, 19.10. Punkt 6: "Bayern gegen
+   Schalke"-Favoritenhinweis unabhängig vom bisherigen Tabellenverlauf). */
+.is-new-look .nl-standings-spieltage-forecast-rank {
+  margin-left: 4px;
   font-size: var(--nl-fs-xs);
-  color: var(--nl-mut-2);
+  font-weight: 600;
+  color: var(--nl-accent, var(--nl-mut));
 }
 
 /* "Aktueller Spieltag"-Sprungknopf neben der Spieltag-Navigation. */
@@ -519,7 +567,7 @@
   background: var(--nl-panel-2);
 }
 
-/* Rang-Chip direkt neben dem Teamnamen der Paarungskarte — Auftrag Chris: Tabellenplatz je Team
+/* Rang-Chip direkt neben dem Teamnamen der Paarungszeile — Auftrag Chris: Tabellenplatz je Team
    sichtbar machen, nicht nur Ergebnisse. */
 .is-new-look .nl-standings-spieltage-card-rank {
   margin-left: 6px;
@@ -535,66 +583,12 @@
   color: var(--nl-accent, var(--nl-good));
 }
 
-.is-new-look .nl-standings-spieltage-card.is-current {
+.is-new-look .nl-standings-spieltage-row.is-current {
   border-color: var(--nl-accent, var(--nl-line));
   /* Akzentuierte Oberkante zusätzlich zur Rahmenfarbe — die "jetzt live"-
      Kante, mit der Sport-Apps einen laufenden Spieltag vom gespielten
      unterscheiden (s. Modernisierungs-Abschnitt unten im Dateikopfkommentar). */
   box-shadow: var(--nl-e2), inset 0 2px 0 var(--nl-accent);
-}
-
-/*
- * TABELLENPLATZ VOR DEM SPIEL — Auftrag Chris, wörtlich: „die aktuelle platzierung der teams vor
- * dem match", bisher nirgends im Spiel sichtbar (s. season-matchday-fixtures-overview.ts).
- * Nur bei einer noch nicht gewerteten Begegnung (renderSpieltagPrematchStandings).
- */
-.is-new-look .nl-standings-spieltage-prematch {
-  display: grid;
-  gap: 4px;
-  padding: var(--nl-s2);
-  border-radius: var(--nl-r-sm);
-  background: var(--nl-panel-2);
-  border: 1px solid var(--nl-line);
-}
-
-.is-new-look .nl-standings-spieltage-prematch-label {
-  font-size: var(--nl-fs-xs);
-  color: var(--nl-mut-2);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.is-new-look .nl-standings-spieltage-prematch-teams {
-  display: flex;
-  align-items: baseline;
-  gap: var(--nl-s1);
-  flex-wrap: wrap;
-}
-
-.is-new-look .nl-standings-spieltage-prematch-team {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  /* Eigene kleine Kartenfläche je Team — "Matchup-Vorschau"-Optik statt
-     loser Textzeile (s. Modernisierungs-Abschnitt am Dateiende). */
-  padding: 4px 9px;
-  border-radius: var(--nl-r-sm);
-  background: var(--nl-panel);
-  border: 1px solid var(--nl-line);
-}
-
-.is-new-look .nl-standings-spieltage-prematch-rank {
-  font-weight: 700;
-  color: var(--nl-ink);
-}
-
-.is-new-look .nl-standings-spieltage-prematch-name {
-  font-size: var(--nl-fs-sm);
-}
-
-.is-new-look .nl-standings-spieltage-prematch-points {
-  font-size: var(--nl-fs-xs);
-  color: var(--nl-mut);
 }
 
 /* ------------------------------------------------------------------ *
@@ -621,9 +615,8 @@
  *      Ziffer — Platz 1–3 in Medaillenfarbe (dieselben Tokens wie
  *      Podium/NlMedalBadge, keine neue Farbe). Dieselbe Chip-Form läuft
  *      durch BEIDE Ansichten: Rang-Spalte der Daten-Tabelle, Rang neben
- *      dem Teamnamen der Paarungskarte, Rang in der „Tabellenplatz vor
- *      diesem Spiel"-Box — eine Antwort auf „wie sieht ein Tabellenplatz
- *      aus", nicht drei verschiedene.
+ *      dem Teamnamen der Spieltage-Paarungszeile — eine Antwort auf „wie
+ *      sieht ein Tabellenplatz aus", nicht zwei verschiedene.
  *   2. Punkte als auffälligste Zahl der Zeile (eigene Pille), weil beide
  *      Vorbilder „Pkt."/„PTS" deutlich vom Rest abheben.
  *   3. Eine optische Trennlinie zwischen „wer steht wo" (Rang/Team/
@@ -631,18 +624,18 @@
  *      `border-left`-Konvention der Bereichsspalten, nur vor den
  *      nächsten beiden Spaltenblöcken (Formkarten, Finanzen) wiederholt.
  *   4. Teamfarbe als kleiner Identitäts-Punkt neben dem Namen der
- *      Paarungskarte (Ersatz für Trikotfarbe/Wappen; echte Liga-Logos
+ *      Paarungszeile (Ersatz für Trikotfarbe/Wappen; echte Liga-Logos
  *      bleiben außen vor) — auf denselben `--team-tag-*`-Variablen wie
  *      der linke Zeilen-Akzent der Daten-Tabelle (`getSeasonV2TeamTagStyle`),
  *      keine neue Farbquelle.
- *   5. Spieltage-Paarungskarte als Mini-Scoreboard: Ergebnis größer/
+ *   5. Spieltage-Paarungszeile als Mini-Scoreboard: Ergebnis größer/
  *      fetter, Punkteverhältnis als farbige Pille statt bloßem Text,
  *      laufender Spieltag mit Live-Punkt statt reinem „· läuft"-Text —
  *      dieselbe Sprache, mit der Sport-Apps einen laufenden Spieltag von
  *      einem bereits gewerteten unterscheiden.
  * ------------------------------------------------------------------ */
 
-/* --- 1. Rang-Chip: Daten-Tabelle UND Spieltage-Paarungskarte teilen sich
+/* --- 1. Rang-Chip: Daten-Tabelle UND Spieltage-Paarungszeile teilen sich
    dieselbe Grundform; die jeweilige Kontextklasse bestimmt nur Abstand. */
 .is-new-look .nl-standings-rank-chip {
   display: inline-flex;
@@ -711,7 +704,7 @@
   color: var(--nl-mut);
 }
 
-/* --- 4. Team-Identitäts-Punkt in der Paarungskarte ------------------ */
+/* --- 4. Team-Identitäts-Punkt in der Paarungszeile ------------------ */
 .is-new-look .nl-standings-spieltage-card-team {
   display: inline-flex;
   align-items: baseline;
@@ -728,7 +721,7 @@
   background: var(--team-tag-border, var(--nl-line-2));
 }
 
-/* --- 5. Paarungskarte als Mini-Scoreboard --------------------------- */
+/* --- 5. Paarungszeile als Mini-Scoreboard --------------------------- */
 
 /* Live-Punkt im "läuft"-Tag statt reinem Text. */
 .is-new-look .nl-standings-spieltage-card-current-tag {

@@ -12,6 +12,7 @@
  * geschriebenem Stand bit-identisch.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { SEASON_DISCIPLINE_AREA_GROUPS, type SeasonDisciplineAreaId } from "@/lib/season/season-discipline-area-groups";
 
 export function summiereSaisonVerhaeltnis(
   gameState: Pick<GameState, "seasonState">,
@@ -35,6 +36,51 @@ export function summiereSaisonVerhaeltnis(
     if (typeof row.verhaeltnis !== "number" || !Number.isFinite(row.verhaeltnis)) continue;
     gefunden = true;
     summe.set(row.teamId, (summe.get(row.teamId) ?? 0) + row.verhaeltnis);
+  }
+  return gefunden ? summe : null;
+}
+
+/** disciplineId → Bereich (POW/SPE/MEN/SOC), einmal aus `SEASON_DISCIPLINE_AREA_GROUPS` gebaut. */
+const AREA_BY_DISCIPLINE_ID = new Map<string, SeasonDisciplineAreaId>(
+  SEASON_DISCIPLINE_AREA_GROUPS.flatMap((group) => group.keys.map((key) => [key, group.id] as const)),
+);
+
+/**
+ * DIESELBE SUMME WIE OBEN, NUR JE BEREICH (POW/SPE/MEN/SOC) — Saisonstand-Auftrag Chris, 19.10.:
+ * „neben der Hauptpunktzahl in Klammern noch das Torverhältnis" je Achsen-Spalte. Keine neue
+ * Rechnung: dieselben `DisciplineResultRecord.verhaeltnis`-Zeilen wie `summiereSaisonVerhaeltnis`,
+ * nur zusätzlich nach dem Bereich ihrer `disciplineId` gruppiert statt nur nach Team summiert.
+ *
+ * `null` statt einer leeren Map unter denselben Bedingungen wie oben (Manager-Save, Battle-Save
+ * ohne eine einzige Verhaeltnis-Zeile in der Saison) — ein fehlendes Battle-Duell-System liefert
+ * hier nichts Erfundenes.
+ */
+export function summiereSaisonVerhaeltnisProBereich(
+  gameState: Pick<GameState, "seasonState">,
+  seasonId: string,
+  options: { zusaetzlicheMatchdayResultId?: string | null } = {},
+): Map<string, Record<SeasonDisciplineAreaId, number | null>> | null {
+  const gewerteteIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter(
+        (result) =>
+          result.seasonId === seasonId &&
+          (result.status === "preview_applied" || result.id === options.zusaetzlicheMatchdayResultId),
+      )
+      .map((result) => result.id),
+  );
+  if (gewerteteIds.size === 0) return null;
+  const summe = new Map<string, Record<SeasonDisciplineAreaId, number | null>>();
+  let gefunden = false;
+  for (const row of gameState.seasonState.disciplineResults ?? []) {
+    if (!gewerteteIds.has(row.matchdayResultId)) continue;
+    if (typeof row.verhaeltnis !== "number" || !Number.isFinite(row.verhaeltnis)) continue;
+    const area = AREA_BY_DISCIPLINE_ID.get(row.disciplineId);
+    if (!area) continue;
+    gefunden = true;
+    const bisher = summe.get(row.teamId) ?? { pow: null, spe: null, men: null, soc: null };
+    bisher[area] = (bisher[area] ?? 0) + row.verhaeltnis;
+    summe.set(row.teamId, bisher);
   }
   return gefunden ? summe : null;
 }
