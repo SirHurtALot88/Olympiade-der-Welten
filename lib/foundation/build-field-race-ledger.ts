@@ -101,18 +101,24 @@ export function buildFieldRaceLedger(
   const orderedMatchdays = getMatchdaySummaryOptions(gameState, seasonId);
   const ledger = precomputedPointsLedger ?? buildSeasonPointsLedger(gameState, seasonId);
 
-  // Tagespunkte je Spieltag je Team (aus den Punkt-Einträgen des Ledgers).
+  // Tagespunkte je Spieltag je Team.
+  //
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, 19.10.): aus `ledger.tableGroupContributions`, NICHT
+  // mehr direkt aus den Punkt-Eintraegen (`ledger.pointEntries[].points`) summiert -- fuer eine
+  // Duell-Zeile (Battle Mode) ist `points` seitdem die leistungsbasierte Spieler-PP
+  // (`ppAusSpielerScore()`), nicht mehr der 2/1/0-Team-Budget-Anteil. `tableGroupContributions`
+  // traegt fuer eine Duell-Zeile weiter `teamResult.teamPoints` (2/1/0) -- GENAU DIESELBE Waehrung
+  // wie `teamSummary.totalPoints` und wie `season-matchday-points.ts`, das Feld-Rennen braeche
+  // sonst mit der Saisontabelle auseinander (s. Kommentar an `summiereSpieltagsPunkteAusLedger()`).
   const pointsByMatchday = new Map<string, Map<string, number>>();
-  for (const entry of ledger.pointEntries) {
-    if (entry.matchdayId == null) continue;
-    let perTeam = pointsByMatchday.get(entry.matchdayId);
+  for (const beitrag of ledger.tableGroupContributions) {
+    if (beitrag.matchdayId == null) continue;
+    let perTeam = pointsByMatchday.get(beitrag.matchdayId);
     if (!perTeam) {
       perTeam = new Map();
-      pointsByMatchday.set(entry.matchdayId, perTeam);
+      pointsByMatchday.set(beitrag.matchdayId, perTeam);
     }
-    // `entry.points` (Rang-Anteil + Mutator), damit das Feld-Rennen dieselbe Summe zeigt wie
-    // Saisonstand und Spieltag. Siehe `season-matchday-points.ts` — beide muessen gleich bleiben.
-    perTeam.set(entry.teamId, roundValue((perTeam.get(entry.teamId) ?? 0) + entry.points, 4));
+    perTeam.set(beitrag.teamId, roundValue((perTeam.get(beitrag.teamId) ?? 0) + beitrag.points, 4));
   }
 
   const rowsByTeamId = new Map<string, FieldRaceLedgerEntry[]>();

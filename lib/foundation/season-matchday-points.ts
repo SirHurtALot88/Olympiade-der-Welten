@@ -49,6 +49,17 @@ export function spieltageMitDisziplinErgebnissen(gameState: GameState, seasonId:
  * „bekannt und leer" und „unbekannt" ist der ganze Punkt. Nur an ihm merkt der Leser, dass ihm ein
  * Spieltag fehlt, statt stillschweigend mit 0 weiterzurechnen (siehe `missing_matchday_points` in
  * `buildMatchdaySummary`).
+ *
+ * PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, 19.10.): summiert ab jetzt `ledger.tableGroupContributions`
+ * statt direkt `ledger.pointEntries[].points` -- fuer eine Duell-Zeile (Battle Mode) ist `points`
+ * seitdem die leistungsbasierte Spieler-PP (`ppAusSpielerScore()`), NICHT mehr der 2/1/0-Team-Budget-
+ * Anteil. Eine direkte Summe ueber `pointEntries` haette fuer Battle-Saves genau die Fehlerklasse
+ * reproduziert, die diese Datei schon einmal fuer den Mutator-Bonus behoben hat: "Platz 1 im
+ * Spieltag, aber nur 2. in der Saison, das kann doch gar nicht sein" -- der Spieltagsrang waere
+ * dann aus der leistungsbasierten PP-Summe, die Saisontabelle aber weiter aus Σ 2/1/0 gebaut, zwei
+ * verschiedene Waehrungen fuer denselben Rang. `tableGroupContributions` traegt fuer eine Duell-Zeile
+ * `teamResult.teamPoints` (2/1/0, einmal je Gruppe) und fuer eine Manager-Mode-Zeile bit-identisch
+ * Σ Spieler-`points` dieser Gruppe -- GENAU DIESELBE Waehrung wie `teamSummary.totalPoints`.
  */
 export function summiereSpieltagsPunkteAusLedger(
   ledger: SeasonPointsLedger,
@@ -59,17 +70,14 @@ export function summiereSpieltagsPunkteAusLedger(
     punkteJeSpieltag.set(matchdayId, new Map<string, number>());
   }
 
-  for (const entry of ledger.pointEntries) {
-    if (entry.matchdayId == null) continue;
-    let jeTeam = punkteJeSpieltag.get(entry.matchdayId);
+  for (const beitrag of ledger.tableGroupContributions) {
+    if (beitrag.matchdayId == null) continue;
+    let jeTeam = punkteJeSpieltag.get(beitrag.matchdayId);
     if (!jeTeam) {
       jeTeam = new Map<string, number>();
-      punkteJeSpieltag.set(entry.matchdayId, jeTeam);
+      punkteJeSpieltag.set(beitrag.matchdayId, jeTeam);
     }
-    // `entry.points`, NICHT `entry.basePoints`: `points` ist Rang-Anteil PLUS Mutator-Aufschlag,
-    // also die Zahl, die auch gutgeschrieben wird. Mit `basePoints` rankte der Spieltag nach einer
-    // anderen Groesse als der Saisonstand bucht — am Live-Abbild bis zu 6,9 Punkte je Team.
-    jeTeam.set(entry.teamId, roundValue((jeTeam.get(entry.teamId) ?? 0) + entry.points, 4));
+    jeTeam.set(beitrag.teamId, roundValue((jeTeam.get(beitrag.teamId) ?? 0) + beitrag.points, 4));
   }
 
   return punkteJeSpieltag;

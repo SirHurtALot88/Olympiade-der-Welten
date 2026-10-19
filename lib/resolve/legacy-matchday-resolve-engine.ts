@@ -23,9 +23,14 @@ import { isBattleModeSave } from "@/lib/season/game-mode";
 import {
   baueFixtureIndex,
   berechneDuellVerhaeltnis,
+  berechneErgebnisNormiert,
   berechnePpsDuellOverrides,
   findeSpieltagsFixtures,
+  KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS,
   outcomeAusPunkten,
+  ppAusSpielerScore,
+  resolveNiveauReferenz,
+  resolveSpielerPpReferenz,
 } from "@/lib/resolve/battle-mode-pps-duell";
 // SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
 // Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
@@ -828,15 +833,30 @@ export function buildLegacyMatchdayResolvePreview(
     // Der Score ist derselbe, nach dem unten gerankt wird (nach Team-Power-Debuffs).
     const legacyScorePlayerCountForThisDiscipline =
       bucket.find((entry) => entry.legacyScorePlayerCount != null)?.legacyScorePlayerCount ?? null;
+    // PPS-Team-Score je Team (dieselbe Groesse, nach der unten gerankt wird) -- fuer die
+    // PPS-Duell-Bruecke SELBST (seiten der Bruecke sind exakt diese Werte) UND fuer das Niveau der
+    // 0-10-Normierung bei Konstantsummen-Disziplinen (Teil B, s. `KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS`).
+    const ppsScoreByTeamId = new Map(teamResultsAfterPowers.map((result) => [result.teamId, result.score] as const));
     const ppsDuellOverridesForThisDiscipline = duellFixtureIndex
       ? berechnePpsDuellOverrides({
           fixtures: [...new Set(duellFixtureIndex.values())],
-          scoreByTeamId: new Map(teamResultsAfterPowers.map((result) => [result.teamId, result.score] as const)),
+          scoreByTeamId: ppsScoreByTeamId,
           disciplineId,
           playerCount: legacyScorePlayerCountForThisDiscipline,
           ausgeschlosseneTeamIds: new Set(arenaOverridesForThisDiscipline?.keys() ?? []),
         })
       : null;
+    // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
+    const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
+    const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
+    // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
+    // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
+    // ihn (20/20). Ohne diesen Rueckfall stuende mu fuer jede arena-aufgeloeste Nicht-Konstantsummen-
+    // Disziplin (Showcase/Eiskunstlauf/Wettessen/Fechten/Takeshi's Castle) fest auf 0,5, das Ergebnis
+    // waere dort reine Funktion von D. Der PPS-Team-Score traegt IMMER echtes Niveau (s.
+    // Konstantsummen-Zweig) und hat eine gezogene Referenz -- also dieselbe Quelle wie dort, bis eine
+    // Arena-Niveau-Referenz gezogen ist. Die Sieger-Ordnungs-Garantie haengt davon nicht ab.
+    const niveauAusPps = niveauIstKonstantsumme || resolveNiveauReferenz("arena", disciplineId, legacyScorePlayerCountForThisDiscipline) == null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
@@ -845,21 +865,46 @@ export function buildLegacyMatchdayResolvePreview(
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => {
       const arenaOverride = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
       const ppsDuell = arenaOverride ? null : ppsDuellOverridesForThisDiscipline?.get(item.teamId) ?? null;
-      // Verhaeltnis eines Arena-Duells aus seinem Seitenstand (Ausgang aus den gebuchten Punkten,
-      // damit ein kg-Tiebreak-Sieg bei Duellgleichstand als knappster Sieg D = 1 zaehlt).
+      // Ausgang dieses Duells aus Sicht DIESES Teams -- ein Arena-Override traegt ihn meistens schon
+      // (`arenaOverride.outcome`), sonst aus den gebuchten 2/1/0-Team-Punkten rekonstruiert (kg-
+      // Tiebreak bei Gewichtheben-Duellgleichstand zaehlt dadurch als knappster Sieg, nicht Remis).
+      const resolvedOutcome = arenaOverride
+        ? arenaOverride.outcome ?? outcomeAusPunkten(arenaOverride.teamPoints, 2 - arenaOverride.teamPoints)
+        : ppsDuell?.outcome ?? null;
+      // Verhaeltnis eines Arena-Duells aus seinem Seitenstand.
       const arenaVerhaeltnis =
-        arenaOverride?.seiten != null
+        arenaOverride?.seiten != null && resolvedOutcome
           ? berechneDuellVerhaeltnis({
               quelle: "arena",
               disciplineId,
               playerCount: legacyScorePlayerCountForThisDiscipline,
               seiten: arenaOverride.seiten,
-              outcome:
-                arenaOverride.outcome ??
-                outcomeAusPunkten(arenaOverride.teamPoints, 2 - arenaOverride.teamPoints),
+              outcome: resolvedOutcome,
             })
           : null;
       const duellVerhaeltnis = arenaVerhaeltnis ?? ppsDuell;
+      // NIVEAU+MARGE 0-10-NORMIERUNG (Teil B): nur an Duell-Zeilen mit aufgeloestem Ausgang. Bei
+      // Konstantsummen-Disziplinen (Tennis/Speed-Schach/Gewichtheben/Spurt/Climbing/Staffel/
+      // Time-Trial) traegt der native Arena-Seitenwert kein Niveau (Summe strukturell ~konstant) --
+      // dort gilt stattdessen der PPS-Team-Score (`ppsScoreByTeamId`), der IMMER echtes Niveau
+      // traegt. Fuer PPS-Duell-Zeilen SIND die Seiten bereits PPS-Scores, keine Sonderbehandlung noetig.
+      const ergebnisNormiert: [number, number] | null =
+        duellVerhaeltnis && resolvedOutcome
+          ? (() => {
+              const quelleFuerNiveau = arenaOverride && !niveauAusPps ? "arena" : "pps";
+              const [eigenerRoh, gegnerRoh] =
+                arenaOverride && niveauAusPps
+                  ? [ppsScoreByTeamId.get(item.teamId) ?? 0, ppsScoreByTeamId.get(arenaOverride.opponentTeamId ?? "") ?? 0]
+                  : (arenaOverride?.seiten ?? ppsDuell?.seiten ?? [0, 0]);
+              return berechneErgebnisNormiert({
+                outcome: resolvedOutcome,
+                betrag: Math.abs(duellVerhaeltnis.verhaeltnis),
+                niveauEigen: eigenerRoh,
+                niveauGegner: gegnerRoh,
+                referenz: resolveNiveauReferenz(quelleFuerNiveau, disciplineId, legacyScorePlayerCountForThisDiscipline),
+              });
+            })()
+          : null;
       // Ein Battle-Save ohne Duell fuer diese Seite (kein Fixture im Spielplan) bekommt KEINE
       // Rangtabellen-Punkte mehr, sondern `null` + Warnung — laut statt still falsch.
       const battleOhneDuell = isBattleModeArenaEligible && !arenaOverride && !ppsDuell;
@@ -936,6 +981,7 @@ export function buildLegacyMatchdayResolvePreview(
               duellSeiten: arenaOverride?.seiten
                 ? ([arenaOverride.seiten[0], arenaOverride.seiten[1]] as [number, number])
                 : ppsDuell?.seiten ?? null,
+              ergebnisNormiert,
             }
           : {}),
       };
@@ -966,33 +1012,35 @@ export function buildLegacyMatchdayResolvePreview(
           finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
           scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         })),
-        // PPS-DUELL-BRUECKE, PLAYER-LEVEL-FIX (18.10., Befund "Basketball-PP des menschlichen
-        // Teams steht nach dem Buchen auf 0,0"): ohne dieses Override verteilte diese Stelle den
-        // generischen PPS-RANG-Punktestand (ueber ALLE Teams der Disziplin, 0,1 bis ~19,9) an die
-        // Spieler — unabhaengig davon, ob die Seite ihr eigenes Duell (2/1/0) gewonnen oder
-        // verloren hatte. Genau DIESER Wert wird live in der Arena gezeigt und 1:1 gebucht
-        // (`playerDisciplinePerformances.scoreContribution`/`pointsAwarded`, "was du siehst, wird
-        // gebucht"). `season-points-ledger.ts::deriveRankPointsFromPerformances()` rechnet beim
-        // SPAETEREN Aufbau der Saison-PPS-Spalte (Kader-/Teams-Tab, Liga-Leaders) für `pps_duell`-
-        // Zeilen dagegen ganz bewusst mit `teamPointsOverride: teamResult.teamPoints` — dem
-        // 2/1/0-Resultat DIESES Duells (s. `istDuellWertung()`). Verlor eine Seite ihr Duell knapp,
-        // obwohl ihre Spieler ligaweit ordentlich rangierten, zeigte die Arena live reelle PP
-        // (z. B. 3,9/3,6/2,5 PP), der Kader-Tab nach dem Buchen aber 0,0 — derselbe Spieltag,
-        // zwei verschiedene Zahlen aus zwei Stellen, die denselben Rohwert eigentlich teilen
-        // sollten. Reproduziert mit einem frischen Battle-Save: Team verlor sein Basketball-Duell
-        // 61,9:91,2 bei PPS-Rang 15/32 — Arena zeigte 1,37/0,73 PP (Rang-Budget 2,1), der Ledger
-        // bucht season-seitig 0/0 (Duell-Budget 0 bei Niederlage). Betroffen ist dabei NIE die
-        // Kontrollart (menschlich/KI) selbst, sondern einzig das Duell-Resultat — ein gewinnendes
-        // KI-Team zeigte im selben Repro ebenso zwei verschiedene Werte, nur eben beide > 0, was
-        // den Unterschied beim Playtest unauffaellig machte. Die Buehne bucht ab jetzt denselben
-        // 2/1/0-Anteil, den der Ledger ohnehin fuer die Saison-PP ansetzt — live und gebucht sind
-        // damit wieder dieselbe Zahl. Betrifft ausdruecklich NUR `"pps_duell"` (Battle Mode, PPS-
-        // Duell-Bruecke): Manager-Mode-Zeilen bleiben `"pps"` und nehmen diesen Zweig nie, Arena-
-        // Zeilen (`"arena"`) behalten ihr bisheriges Verhalten unveraendert (dort deckt der
-        // Boxscore-Impact bzw. der PPS-Rang-Nachschlag den einzelnen Spieler ab, s. Kommentar
-        // "Battle Mode PR7" unten) — beide Faelle bit-identisch zum Stand vor diesem Fix.
-        teamPointsOverride: rankedTeam?.resolutionSource === "pps_duell" ? rankedTeam.teamPoints : null,
+        // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10. -- ERSETZT den bisherigen
+        // PLAYER-LEVEL-FIX von hier, der fuer `"pps_duell"` das 2/1/0-Team-Budget per
+        // `teamPointsOverride` proportional unter den Spielern verteilte: "Ein guter Spieler im
+        // schlechten Verlierer-Team kann also trotzdem viele Punkte sammeln" -- der beste Spieler
+        // eines 0:2-Verlierers bekam vorher strukturell 0 PP, egal wie gut sein eigener Score war.
+        // `teamPointsOverride` bleibt deshalb IMMER `null`: weder Arena- noch PPS-Duell-Zeilen
+        // duerfen die Spieler-PP noch aus dem Team-Ausgang ableiten. Der eigentliche Ersatz
+        // (`ppAusSpielerScore()` aus `finalPlayerScore`) steht unten bei der
+        // `ppsDuellSpielerPpByPlayerId`-Map, analog zu `arenaIndividualPpsForThisDiscipline`.
+        teamPointsOverride: null,
       });
+
+      // PP-BUDGET (Teil A): fuer eine `"pps_duell"`-Zeile ersetzt `ppAusSpielerScore()` den
+      // Rang-Budget-Anteil von `distributedPoints` -- rein leistungsbasiert aus `finalPlayerScore`,
+      // komplett unabhaengig vom Team-Ausgang dieses Duells. Analog zu
+      // `arenaIndividualPpsForThisDiscipline` oben, nur fuer die PPS-Duell-Bruecke statt die Arena.
+      // Ausserhalb des `if (rankedTeam)`-Blocks berechnet, weil BEIDE Stellen sie brauchen, die hier
+      // unten gebaute `rawPlayerEntries`-Zeile (das, was `legacy-matchday-result-mapper.ts`
+      // tatsaechlich persistiert, s. `topPlayers`) UND `rankedTeam.entries` (die Live-Buehne) --
+      // "gezeigt == gebucht" gilt nur, wenn beide dieselbe Map lesen.
+      const ppsDuellSpielerPpByPlayerId =
+        rankedTeam?.resolutionSource === "pps_duell"
+          ? new Map(
+              rankedWithinTeam.map(({ entry }) => [
+                entry.playerId,
+                ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
+              ] as const),
+            )
+          : null;
 
       if (rankedTeam) {
         // Battle Mode PR7: fuer ein Arena-Ergebnis bleibt `teamPoints`/`pointSource` beim 2/1/0-Wert
@@ -1022,9 +1070,10 @@ export function buildLegacyMatchdayResolvePreview(
           // einzelner nicht zuordenbarer Mitspieler faellt fuer sich selbst auf PPS zurueck, ohne
           // seine Teamkollegen zu beruehren).
           const arenaPps = arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null;
+          const ppsDuellPps = ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ?? null;
           return {
             ...entry,
-            pointsAwarded: arenaPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
+            pointsAwarded: arenaPps ?? ppsDuellPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
             arenaBoxscoreImpactApplied: arenaPps != null,
           };
         });
@@ -1053,7 +1102,11 @@ export function buildLegacyMatchdayResolvePreview(
         teamPowerShare: entry.teamPowerShare ?? null,
         finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
-        pointsAwarded: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? distributedPoints.entries[index]?.points ?? null,
+        pointsAwarded:
+          arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ??
+          ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ??
+          distributedPoints.entries[index]?.points ??
+          null,
         pointSource: distributedPoints.pointSource,
         // BOXSCORE-AN-PPS: nur informativ (Debug/Anzeige) -- `pointsAwarded` oben ist die einzige
         // Stelle, an der der Boxscore-Impact tatsaechlich Punkte vergibt.

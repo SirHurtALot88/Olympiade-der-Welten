@@ -7,8 +7,11 @@ import {
 import {
   buildPersistedSeasonDerivationsRecord,
   hydrateSeasonDerivations,
+  istPersistierterLedgerAktuell,
+  readPersistedSeasonDerivations,
   serializeSeasonDerivations,
   withPersistedSeasonDerivations,
+  type PersistedSeasonDerivationsRecord,
 } from "@/lib/foundation/materialize-season-derivations";
 import { computeSeasonDerivationsFresh } from "@/lib/foundation/season-derivations-compute";
 import { invalidateSeasonDerivationsCache } from "@/lib/foundation/season-derivations-cache";
@@ -77,6 +80,35 @@ describe("materialized season derivations", () => {
     const fresh = computeSeasonDerivationsFresh(gameState, gameState.season.id);
 
     expect(fromPersisted.ratingsById.size).toBe(fresh.ratingsById.size);
+  });
+
+  it("OPUS-REVIEW PR #1296: ein persistierter Ledger ohne `tableGroupContributions` (Schema vor dem " +
+    "PP-Budget) gilt als veraltet -- sonst zeigten Spieltagsrang/Tagespunkte/Feld-Rennen fuer JEDEN " +
+    "bestehenden Spielstand (auch Manager-Mode) 0 fuer alle Teams, bis zur naechsten vollen Neuberechnung", () => {
+    const gameState = createSingleplayerGameState();
+    const signature = buildGameStateContentSignature(gameState);
+    const materialized = withPersistedSeasonDerivations(gameState, "save-schema-alt");
+    const aktuell = materialized.seasonState.persistedSeasonDerivations as PersistedSeasonDerivationsRecord;
+    expect(istPersistierterLedgerAktuell(aktuell)).toBe(true);
+    expect(readPersistedSeasonDerivations(materialized, signature)).not.toBeNull();
+
+    const ledgerAlt = { ...aktuell.ledger };
+    delete ledgerAlt.tableGroupContributions;
+    const altesSchema = {
+      ...materialized,
+      seasonState: {
+        ...materialized.seasonState,
+        persistedSeasonDerivations: { ...aktuell, ledger: ledgerAlt },
+      },
+    };
+    expect(istPersistierterLedgerAktuell(altesSchema.seasonState.persistedSeasonDerivations as PersistedSeasonDerivationsRecord)).toBe(false);
+    expect(readPersistedSeasonDerivations(altesSchema, signature)).toBeNull();
+
+    const saveId = "save-schema-alt";
+    invalidateSeasonDerivationsCache(saveId);
+    const ueberGetter = getSeasonDerivations({ gameState: altesSchema, saveId, contentSignature: signature });
+    const fresh = computeSeasonDerivationsFresh(gameState, gameState.season.id);
+    expect(ueberGetter.ledger.tableGroupContributions).toEqual(fresh.ledger.tableGroupContributions);
   });
 
   it("builds a persisted record with matching signature metadata", () => {

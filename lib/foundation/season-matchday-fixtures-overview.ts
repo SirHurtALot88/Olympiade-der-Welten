@@ -57,7 +57,7 @@ import type {
 import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { getLeagueOf, type LeagueTier } from "@/lib/season/league-split";
-import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
+import { berechneErgebnisNormiert, findeSpieltagsFixtures, outcomeAusPunkten } from "@/lib/resolve/battle-mode-pps-duell";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 
 export type SpieltagsPaarungTeilnehmer = {
@@ -83,6 +83,17 @@ export type SpieltagsDuellDisziplin = {
   verhaeltnisHeim: number | null;
   /** Dieselbe Größe aus Sicht des GASTTEAMS — eigenständig aus dessen Zeile gelesen (Gegenprobe: Summe = 0). */
   verhaeltnisGast: number | null;
+  /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.): `[Heim, Gast]`, 0..10 ganzzahlig, `Heim - Gast =
+   * verhaeltnisHeim` IMMER exakt -- anders als `seiten` (oben) IMMER gesetzt, wenn gespielt UND
+   * ein Duell (Arena UND PPS-Bruecke), weil diese Zahl NIE der rohe, disziplinabhaengig beliebig
+   * grosse Seitenwert ist, sondern immer 0..10 -- genau das Problem, das `seiten` fuer "pps_duell"
+   * oben bewusst unbeantwortet laesst ("273:297"), loest diese Zahl fuer BEIDE Quellen. Aeltere
+   * Zeilen ohne das persistierte Feld (vor diesem PR) werden live aus `verhaeltnis`/`punkteHeim`/
+   * `punkteGast` nachberechnet (Niveau dabei neutral 0,5 -- nur D ist garantiert, s.
+   * `berechneErgebnisNormiert()`).
+   */
+  ergebnisNormiert: [number, number] | null;
   /** `null`, solange nicht gewertet. */
   resolutionSource: "pps" | "arena" | "pps_duell" | null;
   arenaAusfall: ArenaAusfall | null;
@@ -230,6 +241,34 @@ export function findeDisziplinErgebnis(
 }
 
 /**
+ * NIVEAU+MARGE 0-10-NORMIERUNG, ANZEIGE-SEITE: liest `homeRow.ergebnisNormiert`, wenn persistiert
+ * (der Normalfall ab diesem PR). Fehlt es (eine Zeile aus einem Save vor diesem PR), wird es LIVE
+ * aus `verhaeltnis`/`teamPoints` nachberechnet -- ohne Niveau-Referenz (neutral 0,5), aber mit
+ * derselben Garantie `Heim - Gast = verhaeltnisHeim` exakt, s. `berechneErgebnisNormiert()`. Keine
+ * Migration noetig, und eine spaetere neue Referenz aendert nie eine historische Anzeige rueckwirkend
+ * (die Rohwerte bleiben unberuehrt, nur diese Live-Ableitung wuerde sich mitbewegen).
+ */
+function resolveErgebnisNormiertFuerAnzeige(
+  homeRow: DisciplineResultRecord | null,
+  awayRow: DisciplineResultRecord | null,
+): [number, number] | null {
+  if (homeRow?.ergebnisNormiert) {
+    return homeRow.ergebnisNormiert;
+  }
+  if (homeRow?.verhaeltnis == null || homeRow.teamPoints == null || awayRow?.teamPoints == null) {
+    return null;
+  }
+  const outcome = outcomeAusPunkten(homeRow.teamPoints, awayRow.teamPoints);
+  return berechneErgebnisNormiert({
+    outcome,
+    betrag: Math.abs(homeRow.verhaeltnis),
+    niveauEigen: homeRow.duellSeiten?.[0] ?? 0,
+    niveauGegner: homeRow.duellSeiten?.[1] ?? 0,
+    referenz: null,
+  });
+}
+
+/**
  * Gibt es für GENAU dieses Team-Paar (in GETAUSCHTEN Seiten) eine frühere Begegnung im
  * Saison-Spielplan? S. Dateikommentar — das ist pair-spezifisch, nicht saisonhälften-weit.
  */
@@ -314,6 +353,7 @@ export function buildSpieltagsUebersicht(
         // Fuer "pps_duell" bleibt `seiten` darum bewusst `null` — die UI faellt dann ehrlich auf das
         // 2/1/0-Teampunkte-Schema zurueck (`punkteHeim:punkteGast`), wie vor PR #1294.
         seiten: gespielt && homeRow?.resolutionSource === "arena" && homeRow?.duellSeiten ? homeRow.duellSeiten : null,
+        ergebnisNormiert: gespielt ? resolveErgebnisNormiertFuerAnzeige(homeRow, awayRow) : null,
         verhaeltnisHeim: gespielt ? homeRow?.verhaeltnis ?? null : null,
         verhaeltnisGast: gespielt ? awayRow?.verhaeltnis ?? null : null,
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,
