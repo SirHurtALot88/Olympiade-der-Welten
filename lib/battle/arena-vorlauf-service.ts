@@ -214,7 +214,14 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
 
   // SEQUENZIELL, NICHT PARALLEL (Plan 2.7/4.4) — D1 und D2 derselben Signatur laufen eins nach dem
   // anderen, und der globale Semaphor serialisiert zusaetzlich gegen JEDEN anderen Vorlauf im
-  // Prozess (anderer Save, anderer Spieltag).
+  // Prozess (anderer Save, anderer Spieltag). Das gilt UNVERAENDERT nur fuer die DISZIPLINEN
+  // selbst (D1 vs. D2) -- seit dem Latenz-Fix 18.10. laufen innerhalb EINER Disziplin (hier, unter
+  // demselben gehaltenen Semaphor-Griff) ihre ZWEI Liga-Stufen gleichzeitig, nicht mehr
+  // nacheinander (s. `runBattleModeArenaMatchday()`s Dateikopf-Kommentar in
+  // `battle-mode-arena-team-points.ts`). D1/D2 bewusst weiter seriell gehalten: zwei Disziplinen
+  // gleichzeitig waeren zusaetzlich zu den zwei parallelen Liga-Stufen bis zu VIER gleichzeitige
+  // Chromium-Prozesse (~4 GB RSS, gemessen ~1 GB je Prozess lokal) -- auf dem CX23 (4 GB RAM) ein
+  // reales OOM-Risiko, das die ZWEI-Browser-Parallelitaet (gemessen ~2 GB) nicht hat.
   for (const disziplinId of input.arenaDisciplineIds) {
     const gesamtStart = Date.now();
     // OPUS-REVIEW (Nachtrag 18.10., Design-Fix): die automatische Wiederholung bei einem
@@ -243,6 +250,12 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             disciplineId: disziplinId,
             runArenaFixturesImpl: input.runArenaFixturesImpl,
             matchdayMutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
+            // OPUS-REVIEW PR #1290: die automatische Wiederholung faehrt die Liga-Stufen SERIELL (ein
+            // Browser zur Zeit). War Versuch 1 mit zwei gleichzeitigen Browsern zu schwer fuer den
+            // Server (Absturz/Timeout unter Speicher- oder CPU-Druck), wuerde ein zweiter paralleler
+            // Versuch genau daran wieder scheitern -- seriell ist der bewaehrte Pfad von vor dem
+            // Latenz-Fix. Versuch 1 entscheidet `entscheideArenaTierParallel()` (ENV + RAM-Guard).
+            tierParallel: lokalerVersuch === 1 ? undefined : false,
             // JEDER Versuch bekommt dasselbe volle Gesamt-Budget (Opus: "demselben Gesamt-Budget
             // je Versuch") -- keine Aufteilung eines gemeinsamen Budgets ueber beide Versuche.
             runArenaFixturesOptions: {

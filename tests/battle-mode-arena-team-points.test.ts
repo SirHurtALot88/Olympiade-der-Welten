@@ -41,6 +41,7 @@ import {
   resolveHockeyPpsReferenz,
   resolveSpeedSchachPpsReferenz,
   resolveShowcasePpsReferenz,
+  entscheideArenaTierParallel,
   runBattleModeArenaMatchday,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 
@@ -1174,5 +1175,129 @@ describe("runBattleModeArenaMatchday (gemockter Runner, kein Browser)", () => {
     expect(warnings.some((warning) => warning.startsWith("arena_matchday_league_failed:liga1"))).toBe(true);
     expect(overridesByTeamId.has("liga1-a")).toBe(false);
     expect(overridesByTeamId.get("liga2-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+  });
+});
+
+/**
+ * OPUS-REVIEW PR #1290 (Latenz-Fix 18.10.): die Liga-Stufen laufen standardmaessig gleichzeitig.
+ * Diese Tests halten fest, dass (1) der Parallel-Pfad wirklich parallel ist, (2) Notschalter,
+ * Aufrufer-Schalter und RAM-Guard wirklich auf seriell zurueckschalten (nicht nur Dekoration sind)
+ * und (3) das Ergebnis -- Overrides UND Warnungsreihenfolge -- in beiden Modi identisch ist, auch
+ * wenn im Parallel-Fall Liga 2 VOR Liga 1 fertig wird.
+ */
+describe("runBattleModeArenaMatchday · Liga-Stufen parallel/seriell (PR #1290)", () => {
+  function buildGameState(): GameState {
+    return {
+      disciplines: [{ id: "basketball", playerCount: 6 }],
+      seasonState: {
+        schedule: buildFixtureSchedule([
+          { id: "f-liga1", homeTeamId: "liga1-a", awayTeamId: "liga1-b", matchdayId: "matchday-1", leagueTier: "liga1" },
+          { id: "f-liga2", homeTeamId: "liga2-a", awayTeamId: "liga2-b", matchdayId: "matchday-1", leagueTier: "liga2" },
+        ]),
+      },
+    } as unknown as GameState;
+  }
+
+  /** Runner, der jede Liga erst auf ausdrueckliches Signal beendet -- so wird Gleichzeitigkeit messbar. */
+  function steuerbarerRunner() {
+    const offen = new Map<string, () => void>();
+    const gestartet: string[] = [];
+    const impl = vi.fn((_gameState: unknown, fixtures: Array<{ homeTeamId: string; awayTeamId: string }>) => {
+      const liga = fixtures[0].homeTeamId.split("-")[0];
+      gestartet.push(liga);
+      return new Promise((resolve, reject) => {
+        offen.set(liga, () => {
+          if (liga === "liga1") {
+            reject(new Error("chromium crashed"));
+            return;
+          }
+          resolve(fixtures.map((f) => ({ homeTeamId: f.homeTeamId, awayTeamId: f.awayTeamId, seiten: [3, 1], boxscore: [] })));
+        });
+      });
+    });
+    return { impl, gestartet, beende: (liga: string) => offen.get(liga)?.() };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  function mitEnv<T>(werte: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+    const vorher = Object.fromEntries(Object.keys(werte).map((k) => [k, process.env[k]]));
+    for (const [k, v] of Object.entries(werte)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    return fn().finally(() => {
+      for (const [k, v] of Object.entries(vorher)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    });
+  }
+
+  async function fahre(env: Record<string, string | undefined>, extra: { tierParallel?: boolean } = {}) {
+    return mitEnv(env, async () => {
+      const runner = steuerbarerRunner();
+      const lauf = runBattleModeArenaMatchday({
+        gameState: buildGameState(),
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        runArenaFixturesImpl: runner.impl as never,
+        ...extra,
+      });
+      await tick();
+      const gleichzeitigGestartet = [...runner.gestartet];
+      // Liga 2 zuerst beenden: im Parallel-Fall wird sie VOR Liga 1 fertig.
+      runner.beende("liga2");
+      await tick();
+      runner.beende("liga1");
+      await tick();
+      runner.beende("liga2");
+      const ergebnis = await lauf;
+      return { gleichzeitigGestartet, ergebnis, aufrufe: runner.impl.mock.calls.length };
+    });
+  }
+
+  it("Standard: beide Liga-Stufen starten, bevor eine fertig ist (echte Gleichzeitigkeit)", async () => {
+    const { gleichzeitigGestartet, aufrufe } = await fahre({ OLY_ARENA_TIER_PARALLEL: undefined, OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: "0" });
+    expect(gleichzeitigGestartet).toEqual(["liga1", "liga2"]);
+    expect(aufrufe).toBe(2);
+  });
+
+  it("OLY_ARENA_TIER_PARALLEL=0 schaltet wirklich auf seriell (Liga 2 startet erst nach Liga 1)", async () => {
+    const { gleichzeitigGestartet, aufrufe } = await fahre({ OLY_ARENA_TIER_PARALLEL: "0", OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: "0" });
+    expect(gleichzeitigGestartet).toEqual(["liga1"]);
+    expect(aufrufe).toBe(2);
+  });
+
+  it("tierParallel:false (Wiederholung nach Ausfall) schaltet seriell, auch wenn ENV parallel erlaubt", async () => {
+    const { gleichzeitigGestartet } = await fahre({ OLY_ARENA_TIER_PARALLEL: undefined, OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: "0" }, { tierParallel: false });
+    expect(gleichzeitigGestartet).toEqual(["liga1"]);
+  });
+
+  it("RAM-Guard: verlangt mehr frei, als die Maschine haben kann -> seriell", async () => {
+    const { gleichzeitigGestartet } = await fahre({ OLY_ARENA_TIER_PARALLEL: undefined, OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: String(1024 * 1024 * 1024) });
+    expect(gleichzeitigGestartet).toEqual(["liga1"]);
+  });
+
+  it("parallel und seriell liefern dieselben Overrides und dieselbe Warnungsreihenfolge", async () => {
+    const parallel = await fahre({ OLY_ARENA_TIER_PARALLEL: undefined, OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: "0" });
+    const seriell = await fahre({ OLY_ARENA_TIER_PARALLEL: "0", OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: "0" });
+    expect(parallel.ergebnis.warnings).toEqual(seriell.ergebnis.warnings);
+    expect(parallel.ergebnis.warnings[0]).toMatch(/^arena_matchday_league_failed:liga1:chromium crashed/);
+    expect([...parallel.ergebnis.overridesByTeamId]).toEqual([...seriell.ergebnis.overridesByTeamId]);
+    expect(parallel.ergebnis.overridesByTeamId.has("liga1-a")).toBe(false);
+    expect(parallel.ergebnis.overridesByTeamId.get("liga2-a")?.teamPoints).toBe(ARENA_TEAM_POINTS.win);
+  });
+
+  it("entscheideArenaTierParallel: Reihenfolge der Gruende", () => {
+    return mitEnv({ OLY_ARENA_TIER_PARALLEL: undefined, OLY_ARENA_TIER_PARALLEL_MIN_FREE_MB: undefined }, async () => {
+      expect(entscheideArenaTierParallel({ anzahlStufen: 1, freiMbImpl: () => 99_999 }).grund).toBe("nur_eine_stufe");
+      expect(entscheideArenaTierParallel({ anzahlStufen: 2, tierParallel: false, freiMbImpl: () => 99_999 }).grund).toBe("aufrufer_seriell");
+      expect(entscheideArenaTierParallel({ anzahlStufen: 2, freiMbImpl: () => 2047 })).toEqual({ parallel: false, grund: "ram_guard", freiMb: 2047 });
+      expect(entscheideArenaTierParallel({ anzahlStufen: 2, freiMbImpl: () => 2048 }).parallel).toBe(true);
+      process.env.OLY_ARENA_TIER_PARALLEL = "false";
+      expect(entscheideArenaTierParallel({ anzahlStufen: 2, freiMbImpl: () => 99_999 }).grund).toBe("notschalter");
+    });
   });
 });

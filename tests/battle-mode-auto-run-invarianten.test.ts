@@ -56,6 +56,17 @@ import type { DisciplineResultRecord } from "@/lib/data/olyDataTypes";
 // `runBattleModeArenaMatchday()` dazu (gemessen 10-18s je Disziplin lokal, Plan Abschnitt 2.6) —
 // der Timeout unten ist deshalb grosszuegiger als die reine Vorher-Zahl.
 const SPIELTAGE = 2;
+// OPUS-REVIEW PR #1290 (CI-Rotfall Run 39162748229, "expected 0 to be greater than 0" in Zeile
+// "arenaDisziplinenZeilen.length"): der Disziplin-Spielplan haengt an der ZUFAELLIGEN saveId
+// (`new-game-<Date.now()>-<zufall>`, Saat in `buildSeasonSeededDisciplineSchedule()`). Nachgerechnet
+// ueber 3000 zufaellige saveIds: in 0,83 % aller frischen Battle-Saves steht an Spieltag 1 UND 2
+// KEINE einzige Disziplin aus `ARENA_RESOLVED_DISCIPLINE_IDS` (an Spieltag 1 allein in 11 %). Dann
+// gibt es per Konstruktion keine Arena-Zeile, egal ob die Arena laeuft -- die K1-Pruefung unten war
+// damit ein Zufallstreffer, keine Aussage ueber den Code. Deshalb: mindestens SPIELTAGE spielen und
+// danach so lange weiter, bis ein arena-aufgeloester Slot gespielt wurde (hoechstens
+// MAX_SPIELTAGE; dass sechs Spieltage am Stueck keine Arena-Disziplin tragen, kommt bei 13 von 20
+// arena-aufgeloesten Disziplinen praktisch nicht vor -- und waere dann ein echter Spielplan-Befund).
+const MAX_SPIELTAGE = 6;
 
 function frischerDienst() {
   process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-battle-invarianten-${Math.random().toString(36).slice(2)}.sqlite`;
@@ -106,10 +117,27 @@ describe("Task #164 · Battle-Save-Invarianten über den echten Wizard-/Auto-Run
         applyGameModeOwnership(nachDraft.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
       );
 
-      for (let index = 0; index < SPIELTAGE; index += 1) {
+      const spielplan = (persistence.getSaveById(saveId)!.gameState.seasonState.disciplineSchedule ?? []) as Array<{
+        matchdayId: string;
+        discipline1?: { disciplineId?: string | null } | null;
+        discipline2?: { disciplineId?: string | null } | null;
+      }>;
+      const arenaSlotsAn = (matchdayId: string) => {
+        const eintrag = spielplan.find((zeile) => zeile.matchdayId === matchdayId);
+        return [eintrag?.discipline1?.disciplineId, eintrag?.discipline2?.disciplineId].filter(
+          (id): id is string => typeof id === "string" && ARENA_RESOLVED_DISCIPLINE_IDS.has(id),
+        );
+      };
+      const gespielteArenaSlots: string[] = [];
+      const gespielteSpieltage: string[] = [];
+
+      for (let index = 0; index < MAX_SPIELTAGE; index += 1) {
+        if (index >= SPIELTAGE && gespielteArenaSlots.length > 0) break;
         const aktuell = persistence.getSaveById(saveId)!;
         const seasonId = aktuell.gameState.season.id;
         const matchdayId = aktuell.gameState.matchdayState.matchdayId;
+        gespielteSpieltage.push(matchdayId);
+        gespielteArenaSlots.push(...arenaSlotsAn(matchdayId).map((id) => `${matchdayId}:${id}`));
         const lauf = await runLocalMatchdayAutoRun(
           {
             saveId,
@@ -194,7 +222,8 @@ describe("Task #164 · Battle-Save-Invarianten über den echten Wizard-/Auto-Run
       // erklärt (`arenaAusfall`). Ein `nicht_ausgefuehrt` wäre vor PR 3 der einzige Fall gewesen;
       // nach dem Umbau zeigt dieser Test überwiegend `"arena"`.
       const arenaDisziplinenZeilen = zeilen.filter((zeile) => ARENA_RESOLVED_DISCIPLINE_IDS.has(zeile.disciplineId));
-      expect(arenaDisziplinenZeilen.length).toBeGreaterThan(0);
+      expect(gespielteArenaSlots.length, `kein arena-aufgeloester Slot in ${gespielteSpieltage.join(", ")} (saveId ${saveId})`).toBeGreaterThan(0);
+      expect(arenaDisziplinenZeilen.length, `gespielte Arena-Slots: ${gespielteArenaSlots.join(", ")}`).toBeGreaterThan(0);
       const wederNoch = arenaDisziplinenZeilen.filter(
         (zeile) => zeile.resolutionSource !== "arena" && !(zeile.arenaAusfall as ArenaAusfall | null | undefined),
       );
