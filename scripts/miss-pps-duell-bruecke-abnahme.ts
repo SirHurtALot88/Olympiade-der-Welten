@@ -83,7 +83,7 @@ import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-type
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FELDGROESSE = 6;
 const PAARUNGEN_JE_SPIELTAG = 2;
-const SAATSTROEME = [0, 10_000_000] as const;
+const ALLE_SAATSTROEME = [0, 10_000_000] as const;
 
 const args = new Map(
   process.argv.slice(2).filter((a) => a.startsWith("--")).map((a) => {
@@ -91,6 +91,15 @@ const args = new Map(
     return [k!, v ?? "1"] as const;
   }),
 );
+// Container-Haertung (19.10.): der Vier-Kern-Host braucht fuer EINEN Saatstrom bereits ~50 Minuten
+// (buildLegacyMatchdayResolvePreview je Spieltag dominiert) -- beide Stroeme in einem Prozess
+// liefen damit ins Hintergrund-Zeitlimit und der Prozess wurde OHNE geschriebene Ausgabe
+// abgeschossen (writeFileSync passiert erst ganz am Ende von main()), jeder Lauf war komplett
+// verloren. `--stroeme=0` bzw. `--stroeme=10000000` laesst genau EINEN Saatstrom laufen (mit
+// `--ausgabe=<pfad>` getrennt geschrieben), ohne das Verhalten ohne diesen Schalter zu aendern.
+const SAATSTROEME = args.get("stroeme")
+  ? ALLE_SAATSTROEME.filter((s) => args.get("stroeme")!.split(",").map(Number).includes(s))
+  : ALLE_SAATSTROEME;
 // Ueberschreibbar (--ausgabe=<pfad>), damit zwei parallele Teilmessungen (z.B. ein reiner Teil-A-
 // Feldgroessen-Sweep mit --skip-teil-b neben einer Teil-B-Nachmessung) sich nicht gegenseitig die
 // Ausgabedatei ueberschreiben.
@@ -233,9 +242,16 @@ function main() {
   // Spieltage werden deshalb in zwei DISJUNKTE Fenster geteilt, je ein Fenster pro Saatstrom:
   // echte, nicht ueberlappende reale Spieltage statt zweimal derselben Stichprobe.
   const matchdayPool = basis.season.matchdayIds ?? [];
-  const fensterGroesse = Math.max(1, Math.min(SPIELTAGE_LIMIT, Math.floor(matchdayPool.length / SAATSTROEME.length)));
+  // Immer gegen ALLE_SAATSTROEME.length bemessen/indiziert (nicht das ggf. per `--stroeme`
+  // gefilterte SAATSTROEME) -- sonst bekaeme ein einzeln nachgefahrener Strom ein anderes
+  // (breiteres) Spieltags-Fenster als beim gemeinsamen Lauf und waere mit dessen bereits
+  // gemessenem Partner-Strom nicht mehr disjunkt/vergleichbar.
+  const fensterGroesse = Math.max(1, Math.min(SPIELTAGE_LIMIT, Math.floor(matchdayPool.length / ALLE_SAATSTROEME.length)));
   const spieltageJeStrom = new Map(
-    SAATSTROEME.map((strom, i) => [strom, matchdayPool.slice(i * fensterGroesse, i * fensterGroesse + fensterGroesse)] as const),
+    SAATSTROEME.map((strom) => {
+      const i = ALLE_SAATSTROEME.indexOf(strom);
+      return [strom, matchdayPool.slice(i * fensterGroesse, i * fensterGroesse + fensterGroesse)] as const;
+    }),
   );
   const alleDisziplinen = basis.disciplines;
   const gewaehlt = DISZIPLINEN.map((id) => alleDisziplinen.find((d) => d.id === id)).filter((d): d is Discipline => Boolean(d));
