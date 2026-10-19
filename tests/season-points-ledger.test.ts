@@ -327,4 +327,181 @@ describe("season points ledger", () => {
     expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.points).toBe(4.934);
     expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.teamId).toBe(teamA.teamId);
   });
+
+  it("PP-BUDGET, REIN LEISTUNGSBASIERT (19.10.): `tableGroupContributions` einer Duell-Zeile " +
+    "traegt das 2/1/0-Team-Budget, NICHT die (jetzt leistungsbasierte) Spieler-PP-Summe -- " +
+    "`teamSummary.totalPoints` und der Spieltagsrang (`season-matchday-points.ts`, " +
+    "`build-field-race-ledger.ts`) muessen dieselbe Waehrung lesen wie die Saisontabelle, sonst " +
+    "entsteht fuer Battle-Saves genau die Inkonsistenz, die diese Datei fuer den Mutator-Bonus " +
+    "schon einmal behoben hat (\"Platz 1 im Spieltag, aber nur 2. in der Saison\").", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const teamA = gameState.teams[0]!;
+    const teamB = gameState.teams[1]!;
+    const [playerA1, playerA2, playerB1, playerB2] = gameState.players.slice(0, 4);
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 2,
+        teamsReady: 2,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    // Team A verliert sein Duell (0 von 2 Punkten), hat aber die beiden staerkeren Spieler
+    // (finalPlayerScore 80/60) -- genau der Fall, den Chris' Entscheidung adressiert ("ein guter
+    // Spieler im schlechten Verlierer-Team kann trotzdem viele Punkte sammeln").
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "discipline-a",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        rank: 2,
+        baseScore: 70,
+        totalScore: 140,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "pps_duell",
+        pointSource: "battle_mode_pps_duell_win_draw_loss",
+        teamPoints: 0,
+        opponentTeamId: teamB.teamId,
+      },
+      {
+        id: "discipline-b",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        rank: 1,
+        baseScore: 20,
+        totalScore: 40,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T12:02:00.000Z",
+        resolutionSource: "pps_duell",
+        pointSource: "battle_mode_pps_duell_win_draw_loss",
+        teamPoints: 2,
+        opponentTeamId: teamA.teamId,
+      },
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-a-1",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        playerId: playerA1!.id,
+        activePlayerId: playerA1!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 80,
+        scoreContribution: 0.57,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: 0.57,
+        createdAt: "2026-06-06T12:03:00.000Z",
+      },
+      {
+        id: "perf-a-2",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        playerId: playerA2!.id,
+        activePlayerId: playerA2!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 1,
+        baseValue: 60,
+        finalPlayerScore: 60,
+        scoreContribution: 0.43,
+        rankInTeam: 2,
+        rankInDiscipline: 3,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 0.43,
+        createdAt: "2026-06-06T12:04:00.000Z",
+      },
+      {
+        id: "perf-b-1",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        playerId: playerB1!.id,
+        activePlayerId: playerB1!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 10,
+        finalPlayerScore: 10,
+        scoreContribution: 0.5,
+        rankInTeam: 1,
+        rankInDiscipline: 7,
+        isTop10: false,
+        isMvpCandidate: false,
+        storyWeight: 0.5,
+        createdAt: "2026-06-06T12:05:00.000Z",
+      },
+      {
+        id: "perf-b-2",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        playerId: playerB2!.id,
+        activePlayerId: playerB2!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 1,
+        baseValue: 10,
+        finalPlayerScore: 10,
+        scoreContribution: 0.5,
+        rankInTeam: 2,
+        rankInDiscipline: 8,
+        isTop10: false,
+        isMvpCandidate: false,
+        storyWeight: 0.5,
+        createdAt: "2026-06-06T12:06:00.000Z",
+      },
+    ];
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    const teamASummary = ledger.teamSummariesByTeamId.get(teamA.teamId)!;
+    const teamBSummary = ledger.teamSummariesByTeamId.get(teamB.teamId)!;
+
+    // Tabellenpunkte bleiben exakt Σ 2/1/0 -- Team A verlor, Team B gewann.
+    expect(teamASummary.totalPoints).toBe(0);
+    expect(teamBSummary.totalPoints).toBe(2);
+    expect(teamASummary.reconciliationStatus).toBe("reconciled");
+    expect(teamBSummary.reconciliationStatus).toBe("reconciled");
+
+    // ABER: Team A (der Verlierer) hat die weitaus hoehere leistungsbasierte Spieler-PP-Summe,
+    // weil seine Spieler absolut staerker waren -- genau die Entkopplung, die Teil A will.
+    expect(teamASummary.playerDerivedTotal).toBeGreaterThan(teamBSummary.playerDerivedTotal);
+    expect(teamASummary.playerDerivedTotal).toBeGreaterThan(0);
+
+    // DIE REGRESSION, DIE DIESER TEST SPERRT: `tableGroupContributions` (Spieltagsrang/Feld-Rennen)
+    // liest das 2/1/0-Team-Budget, NICHT die Spieler-PP-Summe -- sonst wuerde "wer hat an diesem
+    // Spieltag mehr Punkte geholt" (Tagessieger) der leistungsbasierten PP-Summe folgen und
+    // Team A (den Verlierer) als Tagessieger zeigen, waehrend die Saisontabelle Team B fuehrt.
+    const beitragA = ledger.tableGroupContributions.find((b) => b.teamId === teamA.teamId && b.disciplineId === "basketball");
+    const beitragB = ledger.tableGroupContributions.find((b) => b.teamId === teamB.teamId && b.disciplineId === "basketball");
+    expect(beitragA?.points).toBe(0);
+    expect(beitragB?.points).toBe(2);
+    expect(beitragA?.matchdayId).toBe("matchday-1");
+    // Σ `tableGroupContributions` je Team == `teamSummary.totalPoints` -- dieselbe Waehrung.
+    expect(beitragA?.points).toBe(teamASummary.totalPoints);
+    expect(beitragB?.points).toBe(teamBSummary.totalPoints);
+  });
 });

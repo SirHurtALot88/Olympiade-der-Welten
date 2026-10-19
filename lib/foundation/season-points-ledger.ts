@@ -69,12 +69,31 @@ export type SeasonPlayerPointsSummary = {
   warnings: string[];
 };
 
+/**
+ * Der Tabellen-Beitrag EINER Gruppe (Team + Disziplin + Seite an einem Spieltag) -- fuer eine
+ * Duell-Zeile `teamResult.teamPoints` (2/1/0), fuer eine Manager-Mode-Zeile Σ Spieler-`points`
+ * dieser Gruppe (bit-identisch zur bisherigen Summe). GENAU DIESELBE Groesse, die auch in
+ * `teamSummary.totalPoints` einfliesst -- hier zusaetzlich mit `matchdayId` markiert, damit
+ * `season-matchday-points.ts` (Spieltagsrang/"Tagespunkte") dieselbe Waehrung verwendet wie die
+ * Saisontabelle, statt (seit dem PP-Budget, Teil A, 19.10.) ueber `pointEntries` die jetzt
+ * leistungsbasierten Spieler-PP direkt zu summieren -- das wuerde fuer Battle-Saves denselben
+ * Fehlerklasse reproduzieren, die diese Datei fuer den Mutator-Bonus schon einmal behoben hat
+ * ("Platz 1 im Spieltag, aber nur 2. in der Saison").
+ */
+export type SeasonTableGroupContribution = {
+  matchdayId: string | null;
+  teamId: string;
+  disciplineId: string;
+  points: number;
+};
+
 export type SeasonPointsLedger = {
   hasResultSource: boolean;
   pointEntries: SeasonPlayerPointLedgerEntry[];
   pointEntriesByPerformanceId: Map<string, SeasonPlayerPointLedgerEntry>;
   teamSummariesByTeamId: Map<string, SeasonTeamPointsSummary>;
   playerSummariesByPlayerId: Map<string, SeasonPlayerPointsSummary>;
+  tableGroupContributions: SeasonTableGroupContribution[];
   warnings: string[];
 };
 
@@ -333,6 +352,10 @@ export function buildSeasonPointsLedger(
   // Hier nur gesammelt (teamSummariesByTeamId existiert erst nach diesem Loop); angewendet gleich
   // danach, zusammen mit dem Null-Init aller Teams.
   const duellGruppenBeitraege: Array<{ teamId: string; disciplineId: string; category: DisciplineCategory | null; beitrag: number }> = [];
+  // TAGESPUNKTE/SPIELTAGSRANG (`lib/foundation/season-matchday-points.ts`): dieselbe
+  // Tabellen-Waehrung wie `totalPoints` oben, nur zusaetzlich je Spieltag aufgeschluesselt -- s.
+  // `SeasonTableGroupContribution`-Kommentar.
+  const tableGroupContributions: SeasonTableGroupContribution[] = [];
 
   for (const performances of groupedPerformances.values()) {
     const reference = performances[0];
@@ -405,19 +428,22 @@ export function buildSeasonPointsLedger(
     // Manager-Mode-Zeilen -- eine Duell-Zeile ist per Konstruktion entkoppelt (`totalPoints` kommt
     // unten direkt aus `teamResult.teamPoints`, nicht aus der Spieler-Summe), ein Vergleich gegen den
     // PPS-Totalscore waere hier immer eine falsche Warnung.
+    let gruppenTabellenBeitrag: number | null = null;
     if (!duellPoints) {
       const reconciliationTarget = rankPointDistribution?.teamPoints ?? teamTotal;
-      if (reconciliationTarget != null) {
-        const derivedGroupTotal = roundValue(
-          normalizedEntries.reduce((sum, entry) => sum + entry.basePoints, 0),
-          4,
-        );
-        if (!isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
-          const warning = `reconciliation_failed:${reference.teamId}:${reference.disciplineId}:${reference.disciplineSide}`;
-          warnings.push(warning);
-          for (const entry of normalizedEntries) {
-            entry.warnings.push(warning);
-          }
+      const derivedGroupTotal = roundValue(
+        normalizedEntries.reduce((sum, entry) => sum + entry.basePoints, 0),
+        4,
+      );
+      // TAGESPUNKTE/SPIELTAGSRANG (s. `tableGroupContributions` unten): fuer Manager-Mode-Zeilen
+      // bit-identisch die Σ Spieler-`points` (nicht `basePoints`) dieser Gruppe -- derselbe Wert,
+      // der vorher direkt aus `pointEntries` aufsummiert wurde.
+      gruppenTabellenBeitrag = roundValue(normalizedEntries.reduce((sum, entry) => sum + entry.points, 0), 4);
+      if (reconciliationTarget != null && !isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
+        const warning = `reconciliation_failed:${reference.teamId}:${reference.disciplineId}:${reference.disciplineSide}`;
+        warnings.push(warning);
+        for (const entry of normalizedEntries) {
+          entry.warnings.push(warning);
         }
       }
     } else if (teamResult) {
@@ -426,6 +452,16 @@ export function buildSeasonPointsLedger(
         disciplineId: reference.disciplineId,
         category: disciplineCategoryById.get(reference.disciplineId) ?? null,
         beitrag: teamResult.teamPoints ?? 0,
+      });
+      gruppenTabellenBeitrag = teamResult.teamPoints ?? 0;
+    }
+
+    if (gruppenTabellenBeitrag != null) {
+      tableGroupContributions.push({
+        matchdayId: matchdayResult?.matchdayId ?? null,
+        teamId: reference.teamId,
+        disciplineId: reference.disciplineId,
+        points: gruppenTabellenBeitrag,
       });
     }
 
@@ -628,6 +664,7 @@ export function buildSeasonPointsLedger(
     pointEntriesByPerformanceId,
     teamSummariesByTeamId,
     playerSummariesByPlayerId,
+    tableGroupContributions,
     warnings: Array.from(new Set(warnings)),
   };
 }

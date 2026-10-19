@@ -48,7 +48,6 @@ import type { Discipline, GameState, SeasonDisciplineScheduleSlot } from "@/lib/
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ZIEL = path.join(WURZEL, "data/generated/verhaeltnis-referenz.json");
 const FELDGROESSEN = [2, 3, 4, 5, 6] as const;
 const PAARUNGEN_JE_SPIELTAG = 2;
 
@@ -58,6 +57,12 @@ const args = new Map(
     return [k!, v ?? "1"] as const;
   }),
 );
+
+// `--ausgabe=<pfad>` (wie bei scripts/miss-pps-duell-bruecke-abnahme.ts): ueberschreibbar, damit
+// mehrere parallele Teilziehungen (verschiedene Disziplin-Teilmengen, je ein Prozess je CPU-Kern)
+// sich nicht gegenseitig die gemeinsame Zieldatei wegschreiben -- ohne das wuerde der zuletzt
+// fertige Prozess alle anderen Teilziehungen stillschweigend ueberschreiben (kein Lock auf der Datei).
+const ZIEL = args.get("ausgabe") ? path.resolve(args.get("ausgabe")!) : path.join(WURZEL, "data/generated/verhaeltnis-referenz.json");
 
 // `--aufstellung=ki` (Standard): die KI-Aufstellung des Spiels je Team; `--aufstellung=beste-n`: die
 // besten n nach Disziplin-Score ohne Modifikatoren (Methode der *-pps-referenz-Skripte). Gemessen

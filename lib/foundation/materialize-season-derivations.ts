@@ -5,6 +5,7 @@ import type {
   SeasonPlayerPointLedgerEntry,
   SeasonPlayerPointsSummary,
   SeasonPointsLedger,
+  SeasonTableGroupContribution,
   SeasonTeamPointsSummary,
 } from "@/lib/foundation/season-points-ledger";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -25,6 +26,16 @@ type PersistedSeasonPointsLedger = {
   warnings: string[];
   teamSummariesByTeamId: Record<string, SeasonTeamPointsSummary>;
   playerSummariesByPlayerId: Record<string, SeasonPlayerPointsSummary>;
+  /**
+   * PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, 19.10.): additiv -- `tableGroupContributions` traegt
+   * die Tabellen-Waehrung getrennt von der (jetzt leistungsbasierten) Spieler-PP, s.
+   * `SeasonTableGroupContribution`-Kommentar in season-points-ledger.ts. Fehlt es (aeltere
+   * gecachte Derivations vor diesem Feld), liefert `hydrateLedger()` ein leeres Array -- ein
+   * Battle-Save mit einem veralteten Cache-Eintrag faellt dann fuer EINEN Lesevorgang auf 0
+   * Tagespunkte zurueck (sichtbar leer, nie falsch), bis der naechste Buchungsvorgang den Cache
+   * neu befuellt.
+   */
+  tableGroupContributions?: SeasonTableGroupContribution[];
 };
 
 export type PersistedSeasonDerivationsRecord = {
@@ -47,6 +58,7 @@ function serializeLedger(ledger: SeasonPointsLedger): PersistedSeasonPointsLedge
     warnings: ledger.warnings,
     teamSummariesByTeamId: Object.fromEntries(ledger.teamSummariesByTeamId),
     playerSummariesByPlayerId: Object.fromEntries(ledger.playerSummariesByPlayerId),
+    tableGroupContributions: ledger.tableGroupContributions,
   };
 }
 
@@ -60,6 +72,7 @@ function hydrateLedger(persisted: PersistedSeasonPointsLedger): SeasonPointsLedg
     ),
     teamSummariesByTeamId: new Map(Object.entries(persisted.teamSummariesByTeamId)),
     playerSummariesByPlayerId: new Map(Object.entries(persisted.playerSummariesByPlayerId)),
+    tableGroupContributions: persisted.tableGroupContributions ?? [],
   };
 }
 

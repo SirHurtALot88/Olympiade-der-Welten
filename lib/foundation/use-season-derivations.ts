@@ -14,6 +14,7 @@ const EMPTY_DERIVATIONS: SeasonDerivations = {
     pointEntriesByPerformanceId: new Map(),
     playerSummariesByPlayerId: new Map(),
     teamSummariesByTeamId: new Map(),
+    tableGroupContributions: [],
     warnings: [],
   },
   ratingsById: new Map(),
