@@ -53,6 +53,16 @@ export type PlayerAllTimeDisciplineRow = {
   teamId: string | null;
   teamCode: string | null;
   teamName: string | null;
+  /**
+   * Das zuletzt bekannte Team: das aktuelle (`teamId`), sonst das Team aus dem jüngsten
+   * archivierten Saison-Snapshot, in dem der Spieler auftauchte. Für den Liga-Filter der
+   * All-Time-Liste (Opus-Review PR #1295, Punkt 5): ein vereinsloser Spieler (`teamId` null, z. B.
+   * entlassen/auf dem Markt) fiel dort sonst aus JEDER Liga-Ansicht heraus, auch aus der
+   * Standardansicht „Liga 1" (am Live-Save tragen 58 von 386 All-Time-Zeilen kein aktuelles Team;
+   * jener Save hat noch keinen Liga-Split, jeder Save MIT Split traefe es). `null` nur, wenn es
+   * auch kein Snapshot-Team gibt (nur in der laufenden Saison gespielt, schon wieder ohne Verein).
+   */
+  lastKnownTeamId: string | null;
   /** Saisons mit irgendeinem Einsatz, in irgendeiner Disziplin. */
   seasonsPlayed: number;
   overall: PlayerAllTimeStatCell;
@@ -166,6 +176,10 @@ export function buildPlayerAllTimeDisciplineStats(gameState: GameState): PlayerA
       });
     }
   }
+  // Das Snapshot-Team VOR dem Ueberschreiben durch den aktuellen Kader merken (`lastKnownTeamId`).
+  const snapshotTeamIdByPlayerId = new Map(
+    [...latestIdentityByPlayerId].map(([playerId, identity]) => [playerId, identity.teamId] as const),
+  );
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const currentTeamIdByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry.teamId] as const));
   for (const player of gameState.players ?? []) {
@@ -224,6 +238,7 @@ export function buildPlayerAllTimeDisciplineStats(gameState: GameState): PlayerA
       teamId: identity?.teamId ?? null,
       teamCode: identity?.teamCode ?? null,
       teamName: identity?.teamName ?? null,
+      lastKnownTeamId: identity?.teamId ?? snapshotTeamIdByPlayerId.get(playerId) ?? null,
       seasonsPlayed: overallSeasonIds.size,
       overall: {
         points: roundValue(overallPoints, 1),

@@ -145,15 +145,21 @@ export default function FoundationSeasonV2Host({
   );
 
   /**
-   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team ("Staffel-Rang") ZUSÄTZLICH
-   * zum laufenden Tabellenrang im Spieltage-Modus — dieselbe reine Kaderstärke-Rechnung, die die
-   * „Ranks"-Ansicht zeigt (`buildTeamDisciplineRankRowsFromGameState`, Top-6-Spieler je Disziplin,
-   * liga-lokal sobald der Liga-Split aktiv ist). Unabhängig vom Saisonverlauf — zeigt, wer laut
-   * Kader favorisiert ist, auch wenn der bisherige Tabellenstand das (noch) nicht zeigt.
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team UND DISZIPLIN ("Staffel-Rang")
+   * ZUSÄTZLICH zum laufenden Tabellenrang im Spieltage-Modus — dieselbe reine Kaderstärke-Rechnung,
+   * die die „Ranks"-Ansicht zeigt (`buildTeamDisciplineRankRowsFromGameState`, Top-6-Spieler je
+   * Disziplin, liga-lokal sobald der Liga-Split aktiv ist). Unabhängig vom Saisonverlauf — zeigt,
+   * wer laut Kader favorisiert ist, auch wenn der bisherige Tabellenstand das (noch) nicht zeigt.
+   *
+   * PRO DISZIPLIN, NICHT EIN GESAMTRANG (Review-Fund 19.10. Abend): Chris' eigenes Beispiel nennt
+   * die Staffel namentlich und verlangt ausdrücklich ZWEI separate Werte für die zwei Disziplinen
+   * eines Spieltags — `row.disciplineRanks` (disciplineId -> Rang) existierte dafür bereits in
+   * `team-discipline-rank-engine.ts`, nur `row.totalRank` (ein über alle 20 Disziplinen gemittelter
+   * Wert) wurde bisher durchgereicht.
    */
   const teamStrengthRankByTeamId = useMemo(() => {
     const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
-    return new Map(rows.map((row) => [row.teamId, row.totalRank] as const));
+    return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
   }, [gameState]);
 
   const model = useSeasonV2PanelModel({

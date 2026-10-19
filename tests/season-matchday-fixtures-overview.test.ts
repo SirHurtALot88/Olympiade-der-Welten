@@ -130,9 +130,13 @@ describe("buildSpieltagsUebersicht", () => {
     expect(f1.disziplinen).toHaveLength(2);
 
     const basketball = f1.disziplinen.find((d) => d.disciplineId === "basketball")!;
-    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: [70, 15], verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell", occurrenceInSeason: 1 });
+    // `seiten` bleibt bei "pps_duell" bewusst `null` (Review-Fund 19.10. Abend): `duellSeiten` ist
+    // hier der rohe PPS-Score beider Seiten, kein echter Spielstand — s. Kommentar im Builder.
+    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: null, verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell", occurrenceInSeason: 1 });
     const battlefield = f1.disziplinen.find((d) => d.disciplineId === "battlefield")!;
-    expect(battlefield).toMatchObject({ punkteHeim: 1, punkteGast: 1, verhaeltnisHeim: 0, verhaeltnisGast: 0, resolutionSource: "arena", occurrenceInSeason: 1 });
+    // Gegenstueck zur pps_duell-Zeile oben: bei "arena" MUSS der echte native Spielstand
+    // durchkommen -- sonst haette der Fix das "echte Ergebnis" fuer alle Disziplinen abgeschaltet.
+    expect(battlefield).toMatchObject({ punkteHeim: 1, punkteGast: 1, seiten: [50, 50], verhaeltnisHeim: 0, verhaeltnisGast: 0, resolutionSource: "arena", occurrenceInSeason: 1 });
 
     const f2 = uebersicht!.paarungen.find((p) => p.fixtureId === "f2")!;
     expect(f2.leagueTier).toBe("liga2");

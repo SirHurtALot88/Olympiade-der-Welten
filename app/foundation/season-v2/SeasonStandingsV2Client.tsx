@@ -297,13 +297,16 @@ export type SeasonStandingsV2ClientProps = {
    */
   areaVerhaeltnisByTeamId?: Map<string, Record<SeasonDisciplineAreaId, number | null>> | null;
   /**
-   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team ("Staffel-Rang", reine
-   * Kaderstärke unabhängig vom bisherigen Saisonverlauf — `buildTeamDisciplineRankRowsFromGameState`,
-   * dieselbe Rechnung wie die "Ranks"-Ansicht). Zeigt im Spieltage-Modus NEBEN dem aktuellen
-   * Tabellenrang, wer laut Kader favorisiert ist. Optional/`null` — ohne diesen Prop bleibt der
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team UND DISZIPLIN ("Staffel-Rang",
+   * reine Kaderstärke unabhängig vom bisherigen Saisonverlauf — `buildTeamDisciplineRankRowsFromGameState`,
+   * dieselbe Rechnung wie die "Ranks"-Ansicht). `disciplineId -> Rang` statt eines einzelnen
+   * Gesamtrangs (Review-Fund 19.10. Abend: Chris wollte ausdrücklich EINEN Rang je Disziplin des
+   * Spieltags — „für Staffel UND eine Stärke für Wettessen", nicht einen über 20 Disziplinen
+   * gemittelten Wert). Zeigt im Spieltage-Modus NEBEN dem aktuellen Tabellenrang, wer laut Kader in
+   * GENAU DIESER Disziplin favorisiert ist. Optional/`null` — ohne diesen Prop bleibt der
    * Spieltage-Modus unverändert (nur Tabellenrang).
    */
-  teamStrengthRankByTeamId?: Map<string, number> | null;
+  teamStrengthRankByTeamId?: Map<string, Record<string, number>> | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
