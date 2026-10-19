@@ -478,6 +478,77 @@
   gap: var(--nl-s1);
 }
 
+/*
+ * MINI-DM-POD-GRUPPEN (19.10., Chris: "3 -> umbauen dass die 4er teams da drin sind!!!"): eigener
+ * Block ÜBER der Paarungsliste, eine Karte je Vierergruppe — vier Teams mit ihren vier Werten,
+ * nicht als 2-Team-Duell in eine Paarungszeile gezwängt (s. Kommentar an
+ * `SpieltagsDuellDisziplin.miniDmPodIdHeim`, lib/foundation/season-matchday-fixtures-overview.ts).
+ */
+.is-new-look .nl-standings-spieltage-pods {
+  list-style: none;
+  margin: 0 0 var(--nl-s2);
+  padding: 0;
+  display: grid;
+  gap: var(--nl-s2);
+}
+
+.is-new-look .nl-standings-spieltage-pod {
+  padding: var(--nl-s2) var(--nl-s3);
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-standings-spieltage-pod-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-standings-spieltage-pod-label {
+  font-weight: 700;
+  font-size: var(--nl-fs-md);
+}
+
+.is-new-look .nl-standings-spieltage-pod-disziplin {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-spieltage-pod-mitglieder {
+  list-style: none;
+  margin: var(--nl-s1) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.is-new-look .nl-standings-spieltage-pod-mitglied {
+  display: grid;
+  grid-template-columns: 1.6em 1fr auto auto;
+  align-items: center;
+  gap: var(--nl-s1);
+  font-size: var(--nl-fs-sm);
+}
+
+.is-new-look .nl-standings-spieltage-pod-platz {
+  font-weight: 700;
+  color: var(--nl-mut);
+  text-align: center;
+}
+
+.is-new-look .nl-standings-spieltage-pod-wert {
+  font-weight: 700;
+  min-width: 1.6em;
+  text-align: right;
+}
+
+.is-new-look .nl-standings-spieltage-pod-punkte {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+  min-width: 3.4em;
+  text-align: right;
+}
+
 .is-new-look .nl-standings-spieltage-row-teams {
   display: flex;
   flex-wrap: wrap;

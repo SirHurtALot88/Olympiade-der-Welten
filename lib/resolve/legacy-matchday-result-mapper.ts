@@ -89,6 +89,13 @@ export type DisciplineResultWritePayload = {
   duellSeiten?: [number, number] | null;
   /** NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.) -- s. `DisciplineResultRecord.ergebnisNormiert`. */
   ergebnisNormiert?: [number, number] | null;
+  /** MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts). */
+  miniDmPod?: {
+    podId: string;
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+  } | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -259,6 +266,11 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
                 ergebnisNormiert: teamResult.ergebnisNormiert ?? null,
               }
             : {}),
+          // MINI-DM-POD-RESOLVE: eigener additiver Schluessel (nicht an `verhaeltnis != null`
+          // gekoppelt wie oben, weil ein Pod-Verhaeltnis fuer Platz 2/3 durchaus 0 sein kann, ohne
+          // dass das etwas ueber das Vorhandensein des Pods aussagt) -- nur gesetzt, wenn diese
+          // Zeile tatsaechlich aus einem Pod stammt.
+          ...(teamResult.miniDmPod ? { miniDmPod: teamResult.miniDmPod } : {}),
         };
       }),
   );

@@ -77,6 +77,7 @@ import {
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 import {
   resolveSpielquelleLabel,
+  type SpieltagsMiniDmPod,
   type SpieltagsPaarung,
 } from "@/lib/foundation/season-matchday-fixtures-overview";
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -2870,6 +2871,14 @@ export default function SeasonStandingsNewLook({
 
         {renderSpieltageHeadline(activeOption)}
 
+        {activeSpieltagUebersicht && activeSpieltagUebersicht.miniDmPods.length > 0 ? (
+          <ol className="nl-standings-spieltage-pods" data-testid="nl-standings-spieltage-pods">
+            {activeSpieltagUebersicht.miniDmPods
+              .filter((pod) => !hasLeagueSplit || spieltagLeagueFilter === "alle" || pod.leagueTier === spieltagLeagueFilter)
+              .map((pod, index) => renderMiniDmPodGruppe(pod, index, teamLabel))}
+          </ol>
+        ) : null}
+
         {spieltagPaarungen.length === 0 ? (
           <NlCard className="nl-standings-empty-card">
             <p className="nl-standings-empty-text">Für diesen Spieltag liegen keine Paarungen vor.</p>
@@ -3003,6 +3012,23 @@ export default function SeasonStandingsNewLook({
       SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
       disziplin.disciplineName.slice(0, 3).toUpperCase();
     const quelle = resolveSpielquelleLabel(disziplin);
+    // MINI-DM-POD-RESOLVE (19.10.): KEIN "Heim:Gast"-Duell -- Heim- und Gastteam koennen in
+    // verschiedenen Pods stehen (s. `SpieltagsDuellDisziplin.miniDmPodIdHeim`). Die echte Gruppe
+    // steht als eigener Block ueber der Paarungsliste (`renderMiniDmPodGruppe`); diese Zelle zeigt
+    // nur noch den eigenen Pod-Platz je Team, als Verweis dorthin.
+    if (disziplin.resolutionSource === "mini_dm_pod") {
+      const ergebnisText = !disziplin.gespielt ? "—" : `${disziplin.punkteHeim ?? "–"}:${disziplin.punkteGast ?? "–"}`;
+      return (
+        <span
+          key={disziplin.disciplineId}
+          className="nl-standings-spieltage-disziplin-ergebnis"
+          title={[disziplin.disciplineName, "Mini-DM-Pod — s. Gruppe oberhalb der Paarungsliste, kein Zwei-Team-Duell"].join(" — ")}
+        >
+          <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
+          <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
+        </span>
+      );
+    }
     const ergebnisText = !disziplin.gespielt
       ? "—"
       : disziplin.ergebnisNormiert
@@ -3020,6 +3046,43 @@ export default function SeasonStandingsNewLook({
         <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
         <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
       </span>
+    );
+  }
+
+  /**
+   * MINI-DM-POD-RESOLVE (19.10., Chris: "3 -> umbauen dass die 4er teams da drin sind!!!"): die
+   * echte Vierergruppe, als das was sie ist — vier Teams mit ihren vier Werten, 2-1-0-0 nach
+   * Platz, NICHT als 2-Team-Duell in eine Paarungszeile gezwängt. Eine je Pod, über ALLE Paarungen
+   * des Spieltags hinweg (ein Pod verschmilzt zwei normale Fixtures, s. Kommentar an
+   * `SpieltagsDuellDisziplin.miniDmPodIdHeim`).
+   */
+  function renderMiniDmPodGruppe(pod: SpieltagsMiniDmPod, index: number, teamLabel: (teamId: string) => string) {
+    const gruppenLabel = `Gruppe ${String.fromCharCode(65 + index)}`;
+    return (
+      <li key={pod.podId} className="nl-card nl-standings-spieltage-pod" data-testid="nl-standings-spieltage-pod">
+        <div className="nl-standings-spieltage-pod-head">
+          <span className="nl-standings-spieltage-pod-label">{gruppenLabel}</span>
+          <span className="nl-standings-spieltage-pod-disziplin">{pod.disciplineName} · Mini-DM-Pod (2-1-0-0)</span>
+        </div>
+        <ol className="nl-standings-spieltage-pod-mitglieder">
+          {pod.mitglieder.map((mitglied) => (
+            <li
+              key={mitglied.teamId}
+              className="nl-standings-spieltage-pod-mitglied"
+              style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(mitglied.teamId)?.teamCode) as CSSProperties}
+            >
+              <span className="nl-standings-spieltage-pod-platz">{mitglied.platz ?? "–"}</span>
+              <span className="nl-standings-spieltage-pod-team">{teamLabel(mitglied.teamId)}</span>
+              <span className="nl-standings-spieltage-pod-wert nl-tnum">
+                {mitglied.wert != null ? mitglied.wert : "–"}
+              </span>
+              <span className="nl-standings-spieltage-pod-punkte nl-tnum" title="Liga-Punkte (2-1-0-0 nach Platz)">
+                {mitglied.teamPoints != null ? `${mitglied.teamPoints} Pkt` : ""}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </li>
     );
   }
 

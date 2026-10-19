@@ -88,8 +88,11 @@ export type DisciplineHighlightCandidate = {
  *  - `"pps_duell"`: Battle Mode, 2/1/0 aus dem PPS-Score beider Seiten desselben Fixtures
  *    (PPS-Duell-Bruecke, lib/resolve/battle-mode-pps-duell.ts) — der verbindliche Rueckfall ohne
  *    Arena-Ergebnis.
+ *  - `"mini_dm_pod"`: Battle Mode, Mini-DM ausschliesslich -- 2-1-0-0 aus der echten Vierergruppe
+ *    (Pod, `lib/season/mini-dm-pod-schedule.ts`), NICHT aus dem Zwei-Team-Fixture des Spieltags
+ *    (lib/resolve/mini-dm-pod-resolve.ts). Chris 19.10.: "umbauen dass die 4er teams da drin sind".
  */
-export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell";
+export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell" | "mini_dm_pod";
 
 /**
  * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
@@ -229,6 +232,13 @@ export type DisciplineTeamResolvePreview = {
    * also byte-identisch zum Stand vor dieser Ergänzung).
    */
   arenaAusfall?: ArenaAusfall | null;
+  /** MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts). */
+  miniDmPod?: {
+    podId: string;
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+  } | null;
   warnings: string[];
   missingLineup: boolean;
   missingPlayers: number;

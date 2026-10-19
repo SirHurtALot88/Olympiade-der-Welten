@@ -99,7 +99,10 @@ async function einLauf(nr: number) {
   const zeilen = gs.seasonState.disciplineResults ?? [];
   const sum210ByTeam = new Map<string, number>();
   for (const z of zeilen) {
-    if (z.resolutionSource === "arena" || z.resolutionSource === "pps_duell") {
+    // MINI-DM-POD-RESOLVE (19.10.): "mini_dm_pod" zahlt 2-1-0-0 nach Platz, kein 2/1/0-Duell --
+    // gehoert aber genauso in diese Summe (dieselbe `istDuellWertung()`-Entkopplung von
+    // `teamSummary.totalPoints` gegen die Spieler-PP, s. battle-mode-pps-duell.ts).
+    if (z.resolutionSource === "arena" || z.resolutionSource === "pps_duell" || z.resolutionSource === "mini_dm_pod") {
       sum210ByTeam.set(z.teamId, (sum210ByTeam.get(z.teamId) ?? 0) + (z.teamPoints ?? 0));
     }
   }

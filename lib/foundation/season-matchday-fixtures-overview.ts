@@ -58,7 +58,8 @@ import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { getLeagueOf, type LeagueTier } from "@/lib/season/league-split";
 import { berechneErgebnisNormiert, findeSpieltagsFixtures, outcomeAusPunkten } from "@/lib/resolve/battle-mode-pps-duell";
-import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { getSeasonDisciplineScheduleEntry, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
 export type SpieltagsPaarungTeilnehmer = {
   teamId: string;
@@ -95,7 +96,7 @@ export type SpieltagsDuellDisziplin = {
    */
   ergebnisNormiert: [number, number] | null;
   /** `null`, solange nicht gewertet. */
-  resolutionSource: "pps" | "arena" | "pps_duell" | null;
+  resolutionSource: "pps" | "arena" | "pps_duell" | "mini_dm_pod" | null;
   arenaAusfall: ArenaAusfall | null;
   /**
    * PRÄZISIERUNG (Opus, 17.10.): Hin-/Rückrunde ist ein Begriff der DISZIPLIN (jede läuft genau
@@ -105,6 +106,47 @@ export type SpieltagsDuellDisziplin = {
    * `null` bei Alt-Saves/Manager-Mode ohne diese Markierung.
    */
   occurrenceInSeason: 1 | 2 | null;
+  /**
+   * MINI-DM-POD-RESOLVE (19.10.): die Pod-ID, der das HEIMTEAM dieser Zeile angehoert, `null`
+   * ausserhalb von Mini-DM. Ein Mini-DM-Pod verschmilzt zwei normale Fixtures zu einer
+   * Vierergruppe (`lib/season/mini-dm-pod-schedule.ts`) -- Heim- und Gastteam DIESES Fixtures
+   * koennen deshalb in VERSCHIEDENEN Pods stehen (oder in gar keinem, wenn die Liga nicht durch 4
+   * teilbar ist). `punkteHeim`/`punkteGast` bleiben trotzdem je TEAM korrekt (sein eigener
+   * Pod-Platz), nur `seiten`/die "Heim gegen Gast"-Framing ergeben fuer Mini-DM keinen Sinn mehr --
+   * die UI loest stattdessen ueber `miniDmPodIdHeim`/`miniDmPodIdGast` in
+   * `SpieltagsUebersicht.miniDmPods` auf und zeigt die echte Gruppe.
+   */
+  miniDmPodIdHeim: string | null;
+  /** Dieselbe Groesse fuer das GASTTEAM dieser Zeile -- s. `miniDmPodIdHeim`. */
+  miniDmPodIdGast: string | null;
+};
+
+/** EIN Mitglied eines Mini-DM-Pods, mit seinem Ergebnis (falls schon gewertet). */
+export type SpieltagsMiniDmPodMitglied = {
+  teamId: string;
+  /** `null`, solange der Pod noch nicht gewertet ist. */
+  platz: 1 | 2 | 3 | 4 | null;
+  /** 2-1-0-0 nach Platz (Chris 14.09.) -- `null`, solange ungewertet. */
+  teamPoints: number | null;
+  /** 0..10, N-Team-Normierung mit Ordnungsgarantie (`berechneErgebnisNormiertNTeam()`). */
+  wert: number | null;
+};
+
+/**
+ * EINE Mini-DM-Vierergruppe EINES Spieltags, mit ihrem Ergebnis (falls schon gewertet) -- die
+ * ehrliche Darstellung von Chris' Befund 19.10. ("3 -> umbauen dass die 4er teams da drin sind"):
+ * vier Teams mit ihren vier Werten, nicht als 2-Seiten-Duell gezwaengt.
+ */
+export type SpieltagsMiniDmPod = {
+  podId: string;
+  leagueTier: LeagueTier | null;
+  disciplineId: string;
+  disciplineName: string;
+  disciplineSide: "d1" | "d2";
+  /** `true`, sobald mindestens ein Mitglied gewertet ist. */
+  gespielt: boolean;
+  /** Nach Platz sortiert, sobald `gespielt`; sonst in Pod-Reihenfolge (`mini-dm-pod-schedule.ts`). */
+  mitglieder: SpieltagsMiniDmPodMitglied[];
 };
 
 export type SpieltagsPaarung = {
@@ -129,6 +171,8 @@ export type SpieltagsUebersicht = {
   matchdayId: string;
   matchdayIndex: number;
   paarungen: SpieltagsPaarung[];
+  /** MINI-DM-POD-RESOLVE (19.10.): leer an jedem Spieltag ohne Mini-DM. */
+  miniDmPods: SpieltagsMiniDmPod[];
 };
 
 /**
@@ -178,6 +222,9 @@ export function resolveSpielquelleLabel(disziplin: Pick<SpieltagsDuellDisziplin,
       return `PPS-Duell — Arena ausgefallen: ${arenaAusfallGrundLabel(disziplin.arenaAusfall.grund)}`;
     }
     return "PPS-Duell";
+  }
+  if (disziplin.resolutionSource === "mini_dm_pod") {
+    return "Mini-DM-Pod (4 Teams)";
   }
   // "pps": der alte Rangtabellen-Pfad -- im Spieltage-Modus (nur Battle-Saves) nicht erwartet,
   // aber kein Fehlerwurf an einer reinen Lese-/Anzeigefunktion.
@@ -294,6 +341,55 @@ function findeFruehereBegegnung(
 }
 
 /**
+ * MINI-DM-POD-RESOLVE (19.10.): die Pods EINES Disziplin-Slots (`getMiniDmPodsForMatchday()` ist
+ * eine REINE Ableitung aus bereits persistierten Fakten, s. Kopfkommentar an
+ * `mini-dm-pod-schedule.ts` -- liefert deshalb vor UND nach dem Resolve dieselben vier Teams je
+ * Pod, live neu berechnet statt aus einer Persistenz gelesen). Das Ergebnis je Mitglied (Platz,
+ * Punkte, Wert) kommt dagegen aus der PERSISTIERTEN Zeile (`DisciplineResultRecord.miniDmPod`),
+ * `null` solange der Spieltag noch nicht gewertet ist -- die Gruppe selbst ist aber schon vor dem
+ * Spieltag sichtbar (das ist exakt die Spielplan-Ankuendigung, die Chris sah).
+ */
+function buildMiniDmPodsForSlot(
+  gameState: GameState,
+  matchdayId: string,
+  slot: { disciplineId: string; displayName: string; occurrenceInSeason?: 1 | 2 },
+  disciplineSide: "d1" | "d2",
+  rowsByTeam: Map<string, Map<string, DisciplineResultRecord>>,
+  leagueFilter?: LeagueTier,
+): SpieltagsMiniDmPod[] {
+  if (slot.disciplineId !== MINI_DM_DISCIPLINE_ID) {
+    return [];
+  }
+  return getMiniDmPodsForMatchday(gameState, matchdayId)
+    .filter((pod) => !leagueFilter || pod.leagueTier === leagueFilter)
+    .map((pod) => {
+      const mitgliederRoh: SpieltagsMiniDmPodMitglied[] = pod.teamIds.map((teamId) => {
+        const row = rowsByTeam.get(teamId)?.get(slot.disciplineId) ?? null;
+        return {
+          teamId,
+          platz: row?.miniDmPod?.platz ?? null,
+          teamPoints: row?.teamPoints ?? null,
+          wert: row?.miniDmPod?.wert ?? null,
+        };
+      });
+      const gespielt = mitgliederRoh.some((mitglied) => mitglied.teamPoints != null);
+      return {
+        podId: pod.id,
+        leagueTier: pod.leagueTier,
+        disciplineId: slot.disciplineId,
+        disciplineName: slot.displayName,
+        disciplineSide,
+        gespielt,
+        // Nach Platz sortiert, sobald gewertet (1. zuerst) -- vorher in der Pod-Reihenfolge, die
+        // `mini-dm-pod-schedule.ts` liefert (es gibt noch keinen Platz zum Sortieren).
+        mitglieder: gespielt
+          ? [...mitgliederRoh].sort((a, b) => (a.platz ?? 99) - (b.platz ?? 99))
+          : mitgliederRoh,
+      };
+    });
+}
+
+/**
  * Baut die Paarungen EINES Spieltags, optional auf eine Liga eingegrenzt. `null`, wenn der Modus
  * für diesen Save nicht gilt (`istSpieltagsModusVerfuegbar`) oder der Spieltag unbekannt ist.
  */
@@ -328,6 +424,18 @@ export function buildSpieltagsUebersicht(
 
   const rowsByTeam = buildTeamDisciplineRowsAtMatchday(gameState, matchdayId);
 
+  // MINI-DM-POD-RESOLVE (19.10.): EINMAL je Spieltag gebaut (Pods verschmelzen zwei Fixtures, s.
+  // Kommentar an `SpieltagsDuellDisziplin.miniDmPodIdHeim`), nicht je Fixture neu.
+  const miniDmPods: SpieltagsMiniDmPod[] = disziplinSlots.flatMap((slot, slotIndex) =>
+    buildMiniDmPodsForSlot(gameState, matchdayId, slot, slotIndex === 0 ? "d1" : "d2", rowsByTeam, options?.leagueTier),
+  );
+  const miniDmPodIdByTeamId = new Map<string, string>();
+  for (const pod of miniDmPods) {
+    for (const mitglied of pod.mitglieder) {
+      miniDmPodIdByTeamId.set(mitglied.teamId, pod.podId);
+    }
+  }
+
   const paarungen: SpieltagsPaarung[] = fixtures.map((fixture) => {
     const homeRows = rowsByTeam.get(fixture.homeTeamId);
     const awayRows = rowsByTeam.get(fixture.awayTeamId);
@@ -359,6 +467,8 @@ export function buildSpieltagsUebersicht(
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,
         arenaAusfall: homeRow?.arenaAusfall ?? awayRow?.arenaAusfall ?? null,
         occurrenceInSeason: slot.occurrenceInSeason ?? null,
+        miniDmPodIdHeim: slot.disciplineId === MINI_DM_DISCIPLINE_ID ? miniDmPodIdByTeamId.get(fixture.homeTeamId) ?? null : null,
+        miniDmPodIdGast: slot.disciplineId === MINI_DM_DISCIPLINE_ID ? miniDmPodIdByTeamId.get(fixture.awayTeamId) ?? null : null,
       };
     });
 
@@ -386,5 +496,5 @@ export function buildSpieltagsUebersicht(
     };
   });
 
-  return { matchdayId, matchdayIndex, paarungen };
+  return { matchdayId, matchdayIndex, paarungen, miniDmPods };
 }

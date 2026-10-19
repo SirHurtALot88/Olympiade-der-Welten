@@ -47,6 +47,8 @@ const OPTIONALE_DISZIPLIN_ZEILEN_FELDER: readonly (keyof DisciplineResultWritePa
   "verhaeltnis",
   "margeM90",
   "duellSeiten",
+  // MINI-DM-POD-RESOLVE (19.10.): dasselbe "nur bei Duell-Zeilen"-Muster, nur fuer Mini-DM-Pods.
+  "miniDmPod",
 ];
 
 const ausgabe = process.argv[2] ?? "/dev/stdout";

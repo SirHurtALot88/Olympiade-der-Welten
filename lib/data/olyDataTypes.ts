@@ -2604,8 +2604,12 @@ export type DisciplineResultRecord = {
    */
   teamPoints?: number | null;
   pointSource?: string;
-  /** `"pps_duell"` seit der PPS-Duell-Bruecke (16.10.), s. `DisciplineResolutionSource` in legacy-matchday-resolve-types.ts. */
-  resolutionSource?: "pps" | "arena" | "pps_duell";
+  /**
+   * `"pps_duell"` seit der PPS-Duell-Bruecke (16.10.), `"mini_dm_pod"` seit dem Mini-DM-Pod-Resolve
+   * (19.10., docs/design/mini-dm-pod-resolve-19-10.md) -- s. `DisciplineResolutionSource` in
+   * legacy-matchday-resolve-types.ts.
+   */
+  resolutionSource?: "pps" | "arena" | "pps_duell" | "mini_dm_pod";
   arenaMatchSeed?: string | null;
   /**
    * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): additiv und
@@ -2626,6 +2630,22 @@ export type DisciplineResultRecord = {
    * aus `marge`/`margeM90`/`duellSeiten` live nachberechnet (s. season-matchday-fixtures-overview.ts).
    */
   ergebnisNormiert?: [number, number] | null;
+  /**
+   * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
+   * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
+   * Modus bleibt unberuehrt. Traegt die echte Vierergruppe (Pod), aus der `teamPoints` (2-1-0-0)
+   * stammt, damit die UI (season-matchday-fixtures-overview.ts) die Gruppe als das zeigen kann, was
+   * sie ist -- vier Teams, nicht ein 2-Team-Duell. `wert` ist die N-Team-0-10-Normierung dieses
+   * Teams (`berechneErgebnisNormiertNTeam()`, mini-dm-pod-resolve.ts) -- dieselbe Garantie wie
+   * `ergebnisNormiert` (Platzierungsreihenfolge kann nie kippen), nur fuer vier statt zwei Teams.
+   */
+  miniDmPod?: {
+    podId: string;
+    /** 1 = bester Platz im Pod, 4 = schlechtester -- s. `MiniDmPodOverride.platz`. */
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+  } | null;
   /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
    * Klasse A): wie `arenaMatchSeed` additiv und optional -- aeltere Zeilen (vor dieser Aenderung
