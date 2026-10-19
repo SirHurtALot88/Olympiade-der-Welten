@@ -70170,7 +70170,7 @@ span.nl-facility-ampel-chip {
   margin-top: 12px;
   font: inherit;
   font-weight: 700;
-  color: var(--nl-accent);
+  color: var(--nl-accent-text, var(--nl-accent));
   background: none;
   border-radius: 8px;
   padding: 8px 14px;
