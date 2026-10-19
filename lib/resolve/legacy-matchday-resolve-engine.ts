@@ -966,6 +966,32 @@ export function buildLegacyMatchdayResolvePreview(
           finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
           scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         })),
+        // PPS-DUELL-BRUECKE, PLAYER-LEVEL-FIX (18.10., Befund "Basketball-PP des menschlichen
+        // Teams steht nach dem Buchen auf 0,0"): ohne dieses Override verteilte diese Stelle den
+        // generischen PPS-RANG-Punktestand (ueber ALLE Teams der Disziplin, 0,1 bis ~19,9) an die
+        // Spieler — unabhaengig davon, ob die Seite ihr eigenes Duell (2/1/0) gewonnen oder
+        // verloren hatte. Genau DIESER Wert wird live in der Arena gezeigt und 1:1 gebucht
+        // (`playerDisciplinePerformances.scoreContribution`/`pointsAwarded`, "was du siehst, wird
+        // gebucht"). `season-points-ledger.ts::deriveRankPointsFromPerformances()` rechnet beim
+        // SPAETEREN Aufbau der Saison-PPS-Spalte (Kader-/Teams-Tab, Liga-Leaders) für `pps_duell`-
+        // Zeilen dagegen ganz bewusst mit `teamPointsOverride: teamResult.teamPoints` — dem
+        // 2/1/0-Resultat DIESES Duells (s. `istDuellWertung()`). Verlor eine Seite ihr Duell knapp,
+        // obwohl ihre Spieler ligaweit ordentlich rangierten, zeigte die Arena live reelle PP
+        // (z. B. 3,9/3,6/2,5 PP), der Kader-Tab nach dem Buchen aber 0,0 — derselbe Spieltag,
+        // zwei verschiedene Zahlen aus zwei Stellen, die denselben Rohwert eigentlich teilen
+        // sollten. Reproduziert mit einem frischen Battle-Save: Team verlor sein Basketball-Duell
+        // 61,9:91,2 bei PPS-Rang 15/32 — Arena zeigte 1,37/0,73 PP (Rang-Budget 2,1), der Ledger
+        // bucht season-seitig 0/0 (Duell-Budget 0 bei Niederlage). Betroffen ist dabei NIE die
+        // Kontrollart (menschlich/KI) selbst, sondern einzig das Duell-Resultat — ein gewinnendes
+        // KI-Team zeigte im selben Repro ebenso zwei verschiedene Werte, nur eben beide > 0, was
+        // den Unterschied beim Playtest unauffaellig machte. Die Buehne bucht ab jetzt denselben
+        // 2/1/0-Anteil, den der Ledger ohnehin fuer die Saison-PP ansetzt — live und gebucht sind
+        // damit wieder dieselbe Zahl. Betrifft ausdruecklich NUR `"pps_duell"` (Battle Mode, PPS-
+        // Duell-Bruecke): Manager-Mode-Zeilen bleiben `"pps"` und nehmen diesen Zweig nie, Arena-
+        // Zeilen (`"arena"`) behalten ihr bisheriges Verhalten unveraendert (dort deckt der
+        // Boxscore-Impact bzw. der PPS-Rang-Nachschlag den einzelnen Spieler ab, s. Kommentar
+        // "Battle Mode PR7" unten) — beide Faelle bit-identisch zum Stand vor diesem Fix.
+        teamPointsOverride: rankedTeam?.resolutionSource === "pps_duell" ? rankedTeam.teamPoints : null,
       });
 
       if (rankedTeam) {

@@ -250,6 +250,48 @@ describe("INVARIANTE: Battle-Save, jede Zeile mit Fixture zahlt 0/1/2 — nie di
     expect(c.resolutionSource).toBe("pps_duell");
   });
 
+  it("PLAYER-LEVEL-FIX (18.10.): die einzelnen Spieler-PP folgen dem 2/1/0-Duell-Budget, nicht dem " +
+    "generischen PPS-Rang ueber alle Teams der Disziplin — sonst zeigt die Arena live reelle PP, " +
+    "die der Kader-Tab nach dem Buchen auf 0 zurueckbucht (Befund: menschliches Team verlor sein " +
+    "Basketball-Duell, Arena zeigte 1,37/0,73 PP, der Saison-Ledger buchte 0/0)", () => {
+    const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
+    const basketball = preview.disciplinePreviews.find((d) => d.disciplineId === D1)!;
+    for (const team of basketball.teamResults) {
+      expect(team.resolutionSource).toBe("pps_duell");
+      const summeSpielerPp = team.entries.reduce((summe, entry) => summe + (entry.pointsAwarded ?? 0), 0);
+      // Die Spieler-Summe folgt dem GEBUCHTEN Duell-Budget (0/1/2) dieser Seite — nicht dem alten
+      // generischen Rang-Nachschlag ueber alle vier Teams der Disziplin (der fuer B z.B. trotz
+      // klarer Niederlage einen positiven Rang-Betrag geliefert haette).
+      expect(summeSpielerPp).toBeCloseTo(team.teamPoints ?? 0, 4);
+    }
+    // B verliert sein Duell gegen A klar (15 PPS-Score aus A/B, s. vierTeams) -> Budget 0, und damit
+    // bekommt JEDER Spieler von B exakt 0 PP, trotz eines strukturell positiven Einzel-Scores.
+    const b = basketball.teamResults.find((t) => t.teamId === "B")!;
+    expect(b.teamPoints).toBe(0);
+    for (const entry of b.entries) {
+      expect(entry.pointsAwarded ?? 0).toBe(0);
+    }
+    // A gewinnt (Budget 2) und verteilt diese 2 Punkte anteilig an seinen besten Spieler.
+    const a = basketball.teamResults.find((t) => t.teamId === "A")!;
+    expect(a.teamPoints).toBe(2);
+    expect(a.entries.some((entry) => (entry.pointsAwarded ?? 0) > 0)).toBe(true);
+  });
+
+  it("Manager-Mode (resolutionSource 'pps') bleibt unveraendert: Spieler-PP folgen weiter dem " +
+    "generischen PPS-Rang, kein Duell-Budget greift (keine Fixtures/kein Battle-Save)", () => {
+    const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("manager")));
+    for (const disziplin of preview.disciplinePreviews) {
+      for (const team of disziplin.teamResults) {
+        expect(team.resolutionSource).toBe("pps");
+        // Rang-basiert heisst: auch ein Team mit vergleichsweise schwachem Score bekommt einen
+        // Rang-Punktwert > 0 (die rank-to-points-Tabelle hat keine Nullzeile) — NICHT 0 wie im
+        // Duell-Budget einer Niederlage.
+        const summeSpielerPp = team.entries.reduce((summe, entry) => summe + (entry.pointsAwarded ?? 0), 0);
+        expect(summeSpielerPp).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it("Battle-Save OHNE Fixture fuer ein Team: KEINE Rangtabellen-Punkte, sondern null + Warnung", () => {
     const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle", [])));
     for (const disziplin of preview.disciplinePreviews) {
