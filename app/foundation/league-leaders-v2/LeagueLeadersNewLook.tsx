@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   NlCard,
@@ -21,12 +21,14 @@ import {
   type NlTone,
 } from "@/components/foundation/new-look";
 import { VeloPendingRanking, type VeloPendingRankingSlot } from "@/components/foundation/velo-ui";
+import { getLeagueOf, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import PlayerStarFrame from "@/components/foundation/player-portrait-card/PlayerStarFrame";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import {
   isLeagueLeaderCategoryPending,
+  LEAGUE_LEADER_DEFAULT_LIMIT,
   type LeagueLeaderCategory,
   type LeagueLeaderEntry,
   type LeagueLeaderTone,
@@ -311,6 +313,46 @@ const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = 
 ];
 
 /**
+ * LIGA-FILTER FUER DIE TOP-LISTEN (Saisonstand-Auftrag Chris, 19.10., Punkt 5): Chris, wörtlich —
+ * „du hast Liga 1 und Liga 2 anscheinend zusammen [...] Liga 2 muss quasi einen anderen Kosmos
+ * haben [...] müssten Top-Player erste und zweite Liga voneinander gesplittet sein". `categories`
+ * kam bisher UNGEFILTERT ueber alle 32 Teams beider Ligen rein (`seasonTopPlayerRows` in
+ * `use-foundation-shell-router-body-scope.tsx` kennt gar kein `leagueTier`) — ein Liga-2-Spieler
+ * konnte dadurch in derselben Top-5 stehen wie die Liga-1-Spitze, nur weil er in seiner (schwaecheren)
+ * Liga ueberragend ist. Dieselbe Luecke traf die neue „All-Time nach Disziplin"-Liste (PR #1293,
+ * `buildPlayerAllTimeDisciplineStats`, ebenfalls ohne Liga-Wissen).
+ *
+ * FIX HIER BEWUSST CLIENT-SEITIG, NICHT IN DER BUILDER-PIPELINE: `category.entries`/`fullEntries`
+ * tragen bereits `teamId`, aus dem sich die Liga ueber `getLeagueOf()` (derselbe Weg wie im
+ * Saisonstand-Spieltage-Modus, `SeasonStandingsNewLook.tsx`) ableiten laesst — kein Datenverlust,
+ * keine zweite Berechnung in `league-leaders-service.ts`/`player-all-time-discipline-stats.ts`
+ * noetig. Ein gefilterter Rang beginnt wieder bei 1 (sonst stuende z. B. "#7" oben, weil die
+ * Liga-1-Spieler vor ihm aus der globalen Liste verschwinden, aber ihr Rang nicht neu gezaehlt
+ * wird). `ovrRank` (ligaweiter OVR-Rang fuers Star-Tier-Portrait, s. Typkommentar) bleibt bewusst
+ * UNVERAENDERT — er ist laut eigenem Kommentar ausdruecklich ligaweit gemeint, kein Kategorie-Rang.
+ *
+ * BEWUSST NICHT ANGEFASST: `seasonBests`/`footprint`/`achievements` lesen weiterhin die
+ * UNGEFILTERTE `categories`-Prop — das sind eigene Features (Season-Bestwerte, "Dein Bester",
+ * Meilensteine), die Chris' Meldung nicht betraf, und sie clientseitig mitzufiltern haette ihre
+ * eigene Semantik (z. B. ligaweite Rekorde) ungefragt veraendert. Nur die beiden tatsaechlich
+ * gemeldeten Ansichten (Liga-Leaders-Grid/Ranking-Drawer, All-Time nach Disziplin) sind betroffen.
+ */
+function scopeLeagueLeaderCategory(
+  category: LeagueLeaderCategory,
+  gameState: GameState | null,
+  filter: LeagueTier | "alle",
+): LeagueLeaderCategory {
+  if (filter === "alle" || !gameState) {
+    return category;
+  }
+  const source = category.fullEntries ?? category.entries;
+  const scopedFull: LeagueLeaderEntry[] = source
+    .filter((entry) => entry.teamId != null && getLeagueOf(gameState, entry.teamId) === filter)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+  return { ...category, fullEntries: scopedFull, entries: scopedFull.slice(0, LEAGUE_LEADER_DEFAULT_LIMIT) };
+}
+
+/**
  * DIE HERLEITUNG HINTER „MOST IMPROVED" — als Hover.
  *
  * GEBETEN VON CHRIS (`pxoa72`): „Wir brauchen noch eine erklärung wie Most Improved Player sich
@@ -432,6 +474,25 @@ export default function LeagueLeadersNewLook({
 }: LeagueLeadersClientProps) {
   const [subTab, setSubTab] = useState<NlLeagueLeadersSubTab>("leaders");
 
+  /**
+   * Liga-Filter (Saisonstand-Auftrag Chris, 19.10. Punkt 5) — lazy-init auf "liga1", sobald der
+   * Save ueberhaupt einen Liga-Split hat (derselbe Default wie der Spieltage-Modus im Saisonstand,
+   * `SeasonStandingsNewLook.tsx`); ein Legacy-32er-Save ohne Split bleibt bei "alle", weil dort
+   * keine einzige Zeile einer Liga zugeordnet ist.
+   */
+  const hasLeagueSplit = Boolean(gameState && isLeagueSplitActive(gameState));
+  const [leagueFilter, setLeagueFilter] = useState<LeagueTier | "alle">(() => (hasLeagueSplit ? "liga1" : "alle"));
+  useEffect(() => {
+    if (!hasLeagueSplit && leagueFilter !== "alle") {
+      setLeagueFilter("alle");
+    }
+  }, [hasLeagueSplit, leagueFilter]);
+
+  const scopedCategories = useMemo(
+    () => categories.map((category) => scopeLeagueLeaderCategory(category, gameState ?? null, leagueFilter)),
+    [categories, gameState, leagueFilter],
+  );
+
   // "Neuer Look" (#37, flag-gated, additiv): KPI-Ranking-Drawer statt voller
   // Navigation beim Klick auf die Leader/Median/"Dein Bester"-Chips einer
   // Kategorie — Zeilen kommen 1:1 aus `category.entries` (Top N ligaweit),
@@ -451,8 +512,8 @@ export default function LeagueLeadersNewLook({
   }
 
   const rankingDrawerCategory = useMemo(
-    () => categories.find((category) => category.id === rankingDrawerCategoryId) ?? null,
-    [categories, rankingDrawerCategoryId],
+    () => scopedCategories.find((category) => category.id === rankingDrawerCategoryId) ?? null,
+    [scopedCategories, rankingDrawerCategoryId],
   );
 
   /**
@@ -541,6 +602,21 @@ export default function LeagueLeadersNewLook({
     [foundationGameState],
   );
 
+  /**
+   * Derselbe Liga-Filter wie oben (`scopeLeagueLeaderCategory`), hier auf die All-Time-Zeilen
+   * angewendet — `PlayerAllTimeDisciplineRow.teamId` traegt bereits das AKTUELLE Team des
+   * Spielers, aus dem sich seine Liga ableiten laesst. Keine Neu-Berechnung der Werte selbst,
+   * nur eine Teilmenge/Neu-Sortierung passiert ohnehin client-seitig beim Rendern.
+   */
+  const scopedAllTimeDisciplineRows = useMemo(() => {
+    if (leagueFilter === "alle" || !foundationGameState) {
+      return allTimeDisciplineRows;
+    }
+    return allTimeDisciplineRows.filter(
+      (row) => row.teamId != null && getLeagueOf(foundationGameState, row.teamId) === leagueFilter,
+    );
+  }, [allTimeDisciplineRows, foundationGameState, leagueFilter]);
+
   // D7 — In-Season-Bestwerte ("Saison-Bestwerte (laufend)"): seedet den Rekord-
   // Tab, damit er ab S1/MD1 lebt statt bis zur ersten archivierten Saison leer
   // zu bleiben. Rein aus öffentlichen Kategorie-Leadern + laufendem Kaderwert.
@@ -584,16 +660,16 @@ export default function LeagueLeadersNewLook({
   const { filledCategories, pendingCategories } = useMemo(() => {
     const filled: LeagueLeaderCategory[] = [];
     const pending: LeagueLeaderCategory[] = [];
-    for (const category of categories) {
+    for (const category of scopedCategories) {
       (isLeagueLeaderCategoryPending(category) ? pending : filled).push(category);
     }
     return { filledCategories: filled, pendingCategories: pending };
-  }, [categories]);
+  }, [scopedCategories]);
 
   /** Gemeldete Spieler = größte vorhandene Ranglistenlänge — keine neue Quelle. */
   const gemeldeteSpieler = useMemo(
-    () => categories.reduce((max, category) => Math.max(max, (category.fullEntries ?? category.entries).length), 0),
-    [categories],
+    () => scopedCategories.reduce((max, category) => Math.max(max, (category.fullEntries ?? category.entries).length), 0),
+    [scopedCategories],
   );
 
   const pendingSlots = useMemo<VeloPendingRankingSlot[]>(
@@ -647,6 +723,19 @@ export default function LeagueLeadersNewLook({
           aria-label="Liga-Leaders Ansicht"
           className="nl-leaders-subtabs"
         />
+        {hasLeagueSplit && (subTab === "leaders" || subTab === "allTimeDisciplines") ? (
+          <NlSubTabs
+            items={[
+              { id: "liga1", label: "Liga 1" },
+              { id: "liga2", label: "Liga 2" },
+              { id: "alle", label: "Beide Ligen" },
+            ]}
+            activeId={leagueFilter}
+            onSelect={(id) => setLeagueFilter(id as LeagueTier | "alle")}
+            aria-label="Liga wählen"
+            className="nl-leaders-subtabs nl-leaders-league-tabs"
+          />
+        ) : null}
       </NlCard>
 
       {subTab === "records" ? (
@@ -665,7 +754,7 @@ export default function LeagueLeadersNewLook({
         />
       ) : subTab === "allTimeDisciplines" ? (
         <AllTimeDisciplineLeadersPanel
-          rows={allTimeDisciplineRows}
+          rows={scopedAllTimeDisciplineRows}
           hasHistory={records?.hasHistory ?? false}
           seasonCount={records?.seasonCount ?? 0}
           onOpenPlayer={onOpenPlayer}

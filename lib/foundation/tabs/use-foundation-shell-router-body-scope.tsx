@@ -11392,9 +11392,15 @@ export function useFoundationShellRouterBodyScope({
     () => (isViewingArchivedSeason ? null : summiereSaisonVerhaeltnisProBereich(gameState, seasonOverviewSeasonId)),
     [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
   );
+  /**
+   * PRO DISZIPLIN, NICHT EIN GESAMTRANG (Review-Fund 19.10. Abend, s. ausfuehrlicher Kommentar in
+   * `FoundationSeasonV2Host.tsx`): `row.disciplineRanks` statt `row.totalRank` — Chris wollte je
+   * Disziplin des Spieltags einen eigenen Staerke-Rang-Chip ("Staffel UND Wettessen"), nicht einen
+   * ueber alle 20 Disziplinen gemittelten Gesamtwert.
+   */
   const seasonV2TeamStrengthRankByTeamId = useMemo(() => {
     const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
-    return new Map(rows.map((row) => [row.teamId, row.totalRank] as const));
+    return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
   }, [gameState]);
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {

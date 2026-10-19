@@ -130,7 +130,9 @@ describe("buildSpieltagsUebersicht", () => {
     expect(f1.disziplinen).toHaveLength(2);
 
     const basketball = f1.disziplinen.find((d) => d.disciplineId === "basketball")!;
-    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: [70, 15], verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell", occurrenceInSeason: 1 });
+    // `seiten` bleibt bei "pps_duell" bewusst `null` (Review-Fund 19.10. Abend): `duellSeiten` ist
+    // hier der rohe PPS-Score beider Seiten, kein echter Spielstand — s. Kommentar im Builder.
+    expect(basketball).toMatchObject({ punkteHeim: 2, punkteGast: 0, seiten: null, verhaeltnisHeim: 5, verhaeltnisGast: -5, resolutionSource: "pps_duell", occurrenceInSeason: 1 });
     const battlefield = f1.disziplinen.find((d) => d.disciplineId === "battlefield")!;
     expect(battlefield).toMatchObject({ punkteHeim: 1, punkteGast: 1, verhaeltnisHeim: 0, verhaeltnisGast: 0, resolutionSource: "arena", occurrenceInSeason: 1 });
 

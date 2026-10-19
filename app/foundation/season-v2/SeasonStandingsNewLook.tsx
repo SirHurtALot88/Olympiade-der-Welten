@@ -2921,39 +2921,56 @@ export default function SeasonStandingsNewLook({
   /**
    * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang ("Staffel-Rang") NEBEN dem
    * Tabellenrang — Chris' Beispiel wörtlich: „Black Panthers sind in der Staffel Platz 4,
-   * aktueller Tabellenrang ist aber 16", analog zu „Bayern gegen Schalke". Quelle:
-   * `teamStrengthRankByTeamId` (vom Host aus `buildTeamDisciplineRankRowsFromGameState` gebaut,
-   * reine Kaderstärke, unabhängig vom bisherigen Saisonverlauf). Optional — ohne den Prop (z. B.
-   * ältere Host-Version) bleibt die Zeile unverändert, nur ohne diesen zweiten Rang-Chip.
+   * aktueller Tabellenrang ist aber 16", analog zu „Bayern gegen Schalke".
+   *
+   * PRÄZISIERUNG (Review-Fund, Spieltage-Review 19.10. Abend): Chris' Beispiel nennt
+   * AUSDRÜCKLICH die Staffel, nicht einen über alle zwanzig Disziplinen gemittelten
+   * Gesamtwert — wörtlich weiter: „jetzt steht da Stärke Nummer 1 und Stärke Nummer 2 [...]
+   * dabei müsste ja jeder von den beiden eine Stärke haben, für Staffel UND eine Stärke für
+   * Wettessen." Ein Chip pro Disziplin DIESES Spieltags statt eines kombinierten Gesamtrangs —
+   * `teamStrengthRankByTeamId` trägt seit diesem Fix `row.disciplineRanks` (disciplineId -> Rang,
+   * `team-discipline-rank-engine.ts` berechnet das ohnehin schon pro Disziplin, dieselbe Zahl wie
+   * die "Ranks"-Ansicht), nicht mehr nur `row.totalRank`. Optional — ohne den Prop (z. B. ältere
+   * Host-Version) bleibt die Zeile unverändert, nur ohne diese Rang-Chips.
    */
-  function renderSpieltagForecastRank(teamId: string) {
-    const rank = teamStrengthRankByTeamId?.get(teamId);
-    if (rank == null || !Number.isFinite(rank)) {
+  function renderSpieltagForecastRank(teamId: string, disziplinen: SpieltagsPaarung["disziplinen"]) {
+    const ranks = teamStrengthRankByTeamId?.get(teamId);
+    if (!ranks) {
       return null;
     }
-    return (
-      <span
-        className="nl-standings-spieltage-forecast-rank nl-tnum"
-        title="Stärke-Rang: reine Kaderstärke dieser Saison, unabhängig vom bisherigen Tabellenverlauf"
-      >
-        Stärke #{rank}
-      </span>
-    );
+    return disziplinen.map((disziplin) => {
+      const rank = ranks[disziplin.disciplineId];
+      if (rank == null || !Number.isFinite(rank)) {
+        return null;
+      }
+      const kuerzel =
+        SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
+        disziplin.disciplineName.slice(0, 3).toUpperCase();
+      return (
+        <span
+          key={disziplin.disciplineId}
+          className="nl-standings-spieltage-forecast-rank nl-tnum"
+          title={`Stärke-Rang ${disziplin.disciplineName}: reine Kaderstärke dieser Saison, unabhängig vom bisherigen Tabellenverlauf`}
+        >
+          {kuerzel} #{rank}
+        </span>
+      );
+    });
   }
 
   /**
    * Saisonstand-Auftrag Chris (19.10.) Punkt 3: das ECHTE, disziplinspezifische Ergebnis statt des
    * Team-Punkte-Schemas (2/1/0, bisher immer als "2:0"/"1:1"/"0:2" dargestellt — für jeden Sieg
-   * identisch). `disziplin.seiten` trägt bereits das echte native Ergebnis: bei
-   * `resolutionSource === "arena"` der Punktestand/die Rohgröße direkt aus der Arena-Simulation
-   * (`ArenaFixtureResult.seiten`, z. B. ein echter Basketball-Endstand), bei `"pps_duell"` das
-   * Rohwerte-Paar der PPS-Duell-Brücke VOR der 2/1/0-Rundung (`battle-mode-pps-duell.ts`,
-   * `duellSeiten`). Beides läuft über denselben Kanal bis in `SpieltagsDuellDisziplin.seiten`
-   * (`season-matchday-fixtures-overview.ts`) — nichts Neues berechnet, nur das bereits
-   * durchgereichte Feld jetzt auch angezeigt. Auf ganze Zahlen gerundet fürs Auge, wie ein echtes
-   * Sport-Ergebnis (Auftrag: "wie beim Fußball … steht nicht jedes Mal 2 zu 0"). Rückfall auf das
-   * alte Team-Punkte-Schema NUR, falls `seiten` ausnahmsweise fehlt (sollte an einem echten
-   * Battle-Duell nicht vorkommen, s. Dateikommentar `legacy-matchday-resolve-engine.ts`).
+   * identisch). `disziplin.seiten` trägt NUR BEI `resolutionSource === "arena"` ein echtes natives
+   * Ergebnis (direkt aus der Arena-Simulation, `ArenaFixtureResult.seiten`, z. B. ein echter
+   * Basketball-Endstand) — bei `"pps_duell"` bleibt es bewusst `null` (Review-Fund 19.10. Abend:
+   * das wäre dort der rohe, aufsummierte PPS-Score beider Seiten, NIE als Sport-Ergebnis gedacht und
+   * je nach Disziplin/Kadergröße beliebig groß, s. Kommentar im Builder
+   * `season-matchday-fixtures-overview.ts`; Chris sah dadurch z. B. ein unmögliches "273:297" bei
+   * einem auf 6 Minuten begrenzten Basketball-Spiel). Für `"pps_duell"`-Disziplinen (Basketball,
+   * Hockey, Battlefield, TDM, Mini-DM, I-Spy, Football) zeigt die Zeile deshalb weiterhin das ehrliche
+   * 2/1/0-Teampunkte-Schema. Rückfall auf dasselbe Schema auch für den (an einem echten Battle-Duell
+   * nicht erwarteten) Fall, dass `seiten` ausnahmsweise fehlt.
    */
   function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number]) {
     const kuerzel =
@@ -2972,7 +2989,16 @@ export default function SeasonStandingsNewLook({
         <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
         <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
         {disziplin.gespielt ? (
-          <span className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}>
+          // Saisonstand-Auftrag Chris (19.10.) Punkt 3: die farbige +/- Zahl war bisher eine
+          // nackte Zahl ohne jede Beschriftung ("Die Zahl dahinter, was ist die? ... verstehe ich
+          // auch nicht" — wörtlich). `verhaeltnis` existierte vorher schon (unveraendert korrekt,
+          // s. PR #1294-Text "unverändert, war schon richtig"), nur ganz ohne erklärenden Titel.
+          // Jetzt mit demselben Tooltip-Muster wie die Achsen-Klammerzahl der Daten-Tabelle
+          // (`nl-standings-area-verhaeltnis` weiter oben in dieser Datei).
+          <span
+            className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}
+            title={`Punkteverhältnis: wie deutlich dieses Duell ausfiel (1 = knapp, 10 = deutlich) — Tiebreaker für die Tabelle bei Punktegleichstand, keine zusätzlichen Punkte`}
+          >
             {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
           </span>
         ) : null}
@@ -3009,7 +3035,7 @@ export default function SeasonStandingsNewLook({
                 <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
                 {teamLabel(teilnehmer.teamId)}
                 {renderSpieltagTeamRank(teilnehmer.teamId)}
-                {renderSpieltagForecastRank(teilnehmer.teamId)}
+                {renderSpieltagForecastRank(teilnehmer.teamId, paarung.disziplinen)}
               </span>
             </Fragment>
           ))}

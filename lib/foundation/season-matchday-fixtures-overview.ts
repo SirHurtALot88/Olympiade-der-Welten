@@ -303,7 +303,17 @@ export function buildSpieltagsUebersicht(
         gespielt,
         punkteHeim: homeRow?.teamPoints ?? null,
         punkteGast: awayRow?.teamPoints ?? null,
-        seiten: gespielt && homeRow?.duellSeiten ? homeRow.duellSeiten : null,
+        // NUR BEI resolutionSource === "arena" ist `duellSeiten` ein echter, nativer Spielstand
+        // (direkt aus der Arena-Simulation dieser Disziplin, z. B. ein echter Basketball-Endstand).
+        // Bei "pps_duell" ist dasselbe Feld der rohe, aufsummierte PPS-Score beider Seiten
+        // (battle-mode-pps-duell.ts, `berechnePpsDuellOverrides()`) — eine interne Rechengroesse,
+        // NIE als Sport-Ergebnis gedacht, und je nach Disziplin/Kadergroesse beliebig groß (Review-
+        // Fund 19.10. Abend: Chris sah z. B. "273:297" bei einem auf 6 Minuten begrenzten
+        // Basketball-Spiel — Basketball ist NICHT arena-aufgeloest, s. ARENA_RESOLVED_DISCIPLINE_IDS,
+        // lief also ueber die Bruecke und zeigte den PPS-Summenwert statt eines echten Spielstands).
+        // Fuer "pps_duell" bleibt `seiten` darum bewusst `null` — die UI faellt dann ehrlich auf das
+        // 2/1/0-Teampunkte-Schema zurueck (`punkteHeim:punkteGast`), wie vor PR #1294.
+        seiten: gespielt && homeRow?.resolutionSource === "arena" && homeRow?.duellSeiten ? homeRow.duellSeiten : null,
         verhaeltnisHeim: gespielt ? homeRow?.verhaeltnis ?? null : null,
         verhaeltnisGast: gespielt ? awayRow?.verhaeltnis ?? null : null,
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,
