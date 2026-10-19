@@ -70073,6 +70073,115 @@ span.nl-facility-ampel-chip {
 }
 
 /* ===================================================================
+   "Neuer Look" — All-Time nach Disziplin (Chris, 19.10.: Bestenliste über
+   mehrere Saisons, filterbar nach Bereich/Disziplin, Gesamtpunkte UND
+   Punkte/Einsatz nebeneinander). Namespacing: `.nl-alltime-discipline-*`.
+   =================================================================== */
+
+.is-new-look .nl-alltime-discipline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 14px;
+}
+
+.is-new-look .nl-alltime-discipline-focus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-alltime-discipline-focus select {
+  font: inherit;
+  font-weight: 700;
+  color: var(--nl-fg);
+  background: var(--nl-bg-2);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-alltime-discipline-table-shell {
+  max-height: 70vh;
+}
+
+.is-new-look .nl-alltime-discipline-table th.is-focused,
+.is-new-look .nl-alltime-discipline-table td.is-focused {
+  background: rgba(92, 145, 218, 0.16);
+}
+
+.is-new-look .nl-alltime-discipline-table th.is-discipline-child {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: right;
+  opacity: 0.85;
+}
+
+.is-new-look .nl-alltime-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+  gap: 1px;
+}
+
+.is-new-look .nl-alltime-cell strong {
+  font-size: 0.95em;
+}
+
+.is-new-look .nl-alltime-cell small {
+  font-size: 0.72em;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.is-new-look .nl-alltime-cell.is-empty {
+  opacity: 0.4;
+}
+
+.is-new-look .nl-alltime-player-link {
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.is-new-look .nl-alltime-player-link:hover {
+  text-decoration: underline;
+}
+
+.is-new-look .nl-alltime-player-team {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.is-new-look .nl-alltime-discipline-show-more {
+  margin-top: 12px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--nl-accent);
+  background: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.is-new-look .nl-alltime-discipline-show-more:hover {
+  background: rgba(92, 145, 218, 0.12);
+}
+
+/* ===================================================================
    "Neuer Look" — Scouting-Center Wave 2 (Erkenntnis-Ladder + Shortlist-Board)
    Scratch file — merge under `.is-new-look` in app/globals.css.
    Namespacing: everything below is `.nl-scout-ladder-*` (task 1,

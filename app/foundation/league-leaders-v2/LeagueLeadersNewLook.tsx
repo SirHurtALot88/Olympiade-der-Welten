@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {
   NlCard,
@@ -57,6 +57,17 @@ import {
 } from "@/lib/foundation/eternal-player-table";
 import { buildLeagueLegends } from "@/lib/foundation/league-legend-criteria";
 import { buildLeagueRecordBook } from "@/lib/foundation/league-record-book";
+import {
+  buildPlayerAllTimeDisciplineStats,
+  type PlayerAllTimeDisciplineRow,
+  type PlayerAllTimeStatCell,
+} from "@/lib/foundation/player-all-time-discipline-stats";
+import {
+  SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER,
+  SEASON_DISCIPLINE_LABELS,
+  type SeasonDisciplineAreaId,
+  type SeasonDisciplineKey,
+} from "@/lib/season/season-discipline-area-groups";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildLeagueAchievements,
@@ -289,12 +300,13 @@ function getCategoryStatDecimals(categoryId: string): number {
   return categoryId === "mvs" || categoryId === "ovr" ? 0 : 1;
 }
 
-type NlLeagueLeadersSubTab = "leaders" | "records" | "legends" | "achievements";
+type NlLeagueLeadersSubTab = "leaders" | "records" | "legends" | "allTimeDisciplines" | "achievements";
 
 const NL_LEADERS_SUBTABS: Array<{ id: NlLeagueLeadersSubTab; label: string }> = [
   { id: "leaders", label: "Liga-Leaders" },
   { id: "records", label: "Rekorde" },
   { id: "legends", label: "🏆 Legendäre Spieler" },
+  { id: "allTimeDisciplines", label: "All-Time nach Disziplin" },
   { id: "achievements", label: "Erfolge" },
 ];
 
@@ -518,6 +530,17 @@ export default function LeagueLeadersNewLook({
     [foundationGameState],
   );
 
+  /**
+   * All-Time-Bestenliste je Disziplin/Bereich — Chris, wörtlich (19.10.): „dass ich in eine
+   * Top-List reingehen kann und dann nach 5 Seasons schon sehen kann, okay, wer war […] der
+   * Beste in Fechten? […] auch in Fechten pro Einsatz." Reine Projektion archivierter Saisons
+   * + laufender Saison, siehe `player-all-time-discipline-stats.ts`.
+   */
+  const allTimeDisciplineRows = useMemo<PlayerAllTimeDisciplineRow[]>(
+    () => (foundationGameState ? buildPlayerAllTimeDisciplineStats(foundationGameState) : []),
+    [foundationGameState],
+  );
+
   // D7 — In-Season-Bestwerte ("Saison-Bestwerte (laufend)"): seedet den Rekord-
   // Tab, damit er ab S1/MD1 lebt statt bis zur ersten archivierten Saison leer
   // zu bleiben. Rein aus öffentlichen Kategorie-Leadern + laufendem Kaderwert.
@@ -638,6 +661,13 @@ export default function LeagueLeadersNewLook({
           records={records}
           gameState={foundationGameState}
           ownTeamId={selectedTeamId}
+          onOpenPlayer={onOpenPlayer}
+        />
+      ) : subTab === "allTimeDisciplines" ? (
+        <AllTimeDisciplineLeadersPanel
+          rows={allTimeDisciplineRows}
+          hasHistory={records?.hasHistory ?? false}
+          seasonCount={records?.seasonCount ?? 0}
           onOpenPlayer={onOpenPlayer}
         />
       ) : subTab === "achievements" ? (
@@ -1545,6 +1575,303 @@ function LegendaryPlayersPanel({
 
       {gameState ? <LegendCriteriaPanel gameState={gameState} legends={legends} onOpenPlayer={onOpenPlayer} /> : null}
       {gameState ? <EternalPlayerTablePanel gameState={gameState} ownTeamId={ownTeamId} onOpenPlayer={onOpenPlayer} /> : null}
+    </div>
+  );
+}
+
+type AllTimeDisciplineFocus =
+  | { kind: "overall" }
+  | { kind: "area"; id: SeasonDisciplineAreaId }
+  | { kind: "discipline"; key: SeasonDisciplineKey; areaId: SeasonDisciplineAreaId };
+
+type AllTimeDisciplineMetric = "points" | "pointsPerAppearance";
+
+const ALL_TIME_DISCIPLINE_METRIC_TABS: Array<{ id: AllTimeDisciplineMetric; label: string }> = [
+  { id: "points", label: "Gesamtpunkte" },
+  { id: "pointsPerAppearance", label: "Punkte pro Einsatz" },
+];
+
+const ALL_TIME_DISCIPLINE_ROW_STEP = 30;
+
+function encodeAllTimeFocus(focus: AllTimeDisciplineFocus): string {
+  if (focus.kind === "overall") return "overall";
+  if (focus.kind === "area") return `area:${focus.id}`;
+  return `discipline:${focus.key}`;
+}
+
+function getAllTimeFocusCell(row: PlayerAllTimeDisciplineRow, focus: AllTimeDisciplineFocus): PlayerAllTimeStatCell {
+  if (focus.kind === "overall") return row.overall;
+  if (focus.kind === "area") return row.byArea[focus.id];
+  return (
+    row.byDiscipline[focus.key] ?? { points: 0, appearances: 0, pointsPerAppearance: null, seasonsPlayed: 0 }
+  );
+}
+
+function getAllTimeAreaTone(areaId: SeasonDisciplineAreaId): NlTone {
+  if (areaId === "pow") return "pow";
+  if (areaId === "spe") return "spe";
+  if (areaId === "men") return "men";
+  return "soc";
+}
+
+/**
+ * Eine Zelle der All-Time-Tabelle: Gesamtpunkte fett, Punkte/Einsatz daneben, und wie viele
+ * Einsätze/Saisons dahinterstehen — genau Chris' Punkt: „10 Punkte mit einem Einsatz" und „10
+ * Punkte mit 5 Einsätzen" müssen unterscheidbar bleiben, nicht nur an der Spitze, sondern in
+ * JEDER Zelle (Bereich UND Einzeldisziplin).
+ */
+function AllTimeDisciplineCell({ cell }: { cell: PlayerAllTimeStatCell }) {
+  if (cell.appearances <= 0) {
+    return <span className="nl-alltime-cell is-empty">—</span>;
+  }
+  return (
+    <span
+      className="nl-alltime-cell"
+      title={`${formatNlNumber(cell.points, 1)} Punkte aus ${formatNlNumber(cell.appearances, 0)} Einsätzen über ${formatNlNumber(cell.seasonsPlayed, 0)} Saison${cell.seasonsPlayed === 1 ? "" : "en"} — ${formatNlNumber(cell.pointsPerAppearance ?? 0, 2)} Punkte/Einsatz`}
+    >
+      <strong className="nl-tnum">{formatNlNumber(cell.points, 1)}</strong>
+      <small className="nl-tnum">{formatNlNumber(cell.pointsPerAppearance ?? 0, 2)}/E</small>
+      <small className="nl-alltime-cell-meta nl-tnum">
+        {formatNlNumber(cell.appearances, 0)} E · {formatNlNumber(cell.seasonsPlayed, 0)} S
+      </small>
+    </span>
+  );
+}
+
+/**
+ * "All-Time nach Disziplin" — Chris, wörtlich (19.10.): „Diese Top-Listen müssten dann ja
+ * eventuell auch mal erweitert werden, dass man da quasi noch filtern kann nach einzelnen
+ * Bereichen und einzelnen Disziplinen. […] nach 5 Seasons schon sehen […] wer war der Beste in
+ * Fechten? Ja, und auch in Fechten pro Einsatz." Und zur Spaltenstruktur: „erst die Bereiche
+ * […] Power, Speed, Mental, Social, und dass man das dann nochmal aufklappen kann und es eine
+ * eigene Spalte gibt für jede einzelne Disziplin."
+ *
+ * Spaltenstruktur folgt der Teamtabelle/Spieler-Historie: Bereichsspalten standardmäßig
+ * eingeklappt (Vorbild: `PlayerDrawerHistoryTable`/`SeasonStandingsNewLook`), je Bereich ein
+ * Expand-Header (`season-v2-expand-header`, dieselbe Klasse wie dort) öffnet die Einzeldisziplin-
+ * Spalten dieses Bereichs (`SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER` — nicht neu erfunden,
+ * dieselbe Bereichszuordnung wie überall sonst im Spiel).
+ *
+ * "Filtern" ist die Fokus-Auswahl (Select): sie sortiert die GANZE Tabelle nach dem gewählten
+ * Bereich/der gewählten Disziplin (und klappt dessen Bereich automatisch auf) — die Antwort auf
+ * „wer war der Beste in Fechten" ist dann schlicht Zeile 1. Der Metrik-Umschalter daneben
+ * entscheidet, ob diese Sortierung nach Gesamtpunkten oder nach Punkten/Einsatz läuft; JEDE Zelle
+ * zeigt aber immer BEIDE Zahlen, unabhängig von Fokus/Metrik.
+ */
+function AllTimeDisciplineLeadersPanel({
+  rows,
+  hasHistory,
+  seasonCount,
+  onOpenPlayer,
+}: {
+  rows: PlayerAllTimeDisciplineRow[];
+  hasHistory: boolean;
+  seasonCount: number;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  const [metric, setMetric] = useState<AllTimeDisciplineMetric>("points");
+  const [focus, setFocus] = useState<AllTimeDisciplineFocus>({ kind: "overall" });
+  const [expandedAreas, setExpandedAreas] = useState<Record<SeasonDisciplineAreaId, boolean>>({
+    pow: false,
+    spe: false,
+    men: false,
+    soc: false,
+  });
+  const [visibleCount, setVisibleCount] = useState(ALL_TIME_DISCIPLINE_ROW_STEP);
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((left, right) => {
+      const leftValue = getAllTimeFocusCell(left, focus)[metric] ?? 0;
+      const rightValue = getAllTimeFocusCell(right, focus)[metric] ?? 0;
+      if (rightValue !== leftValue) return rightValue - leftValue;
+      return left.playerName.localeCompare(right.playerName, "de");
+    });
+  }, [rows, focus, metric]);
+
+  function handleFocusChange(value: string) {
+    if (value === "overall") {
+      setFocus({ kind: "overall" });
+      return;
+    }
+    const [kind, id] = value.split(":");
+    if (kind === "area" && (id === "pow" || id === "spe" || id === "men" || id === "soc")) {
+      setFocus({ kind: "area", id });
+      return;
+    }
+    if (kind === "discipline") {
+      const group = SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.find((candidate) =>
+        candidate.keys.includes(id as SeasonDisciplineKey),
+      );
+      if (group) {
+        setFocus({ kind: "discipline", key: id as SeasonDisciplineKey, areaId: group.id });
+        setExpandedAreas((current) => ({ ...current, [group.id]: true }));
+      }
+    }
+  }
+
+  function toggleArea(areaId: SeasonDisciplineAreaId) {
+    setExpandedAreas((current) => ({ ...current, [areaId]: !current[areaId] }));
+  }
+
+  if (!hasHistory && rows.length === 0) {
+    return (
+      <div className="nl-alltime-discipline" data-testid="nl-alltime-discipline-leaders">
+        <NlCard className="nl-records-empty-card" title="All-Time nach Disziplin">
+          <p className="nl-records-empty-text">
+            Noch keine Karrieredaten — sobald der erste Spieltag gerechnet ist, entsteht hier die All-Time-Bestenliste je
+            Bereich und Disziplin, mit Gesamtpunkten und Punkten pro Einsatz.
+          </p>
+        </NlCard>
+      </div>
+    );
+  }
+
+  const visibleRows = sortedRows.slice(0, visibleCount);
+  const canShowMore = visibleCount < sortedRows.length;
+
+  return (
+    <div className="nl-alltime-discipline" data-testid="nl-alltime-discipline-leaders">
+      <NlCard
+        className="nl-alltime-discipline-card"
+        eyebrow={
+          hasHistory
+            ? `${formatNlNumber(seasonCount, 0)} Saison${seasonCount === 1 ? "" : "en"} im Archiv · plus laufende`
+            : "laufende Saison · noch nichts archiviert"
+        }
+        title="All-Time nach Disziplin"
+      >
+        <p className="nl-leaders-hint">
+          Wer war über mehrere Saisons der Beste — in welchem Bereich, in welcher Disziplin? Jede Zelle zeigt
+          Gesamtpunkte UND Punkte pro Einsatz, dazu wie viele Einsätze/Saisons dahinterstehen — zehn Punkte aus einem
+          Einsatz sind nicht dasselbe wie zehn Punkte aus fünf.
+        </p>
+        <div className="nl-alltime-discipline-controls">
+          <label className="nl-alltime-discipline-focus">
+            <span>Sortiert nach</span>
+            <select value={encodeAllTimeFocus(focus)} onChange={(event) => handleFocusChange(event.target.value)}>
+              <option value="overall">Gesamt (alle Disziplinen)</option>
+              {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  <option value={`area:${group.id}`}>{group.label} (Bereich gesamt)</option>
+                  {group.keys.map((key) => (
+                    <option key={key} value={`discipline:${key}`}>
+                      {SEASON_DISCIPLINE_LABELS[key]}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+          <NlSubTabs
+            items={ALL_TIME_DISCIPLINE_METRIC_TABS}
+            activeId={metric}
+            onSelect={(id) => setMetric(id as AllTimeDisciplineMetric)}
+            aria-label="Metrik für die Sortierung"
+            className="nl-alltime-discipline-metric-tabs"
+          />
+        </div>
+        <div className="nl-table-shell nl-alltime-discipline-table-shell">
+          <table className="nl-table nl-tnum is-zebra is-hoverable is-sticky-head nl-alltime-discipline-table">
+            <thead>
+              <tr>
+                <th className="is-align-right">#</th>
+                <th>Spieler</th>
+                <th>Saisons</th>
+                {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => {
+                  const expanded = expandedAreas[group.id];
+                  const isFocused =
+                    (focus.kind === "area" && focus.id === group.id) ||
+                    (focus.kind === "discipline" && focus.areaId === group.id);
+                  return (
+                    <Fragment key={group.id}>
+                      <th className={`${nlToneClass(getAllTimeAreaTone(group.id))}${isFocused ? " is-focused" : ""}`}>
+                        <button
+                          type="button"
+                          className={`season-v2-expand-header${expanded ? " is-expanded" : ""}`}
+                          onClick={() => toggleArea(group.id)}
+                          aria-expanded={expanded}
+                        >
+                          <span>{group.label}</span>
+                          <b>{expanded ? "−" : "+"}</b>
+                        </button>
+                      </th>
+                      {expanded
+                        ? group.keys.map((key) => (
+                            <th
+                              key={key}
+                              className={`${nlToneClass(getAllTimeAreaTone(group.id))} is-discipline-child${
+                                focus.kind === "discipline" && focus.key === key ? " is-focused" : ""
+                              }`}
+                              title={SEASON_DISCIPLINE_LABELS[key]}
+                            >
+                              {SEASON_DISCIPLINE_LABELS[key]}
+                            </th>
+                          ))
+                        : null}
+                    </Fragment>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row, index) => (
+                <tr key={row.playerId}>
+                  <td className="is-align-right nl-tnum">{index + 1}</td>
+                  <td>
+                    <button type="button" className="nl-alltime-player-link" onClick={() => onOpenPlayer(row.playerId)}>
+                      {row.playerName}
+                    </button>
+                    <span className="nl-alltime-player-team">{row.teamCode ?? row.teamName ?? "—"}</span>
+                  </td>
+                  <td className="is-align-right nl-tnum">{formatNlNumber(row.seasonsPlayed, 0)}</td>
+                  {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((group) => (
+                    <Fragment key={group.id}>
+                      <td
+                        className={
+                          (focus.kind === "area" && focus.id === group.id) ||
+                          (focus.kind === "discipline" && focus.areaId === group.id)
+                            ? "is-focused"
+                            : undefined
+                        }
+                      >
+                        <AllTimeDisciplineCell cell={row.byArea[group.id]} />
+                      </td>
+                      {expandedAreas[group.id]
+                        ? group.keys.map((key) => (
+                            <td
+                              key={key}
+                              className={focus.kind === "discipline" && focus.key === key ? "is-focused" : undefined}
+                            >
+                              <AllTimeDisciplineCell
+                                cell={
+                                  row.byDiscipline[key] ?? {
+                                    points: 0,
+                                    appearances: 0,
+                                    pointsPerAppearance: null,
+                                    seasonsPlayed: 0,
+                                  }
+                                }
+                              />
+                            </td>
+                          ))
+                        : null}
+                    </Fragment>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {canShowMore ? (
+          <button
+            type="button"
+            className="nl-alltime-discipline-show-more"
+            onClick={() => setVisibleCount((current) => current + ALL_TIME_DISCIPLINE_ROW_STEP)}
+          >
+            Mehr anzeigen ({sortedRows.length - visibleCount} weitere)
+          </button>
+        ) : null}
+      </NlCard>
     </div>
   );
 }
