@@ -87,6 +87,8 @@ export type DisciplineResultWritePayload = {
   verhaeltnis?: number | null;
   margeM90?: number | null;
   duellSeiten?: [number, number] | null;
+  /** NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.) -- s. `DisciplineResultRecord.ergebnisNormiert`. */
+  ergebnisNormiert?: [number, number] | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -254,6 +256,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
                 verhaeltnis: teamResult.verhaeltnis,
                 margeM90: teamResult.margeM90 ?? null,
                 duellSeiten: teamResult.duellSeiten ?? null,
+                ergebnisNormiert: teamResult.ergebnisNormiert ?? null,
               }
             : {}),
         };

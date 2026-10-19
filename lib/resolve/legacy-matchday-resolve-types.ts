@@ -192,6 +192,14 @@ export type DisciplineTeamResolvePreview = {
   margeM90?: number | null;
   duellSeiten?: [number, number] | null;
   /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, Opus/Fable 19.10., docs/design/... s. battle-mode-pps-duell.ts
+   * `berechneErgebnisNormiert()`): `[eigenes Ergebnis, gegnerisches Ergebnis]`, 0..10 ganzzahlig,
+   * `eigenes - gegnerisches = verhaeltnis` (unvorzeichenbehaftet) IMMER exakt -- by construction,
+   * unabhaengig von der Guete der gezogenen Niveau-Referenz. Nur an Duell-Zeilen gesetzt, wie
+   * `marge`/`verhaeltnis`.
+   */
+  ergebnisNormiert?: [number, number] | null;
+  /**
    * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
    * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau
    * dieses Arena-Duell reproduzieren liesse. Die "Versionierung", die Chris fuer PR7 wollte — keine

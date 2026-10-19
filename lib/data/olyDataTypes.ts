@@ -2620,6 +2620,13 @@ export type DisciplineResultRecord = {
   margeM90?: number | null;
   duellSeiten?: [number, number] | null;
   /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.): `[eigenes Ergebnis, gegnerisches Ergebnis]`, s.
+   * `DisciplineTeamResolvePreview.ergebnisNormiert` (legacy-matchday-resolve-types.ts) fuer die volle
+   * Begruendung. Additiv wie `marge`/`verhaeltnis`; aeltere Zeilen ohne dieses Feld werden beim Lesen
+   * aus `marge`/`margeM90`/`duellSeiten` live nachberechnet (s. season-matchday-fixtures-overview.ts).
+   */
+  ergebnisNormiert?: [number, number] | null;
+  /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
    * Klasse A): wie `arenaMatchSeed` additiv und optional -- aeltere Zeilen (vor dieser Aenderung
    * geschrieben) haben dieses Feld nicht, jeder Leser behandelt sein Fehlen als "keine Momente",

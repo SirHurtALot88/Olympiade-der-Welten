@@ -8,10 +8,14 @@ import {
   DUELL_TEAM_PUNKTE,
   VERHAELTNIS_RUECKFALL_D,
   berechneDuellVerhaeltnis,
+  berechneErgebnisNormiert,
   berechnePpsDuellOverrides,
   berechneVerhaeltnisBetrag,
   istDuellWertung,
+  ppAusSpielerScore,
   resolveMargeReferenz,
+  resolveNiveauReferenz,
+  resolveSpielerPpReferenz,
 } from "@/lib/resolve/battle-mode-pps-duell";
 import { resolveProjectedRankWithTiePolicy, type StandingsTieBreakItem } from "@/lib/standings/standings-tiebreaker-policy";
 import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
@@ -250,28 +254,29 @@ describe("INVARIANTE: Battle-Save, jede Zeile mit Fixture zahlt 0/1/2 — nie di
     expect(c.resolutionSource).toBe("pps_duell");
   });
 
-  it("PLAYER-LEVEL-FIX (18.10.): die einzelnen Spieler-PP folgen dem 2/1/0-Duell-Budget, nicht dem " +
-    "generischen PPS-Rang ueber alle Teams der Disziplin — sonst zeigt die Arena live reelle PP, " +
-    "die der Kader-Tab nach dem Buchen auf 0 zurueckbucht (Befund: menschliches Team verlor sein " +
-    "Basketball-Duell, Arena zeigte 1,37/0,73 PP, der Saison-Ledger buchte 0/0)", () => {
+  it("PP-BUDGET, REIN LEISTUNGSBASIERT (19.10., ERSETZT den PLAYER-LEVEL-FIX vom 18.10.): die " +
+    "einzelnen Spieler-PP folgen `ppAusSpielerScore()` (dem eigenen `finalPlayerScore`), NICHT mehr " +
+    "dem 2/1/0-Duell-Budget dieser Seite — Chris 19.10.: \"Ein guter Spieler im schlechten " +
+    "Verlierer-Team kann also trotzdem viele Punkte sammeln\". Der PLAYER-LEVEL-FIX-Test vom " +
+    "18.10. verlangte das genaue Gegenteil (Spieler-Summe == Team-Budget) -- das ist jetzt bewusst " +
+    "nicht mehr der Fall, s. PR-Report.", () => {
     const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")));
     const basketball = preview.disciplinePreviews.find((d) => d.disciplineId === D1)!;
     for (const team of basketball.teamResults) {
       expect(team.resolutionSource).toBe("pps_duell");
-      const summeSpielerPp = team.entries.reduce((summe, entry) => summe + (entry.pointsAwarded ?? 0), 0);
-      // Die Spieler-Summe folgt dem GEBUCHTEN Duell-Budget (0/1/2) dieser Seite — nicht dem alten
-      // generischen Rang-Nachschlag ueber alle vier Teams der Disziplin (der fuer B z.B. trotz
-      // klarer Niederlage einen positiven Rang-Betrag geliefert haette).
-      expect(summeSpielerPp).toBeCloseTo(team.teamPoints ?? 0, 4);
+      const referenz = resolveSpielerPpReferenz(D1, team.entries.length);
+      for (const entry of team.entries) {
+        expect(entry.pointsAwarded ?? 0).toBeCloseTo(ppAusSpielerScore(entry.finalPlayerScore, referenz), 2);
+      }
     }
-    // B verliert sein Duell gegen A klar (15 PPS-Score aus A/B, s. vierTeams) -> Budget 0, und damit
-    // bekommt JEDER Spieler von B exakt 0 PP, trotz eines strukturell positiven Einzel-Scores.
+    // B verliert sein Duell gegen A klar (15 PPS-Score aus A/B, s. vierTeams) -- Budget 0 UND
+    // TROTZDEM behaelt sein bester Spieler eine positive, aus seinem eigenen Score abgeleitete PP
+    // (anders als beim alten 2/1/0-Team-Budget, das JEDEN Spieler eines Verlierers auf 0 zwang).
     const b = basketball.teamResults.find((t) => t.teamId === "B")!;
     expect(b.teamPoints).toBe(0);
-    for (const entry of b.entries) {
-      expect(entry.pointsAwarded ?? 0).toBe(0);
-    }
-    // A gewinnt (Budget 2) und verteilt diese 2 Punkte anteilig an seinen besten Spieler.
+    expect(b.entries.some((entry) => (entry.pointsAwarded ?? 0) > 0)).toBe(true);
+    // A gewinnt (Budget 2), aber seine Spieler-PP kommt trotzdem aus der Impact-Kurve, nicht aus
+    // einer proportionalen Aufteilung von genau "2".
     const a = basketball.teamResults.find((t) => t.teamId === "A")!;
     expect(a.teamPoints).toBe(2);
     expect(a.entries.some((entry) => (entry.pointsAwarded ?? 0) > 0)).toBe(true);
@@ -387,4 +392,82 @@ describe("Referenz-Datei", () => {
       }
     }
   });
+});
+
+describe("Teil B: Sieger-Ordnungs-Garantie von berechneErgebnisNormiert() (Property-Test)", () => {
+  // Seeded PRNG statt `Math.random()` -- ein fehlschlagender Lauf ist damit reproduzierbar (gleicher
+  // Seed, gleiche Eingaben), s. CLAUDE.md "ein Spiel, nicht eine Saison"-Abschnitt zur Teststrenge.
+  function mulberry32(seed: number) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const FELDGROESSEN = [2, 3, 4, 5, 6] as const;
+  const DISZIPLINEN = [
+    // Konstantsummen-Disziplinen (Niveau aus PPS-Totalscore, s. KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS).
+    "tennis",
+    "speed-schach",
+    "gewichtheben",
+    "staffel",
+    "climbing",
+    "spurt",
+    "time-trial",
+    // Gewoehnliche Disziplinen (Niveau aus dem nativen Seitenwert).
+    "basketball",
+    "battlefield",
+    "hockey",
+    "football",
+    // Ohne jede gezogene Referenz -- die Garantie darf davon NIE abhaengen.
+    "disziplin-ohne-referenz",
+  ];
+
+  it("W >= V immer, W - V = D exakt, beide in [0,10] -- ueber Feldgroessen 2..6, alle betroffenen " +
+    "Disziplinen (inkl. Konstantsummen UND ohne jede gezogene Referenz), Remis und beliebige Niveau-Werte", () => {
+    const zufall = mulberry32(190_1026);
+    let geprueft = 0;
+    for (let i = 0; i < 4000; i += 1) {
+      const disziplin = DISZIPLINEN[Math.floor(zufall() * DISZIPLINEN.length)]!;
+      const n = FELDGROESSEN[Math.floor(zufall() * FELDGROESSEN.length)]!;
+      const quelle = zufall() < 0.5 ? "pps" : "arena";
+      const outcomeRoll = zufall();
+      const outcome = outcomeRoll < 0.1 ? "draw" : outcomeRoll < 0.55 ? "win" : "loss";
+      // marge/m90 beliebig, inklusive Rand- und Entartungsfaellen (m90 = 0, marge > m90, marge = 0 bei
+      // einem Sieg -- der kg-Tiebreak-Fall bei Gewichtheben-Duellgleichstand).
+      const marge = zufall() < 0.1 ? 0 : zufall() * 500;
+      const m90 = zufall() < 0.1 ? 0 : zufall() * 200;
+      const betrag = berechneVerhaeltnisBetrag({ outcome, marge, m90: zufall() < 0.1 ? null : m90 });
+      const niveauEigen = (zufall() - 0.2) * 1000; // auch negative Werte (Rauschboden, s. Impact-Kurve)
+      const niveauGegner = (zufall() - 0.2) * 1000;
+      const referenz = resolveNiveauReferenzFuerTest(quelle, disziplin, n);
+
+      const [eigen, gegner] = berechneErgebnisNormiert({ outcome, betrag, niveauEigen, niveauGegner, referenz });
+      geprueft += 1;
+
+      expect(eigen, `#${i} ${disziplin} n=${n} outcome=${outcome} betrag=${betrag}`).toBeGreaterThanOrEqual(0);
+      expect(eigen).toBeLessThanOrEqual(10);
+      expect(gegner).toBeGreaterThanOrEqual(0);
+      expect(gegner).toBeLessThanOrEqual(10);
+      if (outcome === "draw") {
+        expect(betrag).toBe(0);
+        expect(eigen).toBe(gegner);
+      } else if (outcome === "win") {
+        expect(eigen).toBeGreaterThanOrEqual(gegner);
+        expect(eigen - gegner).toBe(betrag);
+      } else {
+        expect(gegner).toBeGreaterThanOrEqual(eigen);
+        expect(gegner - eigen).toBe(betrag);
+      }
+    }
+    expect(geprueft).toBe(4000);
+  });
+
+  function resolveNiveauReferenzFuerTest(quelle: "pps" | "arena", disziplin: string, n: number) {
+    return resolveNiveauReferenz(quelle, disziplin, n);
+  }
 });

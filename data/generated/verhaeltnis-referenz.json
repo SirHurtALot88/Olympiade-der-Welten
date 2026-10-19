@@ -1,5 +1,5 @@
 {
- "hinweis": "M90 (90. Perzentil des rohen Duell-Abstands m) je Quelle, Disziplin und Feldgroesse fuer das Punkteverhaeltnis D = max(1, round(10*min(1, m/M90))). Gelesen von resolveMargeReferenz() in lib/resolve/battle-mode-pps-duell.ts. Quelle 'pps' = |PPS-Score Heim - Gast| ueber buildLegacyMatchdayResolvePreview() mit der KI-Aufstellung des Spiels (scripts/ziehe-verhaeltnis-referenz.ts, --aufstellung=ki, 3 Spieltage, je Disziplin und Feldgroesse 96 Fixtures, zwei Laeufe mit je zehn Disziplinen); Quelle 'arena' = |Seitenstand Heim - Gast| des Arena-Duells (scripts/ziehe-verhaeltnis-referenz-arena.ts, 48 Fixtures je Feldgroesse; Staffel/Time-Trial ohne Eintrag, dort gilt D = 5 je Sieg mit Warnung verhaeltnis_referenz_fehlt). Neu ziehen nach jeder Aenderung, die die Score- bzw. Seitenstand-Skala verschiebt.",
+ "hinweis": "M90 (90. Perzentil des rohen Duell-Abstands m) je Quelle, Disziplin und Feldgroesse fuer das Punkteverhaeltnis D = max(1, round(10*min(1, m/M90))). Gelesen von resolveMargeReferenz() in lib/resolve/battle-mode-pps-duell.ts. Quelle 'pps' = |PPS-Score Heim - Gast| ueber buildLegacyMatchdayResolvePreview() (scripts/ziehe-verhaeltnis-referenz.ts); Quelle 'arena' = |Seitenstand Heim - Gast| des Arena-Duells (scripts/ziehe-verhaeltnis-referenz-arena.ts; Staffel/Time-Trial ohne Eintrag, dort gilt D = 5 je Sieg mit Warnung verhaeltnis_referenz_fehlt). Neu ziehen nach jeder Aenderung, die die PPS-Score-Skala verschiebt (Eignung/Score-Engine, Form, Mutator, Slot-Rollen, Team-Powers).",
  "provenienz": {
   "arena": {
    "gezogenAm": "2026-10-16T17:19:04.156Z",
@@ -12,16 +12,16 @@
    "mechanismus": "runArenaFixtures gegen echte Liga-Kader (buildArenaTeam), beste n nach Eignung, Paarung innerhalb der (nachgebildeten) Liga, 3 Runden je Feldgroesse; Staffel/Time-Trial bewusst ohne Eintrag (seiten 1:0)"
   },
   "pps": {
-   "gezogenAm": "2026-10-16T17:39:02.391Z",
-   "repoCommit": "ace4306288cc444121dc48bacd9e6714ff59cbcb",
+   "gezogenAm": "2026-10-19T18:29:23.844Z",
+   "repoCommit": "8d8012b7c17266a061fcbf79d13f41547fdaa54e",
    "quelle": {
     "saveId": "new-game-1787123325719-swnjlk",
     "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
     "seasonId": "season-2",
-    "spieltage": 3
+    "spieltage": 2
    },
    "mechanismus": "KI-Aufstellung des Spiels (buildAiLegacyLineupPreviewWithModifiers), buildLegacyMatchdayResolvePreview(), Paarung innerhalb der Liga (buildInitialLeagueAssignment nachgebildet), 2 Zufallspaarungen je Liga und Spieltag",
-   "vorschauen": 75
+   "vorschauen": 10
   }
  },
  "quellen": {
@@ -30,53 +30,138 @@
     "feldgroessen": {
      "2": {
       "n": 2,
-      "fixtures": 96,
-      "m90": 69.6,
-      "median": 19.95,
-      "p75": 50.05,
-      "p95": 88.75,
-      "max": 130.7,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 80.56,
+      "median": 34,
+      "p75": 50.6,
+      "p95": 102.62,
+      "max": 120.2,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 37.25,
+       "p995": 120.69,
+       "stichprobe": 128
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        23.15,
+        63.95,
+        147.03
+       ]
+      }
      },
      "3": {
       "n": 3,
-      "fixtures": 96,
-      "m90": 80.55,
-      "median": 30.3,
-      "p75": 52.58,
-      "p95": 100.2,
-      "max": 113.6,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 83.17,
+      "median": 40.9,
+      "p75": 62.45,
+      "p95": 101.56,
+      "max": 143.2,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 38.9,
+       "p995": 118.77,
+       "stichprobe": 192
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        62.01,
+        114.15,
+        188.31
+       ]
+      }
      },
      "4": {
       "n": 4,
-      "fixtures": 96,
-      "m90": 112.3,
-      "median": 37.65,
-      "p75": 77.05,
-      "p95": 138.82,
-      "max": 149.7,
-      "remisAnteil": 0.01
+      "fixtures": 64,
+      "m90": 107.64,
+      "median": 49,
+      "p75": 89.2,
+      "p95": 142.48,
+      "max": 160,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 35.3,
+       "p995": 118.34,
+       "stichprobe": 256
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        71.87,
+        145.35,
+        222.99
+       ]
+      }
      },
      "5": {
       "n": 5,
-      "fixtures": 96,
-      "m90": 109,
-      "median": 50.7,
-      "p75": 81.3,
-      "p95": 141.9,
-      "max": 203,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 138.03,
+      "median": 63.65,
+      "p75": 102.58,
+      "p95": 169.12,
+      "max": 232.2,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 35.1,
+       "p995": 118.2,
+       "stichprobe": 302
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        76.92,
+        166.7,
+        268.39
+       ]
+      }
      },
      "6": {
       "n": 6,
-      "fixtures": 96,
-      "m90": 140.45,
-      "median": 66.6,
-      "p75": 110.4,
-      "p95": 184.8,
-      "max": 297.1,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 178.84,
+      "median": 69.5,
+      "p75": 126.13,
+      "p95": 191.4,
+      "max": 242.8,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 34.25,
+       "p995": 118.11,
+       "stichprobe": 330
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        61.8,
+        173.4,
+        305.55
+       ]
+      }
      }
     }
    },
@@ -84,53 +169,138 @@
     "feldgroessen": {
      "2": {
       "n": 2,
-      "fixtures": 96,
-      "m90": 81.45,
-      "median": 23.4,
-      "p75": 47.75,
-      "p95": 90.9,
-      "max": 128.4,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 59.05,
+      "median": 26.6,
+      "p75": 43.47,
+      "p95": 73.94,
+      "max": 89.3,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 36,
+       "p995": 89.86,
+       "stichprobe": 128
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        30.25,
+        73.6,
+        124.2
+       ]
+      }
      },
      "3": {
       "n": 3,
-      "fixtures": 96,
-      "m90": 94.5,
-      "median": 32.9,
-      "p75": 62.53,
-      "p95": 108.8,
-      "max": 135,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 93.96,
+      "median": 37.8,
+      "p75": 63.72,
+      "p95": 113.72,
+      "max": 135.1,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 31.5,
+       "p995": 81.48,
+       "stichprobe": 192
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        37.78,
+        92.5,
+        169.92
+       ]
+      }
      },
      "4": {
       "n": 4,
-      "fixtures": 96,
-      "m90": 120.25,
-      "median": 45.65,
-      "p75": 70.97,
-      "p95": 143.55,
-      "max": 170.4,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 101.05,
+      "median": 42.9,
+      "p75": 82.35,
+      "p95": 109.32,
+      "max": 181.6,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 28.85,
+       "p995": 77.99,
+       "stichprobe": 256
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        59.25,
+        112.55,
+        186.09
+       ]
+      }
      },
      "5": {
       "n": 5,
-      "fixtures": 96,
-      "m90": 131.25,
-      "median": 51.35,
-      "p75": 91.03,
-      "p95": 163.45,
-      "max": 238.7,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 133.43,
+      "median": 59.15,
+      "p75": 101.8,
+      "p95": 203.6,
+      "max": 278.9,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 26.3,
+       "p995": 96.92,
+       "stichprobe": 300
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        45.1,
+        121.15,
+        259.24
+       ]
+      }
      },
      "6": {
       "n": 6,
-      "fixtures": 96,
-      "m90": 136.15,
-      "median": 53.5,
-      "p75": 102.88,
-      "p95": 153.65,
-      "max": 191.5,
-      "remisAnteil": 0
+      "fixtures": 64,
+      "m90": 157.74,
+      "median": 71.35,
+      "p75": 118.73,
+      "p95": 193.38,
+      "max": 238.6,
+      "remisAnteil": 0,
+      "spieler": {
+       "p50": 25.25,
+       "p995": 95.93,
+       "stichprobe": 314
+      },
+      "niveau": {
+       "p": [
+        0.05,
+        0.5,
+        0.95
+       ],
+       "w": [
+        52.88,
+        126.45,
+        238.8
+       ]
+      }
      }
     }
    },

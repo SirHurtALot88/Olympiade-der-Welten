@@ -2987,6 +2987,17 @@ export default function SeasonStandingsNewLook({
     return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1, useGrouping: false }).format(value);
   }
 
+  /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.): ERSETZT sowohl den rohen `seiten`/
+   * `punkteHeim:punkteGast`-Zweig ALS AUCH die separate farbige ±D-Zahl, die bisher daneben stand.
+   * `disziplin.ergebnisNormiert` ist IMMER 0..10 (egal ob Arena oder PPS-Duell-Brücke, egal wie groß
+   * der rohe Seitenwert dieser Disziplin ist — löst damit auch das "273:297"-Problem, das `seiten`
+   * für `"pps_duell"` bewusst unbeantwortet ließ) UND traegt die Differenz (W−V = Punkteverhältnis
+   * dieses Duells) schon im Ergebnis selbst — eine zweite, separate Zahl daneben wäre dieselbe
+   * Information zweimal ("die Zahl daneben kann beim Ergebnis weg", Chris 19.10.). Fehlt die
+   * normierte Zahl (keine Referenz gezogen, kein Duell), faellt die Zeile auf den bisherigen,
+   * disziplinabhaengigen Rohwert zurueck.
+   */
   function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number]) {
     const kuerzel =
       SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
@@ -2994,29 +3005,20 @@ export default function SeasonStandingsNewLook({
     const quelle = resolveSpielquelleLabel(disziplin);
     const ergebnisText = !disziplin.gespielt
       ? "—"
+      : disziplin.ergebnisNormiert
+      ? `${disziplin.ergebnisNormiert[0]}:${disziplin.ergebnisNormiert[1]}`
       : disziplin.seiten
       ? `${formatSpieltagSeite(disziplin.seiten[0])}:${formatSpieltagSeite(disziplin.seiten[1])}`
       : `${disziplin.punkteHeim}:${disziplin.punkteGast}`;
     const titleParts = [disziplin.disciplineName];
     if (quelle) titleParts.push(quelle);
+    if (disziplin.gespielt && disziplin.ergebnisNormiert) {
+      titleParts.push("Ergebnis 0–10 normiert — der Abstand ist das Punkteverhältnis dieses Duells, keine zusätzlichen Punkte");
+    }
     return (
       <span key={disziplin.disciplineId} className="nl-standings-spieltage-disziplin-ergebnis" title={titleParts.join(" — ")}>
         <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
         <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
-        {disziplin.gespielt ? (
-          // Saisonstand-Auftrag Chris (19.10.) Punkt 3: die farbige +/- Zahl war bisher eine
-          // nackte Zahl ohne jede Beschriftung ("Die Zahl dahinter, was ist die? ... verstehe ich
-          // auch nicht" — wörtlich). `verhaeltnis` existierte vorher schon (unveraendert korrekt,
-          // s. PR #1294-Text "unverändert, war schon richtig"), nur ganz ohne erklärenden Titel.
-          // Jetzt mit demselben Tooltip-Muster wie die Achsen-Klammerzahl der Daten-Tabelle
-          // (`nl-standings-area-verhaeltnis` weiter oben in dieser Datei).
-          <span
-            className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}
-            title="Punkteverhältnis aus Sicht des zuerst genannten Teams: +1 = knapp gewonnen … +10 = deutlich gewonnen, negativ = verloren, 0 = Remis — Tiebreaker für die Tabelle bei Punktegleichstand, keine zusätzlichen Punkte"
-          >
-            {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
-          </span>
-        ) : null}
       </span>
     );
   }

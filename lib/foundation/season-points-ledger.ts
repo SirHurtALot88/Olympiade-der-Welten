@@ -5,7 +5,7 @@ import type {
   MatchdayResultRecord,
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
-import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
+import { istDuellWertung, ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -18,7 +18,12 @@ type LedgerPointSource =
   | "score_contribution"
   | "share_times_team_total"
   | "final_player_score_without_team_total"
-  | "score_contribution_without_team_total";
+  | "score_contribution_without_team_total"
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10.): Spieler-PP einer Duell-Zeile
+  // (`resolutionSource` `"arena"`/`"pps_duell"`) folgen NICHT mehr dem 2/1/0-Team-Budget, sondern
+  // `ppAusSpielerScore()` -- s. Kommentar an `derivePlayerPointsForDuellGroup()` unten.
+  | "battle_mode_arena_boxscore_impact"
+  | "battle_mode_pps_duell_player_score";
 
 export type SeasonPlayerPointLedgerEntry = {
   performanceId: string;
@@ -181,12 +186,13 @@ function deriveRankPointsFromPerformances(
     playerCount,
     rank: teamResult.rank,
     entries: performances,
-    // STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): fuer
-    // arena-aufgeloeste Zeilen mit gebuchtem `teamPoints` (2/1/0) wird DIESER Wert verteilt statt
-    // des PPS-Rang-Nachschlags -- sonst ueberschreibt genau diese Nachbuchung den Fix aus
-    // standings-preview-engine.ts wieder (der urspruengliche Fund, Abschnitt 1.3 des Plans).
-    // PPS-DUELL-BRUECKE (16.10.): dasselbe fuer `"pps_duell"`-Zeilen, s. `istDuellWertung()`.
-    teamPointsOverride: istDuellWertung(teamResult) ? teamResult.teamPoints : null,
+    // PP-BUDGET (Teil A, 19.10.): dieser Pfad ist jetzt NUR noch fuer Manager-Mode-Zeilen
+    // (`resolutionSource: "pps"`) in Benutzung -- `buildSeasonPointsLedger()` ruft ihn fuer jede
+    // Duell-Zeile (`istDuellWertung(teamResult)`) gar nicht mehr auf, s.
+    // `derivePlayerPointsForDuellGroup()`. `teamPointsOverride` bleibt deshalb immer `null`
+    // (bis 19.10.: `istDuellWertung(teamResult) ? teamResult.teamPoints : null`, der 2/1/0-Anteil,
+    // den `ppAusSpielerScore()` ersetzt hat).
+    teamPointsOverride: null,
   });
 
   if (distributed.teamPoints == null) {
@@ -194,6 +200,55 @@ function deriveRankPointsFromPerformances(
   }
 
   return distributed;
+}
+
+/**
+ * PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10., "bei PP waere ich bei Fable, die PPs
+ * haengen vom Impact Rating der Spieler ab! Ein guter Spieler im schlechten Verlierer-Team kann
+ * also trotzdem viele Punkte sammeln!"). ERSETZT `deriveRankPointsFromPerformances()` fuer
+ * Duell-Zeilen (`istDuellWertung(teamResult)`) -- der Rang-/Team-Budget-Pfad bleibt dafuer komplett
+ * unberuehrt (Manager-Mode, `resolutionSource: "pps"`, bit-identisch).
+ *
+ * ARENA ("arena"): der persistierte `performance.scoreContribution` -- seit der Engine-Aenderung
+ * derselbe Wert, den die Live-Buehne zeigt (`ppsAusArenaImpact()`-Boxscore-Wert, falls vorhanden,
+ * sonst der bisherige PPS-Rang-Nachschlag) -- wird VERTRAUT, nicht neu gerechnet. "Gezeigt == gebucht".
+ *
+ * PPS-DUELL ("pps_duell"): deterministisch aus dem persistierten `performance.finalPlayerScore` +
+ * der gezogenen Referenz NEU gerechnet, nicht aus dem persistierten Wert gelesen -- das heilt
+ * bestehende Battle-Saves (die noch den alten 2/1/0-Anteil persistiert haben) beim blossen Lesen,
+ * ohne Migration.
+ */
+function derivePlayerPointsForDuellGroup(
+  gameState: GameState,
+  matchdayId: string | null,
+  performances: PlayerDisciplinePerformanceRecord[],
+  teamResult: DisciplineResultRecord,
+): { pointSource: LedgerPointSource; pointsByPerformanceId: Map<string, number> } | null {
+  if (!istDuellWertung(teamResult)) {
+    return null;
+  }
+
+  if (teamResult.resolutionSource === "arena") {
+    const pointsByPerformanceId = new Map(
+      performances.map((performance) => [performance.id, roundValue(performance.scoreContribution ?? 0, 4)] as const),
+    );
+    return { pointSource: "battle_mode_arena_boxscore_impact", pointsByPerformanceId };
+  }
+
+  const reference = performances[0];
+  if (!reference) {
+    return null;
+  }
+  const playerCount = resolveDisciplinePlayerCount(gameState, {
+    matchdayId,
+    disciplineId: reference.disciplineId,
+    disciplineSide: reference.disciplineSide,
+  });
+  const referenz = resolveSpielerPpReferenz(reference.disciplineId, playerCount);
+  const pointsByPerformanceId = new Map(
+    performances.map((performance) => [performance.id, ppAusSpielerScore(performance.finalPlayerScore, referenz)] as const),
+  );
+  return { pointSource: "battle_mode_pps_duell_player_score", pointsByPerformanceId };
 }
 
 function buildSeasonResultLookup(
@@ -272,6 +327,12 @@ export function buildSeasonPointsLedger(
   }
 
   const pointEntries: SeasonPlayerPointLedgerEntry[] = [];
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A): `teamSummary.totalPoints` einer Duell-Zeile darf NICHT
+  // mehr Σ Spieler-PP sein (die folgen jetzt `ppAusSpielerScore()`, nicht dem Team-Budget) -- es
+  // bleibt stattdessen Σ `teamResult.teamPoints` (2/1/0), GENAU EINMAL je Gruppe, nicht je Spieler.
+  // Hier nur gesammelt (teamSummariesByTeamId existiert erst nach diesem Loop); angewendet gleich
+  // danach, zusammen mit dem Null-Init aller Teams.
+  const duellGruppenBeitraege: Array<{ teamId: string; disciplineId: string; category: DisciplineCategory | null; beitrag: number }> = [];
 
   for (const performances of groupedPerformances.values()) {
     const reference = performances[0];
@@ -283,13 +344,14 @@ export function buildSeasonPointsLedger(
     const teamTotal = teamResult?.totalScore ?? null;
     const entryWarnings: string[] = [];
     const matchdayResult = matchdayResultById.get(reference.matchdayResultId) ?? null;
-    const rankPointDistribution = deriveRankPointsFromPerformances(
-      gameState,
-      matchdayResult?.matchdayId ?? null,
-      performances,
-      teamResult,
-    );
+    const duellPoints = teamResult
+      ? derivePlayerPointsForDuellGroup(gameState, matchdayResult?.matchdayId ?? null, performances, teamResult)
+      : null;
+    const rankPointDistribution = duellPoints
+      ? null
+      : deriveRankPointsFromPerformances(gameState, matchdayResult?.matchdayId ?? null, performances, teamResult);
     const pointSource =
+      duellPoints?.pointSource ??
       (rankPointDistribution?.pointSource as LedgerPointSource | undefined) ??
       choosePointSource(performances, teamTotal);
 
@@ -302,6 +364,7 @@ export function buildSeasonPointsLedger(
 
     const normalizedEntries = performances.map((performance) => {
       const derivedPoints =
+        duellPoints?.pointsByPerformanceId.get(performance.id) ??
         rankPointDistribution?.entries.find((entry) => entry.item === performance)?.points ??
         derivePointsFromPerformance(performance, pointSource, teamTotal);
       if (!isFiniteNumber(derivedPoints)) {
@@ -338,19 +401,32 @@ export function buildSeasonPointsLedger(
       } satisfies SeasonPlayerPointLedgerEntry;
     });
 
-    const reconciliationTarget = rankPointDistribution?.teamPoints ?? teamTotal;
-    if (reconciliationTarget != null) {
-      const derivedGroupTotal = roundValue(
-        normalizedEntries.reduce((sum, entry) => sum + entry.basePoints, 0),
-        4,
-      );
-      if (!isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
-        const warning = `reconciliation_failed:${reference.teamId}:${reference.disciplineId}:${reference.disciplineSide}`;
-        warnings.push(warning);
-        for (const entry of normalizedEntries) {
-          entry.warnings.push(warning);
+    // Die Gruppen-Summen-Reconciliation (Σ Spieler-Anteil == Team-Budget) gilt NUR noch fuer
+    // Manager-Mode-Zeilen -- eine Duell-Zeile ist per Konstruktion entkoppelt (`totalPoints` kommt
+    // unten direkt aus `teamResult.teamPoints`, nicht aus der Spieler-Summe), ein Vergleich gegen den
+    // PPS-Totalscore waere hier immer eine falsche Warnung.
+    if (!duellPoints) {
+      const reconciliationTarget = rankPointDistribution?.teamPoints ?? teamTotal;
+      if (reconciliationTarget != null) {
+        const derivedGroupTotal = roundValue(
+          normalizedEntries.reduce((sum, entry) => sum + entry.basePoints, 0),
+          4,
+        );
+        if (!isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
+          const warning = `reconciliation_failed:${reference.teamId}:${reference.disciplineId}:${reference.disciplineSide}`;
+          warnings.push(warning);
+          for (const entry of normalizedEntries) {
+            entry.warnings.push(warning);
+          }
         }
       }
+    } else if (teamResult) {
+      duellGruppenBeitraege.push({
+        teamId: reference.teamId,
+        disciplineId: reference.disciplineId,
+        category: disciplineCategoryById.get(reference.disciplineId) ?? null,
+        beitrag: teamResult.teamPoints ?? 0,
+      });
     }
 
     pointEntries.push(...normalizedEntries);
@@ -362,6 +438,12 @@ export function buildSeasonPointsLedger(
 
   const teamSummariesByTeamId = new Map<string, SeasonTeamPointsSummary>();
   const expectedRankPointsByTeamId = new Map<string, number>();
+  // Non-Duell-Anteil von `playerDerivedTotal` je Team -- die EINZIGE Groesse, gegen die
+  // `expectedRankPointsByTeamId` unten noch verglichen wird (s. Reconciliation-Loop ganz unten).
+  // Ein Team mit Duell- UND Manager-Mode-Zeilen in derselben Saison (selten, z.B. eine arena-faehige
+  // Disziplin ohne Fixture faellt auf den Rangpfad zurueck) darf durch die jetzt leistungsbasierten
+  // Duell-PP nicht faelschlich als `reconciliation_failed` markiert werden.
+  const managerBasePlayerDerivedByTeamId = new Map<string, number>();
   for (const team of gameState.teams) {
     teamSummariesByTeamId.set(team.teamId, {
       teamId: team.teamId,
@@ -375,6 +457,23 @@ export function buildSeasonPointsLedger(
     });
   }
 
+  // PP-BUDGET (Teil A): `totalPoints`/`pointsByDiscipline`/`pointsByArea` einer Duell-Gruppe kommen
+  // ab hier direkt aus `teamResult.teamPoints` (2/1/0), GENAU EINMAL je Gruppe -- s. Kommentar an
+  // `duellGruppenBeitraege` oben. Die Spieler-Summe (`playerDerivedTotal`) bleibt unten unveraendert
+  // Σ `entry.points` ueber ALLE Zeilen (Duell UND Manager-Mode).
+  for (const beitrag of duellGruppenBeitraege) {
+    const summary = teamSummariesByTeamId.get(beitrag.teamId);
+    if (!summary) continue;
+    summary.totalPoints = roundValue(summary.totalPoints + beitrag.beitrag, 4);
+    summary.pointsByDiscipline[beitrag.disciplineId] = roundValue(
+      (summary.pointsByDiscipline[beitrag.disciplineId] ?? 0) + beitrag.beitrag,
+      4,
+    );
+    if (beitrag.category) {
+      summary.pointsByArea[beitrag.category] = roundValue(summary.pointsByArea[beitrag.category] + beitrag.beitrag, 4);
+    }
+  }
+
   for (const result of seasonDisciplineResults) {
     const summary = teamSummariesByTeamId.get(result.teamId);
     const performances = groupedPerformances.get(toDisciplineResultKey(result)) ?? [];
@@ -382,19 +481,24 @@ export function buildSeasonPointsLedger(
       continue;
     }
 
-    summary.totalPoints = roundValue(summary.totalPoints + result.totalScore, 4);
+    // Eine Duell-Zeile OHNE Performances (keine Spieler erfasst) bucht ihr 2/1/0-Team-Budget, nie
+    // den rohen PPS-Totalscore -- sonst wuerde ausgerechnet der leere Rand-Fall die 2/1/0-Oekonomie
+    // verlassen, die der Rest dieser Datei fuer Duell-Zeilen gerade erst durchsetzt.
+    const beitrag = istDuellWertung(result) ? result.teamPoints ?? 0 : result.totalScore;
+    summary.totalPoints = roundValue(summary.totalPoints + beitrag, 4);
     summary.pointsByDiscipline[result.disciplineId] = roundValue(
-      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + result.totalScore,
+      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + beitrag,
       4,
     );
     const category = disciplineCategoryById.get(result.disciplineId);
     if (category) {
-      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + result.totalScore, 4);
+      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + beitrag, 4);
     }
   }
 
   const playerSummariesByPlayerId = new Map<string, SeasonPlayerPointsSummary>();
   for (const entry of pointEntries) {
+    const istDuellEntry = entry.pointSource === "battle_mode_arena_boxscore_impact" || entry.pointSource === "battle_mode_pps_duell_player_score";
     const category = disciplineCategoryById.get(entry.disciplineId) ?? null;
     const playerSummary = playerSummariesByPlayerId.get(entry.playerId) ?? {
       playerId: entry.playerId,
@@ -424,21 +528,39 @@ export function buildSeasonPointsLedger(
 
     const teamSummary = teamSummariesByTeamId.get(entry.teamId);
     if (teamSummary) {
-      teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.points, 4);
-      teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
-        (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.points,
-        4,
-      );
-      if (category) {
-        teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
+      // PP-BUDGET (Teil A): `totalPoints`/`pointsByDiscipline`/`pointsByArea` einer Duell-Zeile
+      // kommen ausschliesslich aus `duellGruppenBeitraege` oben (einmal je Gruppe, Σ teamPoints) --
+      // hier NICHT nochmal aus der (jetzt leistungsbasierten) Spieler-Summe addieren, sonst zaehlte
+      // die Duell-PP doppelt und in der falschen Waehrung.
+      if (!istDuellEntry) {
+        teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.points, 4);
+        teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
+          (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.points,
+          4,
+        );
+        if (category) {
+          teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
+        }
+        managerBasePlayerDerivedByTeamId.set(
+          entry.teamId,
+          roundValue((managerBasePlayerDerivedByTeamId.get(entry.teamId) ?? 0) + entry.basePoints, 4),
+        );
       }
       teamSummary.mutatorPpsBonus = roundValue(teamSummary.mutatorPpsBonus + entry.mutatorPpsBonus, 4);
+      // `playerDerivedTotal` bleibt Σ Spieler-PP ueber ALLE Zeilen (Duell UND Manager-Mode) -- das
+      // ist jetzt die "Leistungs-PP"-Spalte fuer Kader-/Liga-Leaders-Ansichten, bewusst entkoppelt
+      // von `totalPoints` (der Tabellenpunktzahl) fuer Duell-Saves.
       teamSummary.playerDerivedTotal = roundValue(teamSummary.playerDerivedTotal + entry.points, 4);
       teamSummary.warnings = Array.from(new Set([...teamSummary.warnings, ...entry.warnings]));
     }
   }
 
   for (const result of seasonDisciplineResults) {
+    // Duell-Ergebnisse sind per Konstruktion reconciled (s. `duellGruppenBeitraege` oben) -- dieser
+    // Vergleich gilt nur noch fuer Manager-Mode-Zeilen.
+    if (istDuellWertung(result)) {
+      continue;
+    }
     const rankPoints = deriveRankPointsFromPerformances(
       gameState,
       matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
@@ -471,7 +593,10 @@ export function buildSeasonPointsLedger(
 
     const expectedRankPoints = expectedRankPointsByTeamId.get(teamSummary.teamId) ?? 0;
 
-    const basePlayerDerivedTotal = roundValue(teamSummary.playerDerivedTotal - teamSummary.mutatorPpsBonus, 4);
+    // NUR der Manager-Mode-Anteil (s. `managerBasePlayerDerivedByTeamId` oben) -- fuer ein reines
+    // Battle-Save ist das 0/0 (kein Manager-Mode-Anteil vorhanden), was unten `"reconciled"` ergibt:
+    // eine Duell-Zeile ist per Konstruktion reconciled, s. `duellGruppenBeitraege`.
+    const basePlayerDerivedTotal = roundValue(managerBasePlayerDerivedByTeamId.get(teamSummary.teamId) ?? 0, 4);
 
     if (basePlayerDerivedTotal === 0 && expectedRankPoints === 0) {
       teamSummary.reconciliationStatus = "reconciled";

@@ -143,7 +143,27 @@ function baueDraft(context: LegacyLineupLoadedContext, d1: string, d2: string) {
   };
 }
 
-type Ergebnis = { n: number; fixtures: number; m90: number; median: number; p75: number; p95: number; max: number; remisAnteil: number };
+type Ergebnis = {
+  n: number;
+  fixtures: number;
+  m90: number;
+  median: number;
+  p75: number;
+  p95: number;
+  max: number;
+  remisAnteil: number;
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Chris 19.10., "bei PP waere ich bei Fable, die PPs haengen
+  // vom Impact Rating der Spieler ab"): p50/p99,5 des einzelnen Spieler-Scores (`finalPlayerScore`)
+  // je Disziplin und Feldgroesse -- die Referenz fuer `ppAusSpielerScore()`
+  // (lib/resolve/battle-mode-pps-duell.ts), analog zu `ArenaPpsReferenzFeldgroesse.iMittel/iKrass`.
+  spieler?: { p50: number; p995: number; stichprobe: number };
+  // NIVEAU+MARGE 0-10-NORMIERUNG (dieselbe Runde, Teil B): grob gerasterte, monotone CDF des rohen
+  // Seiten-Scores (hier: PPS-Team-Score) je Disziplin und Feldgroesse -- p5 -> 0, p50 -> 0.5,
+  // p95 -> 1, dazwischen linear (`interpoliereNiveau()` in battle-mode-pps-duell.ts). Drei Anker
+  // reichen fuer eine kosmetische Niveau-Anzeige; die Sieger-Ordnung haengt NIE von dieser Tabelle
+  // ab (die kommt allein aus D, s. `berechneErgebnisNormiert()`).
+  niveau?: { p: [number, number, number]; w: [number, number, number] };
+};
 
 function main() {
   const persistence = createPersistenceService();
@@ -173,6 +193,11 @@ function main() {
 
   const margen = new Map<string, number[]>();
   const remis = new Map<string, number>();
+  // PP-BUDGET + NIVEAU (s. `Ergebnis.spieler`/`Ergebnis.niveau` oben): je Schluessel `${disziplin}::${n}`
+  // ALLE Team-Scores (fuer die Niveau-CDF) bzw. ALLE Spieler-Endscores (`finalPlayerScore`, fuer die
+  // PP-Budget-Referenz) ueber jede Probe -- nicht nur die zufaellig gepaarten Margen oben.
+  const teamScores = new Map<string, number[]>();
+  const spielerScores = new Map<string, number[]>();
   const t0 = Date.now();
   let laeufe = 0;
   for (const n of FELDGROESSEN) {
@@ -218,6 +243,21 @@ function main() {
           }
           const schluessel = `${dp.disciplineId}::${n}`;
           const liste = margen.get(schluessel) ?? [];
+          // NIVEAU (Teil B): JEDER Team-Score dieser Probe, nicht nur die zufaellig gepaarten Margen
+          // -- die Niveau-CDF braucht die volle Verteilung, nicht nur Abstaende.
+          const teamScoreListe = teamScores.get(schluessel) ?? [];
+          for (const wert of score.values()) teamScoreListe.push(wert);
+          teamScores.set(schluessel, teamScoreListe);
+          // PP-BUDGET (Teil A): JEDER Spieler-Endscore (`finalPlayerScore`) dieser Probe.
+          const spielerListe = spielerScores.get(schluessel) ?? [];
+          for (const tr of dp.teamResults) {
+            for (const entry of tr.entries) {
+              if (typeof entry.finalPlayerScore === "number" && Number.isFinite(entry.finalPlayerScore)) {
+                spielerListe.push(entry.finalPlayerScore);
+              }
+            }
+          }
+          spielerScores.set(schluessel, spielerListe);
           for (let p = 0; p < PAARUNGEN_JE_SPIELTAG; p += 1) {
             for (const [li, liga] of ligen.entries()) {
               const reihe = gemischt(liga, n * 1_000_003 + mi * 7919 + p * 104_729 + li * 13 + dp.disciplineId.length);
@@ -246,6 +286,8 @@ function main() {
       const schluessel = `${d.id}::${n}`;
       const werte = [...(margen.get(schluessel) ?? [])].sort((x, y) => x - y);
       if (werte.length === 0) continue;
+      const spielerWerte = [...(spielerScores.get(schluessel) ?? [])].sort((x, y) => x - y);
+      const teamWerte = [...(teamScores.get(schluessel) ?? [])].sort((x, y) => x - y);
       feldgroessen[String(n)] = {
         n,
         fixtures: werte.length,
@@ -255,6 +297,17 @@ function main() {
         p95: r2(quantil(werte, 0.95)),
         max: r2(werte[werte.length - 1]!),
         remisAnteil: r2((remis.get(schluessel) ?? 0) / werte.length),
+        ...(spielerWerte.length > 0
+          ? { spieler: { p50: r2(quantil(spielerWerte, 0.5)), p995: r2(quantil(spielerWerte, 0.995)), stichprobe: spielerWerte.length } }
+          : {}),
+        ...(teamWerte.length > 0
+          ? {
+              niveau: {
+                p: [0.05, 0.5, 0.95],
+                w: [r2(quantil(teamWerte, 0.05)), r2(quantil(teamWerte, 0.5)), r2(quantil(teamWerte, 0.95))],
+              },
+            }
+          : {}),
       };
     }
     pps[d.id] = { feldgroessen };
