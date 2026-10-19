@@ -321,6 +321,24 @@ function getAreaRankBandClass(rank: number | undefined): string {
 }
 
 /**
+ * Modernisierung Saisonstand (Chris: "wie bei NBA oder in der Bundesliga ... dass wir die
+ * Tabelle mal hübsch bekommen"): Rang-Chip-Zusatzklasse für die Top-3-Medaillenfarbe —
+ * dieselben Tokens wie Podium/NlMedalBadge, nicht neu erfunden. Gilt sowohl für die
+ * Rang-Spalte der Daten-Tabelle als auch für die Rang-Chips der Spieltage-Paarungskarten
+ * (renderSpieltagTeamRank/renderSpieltagPrematchStandings) — eine Quelle für "wie sieht ein
+ * Tabellenplatz aus", in beiden Ansichten gleich.
+ */
+function nlRankTierClass(rank: number | null | undefined): string {
+  if (rank == null || !Number.isFinite(rank)) {
+    return "";
+  }
+  if (rank === 1) return " is-rank-1";
+  if (rank === 2) return " is-rank-2";
+  if (rank === 3) return " is-rank-3";
+  return "";
+}
+
+/**
  * Liga-Rang je Team für eine Kennzahl, immer über ALLE Zeilen (nicht über die
  * gerade sichtbare Sortierung) — größter Wert = #1.
  *
@@ -1752,7 +1770,7 @@ export default function SeasonStandingsNewLook({
                   )}
                 </th>
               ) : null}
-              <th>{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
+              <th className="nl-standings-th-bonus">{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCards", "Formkarten")}</th>
               <th className="nl-standings-th-formcards">{renderTableSortHeader("formCardsLeft", "Rest")}</th>
               {/* Ticket #34 (Chris): „im Saisonstand eine Spalte einfügen mit der Anzahl an
@@ -1766,7 +1784,7 @@ export default function SeasonStandingsNewLook({
                   {renderTableSortHeader(group.id, group.label)}
                 </th>
               ))}
-              <th>{renderTableSortHeader("mw", "MW")}</th>
+              <th className="nl-standings-th-mw">{renderTableSortHeader("mw", "MW")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("cash", "Cash")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("sponsor", "Sponsoren")}</th>
               <th className="nl-standings-th-fin">{renderTableSortHeader("salary", "Gehälter")}</th>
@@ -1816,6 +1834,7 @@ export default function SeasonStandingsNewLook({
           eyebrow="Saisonstand"
           title="Liga 1"
           data-testid="nl-standings-liga1-card"
+          actions={<span className="nl-standings-liga-count nl-tnum">{liga1Rows.length} Teams</span>}
         >
           {renderDatenTableForRows(liga1Rows)}
         </NlCard>
@@ -1824,6 +1843,7 @@ export default function SeasonStandingsNewLook({
           eyebrow="Saisonstand"
           title="Liga 2"
           data-testid="nl-standings-liga2-card"
+          actions={<span className="nl-standings-liga-count nl-tnum">{liga2Rows.length} Teams</span>}
         >
           {renderDatenTableForRows(liga2Rows)}
         </NlCard>
@@ -1991,7 +2011,7 @@ export default function SeasonStandingsNewLook({
             </button>
           </td>
           <td className="nl-standings-td-rank">
-            <span className="nl-tnum">{row.rank ?? "—"}</span>
+            <span className={`nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}>{row.rank ?? "—"}</span>
             {renderRankMovementChip(row)}
           </td>
           <td className="nl-standings-td-team">
@@ -2026,7 +2046,9 @@ export default function SeasonStandingsNewLook({
             </button>
             </StandingsKaderHover>
           </td>
-          <td className="nl-standings-td-points">{formatNlNumber(row.points, 1)}</td>
+          <td className="nl-standings-td-points">
+            <span className="nl-standings-points-chip nl-tnum">{formatNlNumber(row.points, 1)}</span>
+          </td>
           {hasVerhaeltnis ? (
             <td
               className={`nl-standings-td-verhaeltnis nl-tnum${nlMoneySignClass(row.verhaeltnis)}`}
@@ -2817,7 +2839,7 @@ export default function SeasonStandingsNewLook({
     const ligaLabel = spieltagLigaLabel(row.leagueTier);
     return (
       <span
-        className="nl-standings-spieltage-card-rank nl-tnum"
+        className={`nl-standings-spieltage-card-rank nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}
         title={`Tabellenplatz${ligaLabel ? ` (${ligaLabel})` : ""}: Rang ${row.rank}`}
       >
         #{row.rank}
@@ -2850,7 +2872,9 @@ export default function SeasonStandingsNewLook({
             <Fragment key={teilnehmer.teamId}>
               {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
               <span className="nl-standings-spieltage-prematch-team">
-                <span className="nl-standings-spieltage-prematch-rank nl-tnum">
+                <span
+                  className={`nl-standings-spieltage-prematch-rank nl-standings-rank-chip nl-tnum${nlRankTierClass(row.rank)}`}
+                >
                   {row.rank != null ? `#${row.rank}` : "—"}
                 </span>
                 <span className="nl-standings-spieltage-prematch-name">{teamLabel(teilnehmer.teamId)}</span>
@@ -2886,13 +2910,22 @@ export default function SeasonStandingsNewLook({
           {paarung.teilnehmer.map((teilnehmer, index) => (
             <Fragment key={teilnehmer.teamId}>
               {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
-              <span className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}>
+              <span
+                className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}
+                style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(teilnehmer.teamId)?.teamCode) as CSSProperties}
+              >
+                <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
                 {teamLabel(teilnehmer.teamId)}
                 {renderSpieltagTeamRank(teilnehmer.teamId)}
               </span>
             </Fragment>
           ))}
-          {isCurrentMatchday ? <span className="nl-standings-spieltage-card-current-tag">· läuft</span> : null}
+          {isCurrentMatchday ? (
+            <span className="nl-standings-spieltage-card-current-tag">
+              <span className="nl-standings-spieltage-live-dot" aria-hidden="true" />
+              Läuft
+            </span>
+          ) : null}
         </div>
         {paarung.istRueckspiel ? (
           <p className="nl-standings-spieltage-rueckspiel">

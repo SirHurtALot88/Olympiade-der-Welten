@@ -537,6 +537,10 @@
 
 .is-new-look .nl-standings-spieltage-card.is-current {
   border-color: var(--nl-accent, var(--nl-line));
+  /* Akzentuierte Oberkante zusätzlich zur Rahmenfarbe — die "jetzt live"-
+     Kante, mit der Sport-Apps einen laufenden Spieltag vom gespielten
+     unterscheiden (s. Modernisierungs-Abschnitt unten im Dateikopfkommentar). */
+  box-shadow: var(--nl-e2), inset 0 2px 0 var(--nl-accent);
 }
 
 /*
@@ -571,6 +575,12 @@
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
+  /* Eigene kleine Kartenfläche je Team — "Matchup-Vorschau"-Optik statt
+     loser Textzeile (s. Modernisierungs-Abschnitt am Dateiende). */
+  padding: 4px 9px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-line);
 }
 
 .is-new-look .nl-standings-spieltage-prematch-rank {
@@ -585,4 +595,195 @@
 .is-new-look .nl-standings-spieltage-prematch-points {
   font-size: var(--nl-fs-xs);
   color: var(--nl-mut);
+}
+
+/* ------------------------------------------------------------------ *
+ * MODERNISIERUNG SAISONSTAND (Chris, wörtlich: „Achte dann darauf, dass
+ * das auch direkt modern und hübsch dargestellt ist. … wie bei NBA oder
+ * in der Bundesliga die Tabellen dargestellt werden … die Spieltagstabelle
+ * auch hübsch bekommen, also da, wo die Ergebnisse stehen, auch mit den
+ * Platzierungen").
+ *
+ * Recherche (echte Seiten, nicht aus dem Training geraten): ein roher
+ * HTTP-Abruf von nba.com/standings und bundesliga.com/de/bundesliga/
+ * tabelle liefert nur ein 403 (Bot-Schutz) — WebFetch (eigener Renderer)
+ * kam trotzdem an die STRUKTUR, nicht an Pixelwerte: NBA-Legende mit
+ * Buchstaben-Codes neben dem Teamnamen (x = Playoff gesichert, y =
+ * Division gewonnen, z/c = Heimrecht, pi/ps = Play-In/Postseason),
+ * Bundesliga-Spalten Rang/Verein (Wappen+Kürzel+Vollname)/Sp/S-U-N/
+ * Tore/Diff/Pkt mit fester Zonen-Legende (CL/EL/ECL/Relegation/Abstieg)
+ * unter der Tabelle. Übernommen ist die DESIGNSPRACHE dieser
+ * Konventionen — keine Logos/Markenzeichen, keine neuen Zonen (die
+ * Auf-/Abstiegszonen bleiben aus, s. Dateikopfkommentar der .tsx: kein
+ * Zonen-Konzept im Datenmodell):
+ *
+ *   1. Rang als eigener, farblich hervorgehobener CHIP statt nackter
+ *      Ziffer — Platz 1–3 in Medaillenfarbe (dieselben Tokens wie
+ *      Podium/NlMedalBadge, keine neue Farbe). Dieselbe Chip-Form läuft
+ *      durch BEIDE Ansichten: Rang-Spalte der Daten-Tabelle, Rang neben
+ *      dem Teamnamen der Paarungskarte, Rang in der „Tabellenplatz vor
+ *      diesem Spiel"-Box — eine Antwort auf „wie sieht ein Tabellenplatz
+ *      aus", nicht drei verschiedene.
+ *   2. Punkte als auffälligste Zahl der Zeile (eigene Pille), weil beide
+ *      Vorbilder „Pkt."/„PTS" deutlich vom Rest abheben.
+ *   3. Eine optische Trennlinie zwischen „wer steht wo" (Rang/Team/
+ *      Punkte/Verh.) und den weiteren Spalten — dieselbe bestehende
+ *      `border-left`-Konvention der Bereichsspalten, nur vor den
+ *      nächsten beiden Spaltenblöcken (Formkarten, Finanzen) wiederholt.
+ *   4. Teamfarbe als kleiner Identitäts-Punkt neben dem Namen der
+ *      Paarungskarte (Ersatz für Trikotfarbe/Wappen; echte Liga-Logos
+ *      bleiben außen vor) — auf denselben `--team-tag-*`-Variablen wie
+ *      der linke Zeilen-Akzent der Daten-Tabelle (`getSeasonV2TeamTagStyle`),
+ *      keine neue Farbquelle.
+ *   5. Spieltage-Paarungskarte als Mini-Scoreboard: Ergebnis größer/
+ *      fetter, Punkteverhältnis als farbige Pille statt bloßem Text,
+ *      laufender Spieltag mit Live-Punkt statt reinem „· läuft"-Text —
+ *      dieselbe Sprache, mit der Sport-Apps einen laufenden Spieltag von
+ *      einem bereits gewerteten unterscheiden.
+ * ------------------------------------------------------------------ */
+
+/* --- 1. Rang-Chip: Daten-Tabelle UND Spieltage-Paarungskarte teilen sich
+   dieselbe Grundform; die jeweilige Kontextklasse bestimmt nur Abstand. */
+.is-new-look .nl-standings-rank-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--nl-r-pill);
+  border: 1px solid var(--nl-line-2);
+  background: var(--nl-panel-2);
+  color: var(--nl-ink);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.is-new-look .nl-standings-rank-chip.is-rank-1 {
+  border-color: color-mix(in srgb, var(--nl-gold) 70%, transparent);
+  background: color-mix(in srgb, var(--nl-gold) 30%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-standings-rank-chip.is-rank-2 {
+  border-color: color-mix(in srgb, var(--nl-silver) 60%, transparent);
+  background: color-mix(in srgb, var(--nl-silver) 26%, var(--nl-panel-2));
+}
+
+.is-new-look .nl-standings-rank-chip.is-rank-3 {
+  border-color: color-mix(in srgb, var(--nl-bronze) 65%, transparent);
+  background: color-mix(in srgb, var(--nl-bronze) 30%, var(--nl-panel-2));
+}
+
+/* --- 2. Punkte-Spalte: die auffälligste Zahl der Zeile. --- */
+.is-new-look .nl-standings-points-chip {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 2px 9px;
+  border-radius: var(--nl-r-pill);
+  background: var(--nl-accent-soft);
+  color: var(--nl-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* --- 3. Spaltenblock-Trennlinien (Formkarten-Block, Finanz-Block) --- */
+.is-new-look .nl-standings-th-bonus,
+.is-new-look .nl-standings-td-bonus,
+.is-new-look .nl-standings-th-mw,
+.is-new-look .nl-standings-td-mw {
+  border-left: 1px solid var(--nl-line-2);
+}
+
+/* Tabellenkopf: kräftigere Unterkante als der Tabellenkörper, damit Kopf
+   und Körper klarer getrennt wirken (`.is-compact` macht den Selektor
+   spezifischer als die Basisregel in globals.css, unabhängig von der
+   Bundle-Reihenfolge — dieselbe Technik wie im Dateikopf beschrieben). */
+.is-new-look .nl-standings-table.is-compact thead th {
+  border-bottom: 2px solid var(--nl-line-2);
+}
+
+/* Liga-Teamzahl im Kartenkopf ("16 Teams") — ruhiger Kontext neben dem
+   Titel, kein eigener Fokuspunkt. */
+.is-new-look .nl-standings-liga-count {
+  font-size: var(--nl-fs-sm);
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+/* --- 4. Team-Identitäts-Punkt in der Paarungskarte ------------------ */
+.is-new-look .nl-standings-spieltage-card-team {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.is-new-look .nl-standings-spieltage-card-team-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 50%;
+  background: var(--team-tag-border, var(--nl-line-2));
+}
+
+/* --- 5. Paarungskarte als Mini-Scoreboard --------------------------- */
+
+/* Live-Punkt im "läuft"-Tag statt reinem Text. */
+.is-new-look .nl-standings-spieltage-card-current-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.is-new-look .nl-standings-spieltage-live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nl-good);
+  animation: nl-standings-live-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-standings-spieltage-live-dot {
+    animation: none;
+  }
+}
+
+@keyframes nl-standings-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Ergebnis größer/fetter als der Rest der Zeile — das ist die Zahl, auf
+   die ein Blick zuerst fällt. */
+.is-new-look .nl-standings-spieltage-ergebnis {
+  font-size: 15px;
+  min-width: 2.6em;
+  text-align: center;
+}
+
+/* Punkteverhältnis als Pille statt reinem Farbtext — dieselbe Grün-/
+   Rot-Logik wie bisher (nlMoneySignClass), nur mit Fläche statt nur
+   Schriftfarbe. */
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-pos,
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-neg {
+  padding: 1px 6px;
+  border-radius: var(--nl-r-pill);
+  font-weight: 700;
+}
+
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-pos {
+  background: color-mix(in srgb, var(--nl-good) 18%, transparent);
+}
+
+.is-new-look .nl-standings-spieltage-verhaeltnis.is-neg {
+  background: color-mix(in srgb, var(--nl-risk) 18%, transparent);
 }
