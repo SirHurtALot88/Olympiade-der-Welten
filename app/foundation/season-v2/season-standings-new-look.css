@@ -501,3 +501,88 @@
   font-size: var(--nl-fs-xs);
   color: var(--nl-mut-2);
 }
+
+/* "Aktueller Spieltag"-Sprungknopf neben der Spieltag-Navigation. */
+.is-new-look .nl-standings-spieltage-jumpcurrent {
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-accent, var(--nl-line));
+  background: transparent;
+  color: var(--nl-accent, var(--nl-ink));
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-spieltage-jumpcurrent:hover {
+  background: var(--nl-panel-2);
+}
+
+/* Rang-Chip direkt neben dem Teamnamen der Paarungskarte — Auftrag Chris: Tabellenplatz je Team
+   sichtbar machen, nicht nur Ergebnisse. */
+.is-new-look .nl-standings-spieltage-card-rank {
+  margin-left: 6px;
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-standings-spieltage-card-current-tag {
+  margin-left: auto;
+  font-size: var(--nl-fs-xs);
+  font-weight: 600;
+  color: var(--nl-accent, var(--nl-good));
+}
+
+.is-new-look .nl-standings-spieltage-card.is-current {
+  border-color: var(--nl-accent, var(--nl-line));
+}
+
+/*
+ * TABELLENPLATZ VOR DEM SPIEL — Auftrag Chris, wörtlich: „die aktuelle platzierung der teams vor
+ * dem match", bisher nirgends im Spiel sichtbar (s. season-matchday-fixtures-overview.ts).
+ * Nur bei einer noch nicht gewerteten Begegnung (renderSpieltagPrematchStandings).
+ */
+.is-new-look .nl-standings-spieltage-prematch {
+  display: grid;
+  gap: 4px;
+  padding: var(--nl-s2);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+  border: 1px solid var(--nl-line);
+}
+
+.is-new-look .nl-standings-spieltage-prematch-label {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut-2);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.is-new-look .nl-standings-spieltage-prematch-teams {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nl-s1);
+  flex-wrap: wrap;
+}
+
+.is-new-look .nl-standings-spieltage-prematch-team {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.is-new-look .nl-standings-spieltage-prematch-rank {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-standings-spieltage-prematch-name {
+  font-size: var(--nl-fs-sm);
+}
+
+.is-new-look .nl-standings-spieltage-prematch-points {
+  font-size: var(--nl-fs-xs);
+  color: var(--nl-mut);
+}

@@ -2780,6 +2780,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               topPlayer={seasonV2TopPlayers[0] ?? null}
               standingsRows={seasonV2StandingsRows}
               spieltage={seasonV2Spieltage}
+              currentMatchdayId={gameState.matchdayState.matchdayId}
               topPlayers={seasonV2TopPlayers}
               teamTopPlayersByColumn={seasonV2TeamTopPlayersByColumn}
               teamFormCardBonusByTeamId={seasonV2FormCardBonusByTeamId}
