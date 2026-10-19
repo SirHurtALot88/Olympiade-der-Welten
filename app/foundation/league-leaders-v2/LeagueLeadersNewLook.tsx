@@ -604,16 +604,19 @@ export default function LeagueLeadersNewLook({
 
   /**
    * Derselbe Liga-Filter wie oben (`scopeLeagueLeaderCategory`), hier auf die All-Time-Zeilen
-   * angewendet — `PlayerAllTimeDisciplineRow.teamId` traegt bereits das AKTUELLE Team des
-   * Spielers, aus dem sich seine Liga ableiten laesst. Keine Neu-Berechnung der Werte selbst,
-   * nur eine Teilmenge/Neu-Sortierung passiert ohnehin client-seitig beim Rendern.
+   * angewendet — die Liga kommt aus dem ZULETZT BEKANNTEN Team (`lastKnownTeamId`: das aktuelle,
+   * sonst das aus dem juengsten Saison-Snapshot). Nur `teamId` reichte nicht (Opus-Review PR #1295):
+   * ein gerade vereinsloser Spieler haette `teamId: null` und waere in JEDER Liga-Ansicht
+   * verschwunden (am Live-Save tragen 58 von 386 All-Time-Zeilen kein aktuelles Team) — in einer
+   * All-Time-Liste genau die Legenden, die man dort sucht. Keine Neu-Berechnung der Werte selbst, nur eine Teilmenge; die
+   * Raenge vergibt `AllTimeDisciplineLeadersPanel` ohnehin erst beim Sortieren (1..N).
    */
   const scopedAllTimeDisciplineRows = useMemo(() => {
     if (leagueFilter === "alle" || !foundationGameState) {
       return allTimeDisciplineRows;
     }
     return allTimeDisciplineRows.filter(
-      (row) => row.teamId != null && getLeagueOf(foundationGameState, row.teamId) === leagueFilter,
+      (row) => row.lastKnownTeamId != null && getLeagueOf(foundationGameState, row.lastKnownTeamId) === leagueFilter,
     );
   }, [allTimeDisciplineRows, foundationGameState, leagueFilter]);
 

@@ -320,6 +320,49 @@ describe("player-all-time-discipline-stats", () => {
     expect(row.overall.appearances).toBe(10);
   });
 
+  it("lastKnownTeamId: aktuelles Team, sonst das Snapshot-Team eines inzwischen vereinslosen Spielers", () => {
+    // Opus-Review PR #1295 (Punkt 5): der Liga-Filter der All-Time-Liste liest die Liga aus diesem
+    // Feld. Ein entlassener Spieler (`teamId` null) darf dort nicht aus jeder Liga-Ansicht fallen.
+    const gameState = createFreshSeasonOneGameState();
+    const player = gameState.players[0]!;
+    const team = gameState.teams[0]!;
+    gameState.seasonState.seasonSnapshots = [
+      buildArchivedSnapshot({
+        seasonId: "season-1",
+        playerPerformances: [
+          {
+            playerId: player.id,
+            playerName: player.name,
+            teamId: team.teamId,
+            teamCode: team.shortCode,
+            teamName: team.name,
+            appearances: 1,
+            totalContribution: 5,
+            totalFinalScore: 0,
+            averageContribution: 5,
+            averageFinalScore: 0,
+            top10Count: 0,
+            mvpCount: 0,
+            bestDisciplineId: null,
+            bestDisciplineScore: null,
+            disciplineBreakdown: [
+              { disciplineId: "fechten", disciplineName: "Fechten", appearances: 1, totalContribution: 5, averageContribution: 5, averageFinalScore: 0 },
+            ],
+          },
+        ],
+      }),
+    ];
+
+    const mitVerein = buildPlayerAllTimeDisciplineStats(gameState).find((row) => row.playerId === player.id)!;
+    const aktuellesTeam = gameState.rosters.find((roster) => roster.playerId === player.id)?.teamId ?? null;
+    expect(mitVerein.lastKnownTeamId).toBe(aktuellesTeam ?? team.teamId);
+
+    gameState.rosters = gameState.rosters.filter((roster) => roster.playerId !== player.id);
+    const vereinslos = buildPlayerAllTimeDisciplineStats(gameState).find((row) => row.playerId === player.id)!;
+    expect(vereinslos.teamId).toBeNull();
+    expect(vereinslos.lastKnownTeamId).toBe(team.teamId);
+  });
+
   it("excludes players with zero appearances entirely (no fabricated rows)", () => {
     const gameState = createFreshSeasonOneGameState();
     const rows = buildPlayerAllTimeDisciplineStats(gameState);

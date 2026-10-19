@@ -2940,7 +2940,9 @@ export default function SeasonStandingsNewLook({
     }
     return disziplinen.map((disziplin) => {
       const rank = ranks[disziplin.disciplineId];
-      if (rank == null || !Number.isFinite(rank)) {
+      // `team-discipline-rank-engine.ts` setzt `?? 0` für ein Team ohne Rang in dieser Disziplin —
+      // ein „#0"-Chip wäre eine erfundene Zahl, deshalb wie „kein Rang" behandeln.
+      if (rank == null || !Number.isFinite(rank) || rank <= 0) {
         return null;
       }
       const kuerzel =
@@ -2962,8 +2964,8 @@ export default function SeasonStandingsNewLook({
    * Saisonstand-Auftrag Chris (19.10.) Punkt 3: das ECHTE, disziplinspezifische Ergebnis statt des
    * Team-Punkte-Schemas (2/1/0, bisher immer als "2:0"/"1:1"/"0:2" dargestellt — für jeden Sieg
    * identisch). `disziplin.seiten` trägt NUR BEI `resolutionSource === "arena"` ein echtes natives
-   * Ergebnis (direkt aus der Arena-Simulation, `ArenaFixtureResult.seiten`, z. B. ein echter
-   * Basketball-Endstand) — bei `"pps_duell"` bleibt es bewusst `null` (Review-Fund 19.10. Abend:
+   * Ergebnis (direkt aus der Arena-Simulation, `ArenaFixtureResult.seiten`, z. B. gewonnene
+   * Gewichtheben-Zweikämpfe oder 1:0 im Staffel-Zieleinlauf) — bei `"pps_duell"` bleibt es bewusst `null` (Review-Fund 19.10. Abend:
    * das wäre dort der rohe, aufsummierte PPS-Score beider Seiten, NIE als Sport-Ergebnis gedacht und
    * je nach Disziplin/Kadergröße beliebig groß, s. Kommentar im Builder
    * `season-matchday-fixtures-overview.ts`; Chris sah dadurch z. B. ein unmögliches "273:297" bei
@@ -2972,6 +2974,19 @@ export default function SeasonStandingsNewLook({
    * 2/1/0-Teampunkte-Schema. Rückfall auf dasselbe Schema auch für den (an einem echten Battle-Duell
    * nicht erwarteten) Fall, dass `seiten` ausnahmsweise fehlt.
    */
+  /**
+   * EINE SEITE DES ECHTEN ERGEBNISSES (Opus-Review PR #1295, Punkt 1 "Komma statt Punkt"): KEIN
+   * Tausenderpunkt — ein Spielstand ist eine Zählung, kein Geldbetrag, und „4.745:4.287"
+   * (Wettessen) las sich als Dezimalzahl. UND eine Nachkommastelle, wo die Arena halbe/zehntel
+   * Punkte liefert: Speed-Schach zählt Remis als 0,5 (vorher „2,5:1,5" auf ganze Zahlen gerundet
+   * zu „3:2" — eine Partie, die es so nicht gab), Takeshi's Castle Burgpunkte mit einer Stelle.
+   * Ganze Zahlen bleiben ganz („5:1", „1:0").
+   */
+  function formatSpieltagSeite(value: number): string {
+    if (!Number.isFinite(value)) return "—";
+    return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1, useGrouping: false }).format(value);
+  }
+
   function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number]) {
     const kuerzel =
       SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
@@ -2980,7 +2995,7 @@ export default function SeasonStandingsNewLook({
     const ergebnisText = !disziplin.gespielt
       ? "—"
       : disziplin.seiten
-      ? `${formatNlNumber(disziplin.seiten[0], 0)}:${formatNlNumber(disziplin.seiten[1], 0)}`
+      ? `${formatSpieltagSeite(disziplin.seiten[0])}:${formatSpieltagSeite(disziplin.seiten[1])}`
       : `${disziplin.punkteHeim}:${disziplin.punkteGast}`;
     const titleParts = [disziplin.disciplineName];
     if (quelle) titleParts.push(quelle);
@@ -2997,7 +3012,7 @@ export default function SeasonStandingsNewLook({
           // (`nl-standings-area-verhaeltnis` weiter oben in dieser Datei).
           <span
             className={`nl-standings-spieltage-verhaeltnis nl-tnum${nlMoneySignClass(disziplin.verhaeltnisHeim)}`}
-            title={`Punkteverhältnis: wie deutlich dieses Duell ausfiel (1 = knapp, 10 = deutlich) — Tiebreaker für die Tabelle bei Punktegleichstand, keine zusätzlichen Punkte`}
+            title="Punkteverhältnis aus Sicht des zuerst genannten Teams: +1 = knapp gewonnen … +10 = deutlich gewonnen, negativ = verloren, 0 = Remis — Tiebreaker für die Tabelle bei Punktegleichstand, keine zusätzlichen Punkte"
           >
             {formatNlSignedNumber(disziplin.verhaeltnisHeim, 0)}
           </span>

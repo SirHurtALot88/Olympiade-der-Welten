@@ -304,7 +304,7 @@ export function buildSpieltagsUebersicht(
         punkteHeim: homeRow?.teamPoints ?? null,
         punkteGast: awayRow?.teamPoints ?? null,
         // NUR BEI resolutionSource === "arena" ist `duellSeiten` ein echter, nativer Spielstand
-        // (direkt aus der Arena-Simulation dieser Disziplin, z. B. ein echter Basketball-Endstand).
+        // (direkt aus der Arena-Simulation dieser Disziplin, z. B. gewonnene Gewichtheben-Zweikaempfe).
         // Bei "pps_duell" ist dasselbe Feld der rohe, aufsummierte PPS-Score beider Seiten
         // (battle-mode-pps-duell.ts, `berechnePpsDuellOverrides()`) — eine interne Rechengroesse,
         // NIE als Sport-Ergebnis gedacht, und je nach Disziplin/Kadergroesse beliebig groß (Review-

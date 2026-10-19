@@ -37368,10 +37368,22 @@
     return {seiten:[imZiel(0),imZiel(1)], suffix:"im Ziel", punkte:null, gewertet:false};
   }
 
+  // STAFFEL-BEINZAHL EINER SEITE fuer die ANZEIGE (Opus-Review PR #1295, 19.10.): seit bauSpurt()
+  // die Beingrenzen nach den tatsaechlich aufgestellten Laeufern setzt (`staffelBeine`, s. dort),
+  // ist ein Rennen mit fuenf Staffel-Slots ein Rennen ueber fuenf Abschnitte — "Abschnitt 3/6"
+  // und ein Anker-Banner auf Bein 6 waeren dann falsch. Reiner Lesezugriff auf LAEUFER; ohne
+  // Laeufer (vor dem ersten bauSpurt) derselbe Rueckfall wie bisher.
+  function staffelBeineVon(seite){
+    const k=LAEUFER.filter(o=>o.seite===seite).length;
+    return k||BA().jeSeite||6;
+  }
   // B4.3 BEIN-DUELL (Staffel "Marke und Zug"), s. Aufrufstelle in updateHudBahn().
   function staffelBeinDuellPruefen(){
     if(!staffelMarkeZug.aktiv||!BA().staffel)return;
-    const beinN=BA().jeSeite||6;
+    // Abschnitts-Duelle sind nur bei GLEICHER Beinzahl beider Seiten vergleichbar (gleiche
+    // Abschnittslaenge) — sonst laeuft Abschnitt 2 der einen Seite eine andere Strecke.
+    const beinN=staffelBeineVon(0);
+    if(beinN!==staffelBeineVon(1))return;
     for(let b=0;b<beinN;b++){
       if(staffelBeinDuellGemeldet.has(b))continue;
       const h=LAEUFER.find(o=>o.seite===0&&o.bein===b), g=LAEUFER.find(o=>o.seite===1&&o.bein===b);
@@ -37492,7 +37504,7 @@
               // ihm, seinem Gegenueber und dem aktuellen Rueckstand. Ueber callout() DIREKT,
               // nicht ueber feed()/big ("nicht fett im Ticker", Abschnitt 4.3) -- reiner
               // Lesezugriff auf Felder, die #bahnHud ohnehin schon zeigt.
-              if(!staffelAnkerGezeigt[seite] && akt.bein===(BA().jeSeite||6)-1){
+              if(!staffelAnkerGezeigt[seite] && akt.bein===staffelBeineVon(seite)-1){
                 staffelAnkerGezeigt[seite]=true;
                 const gegner=LAEUFER.find(o=>o.seite===1-seite&&o.aktiv);
                 let lage="";
@@ -37788,7 +37800,7 @@
           // einer Seite bleibt ihr letzter Abschnitt stehen (gesamtfortschritt()==1).
           const voran=gesamtfortschritt(0)>=gesamtfortschritt(1)?0:1;
           const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
-          const beinN=BA().jeSeite||6, jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
+          const beinN=staffelBeineVon(voran), jeRunde=OVAL_BEINE_JE_RUNDE||2, rundenN=Math.ceil(beinN/jeRunde);
           const beinNr=Math.min(beinN,aktivBein?aktivBein.bein+1:beinN);
           const beinZeile='<small class="bhbein">Abschnitt '+beinNr+'/'+beinN+' · Runde '
             +Math.min(rundenN,Math.ceil(beinNr/jeRunde))+'/'+rundenN+'</small>';
@@ -37856,7 +37868,7 @@
         const aktivBein=LAEUFER.find(o=>o.seite===voran&&o.aktiv);
         if(!aktivBein)return null;
         return "Positionskampf: "+VEREIN[voran].name+" führt auf Abschnitt "
-          +(aktivBein.bein+1)+"/"+(BA().jeSeite||6);
+          +(aktivBein.bein+1)+"/"+staffelBeineVon(voran);
       }
       if(!staffelWechselAnzeige)return null;
       return "Letzter Wechsel: Abschnitt "+staffelWechselAnzeige.bein
@@ -42444,6 +42456,18 @@
     const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
     // Staffel: dieselbe Slot-Reihenfolge fuer die Gastseite (s. staffelNachSlot oben).
     const gegen=(gastGesetzt.length?staffelNachSlot(gastGesetzt):OPP).slice(0,n);
+    // STAFFEL: BEINZAHL JE SEITE = TATSAECHLICH AUFGESTELLTE LAEUFER, NICHT art.jeSeite
+    // (Opus-Review PR #1295, 19.10., Chris' Meldung "Staffel zeigt 0,0"). Die Saison wuerfelt die
+    // Feldgroesse JEDER Disziplin gleichverteilt 2..6 (`buildSeasonPlayerCountByDiscipline()`),
+    // die Aufstellung traegt dann z. B. FUENF Staffel-Slots — `mine`/`gegen` haben fuenf
+    // Laeufer, die Beingrenzen standen aber fest auf `idx/6`. Der fuenfte Laeufer endete damit
+    // bei `beinBis = 5/6 < 1`, der WECHSEL-Zweig in stepSpurt fand keinen sechsten Nehmer, und
+    // die Mannschaft blieb fuer immer auf 5/6 der Strecke stehen: keine Seite kam je ins Ziel,
+    // `spieleBahn()` lieferte nach dem Zeitbudget `[0,0]`, gebucht als Remis — nachgemessen an
+    // einem echten 20-Spieltage-Battle-Save: ALLE 64 Staffel-Zeilen [0,0]/1:1. Ohne Aufstellung
+    // (Ersatzaufstellung, jede kaderfeste Messung) laufen immer `n` = 6 Laeufer, `idx/6` bleibt
+    // dort Zeichen fuer Zeichen derselbe Wert — rho/Pp-Messungen sind dadurch unberuehrt.
+    const staffelBeine=[Math.max(1,mine.length),Math.max(1,gegen.length)];
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
       // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
@@ -42588,7 +42612,8 @@
       // von Anfang an unterwegs; die uebrigen stehen sichtbar in ihrer Wechselzone, was
       // genau das ist, was man bei einer Staffel sieht.
       if(art.staffel){
-        L.bein=idx; L.beinVon=idx/n; L.beinBis=(idx+1)/n;
+        const nb=staffelBeine[seite];   // s. `staffelBeine` oben — die echte Beinzahl DIESER Seite
+        L.bein=idx; L.beinVon=idx/nb; L.beinBis=(idx+1)/nb;
         L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
         // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus des NEHMERS aus der Aufstellung (s.
         // Parser bei echterKader.aufstellung). Ohne die Felder bekommt der Laeufer keines der
