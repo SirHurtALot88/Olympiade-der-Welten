@@ -254,6 +254,33 @@ describe("INVARIANTE: Battle-Save, jede Zeile mit Fixture zahlt 0/1/2 — nie di
     expect(c.resolutionSource).toBe("pps_duell");
   });
 
+  it("OPUS-REVIEW PR #1296: 0-10-Ergebnis einer Arena-Zeile OHNE gezogene Arena-Niveau-Referenz " +
+    "nimmt das Niveau aus dem PPS-Team-Score (gezogene PPS-Referenz) statt fest mu = 0,5; beide " +
+    "Seiten gespiegelt, W - V = |D| exakt", () => {
+    expect(resolveNiveauReferenz("arena", D1, 2)).toBeNull();
+    expect(resolveNiveauReferenz("pps", D1, 2)).not.toBeNull();
+    const arena = new Map([
+      ["A", { teamPoints: 0, arenaMatchSeed: "s", opponentTeamId: "B", seiten: [3, 5] as const, outcome: "loss" as const }],
+      ["B", { teamPoints: 2, arenaMatchSeed: "s", opponentTeamId: "A", seiten: [5, 3] as const, outcome: "win" as const }],
+    ]);
+    const preview = buildLegacyMatchdayResolvePreview(vierTeams(gameState("battle")), {
+      arenaTeamPointsByDisciplineId: new Map([[D1, arena]]),
+    });
+    const basketball = preview.disciplinePreviews.find((d) => d.disciplineId === D1)!;
+    const a = basketball.teamResults.find((t) => t.teamId === "A")!;
+    const b = basketball.teamResults.find((t) => t.teamId === "B")!;
+    const erwartetA = berechneErgebnisNormiert({
+      outcome: "loss",
+      betrag: Math.abs(a.verhaeltnis ?? 0),
+      niveauEigen: a.score,
+      niveauGegner: b.score,
+      referenz: resolveNiveauReferenz("pps", D1, a.entries.length),
+    });
+    expect(a.ergebnisNormiert).toEqual(erwartetA);
+    expect(b.ergebnisNormiert).toEqual([erwartetA[1], erwartetA[0]]);
+    expect(b.ergebnisNormiert![0] - b.ergebnisNormiert![1]).toBe(Math.abs(b.verhaeltnis ?? 0));
+  });
+
   it("PP-BUDGET, REIN LEISTUNGSBASIERT (19.10., ERSETZT den PLAYER-LEVEL-FIX vom 18.10.): die " +
     "einzelnen Spieler-PP folgen `ppAusSpielerScore()` (dem eigenen `finalPlayerScore`), NICHT mehr " +
     "dem 2/1/0-Duell-Budget dieser Seite — Chris 19.10.: \"Ein guter Spieler im schlechten " +

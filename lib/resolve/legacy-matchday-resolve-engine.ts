@@ -849,6 +849,14 @@ export function buildLegacyMatchdayResolvePreview(
     // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
     const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
     const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
+    // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
+    // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
+    // ihn (20/20). Ohne diesen Rueckfall stuende mu fuer jede arena-aufgeloeste Nicht-Konstantsummen-
+    // Disziplin (Showcase/Eiskunstlauf/Wettessen/Fechten/Takeshi's Castle) fest auf 0,5, das Ergebnis
+    // waere dort reine Funktion von D. Der PPS-Team-Score traegt IMMER echtes Niveau (s.
+    // Konstantsummen-Zweig) und hat eine gezogene Referenz -- also dieselbe Quelle wie dort, bis eine
+    // Arena-Niveau-Referenz gezogen ist. Die Sieger-Ordnungs-Garantie haengt davon nicht ab.
+    const niveauAusPps = niveauIstKonstantsumme || resolveNiveauReferenz("arena", disciplineId, legacyScorePlayerCountForThisDiscipline) == null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
@@ -883,9 +891,9 @@ export function buildLegacyMatchdayResolvePreview(
       const ergebnisNormiert: [number, number] | null =
         duellVerhaeltnis && resolvedOutcome
           ? (() => {
-              const quelleFuerNiveau = arenaOverride && niveauIstKonstantsumme ? "pps" : arenaOverride ? "arena" : "pps";
+              const quelleFuerNiveau = arenaOverride && !niveauAusPps ? "arena" : "pps";
               const [eigenerRoh, gegnerRoh] =
-                arenaOverride && niveauIstKonstantsumme
+                arenaOverride && niveauAusPps
                   ? [ppsScoreByTeamId.get(item.teamId) ?? 0, ppsScoreByTeamId.get(arenaOverride.opponentTeamId ?? "") ?? 0]
                   : (arenaOverride?.seiten ?? ppsDuell?.seiten ?? [0, 0]);
               return berechneErgebnisNormiert({

@@ -503,5 +503,18 @@ describe("season points ledger", () => {
     // Σ `tableGroupContributions` je Team == `teamSummary.totalPoints` -- dieselbe Waehrung.
     expect(beitragA?.points).toBe(teamASummary.totalPoints);
     expect(beitragB?.points).toBe(teamBSummary.totalPoints);
+
+    // OPUS-REVIEW PR #1296: eine Duell-Zeile OHNE erfasste Leistungen (leere Aufstellung) bucht ihr
+    // 2/1/0 in `totalPoints` UND in `tableGroupContributions` -- sonst liefen Saisontabelle und
+    // Spieltagsrang genau in diesem Rand-Fall auseinander.
+    gameState.seasonState.playerDisciplinePerformances = gameState.seasonState.playerDisciplinePerformances.filter(
+      (performance) => performance.teamId !== teamB.teamId,
+    );
+    const ohneLeistungen = buildSeasonPointsLedger(gameState);
+    expect(ohneLeistungen.teamSummariesByTeamId.get(teamB.teamId)!.totalPoints).toBe(2);
+    const beitragOhneLeistungen = ohneLeistungen.tableGroupContributions.filter((b) => b.teamId === teamB.teamId);
+    expect(beitragOhneLeistungen).toEqual([
+      { matchdayId: "matchday-1", teamId: teamB.teamId, disciplineId: "basketball", points: 2 },
+    ]);
   });
 });

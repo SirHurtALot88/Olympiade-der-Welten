@@ -479,7 +479,15 @@ export function buildSeasonPointsLedger(
   // Ein Team mit Duell- UND Manager-Mode-Zeilen in derselben Saison (selten, z.B. eine arena-faehige
   // Disziplin ohne Fixture faellt auf den Rangpfad zurueck) darf durch die jetzt leistungsbasierten
   // Duell-PP nicht faelschlich als `reconciliation_failed` markiert werden.
-  const managerBasePlayerDerivedByTeamId = new Map<string, number>();
+  //
+  // OPUS-REVIEW PR #1296: getrennt als Σ `points` und Σ `mutatorPpsBonus` gefuehrt (statt direkt
+  // Σ `basePoints`), damit die Rechnung unten fuer ein reines Manager-Save BIT-IDENTISCH zur alten
+  // bleibt: dort war `basePlayerDerivedTotal = round4(playerDerivedTotal - round1(mutatorPpsBonus))`
+  // -- `mutatorPpsBonus` ist zu dem Zeitpunkt schon auf EINE Nachkommastelle gerundet. Σ `basePoints`
+  // weicht davon um bis zu 0,05 ab und haette `reconciliationStatus` an der 0,2-Toleranzgrenze
+  // kippen koennen.
+  const managerPlayerDerivedByTeamId = new Map<string, number>();
+  const managerMutatorPpsBonusByTeamId = new Map<string, number>();
   for (const team of gameState.teams) {
     teamSummariesByTeamId.set(team.teamId, {
       teamId: team.teamId,
@@ -520,8 +528,21 @@ export function buildSeasonPointsLedger(
     // Eine Duell-Zeile OHNE Performances (keine Spieler erfasst) bucht ihr 2/1/0-Team-Budget, nie
     // den rohen PPS-Totalscore -- sonst wuerde ausgerechnet der leere Rand-Fall die 2/1/0-Oekonomie
     // verlassen, die der Rest dieser Datei fuer Duell-Zeilen gerade erst durchsetzt.
-    const beitrag = istDuellWertung(result) ? result.teamPoints ?? 0 : result.totalScore;
+    const istDuell = istDuellWertung(result);
+    const beitrag = istDuell ? result.teamPoints ?? 0 : result.totalScore;
     summary.totalPoints = roundValue(summary.totalPoints + beitrag, 4);
+    // OPUS-REVIEW PR #1296: dieselbe Tabellen-Waehrung auch fuer Spieltagsrang/Feld-Rennen -- sonst
+    // stuende genau dieser Rand-Fall in `totalPoints`, aber nicht in `tableGroupContributions`
+    // ("Platz 1 im Spieltag, aber nur 2. in der Saison"). Nur fuer Duell-Zeilen: Manager-Mode-Zeilen
+    // ohne Leistungen standen auch vorher nicht in den Tagespunkten (bit-identisch belassen).
+    if (istDuell) {
+      tableGroupContributions.push({
+        matchdayId: matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
+        teamId: result.teamId,
+        disciplineId: result.disciplineId,
+        points: beitrag,
+      });
+    }
     summary.pointsByDiscipline[result.disciplineId] = roundValue(
       (summary.pointsByDiscipline[result.disciplineId] ?? 0) + beitrag,
       4,
@@ -577,9 +598,13 @@ export function buildSeasonPointsLedger(
         if (category) {
           teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
         }
-        managerBasePlayerDerivedByTeamId.set(
+        managerPlayerDerivedByTeamId.set(
           entry.teamId,
-          roundValue((managerBasePlayerDerivedByTeamId.get(entry.teamId) ?? 0) + entry.basePoints, 4),
+          roundValue((managerPlayerDerivedByTeamId.get(entry.teamId) ?? 0) + entry.points, 4),
+        );
+        managerMutatorPpsBonusByTeamId.set(
+          entry.teamId,
+          roundValue((managerMutatorPpsBonusByTeamId.get(entry.teamId) ?? 0) + entry.mutatorPpsBonus, 4),
         );
       }
       teamSummary.mutatorPpsBonus = roundValue(teamSummary.mutatorPpsBonus + entry.mutatorPpsBonus, 4);
@@ -629,10 +654,14 @@ export function buildSeasonPointsLedger(
 
     const expectedRankPoints = expectedRankPointsByTeamId.get(teamSummary.teamId) ?? 0;
 
-    // NUR der Manager-Mode-Anteil (s. `managerBasePlayerDerivedByTeamId` oben) -- fuer ein reines
+    // NUR der Manager-Mode-Anteil (s. `managerPlayerDerivedByTeamId` oben) -- fuer ein reines
     // Battle-Save ist das 0/0 (kein Manager-Mode-Anteil vorhanden), was unten `"reconciled"` ergibt:
     // eine Duell-Zeile ist per Konstruktion reconciled, s. `duellGruppenBeitraege`.
-    const basePlayerDerivedTotal = roundValue(managerBasePlayerDerivedByTeamId.get(teamSummary.teamId) ?? 0, 4);
+    const basePlayerDerivedTotal = roundValue(
+      (managerPlayerDerivedByTeamId.get(teamSummary.teamId) ?? 0) -
+        roundValue(managerMutatorPpsBonusByTeamId.get(teamSummary.teamId) ?? 0, 1),
+      4,
+    );
 
     if (basePlayerDerivedTotal === 0 && expectedRankPoints === 0) {
       teamSummary.reconciliationStatus = "reconciled";

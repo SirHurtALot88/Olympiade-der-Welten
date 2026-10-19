@@ -379,11 +379,21 @@ export const KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   "climbing",
   "staffel",
   "time-trial",
+  // OPUS-REVIEW PR #1296, gegen die Chassis-Logik nachgeprueft (public/mockups/battle-mode.engine.js,
+  // `spieleBuehneGauntlet()`): Breakings Seitenstand ist die Ueberlebenden-Zaehlung `[alive(0),
+  // alive(1)]`, und der Gauntlet laeuft immer, bis EIN Team aufgebraucht ist -- der Verlierer steht
+  // also strukturell IMMER auf 0, der Sieger auf genau seiner Marge. Der native Seitenwert traegt
+  // damit dasselbe Nicht-Niveau wie eine Konstantsumme (er ist reine Marge), gehoert also nach
+  // demselben Kriterium hierher. Die uebrigen arena-aufgeloesten Disziplinen bleiben draussen:
+  // Showcase/Eiskunstlauf/Wettessen (Auftritts-Summe), Fechten (Treffer-Summe) und Takeshi's Castle
+  // (Burgpunkte) haben eine echt variable Seitensumme.
+  "breaking",
 ]);
 
 /**
- * F: die grob gerasterte, monotone CDF aus `resolveNiveauReferenz()` (drei Anker: p5 -> 0, p50 ->
- * 0,5, p95 -> 1, dazwischen UND an den Raendern linear/geklemmt). `referenz: null` liefert ein
+ * F: die grob gerasterte, monotone CDF aus `resolveNiveauReferenz()` (drei Anker aus der Referenz,
+ * `p: [0.05, 0.5, 0.95]` an `w: [p5, p50, p95]` -- also p5 -> 0,05, p50 -> 0,5, p95 -> 0,95,
+ * dazwischen linear, ausserhalb auf 0,05/0,95 geklemmt; mu liegt damit in [0,05; 0,95]). `referenz: null` liefert ein
  * neutrales 0,5 -- die Sieger-Ordnungs-Garantie haengt NIE von F ab (s. Datei-Kommentar oben), ein
  * fehlendes/duennes Niveau-Raster macht die Anzeige also bestenfalls weniger aussagekraeftig, nie
  * falsch geordnet.
