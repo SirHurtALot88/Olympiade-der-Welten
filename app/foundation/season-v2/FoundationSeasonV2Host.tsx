@@ -7,6 +7,8 @@ import FoundationSeasonV2Panel, {
 } from "@/app/foundation/season-v2/FoundationSeasonV2Panel";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import {
   useSeasonV2PanelModel,
   type UseSeasonV2PanelModelInput,
@@ -129,6 +131,31 @@ export default function FoundationSeasonV2Host({
     [gameState, seasonOverviewSeasonId],
   );
 
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 5: Punkteverhältnis je ACHSE (POW/SPE/MEN/SOC), in
+   * Klammern neben der Hauptpunktzahl der Spalte — dieselbe Rohgröße wie die bestehende
+   * Saisonspalte „Verh." (`DisciplineResultRecord.verhaeltnis`), nur nach dem Bereich der
+   * jeweiligen Disziplin gruppiert statt nur nach Team summiert (`summiereSaisonVerhaeltnisProBereich`).
+   * Archiv-Saison: `null`, aus demselben Grund wie `teamTopPlayersByColumn` oben — `gameState`
+   * trägt nur die LIVE-Saison, ein archivierter Stand würde hier falsche Zahlen zeigen.
+   */
+  const areaVerhaeltnisByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : summiereSaisonVerhaeltnisProBereich(gameState, seasonOverviewSeasonId)),
+    [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
+  );
+
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team ("Staffel-Rang") ZUSÄTZLICH
+   * zum laufenden Tabellenrang im Spieltage-Modus — dieselbe reine Kaderstärke-Rechnung, die die
+   * „Ranks"-Ansicht zeigt (`buildTeamDisciplineRankRowsFromGameState`, Top-6-Spieler je Disziplin,
+   * liga-lokal sobald der Liga-Split aktiv ist). Unabhängig vom Saisonverlauf — zeigt, wer laut
+   * Kader favorisiert ist, auch wenn der bisherige Tabellenstand das (noch) nicht zeigt.
+   */
+  const teamStrengthRankByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.totalRank] as const));
+  }, [gameState]);
+
   const model = useSeasonV2PanelModel({
     gameState,
     selectedTeamId,
@@ -163,6 +190,8 @@ export default function FoundationSeasonV2Host({
       playerRows={model.playerRows}
       teamTopPlayersByColumn={teamTopPlayersByColumn}
       teamFormCardBonusByTeamId={teamFormCardBonusByTeamId}
+      areaVerhaeltnisByTeamId={areaVerhaeltnisByTeamId}
+      teamStrengthRankByTeamId={teamStrengthRankByTeamId}
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
       disciplineLeaders={model.disciplineLeaders}

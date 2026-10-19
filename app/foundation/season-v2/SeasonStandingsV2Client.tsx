@@ -6,7 +6,7 @@ import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNe
 import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
-import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { SeasonDisciplineAreaId, SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { TitleRaceResult } from "@/lib/season/title-race";
 import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
@@ -288,6 +288,22 @@ export type SeasonStandingsV2ClientProps = {
    * gewählte Saison keine Aufstellungen mehr vorliegen (dann zeigt die Spalte „—").
    */
   teamFormCardBonusByTeamId?: SeasonFormCardBonusByTeamId | null;
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 5: Punkteverhältnis je Achse (POW/SPE/MEN/SOC),
+   * Saisonsumme der ±D-Werte NUR der Disziplinen dieser Achse (`summiereSaisonVerhaeltnisProBereich`,
+   * dieselbe Rohgröße wie `SeasonV2StandingsRow.verhaeltnis`, nur je Bereich statt nur je Team
+   * summiert). Optional/`null` außerhalb von Battle-Saves bzw. in einer Archiv-Saison — die
+   * Klammer-Zahl neben der Achsen-Punktzahl erscheint dann gar nicht erst.
+   */
+  areaVerhaeltnisByTeamId?: Map<string, Record<SeasonDisciplineAreaId, number | null>> | null;
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team ("Staffel-Rang", reine
+   * Kaderstärke unabhängig vom bisherigen Saisonverlauf — `buildTeamDisciplineRankRowsFromGameState`,
+   * dieselbe Rechnung wie die "Ranks"-Ansicht). Zeigt im Spieltage-Modus NEBEN dem aktuellen
+   * Tabellenrang, wer laut Kader favorisiert ist. Optional/`null` — ohne diesen Prop bleibt der
+   * Spieltage-Modus unverändert (nur Tabellenrang).
+   */
+  teamStrengthRankByTeamId?: Map<string, number> | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
