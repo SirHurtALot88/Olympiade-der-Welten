@@ -850,10 +850,27 @@ export function buildLegacyMatchdayResolvePreview(
     // den nicht alle vier Teams einen PPS-Score haben, liefert keine Overrides (s.
     // `berechneMiniDmPodOverride`) -- seine Teams fallen unten defensiv auf die alte PPS-Duell-
     // Bruecke (2-Team-Fixture) zurueck, statt gar nicht gewertet zu werden.
+    //
+    // OPUS-REVIEW-FUND (19.10., gegen tests/battle-mode-arena-resolve-engine.test.ts): etliche
+    // bestehende Tests bauen ein bewusst MINIMALES `GameState` (kein `season`, keine
+    // `disciplineSchedule`) und nutzen "mini-dm" nur als beliebige Platzhalter-Disziplin-ID fuer
+    // etwas ganz anderes (z. B. "ignoriert die Arena-Punkte-Map fuer eine Nicht-Basketball-
+    // Disziplin"). `getMiniDmPodsForMatchday()` liest `gameState.season.id` OHNE Schutz und wirft
+    // dort eine TypeError. Dieser Aufruf bleibt deshalb defensiv: ein Fehler beim Pod-Ermitteln
+    // bedeutet "kein Pod heute", NIE einen geworfenen Fehler -- exakt dieselbe Philosophie wie der
+    // Rest dieser Datei ("additiv, faellt bei fehlenden Daten auf das Bisherige zurueck").
+    let miniDmPodsForThisMatchday: ReturnType<typeof getMiniDmPodsForMatchday> = [];
+    if (isBattleModeArenaEligible && disciplineId === MINI_DM_DISCIPLINE_ID && base.gameState) {
+      try {
+        miniDmPodsForThisMatchday = getMiniDmPodsForMatchday(base.gameState, base.matchdayId, { saveId: base.saveId });
+      } catch {
+        miniDmPodsForThisMatchday = [];
+      }
+    }
     const miniDmPodOverridesForThisDiscipline =
-      isBattleModeArenaEligible && disciplineId === MINI_DM_DISCIPLINE_ID && base.gameState
+      miniDmPodsForThisMatchday.length > 0
         ? berechneMiniDmPodOverrides({
-            pods: getMiniDmPodsForMatchday(base.gameState, base.matchdayId, { saveId: base.saveId }),
+            pods: miniDmPodsForThisMatchday,
             scoreByTeamId: ppsScoreByTeamId,
             disciplineId,
             playerCount: legacyScorePlayerCountForThisDiscipline,

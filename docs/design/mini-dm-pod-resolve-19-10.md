@@ -83,7 +83,15 @@ unveränderten PPS-Score-Kanal (`scoreLegacyLineupDisciplineSide()`), dessen Fid
    Pod-Kader-Wert 1) indiziert — dieselbe Referenz, die die PPS-Duell-Brücke für Mini-DM schon
    nutzt, bleibt gültig, weil sie die Verteilung des EINZELSPIELER-Scores misst, nicht die
    2-Team-vs-4-Team-Gruppierung.
-6. **UI** (`lib/foundation/season-matchday-fixtures-overview.ts`, `SeasonStandingsNewLook.tsx`):
+6. **Defensive Absicherung** (gefunden über die bestehende Test-Suite, nicht über den Live-Spielstand):
+   mehrere Tests bauen ein bewusst minimales `GameState` (kein `season`, keine `disciplineSchedule`)
+   und nutzen `"mini-dm"` als beliebige Platzhalter-Disziplin-ID für etwas ganz anderes (z. B.
+   `tests/battle-mode-arena-resolve-engine.test.ts`, „ignoriert die Arena-Punkte-Map für eine
+   Nicht-Basketball-Disziplin"). `getMiniDmPodsForMatchday()` liest `gameState.season.id` ohne
+   Schutz und hätte dort geworfen. Der Aufruf in `legacy-matchday-resolve-engine.ts` ist deshalb in
+   `try`/`catch` gefasst — ein Fehler beim Pod-Ermitteln bedeutet „kein Pod heute", nie ein
+   geworfener Fehler, dieselbe Philosophie wie der Rest der Datei.
+7. **UI** (`lib/foundation/season-matchday-fixtures-overview.ts`, `SeasonStandingsNewLook.tsx`):
    neues `SpieltagsUebersicht.miniDmPods[]` (eine Gruppe je Pod, Mitglieder mit Platz/Punkten/Wert)
    zusätzlich zu den normalen Paarungen; die Spieltage-Ansicht zeigt einen eigenen „Gruppe
    A/B/..."-Block über der Paarungsliste, die betroffene Disziplin-Zelle in der normalen
