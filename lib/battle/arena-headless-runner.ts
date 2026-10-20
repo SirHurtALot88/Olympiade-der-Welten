@@ -6,6 +6,7 @@ import { chromium, type Browser, type Page } from "playwright";
 
 import { buildArenaTeam, type ArenaSpieler } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import {
+  buildArenaAufstellung,
   buildArenaAufstellungBeide,
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
@@ -830,11 +831,30 @@ export async function runArenaFixtures(
  * `DisciplineStageNativeArena.tsx`) — kein Aufrufer bucht sein Ergebnis heute in die
  * Saisontabelle.
  *
- * STRUKTURELL EINFACHER als `runArenaFixtures()`: `spieleMiniDmFfaEvent(vierTeams, saat)` nimmt
- * die vier Kader als EXPLIZITE Funktionsargumente entgegen (kein Umweg ueber
+ * STRUKTURELL EINFACHER als `runArenaFixtures()`: `spieleMiniDmFfaEvent(vierTeams, saat, platz)`
+ * nimmt die vier Kader als EXPLIZITE Funktionsargumente entgegen (kein Umweg ueber
  * `window.__olyArenaKader`/SQUAD/OPP wie beim 2-Team-Chassis) — ein Pod-Batch braucht deshalb
  * NUR EINEN Motor-Ladevorgang fuer die gesamte Seite, kein Neu-Einhaengen von
  * `<script src="battle-mode.engine.js">` je Pod (s. `simuliereFixturesImBrowser` oben).
+ *
+ * AUFSTELLUNG (20.10., PR A der Mini-DM-Anbindung): vorher stellte `spieleMiniDmFfaEvent()` die
+ * vier Kaempfer je Team SELBST nach absteigender Mini-DM-Eignung zusammen (`aufstellung: {}`
+ * fest verdrahtet) — die Aufstellung des Managers wurde ignoriert. Dieser Runner baut jetzt je
+ * Team denselben `place` wie die anderen Arena-Disziplinen (`buildArenaAufstellung()`, EIN Team
+ * statt `buildArenaAufstellungBeide()`s Zwei-Team-Merge — ein Pod-Teilnehmer kennt nur seinen
+ * EIGENEN Kader, keine Namenskollision mit den drei anderen Teams moeglich) und reicht ihn als
+ * dritten, optionalen Parameter durch. Ein Team ohne Lineup-Entwurf (oder ohne Eintrag fuer eine
+ * bestimmte Mini-DM-Rolle) faellt WEITERHIN auf den alten Eignungs-Reihum zurueck — s.
+ * `mdffaGesetzteRolle()`/"gesetzt vs. frei" in battle-mode.engine.js.
+ *
+ * MUTATOREN: `options.mutatoren` — derselbe Spieltagswurf, den andere Arena-Fixtures ueber
+ * `RunArenaFixturesOptions.mutatoren` bekommen (fuer das GESAMTE Batch gleich, s. dort) — statt
+ * des bisher hart verdrahteten `mutatoren: []`. Der Aufrufer liefert ihn (z. B.
+ * `resolveMatchdayMutatorTraitsForDiscipline({...}, disciplineId: MINI_DM_DISCIPLINE_ID)`); ohne
+ * Option bleibt das Verhalten wie vorher (leerer Wurf).
+ *
+ * Bleibt WEITERHIN Praesentationszweck (s. Kopfkommentar oben, unveraendert) — kein Aufrufer
+ * bucht dieses Ergebnis heute in die Saisontabelle, das bleibt PR B vorbehalten.
  */
 export type MiniDmFfaPodFixtureInput = {
   podId: string;
@@ -897,6 +917,13 @@ export type RunMiniDmFfaPodFixturesOptions = {
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
   chromiumExecutablePath?: string;
   seitenTimeoutMs?: number;
+  /** Der Spieltagswurf (20.10., PR A) — s. Kopfkommentar oben, `RunArenaFixturesOptions.mutatoren`
+   *  fuer dieselbe Bauart bei den 2-Team-Disziplinen. Ohne Option: leerer Wurf, wie bisher. */
+  mutatoren?: string[];
+  /** `false` (20.10., PR A): jedes Team spielt den alten reinen Eignungs-Reihum, selbst wenn ein
+   *  Lineup-Entwurf existiert — fuer Aufrufer, die (noch) bewusst das Vorher-Verhalten wollen
+   *  (z. B. eine Vergleichsmessung). Default `true`. */
+  aufstellungBeachten?: boolean;
 };
 
 /**
@@ -923,12 +950,16 @@ function baueEindeutigeNamenZuordnungFuerTeam(kader: ArenaSpieler[]): Map<string
  * Einschraenkungen: nur Argumente + Browser-Globale, keine Node-Closures).
  */
 async function simuliereMiniDmFfaPodsImBrowser(payload: {
-  pods: Array<{ teams: ArenaSpieler[][]; seed: number }>;
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[] }>;
   timeoutMs: number;
 }): Promise<Array<RoherMiniDmFfaEventErgebnis | null>> {
   const fenster = window as unknown as {
     __arena?: {
-      miniDmFfaEvent: (vierTeams: ArenaSpieler[][], saat: number) => RoherMiniDmFfaEventErgebnis | null;
+      miniDmFfaEvent: (
+        vierTeams: ArenaSpieler[][],
+        saat: number,
+        platzJeTeam?: ArenaAufstellung[],
+      ) => RoherMiniDmFfaEventErgebnis | null;
     };
   };
 
@@ -940,7 +971,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 
-  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed));
+  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam));
 }
 
 /**
@@ -961,10 +992,18 @@ export async function runMiniDmFfaPodFixtures(
 ): Promise<Array<MiniDmFfaPodFixtureResult | null>> {
   if (pods.length === 0) return [];
 
+  // AUFSTELLUNG (20.10., PR A) — je Team EIN `place` (buildArenaAufstellung(), kein Merge noetig,
+  // s. Kopfkommentar). `aufstellungBeachten: false` haelt bewusst beim alten Verhalten (leere
+  // `place`-Objekte -> reiner Eignungs-Reihum im Motor, s. `mdffaGesetzteRolle()`).
+  const aufstellungBeachten = options.aufstellungBeachten ?? true;
+  const matchdayId = gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
     kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    platzJeTeam: aufstellungBeachten
+      ? pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId))
+      : pod.teamIds.map(() => ({}) as ArenaAufstellung),
   }));
 
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
@@ -999,15 +1038,22 @@ export async function runMiniDmFfaPodFixtures(
       (kader) => {
         (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
       },
-      // `mutatoren: []` (29.09.): kein engine-eigener Ersatzwurf — dieser Runner ist reine
-      // Praesentation und kennt den echten Spieltagswurf nicht, s. `RunArenaFixturesOptions.mutatoren`.
-      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {}, mutatoren: [] },
+      // `mutatoren` (20.10., PR A): `options.mutatoren` statt des bisher hart verdrahteten `[]` —
+      // derselbe Bootstrap-Weg, ueber den auch die 2-Team-Disziplinen ihren Spieltagswurf lesen
+      // (s. Kopfkommentar). Die mini-dm-eigene `aufstellung` hier bleibt leer (bootstrap-seitig
+      // ungenutzt, `miniDmFfaEvent()` bekommt die echte je Pod als expliziten Funktionsparameter).
+      {
+        heim: bootstrapPod.kaderJeTeam[0],
+        gast: bootstrapPod.kaderJeTeam[1],
+        aufstellung: {},
+        mutatoren: options.mutatoren ?? [],
+      },
     );
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const rohErgebnisse = await page.evaluate(simuliereMiniDmFfaPodsImBrowser, {
-      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed })),
+      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed, platzJeTeam: pod.platzJeTeam })),
       timeoutMs,
     });
 

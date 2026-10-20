@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runMiniDmFfaPodFixtures, type MiniDmFfaPodFixtureResult } from "@/lib/battle/arena-headless-runner";
-import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 
 const CHROMIUM_PFAD = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const LAUF_TIMEOUT_MS = 90_000;
@@ -354,6 +354,117 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
       // (statt wie frueher nur stillschweigend durchzufallen, wenn zufaellig nichts Neues auftauchte):
       // kein eigener Chromium-Nachkomme bedeutet kein gelerntes Profil.
       expect(profile.size).toBe(0);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  /**
+   * AUFSTELLUNG (20.10., PR A) — Wiring-Nachweis: ein Lineup-Entwurf, der `team-a`s SCHWAECHSTEN
+   * Mini-DM-Spieler (Index 0, s. `baueKader()`: `disciplineRatings["mini-dm"]` steigt mit dem
+   * Index) explizit auf die Frontliner-Rolle setzt, muss GENAU DIESEN Spieler im Boxscore der
+   * Frontliner-Runde sehen -- nicht den Spieler, den die reine Eignungs-Sortierung (Index 9, der
+   * staerkste) dort automatisch gesetzt haette. Die drei anderen Teams bekommen keinen Entwurf
+   * und bleiben beim alten Eignungs-Reihum (GEGENPROBE fuer "nur die gesetzte Rolle aendert sich,
+   * sonst nichts").
+   */
+  it(
+    "uebernimmt einen expliziten Lineup-Entwurf fuer eine Mini-DM-Rolle statt der reinen Eignungs-Auswahl",
+    async () => {
+      const basis = baueGameState(
+        { teamId: "team-a", prefix: "A" },
+        { teamId: "team-b", prefix: "B" },
+        { teamId: "team-c", prefix: "C" },
+        { teamId: "team-d", prefix: "D" },
+      );
+      const lineupDraft: LineupDraft = {
+        lineupId: "draft-team-a",
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-mini-dm",
+        teamId: "team-a",
+        status: "resolved",
+        entries: [
+          // slotIndex 0 = "frontliner" (SLOTS_JE_DISC["mini-dm"][0] im Motor) -- "A Spieler 0"
+          // ist mit Abstand der schwaechste Mini-DM-Kaempfer von team-a (d=30), waehrend die
+          // Eignungs-Sortierung ohne diesen Entwurf "A Spieler 9" (d=75) dort gesetzt haette.
+          { disciplineId: "mini-dm", disciplineSide: "d1", slotIndex: 0, playerId: "A-0", activePlayerId: null },
+        ],
+        createdAt: "2026-10-20T00:00:00.000Z",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+      };
+      const gameState: GameState = {
+        ...basis,
+        matchdayState: { matchdayId: "md-mini-dm" } as GameState["matchdayState"],
+        seasonState: { lineupDrafts: [lineupDraft] } as GameState["seasonState"],
+      };
+
+      const ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
+        { podId: "pod-aufstellung", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-aufstellung" },
+      ]);
+
+      expect(ergebnisse).toHaveLength(1);
+      const pod = ergebnisse[0]!;
+      pruefePodErgebnisForm(pod, ["team-a", "team-b", "team-c", "team-d"]);
+
+      const frontlinerVonTeamA = pod.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === "team-a");
+      expect(frontlinerVonTeamA?.name).toBe("A Spieler 0");
+      expect(frontlinerVonTeamA?.playerId).toBe("A-0");
+
+      // "A Spieler 9" (der eigentlich staerkste) fehlt nicht einfach -- er kaempft jetzt in einer
+      // der DREI anderen (nicht gesetzten) Rollen, ueber den Reihum-Fallback der "freien" Spieler.
+      const alleTeamANamen = pod.boxscore.filter((e) => e.teamId === "team-a").map((e) => e.name);
+      expect(alleTeamANamen).toContain("A Spieler 9");
+      // Genau EIN Boxscore-Eintrag je Team und Rolle (vier Rollen, team-a also genau viermal) --
+      // "A Spieler 0" taucht nicht ZUSAETZLICH irgendwo anders auf.
+      expect(alleTeamANamen.filter((n) => n === "A Spieler 0")).toHaveLength(1);
+      expect(pod.boxscore.filter((e) => e.teamId === "team-a")).toHaveLength(4);
+
+      // Teams ohne eigenen Entwurf (b/c/d) bleiben beim alten Verhalten: ihr jeweils staerkster
+      // Spieler (Index 9) steht weiterhin in der Frontliner-Rolle (Rang 0 des Eignungs-Reihums).
+      for (const teamId of ["team-b", "team-c", "team-d"]) {
+        const frontliner = pod.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === teamId);
+        expect(frontliner?.name?.endsWith("Spieler 9")).toBe(true);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  it(
+    "aufstellungBeachten: false haelt bewusst beim alten reinen Eignungs-Reihum, trotz Entwurf",
+    async () => {
+      const basis = baueGameState(
+        { teamId: "team-a", prefix: "A" },
+        { teamId: "team-b", prefix: "B" },
+        { teamId: "team-c", prefix: "C" },
+        { teamId: "team-d", prefix: "D" },
+      );
+      const lineupDraft: LineupDraft = {
+        lineupId: "draft-team-a",
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-mini-dm",
+        teamId: "team-a",
+        status: "resolved",
+        entries: [{ disciplineId: "mini-dm", disciplineSide: "d1", slotIndex: 0, playerId: "A-0", activePlayerId: null }],
+        createdAt: "2026-10-20T00:00:00.000Z",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+      };
+      const gameState: GameState = {
+        ...basis,
+        matchdayState: { matchdayId: "md-mini-dm" } as GameState["matchdayState"],
+        seasonState: { lineupDrafts: [lineupDraft] } as GameState["seasonState"],
+      };
+
+      const ergebnisse = await runMiniDmFfaPodFixtures(
+        gameState,
+        [{ podId: "pod-ohne-aufstellung", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-aufstellung" }],
+        { aufstellungBeachten: false },
+      );
+
+      const frontlinerVonTeamA = ergebnisse[0]!.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === "team-a");
+      // Trotz Entwurf: "A Spieler 9" (staerkster), nicht "A Spieler 0" -- der Entwurf wird
+      // ignoriert, wenn der Aufrufer das ausdruecklich so will.
+      expect(frontlinerVonTeamA?.name).toBe("A Spieler 9");
     },
     LAUF_TIMEOUT_MS,
   );
