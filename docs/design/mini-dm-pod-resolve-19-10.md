@@ -25,6 +25,14 @@ diesen Pod-Resolve.
 
 ## Entscheidung: PPS-Score-basierter Pod statt FFA-Chromium-Integration
 
+**OFFENE ANNAHME, NICHT CHRIS-BESTÄTIGT (Review-Auflage 20.10.): diese Entscheidung ist mein eigener
+Design-Call als umsetzender Agent, keine von Chris oder der Projektaufsicht getroffene Festlegung.**
+Ich habe Weg 2 (unten) gewählt, weil er den konkreten Bug sofort behebt, ohne das rho/Pp-Risiko
+einer neu verdrahteten Motor-Integration einzugehen — das ist aber eine Abwägung, die ein
+Reviewer (Opus) oder Chris selbst anders treffen könnte, insbesondere weil der FFA-Motor die
+Pflichtzahlen bereits (isoliert) erfüllt. **Bitte vor dem Merge explizit bestätigen oder
+widersprechen**, statt diese Begründung als bereits entschiedene Sache zu lesen.
+
 Zwei Wege standen offen:
 
 1. **Der echte FFA-Kampfmotor** (`runMiniDmFfaPodFixtures()`), isoliert am 13.10. gemessen mit
@@ -37,16 +45,21 @@ Zwei Wege standen offen:
    Disziplinen (Football, I-Spy, Battlefield, TDM) nutzt — nur korrekt als Vierergruppe gruppiert
    statt als falsch gepaartes Zweier-Duell.
 
-Dieser PR wählt **Weg 2** (`lib/resolve/mini-dm-pod-resolve.ts`). Begründung, identisch mit der
-bereits getroffenen Entscheidung für die PPS-Duell-Brücke selbst (Abschnitt 5.2 des 16.10.-Dokuments,
-wörtlich): „Der PPS-Pfad ist kein Motor, [...] sie ist die Eignung [...] Ein Arena-Motor ersetzt sie
-erst, wenn er beweist, dass er sie verbessert (rho > 0,80, Pp ≤ 25)." Der FFA-Motor hat das zwar
-schon isoliert bewiesen — ihn tatsächlich synchron einzuhängen ist aber ein separater, größerer
-Umbau der Vorlauf-Infrastruktur, der in dieser Runde bewusst nicht mitgemacht wurde (s. PR-Report,
-Abschnitt „Was nicht fertig wurde"). Weg 2 behebt Chris' konkreten Befund (falsch gebuchtes
-Zwei-Team-Ergebnis) vollständig, ohne das rho/Pp-Risiko eines neu verdrahteten Motors einzugehen:
-der Score ist exakt derselbe, nach dem auch die anderen 19 Disziplinen gewertet werden, nur
-Gruppierung (4 statt 2 Teams) und Punktevergabe (2-1-0-0 statt 2-1-0) ändern sich.
+Dieser PR wählt **Weg 2** (`lib/resolve/mini-dm-pod-resolve.ts`) — MEINE eigene Abwägung als
+umsetzender Agent, per Analogie zur bereits getroffenen Entscheidung für die PPS-Duell-Brücke
+selbst (Abschnitt 5.2 des 16.10.-Dokuments, wörtlich): „Der PPS-Pfad ist kein Motor, [...] sie ist
+die Eignung [...] Ein Arena-Motor ersetzt sie erst, wenn er beweist, dass er sie verbessert
+(rho > 0,80, Pp ≤ 25)." Diese Analogie trägt hier aber nur BEDINGT: der FFA-Motor hat den Beweis
+(rho 0,80/0,82) bereits isoliert erbracht — bei den vier anderen PPS-Duell-Disziplinen (Football/
+I-Spy/Battlefield/TDM) existiert kein vergleichbar bereits bestandener Arena-Motor, den man
+stattdessen hätte verdrahten können. Ob das denselben Rückfall rechtfertigt oder ob hier eigentlich
+der Motor Vorrang haben sollte, ist genau die Frage, die ich NICHT selbst entschieden habe und die
+vor dem Merge von Chris/Opus geklärt werden sollte. Weg 2 behebt Chris' konkreten Befund (falsch
+gebuchtes Zwei-Team-Ergebnis) vollständig, ohne das rho/Pp-Risiko eines neu verdrahteten Motors
+einzugehen: der Score ist exakt derselbe, nach dem auch die anderen 19 Disziplinen gewertet werden,
+nur Gruppierung (4 statt 2 Teams) und Punktevergabe (2-1-0-0 statt 2-1-0) ändern sich. Ein größerer
+Umbau der Vorlauf-Infrastruktur für den echten FFA-Motor wurde in dieser Runde bewusst nicht
+mitgemacht (s. PR-Report, Abschnitt „Was nicht fertig wurde").
 
 **Rho/Pp-Einordnung:** Die Platzierung eines Teams in seinem Pod folgt deterministisch aus seinem
 bereits berechneten PPS-Score — keine zusätzliche Zufallsquelle, keine neue Motor-Logik. Die
