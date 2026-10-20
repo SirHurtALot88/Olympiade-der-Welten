@@ -76,6 +76,7 @@ import {
 } from "@/lib/season/title-race";
 import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 import {
+  resolveMiniDmPodPlatzLabel,
   resolveSpielquelleLabel,
   type SpieltagsMiniDmPod,
   type SpieltagsPaarung,
@@ -3007,22 +3008,33 @@ export default function SeasonStandingsNewLook({
    * normierte Zahl (keine Referenz gezogen, kein Duell), faellt die Zeile auf den bisherigen,
    * disziplinabhaengigen Rohwert zurueck.
    */
-  function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number]) {
+  function renderSpieltagDisziplinErgebnis(disziplin: SpieltagsPaarung["disziplinen"][number], paarung: SpieltagsPaarung) {
     const kuerzel =
       SEASON_DISCIPLINE_LABELS[disziplin.disciplineId as SeasonDisciplineKey] ??
       disziplin.disciplineName.slice(0, 3).toUpperCase();
     const quelle = resolveSpielquelleLabel(disziplin);
-    // MINI-DM-POD-RESOLVE (19.10.): KEIN "Heim:Gast"-Duell -- Heim- und Gastteam koennen in
-    // verschiedenen Pods stehen (s. `SpieltagsDuellDisziplin.miniDmPodIdHeim`). Die echte Gruppe
-    // steht als eigener Block ueber der Paarungsliste (`renderMiniDmPodGruppe`); diese Zelle zeigt
-    // nur noch den eigenen Pod-Platz je Team, als Verweis dorthin.
+    // MINI-DM-POD-RESOLVE (19.10.), UI-FIX (20.10.): KEIN "Heim:Gast"-Duell -- Heim- und Gastteam
+    // koennen in verschiedenen Pods stehen (s. `SpieltagsDuellDisziplin.miniDmPodIdHeim`). Die
+    // echte Gruppe steht als eigener Block ueber der Paarungsliste (`renderMiniDmPodGruppe`); diese
+    // Zelle zeigt deshalb nicht mehr `punkteHeim:punkteGast` (sah wie ein taeuschendes 2-Team-
+    // Ergebnis aus, obwohl die beiden Teams oft gar nicht gegeneinander antraten), sondern die
+    // eigene POD-PLATZIERUNG je Team ("1./3." = Heim wurde 1. in seinem Pod, Gast 3. in seinem,
+    // `resolveMiniDmPodPlatzLabel()`).
     if (disziplin.resolutionSource === "mini_dm_pod") {
-      const ergebnisText = !disziplin.gespielt ? "—" : `${disziplin.punkteHeim ?? "–"}:${disziplin.punkteGast ?? "–"}`;
+      const ergebnisText = resolveMiniDmPodPlatzLabel(
+        disziplin,
+        activeSpieltagUebersicht?.miniDmPods ?? [],
+        paarung.homeTeamId,
+        paarung.awayTeamId,
+      );
       return (
         <span
           key={disziplin.disciplineId}
           className="nl-standings-spieltage-disziplin-ergebnis"
-          title={[disziplin.disciplineName, "Mini-DM-Pod — s. Gruppe oberhalb der Paarungsliste, kein Zwei-Team-Duell"].join(" — ")}
+          title={[
+            disziplin.disciplineName,
+            "Mini-DM-Pod-Platzierung (1.–4.) je Team — s. Gruppe oberhalb der Paarungsliste, kein Zwei-Team-Duell",
+          ].join(" — ")}
         >
           <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
           <span className="nl-standings-spieltage-ergebnis nl-tnum">{ergebnisText}</span>
@@ -3133,7 +3145,7 @@ export default function SeasonStandingsNewLook({
           </p>
         ) : null}
         <div className="nl-standings-spieltage-row-ergebnisse">
-          {paarung.disziplinen.map((disziplin) => renderSpieltagDisziplinErgebnis(disziplin))}
+          {paarung.disziplinen.map((disziplin) => renderSpieltagDisziplinErgebnis(disziplin, paarung))}
         </div>
       </li>
     );
