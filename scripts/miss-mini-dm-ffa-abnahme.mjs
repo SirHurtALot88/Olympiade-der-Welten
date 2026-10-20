@@ -22,12 +22,15 @@
 //
 //   node scripts/miss-mini-dm-ffa-abnahme.mjs [spiele] [--pp[=laeufe]] [--nur-pp]
 //        [--ohne-rangtreue] [--seite=<pfad zu battle-mode.html>] [--param='<json>']
-//        [--json=<datei>]
+//        [--aufstellung=optimal|verschoben] [--json=<datei>]
 //
 // Ohne Schalter: Rangtreue, zwei Saatstroeme (Versatz 0 und 10 000 000), 6 Events je Gruppe.
 // --pp misst zusaetzlich die Pp-Abweichung (Budget-Methode, +15) in beiden Stroemen.
 // --param setzt Schlagwechsel-Parameter nur fuer diese Messung (window.__arena.miniDmFfaParameter).
 // --seite misst einen anderen Motorstand (z. B. eine Kopie von origin/main fuer „vorher").
+// --aufstellung (20.10., PR A der Mini-DM-Anbindung): testet rho/Pp mit einer SYNTHETISCHEN
+//   Manager-Aufstellung statt der reinen Eignungs-Auswahl -- s. Kommentar bei AUFSTELLUNG unten
+//   und `mdffaPlatzFuerModus()` in battle-mode.engine.js.
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -47,6 +50,16 @@ const NUR_PP = hat("nur-pp") || hat("ohne-rangtreue");
 const SEITE = pathToFileURL(wert("seite") || path.join(WURZEL, "public/mockups/battle-mode.html")).href;
 const PARAM = wert("param") ? JSON.parse(wert("param")) : null;
 const JSON_AUS = wert("json");
+// AUFSTELLUNG (20.10., PR A der Mini-DM-Anbindung): ohne Schalter unveraendert die reine
+// Eignungs-Auswahl (Vorher-Vergleichswert). "optimal" setzt je Team explizit Eignungs-Rang 0..3
+// auf die vier Rollen (muss rho/Pp BIT-IDENTISCH zum Default liefern -- Sanity-Check der
+// Aufstellungs-Verdrahtung selbst). "verschoben" setzt Rang 1..4 (der Manager haelt seinen
+// Top-Mini-DM-Talent fuer eine andere Disziplin zurueck) -- die realistische Abweichung, die der
+// Auftrag befuerchtet, s. battle-mode.engine.js `mdffaPlatzFuerModus()`-Kommentar.
+const AUFSTELLUNG = wert("aufstellung");
+if (AUFSTELLUNG && AUFSTELLUNG !== "optimal" && AUFSTELLUNG !== "verschoben") {
+  throw new Error(`--aufstellung muss "optimal" oder "verschoben" sein, bekam "${AUFSTELLUNG}".`);
+}
 const STROEME = [0, 10_000_000];
 const MATRIX_MINI_DM = { torment: 24, health: 20, power: 16, stamina: 16, will: 14, dexterity: 10 };
 
@@ -173,8 +186,8 @@ try {
       const t0 = Date.now();
       let events;
       if (hatSonde) {
-        events = (await seite.evaluate(({ kader, gruppen, n, versatz }) =>
-          window.__arena.miniDmFfaSonde(kader, { gruppen, n, versatz, mitStatistik: true }), { kader, gruppen: GRUPPEN, n: SPIELE, versatz })).events;
+        events = (await seite.evaluate(({ kader, gruppen, n, versatz, platzModus }) =>
+          window.__arena.miniDmFfaSonde(kader, { gruppen, n, versatz, mitStatistik: true, platzModus }), { kader, gruppen: GRUPPEN, n: SPIELE, versatz, platzModus: AUFSTELLUNG })).events;
       } else {
         // ALTER MOTORSTAND (vorher-Messung, z. B. origin/main): dieselbe Event-Schleife von aussen,
         // ohne Formkarten-Ziehung fuer die zwei Fremdkader (der alte Motor kennt die Sonde nicht).
@@ -200,8 +213,8 @@ try {
     if (!hatSonde) throw new Error("--pp braucht window.__arena.miniDmFfaEinfluss (neuer Motorstand).");
     for (const versatz of STROEME) {
       const t0 = Date.now();
-      const r = await seite.evaluate(({ kader, gruppen, n, versatz }) =>
-        window.__arena.miniDmFfaEinfluss(kader, { gruppen, n, versatz }), { kader, gruppen: GRUPPEN, n: PP_LAEUFE, versatz });
+      const r = await seite.evaluate(({ kader, gruppen, n, versatz, platzModus }) =>
+        window.__arena.miniDmFfaEinfluss(kader, { gruppen, n, versatz, platzModus }), { kader, gruppen: GRUPPEN, n: PP_LAEUFE, versatz, platzModus: AUFSTELLUNG });
       ausgabe.pp[versatz] = { ...r, sekunden: (Date.now() - t0) / 1000 };
     }
   }
@@ -210,7 +223,7 @@ try {
 }
 
 const f = (x, k = 3) => (x == null || Number.isNaN(x) ? "—" : x.toFixed(k));
-console.log(`Mini-DM 4-Team-FFA — kaderfest, ${TEAMNAMEN.length} Teams, ${GRUPPEN.length} Vierergruppen, ${SPIELE} Events je Gruppe und Strom`);
+console.log(`Mini-DM 4-Team-FFA — kaderfest, ${TEAMNAMEN.length} Teams, ${GRUPPEN.length} Vierergruppen, ${SPIELE} Events je Gruppe und Strom, Aufstellung: ${AUFSTELLUNG || "aus (reine Eignungs-Auswahl)"}`);
 console.log(`Gewichte (Motor): ${JSON.stringify(ausgabe.gewichte)}`);
 for (const [v, s] of Object.entries(ausgabe.stroeme)) {
   console.log(`\nStrom ${v} (${s.events} Events, ${s.runden} Runden, ${s.sekunden.toFixed(1)} s)`);

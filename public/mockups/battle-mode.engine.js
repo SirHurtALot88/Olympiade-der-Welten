@@ -50823,15 +50823,75 @@
   // dasselbe Prinzip wie Options C in der Recherche, nur als Tiebreak statt als Hauptformel).
   // Bleiben Teams AUCH DARIN exakt gleich, teilen sie sich die Liga-Punkte der betroffenen
   // Plaetze (verteilePlatzierungspunkte leistet das automatisch).
-  function spieleMiniDmFfaEvent(vierTeams,saat){
+  // AUFSTELLUNG (20.10., PR A der heutigen Mini-DM-Anbindung): `platzJeTeam`, VIERTER Parameter,
+  // optional — ein Array von vier `place`-Objekten (eins je Team, dieselbe Form wie `place` beim
+  // 2-Team-Chassis: `{name: {d,slot}}`, s. arena-aufstellung-adapter.ts), `null`/`undefined` je
+  // Team ohne Entwurf. OHNE diesen Parameter (jeder BESTEHENDE Aufrufer — alle Sonden, der
+  // Test-Interface-Pfad `window.__arena.miniDmFfaEvent(teams,saat)`) ist das Verhalten BYTE-
+  // IDENTISCH zu vorher: reiner Eignungs-Reihum, s. Property unten. MIT Parameter uebernimmt ein
+  // Spieler, den der Manager EXPLIZIT auf eine Mini-DM-Rolle gesetzt hat, genau diese Rolle;
+  // Rollen ohne gesetzten Spieler fallen auf den Eignungs-Reihum der NICHT gesetzten Spieler
+  // zurueck — dieselbe "gesetzt vs. frei"-Trennung wie `slotFuer()`/`frei=SQUAD.filter(p=>!place[p.n])`
+  // beim 2-Team-Chassis, nur hier je Team statt ueber beide Kader hinweg (ein Pod-Teilnehmer
+  // kennt nur seinen EIGENEN Kader, keine Kollision mit den drei anderen Teams moeglich).
+  function mdffaGesetzteRolle(kader,place){
+    const m=new Map();
+    if(!place)return m;
+    for(const p of kader){
+      const e=place[p.n];
+      if(e&&e.d==="mini-dm"&&MINI_DM_FFA_ROLLEN.includes(e.slot)&&!m.has(e.slot))m.set(e.slot,p);
+    }
+    return m;
+  }
+  // GEMEINSAME AUSWAHL-GRUNDLAGE fuer `spieleMiniDmFfaEvent()` UND `miniDmFfaEinfluss()` (PP-
+  // Sonde, s. dort) — EINE Stelle, die "gesetzt vs. frei" entscheidet, damit die PP-Sonde
+  // nachweislich dieselbe Auswahl trifft wie das echte Event, nicht eine zweite, abweichende
+  // Kopie der Logik.
+  function mdffaAuswahlVorbereiten(vierTeams,platzJeTeam){
+    const sortiert=vierTeams.map(kader=>[...kader].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0)));
+    const gesetztJeTeam=vierTeams.map((kader,teamIdx)=>mdffaGesetzteRolle(kader,platzJeTeam&&platzJeTeam[teamIdx]));
+    // "Frei" = sortierter Kader OHNE die bereits explizit gesetzten Spieler — ohne jede gesetzte
+    // Rolle (der Normalfall ohne `platzJeTeam`) ist `frei` identisch zu `sortiert`, der Reihum-
+    // Fallback unten reproduziert dann exakt `kader[i%kader.length]` von vorher. Bleibt NACH dem
+    // Herausnehmen nichts mehr uebrig (jeder Eignungstraeger ist irgendwo gesetzt), faellt der
+    // Fallback auf den vollen sortierten Kader zurueck statt leerzulaufen.
+    const freiJeTeam=sortiert.map((kader,teamIdx)=>{
+      const gesetzteNamen=new Set([...gesetztJeTeam[teamIdx].values()].map(p=>p.n));
+      const frei=kader.filter(p=>!gesetzteNamen.has(p.n));
+      return frei.length?frei:kader;
+    });
+    // SEQUENTIELLER Reihum-Zaehler JE TEAM statt des globalen Rollen-Index `i`: ohne ihn wuerde
+    // `frei[i%frei.length]` bei einer GESETZTEN Rolle 0 den besten "freien" Spieler (`frei[0]`)
+    // NIE verwenden (Rolle 1 laese bereits bei Index 1 weiter) — ein Spieler koennte so trotz
+    // freier Kapazitaet unbenutzt bleiben, selbst wenn der Kader genau zur Rollenzahl passt
+    // (gefunden ueber den Wiring-Test `tests/mini-dm-ffa-pod-headless-runner.test.ts`, nicht ueber
+    // den Live-Spielstand). Der Zaehler erhoeht sich NUR bei einer Rolle, die tatsaechlich auf
+    // "frei" zurueckfaellt — bleibt KEINE Rolle gesetzt (der Normalfall ohne `platzJeTeam`), zaehlt
+    // er exakt mit dem globalen Rollen-Index mit und reproduziert `kader[i%kader.length]` von
+    // vorher bit-identisch (s. Property-Test).
+    const freiIndexJeTeam=vierTeams.map(()=>0);
+    return {sortiert,gesetztJeTeam,freiJeTeam,freiIndexJeTeam};
+  }
+  function mdffaWaehleVier(aufstellung,slotId){
+    return aufstellung.sortiert.map((kader,teamIdx)=>{
+      const gesetzt=aufstellung.gesetztJeTeam[teamIdx].get(slotId);
+      if(gesetzt)return gesetzt;
+      const frei=aufstellung.freiJeTeam[teamIdx];
+      if(!frei.length)return null;
+      const idx=aufstellung.freiIndexJeTeam[teamIdx]%frei.length;
+      aufstellung.freiIndexJeTeam[teamIdx]+=1;
+      return frei[idx];
+    });
+  }
+  function spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam){
     if(!Array.isArray(vierTeams)||vierTeams.length!==4){
       throw new Error("spieleMiniDmFfaEvent: braucht genau 4 Team-Kader, bekam "+
         (Array.isArray(vierTeams)?vierTeams.length:typeof vierTeams)+".");
     }
     const saatBasis=normalisiereSaat(saat);
-    const sortiert=vierTeams.map(kader=>[...kader].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0)));
+    const aufstellung=mdffaAuswahlVorbereiten(vierTeams,platzJeTeam);
     const runden=MINI_DM_FFA_ROLLEN.map((slotId,i)=>{
-      const vier=sortiert.map(kader=>kader.length?kader[i%kader.length]:null);
+      const vier=mdffaWaehleVier(aufstellung,slotId);
       if(vier.some(p=>!p))throw new Error("spieleMiniDmFfaEvent: mindestens ein Team stellt keinen einzigen Mini-DM-Kaempfer.");
       // Runden-Saat aus der Event-Saat abgeleitet, aber je Rolle verschieden, damit die
       // vier Runden nicht denselben Zufallslauf viermal wiederholen — derselbe
@@ -50878,11 +50938,39 @@
     else if(mutatorModus==="aus")MUTATOREN=[];
   }
 
+  // AUFSTELLUNGS-SIMULATION FUER DIE ABNAHME (20.10., PR A): `opt.platzModus` an `miniDmFfaSonde`
+  // baut je Team ein synthetisches `place` (dieselbe Form, die `spieleMiniDmFfaEvent()` jetzt als
+  // dritten Parameter nimmt), um zu testen, ob rho/Pp auch mit einer ECHTEN Manager-Aufstellung
+  // (statt der reinen Eignungs-Auswahl) bestehen:
+  //  - "optimal": Rolle i bekommt den Spieler auf Eignungs-Rang i — reproduziert bei einem Kader
+  //    mit >= 4 Eignungstraegern GENAU die bisherige Auswahl (Sanity-Check: muss bit-identische
+  //    rho/Pp-Werte liefern wie ganz ohne `platzModus`).
+  //  - "verschoben": Rolle i bekommt Eignungs-Rang i+1 (der Manager haelt seinen Top-Mini-DM-
+  //    Talent fuer eine andere Disziplin zurueck) — die realistische Abweichung, die der heutige
+  //    Auftrag befuerchtet ("taktische statt rein eignungsoptimale Entscheidungen"), KEIN
+  //    Worst-Case. Kader mit weniger als fuenf Eignungstraegern bleiben ohne Versatz (kein Rang
+  //    i+1 mehr verfuegbar) — reproduziert dort "optimal".
+  function mdffaPlatzFuerModus(teams,modus){
+    if(!modus||modus==="aus")return [null,null,null,null];
+    return teams.map(kader=>{
+      const sortiert=[...kader].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0));
+      const versatz=modus==="verschoben"&&sortiert.length>=MINI_DM_FFA_ROLLEN.length+1?1:0;
+      const place={};
+      if(!sortiert.length)return place;
+      MINI_DM_FFA_ROLLEN.forEach((slotId,i)=>{
+        const p=sortiert[(i+versatz)%sortiert.length];
+        if(p)place[p.n]={d:"mini-dm",slot:slotId};
+      });
+      return place;
+    });
+  }
+
   // RANGTREUE-SONDE. `kader` = Liste von Team-Kadern (ArenaSpieler[], `d["mini-dm"]` gesetzt),
   // `opt.gruppen` = Liste von Vierergruppen (Indizes in `kader`), `opt.n` Laeufe je Gruppe,
-  // `opt.versatz` Saatstrom. Liefert je Event die vier Runden mit {n, side, eig, wert} — eig
-  // OHNE Mutator (wie disziplinProbe: der Mutator weicht absichtlich von der Eignung ab, die
-  // Abnahme soll das sehen) — und den Event-Ausgang. Die Statistik rechnet das Skript.
+  // `opt.versatz` Saatstrom, `opt.platzModus` s.o. Liefert je Event die vier Runden mit
+  // {n, side, eig, wert} — eig OHNE Mutator (wie disziplinProbe: der Mutator weicht absichtlich
+  // von der Eignung ab, die Abnahme soll das sehen) — und den Event-Ausgang. Die Statistik
+  // rechnet das Skript.
   function miniDmFfaSonde(kader,opt){
     const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
     const formVorher=FORMKARTE, mutVorher=MUTATOREN;
@@ -50891,9 +50979,10 @@
       FORMKARTE={...FORMKARTE};
       (o.gruppen||[]).forEach((gr,g)=>{
         const teams=gr.map(ix=>mitKit(kader[ix]));
+        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus);
         for(let i=0;i<n;i++){
           mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
-          const ev=spieleMiniDmFfaEvent(teams,mdffaEventSaat(g,i,versatz));
+          const ev=spieleMiniDmFfaEvent(teams,mdffaEventSaat(g,i,versatz),platzJeTeam);
           events.push({gruppe:g, lauf:i, teamsIx:gr,
             runden:ev.runden.map(r=>({slotId:r.slotId, takte:r.dauer,
               teilnehmer:r.teams.map(t=>({n:t.n, side:t.side, eig:t.eigOhneMutator, wert:t.beitrag,
@@ -50921,12 +51010,23 @@
       FORMKARTE={...FORMKARTE};
       (o.gruppen||[]).forEach((gr,g)=>{
         const teams=gr.map(ix=>mitKit(kader[ix]));
-        const sortiert=teams.map(k=>[...k].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0)));
+        // `platzModus` s. `mdffaPlatzFuerModus()`/`miniDmFfaSonde()`-Kommentar — dieselbe
+        // Auswahl-Grundlage (`mdffaAuswahlVorbereiten()`) wie `spieleMiniDmFfaEvent()`, damit die
+        // Pp-Sonde den Einfluss der Spieler misst, die bei einer echten Aufstellung TATSAECHLICH
+        // kaempfen, nicht eine zweite, abweichende Eignungs-Auswahl.
+        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus);
         for(let i=0;i<n;i++){
           mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
           const saatBasis=normalisiereSaat(mdffaEventSaat(g,i,versatz));
+          // NEU JE EVENT (nicht einmal je Gruppe): `mdffaAuswahlVorbereiten()` traegt einen
+          // mutierenden "frei"-Zaehler je Team (s. `mdffaWaehleVier()`-Kommentar) — eine einzige
+          // Instanz ueber alle `n` Laeufe hinweg haette den Zaehler ueber die Laeufe akkumuliert
+          // und ab dem zweiten Lauf eine andere (falsche) Auswahl getroffen, obwohl
+          // `spieleMiniDmFfaEvent()` je Aufruf frisch beginnt. Gefunden ueber den
+          // Wiring-Test, bevor es den Live-Spielstand je erreicht hat.
+          const aufstellung=mdffaAuswahlVorbereiten(teams,platzJeTeam);
           MINI_DM_FFA_ROLLEN.forEach((slotId,ri)=>{
-            const vier=sortiert.map(k=>k[ri%k.length]);
+            const vier=mdffaWaehleVier(aufstellung,slotId);
             const rs=(saatBasis*2654435761+ri*40503)>>>0;
             ATTR_HEBUNG=null;
             const grund=anteile(baueMiniDmFfaRunde(vier,slotId,rs));
@@ -53135,11 +53235,13 @@
       trips:s.trips.map(t=>({station:t.station.fableLabel,u:t.u.n,kg:t.kg,start:+t.start.toFixed(2),
         dauer:+t.dauer.toFixed(2),rutscher:t.rutscher,pause:t.pause,doppelt:t.doppelt,uebergabe:t.uebergabe}))})):null,
     // MINI-DM 4-TEAM-FFA (docs/design/mini-dm-4-team-ffa-recherche-06-09.md) — eigenstaendige
-    // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben.
-    // Noch NICHT an einen echten Spieltag/Fixture angebunden (das ist Abschnitt 5 der
-    // Recherche, bewusst nicht Teil dieser Aenderung).
+    // Testschnittstelle, s. Kopfkommentar bei baueMiniDmFfaRunde/spieleMiniDmFfaEvent oben. Seit
+    // der Mini-DM-Spielplan-Verankerung (14.09., `lib/battle/arena-headless-runner.ts`,
+    // `runMiniDmFfaPodFixtures()`) PRAESENTATIONSZWECK-angebunden, bislang mit `platzJeTeam`
+    // weggelassen (reine Eignungs-Auswahl). `platzJeTeam` (20.10., PR A der Mini-DM-Anbindung,
+    // drittes/optionales Argument) laesst den Aufrufer die echte Manager-Aufstellung durchreichen.
     miniDmFfaRunde:(vierSpieler,slotId,saat)=>baueMiniDmFfaRunde(vierSpieler,slotId,saat),
-    miniDmFfaEvent:(vierTeams,saat)=>spieleMiniDmFfaEvent(vierTeams,saat),
+    miniDmFfaEvent:(vierTeams,saat,platzJeTeam)=>spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam),
     miniDmFfaRollen:()=>[...MINI_DM_FFA_ROLLEN],
     miniDmFfaLigapunkte:()=>[...MINI_DM_FFA_LIGAPUNKTE],
     miniDmFfaRundenpunkte:()=>[...MINI_DM_FFA_RUNDENPUNKTE],
