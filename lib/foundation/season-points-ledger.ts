@@ -563,7 +563,15 @@ export function buildSeasonPointsLedger(
 
   const playerSummariesByPlayerId = new Map<string, SeasonPlayerPointsSummary>();
   for (const entry of pointEntries) {
-    const istDuellEntry = entry.pointSource === "battle_mode_arena_boxscore_impact" || entry.pointSource === "battle_mode_pps_duell_player_score";
+    // MINI-DM-POD-RESOLVE (19.10., Review-Fund 20.10.): "battle_mode_mini_dm_pod_player_score" fehlte
+    // hier -- eine Mini-DM-Pod-Zeile wurde dadurch wie eine Manager-Mode-Zeile behandelt und ihre
+    // Spieler-PP-Summe ZUSAETZLICH zum schon ueber `duellGruppenBeitraege` gebuchten 2-1-0-0-Budget in
+    // `teamSummary.totalPoints` aufaddiert -- echte Doppelzaehlung, gefunden per Season-Sum-Probe
+    // (scripts/miss-mini-dm-pod-saisonsumme.ts) an einem echten 20-Spieltage-Battle-Save.
+    const istDuellEntry =
+      entry.pointSource === "battle_mode_arena_boxscore_impact" ||
+      entry.pointSource === "battle_mode_pps_duell_player_score" ||
+      entry.pointSource === "battle_mode_mini_dm_pod_player_score";
     const category = disciplineCategoryById.get(entry.disciplineId) ?? null;
     const playerSummary = playerSummariesByPlayerId.get(entry.playerId) ?? {
       playerId: entry.playerId,
