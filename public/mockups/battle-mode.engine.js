@@ -50823,17 +50823,22 @@
   // dasselbe Prinzip wie Options C in der Recherche, nur als Tiebreak statt als Hauptformel).
   // Bleiben Teams AUCH DARIN exakt gleich, teilen sie sich die Liga-Punkte der betroffenen
   // Plaetze (verteilePlatzierungspunkte leistet das automatisch).
-  // AUFSTELLUNG (20.10., PR A der heutigen Mini-DM-Anbindung): `platzJeTeam`, VIERTER Parameter,
+  // AUFSTELLUNG (20.10., PR A der heutigen Mini-DM-Anbindung): `platzJeTeam`, DRITTER Parameter,
   // optional — ein Array von vier `place`-Objekten (eins je Team, dieselbe Form wie `place` beim
   // 2-Team-Chassis: `{name: {d,slot}}`, s. arena-aufstellung-adapter.ts), `null`/`undefined` je
   // Team ohne Entwurf. OHNE diesen Parameter (jeder BESTEHENDE Aufrufer — alle Sonden, der
-  // Test-Interface-Pfad `window.__arena.miniDmFfaEvent(teams,saat)`) ist das Verhalten BYTE-
-  // IDENTISCH zu vorher: reiner Eignungs-Reihum, s. Property unten. MIT Parameter uebernimmt ein
-  // Spieler, den der Manager EXPLIZIT auf eine Mini-DM-Rolle gesetzt hat, genau diese Rolle;
-  // Rollen ohne gesetzten Spieler fallen auf den Eignungs-Reihum der NICHT gesetzten Spieler
-  // zurueck — dieselbe "gesetzt vs. frei"-Trennung wie `slotFuer()`/`frei=SQUAD.filter(p=>!place[p.n])`
-  // beim 2-Team-Chassis, nur hier je Team statt ueber beide Kader hinweg (ein Pod-Teilnehmer
-  // kennt nur seinen EIGENEN Kader, keine Kollision mit den drei anderen Teams moeglich).
+  // Test-Interface-Pfad `window.__arena.miniDmFfaEvent(teams,saat)`, die Anzeige renderMiniDmFfa())
+  // ist das Verhalten BYTE-IDENTISCH zu vorher: reiner Eignungs-Reihum, s. Property unten. MIT
+  // Parameter uebernimmt ein Spieler, den der Manager EXPLIZIT auf eine Mini-DM-Rolle gesetzt hat,
+  // genau diese Rolle; Rollen ohne gesetzten Spieler fallen auf den Eignungs-Reihum der NICHT FUER
+  // MINI-DM gesetzten Spieler zurueck, je Team (ein Pod-Teilnehmer kennt nur seinen EIGENEN Kader).
+  // ACHTUNG, KEINE KOPIE DER 2-TEAM-REGEL (Opus-Review PR #1299): `bauFeldspiel` spielt, sobald
+  // irgendein Spieler fuer die Disziplin gesetzt ist, NUR die Gesetzten ("wer gesetzt ist, spielt",
+  // Unterzahl eingeschlossen) — hier dagegen fuellt der Reihum die uebrigen Rollen auf, und zwar
+  // auch mit Spielern, die am selben Spieltag in der ANDEREN Disziplin gesetzt sind. Im echten
+  // Spiel steht Mini-DM auf `MINI_DM_FIXED_PLAYER_COUNT = 1` (ein Eintrag, slotIndex 0 =
+  // "frontliner"), d. h. drei der vier Rollenrunden bestreitet dieser Reihum. Ob das so bleiben
+  // soll, ist eine offene Design-Frage fuer PR B (docs/design/mini-dm-ffa-aufstellung-mutatoren-20-10.md).
   function mdffaGesetzteRolle(kader,place){
     const m=new Map();
     if(!place)return m;
