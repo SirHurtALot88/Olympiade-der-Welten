@@ -231,6 +231,40 @@ export function resolveSpielquelleLabel(disziplin: Pick<SpieltagsDuellDisziplin,
   return "Rangtabelle";
 }
 
+/** EIN Teams Platz in SEINEM Mini-DM-Pod, `null` ohne Pod oder solange ungewertet. */
+function findeMiniDmPodPlatzFuerTeam(
+  podId: string | null,
+  teamId: string,
+  miniDmPods: readonly SpieltagsMiniDmPod[],
+): number | null {
+  if (!podId) return null;
+  const pod = miniDmPods.find((kandidat) => kandidat.podId === podId);
+  return pod?.mitglieder.find((mitglied) => mitglied.teamId === teamId)?.platz ?? null;
+}
+
+/**
+ * UI-FIX (20.10., Mini-DM-Anbindungs-Auftrag Punkt 7): die normale Spieltage-Paarungszeile
+ * zeigte fuer ein Mini-DM-"Duell" bisher `punkteHeim:punkteGast` (z. B. "2:0") -- sieht aus wie
+ * ein gewoehnliches Zwei-Team-Ergebnis, obwohl Heim- und Gastteam oft in VERSCHIEDENEN
+ * Vierergruppen stehen und nie gegeneinander antraten (nur per Tooltip als "eigentlich Teil
+ * einer 4er-Gruppe" erklaert, s. `resolveSpielquelleLabel`-Nachbarfunktion). Diese Funktion gibt
+ * stattdessen die ECHTE Pod-Platzierung BEIDER Teams aus, je in ihrer EIGENEN Gruppe
+ * (z. B. "1./3." = Heim wurde 1. in seinem Pod, Gast 3. in seinem) -- "–" ohne Pod, "—" solange
+ * ungewertet. Reine Anzeige-Ableitung aus bereits vorhandenen Feldern
+ * (`miniDmPodIdHeim`/`miniDmPodIdGast`, `SpieltagsUebersicht.miniDmPods`), keine neue Rechnung.
+ */
+export function resolveMiniDmPodPlatzLabel(
+  disziplin: Pick<SpieltagsDuellDisziplin, "gespielt" | "miniDmPodIdHeim" | "miniDmPodIdGast">,
+  miniDmPods: readonly SpieltagsMiniDmPod[],
+  homeTeamId: string,
+  awayTeamId: string,
+): string {
+  if (!disziplin.gespielt) return "—";
+  const platzHeim = findeMiniDmPodPlatzFuerTeam(disziplin.miniDmPodIdHeim, homeTeamId, miniDmPods);
+  const platzGast = findeMiniDmPodPlatzFuerTeam(disziplin.miniDmPodIdGast, awayTeamId, miniDmPods);
+  return `${platzHeim != null ? `${platzHeim}.` : "–"}/${platzGast != null ? `${platzGast}.` : "–"}`;
+}
+
 /**
  * NUR bei Battle-Saves mit echtem Fixture-Plan sichtbar (Auftrag: Manager-Saves mit
  * Dummy-Paarungen — `buildSeasonFixtures()` in preseason-workflow-service.ts, ein `i % n`-
