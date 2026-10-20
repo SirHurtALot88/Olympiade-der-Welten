@@ -99,7 +99,10 @@ async function einLauf(nr: number) {
   const zeilen = gs.seasonState.disciplineResults ?? [];
   const sum210ByTeam = new Map<string, number>();
   for (const z of zeilen) {
-    if (z.resolutionSource === "arena" || z.resolutionSource === "pps_duell") {
+    // MINI-DM-POD-RESOLVE (19.10.): "mini_dm_pod" zahlt 2-1-0-0 nach Platz, kein 2/1/0-Duell --
+    // gehoert aber genauso in diese Summe (dieselbe `istDuellWertung()`-Entkopplung von
+    // `teamSummary.totalPoints` gegen die Spieler-PP, s. battle-mode-pps-duell.ts).
+    if (z.resolutionSource === "arena" || z.resolutionSource === "pps_duell" || z.resolutionSource === "mini_dm_pod") {
       sum210ByTeam.set(z.teamId, (sum210ByTeam.get(z.teamId) ?? 0) + (z.teamPoints ?? 0));
     }
   }
@@ -115,7 +118,10 @@ async function einLauf(nr: number) {
   // Einsatz-Deckel: keine EINZELNE Duell-Zeile darf ueber PPS_DUELL_SPIELER_PP_MAX liegen.
   const ueberschreitungen = ledger.pointEntries.filter(
     (entry) =>
-      (entry.pointSource === "battle_mode_pps_duell_player_score" || entry.pointSource === "battle_mode_arena_boxscore_impact") &&
+      (entry.pointSource === "battle_mode_pps_duell_player_score" ||
+        entry.pointSource === "battle_mode_arena_boxscore_impact" ||
+        // OPUS-REVIEW PR #1297: Mini-DM-Pod-Zeilen laufen ueber dieselbe Kurve und denselben Deckel.
+        entry.pointSource === "battle_mode_mini_dm_pod_player_score") &&
       entry.basePoints > PPS_DUELL_SPIELER_PP_MAX + 1e-6,
   ).length;
 

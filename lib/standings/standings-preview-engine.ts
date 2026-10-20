@@ -362,7 +362,7 @@ function resolveDisciplinePoints(input: {
    * vor dem Fix gebuchte Saves, oder `"arena"` ohne `teamPoints`) faellt exakt auf das bisherige
    * Verhalten zurueck. Das haelt die sieben nicht-arena-aufgeloesten Disziplinen unveraendert.
    */
-  resolutionSource?: "pps" | "arena" | "pps_duell";
+  resolutionSource?: "pps" | "arena" | "pps_duell" | "mini_dm_pod";
   teamPoints?: number | null;
 }): DisciplinePointsLookup {
   const warnings: string[] = [];

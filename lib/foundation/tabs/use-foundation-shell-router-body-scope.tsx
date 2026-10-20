@@ -11292,9 +11292,11 @@ export function useFoundationShellRouterBodyScope({
       verfuegbar: true as const,
       matchdayOptions,
       defaultMatchdayId,
-      getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId),
+      // OPUS-REVIEW PR #1297: `saveId` fuer die Mini-DM-Vierergruppen VOR dem Resolve -- derselbe
+      // Pod-Seed wie Resolve-Engine und Spielplan-Tab (s. `buildMiniDmPodsForSlot`).
+      getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId, { saveId: activeSaveId }),
     };
-  }, [gameState]);
+  }, [gameState, activeSaveId]);
   const seasonV2PpRows = useMemo(
     () =>
       sortedPpAreaRows.map((row) => ({

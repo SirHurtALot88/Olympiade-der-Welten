@@ -271,7 +271,10 @@ export function berechnePpsDuellOverrides(input: {
  * season-points-ledger.ts.
  */
 export function istDuellWertung(row: { resolutionSource?: string | null; teamPoints?: number | null }): boolean {
-  return (row.resolutionSource === "arena" || row.resolutionSource === "pps_duell") && row.teamPoints != null;
+  return (
+    (row.resolutionSource === "arena" || row.resolutionSource === "pps_duell" || row.resolutionSource === "mini_dm_pod") &&
+    row.teamPoints != null
+  );
 }
 
 // ===================================================================================

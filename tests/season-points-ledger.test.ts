@@ -517,4 +517,96 @@ describe("season points ledger", () => {
       { matchdayId: "matchday-1", teamId: teamB.teamId, disciplineId: "basketball", points: 2 },
     ]);
   });
+
+  it("MINI-DM-POD-RESOLVE (19.10., Review-Fund 20.10.): eine Mini-DM-Pod-Zeile (`resolutionSource: " +
+    "\"mini_dm_pod\"`) darf ihre Spieler-PP-Summe NICHT zusaetzlich zum schon gebuchten 2-1-0-0-" +
+    "Budget in `teamSummary.totalPoints` aufaddieren -- genau die Doppelzaehlung, die die " +
+    "Season-Sum-Probe (scripts/miss-mini-dm-pod-saisonsumme.ts) an einem echten 20-Spieltage-" +
+    "Battle-Save gefunden hat (`totalPoints` lag dort fuer JEDES Team ueber dem gebuchten Wert).", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const [teamA, teamB, teamC, teamD] = gameState.teams;
+    const [playerA, playerB, playerC, playerD] = gameState.players;
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-pod-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 4,
+        teamsReady: 4,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    const podTeamIds = [teamA!.teamId, teamB!.teamId, teamC!.teamId, teamD!.teamId] as const;
+    const platzByTeamId = new Map(podTeamIds.map((teamId, index) => [teamId, (index + 1) as 1 | 2 | 3 | 4]));
+    const teamPointsByPlatz = [2, 1, 0, 0];
+    gameState.seasonState.disciplineResults = podTeamIds.map((teamId, index) => ({
+      id: `discipline-pod-${index}`,
+      matchdayResultId: "result-pod-1",
+      teamId,
+      disciplineId: "mini-dm",
+      disciplineSide: "d1" as const,
+      rank: index + 1,
+      baseScore: 50 - index * 10,
+      totalScore: 50 - index * 10,
+      readinessStatus: "ready" as const,
+      warnings: [],
+      createdAt: "2026-06-06T12:01:00.000Z",
+      resolutionSource: "mini_dm_pod" as const,
+      pointSource: "battle_mode_mini_dm_pod_platz",
+      teamPoints: teamPointsByPlatz[index],
+      miniDmPod: { podId: "pod-test", platz: platzByTeamId.get(teamId)!, teamIds: podTeamIds, wert: 10 - index * 2 },
+    }));
+    // Team D (letzter Platz, 0 Liga-Punkte) hat den mit Abstand STAERKSTEN Einzelspieler -- Chris'
+    // "Impact Rating"-Beispiel ("ein guter Spieler im schlechten Verlierer-Team"). Waere die
+    // Doppelzaehlung noch da, wuerde Team D trotz Platz 4 die hoechste Tabellenpunktzahl zeigen.
+    const scoreByTeamId = new Map([
+      [teamA!.teamId, 10],
+      [teamB!.teamId, 10],
+      [teamC!.teamId, 10],
+      [teamD!.teamId, 200],
+    ]);
+    gameState.seasonState.playerDisciplinePerformances = podTeamIds.map((teamId, index) => ({
+      id: `perf-pod-${index}`,
+      matchdayResultId: "result-pod-1",
+      teamId,
+      playerId: [playerA, playerB, playerC, playerD][index]!.id,
+      activePlayerId: [playerA, playerB, playerC, playerD][index]!.id,
+      disciplineId: "mini-dm",
+      disciplineSide: "d1" as const,
+      slotIndex: 0,
+      baseValue: scoreByTeamId.get(teamId)!,
+      finalPlayerScore: scoreByTeamId.get(teamId)!,
+      scoreContribution: 1,
+      rankInTeam: 1,
+      rankInDiscipline: index + 1,
+      isTop10: true,
+      isMvpCandidate: false,
+      storyWeight: 1,
+      createdAt: "2026-06-06T12:02:00.000Z",
+    }));
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    for (const teamId of podTeamIds) {
+      const erwartet = teamPointsByPlatz[platzByTeamId.get(teamId)! - 1];
+      expect(ledger.teamSummariesByTeamId.get(teamId)!.totalPoints, `Team ${teamId}`).toBe(erwartet);
+      const beitrag = ledger.tableGroupContributions.find((b) => b.teamId === teamId && b.disciplineId === "mini-dm");
+      expect(beitrag?.points).toBe(erwartet);
+    }
+    // Trotz des staerksten Einzelspielers bleibt Team D (Platz 4) bei 0 Tabellenpunkten -- seine
+    // hohe Spieler-PP (`playerDerivedTotal`) ist eine SEPARATE Groesse, fliesst NICHT in `totalPoints`.
+    expect(ledger.teamSummariesByTeamId.get(teamD!.teamId)!.totalPoints).toBe(0);
+    expect(ledger.teamSummariesByTeamId.get(teamD!.teamId)!.playerDerivedTotal).toBeGreaterThan(
+      ledger.teamSummariesByTeamId.get(teamA!.teamId)!.playerDerivedTotal,
+    );
+  });
 });
