@@ -6,7 +6,7 @@ import {
   berechneMiniDmPodOverrides,
   MINI_DM_POD_TEAM_PUNKTE,
 } from "@/lib/resolve/mini-dm-pod-resolve";
-import { resolveNiveauReferenz } from "@/lib/resolve/battle-mode-pps-duell";
+import { berechneErgebnisNormiert, berechneVerhaeltnisBetrag, resolveNiveauReferenz } from "@/lib/resolve/battle-mode-pps-duell";
 import type { MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 
 function mulberry32(seed: number) {
@@ -67,9 +67,14 @@ describe("berechneErgebnisNormiertNTeam (N-Team-0-10-Normierung, Property-Test)"
         expect(Number.isInteger(wert)).toBe(true);
       }
       for (let k = 0; k < werte.length - 1; k += 1) {
-        expect(werte[k]!, `#${i} n=${n} k=${k} werte=${JSON.stringify(werte)} scores=${JSON.stringify(teams.map((t) => t.score))}`).toBeGreaterThanOrEqual(
-          werte[k + 1]!,
-        );
+        const meldung = `#${i} n=${n} k=${k} werte=${JSON.stringify(werte)} scores=${JSON.stringify(teams.map((t) => t.score))}`;
+        // OPUS-REVIEW PR #1297: SIEGER-GARANTIE wie beim 2-Team-Duell -- verschiedener Score =>
+        // STRIKT verschiedener Wert, exakt gleicher Score => gleicher Wert.
+        if (teams[k]!.score > teams[k + 1]!.score) {
+          expect(werte[k]!, meldung).toBeGreaterThan(werte[k + 1]!);
+        } else {
+          expect(werte[k]!, meldung).toBe(werte[k + 1]!);
+        }
       }
     }
     expect(geprueft).toBe(4000);
@@ -122,6 +127,55 @@ describe("berechneErgebnisNormiertNTeam (N-Team-0-10-Normierung, Property-Test)"
     expect(werte[0]!).toBeGreaterThanOrEqual(werte[1]!);
     expect(werte[1]!).toBeGreaterThanOrEqual(werte[2]!);
     expect(werte[2]!).toBeGreaterThanOrEqual(werte[3]!);
+  });
+});
+
+describe("berechneErgebnisNormiertNTeam -- Opus-Review PR #1297", () => {
+  it("Regression: Platz 1 und 2 mit verschiedenem Score fallen bei gestauchter Spanne NICHT mehr auf denselben Wert", () => {
+    // Vorher: Luecken 1/10/10 -> Leiter 21/20/10/0 * 10/21 -> gerundet 10/10/5/0 (Platz 1 = Platz 2,
+    // obwohl 2 vs 1 Liga-Punkte).
+    const werte = berechneErgebnisNormiertNTeam({
+      sortiert: [
+        { teamId: "a", score: 100 },
+        { teamId: "b", score: 99.5 },
+        { teamId: "c", score: 50 },
+        { teamId: "d", score: 0 },
+      ],
+      m90: 10,
+      niveauReferenz: null,
+    });
+    expect(werte[0]!).toBeGreaterThan(werte[1]!);
+    expect(werte[1]!).toBeGreaterThan(werte[2]!);
+    expect(werte[2]!).toBeGreaterThan(werte[3]!);
+    expect(werte[0]! - werte[3]!).toBeLessThanOrEqual(10);
+  });
+
+  it("n = 2 ist exakt die 2-Team-Normierung (`berechneErgebnisNormiert`) -- ueber 2000 Zufallsfaelle", () => {
+    const zufall = mulberry32(201_020);
+    const referenz = resolveNiveauReferenz("pps", "mini-dm", 4);
+    for (let i = 0; i < 2000; i += 1) {
+      const a = (zufall() - 0.3) * 200;
+      const b = zufall() < 0.1 ? a : (zufall() - 0.3) * 200;
+      const [hoch, tief] = a >= b ? [a, b] : [b, a];
+      const m90 = zufall() < 0.1 ? null : zufall() * 100;
+      const nTeam = berechneErgebnisNormiertNTeam({
+        sortiert: [
+          { teamId: "x", score: hoch },
+          { teamId: "y", score: tief },
+        ],
+        m90,
+        niveauReferenz: referenz,
+      });
+      const outcome = hoch > tief ? "win" : "draw";
+      const zweiTeam = berechneErgebnisNormiert({
+        outcome,
+        betrag: berechneVerhaeltnisBetrag({ outcome, marge: hoch - tief, m90 }),
+        niveauEigen: hoch,
+        niveauGegner: tief,
+        referenz,
+      });
+      expect(nTeam, `#${i} ${hoch}/${tief} m90=${m90}`).toEqual(zweiTeam);
+    }
   });
 });
 

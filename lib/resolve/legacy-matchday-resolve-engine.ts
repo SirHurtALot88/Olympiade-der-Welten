@@ -1102,8 +1102,14 @@ export function buildLegacyMatchdayResolvePreview(
       // unten gebaute `rawPlayerEntries`-Zeile (das, was `legacy-matchday-result-mapper.ts`
       // tatsaechlich persistiert, s. `topPlayers`) UND `rankedTeam.entries` (die Live-Buehne) --
       // "gezeigt == gebucht" gilt nur, wenn beide dieselbe Map lesen.
+      // OPUS-REVIEW PR #1297 (20.10.): `"mini_dm_pod"` gehoert hier dazu -- der Ledger leitet die
+      // Spieler-PP einer Pod-Zeile ueber `istDuellWertung()` ohnehin aus `ppAusSpielerScore()` ab
+      // (season-points-ledger.ts, `derivePlayerPointsForDuellGroup`). Ohne diesen Zweig fiel
+      // `pointsAwarded` (Live-Buehne, persistierter `scoreContribution`, MVP/Top-Spieler) fuer
+      // Mini-DM auf den alten Rangtabellen-Anteil von `distributedPoints` zurueck -- vor diesem PR
+      // war Mini-DM `"pps_duell"` und damit konsistent.
       const ppsDuellSpielerPpByPlayerId =
-        rankedTeam?.resolutionSource === "pps_duell"
+        rankedTeam?.resolutionSource === "pps_duell" || rankedTeam?.resolutionSource === "mini_dm_pod"
           ? new Map(
               rankedWithinTeam.map(({ entry }) => [
                 entry.playerId,

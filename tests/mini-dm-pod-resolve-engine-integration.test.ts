@@ -11,6 +11,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { MINI_DM_POD_TEAM_PUNKTE } from "@/lib/resolve/mini-dm-pod-resolve";
+import { ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
 
 const MINI_DM = "mini-dm";
 
@@ -208,5 +209,23 @@ describe("Mini-DM-Pod-Resolve, echte Integration (legacy-matchday-resolve-engine
     // (`ppAusSpielerScore()`) haengt NUR an diesem Wert, nicht am Pod-Platz, s.
     // `derivePlayerPointsForDuellGroup()` (season-points-ledger.ts) und die dedizierten Tests
     // fuer `ppAusSpielerScore` in battle-mode-pps-duell.test.ts.
+
+    // OPUS-REVIEW PR #1297 (20.10.): "gezeigt == gebucht" -- `pointsAwarded` (Live-Buehne,
+    // `rankedTeam.entries`) UND der persistierte Spieler-Eintrag (`topPlayers`, wird zu
+    // `scoreContribution`) muessen fuer eine Pod-Zeile GENAU `ppAusSpielerScore()` tragen, wie der
+    // Ledger sie bucht -- nicht den alten Rangtabellen-Anteil (`distributeRankPointsToPlayers`).
+    const referenz = resolveSpielerPpReferenz(MINI_DM, 2);
+    for (const result of miniDmPreview.teamResults) {
+      for (const entry of result.entries) {
+        expect(entry.pointsAwarded, `${result.teamId}/${entry.playerId} (Buehne)`).toBe(
+          ppAusSpielerScore(entry.finalPlayerScore ?? 0, referenz),
+        );
+      }
+    }
+    for (const player of miniDmPreview.topPlayers) {
+      expect(player.pointsAwarded, `${player.teamId}/${player.playerId} (gebucht)`).toBe(
+        ppAusSpielerScore(player.finalPlayerScore, referenz),
+      );
+    }
   });
 });

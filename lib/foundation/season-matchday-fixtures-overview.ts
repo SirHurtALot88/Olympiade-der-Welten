@@ -341,13 +341,18 @@ function findeFruehereBegegnung(
 }
 
 /**
- * MINI-DM-POD-RESOLVE (19.10.): die Pods EINES Disziplin-Slots (`getMiniDmPodsForMatchday()` ist
- * eine REINE Ableitung aus bereits persistierten Fakten, s. Kopfkommentar an
- * `mini-dm-pod-schedule.ts` -- liefert deshalb vor UND nach dem Resolve dieselben vier Teams je
- * Pod, live neu berechnet statt aus einer Persistenz gelesen). Das Ergebnis je Mitglied (Platz,
- * Punkte, Wert) kommt dagegen aus der PERSISTIERTEN Zeile (`DisciplineResultRecord.miniDmPod`),
- * `null` solange der Spieltag noch nicht gewertet ist -- die Gruppe selbst ist aber schon vor dem
- * Spieltag sichtbar (das ist exakt die Spielplan-Ankuendigung, die Chris sah).
+ * MINI-DM-POD-RESOLVE (19.10.): die Pods EINES Disziplin-Slots. Das Ergebnis je Mitglied (Platz,
+ * Punkte, Wert) kommt aus der PERSISTIERTEN Zeile (`DisciplineResultRecord.miniDmPod`), `null`
+ * solange der Spieltag noch nicht gewertet ist -- die Gruppe selbst ist aber schon vor dem Spieltag
+ * sichtbar (das ist exakt die Spielplan-Ankuendigung, die Chris sah).
+ *
+ * OPUS-REVIEW PR #1297 (20.10.), ZUSAMMENSETZUNG DER GRUPPE:
+ *  - GEWERTET: die Gruppe kommt aus `miniDmPod.teamIds` der gebuchten Zeilen -- "gezeigt ==
+ *    gebucht" per Konstruktion, unabhaengig davon, wie die Ableitung heute rechnet.
+ *  - NOCH NICHT GEWERTET: `getMiniDmPodsForMatchday()` mit DERSELBEN `saveId` wie Resolve-Engine
+ *    und Spielplan-Tab. Der Seed der Ableitung traegt die `saveId`; ohne sie (Rueckfall
+ *    "normalized-local-save") entstehen bei jedem echten Save ANDERE Vierergruppen als gebucht --
+ *    vorher zeigte dieser Block deshalb Gruppen mit z. B. zwei ersten Plaetzen.
  */
 function buildMiniDmPodsForSlot(
   gameState: GameState,
@@ -356,11 +361,35 @@ function buildMiniDmPodsForSlot(
   disciplineSide: "d1" | "d2",
   rowsByTeam: Map<string, Map<string, DisciplineResultRecord>>,
   leagueFilter?: LeagueTier,
+  saveId?: string | null,
 ): SpieltagsMiniDmPod[] {
   if (slot.disciplineId !== MINI_DM_DISCIPLINE_ID) {
     return [];
   }
-  return getMiniDmPodsForMatchday(gameState, matchdayId)
+  const abgeleitet = getMiniDmPodsForMatchday(gameState, matchdayId, { saveId });
+  const leagueTierByPodId = new Map(abgeleitet.map((pod) => [pod.id, pod.leagueTier] as const));
+
+  const gebucht = new Map<string, { teamIds: readonly string[] }>();
+  for (const teamRows of rowsByTeam.values()) {
+    const pod = teamRows.get(slot.disciplineId)?.miniDmPod;
+    if (pod && !gebucht.has(pod.podId)) {
+      gebucht.set(pod.podId, { teamIds: pod.teamIds });
+    }
+  }
+  const gruppen: Array<{ id: string; leagueTier: LeagueTier | null; teamIds: readonly string[] }> =
+    gebucht.size > 0
+      ? [...gebucht.entries()]
+          .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+          .map(([podId, pod]) => ({
+            id: podId,
+            leagueTier: leagueTierByPodId.has(podId)
+              ? leagueTierByPodId.get(podId)!
+              : getLeagueOf(gameState, pod.teamIds[0]!) ?? null,
+            teamIds: pod.teamIds,
+          }))
+      : abgeleitet;
+
+  return gruppen
     .filter((pod) => !leagueFilter || pod.leagueTier === leagueFilter)
     .map((pod) => {
       const mitgliederRoh: SpieltagsMiniDmPodMitglied[] = pod.teamIds.map((teamId) => {
@@ -396,7 +425,11 @@ function buildMiniDmPodsForSlot(
 export function buildSpieltagsUebersicht(
   gameState: GameState,
   matchdayId: string,
-  options?: { leagueTier?: LeagueTier },
+  /**
+   * `saveId`: OPUS-REVIEW PR #1297 -- noetig fuer die Mini-DM-Vierergruppen VOR dem Resolve (der
+   * Pod-Seed traegt die `saveId`, s. `buildMiniDmPodsForSlot`). Ohne sie stimmen nur gewertete Pods.
+   */
+  options?: { leagueTier?: LeagueTier; saveId?: string | null },
 ): SpieltagsUebersicht | null {
   if (!istSpieltagsModusVerfuegbar(gameState)) {
     return null;
@@ -427,7 +460,15 @@ export function buildSpieltagsUebersicht(
   // MINI-DM-POD-RESOLVE (19.10.): EINMAL je Spieltag gebaut (Pods verschmelzen zwei Fixtures, s.
   // Kommentar an `SpieltagsDuellDisziplin.miniDmPodIdHeim`), nicht je Fixture neu.
   const miniDmPods: SpieltagsMiniDmPod[] = disziplinSlots.flatMap((slot, slotIndex) =>
-    buildMiniDmPodsForSlot(gameState, matchdayId, slot, slotIndex === 0 ? "d1" : "d2", rowsByTeam, options?.leagueTier),
+    buildMiniDmPodsForSlot(
+      gameState,
+      matchdayId,
+      slot,
+      slotIndex === 0 ? "d1" : "d2",
+      rowsByTeam,
+      options?.leagueTier,
+      options?.saveId,
+    ),
   );
   const miniDmPodIdByTeamId = new Map<string, string>();
   for (const pod of miniDmPods) {

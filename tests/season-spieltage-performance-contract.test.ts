@@ -38,7 +38,7 @@ describe("Spieltage-Modus — Performance-Vertrag (Task #159 Punkt 2)", () => {
     // ueberhaupt nur EINMAL im ganzen Hook auf -- innerhalb der lazy `getUebersicht`-Funktion.
     const builderCalls = source.match(/buildSpieltagsUebersicht\(gameState/g) ?? [];
     expect(builderCalls.length).toBe(1);
-    expect(source).toContain("getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId)");
+    expect(source).toContain("getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId");
     // Das alte eager-gebaute Lookup-Objekt darf nicht wiederkommen.
     expect(source).not.toContain("overviewByMatchdayId");
   });

@@ -7,6 +7,7 @@ import {
   istSpieltagsModusVerfuegbar,
   resolveSpielquelleLabel,
 } from "@/lib/foundation/season-matchday-fixtures-overview";
+import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
 /**
  * SPIELTAGS-UEBERSICHT — reiner Builder-Test (Fixtures + disciplineResults zusammenfuehren),
@@ -236,5 +237,97 @@ describe("resolveSpielquelleLabel / arenaAusfallGrundLabel", () => {
       // Keine Rohschluessel-Lecks (Unterstrich) in der UI-Beschriftung.
       expect(label).not.toContain("_");
     }
+  });
+});
+
+/**
+ * OPUS-REVIEW PR #1297 (20.10.): die Mini-DM-Gruppen der Spieltage-Ansicht muessen GENAU die
+ * gebuchten Vierergruppen zeigen. Der Pod-Seed traegt die `saveId` -- vorher rief der Builder
+ * `getMiniDmPodsForMatchday()` OHNE `saveId` auf (Rueckfall "normalized-local-save"), die
+ * Resolve-Engine dagegen MIT der echten Save-ID: bei jedem echten Save zeigte die UI dadurch andere
+ * Gruppen als gebucht (z. B. zwei erste Plaetze in einer Gruppe).
+ */
+describe("buildSpieltagsUebersicht -- Mini-DM-Pods (Opus-Review PR #1297)", () => {
+  const TEAMS = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+  const ECHTE_SAVE_ID = "new-game-1792458424395-6v71zp";
+
+  function buildMiniDmGameState(mitErgebnissen: boolean): GameState {
+    const gs = {
+      scenarioMeta: { gameMode: "battle" },
+      season: { id: "s1", matchdayIds: ["md1"], currentMatchday: 1 },
+      disciplines: [{ id: "mini-dm", name: "Mini DM", category: "power", weight: 1, playerCount: 1 }],
+      rosters: [],
+      players: [],
+      teams: TEAMS.map((teamId) => ({ teamId, name: teamId, shortCode: teamId })),
+      seasonState: {
+        schedule: [
+          { id: "f1", homeTeamId: "T1", awayTeamId: "T2", matchdayId: "md1", status: "scheduled", leagueTier: null },
+          { id: "f2", homeTeamId: "T3", awayTeamId: "T4", matchdayId: "md1", status: "scheduled", leagueTier: null },
+          { id: "f3", homeTeamId: "T5", awayTeamId: "T6", matchdayId: "md1", status: "scheduled", leagueTier: null },
+          { id: "f4", homeTeamId: "T7", awayTeamId: "T8", matchdayId: "md1", status: "scheduled", leagueTier: null },
+        ],
+        disciplineSchedule: [
+          {
+            seasonId: "s1",
+            matchdayId: "md1",
+            matchdayIndex: 0,
+            discipline1: { disciplineId: "mini-dm", displayName: "Mini DM", order: 1, playerCount: 1, category: "power", occurrenceInSeason: 1 },
+            discipline2: null,
+          },
+        ],
+        matchdayResults: [matchdayResult("mr-md1", "md1")],
+        disciplineResults: [] as DisciplineResultRecord[],
+      },
+    } as unknown as GameState;
+    if (mitErgebnissen) {
+      // Gebucht wie die Resolve-Engine: Pods MIT der echten Save-ID, Platz = Position im Pod.
+      const pods = getMiniDmPodsForMatchday(gs, "md1", { saveId: ECHTE_SAVE_ID });
+      gs.seasonState.disciplineResults = pods.flatMap((pod) =>
+        pod.teamIds.map((teamId, index) =>
+          zeile({
+            id: `r-${teamId}`,
+            matchdayResultId: "mr-md1",
+            teamId,
+            disciplineId: "mini-dm",
+            disciplineSide: "d1",
+            teamPoints: [2, 1, 0, 0][index]!,
+            resolutionSource: "mini_dm_pod",
+            miniDmPod: { podId: pod.id, platz: (index + 1) as 1 | 2 | 3 | 4, teamIds: pod.teamIds, wert: 8 - 2 * index },
+          }),
+        ),
+      );
+    }
+    return gs;
+  }
+
+  const gruppenSchluessel = (gruppen: string[][]) => gruppen.map((teamIds) => [...teamIds].sort().join(",")).sort();
+
+  it("Vorbedingung: Rueckfall-Seed und echte Save-ID liefern hier tatsaechlich VERSCHIEDENE Gruppen", () => {
+    const gs = buildMiniDmGameState(false);
+    const ohne = getMiniDmPodsForMatchday(gs, "md1").map((pod) => pod.teamIds);
+    const mit = getMiniDmPodsForMatchday(gs, "md1", { saveId: ECHTE_SAVE_ID }).map((pod) => pod.teamIds);
+    expect(gruppenSchluessel(ohne)).not.toEqual(gruppenSchluessel(mit));
+  });
+
+  it("gewertet: zeigt die GEBUCHTEN Gruppen (Plaetze 1-4 je Gruppe), auch ohne saveId-Option", () => {
+    const gs = buildMiniDmGameState(true);
+    const gebucht = getMiniDmPodsForMatchday(gs, "md1", { saveId: ECHTE_SAVE_ID }).map((pod) => pod.teamIds);
+    for (const uebersicht of [buildSpieltagsUebersicht(gs, "md1"), buildSpieltagsUebersicht(gs, "md1", { saveId: ECHTE_SAVE_ID })]) {
+      const pods = uebersicht!.miniDmPods;
+      expect(gruppenSchluessel(pods.map((pod) => pod.mitglieder.map((m) => m.teamId)))).toEqual(gruppenSchluessel(gebucht));
+      for (const pod of pods) {
+        expect(pod.gespielt).toBe(true);
+        expect(pod.mitglieder.map((m) => m.platz)).toEqual([1, 2, 3, 4]);
+        expect(pod.mitglieder.map((m) => m.teamPoints)).toEqual([2, 1, 0, 0]);
+      }
+    }
+  });
+
+  it("noch nicht gewertet: zeigt mit saveId dieselben Gruppen, die Resolve-Engine und Spielplan-Tab ziehen", () => {
+    const gs = buildMiniDmGameState(false);
+    const erwartet = getMiniDmPodsForMatchday(gs, "md1", { saveId: ECHTE_SAVE_ID }).map((pod) => pod.teamIds);
+    const pods = buildSpieltagsUebersicht(gs, "md1", { saveId: ECHTE_SAVE_ID })!.miniDmPods;
+    expect(pods.every((pod) => !pod.gespielt)).toBe(true);
+    expect(gruppenSchluessel(pods.map((pod) => pod.mitglieder.map((m) => m.teamId)))).toEqual(gruppenSchluessel(erwartet));
   });
 });

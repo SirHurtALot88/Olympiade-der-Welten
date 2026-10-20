@@ -96,6 +96,11 @@ function sortierePodTeams(
  * nicht-fallender Funktionen ist wieder monoton nicht-fallend: `wert[0] >= wert[1] >= ... >=
  * wert[n-1]` gilt deshalb IMMER, nicht nur im Erwartungswert -- s. Property-Test
  * `tests/mini-dm-pod-resolve.test.ts`.
+ *
+ * STRENG (Opus-Review PR #1297): die Luecken werden VOR dem Aufaddieren ganzzahlig gemacht (je
+ * echter Score-Unterschied mindestens 1), die untere Grenze genau einmal gerundet -- damit gilt
+ * zusaetzlich `score[k] > score[k+1]  =>  wert[k] > wert[k+1]`, wie die Sieger-Garantie des
+ * 2-Team-Duells. Fuer n = 2 ist das Ergebnis exakt `berechneErgebnisNormiert()`.
  */
 export function berechneErgebnisNormiertNTeam(input: {
   /** Bereits nach Platz sortiert, Platz 1 (bester) zuerst. Laenge >= 1. */
@@ -115,26 +120,54 @@ export function berechneErgebnisNormiertNTeam(input: {
     luecken.push(differenz <= 0 ? 0 : berechneVerhaeltnisBetrag({ outcome: "win", marge: differenz, m90: input.m90 }));
   }
 
-  // Kumulative Leiter von UNTEN (letzter Platz = 0) nach OBEN -- nicht-steigend von Index 0 (Platz 1).
-  const leiterVonUnten = new Array<number>(n).fill(0);
-  for (let i = n - 2; i >= 0; i -= 1) {
-    leiterVonUnten[i] = leiterVonUnten[i + 1]! + luecken[i]!;
-  }
-  const spanne = leiterVonUnten[0]!; // >= 0, Abstand Platz 1 zu Platz n (vor Skalierung)
+  const spanneRoh = luecken.reduce((summe, luecke) => summe + luecke, 0); // >= 0, Platz 1 zu Platz n
 
   // GEMEINSAME Skalierung: passt die GESAMTE Spanne (nicht jede Luecke einzeln) ins Intervall
   // [0,10] -- ein einziger, fuer alle Plaetze gleicher, POSITIVER Faktor (s. Ordnungsgarantie oben).
-  const skalierungsfaktor = spanne > 10 ? 10 / spanne : 1;
-  const skaliert = leiterVonUnten.map((wert) => wert * skalierungsfaktor);
-  const skalierteSpanne = skaliert[0]!; // <= 10, >= 0
+  //
+  // OPUS-REVIEW PR #1297 (20.10.), SIEGER-GARANTIE WIE BEIM 2-TEAM-DUELL: vorher wurde die Leiter
+  // erst NACH der Skalierung gerundet -- bei einer Spanne > 10 konnten zwei Plaetze mit
+  // VERSCHIEDENEM Score (und verschiedenen Liga-Punkten, 2 vs 1 oder 1 vs 0) auf denselben
+  // ganzzahligen Wert fallen (synthetisch ~2,5 % der Pods). Jetzt wird jede LUECKE ganzzahlig
+  // skaliert, mit Mindestabstand 1 fuer jeden echten Score-Unterschied (dieselbe Regel wie
+  // `berechneVerhaeltnisBetrag()`: ein Sieg ist nie D = 0). Uebersteigt die Summe danach 10,
+  // wird die jeweils groesste Luecke (> 1) um 1 verkleinert -- terminiert immer, weil n - 1 <= 10
+  // Mindestluecken hineinpassen (ein Mini-DM-Pod hat n = 4). Exakt gleiche Scores behalten
+  // Luecke 0 (gleicher Wert, wie ein Remis beim 2-Team-Duell).
+  const skalierungsfaktor = spanneRoh > 10 ? 10 / spanneRoh : 1;
+  const ganzzahligeLuecken = luecken.map((luecke) =>
+    luecke <= 0 ? 0 : Math.max(1, Math.round(luecke * skalierungsfaktor)),
+  );
+  let lueckenSumme = ganzzahligeLuecken.reduce((summe, luecke) => summe + luecke, 0);
+  while (lueckenSumme > 10) {
+    let groessterIndex = -1;
+    for (let i = 0; i < ganzzahligeLuecken.length; i += 1) {
+      if (ganzzahligeLuecken[i]! > 1 && (groessterIndex < 0 || ganzzahligeLuecken[i]! > ganzzahligeLuecken[groessterIndex]!)) {
+        groessterIndex = i;
+      }
+    }
+    if (groessterIndex < 0) break; // nur bei n - 1 > 10 Mindestluecken erreichbar (nie bei Mini-DM)
+    ganzzahligeLuecken[groessterIndex] = ganzzahligeLuecken[groessterIndex]! - 1;
+    lueckenSumme -= 1;
+  }
+
+  // Kumulative Leiter von UNTEN (letzter Platz = 0) nach OBEN -- nicht-steigend von Index 0
+  // (Platz 1), ganzzahlig, streng fallend ueberall dort, wo der Score streng faellt.
+  const leiterVonUnten = new Array<number>(n).fill(0);
+  for (let i = n - 2; i >= 0; i -= 1) {
+    leiterVonUnten[i] = leiterVonUnten[i + 1]! + ganzzahligeLuecken[i]!;
+  }
+  const skalierteSpanne = Math.min(10, leiterVonUnten[0]!); // ganzzahlig, 0..10
 
   // NIVEAU: Mittel der Niveau-CDF ueber ALLE Teams des Pods (verallgemeinert "mu = Mittel aus
-  // Sieger- und Verlierer-Niveau" bei `berechneErgebnisNormiert()` auf n statt 2 Teams).
+  // Sieger- und Verlierer-Niveau" bei `berechneErgebnisNormiert()` auf n statt 2 Teams). Die
+  // untere Grenze wird -- wie dort der Verlierer-Wert -- EINMAL gerundet, danach nur noch
+  // ganzzahlig addiert: kein zweites Runden, das Abstaende einebnen koennte.
   const mu = input.sortiert.reduce((summe, team) => summe + interpoliereNiveau(team.score, input.niveauReferenz), 0) / n;
   const mitte = 10 * mu;
-  const untereGrenze = clamp(mitte - skalierteSpanne / 2, 0, 10 - skalierteSpanne);
+  const untereGrenze = Math.round(clamp(mitte - skalierteSpanne / 2, 0, 10 - skalierteSpanne));
 
-  return skaliert.map((wert) => Math.round(clamp(untereGrenze + wert, 0, 10)));
+  return leiterVonUnten.map((wert) => clamp(untereGrenze + wert, 0, 10));
 }
 
 /**

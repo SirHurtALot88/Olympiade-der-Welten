@@ -119,3 +119,39 @@ unveränderten PPS-Score-Kanal (`scoreLegacyLineupDisciplineSide()`), dessen Fid
 - Eine neu gezogene `verhaeltnis-referenz.json`-Zelle speziell für den Pod-Kontext — die
   bestehende „pps"/"mini-dm"-Zelle wird unverändert weiterverwendet (Begründung oben, Punkt 5).
 - Alle 19 anderen Disziplinen bleiben unverändert 2-Team-Duelle.
+
+## Opus-Review 20.10. (vor dem Merge)
+
+Drei echte Fehler gefunden und auf dem PR-Branch behoben, je mit Regressionstest, der gegen den
+vorherigen Stand nachweislich rot ist:
+
+1. **Spieltage-Ansicht zeigte andere Vierergruppen als gebucht.** Der Pod-Seed traegt die `saveId`
+   (`mini-dm-pod-schedule.ts`). Resolve-Engine und Spielplan-Tab rufen `getMiniDmPodsForMatchday()`
+   MIT der echten Save-ID auf, `buildSpieltagsUebersicht()` dagegen OHNE (Rueckfall
+   `"normalized-local-save"`) -- bei jedem echten Save (`new-game-...`) entstanden dadurch andere
+   Gruppen, mit Plaetzen aus fremden Pods (z. B. zwei erste Plaetze in einer Gruppe). Die Pod-ID
+   traegt die `saveId` nicht, deshalb fiel das auch in der Saisonsummen-Sonde nicht auf (die gruppiert
+   nach persistierter `podId`). Fix: gewertete Gruppen kommen jetzt aus `miniDmPod.teamIds` der
+   gebuchten Zeilen ("gezeigt == gebucht" per Konstruktion), ungewertete aus der Ableitung mit
+   derselben `saveId` (neu durchgereicht aus `use-foundation-shell-router-body-scope.tsx`).
+2. **Spieler-PP auf Buehne/gespeicherter Zeile != Ledger.** `ppsDuellSpielerPpByPlayerId` in der
+   Engine griff nur bei `"pps_duell"` -- fuer `"mini_dm_pod"` fiel `pointsAwarded` (Live-Buehne,
+   persistierter `scoreContribution`, MVP/Top-Spieler) auf den alten Rangtabellen-Anteil zurueck,
+   waehrend der Ledger `ppAusSpielerScore()` bucht. Vor diesem PR war Mini-DM `"pps_duell"` und
+   damit konsistent -- eine Regression, die der Integrationstest nicht sah, weil er nur
+   `finalPlayerScore` pruefte.
+3. **N-Team-Normierung nur schwach geordnet.** Bei einer Spanne > 10 wurde erst nach dem Stauchen
+   gerundet; Plaetze mit verschiedenem Score (und verschiedenen Liga-Punkten) konnten denselben Wert
+   zeigen (synthetisch ~2,5 % der Pods). Jetzt ganzzahlige Luecken mit Mindestabstand 1 je echtem
+   Score-Unterschied -- dieselbe Sieger-Garantie wie beim 2-Team-Duell; fuer n = 2 ist das Ergebnis
+   exakt `berechneErgebnisNormiert()` (Property-Test).
+
+**Zur offenen FFA-Frage (Einschaetzung, keine Entscheidung):** der FFA-Motor ist NICHT "fertig, nur
+anzubinden". `spieleMiniDmFfaEvent()` stellt die Kaempfer selbst nach Mini-DM-Eignung auf (die
+Aufstellung des Managers wird ignoriert, `aufstellung: {}`), ohne echte Formkarten und Mutatoren
+(`mutatoren: []`); es gibt keinen N-Team-Override-Typ im Buchungspfad (`ArenaTeamPointsOverride` ist
+paarweise), keinen Vorlauf-/Snapshot-Eintrag und keine Boxscore->PP-Zuordnung fuer vier Teams. Die
+gemessenen rho 0,80/0,82 gelten fuer genau dieses Auto-Aufstellungs-Format und muessten nach dem
+Anbinden der echten Aufstellung neu gemessen werden. Weg 2 aendert die Score-QUELLE gegenueber dem
+bisherigen Stand nicht (Mini-DM lief schon vorher ueber den PPS-Score), nur Gruppierung und
+Punktevergabe. Ob Mini-DM spaeter auf den FFA-Motor umzieht, bleibt eine Frage an Chris.
