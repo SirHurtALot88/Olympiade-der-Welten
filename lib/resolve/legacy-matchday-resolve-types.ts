@@ -232,12 +232,19 @@ export type DisciplineTeamResolvePreview = {
    * also byte-identisch zum Stand vor dieser Ergänzung).
    */
   arenaAusfall?: ArenaAusfall | null;
-  /** MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts). */
+  /**
+   * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
+   * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.) -- `undefined`
+   * ueber den (unveraenderten) PPS-Pod-Pfad.
+   */
   miniDmPod?: {
     podId: string;
     platz: 1 | 2 | 3 | 4;
     teamIds: readonly [string, string, string, string];
     wert: number;
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
   } | null;
   warnings: string[];
   missingLineup: boolean;

@@ -121,7 +121,11 @@ async function einLauf(nr: number) {
       (entry.pointSource === "battle_mode_pps_duell_player_score" ||
         entry.pointSource === "battle_mode_arena_boxscore_impact" ||
         // OPUS-REVIEW PR #1297: Mini-DM-Pod-Zeilen laufen ueber dieselbe Kurve und denselben Deckel.
-        entry.pointSource === "battle_mode_mini_dm_pod_player_score") &&
+        entry.pointSource === "battle_mode_mini_dm_pod_player_score" ||
+        // PR 4 (21.10.): Mini-DM-FFA-Zeilen (`quelle: "ffa"`) laufen ebenfalls ueber dieselbe
+        // Impact-Kurve/denselben Deckel -- in PR 4 noch kein echter Fall (kein FFA-Aufrufer), aber
+        // schon mitgeprueft, bevor PR 5 einen verdrahtet.
+        entry.pointSource === "battle_mode_mini_dm_ffa_player_score") &&
       entry.basePoints > PPS_DUELL_SPIELER_PP_MAX + 1e-6,
   ).length;
 

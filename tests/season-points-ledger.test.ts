@@ -609,4 +609,127 @@ describe("season points ledger", () => {
       ledger.teamSummariesByTeamId.get(teamA!.teamId)!.playerDerivedTotal,
     );
   });
+
+  it("MINI-DM-FFA (PR 4, Opus-Plan 21.10.): `miniDmPod.quelle === \"ffa\"` vertraut " +
+    "`performance.scoreContribution` wie eine Arena-Zeile -- `fehlt quelle`, bleibt der " +
+    "PPS-basierte Pfad (`finalPlayerScore` + Referenz) unveraendert aktiv.", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const [teamA, teamB, teamC, teamD] = gameState.teams;
+    const [playerA, playerB] = gameState.players;
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-pod-ffa-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 4,
+        teamsReady: 4,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    const podTeamIds = [teamA!.teamId, teamB!.teamId, teamC!.teamId, teamD!.teamId] as const;
+    // Team A traegt `quelle: "ffa"` -- Team B denselben Pod-Mechanismus OHNE `quelle` (Stand vor
+    // PR 4, Rueckwaertskompatibilitaet fuer bestehende Battle-Saves).
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "discipline-pod-ffa-a",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamA!.teamId,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        rank: 1,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready" as const,
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "mini_dm_pod" as const,
+        pointSource: "battle_mode_mini_dm_pod_platz",
+        teamPoints: 2,
+        miniDmPod: { podId: "pod-ffa-test", platz: 1 as const, teamIds: podTeamIds, wert: 8, quelle: "ffa" as const, rundenPunkteSumme: 10 },
+      },
+      {
+        id: "discipline-pod-ffa-b",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamB!.teamId,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        rank: 2,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready" as const,
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "mini_dm_pod" as const,
+        pointSource: "battle_mode_mini_dm_pod_platz",
+        teamPoints: 1,
+        // KEIN `quelle` -- dieselbe Form wie jede Mini-DM-Pod-Zeile vor PR 4.
+        miniDmPod: { podId: "pod-ffa-test", platz: 2 as const, teamIds: podTeamIds, wert: 6 },
+      },
+    ];
+    // `scoreContribution` (3,3) und `finalPlayerScore` (99) bewusst WEIT auseinander -- so zeigt
+    // ein Test-Fehlschlag sofort, WELCHER der beiden Werte tatsaechlich gebucht wurde.
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-pod-ffa-a",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamA!.teamId,
+        playerId: playerA!.id,
+        activePlayerId: playerA!.id,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 99,
+        finalPlayerScore: 99,
+        scoreContribution: 3.3,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 1,
+        createdAt: "2026-06-06T12:02:00.000Z",
+      },
+      {
+        id: "perf-pod-ffa-b",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamB!.teamId,
+        playerId: playerB!.id,
+        activePlayerId: playerB!.id,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 99,
+        finalPlayerScore: 99,
+        scoreContribution: 3.3,
+        rankInTeam: 1,
+        rankInDiscipline: 2,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 1,
+        createdAt: "2026-06-06T12:02:00.000Z",
+      },
+    ];
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    const entryA = ledger.pointEntries.find((entry) => entry.performanceId === "perf-pod-ffa-a");
+    const entryB = ledger.pointEntries.find((entry) => entry.performanceId === "perf-pod-ffa-b");
+
+    // Team A (`quelle: "ffa"`): `scoreContribution` wird VERTRAUT, wie bei einer Arena-Zeile.
+    expect(entryA?.pointSource).toBe("battle_mode_mini_dm_ffa_player_score");
+    expect(entryA?.basePoints).toBeCloseTo(3.3, 6);
+
+    // Team B (kein `quelle`): bleibt der bestehende PPS-basierte Pfad -- `scoreContribution` (3,3)
+    // wird NICHT uebernommen, `basePoints` kommt stattdessen aus `finalPlayerScore` (99) + Referenz.
+    expect(entryB?.pointSource).toBe("battle_mode_mini_dm_pod_player_score");
+    expect(entryB?.basePoints).not.toBeCloseTo(3.3, 6);
+  });
 });

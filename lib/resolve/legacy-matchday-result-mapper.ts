@@ -89,12 +89,18 @@ export type DisciplineResultWritePayload = {
   duellSeiten?: [number, number] | null;
   /** NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.) -- s. `DisciplineResultRecord.ergebnisNormiert`. */
   ergebnisNormiert?: [number, number] | null;
-  /** MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts). */
+  /**
+   * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
+   * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.).
+   */
   miniDmPod?: {
     podId: string;
     platz: 1 | 2 | 3 | 4;
     teamIds: readonly [string, string, string, string];
     wert: number;
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
   } | null;
 };
 
