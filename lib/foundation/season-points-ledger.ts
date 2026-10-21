@@ -26,7 +26,13 @@ type LedgerPointSource =
   | "battle_mode_pps_duell_player_score"
   // MINI-DM-POD-RESOLVE (19.10.): dieselbe Kurve, nur an `resolutionSource: "mini_dm_pod"`-Zeilen --
   // eigener Name, damit ein Log/Report Mini-DM-Pod-Zeilen von normalen PPS-Duellen unterscheiden kann.
-  | "battle_mode_mini_dm_pod_player_score";
+  | "battle_mode_mini_dm_pod_player_score"
+  // MINI-DM-FFA (PR 4, Opus-Plan 21.10.): `resolutionSource: "mini_dm_pod"` MIT
+  // `miniDmPod.quelle === "ffa"` vertraut -- wie `"arena"` -- dem bereits persistierten
+  // `performance.scoreContribution` (s. Kommentar an `derivePlayerPointsForDuellGroup()` unten),
+  // statt ihn aus `finalPlayerScore` neu zu rechnen. Eigener Name fuer Logs/Reports, analog
+  // `battle_mode_mini_dm_pod_player_score` oben.
+  | "battle_mode_mini_dm_ffa_player_score";
 
 export type SeasonPlayerPointLedgerEntry = {
   performanceId: string;
@@ -239,6 +245,14 @@ function deriveRankPointsFromPerformances(
  * der gezogenen Referenz NEU gerechnet, nicht aus dem persistierten Wert gelesen -- das heilt
  * bestehende Battle-Saves (die noch den alten 2/1/0-Anteil persistiert haben) beim blossen Lesen,
  * ohne Migration.
+ *
+ * MINI-DM-FFA ("mini_dm_pod" MIT `miniDmPod.quelle === "ffa"`, PR 4, Opus-Plan 21.10.): wie
+ * "arena" -- vertraut dem persistierten `performance.scoreContribution` (der dort landet, weil
+ * `arenaIndividualBoxscorePpsByDisciplineId.set("mini-dm", ...)` denselben `pointsAwarded`-Pfad wie
+ * ein Arena-Boxscore durchlaeuft, s. Kommentar an `ppAusMiniDmFfaBeitrag()`,
+ * mini-dm-pod-resolve.ts), statt ihn aus `finalPlayerScore` neu zu rechnen. FEHLT `quelle` (JEDE
+ * heutige Mini-DM-Pod-Zeile, PR 4 hat keinen produktiven FFA-Aufrufer) gilt UNVERAENDERT der
+ * PPS-basierte Zweig unten -- byte-identisch zum Stand vor diesem PR.
  */
 function derivePlayerPointsForDuellGroup(
   gameState: GameState,
@@ -250,11 +264,15 @@ function derivePlayerPointsForDuellGroup(
     return null;
   }
 
-  if (teamResult.resolutionSource === "arena") {
+  const istMiniDmFfa = teamResult.resolutionSource === "mini_dm_pod" && teamResult.miniDmPod?.quelle === "ffa";
+  if (teamResult.resolutionSource === "arena" || istMiniDmFfa) {
     const pointsByPerformanceId = new Map(
       performances.map((performance) => [performance.id, roundValue(performance.scoreContribution ?? 0, 4)] as const),
     );
-    return { pointSource: "battle_mode_arena_boxscore_impact", pointsByPerformanceId };
+    return {
+      pointSource: istMiniDmFfa ? "battle_mode_mini_dm_ffa_player_score" : "battle_mode_arena_boxscore_impact",
+      pointsByPerformanceId,
+    };
   }
 
   const reference = performances[0];
@@ -568,10 +586,14 @@ export function buildSeasonPointsLedger(
     // Spieler-PP-Summe ZUSAETZLICH zum schon ueber `duellGruppenBeitraege` gebuchten 2-1-0-0-Budget in
     // `teamSummary.totalPoints` aufaddiert -- echte Doppelzaehlung, gefunden per Season-Sum-Probe
     // (scripts/miss-mini-dm-pod-saisonsumme.ts) an einem echten 20-Spieltage-Battle-Save.
+    // PR 4 (21.10.): "battle_mode_mini_dm_ffa_player_score" aus demselben Grund ergaenzt, BEVOR es
+    // je an einem echten Save fehlen kann -- derselbe Doppelzaehlungs-Fehler wie oben waere sonst
+    // nur eine Frage der Zeit, sobald PR 5 einen FFA-Aufrufer verdrahtet.
     const istDuellEntry =
       entry.pointSource === "battle_mode_arena_boxscore_impact" ||
       entry.pointSource === "battle_mode_pps_duell_player_score" ||
-      entry.pointSource === "battle_mode_mini_dm_pod_player_score";
+      entry.pointSource === "battle_mode_mini_dm_pod_player_score" ||
+      entry.pointSource === "battle_mode_mini_dm_ffa_player_score";
     const category = disciplineCategoryById.get(entry.disciplineId) ?? null;
     const playerSummary = playerSummariesByPlayerId.get(entry.playerId) ?? {
       playerId: entry.playerId,

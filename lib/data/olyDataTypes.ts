@@ -2655,6 +2655,18 @@ export type DisciplineResultRecord = {
     platz: 1 | 2 | 3 | 4;
     teamIds: readonly [string, string, string, string];
     wert: number;
+    /**
+     * PR 4 (Opus-Plan 21.10., Mini-DM-6-Rollen-Umbau): additiv und optional -- `undefined`/fehlend
+     * fuer JEDE heute existierende Zeile (der PPS-Pod-Pfad setzt diese drei Felder nicht, s.
+     * `MiniDmPodOverride` in mini-dm-pod-resolve.ts). `quelle === "ffa"` ist das Signal, an dem
+     * `derivePlayerPointsForDuellGroup()` (season-points-ledger.ts) zwischen dem (bisherigen)
+     * PPS-Pod-Pfad und dem (ab PR 5 echten) FFA-Pod-Pfad unterscheidet -- fehlt `quelle`, gilt
+     * weiter der PPS-Pfad (Rueckwaertskompatibilitaet, jeder bestehende Battle-Save bleibt
+     * unberuehrt). `rundenPunkteSumme`/`teilnahme` sind rein informativ (UI/Report).
+     */
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
   } | null;
   /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,

@@ -1,0 +1,4 @@
+{
+  "hinweis": "PLATZHALTER (PR 4 des Mini-DM-6-Rollen-Opus-Plans, 21.10.) -- diese Datei traegt noch KEINE gezogenen Feldgroessen. Sie existiert nur, damit der statische Import in lib/resolve/mini-dm-pod-resolve.ts (resolveMiniDmFfaMargeReferenz()/resolveMiniDmFfaSpielerPpReferenz()) nicht gegen eine fehlende Datei laeuft. PR 3 (separat, Motor-Erweiterung + Referenz-Ziehung) befuellt 'feldgroessen' real -- analog zu data/generated/verhaeltnis-referenz.json, aber EIGENSTAENDIG (eigene Groesse: v_t = R_t/k + B_t/(k*1e6), nicht der PPS-Score), s. Kopfkommentar an den beiden Resolvern. Ein leeres/fehlendes 'feldgroessen' ist fuer beide Resolver ein normaler, sauber behandelter Fall (liefern null -> bestehende Rueckfaelle VERHAELTNIS_RUECKFALL_D bzw. 0 PP) -- in PR 4 ohnehin toter Code, weil kein Aufrufer FFA-Rohdaten liefert.",
+  "feldgroessen": {}
+}

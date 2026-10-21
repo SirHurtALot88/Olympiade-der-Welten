@@ -358,6 +358,10 @@ export function buildLegacyMatchdayResolvePreview(
     arenaTeamPointsByDisciplineId: options?.arenaTeamPointsByDisciplineId ?? null,
     arenaIndividualBoxscorePpsByDisciplineId: options?.arenaIndividualBoxscorePpsByDisciplineId ?? null,
     arenaAusfallByDisciplineId: options?.arenaAusfallByDisciplineId ?? null,
+    // MINI-DM-FFA-ROHDATEN (PR 4, 21.10.): kein heutiger Aufrufer setzt dieses Feld (s.
+    // Kommentar an `LegacyResolvePreviewOptions.miniDmFfaPodRohdatenByDisciplineId`) -- der
+    // Default `null` haelt den Mini-DM-Zweig unten IMMER beim bisherigen PPS-Pod-Pfad.
+    miniDmFfaPodRohdatenByDisciplineId: options?.miniDmFfaPodRohdatenByDisciplineId ?? null,
   };
   // SICHTBARE ARENA-AUSFÄLLE: EIN Zeitstempel fuer die ganze Vorschau (statt je Team neu
   // `new Date().toISOString()` zu rufen) -- rein kosmetisch (Log/Tooltip), aber so bekommen nicht
@@ -867,6 +871,15 @@ export function buildLegacyMatchdayResolvePreview(
         miniDmPodsForThisMatchday = [];
       }
     }
+    // MINI-DM-FFA-VORRANG (PR 4 eines 6-PR-Opus-Plans, 21.10.): liegen fuer diese Disziplin
+    // FFA-Rohdaten vor (kein heutiger Aufrufer liefert sie -- das ist PR 5), versucht
+    // `berechneMiniDmPodOverrides()` sie ZUERST je Pod; fehlende/unvollstaendige Rohdaten fallen
+    // je Pod defensiv auf den bisherigen PPS-Pod-Pfad zurueck (s. Kommentar an der Funktion,
+    // mini-dm-pod-resolve.ts). `?? null` haelt diesen Zweig heute IMMER inaktiv.
+    const miniDmFfaRohdatenForThisDiscipline =
+      disciplineId === MINI_DM_DISCIPLINE_ID
+        ? resolveOptions.miniDmFfaPodRohdatenByDisciplineId?.get(disciplineId) ?? null
+        : null;
     const miniDmPodOverridesForThisDiscipline =
       miniDmPodsForThisMatchday.length > 0
         ? berechneMiniDmPodOverrides({
@@ -874,6 +887,7 @@ export function buildLegacyMatchdayResolvePreview(
             scoreByTeamId: ppsScoreByTeamId,
             disciplineId,
             playerCount: legacyScorePlayerCountForThisDiscipline,
+            ffaRohdatenByPodId: miniDmFfaRohdatenForThisDiscipline,
           })
         : null;
     const ppsDuellOverridesForThisDiscipline = duellFixtureIndex
@@ -1051,7 +1065,20 @@ export function buildLegacyMatchdayResolvePreview(
               margeM90: null,
               duellSeiten: null,
               ergebnisNormiert: null,
-              miniDmPod: { podId: miniDmPod.podId, platz: miniDmPod.platz, teamIds: miniDmPod.teamIds, wert: miniDmPod.wert },
+              miniDmPod: {
+                podId: miniDmPod.podId,
+                platz: miniDmPod.platz,
+                teamIds: miniDmPod.teamIds,
+                wert: miniDmPod.wert,
+                // PR 4 (21.10.): nur gesetzt, wenn `berechneMiniDmFfaPodOverride()` sie wirklich
+                // befuellt hat (`quelle: "ffa"`) -- der bisherige PPS-Pod-Pfad laesst `miniDmPod.quelle`
+                // `undefined`, dieser Zweig bleibt dadurch inert (kein neuer Schluessel im Objekt,
+                // `JSON.stringify` liesse `undefined`-Werte ohnehin weg -- hier zusaetzlich gar nicht
+                // erst erzeugt, s. Bit-Identitaets-Pflicht).
+                ...(miniDmPod.quelle
+                  ? { quelle: miniDmPod.quelle, rundenPunkteSumme: miniDmPod.rundenPunkteSumme, teilnahme: miniDmPod.teilnahme }
+                  : {}),
+              },
             }
           : {}),
       };
