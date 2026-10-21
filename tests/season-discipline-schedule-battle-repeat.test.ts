@@ -162,13 +162,11 @@ describe("buildSeasonSeededDisciplineSchedule · repeat=2 (Battle Mode 20 Spielt
     }
   });
 
-  it("(iii) Kadergroesse 2. Vorkommen != 1. Vorkommen, fuer alle 20 Disziplinen AUSSER Mini-DM", () => {
-    // MINI-DM AUSGENOMMEN (mini-dm-spielplan-verankerung, 14.09.): Mini-DM ist jetzt rollenfest
-    // auf `playerCount: 1` in BEIDEN Saison-Vorkommen fixiert (s.
-    // `withMiniDmPlayerCountOverride` in season-discipline-schedule.ts) -- es tritt an keiner
-    // Derangement-Ziehung mehr teil, `counts[0] === counts[1] === 1` ist fuer Mini-DM deshalb das
-    // GEWUENSCHTE Verhalten, nicht die Ausnahme von einer Regel. Die anderen 19 Disziplinen
-    // (inklusive der vier anderen Power-Disziplinen, s. Test unten) bleiben unveraendert.
+  it("(iii) Kadergroesse 2. Vorkommen != 1. Vorkommen, fuer alle 20 Disziplinen OHNE AUSNAHME", () => {
+    // PR 1 (21.10., Mini-DM-2-6-Spieler-Rueckkehr): Chris' 14.09.-Fixierung ("mini dm sind immer
+    // 4 teams mit je 1 spieler") ist zurueckgenommen -- Mini-DM nimmt wieder ganz normal an der
+    // Derangement-Ziehung teil, wie jede der anderen 19 Disziplinen (`withMiniDmPlayerCount-
+    // Override` ist entfernt). Keine Sonderbehandlung mehr in dieser Pruefung.
     for (const seasonId of seasonIds) {
       const { entries } = buildRepeatTwoSchedule(seasonId);
       const countsByDisciplineId = new Map<string, number[]>();
@@ -184,42 +182,25 @@ describe("buildSeasonSeededDisciplineSchedule · repeat=2 (Battle Mode 20 Spielt
 
       for (const [disciplineId, counts] of countsByDisciplineId) {
         expect(counts, `${seasonId}/${disciplineId}`).toHaveLength(2);
-        if (disciplineId === "mini-dm") {
-          expect(counts, `${seasonId}/mini-dm`).toEqual([1, 1]);
-          continue;
-        }
         expect(counts[0], `${seasonId}/${disciplineId}: ${counts[0]} sollte != ${counts[1]} sein`).not.toBe(counts[1]);
       }
     }
   });
 
-  it("(iv) je Kategorie und Haelfte genau [2,3,4,5,6] fuer die VIER Nicht-Mini-DM-Power-Disziplinen", () => {
-    // MINI-DM AUSGENOMMEN: die "power"-Kategorie zieht intern weiterhin eine vollstaendige
-    // [2,3,4,5,6]-Permutation ueber alle fuenf Mitglieder (Mini-DM eingeschlossen, bit-identisch
-    // zum Stand vor dieser PR) -- NUR Mini-DMs eigener gezogener Wert wird danach auf 1
-    // ueberschrieben und verworfen, s. `withMiniDmPlayerCountOverride`-Kommentar. tdm/
-    // gewichtheben/hockey/breaking sehen davon nichts: ihre vier Werte bleiben vier PAARWEISE
-    // VERSCHIEDENE Werte aus {2,3,4,5,6} (welche vier der fuenf, haengt vom Seed ab -- der
-    // fuenfte, an Mini-DM gegangene Wert variiert und wird ihnen nie weitergereicht, s. Test
-    // unten fuer den Beweis, dass tatsaechlich alle fuenf Werte je einmal als "der an Mini-DM
-    // gegangene" vorkommen). Diese Pruefung schliesst Mini-DM deshalb aus der [2,3,4,5,6]-Menge
-    // aus und prueft es separat auf `1`; fuer die anderen vier genuegt "vier verschiedene Werte
-    // aus {2..6}", nicht ein fest erwartetes Quadrupel.
+  it("(iv) je Kategorie und Haelfte genau [2,3,4,5,6] fuer ALLE FUENF Power-Disziplinen, Mini-DM eingeschlossen", () => {
+    // PR 1 (21.10.): keine Mini-DM-Ausnahme mehr -- die "power"-Kategorie liefert je Haelfte eine
+    // vollstaendige [2,3,4,5,6]-Permutation ueber alle fuenf Mitglieder (Mini-DM eingeschlossen),
+    // genau wie jede andere Kategorie.
     for (const seasonId of seasonIds) {
       const { entries } = buildRepeatTwoSchedule(seasonId);
       const categoryOf = new Map(DISCIPLINES.map((discipline) => [discipline.id, discipline.category] as const));
 
       const halfOneByCategory = new Map<DisciplineCategory, number[]>(CATEGORIES.map((category) => [category, []]));
       const halfTwoByCategory = new Map<DisciplineCategory, number[]>(CATEGORIES.map((category) => [category, []]));
-      const miniDmCounts: number[] = [];
 
       for (const entry of entries) {
         for (const slot of [entry.discipline1, entry.discipline2]) {
           if (!slot?.disciplineId || slot.playerCount == null) continue;
-          if (slot.disciplineId === "mini-dm") {
-            miniDmCounts.push(slot.playerCount);
-            continue;
-          }
           const category = categoryOf.get(slot.disciplineId);
           if (!category) continue;
           const target = entry.matchdayIndex <= 10 ? halfOneByCategory : halfTwoByCategory;
@@ -227,59 +208,43 @@ describe("buildSeasonSeededDisciplineSchedule · repeat=2 (Battle Mode 20 Spielt
         }
       }
 
-      expect(miniDmCounts, `${seasonId}/mini-dm`).toEqual([1, 1]);
-
       for (const category of CATEGORIES) {
         for (const [half, values] of [
           ["Haelfte1", halfOneByCategory.get(category) ?? []],
           ["Haelfte2", halfTwoByCategory.get(category) ?? []],
         ] as const) {
           const label = `${seasonId}/${category}/${half}`;
-          if (category !== "power") {
-            expect([...values].sort((a, b) => a - b), label).toEqual([2, 3, 4, 5, 6]);
-            continue;
-          }
-          // power: vier PAARWEISE VERSCHIEDENE Werte aus {2..6} -- welche vier ist nicht fixiert
-          // (haengt vom Seed ab, welcher Wert an Mini-DM ging und verworfen wurde).
-          expect(values, label).toHaveLength(4);
-          expect(new Set(values).size, `${label}: alle vier verschieden`).toBe(4);
-          for (const value of values) {
-            expect(value, `${label}: ${value} in {2..6}`).toBeGreaterThanOrEqual(2);
-            expect(value, `${label}: ${value} in {2..6}`).toBeLessThanOrEqual(6);
-          }
+          expect([...values].sort((a, b) => a - b), label).toEqual([2, 3, 4, 5, 6]);
         }
       }
     }
   });
 
-  it("(iv-b) REVIEW-FIX PR #930: legacyScorePlayerCount traegt weiterhin den echten [2..6]-Wert, playerCount bleibt 1", () => {
-    // Unabhaengiges Review von PR #930 (14.09.): `playerCount: 1` floss unveraendert auch in den
-    // laengst aktiven legacy-PPS-Scoring-Pfad (`getRankToPointsValue()`/
-    // `resolveDisciplinePlayerCount()`), dessen Referenztabelle keine Zeile fuer `playerCount: 1`
-    // hat -- jeder Mini-DM-Spieltag haette ab Merge lautlos 0 Liga-Punkte gebucht. Der Fix haelt
-    // beide Werte getrennt: `playerCount` bleibt 1 (Kader-/Pod-Zweck), `legacyScorePlayerCount`
-    // traegt den Wert, den Mini-DM OHNE die Pod-Ueberschreibung gezogen haette -- also weiterhin
-    // eine von vier PAARWEISE VERSCHIEDENEN {2..6}-Zahlen (mit tdm/gewichtheben/hockey/breaking
-    // zusammen genau [2,3,4,5,6] je Kategorie/Haelfte), niemals 1.
-    const legacyScoreValuesSeen = new Set<number>();
+  it("(iv-b) PR 1 (21.10.): legacyScorePlayerCount ist fuer Mini-DM wieder identisch zu playerCount", () => {
+    // Die PR-#930-Trennung (14.09.) bestand genau deshalb, weil `playerCount` fuer Mini-DM auf 1
+    // fixiert war, waehrend `legacyScorePlayerCount` den echten [2..6]-Wert fuer das legacy-PPS-
+    // Scoring trug. PR 1 nimmt die Fixierung zurueck: beide Felder tragen fuer Mini-DM wieder
+    // denselben, gezogenen [2..6]-Wert -- wie fuer jede andere Disziplin. Das Feld selbst bleibt
+    // bestehen (andere Codepfade lesen es weiterhin bevorzugt, s. Kommentar an
+    // `SeasonDisciplineScheduleSlot.legacyScorePlayerCount`).
+    const playerCountValuesSeen = new Set<number>();
     for (const seasonId of seasonIds) {
       const { entries } = buildRepeatTwoSchedule(seasonId);
       for (const entry of entries) {
         for (const slot of [entry.discipline1, entry.discipline2]) {
           if (slot?.disciplineId !== "mini-dm") continue;
-          expect(slot.playerCount, `${seasonId}/mini-dm playerCount`).toBe(1);
-          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount`).not.toBeNull();
-          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount != 1`).not.toBe(1);
-          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount in {2..6}`).toBeGreaterThanOrEqual(2);
-          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount in {2..6}`).toBeLessThanOrEqual(6);
-          legacyScoreValuesSeen.add(slot.legacyScorePlayerCount as number);
+          expect(slot.legacyScorePlayerCount, `${seasonId}/mini-dm legacyScorePlayerCount === playerCount`).toBe(
+            slot.playerCount,
+          );
+          expect(slot.playerCount, `${seasonId}/mini-dm playerCount in {2..6}`).toBeGreaterThanOrEqual(2);
+          expect(slot.playerCount, `${seasonId}/mini-dm playerCount in {2..6}`).toBeLessThanOrEqual(6);
+          playerCountValuesSeen.add(slot.playerCount as number);
         }
       }
     }
-    // Ueber 200 Saison-Seeds sollten alle fuenf moeglichen Werte mindestens einmal als "der an
-    // Mini-DM gegangene, verworfene Wert" auftauchen -- derselbe Beweis wie fuer die vier anderen
-    // Power-Disziplinen oben, nur diesmal fuer das Feld, das den Wert NICHT verwirft.
-    expect([...legacyScoreValuesSeen].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6]);
+    // Ueber 200 Saison-Seeds sollten alle fuenf moeglichen Werte mindestens einmal vorkommen --
+    // derselbe Beweis wie fuer die vier anderen Power-Disziplinen in (iv) oben.
+    expect([...playerCountValuesSeen].sort((a, b) => a - b)).toEqual([2, 3, 4, 5, 6]);
   });
 
   it("erlaubt dieselbe Disziplin an Spieltag 10 und 11 direkt hintereinander (Chris 30.08., keine Mindestabstands-Logik)", () => {
@@ -392,8 +357,10 @@ describe("buildSeasonDisciplinePlayerCountDisplayMap", () => {
         expect(display?.label).toBe(`${occurrences[0].playerCount} · ${occurrences[1].playerCount}`);
         sawDualLabel = true;
       } else {
-        // Ausnahme (z. B. Mini-DM, formatbedingt immer 1): beide Vorkommen gleich -> ein
-        // einfacher Wert wie bei repeat=1, kein redundantes "1 · 1".
+        // Seltener Rand (Derangement-Fallback-Zweig bei einer Kategorie != 5 Disziplinen, oder
+        // ein zufaelliger Gleichstand): beide Vorkommen gleich -> ein einfacher Wert wie bei
+        // repeat=1, kein redundantes "4 · 4". Seit PR 1 (21.10.) gilt das fuer JEDE Disziplin
+        // gleich, Mini-DM eingeschlossen -- keine Sonderrolle mehr.
         expect(display?.label).toBe(String(occurrences[0].playerCount));
       }
     }

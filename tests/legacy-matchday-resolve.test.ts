@@ -772,34 +772,31 @@ describe("legacy matchday resolve preview payload", () => {
 });
 
 /**
- * REVIEW-FIX PR #930 (14.09., "Mini-DM-Spielplan: 4-Team-Pods, Kadergroesse 1, FFA-Motor-Wiring"):
- * unabhaengiges Review fand einen konkreten, reproduzierten Produktions-Bug -- s.
- * docs/design/mini-dm-spielplan-umsetzung-14-09.md und den Review-Kommentar auf PR #930.
+ * REVIEW-FIX PR #930 (14.09.) + PR 1 der Mini-DM-2-6-Spieler-Rueckkehr (21.10.).
  *
- * `withMiniDmPlayerCountOverride` setzt Mini-DMs Spielplan-Slot fest auf `playerCount: 1`
- * (Kader-/Pod-Zweck, korrekt). Mini-DM haengt aber weiterhin NICHT in
- * `ARENA_RESOLVED_DISCIPLINE_IDS` -- es laeuft also weiterhin ueber das laengst aktive,
- * liga-weite PPS-Renn-Scoring (`getRankToPointsValue()`/`distributeRankPointsToPlayers()`,
- * `lib/resolve/rank-to-points.ts`), dessen Referenztabelle (`references/sheets/rank-to-points.json`)
- * nur Zeilen fuer `playerCount` 2 bis 6 hat. Ohne Trennung floss derselbe `1`-Wert auch in diesen
- * Lookup -- `getRankToPointsValue(1, rang)` liefert `null` fuer JEDEN Rang, `distributeRankPoints-
- * ToPlayers()` liefert `pointSource: "rank_to_points_missing"`, und `standings-apply-service.ts`
- * behandelt ein `null` `projectedPoints` als "keine Aenderung" -- jeder Mini-DM-Spieltag haette ab
- * Merge fuer JEDES Team lautlos 0 Liga-Punkte gebucht.
+ * URSPRUENGLICHER BEFUND (14.09.): `withMiniDmPlayerCountOverride` setzte Mini-DMs Spielplan-Slot
+ * fest auf `playerCount: 1` (Kader-/Pod-Zweck). Mini-DM haengt aber NICHT in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` -- es laeuft ueber das liga-weite PPS-Renn-Scoring
+ * (`getRankToPointsValue()`/`distributeRankPointsToPlayers()`, `lib/resolve/rank-to-points.ts`),
+ * dessen Referenztabelle (`references/sheets/rank-to-points.json`) nur Zeilen fuer `playerCount`
+ * 2 bis 6 hat. Der damalige Fix hielt deshalb zwei Werte getrennt
+ * (`SeasonDisciplineScheduleSlot.legacyScorePlayerCount` in lib/data/olyDataTypes.ts): `playerCount`
+ * blieb 1 fuer Kader-/Lineup-/Pod-Zwecke, `legacyScorePlayerCount` trug den eigentlich gezogenen
+ * [2..6]-Wert und NUR dieser erreichte `getRankToPointsValue()`.
  *
- * Der Fix haelt zwei Werte getrennt (`SeasonDisciplineScheduleSlot.legacyScorePlayerCount` in
- * lib/data/olyDataTypes.ts traegt die volle Begruendung): `playerCount` bleibt 1 fuer Kader-/
- * Lineup-/Pod-Zwecke, `legacyScorePlayerCount` traegt den Wert, den Mini-DM OHNE die Pod-
- * Ueberschreibung gezogen haette, und NUR dieser zweite Wert erreicht `getRankToPointsValue()`.
- *
- * Diese Suite deckt genau die Luecke ab, die die PR-eigenen Tests nicht sahen: sie spannt den
- * Bogen von einem ECHTEN, ueber `buildSeasonSeededDisciplineSchedule()` gezogenen Mini-DM-
- * Spielplan-Slot durch `buildMatchdayLineupContract()` (denselben Layer, den
+ * PR 1 (21.10., Chris: "natuerlich wollen wir 2-6 spieler in JEDER disziplin!!!") NIMMT DIE
+ * 14.09.-FIXIERUNG ZURUECK: `withMiniDmPlayerCountOverride` ist entfernt, Mini-DM zieht wieder die
+ * normale `[2,3,4,5,6]`-Kadergroesse wie jede andere Power-Disziplin -- `playerCount` und
+ * `legacyScorePlayerCount` sind fuer Mini-DM jetzt wieder IDENTISCH (beide im gezogenen [2..6]-
+ * Wert), genau wie vor dem 14.09. Diese Suite bleibt als Regressionstest bestehen: sie beweist,
+ * dass der legacy-PPS-Scoring-Pfad fuer JEDEN moeglichen gezogenen Mini-DM-Wert (2..6) funktioniert
+ * -- spannt den Bogen von einem ECHTEN, ueber `buildSeasonSeededDisciplineSchedule()` gezogenen
+ * Mini-DM-Spielplan-Slot durch `buildMatchdayLineupContract()` (denselben Layer, den
  * `legacy-lineup-local-service.ts` fuer den echten Resolve-Kontext liest) bis in
  * `buildLegacyMatchdayResolvePreview()` -- nicht nur den Schedule-/Pod-Layer isoliert
  * (`tests/mini-dm-pod-schedule.test.ts`), sondern bis zum tatsaechlichen Scoring-Ergebnis.
  */
-describe("review-fix PR #930: Mini-DM legacy PPS scoring survives the playerCount:1 schedule override", () => {
+describe("PR 1 (21.10.): Mini-DM legacy PPS scoring funktioniert fuer die zurueckgekehrte 2-6-Kadergroesse", () => {
   // Fuenf "power"-Disziplinen (loest denselben [2,3,4,5,6]-Kategorie-Shuffle aus wie der echte
   // Katalog) plus drei weitere, damit Mini-DM auf seinem Spieltag einen Partner-Slot bekommt.
   const REVIEW_FIX_DISCIPLINES: Discipline[] = [
@@ -860,8 +857,7 @@ describe("review-fix PR #930: Mini-DM legacy PPS scoring survives the playerCoun
         [input.d1DisciplineId]: input.d1RequiredPlayers,
         [input.d2DisciplineId]: input.d2RequiredPlayers,
       },
-      // Kader-/Lineup-Zweck: bleibt bei Mini-DMs echtem Kaderwert (1) -- diese Zahlen duerfen sich
-      // durch den Fix NICHT aendern.
+      // Kader-/Lineup-Zweck: seit PR 1 (21.10.) fuer Mini-DM wieder der echte gezogene [2..6]-Wert.
       disciplineSidePlayerCounts: {
         [`${input.d1DisciplineId}::d1`]: input.d1RequiredPlayers,
         [`${input.d2DisciplineId}::d2`]: input.d2RequiredPlayers,
@@ -999,14 +995,12 @@ describe("review-fix PR #930: Mini-DM legacy PPS scoring survives the playerCoun
     const otherSlot = miniDmIsD1 ? miniDmEntry!.discipline2 : miniDmEntry!.discipline1;
     expect(otherSlot).toBeTruthy();
 
-    // Kader-/Pod-Zweck: bleibt fest 1 (Chris' Entscheidung, PR #930) -- unveraendert durch den Fix.
-    expect(miniDmSlot.playerCount).toBe(1);
-    // Legacy-PPS-Scoring-Zweck (REVIEW-FIX): der EIGENTLICHE, seed-gezogene [2..6]-Wert -- genau
-    // der Review-Fund: ohne diese Trennung waere dieser Wert ebenfalls 1, und rank-to-points.json
-    // hat keine Zeile fuer playerCount 1.
-    expect(miniDmSlot.legacyScorePlayerCount).not.toBe(1);
-    expect(miniDmSlot.legacyScorePlayerCount).toBeGreaterThanOrEqual(2);
-    expect(miniDmSlot.legacyScorePlayerCount).toBeLessThanOrEqual(6);
+    // PR 1 (21.10.): Kader-/Pod-Zweck UND Legacy-PPS-Scoring-Zweck tragen fuer Mini-DM wieder
+    // denselben, echten gezogenen [2..6]-Wert -- keine Fixierung auf 1 mehr.
+    expect(miniDmSlot.playerCount).not.toBe(1);
+    expect(miniDmSlot.playerCount).toBeGreaterThanOrEqual(2);
+    expect(miniDmSlot.playerCount).toBeLessThanOrEqual(6);
+    expect(miniDmSlot.legacyScorePlayerCount).toBe(miniDmSlot.playerCount);
 
     const matchdayContract = buildMatchdayLineupContract({
       season: {
@@ -1031,19 +1025,22 @@ describe("review-fix PR #930: Mini-DM legacy PPS scoring survives the playerCoun
     expect(miniDmContract).toBeTruthy();
     expect(otherContract).toBeTruthy();
 
-    // Dieselbe Trennung, jetzt durch den Lineup-Contract-Layer durch -- den Layer, den
+    // Dieselbe Gleichheit, jetzt durch den Lineup-Contract-Layer durch -- den Layer, den
     // `legacy-lineup-local-service.ts` tatsaechlich fuer den echten Resolve-Kontext liest.
-    expect(miniDmContract.requiredPlayers).toBe(1);
+    expect(miniDmContract.requiredPlayers).toBe(miniDmSlot.playerCount);
     expect(miniDmContract.legacyScorePlayerCount).toBe(miniDmSlot.legacyScorePlayerCount);
 
+    const miniDmRequiredPlayers = miniDmContract.requiredPlayers ?? 2;
     const otherRequiredPlayers = otherContract.requiredPlayers ?? 2;
     const buildTeamContext = (teamId: string, teamName: string, miniDmScore: number, otherBaseScore: number) => {
       const otherScores = Array.from({ length: otherRequiredPlayers }, (_, index) => otherBaseScore - index);
       const miniDmSide = {
         disciplineId: "mini-dm",
-        scores: [miniDmScore],
-        requiredPlayers: miniDmContract.requiredPlayers ?? 1,
-        legacyScorePlayerCount: miniDmContract.legacyScorePlayerCount ?? 1,
+        // PR 1 (21.10.): Mini-DM hat wieder echte `requiredPlayers` Spieler je Seite, nicht mehr
+        // nur einen -- genau wie `otherSide` unten.
+        scores: Array.from({ length: miniDmRequiredPlayers }, (_, index) => miniDmScore - index),
+        requiredPlayers: miniDmRequiredPlayers,
+        legacyScorePlayerCount: miniDmContract.legacyScorePlayerCount ?? miniDmRequiredPlayers,
       };
       const otherSide = {
         disciplineId: otherContract.disciplineId,
