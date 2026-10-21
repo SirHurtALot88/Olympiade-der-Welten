@@ -15,9 +15,10 @@ type ScheduledDiscipline = {
   discipline: Discipline;
   playerCount: number;
   /**
-   * REVIEW-FIX (PR #930, 14.09.): der `playerCount`-Wert VOR der Mini-DM-Ueberschreibung — fuer
-   * jede Disziplin ausser Mini-DM identisch zu `playerCount`. S. ausfuehrliche Begruendung an
-   * `SeasonDisciplineScheduleSlot.legacyScorePlayerCount` (lib/data/olyDataTypes.ts).
+   * Seit PR 1 (21.10., Mini-DM-2-6-Spieler-Rueckkehr) fuer JEDE Disziplin -- Mini-DM
+   * eingeschlossen -- identisch zu `playerCount` (kein Mini-DM-Sonderfall mehr). S.
+   * ausfuehrliche Begruendung an `SeasonDisciplineScheduleSlot.legacyScorePlayerCount`
+   * (lib/data/olyDataTypes.ts).
    */
   legacyScorePlayerCount: number;
 };
