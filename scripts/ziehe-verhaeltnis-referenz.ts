@@ -18,9 +18,10 @@
 // `buildInitialLeagueAssignment()` nachgebildet — dieselbe Zuordnung, die ein neues Battle-Spiel
 // bekommt. Je Spieltag zwei Zufallspaarungen je Liga.
 //
-// Feldgroesse = `legacyScorePlayerCount` des Slots (fuer Mini-DM der gewuerfelte Rohwert; der
-// Kader-/Pod-Wert 1 bleibt `playerCount`) — derselbe Schluessel, mit dem der Resolve die Referenz
-// nachschlaegt.
+// Feldgroesse = `legacyScorePlayerCount` des Slots -- seit PR 1 (21.10., Mini-DM-2-6-Spieler-
+// Rueckkehr) fuer JEDE Disziplin identisch zu `playerCount`, auch fuer Mini-DM (keine
+// Sonderbehandlung mehr, s. `slotFuer()` unten) — derselbe Schluessel, mit dem der Resolve die
+// Referenz nachschlaegt.
 //
 // AUFRUF (s. CLAUDE.md "An die Spielstaende kommen"; das Skript SCHREIBT nichts in die SQLite):
 //
@@ -43,7 +44,6 @@ import {
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { buildInitialLeagueAssignment, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
-import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import type { Discipline, GameState, SeasonDisciplineScheduleSlot } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
@@ -103,13 +103,16 @@ function quantil(sortiert: readonly number[], p: number): number {
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 function slotFuer(discipline: Discipline, n: number): SeasonDisciplineScheduleSlot {
-  const istMiniDm = discipline.id === MINI_DM_DISCIPLINE_ID;
   return {
     disciplineId: discipline.id,
     displayName: discipline.name,
     order: discipline.displayOrder ?? discipline.originalOrder ?? null,
-    // Mini-DM: Kader-/Pod-Wert 1, gewertete Feldgroesse n (wie `withMiniDmPlayerCountOverride`).
-    playerCount: istMiniDm ? 1 : n,
+    // PR 1 (21.10., Mini-DM-2-6-Spieler-Rueckkehr): keine Mini-DM-Sonderbehandlung mehr --
+    // `playerCount` ist fuer JEDE Disziplin die tatsaechlich gewertete Feldgroesse n, genau wie
+    // `buildSeededDisciplinePairs()` es seit dieser PR auch produktiv zieht (kein
+    // `withMiniDmPlayerCountOverride` mehr). Vorher stand hier `istMiniDm ? 1 : n` -- das zog die
+    // Mini-DM-Referenz mit nur EINEM Spieler je Team, unabhaengig von n (s. PR-Report).
+    playerCount: n,
     category: discipline.category,
     legacyScorePlayerCount: n,
   };

@@ -567,13 +567,9 @@ describe("singleplayer game state", () => {
       for (const entry of save.gameState.seasonState.disciplineSchedule ?? []) {
         for (const slot of [entry.discipline1, entry.discipline2]) {
           if (!slot) continue;
-          // MINI-DM AUSGENOMMEN (mini-dm-spielplan-verankerung, 14.09.): rollenfest auf
-          // `playerCount: 1` fixiert, nicht mehr Teil der generischen 2-6-Ziehung -- s.
-          // `withMiniDmPlayerCountOverride` in season-discipline-schedule.ts.
-          if (slot.disciplineId === "mini-dm") {
-            expect(slot.playerCount).toBe(1);
-            continue;
-          }
+          // PR 1 (21.10., Mini-DM-2-6-Spieler-Rueckkehr): keine Ausnahme mehr -- Mini-DM zieht
+          // wieder dieselbe generische 2-6-Kadergroesse wie jede andere Disziplin (die
+          // 14.09.-Fixierung `withMiniDmPlayerCountOverride` ist entfernt).
           expect(slot.playerCount).toBeGreaterThanOrEqual(2);
           expect(slot.playerCount).toBeLessThanOrEqual(6);
         }
