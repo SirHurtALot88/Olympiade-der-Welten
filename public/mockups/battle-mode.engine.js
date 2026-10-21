@@ -7662,6 +7662,45 @@
       {id:"reveal",label:"Reveal",text:"Setzt den Fund über Torment und Spirit um.",gross:"determination",klein:"torment",last:"intelligence",mueh:"medium",profil:{spirit:15.8,will:14.3,torment:14.1,determination:12.7,charisma:9.8,speed:8.6,dexterity:8.5,awareness:7.8,intelligence:5.6,health:2.8}}
     ]
   };
+  // MINI-DM-FFA-ROLLEN JE KADERGROESSE k=2..6 (PR 2 des 6-PR-Plans, 21.10. — der FFA-
+  // Kampfmotor auf 6 Rollen erweitert). NICHT dasselbe wie SLOTS_JE_DISC["mini-dm"] oben
+  // (das bleibt unangetastet beim 4er-Set, s. slotZahl() im Generator-Skript) — dieser
+  // Block speist ausschliesslich MINI_DM_FFA_SLOTS_JE_K weiter unten, der neue, separate
+  // Mechanismus fuer variable FFA-Kadergroessen. Aus derselben echten Quelle wie oben
+  // (resolveSlotRolesForDiscipline("mini-dm","mini-dm",k), lib/lineups/matchday-slot-
+  // roles.ts) — "gezeigt ist gleich gespielt".
+  const MINI_DM_FFA_SLOTS_JE_K={
+    2:[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"stamina",last:"will",mueh:"medium",profil:{torment:23.8,stamina:15.8,will:13.6,health:12.6,power:10.6,dexterity:10.2,intelligence:6.7,spirit:6.7}}
+    ],
+    3:[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"stamina",klein:"will",last:"health",mueh:"medium",profil:{torment:18.4,stamina:17.6,will:15.1,health:14.9,power:12.4,intelligence:7.4,spirit:7.4,dexterity:6.7}}
+    ],
+    4:[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:19,health:16.3,will:15.4,dexterity:13,power:12.7,stamina:12.7,intelligence:5.5,spirit:5.5}},
+      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:20.4,stamina:18.9,health:16.7,power:13.7,will:11.7,intelligence:8,spirit:8,dexterity:2.8}}
+    ],
+    5:[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:19,health:16.3,will:15.4,dexterity:13,power:12.7,stamina:12.7,intelligence:5.5,spirit:5.5}},
+      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"health",klein:"stamina",last:"torment",mueh:"high",profil:{health:23.4,torment:18.2,stamina:17.4,power:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"chaosdriver",label:"Chaos Driver",text:"Erzwingt Tempo über Torment und Power.",gross:"torment",klein:"intelligence",last:"stamina",mueh:"high",profil:{torment:23.3,power:15.5,stamina:15.5,will:13.2,health:11.3,intelligence:8.7,spirit:8.7,dexterity:3.9}}
+    ],
+    6:[
+      {id:"frontliner",label:"Frontliner",text:"Nimmt Druck auf und stabilisiert den Einstieg.",gross:"health",klein:"power",last:"stamina",mueh:"high",profil:{health:23.4,torment:18.2,power:17.4,stamina:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"finisher",label:"Finisher",text:"Schliesst Fights über Torment-Spitzen ab.",gross:"torment",klein:"dexterity",last:"will",mueh:"medium",profil:{torment:26.4,health:15.7,dexterity:12.4,power:12.2,stamina:12.2,will:10.5,intelligence:5.3,spirit:5.3}},
+      {id:"trickfighter",label:"Trick Fighter",text:"Findet Winkel über Dexterity und Will.",gross:"dexterity",klein:"will",last:"health",mueh:"medium",profil:{torment:19,health:16.3,will:15.4,dexterity:13,power:12.7,stamina:12.7,intelligence:5.5,spirit:5.5}},
+      {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"health",klein:"stamina",last:"torment",mueh:"high",profil:{health:23.4,torment:18.2,stamina:17.4,power:12.2,will:10.4,dexterity:7.9,intelligence:5.3,spirit:5.3}},
+      {id:"chaosdriver",label:"Chaos Driver",text:"Erzwingt Tempo über Torment und Power.",gross:"torment",klein:"power",last:"stamina",mueh:"high",profil:{torment:26.4,power:17.4,health:15.5,stamina:12.1,will:10.4,dexterity:7.8,intelligence:5.2,spirit:5.2}},
+      {id:"lasthit",label:"Last Hit",text:"Braucht Nerven für den finalen Zugriff.",gross:"intelligence",klein:"spirit",last:"dexterity",mueh:"medium",profil:{torment:17.9,stamina:17.4,will:14.9,health:13.8,power:12.1,intelligence:9.5,spirit:9.5,dexterity:5.1}}
+    ]
+  };
   // >>> ENDE GENERIERT: arena-daten
   // Reihe und Befehl je Slot — die Inszenierung, nicht die Regel. Das Spiel kennt keine
   // Reihen; dass ein Breaker vorprescht und ein Skirmisher flankiert, ist eine Entscheidung
@@ -50444,6 +50483,29 @@
   // eines neuen variablen Mini-DM-Kaders).
   const MINI_DM_FFA_ROLLEN=Object.freeze(SLOTS_JE_DISC["mini-dm"].map(s2=>s2.id));
 
+  // SECHS ROLLEN JE KADERGROESSE (PR 2 des 6-PR-Plans, 21.10.): die UI-Rollen-Infrastruktur
+  // (lib/lineups/matchday-slot-roles.ts) fuehrt fuer Mini-DM seit je SECHS Rollen-Themen
+  // (frontliner/finisher/trickfighter/ironguard/chaosdriver/lasthit) — der FFA-Kampfmotor
+  // kannte bis hierher nur die ersten vier (MINI_DM_FFA_ROLLEN oben, aus dem unveraenderten
+  // SLOTS_JE_DISC["mini-dm"]). MINI_DM_FFA_ROLLEN6 ist die VOLLE Liste (k=6), aus
+  // MINI_DM_FFA_SLOTS_JE_K[6] (s. Kopfkommentar dort) — dieselben sechs Rollen-Ids, die die
+  // Aufstellungs-UI fuer eine 6er-Kadergroesse zeigt. Reine Erweiterung: NICHTS wird dadurch
+  // gebucht, kein bestehender Aufrufer liest diese Konstante ohne es ausdruecklich zu wollen.
+  const MINI_DM_FFA_ROLLEN6=Object.freeze(MINI_DM_FFA_SLOTS_JE_K[6].map(s2=>s2.id));
+
+  // ROLLEN(-DEFINITIONEN) FUER EINE GEGEBENE KADERGROESSE k. Ohne k (null/undefined) EXAKT
+  // der alte Vierer-Pfad: `rollen`=MINI_DM_FFA_ROLLEN, `rollenDefs`=null (kein Slot-Profil
+  // durchgereicht -- mdffaKaempfer() faellt dann auf den alten SLOTVON-Nachschlag zurueck,
+  // s. slotAufschlagMit()/betroffeneAttributeMit()). MIT k (2..6) die k-spezifischen
+  // Profile aus MINI_DM_FFA_SLOTS_JE_K -- fuer k=4 sind das, aus derselben Quelle gebaut,
+  // dieselben Profile wie der Altpfad (Property-Test "mit {k:4} wie ganz ohne Optionen").
+  function mdffaRollenFuerK(k){
+    if(k==null)return {rollen:MINI_DM_FFA_ROLLEN, rollenDefs:null};
+    const defs=MINI_DM_FFA_SLOTS_JE_K[k];
+    if(!defs)throw new Error("mdffaRollenFuerK: unbekannte Mini-DM-Kadergroesse k="+k+" -- erwartet 2..6.");
+    return {rollen:defs.map(s2=>s2.id), rollenDefs:defs};
+  }
+
   // RUNDENPUNKTE, unveraendert aus der Recherche (Abschnitt 4.3) — Chris hat NUR die
   // Liga-Punkte-Frage ueberstimmt ("mini dm 2-1-0-0 will ich dann"), nicht diese hier.
   const MINI_DM_FFA_RUNDENPUNKTE=Object.freeze([4,3,2,1]);
@@ -50525,15 +50587,43 @@
   // nur aus, wie stark eine Mechanik ueberhaupt auf die Wertung durchschlaegt (ein Treffer-
   // prozent wirkt anders als ein Lebenspunkt); kalibriert per Budget-Methode, s.
   // ARENA_ART["mini-dm"].ffa.
-  function mdffaKaempfer(p,side,slotId){
+  //
+  // ZWEI BYTE-IDENTISCHE WRAPPER (PR 2 des 6-PR-Plans, 21.10.): `slotAufschlagMit`/
+  // `betroffeneAttributeMit` erweitern `slotAufschlag`/`betroffeneAttribute` um ein
+  // optionales `slotDef` (ein Eintrag aus MINI_DM_FFA_SLOTS_JE_K) — OHNE `slotDef` exakt
+  // das alte Verhalten (SLOTVON-Nachschlag ueber `slotId`), byte-identisch. Gebraucht fuer
+  // Chaos Driver/Last Hit (k=5/6): die stehen in SLOTVON gar nicht (das kennt nur die vier
+  // Rollen aus SLOTS_JE_DISC["mini-dm"]), brauchen also ihr Profil direkt uebergeben.
+  function slotAufschlagMit(p,slotId,d,slotDef){
+    if(!slotDef)return slotAufschlag(p,slotId,d);
+    const basis=BASIS_JE_DISC[d]; if(!basis)return 0;
+    const roh=(gewichtet(p.a,slotDef.profil)-gewichtet(p.a,basis))*2.2;
+    return Math.max(-8.5,Math.min(8.5,Math.round(roh*10)/10));
+  }
+  function betroffeneAttributeMit(slotId,dId,eng,slotDef){
+    if(!slotDef)return betroffeneAttribute(slotId,dId,eng);
+    const W=BASIS_JE_DISC[dId]||{};
+    const breit=Object.keys(W).filter(k=>W[k]>0);
+    if(!eng)return breit;
+    // FOKUS-REGEL FUER DEN NEUEN PFAD: im FFA speist JEDES Matrix-Attribut einen benannten
+    // Kanal (s. Kopfkommentar oben) — die Rezept-Pruefung des 4-gegen-4-Chassis
+    // (betroffeneAttribute() oben, "speist dieses Attribut einen Kampfwert?") kennt diese
+    // FFA-Kanaele gar nicht und passt hier nicht. Fokus ist deshalb einfach [gross,klein],
+    // soweit die Matrix das ueberhaupt gewichtet — betrifft praktisch nur Last Hit
+    // (intelligence/spirit), deren Fokus die Rezept-Pruefung sonst als "speist nichts"
+    // verworfen und auf "breit" zurueckgefallen waere.
+    const fokus=[slotDef.gross,slotDef.klein].filter(k=>W[k]>0);
+    return fokus.length?fokus:breit;
+  }
+  function mdffaKaempfer(p,side,slotId,slotDef){
     const d="mini-dm";
-    const engPunkte=slotId?slotAufschlag(p,slotId,d):0;
+    const engPunkte=slotId?slotAufschlagMit(p,slotId,d,slotDef):0;
     const breitPunkte=formVon(p.n)+stufenWert();
     const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const E=eigOhneMutator+eigMutator(p,d);
-    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true),d);
-    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false),d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttributeMit(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttributeMit(slotId,d,false,slotDef),d);
     const P=MDFFA, R=P.mitte, W=BASIS_JE_DISC[d]||{};
     // Zwei Formanteile: `kappa` fuer die Grundkanaele (Stand, Wucht, Treffer, Ausdauer), wo
     // jedes Profil-Zuviel die Rangtreue kostet, und `kappaWege` fuer die WEGE (Finisher setzen/
@@ -50784,17 +50874,21 @@
   // Ruehrt keinen globalen Kampfzustand an (kein U, kein seed, kein disc) — anders als die
   // Sandplatz-Fassung kann diese Funktion deshalb auch mitten in einer laufenden Partie fuer
   // eine Sonde aufgerufen werden, ohne sie zu stoeren.
-  function baueMiniDmFfaRunde(vierSpieler,slotId,saat){
+  function baueMiniDmFfaRunde(vierSpieler,slotId,saat,slotDef){
     if(!Array.isArray(vierSpieler)||vierSpieler.length!==4){
       throw new Error("baueMiniDmFfaRunde: braucht genau 4 Spieler (einen je Team), bekam "+
         (Array.isArray(vierSpieler)?vierSpieler.length:typeof vierSpieler)+".");
     }
-    if(!MINI_DM_FFA_ROLLEN.includes(slotId)){
+    // MINI_DM_FFA_ROLLEN6 (PR 2, s. dort) ist eine ECHTE OBERMENGE von MINI_DM_FFA_ROLLEN --
+    // dieselben vier Rollen-Ids, dieselbe Reihenfolge, plus chaosdriver/lasthit. Die Pruefung
+    // hier lockert sich deshalb gefahrlos auf die groessere Liste, statt zwei Pruefungen zu
+    // pflegen; fuer jeden ALTEN Aufruf (eine der vier alten Rollen) aendert sich nichts.
+    if(!MINI_DM_FFA_ROLLEN6.includes(slotId)){
       throw new Error("baueMiniDmFfaRunde: unbekannte Mini-DM-Rolle \""+slotId+"\" — erwartet "+
-        "eine von "+MINI_DM_FFA_ROLLEN.join(", ")+".");
+        "eine von "+MINI_DM_FFA_ROLLEN6.join(", ")+".");
     }
     const s=normalisiereSaat(saat);
-    const kaempfer=vierSpieler.map((p,side)=>mdffaKaempfer(p,side,slotId));
+    const kaempfer=vierSpieler.map((p,side)=>mdffaKaempfer(p,side,slotId,slotDef));
     const {takte,gespielt}=mdffaSchlagwechsel(kaempfer,s);
     const beitraege=kaempfer.map(k=>k.wert);
     const {punkte,platz}=verteilePlatzierungspunkte(beitraege,MINI_DM_FFA_RUNDENPUNKTE);
@@ -50844,7 +50938,9 @@
     if(!place)return m;
     for(const p of kader){
       const e=place[p.n];
-      if(e&&e.d==="mini-dm"&&MINI_DM_FFA_ROLLEN.includes(e.slot)&&!m.has(e.slot))m.set(e.slot,p);
+      // MINI_DM_FFA_ROLLEN6 statt MINI_DM_FFA_ROLLEN (PR 2, s. dort): echte Obermenge, damit
+      // ein Entwurf auf chaosdriver/lasthit (k=5/6) hier ebenfalls als "gesetzt" erkannt wird.
+      if(e&&e.d==="mini-dm"&&MINI_DM_FFA_ROLLEN6.includes(e.slot)&&!m.has(e.slot))m.set(e.slot,p);
     }
     return m;
   }
@@ -50888,21 +50984,43 @@
       return frei[idx];
     });
   }
-  function spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam){
+  // `optionen` (VIERTER, optionaler Parameter, PR 2 des 6-PR-Plans 21.10.): {k, nurGesetzte}.
+  // OHNE `optionen` (oder mit leerem Objekt) EXAKT der alte Vierer-Pfad -- `mdffaRollenFuerK(null)`
+  // liefert `rollenDefs=null`, jede Runde bekommt also KEIN `slotDef` durchgereicht und
+  // `baueMiniDmFfaRunde`/`mdffaKaempfer` fallen exakt auf ihr altes Verhalten zurueck
+  // (slotAufschlagMit/betroffeneAttributeMit OHNE slotDef, s. deren Kopfkommentar) -- BYTE-
+  // IDENTISCH zu vorher, s. SHA-Vergleichstest. `optionen.k` (2..6) spielt stattdessen die
+  // k-spezifischen Rollen aus MINI_DM_FFA_SLOTS_JE_K[k] (fuer k=4 PER KONSTRUKTION dieselben
+  // Profile wie der Altpfad, s. Property-Test "mit {k:4} wie ganz ohne Optionen").
+  // `optionen.nurGesetzte`: spielt nur Rollen, fuer die MINDESTENS EIN Team einen explizit
+  // gesetzten Kaempfer hat (statt jede Rolle ueber den Eignungs-Reihum aufzufuellen) --
+  // nur wirksam, wenn `platzJeTeam` ueberhaupt etwas setzt (sonst bliebe sonst JEDE Rolle
+  // ungespielt statt auf den Reihum zurueckzufallen).
+  function spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam,optionen){
     if(!Array.isArray(vierTeams)||vierTeams.length!==4){
       throw new Error("spieleMiniDmFfaEvent: braucht genau 4 Team-Kader, bekam "+
         (Array.isArray(vierTeams)?vierTeams.length:typeof vierTeams)+".");
     }
+    const opt=optionen||{};
+    const {rollen,rollenDefs}=mdffaRollenFuerK(opt.k);
     const saatBasis=normalisiereSaat(saat);
     const aufstellung=mdffaAuswahlVorbereiten(vierTeams,platzJeTeam);
-    const runden=MINI_DM_FFA_ROLLEN.map((slotId,i)=>{
+    const irgendwasGesetzt=aufstellung.gesetztJeTeam.some(g=>g.size>0);
+    const slotIdsGespielt=(opt.nurGesetzte&&irgendwasGesetzt)
+      ?rollen.filter(slotId=>aufstellung.gesetztJeTeam.some(g=>g.has(slotId)))
+      :rollen;
+    const runden=slotIdsGespielt.map((slotId)=>{
+      const i=rollen.indexOf(slotId);
+      const slotDef=rollenDefs?rollenDefs[i]:null;
       const vier=mdffaWaehleVier(aufstellung,slotId);
       if(vier.some(p=>!p))throw new Error("spieleMiniDmFfaEvent: mindestens ein Team stellt keinen einzigen Mini-DM-Kaempfer.");
       // Runden-Saat aus der Event-Saat abgeleitet, aber je Rolle verschieden, damit die
-      // vier Runden nicht denselben Zufallslauf viermal wiederholen — derselbe
-      // Hash-vor-Uebergabe-Kniff wie in normalisiereSaat()/seedZuZahl (arena-headless-
-      // runner.ts), nur hier ohne Fremdabhaengigkeit inline gehalten.
-      return baueMiniDmFfaRunde(vier,slotId,(saatBasis*2654435761+i*40503)>>>0);
+      // Runden nicht denselben Zufallslauf wiederholen — derselbe Hash-vor-Uebergabe-Kniff
+      // wie in normalisiereSaat()/seedZuZahl (arena-headless-runner.ts), nur hier ohne
+      // Fremdabhaengigkeit inline gehalten. `i` ist der Index in `rollen`, NICHT in
+      // `slotIdsGespielt` -- ohne optionen/nurGesetzte sind beide Listen identisch (gleiche
+      // Reihenfolge), die Saat je Rolle bleibt also fuer den Altpfad exakt wie vorher.
+      return baueMiniDmFfaRunde(vier,slotId,(saatBasis*2654435761+i*40503)>>>0,slotDef);
     });
     const summeRundenpunkte=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].rundenPunkte,0));
     const summeBeitrag=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].beitrag,0));
@@ -50955,15 +51073,25 @@
   //    Auftrag befuerchtet ("taktische statt rein eignungsoptimale Entscheidungen"), KEIN
   //    Worst-Case. Kader mit weniger als fuenf Eignungstraegern bleiben ohne Versatz (kein Rang
   //    i+1 mehr verfuegbar) — reproduziert dort "optimal".
-  function mdffaPlatzFuerModus(teams,modus){
+  //  - "raenge:0,2,1,..." (PR 2 des 6-PR-Plans, 21.10.): VERALLGEMEINERT "optimal"/"verschoben"
+  //    auf einen beliebigen Eignungs-Rang je Rolle -- Rolle i bekommt den sortierten Spieler auf
+  //    Rang `raenge[i]` (modulo Kadergroesse). Gebraucht fuer `rollen.length` != 4 (opt.k an
+  //    `miniDmFfaSonde`/`miniDmFfaEinfluss`), wo "optimal"/"verschoben" (fest auf 0..3/1..4)
+  //    nicht mehr passen. `rollen` ist standardmaessig MINI_DM_FFA_ROLLEN (die alten vier) --
+  //    jeder bestehende Aufruf (ohne diesen vierten Parameter) ist unveraendert.
+  function mdffaPlatzFuerModus(teams,modus,rollen){
     if(!modus||modus==="aus")return [null,null,null,null];
+    const lauf=rollen||MINI_DM_FFA_ROLLEN;
+    const raenge=modus.startsWith("raenge:")?modus.slice(7).split(",").map(Number):null;
     return teams.map(kader=>{
       const sortiert=[...kader].sort((a,b)=>(b.d["mini-dm"]||0)-(a.d["mini-dm"]||0));
-      const versatz=modus==="verschoben"&&sortiert.length>=MINI_DM_FFA_ROLLEN.length+1?1:0;
+      const versatz=modus==="verschoben"&&sortiert.length>=lauf.length+1?1:0;
       const place={};
       if(!sortiert.length)return place;
-      MINI_DM_FFA_ROLLEN.forEach((slotId,i)=>{
-        const p=sortiert[(i+versatz)%sortiert.length];
+      lauf.forEach((slotId,i)=>{
+        const rang=raenge?(raenge[i]??i):(i+versatz);
+        const idx=((rang%sortiert.length)+sortiert.length)%sortiert.length;
+        const p=sortiert[idx];
         if(p)place[p.n]={d:"mini-dm",slot:slotId};
       });
       return place;
@@ -50976,18 +51104,23 @@
   // {n, side, eig, wert} — eig OHNE Mutator (wie disziplinProbe: der Mutator weicht absichtlich
   // von der Eignung ab, die Abnahme soll das sehen) — und den Event-Ausgang. Die Statistik
   // rechnet das Skript.
+  // `opt.k`/`opt.nurGesetzte` (PR 2, 21.10.): durchgereicht an `spieleMiniDmFfaEvent()`.
+  // `opt.platzModus` baut sein synthetisches `place` auf der ZUR `opt.k` passenden Rollenliste
+  // (statt immer MINI_DM_FFA_ROLLEN) -- s. `mdffaPlatzFuerModus()`-Kommentar, nur so passen
+  // "optimal"/"verschoben"/"raenge:..." auch fuer eine Rollenzahl != 4.
   function miniDmFfaSonde(kader,opt){
     const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const rollenFuerPlatz=mdffaRollenFuerK(o.k).rollen;
     const formVorher=FORMKARTE, mutVorher=MUTATOREN;
     const events=[];
     try{
       FORMKARTE={...FORMKARTE};
       (o.gruppen||[]).forEach((gr,g)=>{
         const teams=gr.map(ix=>mitKit(kader[ix]));
-        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus);
+        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus,rollenFuerPlatz);
         for(let i=0;i<n;i++){
           mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
-          const ev=spieleMiniDmFfaEvent(teams,mdffaEventSaat(g,i,versatz),platzJeTeam);
+          const ev=spieleMiniDmFfaEvent(teams,mdffaEventSaat(g,i,versatz),platzJeTeam,{k:o.k,nurGesetzte:o.nurGesetzte});
           events.push({gruppe:g, lauf:i, teamsIx:gr,
             runden:ev.runden.map(r=>({slotId:r.slotId, takte:r.dauer,
               teilnehmer:r.teams.map(t=>({n:t.n, side:t.side, eig:t.eigOhneMutator, wert:t.beitrag,
@@ -51005,8 +51138,13 @@
   // einflussVon()), dieselbe Rundensaat, dieselben Formkarten und Mutatoren, Gewinn im
   // ANTEIL an der Rundenwertung (dasselbe Mass wie MOTOREN[...].wert()). Normiert wie
   // einflussVon(), Abweichung gegen BASIS_JE_DISC["mini-dm"].
+  // `opt.k`/`opt.nurGesetzte` (PR 2, 21.10.): dieselbe Rollenliste (ggf. k-spezifisch mit
+  // `slotDef`) und dasselbe "nur tatsaechlich gespielte Rollen"-Filter wie in
+  // `spieleMiniDmFfaEvent()` -- die Pp-Sonde misst damit genau die Runden, die ein Event mit
+  // denselben Optionen auch spielen wuerde, keine zweite, abweichende Auswahl.
   function miniDmFfaEinfluss(kader,opt){
     const o=opt||{}, n=o.n||3, versatz=o.versatz||0, hoehe=o.plus||15;
+    const {rollen,rollenDefs}=mdffaRollenFuerK(o.k);
     const formVorher=FORMKARTE, mutVorher=MUTATOREN, hebungVorher=ATTR_HEBUNG;
     const summe={}; let proben=0;
     for(const at of EINFLUSS_ATTR)summe[at]=0;
@@ -51019,7 +51157,7 @@
         // Auswahl-Grundlage (`mdffaAuswahlVorbereiten()`) wie `spieleMiniDmFfaEvent()`, damit die
         // Pp-Sonde den Einfluss der Spieler misst, die bei einer echten Aufstellung TATSAECHLICH
         // kaempfen, nicht eine zweite, abweichende Eignungs-Auswahl.
-        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus);
+        const platzJeTeam=mdffaPlatzFuerModus(teams,o.platzModus,rollen);
         for(let i=0;i<n;i++){
           mdffaVorbereiten(teams,g,i,versatz,o.mutatoren);
           const saatBasis=normalisiereSaat(mdffaEventSaat(g,i,versatz));
@@ -51030,15 +51168,21 @@
           // `spieleMiniDmFfaEvent()` je Aufruf frisch beginnt. Gefunden ueber den
           // Wiring-Test, bevor es den Live-Spielstand je erreicht hat.
           const aufstellung=mdffaAuswahlVorbereiten(teams,platzJeTeam);
-          MINI_DM_FFA_ROLLEN.forEach((slotId,ri)=>{
+          const irgendwasGesetzt=aufstellung.gesetztJeTeam.some(gj=>gj.size>0);
+          const rollenGemessen=(o.nurGesetzte&&irgendwasGesetzt)
+            ?rollen.filter(slotId=>aufstellung.gesetztJeTeam.some(gj=>gj.has(slotId)))
+            :rollen;
+          rollenGemessen.forEach((slotId)=>{
+            const ri=rollen.indexOf(slotId);
+            const slotDef=rollenDefs?rollenDefs[ri]:null;
             const vier=mdffaWaehleVier(aufstellung,slotId);
             const rs=(saatBasis*2654435761+ri*40503)>>>0;
             ATTR_HEBUNG=null;
-            const grund=anteile(baueMiniDmFfaRunde(vier,slotId,rs));
+            const grund=anteile(baueMiniDmFfaRunde(vier,slotId,rs,slotDef));
             vier.forEach((p,side)=>{
               for(const at of EINFLUSS_ATTR){
                 ATTR_HEBUNG={wer:p.n, attribut:at, plus:hoehe};
-                const neu=anteile(baueMiniDmFfaRunde(vier,slotId,rs));
+                const neu=anteile(baueMiniDmFfaRunde(vier,slotId,rs,slotDef));
                 summe[at]+=neu[side]-grund[side];
               }
               proben++;
@@ -53245,9 +53389,17 @@
     // `runMiniDmFfaPodFixtures()`) PRAESENTATIONSZWECK-angebunden, bislang mit `platzJeTeam`
     // weggelassen (reine Eignungs-Auswahl). `platzJeTeam` (20.10., PR A der Mini-DM-Anbindung,
     // drittes/optionales Argument) laesst den Aufrufer die echte Manager-Aufstellung durchreichen.
-    miniDmFfaRunde:(vierSpieler,slotId,saat)=>baueMiniDmFfaRunde(vierSpieler,slotId,saat),
-    miniDmFfaEvent:(vierTeams,saat,platzJeTeam)=>spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam),
-    miniDmFfaRollen:()=>[...MINI_DM_FFA_ROLLEN],
+    // `slotDef`/`optionen` (PR 2 des 6-PR-Plans, 21.10.): optionale vierte/fuenfte Argumente,
+    // s. Kopfkommentar bei baueMiniDmFfaRunde()/spieleMiniDmFfaEvent(). Ohne sie unveraendert.
+    miniDmFfaRunde:(vierSpieler,slotId,saat,slotDef)=>baueMiniDmFfaRunde(vierSpieler,slotId,saat,slotDef),
+    miniDmFfaEvent:(vierTeams,saat,platzJeTeam,optionen)=>spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam,optionen),
+    // `k` (PR 2, optional): liefert die Rollen-Ids/-Labels der k-spezifischen Tabelle statt
+    // der alten festen Vier. Ohne `k` unveraendert.
+    miniDmFfaRollen:(k)=>k!=null?mdffaRollenFuerK(k).rollen.slice():[...MINI_DM_FFA_ROLLEN],
+    miniDmFfaRollenLabel:(k)=>(k!=null?(MINI_DM_FFA_SLOTS_JE_K[k]||[]):SLOTS_JE_DISC["mini-dm"]).map(r=>({id:r.id,label:r.label})),
+    // Rohe Slot-Profile je Kadergroesse (2..6) -- fuer Messskripte/Cross-Checks gegen
+    // `resolveSlotRolesForDiscipline("mini-dm","mini-dm",k)` (lib/lineups/matchday-slot-roles.ts).
+    miniDmFfaSlotsJeK:()=>JSON.parse(JSON.stringify(MINI_DM_FFA_SLOTS_JE_K)),
     miniDmFfaLigapunkte:()=>[...MINI_DM_FFA_LIGAPUNKTE],
     miniDmFfaRundenpunkte:()=>[...MINI_DM_FFA_RUNDENPUNKTE],
     // FFA-ABNAHME (13.10.): Rangtreue- und Pp-Sonde auf dem gespielten Format, s. miniDmFfaSonde()/
