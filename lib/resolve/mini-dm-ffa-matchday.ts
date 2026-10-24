@@ -70,7 +70,7 @@ export function resolveMiniDmFfaPlayerCountForMatchday(
 /** Slot-Ids (`MINI_DM_FFA_ROLLEN6.slice(0, k)`, 1-indexiert ueber den Rueckgabe-Index) fuer eine
  *  gegebene Kadergroesse -- dieselbe Teilliste, die der Motor fuer `opt.k` spielt (s.
  *  `MINI_DM_FFA_SLOTS_JE_K`/`MINI_DM_FFA_ROLLEN6`-Spiegeltest, mini-dm-pod-resolve.ts). */
-function rollenFuerK(k: number): readonly string[] {
+export function rollenFuerK(k: number): readonly string[] {
   return MINI_DM_FFA_ROLLEN6.slice(0, k);
 }
 
@@ -104,8 +104,13 @@ function baueGesetzteRollenFuerTeam(gameState: GameState, teamId: string, matchd
  * Liefert eine Fehlermeldung (String) bei einem Verstoss, sonst `null`. Der AUFRUFER
  * (`runMiniDmFfaMatchday()`) verwirft bei einer Fehlermeldung den GANZEN Pod -- derselbe Rueckfall
  * wie bei einem Motor-`null` (PPS-Pod-Pfad), NICHT die bisherige stille `beitrag ?? 0`-Behandlung.
+ *
+ * Exportiert fuer `tests/mini-dm-ffa-matchday.test.ts` (OPUS-REVIEW, zweite Runde, 24.10.: Opus hat
+ * die Faelle selbst mit einem gefaelschten Motor durchgespielt, aber es fehlte ein eigener Test
+ * dafuer im Repo -- s. dortige Testfaelle fuer vollstaendig/fremde Rolle/doppelter Eintrag/
+ * unvollstaendig).
  */
-function pruefeMotorErgebnisVollstaendigkeit(
+export function pruefeMotorErgebnisVollstaendigkeit(
   pod: Pick<MiniDmPod, "id" | "teamIds">,
   k: number,
   ergebnis: MiniDmFfaPodFixtureResult,

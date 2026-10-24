@@ -12,34 +12,6 @@ import type { runArenaFixtures, RunArenaFixturesOptions, runMiniDmFfaPodFixtures
 import { berechneArenaEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
 import { MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
 
-/**
- * ECHTER ROLLBACK-MECHANISMUS (OPUS-REVIEW, PR 5, Pflicht-Fix 8): `MINI_DM_FFA_VORLAUF_AKTIV`
- * (arena-resolved-disciplines.ts) ist eine reine Code-Konstante -- ein Abschalten braucht Commit +
- * CI + Deploy + Docker-Build, nicht "eine Zeile, kein Deploy-Wettlauf", wie der Kommentar dort es
- * behauptet. DIESE Datei ist bewusst der Ort fuer die Umgebungsvariable (nicht
- * arena-resolved-disciplines.ts): jene Datei ist client-importierbar (`FoundationBattleArenaHost.tsx`,
- * s. ihr eigener Kopfkommentar) und darf deshalb kein `process.env` lesen -- `arena-vorlauf-service.ts`
- * laeuft dagegen ausschliesslich serverseitig.
- *
- * `OLY_MINI_DM_FFA_VORLAUF=aus` auf dem Server (Container-Umgebung, `deploy/hetzner/.env` oder
- * `docker-compose.yml`) schaltet den Mini-DM-FFA-Vorlauf OHNE Deploy ab -- ein Container-Neustart
- * reicht, weil `process.env` beim Prozessstart gelesen wird. Jeder andere Wert (inkl. fehlend/leer)
- * laesst `MINI_DM_FFA_VORLAUF_AKTIV` unveraendert wirken (Code-Konstante bleibt die Grundeinstellung).
- *
- * WICHTIG, UND DAS GEHOERT IN JEDE ROLLBACK-ENTSCHEIDUNG: das Abschalten wirkt nur VORWAERTS, auf
- * Spieltage, deren Vorlauf NACH dem Neustart beginnt. Ein Mini-DM-Spieltag, dessen Snapshot VOR dem
- * Abschalten bereits mit `quelle: "ffa"` fertiggestellt wurde, bucht beim Season-Finish WEITERHIN mit
- * diesem bereits berechneten FFA-Ergebnis -- `kickoffArenaMatchdayApply` liest den fertigen Snapshot,
- * nicht den aktuellen Wert dieses Schalters. Das ist erwartbar (derselbe Snapshot-vorher,
- * buchen-nachher-Grundsatz wie bei jeder anderen Arena-Disziplin), aber ausdruecklich festgehalten,
- * damit niemand nach einem Abschalten einen bereits "ffa"-gebuchten Spieltag als Bug meldet.
- */
-function istMiniDmFfaVorlaufAktiv(): boolean {
-  if (typeof process !== "undefined" && process.env?.OLY_MINI_DM_FFA_VORLAUF === "aus") {
-    return false;
-  }
-  return MINI_DM_FFA_VORLAUF_AKTIV;
-}
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import {
   runMiniDmFfaMatchday,
@@ -60,6 +32,47 @@ import {
   type MatchdayResolveScope,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { mitChromiumSemaphor } from "@/lib/battle/arena-chromium-semaphor";
+
+/**
+ * ECHTER ROLLBACK-MECHANISMUS (OPUS-REVIEW, PR 5, Pflicht-Fix 8): `MINI_DM_FFA_VORLAUF_AKTIV`
+ * (arena-resolved-disciplines.ts) ist eine reine Code-Konstante -- ein Abschalten braucht Commit +
+ * CI + Deploy + Docker-Build, nicht "eine Zeile, kein Deploy-Wettlauf", wie der Kommentar dort es
+ * behauptet. DIESE Datei ist bewusst der Ort fuer die Umgebungsvariable (nicht
+ * arena-resolved-disciplines.ts): jene Datei ist client-importierbar (`FoundationBattleArenaHost.tsx`,
+ * s. ihr eigener Kopfkommentar) und darf deshalb kein `process.env` lesen -- `arena-vorlauf-service.ts`
+ * laeuft dagegen ausschliesslich serverseitig.
+ *
+ * `OLY_MINI_DM_FFA_VORLAUF=aus` auf dem Server (`deploy/hetzner/.env`, s. `.env.example` dort)
+ * schaltet den Mini-DM-FFA-Vorlauf ab. **KORRIGIERT nach der zweiten Opus-Review-Runde (24.10.):**
+ * ein blosser Container-NEUSTART reicht NICHT -- `docker-compose.yml` reicht die Variable per
+ * `${OLY_MINI_DM_FFA_VORLAUF:-}`-Interpolation durch, und diese Interpolation liest Compose nur
+ * beim ERSTELLEN/NEU-ERSTELLEN des Containers (`docker compose up -d`), nicht bei einem blossen
+ * `docker restart` auf dem bereits laufenden Container (der behaelt die beim letzten `up`
+ * eingefrorene Umgebung, `.env` wird dabei nicht neu gelesen). Auf dem Server also: Eintrag in
+ * `deploy/hetzner/.env` setzen, dann `docker compose up -d` im Repo-Verzeichnis -- genau derselbe
+ * Mechanismus wie beim Geschwister-Notschalter `OLY_ARENA_TIER_PARALLEL` (PR #1290,
+ * battle-mode-arena-team-points.ts). Jeder andere Wert (inkl. fehlend/leer) laesst
+ * `MINI_DM_FFA_VORLAUF_AKTIV` unveraendert wirken (Code-Konstante bleibt die Grundeinstellung).
+ *
+ * WICHTIG, UND DAS GEHOERT IN JEDE ROLLBACK-ENTSCHEIDUNG: das Abschalten wirkt nur VORWAERTS, auf
+ * Spieltage, deren Vorlauf NACH dem `docker compose up -d` beginnt. Ein Mini-DM-Spieltag, dessen
+ * Snapshot VOR dem Abschalten bereits mit `quelle: "ffa"` fertiggestellt wurde, bucht beim
+ * Season-Finish WEITERHIN mit diesem bereits berechneten FFA-Ergebnis -- `kickoffArenaMatchdayApply`
+ * liest den fertigen Snapshot, nicht den aktuellen Wert dieses Schalters. Das ist erwartbar
+ * (derselbe Snapshot-vorher, buchen-nachher-Grundsatz wie bei jeder anderen Arena-Disziplin), aber
+ * ausdruecklich festgehalten, damit niemand nach einem Abschalten einen bereits "ffa"-gebuchten
+ * Spieltag als Bug meldet.
+ */
+function istMiniDmFfaVorlaufAktiv(): boolean {
+  // Trim + Kleinschreibung, angeglichen an `resolveArenaTierParallelEnabled()`
+  // (battle-mode-arena-team-points.ts) -- derselbe Normalisierungs-Stil fuer denselben "Server-
+  // Notschalter"-Zweck.
+  const raw = typeof process !== "undefined" ? process.env?.OLY_MINI_DM_FFA_VORLAUF?.trim().toLowerCase() : undefined;
+  if (raw === "aus") {
+    return false;
+  }
+  return MINI_DM_FFA_VORLAUF_AKTIV;
+}
 
 /**
  * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`

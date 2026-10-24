@@ -8,7 +8,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { runMiniDmFfaMatchday, resolveMiniDmFfaPlayerCountForMatchday } from "@/lib/resolve/mini-dm-ffa-matchday";
+import {
+  runMiniDmFfaMatchday,
+  resolveMiniDmFfaPlayerCountForMatchday,
+  pruefeMotorErgebnisVollstaendigkeit,
+  rollenFuerK,
+} from "@/lib/resolve/mini-dm-ffa-matchday";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import type { GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type { MiniDmFfaPodFixtureInput, MiniDmFfaPodFixtureResult } from "@/lib/battle/arena-headless-runner";
@@ -272,5 +277,82 @@ describe("runMiniDmFfaMatchday", () => {
       runMiniDmFfaPodFixturesImpl: spion,
     });
     expect(gesehenesK).toBe(k);
+  });
+});
+
+/**
+ * PRUEFE-MOTOR-ERGEBNIS-VOLLSTAENDIGKEIT (OPUS-REVIEW, Pflicht-Fix 1 der ERSTEN Opus-Review-Runde,
+ * Unit-Tests ergaenzt in der ZWEITEN Runde, 24.10.): Opus hat die vier Faelle unten selbst mit
+ * einem gefaelschten Motor durchgespielt und das Verwerfen bestaetigt -- bisher aber ohne eigenen
+ * Test im Repo. Jeder Fall baut einen MINIMALEN, HANDGEBAUTEN `MiniDmFfaPodFixtureResult` (kein
+ * `buildFakeRunner()`, der absichtlich immer ein VOLLSTAENDIGES Ergebnis liefert) und prueft die
+ * Funktion isoliert, ohne den vollen `runMiniDmFfaMatchday()`-Umweg.
+ */
+describe("pruefeMotorErgebnisVollstaendigkeit", () => {
+  const k = 4;
+  const pod = { id: "pod-1", teamIds: TEAM_IDS };
+
+  function baueVollstaendigesErgebnis(): MiniDmFfaPodFixtureResult {
+    return {
+      podId: pod.id,
+      teamIds: TEAM_IDS,
+      teams: TEAM_IDS.map((teamId, podSide) => ({ teamId, podSide, rundenPunkteSumme: 0, beitragSumme: 0, eventPlatz: podSide + 1, ligaPunkte: 0 })),
+      boxscore: rollenFuerK(k).flatMap((slotId, rundenIndex) =>
+        TEAM_IDS.map((teamId, podSide) => ({
+          slotId,
+          name: `n-${podSide}-${rundenIndex}`,
+          playerId: `${teamId}-p${rundenIndex}`,
+          teamId,
+          podSide,
+          rundenPlatz: podSide + 1,
+          rundenPunkte: 4 - podSide,
+          beitrag: podSide * 100 + rundenIndex,
+        })),
+      ),
+    };
+  }
+
+  it("ein vollstaendiger Boxscore (jede Rolle x jedes Team genau einmal) besteht -- liefert `null`", () => {
+    expect(pruefeMotorErgebnisVollstaendigkeit(pod, k, baueVollstaendigesErgebnis())).toBeNull();
+  });
+
+  it("ein FEHLENDER Boxscore-Eintrag (eine Runde/Team-Kombination fehlt) wird verworfen", () => {
+    const ergebnis = baueVollstaendigesErgebnis();
+    ergebnis.boxscore = ergebnis.boxscore.slice(1); // der allererste Eintrag fehlt.
+    const fehler = pruefeMotorErgebnisVollstaendigkeit(pod, k, ergebnis);
+    expect(fehler).not.toBeNull();
+    expect(fehler).toContain("mini_dm_ffa_unvollstaendiger_boxscore");
+    expect(fehler).toContain(`${k * TEAM_IDS.length - 1}/${k * TEAM_IDS.length}`);
+  });
+
+  it("eine FREMDE Rolle (slotId, die fuer dieses k nicht existiert) wird verworfen -- faengt auch ein vom Motor ignoriertes k ab", () => {
+    const ergebnis = baueVollstaendigesErgebnis();
+    // "lasthit" ist Rolle 6 (Index 5) -- existiert fuer k=4 nicht (rollenFuerK(4) hat nur 4 Rollen).
+    // Genau der Fall, den ein vom Motor ignoriertes `optionen.k` (Ruckfall auf den alten
+    // Vierer-Pfad mit FALSCHEN Rollen fuer ein hoeheres k) erzeugen wuerde.
+    ergebnis.boxscore[0] = { ...ergebnis.boxscore[0]!, slotId: "lasthit" };
+    const fehler = pruefeMotorErgebnisVollstaendigkeit(pod, k, ergebnis);
+    expect(fehler).not.toBeNull();
+    expect(fehler).toContain("mini_dm_ffa_fremde_rolle");
+    expect(fehler).toContain("lasthit");
+  });
+
+  it("ein DOPPELTER Eintrag (zwei Boxscore-Zeilen fuer dieselbe Runde/Team-Kombination) wird verworfen", () => {
+    const ergebnis = baueVollstaendigesErgebnis();
+    // Erster Eintrag doppelt angehaengt -- dieselbe (slotId, teamId)-Kombination taucht zweimal auf.
+    ergebnis.boxscore = [...ergebnis.boxscore, { ...ergebnis.boxscore[0]! }];
+    const fehler = pruefeMotorErgebnisVollstaendigkeit(pod, k, ergebnis);
+    expect(fehler).not.toBeNull();
+    expect(fehler).toContain("mini_dm_ffa_doppelter_boxscore_eintrag");
+  });
+
+  it("ein Eintrag fuer ein FREMDES Team (nicht Teil dieses Pods) wird ignoriert, zaehlt aber nicht als Deckung -- bleibt unvollstaendig, wenn dadurch ein echter Eintrag fehlt", () => {
+    const ergebnis = baueVollstaendigesErgebnis();
+    // Letzter Eintrag (ein echtes Pod-Team) wird durch einen Eintrag fuer ein FREMDES Team ersetzt --
+    // die Deckung dieses Pods sinkt dadurch auf k*4-1, der fremde Eintrag darf das nicht verdecken.
+    ergebnis.boxscore[ergebnis.boxscore.length - 1] = { ...ergebnis.boxscore[ergebnis.boxscore.length - 1]!, teamId: "team-ausserhalb-des-pods" };
+    const fehler = pruefeMotorErgebnisVollstaendigkeit(pod, k, ergebnis);
+    expect(fehler).not.toBeNull();
+    expect(fehler).toContain("mini_dm_ffa_unvollstaendiger_boxscore");
   });
 });

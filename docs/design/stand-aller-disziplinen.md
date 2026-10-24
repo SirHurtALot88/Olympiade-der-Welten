@@ -7,10 +7,18 @@ Aufrufer lieferte `MiniDmFfaPodRohdaten`. Diese PR fuegt genau diesen Aufrufer h
 ihn produktiv.
 
 - **Schalter**: `MINI_DM_FFA_VORLAUF_AKTIV` (lib/battle/arena-resolved-disciplines.ts), `true`.
-  Normaler Rollout-Schalter wie bei jeder anderen Disziplin beim Scharfschalten — `false` faellt in
-  einer Zeile auf den unveraenderten PPS-Pod-Pfad zurueck. Mini-DM bleibt dabei bewusst AUSSERHALB
-  von `ARENA_RESOLVED_DISCIPLINE_IDS` (kein Zweier-Duell-Chassis, eigener Pod-Resolve-Pfad) — der
-  Schalter ist deshalb ein eigener Boolean, kein Mengen-Eintrag.
+  Normaler Rollout-Schalter wie bei jeder anderen Disziplin beim Scharfschalten. Mini-DM bleibt
+  dabei bewusst AUSSERHALB von `ARENA_RESOLVED_DISCIPLINE_IDS` (kein Zweier-Duell-Chassis, eigener
+  Pod-Resolve-Pfad) — der Schalter ist deshalb ein eigener Boolean, kein Mengen-Eintrag.
+  **KORRIGIERT nach der zweiten Opus-Review-Runde (24.10.): kein bloßer Code-Konstante-Schalter
+  mehr.** `lib/battle/arena-vorlauf-service.ts`s `istMiniDmFfaVorlaufAktiv()` liest zusaetzlich die
+  Server-Umgebungsvariable `OLY_MINI_DM_FFA_VORLAUF` — `=aus` schaltet den Vorlauf ab, unabhaengig
+  vom Code-Wert. Das reicht NICHT per Container-Neustart: `deploy/hetzner/docker-compose.yml`
+  interpoliert die Variable aus `deploy/hetzner/.env` nur beim ERSTELLEN des Containers
+  (`docker compose up -d`), nicht bei einem blossen `docker restart`. Richtiger Ablauf: Eintrag in
+  `.env` setzen, dann `docker compose up -d` im Repo-Verzeichnis auf dem Server — derselbe
+  Mechanismus wie beim Geschwister-Notschalter `OLY_ARENA_TIER_PARALLEL` (PR #1290). Bereits mit
+  `quelle: "ffa"` fertiggestellte Snapshots buchen nach dem Abschalten trotzdem weiter so vor.
 - **Chris' Freigabe (24.10.)**: ALLE k=2..6 werden verdrahtet, obwohl `rhoJeEvent` (die
   CLAUDE.md-massgebliche Spieler-Ebene-Zahl, PR 3) bei jedem k unter 0,80 liegt (0,608-0,686) —
   dieselbe Star-/Paartreue-Begruendung, mit der Chris Hockey schon frueher freigegeben hat (s.

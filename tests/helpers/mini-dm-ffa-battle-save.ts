@@ -26,13 +26,99 @@ import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
-import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
+import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
+import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
+import type { PersistenceService } from "@/lib/persistence/types";
 import { expect } from "vitest";
 
 /** Default-Kadergroesse fuer Tests, die die VERDRAHTUNG pruefen (laeuft der FFA-Pfad ueberhaupt
  *  an, wird sein Ergebnis gebucht), nicht die k-Abhaengigkeit selbst (die deckt
  *  `tests/mini-dm-ffa-matchday.test.ts` unit-genau ab). */
 export const TEST_K = 4;
+
+/**
+ * CI-FIX (24.10., Opus-Review-Nacharbeit): erzwingt fuer JEDES Team JEDES Pods eine VOLLSTAENDIGE
+ * Mini-DM-Aufstellung (alle `k` Rollen besetzt), unabhaengig davon, ob der echte (unseeded) KI-/
+ * Liga-Draft diesem Team genug Mini-DM-faehige Spieler zugeteilt hat. Ersetzt NUR den
+ * Mini-DM-Eintrag (`disciplineId: "mini-dm", disciplineSide: "d1"`) eines Teams -- andere
+ * Disziplin-Eintraege/die AI-gesetzte Reihenfolge sonstiger Rollen bleiben unberuehrt. Mini-DM
+ * steht in diesem Helfer immer auf D1 (s. `erzwungenerSpieltag` oben), deshalb `disciplineSide: "d1"`
+ * fest.
+ *
+ * Nutzt bewusst dieselbe `LineupDraftEntry`-Form wie `tests/mini-dm-ffa-matchday.test.ts`s
+ * `buildTeamFixture()` (dort schon gegen `buildArenaAufstellung()` erfolgreich erprobt) -- keine
+ * neue Annahme ueber die Lineup-Form, nur eine zweite Anwendung derselben.
+ */
+function stelleVollstaendigeMiniDmTeilnahmeSicher(
+  persistence: PersistenceService,
+  saveId: string,
+  matchdayId: string,
+  pods: readonly MiniDmPod[],
+  k: number,
+): void {
+  const save = persistence.getSaveById(saveId);
+  if (!save) return;
+  let gameState: GameState = save.gameState;
+  const rollen = MINI_DM_FFA_ROLLEN6.slice(0, k);
+  const teamIds = [...new Set(pods.flatMap((pod) => pod.teamIds))];
+  let geaendert = false;
+
+  for (const teamId of teamIds) {
+    const vollstaendig = new Set(
+      Object.values(buildArenaAufstellung(gameState, teamId, matchdayId))
+        .filter((eintrag) => eintrag.d === MINI_DM_DISCIPLINE_ID)
+        .map((eintrag) => eintrag.slot),
+    );
+    if (rollen.every((rolle) => vollstaendig.has(rolle))) continue; // bereits vollstaendig, nichts zu tun.
+
+    const rosterPlayerIds = gameState.rosters.filter((zeile) => zeile.teamId === teamId).map((zeile) => zeile.playerId);
+    if (rosterPlayerIds.length < rollen.length) {
+      throw new Error(
+        `stelleVollstaendigeMiniDmTeilnahmeSicher: Team ${teamId} hat nur ${rosterPlayerIds.length} Kaderspieler, braucht ${rollen.length} fuer k=${k} -- Draft-Annahme (genug Spieler je Team) stimmt nicht mehr.`,
+      );
+    }
+    const neueEintraege = rollen.map((_rolle, slotIndex) => ({
+      playerId: rosterPlayerIds[slotIndex]!,
+      slotIndex,
+      disciplineId: MINI_DM_DISCIPLINE_ID,
+      disciplineSide: "d1" as const,
+      activePlayerId: null,
+    })) as unknown as LineupDraft["entries"];
+
+    const bestehendeDrafts = gameState.seasonState.lineupDrafts ?? [];
+    const bestehenderDraft = bestehendeDrafts.find((draft) => draft.teamId === teamId && draft.matchdayId === matchdayId);
+    const andereEintraege = (bestehenderDraft?.entries ?? []).filter(
+      (eintrag) => !(eintrag.disciplineId === MINI_DM_DISCIPLINE_ID && eintrag.disciplineSide === "d1"),
+    );
+    const neuerDraft: LineupDraft = {
+      lineupId: bestehenderDraft?.lineupId ?? `lineup-${teamId}-${matchdayId}-mini-dm-fix`,
+      saveId,
+      seasonId: gameState.season.id,
+      matchdayId,
+      teamId,
+      status: bestehenderDraft?.status ?? "submitted",
+      entries: [...andereEintraege, ...neueEintraege],
+      createdAt: bestehenderDraft?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    gameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        lineupDrafts: [...bestehendeDrafts.filter((draft) => !(draft.teamId === teamId && draft.matchdayId === matchdayId)), neuerDraft],
+      },
+    };
+    geaendert = true;
+  }
+
+  if (geaendert) {
+    persistence.saveSingleplayerState(saveId, gameState);
+  }
+}
 
 /**
  * Baut einen frischen Battle-Save, laesst den echten Liga-/KI-Lineup-Pfad einmal durchlaufen und
@@ -115,6 +201,22 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
     persistence,
   );
   expect(batch.summary.blockingReasons, batch.summary.blockingReasons.join(" | ")).toEqual([]);
+
+  // CI-FIX (24.10., Opus-Review-Nacharbeit): `batch.summary.blockingReasons` leer heisst nur, dass
+  // die KI-Aufstellungsrunde selbst nicht komplett gescheitert ist -- es garantiert NICHT, dass
+  // JEDES der vier Pod-Teams fuer JEDE der k Mini-DM-Rollen tatsaechlich einen gesetzten Spieler
+  // hat. Ein Team mit einem (durch die ECHTE, unseeded Zufallsvergabe im Liga-Draft) zu duennen
+  // Mini-DM-Kader bekommt von der KI nur so viele Rollen besetzt, wie Spieler da sind -- der Rest
+  // bleibt ungesetzt, `teilnahme: false` in den Rohdaten (s. Kopfkommentar der Produktionsdatei:
+  // "Teilnahme kommt aus der ECHTEN Aufstellung"). Gemessen (CI, Commit 6daf2581): genau das liess
+  // `tests/arena-vorlauf-mini-dm-ffa.test.ts`s ersten Test sporadisch fehlschlagen (einmal
+  // `platz` falsch, einmal `status: "failed"`), OBWOHL der injizierte Fake-Motor (der NICHTS von
+  // echten Rostern weiss) IMMER einen vollstaendigen, strukturell gueltigen Boxscore liefert -- der
+  // Fake-Motor ist nicht das Problem, die reale Teilnahme-Herleitung ist es. Das ist eine
+  // PRE-EXISTING Fragilitaet der Testmethodik (echter, unseeded Liga-Draft, kein Produktionsfehler)
+  // -- diese Funktion macht die Teilnahme ab hier deterministisch vollstaendig, statt auf einen
+  // "guten" Zufalls-Draft zu hoffen.
+  stelleVollstaendigeMiniDmTeilnahmeSicher(persistence, saveId, matchdayId, pods, k);
 
   return {
     persistence,
