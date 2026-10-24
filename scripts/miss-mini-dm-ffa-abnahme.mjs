@@ -199,7 +199,10 @@ function auswertenFfa(events) {
 
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-const ausgabe = { spiele: SPIELE, seite: SEITE, stroeme: {}, pp: {}, kWerte: {} };
+// `kWerte` wird NUR gesetzt, wenn --k tatsaechlich etwas misst -- ohne --k bleibt `ausgabe` sonst
+// GENAU die alte Form (Opus-Review PR3, 24.10.: "ohne --k byte-identisch" stimmte fuer die
+// Konsolenausgabe/JSON-Struktur nicht ganz, weil dieser Schluessel immer da war).
+const ausgabe = { spiele: SPIELE, seite: SEITE, stroeme: {}, pp: {} };
 const fehler = [];
 try {
   const seite = await browser.newPage();
@@ -274,25 +277,33 @@ try {
     ausgabe.pp = alt.pp;
   }
 
-  // NEU: JEDE angegebene Kadergroesse zusaetzlich, unter `ausgabe.kWerte[k]`.
-  for (const k of K_LISTE) {
-    ausgabe.kWerte[k] = await missEineKadergroesse(k);
+  // NEU: JEDE angegebene Kadergroesse zusaetzlich, unter `ausgabe.kWerte[k]` -- dieser
+  // Schluessel entsteht nur, wenn --k ueberhaupt etwas zu messen hat (s. Kommentar an `ausgabe`
+  // oben).
+  if (K_LISTE.length) {
+    ausgabe.kWerte = {};
+    for (const k of K_LISTE) {
+      ausgabe.kWerte[k] = await missEineKadergroesse(k);
+    }
   }
 } finally {
   await browser.close();
 }
 
 const f = (x, k = 3) => (x == null || Number.isNaN(x) ? "—" : x.toFixed(k));
+// NEUE, k-generische Druckfunktion -- NUR benutzt, wenn --k tatsaechlich etwas misst (s. unten).
+// Byte-identisch zu vorher heisst: OHNE --k laeuft weiterhin der Original-Block darunter,
+// Wort fuer Wort wie vor PR 3 (Opus-Review, 24.10.).
 function druckeKadergroesse(titel, stroeme, pp) {
   for (const [v, s] of Object.entries(stroeme)) {
     console.log(`\n${titel} — Strom ${v} (${s.events} Events, ${s.runden} Runden, ${s.sekunden.toFixed(1)} s)`);
     console.log(`  rho je Runde (Kaempfer)       Mittel ${f(s.rhoRunde)}  Median ${f(s.rhoRundeMedian)}`);
     console.log(`  je Vierergruppe (Mittel der Runden): Median ${f(s.gruppenMedian)}  Spannweite ${f(s.gruppenMin)}..${f(s.gruppenMax)}  unter 0,80: ${s.gruppenUnter80} von ${s.gruppen}`);
-    console.log(`  rho je Event (Anteil)         ${f(s.rhoEvent)}    (absolute Wertung) ${f(s.rhoEventAbs)}`);
+    console.log(`  rho je Event (Anteil, SPIELER-Ebene)  ${f(s.rhoEvent)}    (absolute Wertung) ${f(s.rhoEventAbs)}`);
     console.log(`  Validitaet je Runde           ${f(s.validitaetRunde)}    rho Saison (110 Spieler) ${f(s.rhoSaison)}`);
     console.log(`  Star: Rang 1 ${f(s.star1, 1)} %  · erste zwei ${f(s.star2, 1)} %  · letzter ${f(s.starLetzt, 1)} %`);
     console.log(`  Paare richtig: >=15 ${f(s.paarGross, 1)} %  · 5-15 ${f(s.paarMittel, 1)} %  · <5 ${f(s.paarKlein, 1)} %   (Paare ${JSON.stringify(s.paarAnteil)})`);
-    console.log(`  Team-rho (Eventplatz)         ${f(s.teamRho)}    Ausfallquote ${f(s.ausfall, 1)} %   Takte je Runde ${f(s.takte, 2)}`);
+    console.log(`  Team-rho (Eventplatz, NICHT die CLAUDE.md-Schranke) ${f(s.teamRho)}    Ausfallquote ${f(s.ausfall, 1)} %   Takte je Runde ${f(s.takte, 2)}`);
     if (s.mechanik) console.log(`  je Runde: Buendnisse ${f(s.mechanik.buendnisse, 2)} · Schwachstellen ${f(s.mechanik.schwachstellen, 2)} · Positionierungen ${f(s.mechanik.ausgewichen, 2)} · Finishes ${f(s.mechanik.finishes, 2)} · Finisher ueberstanden ${f(s.mechanik.ueberstanden, 2)} · K.o. durch Schaden ${f(s.mechanik.kos, 2)} · geteilte Beute ${f(s.mechanik.beute, 2)}`);
   }
   for (const [v, r] of Object.entries(pp)) {
@@ -300,9 +311,33 @@ function druckeKadergroesse(titel, stroeme, pp) {
     for (const z of r.reihen) console.log(`  ${z.attribut.padEnd(13)} ${String(z.anteil).padStart(5)} %  (Gewicht ${ausgabe.gewichte[z.attribut] || 0})  Rohgewinn ${z.gewinn}`);
   }
 }
-console.log(`Mini-DM FFA — kaderfest, ${TEAMNAMEN.length} Teams, ${GRUPPEN.length} Vierergruppen, ${SPIELE} Events je Gruppe und Strom, Aufstellung: ${AUFSTELLUNG || "aus (reine Eignungs-Auswahl)"}`);
-console.log(`Gewichte (Motor): ${JSON.stringify(ausgabe.gewichte)}`);
-if (!NUR_K) druckeKadergroesse("Alter Vierer-Pfad (k=4, MINI_DM_FFA_ROLLEN)", ausgabe.stroeme, ausgabe.pp);
-for (const k of K_LISTE) druckeKadergroesse(`k=${k} (MINI_DM_FFA_SLOTS_JE_K[${k}])`, ausgabe.kWerte[k].stroeme, ausgabe.kWerte[k].pp);
+if (K_LISTE.length) {
+  // MIT --k: neue, k-generische Ausgabe (keine Vorgaenger-Form zu erhalten -- dieser Aufruf-Stil
+  // ist neu). `rho je Event (Anteil)` ist hier die CLAUDE.md-massgebliche Spieler-Ebene-Zahl
+  // (Pflichtgroesse "rho je Spiel" bei n=4*k Teilnehmern je Event) -- NICHT `teamRho`.
+  console.log(`Mini-DM FFA — kaderfest, ${TEAMNAMEN.length} Teams, ${GRUPPEN.length} Vierergruppen, ${SPIELE} Events je Gruppe und Strom, Aufstellung: ${AUFSTELLUNG || "aus (reine Eignungs-Auswahl)"}`);
+  console.log(`Gewichte (Motor): ${JSON.stringify(ausgabe.gewichte)}`);
+  if (!NUR_K) druckeKadergroesse("Alter Vierer-Pfad (k=4, MINI_DM_FFA_ROLLEN)", ausgabe.stroeme, ausgabe.pp);
+  for (const k of K_LISTE) druckeKadergroesse(`k=${k} (MINI_DM_FFA_SLOTS_JE_K[${k}])`, ausgabe.kWerte[k].stroeme, ausgabe.kWerte[k].pp);
+} else {
+  // OHNE --k: der Original-Block aus PR 0 (13.10.), unveraendert -- s. Kopfkommentar an `ausgabe`.
+  console.log(`Mini-DM 4-Team-FFA — kaderfest, ${TEAMNAMEN.length} Teams, ${GRUPPEN.length} Vierergruppen, ${SPIELE} Events je Gruppe und Strom, Aufstellung: ${AUFSTELLUNG || "aus (reine Eignungs-Auswahl)"}`);
+  console.log(`Gewichte (Motor): ${JSON.stringify(ausgabe.gewichte)}`);
+  for (const [v, s] of Object.entries(ausgabe.stroeme)) {
+    console.log(`\nStrom ${v} (${s.events} Events, ${s.runden} Runden, ${s.sekunden.toFixed(1)} s)`);
+    console.log(`  rho je Runde (4 Kaempfer)     Mittel ${f(s.rhoRunde)}  Median ${f(s.rhoRundeMedian)}`);
+    console.log(`  je Vierergruppe (Mittel der Runden): Median ${f(s.gruppenMedian)}  Spannweite ${f(s.gruppenMin)}..${f(s.gruppenMax)}  unter 0,80: ${s.gruppenUnter80} von ${s.gruppen}`);
+    console.log(`  rho je Event (16, Anteil)     ${f(s.rhoEvent)}    (16, absolute Wertung) ${f(s.rhoEventAbs)}`);
+    console.log(`  Validitaet je Runde           ${f(s.validitaetRunde)}    rho Saison (110 Spieler) ${f(s.rhoSaison)}`);
+    console.log(`  Star: Rang 1 ${f(s.star1, 1)} %  · erste zwei ${f(s.star2, 1)} %  · letzter ${f(s.starLetzt, 1)} %`);
+    console.log(`  Paare richtig: >=15 ${f(s.paarGross, 1)} %  · 5-15 ${f(s.paarMittel, 1)} %  · <5 ${f(s.paarKlein, 1)} %   (Paare ${JSON.stringify(s.paarAnteil)})`);
+    console.log(`  Team-rho (Eventplatz)         ${f(s.teamRho)}    Ausfallquote ${f(s.ausfall, 1)} %   Takte je Runde ${f(s.takte, 2)}`);
+    if (s.mechanik) console.log(`  je Runde: Buendnisse ${f(s.mechanik.buendnisse, 2)} · Schwachstellen ${f(s.mechanik.schwachstellen, 2)} · Positionierungen ${f(s.mechanik.ausgewichen, 2)} · Finishes ${f(s.mechanik.finishes, 2)} · Finisher ueberstanden ${f(s.mechanik.ueberstanden, 2)} · K.o. durch Schaden ${f(s.mechanik.kos, 2)} · geteilte Beute ${f(s.mechanik.beute, 2)}`);
+  }
+  for (const [v, r] of Object.entries(ausgabe.pp)) {
+    console.log(`\nPp Strom ${v}: ${r.abweichungPp} Pp (${r.proben} Kaempfer-Proben, ${r.sekunden.toFixed(1)} s)`);
+    for (const z of r.reihen) console.log(`  ${z.attribut.padEnd(13)} ${String(z.anteil).padStart(5)} %  (Gewicht ${ausgabe.gewichte[z.attribut] || 0})  Rohgewinn ${z.gewinn}`);
+  }
+}
 console.log("\nSeitenfehler: " + (fehler.length ? fehler.slice(0, 3).join(" | ") : "keine"));
 if (JSON_AUS) writeFileSync(JSON_AUS, JSON.stringify(ausgabe, null, 1));

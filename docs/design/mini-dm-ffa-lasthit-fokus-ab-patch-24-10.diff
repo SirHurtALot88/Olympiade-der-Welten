@@ -1,0 +1,42 @@
+# A/B-TEST-PATCH (PR 3 des 6-PR-Mini-DM-Opus-Plans, 21.10./24.10.) -- NUR ZUR REPRODUKTION,
+# NICHT PRODUKTIV ANGEWENDET. s. docs/design/stand-aller-disziplinen.md, Vierundzwanzigster
+# Nachtrag, Abschnitt "A/B-Test der Last-Hit-Fokusregel".
+#
+# Was er tut: ersetzt in public/mockups/battle-mode.engine.js die Fokusregel des ENG-Kanals
+# jeder FFA-Rolle ([slotDef.gross, slotDef.klein].filter(W>0), Fallback "breit") durch IMMER
+# "breit" (keine 2-Attribut-Konzentration, fuer JEDE Rolle, nicht nur Last Hit).
+#
+# Ergebnis (gemessen mit node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=6 --nur-k --pp=2
+# --seite=<Kopie mit angewendetem Patch>/battle-mode.html, zwei Saatstroeme):
+#   Pp 8,0/8,6 (Fokusregel, unveraendert) gegen 8,7/8,6 (dieser Patch) -- kein messbarer
+#   Unterschied, rho-Median beide 0,800. ENTSCHEIDUNG: kein Produktivcode-Wechsel, die
+#   Alternative ist nicht "klar besser".
+#
+# Reproduktion: eine Kopie von public/mockups/{battle-mode.html,battle-mode.css,
+# battle-mode.rezepte.js,battle-mode.engine.js} anlegen, diesen Patch GEGEN DIE KOPIE DES
+# ENGINE-FILES anwenden (git apply --directory=<kopie> oder patch -p1 im Kopie-Verzeichnis),
+# dann --seite=<kopie>/battle-mode.html messen. `git apply --check` gegen den echten Motorstand
+# bestaetigt, dass der Patch dort weiterhin anwendbar ist (die Zeilen sind seit PR 2 unveraendert).
+--- a/public/mockups/battle-mode.engine.js
++++ b/public/mockups/battle-mode.engine.js
+@@ -50604,16 +50604,10 @@
+     if(!slotDef)return betroffeneAttribute(slotId,dId,eng);
+     const W=BASIS_JE_DISC[dId]||{};
+     const breit=Object.keys(W).filter(k=>W[k]>0);
+-    if(!eng)return breit;
+-    // FOKUS-REGEL FUER DEN NEUEN PFAD: im FFA speist JEDES Matrix-Attribut einen benannten
+-    // Kanal (s. Kopfkommentar oben) — die Rezept-Pruefung des 4-gegen-4-Chassis
+-    // (betroffeneAttribute() oben, "speist dieses Attribut einen Kampfwert?") kennt diese
+-    // FFA-Kanaele gar nicht und passt hier nicht. Fokus ist deshalb einfach [gross,klein],
+-    // soweit die Matrix das ueberhaupt gewichtet — betrifft praktisch nur Last Hit
+-    // (intelligence/spirit), deren Fokus die Rezept-Pruefung sonst als "speist nichts"
+-    // verworfen und auf "breit" zurueckgefallen waere.
+-    const fokus=[slotDef.gross,slotDef.klein].filter(k=>W[k]>0);
+-    return fokus.length?fokus:breit;
++    // A/B-ALTERNATIVE (PR 3 Abnahme-Messung, NUR in dieser Kopie, NICHT im echten Motor):
++    // IMMER breit, wie der breitPunkte-Kanal (eng=false) es ohnehin schon tut -- keine
++    // 2-Attribut-Konzentration auf [gross,klein] fuer irgendeine Rolle.
++    return breit;
+   }
+   function mdffaKaempfer(p,side,slotId,slotDef){
+     const d="mini-dm";

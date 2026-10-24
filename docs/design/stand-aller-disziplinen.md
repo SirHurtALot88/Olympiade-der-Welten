@@ -1,43 +1,69 @@
 # Der Stand aller zwanzig Disziplinen
 
 **Vierundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Abnahme + Referenzen fuer k=2..6 (PR 3 eines
-6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile.** Fortsetzung von PR 1 (#1300,
-Commit 6831d7a7, Spielplan zieht wieder 2-6 Spieler), PR 2 (#1302, Commit a3a88369, FFA-Kampfmotor
-kennt jetzt alle sechs Rollen frontliner/finisher/trickfighter/ironguard/chaosdriver/lasthit,
-`opt.k`) und PR 4 (#1301, Commit dca6815c, Buchungsformel `berechneMiniDmFfaPodOverride()` kann
-FFA-Rohdaten in Liga-Platzierung uebersetzen). PR 3 ist der Mess-/Kalibrierungsschritt, der den
-noch fehlenden PR 5 (Verdrahtung in echte Spieltage) erst zulaessig macht — **rein additiv, die
-bestehende `mini-dm`-Abnahme (vierzehnter Absatz oben, 13.10.) bleibt unberuehrt.**
+6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile. KORRIGIERT 24.10. nach Opus-Review an
+PR #1303: rho auf SPIELER-Ebene (die CLAUDE.md-massgebliche Zahl) besteht bei KEINEM k — die
+urspruengliche Fassung dieses Nachtrags hatte sich faelschlich selbst eine Freigabe ausgestellt.**
+Fortsetzung von PR 1 (#1300, Commit 6831d7a7, Spielplan zieht wieder 2-6 Spieler), PR 2 (#1302,
+Commit a3a88369, FFA-Kampfmotor kennt jetzt alle sechs Rollen
+frontliner/finisher/trickfighter/ironguard/chaosdriver/lasthit, `opt.k`) und PR 4 (#1301, Commit
+dca6815c, Buchungsformel `berechneMiniDmFfaPodOverride()` kann FFA-Rohdaten in Liga-Platzierung
+uebersetzen). PR 3 ist der Mess-/Kalibrierungsschritt, der den noch fehlenden PR 5 (Verdrahtung in
+echte Spieltage) erst zulaessig macht — **rein additiv, die bestehende `mini-dm`-Abnahme
+(vierzehnter Absatz oben, 13.10.) bleibt unberuehrt.**
 
 **Gemessen: `scripts/miss-mini-dm-ffa-abnahme.mjs` um `--k=2..6` erweitert** (kommagetrennt oder
 als Bereich, z. B. `--k=2..6`; `--nur-k` ueberspringt den alten, unveraenderten Vierer-Pfad fuer
-schnellere Laeufe) — ohne `--k` bleibt das Skript byte-identisch zu vorher. Je Kadergroesse misst
-es dieselbe kaderfeste Vierergruppen-Stichprobe (zehn echte Teams aus
+schnellere Laeufe) — ohne `--k` bleibt das Skript byte-identisch zu vorher (Konsolenausgabe UND
+JSON-Struktur, per `diff` gegen den Stand vor PR 3 bestaetigt). Je Kadergroesse misst es dieselbe
+kaderfeste Vierergruppen-Stichprobe (zehn echte Teams aus
 `data/generated/kaderfamilie-live-save.json`, 210 Vierergruppen, zwei Saatstroeme) mit den
 k-spezifischen Rollen aus `MINI_DM_FFA_SLOTS_JE_K[k]`:
 
-| k | rho je Runde (Mittel/Median) | rho je Event/Pod (Eventplatz) | Pp (Budget, n=2) |
-|---|---:|---:|---:|
-| 2 | 0,799 / 0,798 — 0,800 / 0,800 | 0,830 / 0,827 | 7,7 / 7,8 |
-| 3 | 0,814 / 0,816 — 0,800 / 0,800 | 0,869 / 0,873 | 10,0 / 10,9 |
-| 4 | 0,822 / 0,816 — 0,800 / 0,800 | 0,865 / 0,872 | 8,7 / 9,0 |
-| 5 | 0,798 / 0,794 — 0,800 / 0,800 | 0,864 / 0,873 | 8,8 / 9,5 |
-| 6 | 0,813 / 0,811 — 0,800 / 0,800 | 0,891 / 0,888 | 8,0 / 8,6 |
+| k | **rho je Event (Spieler-Ebene, Schranke)** | rho je Runde (Mittel/Median) | rho je Event/Pod (Team-Ebene, Eventplatz) | Star Rang 1 / erste zwei | Paare ab 15 richtig | Pp (Budget, n=2) |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 | **0,650 / 0,656** | 0,799 / 0,798 — 0,800 / 0,800 | 0,830 / 0,827 | 76-78 % / 93-94 % | 98,9-99,0 % | 7,7 / 7,8 |
+| 3 | **0,673 / 0,677** | 0,814 / 0,816 — 0,800 / 0,800 | 0,869 / 0,873 | 76-77 % / 94 % | 99,3 % | 10,0 / 10,9 |
+| 4 | **0,686 / 0,686** | 0,822 / 0,816 — 0,800 / 0,800 | 0,865 / 0,872 | 78-79 % / 94-95 % | 99,4 % | 8,7 / 9,0 |
+| 5 | **0,608 / 0,606** | 0,798 / 0,794 — 0,800 / 0,800 | 0,864 / 0,873 | 77-78 % / 94 % | 99,4 % | 8,8 / 9,5 |
+| 6 | **0,624 / 0,624** | 0,813 / 0,811 — 0,800 / 0,800 | 0,891 / 0,888 | 79-81 % / 95 % | 99,1-99,2 % | 8,0 / 8,6 |
 
-**Ehrlich, nicht schoengerechnet: rho je Runde landet bei JEDEM k exakt auf 0,800, nicht strikt
-darueber** — dieselbe Grenzlage, die die bestehende `mini-dm`-Zeile fuer k=4 schon dokumentiert
-("Median je Runde genau 0,800"). Das ist kein Regressions-Fund dieser Runde, sondern dieselbe
-Eigenschaft bei jeder getesteten Kadergroesse: eine Runde hat immer genau vier Kaempfer, und
-Spearman-rho bei n=4 kennt nur eine Handvoll diskrete Werte (0,8 = genau ein benachbartes Paar
-vertauscht) — der Median vieler Vierergruppen trifft diesen Wert immer wieder exakt. Die
-**gebuchte** Einheit eines Mini-DM-FFA-Pods ist aber nicht die einzelne Rollenrunde, sondern der
-Event-/Pod-Platz (R_t-Rang ueber alle k Runden, `berechneMiniDmFfaPodOverride()` in
-`lib/resolve/mini-dm-pod-resolve.ts`) — auf dieser Ebene liegt JEDES k klar ueber 0,80 (0,827 bis
-0,891). Pp bleibt bei jedem k deutlich unter der 25er-Schranke (7,7 bis 10,9), auch k=6 mit der
-neuen Last-Hit-Rolle. **Status laut `data/generated/disziplin-abnahme.json` (neuer, eigener
-Schluessel `mini-dm-ffa`, additiv): rho auf Rundenebene durchweg knapp/an der Grenze bei allen
-fuenf k, auf Event-/Pod-Ebene bei allen fuenf k bestanden; Pp bei allen fuenf k bestanden.** Kein k
-wird deshalb fuer PR 5 gesperrt, aber die Rundenebene-Grenzlage gehoert in jeden PR-5-Bericht.
+**Die massgebliche Zahl ist `rho je Event` auf SPIELER-Ebene (fett), nicht `teamRhoEventplatz`.**
+CLAUDE.md verlangt rho auf Spielerebene je Spiel ("ein Spieler mit Stat 80 muss zu den Top-Leuten
+gehoeren") — fuer Mini-DM-FFA ist "ein Spiel" ein Event (ein Pod-Treffen, 4 Teams, k Runden, also
+4·k Teilnehmer), gemessen als rho zwischen Eignung und normiertem Beitrag ueber ALLE Teilnehmer
+dieses Events (`auswertenFfa().rhoEvent` im Messskript — das Skript berechnete diese Zahl bereits
+vorher, die erste Fassung dieses Nachtrags fuehrte sie aber nicht). **Ergebnis: rho je Event liegt
+bei JEDEM k klar UNTER 0,80 (0,608 bis 0,686) — bestanden ist das Kriterium bei KEINEM k.** k=5
+und k=6, die beiden NEUEN Kadergroessen aus diesem PR, liegen sogar SCHLECHTER als der heutige
+4er-Baseline-Wert (0,686) ab, nicht besser. `teamRhoEventplatz` (Team-Ebene, 4 Werte je Event) ist
+dagegen bei allen fuenf k komfortabel ueber 0,80 (0,827-0,891) — das ist aber nicht die
+CLAUDE.md-Schranke und war schon einmal als nicht ausreichend verworfen worden
+(`docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md` Abschnitt 4: Team-rho 0,87 ohne
+Spieler-rho galt dort explizit als nicht genuegend).
+
+**Auch rho je Runde ist kritischer als "nur ein Median-Grenzfall": bei k=2 und k=5 liegt sogar das
+MITTEL unter 0,80** (0,799/0,798 bzw. 0,798/0,794), nicht nur der Median exakt auf 0,800. Dass der
+Median bei ALLEN FUENF k exakt auf 0,800 landet, ist weiterhin kein neuer Regressionsbefund,
+sondern eine Eigenschaft von Spearman-rho bei n=4 Kaempfern je Runde (0,8 = genau ein benachbartes
+Paar vertauscht, einer der wenigen diskreten Werte) — aber das macht die Rundenebene nicht zu einem
+brauchbaren Ersatz fuer die fehlende Spieler-Event-Zahl.
+
+**Gegengewicht, CLAUDE.md-eigene, ehrlichere Lesart bei kleinem n: Star- und Paartreue sind bei
+jedem k gut.** Star auf Rang 1 landet bei 76-81 %, in den ersten beiden bei 93-95 %; Paare mit
+mindestens 15 Punkten Eignungsabstand werden zu 99 % richtig geordnet (Tabelle oben) — konsistent
+mit CLAUDE.md Abschnitt "Was rho drueckt, ist oft gar kein Fehler": die niedrige rho-Zahl kommt vor
+allem aus den knappen Paaren (< 5 Punkte Abstand), die kein Motor zuverlaessig ordnen kann oder
+soll. Das rechtfertigt die niedrige rho-Zahl nicht weg, zeigt aber, dass die Mechanik den STAR
+zuverlaessig erkennt.
+
+**Status: NICHT BESTANDEN auf der massgeblichen Spieler-Ebene, bei jedem k=2..6 — keine
+Selbstfreigabe.** `data/generated/disziplin-abnahme.json` (Schluessel `mini-dm-ffa`, additiv,
+`"status"`-Feld) haelt das jetzt explizit fest, statt "bestanden"/"kein k wird gesperrt" zu
+schreiben. Ob PR 5 trotzdem kommt — und falls ja, mit welchem k oder mit welcher Rezeptaenderung
+zuerst — ist eine Entscheidung, die bei Chris liegt, nicht bei dieser Messrunde. Pp bleibt bei
+jedem k deutlich unter der 25er-Schranke (7,7 bis 10,9), das Pp-Kriterium ist unabhaengig davon
+bestanden.
 
 **Referenz real gezogen statt kopiert: `scripts/ziehe-mini-dm-ffa-referenz.mjs` (neu) befuellt
 `data/generated/mini-dm-ffa-referenz.json`.** Die Datei kam aus PR 4 als Platzhalter
@@ -47,12 +73,27 @@ jedes k=2..6 aus 10 080 simulierten Events (210 Vierergruppen × 24 Laeufe × zw
 `v_t = R_t/k + B_t/(k·10⁶)`, gelesen von `resolveMiniDmFfaMargeReferenz()`) und `spieler.p50`/
 `p995` (Perzentile des rohen Einzelrunden-Beitrags, gelesen von
 `resolveMiniDmFfaSpielerPpReferenz()`/`ppAusMiniDmFfaBeitrag()`). Ergebnis je k: m90 1,33-1,5,
-Spieler-p50 fallend von 145 (k=2) auf 69 (k=6) — plausibel, weil mehr Runden den rohen
-Einzelbeitrag ueber mehr Gegner/Formkarten-Ziehungen glaetten. **Bleibt trotzdem toter Code**: PR 4
-hat keinen produktiven Aufrufer, der `ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId`
-befuellt (grep ueber das ganze Repo bestaetigt: nur die Typdefinition und der Default-Durchgriff
-auf `null` in `legacy-matchday-resolve-engine.ts`) — das ist PR 5. Das Befuellen der Referenz
-aendert deshalb an keinem heutigen Resolve-Lauf etwas.
+Spieler-p50 fallend von 145 (k=2) auf 69 (k=6). **KORRIGIERT 24.10.: das ist KEINE "Glaettung
+durch mehr Runden"** (ein einzelner Einzelrunden-Beitrag haengt von der Rundenzahl gar nicht ab) —
+**sondern ein SELEKTIONSEFFEKT**: bei hoeherem k spielen auch die Eignungs-Raenge 5/6 eines Teams
+mit (chaosdriver/lasthit), die bei k=2..4 gar nicht erst antreten, und das sind durchweg die
+schwaecheren Mini-DM-Kaempfer eines Kaders. Das zieht den POOLED Median ueber alle Runden/Raenge
+nach unten, je hoeher k.
+
+**Offene Design-Frage fuer PR 5, aus diesem Befund:** `ppAusMiniDmFfaBeitrag()` liest die
+Referenz heute gepoolt je k (eine einzige p50/p995 fuer alle Raenge). Bei GLEICHER individueller
+Leistung (derselbe rohe `beitrag`) bekaeme derselbe Spieler ueber diese Kurve bei k=6 MEHR PP als
+bei k=2, weil die gepoolte p50-Referenz bei k=6 niedriger liegt (69 statt 145) — nicht, weil er
+besser gespielt hat, sondern weil mehr schwaechere Mitspieler die Referenz nach unten ziehen. PR 5
+muss entscheiden, ob die Referenz weiter gepoolt je k bleibt (einfach, aber mit diesem Verzerrungs-
+Risiko) oder nach Rolle/Eignungsrang getrennt gezogen wird (genauer, aber sechsmal so viele
+Referenzzellen). Diese PR trifft diese Entscheidung nicht, haelt sie aber ausdruecklich fest.
+
+**Bleibt trotzdem toter Code**: PR 4 hat keinen produktiven Aufrufer, der
+`ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId` befuellt (grep ueber das ganze Repo
+bestaetigt: nur die Typdefinition und der Default-Durchgriff auf `null` in
+`legacy-matchday-resolve-engine.ts`) — das ist PR 5. Das Befuellen der Referenz aendert deshalb an
+keinem heutigen Resolve-Lauf etwas.
 
 **A/B-Test der Last-Hit-Fokusregel: KEIN messbarer Unterschied, keine Codeaenderung.** PR 2 hat
 fuer den neuen ENG-Kanal jeder FFA-Rolle (`betroffeneAttributeMit`) eine Fokusregel gebaut:
@@ -64,14 +105,16 @@ Override (`lib/player-generator/spiel-eignung-overrides.ts`: intelligence/spirit
 Fokusregel ist also fuer Last Hit tatsaechlich wirksam (gemessen: "Gewichte (Motor)"
 `{torment:21,health:18,power:14,stamina:14,will:12,dexterity:9,intelligence:6,spirit:6}`). Gegen
 eine Kopie von `battle-mode.engine.js`, in der `betroffeneAttributeMit` fuer den ENG-Kanal IMMER
-die breite Streuung liefert (keine Fokus-Konzentration mehr, fuer JEDE Rolle, nicht nur Last Hit),
-gemessen mit `--k=6 --seite=<kopie> --pp=2` (Budget-Methode, zwei Saatstroeme): Pp 8,0/8,6
-(Fokusregel) gegen 8,7/8,6 (immer breit), rho je Runde Median beide 0,800, rho Mittel 0,813/0,811
-gegen 0,816/0,814 — innerhalb der Saatstrom-zu-Saatstrom-Streuung, kein klarer Gewinner. Intelligence/
-spirit treffen ihr Matrixgewicht (6 %) in BEIDEN Varianten nahezu exakt (Fokusregel: 7,1/6,9 %
-Intelligence, 6,0/6,0 % Spirit). **Entscheidung: keine Codeaenderung** — die Alternative ist nicht
-"klar besser" (CLAUDE.md-Kriterium fuer eine Aenderung an einer bereits dokumentierten,
-Chris-bestaetigten Mechanik), beide liegen komfortabel innerhalb der 25er-Pp-Schranke.
+die breite Streuung liefert (keine Fokus-Konzentration mehr, fuer JEDE Rolle, nicht nur Last Hit;
+Patch zur Reproduktion eingecheckt:
+`docs/design/mini-dm-ffa-lasthit-fokus-ab-patch-24-10.diff`), gemessen mit
+`--k=6 --seite=<kopie> --pp=2` (Budget-Methode, zwei Saatstroeme): Pp 8,0/8,6 (Fokusregel) gegen
+8,7/8,6 (immer breit), rho je Runde Median beide 0,800, rho Mittel 0,813/0,811 gegen 0,816/0,814 —
+innerhalb der Saatstrom-zu-Saatstrom-Streuung, kein klarer Gewinner. Intelligence/spirit treffen
+ihr Matrixgewicht (6 %) in BEIDEN Varianten nahezu exakt (Fokusregel: 7,1/6,9 % Intelligence,
+6,0/6,0 % Spirit). **Entscheidung: keine Codeaenderung** — die Alternative ist nicht "klar besser"
+(CLAUDE.md-Kriterium fuer eine Aenderung an einer bereits dokumentierten, Chris-bestaetigten
+Mechanik), beide liegen komfortabel innerhalb der 25er-Pp-Schranke.
 
 **Manager-Mode-Bit-Identitaet nachgewiesen, nicht nur behauptet.** Zwei unabhaengige Nachweise
 gegen eine frische live-save-Kopie (`scripts/pruefe-spiegel-frische.ts`: beide Spiegel < 1 h alt):
