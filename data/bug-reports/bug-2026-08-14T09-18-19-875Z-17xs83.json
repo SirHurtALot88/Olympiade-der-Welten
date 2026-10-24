@@ -1,0 +1,42 @@
+{
+  "note": "Beim Switch in Season 2 ist C-C plötzlich auch ein von mir gesteuertes Team! aber nur im KI Verhalten Reiter - und ich bekomme das nicht weg... deswegen sollte es nur noch einen Weg geben im Spielstände & Start Reiter! Bitte dafür sorgen dass ich an EINER Stelle die Teams auf Human oder AI umstellen kann das ist aktuell nicht möglich",
+  "view": "teamSettings",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=teamSettings&team=S-C&saveId=new-game-1786626914058-hwz8fk&saveMode=solo_1",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T09:18:24.184Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T09-18-19-875Z-17xs83",
+  "createdAt": "2026-08-14T09:18:19.875Z",
+  "page": {
+    "path": "/foundation",
+    "view": "teamSettings",
+    "tab": null,
+    "label": "Verwaltung · Settings"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

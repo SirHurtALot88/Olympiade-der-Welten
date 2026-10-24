@@ -1,0 +1,41 @@
+{
+  "note": "für Später - bitte mal auswerten wie viele verletzungen es überhaupt gab. ich habe das gefühl es ist zu einfach auch mit 9 spielern verletzungen zu vermeiden!  sonst muss ein einsatz auf allen 3 stufen etwas mehr kosten",
+  "view": "lineup",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=lineup&team=S-C&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 1710,
+    "height": 846
+  },
+  "clientTime": "2026-08-10T11:48:46.659Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-10T11-48-46-940Z-cd83zb",
+  "createdAt": "2026-08-10T11:48:46.940Z",
+  "page": {
+    "path": "/foundation",
+    "view": "lineup",
+    "tab": null,
+    "label": "Spieltag · Einsatzliste"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 9,
+    "matchdayId": "season-2-matchday-9",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "note": "beim letzten spieltag könnte es cool sein die top teams die noch chance auf die meisterschaft haben etwas hervorzuheben damit man den meisterschaftskampf im blick hat oder das irgendwie präsenter zu machen",
+  "view": "matchdayArena",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=matchdayArena&team=S-C&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-04T18:30:44.531Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-04T18-31-52-147Z-g5enkj",
+  "createdAt": "2026-08-04T18:31:52.147Z",
+  "page": {
+    "path": "/foundation",
+    "view": "matchdayArena",
+    "tab": null,
+    "label": "Spieltag · Arena"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
