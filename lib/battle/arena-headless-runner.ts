@@ -924,6 +924,15 @@ export type RunMiniDmFfaPodFixturesOptions = {
    *  Lineup-Entwurf existiert — fuer Aufrufer, die (noch) bewusst das Vorher-Verhalten wollen
    *  (z. B. eine Vergleichsmessung). Default `true`. */
   aufstellungBeachten?: boolean;
+  /**
+   * `k` (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung") — durchgereicht als DRITTES Feld
+   * von `optionen` an `window.__arena.miniDmFfaEvent()`/`spieleMiniDmFfaEvent()` (battle-mode.engine.js,
+   * PR 2 #1302): die Kadergroesse 2..6 des Spielplan-Slots dieses Spieltags,
+   * `MINI_DM_FFA_SLOTS_JE_K[k]` spielt dann genau `k` Runden mit den k-spezifischen Rollenprofilen
+   * statt der festen vier. OHNE `k` (jeder bisherige Aufrufer -- nur Tests) EXAKT der alte
+   * Vierer-Pfad (`mdffaRollenFuerK(null)`), byte-identisches Verhalten.
+   */
+  k?: number;
 };
 
 /**
@@ -950,7 +959,7 @@ function baueEindeutigeNamenZuordnungFuerTeam(kader: ArenaSpieler[]): Map<string
  * Einschraenkungen: nur Argumente + Browser-Globale, keine Node-Closures).
  */
 async function simuliereMiniDmFfaPodsImBrowser(payload: {
-  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[] }>;
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen?: { k?: number } }>;
   timeoutMs: number;
 }): Promise<Array<RoherMiniDmFfaEventErgebnis | null>> {
   const fenster = window as unknown as {
@@ -959,6 +968,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
         vierTeams: ArenaSpieler[][],
         saat: number,
         platzJeTeam?: ArenaAufstellung[],
+        optionen?: { k?: number },
       ) => RoherMiniDmFfaEventErgebnis | null;
     };
   };
@@ -971,7 +981,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 
-  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam));
+  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
 }
 
 /**
@@ -1053,7 +1063,12 @@ export async function runMiniDmFfaPodFixtures(
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const rohErgebnisse = await page.evaluate(simuliereMiniDmFfaPodsImBrowser, {
-      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed, platzJeTeam: pod.platzJeTeam })),
+      pods: laufbarePods.map((pod) => ({
+        teams: pod.kaderJeTeam,
+        seed: pod.seed,
+        platzJeTeam: pod.platzJeTeam,
+        ...(options.k != null ? { optionen: { k: options.k } } : {}),
+      })),
       timeoutMs,
     });
 

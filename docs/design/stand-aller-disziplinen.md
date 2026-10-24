@@ -1,5 +1,64 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Fuenfundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Vorlauf-Verdrahtung (PR 5 eines 6-PR-Opus-Plans,
+21.10., "das Risikoreichste" laut Plan) — scharf geschaltet.** Der Mini-DM-FFA-Pfad (Motor PR 2
+#1302, Buchungsformel PR 4 #1301, Abnahme PR 3 #1303) war bis hierher additiv und tot: kein
+Aufrufer lieferte `MiniDmFfaPodRohdaten`. Diese PR fuegt genau diesen Aufrufer hinzu und schaltet
+ihn produktiv.
+
+- **Schalter**: `MINI_DM_FFA_VORLAUF_AKTIV` (lib/battle/arena-resolved-disciplines.ts), `true`.
+  Normaler Rollout-Schalter wie bei jeder anderen Disziplin beim Scharfschalten — `false` faellt in
+  einer Zeile auf den unveraenderten PPS-Pod-Pfad zurueck. Mini-DM bleibt dabei bewusst AUSSERHALB
+  von `ARENA_RESOLVED_DISCIPLINE_IDS` (kein Zweier-Duell-Chassis, eigener Pod-Resolve-Pfad) — der
+  Schalter ist deshalb ein eigener Boolean, kein Mengen-Eintrag.
+- **Chris' Freigabe (24.10.)**: ALLE k=2..6 werden verdrahtet, obwohl `rhoJeEvent` (die
+  CLAUDE.md-massgebliche Spieler-Ebene-Zahl, PR 3) bei jedem k unter 0,80 liegt (0,608-0,686) —
+  dieselbe Star-/Paartreue-Begruendung, mit der Chris Hockey schon frueher freigegeben hat (s.
+  CLAUDE.md "Die Abnahme jeder Disziplin"). `data/generated/disziplin-abnahme.json` traegt das
+  additiv als eigenes `freigabe`-Feld am Schluessel `mini-dm-ffa` — die gemessenen Zahlen selbst
+  bleiben unveraendert stehen.
+- **Neue Datei `lib/resolve/mini-dm-ffa-matchday.ts`**: `runMiniDmFfaMatchday()` nimmt alle Pods
+  eines Mini-DM-Spieltags, ruft `runMiniDmFfaPodFixtures()` (jetzt mit `optionen.k`, s. unten) MIT
+  der echten Aufstellung/Mutatoren/Spieltagswurf auf und uebersetzt das Ergebnis in
+  `MiniDmFfaPodRohdaten`. **Teilnahme a(t,r) kommt bewusst aus der ECHTEN Aufstellung
+  (`buildArenaAufstellung()`), NICHT aus dem Motor-Boxscore** — der Motor selbst spielt jede Rolle
+  auch ohne Lineup-Eintrag per Eignungs-Reihum (PR A), die Buchungsformel (PR 4) will davon aber nur
+  die echten Eintraege sehen. Ein Reihum-Fallback-Kaempfer bekommt deshalb `beitrag: 0`/`teilnahme:
+  false` in den Rohdaten und KEINE Spieler-PP, unabhaengig davon, was der Motor fuer ihn simuliert
+  hat.
+- **arena-vorlauf-service.ts**: eigener Mini-DM-Zweig neben (nicht in) dem generischen
+  `runBattleModeArenaMatchday()`-Loop — `determineArenaDisciplineContexts()` erkennt Mini-DMs
+  Praesenz an D1/D2 jetzt zusaetzlich zur bestehenden `ARENA_RESOLVED_DISCIPLINE_IDS`-Pruefung,
+  OHNE "mini-dm" in `arenaDisciplineIds` aufzunehmen (das wuerde den falschen, Fixture-basierten
+  Dispatch treffen). `ermittleAnwendbarkeit()` ist jetzt auch fuer einen Spieltag anwendbar, an dem
+  NUR Mini-DM steht (vorher waere der Vorlauf fuer so einen Spieltag nie angelaufen). Derselbe
+  Semaphor/derselbe Zwei-Versuche-Retry wie die anderen Disziplinen; ein Ausfall faellt defensiv auf
+  den PPS-Pod-Pfad zurueck (PR 4 war genau dafuer gebaut) und markiert den Gesamt-Vorlauf als
+  `"failed"` — bucht trotzdem (`matchday-auto-run-service.ts` behandelt `"failed"` als Warnung, nicht
+  als Blocker).
+- **arena-seed.ts/arena-eingabe-hash.ts**: `buildMiniDmFfaPodMatchSeed()` (vier-Team-Pod statt
+  Heim/Gast-Duell) und `berechneMiniDmFfaEingabeHash()` (deckt zusaetzlich `playerCount`/k und die
+  volle Aufstellung aller vier Pod-Teams ab — ohne `playerCount` im Hash wuerden zwei Spieltage mit
+  unterschiedlichem k, aber sonst identischer Aufstellung, denselben Fingerabdruck tragen).
+  `lib/foundation/matchday-resolve-snapshot.ts`s `findeArenaEingabeHashDivergenz()` dispatcht fuer
+  `disciplineId === "mini-dm"` jetzt auf diese Funktion statt auf die generische (sonst waere jede
+  Buchung mit einer arena-aufgeloesten Zweit-Disziplin UND Mini-DM am selben Spieltag faelschlich
+  als "instabil" verworfen worden, weil die generische Funktion fuer Mini-DM keine Fixtures findet).
+- **Offene Design-Frage aus PR 3 entschieden**: `ppAusMiniDmFfaBeitrag()` liest die Referenz
+  weiterhin GEPOOLT je k (nicht nach Rolle/Eignungsrang getrennt). Begruendung: eine getrennte
+  Referenz braucht sechsmal so viele Referenzzellen, die PR 3 nicht gezogen hat — das waere eine
+  neue Messrunde, kein reiner Verdrahtungs-Schritt. Der von PR 3 benannte Verzerrungs-Effekt (ein
+  Spieler bekommt bei gleicher Leistung bei k=6 mehr PP als bei k=2, weil die gepoolte Referenz
+  durch die schwaecheren Raenge 5/6 nach unten gezogen wird) bleibt dadurch bestehen und ist hier
+  bewusst nicht behoben — dokumentiert als bekannte Grenze, kein versteckter Kompromiss.
+- **Nachweise**: Manager-Mode byte-identisch (`scripts/pruefe-resolve-bit-identitaet.ts`/
+  `scripts/pruefe-mapper-bit-identitaet.ts`, je vor/nach gegen eine frische, unabhaengige Kopie des
+  live-save-Abbilds); Battle-Mode-Mini-DM aendert sich ABSICHTLICH (eigener Integrationstest,
+  `tests/arena-vorlauf-mini-dm-ffa.test.ts`, zeigt `quelle: "ffa"` statt des alten PPS-Pod-Pfads);
+  alle anderen 19 Disziplinen unberuehrt (keine ihrer Dateien angefasst, der generische
+  `runBattleModeArenaMatchday()`-Loop ist unveraendert). Volle Begruendung, Testergebnisse und
+  bekannte Grenzen im PR-Bericht selbst.
+
 **Vierundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Abnahme + Referenzen fuer k=2..6 (PR 3 eines
 6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile. KORRIGIERT 24.10. nach Opus-Review an
 PR #1303: rho auf SPIELER-Ebene (die CLAUDE.md-massgebliche Zahl) besteht bei KEINEM k — die

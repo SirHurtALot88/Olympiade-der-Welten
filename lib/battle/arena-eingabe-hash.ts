@@ -4,9 +4,10 @@ import path from "node:path";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaTeam } from "@/lib/foundation/battle-arena/arena-kader-adapter";
-import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { buildArenaAufstellung, buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
-import { buildArenaMatchSeed } from "@/lib/battle/arena-seed";
+import { buildArenaMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
+import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
 /**
  * OPUS-AUFLAGE B2 (`docs/design/battle-arena-auto-run-anbindung-plan-16-10.md` Abschnitt 9,
@@ -80,5 +81,65 @@ export function berechneArenaEingabeHash(input: {
 
   return createHash("sha256")
     .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash() }))
+    .digest("hex");
+}
+
+/**
+ * MINI-DM-FFA-EINGABE-HASH (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung"). Eigene
+ * Funktion statt `berechneArenaEingabeHash()` fuer `disciplineId === MINI_DM_DISCIPLINE_ID`: ein
+ * Mini-DM-Pod ist KEIN `findeSpieltagsFixtures()`-Zweier-Duell (vier Teams, s.
+ * `lib/season/mini-dm-pod-schedule.ts`) — die generische Funktion fuende dafuer keine (oder die
+ * falschen) Fixtures und bliebe strukturell blind fuer `playerCount`/die k-Rollen-Aufstellung.
+ *
+ * DECKT (Opus-Auflage B2 analog, hier um `playerCount` erweitert, s. Kommentar an
+ * `berechneArenaEingabeHash()` oben fuer die volle Begruendung des Musters):
+ *   - jeden Pod-Seed (`buildMiniDmFfaPodMatchSeed()`);
+ *   - den vollen Kader UND die volle Teilaufstellung ALLER VIER Pod-Teams (nicht nur zweier Seiten);
+ *   - `playerCount` (k = 2..6) SELBST — ohne dieses Feld wuerde ein Kadergroessenwechsel
+ *     zwischen zwei Spieltagen mit sonst identischer Aufstellung (seltener, aber moeglich bei
+ *     einem erneuten Saison-Wurf) denselben Hash liefern und eine veraltete Vorberechnung faelschlich
+ *     als noch gueltig buchen (CLAUDE.md-Pflichtpruefung, Opus-Plan Punkt 4: "k UND die vollstaendige
+ *     k-Rollen-Aufstellung mit einbeziehen, sonst kollidieren Cache-Eintraege zwischen verschiedenen
+ *     Kadergroessen");
+ *   - denselben Motor-Datei-Hash wie oben (derselbe Deploy-Schutz).
+ *
+ * Faellt (wie `berechneArenaEingabeHash()`) niemals auf `null` zurueck, selbst wenn an diesem
+ * Spieltag gar kein Mini-DM-Pod (mehr) steht (`teile` bleibt dann leer) — derselbe Fall wie ein
+ * Spieltag ohne Fixtures fuer die generische Funktion oben: ein leerer, aber wohldefinierter Hash,
+ * kein Sonderfall fuer den Aufrufer.
+ */
+export function berechneMiniDmFfaEingabeHash(input: {
+  gameState: GameState;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  playerCount: number | null;
+  mutatoren: readonly string[];
+}): string {
+  const pods = getMiniDmPodsForMatchday(input.gameState, input.matchdayId, { saveId: input.saveId });
+  const teile: string[] = [];
+  for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
+    const seed = buildMiniDmFfaPodMatchSeed({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      podId: pod.id,
+    });
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
+    teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
+  }
+  const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
+
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        disciplineId: "mini-dm",
+        playerCount: input.playerCount,
+        teile,
+        mutatoren,
+        motorHash: leseMotorDateiHash(),
+      }),
+    )
     .digest("hex");
 }

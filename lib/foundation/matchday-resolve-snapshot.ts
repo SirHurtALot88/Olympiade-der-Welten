@@ -18,8 +18,10 @@ import {
 } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
-import { berechneArenaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import { berechneArenaEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
+import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { resolveMiniDmFfaPlayerCountForMatchday } from "@/lib/resolve/mini-dm-ffa-matchday";
 
 export type MatchdayResolveScope = {
   saveId: string;
@@ -362,14 +364,28 @@ function findeArenaEingabeHashDivergenz(
         d2DisciplineId,
         disciplineId,
       }) ?? [];
-    const aktuellerHash = berechneArenaEingabeHash({
-      gameState,
-      saveId: scope.saveId,
-      seasonId: scope.seasonId,
-      matchdayId: scope.matchdayId,
-      disciplineId,
-      mutatoren,
-    });
+    // MINI-DM-FFA (PR 5 des 6-PR-Opus-Plans 21.10.): Mini-DM ist KEIN `findeSpieltagsFixtures()`-
+    // Zweier-Duell (vier Teams je Pod) -- `berechneArenaEingabeHash()` waere hier strukturell blind
+    // (falsche/keine Fixtures, kein `playerCount`). `berechneMiniDmFfaEingabeHash()` ist der
+    // Mini-DM-eigene Fingerabdruck, s. dortiger Kommentar.
+    const aktuellerHash =
+      disciplineId === MINI_DM_DISCIPLINE_ID
+        ? berechneMiniDmFfaEingabeHash({
+            gameState,
+            saveId: scope.saveId,
+            seasonId: scope.seasonId,
+            matchdayId: scope.matchdayId,
+            playerCount: resolveMiniDmFfaPlayerCountForMatchday(gameState, scope.matchdayId, { saveId: scope.saveId }),
+            mutatoren,
+          })
+        : berechneArenaEingabeHash({
+            gameState,
+            saveId: scope.saveId,
+            seasonId: scope.seasonId,
+            matchdayId: scope.matchdayId,
+            disciplineId,
+            mutatoren,
+          });
     if (aktuellerHash !== eintrag.eingabeHash) abweichend.push(disciplineId);
   }
   return abweichend;
