@@ -1,5 +1,99 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Vierundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Abnahme + Referenzen fuer k=2..6 (PR 3 eines
+6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile.** Fortsetzung von PR 1 (#1300,
+Commit 6831d7a7, Spielplan zieht wieder 2-6 Spieler), PR 2 (#1302, Commit a3a88369, FFA-Kampfmotor
+kennt jetzt alle sechs Rollen frontliner/finisher/trickfighter/ironguard/chaosdriver/lasthit,
+`opt.k`) und PR 4 (#1301, Commit dca6815c, Buchungsformel `berechneMiniDmFfaPodOverride()` kann
+FFA-Rohdaten in Liga-Platzierung uebersetzen). PR 3 ist der Mess-/Kalibrierungsschritt, der den
+noch fehlenden PR 5 (Verdrahtung in echte Spieltage) erst zulaessig macht — **rein additiv, die
+bestehende `mini-dm`-Abnahme (vierzehnter Absatz oben, 13.10.) bleibt unberuehrt.**
+
+**Gemessen: `scripts/miss-mini-dm-ffa-abnahme.mjs` um `--k=2..6` erweitert** (kommagetrennt oder
+als Bereich, z. B. `--k=2..6`; `--nur-k` ueberspringt den alten, unveraenderten Vierer-Pfad fuer
+schnellere Laeufe) — ohne `--k` bleibt das Skript byte-identisch zu vorher. Je Kadergroesse misst
+es dieselbe kaderfeste Vierergruppen-Stichprobe (zehn echte Teams aus
+`data/generated/kaderfamilie-live-save.json`, 210 Vierergruppen, zwei Saatstroeme) mit den
+k-spezifischen Rollen aus `MINI_DM_FFA_SLOTS_JE_K[k]`:
+
+| k | rho je Runde (Mittel/Median) | rho je Event/Pod (Eventplatz) | Pp (Budget, n=2) |
+|---|---:|---:|---:|
+| 2 | 0,799 / 0,798 — 0,800 / 0,800 | 0,830 / 0,827 | 7,7 / 7,8 |
+| 3 | 0,814 / 0,816 — 0,800 / 0,800 | 0,869 / 0,873 | 10,0 / 10,9 |
+| 4 | 0,822 / 0,816 — 0,800 / 0,800 | 0,865 / 0,872 | 8,7 / 9,0 |
+| 5 | 0,798 / 0,794 — 0,800 / 0,800 | 0,864 / 0,873 | 8,8 / 9,5 |
+| 6 | 0,813 / 0,811 — 0,800 / 0,800 | 0,891 / 0,888 | 8,0 / 8,6 |
+
+**Ehrlich, nicht schoengerechnet: rho je Runde landet bei JEDEM k exakt auf 0,800, nicht strikt
+darueber** — dieselbe Grenzlage, die die bestehende `mini-dm`-Zeile fuer k=4 schon dokumentiert
+("Median je Runde genau 0,800"). Das ist kein Regressions-Fund dieser Runde, sondern dieselbe
+Eigenschaft bei jeder getesteten Kadergroesse: eine Runde hat immer genau vier Kaempfer, und
+Spearman-rho bei n=4 kennt nur eine Handvoll diskrete Werte (0,8 = genau ein benachbartes Paar
+vertauscht) — der Median vieler Vierergruppen trifft diesen Wert immer wieder exakt. Die
+**gebuchte** Einheit eines Mini-DM-FFA-Pods ist aber nicht die einzelne Rollenrunde, sondern der
+Event-/Pod-Platz (R_t-Rang ueber alle k Runden, `berechneMiniDmFfaPodOverride()` in
+`lib/resolve/mini-dm-pod-resolve.ts`) — auf dieser Ebene liegt JEDES k klar ueber 0,80 (0,827 bis
+0,891). Pp bleibt bei jedem k deutlich unter der 25er-Schranke (7,7 bis 10,9), auch k=6 mit der
+neuen Last-Hit-Rolle. **Status laut `data/generated/disziplin-abnahme.json` (neuer, eigener
+Schluessel `mini-dm-ffa`, additiv): rho auf Rundenebene durchweg knapp/an der Grenze bei allen
+fuenf k, auf Event-/Pod-Ebene bei allen fuenf k bestanden; Pp bei allen fuenf k bestanden.** Kein k
+wird deshalb fuer PR 5 gesperrt, aber die Rundenebene-Grenzlage gehoert in jeden PR-5-Bericht.
+
+**Referenz real gezogen statt kopiert: `scripts/ziehe-mini-dm-ffa-referenz.mjs` (neu) befuellt
+`data/generated/mini-dm-ffa-referenz.json`.** Die Datei kam aus PR 4 als Platzhalter
+(`feldgroessen: {}`, Kopfkommentar dort: "PR 3 befuellt sie real"). Das neue Skript zieht fuer
+jedes k=2..6 aus 10 080 simulierten Events (210 Vierergruppen × 24 Laeufe × zwei Saatstroeme)
+`m90` (90. Perzentil der Luecken zwischen benachbarten Pod-Plaetzen im Anzeigescore
+`v_t = R_t/k + B_t/(k·10⁶)`, gelesen von `resolveMiniDmFfaMargeReferenz()`) und `spieler.p50`/
+`p995` (Perzentile des rohen Einzelrunden-Beitrags, gelesen von
+`resolveMiniDmFfaSpielerPpReferenz()`/`ppAusMiniDmFfaBeitrag()`). Ergebnis je k: m90 1,33-1,5,
+Spieler-p50 fallend von 145 (k=2) auf 69 (k=6) — plausibel, weil mehr Runden den rohen
+Einzelbeitrag ueber mehr Gegner/Formkarten-Ziehungen glaetten. **Bleibt trotzdem toter Code**: PR 4
+hat keinen produktiven Aufrufer, der `ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId`
+befuellt (grep ueber das ganze Repo bestaetigt: nur die Typdefinition und der Default-Durchgriff
+auf `null` in `legacy-matchday-resolve-engine.ts`) — das ist PR 5. Das Befuellen der Referenz
+aendert deshalb an keinem heutigen Resolve-Lauf etwas.
+
+**A/B-Test der Last-Hit-Fokusregel: KEIN messbarer Unterschied, keine Codeaenderung.** PR 2 hat
+fuer den neuen ENG-Kanal jeder FFA-Rolle (`betroffeneAttributeMit`) eine Fokusregel gebaut:
+`[slotDef.gross, slotDef.klein].filter(W>0)`. Erster Befund beim Nachlesen: unter der GESPERRTEN
+Matrix-Datei selbst waeren Last Hits Attribute (intelligence/spirit) beide Gewicht 0, der Filter
+liefe leer und faellt auf "breit" zurueck — aber `BASIS_JE_DISC["mini-dm"]` im Motor fuehrt NICHT
+die rohe Matrix, sondern Chris' bestehenden, bereits am 05.09./13.10. ausdruecklich bestaetigten
+Override (`lib/player-generator/spiel-eignung-overrides.ts`: intelligence/spirit je 6) — die
+Fokusregel ist also fuer Last Hit tatsaechlich wirksam (gemessen: "Gewichte (Motor)"
+`{torment:21,health:18,power:14,stamina:14,will:12,dexterity:9,intelligence:6,spirit:6}`). Gegen
+eine Kopie von `battle-mode.engine.js`, in der `betroffeneAttributeMit` fuer den ENG-Kanal IMMER
+die breite Streuung liefert (keine Fokus-Konzentration mehr, fuer JEDE Rolle, nicht nur Last Hit),
+gemessen mit `--k=6 --seite=<kopie> --pp=2` (Budget-Methode, zwei Saatstroeme): Pp 8,0/8,6
+(Fokusregel) gegen 8,7/8,6 (immer breit), rho je Runde Median beide 0,800, rho Mittel 0,813/0,811
+gegen 0,816/0,814 — innerhalb der Saatstrom-zu-Saatstrom-Streuung, kein klarer Gewinner. Intelligence/
+spirit treffen ihr Matrixgewicht (6 %) in BEIDEN Varianten nahezu exakt (Fokusregel: 7,1/6,9 %
+Intelligence, 6,0/6,0 % Spirit). **Entscheidung: keine Codeaenderung** — die Alternative ist nicht
+"klar besser" (CLAUDE.md-Kriterium fuer eine Aenderung an einer bereits dokumentierten,
+Chris-bestaetigten Mechanik), beide liegen komfortabel innerhalb der 25er-Pp-Schranke.
+
+**Manager-Mode-Bit-Identitaet nachgewiesen, nicht nur behauptet.** Zwei unabhaengige Nachweise
+gegen eine frische live-save-Kopie (`scripts/pruefe-spiegel-frische.ts`: beide Spiegel < 1 h alt):
+(1) **analytisch** — `grep -rn miniDmFfaPodRohdatenByDisciplineId` zeigt nur die Typdefinition in
+`lib/lineups/legacy-lineup-types.ts` und den Default-Durchgriff `options?.miniDmFfaPodRohdatenByDisciplineId
+?? null` in `legacy-matchday-resolve-engine.ts` — KEIN heutiger Aufrufer von
+`buildLegacyMatchdayResolvePreview()` setzt dieses Feld, der FFA-Zweig in
+`berechneMiniDmPodOverrides()` ist fuer jeden bestehenden Save tot code, befuelltes
+`mini-dm-ffa-referenz.json` hin oder her. (2) **empirisch** —
+`scripts/pruefe-mapper-bit-identitaet.ts`/`scripts/pruefe-resolve-bit-identitaet.ts`, je einmal auf
+`origin/main` (vor diesem PR) und einmal auf diesem Branch (danach), beide gegen eine EIGENE Kopie
+desselben Abbilds: SHA-256-Hashes je Save/Spieltag, Ledger und Nachbuchung sowie die
+Schluesselpraesenz von `miniDmPod` (0 in jedem bestehenden Save, manager mode) — **identisch**.
+
+**Volle Testsuite fuer die beruehrten Dateien gruen** (`tests/mini-dm-pod-resolve.test.ts`,
+`tests/mini-dm-pod-resolve-engine-integration.test.ts`,
+`tests/mini-dm-ffa-pod-headless-runner.test.ts`, `tests/disziplin-abnahme-guard.test.ts`,
+`tests/battle-mode-pps-duell.test.ts`), `node --check` fuer beide neuen/geaenderten `.mjs`-Skripte
+sauber.
+
+---
+
 **Dreiundzwanzigster Nachtrag 15.10. — Formkarten-Kopplung (Punkt 30) gemessen, nichts gebaut.**
 `docs/design/formkarten-kopplung-messrunde-15-10.md` beantwortet die in CLAUDE.md
 ("Eignungsmatrix ist gesperrt") und Punkt 30 (`chris-feedback-breite-runde-13-10.md`) offen

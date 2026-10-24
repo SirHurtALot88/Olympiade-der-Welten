@@ -558,6 +558,63 @@
    "rhoFrisch": true,
    "ppFrisch": false,
    "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); gebuchte Einheit waere der Event-Platz — s. docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 4."
+  },
+  "mini-dm-ffa": {
+   "format": "FFA (gespielt), VARIABLE Kadergroesse k=2..6 Rollenrunden je Event (MINI_DM_FFA_SLOTS_JE_K, PR 2 des 6-PR-Opus-Plans 21.10., Commit a3a88369) — ERGAENZT die bestehende 'mini-dm'-Zeile (fester 4er-Pfad), ueberschreibt sie nicht",
+   "hinweis": "PR 3 des 6-PR-Opus-Plans (21.10., Mini-DM-6-Rollen-Umbau). Additiv: eigener Schluessel, die bestehende 'mini-dm'-Zeile (4er-Pfad, 13.10.) bleibt unveraendert. Kein produktiver Aufrufer liest variable k heute (PR 5 folgt) -- s. CLAUDE.md 'Pp-Abweichung ist Pflichtpruefung fuer jede Disziplin, jede neue Mechanik, jedes Rezept', nicht nur fuer bereits angeschlossene Disziplinen.",
+   "kWerte": {
+    "2": {
+     "rhoJeRundeMittel": [0.799, 0.798],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.830, 0.827],
+     "pp": [7.7, 7.8],
+     "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80, wie bei k=4); Event-/Pod-Ebene (teamRhoEventplatz, die gebuchte Einheit) klar ueber 0,80."
+    },
+    "3": {
+     "rhoJeRundeMittel": [0.814, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.869, 0.873],
+     "pp": [10.0, 10.9],
+     "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); Event-/Pod-Ebene klar ueber 0,80."
+    },
+    "4": {
+     "rhoJeRundeMittel": [0.822, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.865, 0.872],
+     "pp": [8.7, 9.0],
+     "anmerkung": "Deckt sich mit der bestehenden 'mini-dm'-Zeile (dieselbe Mechanik bei k=4, MINI_DM_FFA_SLOTS_JE_K[4] ist per Konstruktion identisch zum Altpfad)."
+    },
+    "5": {
+     "rhoJeRundeMittel": [0.798, 0.794],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.864, 0.873],
+     "pp": [8.8, 9.5],
+     "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); Event-/Pod-Ebene klar ueber 0,80."
+    },
+    "6": {
+     "rhoJeRundeMittel": [0.813, 0.811],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.891, 0.888],
+     "pp": [8.0, 8.6],
+     "anmerkung": "Fuehrt Last Hit (intelligence/spirit) ein -- A/B-Test der Fokusregel gegen eine 'immer breit'-Alternative zeigt KEINEN messbaren Unterschied (Pp 8,0/8,6 vs. 8,7/8,6, rho-Median beide 0,800), s. docs/design/stand-aller-disziplinen.md Vierundzwanzigster Nachtrag -- keine Codeaenderung."
+    }
+   },
+   "rhoMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2",
+    "spiele": 6,
+    "vierergruppen": 210,
+    "saatStroeme": [0, 10000000]
+   },
+   "ppMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2 (Budget-Methode, Anhebung +15)",
+    "laeufe": 2,
+    "saatStroeme": [0, 10000000]
+   },
+   "datum": "2026-10-24",
+   "commit": "a3a88369",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "Alle fuenf Kadergroessen (k=2..6): rho je Runde liegt bei jedem k GENAU auf 0,800 (nicht strikt > 0,80, dieselbe Grenzlage wie die bestehende 4er-'mini-dm'-Zeile) -- ehrlich als 'knapp', nicht schoengerechnet. Die GEBUCHTE Einheit eines Mini-DM-FFA-Pods ist aber der Event-/Pod-Platz (R_t-Rang, s. berechneMiniDmFfaPodOverride() in lib/resolve/mini-dm-pod-resolve.ts), nicht die einzelne Rollenrunde -- auf dieser Ebene (teamRhoEventplatz) liegt JEDES k klar ueber 0,80 (0,827-0,891). Pp bleibt bei jedem k deutlich unter der 25er-Schranke (7,7-10,9), inklusive k=6 mit der neuen Last-Hit-Rolle. Referenz fuer die Buchungsformel (data/generated/mini-dm-ffa-referenz.json, m90 + Spieler-p50/p99,5 je k) real gezogen (scripts/ziehe-mini-dm-ffa-referenz.mjs, 10080 Events je k, zwei Saatstroeme) -- ersetzt den Platzhalter aus PR 4 (Commit dca6815c), bleibt aber toter Code (kein produktiver Aufrufer vor PR 5, Bit-Identitaet gegen eine frische live-save-Kopie bestaetigt: scripts/pruefe-mapper-bit-identitaet.ts / scripts/pruefe-resolve-bit-identitaet.ts byte-identisch vorher/nachher)."
   }
  }
 }
