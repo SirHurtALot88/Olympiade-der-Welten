@@ -558,6 +558,84 @@
    "rhoFrisch": true,
    "ppFrisch": false,
    "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); gebuchte Einheit waere der Event-Platz — s. docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 4."
+  },
+  "mini-dm-ffa": {
+   "format": "FFA (gespielt), VARIABLE Kadergroesse k=2..6 Rollenrunden je Event (MINI_DM_FFA_SLOTS_JE_K, PR 2 des 6-PR-Opus-Plans 21.10., Commit a3a88369) — ERGAENZT die bestehende 'mini-dm'-Zeile (fester 4er-Pfad), ueberschreibt sie nicht",
+   "status": "NICHT BESTANDEN auf der massgeblichen Spieler-Ebene, bei JEDEM k=2..6 -- keine Freigabe. Ob PR 5 trotzdem kommt, entscheidet Chris (s. Opus-Review 24.10. an PR #1303).",
+   "hinweis": "PR 3 des 6-PR-Opus-Plans (21.10., Mini-DM-6-Rollen-Umbau). Additiv: eigener Schluessel, die bestehende 'mini-dm'-Zeile (4er-Pfad, 13.10.) bleibt unveraendert. Kein produktiver Aufrufer liest variable k heute (PR 5 folgt) -- s. CLAUDE.md 'Pp-Abweichung ist Pflichtpruefung fuer jede Disziplin, jede neue Mechanik, jedes Rezept', nicht nur fuer bereits angeschlossene Disziplinen. KORRIGIERT 24.10. nach Opus-Review: die erste Fassung dieser Zeile hatte 'rhoJeEvent' (die CLAUDE.md-massgebliche Spieler-Ebene-Zahl, 'ein Spieler mit Stat 80 muss zu den Top-Leuten gehoeren') WEDER gemessen noch eingetragen, nur die Team-Ebene-Zahl (teamRhoEventplatz) -- und hatte sich damit eine Freigabe ('bestanden', 'kein k wird gesperrt') selbst ausgestellt, die so nicht zutrifft. teamRhoEventplatz bleibt als Zusatzinfo stehen, ist aber NICHT die Schranken-Zahl.",
+   "kWerte": {
+    "2": {
+     "rhoJeEvent": [0.650, 0.656],
+     "rhoJeRundeMittel": [0.799, 0.798],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.830, 0.827],
+     "star1Prozent": [76.2, 77.5],
+     "starErsteZweiProzent": [93.3, 93.8],
+     "paarAb15RichtigProzent": [98.9, 99.0],
+     "pp": [7.7, 7.8],
+     "anmerkung": "rhoJeEvent (Spieler-Ebene, die CLAUDE.md-Schranke) 0,650/0,656 -- KLAR UNTER 0,80, nicht bestanden. rho je Runde liegt auch im MITTEL unter 0,80 (0,799/0,798), nicht nur der Median exakt auf 0,800. Star/Paartreue (die ehrlichere Lesart bei kleinem n) deutlich besser: Star Rang 1 76-78%, erste zwei 93-94%, Paare ab 15 Punkten Abstand 99% richtig."
+    },
+    "3": {
+     "rhoJeEvent": [0.673, 0.677],
+     "rhoJeRundeMittel": [0.814, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.869, 0.873],
+     "star1Prozent": [76.2, 77.1],
+     "starErsteZweiProzent": [93.8, 94.4],
+     "paarAb15RichtigProzent": [99.3, 99.3],
+     "pp": [10.0, 10.9],
+     "anmerkung": "rhoJeEvent (Spieler-Ebene) 0,673/0,677 -- unter 0,80, nicht bestanden. Star Rang 1 76-77%, erste zwei 94%, Paare ab 15 99,3% richtig."
+    },
+    "4": {
+     "rhoJeEvent": [0.686, 0.686],
+     "rhoJeRundeMittel": [0.822, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.865, 0.872],
+     "star1Prozent": [78.1, 78.8],
+     "starErsteZweiProzent": [94.8, 94.6],
+     "paarAb15RichtigProzent": [99.4, 99.4],
+     "pp": [8.7, 9.0],
+     "anmerkung": "Deckt sich mit der bestehenden 'mini-dm'-Zeile (dieselbe Mechanik bei k=4, MINI_DM_FFA_SLOTS_JE_K[4] ist per Konstruktion identisch zum Altpfad; rhoJeEvent 0,686 = dortiges rhoJeEvent16). Auch bei k=4 unter 0,80, nicht bestanden -- die bestehende Zeile war hier schon zu grosszuegig framed (rhoJeSpiel=0,8 nahm rho je RUNDE statt rho je EVENT/Spieler)."
+    },
+    "5": {
+     "rhoJeEvent": [0.608, 0.606],
+     "rhoJeRundeMittel": [0.798, 0.794],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.864, 0.873],
+     "star1Prozent": [76.7, 77.8],
+     "starErsteZweiProzent": [94.1, 94.3],
+     "paarAb15RichtigProzent": [99.4, 99.4],
+     "pp": [8.8, 9.5],
+     "anmerkung": "SCHWAECHSTES k: rhoJeEvent 0,608/0,606 -- deutlich unter 0,80, schlechter als der heutige 4er-Baseline-Wert (0,686). rho je Runde liegt auch im MITTEL unter 0,80 (0,798/0,794)."
+    },
+    "6": {
+     "rhoJeEvent": [0.624, 0.624],
+     "rhoJeRundeMittel": [0.813, 0.811],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.891, 0.888],
+     "star1Prozent": [79.2, 80.6],
+     "starErsteZweiProzent": [95.4, 95.4],
+     "paarAb15RichtigProzent": [99.1, 99.2],
+     "pp": [8.0, 8.6],
+     "anmerkung": "rhoJeEvent 0,624/0,624 -- unter 0,80, schlechter als der heutige 4er-Baseline-Wert (0,686), aber besser als k=5. Fuehrt Last Hit (intelligence/spirit) ein -- A/B-Test der Fokusregel gegen eine 'immer breit'-Alternative (Patch: docs/design/mini-dm-ffa-lasthit-fokus-ab-patch-24-10.diff) zeigt KEINEN messbaren Unterschied (Pp 8,0/8,6 vs. 8,7/8,6, rho-Median beide 0,800) -- keine Codeaenderung."
+    }
+   },
+   "rhoMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2",
+    "spiele": 6,
+    "vierergruppen": 210,
+    "saatStroeme": [0, 10000000]
+   },
+   "ppMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2 (Budget-Methode, Anhebung +15)",
+    "laeufe": 2,
+    "saatStroeme": [0, 10000000]
+   },
+   "datum": "2026-10-24",
+   "commit": "a3a88369",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "KORRIGIERT 24.10. (Opus-Review an PR #1303): Die massgebliche CLAUDE.md-Kennzahl ist rho auf SPIELER-Ebene je Spiel (ein Event = ein Spiel, 4*k Teilnehmer), NICHT die Team-Ebene (teamRhoEventplatz) und nicht die Einzelrunde. rhoJeEvent liegt bei JEDEM k klar UNTER 0,80 (0,608 bis 0,686) -- NICHT BESTANDEN, bei keinem k. k=5/k=6 (die neuen Kadergroessen) liegen sogar SCHLECHTER als der heutige 4er-Baseline-Wert (0,686). Zusaetzlich: rho je Runde liegt bei k=2 und k=5 auch im MITTEL unter 0,80 (0,799/0,798 bzw. 0,798/0,794), nicht nur der irrelevante Median-Grenzfall bei 0,800 (der bei ALLEN fuenf k exakt dort liegt, eine Eigenschaft von Spearman-rho bei n=4 Kaempfern/Runde, kein neuer Befund). Gegengewicht (CLAUDE.md-eigene, ehrlichere Lesart bei kleinem n): Star Rang 1 76-81%, erste zwei 93-95%, Paare ab 15 Punkten Abstand 99% richtig -- bei allen fuenf k aehnlich gut. Pp bleibt bei jedem k deutlich unter der 25er-Schranke (7,7-10,9). Referenz fuer die Buchungsformel (data/generated/mini-dm-ffa-referenz.json, m90 + Spieler-p50/p99,5 je k) real gezogen -- Spieler-p50 faellt von 145 (k=2) auf 69 (k=6) durch einen SELEKTIONSEFFEKT (Raenge 5/6 der Eignung kommen bei hoeherem k dazu, nicht 'Glaettung'); offene PR-5-Frage, ob die Referenz je k gepoolt bleibt oder nach Rolle/Rang getrennt wird, s. stand-aller-disziplinen.md. Bleibt toter Code vor PR 5 (kein produktiver Aufrufer, Bit-Identitaet gegen eine frische live-save-Kopie bestaetigt: scripts/pruefe-mapper-bit-identitaet.ts / scripts/pruefe-resolve-bit-identitaet.ts byte-identisch vorher/nachher, je gegen main via git stash und diesen Branch)."
   }
  }
 }
