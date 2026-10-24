@@ -89,10 +89,54 @@ function baueGesetzteRollenFuerTeam(gameState: GameState, teamId: string, matchd
 }
 
 /**
+ * VOLLSTAENDIGKEITSPRUEFUNG VOR DER UEBERSETZUNG (OPUS-REVIEW, PR 5 des 6-PR-Opus-Plans 21.10.,
+ * Pflicht-Fix 4). `uebersetzeMotorErgebnisZuRohdaten()` baut die k×4-Struktur IMMER selbst aus
+ * `rollenFuerK(k)` × `pod.teamIds` -- fehlt ein Boxscore-Eintrag, liess sie das bisher STILL als
+ * `beitrag: 0` durchgehen (ein Gleichstand sieht aus wie ein echtes Ergebnis, nicht wie ein
+ * Datenfehler). `pruefeMiniDmFfaRohdaten()` aus PR 4 (mini-dm-pod-resolve.ts) prueft zwar die
+ * ROHDATEN-STRUKTUR, bekommt aber nur das bereits "reparierte" Ergebnis dieser Datei zu sehen --
+ * sie ist deshalb WIRKUNGSLOS gegen genau die Faelle, die hier auftreten koennen: ein fehlender
+ * Boxscore-Eintrag (Runde/Team-Paar), ein `slotId`, das fuer dieses `k` gar nicht existiert
+ * (deutet auf ein vom Motor IGNORIERTES `k` hin -- faellt bei k>4 zusaetzlich durch die
+ * Mengen-Pruefung unten auf), oder ein doppelter Eintrag (zwei Boxscore-Zeilen fuer dieselbe
+ * Runde/Team-Kombination).
+ *
+ * Liefert eine Fehlermeldung (String) bei einem Verstoss, sonst `null`. Der AUFRUFER
+ * (`runMiniDmFfaMatchday()`) verwirft bei einer Fehlermeldung den GANZEN Pod -- derselbe Rueckfall
+ * wie bei einem Motor-`null` (PPS-Pod-Pfad), NICHT die bisherige stille `beitrag ?? 0`-Behandlung.
+ */
+function pruefeMotorErgebnisVollstaendigkeit(
+  pod: Pick<MiniDmPod, "id" | "teamIds">,
+  k: number,
+  ergebnis: MiniDmFfaPodFixtureResult,
+): string | null {
+  const erwarteteRollen = new Set<string>(rollenFuerK(k));
+  const erwarteteTeams = new Set<string>(pod.teamIds);
+  const gesehen = new Set<string>();
+  for (const eintrag of ergebnis.boxscore) {
+    if (!eintrag.teamId || !erwarteteTeams.has(eintrag.teamId)) continue; // anderes Team/Pod -- sollte beim pro-Pod-Motoraufruf nie vorkommen, hier bewusst ignoriert statt gezaehlt.
+    if (!erwarteteRollen.has(eintrag.slotId)) {
+      return `mini_dm_ffa_fremde_rolle:${pod.id}:${eintrag.slotId}`;
+    }
+    const schluessel = `${eintrag.slotId}|${eintrag.teamId}`;
+    if (gesehen.has(schluessel)) {
+      return `mini_dm_ffa_doppelter_boxscore_eintrag:${pod.id}:${schluessel}`;
+    }
+    gesehen.add(schluessel);
+  }
+  const erwartet = erwarteteRollen.size * erwarteteTeams.size;
+  if (gesehen.size !== erwartet) {
+    return `mini_dm_ffa_unvollstaendiger_boxscore:${pod.id}:${gesehen.size}/${erwartet}`;
+  }
+  return null;
+}
+
+/**
  * EIN Motor-Ergebnis (`MiniDmFfaPodFixtureResult`, bereits ECHTE k Runden mit `k`-spezifischen
  * Rollen) -> `MiniDmFfaPodRohdaten` -- UNTER ANWENDUNG der Teilnahme-Pruefung aus der ECHTEN
  * Aufstellung (s. Datei-Kopfkommentar). Der `boxscore` ist flach ueber alle Runden/Teams, deshalb
- * zuerst zu `(slotId, teamId) -> beitrag` indiziert.
+ * zuerst zu `(slotId, teamId) -> beitrag` indiziert. Setzt `pruefeMotorErgebnisVollstaendigkeit()`
+ * bereits als bestanden voraus -- der Aufrufer prueft das VORHER.
  */
 function uebersetzeMotorErgebnisZuRohdaten(
   gameState: GameState,
@@ -203,6 +247,13 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     // Aufstellung als `platzJeTeam`, DAMIT die Reihum-Auswahl ueberhaupt die richtigen Spieler
     // uebrig laesst/ausschliesst. Die Teilnahme-Pruefung DIESER Datei (s. Kopfkommentar) ist davon
     // unabhaengig -- sie liest dieselbe Aufstellung noch einmal direkt, nicht ueber den Motor.
+    //
+    // OPUS-REVIEW, Lesepfad-Robustheit (nicht blockierend): derselbe `matchdayId`, den diese
+    // Funktion fuer Seed/Hash/Teilnahme verwendet -- der Runner liest ohne dieses Feld stattdessen
+    // `gameState.matchdayState?.matchdayId` selbst (s. `RunMiniDmFfaPodFixturesOptions.matchdayId`).
+    // Beide Werte sind heute immer identisch; explizit zu uebergeben macht das nicht mehr vom
+    // impliziten GameState-Lesepfad abhaengig.
+    matchdayId: input.matchdayId,
   });
 
   const rohdatenByPodId = new Map<string, MiniDmFfaPodRohdaten>();
@@ -213,6 +264,15 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     const ergebnis = ergebnisse[index] ?? null;
     if (!ergebnis) {
       warnings.push(`mini_dm_ffa_matchday_pod_ohne_ergebnis:${pod.id}`);
+      return;
+    }
+    // OPUS-REVIEW, Pflicht-Fix 4: ein strukturell unvollstaendiger/kaputter Boxscore (fehlende
+    // Runde, fremde Rollen-ID, vom Motor ignoriertes k) verwirft den GANZEN Pod -- derselbe
+    // Rueckfall wie bei `ergebnis === null` (PPS-Pod-Pfad), NICHT die alte stille
+    // `beitrag ?? 0`-Behandlung, die einen Datenfehler wie einen echten Gleichstand aussehen liess.
+    const vollstaendigkeitsFehler = pruefeMotorErgebnisVollstaendigkeit(pod, k, ergebnis);
+    if (vollstaendigkeitsFehler) {
+      warnings.push(vollstaendigkeitsFehler);
       return;
     }
     rohdatenByPodId.set(pod.id, uebersetzeMotorErgebnisZuRohdaten(input.gameState, input.matchdayId, pod, k, ergebnis));

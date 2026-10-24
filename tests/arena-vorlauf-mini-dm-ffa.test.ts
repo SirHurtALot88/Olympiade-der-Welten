@@ -1,18 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
-import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
-import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
-import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
-import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
 import { kickoffArenaVorlauf, stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
-import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 import type { MiniDmFfaPodFixtureInput, MiniDmFfaPodFixtureResult } from "@/lib/battle/arena-headless-runner";
+import { bauFrischenBattleSaveMitMiniDmAnSpieltag1 } from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * MINI-DM-FFA-VORLAUF-VERDRAHTUNG (PR 5 des 6-PR-Opus-Plans 21.10.). Dasselbe Grundgeruest wie
@@ -55,107 +50,12 @@ function buildFakeMiniDmFfaRunner(k: number) {
 }
 
 /**
- * FEST GEWAEHLTE KADERGROESSE fuer diese Tests. Welches k an einem echten Spieltag steht, ist
- * seed-/formkarten-abhaengig -- die Tests hier pruefen die VERDRAHTUNG (laeuft der FFA-Pfad
- * ueberhaupt an, wird sein Ergebnis gebucht), nicht die k-Abhaengigkeit selbst (die deckt
- * `tests/mini-dm-ffa-matchday.test.ts` unit-genau ab).
+ * `bauFrischenBattleSaveMitMiniDmAnSpieltag1()`/`TEST_K` wohnen jetzt in
+ * `tests/helpers/mini-dm-ffa-battle-save.ts` (OPUS-REVIEW, PR 5, Pflicht-Fix 3) -- ausgelagert, weil
+ * `tests/mini-dm-ffa-e2e-real-chromium.test.ts` denselben Aufbau braucht, UND ein Import einer
+ * `.test.ts`-Datei als Modul deren `describe()`/`it()`-Aufrufe ein zweites Mal registriert hätte
+ * (s. ausführlicher Kommentar an der Helfer-Datei).
  */
-const TEST_K = 4;
-
-/**
- * Baut einen frischen Battle-Save, laesst den echten Liga-/KI-Lineup-Pfad einmal durchlaufen und
- * ERZWINGT danach Mini-DM an D1 von Spieltag 1 mit `TEST_K` Spielern -- statt (wie die
- * Geschwisterdateien `tests/arena-eingabe-stabil.test.ts`/`tests/arena-vorlauf-service.test.ts`)
- * auf einen zufaelligen Treffer zu warten.
- *
- * WARUM NICHT DIE ZUFALLS-SUCHE DER GESCHWISTERDATEIEN: jene suchen nach IRGENDEINER von 13
- * arena-aufgeloesten Disziplinen (hohe Trefferquote, ~89 % je Spieltag, 3 Versuche reichen). Mini-DM
- * ist dagegen GENAU EINE von 20 Disziplinen mit (bei Battle-Mode-Repeat 2) zwei Vorkommen auf 20
- * Spieltagen -- die Trefferquote fuer "steht an Spieltag 1" liegt bei ~10 %, eine zufallsbasierte
- * Suche haette unzumutbar viele (und unzumutbar teure, je ein voller 32-Team-Liga-Draft) Versuche
- * gebraucht, um zuverlaessig zu treffen. Das direkte Ueberschreiben des Spielplan-Slots ist
- * deterministisch UND kostet nur EINEN Liga-Draft.
- *
- * Das Ueberschreiben passiert NACH `fuehreLigaSetupDraftAus()` (Liga-/Team-Zuordnung steht schon,
- * `getMiniDmPodsForMatchday()` braucht nur diese, nicht den urspruenglichen Spielplan-Inhalt) und
- * VOR `applyAiLegacyLineupBatchLocally()` (die KI liest den Spielplan-Slot erst beim Aufstellen).
- */
-async function bauFrischenBattleSaveMitMiniDmAnSpieltag1() {
-  process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-mini-dm-ffa-${Math.random().toString(36).slice(2)}.sqlite`;
-  const persistence = createPersistenceService();
-  persistence.bootstrapSingleplayerSave();
-  const input = { presetId: "solo_1" as const, gameMode: "battle" as const };
-  const preview = previewNewGameSetup(input);
-  const angelegt = applyNewGameSetup({ ...input, confirmToken: preview.confirmToken }, persistence, { ownerId: null });
-  const saveId = angelegt.save.saveId;
-  await fuehreLigaSetupDraftAus({
-    persistence,
-    saveId,
-    seasonId: persistence.getSaveById(saveId)!.gameState.season.id,
-    callerWritableTeamIds: null,
-    excludeTeamIds: [],
-    logPrefix: "[arena-vorlauf-mini-dm-ffa-test]",
-  });
-  const nachDraft = persistence.getSaveById(saveId)!;
-  persistence.saveSingleplayerState(
-    saveId,
-    applyGameModeOwnership(nachDraft.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
-  );
-  const vorUeberschreiben = persistence.getSaveById(saveId)!;
-  const seasonId = vorUeberschreiben.gameState.season.id;
-  const matchdayId = vorUeberschreiben.gameState.matchdayState.matchdayId;
-  const bisherigerSpieltag = (vorUeberschreiben.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
-  const andereArenaDisziplinPraesent = bisherigerSpieltag?.discipline2?.disciplineId != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(bisherigerSpieltag.discipline2.disciplineId);
-
-  if (!bisherigerSpieltag) {
-    throw new Error("bauFrischenBattleSaveMitMiniDmAnSpieltag1: Spieltag 1 hat gar keinen Spielplan-Eintrag -- Setup pruefen.");
-  }
-  // NUR `discipline1` wird ersetzt -- der Rest des bestehenden, typkorrekten Eintrags (inklusive
-  // `discipline2`, s. `andereArenaDisziplinPraesent` oben) bleibt unveraendert, statt ihn hier per
-  // Objektliteral neu (und fehleranfaellig gegenueber `SeasonDisciplineScheduleSourceStatus`) nachzubauen.
-  const erzwungenerSpieltag = {
-    ...bisherigerSpieltag,
-    discipline1: {
-      disciplineId: "mini-dm",
-      displayName: "Mini DM",
-      order: bisherigerSpieltag.discipline1?.order ?? 1,
-      playerCount: TEST_K,
-      legacyScorePlayerCount: TEST_K,
-      category: bisherigerSpieltag.discipline1?.category ?? "power",
-      occurrenceInSeason: 1 as const,
-    },
-  };
-  const neuerSpielplan = [
-    ...(vorUeberschreiben.gameState.seasonState.disciplineSchedule ?? []).filter((e) => e.matchdayId !== matchdayId),
-    erzwungenerSpieltag,
-  ];
-  persistence.saveSingleplayerState(saveId, {
-    ...vorUeberschreiben.gameState,
-    seasonState: { ...vorUeberschreiben.gameState.seasonState, disciplineSchedule: neuerSpielplan },
-  });
-
-  const pods = getMiniDmPodsForMatchday(persistence.getSaveById(saveId)!.gameState, matchdayId, { saveId });
-  if (pods.length === 0) {
-    throw new Error(
-      "bauFrischenBattleSaveMitMiniDmAnSpieltag1: erzwungener Mini-DM-Slot lieferte trotzdem keine Pods -- " +
-        "Annahme ueber den Spielplan-Aufbau (getSeasonDisciplineSchedule()) stimmt nicht mehr, Setup pruefen.",
-    );
-  }
-
-  const batch = applyAiLegacyLineupBatchLocally(
-    { saveId, seasonId, matchdayId, dryRun: false, includeWarningTeams: true, overwriteExisting: true },
-    persistence,
-  );
-  expect(batch.summary.blockingReasons, batch.summary.blockingReasons.join(" | ")).toEqual([]);
-
-  return {
-    persistence,
-    scope: { saveId, seasonId, matchdayId },
-    k: TEST_K,
-    pods,
-    andereArenaDisziplinPraesent,
-  };
-}
 
 describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorlauf-Verdrahtung')", () => {
   it(

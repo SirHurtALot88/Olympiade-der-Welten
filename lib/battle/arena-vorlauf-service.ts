@@ -11,6 +11,35 @@ import type { ArenaAusfall, ArenaAusfallGrund } from "@/lib/resolve/legacy-match
 import type { runArenaFixtures, RunArenaFixturesOptions, runMiniDmFfaPodFixtures, RunMiniDmFfaPodFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import { berechneArenaEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
 import { MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
+
+/**
+ * ECHTER ROLLBACK-MECHANISMUS (OPUS-REVIEW, PR 5, Pflicht-Fix 8): `MINI_DM_FFA_VORLAUF_AKTIV`
+ * (arena-resolved-disciplines.ts) ist eine reine Code-Konstante -- ein Abschalten braucht Commit +
+ * CI + Deploy + Docker-Build, nicht "eine Zeile, kein Deploy-Wettlauf", wie der Kommentar dort es
+ * behauptet. DIESE Datei ist bewusst der Ort fuer die Umgebungsvariable (nicht
+ * arena-resolved-disciplines.ts): jene Datei ist client-importierbar (`FoundationBattleArenaHost.tsx`,
+ * s. ihr eigener Kopfkommentar) und darf deshalb kein `process.env` lesen -- `arena-vorlauf-service.ts`
+ * laeuft dagegen ausschliesslich serverseitig.
+ *
+ * `OLY_MINI_DM_FFA_VORLAUF=aus` auf dem Server (Container-Umgebung, `deploy/hetzner/.env` oder
+ * `docker-compose.yml`) schaltet den Mini-DM-FFA-Vorlauf OHNE Deploy ab -- ein Container-Neustart
+ * reicht, weil `process.env` beim Prozessstart gelesen wird. Jeder andere Wert (inkl. fehlend/leer)
+ * laesst `MINI_DM_FFA_VORLAUF_AKTIV` unveraendert wirken (Code-Konstante bleibt die Grundeinstellung).
+ *
+ * WICHTIG, UND DAS GEHOERT IN JEDE ROLLBACK-ENTSCHEIDUNG: das Abschalten wirkt nur VORWAERTS, auf
+ * Spieltage, deren Vorlauf NACH dem Neustart beginnt. Ein Mini-DM-Spieltag, dessen Snapshot VOR dem
+ * Abschalten bereits mit `quelle: "ffa"` fertiggestellt wurde, bucht beim Season-Finish WEITERHIN mit
+ * diesem bereits berechneten FFA-Ergebnis -- `kickoffArenaMatchdayApply` liest den fertigen Snapshot,
+ * nicht den aktuellen Wert dieses Schalters. Das ist erwartbar (derselbe Snapshot-vorher,
+ * buchen-nachher-Grundsatz wie bei jeder anderen Arena-Disziplin), aber ausdruecklich festgehalten,
+ * damit niemand nach einem Abschalten einen bereits "ffa"-gebuchten Spieltag als Bug meldet.
+ */
+function istMiniDmFfaVorlaufAktiv(): boolean {
+  if (typeof process !== "undefined" && process.env?.OLY_MINI_DM_FFA_VORLAUF === "aus") {
+    return false;
+  }
+  return MINI_DM_FFA_VORLAUF_AKTIV;
+}
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import {
   runMiniDmFfaMatchday,
@@ -100,7 +129,7 @@ export function determineArenaDisciplineContexts(
     const d2 = context.contextMeta.d2DisciplineId;
     if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1)) kandidaten.add(d1);
     if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
-    if (MINI_DM_FFA_VORLAUF_AKTIV && (d1 === MINI_DM_DISCIPLINE_ID || d2 === MINI_DM_DISCIPLINE_ID)) {
+    if (istMiniDmFfaVorlaufAktiv() && (d1 === MINI_DM_DISCIPLINE_ID || d2 === MINI_DM_DISCIPLINE_ID)) {
       miniDmPresent = true;
     }
   }
@@ -442,7 +471,25 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
           playerCount: resolveMiniDmFfaPlayerCountForMatchday(current.gameState, input.matchdayId, { saveId: input.saveId }),
           mutatoren: input.mutatorTraitsByDisciplineId.get(MINI_DM_DISCIPLINE_ID) ?? [],
         });
-        disziplinen[MINI_DM_DISCIPLINE_ID] = { status: "arena", dauerMs: Date.now() - gesamtStart, eingabeHash, versucheIntern };
+        // OPUS-REVIEW, Pflicht-Fix 4: ein GESAMTERFOLG (mindestens ein Pod lieferte ein gueltiges
+        // Ergebnis) hat trotzdem Teilwarnungen, wenn EINZELNE Pods wegen eines unvollstaendigen
+        // Boxscores verworfen wurden (`pruefeMotorErgebnisVollstaendigkeit()`,
+        // mini-dm-ffa-matchday.ts) -- die fielen vorher komplett unter den Tisch: nicht geloggt,
+        // nicht persistiert, der betroffene Pod faellt nur still auf den PPS-Pfad zurueck.
+        // Jetzt BEIDES: console.error (sofort sichtbar in den Server-Logs) UND persistiert in
+        // `ArenaVorlaufDisziplinEintrag.teilwarnungen` (spaeter abfragbar, nicht nur ein Log-Zeitpunkt).
+        if (erfolg.warnings.length > 0) {
+          console.error(
+            `[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) Gesamterfolg mit ${erfolg.warnings.length} Teilwarnung(en): ${erfolg.warnings.join(", ")}`,
+          );
+        }
+        disziplinen[MINI_DM_DISCIPLINE_ID] = {
+          status: "arena",
+          dauerMs: Date.now() - gesamtStart,
+          eingabeHash,
+          versucheIntern,
+          ...(erfolg.warnings.length > 0 ? { teilwarnungen: erfolg.warnings } : {}),
+        };
       } else {
         arenaAusfallByDisciplineId.set(MINI_DM_DISCIPLINE_ID, letzterAusfall!);
         gesamtStatus = "failed";

@@ -2784,6 +2784,18 @@ export type ArenaVorlaufDisziplinEintrag = {
    * nur noch das ENDGUELTIGE Ergebnis, "failed" ist ab dann immer terminal.
    */
   versucheIntern?: number;
+  /**
+   * TEILWARNUNGEN BEI GESAMTERFOLG (OPUS-REVIEW, PR 5 des 6-PR-Opus-Plans 21.10., Mini-DM-FFA-
+   * Vorlauf-Verdrahtung, Pflicht-Fix 4): additiv, optional -- bisher ausschliesslich fuer Mini-DM
+   * gesetzt (`lib/battle/arena-vorlauf-service.ts`s Mini-DM-Zweig). `status: "arena"` heisst nur
+   * "MINDESTENS EIN Pod/Team hat ein gueltiges Ergebnis geliefert" -- ohne dieses Feld gingen
+   * einzelne, strukturell unvollstaendige Pods (fehlende Runde, fremde Rollen-ID, vom Motor
+   * ignoriertes k) bei einem Teilerfolg STILL unter (sie fallen defensiv auf den PPS-Pod-Pfad
+   * zurueck, aber ohne sichtbare Spur). Jede Zeile hier beschreibt EINEN verworfenen Pod dieser
+   * Disziplin dieses Spieltags, `null`/fehlend/leer heisst "keine Teilwarnung". `undefined` fuer
+   * jeden Save/jede andere Disziplin von vor diesem Feld — `JSON.stringify` laesst es ohnehin weg.
+   */
+  teilwarnungen?: string[] | null;
 };
 
 export type ArenaVorlaufRecord = {

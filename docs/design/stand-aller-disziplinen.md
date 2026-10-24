@@ -44,13 +44,21 @@ ihn produktiv.
   `disciplineId === "mini-dm"` jetzt auf diese Funktion statt auf die generische (sonst waere jede
   Buchung mit einer arena-aufgeloesten Zweit-Disziplin UND Mini-DM am selben Spieltag faelschlich
   als "instabil" verworfen worden, weil die generische Funktion fuer Mini-DM keine Fixtures findet).
-- **Offene Design-Frage aus PR 3 entschieden**: `ppAusMiniDmFfaBeitrag()` liest die Referenz
-  weiterhin GEPOOLT je k (nicht nach Rolle/Eignungsrang getrennt). Begruendung: eine getrennte
-  Referenz braucht sechsmal so viele Referenzzellen, die PR 3 nicht gezogen hat — das waere eine
-  neue Messrunde, kein reiner Verdrahtungs-Schritt. Der von PR 3 benannte Verzerrungs-Effekt (ein
-  Spieler bekommt bei gleicher Leistung bei k=6 mehr PP als bei k=2, weil die gepoolte Referenz
-  durch die schwaecheren Raenge 5/6 nach unten gezogen wird) bleibt dadurch bestehen und ist hier
-  bewusst nicht behoben — dokumentiert als bekannte Grenze, kein versteckter Kompromiss.
+- **Offene Design-Frage aus PR 3 entschieden, UND KORRIGIERT nach Opus-Review an PR #1304**:
+  `ppAusMiniDmFfaBeitrag()` liest die Referenz GEPOOLT je Disziplin+k (eine p50/p995 ueber ALLE
+  sechs Rollen desselben k), nicht nach Rolle/Eignungsrang getrennt. Die erste Fassung dieses
+  Nachtrags nannte das einen "Verzerrungs-Effekt"/eine "bekannte Grenze" — das war FALSCH und ist
+  hier richtiggestellt, nicht nur ergaenzt: laut Opus-Review ist das gepoolte Referenz-je-k genau
+  der RICHTIGE Projektstandard, nicht ein Kompromiss. Eine nach Rolle getrennte Referenz wuerde
+  einen Last-Hit-Median (die laut Matrix schwaechste Rolle, intelligence/spirit-Fokus) auf
+  denselben p50 heben wie einen Frontliner-Median (die staerkste) — WIDERSPRUCH zu CLAUDE.md ("Die
+  Eignungsmatrix ist gesperrt"-Abschnitt, Chris' wortlicher Massstab "ein Spieler mit einer Stat von
+  80 ... erwarte ich auch, dass da einer der Top-Leute ist"): die Referenz muss je DISZIPLIN+k
+  gezogen werden, nicht je Rolle, sonst verschwindet genau die Eignungs-Reihenfolge zwischen den
+  Rollen, die die Matrix vorgibt. Der Selektionseffekt (hoeheres k zieht auch schwaechere Raenge
+  5/6 mit hinein, s. 24. Nachtrag unten) bleibt bestehen, ist aber keine Verzerrung, die zu beheben
+  waere — er ist genau das Verhalten, das die Budget-Methode von einer je-k gepoolten Referenz
+  erwartet.
 - **Nachweise**: Manager-Mode byte-identisch (`scripts/pruefe-resolve-bit-identitaet.ts`/
   `scripts/pruefe-mapper-bit-identitaet.ts`, je vor/nach gegen eine frische, unabhaengige Kopie des
   live-save-Abbilds); Battle-Mode-Mini-DM aendert sich ABSICHTLICH (eigener Integrationstest,
@@ -139,14 +147,15 @@ mit (chaosdriver/lasthit), die bei k=2..4 gar nicht erst antreten, und das sind 
 schwaecheren Mini-DM-Kaempfer eines Kaders. Das zieht den POOLED Median ueber alle Runden/Raenge
 nach unten, je hoeher k.
 
-**Offene Design-Frage fuer PR 5, aus diesem Befund:** `ppAusMiniDmFfaBeitrag()` liest die
-Referenz heute gepoolt je k (eine einzige p50/p995 fuer alle Raenge). Bei GLEICHER individueller
-Leistung (derselbe rohe `beitrag`) bekaeme derselbe Spieler ueber diese Kurve bei k=6 MEHR PP als
-bei k=2, weil die gepoolte p50-Referenz bei k=6 niedriger liegt (69 statt 145) — nicht, weil er
-besser gespielt hat, sondern weil mehr schwaechere Mitspieler die Referenz nach unten ziehen. PR 5
-muss entscheiden, ob die Referenz weiter gepoolt je k bleibt (einfach, aber mit diesem Verzerrungs-
-Risiko) oder nach Rolle/Eignungsrang getrennt gezogen wird (genauer, aber sechsmal so viele
-Referenzzellen). Diese PR trifft diese Entscheidung nicht, haelt sie aber ausdruecklich fest.
+**Design-Frage aus diesem Befund — von PR 5 entschieden, s. 25. Nachtrag oben, dort nach
+Opus-Review KORRIGIERT:** `ppAusMiniDmFfaBeitrag()` liest die Referenz gepoolt je k (eine einzige
+p50/p995 fuer alle Raenge). Bei GLEICHER individueller Leistung (derselbe rohe `beitrag`) bekaeme
+derselbe Spieler ueber diese Kurve bei k=6 mehr PP als bei k=2, weil die gepoolte p50-Referenz bei
+k=6 niedriger liegt (69 statt 145) — das ist der Selektionseffekt von oben (hoeheres k zieht
+schwaechere Raenge 5/6 mit hinein), KEIN Fehler der Referenz-Methode. PR 5 hat entschieden: gepoolt
+je Disziplin+k bleibt, nicht nach Rolle/Eignungsrang getrennt — das ist laut Opus-Review der
+richtige Projektstandard (eine rollengetrennte Referenz wuerde Last-Hit- und Frontliner-Mediane
+gleichsetzen, Widerspruch zur gesperrten Eignungsmatrix, s. 25. Nachtrag).
 
 **Bleibt trotzdem toter Code**: PR 4 hat keinen produktiven Aufrufer, der
 `ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId` befuellt (grep ueber das ganze Repo

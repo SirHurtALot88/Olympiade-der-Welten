@@ -1172,7 +1172,20 @@ export function buildLegacyMatchdayResolvePreview(
           // Team-Punkte oben braucht diese Zahl keine vollstaendige Deckung der ganzen Seite: ein
           // einzelner nicht zuordenbarer Mitspieler faellt fuer sich selbst auf PPS zurueck, ohne
           // seine Teamkollegen zu beruehren).
-          const arenaPps = arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null;
+          //
+          // OPUS-REVIEW, PR 5 ("gezeigt != gebucht"-Randfall): `arenaIndividualPpsForThisDiscipline`
+          // ist bei Mini-DM NICHT pro Pod gezogen, sondern einmal fuer den GANZEN Spieltag
+          // (`arenaIndividualBoxscorePpsByDisciplineId.get("mini-dm")`, befuellt aus ALLEN Pods, die
+          // der Motor ueberhaupt lieferte). Faellt EIN Pod wegen eines fehlenden/unvollstaendigen
+          // Teams defensiv auf den PPS-Pod-Pfad zurueck (`miniDmPod.quelle` bleibt dann `undefined`),
+          // stehen dessen andere drei Teams trotzdem noch in dieser Map -- ohne die Absicherung unten
+          // wuerde ihr Arena-PP angewendet, waehrend ihr `miniDmPod`-Eintrag (Platz/Marge/Verhaeltnis)
+          // laengst aus der PPS-Rechnung kommt. Nur "arena" (die generischen Zweier-Duell-Disziplinen)
+          // ODER ein Mini-DM-Pod MIT `quelle === "ffa"` duerfen die Boxscore-PP tatsaechlich ziehen.
+          const arenaIndividualPpsGueltig =
+            rankedTeam.resolutionSource === "arena" ||
+            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa");
+          const arenaPps = arenaIndividualPpsGueltig ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null : null;
           const ppsDuellPps = ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ?? null;
           return {
             ...entry,
@@ -1205,15 +1218,34 @@ export function buildLegacyMatchdayResolvePreview(
         teamPowerShare: entry.teamPowerShare ?? null,
         finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
+        // OPUS-REVIEW, PR 5 ("gezeigt != gebucht"-Randfall, s. ausfuehrlicher Kommentar oben an
+        // `rankedTeam.entries.map()`): dieselbe Absicherung hier, weil DIESE Zeile (nicht die oben)
+        // tatsaechlich persistiert wird (`legacy-matchday-result-mapper.ts`:
+        // `scoreContribution: player.pointsAwarded ?? player.scoreContribution`) und darueber in den
+        // Ledger geht -- ohne die Absicherung wuerde ein auf PPS zurueckgefallenes Mini-DM-Pod-Team
+        // trotzdem die Arena-Boxscore-PP eines ANDEREN, FFA-gewerteten Pods desselben Spieltags
+        // bekommen, nur weil beide ueber dieselbe spieltagsweite `arenaIndividualBoxscorePps`-Map
+        // laufen. `arenaIndividualPpsGueltigFuerDiesenSpieler` nutzt dieselbe Bedingung wie oben an
+        // `rankedTeam.entries.map()`, hier ueber ein `rankedTeam &&`-Boolean statt optionalem
+        // Verketten, damit TS `rankedTeam.miniDmPod` ohne weiteres `?.` narrowt.
         pointsAwarded:
-          arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ??
+          (rankedTeam &&
+          (rankedTeam.resolutionSource === "arena" ||
+            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa"))
+            ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId)
+            : null) ??
           ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ??
           distributedPoints.entries[index]?.points ??
           null,
         pointSource: distributedPoints.pointSource,
         // BOXSCORE-AN-PPS: nur informativ (Debug/Anzeige) -- `pointsAwarded` oben ist die einzige
         // Stelle, an der der Boxscore-Impact tatsaechlich Punkte vergibt.
-        arenaBoxscoreImpactApplied: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+        arenaBoxscoreImpactApplied: Boolean(
+          rankedTeam &&
+            (rankedTeam.resolutionSource === "arena" ||
+              (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa")) &&
+            arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+        ),
         rankInTeam,
         rankInDiscipline: 0,
         isTop10: false,
