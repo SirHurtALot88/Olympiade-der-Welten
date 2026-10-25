@@ -40,7 +40,7 @@ import { expect } from "vitest";
 export const TEST_K = 4;
 
 /**
- * CI-FIX (24.-25.10., Opus-Review-Nacharbeit, ZWEITER ANLAUF): erzwingt fuer JEDES Team JEDES
+ * CI-FIX (24.-25.10., Opus-Review-Nacharbeit, DRITTER ANLAUF): erzwingt fuer JEDES Team JEDES
  * Pods eine VOLLSTAENDIGE Mini-DM-Aufstellung (alle `k` Rollen besetzt), unabhaengig davon, ob der
  * echte (unseeded) KI-/Liga-Draft diesem Team genug Mini-DM-faehige Spieler zugeteilt hat. Ersetzt
  * NUR den Mini-DM-Eintrag (`disciplineId: "mini-dm", disciplineSide: "d1"`) eines Teams -- andere
@@ -48,24 +48,36 @@ export const TEST_K = 4;
  * steht in diesem Helfer immer auf D1 (s. `erzwungenerSpieltag` oben), deshalb `disciplineSide: "d1"`
  * fest.
  *
- * DER ERSTE ANLAUF (24.10.) behob die CI-Flakigkeit in meinem eigenen 5-Datei-Reproduktionslauf,
- * schlug aber in der VOLLEN CI-Suite weiterhin fehl -- derselbe Fehler. ROOT CAUSE, dieses Mal
- * wirklich geschlossen: `buildArenaAufstellung()` (arena-aufstellung-adapter.ts) schluesselt sein
- * Ergebnis nach SPIELER-NAME, nicht nach `playerId` (deren Kopfkommentar, Zeilen ~140-147,
- * dokumentiert das ausdruecklich: der Namensgenerator baut aus nur 280 Kombinationen OHNE
- * Eindeutigkeitspruefung ueber den ganzen Save -- bei Hunderten Spielern je 32-Team-Save sind
- * Namenskollisionen der NORMALFALL, kein Rand). Mein erster Patch wählte `k` Roster-Einträge nach
- * `playerId` -- DISTINKTE IDs koennen trotzdem auf denselben NAMEN zeigen, und
- * `buildArenaAufstellung()` kollabiert zwei Eintraege mit demselben Namen zu EINEM Schluessel. Die
- * resultierende Aufstellung hat dann WENIGER als `k` tatsaechlich unterscheidbare Rollen -- exakt
- * das urspruengliche Symptom, nur durch meinen eigenen Patch unbeabsichtigt reproduziert, sobald
- * die gewaehlten `k` Roster-Spieler zufaellig einen Namen teilten. In meinem kleinen
- * Reproduktionslauf (wenige Saves) war die Kollisionswahrscheinlichkeit gering genug, um gruen zu
- * bleiben -- in der vollen CI-Suite (viele Saves/Spieler insgesamt) schlug sie zu.
+ * ZWEI FRUEHERE ANLAEUFE, BEIDE AM SELBEN SYMPTOM GESCHEITERT (`tests/arena-vorlauf-mini-dm-ffa.
+ * test.ts`s erster Test, sporadisch `status: "failed"` statt `"ready"` in CI, nie lokal
+ * reproduzierbar genug):
  *
- * FIX: die `k` Ersatzspieler werden jetzt nach PAARWEISE DISTINKTEM `player.name` gewaehlt, nicht
- * nur nach distinkter `playerId` -- genau die Garantie, die `buildArenaAufstellung()` tatsaechlich
- * braucht, um `k` unterscheidbare Rollen zu erzeugen.
+ *  1. (24.10.) Erster Anlauf wählte `k` Roster-Einträge nach distinkter `playerId` -- schlug in der
+ *     vollen CI-Suite weiterhin fehl.
+ *  2. (24.-25.10.) ROOT CAUSE gefunden: `buildArenaAufstellung()` (arena-aufstellung-adapter.ts)
+ *     schluesselt sein Ergebnis nach SPIELER-NAME, nicht nach `playerId` (deren Kopfkommentar,
+ *     Zeilen ~140-147: der Namensgenerator baut aus nur 280 Kombinationen OHNE Eindeutigkeits-
+ *     pruefung ueber den ganzen Save). Zweiter Anlauf wählte deshalb `k` Einträge nach paarweise
+ *     DISTINKTEM `player.name` INNERHALB des bestehenden Rosters -- bestand 22 lokale
+ *     Zufalls-Wiederholungen UND den vollen `persistenz-suiten`-Joblauf (197/197), schlug aber in
+ *     einem DRITTEN CI-Lauf (`full-test-suite`, andere/mehr gleichzeitig importierte Testdateien)
+ *     am exakt selben Symptom erneut fehl.
+ *
+ * WARUM ZWEI ANLAEUFE NICHT REICHTEN: "genug eindeutige Namen im bestehenden Roster suchen" bleibt
+ * ein WAHRSCHEINLICHKEITS-Problem, solange der Namenspool nur 280 Kombinationen hat -- bei genug
+ * Wiederholungen/Testkombinationen (verschiedene CI-Jobs, unterschiedliche Dateizahl, unter-
+ * schiedliche Nebenlaeufigkeit) wird eine Kollision IMMER wieder auftreten, nur mit wechselnder
+ * Haeufigkeit. Eine hohe Erfolgsquote ist nicht dasselbe wie eine Garantie.
+ *
+ * FIX, DIESMAL DETERMINISTISCH STATT WAHRSCHEINLICHKEITSBASIERT: die `k` fuer Mini-DM gewaehlten
+ * Spieler bekommen ihren `name` HIER EXPLIZIT auf einen garantiert eindeutigen Test-Namen gesetzt
+ * (`MiniDM-Test-<teamId>-<slotIndex>`) -- VOR dem Aufruf von `buildArenaAufstellung()`. Das macht
+ * das Testergebnis unabhaengig vom Zufall der echten Namensgenerierung: es ist vollkommen egal, ob
+ * der echte 280-Kombinationen-Generator fuer diese Spieler irgendwo im Save einen doppelten Namen
+ * erzeugt hat, weil ihr Name ab hier ohnehin ueberschrieben wird. Das ist eine Aenderung an der
+ * TESTMETHODIK (wie dieser Helfer den Battle-Save fuer den Test vorbereitet), NICHT am
+ * Produktionscode -- der echte Namensgenerator mit seinen 280 Kombinationen ist ein bekanntes,
+ * vorbestehendes, nicht von dieser PR verursachtes Verhalten und bleibt unveraendert.
  *
  * Nutzt bewusst dieselbe `LineupDraftEntry`-Form wie `tests/mini-dm-ffa-matchday.test.ts`s
  * `buildTeamFixture()` (dort schon gegen `buildArenaAufstellung()` erfolgreich erprobt) -- keine
@@ -93,28 +105,27 @@ function stelleVollstaendigeMiniDmTeilnahmeSicher(
     );
     if (rollen.every((rolle) => vollstaendig.has(rolle))) continue; // bereits vollstaendig, nichts zu tun.
 
-    // NAMENS-EINDEUTIGKEIT, NICHT NUR ID-EINDEUTIGKEIT (s. Kopfkommentar oben): ein Name, der
-    // irgendwo im Roster dieses Teams MEHRFACH vorkommt, liefert hier nur EINEN Kandidaten (den
-    // ersten) -- genauso, wie `buildArenaAufstellung()` ihn ohnehin nur einmal als Schluessel
-    // haette. Zwei Roster-Zeilen mit demselben Namen zaehlen also als EIN verfuegbarer Platz.
-    const nameVonPlayerId = new Map(gameState.players.map((player) => [player.id, player.name] as const));
-    const gesehenNamen = new Set<string>();
-    const eindeutigeKandidaten: string[] = [];
-    for (const zeile of gameState.rosters) {
-      if (zeile.teamId !== teamId) continue;
-      const name = nameVonPlayerId.get(zeile.playerId);
-      if (!name || gesehenNamen.has(name)) continue;
-      gesehenNamen.add(name);
-      eindeutigeKandidaten.push(zeile.playerId);
-    }
-    if (eindeutigeKandidaten.length < rollen.length) {
+    // `k` DISTINKTE playerIds aus dem Roster dieses Teams -- distinkte Roster-ZEILEN sind per
+    // Konstruktion distinkte Spieler, unabhaengig von ihrem (moeglicherweise kollidierenden) Namen.
+    const rosterPlayerIds = [...new Set(gameState.rosters.filter((zeile) => zeile.teamId === teamId).map((zeile) => zeile.playerId))];
+    if (rosterPlayerIds.length < rollen.length) {
       throw new Error(
-        `stelleVollstaendigeMiniDmTeilnahmeSicher: Team ${teamId} hat nur ${eindeutigeKandidaten.length} NAMENTLICH unterscheidbare Kaderspieler (Namensgenerator hat nur 280 Kombinationen, s. Kopfkommentar), braucht ${rollen.length} fuer k=${k} -- Draft-Annahme (genug namentlich unterscheidbare Spieler je Team) stimmt nicht mehr.`,
+        `stelleVollstaendigeMiniDmTeilnahmeSicher: Team ${teamId} hat nur ${rosterPlayerIds.length} Kaderspieler, braucht ${rollen.length} fuer k=${k} -- Draft-Annahme (genug Spieler je Team) stimmt nicht mehr.`,
       );
     }
-    const rosterPlayerIds = eindeutigeKandidaten;
+    const gewaehlteSpielerIds = rosterPlayerIds.slice(0, rollen.length);
+
+    // DETERMINISTISCHE NAMENS-EINDEUTIGKEIT (s. Kopfkommentar): ersetzt den (moeglicherweise mit
+    // einem anderen Spieler irgendwo im Save kollidierenden) echten Namen dieser `k` Spieler durch
+    // einen garantiert eindeutigen Test-Namen -- `buildArenaAufstellung()` schluesselt nach `name`,
+    // dieser Name ist hier fest, nicht vom 280-Kombinationen-Generator abhaengig.
+    const neuerNameJePlayerId = new Map(gewaehlteSpielerIds.map((playerId, slotIndex) => [playerId, `MiniDM-Test-${teamId}-${slotIndex}`] as const));
+    const neuePlayers = gameState.players.map((player) =>
+      neuerNameJePlayerId.has(player.id) ? { ...player, name: neuerNameJePlayerId.get(player.id)! } : player,
+    );
+
     const neueEintraege = rollen.map((_rolle, slotIndex) => ({
-      playerId: rosterPlayerIds[slotIndex]!,
+      playerId: gewaehlteSpielerIds[slotIndex]!,
       slotIndex,
       disciplineId: MINI_DM_DISCIPLINE_ID,
       disciplineSide: "d1" as const,
@@ -140,6 +151,7 @@ function stelleVollstaendigeMiniDmTeilnahmeSicher(
 
     gameState = {
       ...gameState,
+      players: neuePlayers,
       seasonState: {
         ...gameState.seasonState,
         lineupDrafts: [...bestehendeDrafts.filter((draft) => !(draft.teamId === teamId && draft.matchdayId === matchdayId)), neuerDraft],
@@ -150,6 +162,24 @@ function stelleVollstaendigeMiniDmTeilnahmeSicher(
 
   if (geaendert) {
     persistence.saveSingleplayerState(saveId, gameState);
+    // SELBSTPRUEFUNG, NICHT NUR HOFFNUNG: nach dem Schreiben noch einmal durch `buildArenaAufstellung()`
+    // lesen (derselbe Pfad, den die Produktion und `baueGesetzteRollenFuerTeam()` tatsaechlich
+    // nutzen) -- schlaegt HIER laut und sofort fehl, falls die deterministischen Namen aus
+    // irgendeinem Grund (z. B. zwei verschiedene Teams bekommen denselben `teamId`-Praefix, was bei
+    // echten Save-IDs nicht vorkommen sollte) trotzdem kollidieren, statt erst Minuten spaeter als
+    // ein verwirrendes `status: "failed"` im eigentlichen Test aufzutauchen.
+    for (const teamId of teamIds) {
+      const nachPatchVollstaendig = new Set(
+        Object.values(buildArenaAufstellung(gameState, teamId, matchdayId))
+          .filter((eintrag) => eintrag.d === MINI_DM_DISCIPLINE_ID)
+          .map((eintrag) => eintrag.slot),
+      );
+      if (!rollen.every((rolle) => nachPatchVollstaendig.has(rolle))) {
+        throw new Error(
+          `stelleVollstaendigeMiniDmTeilnahmeSicher: Selbstpruefung fehlgeschlagen fuer Team ${teamId} -- nach dem deterministischen Namens-Patch sind trotzdem nur ${nachPatchVollstaendig.size}/${rollen.length} Rollen in buildArenaAufstellung() sichtbar. Das sollte mit garantiert eindeutigen Namen nie passieren -- Pruefen, ob eine andere Ursache vorliegt.`,
+        );
+      }
+    }
   }
 }
 
