@@ -474,8 +474,8 @@
    "rhoJeSpiel": 0.807,
    "rhoSaison": 0.902,
    "pp": [
-    64.6,
-    61.7
+    121.0,
+    120.1
    ],
    "rhoMessung": {
     "befehl": "node scripts/miss-alle-disziplinen.mjs 48 football",
@@ -484,18 +484,18 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs football (+ --saat-versatz=10000000)",
+    "befehl": "node scripts/messe-arena-einfluss.mjs football 48 (+ --saat-versatz=10000000)",
     "saatStroeme": [
      0,
      10000000
     ]
    },
-   "datum": "2026-10-14",
-   "quelle": "docs/design/football-kickoff-return-14-10.md Abschnitt 5",
+   "datum": "2026-10-25",
+   "quelle": "docs/design/stand-aller-disziplinen.md Abschnitt 14",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "commit": "f9181c15",
-   "anmerkung": "KORRIGIERT 25.10. (Konsistenz-Audit): die vorherige Zeile (rho 0,818, Pp 47,3, 26.09., aus gesamtstand-audit-13-10.md uebernommen) war bereits vor dem 16.10.-Review als stale erkannt worden (s. docs/design/battle-mode-20-spieltage-liga-mechanik-16-10.md Zeile 136), wurde aber nie auf den tatsaechlich juengsten Stand nachgezogen. Die vier Schritte des Kickoff/QB/Kicker-Plans (14.10., PR #1224-#1227) hoben rho zuletzt auf 0,807 (bestanden) und die Pp-Abweichung auf 64,6/61,7 (klar verletzt) -- Football bleibt deshalb nicht angeschlossen, der Blocker ist jetzt eindeutig Pp, nicht rho. rhoFrisch/ppFrisch hier true, weil mit dem Standardprotokoll (zwei Saatstroeme, n=48) gemessen -- Football selbst bleibt trotzdem ausserhalb ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS, diese Zeile dient nur der ehrlichen Dokumentation."
+   "commit": "unbekannt",
+   "anmerkung": "KORRIGIERT 25.10. (Task #196, nach dem Konsistenz-Audit vom selben Tag, Commit f9181c15): die Zeile von f9181c15 (Pp 64,6/61,7) maß gegen BASIS_JE_DISC.football -- fuer Football seit PR #934 (16.09.) der Spiel-Eignungs-Override, nicht die gesperrte Matrix (CLAUDE.md: die Pp-Pflichtpruefung muss gegen die Matrix laufen). Football ist die einzige der zwanzig Disziplinen mit dieser Abweichung. Fix: neue PP_MATRIX_JE_DISC-Konstante in battle-mode.engine.js, nur von den Pp-Messwerkzeugen gelesen (BASIS_JE_DISC/mitAufschlag()/die Kaderanzeige bleiben unveraendert auf dem Override). Frisch nachgemessen mit dem korrigierten Werkzeug: Pp 121,0/120,1 -- WEITER WEIT ueber der 25-Pp-Schranke, sogar deutlich hoeher als vorher berichtet. rho (0,807/0,902) unveraendert aus f9181c15 uebernommen, nicht in dieser Runde neu gemessen (kein rr()-konsumierender Code beruehrt). Football bleibt deshalb weiterhin ausserhalb ARENA_RESOLVED_DISCIPLINE_IDS; rhoFrisch/ppFrisch bleiben true, weil beide Werte aus einer vollen Standardmessung (n=48, zwei Saatstroeme) stammen, nur eben mit dem jetzt korrekten Vergleichstisch fuer Pp."
   },
   "i-spy": {
    "rhoJeSpiel": 0.75,
