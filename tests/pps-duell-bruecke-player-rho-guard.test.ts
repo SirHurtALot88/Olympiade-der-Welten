@@ -42,6 +42,17 @@ import abnahme from "@/data/generated/pps-duell-bruecke-abnahme.json";
  * s. tests/pps-duell-bruecke-score-kanal.test.ts) liest Football 5,9/12,5 -- kein eigenständiger
  * Befund mehr. PP_BEKANNTE_AUSNAHMEN hält nur noch Mini-DM (30,5/30,5, kleine Grundgesamtheit,
  * playerCount 1 je Seite, s. Abschnitt 8.4 der Doku).
+ *
+ * NACHTRAG 25.10. (Opus-Audit Task #191, `gameModeFixCaveat` in der JSON): das Skript setzte
+ * `scenarioMeta.gameMode` nie auf "battle" -- jede Zeile lief als `resolutionSource: "pps"`
+ * (Rückfall) statt `"pps_duell"`/`"mini_dm_pod"`. Gefixt; Teil A oben ist seither neu gemessen. Ein
+ * Nebeneffekt: VOR dem Fix lief Mini-DM in dieser Messung NIE über `mini_dm_pod` und hatte deshalb
+ * auf Seiten-Ebene IMMER genau n=0 (playerCount 1, Spearman verlangt n>=3) -- das war selbst ein
+ * Artefakt des Bugs, keine Eigenschaft von Mini-DM. Nach dem Fix schwankt n je Saatstrom-Fenster
+ * (0 oder ~30, abhängig davon, ob `mini_dm_pod`-Gruppen mit >=3 Spielern pro Seite in diesem
+ * Fenster vorkommen) -- Mini-DM bleibt deshalb in `RHO_NICHT_MESSBAR` (kein verlässlicher, fester
+ * Wert), aber die frühere harte "n ist immer 0"-Annahme ist nicht mehr haltbar und wird hier nicht
+ * mehr geprüft.
  */
 
 type TeilAZeile = {
@@ -120,15 +131,13 @@ describe("PPS-Duell-Brücke, Teil A: rho bei Feldgröße 6 (robust, ohne Diskret
     expect(verfehlte).toEqual([]);
   });
 
-  it("Mini-DM bleibt auf Seiten-Ebene strukturell nicht messbar (playerCount 1 je Seite, n=0)", () => {
+  it("Mini-DM bleibt von der Seiten-rho-Schranke ausgenommen (kein verlässlicher, fester n-Wert)", () => {
+    // S. Nachtrag 25.10. oben: n war nur VOR dem gameMode-Fix immer 0 (ein Artefakt des Bugs,
+    // nicht von Mini-DM) -- jetzt schwankt n je Fenster, deshalb keine feste n/median-Erwartung
+    // mehr, nur die Ausnahme von der Schranke selbst (geprüft im ersten Test oben via `continue`).
     for (const disziplin of RHO_NICHT_MESSBAR) {
       const zeilen = TABELLE.teilA[disziplin];
       expect(zeilen, disziplin).toBeDefined();
-      for (const zeile of zeilen!) {
-        const v = zeile.spielerRhoJeFeldgroesse[ROBUSTE_FELDGROESSE];
-        expect(v?.n, disziplin).toBe(0);
-        expect(v?.median, disziplin).toBeNull();
-      }
     }
   });
 });

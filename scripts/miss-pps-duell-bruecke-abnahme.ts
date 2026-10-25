@@ -310,6 +310,16 @@ function main() {
       for (const [mi, matchdayId] of spieltage.entries()) {
         const gs: GameState = {
           ...basis,
+          // BATTLE-GATE-KORREKTUR (25.10., Opus-Audit Task #191, Fund bereits in PR #1284 18.10.
+          // dokumentiert, dort aber nie gemergt): OHNE diesen Override bleibt `scenarioMeta.gameMode`
+          // beim Wert des zugrundeliegenden Saves ("manager", da `new-game-1787123325719-swnjlk` ein
+          // Manager-Mode-Save ist) -- `isBattleModeSave()`/`isBattleModeArenaEligible`
+          // (legacy-matchday-resolve-engine.ts) blieben dadurch IMMER `false`, und jede Zeile lief als
+          // `resolutionSource: "pps"` (der alte Rangpfad) statt `"pps_duell"` (die eigentlich zu
+          // messende Bruecke aus `ppAusSpielerScore()`, PR #1296). Diese Messung testete bisher also
+          // nie den Pfad, den sie zu testen vorgab. S. docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md
+          // Abschnitt 8.6/8.2 fuer die volle Herleitung und die dadurch ungueltigen Alt-Zahlen.
+          scenarioMeta: { ...basis.scenarioMeta, gameMode: "battle" } as GameState["scenarioMeta"],
           seasonState: {
             ...basis.seasonState,
             disciplineSchedule: (basis.seasonState.disciplineSchedule ?? []).map((zeile) =>
