@@ -371,6 +371,17 @@ Fassungen (16.–17.10.) sind ausdrücklich überholt und werden hier nicht als 
 > (7 von 8 bestehen) kommen weiter unten als **Zusatzgrößen**, nicht als Eröffnung — sie beantworten
 > eine andere, engere Frage (individuelle Eignung vs. vergebene PP innerhalb einer Teamseite bzw.
 > Verzerrung des Score-Kanals) und dürfen die Fixture-Ebene-Aussage oben nicht verdecken.
+>
+> **Nachtrag 25.10., wichtig für alles Folgende: dieser gesamte Abschnitt 8 (bis einschließlich
+> 8.6) wurde — ohne dass es damals bemerkt wurde — zu 100 % über den ALTEN `"pps"`-Pfad gemessen,
+> nie über die Brücke (`"pps_duell"`) selbst.** `scripts/miss-pps-duell-bruecke-abnahme.ts` setzte
+> `scenarioMeta.gameMode` nie auf `"battle"`, wodurch `isBattleModeArenaEligible` immer `false`
+> blieb. Gefixt (25.10., **Abschnitt 8.7**) — aber der Fix allein reicht nicht aus: alle acht
+> Live-Spielstände haben nur eine Dummy-Spielplan-Kette (1 Fixture/Spieltag statt eines echten
+> Rundenplans), wodurch auch NACH dem Fix nur **5,5 %** der gemessenen Team-Seiten echt über
+> `"pps_duell"` laufen. Die Zahlen unten (8.2–8.6) bleiben als historischer Befund stehen, sind
+> aber WEDER vor noch nach dem Fix eine belastbare Aussage über die eigentliche Brücke — **Details,
+> neu gemessene Zahlen und Einordnung in Abschnitt 8.7.**
 
 ### 8.1 Was eigentlich zu messen ist
 
@@ -568,6 +579,11 @@ Keines von beiden ist die Abnahmezahl selbst — die ist Teil B (8.3) und Teil A
 
 ### 8.6 Einordnung und Guard-Test
 
+> **Nachtrag 25.10. (Abschnitt 8.7):** jede Zahl in diesem Unterabschnitt stammt aus einer Messung,
+> die versehentlich zu 100 % den alten `"pps"`-Pfad maß (gameMode-Bug). Nach dem Fix bleiben die
+> Fixture-Ebene-Zahlen praktisch unverändert (weiterhin >90 % `"pps"`, s. 8.7) — die Einordnung
+> unten gilt unverändert, ist aber keine Aussage über die eigentliche Brücke.
+
 **Die Einzelspiel-rho-Abnahme auf Fixture-Ebene besteht die Brücke derzeit NICHT** (0,61–0,78
 Mittel, nur 27–51 % der Fixtures ≥0,80 bei Feldgröße 6 — größtenteils erklärt durch den
 vorbestehenden Team-Rang-Topf-Effekt, 8.2, Task #176, nicht primär durch die Feldgröße). Das ist
@@ -617,3 +633,114 @@ OLY_APP_SQLITE_PATH=<abbild> npx tsx scripts/miss-pps-duell-bruecke-abnahme.ts \
   [--disziplinen=a,b,...] [--spieltage=3] [--feldgroessen=3,4,5,6] [--pp-trials-je-seite=8] \
   [--skip-teil-b] [--ausgabe=<pfad>]
 ```
+
+### 8.7 Nachtrag 25.10. (Opus-Audit Task #191): gameMode-Fix — und ein tieferliegender, zweiter Befund
+
+**Der Fund.** `scripts/miss-pps-duell-bruecke-abnahme.ts` biegt den Spielplan für den Probe-Spieltag
+korrekt auf die gewünschten Disziplinen um, setzte aber **nirgends** `scenarioMeta.gameMode =
+"battle"` am verwendeten Save (einem der acht Manager-Mode-Saves des Live-Abbilds).
+`resolveGameMode()`/`isBattleModeSave()` (`lib/season/game-mode.ts`) fallen ohne dieses Feld auf
+`"manager"` zurück, `isBattleModeArenaEligible` in `legacy-matchday-resolve-engine.ts` blieb dadurch
+**immer** `false`, und jede gemessene Zeile lief als `resolutionSource: "pps"` — der alte, vor PR
+#1296 gültige Rangpfad — statt `"pps_duell"` (die eigentlich zu messende Brücke aus
+`ppAusSpielerScore()`). **Der gesamte obige Abschnitt 8 (8.1–8.6) misst damit zu 100 % den alten
+Pfad, nie die Brücke selbst** — unabhängig davon, wie die einzelnen Zahlen dort eingeordnet wurden.
+
+Derselbe Fund stand bereits in PR #1284 (18.10., "Nebenfund", nie gemergt — von PR #1296
+überholt und inzwischen geschlossen) mit demselben einzeiligen Fix. Der Fix wurde nie in PR #1296
+übernommen, dessen eigene Abschnitt-3-Neumessung ("rho/Pp-Neumessung der PPS-Duell-Brücke") maß
+deshalb **ebenfalls** versehentlich den alten Pfad, trotz des irreführenden Namens.
+
+**Der Fix** (minimal-invasiv, nur dieses Skript, keine Produktionslogik):
+
+```ts
+const gs: GameState = {
+  ...basis,
+  scenarioMeta: { ...basis.scenarioMeta, gameMode: "battle" } as GameState["scenarioMeta"],
+  seasonState: { /* unverändert */ },
+};
+```
+
+Direkt verifiziert (nicht nur behauptet): ohne den Fix liefert eine Testmessung 0 % `"pps_duell"`-
+Zeilen (64/64 `"pps"`); mit dem Fix erscheinen `"pps_duell"`-Zeilen überhaupt erstmals. Der Fix ist
+korrekt und notwendig.
+
+**Der zweite, tiefere Befund (beim Nachmessen entdeckt, nicht Teil der ursprünglichen Aufgabe):
+der Fix allein reicht nicht für eine belastbare Messung.** `findeSpieltagsFixtures()`
+(`battle-mode-pps-duell.ts`) liest `seasonState.schedule` — den echten Spieltags-Spielplan (wer
+spielt an Spieltag k gegen wen). Alle acht Spielstände im aktuellen Live-Abbild haben
+`isLeagueSplitActive() === false` und damit laut `season-fixture-schedule.ts` (Kopfkommentar) nur
+die alte **"Dummy-Paarung"** aus `preseason-workflow-service.ts`: eine Kette von genau EINEM
+Fixture pro Spieltag (z. B. `A-A/B-B`, dann `B-B/B-P`, dann `B-P/C-C`, …), nicht ein echter
+Rundenplan für alle 32 Teams. `new-game-1787123325719-swnjlk` hat so über die ganze Saison nur 10
+Fixtures (ein Fixture pro Spieltag) statt der ~160 (16 je Spieltag × 10 Spieltage), die ein echter
+Rundenplan bräuchte — geprüft für alle acht Live-Saves, überall dasselbe Bild (2 oder 10 Fixtures
+gesamt, nie mehr).
+
+**Folge, direkt nachgemessen** (4 Disziplin-Paare × 3 Spieltage, Feldgröße 6, 768 Team-Seiten
+gesamt, nach dem gameMode-Fix): nur **5,5 % (42/768) laufen als `"pps_duell"`**, 12,5 % als
+`"mini_dm_pod"` (Mini-DM, davon unabhängig), die restlichen **82 % bleiben `"pps"`** — mit genau
+der Begründung `battle_mode_ohne_duell:<disziplin>` (kein Gegner über `findeSpieltagsFixtures()`
+gefunden). Das volle Rohergebnis steht in `data/generated/pps-duell-bruecke-abnahme.json` unter
+`gameModeFixResolutionSourceStichprobe`.
+
+**Was das für die neu gemessenen Zahlen bedeutet — zwei Sorten:**
+
+- **Seiten-Ebene-rho** (Tabelle 8.2, Spalte "Seite"): von diesem Problem **nicht** betroffen. Sie
+  vergleicht Spieler INNERHALB eines Teams und ist durch Konstruktion identisch, egal ob die
+  individuelle PP-Verteilung über den alten Team-Rang-Topf (`"pps"`) oder über `ppAusSpielerScore()`
+  (`"pps_duell"`) läuft — beide sind monoton in der eigenen Punktzahl des Spielers. Sie war **nie**
+  ein Test, welcher Mechanismus aktiv ist, weder vor noch nach diesem Fix. Neu gemessen (6
+  Spieltage je Strom, 8 Standarddisziplinen, Feldgröße 6, zwei disjunkte Fenster):
+
+  | Disziplin | Strom 0 | Strom 1 (10 000 000) |
+  |---|---:|---:|
+  | Football | 0,886 | 0,899 |
+  | I-Spy | 0,886 | 0,900 |
+  | Battlefield | 0,829 | 0,886 |
+  | TDM | 0,886 | 0,886 |
+  | Basketball | 0,900 | 0,900 |
+  | Hockey | 0,900 | 0,900 |
+  | Fechten | 0,829 | 0,900 |
+
+  Alle 14 Werte bestehen die 0,80-Schranke, in derselben Größenordnung wie vor dem Fix
+  (0,829–0,921) — **erwartungsgemäß unverändert**, s. o.
+
+- **Fixture-Ebene / Star / Paartreue-über-Seiten** (die eigentliche Kernaussage-Zahl dieses
+  Abschnitts): potenziell betroffen, aber zu über 90 % weiterhin über den alten `"pps"`-Pfad
+  gezogen. Neu gemessen, Feldgröße 6, Mittel beider Ströme: Football 0,72 (vorher 0,72),
+  Fechten 0,62 (vorher 0,63), Hockey 0,68 (vorher 0,68) — **praktisch identisch zu den Zahlen vor
+  dem Fix**, konsistent mit dem 5,5-%-Anteil oben. Diese Messung bestätigt oder widerlegt damit
+  **nicht**, ob PR #1296s `ppAusSpielerScore()`-Entkopplung (Task #176, der strukturelle Befund
+  aus 8.2) die Fixture-Ebene tatsächlich verbessert — dafür bräuchte es einen Spielstand, an dem
+  die Brücke überhaupt in nennenswertem Umfang greift.
+
+**Warum Teil B (Pp) hier nicht neu gezogen wurde.** Die Pp-Messung hängt nicht an `resolutionSource`
+— sie misst direkt, wie `pointsAwarded` auf eine Attribut-Anhebung reagiert, unabhängig vom
+Verteilungsmechanismus. Bei weiterhin >90 % unverändertem Mechanismus wäre ein voller Neulauf
+(geschätzt 80–100 Minuten für beide Ströme) voraussichtlich kaum anders ausgefallen als die
+bestehenden, bereits bestandenen Zahlen (Abschnitt 8.3) — kein valider Erkenntnisgewinn für die
+Rechenzeit. Die Tabelle in 8.3 bleibt deshalb unverändert stehen, jetzt aber mit demselben Vorbehalt
+versehen wie die Fixture-Ebene oben.
+
+**Einordnung, ungeschönt:** dieser zweite Befund wurde beim Audit nicht erwartet und ist unabhängig
+vom gameMode-Fix selbst — der Fix bleibt richtig und notwendig (ohne ihn: 0 % `"pps_duell"`,
+nachweislich), aber **keiner der in Abschnitt 8 gemessenen Werte, weder vor noch nach dem Fix,
+validiert die eigentliche PPS-Duell-Brücke mit nennenswerter statistischer Masse.** Eine
+aussagekräftige Messung braucht einen Spielstand mit `isLeagueSplitActive() === true` (echter
+Rundenplan-Generator, `season-fixture-schedule.ts`) oder synthetisierte, vollständige
+Spieltags-Fixtures für alle 32 Teams — beides außerhalb des Umfangs dieses Fixes (reine
+Skript-Korrektur, keine Produktionslogik) und ein eigenständiger Folge-Auftrag.
+
+**Manager-Mode-Bit-Identität.** Dieser Fix ändert ausschließlich `scripts/miss-pps-duell-bruecke-
+abnahme.ts` — eine Datei, die von keinem Produktions- oder App-Code importiert wird (geprüft via
+Volltextsuche). Der Resolve-/Mapper-Pfad (`legacy-matchday-resolve-engine.ts`,
+`legacy-matchday-result-mapper.ts`, `season-points-ledger.ts`) ist dadurch bit-identisch
+unberührt — keine separate Sonde nötig, da es keine gemeinsame Codefläche gibt, die der Fix
+erreichen könnte.
+
+**Testwächter.** `tests/pps-duell-bruecke-player-rho-guard.test.ts` neu gemessen und angepasst: die
+frühere harte Annahme "Mini-DM hat auf Seiten-Ebene immer n=0" war selbst ein Artefakt des
+gameMode-Bugs (Mini-DM lief vor dem Fix nie über `mini_dm_pod`, s. o.) — nach dem Fix schwankt n je
+Fenster (0 oder ~30). Mini-DM bleibt von der rho-Schranke ausgenommen, die feste n/median-Erwartung
+wurde entfernt (Begründung im Testkommentar).
