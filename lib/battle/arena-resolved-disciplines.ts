@@ -136,14 +136,23 @@
  * (je kaderfest gemessen, `scripts/miss-alle-disziplinen.mjs 48 football` UND
  * `scripts/messe-arena-einfluss.mjs football`, zwei unabhaengige Saatstroeme) steht Football
  * zuletzt bei **rho 0,807 je Spiel** (Median, n=48, rho Saison 0,902) -- WIEDER UEBER der
- * 0,80-Schranke. **Der Blocker ist seither Pp, nicht mehr rho:** Pp-Abweichung 64,6/61,7 (zwei
- * Stroeme, 14.10.), WEIT ueber der 25-Pp-Schranke -- sechs der zwoelf Matrixattribute (awareness,
- * will, spirit, intelligence, charisma, stamina) tragen laut `football-kickoff-slot-plan-14-10.md`
- * Abschnitt 2.1 mechanisch praktisch nichts zur Mechanik bei. Football steht deshalb WEITERHIN
- * nicht unten in `ARENA_RESOLVED_DISCIPLINE_IDS` -- nur die Begruendung hat sich verschoben, von
- * Rangtreue zu Budget-Methode. `data/generated/disziplin-abnahme.json` (Schluessel "football")
- * haelt diesen Stand (14.10., Commit f9181c15) jetzt fest; die frueher kursierenden Zahlen (0,722
- * hier, 0,818 in frueheren Doku-Stellen wie `stand-aller-disziplinen.md`) sind beide ueberholt.
+ * 0,80-Schranke. **Der Blocker ist seither Pp, nicht mehr rho** -- aber die am 14.10. gemessene
+ * Pp-Abweichung (64,6/61,7, zwei Stroeme) war selbst UNGUELTIG: sie verglich gegen
+ * `BASIS_JE_DISC.football`, und das ist seit PR #934 der Spiel-Eignungs-Override
+ * (`spiel-eignung-overrides.ts`), nicht die gesperrte Matrix -- Football ist die einzige der
+ * zwanzig Disziplinen mit dieser Abweichung (Task #196, 25.10., `PP_MATRIX_JE_DISC` in
+ * `battle-mode.engine.js` behebt das fuer alle Pp-Messwerkzeuge). FRISCH KORRIGIERT GEGEN DIE
+ * ECHTE MATRIX: Pp-Abweichung **121,0/120,1** -- NOCH WEITER ueber der 25-Pp-Schranke als vorher
+ * berichtet, nicht naeher daran. spirit (Matrixgewicht 25, mechanisch 0 %) ist die groesste
+ * Einzelabweichung; sechs der zwoelf Matrixattribute (awareness, will, spirit, intelligence,
+ * charisma, stamina) tragen weiterhin mechanisch praktisch nichts bei (s. `stand-aller-
+ * disziplinen.md` Abschnitt 14 fuer die volle Attributtabelle und die Begruendung, warum keine
+ * neue Rezeptkalibrierung versucht wurde -- der einzige Hebel mit genug Gewicht, TEAMGEIST, ist
+ * im aktuellen Rezept bereits nachweislich gescheitert). Football steht deshalb WEITERHIN nicht
+ * unten in `ARENA_RESOLVED_DISCIPLINE_IDS`. `data/generated/disziplin-abnahme.json` (Schluessel
+ * "football") haelt den korrigierten Stand (25.10.) jetzt fest; die frueher kursierenden Zahlen
+ * (0,722/47,3 hier, 0,818/47,3 in frueheren Doku-Stellen, UND die 64,6/61,7 vom selben Tag) sind
+ * alle ueberholt.
  *
  * BASKETBALL-NACHTRAG (18.10., PR #1289 "Give-and-Go-Schneiden", Task #123 -- Konsistenz-Audit
  * 25.10.): dieselbe Verschiebung wie bei Football, nur in die andere Richtung. Vorher 0,795 je
