@@ -265,10 +265,10 @@ jobs:
   # DIE VOLLE TESTSUITE — seit diesem Commit im Tor.
   #
   # WARUM ES SIE VORHER NICHT GAB, und warum das der eigentliche Befund ist: die CI fuhr
-  # ausschliesslich `ci:flow-smoke` (18 Dateien, 205 Tests). Die volle Suite — 869 Dateien,
-  # ueber 6.800 Tests — lief NIE im Tor. Genau deshalb konnte sie unbemerkt auf 66 rote Tests in
-  # 33 Dateien laufen: eine rote Suite, die niemanden alarmiert, warnt auch dann nicht, wenn ein
-  # echter Fehler dazukommt. Man gewoehnt sich an die Farbe.
+  # ausschliesslich `ci:flow-smoke` (18 Dateien, 205 Tests). Die volle Suite — damals 869 Dateien,
+  # inzwischen (25.10.) 1083 — lief NIE im Tor. Genau deshalb konnte sie unbemerkt auf 66 rote
+  # Tests in 33 Dateien laufen: eine rote Suite, die niemanden alarmiert, warnt auch dann nicht,
+  # wenn ein echter Fehler dazukommt. Man gewoehnt sich an die Farbe.
   #
   # WARUM EIN EIGENER JOB statt eines weiteren Schritts in `test-and-smoke`: der Lauf braucht
   # rund 20 Minuten, jener Job hat 30 und baut, installiert Chromium und faehrt drei Browser-
@@ -278,22 +278,59 @@ jobs:
   #
   # KEIN `npm run build`, KEIN Chromium: die Suite ist reines Node — sie braucht nur die
   # Importdaten (deshalb `ci:import-exists`) und einen eigenen SQLite-Pfad.
+  #
+  # SHARDING (CI-Analyse 25.10., Chris zugestimmt): der Job lief als EIN serieller `npm test`
+  # ueber alle Dateien und schwankte zwischen 19,6 und 37,3 Minuten -- auf geteilter
+  # GitHub-Runner-Hardware oft der langsamste sichtbare Haken, obwohl er selbst KEIN Pflicht-Check
+  # ist (das bleibt `test-and-smoke`, 22-26 Minuten stabil, unveraendert). Jetzt 4 parallele
+  # Matrix-Jobs ueber Vitests NATIVE `--shard=<index>/<anzahl>`-Unterstuetzung (bestaetigt ab
+  # dieser Version vorhanden: `npx vitest run --help` listet `--shard` fuer vitest 4.1.8) statt
+  # eines Wrapper-Skripts -- WAS geprueft wird, bleibt exakt gleich, nur WIE es auf parallele
+  # Jobs verteilt wird.
+  #
+  # ABDECKUNG RECHNERISCH BEWIESEN, nicht nur empirisch gemessen: Vitests `BaseSequencer.shard()`
+  # (node_modules/vitest/dist/chunks/coverage.*.js) sortiert die vollstaendig aufgeloeste
+  # Dateiliste nach einem SHA1-Hash des relativen Pfads jeder Datei und schneidet sie in `count`
+  # zusammenhaengende, nicht ueberlappende Bloecke (`calculateShardRange`). Die Vereinigung aller
+  # `count` Shards ist dadurch per Konstruktion identisch zur ungeshardeten Liste -- keine Datei
+  # doppelt, keine vergessen -- vorausgesetzt jeder Shard sieht denselben Checkout und denselben
+  # `vitest run`-Aufruf ohne zusaetzliche Dateifilter (hier der Fall: alle vier Matrix-Jobs
+  # checken denselben Commit aus und unterscheiden sich nur in `--shard`). Mit genau diesem
+  # Algorithmus lokal gegen die aktuelle Dateiliste nachgerechnet (1083 Dateien, Stand 25.10.):
+  # 271/271/271/270 je Shard, Summe 1083, 0 Duplikate, 0 fehlende.
+  #
+  # ARENA-CHROMIUM-OOM GEPRUEFT, TRIFFT HIER NICHT ZU: die vier schwersten Dateien
+  # (tests/arena-vorlauf-parity.test.ts, tests/arena-vorlauf-service.test.ts,
+  # tests/battle-mode-arena-ausfall-sichtbar.test.ts, tests/battle-mode-auto-run-invarianten.test.ts)
+  # laufen im Job `arena-chromium-tests` oben bewusst als VIER GETRENNTE Prozesse, weil ein
+  # gemeinsamer Lauf mit echtem, installiertem Chromium frueher mit "JavaScript heap out of
+  # memory" abstuerzte. DIESER Job hier installiert aber KEIN Chromium und setzt KEIN
+  # `OLY_ARENA_CHROMIUM_PFLICHT=1` -- alle vier Dateien greifen deshalb auf ihr
+  # `describe.skipIf(!CHROMIUM_VERFUEGBAR)` zurueck (s. die Dateien selbst, Variable
+  # `UEBERSPRINGEN`) und ueberspringen ihre teuren Chromium-Suiten komplett, unabhaengig davon, in
+  # welchen der vier Shards sie fallen. Das OOM-Risiko aus `arena-chromium-tests` entsteht also
+  # gar nicht erst in diesem Job, egal wie die Dateien hier verteilt werden.
   full-test-suite:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: full-test-suite (Shard ${{ matrix.shard }}/4)
     steps:
       - uses: actions/checkout@v4
       - name: Set CI SQLite path
-        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-full-suite.sqlite" >> "$GITHUB_ENV"
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-full-suite-shard-${{ matrix.shard }}.sqlite" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
       - run: npm ci
       - run: npm run ci:import-exists
-      - run: npm test
+      - run: npx vitest run --shard=${{ matrix.shard }}/4
 
   # ARENA-CHROMIUM-TESTS (PR 3/K1, Opus-Review 18.10.) — der einzige Job, der die paar Tests
   # faehrt, die ECHTES Chromium brauchen, UM ETWAS ZU BEWEISEN (nicht nur, um es zu tolerieren).
