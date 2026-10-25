@@ -28,6 +28,7 @@ import { dirname, resolve } from "node:path";
 import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
+  generischeChassisWarnung,
 } from "./lib/rangtreue-messung.mjs";
 
 // Additive Schalter (29.09., MUTATOR ORGANISCH), in beliebiger Position, ohne sie unveraendertes
@@ -113,6 +114,12 @@ if (!motoren.includes(disziplin)) {
   process.exit(1);
 }
 
+// WARNUNG VOR DEM LANGEN MESSLAUF, NICHT NUR DANACH (Task #193, N4): wer das Skript
+// abbricht oder nur den Anfang sieht, soll die Einschraenkung trotzdem sehen -- s.
+// generischeChassisWarnung() in lib/rangtreue-messung.mjs.
+const chassisWarnung = generischeChassisWarnung(disziplin);
+if (chassisWarnung) console.log(chassisWarnung + "\n");
+
 const start = Date.now();
 // ZWEITE HAELFTE DESSELBEN LECKS: Timer. Auch ohne AudioContext legt die Anzeige-Schicht
 // je Ereignis einen setTimeout an (Breaking: der zweite Herzschlag-Ton, ~30 000 je Lauf, dazu
@@ -155,4 +162,5 @@ for (const r of e.reihen) {
   );
 }
 console.log("\nSeitenfehler:", fehler.length ? fehler.slice(0, 5) : "keine");
+if (chassisWarnung) console.log("\n" + chassisWarnung);
 await browser.close();

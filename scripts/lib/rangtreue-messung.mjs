@@ -116,6 +116,38 @@ export function gepoolteSaisonRho(gruppen, spieleVon) {
   return { rho: rho(paare), n: paare.length };
 }
 
+// ===================================================================================
+// GENERISCHE-CHASSIS-WARNUNG (Task #193, N4, 25.10.): `disziplinProbe`/`einflussVon`
+// messen fuer JEDE Disziplin ueber `MOTOREN[dId]` — fuer die allermeisten Disziplinen ist
+// das auch das Chassis, das im Spiel laeuft. Mini-DM ist seit dem 6-PR-Opus-Plan (21.10.)
+// die erste Ausnahme: `MOTOREN["mini-dm"]` ist weiterhin das alte, generische 4-gegen-4
+// (build()/stepSim()), aber gespielt wird das 4-Team-FFA mit variabler Kadergroesse
+// (`spieleMiniDmFfaEvent()`/`miniDmFfaSonde()`/`miniDmFfaEinfluss()`, k=2..6,
+// MINI_DM_FFA_SLOTS_JE_K) — s. Kopfkommentar von scripts/miss-mini-dm-ffa-abnahme.mjs, das
+// dafuer eigens gebaut wurde. `miss-alle-disziplinen.mjs`/`messe-arena-einfluss.mjs` wissen
+// davon nichts: ohne diese Warnung drucken sie fuer "mini-dm" eine rho-/Pp-Zahl, die mit der
+// tatsaechlich gespielten Mechanik nichts zu tun hat, UND OHNE JEDEN HINWEIS darauf — genau
+// die Luecke, die der Opus-Audit vom 24./25.10. unter N4 benennt. Diese Map ist deshalb der
+// EINE Ort fuer diese Ausnahme (additiv, leer fuer jede andere Disziplin): eine neue
+// Disziplin mit demselben Muster (generisches Chassis angeschlossen, echte Mechanik anderswo)
+// braucht nur einen weiteren Eintrag hier, nicht eine zweite, abweichende Warnung in jedem
+// Skript, das ueber disziplinProbe/einflussVon misst.
+export const GENERISCHE_CHASSIS_ABWEICHUNG = new Map([
+  [
+    "mini-dm",
+    'ACHTUNG: "mini-dm" misst hier MOTOREN["mini-dm"], das alte generische 4-gegen-4-Chassis ' +
+      "(build()/stepSim()) — NICHT das 4-Team-FFA, das tatsaechlich gespielt wird " +
+      "(spieleMiniDmFfaEvent(), variable Kadergroesse k=2..6). Fuer die Mechanik, die im Spiel " +
+      "laeuft, s. scripts/miss-mini-dm-ffa-abnahme.mjs --pp --k=2..6 (Pp/rho auf dem FFA-Format) " +
+      'und data/generated/disziplin-abnahme.json Schluessel "mini-dm-ffa".',
+  ],
+]);
+
+/** Gibt die Warnzeile fuer `d` zurueck, oder `null`, wenn `d` kein bekannter Abweichungsfall ist. */
+export function generischeChassisWarnung(d) {
+  return GENERISCHE_CHASSIS_ABWEICHUNG.get(d) || null;
+}
+
 export function median(werte) {
   const s = [...werte].sort((a, b) => a - b);
   const n = s.length, m = n >> 1;

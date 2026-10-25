@@ -41,6 +41,19 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 
 const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 const LAUF_TIMEOUT_MS = 180_000;
+/**
+ * CI-FUND 25.10.: Dieser Regressionstest fuer einen bereits real aufgetretenen Produktionsbug
+ * (F1 oben) lief in KEINEM CI-Job mit echtem Chromium -- `full-test-suite`/`persistenz-suiten`
+ * installieren keines (stilles `describe.skipIf`, EXIT 0, "skipped" statt rot), und die Jobs, die
+ * Chromium installieren (`test-and-smoke`, `arena-chromium-tests`), fuhren diese Datei bisher
+ * nicht. Jetzt in `arena-chromium-tests` verdrahtet (eigener Schritt, s. ci.yml) -- und genau wie
+ * `tests/arena-vorlauf-parity.test.ts` (selbes Muster, dort zuerst eingefuehrt) setzt dieser Job
+ * `OLY_ARENA_CHROMIUM_PFLICHT=1`: bricht der Install-Schritt dort kuenftig (falsche Revision,
+ * Netzwerk), wird daraus ein LAUTER Testfehler statt wieder eines stillen Skips -- sonst waere
+ * exakt dieselbe Luecke nur einen Schritt weiter hinten erneut offen.
+ */
+const CHROMIUM_PFLICHT = process.env.OLY_ARENA_CHROMIUM_PFLICHT === "1";
+const UEBERSPRINGEN = !CHROMIUM_VERFUEGBAR && !CHROMIUM_PFLICHT;
 
 /** Zehn Spieler je Team, volle Attribute fuer Hockey (Feldspiel) UND Mini-DM gleichzeitig --
  *  dieselbe Bauart wie `tests/mini-dm-ffa-formkarten-position-fix.test.ts`s `baueKader()`, nur
@@ -97,7 +110,20 @@ function baueGameState(): GameState {
   } as unknown as GameState;
 }
 
-describe.skipIf(!CHROMIUM_VERFUEGBAR)("OPUS-REVIEW F1 · renderMiniDmFfa() isoliert FORMKARTE von anderen Disziplinen", () => {
+describe.skipIf(UEBERSPRINGEN)("OPUS-REVIEW F1 · renderMiniDmFfa() isoliert FORMKARTE von anderen Disziplinen", () => {
+  // Laut statt leise, wenn der CI-Job, der Chromium garantiert haben SOLLTE
+  // (OLY_ARENA_CHROMIUM_PFLICHT=1), trotzdem keines findet -- s. Kommentar bei CHROMIUM_PFLICHT
+  // oben. `describe.skipIf` greift in diesem Fall NICHT (s. UEBERSPRINGEN).
+  if (CHROMIUM_PFLICHT && !CHROMIUM_VERFUEGBAR) {
+    it("OLY_ARENA_CHROMIUM_PFLICHT=1, aber kein Chromium gefunden -- Install-Schritt dieses Jobs pruefen", () => {
+      throw new Error(
+        "Dieser CI-Job setzt OLY_ARENA_CHROMIUM_PFLICHT=1 (Chromium MUSS installiert sein), aber " +
+          "chromiumVerfuegbar() fand keines. Vermutlich ist der \"npx playwright install chromium\"-" +
+          "Schritt dieses Jobs fehlgeschlagen oder wurde entfernt.",
+      );
+    });
+    return;
+  }
   it(
     "Hockey-Ergebnis bei fester Saat bleibt unveraendert, nachdem die Mini-DM-Vorschau mit echtem Pod/formSaat lief",
     async () => {
@@ -256,7 +282,7 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("OPUS-REVIEW F1 · renderMiniDmFfa() isoli
  * FIX: Rueckfall auf `MINI_DM_FFA_SLOTS_JE_K[6]` (die volle Sechser-Liste), wenn
  * `SLOTS_JE_DISC["mini-dm"]` die Rolle nicht kennt.
  */
-describe.skipIf(!CHROMIUM_VERFUEGBAR)("OPUS-REVIEW F2 · Rollen-Anzeigenamen bei k=6 (Paarungs-Vorschau)", () => {
+describe.skipIf(UEBERSPRINGEN)("OPUS-REVIEW F2 · Rollen-Anzeigenamen bei k=6 (Paarungs-Vorschau)", () => {
   it(
     "Runde 5/6 zeigen 'Chaos Driver'/'Last Hit', nicht die rohen Ids 'chaosdriver'/'lasthit'",
     async () => {

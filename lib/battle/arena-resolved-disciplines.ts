@@ -129,6 +129,32 @@
  * `loeseArenaImpactKonfigAuf()` wird fuer eine nicht-resolved Disziplin nie mit ihrer
  * `disciplineId` aufgerufen.
  *
+ * FOOTBALL-NACHTRAG (14.10., docs/design/football-kickoff-slot-plan-14-10.md, vier gemergte
+ * Schritte: Kicker/Punter-Slot #1225, QB-Slot #1226, Kickoff-Return #1227 -- Konsistenz-Audit
+ * 25.10., Opus-Review): DIE 0,722 IM ABSATZ OBEN IST NICHT MEHR DER AKTUELLE STAND, auch wenn sie
+ * dort als historische Tatsache (Stand #934, 15.09.) weiter richtig steht. Nach den drei Schritten
+ * (je kaderfest gemessen, `scripts/miss-alle-disziplinen.mjs 48 football` UND
+ * `scripts/messe-arena-einfluss.mjs football`, zwei unabhaengige Saatstroeme) steht Football
+ * zuletzt bei **rho 0,807 je Spiel** (Median, n=48, rho Saison 0,902) -- WIEDER UEBER der
+ * 0,80-Schranke. **Der Blocker ist seither Pp, nicht mehr rho:** Pp-Abweichung 64,6/61,7 (zwei
+ * Stroeme, 14.10.), WEIT ueber der 25-Pp-Schranke -- sechs der zwoelf Matrixattribute (awareness,
+ * will, spirit, intelligence, charisma, stamina) tragen laut `football-kickoff-slot-plan-14-10.md`
+ * Abschnitt 2.1 mechanisch praktisch nichts zur Mechanik bei. Football steht deshalb WEITERHIN
+ * nicht unten in `ARENA_RESOLVED_DISCIPLINE_IDS` -- nur die Begruendung hat sich verschoben, von
+ * Rangtreue zu Budget-Methode. `data/generated/disziplin-abnahme.json` (Schluessel "football")
+ * haelt diesen Stand (14.10., Commit f9181c15) jetzt fest; die frueher kursierenden Zahlen (0,722
+ * hier, 0,818 in frueheren Doku-Stellen wie `stand-aller-disziplinen.md`) sind beide ueberholt.
+ *
+ * BASKETBALL-NACHTRAG (18.10., PR #1289 "Give-and-Go-Schneiden", Task #123 -- Konsistenz-Audit
+ * 25.10.): dieselbe Verschiebung wie bei Football, nur in die andere Richtung. Vorher 0,795 je
+ * Spiel (16.10., unter der Schranke), nach PR #1289 **rho 0,810** (n=12 statt der sonst ueblichen
+ * 24/48 -- wiederholte Browser-Abstuerze in dieser Session, s. PR-Text -- deshalb schwaecher
+ * abgesichert als der Standardumfang, aber die einzige vorliegende Nachmessung) -- Rangtreue
+ * besteht jetzt. **Pp verbesserte sich deutlich (43,0/44,7 -> 25,9/30,1), bleibt aber ueber der
+ * 25-Pp-Schranke** -- der Blocker fuer Basketball ist seither Pp, nicht mehr rho.
+ * `data/generated/disziplin-abnahme.json` (Schluessel "basketball") haelt diesen Stand (Commit
+ * f6098377) fest; die 0,795 unten im Mengen-Kommentar war der Stand VOR dieser PR.
+ *
  * CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): Climbing stand
  * bis hierhin bewusst draussen (rho 0,782 je Spiel kaderfest, 0,010 unter der 0,80-Schranke) --
  * derselbe Fall wie Football unten, nur mit dem billigeren Ausgang. `scripts/messe-arena-
@@ -149,12 +175,28 @@
  * Dispatch wie die anderen vier Bahnen, `ARENA_BAHN_DISCIPLINE_IDS` in arena-headless-
  * runner.ts erweitert.
  *
- * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund:
- *  - FOOTBALL (rho 0,722 je Spiel, s. oben): Rangtreue seit #934 NICHT mehr bestanden -- 0,078
- *    unter der 0,80-Schranke aus CLAUDE.md. Config/Referenz sind fertig, der Eintrag hier fehlt
- *    bewusst, bis eine Balance-Runde rho wieder ueber 0,80 gebracht hat.
- *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
- *    (0,251/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
+ * WER BEWUSST DRAUSSEN BLEIBT, und aus welchem Grund (zuletzt nachgezogen 25.10.,
+ * Konsistenz-Audit -- volle Zahlen/Quellen je Disziplin in data/generated/disziplin-abnahme.json):
+ *  - FOOTBALL: rho 0,807 je Spiel (14.10., s. FOOTBALL-NACHTRAG oben) -- bestanden, NICHT mehr die
+ *    0,722 von #934 (15.09.). **Blocker ist jetzt Pp**, nicht rho: Pp-Abweichung 64,6/61,7, WEIT
+ *    ueber der 25-Pp-Schranke (sechs der zwoelf Matrixattribute tragen mechanisch praktisch nichts
+ *    bei). Config/Referenz sind fertig, der Eintrag hier fehlt bewusst, bis eine eigene
+ *    Pp-Rezeptrunde das behebt.
+ *  - I-SPY (0,750, 15.10., docs/design/stand-aller-disziplinen.md Abschnitt 11 -- NICHT mehr die
+ *    laengst ueberholte 0,684 aus der allerersten Produktivierungswelle): ACHSE 1 fehlt weiterhin,
+ *    0,05 unter der 0,80-Schranke; Pp (13,6) bestand schon laenger.
+ *  - BATTLEFIELD (0,399, 15.10.) und TDM (0,324, 07.10.) -- NICHT mehr 0,251/0,253, die Zahlen aus
+ *    der allerersten Produktivierungswelle (05.09., ueberholt von mehreren seitherigen Messrunden,
+ *    u. a. Domination-Layer 22.09. und V9-Handwerk-Versuch 07.10.): ACHSE 1 fehlt bei beiden klar.
+ *  - MINI-DM: kein Mitglied dieser Chassis-Menge und wird es nie (eigener Pod-Resolve-Pfad, s.
+ *    MINI_DM_FFA_VORLAUF_AKTIV unten) -- strukturell aussen, nicht "durchgefallen". Die alte
+ *    0,094 hier war die FFA-Variante VOR dem 13.10./21.10.-Umbau und nicht mehr aussagekraeftig:
+ *    das feste 4-Team-Chassis besteht (rho je Runde 0,80, 13.10.), die neue variable-k-FFA-
+ *    Spieler-Ebene (rhoJeEvent) besteht dagegen bei KEINEM k=2..6 (0,608-0,686, 24.10.) -- s.
+ *    disziplin-abnahme.json Schluessel "mini-dm"/"mini-dm-ffa" fuer beide Zahlen.
+ *  - BASKETBALL bestand rho zwischenzeitlich NICHT (0,795, 16.10.) und ist seit PR #1289 (18.10.)
+ *    wieder bestanden (0,810) -- s. BASKETBALL-NACHTRAG oben und den Kommentar an
+ *    `ARENA_RESOLVED_DISCIPLINE_IDS` unten fuer den jetzigen Pp-Blocker.
  */
 export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -177,10 +219,12 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   // Climbing-Kalibrierung (16.09.): eigene Rezeptkalibrierung hebt rho ueber die Schranke,
   // s. Kommentar oben.
   "climbing",
-  // Football BEWUSST NICHT HIER (15.09.): rho je Spiel seit #934 bei 0,722, unter der 0,80-
-  // Schranke -- Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
-  // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer Balance-Runde,
-  // s. Kommentar oben.
+  // Football BEWUSST NICHT HIER: rho bestand zwischenzeitlich NICHT (0,722 seit #934, 15.09.),
+  // besteht seit den Kickoff/QB/Kicker-Slot-Schritten (14.10.) aber WIEDER (0,807) -- der Blocker
+  // ist seither Pp (64,6/61,7, weit ueber 25), nicht mehr rho, s. FOOTBALL-NACHTRAG im Kommentar
+  // oben. Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
+  // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer eigenen
+  // Pp-Rezeptrunde.
 ]);
 
 /** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,80) und Budget-Methode (Pp ≤ 25). */
@@ -221,7 +265,10 @@ export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new
  * Eintrag MUSS in `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` stehen UND laut
  * data/generated/disziplin-abnahme.json bestehen (oder in `ARENA_ABNAHME_AUSNAHMEN` stehen) —
  * erzwungen von tests/disziplin-abnahme-guard.test.ts. Stand 16.10.: Messwerte und Begruendung je
- * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3.
+ * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3 -- seither
+ * zweimal einzeln nachgezogen (Football 14.10., Basketball 18.10., s. "WER BEWUSST DRAUSSEN
+ * BLEIBT" im Kommentar oben); aktuellster Stand je Disziplin immer in
+ * data/generated/disziplin-abnahme.json.
  */
 /**
  * MINI-DM-FFA-VORLAUF-SCHALTER (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung", 24.10.).
@@ -275,7 +322,9 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // HOCKEY BEWUSST NICHT HIER (16.10., Projektaufsicht): Chris' Ausnahme deckt nur rho, Hockeys Pp
   // ist nicht frisch gemessen (39,4 aus der Doku, n=6) — s. ARENA_ABNAHME_AUSNAHMEN. Bis zur frischen
   // Pp-Messung oder Chris' Pp-Freigabe ueber die PPS-Duell-Bruecke.
-  // BASKETBALL BEWUSST NICHT HIER (16.10.): rho je Spiel 0,795 (Median, kaderfest, 24 Spiele) — unter
-  // der 0,80-Schranke. Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in
-  // Battle Mode zahlt es bis zur bestandenen Abnahme ueber die PPS-Duell-Bruecke.
+  // BASKETBALL BEWUSST NICHT HIER: rho bestand am 16.10. NICHT (0,795), besteht seit PR #1289
+  // (18.10., "Give-and-Go-Schneiden") aber WIEDER (0,810, n=12) -- der Blocker ist seither Pp
+  // (25,9/30,1, weiterhin ueber 25), nicht mehr rho, s. BASKETBALL-NACHTRAG im Kommentar oben.
+  // Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in Battle Mode zahlt es
+  // bis zur bestandenen Pp-Abnahme ueber die PPS-Duell-Bruecke.
 ]);

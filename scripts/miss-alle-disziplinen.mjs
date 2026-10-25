@@ -55,6 +55,7 @@ import {
   disziplinMessen, ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie, bootstrapMedianUnsicherheit,
   IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
+  generischeChassisWarnung,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -135,14 +136,20 @@ console.log(titel + (MUTATOREN ? `\nMutatoren: ${MUTATOREN}` : "")
   + (schalterGesetzt ? `\n${buehneSchalterText(schalterGesetzt)}` : "")
   + (staffelPaarGesetzt ? `\n${staffelPaarSchalterText(staffelPaarGesetzt)}` : "") + "\n");
 console.log("Disziplin           Chassis     Teiln.  rho je Spiel (Median)  Spannweite  rho Saison (Median)  Spannweite   Abnahme");
+// GENERISCHE-CHASSIS-WARNUNGEN SAMMELN (Task #193, N4): jede Zeile, deren Disziplin in
+// generischeChassisWarnung() steht, bekommt zusaetzlich eine Fussnote nach der Tabelle --
+// additiv, aendert keine gemessene Zahl, s. Kommentar an generischeChassisWarnung() selbst.
+const chassisWarnungen = [];
 for (const z of zeilen.sort((a, b) => (b.spielMed ?? -9) - (a.spielMed ?? -9))) {
   if (z.fehler) { console.log(z.d.padEnd(20) + "— " + z.fehler); continue; }
+  const warnung = generischeChassisWarnung(z.d);
+  if (warnung) chassisWarnungen.push(`${z.d}: ${warnung}`);
   const ok = z.spielMed >= 0.80 ? "bestanden" : z.spielMed >= 0.70 ? "knapp" : "durchgefallen";
   console.log(z.d.padEnd(20) + (z.chassis || "").padEnd(12)
     + String(z.teilnehmer).padStart(5)
     + z.spielMed.toFixed(3).padStart(23) + z.spielSpan.toFixed(3).padStart(12)
     + z.saisonMed.toFixed(3).padStart(21) + z.saisonSpan.toFixed(3).padStart(12)
-    + "   " + ok);
+    + "   " + ok + (warnung ? "   [s. Fussnote unten]" : ""));
   // MEDIAN-UNSICHERHEIT (M0, 20.09.2026, additiv hinter --bootstrap-unsicherheit, s.
   // Kopfkommentar). Nur sinnvoll mit einer Kader-Familie (z.varianten) und mindestens zwei
   // Paarungen — sonst ist "Bootstrap ueber eine Ziehung" nur wieder dieselbe eine Zahl.
@@ -172,3 +179,4 @@ if (!EINZELKADER) {
   console.log("docs/design/messgrundlage-kaderfest.md).");
 }
 console.log("Seitenfehler: " + (fehler.length ? fehler.slice(0, 3).join(" | ") : "keine"));
+if (chassisWarnungen.length) console.log("\n" + chassisWarnungen.join("\n\n"));

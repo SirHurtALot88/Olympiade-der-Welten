@@ -48,6 +48,25 @@ import { isBattleModeSave } from "@/lib/season/game-mode";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import type { DisciplineResultRecord } from "@/lib/data/olyDataTypes";
+import { chromiumVerfuegbar } from "@/tests/helpers/chromium-verfuegbar";
+
+/**
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung der Mini-DM-CI-Flakiness, s. ausfuehrliche
+ * Begruendung in `tests/battle-mode-arena-ausfall-sichtbar.test.ts`): dieser Test faehrt wie jener
+ * ECHTES Chromium (`arenaModus: "inline"`) und hatte denselben fehlenden
+ * `describe.skipIf(!CHROMIUM_VERFUEGBAR)`-Guard (etabliertes Muster aus
+ * `arena-vorlauf-parity.test.ts`, 18.10.). Dieser Test selbst prueft keine "Gegenprobe" gegen
+ * Nicht-ARENA_RESOLVED-Zeilen und war deshalb NICHT nachweislich von derselben Assertion
+ * betroffen -- er lief ohne Chromium bisher tolerant durch (jeder Ausfall wird als
+ * `grund:"chromium_start"` gefangen und von `wederNoch` akzeptiert). Der Guard wird trotzdem
+ * ergaenzt, damit dieser Test in `full-test-suite`/`persistenz-suiten` (beide bewusst ohne
+ * Chromium) nicht mehr unnoetig den vollen, langsamen Chromium-Pfad versucht, sondern -- wie
+ * `arena-vorlauf-parity.test.ts` -- konsistent uebersprungen wird, und in `arena-chromium-tests`
+ * (OLY_ARENA_CHROMIUM_PFLICHT=1) weiterhin echt mit Chromium laeuft.
+ */
+const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
+const CHROMIUM_PFLICHT = process.env.OLY_ARENA_CHROMIUM_PFLICHT === "1";
+const UEBERSPRINGEN = !CHROMIUM_VERFUEGBAR && !CHROMIUM_PFLICHT;
 
 // Zwei Spieltage reichen für die Strukturprüfung (die 20/160/160-Zahlen stehen ohnehin schon nach
 // dem Setup, s.o.) und halten die CI-Laufzeit niedrig — lokal gegen 2 und 3 Spieltage gemessen,
@@ -73,7 +92,19 @@ function frischerDienst() {
   return createPersistenceService();
 }
 
-describe("Task #164 · Battle-Save-Invarianten über den echten Wizard-/Auto-Run-Pfad", () => {
+describe.skipIf(UEBERSPRINGEN)(
+  "Task #164 · Battle-Save-Invarianten über den echten Wizard-/Auto-Run-Pfad",
+  () => {
+  if (CHROMIUM_PFLICHT && !CHROMIUM_VERFUEGBAR) {
+    it("OLY_ARENA_CHROMIUM_PFLICHT=1, aber kein Chromium gefunden -- Install-Schritt dieses Jobs pruefen", () => {
+      throw new Error(
+        "Dieser CI-Job setzt OLY_ARENA_CHROMIUM_PFLICHT=1 (Chromium MUSS installiert sein), aber " +
+          "chromiumVerfuegbar() fand keines. Vermutlich ist der \"npx playwright install chromium\"-" +
+          "Schritt dieses Jobs fehlgeschlagen oder wurde entfernt.",
+      );
+    });
+    return;
+  }
   it(
     "20 Spieltage, 160 Fixtures je Liga, teamPoints ∈ {0,1,2}, nie rank_to_points, Verhältnis-Summe 0",
     async () => {
@@ -246,4 +277,5 @@ describe("Task #164 · Battle-Save-Invarianten über den echten Wizard-/Auto-Run
     // Abschnitt 2.6) -- plus die bestehenden ~3 min AI-Draft-Zuteilung.
     420_000,
   );
-});
+  },
+);
