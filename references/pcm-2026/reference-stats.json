@@ -1,0 +1,86 @@
+{
+  "generatedFrom": "echte WorldDB 2026 (.cdb), s. plan.md Abschnitt 0",
+  "rowCounts": {
+    "worldTour": 526,
+    "proTeams": 393,
+    "total": 919
+  },
+  "levelQuantiles": {
+    "worldTour": [
+      62.285714285714285,
+      67.5,
+      70.42857142857143,
+      73.14285714285714,
+      76.42857142857143,
+      80.14285714285714
+    ],
+    "proTeams": [
+      58.714285714285715,
+      63.5,
+      67.57142857142857,
+      70.78571428571429,
+      73.21428571428571,
+      76
+    ]
+  },
+  "withinPlayerSdMedian": 3.639354057959142,
+  "potentielDistribution": {
+    "3": 68,
+    "4": 204,
+    "5": 238,
+    "6": 5,
+    "4.5": 146,
+    "3.5": 242,
+    "5.5": 16
+  },
+  "tourDistribution": {
+    "1": 6,
+    "2": 15,
+    "3": 863,
+    "4": 18,
+    "5": 17
+  },
+  "classicDistribution": {
+    "1": 7,
+    "2": 18,
+    "3": 854,
+    "4": 18,
+    "5": 22
+  },
+  "wtSlotStrengthOrder": [
+    "Lidl-Trek",
+    "UAE",
+    "Visma",
+    "Red Bull",
+    "INEOS",
+    "Bahrain",
+    "Quick-Step",
+    "Jayco",
+    "Decathlon",
+    "Lotto",
+    "EF",
+    "Uno-X",
+    "NSN",
+    "Alpecin",
+    "Movistar",
+    "Astana",
+    "Groupama",
+    "Picnic"
+  ],
+  "ptSlotStrengthOrder": [
+    "Tudor",
+    "Polti",
+    "Pinarello",
+    "TotalEnergies",
+    "Cofidis",
+    "Unibet",
+    "Bardiani",
+    "Caja Rural",
+    "Flanders",
+    "Kern Pharma",
+    "NIPPO",
+    "MBH",
+    "Burgos",
+    "Euskaltel"
+  ]
+}
