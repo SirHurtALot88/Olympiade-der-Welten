@@ -25,6 +25,11 @@ vi.mock("@/lib/battle/arena-eingabe-hash", () => ({
   // Garantiert verschieden bei jedem Aufruf -- weder beim Schreiben (Vorlauf) noch beim Lesen
   // (Buchung) kommt je zweimal derselbe Wert heraus.
   berechneArenaEingabeHash: () => `instabil-${(hashZaehler += 1)}`,
+  // CI-FIX (25.10.): fehlte hier -- seit `berechneMiniDmFfaEingabeHash()` (Mini-DM-FFA-Vorlauf,
+  // PR #1304) existiert, wirft vitest "No export is defined on the mock", sobald der zufaellig
+  // gesaete Spielplan Mini-DM-FFA in diesen Test zieht (reproduzierbar auf main selbst, s.
+  // PR #1312). Dieselbe "garantiert instabil"-Eigenschaft wie oben, fuer denselben Testzweck.
+  berechneMiniDmFfaEingabeHash: () => `instabil-mini-dm-${(hashZaehler += 1)}`,
 }));
 
 const { applyNewGameSetup, previewNewGameSetup } = await import("@/lib/game/new-game-setup-service");

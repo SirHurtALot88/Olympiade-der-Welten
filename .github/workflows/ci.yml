@@ -265,10 +265,10 @@ jobs:
   # DIE VOLLE TESTSUITE — seit diesem Commit im Tor.
   #
   # WARUM ES SIE VORHER NICHT GAB, und warum das der eigentliche Befund ist: die CI fuhr
-  # ausschliesslich `ci:flow-smoke` (18 Dateien, 205 Tests). Die volle Suite — 869 Dateien,
-  # ueber 6.800 Tests — lief NIE im Tor. Genau deshalb konnte sie unbemerkt auf 66 rote Tests in
-  # 33 Dateien laufen: eine rote Suite, die niemanden alarmiert, warnt auch dann nicht, wenn ein
-  # echter Fehler dazukommt. Man gewoehnt sich an die Farbe.
+  # ausschliesslich `ci:flow-smoke` (18 Dateien, 205 Tests). Die volle Suite — damals 869 Dateien,
+  # inzwischen (25.10.) 1083 — lief NIE im Tor. Genau deshalb konnte sie unbemerkt auf 66 rote
+  # Tests in 33 Dateien laufen: eine rote Suite, die niemanden alarmiert, warnt auch dann nicht,
+  # wenn ein echter Fehler dazukommt. Man gewoehnt sich an die Farbe.
   #
   # WARUM EIN EIGENER JOB statt eines weiteren Schritts in `test-and-smoke`: der Lauf braucht
   # rund 20 Minuten, jener Job hat 30 und baut, installiert Chromium und faehrt drei Browser-
@@ -278,22 +278,59 @@ jobs:
   #
   # KEIN `npm run build`, KEIN Chromium: die Suite ist reines Node — sie braucht nur die
   # Importdaten (deshalb `ci:import-exists`) und einen eigenen SQLite-Pfad.
+  #
+  # SHARDING (CI-Analyse 25.10., Chris zugestimmt): der Job lief als EIN serieller `npm test`
+  # ueber alle Dateien und schwankte zwischen 19,6 und 37,3 Minuten -- auf geteilter
+  # GitHub-Runner-Hardware oft der langsamste sichtbare Haken, obwohl er selbst KEIN Pflicht-Check
+  # ist (das bleibt `test-and-smoke`, 22-26 Minuten stabil, unveraendert). Jetzt 4 parallele
+  # Matrix-Jobs ueber Vitests NATIVE `--shard=<index>/<anzahl>`-Unterstuetzung (bestaetigt ab
+  # dieser Version vorhanden: `npx vitest run --help` listet `--shard` fuer vitest 4.1.8) statt
+  # eines Wrapper-Skripts -- WAS geprueft wird, bleibt exakt gleich, nur WIE es auf parallele
+  # Jobs verteilt wird.
+  #
+  # ABDECKUNG RECHNERISCH BEWIESEN, nicht nur empirisch gemessen: Vitests `BaseSequencer.shard()`
+  # (node_modules/vitest/dist/chunks/coverage.*.js) sortiert die vollstaendig aufgeloeste
+  # Dateiliste nach einem SHA1-Hash des relativen Pfads jeder Datei und schneidet sie in `count`
+  # zusammenhaengende, nicht ueberlappende Bloecke (`calculateShardRange`). Die Vereinigung aller
+  # `count` Shards ist dadurch per Konstruktion identisch zur ungeshardeten Liste -- keine Datei
+  # doppelt, keine vergessen -- vorausgesetzt jeder Shard sieht denselben Checkout und denselben
+  # `vitest run`-Aufruf ohne zusaetzliche Dateifilter (hier der Fall: alle vier Matrix-Jobs
+  # checken denselben Commit aus und unterscheiden sich nur in `--shard`). Mit genau diesem
+  # Algorithmus lokal gegen die aktuelle Dateiliste nachgerechnet (1083 Dateien, Stand 25.10.):
+  # 271/271/271/270 je Shard, Summe 1083, 0 Duplikate, 0 fehlende.
+  #
+  # ARENA-CHROMIUM-OOM GEPRUEFT, TRIFFT HIER NICHT ZU: die vier schwersten Dateien
+  # (tests/arena-vorlauf-parity.test.ts, tests/arena-vorlauf-service.test.ts,
+  # tests/battle-mode-arena-ausfall-sichtbar.test.ts, tests/battle-mode-auto-run-invarianten.test.ts)
+  # laufen im Job `arena-chromium-tests` oben bewusst als VIER GETRENNTE Prozesse, weil ein
+  # gemeinsamer Lauf mit echtem, installiertem Chromium frueher mit "JavaScript heap out of
+  # memory" abstuerzte. DIESER Job hier installiert aber KEIN Chromium und setzt KEIN
+  # `OLY_ARENA_CHROMIUM_PFLICHT=1` -- alle vier Dateien greifen deshalb auf ihr
+  # `describe.skipIf(!CHROMIUM_VERFUEGBAR)` zurueck (s. die Dateien selbst, Variable
+  # `UEBERSPRINGEN`) und ueberspringen ihre teuren Chromium-Suiten komplett, unabhaengig davon, in
+  # welchen der vier Shards sie fallen. Das OOM-Risiko aus `arena-chromium-tests` entsteht also
+  # gar nicht erst in diesem Job, egal wie die Dateien hier verteilt werden.
   full-test-suite:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: full-test-suite (Shard ${{ matrix.shard }}/4)
     steps:
       - uses: actions/checkout@v4
       - name: Set CI SQLite path
-        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-full-suite.sqlite" >> "$GITHUB_ENV"
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-full-suite-shard-${{ matrix.shard }}.sqlite" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
       - run: npm ci
       - run: npm run ci:import-exists
-      - run: npm test
+      - run: npx vitest run --shard=${{ matrix.shard }}/4
 
   # ARENA-CHROMIUM-TESTS (PR 3/K1, Opus-Review 18.10.) — der einzige Job, der die paar Tests
   # faehrt, die ECHTES Chromium brauchen, UM ETWAS ZU BEWEISEN (nicht nur, um es zu tolerieren).
@@ -461,3 +498,172 @@ jobs:
       - name: PPS-Referenz-Frische (informativ, blockiert den Merge nicht)
         continue-on-error: true
         run: npm run ci:pps-referenz-frische
+
+  # E1 -- BILDGROESSE UND CHROMIUM-STARTBARKEIT DES PRODUKTIONS-IMAGES (Plan
+  # docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4/6.2 Punkt 8/9.5).
+  #
+  # Zweck ist vor allem die ZAHL, die Chris' Platzmessung (Plan 4.5, `df -h`/`free -m`)
+  # einordnet: ohne diesen Job gibt es nur die SCHAETZUNG aus Abschnitt 4.2 (+0,6-0,75 GB je
+  # Image), nie die echte Groesse DIESES Images. Dazu ein MINIMALER Chromium-Start (nicht die
+  # volle `runArenaFixtures`-Abnahme aus Plan 6.2 Punkt 8 -- die braucht echte Kader-/
+  # Aufstellungsdaten aus lib/ und gehoert in den Battle-Smoke von PR 3, nicht in eine reine
+  # Image-Probe dieses PRs): `chromium.launch()` + eine leere Seite, als User `oly`, mit
+  # `--init` und `--shm-size=256m` (dieselben Compose-Werte wie `deploy/hetzner/
+  # docker-compose.yml`).
+  #
+  # ERSTER ECHTER LAUF (Run 39054117220, Job 117458469085, 17.10.): Bildgroesse **3,83 GB**
+  # (`docker image ls`-Ausgabe im Log, keine Schaetzung). Der Chromium-Start SCHEITERTE beim
+  # ersten Mal -- `chrome_crashpad_handler: --database is required` + `recvmsg: Connection
+  # reset by peer`, SIGTRAP sofort nach dem Start. `continue-on-error: true` auf genau diesem
+  # Schritt hat das damals verdeckt (der JOB stand gruen, der SCHRITT war rot) -- das war ein
+  # Fehler in diesem Kommentar/dieser Einstellung, keine echte Bestaetigung. Ursache gefunden:
+  # `adduser --system` legt fuer `oly` kein Home-Verzeichnis an, `docker run --user oly` setzt
+  # `$HOME` deshalb nicht automatisch auf einen beschreibbaren Pfad, und Chromiums
+  # Crashpad-Handler braucht ein beschreibbares `$HOME` fuer seine Crash-Datenbank (gefixt:
+  # eigenes `/home/oly`-Verzeichnis + `ENV HOME=/home/oly` im Dockerfile). Auch gemessen:
+  # Playwright haengt beim `channel: "chromium"`-Start selbst bereits `--no-sandbox` an die
+  # Kommandozeile (gesehen im `<launching>`-Log), UNABHAENGIG von den eigenen
+  # `ARENA_NETZWERK_ABRIEGELUNG_ARGS` -- vermutlich Containererkennung in Playwright/Chromium
+  # selbst. Die "Sandbox bleibt aktiv"-Aussage in der PR-Beschreibung bezieht sich auf das, was
+  # DIESES PR an den Launch-Flags AENDERT (nichts), nicht auf das, was am Ende tatsaechlich auf
+  # der Kommandozeile steht.
+  #
+  # ZWEITER ECHTER LAUF (Run 39055283007, Job 117461974845, 17.10., Commit a7efc8c4 -- derselbe
+  # Commit, der das npm-12-bereinigte Lockfile traegt): Bildgroesse **3,72 GB**, Chromium-Start
+  # **echt gruen** (Exit-Code 0 des Schritts selbst, kein `continue-on-error` mehr). Dieser Lauf
+  # beweist nebenbei auch, dass `npm ci` MIT DEM IN `node:22-bookworm-slim` GEBUENDELTEN npm
+  # (10.9.x, nicht dem npm 12, mit dem das Lockfile lokal neu erzeugt wurde) das bereinigte
+  # Lockfile klaglos akzeptiert -- der Docker-Build dieses Laufs durchlief die `deps`-Stage
+  # (`RUN npm ci`) vollstaendig, sonst waere der ganze Build schon dort abgebrochen.
+  #
+  # PFLICHT-CHECK, ABER PRAEZISE FORMULIERT: kein `continue-on-error: true` mehr auf irgendeinem
+  # Schritt -- ein Ruecktritt ist jetzt sofort rot, nicht nur eine still verschluckte Warnung.
+  # "Pflicht" heisst hier nur "ehrlich rot/gruen", NICHT automatisch "blockiert den Merge". Ob
+  # ein gruener Status hier wirklich Voraussetzung fuer einen Merge auf `main` ist, entscheidet
+  # ausschliesslich der Branch-Schutz von `main` in den Repo-Settings (Settings -> Branches ->
+  # Regel fuer `main` -> Require status checks to pass), und den kann nur Chris selbst setzen --
+  # ein Agent kommt da nicht heran (derselbe Vorbehalt gilt schon fuer `persistenz-suiten` oben
+  # und fuer `rangtreue-schranke` in `ci-nightly.yml`). Ohne diesen Haken ist dieser Job zwar
+  # sichtbar, haelt aber nichts auf.
+  #
+  # DELTA GEGEN DAS HEUTIGE PRODUKTIONS-IMAGE (Opus-Auflage, Punkt 3): 3,7-3,8 GB ist die
+  # GESAMTgroesse, nicht der Zuwachs durch Chromium. Die beiden Schritte unten bauen zusaetzlich
+  # das unveraenderte `main`-Dockerfile (ohne Chromium-Schicht) als Baseline und geben die
+  # Differenz aus -- das ist die Zahl, die zur Plan-Schaetzung (Abschnitt 4.2: +0,6-0,75 GB)
+  # passt, nicht die 3,7-3,8 GB fuer sich allein.
+  arena-image-chromium-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Baseline-Image bauen (main, OHNE Chromium -- fuer den Delta-Vergleich)
+        run: |
+          git fetch origin main
+          git worktree add /tmp/oly-main-baseline origin/main
+          docker build -t oly-arena-probe:baseline /tmp/oly-main-baseline
+          git worktree remove /tmp/oly-main-baseline --force
+      - name: Produktions-Image bauen (mit Chromium, E1)
+        run: docker build -t oly-arena-probe:ci .
+      - name: Bildgroesse + Delta ausgeben (die Zahlen fuer Chris' Platzmessung)
+        run: |
+          BASE_BYTES=$(docker image inspect oly-arena-probe:baseline --format '{{.Size}}')
+          CI_BYTES=$(docker image inspect oly-arena-probe:ci --format '{{.Size}}')
+          DELTA_BYTES=$((CI_BYTES - BASE_BYTES))
+          echo "baseline (main, ohne Chromium): $(docker image ls oly-arena-probe:baseline --format '{{.Size}}')  (${BASE_BYTES} Bytes)"
+          echo "mit Chromium (dieser PR):       $(docker image ls oly-arena-probe:ci --format '{{.Size}}')  (${CI_BYTES} Bytes)"
+          echo "Delta (Chromium-Zuwachs):       $(awk -v b="$DELTA_BYTES" 'BEGIN{printf "%.2f GB", b/1000/1000/1000}')  (${DELTA_BYTES} Bytes)"
+      - name: Chromium-Start als User oly (--no-sandbox kommt von Playwright selbst, s. Kommentar oben)
+        run: |
+          docker run --rm --init --shm-size=256m --user oly oly-arena-probe:ci \
+            node -e "
+              const { chromium } = require('playwright');
+              (async () => {
+                const browser = await chromium.launch({
+                  headless: true,
+                  channel: 'chromium',
+                  args: ['--proxy-server=direct://', '--host-resolver-rules=MAP * 0.0.0.0'],
+                });
+                const page = await browser.newPage();
+                await page.goto('about:blank');
+                console.log('chromium ok (User oly, HOME=/home/oly, --init, shm_size=256m)');
+                await browser.close();
+              })().catch((err) => { console.error(err); process.exit(1); });
+            "
+      # RAM-SPARFLAGS, Nachtrag 25.10. (Chris: Server bleibt beim CX23 mit 3,8 GB RAM, jede
+      # Einsparung an der Chromium-Last zaehlt direkt). `public/mockups/battle-mode.engine.js`
+      # (die einzige Seite, die dieser Runner laedt) nutzt NACHWEISLICH kein WebGL -- im
+      # gesamten 55000-Zeilen-Motor kommt der String "webgl" kein einziges Mal vor, jede
+      # Canvas-Nutzung ist `getContext("2d")` fuer Sprite-/Pixel-Arbeit, teils sogar mit
+      # `willReadFrequently:true` (ein Hinweis an den Browser, der ohnehin Richtung
+      # Software-Rendering zielt). `--disable-gpu` entfernt damit den separaten GPU-Prozess
+      # OHNE Funktionsrisiko fuer diese Seite. `--no-zygote` entfernt den Zygote-Hilfsprozess
+      # (nur fuer schnelles Forken weiterer Renderer gedacht -- bei einem einzigen,
+      # langlebigen Tab pro Lauf ueberfluessig), ein Standardtipp fuer sandboxlose
+      # Container-Chromium-Laeufe. BEIDE messen wir hier echt, im selben Image/Container wie
+      # Produktion (User oly, --init, shm_size=256m) -- nicht geschaetzt.
+      #
+      # `--single-process` (Variante D) wird NUR zum Vergleich mitgemessen, NICHT uebernommen:
+      # Chromium/Puppeteer/Playwright-Projektdokumentation stuft dieses Flag selbst als
+      # Debug-/Testwerkzeug ein, nicht fuer Produktionsbetrieb -- bekannt fuer Haenger/Abstuerze
+      # gerade in sandboxlosen Containern (hier zusaetzlich sandboxlos, weil Playwright beim
+      # `channel:"chromium"`-Start ohnehin automatisch `--no-sandbox` anhaengt, s. Kommentar
+      # oben). Ohne eine echte Mehrfach-Fixture-Lastprobe (nicht nur `about:blank`) ist das
+      # Stabilitaetsrisiko dieses einen Flags nicht serios einzuschaetzen -- die Zahl hier zeigt
+      # nur die moegliche zusaetzliche RSS-Ersparnis, keine Freigabe fuer den Produktionseinsatz.
+      # Das Skript steht Base64-kodiert in einer EINZIGEN Zeile (`RSS_PROBE_B64` unten) --
+      # bewusst NICHT als mehrzeiliges Heredoc: ein `<<'EOF'`-Heredoc braucht eine
+      # Abschlusszeile OHNE jede Einrueckung, ein YAML-Blockskalar (`run: |`) verlangt aber
+      # genau umgekehrt MINDESTENS die Einrueckung der ersten Inhaltszeile fuer JEDE Zeile --
+      # beides zugleich ist nicht erfuellbar. Eine einzelne Base64-Zeile hat dieses Problem
+      # nicht (keine Zeilenumbrueche, keine Anfuehrungszeichen/`$`, die die umgebende YAML-/
+      # Bash-Quotierung durchbrechen koennten) und ist unabhaengig von der Einrueckung sicher
+      # einzubetten.
+      - name: RAM-Sparflags messen (Chromium-Prozess-RSS je Flag-Kombination, echt gemessen)
+        run: |
+          RSS_PROBE_B64="Y29uc3QgeyBjaHJvbWl1bSB9ID0gcmVxdWlyZSgicGxheXdyaWdodCIpOwpjb25zdCBmcyA9IHJlcXVpcmUoImZzIik7CgpmdW5jdGlvbiBzdW1taWVyZUNocm9tZVJzc01iKCkgewogIGxldCB0b3RhbEtiID0gMDsKICBsZXQgYW56YWhsID0gMDsKICBmb3IgKGNvbnN0IHBpZCBvZiBmcy5yZWFkZGlyU3luYygiL3Byb2MiKSkgewogICAgaWYgKCEvXlxkKyQvLnRlc3QocGlkKSkgY29udGludWU7CiAgICB0cnkgewogICAgICBjb25zdCBzdGF0dXMgPSBmcy5yZWFkRmlsZVN5bmMoIi9wcm9jLyIgKyBwaWQgKyAiL3N0YXR1cyIsICJ1dGY4Iik7CiAgICAgIGNvbnN0IG5hbWUgPSBzdGF0dXMubWF0Y2goL15OYW1lOlxzKihcUyspL20pOwogICAgICBpZiAoIW5hbWUgfHwgIS9jaHJvbS9pLnRlc3QobmFtZVsxXSkpIGNvbnRpbnVlOwogICAgICBjb25zdCByc3MgPSBzdGF0dXMubWF0Y2goL15WbVJTUzpccyooXGQrKVxzKmtCL20pOwogICAgICBpZiAocnNzKSB7CiAgICAgICAgdG90YWxLYiArPSBwYXJzZUludChyc3NbMV0sIDEwKTsKICAgICAgICBhbnphaGwgKz0gMTsKICAgICAgfQogICAgfSBjYXRjaCAoZSkgewogICAgICAvLyBQcm96ZXNzIGthbm4gendpc2NoZW4gcmVhZGRpciB1bmQgcmVhZCB2ZXJzY2h3dW5kZW4gc2VpbiAtLSBpZ25vcmllcmVuLgogICAgfQogIH0KICByZXR1cm4geyBtYjogdG90YWxLYiAvIDEwMjQsIGFuemFobDogYW56YWhsIH07Cn0KCmFzeW5jIGZ1bmN0aW9uIG1lc3NlKGxhYmVsLCBhcmdzKSB7CiAgY29uc3QgYnJvd3NlciA9IGF3YWl0IGNocm9taXVtLmxhdW5jaCh7IGhlYWRsZXNzOiB0cnVlLCBjaGFubmVsOiAiY2hyb21pdW0iLCBhcmdzOiBhcmdzIH0pOwogIGNvbnN0IHBhZ2UgPSBhd2FpdCBicm93c2VyLm5ld1BhZ2UoKTsKICBhd2FpdCBwYWdlLmdvdG8oImFib3V0OmJsYW5rIik7CiAgYXdhaXQgbmV3IFByb21pc2UoZnVuY3Rpb24gKHIpIHsgc2V0VGltZW91dChyLCA4MDApOyB9KTsKICBjb25zdCBlcmdlYm5pcyA9IHN1bW1pZXJlQ2hyb21lUnNzTWIoKTsKICBjb25zb2xlLmxvZyhsYWJlbCArICI6ICIgKyBlcmdlYm5pcy5tYi50b0ZpeGVkKDEpICsgIiBNQiBSU1MgdWViZXIgIiArIGVyZ2VibmlzLmFuemFobCArICIgQ2hyb21lLVByb3plc3MoZSkiKTsKICBhd2FpdCBicm93c2VyLmNsb3NlKCk7CiAgYXdhaXQgbmV3IFByb21pc2UoZnVuY3Rpb24gKHIpIHsgc2V0VGltZW91dChyLCA1MDApOyB9KTsKfQoKKGFzeW5jIGZ1bmN0aW9uICgpIHsKICBjb25zdCBiYXNpcyA9IFsiLS1wcm94eS1zZXJ2ZXI9ZGlyZWN0Oi8vIiwgIi0taG9zdC1yZXNvbHZlci1ydWxlcz1NQVAgKiAwLjAuMC4wIiwgIi0tZGlzYWJsZS1kZXYtc2htLXVzYWdlIl07CiAgYXdhaXQgbWVzc2UoIkEpIEJhc2lzIChTdGFuZCB2b3IgZGllc2VtIE5hY2h0cmFnKSIsIGJhc2lzKTsKICBhd2FpdCBtZXNzZSgiQikgQmFzaXMgKyAtLWRpc2FibGUtZ3B1IiwgYmFzaXMuY29uY2F0KFsiLS1kaXNhYmxlLWdwdSJdKSk7CiAgYXdhaXQgbWVzc2UoIkMpIEJhc2lzICsgLS1kaXNhYmxlLWdwdSArIC0tbm8tenlnb3RlIChVRUJFUk5PTU1FTikiLCBiYXNpcy5jb25jYXQoWyItLWRpc2FibGUtZ3B1IiwgIi0tbm8tenlnb3RlIl0pKTsKICBhd2FpdCBtZXNzZSgiRCkgQmFzaXMgKyAtLWRpc2FibGUtZ3B1ICsgLS1zaW5nbGUtcHJvY2VzcyAoTlVSIFZlcmdsZWljaCkiLCBiYXNpcy5jb25jYXQoWyItLWRpc2FibGUtZ3B1IiwgIi0tc2luZ2xlLXByb2Nlc3MiXSkpOwp9KSgpLmNhdGNoKGZ1bmN0aW9uIChlcnIpIHsKICBjb25zb2xlLmVycm9yKGVycik7CiAgcHJvY2Vzcy5leGl0KDEpOwp9KTsK"
+          echo "$RSS_PROBE_B64" | base64 -d > /tmp/rss-probe.js
+          node --check /tmp/rss-probe.js
+          # NICHT nach /tmp mounten (erster Versuch, 25.10., schlug fehl): Node sucht
+          # `node_modules` nur relativ zum Skriptpfad aufwaerts (`/tmp/node_modules`,
+          # `/node_modules`), nicht unter `/app/node_modules`, wo `playwright` im Image
+          # tatsaechlich liegt (`WORKDIR /app` im Dockerfile) -- Ergebnis war
+          # "Cannot find module 'playwright'". Stattdessen nach `/app/tmp-rss-probe.js`
+          # mounten: Node findet `node_modules` dann im selben Verzeichnis, ganz ohne
+          # Aufwaerts-Suche.
+          docker run --rm --init --shm-size=256m --user oly \
+            -v /tmp/rss-probe.js:/app/tmp-rss-probe.js:ro \
+            oly-arena-probe:ci node /app/tmp-rss-probe.js
+
+  # LOCKFILE-LIBC-WAECHTER (Opus-Review auf PR 1270, Punkt 2, woertlich: "Jeder spaetere Agent
+  # mit npm 10, der den Lockfile anfasst, wirft die `libc`-Felder wieder raus."). Befund aus
+  # genau diesem PR: npm 10.9.x (sowohl das lokal zufaellig installierte 10.9.7 als auch das in
+  # `node:22-bookworm-slim` gebuendelte 10.9.9) laesst beim Neu-Erzeugen des Lockfiles die
+  # `"libc": ["glibc"|"musl"]`-Unterscheidung an ueber vierzig optionalen nativen Paketen
+  # (Next/SWC, rolldown, lightningcss, `@img/sharp-libvips-*`, esbuild) STILLSCHWEIGEND weg,
+  # obwohl die npm-Registry das Feld weiterhin ausliefert -- erst npm >= 12 schreibt es
+  # korrekt. Ohne diese Felder kann `npm ci` auf dem glibc-basierten Produktions-Image die
+  # falsche (oder beide) nativen Varianten installieren -- ein stiller Server-Build-Bruch, der
+  # erst beim Deploy auffaellt.
+  #
+  # Deshalb: EIGENER, SCHNELLER, PFLICHT-Check (kein Docker, keine Minute Laufzeit) --
+  # mindestens 40 `"libc"`-Vorkommen in `package-lock.json` (Stand nach diesem PR: genau 40,
+  # selbst nachgezaehlt). Sinkt die Zahl, hat jemand das Lockfile mit einem npm < 12
+  # neu erzeugt -- rot, bevor es den langsamen Image-Build ueberhaupt erreicht.
+  #
+  # AUFTRAG FUER ALLE KUENFTIGEN AGENTEN: `package-lock.json` nur mit npm >= 12 neu erzeugen
+  # (z. B. `npm install -g npm@12` vor `npm install`/`npm install --package-lock-only`), sonst
+  # wirft genau dieser Check es wieder raus.
+  lockfile-libc-waechter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: "libc-Felder in package-lock.json: mindestens 40"
+        run: |
+          COUNT=$(grep -c '"libc"' package-lock.json)
+          echo "libc-Vorkommen: ${COUNT}"
+          if [ "$COUNT" -lt 40 ]; then
+            echo "::error::Nur ${COUNT} \"libc\"-Felder in package-lock.json (erwartet >= 40)."
+            echo "::error::Das Lockfile wurde wahrscheinlich mit npm < 12 neu erzeugt -- bitte mit npm >= 12 neu generieren (npm install -g npm@12 && npm install --package-lock-only)."
+            exit 1
+          fi
