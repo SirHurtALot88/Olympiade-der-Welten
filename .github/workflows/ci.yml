@@ -344,10 +344,12 @@ jobs:
   # CI-Tor. `test-and-smoke` installiert zwar Chromium, faehrt aber nur `ci:flow-smoke`s feste
   # 18-Datei-Liste, die keine dieser Dateien enthaelt.
   #
-  # WAS HIER LAEUFT: genau die vier Dateien, die den Arena-Vorlauf tatsaechlich mit echtem
-  # Chromium durchspielen — Vorlauf-Service (inkl. B1: genau eine automatische Wiederholung),
-  # die Arena-Pfad-Paritaet ("was du siehst, wird gebucht"), der K1-Simulationstest und der
-  # Task-#164-Invariantentest (2 Spieltage).
+  # WAS HIER LAEUFT: die vier Dateien, die den Arena-Vorlauf tatsaechlich mit echtem Chromium
+  # durchspielen — Vorlauf-Service (inkl. B1: genau eine automatische Wiederholung), die
+  # Arena-Pfad-Paritaet ("was du siehst, wird gebucht"), der K1-Simulationstest und der
+  # Task-#164-Invariantentest (2 Spieltage) — plus (seit CI-Fund 25.10., s. Kommentar bei Schritt
+  # 5/5 unten) der FORMKARTE-Isolationsregressionstest fuer `renderMiniDmFfa()`, der bis dahin in
+  # KEINEM Chromium-Job verdrahtet war.
   #
   # `OLY_ARENA_CHROMIUM_PFLICHT=1`: macht ein fehlendes Chromium in DIESEM Job zu einem LAUTEN
   # Testfehler statt eines stillen Skips (s. `describe.skipIf` in arena-vorlauf-parity.test.ts) —
@@ -375,39 +377,54 @@ jobs:
       - name: Install Chromium for Playwright
         run: timeout 360 npx playwright install chromium --with-deps || npx playwright install chromium
       - run: npm run ci:import-exists
-      # VIER GETRENNTE AUFRUFE, NICHT EINER (CI-Fund, 18.10., Root Cause fuer den OOM-Absturz
-      # "JavaScript heap out of memory" nach ~12 Minuten im ersten Lauf dieses Jobs): Code-Review
-      # von `arena-headless-runner.ts`/`arena-chromium-selftest.ts` zeigt, dass JEDER
-      # `chromium.launch()` ueber ein `finally` (bzw. einen "nur einmal schliessen"-Schutz, auch
-      # auf dem B2-Hart-Timeout-Pfad) mit `browser.close()` beantwortet wird, und das
-      # In-Prozess-Dedup (`laufendeVorlaeufe`) raeumt sich ebenfalls per `.finally()` auf -- KEIN
-      # Hinweis auf nicht geschlossene Browser-/Page-Handles in diesem PR. Der echte Grund: diese
-      # vier Dateien sind die SCHWERSTEN im Repo (echtes Chromium, volle 32-Team-Spielstaende mit
-      # hunderten Spielerobjekten, teils mehrere Spieltage/Vorlaeufe je Test) -- und `vitest.config.ts`
-      # setzt KEINE `pool`/`poolOptions`, Vitests Default-Scheduling teilt mehrere Dateien auf
-      # denselben geforkten Node-Prozess, wenn die Runner-CPU-Zahl kleiner ist als die Dateizahl.
-      # Dann summiert sich der Speicher ALLER vier Dateien in EINEM V8-Heap, statt dass jede Datei
-      # einen frischen Prozess bekommt. Ein eigener `npx vitest run`-Aufruf JE Datei erzwingt genau
-      # das: jede Zeile unten startet einen komplett neuen Node-Prozess, der beim Beenden seinen
-      # gesamten Speicher (Chromium-Objekte, Spielstaende, SQLite-Verbindungen) garantiert freigibt,
-      # bevor die naechste Datei beginnt -- ohne an `--max-old-space-size` zu raten oder
-      # Pool-Internals zu vertrauen, deren Verhalten von der Runner-CPU-Zahl abhaengt.
-      - name: "Arena-Vorlauf-Test 1/4: Parity (echtes Chromium)"
+      # FUENF GETRENNTE AUFRUFE, NICHT EINER (CI-Fund, 18.10., Root Cause fuer den OOM-Absturz
+      # "JavaScript heap out of memory" nach ~12 Minuten im ersten Lauf dieses Jobs, urspruenglich
+      # vier Dateien -- die fuenfte, Schritt 5/5, kam am 25.10. nach demselben Muster dazu, s.
+      # deren eigener Kommentar): Code-Review von `arena-headless-runner.ts`/
+      # `arena-chromium-selftest.ts` zeigt, dass JEDER `chromium.launch()` ueber ein `finally`
+      # (bzw. einen "nur einmal schliessen"-Schutz, auch auf dem B2-Hart-Timeout-Pfad) mit
+      # `browser.close()` beantwortet wird, und das In-Prozess-Dedup (`laufendeVorlaeufe`) raeumt
+      # sich ebenfalls per `.finally()` auf -- KEIN Hinweis auf nicht geschlossene Browser-/
+      # Page-Handles in diesem PR. Der echte Grund: diese Dateien sind die SCHWERSTEN im Repo
+      # (echtes Chromium, volle 32-Team-Spielstaende mit hunderten Spielerobjekten, teils mehrere
+      # Spieltage/Vorlaeufe je Test) -- und `vitest.config.ts` setzt KEINE `pool`/`poolOptions`,
+      # Vitests Default-Scheduling teilt mehrere Dateien auf denselben geforkten Node-Prozess, wenn
+      # die Runner-CPU-Zahl kleiner ist als die Dateizahl. Dann summiert sich der Speicher ALLER
+      # Dateien in EINEM V8-Heap, statt dass jede Datei einen frischen Prozess bekommt. Ein eigener
+      # `npx vitest run`-Aufruf JE Datei erzwingt genau das: jede Zeile unten startet einen
+      # komplett neuen Node-Prozess, der beim Beenden seinen gesamten Speicher (Chromium-Objekte,
+      # Spielstaende, SQLite-Verbindungen) garantiert freigibt, bevor die naechste Datei beginnt --
+      # ohne an `--max-old-space-size` zu raten oder Pool-Internals zu vertrauen, deren Verhalten
+      # von der Runner-CPU-Zahl abhaengt.
+      - name: "Arena-Vorlauf-Test 1/5: Parity (echtes Chromium)"
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/arena-vorlauf-parity.test.ts
-      - name: "Arena-Vorlauf-Test 2/4: Service/B1/B3 (echtes Chromium)"
+      - name: "Arena-Vorlauf-Test 2/5: Service/B1/B3 (echtes Chromium)"
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/arena-vorlauf-service.test.ts
-      - name: "Arena-Vorlauf-Test 3/4: Ausfall sichtbar/K1 (echtes Chromium)"
+      - name: "Arena-Vorlauf-Test 3/5: Ausfall sichtbar/K1 (echtes Chromium)"
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/battle-mode-arena-ausfall-sichtbar.test.ts
-      - name: "Arena-Vorlauf-Test 4/4: Auto-Run-Invarianten (echtes Chromium)"
+      - name: "Arena-Vorlauf-Test 4/5: Auto-Run-Invarianten (echtes Chromium)"
         env:
           OLY_ARENA_CHROMIUM_PFLICHT: "1"
         run: npx vitest run tests/battle-mode-auto-run-invarianten.test.ts
+      # CI-FUND 25.10.: der FORMKARTE-Isolationsregressionstest (OPUS-REVIEW F1, s. Kopfkommentar der
+      # Datei) lief bisher in KEINEM CI-Job mit echtem Chromium -- `full-test-suite`/
+      # `persistenz-suiten` installieren keines (stilles `describe.skipIf`, strukturell nachgemessen:
+      # `HOME=/tmp/leer npx vitest run tests/mini-dm-ffa-render-formkarten-isolation.test.ts` ohne
+      # Chromium im Pfad liefert "3 skipped", Exit 0 -- eine gruene Suite, die den Test nie
+      # ausgefuehrt hat), und dieser Job fuhr die Datei bisher nicht. FUENFTER GETRENNTER AUFRUF statt
+      # Anhaengen an einen der vier obigen (s. Kommentar zum OOM-Fund weiter oben in diesem Job):
+      # jede der vier bestehenden Dateien ist bereits fuer sich die schwerste Klasse im Repo, ein
+      # eigener Prozess haelt den Speicherbedarf dieser fuenften Datei vollstaendig getrennt.
+      - name: "Arena-Vorlauf-Test 5/5: Mini-DM-FFA FORMKARTE-Isolation (echtes Chromium)"
+        env:
+          OLY_ARENA_CHROMIUM_PFLICHT: "1"
+        run: npx vitest run tests/mini-dm-ffa-render-formkarten-isolation.test.ts
 
   # DIE PERSISTENZ-SUITEN ALS EIGENER, ANHAKBARER CHECK — Chris' Antwort 4b.
   #

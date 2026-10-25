@@ -283,6 +283,16 @@ describe.skipIf(UEBERSPRINGEN)("OPUS-REVIEW F1 · renderMiniDmFfa() isoliert FOR
  * `SLOTS_JE_DISC["mini-dm"]` die Rolle nicht kennt.
  */
 describe.skipIf(UEBERSPRINGEN)("OPUS-REVIEW F2 · Rollen-Anzeigenamen bei k=6 (Paarungs-Vorschau)", () => {
+  if (CHROMIUM_PFLICHT && !CHROMIUM_VERFUEGBAR) {
+    it("OLY_ARENA_CHROMIUM_PFLICHT=1, aber kein Chromium gefunden -- Install-Schritt dieses Jobs pruefen", () => {
+      throw new Error(
+        "Dieser CI-Job setzt OLY_ARENA_CHROMIUM_PFLICHT=1 (Chromium MUSS installiert sein), aber " +
+          "chromiumVerfuegbar() fand keines. Vermutlich ist der \"npx playwright install chromium\"-" +
+          "Schritt dieses Jobs fehlgeschlagen oder wurde entfernt.",
+      );
+    });
+    return;
+  }
   it(
     "Runde 5/6 zeigen 'Chaos Driver'/'Last Hit', nicht die rohen Ids 'chaosdriver'/'lasthit'",
     async () => {

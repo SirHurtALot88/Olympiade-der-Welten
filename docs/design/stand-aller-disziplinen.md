@@ -1,5 +1,56 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Siebenundzwanzigster Nachtrag 25.10. — Hockey: frische Pp-Messung nachgeholt (Task #195), Schranke
+auf beiden Stroemen klar verletzt.** CLAUDE.md (Abschnitt "Die Abnahme jeder Disziplin") und
+`lib/battle/arena-resolved-disciplines.ts` hielten Hockeys Pp-Zahl (39,4) seit der Projektaufsicht
+vom 16.10. ausdruecklich fuer unzureichend: n=6, aus der Doku uebernommen, nie frisch mit den
+geforderten ≥24 Laeufen/zwei Saatstroemen gemessen — weil `messe-arena-einfluss.mjs hockey` bei
+n≥12 reproduzierbar mit "Target page, context or browser has been closed" abstuerzte (s. Nachtrag
+weiter unten, "Hockey/Breaking/TDM — technischer Nebenbefund").
+
+**Die Ursache war kein V8-Heap-Leck, sondern ein DOM-Leck in der Messsonde selbst** (gefunden von
+einem frueheren, nie gemergten Agenten-Branch, 04.10.): `einflussVon()`/`einflussVonSandsackFinale()`/
+`disziplinProbe()` riefen `M.lauf()` ohne `stumm=true`, obwohl mehrere Motorkommentare genau das
+voraussetzen. `feed()` schreibt seit dem Protokoll-Reiter (01.10.) jede Zeile ungedeckelt ins DOM
+(`#protokoll`) — bei Hockey rund 1000 Knoten je Spiel, bei n=48 rund 7 Mio. Knoten, cgroup-OOM. Der
+Fix (`messLaufStumm(M)`, try/finally wie bei `spieleBahn()`/`bahnLauf()`) ist laut Original-Commit
+bit-identisch nachgemessen — reine Messsonden-Reparatur, keine Aenderung an Hockeys Mechanik. Dieser
+PR zieht den Fix per Cherry-Pick nach (`public/mockups/battle-mode.engine.js`).
+
+**Ergebnis der frischen Messung** (`node scripts/messe-arena-einfluss.mjs hockey 24` + zweiter Lauf
+mit `--saat-versatz=10000000`, beide ohne Seitenfehler durchgelaufen):
+
+| Strom | Pp | Staerkste Abweichungen |
+|---|---:|---|
+| 0 | 38,5 | stamina +11,4 Pp (Matrix 10); power -7,5 Pp (Matrix 18, deutlich unterrepraesentiert) |
+| 10 000 000 | 81,5 | awareness +28,6 Pp (Matrix nur 8); spirit faellt auf 0 % (Matrix 12) |
+
+Beide Stroeme verletzen die 25-Pp-Schranke klar — ein ehrlicher, erwarteter moeglicher Ausgang
+dieser reinen Messaufgabe, kein Rezept-Umbau wurde versucht. **Auffaellig ist die grosse Spannweite
+zwischen den beiden Stroemen (43 Pp)** — deutlich groesser als bei jeder anderen bisher
+zweistroemig gemessenen Disziplin in der Tabelle unten (die naechstgroesste Spannweite liegt bei
+rund 7 Pp). Welches Attribut die Messung dominiert, wechselt vollstaendig (stamina/power in Strom 0,
+awareness/spirit in Strom 1) — ein moeglicher Hinweis darauf, dass Hockeys sehr niedrige
+Torzahl je Spiel (`punkteNah:1, punkteFern:1`, s. `FELDSPIEL_ART.hockey`) die EINZELSPIEL-
+Budget-Messung selbst instabil macht (anders als CLAUDE.mds "mehr Ereignisse helfen fast nie", das
+sich auf rho/Saison-Rangtreue bezieht, nicht auf diese Budget-Methode). Das ist eine offene Frage
+fuer eine kuenftige Kalibrierrunde, nicht Teil dieser Messaufgabe.
+
+**Keine Mengenaenderung:** Hockey steht weiterhin NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` — Chris'
+Rangtreue-Ausnahme (CLAUDE.md, Star Rang 1 58 %/erste zwei 78 %, kaderfest) deckt ausdruecklich nur
+`rho`, nie `pp`, und Hockeys rho (0,64) liegt ohnehin unter der 0,80-Schranke, unabhaengig vom
+Pp-Ausgang. `data/generated/disziplin-abnahme.json` (Eintrag "hockey") und
+`lib/battle/arena-resolved-disciplines.ts` sind entsprechend aktualisiert; die vollstaendige
+Attribut-Tabelle beider Stroeme steht in der JSON-`anmerkung`.
+
+**Hinweis fuer Chris, nicht Teil dieser Messaufgabe:** unabhaengig vom Pp-Ergebnis hat ein
+Opus-Agent am 25.10. gefunden, dass die in CLAUDE.md zitierte "99 % Paartreue" fuer Hockey selbst
+veraltet ist — frisch nachgemessen ergaben sich 90,9 %, knapp unter Hockeys eigener 95 %-Schwelle
+aus der Fable-Entscheidung vom 10.09. Das ist eine offene, bereits als Task #175 getrackte Frage und
+hier nur als Kontext vermerkt.
+
+---
+
 **Sechsundzwanzigster Nachtrag 25.10. — Dokumentations-Konsistenzkorrektur: veraltete/
 widersprüchliche Zahlen in `lib/battle/arena-resolved-disciplines.ts` und dieser Datei
 vereinheitlicht, nichts am Verhalten geändert.** Ein Opus-Audit (24./25.10.) fand mehrere Stellen,
@@ -968,7 +1019,7 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
 | Gewichtheben | 29,1 | 24 | VERLETZT (neu, s.u. — Regression) |
 | Basketball | 33,4 | 24 | VERLETZT (neu entdeckt) |
 | Takeshi's Castle | 36,4 | 24 (Kopfzahl vor Timeout geretttet, Detailtabelle fehlt) | VERLETZT |
-| Hockey | 39,4 | 6 (n=24 zweimal an Chromium-Abstuerzen gescheitert) | VERLETZT, Zahl klein |
+| Hockey | 38,5 / 81,5 | 24, 2 Saatstroeme (Sechsundzwanzigster Nachtrag 25.10., Messsonden-Leak behoben) | VERLETZT |
 | Fechten | 40,6 / 42,1 | 48, 2 Saatstroeme | VERLETZT |
 | Football | 47,3 | 24 (identisch mit PR #1037s eigenem Basiswert) | VERLETZT |
 | TDM | 51,4 | 2 (n=6/24 an OOM-Abstuerzen gescheitert, s.u.) | VERLETZT, Zahl sehr klein |
@@ -1025,7 +1076,10 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
   **Nachtrag 02.10.:** fuer Breaking ist das inzwischen behoben (PR #1092/B0, echtes
   WebAudio-/Timer-Speicherleck im Messskript selbst, keine Engine-Aenderung) — n=48 laeuft seitdem
   glatt durch, s. Fuenfzehnter Nachtrag. Hockey und TDM sind von diesem Fix unberuehrt (ihr Leck
-  sitzt an anderer Stelle) und bleiben offen.
+  sitzt an anderer Stelle) und bleiben offen. **Nachtrag 25.10. (Task #195, Sechsundzwanzigster
+  Nachtrag oben):** fuer Hockey ist das inzwischen ebenfalls behoben — eigenes DOM-Leck in der
+  Messsonde (`#protokoll` ungedeckelt ohne `stumm`), nicht dasselbe Leck wie bei Breaking. n=24
+  mit zwei Saatstroemen laeuft seitdem glatt durch. TDM bleibt unberuehrt und offen.
 
 **Was diese Runde nicht geschafft hat:** die von Chris/CLAUDE.md gewuenschte Staffel-Nachmessung
 bei n=144 (fuer eine belastbare Pp-Zahl statt der strukturell unsicheren n=24-60,4) — bei der
