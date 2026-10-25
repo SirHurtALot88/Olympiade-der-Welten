@@ -52314,6 +52314,28 @@
   // gewinnt. Das erfasst besser werden UND andere aufhalten.
   const EINFLUSS_ATTR=["power","health","stamina","intelligence","awareness","determination",
                        "speed","dexterity","charisma","will","spirit","torment"];
+  // MESS-LECK HOCKEY (04.10., docs/design/stand-aller-disziplinen.md, Sechzehnter Nachtrag):
+  // "Target page, context or browser has been closed" bei messe-arena-einfluss.mjs hockey
+  // n>=12. URSACHE, gemessen statt vermutet: nicht der V8-Heap (der bleibt nach GC bei 5-16 MB
+  // flach), sondern das DOM. feed() schreibt seit dem Protokoll-Reiter (Broadcast-Audit Runde
+  // 2, Punkt 8, 01.10.) JEDE Zeile ungedeckelt nach #protokoll; geleert wird das nur von
+  // tickerZuruecksetzen() beim Start eines ECHTEN Spiels. Die Messsonden riefen M.lauf() aber
+  // ohne `stumm` -- obwohl mehrere Kommentare im Motor (Fallakte, Fechten-Periodenbanner)
+  // genau das voraussetzen ("die Abnahme ruft M.lauf() mit stumm=true, feed() kehrt sofort
+  // zurueck"). Bei Disziplinen, deren lauf() selbst stumm schaltet (Bahn, Kampf ueber
+  // stepSimStumm), fiel das nie auf; die Feldspiel-Motoren rufen stepFeldspiel() direkt.
+  // Hockey: rund 1000 DOM-Knoten je Spiel (Zeile + 2-3 Spans), einflussVon(hockey,n) faehrt
+  // 145*n Spiele in EINEM synchronen Aufruf -> bei n=48 rund 7 Mio. Knoten, mehrere GB
+  // Renderer-Speicher, cgroup-OOM. Mit stumm bleibt die Knotenzahl konstant.
+  // BIT-IDENTISCH: `stumm` steuert ausschliesslich Anzeige (feed/callout/schwebe/effekt/
+  // Feiern, alle ohne rr() und ohne Schreibzugriff auf Teilnehmer), nachgemessen ueber
+  // miss-alle-disziplinen.mjs 24 (alle zwanzig) und messe-arena-einfluss.mjs vor/nach.
+  // try/finally wie bei spieleBahn()/bahnLauf(): ein Fehler im Lauf darf den Schalter nicht
+  // dauerhaft auf stumm stehen lassen.
+  function messLaufStumm(M){
+    const vorher=stumm; stumm=true;
+    try{ M.lauf(); } finally { stumm=vorher; }
+  }
   // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
   // default 0 -> bit-identisch zum bisherigen Aufruf. Verschiebt BEIDE Seed-Reihen
   // (Formkarten und M.bau) um denselben Betrag, sodass ein zweiter Aufruf mit grossem,
@@ -52346,7 +52368,8 @@
         if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
         else if(modus==="aus")MUTATOREN=[];
         M.bau(1337+versatz+i*7919);
-        M.lauf();
+        // MESS-LECK HOCKEY/FELDSPIEL (04.10.): der Lauf ist STUMM, s. messLaufStumm() oben.
+        messLaufStumm(M);
         const e=M.wert();
         for(const k in e)w[k]=(w[k]||0)+e[k]/n;
       }
@@ -52580,7 +52603,7 @@
       for(let i=0;i<n;i++){
         zieheFormkarten(20260823+versatz+i*104729);
         M.bau(1337+versatz+i*7919);
-        M.lauf();
+        messLaufStumm(M);
         const e=sandsackFinaleWert();
         for(const k in e)w[k]=(w[k]||0)+e[k]/n;
       }
@@ -54885,7 +54908,8 @@
           // unten), kein Lauf-Gesamtwert.
           if(zielDiagAktiv)ZIEL_DIAG={};
           M.bau(saat0+i*schritt);
-          M.lauf();
+          // MESS-LECK (04.10.): stumm, s. messLaufStumm() bei einflussVon().
+          messLaufStumm(M);
           const w=M.wert();
           // Bei der Bahn kommen zwei Diagnosespalten mit, weil sie dort — und nur dort —
           // eine eigene Frage beantworten: `bein` sagt, welchen Abschnitt einer gelaufen
