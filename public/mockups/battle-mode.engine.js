@@ -51347,11 +51347,20 @@
     return [...halb(SQUAD,"Eigene"),...halb(OPP,"Gegner")];
   }
 
-  // Rollen-Klartext (Frontliner/Finisher/Trick Fighter/Iron Guard) statt der internen Id —
-  // dieselbe Liste, aus der auch die normale Mini-DM-Aufstellung (Tab „Aufstellung") ihre
-  // Slot-Karten baut.
+  // Rollen-Klartext (Frontliner/Finisher/Trick Fighter/Iron Guard/Chaos Driver/Last Hit) statt
+  // der internen Id. `SLOTS_JE_DISC["mini-dm"]` (dieselbe Liste, aus der auch die normale
+  // Mini-DM-Aufstellung, Tab „Aufstellung", ihre Slot-Karten baut) traegt bewusst nur die
+  // VIER Eintraege aus der Vor-2-6-Spieler-Zeit (s. Kommentar an `MINI_DM_FFA_SLOTS_JE_K` oben:
+  // "SLOTS_JE_DISC['mini-dm'] bleibt unangetastet beim 4er-Set"). Bei k=5/6 (seit PR 6 zeigt
+  // die Buehne erstmals ueberhaupt Runden jenseits von vier) fehlen "chaosdriver"/"lasthit" dort
+  // -- ohne Rueckfall erschiene die rohe Id statt eines Anzeigenamens, in Titelkarte, Paarungen
+  // UND Ticker (Opus-Review-Fund). Rueckfall auf `MINI_DM_FFA_SLOTS_JE_K[6]`, die volle
+  // Sechser-Liste (Rollen-Ids sind je k ein fester Prefix derselben Reihenfolge, s.
+  // `MINI_DM_FFA_ROLLEN6`/`rollenFuerK()`-Kommentar) -- deckt jede Rolle ab, die
+  // `spieleMiniDmFfaEvent()` fuer irgendein k=2..6 tatsaechlich spielt.
   const mdffaRollenLabel=(slotId)=>{
-    const eintrag=(SLOTS_JE_DISC["mini-dm"]||[]).find(s2=>s2.id===slotId);
+    const eintrag=(SLOTS_JE_DISC["mini-dm"]||[]).find(s2=>s2.id===slotId)
+      ||(MINI_DM_FFA_SLOTS_JE_K[6]||[]).find(s2=>s2.id===slotId);
     return eintrag?eintrag.label:slotId;
   };
 
@@ -51413,8 +51422,26 @@
     const echteBuchung=mdffaKontext.saat!=null&&mdffaTeamEintraegeSindEcht();
     const saat=echteBuchung?mdffaKontext.saat:gebuchteSaatFuerAktuelleDisziplin();
     const saatBasis=normalisiereSaat(saat);
+    // FORMKARTE-ISOLATION (Opus-Review-Fund, PR 6): `formSaat` (oben, nur im echteBuchung-Zweig
+    // gesetzt) laesst `spieleMiniDmFfaEvent()` ueber `mdffaFormkartenFuer()` DAUERHAFT in die
+    // GLOBALE `FORMKARTE`-Variable schreiben, fuer alle Spieler der vier Pod-Teams (dieselbe
+    // Variable, die JEDE andere Disziplin fuer ihre Formwerte liest). Ohne Isolation leckt eine
+    // Mini-DM-Vorschau hier in die naechste angesehene Disziplin: wer zuerst Mini-DM oeffnet und
+    // danach z. B. Hockey, sieht dort ploetzlich ein anderes Ergebnis als das gebuchte --
+    // genau der "gezeigt != gebucht"-Fehler, den diese PR fuer Mini-DM selbst beheben sollte,
+    // jetzt aber fuer die anderen 19 Disziplinen neu eingefuehrt haette (gemessen: Hockey bei
+    // Saat 4242 kippt von 8:2 auf 9:2, nur weil zwischendurch diese Funktion einmal mit
+    // `formSaat` lief). Fix: dieselbe Kopie-vor/Rueckspielen-nach-Technik wie die bestehende
+    // Sonde `miniDmFfaSonde()`/`miniDmFfaEinfluss()` (s. dort) -- `FORMKARTE={...FORMKARTE}`
+    // VOR dem Aufruf (Kopie, nicht Referenz, der Aufruf darf also weiterhin schreiben), der
+    // ORIGINALE Objekt-Verweis kommt im `finally` zurueck, bevor diese Funktion in JEDEM Fall
+    // (Erfolg, Fehler, frueher return) zurueckkehrt -- unabhaengig von `echteBuchung`, auch der
+    // Nicht-Treffer-Zweig (ohne `formSaat`) schreibt nirgends in `FORMKARTE`, die Kopie bleibt
+    // dann einfach ungenutzt.
+    const formVorher=FORMKARTE;
     let ereignis;
     try{
+      FORMKARTE={...FORMKARTE};
       ereignis=spieleMiniDmFfaEvent(eintraege.map(t=>t.kader),saatBasis,
         echteBuchung?(mdffaKontext.aufstellung||undefined):undefined,
         echteBuchung?{...(mdffaKontext.k!=null?{k:mdffaKontext.k}:{}),formSaat:saatBasis}:undefined);
@@ -51429,6 +51456,8 @@
       if(rundenbanner)rundenbanner.hidden=true;
       if(endstandKopf)endstandKopf.hidden=true;
       return;
+    }finally{
+      FORMKARTE=formVorher;
     }
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
