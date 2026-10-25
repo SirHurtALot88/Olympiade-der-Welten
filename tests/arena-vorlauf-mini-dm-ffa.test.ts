@@ -7,7 +7,7 @@ import { kickoffArenaVorlauf, stelleArenaVorlaufSicher } from "@/lib/battle/aren
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import type { MiniDmFfaPodFixtureInput, MiniDmFfaPodFixtureResult } from "@/lib/battle/arena-headless-runner";
-import { bauFrischenBattleSaveMitMiniDmAnSpieltag1 } from "@/tests/helpers/mini-dm-ffa-battle-save";
+import { bauFrischenBattleSaveMitMiniDmAnSpieltag1, buildHarmlosenArenaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * MINI-DM-FFA-VORLAUF-VERDRAHTUNG (PR 5 des 6-PR-Opus-Plans 21.10.). Dasselbe Grundgeruest wie
@@ -66,7 +66,12 @@ describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorla
 
       const vorlauf = await stelleArenaVorlaufSicher(
         scope,
-        { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(k) },
+        // CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): IMMER beide Runner-Typen faken, nie
+        // nur den fuer diesen Testzweck relevanten -- `discipline2` ist seit dem Helfer-Fix fest auf
+        // "hockey" gepinnt (nicht arena-aufgeloest), der Arena-Fake wird hier also im Normalfall nie
+        // aufgerufen, dient aber als Sicherheitsnetz statt stillschweigend auf echtes Chromium
+        // zurueckzufallen, falls sich das je aendert.
+        { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(k), runArenaFixturesImpl: buildHarmlosenArenaFakeRunner() },
         persistence,
       );
       expect(vorlauf.applicable).toBe(true);
@@ -121,7 +126,11 @@ describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorla
         throw new Error("mini-dm-ffa-test: absichtlicher Ausfall");
       };
 
-      const vorlauf = await stelleArenaVorlaufSicher(scope, { runMiniDmFfaPodFixturesImpl: werfenderRunner }, persistence);
+      const vorlauf = await stelleArenaVorlaufSicher(
+        scope,
+        { runMiniDmFfaPodFixturesImpl: werfenderRunner, runArenaFixturesImpl: buildHarmlosenArenaFakeRunner() },
+        persistence,
+      );
       expect(vorlauf.applicable).toBe(true);
       // "failed" ist hier KEIN Blocker (s. matchday-auto-run-service.ts: `"failed"` -> "warning",
       // nicht "blocked") -- nur das Signal, dass mindestens eine Teil-Disziplin (hier Mini-DM)
@@ -169,7 +178,11 @@ describe("Arena-Vorlauf-Service · Mini-DM-FFA (PR 5 des 6-PR-Opus-Plans, 'Vorla
         return;
       }
       ensureMatchdayResolveSnapshot(scope, persistence);
-      const kickoff = kickoffArenaVorlauf(scope, { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(4) }, persistence);
+      const kickoff = kickoffArenaVorlauf(
+        scope,
+        { runMiniDmFfaPodFixturesImpl: buildFakeMiniDmFfaRunner(4), runArenaFixturesImpl: buildHarmlosenArenaFakeRunner() },
+        persistence,
+      );
       expect(kickoff.applicable).toBe(true);
     },
     420_000,

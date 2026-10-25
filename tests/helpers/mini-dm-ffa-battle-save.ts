@@ -22,17 +22,101 @@
  */
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resetDatabaseForTests } from "@/lib/persistence/sqlite";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import type { runMiniDmFfaPodFixtures, runArenaFixtures } from "@/lib/battle/arena-headless-runner";
 import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { expect } from "vitest";
+
+/**
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung, FUeNFTE Runde -- DIE ECHTE Ursache, keine
+ * weitere Namens-Variante): `full-test-suite`/`persistenz-suiten` installieren KEIN Chromium (nur
+ * der isolierte `arena-chromium-tests`-Job tut das) -- lokal ist Chromium immer da
+ * (`PLAYWRIGHT_BROWSERS_PATH`), deshalb lief hier bisher IMMER alles gruen, unabhaengig davon, ob
+ * die vier gemeldeten Namens-Fixes irgendetwas bewirkten (sie bewirkten NICHTS, s. unten).
+ *
+ * Jeder bisherige Test faket immer nur EINEN der beiden Runner-Typen (`runArenaFixturesImpl` ODER
+ * `runMiniDmFfaPodFixturesImpl`), nie beide -- `discipline2` eines zufaelligen (unseeded) Liga-
+ * Drafts blieb dabei grundsaetzlich UNKONTROLLIERT. Mit 13 von 20 Disziplinen in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` landet eine zufaellige zweite Disziplin zu ~65 % auf einer
+ * Arena-Disziplin, fuer deren (nicht gefakten) generischen Runner `fuehreVorlaufAus()` echtes
+ * Chromium starten will -- das scheitert in `full-test-suite`/`persistenz-suiten` mangels
+ * Chromium-Installation mit `chromium_start`/`status: "failed"`. Umgekehrt: steht eine Arena-
+ * Disziplin zufaellig auch an einem Mini-DM-faktierten Save, UND Mini-DM landet (zufaellig)
+ * SELBST an diesem Spieltag, laeuft der NICHT gefakte `runMiniDmFfaPodFixtures()` -- derselbe
+ * Chromium-Mangel, nur am anderen Runner.
+ *
+ * Das erklaert, warum KEINER der fuenf vorherigen Namens-Fixes an `stelleVollstaendigeMiniDmTeilnahmeSicher()`
+ * half: die Namen waren nie der Ausloeser. Fix hier: `bauFrischenBattleSaveMitMiniDmAnSpieltag1()`
+ * haelt `discipline2` jetzt FEST auf einer garantiert nicht-arena-aufgeloesten, nicht-mini-dm
+ * Disziplin (s. dort), UND jede aufrufende Testdatei fakt ab jetzt IMMER BEIDE Runner-Typen, nie
+ * nur den fuer den jeweiligen Testzweck relevanten.
+ */
+
+/**
+ * Generischer, harmloser Mini-DM-FFA-Fake-Runner fuer Tests, die NICHT Mini-DM selbst pruefen
+ * (`tests/arena-vorlauf-service.test.ts`, `tests/arena-eingabe-stabil.test.ts`, `tests/arena-
+ * eingabe-instabil.test.ts`) -- Mini-DM kann an diesen Saves nur ZUFAELLIG (ueber den unseeded
+ * Liga-Draft) an D1/D2 landen, dieser Fake sorgt dafuer, dass genau DANN kein echtes Chromium
+ * anlaeuft. Liest `k` aus `options.k` (immer vom Aufrufer, `runMiniDmFfaMatchday()`, gesetzt),
+ * liefert pro Pod einen strukturell vollstaendigen, aber inhaltlich bedeutungslosen Boxscore --
+ * dieselbe Form wie `buildFakeMiniDmFfaRunner()` in `tests/arena-vorlauf-mini-dm-ffa.test.ts`,
+ * hier nur ohne eine feste `k`-Erwartung des Aufrufers.
+ */
+export function buildHarmlosenMiniDmFfaFakeRunner(): typeof runMiniDmFfaPodFixtures {
+  return (async (_gameState, pods, options) => {
+    const k = Math.max(2, Math.min(6, options?.k ?? 4));
+    return pods.map((pod) => ({
+      podId: pod.podId,
+      teamIds: pod.teamIds,
+      teams: pod.teamIds.map((teamId, podSide) => ({
+        teamId,
+        podSide,
+        rundenPunkteSumme: 0,
+        beitragSumme: 0,
+        eventPlatz: podSide + 1,
+        ligaPunkte: 0,
+      })),
+      boxscore: Array.from({ length: k }, (_v, rundenIndex) =>
+        pod.teamIds.map((teamId, podSide) => ({
+          slotId: MINI_DM_FFA_ROLLEN6[rundenIndex]!,
+          name: `harmlos-fake-${teamId}-${rundenIndex}`,
+          playerId: null,
+          teamId,
+          podSide,
+          rundenPlatz: podSide + 1,
+          rundenPunkte: 4 - podSide,
+          beitrag: (3 - podSide) * 100 + rundenIndex,
+        })),
+      ).flat(),
+    }));
+  }) as typeof runMiniDmFfaPodFixtures;
+}
+
+/**
+ * Generischer, harmloser Arena-Fake-Runner (Zweier-Duell-Chassis) -- Gegenstueck zu
+ * `buildHarmlosenMiniDmFfaFakeRunner()` oben, fuer dieselbe "IMMER BEIDE Runner faken"-Regel.
+ * `discipline2` ist seit dem Fix oben fest auf "hockey" gepinnt (nicht arena-aufgeloest) -- dieser
+ * Fake wird an einem mit diesem Helfer gebauten Save deshalb im Normalfall gar nicht erst
+ * aufgerufen, dient aber als Sicherheitsnetz, falls sich das je aendert, UND als explizite
+ * Dokumentation der Regel direkt am Aufrufort.
+ */
+export function buildHarmlosenArenaFakeRunner(): typeof runArenaFixtures {
+  return (async (_gameState, fixtures) =>
+    fixtures.map((fixture) => ({
+      homeTeamId: fixture.homeTeamId,
+      awayTeamId: fixture.awayTeamId,
+      seiten: [1, 0] as [number, number],
+      boxscore: [],
+    }))) as typeof runArenaFixtures;
+}
 
 /** Default-Kadergroesse fuer Tests, die die VERDRAHTUNG pruefen (laeuft der FFA-Pfad ueberhaupt
  *  an, wird sein Ergebnis gebucht), nicht die k-Abhaengigkeit selbst (die deckt
@@ -198,6 +282,13 @@ function stelleVollstaendigeMiniDmTeilnahmeSicher(
  * VOR `applyAiLegacyLineupBatchLocally()` (die KI liest den Spielplan-Slot erst beim Aufstellen).
  */
 export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST_K) {
+  // CI-FIX (25.10., Nebenbefund derselben Root-Cause-Untersuchung): `getDatabase()`
+  // (lib/persistence/sqlite.ts) cached die SQLite-Verbindung PROZESSWEIT bei ihrem ERSTEN Aufruf
+  // -- ein neuer `OLY_APP_SQLITE_PATH` allein wirkt NICHT mehr, wenn (z. B. weil diese Funktion
+  // innerhalb derselben Testdatei mehrfach aufgerufen wird) schon eine Verbindung offen ist.
+  // Dieselbe Falle wie am "Manager-Mode bleibt unberuehrt"-Test in `tests/arena-vorlauf-mini-dm-
+  // ffa.test.ts` (dort bereits mit `resetDatabaseForTests()` behoben) -- hier bisher gefehlt.
+  resetDatabaseForTests();
   process.env.OLY_APP_SQLITE_PATH = `/tmp/oly-arena-vorlauf-mini-dm-ffa-${Math.random().toString(36).slice(2)}.sqlite`;
   const persistence = createPersistenceService();
   persistence.bootstrapSingleplayerSave();
@@ -222,14 +313,20 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
   const seasonId = vorUeberschreiben.gameState.season.id;
   const matchdayId = vorUeberschreiben.gameState.matchdayState.matchdayId;
   const bisherigerSpieltag = (vorUeberschreiben.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
-  const andereArenaDisziplinPraesent = bisherigerSpieltag?.discipline2?.disciplineId != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(bisherigerSpieltag.discipline2.disciplineId);
 
   if (!bisherigerSpieltag) {
     throw new Error("bauFrischenBattleSaveMitMiniDmAnSpieltag1: Spieltag 1 hat gar keinen Spielplan-Eintrag -- Setup pruefen.");
   }
-  // NUR `discipline1` wird ersetzt -- der Rest des bestehenden, typkorrekten Eintrags (inklusive
-  // `discipline2`, s. `andereArenaDisziplinPraesent` oben) bleibt unveraendert, statt ihn hier per
-  // Objektliteral neu (und fehleranfaellig gegenueber `SeasonDisciplineScheduleSourceStatus`) nachzubauen.
+  // `discipline1` wird auf "mini-dm" erzwungen (wie schon bisher) -- NEU (CI-FIX 25.10., s.
+  // ausfuehrlichen Kopfkommentar oben): `discipline2` wird ab jetzt EBENFALLS erzwungen, statt dem
+  // zufaelligen (unseeded) Liga-Draft zu ueberlassen. "hockey" ist dafuer bewusst gewaehlt: WEDER
+  // in `ARENA_RESOLVED_DISCIPLINE_IDS` (also nie echtes Arena-Chromium fuer D2) NOCH "mini-dm"
+  // selbst (also nie ein zweiter Mini-DM-Zweig/kein `expected 64 to be 32`-Resolve-Doppelzaehler).
+  // Macht `andereArenaDisziplinPraesent` unten statisch `false` -- das ist gewollt, nicht nur ein
+  // Nebeneffekt: der einzige Aufrufer (`tests/arena-vorlauf-mini-dm-ffa.test.ts`s "Mini-DM ALLEIN
+  // ..."-Test) will GENAU diesen Fall pruefen und musste sich bisher bei einem unguenstigen Zufalls-
+  // Draft selbst uebergehen (`return` vor der eigentlichen Pruefung) -- das faellt damit weg.
+  const andereArenaDisziplinPraesent = false;
   const erzwungenerSpieltag = {
     ...bisherigerSpieltag,
     discipline1: {
@@ -239,6 +336,15 @@ export async function bauFrischenBattleSaveMitMiniDmAnSpieltag1(k: number = TEST
       playerCount: k,
       legacyScorePlayerCount: k,
       category: bisherigerSpieltag.discipline1?.category ?? "power",
+      occurrenceInSeason: 1 as const,
+    },
+    discipline2: {
+      disciplineId: "hockey",
+      displayName: "Hockey",
+      order: bisherigerSpieltag.discipline2?.order ?? 2,
+      playerCount: 5,
+      legacyScorePlayerCount: 5,
+      category: "power" as const,
       occurrenceInSeason: 1 as const,
     },
   };

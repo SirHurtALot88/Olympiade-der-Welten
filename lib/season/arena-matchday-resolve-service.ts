@@ -81,6 +81,17 @@ export async function kickoffArenaMatchdayApply(
     {
       runArenaFixturesImpl: input.runArenaFixturesImpl,
       runArenaFixturesOptions: input.runArenaFixturesOptions,
+      // CI-FIX (25.10., dedizierte Root-Cause-Untersuchung der Mini-DM-CI-Flakiness): FEHLTE hier
+      // bisher komplett, obwohl `ArenaMatchdayApplyKickoffInput` (`} & ArenaVorlaufOptions`) das
+      // Feld strukturell schon trug -- ein Aufrufer, der `runMiniDmFfaPodFixturesImpl` setzt, sah
+      // es bis hierhin stillschweigend verschluckt. Steht Mini-DM am selben Spieltag (auch nur
+      // zufaellig, unabhaengig von einer anderen arena-aufgeloesten Disziplin), lief der
+      // Mini-DM-Zweig in `fuehreVorlaufAus()` IMMER mit dem echten, nicht gefakten
+      // `runMiniDmFfaPodFixtures()` -- echtes Chromium, das in CI-Jobs ohne Chromium-Installation
+      // (`full-test-suite`/`persistenz-suiten`, anders als `arena-chromium-tests`) mit
+      // `chromium_start` scheitert. Analog zu `runArenaFixturesImpl` direkt daneben durchgereicht.
+      runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
+      runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
       allowIncompleteField: true,
     },
     persistence,
@@ -112,6 +123,10 @@ export async function kickoffArenaMatchdayApply(
       {
         runArenaFixturesImpl: input.runArenaFixturesImpl,
         runArenaFixturesOptions: input.runArenaFixturesOptions,
+        // CI-FIX (25.10.), s. ausfuehrlichen Kommentar an der ersten `kickoffArenaVorlauf()`-Stelle
+        // oben -- derselbe Lauf (In-Prozess-Entdopplung), deshalb dieselbe Durchreichung hier noetig.
+        runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
+        runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
         allowIncompleteField: true,
       },
       persistence,
@@ -160,7 +175,15 @@ export async function kickoffArenaMatchdayApply(
     console.error(`${logPrefix} Arena-Matchday-Apply: arenaEingabeHash-Divergenz beim Buchen -- erzwinge frischen Vorlauf statt die Bruecke zu buchen.`);
     const erneuterVersuch = await stelleArenaVorlaufSicher(
       scope,
-      { runArenaFixturesImpl: input.runArenaFixturesImpl, runArenaFixturesOptions: input.runArenaFixturesOptions, erzwingeNeuenVersuch: true },
+      {
+        runArenaFixturesImpl: input.runArenaFixturesImpl,
+        runArenaFixturesOptions: input.runArenaFixturesOptions,
+        // CI-FIX (25.10.), s. Kommentar an der ersten `kickoffArenaVorlauf()`-Stelle oben -- der
+        // erzwungene Neuversuch bei einer arenaEingabeHash-Divergenz braucht denselben Testhebel.
+        runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
+        runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
+        erzwingeNeuenVersuch: true,
+      },
       persistence,
     );
     const markedInProgress = schreibeArenaMatchdayResolveStatus(persistence, saveId, erneuterVersuch.status === "ready" ? "ready" : "in_progress");

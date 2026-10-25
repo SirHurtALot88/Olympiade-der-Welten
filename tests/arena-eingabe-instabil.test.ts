@@ -36,7 +36,17 @@ const { ensureMatchdayResolveSnapshot } = await import("@/lib/foundation/matchda
 const { stelleArenaVorlaufSicher } = await import("@/lib/battle/arena-vorlauf-service");
 const { kickoffArenaMatchdayApply } = await import("@/lib/season/arena-matchday-resolve-service");
 const { ARENA_RESOLVED_DISCIPLINE_IDS } = await import("@/lib/battle/arena-resolved-disciplines");
+const { buildHarmlosenMiniDmFfaFakeRunner } = await import("@/tests/helpers/mini-dm-ffa-battle-save");
 type ArenaFixtureResultType = Awaited<ReturnType<typeof import("@/lib/battle/arena-headless-runner").runArenaFixtures>>[number];
+
+/**
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): wie `tests/arena-eingabe-stabil.test.ts`
+ * (Gegenstueck dieser Datei) -- `bauFrischenBattleSaveMitVollemFeld()` unten schliesst Mini-DM an
+ * D1/D2 nicht aus. Landet es zufaellig dort, braucht sowohl der erste `stelleArenaVorlaufSicher()`-
+ * Aufruf ALS AUCH der erzwungene Neuversuch innerhalb von `kickoffArenaMatchdayApply()` (Divergenz-
+ * Zweig, s. `erzwingeNeuenVersuch` in `arena-matchday-resolve-service.ts` -- dort inzwischen
+ * ebenfalls auf `runMiniDmFfaPodFixturesImpl` erweitert) denselben Fake.
+ */
 
 async function bauFrischenBattleSaveMitVollemFeld() {
   for (let versuch = 1; versuch <= 3; versuch += 1) {
@@ -101,7 +111,11 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
           boxscore: [],
         }));
 
-      const vorlauf = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: erfolgreicherRunner }, persistence);
+      const vorlauf = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(vorlauf.applicable).toBe(true);
       expect(vorlauf.status).toBe("ready");
 
@@ -114,6 +128,9 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
         seasonId: scope.seasonId,
         matchdayId: scope.matchdayId,
         runArenaFixturesImpl: erfolgreicherRunner,
+        // CI-FIX (25.10.), s. Dateikopf-Kommentar: der erzwungene Neuversuch bei der (hier
+        // kuenstlich erzeugten) Divergenz braucht denselben Mini-DM-Fake wie der erste Vorlauf.
+        runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
         forceReplace: true,
         allowIncompleteOverride: true,
         logPrefix: "[arena-eingabe-instabil-test]",
