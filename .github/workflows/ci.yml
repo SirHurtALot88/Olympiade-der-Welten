@@ -569,9 +569,16 @@ jobs:
           RSS_PROBE_B64="Y29uc3QgeyBjaHJvbWl1bSB9ID0gcmVxdWlyZSgicGxheXdyaWdodCIpOwpjb25zdCBmcyA9IHJlcXVpcmUoImZzIik7CgpmdW5jdGlvbiBzdW1taWVyZUNocm9tZVJzc01iKCkgewogIGxldCB0b3RhbEtiID0gMDsKICBsZXQgYW56YWhsID0gMDsKICBmb3IgKGNvbnN0IHBpZCBvZiBmcy5yZWFkZGlyU3luYygiL3Byb2MiKSkgewogICAgaWYgKCEvXlxkKyQvLnRlc3QocGlkKSkgY29udGludWU7CiAgICB0cnkgewogICAgICBjb25zdCBzdGF0dXMgPSBmcy5yZWFkRmlsZVN5bmMoIi9wcm9jLyIgKyBwaWQgKyAiL3N0YXR1cyIsICJ1dGY4Iik7CiAgICAgIGNvbnN0IG5hbWUgPSBzdGF0dXMubWF0Y2goL15OYW1lOlxzKihcUyspL20pOwogICAgICBpZiAoIW5hbWUgfHwgIS9jaHJvbS9pLnRlc3QobmFtZVsxXSkpIGNvbnRpbnVlOwogICAgICBjb25zdCByc3MgPSBzdGF0dXMubWF0Y2goL15WbVJTUzpccyooXGQrKVxzKmtCL20pOwogICAgICBpZiAocnNzKSB7CiAgICAgICAgdG90YWxLYiArPSBwYXJzZUludChyc3NbMV0sIDEwKTsKICAgICAgICBhbnphaGwgKz0gMTsKICAgICAgfQogICAgfSBjYXRjaCAoZSkgewogICAgICAvLyBQcm96ZXNzIGthbm4gendpc2NoZW4gcmVhZGRpciB1bmQgcmVhZCB2ZXJzY2h3dW5kZW4gc2VpbiAtLSBpZ25vcmllcmVuLgogICAgfQogIH0KICByZXR1cm4geyBtYjogdG90YWxLYiAvIDEwMjQsIGFuemFobDogYW56YWhsIH07Cn0KCmFzeW5jIGZ1bmN0aW9uIG1lc3NlKGxhYmVsLCBhcmdzKSB7CiAgY29uc3QgYnJvd3NlciA9IGF3YWl0IGNocm9taXVtLmxhdW5jaCh7IGhlYWRsZXNzOiB0cnVlLCBjaGFubmVsOiAiY2hyb21pdW0iLCBhcmdzOiBhcmdzIH0pOwogIGNvbnN0IHBhZ2UgPSBhd2FpdCBicm93c2VyLm5ld1BhZ2UoKTsKICBhd2FpdCBwYWdlLmdvdG8oImFib3V0OmJsYW5rIik7CiAgYXdhaXQgbmV3IFByb21pc2UoZnVuY3Rpb24gKHIpIHsgc2V0VGltZW91dChyLCA4MDApOyB9KTsKICBjb25zdCBlcmdlYm5pcyA9IHN1bW1pZXJlQ2hyb21lUnNzTWIoKTsKICBjb25zb2xlLmxvZyhsYWJlbCArICI6ICIgKyBlcmdlYm5pcy5tYi50b0ZpeGVkKDEpICsgIiBNQiBSU1MgdWViZXIgIiArIGVyZ2VibmlzLmFuemFobCArICIgQ2hyb21lLVByb3plc3MoZSkiKTsKICBhd2FpdCBicm93c2VyLmNsb3NlKCk7CiAgYXdhaXQgbmV3IFByb21pc2UoZnVuY3Rpb24gKHIpIHsgc2V0VGltZW91dChyLCA1MDApOyB9KTsKfQoKKGFzeW5jIGZ1bmN0aW9uICgpIHsKICBjb25zdCBiYXNpcyA9IFsiLS1wcm94eS1zZXJ2ZXI9ZGlyZWN0Oi8vIiwgIi0taG9zdC1yZXNvbHZlci1ydWxlcz1NQVAgKiAwLjAuMC4wIiwgIi0tZGlzYWJsZS1kZXYtc2htLXVzYWdlIl07CiAgYXdhaXQgbWVzc2UoIkEpIEJhc2lzIChTdGFuZCB2b3IgZGllc2VtIE5hY2h0cmFnKSIsIGJhc2lzKTsKICBhd2FpdCBtZXNzZSgiQikgQmFzaXMgKyAtLWRpc2FibGUtZ3B1IiwgYmFzaXMuY29uY2F0KFsiLS1kaXNhYmxlLWdwdSJdKSk7CiAgYXdhaXQgbWVzc2UoIkMpIEJhc2lzICsgLS1kaXNhYmxlLWdwdSArIC0tbm8tenlnb3RlIChVRUJFUk5PTU1FTikiLCBiYXNpcy5jb25jYXQoWyItLWRpc2FibGUtZ3B1IiwgIi0tbm8tenlnb3RlIl0pKTsKICBhd2FpdCBtZXNzZSgiRCkgQmFzaXMgKyAtLWRpc2FibGUtZ3B1ICsgLS1zaW5nbGUtcHJvY2VzcyAoTlVSIFZlcmdsZWljaCkiLCBiYXNpcy5jb25jYXQoWyItLWRpc2FibGUtZ3B1IiwgIi0tc2luZ2xlLXByb2Nlc3MiXSkpOwp9KSgpLmNhdGNoKGZ1bmN0aW9uIChlcnIpIHsKICBjb25zb2xlLmVycm9yKGVycik7CiAgcHJvY2Vzcy5leGl0KDEpOwp9KTsK"
           echo "$RSS_PROBE_B64" | base64 -d > /tmp/rss-probe.js
           node --check /tmp/rss-probe.js
+          # NICHT nach /tmp mounten (erster Versuch, 25.10., schlug fehl): Node sucht
+          # `node_modules` nur relativ zum Skriptpfad aufwaerts (`/tmp/node_modules`,
+          # `/node_modules`), nicht unter `/app/node_modules`, wo `playwright` im Image
+          # tatsaechlich liegt (`WORKDIR /app` im Dockerfile) -- Ergebnis war
+          # "Cannot find module 'playwright'". Stattdessen nach `/app/tmp-rss-probe.js`
+          # mounten: Node findet `node_modules` dann im selben Verzeichnis, ganz ohne
+          # Aufwaerts-Suche.
           docker run --rm --init --shm-size=256m --user oly \
-            -v /tmp/rss-probe.js:/tmp/rss-probe.js:ro \
-            oly-arena-probe:ci node /tmp/rss-probe.js
+            -v /tmp/rss-probe.js:/app/tmp-rss-probe.js:ro \
+            oly-arena-probe:ci node /app/tmp-rss-probe.js
 
   # LOCKFILE-LIBC-WAECHTER (Opus-Review auf PR 1270, Punkt 2, woertlich: "Jeder spaetere Agent
   # mit npm 10, der den Lockfile anfasst, wirft die `libc`-Felder wieder raus."). Befund aus
