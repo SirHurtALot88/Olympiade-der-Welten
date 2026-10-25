@@ -304,7 +304,14 @@ const SLOT_VOCAB: Record<string, string[]> = {
   tdm: ["Opener", "Trader", "Anchor", "Lurker", "Closer"],
   // Szenen ohne definierte SLOTS — thematischer Fallback:
   battlefield: ["Ansturm", "Flanke", "Verteidigung", "Belagerung", "Sturm-Finale"],
-  "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
+  // Rollen-Klartext statt generischer "Runde N" (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-
+  // Anzeige"): dieselben sechs Rollen-Themen wie `MINI_DM_FFA_ROLLEN6`
+  // (lib/resolve/mini-dm-pod-resolve.ts) / `DISCIPLINE_ROLE_THEMES["mini-dm"]`
+  // (lib/lineups/matchday-slot-roles.ts), in exakt derselben Reihenfolge -- Mini-DM spielt seit
+  // der 2-6-Spieler-Rueckkehr (21.10.) variabel k=2..6 Runden statt fest vier, s. SLOT_VOCAB-
+  // Kommentar oben zu gewichtheben/climbing fuer dasselbe Muster (6 explizite Namen statt des
+  // generischen "Etappe N"-Rueckfalls ab dem letzten Index).
+  "mini-dm": ["Frontliner", "Finisher", "Trick Fighter", "Iron Guard", "Chaos Driver", "Last Hit"],
   "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Fünfter Fund", "Letzter Fund"],
 };
 

@@ -49789,6 +49789,32 @@
     return(typeof saat==="string"||typeof saat==="number")?saat:undefined;
   }
 
+  // "GEZEIGT = GEBUCHT" FUER MINI-DM-FFA (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-Anzeige",
+  // derselbe Gedanke wie `gebuchteSaatFuerAktuelleDisziplin()` oben, nur fuer das eigene
+  // Vierer-Pod-Chassis statt des generischen Zwei-Seiten-`seedByDisciplineId`): Mini-DM ist
+  // NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` (eigener Pod-Resolve-Pfad, s. dortiger Kommentar),
+  // `seedByDisciplineId["mini-dm"]` wird vom Host also nie gesetzt -- diese drei Felder sind
+  // der eigene Kanal dafuer. `FoundationBattleArenaHost.tsx` setzt `miniDmFfaK`/`miniDmFfaSaat`/
+  // `miniDmFfaAufstellung` NUR, wenn `getMiniDmPodForTeam()` fuer das gerade als Heim gewaehlte
+  // Team an diesem Spieltag einen ECHTEN Vierer-Pod findet -- exakt dieselbe Funktion, exakt
+  // dieselbe Saat (`buildMiniDmFfaPodMatchSeed()`+`seedZuZahl()`), exakt dasselbe `k`
+  // (`resolveMiniDmFfaPlayerCountForMatchday()`) und exakt dieselbe `buildArenaAufstellung()`
+  // je Pod-Team, die auch `lib/resolve/mini-dm-ffa-matchday.ts` fuer den ZAEHLENDEN Lauf
+  // verwendet. Ohne Treffer (kein `echterKader`, kein echter Pod fuer dieses Team-Paar an
+  // diesem Spieltag) bleiben alle drei Felder `null` -- `renderMiniDmFfa()` faellt dann auf
+  // sein altes Verhalten zurueck (Ersatzsaat 1337 ueber `gebuchteSaatFuerAktuelleDisziplin()`,
+  // kein `k`, kein `platzJeTeam`), BYTE-IDENTISCH zu vorher.
+  function gebuchteMiniDmFfaKontext(){
+    const k=echterKader&&echterKader.miniDmFfaK;
+    const saat=echterKader&&echterKader.miniDmFfaSaat;
+    const aufstellung=echterKader&&echterKader.miniDmFfaAufstellung;
+    return{
+      k:Number.isInteger(k)?k:null,
+      saat:(typeof saat==="string"||typeof saat==="number")?saat:null,
+      aufstellung:Array.isArray(aufstellung)?aufstellung:null,
+    };
+  }
+
   // LIVE-REVEAL-TIMER FUER MINI-DM (Bugfix 27.09., Opus-Review "kein Spoiler vor dem
   // Anpfiff"): haelt den setTimeout-Handle der laufenden Rundenoffenbarung in
   // renderMiniDmFfa() weiter unten. Deklariert HIER, vor `reset()` (das ihn beim Verlassen
@@ -50874,7 +50900,20 @@
   // Ruehrt keinen globalen Kampfzustand an (kein U, kein seed, kein disc) — anders als die
   // Sandplatz-Fassung kann diese Funktion deshalb auch mitten in einer laufenden Partie fuer
   // eine Sonde aufgerufen werden, ohne sie zu stoeren.
-  function baueMiniDmFfaRunde(vierSpieler,slotId,saat,slotDef){
+  // `gesetztFlags` (optional, 5. Parameter, PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-Anzeige",
+  // Pflichtpunkt 4 "Abwesende Teams/Runden sichtbar machen"): ein Array von 4 Booleans/`null`
+  // (eins je Team, Reihenfolge wie `vierSpieler`) -- `true`, wenn der MANAGER diese Rolle fuer
+  // dieses Team explizit besetzt hat (`platzJeTeam`), `false`, wenn `spieleMiniDmFfaEvent()` hier
+  // auf den Eignungs-Reihum zurueckgefallen ist (s. dessen Kopfkommentar "ein Pod-Teilnehmer
+  // kennt nur seinen EIGENEN Kader"). FEHLT der Parameter (jeder bestehende Aufrufer: alle
+  // Sonden, der Test-Interface-Pfad `window.__arena.miniDmFfaRunde(...)`) bleibt `gesetzt` fuer
+  // jedes Team `null` ("unbekannt") -- rein additiv, kein Wert im Rueckgabe-Objekt aendert sich.
+  // Der simulierte KAMPF SELBST aendert sich durch diesen Parameter NICHT (er fliesst nirgends in
+  // `mdffaKaempfer()`/`mdffaSchlagwechsel()` ein) -- er ist reine ANZEIGE-Information dafuer, ob
+  // dieser Kaempfer eine bewusste Aufstellung war oder der Reihum-Ersatz, NICHT eine Aenderung
+  // daran, dass dieser Kaempfer tatsaechlich und ECHT mitgekaempft hat (s. `mini-dm-ffa-matchday.ts`
+  // Kopfkommentar: "kein Erzwungen-leer-Resultat").
+  function baueMiniDmFfaRunde(vierSpieler,slotId,saat,slotDef,gesetztFlags){
     if(!Array.isArray(vierSpieler)||vierSpieler.length!==4){
       throw new Error("baueMiniDmFfaRunde: braucht genau 4 Spieler (einen je Team), bekam "+
         (Array.isArray(vierSpieler)?vierSpieler.length:typeof vierSpieler)+".");
@@ -50896,6 +50935,7 @@
       eigOhneMutator:+k.eigOhneMutator.toFixed(2),beitrag:+beitraege[i].toFixed(2),
       rundenPlatz:platz[i], rundenPunkte:punkte[i], hp:Math.round(Math.max(0,k.stand)),
       max:Math.round(k.stand0), down:!!k.raus, rausTakt:k.rausTakt, rausArt:k.rausArt,
+      gesetzt:(Array.isArray(gesetztFlags)&&gesetztFlags[i]!=null)?!!gesetztFlags[i]:null,
       st:{...k.st, wucht:+k.st.wucht.toFixed(1)}}));
     return {slotId, seed:s, dauer:gespielt, takte, teams};
   }
@@ -51036,18 +51076,28 @@
     const slotIdsGespielt=(opt.nurGesetzte&&irgendwasGesetzt)
       ?rollen.filter(slotId=>aufstellung.gesetztJeTeam.some(g=>g.has(slotId)))
       :rollen;
+    // "ABWESENDE TEAMS/RUNDEN SICHTBAR MACHEN" (PR 6, Pflichtpunkt 4): `gesetztFlags` je Runde
+    // NUR gebaut, wenn `platzJeTeam` ueberhaupt uebergeben wurde -- ohne ihn (jeder bisherige
+    // Aufrufer: Sonden, Test-Interface) bleibt `gesetzt` im Rueckgabe-Objekt `null` (s.
+    // `baueMiniDmFfaRunde()`-Kommentar), statt faelschlich ueberall "false" zu zeigen (OHNE
+    // echte Aufstellungsdaten ist `aufstellung.gesetztJeTeam` fuer JEDES Team immer leer, das
+    // waere "false" fuer alle, nicht "unbekannt").
+    const hatAufstellung=Array.isArray(platzJeTeam);
     const runden=slotIdsGespielt.map((slotId)=>{
       const i=rollen.indexOf(slotId);
       const slotDef=rollenDefs?rollenDefs[i]:null;
       const vier=mdffaWaehleVier(aufstellung,slotId);
       if(vier.some(p=>!p))throw new Error("spieleMiniDmFfaEvent: mindestens ein Team stellt keinen einzigen Mini-DM-Kaempfer.");
+      const gesetztFlags=hatAufstellung
+        ?aufstellung.gesetztJeTeam.map(g=>g.has(slotId))
+        :undefined;
       // Runden-Saat aus der Event-Saat abgeleitet, aber je Rolle verschieden, damit die
       // Runden nicht denselben Zufallslauf wiederholen — derselbe Hash-vor-Uebergabe-Kniff
       // wie in normalisiereSaat()/seedZuZahl (arena-headless-runner.ts), nur hier ohne
       // Fremdabhaengigkeit inline gehalten. `i` ist der Index in `rollen`, NICHT in
       // `slotIdsGespielt` -- ohne optionen/nurGesetzte sind beide Listen identisch (gleiche
       // Reihenfolge), die Saat je Rolle bleibt also fuer den Altpfad exakt wie vorher.
-      return baueMiniDmFfaRunde(vier,slotId,(saatBasis*2654435761+i*40503)>>>0,slotDef);
+      return baueMiniDmFfaRunde(vier,slotId,(saatBasis*2654435761+i*40503)>>>0,slotDef,gesetztFlags);
     });
     const summeRundenpunkte=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].rundenPunkte,0));
     const summeBeitrag=[0,1,2,3].map(side=>runden.reduce((a,r)=>a+r.teams[side].beitrag,0));
@@ -51268,15 +51318,27 @@
 
   // Vier Team-Eintraege {name,kader} fuer die FFA-Anzeige: bevorzugt die echten Kader, die
   // `FoundationBattleArenaHost.tsx` ueber `window.__olyArenaKader.miniDmFfaTeams` hereinreicht
-  // (Heim, Gast plus zwei automatisch gezogene weitere Teams — s. dessen Kommentar). Ohne
+  // -- seit PR 6 der ECHTE Vierer-Pod dieses Spieltags fuer das als Heim gewaehlte Team
+  // (`getMiniDmPodForTeam()`, s. dessen Kommentar im Host), NICHT mehr vier willkuerlich
+  // gezogene Teams. Ohne echten Pod (Mini-DM steht an diesem Spieltag nicht an) oder ohne
   // Spielstand (Standalone/`battle-mode.html` direkt geoeffnet, oder das Claude-Artefakt)
   // gibt es keine vier echten Team-Kader — dann werden SQUAD/OPP (die beiden Mockup-Kader
   // oben in dieser Datei) je hälftig auf vier benannte Beispiel-Ecken verteilt, klar als
   // Beispiel beschriftet statt so zu tun, als waeren es vier echte Vereine.
-  function mdffaTeamEintraege(){
+  // GENAU DIESELBE PRUEFUNG wie innerhalb von `mdffaTeamEintraege()` unten -- eigene kleine
+  // Funktion statt einer zweiten, eigenstaendig gepflegten Kopie der Bedingung (PR 6, s.
+  // `echteBuchung`-Kommentar an der Aufrufstelle in `renderMiniDmFfa()`): die Buchung
+  // (Saat/k/Aufstellung aus `gebuchteMiniDmFfaKontext()`) darf nur dann auf die ECHTEN
+  // Pod-Teams angewendet werden, wenn `mdffaTeamEintraege()` auch wirklich DIESE liefert und
+  // nicht auf die SQUAD/OPP-Beispiel-Ecken zurueckfaellt -- sonst liefe die echte Saat/
+  // Aufstellung gegen die FALSCHEN (Beispiel-)Kader.
+  function mdffaTeamEintraegeSindEcht(){
     const echte=echterKader&&Array.isArray(echterKader.miniDmFfaTeams)?echterKader.miniDmFfaTeams:null;
-    if(echte&&echte.length===4&&echte.every(t=>t&&Array.isArray(t.kader)&&t.kader.length))
-      return echte.map(t=>({name:String(t.name||"Team"),kader:mitKit(t.kader)}));
+    return !!(echte&&echte.length===4&&echte.every(t=>t&&Array.isArray(t.kader)&&t.kader.length));
+  }
+  function mdffaTeamEintraege(){
+    if(mdffaTeamEintraegeSindEcht())
+      return echterKader.miniDmFfaTeams.map(t=>({name:String(t.name||"Team"),kader:mitKit(t.kader)}));
     const halb=(arr,label)=>{
       const mitte=Math.max(1,Math.ceil(arr.length/2));
       const a=arr.slice(0,mitte),b=arr.slice(mitte);
@@ -51331,13 +51393,31 @@
     if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
     mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
     const eintraege=mdffaTeamEintraege();
-    // DIESELBE GEBUCHTE SAAT wie `build()` (s. dessen Aufruf in `reset()`), nicht der
-    // laufend mutierende RNG-Zustand `seed` — deterministisch reproduzierbar fuer dasselbe
-    // Team-Paar/denselben Spieltag, unabhaengig davon, wie viele rr()-Zuege `build()`
-    // fuer die (hier ungenutzte) klassische Zwei-Seiten-Aufstellung schon verbraucht hat.
+    // GEZEIGT = GEBUCHT (PR 6, s. `gebuchteMiniDmFfaKontext()`-Kommentar oben): mit echtem
+    // Pod-Treffer dieselbe Saat/k/Aufstellung wie der zaehlende Lauf -- OHNE Treffer (kein
+    // `echterKader`, oder dieses Team-Paar hat an diesem Spieltag keinen echten Mini-DM-Pod)
+    // bleibt das Verhalten BYTE-IDENTISCH zu vorher: `gebuchteSaatFuerAktuelleDisziplin()`
+    // faellt wie immer auf die Ersatzsaat 1337 zurueck, kein `k`, kein `platzJeTeam` --
+    // derselbe alte Vierer-Rollenpfad.
+    const mdffaKontext=gebuchteMiniDmFfaKontext();
+    // ECHTE BUCHUNG NUR, WENN `mdffaKontext.saat` gesetzt ist UND `eintraege` oben wirklich
+    // die ECHTEN Pod-Teams sind (`mdffaTeamEintraegeSindEcht()`), nicht der SQUAD/OPP-
+    // Beispiel-Rueckfall (s. `gebuchteMiniDmFfaKontext()`-Kommentar). Der zweite Teil der
+    // Bedingung faengt einen Zwischenzustand ab: der Host kann `miniDmFfaK`/`miniDmFfaSaat`/
+    // `miniDmFfaAufstellung` bereits liefern (ein echter Pod existiert), waehrend die VIER
+    // Pod-Kader selbst noch nachladen (`miniDmFfaTeams` ist dann noch `null`) -- ohne diese
+    // Pruefung wuerde die echte Saat/Aufstellung sonst auf die falschen Beispiel-Kader
+    // angewendet. Ohne Treffer bleibt JEDES der folgenden drei Argumente exakt wie vor diesem
+    // Fix (Ersatzsaat 1337 ueber `gebuchteSaatFuerAktuelleDisziplin()`, `platzJeTeam`/
+    // `optionen` ganz weggelassen statt leer uebergeben).
+    const echteBuchung=mdffaKontext.saat!=null&&mdffaTeamEintraegeSindEcht();
+    const saat=echteBuchung?mdffaKontext.saat:gebuchteSaatFuerAktuelleDisziplin();
+    const saatBasis=normalisiereSaat(saat);
     let ereignis;
     try{
-      ereignis=spieleMiniDmFfaEvent(eintraege.map(t=>t.kader),normalisiereSaat(gebuchteSaatFuerAktuelleDisziplin()));
+      ereignis=spieleMiniDmFfaEvent(eintraege.map(t=>t.kader),saatBasis,
+        echteBuchung?(mdffaKontext.aufstellung||undefined):undefined,
+        echteBuchung?{...(mdffaKontext.k!=null?{k:mdffaKontext.k}:{}),formSaat:saatBasis}:undefined);
     }catch(fehler){
       teamsBox.textContent="";
       rundenBox.innerHTML="<p class='muted'>Mini-DM-FFA konnte nicht simuliert werden: "+
@@ -51418,7 +51498,10 @@
         box.appendChild(el("b",null,"Runde "+(i+1)+" · "+mdffaRollenLabel(runde.slotId)));
         const namen=[0,1,2,3].map(side=>{
           const t=runde.teams.find(tt=>tt.side===side);
-          return t.n+" ("+eintraege[side].name+")";
+          // Dieselbe "(Reihum)"-Kennzeichnung wie `setzeKaempfer()` weiter unten (PR 6,
+          // Pflichtpunkt 4) -- auch in der Paarungs-Vorschau soll ein Team ohne gesetzten
+          // Spieler als Reihum erkennbar sein, nicht wie eine bewusste Aufstellung aussehen.
+          return t.n+(t.gesetzt===false?" (Reihum)":"")+" ("+eintraege[side].name+")";
         }).join(" · ");
         box.appendChild(document.createTextNode(namen));
         paarungenBox.appendChild(box);
@@ -51534,7 +51617,19 @@
       runde.teams.forEach(t=>{
         const karte=eckKarten[t.side];
         karte.classList.remove("mdffa-down","mdffa-wackelt");
-        const k=karte.querySelector(".mdffa-kaempfer"); if(k){k.hidden=false;k.textContent=t.n;}
+        // "ABWESENDE TEAMS/RUNDEN SICHTBAR MACHEN" (PR 6, Pflichtpunkt 4): `t.gesetzt===false`
+        // heisst, der Manager hat fuer diese Rolle KEINEN Spieler aufgestellt -- der Motor liess
+        // das Team trotzdem echt (Eignungs-Reihum) antreten, "kein Erzwungen-leer-Resultat"
+        // (s. `mini-dm-ffa-matchday.ts`-Kopfkommentar), aber die Buehne soll das nicht so
+        // aussehen lassen, als haette der Manager bewusst GENAU DIESEN Kaempfer geschickt.
+        // `t.gesetzt===null` (kein `platzJeTeam` ueberhaupt uebergeben, z. B. Standalone-Demo
+        // ohne Spielstand) zeigt bewusst KEIN Label -- dort gibt es keine echte Aufstellung,
+        // mit der man "Reihum" sinnvoll kontrastieren koennte.
+        const k=karte.querySelector(".mdffa-kaempfer");
+        if(k){
+          k.hidden=false;
+          k.textContent=t.gesetzt===false?t.n+" (Reihum)":t.n;
+        }
         const st=karte.querySelector(".mdffa-status"); if(st){st.hidden=true;st.textContent="";}
         const hpwrap=karte.querySelector(".mdffa-hpwrap"); if(hpwrap)hpwrap.hidden=false;
         const bar=karte.querySelector(".mdffa-hpbar"); if(bar)bar.style.width="100%";

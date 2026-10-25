@@ -34,8 +34,12 @@ import {
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
-import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
-import { getSeasonDisciplineScheduleEntry, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import {
+  getMiniDmPodsForMatchday,
+  resolveMiniDmFfaPlayerCountForMatchday,
+  type MiniDmPod,
+} from "@/lib/season/mini-dm-pod-schedule";
+import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import {
   MINI_DM_FFA_ROLLEN6,
   ppAusMiniDmFfaBeitrag,
@@ -45,27 +49,16 @@ import {
 } from "@/lib/resolve/mini-dm-pod-resolve";
 
 /**
- * DER SPIELPLAN-SLOT-K EINES MINI-DM-SPIELTAGS — `null`, wenn an diesem Spieltag gar kein
- * Mini-DM-Slot steht (D1 UND D2 sind etwas anderes) oder der Slot keine gueltige Kadergroesse
- * traegt. Dieselbe Quelle wie `findMiniDmOccurrenceForMatchday()` (mini-dm-pod-schedule.ts) --
- * EIGENSTAENDIGE, kleine Kopie statt eines Imports von dort, weil jene Funktion privat ist und nur
- * das Vorkommen (1|2) liefert, nicht den Spieler-Zahl-Wert selbst. `legacyScorePlayerCount` zuerst
- * (seit PR 1 der 2-6-Spieler-Rueckkehr, 21.10., IDENTISCH zu `playerCount` fuer Mini-DM -- s.
- * Kommentar an `SeasonDisciplineScheduleSlot.legacyScorePlayerCount`, olyDataTypes.ts), `playerCount`
- * als Rueckfall fuer einen aelteren, noch nicht normalisierten Spielplan-Eintrag.
+ * RE-EXPORT (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-Anzeige"): die Funktion selbst lebt jetzt
+ * in `lib/season/mini-dm-pod-schedule.ts` -- jene Datei ist bewusst OHNE Playwright-/`node:fs`-
+ * Importe (anders als diese hier, s. Importe oben von `arena-headless-runner.ts`), damit
+ * `FoundationBattleArenaHost.tsx` ("use client") sie fuer die Live-Buehne importieren kann, ohne
+ * einen Client-Build zu brechen. Bestehende Importe von HIER (`@/lib/resolve/mini-dm-ffa-matchday`,
+ * z. B. `tests/mini-dm-ffa-matchday.test.ts`, `lib/battle/arena-vorlauf-service.ts`,
+ * `lib/foundation/matchday-resolve-snapshot.ts`) laufen dadurch unveraendert weiter -- EINE
+ * Implementierung, mehrere Aufrufer, kein zweiter Pfad.
  */
-export function resolveMiniDmFfaPlayerCountForMatchday(
-  gameState: GameState,
-  matchdayId: string,
-  options?: { saveId?: string | null },
-): number | null {
-  const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId, options);
-  if (!entry) return null;
-  const slot = [entry.discipline1, entry.discipline2].find((candidate) => candidate?.disciplineId === MINI_DM_DISCIPLINE_ID);
-  if (!slot) return null;
-  const k = slot.legacyScorePlayerCount ?? slot.playerCount ?? null;
-  return Number.isInteger(k) && k != null && k >= 2 && k <= 6 ? k : null;
-}
+export { resolveMiniDmFfaPlayerCountForMatchday };
 
 /** Slot-Ids (`MINI_DM_FFA_ROLLEN6.slice(0, k)`, 1-indexiert ueber den Rueckgabe-Index) fuer eine
  *  gegebene Kadergroesse -- dieselbe Teilliste, die der Motor fuer `opt.k` spielt (s.
