@@ -42,7 +42,7 @@ const positionen = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const schalterWert = (name) => schalter.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 const MUTATOR_MODUS = schalterWert("mutatoren") ?? null;
 const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
-// --flags=... / --haltung-heim=... / --haltung-gast=... (NACHTKONZEPT-SCHALTER, 04.10., additiv),
+// --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv),
 // s. scripts/lib/rangtreue-messung.mjs. Ohne sie misst das Skript den Motor mit allen Flags aus.
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
 // --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv), s. scripts/lib/rangtreue-messung.mjs.

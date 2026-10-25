@@ -78,7 +78,7 @@ const JE_SEITE = jeSeiteArg ? Number(jeSeiteArg.split("=")[1]) : null;
 // der Standard der Engine ("je-spiel": jedes Spiel zieht seinen eigenen Wurf wie im Spiel).
 const mutatorenArg = roheArgs.find((a) => a.startsWith("--mutatoren="));
 const MUTATOREN = mutatorenArg ? mutatorenArg.split("=")[1] : null;
-// --flags=... / --haltung-heim=... / --haltung-gast=... (NACHTKONZEPT-SCHALTER, 04.10., additiv):
+// --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv):
 // schalten die Buehnen-Mechaniken hinter BUEHNE_FLAGS ein, s. scripts/lib/rangtreue-messung.mjs.
 // Ohne sie misst das Skript den Motor wie er im Spiel laeuft (alle Flags aus).
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(roheArgs);

@@ -2487,3 +2487,99 @@ bit-identisches Produktions-/Kaderverhalten fuer alle zwanzig Disziplinen), dies
 `data/generated/disziplin-abnahme.json` (Footballs `pp`/`datum`/`quelle`-Felder auf die
 korrigierte Zahl nachgezogen, `ppFrisch` bleibt `false` — Football ist weiterhin nicht
 angeschlossen, die Tabelle hat dafuer keine Commit-Pflicht).
+
+---
+
+## 15. Gewichtheben Weg C „Sandsack-Rennen": Scoring-Entscheidung Silo-kg (Task #74, 25.10.)
+
+Letzter offener Punkt der Gewichtheben-Weg-C-Produktivierung (Flag 10, freie Stationswahl nach
+Auffassungsgabe, `docs/design/gewichtheben-sandsack-wegc-freie-stationswahl-05-10.md`): die
+Mannschaftswertung stand zwischen **Arbeitswert** (Referenz-Sekunden je kg und Station, 05./06.10.
+als vorlaeufiger Default gesetzt) und **Silo-kg** (die real transportierten/gestapelten Kilogramm).
+Chris' Entscheidung: **Silo-kg.**
+
+**Zwei Zweige der Branches `wegc-6v6-vergleich-05-10`/`visual-fix-sandsack-05-10` (13 Commits,
+bf1403e4..8b4b3784) auf `main` rebased** (eigentlich ein Merge von `origin/main` in den
+Feature-Stand, da die 198 Commits seit dem gemeinsamen Vorfahren — u.a. der komplette
+Mini-DM-6-Rollen-Umbau — eine lineare Commit-fuer-Commit-Rebase in `battle-mode.engine.js` mehrfach
+an derselben Stelle hätte konfliktieren lassen; inhaltlich entspricht das Ergebnis der gleichen
+Operation). Konflikte nur in fünf Dateien, alle additiv und sauber vereinbar: `battle-mode.engine.js`
+(Schild-Rendering/Zweitwaffen-Zweig von main neben der Sandsack-Trage-Pose-Flagge `u.vizOhneSchild`;
+Gauntlet-Spoiler-Fix von main neben der Weg-C-Parallel-HUD-Zeile; außerdem ein durch den Merge erst
+sichtbar gewordener, ECHTER Fehler: `BUEHNE_FLAGS`/`buehneFlags()` existierten unabhängig auf beiden
+Seiten je einmal — zwei `const`-Deklarationen desselben Namens im selben Scope, zwei identische
+Objektliteral-Schlüssel `buehneFlags` in `window.__arena` — zusammengeführt zu je einer Stelle,
+alle drei Flag-Familien (`gewichthebenSandsack`, `speedSchachUhr`, `wettessenMauer`) im selben
+Objekt) sowie vier Messskripte (`scripts/lib/rangtreue-messung.mjs`,
+`scripts/messe-arena-einfluss.mjs`, `scripts/miss-alle-disziplinen.mjs`,
+`scripts/miss-arena-buehne-spiegel.mjs`, dort die Nachtpaket-/Staffel-Paar-Mess-Schalter beider
+Seiten vereint). `lib/battle/arena-resolved-disciplines.ts` und der Resolve-/Mapper-/Ledger-Pfad
+sind von den Branches **unberührt** — Weg C lebt ausschließlich hinter `BUEHNE_FLAGS.
+gewichthebenSandsack` in `public/mockups/battle-mode.engine.js` und bleibt eine Messvariante ohne
+Produktionsanbindung; die Manager-Mode-Bit-Identitätspruefung (CLAUDE.md) entfaellt deshalb fuer
+diese PR.
+
+**Die Umsetzung der Entscheidung ist eine Entkopplung, nicht ein simples Flag-Kippen.** Der Code
+kannte bis dahin nur EINEN Schalter (`SANDSACK_PAR_KONF.freiWertung`), der gleichzeitig (a) die
+Mannschaftswertung UND (b) die KI-Stationswahl steuerte (`sandsackFreiWertJeKg()`) UND (c) die
+interne Spielernote (`freiNoteMass`, Boxscore-Spalte „Note", die Groesse, die in die Rangtreue-
+Messung geht). Ein blosses `freiWertung: 0` (Silo-kg ueberall) trifft genau den Degenerationsfall,
+den die Entscheidungs-Doku (Abschnitt 3) schon am 05.10. beschrieben hatte: „Ansturm auf Station 3"
+— mit Silo-kg als Spielernote ist kg·m/s zwischen Stationen nicht vergleichbar (Station 3 liefert
+jedem mehr kg·m/s als Station 1, unabhaengig vom Koennen), und frisch nachgemessen fiel die
+schwaechste Kader-Paarung (Mortal Sin – Nature's Wrath) damit auf 0,798 — unter die 0,80-Schranke.
+
+Geloest durch Entkopplung: **`freiWertung: 0`** (Silo-kg) bleibt die sichtbare Mannschaftswertung
+UND die Waehrung, nach der die KI ihre Station waehlt — genau das, was Chris entschieden hat, und
+was Team/Zuschauer auf dem Bildschirm sehen. **`freiNoteMass: 1`** (Arbeitswert, stationsneutral)
+bleibt dagegen der Standard fuer die interne Spielernote — ein reines Messdetail der Rangtreue, nie
+Teil der sichtbaren Wertung, und im Code nicht an `freiWertung` gekoppelt (`sandsackFreiMass()`
+liest `freiNoteMass`, die KI-Vorschau `sandsackFreiWertJeKg()` liest `freiWertung` — zwei
+unabhaengige Schalter). Die Boxscore-Spalte "AW" (Arbeitswert) wurde zu "kg" (Silo-kg) umbenannt,
+mit einer neuen Gutschrift-Groesse (`gutschrift[].kg` neben dem bestehenden `.aw`), damit die
+Spieler-Summe exakt das Mannschafts-Silo-kg ergibt statt des Arbeitswerts; alle HUD-/Ticker-/
+Endstand-Texte zeigen jetzt Silo-kg als Hauptzahl (Arbeitswert bleibt als Diagnosewert daneben
+sichtbar, wie zuvor Silo-kg neben Arbeitswert stand).
+
+**Nachgemessen (Flag 10, Kader-Familie `kaderfamilie-live-save.json`, 5 Paarungen):**
+
+| Größe | n=24 | n=48 |
+|---|---:|---:|
+| rho je Spiel, Median | 0,880 | 0,870 |
+| rho, schwächste Paarung (Mortal Sin – Nature's Wrath) | 0,805 | 0,831 |
+| rho Saison, Median | 0,944 | 0,958 |
+| Pp Strom 1 (n=12, Standard-Saat) | — | 8,7 |
+| Pp Strom 2 (n=12, Saatversatz 10 000 000) | — | 12,1 |
+| awareness: Matrixgewicht / gemessener Einfluss | 0 / 0,0 % (beide Stroeme) | |
+
+Beide Pflichtabnahmen bestehen (rho > 0,80, Pp ≤ 25, zwei unabhaengige Saatstroeme). Zum Vergleich
+die mit Arbeitswert als vorlaeufigem Default gemessenen Zahlen vom 05./06.10.: rho je Spiel 0,849,
+schwaechste Paarung 0,825, Pp 11,3/10,0 — die Silo-kg-Zahlen liegen in derselben Grossenordnung
+(Median etwas niedriger bei n=24, bei n=48 vergleichbar; schwaechste Paarung bei n=48 sogar leicht
+hoeher), beide Varianten bestehen die Schranke mit Puffer.
+
+**Ehrlicher Nebenbefund, kein Abnahme-Verstoss:** Mit Silo-kg als KI-Waehrung ist Station 3 (115 kg
+auf 8 m) fuer jeden Traeger die ergiebigste Station — dieselbe Dynamik, die die Entscheidungs-Doku
+vom 05.10. beschreibt. `awareness` ("Auffassungsgabe", der Namensgeber der Flag-10-Mechanik)
+bleibt deshalb fuer das MANNSCHAFTSERGEBNIS praktisch wirkungslos (Matrixgewicht 0 fuer
+Gewichtheben, s. `lib/player-generator/official-discipline-weights.ts` — das ist also keine
+Pp-Verletzung, sondern exakt das vorgegebene Gewicht). Die Flag-10-Mechanik bleibt als KI-
+Geschicklichkeits-Showcase interessant (Abschnitt 5 der Entscheidungs-Doku: „kein Knopf ist immer
+besser"), traegt aber mit Silo-kg weniger zur STATIONS-Vielfalt bei als mit Arbeitswert. Das ist ein
+Spieldesign-Kompromiss, keine gemessene Zahl, die eine Schranke verletzt — hier dokumentiert, damit
+eine kuenftige Kalibrierrunde ihn kennt.
+
+**Produktionsstatus unveraendert:** `BUEHNE_FLAGS.gewichthebenSandsack` bleibt per Default 0 (aus).
+Gewichtheben laeuft im echten Spiel weiterhin ueber die sechs Hantel-Duelle
+(`baueHebenDuelle()`); Weg C ist eine vollstaendig kalibrierte, aber bewusst noch nicht scharf
+geschaltete Alternative, genau wie `speedSchachUhr`/`wettessenMauer` bei anderen Disziplinen. Das
+Scharfschalten (welcher Flag-Wert, welche Disziplin-ID, welches Produktions-Rollout) ist eine
+eigene Entscheidung, die diese PR nicht trifft.
+
+PR: `gewichtheben-weg-c-sandsack-silo-kg` gegen `main`. Geaenderte Dateien:
+`public/mockups/battle-mode.engine.js`, `scripts/lib/rangtreue-messung.mjs`,
+`scripts/messe-arena-einfluss.mjs`, `scripts/miss-alle-disziplinen.mjs`,
+`scripts/miss-arena-buehne-spiegel.mjs`, plus die Weg-C-eigenen Messskripte
+(`scripts/miss-sandsack-wegc*.mjs`, `scripts/pruefe-sandsack-wegc-isolation.mjs`,
+`scripts/screenshot-sandsack-wegc-parallel.mjs`) und Doku (`docs/design/gewichtheben-sandsack-*`,
+dieser Abschnitt).
