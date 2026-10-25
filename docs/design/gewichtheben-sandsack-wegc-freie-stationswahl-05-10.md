@@ -1,5 +1,15 @@
 # Gewichtheben Sandsack Weg C — freie Stationswahl nach Auffassungsgabe (Flag 10, 05.10.)
 
+**NACHTRAG 25.10. (Task #74): Chris hat die in Abschnitt 3/10.1 offene Format-Entscheidung
+getroffen — SILO-KG, nicht Arbeitswert.** Umgesetzt als Entkopplung: `freiWertung: 0` (Silo-kg,
+Mannschaftswertung UND KI-Stationswahl) bleibt der von Chris entschiedene, sichtbare Stand;
+`freiNoteMass: 1` (Arbeitswert) bleibt Default fuer die rein interne Spielernote, weil Silo-kg dort
+(wie dieses Dokument in Abschnitt 6 selbst zeigt) zwischen Stationen nicht vergleichbar ist. Neu
+nachgemessen (n=48): rho je Spiel 0,870, schwaechste Paarung 0,831, Pp 8,7/12,1 — beide Schranken
+bestehen weiterhin. Details, Code-Stellen und der vollstaendige Zahlenvergleich:
+`docs/design/stand-aller-disziplinen.md` Abschnitt 14. Der Rest dieses Dokuments ist der
+historische Stand vom 05.10. (Format noch "vorlaeufig Arbeitswert") und bleibt unten unveraendert.
+
 **Status: reine Messvariante, kein Spielpfad, kein Bild. Erste Fassung, nicht endkalibriert.**
 Hinter `BUEHNE_FLAGS.gewichthebenSandsack` 10, nur über die Messskripte erreichbar. Flag 0…9
 sind bit-identisch (Abschnitt 8). Grundlage ist Flag 9 (`gewichtheben-sandsack-wegc-parallel-

@@ -21490,8 +21490,10 @@
     //                    optimiert, wonach gewertet wird): 0 Silo-kg (A5 wie Flag 6..9), 1
     //                    ARBEITSWERT (jeder Sack zaehlt die Sekunden, die ein Referenztraeger der
     //                    Stufe 50 an seiner Station je Sack braucht; Diagnose aus dem Parallel-
-    //                    Dokument, Abschnitt 6). Mit 1 ist jede Station fuer einen 50er gleich viel
-    //                    wert, und die Wahl folgt Staerke und Bedarf statt dem schwersten Sack.
+    //                    Dokument, Abschnitt 6). Mit 1 waere jede Station fuer einen 50er gleich
+    //                    viel wert, und die Wahl wuerde Staerke und Bedarf statt dem schwersten
+    //                    Sack folgen — CHRIS' ENTSCHEIDUNG (Task #74): SILO-KG, nicht Arbeitswert.
+    //                    Default deshalb 0; 1 bleibt nur als Messvariante erreichbar.
     //   freiWarten       1 = zweite Entscheidung nach Auffassungsgabe: wer leer vom Silo an den
     //                    Uebergabepunkt kommt und dort nichts vorfindet, waegt per Vorschau ab, ob
     //                    er auf den naechsten Beladenen seiner Station wartet (Direktuebergabe)
@@ -21499,10 +21501,19 @@
     //   freiNoteAw       0 = Referenz der Kontext-Inversion hat die awareness des Spielers
     //                    (awareness wirkt aufs Team, nicht auf die eigene Note; Matrixgewicht 0),
     //                    1 = Referenz hat awareness 50 (Gegenprobe)
-    //   freiNoteMass     Mass der Kontext-Inversion: 0 kg x Meter je Bewegungssekunde (wie Flag 8/9),
-    //                    1 ARBEITSWERT je Bewegungssekunde (jede Teilstrecke mit den Referenz-50-
-    //                    Sekunden je kg ihrer Station gewichtet): stationsneutral, denn wer
-    //                    wechselt, sammelt seine Arbeit an mehreren Stationen
+    //   freiNoteMass     Mass der Kontext-Inversion, NUR fuer die interne Spielernote (u.summe,
+    //                    Boxscore-Spalte "Note") -- beeinflusst NICHT die Mannschaftswertung
+    //                    (freiWertung) und NICHT die KI-Stationswahl (sandsackFreiWertJeKg liest
+    //                    freiWertung, nicht freiNoteMass): 0 kg x Meter je Bewegungssekunde (wie
+    //                    Flag 8/9) -- ZWISCHEN STATIONEN NICHT VERGLEICHBAR (Doku freie
+    //                    Stationswahl Abschnitt 6: Station 3 liefert jedem mehr kg·m/s als Station 1,
+    //                    unabhaengig vom Koennen), misst also bei freier Stationswahl die falsche
+    //                    Rangordnung, sobald zwei Spieler verschiedene Stationen laufen. 1 ARBEITSWERT
+    //                    je Bewegungssekunde (jede Teilstrecke mit den Referenz-50-Sekunden je kg
+    //                    ihrer Station gewichtet): stationsneutral, DESHALB DEFAULT, auch nachdem
+    //                    freiWertung (die Mannschaftswertung, Chris' Entscheidung Task #74) auf
+    //                    Silo-kg steht -- die Note ist ein internes Messdetail fuer die Rangtreue,
+    //                    kein Teil der von Chris entschiedenen sichtbaren Wertung.
     //   freiNoteRef      0 = der Referenztraeger der Kontext-Inversion waehlt seine Stationen selbst
     //                    (mit awareness und Entscheidungs-Strom des Spielers), 1 = er FOLGT dem
     //                    Stationsverlauf des Spielers (zu jeder Entscheidung dorthin, wo der Spieler
@@ -21516,7 +21527,7 @@
     //   freiOhneNote     1 = keine Kontext-Inversion und keine Knopf-Diagnose (nur Messung der
     //                    Mannschaftsebene, ~30x schneller); Spielerwerte sind dann 0
     freiModus:0, freiHorizont:45, freiRauschen:0.2, freiSchwelle:0.15, freiStur:0.3, freiZufallRate:0.05,
-    freiMinBesetzung:1, freiPlaetze:3, freiRMax:1.3, freiWertung:1, freiWarten:0, freiNoteAw:0, freiNoteMass:1, freiNoteRef:1, freiNoteSchritt:4, freiAwFest:-1,
+    freiMinBesetzung:1, freiPlaetze:3, freiRMax:1.3, freiWertung:0, freiWarten:0, freiNoteAw:0, freiNoteMass:1, freiNoteRef:1, freiNoteSchritt:4, freiAwFest:-1,
     freiAwHeim:-1, freiAwGast:-1, freiModusHeim:-1, freiModusGast:-1, freiOhneNote:0};
   try{
     const startKalib=window.__olySandsackParKalib;
@@ -23561,14 +23572,15 @@
   // uebergabe; ohne Ereignis ein langsamer Rundgang), die groesser und heller gezeigt wird; die
   // anderen beiden bleiben sichtbar, nur kleiner.
   //
-  // WERTUNG: angezeigt wird der ARBEITSWERT, weil Flag 10 so wertet (freiWertung 1). OFFEN:
-  // Silo-kg oder Arbeitswert ist noch NICHT von Chris bestaetigt (Doku freie Stationswahl,
-  // Abschnitt 3 und 10.1). Die Szene schreibt das sichtbar dazu ("vorläufig").
+  // WERTUNG: angezeigt wird SILO-KG (CHRIS' ENTSCHEIDUNG, Task #74 — Silo-kg statt Arbeitswert,
+  // Default seitdem freiWertung:0). Arbeitswert bleibt als Diagnosewert daneben sichtbar
+  // (Doku freie Stationswahl, Abschnitt 3 und 10.1 beschreiben die offene Frage von vor der
+  // Entscheidung).
   // =====================================================================================
   const SSP_AUFTAKT=3.0, SSP_AUFSTELLUNG=3.5, SSP_SCHLUSS=5.0;
   const SSP_FOKUS_HALTEN=3.0, SSP_FOKUS_VORSCHAU=2.0, SSP_FOKUS_RUNDGANG=9.0, SSP_FOKUS_BLENDE=0.6;
   // Reihenbereich: oben liegt die HTML-Spielstandleiste ueber der Leinwand (Paket-2-Fund:
-  // H*0.08/0.14 war dort unleserlich), unten das Band mit Uhr, Arbeitswert und Belegung.
+  // H*0.08/0.14 war dort unleserlich), unten das Band mit Uhr, Silo-kg und Belegung.
   const SSP_REIHE_Y0=104, SSP_REIHE_Y1=412;
   const SSP_RAND=58, SSP_SILO_ABSTAND=50, SSP_SILO_B=30;
   const SSP_KG_SKALA=6500; // Silo-Fuellstand: kg je Turm (gemessen ~4800 je Seite, Doku 0)
@@ -23705,18 +23717,19 @@
         return {i, u, side:S.side, start:tr.start, aw:tr.aw, schwelle:tr.schwelle||50, spur, idx:0};
       });
       // BEITRAG je Spieler (Boxscore, Auftrag Punkt 6): jeder bis zur Hupe abgelieferte Sack
-      // verteilt seinen Arbeitswert nach GETRAGENEN METERN auf alle, die ihn getragen haben
-      // (Ablage und Direktuebergabe teilen einen Sack), gutgeschrieben im Moment der
-      // Ablieferung. Die Summe je Team ist genau der Arbeitswert der Mannschaftswertung.
+      // verteilt sein Gewicht (Silo-kg, Chris' Entscheidung Task #74) nach GETRAGENEN METERN auf
+      // alle, die ihn getragen haben (Ablage und Direktuebergabe teilen einen Sack), gutgeschrieben
+      // im Moment der Ablieferung. Die Summe je Team ist genau das Silo-kg der Mannschaftswertung.
+      // `aw` (Arbeitswert) bleibt daneben erhalten, nur als Diagnosewert (s. sandsackFreiMass()).
       const legs=new Map();
       traeger.forEach(tr=>tr.spur.forEach(r=>{
         if(r.typ==="trag"&&r.sack){ const l=legs.get(r.sack)||[]; l.push({i:tr.i, len:r.len}); legs.set(r.sack,l); } }));
       const gutschrift=[];
       traeger.forEach(tr=>tr.spur.forEach(r=>{
         if(r.typ!=="wucht"||!(r.t1<=T)||!r.sack)return;
-        const aw=r.kg*F.sekJeKg[r.s], l=legs.get(r.sack)||[{i:tr.i,len:1}];
+        const aw=r.kg*F.sekJeKg[r.s], kg=r.kg, l=legs.get(r.sack)||[{i:tr.i,len:1}];
         const sum=l.reduce((a,x)=>a+x.len,0)||1;
-        for(const x of l)gutschrift.push({t:r.t1, i:x.i, aw:aw*x.len/sum});
+        for(const x of l)gutschrift.push({t:r.t1, i:x.i, aw:aw*x.len/sum, kg:kg*x.len/sum});
       }));
       gutschrift.sort((a,b)=>a.t-b.t);
       return {side:S.side, traeger, haufen:S.haufen, entsch:S.entsch, lieferungen:S.lieferungen,
@@ -23740,7 +23753,7 @@
     const T0=sz.laufVon, st=sz.stationen;
     const tr=(side,i)=>sz.seiten[side].traeger[i];
     add(0.2,()=>feed(0,"Sandsack-Schicht: "+sz.seiten[0].traeger.length+" gegen "+sz.seiten[1].traeger.length+
-      ", alle gleichzeitig an drei Stationen, "+Math.round(sz.T)+" Sekunden. Gewertet wird der Arbeitswert (vorläufig).",false,undefined,"aufstellung"));
+      ", alle gleichzeitig an drei Stationen, "+Math.round(sz.T)+" Sekunden. Gewertet wird Silo-kg.",false,undefined,"aufstellung"));
     add(SSP_AUFTAKT+0.2,()=>sz.seiten.forEach(S=>{
       const teil=[2,1,0].map(s=>"Station "+(s+1)+": "+(S.traeger.filter(x=>x.start===s).map(x=>sspName(x.u)).join(" & ")||"—"));
       feed(S.side,sspTeam(S.side)+" — "+teil.join(" · ")+".",false,undefined,"aufstellung");
@@ -23771,13 +23784,13 @@
         }
       }
     }
-    for(let m=30;m<sz.T;m+=30)add(T0+m,()=>{ const st2=sspStand(); feed(0,"Zwischenstand nach "+sspZeit(m)+": Arbeitswert "+
-      Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+" (Silo "+Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+" kg).",false,undefined,"zwischenstand"); });
+    for(let m=30;m<sz.T;m+=30)add(T0+m,()=>{ const st2=sspStand(); feed(0,"Zwischenstand nach "+sspZeit(m)+": Silo "+
+      Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+" kg (Arbeitswert "+Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+").",false,undefined,"zwischenstand"); });
     add(sz.schlussVon,()=>{
       sfx("gewichtheben","hupe");
       const s=sz.sieger, st2=sspStand();
-      feed(s,"Schlusshupe — "+sspTeam(s)+" gewinnt die Schicht. Arbeitswert "+Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+
-        " (Silo "+Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+" kg).",false,undefined,"laufsieg");
+      feed(s,"Schlusshupe — "+sspTeam(s)+" gewinnt die Schicht. Silo "+Math.round(st2.kg[0])+" : "+Math.round(st2.kg[1])+
+        " kg (Arbeitswert "+Math.round(st2.aw[0])+" : "+Math.round(st2.aw[1])+").",false,undefined,"laufsieg");
       sfx("gewichtheben","laufsieg");
       teamFeierAusloesen(s,"gross",null);
     });
@@ -23807,7 +23820,7 @@
   // `nurFilm` (nur QA-Sonde): auch nach `done` die aus dem Film gezaehlten Werte.
   function sspSichtbar(u,nurFilm){
     const sz=SANDSACK_PAR_SZENE, tr=sspTraegerVon(u);
-    const leer={saecke:0,pausen:0,rutscher:0,wechsel:0,entsch:{normal:0,durch:0,direkt:0,erzwungen:0},beitrag:0,stationen:[],gezeigt:false};
+    const leer={saecke:0,pausen:0,rutscher:0,wechsel:0,entsch:{normal:0,durch:0,direkt:0,erzwungen:0},beitrag:0,beitragAw:0,stationen:[],gezeigt:false};
     if(!sz||!tr)return leer;
     const tau=done?sz.T:sspTau(sz);
     const T=sz.T, sp=tr.spur;
@@ -23821,12 +23834,14 @@
     }
     const entsch={normal:0,durch:0,direkt:0,erzwungen:0};
     for(const e of sz.seiten[u.side].entsch)if(e.i===tr.i&&e.t<=tau)entsch[e.wahl]++;
-    const beitrag=sz.seiten[u.side].gutschrift.filter(g=>g.i===tr.i&&g.t<=tau).reduce((a,g)=>a+g.aw,0);
+    // beitrag ist Silo-kg (Chris' Entscheidung Task #74); beitragAw bleibt als Diagnosewert.
+    const gutJeTr=sz.seiten[u.side].gutschrift.filter(g=>g.i===tr.i&&g.t<=tau);
+    const beitrag=gutJeTr.reduce((a,g)=>a+g.kg,0), beitragAw=gutJeTr.reduce((a,g)=>a+g.aw,0);
     if(done&&!nurFilm){
       return {saecke:u.lastSaecke||0, pausen:u.lastPausen||0, rutscher:u.lastRutscher||0,
-        wechsel:u.parFrei?u.parFrei.wechsel:wechsel, entsch:u.parEntsch||entsch, beitrag, stationen, gezeigt:true};
+        wechsel:u.parFrei?u.parFrei.wechsel:wechsel, entsch:u.parEntsch||entsch, beitrag, beitragAw, stationen, gezeigt:true};
     }
-    return {saecke, pausen, rutscher, wechsel, entsch, beitrag, stationen, gezeigt:tau>=0};
+    return {saecke, pausen, rutscher, wechsel, entsch, beitrag, beitragAw, stationen, gezeigt:tau>=0};
   }
 
   // ZUSTAND EINES TRAEGERS zur Schichtzeit tau, aus dem Film: Phase, Station, Ort (Meter ab dem
@@ -24150,7 +24165,7 @@
       ctx.fillText("Kamera: Station "+(fokus.row+1)+(grText?" ("+grText+")":""),W/2,H*0.185+12);
     }
 
-    // UNTEN: Schichtuhr gegen die Hupe, Arbeitswert, Belegung je Station, Wertungshinweis.
+    // UNTEN: Schichtuhr gegen die Hupe, Silo-kg, Belegung je Station, Wertungshinweis.
     {
       const by=H*0.935, bx0=W/2-170, bx1=W/2+170;
       ctx.fillStyle="rgba(255,255,255,.08)"; ctx.fillRect(bx0,by-3,bx1-bx0,6);
@@ -24160,11 +24175,11 @@
       const rest=abschnitt==="schicht"?sz.T-tauB:(abschnitt==="schluss"?0:sz.T);
       ctx.fillText((abschnitt==="schluss"?"Schichtende":"Schicht noch ")+(abschnitt==="schluss"?"":sspZeit(Math.ceil(rest-1e-9))),W/2,by-11);
       ctx.font="400 8px Georgia,'Times New Roman',serif"; ctx.fillStyle="rgba(200,206,218,.55)";
-      ctx.fillText("Wertung: Arbeitswert — vorläufig, Silo-kg oder Arbeitswert ist noch offen",W/2,by+12);
+      ctx.fillText("Wertung: Silo-kg (die tatsächlich transportierten Kilogramm)",W/2,by+12);
       [0,1].forEach(side=>{
         const x=side===0?16:W-16, al=side===0?"left":"right";
         ctx.textAlign=al; ctx.font="700 12px Georgia,'Times New Roman',serif"; ctx.fillStyle=sspFarbe(side);
-        ctx.fillText("Arbeitswert "+Math.round(stand.aw[side]),x,by-9);
+        ctx.fillText(Math.round(stand.kg[side])+" kg",x,by-9);
         // BELEGUNG je Station (Auftrag Punkt 5): Punkte in Teamfarbe, wer gerade wohin geht hohl.
         const bel=[[],[],[]];
         figuren.filter(f=>f.side===side).forEach(f=>{ const z=f.z;
@@ -24197,7 +24212,7 @@
       tafel([{text:"SANDSACK-SCHICHT",font:"700 13px 'RaniraSeason',Georgia,serif",farbe:"#d6ac36"},
         {text:"Alle gleichzeitig: je zwei an Station 1 (35 kg, 24 m), 2 (80 kg, 16 m) und 3 (115 kg, 8 m über die Rampe)."},
         {text:"Ablegen und kurz rasten, durchpowern oder direkt in die Hand geben — und jeder darf die Station wechseln."},
-        {text:Math.round(sz.T)+" Sekunden. Gewertet wird der Arbeitswert (vorläufig).",farbe:"rgba(200,206,218,.75)"}],ein(sz.t/SSP_AUFTAKT,0.12));
+        {text:Math.round(sz.T)+" Sekunden. Gewertet wird Silo-kg.",farbe:"rgba(200,206,218,.75)"}],ein(sz.t/SSP_AUFTAKT,0.12));
     } else if(abschnitt==="aufstellung"){
       const z=[{text:"STARTAUFSTELLUNG — die Stärksten an Station 3",font:"700 12px 'RaniraSeason',Georgia,serif",farbe:"#d6ac36"}];
       sz.seiten.forEach(S=>z.push({text:sspTeam(S.side)+": "+[2,1,0].map(s=>"S"+(s+1)+" "+(S.traeger.filter(x=>x.start===s).map(x=>sspName(x.u)).join(" & ")||"—")).join(" · "),
@@ -24207,14 +24222,14 @@
     } else if(abschnitt==="schluss"){
       const s=sz.sieger, p=(sz.t-sz.schlussVon)/SSP_SCHLUSS;
       tafel([{text:"SCHICHTENDE — "+sspTeam(s).toUpperCase()+" GEWINNT",font:"700 13px 'RaniraSeason',Georgia,serif",farbe:sspFarbe(s)},
-        {text:"Arbeitswert "+Math.round(stand.aw[0])+" : "+Math.round(stand.aw[1])+"  ·  Silo "+Math.round(stand.kg[0])+" : "+Math.round(stand.kg[1])+" kg  ·  Säcke "+stand.saecke[0]+" : "+stand.saecke[1]},
-        {text:"Wertung nach Arbeitswert ist vorläufig (Chris' Bestätigung offen).",farbe:"rgba(200,206,218,.7)"}],Math.min(1,p/0.1));
+        {text:"Silo "+Math.round(stand.kg[0])+" : "+Math.round(stand.kg[1])+" kg  ·  Säcke "+stand.saecke[0]+" : "+stand.saecke[1]+"  ·  Arbeitswert "+Math.round(stand.aw[0])+" : "+Math.round(stand.aw[1])},
+        {text:"Wertung: Silo-kg — die tatsächlich transportierten Kilogramm (Chris' Entscheidung, Task #74).",farbe:"rgba(200,206,218,.7)"}],Math.min(1,p/0.1));
     }
     teamFeierEffekte(side=>({x:side===0?geo.xSilo+SSP_SILO_B/2:W-geo.xSilo-SSP_SILO_B/2, y:SSP_REIHE_Y0+20}));
   }
 
   // BOXSCORE DER SCHICHT (Auftrag Punkt 6): je Spieler Station(en), Saecke, Wahl an der Ablage
-  // (Anteile), Pausen, Rutscher, Wechsel, Beitrag zum Arbeitswert, dazu die Note (erst am Ende).
+  // (Anteile), Pausen, Rutscher, Wechsel, Beitrag zum Silo-kg des Teams, dazu die Note (erst am Ende).
   // SPOILERFREI wie die Laeufe-Tabelle: alles waechst mit dem Bild (sspSichtbar()); nach `done`
   // stehen genau die Werte der Mechanik.
   function WERTUNG_SANDSACK_PAR(art){
@@ -24236,12 +24251,12 @@
         {id:"pau", kopf:"Pau", titel:"Zwangspausen", wert:z=>zahl(z.sv.pausen)},
         {id:"rut", kopf:"Rut", titel:"Rutscher", wert:z=>zahl(z.sv.rutscher)},
         {id:"wch", kopf:"Wch", titel:"Stationswechsel", wert:z=>zahl(z.sv.wechsel)},
-        {id:"aw",  kopf:"AW", top:true, titel:"Anteil am Arbeitswert des Teams: jeder abgelieferte Sack nach getragenen Metern verteilt (Wertung vorläufig)",
+        {id:"kg",  kopf:"kg", top:true, titel:"Anteil am Silo-kg des Teams: jeder abgelieferte Sack nach getragenen Metern verteilt (Wertung: Silo-kg, Chris' Entscheidung Task #74)",
           wert:z=>z.sv.beitrag?z.sv.beitrag:null, fmt:v=>String(Math.round(v))},
         {id:"note",kopf:"Note", top:true, titel:"Tragenote (Spielerwert = Note ×10), erst nach der Schlusshupe",
           wert:z=>done&&z.u.tragenote!=null?z.u.tragenote:null, fmt:v=>v.toFixed(1).replace(".",",")},
         {id:"eig", kopf:"Eig", wert:z=>z.eig?Math.round(z.eig):null}],
-      fuss:"Sechs gegen sechs, alle gleichzeitig. „St\" zeigt Startstation und Wechsel. „Säcke\" zählt anteilig nach getragenen Metern. „Abl/Durch/Direkt\" sind die Anteile seiner Entscheidungen an der Ablage (Durch schließt erzwungenes Durchpowern ein). „AW\" ist sein Beitrag zum Arbeitswert des Teams — die Wertung nach Arbeitswert ist vorläufig, Chris' Bestätigung steht aus. „Note\" ist der Spielerwert/10 und steht erst nach der Schlusshupe fest."};
+      fuss:"Sechs gegen sechs, alle gleichzeitig. „St\" zeigt Startstation und Wechsel. „Säcke\" zählt anteilig nach getragenen Metern. „Abl/Durch/Direkt\" sind die Anteile seiner Entscheidungen an der Ablage (Durch schließt erzwungenes Durchpowern ein). „kg\" ist sein Beitrag zum Silo-kg des Teams — die Wertung ist Silo-kg, die tatsächlich transportierten Kilogramm (Chris' Entscheidung, Task #74). „Note\" ist der Spielerwert/10 und steht erst nach der Schlusshupe fest."};
   }
 
   function baueHebenDuelle(art,mine,gegner){
@@ -28701,7 +28716,7 @@
     // WEG C PARALLEL (Stufe 3): eigene Unterzeile, nur mit gebauter Flag-10-Szene.
     const parHud=BB().heben&&!!SANDSACK_PAR_SZENE;
     if(sd)sd.textContent=parHud
-      ? "Alle gleichzeitig an drei Stationen, 150-s-Schicht — Arbeitswert (vorläufig)"
+      ? "Alle gleichzeitig an drei Stationen, 150-s-Schicht — Silo-kg"
       : BB().heben
       ? "Reißen und Stoßen, je drei Versuche — Duell um Duell"
       : BB().fechten
@@ -28777,10 +28792,10 @@
     // DUELL: der Punktestand zaehlt gewonnene BRETTER (Vorteil > 0 am Ende), nicht die
     // rohe Punktesumme — genau wie beim Schach-Mannschaftskampf, den es nachbildet.
     if(parHud){
-      // WEG C PARALLEL: ARBEITSWERT im Bild (abgelieferte Saecke bis zur gezeigten Zeit) —
-      // vorlaeufige Wertung, Silo-kg oder Arbeitswert ist Chris' Entscheidung (Doku 10.1).
+      // WEG C PARALLEL: SILO-KG im Bild (abgelieferte Kilogramm bis zur gezeigten Zeit) —
+      // Chris' Entscheidung (Task #74): Silo-kg, nicht Arbeitswert.
       const st=sspStand();
-      document.getElementById("score").textContent=Math.round(st.aw[0])+" : "+Math.round(st.aw[1]);
+      document.getElementById("score").textContent=Math.round(st.kg[0])+" : "+Math.round(st.kg[1]);
     } else if(BB().heben){
       // Der Punktestand zaehlt GEWONNENE DUELLE, wie Chris es wollte — bei sechs Slots
       // also bis 6:0, und ein 3:3 ist moeglich. Entschieden wird es dann ueber die
@@ -28832,11 +28847,12 @@
       document.getElementById("thpL").style.width=(frac(0)*100)+"%";
       document.getElementById("thpR").style.width=(frac(1)*100)+"%";
     } else if(parHud){
-      // WEG C PARALLEL: Arbeitswert im Bild gegen einen festen Massstab (1300, gemessen ~1074 je
-      // Seite) — kein Spoiler aus dem Endstand.
-      const st=sspStand(), voll=Math.max(1300,st.aw[0],st.aw[1]);
-      document.getElementById("thpL").style.width=(Math.min(1,st.aw[0]/voll)*100)+"%";
-      document.getElementById("thpR").style.width=(Math.min(1,st.aw[1]/voll)*100)+"%";
+      // WEG C PARALLEL: Silo-kg im Bild (Chris' Entscheidung Task #74) gegen einen festen
+      // Massstab (2200, nachgemessen ~1800-2000 kg je Seite nach 150 s) — kein Spoiler aus dem
+      // Endstand.
+      const st=sspStand(), voll=Math.max(2200,st.kg[0],st.kg[1]);
+      document.getElementById("thpL").style.width=(Math.min(1,st.kg[0]/voll)*100)+"%";
+      document.getElementById("thpR").style.width=(Math.min(1,st.kg[1]/voll)*100)+"%";
     } else {
       // GEWICHTHEBEN (Broadcast-Audit Runde 2, Punkt 2): die Team-Balken standen aus dem
       // fertigen `summe` schon im Einlauf auf ihrem Endstand (z. B. 69 % gegen 55 %) --
@@ -36960,7 +36976,7 @@
         k.appendChild(el("p",null,"Alle gleichzeitig, 150 Sekunden: Station 1 trägt 35-kg-Säcke über 24 m, "+
           "Station 2 80 kg über 16 m, Station 3 115 kg über 8 m und die Rampe. Startaufstellung nach Kraft, "+
           "danach wählt jeder selbst (Gespür): ablegen und rasten, durchpowern, direkt übergeben oder die "+
-          "Station wechseln. Gewertet wird der Arbeitswert — vorläufig."));
+          "Station wechseln. Gewertet wird Silo-kg — die tatsächlich transportierten Kilogramm."));
         box.appendChild(k);
         const apw=document.getElementById("arenaplan");
         if(apw){apw.textContent="Sandsack-Schicht, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+", drei Stationen."; apw.title=apw.textContent;}
@@ -51800,15 +51816,15 @@
         // UND Balken-Massstab, sonst verriete schon die Balkenlaenge relativ zum (fertigen)
         // Maximum das Ergebnis. Jede andere Buehne liest unveraendert `summe`.
         :istBuehne(disc)?(()=>{
-          // WEG C PARALLEL (Stufe 3): Beitrag zum Arbeitswert im Bild, davor die Station(en) —
-          // Massstab das bisher GEZEIGTE Maximum (kein Spoiler).
+          // WEG C PARALLEL (Stufe 3): Beitrag zum Silo-kg im Bild (Chris' Entscheidung Task #74),
+          // davor die Station(en) — Massstab das bisher GEZEIGTE Maximum (kein Spoiler).
           if(BB().heben&&SANDSACK_PAR_SZENE){
             const sv=new Map(TEILNEHMER.map(y=>[y,sspSichtbar(y)]));
             const kmax=Math.max(1,...TEILNEHMER.map(y=>sv.get(y).beitrag));
             return TEILNEHMER.filter(x=>x.side===seite).map(x=>{ const v=sv.get(x);
               return {n:x.n,down:false,hp:v.beitrag,max:kmax,
-                leiste:{wert:v.beitrag,max:kmax,wort:"Beitrag zum Arbeitswert",
-                  zusatz:"S"+v.stationen.map(s=>s+1).join("→")+" · "+Math.round(v.beitrag)}}; });
+                leiste:{wert:v.beitrag,max:kmax,wort:"Beitrag zum Silo-kg",
+                  zusatz:"S"+v.stationen.map(s=>s+1).join("→")+" · "+Math.round(v.beitrag)+" kg"}}; });
           }
           const kw=BB().heben?hebenSichtbareSumme:(y=>y.summe);
           const kmax=Math.max(1,...TEILNEHMER.map(kw));
@@ -52005,9 +52021,10 @@
         // PUNKT 2 (derselbe Audit): nicht `x.summe` (der fertige Zweikampf, steht ab dem
         // Einlauf fest), sondern der bis zur letzten gezeigten Lampe aufgebaute Wert, s.
         // hebenSichtbareSumme(). Startet bei "KG 0 : 0" und waechst Versuch fuer Versuch.
-        // WEG C PARALLEL (Stufe 3): Arbeitswert im Bild (sspStand()), Praefix "AW".
+        // WEG C PARALLEL (Stufe 3): Silo-kg im Bild (sspStand(), Chris' Entscheidung Task #74),
+        // Praefix "kg".
         : (BB().heben&&SANDSACK_PAR_SZENE)
-        ? (()=>{ const st=sspStand(); return "AW "+Math.round(st.aw[0])+" : "+Math.round(st.aw[1]); })()
+        ? (()=>{ const st=sspStand(); return "kg "+Math.round(st.kg[0])+" : "+Math.round(st.kg[1]); })()
         : BB().heben
         ? ("KG "+Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+hebenSichtbareSumme(x),0))+" : "+
            Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+hebenSichtbareSumme(x),0)))
@@ -52673,12 +52690,12 @@
     // Zweige, die BUEHNE_ART kennt (heben/duell/gauntlet/generisch).
     const art=BB();
     if(art.heben&&SANDSACK_PAR_SZENE){
-      // WEG C PARALLEL (Stufe 3): ARBEITSWERT im Bild (vorlaeufige Wertung). Nach `done` der
-      // Sieger der Mechanik (Arbeitswert, dann Silo-kg, dann Los) — auch wenn die gerundeten
-      // Zahlen gleich aussehen.
-      const st=sspStand(), a=Math.round(st.aw[0]), b=Math.round(st.aw[1]);
-      const sieger=done?SANDSACK_PAR_SZENE.sieger:(st.aw[0]===st.aw[1]?null:(st.aw[0]>st.aw[1]?0:1));
-      return {a,b,sieger,text:a+" : "+b+(a===b&&done?" (knapp, "+(st.aw[0]-st.aw[1]).toFixed(1).replace(".",",")+")":"")};
+      // WEG C PARALLEL (Stufe 3): SILO-KG im Bild (Chris' Entscheidung, Task #74 — nicht mehr
+      // Arbeitswert). Nach `done` der Sieger der Mechanik (Silo-kg, dann Saecke, dann Los) —
+      // auch wenn die gerundeten Zahlen gleich aussehen.
+      const st=sspStand(), a=Math.round(st.kg[0]), b=Math.round(st.kg[1]);
+      const sieger=done?SANDSACK_PAR_SZENE.sieger:(st.kg[0]===st.kg[1]?null:(st.kg[0]>st.kg[1]?0:1));
+      return {a,b,sieger,text:a+" : "+b+(a===b&&done?" (knapp, "+(st.kg[0]-st.kg[1]).toFixed(1).replace(".",",")+")":"")};
     }
     if(art.heben){
       // Beide Duellanten fertig (hebenDuellEntschieden(), Konzept team-publikum-feiermomente
@@ -52706,7 +52723,7 @@
   // meinen -- dieselben vier Zweige, dieselben `art.*`-Flags, die buehneStand() zwei
   // Funktionen oberhalb schon kennt. Reiner Textbaustein fuer den Sieger-Banner.
   function buehneEinheitLabel(art){
-    if(art.heben&&SANDSACK_PAR_SZENE)return "Arbeitswert";
+    if(art.heben&&SANDSACK_PAR_SZENE)return "Silo-kg";
     if(art.heben)return "Duelle";
     if(art.duell)return art.tennis?"Plätze":art.fechten?"Bahnen":"Bretter";
     if(art.gauntlet)return "Verbliebene";
@@ -56956,7 +56973,7 @@
     // stepBuehne() vor (dieselbe Schrittfunktion wie loop(), nur ohne auf Frames zu warten) und
     // liefert Zeitplan, Fokus und die Hoehepunkte des Films. Am Ende (`done`) zusaetzlich der
     // Abgleich Film gegen Mechanik je Spieler (Saecke, Pausen, Rutscher, Wechsel, Entscheidungen,
-    // Beitrag-Summe gegen Arbeitswert). Ohne gebaute Szene null.
+    // Beitrag-Summe gegen Silo-kg/Arbeitswert). Ohne gebaute Szene null.
     sandsackParSzene:(vorspulenSekunden)=>{
       if(!SANDSACK_PAR_SZENE)return null;
       const n=Math.max(0,Math.round((vorspulenSekunden||0)*60));
@@ -56971,8 +56988,9 @@
         hoehepunkte:sz.hoehepunkte.filter(h=>h.prio>=1).map(h=>({t:+h.t.toFixed(2), typ:h.typ, side:h.side, s:h.s,
           n:sz.seiten[h.side].traeger[h.i].u.n, ...(h.nach!=null?{von:h.von,nach:h.nach}:{}), dauer:h.dauer!=null?+h.dauer.toFixed(2):undefined}))};
       if(done){
-        erg.abgleich=sz.seiten.map(S=>({side:S.side, arbeitEnde:S.arbeitEnde,
+        erg.abgleich=sz.seiten.map(S=>({side:S.side, arbeitEnde:S.arbeitEnde, kgEnde:S.kgEnde,
           beitragSumme:S.gutschrift.reduce((a,g)=>a+g.aw,0),
+          kgBeitragSumme:S.gutschrift.reduce((a,g)=>a+g.kg,0),
           spieler:S.traeger.map(tr=>{ const u=tr.u, v=sspSichtbar(u,true);
             const pe=u.parEntsch||{};
             return {n:u.n, film:{saecke:+v.saecke.toFixed(2), pausen:v.pausen, rutscher:v.rutscher, wechsel:v.wechsel, entsch:v.entsch},
