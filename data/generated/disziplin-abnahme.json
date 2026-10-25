@@ -11,33 +11,35 @@
  "disziplinen": {
   "basketball": {
    "chassis": "feldspiel",
-   "rhoJeSpiel": 0.795,
-   "rhoSpannweite": 0.085,
-   "rhoSaison": 0.881,
+   "rhoJeSpiel": 0.810,
+   "rhoSpannweite": null,
+   "rhoSaison": null,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 basketball",
-    "spiele": 24,
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 12 basketball (+ --saat-versatz=10000000) -- PR #1289 (Give-and-Go-Schneiden, Task #123)",
+    "spiele": 12,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "Median ueber die Kader-Familie"
-   },
-   "pp": [],
-   "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs basketball (+ --saat-versatz=10000000)",
-    "laeufe": 48,
-    "anhebung": 15,
-    "mutatoren": "je-lauf",
+    "statistik": "Median ueber die Kader-Familie",
     "saatStroeme": [
      0,
      10000000
     ],
-    "abgebrochen": true
+    "hinweis": "n=12 statt der sonst ueblichen 24/48 -- wiederholte Browser-Abstuerze in der geteilten Sandbox dieser Session, s. PR-Beschreibung."
    },
-   "datum": "2026-10-16",
-   "commit": "ace43062",
+   "pp": [25.9, 30.1],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs basketball (+ --saat-versatz=10000000) -- PR #1289",
+    "laeufe": 12,
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-18",
+   "commit": "f6098377",
    "rhoFrisch": true,
-   "ppFrisch": false,
-   "anmerkung": "Pp am 16.10. abgebrochen (Feldspiel-Messung dauert Stunden) — nicht noetig: rho 0,795 verfehlt die Schranke bereits; Basketball spielt in Battle Mode ueber die PPS-Duell-Bruecke."
+   "ppFrisch": true,
+   "anmerkung": "KORRIGIERT 25.10. (Konsistenz-Audit): PR #1289 (Give-and-Go-Schneiden, 18.10.) hob rho 0,795->0,810 (jetzt UEBER der 0,80-Schranke) und verbesserte Pp 43,0/44,7->25,9/30,1 (deutlich besser, aber WEITERHIN ueber der 25-Pp-Schranke) -- der Blocker fuer Basketball ist seither Pp, nicht mehr rho. Vorherige Zeile (rho 0,795, Pp abgebrochen, 16.10.) ist durch diese PR ueberholt. n=12 ist kleiner als der Standardumfang -- schwaecher abgesichert, aber die einzige vorliegende Nachmessung."
   },
   "hockey": {
    "chassis": "feldspiel",
@@ -476,16 +478,31 @@
    "ppFrisch": true
   },
   "football": {
-   "rhoJeSpiel": 0.818,
+   "rhoJeSpiel": 0.807,
+   "rhoSaison": 0.902,
    "pp": [
-    47.3
+    64.6,
+    61.7
    ],
-   "datum": "2026-09-26",
-   "quelle": "docs/design/gesamtstand-audit-13-10.md",
-   "rhoFrisch": false,
-   "ppFrisch": false,
-   "commit": "unbekannt",
-   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 48 football",
+    "spiele": 48,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs football (+ --saat-versatz=10000000)",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-14",
+   "quelle": "docs/design/football-kickoff-return-14-10.md Abschnitt 5",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "commit": "f9181c15",
+   "anmerkung": "KORRIGIERT 25.10. (Konsistenz-Audit): die vorherige Zeile (rho 0,818, Pp 47,3, 26.09., aus gesamtstand-audit-13-10.md uebernommen) war bereits vor dem 16.10.-Review als stale erkannt worden (s. docs/design/battle-mode-20-spieltage-liga-mechanik-16-10.md Zeile 136), wurde aber nie auf den tatsaechlich juengsten Stand nachgezogen. Die vier Schritte des Kickoff/QB/Kicker-Plans (14.10., PR #1224-#1227) hoben rho zuletzt auf 0,807 (bestanden) und die Pp-Abweichung auf 64,6/61,7 (klar verletzt) -- Football bleibt deshalb nicht angeschlossen, der Blocker ist jetzt eindeutig Pp, nicht rho. rhoFrisch/ppFrisch hier true, weil mit dem Standardprotokoll (zwei Saatstroeme, n=48) gemessen -- Football selbst bleibt trotzdem ausserhalb ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS, diese Zeile dient nur der ehrlichen Dokumentation."
   },
   "i-spy": {
    "rhoJeSpiel": 0.75,

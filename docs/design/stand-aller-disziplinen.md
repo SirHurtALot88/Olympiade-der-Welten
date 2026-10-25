@@ -1,6 +1,6 @@
 # Der Stand aller zwanzig Disziplinen
 
-**Sechsundzwanzigster Nachtrag 25.10. — Hockey: frische Pp-Messung nachgeholt (Task #195), Schranke
+**Siebenundzwanzigster Nachtrag 25.10. — Hockey: frische Pp-Messung nachgeholt (Task #195), Schranke
 auf beiden Stroemen klar verletzt.** CLAUDE.md (Abschnitt "Die Abnahme jeder Disziplin") und
 `lib/battle/arena-resolved-disciplines.ts` hielten Hockeys Pp-Zahl (39,4) seit der Projektaufsicht
 vom 16.10. ausdruecklich fuer unzureichend: n=6, aus der Doku uebernommen, nie frisch mit den
@@ -48,6 +48,43 @@ Opus-Agent am 25.10. gefunden, dass die in CLAUDE.md zitierte "99 % Paartreue" f
 veraltet ist — frisch nachgemessen ergaben sich 90,9 %, knapp unter Hockeys eigener 95 %-Schwelle
 aus der Fable-Entscheidung vom 10.09. Das ist eine offene, bereits als Task #175 getrackte Frage und
 hier nur als Kontext vermerkt.
+
+---
+
+**Sechsundzwanzigster Nachtrag 25.10. — Dokumentations-Konsistenzkorrektur: veraltete/
+widersprüchliche Zahlen in `lib/battle/arena-resolved-disciplines.ts` und dieser Datei
+vereinheitlicht, nichts am Verhalten geändert.** Ein Opus-Audit (24./25.10.) fand mehrere Stellen,
+an denen `arena-resolved-disciplines.ts` (Kopfkommentar und Begründungen neben
+`ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS`/`ARENA_RESOLVED_DISCIPLINE_IDS`) ältere Messwerte zitierte,
+als `data/generated/disziplin-abnahme.json` inzwischen hielt — teils, weil eine spätere PR die
+Disziplin neu gemessen hatte, ohne den erklärenden Kommentar nachzuziehen. **Keine der beiden
+Mengen wurde geändert** — nur Kommentare/Begründungen und die JSON-Zeilen für Football und
+Basketball, die selbst veraltet waren.
+
+| Disziplin | Alte Werte (Fundstellen) | Korrigierter Wert | Quelle/Datum |
+|---|---|---|---|
+| Football | Kopfkommentar 0,722 (Stand #934, 15.09.); diese Datei/andere Docs 0,818 (26.09.) | **rho 0,807 / Saison 0,902, Pp 64,6/61,7** — Blocker ist jetzt Pp, nicht rho | `docs/design/football-kickoff-return-14-10.md` Abschnitt 5, 14.10., PR #1224–#1227 |
+| Basketball | Kommentar/JSON 0,795 (16.10., Pp abgebrochen) | **rho 0,810 (n=12), Pp 25,9/30,1** — rho bestanden, Blocker ist jetzt Pp | PR #1289 „Give-and-Go-Schneiden", 18.10., Commit `f6098377` |
+| I-Spy | Kopfkommentar 0,684 (sehr alte Zahl, vor der ersten Produktivierungswelle) | **0,750** | Abschnitt 11 dieser Datei, 15.10. |
+| Battlefield | Kopfkommentar 0,251 (05.09., allererste Welle) | **0,399** | `docs/design/battle-mode-20-spieltage-liga-mechanik-16-10.md` Fund 11, 15.10. |
+| TDM | Kopfkommentar 0,253 (05.09., allererste Welle) | **0,324** | `docs/design/gesamtstand-audit-13-10.md`, 07.10. |
+| Mini-DM (FFA) | Kopfkommentar 0,094 (vor dem 13.10./21.10.-Umbau) | fest (4-Team) 0,80 / variabel-k (rhoJeEvent) 0,608–0,686, kein k bestanden | `data/generated/disziplin-abnahme.json` Schlüssel `mini-dm`/`mini-dm-ffa`, 13.10./24.10. |
+
+**Wichtig — kein Fall, der die Mengenzugehörigkeit ändert.** Football und Basketball bestehen beide
+inzwischen die Rangtreue-Schranke (0,807 bzw. 0,810, beide > 0,80) — aber beide verfehlen weiterhin
+die Pp-Schranke (64,6/61,7 bzw. 25,9/30,1, beide > 25) deutlich, bleiben also korrekt außerhalb
+`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS`. Die Korrektur ändert nur,
+**warum** sie draußen bleiben (Pp statt rho), nicht **dass** sie draußen bleiben. Ein Fall, der eine
+echte Verhaltensfrage aufwirft, statt nur eine Doku-Frage, wurde dabei NICHT gefunden — in beiden
+Fällen bestätigt die Nachmessung exakt die bisherige Mengen-Zugehörigkeit.
+
+Geänderte Dateien dieser Runde: `lib/battle/arena-resolved-disciplines.ts` (Kommentare),
+`data/generated/disziplin-abnahme.json` (Football/Basketball-Zeilen auf den tatsächlich jüngsten
+Messstand nachgezogen, Guard-Test bleibt grün), dieser Abschnitt. Keine Änderung an
+`ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS`, `ARENA_RESOLVED_DISCIPLINE_IDS`, `battle-mode.engine.js` oder
+irgendeiner Mechanik.
+
+---
 
 **Fuenfundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Vorlauf-Verdrahtung (PR 5 eines 6-PR-Opus-Plans,
 21.10., "das Risikoreichste" laut Plan) — scharf geschaltet.** Der Mini-DM-FFA-Pfad (Motor PR 2

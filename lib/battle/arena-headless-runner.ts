@@ -436,10 +436,39 @@ type VorbereitetesFixture = {
 // bekanntermassen zu knapp fuer Chromium (Crash statt sauberer Fehlermeldung). Das Produktions-
 // Compose setzt zusaetzlich `shm_size: "256m"` (doppelte Absicherung, PR E1) -- dieses Flag hier
 // greift unabhaengig davon auch lokal/in CI, wo niemand `shm_size` setzt.
+//
+// RAM-SPARFLAGS (Nachtrag 25.10., PR 1270 "E1"): Chris bleibt beim CX23 (3,8 GB RAM gesamt,
+// s. PR-Beschreibung) -- jede Einsparung an der Chromium-Last zaehlt direkt. Echt gemessen im CI-
+// Job `arena-image-chromium-probe` (`.github/workflows/ci.yml`, Schritt "RAM-Sparflags messen"),
+// nicht geschaetzt -- die konkrete MB-Zahl steht im CI-Log und in der PR-Beschreibung.
+//
+// `--disable-gpu`: entfernt den separaten GPU-Prozess. Risikofrei fuer diese Seite, weil
+// `public/mockups/battle-mode.engine.js` (die einzige Seite, die dieser Runner laedt) KEIN WebGL
+// nutzt -- im gesamten Motor kommt der String "webgl" kein einziges Mal vor, jede Canvas-Nutzung
+// ist `getContext("2d")` fuer Sprite-/Pixel-Arbeit (teils mit `willReadFrequently:true`, ein
+// Hinweis an den Browser, der ohnehin Richtung Software-Rendering zielt). Ohne GPU-Beduerfnis
+// kein Funktionsverlust, nur ein Prozess weniger.
+//
+// `--no-zygote`: entfernt den Zygote-Hilfsprozess (nur fuer schnelles Forken WEITERER
+// Renderer-Prozesse gedacht). Dieser Runner oeffnet pro Lauf genau EINEN Browser mit genau EINER
+// Page und haengt den Motor zwischen den Fixtures in dieselbe Page neu ein (`haengeMotorNeuEin()`
+// unten) -- es wird nie ein zweiter Renderer nachtraeglich geforkt, der Zygote-Prozess ist damit
+// toter Ballast.
+//
+// BEWUSST NICHT dabei: `--single-process`. Chromium/Puppeteer/Playwright stufen dieses Flag
+// selbst als Debug-/Testwerkzeug ein, nicht fuer Produktionsbetrieb -- bekannt fuer Haenger/
+// Abstuerze gerade in sandboxlosen Containern (hier zusaetzlich sandboxlos, weil Playwright beim
+// `channel:"chromium"`-Start ohnehin automatisch `--no-sandbox` anhaengt, s. PR-Beschreibung). Im
+// CI-Vergleich lief es zwar durch (`about:blank`, keine echte Last), aber OHNE eine echte
+// Mehrfach-Fixture-Lastprobe mit dem tatsaechlichen Canvas-/Pixel-Motor ist das Stabilitaetsrisiko
+// nicht seriös einzuschaetzen -- der zusaetzliche RSS-Gewinn gegenueber `--disable-gpu` +
+// `--no-zygote` steht im CI-Log, aber als Datenpunkt, nicht als Freigabe.
 const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
   "--proxy-server=direct://",
   "--host-resolver-rules=MAP * 0.0.0.0",
   "--disable-dev-shm-usage",
+  "--disable-gpu",
+  "--no-zygote",
 ];
 
 /**
