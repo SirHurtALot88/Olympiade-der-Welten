@@ -2287,9 +2287,156 @@ Abschnitt 3.2 (Nachtrag 18.10.). Gemessene/geaenderte Dateien dieser Runde: nur 
 Produktionscode — die fuer die rr()-Zaehlung instrumentierte Engine-Kopie lag ausserhalb des
 Repos, in einer temporaeren Sandbox-Kopie, und wurde nicht committet.
 
+## 14. Football: die Pp-Pflichtpruefung mass seit PR #934 gegen den falschen Tisch —
+## korrigiert, Pp jetzt 121,0/120,1 statt 64,6/61,7 (Task #196, 25.10.)
+
+Auftrag: Football hatte die rho-Schranke bestanden (0,807/Spiel, 14.10., PR #1224-#1227,
+`docs/design/football-kickoff-return-14-10.md` Abschnitt 5), aber Pp lag mit 64,6/61,7 (zwei
+Saatstroeme) weit ueber der 25-Pp-Schranke — als „eigene, offene Baustelle" markiert. Ziel dieser
+Runde: pruezise diagnostizieren, WELCHE Attribute die Abweichung tragen, und gezielt kalibrieren.
+
+### 14.1 Der eigentliche Befund: kein Rezeptfehler, sondern ein Messwerkzeug-Bug
+
+`scripts/messe-arena-einfluss.mjs` vergleicht den gemessenen Attributanteil gegen
+`window.__arena.matrix(d)` (`battle-mode.engine.js`), und das ist `BASIS_JE_DISC[d]`.
+**`BASIS_JE_DISC.football` ist aber NICHT die gesperrte Eignungsmatrix — es ist der
+Spiel-Eignungs-Override** (`lib/player-generator/spiel-eignung-overrides.ts`): seit PR #934
+(16.09., `docs/design/football-balance-runde-nach-e3-15-09.md` Abschnitt 6, Kommentar bei
+`betroffeneAttribute()`) speist `BASIS_JE_DISC.football` bewusst aus derselben Quelle wie die
+Kaderanzeige/der KI-Kauf — `{power:22,health:18,speed:14,torment:12,determination:10,
+awareness:8,stamina:6,dexterity:4,will:3,spirit:3}` (Summe 100, OHNE charisma-Eintrag). Die
+echte, gesperrte Matrix (`lib/player-generator/official-discipline-weights.ts`) lautet dagegen
+`{power:6,health:14,determination:8,stamina:6,awareness:11,will:10,charisma:4,spirit:25,
+torment:16}` (plus speed/dexterity/intelligence:0) — komplett verschieden, am deutlichsten bei
+spirit (25 vs. 3) und charisma (4 vs. gar nicht vorhanden).
+
+**Football ist die EINZIGE der zwanzig Zeilen in `BASIS_JE_DISC`, die von der Matrix abweicht** —
+jede andere Disziplin hat keinen Override, also ist ihre `BASIS_JE_DISC`-Zeile bit-identisch zur
+Matrix (nachgezaehlt: alle 19 anderen Zeilen stimmen mit `official-discipline-weights.ts` exakt
+ueberein). Der Override ist legitim fuer `mitAufschlag()`/die Kaderanzeige (genau der Zweck, fuer
+den Chris ihn am 05.09. eingefuehrt hat, weil Anzeige- und Spielordnung mit rho 0,427
+auseinanderlagen) — aber CLAUDE.md sagt woertlich: „die Pp-Pflichtpruefung laeuft aber
+ausdruecklich gegen die Matrix, nicht gegen den Override" (Abschnitt „Die Eignungsmatrix ist
+gesperrt", ergaenzt 21.09., nachdem genau diese Frage schon bei Football UND bei I-Spy aufkam).
+Der Code hat diese Policy nie umgesetzt: `einflussVon()`, `einflussVonMitSlot()`,
+`formAttrEigSonde()` und der `matrix()`-Export lasen alle `BASIS_JE_DISC` roh, ohne zwischen
+„Override fuer die Anzeige" und „Matrix fuer die Pflichtpruefung" zu unterscheiden.
+
+**Konsequenz: JEDE bisher fuer Football berichtete Pp-Zahl mass gegen den falschen Tisch** — 47,3
+(24.09.), 71,1 (gescheiterter P1-Versuch), 51,7/57,8 (02.10.), 64,0/71,3 (nach Kicker-/QB-Slot),
+64,6/61,7 (nach Kickoff-Return, 14.10.). Das macht diese Zahlen als Pp-Pflichtpruefung UNGUELTIG,
+nicht nur ungenau: der tatsaechliche Attributkanal im Motor (die „Anteil"-Spalte) war in jeder
+dieser Messungen korrekt, nur die Vergleichsspalte („Matrix") war falsch.
+
+### 14.2 Der Fix: eine zweite, dedizierte Tabelle nur fuer die Pp-Messwerkzeuge
+
+`public/mockups/battle-mode.engine.js`: neue Konstante `PP_MATRIX_JE_DISC` direkt nach
+`BASIS_JE_DISC` — ein Spread von `BASIS_JE_DISC` mit EINEM ueberschriebenen Eintrag
+(`football`, die echte Matrix oben). Fuer alle 19 anderen Disziplinen bit-identisch zu
+`BASIS_JE_DISC`. Nur vier Lesestellen umgestellt, alle auf der Mess-/Berichtsseite:
+`einflussVon()`s `W`, `einflussVonMitSlot()`s `W`, `formAttrEigSonde()`s `W`, und der
+`window.__arena.matrix(d)`-Export (den `messe-arena-einfluss.mjs`,
+`messe-qb-slot-einfluss.mjs`, `messe-arena-einfluss-zweiter-saatstamm.mjs`,
+`miss-hockey-bestand.mjs` u.a. fuer ihre „Matrix"-Anzeigespalte nutzen). **`BASIS_JE_DISC`
+selbst, `mitAufschlag()`, `betroffeneAttribute()` und `eigMutator()` bleiben UNVERAENDERT auf dem
+Override** — Kaderanzeige, KI-Kauf, Formkarten-/Mutator-Eignungsbonus sind dadurch bit-identisch
+zum Stand vorher. Kein `rr()`-konsumierender Code wurde angefasst, also ist rho fuer KEINE
+Disziplin betroffen (bestaetigt: `node --check`/`eslint` 0 neue Fehler/Warnungen, ein
+Synthetik-Kader-Sondierungslauf `miss-alle-disziplinen.mjs 48 football` lief ohne Absturz weiter
+deutlich ueber der Schranke).
+
+### 14.3 Die korrigierte Zahl, kaderfest (n=48, zwei unabhaengige Saatstroeme)
+
+`node scripts/messe-arena-einfluss.mjs football 48` / `... --saat-versatz=10000000`:
+
+| Attribut | Matrix | Anteil Strom 0 | Diff Strom 0 | Anteil Strom 2 | Diff Strom 2 |
+|---|---:|---:|---:|---:|---:|
+| spirit | 25 | 0 % | −25,0 | 0 % | −25,0 |
+| speed | 0 | 23,0 % | +23,0 | 23,7 % | +23,7 |
+| health | 14 | 33,2 % | +19,2 | 32,0 % | +18,0 |
+| power | 6 | 17,4 % | +11,4 | 19,9 % | +13,9 |
+| awareness | 11 | 0 % | −11,0 | 0 % | −11,0 |
+| will | 10 | 0 % | −10,0 | 0 % | −10,0 |
+| torment | 16 | 20,1 % | +4,1 | 19,1 % | +3,1 |
+| stamina | 6 | 0 % | −6,0 | 0 % | −6,0 |
+| determination | 8 | 3,5 % | −4,5 | 3,9 % | −4,1 |
+| charisma | 4 | 0 % | −4,0 | 0 % | −4,0 |
+| dexterity | 0 | 2,8 % | +2,8 | 1,3 % | +1,3 |
+| intelligence | 0 | 0 % | 0,0 | 0 % | 0,0 |
+| **Summe (Pp)** | | | **121,0** | | **120,1** |
+
+**Pp fast verdoppelt sich gegenueber der (ungueltigen) alten Zahl — von 64,6/61,7 auf
+121,0/120,1.** Beide Stroeme stimmen eng ueberein (Differenz 0,9 Pp), das ist also ein stabiler,
+reproduzierbarer Befund, kein Messrauschen. Sechs Matrixattribute (spirit, awareness, will,
+stamina, charisma — und intelligence, das mit Matrixgewicht 0 ohnehin unproblematisch ist) lesen
+exakt 0 % — bestaetigt identisch zu `football-kickoff-slot-plan-14-10.md` Abschnitt 2.1s
+„sechs tote Attribute", nur mit der jetzt RICHTIGEN Referenzspalte. **spirit allein ist mit
+−25,0 Pp die mit Abstand groesste Einzelabweichung** — ueber ein Fuenftel der gesamten Pp-Zahl —,
+gefolgt von speed (0 Matrixgewicht, aber 23 % gemessen, weil es als Nebenattribut in TEAMGEIST
+sitzt, s. 14.4) und health (power/health/torment sind die drei Kanaele, die praktisch die
+gesamte Mechanik tragen: LAUFKRAFT, ABWEHR_LAUF, ABWEHR_PASS, PASSSCHUTZ, BALLSICHERHEIT und
+TEAMGEIST bauen alle ueberwiegend auf diesen drei).
+
+### 14.4 Warum keine Rezept-Kalibrierung in dieser Runde versucht wurde — der einzige Hebel ist bereits widerlegt
+
+Die einzige Stelle mit genug mechanischem Gewicht, um spirit (die 25-Pp-Luecke) ueberhaupt
+spuerbar zu bewegen, ist TEAMGEIST (~44,5 % des gesamten mechanischen Gewichts laut
+`football-rezept-kalibrierung.md` Abschnitt 4.4/4.5 — mit Abstand der schwerste der acht
+Sub-Skills, weil er seit der Rezept-Feinkalibrierung die Receiver-Lotterie jedes kompletten
+Passes zieht, `resolvePass()`). TEAMGEISTS aktuelle Mischung (`health:45,torment:30,speed:25`)
+ist genau DESHALB mit speed bestueckt (ein Attribut mit Matrixgewicht 0) — das erklaert fast die
+gesamte speed-Ueberrepraesentation oben.
+
+**Genau dieser Hebel ist in der aktuellen Rezeptfassung (REZEPT C) bereits getestet und
+gescheitert**, direkt am Code dokumentiert (`battle-mode.engine.js`, Kommentar bei
+`TEAMGEIST:{health:45,torment:30,speed:25}`): ein 8-%-spirit-Zusatz in TEAMGEIST senkte rho je
+Spiel kaderfest von 0,814 auf 0,788 (durchgefallen), 15 % spirit auf 0,765. Ein noch
+weitergehender Versuch unter der ALTEN Rezeptfassung (`football-rezept-kalibrierung.md`
+Abschnitt 4.5, kompletter Sinkhorn-Neubau mit TEAMGEIST als dominantem spirit/torment/charisma-
+Mix) reproduzierte denselben Ausfall (rho 0,407, Saison-Spannweite 0,608 — „eine kaderabhaengig
+instabile Mechanik"). Die anderen vier schweren Kanaele (LAUFKRAFT, PASSGENAUIGKEIT, ABWEHR_PASS,
+ABWEHR_LAUF) sind bewusst unangetastet, weil sie direkt gegen den recherchierten NFL-Korridor
+(Completion-Quote, Yards/Attempt, Sack-/Interception-Quote) gefittet sind — ein Eingriff dort
+riskiert zugleich rho UND den Korridor.
+
+Angesichts einer jetzt auf ~120 Pp korrigierten Luecke (nicht 64,6) und eines bereits zweifach
+unabhaengig widerlegten einzigen nennenswerten Hebels wurde in dieser Runde **keine neue
+Rezeptaenderung versucht** — ein weiterer Anlauf an genau dem Hebel, der schon zweimal
+nachweislich scheiterte, waere kein neues Experiment, sondern eine Wiederholung eines bereits
+bekannten Ergebnisses, bei Kosten von ~20 Minuten pro Messlauf (zwei Stroeme, n=48) in einer zum
+Zeitpunkt dieser Runde stark ressourcenbeschraenkten, geteilten Umgebung.
+
+**Strukturelle Ursache, nicht Kalibrierung** (dieselbe Klasse Befund wie die TDM-Diagnose
+derselben Woche): Football hat nur DREI unabhaengige Kreditvergabe-Achsen im Boxscore (Passer
+ueber PASSGENAUIGKEIT, Laeufer ueber LAUFKRAFT, Receiver ueber TEAMGEIST) fuer zwoelf
+Matrixattribute. Jede Achse, die genug mechanisches Gewicht hat, um spirit/charisma/will/
+awareness/stamina ueberhaupt spuerbar zu tragen, ist bereits mit power/health/torment belegt —
+denselben drei Attributen, die ueberall sonst im Rezept schon ueberrepraesentiert sind. Das
+Projekt hat diese Diagnose bereits 04.09. selbst vorausgesagt
+(`football-rezept-kalibrierung.md` Abschnitt 6, Punkt 2): „Eine zweite unabhaengige Offensiv-
+Rolle statt TEAMGEIST-als-Ersatz-Receiver... verlangt aber einen neunten fachlichen Sub-Skill
+und damit eine neue MATRIX-DISKUSSION" — ausdruecklich eine Mechanik-, keine
+Rezeptaenderung, und bewusst nicht Teil dieser (oder jener) Runde.
+
+### 14.5 Ergebnis dieser Runde
+
+rho unveraendert (0,807/Spiel, 0,902/Saison, kaderfest — `football-kickoff-return-14-10.md`
+Abschnitt 5.1, durch diesen PR nicht beruehrt). Pp: **121,0/120,1** (korrigiert gegen die echte
+Matrix; die alte 64,6/61,7 war ein Messwerkzeug-Fehler, kein echter Fortschritt). Beide WEIT
+ueber der 25-Pp-Schranke — Football bleibt **nicht bestanden** und bleibt bewusst draussen,
+sowohl aus `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` (dort war Football ohnehin nie Mitglied, s.
+`lib/battle/arena-resolved-disciplines.ts`) als auch aus `ARENA_RESOLVED_DISCIPLINE_IDS`.
+
+Geaenderte Dateien: `public/mockups/battle-mode.engine.js` (nur die vier `W=`-Lesestellen der
+Pp-Messwerkzeuge plus die neue `PP_MATRIX_JE_DISC`-Konstante — reine Mess-/Berichtskorrektur,
+bit-identisches Produktions-/Kaderverhalten fuer alle zwanzig Disziplinen), dieser Abschnitt,
+`data/generated/disziplin-abnahme.json` (Footballs `pp`/`datum`/`quelle`-Felder auf die
+korrigierte Zahl nachgezogen, `ppFrisch` bleibt `false` — Football ist weiterhin nicht
+angeschlossen, die Tabelle hat dafuer keine Commit-Pflicht).
+
 ---
 
-## 14. Gewichtheben Weg C „Sandsack-Rennen": Scoring-Entscheidung Silo-kg (Task #74, 25.10.)
+## 15. Gewichtheben Weg C „Sandsack-Rennen": Scoring-Entscheidung Silo-kg (Task #74, 25.10.)
 
 Letzter offener Punkt der Gewichtheben-Weg-C-Produktivierung (Flag 10, freie Stationswahl nach
 Auffassungsgabe, `docs/design/gewichtheben-sandsack-wegc-freie-stationswahl-05-10.md`): die

@@ -7512,6 +7512,30 @@
     "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
     "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
   };
+  // PP_MATRIX_JE_DISC — die GESPERRTE Eignungsmatrix fuer die Pp-Pflichtpruefung, CLAUDE.md
+  // woertlich: "die Pp-Pflichtpruefung laeuft ausdruecklich gegen die Matrix, nicht gegen den
+  // Override" (Abschnitt "Die Eignungsmatrix ist gesperrt"). BASIS_JE_DISC ist dafuer NICHT
+  // immer die richtige Quelle: seit PR #934 (16.09., football-balance-runde-nach-e3-15-09.md
+  // Abschnitt 6) speist BASIS_JE_DISC.football bewusst aus `spiel-eignung-overrides.ts`
+  // (power 22/health 18/speed 14/torment 12/determination 10/awareness 8/stamina 6/dexterity 4/
+  // will 3/spirit 3) statt aus der Matrix — legitim fuer `mitAufschlag()`/die Kaderanzeige
+  // (genau der Zweck, fuer den der Override eingefuehrt wurde), aber eine STILLE
+  // Falschmessung fuer jedes Skript, das `window.__arena.matrix()`/einflussVon()s
+  // abweichungPp als Pp-Abnahmezahl nimmt: football ist die EINZIGE Disziplin mit einem
+  // Override, jede andere Zeile in BASIS_JE_DISC ist bereits bit-identisch zur Matrix in
+  // lib/player-generator/official-discipline-weights.ts. Gefunden bei der Football-Pp-
+  // Diagnose (Task #196, 25.10.): die seit Monaten berichteten Football-Pp-Zahlen (47,3 bis
+  // 71,1, zuletzt 64,6/61,7) massen alle gegen DIESEN Override, nicht gegen die echte,
+  // gesperrte Matrix (power 6/health 14/determination 8/stamina 6/awareness 11/will 10/
+  // charisma 4/spirit 25/torment 16) — macht die bisherigen Zahlen UNGUELTIG als Pp-
+  // Pflichtpruefung, nicht nur ungenau (spirit allein wiegt in der echten Matrix 25 Pp,
+  // im Override nur 3; charisma fehlt im Override komplett). NUR die Pp-Messwerkzeuge
+  // (einflussVon()s `W`, der `matrix()`-Export) lesen ab jetzt diese Tabelle;
+  // BASIS_JE_DISC selbst, `mitAufschlag()` und `betroffeneAttribute()` bleiben UNVERAENDERT
+  // auf dem Override — Produktions-/Kaderverhalten ist dadurch bit-identisch, nur die
+  // Mess-/Berichtsseite misst jetzt gegen das richtige Ziel.
+  const PP_MATRIX_JE_DISC={...BASIS_JE_DISC,
+    football:{power:6,health:14,determination:8,stamina:6,awareness:11,will:10,charisma:4,spirit:25,torment:16}};
   const SLOTS_JE_DISC={
     "tdm":[
       {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
@@ -55479,8 +55503,11 @@
 
     // ABWEICHUNG ZUR MATRIX. Die eine Zahl, an der eine neue Disziplin haengt: Summe der
     // Betraege aus (gemessener Anteil minus Gewicht). Null hiesse, die Mechanik loest die
-    // Wertung exakt ein; je hoeher, desto mehr belohnt sie etwas anderes.
-    const W=BASIS_JE_DISC[dId]||{};
+    // Wertung exakt ein; je hoeher, desto mehr belohnt sie etwas anderes. PP_MATRIX_JE_DISC
+    // statt BASIS_JE_DISC (s. Kommentar bei dessen Definition): die Pp-Pflichtpruefung misst
+    // ausdruecklich gegen die gesperrte Matrix, nicht gegen einen Anzeige-Override — fuer
+    // alle Disziplinen ausser football bit-identisch.
+    const W=PP_MATRIX_JE_DISC[dId]||{};
     const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
       s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
     return {disziplin:dId, laeufe:n, anhebung:hoehe, mutatorModus:modus, saatVersatz:versatz,
@@ -55554,7 +55581,8 @@
     const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
     const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
                     .sort((a,b)=>b.gewinn-a.gewinn);
-    const W=BASIS_JE_DISC[dId]||{};
+    // PP_MATRIX_JE_DISC statt BASIS_JE_DISC, s. Kommentar bei einflussVon() oben.
+    const W=PP_MATRIX_JE_DISC[dId]||{};
     const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
       s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
     return {disziplin:dId, slotId, laeufe:n, anhebung:hoehe, saatVersatz:versatz,
@@ -55642,7 +55670,9 @@
   // Abnahme fuer Punkt 30.
   function formAttrEigSonde(dId,formPlus){
     const hoehe=formPlus==null?4:formPlus;
-    const W=BASIS_JE_DISC[dId]||{};
+    // PP_MATRIX_JE_DISC statt BASIS_JE_DISC: diese Sonde prueft ausdruecklich "ist der
+    // Rohattribut-Kanal MATRIXtreu" (s. Kommentar oben), s. Begruendung bei dessen Definition.
+    const W=PP_MATRIX_JE_DISC[dId]||{};
     const alle=[...SQUAD,...OPP];
     const reihen=alle.map(p=>{
       const vor=gewichtet(p.a,W);
@@ -58438,7 +58468,7 @@
           return gesamt?runden(100*heim/gesamt,1):null; })()
       };
     },
-    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>BASIS_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
+    motoren:()=>Object.keys(MOTOREN), matrix:(d)=>PP_MATRIX_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
 
