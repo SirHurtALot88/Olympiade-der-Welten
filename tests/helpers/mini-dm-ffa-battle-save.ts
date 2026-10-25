@@ -40,13 +40,32 @@ import { expect } from "vitest";
 export const TEST_K = 4;
 
 /**
- * CI-FIX (24.10., Opus-Review-Nacharbeit): erzwingt fuer JEDES Team JEDES Pods eine VOLLSTAENDIGE
- * Mini-DM-Aufstellung (alle `k` Rollen besetzt), unabhaengig davon, ob der echte (unseeded) KI-/
- * Liga-Draft diesem Team genug Mini-DM-faehige Spieler zugeteilt hat. Ersetzt NUR den
- * Mini-DM-Eintrag (`disciplineId: "mini-dm", disciplineSide: "d1"`) eines Teams -- andere
+ * CI-FIX (24.-25.10., Opus-Review-Nacharbeit, ZWEITER ANLAUF): erzwingt fuer JEDES Team JEDES
+ * Pods eine VOLLSTAENDIGE Mini-DM-Aufstellung (alle `k` Rollen besetzt), unabhaengig davon, ob der
+ * echte (unseeded) KI-/Liga-Draft diesem Team genug Mini-DM-faehige Spieler zugeteilt hat. Ersetzt
+ * NUR den Mini-DM-Eintrag (`disciplineId: "mini-dm", disciplineSide: "d1"`) eines Teams -- andere
  * Disziplin-Eintraege/die AI-gesetzte Reihenfolge sonstiger Rollen bleiben unberuehrt. Mini-DM
  * steht in diesem Helfer immer auf D1 (s. `erzwungenerSpieltag` oben), deshalb `disciplineSide: "d1"`
  * fest.
+ *
+ * DER ERSTE ANLAUF (24.10.) behob die CI-Flakigkeit in meinem eigenen 5-Datei-Reproduktionslauf,
+ * schlug aber in der VOLLEN CI-Suite weiterhin fehl -- derselbe Fehler. ROOT CAUSE, dieses Mal
+ * wirklich geschlossen: `buildArenaAufstellung()` (arena-aufstellung-adapter.ts) schluesselt sein
+ * Ergebnis nach SPIELER-NAME, nicht nach `playerId` (deren Kopfkommentar, Zeilen ~140-147,
+ * dokumentiert das ausdruecklich: der Namensgenerator baut aus nur 280 Kombinationen OHNE
+ * Eindeutigkeitspruefung ueber den ganzen Save -- bei Hunderten Spielern je 32-Team-Save sind
+ * Namenskollisionen der NORMALFALL, kein Rand). Mein erster Patch wählte `k` Roster-Einträge nach
+ * `playerId` -- DISTINKTE IDs koennen trotzdem auf denselben NAMEN zeigen, und
+ * `buildArenaAufstellung()` kollabiert zwei Eintraege mit demselben Namen zu EINEM Schluessel. Die
+ * resultierende Aufstellung hat dann WENIGER als `k` tatsaechlich unterscheidbare Rollen -- exakt
+ * das urspruengliche Symptom, nur durch meinen eigenen Patch unbeabsichtigt reproduziert, sobald
+ * die gewaehlten `k` Roster-Spieler zufaellig einen Namen teilten. In meinem kleinen
+ * Reproduktionslauf (wenige Saves) war die Kollisionswahrscheinlichkeit gering genug, um gruen zu
+ * bleiben -- in der vollen CI-Suite (viele Saves/Spieler insgesamt) schlug sie zu.
+ *
+ * FIX: die `k` Ersatzspieler werden jetzt nach PAARWEISE DISTINKTEM `player.name` gewaehlt, nicht
+ * nur nach distinkter `playerId` -- genau die Garantie, die `buildArenaAufstellung()` tatsaechlich
+ * braucht, um `k` unterscheidbare Rollen zu erzeugen.
  *
  * Nutzt bewusst dieselbe `LineupDraftEntry`-Form wie `tests/mini-dm-ffa-matchday.test.ts`s
  * `buildTeamFixture()` (dort schon gegen `buildArenaAufstellung()` erfolgreich erprobt) -- keine
@@ -74,12 +93,26 @@ function stelleVollstaendigeMiniDmTeilnahmeSicher(
     );
     if (rollen.every((rolle) => vollstaendig.has(rolle))) continue; // bereits vollstaendig, nichts zu tun.
 
-    const rosterPlayerIds = gameState.rosters.filter((zeile) => zeile.teamId === teamId).map((zeile) => zeile.playerId);
-    if (rosterPlayerIds.length < rollen.length) {
+    // NAMENS-EINDEUTIGKEIT, NICHT NUR ID-EINDEUTIGKEIT (s. Kopfkommentar oben): ein Name, der
+    // irgendwo im Roster dieses Teams MEHRFACH vorkommt, liefert hier nur EINEN Kandidaten (den
+    // ersten) -- genauso, wie `buildArenaAufstellung()` ihn ohnehin nur einmal als Schluessel
+    // haette. Zwei Roster-Zeilen mit demselben Namen zaehlen also als EIN verfuegbarer Platz.
+    const nameVonPlayerId = new Map(gameState.players.map((player) => [player.id, player.name] as const));
+    const gesehenNamen = new Set<string>();
+    const eindeutigeKandidaten: string[] = [];
+    for (const zeile of gameState.rosters) {
+      if (zeile.teamId !== teamId) continue;
+      const name = nameVonPlayerId.get(zeile.playerId);
+      if (!name || gesehenNamen.has(name)) continue;
+      gesehenNamen.add(name);
+      eindeutigeKandidaten.push(zeile.playerId);
+    }
+    if (eindeutigeKandidaten.length < rollen.length) {
       throw new Error(
-        `stelleVollstaendigeMiniDmTeilnahmeSicher: Team ${teamId} hat nur ${rosterPlayerIds.length} Kaderspieler, braucht ${rollen.length} fuer k=${k} -- Draft-Annahme (genug Spieler je Team) stimmt nicht mehr.`,
+        `stelleVollstaendigeMiniDmTeilnahmeSicher: Team ${teamId} hat nur ${eindeutigeKandidaten.length} NAMENTLICH unterscheidbare Kaderspieler (Namensgenerator hat nur 280 Kombinationen, s. Kopfkommentar), braucht ${rollen.length} fuer k=${k} -- Draft-Annahme (genug namentlich unterscheidbare Spieler je Team) stimmt nicht mehr.`,
       );
     }
+    const rosterPlayerIds = eindeutigeKandidaten;
     const neueEintraege = rollen.map((_rolle, slotIndex) => ({
       playerId: rosterPlayerIds[slotIndex]!,
       slotIndex,
