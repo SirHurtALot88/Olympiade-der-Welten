@@ -46,6 +46,24 @@ log "Build-Stempel: ${NEXT_PUBLIC_OLY_BUILD_SHA:0:7} @ ${NEXT_PUBLIC_OLY_BUILD_D
 # 3) Neu bauen & starten (Container wird bei Aenderung automatisch ersetzt)
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
 
+# 3b) Alte, ungenutzte Images wegraeumen (E1, Fund F10: kein Deploy-Skript tat das bisher).
+#
+# Jeder erfolgreiche Build oben hinterlaesst das VORHERIGE Image als "dangling" (ohne Tag,
+# niemand zeigt mehr drauf), weil `up -d --build` den Container ersetzt, das alte Image aber
+# nicht loescht. Seit Chromium im Image steckt (E1), kostet jedes dieser Images mehrere
+# hundert MB zusaetzlich (Plan Abschnitt 4.2, ~0,6-0,75 GB) -- das summiert sich ueber viele
+# Deploys zur alten "no space left on device"-Falle (CLAUDE.md, 01.09.), nur eine Ebene
+# hoeher (Images statt Git-Historie).
+#
+# `docker image prune -f` entfernt NUR dangling Images (keinen Tag, kein laufender Container
+# zeigt drauf) -- das laufende oly-app-/lec-app-/caddy-Image bleibt unberuehrt, weil der
+# frisch gestartete Container genau darauf zeigt. Ein Fehler hier darf den Deploy NICHT
+# umwerfen (wie bei den Push-Crons unten): das Spiel laeuft, nur die Platte raeumt sich
+# diesmal nicht auf.
+if ! docker image prune -f >/dev/null; then
+  log "WARNUNG: 'docker image prune' fehlgeschlagen — Deploy ist trotzdem durch."
+fi
+
 # 4) Push-Crons nachziehen (Live-Save, Bug-Meldungen).
 #
 # WARUM HIER: eine neue Cron-Zeile im Installer nuetzt nichts, solange niemand den Installer auf dem
