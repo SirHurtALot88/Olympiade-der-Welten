@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { ensureMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { kickoffArenaVorlauf } from "@/lib/battle/arena-vorlauf-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { describeLineupCommitment } from "@/lib/lineups/matchday-lineup-lock";
 import { saveLocalLegacyLineupDraftBatch } from "@/lib/lineups/legacy-lineup-local-service";
@@ -206,6 +207,13 @@ export async function PUT(request: Request) {
     }
     try {
       ensureMatchdayResolveSnapshot({ saveId, seasonId, matchdayId });
+    } catch {
+      // bewusst geschluckt, siehe oben
+    }
+    // ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.3), s. Kommentar an derselben Stelle in
+    // app/api/lineups/legacy/route.ts.
+    try {
+      kickoffArenaVorlauf({ saveId, seasonId, matchdayId });
     } catch {
       // bewusst geschluckt, siehe oben
     }

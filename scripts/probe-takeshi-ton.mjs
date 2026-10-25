@@ -27,6 +27,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -114,17 +115,20 @@ if (gesetzt !== true) {
 await seite.click("#play");
 // Tempo auf 4x, damit ein Rennen in vertretbarer Wallclock-Zeit durchlaeuft.
 await seite.click("#spd"); await seite.click("#spd");
+await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 await seite.waitForTimeout(1500);
 const nach1 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
 await seite.click("#reset");
 await seite.click("#play");
 await seite.click("#spd"); await seite.click("#spd"); // Tempo-Flag ist ein reset()-unabhaengiger Zustand? sicherheitshalber neu setzen
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach2 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 
 await seite.click("#reset");
 await seite.click("#play");
+await warteAufAnpfiff(seite);
 await seite.waitForTimeout(1500);
 const nach3 = await seite.evaluate(() => ({ starts: window.__loopStarts, stops: window.__loopStops }));
 

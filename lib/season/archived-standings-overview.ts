@@ -13,6 +13,13 @@ export type ArchivedSeasonStandingsOverviewItem = {
   teamCode: string | null;
   rank: number | null;
   points: number | null;
+  /**
+   * Task #159: der archivierte Saison-Snapshot (`FrozenValuationSnapshot`/`finalStandings`)
+   * kennt das Punkteverhältnis nicht — es gab zum Zeitpunkt des Einfrierens noch kein Battle-
+   * Duell-System (PR #1266 kam danach). Bleibt deshalb immer `null`, bis der Snapshot das Feld
+   * selbst mitschreibt.
+   */
+  verhaeltnis: number | null;
   cash: number | null;
   cashFc: number | null;
   startplatz: number | null;
@@ -111,6 +118,7 @@ export function buildArchivedSeasonStandingsOverviewItems(
       teamCode: row.teamCode,
       rank: row.rank,
       points: row.points ?? row.disciplinePoints ?? null,
+      verhaeltnis: null,
       cash: row.cashEnd,
       cashFc: row.cashFc ?? null,
       startplatz: row.startplatz ?? row.rank,

@@ -36,12 +36,22 @@ export function createSingleplayerGameState(): GameState {
   return withNormalizedLocalTeamSettings(createGameStateFromSeed(loadSeedData()));
 }
 
-export function createFreshSeasonOneGameState(saveId?: string | null): GameState {
+export function createFreshSeasonOneGameState(
+  saveId?: string | null,
+  options?: {
+    /** 2 = Battle-Mode-Doppelsaison (20 Spieltage). Ohne Angabe: der 10er-Seed wie bisher. */
+    seasonDisciplineRepeat?: 1 | 2;
+  },
+): GameState {
   // Threading saveId here seeds the initial season-1 discipline schedule (pairings + 2..6
   // player counts) per save instead of always reusing the "local-game-state" default — see
   // lib/season/season-discipline-schedule.ts for the seed derivation.
+  const seedOptions = {
+    ...(saveId ? { scheduleSeedId: saveId } : {}),
+    ...(options?.seasonDisciplineRepeat === 2 ? { seasonDisciplineRepeat: 2 as const } : {}),
+  };
   return withNormalizedLocalTeamSettings(
-    createGameStateFromSeed(loadFreshSeasonOneSeedData(), saveId ? { scheduleSeedId: saveId } : undefined),
+    createGameStateFromSeed(loadFreshSeasonOneSeedData(), Object.keys(seedOptions).length > 0 ? seedOptions : undefined),
   );
 }
 

@@ -292,23 +292,48 @@ benötigte Menge (Pack-Größe, ggf. × Sicherheitsfaktor) gedeckt ist → gewic
 (Das Blatt `EK Calc` macht heute die gewichtete Mischkalkulation `Σ(Anzahl×Preis)/ΣAnzahl` manuell.)
 
 > **Wichtig (von Chris):** Der Cardmarket-Preis ist nur der **Waren-Rohpreis**. **Einkaufs-Versand
-> muss obendrauf** – hinterlegt in `cost_settings` (heute: <5 Stk → 1,15/Menge, sonst 1,30/Menge;
-> beim Pack 1,30/Menge×3). Der so ermittelte EK inkl. Einkaufs-Versand geht dann in den HK-Aufbau
+> muss obendrauf** – hinterlegt in `cost_settings`: Bestellporto <5 Stk → 1,15, ab 5 Stk → 1,30,
+> davon werden **50 %** einkalkuliert (Chris: „ich kalkuliere beim einkauf den versand zu 50% ein“);
+> ein 3er-Pack gilt als EINE Einheit, das Porto fällt **1×** an (nicht ×3). Der so ermittelte EK inkl. Einkaufs-Versand geht dann in den HK-Aufbau
 > (§7.3). Und der **VK trägt die eBay-Gebühren-%** (Provision + Anzeigen, §7.3) – beide dürfen in der
 > Kalkulation nie fehlen.
 
 ### 7.3 VK-Kalkulation – Chris' exakte Formeln (aus `VK Preis Kalkulator`)
 
+**Betriebszahlen hinter den Sätzen** (von Chris bestätigt, Stand 10/2026): ca. 3.400 verkaufte Stück/Jahr in
+1.980 Verkaufs-Bestellungen (Ø 1,72 Artikel je Bestellung), ca. 840 Einkaufs-Bestellungen/Jahr (Ø 2–5 Artikel),
+Jahresumsatz ca. 24.000 €, Ø-VK ca. 6,87 €. Chris ist **Kleinunternehmer (§19 UStG)** → das Brutto-Modell ist
+korrekt, die App rechnet **keine Umsatzsteuer**.
+
 **Selbstkosten HK** (pro Verkaufseinheit, ohne eBay-Verkaufsgebühr):
 ```
 HK = EK
-   + Einkauf-Versand   (Einzel: <5 Stk → 1,15/Menge, sonst 1,30/Menge; Pack: 1,30/Menge×3)
+   + Einkauf-Versand   (bestellporto × 50 %;  Porto <5 Stk 1,15 | ab 5 Stk 1,30;  Pack = 1 Einheit, 1× – NICHT ×3)
    + Versand (Brief)   (Einzel ≈ 0,67 ; Pack ≈ 0,50 – netto Portoanteil, konfigurierbar)
-   + Prio/Einschreiben (Einzel 0,15 ; Pack 0,1875)
+   + Einschreiben      (VK ≥ 30 € → 2,35 € ; darunter r, siehe unten)
    + Verpackung        (≈ 52,95 €/1000 = 0,053 ; Pack 61,95 €/1000 = 0,062)
-   + Fixkosten-Anteil  ((95+25+60) €/Jahr ÷ verkaufte Stück 365d = eBay-Shop/Billbee/Lexoffice)
+   + Fixkosten-Anteil  (Σ Jahres-Fixkosten ÷ verkaufte Stück 365d, shopweit; Summe 4.229 €/Jahr)
 ```
-**eBay-Verkaufsgebühren** (auf einen VK-Preis):
+*Einkaufs-Versand:* Das Porto fällt je **Bestellung** an, nicht je Stück; die Portowerte bleiben als nachprüfbare
+Rechnungswerte stehen, einkalkuliert wird `Porto × buyShippingShareFactor` (0,5). Die Staffel „ab 5 Stk“ ist
+derzeit ungenutzt (der Import rechnet mit 3 Stk je Bestellung), bleibt aber im Modell.
+
+*Einschreiben (Schwelle statt Pauschale):* Chris versendet ab 30 € Warenkorb per Einschreiben-Einwurf und
+verbraucht ca. 100 Marken/Jahr à 2,35 € (≈ 5,9 % der Sendungen). Je Stück:
+```
+registered(VK) = VK ≥ T ? C : r         T = 30 €, C = 2,35 €
+r = max(0, S − N_T) × C / (N − N_T)     S = 100 Marken/Jahr, N = Stück 365d (shopweit), N_T = davon Stück mit VK ≥ T
+```
+Ohne N_T (nur eine bekannte Gesamtzahl) gilt der flache Satz `S × C / N`. Eine 35-€-Karte trägt damit real 2,35 €,
+eine 4,99-€-Karte nur den kleinen Restanteil r (die frühere Pauschale 0,15 / 0,1875 je Stück entfällt).
+
+*Fixkosten (alles Jahreswerte, nicht Monatspreise):* eBay-Shop 1.140 (95/Monat) + Billbee 840 (70/Monat) +
+Lexoffice 360 (30/Monat) + Verpackungslizenzen 50 + **Sonstige 1.839** (Sammelfeld für alle übrigen
+volumenunabhängigen EÜR-Posten: Telekommunikation 540, AfA 199, Beiträge/Versicherungen 141, Steuerberatung 16,
+Schuldzinsen 24, Raumkosten 919) = **4.229 €/Jahr** ≈ 1,24 €/Stück bei 3.400 Stück. Der Anteil geht als
+shopweiter Wert in **jeden** Preis-Korridor ein (Dashboard, Sortiment, Marktpreise, Einstellungen-Vorschau).
+
+**eBay-Verkaufsgebühren** (auf einen VK-Preis; gegen 70 echte Abrechnungszeilen geprüft, Abweichung < 0,06 €/Stück):
 ```
 eBay-Provision  = 0,35 € + VK × 11 % × 1,19        (11 % Provision inkl. 19 % USt)
 Anzeigen-Gebühr = VK × 9–10 % × 1,19               (Ads; Einzel akt. 9 %, min/gut 10 %)
@@ -321,6 +346,14 @@ VK-Preis GUT  = (HK + VK-Kosten) × 1,66   → ergibt ≈ 35 % Gewinnmarge   ←
 Gewinn        = VK − VK-Kosten − HK
 Gewinnmarge   = Gewinn / VK
 ```
+**Zweite Korridor-Linie: Deckungsbeitrags-Grenze** (HK **ohne** Fixkostenanteil):
+```
+VK-DB = (HK ohne Fixkosten + 0,35) / (1 − (11 % + Ads) × 1,19)     ← Gewinn vor Fixkosten = 0
+```
+Darunter verliert Chris bei jedem Verkauf echtes Geld (Status `unter_min`). Liegt dagegen schon die Marge
+**vor** Fixkosten bei dem aktuellen VK unter dem MIN-Ziel (z. B. EK 0,90 bei VK 4,99: Obergrenze ≈ 23 %
+statt 25 %), ist das Ziel mit diesem VK nicht erreichbar → Status `ziel_unerreichbar` (statt Dauer-„unter MIN“;
+erscheint nicht als „VK anheben“-Empfehlung).
 
 ### 7.4 „Zu teuer / zu günstig"-Signal fürs Dashboard
 Pro Artikel vergleicht die App:

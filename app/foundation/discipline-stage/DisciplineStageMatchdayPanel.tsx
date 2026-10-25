@@ -38,6 +38,34 @@ import {
   type SpieltagsVerletzungsMarke,
 } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-injuries";
 
+/**
+ * B4 (Opus-Review, PR 3/K1): lesbarer Text je `ArenaAusfallGrund` (legacy-matchday-resolve-
+ * types.ts) fuer den Badge-Titel unten -- bewusst lokal statt importiert: die Gruende sind ein
+ * kleines, stabiles Enum, und diese Datei ist reines Lese-UI ohne Engine-Import.
+ */
+function beschreibeArenaAusfallGrund(grund: string): string {
+  switch (grund) {
+    case "chromium_start":
+      return "Arena-Browser konnte nicht gestartet werden";
+    case "timeout":
+      return "Arena-Simulation hat das Zeitbudget überschritten";
+    case "absturz":
+      return "Arena-Simulation ist abgestürzt";
+    case "liga_fehlgeschlagen":
+      return "Arena-Lauf für diese Liga ist fehlgeschlagen";
+    case "ergebnis_unvollstaendig":
+      return "Arena-Ergebnis war unvollständig";
+    case "abgebrochen_neustart":
+      return "Arena-Lauf wurde durch einen Neustart abgebrochen";
+    case "deaktiviert":
+      return "Arena war für diesen Lauf deaktiviert";
+    case "nicht_ausgefuehrt":
+      return "Arena-Lauf wurde nicht ausgeführt";
+    default:
+      return grund;
+  }
+}
+
 export type MatchdayPanelTeamResult = {
   teamId: string;
   d1DisciplineId: string | null;
@@ -48,6 +76,14 @@ export type MatchdayPanelTeamResult = {
   // A2: Team hat für diesen Spieltag keine Aufstellung eingereicht — die 0 Punkte
   // sind kein echtes Ergebnis und müssen sichtbar markiert werden.
   missingLineup?: boolean;
+  /**
+   * B4 (Opus-Review, PR 3/K1): „PPS-Wertung — Arena ausgefallen: <Grund>" — gesetzt, wenn diese
+   * Disziplin-Seite ueber die PPS-Duell-Bruecke gebucht wurde, weil der Arena-Vorlauf
+   * ausgefallen ist (s. `ArenaAusfall.grund`, legacy-matchday-resolve-types.ts). `null`/
+   * `undefined`: echtes Arena-Ergebnis, kein Hinweis.
+   */
+  d1ArenaAusfallGrund?: string | null;
+  d2ArenaAusfallGrund?: string | null;
 };
 
 export type MatchdayPanelStandingRow = {
@@ -687,6 +723,9 @@ export default function DisciplineStageMatchdayPanel({
           captain: d1Revealed ? mods?.d1?.captainBonus ?? 0 : null,
           mutator: d1Revealed ? mut?.d1Pp ?? 0 : null,
           total: d1Revealed && d1Pts != null ? d1Pts + (mut?.d1Pp ?? 0) : null,
+          // B4 (Opus-Review): nur sichtbar, sobald die Seite selbst aufgedeckt ist -- vorher
+          // waere der Hinweis "Arena ausgefallen" selbst ein Spoiler auf den Buchungsweg.
+          ausfallGrund: d1Revealed ? res?.d1ArenaAusfallGrund ?? null : null,
         },
         d2: {
           points: d2Revealed ? d2Pts : null,
@@ -694,6 +733,7 @@ export default function DisciplineStageMatchdayPanel({
           captain: d2Revealed ? mods?.d2?.captainBonus ?? 0 : null,
           mutator: d2Revealed ? mut?.d2Pp ?? 0 : null,
           total: d2Revealed && d2Pts != null ? d2Pts + (mut?.d2Pp ?? 0) : null,
+          ausfallGrund: d2Revealed ? res?.d2ArenaAusfallGrund ?? null : null,
         },
       },
       missingLineup: res?.missingLineup ?? false,
@@ -1380,6 +1420,25 @@ export default function DisciplineStageMatchdayPanel({
                           <span style={{ fontWeight: 900, letterSpacing: "0.06em" }}>{side.toUpperCase()}</span>
                           <span>{disc?.displayName ?? (side === "d1" ? "Disziplin 1" : "Disziplin 2")}</span>
                         </span>
+                        {values.ausfallGrund ? (
+                          <span
+                            data-testid={`matchday-panel-arena-ausfall-${row.teamId}-${side}`}
+                            title={`PPS-Wertung — Arena ausgefallen: ${beschreibeArenaAusfallGrund(values.ausfallGrund)}`}
+                            style={{
+                              flex: "none",
+                              fontSize: 9.5,
+                              fontWeight: 800,
+                              color: "var(--nl-warn)",
+                              background: "color-mix(in srgb, var(--nl-warn) 16%, transparent)",
+                              border: "1px solid var(--nl-warn)",
+                              borderRadius: 6,
+                              padding: "1px 5px",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            PPS-Wertung — Arena ausgefallen
+                          </span>
+                        ) : null}
                         <span
                           data-testid={`matchday-panel-players-${row.teamId}-${side}`}
                           style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, minWidth: 0 }}

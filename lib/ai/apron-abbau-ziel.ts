@@ -40,7 +40,7 @@ import {
   apronLevyForSalary,
   getTeamApronSalaryBase,
   resolveApronDecisionSalaryFactor,
-  resolveSeasonApronLines,
+  resolveSeasonApronLinesForTeam,
 } from "@/lib/season/apron-service";
 
 /**
@@ -106,7 +106,7 @@ function round2(value: number): number {
  * Leben bleibt, statt sich durch den Abbau selbst abzuschaffen.
  */
 export function buildApronAbbauZiel(gameState: GameState, teamId: string): ApronAbbauZiel {
-  const lines = resolveSeasonApronLines(gameState);
+  const lines = resolveSeasonApronLinesForTeam(gameState, teamId);
   const { factor: salaryFactor, horizonIndex: salaryFactorHorizonIndex } =
     resolveApronDecisionSalaryFactor(gameState);
   const basis = getTeamApronSalaryBase(gameState, teamId);

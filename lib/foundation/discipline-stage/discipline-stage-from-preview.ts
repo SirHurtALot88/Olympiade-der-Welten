@@ -44,6 +44,13 @@ export type StagePreviewPlayer = {
   portraitUrl: string | null;
   mods: StagePreviewMod[];
   pointsAwarded: number | null;
+  /**
+   * Disziplin-Mutator-Aufschlag (die „0,3er" fuer getroffene Mutatoren), getrennt von
+   * `pointsAwarded`. Zusammen ergeben beide die TATSAECHLICH gutgeschriebene PP-Summe
+   * (`resolveAwardedPlayerPoints`, `lib/foundation/player-points-total.ts`) — dieselbe
+   * Aufteilung, die Top-Spieler-Zeile und Hover-Karte schon nutzen (Task #102).
+   */
+  mutatorPpsBonus: number | null;
 };
 
 export type StagePreviewTeam = {
@@ -67,6 +74,16 @@ export type StagePreviewTeam = {
    */
   captainPlayerId: string | null;
   captainName: string | null;
+  /**
+   * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+   * sequenziell+Reveal, Chris 13.10.): Gegner-Team-ID aus genau diesem Zwei-Team-Arena-Duell
+   * (`resolutionSource === "arena"`), sonst `null`. Treibt die Board-für-Board-Paar-Sequenz + den
+   * Matchup-Reveal auf der Bühne für jede arena-aufgelöste Disziplin (`prim === "lamps"` /
+   * `"klassen"` / `"stage"`). Optional (statt eines Pflichtfelds), damit bestehende
+   * Testfixtures, die `StagePreviewTeam` ohne dieses Feld bauen, nicht brechen — `?? null` am
+   * Lesepunkt deckt das Fehlen ab.
+   */
+  opponentTeamId?: string | null;
 };
 
 export type StageTeamMeta = { code: string; name: string; logoUrl: string | null };
@@ -172,6 +189,7 @@ export function buildDisciplineStageTeamsFromPreview(
         portraitUrl: portraitById.get(entry.playerId) ?? null,
         mods,
         pointsAwarded: entry.pointsAwarded ?? null,
+        mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
       };
     });
 
@@ -228,6 +246,7 @@ export function buildDisciplineStageTeamsFromPreview(
       missingLineup: teamResult.missingLineup,
       captainPlayerId: captainEntry?.playerId ?? null,
       captainName: captainEntry?.playerName ?? null,
+      opponentTeamId: teamResult.opponentTeamId ?? null,
     };
   });
 }

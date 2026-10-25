@@ -107,6 +107,34 @@ function matrixBlock(): string {
   return `  const BASIS_JE_DISC={\n${zeilen.join(",\n")}\n  };`;
 }
 
+// EIN SLOT-EINTRAG ALS JS-OBJEKTLITERAL — geteilt zwischen slotBlock() (SLOTS_JE_DISC, alle
+// zwanzig Disziplinen) und miniDmFfaSlotsJeKBlock() (MINI_DM_FFA_SLOTS_JE_K, PR 2 des
+// 6-PR-Plans 21.10.: der FFA-Kampfmotor auf 6 Mini-DM-Rollen). Dieselbe Form, derselbe Weg
+// zur kurzen Kennung ("tdm-6-vanguard" -> "vanguard") — nicht zweimal von Hand nachgebaut.
+function rolleEintrag(r: unknown, kurzeId: string): string {
+  const anyR = r as Record<string, unknown>;
+  const profil = anyR.slotWeightProfile as Record<string, number> | undefined;
+  const p = profil
+    ? Object.entries(profil)
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, v]) => `${k}:${zahl(v)}`)
+        .join(",")
+    : "";
+  const gross = String(anyR.majorPositiveAttribute ?? "");
+  const klein = String(anyR.minorPositiveAttribute ?? "");
+  const last = String(anyR.strainAttribute ?? "");
+  const mueh = String(anyR.fatigueProfile ?? "");
+  return (
+    `{id:${JSON.stringify(kurzeId)},` +
+    `label:${JSON.stringify(String(anyR.label ?? ""))},` +
+    `text:${JSON.stringify(String(anyR.description ?? ""))},` +
+    `gross:${JSON.stringify(gross)},klein:${JSON.stringify(klein)},` +
+    `last:${JSON.stringify(last)},mueh:${JSON.stringify(mueh)},` +
+    `profil:{${p}}}`
+  );
+}
+
 function slotBlock(): string {
   const zeilen: string[] = [];
   for (const id of officialDisciplineWeightOrder) {
@@ -114,36 +142,39 @@ function slotBlock(): string {
     const rollen = resolveSlotRolesForDiscipline(id, id, n);
     if (!rollen.length) continue;
     const eintraege = rollen.map((r) => {
-      const anyR = r as unknown as Record<string, unknown>;
-      const profil = anyR.slotWeightProfile as Record<string, number> | undefined;
-      const p = profil
-        ? Object.entries(profil)
-            .filter(([, v]) => v > 0)
-            .sort((a, b) => b[1] - a[1])
-            .map(([k, v]) => `${k}:${zahl(v)}`)
-            .join(",")
-        : "";
-      const gross = String(anyR.majorPositiveAttribute ?? "");
-      const klein = String(anyR.minorPositiveAttribute ?? "");
-      const last = String(anyR.strainAttribute ?? "");
-      const mueh = String(anyR.fatigueProfile ?? "");
       // KURZE KENNUNG. Die Quelle liefert "tdm-6-vanguard"; der Entwurf spricht seine
       // Slots aber als "vanguard" an — in der Aufstellung, im Rennplan, in den Befehlen.
       // Die lange Kennung hier durchzureichen hiesse, all diese Stellen zu brechen.
-      const langeId = String(anyR.roleId ?? "");
+      const langeId = String((r as Record<string, unknown>).roleId ?? "");
       const kurzeId = langeId.replace(new RegExp(`^${id}-${n}-`), "");
-      return (
-        `      {id:${JSON.stringify(kurzeId)},` +
-        `label:${JSON.stringify(String(anyR.label ?? ""))},` +
-        `text:${JSON.stringify(String(anyR.description ?? ""))},` +
-        `gross:${JSON.stringify(gross)},klein:${JSON.stringify(klein)},` +
-        `last:${JSON.stringify(last)},mueh:${JSON.stringify(mueh)},` +
-        `profil:{${p}}}`
-      );
+      return `      ${rolleEintrag(r, kurzeId)}`;
     });
     zeilen.push(`    ${JSON.stringify(id)}:[\n${eintraege.join(",\n")}\n    ]`);
   }
   return `  const SLOTS_JE_DISC={\n${zeilen.join(",\n")}\n  };`;
+}
+
+// MINI-DM-FFA-ROLLEN JE KADERGROESSE k=2..6 (PR 2 des 6-PR-Plans, 21.10.): der FFA-
+// Kampfmotor (public/mockups/battle-mode.engine.js, MINI_DM_FFA_SLOTS_JE_K) bekommt hier
+// die Slot-Profile, die die Aufstellungs-UI fuer JEDE Mini-DM-Kadergroesse bereits zeigt
+// (lib/lineups/matchday-slot-roles.ts, SECHS Rollen-Themen seit je: frontliner/finisher/
+// trickfighter/ironguard/chaosdriver/lasthit) — "gezeigt ist gleich gespielt".
+//
+// BEWUSST GETRENNT von SLOTS_JE_DISC["mini-dm"], das unveraendert beim 4er-Set bleibt (die
+// Dev-Arena-Anzeige und die CI-Rangtreue-Basislinie haengen daran, s. PR-Beschreibung) —
+// dieser Block speist AUSSCHLIESSLICH den neuen, separaten MINI_DM_FFA_SLOTS_JE_K-Mechanismus.
+function miniDmFfaSlotsJeKBlock(): string {
+  const zeilen: string[] = [];
+  for (let k = 2; k <= 6; k += 1) {
+    const rollen = resolveSlotRolesForDiscipline("mini-dm", "mini-dm", k);
+    const eintraege = rollen.map((r) => {
+      const langeId = String((r as Record<string, unknown>).roleId ?? "");
+      const kurzeId = langeId.replace(new RegExp(`^mini-dm-${k}-`), "");
+      return `      ${rolleEintrag(r, kurzeId)}`;
+    });
+    zeilen.push(`    ${k}:[\n${eintraege.join(",\n")}\n    ]`);
+  }
+  return `  const MINI_DM_FFA_SLOTS_JE_K={\n${zeilen.join(",\n")}\n  };`;
 }
 
 function bericht(): string {
@@ -176,10 +207,12 @@ const block = [
   "  // Erzeugt von scripts/generiere-arena-daten.ts aus den echten Quellen des Spiels:",
   "  //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)",
   "  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)",
-  "  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen)",
+  "  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen, inkl. Mini-DM-FFA-",
+  "  //     Rollen je Kadergroesse k=2..6, PR 2 des 6-PR-Plans 21.10.)",
   "  // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.",
   matrixBlock(),
   slotBlock(),
+  miniDmFfaSlotsJeKBlock(),
   MARKER_ZU,
 ].join("\n");
 

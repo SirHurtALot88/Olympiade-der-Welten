@@ -34,7 +34,7 @@
     const waffen = R.leseWaffen(d.weapons).map(w => w.name).join(", ");
     return { typ: "einheit", id, name: d.name, art: ROLLEN[d.role || "enemy"], fuer: [d.role || "enemy"], tags: einheitTags(d),
       kosten: { typ: "fest", wert: pts }, stufe: R.stufeFuerPunkte(pts), bild, quelle, karte: d,
-      text: `${d.faction || ""} · Qualität ${d.quality} · Verteidigung ${d.defense} · Zäh ${d.tough}${waffen ? " · " + waffen : ""}` };
+      text: `${d.faction || ""} · Qualität ${d.quality} · Verteidigung ${d.defense} · LP ${d.tough}${waffen ? " · " + waffen : ""}` };
   }
   function eintraege() {
     const einheiten = KS.VORLAGEN.map(v => einheitEintrag(v.d, "v:" + v.key, KS.IMG[v.d.art] || null, "Vorlage"))
@@ -51,9 +51,9 @@
   }
 
   // ---------- Anzeige ----------
-  const preisVon = e => e.typ === "einheit" ? `${e.kosten.wert} P.` : e.typ === "fraktion" ? "" : e.typ === "waffe" ? `${G.waffenPreis(R, e.waffe)} P.` : KS.kostenText(e.kosten);
+  const preisVon = e => e.typ === "einheit" ? `${e.kosten.wert} P.` : e.typ === "fraktion" ? "" : e.typ === "waffe" ? `${G.waffenPreis(R, e.waffe)} P.` : KS.kostenText(e);
   const PREIS_TIP = {
-    waffe: "Fester Preis der Waffe, gemessen an einem Standard-Helden (Qualität 4+, Verteidigung 5+, Zäh 5). Auf der Karte zählt die Waffe mit der Qualität der Einheit: Wer besser trifft, zahlt etwas mehr.",
+    waffe: "Fester Preis der Waffe, gemessen an einem Standard-Helden (Qualität 4+, Verteidigung 5+, LP 5). Auf der Karte zählt die Waffe mit der Qualität der Einheit: Wer besser trifft, zahlt etwas mehr.",
     fest: "Feste Punkte, die auf die Karte obendrauf kommen.",
     prozent: "Aufschlag auf die Punkte der Einheit – je stärker die Einheit, desto teurer die Regel.",
     einheit: "Punkte nach der Schmiede-Formel.",
@@ -135,6 +135,7 @@
     $("dbIconRow").hidden = typ !== "fraktion";
     $("dbStaerkeRow").hidden = typ === "waffe" || typ === "fraktion";
     $("dbArtRow").hidden = typ !== "faehigkeit" && typ !== "gegenstand";
+    $("dbEnergieRow").hidden = typ === "waffe" || typ === "fraktion";
     $("dbFuerRow").hidden = typ === "fraktion";
     $("dbFormTags").innerHTML = KAT.TAGS.map(t => `<button type="button" class="chip-f" data-ftag="${t.id}" aria-pressed="${formTags.has(t.id)}">${KS.tagIco(t.id)}${esc(t.name)}</button>`).join("");
     preis();
@@ -154,7 +155,11 @@
       return;
     }
     const k = kostenAusFormular();
-    $("dbPreis").textContent = k.typ === "fest" ? `Kostet fest ${k.wert} Punkte (klein 5, mittel 10, groß 15, elite 20).` : `Kostet ${k.wert} % Aufschlag auf die Formel, wächst also mit der Einheit.`;
+    const probe = { typ, text: $("dbText").value, kosten: k, energie: $("dbEnergie").value };
+    const e = R.energieVon(probe), w = R.preisVon(probe);
+    const wurf = R.MINDESTWURF[e] >= 6 ? "eine 6" : `einen Würfel mit ${R.MINDESTWURF[e]}+`;
+    const nachEnergie = e ? ` Braucht im Zug ${wurf}, deshalb ×${String(R.ENERGIE_FAKTOR[e]).replace(".", ",")}: ${k.typ === "fest" ? `${w} Punkte` : `${w} %`}.` : " Braucht keinen Aktionswürfel.";
+    $("dbPreis").textContent = (k.typ === "fest" ? `Grundpreis fest ${k.wert} Punkte (klein 5, mittel 10, groß 15, elite 20).` : `Grundpreis ${k.wert} % Aufschlag auf die Formel, wächst also mit der Einheit.`) + nachEnergie;
   }
   async function anlegen(e) {
     e.preventDefault();
@@ -163,6 +168,7 @@
     const fuer = [["dbHero", ["hero"]], ["dbEnemy", ["enemy", "companion"]]].filter(([id]) => $(id).checked).flatMap(([, r]) => r);
     const eintrag = { typ, name, fuer, tags: [...formTags], text: $("dbText").value.trim(), kosten: kostenAusFormular(),
       art: typ === "zauber" ? "Zauber" : typ === "waffe" ? "" : typ === "fraktion" ? "Fraktion" : $("dbArt").value };
+    if ($("dbEnergie").value !== "" && typ !== "waffe" && typ !== "fraktion") eintrag.energie = +$("dbEnergie").value;
     if (typ === "waffe") {
       const zeile = $("dbWaffe").value.trim();
       const w = R.leseWaffe(zeile.includes("|") ? zeile : `${name} | Nahkampf | A1 |`);
@@ -176,7 +182,7 @@
     try {
       const f = await KS.nimmAuf(eintrag);
       $("dbMsg").textContent = `${f.name} ist jetzt in der Datenbank.`;
-      $("dbName").value = ""; $("dbText").value = ""; $("dbWaffe").value = ""; formTags.clear(); formFelder();
+      $("dbName").value = ""; $("dbText").value = ""; $("dbWaffe").value = ""; $("dbEnergie").value = ""; formTags.clear(); formFelder();
       KS.nachAenderung(); alles();
     } catch (err) { $("dbMsg").textContent = `Das hat nicht geklappt: ${err.message}.`; }
   }
@@ -206,7 +212,8 @@
       }
     });
     $("dbTyp").addEventListener("change", formFelder);
-    ["dbStaerke", "dbArt"].forEach(id => $(id).addEventListener("change", preis));
+    ["dbStaerke", "dbArt", "dbEnergie"].forEach(id => $(id).addEventListener("change", preis));
+    $("dbText").addEventListener("input", preis);
     $("dbWaffe").addEventListener("input", preis);
     $("dbFormTags").addEventListener("click", e => { const b = e.target.closest("[data-ftag]"); if (!b) return; const t = b.dataset.ftag; if (formTags.has(t)) formTags.delete(t); else formTags.add(t); formFelder(); });
     $("dbForm").addEventListener("submit", anlegen);

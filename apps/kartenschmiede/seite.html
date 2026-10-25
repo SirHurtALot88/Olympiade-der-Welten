@@ -493,6 +493,8 @@ table.charaktere tbody tr { cursor: default; }
 @media (max-width: 880px) { .sim { grid-template-columns: 1fr; } }
 .sim-ctl { display: grid; gap: 14px; }
 .sim-out { display: grid; gap: 14px; font-family: var(--ui); }
+.sim-gruppe-kopf { margin: 10px 0 0; font: 700 15px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); }
+.sim-gruppe { display: flex; flex-wrap: wrap; gap: 6px; align-content: start; min-height: 34px; }
 .bar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); font-weight: 800; font-size: 16px; }
 .bar span { display: grid; place-items: center; min-width: 0; overflow: hidden; white-space: nowrap; color: #14100a; }
 .bar .a { background: #d9b25f; } .bar .d { background: #4a4f58; color: var(--ink); } .bar .b { background: #7fb0e6; }
@@ -589,6 +591,62 @@ fieldset.checks legend { margin-bottom: 6px; }
 .heldenbogen .hb-faeh p { margin: 0 0 2.5mm; break-inside: avoid; }
 .heldenbogen .hb-faeh .tico svg { width: 4mm; height: 4mm; }
 .heldenbogen .hb-faeh .elem { width: 4.6mm; height: 4.6mm; }
+/* ---------- Szenarien ---------- */
+.sz-akt { font: 700 13px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--brass); margin: 14px 0 4px; }
+.sz-leiste-oben { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.sz-leiste-oben label.f { min-width: 180px; }
+.sz-leiste-oben .hint { flex-basis: 100%; }
+.sz-gen .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.sz-gen summary { cursor: pointer; list-style: none; }
+.sz-gen summary::-webkit-details-marker { display: none; }
+.sz-gen summary h3::after { content: " ▾"; color: var(--dim); font-size: 16px; }
+.sz-gen[open] summary h3::after { content: " ▴"; }
+.sz-blatt { display: grid; gap: 18px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg2); }
+.sz-kopf { display: grid; gap: 4px; }
+.sz-titel { font-size: clamp(26px, 3.4vw, 34px); }
+.sz-meta { font-family: var(--ui); color: var(--dim); font-size: 15px; }
+.sz-vorlesen { font-style: italic; font-size: 19px; border-left: 3px solid var(--brass); padding-left: 14px; max-width: 75ch; }
+.sz-raster { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .sz-raster { grid-template-columns: 1fr; } }
+.sz-unten { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.sz-karte { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+.sz-kartenspalte { display: grid; gap: 10px; }
+.sz-text, .sz-teil { display: grid; gap: 8px; align-content: start; }
+.sz-text section, .sz-unten section { display: grid; gap: 6px; }
+.sz-blatt h4 { margin: 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sz-blatt ul, .sz-blatt ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.sz-teil { border-top: 1px solid var(--line); padding-top: 14px; }
+.sz-ausl { font-family: var(--ui); color: var(--dim); }
+.sz-legende { font-size: 15px; list-style: none; padding: 0 !important; }
+.sz-legende small { color: var(--dim); font-family: var(--ui); }
+.sz-marker { display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 14px var(--ui); color: var(--dim); max-width: none; }
+.sz-marker span { display: inline-flex; gap: 6px; align-items: center; }
+.sz-marker i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: #1b1509; font-size: 12px; font-weight: 800; }
+.sz-tab { width: 100%; border-collapse: collapse; font-size: 15px; table-layout: fixed; }
+.sz-tab th:first-child, .sz-tab td:first-child { width: 34%; }
+.sz-unten .sz-tab th:first-child, .sz-unten .sz-tab td:first-child { width: 3em; }
+.sz-text section, .sz-unten section, .sz-teil { min-width: 0; }
+.sz-tab th { text-align: left; font: 700 13px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td, .sz-tab th { white-space: normal; }
+.sz-tab td { overflow-wrap: anywhere; vertical-align: top; border-bottom: 1px solid var(--line); padding: 6px 8px; }
+.sz-tab td:first-child { font-family: var(--ui); font-weight: 600; }
+.sz-leiste { list-style: none; padding: 0 !important; display: flex !important; flex-wrap: wrap; gap: 4px !important; }
+.sz-leiste li { display: grid; place-items: center; min-width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 4px; font: 700 14px var(--ui); }
+.sz-leiste li.start { border-color: var(--t3); }
+.sz-leiste li.ende { border-color: var(--t6); color: var(--t6); }
+.sz-w6 { font-size: 15px; }
+.sz-wellen { list-style: none; padding: 0 !important; }
+.print-area .sz-seite { page: a4-hoch; width: 210mm; box-sizing: border-box; padding: 10mm; background: #fff; color: #1b1509; }
+.print-area .sz-blatt { background: #fff; border: 0; padding: 0; color: #1b1509; gap: 10px; font-size: 12px; }
+.print-area .sz-blatt h4, .print-area .sz-blatt .eyebrow { color: #7a5a1e; }
+.print-area .sz-raster { grid-template-columns: 105mm 1fr; gap: 6mm; }
+.print-area .sz-unten { grid-template-columns: repeat(3, 1fr); }
+.print-area .sz-vorlesen { font-size: 13px; }
+.print-area .sz-tab { font-size: 11px; }
+.print-area .sz-tab th, .print-area .sz-tab td { border-color: #ccc; padding: 3px 5px; }
+.print-area .sz-teil { border-color: #ccc; break-inside: avoid; }
+.print-area .sz-legende, .print-area .sz-w6 { font-size: 11px; }
+.print-area .sz-meta, .print-area .sz-ausl, .print-area .hint, .print-area .sz-legende small { color: #555; }
 @page postkarte-quer { size: 150mm 100mm; margin: 0; }
 @page postkarte-hoch { size: 100mm 150mm; margin: 0; }
 @page a4-hoch { size: A4 portrait; margin: 0; }
@@ -654,6 +712,356 @@ fieldset.checks legend { margin-bottom: 6px; }
 .eintrag .thumb { width: 100%; aspect-ratio: 5 / 3; border-radius: 6px; background: #0c0c0d center 25% / cover no-repeat; }
 .fit-note { color: #ffb070; }
 .fit-note:empty { display: none; }
+
+/* ---------- Reiter „Spielen“ ---------- */
+/* Gebaut für einen 15-Zoll-Laptop (etwa 1440–1512 × 800–950 Pixel): Ein laufender Abend füllt den ganzen Bildschirm,
+   oben die Leisten, links die Schrittkarte, rechts Tischkarte und Gegner, unten die Aktionen. */
+.sp-start { display: grid; gap: 14px; max-width: 900px; }
+.sp-start .row4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.sp-start h4, .sp-karte h4, .sp-seite h4, .sp-fenster h4, .sp-schublade h4 { margin: 4px 0 0; font: 700 14px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-staende { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sp-app { position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--bg); font-size: 19px; }
+.sp-oben { display: flex; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--bg2); }
+.sp-titel { display: grid; line-height: 1.15; font-family: var(--ui); }
+.sp-titel b { font-size: 16px; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-titel small { font-size: 14px; color: var(--dim); }
+.sp-pills { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; align-items: center; flex: 1; }
+.sp-kopfknoepfe { display: flex; gap: 6px; }
+.sp-pill { display: inline-flex; gap: 5px; align-items: center; padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; font: 600 15px var(--ui); background: var(--bg); white-space: nowrap; }
+.sp-pill b { letter-spacing: .05em; text-transform: uppercase; font-size: 12px; color: var(--dim); }
+.sp-pill em { font-style: normal; font-weight: 800; font-size: 18px; font-variant-numeric: tabular-nums; }
+.sp-pill i { display: inline-block; width: 8px; height: 14px; border: 1px solid var(--dim); border-radius: 2px; }
+.sp-pill i.an { background: var(--t5); border-color: var(--t5); }
+.sp-runde { border-color: var(--brass); }
+.sp-verhalten.wuetend { border-color: var(--t6); color: var(--t6); background: rgba(255,74,54,.12); }
+.sp-verhalten.wuetend b { color: var(--t6); }
+.sp-ton { border-color: #a26bff; }
+.sp-mitte { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) clamp(400px, 34vw, 560px); min-height: 0; }
+.sp-karte { --typ: var(--line); display: grid; gap: 14px; align-content: start; padding: 18px 26px 24px; overflow: auto; border-left: 8px solid var(--typ); min-height: 0; }
+.sp-karte.typ-blau { --typ: #4f8fe8; } .sp-karte.typ-lila { --typ: #a26bff; } .sp-karte.typ-messing { --typ: var(--brass); }
+.sp-karte.typ-gelb { --typ: #e8c63a; } .sp-karte.typ-rot { --typ: #e2483a; } .sp-karte.typ-orange { --typ: #f08a2a; } .sp-karte.typ-gruen { --typ: #5fbf5a; }
+.sp-karte > header { display: grid; gap: 2px; }
+.sp-typ { font: 700 15px var(--ui); letter-spacing: .14em; text-transform: uppercase; color: var(--typ); }
+.sp-karte h3 { font-size: clamp(28px, 2.6vw, 36px); }
+.sp-karte ul { margin: 0; padding-left: 24px; display: grid; gap: 5px; }
+.sp-karte > footer { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.sp-msg { font-size: 15px; color: var(--ink); }
+.sp-lies { margin: 0; padding: 14px 18px; border-left: 5px solid var(--brass); background: rgba(207,167,94,.09); border-radius: 0 8px 8px 0; font-size: 24px; line-height: 1.45; font-style: italic; max-width: 62ch; }
+.sp-lies small { display: block; font: 700 13px var(--ui); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--brass); margin-bottom: 4px; }
+.sp-gm { font-family: var(--ui); font-size: 17px; color: var(--dim); max-width: 75ch; }
+.sp-gm::before { content: "Nur für dich: "; font-weight: 700; color: #6fb0ff; }
+.sp-sag { font-style: italic; font-size: 17px; color: var(--ink); margin: 0; max-width: none; }
+.sp-aktiv summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--t6); }
+.sp-aktiv p { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: none; }
+.sp-aktiv[open] p:hover { -webkit-line-clamp: unset; }
+.sp-sag::before { content: "🗣️ "; font-style: normal; }
+.sp-text { font-size: 21px; max-width: 65ch; }
+.sp-hinweise { color: var(--dim); }
+.sp-check { list-style: none; padding: 0 !important; }
+.sp-check label { display: flex; gap: 12px; align-items: baseline; cursor: pointer; font-size: 20px; }
+.sp-check input { width: 20px; height: 20px; accent-color: var(--brass); }
+.sp-tisch { font-size: 19px; }
+.sp-aufbau { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: 22px; align-items: start; }
+@media (max-width: 1250px) { .sp-aufbau { grid-template-columns: 1fr; } }
+.sp-aufbaukarte { display: grid; gap: 10px; }
+.sp-mitte.ohne-seite { grid-template-columns: minmax(0, 1fr); }
+.sp-mitte.ohne-seite .sp-aufbau { grid-template-columns: minmax(280px, .7fr) minmax(0, 1.3fr); }
+.sp-aufbaukarte { grid-template-columns: minmax(0, 1fr) 220px; align-items: start; }
+.sp-aufbaukarte .sp-legende { grid-template-columns: 1fr; }
+.sp-gel { list-style: disc !important; padding-left: 20px !important; }
+.sp-legende { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-family: var(--ui); font-size: 16px; }
+.sp-legende ol, .sp-legende ul { padding-left: 22px; }
+.sp-legende ul { list-style: none; padding-left: 0 !important; }
+.sp-legende li i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; margin-right: 8px; color: #1b1509; font: 800 12px var(--ui); font-style: normal; }
+.sp-cue { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-family: var(--ui); font-size: 17px; }
+.sp-cue.gross { padding: 16px; border: 1px dashed #a26bff; border-radius: 8px; font-size: 21px; }
+.sp-cue.gross > .btn { font-size: 19px; padding: 14px 24px; }
+.sp-audioliste { display: grid; gap: 6px; }
+.sp-upload { cursor: pointer; }
+kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border: 1px solid currentColor; border-radius: 4px; font: 700 12px var(--ui); letter-spacing: 0; text-transform: none; opacity: .85; }
+.btn.aus { opacity: .4; }
+.btn.erledigt { border-color: #5fbf5a; color: #7fd06a; }
+.btn.weiter { min-width: 190px; }
+.btn.faellig { animation: sp-puls 1.4s ease-in-out infinite; }
+@keyframes sp-puls { 50% { box-shadow: 0 0 0 4px rgba(207,167,94,.45); } }
+.sp-letzte { display: grid; gap: 10px; }
+.sp-ev { display: grid; gap: 8px; padding: 12px 16px; border: 1px solid var(--brass); border-radius: 8px; }
+.sp-ev.art-tod { border-color: var(--t6); }
+.sp-ev.art-schwelle, .sp-ev.art-rundenwurf { border-color: #a26bff; }
+.sp-probe { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed #e2483a; border-radius: 8px; font-family: var(--ui); font-size: 18px; }
+.sp-probe > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-probe .btn.sm { min-width: 46px; font-size: 18px; }
+.sp-probe small { color: var(--dim); font-size: 14px; }
+.sp-wurf { font-family: var(--ui); font-size: 18px; }
+.sp-optionen { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.sp-option { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; text-align: left; padding: 14px 16px; border: 1px solid #e2483a; border-radius: 8px; background: rgba(226,72,58,.07); color: var(--ink); cursor: pointer; font: inherit; }
+.sp-option:hover, .sp-option:focus-visible { background: rgba(226,72,58,.18); }
+.sp-option kbd { color: #e2483a; min-width: 32px; height: 32px; font-size: 18px; }
+.sp-option span { display: grid; gap: 5px; }
+.sp-option b { font: 700 20px var(--ui); }
+.sp-option small { font-size: 17px; color: var(--ink); }
+.sp-option em { font: 500 15px var(--ui); color: var(--dim); font-style: normal; }
+.sp-ziel { padding: 10px 12px; border: 1px solid #5fbf5a; border-radius: 8px; font-family: var(--ui); }
+.sp-verh { font-size: 17px; }
+.sp-verh td:first-child, .sp-verh th:first-child { width: 4em !important; }
+.sp-karte li.ja { color: #7fd06a; } .sp-karte li.nein { color: var(--dim); }
+.sp-seite { display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-left: 1px solid var(--line); background: #17191d; min-height: 0; overflow: hidden; }
+.sp-tischkarte { position: relative; display: grid; gap: 4px; }
+.sp-tischkarte > small { font: 500 13px var(--ui); color: var(--dim); }
+.sp-tischkarte svg { width: 100%; height: auto; max-height: 300px; display: block; border-radius: 6px; border: 1px solid var(--line); touch-action: none; user-select: none; }
+.sp-tischkarte.gross svg { max-height: calc(100vh - 230px); }
+.sp-tok { cursor: grab; }
+.sp-tok.marker { cursor: pointer; }
+.sp-tok:active { cursor: grabbing; }
+.sp-tok.tot text { text-decoration: line-through; }
+.sp-pop { position: absolute; z-index: 3; width: min(320px, 70%); display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--brass); border-radius: 8px; background: #0b0c0f; box-shadow: 0 10px 28px rgba(0,0,0,.6); font-size: 16px; }
+.sp-pop header { display: flex; gap: 8px; align-items: start; justify-content: space-between; }
+.sp-pop header b { font: 700 18px var(--ui); display: block; }
+.sp-pop header small { font: 500 14px var(--ui); color: var(--dim); }
+.sp-pop p { margin: 0; }
+.sp-aktiv { max-height: 112px; overflow: auto; display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--t6); border-radius: 8px; background: rgba(255,74,54,.08); font-size: 15px; font-family: var(--ui); }
+.sp-gegnerliste { display: grid; gap: 6px; align-content: start; overflow: auto; min-height: 0; padding-right: 4px; }
+.sp-gegner { display: grid; gap: 3px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); cursor: pointer; }
+.sp-gegner.markiert { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(207,167,94,.35); }
+.sp-gegner.gefallen { opacity: .55; }
+.sp-g-zeile { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sp-g-zeile b { font: 700 17px var(--ui); }
+.sp-g-tok { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 13px; background: #ff6a4a; color: #0b0c0f; font: 800 13px var(--ui); }
+.sp-gefallen .sp-g-tok, .sp-gegner.gefallen .sp-g-tok { background: #77736b; }
+.sp-schaedel { color: var(--t6); letter-spacing: .05em; font-size: 14px; }
+.sp-g-balken { display: inline-flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-left: auto; max-width: 120px; }
+.sp-g-balken i { width: 10px; height: 10px; border-radius: 2px; background: #3a5a36; }
+.sp-g-balken i.wunde { background: var(--t6); }
+.sp-g-knoepfe { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.sp-g-knoepfe .btn.sm { padding: 5px 9px; }
+.sp-g-zustand { display: flex; gap: 8px; align-items: baseline; font-size: 15px; }
+.sp-g-zustand em { font: 700 13px var(--ui); font-style: normal; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); white-space: nowrap; }
+.sp-g-zustand .sp-sag { font-size: 15px; }
+.sp-g-mehr { display: grid; gap: 4px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.sp-g-mehr h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-g-mehr .sp-gm { font-size: 15px; }
+/* Aktionsleiste: Zeile 1 die Ereignisse in Gruppen (eine Zeile, Überlauf als „▴ n weitere“), Zeile 2 fest: Toast links, Navigation rechts */
+.sp-unten { display: grid; gap: 6px; padding: 6px 16px 8px; border-top: 1px solid var(--line); background: var(--bg2); }
+.sp-zeile1 { min-width: 0; }
+.sp-evs { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; min-width: 0; overflow: visible; }
+.sp-zeile2 { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.sp-toast { margin: 0; font: 600 15px var(--ui); color: var(--ink); min-height: 20px; max-width: none; flex: 1; }
+.sp-runden { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.btn.weiter { min-width: 210px; justify-content: center; }
+.sp-mehrknoepfe { position: relative; }
+.sp-mehrknoepfe summary { list-style: none; cursor: pointer; font: 700 13px var(--ui); color: var(--gf, var(--brass)); padding: 5px 8px; border: 1px dashed var(--gf, var(--line)); border-radius: 6px; white-space: nowrap; }
+.sp-mehrknoepfe summary::-webkit-details-marker { display: none; }
+.sp-dropup { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 40; display: grid; gap: 4px; padding: 8px; min-width: 220px; border: 1px solid var(--gf, var(--brass)); border-radius: 8px; background: #0b0c0f; box-shadow: 0 -8px 24px rgba(0,0,0,.5); }
+.sp-evs .btn.sm { padding: 5px 9px; font-size: 13px; letter-spacing: .05em; white-space: nowrap; }
+@media (max-width: 1000px) { .sp-app { position: static; display: block; } .sp-mitte { grid-template-columns: 1fr; } .sp-seite { overflow: visible; } .sp-unten { flex-wrap: wrap; } }
+.sp-fenster { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.62); }
+.sp-fenster-innen { display: grid; gap: 10px; width: min(820px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 20px 24px; border: 1px solid var(--brass); border-radius: 12px; background: var(--bg); font-size: 18px; }
+.sp-fenster-innen.klein { width: min(640px, 100%); }
+.sp-fenster-innen.breit { width: min(1180px, 100%); }
+.sp-fenster-innen.karte { width: min(680px, 100%); }
+.sp-fenster-innen header { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.sp-fenster .sp-lies { font-size: 21px; }
+.sp-npc-raster, .sp-lage { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.sp-npc-raster > div, .sp-lage > section { display: grid; gap: 8px; }
+@media (max-width: 900px) { .sp-npc-raster, .sp-lage { grid-template-columns: 1fr; } }
+.sp-fragen td:first-child { width: 28% !important; }
+.sp-ziele { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
+.sp-ziele li.ja { color: #7fd06a; }
+.sp-regel { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.sp-protokoll { margin: 0; padding-left: 0; list-style: none; font-family: var(--ui); font-size: 15px; color: var(--dim); display: grid; gap: 2px; }
+.sp-protokoll small { color: var(--brass); margin-right: 6px; }
+.sp-kartenbox { width: 100%; }
+.sp-stufen { display: grid; gap: 4px; font-family: var(--ui); font-size: 15px; color: var(--dim); }
+.sp-stufen b { color: var(--ink); margin-right: 6px; }
+.sp-stufe { font-weight: 700; } .sp-stufe.st-anfaenger { color: #7fd06a; } .sp-stufe.st-experte { color: #ff8a1f; } .sp-stufe.st-legendaer { color: var(--t6); }
+.sp-budget { font-family: var(--ui); font-size: 15px; color: var(--dim); margin: 6px 0; } .sp-budget b { color: var(--ink); }
+/* Kampagnenfortschritt im Kopf: ein Abschnitt je Map */
+.sp-fortschritt { display: inline-flex; align-items: center; gap: 3px; margin: 2px 0; }
+.sp-fortschritt i { width: 26px; height: 6px; border-radius: 3px; background: #2c2e36; overflow: hidden; display: block; }
+.sp-fortschritt u { display: block; height: 100%; background: var(--brass); text-decoration: none; }
+.sp-fortschritt em { font: 700 12px var(--ui); color: var(--dim); font-style: normal; margin-left: 4px; }
+/* Wer ist wer: unter der Tischkarte je Gegnerart Kartenbild, Kürzel und wie viele noch stehen */
+.sp-werliste { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sp-wer { display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 4px; border: 1px solid #34363e; border-radius: 8px; background: #1a1b20; color: var(--ink); text-align: left; cursor: pointer; font-family: var(--ui); }
+.sp-wer:hover { border-color: var(--brass); }
+.sp-wer b { display: block; font-size: 15px; } .sp-wer em { display: block; font-size: 12px; color: var(--dim); font-style: normal; }
+.sp-wer small { display: flex; flex-wrap: wrap; gap: 3px; margin: 2px 0; }
+.sp-wer small i { font: 800 12px var(--ui); font-style: normal; background: #ff6a4a; color: #0b0c0f; border-radius: 9px; padding: 0 5px; }
+.sp-wer small i.tot { background: #77736b; text-decoration: line-through; }
+.sp-mini { width: 46px; flex: none; pointer-events: none; } .sp-mini .card { box-shadow: none; }
+/* Drüberfahren: die Karte groß daneben, ohne zu klicken */
+.sp-wer { position: relative; }
+.sp-vorschau { position: fixed; width: 240px; z-index: 60; pointer-events: none; }
+.sp-vorschau[hidden] { display: none; } .sp-vorschau .card { box-shadow: 0 12px 40px rgba(0,0,0,.7); }
+.sp-mini.leer { height: 46px; border-radius: 50%; background: #f2cf4a; color: #0b0c0f; display: grid; place-items: center; font: 800 18px var(--ui); }
+/* Marker: offen oder verdeckt, wofür sie stehen */
+.sp-sicht { font: 600 14px var(--ui); margin: 4px 0; } .sp-sicht.offen { color: #9fe08f; } .sp-sicht.zu { color: #c9ccd2; }
+.sp-wofuer { font: 600 15px var(--ui); color: var(--ink); margin: 2px 0 6px; }
+.sp-markerliste li { display: flex; gap: 8px; align-items: flex-start; } .sp-markerliste li span { display: grid; }
+.sp-markerliste em { font-style: normal; font-size: 13px; color: #9fe08f; } .sp-markerliste li.zu em { color: #c9ccd2; }
+.sp-markerliste small { font-size: 13px; color: var(--dim); }
+.sp-tok.marker.verdeckt { opacity: .8; }
+/* Während des Tracks bereitlegen, Kampfmusik, Text des Tracks */
+.sp-bereit { margin: 14px 0; padding: 10px 14px; border: 1px dashed #5a4a8a; border-radius: 8px; background: #1c1a26; font-family: var(--ui); }
+.sp-bereit h4 { margin: 0 0 4px; color: #c9b6ff; } .sp-bereit h5 { margin: 8px 0 2px; font-size: 14px; color: var(--dim); text-transform: uppercase; letter-spacing: .06em; }
+.sp-bereit ul { margin: 0; padding-left: 20px; font-size: 16px; } .sp-bereit small { color: var(--dim); }
+.sp-musik { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; } .sp-musik > span { font: 700 13px var(--ui); letter-spacing: .08em; text-transform: uppercase; color: #c9b6ff; }
+.sp-tracktext { margin: 8px 0; font-family: var(--ui); } .sp-tracktext summary { cursor: pointer; color: var(--dim); font-size: 14px; }
+.sp-tracktext p { white-space: pre-line; font-family: var(--serif, Georgia, serif); font-size: 17px; line-height: 1.5; color: var(--ink); margin: 6px 0 0; max-width: 70ch; }
+.sp-cue em.fehlt { color: #ff8a1f; font-style: normal; }
+/* NPC: was die Helden herausgekitzelt haben (abhaken), Antworten auf ihre Fragen */
+.sp-wissen { display: grid; gap: 6px; } .sp-wissen label { display: flex; gap: 10px; align-items: flex-start; padding: 6px 8px; border: 1px solid #2e3038; border-radius: 8px; cursor: pointer; }
+.sp-wissen label.an { border-color: #3f6a3a; background: #17251a; } .sp-wissen input { margin-top: 6px; width: 18px; height: 18px; flex: none; }
+.sp-wissen span { display: grid; gap: 2px; } .sp-wissen b { font: 700 15px var(--ui); } .sp-wissen .sp-lies { margin: 2px 0; font-size: 16px; }
+.sp-wissen small { font: 13px var(--ui); color: var(--dim); } .sp-wissen em { font: 600 13px var(--ui); color: var(--brass); font-style: normal; } .sp-wissen label.an em { color: #9fe08f; }
+.sp-fragen p { margin: 0 0 8px; font-size: 16px; } .sp-fragen small { display: block; font: 13px var(--ui); color: var(--dim); }
+.sp-zeile-uhr { display: flex; align-items: center; gap: 4px; } .sp-zeile-uhr .sp-uhr { padding: 0 4px; font-size: 13px; }
+.sp-erzaehlen { font: 700 16px var(--ui); color: #c9b6ff; margin: 0 0 8px; }
+.sp-folgen-start { list-style: none; padding: 0; display: grid; gap: 6px; } .sp-folgen-start li { font-size: 17px; padding: 6px 10px; border-left: 3px solid #3f6a3a; background: #17251a; border-radius: 4px; }
+.sp-befall { margin-top: 6px; padding: 6px 8px; border-left: 3px solid #7fd06a; background: #18211a; border-radius: 4px; } .sp-befall p { margin: 4px 0; font-size: 14px; }
+.sp-sporentab td { vertical-align: top; font-size: 14px; } .sp-sporentab i { color: var(--dim); }
+.sp-reichen { font: 13px var(--ui); background: #1a1b20; color: var(--ink); border: 1px solid #34363e; border-radius: 6px; padding: 2px 4px; margin-left: 4px; }
+.sp-weiter { font: 14px var(--ui); }
+.sp-markeraktionen { display: grid; gap: 6px; margin-top: 6px; } .sp-markeraktionen div { display: grid; gap: 2px; } .sp-markeraktionen small { font: 12px var(--ui); color: var(--dim); }
+.sp-gegner.freund { border-color: #2f6b58; } .sp-gegner.freund .sp-g-tok { background: #4fd1a5; }
+.sp-wer.freund small i { background: #4fd1a5; } .sp-freunde-titel { margin: 12px 0 6px; color: #4fd1a5; }
+.sp-gespeichert { font-variant-numeric: tabular-nums; } .sp-gespeichert.fehler { color: #ff8a1f; border-color: #ff8a1f; }
+/* Was aus der letzten Map übernommen wurde / ob die Map abgeschlossen ist */
+.sp-uebernahme { display: grid; gap: 2px; margin: 10px 0; padding: 10px 14px; border: 1px solid #3f6a3a; border-radius: 8px; background: #17251a; font-family: var(--ui); }
+.sp-uebernahme b { color: #9fe08f; font-size: 16px; } .sp-uebernahme span { color: var(--ink); font-size: 15px; }
+.sp-uebernahme.offen { border-color: #6a5a2a; background: #2a2416; } .sp-uebernahme.offen b { color: var(--brass); }
+/* Zug, Haken, Verhaltenswurf, Sporen */
+.sp-zug em { font-size: 14px; color: var(--brass); }
+.sp-hak { width: 24px; height: 24px; display: inline-grid; place-items: center; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--dim); font: 800 13px var(--ui); cursor: pointer; flex-shrink: 0; }
+.sp-heldchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 0; border-radius: 999px; border: 1px solid #6fb0ff; background: rgba(111,176,255,.1); }
+.sp-heldchip > button[data-chip] { background: none; border: 0; color: var(--ink); font: 700 14px var(--ui); cursor: pointer; padding: 2px 4px 2px 10px; }
+.sp-heldchip.an { background: #6fb0ff; } .sp-heldchip.an > button[data-chip] { color: #0b0c0f; }
+.sp-heldchip.dran { opacity: .6; } .sp-heldchip.dran .sp-hak { color: #7fd06a; border-color: #5fbf5a; }
+.sp-heldchip.befallen { border-color: #a3b83a; }
+.sp-gegner .sp-hak { margin-right: 2px; }
+.sp-verhwurf { margin: 0; font: 600 14px var(--ui); max-width: none; }
+.sp-verhwurf small { color: var(--dim); }
+.sp-sporen { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+.sp-sporen b { font: 800 18px var(--ui); min-width: 20px; text-align: center; }
+.sp-sporen small { color: var(--dim); flex-basis: 100%; }
+.sp-g-zustand.neu { animation: sp-neu 1.2s ease-out; border-radius: 6px; }
+@keyframes sp-neu { 0% { background: rgba(207,167,94,.45); } 100% { background: transparent; } }
+.sp-seite.kampf .sp-tischkarte svg { max-height: 220px; }
+/* Auftrag der Spieler, dauerhaft über der Schrittkarte */
+.sp-auftrag { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--brass); border-radius: 8px; background: rgba(207,167,94,.07); font-family: var(--ui); font-size: 16px; }
+.sp-auftrag > span { font: 700 12px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--brass); }
+.sp-auftrag b { font-size: 17px; }
+.sp-auftrag em { font-family: var(--prose); color: var(--ink); }
+.sp-auftrag small { color: var(--dim); }
+.sp-auftrag .btn { margin-left: auto; }
+.sp-auftrag.fertig { border-color: #5fbf5a; color: #7fd06a; }
+/* Gegner anpassen */
+.sp-mods { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; max-width: none; }
+.sp-mods i { font: 700 12px var(--ui); font-style: normal; padding: 1px 7px; border-radius: 999px; border: 1px solid; }
+.sp-mods i.plus { color: #ff8a7a; border-color: #e2483a; } .sp-mods i.minus { color: #7fd06a; border-color: #5fbf5a; }
+.sp-anpassen { display: grid; gap: 0; padding-top: 6px; border-top: 1px dashed var(--line); }
+.sp-anpassen summary { cursor: pointer; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-anpassen[open] { gap: 6px; }
+.sp-anpassen h5 { margin: 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+.sp-anpassen-raster { display: grid; grid-template-columns: repeat(2, auto 34px 34px); gap: 4px 6px; align-items: center; font: 600 14px var(--ui); justify-content: start; }
+.sp-anpassen-raster .btn.sm { min-width: 0; min-height: 0; padding: 3px 0; }
+.sp-anpassen-regel { display: flex; gap: 6px; }
+.sp-anpassen-regel input { flex: 1; min-width: 0; }
+.sp-alle { font: 500 13px var(--ui); color: var(--dim); display: flex; gap: 6px; align-items: center; }
+.sp-gegnerliste > h4 { display: flex; justify-content: space-between; align-items: center; }
+.sp-neu-liste { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Antworten: Spalten nach Anzahl, Folgen als Pillen */
+.sp-anleitung { font: 500 17px var(--ui); color: var(--dim); max-width: none; }
+.sp-optionen.n1, .sp-optionen.n2 { grid-template-columns: 1fr; }
+.sp-optionen.n3, .sp-optionen.n4 { grid-template-columns: 1fr 1fr; }
+.sp-option kbd { min-width: 40px; height: 40px; font-size: 20px; }
+.sp-option small { font-style: normal; }
+.sp-option span.sp-pillen { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-pillen i { font: 700 13px var(--ui); font-style: normal; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
+.sp-pillen i.plus { border-color: #5fbf5a; color: #7fd06a; } .sp-pillen i.minus { border-color: #e2483a; color: #ff8a7a; } .sp-pillen i.spaeter { border-color: #a26bff; color: #c9a8ff; }
+/* Regie einklappbar, frühere Ereignisse eingeklappt, „Zuletzt“ im Fuß */
+.sp-regie summary, .sp-frueher summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: #6fb0ff; }
+.sp-regie .sp-hinweise { font-family: var(--ui); font-size: 17px; margin-top: 6px; }
+.sp-frueher { display: grid; gap: 8px; }
+.sp-zuletzt { display: block; text-align: left; background: none; border: 0; padding: 0; color: var(--ink); font: 500 15px var(--ui); cursor: pointer; }
+.sp-zuletzt span { font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--brass); margin-right: 6px; }
+.sp-zuletzt em { font-style: normal; color: #ffb070; }
+/* NPC-Schublade über der Schrittkarte */
+.sp-schublade { position: absolute; top: 0; bottom: 0; left: 0; width: calc(100% - clamp(400px, 34vw, 560px)); z-index: 20; display: grid; align-content: start; gap: 12px; padding: 16px 22px; overflow: auto; background: var(--bg); border-right: 1px solid var(--brass); border-left: 8px solid var(--brass); box-shadow: 12px 0 30px rgba(0,0,0,.5); }
+.sp-mitte.ohne-seite .sp-schublade { width: 100%; }
+.sp-schublade > header { display: flex; gap: 12px; align-items: center; }
+.sp-schublade > header h3 { flex: 1; font-size: 30px; }
+.sp-schublade .sp-npc-steckbrief ul { padding-left: 20px; font-size: 18px; }
+.sp-will { font-size: 17px; }
+.sp-antwort { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #a26bff; border-radius: 8px; }
+.sp-antwort small { font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: #c9a8ff; }
+.sp-fragen-knoepfe { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-nicht { color: var(--dim); font-size: 16px; }
+/* Heldenchips unter der Tischkarte */
+.sp-helden { display: flex; flex-wrap: wrap; gap: 5px; }
+.sp-heldchip i { font-style: normal; font-weight: 600; }
+/* Leisten blitzen bei Änderung */
+.sp-pill { position: relative; }
+.sp-pill sup { position: absolute; top: -9px; right: -4px; font: 800 12px var(--ui); padding: 0 4px; border-radius: 6px; background: var(--bg); }
+.sp-pill.blitz-hoch { animation: sp-blitz-hoch .6s ease-out 2; } .sp-pill.blitz-hoch sup { color: #ff8a1f; }
+.sp-pill.blitz-runter { animation: sp-blitz-runter .6s ease-out 2; } .sp-pill.blitz-runter sup { color: #7fd06a; }
+@keyframes sp-blitz-hoch { 0% { box-shadow: 0 0 0 4px rgba(255,138,31,.7); } 100% { box-shadow: 0 0 0 0 rgba(255,138,31,0); } }
+@keyframes sp-blitz-runter { 0% { box-shadow: 0 0 0 4px rgba(127,208,106,.7); } 100% { box-shadow: 0 0 0 0 rgba(127,208,106,0); } }
+/* Gegnerzustand als farbiges Etikett, größere Schadenknöpfe */
+.sp-g-zustand em { padding: 1px 7px; border-radius: 4px; border: 1px solid currentColor; }
+.sp-g-zustand em.z-unverletzt { color: #7fd06a; } .sp-g-zustand em.z-angekratzt { color: #f2cf4a; } .sp-g-zustand em.z-verwundet { color: #ff8a1f; }
+.sp-g-zustand em.z-schwer-verwundet, .sp-g-zustand em.z-am-Ende { color: #ff4a36; } .sp-g-zustand em.z-gefallen { color: #77736b; }
+.sp-g-knoepfe .btn.sm { min-width: 40px; min-height: 36px; font-size: 15px; }
+/* Aktionsleiste: nach Gruppen gegliedert, jede Gruppe mit Etikett und Farbstreifen */
+.sp-gruppe { display: inline-flex; flex-wrap: nowrap; flex-shrink: 0; gap: 4px; align-items: center; padding: 3px 6px 3px 0; border-left: 3px solid var(--gf, var(--line)); padding-left: 6px; }
+.sp-gruppe > span { font: 700 11px var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--gf, var(--dim)); margin-right: 2px; }
+.sp-gruppe.g-untersuchen { --gf: #f2cf4a; } .sp-gruppe.g-bewegen { --gf: #6fb0ff; } .sp-gruppe.g-wege { --gf: #9fb4ff; }
+.sp-gruppe.g-story { --gf: #cfa75e; } .sp-gruppe.g-fragen { --gf: #a26bff; } .sp-gruppe.g-lärm { --gf: #ff8a1f; } .sp-gruppe.g-kampf { --gf: #ff4a36; }
+/* Uhr und Antreiber */
+.sp-uhr { display: inline-flex; align-items: center; padding: 0 8px; font: 700 14px var(--ui); color: var(--dim); font-variant-numeric: tabular-nums; }
+.sp-uhr.spaet { color: #ff8a1f; }
+.sp-antreiber { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #ff8a1f; border-radius: 8px; background: rgba(255,138,31,.08); }
+.sp-antreiber header { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-family: var(--ui); }
+.sp-antreiber header span { display: inline-flex; gap: 6px; }
+.sp-antreiber .sp-lies { font-size: 21px; }
+/* Beute und Inventar */
+.sp-beutezeile { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--ui); }
+.sp-beute { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sp-beute small { color: var(--dim); font-size: 14px; }
+.sp-beute > span { display: inline-flex; gap: 4px; align-items: center; font-size: 14px; }
+.sp-inventar { list-style: none; padding: 0 !important; display: grid; gap: 4px; font-size: 15px; }
+.sp-inventar small { color: var(--dim); }
+.sp-inventare { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.sp-pop h5 { margin: 4px 0 0; font: 700 12px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+/* NPC-Fenster: Steckbrief und Kernsätze oben, unten was sie weiß und was nicht */
+.sp-npc-oben { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.sp-npc-steckbrief { display: grid; gap: 8px; }
+.sp-npc-steckbrief dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.sp-npc-steckbrief dt { font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); padding-top: 3px; }
+.sp-npc-steckbrief dd { margin: 0; }
+.sp-npc-kern { display: grid; gap: 8px; }
+.sp-npc-kern .sp-lies { font-size: 21px; padding: 10px 14px; }
+.sp-npc-unten { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, .9fr); gap: 22px; align-items: start; border-top: 1px solid var(--line); padding-top: 12px; }
+.sp-npc-unten section { display: grid; gap: 8px; }
+.sp-weiss td:first-child { width: 58% !important; font-family: var(--prose) !important; font-weight: 400 !important; }
+.sp-weiss td:last-child { color: var(--dim); font-family: var(--ui); }
+.sp-mehr summary { cursor: pointer; font: 700 13px var(--ui); letter-spacing: .1em; text-transform: uppercase; color: var(--brass); }
+@media (max-width: 900px) { .sp-npc-oben, .sp-npc-unten { grid-template-columns: 1fr; } }
+/* Log */
+.sp-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sp-log li { display: grid; grid-template-columns: 34px 24px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg2); }
+.sp-log li.art-wahl { border-color: #e2483a; }
+.sp-log-r { font: 700 13px var(--ui); color: var(--brass); padding-top: 3px; }
+.sp-log b { font: 700 17px var(--ui); display: block; }
+.sp-log small { color: var(--dim); font: 500 13px var(--ui); }
+.sp-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.sp-chip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); font: 600 13px var(--ui); }
+.sp-chip.spaeter { border-color: var(--brass); }
+.sp-chip i { font-style: normal; color: var(--brass); font-weight: 800; }
+.sp-chip.hoch { border-color: #ff8a1f; color: #ffb070; } .sp-chip.runter { border-color: #6fb0ff; color: #9fc8ff; } .sp-chip.flag { color: var(--ink); }
+.sp-schwellen { list-style: none; padding: 0 !important; margin: 4px 0 0; font: 500 14px var(--ui); color: var(--dim); }
+.sp-schwellen li.ja { color: #ff8a1f; }
+body.sp-laeuft:has(#tabSpielen:not([hidden])) { overflow: hidden; }
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -669,6 +1077,7 @@ fieldset.checks legend { margin-bottom: 6px; }
     <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M5 19C5 9.5 10.5 4 20 4c0 9.5-5.5 15-15 15zM5 19l8.5-8.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A8 8 0 1 1 9.5 4.5a6.2 6.2 0 0 0 10 10z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-sword" viewBox="0 0 24 24"><path d="M20 4l-10.5 10.5M20 4v4.5M20 4h-4.5M6.5 11.5l6 6M8.5 15.5L4 20" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/></symbol>
+    <symbol id="i-bow" viewBox="0 0 24 24"><path d="M5 3.5c8 0 15.5 7.5 15.5 15.5M5 3.5L20.5 19M4 20L17 7M17 7h-4M17 7v4M4 20l.5-3M4 20l3-.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/><path d="M12 1.5v5M12 17.5v5M1.5 12h5M17.5 12h5" stroke="currentColor" stroke-width="1.9"/></symbol>
     <symbol id="i-boot" viewBox="0 0 24 24"><path d="M7.5 3h5.5v10h3.2c2.2 0 3.8 1.3 3.8 3.3V20H4v-3.8l3.5-3.6z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-wing" viewBox="0 0 24 24"><path d="M3 19c7 0 13-4.5 18-15-3.2 1.2-6.2 1.6-9 3.4.8-1.4 1-2.6 1-4-4 1.8-7.4 6-8.4 10.6.9-.6 1.8-.9 2.8-.9C5.5 14.5 3.8 16.6 3 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
@@ -709,6 +1118,8 @@ fieldset.checks legend { margin-bottom: 6px; }
     <nav class="tabs" role="tablist" aria-label="Bereiche">
       <button type="button" role="tab" id="tab-karten" data-tab="karten" aria-selected="true" aria-controls="tabKarten">Erstellen</button>
       <button type="button" role="tab" id="tab-gruppe" data-tab="gruppe" aria-selected="false" aria-controls="tabGruppe">Gruppe</button>
+      <button type="button" role="tab" id="tab-szenarien" data-tab="szenarien" aria-selected="false" aria-controls="tabSzenarien">Szenarien</button>
+      <button type="button" role="tab" id="tab-spielen" data-tab="spielen" aria-selected="false" aria-controls="tabSpielen">Spielen</button>
       <button type="button" role="tab" id="tab-db" data-tab="db" aria-selected="false" aria-controls="tabDb">Datenbank</button>
       <button type="button" role="tab" id="tab-regeln" data-tab="regeln" aria-selected="false" aria-controls="tabRegeln">Regeln</button>
     </nav>
@@ -721,7 +1132,7 @@ fieldset.checks legend { margin-bottom: 6px; }
       <select id="preset" aria-label="Vorlage laden"></select>
       <button type="button" class="btn ghost sm" id="bNewHero">+ Held</button>
       <button type="button" class="btn ghost sm" id="bNewEnemy">+ Gegner</button>
-      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, Zäh +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
+      <button type="button" class="btn ghost sm" id="bElite" data-tip="Macht aus dem Gegner seine Elite-Version: Qualität eine Stufe besser, LP +50 %, +1 Attacke je Waffe. Kostet etwa das Doppelte.">Elite-Version</button>
       <div class="seg" id="modus" role="group" aria-label="Bearbeiten mit">
         <button type="button" data-m="form" aria-pressed="true" data-tip="Alle Werte als Felder: schnell für fertige Einheiten und Vorschläge aus dem Chat.">Formular</button>
         <button type="button" data-m="bau" aria-pressed="false" data-tip="Werte mit + und −, neben jedem Knopf steht, was er kostet. Helden haben ein festes Budget.">Baukasten</button>
@@ -748,7 +1159,7 @@ fieldset.checks legend { margin-bottom: 6px; }
               <label class="f">Modelle <input type="text" id="size"></label>
               <label class="f">Qualität <input type="text" id="quality"></label>
               <label class="f">Verteid. <input type="text" id="defense"></label>
-              <label class="f">Zäh <input type="text" id="tough" title="Zäh je Modell"></label>
+              <label class="f">LP <input type="text" id="tough" title="LP je Modell"></label>
             </div>
             <div class="calc" id="calc" aria-live="polite"></div>
           </fieldset>
@@ -899,9 +1310,23 @@ fieldset.checks legend { margin-bottom: 6px; }
         <div class="copyrow">
           <button type="button" class="btn" id="simRun">Würfeln</button>
           <button type="button" class="btn ghost sm" id="simFair">Test: Fern gegen Nah, gleiche Punkte</button>
-          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an Zäh bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
+          <button type="button" class="btn ghost sm" id="simCheck" data-tip="Jede Fähigkeit und jeder Zauber einzeln: Einheit mit Fähigkeit gegen dieselbe Einheit ohne, die dafür gleich viele Punkte an LP bekommt. Um 50 % heißt: Der Preis passt.">Preis-Check: Fähigkeiten</button>
         </div>
         <p class="hint">Vereinfacht: keine Moral, keine Zauber, gerade Linie auf einem 48"-Tisch, höchstens 8 Runden. Schützen weichen zurück, solange Platz ist. Wer nach 8 Runden noch steht, zählt als Unentschieden.</p>
+        <h3 class="sim-gruppe-kopf">Gruppenkampf</h3>
+        <div class="row">
+          <label class="f">Seite A: hinzufügen <select id="grpAdd0"></select></label>
+          <label class="f">Seite B: hinzufügen <select id="grpAdd1"></select></label>
+        </div>
+        <div class="row">
+          <div class="sim-gruppe" id="grpListe0" aria-label="Seite A"></div>
+          <div class="sim-gruppe" id="grpListe1" aria-label="Seite B"></div>
+        </div>
+        <div class="copyrow">
+          <button type="button" class="btn" id="grpRun">Gruppen würfeln</button>
+          <button type="button" class="btn ghost sm" id="grpHelden" data-tip="Seite B: die vier Helden-Vorlagen">Seite B: vier Helden</button>
+        </div>
+        <p class="hint">Aktivierung abwechselnd wie bei OPR, jede Einheit nimmt sich den nächsten Feind vor, nur das Ziel schlägt zurück. Auren wie Rauschsporen treffen jeden Feind in Reichweite. Startabstand, Kämpfe und Gelände wie oben, höchstens 10 Runden. Schicksalswürfel zählen nicht mit.</p>
       </div>
       <div class="sim-out" id="simOut" aria-live="polite"></div>
     </div>
@@ -920,7 +1345,7 @@ fieldset.checks legend { margin-bottom: 6px; }
           <dt>Trefferchance</dt><dd>Qualität 2+ 0,83 · 3+ 0,67 · 4+ 0,5 · 5+ 0,33 · 6+ 0,17. Zuverlässig zählt wie 2+</dd>
           <dt>Waffenregeln</dt><dd>DS(1) ×1,33 · DS(2) ×1,67 · DS(3+) ×2 · Reißend ×1,15 · Gift ×1,05 · Zerfleischen ×1,15 · Zersetzen ×1,35 · Stoß ×1,1 · Tödlich ×2 · Explosion(X) ×(1 + X/6) · Präzise ×1,25 · Indirekt ×1,15 · Zielsuchend ×1,05 · Überhitzen ×0,85 · Elemente ×1 (kosten nichts)</dd>
           <dt>Reichweite</dt><dd>Nahkampf ×1 · 6" ×0,68 · 12" ×0,8 · 18" ×0,9 · 24" ×1,0 · 30" ×1,1. Mit dem Duell-Simulator so abgestimmt, dass Fern- und Nahkampf bei gleichen Punkten gleich oft gewinnen</dd>
-          <dt>Ausdauer</dt><dd>Zäh × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
+          <dt>Ausdauer</dt><dd>LP × Modelle × Rüstung. Rüstung: Verteidigung 2+ ×6 · 3+ ×3 · 4+ ×2 · 5+ ×1,5 · 6+ ×1,2</dd>
           <dt>Boni</dt><dd>+5 % Geländeläufer, Späher, Tarnung, Fliegen, Furchtlos, Rasend, Held · +10 % Schnell, Hinterhalt, Wucht · +15 % Furcht · +20 % Ausweichen · +25 % Regeneration · −10 % Langsam · −15 % An Beschwörer gebunden</dd>
           <dt>Fest</dt><dd>Zauberer(1) +20, jede weitere Stufe +15 · Skills, Zauber und Gegenstände aus der Datenbank mit ihren festen Punkten</dd>
           <dt>Prozent</dt><dd>Sonderregeln der Gegner aus der Datenbank als Aufschlag auf die Boni</dd>
@@ -942,7 +1367,7 @@ fieldset.checks legend { margin-bottom: 6px; }
           </tbody>
         </table></div>
         <h3>Normal und Elite</h3>
-        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, Zäh plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
+        <p>Eine starke Version kostet etwa das Doppelte der normalen. Das Elite-Paket im Baukasten macht genau das: Qualität eine Stufe besser, LP plus 50 %, eine Attacke mehr je Waffe. Die Formel landet damit beim 1,8- bis 2,2-Fachen, mit einer zusätzlichen Mechanik etwas darüber.</p>
         <h3>Gefährten freischalten</h3>
         <p>Jeder Gegner kann ein Gefährte werden. Der Spielleiter schaltet ihn für eine Gruppe frei, zum Beispiel nachdem die Gruppe seine Elite-Version besiegt hat. Gefährten haben keine Power, keine Skills und sammeln keine XP. Höchstens ein Gefährte je Held. Seine Punkte zählen zur Gruppe, und weil Quest die Gegnerwellen nach den Gruppenpunkten bemisst, bleibt das Spiel von selbst im Gleichgewicht.</p>
       </div>
@@ -986,6 +1411,34 @@ fieldset.checks legend { margin-bottom: 6px; }
         </aside>
         <div class="g-main" id="gMain"></div>
       </div>
+    </section>
+  </div>
+
+  <div id="tabSzenarien" role="tabpanel" aria-labelledby="tab-szenarien" class="tabpanel" hidden>
+    <section aria-labelledby="h-szenarien">
+      <div class="sec-head">
+        <h2 id="h-szenarien">Szenarien</h2>
+        <p class="lede">Die Kampagne Moosgrab Map für Map, mit Tischskizze für den Esstisch und Spielleiter-Blatt, dazu gewürfelte Zusatzmissionen. Die Spieler-Ansicht lässt alles weg, was erst gefunden werden soll.</p>
+      </div>
+      <div class="gruppe">
+        <aside class="g-list">
+          <p class="sz-akt">Kampagne</p>
+          <div id="szKampagne"></div>
+          <p class="sz-akt">Gespeicherte Zusatzmissionen</p>
+          <div id="szGespeichert"></div>
+        </aside>
+        <div class="g-main" id="szMain"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="tabSpielen" role="tabpanel" aria-labelledby="tab-spielen" class="tabpanel" hidden>
+    <section aria-labelledby="h-spielen">
+      <div class="sec-head">
+        <h2 id="h-spielen">Spielen</h2>
+        <p class="lede">Der Laptop als Spielleiter-Schirm: Map Schritt für Schritt, Vorlesetexte, Audio-Cues, NPCs und Gegner mit verdeckten Lebenspunkten. Die Figuren bewegt ihr am Tisch.</p>
+      </div>
+      <div id="spMain"></div>
     </section>
   </div>
 
@@ -1038,6 +1491,9 @@ fieldset.checks legend { margin-bottom: 6px; }
                   <select id="dbStaerke"><option value="klein">Klein</option><option value="mittel" selected>Mittel</option><option value="gross">Groß</option><option value="elite">Elite</option></select>
                 </label>
               </div>
+              <label class="f" id="dbEnergieRow">Aktionswürfel
+                <select id="dbEnergie"><option value="">Automatisch aus dem Text</option><option value="0">Keiner – passiv oder Auslöser</option><option value="1">Würfel 3+</option><option value="2">Würfel 5+</option><option value="3">Eine 6</option></select>
+              </label>
               <label class="f" id="dbArtRow">Art
                 <select id="dbArt"><option>Skill</option><option>Aura</option><option selected>Sonderregel</option><option>Passiv</option><option>Trank</option><option>Ausrüstung</option></select>
               </label>

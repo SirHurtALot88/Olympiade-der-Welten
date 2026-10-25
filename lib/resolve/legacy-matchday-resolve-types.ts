@@ -81,6 +81,64 @@ export type DisciplineHighlightCandidate = {
   payload: Record<string, unknown>;
 };
 
+/**
+ * Woher `teamPoints` einer Disziplin-Zeile stammt:
+ *  - `"pps"`: Manager-Mode-Rangtabelle (`getRankToPointsValue()`), Standard ausserhalb von Battle Mode.
+ *  - `"arena"`: Battle Mode, 2/1/0 aus einem echten Arena-Duell.
+ *  - `"pps_duell"`: Battle Mode, 2/1/0 aus dem PPS-Score beider Seiten desselben Fixtures
+ *    (PPS-Duell-Bruecke, lib/resolve/battle-mode-pps-duell.ts) — der verbindliche Rueckfall ohne
+ *    Arena-Ergebnis.
+ *  - `"mini_dm_pod"`: Battle Mode, Mini-DM ausschliesslich -- 2-1-0-0 aus der echten Vierergruppe
+ *    (Pod, `lib/season/mini-dm-pod-schedule.ts`), NICHT aus dem Zwei-Team-Fixture des Spieltags
+ *    (lib/resolve/mini-dm-pod-resolve.ts). Chris 19.10.: "umbauen dass die 4er teams da drin sind".
+ */
+export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell" | "mini_dm_pod";
+
+/**
+ * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+ * Abschnitt 3.1, PR 1 — harte Auflage der Projektaufsicht): Grund, warum eine arena-aufgelöste
+ * Disziplin (`ARENA_RESOLVED_DISCIPLINE_IDS`) in dieser Zeile KEIN Arena-Ergebnis trägt, sondern
+ * über die PPS-Duell-Brücke läuft. `"nicht_ausgefuehrt"` ist die Engine-Strukturprüfung selbst
+ * (Abschnitt 3.2 Punkt 4) — sie greift immer dann, wenn weder ein Arena-Override noch einer der
+ * anderen, explizit übergebenen Gründe vorliegt. Das ist GENAU der heutige K1-Zustand (der
+ * Auto-Run ruft die Arena nie auf, s. Plan Abschnitt 1.1): bis PR 3 den Arena-Vorlauf anbindet,
+ * bekommt JEDE gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund
+ * — bewusst und laut statt, wie bisher, nur über `console.warn` (Befund F2).
+ */
+export type ArenaAusfallGrund =
+  | "chromium_start" // Launch scheitert: Binary fehlt, Abhaengigkeit fehlt (E1)
+  | "timeout" // seitenTimeoutMs oder Gesamt-Timeout
+  | "absturz" // Target/Page closed, Renderer crash, OOM
+  | "liga_fehlgeschlagen" // eine Liga warf, die andere lief (Teil-Ausfall)
+  | "ergebnis_unvollstaendig" // arena_matchday_missing_result: Team ohne Duell-Ergebnis
+  | "abgebrochen_neustart" // in_progress aelter als 5 min (erst ab PR 3 relevant)
+  | "deaktiviert" // arenaModus "aus" (Tests/Notschalter, erst ab PR 3 relevant)
+  | "nicht_ausgefuehrt" // Engine-Strukturpruefung: gewertet, aber nie versucht (die K1-Klasse)
+  /**
+   * OPUS-REVIEW (Nachtrag 18.10., B3-Instabilitaets-Fix): der `arenaEingabeHash` weicht beim
+   * Buchen ZWEIMAL IN FOLGE fuer dieselbe Aufstellungs-Signatur ab, obwohl die Signatur selbst
+   * (`buildMatchdayResolveSignature()`, Slots/Formkarten/Verfuegbarkeit) unveraendert blieb --
+   * etwas, das NUR der feinere Fingerabdruck sieht (z. B. Fatigue, ein von der KI neu
+   * gespeichertes Lineup mit identischer Belegung, oder eine Zeitstempel-/Map-Reihenfolge-
+   * Abhaengigkeit in `buildArenaTeam()`/`buildArenaAufstellungBeide()`), aendert sich zwischen
+   * Vorlauf und Buchung immer wieder. OHNE diesen Grund haette ein dritter erzwungener
+   * Vorlauf-Neustart eine Endlosschleife ausgeloest (Vorlauf "ready" -> Divergenz -> neuer
+   * Vorlauf -> "ready" -> Divergenz -> ...) -- NIE eine Buchung, Chromium im Dauerlauf. Nach der
+   * ZWEITEN Divergenz zur selben Signatur wird stattdessen sofort die PPS-Duell-Bruecke gebucht,
+   * mit diesem Grund sichtbar markiert statt eines generischen `"nicht_ausgefuehrt"` (die Arena
+   * LIEF ja, zweimal sogar -- nur ihr Ergebnis passte beim Buchen nicht mehr zur Eingabe).
+   */
+  | "eingabe_instabil";
+
+export type ArenaAusfall = {
+  grund: ArenaAusfallGrund;
+  /** gekuerzte Fehlermeldung, max. 200 Zeichen, nur fuer Log/Tooltip. */
+  detail?: string | null;
+  leagueTier?: string | null;
+  zeitpunkt: string;
+  versuch: number;
+};
+
 export type DisciplineTeamResolvePreview = {
   teamId: string;
   teamName: string;
@@ -124,7 +182,26 @@ export type DisciplineTeamResolvePreview = {
    * Arena-Duell, s. lib/resolve/battle-mode-arena-team-points.ts). Fehlt das Feld (aeltere
    * Preview-Objekte), gilt der Default `"pps"` — kein Verhalten aendert sich dadurch.
    */
-  resolutionSource?: "pps" | "arena";
+  resolutionSource?: DisciplineResolutionSource;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): nur bei einem
+   * Duell-Ergebnis (`resolutionSource` `"arena"` oder `"pps_duell"`) gesetzt, sonst `null`/fehlend.
+   * `marge` = roher Abstand beider Seiten, `verhaeltnis` = ±D (0..10) aus Sicht dieses Teams,
+   * `margeM90` = die verwendete Bezugsgroesse (`null` = Rueckfall-D ohne gezogene Referenz).
+   * `duellSeiten` = Rohwerte [dieses Team, Gegner] (PPS-Scores bzw. Arena-Seitenstand).
+   */
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
+  /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, Opus/Fable 19.10., docs/design/... s. battle-mode-pps-duell.ts
+   * `berechneErgebnisNormiert()`): `[eigenes Ergebnis, gegnerisches Ergebnis]`, 0..10 ganzzahlig,
+   * `eigenes - gegnerisches = verhaeltnis` (unvorzeichenbehaftet) IMMER exakt -- by construction,
+   * unabhaengig von der Guete der gezogenen Niveau-Referenz. Nur an Duell-Zeilen gesetzt, wie
+   * `marge`/`verhaeltnis`.
+   */
+  ergebnisNormiert?: [number, number] | null;
   /**
    * Nur gesetzt, wenn `resolutionSource === "arena"`: der deterministische Seed
    * (`${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`), mit dem sich genau
@@ -139,6 +216,36 @@ export type DisciplineTeamResolvePreview = {
    * `ArenaMomentEintrag`, lib/battle/arena-headless-runner.ts), fuer Heim UND Gast identisch.
    */
   momente?: ArenaMomentEintrag[] | null;
+  /**
+   * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+   * sequenziell+Reveal, Chris 13.10.): wie `arenaMatchSeed` nur gesetzt, wenn
+   * `resolutionSource === "arena"` -- die Team-ID des Gegners in diesem Zwei-Team-Duell. Treibt
+   * die paarweise Board-Sequenz + den Matchup-Reveal auf der Bühne (`prim === "lamps"` /
+   * `"klassen"` / `"stage"`); für jede andere Disziplin ungenutzt.
+   */
+  opponentTeamId?: string | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (s. `ArenaAusfall` oben): nur gesetzt, wenn diese Zeile eine
+   * arena-aufgelöste Disziplin ohne Arena-Ergebnis ist — nie bei `resolutionSource === "arena"`
+   * (dort lief die Arena ja) und nie außerhalb von Battle Mode bzw. außerhalb
+   * `ARENA_RESOLVED_DISCIPLINE_IDS` (Manager-Mode-Zeilen bekommen diesen Schlüssel nie, bleiben
+   * also byte-identisch zum Stand vor dieser Ergänzung).
+   */
+  arenaAusfall?: ArenaAusfall | null;
+  /**
+   * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
+   * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.) -- `undefined`
+   * ueber den (unveraenderten) PPS-Pod-Pfad.
+   */
+  miniDmPod?: {
+    podId: string;
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
+  } | null;
   warnings: string[];
   missingLineup: boolean;
   missingPlayers: number;

@@ -48,7 +48,11 @@
  * das ist eine bewusste Vereinfachung, keine unbemerkte Luecke, siehe `buildMiniDmPodGroups()`.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getSeasonDisciplineSchedule, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import {
+  getSeasonDisciplineSchedule,
+  getSeasonDisciplineScheduleEntry,
+  MINI_DM_DISCIPLINE_ID,
+} from "@/lib/season/season-discipline-schedule";
 import { buildCircleRounds } from "@/lib/season/season-fixture-schedule";
 import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 
@@ -197,4 +201,36 @@ export function getMiniDmPodForTeam(
   options?: { saveId?: string | null },
 ): MiniDmPod | null {
   return getMiniDmPodsForMatchday(gameState, matchdayId, options).find((pod) => pod.teamIds.includes(teamId)) ?? null;
+}
+
+/**
+ * DER SPIELPLAN-SLOT-K EINES MINI-DM-SPIELTAGS — `null`, wenn an diesem Spieltag gar kein
+ * Mini-DM-Slot steht (D1 UND D2 sind etwas anderes) oder der Slot keine gueltige Kadergroesse
+ * traegt. `legacyScorePlayerCount` zuerst (seit PR 1 der 2-6-Spieler-Rueckkehr, 21.10., IDENTISCH
+ * zu `playerCount` fuer Mini-DM -- s. Kommentar an `SeasonDisciplineScheduleSlot.
+ * legacyScorePlayerCount`, olyDataTypes.ts), `playerCount` als Rueckfall fuer einen aelteren,
+ * noch nicht normalisierten Spielplan-Eintrag.
+ *
+ * HIERHER VERSCHOBEN (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-Anzeige") statt in
+ * `lib/resolve/mini-dm-ffa-matchday.ts` zu bleiben: diese Datei ist (wie dieser ganze
+ * Modulkopf-Kommentar oben begruendet) bewusst OHNE Playwright-/`node:fs`-Importe, waehrend
+ * `mini-dm-ffa-matchday.ts` ueber `arena-headless-runner.ts` beide mitzieht. Ein Next.js-
+ * Client-Bundle (`FoundationBattleArenaHost.tsx`, "use client") braucht GENAU diese Funktion, um
+ * die echte Kadergroesse k des Spieltags fuer die Live-Buehne zu lesen, OHNE Playwright/`fs`/
+ * `net`/`tls` mitzuziehen (`Module not found`-Build-Fehler, s. `arena-resolved-disciplines.ts`-
+ * Kopfkommentar fuer denselben Grund bei einer anderen Konstante). `mini-dm-ffa-matchday.ts`
+ * importiert sie jetzt von hier zurueck (Re-Export), damit bestehende Importe/Tests unveraendert
+ * weiterlaufen -- EINE Implementierung, zwei Aufrufer, kein zweiter Pfad.
+ */
+export function resolveMiniDmFfaPlayerCountForMatchday(
+  gameState: GameState,
+  matchdayId: string,
+  options?: { saveId?: string | null },
+): number | null {
+  const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId, options);
+  if (!entry) return null;
+  const slot = [entry.discipline1, entry.discipline2].find((candidate) => candidate?.disciplineId === MINI_DM_DISCIPLINE_ID);
+  if (!slot) return null;
+  const k = slot.legacyScorePlayerCount ?? slot.playerCount ?? null;
+  return Number.isInteger(k) && k != null && k >= 2 && k <= 6 ? k : null;
 }

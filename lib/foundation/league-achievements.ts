@@ -330,6 +330,10 @@ export function buildLeagueAchievements(input: {
   let seasonsCompleted = 0;
   let firstMedalSeason: string | null = null;
   let firstTitleSeason: string | null = null;
+  // TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8): der Liga-2-Titel ist
+  // ein EIGENER Meilenstein, getrennt vom Liga-1-/Gesamt-"Meistertitel" (`isGold`) unten — nie
+  // `true` für einen Manager-Mode-/Legacy-Save ohne Liga-Split (`isLiga2Champion` fehlt dort).
+  let firstLiga2TitleSeason: string | null = null;
   for (const snapshot of snapshots) {
     const ownRecord = resolveSeasonSnapshotTeamRecords(snapshot).find((row) => row.teamId === selectedTeamId) ?? null;
     if (!ownRecord) {
@@ -342,6 +346,9 @@ export function buildLeagueAchievements(input: {
     }
     if (firstTitleSeason == null && ownRecord.isGold) {
       firstTitleSeason = label;
+    }
+    if (firstLiga2TitleSeason == null && ownRecord.isLiga2Champion) {
+      firstLiga2TitleSeason = label;
     }
   }
 
@@ -383,6 +390,26 @@ export function buildLeagueAchievements(input: {
     contextLabel: firstTitleSeason,
     progressLabel: firstTitleSeason != null ? null : "Noch kein Titel",
     targetLabel: firstTitleSeason != null ? null : "Ziel: Saison auf Rang 1 beenden",
+    tone: "warn",
+    playerId: null,
+  });
+
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8, Option (a)): „Liga-2-
+   * Platz-1 ist ein eigenständiger Titel (Zweitliga-Meister), getrennt von Liga 1 ausgewiesen."
+   * Nur erreichbar in Battle-Mode-Saves mit aktivem Liga-Split — für jeden Manager-Mode-/
+   * Legacy-Save bleibt dieser Meilenstein dauerhaft "locked" (niemand hat je `isLiga2Champion`).
+   */
+  achievements.push({
+    id: "history-first-liga2-title",
+    group: "history",
+    label: "Zweitliga-Meister",
+    description: "Gewinne Liga 2 (Rang 1) im Battle-Mode-Liga-Split.",
+    state: firstLiga2TitleSeason != null ? "reached" : "locked",
+    detail: firstLiga2TitleSeason != null ? "Liga 2 gewonnen" : null,
+    contextLabel: firstLiga2TitleSeason,
+    progressLabel: firstLiga2TitleSeason != null ? null : "Noch kein Zweitliga-Titel",
+    targetLabel: firstLiga2TitleSeason != null ? null : "Ziel: Liga 2 auf Rang 1 beenden",
     tone: "warn",
     playerId: null,
   });

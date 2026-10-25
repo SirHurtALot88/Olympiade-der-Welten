@@ -40,7 +40,7 @@ RUN mkdir -p /app/data \
   && chmod +x /app/scripts/start-hosted.sh \
   && chown -R lec:nodejs /app/data
 
-USER lec
+# Start als root: start-hosted.sh repariert die Rechte im Volume und wechselt dann zu "lec".
 
 EXPOSE 3000
 

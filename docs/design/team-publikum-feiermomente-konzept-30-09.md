@@ -212,6 +212,15 @@ heute überhaupt nicht zu sehen (B4). Falls Chris ablehnt: Finale entfällt, all
 bleiben unberührt. Einziger bekannter Verbraucher des Overlays in Skripten:
 `scripts/screenshot-broadcast-hud.mjs` — dort ggf. Wartezeit anpassen.
 
+**Gebaut am 07.10.** (Chris' Freigabe zusammen mit D7/A4, s.
+`broadcast-d7-a4-fable-empfehlung-02-10.md` Abschnitt 6): `endstandVormerken()`/
+`endstandNachlaufPruefen()` in `updateHudBuehne()`, `updateHudBahn()` und — zusätzlich, weil es
+seit 30.09. dasselbe Einmal-Muster hat — `updateHudFeldspiel()`. 3,5 s über `jetztMs()`, Sieger-
+Feedzeile sofort, Stufe „finale" für den Sieger, Score-Bug bleibt im Nachlauf stehen, A3-Wischer
+deckt den Übergang zum Overlay. Sonden-Schalter `window.__arena.endstandNachlauf(false)` stellt
+das alte Verhalten her (Overlay im selben Frame, kein „finale"); gesetzt in allen Skripten, die die
+Ticker-Dichte bis zum Endstand zählen oder per `sondenLauf()` den Endstand fotografieren.
+
 ---
 
 ## 3. Die Disziplinen
@@ -322,6 +331,23 @@ der sich der eigene aktive Läufer nähert (`ovalAnteil()`-Abstand zur Zone < 0,
 **Frequenz:** 2 × 5 Übergaben in ~180 s → alle ~18 s pro Team, versetzt ~alle 9 s eine sichtbare
 Teamreaktion; dazu das Anfeuern durchgehend. **Klasse:** A (`stepStaffel` ist `bahnBewegung`-Pfad,
 Vertrag Z. 35248ff; `updateHudBahn` ist HUD). **Aufwand:** M.
+
+**Gebaut am 11.10.** (Block „TEAM-FEIER STAFFEL" hinter `stepStaffel()`: `staffelFeierUebergabe()`,
+`staffelFeierZiel()`, `staffelAnfeuernDy()`, `staffelFeierBild()`; Führungswechsel inline in
+`updateHudBahn()`; Finale kam schon mit dem Endstand-Nachlauf 2.6). Vier Abweichungen vom Text oben,
+alle aus der Sichtprobe bzw. aus Lücken im Text:
+1. **Fehlwechsel-Einsacken:** `sackt` gab es nur für groß/Finale. `teamFeierAusloesen()` kennt dafür
+   jetzt `opt.raunen` — die Gegenseite feiert klein, die patzende Seite sackt trotzdem ein.
+2. **Publikum nach dem Ziel:** auch der Schlussläufer (bleibt formal `aktiv`, läuft aber nicht mehr)
+   hüpft mit — Bedingung `!u.aktiv || u.fertig!=null`, ausgenommen der Nächste im sichtbaren Anlauf.
+3. **Konfetti-Anker:** `laeuferXY()` wie vorgesehen, aber senkrecht auf mindestens 0,66 H gezogen —
+   Ziellinie und Zielgerade liegen unter dem Bahn-HUD (DOM), das Konfetti verschwand dort komplett.
+   Aus demselben Grund liegt das Feuerwerk-Band der Staffel bei 0,50–0,68 H (`opt.feuerwerkAb` von
+   `teamFeierEffekte()`, Vorgabe für alle anderen unverändert 0,12).
+4. **Ziel im selben Tick:** kommen beide Schlussläufer im selben Tick an, entscheidet die
+   Reihenfolge in `rennFertig` über groß/klein.
+Abnahme: `miss-alle-disziplinen.mjs 24` (alle zwanzig) vor/nach bit-identisch;
+`scripts/verify-team-feier-staffel-paket-11-10.mjs` (Orakel je Auslöser, Isolation, Sichtprobe).
 
 ### 3.4 Time-Trial — Teambank im Bildschirmraum
 

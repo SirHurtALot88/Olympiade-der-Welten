@@ -1,5 +1,13 @@
+import { registeredRateBelowThreshold } from "../pricing/costEngine";
 import { describe, expect, it } from "vitest";
-import { buildDashboardViewModel, type ArticleAggregate, type WindowAggregate } from "./viewModel";
+import {
+  buildDashboardViewModel,
+  buildRecommendations,
+  buildSortimentRow,
+  shopVolumeFromAggregates,
+  type ArticleAggregate,
+  type WindowAggregate,
+} from "./viewModel";
 import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
 
 function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
@@ -11,6 +19,7 @@ function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
     shippingCost: 1,
     dbI: 7,
     dbII: 5,
+    fixedCostShare: 0,
     avgPrice: 10,
     rank: null,
     ...overrides,
@@ -158,13 +167,53 @@ describe("buildDashboardViewModel", () => {
     const articles: ArticleAggregate[] = [
       article("Verlustbringer", {
         windows: {
-          all: agg({ qty: 10, revenue: 100, dbII: -50 }),
-          "365": agg({ qty: 10, revenue: 100, dbII: -50 }),
+          all: agg({ qty: 6, revenue: 60, dbII: -30 }),
+          "365": agg({ qty: 6, revenue: 60, dbII: -30 }),
         },
       }),
     ];
     const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
     expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(true);
+  });
+
+  it("empfiehlt bei einem Topseller (51 Verkaeufe) mit negativer DB II KEIN Auslisten", () => {
+    const articles: ArticleAggregate[] = [
+      article("Topseller", {
+        windows: {
+          all: agg({ qty: 51, revenue: 510, dbII: -100 }),
+          "365": agg({ qty: 51, revenue: 510, dbII: -100 }),
+        },
+      }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.recommendations.some((r) => r.kind === "auslisten")).toBe(false);
+  });
+
+  it("meldet 'Daten pruefen' bei Name/Code-Konflikt, Topseller mit Verlust und krummer Stueckzahl", () => {
+    const articles: ArticleAggregate[] = [
+      article("Falscher Code", {
+        setCode: "RA04-DE094",
+        codeNameEn: "Lightning Storm",
+        codeNameDe: "Blitzsturm",
+        codeHint: "ALIN-DE094",
+        windows: { "90": agg({ qty: 4, revenue: 18 }), "365": agg({ qty: 4, revenue: 18 }) },
+      }),
+      article("Topseller", {
+        windows: { all: agg({ qty: 51, revenue: 510, dbII: -100 }), "365": agg({ qty: 51, revenue: 510, dbII: -100 }) },
+      }),
+      article("Krumm", { windows: { "365": agg({ qty: 2.67, revenue: 20, dbII: 5 }) } }),
+    ];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    const ids = vm.recommendations.filter((r) => r.kind === "daten_pruefen").map((r) => r.id);
+    expect(ids).toContain("daten_pruefen:code:Falscher Code");
+    expect(ids).toContain("daten_pruefen:marge:Topseller");
+    expect(ids).toContain("daten_pruefen:menge:Krumm");
+    // Name/Code-Konflikt erzeugt keine Preis-Empfehlung auf einem falschen Marktwert
+    expect(vm.recommendations.some((r) => r.id === "preis_anpassen:Falscher Code")).toBe(false);
+    // Datenfehler stehen vor den €-Empfehlungen
+    const firstEuro = vm.recommendations.findIndex((r) => r.kind !== "ek_pflegen" && r.kind !== "daten_pruefen");
+    const lastData = vm.recommendations.map((r) => r.kind).lastIndexOf("daten_pruefen");
+    if (firstEuro !== -1) expect(lastData).toBeLessThan(firstEuro);
   });
 
   it("erzeugt fuer JEDEN Low-Runner eine eigene Auslisten-Empfehlung (nicht nur den schlimmsten)", () => {
@@ -305,5 +354,104 @@ describe("buildDashboardViewModel", () => {
     const expected = vm.sortiment[0].dbIIPerUnit * 3;
     expect(rec!.effectValue).toBeCloseTo(expected, 2);
     expect(rec!.effectValue).toBeLessThan(3200);
+  });
+});
+
+describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)", () => {
+  /** Renner, der die shopweite Stueckzahl auf 3.400 hebt (Chris' Betriebszahl), Ø-VK 6,87. */
+  const filler = () => article("Renner", { windows: { "365": agg({ qty: 3400, revenue: 3400 * 6.87, ek: 3400 * 2, avgPrice: 6.87 }) } });
+  const cheapCard = () =>
+    article("Billigkarte", {
+      currentVk: 4.99,
+      windows: { "365": agg({ qty: 20, revenue: 20 * 4.99, ek: 20 * 0.9, avgPrice: 4.99 }) },
+    });
+
+  it("shopVolumeFromAggregates: N und N_T aus dem 365-Fenster (Fallback all)", () => {
+    const articles = [
+      article("A", { windows: { "365": agg({ qty: 10, avgPrice: 5 }) } }),
+      article("B", { windows: { "365": agg({ qty: 2, avgPrice: 35 }) } }),
+      article("C", { windows: { "30": agg({ qty: 99, avgPrice: 50 }) } }),
+    ];
+    expect(shopVolumeFromAggregates(articles, DEFAULT_COST_SETTINGS)).toEqual({
+      units365d: 12,
+      unitsAtOrAboveThreshold: 2,
+    });
+    const onlyAll = [article("A", { windows: { all: agg({ qty: 7, avgPrice: 5 }) } })];
+    expect(shopVolumeFromAggregates(onlyAll, DEFAULT_COST_SETTINGS)?.units365d).toBe(7);
+    expect(shopVolumeFromAggregates([article("Leer")], DEFAULT_COST_SETTINGS)).toBeNull();
+  });
+
+  it("Shop-Volumen geht ueber das Einschreiben in den Korridor ein, Fixkosten nicht (Deckungsbeitrag)", () => {
+    const card = article("Karte", {
+      currentVk: 10,
+      windows: { "365": agg({ qty: 10, revenue: 100, ek: 30, avgPrice: 10 }) },
+    });
+    const withShop = buildDashboardViewModel([card, filler()], DEFAULT_COST_SETTINGS).sortiment.find(
+      (r) => r.nameRaw === "Karte"
+    )!;
+    const noShop = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    const shop = shopVolumeFromAggregates([card, filler()], DEFAULT_COST_SETTINGS)!;
+    const mitShop = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, shop);
+    expect(withShop.corridor.min).toBeCloseTo(mitShop.corridor.min, 8);
+    // Einschreiben-Anteil je Stueck (100 Marken x 2,35 € auf 3.410 Stueck) / 0,512 (25 % + Gebuehren)
+    const einschreiben = registeredRateBelowThreshold(shop, DEFAULT_COST_SETTINGS);
+    expect(mitShop.corridor.min - noShop.corridor.min).toBeCloseTo(einschreiben / 0.512, 5);
+    // Die 4.229 € Fixkosten stecken weder in der Spanne noch in der Deckungsbeitrags-Grenze.
+    expect(mitShop.corridor.contribution - noShop.corridor.contribution).toBeLessThan(0.1);
+  });
+
+  it("EK 0,90 / VK 4,99 steht auf der Untergrenze und ist im Korridor (kein Dauer-Alarm mehr)", () => {
+    const vm = buildDashboardViewModel([cheapCard(), filler()], DEFAULT_COST_SETTINGS);
+    const row = vm.sortiment.find((r) => r.nameRaw === "Billigkarte")!;
+    expect(row.priceStatus).toBe("im_korridor");
+    expect(row.corridor.contribution).toBeLessThan(4.99);
+  });
+
+  it("Billigkarte auf der Untergrenze taucht NICHT als 'VK anheben'-Empfehlung auf, echter Verlust schon", () => {
+    const verlust = article("Verlustkarte", {
+      currentVk: 2.5,
+      windows: { "365": agg({ qty: 20, revenue: 20 * 2.5, ek: 20 * 0.9, avgPrice: 2.5 }) },
+    });
+    const articles = [cheapCard(), verlust, filler()];
+    const vm = buildDashboardViewModel(articles, DEFAULT_COST_SETTINGS);
+    expect(vm.sortiment.find((r) => r.nameRaw === "Verlustkarte")!.priceStatus).toBe("unter_min");
+    const ids = buildRecommendations(
+      articles.map((a) => ({ article: a, articleClass: "solide" as const, reason: "" })),
+      vm.sortiment
+    )
+      .filter((r) => r.kind === "preis_anpassen")
+      .map((r) => r.id);
+    expect(ids).toContain("preis_anpassen:Verlustkarte");
+    expect(ids).not.toContain("preis_anpassen:Billigkarte");
+  });
+});
+
+describe("DB III (Vollkosten-Ergebnis)", () => {
+  it("DB III = DB II minus Fixkostenanteil; DB II bleibt der Deckungsbeitrag", () => {
+    // Regression: zuvor steckte der Fixkostenanteil in DB II und es gab keine
+    // dritte Stufe. Chris braucht alle drei getrennt -- DB I fuer den Einkauf,
+    // DB II fuer "lohnt der einzelne Verkauf", DB III fuer "traegt der Artikel
+    // seinen Anteil an Shop, Billbee, Lexoffice, Raumkosten und Lizenzen".
+    const card = article("Yu-Gi-Oh! TST-DE900 Dreistufig", {
+      windows: {
+        "365": agg({ qty: 10, revenue: 100, ek: 40, dbI: 60, dbII: 30, fixedCostShare: 12 }),
+      },
+    });
+    const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    expect(row.dbIPerUnit).toBeCloseTo(6, 5);
+    expect(row.dbIIPerUnit).toBeCloseTo(3, 5);
+    expect(row.dbIIIPerUnit).toBeCloseTo((30 - 12) / 10, 5);
+    expect(row.dbIIIPercent).toBeCloseTo((30 - 12) / 100, 5);
+    expect(row.dbIIIPerUnit).toBeLessThan(row.dbIIPerUnit);
+  });
+
+  it("DB III gleicht DB II, wenn kein Fixkostenanteil anfaellt", () => {
+    const card = article("Yu-Gi-Oh! TST-DE901 Ohne Fixkosten", {
+      windows: {
+        "365": agg({ qty: 10, revenue: 100, ek: 40, dbI: 60, dbII: 30, fixedCostShare: 0 }),
+      },
+    });
+    const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
+    expect(row.dbIIIPerUnit).toBeCloseTo(row.dbIIPerUnit, 5);
   });
 });

@@ -1,6 +1,9 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { roundValue } from "@/lib/foundation/foundation-number-utils";
-import { computePlayerSeasonAverageMatchdayFatigue } from "@/lib/foundation/player-season-fatigue-stats";
+import {
+  computePlayerSeasonAverageMatchdayFatigue,
+  getMatchdayLoadDeductionForStats,
+} from "@/lib/foundation/player-season-fatigue-stats";
 
 export function countTeamSeasonInjuries(gameState: GameState, teamId: string, seasonId: string): number {
   const seenEventIds = new Set<string>();
@@ -67,6 +70,7 @@ export function computeTeamSeasonAverageMatchdayFatigue(input: {
   }
 
   const injuryEvents = input.gameState.seasonState.injuryEvents ?? [];
+  const matchdayLoadDeduction = getMatchdayLoadDeductionForStats(input.gameState);
   const fatigueValues: number[] = [];
 
   for (const playerId of playerIds) {
@@ -78,6 +82,7 @@ export function computeTeamSeasonAverageMatchdayFatigue(input: {
             performances: input.gameState.seasonState.playerDisciplinePerformances ?? [],
             matchdayResults: input.gameState.seasonState.matchdayResults ?? [],
             injuryEvents,
+            matchdayLoadDeduction,
           })
         : input.snapshot
           ? computePlayerSeasonAverageMatchdayFatigue({
@@ -86,6 +91,7 @@ export function computeTeamSeasonAverageMatchdayFatigue(input: {
               performances: input.snapshot.playerDisciplinePerformances ?? [],
               matchdayResults: input.snapshot.matchdayResults ?? [],
               injuryEvents,
+              matchdayLoadDeduction,
             })
           : null;
 

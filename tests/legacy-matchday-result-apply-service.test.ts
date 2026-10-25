@@ -15,8 +15,11 @@ function createContext(input: {
   d1Scores: number[];
   d2Scores: number[];
   withLineup?: boolean;
+  /** Disziplin der D2-Seite (Standard "fechten"; die Staffel-O7-Tests unten setzen "staffel"). */
+  d2DisciplineId?: string;
 }): LegacyLineupLoadedContext {
   const withLineup = input.withLineup ?? true;
+  const d2Id = input.d2DisciplineId ?? "fechten";
   const draftEntries = withLineup
     ? [
         ...input.d1Scores.map((score, index) => ({
@@ -27,7 +30,7 @@ function createContext(input: {
           activePlayerId: `${input.teamId}-active-d1-${index}`,
         })),
         ...input.d2Scores.map((score, index) => ({
-          disciplineId: "fechten",
+          disciplineId: d2Id,
           disciplineSide: "d2" as const,
           slotIndex: index + 1,
           playerId: `${input.teamId}-d2-${index}`,
@@ -44,11 +47,11 @@ function createContext(input: {
     entries: draftEntries,
     disciplinePlayerCounts: {
       "mini-dm": 2,
-      fechten: 2,
+      [d2Id]: 2,
     },
     disciplineSidePlayerCounts: {
       "mini-dm::d1": 2,
-      "fechten::d2": 2,
+      [`${d2Id}::d2`]: 2,
     },
     activePlayers: Array.from({ length: input.activePlayersCount }, (_, index) => ({
       id: `${input.teamId}-active-${index}`,
@@ -66,7 +69,7 @@ function createContext(input: {
       })),
       ...input.d2Scores.map((score, index) => ({
         playerId: `${input.teamId}-d2-${index}`,
-        disciplineId: "fechten",
+        disciplineId: d2Id,
         score,
       })),
     ],
@@ -107,12 +110,12 @@ function createContext(input: {
     })),
     disciplines: [
       { id: "mini-dm", name: "Mini DM", category: "mental" },
-      { id: "fechten", name: "Fechten", category: "speed" },
+      { id: d2Id, name: d2Id === "fechten" ? "Fechten" : d2Id, category: "speed" },
     ],
     disciplineWeights: [],
     seasonDisciplineConfigs: [
       { disciplineId: "mini-dm", originalOrder: 1, displayOrder: 1, playerCount: 2, mutator1: null, mutator2: null },
-      { disciplineId: "fechten", originalOrder: 2, displayOrder: 2, playerCount: 2, mutator1: null, mutator2: null },
+      { disciplineId: d2Id, originalOrder: 2, displayOrder: 2, playerCount: 2, mutator1: null, mutator2: null },
     ],
     existingDraft: withLineup
       ? {
@@ -149,7 +152,7 @@ function createContext(input: {
       matchdayId: "matchday-1",
       teamId: input.teamId,
       d1DisciplineId: "mini-dm",
-      d2DisciplineId: "fechten",
+      d2DisciplineId: d2Id,
     },
     contextLoadMode: "sqlite_local",
     fatigueByPlayerId: {},
@@ -433,5 +436,134 @@ describe("legacy matchday result apply service", () => {
     if (!result.ok) {
       expect(result.error).toContain("read-only");
     }
+  });
+});
+
+/**
+ * STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Zaehler wird im Result-Apply fortgeschrieben — der
+ * einen Stelle, durch die jeder Spieltagspfad laeuft. Der Zaehler liest Aufstellung, Kader und
+ * Spieler aus dem GESPEICHERTEN Spielstand (nicht aus dem Lade-Kontext), deshalb legt dieser
+ * Aufbau beides dort ab.
+ */
+describe("legacy matchday result apply service — Staffel O7", () => {
+  function mitStaffelImSpielstand(save: PersistedSaveGame, contexts: LegacyLineupLoadedContext[]) {
+    const gs = save.gameState;
+    gs.seasonState.lineupDrafts = contexts.map((context) => context.existingDraft!).filter(Boolean);
+    const eintraege = contexts.flatMap((context) =>
+      context.entries.map((entry) => ({ teamId: context.teamId, entry })),
+    );
+    gs.players = eintraege.map(({ entry }) => ({
+      id: entry.playerId,
+      name: entry.playerId,
+      coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+      traitsPositive: [],
+      traitsNegative: [],
+    })) as unknown as GameState["players"];
+    gs.rosters = eintraege.map(({ teamId, entry }) => ({
+      id: entry.activePlayerId!,
+      playerId: entry.playerId,
+      teamId,
+    })) as GameState["rosters"];
+  }
+
+  // Die Grund-Fixture oben fuehrt die Kaderzeilen unter anderen Ids als die Aufstellung — fuer die
+  // uebrigen Tests egal (sie buchen auch `invalid_lineup`), fuer O7 nicht: dort zaehlt nur, wer
+  // wirklich angetreten ist. Deshalb hier eine GUELTIGE Aufstellung (Kaderzeile = activePlayerId).
+  function gueltig(context: LegacyLineupLoadedContext): LegacyLineupLoadedContext {
+    return {
+      ...context,
+      activePlayers: context.entries.map((entry) => ({
+        id: entry.activePlayerId!,
+        saveId: "save-local",
+        seasonId: "season-1",
+        teamId: context.teamId,
+        playerId: entry.playerId,
+        upkeep: 10,
+      })),
+    } as LegacyLineupLoadedContext;
+  }
+
+  function zweiStaffelTeams() {
+    return [
+      gueltig(createContext({ teamId: "A-A", teamName: "Alpha", activePlayersCount: 7, d1Scores: [20, 18], d2Scores: [15, 14], d2DisciplineId: "staffel" })),
+      gueltig(createContext({ teamId: "B-B", teamName: "Beta", activePlayersCount: 7, d1Scores: [19, 17], d2Scores: [10, 9], d2DisciplineId: "staffel" })),
+    ];
+  }
+
+  it("ein Spieltag mit Staffel legt je Team das Nachbarpaar mit einem gemeinsamen Spiel an", async () => {
+    const { save, persistence } = createPersistenceMock();
+    const contexts = zweiStaffelTeams();
+    mitStaffelImSpielstand(save, contexts);
+    const localLoader = vi
+      .fn()
+      .mockReturnValueOnce({ ok: true, warnings: [], context: contexts[0] })
+      .mockReturnValueOnce({ ok: true, warnings: [], context: contexts[1] });
+
+    const service = new LegacyMatchdayResultApplyService(undefined as never, { loadLegacyLineupContext: vi.fn() }, persistence as never, localLoader);
+    const result = await service.applyLegacyMatchdayResult({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      execute: true,
+      confirm: APPLY_CONFIRM_TOKEN,
+    });
+
+    expect(result.ok).toBe(true);
+    const paare = save.gameState.seasonState.staffelWechselPaare ?? [];
+    expect(paare.map((paar) => [paar.teamId, paar.geberPlayerId, paar.nehmerPlayerId, paar.gamesTogether, paar.lastMatchdayId])).toEqual([
+      ["A-A", "A-A-d2-0", "A-A-d2-1", 1, "matchday-1"],
+      ["B-B", "B-B-d2-0", "B-B-d2-1", 1, "matchday-1"],
+    ]);
+  });
+
+  it("die Teil-Buchung nach D1 zaehlt nichts, wenn die Staffel erst in D2 laeuft; der D2-Commit zaehlt einmal", async () => {
+    const { save, persistence } = createPersistenceMock();
+    const contexts = zweiStaffelTeams();
+    mitStaffelImSpielstand(save, contexts);
+    const localLoader = vi.fn((params: { teamId: string }) => ({
+      ok: true,
+      warnings: [],
+      context: contexts.find((context) => context.teamId === params.teamId),
+    }));
+    const service = new LegacyMatchdayResultApplyService(undefined as never, { loadLegacyLineupContext: vi.fn() }, persistence as never, localLoader as never);
+    const buche = (commitThroughSide: "d1" | "d2", forceReplace = false) =>
+      service.applyLegacyMatchdayResult({
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        execute: true,
+        confirm: APPLY_CONFIRM_TOKEN,
+        commitThroughSide,
+        forceReplace,
+      });
+
+    expect((await buche("d1")).ok).toBe(true);
+    expect(save.gameState.seasonState.staffelWechselPaare).toBeUndefined();
+
+    expect((await buche("d2", true)).ok).toBe(true);
+    const nachD2 = JSON.stringify(save.gameState.seasonState.staffelWechselPaare);
+    expect((save.gameState.seasonState.staffelWechselPaare ?? []).map((paar) => paar.gamesTogether)).toEqual([1, 1]);
+
+    // Erneutes Buchen desselben Spieltags zaehlt nicht doppelt.
+    expect((await buche("d2", true)).ok).toBe(true);
+    expect(JSON.stringify(save.gameState.seasonState.staffelWechselPaare)).toBe(nachD2);
+  });
+
+  it("ein Spieltag ohne Staffel laesst den Spielstand ohne das neue Feld (alte Staende bleiben unberuehrt)", async () => {
+    const { save, persistence } = createPersistenceMock();
+    const localLoader = vi
+      .fn()
+      .mockReturnValueOnce({ ok: true, warnings: [], context: createContext({ teamId: "A-A", teamName: "Alpha", activePlayersCount: 7, d1Scores: [20, 18], d2Scores: [15, 14] }) })
+      .mockReturnValueOnce({ ok: true, warnings: [], context: createContext({ teamId: "B-B", teamName: "Beta", activePlayersCount: 7, d1Scores: [19, 17], d2Scores: [10, 9] }) });
+    const service = new LegacyMatchdayResultApplyService(undefined as never, { loadLegacyLineupContext: vi.fn() }, persistence as never, localLoader);
+    const result = await service.applyLegacyMatchdayResult({
+      saveId: "save-local",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      execute: true,
+      confirm: APPLY_CONFIRM_TOKEN,
+    });
+    expect(result.ok).toBe(true);
+    expect("staffelWechselPaare" in save.gameState.seasonState).toBe(false);
   });
 });

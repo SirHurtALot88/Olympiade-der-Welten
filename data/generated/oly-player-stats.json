@@ -312229,7 +312229,7 @@
   {
     "id": "player-2984-vip-wal",
     "name": "VIP Wal",
-    "rating": 69.55,
+    "rating": 69.98,
     "className": "Bard",
     "race": "Fish",
     "alignment": "C-G",
@@ -312293,7 +312293,7 @@
     ],
     "disciplineRatings": {
       "tdm": 80.8,
-      "mini-dm": 67.8,
+      "mini-dm": 76.5,
       "battlefield": 93.4,
       "gewichtheben": 79,
       "climbing": 65.8,
@@ -312330,10 +312330,10 @@
     "referenceClass": null,
     "imageSource": null,
     "bracketLabel": null,
-    "marketValue": 70.65,
-    "displayMarketValue": 70.65,
-    "salaryDemand": 19.46,
-    "displaySalary": 19.46,
-    "portraitUrl": "/api/media/player-portrait/player-2984-vip-wal"
+    "marketValue": 71.82,
+    "displayMarketValue": 71.82,
+    "salaryDemand": 19.72,
+    "displaySalary": 19.72,
+    "portraitUrl": "/portraits/vip-wal.jpg"
   }
 ]

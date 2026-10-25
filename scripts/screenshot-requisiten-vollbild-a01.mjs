@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createReadStream, statSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const ROOT = process.argv[2];
 const OUT = process.argv[3];
@@ -60,6 +61,7 @@ for (const p of PAARE) {
   await seite.evaluate((d) => window.__arena.setDisc(d), p.disc);
   await seite.click("#t2");
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   await seite.waitForTimeout(400);
   const d = await seite.evaluate(
     ({ name, ani, dir, lunge }) => window.__arena.renderProbe(name, ani, true, dir, lunge, 64, null, null),

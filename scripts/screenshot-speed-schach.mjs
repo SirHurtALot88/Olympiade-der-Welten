@@ -9,6 +9,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { createReadStream, statSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -54,6 +55,7 @@ try {
   await seite.evaluate(() => window.__arena.setDisc("speed-schach"));
   await seite.click("#t2");
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
   // Drei Zeitpunkte eines laufenden Spiels: kurz nach Start, Mitte, spaet — zeigt die
   // Zugliste wachsen und das Brett voranschreiten.

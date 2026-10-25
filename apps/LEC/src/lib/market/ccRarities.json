@@ -1,0 +1,230 @@
+{
+"1": {
+"abbr": "C",
+"name": "Common"
+},
+"10": {
+"abbr": "GSCR",
+"name": "Gold Secret Rare"
+},
+"11": {
+"abbr": "PMSCR",
+"name": "Prismatic Secret Rare"
+},
+"12": {
+"abbr": "PLR",
+"name": "Platinum Rare"
+},
+"14": {
+"abbr": "PLSCR",
+"name": "Platinum Secret Rare"
+},
+"15": {
+"abbr": "SHR",
+"name": "Shatterfoil Rare"
+},
+"16": {
+"abbr": "SFR",
+"name": "Starfoil Rare"
+},
+"17": {
+"abbr": "MSR",
+"name": "Mosaic Rare"
+},
+"18": {
+"abbr": "GHGR",
+"name": "Ghost Gold Rare"
+},
+"19": {
+"abbr": "EXSCR",
+"name": "Extra Secret Rare"
+},
+"20": {
+"abbr": "PC",
+"name": "Parallel Common"
+},
+"21": {
+"abbr": "PSR",
+"name": "Parallel Super Rare"
+},
+"22": {
+"abbr": "PUR",
+"name": "Parallel Ultra Rare"
+},
+"23": {
+"abbr": "DTC",
+"name": "Duel Terminal Common"
+},
+"24": {
+"abbr": "DTR",
+"name": "Duel Terminal Rare"
+},
+"25": {
+"abbr": "DTSR",
+"name": "Duel Terminal Super Rare"
+},
+"26": {
+"abbr": "DTUR",
+"name": "Duel Terminal Ultra Rare"
+},
+"27": {
+"abbr": "DTSCR",
+"name": "Duel Terminal Secret Rare"
+},
+"28": {
+"abbr": "SLR",
+"name": "Starlight Rare"
+},
+"29": {
+"abbr": "PGR",
+"name": "Premium Gold Rare"
+},
+"3": {
+"abbr": "R",
+"name": "Rare"
+},
+"30": {
+"abbr": "CR",
+"name": "Collector's Rare"
+},
+"31": {
+"abbr": "BLUR",
+"name": "Blue Ultra Rare"
+},
+"32": {
+"abbr": "GRUR",
+"name": "Green Ultra Rare"
+},
+"33": {
+"abbr": "PUUR",
+"name": "Purple Ultra Rare"
+},
+"34": {
+"abbr": "10K",
+"name": "10000 Secret Rare"
+},
+"35": {
+"abbr": "GLR",
+"name": "Gold Letter Rare"
+},
+"4": {
+"abbr": "SR",
+"name": "Super Rare"
+},
+"5": {
+"abbr": "UR",
+"name": "Ultra Rare"
+},
+"52": {
+"abbr": "BRR",
+"name": "Bronze Rare"
+},
+"54": {
+"abbr": "LBR",
+"name": "Light Blue Rare"
+},
+"55": {
+"abbr": "BLR",
+"name": "Blue Rare"
+},
+"56": {
+"abbr": "GRR",
+"name": "Green Rare"
+},
+"57": {
+"abbr": "RER",
+"name": "Red Rare"
+},
+"58": {
+"abbr": "PRR",
+"name": "Purple Rare"
+},
+"59": {
+"abbr": "BWR",
+"name": "Black/White Rare"
+},
+"6": {
+"abbr": "UMR",
+"name": "Ultimate Rare"
+},
+"60": {
+"abbr": "DSUR",
+"name": "Duelist Saga Ultra Rare"
+},
+"61": {
+"abbr": "PHRU",
+"name": "Pharaoh's Rare (Ultra Rare foiling)"
+},
+"62": {
+"abbr": "BLSCR",
+"name": "Blue Secret Rare"
+},
+"63": {
+"abbr": "SLRA",
+"name": "Starlight Rare (Astral glyphs)"
+},
+"65": {
+"abbr": "UR",
+"name": "Ultra Rare"
+},
+"66": {
+"abbr": "SR",
+"name": "Super Rare"
+},
+"67": {
+"abbr": "R",
+"name": "Rare"
+},
+"68": {
+"abbr": "N",
+"name": "Normal"
+},
+"69": {
+"abbr": "REUR",
+"name": "Red Ultra Rare"
+},
+"7": {
+"abbr": "SCR",
+"name": "Secret Rare"
+},
+"70": {
+"abbr": "QCSCR",
+"name": "Quarter Century Secret Rare"
+},
+"71": {
+"abbr": "PHRS",
+"name": "Pharaoh's Rare (Secret Rare foiling)"
+},
+"72": {
+"abbr": "PMCR",
+"name": "Prismatic Collector's Rare"
+},
+"73": {
+"abbr": "PMUR",
+"name": "Prismatic Ultimate Rare"
+},
+"74": {
+"abbr": "SUR",
+"name": "Silver Ultra Rare"
+},
+"75": {
+"abbr": "URA",
+"name": "Ultra Rare (Astral glyphs)"
+},
+"76": {
+"abbr": "SURA",
+"name": "Silver Ultra Rare (Astral glyphs)"
+},
+"77": {
+"abbr": "GMR",
+"name": "Grand Master Rare"
+},
+"8": {
+"abbr": "GHR",
+"name": "Ghost Rare"
+},
+"9": {
+"abbr": "GR",
+"name": "Gold Rare"
+}
+}

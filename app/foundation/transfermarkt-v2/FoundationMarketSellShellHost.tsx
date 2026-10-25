@@ -160,7 +160,11 @@ export default function FoundationMarketSellShellHost({
   const context = marketSellPlayerContext;
 
   // --- Zustands-Ableitung: genau ein tragender Zustand pro Render. ---
-  const issue = marketSellError ? describeSellPreviewIssue(marketSellError) : null;
+  // W4: "nach Spieltag N" soll die echte Saisonlaenge nennen (Battle Mode, 20 Spieltage) statt
+  // hart "10" -- `derivationsInput.gameState` ist ohnehin schon da, kein neuer Prop noetig.
+  const issue = marketSellError
+    ? describeSellPreviewIssue(marketSellError, derivationsInput.gameState.season?.matchdayIds?.length || 10)
+    : null;
   const isLoading = marketSellBusy && !preview && !marketSellSuccess;
   const showIssueScreen = !isLoading && !marketSellSuccess && !preview && issue != null;
   // Preview vorhanden, aber ein Folge-Fehler (z. B. Bestätigung fehlgeschlagen):

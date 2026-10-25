@@ -195,6 +195,21 @@ describe("matchday MVP scoring service", () => {
         execute: true,
         dryRun: false,
         confirmToken: MATCHDAY_MVP_SCORING_CONFIRM_TOKEN,
+        // forceReplace mirrors matchday-auto-run-service's own `forceReplace: !stopOnTie`
+        // (standings-apply-service.ts:147-148,158-159): this fixed, deterministic fixture
+        // happens to produce an EXACT points tie between two teams on this matchday (confirmed
+        // via bisection: the tie first appears at commit 62d79637, PR #1226's Football
+        // QB-slot role rename, which legitimately shifted a computed legacy score by a
+        // fraction of a point — not a bug in the tie logic or the rename). Without
+        // forceReplace, standingsApply correctly refuses an unconfirmed exact tie
+        // ("tie_groups_require_confirmed_policy"), which is the intended block_on_tie
+        // behavior (standings-apply-service.ts:164-165), not something this write-path test
+        // is meant to exercise. The previous comment here described a DIFFERENT, already-fixed
+        // bug (legacy-matchday-readiness.ts's getRequiredCounts() once read only the
+        // discipline-wide player count instead of the side-specific one, see that file's own
+        // header comment) that no longer reproduces — it was stale documentation left behind
+        // after the underlying fix landed, not an active regression.
+        forceReplace: true,
       },
       persistence,
     );
@@ -203,23 +218,6 @@ describe("matchday MVP scoring service", () => {
     const points = updatedSave?.gameState.seasonState.standings ?? {};
 
     expect(result.executed).toBe(true);
-    // KNOWN REGRESSION (left red intentionally, do not weaken): `status` comes
-    // back "warning" instead of "applied" because standingsApply.applied is
-    // false (lib/season/matchday-mvp-scoring-service.ts ~line 862-879). Root
-    // cause: lib/resolve/legacy-matchday-readiness.ts's getRequiredCounts()
-    // resolves each discipline's required-player count only from
-    // context.disciplinePlayerCounts (the static, non-schedule-aware
-    // Discipline.playerCount from lib/data/dataAdapter.ts), while the AI
-    // lineup engine and the matchday contract itself
-    // (lib/lineups/lineup-discipline-contract.ts buildMatchdayLineupContract)
-    // correctly use the season-schedule-rolled per-matchday count
-    // (lib/season/season-discipline-schedule.ts "balanced slot buckets"). This
-    // marks correctly AI-built lineups "invalid_lineup", which cascades into
-    // standings-preview's "incomplete_result" and blocks standings apply. Same
-    // root cause documented in tests/matchday-auto-run-service.test.ts, and
-    // independently reproduced via `npm run season:smoke-matchday-auto-run`,
-    // which currently fails the same way — a genuine production regression,
-    // not a fixture issue.
     expect(result.status).toBe("applied");
     expect(result.mutatorMode).toBe("legacy_selected_traits");
     expect([...result.d1Scoreboard, ...result.d2Scoreboard].some((row) => (row.formCardModifier ?? 0) !== 0)).toBe(true);

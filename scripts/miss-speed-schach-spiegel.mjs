@@ -7,14 +7,20 @@
 // Aufruf:
 //   node scripts/miss-speed-schach-spiegel.mjs            -> 300 Laeufe
 //   node scripts/miss-speed-schach-spiegel.mjs 500
+//   node scripts/miss-speed-schach-spiegel.mjs 500 --flags=speedSchachUhr:2   (Nachtkonzept-Uhr, 04.10.)
 import { chromium } from "playwright";
+import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
 
-const N = Number(process.argv[2] || 300);
+// --flags=... / --haltung-*=... (NACHTKONZEPT-SCHALTER, 04.10., additiv, s. scripts/lib/rangtreue-
+// messung.mjs): ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
+const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
+const posArgs = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
+const N = Number(posArgs[0] || 300);
 const hier = dirname(fileURLToPath(import.meta.url));
-const seitePfad = process.argv[3] || resolve(hier, "..", "public", "mockups", "battle-mode.html");
+const seitePfad = posArgs[1] || resolve(hier, "..", "public", "mockups", "battle-mode.html");
 if (!existsSync(seitePfad)) {
   console.error("Mockup nicht gefunden: " + seitePfad);
   process.exit(1);
@@ -45,6 +51,8 @@ await page.addInitScript((kader) => {
 
 await page.goto(pathToFileURL(seitePfad).href);
 await page.waitForFunction(() => Boolean(window.__arena), null, { timeout: 15000 });
+const schalterGesetzt = await setzeBuehneSchalter(page, BUEHNE_SCHALTER);
+if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 
 const hatDuell = await page.evaluate(() => typeof window.__arena.spieleBuehneDuell === "function");
 if (!hatDuell) {

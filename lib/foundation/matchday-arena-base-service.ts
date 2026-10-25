@@ -2,7 +2,8 @@ import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
-import { buildMatchdayResolveSignature, readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { buildMatchdayResolveSignature, readArenaVorlaufRecord, readMatchdayResolveSnapshot } from "@/lib/foundation/matchday-resolve-snapshot";
+import { kickoffArenaVorlauf } from "@/lib/battle/arena-vorlauf-service";
 import {
   loadSqliteLegacyMatchdayResolvePreview,
   type LegacyMatchdayResolvePreviewPayload,
@@ -211,6 +212,21 @@ export async function loadMatchdayArenaBase(input: {
   let resolvePreview: LegacyMatchdayResolvePreviewPayload | null = null;
   let standingsPreview: Awaited<ReturnType<typeof buildStandingsPreview>> | null = null;
 
+  // ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.3, Auslosepunkt 2): die Buehne ist der zweite Ort
+  // (neben den Lineup-Routen), an dem ein fehlender/veralteter Vorlauf angestossen wird — fuer den
+  // Fall, dass die Aufstellung ueber einen anderen Weg (Skript, AI-Batch ohne HTTP-Route-Durchlauf)
+  // entstand. `kickoffArenaVorlauf()` ist selbst billig bei einem schon gueltigen Vorlauf (liest
+  // nur). `applicable: false` (Manager Mode, keine arena-aufgeloeste Disziplin) bleibt `null` —
+  // die Buehne zeigt dann keinen Wartezustand.
+  const arenaVorlaufKickoff = kickoffArenaVorlauf(
+    { saveId: save.saveId, seasonId: input.seasonId, matchdayId: input.matchdayId },
+    {},
+    persistence,
+  );
+  const arenaVorlauf = arenaVorlaufKickoff.applicable
+    ? { status: arenaVorlaufKickoff.status, disziplinen: arenaVorlaufKickoff.record?.disziplinen ?? null }
+    : null;
+
   if (input.includeDetails === true) {
     const resolveCacheKey = `${save.saveId}:${params.seasonId}:${params.matchdayId}`;
     // Die Save-Content-Signatur allein reicht hier NICHT: sie kennt von den Aufstellungen
@@ -303,5 +319,10 @@ export async function loadMatchdayArenaBase(input: {
     briefingStandings: buildArenaBriefingStandings(save),
     saveVersion: save.gameState.saveVersion ?? 0,
     contentSignature,
+    // ARENA-VORLAUF (PR 3, K1 — Plan Abschnitt 2.3): `null`, wenn gar kein Vorlauf anwendbar ist
+    // (Manager Mode, keine arena-aufgeloeste Disziplin an D1/D2) — sonst `status` ("in_progress" /
+    // "ready" / "failed" / `null`, solange das Feld noch unvollstaendig ist) und je Disziplin der
+    // Stand, den die Buehne fuer einen Wartezustand/Ausfall-Hinweis braucht (Plan Abschnitt 3.3).
+    arenaVorlauf,
   };
 }

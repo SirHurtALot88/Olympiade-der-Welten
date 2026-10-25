@@ -7,6 +7,8 @@ import {
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
+import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -113,6 +115,17 @@ describe("new-game-setup-service", () => {
     // unangetastet (der alte, saveunabhaengige Dummy-Platzhalter aus dem Seed), nicht die
     // 160-Fixture-Liga-Split-Paarung.
     expect(gameState.seasonState.schedule).not.toHaveLength(160);
+    // W2 bleibt Battle-only: Manager Mode behält 10 Spieltage, jede Disziplin einmal, und KEINE
+    // aktive Erholung (Chris' laufender Manager-Save darf davon nicht berührt werden).
+    expect(gameState.season.matchdayIds).toHaveLength(10);
+    expect(gameState.seasonState.disciplineSchedule).toHaveLength(10);
+    expect(
+      (gameState.seasonState.disciplineSchedule ?? []).every(
+        (entry) => entry.discipline1?.occurrenceInSeason === undefined && entry.discipline2?.occurrenceInSeason === undefined,
+      ),
+    ).toBe(true);
+    expect(isFatigueActiveRecoveryEnabled(gameState)).toBe(false);
+    expect(preview.seasonSetup.matchdayCount).toBe(10);
   }, 120_000);
 
   it("sets Season 1 setup and LEAGUE-LOCAL start ranks for a Battle Mode game (gameMode: \"battle\")", () => {
@@ -139,10 +152,40 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.standings["R-R"]?.rank).toBe(16);
     expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
     expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
+    // W2 (16.10.): ein Battle-Save hat 20 Spieltage, jede Disziplin genau zweimal — einmal je
+    // Saisonhälfte, die zweite Kadergröße nie gleich der ersten (Chris 06.09.).
+    expect(gameState.season.matchdayIds).toHaveLength(20);
+    expect(gameState.season.matchdayIds[19]).toBe("matchday-20");
+    expect(gameState.seasonState.disciplineSchedule).toHaveLength(20);
+    const vorkommen = new Map<string, Array<{ index: number; size: number | null | undefined; occ?: number }>>();
+    for (const entry of gameState.seasonState.disciplineSchedule ?? []) {
+      for (const slot of [entry.discipline1, entry.discipline2]) {
+        if (!slot?.disciplineId) continue;
+        vorkommen.set(slot.disciplineId, [
+          ...(vorkommen.get(slot.disciplineId) ?? []),
+          { index: entry.matchdayIndex, size: slot.playerCount, occ: slot.occurrenceInSeason },
+        ]);
+      }
+    }
+    expect(vorkommen.size).toBe(20);
+    for (const [disciplineId, eintraege] of vorkommen) {
+      expect(eintraege, disciplineId).toHaveLength(2);
+      const [erstes, zweites] = [...eintraege].sort((a, b) => a.index - b.index);
+      expect(erstes!.index).toBeLessThanOrEqual(10);
+      expect(zweites!.index).toBeGreaterThanOrEqual(11);
+      expect(erstes!.occ).toBe(1);
+      expect(zweites!.occ).toBe(2);
+      if (disciplineId !== "mini-dm") {
+        expect(zweites!.size, disciplineId).not.toBe(erstes!.size);
+      }
+    }
+    // ... und die aktive Erholung greift in genau dieser Saison (Fatigue-Plan Teil C).
+    expect(isFatigueActiveRecoveryEnabled(gameState)).toBe(true);
+    expect(preview.seasonSetup.matchdayCount).toBe(20);
     // Echter Spielplan der ersten Saison statt der Dummy-Paarung (Plan-Abschnitt 5): 2 Ligen *
-    // 10 Spieltage * 8 Paarungen = 160 Fixtures, jedes Team genau 1 Fixture pro Spieltag, alle
-    // Paarungen liga-intern.
-    expect(gameState.seasonState.schedule).toHaveLength(160);
+    // 20 Spieltage * 8 Paarungen = 320 Fixtures (Doppel-Rundenplan), jedes Team genau 1 Fixture
+    // pro Spieltag, alle Paarungen liga-intern.
+    expect(gameState.seasonState.schedule).toHaveLength(320);
     const md1Fixtures = gameState.seasonState.schedule.filter(
       (fixture) => fixture.matchdayId === gameState.season.matchdayIds[0],
     );
@@ -219,6 +262,101 @@ describe("new-game-setup-service", () => {
       const contract = getTeamSponsorContract(gameState, teamId);
       expect(contract, `expected AI team ${teamId} to have a signed sponsor contract in S1`).not.toBeNull();
       expect(contract?.seasonId).toBe(gameState.season.id);
+    }
+  }, 120_000);
+
+  /**
+   * TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert (Wizard-Filter): ein Liga-2-Team
+   * darf als Chris-/Franky-Team niemals in einem Battle-Mode-Save ankommen, auch nicht über einen
+   * direkten Aufruf, der die UI-Sperre umgeht. R-R ist laut dem Battle-Mode-Test oben verlässlich
+   * Liga 2 (Budget-Rang 32 global, `leagueByTeamId["R-R"] === "liga2"`).
+   */
+  it("filtert ein Liga-2-Team aus chrisTeamIds im Battle Mode heraus und blockiert ohne verbleibendes Team", () => {
+    const { gameState, preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
+    expect(preview.chrisTeamIds).toEqual([]);
+    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+    expect(preview.blockers).toContain("new_game_requires_at_least_one_chris_team");
+    // R-R landet stattdessen bei der KI, nicht als humanControlled-Team.
+    expect(preview.aiTeamIds).toContain("R-R");
+    expect(gameState.teams.find((team) => team.teamId === "R-R")?.humanControlled).toBe(false);
+  }, 120_000);
+
+  it("behält ein Liga-1-Team und verwirft nur das Liga-2-Team, wenn beide als chrisTeamIds übergeben werden", () => {
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M", "R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.chrisTeamIds).toEqual(["M-M"]);
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  it("lässt Liga-2-Teams im Manager Mode unangetastet wählbar (keine Liga-2-Sperre ohne Battle Mode)", () => {
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "manager",
+      chrisTeamIds: ["R-R"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  /**
+   * TASK #155 — OPUS-REVIEW ZU PR #1272, FRANKY-EDGE-CASE: fallen BEIDE Preset-Teams von Franky
+   * in Liga 2, wird `frankyTeamIds` komplett leer, aber nur der Chris-Null-Teams-Fall hat einen
+   * Blocker — Franky stünde (im seltenen Fall, dass sein Preset komplett Liga-2-Teams trifft) ohne
+   * eigenes Team da, nur durch die Warnung sichtbar. Opus: kein Blocker nötig (Presets
+   * normalisieren sich im Wizard ohnehin auf "custom"), aber die Warnung muss tatsächlich
+   * ankommen — und zwar lesbar, nicht als Rohcode (dafür `formatGameFlowBlocker`,
+   * s. `tests/game-flow-blocker-incomplete-result-label.test.ts`).
+   *
+   * Die betroffenen Liga-2-Team-IDs werden hier bewusst aus der echten Zuordnung gelesen statt
+   * hart codiert — welche Team-IDs Liga 2 sind, hängt an den Startbudgets, nicht an festen Codes.
+   */
+  it("Franky-Edge-Case: fallen beide Franky-Teams in Liga 2, bleibt es ein Hinweis (kein Blocker), aber sichtbar und lesbar", () => {
+    const probe = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M"],
+      now: "2026-06-13T10:00:00.000Z",
+    });
+    const liga2TeamIds = Object.entries(probe.gameState.seasonState.leagueByTeamId ?? {})
+      .filter(([, tier]) => tier === "liga2")
+      .map(([teamId]) => teamId);
+    expect(liga2TeamIds.length).toBeGreaterThanOrEqual(2);
+    const frankyLiga2Pick = liga2TeamIds.slice(0, 2);
+
+    const { preview } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: frankyLiga2Pick,
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(preview.frankyTeamIds).toEqual([]);
+    // Kein Blocker -- Chris hat sein Team, das reicht laut heutiger Regel zum Starten.
+    expect(preview.blockers).toEqual([]);
+    for (const teamId of frankyLiga2Pick) {
+      expect(preview.warnings).toContain(`battle_mode_liga2_team_not_selectable:${teamId}`);
+      // Und lesbar, nicht nur als Code -- das ist die eigentliche Opus-Anforderung: die Warnung
+      // darf nicht lautlos im internen Array verschwinden.
+      const label = formatGameFlowBlocker(`battle_mode_liga2_team_not_selectable:${teamId}`);
+      expect(label).toContain(teamId);
+      expect(label).toMatch(/liga 2/i);
     }
   }, 120_000);
 });

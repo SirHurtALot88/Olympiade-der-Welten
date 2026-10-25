@@ -287,6 +287,12 @@
       if (!geladen) { geladen = true; verdrahten(); await liste(); if (gruppen[0]) aktiv = await lade(gruppen[0].id); if (aktiv) aktiv.mitglieder.forEach(aktualisiere); }
       zeigeListe(); zeigeGruppe();
     },
+    // Für den Reiter „Szenarien“: Gruppen zur Auswahl, ihre Punkte und der Gegner-Pool für die Wellen
+    async gruppen() { await liste(); return gruppen.slice(); },
+    async gruppe(id) { const g = await lade(id); if (g) g.mitglieder.forEach(aktualisiere); return g; },
+    punkteVon: g => (g && Array.isArray(g.mitglieder) ? g.mitglieder.reduce((s, k) => s + (+R.punkte(k).pts || 0), 0) : 0),
+    alleGegner: () => alleGegner(),
+    SCHWIERIGKEIT,
   };
   if (!$("tabGruppe").hidden) window.KartenschmiedeGruppe.zeigen();
 })();

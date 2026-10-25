@@ -85,6 +85,8 @@ export function buildTeamOverviewSlice(input: {
               {
                 rank: existing?.rank ?? null,
                 points: existing?.points ?? null,
+                // Task #159: Punkteverhältnis — nur in Battle-Saves gesetzt.
+                verhaeltnis: existing?.verhaeltnis ?? null,
                 cash: team.cash,
                 cashFc: existing?.cashFc ?? null,
                 startplatz: existing?.startplatz ?? null,

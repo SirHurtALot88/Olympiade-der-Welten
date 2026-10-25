@@ -19,6 +19,11 @@ import type {
 // diese Datei importiert (derselbe Grund, aus dem `seedZuZahl`/`buildArenaMatchSeed` als
 // LAUFZEIT-Funktionen eigens nach arena-seed.ts verschoben wurden -- hier reicht der Typ).
 import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
+import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
+// `import type` -- zieht KEINE Laufzeitabhaengigkeit, s. Kommentar an `ArenaMomentEintrag` oben
+// (mini-dm-pod-resolve.ts selbst ist zwar "rein", der Typ-Import ist hier trotzdem bewusst so
+// markiert, falls das je aendert).
+import type { MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
 
 export type DisciplineSide = "d1" | "d2";
 
@@ -585,7 +590,35 @@ export type LegacyResolvePreviewOptions = {
    */
   arenaTeamPointsByDisciplineId?: ReadonlyMap<
     string,
-    ReadonlyMap<string, { teamPoints: number; arenaMatchSeed: string; momente?: ArenaMomentEintrag[] }>
+    ReadonlyMap<
+      string,
+      {
+        teamPoints: number;
+        arenaMatchSeed: string;
+        momente?: ArenaMomentEintrag[];
+        /**
+         * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+         * sequenziell+Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU diesem
+         * Zwei-Team-Duell -- durchgereicht aus `ArenaTeamPointsOverride.opponentTeamId`
+         * (lib/resolve/battle-mode-arena-team-points.ts), das dieses Feld schon immer trug. Bis
+         * hierher wurde es an dieser engen Zwischenstelle STILL fallengelassen (dieselbe Lücke
+         * wie bei `momente`, bevor es hier ergänzt wurde) -- reine Typ-Erweiterung, keine
+         * Laufzeitänderung: das Objekt trug das Feld schon, nur ungenutzt. Erlaubt der Bühne,
+         * Board-für-Board-Paare für JEDE arena-aufgelöste Disziplin zu sequenzieren statt alle
+         * Teams im Gleichschritt zu enthüllen (`prim === "lamps"` / `"klassen"` / `"stage"`).
+         */
+        opponentTeamId?: string;
+        /**
+         * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): der
+         * Seitenstand [dieses Team, Gegner] und der Ausgang des Arena-Duells — durchgereicht aus
+         * `ArenaTeamPointsOverride.seiten`/`outcome`, das beide Felder schon immer trug ("fuer
+         * Anzeige/Tie-Breaking"). Daraus rechnet der Resolve `marge`/`verhaeltnis`. Fehlt `seiten`,
+         * gibt es fuer diese Zeile kein Verhaeltnis (0), die Punkte bleiben unberuehrt.
+         */
+        seiten?: readonly [number, number];
+        outcome?: "win" | "draw" | "loss";
+      }
+    >
   > | null;
   /**
    * BOXSCORE-AN-PPS (docs/design/boxscore-an-pps.md, Nachtrag zu PR7) — SEIT
@@ -602,4 +635,26 @@ export type LegacyResolvePreviewOptions = {
    * `undefined`/leer/fehlender Eintrag aendert nichts.
    */
   arenaIndividualBoxscorePpsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, number>> | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+   * Abschnitt 3.2 Punkt 4, PR 1): ein explizit ÜBERGEBENER Ausfallgrund je Disziplin — so kann ein
+   * Aufrufer (z.B. der künftige Arena-Vorlauf-Service, PR 3) "Chromium ist abgestürzt" melden,
+   * statt dass die Engine das stillschweigend als `"nicht_ausgefuehrt"` liest. Kein heutiger
+   * Aufrufer setzt dieses Feld (die Engine-Strukturprüfung greift deshalb ÜBERALL, wo eine
+   * arena-aufgelöste Disziplin kein Arena-Ergebnis UND keinen expliziten Grund hat — genau die
+   * heutige K1-Lücke). `undefined`/leer/kein Eintrag für die aktuelle Disziplin aendert nichts.
+   */
+  arenaAusfallByDisciplineId?: ReadonlyMap<string, ArenaAusfall> | null;
+  /**
+   * MINI-DM-FFA-ROHDATEN (PR 4 eines 6-PR-Opus-Plans, 21.10.) -- `disciplineId -> podId ->
+   * Rohdaten`, dieselbe Schachtelungsidee wie `arenaTeamPointsByDisciplineId` oben. Liegt fuer
+   * einen Mini-DM-Pod ein Eintrag vor, bucht die Engine ihn ueber `berechneMiniDmFfaPodOverride()`
+   * (mini-dm-pod-resolve.ts) statt ueber den bisherigen PPS-Pod-Pfad; fehlende/unvollstaendige
+   * Rohdaten fallen defensiv auf den PPS-Pod-Pfad zurueck.
+   *
+   * KEIN HEUTIGER AUFRUFER SETZT DIESES FELD -- das ist PR 5 ("Vorlauf-Verdrahtung") desselben
+   * Plans. `undefined`/leer/kein Eintrag fuer den aktuellen Pod aendert NICHTS am PPS-Pod-Pfad:
+   * diese PR fuegt nur toten, aber vollstaendig getesteten Code hinzu.
+   */
+  miniDmFfaPodRohdatenByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, MiniDmFfaPodRohdaten>> | null;
 };

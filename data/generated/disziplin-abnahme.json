@@ -1,0 +1,642 @@
+{
+ "hinweis": "Pflichtabnahme je Disziplin (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80 UND Pp-Abweichung <= 25 in zwei Saatstroemen. Gelesen von tests/disziplin-abnahme-guard.test.ts gegen ARENA_RESOLVED_DISCIPLINE_IDS (lib/battle/arena-resolved-disciplines.ts). Neu messen und hier eintragen, bevor eine Disziplin in die Arena-Wertung aufgenommen wird; ein Eintrag, der nicht mehr besteht, nimmt sie heraus (sie zahlt dann ueber die PPS-Duell-Bruecke). Frische JE MESSGROESSE: 'rhoFrisch'/'ppFrisch' true = am angegebenen Datum/Commit mit dem genannten Befehl gemessen; false = aus der Doku uebernommen bzw. nicht gemessen. Der Waechter zaehlt nur frische Werte.",
+ "beobachtungsliste": {
+  "breaking": "rho 0,801 bei Kaderspannweite 0,289 — genau auf der Schranke; bei der naechsten Nachmessung zuerst pruefen. Die Schranke selbst bleibt unveraendert."
+ },
+ "schranken": {
+  "rhoJeSpielUeber": 0.8,
+  "ppHoechstens": 25,
+  "ppSaatstroemeMindestens": 2
+ },
+ "disziplinen": {
+  "basketball": {
+   "chassis": "feldspiel",
+   "rhoJeSpiel": 0.795,
+   "rhoSpannweite": 0.085,
+   "rhoSaison": 0.881,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 basketball",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs basketball (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ],
+    "abgebrochen": true
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": false,
+   "anmerkung": "Pp am 16.10. abgebrochen (Feldspiel-Messung dauert Stunden) — nicht noetig: rho 0,795 verfehlt die Schranke bereits; Basketball spielt in Battle Mode ueber die PPS-Duell-Bruecke."
+  },
+  "hockey": {
+   "chassis": "feldspiel",
+   "rhoJeSpiel": 0.64,
+   "rhoSpannweite": 0.222,
+   "rhoSaison": 0.797,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 hockey",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    39.4
+   ],
+   "ppMessung": {
+    "quelle": "docs/design/gesamtstand-audit-13-10.md (n=6, Chromium-Abstuerze)",
+    "laeufe": 6
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": false,
+   "rhoJeSpielNurFeldspieler": 0.676,
+   "anmerkung": "Chris-Ausnahme deckt NUR rho (CLAUDE.md, vor der Pp-Pflicht vom 21.09.). Pp NICHT frisch gemessen (Doku-Wert, n=6) — Hockey ist deshalb nicht arena-gewertet, bis eine frische Pp-Messung (>= 24 Laeufe, zwei Saatstroeme, <= 25) vorliegt oder Chris die Pp-Ausnahme gibt."
+  },
+  "gewichtheben": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.865,
+   "rhoSpannweite": 0.143,
+   "rhoSaison": 0.944,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 gewichtheben",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    8.5,
+    10.0
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs gewichtheben (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "speed-schach": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.91,
+   "rhoSpannweite": 0.089,
+   "rhoSaison": 0.986,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 speed-schach",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    12.1,
+    11.0
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs speed-schach (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "showcase": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.835,
+   "rhoSpannweite": 0.148,
+   "rhoSaison": 0.937,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 showcase",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    11.1,
+    12.7
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs showcase (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "eiskunstlauf": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.866,
+   "rhoSpannweite": 0.105,
+   "rhoSaison": 0.986,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 eiskunstlauf",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    18.8,
+    19.8
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs eiskunstlauf (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "breaking": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.801,
+   "rhoSpannweite": 0.289,
+   "rhoSaison": 0.944,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 breaking",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    14.3,
+    13.9
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs breaking (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "wettessen": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.91,
+   "rhoSpannweite": 0.122,
+   "rhoSaison": 0.937,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 wettessen",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    8.7,
+    10.0
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs wettessen (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "tennis": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.813,
+   "rhoSpannweite": 0.199,
+   "rhoSaison": 0.944,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 tennis",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    6.9,
+    4.4
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs tennis (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "fechten": {
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.86,
+   "rhoSpannweite": 0.191,
+   "rhoSaison": 0.937,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 fechten",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    20.1,
+    20.7
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs fechten (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "staffel": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.937,
+   "rhoSpannweite": 0.089,
+   "rhoSaison": 0.958,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 staffel",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    21.1,
+    22.0
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs staffel (+ --saat-versatz=10000000)",
+    "laeufe": 144,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "takeshis-castle": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.898,
+   "rhoSpannweite": 0.062,
+   "rhoSaison": 0.986,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 takeshis-castle",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    18.9,
+    17.7
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs takeshis-castle (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "time-trial": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.943,
+   "rhoSpannweite": 0.049,
+   "rhoSaison": 0.951,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 time-trial",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    11.4,
+    12.5
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs time-trial (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "spurt": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.91,
+   "rhoSpannweite": 0.142,
+   "rhoSaison": 0.963,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 spurt",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    19.4,
+    14.9
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs spurt (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "climbing": {
+   "chassis": "bahn",
+   "rhoJeSpiel": 0.833,
+   "rhoSpannweite": 0.135,
+   "rhoSaison": 0.881,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 climbing",
+    "spiele": 24,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [
+    12.0,
+    9.5
+   ],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs climbing (+ --saat-versatz=10000000)",
+    "laeufe": 48,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": true
+  },
+  "football": {
+   "rhoJeSpiel": 0.818,
+   "pp": [
+    47.3
+   ],
+   "datum": "2026-09-26",
+   "quelle": "docs/design/gesamtstand-audit-13-10.md",
+   "rhoFrisch": false,
+   "ppFrisch": false,
+   "commit": "unbekannt",
+   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+  },
+  "i-spy": {
+   "rhoJeSpiel": 0.75,
+   "pp": [
+    13.6
+   ],
+   "datum": "2026-10-15",
+   "quelle": "docs/design/stand-aller-disziplinen.md",
+   "rhoFrisch": false,
+   "ppFrisch": false,
+   "commit": "unbekannt",
+   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+  },
+  "battlefield": {
+   "rhoJeSpiel": 0.399,
+   "pp": [
+    30.1,
+    37.1
+   ],
+   "datum": "2026-10-15",
+   "quelle": "docs/design/battle-mode-20-spieltage-liga-mechanik-16-10.md Fund 11",
+   "rhoFrisch": false,
+   "ppFrisch": false,
+   "commit": "unbekannt",
+   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+  },
+  "tdm": {
+   "rhoJeSpiel": 0.324,
+   "pp": [
+    51.4
+   ],
+   "datum": "2026-10-07",
+   "quelle": "docs/design/gesamtstand-audit-13-10.md",
+   "rhoFrisch": false,
+   "ppFrisch": false,
+   "commit": "unbekannt",
+   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+  },
+  "mini-dm": {
+   "format": "4-Team-FFA (gespielt), 4 Rollenrunden je Event",
+   "rhoJeSpiel": 0.8,
+   "rhoJeRundeMittel": [
+    0.822,
+    0.816
+   ],
+   "rhoJeRundeMedian": [
+    0.8,
+    0.8
+   ],
+   "rhoJeEvent16": [
+    0.686,
+    0.686
+   ],
+   "teamRhoEventplatz": [
+    0.865,
+    0.872
+   ],
+   "rhoMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs",
+    "spiele": 6,
+    "vierergruppen": 210,
+    "saatStroeme": [
+     0,
+     10000000
+    ]
+   },
+   "pp": [
+    8.7,
+    9.0
+   ],
+   "ppMessung": {
+    "quelle": "docs/design/stand-aller-disziplinen.md, Neunzehnter Nachtrag 13.10.",
+    "frisch": false
+   },
+   "datum": "2026-10-16",
+   "commit": "ace43062",
+   "rhoFrisch": true,
+   "ppFrisch": false,
+   "anmerkung": "Median je Runde genau 0,800 (nicht ueber 0,80); gebuchte Einheit waere der Event-Platz — s. docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 4."
+  },
+  "mini-dm-ffa": {
+   "format": "FFA (gespielt), VARIABLE Kadergroesse k=2..6 Rollenrunden je Event (MINI_DM_FFA_SLOTS_JE_K, PR 2 des 6-PR-Opus-Plans 21.10., Commit a3a88369) — ERGAENZT die bestehende 'mini-dm'-Zeile (fester 4er-Pfad), ueberschreibt sie nicht",
+   "status": "NICHT BESTANDEN auf der massgeblichen Spieler-Ebene, bei JEDEM k=2..6 -- keine Freigabe aus dieser Messung selbst. Ob PR 5 trotzdem kommt, entscheidet Chris (s. Opus-Review 24.10. an PR #1303).",
+   "freigabe": "Chris am 24.10., per ausdruecklicher Ruecksprache auf genau diesen Befund: ALLE k=2..6 werden trotz rhoJeEvent < 0,80 verdrahtet (PR 5 des 6-PR-Opus-Plans, 'Vorlauf-Verdrahtung'). Begruendung: CLAUDE.md 'Die Abnahme jeder Disziplin', Abschnitt zur Star-/Paartreue als ehrlichere Abnahme bei kleinem n -- dieselbe Argumentation, mit der Chris Hockey bereits freigegeben hat (Star Rang 1 58%/erste zwei 78%, ARENA_ABNAHME_AUSNAHMEN in lib/battle/arena-resolved-disciplines.ts), hier auf Mini-DM angewendet und von Chris bestaetigt, nicht von einem Agenten selbst gezogen. Mini-DMs Star-/Paartreue ist bei jedem k GUT (Star Rang 1 76-81%, erste zwei 93-95%, Paare ab 15 Punkten Abstand 99% richtig) -- besser als Hockeys bereits akzeptierte Werte. WICHTIG: diese Freigabe aendert NICHTS an den gemessenen Zahlen oben (rhoJeEvent bleibt wie gemessen, 0,608-0,686, unter 0,80) -- sie ist ein separates, explizit dokumentiertes Go/No-Go-Feld, kein Umschreiben von 'status' auf 'bestanden'. Mini-DM steht WEITERHIN NICHT in ARENA_RESOLVED_DISCIPLINE_IDS (eigener Pod-Resolve-Pfad, kein Chassis-Set-Mitglied, s. tests/disziplin-abnahme-guard.test.ts) -- der disziplin-abnahme-guard-Waechter dort prueft dieses Set, nicht diesen Schluessel, und bleibt deshalb unveraendert gruen. Der produktive Schalter fuer diese Freigabe ist MINI_DM_FFA_VORLAUF_AKTIV (lib/battle/arena-resolved-disciplines.ts).",
+   "hinweis": "PR 3 des 6-PR-Opus-Plans (21.10., Mini-DM-6-Rollen-Umbau). Additiv: eigener Schluessel, die bestehende 'mini-dm'-Zeile (4er-Pfad, 13.10.) bleibt unveraendert. Kein produktiver Aufrufer liest variable k heute (PR 5 folgt) -- s. CLAUDE.md 'Pp-Abweichung ist Pflichtpruefung fuer jede Disziplin, jede neue Mechanik, jedes Rezept', nicht nur fuer bereits angeschlossene Disziplinen. KORRIGIERT 24.10. nach Opus-Review: die erste Fassung dieser Zeile hatte 'rhoJeEvent' (die CLAUDE.md-massgebliche Spieler-Ebene-Zahl, 'ein Spieler mit Stat 80 muss zu den Top-Leuten gehoeren') WEDER gemessen noch eingetragen, nur die Team-Ebene-Zahl (teamRhoEventplatz) -- und hatte sich damit eine Freigabe ('bestanden', 'kein k wird gesperrt') selbst ausgestellt, die so nicht zutrifft. teamRhoEventplatz bleibt als Zusatzinfo stehen, ist aber NICHT die Schranken-Zahl.",
+   "kWerte": {
+    "2": {
+     "rhoJeEvent": [0.650, 0.656],
+     "rhoJeRundeMittel": [0.799, 0.798],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.830, 0.827],
+     "star1Prozent": [76.2, 77.5],
+     "starErsteZweiProzent": [93.3, 93.8],
+     "paarAb15RichtigProzent": [98.9, 99.0],
+     "pp": [7.7, 7.8],
+     "anmerkung": "rhoJeEvent (Spieler-Ebene, die CLAUDE.md-Schranke) 0,650/0,656 -- KLAR UNTER 0,80, nicht bestanden. rho je Runde liegt auch im MITTEL unter 0,80 (0,799/0,798), nicht nur der Median exakt auf 0,800. Star/Paartreue (die ehrlichere Lesart bei kleinem n) deutlich besser: Star Rang 1 76-78%, erste zwei 93-94%, Paare ab 15 Punkten Abstand 99% richtig."
+    },
+    "3": {
+     "rhoJeEvent": [0.673, 0.677],
+     "rhoJeRundeMittel": [0.814, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.869, 0.873],
+     "star1Prozent": [76.2, 77.1],
+     "starErsteZweiProzent": [93.8, 94.4],
+     "paarAb15RichtigProzent": [99.3, 99.3],
+     "pp": [10.0, 10.9],
+     "anmerkung": "rhoJeEvent (Spieler-Ebene) 0,673/0,677 -- unter 0,80, nicht bestanden. Star Rang 1 76-77%, erste zwei 94%, Paare ab 15 99,3% richtig."
+    },
+    "4": {
+     "rhoJeEvent": [0.686, 0.686],
+     "rhoJeRundeMittel": [0.822, 0.816],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.865, 0.872],
+     "star1Prozent": [78.1, 78.8],
+     "starErsteZweiProzent": [94.8, 94.6],
+     "paarAb15RichtigProzent": [99.4, 99.4],
+     "pp": [8.7, 9.0],
+     "anmerkung": "Deckt sich mit der bestehenden 'mini-dm'-Zeile (dieselbe Mechanik bei k=4, MINI_DM_FFA_SLOTS_JE_K[4] ist per Konstruktion identisch zum Altpfad; rhoJeEvent 0,686 = dortiges rhoJeEvent16). Auch bei k=4 unter 0,80, nicht bestanden -- die bestehende Zeile war hier schon zu grosszuegig framed (rhoJeSpiel=0,8 nahm rho je RUNDE statt rho je EVENT/Spieler)."
+    },
+    "5": {
+     "rhoJeEvent": [0.608, 0.606],
+     "rhoJeRundeMittel": [0.798, 0.794],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.864, 0.873],
+     "star1Prozent": [76.7, 77.8],
+     "starErsteZweiProzent": [94.1, 94.3],
+     "paarAb15RichtigProzent": [99.4, 99.4],
+     "pp": [8.8, 9.5],
+     "anmerkung": "SCHWAECHSTES k: rhoJeEvent 0,608/0,606 -- deutlich unter 0,80, schlechter als der heutige 4er-Baseline-Wert (0,686). rho je Runde liegt auch im MITTEL unter 0,80 (0,798/0,794)."
+    },
+    "6": {
+     "rhoJeEvent": [0.624, 0.624],
+     "rhoJeRundeMittel": [0.813, 0.811],
+     "rhoJeRundeMedian": [0.800, 0.800],
+     "teamRhoEventplatz": [0.891, 0.888],
+     "star1Prozent": [79.2, 80.6],
+     "starErsteZweiProzent": [95.4, 95.4],
+     "paarAb15RichtigProzent": [99.1, 99.2],
+     "pp": [8.0, 8.6],
+     "anmerkung": "rhoJeEvent 0,624/0,624 -- unter 0,80, schlechter als der heutige 4er-Baseline-Wert (0,686), aber besser als k=5. Fuehrt Last Hit (intelligence/spirit) ein -- A/B-Test der Fokusregel gegen eine 'immer breit'-Alternative (Patch: docs/design/mini-dm-ffa-lasthit-fokus-ab-patch-24-10.diff) zeigt KEINEN messbaren Unterschied (Pp 8,0/8,6 vs. 8,7/8,6, rho-Median beide 0,800) -- keine Codeaenderung."
+    }
+   },
+   "rhoMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2",
+    "spiele": 6,
+    "vierergruppen": 210,
+    "saatStroeme": [0, 10000000]
+   },
+   "ppMessung": {
+    "befehl": "node scripts/miss-mini-dm-ffa-abnahme.mjs 6 --k=2..6 --nur-k --pp=2 (Budget-Methode, Anhebung +15)",
+    "laeufe": 2,
+    "saatStroeme": [0, 10000000]
+   },
+   "datum": "2026-10-24",
+   "commit": "a3a88369",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "KORRIGIERT 24.10. (Opus-Review an PR #1303): Die massgebliche CLAUDE.md-Kennzahl ist rho auf SPIELER-Ebene je Spiel (ein Event = ein Spiel, 4*k Teilnehmer), NICHT die Team-Ebene (teamRhoEventplatz) und nicht die Einzelrunde. rhoJeEvent liegt bei JEDEM k klar UNTER 0,80 (0,608 bis 0,686) -- NICHT BESTANDEN, bei keinem k. k=5/k=6 (die neuen Kadergroessen) liegen sogar SCHLECHTER als der heutige 4er-Baseline-Wert (0,686). Zusaetzlich: rho je Runde liegt bei k=2 und k=5 auch im MITTEL unter 0,80 (0,799/0,798 bzw. 0,798/0,794), nicht nur der irrelevante Median-Grenzfall bei 0,800 (der bei ALLEN fuenf k exakt dort liegt, eine Eigenschaft von Spearman-rho bei n=4 Kaempfern/Runde, kein neuer Befund). Gegengewicht (CLAUDE.md-eigene, ehrlichere Lesart bei kleinem n): Star Rang 1 76-81%, erste zwei 93-95%, Paare ab 15 Punkten Abstand 99% richtig -- bei allen fuenf k aehnlich gut. Pp bleibt bei jedem k deutlich unter der 25er-Schranke (7,7-10,9). Referenz fuer die Buchungsformel (data/generated/mini-dm-ffa-referenz.json, m90 + Spieler-p50/p99,5 je k) real gezogen -- Spieler-p50 faellt von 145 (k=2) auf 69 (k=6) durch einen SELEKTIONSEFFEKT (Raenge 5/6 der Eignung kommen bei hoeherem k dazu, nicht 'Glaettung'); offene PR-5-Frage, ob die Referenz je k gepoolt bleibt oder nach Rolle/Rang getrennt wird, s. stand-aller-disziplinen.md. Bleibt toter Code vor PR 5 (kein produktiver Aufrufer, Bit-Identitaet gegen eine frische live-save-Kopie bestaetigt: scripts/pruefe-mapper-bit-identitaet.ts / scripts/pruefe-resolve-bit-identitaet.ts byte-identisch vorher/nachher, je gegen main via git stash und diesen Branch)."
+  }
+ }
+}

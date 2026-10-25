@@ -34,6 +34,10 @@ import {
   resolveMatchdayPreviewToBook,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
+import {
+  listStaffelTeamsThatRan,
+  updateStaffelWechselPaareAfterMatchday,
+} from "@/lib/season/staffel-wechsel-paar-bonus-service";
 
 type DbClient = typeof db;
 
@@ -990,8 +994,22 @@ export class LegacyMatchdayResultApplyService {
       deferredPlayerIds: injuryResult.deferredPlayerIds,
     });
 
+    // STAFFEL O7 "EINGESPIELTE PAARE" (11.10., lib/season/staffel-wechsel-paar-bonus-service.ts):
+    // der Paar-Zaehler wird HIER fortgeschrieben, nicht im Auto-Run — durch diesen Apply laeuft
+    // jeder Spieltagspfad (Arena-Hintergrundlauf, Auto-Run, Apply-Route, MVP-Scoring). Nur Teams,
+    // deren Staffel in genau diesem Apply gebucht ist (eine Teil-Buchung nach D1 ohne Staffel
+    // zaehlt nichts); idempotent je Spieltag, damit der D2-Commit nach dem D1-Commit und jedes
+    // erneute Buchen nichts doppelt zaehlen. Ohne Staffel an diesem Spieltag: derselbe gameState.
+    const staffelPaarGameState = updateStaffelWechselPaareAfterMatchday(accumulatedGameState, {
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+      teamIds: listStaffelTeamsThatRan(nextDisciplineResults, { matchdayResultId }),
+      now,
+    });
+
     const objectiveStartedAt = performance.now();
-    const refreshedGameState = refreshTeamObjectiveState(accumulatedGameState);
+    const refreshedGameState = refreshTeamObjectiveState(staffelPaarGameState);
     const standingsObjectiveRefreshMs = elapsedSince(objectiveStartedAt);
     const saveStartedAt = performance.now();
     persistGameStateWithMaterializedDerivations(this.persistence, save.saveId, refreshedGameState);

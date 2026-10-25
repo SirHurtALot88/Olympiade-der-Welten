@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -77,6 +78,7 @@ try {
   }
   await seite.click("#t2");
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
   const lies = () => seite.evaluate(() => ({
     score: document.getElementById("score")?.textContent?.trim() || null,

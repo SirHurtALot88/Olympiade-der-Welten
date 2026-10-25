@@ -15,10 +15,11 @@
 // =====================================================================================
 "use client";
 
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { DisciplineFieldProps, RT } from "./types";
 import { clamp } from "@/lib/foundation/foundation-number-utils";
 import { GhostLayer, TokenChrome, tokenRadius } from "./benchmark";
+import { buildTimeTrialTerrainProfile, type TerrainZoneKind } from "@/lib/matchday-arena/time-trial-terrain";
 
 // Deterministischer 0…1-Hash (FNV-1a) — Feld-Deko/Fahrer-Phasen ohne Hydration-Mismatch.
 function h01(s: string): number {
@@ -48,12 +49,36 @@ type GP = {
   prevDrawn: number | null;
   wPh: number; // Idle-Roll-Phase
   queue: number; // Start-Grid-Stagger
+  // ZF2: EINZELSTART-OPTIK (Chris 13.10., "im Time Trial sollen die Spieler NACHEINANDER
+  // antreten wie beim Zeitfahren"). `holdDelayMs` ist die rAF-eigene `nowT`-Schwelle, ab der
+  // dieser Fahrer die Startrampe verlassen darf — nach `t.laneIdx` gestaffelt, derselben
+  // dichten, deterministischen Reihenfolge, die `queue` (Start-Grid) bereits nutzt. Bis dahin
+  // zeichnet `dx` (s. rAF unten) ihn unabhängig von seiner wahren Score-Position an der Rampe;
+  // `releaseEase` blendet danach weich zur wahren Position auf (kein Teleport). Reine Anzeige:
+  // `st.x`/`t.score`/`t.displayScore`/`t.rank` laufen unveraendert, NUR `dx` (das, was
+  // tatsaechlich gezeichnet wird) haengt waehrend der Rampe vom Fortschritt `releaseEase` ab,
+  // nie von Score. `releaseEase` startet bei 1 (kein Halt), wenn der Fahrer beim Mounten schon
+  // sichtbar unterwegs ist (Seitenaufruf mitten im Rennen) — gated in der Init-Stelle unten.
+  holdDelayMs: number;
+  releaseEase: number;
+  // ZF1: letzte tatsächlich GEZEICHNETE Position (nach Windschatten/Bob) — Grundlage für den
+  // Profil-Positionsmarker (ZF1.3) UND den Kamerafokus (ZF1.5). Reine Anzeige, kein Score-Feld.
+  drawnX: number;
+  drawnY: number;
 };
+
+// ZF2: Abstand zwischen zwei Startrampen-Freigaben (ms, rAF-Zeit — unabhängig von
+// TRACK_ROUND_MS/Host-Rundentakt, ein reiner Optik-Parameter dieser Komponente). Bei bis zu
+// 12 Fahrern (BAHN_ART["time-trial"].jeSeite 6, zwei Seiten) ergibt das knapp über vier
+// Sekunden Gesamt-Spreizung bis der letzte losfährt — sichtbar nacheinander, ohne dass der
+// Zuschauer lange auf den fernsten Fahrer warten muss.
+const START_STAGGER_MS = 360;
 
 export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const {
     primitive: prim,
     disciplineName,
+    matchdayId,
     reducedMotion,
     W,
     H,
@@ -68,7 +93,9 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
     highlightIdxs,
     openHover,
     scheduleHoverClose,
-    onOpenTeam,
+    // onOpenTeam wird hier NICHT mehr direkt verdrahtet: der Klick auf ein Token steuert jetzt
+    // den Kamerafokus (ZF1.5); den Team-Drawer öffnet weiterhin die Host-Hovercard (Hover →
+    // Klick auf die Karte), s. `HoverTeamCardPortal`-`onClick` in DisciplineStageNativeArena.
   } = props;
   const trioSet = new Set(highlightIdxs ?? []);
 
@@ -87,6 +114,23 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const CLUMP_GAP = 40;
   const PACK_GAP = 24;
 
+  // ---- ZF1.1/1.2: Höhenprofil-Band ÜBER der Straße, direkt unter dem Horizont ----------
+  // Liegt knapp über der Barriere/dem Gras (barrier(ROAD_T - 12) in roadArt unten), NICHT als
+  // dritter Streifen unter dem Feld (das war der alte, entfernte Strip, Commit `acfd9c39`).
+  const PROFILE_B = ROAD_T - 16;
+  const PROFILE_H = 30;
+  const PROFILE_T = PROFILE_B - PROFILE_H;
+
+  // ZF1.1: Geländezonen deterministisch aus der Matchday-ID — reine Anzeige (s. Dateikopf-
+  // Kommentar „x = kumulierte Punkte (Score = Wahrheit)"). KEIN Zufall, der das Ergebnis
+  // beeinflusst: `buildTimeTrialTerrainProfile` liest nur den Schlüssel, schreibt nichts.
+  // Ohne echte Matchday-ID (Vorschau/Demo) ein fester Fallback-Schlüssel — immer noch
+  // deterministisch, nur nicht an einen echten Spieltag gebunden.
+  const terrain = useMemo(
+    () => buildTimeTrialTerrainProfile(matchdayId || "zeitfahren-vorschau"),
+    [matchdayId],
+  );
+
   // Frische Prop-Spiegel für die rAF-Schleife (ohne Neustart).
   const rtRef = useRef<RT[]>(rt);
   rtRef.current = rt;
@@ -104,6 +148,23 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
   const ghostRefs = useRef<Map<number, SVGGElement | null>>(new Map());
   const streakRefs = useRef<Map<number, SVGLineElement | null>>(new Map());
   const packRefs = useRef<Map<number, SVGCircleElement | null>>(new Map());
+  // ZF1.3: Positionsmarker je Fahrer auf dem Höhenprofil-Band (rAF-getrieben, s.u.).
+  const profDotRefs = useRef<Map<number, SVGCircleElement | null>>(new Map());
+  // ZF1.5: Kamerafokus — EIN <g> umschließt die gesamte Szene (Straße + Profil + Fahrer); die
+  // rAF-Schleife setzt jeden Frame dessen transform (translate/scale), während der Score für
+  // ALLE Fahrer unverändert weiterläuft (s. Sichtprüfung). `focusIdx === null` ⇒ Transform
+  // nähert sich der Identität an — niemand wird ausgeblendet, es wird nur herangezoomt.
+  const camGroupRef = useRef<SVGGElement | null>(null);
+  const camScaleRef = useRef(1);
+  const camFxRef = useRef(W / 2);
+  const camFyRef = useRef(H / 2);
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
+  const focusIdxRef = useRef<number | null>(null);
+  focusIdxRef.current = focusIdx;
+  // Fokus beim Disziplinende auflösen — der Zieleinlauf/Endstand soll das volle Feld zeigen.
+  useEffect(() => {
+    if (done) setFocusIdx(null);
+  }, [done]);
 
   const rOf = (t: RT): number => (tokenRadius(t, geo));
 
@@ -205,6 +266,51 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [W, H]);
 
+  // ---- ZF1.2: Höhenprofil-Band — eingefärbte Zonen + Höhenlinie, EINMALIG (Zonen ändern
+  // sich nie während eines Spiels, nur die Positionsmarker tun das, s. rAF unten). ----------
+  const ZONE_FILL: Record<TerrainZoneKind, string> = {
+    steigung: "rgba(224,120,70,.32)",
+    abfahrt: "rgba(90,154,208,.30)",
+    flach: "rgba(160,170,185,.20)",
+  };
+  const ZONE_GLYPH: Record<TerrainZoneKind, string> = { steigung: "⬈", abfahrt: "⬊", flach: "▬" };
+  const profileBand = useMemo(() => {
+    const span = X1 - X0;
+    const xOf = (frac: number) => X0 + frac * span;
+    const yOf = (frac: number) => PROFILE_B - terrain.elevationAt(frac) * PROFILE_H;
+    const SAMPLES = 48;
+    const linePts: string[] = [];
+    for (let i = 0; i <= SAMPLES; i += 1) {
+      const f = i / SAMPLES;
+      linePts.push(`${i === 0 ? "M" : "L"} ${xOf(f).toFixed(1)} ${yOf(f).toFixed(1)}`);
+    }
+    const lineD = linePts.join(" ");
+    const fillD = `${lineD} L ${X1.toFixed(1)} ${PROFILE_B} L ${X0.toFixed(1)} ${PROFILE_B} Z`;
+    return (
+      <g aria-hidden pointerEvents="none">
+        {/* Band-Hintergrund, leicht abgesetzt vom Himmel. */}
+        <rect x={X0} y={PROFILE_T} width={span} height={PROFILE_H} rx={4} fill="rgba(10,14,20,.38)" />
+        {/* Eingefärbte Zonen. */}
+        {terrain.zones.map((z, i) => (
+          <rect key={"zone" + i} x={xOf(z.from)} y={PROFILE_T} width={Math.max(0, xOf(z.to) - xOf(z.from))} height={PROFILE_H} fill={ZONE_FILL[z.kind]} />
+        ))}
+        {/* Höhenlinie + Füllfläche darunter. */}
+        <path d={fillD} fill="rgba(235,240,246,.14)" />
+        <path d={lineD} fill="none" stroke="rgba(235,240,246,.75)" strokeWidth={1.6} />
+        {/* Zonen-Trenner + Richtungsglyphe. */}
+        {terrain.zones.map((z, i) => (
+          <g key={"zg" + i}>
+            {i > 0 ? <path d={`M ${xOf(z.from).toFixed(1)} ${PROFILE_T} V ${PROFILE_B}`} stroke="rgba(235,240,246,.22)" strokeWidth={1} strokeDasharray="3 3" /> : null}
+            <text x={xOf((z.from + z.to) / 2).toFixed(1)} y={PROFILE_T - 4} textAnchor="middle" fontSize={9} fill="rgba(235,240,246,.55)">
+              {ZONE_GLYPH[z.kind]}
+            </text>
+          </g>
+        ))}
+      </g>
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [W, H, terrain]);
+
   // ---- rAF: linearer Glide + organische Peloton-Klumpung + Windschatten ---------------
   useEffect(() => {
     let raf = 0;
@@ -236,11 +342,19 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         const tgt = tp(t, t.displayScore);
         let st = g.get(t.idx);
         if (!st) {
+          // ZF2: nur staffeln, wenn dieser Fahrer beim Mounten noch sichtbar auf der Rampe
+          // steht (Score=Wahrheit ist noch an/nahe X0) — ein Seitenaufruf mitten im Rennen
+          // (Reload, spaeter Einstieg) zeigt jeden sofort an seiner echten Position, ohne ihn
+          // kuenstlich zurueckzuhalten.
+          const onRamp = tgt.x - X0 < (X1 - X0) * 0.03;
           st = {
             x: tgt.x, fromX: tgt.x, toX: tgt.x, glideT: 1, target: tgt.x,
             y: tgt.y, yTo: tgt.y, baseOff: tgt.y - roadC, comp: 1,
             draft: 0, draftTo: 0, pack: false, sw: 8, prevDrawn: null,
             wPh: h01(t.code + "wp") * 6.283, queue: t.laneIdx % 4,
+            holdDelayMs: onRamp ? t.laneIdx * START_STAGGER_MS : 0,
+            releaseEase: onRamp && !reduce ? 0 : 1,
+            drawnX: tgt.x, drawnY: tgt.y,
           };
           g.set(t.idx, st);
         }
@@ -324,11 +438,32 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
           st.x = tp(t, t.animScore).x;
           st.draft += (st.draftTo - st.draft) * 0.045;
           st.y += (st.yTo - st.y) * 0.028;
+          // ZF2: Startrampen-Freigabe — erst NACH `holdDelayMs` beginnt das weiche Aufschließen
+          // zur wahren Position (500ms linear, kein Teleport). Bis dahin bleibt `releaseEase`
+          // bei 0, s. drawX()/dx unten.
+          if (st.releaseEase < 1 && nowT >= st.holdDelayMs) {
+            st.releaseEase = Math.min(1, st.releaseEase + dt / 500);
+          }
         }
-        const dx = drawX(st, reduce);
+        const trueDx = drawX(st, reduce);
+        // Waehrend der Rampe (releaseEase < 1) bleibt die GEZEICHNETE Position bei X0, ganz
+        // gleich, wie weit `st.x`/Score schon ist — nur `dx` (das Transform) haengt daran, nie
+        // `st.x` selbst oder irgendein Score-/Rang-Feld.
+        const dx = st.releaseEase >= 1 ? trueDx : X0 + (trueDx - X0) * st.releaseEase;
         const dy = st.y + (reduce ? 0 : Math.cos(nowT * 0.0013 + st.wPh * 1.7) * 1.2);
         const el = gRefs.current.get(t.idx);
         if (el) el.setAttribute("transform", `translate(${dx} ${dy})`);
+        st.drawnX = dx;
+        st.drawnY = dy;
+        // ZF1.3: Positionsmarker auf dem Höhenprofil-Band — dieselbe x-Projektion wie das
+        // Hauptfeld (dx), nur auf die Profil-y-Achse gemappt (elevationAt). Reine Anzeige.
+        const pdot = profDotRefs.current.get(t.idx);
+        if (pdot) {
+          const frac = clamp((dx - X0) / ((X1 - X0) || 1), 0, 1);
+          const py = PROFILE_B - terrain.elevationAt(frac) * PROFILE_H;
+          pdot.setAttribute("cx", dx.toFixed(1));
+          pdot.setAttribute("cy", py.toFixed(1));
+        }
         // Ghost der Vorrunde (Benchmark): bei tokenPos(roundStartScore); die Lücke = Zugewinn.
         const gel = ghostRefs.current.get(t.idx);
         if (gel) {
@@ -355,6 +490,37 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         if (pref) pref.style.opacity = st.pack ? "1" : "0";
       }
 
+      // ZF1.5: Kamerafokus — EIN <g>-Transform für die ganze Szene, läuft JEDEN Frame mit
+      // (folgt dem fokussierten Fahrer stetig über die Straße UND das Höhenprofil). Ohne
+      // Fokus nähert sich scale/fx/fy wieder der Identität (1 / Bildmitte) an. Betrifft nur
+      // die Darstellung dieser EINEN Feld-Komponente — rtl/animScore/Ranking laufen für ALLE
+      // Fahrer unangetastet weiter, s. Sichtprüfung in der PR-Beschreibung.
+      {
+        const fIdx = focusIdxRef.current;
+        let targetScale = 1;
+        let targetFx = W / 2;
+        let targetFy = H / 2;
+        if (fIdx != null) {
+          const fst = g.get(fIdx);
+          if (fst) {
+            targetScale = 2.1;
+            targetFx = fst.drawnX;
+            targetFy = fst.drawnY;
+          }
+        }
+        const ease = reduce ? 1 : 0.09;
+        camScaleRef.current += (targetScale - camScaleRef.current) * ease;
+        camFxRef.current += (targetFx - camFxRef.current) * ease;
+        camFyRef.current += (targetFy - camFyRef.current) * ease;
+        const camEl = camGroupRef.current;
+        if (camEl) {
+          const s = camScaleRef.current;
+          const fx = camFxRef.current;
+          const fy = camFyRef.current;
+          camEl.setAttribute("transform", `translate(${(W / 2).toFixed(1)} ${(H / 2).toFixed(1)}) scale(${s.toFixed(3)}) translate(${(-fx).toFixed(1)} ${(-fy).toFixed(1)})`);
+        }
+      }
+
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -375,7 +541,16 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
         )}
       </defs>
 
+      {/* ZF1.5: Kamerafokus — EIN <g> umschließt die GESAMTE Szene; die rAF-Schleife setzt
+          dessen transform jeden Frame (s.o.). Ohne Fokus ist das die Identität, mit Fokus
+          eine stetig nachgeführte Vergrößerung auf den gewählten Fahrer. Alle Teilnehmer
+          bleiben Kinder dieses <g> und werden weiter jeden Frame positioniert — niemand wird
+          ausgeblendet, es wird nur herangezoomt (Sichtprüfung s. PR-Beschreibung). */}
+      <g ref={camGroupRef}>
       {roadArt}
+
+      {/* ZF1.1/1.2: Höhenprofil-Band (Zonen + Höhenlinie), ÜBER der Straße. */}
+      {profileBand}
 
       {/* Feld-Wasserzeichen */}
       {disciplineName ? (
@@ -386,6 +561,23 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
 
       {/* Ghost der Vorrunde (Benchmark) — VOR den Fahrern. */}
       <GhostLayer sorted={sorted} geo={geo} ghostRefs={ghostRefs} />
+
+      {/* ZF1.3: Live-Positionsmarker je Fahrer auf dem Höhenprofil-Band (rAF setzt cx/cy,
+          s.o.). Eigenes Team/Führender etwas größer + farbig, Rest dezent. */}
+      <g aria-hidden pointerEvents="none">
+        {rt.map((t) => (
+          <circle
+            key={"pdot" + t.code}
+            ref={(el) => {
+              profDotRefs.current.set(t.idx, el);
+            }}
+            r={t.isOwn || t.rank === 1 ? 3.2 : 2.1}
+            fill={t.isOwn ? "var(--nl-accent)" : t.rank === 1 ? "#f6c750" : "rgba(235,240,246,.75)"}
+            stroke="rgba(10,14,20,.6)"
+            strokeWidth={0.75}
+          />
+        ))}
+      </g>
 
       {/* Fahrer-Tokens — in Rang-Reihenfolge rückwärts, damit der Führende oben liegt. */}
       {sorted
@@ -411,13 +603,24 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
                   el.setAttribute("transform", `translate(${initX} ${initY})`);
                 }
               }}
-              style={{ cursor: onOpenTeam && t.teamId ? "pointer" : "default" }}
+              style={{ cursor: "pointer" }}
               onMouseEnter={() => openHover(t.idx)}
               onMouseLeave={scheduleHoverClose}
+              // ZF1.5: Klick fokussiert die Kamera auf diesen Fahrer (Toggle — derselbe Fahrer
+              // noch einmal löst den Fokus wieder). Team-Details bleiben über Hover → die
+              // bereits vorhandene Host-Hovercard erreichbar (ihr Klick öffnet weiter den
+              // Team-Drawer, s. `onClick` auf `HoverTeamCardPortal` im Host).
               onClick={() => {
-                if (onOpenTeam && t.teamId) onOpenTeam(t.teamId);
+                setFocusIdx((cur) => (cur === t.idx ? null : t.idx));
               }}
             >
+              {/* SVG-<g> kennt kein `title`-Attribut als Tooltip — ein `<title>`-Kind erfüllt
+                  denselben Zweck (native Browser-Tooltip bei Hover). */}
+              <title>{focusIdx === t.idx ? "Klick: Fokus verlassen" : "Klick: Kamera fokussieren"}</title>
+              {/* ZF1.5: Fokus-Ring — zeigt, wer gerade im Kamerafokus steht. */}
+              {focusIdx === t.idx ? (
+                <circle r={r + 10} fill="none" stroke="var(--nl-accent)" strokeWidth={2} strokeDasharray="4 3" opacity={0.9} />
+              ) : null}
               {/* Windschatten-Streifen nach hinten (Länge per rAF). */}
               <line
                 ref={(el) => {
@@ -467,6 +670,7 @@ export default function PelotonField(props: DisciplineFieldProps): ReactNode {
             </g>
           );
         })}
+      </g>
     </>
   );
 }

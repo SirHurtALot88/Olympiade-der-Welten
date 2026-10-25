@@ -533,9 +533,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2PlayerRows,
   seasonV2PressureTeam,
   seasonV2SelectedTeamSummary,
+  seasonV2Spieltage,
   seasonV2StandingsRows,
   seasonV2TeamTopPlayersByColumn,
   seasonV2FormCardBonusByTeamId,
+  seasonV2AreaVerhaeltnisByTeamId,
+  seasonV2TeamStrengthRankByTeamId,
   seasonV2TopPlayers,
   selectedBoardConfidence,
   selectedEncyclopediaEntry,
@@ -917,8 +920,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         >
           <strong>Arena-Spieltag wird simuliert …</strong>
           <span>
-            Die Basketball-Duelle dieses Spieltags laufen gerade in der Arena. Das dauert ein paar
-            Sekunden bis unter einer Minute — wir aktualisieren automatisch, sobald das Ergebnis steht.
+            {/* FUND F6 (Plan docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.3):
+                hiess bis zur PPS-Duell-Bruecke (#1266) fest "Die Basketball-Duelle …", obwohl
+                Basketball seither gar nicht mehr arena-gewertet ist (laeuft ueber die Bruecke) --
+                generisch auf die arena-gewerteten Disziplinen dieses Spieltags statt auf eine. */}
+            Die Arena-Duelle dieses Spieltags laufen gerade. Das dauert ein paar Sekunden bis unter
+            einer Minute — wir aktualisieren automatisch, sobald das Ergebnis steht.
           </span>
         </div>
       ) : arenaMatchdayResolveStatus === "failed" ? (
@@ -929,7 +936,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           data-arena-matchday-resolve-status="failed"
         >
           <strong>Arena-Spieltag fehlgeschlagen</strong>
-          <span>Die Basketball-Arena-Duelle konnten nicht simuliert werden. Bitte den Spieltag erneut simulieren.</span>
+          <span>Die Arena-Duelle dieses Spieltags konnten nicht simuliert werden. Bitte den Spieltag erneut simulieren.</span>
         </div>
       ) : null}
       <FoundationShell
@@ -2774,9 +2781,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               pressureTeam={seasonV2PressureTeam}
               topPlayer={seasonV2TopPlayers[0] ?? null}
               standingsRows={seasonV2StandingsRows}
+              spieltage={seasonV2Spieltage}
+              currentMatchdayId={gameState.matchdayState.matchdayId}
               topPlayers={seasonV2TopPlayers}
               teamTopPlayersByColumn={seasonV2TeamTopPlayersByColumn}
               teamFormCardBonusByTeamId={seasonV2FormCardBonusByTeamId}
+              areaVerhaeltnisByTeamId={seasonV2AreaVerhaeltnisByTeamId}
+              teamStrengthRankByTeamId={seasonV2TeamStrengthRankByTeamId}
               playerRows={seasonV2PlayerRows}
               gmRows={seasonV2GmRows}
               archiveRows={seasonV2ArchiveRows}

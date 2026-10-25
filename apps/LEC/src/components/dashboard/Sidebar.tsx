@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 type NavKey =
   | "dashboard"
+  | "cockpit"
   | "sortiment"
   | "topflop"
   | "marktpreise"
@@ -11,22 +12,18 @@ type NavKey =
   | "import"
   | "einstellungen";
 
+// Nur zwei Seiten: Dashboard (das Wichtigste) und Sortiment (alle Details). Die uebrigen Seiten bleiben
+// per Adresse erreichbar, stehen aber nicht mehr in der Navigation. Einstellungen (Billbee-Zugang,
+// Datenstand) liegt als kleiner Link unten.
 const NAV_ITEMS: { key: NavKey; label: string; href: string }[] = [
   { key: "dashboard", label: "Dashboard", href: "/" },
   { key: "sortiment", label: "Sortiment", href: "/sortiment" },
-  { key: "topflop", label: "Top / Flop", href: "/top-flop" },
-  { key: "marktpreise", label: "Marktpreise", href: "/marktpreise" },
-];
-
-const NAV_ITEMS_STEUERUNG: { key: NavKey; label: string; href: string }[] = [
-  { key: "empfehlungen", label: "Empfehlungen", href: "/empfehlungen" },
-  { key: "import", label: "Import & Matching", href: "/import" },
-  { key: "einstellungen", label: "Einstellungen", href: "/einstellungen" },
 ];
 
 /** Ordnet die aktuelle Route dem Sidebar-Eintrag zu (aktiver Zustand aus der Route). */
 function navKeyForPath(pathname: string): NavKey {
   if (pathname === "/") return "dashboard";
+  if (pathname.startsWith("/cockpit")) return "cockpit";
   if (pathname.startsWith("/sortiment")) return "sortiment";
   if (pathname.startsWith("/top-flop")) return "topflop";
   if (pathname.startsWith("/marktpreise")) return "marktpreise";
@@ -55,14 +52,12 @@ export function Sidebar() {
             {item.label}
           </a>
         ))}
-        <div className="navsec">Steuerung</div>
-        {NAV_ITEMS_STEUERUNG.map((item) => (
-          <a key={item.key} className={item.key === active ? "active" : undefined} href={item.href}>
-            {item.label}
-          </a>
-        ))}
       </nav>
-      <div className="sidefoot">LEC Cockpit · Live-Daten</div>
+      <div className="sidefoot">
+        <a href="/einstellungen" className={active === "einstellungen" ? "active" : undefined} style={{ color: "inherit", textDecoration: "underline dotted" }}>
+          Einstellungen &amp; Datenstand
+        </a>
+      </div>
     </aside>
   );
 }

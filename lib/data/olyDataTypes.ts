@@ -3,7 +3,9 @@ import type { LeagueTier } from "@/lib/season/league-split";
 // `import type` -- rein typseitig, erzeugt keine Laufzeit-Zirkularitaet trotz des
 // Rueckimports von GameState/Player aus dieser Datei in arena-headless-runner.ts (s. dort).
 import type { ArenaMomentEintrag } from "@/lib/battle/arena-headless-runner";
-// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner.
+// Nur ein Typ-Import: zur Laufzeit bleibt davon nichts, der Zirkel ist also keiner. Derselbe
+// Grund gilt fuer `ArenaAusfall` -- s. dort fuer die Begruendung des Rueckimports.
+import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import type { FoundationSeasonHistoryEntry } from "@/lib/persistence/foundation-season-history-projection";
 import type { FoundationFieldRaceProjection } from "@/lib/persistence/foundation-field-race-projection";
 
@@ -313,6 +315,13 @@ export type StandingRecord = {
    */
   matchdayBaselinePoints?: number | null;
   matchdayBaselineId?: string | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): Saisonsumme der
+   * ±D-Werte aller gebuchten Battle-Duelle — Tiebreaker nach `points`, KEINE Zusatzpunkte. Nur in
+   * Battle-Saves gesetzt; wird bei jeder Buchung aus `DisciplineResultRecord.verhaeltnis` neu
+   * summiert (idempotent, keine eigene Baseline noetig), s. lib/standings/standings-verhaeltnis.ts.
+   */
+  verhaeltnis?: number | null;
   cashFc?: number | null;
   startplatz?: number | null;
   rankDiff?: number | null;
@@ -1835,6 +1844,22 @@ export type ApronSettlementLogRecord = {
   createdAt: string;
 };
 
+/**
+ * TASK #158 — Idempotenz-/Audit-Marker für den `league_movement`-Schritt (Saisonende, Battle-Mode
+ * mit aktivem Liga-Split). Analog zu `ApronSettlementLogRecord`/`SponsorPayoutLogRecord`: ein
+ * Eintrag je Saison verhindert, dass der Schritt bei einem erneuten Aufruf (z. B. ein wiederholter
+ * `runLocalSeasonCompletion`-Dry-Run/Execute) die bereits neu zugeordnete Liga ein zweites Mal
+ * gegen sich selbst auswertet.
+ */
+export type LeagueMovementLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  createdAt: string;
+  promotedTeamIds: string[];
+  relegatedTeamIds: string[];
+};
+
 export type LoanLenderType = "bank" | "team"; // "team" erst Phase 3
 
 export type LoanRecord = {
@@ -2441,18 +2466,28 @@ export type SeasonDisciplineScheduleSlot = {
    */
   occurrenceInSeason?: 1 | 2;
   /**
-   * Additiv, optional (mini-dm-spielplan-verankerung-Review-Fix, 14.09.): der `playerCount`-Wert,
-   * den diese Disziplin/Seite OHNE eine spaetere, nur-fuer-Kader/Pod-Zwecke gedachte Ueberschreibung
-   * gezogen haette — fuer JEDE Disziplin ausser Mini-DM identisch zu `playerCount`. Mini-DM ist die
-   * einzige Ausnahme: `playerCount` ist fuer sie fest `1` (Kadergroesse/FFA-Pod, s.
-   * `MINI_DM_FIXED_PLAYER_COUNT`), waehrend `legacyScorePlayerCount` weiterhin den eigentlichen,
-   * seed-gezogenen `[2..6]`-Wert traegt — genau den Wert, den das bereits laengst aktive,
+   * Additiv, optional (mini-dm-spielplan-verankerung-Review-Fix, 14.09.; Mini-DM-Sonderfall seit
+   * PR 1 der 2-6-Spieler-Rueckkehr, 21.10., ZURUECKGENOMMEN): der `playerCount`-Wert, den diese
+   * Disziplin/Seite OHNE eine zusaetzliche, nur-fuer-Kader/Pod-Zwecke gedachte Ueberschreibung
+   * gezogen haette — fuer JEDE Disziplin, Mini-DM eingeschlossen, IDENTISCH zu `playerCount`.
+   *
+   * Zwischen dem 14.09. und dem 21.10. war Mini-DM hier die einzige Ausnahme: `playerCount` war
+   * fest `1` (Kadergroesse/FFA-Pod, Chris' inzwischen zurueckgenommene Entscheidung), waehrend
+   * dieses Feld weiterhin den eigentlichen, seed-gezogenen `[2..6]`-Wert trug — den das
    * liga-weite PPS-Renn-Scoring (`getRankToPointsValue()`/`resolveDisciplinePlayerCount()`) lesen
-   * MUSS, weil `references/sheets/rank-to-points.json` keine Zeile fuer `playerCount: 1` hat. Ohne
-   * diese Trennung wuerde derselbe Wert (`1`) sowohl in den Kader-/Pod-Pfad als auch in den
-   * PPS-Scoring-Pfad einfliessen und dort JEDEN Mini-DM-Spieltag lautlos auf 0 Liga-Punkte setzen
-   * (Review-Fund PR #930). `undefined`/fehlend faellt auf `playerCount` zurueck — bit-identisch zum
-   * Stand vor diesem Feld fuer jeden aelteren, bereits persistierten Spielplan-Eintrag.
+   * MUSSTE, weil `references/sheets/rank-to-points.json` keine Zeile fuer `playerCount: 1` hat
+   * (Review-Fund PR #930). Seit PR 1 (21.10.) zieht Mini-DM wieder die normale `[2,3,4,5,6]`-
+   * Ziehung wie tdm/gewichtheben/hockey/breaking — `playerCount` und `legacyScorePlayerCount`
+   * laufen fuer sie wieder synchron.
+   *
+   * Das Feld bleibt bestehen, statt entfernt zu werden: andere Codepfade
+   * (`rank-to-points.ts`/`standings-preview-engine.ts`) lesen es weiterhin bevorzugt, und ein
+   * bereits PERSISTIERTER Alt-Spielplan-Slot aus der Fixierungszeit kann noch `playerCount: 1`
+   * mit abweichendem `legacyScorePlayerCount` tragen — `getSeasonDisciplineSchedule()`
+   * (`normalizeStoredMiniDmPlayerCounts()`) gleicht genau das fuer noch nicht gespielte
+   * Spieltage beim Lesen wieder an. `undefined`/fehlend faellt auf `playerCount` zurueck —
+   * bit-identisch zum Stand vor diesem Feld fuer jeden aelteren, bereits persistierten
+   * Spielplan-Eintrag.
    */
   legacyScorePlayerCount?: number | null;
 };
@@ -2579,8 +2614,60 @@ export type DisciplineResultRecord = {
    */
   teamPoints?: number | null;
   pointSource?: string;
-  resolutionSource?: "pps" | "arena";
+  /**
+   * `"pps_duell"` seit der PPS-Duell-Bruecke (16.10.), `"mini_dm_pod"` seit dem Mini-DM-Pod-Resolve
+   * (19.10., docs/design/mini-dm-pod-resolve-19-10.md) -- s. `DisciplineResolutionSource` in
+   * legacy-matchday-resolve-types.ts.
+   */
+  resolutionSource?: "pps" | "arena" | "pps_duell" | "mini_dm_pod";
   arenaMatchSeed?: string | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): additiv und
+   * optional wie `momente`, nur an Battle-Duell-Zeilen gesetzt. `marge` = roher Abstand beider
+   * Seiten, `verhaeltnis` = ±D (0..10) aus Sicht dieses Teams, `margeM90` = die verwendete
+   * Bezugsgroesse (`null` = Rueckfall-D), `duellSeiten` = Rohwerte [dieses Team, Gegner]. Rohwerte
+   * UND D werden gespeichert, damit eine Nachjustierung der Formel keine neue Simulation braucht.
+   */
+  opponentTeamId?: string | null;
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
+  /**
+   * NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.): `[eigenes Ergebnis, gegnerisches Ergebnis]`, s.
+   * `DisciplineTeamResolvePreview.ergebnisNormiert` (legacy-matchday-resolve-types.ts) fuer die volle
+   * Begruendung. Additiv wie `marge`/`verhaeltnis`; aeltere Zeilen ohne dieses Feld werden beim Lesen
+   * aus `marge`/`margeM90`/`duellSeiten` live nachberechnet (s. season-matchday-fixtures-overview.ts).
+   */
+  ergebnisNormiert?: [number, number] | null;
+  /**
+   * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
+   * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
+   * Modus bleibt unberuehrt. Traegt die echte Vierergruppe (Pod), aus der `teamPoints` (2-1-0-0)
+   * stammt, damit die UI (season-matchday-fixtures-overview.ts) die Gruppe als das zeigen kann, was
+   * sie ist -- vier Teams, nicht ein 2-Team-Duell. `wert` ist die N-Team-0-10-Normierung dieses
+   * Teams (`berechneErgebnisNormiertNTeam()`, mini-dm-pod-resolve.ts) -- dieselbe Garantie wie
+   * `ergebnisNormiert` (Platzierungsreihenfolge kann nie kippen), nur fuer vier statt zwei Teams.
+   */
+  miniDmPod?: {
+    podId: string;
+    /** 1 = bester Platz im Pod, 4 = schlechtester -- s. `MiniDmPodOverride.platz`. */
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+    /**
+     * PR 4 (Opus-Plan 21.10., Mini-DM-6-Rollen-Umbau): additiv und optional -- `undefined`/fehlend
+     * fuer JEDE heute existierende Zeile (der PPS-Pod-Pfad setzt diese drei Felder nicht, s.
+     * `MiniDmPodOverride` in mini-dm-pod-resolve.ts). `quelle === "ffa"` ist das Signal, an dem
+     * `derivePlayerPointsForDuellGroup()` (season-points-ledger.ts) zwischen dem (bisherigen)
+     * PPS-Pod-Pfad und dem (ab PR 5 echten) FFA-Pod-Pfad unterscheidet -- fehlt `quelle`, gilt
+     * weiter der PPS-Pfad (Rueckwaertskompatibilitaet, jeder bestehende Battle-Save bleibt
+     * unberuehrt). `rundenPunkteSumme`/`teilnahme` sind rein informativ (UI/Report).
+     */
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
+  } | null;
   /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
    * Klasse A): wie `arenaMatchSeed` additiv und optional -- aeltere Zeilen (vor dieser Aenderung
@@ -2589,6 +2676,15 @@ export type DisciplineResultRecord = {
    * lib/battle/arena-headless-runner.ts.
    */
   momente?: ArenaMomentEintrag[] | null;
+  /**
+   * SICHTBARE ARENA-AUSFÄLLE (Plan docs/design/battle-arena-auto-run-anbindung-plan-16-10.md
+   * Abschnitt 3.2 Punkt 3, PR 1): additiv und optional wie `momente` -- aeltere Zeilen (vor dieser
+   * Aenderung geschrieben) haben dieses Feld nicht, jeder Leser behandelt sein Fehlen als "kein
+   * Ausfall bekannt", nie als Fehler (kein Breaking Change am Schema). Durchgereicht aus
+   * `DisciplineTeamResolvePreview.arenaAusfall` (legacy-matchday-resolve-types.ts), das dieses
+   * Feld schon 1:1 traegt.
+   */
+  arenaAusfall?: ArenaAusfall | null;
 };
 
 export type PlayerDisciplinePerformanceRecord = {
@@ -2647,6 +2743,83 @@ export type DisciplineHighlightRecord = {
  * gerechnet — ein Snapshot darf niemals ein Ergebnis zu einer Aufstellung liefern, die
  * so gar nicht mehr antritt.
  */
+/**
+ * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
+ * Abschnitt 2.2): Status des Hintergrundlaufs, der die Arena-Duelle eines Battle-Spieltags
+ * VOR der Buehne rechnet und in den `MatchdayResolveSnapshotRecord` schreibt. JE SPIELTAG
+ * statt des alten saveweiten Einzelfelds `seasonState.arenaMatchdayResolveStatus` (Befund F5:
+ * das alte Feld kennt weder Spieltag noch Zeitstempel und blieb nach einem Container-Neustart
+ * fuer immer "in_progress"). `"ready"` UND `"failed"` sind beide TERMINAL — "failed" heisst nur
+ * "mindestens eine Disziplin ist ohne Arena-Ergebnis auf die PPS-Duell-Bruecke gefallen", nicht
+ * "nichts wurde gebucht": der Auto-Run bucht in beiden Faellen den Snapshot, nur sein Inhalt
+ * unterscheidet sich (reines Arena-Ergebnis vs. eine mit `arenaAusfall` markierte Bruecke).
+ */
+export type ArenaVorlaufStatus = "in_progress" | "ready" | "failed";
+
+export type ArenaVorlaufDisziplinEintrag = {
+  status: "arena" | "ausgefallen";
+  ausfall?: ArenaAusfall | null;
+  dauerMs?: number | null;
+  /**
+   * OPUS-AUFLAGE B2 (Plan Abschnitt 9, Punkt 2): Fingerabdruck ueber Saat, Kader, Aufstellung,
+   * Mutator-Wurf und Motor-Datei-Hash fuer GENAU diese Disziplin dieses Spieltags — berechnet von
+   * `berechneArenaEingabeHash()` (`lib/battle/arena-eingabe-hash.ts`). Nicht nur diagnostisch:
+   * `resolveMatchdayPreviewToBook()` (`lib/foundation/matchday-resolve-snapshot.ts`) berechnet ihn
+   * beim Buchen ERNEUT und verwirft den Snapshot fuers Buchen, wenn er nicht mehr passt — sichtbar
+   * (Warnung, neuer Vorlauf) statt eine stille Divergenz zwischen Vorlauf- und Buchungszustand zu
+   * buchen.
+   */
+  eingabeHash?: string | null;
+  /**
+   * OPUS-REVIEW (Nachtrag 18.10., Design-Fix "Wiederholung gehoert in den Vorlauf selbst"): wie
+   * viele INTERNE Versuche diese Disziplin innerhalb EINES `fuehreVorlaufAus()`-Laufs brauchte
+   * (1 oder 2, s. `MAX_AUTOMATISCHE_VERSUCHE` in arena-vorlauf-service.ts) — NICHT dasselbe wie
+   * `ArenaVorlaufRecord.versuch` (das zaehlt EXTERNE Neustarts derselben Signatur: erzwungen durch
+   * den geplanten "Arena erneut versuchen"-Knopf oder eine neue Signatur, nie automatisch). Vor
+   * diesem Fix persistierte ein erster Fehlschlag sofort als `"failed"`, und erst ein SPAeTERER,
+   * externer Aufrufer (Buchung, Buehnen-Poll, Lineup-Speichern) stiess den automatischen zweiten
+   * Versuch an -- das liess den Zustand fuer den Spieler flackern ("ausgefallen" -> kurz danach
+   * wieder "laeuft") und machte "failed" zweideutig (endgueltig ODER "gleich kommt noch ein
+   * Versuch"). Jetzt passiert die Wiederholung SOFORT, noch VOR dem Schreiben -- persistiert wird
+   * nur noch das ENDGUELTIGE Ergebnis, "failed" ist ab dann immer terminal.
+   */
+  versucheIntern?: number;
+  /**
+   * TEILWARNUNGEN BEI GESAMTERFOLG (OPUS-REVIEW, PR 5 des 6-PR-Opus-Plans 21.10., Mini-DM-FFA-
+   * Vorlauf-Verdrahtung, Pflicht-Fix 4): additiv, optional -- bisher ausschliesslich fuer Mini-DM
+   * gesetzt (`lib/battle/arena-vorlauf-service.ts`s Mini-DM-Zweig). `status: "arena"` heisst nur
+   * "MINDESTENS EIN Pod/Team hat ein gueltiges Ergebnis geliefert" -- ohne dieses Feld gingen
+   * einzelne, strukturell unvollstaendige Pods (fehlende Runde, fremde Rollen-ID, vom Motor
+   * ignoriertes k) bei einem Teilerfolg STILL unter (sie fallen defensiv auf den PPS-Pod-Pfad
+   * zurueck, aber ohne sichtbare Spur). Jede Zeile hier beschreibt EINEN verworfenen Pod dieser
+   * Disziplin dieses Spieltags, `null`/fehlend/leer heisst "keine Teilwarnung". `undefined` fuer
+   * jeden Save/jede andere Disziplin von vor diesem Feld — `JSON.stringify` laesst es ohnehin weg.
+   */
+  teilwarnungen?: string[] | null;
+};
+
+export type ArenaVorlaufRecord = {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  /** `buildMatchdayResolveSignature()` beim Start — passt sie beim Schreiben nicht mehr, wird verworfen. */
+  signature: string;
+  status: ArenaVorlaufStatus;
+  startedAt: string;
+  finishedAt?: string | null;
+  /**
+   * Wievielter EXTERNER Neustart fuer diese Signatur -- NICHT die automatische Wiederholung bei
+   * `absturz`/`timeout`/`chromium_start` (die passiert seit dem Design-Fix vom 18.10. INTERN
+   * innerhalb EINES Laufs, s. `ArenaVorlaufDisziplinEintrag.versucheIntern`, und persistiert nie
+   * ein Zwischenergebnis). Steigt nur bei einem `erzwingeNeuenVersuch` (der geplante "Arena
+   * erneut versuchen"-Knopf, oder eine arenaEingabeHash-Divergenz beim Buchen) oder bei einer
+   * neuen Signatur -- im automatischen Normalfall bleibt dieses Feld bei 1.
+   */
+  versuch: number;
+  /** je arena-aufgeloester Disziplin dieses Spieltags (D1 und/oder D2, s. WEG B). */
+  disziplinen: Record<string, ArenaVorlaufDisziplinEintrag>;
+};
+
 export type MatchdayResolveSnapshotRecord = {
   id: string;
   saveId: string;
@@ -2700,6 +2873,12 @@ export type MatchdayResolveSnapshotRecord = {
   /** Das Ergebnis, in das diese Rechnung gebucht wurde. Zusammen mit `bookedAt` der Beleg. */
   bookedMatchdayResultId?: string | null;
   createdAt: string;
+  /**
+   * ARENA-VORLAUF (PR 3, K1): `null`/fehlend, solange kein Vorlauf fuer diesen Spieltag lief oder
+   * er noch gar nicht anwendbar ist (Manager Mode, keine arena-aufgeloeste Disziplin an D1/D2).
+   * Additiv wie `bookedAt` — ein Snapshot ohne dieses Feld verhaelt sich wie vor PR 3.
+   */
+  arenaVorlauf?: ArenaVorlaufRecord | null;
 };
 
 export type ResultAuditLogRecord = {
@@ -2838,6 +3017,19 @@ export type SeasonSnapshotTeamRecord = {
   isTop5?: boolean;
   isTop10?: boolean;
   avgRankContribution?: number | null;
+  /**
+   * TASK #158/#161, liga-split-plan.md 10.8: Liga-Zugehoerigkeit DIESES Teams IN DIESER Saison
+   * (eingefroren beim Snapshot, bevor `league_movement` sie fuer die naechste Saison aendert).
+   * `undefined`/fehlend fuer jeden Manager-Mode-/Legacy-Save ohne aktiven Liga-Split.
+   */
+  leagueTier?: LeagueTier | null;
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.8): Liga-2-Rang-1 zaehlt
+   * als EIGENER, von `isGold` getrennter Titel ("Zweitliga-Meister") — nicht derselbe
+   * "Meistertitel" wie der Liga-1-/Gesamt-Sieger. `isGold` bedeutet seitdem bei aktivem Split
+   * ausschliesslich "Liga-1-Meister" (s. `season-snapshot-service.ts`).
+   */
+  isLiga2Champion?: boolean;
 };
 
 export type SeasonSnapshotPlayerDisciplineBreakdownRecord = {
@@ -2847,6 +3039,41 @@ export type SeasonSnapshotPlayerDisciplineBreakdownRecord = {
   totalContribution: number | null;
   averageContribution: number | null;
   averageFinalScore: number | null;
+  /**
+   * DISZIPLIN-LAUFBAHN (Q2, docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt 3.2,
+   * docs/design/disziplin-laufbahn-q2-15-10.md): wie `DisciplineResultRecord.momente?` und
+   * `SeasonState.staffelWechselPaare?` additiv und optional -- jeder Schnappschuss von vor dieser
+   * Aenderung hat dieses Feld nicht, jeder Leser behandelt sein Fehlen als "noch keine Laufbahn-
+   * Zaehler erfasst", nie als Fehler (kein Breaking Change am Schema, keine Migration noetig).
+   *
+   * Je Saison-Zaehler (Saison-SUMME, nie ein Einzelereignis), gefuellt aus
+   * `lib/season/player-discipline-laufbahn.ts` (`finalizeLaufbahnCounters`), beim Saisonabschluss
+   * aus den da noch vorhandenen `playerDisciplinePerformances` des Spieltags gefaltet -- NIE
+   * waehrend der laufenden Saison inkrementiert (das waere genau der O7-Fehler aus dem
+   * Achtzehnten Nachtrag: ein neu gebuchter AELTERER Spieltag koennte einen Zaehler eines
+   * NEUEREN zuruecksetzen). Bekannte Schluessel (jeder optional, fehlt ein Schluessel, gab es dazu
+   * keine Daten -- nie als "0" zu lesen):
+   *   - `starts`: Einsaetze (== `appearances` oben, hier nur der Vollstaendigkeit halber gespiegelt)
+   *   - `siege`: Spieltage mit `rankInDiscipline === 1` (ligaweiter Bestwert dieser Disziplin)
+   *   - `podien`: Spieltage mit `rankInDiscipline <= 3`
+   *   - `rangSumme`: Summe von `rankInDiscipline` ueber alle Spieltage (fuer den Mittelwert beim Lesen)
+   *   - `bestRang`: kleinster `rankInDiscipline` der Saison
+   *   - `bestWertung`: groesster `finalPlayerScore` der Saison
+   *   - `spielerDesSpieltags`: Spieltage mit `isMvpCandidate === true` -- deckt sich heute mit
+   *     `siege` (derselbe Rang-1-Wurf bestimmt beide), bleibt aber ein eigener Schluessel, falls ein
+   *     Chassis `isMvpCandidate` einmal unabhaengig vom Rang vergibt.
+   *   - `verletzungen`: Verletzungen dieser Saison, deren Spieltags-Einsatzliste (`lineupDrafts`,
+   *     ueber `resolveInjuryMatchdayDisciplines`) diese Disziplin traegt. Steht ein Spieler am
+   *     Verletzungs-Spieltag in BEIDEN Disziplinen, zaehlt die Verletzung bei beiden -- der Wurf
+   *     selbst haengt am Spieltag, nicht an einer Disziplin (`InjuryEventRecord` hat kein
+   *     `disciplineId`), es wird nichts geraten, nur nicht an EINE von zwei moeglichen verschenkt.
+   * NICHT enthalten: die disziplineigenen Zaehler aus 3.2.3 (Ausschaltungen, Schaden, Assists,
+   * Rebounds, Duelle gewonnen, ...) -- nachgemessen (s. Design-Doc) traegt heute keiner von ihnen
+   * ueber einen Boxscore bis in den Spielstand, nur ein skalarer `finalPlayerScore` plus der
+   * ligaweite `rankInDiscipline`. Erfunden wird hier nichts; was nicht aus einem bereits
+   * gespeicherten Feld kommt, faellt weg.
+   */
+  laufbahn?: Record<string, number>;
 };
 
 export type SeasonSnapshotPlayerTeamBreakdownRecord = {
@@ -3462,6 +3689,15 @@ export type SeasonState = {
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
   /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */
   apronLinesSnapshot?: ApronLinesSnapshot;
+  /**
+   * TASK #158/#161, Chris' Entscheidung vom 18.10. (liga-split-plan.md 10.4): „Ja, Apron künftig
+   * pro Liga rechnen". Nur bei aktivem Liga-Split (`isLeagueSplitActive`) befüllt — je Liga EIN
+   * eigener Median-Snapshot statt des einen globalen `apronLinesSnapshot` über alle 32 Teams.
+   * `apronLinesSnapshot` bleibt daneben bestehen (auf den Liga-1-Scope berechnet) für Leser, die
+   * noch keine Liga kennen (s. `ensureSeasonApronLinesFrozen`, `resolveSeasonApronLinesForTeam`).
+   * Legacy-/Manager-Mode-Saves ohne Split befüllen dieses Feld nie.
+   */
+  apronLinesSnapshotByLeague?: Partial<Record<LeagueTier, ApronLinesSnapshot>>;
   /** Ledger der Apron-Abgaben/Ausschüttungen — Idempotenz-Marker + Audit-Trail, analog sponsorPayoutLogs. */
   apronSettlementLogs?: ApronSettlementLogRecord[];
   /**
@@ -3487,6 +3723,17 @@ export type SeasonState = {
   formCardPlans?: FormCardPlanRecord[];
   teamPowers?: TeamPowerRecord[];
   lineupDrafts?: LineupDraft[];
+  /**
+   * STAFFEL O7 "EINGESPIELTE PAARE" (11.10., s. `StaffelWechselPaarRecord`): wie `momente?` an
+   * `DisciplineResultRecord` additiv und optional -- jeder Spielstand von vor dieser Aenderung hat
+   * dieses Feld nicht, und jeder Leser behandelt sein Fehlen als "noch keine Paar-Geschichte"
+   * (`?? []`, Bonus 0), nie als Fehler (kein Breaking Change am Schema, keine Migration noetig).
+   * Traegt bewusst ueber den Saisonwechsel: der Saisonstart (preseason-workflow-service.ts)
+   * kopiert den alten `seasonState` per Spread und setzt nur die aufgezaehlten Felder zurueck --
+   * dieses gehoert nicht dazu, weil die Staffel je Team nur ein- bis zweimal pro Saison laeuft und
+   * ein reiner Saisonzaehler die Stufe "eingespielt" (ab drei Spielen) nie erreichen koennte.
+   */
+  staffelWechselPaare?: StaffelWechselPaarRecord[];
   /** Per-team depth stress ledger for next-season roster planning (computed at season_end). */
   teamRosterStressByTeamId?: Record<string, TeamRosterStressRecord>;
   matchdayResults?: MatchdayResultRecord[];
@@ -3568,6 +3815,12 @@ export type SeasonState = {
    */
   leagueByTeamId?: Record<string, LeagueTier>;
   /**
+   * TASK #158 — Idempotenz-/Audit-Ledger des `league_movement`-Schritts (Saisonende). Siehe
+   * `LeagueMovementLogRecord`, `lib/season/league-movement-service.ts`. Optional und nur bei
+   * Battle-Mode-Saves mit aktivem Liga-Split befüllt.
+   */
+  leagueMovementLogs?: LeagueMovementLogRecord[];
+  /**
    * Migrationsmarker fuer den Liga-Split, nach dem Muster von `sponsorLadderMigrationVersion` oben
    * (Plan-Abschnitt 8). Optional, von keinem heutigen Code gesetzt oder gelesen.
    */
@@ -3627,6 +3880,31 @@ export type LineupDraft = {
   entries: LineupDraftEntry[];
   modifiers?: LineupDraftModifiers;
   createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * STAFFEL O7 "EINGESPIELTE PAARE" (Fable 4.1, docs/design/fable-ideen-bahn-30-09.md; Chris'
+ * Freigabe 11.10.): wie oft ein Geber/Nehmer-Paar EINES Teams in der Staffel ohne Unterbrechung
+ * zusammen gewechselt hat. Gerichtet: Geber = Bein i, Nehmer = Bein i+1 in Aufstellungs-
+ * reihenfolge (Slot-Reihenfolge, seit O7 auch die Bein-Reihenfolge des Motors). Ein Paar, das im
+ * naechsten tatsaechlich gelaufenen Staffel-Spiel seines Teams nicht mehr benachbart steht
+ * (Kaderwechsel, neue Reihenfolge), verliert seinen Eintrag; beim naechsten gemeinsamen Spiel
+ * beginnt es wieder bei 1. Gepflegt ausschliesslich von
+ * lib/season/staffel-wechsel-paar-bonus-service.ts.
+ */
+export type StaffelWechselPaarRecord = {
+  id: string;
+  saveId: string;
+  /** Saison des LETZTEN gezaehlten Spiels (nicht: Gueltigkeit — der Zaehler traegt ueber den Saisonwechsel). */
+  seasonId: string;
+  teamId: string;
+  geberPlayerId: string;
+  nehmerPlayerId: string;
+  /** Anzahl gemeinsamer Staffel-Spiele in Folge, einschliesslich `lastMatchdayId`. Immer >= 1. */
+  gamesTogether: number;
+  /** Spieltag des letzten gezaehlten Spiels; zusammen mit `seasonId` der Idempotenz-Schluessel. */
+  lastMatchdayId: string;
   updatedAt: string;
 };
 

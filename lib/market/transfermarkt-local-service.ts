@@ -67,7 +67,10 @@ import {
   applyTransferBudgetSpend,
   resolveMarketSpendableCashForPlanner,
 } from "@/lib/ai/ai-manager-apply-service";
-import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonDisciplinePlayerCountDisplayMap,
+  buildSeasonDisciplinePlayerCountMap,
+} from "@/lib/season/season-discipline-schedule";
 import { getTransfermarktTierFromPoints, type TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
@@ -297,9 +300,92 @@ type TransfermarktFreeAgentBrowseIndexEntry = Pick<
 >;
 
 const localFreeAgentBrowseIndexCache = new Map<string, TransfermarktFreeAgentBrowseIndexEntry[]>();
-const localMarketContextCache = new Map<string, LocalMarketContext>();
+
+/**
+ * Finding #178: `localMarketContextCache` war ein VOELLIG unbegrenztes `Map` — kein Deckel, nicht
+ * einmal ein Eintrags-Zaehler. Der Schluessel (`getLocalMarketContextKey`) enthaelt u. a.
+ * `getPlayerPotentialCacheSignature()` und `getPlayerMarketCacheSignature()`, je ein sortierter
+ * String-Dump UEBER ALLE SPIELER — bei einem vollen Save mehrstellig MB gross. Jeder je
+ * angefasste Save erzeugte so einen neuen, nie verworfenen Eintrag (mehrere MB Schluesselstring +
+ * ein `LocalMarketContext` mit eigenen Maps/Aggregaten je Team), fuer die Lebensdauer des
+ * Prozesses. Gleiche LRU-Idiomatik wie `save-session-cache.ts`/`season-derivations-cache.ts`:
+ * Eintrags-Deckel als Sicherheitsnetz, Byte-Deckel als eigentliche Grenze.
+ */
+type LocalMarketContextCacheEntry = {
+  context: LocalMarketContext;
+  approxBytes: number;
+};
+
+const DEFAULT_MAX_LOCAL_MARKET_CONTEXT_CACHE_ENTRIES = 8;
+// `LocalMarketContext` haelt ueberwiegend Maps/Sets auf bereits existierende Objekte aus
+// `gameState` (keine Tiefenkopie) — JSON.stringify wuerde das ohnehin nicht korrekt erfassen
+// (Map/Set serialisieren zu "{}") und dabei den referenzierten `save` unnoetig komplett
+// durchstringifizieren. Die Schaetzung nimmt deshalb die verlaesslich MESSBARE Groesse (den
+// Schluesselstring, der den Potenzial-/Markt-Signatur-Dump traegt) plus einen kleinen Aufschlag
+// je Spieler/Roster-Eintrag fuer die pro Team aufgebauten Aggregate.
+const DEFAULT_MAX_LOCAL_MARKET_CONTEXT_CACHE_BYTES = 150_000_000;
+
+let maxLocalMarketContextCacheEntries = DEFAULT_MAX_LOCAL_MARKET_CONTEXT_CACHE_ENTRIES;
+let maxLocalMarketContextCacheBytes = DEFAULT_MAX_LOCAL_MARKET_CONTEXT_CACHE_BYTES;
+let localMarketContextCacheApproxBytes = 0;
+
+const localMarketContextCache = new Map<string, LocalMarketContextCacheEntry>();
 const localMarketContextKeyCache = new WeakMap<GameState, string>();
 const localNegotiationPreviewCache = new Map<string, ReturnType<typeof buildContractNegotiationPreview>>();
+
+function estimateLocalMarketContextApproxBytes(cacheKey: string, gameState: GameState): number {
+  const keyBytes = cacheKey.length * 2;
+  const perPlayerOverheadBytes = gameState.players.length * 160;
+  const perRosterOverheadBytes = gameState.rosters.length * 96;
+  return keyBytes + perPlayerOverheadBytes + perRosterOverheadBytes;
+}
+
+function evictLocalMarketContextCacheToLimit() {
+  while (
+    localMarketContextCache.size > 0 &&
+    (localMarketContextCache.size > maxLocalMarketContextCacheEntries ||
+      localMarketContextCacheApproxBytes > maxLocalMarketContextCacheBytes)
+  ) {
+    const oldestKey = localMarketContextCache.keys().next().value;
+    if (!oldestKey) {
+      break;
+    }
+    const oldestEntry = localMarketContextCache.get(oldestKey);
+    if (oldestEntry) {
+      localMarketContextCacheApproxBytes -= oldestEntry.approxBytes;
+    }
+    localMarketContextCache.delete(oldestKey);
+  }
+  if (localMarketContextCache.size === 0) {
+    localMarketContextCacheApproxBytes = 0;
+  }
+}
+
+export function setLocalMarketContextCacheMaxEntries(maxEntries: number) {
+  maxLocalMarketContextCacheEntries = Math.max(1, Math.round(maxEntries));
+  evictLocalMarketContextCacheToLimit();
+}
+
+export function getLocalMarketContextCacheMaxEntries() {
+  return maxLocalMarketContextCacheEntries;
+}
+
+export function setLocalMarketContextCacheMaxBytes(maxBytes: number) {
+  maxLocalMarketContextCacheBytes = Math.max(1, Math.round(maxBytes));
+  evictLocalMarketContextCacheToLimit();
+}
+
+export function getLocalMarketContextCacheMaxBytes() {
+  return maxLocalMarketContextCacheBytes;
+}
+
+export function localMarketContextCacheSizeForTests() {
+  return localMarketContextCache.size;
+}
+
+export function localMarketContextCacheApproxBytesForTests() {
+  return localMarketContextCacheApproxBytes;
+}
 
 const getPlayerMarketValue = (player: Player) => resolvePlayerEconomyContract({ player }).marketValue;
 const getPlayerSalary = (player: Player) => resolvePlayerEconomyContract({ player }).salary;
@@ -622,6 +708,10 @@ function getTopDisciplineScores(input: {
   saveId: string;
   disciplinesById: Map<string, string>;
   disciplinePlayerCountById?: Map<string, number | null>;
+  // W4 (docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.8/5): Anzeige-Label
+  // dazu -- bei zwei unterschiedlichen Saison-Vorkommen (Battle Mode, repeat=2) "4 · 6" statt nur
+  // die eine Zahl aus `disciplinePlayerCountById`.
+  disciplinePlayerCountLabelById?: Map<string, string | null>;
   teamDisciplineRankById?: Map<string, number | null>;
   player: Player;
   scoutingLevel?: number | null;
@@ -636,15 +726,21 @@ function getTopDisciplineScores(input: {
       score,
     })),
     topN: 5,
-  }).map((entry) => ({
-    disciplineId: entry.disciplineId,
-    disciplineName: entry.disciplineName,
-    scoreTier: entry.scoreTier,
-    displayedScore: entry.displayedScore,
-    ppsLastSeason: null,
-    playerCount: input.disciplinePlayerCountById?.get(entry.disciplineId) ?? null,
-    teamRank: input.teamDisciplineRankById?.get(entry.disciplineId) ?? null,
-  }));
+  }).map((entry) => {
+    const playerCount = input.disciplinePlayerCountById?.get(entry.disciplineId) ?? null;
+    return {
+      disciplineId: entry.disciplineId,
+      disciplineName: entry.disciplineName,
+      scoreTier: entry.scoreTier,
+      displayedScore: entry.displayedScore,
+      ppsLastSeason: null,
+      playerCount,
+      playerCountLabel:
+        input.disciplinePlayerCountLabelById?.get(entry.disciplineId) ??
+        (playerCount != null ? String(playerCount) : null),
+      teamRank: input.teamDisciplineRankById?.get(entry.disciplineId) ?? null,
+    };
+  });
 }
 
 function buildLocalTeamDisciplineRankMap(gameState: GameState, teamId: string) {
@@ -828,7 +924,12 @@ function buildLocalMarketContext(save: ReturnType<typeof resolveLocalSave>["save
   const cacheKey = getLocalMarketContextKey(save);
   const cached = localMarketContextCache.get(cacheKey);
   if (cached) {
-    return cached;
+    // LRU-Touch: bei einem Treffer an die juengste Position verschieben (Delete+Set aendert bei
+    // einer Map die Iterationsreihenfolge), damit ein wiederholt genutzter Save nicht verdraengt
+    // wird, waehrend sich der Deckel an seltener genutzten Eintraegen abarbeitet.
+    localMarketContextCache.delete(cacheKey);
+    localMarketContextCache.set(cacheKey, cached);
+    return cached.context;
   }
 
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
@@ -880,7 +981,10 @@ function buildLocalMarketContext(save: ReturnType<typeof resolveLocalSave>["save
     teamContextsById,
     cacheKey,
   };
-  localMarketContextCache.set(cacheKey, context);
+  const approxBytes = estimateLocalMarketContextApproxBytes(cacheKey, gameState);
+  localMarketContextCache.set(cacheKey, { context, approxBytes });
+  localMarketContextCacheApproxBytes += approxBytes;
+  evictLocalMarketContextCacheToLimit();
   return context;
 }
 
@@ -1609,6 +1713,13 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const playerMin = selectedTeamContext?.playerMin ?? null;
   const playerOpt = selectedTeamContext?.playerOpt ?? null;
   const seasonDisciplinePlayerCountById = buildSeasonDisciplinePlayerCountMap(gameState);
+  // W4: dieselbe Vorbedingung, nur die Anzeige-Variante (Hinrunde/Rückrunde-Label).
+  const seasonDisciplinePlayerCountLabelById = new Map(
+    [...buildSeasonDisciplinePlayerCountDisplayMap(gameState)].map(([disciplineId, display]) => [
+      disciplineId,
+      display.label,
+    ]),
+  );
   const soldPlayerBanIds = new Set(buildSoldPlayerSeasonBans(gameState, gameState.season.id).keys());
 
   const browseIndexCacheKey = `${cacheKey}:browse_index`;
@@ -1755,6 +1866,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
           saveId: save.saveId,
           disciplinesById,
           disciplinePlayerCountById: seasonDisciplinePlayerCountById,
+          disciplinePlayerCountLabelById: seasonDisciplinePlayerCountLabelById,
           player,
           scoutingLevel: 0,
         }),
@@ -1836,6 +1948,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     : 0;
   const selectedNeeds = selectedTeam ? evaluateAiNeeds(gameState, selectedTeam.teamId) : null;
   const disciplinePlayerCountById = seasonDisciplinePlayerCountById;
+  const disciplinePlayerCountLabelById = seasonDisciplinePlayerCountLabelById;
   const teamDisciplineRankById = selectedTeam ? buildLocalTeamDisciplineRankMap(gameState, selectedTeam.teamId) : new Map<string, number | null>();
   const selectedAxisAverages = selectedRosterPlayers.length
     ? {
@@ -1874,6 +1987,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             saveId: save.saveId,
             disciplinesById,
             disciplinePlayerCountById,
+            disciplinePlayerCountLabelById,
             teamDisciplineRankById,
             player,
             scoutingLevel: playerScoutingLevel,
@@ -2015,6 +2129,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             saveId: save.saveId,
             disciplinesById,
             disciplinePlayerCountById,
+            disciplinePlayerCountLabelById,
             teamDisciplineRankById,
             player,
             scoutingLevel: playerScoutingLevel,
@@ -2333,10 +2448,14 @@ export function invalidateLocalTransfermarktCachesForSave(saveId: string) {
       localFreeAgentBrowseIndexCache.delete(key);
     }
   }
-  for (const key of [...localMarketContextCache.keys()]) {
+  for (const [key, entry] of [...localMarketContextCache.entries()]) {
     if (key.startsWith(prefix) || key.startsWith(saveId)) {
+      localMarketContextCacheApproxBytes -= entry.approxBytes;
       localMarketContextCache.delete(key);
     }
+  }
+  if (localMarketContextCache.size === 0) {
+    localMarketContextCacheApproxBytes = 0;
   }
 }
 

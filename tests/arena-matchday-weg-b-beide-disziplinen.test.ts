@@ -74,11 +74,19 @@ function createInMemoryPersistence(gameState: GameState): PersistenceService {
   } as unknown as PersistenceService;
 }
 
-/** D1 = basketball, D2 = gewichtheben — BEIDE arena-aufgeloest, absichtlich die Weg-B-Konstellation. */
-const D1_ARENA = "basketball";
+/** D1 = speed-schach (bis 16.10. basketball, s. disziplin-abnahme.json), D2 = gewichtheben — BEIDE arena-aufgeloest, absichtlich die Weg-B-Konstellation. */
+const D1_ARENA = "speed-schach";
 const D2_ARENA = "gewichtheben";
 /** Kontroll-Fixture (Abschnitt "eine arena-faehige Disziplin bleibt unveraendert"): D2 nicht arena-faehig. */
 const D2_NICHT_ARENA = "football";
+/**
+ * ZWEITE Kontroll-Disziplin fuer den "weder D1 noch D2 arena-faehig"-Fall (CI-Fix 24.10., s.
+ * Kommentar am Testfall unten) -- bewusst NICHT "mini-dm": Mini-DM hat seit PR 5 des 6-PR-Opus-
+ * Plans einen eigenen `miniDmPresent`-Erkennungszweig, der unabhaengig von
+ * `ARENA_RESOLVED_DISCIPLINE_IDS` Anwendbarkeit ausloest. Hockey hat das nicht -- Chris' Ausnahme
+ * (`ARENA_ABNAHME_AUSNAHMEN`) deckt nur die rho-Schranke, nicht die Mengen-Zugehoerigkeit selbst.
+ */
+const D2_NICHT_ARENA_ZWEITE = "hockey";
 
 function buildMinimalBattleModeGameState(input: { d1: string; d2: string }): GameState {
   return {
@@ -151,6 +159,7 @@ describe("Vorbedingung", () => {
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D1_ARENA)).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D2_ARENA)).toBe(true);
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D2_NICHT_ARENA)).toBe(false);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has(D2_NICHT_ARENA_ZWEITE)).toBe(false);
   });
 });
 
@@ -160,7 +169,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl } = buildMockRunner({ [D1_ARENA]: [80, 70], [D2_ARENA]: [60, 90] });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -173,7 +182,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
     // der Kern von Fund B1: der gesamte Spieltag fiel auf PPS zurueck, obwohl beide Disziplinen
     // arena-faehig sind.
     expect(kickoff.applicable).toBe(true);
-    if (kickoff.applicable) {
+    if (kickoff.applicable && !kickoff.booked) {
       expect(kickoff.save.gameState.seasonState.arenaMatchdayResolveStatus).toBe("in_progress");
     }
 
@@ -190,7 +199,7 @@ describe("WEG B: ein Spieltag mit ZWEI arena-faehigen Disziplinen (Fund B1)", ()
       [D2_ARENA]: [60, 90],
     });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -227,7 +236,7 @@ describe("Unveraendert: ein Spieltag mit NUR EINER arena-faehigen Disziplin", ()
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl, aufrufeJeDisziplin } = buildMockRunner({ [D1_ARENA]: [80, 70] });
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",
@@ -247,12 +256,24 @@ describe("Unveraendert: ein Spieltag mit NUR EINER arena-faehigen Disziplin", ()
 });
 
 describe("Unveraendert: kein arena-aufgeloester Spieltag", () => {
-  it("bleibt applicable:false, wenn weder D1 noch D2 arena-faehig sind", () => {
-    const gameState = buildMinimalBattleModeGameState({ d1: "football", d2: "mini-dm" });
+  it("bleibt applicable:false, wenn weder D1 noch D2 arena-faehig sind", async () => {
+    // CI-FIX (24.10., Opus-Review-Nacharbeit an PR 5 des 6-PR-Opus-Plans "Vorlauf-Verdrahtung"):
+    // D2 war hier urspruenglich "mini-dm" -- zum Zeitpunkt, als dieser Test geschrieben wurde, war
+    // mini-dm (wie football) an KEINEM Pfad arena-anwendbar. Seit PR 5 erkennt
+    // `determineArenaDisciplineContexts()` Mini-DMs Praesenz an D1/D2 zusaetzlich zur
+    // `ARENA_RESOLVED_DISCIPLINE_IDS`-Pruefung (eigener `miniDmPresent`-Zweig, s.
+    // arena-vorlauf-service.ts) und macht den Spieltag dadurch ABSICHTLICH anwendbar -- fuer
+    // DIESEN Test (der "weder D1 noch D2 ist arena-faehig" pruefen will) war "mini-dm" also nie der
+    // richtige Kontroll-Fall, er testete seit PR 5 versehentlich den falschen Fall. "hockey" ersetzt
+    // "mini-dm" hier: Chris' ausdrueckliche Entscheidung (CLAUDE.md "Die Abnahme jeder Disziplin",
+    // `ARENA_ABNAHME_AUSNAHMEN`) haelt Hockey bewusst ausserhalb von `ARENA_RESOLVED_DISCIPLINE_IDS`
+    // (PPS-Duell-Bruecke) UND Hockey hat -- anders als Mini-DM -- keinen eigenen Pod-Praesenz-Zweig,
+    // der die Anwendbarkeit unabhaengig von dieser Menge auslösen könnte.
+    const gameState = buildMinimalBattleModeGameState({ d1: D2_NICHT_ARENA, d2: D2_NICHT_ARENA_ZWEITE });
     const persistence = createInMemoryPersistence(gameState);
     const { runArenaFixturesImpl } = buildMockRunner({});
 
-    const kickoff = kickoffArenaMatchdayApply({
+    const kickoff = await kickoffArenaMatchdayApply({
       persistence,
       saveId: "test-save",
       seasonId: "season-1",

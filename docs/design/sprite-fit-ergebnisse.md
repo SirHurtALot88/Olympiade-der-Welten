@@ -140,3 +140,24 @@ Haar. Ebenfalls unsicher: Aegirion vs. Kreischende Kogge (beides Schiff-Charakte
 Kreischende Kogges generisches Piraten-Segel zufällig ein Totenkopf-Motiv trägt, das zum
 Geisterschiff-Konzept passt, kam es auf ★★★ statt ★★ wie Aegirion; das ist eine sehr knappe
 Entscheidung, die stark vom Zufall der verwendeten Segel-Textur abhängt.
+
+## Nachtrag (16.10.): der Wald-Riesen-Cluster ist bearbeitet
+
+Diese Seite ist der Schnappschuss vom 04.09. und wird nicht laufend nachgezogen (s.
+[`sprite-cluster-runde-1.md`](./sprite-cluster-runde-1.md) für dieselbe Praxis). Zwei Stellen
+oben beziehen sich ausdrücklich auf den damaligen Zustand von Cyrn/Greenkraut/Rootheart/
+Treantos/Tropfina — Zeile 116/118/120/122 (alle fünf in der ★★-Gesamtliste) und Zeile 124-128
+("Auffälligstes Teilmuster ... Wald-Riese/Baumwesen-Charakter ... landet ... bei derselben
+generischen grünen Silhouette"). Beides gilt nicht mehr:
+
+- Cyrn, Greenkraut, Rootheart und Treantos standen laut `sprite-fit-bewertung.json` schon vor
+  dieser Runde bei ★★★★ (Nachlieferungen 13.10., `vollbild:"treant"` statt generischem Orc-Kopf
+  — das hier beschriebene "Baukasten-Loch" ist für diese vier seit dem geschlossen).
+- Tropfina stand bei ★★ und ist mit dieser Runde
+  ([`sprite-wald-riesen-cluster-16-10.md`](./sprite-wald-riesen-cluster-16-10.md)) auf ★★★
+  gehoben: `vollbild:"dryade"` (neu verdrahtetes Pflanzenwesen-Standbild) statt
+  `kopf:"human",haut:"green"` löst exakt das hier beschriebene Muster ("nicht-humanoides Konzept
+  als Standard-Mensch mit Farb-Swap") für den letzten der fünf Wald-Riesen auf.
+
+Die vollständige, aktuelle Einzelbegründung je Charakter steht wie immer in
+`data/generated/sprite-fit-bewertung.json`, nicht auf dieser Seite.

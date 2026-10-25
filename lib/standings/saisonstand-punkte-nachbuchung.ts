@@ -39,7 +39,62 @@ import { spieltageMitDisziplinErgebnissen } from "@/lib/foundation/season-matchd
 import {
   DEFAULT_STANDINGS_TIEBREAKER_MODE,
   resolveProjectedRankWithTiePolicy,
+  type StandingsTieBreakItem,
 } from "@/lib/standings/standings-tiebreaker-policy";
+import { summiereSaisonVerhaeltnis } from "@/lib/standings/standings-verhaeltnis";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+
+/**
+ * LIGA-LOKALER RANG BEI DER NACHBUCHUNG (16.10., Befund aus dem 2-Liga-Smoke-Test): ohne diesen
+ * Wrapper vergab `resolveProjectedRankWithTiePolicy` einen gemeinsamen Rang 1..32 ueber BEIDE Ligen,
+ * weil die Funktion selbst kein Liga-Wissen hat. Dasselbe Muster wie `partitionTeamsByLeague` +
+ * `mergeRankMaps` in `standings-preview-engine.ts` bzw. `buildScopedRankMap` in
+ * `team-discipline-rank-engine.ts`: Teams VOR dem Ranking nach Liga gruppieren, je Gruppe getrennt
+ * 1..N vergeben, danach wieder zu einer Map zusammenfuehren. Sortierkriterien (Punkte ->
+ * Verhaeltnis -> totalScore, PR #1266) bleiben unveraendert — nur die Gruppierung davor ist neu.
+ *
+ * OHNE AKTIVEN SPLIT (`isLeagueSplitActive() === false`, jeder heutige Manager-Save UND jeder
+ * Battle-Save vor dem Liga-Split) bleibt GENAU EINE Gruppe mit allen Teams uebrig — bit-identisch
+ * zum bisherigen direkten Aufruf von `resolveProjectedRankWithTiePolicy`.
+ */
+function resolveProjectedRankScopedByLeague(
+  gameState: GameState,
+  items: StandingsTieBreakItem[],
+): Map<string, number | null> {
+  if (!isLeagueSplitActive(gameState)) {
+    return resolveProjectedRankWithTiePolicy(items, DEFAULT_STANDINGS_TIEBREAKER_MODE);
+  }
+
+  const liga1: StandingsTieBreakItem[] = [];
+  const liga2: StandingsTieBreakItem[] = [];
+  const unassigned: StandingsTieBreakItem[] = [];
+  for (const item of items) {
+    const tier = getLeagueOf(gameState, item.teamId);
+    if (tier === "liga1") liga1.push(item);
+    else if (tier === "liga2") liga2.push(item);
+    else unassigned.push(item);
+  }
+
+  // OPUS-REVIEW-FUND (PR #1271, 17.10.): die `unassigned`-Gruppe rankt still ihre eigenen Plaetze
+  // 1..k. Bei aktivem Split darf sie nicht vorkommen -- jedes Team hat dann ein `leagueByTeamId`.
+  // Kommt sie doch vor (z.B. ein neu aufgestiegenes Team ohne Zuordnung), entstehen doppelte
+  // Rang-1-Plaetze ohne Hinweis (Liga 1 Rang 1, Liga 2 Rang 1, UND `unassigned` Rang 1). Diese
+  // Warnung macht das sichtbar, statt es lautlos durchlaufen zu lassen.
+  if (unassigned.length > 0) {
+    for (const item of unassigned) {
+      console.warn(`liga_split_team_ohne_liga:${item.teamId}`);
+    }
+  }
+
+  const merged = new Map<string, number | null>();
+  for (const group of [liga1, liga2, unassigned]) {
+    if (group.length === 0) continue;
+    for (const [teamId, rank] of resolveProjectedRankWithTiePolicy(group, DEFAULT_STANDINGS_TIEBREAKER_MODE)) {
+      merged.set(teamId, rank);
+    }
+  }
+  return merged;
+}
 
 /** Kleiner als das, und es ist Rundung statt Befund — die Punkte stehen auf einer Nachkommastelle. */
 const TOLERANZ = 0.05;
@@ -100,7 +155,16 @@ export function zieheSaisonstandPunkteNach(
     ]),
   );
 
-  const rangJeTeam = resolveProjectedRankWithTiePolicy(
+  // PUNKTEVERHAELTNIS (16.10.): derselbe Tiebreaker wie in der Buchung (`standings-preview-engine.ts`),
+  // sonst vergaebe diese Nachbuchung die Raenge nach einer anderen Regel als die Buchung selbst.
+  // `null` fuer jeden Save ohne Duell-Verhaeltnis -> unveraendertes Verhalten.
+  const verhaeltnisJeTeam = summiereSaisonVerhaeltnis(gameState, seasonId);
+
+  // LIGA-SPLIT (16.10., Befund aus dem 2-Liga-Smoke-Test): Raenge je Liga getrennt vergeben, statt
+  // einen gemeinsamen Rang 1..32 ueber beide Ligen zu ziehen. Ohne aktiven Split (jeder heutige
+  // Manager-Save) bleibt das Verhalten bit-identisch, s. `resolveProjectedRankScopedByLeague` oben.
+  const rangJeTeam = resolveProjectedRankScopedByLeague(
+    gameState,
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       teamName: team.name,
@@ -110,8 +174,8 @@ export function zieheSaisonstandPunkteNach(
       currentPoints: standings[team.teamId]?.points ?? null,
       matchdayRank: null,
       cash: team.cash ?? null,
+      verhaeltnis: verhaeltnisJeTeam ? verhaeltnisJeTeam.get(team.teamId) ?? 0 : null,
     })),
-    DEFAULT_STANDINGS_TIEBREAKER_MODE,
   );
 
   const geaenderteTeams: SaisonstandPunkteAenderung[] = [];
@@ -124,7 +188,15 @@ export function zieheSaisonstandPunkteNach(
     const rangNachher = rangJeTeam.get(team.teamId) ?? null;
     const rangVorher = typeof vorher?.rank === "number" ? vorher.rank : null;
 
-    if (punkteVorher != null && Math.abs(punkteVorher - punkteNachher) < TOLERANZ && rangVorher === rangNachher) {
+    const verhaeltnisNachher = verhaeltnisJeTeam ? verhaeltnisJeTeam.get(team.teamId) ?? 0 : null;
+    const verhaeltnisUnveraendert = verhaeltnisNachher == null || vorher?.verhaeltnis === verhaeltnisNachher;
+
+    if (
+      punkteVorher != null &&
+      Math.abs(punkteVorher - punkteNachher) < TOLERANZ &&
+      rangVorher === rangNachher &&
+      verhaeltnisUnveraendert
+    ) {
       continue;
     }
 
@@ -132,6 +204,7 @@ export function zieheSaisonstandPunkteNach(
       ...(vorher ?? { points: 0, rank: null }),
       points: punkteNachher,
       rank: rangNachher,
+      ...(verhaeltnisNachher != null ? { verhaeltnis: verhaeltnisNachher } : {}),
       // `matchdayBaselinePoints` gehoert zum zuletzt gebuchten Spieltag und wird um genau die
       // Korrektur mitverschoben — sonst rechnete ein `forceReplace` desselben Spieltags die
       // Nachbuchung wieder heraus.

@@ -11,6 +11,7 @@ function agg(overrides: Partial<WindowAggregate> = {}): WindowAggregate {
     shippingCost: 1,
     dbI: 7,
     dbII: 5,
+    fixedCostShare: 0,
     avgPrice: 10,
     rank: null,
     ...overrides,

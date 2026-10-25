@@ -27,8 +27,9 @@ import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
 
-// --flags=... (NACHT-PAKET-SCHALTER, 05.10., additiv): schaltet Buehnen-Mechaniken hinter
-// BUEHNE_FLAGS ein (z.B. --flags=gewichthebenSandsack:1), s. scripts/lib/rangtreue-messung.mjs.
+// --flags=... / --haltung-*=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv, s. scripts/lib/rangtreue-
+// messung.mjs): schaltet Buehnen-Mechaniken hinter BUEHNE_FLAGS ein (z.B.
+// --flags=gewichthebenSandsack:1); ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
 const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
 const N = Number(args[0] || 60);

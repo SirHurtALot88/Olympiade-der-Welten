@@ -1,5 +1,7 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
+import { buildInitialLeagueAssignment } from "@/lib/season/league-split";
+import { buildSpieltagsUebersicht, istSpieltagsModusVerfuegbar } from "@/lib/foundation/season-matchday-fixtures-overview";
 import {
   springeZuElement,
   springeZuPosition,
@@ -263,6 +265,7 @@ import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { buildSeasonDisciplinePlayerCountMap, getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { getLeagueOf } from "@/lib/season/league-split";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
 import {
   CANONICAL_PROGRESS_TRAITS,
@@ -340,6 +343,8 @@ import type { FoundationStateContextValue } from "@/lib/foundation/foundation-st
 import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-points-source";
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
+import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
+import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
 import { countTeamSeasonInjuries } from "@/lib/foundation/team-history-health-metrics";
@@ -4674,9 +4679,23 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
+  // OPUS-REVIEW B4 (PR 3, K1): wie lange/oft die Buehne auf einen laufenden Arena-Vorlauf wartet,
+  // bevor sie es doch als Fehler zeigt. DIESES Budget muss den SERVERSEITIGEN Worst Case decken,
+  // nicht nur die geschaetzte Normalzeit (20-70s je Spieltag, Plan Abschnitt 8) -- sonst zeigt die
+  // Buehne "Punkte nicht gebucht", WAEHREND der Server (B1: genau eine automatische Wiederholung,
+  // B2: Gesamt-Timeout `OLY_ARENA_GESAMT_TIMEOUT_MS`, Standard 180s) noch legitim an einem zweiten
+  // Versuch arbeitet -- ein Fehlalarm kurz vor dem eigentlichen Erfolg. Worst Case: 2 Versuche x
+  // 180s x bis zu 2 arena-aufgeloeste Disziplinen (WEG B, seriell hinter demselben Chromium-
+  // Semaphor) = 720s. 300 x 3s = 900s deckt das mit Reserve -- B1/B2 im Server selbst sorgen
+  // dafuer, dass ein echt kaputter Vorlauf nicht endlos "in_progress" bleibt, diese Schranke hier
+  // ist nur die Client-seitige Entsprechung, damit die Buehne nicht ebenfalls endlos pollt.
+  const ARENA_VORLAUF_POLL_INTERVAL_MS = 3_000;
+  const ARENA_VORLAUF_POLL_MAX_VERSUCHE = 300;
+
   async function commitArenaDiscipline(
     side: "d1" | "d2",
     shownPreview: LegacyMatchdayResolvePreview | null = null,
+    pollVersuch = 0,
   ) {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -4733,6 +4752,23 @@ export function useFoundationShellRouterBodyScope({
         ...(result?.blockingReasons ?? []),
         ...(result?.steps ?? []).flatMap((step) => step.blockingReasons ?? []),
       ];
+      // ARENA-VORLAUF LAEUFT NOCH (PR 3, K1 — Opus-Review B4): kein Fehler, sondern "bitte kurz
+      // warten" — der Vorlauf rechnet im Hintergrund (Plan Abschnitt 2.4), es gibt JETZT nichts zu
+      // buchen, aber gleich etwas. Statt eines Fehlerbanners samt `DisciplineCommitBlockedError`
+      // wartet die Buehne kurz und versucht automatisch erneut, bis der Vorlauf fertig ist (oder
+      // die Versuchsgrenze erreicht ist -- ein echt haengender Vorlauf ist serverseitig durch B1
+      // (genau eine automatische Wiederholung) und B2 (Gesamt-Timeout) begrenzt, diese Schranke
+      // hier ist nur die Client-Entsprechung, damit die Seite nicht ebenfalls endlos pollt).
+      const vorlaufLaeuftNoch = blockers.includes("arena_vorlauf_laeuft") || blockers.includes("arena_eingabe_divergenz");
+      if (vorlaufLaeuftNoch && pollVersuch < ARENA_VORLAUF_POLL_MAX_VERSUCHE) {
+        setFoundationActionFeedback({
+          tone: "info",
+          title: "Arena-Duelle werden ausgetragen …",
+          detail: "Die Punkte werden automatisch gebucht, sobald der Vorlauf fertig ist.",
+        });
+        await new Promise((resolve) => setTimeout(resolve, ARENA_VORLAUF_POLL_INTERVAL_MS));
+        return commitArenaDiscipline(side, shownPreview, pollVersuch + 1);
+      }
       const detail =
         blockers.length > 0
           ? [...new Set(blockers.map((reason) => formatCockpitReason(reason)))].join(" · ")
@@ -6338,9 +6374,28 @@ export function useFoundationShellRouterBodyScope({
    * neue Save mit Liga-Split (`leagueByTeamId`) angelegt wird, also beschreibt eine vor dem
    * Wechsel geprüfte Vorschau danach ein anderes Spiel. Der `confirmToken` aus dieser Vorschau
    * darf nicht in ein Anlegen mit dem neuen Modus durchrutschen.
+   *
+   * TASK #155 — beim Wechsel AUF Battle Mode werden bereits gewählte Liga-2-Teams aus Chris'/
+   * Frankys Auswahl geworfen: Liga 2 startet im Battle Mode unter KI-Kontrolle, ist im Anlege-
+   * Assistenten nicht wählbar. Die Klub-Raster blenden Liga-2-Klubs im Battle-Mode-Schritt zwar
+   * schon aus, aber eine Auswahl, die noch aus dem Manager-Mode-Schritt (oder einem Preset)
+   * stammt, muss hier bereinigt werden — sonst bliebe ein unsichtbar gewordenes Liga-2-Team in der
+   * Auswahl stehen.
+   *
+   * GILT NUR FÜR DIESEN ASSISTENTEN. Ein bereits laufender Battle-Mode-Save lässt ein Liga-2-Team
+   * weiterhin ganz normal auf Chris/Franky umstellen — das läuft über `toggleGameModeOwnershipTeam`
+   * / `applyGameModeOwnership` (`lib/foundation/team-control-settings.ts`) und kennt keine
+   * Liga-Sperre (Chris' Klarstellung zu Task #155: „es ist ja möglich dass jemand ein team aus
+   * liga 2 übernimmt … dann läuft es ganz normal").
    */
   function selectNewGameMode(mode: GameMode) {
     setNewGameMode(mode);
+    if (mode === "battle") {
+      const leagueAssignment = buildInitialLeagueAssignment(gameState.teams);
+      const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
+      setNewGameChrisTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+      setNewGameFrankyTeamIds((current) => current.filter((teamId) => !isLiga2TeamId(teamId)));
+    }
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -6355,6 +6410,17 @@ export function useFoundationShellRouterBodyScope({
   }
 
   function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
+    // TASK #155 — Liga 2 ist im Battle Mode komplett KI-gesteuert, nicht wählbar. Die Klub-Raster
+    // rendern Liga-2-Karten im Battle-Mode-Schritt schon gar nicht als anklickbar; diese Sperre
+    // ist die zweite Verteidigungslinie, falls dieser Handler je anders aufgerufen wird. Ein
+    // Abwählen (Team ist bereits in der Liste) bleibt immer erlaubt.
+    if (newGameMode === "battle") {
+      const alreadySelected =
+        owner === "chris" ? newGameChrisTeamIds.includes(teamId) : newGameFrankyTeamIds.includes(teamId);
+      if (!alreadySelected && buildInitialLeagueAssignment(gameState.teams)[teamId] === "liga2") {
+        return;
+      }
+    }
     const limits = getGameModeOwnershipLimits(newGamePresetId);
     setNewGamePreview(null);
     setNewGameError(null);
@@ -11069,6 +11135,9 @@ export function useFoundationShellRouterBodyScope({
           rank: row.rank ?? null,
           rankDiff: row.rankDiff ?? null,
           points: row.points ?? null,
+          // Task #159: Punkteverhältnis-Spalte — `null` außerhalb von Battle-Saves (dann ist die
+          // Spalte in der Daten-Tabelle gar nicht erst zu sehen, s. SeasonStandingsNewLook.tsx).
+          verhaeltnis: row.verhaeltnis ?? null,
           pps: row.ppsTotal ?? null,
           pow: row.ppsPow ?? null,
           spe: row.ppsSpe ?? null,
@@ -11156,10 +11225,78 @@ export function useFoundationShellRouterBodyScope({
           // Ledger gilt für die LIVE-Season; auf Archiv-Snapshots daher bewusst
           // kein Live-Delta (sonst irreführend) → null.
           fieldRaceRankDelta: isViewingArchivedSeason ? null : resolveMatchdayRankDelta(row.teamId),
+          // Task #159: `null` im Legacy-32er-Modus (jeder heutige/laufende Save vor dem
+          // Liga-Split) — die Tabelle rendert dann unveraendert eine einzige 32-Zeilen-Liste.
+          leagueTier: getLeagueOf(gameState, row.teamId),
         };
       }),
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
   );
+  /**
+   * Task #159 Punkt 2 ("Spieltage"-Modus) — NUR bei Battle-Saves mit echtem Fixture-Plan
+   * (`istSpieltagsModusVerfuegbar`), sonst `verfuegbar: false` und die UI zeigt den Modus gar
+   * nicht an (Manager-Saves mit Dummy-Paarungen bleiben unberuehrt).
+   *
+   * PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.) — vorher baute dieses Memo die VOLLE
+   * Paarungs-Uebersicht (`buildSpieltagsUebersicht`, inkl. Rueckspiel-Suche über den gesamten
+   * Spielplan) für ALLE 20 Spieltage, bei JEDER `gameState`-Aenderung — auch wenn der
+   * Saisonstand gar nicht offen war (Speichern, Polling-Reload, Koop-Benachrichtigung), macht
+   * also gegen Saisonende bis zu 1280 Ergebniszeilen pro Aufruf umsonst nach. Jetzt zweigeteilt:
+   *  1) `matchdayIdByResultId` einmal indexiert (billig, ein Durchlauf).
+   *  2) `matchdayOptions`/`defaultMatchdayId` (die "gespielt ja/nein"-Liste für die Navigation)
+   *     kommen aus einem zweiten billigen Durchlauf über `disciplineResults`
+   *     (`gespieltByMatchdayId`), NICHT aus der vollen Uebersicht.
+   *  3) Die teure volle Uebersicht wird NIE hier gebaut — `getUebersicht` ist eine LAZY Funktion,
+   *     die sie erst auf Abruf für GENAU EINEN Spieltag liefert. Der Konsument
+   *     (SeasonStandingsNewLook.tsx) ruft sie in einem eigenen Memo auf `[spieltage,
+   *     spieltagMatchdayId]` auf — effektiv `[gameState, selectedMatchdayId]`, weil `spieltage`
+   *     selbst nur bei echter `gameState`-Aenderung eine neue Referenz bekommt — UND nur,
+   *     während die Komponente überhaupt gemountet ist (`FoundationSeasonV2Panel`s `active`-Gate).
+   *
+   * Scope bewusst nur die LAUFENDE Saison (Opus/Coordinator 17.10.) — ein Archiv-Rueckblick ist
+   * ein separater Folgeschritt.
+   */
+  const seasonV2Spieltage = useMemo(() => {
+    if (!istSpieltagsModusVerfuegbar(gameState)) {
+      return { verfuegbar: false as const, matchdayOptions: [], defaultMatchdayId: null, getUebersicht: () => null };
+    }
+    const matchdayIdByResultId = new Map<string, string>();
+    for (const result of gameState.seasonState.matchdayResults ?? []) {
+      matchdayIdByResultId.set(result.id, result.matchdayId);
+    }
+    const gespieltByMatchdayId = new Set<string>();
+    for (const row of gameState.seasonState.disciplineResults ?? []) {
+      if (row.teamPoints == null) {
+        continue;
+      }
+      const matchdayId = matchdayIdByResultId.get(row.matchdayResultId);
+      if (matchdayId) {
+        gespieltByMatchdayId.add(matchdayId);
+      }
+    }
+    const matchdayOptions = gameState.season.matchdayIds.map((matchdayId, index) => ({
+      id: matchdayId,
+      index,
+      label: `Spieltag ${index + 1}`,
+      gespielt: gespieltByMatchdayId.has(matchdayId),
+    }));
+    // Default = letzter GESPIELTER Spieltag; ohne jede Wertung (Saisonstart) der erste.
+    let defaultMatchdayId: string | null = matchdayOptions[0]?.id ?? null;
+    for (let i = matchdayOptions.length - 1; i >= 0; i -= 1) {
+      if (matchdayOptions[i].gespielt) {
+        defaultMatchdayId = matchdayOptions[i].id;
+        break;
+      }
+    }
+    return {
+      verfuegbar: true as const,
+      matchdayOptions,
+      defaultMatchdayId,
+      // OPUS-REVIEW PR #1297: `saveId` fuer die Mini-DM-Vierergruppen VOR dem Resolve -- derselbe
+      // Pod-Seed wie Resolve-Engine und Spielplan-Tab (s. `buildMiniDmPodsForSlot`).
+      getUebersicht: (matchdayId: string) => buildSpieltagsUebersicht(gameState, matchdayId, { saveId: activeSaveId }),
+    };
+  }, [gameState, activeSaveId]);
   const seasonV2PpRows = useMemo(
     () =>
       sortedPpAreaRows.map((row) => ({
@@ -11243,6 +11380,30 @@ export function useFoundationShellRouterBodyScope({
     () => buildSeasonFormCardBonusByTeamId(gameState, seasonOverviewSeasonId),
     [gameState, seasonOverviewSeasonId],
   );
+  /**
+   * DIESELBE FEHLERKLASSE, DRITTER UND VIERTER FALL (Saisonstand-Auftrag Chris, 19.10., Punkte 5+6):
+   * Achsen-Punkteverhaeltnis (Klammerwert POW/SPE/MEN/SOC) und Staerke-Rang im Spieltage-Modus
+   * wurden zuerst nur im (nirgends gerenderten) `FoundationSeasonV2Host` gebaut — exakt derselbe
+   * Fehler wie bei `seasonV2TeamTopPlayersByColumn`/`seasonV2FormCardBonusByTeamId` oben, erst beim
+   * Chromium-Verifikationslauf an der leeren Klammer bzw. am fehlenden "Stärke #"-Chip bemerkt statt
+   * an einem Typfehler, weil beide Props an `SeasonStandingsV2Client` optional sind. Archiv-Sonderfall
+   * wie bei `areaVerhaeltnisByTeamId` oben in `FoundationSeasonV2Host`: nur die LIVE-Saison traegt
+   * sinnvolle Werte.
+   */
+  const seasonV2AreaVerhaeltnisByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : summiereSaisonVerhaeltnisProBereich(gameState, seasonOverviewSeasonId)),
+    [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
+  );
+  /**
+   * PRO DISZIPLIN, NICHT EIN GESAMTRANG (Review-Fund 19.10. Abend, s. ausfuehrlicher Kommentar in
+   * `FoundationSeasonV2Host.tsx`): `row.disciplineRanks` statt `row.totalRank` — Chris wollte je
+   * Disziplin des Spieltags einen eigenen Staerke-Rang-Chip ("Staffel UND Wettessen"), nicht einen
+   * ueber alle 20 Disziplinen gemittelten Gesamtwert.
+   */
+  const seasonV2TeamStrengthRankByTeamId = useMemo(() => {
+    const rows = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
+    return new Map(rows.map((row) => [row.teamId, row.disciplineRanks] as const));
+  }, [gameState]);
   const seasonV2TopPlayers = useMemo(() => {
     return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
       const player = seasonV2PlayerById.get(row.playerId) ?? null;
@@ -12982,9 +13143,12 @@ export function useFoundationShellRouterBodyScope({
     seasonV2PlayerRows,
     seasonV2PressureTeam,
     seasonV2SelectedTeamSummary,
+    seasonV2Spieltage,
     seasonV2StandingsRows,
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
+    seasonV2AreaVerhaeltnisByTeamId,
+    seasonV2TeamStrengthRankByTeamId,
     seasonV2TopPlayers,
     selectNewGameMode,
     selectTeamSettingsTeam,

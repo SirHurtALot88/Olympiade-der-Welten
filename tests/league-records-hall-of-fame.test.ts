@@ -59,6 +59,8 @@ describe("league-records-hall-of-fame", () => {
         goldTeamName: "Beta",
         silverTeamName: "Alpha",
         bronzeTeamName: null,
+        liga2ChampionTeamId: null,
+        liga2ChampionTeamName: null,
       },
       {
         seasonId: "season-1",
@@ -68,8 +70,44 @@ describe("league-records-hall-of-fame", () => {
         goldTeamName: "Alpha",
         silverTeamName: "Beta",
         bronzeTeamName: "Gamma",
+        liga2ChampionTeamId: null,
+        liga2ChampionTeamName: null,
       },
     ]);
+  });
+
+  it("Task #158/#161 (10.8): Liga-2-Rang-1 ist ein eigener Titel, getrennt vom Liga-1-/Gesamt-Meister", () => {
+    const records = buildLeagueRecordsHallOfFame(
+      buildGameState({
+        seasonState: {
+          seasonSnapshots: [
+            {
+              seasonId: "season-1",
+              seasonName: "Season 1",
+              finalStandings: [
+                // Liga 1: t1 ist Liga-1-Meister (isGold), t2 Vize.
+                { teamId: "t1", teamCode: "AAA", teamName: "Alpha", rank: 1, leagueTier: "liga1", isGold: true, disciplinePointsByArea: {} },
+                { teamId: "t2", teamCode: "BBB", teamName: "Beta", rank: 2, leagueTier: "liga1", disciplinePointsByArea: {} },
+                // Liga 2: t3 hat ebenfalls rank === 1 (liga-lokal!), ist aber NICHT isGold, sondern
+                // isLiga2Champion — genau der Fall, den die rohe `rank === 1`-Lesart vor Task #158
+                // falsch (als zweiten "Meister") gezählt hätte.
+                { teamId: "t3", teamCode: "CCC", teamName: "Gamma", rank: 1, leagueTier: "liga2", isLiga2Champion: true, disciplinePointsByArea: {} },
+                { teamId: "t4", teamCode: "DDD", teamName: "Delta", rank: 2, leagueTier: "liga2", disciplinePointsByArea: {} },
+              ],
+              playerPerformances: [],
+            },
+          ],
+        } as unknown as GameState["seasonState"],
+      }),
+    );
+
+    expect(records.seasonChampions).toHaveLength(1);
+    const entry = records.seasonChampions[0]!;
+    expect(entry.goldTeamId).toBe("t1");
+    expect(entry.liga2ChampionTeamId).toBe("t3");
+    expect(entry.liga2ChampionTeamName).toBe("Gamma");
+    // Der Liga-2-Erste darf NICHT als Liga-1-/Gesamt-Meister durchrutschen.
+    expect(entry.goldTeamId).not.toBe("t3");
   });
 
   it("tracks distinct teams per player and exposes an extended legendary-players list", () => {

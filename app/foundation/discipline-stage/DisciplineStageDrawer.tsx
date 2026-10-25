@@ -525,6 +525,43 @@ function PlayerBody({
             ) : null}
           </span>
         </div>
+        {/* DISZIPLIN-LAUFBAHN (Q2, docs/design/disziplin-laufbahn-q2-15-10.md): kompakte
+            Karriere-Zeile — nur Zähler, die der Spieltag schon trägt, nie eine erfundene "0".
+            Dasselbe `data.disciplineValues[].laufbahn` wie das ausklappbare Panel im Spielerprofil
+            (PlayerDetailDrawer.tsx), hier ohne Saison-für-Saison-Liste (kein Platz im Drawer). */}
+        {discEntry?.laufbahn ? (
+          <div
+            style={{
+              marginTop: 8,
+              paddingTop: 8,
+              borderTop: "1px solid var(--nl-line)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "4px 12px",
+              fontSize: 11.5,
+              color: "var(--nl-mut)",
+            }}
+          >
+            <span>
+              <strong style={{ color: "var(--nl-ink)" }}>{discEntry.laufbahn.careerAppearances}</strong> Einsätze Laufbahn
+            </span>
+            {typeof discEntry.laufbahn.career.siege === "number" ? (
+              <span>
+                <strong style={{ color: "var(--nl-ink)" }}>{discEntry.laufbahn.career.siege}</strong>× Rang 1
+              </span>
+            ) : null}
+            {typeof discEntry.laufbahn.career.podien === "number" ? (
+              <span>
+                <strong style={{ color: "var(--nl-ink)" }}>{discEntry.laufbahn.career.podien}</strong>× Top 3
+              </span>
+            ) : null}
+            {typeof discEntry.laufbahn.career.bestRang === "number" ? (
+              <span>
+                bester Rang <strong style={{ color: "var(--nl-ink)" }}>{discEntry.laufbahn.career.bestRang}</strong>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </Section>
 
       {/* Kopfzahlen: OVR (groß, --accent), PP, MVS */}

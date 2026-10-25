@@ -1,0 +1,94 @@
+{
+ "hinweis": "ECHTE Referenz (PR 3 des 6-PR-Opus-Plans, 21.10., scripts/ziehe-mini-dm-ffa-referenz.mjs) -- ersetzt den Platzhalter aus PR 4 (Commit dca6815c, 'feldgroessen: {}'). m90 = 90. Perzentil der v_t-Luecken (v_t = R_t/k + B_t/(k*1e6)) zwischen aufeinanderfolgenden Pod-Plaetzen -- gelesen von resolveMiniDmFfaMargeReferenz() in lib/resolve/mini-dm-pod-resolve.ts. spieler.p50/p995 = Perzentile des rohen Einzelrunden-`beitrag` -- gelesen von resolveMiniDmFfaSpielerPpReferenz()/ppAusMiniDmFfaBeitrag() in derselben Datei. PR 4 hat KEINEN produktiven Aufrufer, der FFA-Rohdaten liefert (das ist PR 5) -- diese Datei bleibt bis dahin toter Code, s. docs/design/stand-aller-disziplinen.md.",
+ "feldgroessen": {
+  "2": {
+   "k": 2,
+   "fixtures": 10080,
+   "luecken": 30239,
+   "m90": 1.5,
+   "median": 1,
+   "p75": 1.5,
+   "p95": 1.5,
+   "max": 2,
+   "spieler": {
+    "p50": 145.02,
+    "p995": 435.76,
+    "stichprobe": 80640
+   }
+  },
+  "3": {
+   "k": 3,
+   "fixtures": 10080,
+   "luecken": 30240,
+   "m90": 1.33,
+   "median": 0.67,
+   "p75": 1,
+   "p95": 1.67,
+   "max": 2,
+   "spieler": {
+    "p50": 116.12,
+    "p995": 424.32,
+    "stichprobe": 120960
+   }
+  },
+  "4": {
+   "k": 4,
+   "fixtures": 10080,
+   "luecken": 30240,
+   "m90": 1.5,
+   "median": 0.75,
+   "p75": 1,
+   "p95": 1.5,
+   "max": 2,
+   "spieler": {
+    "p50": 100.43,
+    "p995": 414.73,
+    "stichprobe": 161280
+   }
+  },
+  "5": {
+   "k": 5,
+   "fixtures": 10080,
+   "luecken": 30240,
+   "m90": 1.4,
+   "median": 0.6,
+   "p75": 1,
+   "p95": 1.6,
+   "max": 2,
+   "spieler": {
+    "p50": 78.34,
+    "p995": 410.91,
+    "stichprobe": 201600
+   }
+  },
+  "6": {
+   "k": 6,
+   "fixtures": 10080,
+   "luecken": 30240,
+   "m90": 1.33,
+   "median": 0.5,
+   "p75": 1,
+   "p95": 1.5,
+   "max": 2,
+   "spieler": {
+    "p50": 68.71,
+    "p995": 405.66,
+    "stichprobe": 241920
+   }
+  }
+ },
+ "provenienz": {
+  "2026-10-24T16:24:50.879Z": {
+   "repoCommit": "a3a88369666702b91d395b8af8a18087c433ee91",
+   "kWerte": [
+    2,
+    3,
+    4,
+    5,
+    6
+   ],
+   "mechanismus": "window.__arena.miniDmFfaSonde(kader,{k,...}) -- kaderfeste Simulation, 210 Vierergruppen aus data/generated/kaderfamilie-live-save.json, 24 Events je Gruppe und Saatstrom, 2 Saatstroeme",
+   "skript": "scripts/ziehe-mini-dm-ffa-referenz.mjs"
+  }
+ }
+}

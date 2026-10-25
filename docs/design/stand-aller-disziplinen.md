@@ -1,5 +1,814 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Fuenfundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Vorlauf-Verdrahtung (PR 5 eines 6-PR-Opus-Plans,
+21.10., "das Risikoreichste" laut Plan) — scharf geschaltet.** Der Mini-DM-FFA-Pfad (Motor PR 2
+#1302, Buchungsformel PR 4 #1301, Abnahme PR 3 #1303) war bis hierher additiv und tot: kein
+Aufrufer lieferte `MiniDmFfaPodRohdaten`. Diese PR fuegt genau diesen Aufrufer hinzu und schaltet
+ihn produktiv.
+
+- **Schalter**: `MINI_DM_FFA_VORLAUF_AKTIV` (lib/battle/arena-resolved-disciplines.ts), `true`.
+  Normaler Rollout-Schalter wie bei jeder anderen Disziplin beim Scharfschalten. Mini-DM bleibt
+  dabei bewusst AUSSERHALB von `ARENA_RESOLVED_DISCIPLINE_IDS` (kein Zweier-Duell-Chassis, eigener
+  Pod-Resolve-Pfad) — der Schalter ist deshalb ein eigener Boolean, kein Mengen-Eintrag.
+  **KORRIGIERT nach der zweiten Opus-Review-Runde (24.10.): kein bloßer Code-Konstante-Schalter
+  mehr.** `lib/battle/arena-vorlauf-service.ts`s `istMiniDmFfaVorlaufAktiv()` liest zusaetzlich die
+  Server-Umgebungsvariable `OLY_MINI_DM_FFA_VORLAUF` — `=aus` schaltet den Vorlauf ab, unabhaengig
+  vom Code-Wert. Das reicht NICHT per Container-Neustart: `deploy/hetzner/docker-compose.yml`
+  interpoliert die Variable aus `deploy/hetzner/.env` nur beim ERSTELLEN des Containers
+  (`docker compose up -d`), nicht bei einem blossen `docker restart`. Richtiger Ablauf: Eintrag in
+  `.env` setzen, dann `docker compose up -d` im Repo-Verzeichnis auf dem Server — derselbe
+  Mechanismus wie beim Geschwister-Notschalter `OLY_ARENA_TIER_PARALLEL` (PR #1290). Bereits mit
+  `quelle: "ffa"` fertiggestellte Snapshots buchen nach dem Abschalten trotzdem weiter so vor.
+- **Chris' Freigabe (24.10.)**: ALLE k=2..6 werden verdrahtet, obwohl `rhoJeEvent` (die
+  CLAUDE.md-massgebliche Spieler-Ebene-Zahl, PR 3) bei jedem k unter 0,80 liegt (0,608-0,686) —
+  dieselbe Star-/Paartreue-Begruendung, mit der Chris Hockey schon frueher freigegeben hat (s.
+  CLAUDE.md "Die Abnahme jeder Disziplin"). `data/generated/disziplin-abnahme.json` traegt das
+  additiv als eigenes `freigabe`-Feld am Schluessel `mini-dm-ffa` — die gemessenen Zahlen selbst
+  bleiben unveraendert stehen.
+- **Neue Datei `lib/resolve/mini-dm-ffa-matchday.ts`**: `runMiniDmFfaMatchday()` nimmt alle Pods
+  eines Mini-DM-Spieltags, ruft `runMiniDmFfaPodFixtures()` (jetzt mit `optionen.k`, s. unten) MIT
+  der echten Aufstellung/Mutatoren/Spieltagswurf auf und uebersetzt das Ergebnis in
+  `MiniDmFfaPodRohdaten`. **Teilnahme a(t,r) kommt bewusst aus der ECHTEN Aufstellung
+  (`buildArenaAufstellung()`), NICHT aus dem Motor-Boxscore** — der Motor selbst spielt jede Rolle
+  auch ohne Lineup-Eintrag per Eignungs-Reihum (PR A), die Buchungsformel (PR 4) will davon aber nur
+  die echten Eintraege sehen. Ein Reihum-Fallback-Kaempfer bekommt deshalb `beitrag: 0`/`teilnahme:
+  false` in den Rohdaten und KEINE Spieler-PP, unabhaengig davon, was der Motor fuer ihn simuliert
+  hat.
+- **arena-vorlauf-service.ts**: eigener Mini-DM-Zweig neben (nicht in) dem generischen
+  `runBattleModeArenaMatchday()`-Loop — `determineArenaDisciplineContexts()` erkennt Mini-DMs
+  Praesenz an D1/D2 jetzt zusaetzlich zur bestehenden `ARENA_RESOLVED_DISCIPLINE_IDS`-Pruefung,
+  OHNE "mini-dm" in `arenaDisciplineIds` aufzunehmen (das wuerde den falschen, Fixture-basierten
+  Dispatch treffen). `ermittleAnwendbarkeit()` ist jetzt auch fuer einen Spieltag anwendbar, an dem
+  NUR Mini-DM steht (vorher waere der Vorlauf fuer so einen Spieltag nie angelaufen). Derselbe
+  Semaphor/derselbe Zwei-Versuche-Retry wie die anderen Disziplinen; ein Ausfall faellt defensiv auf
+  den PPS-Pod-Pfad zurueck (PR 4 war genau dafuer gebaut) und markiert den Gesamt-Vorlauf als
+  `"failed"` — bucht trotzdem (`matchday-auto-run-service.ts` behandelt `"failed"` als Warnung, nicht
+  als Blocker).
+- **arena-seed.ts/arena-eingabe-hash.ts**: `buildMiniDmFfaPodMatchSeed()` (vier-Team-Pod statt
+  Heim/Gast-Duell) und `berechneMiniDmFfaEingabeHash()` (deckt zusaetzlich `playerCount`/k und die
+  volle Aufstellung aller vier Pod-Teams ab — ohne `playerCount` im Hash wuerden zwei Spieltage mit
+  unterschiedlichem k, aber sonst identischer Aufstellung, denselben Fingerabdruck tragen).
+  `lib/foundation/matchday-resolve-snapshot.ts`s `findeArenaEingabeHashDivergenz()` dispatcht fuer
+  `disciplineId === "mini-dm"` jetzt auf diese Funktion statt auf die generische (sonst waere jede
+  Buchung mit einer arena-aufgeloesten Zweit-Disziplin UND Mini-DM am selben Spieltag faelschlich
+  als "instabil" verworfen worden, weil die generische Funktion fuer Mini-DM keine Fixtures findet).
+- **Offene Design-Frage aus PR 3 entschieden, UND KORRIGIERT nach Opus-Review an PR #1304**:
+  `ppAusMiniDmFfaBeitrag()` liest die Referenz GEPOOLT je Disziplin+k (eine p50/p995 ueber ALLE
+  sechs Rollen desselben k), nicht nach Rolle/Eignungsrang getrennt. Die erste Fassung dieses
+  Nachtrags nannte das einen "Verzerrungs-Effekt"/eine "bekannte Grenze" — das war FALSCH und ist
+  hier richtiggestellt, nicht nur ergaenzt: laut Opus-Review ist das gepoolte Referenz-je-k genau
+  der RICHTIGE Projektstandard, nicht ein Kompromiss. Eine nach Rolle getrennte Referenz wuerde
+  einen Last-Hit-Median (die laut Matrix schwaechste Rolle, intelligence/spirit-Fokus) auf
+  denselben p50 heben wie einen Frontliner-Median (die staerkste) — WIDERSPRUCH zu CLAUDE.md ("Die
+  Eignungsmatrix ist gesperrt"-Abschnitt, Chris' wortlicher Massstab "ein Spieler mit einer Stat von
+  80 ... erwarte ich auch, dass da einer der Top-Leute ist"): die Referenz muss je DISZIPLIN+k
+  gezogen werden, nicht je Rolle, sonst verschwindet genau die Eignungs-Reihenfolge zwischen den
+  Rollen, die die Matrix vorgibt. Der Selektionseffekt (hoeheres k zieht auch schwaechere Raenge
+  5/6 mit hinein, s. 24. Nachtrag unten) bleibt bestehen, ist aber keine Verzerrung, die zu beheben
+  waere — er ist genau das Verhalten, das die Budget-Methode von einer je-k gepoolten Referenz
+  erwartet.
+- **Nachweise**: Manager-Mode byte-identisch (`scripts/pruefe-resolve-bit-identitaet.ts`/
+  `scripts/pruefe-mapper-bit-identitaet.ts`, je vor/nach gegen eine frische, unabhaengige Kopie des
+  live-save-Abbilds); Battle-Mode-Mini-DM aendert sich ABSICHTLICH (eigener Integrationstest,
+  `tests/arena-vorlauf-mini-dm-ffa.test.ts`, zeigt `quelle: "ffa"` statt des alten PPS-Pod-Pfads);
+  alle anderen 19 Disziplinen unberuehrt (keine ihrer Dateien angefasst, der generische
+  `runBattleModeArenaMatchday()`-Loop ist unveraendert). Volle Begruendung, Testergebnisse und
+  bekannte Grenzen im PR-Bericht selbst.
+
+**Vierundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Abnahme + Referenzen fuer k=2..6 (PR 3 eines
+6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile. KORRIGIERT 24.10. nach Opus-Review an
+PR #1303: rho auf SPIELER-Ebene (die CLAUDE.md-massgebliche Zahl) besteht bei KEINEM k — die
+urspruengliche Fassung dieses Nachtrags hatte sich faelschlich selbst eine Freigabe ausgestellt.**
+Fortsetzung von PR 1 (#1300, Commit 6831d7a7, Spielplan zieht wieder 2-6 Spieler), PR 2 (#1302,
+Commit a3a88369, FFA-Kampfmotor kennt jetzt alle sechs Rollen
+frontliner/finisher/trickfighter/ironguard/chaosdriver/lasthit, `opt.k`) und PR 4 (#1301, Commit
+dca6815c, Buchungsformel `berechneMiniDmFfaPodOverride()` kann FFA-Rohdaten in Liga-Platzierung
+uebersetzen). PR 3 ist der Mess-/Kalibrierungsschritt, der den noch fehlenden PR 5 (Verdrahtung in
+echte Spieltage) erst zulaessig macht — **rein additiv, die bestehende `mini-dm`-Abnahme
+(vierzehnter Absatz oben, 13.10.) bleibt unberuehrt.**
+
+**Gemessen: `scripts/miss-mini-dm-ffa-abnahme.mjs` um `--k=2..6` erweitert** (kommagetrennt oder
+als Bereich, z. B. `--k=2..6`; `--nur-k` ueberspringt den alten, unveraenderten Vierer-Pfad fuer
+schnellere Laeufe) — ohne `--k` bleibt das Skript byte-identisch zu vorher (Konsolenausgabe UND
+JSON-Struktur, per `diff` gegen den Stand vor PR 3 bestaetigt). Je Kadergroesse misst es dieselbe
+kaderfeste Vierergruppen-Stichprobe (zehn echte Teams aus
+`data/generated/kaderfamilie-live-save.json`, 210 Vierergruppen, zwei Saatstroeme) mit den
+k-spezifischen Rollen aus `MINI_DM_FFA_SLOTS_JE_K[k]`:
+
+| k | **rho je Event (Spieler-Ebene, Schranke)** | rho je Runde (Mittel/Median) | rho je Event/Pod (Team-Ebene, Eventplatz) | Star Rang 1 / erste zwei | Paare ab 15 richtig | Pp (Budget, n=2) |
+|---|---:|---:|---:|---:|---:|---:|
+| 2 | **0,650 / 0,656** | 0,799 / 0,798 — 0,800 / 0,800 | 0,830 / 0,827 | 76-78 % / 93-94 % | 98,9-99,0 % | 7,7 / 7,8 |
+| 3 | **0,673 / 0,677** | 0,814 / 0,816 — 0,800 / 0,800 | 0,869 / 0,873 | 76-77 % / 94 % | 99,3 % | 10,0 / 10,9 |
+| 4 | **0,686 / 0,686** | 0,822 / 0,816 — 0,800 / 0,800 | 0,865 / 0,872 | 78-79 % / 94-95 % | 99,4 % | 8,7 / 9,0 |
+| 5 | **0,608 / 0,606** | 0,798 / 0,794 — 0,800 / 0,800 | 0,864 / 0,873 | 77-78 % / 94 % | 99,4 % | 8,8 / 9,5 |
+| 6 | **0,624 / 0,624** | 0,813 / 0,811 — 0,800 / 0,800 | 0,891 / 0,888 | 79-81 % / 95 % | 99,1-99,2 % | 8,0 / 8,6 |
+
+**Die massgebliche Zahl ist `rho je Event` auf SPIELER-Ebene (fett), nicht `teamRhoEventplatz`.**
+CLAUDE.md verlangt rho auf Spielerebene je Spiel ("ein Spieler mit Stat 80 muss zu den Top-Leuten
+gehoeren") — fuer Mini-DM-FFA ist "ein Spiel" ein Event (ein Pod-Treffen, 4 Teams, k Runden, also
+4·k Teilnehmer), gemessen als rho zwischen Eignung und normiertem Beitrag ueber ALLE Teilnehmer
+dieses Events (`auswertenFfa().rhoEvent` im Messskript — das Skript berechnete diese Zahl bereits
+vorher, die erste Fassung dieses Nachtrags fuehrte sie aber nicht). **Ergebnis: rho je Event liegt
+bei JEDEM k klar UNTER 0,80 (0,608 bis 0,686) — bestanden ist das Kriterium bei KEINEM k.** k=5
+und k=6, die beiden NEUEN Kadergroessen aus diesem PR, liegen sogar SCHLECHTER als der heutige
+4er-Baseline-Wert (0,686) ab, nicht besser. `teamRhoEventplatz` (Team-Ebene, 4 Werte je Event) ist
+dagegen bei allen fuenf k komfortabel ueber 0,80 (0,827-0,891) — das ist aber nicht die
+CLAUDE.md-Schranke und war schon einmal als nicht ausreichend verworfen worden
+(`docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md` Abschnitt 4: Team-rho 0,87 ohne
+Spieler-rho galt dort explizit als nicht genuegend).
+
+**Auch rho je Runde ist kritischer als "nur ein Median-Grenzfall": bei k=2 und k=5 liegt sogar das
+MITTEL unter 0,80** (0,799/0,798 bzw. 0,798/0,794), nicht nur der Median exakt auf 0,800. Dass der
+Median bei ALLEN FUENF k exakt auf 0,800 landet, ist weiterhin kein neuer Regressionsbefund,
+sondern eine Eigenschaft von Spearman-rho bei n=4 Kaempfern je Runde (0,8 = genau ein benachbartes
+Paar vertauscht, einer der wenigen diskreten Werte) — aber das macht die Rundenebene nicht zu einem
+brauchbaren Ersatz fuer die fehlende Spieler-Event-Zahl.
+
+**Gegengewicht, CLAUDE.md-eigene, ehrlichere Lesart bei kleinem n: Star- und Paartreue sind bei
+jedem k gut.** Star auf Rang 1 landet bei 76-81 %, in den ersten beiden bei 93-95 %; Paare mit
+mindestens 15 Punkten Eignungsabstand werden zu 99 % richtig geordnet (Tabelle oben) — konsistent
+mit CLAUDE.md Abschnitt "Was rho drueckt, ist oft gar kein Fehler": die niedrige rho-Zahl kommt vor
+allem aus den knappen Paaren (< 5 Punkte Abstand), die kein Motor zuverlaessig ordnen kann oder
+soll. Das rechtfertigt die niedrige rho-Zahl nicht weg, zeigt aber, dass die Mechanik den STAR
+zuverlaessig erkennt.
+
+**Status: NICHT BESTANDEN auf der massgeblichen Spieler-Ebene, bei jedem k=2..6 — keine
+Selbstfreigabe.** `data/generated/disziplin-abnahme.json` (Schluessel `mini-dm-ffa`, additiv,
+`"status"`-Feld) haelt das jetzt explizit fest, statt "bestanden"/"kein k wird gesperrt" zu
+schreiben. Ob PR 5 trotzdem kommt — und falls ja, mit welchem k oder mit welcher Rezeptaenderung
+zuerst — ist eine Entscheidung, die bei Chris liegt, nicht bei dieser Messrunde. Pp bleibt bei
+jedem k deutlich unter der 25er-Schranke (7,7 bis 10,9), das Pp-Kriterium ist unabhaengig davon
+bestanden.
+
+**Referenz real gezogen statt kopiert: `scripts/ziehe-mini-dm-ffa-referenz.mjs` (neu) befuellt
+`data/generated/mini-dm-ffa-referenz.json`.** Die Datei kam aus PR 4 als Platzhalter
+(`feldgroessen: {}`, Kopfkommentar dort: "PR 3 befuellt sie real"). Das neue Skript zieht fuer
+jedes k=2..6 aus 10 080 simulierten Events (210 Vierergruppen × 24 Laeufe × zwei Saatstroeme)
+`m90` (90. Perzentil der Luecken zwischen benachbarten Pod-Plaetzen im Anzeigescore
+`v_t = R_t/k + B_t/(k·10⁶)`, gelesen von `resolveMiniDmFfaMargeReferenz()`) und `spieler.p50`/
+`p995` (Perzentile des rohen Einzelrunden-Beitrags, gelesen von
+`resolveMiniDmFfaSpielerPpReferenz()`/`ppAusMiniDmFfaBeitrag()`). Ergebnis je k: m90 1,33-1,5,
+Spieler-p50 fallend von 145 (k=2) auf 69 (k=6). **KORRIGIERT 24.10.: das ist KEINE "Glaettung
+durch mehr Runden"** (ein einzelner Einzelrunden-Beitrag haengt von der Rundenzahl gar nicht ab) —
+**sondern ein SELEKTIONSEFFEKT**: bei hoeherem k spielen auch die Eignungs-Raenge 5/6 eines Teams
+mit (chaosdriver/lasthit), die bei k=2..4 gar nicht erst antreten, und das sind durchweg die
+schwaecheren Mini-DM-Kaempfer eines Kaders. Das zieht den POOLED Median ueber alle Runden/Raenge
+nach unten, je hoeher k.
+
+**Design-Frage aus diesem Befund — von PR 5 entschieden, s. 25. Nachtrag oben, dort nach
+Opus-Review KORRIGIERT:** `ppAusMiniDmFfaBeitrag()` liest die Referenz gepoolt je k (eine einzige
+p50/p995 fuer alle Raenge). Bei GLEICHER individueller Leistung (derselbe rohe `beitrag`) bekaeme
+derselbe Spieler ueber diese Kurve bei k=6 mehr PP als bei k=2, weil die gepoolte p50-Referenz bei
+k=6 niedriger liegt (69 statt 145) — das ist der Selektionseffekt von oben (hoeheres k zieht
+schwaechere Raenge 5/6 mit hinein), KEIN Fehler der Referenz-Methode. PR 5 hat entschieden: gepoolt
+je Disziplin+k bleibt, nicht nach Rolle/Eignungsrang getrennt — das ist laut Opus-Review der
+richtige Projektstandard (eine rollengetrennte Referenz wuerde Last-Hit- und Frontliner-Mediane
+gleichsetzen, Widerspruch zur gesperrten Eignungsmatrix, s. 25. Nachtrag).
+
+**Bleibt trotzdem toter Code**: PR 4 hat keinen produktiven Aufrufer, der
+`ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId` befuellt (grep ueber das ganze Repo
+bestaetigt: nur die Typdefinition und der Default-Durchgriff auf `null` in
+`legacy-matchday-resolve-engine.ts`) — das ist PR 5. Das Befuellen der Referenz aendert deshalb an
+keinem heutigen Resolve-Lauf etwas.
+
+**A/B-Test der Last-Hit-Fokusregel: KEIN messbarer Unterschied, keine Codeaenderung.** PR 2 hat
+fuer den neuen ENG-Kanal jeder FFA-Rolle (`betroffeneAttributeMit`) eine Fokusregel gebaut:
+`[slotDef.gross, slotDef.klein].filter(W>0)`. Erster Befund beim Nachlesen: unter der GESPERRTEN
+Matrix-Datei selbst waeren Last Hits Attribute (intelligence/spirit) beide Gewicht 0, der Filter
+liefe leer und faellt auf "breit" zurueck — aber `BASIS_JE_DISC["mini-dm"]` im Motor fuehrt NICHT
+die rohe Matrix, sondern Chris' bestehenden, bereits am 05.09./13.10. ausdruecklich bestaetigten
+Override (`lib/player-generator/spiel-eignung-overrides.ts`: intelligence/spirit je 6) — die
+Fokusregel ist also fuer Last Hit tatsaechlich wirksam (gemessen: "Gewichte (Motor)"
+`{torment:21,health:18,power:14,stamina:14,will:12,dexterity:9,intelligence:6,spirit:6}`). Gegen
+eine Kopie von `battle-mode.engine.js`, in der `betroffeneAttributeMit` fuer den ENG-Kanal IMMER
+die breite Streuung liefert (keine Fokus-Konzentration mehr, fuer JEDE Rolle, nicht nur Last Hit;
+Patch zur Reproduktion eingecheckt:
+`docs/design/mini-dm-ffa-lasthit-fokus-ab-patch-24-10.diff`), gemessen mit
+`--k=6 --seite=<kopie> --pp=2` (Budget-Methode, zwei Saatstroeme): Pp 8,0/8,6 (Fokusregel) gegen
+8,7/8,6 (immer breit), rho je Runde Median beide 0,800, rho Mittel 0,813/0,811 gegen 0,816/0,814 —
+innerhalb der Saatstrom-zu-Saatstrom-Streuung, kein klarer Gewinner. Intelligence/spirit treffen
+ihr Matrixgewicht (6 %) in BEIDEN Varianten nahezu exakt (Fokusregel: 7,1/6,9 % Intelligence,
+6,0/6,0 % Spirit). **Entscheidung: keine Codeaenderung** — die Alternative ist nicht "klar besser"
+(CLAUDE.md-Kriterium fuer eine Aenderung an einer bereits dokumentierten, Chris-bestaetigten
+Mechanik), beide liegen komfortabel innerhalb der 25er-Pp-Schranke.
+
+**Manager-Mode-Bit-Identitaet nachgewiesen, nicht nur behauptet.** Zwei unabhaengige Nachweise
+gegen eine frische live-save-Kopie (`scripts/pruefe-spiegel-frische.ts`: beide Spiegel < 1 h alt):
+(1) **analytisch** — `grep -rn miniDmFfaPodRohdatenByDisciplineId` zeigt nur die Typdefinition in
+`lib/lineups/legacy-lineup-types.ts` und den Default-Durchgriff `options?.miniDmFfaPodRohdatenByDisciplineId
+?? null` in `legacy-matchday-resolve-engine.ts` — KEIN heutiger Aufrufer von
+`buildLegacyMatchdayResolvePreview()` setzt dieses Feld, der FFA-Zweig in
+`berechneMiniDmPodOverrides()` ist fuer jeden bestehenden Save tot code, befuelltes
+`mini-dm-ffa-referenz.json` hin oder her. (2) **empirisch** —
+`scripts/pruefe-mapper-bit-identitaet.ts`/`scripts/pruefe-resolve-bit-identitaet.ts`, je einmal auf
+`origin/main` (vor diesem PR) und einmal auf diesem Branch (danach), beide gegen eine EIGENE Kopie
+desselben Abbilds: SHA-256-Hashes je Save/Spieltag, Ledger und Nachbuchung sowie die
+Schluesselpraesenz von `miniDmPod` (0 in jedem bestehenden Save, manager mode) — **identisch**.
+
+**Volle Testsuite fuer die beruehrten Dateien gruen** (`tests/mini-dm-pod-resolve.test.ts`,
+`tests/mini-dm-pod-resolve-engine-integration.test.ts`,
+`tests/mini-dm-ffa-pod-headless-runner.test.ts`, `tests/disziplin-abnahme-guard.test.ts`,
+`tests/battle-mode-pps-duell.test.ts`), `node --check` fuer beide neuen/geaenderten `.mjs`-Skripte
+sauber.
+
+---
+
+**Dreiundzwanzigster Nachtrag 15.10. — Formkarten-Kopplung (Punkt 30) gemessen, nichts gebaut.**
+`docs/design/formkarten-kopplung-messrunde-15-10.md` beantwortet die in CLAUDE.md
+("Eignungsmatrix ist gesperrt") und Punkt 30 (`chris-feedback-breite-runde-13-10.md`) offen
+gelassene Frage, wie stark sich eine isolierte +4-Formkarte in Feldspiel/Buehne/Zeitfahren/
+Climbing/Spurt tatsaechlich bewegt, gegen Arena/TDM als bereits proportional gekoppelte Referenz.
+Zwei Messebenen: (A) der reine Attribut-Kanal (`mitAufschlag`/`betroffeneAttribute`) hebt die
+matrixgewichtete Eignung (`gewichtet(a,BASIS_JE_DISC[d])`) in JEDER getesteten Disziplin —
+Feldspiel, Buehne, Zeitfahren, Climbing, Spurt UND TDM — exakt um 4,00 Punkte, algebraisch
+garantiert, keine Streuung. (B) die tatsaechliche Spielwertung (`formEinflussVon`, isoliertes
+Formkarten-Delta, ein Spieler +4, gepaarte Saat) bewegt sich dagegen sehr unterschiedlich stark:
+Climbing bewegt einen Laeufer im Schnitt um 23 % des Feldes, Spurt 14 %, Zeitfahren 8 %, Tennis/
+Basketball 6-6,5 % (jeweils bei groesserer Feldgroesse) — eine Streuung, die selbst zwischen den
+drei Bahn-Disziplinen auftritt, die Motor UND Attribut-Kanal exakt teilen, also an den
+disziplinspezifischen Sub-Skill-Rezepten liegen muss, nicht am Kanal. Fuer TDMs Spielwertung (B)
+liefert diese Runde keine live gemessene Zahl — ein gepaarter Lauf ist dort je Kampf deutlich
+teurer als Feldspiel/Buehne/Bahn und lief wiederholt ueber zehn Minuten, ohne durchzulaufen; die
+Referenz steht im Dokument analytisch (Code-Beleg: `eigWert` nimmt den Kartenwert additiv/exakt
+auf, bevor `aufEignung()` die Kampfwerte normiert). Eine neue, rein lesende
+Messsonde (`formAttrEigSonde`, `window.__arena`) und ein Treiberskript
+(`scripts/messe-formkarten-kopplung.mjs`) kamen dazu; keine Mechanik-Aenderung. Die
+Design-Entscheidung (proportionale Kopplung nachziehen oder Rohattribut-Kopplung bewusst
+behalten) bleibt unveraendert bei Chris.
+
+**Zweiundzwanzigster Nachtrag 15.10. — Eiskunstlauf: E-F2 gebaut, bei ungerader Feldgroesse laeuft
+jetzt der Star solo, nicht der Schwaechste.** Chris' Sammel-Antwort auf eine Liste offener Punkte
+("ja ueberall D, bau weiter") deckte `docs/design/fable-ideen-buehne-auftritt-30-09.md` Abschnitt
+„E-F2" (Klasse C, winzig) ab: `fusioniereSeite()` (`public/mockups/battle-mode.engine.js`, DUETT-
+Block) paarte bislang von oben (Rang 1+2, 3+4, …) — bei ungerader Feldgroesse (3 oder 5 je Seite,
+zwei von fuenf Saisons laut `buildSeasonPlayerCountByDiscipline`) blieb dadurch der SCHWAECHSTE
+Laeufer als Rest solo, ein Nebeneffekt der Sortierrichtung, keine bewusste Entscheidung. Geaendert:
+Paarung beginnt jetzt ab Index `g.length % 2` statt immer bei 0, sodass bei ungerader Groesse
+`g[0]` (der Star) unberuehrt bleibt; `baueGruppenJeSeite()` (Startreihenfolge) kennt denselben
+Rest-Index, damit der Star-Solo-Auftritt nach dem `reverse()` auch tatsaechlich der letzte Starter
+seiner Seite ist ("das Duett eroeffnet, der Star schliesst ab"). Bei gerader Feldgroesse aendert
+sich nichts (`rest===0`), bit-identisch bestaetigt.
+
+**Gemessen, vorher/nachher, kaderfest (live-save-Kaderfamilie, `miss-alle-disziplinen.mjs`):**
+
+| Feldgroesse je Seite | rho je Spiel (vorher → nachher) | Spannweite | rho Saison (vorher → nachher) | Abnahme |
+|---|---:|---:|---:|---|
+| 3 (ungerade) | 0,919 → 0,905 | 0,181 → 0,262 | 1,000 → 1,000 | bestanden (beide) |
+| 5 (ungerade) | 0,843 → 0,866 | 0,111 → 0,080 | 0,976 → 0,976 | bestanden (beide) |
+| 4 (gerade, Kontrolle) | 0,849 → 0,849 | 0,159 → 0,159 | 0,976 → 0,976 | bit-identisch |
+| 6/Standard (gerade) | 0,866 → 0,866 | 0,105 → 0,105 | 0,986 → 0,986 | bit-identisch |
+
+Die einzigen Bewegungen (je-Seite 3 und 5) liegen innerhalb der eigenen Kaderrauschen-Spannweite
+der Disziplin und sind damit von Null nicht unterscheidbar — keine Regression, die Schranke
+(>0,80 je Spiel) haelt in jeder getesteten Feldgroesse vor UND nach der Aenderung.
+
+**Pp-Pflichtpruefung (`messe-arena-einfluss.mjs`, zwei unabhaengige Saatstroeme, n=24):** die
+letzte Showcase/Eiskunstlauf-Pp-Zahl im Repo war alt (Teil 2 oben, n=48, 26.09.) — diese Runde
+misst frisch nach. Standardmessung (`einflussVon` baut die Disziplin ohne `jeSeite`-Parameter,
+also mit der geraden Katalog-Feldgroesse) ist vom Rest-Index gar nicht beruehrt und deshalb
+erwartungsgemaess bit-identisch vorher/nachher: **19,9 Pp / 17,8 Pp** (beide Stroeme deutlich
+unter der 25-Pp-Schranke).
+
+**Gebaut, kein Draft:** beide Pflichtzahlen halten, in keiner getesteten Konfiguration ein
+Regress. Aenderung in `public/mockups/battle-mode.engine.js` (`fusioniereSeite()` und
+`baueGruppenJeSeite()` im Eiskunstlauf-DUETT-Block), s. Abschnitt 5b unten (Eiskunstlauf-Zeile)
+fuer die Kurzfassung in der grossen Tabelle.
+
+**Einundzwanzigster Nachtrag 15.10. — Time-Trial: PP nach Zeit statt Platz gebaut (Task #105,
+Margin-Formel, Variante D/E aus der 15.10.-Diagnose), nach dem Stamina-Puffer desselben Tages
+(Zwanzigster Nachtrag unten) jetzt SICHER.** Die Diagnose in
+`docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md` Abschnitt 2 hatte die Margin-Formel
+als "implementierungsreif, sobald Schritt 1 (Stamina-Kalibrierung) steht" markiert, aber mit
+Puffer von nur 0,3-1,5 Pp auf dem schwaecheren Saatstrom — zu knapp, um sie scharf zu schalten.
+Die Stamina-Kalibrierung (Zwanzigster Nachtrag) schuf den Puffer (Pp-Abweichung 22,3/24,1 →
+13,5/14,1); dieser Nachtrag prueft, ob er reicht, und baut die Formel, weil er es tut.
+
+**Baseline unabhaengig reproduziert** (`node scripts/messe-arena-einfluss.mjs time-trial 24
+--saat-versatz=0`/`10000000`, ohne jede Margin-Aenderung): 13,5/14,1 Pp — bestaetigt den
+Zwanzigsten Nachtrag bit-genau, eigener Messlauf.
+
+**Umsetzung:** `BAHN_ART["time-trial"].marginAnteil:0.20` (neues, NUR fuer Time-Trial gesetztes
+Feld — jede andere Bahn liest hier `undefined` und bleibt unveraendert). `bahnRangliste()` mischt
+fuer Time-Trial 20 % Zeitabstand-Margin in die Rangpunkte: Anker N..1 bleibt exakt wie bisher
+(schnellste Zielzeit N Punkte, langsamste 1), nur die Zwischenschritte richten sich jetzt linear
+nach dem tatsaechlichen Zeitabstand zum Feld (relativ zur Feldspanne: bester..schlechtester
+Zielzeit dieses Rennens) statt nach gleichen Eins-Schritten — Variante D/E aus der Diagnose, nicht
+die ungedaempfte Variante A, die dort auf beiden Saatstroemen riss. `MOTOREN["time-trial"].wert()`
+ruft jetzt `bahnRangliste()` direkt auf (kein zweiter, separat gepflegter Formel-Code), damit die
+Pflichtsonde nie von der Produktions-PP abweichen kann (Diagnose Abschnitt 2.1).
+`data/generated/time-trial-pps-referenz.json` neu gezogen (`scripts/ziehe-buehne-pps-referenz.ts
+time-trial` gegen den frischen `live-save`-Spiegel) — die neue, kontinuierliche Verteilung
+verschiebt `iMittel` leicht (z.B. Feldgroesse 4: 4,5 → 4,49), `iKrass` unveraendert.
+
+**Gemessen (n=24, zwei unabhaengige Saatstroeme):**
+
+| Groesse | Strom 0 | Strom 10 000 000 |
+|---|---:|---:|
+| Abweichung zur Matrix (vorher → nachher) | 13,5 → 12,9 Pp | 14,1 → 13,8 Pp |
+| rho je Spiel (Median, kaderfest, n=24) | 0,943 → **0,943** | unveraendert |
+| Spannweite | 0,049 | unveraendert |
+| rho Saison (Median) | 0,951 → **0,951** | unveraendert |
+
+**Pp-Abweichung sinkt sogar leicht statt nur zu halten** — der neue Puffer liegt bei rund 11-12 Pp
+auf beiden Stroemen, weit ueber der verlangten 3-5-Pp-Marke. **rho je Spiel bleibt bit-genau bei
+0,943**, exakt die mathematische Invarianz, die die Diagnose vorhergesagt hatte (Spearman haengt
+nur am Rang, nicht am Massstab einer monotonen Neufassung, s. dortiger Abschnitt 2.2) — kein
+Zielkonflikt zwischen rho und Pp-Abweichung in dieser Runde.
+
+**Isolation geprueft:** `node scripts/miss-alle-disziplinen.mjs 24 staffel spurt time-trial
+takeshis-castle climbing` — Staffel 0,937, Spurt 0,910, Takeshi's Castle 0,898, Climbing 0,833,
+alle vier bit-identisch zu ihrem eigenen Stand (`marginAnteil` ist nur in
+`BAHN_ART["time-trial"]` gesetzt, `bahnRangliste()` liest es generisch fuer alle fuenf Bahnen,
+greift aber nur dort, wo das Feld gesetzt ist). Vier neue Tests
+(`tests/time-trial-pp-margin-formel.test.ts`, Playwright/Chromium gegen
+`public/mockups/battle-mode.html`): Anker bleibt N..1 bei vollstaendigen Rennen, Monotonie
+(schnellere Zielzeit nie weniger Punkte), die Formel wirkt wirklich (Punkteschritte nicht alle
+exakt 1), Spurt bleibt bit-identisch ganzzahlig. Bestehende Pflicht-Invarianten
+(`tests/spiele-bahn-invarianten.test.ts`, 240 Saaten je Bahn) und
+`tests/battle-mode-arena-team-points.test.ts` bleiben gruen (95 bzw. 77 Tests).
+
+**Scope-Grenze:** `wertung:"zeit"` (die TEAM-Wertung, Zeitsumme) ist unveraendert — nur die
+INDIVIDUELLE PP je Laeufer (`bahnRangliste().punkte`) traegt jetzt die Margin-Mischung. Keine
+andere Bahn-Disziplin angefasst (`marginAnteil` existiert nirgends sonst).
+
+---
+
+**Zwanzigster Nachtrag 15.10. — Time-Trial: Stamina-Ueberschuss im Rangpunkte-Rezept kalibriert
+(Budget-Methode, Climbing-Vorbild), PP-nach-Zeit-Frage bleibt ausserhalb des Scopes.**
+`docs/design/time-trial-sequenzieller-start-pp-zeit-15-10.md` Abschnitt 2.5 diagnostizierte den
+Auftrag: Stamina trug im Rangpunkte-Rezept auf JEDEM gemessenen Saatstrom rund +9 Pp zu viel
+(`messe-arena-einfluss.mjs time-trial 24`, zwei unabhaengige Stroeme `--saat-versatz=0`/
+`10000000`), weil STEHEN **und** ENDTEMPO beide `u.STEHEN`/Stamina streckenweit (nicht nur
+zonenweit) lesen (`mued`/`KRAFT_VON`/`leer`/`pusteRegen` in `tempoVon()`/`stepSpurt()`) — derselbe
+Fehler, den die Climbing-Kalibrierrunde (16.09., `climbing-kalibrierung-16-09.md`) schon einmal
+gefunden hatte: ein Attribut sitzt in zu vielen Kanaelen gleichzeitig und gewinnt strukturell.
+
+**Baseline (vor dieser Runde, n=24, zwei Saatstroeme):** Abweichung zur Matrix 22,3/24,1 Pp,
+Stamina +8,8/+10,3 (groesster Einzelposten auf beiden Stroemen), Dexterity (Matrix 25, das
+schwerste Attribut) -4,4/-4,1 das groesste Loch. rho je Spiel 0,923, Spannweite 0,064, Saison
+0,902 (bestand die 0,80-Schranke bereits deutlich, aber die 23.09.-Pp-Fixrunde hatte keinen Puffer
+mehr fuer die Task-#105-Margin-PP uebrig gelassen).
+
+**Kalibriert (ein Hebel, zwei Messschritte, wie bei Climbing):** nur
+`BAHN_ART["time-trial"].rezept.STEHEN` geaendert (Kommentar am Code, `public/mockups/
+battle-mode.engine.js`), ANTRITT/ENDTEMPO/TECHNIK/WENDIGKEIT/WUCHT/ROBUST/GESPUER unveraendert.
+Schritt 1: `{stamina:34,intelligence:26,awareness:32,dexterity:8}` → `{stamina:18,…,dexterity:24}`
+schloss das Dexterity-Loch fast vollstaendig (-4,4 → -0,1 bei n=24), liess Stamina bei +5,1 Pp
+stehen. Schritt 2: ein kleiner Torment-Anteil (Matrix nur 3, aber durch WUCHTs auf die Berg-Zonen
+begrenzten Kanal praktisch tot, 0,4-0,7 %) auf weitere Kosten von Stamina
+(`{stamina:10,intelligence:26,awareness:32,dexterity:24,torment:8}`) senkte Stamina auf +3,5/+4,2
+Pp — **unter die Haelfte des Ausgangswerts auf BEIDEN Stroemen**, ohne Dexterity erneut zu
+verschieben (-0,7/-0,9 nach Schritt 2, weiterhin nah an der Matrix).
+
+| Groesse | Strom 0 | Strom 10 000 000 |
+|---|---:|---:|
+| Abweichung zur Matrix (vorher → nachher) | 22,3 → 13,5 Pp | 24,1 → 14,1 Pp |
+| Stamina (vorher → nachher) | +8,8 → +3,5 Pp | +10,3 → +4,2 Pp |
+| Dexterity (vorher → nachher) | -4,4 → -0,7 Pp | -4,1 → -0,9 Pp |
+| rho je Spiel (Median, kaderfest, n=24) | 0,923 → **0,943** | — |
+| Spannweite | 0,064 → 0,049 | — |
+| rho Saison (Median) | 0,902 → **0,951** | — |
+
+rho **verbessert sich, statt nur gehalten zu werden** — kein Zielkonflikt zwischen rho und
+Pp-Abweichung in dieser Runde, anders als bei den im 15.10.-Dokument geprueften PP-nach-Zeit-
+Prototypen. **Isolation geprueft:**
+`node scripts/miss-alle-disziplinen.mjs 24 staffel spurt time-trial takeshis-castle climbing` —
+Staffel 0,937, Spurt 0,910, Takeshi's Castle 0,898, Climbing 0,833, alle vier unveraendert
+gegenueber ihrem eigenen Stand (jede Bahn-Disziplin fuehrt ihr eigenes, getrenntes `rezept`-Objekt
+in `BAHN_ART`; nur der `STEHEN`-Eintrag unter `"time-trial"` wurde angefasst).
+
+**Scope-Grenze, bewusst eingehalten:** diese Runde aendert NICHTS an `bahnRangliste()`,
+`MOTOREN["time-trial"].wert()`, der Zeitsumme (`wertung:"zeit"`) oder der PPS-Referenz — nur die
+`rezept`-Gewichte, die die bestehende Rangpunkte-Wertung durchreicht. Die PP-nach-Zeit-Frage
+(Task #105, margin-basierte Individual-PP) bleibt unveraendert Abschnitt 2 des 15.10.-Dokuments:
+nicht gebaut, jetzt mit mehr Puffer fuer einen spaeteren Anlauf, aber ein eigener, separater
+Auftrag.
+
+---
+
+**Neunzehnter Nachtrag 13.10. — Mini-DM FFA: Chris' Override (Intelligence/Spirit) gebaut, neuer
+Schlagwechsel ersetzt den alten Sandplatz-Takt, rho/Pp auf dem GESPIELTEN FORMAT bestehen —
+nicht in echte Spieltagsergebnisse verdrahtet.** Chris' Auftrag 13.10., wörtlich: „auch das FFA
+soll nach den gewichtungen geschehen die vorgegeben sind! weil du schreibst eigenes system,
+nirgendwo soll ein 'EIGENES' system genutzt werden sondern die vorgegebene Verteilung!
+Intelligenz kann dabei ja auch für schwachstellen genutzt werden oder positionierung, spirit für
+kurzfristiges zusammenarbeiten mit anderen kontrahenten um ggf. zu gewinnen" — dazu „bitte mini
+dm gerade ziehen und rein mergen damit ich das echte auch sehen kann".
+
+**Die Matrix-Frage zuerst geklärt, nicht übergangen.** Die offizielle, gesperrte Eignungsmatrix
+führt für Mini-DM nur sechs Attribute (torment 24, health 20, power 16, stamina 16, will 14,
+dexterity 10); Intelligence und Spirit stehen dort auf 0. Das bisherige Mini-DM-Rezept im Motor
+war also bereits matrixtreu — Chris' Sorge „eigenes System" galt nicht dem, was schon da war,
+sondern dem, was er zusätzlich wollte. Die einzige saubere Art, Intelligence/Spirit trotzdem
+wirken zu lassen, ist der Override-Mechanismus aus `lib/player-generator/
+spiel-eignung-overrides.ts` (CLAUDE.md: „der einzige legitime Weg, wenn eine Disziplin intern
+andere Gewichte braucht als die Matrix zeigt", bisher nur für Football genutzt). Mini-DM ist
+jetzt die zweite Ausnahme, mit Chris' obigem Zitat als Beleg: die zwölf neuen Punkte kommen
+PROPORTIONAL aus den sechs Matrix-Attributen (je ×0,88), Intelligence und Spirit bekommen je 6
+(kleiner als jedes Matrix-Attribut, weil Chris sie als situative Wege beschreibt, nicht als neue
+Hauptsache) — Summe bleibt 100, die Matrix-Datei selbst bleibt byte-identisch.
+
+**Befund vor dem Bau: das Sandplatz-FFA maß rho 0,40 je Runde — die Ursache saß im Aufbau, nicht
+im Rezeptgewicht.** Die alte FFA-Runde lief über denselben Zwei-Seiten-Nahkampf-Takt wie das
+4-gegen-4 (Profile gegeneinander statt gewichteter Summe, Geometrie/Ecke als zusätzliche
+Varianz-Quelle). Neu gebaut: ein eigenständiger „Schlagwechsel" (`mdffaSchlagwechsel()`,
+höchstens zwölf Takte, ein Leben, Bruchpunkt, Finisher, Ring), in dem JEDES der acht
+Override-Gewichte genau einen benannten Kanal hat — keine zweite Gewichtung neben der
+vorgegebenen Verteilung: Torment/Power → Wucht, Health → Stand, Stamina → Ausdauer,
+Will/Health → Finisher überstehen, Torment/Power → Finisher setzen, Dexterity → Treffer,
+**Intelligence → Schwachstelle lesen (Zielwahl) und Positionierung (Ausweichen vor
+Doppelangriffen)**, **Spirit → Zweckbündnis (zwei Nicht-Führende jagen für zwei Takte gemeinsam
+den Führenden, geteilte Beute bei Erfolg)** — exakt Chris' zwei genannte Wege. Menge kommt aus
+der Eignung, Form aus dem Profil (`c = E + kappa·(a−E)`, dasselbe Prinzip wie `aufEignung()` in
+der Arena, hier für alle Kanäle).
+
+**Gemessen (13.10., `scripts/miss-mini-dm-ffa-abnahme.mjs`, kaderfest: zehn echte Kader, 210
+Vierergruppen, zwei Saatströme) — von mir unabhängig nachgemessen, nicht nur aus dem Code
+übernommen:**
+
+| Größe | Strom 0 | Strom 10 000 000 | Schranke |
+|---|---:|---:|---:|
+| rho je Runde (Mittel / Median) | 0,822 / 0,800 | 0,816 / 0,800 | > 0,80 |
+| Validität je Runde | 0,900 | 0,910 | — |
+| Star Rang 1 / erste zwei | 78,1 % / 94,8 % | 78,8 % / 94,6 % | — |
+| Pp (Budget-Methode, +15, n=2) | 8,7 | 9,0 | ≤ 25 |
+
+Die Pp-Aufschlüsselung ist lehrbuchhaft matrixtreu: torment 22,2 %/Gewicht 21, health 16,5 %/18,
+power 14,3 %/14, stamina 12,8 %/14, will 10,4 %/12, dexterity 10,1 %/9, **intelligence 7,4 %/6,
+spirit 6,4 %/6** — alle acht Override-Attribute tragen proportional zu ihrem Gewicht,
+Charisma/Awareness/Determination/Speed (Gewicht 0) tragen exakt 0 %. `npx vitest run` (29
+bestehende Mini-DM-Tests, unverändert grün), `node --check` sauber.
+
+**Was das NICHT ist: keine Verdrahtung in echte Spieltagsergebnisse.** `ARENA_RESOLVED_
+DISCIPLINE_IDS` (`lib/battle/arena-resolved-disciplines.ts`) gilt für das generische
+4-gegen-4-Chassis (`MOTOREN["mini-dm"]`), nicht für das FFA-Format — dessen rho (0,094, s.
+Tabelle unten) ist von dieser Änderung unberührt und bleibt bewusst draußen, der Eintrag wurde
+hier absichtlich NICHT ergänzt (das wäre der falsche Hebel). Mini-DMs reale Saisonpunkte laufen
+weiterhin über den alten `getRankToPointsValue()`-Pfad, nicht über eine Arena-Simulation; und
+selbst eine korrekte Verdrahtung würde an **keinem** von Chris' sieben echten Spielständen etwas
+ändern, weil alle sieben strukturell im Manager Mode laufen (s. `gesamtstand-audit-13-10.md`).
+Eine Verdrahtung des FFA-Formats in echte Ergebnisse braucht einen eigenen, separaten
+Resolve-Pfad (neu, nicht Teil dieser Änderung) — das ist absichtlich nicht mitgebaut, um dieses
+bereits große Paket nicht weiter aufzublähen.
+
+**Was Chris jetzt tatsächlich sehen kann:** die komplette neue Schlagwechsel-Choreografie
+(Stand-Balken, Schadenszahlen, Ereignis-Ticker mit Zweckbündnis/Positionierung/Finisher/K.o./
+Ring) ist im Battle-Arena-Entwicklerwerkzeug (`battle-mode.html`, erreichbar über den
+„Battle Arena"-Reiter in der echten App) voll funktionsfähig — das ist aktuell der einzige Ort,
+an dem IRGENDEINE Arena-Disziplin sichtbar ist, unabhängig von Mini-DM (s. Manager-Mode-Befund
+oben).
+
+---
+
+**Achtzehnter Nachtrag 11.10. — Staffel O7 „Eingespielte Paare" gebaut (Klasse S); dabei die
+Bein-Reihenfolge im Produktivpfad repariert.** Chris' Freigabe 11.10. („Ja, bauen") zu Fable 4.1
+(`fable-ideen-bahn-30-09.md` 4.1, O7 in `staffel-nachtkonzept-03-10.md`): jedes Geber/Nehmer-Paar
+eines Teams bekommt im Spielstand einen Zaehler (`SeasonState.staffelWechselPaare?`, additiv und
+optional wie `DisciplineResultRecord.momente?` — ein Stand ohne das Feld hat einfach noch keine
+Paar-Geschichte). Bonus auf `Q` der Wechselformel nach gemeinsamen Spielen VOR dem Rennen:
+1 → +0,03, 2 → +0,06, ≥3 → +0,10 und „eingespielt" (Ausfuehrungsstreuung ×0,90). Neue Reihenfolge
+oder Kaderwechsel setzt genau das betroffene Paar zurueck. Fortgeschrieben im Result-Apply (jeder
+Spieltagspfad, idempotent je Spieltag), gelesen im Aufstellungs-Rohr zur Arena und in der
+Einsatzliste („eingespielt seit N Spielen"). Kein zusaetzlicher `rr()`-Zug.
+
+**Befund vor dem Bau, das Abbruchkriterium des Auftrags:** der Motor lief die Staffel-Beine im
+echten Spiel NICHT in Aufstellungsreihenfolge. `inDisc()` filtert den Kader nur, und der Kader
+kommt nach TDM-Eignung sortiert (`buildArenaTeam`) — ein als Anchor gesetzter Laeufer lief Bein 1,
+der Start Runner das letzte (Playwright, Aufstellung ueber `__olyArenaKader` wie im
+Headless-Lauf). Der Slot wirkte nur auf Slot-Aufschlag und Rennplan (`planJeSlot` „schluss" auf
+Bein 1). Ein Paar-Zaehler nach Aufstellung haette also andere Laeufer belohnt als die, die den
+Stab tauschen. Minimal-invasive Korrektur: nur fuer die Staffel und nur, wenn jeder gesetzte
+Laeufer einen eindeutigen Staffel-Slot hat, werden die Gesetzten nach Slot-Index geordnet
+(`staffelNachSlot` in `bauSpurt()`); Messpfad (keine Aufstellung) und jede andere Bahn
+bit-identisch. Zusaetzlich wendet der Motor den Bonus nur an, wenn der tatsaechliche Geber der
+erwartete ist (`wechselPaarGeber`). Spieler-Identitaet: `playerId`, aufgeloest ueber die
+Kaderzeile (`activePlayerId` ist die Zeilen-Id) — am Live-Abbild in allen 10 052
+Aufstellungseintraegen konsistent.
+
+Gemessen (Kader-Familie live-save, fuenf Paarungen; Bonus kaderfest ueber die neue Mess-Sonde
+`--staffel-paare=…`, weil die Messung keine Staffel aufstellt):
+
+| Variante | rho/Spiel Median (n=48) | Spannweite | vigilante-armageddon | Pp S1/S2 (n=144) | Star Rang1 | Star ≤2 | Paartreue ≥15 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| ohne Paar-Geschichte (= heute, Nullprobe) | 0,933 | 0,105 | 0,845 | 21,1 / 22,0 | 60,0 % | 88,3 % | 99,9 % |
+| „zufall": 0–3 Spiele je Paar, unabhaengig vom Koennen | 0,933 | 0,123 | 0,832 | 20,9 / 21,6 | 62,5 % | 89,2 % | 99,9 % |
+| „alle": jedes Paar eingespielt (Obergrenze) | 0,941 | 0,114 | 0,840 | 22,2 / 21,5 | 63,8 % | 87,9 % | 99,9 % |
+
+Nullprobe ohne Paar-Felder: `miss-alle-disziplinen.mjs 24` fuer alle zwanzig ALLE_ZWANZIG, Pp
+21,1/22,0 wie im Siebzehnten Nachtrag; `verify-staffel-o7-eingespielte-paare-paket-11-10.mjs`
+(I) disziplinProbe aller zwanzig + einflussVon(staffel) gegen den Stand vor dem Paket
+bit-identisch. Die Abbruchregel („kostet der Bonus rho, kleiner machen") musste nicht greifen:
+Median unveraendert, Sentinel −0,013 bzw. −0,005 (innerhalb der Kaderspannweite, klar ueber 0,80),
+Pp 20,9/21,6 bzw. 22,2/21,5 (heute 21,1/22,0, Schranke 25). Die Bein-Reihenfolge-Korrektur produktionsnah gemessen (Aufstellung ueber
+`__olyArenaKader`, n=48, Basis gegen neu): Slotfolge = Kaderfolge 0,937 → 0,937 (identisch),
+umgekehrt 0,929 → 0,923, verwuerfelt 0,883 → 0,924 — die alte Fehlzuordnung Rennplan/Bein kostete
+bei verwuerfelter Aufstellung rho.
+
+**Unabhaengiges Review (12.10., PR #1172), vier Befunde — keiner davon ein Korruptions- oder
+Determinismus-Bug, alle dokumentiert statt behoben:**
+
+1. **Wirkt heute an keinem einzigen Live-Spielstand (alle sieben laufen im Manager Mode).** Der
+   Bonus und die Beinreihenfolge-Korrektur sitzen im Motor (`battle-mode.engine.js`); ein Ergebnis
+   geht dort nur durch, wenn `isBattleModeSave(gameState)` UND die Disziplin einen eigenen Eintrag
+   in `arenaTeamPointsByDisciplineId` hat (`legacy-matchday-resolve-engine.ts` Z. 338-347) — sonst
+   bleibt es beim PPS-Pfad. Keiner der sieben Spielstaende im Live-Abbild hat `scenarioMeta.gameMode`
+   gesetzt, laeuft also im Manager Mode: dasselbe gilt seit PR #1154 schon fuer O2 „Marke und Zug".
+   Der Zaehler wird trotzdem fortgeschrieben und das Einsatzlisten-Badge trotzdem angezeigt — Chris
+   sieht ein Versprechen („wechselt etwas schneller und sicherer"), das sich in seinen eigenen
+   Spielstaenden nicht einloest. Das ist dieselbe Einschraenkung, die in der Tabelle unten bei fast
+   jeder Disziplin als „nicht im echten Spielstand" steht, hier nur zum ersten Mal konkret an einem
+   sichtbaren UI-Element. Kein Blocker fuer diesen PR (konsistent mit dem gesamten Projektstand),
+   aber Chris sollte es wissen, bevor er das Badge zum ersten Mal sieht.
+2. **Idempotenz gilt nur fuer den juengsten Spieltag mit unveraenderter Aufstellung.**
+   Wird ueber `forceReplace` ein AELTERER Spieltag neu gebucht, nachdem bereits ein neuerer lief
+   (oder derselbe Spieltag mit geaenderter Aufstellung), kann das die Paare des zwischenzeitlich
+   gelaufenen, neueren Spieltags auf 0 zuruecksetzen. Erreichbar nur ueber manuelles Neu-Buchen
+   (Apply-Route/MVP-Scoring/Debug-Bootstrap), nicht im normalen Spielfluss. Niedrige Schwere:
+   betrifft nur die Zaehler-Anzeige/den Bonus, nicht die Korrektheit des gebuchten Ergebnisses.
+3. **Zaehler und Motor koennen auseinanderlaufen, wenn ein im Entwurf stehender Laeufer in der
+   Arena nicht antritt** (fehlender Attributbogen o.ae. — `resolveStaffelLegPlayerIds` prueft nur
+   `players`, der Arena-Adapter filtert zusaetzlich). Die Geber-Pruefung (`wechselPaarGeber`)
+   verhindert, dass ein falscher Bonus wirkt; gezaehlt werden kann aber ein Paar, das nie
+   gewechselt hat. Niedrige Schwere, reine Anzeige-Ungenauigkeit.
+4. **Die (I)-Isolationspruefung im Verify-Skript ist schwaecher, als sie aussieht** — der Messpfad
+   stellt nie eine Staffel-Aufstellung, beruehrt den neuen Code also strukturell nicht und muss
+   zwangslaeufig gruen sein. Die Rueckfallzweige (doppelter/unbekannter Slot, Teilaufstellung) sind
+   nur durch Lesen, nicht durch einen Test geprueft (und laut Review korrekt). Fuer eine kuenftige
+   Kalibrierrunde: das Verify-Skript sollte diese Zweige direkt pruefen statt nur durch Code-Lesen.
+
+**Siebzehnter Nachtrag 06.10. — Staffel-Sentinel behoben: der Tempo-Kanal, nicht Marke/Zug.**
+Nach dem Sechzehnten Nachtrag (O2 „Marke und Zug", unten) blieb der Sentinel
+vigilante-armageddon bei JEDER getesteten Variante unter 0,80 (beste 0,797), obwohl der
+Median-rho von 0,895 auf 0,937 stieg und Pp von 37,7/41,1 auf 35,6/37,9 sank. Diagnose mit
+`messe-arena-einfluss.mjs staffel` (zwei Saatstroeme, Versatz 0/10 000 000): ANTRITT und
+ENDTEMPO — ueber `grund*tempoSpanne` praktisch die gesamte Renndauer, s. `tempoVon()` — liefen
+ausschliesslich ueber Speed und Stamina (Speed +11,2/+11,3 Pp ueber Matrix, Stamina +6,8/+7,1),
+ohne jeden Kanal fuer Awareness/Dexterity/Charisma. In einer Paarung mit vielen Laeufern in
+enger Eignungsspanne (vigilante-armageddon, acht von zwoelf zwischen Eig 39 und 46) entschied
+dadurch die Rezeptform statt die Eignung — genau wie das O2-Konzeptpapier es fuer den „Pp-Rest"
+vorhergesagt hatte (staffel-nachtkonzept-03-10.md 5.3: „Der Rest (Speed +10) sitzt im
+Tempo-Kanal … das ist mit keinem Wechsel-/Haltungskonzept zu beheben und gehoert in eine eigene
+Rezept-/Nenner-Runde").
+
+**Ursache bestaetigt, NICHT der Wechsel-/Zug-Mechanismus** (`staffelZugProbe` vor und nach der
+Aenderung: Break-even des Angriffs unveraendert bei traeger ≈ 62-65, da `staffelTraeger` und
+`ZUG_FADE` ausschliesslich WUCHT/TECHNIK lesen, die diese Runde nicht anfasst). Behoben allein
+im Rezept (`public/mockups/battle-mode.engine.js`, `BAHN_ART.staffel.rezept`): ANTRITT verliert
+STAMINA (die Ermuedung traegt STEHEN ohnehin separat) und bekommt DEXTERITY/AWARENESS
+("explosiv UND wach aus dem Startblock"); ENDTEMPO gibt einen Teil von SPEED/STAMINA an SPIRIT
+ab. TECHNIK und WUCHT bleiben byte-identisch — ihre Kalibrierung (ZUG_FADE auf traeger 62,9)
+haengt direkt an ihrer heutigen Zusammensetzung. Zusaetzlich `KURVE_KOSTEN` (nur fuer
+`BA().staffel` scharf, kein geteilter Bahn-Code) 0,12 → 0,20, damit WENDIGKEIT (jetzt
+dexterity:46/awareness:40/speed:14) spuerbar mehr Gewicht auf der Uhr bekommt, ohne den
+Wechsel-/Zug-Code zu beruehren; `KURVE_WENDIG` bleibt proportional (`KURVE_KOSTEN/100`), WENDIGKEIT
+100 gleicht die Kurve weiterhin vollstaendig aus.
+
+Gemessen, Kader-Familie (live-save, fuenf Paarungen), Schalter an (`staffelMarkeZug(true,
+{modus:"ki"})`, FLIEG_MAX 0,24 unveraendert):
+
+| Variante | rho/Spiel (Median) | Spannweite | vigilante-armageddon | Pp S1/S2 | Star Rang1 | Star ≤2 | Paartreue ≥15 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| vorher (O2, Sechzehnter Nachtrag) | 0,937 | 0,188 | 0,756 | 35,6 / 37,9 | 61 % | 88 % | 99,8 % |
+| **nachher (Tempo-Kanal-Fix)** | **0,933** | **0,105** | **0,845** | **21,1 / 22,0** | **60,0 %** | **88,3 %** | **99,9 %** |
+
+Alle fuenf Paarungen einzeln (n=48, nachher): vigilante-armageddon 0,845 · coldsteel-direlegion
+0,878 · goldengladiators-silversoldiers 0,950 · mortalsin-natureswrath 0,936 ·
+piratecrew-raginglunatics 0,933. Reproduziert bei n=96 (0,933 Median, Sentinel 0,840) — kein
+n=48-Zufallstreffer.
+
+**Alle Extremvarianten jetzt ebenfalls ueber 0,80** (vorher war 0,797 das Maximum ueber alle
+getesteten Varianten): KI 0,845 · Kader-Regel 0,849 · alle Normal (mit Gewinn) 0,822 · alle
+Angreifen 0,814 · alle Absichern 0,841 · Zufalls-Haltung 0,826. Das stuetzt die Diagnose: die
+Ursache sass nicht in einer bestimmten Haltung oder einer bestimmten Marke-Vorgabe, sondern im
+rezeptweiten Tempo-Kanal, der jede Variante gleich betraf.
+
+**Vier Abnahmekriterien dieser Runde — drei klar erfuellt, eines ein ehrlicher Fast-Treffer:**
+(a) Sentinel vigilante-armageddon ueber 0,80: **erfuellt**, 0,845 (vorher 0,756), mit Marge
+reproduziert bei n=96 und in jeder getesteten Extremvariante. (b) Median-rho mindestens auf dem
+bisherigen Niveau: **0,933 gegen 0,937, −0,004** — eine Bewegung, die kleiner ist als die eigene
+Kader-Spannweite dieser Messung (0,105-0,111) und nach dem Massstab aus Abschnitt „Messgrundlage
+kaderfest" von Null nicht zu unterscheiden ist, aber formal unter dem Vorwert; mehrere
+Gegenproben (KURVE_KOSTEN 0,17/0,20/0,24, ANTRITT-Speed 28 vs. 32) bestaetigten dasselbe
+Plateau um 0,930-0,935, kein Hinweis auf einen einfachen weiteren Gewinn. (c) Pp ≤ 25 bei zwei
+Saatstroemen: **erfuellt**, 21,1 / 22,0 (vorher 35,6 / 37,9) — der verbleibende Rest sitzt in
+Charisma (−6,0/−6,5 Pp), dessen einzige Kanaele TECHNIK/WUCHT absichtlich unangetastet blieben,
+und Health (−2,0, Matrixgewicht nur 2). (d) Star auf Rang 1 nicht weiter verschlechtert:
+**im Rahmen der Messgenauigkeit erfuellt** (60,0 % gegen 61 % vorher, Differenz < 1 Standardfehler
+bei n=240 Rennen) — bleibt aber klar unter dem Vor-O2-Stand von 69 %. Das deckt sich mit der
+eigenen Diagnose des O2-Konzeptpapiers (5.4): der Ruecksetzer kommt aus dem haelftig geteilten
+fliegenden Gewinn selbst (`FLIEG_MAX`), nicht aus dem Tempo-Kanal, den diese Runde behoben hat —
+eine Korrektur daran wuerde den Wechsel-/Zug-Mechanismus aendern, den diese Runde bewusst nicht
+anfasst, s.o. Bleibt ein offener Punkt fuer eine kuenftige, auf `FLIEG_MAX`/den Marke-Gewinn
+fokussierte Runde.
+
+**Isolation geprueft:** `node scripts/miss-alle-disziplinen.mjs 24 staffel spurt time-trial
+takeshis-castle climbing` — spurt/time-trial/takeshis-castle/climbing unveraendert (0,880 /
+0,923 / 0,898 / 0,837, identisch zum Stand vor dieser Runde), weil `KURVE_KOSTEN`/`KURVE_WENDIG`
+ausschliesslich hinter `BA().staffel` scharf sind und die anderen vier Bahnen ihr eigenes
+`rezept` fuehren. `node --check public/mockups/battle-mode.engine.js` sauber. Staffel mit
+Schalter AUS (Produktionsstand) bewegt sich mit, weil das Rezept unconditional ist (nicht hinter
+`staffelMarkeZug.aktiv`): 0,906 bei n=24 (vorher 0,899, 26.09.-Nachtrag) — keine Verschlechterung
+des heute aktiven Standardverhaltens.
+
+Geaenderte Datei: nur `public/mockups/battle-mode.engine.js` (`BAHN_ART.staffel.rezept`,
+`KURVE_KOSTEN`/`KURVE_WENDIG`). Wechsel-/Zug-Code (`stepSpurt`, `zugFaktor`, `ZUG_FADE`,
+`STAFFEL_MARKE`, `FLIEG_MAX`) byte-identisch.
+
+---
+
+**Sechzehnter Nachtrag 04.10. — drei Bahn-Pakete aus der Nachtkonzeptrunde gebaut (Staffel O2,
+Spurt S-N1+S-N2, Time-Trial J2).** Chris hat nach den Nachtkonzepten vom 03.10. drei Pakete zum
+Bau freigegeben. Alle drei teilen sich `battle-mode.engine.js` (`BAHN_ART`, `stepSpurt`,
+`tempoVon`) und wurden deshalb nacheinander in einem Arbeitsbaum gebaut, je ein Commit. Die
+beiden Klasse-B-Pakete stehen hinter einem QA-Schalter, Standard **aus** (Muster
+`sandsackVorschauAktiv`); ohne Schalter ist jede Bahn bit-identisch zu vorher (Rohdaten-Hash der
+Sonde, nicht nur rho). Gemessen mit derselben Kader-Familie (live-save, fuenf Paarungen) wie
+alle Zahlen hier; Pp mit `einflussVon` an zwei Saatstaemmen (Versatz 0 / 10 000 000).
+
+1. **Staffel — Paket O2 „Marke und Zug"** (`docs/design/staffel-nachtkonzept-03-10.md`).
+   Gebaut: B1 Marke (Wechsel als Risikoregler mit fliegendem Gewinn, FLIEG_MAX 0,24), B2 Zug
+   (Haltung auf dem Bein, Traeger 0,5·WUCHT+0,5·TECHNIK), B3 Stufe 1 (Automatik aus
+   Persoenlichkeit, Tabelle 3.4, ohne den bedingten Duellanten = O3), B4 Anzeigen (Anlaufmarke,
+   Wechselzeile mit Vorzeichen, Bein-Duell-Banner, Abstandsuhr am Wechsel-Schild,
+   Einbruch-Banner, Anweisungsbilanz im Endstand). Nicht gebaut: O3, Stufe-2-Managerfeld.
+   Schalter: `window.__arena.staffelMarkeZug(true,{modus:"ki"})`.
+
+   *Zwei Abweichungen vom Papier, beide begruendet:* (a) Der fliegende Gewinn wird physisch als
+   Vorlauf von 0,65·|netto| Sekunden umgesetzt (symmetrisch zum Stolpern auf 35 % Tempo) und
+   `startT` rueckt um denselben Betrag vor — K4 sagt nur „startet in der Uhr frueher", was in
+   einem integrierenden Motor allein keine Zeit bringt. (b) Der Fade-Beiwert des Angriffs ist am
+   Motor kalibriert: 0,00004 (Papier) ergibt einen Break-even unter traeger 30, der Angriff waere
+   fuer fast alle ein Gewinn. **ZUG_FADE 0,000068 → Break-even traeger 62,9**
+   (`window.__arena.staffelZugProbe`, 480 Beine echter Kaderprofile):
+
+   | traeger | n | Angriff gegen Normal (ms je Bein) | Angriff traegt | Absichern (ms) |
+   |---|---:|---:|---:|---:|
+   | < 40 | 142 | −114,6 | 0 % | −24,8 |
+   | 40–55 | 128 | −50 bis −24 | 0 % | −20,5 |
+   | 55–60 | 37 | −11,6 | 0 % | −20,8 |
+   | 60–65 | 33 | −0,6 | 39 % | −20,9 |
+   | 65–70 | 61 | +11,1 | 100 % | −20,3 |
+   | ≥ 70 | 79 | +21 bis +41 | 100 % | −19 |
+
+   *Designregel 1:* Schalter an, alle Normal, `fliegMax:0` → Hash `b28b99a1475b`, identisch zu
+   Schalter aus. *Isolation:* spurt/time-trial/takeshis-castle/climbing bit-identisch.
+
+   Gemessen, n=48 (rho) / n=48 (Pp), 6 je Seite:
+
+   | Variante | rho/Spiel | vigilante-armageddon | Saison | Pp S1 / S2 | Star Rang 1 | Star ≤ 2 | Paare ≥15 | Patzer | getragen / eingebr. | Sieger kippt |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | heute (Schalter aus) | 0,895 | **0,698** | 0,930 | 37,7 / 41,1 | 69 % | 88 % | 98,8 % | 0,48 | — | — |
+   | **KI (Persoenlichkeit, Stufe 1)** | **0,937** | **0,756** | 0,923 | **35,6 / 37,9** | 61 % | 88 % | 99,8 % | 0,42 | 1,0 / 1,6 | 1 % |
+   | Kader-Regel (Modell-KI) | 0,928 | 0,797 | 0,937 | 37,2 / 34,7 | 65 % | 93 % | 99,8 % | 0,50 | 3,3 / 0 | 3 % |
+   | alle Normal (mit Gewinn) | 0,915 | 0,729 | 0,923 | 38,8 / 39,4 | 60 % | 85 % | 99,6 % | 0,49 | — | 4 % |
+   | alle Angreifen | 0,930 | 0,759 | 0,965 | 31,0 / 30,0 | 61 % | 85 % | 99,7 % | 0,88 | 3,7 / 8,3 | 9 % |
+   | alle Absichern | 0,927 | 0,771 | 0,937 | 42,6 / 40,4 | 65 % | 90 % | 99,7 % | 0,27 | — | 1 % |
+   | Zufall (Namens-Hash) | 0,929 | 0,797 | 0,951 | 35,8 / 35,2 | 62 % | 84 % | 99,5 % | 0,58 | 1,2 / 1,8 | 6 % |
+   | KI, FLIEG_MAX 0,16 (Info) | 0,931 | 0,756 | — | 36,0 / 39,9 | | | | | | |
+   | KI, FLIEG_MAX 0,32 (Info) | 0,940 | 0,769 | — | 34,2 / 35,4 | | | | | | |
+
+   Beingroessen (KI, n=48): 2 je Seite 0,836 (heute 0,825), 4 je Seite 0,870 (heute 0,880), 6 je
+   Seite 0,937 — Median ueberall ueber 0,80; die Automatik zeigt bei 2 je Seite auf keinen
+   fehlenden Mittellaeufer (Bein 1 ohne Marke, jeder Haltung aus eigenem Kader).
+
+   **Ehrlich gegen die Abnahme aus 7.3:** rho-Median bestanden und deutlich besser (0,895 →
+   0,937); Pp nicht schlechter (37,7/41,1 → 35,6/37,9), Ziel ≤ 25 weiter offen. **Nicht
+   bestanden: der Sentinel** — vigilante-armageddon steigt 0,698 → 0,756, bleibt unter 0,80
+   (Modell sagte 0,867; das Modell reproduzierte schon den Basiswert nicht, 0,811 statt 0,698).
+   Auch FLIEG_MAX 0,16/0,32 und alle Extremvarianten bleiben darunter (beste 0,797). Diagnose:
+   in dieser Paarung liegen acht von zwoelf Laeufern zwischen Eignung 39 und 46, und ihre
+   Reihenfolge folgt der Rezeptform statt der Eignung (Lulu, Eig 39,4, im Mittel Rang 4–5;
+   Jorund, Eig 45,8, Rang 7) — das ist der Tempo-Kanal/Pp-Rest (Speed +10), den das Papier selbst
+   als eigene Runde ausweist, nicht ein Wechsel-/Haltungsproblem. **Ebenfalls nicht bestanden:
+   „Star auf Rang 1 nicht unter heute"** — 69 % → 61 % (Star in den ersten zwei bleibt 88 %); der
+   Effekt kommt aus dem fliegenden Gewinn selbst (alle Normal mit Gewinn: 60 %), der hälftig
+   beiden Wechselpartnern gutgeschrieben wird — derselbe Zielkonflikt, den das Papier in 5.4 fuer
+   FLIEG_MAX benennt. **Kleiner als vorhergesagt:** Sieger kippt in 1 % statt 10 % der Rennen
+   (die Automatik vergibt bei diesem Kader ueberwiegend Absichern-Marken, 5,3 von 10, weil viele
+   Paare unter TECHNIK 45 liegen), Fuehrungswechsel steigen nicht (0,56 → 0,51 je Rennen,
+   gemessen als Fuehrung je 1 % Strecke), Zielabstand waechst (1,20 → 1,43 Sim-s Median).
+   Sichtprobe (Live-Rennen, Tempo 4×): keine Seitenfehler, alle B4-Anzeigen erscheinen.
+
+2. **Spurt — Paket S-N1 + S-N2 „Die Säule muss laufen"** (`docs/design/spurt-nachtkonzept-03-10.md`).
+   Gebaut: S-N1 Joker-Station (8 % der Strecke, **nur KI-Vorgabe**: teuerster eigener Stopp, bei
+   Gleichstand die spaeteste — keine Manager-Anweisung), S-N2 Station als Bewegung (Kriechen
+   k=0,25, Stopp ×1/(1−k), Puste-Gutschrift am Hindernis ×(1−k)), S-N5 Anzeigen
+   (Stationsduell-Tafel, gedrosselter Ticker fuer die saubere Station mit Stationsbestzeit,
+   Fotofinish-Banner unter 0,1 echten Sekunden **ohne** Pause/Standbild — die angehaltene
+   Sekunde waere T und ist nicht gebaut), dazu die Joker-Schleife als Bogen im Bild und eine
+   Tickerzeile beim Abbiegen. Nicht gebaut: S-N3, S-N4, Manager-Joker.
+   Schalter: `window.__arena.spurtSaeule(true)` (Teilschalter `{joker:false}` /
+   `{kriechen:false}` fuer die Einzelmessung). Neue Sonde: `spurtSzenenProbe`.
+
+   Gemessen n=24 je Paarung, 6 je Seite (Papier-Vorhersage in Klammern):
+
+   | Variante | rho/Spiel | Saison | Pp S1 / S2 | Stillstand | Saeulenzeit | Restpuste | Einbr./Rennen | Star Rang 1 / ≤ 2 | Paare ≥15 |
+   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+   | heute | 0,880 | 0,939 | 19,2 / 15,4 | 43,3 % | 19,7 % | 15 % | 3,4 | 48 / 76 % | 99,3 % |
+   | **Paket** | **0,910** (0,907) | 0,963 (0,964) | **18,7 / 15,6** (16,1 / 12,5) | **0,0 %** (0) | **0,0 %** (0) | 18 % (18) | 2,5 | 57 / 80 % | 99,5 % |
+   | nur Joker | 0,901 (0,903) | 0,964 (0,972) | 18,9 / 18,0 (23,5 / 19,5) | 36,1 % | 17,3 % | 12 % (11) | 5,2 | 57 / 85 % | 99,5 % |
+   | nur Kriechen | 0,891 (0,891) | 0,965 (0,965) | 17,8 / 18,9 (17,8) | 0,0 % | 0,0 % | 25 % (24) | 1,3 | 50 / 73 % | 99,4 % |
+
+   Joker-Stationen (KI, 120 Rennen × 12): Mauer 1044, Seil 252, Strohballen 96 — die
+   Kraftstationen dominieren wegen `wuchtPreisFaktor`, wie das Papier vorhersagt.
+   Beingroessen (Paket, n=24): 4 je Seite 0,870 → 0,921; **2 je Seite 0,725 → 0,717** — dort
+   lag schon die Basis unter 0,80 (das Papier hat 2/4 je Seite nicht gemessen); ehrlichere
+   Abnahme bei 2 je Seite: Star in den ersten zwei 93 % → 93 %, Paare ≥15 96,6 % → 97,8 %.
+
+   **Bewertung:** rho, Saison, Stillstand, Saeule und Restpuste treffen die Vorhersage auf ±0,01
+   bzw. ±1 Punkt. **Pp bleibt an beiden Staemmen klar unter 25, verbessert sich aber nicht wie
+   vorhergesagt** (18,7/15,6 gegen heute 19,2/15,4, Papier 16,1/12,5) — im Mittel neutral.
+   Ohne Schalter bit-identisch (Rohdaten-Hash spurt `fc7f6b28a7e8` unveraendert);
+   Isolationsnachweis ueber alle zwanzig s. Punkt 4 unten. Sichtprobe: keine Seitenfehler,
+   Joker-Bogen, Duell-Tafel und Stationsbestzeiten erscheinen; ein Fotofinish unter 0,1 s kam
+   im Probelauf nicht vor (selten, wie im Papier).
+
+3. **Time-Trial — nur J2 „Die Live-Ampel"** (`docs/design/time-trial-nachtkonzept-03-10.md`
+   Abschnitt 3.3). **J1 (Startfolge umkehren) ist NICHT gebaut** — Chris hat es abgelehnt („So
+   lassen"), die Startfolge ist unveraendert. Gebaut, Klasse A, ohne Schalter direkt aktiv: stille
+   Messpunkte alle 10 % als **eigenes** Feld `ampelPunkte`/`u.mp` (nicht in `zwischenzeiten` —
+   Endstand-Spalten und ZZ-Toene bleiben unveraendert), Ampel im Fokus-Panel (grün/rot gegen die
+   Messpunktzeit des Hot-Seat-Halters, vor dem ersten Zieleinlauf gegen die Bestzeit im Feld),
+   Ticker nur bei Kipppunkten (Farbwechsel, mit Gelaendegrund „der Berg kostet" / „die Abfahrt
+   bringt es"), Regie-Automatik auf den Fahrer innerhalb 3 % des Hot Seats mit 4 s
+   Mindestverweildauer. Neue Sonde: `ttAmpelProbe` (spielt die Ampel in echter Zeitfolge nach).
+
+   **Bit-identisch:** Rohdaten-Hash time-trial `6ba2652ef3e4` vor und nach (rho 0,923 / Saison
+   0,902, n=24), ebenso spurt und staffel. Die Messpunkte schreiben nur `u.mp` (Uebergangszeit
+   im Tick interpoliert), nichts davon fliesst in `tempoVon()`/`wert()` zurueck, kein `rr()`.
+   **Dramaturgie wie vorhergesagt fast stumm:** 120 Rennen (Kader-Familie × 24) — Kipppunkte je
+   Rennen Median **1** (Papier 1), P90 5 (Papier 4), 46 % der Rennen ganz ohne Kipppunkt;
+   Hot-Seat-Wechsel Median 0. Das ist der bekannte und akzeptierte Befund „J2 ohne J1 ist die
+   Erzaehlung ohne die Reihenfolge"; die Regie findet ohne J1 kaum Kandidaten innerhalb 3 %
+   und bleibt in der Sichtprobe bei der Startnummernfolge. Sichtprobe: Ampel erscheint im Panel
+   („● ROT +17,8 s gegen Bestzeit bei 80 %", danach „gegen Hot Seat"), keine Seitenfehler.
+
+4. **Isolationsnachweis ueber alle zwanzig.** Endstand dieses Arbeitsbaums (alle drei Pakete,
+   Schalter aus) gegen `main` `e0225175`: der SHA-1 der kompletten `disziplinProbe`-Rohdaten
+   (jeder Teilnehmer, jede Eignung, jeder Wert, jede Etappe) ist fuer **alle zwanzig**
+   Disziplinen identisch (n=4 je Paarung, fuenf Paarungen; bei n=24 zusaetzlich fuer spurt,
+   time-trial, takeshis-castle, climbing und staffel). Ein Hash-Vergleich ist strenger als ein
+   rho-Vergleich — er wuerde schon eine einzige verschobene Nachkommastelle zeigen. Die volle
+   n=24-Runde ueber alle zwanzig wurde zweimal gestartet und abgebrochen: die Maschine lief mit
+   Last ~20 auf 4 Kernen (parallele Messlaeufe anderer Sitzungen), TDM allein brauchte bei n=4
+   sechs Minuten. Ohne Schalter sind die Bahn-Rennen ausserdem strukturell unberuehrt: jede neue
+   Zeile haengt an Feldern (`u.haltung`, `u.marke`, `u.kriechK`, `u.jokerIdx`), die nur der
+   QA-Einstieg vergibt, bzw. an `u.mp`, das nie zurueckgelesen wird.
+
+---
+
+**Sechzehnter Nachtrag 04.10. (Tennis) — nur der abgeschwaechte Druckmesser (T-N1, Klasse A\*),
+die Kernmechanik bleibt `vorteil`.** Chris hat die Tennis-Kernmechanik aus dem Nachtkonzept
+(`docs/design/tennis-nachtkonzept-03-10.md`, **T-N2 „Rennen bis 7" als Platzentscheider mit
+Clutch-/Momentum-Termen**) ausdruecklich **abgelehnt — das gilt weiterhin**. Gebaut wurde deshalb
+weder T-N2 noch das volle T-N1 (eine `a:b`-Tafel ueber ein Rennen, das nicht entscheidet, waere
+genau der Widerspruch, den Fechten mit F1 beseitigt hat), sondern nur die im Papier (3.1, Absatz
+„rho/Pp", und Frage 1 in Abschnitt 6) als „schwaecher, aber moeglich" beschriebene Fassung im
+heutigen Format:
+
+- **Siegchance und Wichtigkeit ueber die verbleibenden Runden** (`tennisDruckStand()` in
+  `battle-mode.engine.js`): symmetrisches Modell, Rundendifferenz ~ N(0, 30²), analytisch statt
+  Monte-Carlo (kein Zufall, kein `rr()`). Sigma 30 ist an 720 echten Plaetzen nachgemessen
+  (Rauschen innerhalb eines Platzes 29,4; Gesamtstreuung 36,5, davon Staerke-Drift 21,6).
+  Wichtigkeit nach Morris = erwartete Siegchance nach gewonnener minus nach verlorener naechster
+  Runde. Gelesen wird nur der von BEIDEN Seiten enthuellte Stand — spoilerfrei.
+- **Banner nach Wichtigkeit statt nach Ereignis**, Schwellen am echten `vorteil`-Verlauf
+  nachgerechnet (nicht aus der Rennen-bis-13-Tabelle uebertragen): MATCHBALL (Fuehrender kaeme
+  mit der naechsten Runde auf ≥ 95 %, faellt mit einer verlorenen auf ≤ 80 %; ~1,2 je
+  Mannschaftskampf, nur Runde 7–10), ABGEWEHRT (~0,3 je Kampf), ENTSCHEIDUNGSPUNKT (letzte Runde,
+  Wichtigkeit ≥ 0,5; ~0,5 je Kampf), COMEBACK (Sieger lag bei ≤ 15 %; ~0,26 je Kampf). Die
+  naheliegende Schwelle „Siegchance > 90 %" taugt in diesem Format NICHT als Matchball: sie wird
+  in 91 % aller Plaetze ueberschritten, meist schon in Runde 2–5.
+- **Ticker-Dosis aus der Wichtigkeit:** eigene Zeile nur fuer Runden mit Wichtigkeit ≥ 0,30,
+  Fuehrungswechsel/BREAK nur dort als Banner, eine Druck-Uebersicht je Runde. Nebenbefund: die
+  Ballwechsel-Zeilen gaben immer ein `kind` mit und landeten deshalb trotz Stufe „routine" alle
+  im sichtbaren Ticker (vorher 145 Zeilen in 1:02 = 140/min). Nachher 20 Zeilen (19,4/min) im
+  Ticker, alles Uebrige im Protokoll — Zielband ≤ 30 erreicht.
+- **Spannungsleiste je Platz** (Fuellstand in der Mannschafts-Leiste = Wichtigkeit der naechsten
+  Runde) und die Siegchance des Fokus-Platzes in der Kopfzeile.
+
+**`vorteil`-System unveraendert:** `u.summe`, `vorteil`, `verlauf`, `runden[]`, Punktevergabe,
+`punktGewinner`/Aufschlag (`TENNIS_AUFSCHLAG_H`, Tiebreak-Wechselregel) und der Platzsieger
+(`u.vorteil>0`) sind bit-identisch — nachgewiesen auf Rundenebene (120 Spiele, voller
+`TEILNEHMER`-Dump), im Produktionspfad `spieleBuehneDuell("tennis")` (200 Spiele, `seiten` +
+`boxscore`) und mit den Abnahmesonden (s. Tabelle). Kein Feature-Flag noetig.
+
+| Sonde (vorher = Engine aus `HEAD`, nachher = dieser Stand, je eigener Spiegelbaum) | vorher | nachher |
+|---|---:|---:|
+| `miss-alle-disziplinen.mjs 24`, Tennis rho je Spiel / Saison (Median, Spannweite) | 0,813 (0,199) / 0,944 | 0,813 (0,199) / 0,944 |
+| `miss-alle-disziplinen.mjs 24`, alle zwanzig Disziplinen | — | Ausgabe zeichengleich (`diff` leer) |
+| `messe-arena-einfluss.mjs tennis 48`, Strom 1 / `--saat-versatz=10000000` | 6,9 / 4,4 Pp | 6,9 / 4,4 Pp (Attributvektoren zeichengleich) |
+| `miss-ticker-dichte.mjs tennis` (sichtbarer Ticker) | 145 Zeilen, 140/min | 20 Zeilen, 19,4/min |
+
+(Die im Nachtkonzept zitierten Pp 9,8 / 6,2 stammen aus PR #1135; der heutige `main`-Stand misst
+6,9 / 4,4 — beides weit unter 25, und von dieser Aenderung unberuehrt.)
+
+**Ehrlich:** das ist deutlich weniger Drama als das abgelehnte Rennen bis 7 (Papier: ~5
+„abgewehrt" je Kampf). Die meisten Plaetze sind im Summenformat frueh strukturell entschieden
+(nur 6 % enden innerhalb ±20 Punkte); in einem von fuenf Sichtpruefungs-Spielen kam gar kein
+Druckmesser-Banner, nur die Uebersichtszeilen. Der Druckmesser zeigt das jetzt, statt es zu
+ueberschreien.
+
 **Fuenfzehnter Nachtrag 02.10. — reine Doku-Pflege: Staffel-Pp bei n=48 bestaetigt, Breaking-Pp
 nach dem Speicherleck-Fix neu gemessen.** Zwei offene Positionen aus fruaheren Nachtraegen
 nachgezogen, keine Code-Aenderung in `battle-mode.engine.js`.
@@ -131,7 +940,7 @@ durchzumessen, gegen die unveraenderte, gesperrte Matrix, Ziel ≤ 25 Pp:
 | Tennis | 53,9 / 56,4 | 48, 2 Saatstroeme | VERLETZT |
 | Battlefield | 54 | 24 | VERLETZT |
 | Staffel | 61,9 | 48 (PR #1109 bit-identisch bestaetigt, s. Fuenfzehnter Nachtrag) | VERLETZT, klar verletzt |
-| Mini-DM | 115 | 24 | VERLETZT, deutlichste Verletzung im Feld |
+| Mini-DM | 115 → 55,6 / 43,9 (07.10., P1, n=12, 2 Saatstroeme; vorher am selben n 77,9 / 85,2) | 24 / 12 | VERLETZT, aber deutlich kleiner |
 
 **Ursachen, wo bekannt:**
 - **Fechten/Tennis/Showcase:** der WAGNIS-Fix (PR #1036, 26.09., generischer Auftritt-Risiko-Block
@@ -510,7 +1319,7 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 
 | Disziplin | Chassis | rho je Spiel (Median) | Spannweite | rho Saison (Median) | Abnahme |
 |---|---|---:|---:|---:|---|
-| Time-Trial | Bahn | 0,929 | 0,072 | 0,902 | bestanden |
+| Time-Trial | Bahn | 0,943 (15.10.-Nachtrag, Stamina-Kalibrierung; Baseline unmittelbar davor 0,923, die alte 0,929 war bereits Dokumentationsrueckstand) | 0,049 | 0,951 | bestanden |
 | Speed-Schach | Buehne | 0,906 | 0,057 | 0,979 | bestanden |
 | Spurt | Bahn | 0,906 | 0,144 | 0,964 | bestanden |
 | Staffel | Bahn | 0,899 | 0,100 | 0,951 | bestanden |
@@ -528,9 +1337,9 @@ Der Zusammenhang aus CLAUDE.md gilt unveraendert:
 | I-Spy | Buehne | 0,756 | 0,170 | 0,909 | knapp |
 | Hockey (alle 12, inkl. Torwart) | Feldspiel | 0,686 | 0,180 | 0,860 | durchgefallen |
 | ↳ Hockey, nur Feldspieler | Feldspiel | 0,725 | 0,204 | 0,836 | knapp |
-| Mini-DM | Arena | 0,394 | 0,563 | 0,500 | durchgefallen |
-| Battlefield | Arena | 0,392 | 0,746 | 0,524 | durchgefallen |
-| TDM | Arena | 0,306–0,326 | 0,934 | 0,252 | durchgefallen |
+| Mini-DM | Arena | 0,588 (07.10., P1; vorher 0,365) | 0,680 | 0,595 | durchgefallen |
+| Battlefield | Arena | 0,399 (07.10., unveraendert) | 0,834 | 0,310 | durchgefallen |
+| TDM | Arena | 0,324 (07.10., unveraendert) | 0,861 | 0,308 | durchgefallen |
 
 **Diese Tabelle ist die komplette Neumessung vom 26.09. (Abend), s. Zwoelfter Nachtrag ganz
 oben.** Die Saison-Spannweite (fuenfte Spalte der alten Tabelle) wurde in dieser Runde nicht mit
@@ -1013,22 +1822,22 @@ ueber das hinausgehen, was ihr Chassis fuer alle mitbringt.
 | Hockey | 71 % | 0,725 (Feldspieler) / 0,686 (alle 12), 26.09.-Nachtrag | Live-Motor mit Torwart, Bodychecks, Strafen und Ueberzahl · eigene Eisflaeche · Feldspieler-only-Messung jetzt Standard (Abschnitt 1a) · K3 (Tore halb als xG) gemessen umgesetzt, rho Feldspieler 0,651→0,719 · HK_TW_BASIS/HK_TW_REF nachgezogen (7,16/0,907→9,13/0,871), alle-12 dadurch 0,618→0,669, Feldspieler bit-identisch · ein struktureller Anlauf (Zoneneintritt) zweimal gebaut, beide Male bei groesserem n nicht haltbar, nicht committed — spuerbar besser als vor dieser Runde, aber nicht bei 0,80 · Chris hat die aktuelle Rangtreue fuer den Live-Betrieb ausdruecklich abgenommen (rangtreuer als echtes Eishockey, rho ≈ 0,40) · **produktiviert** (`docs/design/hockey-produktivierung.md`, PR #780, gemergt): `ARENA_RESOLVED_DISCIPLINE_IDS`, nutzt das bestehende Feldspiel-Chassis (kein neues), eigene Torwart-PPS-Referenz — im echten Spielstand, sobald ein Save Battle Mode nutzt |
 | Fechten | 48 % | 0,825 (26.09.-Nachtrag) | Auf der Buehne (vorher Arena, rho 0,153) · Rangtreue bestanden, Puffer kleiner als in der 06.09.-Fassung notiert (0,840 → 0,816, Dokumentationsrueckstand, s. Vierter Nachtrag) · Rezept ein erster, unkalibrierter Entwurf, bewusst NICHT in dieser Runde umgebaut (Puffer 0,016 kleiner als das eigene Kaderrauschen 0,192 — Beobachtungspunkt fuer die naechste Neumessung, s. Sechster Nachtrag) · kein interaktiver Paar-Rechner (optional, nicht noetig fuer die Abnahme) · **Nachtrag 07.09.:** Waffenschwung-Pose zeigt jetzt IMMER eine Schwertwaffenebene statt der zufaelligen Kosmetik-Waffe, rho bit-identisch bestaetigt · nicht im echten Spielstand |
 | Tennis | 48 % | 0,821 (26.09.-Nachtrag) | Auf der Buehne (vorher Feldspiel, rho 0,505) · Rangtreue bestanden · nicht im echten Spielstand · **Nachtrag 07.09. (Tennis-eigene Rezeptkalibrierung, s. `battle-mode.engine.js` Kommentar bei `BUEHNE_ART.tennis`):** das Rezept war bis hierher tatsaechlich 1:1 aus dem alten Feldspiel-Rezept uebernommen, nie gegen Tennis' eigene MATRIX gefittet (`docs/pm-briefings/pm-gesamtstand-07-09.md` Abschnitt 6 Punkt 5) — dieselbe Luecke wie bei Gewichtheben/Breaking vor deren NACHGEZOGEN-Korrekturen: TECHNIK (der Rollenkanal mit dem groessten Erfolgs-Koeffizienten) trug determination (Matrixgewicht 6) statt dexterity (12), und PUBLIKUM (der rauschaermste Kanal, reiner Festzuschlag) trug charisma (Matrixgewicht 4, das niedrigste der ganzen Matrix) mit 45 % Rollengewicht statt awareness (20). Nach dem #820-Symmetriefix war Tennis kaderfest bei 0,786 durchgefallen (s. PR #840, Nebenfund); mit der Rezeptkorrektur (nur `rezept`-Attributgewichte geaendert, keine Aenderung an der gemeinsamen Buehnen-Punkteformel) jetzt kaderfest 0,786 -> 0,825 (n=24, Saison 0,846 -> 0,839) — die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen (`node scripts/miss-alle-disziplinen.mjs 24 gewichtheben showcase eiskunstlauf breaking wettessen speed-schach i-spy tennis fechten`). Ein Review-Anlauf hatte AUSDAUER testweise auf stamina:55/spirit:30/determination:15 verschoben (nicht Matrix-proportional: spirit (18) ist in Tennis' Matrix schwerer als stamina (12), die Verschiebung machte stamina aber noch dominanter) — Revert-Messung zeigte, dass das nicht tragend war (0,825 mit Original-Gewichten gegen 0,830 mit der Verschiebung, beides klar ueber der Schranke), AUSDAUER blieb deshalb unveraendert. Aspiratives 0,85-Ziel nicht erreicht — dafuer fehlt der Buehne weiterhin das Sinkhorn-Rezeptwerkzeug aus Recherche-Teil F.2. |
-| Time-Trial | 55 % | 0,929 (26.09.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis |
+| Time-Trial | 55 % | 0,943 (15.10.-Nachtrag) | Kurvenmodell mit Linie und Risiko · Rangtreue bestanden, aber real gesunken (0,867 → 0,828, kaderfest reproduziert, s. Vierter Nachtrag — mutmasslich PR #848 ueber den geteilten Bahn-Chassis-Code) · Bild vom Chassis · **Nachtrag 04.10.:** J2 Live-Ampel (stille Messpunkte, Kipppunkt-Ticker, Regie) gebaut, bit-identisch; J1 nach Chris' Entscheidung nicht gebaut, s. Sechzehnter Nachtrag · **Nachtrag 15.10. (Stamina-Kalibrierung, s. Zwanzigster Nachtrag oben):** STEHEN nachgezogen (Climbing-Budget-Methode) — Stamina-Ueberschuss 22.09.-Rezept +8,8/+10,3 Pp (zwei Saatstroeme) → +3,5/+4,2 Pp, Dexterity-Loch -4,4/-4,1 → -0,7/-0,9, rho 0,923 → 0,943 (verbessert, nicht nur gehalten), Saison 0,902 → 0,951 · Isolation gegen die anderen vier Bahn-Disziplinen bestaetigt · **Nachtrag 15.10. (PP nach Zeit statt Platz, Task #105, s. Einundzwanzigster Nachtrag oben):** Margin-Formel gebaut (`marginAnteil:0.20`, Variante D/E) -- `bahnRangliste()` mischt 20 % Zeitabstand-Margin in die bisherigen Rangpunkte, Anker N..1 unveraendert; `MOTOREN["time-trial"].wert()` ruft dieselbe Funktion auf, PPS-Referenz neu gezogen. Pp 13,5/14,1 → 12,9/13,8 (Puffer ~11-12 Pp, weit ueber der 3-5-Pp-Marke), rho 0,943 → 0,943 bit-genau (erwartete Spearman-Invarianz) · Isolation erneut bestaetigt |
 | Gewichtheben | 70 % | 0,843 (26.09.-Nachtrag) | Reissen und Stossen, Duelle je Slot, Nullwertung, eigenes Buehnenbild · Architekturfrage entschieden (04.09.): Charisma beruehrt jetzt auch die physische Hebe-Obergrenze (`HEBEN_TAGESMAX_ANSAGE_K`), nicht nur die Erfolgschance — rho 0,720 -> 0,887, Pp 23,1 -> 17,3, Korridor haelt bei beiden Werten · Ein-Zeilen-Umkehr dokumentiert, falls Chris die physische Obergrenze lieber unangetastet haette · **produktiviert** (`docs/design/gewichtheben-produktivierung.md`, S6): `ARENA_RESOLVED_DISCIPLINE_IDS`, eigenes Buehnen-Duell-Motor-Chassis (`spieleBuehneHeben`), individuelle PPs aus echten Zweikampf-kg, Gesamt-kg-Tiebreak — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 07.09. (kuehner Versuch, `docs/design/gewichtheben-risiko-versuch-recherche-06-09.md`):** freiwilliger Zuschlag ueber das Ausgleichskilo im dritten Versuch, deterministisch aus ANSAGE, mit Verletzungsrisiko bei Misslingen und "Punktesieg"-Auszeichnung bei Gelingen — Belohnung bewusst NICHT in `u.summe`/`u.zweikampf`, sondern reines Ticker-/Boxscore-Ereignis (s. Recherche Abschnitt 2.5). #840 zog die Basislinie nach der #813/#820-Bisektion auf 0,847 zurueck; die frische Neumessung dieser Runde (07.09., an `main` `7a70413e`) bestaetigt seither **0,854** — Bewegung liegt innerhalb der eigenen Kaderrauschen-Spannweite (~0,21) und ist damit nicht von Null unterscheidbar, keine neue Rezeptaenderung. |
 | Climbing | 48 % | 0,814 (26.09.-Nachtrag) | Steigung und Kraftbudget statt Antritt · nach PR 2 (26.09., Griffarten/Balance/Zeitlimit kalibriert) kaderfest wieder bestanden (vorher 0,790, knapp) · Bild vom Chassis |
 | Speed-Schach | 45 % | 0,906 (26.09.-Nachtrag) | Duell-Variante der Buehne, Brett gegen Brett · beste Rangtreue im Feld ausser Staffel · eigenes Buehnenbild (Fokus-Brett, Uhren, Bewertungsbalken, PR #809) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Duell-Chassis (`spieleBuehneDuell`, generisch ueber `art.duell`), dabei einen vorbestehenden Motor-Fehler in der Duell-Paarung gefunden und behoben (Brettzahl zaehlte vorher ueber `art.jeSeite` statt die tatsaechliche Teilnehmerzahl) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | Wettessen | 40 % | 0,872 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik |
-| Eiskunstlauf | 40 % | 0,878 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · **Nachtrag 07.09. (Fable-Recherche `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`):** stand kaderfest knapp unter der Schranke (0,792, reines Verlaesslichkeitsproblem bei exzellenter Saisonzahl 0,944) — `rundenN` 6→12, `rundenDauer` 0,85→0,425 (Spearman-Brown-Fall, keine RNG-Kaskade wie bei Hockey) hebt kaderfest auf **0,875** (Saison 0,965), die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen. Dazu die Waffenpose korrigiert: keine Waffenebene mehr beim Landen (vorher zufaellige Kampfwaffe je nach Kosmetik), rho-neutral |
+| Eiskunstlauf | 40 % | 0,878 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · **Nachtrag 07.09. (Fable-Recherche `fechten-eiskunstlauf-breaking-politur-recherche-07-09.md`):** stand kaderfest knapp unter der Schranke (0,792, reines Verlaesslichkeitsproblem bei exzellenter Saisonzahl 0,944) — `rundenN` 6→12, `rundenDauer` 0,85→0,425 (Spearman-Brown-Fall, keine RNG-Kaskade wie bei Hockey) hebt kaderfest auf **0,875** (Saison 0,965), die anderen acht Buehnen-Disziplinen bit-identisch nachgemessen. Dazu die Waffenpose korrigiert: keine Waffenebene mehr beim Landen (vorher zufaellige Kampfwaffe je nach Kosmetik), rho-neutral · **Nachtrag 15.10. (E-F2, Zweiundzwanzigster Nachtrag oben):** bei ungerader Feldgroesse laeuft jetzt der Star solo statt des Schwaechsten (`fusioniereSeite()` paart ab Index `rest` statt immer ab 0) — rho je Spiel 0,919→0,905 (je-Seite 3) und 0,843→0,866 (je-Seite 5), beide Bewegungen innerhalb der Kaderrauschen-Spannweite, gerade Feldgroessen bit-identisch; Pp 19,9/17,8 (zwei Saatstroeme, unveraendert, da die Standardmessung die gerade Katalog-Feldgroesse nutzt) |
 | Breaking | 40 % | 0,833 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · keine eigene Mechanik · **Nachtrag 07.09. (dieselbe Recherche wie Eiskunstlauf):** stand kaderfest mit knappstem Puffer aller bestandenen Disziplinen (0,804, nur 0,004 ueber der Schranke) — `rundenN` 4→8, `rundenDauer` 1,25→0,625 hebt kaderfest auf **0,869** (Saison 0,951). Dazu dieselbe Waffenpose-Korrektur wie Eiskunstlauf, rho-neutral |
 | Showcase | 40 % | 0,896 (26.09.-Nachtrag) | Nur Buehnen-Durchgaenge mit eigenem Rezept · kaderfest bestanden (vorher knapp, reines Kaderrauschen) · **Produktivierung (06.09.) als PR vorbereitet** (`docs/design/speed-schach-showcase-produktivierung.md`): `ARENA_RESOLVED_DISCIPLINE_IDS`, neues Buehnen-Auftritt-Chassis (`spieleBuehneAuftritt`, Seitenstand = Summe der Auftrittswerte, wie `updateHudBuehne()` es schon live zeigt) — noch nicht gemergt/im echten Spielstand, kein aktiver Save nutzt Battle Mode |
 | **Takeshi's Castle** | **50 %** | **0,874 (26.09.-Nachtrag)** | **Kaderfest bestanden (vorher als 0,697/durchgefallen, dann 0,886 dokumentiert — beides Dokumentationsrueckstand, s. Vierter Nachtrag)** · Hindernisse, Nerven, Burgpunkte, drei Kurse, zehn Fallen (PR #810) · PR #813 (Route+Chaos) offen, nicht Voraussetzung fuer die Abnahme · **13.09.: der TYP der Falle entscheidet den Sauber-Wurf mit (`fallenKoennen:0.75`) — vorher wuerfelte an allen vierzehn Fallen dieselbe TECHNIK, die Sauber-Quote desselben Laeufers an starker und schwacher Falle lag 1,3 Pp auseinander, jetzt 13,8 Pp; rho 0,861 → 0,883, s. `takeshi-hindernis-vs-strecke-recherche-13-09.md`** · nicht im echten Spielstand |
-| **Staffel** | **48 %** | **0,899 (26.09.-Nachtrag)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand |
-| I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) |
-| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt |
+| **Staffel** | **48 %** | **0,906 (06.10.-Nachtrag, n=24, Schalter aus)** | **Kaderfest bestanden, beste Rangtreue im gesamten Feld (vorher als 0,681/durchgefallen dokumentiert — reines Kaderrauschen, s. Abschnitt 1)** · Abschnittszeit, stufenlose Uebergabe, Kurve, Zug an der Spitze · nicht im echten Spielstand · Paket O2 „Marke und Zug" hinter QA-Schalter (Standard aus) · **Nachtrag 06.10. (Siebzehnter Nachtrag):** Tempo-Kanal-Rezept nachgezogen (ANTRITT/ENDTEMPO verloren Speed/Stamina-Uebergewicht, gewannen Dexterity/Awareness/Spirit; `KURVE_KOSTEN` 0,12→0,20) — mit Schalter KI rho 0,933 (n=48/96, vorher 0,937), **Sentinel vigilante-armageddon 0,845 — jetzt ueber 0,80** (vorher 0,756, bestes vorher 0,797), Pp 21,1/22,0 (vorher 35,6/37,9, Ziel ≤25 **erreicht**), Star Rang1 60,0 % (vorher 61 %, statistisch flach, bleibt unter dem Vor-O2-Stand 69 % — Ursache laut O2-Papier der haelftig geteilte fliegende Gewinn, nicht der Tempo-Kanal, absichtlich nicht angefasst). Wechsel-/Zug-Mechanismus (TECHNIK/WUCHT/ZUG_FADE/FLIEG_MAX) byte-identisch, alle Extremvarianten (Angreifen/Absichern/Zufall/Kader-Regel) jetzt ebenfalls ueber 0,80 · **Nachtrag 11.10. (Achtzehnter Nachtrag):** O7 „Eingespielte Paare" gebaut (Paar-Zaehler im Spielstand, bis +0,10 auf Q, ab drei Spielen engere Streuung) — rho 0,933 → 0,933 (zufaellige Paar-Geschichte) / 0,941 (alle eingespielt), Sentinel 0,832/0,840, Pp 20,9/21,6 bzw. 22,2/21,5; dabei die Bein-Reihenfolge im Produktivpfad auf die Slot-Reihenfolge korrigiert (vorher lief der Kader-TDM-Beste Bein 1, egal welcher Slot) |
+| I-Spy | 35 % | 0,756 (26.09.-Nachtrag; die alte 0,684 hier war bereits vor P1-Prototyp-Runde in Abschnitt 7 stale) | Duell-Variante der Buehne · Spielerwert auf eigene Punkte umgestellt · P1-Prototyp "Spur statt Los" gebaut, gemessen, verworfen (Abschnitt 7) · I-2k "Kennerblick" (07.10.) gebaut, gemessen, verworfen (Abschnitt 7, Nachtrag) |
+| Spurt | 55 % | 0,906 (26.09.-Nachtrag) | Hindernislauf statt Ermuedungssprint (05.09., `spurt-modellierung-recherche-05-09.md` Prototyp P6): Zeitpreis je Hindernis nach Sub-Skill (0,36–0,84 s), Rempler gedaempft, Ermuedung halbiert — rho 0,652 → 0,871, Dexterity-Einfluss 3,5 % → 16,7 % · Huerden, Windschatten, Rempler, drei Rennplaene · Bild vom Chassis · **Nachtrag 14.09. (Produktionsanbindung, s. Siebter Nachtrag oben):** Feldgroesse 4 → 6 behoben (Opus-Review PR #881 Fund F1), rho 0,871 → 0,894 · eigene Bewegungspose ergaenzt (`stepHuerden`, war die letzte der vier Bahnen ohne, wie Time-Trial vor PR #908) · **jetzt produktiviert** (`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_BAHN_DISCIPLINE_IDS`) — im echten Spielstand, sobald ein Save Battle Mode nutzt · **Nachtrag 04.10.:** Paket S-N1+S-N2 (Joker 8 % + Kriechen) hinter QA-Schalter gebaut (Standard aus, bit-identisch); mit Schalter rho 0,910 (heute 0,880, n=24), Pp 18,7/15,6, Stillstand und Saeulenzeit 0 %, s. Sechzehnter Nachtrag |
 | **Football** | **32 %** | **0,818 (26.09.-Nachtrag — die alte 0,516 war stale, keine heutige Codeaenderung an Football, s. Zwoelfter Nachtrag)** | **Neuer Live-Motor** (Downs, Line of Scrimmage, echte Formationen, Snap-Phase, fuenf sichtbar unterschiedliche Spielzuege) statt des alten Vorab-Pfads · strukturell der groesste Fortschritt seit der letzten Fassung · Rezept war beim Umstieg vollstaendig ungemessene Platzhalter (Kopfzahl zunaechst RUECKWAERTS, 0,345→0,305), seither **gegen echte NFL-2024-Quoten kalibriert** (`football-rezept-kalibrierung.md`, →0,460), mit einer Down-Verdrahtung in vier zuvor toten Entscheidungsfunktionen nachgezogen (`football-review-bugfixes.md`, →0,468) und mit einem eigenen `spielEignung`-Block neben der gesperrten Matrix weiter angehoben (PR #803, 05.09., →**0,516**) · Anzeige/Teamstaerke/KI-Kauf ordnen Football weiterhin nach der alten Matrix, das Minispiel nach der neuen (bekannter, akzeptierter Nebeneffekt aus PR #803, Chris' Entscheidung offen) · nicht im echten Spielstand |
-| Mini-DM | 30 % | 0,394 (26.09.-Nachtrag) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · Zielwahl-Redesign recherchiert (Fable, 03.09.), nicht umgesetzt · Kader-Spannweite (0,697) groesser als der eigene Median — jede Bewegung hier ist bei n=24 unbeweisbar (s. Abschnitt 5) |
-| TDM | 30 % | 0,306–0,326 (26.09.-Nachtrag) | Aeltester Motor, am staerksten eingemessen · Zielwahl haengt an der Geometrie, nicht an der Recherche-Frage |
-| Battlefield | 30 % | 0,392 (26.09.-Nachtrag) | Aufstellung repariert und nachgemessen (Siege Core stand hinten, Saison-Validitaet 0,595) · Zielwahl-Redesign recherchiert, nicht umgesetzt |
+| Mini-DM | 35 % | **0,588 / 0,576** (07.10., Strom 1/2; vorher 0,365/0,363) | Gemeinsamer Arena-Motor mit eigenen Slots · Wertformel und Eignung repariert · **Nachtrag 07.10. (Arena-Persoenlichkeit P1, `arena-zielwahl-opus-empfehlung-02-10.md` Abschnitt 10):** Zusammenhalt ist Handwerk (`ARENA_ART["mini-dm"].persHandwerk:["z"]`, alle auf "ausgewogen"), Zielneigung/Haltung/Bindung bleiben Persoenlichkeit — rho Saison 0,311 → 0,595/0,643, 10 von 10 Paarung-Strom-Faellen besser, Paare ≥15 67/66 → 77/76 %, Team-Ergebnistreue 88,7 → 86,5 %, **Pp 77,9/85,2 → 55,6/43,9** (n=12, besser, aber weiter ueber 25) · gemessen wird weiter das 4-gegen-4, nicht das FFA |
+| TDM | 30 % | 0,324 / 0,247 (07.10., Strom 1/2, unveraendert) | Aeltester Motor, am staerksten eingemessen · **Nachtrag 07.10. (P1):** mit Zusammenhalt+Bindung als Handwerk (V9) gemessen 0,416/0,432, Star Rang 1 2 → 14–15 %, A–E bestanden — aber **vorerst nicht eingeschaltet** (`persHandwerk:[]`), weil die Pflicht-Pp-Messung (F) auf der ueberlasteten Messmaschine nicht ins Ziel kam; Einschalten ist eine Zeile, sobald F gemessen ist |
+| Battlefield | 30 % | 0,399 / 0,391 (07.10., Strom 1/2, unveraendert) | Aufstellung repariert und nachgemessen · **Nachtrag 07.10. (P1):** mit V9 gemessen 0,583/0,616, Saison-Validitaet 0,31 → 0,81/0,76, A–E bestanden, aber **Pp 35,7/48,6 → 62,8/85,4** (Kriterium F klar verfehlt) — nach Abbruchregel 1 `persHandwerk:[]`, bit-identisch zum Stand davor; braucht zuerst die TMP/AUS-Pp-Reparatur am Chassis |
 
 **Kein Durchschnitt ueber alles**, weil die Achsen ungleich schwer wiegen: die neunzehn
 Disziplinen ausserhalb von Basketball koennen zusammen keine 15 % erreichen, solange sie nicht
@@ -1089,3 +1898,356 @@ Varianten fehlerfrei, das Verhalten ist monoton im Koennen; das Problem liegt in
 deterministischer Rätselart-Rotation statt fixer Spezialisierung, oder Chris' Entscheidung zur
 "ehrlicheren Abnahme" aus `CLAUDE.md` (Ist-Stand erfuellt dort 3 von 4 Bedingungen, Star Rang1 nur
 2,5 Punkte unter der Schranke).
+
+**Nachtrag 07.10. — I-2k „Kennerblick" (Mehrwege im Finden) gebaut, gemessen, verworfen.** Chris hat
+den Prototyp aus `docs/design/i-spy-fable-empfehlung-02-10.md` freigegeben; Befund dort in Abschnitt
+10. Nullprobe bit-identisch, dann Dosisreihe 0,80/0,85/0,90: rho je Spiel 0,717/0,724/0,738
+(Ist 0,750), Saison 0,818/0,818/0,804 (Ist 0,881), Star Rang 1 39,2/37,5/39,2 % (Ist 43,3 %),
+Paartreue 93,6/93,4/92,9 % (Ist 94,6 %), Pp bei 0,90 25,9/19,0 (n=24). Sechs der acht Zeilen des
+Abbruchkriteriums verfehlt (a bis e in jeder Dosis) — **nicht gemergt, I-Spy bleibt beim Ist-Stand**
+(Basislinie 0,750/0,881). Ursache: der Nebenweg hebt das Mittelfeld mit hoher Knack-Kompetenz,
+nicht den Star (bei Umbrafond liegt 0,85·KENNERBLICK unter SPUERSINN). Die Entscheidung G1* mit
+Toleranz vs. dritter Anlauf liegt bei Chris; die dafuer verlangte n=48-Nachmessung des Ist-Stands
+liest Star Rang 1 47,1 %, Top 2 77,1 %, Paartreue 94,5 %, Saison-Median 0,839.
+
+## 8. Speed-Schach: „Die Uhr wird der dritte Spieler", Stufe 1 + 2 — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/speed-schach-nachtkonzept-03-10.md` (Abschnitt 3.2/3.3), von Chris zum Bau
+freigegeben. Stufe 3 (Armageddon) bewusst **nicht** gebaut (Klasse T, abgelehnt); auch sonst kein
+Mechanismus, der ein 3:3 erzwingt oder verhindert. Klasse B, deshalb hinter
+`BUEHNE_FLAGS.speedSchachUhr` in `battle-mode.engine.js`, **Standard 0 = aus** — jeder echte
+Spielstand laeuft unveraendert (Muster `sandsackVorschauAktiv`). Einschalten fuer Messungen:
+`--flags=speedSchachUhr:1|2` an `miss-alle-disziplinen.mjs`, `messe-arena-einfluss.mjs`,
+`miss-speed-schach-spiegel.mjs` und dem neuen `miss-speed-schach-uhr.mjs` (Brett-Kennzahlen).
+
+Gebaut: TEMPO (speed 50/dexterity 30/awareness 20), entkoppelte Uhr 12 s/17 s × (1+(50−TEMPO)·0,022),
+Start 180 s, Zeitnot unter 30 s, `u.geflaggt`/`u.zeitSieg` im Paarungsblock (genau einer geflaggt →
+Brett auf Zeit verloren, sonst `vorteil`), ein gemeinsamer Brettentscheid `duellBrettSieg()` fuer
+alle fuenf Leser. Stufe 2: Ansage rechnen/normal/blitzen (×1,30/+4 pp · ×1 · ×0,72/−4 pp), Zeitnot
+−0,10·(1−NERVEN/100)·1,6 auf die Erfolgschance, Restzuege nach dem Blaettchen 0 Punkte, KI =
+Zeitbudget-Regel (25 s Rand). Uebergabe `{d,slot,haltung}` im Motor und im Adapter-Typ angelegt
+(die Einsatzliste selbst hat noch kein Haltungsfeld — Grundgeruest der Konsultation, Zeile 0).
+
+Gemessen am echten Motor, kaderfest (Familie live-save, 5 Paarungen), 04.10.:
+
+| | Flag aus (heute) | Stufe 1 | Stufe 2, KI beidseitig | Papier-Sonde (5.2, KI) |
+|---|---:|---:|---:|---:|
+| rho je Spiel (Median, n=24) | 0,898 | 0,898 (bit-identisch) | **0,909** | 0,923 |
+| rho je Spiel 4 / 2 je Seite | 0,914 / 0,906 | — | 0,915 / 0,892 | — |
+| Pp n=48, zwei Saatstroeme | 17,7 / 17,6 | 17,7 (bit-identisch) | **11,8 / 11,4** | 12,2 / 13,4 |
+| Pp n=24 gestueckelt 4×6, zwei Stroeme | 17,2 / 18,4 | — | **12,6 / 11,3** | — |
+| speed-Anteil (Matrix 10) | 7,0 % | 7,0 % | 10,2 % | 8,5 % |
+| Spieler geflaggt (n=48 je Paarung) | — | 26,8 % | 5,6 % | 1,2 % |
+| Brett auf Zeit gegen den Vorteil | — | **3,9 %** | **0,0 %** | 0,0 % |
+| Mannschaftskampf 3:3 | 22,5 % | 21,7 % | 20,4 % | ~30 % |
+| Spiegeltest Heim:Gast (600, identischer Kader) | 256:260 | 256:260 | 249:243, Bretter 2,52:2,52 | — |
+
+„Kein Knopf immer besser" (Heimsieg gegen KI-beidseitig 67,5 % / Gastsieg 12,1 %, die Familie ist
+heimlastig, s. Flag aus 68,3/9,2): Heim pauschal rechnen 20,4 %, pauschal blitzen 63,8 %; Gast
+pauschal rechnen 9,2 %, blitzen 7,9 % — beide Pauschalen verlieren auf beiden Seiten gegen die
+KI-Regel. Extremfaelle: alle rechnen rho 0,839 (47 % geflaggt, 16,7 % Entscheide gegen den
+Vorteil), alle blitzen 0,887. KI-Ansagen: rechnen 44 % · normal 17 % · blitzen 38 %.
+
+**Ehrliche Befunde.** (1) Der echte Kader streut TEMPO von 10 bis 99 (Quartile 34/75) — viel
+breiter als die synthetische Sonde. In **Stufe 1 allein** flaggt deshalb praktisch jeder unter
+TEMPO 35 und keiner ueber 40: 46,5 % der Bretter werden auf Zeit entschieden, fast immer im Einklang
+mit dem Vorteil, aber deterministisch nach TEMPO statt als Ereignis. Stufe 1 ohne Stufe 2 ist so
+nicht empfehlenswert; mit Stufe 2 waehlen langsame Haende Blitzen, und nur noch 5,6 % flaggen.
+(2) Mit der Zeitbudget-KI auf **beiden** Seiten entsteht **kein** Sieg auf Zeit gegen den Vorteil
+(0,0 %, wie die Sonde in 5.2 und deren Lesart 5.3 Punkt 5): Botez-Hansen-Momente kommen nur aus
+Manager-Entscheidungen (Heim rechnen: 22,2 %). Sensitivitaet, nicht eingebaut: KI-Rand 10 s →
+0,7 %, 0 s → 3,3 % (rho 0,901, Pp 11,8) — eine einzige Konstante (`SCHACH_KI_RAND_S`), falls Chris
+das Zielband 1–5 % auch ohne Manager-Eingriff will.
+
+## 9. Wettessen: „Die Mauer, die Haltung" (K1 + K2) — gebaut, hinter Flag AUS (Nachtrag 04.10.)
+
+Quelle: `docs/design/wettessen-nachtkonzept-03-10.md` (Abschnitt 3 K1/K2, Anhang A), von Chris
+freigegeben. K3 (Tunken) nicht gebaut; keine Disqualifikation, kein Live-Eingriff, `rundenN`/
+`rundenDauer`/60 s Sendezeit unveraendert. Klasse B hinter `BUEHNE_FLAGS.wettessenMauer`
+(0 aus · 1 K1 · 2 K1+K2), **Standard 0**. Eigene Weiche `mauer:true` an `BUEHNE_ART.wettessen`;
+`ermued` entfaellt nur dort und nur mit Flag, die anderen fuenf Buehnen bleiben unberuehrt.
+Messwerkzeug neu: `scripts/miss-wettessen-mauer.mjs` (echter Motor, kaderfest, inkl. Erwartung je
+Esser und Haltung ueber 40 feste Zufallsstroeme — der „tote Knopf"-Test).
+
+Gebaut: Fuellstand = Summe der Minutenpunkte, K = 65 + AUSDAUER·5 (Steigung 5 behalten — health/
+stamina liegen nur +0,4 bis +1,0 ueber der Matrix, die Stellschraube „4" war nicht noetig);
+Mauerfaktor 0,45+NERVEN·0,005, Erfolg −0,05, halber Bonus; Minute 10 doppelter WAGNIS-Trade-off,
+voller Bonus. K2: Sprint/Gleichmaessig/Schlussspurt, KI nach NERVEN (≥60 Schlussspurt, <45
+Gleichmaessig, sonst Sprint), Uebergabe `{d,slot,haltung}`.
+
+**Kalibrierung K2 am Motor** (das Papier warnte: erster Satz „Sprint immer am besten"). Am echten
+Motor kippte es mit den Startwerten andersherum: Sprint beste Wahl fuer 7 % (toter Knopf),
+Schlussspurt 69 %, beste Haltung staerker an der Eignung (0,46) als an NERVEN (0,39). Raster ueber
+fuenf Konstanten, gewaehlt: Sprint-Erfolg −0,10 → **−0,07**, Schlussspurt-Bonus ×1,5 → **×1,18**,
+NERVEN-Zuschlag 0,004 → **0,006**, frueh ×0,97 → **×0,965** (Sprint-Basis ×1,10, K ×0,92 und
+Minuten wie im Papier). Ergebnis n=24 × 5 Paarungen:
+
+| Beste Haltung (Erwartung) | Sprint | Gleichmaessig | Schlussspurt |
+|---|---:|---:|---:|
+| alle Esser | 26,7 % | 26,8 % | 46,5 % |
+| NERVEN < 45 | 17,6 % | 79,2 % | 3,3 % |
+| NERVEN 45-59 | 35,1 % | 44,1 % | 20,9 % |
+| NERVEN ≥ 60 | 25,4 % | 2,6 % | 72,0 % |
+
+rho(beste Haltung, NERVEN) 0,657 > rho(…, Eignung) 0,625. KI trifft die beste Haltung in 63 %,
+Verlust gegen das Optimum 2,3 Punkte je Esser — jede Pauschale verliert mehr (alle Schlussspurt
+3,5 · alle Sprint 5,9 · alle Gleichmaessig 7,2): kein Knopf ist immer besser. Schwaechste Stelle:
+im Band NERVEN 45-59 waehlt die KI Sprint, im Mittel waere dort Gleichmaessig knapp besser (44 zu 35 %).
+
+Gemessen am echten Motor, kaderfest (Familie live-save), 04.10.:
+
+| | Flag aus (heute) | K1 | K1+K2, KI | Papier-Sonde (ohne Slot/Form) |
+|---|---:|---:|---:|---:|
+| rho je Spiel 6 je Seite (n=24) | 0,866 | 0,908 | **0,910** | 0,951 → 0,962 |
+| rho je Spiel 4 je Seite (n=24) | 0,801 | 0,833 | **0,848** | — |
+| rho je Spiel 2 je Seite (n=48) | 0,771 (knapp) | 0,792 (knapp) | **0,811** | — |
+| Pp n=48, zwei Saatstroeme | 14,1 / 15,0 | 9,2 / 9,8 | **8,7 / 10,0** | 11,8 → 12,2 |
+| will-Anteil (Matrix 26) / torment (6) | 22,5 / 12,0 | 25,6 / 7,4 | 25,3 / 9,0 | — |
+| Pp alle Sprint / alle Schlussspurt | — | — | 8,1 / 7,5 | 13,5 / 12,0 |
+| Mauer-Minute Median, Spanne | — | 7, 4-10 | 6, 4-10 | 7, 4-10 |
+| Spiegeltest Heim:Gast (300) | 154:146 | 149:151 | 152:147 | — |
+
+Kurve je Minute (K1+K2): 73 72 73 72 69 61 56 59 58 63 — statt der flachen Ist-Linie. Extremfaelle
+rho (6 je Seite): alle Sprint 0,913, alle Gleichmaessig 0,908 (= K1, bit-identisch), alle
+Schlussspurt 0,909; einseitige Pauschalen 0,909-0,914, Heimsieg 46,7-48,3 % gegen 50,0 % mit KI.
+
+**Offen/ehrlich:** (1) Die mittlere Seitensumme sinkt mit der Mauer um ~10,5 % (Spiegel 4744 → 4242
+Punkte) — die PPS-Referenz `data/generated/wettessen-pps-referenz.json` ist seit dem 04.10.
+(Nachtrag) MIT `wettessenMauer:2` gezogen (`scripts/ziehe-buehne-pps-referenz.ts wettessen
+--flags=wettessenMauer:2`, 64 Fixtures je Feldgroesse 2-6, Feld `buehneFlags` in der Datei).
+Mediane je Feldgroesse 847/798,5/764,5/742/699,5 → 781,5/745/703/666/632 (−6,7 bis −10,2 %),
+iKrass nur −0,2 bis −3,6 % (1230 → 1197 bei 5). Der Median-Esser bekommt damit wieder genau
+1,38 PPS (5,5 · 0,25); gegen die alte Referenz laege er mit Mauer bei 1,02-1,10. **Kopplung:**
+die Referenz wird unabhaengig vom Schalter statisch importiert — sie und `BUEHNE_FLAGS.wettessenMauer=2`
+muessen GEMEINSAM live gehen; mit Flag aus gegen die neue Referenz waere Wettessen ueberbewertet. (2) Bei 2 je Seite liegt schon der heutige Motor knapp unter 0,80 (0,771, n=48,
+Spannweite 0,30); K1+K2 hebt ihn darueber. (3) Die Einsatzliste hat noch kein Haltungsfeld —
+ohne Grundgeruest entscheidet immer die KI-Vorgabe.
+
+**Climbing-Kontakt (14.10., Produktions-PR, Konzept `docs/design/climbing-kontakt-konzept-14-10.md`
+Anhang A).** Chris' Freigabe fuer E4, woertlich: „ja möchte ich, unsere oly ist ja ein brutalerer
+sport als das normale climbing" — dreht sein eigenes Veto vom 24.09. (G-1 abgelehnt) fuer eine
+gedeckelte, „kein Sturz, nur Balance/Zeit"-Form um. Gebaut: zwei Kreuzungsgriffe je Routenpaar
+(Index 4/7 der zehn `hindernisse`), an denen der fuehrende Duellpartner den aufholenden
+herunterziehen kann (Zugstaerke aus WUCHT, Widerstand aus GLEICHGEWICHT+Balance), mit einem
+eigenen Wehren-Gegenwurf, der den Balanceverlust bei Erfolg auf einen kleinen Rest drueckt.
+Schreibt ausschliesslich `u.balance` des Gezogenen — kein Kanal aendert `u.hoch`, einen Sturz
+oder einen Rang direkt ("kein Zug durch fremde Hand").
+
+Patch 1:1 aus dem Konzeptpapier (`kreuzungsPos`-Block in `BAHN_ART.climbing`, Kontakt-Block in
+`stepSpurt()` vor der HUERDEN-Schleife, Diagnosefelder in `wandProbe()`), diesmal gegen die
+PRODUKTIONSDATEI gemessen statt gegen eine disposable Kopie — frisch verifiziert, nicht nur aus
+dem Konzeptpapier kopiert:
+
+| Kennzahl | Strom 1 (1337/7919) | Strom 2 (424242/6089) | Ziel |
+|---|---:|---:|---|
+| rho je Spiel (kaderfest) | 0,833 | 0,816 | > 0,80 |
+| Pp-Abweichung (n=48) | 12,0 | 9,5 | ≤ 25 |
+
+Ereignisse/Rennen 3,83, 93 % der Rennen mit ≥ 1 Ereignis, Wehr-Erfolgsquote 49,3 %, Ziehender von
+Heimseite 53,0 % (wandProbe, n=300) — alle vier Werte reproduzieren das Konzeptpapier exakt, kein
+Drift gegenueber dem Stand vom 14.10. `node --check`/`eslint` auf der Engine: 0 neue Fehler/
+Warnungen gegenueber der Basislinie.
+
+## 10. Feldspiel-Taktik-Karte: gemeinsames Fundament, Basketball P4 (15.10.)
+
+Quelle: `docs/design/feldspiel-taktik-karte-fundament-15-10.md`. Chris' Sammel-Freigabe ("ja
+ueberall D, bau weiter") auf `fable-ideen-feldspiel-30-09.md` 2.2 ("Eine Taktik-Karte, drei
+Optionssaetze"), Basketball zuerst. **Reines Fundament, Klasse A, bit-identisch gemessen** — kein
+Mechanik-Umbau. Zwei Abhaengigkeiten vorab geprueft: Task #31 ("Spiel des Tages") hat nur die
+"Drei Momente" gebaut, **nicht** den vollen Replay aus 2.1 — die Praemisse "ohne Replay ist jede
+Taktik-Karte ein Formular" bleibt fuer eine manager-seitige UI offen. Task #33 (F1/B1) hat
+Basketball P4 an keiner Stelle vorbereitet.
+
+Gebaut in `battle-mode.engine.js`: `FELDSPIEL_ART.<disziplin>.taktik`-Schema (disziplin-generisch,
+nur Basketball gefuellt), die vier P4-Schalter (Angriff/Verteidigung/Screen-Coverage/Bretter) 1:1
+aus `basketball-opus-konzeptreview-26-09.md`, eine deterministische KI-Vorgabe je Schalter (liest
+nur bestehende Rezeptwerte, kein `rr()`), und `berechneTaktikAuto`/`effektiverTaktik`/`setzeTaktik`
+nach dem Muster von `berechneFokusAuto`. Die neuen Felder (`fsLive.taktikAuto`/`taktikManuell`)
+werden von KEINER Mechanik gelesen — nachgewiesen per Grep ueber die ganze Datei.
+
+| | vorher (HEAD) | nachher (Fundament) |
+|---|---:|---:|
+| rho je Spiel (n=24, Median) | 0,795 | **0,795** |
+| rho Saison (Median) | 0,881 | 0,881 |
+
+Bit-identisch. Pp (`messe-arena-einfluss.mjs basketball 24`): **33,7 Pp**, gegen die seit 26.09.
+dokumentierte, unveraenderte Verletzung von 33,4 Pp (`gesamtstand-audit-13-10.md` Zeile 100) —
+kein neuer Schaden, nur das bekannte, hier nicht angefasste Rezeptproblem.
+
+**Bewusst nicht Teil dieser Runde:** die Mechanik-Bindung je Schalter (zwei der vier Schalter
+haengen an P1 Foul-System/P3 Pick-and-Roll, die noch nicht existieren) und die UI-Integration in
+den Matchday-/Lineup-Fluss (eigenes Vorhaben, s. `app/foundation/legacy-lineup-lab/`) — beides
+klar als naechster Schritt dokumentiert, nicht halbfertig gebaut.
+
+## 11. I-Spy: Raumwahl (I-1) gebaut, Standard bleibt Werkstatt (15.10.)
+
+Chris' Freigabe ("ja ueberall D, bau weiter"), Spezifikation `docs/design/fable-ideen-arena-
+ispy-30-09.md` Abschnitt 6/I-1, Kontext `docs/design/i-spy-fable-empfehlung-02-10.md` Abschnitt
+8. Voller Befund: `docs/design/i-spy-raumwahl-i1-15-10.md`.
+
+Gebaut: drei Raeume (Archiv/Werkstatt/Salon) als Varianten der Fundort-Art-Verteilung — gleiche
+zwoelf Positionen, gleiche Stufenmultimenge, nur die Art-Beschriftung zweier kleiner
+Stufe-1-Bloecke wandert (Archiv 48,4/35,5/16,1 %, Werkstatt — unveraendert — 41,9/35,5/22,6 %,
+Salon 35,5/48,4/16,1 % Logik/Verhoer/Mechanik). Kein neues Attribut, kein neues Rezept. Eine
+intelligente KI-Regel (Argmax ueber das Team-Mittel der drei Knack-Sub-Skills) ist vollstaendig
+gebaut, dazu manuelle Uebersteuerung je Seite (`window.__arena.ispyRaumWahl()`, Muster wie
+`buehneHaltungTest`).
+
+**Gemessener Befund, der den Plan korrigiert hat:** die Spezifikation nahm an, die KI-Regel sei
+"per Konstruktion" rho-neutral (wie die Bahn mit ihrer Standardaufstellung). Nachgemessen
+(kaderfeste live-save-Familie) bewegt der reine Argmax als Standard rho/Spiel von 0,750 auf
+0,700 — getragen von EINER einzigen Kader-Paarung (Team-Mittel-Marge 14,9 Punkte, ihr eigenes
+rho faellt dort von 0,750 auf 0,649), kein gleichmaessiger Effekt ueber alle fuenf Paarungen.
+Kontrollmessung (beide Seiten fest auf Werkstatt) reproduziert exakt 0,750/0,177/0,881/0,210 —
+die Verdrahtung ist korrekt, der Effekt kommt ausschliesslich aus der Raum-Differenzierung
+selbst. Ein Schwellenwert-Versuch (Marge ≥8-13 vor dem Wechsel) aenderte fast nichts (0,700 →
+0,703-0,704); erst eine Schwelle praktisch ausserhalb jeder realistischen Marge naeherte sich
+wieder der Baseline an.
+
+**Entscheidung:** der echte Standard ohne jede Vorgabe ist "Werkstatt fuer beide Seiten" (bit-
+identisch zum Ist-Stand), die intelligente Wahl bleibt als explizite vierte Option (`"auto"`)
+verfuegbar, aber kein stiller Standard. Gemessen, Standardpfad:
+
+| Kennzahl | Wert |
+|---|---:|
+| rho je Spiel (kaderfest) | 0,750 (bit-identisch zum Ist-Stand) |
+| rho Saison | 0,881 |
+| Pp, Strom 1 / Strom 2 | 15,3 / 11,1 |
+| Pp je Raum (fest gewaehlt), Archiv/Werkstatt/Salon/"auto" | 19,8 / 15,3 / 14,5 / 17,7 |
+
+Alle Pp-Werte weit unter der 25er-Schranke — das Spezifikations-Risiko ("±8 Pp Art-Verschiebung
+≈ ±3 Pp Attributebene") bestaetigt sich auf der Pp-Seite vollstaendig; das einzige offene Risiko
+war die rho-Seite, dort jetzt durch den Werkstatt-Standard abgefangen. I-Spy ist nicht arena-
+aufgeloest (`lib/battle/arena-resolved-disciplines.ts`), hat deshalb keine bestehende Lineup-UI
+und bekommt vorerst nur eine Ticker-Ansage bei unterschiedlicher Raumwahl — eine echte
+Vorspiel-Auswahloberfläche ist der naheliegende naechste Schritt, sobald die Disziplin selbst
+arena-aufgeloest wird.
+
+## 12. Basketball — Option D (Viertellaenge erneut anheben), 15.10., NICHT umgesetzt
+
+Chris' Antwort auf die Frage aus `docs/design/basketball-tempo-passing-diagnose-14-10.md`
+Abschnitt 5/6: **Option D** — die Viertellaenge erneut anheben, um mehr Tempowechsel/Passspiel/
+Possessions zu bekommen (sein eigentliches Ziel hinter der "Spieler ballen sich zusammen/zu wenig
+Passspiel"-Beschwerde). Ergebnis dieser Runde: **nichts gebaut** — jede getestete Stufe haelt rho
+zwar formal ueber 0,80, aber keine mit einem Puffer, der groesser ist als das Kaderrauschen
+(0,06-0,085) — exakt der Fall, den der Auftrag selbst als "nicht sicher genug" vorgesehen hat.
+
+**Vorab-Befund, der jede weitere Basketball-Zeitrunde betrifft:** `VIERTEL_DAUER_BASKETBALL`
+(`battle-mode.engine.js:7886`) ist fuer die tatsaechlich gespielte Partie **toter Code**. Der
+Code-Kommentar an dieser Stelle (s. `basketball-tempo-passing-diagnose-14-10.md` Abschnitt 3.3)
+nennt sie "DIE EINE Konstante, die Chris gehoert" — das stimmt nicht mehr. Die Live-Simulation
+liest die Viertellaenge ausschliesslich aus `FELDSPIEL_ART.basketball.live.periodenDauer`
+(`:7020`, hartkodiert `90`); `LIVE()` (`:7590`) liefert fuer Basketball nie `null`, also greift
+der `VIERTEL_DAUER_BASKETBALL`-Fallback in `naechsterAngriff()` (`:11299`) nie. Nachgewiesen: eine
+Aenderung von `VIERTEL_DAUER_BASKETBALL` 90→105 allein ergab bit-identisches rho (0,795/0,085,
+n=24) gegen die Baseline — erst das Nachziehen von `periodenDauer` in der `live`-Zeile bewegte
+irgendetwas. Jede kuenftige Runde, die an dieser Stellschraube dreht, muss **beide** Stellen
+aendern, sonst misst sie sich selbst eine wirkungslose Aenderung vor.
+
+**Baseline (90s/Viertel, 360s Gesamt, origin/main, frisch nachgemessen statt nur zitiert):**
+
+| Groesse | Wert |
+|---|---:|
+| rho je Spiel (Median, n=24, Kader-Familie live-save) | 0,795 (Spannweite 0,085) |
+| Pp-Abweichung, Strom 1 / Strom 2 (n=24, Saatversatz 10.000.000) | 33,7 / 35,1 Pp |
+| Possessions/Spiel (Mittel, 10 Saaten) | 72,3 |
+| Paesse/Spiel | 169,9 (2,35/Possession) |
+| Feldwurfversuche/Spiel | 79,6 (1,10/Possession) |
+
+Pp-Zahl deckt sich mit der 14.10.-Diagnose (33,7 Pp) — vorbestehender, von dieser Runde
+unabhaengiger Rezeptzustand (analog Football), nicht Teil dieses Auftrags.
+
+**Drei Stufen (beide Konstanten synchron angehoben, je n=24 fuer rho, 10 Saaten fuer Possessions/
+Paesse/FGA; Pp nur am Endstand als Stichprobe, s.u.):**
+
+| Viertellaenge | Gesamtspielzeit | rho je Spiel (Median) | Spannweite | Marge ueber 0,80 | Possessions | Paesse | FGA |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 90s (Basis) | 360s | 0,795 | 0,085 | −0,005 | 72,3 | 169,9 | 79,6 |
+| 105s | 420s | **0,804** | 0,061 | **+0,004** | 84,7 (+17 %) | 205,3 (+21 %) | 92,0 (+16 %) |
+| 120s | 480s | **0,817** | 0,072 | **+0,017** | 96,2 (+33 %) | 231,1 (+36 %) | 103,3 (+30 %) |
+
+**Pp bei 120s (ein Saatstrom, Sanitycheck):** 31,5 Pp — gegenueber 33,7/35,1 Pp der Baseline nicht
+schlechter, eher leicht besser; bestaetigt die Erwartung, dass eine reine Zeitaenderung die
+Attributgewichtung nicht verschiebt. Kein zweiter Strom gefahren, weil nichts gebaut wird (s.u.) —
+bei einer kuenftigen Umsetzung waere der zweite Strom vor dem Merge Pflicht.
+
+**Lesart.** Der praktische Effekt, den Chris wollte, ist eindeutig da: Possessions, Paesse und
+Feldwurfversuche steigen bei jeder Stufe deutlich und monoton (120s: +33 %/+36 %/+30 % gegenueber
+heute). Die rho-Zahl bewegt sich dabei NICHT in die gefuerchtete Richtung — anders als die alte,
+nicht direkt uebertragbare 180→120s-Gesamtspielzeit-Regression aus der Vor-Viertel-Aera
+(rho 0,785→0,718, s. `basketball-tempo-passing-diagnose-14-10.md` Abschnitt 3.3), steigt rho hier
+mit laengeren Vierteln leicht an (0,795→0,804→0,817) statt zu fallen. Das Risiko "laenger macht
+rho kaputt" bestaetigt sich also nicht.
+
+Trotzdem ist keine der drei Stufen **sicher**: die Marge ueber der 0,80-Schranke (+0,004 bei 105s,
++0,017 bei 120s) bleibt in beiden Faellen kleiner als die Spannweite des Kaderrauschens bei
+UNVERAENDERTER Mechanik (0,06-0,085, gemessen an genau dieser Kader-Familie). Eine Verbesserung,
+die kleiner ist als das Rauschen, ist von Zufall nicht unterscheidbar (`docs/design/
+messgrundlage-kaderfest.md`) — bei 120s koennte die naechste Kader-Ziehung ebenso gut wieder unter
+0,80 fallen. Damit ist auch die hoechste der drei getesteten, moderaten Stufen kein belastbares
+"haelt rho sicher", nur ein "haelt rho im selben knappen Fenster wie heute, eher an dessen guenstigem
+Rand".
+
+**Entscheidung dieser Runde:** nichts committet. `VIERTEL_DAUER_BASKETBALL`/`periodenDauer` bleiben
+bei 90, keine Mechanik-Aenderung in `battle-mode.engine.js`. Grund: der Auftrag verlangte
+ausdruecklich eine Stufe mit **echtem** Puffer ("nicht knapp"), nicht nur eine, die formal ueber
+0,80 liegt — und keine der drei bietet den. Basketballs rho steht ohnehin seit dem 14.10. im
+selben knappen Fenster um 0,79-0,82; eine Zeitaenderung allein hebt es nicht verlaesslich heraus.
+
+**Fuer eine kuenftige Runde:** die Richtung (laenger = mehr Possessions, rho tendenziell nicht
+schlechter) ist jetzt durch drei unabhaengige Messpunkte belegt, nicht nur vermutet. Wer Option D
+spaeter umsetzen will, hat zwei ehrliche Wege: (a) eine groessere Stichprobe (mehr Kader-Varianten
+oder ein zweiter unabhaengiger Kader-Pool) um zu pruefen, ob die Mehrheit der Varianten bei 120s
+wirklich ueber 0,80 bleibt, statt nur der Median einer Familie, oder (b) zuerst Option E (Validitaet
+sichern, s. Diagnose-Dokument Abschnitt 6) fahren, damit die Basislinie selbst einen echten Puffer
+hat, bevor eine Zeitaenderung drauf aufbaut.
+
+Gemessene/geaenderte Dateien dieser Runde: nur dieser Abschnitt (`docs/design/
+stand-aller-disziplinen.md`). `battle-mode.engine.js` wurde fuer die Messung temporaer editiert
+(`VIERTEL_DAUER_BASKETBALL`, `FELDSPIEL_ART.basketball.live.periodenDauer`, sowie ein
+Possession/Pass-Zaehler in `passeAb()`/`naechsterAngriff()` analog zur 14.10.-Runde) und vor dem
+Commit vollstaendig zurueckgesetzt — `git diff` gegen `origin/main` zeigt fuer diese Datei keine
+Aenderung.
+
+---
+
+## 13. Pp-Rauschboden: einflussVon() auf RNG-Rauschen geprueft, Schranke haelt (Task #174, 18.10.)
+
+Hintergrund: `docs/design/neue-disziplin-handbuch.md` Abschnitt 3.2 hatte als „verwandten, noch
+offenen" Befund notiert, dass Basis- und Hebungslauf in `einflussVon()` sich Seed UND
+rr()-Aufrufzahl teilen (`battle-mode.engine.js:9545`ff., Basketball-Wurfbonus-Runde) — jeder
+zusaetzliche bedingte Wuerfel-Aufruf verschiebt die Zufallsfolge und kann ein Pp-Artefakt
+erzeugen, das nichts mit echtem Attributeinfluss zu tun hat. Auftrag dieser Runde: wie gross ist
+dieser Rauschboden tatsaechlich, und haelt die ≤25-Pp-Schranke mit genuegend Abstand darueber?
+
+**Mechanismus am Code bestaetigt.** `rr()` (`battle-mode.engine.js:34053`) ist ein LCG mit einem
+globalen `seed`, den `M.bau(saat)` je Durchlauf auf `saat` zuruecksetzt. Zwei frische Proben:
+
+| Probe | Disziplin | n | Befund |
+|---|---|---:|---|
+| Kontrolle ohne bedingte Wuerfel | Spurt (reine Rennmechanik) | 48 | intelligence/charisma/spirit (Matrix 0) lesen EXAKT 0,0 % — kein Rauschen, weil keine Verzweigung |
+| rr()-Zaehlung je Spiel (instrumentierte Kopie, nicht im Repo) | Basketball (6v6, Feldspiel-Live) | 1 | health/determination/will (Matrix 0, nirgends gelesen) exakt Delta 0 bei allen 12 Spielern; die neun lebenden Attribute verschieben die rr()-Aufrufzahl um bis zu −292/+227 (≈ 9 % von 3306) |
+
+**Ergebnis.** Ein Gewicht-0-Attribut, das (wie an beiden Proben gemessen) auch mechanisch toter
+Code ist, liest in `einflussVon()` exakt null — kein Rauschen, kein Risiko fuer die Schranke. Das
+reale Risiko sitzt bei den lebenden Attributen, deren rr()-Verschiebung sich mit dem echten
+Effekt mischt. Ob n=24/48 das ausmittelt, zeigt die bestehende Messhistorie: zwei unabhaengige
+Saatstroeme schwankten um 1,4–2,2 Pp (17,2/19,4 fruehe Rezeptstufe PR #680; 33,7/35,1 Abschnitt 12
+oben, 15.10.) — 6–9 % der 25-Pp-Schranke, also ein kleiner Rauschboden gegen eine Schranke mit
+echtem Puffer. **Keine Code-Aenderung noetig — die Schranke haelt.** Basketballs aktuelle
+33,7/35,1 Pp liegen zwar selbst schon ueber 25, das ist aber der vorbestehende Rezeptbefund aus
+Abschnitt 12, nicht dieses Rauschen.
+
+**Werkzeuggrenze.** Ein frischer `einflussVon("basketball",12)`-Lauf blieb in dieser Sitzung
+zweimal unzuverlaessig (einmal > 15 Minuten ohne Ausgabe, einmal > 35 Minuten haengend ohne
+Fehlermeldung) — vermutlich derselbe Speicherdruck, den der Skriptkopf von
+`messe-arena-einfluss.mjs` schon fuer n=48 beschreibt, hier vermutlich verschaerft durch mehrere
+`einflussVon()`-Aufrufe in EINER Playwright-Seite ohne Reload. Empfehlung fuer kuenftige
+Basketball-Pp-Messungen: pro Saatstrom einen frischen Prozess starten (wie das Standard-Skript es
+ohnehin tut), keine Mehrfachaufrufe in einer Seite verketten.
+
+Ausfuehrlicher Mechanismus, Zahlen und Code-Zitate: `docs/design/neue-disziplin-handbuch.md`
+Abschnitt 3.2 (Nachtrag 18.10.). Gemessene/geaenderte Dateien dieser Runde: nur Dokumentation
+(dieser Abschnitt + Handbuch-Nachtrag); keine Aenderung an `battle-mode.engine.js` oder sonstigem
+Produktionscode — die fuer die rr()-Zaehlung instrumentierte Engine-Kopie lag ausserhalb des
+Repos, in einer temporaeren Sandbox-Kopie, und wurde nicht committet.

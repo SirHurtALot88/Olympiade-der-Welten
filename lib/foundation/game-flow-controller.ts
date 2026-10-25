@@ -978,7 +978,7 @@ export function shouldAutoOpenSeasonBriefing(
 
   const seasonId = gameState.season.id;
   const currentMatchday = gameState.season.currentMatchday ?? 1;
-  const totalMatchdays = gameState.season.totalMatchdays ?? 10;
+  const totalMatchdays = gameState.season.totalMatchdays ?? (gameState.season.matchdayIds?.length || 10);
   if (currentMatchday > 1) {
     return false;
   }

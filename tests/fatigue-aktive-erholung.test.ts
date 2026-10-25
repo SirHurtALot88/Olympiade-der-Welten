@@ -1,5 +1,5 @@
 /**
- * WER SPIELT, BEKOMMT KÜNFTIG AUCH ERHOLUNG — hinter einem Schalter, der noch aus ist.
+ * WER SPIELT, BEKOMMT AUCH ERHOLUNG — in einer 20-Spieltage-Battle-Saison, sonst nirgends.
  *
  * BEFUND (Designplan `docs/design/fatigue-saisonlaenge-plan.md`, B.2): Ein Spieler, der nie
  * rotiert wird, bekommt heute an KEINEM Spieltag Erholung — die Recovery-Schleife überspringt
@@ -16,8 +16,9 @@
  * WAS DIESER TEST FESTHÄLT — die zwei Seiten der Auslieferung:
  *   1. Schalter AUS (Default): NICHTS ändert sich. Bank wie Einsatz rechnen auf die Nachkommastelle
  *      wie vor der Änderung. Das ist der Regressionsschutz für jeden bestehenden Spielstand.
- *   2. Schalter AN: die vier Fälle aus der Tabelle in B.4 — Einsatz normal +5, schonen +1,
- *      pushen +11,4, Bank −28.
+ *   2. Schalter AN: die vier Fälle aus B.4, mit dem VERMESSENEN aktiven Anteil 4,5 statt der
+ *      Plan-Zahl 11 — Einsatz normal +11,5, schonen +7,5, pushen +17,9, Bank −28.
+ *   3. Ohne ENV entscheidet der Spielstand: AN nur in einer Battle-Saison mit 20 Spieltagen.
  *
  * Die absoluten Zahlen stehen hier bewusst NICHT als getippte Konstanten, sondern werden aus
  * `MATCHDAY_FATIGUE_LOAD`, `INTENSITY_FATIGUE_MULT` und `MATCHDAY_ACTIVE_RECOVERY` gerechnet —
@@ -226,9 +227,11 @@ describe("Die Zerlegung der Erholung", () => {
     expect(MATCHDAY_ACTIVE_RECOVERY + MATCHDAY_BENCH_BONUS_RECOVERY).toBe(BASE_MATCHDAY_RECOVERY);
   });
 
-  it("trägt die Zahlen aus dem Designplan: 11 aktiv, 17 Bank-Bonus", () => {
-    expect(MATCHDAY_ACTIVE_RECOVERY).toBe(11);
-    expect(MATCHDAY_BENCH_BONUS_RECOVERY).toBe(17);
+  it("trägt die VERMESSENEN Zahlen: 4,5 aktiv, 23,5 Bank-Bonus (Plan-Vorschlag war 11/17)", () => {
+    // scripts/messe-erholungskorridor.ts, zwei Saatstämme: 4,5 hält eine 20-Spieltage-Saison bei
+    // 159/154 Verletzungen (Chris' Korridor 150-200), 11 drückte sie auf 2.
+    expect(MATCHDAY_ACTIVE_RECOVERY).toBe(4.5);
+    expect(MATCHDAY_BENCH_BONUS_RECOVERY).toBe(23.5);
   });
 
   it("die Gebäude wirken auf BEIDE Teile, ohne die Bank-Erholung anzuheben", () => {
@@ -246,9 +249,11 @@ describe("Die Zerlegung der Erholung", () => {
     expect(ausgebaut.activeRecovery).toBeGreaterThan(ohne.activeRecovery);
     // Der Aufschlag wird ANTEILIG geteilt, nicht zweimal voll addiert — sonst risse die
     // Bank-Erholung den gebäudelosen Verletzungs-Korridor.
+    // Präzision 3: der aktive Anteil wird auf zwei Nachkommastellen gerundet, das Verhältnis
+    // trägt bei kleinen Werten (4,5 von 28) deshalb nur gut drei Stellen.
     expect(ausgebaut.activeRecovery / ausgebaut.normalRecovery).toBeCloseTo(
       MATCHDAY_ACTIVE_RECOVERY / BASE_MATCHDAY_RECOVERY,
-      4,
+      3,
     );
   });
 
@@ -297,31 +302,31 @@ describe("Schalter AUS (Default): der bestehende Spielstand rechnet unverändert
   });
 });
 
-describe("Schalter AN: die vier Fälle aus Plan-Abschnitt B.4", () => {
+describe("Schalter AN: die vier Fälle, mit dem vermessenen Wert 4,5", () => {
   const netto = (intensity: MatchdayIntensityStage) =>
     Number((last(intensity) - MATCHDAY_ACTIVE_RECOVERY).toFixed(2));
 
-  it("Einsatz normal: +5 netto statt +16", () => {
+  it("Einsatz normal: +11,5 netto statt +16", () => {
     withFlag("1", () => {
       const gespielt = spielSpieltag({ usedFatigue: 30, intensity: "normal" });
-      expect(netto("normal")).toBe(5);
-      expect(gespielt.einsatzNachher).toBe(30 + 5);
+      expect(netto("normal")).toBe(11.5);
+      expect(gespielt.einsatzNachher).toBe(30 + 11.5);
     });
   });
 
-  it("Einsatz schonen: +1 netto — Schonen wird fast eine Dauerlösung", () => {
+  it("Einsatz schonen: +7,5 netto", () => {
     withFlag("1", () => {
       const gespielt = spielSpieltag({ usedFatigue: 30, intensity: "conserve" });
-      expect(netto("conserve")).toBe(1);
-      expect(gespielt.einsatzNachher).toBe(30 + 1);
+      expect(netto("conserve")).toBe(7.5);
+      expect(gespielt.einsatzNachher).toBe(30 + 7.5);
     });
   });
 
-  it("Einsatz pushen: +11,4 netto — Pushen bleibt spürbar riskanter", () => {
+  it("Einsatz pushen: +17,9 netto — Pushen bleibt spürbar riskanter", () => {
     withFlag("1", () => {
       const gespielt = spielSpieltag({ usedFatigue: 30, intensity: "push" });
-      expect(netto("push")).toBeCloseTo(11.4, 2);
-      expect(gespielt.einsatzNachher).toBeCloseTo(41.4, 2);
+      expect(netto("push")).toBeCloseTo(17.9, 2);
+      expect(gespielt.einsatzNachher).toBeCloseTo(47.9, 2);
     });
   });
 
@@ -332,21 +337,21 @@ describe("Schalter AN: die vier Fälle aus Plan-Abschnitt B.4", () => {
     });
   });
 
-  it("Rotation bleibt das stärkste Werkzeug: ein Bank-Spieltag tilgt mehrere Einsätze", () => {
+  it("Rotation bleibt das stärkste Werkzeug: ein Bank-Spieltag tilgt mehr als zwei Einsätze", () => {
     withFlag("1", () => {
-      expect(BASE_MATCHDAY_RECOVERY / netto("normal")).toBeGreaterThan(5);
+      expect(BASE_MATCHDAY_RECOVERY / netto("normal")).toBeGreaterThan(2);
     });
   });
 });
 
-describe("Schalter AN: die Kappungsgrenze wird über die Saison gestreckt", () => {
-  it("ein Dauerstarter erreicht 100 erst nach ~20 statt nach 7 Spieltagen", () => {
+describe("Schalter AN: die Kappungsgrenze kommt später", () => {
+  it("ein Dauerstarter erreicht 100 nach 9 statt nach 7 Spieltagen", () => {
     withFlag("1", () => {
       const nettoNormal = last("normal") - MATCHDAY_ACTIVE_RECOVERY;
       const spieltageBisKappung = Math.ceil(100 / nettoNormal);
       const heute = Math.ceil(100 / last("normal"));
       expect(heute).toBe(7);
-      expect(spieltageBisKappung).toBeGreaterThanOrEqual(18);
+      expect(spieltageBisKappung).toBe(9);
     });
   });
 
@@ -361,10 +366,86 @@ describe("Schalter AN: die Kappungsgrenze wird über die Saison gestreckt", () =
         activeRecovery: getPlayerActiveRecoveryCredit(createGameState(), "A-A", "mittel"),
       });
       expect(projektion.activeRecovery).toBe(MATCHDAY_ACTIVE_RECOVERY);
-      expect(projektion.fatigueBeforeRoll).toBe(35);
+      expect(projektion.fatigueBeforeRoll).toBe(41.5);
 
       const gespielt = spielSpieltag({ usedFatigue: 30, intensity: "normal" });
       expect(gespielt.result.injuryEvents[0]?.fatigueBefore).toBe(projektion.fatigueBeforeRoll);
+    });
+  });
+});
+
+/**
+ * DAS GATE — wo die aktive Erholung ohne ENV greift. Nur in einer Battle-Saison mit 20 Spieltagen
+ * (`isDoubledBattleSeason`). Jeder Manager-Spielstand und jede 10-Spieltage-Battle-Saison bleibt
+ * unberührt — insbesondere Chris' laufender Manager-Save auf dem Server.
+ */
+describe("Ohne ENV entscheidet der Spielstand", () => {
+  const disziplinen = Array.from({ length: 20 }, (_, index) => ({
+    id: `d-${index}`,
+    name: `D${index}`,
+    category: (["power", "speed", "mental", "social"] as const)[index % 4],
+    weight: 1,
+  }));
+  const stand = (gameMode: "battle" | "manager" | null, spieltage: number) =>
+    ({
+      ...createGameState({ usedFatigue: 30 }),
+      ...(gameMode ? { scenarioMeta: { gameMode } } : {}),
+      disciplines: disziplinen,
+      season: {
+        id: "season-1",
+        name: "Season 1",
+        year: 1,
+        currentMatchday: 1,
+        matchdayIds: ["md-1", ...Array.from({ length: spieltage - 1 }, (_, index) => `md-${index + 2}`)],
+      },
+    }) as unknown as GameState;
+
+  it("Battle Mode mit 20 Spieltagen: AN", () => {
+    withFlag(null, () => {
+      expect(isFatigueActiveRecoveryEnabled(stand("battle", 20))).toBe(true);
+      const gespielt = applyFatigueAndInjuryAfterMatchday({
+        gameState: stand("battle", 20),
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-1",
+        matchdayResultId: "result-1",
+        timestamp: "2026-08-30T00:00:00.000Z",
+      });
+      const einsatz = gespielt.gameState.players.find((entry) => entry.id === "spieler-einsatz")?.fatigue;
+      expect(einsatz).toBe(30 + last("normal") - MATCHDAY_ACTIVE_RECOVERY);
+    });
+  });
+
+  it("Battle Mode mit 10 Spieltagen (Alt-Save, laufende Saison): AUS", () => {
+    withFlag(null, () => {
+      expect(isFatigueActiveRecoveryEnabled(stand("battle", 10))).toBe(false);
+    });
+  });
+
+  it("Manager Mode — egal wie lang die Saison ist: AUS", () => {
+    withFlag(null, () => {
+      expect(isFatigueActiveRecoveryEnabled(stand("manager", 10))).toBe(false);
+      expect(isFatigueActiveRecoveryEnabled(stand("manager", 20))).toBe(false);
+      expect(isFatigueActiveRecoveryEnabled(stand(null, 20))).toBe(false);
+      const gespielt = applyFatigueAndInjuryAfterMatchday({
+        gameState: stand("manager", 10),
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-1",
+        matchdayResultId: "result-1",
+        timestamp: "2026-08-30T00:00:00.000Z",
+      });
+      const einsatz = gespielt.gameState.players.find((entry) => entry.id === "spieler-einsatz")?.fatigue;
+      expect(einsatz).toBe(30 + last("normal"));
+    });
+  });
+
+  it("ENV „0“ erzwingt AUS auch in der Doppelsaison, „1“ erzwingt AN überall", () => {
+    withFlag("0", () => {
+      expect(isFatigueActiveRecoveryEnabled(stand("battle", 20))).toBe(false);
+    });
+    withFlag("1", () => {
+      expect(isFatigueActiveRecoveryEnabled(stand("manager", 10))).toBe(true);
     });
   });
 });

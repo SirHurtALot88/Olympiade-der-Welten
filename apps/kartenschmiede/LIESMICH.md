@@ -12,6 +12,11 @@ Läuft in der App unter **`/kartenschmiede`** (hinter demselben Login wie das Sp
 | `datenbank.js` | Reiter „Datenbank“: Suche, Typ- und Tag-Filter, Generator, eigene Einträge |
 | `app.js` | Reiter „Karten“: Werkstatt, Baukasten, Fähigkeiten-Datenbank, Simulator, Speichern, Karte als Text |
 | `gruppe.js` | Reiter „Gruppe“: Helden-Lineups mit Budget, Fähigkeiten je Mitglied, Wellengröße, Druck |
+| `szenarien.js` | Reiter „Szenarien“: Kampagne Moosgrab (Map 1–5 mit Tischskizze, Spielleiter-Blatt, Folgen), Zusatzmissionen aus Schauplatz × Ziel × Komplikation mit Alarmstufe, Gelände nach OPR, Tische bis 120 × 80 cm. Ohne DOM, getestet |
+| `szenarien-ui.js` | Oberfläche dazu: Spieler- und Spielleiter-Ansicht (ohne Spoiler), Tischkarte als SVG, Wellenpunkte aus einer Gruppe, A4-Druckbogen, Speichern unter `kartenschmiede/szenarien/` |
+| `spiel-motor.js` | Motor des Reiters „Spielen“: spielt eine Map als Schrittgraph ab (Bedingungen, Flags, Leisten, Runden, Ereignisse, Antwortwahl, Gegner mit verdeckten Zustandsstufen, Rückgängig). Ohne DOM, getestet |
+| `spiel.js` | Reiter „Spielen“: Spielleiter-Schirm mit Schrittkarte, Vorlesetexten, NPC-Fenster, Audio-Cues (Upload unter `kartenschmiede/audio/`), Gegnerspalte mit +1/+2 und Spielstand unter `kartenschmiede/spielstaende/`. Tasten: Leertaste weiter, Backspace zurück, 1–4 Antwort, R Runde, A Cue, Tab/+/− Gegner |
+| `kampagnen/<kampagne>/mapN.json` | Spieldaten je Map für den Reiter „Spielen“ (Moosgrab Map 1 und 2). Felder neben Schritten und Ereignissen: `probe` (Stufen ab 3/5 nach dem Wurf), Leisten-`schwellen`, Gegner-`tod`/`zusatz`/`info`, `lage` (Ziele, Flucht, Sonderregeln), `rundenwurf`, `tischplan`; Entfernungen in Kartenbreiten und Kartenlängen statt Zoll. Neue Maps in `lib/kartenschmiede/seite.ts` unter `SPIELMODUS_MAPS` eintragen. Konzept: `docs/design/moosgrab-spielmodus-konzept.md` |
 | `charaktere.js` | Tabelle „Fertige Charaktere“ unter dem Erstellen: Vorlagen und gespeicherte Karten, sortier- und filterbar |
 | `assets/`, `fonts/` | Beispielbilder aus Chris' Einheiten-Tabelle, Schriften (SIL OFL, über Fontsource) |
 | `vendor/html-to-image.js` | PNG-Export (MIT, Version 1.11.11) |

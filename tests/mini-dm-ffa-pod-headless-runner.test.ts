@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { runMiniDmFfaPodFixtures, type MiniDmFfaPodFixtureResult } from "@/lib/battle/arena-headless-runner";
-import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 
 const CHROMIUM_PFAD = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const LAUF_TIMEOUT_MS = 90_000;
@@ -36,12 +36,112 @@ function chromiumVerfuegbar(): boolean {
 
 const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
 
-function zaehleChromiumKindprozesse(): number {
+type PsZeile = { pid: string; ppid: string; args: string };
+
+/**
+ * Ein `ps`-Schnappschuss mit PPID -- aus demselben Grund wie in
+ * tests/arena-headless-runner.test.ts (Flaky-Fund 07.10.): ein reiner Vorher/Nachher-Vergleich
+ * ueber ALLE Chromium-Prozesse der Maschine ist fragil, sobald irgendein ANDERER Prozess waehrend
+ * des Tests nebenlaeufig Chromium startet oder beendet. Die PPID traegt die Abstammungspruefung
+ * in `eigeneProfileAusSchnappschuss()`, die stattdessen nur UNSERE eigenen Chromium-Prozesse
+ * findet.
+ */
+function schnappschuss(): PsZeile[] | null {
   try {
-    const ausgabe = execSync("ps -eo pid,args", { encoding: "utf8" });
-    return ausgabe.split("\n").filter((zeile) => zeile.includes(CHROMIUM_PFAD)).length;
+    // `-ww`: ohne diesen Schalter kappt `ps` jede Zeile an `$COLUMNS` (in manchen Shells/CI
+    // exportiert) -- die Hauptprozesszeile ist mit all ihren Chromium-Flags weit ueber 1000
+    // Zeichen lang, das `--user-data-dir` liegt also oft hinter dem Schnitt und `profile` bliebe
+    // leer, obwohl ein Browser lief (Fund im Opus-Review 07.10., s. ausfuehrlicher Kommentar in
+    // tests/arena-headless-runner.test.ts).
+    const ausgabe = execSync("ps -ww -eo pid,ppid,args", { encoding: "utf8" });
+    const zeilen: PsZeile[] = [];
+    for (const zeile of ausgabe.split("\n")) {
+      const treffer = zeile.match(/^\s*(\d+)\s+(\d+)\s+(.*)$/);
+      if (treffer) zeilen.push({ pid: treffer[1], ppid: treffer[2], args: treffer[3] });
+    }
+    return zeilen;
   } catch {
-    return -1;
+    return null;
+  }
+}
+
+function istNachkommeVon(pid: string, ppidVon: Map<string, string>, wurzel: string): boolean {
+  let aktuell = pid;
+  const gesehen = new Set<string>();
+  for (;;) {
+    const ppid = ppidVon.get(aktuell);
+    if (!ppid || gesehen.has(aktuell)) return false;
+    if (ppid === wurzel) return true;
+    gesehen.add(aktuell);
+    aktuell = ppid;
+  }
+}
+
+/**
+ * Liefert die `--user-data-dir`-Profile aller Chromium-Prozesse im Schnappschuss, die zu diesem
+ * Zeitpunkt (noch) Nachkommen von `wurzelPid` sind -- also nachweisbar von DIESEM Testprozess
+ * gestartet wurden, nicht von irgendeinem anderen, gleichzeitig in dieser geteilten Umgebung
+ * laufenden Agenten (ausfuehrlicher Kommentar in tests/arena-headless-runner.test.ts).
+ */
+function eigeneProfileAusSchnappschuss(zeilen: PsZeile[], wurzelPid: number): Set<string> {
+  const ppidVon = new Map(zeilen.map((z) => [z.pid, z.ppid]));
+  const profile = new Set<string>();
+  for (const z of zeilen) {
+    if (!z.args.includes(CHROMIUM_PFAD)) continue;
+    if (!istNachkommeVon(z.pid, ppidVon, String(wurzelPid))) continue;
+    const treffer = z.args.match(/--user-data-dir=(\S+)/);
+    if (treffer) profile.add(treffer[1]);
+  }
+  return profile;
+}
+
+/**
+ * Sammelt waehrend `aktion()` laufend (alle 100ms) die Playwright-Profilverzeichnisse, die dieser
+ * Testprozess selbst gestartet hat (ausfuehrlicher Kommentar, inklusive der bewusst
+ * hingenommenen crashpad_handler-Luecke, in tests/arena-headless-runner.test.ts). Sobald
+ * `browser.close()` den Hauptprozess beendet, werden seine verbliebenen Helfer (Zygote/GPU/
+ * Utility) vom Kernel auf PID 1 umgehaengt -- danach ist eine Abstammungspruefung wirkungslos.
+ * Das pro Start zufaellige `--user-data-dir` bleibt dagegen in jedem zugehoerigen Prozess
+ * sichtbar.
+ */
+async function sammleEigeneProfileWaehrend(aktion: () => Promise<void>): Promise<Set<string>> {
+  const profile = new Set<string>();
+  let laeuft = true;
+  const erfasse = () => {
+    const zeilen = schnappschuss();
+    if (zeilen) for (const p of eigeneProfileAusSchnappschuss(zeilen, process.pid)) profile.add(p);
+  };
+  const sammlerFertig = (async () => {
+    while (laeuft) {
+      erfasse();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    erfasse(); // letzter Schnappschuss, falls `aktion` zwischen zwei Intervallen fertig wurde
+  })();
+  try {
+    await aktion();
+  } finally {
+    laeuft = false;
+    await sammlerFertig;
+  }
+  return profile;
+}
+
+/**
+ * Wartet bis zu `maxWartenMs` darauf, dass kein Chromium-Prozess mit einem der gesammelten
+ * Profile mehr lebt, und liefert die am Ende noch lebenden PIDs zurueck (leer = kein Leck).
+ */
+async function wartetBisProfileVerschwinden(profile: Set<string>, maxWartenMs = 5000): Promise<string[]> {
+  if (profile.size === 0) return [];
+  const start = Date.now();
+  for (;;) {
+    const zeilen = schnappschuss();
+    const lebend =
+      zeilen === null
+        ? []
+        : zeilen.filter((z) => z.args.includes(CHROMIUM_PFAD) && [...profile].some((p) => z.args.includes(p))).map((z) => z.pid);
+    if (lebend.length === 0 || Date.now() - start >= maxWartenMs) return lebend;
+    await new Promise((resolve) => setTimeout(resolve, 150));
   }
 }
 
@@ -209,30 +309,27 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
   it(
     "schliesst den Browser zuverlaessig nach Erfolg (kein Zombie-Prozess)",
     async () => {
-      // DELTA statt absolutem Nullwert (wie tests/arena-headless-runner.test.ts es fuer
-      // `runArenaFixtures()` bereits vormacht): diese Umgebung kann bereits vor diesem Test
-      // Chromium-Prozesse fuehren (z. B. ein zeitgleich laufender anderer Chromium-Test); nur der
-      // Unterschied VOR/NACH diesem Aufruf ist aussagekraeftig, ein absolutes `toBe(0)` waere
-      // gegen jede Parallelitaet fragil.
-      const vorher = zaehleChromiumKindprozesse();
-
       const gameState = baueGameState(
         { teamId: "team-a", prefix: "A" },
         { teamId: "team-b", prefix: "B" },
         { teamId: "team-c", prefix: "C" },
         { teamId: "team-d", prefix: "D" },
       );
-      await runMiniDmFfaPodFixtures(gameState, [
-        { podId: "pod-shutdown", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-shutdown" },
-      ]);
 
-      const nachher = zaehleChromiumKindprozesse();
-      if (vorher === -1 || nachher === -1) {
-        // `ps` in dieser Umgebung nicht verfuegbar -- der eigentliche Simulationslauf oben ist
-        // trotzdem bereits erfolgreich durchgelaufen.
+      const profile = await sammleEigeneProfileWaehrend(async () => {
+        await runMiniDmFfaPodFixtures(gameState, [
+          { podId: "pod-shutdown", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-shutdown" },
+        ]);
+      });
+
+      if (profile.size === 0) {
+        // `ps` in dieser Umgebung nicht verfuegbar, ODER das 100ms-Sampling hat keinen einzigen
+        // Schnappschuss waehrend eines lebenden Chromium-Prozesses getroffen -- der eigentliche
+        // Simulationslauf oben ist trotzdem bereits erfolgreich durchgelaufen.
         return;
       }
-      expect(nachher).toBe(vorher);
+      const lebend = await wartetBisProfileVerschwinden(profile);
+      expect(lebend).toEqual([]);
     },
     LAUF_TIMEOUT_MS,
   );
@@ -240,17 +337,134 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("runMiniDmFfaPodFixtures", () => {
   it(
     "liefert null (statt zu werfen) und startet keinen Browser, wenn ALLE Pods unvollstaendig sind",
     async () => {
-      const vorher = zaehleChromiumKindprozesse();
       const gameState = baueGameState({ teamId: "team-a", prefix: "A" });
-      const ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
-        { podId: "pod-leer", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-leer" },
-      ]);
+      let ergebnisse: (MiniDmFfaPodFixtureResult | null)[] = [];
+      const profile = await sammleEigeneProfileWaehrend(async () => {
+        ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
+          { podId: "pod-leer", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-leer" },
+        ]);
+      });
       expect(ergebnisse).toEqual([null]);
-      const nachher = zaehleChromiumKindprozesse();
-      if (vorher === -1 || nachher === -1) {
+      if (schnappschuss() === null) {
+        // `ps` in dieser Umgebung nicht verfuegbar -- der Determinismus-Teil oben (ergebnisse)
+        // hat die eigentliche Behauptung des Tests bereits geprueft.
         return;
       }
-      expect(nachher).toBe(vorher);
+      // Die Abstammungspruefung macht jetzt sichtbar, ob WIRKLICH kein Browser gestartet wurde
+      // (statt wie frueher nur stillschweigend durchzufallen, wenn zufaellig nichts Neues auftauchte):
+      // kein eigener Chromium-Nachkomme bedeutet kein gelerntes Profil.
+      expect(profile.size).toBe(0);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  /**
+   * AUFSTELLUNG (20.10., PR A) — Wiring-Nachweis: ein Lineup-Entwurf, der `team-a`s SCHWAECHSTEN
+   * Mini-DM-Spieler (Index 0, s. `baueKader()`: `disciplineRatings["mini-dm"]` steigt mit dem
+   * Index) explizit auf die Frontliner-Rolle setzt, muss GENAU DIESEN Spieler im Boxscore der
+   * Frontliner-Runde sehen -- nicht den Spieler, den die reine Eignungs-Sortierung (Index 9, der
+   * staerkste) dort automatisch gesetzt haette. Die drei anderen Teams bekommen keinen Entwurf
+   * und bleiben beim alten Eignungs-Reihum (GEGENPROBE fuer "nur die gesetzte Rolle aendert sich,
+   * sonst nichts").
+   */
+  it(
+    "uebernimmt einen expliziten Lineup-Entwurf fuer eine Mini-DM-Rolle statt der reinen Eignungs-Auswahl",
+    async () => {
+      const basis = baueGameState(
+        { teamId: "team-a", prefix: "A" },
+        { teamId: "team-b", prefix: "B" },
+        { teamId: "team-c", prefix: "C" },
+        { teamId: "team-d", prefix: "D" },
+      );
+      const lineupDraft: LineupDraft = {
+        lineupId: "draft-team-a",
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-mini-dm",
+        teamId: "team-a",
+        status: "resolved",
+        entries: [
+          // slotIndex 0 = "frontliner" (SLOTS_JE_DISC["mini-dm"][0] im Motor) -- "A Spieler 0"
+          // ist mit Abstand der schwaechste Mini-DM-Kaempfer von team-a (d=30), waehrend die
+          // Eignungs-Sortierung ohne diesen Entwurf "A Spieler 9" (d=75) dort gesetzt haette.
+          { disciplineId: "mini-dm", disciplineSide: "d1", slotIndex: 0, playerId: "A-0", activePlayerId: null },
+        ],
+        createdAt: "2026-10-20T00:00:00.000Z",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+      };
+      const gameState: GameState = {
+        ...basis,
+        matchdayState: { matchdayId: "md-mini-dm" } as GameState["matchdayState"],
+        seasonState: { lineupDrafts: [lineupDraft] } as GameState["seasonState"],
+      };
+
+      const ergebnisse = await runMiniDmFfaPodFixtures(gameState, [
+        { podId: "pod-aufstellung", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-aufstellung" },
+      ]);
+
+      expect(ergebnisse).toHaveLength(1);
+      const pod = ergebnisse[0]!;
+      pruefePodErgebnisForm(pod, ["team-a", "team-b", "team-c", "team-d"]);
+
+      const frontlinerVonTeamA = pod.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === "team-a");
+      expect(frontlinerVonTeamA?.name).toBe("A Spieler 0");
+      expect(frontlinerVonTeamA?.playerId).toBe("A-0");
+
+      // "A Spieler 9" (der eigentlich staerkste) fehlt nicht einfach -- er kaempft jetzt in einer
+      // der DREI anderen (nicht gesetzten) Rollen, ueber den Reihum-Fallback der "freien" Spieler.
+      const alleTeamANamen = pod.boxscore.filter((e) => e.teamId === "team-a").map((e) => e.name);
+      expect(alleTeamANamen).toContain("A Spieler 9");
+      // Genau EIN Boxscore-Eintrag je Team und Rolle (vier Rollen, team-a also genau viermal) --
+      // "A Spieler 0" taucht nicht ZUSAETZLICH irgendwo anders auf.
+      expect(alleTeamANamen.filter((n) => n === "A Spieler 0")).toHaveLength(1);
+      expect(pod.boxscore.filter((e) => e.teamId === "team-a")).toHaveLength(4);
+
+      // Teams ohne eigenen Entwurf (b/c/d) bleiben beim alten Verhalten: ihr jeweils staerkster
+      // Spieler (Index 9) steht weiterhin in der Frontliner-Rolle (Rang 0 des Eignungs-Reihums).
+      for (const teamId of ["team-b", "team-c", "team-d"]) {
+        const frontliner = pod.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === teamId);
+        expect(frontliner?.name?.endsWith("Spieler 9")).toBe(true);
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  it(
+    "aufstellungBeachten: false haelt bewusst beim alten reinen Eignungs-Reihum, trotz Entwurf",
+    async () => {
+      const basis = baueGameState(
+        { teamId: "team-a", prefix: "A" },
+        { teamId: "team-b", prefix: "B" },
+        { teamId: "team-c", prefix: "C" },
+        { teamId: "team-d", prefix: "D" },
+      );
+      const lineupDraft: LineupDraft = {
+        lineupId: "draft-team-a",
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "md-mini-dm",
+        teamId: "team-a",
+        status: "resolved",
+        entries: [{ disciplineId: "mini-dm", disciplineSide: "d1", slotIndex: 0, playerId: "A-0", activePlayerId: null }],
+        createdAt: "2026-10-20T00:00:00.000Z",
+        updatedAt: "2026-10-20T00:00:00.000Z",
+      };
+      const gameState: GameState = {
+        ...basis,
+        matchdayState: { matchdayId: "md-mini-dm" } as GameState["matchdayState"],
+        seasonState: { lineupDrafts: [lineupDraft] } as GameState["seasonState"],
+      };
+
+      const ergebnisse = await runMiniDmFfaPodFixtures(
+        gameState,
+        [{ podId: "pod-ohne-aufstellung", teamIds: ["team-a", "team-b", "team-c", "team-d"], seed: "seed-aufstellung" }],
+        { aufstellungBeachten: false },
+      );
+
+      const frontlinerVonTeamA = ergebnisse[0]!.boxscore.find((e) => e.slotId === "frontliner" && e.teamId === "team-a");
+      // Trotz Entwurf: "A Spieler 9" (staerkster), nicht "A Spieler 0" -- der Entwurf wird
+      // ignoriert, wenn der Aufrufer das ausdruecklich so will.
+      expect(frontlinerVonTeamA?.name).toBe("A Spieler 9");
     },
     LAUF_TIMEOUT_MS,
   );

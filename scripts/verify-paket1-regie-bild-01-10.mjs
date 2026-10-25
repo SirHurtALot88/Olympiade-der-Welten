@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -69,6 +70,7 @@ try {
       document.querySelector(".oly-battle-arena")?.classList.add("im-spiel");
     });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+    await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Countdown/Finale-in-Echtzeit/Endstand-Nachlauf aus -- diese Sonde misst bis zum Endstand bzw. per sondenLauf(), s. scripts/lib/arena-anpfiff.mjs
     await seite.evaluate((d) => window.__arena.setDisc(d), disc);
     await seite.click("#t2");
     await seite.click("#play");

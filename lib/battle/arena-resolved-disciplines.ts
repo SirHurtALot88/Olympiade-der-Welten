@@ -1,4 +1,18 @@
 /**
+ * ZWEI MENGEN SEIT DER PPS-DUELL-BRUECKE (16.10., docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md):
+ *
+ *  - `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` (weiter unten, frueher `ARENA_RESOLVED_DISCIPLINE_IDS`):
+ *    die Disziplinen, deren Motor an die Arena-Pipeline ANGESCHLOSSEN ist — Chassis-Dispatch im
+ *    Headless-Runner, PPS-Referenz, Impact-Konfig. Die gesamte Herleitung unten (Wellen,
+ *    Kalibrierungen) beschreibt diese Menge.
+ *  - `ARENA_RESOLVED_DISCIPLINE_IDS` (ganz unten): die Teilmenge, deren Arena-Ergebnis in einem
+ *    Battle-Save TATSAECHLICH zaehlt. Nur wer die Pflichtabnahme aus CLAUDE.md besteht (rho je Spiel
+ *    > 0,80 UND Pp-Abweichung ≤ 25 in zwei Saatstroemen, Tabelle data/generated/disziplin-abnahme.json)
+ *    oder fuer das verfehlte Kriterium auf Chris' Ausnahmeliste steht (`ARENA_ABNAHME_AUSNAHMEN`, je Kriterium), darf hier stehen
+ *    — `tests/disziplin-abnahme-guard.test.ts` schlaegt sonst fehl. Jede angeschlossene, aber nicht
+ *    abgenommene Disziplin laeuft in Battle Mode ueber die PPS-Duell-Bruecke (2/1/0 aus dem
+ *    PPS-Score desselben Fixtures), nie mehr ueber die Rangtabelle.
+ *
  * ARENA_RESOLVED_DISCIPLINE_IDS — eigene Datei ohne Fremd-Importe (A3-Nachtrag, docs/pm-
  * briefings/projektmanager-plan-kampfmodell-umsetzung-20-09.md §3.2), aus demselben Grund wie
  * `arena-seed.ts` daneben: `FoundationBattleArenaHost.tsx` ("use client", Browser-Bundle) muss
@@ -142,7 +156,7 @@
  *  - I-SPY (0,684), BASKETBALLs Nachbarn im "knapp"-Feld, BATTLEFIELD/TDM/MINI-DM
  *    (0,251/0,253/0,094): ACHSE 1 fehlt -- sie bestehen ihre eigene Abnahme nicht.
  */
-export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
   "gewichtheben",
   "hockey",
@@ -167,4 +181,101 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // Schranke -- Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
   // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer Balance-Runde,
   // s. Kommentar oben.
+]);
+
+/** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,80) und Budget-Methode (Pp ≤ 25). */
+export type AbnahmeKriterium = "rho" | "pp";
+
+export type AbnahmeAusnahme = {
+  /** GENAU die Kriterien, die Chris abgenommen hat — jedes andere prueft der Waechter normal weiter. */
+  deckt: readonly AbnahmeKriterium[];
+  begruendung: string;
+};
+
+/**
+ * CHRIS' AUSDRUECKLICH BESTAETIGTE AUSNAHMEN von der Pflichtabnahme, JE KRITERIUM (Projektaufsicht
+ * 16.10.): eine Ausnahme deckt nur das, was Chris tatsaechlich abgenommen hat. Nur mit Zitat/Quelle,
+ * neue Eintraege und neue Kriterien NUR mit Chris' Bestaetigung.
+ *
+ * HOCKEY: Chris hat die Rangtreue abgenommen — vor dem 21.09., also bevor die Pp-Pruefung Pflicht
+ * wurde. Eine Pp-Ausnahme gibt es nicht, und Hockeys Pp (39,4) ist weder frisch noch mit genug Laeufen
+ * gemessen (n=6, Chromium-Abstuerze). Hockey steht deshalb NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS`
+ * und spielt ueber die PPS-Duell-Bruecke, bis eine frische Pp-Messung (≥ 24 Laeufe, zwei Saatstroeme,
+ * ≤ 25) vorliegt oder Chris die Pp-Ausnahme ausdruecklich gibt.
+ */
+export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new Map([
+  [
+    "hockey",
+    {
+      deckt: ["rho"],
+      begruendung:
+        "CLAUDE.md, Abschnitt 'Die Abnahme jeder Disziplin': Chris hat die Feldspieler-Rangtreue von Hockey " +
+        "ausdruecklich abgenommen (Star Rang 1 in 58 %, erste zwei 78 %, kaderfest; docs/design/hockey-opus-review-nhl.md 5.3). " +
+        "Gilt NUR fuer rho — eine Pp-Ausnahme hat Chris nie gegeben.",
+    },
+  ],
+]);
+
+/**
+ * DIE DISZIPLINEN, DEREN ARENA-ERGEBNIS IN EINEM BATTLE-SAVE ZAEHLT (s. Kopfkommentar). Jeder
+ * Eintrag MUSS in `ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS` stehen UND laut
+ * data/generated/disziplin-abnahme.json bestehen (oder in `ARENA_ABNAHME_AUSNAHMEN` stehen) —
+ * erzwungen von tests/disziplin-abnahme-guard.test.ts. Stand 16.10.: Messwerte und Begruendung je
+ * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3.
+ */
+/**
+ * MINI-DM-FFA-VORLAUF-SCHALTER (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung", 24.10.).
+ *
+ * Mini-DM laeuft NICHT ueber dieses generische Chassis-Set — es hat einen eigenen Pod-Resolve-Pfad
+ * (`lib/resolve/mini-dm-pod-resolve.ts`, vier Teams statt eines Zweier-Duells, 2-1-0-0 statt
+ * Sieg/Unentschieden/Niederlage) und wird deshalb hier NIEMALS eingetragen (s.
+ * `tests/disziplin-abnahme-guard.test.ts`, "Mini-DM ist NICHT arena-gewertet"). Dieser Schalter ist
+ * der Mini-DM-eigene Analog-Schalter dazu: `lib/battle/arena-vorlauf-service.ts` prueft ihn, um zu
+ * entscheiden, ob ein Mini-DM-Spieltag echte FFA-Rohdaten bekommt (`MiniDmFfaPodRohdaten`, ueber
+ * `lib/resolve/mini-dm-ffa-matchday.ts` -> `berechneMiniDmPodOverrides({ ffaRohdatenByPodId })`,
+ * mini-dm-pod-resolve.ts PR 4) oder beim bisherigen PPS-Pod-Pfad bleibt.
+ *
+ * CHRIS' ENTSCHEIDUNG (24.10., per Rueckfrage auf PR 3s ehrlichen Befund
+ * `data/generated/disziplin-abnahme.json` Schluessel "mini-dm-ffa"): die Spieler-Ebene-Rangtreue
+ * (rho je Event, die CLAUDE.md-massgebliche Zahl) liegt bei JEDEM k=2..6 unter 0,80 (0,608-0,686) —
+ * schlechter als das bereits live geschaltete Hockey (0,670). TROTZDEM werden ALLE k=2..6
+ * verdrahtet, weil CLAUDE.md ("Die Abnahme jeder Disziplin", Abschnitt zu Star-/Paartreue bei
+ * kleinem n) genau diesen Fall vorwegnimmt: eine Saison hat je Disziplin nur eine Handvoll Spiele,
+ * die nackte Rangkorrelation ist bei kleinem n die UNEHRLICHERE Abnahme. Mini-DMs Stern-/Paartreue
+ * ist durchweg GUT (Star Rang 1 76-81 %, erste zwei 93-95 %, Paare ab 15 Punkten Abstand 99 %
+ * richtig, bei jedem k) — vergleichbar mit Hockeys bereits von Chris abgenommener Star-Rangtreue
+ * (58 %/78 %, `ARENA_ABNAHME_AUSNAHMEN` oben). Diese Faelle sind nicht identisch (Hockeys Ausnahme
+ * deckt nur `rho`, Mini-DM steht nicht einmal in `ARENA_RESOLVED_DISCIPLINE_IDS` und braucht deshalb
+ * keinen Eintrag in jener Map), aber dieselbe Begruendung trifft hier zu — Chris hat sie fuer
+ * Mini-DM ausdruecklich bestaetigt, nicht diese PR von sich aus angewendet.
+ *
+ * NORMALER ROLLOUT-SCHALTER, wie jede andere Disziplin beim Scharfschalten einen hatte (hier ein
+ * eigener Boolean statt eines Mengen-Eintrags, weil Mini-DM kein Chassis-Set-Mitglied ist/wird):
+ * `false` faellt sofort und vollstaendig auf den bisherigen PPS-Pod-Pfad zurueck (Rollback in einer
+ * Zeile, kein Deploy-Wettlauf) — `berechneMiniDmPodOverrides()` behandelt fehlende
+ * `ffaRohdatenByPodId` ohnehin schon immer als "kein FFA-Ergebnis fuer diesen Pod", s. dortiger
+ * Kommentar.
+ */
+export const MINI_DM_FFA_VORLAUF_AKTIV = true;
+
+export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  "gewichtheben",
+  "speed-schach",
+  "showcase",
+  "eiskunstlauf",
+  "breaking",
+  "wettessen",
+  "tennis",
+  "fechten",
+  "staffel",
+  "takeshis-castle",
+  "time-trial",
+  "spurt",
+  "climbing",
+  // HOCKEY BEWUSST NICHT HIER (16.10., Projektaufsicht): Chris' Ausnahme deckt nur rho, Hockeys Pp
+  // ist nicht frisch gemessen (39,4 aus der Doku, n=6) — s. ARENA_ABNAHME_AUSNAHMEN. Bis zur frischen
+  // Pp-Messung oder Chris' Pp-Freigabe ueber die PPS-Duell-Bruecke.
+  // BASKETBALL BEWUSST NICHT HIER (16.10.): rho je Spiel 0,795 (Median, kaderfest, 24 Spiele) — unter
+  // der 0,80-Schranke. Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in
+  // Battle Mode zahlt es bis zur bestandenen Abnahme ueber die PPS-Duell-Bruecke.
 ]);

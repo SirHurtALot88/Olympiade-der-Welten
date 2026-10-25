@@ -36,10 +36,12 @@ import {
   areSeasonApronLinesFrozen,
   computeApronSettlement,
   resolveSeasonApronLines,
+  resolveSeasonApronLinesForTeam,
   resolveApronSalaryFactor,
   type ApronLines,
   getTeamApronSalaryBase,
 } from "@/lib/season/apron-service";
+import { getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
 
 /** Anzahl der Ligaplätze, mit denen `apronWertungsanteil` bei unbekanntem Rang rechnet — letzter Platz. */
 const APRON_FALLBACK_RANK = 32;
@@ -105,48 +107,75 @@ export function buildApronProjection(input: {
   // davor am aktuellen Median. Vorher stand hier (und in `ai-cash-salary-target-service.ts`)
   // dieselbe Auswahl doppelt und ohne die Aufbauphase-Regel — die Anzeige zeigte während des
   // Kaderbaus eine Grenze, die der Gehaltsstand daneben längst überholt hatte.
-  const lines: ApronLines = resolveSeasonApronLines(gameState);
-  // „Eingefroren" heisst: das Kauffenster ist zu UND ein zur Saison passender Snapshot liegt vor.
-  // Dieselbe Frage, die auch `resolveSeasonApronLines` eine Zeile darueber beantwortet — nicht
-  // zweitgerechnet, sonst koennte die Anzeige „eingefroren" melden, waehrend die Zahl daneben noch
-  // live aus dem Median faellt.
+  //
+  // TASK #158/#161, liga-split-plan.md 10.4: MIT aktivem Liga-Split rechnet die Hochrechnung JE
+  // LIGA getrennt (eigene Linien, eigener Topf, 16er-Gewichtstabelle statt 32er) — derselbe Grund
+  // wie in `apron-settlement-service.ts` (`previewApronSettlement`), hier nur für die laufende
+  // Anzeige statt die echte Saisonend-Buchung.
   const frozenLines = areSeasonApronLinesFrozen(gameState);
   const salaryFactor = resolveApronSalaryFactor(gameState);
+  const splitActive = isLeagueSplitActive(gameState);
 
-  const teams = gameState.teams.map((team) => ({
-    teamId: team.teamId,
-    // Dieselbe Bemessungsgrundlage wie Abrechnung und Linien — siehe apron-service.ts.
-    salary: getTeamApronSalaryBase(gameState, team.teamId),
-    rankShare: apronWertungsanteil(input.rankByTeamId.get(team.teamId) ?? APRON_FALLBACK_RANK, salaryFactor),
-  }));
+  const byTeamId = new Map<string, ApronProjectionTeamRow>();
+  let combinedTopf = 0;
+  let combinedZahlerCount = 0;
+  let combinedEmpfaengerCount = 0;
+  let primaryLines: ApronLines | null = null;
 
-  const settlement = computeApronSettlement({ lines, salaryFactor, teams });
+  const runGroup = (teamIds: readonly string[], lines: ApronLines, leagueSize: number) => {
+    primaryLines = primaryLines ?? lines;
+    const teams = teamIds.map((teamId) => ({
+      teamId,
+      // Dieselbe Bemessungsgrundlage wie Abrechnung und Linien — siehe apron-service.ts.
+      salary: getTeamApronSalaryBase(gameState, teamId),
+      rankShare: apronWertungsanteil(input.rankByTeamId.get(teamId) ?? leagueSize, salaryFactor, leagueSize),
+    }));
+    const settlement = computeApronSettlement({ lines, salaryFactor, teams });
+    combinedTopf += settlement.topf;
+    combinedZahlerCount += settlement.zahlerCount;
+    combinedEmpfaengerCount += settlement.empfaengerCount;
+    for (const row of settlement.rows) {
+      byTeamId.set(row.teamId, {
+        teamId: row.teamId,
+        rank: input.rankByTeamId.get(row.teamId) ?? null,
+        salary: row.salary,
+        abgabe: row.abgabe,
+        ausgleich: row.ausgleich,
+        nettoDelta: row.nettoDelta,
+        // Der Deckel hat gegriffen, sobald er die (positive) Rohabgabe wirklich beschnitten
+        // hat. Gleichstand zählt nicht als gedeckelt — sonst meldete jede Abgabe von exakt 0
+        // einen greifenden Deckel.
+        gedeckelt: row.rohAbgabe > row.deckel + 0.005 && row.rohAbgabe > 0,
+        empfaenger: row.istEmpfaenger,
+      });
+    }
+  };
+
+  if (!splitActive) {
+    runGroup(gameState.teams.map((team) => team.teamId), resolveSeasonApronLines(gameState), APRON_FALLBACK_RANK);
+  } else {
+    const assignedTeamIds = new Set<string>();
+    for (const tier of ["liga1", "liga2"] as const) {
+      const teamIds = getLeagueTeamIds(gameState, tier);
+      teamIds.forEach((teamId) => assignedTeamIds.add(teamId));
+      if (teamIds.length === 0) continue;
+      // Ein beliebiges Team der Liga reicht — alle Teams derselben Liga teilen dieselben Linien.
+      runGroup(teamIds, resolveSeasonApronLinesForTeam(gameState, teamIds[0]!), teamIds.length);
+    }
+    const unassigned = gameState.teams.map((team) => team.teamId).filter((teamId) => !assignedTeamIds.has(teamId));
+    if (unassigned.length > 0) {
+      runGroup(unassigned, resolveSeasonApronLines(gameState), APRON_FALLBACK_RANK);
+    }
+  }
 
   return {
-    lines,
+    lines: primaryLines ?? resolveSeasonApronLines(gameState),
     frozenLines,
     salaryFactor,
     konjunkturhebel: apronKonjunkturhebel(salaryFactor),
-    topf: settlement.topf,
-    zahlerCount: settlement.zahlerCount,
-    empfaengerCount: settlement.empfaengerCount,
-    byTeamId: new Map(
-      settlement.rows.map((row) => [
-        row.teamId,
-        {
-          teamId: row.teamId,
-          rank: input.rankByTeamId.get(row.teamId) ?? null,
-          salary: row.salary,
-          abgabe: row.abgabe,
-          ausgleich: row.ausgleich,
-          nettoDelta: row.nettoDelta,
-          // Der Deckel hat gegriffen, sobald er die (positive) Rohabgabe wirklich beschnitten
-          // hat. Gleichstand zählt nicht als gedeckelt — sonst meldete jede Abgabe von exakt 0
-          // einen greifenden Deckel.
-          gedeckelt: row.rohAbgabe > row.deckel + 0.005 && row.rohAbgabe > 0,
-          empfaenger: row.istEmpfaenger,
-        },
-      ]),
-    ),
+    topf: combinedTopf,
+    zahlerCount: combinedZahlerCount,
+    empfaengerCount: combinedEmpfaengerCount,
+    byTeamId,
   };
 }

@@ -6,6 +6,7 @@ import { chromium, type Browser, type Page } from "playwright";
 
 import { buildArenaTeam, type ArenaSpieler } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import {
+  buildArenaAufstellung,
   buildArenaAufstellungBeide,
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
@@ -62,7 +63,40 @@ import { seedZuZahl } from "@/lib/battle/arena-seed";
  */
 
 const STANDARD_CHROMIUM_EXECUTABLE_PATH = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-const STANDARD_SEITEN_TIMEOUT_MS = 20_000;
+
+/**
+ * TIMEOUT-BUDGET AUS DER MESSUNG ABLEITEN, NICHT RATEN (Opus-Auflage, Plan Abschnitt 9 Punkt 1).
+ * Deckt NUR das Warten auf `window.__arena` ab — einmal beim Seitenaufbau, dann je weiterem
+ * Fixture nach dem Neu-Einhaengen des Motors (s. `wartenAufMotor()` in
+ * `simuliereFixturesImBrowser()` unten). Die eigentliche Simulation (`spieleFeldspiel()`/...) ist
+ * SYNCHRONER Browser-JS ohne eigenes Timeout -- dieser Wert begrenzt also "startet/laedt der Motor
+ * ueberhaupt", nicht "wie lange darf das ganze Batch dauern". Per ENV konfigurierbar, damit die
+ * echte CX23-Zahl aus der Live-Abnahme (Plan Abschnitt 6.3) ohne Deploy-Wartezeit eingetragen
+ * werden kann, bevor sie im Code als neuer Standard landet.
+ */
+const STANDARD_SEITEN_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_SEITEN_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 20_000;
+})();
+
+/**
+ * OPUS-REVIEW B2 (kritisch): GESAMT-TIMEOUT fuer den ganzen Lauf, nicht nur fuer das Warten auf
+ * `window.__arena` (`STANDARD_SEITEN_TIMEOUT_MS` deckt wie oben dokumentiert NUR das Laden/
+ * Neueinhaengen des Motors ab, NICHT das synchrone `spieleFeldspiel()`/... selbst, das danach ohne
+ * jedes eigene Timeout rechnet). Haengt eine Simulation (Motor-Bug, Endlosschleife im Rezept),
+ * blieb das zugehoerige Promise in `runArenaFixtures()` fuer immer offen -- und mit ihm der globale
+ * Chromium-Semaphor (`arena-vorlauf-service.ts`), der JEDEN weiteren Vorlauf ALLER Saves blockiert,
+ * nicht nur den haengenden. Das Gesamt-Budget ist deshalb grosszuegig (Plan 3.1 nennt es explizit
+ * "Gesamt-Timeout"), per ENV konfigurierbar, bis die echte CX23-Messung (Plan 6.3) eine engere Zahl
+ * liefert -- 180s deckt selbst eine Liga mit 16 Fixtures bei einem Vielfachen der lokal gemessenen
+ * 10-18s je Disziplin (beide Ligen) komfortabel ab.
+ */
+const STANDARD_GESAMT_TIMEOUT_MS = (() => {
+  const raw = process.env.OLY_ARENA_GESAMT_TIMEOUT_MS;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 180_000;
+})();
 
 /**
  * FUND (nachgemessen, nicht vermutet): `spieleFeldspiel(fd, saat)` reicht `saat` unveraendert an
@@ -342,6 +376,13 @@ export type RunArenaFixturesOptions = {
   /** Wie lange auf `window.__arena` je Fixture gewartet wird, bevor der Lauf abbricht. */
   seitenTimeoutMs?: number;
   /**
+   * OPUS-REVIEW B2: GESAMT-Budget fuer den kompletten Lauf (Laden + ALLE Fixtures synchron
+   * gerechnet) -- anders als `seitenTimeoutMs` deckt das auch eine haengende Simulation ab, nicht
+   * nur das Laden. Ueberschreitung schliesst den Browser hart und wirft, der Aufrufer
+   * (`battle-mode-arena-team-points.ts`) fuer Warnungen/`arena-vorlauf-service.ts` fuer `ArenaAusfall`.
+   */
+  gesamtTimeoutMs?: number;
+  /**
    * MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
    * dieser Disziplin-Seite (`rollMatchdayMutatorTraitsForSide()`, zwei Traits aus dem 36er-Pool,
    * fuer alle Teams gleich). Er faehrt als `window.__olyArenaKader.mutatoren` in die Engine, die
@@ -350,6 +391,14 @@ export type RunArenaFixturesOptions = {
    * (Referenzziehungen, Tests) soll niemanden zufaellig besser machen.
    */
   mutatoren?: readonly string[];
+  /**
+   * NACHTKONZEPT-SCHALTER (04.10.): Startwerte fuer `BUEHNE_FLAGS` in battle-mode.engine.js
+   * (z. B. `{ wettessenMauer: 2 }`). Faehrt als `window.__olyBuehneFlags` in JEDE neu
+   * eingehaengte Engine-Instanz (die Engine wird je Fixture neu geladen, ein nachtraeglich
+   * gesetzter Schalter ginge verloren). Nur fuer Messungen/Referenzziehungen wie
+   * scripts/ziehe-buehne-pps-referenz.ts --flags=...; weggelassen -> Engine-Standard.
+   */
+  buehneFlags?: Readonly<Record<string, number>>;
 };
 
 type VorbereitetesFixture = {
@@ -383,11 +432,32 @@ type VorbereitetesFixture = {
  * aufloesen (sofortiges ECONNREFUSED statt DNS-/Tunnel-Wartezeit). `file://`-Navigation
  * (die einzige, die dieser Runner macht) ist von beidem unberuehrt.
  */
-const ARENA_NETZWERK_ABRIEGELUNG_ARGS = ["--proxy-server=direct://", "--host-resolver-rules=MAP * 0.0.0.0"];
+// DOCKER-/dev-shm-ABSICHERUNG (E1, Plan Abschnitt 4.1/F11): Dockers Standard-`/dev/shm` ist 64 MB,
+// bekanntermassen zu knapp fuer Chromium (Crash statt sauberer Fehlermeldung). Das Produktions-
+// Compose setzt zusaetzlich `shm_size: "256m"` (doppelte Absicherung, PR E1) -- dieses Flag hier
+// greift unabhaengig davon auch lokal/in CI, wo niemand `shm_size` setzt.
+const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
+  "--proxy-server=direct://",
+  "--host-resolver-rules=MAP * 0.0.0.0",
+  "--disable-dev-shm-usage",
+];
 
-function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
-  const kandidat = executablePathOverride ?? STANDARD_CHROMIUM_EXECUTABLE_PATH;
-  if (existsSync(kandidat)) {
+/**
+ * Exportiert (PR 3, K1): der Chromium-Selbsttest (`lib/battle/arena-chromium-selftest.ts`, Opus-
+ * Auflage "`/api/health` darf nicht bei jedem Aufruf Chromium starten") braucht GENAU dieselben
+ * Launch-Optionen wie der echte Arena-Lauf — sonst koennte der Selbsttest "ok" melden, waehrend
+ * der echte Lauf an einer anderen Pfad-/Argument-Kombination scheitert, oder umgekehrt.
+ *
+ * REIHENFOLGE DER PFAD-ERMITTLUNG (E1, Plan Abschnitt 4.1): `executablePathOverride` (explizite
+ * Test-/Messskript-Injektion) VOR `OLY_ARENA_CHROMIUM_EXECUTABLE` (die Umgebungsvariable, die das
+ * Produktions-Image setzt, sobald Chromium dort unter der von Playwright 1.60 erwarteten Revision
+ * 1223 statt der hier hartkodierten lokalen 1194 liegt) VOR dem hartkodierten lokalen Standard.
+ * Ohne eine der beiden faellt `existsSync()` unten durch und `channel: "chromium"` greift (CI-
+ * Runner-Fall, unveraendert).
+ */
+export function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
+  const kandidat = executablePathOverride || process.env.OLY_ARENA_CHROMIUM_EXECUTABLE || STANDARD_CHROMIUM_EXECUTABLE_PATH;
+  if (kandidat && existsSync(kandidat)) {
     return { headless: true, executablePath: kandidat, args: ARENA_NETZWERK_ABRIEGELUNG_ARGS };
   }
   // Ohne festen Pfad (z.B. auf dem CI-Runner) loest Playwright den Standard-"chromium"-
@@ -583,10 +653,38 @@ export async function runArenaFixtures(
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
   }
   const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const gesamtTimeoutMs = options.gesamtTimeoutMs ?? STANDARD_GESAMT_TIMEOUT_MS;
   const mutatoren = [...(options.mutatoren ?? [])].map((trait) => String(trait).trim()).filter(Boolean);
 
   const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
-  try {
+  // OPUS-REVIEW B2: `schliesseEinmal()` ist von AUSSEN (dem Timeout-Wettlauf unten) UND von INNEN
+  // (dem `finally` des eigentlichen Laufs) erreichbar -- der Schutz verhindert einen doppelten
+  // `browser.close()`-Aufruf, wenn beide fast gleichzeitig greifen.
+  let browserGeschlossen = false;
+  const schliesseEinmal = async () => {
+    if (browserGeschlossen) return;
+    browserGeschlossen = true;
+    await schliesseBrowserHart(browser).catch(() => {
+      // Ein Fehler beim (zweiten) Schliessen ist hier kein neuer Befund -- der Browser ist in
+      // jedem Fall nicht mehr erreichbar, genau das war das Ziel.
+    });
+  };
+
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const gesamtTimeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      void schliesseEinmal().then(() => {
+        reject(
+          new Error(
+            `arena-headless-runner: Gesamt-Timeout (${gesamtTimeoutMs}ms) ueberschritten fuer "${disziplin}" -- Browser hart geschlossen, kein haengender Prozess.`,
+          ),
+        );
+      });
+    }, gesamtTimeoutMs);
+  });
+
+  const lauf = (async (): Promise<ArenaFixtureResult[]> => {
+    try {
     const page: Page = await browser.newPage();
     // TSX/ESBUILD-KOMPATIBILITAET (PPS-Skalierung, 03.09., gefunden beim Bau von
     // scripts/ziehe-basketball-pps-referenz.ts): `tsx` -- der Loader, mit dem JEDES Skript in
@@ -608,6 +706,13 @@ export async function runArenaFixtures(
         fenster.__name = (fn) => fn;
       }
     });
+    // BUEHNEN-FLAGS (s. `buehneFlags` in RunArenaFixturesOptions): ein Fensterwert ueberlebt das
+    // Neu-Einhaengen der Engine je Fixture. Ohne Option wird nichts gesetzt.
+    if (options.buehneFlags) {
+      await page.addInitScript((flags) => {
+        (window as unknown as { __olyBuehneFlags?: unknown }).__olyBuehneFlags = flags;
+      }, { ...options.buehneFlags });
+    }
     // Erstes Fixture VOR der Navigation setzen (Plan Abschnitt 3.3b) — der normale
     // Seitenaufbau (battle-mode.html haengt battle-mode.engine.js selbst per <script src> ein)
     // liest diesen Kader dann beim allerersten Motor-Start, kein zusaetzliches Einhaengen noetig.
@@ -702,9 +807,13 @@ export async function runArenaFixtures(
         ...(momente ? { momente } : {}),
       };
     });
-  } finally {
-    await schliesseBrowserHart(browser);
-  }
+    } finally {
+      await schliesseEinmal();
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  })();
+
+  return Promise.race([lauf, gesamtTimeoutPromise]);
 }
 
 /**
@@ -722,11 +831,30 @@ export async function runArenaFixtures(
  * `DisciplineStageNativeArena.tsx`) — kein Aufrufer bucht sein Ergebnis heute in die
  * Saisontabelle.
  *
- * STRUKTURELL EINFACHER als `runArenaFixtures()`: `spieleMiniDmFfaEvent(vierTeams, saat)` nimmt
- * die vier Kader als EXPLIZITE Funktionsargumente entgegen (kein Umweg ueber
+ * STRUKTURELL EINFACHER als `runArenaFixtures()`: `spieleMiniDmFfaEvent(vierTeams, saat, platz)`
+ * nimmt die vier Kader als EXPLIZITE Funktionsargumente entgegen (kein Umweg ueber
  * `window.__olyArenaKader`/SQUAD/OPP wie beim 2-Team-Chassis) — ein Pod-Batch braucht deshalb
  * NUR EINEN Motor-Ladevorgang fuer die gesamte Seite, kein Neu-Einhaengen von
  * `<script src="battle-mode.engine.js">` je Pod (s. `simuliereFixturesImBrowser` oben).
+ *
+ * AUFSTELLUNG (20.10., PR A der Mini-DM-Anbindung): vorher stellte `spieleMiniDmFfaEvent()` die
+ * vier Kaempfer je Team SELBST nach absteigender Mini-DM-Eignung zusammen (`aufstellung: {}`
+ * fest verdrahtet) — die Aufstellung des Managers wurde ignoriert. Dieser Runner baut jetzt je
+ * Team denselben `place` wie die anderen Arena-Disziplinen (`buildArenaAufstellung()`, EIN Team
+ * statt `buildArenaAufstellungBeide()`s Zwei-Team-Merge — ein Pod-Teilnehmer kennt nur seinen
+ * EIGENEN Kader, keine Namenskollision mit den drei anderen Teams moeglich) und reicht ihn als
+ * dritten, optionalen Parameter durch. Ein Team ohne Lineup-Entwurf (oder ohne Eintrag fuer eine
+ * bestimmte Mini-DM-Rolle) faellt WEITERHIN auf den alten Eignungs-Reihum zurueck — s.
+ * `mdffaGesetzteRolle()`/"gesetzt vs. frei" in battle-mode.engine.js.
+ *
+ * MUTATOREN: `options.mutatoren` — derselbe Spieltagswurf, den andere Arena-Fixtures ueber
+ * `RunArenaFixturesOptions.mutatoren` bekommen (fuer das GESAMTE Batch gleich, s. dort) — statt
+ * des bisher hart verdrahteten `mutatoren: []`. Der Aufrufer liefert ihn (z. B.
+ * `resolveMatchdayMutatorTraitsForDiscipline({...}, disciplineId: MINI_DM_DISCIPLINE_ID)`); ohne
+ * Option bleibt das Verhalten wie vorher (leerer Wurf).
+ *
+ * Bleibt WEITERHIN Praesentationszweck (s. Kopfkommentar oben, unveraendert) — kein Aufrufer
+ * bucht dieses Ergebnis heute in die Saisontabelle, das bleibt PR B vorbehalten.
  */
 export type MiniDmFfaPodFixtureInput = {
   podId: string;
@@ -789,6 +917,43 @@ export type RunMiniDmFfaPodFixturesOptions = {
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
   chromiumExecutablePath?: string;
   seitenTimeoutMs?: number;
+  /** Der Spieltagswurf (20.10., PR A) — s. Kopfkommentar oben, `RunArenaFixturesOptions.mutatoren`
+   *  fuer dieselbe Bauart bei den 2-Team-Disziplinen. Ohne Option: leerer Wurf, wie bisher. */
+  mutatoren?: string[];
+  /** `false` (20.10., PR A): jedes Team spielt den alten reinen Eignungs-Reihum, selbst wenn ein
+   *  Lineup-Entwurf existiert — fuer Aufrufer, die (noch) bewusst das Vorher-Verhalten wollen
+   *  (z. B. eine Vergleichsmessung). Default `true`. */
+  aufstellungBeachten?: boolean;
+  /**
+   * `k` (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung") — durchgereicht als Feld von
+   * `optionen` an `window.__arena.miniDmFfaEvent()`/`spieleMiniDmFfaEvent()` (battle-mode.engine.js,
+   * PR 2 #1302): die Kadergroesse 2..6 des Spielplan-Slots dieses Spieltags,
+   * `MINI_DM_FFA_SLOTS_JE_K[k]` spielt dann genau `k` Runden mit den k-spezifischen Rollenprofilen
+   * statt der festen vier. OHNE `k` EXAKT der alte Vierer-Pfad fuer die ROLLENAUSWAHL
+   * (`mdffaRollenFuerK(null)`).
+   *
+   * ACHTUNG (OPUS-REVIEW B1, Blocker-Fix): `k` alleine ist NICHT mehr "byte-identisch ohne
+   * Option" -- `runMiniDmFfaPodFixtures()` setzt seit diesem Fix IMMER zusaetzlich
+   * `optionen.formSaat` (je Pod auf dessen eigenen `seed`), unabhaengig von `k`. Das ist
+   * ABSICHTLICH: ohne eigene Formkarten je Pod bevorzugte der Motor strukturell die beiden
+   * Bootstrap-Teams (gemessen 192/200 bzw. 181/200 Events gegen einen attributgleichen Klon an
+   * anderer Pod-Position, s. Kommentar an der Aufrufstelle unten) -- ein Fehler, keine
+   * Kompatibilitaet, die es zu bewahren galt.
+   */
+  k?: number;
+  /**
+   * OPUS-REVIEW, PR 5 (Lesepfad-Robustheit, nicht blockierend): explizit uebergebener Spieltag fuer
+   * `buildArenaAufstellung()` unten -- ohne dieses Feld liest diese Funktion `gameState.matchdayState
+   * ?.matchdayId` selbst, UNABHAENGIG vom `matchdayId`, das der Aufrufer (`runMiniDmFfaMatchday()`,
+   * mini-dm-ffa-matchday.ts) fuer Hash/Teilnahme/Seed tatsaechlich verwendet. In der Praxis sind
+   * beide Werte heute immer gleich (`matchdayState.matchdayId` ist der aktuell offene Spieltag, und
+   * nur der wird vorlaeufig aufgeloest) -- aber EIN impliziter Lesepfad weniger ist robuster, falls
+   * ein kuenftiger Aufrufer (z.B. ein Nachtrag/Resolve fuer einen VERGANGENEN Spieltag) die beiden
+   * einmal auseinanderlaufen laesst. Gesetzt, gewinnt dieses Feld; `undefined` laesst das
+   * Lese-Verhalten exakt wie vor diesem Fix (byte-identisch fuer jeden bestehenden Aufrufer, der es
+   * nicht setzt).
+   */
+  matchdayId?: string | null;
 };
 
 /**
@@ -815,12 +980,17 @@ function baueEindeutigeNamenZuordnungFuerTeam(kader: ArenaSpieler[]): Map<string
  * Einschraenkungen: nur Argumente + Browser-Globale, keine Node-Closures).
  */
 async function simuliereMiniDmFfaPodsImBrowser(payload: {
-  pods: Array<{ teams: ArenaSpieler[][]; seed: number }>;
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen?: { k?: number; formSaat?: number } }>;
   timeoutMs: number;
 }): Promise<Array<RoherMiniDmFfaEventErgebnis | null>> {
   const fenster = window as unknown as {
     __arena?: {
-      miniDmFfaEvent: (vierTeams: ArenaSpieler[][], saat: number) => RoherMiniDmFfaEventErgebnis | null;
+      miniDmFfaEvent: (
+        vierTeams: ArenaSpieler[][],
+        saat: number,
+        platzJeTeam?: ArenaAufstellung[],
+        optionen?: { k?: number; formSaat?: number },
+      ) => RoherMiniDmFfaEventErgebnis | null;
     };
   };
 
@@ -832,7 +1002,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 
-  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed));
+  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
 }
 
 /**
@@ -853,10 +1023,21 @@ export async function runMiniDmFfaPodFixtures(
 ): Promise<Array<MiniDmFfaPodFixtureResult | null>> {
   if (pods.length === 0) return [];
 
+  // AUFSTELLUNG (20.10., PR A) — je Team EIN `place` (buildArenaAufstellung(), kein Merge noetig,
+  // s. Kopfkommentar). `aufstellungBeachten: false` haelt bewusst beim alten Verhalten (leere
+  // `place`-Objekte -> reiner Eignungs-Reihum im Motor, s. `mdffaGesetzteRolle()`).
+  const aufstellungBeachten = options.aufstellungBeachten ?? true;
+  // OPUS-REVIEW, PR 5: `options.matchdayId` gewinnt, wenn der Aufrufer ihn explizit setzt (s.
+  // Kommentar an `RunMiniDmFfaPodFixturesOptions.matchdayId`) -- `undefined` laesst exakt den alten
+  // Lesepfad (`gameState.matchdayState?.matchdayId`), byte-identisch fuer jeden bestehenden Aufrufer.
+  const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
     kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    platzJeTeam: aufstellungBeachten
+      ? pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId))
+      : pod.teamIds.map(() => ({}) as ArenaAufstellung),
   }));
 
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
@@ -891,15 +1072,38 @@ export async function runMiniDmFfaPodFixtures(
       (kader) => {
         (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
       },
-      // `mutatoren: []` (29.09.): kein engine-eigener Ersatzwurf — dieser Runner ist reine
-      // Praesentation und kennt den echten Spieltagswurf nicht, s. `RunArenaFixturesOptions.mutatoren`.
-      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {}, mutatoren: [] },
+      // `mutatoren` (20.10., PR A): `options.mutatoren` statt des bisher hart verdrahteten `[]` —
+      // derselbe Bootstrap-Weg, ueber den auch die 2-Team-Disziplinen ihren Spieltagswurf lesen
+      // (s. Kopfkommentar). Die mini-dm-eigene `aufstellung` hier bleibt leer (bootstrap-seitig
+      // ungenutzt, `miniDmFfaEvent()` bekommt die echte je Pod als expliziten Funktionsparameter).
+      {
+        heim: bootstrapPod.kaderJeTeam[0],
+        gast: bootstrapPod.kaderJeTeam[1],
+        aufstellung: {},
+        mutatoren: options.mutatoren ?? [],
+      },
     );
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const rohErgebnisse = await page.evaluate(simuliereMiniDmFfaPodsImBrowser, {
-      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed })),
+      // `formSaat` (OPUS-REVIEW B1, PR 5 des 6-PR-Plans 21.10., Blocker-Fix): IMMER gesetzt, je
+      // Pod auf dessen EIGENEN `seed` -- s. ausfuehrlicher Kommentar an `spieleMiniDmFfaEvent()`s
+      // `optionen.formSaat` (battle-mode.engine.js). OHNE das zog die globale `FORMKARTE` (einmalig
+      // beim Seiten-Bootstrap, nur fuer die beiden via `window.__olyArenaKader` geladenen Teams --
+      // hier `laufbarePods[0]`s Team 0/1) Formkarten fuer hoechstens ZWEI von bis zu 32 Teams je
+      // Spieltag; jedes andere Team (inkl. Team 2/3 des ERSTEN Pods selbst) bekam `formVon() = 0`
+      // -- eine strukturelle, mit echtem Chromium gemessene Bevorzugung (192/200 bzw. 181/200
+      // Events gegen einen attributgleichen Klon an anderer Pod-Position, s. PR-Bericht). Denselben
+      // `seed` wie fuer die Rundenfolge zu nehmen (statt eines zweiten, unabhaengigen Saat-Stroms)
+      // folgt demselben Muster wie beim Zweier-Duell (s. `arena-eingabe-hash.ts`-Kommentar:
+      // "Formkarten seit 15.10. in die Saat gekoppelt").
+      pods: laufbarePods.map((pod) => ({
+        teams: pod.kaderJeTeam,
+        seed: pod.seed,
+        platzJeTeam: pod.platzJeTeam,
+        optionen: { ...(options.k != null ? { k: options.k } : {}), formSaat: pod.seed },
+      })),
       timeoutMs,
     });
 

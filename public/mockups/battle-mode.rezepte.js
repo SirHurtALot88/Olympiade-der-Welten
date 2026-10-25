@@ -208,9 +208,12 @@ window.__ARENA_REZEPTE = {
     // ABSCHLUSS ist KEIN Erfolgswert (das sind SCHUSS_NAH/SCHUSS_FERN), sondern
     // "generische Abschlussstaerke" fuer drei Auswahl-Entscheidungen: wer als
     // Zielspieler angespielt wird (offensterMitspieler), wie frueh sich ein
-    // Ballfuehrer einen Wurf zutraut (schwelle) und die Freiwurfquote. Genau dafuer
-    // steht hier Handling (dexterity) vor Selbstvertrauen (charisma/spirit) —
-    // "der Typ, der den Ball haben WILL, wenn es eng wird".
+    // Ballfuehrer einen Wurf zutraut (schwelle) und — bis 07.10. — die Freiwurfquote.
+    // Genau dafuer steht hier Handling (dexterity) vor Selbstvertrauen (charisma/spirit) —
+    // "der Typ, der den Ball haben WILL, wenn es eng wird". Seit B2a (07.10.) liest der
+    // Freiwurf NICHT mehr ABSCHLUSS, sondern einen eigenen spirit-gefuehrten Kanal
+    // (FREIWURF_KANAL bei verbucheFreiwurf in battle-mode.engine.js); dieses Rezept blieb
+    // dafuer zeichengleich.
     ABSCHLUSS:   {spirit:22,dexterity:20,charisma:16,power:14,awareness:10,stamina:10,intelligence:8},
     // Wurfauswahl und Geduld ("Shot Intelligence", Chris' Wort). Bleibt
     // intelligence-gefuehrt wie bisher; das Rezept ist logisch richtig, sein

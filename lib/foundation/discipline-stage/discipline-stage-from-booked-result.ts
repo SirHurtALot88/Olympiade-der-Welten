@@ -97,6 +97,12 @@ export function buildDisciplineStageTeamsFromBookedResult(
       portraitUrl: portraitById.get(eintrag.playerId) ?? null,
       mods: [] as StagePreviewTeam["players"][number]["mods"],
       pointsAwarded: null,
+      // Derselbe Rückfall-Grund wie bei `pointsAwarded` direkt darüber: die abgeleitete PP-Summe
+      // dieses Pfads (bereits gebuchte, aus der Vorschau gefallene Altdisziplin) bräuchte dieselbe
+      // Ledger-Ableitung wie `discipline-stage-matchday-top-players.ts` — out of scope für diesen
+      // ersten PP-Anzeige-Rollout (Task #102), bewusst als offene Lücke im PR dokumentiert statt
+      // geschätzt.
+      mutatorPpsBonus: null,
     }));
 
     /**
@@ -138,6 +144,11 @@ export function buildDisciplineStageTeamsFromBookedResult(
       missingLineup: eigene.length === 0,
       captainPlayerId: null,
       captainName: null,
+      // Das gebuchte Ergebnis trägt keine Gegner-Team-ID (Tasks #116/#118/#119/#126/#127) -- die
+      // Bühne fällt für bereits gewertete/historische Disziplinen auf die ungepaarte Enthüllung
+      // zurück, exakt wie sie das für Fatigue/Captain/Mutator-Mods oben im Dateikopf-Kommentar
+      // schon tut.
+      opponentTeamId: null,
       players,
     };
   });

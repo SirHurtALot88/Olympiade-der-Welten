@@ -34,6 +34,9 @@ import {
 } from "@/lib/season/season-completion-service";
 import { getTeamSponsorOffers, chooseSponsorOffer, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { applyTeamTrainingSettings, previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
+import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
+import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
+import type { GameState } from "@/lib/data/olyDataTypes";
 
 const OUTPUT_DIR = path.join(process.cwd(), "outputs", "balance-audit");
 const DEFAULT_SEASONS = 5;
@@ -61,9 +64,19 @@ function parseArgs(argv: string[]) {
     }
     args.set(key, "true");
   }
+  const gameMode = args.get("game-mode") === "battle" ? ("battle" as const) : ("manager" as const);
   return {
     seasons: Number(args.get("seasons") ?? DEFAULT_SEASONS),
-    matchdaysPerSeason: Number(args.get("matchdays-per-season") ?? DEFAULT_MATCHDAYS_PER_SEASON),
+    /**
+     * Ohne Angabe: Manager wie bisher 10; Battle die Länge, die der Save selbst trägt (20 seit
+     * W2, docs/design/fatigue-aktive-erholung-korridor-16-10.md) — `null` heisst „aus dem Save“.
+     */
+    matchdaysPerSeason: args.has("matchdays-per-season")
+      ? Number(args.get("matchdays-per-season"))
+      : gameMode === "battle"
+        ? null
+        : DEFAULT_MATCHDAYS_PER_SEASON,
+    gameMode,
   };
 }
 
@@ -154,6 +167,87 @@ function setupFreshSoloSave(persistence = createPersistenceService()) {
   const manualTeamId = resolveManualTeamId(saved);
   if (!manualTeamId) throw new Error("No manual team after solo_1 setup.");
   return { save: saved, manualTeamId, seasonId };
+}
+
+/**
+ * BATTLE MODE ÜBER DEN ECHTEN ANLEGE-PFAD — derselbe `applyNewGameSetup`, den der Wizard nimmt
+ * (`gameMode: "battle"`: Liga-Split, Circle-Spielplan, seit W2 20 Spieltage mit Halbserien und
+ * aktiver Erholung). `createFreshSeasonOneSave` kennt keinen Spielmodus und taugt dafür nicht.
+ */
+function setupFreshBattleSave(persistence = createPersistenceService()) {
+  const input = { presetId: "solo_1" as const, gameMode: "battle" as const, sandbox: true };
+  const preview = previewNewGameSetup(input);
+  const applied = applyNewGameSetup({ ...input, confirmToken: preview.confirmToken }, persistence);
+  log(`Battle-Save angelegt, Anlage-Warnungen: [${applied.preview.warnings.join(", ")}]`);
+  const created = requireValue(persistence.getSaveById(applied.save.saveId), "Battle save missing after apply.");
+  const seasonId = created.gameState.season.id;
+  topUpRostersForLineups(created, seasonId);
+  const saved = requireValue(persistence.getSaveById(created.saveId), "Battle save missing after top-up.");
+  const manualTeamId = resolveManualTeamId(saved);
+  if (!manualTeamId) throw new Error("No manual team after battle setup.");
+  return { save: saved, manualTeamId, seasonId, setupWarnings: applied.preview.warnings };
+}
+
+/**
+ * STRUKTUR EINER SAISON — was die 20-Spieltage-Umstellung garantieren soll, am echten Save gelesen:
+ * Spieltage, Disziplin-Vorkommen (je Hälfte), Kadergröße Rück- ≠ Hinrunde, Fixtures je Liga,
+ * Wiederholungen mit gleicher Heim/Auswärts-Seite, Gate der aktiven Erholung.
+ */
+function describeSeasonStructure(gameState: GameState) {
+  const schedule = (gameState.seasonState.disciplineSchedule ?? []).filter((entry) => entry.seasonId === gameState.season.id);
+  const half = Math.floor(gameState.season.matchdayIds.length / 2);
+  const occurrences = new Map<string, Array<{ index: number; size: number | null | undefined }>>();
+  for (const entry of schedule) {
+    for (const slot of [entry.discipline1, entry.discipline2]) {
+      if (!slot?.disciplineId) continue;
+      occurrences.set(slot.disciplineId, [
+        ...(occurrences.get(slot.disciplineId) ?? []),
+        { index: entry.matchdayIndex, size: slot.playerCount },
+      ]);
+    }
+  }
+  const counts = [...occurrences.values()].map((list) => list.length);
+  const twiceOncePerHalf = [...occurrences.values()].filter(
+    (list) => list.length === 2 && list.some((o) => o.index <= half) && list.some((o) => o.index > half),
+  ).length;
+  const sizeDiffers = [...occurrences.entries()].filter(([disciplineId, list]) => {
+    if (list.length !== 2) return false;
+    const [a, b] = [...list].sort((x, y) => x.index - y.index);
+    return disciplineId === "mini-dm" ? true : a!.size !== b!.size;
+  }).length;
+  const fixtures = (gameState.seasonState.schedule ?? []).filter((fixture) =>
+    gameState.season.matchdayIds.includes(fixture.matchdayId),
+  );
+  const perLeague: Record<string, number> = {};
+  const exactRepeats: Record<string, number> = {};
+  for (const tier of ["liga1", "liga2"]) {
+    const ligaFixtures = fixtures.filter((fixture) => fixture.leagueTier === tier);
+    perLeague[tier] = ligaFixtures.length;
+    const seen = new Set<string>();
+    let repeats = 0;
+    for (const fixture of ligaFixtures) {
+      const key = `${fixture.homeTeamId}>${fixture.awayTeamId}`;
+      if (seen.has(key)) repeats += 1;
+      seen.add(key);
+    }
+    exactRepeats[tier] = repeats;
+  }
+  return {
+    seasonId: gameState.season.id,
+    gameMode: gameState.scenarioMeta?.gameMode ?? "manager",
+    matchdays: gameState.season.matchdayIds.length,
+    disciplines: occurrences.size,
+    occurrencesMin: Math.min(...counts),
+    occurrencesMax: Math.max(...counts),
+    twiceOncePerHalf,
+    secondSizeDiffersFromFirst: sizeDiffers,
+    fixturesPerLeague: perLeague,
+    exactRepeatsSameHomeAway: exactRepeats,
+    activeRecovery: isFatigueActiveRecoveryEnabled(gameState),
+    /** Warnungen des Saisonübergangs, der DIESE Saison angelegt hat (leer für Saison 1). */
+    preseasonWarnings:
+      (gameState.seasonState.preSeasonWorkflowLogs ?? []).find((log) => log.toSeasonId === gameState.season.id)?.warnings ?? [],
+  };
 }
 
 function previewTrainingConfirmToken(save: PersistedSaveGame, teamId: string) {
@@ -579,8 +673,11 @@ async function main() {
   log(`Starting ${args.seasons}-season multi-season smoke (${args.matchdaysPerSeason} matchdays/season)…`);
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
-  const { save, manualTeamId, seasonId: firstSeasonId } = setupFreshSoloSave(persistence);
-  log(`Fresh save created: ${save.saveId}, manual team: ${manualTeamId}`);
+  const setup = args.gameMode === "battle" ? setupFreshBattleSave(persistence) : setupFreshSoloSave(persistence);
+  const { save, manualTeamId, seasonId: firstSeasonId } = setup;
+  const setupWarnings: string[] = "setupWarnings" in setup ? (setup.setupWarnings as string[]) : [];
+  log(`Fresh save created: ${save.saveId} (${args.gameMode}), manual team: ${manualTeamId}`);
+  const structures = [describeSeasonStructure(save.gameState)];
   const teamIds = save.gameState.teams.map((team) => team.teamId);
 
   const allMetrics: SeasonMetrics[] = [];
@@ -588,11 +685,14 @@ async function main() {
 
   for (let i = 0; i < args.seasons; i += 1) {
     log(`\n=== SEASON ${i + 1}/${args.seasons} (${currentSeasonId}) ===`);
-    const metrics = await runOneSeason(save.saveId, manualTeamId, teamIds, currentSeasonId, i, args.matchdaysPerSeason, persistence);
+    const seasonStart = requireValue(persistence.getSaveById(save.saveId), "Save missing at season start.");
+    const matchdaysTarget = args.matchdaysPerSeason ?? seasonStart.gameState.season.matchdayIds.length;
+    const metrics = await runOneSeason(save.saveId, manualTeamId, teamIds, currentSeasonId, i, matchdaysTarget, persistence);
     allMetrics.push(metrics);
 
     const afterSave = requireValue(persistence.getSaveById(save.saveId), "Save missing after season.");
     currentSeasonId = afterSave.gameState.season.id;
+    structures.push(describeSeasonStructure(afterSave.gameState));
     log(`Season ${i + 1} done. Next season: ${currentSeasonId}`);
   }
 
@@ -602,6 +702,9 @@ async function main() {
     manualTeamId,
     seasons: args.seasons,
     matchdaysPerSeason: args.matchdaysPerSeason,
+    gameMode: args.gameMode,
+    setupWarnings,
+    seasonStructures: structures,
     seasonMetrics: allMetrics,
     balanceTrend: allMetrics.map((m) => {
       const manualTeam = m.teams.find((t) => t.isManual);
@@ -661,6 +764,11 @@ async function main() {
         `rotation manual=${f.rotationManualAvg} ai=${f.rotationAiAvg}`,
     );
   }
+  console.log("\n=== SAISON-STRUKTUR (je Saisonbeginn) ===");
+  if (setupWarnings.length > 0 || args.gameMode === "battle") {
+    console.log(`Anlage-Warnungen Saison 1: [${setupWarnings.join(", ")}]`);
+  }
+  for (const structure of structures) console.log(JSON.stringify(structure));
   console.log(`\nFull report: ${outPath}`);
 }
 

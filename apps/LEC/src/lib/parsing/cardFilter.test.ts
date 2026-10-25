@@ -15,6 +15,13 @@ describe("isCardArticleName", () => {
     expect(isCardArticleName("100 YuGiOh Karten Sammlung 15 Seltene")).toBe(true);
   });
 
+  it("erkennt Pokemon (mit und ohne Akzent), sonst keine anderen Spiele", () => {
+    expect(isCardArticleName("Pokémon Glurak EX 199/165 Deutsch NM")).toBe(true);
+    expect(isCardArticleName("Pokemon Booster Display 36er")).toBe(true);
+    expect(isCardArticleName("Magic the Gathering Commander Deck")).toBe(false);
+    expect(isCardArticleName("Dragon Ball Super Card Game Booster")).toBe(false);
+  });
+
   it("filtert Privatverkaeufe (Schmuck/Elektronik) heraus", () => {
     expect(
       isCardArticleName("Schmuck Konvolut Pandora 925 Silber, CEM Ring 925, Konplott Statement Ring")

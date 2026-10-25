@@ -12,7 +12,10 @@ import {
   runSeasonEndProgressionBatch,
   type SeasonEndProgressionBatchResult,
 } from "@/lib/progression/season-end-progression-batch";
-import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import {
+  buildSeasonSeededDisciplineSchedule,
+  getActiveSeasonDisciplineRepeatCount,
+} from "@/lib/season/season-discipline-schedule";
 import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
 import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
@@ -545,11 +548,21 @@ function buildNextSeasonGameState(
     : saveNachVertragsalterung;
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
   const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
+  /**
+   * W2 — DIE FOLGESAISON ERBT DIE LÄNGE, UND MIT IHR DIE HALBSERIEN. War die abgelaufene Saison eine
+   * 20-Spieltage-Battle-Saison (`isDoubledBattleSeason`), wird auch die neue mit `repeat: 2` gebaut —
+   * sonst bekäme sie 20 `matchdayIds`, aber nur 20 Disziplin-Slots für 40 (zehn leere Spieltage).
+   * Jeder Manager-Save und jeder 10-Spieltage-Battle-Save (Alt-Save, keine Migration) bleibt bei
+   * `repeat` 1 und damit beim exakt gleichen Aufruf wie vorher.
+   */
+  const seasonRepeat = getActiveSeasonDisciplineRepeatCount(save.gameState);
+  const repeatOption = seasonRepeat === 2 ? { repeat: seasonRepeat } : {};
   let schedulePlan = buildSeasonSeededDisciplineSchedule({
     saveId: save.saveId,
     seasonId: nextSeasonId,
     disciplines: save.gameState.disciplines,
     matchdayCount: save.gameState.season.matchdayIds.length || 10,
+    ...repeatOption,
   });
   let scheduleRerollCount = 0;
   while (
@@ -564,6 +577,7 @@ function buildNextSeasonGameState(
       disciplines: save.gameState.disciplines,
       matchdayCount: save.gameState.season.matchdayIds.length || 10,
       scheduleVersion: `season-setup-v2-reroll-${scheduleRerollCount}`,
+      ...repeatOption,
     });
   }
   const matchdayIds = schedulePlan.matchdayIds;
@@ -590,15 +604,14 @@ function buildNextSeasonGameState(
    * LIGA-SPIELPLAN AB SAISON 2 FUER BATTLE-MODE-SAVES (Folgefund zu F3,
    * docs/design/battle-mode-20-spieltage-recherche-06-09.md Abschnitt 1.2).
    *
-   * `leagueByTeamId` wird bei DIESEM Uebergang nirgends neu zugeordnet -- es gibt (Stand heute)
-   * noch keine Auf-/Abstiegs-Logik im Repo (`RELEGATION_COUNT` in league-split.ts ist definiert,
-   * aber von keinem Produktionscode gelesen); das Feld traegt unten im Spread
-   * `...save.gameState.seasonState` unveraendert in `nextSeasonState.leagueByTeamId` fort. Der
-   * Circle-Generator liest deshalb bewusst noch von `save.gameState` (der ALTEN Saison) -- das ist
-   * exakt dieselbe Zuordnung, die gleich unveraendert in die neue Saison uebernommen wird, nur
-   * bevor sie durch den Spread hindurchgereicht ist. Sobald eine Auf-/Abstiegs-PR
-   * `leagueByTeamId` hier tatsaechlich neu berechnet, muss dieser Block auf die NEUE Zuordnung
-   * umgestellt werden, nicht mehr auf `save.gameState`.
+   * TASK #158 (umgesetzt): `leagueByTeamId` wird NICHT MEHR hier neu zugeordnet, sondern bereits
+   * eine Stufe frueher, im `league_movement`-Schritt von `runLocalSeasonCompletion`
+   * (`season-completion-service.ts`) — der laeuft VOR diesem Workflow und schreibt die neue
+   * Auf-/Abstiegs-Zuordnung direkt in `save.gameState.seasonState.leagueByTeamId`. `save.gameState`
+   * ist an dieser Stelle also bereits die NEUE Zuordnung, nicht mehr die der abgelaufenen Saison —
+   * der Spread `...save.gameState.seasonState` unten traegt sie unveraendert fort, und der
+   * Circle-Generator liest sie korrekt, obwohl er weiterhin (unveraendert seit diesem Kommentar hier
+   * stand) von `save.gameState` liest. Kein Code in DIESER Datei musste dafuer angefasst werden.
    *
    * Ohne aktiven Split (Manager-Mode-/Legacy-Saves, `isLeagueSplitActive` liefert `false`) bleibt
    * exakt der alte Dummy-Spielplan (`buildSeasonFixtures` unten, Rest-Klassen-Paarung ohne

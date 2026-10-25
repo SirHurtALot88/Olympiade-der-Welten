@@ -5,6 +5,7 @@ import type {
   SeasonPlayerPointLedgerEntry,
   SeasonPlayerPointsSummary,
   SeasonPointsLedger,
+  SeasonTableGroupContribution,
   SeasonTeamPointsSummary,
 } from "@/lib/foundation/season-points-ledger";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -25,6 +26,24 @@ type PersistedSeasonPointsLedger = {
   warnings: string[];
   teamSummariesByTeamId: Record<string, SeasonTeamPointsSummary>;
   playerSummariesByPlayerId: Record<string, SeasonPlayerPointsSummary>;
+  /**
+   * PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, 19.10.): additiv -- `tableGroupContributions` traegt
+   * die Tabellen-Waehrung getrennt von der (jetzt leistungsbasierten) Spieler-PP, s.
+   * `SeasonTableGroupContribution`-Kommentar in season-points-ledger.ts. Fehlt es (aeltere
+   * gecachte Derivations vor diesem Feld), gilt der GANZE persistierte Ledger als veraltet --
+   * s. `istPersistierterLedgerAktuell()`: `readPersistedSeasonDerivations()` liefert dann `null`,
+   * und der Aufrufer rechnet frisch.
+   *
+   * OPUS-REVIEW PR #1296: vorher lieferte `hydrateLedger()` hier ein leeres Array. Der persistierte
+   * Ledger haengt an der `contentSignature` des Spielstands, NICHT am Code-Stand -- nach dem Deploy
+   * haette JEDER bestehende Spielstand (Manager-Mode genauso wie Battle) Spieltagsrang, Tagespunkte
+   * und Feld-Rennen mit 0 fuer alle Teams gezeigt, und zwar nicht nur fuer einen Lesevorgang:
+   * `recomputeSeasonDerivationsForPlayerIds()` (Transfer-Pfad) uebernimmt `priorRecord.ledger`
+   * unveraendert unter einer NEUEN Signatur, der Mangel haette also bis zur naechsten vollen
+   * Neuberechnung weitergelebt. Dazu traegt ein veralteter Battle-Ledger noch die alten
+   * 2/1/0-Anteil-PP in `pointEntries` -- die "Heilung beim Lesen" griffe ohne Neuberechnung nie.
+   */
+  tableGroupContributions?: SeasonTableGroupContribution[];
 };
 
 export type PersistedSeasonDerivationsRecord = {
@@ -47,7 +66,17 @@ function serializeLedger(ledger: SeasonPointsLedger): PersistedSeasonPointsLedge
     warnings: ledger.warnings,
     teamSummariesByTeamId: Object.fromEntries(ledger.teamSummariesByTeamId),
     playerSummariesByPlayerId: Object.fromEntries(ledger.playerSummariesByPlayerId),
+    tableGroupContributions: ledger.tableGroupContributions,
   };
+}
+
+/**
+ * Traegt ein persistierter Derivations-Record den Ledger im AKTUELLEN Schema? Ein Record ohne
+ * `ledger.tableGroupContributions` stammt von vor PR #1296 (PP-Budget, Teil A) und wird wie eine
+ * nicht passende Signatur behandelt -- s. Kommentar an `PersistedSeasonPointsLedger.tableGroupContributions`.
+ */
+export function istPersistierterLedgerAktuell(record: PersistedSeasonDerivationsRecord | null | undefined): boolean {
+  return Array.isArray(record?.ledger?.tableGroupContributions);
 }
 
 function hydrateLedger(persisted: PersistedSeasonPointsLedger): SeasonPointsLedger {
@@ -60,6 +89,7 @@ function hydrateLedger(persisted: PersistedSeasonPointsLedger): SeasonPointsLedg
     ),
     teamSummariesByTeamId: new Map(Object.entries(persisted.teamSummariesByTeamId)),
     playerSummariesByPlayerId: new Map(Object.entries(persisted.playerSummariesByPlayerId)),
+    tableGroupContributions: persisted.tableGroupContributions ?? [],
   };
 }
 
@@ -105,6 +135,9 @@ export function readPersistedSeasonDerivations(
     return null;
   }
   if (persisted.seasonId !== gameState.season.id) {
+    return null;
+  }
+  if (!istPersistierterLedgerAktuell(persisted)) {
     return null;
   }
   // fieldRaceLedger bleibt der leere Platzhalter aus hydrateSeasonDerivations —

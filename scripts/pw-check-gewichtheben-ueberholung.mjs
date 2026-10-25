@@ -6,6 +6,7 @@ import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SEITE = pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href;
@@ -91,6 +92,7 @@ const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest 
 
   const start = Date.now();
   await seite.click("#play");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   // TEMPO-PROBE: der Feed bekommt einen neuen Eintrag pro enthuelltem Versuch. Bleibt der
   // Text ueber ~5s nach dem ersten Versuch UNVERAENDERT, ist ZEIT_DEHNUNG.gewichtheben=4
   // wirksam (~6,2s je Versuch); ein zu frueher zweiter Eintrag waere ein Regressionssignal.

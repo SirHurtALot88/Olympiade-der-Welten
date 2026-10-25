@@ -6,8 +6,30 @@ import SeasonStandingsNewLook from "@/app/foundation/season-v2/SeasonStandingsNe
 import type { GuvApronProjectionInput } from "@/lib/finance/guv-breakdown";
 import type { SeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
-import type { SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { SeasonDisciplineAreaId, SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import type { LeagueTier } from "@/lib/season/league-split";
 import type { TitleRaceResult } from "@/lib/season/title-race";
+import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
+
+/**
+ * Task #159 Punkt 2 ("Spieltage"-Modus): Daten für den Host (`use-foundation-shell-router-
+ * body-scope.tsx`). `verfuegbar: false` (Manager-Save oder kein Fixture-Plan) heißt: der Modus
+ * wird gar nicht erst angeboten.
+ *
+ * PERFORMANCE-AUFLAGE (Opus-Review zu PR #1276, 17.10.): `matchdayOptions`/`defaultMatchdayId`
+ * kommen aus einem BILLIGEN Index (ein Durchlauf über `disciplineResults`, kein Builder-Aufruf).
+ * Die TEURE volle Paarungs-Übersicht (`buildSpieltagsUebersicht`, u. a. die Rückspiel-Suche über
+ * den ganzen Spielplan) wird NICHT für alle Spieltage vorgebaut — `getUebersicht` ist eine LAZY
+ * Funktion, die sie erst auf Abruf für GENAU EINEN Spieltag baut. Davor baute der Host sie für
+ * ALLE 20 Spieltage bei JEDER `gameState`-Änderung, auch wenn der Saisonstand gar nicht offen
+ * war (Speichern, Polling-Reload, Koop-Benachrichtigung — bis zu 1280 Ergebniszeilen umsonst).
+ */
+export type SeasonV2SpieltageBundle = {
+  verfuegbar: boolean;
+  matchdayOptions: Array<{ id: string; index: number; label: string; gespielt: boolean }>;
+  defaultMatchdayId: string | null;
+  getUebersicht: (matchdayId: string) => SpieltagsUebersicht | null;
+};
 
 type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
 
@@ -49,6 +71,15 @@ export type SeasonV2StandingsRow = {
   rank: number | null;
   rankDiff: number | null;
   /**
+   * Task #159 (Saisonstand-UI, 2×16): Liga-Zugehörigkeit dieses Teams, `null` im
+   * Legacy-32er-Modus oder solange `seasonState.leagueByTeamId` fehlt (siehe
+   * `isLeagueSplitActive`/`getLeagueOf` in `lib/season/league-split.ts`). `rank` bleibt dabei der
+   * LIGA-LOKALE Rang 1..16 (seit PR #1271, `saisonstand-punkte-nachbuchung.ts` bzw.
+   * `standings-preview-engine.ts`), nicht mehr 1..32 — dieses Feld sagt der Tabelle nur noch,
+   * WELCHE der beiden Tabellen eine Zeile zeigen soll.
+   */
+  leagueTier?: LeagueTier | null;
+  /**
    * Wave D · D4 Rang-Movement: Δ Gesamtrang gegenüber dem letzten Spieltag
    * (Feld-Rennen-Ledger, `rankDeltaVsPrev`). >0 = Plätze gutgemacht (▲),
    * <0 = abgerutscht (▼), `null` am ersten Spieltag. Additiv/optional — der
@@ -56,6 +87,13 @@ export type SeasonV2StandingsRow = {
    */
   fieldRaceRankDelta?: number | null;
   points: number | null;
+  /**
+   * Task #159: PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md) —
+   * Saisonsumme der ±D-Werte aller gebuchten Battle-Duelle, Tiebreaker nach `points`. `null`
+   * außerhalb von Battle-Saves (Manager Mode, jeder Save vor PR #1266) — die Spalte "Verh."
+   * erscheint dann in der Daten-Tabelle gar nicht erst.
+   */
+  verhaeltnis?: number | null;
   pps: number | null;
   pow: number | null;
   spe: number | null;
@@ -250,6 +288,25 @@ export type SeasonStandingsV2ClientProps = {
    * gewählte Saison keine Aufstellungen mehr vorliegen (dann zeigt die Spalte „—").
    */
   teamFormCardBonusByTeamId?: SeasonFormCardBonusByTeamId | null;
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 5: Punkteverhältnis je Achse (POW/SPE/MEN/SOC),
+   * Saisonsumme der ±D-Werte NUR der Disziplinen dieser Achse (`summiereSaisonVerhaeltnisProBereich`,
+   * dieselbe Rohgröße wie `SeasonV2StandingsRow.verhaeltnis`, nur je Bereich statt nur je Team
+   * summiert). Optional/`null` außerhalb von Battle-Saves bzw. in einer Archiv-Saison — die
+   * Klammer-Zahl neben der Achsen-Punktzahl erscheint dann gar nicht erst.
+   */
+  areaVerhaeltnisByTeamId?: Map<string, Record<SeasonDisciplineAreaId, number | null>> | null;
+  /**
+   * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team UND DISZIPLIN ("Staffel-Rang",
+   * reine Kaderstärke unabhängig vom bisherigen Saisonverlauf — `buildTeamDisciplineRankRowsFromGameState`,
+   * dieselbe Rechnung wie die "Ranks"-Ansicht). `disciplineId -> Rang` statt eines einzelnen
+   * Gesamtrangs (Review-Fund 19.10. Abend: Chris wollte ausdrücklich EINEN Rang je Disziplin des
+   * Spieltags — „für Staffel UND eine Stärke für Wettessen", nicht einen über 20 Disziplinen
+   * gemittelten Wert). Zeigt im Spieltage-Modus NEBEN dem aktuellen Tabellenrang, wer laut Kader in
+   * GENAU DIESER Disziplin favorisiert ist. Optional/`null` — ohne diesen Prop bleibt der
+   * Spieltage-Modus unverändert (nur Tabellenrang).
+   */
+  teamStrengthRankByTeamId?: Map<string, Record<string, number>> | null;
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
@@ -258,6 +315,17 @@ export type SeasonStandingsV2ClientProps = {
   onOpenRanks?: (() => void) | null;
   onOpenPrize?: (() => void) | null;
   isLoading?: boolean;
+  /** Task #159 Punkt 2: Daten für den 4. Modus "Spieltage". `null`/fehlend ⇒ Modus bleibt verborgen. */
+  spieltage?: SeasonV2SpieltageBundle | null;
+  /**
+   * Spielplan/Ergebnisse-Auftrag (Chris, wörtlich: "wo man die ergebnisse sieht und die aktuelle
+   * platzierung der teams vor dem match"): die Spieltag-ID, die GERADE läuft
+   * (`gameState.matchdayState.matchdayId`) — derselbe Wert, mit dem der Spielplan-Reiter
+   * (`FoundationDiszisNewLook`) seine "läuft"-Markierung setzt. Nur für die Beschriftung im
+   * Spieltage-Modus (welcher Eintrag "läuft" statt nur "ausstehend" ist); `null`/fehlend ⇒ keine
+   * Markierung, der Modus funktioniert unverändert.
+   */
+  currentMatchdayId?: string | null;
 };
 
 const seasonV2TeamTagColorMap: Record<string, { bg: string; border: string; text: string; glow: string }> = {

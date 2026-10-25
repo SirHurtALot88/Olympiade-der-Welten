@@ -8,10 +8,19 @@ import {
   listeArenaTeams,
 } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
-import { buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
-import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
+import {
+  buildArenaAufstellung,
+  buildArenaAufstellungBeide,
+} from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
+import { buildArenaMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
+import { baueFixtureIndex, findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
+import { buildArenaHostSpielquelleHinweise } from "@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis";
+import {
+  getMiniDmPodForTeam,
+  resolveMiniDmFfaPlayerCountForMatchday,
+} from "@/lib/season/mini-dm-pod-schedule";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -126,30 +135,36 @@ export default function FoundationBattleArenaHost({
     return andere?.teamId ?? teams[0]?.teamId ?? "";
   });
 
-  // MINI-DM 4-TEAM-FFA (Bugfix 22.09., Chris' Screenshot zeigte fälschlich einen klassischen
-  // Zwei-Seiten-Kampf statt des eigens beschlossenen Vier-Team-FFA, s. PR-Beschreibung): der
-  // Host bietet weiterhin nur Heim/Gast als Auswahl an (das bleibt die richtige UI für die
-  // uebrigen 19 Disziplinen), zieht daneben aber automatisch ZWEI WEITERE Teams, damit der
-  // Motor fuer Mini-DM echte vier Kader bekommt statt nur Heim/Gast zu duplizieren. Wahl:
-  // die zwei Teams, die in der (nach Name sortierten) Team-Liste auf den Gast folgen,
-  // zyklisch, unter Auslassen von Heim/Gast selbst — deterministisch bei gleicher Team-Wahl,
-  // ohne dass der Spieler dafuer eine eigene 4-Team-UI bedienen muesste (die es fuer diesen
-  // Entwurf/Vorschau-Rahmen nicht gibt und fuer eine EINZELNE Sonder-Disziplin auch nicht
-  // rechtfertigt).
-  const [dritteTeamId, vierteTeamId] = useMemo<[string, string]>(() => {
-    if (teams.length < 4) return ["", ""];
-    const startIdx = Math.max(0, teams.findIndex((team) => team.teamId === gastTeamId));
-    const uebrig: string[] = [];
-    // Modulo-Wrap ueber die ganze Liste, Heim/Gast selbst uebersprungen — bei mindestens
-    // vier Teams gibt es garantiert zwei weitere, spaetestens nach `teams.length` Schritten.
-    for (let i = 1; uebrig.length < 2 && i < teams.length; i += 1) {
-      const kandidat = teams[(startIdx + i) % teams.length]!;
-      if (kandidat.teamId !== heimTeamId && kandidat.teamId !== gastTeamId) {
-        uebrig.push(kandidat.teamId);
-      }
-    }
-    return [uebrig[0] ?? "", uebrig[1] ?? ""];
-  }, [teams, heimTeamId, gastTeamId]);
+  // MINI-DM 4-TEAM-FFA, "GEZEIGT = GEBUCHT" (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-
+  // Anzeige" — Nachtrag zu PR 5s Vorlauf-Verdrahtung). Bis hierher zog dieser Block ZWEI
+  // WEITERE Teams rein aus der (nach Name sortierten) Team-Liste, zyklisch ab Gast — eine
+  // Phantasie-Vierergruppe, die mit dem tatsaechlich gebuchten Mini-DM-Pod dieses Spieltags
+  // (falls es ueberhaupt einer ist) nichts zu tun hatte: Chris sah live ein ANDERES
+  // Mini-DM-Spiel als das, was gebucht wurde und in der Spieltagstabelle/im Ledger landet —
+  // derselbe "gezeigt ≠ gebucht"-Fehlerfall, den A3 oben fuer die klassischen Zwei-Team-
+  // Disziplinen schon einmal behoben hat (`arenaSeedByDisciplineId`).
+  //
+  // Der Fix: `getMiniDmPodForTeam()` (lib/season/mini-dm-pod-schedule.ts, dieselbe Funktion,
+  // die die echte Pod-Bildung fuer die Buchung liest) sucht den ECHTEN Vierer-Pod, der
+  // `heimTeamId` an DIESEM Spieltag traegt — unabhaengig von der UI-Auswahl `gastTeamId`:
+  // ein Mini-DM-Pod ist eine EIGENE, zur normalen Fixture-Paarung parallele Gruppierung
+  // (s. dortiger Datei-Kopfkommentar), `gastTeamId` muss darin gar nicht vorkommen. Gibt es
+  // keinen echten Pod (Mini-DM steht an diesem Spieltag nicht an, oder die Liga ist nicht
+  // durch 4 teilbar), bleibt `miniDmPod` `null` — die Buehne zeigt dann GAR KEINE
+  // Mini-DM-FFA-Vierergruppe mehr (vorher wurde IMMER eine erfunden, sobald 4 Teams existierten,
+  // unabhaengig davon, ob Mini-DM an diesem Spieltag ueberhaupt gespielt wird).
+  const miniDmPod = useMemo(() => {
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getMiniDmPodForTeam(gameState, heimTeamId, matchdayId, { saveId });
+  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+
+  // Primitive Strings statt des Pod-Objekts selbst als Hook-Abhaengigkeiten weiter unten —
+  // `miniDmPod` ist bei gleichen Eingaben zwar bereits memoisiert (dieselbe Referenz bleibt
+  // ueber Re-Renders stabil), aber die VIER IDs einzeln zu fuehren haelt den Rest dieser Datei
+  // im selben Stil wie das bisherige `dritteTeamId`/`vierteTeamId`-Paar.
+  const [miniDmTeamId0, miniDmTeamId1, miniDmTeamId2, miniDmTeamId3] =
+    miniDmPod?.teamIds ?? (["", "", "", ""] as const);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -164,13 +179,17 @@ export default function FoundationBattleArenaHost({
 
   useEffect(() => {
     if (!saveId || saveId === "loading-save") return;
-    // Die zwei zusaetzlichen Mini-DM-FFA-Teams werden HIER MIT nachgeladen (dieselbe Bulk-
+    // Die (bis zu vier) Mini-DM-FFA-Pod-Teams werden HIER MIT nachgeladen (dieselbe Bulk-
     // Route, ein Promise.all-Schwung) statt in einem zweiten Effekt — sie tragen exakt
     // dasselbe Fog-of-War-Problem wie Heim/Gast und sollen nicht selbst einen zweiten
-    // Ladezustand samt Race-Bedingung gegen diesen Effekt hier aufmachen.
+    // Ladezustand samt Race-Bedingung gegen diesen Effekt hier aufmachen. Heim/Gast koennen
+    // mit den Pod-IDs ueberlappen (heimTeamId ist IMMER Teil des Pods, s. `miniDmPod`-
+    // Kommentar oben) — das Set() entdoppelt.
     const teamIds = [
       ...new Set(
-        [heimTeamId, gastTeamId, dritteTeamId, vierteTeamId].filter(Boolean),
+        [heimTeamId, gastTeamId, miniDmTeamId0, miniDmTeamId1, miniDmTeamId2, miniDmTeamId3].filter(
+          Boolean,
+        ),
       ),
     ];
     if (teamIds.length === 0) return;
@@ -219,7 +238,16 @@ export default function FoundationBattleArenaHost({
     return () => {
       abgebrochen = true;
     };
-  }, [saveId, heimTeamId, gastTeamId, dritteTeamId, vierteTeamId, activeManagerTeamId]);
+  }, [
+    saveId,
+    heimTeamId,
+    gastTeamId,
+    miniDmTeamId0,
+    miniDmTeamId1,
+    miniDmTeamId2,
+    miniDmTeamId3,
+    activeManagerTeamId,
+  ]);
 
   const heimKader = useMemo(
     () => buildArenaTeam(gameState, heimTeamId, sheetsByPlayerId),
@@ -229,41 +257,82 @@ export default function FoundationBattleArenaHost({
     () => buildArenaTeam(gameState, gastTeamId, sheetsByPlayerId),
     [gameState, gastTeamId, sheetsByPlayerId],
   );
-  const dritteKader = useMemo(
-    () =>
-      dritteTeamId ? buildArenaTeam(gameState, dritteTeamId, sheetsByPlayerId) : [],
-    [gameState, dritteTeamId, sheetsByPlayerId],
+  // Die vier Pod-Kader EINZELN aufgebaut (nicht ueber heimKader/gastKader, s. `miniDmPod`-
+  // Kommentar oben: der Pod kann heimTeamId an JEDER der vier Positionen tragen, und
+  // gastTeamId muss darin gar nicht vorkommen) — exakt dasselbe `buildArenaTeam()` wie
+  // heimKader/gastKader, nur viermal mit den echten Pod-IDs.
+  const miniDmKader0 = useMemo(
+    () => (miniDmTeamId0 ? buildArenaTeam(gameState, miniDmTeamId0, sheetsByPlayerId) : []),
+    [gameState, miniDmTeamId0, sheetsByPlayerId],
   );
-  const vierteKader = useMemo(
-    () =>
-      vierteTeamId ? buildArenaTeam(gameState, vierteTeamId, sheetsByPlayerId) : [],
-    [gameState, vierteTeamId, sheetsByPlayerId],
+  const miniDmKader1 = useMemo(
+    () => (miniDmTeamId1 ? buildArenaTeam(gameState, miniDmTeamId1, sheetsByPlayerId) : []),
+    [gameState, miniDmTeamId1, sheetsByPlayerId],
+  );
+  const miniDmKader2 = useMemo(
+    () => (miniDmTeamId2 ? buildArenaTeam(gameState, miniDmTeamId2, sheetsByPlayerId) : []),
+    [gameState, miniDmTeamId2, sheetsByPlayerId],
+  );
+  const miniDmKader3 = useMemo(
+    () => (miniDmTeamId3 ? buildArenaTeam(gameState, miniDmTeamId3, sheetsByPlayerId) : []),
+    [gameState, miniDmTeamId3, sheetsByPlayerId],
   );
 
-  // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor (s. `miniDmFfaTeams`-Kommentar oben bei
-  // dritteTeamId/vierteTeamId): NUR gesetzt, wenn alle vier Kader wirklich stehen (jeder
-  // mindestens einen Spieler mit vollstaendigem Attribut-Bogen) — sonst liest der Motor
-  // (battle-mode.engine.js, `mdffaKader()`) `undefined`/unvollstaendig und faellt auf seinen
-  // eigenen, klar beschrifteten Standalone-Ersatz zurueck, statt mit leeren Teams zu rechnen.
+  // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
+  // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier
+  // Kader wirklich stehen (jeder mindestens einen Spieler mit vollstaendigem Attribut-Bogen)
+  // — sonst liest der Motor (battle-mode.engine.js, `mdffaTeamEintraege()`)
+  // `undefined`/unvollstaendig und faellt auf seinen eigenen, klar beschrifteten
+  // Standalone-Ersatz zurueck, statt mit leeren oder erfundenen Teams zu rechnen.
   const miniDmFfaTeams = useMemo(() => {
-    const eintraege = [
-      { name: teams.find((t) => t.teamId === heimTeamId)?.name ?? "Heim", kader: heimKader },
-      { name: teams.find((t) => t.teamId === gastTeamId)?.name ?? "Gast", kader: gastKader },
-      { name: teams.find((t) => t.teamId === dritteTeamId)?.name ?? "", kader: dritteKader },
-      { name: teams.find((t) => t.teamId === vierteTeamId)?.name ?? "", kader: vierteKader },
-    ];
+    if (!miniDmPod) return null;
+    const kaderByIndex = [miniDmKader0, miniDmKader1, miniDmKader2, miniDmKader3];
+    const eintraege = miniDmPod.teamIds.map((teamId, index) => ({
+      name: teams.find((t) => t.teamId === teamId)?.name ?? teamId,
+      kader: kaderByIndex[index] ?? [],
+    }));
     return eintraege.every((e) => e.kader.length > 0) ? eintraege : null;
-  }, [
-    teams,
-    heimTeamId,
-    gastTeamId,
-    dritteTeamId,
-    vierteTeamId,
-    heimKader,
-    gastKader,
-    dritteKader,
-    vierteKader,
-  ]);
+  }, [miniDmPod, teams, miniDmKader0, miniDmKader1, miniDmKader2, miniDmKader3]);
+
+  // DIE ECHTE KADERGROESSE k (2..6) DIESES MINI-DM-SPIELTAGS — dieselbe Funktion, die
+  // `lib/resolve/mini-dm-ffa-matchday.ts` fuer die ZAEHLENDE Buchung aufruft (jetzt verschoben
+  // nach `lib/season/mini-dm-pod-schedule.ts`, s. dortiger Kommentar, genau damit dieser
+  // Client-Host sie importieren kann). `null`, wenn kein echter Pod existiert (dann liest der
+  // Motor unten ohnehin kein `k` und faellt auf seinen alten Vierer-Pfad zurueck).
+  const miniDmFfaK = useMemo(() => {
+    if (!miniDmPod) return null;
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!matchdayId) return null;
+    return resolveMiniDmFfaPlayerCountForMatchday(gameState, matchdayId, { saveId });
+  }, [miniDmPod, gameState, gameState.matchdayState?.matchdayId, saveId]);
+
+  // DIE GEBUCHTE POD-SAAT — `buildMiniDmFfaPodMatchSeed()` + `seedZuZahl()`
+  // (`@/lib/battle/arena-seed`), DENSELBEN Funktionen, die `lib/resolve/mini-dm-ffa-matchday.ts`
+  // fuer den ZAEHLENDEN Lauf aufruft (s. Kopfkommentar dort). Keine zweite Implementierung —
+  // nur ein zweiter Aufrufer derselben Funktion mit denselben Argumenten, genau wie
+  // `arenaSeedByDisciplineId` weiter unten fuer die klassischen Zwei-Team-Disziplinen.
+  const miniDmFfaSaat = useMemo(() => {
+    if (!miniDmPod || !saveId || saveId === "loading-save") return null;
+    const seasonId = gameState.season?.id;
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!seasonId || !matchdayId) return null;
+    return seedZuZahl(
+      buildMiniDmFfaPodMatchSeed({ saveId, seasonId, matchdayId, podId: miniDmPod.id }),
+    );
+  }, [miniDmPod, saveId, gameState.season?.id, gameState.matchdayState?.matchdayId]);
+
+  // DIE ECHTE AUFSTELLUNG, JE POD-TEAM EINZELN (nicht gemergt wie `buildArenaAufstellungBeide()`
+  // — ein Mini-DM-Pod-Teilnehmer kennt nur seinen EIGENEN Kader, keine Namenskollision mit den
+  // drei anderen Pod-Teams moeglich, s. `arena-headless-runner.ts`s
+  // `MiniDmFfaPodFixtureInput`-Kopfkommentar "ein Pod-Teilnehmer kennt nur seinen EIGENEN
+  // Kader"). `spieleMiniDmFfaEvent()`/`mdffaAuswahlVorbereiten()` (battle-mode.engine.js) lesen
+  // `platzJeTeam[teamIdx]` POSITIONSGLEICH zu `vierTeams[teamIdx]` — die Reihenfolge hier MUSS
+  // also exakt `miniDmPod.teamIds` folgen, wie `miniDmFfaTeams` oben.
+  const miniDmFfaAufstellung = useMemo(() => {
+    if (!miniDmPod) return null;
+    const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+    return miniDmPod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId));
+  }, [miniDmPod, gameState, gameState.matchdayState?.matchdayId]);
 
   // A3 (docs/pm-briefings/opus-synthese-echtzeit-vs-rundenbasiert-19-09.md Abschnitt 5.3,
   // "die gebuchte Saat durch den Host reichen" — "Was Chris zuschaut, ist nicht das Spiel, das
@@ -274,15 +343,24 @@ export default function FoundationBattleArenaHost({
   // Import von dort). Keine zweite Implementierung, kein zweiter Pfad — nur ein zweiter
   // Aufrufer derselben Funktionen mit denselben Argumenten.
   //
-  // Ein Eintrag entsteht NUR fuer eine Disziplin, die an DIESEM Spieltag (`disciplineSchedule`)
-  // als D1 ODER D2 gebucht UND arena-aufgeloest ist (`ARENA_RESOLVED_DISCIPLINE_IDS`, dieselbe
-  // Menge, die `runBattleModeArenaMatchday()` fuer die echte Wertung prueft) — jede andere vom
-  // eingebetteten Motor waehlbare Disziplin (inklusive des Standard-Tabs "tdm", der ueberhaupt
-  // keine gewertete Olympiade-Disziplin ist) hat hier bewusst KEINEN Eintrag und faellt im Motor
-  // unveraendert auf die bisherige Ersatzsaat 1337 zurueck (s. `gebuchteSaatFuerAktuelleDisziplin()`
-  // in battle-mode.engine.js) — GENAUSO, wenn Chris hier zwei beliebige Teams zum Erkunden waehlt,
-  // die an diesem Spieltag gar nicht gegeneinander gebucht sind: fuer sie wurde nie ein echtes
-  // Ergebnis gezaehlt, es gibt also keine Saat zum Nachstellen.
+  // F9-FIX (PR 3, K1 — Plan Abschnitt 5.2 "Host-Orientierung"): bis hierher baute dieser Block die
+  // Saat IMMER aus `heimTeamId`/`gastTeamId` — also aus der UI-AUSWAHL, nicht aus dem tatsaechlich
+  // gebuchten Fixture. Waehlt der Spieler das Paar verkehrt herum, hiess der Seed-String
+  // `...:<away>:<home>` statt `...:<home>:<away>`, ergab eine ANDERE Saat, und es wurde nie
+  // geprueft, ob das Paar an diesem Spieltag ueberhaupt ein Fixture ist (der Kommentar oben
+  // behauptete einen Rueckfall auf 1337 fuer Nicht-Fixture-Paare, den dieser Code nie hatte). Der
+  // Fix: `findeSpieltagsFixtures()`/`baueFixtureIndex()` (`lib/resolve/battle-mode-pps-duell.ts`,
+  // bewusst ohne Fremd-Importe, s. dortiger Kommentar) sucht das ECHTE Fixture dieses Spieltags zu
+  // `heimTeamId`. Nur wenn es existiert UND sein Gegner GENAU `gastTeamId` ist (in beliebiger
+  // Reihenfolge), wird die Saat aus `fixture.homeTeamId`/`fixture.awayTeamId` gebaut — ORIENTIERUNGS-
+  // UNABHAENGIG von der UI-Auswahl, also bitgleich mit dem, was der zaehlende Lauf verwendet hat.
+  // Jedes andere Paar (kein Fixture / falscher Gegner) bekommt weiterhin KEINEN Eintrag und faellt
+  // im Motor auf die Ersatzsaat 1337 zurueck — jetzt tatsaechlich wahr, nicht nur behauptet.
+  const spieltagFixtures = useMemo(
+    () => findeSpieltagsFixtures(gameState, gameState.matchdayState?.matchdayId ?? ""),
+    [gameState, gameState.matchdayState?.matchdayId],
+  );
+  const spieltagFixtureIndex = useMemo(() => baueFixtureIndex(spieltagFixtures), [spieltagFixtures]);
   const arenaSeedByDisciplineId = useMemo(() => {
     const karte: Record<string, number> = {};
     const seasonId = gameState.season?.id;
@@ -298,20 +376,31 @@ export default function FoundationBattleArenaHost({
     ) {
       return karte;
     }
+    const echtesFixture = spieltagFixtureIndex.get(heimTeamId);
+    const istDasGewaehltePaar =
+      echtesFixture &&
+      ((echtesFixture.homeTeamId === heimTeamId && echtesFixture.awayTeamId === gastTeamId) ||
+        (echtesFixture.homeTeamId === gastTeamId && echtesFixture.awayTeamId === heimTeamId));
+    if (!istDasGewaehltePaar || !echtesFixture) {
+      // Kein Fixture dieses Spieltags fuer dieses Paar -- kein Eintrag, Motor faellt auf 1337.
+      return karte;
+    }
     const spieltag = gameState.seasonState?.disciplineSchedule?.find(
       (eintrag) => eintrag.matchdayId === matchdayId,
     );
     if (!spieltag) return karte;
     for (const slot of [spieltag.discipline1, spieltag.discipline2]) {
       if (!slot || !ARENA_RESOLVED_DISCIPLINE_IDS.has(slot.disciplineId)) continue;
+      // IMMER `echtesFixture.homeTeamId`/`.awayTeamId`, NIE `heimTeamId`/`gastTeamId` direkt --
+      // orientierungsunabhaengig von der UI-Auswahl, s. Kommentar oben.
       karte[slot.disciplineId] = seedZuZahl(
         buildArenaMatchSeed({
           saveId,
           seasonId,
           matchdayId,
           disciplineId: slot.disciplineId,
-          homeTeamId: heimTeamId,
-          awayTeamId: gastTeamId,
+          homeTeamId: echtesFixture.homeTeamId,
+          awayTeamId: echtesFixture.awayTeamId,
         }),
       );
     }
@@ -323,6 +412,7 @@ export default function FoundationBattleArenaHost({
     gameState.seasonState?.disciplineSchedule,
     heimTeamId,
     gastTeamId,
+    spieltagFixtureIndex,
   ]);
 
   // MUTATOR ORGANISCH (29.09., lib/battle/battle-mutator-organisch.ts): der ECHTE Spieltagswurf
@@ -345,6 +435,20 @@ export default function FoundationBattleArenaHost({
     if (d2DisciplineId) karte[d2DisciplineId] = [...wurf.d2];
     return karte;
   }, [saveId, gameState.season?.id, gameState.matchdayState?.matchdayId, gameState.seasonState?.disciplineSchedule]);
+
+  /**
+   * ARENA-HOST-HINWEIS ("gewertet per PPS-Duell, Arena nur Vorschau") — Task #159 Punkt 3,
+   * eigener kleiner Posten, s. PR #1276s Beschreibung. Der Header-Text oben ("noch keine
+   * offizielle Wertung … fließt nirgends in die Tabelle ein") gilt pauschal für JEDE Disziplin,
+   * zu jeder Zeit — dieser Hinweis ist präziser: er sagt für die an DIESEM Spieltag gebuchten
+   * Disziplinen, ob die ECHTE Wertung (die in die Tabelle fließt) überhaupt über die Arena
+   * läuft, oder über die PPS-Duell-Brücke. Reine Logik + eigener Unit-Test in
+   * `lib/foundation/battle-arena/arena-host-spielquelle-hinweis.ts` — hier nur der Aufruf.
+   */
+  const spielquelleHinweise = useMemo(
+    () => buildArenaHostSpielquelleHinweise(gameState, heimTeamId),
+    [gameState, heimTeamId],
+  );
 
   const keineTeams = teams.length === 0;
   // "Vollstaendig geladen, aber leer" (Team hat wirklich keinen Spieler mit Attribut-Bogen)
@@ -479,11 +583,21 @@ export default function FoundationBattleArenaHost({
       (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = {
         heim: heimKader,
         gast: gastKader,
-        // MINI-DM 4-TEAM-FFA (s. Kommentar bei dritteTeamId/vierteTeamId oben): vier echte
-        // Kader, nur gesetzt, wenn alle vier stehen. Der Motor liest das ausschliesslich,
-        // wenn die Disziplin "mini-dm" aktiv ist (spieleMiniDmFfaEvent statt der klassischen
-        // Zwei-Seiten-Aufstellung); jede andere Disziplin ignoriert dieses Feld vollstaendig.
+        // MINI-DM 4-TEAM-FFA (s. `miniDmPod`-Kommentar oben): vier echte Kader des ECHTEN
+        // Spieltags-Pods, nur gesetzt, wenn ein Pod existiert und alle vier Kader stehen.
+        // Der Motor liest das ausschliesslich, wenn die Disziplin "mini-dm" aktiv ist
+        // (spieleMiniDmFfaEvent statt der klassischen Zwei-Seiten-Aufstellung); jede
+        // andere Disziplin ignoriert dieses Feld vollstaendig.
         miniDmFfaTeams,
+        // "GEZEIGT = GEBUCHT" fuer Mini-DM (PR 6, s. `miniDmFfaK`/`miniDmFfaSaat`/
+        // `miniDmFfaAufstellung`-Kommentare oben): dieselbe Kadergroesse k, Saat und
+        // Aufstellung, die auch der zaehlende Lauf verwendet hat — gelesen von
+        // `gebuchteMiniDmFfaKontext()` in `renderMiniDmFfa()` (battle-mode.engine.js).
+        // Alle drei `null`, wenn kein echter Pod existiert; der Motor faellt dann auf
+        // seinen alten Verhalten zurueck (Ersatzsaat 1337, Vierer-Rollenpfad, kein `platzJeTeam`).
+        miniDmFfaK,
+        miniDmFfaSaat,
+        miniDmFfaAufstellung,
         // DIE AUFSTELLUNG, die der Manager gesetzt hat — bis hierher reichte der
         // Umschlag nur Kader durch. Der Motor fragt sie in `slotFuer` (bauFeldspiel)
         // laengst ab und fiel mangels Daten immer auf Reihum zurueck; Chris' Zuweisung
@@ -544,7 +658,18 @@ export default function FoundationBattleArenaHost({
     return () => {
       abgebrochen = true;
     };
-  }, [gerenderterKader, huelle, teams, gameState, arenaSeedByDisciplineId, mutatorenByDisciplineId, miniDmFfaTeams]);
+  }, [
+    gerenderterKader,
+    huelle,
+    teams,
+    gameState,
+    arenaSeedByDisciplineId,
+    mutatorenByDisciplineId,
+    miniDmFfaTeams,
+    miniDmFfaK,
+    miniDmFfaSaat,
+    miniDmFfaAufstellung,
+  ]);
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
   // Dependency-Array), nicht bei jedem Team-Wechsel — der raeumt sich selbst auf (s. oben).
@@ -666,11 +791,37 @@ export default function FoundationBattleArenaHost({
             className="muted"
             style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
           >
-            Mini-DM tritt hier als 4-Team-FFA an — zusätzlich zu Heim/Gast sind{" "}
-            <strong>{miniDmFfaTeams[2]!.name}</strong> und{" "}
-            <strong>{miniDmFfaTeams[3]!.name}</strong> automatisch mit dabei
+            Mini-DM tritt hier als 4-Team-FFA an — die fuer diesen Spieltag
+            tatsächlich gebuchte Vierergruppe:{" "}
+            {miniDmFfaTeams.map((team, index) => (
+              <span key={team.name + index}>
+                {index > 0 ? ", " : ""}
+                <strong>{team.name}</strong>
+              </span>
+            ))}
+            {" "}
             (nur in der Mini-DM-Ansicht der Arena unten, ohne Auswirkung auf
-            die übrigen Disziplinen).
+            die übrigen Disziplinen; Heim/Gast muss darin nicht beide
+            vorkommen — Mini-DM-Pods sind eine eigene, von der Heim/Gast-Wahl
+            unabhängige Gruppierung).
+          </p>
+        ) : null}
+        {spielquelleHinweise.length > 0 ? (
+          <p
+            className="muted"
+            data-testid="oly-arena-spielquelle-hinweis"
+            style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
+          >
+            {/* Opus-Review zu PR #1282 (17.10.): der "nur Vorschau"-Zusatz muss je Disziplin
+                stehen, nicht als EIN Schlusssatz hinter allen Hinweisen — sonst liest sich das
+                an einem Spieltag mit einer echt per Arena UND einer per Brücke gewerteten
+                Disziplin so, als wäre auch die Arena-Disziplin nur Vorschau. */}
+            {spielquelleHinweise.map((hinweis, index) => (
+              <span key={hinweis.disciplineId}>
+                {index > 0 ? " · " : ""}
+                <strong>{hinweis.disciplineName}</strong> {hinweis.text} — hier nur Vorschau.
+              </span>
+            ))}
           </p>
         ) : null}
 

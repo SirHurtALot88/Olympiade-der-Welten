@@ -27,6 +27,7 @@ const SCHREIBWEG = readFileSync(join(process.cwd(), "lib/standings/standings-app
 const SPIELTAG = readFileSync(join(process.cwd(), "lib/foundation/season-matchday-points.ts"), "utf8");
 const FELDRENNEN = readFileSync(join(process.cwd(), "lib/foundation/build-field-race-ledger.ts"), "utf8");
 const SUMMENQUELLE = readFileSync(join(process.cwd(), "lib/foundation/player-points-total.ts"), "utf8");
+const LEDGER = readFileSync(join(process.cwd(), "lib/foundation/season-points-ledger.ts"), "utf8");
 
 describe("Saisonstand-Punkte enthalten den Mutator-Aufschlag", () => {
   it("die Buchung summiert den Mutator-Aufschlag je Team", () => {
@@ -46,13 +47,23 @@ describe("Saisonstand-Punkte enthalten den Mutator-Aufschlag", () => {
     expect(stelle).toContain("mutatorBonus");
   });
 
-  it("Spieltag und Feld-Rennen summieren `points`, nicht `basePoints`", () => {
+  it("Spieltag und Feld-Rennen summieren die mutator-inklusive Tabellen-Waehrung, nicht `basePoints`", () => {
     // `basePoints` ist der reine Rang-Anteil. Wer danach rankt, rankt nach einer anderen Groesse
     // als der Saisonstand bucht — genau der Widerspruch aus der Meldung.
+    //
+    // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, 19.10.): Spieltag und Feld-Rennen summieren seitdem
+    // nicht mehr `entry.points` direkt, sondern `ledger.tableGroupContributions` (`beitrag.points`) --
+    // fuer eine Duell-Zeile ist `entry.points` seitdem die leistungsbasierte Spieler-PP, nicht mehr
+    // die 2/1/0-Tabellen-Waehrung (s. Kommentar an `summiereSpieltagsPunkteAusLedger`). Der Waechter
+    // prueft deshalb zweistufig: (1) beide Konsumenten summieren `beitrag.points` aus
+    // `tableGroupContributions`, (2) `tableGroupContributions` selbst zieht fuer eine
+    // Manager-Mode-Zeile weiter aus `entry.points` (mutator-inklusiv), nicht aus `entry.basePoints`.
     for (const quelle of [SPIELTAG, FELDRENNEN]) {
-      expect(quelle).toContain(") + entry.points, 4)");
-      expect(quelle).not.toContain(") + entry.basePoints, 4)");
+      expect(quelle).toContain(") + beitrag.points, 4)");
+      expect(quelle).not.toContain(") + beitrag.basePoints, 4)");
     }
+    expect(LEDGER).toContain("entry.points, 0), 4)");
+    expect(LEDGER).not.toContain("entry.basePoints, 0), 4)");
   });
 });
 

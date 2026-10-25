@@ -46,7 +46,8 @@ describe("D2-Kontrolldisziplin (Arena-E2E)", () => {
  * ECHTE Resolve-Pipeline (`buildLegacyMatchdayResolvePreview`) ein und die dort ankommenden
  * Team-Punkte werden gegen das 2/1/0-Modell geprueft — inklusive sichtbarem `resolutionSource`
  * und `arenaMatchSeed`, und der Kontrolle, dass die zweite (Nicht-Arena-)Disziplin desselben
- * Spieltags weiterhin ueber `getRankToPointsValue()` laeuft (Konsistenz-Nachweis aus dem Auftrag).
+ * Spieltags als PPS-Duell desselben Fixtures 2/1/0 zahlt (seit der PPS-Duell-Bruecke 16.10.; vorher
+ * lief sie hier ueber `getRankToPointsValue()`).
  *
  * Ein echter Playwright-Browser-Klick durch die komplette Next.js-UI ("Spieltag simulieren"-
  * Button) haette eine laufende App-Instanz samt Persistenz/Auth in dieser Umgebung gebraucht;
@@ -258,7 +259,7 @@ function createContext(input: {
 
 describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Resolve-Pipeline", () => {
   it(
-    "ein echtes Arena-Ergebnis kommt an, traegt resolutionSource:arena + sichtbaren Seed, und die D2-Kontrolldisziplin (PPS) bleibt konsistent ueber getRankToPointsValue",
+    "ein echtes Arena-Ergebnis kommt an, traegt resolutionSource:arena + sichtbaren Seed, und die D2-Kontrolldisziplin zahlt als PPS-Duell dieselbe 2/1/0-Skala",
     async () => {
       const gameState = baueBattleModeGameState();
 
@@ -300,15 +301,21 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Battle Mode PR7: echter Arena-Lauf -> Res
         expect(team.teamPoints).toBe(overridesByTeamId.get(team.teamId)?.teamPoints);
       }
 
-      // Die Kontrolldisziplin (D2, keine Arena-Disziplin) bleibt exakt beim bestehenden, gerankten PPS-Pfad --
-      // "konsistent mit einer Nicht-Arena-Disziplin desselben Spieltags" aus dem Auftrag.
+      // Die Kontrolldisziplin (D2, keine Arena-Disziplin) laeuft seit der PPS-Duell-Bruecke (16.10.,
+      // docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md) NICHT mehr ueber die Rangtabelle,
+      // sondern als PPS-Duell DESSELBEN Fixtures: 2/1/0 aus dem PPS-Score beider Seiten -- dieselbe
+      // Punkteskala wie das Arena-Duell in D1, nur ohne Arena-Seed.
       const kontrolle = preview.disciplinePreviews.find((discipline) => discipline.disciplineId === D2_KONTROLL_DISZIPLIN);
       expect(kontrolle).toBeDefined();
       for (const team of kontrolle?.teamResults ?? []) {
-        expect(team.resolutionSource).toBe("pps");
-        expect(team.pointSource).toBe("rank_to_points_final_score_share");
+        expect(team.resolutionSource).toBe("pps_duell");
+        expect(team.pointSource).toBe("battle_mode_pps_duell_win_draw_loss");
+        expect([0, 1, 2]).toContain(team.teamPoints);
         expect(team.arenaMatchSeed ?? null).toBeNull();
       }
+      const d2Punkte = (teamId: string) => kontrolle?.teamResults.find((team) => team.teamId === teamId)?.teamPoints ?? -1;
+      expect(d2Punkte("liga1-a") + d2Punkte("liga1-b")).toBe(2);
+      expect(d2Punkte("liga2-a") + d2Punkte("liga2-b")).toBe(2);
     },
     LAUF_TIMEOUT_MS,
   );

@@ -480,3 +480,158 @@ fehlen, sie sind klein und spielweise, ändern die Ordnung über 60 Spieler aber
 (`main` `466e53fb`, Stellen wie im Kopf angegeben) · `scripts/miss-alle-disziplinen.mjs`,
 `scripts/miss-star-paartreue.mjs`, `scripts/messe-arena-einfluss.mjs`,
 `scripts/messe-arena-einfluss-zweiter-saatstamm.mjs`, `scripts/miss-arena-buehne-spiegel.mjs`.
+
+---
+
+## 10. PR 0 gemessen (07.10.): I-2k „Kennerblick" fällt — Abbruchkriterium verfehlt, nicht gemergt
+
+Chris hat am 07.10. dem Bau zugestimmt. Gebaut und gemessen wurde **exakt** Abschnitt 5.2 auf
+`origin/main` `2470c502`, Branch `i-spy-kennerblick-paket-07-10` (Diagnose-Commit, **kein PR**):
+Rezeptzeile `KENNERBLICK: {will:16, dexterity:15, torment:14, charisma:13, spirit:13, speed:12,
+determination:10, intelligence:7}`, Konstante `ISPY_KENNERBLICK_FAKTOR`,
+`FINDEN = max(SPUERSINN, FAKTOR·KENNERBLICK)`, `sieht2`/`sieht3` lesen `FINDEN`. Kein neuer
+`rr()`-Wurf. Dazu eine reine Zählsonde `window.__arena.ispyKennerblickSondeStart()/-Stopp()`
+(kein rr(), kein Gameplay) für die Korridor-Kennzahl aus Schritt 6. Die Ticker-Anzeige
+(`r.weg`, 5.6) ist nicht gebaut. **Auf dem Branch steht der Faktor auf 0** — der Code ist dort
+bit-identisch zu `main` und nur zur Reproduktion da (Faktor per Hand setzen, messen).
+
+### 10.1 Nullprobe: bestanden, bit-identisch
+
+Faktor 0 → `miss-alle-disziplinen.mjs 24 i-spy` liest **0,750 / 0,177 / 0,881 / 0,210**, exakt
+die Basislinie. Strenger als die Tabelle: ein SHA-256 über alle Rohdaten der kaderfesten Probe
+(je Paarung, je Spiel, je Teilnehmer `n`/`eig`/`wert`) ist zwischen `main` und Faktor 0 gleich
+(`ea61d66671fe5b30`). `miss-star-paartreue.mjs 24 i-spy` ist zeichengleich zum Ist-Stand.
+
+### 10.2 Dosisreihe (n = 24 je Paarung, Kader-Familie live-save, gleiche Saaten)
+
+rho je Spiel je Paarung (v-a · c-d · g-s · m-n · p-r) und die Mediane:
+
+| Variante | v-a | c-d | g-s | m-n | **p-r** | rho Spiel Med. | rho Saison Med. | Star R1 | Top 2 | Letzter | Paartreue ≥15 | Kennerblick-Züge |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **Ist-Stand** (= Faktor 0) | 0,858 | 0,750 | 0,707 | 0,799 | **0,681** | **0,750** | **0,881** | 43,3 % | 74,2 % | 0 % | 94,6 % | 0 % |
+| Faktor 0,80 | 0,863 | 0,706 | 0,717 | 0,765 | 0,674 | 0,717 | 0,818 | 39,2 % | 72,5 % | 0 % | 93,6 % | 25,0 % |
+| Faktor 0,85 (Start) | 0,871 | 0,698 | 0,724 | 0,756 | 0,662 | 0,724 | 0,818 | 37,5 % | 70,8 % | 0 % | 93,4 % | 27,2 % |
+| Faktor 0,90 | 0,852 | 0,666 | 0,738 | 0,747 | 0,666 | 0,738 | 0,804 | 39,2 % | 66,7 % | 0 % | 92,9 % | 33,3 % |
+| *Diagnose: Faktor 1,0* | 0,827 | 0,627 | 0,735 | 0,720 | 0,682 | 0,720 | 0,804 | 30,0 % | 57,5 % | 0 % | 91,7 % | 55,9 % |
+| *Diagnose: Mischung 0,5·SP + 0,5·KB* | 0,866 | 0,761 | 0,739 | 0,769 | 0,638 | 0,761 | 0,818 | 38,3 % | 66,7 % | 0 % | 93,7 % | — |
+
+Saison-rho je Paarung bei 0,85: 0,986 · 0,832 · 0,818 · 0,776 · 0,755 (Ist 0,979 · 0,888 · 0,839 ·
+0,881 · 0,769). Der „Kennerblick-Anteil" ist der Anteil aller Züge (11 520 je Lauf = 120 Spiele ×
+12 Teilnehmer × 8 Ticks) mit `FINDEN > SPUERSINN`; bei jedem einzelnen davon hob sich `sieht3`
+tatsächlich (kein Zug lag schon am Deckel).
+
+### 10.3 Abbruch-Tabelle (Abschnitt 6), beste Dosis
+
+„Beste Dosis" = höchster Median rho je Spiel, also **0,90** (0,738). Die Spalten 0,80/0,85 stehen
+daneben, weil keine Dosis eine andere Zeile rettet.
+
+| Bedingung | Schwelle | 0,80 | 0,85 | **0,90** | Ergebnis |
+|---|---|---:|---:|---:|---|
+| (a) paarweise rho je Spiel ≥ Ist, piratecrew darunter | ≥ 4/5, p-r Pflicht | 2/5, p-r ✗ | 2/5, p-r ✗ | **1/5, p-r ✗** (0,666 < 0,681) | **verfehlt** |
+| (b) rho je Spiel, Median | ≥ 0,77 | 0,717 | 0,724 | **0,738** | **verfehlt** (unter Ist) |
+| (c) rho Saison, Median | ≥ 0,87 | 0,818 | 0,818 | **0,804** | **verfehlt** — unter 0,85, also genau der Kompressionsfall aus 4.3 |
+| (d) Star Rang 1 / Top 2 / Letzter | ≥ 47,5 % / ≥ 75 % / 0 % | 39,2 / 72,5 / 0 | 37,5 / 70,8 / 0 | **39,2 / 66,7 / 0** | **verfehlt** (Rang 1 und Top 2 unter Ist) |
+| (e) Paartreue ≥ 15 | ≥ 95 % | 93,6 % | 93,4 % | **92,9 %** | **verfehlt** (unter Ist 94,6 %) |
+| (f) Pp, zwei Saatstämme | ≤ 25 beide | — | — | **25,9 / 19,0** (n=24) | **verfehlt** (Saat 1 über 25) |
+| (g) Kennerblick-Anteil der Züge | 15–45 % | 25,0 % | 27,2 % | **33,3 %** | gehalten |
+| (h) Spiegeltest | 45–55 | — | — | **59 : 61** (49,2 %, Punkte 1206,9 : 1205,2) | gehalten |
+
+**Sechs von acht Zeilen verfehlt bei der besten Dosis; (a) bis (e) in jeder Dosis.** Nach
+Abschnitt 6 fällt I-2k damit. Die Abbruch-Regel ist eindeutig, und eine Feinkalibrierung (±0,025)
+macht aus einer Verschlechterung in fünf Größen bei allen drei Dosen keine Verbesserung.
+**Nicht gemergt, kein PR.**
+
+### 10.4 Warum: der Star bekommt den Nebenweg nicht, das Mittelfeld schon
+
+Die Diagnose aus Abschnitt 1 (der Star von piratecrew sieht schlechter als drei Mitspieler) stimmt.
+Die Kur greift aber nicht bei ihm. Gemessen am Motor (Faktor 0,90, piratecrew, je Spieler Anteil
+seiner Züge mit `FINDEN > SPUERSINN`):
+
+| Spieler | eig (mit Slot/Form) | SPÜRSINN (roh) | KENNERBLICK (roh) | Kennerblick-Züge |
+|---|---:|---:|---:|---:|
+| **Umbrafond (Star)** | 49,1 | 50,2 | 53,8 | **0 %** |
+| Yuko | 48,7 | 57,5 | 51,7 | 0 % |
+| Radditz | 45,9 | 48,6 | 54,3 | 100 % |
+| Swiftfoot | 43,9 | 40,7 | 52,5 | 100 % |
+| Belandria | 42,8 | 42,5 | 51,8 | 100 % |
+
+(Roh = Rezeptmischung über `p.a` ohne Slot/Form, wie Anhang A; der Motor rechnet mit Zuschlag,
+die Zuordnung 0 %/100 % stimmt mit der Rohrechnung überein.)
+
+1. **Rechenfehler in Abschnitt 7.** Für Umbrafond ist 0,85 · 53,8 = 45,7 < 50,2 — der Kennerblick
+   hebt seine Schwelle bei keinem Faktor unter ~0,93. Die Erwartung „Star sieht von 65 % auf
+   ~71 %" entspricht Faktor 1,0 (0,013 · 53,8 = 0,70), nicht 0,85. Bei Faktor 1,0 sinkt Star
+   Rang 1 in piratecrew sogar auf 12,5 %.
+2. **Wer den Nebenweg bekommt, ist das Mittelfeld mit hoher Knack-Kompetenz und niedrigem
+   SPÜRSINN** (Swiftfoot, Belandria: eig ~43, SPÜRSINN ~41). Sie rücken im Zugang auf die Höhe des
+   Stars. Weil dieselben Spieler über den Reihenfolge-Schlüssel (0,3·NERVEN + 0,7·Kompetenz)
+   ohnehin früh an die Truhen kommen, bekommen sie den gehobenen Zugang dort, wo er am meisten
+   wert ist — *Vermutung*, nicht einzeln gemessen. Das Ergebnis ist die Kompression aus 4.3:
+   Saison-Validität −0,06 bis −0,08 bei allen drei Dosen.
+3. **Die Kaderprobe aus Abschnitt 4 hat andere Spieler gerechnet als der Motor aufstellt.**
+   Anhang A nimmt `v[side][:6]` auf beiden Seiten. `bauBuehne()` stellt in der Probe aber die
+   Heimseite nach `p.d[disc]` sortiert auf (Top 6), die Gastseite in Listenreihenfolge (die ersten
+   sechs). In piratecrew stehen deshalb im Motor Yuko und Belandria statt Broxingar (eig 7,9) und
+   Maru auf dem Feld. Ein Spieler mit eig 7,9 in einer Spearman-Rechnung über zwölf zieht die
+   Ordnung stark, und die Probe hat damit eine andere Frage beantwortet als der Motor. (Am Rande
+   und nicht Teil dieser Aufgabe: dieselbe Gastregel lässt in piratecrew Don Micelio Valens, eig
+   71,3 und mit Abstand der beste I-Spy-Spieler der Paarung, in der kaderfesten Probe draußen.
+   Ob das so gewollt ist, betrifft alle Bühnen-Messungen und ist eine eigene Frage.)
+
+**Die Kontrollen beantworten die Frage aus Abschnitt 4 („Breite oder Mehrwege-Struktur?"):
+keins von beiden hebt die Validität.** Die Mischung 0,5/0,5 hebt rho je Spiel auf 0,761 und senkt
+die Saison auf 0,818. Das ist dieselbe Tauschkurve, die die Diagnose vom 02.10. für alle
+Verlässlichkeits-Hebel gemessen hat (Verlässlichkeit ≈ (rho Spiel / rho Saison)²: Ist 0,725 →
+Mischung 0,866; Faktor 0,90: 0,843), nur aus einem anderen Kanal. Das Sichttor macht die Spiele
+ruhiger, weil mehr Spieler gleich gut sehen — und genau dadurch ordnet es schlechter.
+
+### 10.5 Was das für Chris heißt
+
+Nach Abschnitt 6 ist I-2 für I-Spy damit abgeschlossen: beide Formen von „Mehrwege im Finden"
+sind geprüft (die themengewählte in der Kaderprobe, die breite jetzt am Motor). **Die Entscheidung
+liegt bei Chris** und ist dieselbe wie in Abschnitt 9, Frage 3:
+
+- **(a) G1* mit Toleranz** — als Regel für alle zwanzig, nicht als I-Spy-Ausnahme, und erst nach
+  der n=48-Star-Nachmessung auf dem Ist-Stand (gefahren, s. 10.6).
+- **oder ein dritter Anlauf**, der nicht am Sichttor ansetzt. Was dieser Befund dafür lehrt: jeder
+  Hebel, der den Zugang breiter verteilt, tauscht Validität gegen Verlässlichkeit. Ein Hebel,
+  der die Validität hebt, müsste den Zugang **steiler** an die Eignung binden, nicht breiter.
+
+Reproduktion auf dem Branch: `ISPY_KENNERBLICK_FAKTOR` in `public/mockups/battle-mode.engine.js`
+auf die Dosis setzen, dann `node scripts/miss-alle-disziplinen.mjs 24 i-spy`,
+`node scripts/miss-star-paartreue.mjs 24 i-spy`, und für den Anteil im Browser
+`__arena.ispyKennerblickSondeStart(); __arena.disziplinProbe("i-spy",{n:24,kaderFamilie}); __arena.ispyKennerblickSondeStopp()`.
+Die Mischungskontrolle ersetzt die `finden`-Zeile in `ispySeiteTick()` durch
+`0.5*u.SPUERSINN+0.5*u.KENNERBLICK`.
+
+### 10.6 Messbedingungen und was fehlt
+
+- **Pp nur bei n = 24 und nur für Faktor 0,90.** `messe-arena-einfluss.mjs i-spy 48` hing nach
+  30 Minuten (Timeout, Exit 124) — dieselbe Hänge-Eigenschaft von `einflussVon(i-spy,48)`, die der
+  Motor-Kommentar bei `ISPY_REIHENFOLGE_NERVEN_ANTEIL` schon für `main` beschreibt. Rückfall auf
+  n = 24: Saat 1 **25,9 Pp** (will +5,0, determination +3,4, dexterity +3,2, intelligence −3,7,
+  torment −3,4), zweiter Saatstamm (Versatz 10 000 000) **19,0 Pp** (will +3,5, intelligence −4,5,
+  torment −3,1). Genau die Richtung, vor der 5.4 gewarnt hat: will/determination steigen,
+  intelligence fällt. Eine Vergleichsmessung des Ist-Stands bei n = 24 (beide Saaten) hing unter
+  der Last dieses Tages (≈ 30 parallele Chromium-Messungen auf vier Kernen) ebenfalls und wurde
+  nach 30 Minuten abgebrochen; „vorher" ist deshalb die dokumentierte Zahl 16,6 / 12,8 (n = 48,
+  02.10.). Für das Urteil ist das gleichgültig — (a) bis (e) fallen ohne Pp.
+- **Spiegeltest** `miss-arena-buehne-spiegel.mjs 120 i-spy` bei Faktor 0,90.
+- **n=48-Star-Nachmessung des Ist-Stands** (Abschnitt 2, Punkt 2, Voraussetzung für jede
+  G1*-Entscheidung), `miss-star-paartreue.mjs 48 i-spy` auf Faktor 0 = `main`:
+
+| Paarung | rho Spiel | rho Saison | Star R1 | Top 2 | Paartreue ≥ 15 |
+|---|---:|---:|---:|---:|---:|
+| vigilante-armageddon | 0,840 | 0,986 | 43,8 % | 93,8 % | 99,6 % |
+| coldsteel-direlegion | 0,749 | 0,909 | 56,3 % | 77,1 % | 91,3 % |
+| goldengladiators-silversoldiers | 0,726 | 0,839 | 54,2 % | 72,9 % | 91,7 % |
+| mortalsin-natureswrath | 0,796 | 0,818 | 52,1 % | 87,5 % | 97,4 % |
+| piratecrew-raginglunatics | 0,662 | 0,734 | 29,2 % | 54,2 % | 94,4 % |
+| **Median / gesamt** | **0,749** | **0,839** | **47,1 %** | **77,1 %** | **94,5 %** (n = 6561) |
+
+  Star Letzter 0 %. Bei 240 Star-Ereignissen liegt Rang 1 mit 47,1 % näher an der Schranke als bei
+  n = 24 (43,3 %), bleibt aber darunter; Top 2 hält jetzt (77,1 %). **Neu und wichtig für die
+  G1*-Frage:** der Saison-Median fällt bei n = 48 auf 0,839 und damit unter die G1*-Bedingung (a)
+  ≥ 0,85 — bei n = 24 lag er mit 0,881 komfortabel darüber. Auf n = 48 sind damit drei der vier
+  G1*-Bedingungen verfehlt (Saison 0,839, Rang 1 47,1 %, Paartreue 94,5 %), alle knapp. Eine
+  G1*-Toleranz müsste also mehr abdecken als nur Star Rang 1.

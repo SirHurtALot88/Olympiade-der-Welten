@@ -8,7 +8,7 @@ import {
   deriveBlockedBreakdownFromReasons,
 } from "@/lib/ai/ai-action-breakdown";
 import type { AiPreseasonAutomationRunRecord, MappingWarning } from "@/lib/data/olyDataTypes";
-import { LEAGUE_SIZE } from "@/lib/season/league-split";
+import { LEAGUE_SIZE, buildInitialLeagueAssignment } from "@/lib/season/league-split";
 
 import {
   NlCard,
@@ -551,6 +551,19 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         ? getBusyActionReason("Das New-Game-Setup")
         : null;
 
+    /**
+     * TASK #155 — LIGA 2 IST IM BATTLE MODE KOMPLETT KI-GESTEUERT (WIZARD-FILTER).
+     *
+     * Dieselbe reine Funktion wie im Server (`lib/game/new-game-setup-service.ts`,
+     * `buildInitialLeagueAssignment`) — bewusst hier im Client noch einmal auf `gameState.teams`
+     * angewendet, NICHT auf eine zweite, eigene Sortierung: Budget-Startrang 1..16 → Liga 1,
+     * 17..32 → Liga 2, exakt dieselbe Zuordnung, die ein Battle-Mode-Save beim Anlegen bekommt.
+     * Nur im Battle-Mode-Schritt relevant — Manager Mode kennt keine Liga 2 und zeigt weiterhin
+     * jeden Klub.
+     */
+    const newGameLeagueAssignment = newGameMode === "battle" ? buildInitialLeagueAssignment(gameState.teams) : null;
+    const isNewGameTeamSelectable = (teamId: string) => newGameLeagueAssignment?.[teamId] !== "liga2";
+
     return (
       <section
         className={`nl-teamsettings-subpanel nl-newgame${newGameWizardOpen ? "" : " is-eingeklappt"}`}
@@ -576,62 +589,35 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
 
         {!newGameWizardOpen ? (
           <p className="nl-newgame-collapsed-hint muted">
-            <strong>Der einzige Weg zu einem neuen Spielstand.</strong> Hier tippst du die Klubs an,
-            die du selbst steuerst — alle übrigen übernimmt die KI — und legst damit ein komplett
-            neues Spiel mit frischer Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt
-            erhalten, ist danach aber nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel
-            beginnen soll.
+            <strong>Der einzige Weg zu einem neuen Spielstand.</strong> Hier beantwortest du zuerst,
+            ob der neue Spielstand im <strong>Manager Mode</strong> (Standard, eine gemeinsame
+            Tabelle) oder im <strong>Battle Mode</strong> (zwei getrennte Ligen) läuft — das lässt
+            sich danach nicht mehr ändern. Danach tippst du die Klubs an, die du selbst steuerst —
+            alle übrigen übernimmt die KI — und legst damit ein komplett neues Spiel mit
+            frischer Season 1 an. Dein aktueller Save ({activeSaveName}) bleibt erhalten, ist
+            danach aber nicht mehr aktiv. Nur nötig, wenn wirklich ein neues Spiel beginnen soll.
           </p>
         ) : null}
 
         {newGameWizardOpen ? (
         <>
-        {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. */}
-        <div className="nl-newgame-hero">
-          <div className="nl-newgame-hero-lead">
-            <span className="nl-newgame-hero-eyebrow">Dein Klub-Portfolio</span>
-            <p className="nl-newgame-hero-headline">
-              Du steuerst{" "}
-              <NlCountUpValue
-                className="nl-newgame-hero-count nl-tnum"
-                value={newGameChrisTeamIds.length}
-                format={(value) => String(Math.round(value))}
-              />{" "}
-              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
-            </p>
-            <span className="nl-newgame-hero-hint">
-              {newGameChrisTeamIds.length === 0
-                ? "Wähle 1 bis 4 Klubs, die du selbst managst — alle übrigen laufen unter KI-Kontrolle."
-                : `${newGameChrisTeamIds.length === 1 ? "1 Klub" : `${newGameChrisTeamIds.length} Klubs`} unter deiner Kontrolle · bis zu 4 möglich`}
-            </span>
-          </div>
-          <StatChipRow className="nl-newgame-hero-chips" aria-label="Setup-Übersicht">
-            <StatChip
-              label="Deine Teams"
-              value={`${newGameChrisTeamIds.length}/4`}
-              tone={newGameChrisTeamIds.length > 0 ? "good" : "neutral"}
-              sub="du steuerst"
-            />
-            <StatChip
-              label="KI-Teams"
-              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
-              sub="automatisch"
-            />
-            {newGameFrankyTeamIds.length > 0 ? (
-              <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
-            ) : null}
-          </StatChipRow>
-        </div>
-
         {/*
-          Moduswahl (docs/design/battle-mode-spielmodus-plan.md, 3.1): die erste Entscheidung des
-          Assistenten, noch vor dem Klub-Raster. Sie gilt fuer den neuen Save DAUERHAFT — es gibt
-          bewusst kein UI, den Modus eines laufenden Spielstands nachtraeglich zu drehen (neue
-          Idee, neuer Spielstand). Genau EIN Bedienelement, nach demselben Grundsatz wie das
-          Klub-Raster darunter.
+          Moduswahl (docs/design/battle-mode-spielmodus-plan.md, 3.1): die ERSTE Frage des
+          Assistenten — bewusst noch vor dem Portfolio-Hero UND dem Klub-Raster, nicht nur
+          irgendwo dazwischen. Sie gilt fuer den neuen Save DAUERHAFT — es gibt bewusst kein UI,
+          den Modus eines laufenden Spielstands nachtraeglich zu drehen (neue Idee, neuer
+          Spielstand). Genau EIN Bedienelement, nach demselben Grundsatz wie das Klub-Raster
+          darunter.
+
+          GEMELDET VON CHRIS (fable-konzept-chris-feedback-13-10.md, E1): „ich habe es versucht
+          aber wenn ich ein neues spiel starte werde ich nicht gefragt ob das im battle mode sein
+          soll". Die Kacheln selbst gab es seit PR #689 schon — nur verschwanden sie zwischen dem
+          Portfolio-Hero und dem Klub-Raster inmitten einer langen Settings-Seite, ohne als
+          FRAGE zu wirken. Jetzt: erstes sichtbares Element nach dem Öffnen, mit einer echten
+          Frageformulierung statt einer bloßen Beschriftung.
         */}
         <div className="nl-newgame-pickerhead">
-          <strong>Wähle deinen Spielmodus</strong>
+          <strong>Manager Mode oder Battle Mode — in welchem soll dieser Spielstand laufen?</strong>
           <span className="nl-teamsettings-hint">
             gilt dauerhaft für diesen Spielstand · später nicht mehr umstellbar
           </span>
@@ -685,6 +671,44 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </button>
         </div>
 
+        {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. Sitzt bewusst NACH der
+            Moduswahl oben — die Frage "welcher Modus" kommt vor der Frage "welche Klubs". */}
+        <div className="nl-newgame-hero">
+          <div className="nl-newgame-hero-lead">
+            <span className="nl-newgame-hero-eyebrow">Dein Klub-Portfolio</span>
+            <p className="nl-newgame-hero-headline">
+              Du steuerst{" "}
+              <NlCountUpValue
+                className="nl-newgame-hero-count nl-tnum"
+                value={newGameChrisTeamIds.length}
+                format={(value) => String(Math.round(value))}
+              />{" "}
+              <span className="nl-newgame-hero-of">von {gameState.teams.length}</span> Teams
+            </p>
+            <span className="nl-newgame-hero-hint">
+              {newGameChrisTeamIds.length === 0
+                ? "Wähle 1 bis 4 Klubs, die du selbst managst — alle übrigen laufen unter KI-Kontrolle."
+                : `${newGameChrisTeamIds.length === 1 ? "1 Klub" : `${newGameChrisTeamIds.length} Klubs`} unter deiner Kontrolle · bis zu 4 möglich`}
+            </span>
+          </div>
+          <StatChipRow className="nl-newgame-hero-chips" aria-label="Setup-Übersicht">
+            <StatChip
+              label="Deine Teams"
+              value={`${newGameChrisTeamIds.length}/4`}
+              tone={newGameChrisTeamIds.length > 0 ? "good" : "neutral"}
+              sub="du steuerst"
+            />
+            <StatChip
+              label="KI-Teams"
+              value={Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}
+              sub="automatisch"
+            />
+            {newGameFrankyTeamIds.length > 0 ? (
+              <StatChip label="2. Spieler" value={`${newGameFrankyTeamIds.length}/4`} tone="warn" sub="Franky" />
+            ) : null}
+          </StatChipRow>
+        </div>
+
         {/* Kompakte Optionen: Save-Name + Sandbox (Bindings/Titel unverändert). */}
         <div className="nl-newgame-options">
           <NlField label="Save-Name">
@@ -729,10 +753,16 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
         {/* Club-Picker: die ganze Karte ist der Auswahl-Toggle. */}
         <div className="nl-newgame-pickerhead">
           <strong>Wähle deine Klubs</strong>
-          <span className="nl-teamsettings-hint">Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI</span>
+          <span className="nl-teamsettings-hint">
+            Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI
+            {newGameMode === "battle"
+              ? ` · Liga 2 (Rang ${LEAGUE_SIZE + 1}–${gameState.teams.length}) startet unter KI-Kontrolle — hier nicht wählbar, später im laufenden Spiel übernehmbar — nur Liga 1 startet wählbar`
+              : ""}
+          </span>
         </div>
         <div className="nl-newgame-clubgrid" data-testid="new-game-ownership-picker">
           {[...gameState.teams]
+            .filter((team) => isNewGameTeamSelectable(team.teamId))
             .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
             .map((team) => {
               const isChris = newGameChrisTeamIds.includes(team.teamId);
@@ -814,6 +844,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </div>
           <div className="nl-teamsettings-team-grid">
             {[...gameState.teams]
+              .filter((team) => isNewGameTeamSelectable(team.teamId))
               .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
               .map((team) => {
                 const isChris = newGameChrisTeamIds.includes(team.teamId);
@@ -969,7 +1000,14 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
               </table>
             </div>
             {newGamePreview.warnings.length > 0 ? (
-              <p className="nl-teamsettings-note">Hinweise: {newGamePreview.warnings.join(" · ")}</p>
+              // Lesbar statt Rohcode (TASK #155): u.a. "battle_mode_liga2_team_not_selectable:R-R"
+              // wurde sonst nur zu "battle mode liga2 team not selectable:R-R" -- erkennbar, aber
+              // nicht erklärend. `formatCockpitReason` kennt den Code (s.
+              // `lib/foundation/game-flow-blocker-labels.ts`) und fällt für jeden anderen,
+              // unbekannten Hinweis auf denselben "_"→" "-Rohtext zurück wie vorher.
+              <p className="nl-teamsettings-note">
+                Hinweise: {newGamePreview.warnings.map((reason: string) => formatCockpitReason(reason)).join(" · ")}
+              </p>
             ) : null}
             {newGamePreview.blockers.length > 0 ? (
               <p className="nl-teamsettings-msg is-risk">Blocker: {newGamePreview.blockers.join(" · ")}</p>

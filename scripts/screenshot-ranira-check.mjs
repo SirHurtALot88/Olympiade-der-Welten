@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -54,11 +55,13 @@ try {
   await seite.click("#play");
   await seite.click("#spd");
   await seite.click("#spd");
+  await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
   await seite.waitForTimeout(4000);
   await seite.screenshot({ path: path.join(OUT_DIR, "wettessen.png") });
 
   await seite.evaluate(() => window.__arena.setDisc("gewichtheben"));
   await seite.click("#play");
+  await warteAufAnpfiff(seite);
   await seite.waitForTimeout(3000);
   await seite.screenshot({ path: path.join(OUT_DIR, "gewichtheben.png") });
 

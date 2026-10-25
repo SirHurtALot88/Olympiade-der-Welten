@@ -11,6 +11,14 @@ export type ApiWriteRoutePolicyEntry = {
 
 export const API_WRITE_ROUTE_ALLOWLIST: ApiWriteRoutePolicyEntry[] = [
   {
+    routePath: "kartenschmiede/audio/[id]",
+    methods: ["PUT", "DELETE"],
+    policy: "allowlisted",
+    reason:
+      "Kartenschmiede (OPR-Quest-Werkzeug): legt Audio-Cues fuer den Reiter Spielen im eigenen Ablageordner ab. " +
+      "Kein Spielstand der Olympiade, kein Raum; Zugriff nur mit Login ueber kartenZugriff().",
+  },
+  {
     routePath: "lineups/legacy/preview",
     methods: ["POST"],
     policy: "allowlisted",

@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SaleWindowKey } from "../parsing/date";
 import { buildDashboardViewModel, type ArticleAggregate, type DashboardViewModel } from "./viewModel";
+import { marketValueOf, type LatestQuote } from "./marketComparison";
 import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costSettings";
 
 export interface ArticleAggregatesResult {
@@ -22,23 +23,25 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
   return {
     buyShippingUnderFive: active.buyShippingUnderFive,
     buyShippingFive: active.buyShippingFive,
+    buyShippingShareFactor: active.buyShippingShareFactor,
     shippingSingle: active.shippingSingle,
     shippingPack: active.shippingPack,
-    registeredSingle: active.registeredSingle,
-    registeredPack: active.registeredPack,
+    registeredCostPerShipment: active.registeredCostPerShipment,
+    registeredThreshold: active.registeredThreshold,
+    registeredStampsPerYear: active.registeredStampsPerYear,
     packagingSingle: active.packagingSingle,
     packagingPack: active.packagingPack,
     fixedYearlyEbayShop: active.fixedYearlyEbayShop,
     fixedYearlyBillbee: active.fixedYearlyBillbee,
     fixedYearlyLexoffice: active.fixedYearlyLexoffice,
+    fixedYearlyPackagingLicense: active.fixedYearlyPackagingLicense,
+    fixedYearlyOther: active.fixedYearlyOther,
     ebayCommissionRate: active.ebayCommissionRate,
     ebayCommissionVat: active.ebayCommissionVat,
     ebayCommissionFixed: active.ebayCommissionFixed,
     adFeeRateSingle: active.adFeeRateSingle,
     adFeeRateMin: active.adFeeRateMin,
     adFeeRateGood: active.adFeeRateGood,
-    marginMinMultiplier: active.marginMinMultiplier,
-    marginGoodMultiplier: active.marginGoodMultiplier,
   };
 }
 
@@ -49,7 +52,7 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
  * nicht jede Seite ihre eigene Prisma-Query schreibt.
  */
 export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
-  const [articles, latestMarketPrices, costSettings] = await Promise.all([
+  const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
       where: { isCard: true },
       include: { saleWindows: true },
@@ -58,17 +61,48 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       orderBy: { fetchedAt: "desc" },
     }),
     loadActiveCostSettings(prisma),
+    // eBay-Artikelnummern aus den Verkaufsberichten: Rueckfall, wenn der Shop-Abruf sie nicht geliefert hat.
+    prisma.ebayListingFact.findMany({
+      where: { articleId: { not: null } },
+      select: { articleId: true, ebayItemId: true },
+      orderBy: { reportTo: "desc" },
+    }),
   ]);
+  const factItemByArticle = new Map<string, string>();
+  for (const f of itemFacts) if (f.articleId && f.ebayItemId && !factItemByArticle.has(f.articleId)) factItemByArticle.set(f.articleId, f.ebayItemId);
 
   // Juengsten Marktpreis je Artikel merken (Liste ist bereits fetchedAt-desc sortiert).
-  const latestTrendByArticle = new Map<string, number | null>();
+  const latestQuoteByArticle = new Map<string, LatestQuote>();
   for (const mp of latestMarketPrices) {
-    if (!latestTrendByArticle.has(mp.articleId)) {
-      latestTrendByArticle.set(mp.articleId, mp.priceTrend ?? null);
+    if (latestQuoteByArticle.has(mp.articleId)) continue;
+    let how: string | null = null;
+    let usedCode: string | null = null;
+    try {
+      const parsed = mp.raw ? (JSON.parse(mp.raw) as { how?: string; code?: string }) : null;
+      how = parsed?.how ?? null;
+      usedCode = parsed?.code ?? null;
+    } catch {
+      how = null;
     }
+    latestQuoteByArticle.set(mp.articleId, {
+      priceFrom: mp.priceFrom,
+      priceTrend: mp.priceTrend,
+      priceAvg30: mp.priceAvg30,
+      priceAvg7: mp.priceAvg7,
+      priceAvg1: mp.priceAvg1,
+      available: mp.available,
+      fetchedAt: mp.fetchedAt,
+      matchQuality: mp.matchQuality,
+      priceMin: mp.priceMin,
+      priceMax: mp.priceMax,
+      variants: mp.variants,
+      how,
+      usedCode,
+    });
   }
 
   const aggregates: ArticleAggregate[] = articles.map((article) => {
+    const quote = latestQuoteByArticle.get(article.id);
     const windows: ArticleAggregate["windows"] = {};
     for (const sw of article.saleWindows) {
       const key = sw.window as SaleWindowKey;
@@ -83,6 +117,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
         existing.shippingCost += sw.shippingCost;
         existing.dbI += sw.dbI;
         existing.dbII += sw.dbII;
+        existing.fixedCostShare += sw.fixedCostShare;
         existing.avgPrice = existing.qty > 0 ? existing.revenue / existing.qty : 0;
         existing.rank = existing.rank ?? sw.rank ?? null;
       } else {
@@ -94,6 +129,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
           shippingCost: sw.shippingCost,
           dbI: sw.dbI,
           dbII: sw.dbII,
+          fixedCostShare: sw.fixedCostShare,
           avgPrice: sw.avgPrice,
           rank: sw.rank ?? null,
         };
@@ -107,9 +143,18 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
-      currentVk: article.currentVk,
+      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
+      currentVk: article.ebayPrice ?? article.currentVk,
+      vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
+      vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
-      latestMarketTrend: latestTrendByArticle.get(article.id) ?? null,
+      ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
+      codeNameEn: article.codeNameEn,
+      codeNameDe: article.codeNameDe,
+      codeHint: article.codeHint,
+      // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
+      latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
+      marketQuote: quote ?? null,
       windows,
     };
   });

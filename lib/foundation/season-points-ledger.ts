@@ -5,6 +5,7 @@ import type {
   MatchdayResultRecord,
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
+import { istDuellWertung, ppAusSpielerScore, resolveSpielerPpReferenz } from "@/lib/resolve/battle-mode-pps-duell";
 import { resolveAwardedPlayerPoints } from "@/lib/foundation/player-points-total";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
 import { distributeRankPointsToPlayers, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
@@ -17,7 +18,21 @@ type LedgerPointSource =
   | "score_contribution"
   | "share_times_team_total"
   | "final_player_score_without_team_total"
-  | "score_contribution_without_team_total";
+  | "score_contribution_without_team_total"
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10.): Spieler-PP einer Duell-Zeile
+  // (`resolutionSource` `"arena"`/`"pps_duell"`) folgen NICHT mehr dem 2/1/0-Team-Budget, sondern
+  // `ppAusSpielerScore()` -- s. Kommentar an `derivePlayerPointsForDuellGroup()` unten.
+  | "battle_mode_arena_boxscore_impact"
+  | "battle_mode_pps_duell_player_score"
+  // MINI-DM-POD-RESOLVE (19.10.): dieselbe Kurve, nur an `resolutionSource: "mini_dm_pod"`-Zeilen --
+  // eigener Name, damit ein Log/Report Mini-DM-Pod-Zeilen von normalen PPS-Duellen unterscheiden kann.
+  | "battle_mode_mini_dm_pod_player_score"
+  // MINI-DM-FFA (PR 4, Opus-Plan 21.10.): `resolutionSource: "mini_dm_pod"` MIT
+  // `miniDmPod.quelle === "ffa"` vertraut -- wie `"arena"` -- dem bereits persistierten
+  // `performance.scoreContribution` (s. Kommentar an `derivePlayerPointsForDuellGroup()` unten),
+  // statt ihn aus `finalPlayerScore` neu zu rechnen. Eigener Name fuer Logs/Reports, analog
+  // `battle_mode_mini_dm_pod_player_score` oben.
+  | "battle_mode_mini_dm_ffa_player_score";
 
 export type SeasonPlayerPointLedgerEntry = {
   performanceId: string;
@@ -63,12 +78,31 @@ export type SeasonPlayerPointsSummary = {
   warnings: string[];
 };
 
+/**
+ * Der Tabellen-Beitrag EINER Gruppe (Team + Disziplin + Seite an einem Spieltag) -- fuer eine
+ * Duell-Zeile `teamResult.teamPoints` (2/1/0), fuer eine Manager-Mode-Zeile Σ Spieler-`points`
+ * dieser Gruppe (bit-identisch zur bisherigen Summe). GENAU DIESELBE Groesse, die auch in
+ * `teamSummary.totalPoints` einfliesst -- hier zusaetzlich mit `matchdayId` markiert, damit
+ * `season-matchday-points.ts` (Spieltagsrang/"Tagespunkte") dieselbe Waehrung verwendet wie die
+ * Saisontabelle, statt (seit dem PP-Budget, Teil A, 19.10.) ueber `pointEntries` die jetzt
+ * leistungsbasierten Spieler-PP direkt zu summieren -- das wuerde fuer Battle-Saves denselben
+ * Fehlerklasse reproduzieren, die diese Datei fuer den Mutator-Bonus schon einmal behoben hat
+ * ("Platz 1 im Spieltag, aber nur 2. in der Saison").
+ */
+export type SeasonTableGroupContribution = {
+  matchdayId: string | null;
+  teamId: string;
+  disciplineId: string;
+  points: number;
+};
+
 export type SeasonPointsLedger = {
   hasResultSource: boolean;
   pointEntries: SeasonPlayerPointLedgerEntry[];
   pointEntriesByPerformanceId: Map<string, SeasonPlayerPointLedgerEntry>;
   teamSummariesByTeamId: Map<string, SeasonTeamPointsSummary>;
   playerSummariesByPlayerId: Map<string, SeasonPlayerPointsSummary>;
+  tableGroupContributions: SeasonTableGroupContribution[];
   warnings: string[];
 };
 
@@ -180,14 +214,13 @@ function deriveRankPointsFromPerformances(
     playerCount,
     rank: teamResult.rank,
     entries: performances,
-    // STANDINGS-BYPASS-FIX (docs/design/standings-bypass-fix-plan-15-09.md, 15.09.): fuer
-    // arena-aufgeloeste Zeilen mit gebuchtem `teamPoints` (2/1/0) wird DIESER Wert verteilt statt
-    // des PPS-Rang-Nachschlags -- sonst ueberschreibt genau diese Nachbuchung den Fix aus
-    // standings-preview-engine.ts wieder (der urspruengliche Fund, Abschnitt 1.3 des Plans).
-    teamPointsOverride:
-      teamResult.resolutionSource === "arena" && teamResult.teamPoints != null
-        ? teamResult.teamPoints
-        : null,
+    // PP-BUDGET (Teil A, 19.10.): dieser Pfad ist jetzt NUR noch fuer Manager-Mode-Zeilen
+    // (`resolutionSource: "pps"`) in Benutzung -- `buildSeasonPointsLedger()` ruft ihn fuer jede
+    // Duell-Zeile (`istDuellWertung(teamResult)`) gar nicht mehr auf, s.
+    // `derivePlayerPointsForDuellGroup()`. `teamPointsOverride` bleibt deshalb immer `null`
+    // (bis 19.10.: `istDuellWertung(teamResult) ? teamResult.teamPoints : null`, der 2/1/0-Anteil,
+    // den `ppAusSpielerScore()` ersetzt hat).
+    teamPointsOverride: null,
   });
 
   if (distributed.teamPoints == null) {
@@ -195,6 +228,72 @@ function deriveRankPointsFromPerformances(
   }
 
   return distributed;
+}
+
+/**
+ * PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10., "bei PP waere ich bei Fable, die PPs
+ * haengen vom Impact Rating der Spieler ab! Ein guter Spieler im schlechten Verlierer-Team kann
+ * also trotzdem viele Punkte sammeln!"). ERSETZT `deriveRankPointsFromPerformances()` fuer
+ * Duell-Zeilen (`istDuellWertung(teamResult)`) -- der Rang-/Team-Budget-Pfad bleibt dafuer komplett
+ * unberuehrt (Manager-Mode, `resolutionSource: "pps"`, bit-identisch).
+ *
+ * ARENA ("arena"): der persistierte `performance.scoreContribution` -- seit der Engine-Aenderung
+ * derselbe Wert, den die Live-Buehne zeigt (`ppsAusArenaImpact()`-Boxscore-Wert, falls vorhanden,
+ * sonst der bisherige PPS-Rang-Nachschlag) -- wird VERTRAUT, nicht neu gerechnet. "Gezeigt == gebucht".
+ *
+ * PPS-DUELL ("pps_duell"): deterministisch aus dem persistierten `performance.finalPlayerScore` +
+ * der gezogenen Referenz NEU gerechnet, nicht aus dem persistierten Wert gelesen -- das heilt
+ * bestehende Battle-Saves (die noch den alten 2/1/0-Anteil persistiert haben) beim blossen Lesen,
+ * ohne Migration.
+ *
+ * MINI-DM-FFA ("mini_dm_pod" MIT `miniDmPod.quelle === "ffa"`, PR 4, Opus-Plan 21.10.): wie
+ * "arena" -- vertraut dem persistierten `performance.scoreContribution` (der dort landet, weil
+ * `arenaIndividualBoxscorePpsByDisciplineId.set("mini-dm", ...)` denselben `pointsAwarded`-Pfad wie
+ * ein Arena-Boxscore durchlaeuft, s. Kommentar an `ppAusMiniDmFfaBeitrag()`,
+ * mini-dm-pod-resolve.ts), statt ihn aus `finalPlayerScore` neu zu rechnen. FEHLT `quelle` (JEDE
+ * heutige Mini-DM-Pod-Zeile, PR 4 hat keinen produktiven FFA-Aufrufer) gilt UNVERAENDERT der
+ * PPS-basierte Zweig unten -- byte-identisch zum Stand vor diesem PR.
+ */
+function derivePlayerPointsForDuellGroup(
+  gameState: GameState,
+  matchdayId: string | null,
+  performances: PlayerDisciplinePerformanceRecord[],
+  teamResult: DisciplineResultRecord,
+): { pointSource: LedgerPointSource; pointsByPerformanceId: Map<string, number> } | null {
+  if (!istDuellWertung(teamResult)) {
+    return null;
+  }
+
+  const istMiniDmFfa = teamResult.resolutionSource === "mini_dm_pod" && teamResult.miniDmPod?.quelle === "ffa";
+  if (teamResult.resolutionSource === "arena" || istMiniDmFfa) {
+    const pointsByPerformanceId = new Map(
+      performances.map((performance) => [performance.id, roundValue(performance.scoreContribution ?? 0, 4)] as const),
+    );
+    return {
+      pointSource: istMiniDmFfa ? "battle_mode_mini_dm_ffa_player_score" : "battle_mode_arena_boxscore_impact",
+      pointsByPerformanceId,
+    };
+  }
+
+  const reference = performances[0];
+  if (!reference) {
+    return null;
+  }
+  const playerCount = resolveDisciplinePlayerCount(gameState, {
+    matchdayId,
+    disciplineId: reference.disciplineId,
+    disciplineSide: reference.disciplineSide,
+  });
+  const referenz = resolveSpielerPpReferenz(reference.disciplineId, playerCount);
+  const pointsByPerformanceId = new Map(
+    performances.map((performance) => [performance.id, ppAusSpielerScore(performance.finalPlayerScore, referenz)] as const),
+  );
+  // MINI-DM-POD-RESOLVE (19.10.): dieselbe leistungsbasierte Kurve wie `"pps_duell"` -- Chris'
+  // "Impact Rating"-Philosophie (Teil A oben) gilt unveraendert, unabhaengig vom Pod-Platz des
+  // eigenen Teams. Nur der Name der Quelle unterscheidet sich, fuer Logs/Reports.
+  const pointSource: LedgerPointSource =
+    teamResult.resolutionSource === "mini_dm_pod" ? "battle_mode_mini_dm_pod_player_score" : "battle_mode_pps_duell_player_score";
+  return { pointSource, pointsByPerformanceId };
 }
 
 function buildSeasonResultLookup(
@@ -273,6 +372,16 @@ export function buildSeasonPointsLedger(
   }
 
   const pointEntries: SeasonPlayerPointLedgerEntry[] = [];
+  // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A): `teamSummary.totalPoints` einer Duell-Zeile darf NICHT
+  // mehr Σ Spieler-PP sein (die folgen jetzt `ppAusSpielerScore()`, nicht dem Team-Budget) -- es
+  // bleibt stattdessen Σ `teamResult.teamPoints` (2/1/0), GENAU EINMAL je Gruppe, nicht je Spieler.
+  // Hier nur gesammelt (teamSummariesByTeamId existiert erst nach diesem Loop); angewendet gleich
+  // danach, zusammen mit dem Null-Init aller Teams.
+  const duellGruppenBeitraege: Array<{ teamId: string; disciplineId: string; category: DisciplineCategory | null; beitrag: number }> = [];
+  // TAGESPUNKTE/SPIELTAGSRANG (`lib/foundation/season-matchday-points.ts`): dieselbe
+  // Tabellen-Waehrung wie `totalPoints` oben, nur zusaetzlich je Spieltag aufgeschluesselt -- s.
+  // `SeasonTableGroupContribution`-Kommentar.
+  const tableGroupContributions: SeasonTableGroupContribution[] = [];
 
   for (const performances of groupedPerformances.values()) {
     const reference = performances[0];
@@ -284,13 +393,14 @@ export function buildSeasonPointsLedger(
     const teamTotal = teamResult?.totalScore ?? null;
     const entryWarnings: string[] = [];
     const matchdayResult = matchdayResultById.get(reference.matchdayResultId) ?? null;
-    const rankPointDistribution = deriveRankPointsFromPerformances(
-      gameState,
-      matchdayResult?.matchdayId ?? null,
-      performances,
-      teamResult,
-    );
+    const duellPoints = teamResult
+      ? derivePlayerPointsForDuellGroup(gameState, matchdayResult?.matchdayId ?? null, performances, teamResult)
+      : null;
+    const rankPointDistribution = duellPoints
+      ? null
+      : deriveRankPointsFromPerformances(gameState, matchdayResult?.matchdayId ?? null, performances, teamResult);
     const pointSource =
+      duellPoints?.pointSource ??
       (rankPointDistribution?.pointSource as LedgerPointSource | undefined) ??
       choosePointSource(performances, teamTotal);
 
@@ -303,6 +413,7 @@ export function buildSeasonPointsLedger(
 
     const normalizedEntries = performances.map((performance) => {
       const derivedPoints =
+        duellPoints?.pointsByPerformanceId.get(performance.id) ??
         rankPointDistribution?.entries.find((entry) => entry.item === performance)?.points ??
         derivePointsFromPerformance(performance, pointSource, teamTotal);
       if (!isFiniteNumber(derivedPoints)) {
@@ -339,19 +450,45 @@ export function buildSeasonPointsLedger(
       } satisfies SeasonPlayerPointLedgerEntry;
     });
 
-    const reconciliationTarget = rankPointDistribution?.teamPoints ?? teamTotal;
-    if (reconciliationTarget != null) {
+    // Die Gruppen-Summen-Reconciliation (Σ Spieler-Anteil == Team-Budget) gilt NUR noch fuer
+    // Manager-Mode-Zeilen -- eine Duell-Zeile ist per Konstruktion entkoppelt (`totalPoints` kommt
+    // unten direkt aus `teamResult.teamPoints`, nicht aus der Spieler-Summe), ein Vergleich gegen den
+    // PPS-Totalscore waere hier immer eine falsche Warnung.
+    let gruppenTabellenBeitrag: number | null = null;
+    if (!duellPoints) {
+      const reconciliationTarget = rankPointDistribution?.teamPoints ?? teamTotal;
       const derivedGroupTotal = roundValue(
         normalizedEntries.reduce((sum, entry) => sum + entry.basePoints, 0),
         4,
       );
-      if (!isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
+      // TAGESPUNKTE/SPIELTAGSRANG (s. `tableGroupContributions` unten): fuer Manager-Mode-Zeilen
+      // bit-identisch die Σ Spieler-`points` (nicht `basePoints`) dieser Gruppe -- derselbe Wert,
+      // der vorher direkt aus `pointEntries` aufsummiert wurde.
+      gruppenTabellenBeitrag = roundValue(normalizedEntries.reduce((sum, entry) => sum + entry.points, 0), 4);
+      if (reconciliationTarget != null && !isWithinTolerance(derivedGroupTotal, reconciliationTarget)) {
         const warning = `reconciliation_failed:${reference.teamId}:${reference.disciplineId}:${reference.disciplineSide}`;
         warnings.push(warning);
         for (const entry of normalizedEntries) {
           entry.warnings.push(warning);
         }
       }
+    } else if (teamResult) {
+      duellGruppenBeitraege.push({
+        teamId: reference.teamId,
+        disciplineId: reference.disciplineId,
+        category: disciplineCategoryById.get(reference.disciplineId) ?? null,
+        beitrag: teamResult.teamPoints ?? 0,
+      });
+      gruppenTabellenBeitrag = teamResult.teamPoints ?? 0;
+    }
+
+    if (gruppenTabellenBeitrag != null) {
+      tableGroupContributions.push({
+        matchdayId: matchdayResult?.matchdayId ?? null,
+        teamId: reference.teamId,
+        disciplineId: reference.disciplineId,
+        points: gruppenTabellenBeitrag,
+      });
     }
 
     pointEntries.push(...normalizedEntries);
@@ -363,6 +500,20 @@ export function buildSeasonPointsLedger(
 
   const teamSummariesByTeamId = new Map<string, SeasonTeamPointsSummary>();
   const expectedRankPointsByTeamId = new Map<string, number>();
+  // Non-Duell-Anteil von `playerDerivedTotal` je Team -- die EINZIGE Groesse, gegen die
+  // `expectedRankPointsByTeamId` unten noch verglichen wird (s. Reconciliation-Loop ganz unten).
+  // Ein Team mit Duell- UND Manager-Mode-Zeilen in derselben Saison (selten, z.B. eine arena-faehige
+  // Disziplin ohne Fixture faellt auf den Rangpfad zurueck) darf durch die jetzt leistungsbasierten
+  // Duell-PP nicht faelschlich als `reconciliation_failed` markiert werden.
+  //
+  // OPUS-REVIEW PR #1296: getrennt als Σ `points` und Σ `mutatorPpsBonus` gefuehrt (statt direkt
+  // Σ `basePoints`), damit die Rechnung unten fuer ein reines Manager-Save BIT-IDENTISCH zur alten
+  // bleibt: dort war `basePlayerDerivedTotal = round4(playerDerivedTotal - round1(mutatorPpsBonus))`
+  // -- `mutatorPpsBonus` ist zu dem Zeitpunkt schon auf EINE Nachkommastelle gerundet. Σ `basePoints`
+  // weicht davon um bis zu 0,05 ab und haette `reconciliationStatus` an der 0,2-Toleranzgrenze
+  // kippen koennen.
+  const managerPlayerDerivedByTeamId = new Map<string, number>();
+  const managerMutatorPpsBonusByTeamId = new Map<string, number>();
   for (const team of gameState.teams) {
     teamSummariesByTeamId.set(team.teamId, {
       teamId: team.teamId,
@@ -376,6 +527,23 @@ export function buildSeasonPointsLedger(
     });
   }
 
+  // PP-BUDGET (Teil A): `totalPoints`/`pointsByDiscipline`/`pointsByArea` einer Duell-Gruppe kommen
+  // ab hier direkt aus `teamResult.teamPoints` (2/1/0), GENAU EINMAL je Gruppe -- s. Kommentar an
+  // `duellGruppenBeitraege` oben. Die Spieler-Summe (`playerDerivedTotal`) bleibt unten unveraendert
+  // Σ `entry.points` ueber ALLE Zeilen (Duell UND Manager-Mode).
+  for (const beitrag of duellGruppenBeitraege) {
+    const summary = teamSummariesByTeamId.get(beitrag.teamId);
+    if (!summary) continue;
+    summary.totalPoints = roundValue(summary.totalPoints + beitrag.beitrag, 4);
+    summary.pointsByDiscipline[beitrag.disciplineId] = roundValue(
+      (summary.pointsByDiscipline[beitrag.disciplineId] ?? 0) + beitrag.beitrag,
+      4,
+    );
+    if (beitrag.category) {
+      summary.pointsByArea[beitrag.category] = roundValue(summary.pointsByArea[beitrag.category] + beitrag.beitrag, 4);
+    }
+  }
+
   for (const result of seasonDisciplineResults) {
     const summary = teamSummariesByTeamId.get(result.teamId);
     const performances = groupedPerformances.get(toDisciplineResultKey(result)) ?? [];
@@ -383,19 +551,49 @@ export function buildSeasonPointsLedger(
       continue;
     }
 
-    summary.totalPoints = roundValue(summary.totalPoints + result.totalScore, 4);
+    // Eine Duell-Zeile OHNE Performances (keine Spieler erfasst) bucht ihr 2/1/0-Team-Budget, nie
+    // den rohen PPS-Totalscore -- sonst wuerde ausgerechnet der leere Rand-Fall die 2/1/0-Oekonomie
+    // verlassen, die der Rest dieser Datei fuer Duell-Zeilen gerade erst durchsetzt.
+    const istDuell = istDuellWertung(result);
+    const beitrag = istDuell ? result.teamPoints ?? 0 : result.totalScore;
+    summary.totalPoints = roundValue(summary.totalPoints + beitrag, 4);
+    // OPUS-REVIEW PR #1296: dieselbe Tabellen-Waehrung auch fuer Spieltagsrang/Feld-Rennen -- sonst
+    // stuende genau dieser Rand-Fall in `totalPoints`, aber nicht in `tableGroupContributions`
+    // ("Platz 1 im Spieltag, aber nur 2. in der Saison"). Nur fuer Duell-Zeilen: Manager-Mode-Zeilen
+    // ohne Leistungen standen auch vorher nicht in den Tagespunkten (bit-identisch belassen).
+    if (istDuell) {
+      tableGroupContributions.push({
+        matchdayId: matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
+        teamId: result.teamId,
+        disciplineId: result.disciplineId,
+        points: beitrag,
+      });
+    }
     summary.pointsByDiscipline[result.disciplineId] = roundValue(
-      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + result.totalScore,
+      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + beitrag,
       4,
     );
     const category = disciplineCategoryById.get(result.disciplineId);
     if (category) {
-      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + result.totalScore, 4);
+      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + beitrag, 4);
     }
   }
 
   const playerSummariesByPlayerId = new Map<string, SeasonPlayerPointsSummary>();
   for (const entry of pointEntries) {
+    // MINI-DM-POD-RESOLVE (19.10., Review-Fund 20.10.): "battle_mode_mini_dm_pod_player_score" fehlte
+    // hier -- eine Mini-DM-Pod-Zeile wurde dadurch wie eine Manager-Mode-Zeile behandelt und ihre
+    // Spieler-PP-Summe ZUSAETZLICH zum schon ueber `duellGruppenBeitraege` gebuchten 2-1-0-0-Budget in
+    // `teamSummary.totalPoints` aufaddiert -- echte Doppelzaehlung, gefunden per Season-Sum-Probe
+    // (scripts/miss-mini-dm-pod-saisonsumme.ts) an einem echten 20-Spieltage-Battle-Save.
+    // PR 4 (21.10.): "battle_mode_mini_dm_ffa_player_score" aus demselben Grund ergaenzt, BEVOR es
+    // je an einem echten Save fehlen kann -- derselbe Doppelzaehlungs-Fehler wie oben waere sonst
+    // nur eine Frage der Zeit, sobald PR 5 einen FFA-Aufrufer verdrahtet.
+    const istDuellEntry =
+      entry.pointSource === "battle_mode_arena_boxscore_impact" ||
+      entry.pointSource === "battle_mode_pps_duell_player_score" ||
+      entry.pointSource === "battle_mode_mini_dm_pod_player_score" ||
+      entry.pointSource === "battle_mode_mini_dm_ffa_player_score";
     const category = disciplineCategoryById.get(entry.disciplineId) ?? null;
     const playerSummary = playerSummariesByPlayerId.get(entry.playerId) ?? {
       playerId: entry.playerId,
@@ -425,21 +623,43 @@ export function buildSeasonPointsLedger(
 
     const teamSummary = teamSummariesByTeamId.get(entry.teamId);
     if (teamSummary) {
-      teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.points, 4);
-      teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
-        (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.points,
-        4,
-      );
-      if (category) {
-        teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
+      // PP-BUDGET (Teil A): `totalPoints`/`pointsByDiscipline`/`pointsByArea` einer Duell-Zeile
+      // kommen ausschliesslich aus `duellGruppenBeitraege` oben (einmal je Gruppe, Σ teamPoints) --
+      // hier NICHT nochmal aus der (jetzt leistungsbasierten) Spieler-Summe addieren, sonst zaehlte
+      // die Duell-PP doppelt und in der falschen Waehrung.
+      if (!istDuellEntry) {
+        teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.points, 4);
+        teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
+          (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.points,
+          4,
+        );
+        if (category) {
+          teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
+        }
+        managerPlayerDerivedByTeamId.set(
+          entry.teamId,
+          roundValue((managerPlayerDerivedByTeamId.get(entry.teamId) ?? 0) + entry.points, 4),
+        );
+        managerMutatorPpsBonusByTeamId.set(
+          entry.teamId,
+          roundValue((managerMutatorPpsBonusByTeamId.get(entry.teamId) ?? 0) + entry.mutatorPpsBonus, 4),
+        );
       }
       teamSummary.mutatorPpsBonus = roundValue(teamSummary.mutatorPpsBonus + entry.mutatorPpsBonus, 4);
+      // `playerDerivedTotal` bleibt Σ Spieler-PP ueber ALLE Zeilen (Duell UND Manager-Mode) -- das
+      // ist jetzt die "Leistungs-PP"-Spalte fuer Kader-/Liga-Leaders-Ansichten, bewusst entkoppelt
+      // von `totalPoints` (der Tabellenpunktzahl) fuer Duell-Saves.
       teamSummary.playerDerivedTotal = roundValue(teamSummary.playerDerivedTotal + entry.points, 4);
       teamSummary.warnings = Array.from(new Set([...teamSummary.warnings, ...entry.warnings]));
     }
   }
 
   for (const result of seasonDisciplineResults) {
+    // Duell-Ergebnisse sind per Konstruktion reconciled (s. `duellGruppenBeitraege` oben) -- dieser
+    // Vergleich gilt nur noch fuer Manager-Mode-Zeilen.
+    if (istDuellWertung(result)) {
+      continue;
+    }
     const rankPoints = deriveRankPointsFromPerformances(
       gameState,
       matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
@@ -472,7 +692,14 @@ export function buildSeasonPointsLedger(
 
     const expectedRankPoints = expectedRankPointsByTeamId.get(teamSummary.teamId) ?? 0;
 
-    const basePlayerDerivedTotal = roundValue(teamSummary.playerDerivedTotal - teamSummary.mutatorPpsBonus, 4);
+    // NUR der Manager-Mode-Anteil (s. `managerPlayerDerivedByTeamId` oben) -- fuer ein reines
+    // Battle-Save ist das 0/0 (kein Manager-Mode-Anteil vorhanden), was unten `"reconciled"` ergibt:
+    // eine Duell-Zeile ist per Konstruktion reconciled, s. `duellGruppenBeitraege`.
+    const basePlayerDerivedTotal = roundValue(
+      (managerPlayerDerivedByTeamId.get(teamSummary.teamId) ?? 0) -
+        roundValue(managerMutatorPpsBonusByTeamId.get(teamSummary.teamId) ?? 0, 1),
+      4,
+    );
 
     if (basePlayerDerivedTotal === 0 && expectedRankPoints === 0) {
       teamSummary.reconciliationStatus = "reconciled";
@@ -504,6 +731,7 @@ export function buildSeasonPointsLedger(
     pointEntriesByPerformanceId,
     teamSummariesByTeamId,
     playerSummariesByPlayerId,
+    tableGroupContributions,
     warnings: Array.from(new Set(warnings)),
   };
 }

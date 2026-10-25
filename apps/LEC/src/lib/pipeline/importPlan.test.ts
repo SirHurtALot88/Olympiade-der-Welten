@@ -5,6 +5,7 @@ import type { EbayImportResult, EbayRow } from "../importers/ebay";
 import { normalizeArticleName } from "../parsing/name";
 import { extractSetCode } from "../parsing/setCode";
 import { DEFAULT_COST_SETTINGS } from "../pricing/costSettings";
+import { totalFixedYearly, registeredRateBelowThreshold } from "../pricing/costEngine";
 
 function billbeeRow(nameRaw: string, overrides: Partial<BillbeeRow> = {}): BillbeeRow {
   const { normalized, packQty } = normalizeArticleName(nameRaw);
@@ -113,10 +114,58 @@ describe("buildImportPlan", () => {
       DEFAULT_COST_SETTINGS
     );
     const sw30 = plan.saleWindows.find((s) => s.window === "30")!;
-    // Fixkosten (95+25+60=180 EUR/Jahr) / 60 shopweite Stk = 3 EUR/Stk * 1 verkaufte Stk im 30d-Fenster = 3 EUR.
-    expect(sw30.fixedCostShare).toBeCloseTo(3, 5);
-    // NICHT 180 EUR (= volle Jahresfixkosten allein auf den einen Nischenverkauf umgelegt).
-    expect(sw30.fixedCostShare).toBeLessThan(10);
+    // Alle Fixkostenfelder (4.229 EUR/Jahr) / 60 shopweite Stk * 1 verkaufte Stk im 30d-Fenster.
+    expect(sw30.fixedCostShare).toBeCloseTo(totalFixedYearly(DEFAULT_COST_SETTINGS) / 60, 5);
+    expect(sw30.fixedCostShare).toBeCloseTo(4229 / 60, 5);
+    // NICHT 4.229 EUR (= volle Jahresfixkosten allein auf den einen Nischenverkauf umgelegt).
+    expect(sw30.fixedCostShare).toBeLessThan(100);
+  });
+
+  it("rechnet das Einschreiben je Zeile nach Ø-VK (Schwelle) und N/N_T aus dem Shop-Fenster", () => {
+    // Regression: vorher pauschal 0,15 je Stueck, egal ob 4,99er oder 35-EUR-Karte.
+    const guenstig = "Yu-Gi-Oh! TST-DE801 Billigkarte";
+    const teuer = "Yu-Gi-Oh! TST-DE802 Teurekarte";
+    const plan = buildImportPlan(
+      [
+        billbeeResult("365", [
+          billbeeRow(guenstig, { qty: 90, revenue: 90 * 4.99, ek: 90 * 0.9 }),
+          billbeeRow(teuer, { qty: 10, revenue: 350, ek: 180 }),
+        ]),
+      ],
+      null,
+      DEFAULT_COST_SETTINGS
+    );
+    const sGuenstig = plan.saleWindows.find((s) => s.nameNormalized.includes("billigkarte"))!;
+    const sTeuer = plan.saleWindows.find((s) => s.nameNormalized.includes("teurekarte"))!;
+    const volume = { units365d: 100, unitsAtOrAboveThreshold: 10 };
+    const r = registeredRateBelowThreshold(volume, DEFAULT_COST_SETTINGS);
+    const fixedPerUnit = 4229 / 100;
+    // shippingCost enthaelt NUR variable Nebenkosten -- der Fixkostenanteil wird
+    // getrennt in fixedCostShare gefuehrt (DB II ist ein Deckungsbeitrag).
+    const common = 0.575 + 0.67 + 0.053; // Einkaufs-Versand 50 %, Versand, Verpackung
+    expect(sGuenstig.shippingCost / 90).toBeCloseTo(common + r, 5);
+    expect(sTeuer.shippingCost / 10).toBeCloseTo(common + 2.35, 5);
+    expect(sGuenstig.fixedCostShare / 90).toBeCloseTo(fixedPerUnit, 5);
+    expect(sTeuer.fixedCostShare / 10).toBeCloseTo(fixedPerUnit, 5);
+  });
+
+  it("fuehrt DB II als Deckungsbeitrag OHNE Fixkosten, Vollkosten = dbII - fixedCostShare", () => {
+    // Regression: zuvor steckte der Fixkostenanteil in shippingCost und damit in dbII.
+    // Folge: dbII war in Wahrheit ein Vollkosten-Wert, und wer fixedCostShare
+    // zusaetzlich abzog, zaehlte ihn doppelt.
+    const name = "Yu-Gi-Oh! TST-DE803 Dreistufig";
+    const plan = buildImportPlan(
+      [billbeeResult("365", [billbeeRow(name, { qty: 10, revenue: 100, ek: 40 })])],
+      null,
+      DEFAULT_COST_SETTINGS
+    );
+    const sw = plan.saleWindows[0];
+    expect(sw.dbI).toBeCloseTo(60, 5); // Umsatz - EK
+    expect(sw.dbII).toBeCloseTo(sw.dbI - sw.ebayFeeTotal - sw.shippingCost, 5);
+    expect(sw.fixedCostShare).toBeGreaterThan(0);
+    // DB II liegt UEBER dem Vollkosten-Ergebnis, genau um den Fixkostenanteil.
+    expect(sw.dbII - (sw.dbII - sw.fixedCostShare)).toBeCloseTo(sw.fixedCostShare, 5);
+    expect(sw.dbII).toBeGreaterThan(sw.dbII - sw.fixedCostShare);
   });
 
   it("verteilt eBay-Gebuehren aus gematchten Zeilen auf DB II", () => {

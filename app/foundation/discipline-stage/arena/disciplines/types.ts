@@ -51,6 +51,9 @@ export type DisciplineFieldProps = {
   // ---- Identität / Skin -------------------------------------------------------------
   primitive: StagePrimitive; // welche Disziplin (eine Komponente kann eine Familie bedienen)
   disciplineName?: string; // Feld-Wasserzeichen
+  // ZF1: einziger erlaubter Seed für anzeige-generierte Zonen/Profile (z.B. das Zeitfahren-
+  // Geländeprofil in peloton.tsx) — rein informativ, NIE Eingabe für score/displayScore/rank.
+  matchdayId?: string | null;
   accent?: string;
   skinAccent: string; // aufgelöste Akzentfarbe (Feldlinien/Wasserzeichen)
   motif?: StageMotif; // dezentes Hintergrund-Motiv (wenn kein env)

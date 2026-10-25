@@ -1,5 +1,9 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
+import {
+  buildStaffelWechselPaarBonusByNehmer,
+  STAFFEL_DISCIPLINE_ID,
+} from "@/lib/season/staffel-wechsel-paar-bonus-service";
 
 /**
  * DAS ROHR VON DER AUFSTELLUNG ZUR ARENA.
@@ -27,8 +31,32 @@ import { resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
  * ueber ihre Form hin. Diese Datei bleibt reine Verdrahtung.
  */
 
-/** Was der Motor als `place`-Eintrag erwartet: Disziplin plus kurze Rollenkennung. */
-export type ArenaAufstellungEintrag = { d: string; slot: string };
+/**
+ * Was der Motor als `place`-Eintrag erwartet: Disziplin plus kurze Rollenkennung.
+ *
+ * `haltung` (optional, 04.10.): die Spieler-Anweisung des Managers, drittes Feld der Übergabe
+ * `{d, slot, haltung}` aus dem Grundgerüst der Konsultation 02.10. (Zeile 0). Gelesen nur von
+ * Bühnen-Mechaniken hinter `BUEHNE_FLAGS` in battle-mode.engine.js (standardmäßig aus):
+ * Speed-Schach (`"rechnen" | "normal" | "blitzen"`) und Wettessen
+ * (`"sprint" | "gleichmaessig" | "schlussspurt"`). Fehlt das Feld, entscheidet die KI-Vorgabe
+ * der Disziplin. Diese Datei füllt es noch nicht — der Aufstellungsentwurf hat (noch) kein
+ * Haltungsfeld; das Rohr steht, die Buchse in der Einsatzliste folgt mit dem Grundgerüst.
+ *
+ * `wechselPaarBonus`/`wechselPaarGeber`/`wechselPaarEingespielt` (optional, 11.10., Staffel O7
+ * "Eingespielte Paare", lib/season/staffel-wechsel-paar-bonus-service.ts): nur am NEHMER eines
+ * Staffel-Paares mit gemeinsamer Geschichte gesetzt — Bonus auf `Q` der Wechselformel, der Name
+ * des erwarteten Gebers (der Motor wendet den Bonus nur an, wenn genau dieser Laeufer ihm den Stab
+ * reicht) und ob das Paar "eingespielt" ist (engere Streuung). Fehlen die Felder (jeder Spielstand
+ * ohne Paar-Geschichte, jede andere Disziplin), ist der Eintrag exakt das alte `{d, slot}`.
+ */
+export type ArenaAufstellungEintrag = {
+  d: string;
+  slot: string;
+  haltung?: string;
+  wechselPaarBonus?: number;
+  wechselPaarGeber?: string;
+  wechselPaarEingespielt?: boolean;
+};
 
 /** Spielername -> Platzierung. Der Motor schluesselt `place` ueber den NAMEN, nicht die ID. */
 export type ArenaAufstellung = Record<string, ArenaAufstellungEintrag>;
@@ -82,6 +110,23 @@ export function buildArenaAufstellung(
     if (!slot) continue;
 
     aufstellung[name] = { d: eintrag.disciplineId, slot };
+  }
+
+  // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus faehrt am NEHMER mit (s. Typkommentar oben).
+  // Ohne gespeicherte Paar-Geschichte ist die Map leer und `aufstellung` bleibt Zeichen fuer
+  // Zeichen das, was die Schleife darueber gebaut hat.
+  for (const [nehmerId, paar] of buildStaffelWechselPaarBonusByNehmer(gameState, entwurf)) {
+    const nehmerName = nameVon.get(nehmerId);
+    const geberName = nameVon.get(paar.geberPlayerId);
+    if (!nehmerName || !geberName) continue;
+    const vorhanden = aufstellung[nehmerName];
+    if (!vorhanden || vorhanden.d !== STAFFEL_DISCIPLINE_ID) continue;
+    aufstellung[nehmerName] = {
+      ...vorhanden,
+      wechselPaarBonus: paar.bonus,
+      wechselPaarGeber: geberName,
+      ...(paar.eingespielt ? { wechselPaarEingespielt: true } : {}),
+    };
   }
   return aufstellung;
 }

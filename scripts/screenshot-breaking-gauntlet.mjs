@@ -10,6 +10,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { createReadStream, statSync } from "node:fs";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -56,11 +57,15 @@ try {
     await seite.click("#t2");
     await seite.click("#spd"); await seite.click("#spd"); // 4x Tempo
     await seite.click("#play");
+    await warteAufAnpfiff(seite); // Sendungsrahmen-Paket 07.10.: Anpfiff-Countdown abwarten, s. scripts/lib/arena-anpfiff.mjs
 
     await seite.waitForTimeout(1500);
     await (await seite.$("#cv")).screenshot({ path: path.join(OUT_DIR, `saat${saat}-01-zwischenstand.png`) });
 
     await seite.waitForFunction(() => document.getElementById("phase")?.textContent === "beendet", null, { timeout: 60000 }).catch(() => {});
+    // ENDSTAND-NACHLAUF (Sendungsrahmen-Paket 07.10.): das Overlay kommt 3,5 s nach "beendet",
+    // nicht mehr im selben Frame -- auf das Overlay selbst warten statt auf eine feste Zeit.
+    await seite.waitForFunction(() => !document.getElementById("endstand").hidden, null, { timeout: 15000 }).catch(() => {});
     await seite.waitForTimeout(300);
     await (await seite.$("#cv")).screenshot({ path: path.join(OUT_DIR, `saat${saat}-02-endstand.png`) });
 

@@ -62,9 +62,12 @@ function isNonIncreasing(ladder: readonly number[]): boolean {
 // ── 1. Sponsor-Topf-Rabatt (SPONSOR_TOPF_FAKTOR_JE_LIGA) ─────────────────────────────────────────
 
 describe("Sponsor-Topf-Rabatt — wirkt exakt auf Topf-Ebene, vor der Verteilungsformel", () => {
-  it("SPONSOR_TOPF_FAKTOR_JE_LIGA: liga1 = 1 (unveraendert), liga2 = 0,8", () => {
-    expect(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1).toBe(1);
-    expect(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2).toBe(0.8);
+  it("SPONSOR_TOPF_FAKTOR_JE_LIGA: 60/40-Split (Chris' Entscheidung 18.10., Task #161, liga-split-plan.md 10.3)", () => {
+    expect(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1).toBe(0.6);
+    expect(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2).toBe(0.4);
+    // Beide Ligen ZUSAMMEN ziehen wieder exakt den einen, urspruenglich kalibrierten Topf —
+    // das ist der ganze Punkt des Splits (kein Doppel-Payout mehr aus zwei vollen Toepfen).
+    expect(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1 + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2).toBeCloseTo(1, 9);
   });
 
   it("sponsorLigaLeiter: ohne leagueTier bleibt der TOPF-FAKTOR unveraendert (1) und der Zonen-Term aus — Legacy-Pfad bit-identisch", () => {
@@ -87,26 +90,34 @@ describe("Sponsor-Topf-Rabatt — wirkt exakt auf Topf-Ebene, vor der Verteilung
     }
   });
 
-  it("sponsorLigaLeiter: jede Sprosse liga2 minus Zonen-Term ist EXAKT 0,8 × (Sprosse ohne Liga-Tier minus Sockel) + Sockel", () => {
+  it("sponsorLigaLeiter: jede Sprosse liga1/liga2 minus Zonen-Term ist EXAKT Faktor × (Sprosse ohne Liga-Tier minus Sockel) + Sockel", () => {
     // Algebraischer Beweis statt Stichprobe: `topfFaktor` skaliert in `sponsorLigaLeiterOhneZonenTerm`
     // NUR den Wertungsanteil (Sprosse − Sockel), linear und fuer JEDEN Rang gleich — der Sockel selbst
     // ist tier-unabhaengig. Der Zonen-Term wird erst DANACH additiv aufgetragen (siehe
     // sponsor-liga-leiter.ts, `mitZonenTerm`) und muss deshalb vor dem Vergleich abgezogen werden.
+    // NACH dem 60/40-Split (18.10.) hat auch Liga 1 einen Faktor != 1 — anders als vor der
+    // Entscheidung ist "ohne Tier" (Faktor 1) deshalb NICHT mehr dasselbe wie "liga1".
     for (const startRank of [1, 5, 16, 22, 32]) {
       for (const salaryFactor of SALARY_FACTORS) {
         const sockel = sponsorSockelFuerStartrang(startRank);
         const referenz = sponsorLigaLeiter({ startRank, salaryFactor }); // kein Tier = Faktor 1, kein Zonen-Term
+        const liga1 = sponsorLigaLeiter({ startRank, salaryFactor, leagueTier: "liga1" });
         const liga2 = sponsorLigaLeiter({ startRank, salaryFactor, leagueTier: "liga2" });
         for (let rank = 1; rank <= 32; rank += 1) {
-          const zonenTerm = rank <= SPONSOR_ZONE_AUFSTIEG_RANKS ? SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor : 0;
-          const erwartet = sockel + 0.8 * (referenz[rank - 1]! - sockel) + zonenTerm;
-          expect(liga2[rank - 1]!, `Rang ${rank}, Startrang ${startRank}, f=${salaryFactor}`).toBeCloseTo(erwartet, 9);
+          const aufstiegsBonus = rank <= SPONSOR_ZONE_AUFSTIEG_RANKS ? SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor : 0;
+          const abstiegsMalus = rank > 32 - SPONSOR_ZONE_ABSTIEG_RANKS ? SPONSOR_ZONE_ABSTIEG_MALUS * salaryFactor : 0;
+          const erwartetLiga1 =
+            sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1 * (referenz[rank - 1]! - sockel) - abstiegsMalus;
+          const erwartetLiga2 =
+            sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 * (referenz[rank - 1]! - sockel) + aufstiegsBonus;
+          expect(liga1[rank - 1]!, `liga1 Rang ${rank}, Startrang ${startRank}, f=${salaryFactor}`).toBeCloseTo(erwartetLiga1, 9);
+          expect(liga2[rank - 1]!, `liga2 Rang ${rank}, Startrang ${startRank}, f=${salaryFactor}`).toBeCloseTo(erwartetLiga2, 9);
         }
       }
     }
   });
 
-  it("Kalibrierungs-Invariante Liga 2: Σ Wertungsanteil (ohne Zonen-Term) = SPONSOR_WERTUNGSTOPF × f × 0,8 — exakt 80 % des Liga-1-Topfs", () => {
+  it("Kalibrierungs-Invariante: Σ Wertungsanteil (ohne Zonen-Term) je Liga trifft exakt ihren Anteil (0,6/0,4) am EINEN SPONSOR_WERTUNGSTOPF", () => {
     for (const salaryFactor of SALARY_FACTORS) {
       const startRank = 16;
       const sockel = sponsorSockelFuerStartrang(startRank);
@@ -122,16 +133,19 @@ describe("Sponsor-Topf-Rabatt — wirkt exakt auf Topf-Ebene, vor der Verteilung
       // um den reinen Topf-Vergleich zu isolieren.
       const liga1MalusSumme = SPONSOR_ZONE_ABSTIEG_RANKS * SPONSOR_ZONE_ABSTIEG_MALUS * salaryFactor;
       const liga1WertungOhneZone = liga1Sum + liga1MalusSumme;
-      expect(liga1WertungOhneZone).toBeCloseTo(SPONSOR_WERTUNGSTOPF * salaryFactor, 6);
+      expect(liga1WertungOhneZone).toBeCloseTo(SPONSOR_WERTUNGSTOPF * salaryFactor * SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1, 6);
 
       const liga2BonusSumme = SPONSOR_ZONE_AUFSTIEG_RANKS * SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor;
       const liga2WertungOhneZone = liga2LadderSum - liga2BonusSumme;
-      expect(liga2WertungOhneZone).toBeCloseTo(SPONSOR_WERTUNGSTOPF * salaryFactor * 0.8, 6);
-      expect(liga2WertungOhneZone).toBeCloseTo(liga1WertungOhneZone * 0.8, 6);
+      expect(liga2WertungOhneZone).toBeCloseTo(SPONSOR_WERTUNGSTOPF * salaryFactor * SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2, 6);
+
+      // DER GANZE PUNKT DES SPLITS: beide Toepfe ZUSAMMEN ergeben wieder genau den EINEN,
+      // urspruenglich kalibrierten Topf — kein Doppel-Payout aus zwei vollen 16er-Toepfen mehr.
+      expect(liga1WertungOhneZone + liga2WertungOhneZone).toBeCloseTo(SPONSOR_WERTUNGSTOPF * salaryFactor, 6);
     }
   });
 
-  it("sponsorKurvenLeiter (geshapete Leiter, der LIVE-Pfad): dieselbe exakte 0,8-Linearitaet je Rang, fuer alle 11 Kurvenformen", () => {
+  it("sponsorKurvenLeiter (geshapete Leiter, der LIVE-Pfad): dieselbe exakte Faktor-Linearitaet je Rang, fuer alle 11 Kurvenformen", () => {
     // Beweist, dass der Topf-Rabatt NICHT in der Kurvenformung verwaschen wird (siehe Kommentar in
     // sponsor-liga-leiter.ts, `sponsorKurvenLeiter`): Sockel bleibt Sockel, nur der Wertungsanteil
     // skaliert — auch nachdem die 11 Kurvenformen ihn neu ueber die Raenge verteilt haben.
@@ -139,11 +153,12 @@ describe("Sponsor-Topf-Rabatt — wirkt exakt auf Topf-Ebene, vor der Verteilung
       for (const startRank of [1, 8, 16, 27, 32]) {
         for (const salaryFactor of SALARY_FACTORS) {
           const sockel = sponsorSockelFuerStartrang(startRank);
-          const liga1 = sponsorKurvenLeiter({ shape, startRank, salaryFactor });
+          const referenz = sponsorKurvenLeiter({ shape, startRank, salaryFactor });
           const liga2 = sponsorKurvenLeiter({ shape, startRank, salaryFactor, leagueTier: "liga2" });
           for (let rank = 1; rank <= 32; rank += 1) {
             const zonenTerm = rank <= SPONSOR_ZONE_AUFSTIEG_RANKS ? SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor : 0;
-            const erwartet = sockel + 0.8 * (liga1[rank - 1]! - sockel) + zonenTerm;
+            const erwartet =
+              sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 * (referenz[rank - 1]! - sockel) + zonenTerm;
             expect(
               liga2[rank - 1]!,
               `${shape} @ Startrang ${startRank}, f=${salaryFactor}, Rang ${rank}`,
@@ -178,7 +193,8 @@ describe("Sponsor-Zonen-Term — trifft die richtigen Raenge, bleibt monoton", (
     const ohneTier = sponsorLigaLeiter({ startRank, salaryFactor });
     const liga2 = sponsorLigaLeiter({ startRank, salaryFactor, leagueTier: "liga2" });
     for (let rank = 1; rank <= 32; rank += 1) {
-      const diffOhneTopfrabatt = liga2[rank - 1]! - (sockel + 0.8 * (ohneTier[rank - 1]! - sockel));
+      const diffOhneTopfrabatt =
+        liga2[rank - 1]! - (sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 * (ohneTier[rank - 1]! - sockel));
       if (rank <= SPONSOR_ZONE_AUFSTIEG_RANKS) {
         expect(diffOhneTopfrabatt, `Rang ${rank}`).toBeCloseTo(SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor, 9);
       } else {
@@ -190,10 +206,14 @@ describe("Sponsor-Zonen-Term — trifft die richtigen Raenge, bleibt monoton", (
   it("Liga 1: nur die letzten 3 Endraenge bekommen den Malus, alle anderen 0", () => {
     const startRank = 10;
     const salaryFactor = 1.0;
+    const sockel = sponsorSockelFuerStartrang(startRank);
     const ohneTier = sponsorLigaLeiter({ startRank, salaryFactor });
     const liga1 = sponsorLigaLeiter({ startRank, salaryFactor, leagueTier: "liga1" });
     for (let rank = 1; rank <= 32; rank += 1) {
-      const diff = liga1[rank - 1]! - ohneTier[rank - 1]!; // liga1-Topffaktor ist 1, also reiner Zonen-Term
+      // liga1-Topffaktor ist seit dem 60/40-Split NICHT mehr 1 — den Topf-Anteil herausrechnen,
+      // damit nur der reine Zonen-Term (Malus) uebrig bleibt.
+      const diff =
+        liga1[rank - 1]! - (sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1 * (ohneTier[rank - 1]! - sockel));
       if (rank > 32 - SPONSOR_ZONE_ABSTIEG_RANKS) {
         expect(diff, `Rang ${rank}`).toBeCloseTo(-SPONSOR_ZONE_ABSTIEG_MALUS * salaryFactor, 9);
       } else {
@@ -208,7 +228,7 @@ describe("Sponsor-Zonen-Term — trifft die richtigen Raenge, bleibt monoton", (
       const ohneTier = sponsorLigaLeiter({ startRank, salaryFactor });
       const liga2 = sponsorLigaLeiter({ startRank, salaryFactor, leagueTier: "liga2" });
       const sockel = sponsorSockelFuerStartrang(startRank);
-      const bonusRang1 = liga2[0]! - (sockel + 0.8 * (ohneTier[0]! - sockel));
+      const bonusRang1 = liga2[0]! - (sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 * (ohneTier[0]! - sockel));
       expect(bonusRang1).toBeCloseTo(SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor, 9);
     }
   });
@@ -225,8 +245,8 @@ describe("Sponsor-Zonen-Term — trifft die richtigen Raenge, bleibt monoton", (
     const liga2 = sponsorLigaLeiter({ startRank, salaryFactor, leagueSize: LEAGUE_SIZE, leagueTier: "liga2" });
     const liga1 = sponsorLigaLeiter({ startRank, salaryFactor, leagueSize: LEAGUE_SIZE, leagueTier: "liga1" });
     for (let rank = 1; rank <= LEAGUE_SIZE; rank += 1) {
-      const liga2Diff = liga2[rank - 1]! - (sockel + 0.8 * (ohneTier[rank - 1]! - sockel));
-      const liga1Diff = liga1[rank - 1]! - ohneTier[rank - 1]!;
+      const liga2Diff = liga2[rank - 1]! - (sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 * (ohneTier[rank - 1]! - sockel));
+      const liga1Diff = liga1[rank - 1]! - (sockel + SPONSOR_TOPF_FAKTOR_JE_LIGA.liga1 * (ohneTier[rank - 1]! - sockel));
       if (rank <= 3) {
         expect(liga2Diff, `liga2 Rang ${rank}`).toBeCloseTo(SPONSOR_ZONE_AUFSTIEG_BONUS * salaryFactor, 9);
       } else {
@@ -392,9 +412,15 @@ describe("Gebäudeeinnahmen-Rabatt (Facility-Income) — Liga 2 zahlt 80 % des E
     }
   });
 
-  it("FACILITY_INCOME_FAKTOR_JE_LIGA: liga1 = 1, liga2 = 0,8 — derselbe Faktor wie beim Sponsor-Topf", () => {
+  it("FACILITY_INCOME_FAKTOR_JE_LIGA: liga1 = 1, liga2 = 0,8 — eigener, unabhaengiger Wert (Task #161, 18.10.)", () => {
+    // Vor dem 60/40-Sponsor-Split (Task #161, 10.3) war das zufaellig derselbe Zahlenwert wie
+    // SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2 (0,8) — das war schon damals ein eigener Konstanten-Wert
+    // ohne Import von dort (siehe Kommentar in facility-effects.ts), keine echte Kopplung. Chris'
+    // 18.10.-Entscheidung betrifft ausdrücklich nur Frage 10.3 (Sponsor-Topf) — Gebäudeeinnahmen
+    // waren nicht Teil dieser Runde und bleiben deshalb unveraendert bei 0,8.
     expect(FACILITY_INCOME_FAKTOR_JE_LIGA.liga1).toBe(1);
-    expect(FACILITY_INCOME_FAKTOR_JE_LIGA.liga2).toBe(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2);
+    expect(FACILITY_INCOME_FAKTOR_JE_LIGA.liga2).toBe(0.8);
+    expect(FACILITY_INCOME_FAKTOR_JE_LIGA.liga2).not.toBe(SPONSOR_TOPF_FAKTOR_JE_LIGA.liga2);
   });
 
   it("Aktiv-Beweis: resolveFacilityIncomeFaktor liefert 0,8 fuer ein Liga-2-Team bei gesetztem leagueByTeamId", () => {

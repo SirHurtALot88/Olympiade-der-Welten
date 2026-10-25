@@ -327,4 +327,409 @@ describe("season points ledger", () => {
     expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.points).toBe(4.934);
     expect(after.pointEntriesByPerformanceId.get("perf-a-1")?.teamId).toBe(teamA.teamId);
   });
+
+  it("PP-BUDGET, REIN LEISTUNGSBASIERT (19.10.): `tableGroupContributions` einer Duell-Zeile " +
+    "traegt das 2/1/0-Team-Budget, NICHT die (jetzt leistungsbasierte) Spieler-PP-Summe -- " +
+    "`teamSummary.totalPoints` und der Spieltagsrang (`season-matchday-points.ts`, " +
+    "`build-field-race-ledger.ts`) muessen dieselbe Waehrung lesen wie die Saisontabelle, sonst " +
+    "entsteht fuer Battle-Saves genau die Inkonsistenz, die diese Datei fuer den Mutator-Bonus " +
+    "schon einmal behoben hat (\"Platz 1 im Spieltag, aber nur 2. in der Saison\").", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const teamA = gameState.teams[0]!;
+    const teamB = gameState.teams[1]!;
+    const [playerA1, playerA2, playerB1, playerB2] = gameState.players.slice(0, 4);
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 2,
+        teamsReady: 2,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    // Team A verliert sein Duell (0 von 2 Punkten), hat aber die beiden staerkeren Spieler
+    // (finalPlayerScore 80/60) -- genau der Fall, den Chris' Entscheidung adressiert ("ein guter
+    // Spieler im schlechten Verlierer-Team kann trotzdem viele Punkte sammeln").
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "discipline-a",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        rank: 2,
+        baseScore: 70,
+        totalScore: 140,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "pps_duell",
+        pointSource: "battle_mode_pps_duell_win_draw_loss",
+        teamPoints: 0,
+        opponentTeamId: teamB.teamId,
+      },
+      {
+        id: "discipline-b",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        rank: 1,
+        baseScore: 20,
+        totalScore: 40,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-06T12:02:00.000Z",
+        resolutionSource: "pps_duell",
+        pointSource: "battle_mode_pps_duell_win_draw_loss",
+        teamPoints: 2,
+        opponentTeamId: teamA.teamId,
+      },
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-a-1",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        playerId: playerA1!.id,
+        activePlayerId: playerA1!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 80,
+        scoreContribution: 0.57,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: 0.57,
+        createdAt: "2026-06-06T12:03:00.000Z",
+      },
+      {
+        id: "perf-a-2",
+        matchdayResultId: "result-1",
+        teamId: teamA.teamId,
+        playerId: playerA2!.id,
+        activePlayerId: playerA2!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 1,
+        baseValue: 60,
+        finalPlayerScore: 60,
+        scoreContribution: 0.43,
+        rankInTeam: 2,
+        rankInDiscipline: 3,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 0.43,
+        createdAt: "2026-06-06T12:04:00.000Z",
+      },
+      {
+        id: "perf-b-1",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        playerId: playerB1!.id,
+        activePlayerId: playerB1!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 10,
+        finalPlayerScore: 10,
+        scoreContribution: 0.5,
+        rankInTeam: 1,
+        rankInDiscipline: 7,
+        isTop10: false,
+        isMvpCandidate: false,
+        storyWeight: 0.5,
+        createdAt: "2026-06-06T12:05:00.000Z",
+      },
+      {
+        id: "perf-b-2",
+        matchdayResultId: "result-1",
+        teamId: teamB.teamId,
+        playerId: playerB2!.id,
+        activePlayerId: playerB2!.id,
+        disciplineId: "basketball",
+        disciplineSide: "d1",
+        slotIndex: 1,
+        baseValue: 10,
+        finalPlayerScore: 10,
+        scoreContribution: 0.5,
+        rankInTeam: 2,
+        rankInDiscipline: 8,
+        isTop10: false,
+        isMvpCandidate: false,
+        storyWeight: 0.5,
+        createdAt: "2026-06-06T12:06:00.000Z",
+      },
+    ];
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    const teamASummary = ledger.teamSummariesByTeamId.get(teamA.teamId)!;
+    const teamBSummary = ledger.teamSummariesByTeamId.get(teamB.teamId)!;
+
+    // Tabellenpunkte bleiben exakt Σ 2/1/0 -- Team A verlor, Team B gewann.
+    expect(teamASummary.totalPoints).toBe(0);
+    expect(teamBSummary.totalPoints).toBe(2);
+    expect(teamASummary.reconciliationStatus).toBe("reconciled");
+    expect(teamBSummary.reconciliationStatus).toBe("reconciled");
+
+    // ABER: Team A (der Verlierer) hat die weitaus hoehere leistungsbasierte Spieler-PP-Summe,
+    // weil seine Spieler absolut staerker waren -- genau die Entkopplung, die Teil A will.
+    expect(teamASummary.playerDerivedTotal).toBeGreaterThan(teamBSummary.playerDerivedTotal);
+    expect(teamASummary.playerDerivedTotal).toBeGreaterThan(0);
+
+    // DIE REGRESSION, DIE DIESER TEST SPERRT: `tableGroupContributions` (Spieltagsrang/Feld-Rennen)
+    // liest das 2/1/0-Team-Budget, NICHT die Spieler-PP-Summe -- sonst wuerde "wer hat an diesem
+    // Spieltag mehr Punkte geholt" (Tagessieger) der leistungsbasierten PP-Summe folgen und
+    // Team A (den Verlierer) als Tagessieger zeigen, waehrend die Saisontabelle Team B fuehrt.
+    const beitragA = ledger.tableGroupContributions.find((b) => b.teamId === teamA.teamId && b.disciplineId === "basketball");
+    const beitragB = ledger.tableGroupContributions.find((b) => b.teamId === teamB.teamId && b.disciplineId === "basketball");
+    expect(beitragA?.points).toBe(0);
+    expect(beitragB?.points).toBe(2);
+    expect(beitragA?.matchdayId).toBe("matchday-1");
+    // Σ `tableGroupContributions` je Team == `teamSummary.totalPoints` -- dieselbe Waehrung.
+    expect(beitragA?.points).toBe(teamASummary.totalPoints);
+    expect(beitragB?.points).toBe(teamBSummary.totalPoints);
+
+    // OPUS-REVIEW PR #1296: eine Duell-Zeile OHNE erfasste Leistungen (leere Aufstellung) bucht ihr
+    // 2/1/0 in `totalPoints` UND in `tableGroupContributions` -- sonst liefen Saisontabelle und
+    // Spieltagsrang genau in diesem Rand-Fall auseinander.
+    gameState.seasonState.playerDisciplinePerformances = gameState.seasonState.playerDisciplinePerformances.filter(
+      (performance) => performance.teamId !== teamB.teamId,
+    );
+    const ohneLeistungen = buildSeasonPointsLedger(gameState);
+    expect(ohneLeistungen.teamSummariesByTeamId.get(teamB.teamId)!.totalPoints).toBe(2);
+    const beitragOhneLeistungen = ohneLeistungen.tableGroupContributions.filter((b) => b.teamId === teamB.teamId);
+    expect(beitragOhneLeistungen).toEqual([
+      { matchdayId: "matchday-1", teamId: teamB.teamId, disciplineId: "basketball", points: 2 },
+    ]);
+  });
+
+  it("MINI-DM-POD-RESOLVE (19.10., Review-Fund 20.10.): eine Mini-DM-Pod-Zeile (`resolutionSource: " +
+    "\"mini_dm_pod\"`) darf ihre Spieler-PP-Summe NICHT zusaetzlich zum schon gebuchten 2-1-0-0-" +
+    "Budget in `teamSummary.totalPoints` aufaddieren -- genau die Doppelzaehlung, die die " +
+    "Season-Sum-Probe (scripts/miss-mini-dm-pod-saisonsumme.ts) an einem echten 20-Spieltage-" +
+    "Battle-Save gefunden hat (`totalPoints` lag dort fuer JEDES Team ueber dem gebuchten Wert).", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const [teamA, teamB, teamC, teamD] = gameState.teams;
+    const [playerA, playerB, playerC, playerD] = gameState.players;
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-pod-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 4,
+        teamsReady: 4,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    const podTeamIds = [teamA!.teamId, teamB!.teamId, teamC!.teamId, teamD!.teamId] as const;
+    const platzByTeamId = new Map(podTeamIds.map((teamId, index) => [teamId, (index + 1) as 1 | 2 | 3 | 4]));
+    const teamPointsByPlatz = [2, 1, 0, 0];
+    gameState.seasonState.disciplineResults = podTeamIds.map((teamId, index) => ({
+      id: `discipline-pod-${index}`,
+      matchdayResultId: "result-pod-1",
+      teamId,
+      disciplineId: "mini-dm",
+      disciplineSide: "d1" as const,
+      rank: index + 1,
+      baseScore: 50 - index * 10,
+      totalScore: 50 - index * 10,
+      readinessStatus: "ready" as const,
+      warnings: [],
+      createdAt: "2026-06-06T12:01:00.000Z",
+      resolutionSource: "mini_dm_pod" as const,
+      pointSource: "battle_mode_mini_dm_pod_platz",
+      teamPoints: teamPointsByPlatz[index],
+      miniDmPod: { podId: "pod-test", platz: platzByTeamId.get(teamId)!, teamIds: podTeamIds, wert: 10 - index * 2 },
+    }));
+    // Team D (letzter Platz, 0 Liga-Punkte) hat den mit Abstand STAERKSTEN Einzelspieler -- Chris'
+    // "Impact Rating"-Beispiel ("ein guter Spieler im schlechten Verlierer-Team"). Waere die
+    // Doppelzaehlung noch da, wuerde Team D trotz Platz 4 die hoechste Tabellenpunktzahl zeigen.
+    const scoreByTeamId = new Map([
+      [teamA!.teamId, 10],
+      [teamB!.teamId, 10],
+      [teamC!.teamId, 10],
+      [teamD!.teamId, 200],
+    ]);
+    gameState.seasonState.playerDisciplinePerformances = podTeamIds.map((teamId, index) => ({
+      id: `perf-pod-${index}`,
+      matchdayResultId: "result-pod-1",
+      teamId,
+      playerId: [playerA, playerB, playerC, playerD][index]!.id,
+      activePlayerId: [playerA, playerB, playerC, playerD][index]!.id,
+      disciplineId: "mini-dm",
+      disciplineSide: "d1" as const,
+      slotIndex: 0,
+      baseValue: scoreByTeamId.get(teamId)!,
+      finalPlayerScore: scoreByTeamId.get(teamId)!,
+      scoreContribution: 1,
+      rankInTeam: 1,
+      rankInDiscipline: index + 1,
+      isTop10: true,
+      isMvpCandidate: false,
+      storyWeight: 1,
+      createdAt: "2026-06-06T12:02:00.000Z",
+    }));
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    for (const teamId of podTeamIds) {
+      const erwartet = teamPointsByPlatz[platzByTeamId.get(teamId)! - 1];
+      expect(ledger.teamSummariesByTeamId.get(teamId)!.totalPoints, `Team ${teamId}`).toBe(erwartet);
+      const beitrag = ledger.tableGroupContributions.find((b) => b.teamId === teamId && b.disciplineId === "mini-dm");
+      expect(beitrag?.points).toBe(erwartet);
+    }
+    // Trotz des staerksten Einzelspielers bleibt Team D (Platz 4) bei 0 Tabellenpunkten -- seine
+    // hohe Spieler-PP (`playerDerivedTotal`) ist eine SEPARATE Groesse, fliesst NICHT in `totalPoints`.
+    expect(ledger.teamSummariesByTeamId.get(teamD!.teamId)!.totalPoints).toBe(0);
+    expect(ledger.teamSummariesByTeamId.get(teamD!.teamId)!.playerDerivedTotal).toBeGreaterThan(
+      ledger.teamSummariesByTeamId.get(teamA!.teamId)!.playerDerivedTotal,
+    );
+  });
+
+  it("MINI-DM-FFA (PR 4, Opus-Plan 21.10.): `miniDmPod.quelle === \"ffa\"` vertraut " +
+    "`performance.scoreContribution` wie eine Arena-Zeile -- `fehlt quelle`, bleibt der " +
+    "PPS-basierte Pfad (`finalPlayerScore` + Referenz) unveraendert aktiv.", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const [teamA, teamB, teamC, teamD] = gameState.teams;
+    const [playerA, playerB] = gameState.players;
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-pod-ffa-1",
+        saveId: "save-local",
+        seasonId: gameState.season.id,
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 4,
+        teamsReady: 4,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-06T12:00:00.000Z",
+        updatedAt: "2026-06-06T12:00:00.000Z",
+      },
+    ];
+    const podTeamIds = [teamA!.teamId, teamB!.teamId, teamC!.teamId, teamD!.teamId] as const;
+    // Team A traegt `quelle: "ffa"` -- Team B denselben Pod-Mechanismus OHNE `quelle` (Stand vor
+    // PR 4, Rueckwaertskompatibilitaet fuer bestehende Battle-Saves).
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "discipline-pod-ffa-a",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamA!.teamId,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        rank: 1,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready" as const,
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "mini_dm_pod" as const,
+        pointSource: "battle_mode_mini_dm_pod_platz",
+        teamPoints: 2,
+        miniDmPod: { podId: "pod-ffa-test", platz: 1 as const, teamIds: podTeamIds, wert: 8, quelle: "ffa" as const, rundenPunkteSumme: 10 },
+      },
+      {
+        id: "discipline-pod-ffa-b",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamB!.teamId,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        rank: 2,
+        baseScore: 10,
+        totalScore: 10,
+        readinessStatus: "ready" as const,
+        warnings: [],
+        createdAt: "2026-06-06T12:01:00.000Z",
+        resolutionSource: "mini_dm_pod" as const,
+        pointSource: "battle_mode_mini_dm_pod_platz",
+        teamPoints: 1,
+        // KEIN `quelle` -- dieselbe Form wie jede Mini-DM-Pod-Zeile vor PR 4.
+        miniDmPod: { podId: "pod-ffa-test", platz: 2 as const, teamIds: podTeamIds, wert: 6 },
+      },
+    ];
+    // `scoreContribution` (3,3) und `finalPlayerScore` (99) bewusst WEIT auseinander -- so zeigt
+    // ein Test-Fehlschlag sofort, WELCHER der beiden Werte tatsaechlich gebucht wurde.
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-pod-ffa-a",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamA!.teamId,
+        playerId: playerA!.id,
+        activePlayerId: playerA!.id,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 99,
+        finalPlayerScore: 99,
+        scoreContribution: 3.3,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 1,
+        createdAt: "2026-06-06T12:02:00.000Z",
+      },
+      {
+        id: "perf-pod-ffa-b",
+        matchdayResultId: "result-pod-ffa-1",
+        teamId: teamB!.teamId,
+        playerId: playerB!.id,
+        activePlayerId: playerB!.id,
+        disciplineId: "mini-dm",
+        disciplineSide: "d1" as const,
+        slotIndex: 0,
+        baseValue: 99,
+        finalPlayerScore: 99,
+        scoreContribution: 3.3,
+        rankInTeam: 1,
+        rankInDiscipline: 2,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 1,
+        createdAt: "2026-06-06T12:02:00.000Z",
+      },
+    ];
+
+    const ledger = buildSeasonPointsLedger(gameState);
+    const entryA = ledger.pointEntries.find((entry) => entry.performanceId === "perf-pod-ffa-a");
+    const entryB = ledger.pointEntries.find((entry) => entry.performanceId === "perf-pod-ffa-b");
+
+    // Team A (`quelle: "ffa"`): `scoreContribution` wird VERTRAUT, wie bei einer Arena-Zeile.
+    expect(entryA?.pointSource).toBe("battle_mode_mini_dm_ffa_player_score");
+    expect(entryA?.basePoints).toBeCloseTo(3.3, 6);
+
+    // Team B (kein `quelle`): bleibt der bestehende PPS-basierte Pfad -- `scoreContribution` (3,3)
+    // wird NICHT uebernommen, `basePoints` kommt stattdessen aus `finalPlayerScore` (99) + Referenz.
+    expect(entryB?.pointSource).toBe("battle_mode_mini_dm_pod_player_score");
+    expect(entryB?.basePoints).not.toBeCloseTo(3.3, 6);
+  });
 });

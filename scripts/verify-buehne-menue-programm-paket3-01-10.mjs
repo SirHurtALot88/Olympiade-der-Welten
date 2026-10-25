@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, createReadStream, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
+import { sendungsrahmenAus, warteAufAnpfiff } from "./lib/arena-anpfiff.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(WURZEL, "public");
@@ -66,6 +67,7 @@ try {
     seite.on("pageerror", (e) => fehler.push(String(e)));
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+    await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Countdown/Finale-in-Echtzeit/Endstand-Nachlauf aus -- diese Sonde misst bis zum Endstand bzw. per sondenLauf(), s. scripts/lib/arena-anpfiff.mjs
     const saaten = Array.from({ length: 30 }, (_, i) => 1 + i * 104729);
     const proben = await seite.evaluate(
       (ss) => ss.map((s) => window.__arena.wettessenMenuProbeFuerSaat(s)),
@@ -85,6 +87,7 @@ try {
     });
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+    await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Countdown/Finale-in-Echtzeit/Endstand-Nachlauf aus -- diese Sonde misst bis zum Endstand bzw. per sondenLauf(), s. scripts/lib/arena-anpfiff.mjs
     await seite.addStyleTag({ content: "body{background:#0B1018}" });
     await seite.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "dark");
@@ -127,6 +130,7 @@ try {
     });
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+    await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Countdown/Finale-in-Echtzeit/Endstand-Nachlauf aus -- diese Sonde misst bis zum Endstand bzw. per sondenLauf(), s. scripts/lib/arena-anpfiff.mjs
     await seite.addStyleTag({ content: "body{background:#0B1018}" });
     await seite.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "dark");
@@ -154,6 +158,7 @@ try {
     const seite = await browser.newPage();
     await seite.goto(SEITE, { waitUntil: "networkidle" });
     await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
+    await sendungsrahmenAus(seite); // Sendungsrahmen-Paket 07.10.: Countdown/Finale-in-Echtzeit/Endstand-Nachlauf aus -- diese Sonde misst bis zum Endstand bzw. per sondenLauf(), s. scripts/lib/arena-anpfiff.mjs
     const kandidaten = ["Draco", "Lava Golem", "Krolach", "Johanna", "King Arlen Morgolor", "Gram", "Rhyx'Tal", "Xelara", "Jorund", "Inefinna", "Lulu"];
     const treffer = [];
     for (const name of kandidaten) {

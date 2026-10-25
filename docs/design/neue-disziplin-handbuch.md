@@ -274,6 +274,86 @@ Ereignisdichte, dann das Impact-Maß, dann das Rezept.
   13 × 12 × n volle Spiele; Basketball bei n=48 hat einmal das Sitzungsbudget gesprengt
   (Hockey-Plan G.1). Deshalb ist die Abnahme dort n=48, n=96 nur als Bestätigung ohne
   Zeitdruck (H.6).
+- **Basiswert und Anhebung MÜSSEN über denselben Rechenweg im selben Lauf gehen — nie
+  über einen gespeicherten/historischen Basiswert.** Fund am 17.10. bei der PPS-Duell-
+  Brücken-Abnahme (`scripts/miss-pps-duell-bruecke-abnahme.ts`,
+  `docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md` Abschnitt 8.5): die erste
+  Fassung verglich einen frisch über `calculateRawDisciplineScore` +
+  `buildCompetitionRanks` + `mapRankToDisciplineStat` NEU hergeleiteten Wert gegen den
+  ECHTEN, aus der SQLite gelesenen (historisch geschriebenen) Basiswert. Schon die blosse
+  Differenz zwischen „historisch" und „frisch neu hergeleitet" erzeugte einen Sprung —
+  und zwar für JEDES Attribut gleich, auch für eines mit Matrix-/Override-Gewicht 0 (das
+  die Formel komplett ignorieren muss). Football las dadurch 64,4 Pp statt der echten
+  ~6–9 Pp — ein Mess-Artefakt, kein Befund am Spiel. Der Fix: Basislinie UND Anhebung
+  über DIESELBE Neuherleitung im selben Lauf rechnen, nur das DELTA additiv auf den
+  echten Basiswert legen. Der dauerhafte Selbsttest dafür: ein Attribut mit Gewicht 0
+  MUSS |Delta| ≈ 0 liefern, sonst bricht die Messung ab statt still falsch zu messen
+  (eingebaut in besagtem Skript; als Regressions-Wächter zusätzlich in
+  `tests/pps-duell-bruecke-score-kanal.test.ts`). **Geprüft, NICHT betroffen:**
+  `messe-arena-einfluss.mjs`/`einflussVon()` — dort laufen Basis- und Hebungslauf beide
+  FRISCH im selben Simulationslauf durch die Arena-Engine, nie gegen einen gespeicherten
+  Wert. Das Werkzeug hat allerdings eine VERWANDTE, bereits dokumentierte Schwachstelle
+  (`battle-mode.engine.js:9545`ff., Basketball-Wurfbonus-Runde): Basis- und Hebungslauf
+  teilen sich denselben Seed und dieselbe rr()-Aufrufzahl je Tick — ein neuer, bedingter
+  rr()-Aufruf (Foul-/Freiwurf-Würfel), der in beiden Läufen zu unterschiedlichen
+  Zeitpunkten fällt, verschiebt die nachfolgende Zufallsfolge und erzeugt ebenfalls ein
+  Pp-Artefakt (dort schon als solches erkannt und mit `GEO_BONUS`/`schussSkillFuer`
+  umgangen, nicht behoben). Dieselbe Familie von Risiko — Basislinie und Anhebung
+  driften aus einem von der Attribut-Anhebung UNABHÄNGIGEN Grund auseinander — also bei
+  jedem neuen Messskript als Erstes ausschließen: **"liefert ein Attribut mit
+  Gewicht/Einfluss 0 exakt 0, oder nur ungefähr?"**
+
+- **Nachtrag 18.10. (Task #174) — der Rauschboden selbst gemessen, nicht nur vermutet.**
+  Mechanismus am Code bestätigt: `rr()` (`battle-mode.engine.js:34053`) ist ein simpler
+  LCG mit EINEM globalen `seed`, den `M.bau(saat)` je Durchlauf auf `saat` zurücksetzt
+  (`seed=saat||1337`, Kommentar `:34080`); jeder zusätzliche oder fehlende `rr()`-Aufruf
+  zwischen Basis- und Hebungslauf (gleicher `saat`) verschiebt die komplette restliche
+  Zufallsfolge dieser Partie. Zwei Proben dazu, beide frisch gemessen:
+  1. **Kontrolle ohne bedingte Würfel** (Spurt, reine Rennmechanik, keine Fouls/Freiwürfe):
+     `node scripts/messe-arena-einfluss.mjs spurt 48` liest intelligence/charisma/spirit
+     (Matrixgewicht 0, von der Rennmechanik nirgends gelesen) EXAKT 0,0 % — nicht nur
+     klein, bit-genau null. Ohne bedingte Verzweigung gibt es keinen Seed-Versatz, also
+     keinen Rauschboden.
+  2. **Direkte rr()-Zählung in Basketball** (6 gegen 6, Feldspiel-Live, ~3306 `rr()`-Aufrufe
+     je Partie bei `saat=1337`): eine ausserhalb des Repos instrumentierte Kopie von
+     `battle-mode.engine.js` zählt `rr()`-Aufrufe je `M.lauf()`. Für health/determination/
+     will (Matrixgewicht 0 UND nirgends im Basketball-Code gelesen, per `grep` geprüft)
+     liegt die Aufrufzahl bei JEDEM der zwölf getesteten Spieler exakt bei den 3306
+     Aufrufen des Basislaufs — Delta 0, `gewinn` 0, `anteil` 0,0 %, bei n=1 (ein einziges
+     Spiel). Für die neun Attribute, die die Mechanik tatsächlich liest (power…torment,
+     alle Matrixgewicht > 0), verschiebt die Hebung die Aufrufzahl dagegen schon in einem
+     einzigen Spiel um bis zu −292/+227 Aufrufe (≈ 9 % von 3306) — die rr()-Verschiebung
+     aus dem Wurfbonus-Fund oben, jetzt gezählt statt vermutet.
+
+  **Folgerung für die ≤25-Pp-Schranke.** Der gefürchtete Fall — ein totes, Gewicht-0-
+  Attribut liest wegen Seed-Drift fälschlich einen Pp-Betrag — tritt NICHT ein, solange
+  das Attribut (wie in beiden Proben) tatsächlich nirgends gelesen wird: dort ist der
+  Rauschboden exakt null. Der Plausibilitäts-Selbsttest aus
+  `scripts/miss-pps-duell-bruecke-abnahme.ts` (|Delta| ≈ 0 für Gewicht 0) gilt für
+  `einflussVon()` also ebenfalls — nicht weil die Methode rauschfrei wäre, sondern weil in
+  diesen Fällen schlicht kein zusätzlicher `rr()`-Aufruf entsteht. Das eigentliche Risiko
+  sitzt bei den LEBENDEN Attributen: ihre Pro-Spiel-Verschiebung (≈ 9 % der Aufrufzahl)
+  steckt in jedem gemessenen `gewinn` mit drin, vom echten Effekt nicht zu trennen. Ob
+  n=24/48 das ausreichend heraus mittelt, zeigt die bestehende Projekt-Messhistorie (eine
+  frische Mehrfachmessung wurde in dieser Sitzung zweimal unzuverlässig, s.u.): zwei
+  unabhängige Saatströme lasen 17,2/19,4 Pp (frühe Rezeptstufe, PR #680) und 33,7/35,1 Pp
+  (15.10., `docs/design/stand-aller-disziplinen.md` Abschnitt 12) — eine Schwankung von
+  1,4–2,2 Pp zwischen Strömen, also 6–9 % der 25-Pp-Schranke. **Der Rauschboden der
+  GESAMTZAHL ist damit klein gegen die Schranke** — 25 Pp bleibt ein Urteil mit echtem
+  Puffer, ausser eine Disziplin liegt bereits selbst nur 1–2 Pp vor der Schranke (wie
+  Basketball es mit 33,7/35,1 Pp ohnehin schon tut — ein vorbestehender Rezeptbefund,
+  unabhängig von dieser Rauschfrage, s. Stand-Dokument Abschnitt 12).
+
+  **Werkzeuggrenze, nachgewiesen statt vermutet.** Ein frischer
+  `einflussVon("basketball",12)`-Lauf (6 gegen 6, ~1750 Partien bei n=12) blieb in dieser
+  Sandbox zweimal unzuverlässig: einmal > 15 Minuten ohne Ausgabe (Prozess verloren),
+  einmal > 35 Minuten hängend ohne Fehlermeldung (der Playwright-Zielprozess/Renderer war
+  verschwunden, die Seite antwortete nicht mehr) — vermutlich derselbe Speicherdruck, den
+  der Skriptkopf von `messe-arena-einfluss.mjs` bereits für n=48 beschreibt (Zeile 86-97),
+  hier vermutlich verschärft durch mehrere `einflussVon()`-Aufrufe in EINER Playwright-
+  Seite ohne Reload. **Wer Basketballs Pp frisch nachmessen will, startet pro Saatstrom
+  einen frischen Prozess** (wie `messe-arena-einfluss.mjs` es ohnehin tut), statt mehrere
+  Aufrufe in einer Seite zu verketten.
 
 ### 3.3 Zur Rangtreue: warum ein Spiel, nicht eine Saison
 

@@ -10,6 +10,7 @@ import {
   calculateMutatorModifierForSide,
   buildMatchdayMutatorTraitsBySide,
   toBattleArenaOrganicMutatorResult,
+  toBattleDuellMutatorResult,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { calculatePassiveTeamPowerBonus, calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
@@ -19,8 +20,32 @@ import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-perf
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { isBattleModeSave } from "@/lib/season/game-mode";
+import {
+  baueFixtureIndex,
+  berechneDuellVerhaeltnis,
+  berechneErgebnisNormiert,
+  berechnePpsDuellOverrides,
+  findeSpieltagsFixtures,
+  KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS,
+  outcomeAusPunkten,
+  ppAusSpielerScore,
+  resolveNiveauReferenz,
+  resolveSpielerPpReferenz,
+} from "@/lib/resolve/battle-mode-pps-duell";
+// MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): Mini-DM ist die EINZIGE
+// Disziplin, die hier als Vierergruppe statt als Zweier-Duell aufgeloest wird -- s. Kopfkommentar
+// an mini-dm-pod-resolve.ts fuer die volle Begruendung.
+import { berechneMiniDmPodOverrides } from "@/lib/resolve/mini-dm-pod-resolve";
+import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+// SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
+// Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
+// der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
+// wissen, fuer welche Disziplinen ein fehlendes Arena-Ergebnis ueberhaupt markiert werden soll.
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
+  ArenaAusfall,
   DisciplineHighlightCandidate,
   DisciplineResolvePreview,
   DisciplineTeamResolvePreview,
@@ -332,7 +357,16 @@ export function buildLegacyMatchdayResolvePreview(
     captainMode: options?.captainMode ?? "selected_captain",
     arenaTeamPointsByDisciplineId: options?.arenaTeamPointsByDisciplineId ?? null,
     arenaIndividualBoxscorePpsByDisciplineId: options?.arenaIndividualBoxscorePpsByDisciplineId ?? null,
+    arenaAusfallByDisciplineId: options?.arenaAusfallByDisciplineId ?? null,
+    // MINI-DM-FFA-ROHDATEN (PR 4, 21.10.): kein heutiger Aufrufer setzt dieses Feld (s.
+    // Kommentar an `LegacyResolvePreviewOptions.miniDmFfaPodRohdatenByDisciplineId`) -- der
+    // Default `null` haelt den Mini-DM-Zweig unten IMMER beim bisherigen PPS-Pod-Pfad.
+    miniDmFfaPodRohdatenByDisciplineId: options?.miniDmFfaPodRohdatenByDisciplineId ?? null,
   };
+  // SICHTBARE ARENA-AUSFÄLLE: EIN Zeitstempel fuer die ganze Vorschau (statt je Team neu
+  // `new Date().toISOString()` zu rufen) -- rein kosmetisch (Log/Tooltip), aber so bekommen nicht
+  // 32 Zeilen derselben Disziplin 32 leicht verschiedene Millisekunden-Zeitstempel.
+  const nichtAusgefuehrtZeitpunkt = new Date().toISOString();
   const base = contexts[0];
   /**
    * SICHERHEITSRAHMEN Battle Mode PR7, seit WEG B disziplin-bewusst statt Basketball-fest: eine
@@ -345,6 +379,25 @@ export function buildLegacyMatchdayResolvePreview(
    * defensiv beim bisherigen PPS-Pfad.
    */
   const isBattleModeArenaEligible = Boolean(base.gameState && isBattleModeSave(base.gameState));
+  /**
+   * PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): in einem
+   * Battle-Save ist das Fixture des Spieltags die Einheit JEDER Disziplin. Wer an diesem Spieltag
+   * gegen wen spielt, steht schon vor dem Scoring fest — der Index wird einmal gebaut. `null` ausserhalb
+   * von Battle Mode: dort aendert sich nichts.
+   */
+  const duellFixtureIndex = isBattleModeArenaEligible
+    ? baueFixtureIndex(findeSpieltagsFixtures(base.gameState, base.matchdayId))
+    : null;
+  const kontextTeamIds = new Set(contexts.map((context) => context.team.id));
+  const hatArenaErgebnis = (disciplineId: string, teamId: string) =>
+    isBattleModeArenaEligible && (resolveOptions.arenaTeamPointsByDisciplineId?.get(disciplineId)?.has(teamId) ?? false);
+  /** Wird diese Seite ueber das PPS-Duell gewertet (Fixture vorhanden, Gegner geladen, kein Arena-Ergebnis)? */
+  const istPpsDuellSeite = (disciplineId: string, teamId: string) => {
+    const fixture = duellFixtureIndex?.get(teamId);
+    if (!fixture) return false;
+    const gegnerId = fixture.homeTeamId === teamId ? fixture.awayTeamId : fixture.homeTeamId;
+    return kontextTeamIds.has(gegnerId) && !hatArenaErgebnis(disciplineId, teamId) && !hatArenaErgebnis(disciplineId, gegnerId);
+  };
   const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
     saveId: base.saveId,
     seasonId: base.seasonId,
@@ -517,8 +570,13 @@ export function buildLegacyMatchdayResolvePreview(
                   rosterPlayers: context.rosterPlayers,
                   matchdayMutatorTraits: matchdayMutatorTraitsBySide[meta.disciplineSide],
                 });
+          // PPS-DUELL-BRUECKE: eine per PPS-Duell gewertete Battle-Seite behaelt den Score-Anteil des
+          // Mutators, verliert aber den flachen PP-Nachschlag (sonst Zusatzpunkte neben 2/1/0 in der
+          // Tabelle), s. `toBattleDuellMutatorResult()`.
           const mutatorResult = arenaSimuliertDieseSeite
             ? toBattleArenaOrganicMutatorResult(rohMutatorResult)
+            : istPpsDuellSeite(meta.disciplineId, context.team.id)
+            ? toBattleDuellMutatorResult(rohMutatorResult)
             : rohMutatorResult;
           const effectiveMutatorModifier =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
@@ -766,11 +824,95 @@ export function buildLegacyMatchdayResolvePreview(
       isBattleModeArenaEligible
         ? resolveOptions.arenaTeamPointsByDisciplineId?.get(disciplineId) ?? null
         : null;
+    // SICHTBARE ARENA-AUSFÄLLE (Plan Abschnitt 3.2 Punkt 4): ein von einem Aufrufer EXPLIZIT
+    // erklärter Ausfallgrund für genau diese Disziplin (z.B. künftig der Arena-Vorlauf-Service,
+    // PR 3 — "Chromium ist abgestürzt"). Kein heutiger Aufrufer setzt das; ohne ihn greift unten
+    // die Engine-eigene Strukturprüfung.
+    const erklaerterArenaAusfallFuerDiesesDisziplin =
+      isBattleModeArenaEligible ? resolveOptions.arenaAusfallByDisciplineId?.get(disciplineId) ?? null : null;
     // BOXSCORE-AN-PPS: dieselbe Sperre wie oben — s. docs/design/boxscore-an-pps.md.
     const arenaIndividualPpsForThisDiscipline =
       isBattleModeArenaEligible
         ? resolveOptions.arenaIndividualBoxscorePpsByDisciplineId?.get(disciplineId) ?? null
         : null;
+    // PPS-DUELL-BRUECKE (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md, Konzept
+    // battle-mode-20-spieltage-liga-mechanik-16-10.md Abschnitt 5): jede Battle-Seite OHNE
+    // Arena-Ergebnis, die ein Fixture hat, wird aus dem PPS-Score beider Seiten als Duell gewertet
+    // (2/1/0). Das ist der VERBINDLICHE Rueckfall — fuer nicht arena-aufgeloeste Disziplinen, fuer
+    // arena-aufgeloeste, deren Lauf scheiterte, und fuer solche, die die Abnahme nicht bestehen.
+    // Der Score ist derselbe, nach dem unten gerankt wird (nach Team-Power-Debuffs).
+    const legacyScorePlayerCountForThisDiscipline =
+      bucket.find((entry) => entry.legacyScorePlayerCount != null)?.legacyScorePlayerCount ?? null;
+    // PPS-Team-Score je Team (dieselbe Groesse, nach der unten gerankt wird) -- fuer die
+    // PPS-Duell-Bruecke SELBST (seiten der Bruecke sind exakt diese Werte) UND fuer das Niveau der
+    // 0-10-Normierung bei Konstantsummen-Disziplinen (Teil B, s. `KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS`).
+    const ppsScoreByTeamId = new Map(teamResultsAfterPowers.map((result) => [result.teamId, result.score] as const));
+    // MINI-DM-POD-RESOLVE (19.10.): die EINZIGE Disziplin, die hier als echte Vierergruppe statt als
+    // Zweier-Duell gewertet wird (Chris 14.09./19.10.) -- s. Kopfkommentar an mini-dm-pod-resolve.ts.
+    // Pods kommen aus genau derselben Quelle wie der Spielplan-Tab (`getMiniDmPodsForMatchday()`),
+    // damit die Wertung IMMER zu dem passt, was Chris im Spielplan angekuendigt sieht. Ein Pod, fuer
+    // den nicht alle vier Teams einen PPS-Score haben, liefert keine Overrides (s.
+    // `berechneMiniDmPodOverride`) -- seine Teams fallen unten defensiv auf die alte PPS-Duell-
+    // Bruecke (2-Team-Fixture) zurueck, statt gar nicht gewertet zu werden.
+    //
+    // OPUS-REVIEW-FUND (19.10., gegen tests/battle-mode-arena-resolve-engine.test.ts): etliche
+    // bestehende Tests bauen ein bewusst MINIMALES `GameState` (kein `season`, keine
+    // `disciplineSchedule`) und nutzen "mini-dm" nur als beliebige Platzhalter-Disziplin-ID fuer
+    // etwas ganz anderes (z. B. "ignoriert die Arena-Punkte-Map fuer eine Nicht-Basketball-
+    // Disziplin"). `getMiniDmPodsForMatchday()` liest `gameState.season.id` OHNE Schutz und wirft
+    // dort eine TypeError. Dieser Aufruf bleibt deshalb defensiv: ein Fehler beim Pod-Ermitteln
+    // bedeutet "kein Pod heute", NIE einen geworfenen Fehler -- exakt dieselbe Philosophie wie der
+    // Rest dieser Datei ("additiv, faellt bei fehlenden Daten auf das Bisherige zurueck").
+    let miniDmPodsForThisMatchday: ReturnType<typeof getMiniDmPodsForMatchday> = [];
+    if (isBattleModeArenaEligible && disciplineId === MINI_DM_DISCIPLINE_ID && base.gameState) {
+      try {
+        miniDmPodsForThisMatchday = getMiniDmPodsForMatchday(base.gameState, base.matchdayId, { saveId: base.saveId });
+      } catch {
+        miniDmPodsForThisMatchday = [];
+      }
+    }
+    // MINI-DM-FFA-VORRANG (PR 4 eines 6-PR-Opus-Plans, 21.10.): liegen fuer diese Disziplin
+    // FFA-Rohdaten vor (kein heutiger Aufrufer liefert sie -- das ist PR 5), versucht
+    // `berechneMiniDmPodOverrides()` sie ZUERST je Pod; fehlende/unvollstaendige Rohdaten fallen
+    // je Pod defensiv auf den bisherigen PPS-Pod-Pfad zurueck (s. Kommentar an der Funktion,
+    // mini-dm-pod-resolve.ts). `?? null` haelt diesen Zweig heute IMMER inaktiv.
+    const miniDmFfaRohdatenForThisDiscipline =
+      disciplineId === MINI_DM_DISCIPLINE_ID
+        ? resolveOptions.miniDmFfaPodRohdatenByDisciplineId?.get(disciplineId) ?? null
+        : null;
+    const miniDmPodOverridesForThisDiscipline =
+      miniDmPodsForThisMatchday.length > 0
+        ? berechneMiniDmPodOverrides({
+            pods: miniDmPodsForThisMatchday,
+            scoreByTeamId: ppsScoreByTeamId,
+            disciplineId,
+            playerCount: legacyScorePlayerCountForThisDiscipline,
+            ffaRohdatenByPodId: miniDmFfaRohdatenForThisDiscipline,
+          })
+        : null;
+    const ppsDuellOverridesForThisDiscipline = duellFixtureIndex
+      ? berechnePpsDuellOverrides({
+          fixtures: [...new Set(duellFixtureIndex.values())],
+          scoreByTeamId: ppsScoreByTeamId,
+          disciplineId,
+          playerCount: legacyScorePlayerCountForThisDiscipline,
+          ausgeschlosseneTeamIds: new Set([
+            ...(arenaOverridesForThisDiscipline?.keys() ?? []),
+            ...(miniDmPodOverridesForThisDiscipline?.keys() ?? []),
+          ]),
+        })
+      : null;
+    // PP-BUDGET (Teil A) + NIVEAU-REFERENZ (Teil B): einmal je Disziplin aufgeloest, nicht je Team.
+    const spielerPpReferenzFuerDiesesDisziplin = resolveSpielerPpReferenz(disciplineId, legacyScorePlayerCountForThisDiscipline);
+    const niveauIstKonstantsumme = KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS.has(disciplineId);
+    // OPUS-REVIEW PR #1296: fuer die Quelle "arena" ist in data/generated/verhaeltnis-referenz.json
+    // (Stand 19.10.) fuer KEINE Disziplin ein `niveau`-Block gezogen -- nur die Quelle "pps" traegt
+    // ihn (20/20). Ohne diesen Rueckfall stuende mu fuer jede arena-aufgeloeste Nicht-Konstantsummen-
+    // Disziplin (Showcase/Eiskunstlauf/Wettessen/Fechten/Takeshi's Castle) fest auf 0,5, das Ergebnis
+    // waere dort reine Funktion von D. Der PPS-Team-Score traegt IMMER echtes Niveau (s.
+    // Konstantsummen-Zweig) und hat eine gezogene Referenz -- also dieselbe Quelle wie dort, bis eine
+    // Arena-Niveau-Referenz gezogen ist. Die Sieger-Ordnungs-Garantie haengt davon nicht ab.
+    const niveauAusPps = niveauIstKonstantsumme || resolveNiveauReferenz("arena", disciplineId, legacyScorePlayerCountForThisDiscipline) == null;
     const teamResultsRanked = rankWithinLeagueScope(
       teamResultsAfterPowers,
       (result) => result.score,
@@ -778,11 +920,92 @@ export function buildLegacyMatchdayResolvePreview(
       base.gameState,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => {
       const arenaOverride = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      // MINI-DM-POD-RESOLVE (19.10.): nur gesetzt fuer `disciplineId === MINI_DM_DISCIPLINE_ID` --
+      // `ppsDuellOverridesForThisDiscipline` schliesst diese Team-IDs schon oben aus
+      // (`ausgeschlosseneTeamIds`), `ppsDuell` ist fuer ein Pod-Team deshalb IMMER `null`.
+      const miniDmPod = arenaOverride ? null : miniDmPodOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      const ppsDuell = arenaOverride || miniDmPod ? null : ppsDuellOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      // Ausgang dieses Duells aus Sicht DIESES Teams -- ein Arena-Override traegt ihn meistens schon
+      // (`arenaOverride.outcome`), sonst aus den gebuchten 2/1/0-Team-Punkten rekonstruiert (kg-
+      // Tiebreak bei Gewichtheben-Duellgleichstand zaehlt dadurch als knappster Sieg, nicht Remis).
+      const resolvedOutcome = arenaOverride
+        ? arenaOverride.outcome ?? outcomeAusPunkten(arenaOverride.teamPoints, 2 - arenaOverride.teamPoints)
+        : ppsDuell?.outcome ?? null;
+      // Verhaeltnis eines Arena-Duells aus seinem Seitenstand.
+      const arenaVerhaeltnis =
+        arenaOverride?.seiten != null && resolvedOutcome
+          ? berechneDuellVerhaeltnis({
+              quelle: "arena",
+              disciplineId,
+              playerCount: legacyScorePlayerCountForThisDiscipline,
+              seiten: arenaOverride.seiten,
+              outcome: resolvedOutcome,
+            })
+          : null;
+      const duellVerhaeltnis = arenaVerhaeltnis ?? ppsDuell;
+      // NIVEAU+MARGE 0-10-NORMIERUNG (Teil B): nur an Duell-Zeilen mit aufgeloestem Ausgang. Bei
+      // Konstantsummen-Disziplinen (Tennis/Speed-Schach/Gewichtheben/Spurt/Climbing/Staffel/
+      // Time-Trial) traegt der native Arena-Seitenwert kein Niveau (Summe strukturell ~konstant) --
+      // dort gilt stattdessen der PPS-Team-Score (`ppsScoreByTeamId`), der IMMER echtes Niveau
+      // traegt. Fuer PPS-Duell-Zeilen SIND die Seiten bereits PPS-Scores, keine Sonderbehandlung noetig.
+      const ergebnisNormiert: [number, number] | null =
+        duellVerhaeltnis && resolvedOutcome
+          ? (() => {
+              const quelleFuerNiveau = arenaOverride && !niveauAusPps ? "arena" : "pps";
+              const [eigenerRoh, gegnerRoh] =
+                arenaOverride && niveauAusPps
+                  ? [ppsScoreByTeamId.get(item.teamId) ?? 0, ppsScoreByTeamId.get(arenaOverride.opponentTeamId ?? "") ?? 0]
+                  : (arenaOverride?.seiten ?? ppsDuell?.seiten ?? [0, 0]);
+              return berechneErgebnisNormiert({
+                outcome: resolvedOutcome,
+                betrag: Math.abs(duellVerhaeltnis.verhaeltnis),
+                niveauEigen: eigenerRoh,
+                niveauGegner: gegnerRoh,
+                referenz: resolveNiveauReferenz(quelleFuerNiveau, disciplineId, legacyScorePlayerCountForThisDiscipline),
+              });
+            })()
+          : null;
+      // Ein Battle-Save ohne Duell fuer diese Seite (kein Fixture im Spielplan) bekommt KEINE
+      // Rangtabellen-Punkte mehr, sondern `null` + Warnung — laut statt still falsch. Ein
+      // Mini-DM-Pod-Team ist KEIN "ohne Duell"-Fall, auch wenn es weder Arena- noch PPS-Duell-
+      // Override traegt.
+      const battleOhneDuell = isBattleModeArenaEligible && !arenaOverride && !ppsDuell && !miniDmPod;
+      // SICHTBARE ARENA-AUSFÄLLE (Plan Abschnitt 3.2 Punkt 4, harte Auflage der Projektaufsicht):
+      // ein Arena-Override macht jeden Ausfall gegenstandslos (die Arena lief ja). Sonst gilt ein
+      // vom Aufrufer erklärter Grund. Liegt WEDER ein Override NOCH ein erklärter Grund vor, UND
+      // ist diese Disziplin arena-aufgelöst (`ARENA_RESOLVED_DISCIPLINE_IDS`), markiert die Engine
+      // das SELBST als `"nicht_ausgefuehrt"` — genau der heutige K1-Zustand (Auto-Run ruft die
+      // Arena nie auf, Plan Abschnitt 1.1): bis PR 3 den Arena-Vorlauf anbindet, trägt JEDE
+      // gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund. Das
+      // ändert NICHTS an `teamPoints`/`resolutionSource`/`pointSource` unten — die PPS-Duell-
+      // Brücke rechnet unverändert weiter, die Zeile ist nur zusätzlich markiert.
+      const arenaAusfall: ArenaAusfall | null = arenaOverride
+        ? null
+        : erklaerterArenaAusfallFuerDiesesDisziplin ??
+          (isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
+            ? { grund: "nicht_ausgefuehrt", zeitpunkt: nichtAusgefuehrtZeitpunkt, versuch: 1 }
+            : null);
       return {
         ...item,
         rank,
+        warnings:
+          duellVerhaeltnis?.warnings.length || miniDmPod?.warnings.length || battleOhneDuell || arenaAusfall
+            ? [
+                ...item.warnings,
+                ...(duellVerhaeltnis?.warnings ?? []),
+                ...(miniDmPod?.warnings ?? []),
+                ...(battleOhneDuell ? [`battle_mode_ohne_duell:${disciplineId}`] : []),
+                ...(arenaAusfall ? [`arena_ausgefallen:${arenaAusfall.grund}`] : []),
+              ]
+            : item.warnings,
         teamPoints: arenaOverride
           ? arenaOverride.teamPoints
+          : miniDmPod
+          ? miniDmPod.teamPoints
+          : ppsDuell
+          ? ppsDuell.teamPoints
+          : battleOhneDuell
+          ? null
           : getRankToPointsValue(
               // REVIEW-FIX (PR #930, 14.09.): `legacyScorePlayerCount` statt `score.requiredPlayers`
               // -- fuer Mini-DM ist `requiredPlayers` seit dieser PR fest 1 (Kader-/Pod-Zweck),
@@ -792,11 +1015,72 @@ export function buildLegacyMatchdayResolvePreview(
                 ?.legacyScorePlayerCount ?? item.entries.length,
               rank,
             ),
-        pointSource: arenaOverride ? "battle_mode_arena_win_draw_loss" : "rank_to_points_final_score_share",
-        resolutionSource: arenaOverride ? "arena" : "pps",
+        pointSource: arenaOverride
+          ? "battle_mode_arena_win_draw_loss"
+          : miniDmPod
+          ? "battle_mode_mini_dm_pod_platz"
+          : ppsDuell
+          ? "battle_mode_pps_duell_win_draw_loss"
+          : battleOhneDuell
+          ? "battle_mode_ohne_duell"
+          : "rank_to_points_final_score_share",
+        resolutionSource: arenaOverride ? "arena" : miniDmPod ? "mini_dm_pod" : ppsDuell ? "pps_duell" : "pps",
         arenaMatchSeed: arenaOverride ? arenaOverride.arenaMatchSeed : null,
         // "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A): s. `ArenaMomentEintrag`-Kommentar.
         momente: arenaOverride?.momente ?? null,
+        // Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+        // sequenziell+Reveal): die Gegner-Team-ID dieses Zwei-Team-Duells, nur gesetzt bei
+        // `resolutionSource === "arena"` -- die Bühne braucht sie, um Boards paarweise zu
+        // sequenzieren statt alle Teams im Gleichschritt zu enthüllen (s.
+        // DisciplineStageNativeArena.tsx, `prim === "lamps"`/`"klassen"`/`"stage"`). Ein
+        // Mini-DM-Pod hat KEINEN einzelnen Gegner (vier Teams, kein Zweier-Duell) -- bleibt `null`.
+        opponentTeamId: arenaOverride?.opponentTeamId ?? ppsDuell?.opponentTeamId ?? null,
+        // SICHTBARE ARENA-AUSFÄLLE: additiv wie `momente`/`arenaMatchSeed` -- nur gesetzt, nie
+        // außerhalb von Battle Mode bzw. außerhalb arena-aufgelöster Disziplinen (Manager-Mode-
+        // Vorschauen bleiben dadurch byte-identisch zum Stand vor dieser Ergänzung).
+        ...(arenaAusfall ? { arenaAusfall } : {}),
+        // PUNKTEVERHAELTNIS: nur an Duell-Zeilen — ausserhalb von Battle Mode entstehen hier keine
+        // neuen Schluessel (Manager-Mode-Vorschauen bleiben byte-identisch). `duellVerhaeltnis` ist
+        // fuer ein Mini-DM-Pod-Team immer `null` (kein `arenaOverride`/`ppsDuell`) -- dessen
+        // Verhaeltnis/Marge kommt stattdessen aus dem eigenen Zweig direkt darunter.
+        ...(duellVerhaeltnis
+          ? {
+              marge: duellVerhaeltnis.marge,
+              verhaeltnis: duellVerhaeltnis.verhaeltnis,
+              margeM90: duellVerhaeltnis.margeM90,
+              duellSeiten: arenaOverride?.seiten
+                ? ([arenaOverride.seiten[0], arenaOverride.seiten[1]] as [number, number])
+                : ppsDuell?.seiten ?? null,
+              ergebnisNormiert,
+            }
+          : {}),
+        // MINI-DM-POD-RESOLVE (19.10.): `marge`/`verhaeltnis` fuellen dieselbe Tiebreaker-Spalte wie
+        // ein normales Duell (Zero-Sum-Konstruktion, s. `berechneMiniDmPodOverride()`); `duellSeiten`/
+        // `ergebnisNormiert` bleiben bewusst `null` (ein Pod hat keinen einzelnen Gegner, s. oben) --
+        // die UI liest stattdessen `miniDmPod.wert` (0..10, N-Team-Normierung mit Ordnungsgarantie).
+        ...(miniDmPod
+          ? {
+              marge: miniDmPod.margeZumNaechstbesserenPlatz,
+              verhaeltnis: miniDmPod.verhaeltnis,
+              margeM90: null,
+              duellSeiten: null,
+              ergebnisNormiert: null,
+              miniDmPod: {
+                podId: miniDmPod.podId,
+                platz: miniDmPod.platz,
+                teamIds: miniDmPod.teamIds,
+                wert: miniDmPod.wert,
+                // PR 4 (21.10.): nur gesetzt, wenn `berechneMiniDmFfaPodOverride()` sie wirklich
+                // befuellt hat (`quelle: "ffa"`) -- der bisherige PPS-Pod-Pfad laesst `miniDmPod.quelle`
+                // `undefined`, dieser Zweig bleibt dadurch inert (kein neuer Schluessel im Objekt,
+                // `JSON.stringify` liesse `undefined`-Werte ohnehin weg -- hier zusaetzlich gar nicht
+                // erst erzeugt, s. Bit-Identitaets-Pflicht).
+                ...(miniDmPod.quelle
+                  ? { quelle: miniDmPod.quelle, rundenPunkteSumme: miniDmPod.rundenPunkteSumme, teilnahme: miniDmPod.teilnahme }
+                  : {}),
+              },
+            }
+          : {}),
       };
     });
 
@@ -825,14 +1109,50 @@ export function buildLegacyMatchdayResolvePreview(
           finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
           scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
         })),
+        // PP-BUDGET, REIN LEISTUNGSBASIERT (Teil A, Chris 19.10. -- ERSETZT den bisherigen
+        // PLAYER-LEVEL-FIX von hier, der fuer `"pps_duell"` das 2/1/0-Team-Budget per
+        // `teamPointsOverride` proportional unter den Spielern verteilte: "Ein guter Spieler im
+        // schlechten Verlierer-Team kann also trotzdem viele Punkte sammeln" -- der beste Spieler
+        // eines 0:2-Verlierers bekam vorher strukturell 0 PP, egal wie gut sein eigener Score war.
+        // `teamPointsOverride` bleibt deshalb IMMER `null`: weder Arena- noch PPS-Duell-Zeilen
+        // duerfen die Spieler-PP noch aus dem Team-Ausgang ableiten. Der eigentliche Ersatz
+        // (`ppAusSpielerScore()` aus `finalPlayerScore`) steht unten bei der
+        // `ppsDuellSpielerPpByPlayerId`-Map, analog zu `arenaIndividualPpsForThisDiscipline`.
+        teamPointsOverride: null,
       });
+
+      // PP-BUDGET (Teil A): fuer eine `"pps_duell"`-Zeile ersetzt `ppAusSpielerScore()` den
+      // Rang-Budget-Anteil von `distributedPoints` -- rein leistungsbasiert aus `finalPlayerScore`,
+      // komplett unabhaengig vom Team-Ausgang dieses Duells. Analog zu
+      // `arenaIndividualPpsForThisDiscipline` oben, nur fuer die PPS-Duell-Bruecke statt die Arena.
+      // Ausserhalb des `if (rankedTeam)`-Blocks berechnet, weil BEIDE Stellen sie brauchen, die hier
+      // unten gebaute `rawPlayerEntries`-Zeile (das, was `legacy-matchday-result-mapper.ts`
+      // tatsaechlich persistiert, s. `topPlayers`) UND `rankedTeam.entries` (die Live-Buehne) --
+      // "gezeigt == gebucht" gilt nur, wenn beide dieselbe Map lesen.
+      // OPUS-REVIEW PR #1297 (20.10.): `"mini_dm_pod"` gehoert hier dazu -- der Ledger leitet die
+      // Spieler-PP einer Pod-Zeile ueber `istDuellWertung()` ohnehin aus `ppAusSpielerScore()` ab
+      // (season-points-ledger.ts, `derivePlayerPointsForDuellGroup`). Ohne diesen Zweig fiel
+      // `pointsAwarded` (Live-Buehne, persistierter `scoreContribution`, MVP/Top-Spieler) fuer
+      // Mini-DM auf den alten Rangtabellen-Anteil von `distributedPoints` zurueck -- vor diesem PR
+      // war Mini-DM `"pps_duell"` und damit konsistent.
+      const ppsDuellSpielerPpByPlayerId =
+        rankedTeam?.resolutionSource === "pps_duell" || rankedTeam?.resolutionSource === "mini_dm_pod"
+          ? new Map(
+              rankedWithinTeam.map(({ entry }) => [
+                entry.playerId,
+                ppAusSpielerScore(scalePlayerScore(entry.finalContribution ?? entry.score ?? 0), spielerPpReferenzFuerDiesesDisziplin),
+              ] as const),
+            )
+          : null;
 
       if (rankedTeam) {
         // Battle Mode PR7: fuer ein Arena-Ergebnis bleibt `teamPoints`/`pointSource` beim 2/1/0-Wert
         // von oben — `distributeRankPointsToPlayers()` liefert hier trotzdem noch die individuellen
         // PPS-basierten `pointsAwarded` je Spieler, nur der TEAM-Wert darf nicht ueberschrieben
         // werden.
-        if (rankedTeam.resolutionSource !== "arena") {
+        // PPS-DUELL-BRUECKE: dasselbe gilt fuer ein PPS-Duell (`"pps_duell"`) — und in einem
+        // Battle-Save ueberhaupt fuer JEDE Zeile: dort darf die Rangtabelle nie Team-Punkte setzen.
+        if (rankedTeam.resolutionSource === "pps" && !isBattleModeArenaEligible) {
           rankedTeam.pointSource = distributedPoints.pointSource;
           rankedTeam.teamPoints = distributedPoints.teamPoints;
         }
@@ -852,10 +1172,24 @@ export function buildLegacyMatchdayResolvePreview(
           // Team-Punkte oben braucht diese Zahl keine vollstaendige Deckung der ganzen Seite: ein
           // einzelner nicht zuordenbarer Mitspieler faellt fuer sich selbst auf PPS zurueck, ohne
           // seine Teamkollegen zu beruehren).
-          const arenaPps = arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null;
+          //
+          // OPUS-REVIEW, PR 5 ("gezeigt != gebucht"-Randfall): `arenaIndividualPpsForThisDiscipline`
+          // ist bei Mini-DM NICHT pro Pod gezogen, sondern einmal fuer den GANZEN Spieltag
+          // (`arenaIndividualBoxscorePpsByDisciplineId.get("mini-dm")`, befuellt aus ALLEN Pods, die
+          // der Motor ueberhaupt lieferte). Faellt EIN Pod wegen eines fehlenden/unvollstaendigen
+          // Teams defensiv auf den PPS-Pod-Pfad zurueck (`miniDmPod.quelle` bleibt dann `undefined`),
+          // stehen dessen andere drei Teams trotzdem noch in dieser Map -- ohne die Absicherung unten
+          // wuerde ihr Arena-PP angewendet, waehrend ihr `miniDmPod`-Eintrag (Platz/Marge/Verhaeltnis)
+          // laengst aus der PPS-Rechnung kommt. Nur "arena" (die generischen Zweier-Duell-Disziplinen)
+          // ODER ein Mini-DM-Pod MIT `quelle === "ffa"` duerfen die Boxscore-PP tatsaechlich ziehen.
+          const arenaIndividualPpsGueltig =
+            rankedTeam.resolutionSource === "arena" ||
+            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa");
+          const arenaPps = arenaIndividualPpsGueltig ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null : null;
+          const ppsDuellPps = ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ?? null;
           return {
             ...entry,
-            pointsAwarded: arenaPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
+            pointsAwarded: arenaPps ?? ppsDuellPps ?? pointsByPlayerId.get(entry.playerId) ?? entry.pointsAwarded ?? null,
             arenaBoxscoreImpactApplied: arenaPps != null,
           };
         });
@@ -884,11 +1218,34 @@ export function buildLegacyMatchdayResolvePreview(
         teamPowerShare: entry.teamPowerShare ?? null,
         finalPlayerScore: scalePlayerScore(entry.finalContribution ?? entry.score ?? 0),
         scoreContribution: total > 0 ? scalePlayerScore(entry.finalContribution ?? entry.score ?? 0) / total : 0,
-        pointsAwarded: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? distributedPoints.entries[index]?.points ?? null,
+        // OPUS-REVIEW, PR 5 ("gezeigt != gebucht"-Randfall, s. ausfuehrlicher Kommentar oben an
+        // `rankedTeam.entries.map()`): dieselbe Absicherung hier, weil DIESE Zeile (nicht die oben)
+        // tatsaechlich persistiert wird (`legacy-matchday-result-mapper.ts`:
+        // `scoreContribution: player.pointsAwarded ?? player.scoreContribution`) und darueber in den
+        // Ledger geht -- ohne die Absicherung wuerde ein auf PPS zurueckgefallenes Mini-DM-Pod-Team
+        // trotzdem die Arena-Boxscore-PP eines ANDEREN, FFA-gewerteten Pods desselben Spieltags
+        // bekommen, nur weil beide ueber dieselbe spieltagsweite `arenaIndividualBoxscorePps`-Map
+        // laufen. `arenaIndividualPpsGueltigFuerDiesenSpieler` nutzt dieselbe Bedingung wie oben an
+        // `rankedTeam.entries.map()`, hier ueber ein `rankedTeam &&`-Boolean statt optionalem
+        // Verketten, damit TS `rankedTeam.miniDmPod` ohne weiteres `?.` narrowt.
+        pointsAwarded:
+          (rankedTeam &&
+          (rankedTeam.resolutionSource === "arena" ||
+            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa"))
+            ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId)
+            : null) ??
+          ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ??
+          distributedPoints.entries[index]?.points ??
+          null,
         pointSource: distributedPoints.pointSource,
         // BOXSCORE-AN-PPS: nur informativ (Debug/Anzeige) -- `pointsAwarded` oben ist die einzige
         // Stelle, an der der Boxscore-Impact tatsaechlich Punkte vergibt.
-        arenaBoxscoreImpactApplied: arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+        arenaBoxscoreImpactApplied: Boolean(
+          rankedTeam &&
+            (rankedTeam.resolutionSource === "arena" ||
+              (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa")) &&
+            arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
+        ),
         rankInTeam,
         rankInDiscipline: 0,
         isTop10: false,

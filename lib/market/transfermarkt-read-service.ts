@@ -51,6 +51,12 @@ export type TransfermarktDisciplineScore = {
   displayedScore?: number | null;
   ppsLastSeason: number | null;
   playerCount?: number | null;
+  /**
+   * Anzeige-Text zu `playerCount` (W4): bei einem Saison-Vorkommen identisch zur Zahl, bei zwei
+   * unterschiedlichen Vorkommen (Battle Mode, repeat=2) „4 · 6" (Hinrunde · Rückrunde) —
+   * s. `buildSeasonDisciplinePlayerCountDisplayMap`.
+   */
+  playerCountLabel?: string | null;
   teamRank?: number | null;
 };
 

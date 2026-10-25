@@ -1,5 +1,7 @@
 import type {
+  ArenaAusfall,
   DisciplineHighlightCandidate,
+  DisciplineResolutionSource,
   LegacyMatchdayResolvePreview,
   PlayerPerformancePreview,
   ResolveHighlightType,
@@ -70,10 +72,36 @@ export type DisciplineResultWritePayload = {
    */
   teamPoints: number | null;
   pointSource: string;
-  resolutionSource?: "pps" | "arena";
+  resolutionSource?: DisciplineResolutionSource;
   arenaMatchSeed?: string | null;
   /** "SPIEL DES TAGES" (Task #31 Paket 1, Klasse A) -- s. Kommentar an `DisciplineTeamResolvePreview.momente`. */
   momente?: ArenaMomentEintrag[] | null;
+  /** SICHTBARE ARENA-AUSFÄLLE -- s. Kommentar an `DisciplineTeamResolvePreview.arenaAusfall`. */
+  arenaAusfall?: ArenaAusfall | null;
+  /**
+   * PUNKTEVERHAELTNIS (docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md): nur an
+   * Duell-Zeilen gesetzt, s. `DisciplineTeamResolvePreview.marge`/`verhaeltnis`/`margeM90`.
+   */
+  opponentTeamId?: string | null;
+  marge?: number | null;
+  verhaeltnis?: number | null;
+  margeM90?: number | null;
+  duellSeiten?: [number, number] | null;
+  /** NIVEAU+MARGE 0-10-NORMIERUNG (Teil B, 19.10.) -- s. `DisciplineResultRecord.ergebnisNormiert`. */
+  ergebnisNormiert?: [number, number] | null;
+  /**
+   * MINI-DM-POD-RESOLVE (19.10.) -- s. `DisciplineResultRecord.miniDmPod` (olyDataTypes.ts).
+   * `quelle`/`rundenPunkteSumme`/`teilnahme` additiv seit PR 4 (Opus-Plan 21.10.).
+   */
+  miniDmPod?: {
+    podId: string;
+    platz: 1 | 2 | 3 | 4;
+    teamIds: readonly [string, string, string, string];
+    wert: number;
+    quelle?: "pps" | "ffa";
+    rundenPunkteSumme?: number;
+    teilnahme?: readonly boolean[];
+  } | null;
 };
 
 export type PlayerDisciplinePerformanceWritePayload = {
@@ -226,6 +254,29 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           resolutionSource: teamResult.resolutionSource,
           arenaMatchSeed: teamResult.arenaMatchSeed,
           momente: teamResult.momente,
+          // SICHTBARE ARENA-AUSFÄLLE: additiv wie `verhaeltnis` zwei Zeilen weiter unten -- der
+          // Schlüssel erscheint nur, wenn die Preview-Zeile tatsächlich einen Ausfall trägt. Ein
+          // unbedingtes `arenaAusfall: teamResult.arenaAusfall ?? null` (wie zuvor hier) hätte
+          // AUCH Manager-Mode-Zeilen (dort ist `arenaAusfall` nie gesetzt) ein neues Feld
+          // `arenaAusfall: null` eingeschrieben -- widerspricht dem Muster direkt darunter
+          // ("nur Duell-Zeilen tragen die Felder, Manager-Mode bleibt unveraendert").
+          ...(teamResult.arenaAusfall ? { arenaAusfall: teamResult.arenaAusfall } : {}),
+          // PUNKTEVERHAELTNIS: nur Duell-Zeilen tragen die Felder (Manager-Mode-Zeilen bleiben unveraendert).
+          ...(teamResult.verhaeltnis != null
+            ? {
+                opponentTeamId: teamResult.opponentTeamId ?? null,
+                marge: teamResult.marge ?? null,
+                verhaeltnis: teamResult.verhaeltnis,
+                margeM90: teamResult.margeM90 ?? null,
+                duellSeiten: teamResult.duellSeiten ?? null,
+                ergebnisNormiert: teamResult.ergebnisNormiert ?? null,
+              }
+            : {}),
+          // MINI-DM-POD-RESOLVE: eigener additiver Schluessel (nicht an `verhaeltnis != null`
+          // gekoppelt wie oben, weil ein Pod-Verhaeltnis fuer Platz 2/3 durchaus 0 sein kann, ohne
+          // dass das etwas ueber das Vorhandensein des Pods aussagt) -- nur gesetzt, wenn diese
+          // Zeile tatsaechlich aus einem Pod stammt.
+          ...(teamResult.miniDmPod ? { miniDmPod: teamResult.miniDmPod } : {}),
         };
       }),
   );

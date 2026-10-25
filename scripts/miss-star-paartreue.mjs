@@ -37,6 +37,7 @@ import path from "node:path";
 import {
   auswerten, ohneTorwart, hatTorwart, median, spannweite,
   ladeKaderFamilieAusDatei, baueSynthetischeKaderFamilie,
+  IST_STAFFEL_PAAR_SCHALTER, staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
 } from "./lib/rangtreue-messung.mjs";
 
 const WURZEL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,7 +46,11 @@ const KADERFAMILIE_PFAD = process.env.OLY_KADER_FAMILIE
   || path.join(WURZEL, "data/generated/kaderfamilie-live-save.json");
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
-const roheArgs = process.argv.slice(2);
+// --staffel-paare=zufall|alle|stufe:N (STAFFEL O7, 11.10., additiv, s. scripts/lib/rangtreue-messung.mjs):
+// Mess-Sonde fuer den Paar-Bonus. Ohne den Schalter unveraendertes Verhalten.
+const alleArgs = process.argv.slice(2);
+const STAFFEL_PAAR_SCHALTER = staffelPaarSchalterAusArgs(alleArgs);
+const roheArgs = alleArgs.filter((a) => !IST_STAFFEL_PAAR_SCHALTER(a));
 const SPIELE = Number(roheArgs[0] || 24);
 const DISZIPLINEN = roheArgs.slice(1);
 if (!DISZIPLINEN.length) {
@@ -130,6 +135,8 @@ try {
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(SEITE, { waitUntil: "domcontentloaded" });
   await seite.waitForFunction(() => window.__arena && window.__arena.disziplinProbe, null, { timeout: 30000 });
+  const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
+  if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
 
   let kaderFamilie, kaderQuelle;
   const geladen = ladeKaderFamilieAusDatei(KADERFAMILIE_PFAD);

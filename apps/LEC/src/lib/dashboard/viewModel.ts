@@ -1,6 +1,18 @@
 import type { SaleWindowKey } from "../parsing/date";
+import { cleanTitle } from "./board";
+import { HIGH_SELLER_QTY_365 } from "../pricing/classification";
+import { titleNameMismatch } from "../market/names";
+import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
-import { computeHk, computePriceCorridor, classifyPriceStatus, type ItemKind } from "../pricing/costEngine";
+import {
+  computeHk,
+  computePriceCorridor,
+  classifyPriceStatus,
+  computeShopVolume,
+  fixedCostPerUnit,
+  type ItemKind,
+  type ShopVolume,
+} from "../pricing/costEngine";
 import type { CostSettingsValues } from "../pricing/costSettings";
 
 export interface WindowAggregate {
@@ -11,6 +23,9 @@ export interface WindowAggregate {
   shippingCost: number;
   dbI: number;
   dbII: number;
+  /** Anteil der SHOPWEITEN Jahresfixkosten, der auf dieses Fenster entfaellt.
+   * NICHT in dbII enthalten -- DB II ist ein Deckungsbeitrag. DB III = dbII - fixedCostShare. */
+  fixedCostShare: number;
   avgPrice: number;
   rank: number | null;
 }
@@ -33,9 +48,22 @@ export interface ArticleAggregate {
    * (Repricing-Frage), nicht den historischen Durchschnitt.
    */
   currentVk: number | null;
+  /** Woher `currentVk` stammt: eBay-Shop (live, Vorrang) oder Billbee-Artikelstamm. */
+  vkSource?: "ebay" | "billbee" | null;
+  /** Stand des eBay-Preises, nur bei vkSource "ebay". */
+  vkAt?: Date | null;
+  /** eBay-Artikelnummer des Angebots (Shop-Abruf, sonst Verkaufsbericht), fuer den Link zum Angebot. */
+  ebayItemId?: string | null;
+  /** Kartenname laut Set-Code (YGOPRODeck), zum Pruefen des Titels. */
+  codeNameEn?: string | null;
+  codeNameDe?: string | null;
+  codeHint?: string | null;
   currentEk: number | null;
-  /** Cardmarket-Preistrend aus dem juengsten MarketPrice-Datensatz, sonst null ("—"). */
+  /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack-Menge) aus dem juengsten MarketPrice-Datensatz,
+   * sonst null ("—"), auch bei mehrdeutiger Seltenheit. */
   latestMarketTrend: number | null;
+  /** Juengster Cardmarket-Datensatz, fuer Zielspanne und Urteil vs. Markt (marketComparison.ts). */
+  marketQuote?: LatestQuote | null;
   windows: Partial<Record<SaleWindowKey, WindowAggregate>>;
 }
 
@@ -97,7 +125,9 @@ export interface SortimentRow {
   ek: number;
   /** Aktueller Listen-EK aus dem Artikelstamm-Export, rein informativ (Repricing), null falls unbekannt. */
   currentEk: number | null;
-  corridor: { min: number; good: number };
+  /** Vollkosten-Korridor MIN/GUT plus Deckungsbeitrags-Grenze `contribution` (VK, ab dem der Verkauf
+   * vor Fixkosten kein Geld mehr verliert). */
+  corridor: { min: number; good: number; contribution: number };
   /** Ampel-Status: vergleicht den AKTUELLEN Listen-VK (Fallback: realisierter Ø-VK, wenn kein
    * Artikelstamm-Preis vorliegt) gegen den Korridor. `"kein_ek"` (FIX 1) statt einem der drei
    * Korridor-Status, wenn `ekMissing` true ist -- der Korridor waere sonst auf Basis EK=0
@@ -111,6 +141,9 @@ export interface SortimentRow {
   dbIPerUnit: number;
   dbIIPerUnit: number;
   dbIIPercent: number;
+  /** DB III = DB II abzueglich Fixkostenanteil (Vollkosten-Ergebnis) je Stueck. */
+  dbIIIPerUnit: number;
+  dbIIIPercent: number;
   /** true = weder realisierter EK (Referenz-Fenster) noch aktueller Listen-EK bekannt
    * (FIX 1, KONZEPT §7.3/§8) -- betrifft laut Chris 747 aktive Artikel. Ohne diesen Flag
    * wuerde die App Phantom-Margen (dbI = Umsatz − 0) als echte Marge behandeln. */
@@ -125,8 +158,45 @@ export interface SortimentRow {
   potentialRevenue: number | null;
   /** Bestandsreichweite in Monaten (Stk / Verkaeufe pro Monat aus 90T), null ohne Bestand/Velocity. */
   stockMonthsCover: number | null;
-  /** Cardmarket-Preistrend (aus MarketPrice), null wenn noch nicht erfasst -> "—". */
+  /** Marktwert des Artikels (Cardmarket-7-Tage-Schnitt x Pack), null wenn nicht zugeordnet oder mehrdeutig -> "—". */
   priceTrend: number | null;
+  /** Woher `listingVk` stammt und wie frisch er ist: eBay-Shop (live) oder Billbee-Artikelstamm. */
+  listingVkSource: "ebay" | "billbee" | null;
+  listingVkAt: string | null;
+  /** eBay-Artikelnummer fuer den Link zum Angebot, null wenn unbekannt. */
+  ebayItemId: string | null;
+  /** Kartenname laut Set-Code; `mismatch` = der Titel nennt einen anderen Namen (Titel pruefen). */
+  codeName: { en: string | null; de: string | null; mismatch: boolean; hint: string | null; usedCode: string | null } | null;
+  /** Cardmarket-Marktwert, Zielspanne (25-33 % Deckungsbeitrag) und Urteil. Null ohne Datensatz. */
+  market: SortimentMarket | null;
+}
+
+export interface SortimentMarket {
+  /** Marktwert des Artikels; null, wenn mehrdeutig (dann `range`). */
+  value: number | null;
+  range: { min: number; max: number; variants: number } | null;
+  /** VK fuer 25 % (min) bis 33 % (opt) Deckungsbeitrags-Marge bei Marktwert-EK, mindestens 4,99 €. */
+  targetMin: number | null;
+  targetOpt: number | null;
+  /** Der Marktdeckel (teure Karten: selten mehr als 1,5-fach) hat die Spanne begrenzt. */
+  capped: boolean;
+  /** Nein = die 25-%-Marge ist bei realistischem Preis nicht erreichbar; der Markt gibt nicht mehr her. */
+  marginReachable: boolean;
+  /** Deckungsbeitrags-Marge des heutigen VK bei Nachkauf zum Marktwert. */
+  margin: number | null;
+  status: "zu_guenstig" | "im_korridor" | "zu_teuer";
+  /** Nur ein Urteil, wenn Marktwert (oder bei Spanne: fuer alle Varianten gleiches Urteil) vorliegt. */
+  rated: boolean;
+  quality: string | null;
+  how: string | null;
+  ekAboveMarket: boolean;
+  /** Letzter Einkaufspreis je Stueck und die Marge des heutigen VK damit (Gegenstueck zu `margin` = Wiederbeschaffung zum Marktwert). */
+  lastEk: number | null;
+  marginLastEk: number | null;
+  /** Hat sich zu (fast) diesem VK schon mehrfach verkauft: Urteil "zu teuer" entfaellt. */
+  provenByDemand: boolean;
+  soldAt: { qty: number; avg: number; days: 90 | 365 } | null;
+  fetchedAt: string;
 }
 
 export interface OperatingQuotas {
@@ -150,7 +220,7 @@ export interface RecommendationLotItem {
 export interface Recommendation {
   /** Stabile ID fuer clientseitiges "Ausblenden" (localStorage, /empfehlungen). */
   id: string;
-  kind: "ek_pflegen" | "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
+  kind: "ek_pflegen" | "daten_pruefen" | "auslisten" | "preis_anpassen" | "nachkaufen" | "lot_bilden";
   title: string;
   detail: string;
   effect: string;
@@ -178,6 +248,32 @@ export interface DashboardViewModel {
 
 function pct(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : numerator / denominator;
+}
+
+/**
+ * Shopweite 365-Tage-Stueckzahl (N) und Stueck ab Einschreiben-Schwelle (N_T) aus den
+ * Artikel-Aggregaten — dieselbe Quelle wie im Import (`importPlan.ts`): das "365"-Fenster,
+ * sonst "all" als Naeherung. EINE Zahl fuer den ganzen Shop; sie speist die Fixkosten-
+ * Umlage UND den Einschreiben-Satz in JEDEM Korridor (Dashboard, Sortiment, Marktpreise,
+ * Einstellungen), damit die App sich nicht selbst widerspricht.
+ * `null`, wenn kein Fenster mit Verkaeufen vorliegt (dann ist nichts umzulegen).
+ */
+export function shopVolumeFromAggregates(
+  articles: ArticleAggregate[],
+  costSettings: CostSettingsValues
+): ShopVolume | null {
+  const windowKey: SaleWindowKey | null = articles.some((a) => a.windows["365"])
+    ? "365"
+    : articles.some((a) => a.windows.all)
+      ? "all"
+      : null;
+  if (windowKey === null) return null;
+  const rows = articles
+    .map((a) => a.windows[windowKey])
+    .filter((w): w is WindowAggregate => !!w)
+    .map((w) => ({ qty: w.qty, avgPrice: w.avgPrice }));
+  const volume = computeShopVolume(rows, costSettings);
+  return volume.units365d > 0 ? volume : null;
 }
 
 export function buildDashboardViewModel(
@@ -296,6 +392,7 @@ function toMoverItem(a: ArticleAggregate, window: SaleWindowKey): MoverItem {
     ek: 0,
     dbI: 0,
     dbII: 0,
+    fixedCostShare: 0,
     ebayFeeTotal: 0,
     shippingCost: 0,
     avgPrice: 0,
@@ -391,7 +488,8 @@ function monthlyVelocity(a: ArticleAggregate): number {
 export function buildSortimentRow(
   a: ArticleAggregate,
   articleClass: ArticleClass,
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  shop: ShopVolume | null
 ): SortimentRow {
   const referenceAgg = a.windows["365"] ?? a.windows.all;
   // REALISIERTER Ø-VK/EK der Referenz-Periode -- Basis der Marge/DB, siehe
@@ -407,11 +505,20 @@ export function buildSortimentRow(
   const listingVk = a.currentVk !== null && a.currentVk > 0 ? a.currentVk : null;
   const vkForCorridor = listingVk ?? avgVkRealized;
 
+  // Shopweiter Fixkostenanteil (KONZEPT §7.3: HK-Bestandteil) -- NICHT 0: sonst enthielte der
+  // Korridor keine Fixkosten. Einschreiben haengt am VK (Schwelle), daher VK mit durchreichen.
   const hk = computeHk(
-    { ek: ekPerUnit, kind, packSize: a.packQty, fixedCostPerUnit: 0 },
+    {
+      ek: ekPerUnit,
+      kind,
+      packSize: a.packQty,
+      fixedCostPerUnit: fixedCostPerUnit(shop?.units365d ?? 0, costSettings),
+      vk: vkForCorridor > 0 ? vkForCorridor : null,
+      shop,
+    },
     costSettings
   );
-  const corridor = computePriceCorridor(hk.total, vkForCorridor || hk.total, costSettings);
+  const corridor = computePriceCorridor(hk, vkForCorridor || hk.total, costSettings, { kind, packSize: a.packQty, shop });
   const ekMissing = hasNoEkData(a);
   // FIX 1: Ohne EK ist der Korridor auf Basis EK=0 winzig (HK enthaelt praktisch nur
   // Versand/Gebuehren) -- der reale VK liegt dann fast immer "im Korridor" oder "ueber
@@ -427,6 +534,12 @@ export function buildSortimentRow(
   const dbIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbI / referenceAgg.qty : 0;
   const dbIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? referenceAgg.dbII / referenceAgg.qty : 0;
   const dbIIPercent = referenceAgg && referenceAgg.revenue > 0 ? referenceAgg.dbII / referenceAgg.revenue : 0;
+  // DB III = DB II - Fixkostenanteil (Vollkosten). DB II traegt bewusst KEINE
+  // Fixkosten, siehe importPlan.ts; erst DB III sagt, ob der Artikel seinen
+  // Anteil an Shop, Billbee, Lexoffice, Raumkosten und Lizenzen traegt.
+  const dbIII = referenceAgg ? referenceAgg.dbII - referenceAgg.fixedCostShare : 0;
+  const dbIIIPerUnit = referenceAgg && referenceAgg.qty > 0 ? dbIII / referenceAgg.qty : 0;
+  const dbIIIPercent = referenceAgg && referenceAgg.revenue > 0 ? dbIII / referenceAgg.revenue : 0;
 
   const windowMetrics: SortimentRow["windows"] = {};
   for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
@@ -438,6 +551,32 @@ export function buildSortimentRow(
   const velocityPerMonth = monthlyVelocity(a);
   const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
 
+  // Cardmarket-Marktwert und Zielspanne: dieselbe Zeile wie auf /marktpreise (eine Rechnung, keine zweite).
+  let marketInfo: SortimentMarket | null = null;
+  if (a.marketQuote) {
+    const m = buildMarketComparisonRow(a, a.marketQuote, costSettings, shop);
+    marketInfo = {
+      value: m.marketValue,
+      range: m.marketRange,
+      targetMin: m.targetMin,
+      targetOpt: m.targetOpt,
+      capped: m.capped,
+      marginReachable: m.marginReachable,
+      margin: m.marginAtMarket,
+      status: m.status,
+      // Urteil nur mit Marktwert; bei Spanne nur, wenn die Ampel fuer JEDE Variante anschlaegt.
+      rated: m.marketValue !== null || (m.marketRange !== null && m.status !== "im_korridor"),
+      quality: m.matchQuality,
+      how: m.how,
+      ekAboveMarket: m.ekAboveMarket,
+      lastEk: m.lastEk,
+      marginLastEk: m.marginAtLastEk,
+      provenByDemand: m.provenByDemand,
+      soldAt: m.soldAtVk,
+      fetchedAt: m.fetchedAt.toISOString(),
+    };
+  }
+
   return {
     articleId: a.articleId,
     nameRaw: a.nameRaw,
@@ -448,13 +587,15 @@ export function buildSortimentRow(
     listingVk,
     ek: ekPerUnit,
     currentEk: a.currentEk,
-    corridor: { min: corridor.vkMin, good: corridor.vkGood },
+    corridor: { min: corridor.vkMin, good: corridor.vkGood, contribution: corridor.vkContribution },
     priceStatus,
     articleClass,
     classLabel: LABELS_DE[articleClass],
     dbIPerUnit,
     dbIIPerUnit,
     dbIIPercent,
+    dbIIIPerUnit,
+    dbIIIPercent,
     ekMissing,
     windows: windowMetrics,
     active: a.active,
@@ -462,6 +603,20 @@ export function buildSortimentRow(
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,
     priceTrend: a.latestMarketTrend,
+    listingVkSource: a.currentVk !== null && a.currentVk > 0 ? (a.vkSource ?? null) : null,
+    listingVkAt: a.vkAt ? a.vkAt.toISOString() : null,
+    ebayItemId: a.ebayItemId ?? null,
+    codeName:
+      a.codeNameEn || a.codeNameDe
+        ? {
+            en: a.codeNameEn ?? null,
+            de: a.codeNameDe ?? null,
+            hint: a.codeHint ?? null,
+            usedCode: a.marketQuote?.usedCode ?? null,
+            mismatch: titleNameMismatch(cleanTitle(a.nameRaw).name, { en: a.codeNameEn ?? null, de: a.codeNameDe ?? null }),
+          }
+        : null,
+    market: marketInfo,
   };
 }
 
@@ -477,6 +632,7 @@ export function buildFullSortiment(
   costSettings: CostSettingsValues
 ): SortimentRow[] {
   const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
+  const shop = shopVolumeFromAggregates(articles, costSettings);
   return [...articles]
     .sort((a, b) => {
       const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);
@@ -488,7 +644,7 @@ export function buildFullSortiment(
         (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
       );
     })
-    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings));
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop));
 }
 
 /** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
@@ -503,6 +659,7 @@ export const LABELS_DE: Record<ArticleClass, string> = {
 
 const RECOMMENDATION_KIND_PRIORITY: Record<Recommendation["kind"], number> = {
   ek_pflegen: -1,
+  daten_pruefen: -1,
   auslisten: 0,
   preis_anpassen: 1,
   nachkaufen: 2,
@@ -553,9 +710,67 @@ export function buildRecommendations(
     });
   }
 
+  // Daten pruefen: Auffaelligkeiten, die eher ein Eingabefehler sind als ein echtes Preisproblem.
+  // Sie stehen vor den €-Empfehlungen, weil sie deren Urteil verfaelschen (Chris: ein falscher Code
+  // macht aus einer 0,32-€-Karte eine 27-€-Karte und damit eine "krass zu guenstige" Abweichung).
+  for (const s of sortiment) {
+    if (!s.active) continue;
+    const revenue90 = s.windows["90"]?.revenue ?? 0;
+    const qty365 = s.windows["365"]?.qty ?? 0;
+    if (s.codeName?.mismatch) {
+      const was = s.codeName.de ?? s.codeName.en ?? "eine andere Karte";
+      recommendations.push({
+        id: `daten_pruefen:code:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: Name und Code passen nicht zusammen.`,
+        detail:
+          `Der Code ${s.setCode ?? "?"} gehört zu „${was}“.` +
+          (s.codeName.hint ? ` Zum Namen im Titel passt: ${s.codeName.hint}.` : "") +
+          (s.codeName.usedCode ? ` Marktwert gilt für ${s.codeName.usedCode} (Name wird als richtig angenommen).` : " Ohne eindeutigen Code gibt es keinen Marktwert und kein Preisurteil."),
+        effect: "Code in Billbee und bei eBay korrigieren",
+        effectValue: Math.max(1, revenue90),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+      continue;
+    }
+    // Topseller mit negativer Marge: nicht auslisten, sondern EK/Preis pruefen.
+    if (qty365 >= HIGH_SELLER_QTY_365 && s.dbIIPercent < 0) {
+      recommendations.push({
+        id: `daten_pruefen:marge:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: ${qty365} Verkäufe im Jahr, aber negative Marge.`,
+        detail: `DB II ${(s.dbIIPercent * 100).toFixed(0)} % bei Ø-VK ${s.avgVkRealized.toFixed(2)} € und EK ${(s.ek).toFixed(2)} €. Ein Bestseller macht selten Verlust: EK im Artikelstamm und Preis prüfen, nicht auslisten.`,
+        effect: `DB II ≈ ${(s.dbIIPerUnit * qty365).toFixed(0)} € in 365 T`,
+        effectValue: Math.max(1, Math.abs(s.dbIIPerUnit * qty365)),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+      continue;
+    }
+    // Stueckzahlen, die keine ganzen Zahlen sind, kommen bei Einzelkarten nicht vor.
+    const fractional = (["30", "90", "365"] as const).some((w) => {
+      const q = s.windows[w]?.qty;
+      return q !== undefined && Math.abs(q - Math.round(q)) > 1e-9;
+    });
+    if (fractional) {
+      recommendations.push({
+        id: `daten_pruefen:menge:${s.articleId}`,
+        kind: "daten_pruefen",
+        title: `${shortName(s.nameRaw)}: krumme Stückzahl in den Verkäufen.`,
+        detail: "Eine Karte wird nicht in Bruchteilen verkauft. Bestellungen oder Pack-Zuordnung in Billbee prüfen.",
+        effect: "Verkaufszahlen unsicher",
+        effectValue: Math.max(1, revenue90),
+        linkQuery: s.setCode ?? s.nameRaw,
+      });
+    }
+  }
+
   // Auslisten: JEDER Low-Runner (nicht nur der schlechteste einzelne Fall).
   // effectValue = |Lebenszeit-DB II| -- bereits eine "€ gesamt"-Groesse (Fix 4 unveraendert).
   for (const c of classified.filter((c) => c.articleClass === "low_runner")) {
+    // Deckt der AKTUELLE Preis die Kosten (VK ueber der Deckungsbeitrags-Grenze), war der Verlust
+    // historisch (alter Preis oder alter EK): kein Auslisten empfehlen.
+    const row = sortimentByArticleId.get(c.article.articleId);
+    if (row && row.listingVk !== null && row.listingVk >= row.corridor.contribution) continue;
     const dbIILifetime = c.article.windows.all?.dbII ?? 0;
     recommendations.push({
       id: `auslisten:${c.article.articleId}`,
@@ -569,7 +784,9 @@ export function buildRecommendations(
   }
 
   // Preis anpassen: JEDER Artikel unter dem MIN-Korridor (kein_ek-Artikel fallen hier
-  // automatisch raus, siehe SortimentRow.priceStatus/FIX 1).
+  // automatisch raus, siehe SortimentRow.priceStatus/FIX 1). "ziel_unerreichbar" ist bewusst
+  // NICHT dabei: dort liegt die Marge schon vor Fixkosten unter dem Ziel, "VK anheben" bis MIN
+  // waere kein sinnvoller Handlungsvorschlag, sondern Dauerrauschen (Signal ohne Aussage).
   // FIX 4: effectValue = Preis-Luecke/Stk x Hebel (max. aus Bestand ODER 90T-Velocity) --
   // "€ gesamt", NICHT mehr €/Stk. Der Hebel ist bewusst das Maximum aus Bestand (koennte man
   // sofort umpreisen) und 90T-Absatz (wird ohnehin in den naechsten ~3 Monaten verkauft),
@@ -579,6 +796,10 @@ export function buildRecommendations(
     const gap = s.corridor.min - alertVk;
     const qty90 = s.windows["90"]?.qty ?? 0;
     const lever = Math.max(s.stock, qty90);
+    // Nur wo es Nachfrage (mind. 3 Verkaeufe im Jahr oder 1 im Quartal) oder Bestand gibt: bei hunderten
+    // "zu guenstig"-Karten ohne Verkaeufe und ohne Bestand waere das reines Rauschen.
+    const qty365 = s.windows["365"]?.qty ?? 0;
+    if (!(qty365 >= 3 || s.stock >= 1 || qty90 >= 1) || s.codeName?.mismatch) continue;
     const effectValue = gap * lever;
     recommendations.push({
       id: `preis_anpassen:${s.articleId}`,
@@ -656,6 +877,10 @@ export function buildRecommendations(
     const aIsEkPflegen = a.kind === "ek_pflegen";
     const bIsEkPflegen = b.kind === "ek_pflegen";
     if (aIsEkPflegen !== bIsEkPflegen) return aIsEkPflegen ? -1 : 1;
+    // Daten pruefen (Eingabefehler) vor den €-Empfehlungen, untereinander nach Umsatz-Gewicht.
+    const aIsData = a.kind === "daten_pruefen";
+    const bIsData = b.kind === "daten_pruefen";
+    if (aIsData !== bIsData) return aIsData ? -1 : 1;
     const diff = Math.abs(b.effectValue) - Math.abs(a.effectValue);
     if (diff !== 0) return diff;
     return RECOMMENDATION_KIND_PRIORITY[a.kind] - RECOMMENDATION_KIND_PRIORITY[b.kind];

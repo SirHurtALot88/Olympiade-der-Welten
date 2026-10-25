@@ -5,7 +5,7 @@ import { buildPlayerSeasonAwards } from "@/lib/foundation/player-season-awards";
 import { istZustandUnbekannt } from "@/lib/foundation/antwort-als-json";
 import dynamic from "next/dynamic";
 
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { ArenaVorlaufStatus, GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
 import { useArenaRoomSync } from "@/lib/room/use-arena-room-sync";
 import type { RoomArenaState } from "@/types/game";
@@ -43,6 +43,8 @@ import DisciplineStageHighlights from "@/app/foundation/discipline-stage/Discipl
 import { SPIELTAGS_TOPSPIELER_LIMIT } from "@/lib/foundation/discipline-stage/discipline-stage-matchday-top-players";
 import DisciplineStageTopPlayers, { type DisciplineStageTopPlayer } from "@/app/foundation/discipline-stage/DisciplineStageTopPlayers";
 import { getRankToPointsValue, resolveDisciplinePlayerCount } from "@/lib/resolve/rank-to-points";
+import { istDuellWertung } from "@/lib/resolve/battle-mode-pps-duell";
+import { ermittleSpielerHoehe } from "@/lib/player-generator/provisional-height";
 import DisciplineStageNativeArena, { type StagePrimitive, type StageMotif, type StageEnv, type StageLiveResultsByTeam } from "@/app/foundation/discipline-stage/arena/DisciplineStageNativeArena";
 import type { DisciplineStageDrawerTarget } from "@/app/foundation/discipline-stage/DisciplineStageDrawer";
 // PERF: Der Drawer (~1.300 Zeilen) zeigt bis zum ersten Team-/Spieler-Klick nichts an
@@ -302,7 +304,14 @@ const SLOT_VOCAB: Record<string, string[]> = {
   tdm: ["Opener", "Trader", "Anchor", "Lurker", "Closer"],
   // Szenen ohne definierte SLOTS — thematischer Fallback:
   battlefield: ["Ansturm", "Flanke", "Verteidigung", "Belagerung", "Sturm-Finale"],
-  "mini-dm": ["Runde 1", "Runde 2", "Runde 3", "Runde 4", "Runde 5"],
+  // Rollen-Klartext statt generischer "Runde N" (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-
+  // Anzeige"): dieselben sechs Rollen-Themen wie `MINI_DM_FFA_ROLLEN6`
+  // (lib/resolve/mini-dm-pod-resolve.ts) / `DISCIPLINE_ROLE_THEMES["mini-dm"]`
+  // (lib/lineups/matchday-slot-roles.ts), in exakt derselben Reihenfolge -- Mini-DM spielt seit
+  // der 2-6-Spieler-Rueckkehr (21.10.) variabel k=2..6 Runden statt fest vier, s. SLOT_VOCAB-
+  // Kommentar oben zu gewichtheben/climbing fuer dasselbe Muster (6 explizite Namen statt des
+  // generischen "Etappe N"-Rueckfalls ab dem letzten Index).
+  "mini-dm": ["Frontliner", "Finisher", "Trick Fighter", "Iron Guard", "Chaos Driver", "Last Hit"],
   "i-spy": ["Erster Fund", "Zweiter Fund", "Dritter Fund", "Vierter Fund", "Fünfter Fund", "Letzter Fund"],
 };
 
@@ -701,6 +710,28 @@ export default function DisciplineStageArena({
     return map;
   }, [gameState?.players]);
 
+  /**
+   * Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully, Chris 13.10. — docs/design/
+   * chris-feedback-breite-runde-13-10.md Abschnitt "Basketball" Punkt 21 / "Eishockey" Punkt
+   * 24): „die 2 größten Spieler oder die 'Centers'" sollen den Sprungball/Bully ausführen —
+   * dafür braucht die Arena eine Körpergröße je Spieler. `attributeSheetStats.height` ist bei
+   * vielen (insb. älteren) Spielern noch `null` (echte Werte kommen erst später von Chris, s.
+   * `lib/player-generator/provisional-height.ts`); `ermittleSpielerHoehe` ist dafür der EINZIGE
+   * vorgesehene sichere Zugriffspfad (echte Height, sonst Rasse/Subklassen-Schätzung) — betrifft
+   * NICHT die gesperrte Eignungsmatrix (`official-discipline-weights.ts`), height ist dort kein
+   * Attribut.
+   */
+  const playerHeightById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const player of gameState?.players ?? []) {
+      map.set(
+        player.id,
+        ermittleSpielerHoehe(player.attributeSheetStats?.height ?? null, player.race, player.subclasses),
+      );
+    }
+    return map;
+  }, [gameState?.players]);
+
   // Kanonische Ratings (OVR/Rang/PP/MVS) je Spieler für Drawer, Hover-Vorschau, Chips
   // und Star-Rahmen — EINMAL je gameState memoisiert.
   //
@@ -727,6 +758,17 @@ export default function DisciplineStageArena({
 
   // Echte Resolve-Preview der Arena laden (nur wenn Matchday-Kontext vorhanden).
   const [preview, setPreview] = useState<LegacyMatchdayResolvePreview | null>(null);
+  /**
+   * ARENA-VORLAUF-STATUS, NUR FUERS NACHLADEN (Latenz-Fix 18.10., Chris' Top-Prio-Meldung "das darf
+   * nicht passieren ... muss direkt starten"): `/api/matchday/arena-base` liefert seit PR 3
+   * (K1) ein `arenaVorlauf`-Feld (`{status, disziplinen}`), das diese Komponente bisher komplett
+   * ignorierte. Die Buehne zeigte dadurch sofort die SCHNELLE PPS-Duell-Vorschau (kein Chromium im
+   * Request, s. `loadMatchdayArenaBase()`), aber NIE automatisch die echten Arena-Duell-Zeilen,
+   * sobald der Hintergrund-Vorlauf fertig wurde -- nur ein manueller Reload half. `previewState`
+   * bleibt bewusst UNBERUEHRT davon (kein Spinner, kein Blockieren): die Buehne startet weiter
+   * sofort, dieses Feld steuert nur den stillen Nachlade-Poll unten und den kleinen Hinweis-Badge.
+   */
+  const [arenaVorlaufStatus, setArenaVorlaufStatus] = useState<ArenaVorlaufStatus | null>(null);
   const [briefingItems, setBriefingItems] = useState<
     { teamId: string; currentRank: number | null; projectedRank: number | null }[]
   >([]);
@@ -792,6 +834,7 @@ export default function DisciplineStageArena({
             resolvePreview?: { preview?: unknown } | null;
             briefingStandings?: { items?: unknown } | null;
             standingsPreview?: { items?: unknown } | null;
+            arenaVorlauf?: { status?: ArenaVorlaufStatus | null } | null;
           }>(sessionKey);
     if (cached) {
       const cachedPreview = (cached.resolvePreview?.preview ?? null) as typeof preview;
@@ -799,6 +842,7 @@ export default function DisciplineStageArena({
       setBriefingItems(Array.isArray(cached.briefingStandings?.items) ? (cached.briefingStandings.items as MatchdayPanelStandingRow[]) : []);
       setStandingsItems(Array.isArray(cached.standingsPreview?.items) ? (cached.standingsPreview.items as MatchdayPanelStandingRow[]) : []);
       setPreviewState(cachedPreview ? "ready" : "unavailable");
+      setArenaVorlaufStatus(cached.arenaVorlauf?.status ?? null);
       return;
     }
 
@@ -821,6 +865,7 @@ export default function DisciplineStageArena({
         setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
         setStandingsItems(Array.isArray(payloadJson?.standingsPreview?.items) ? payloadJson.standingsPreview.items : []);
         setPreviewState(enginePreview ? "ready" : "unavailable");
+        setArenaVorlaufStatus(payloadJson?.arenaVorlauf?.status ?? null);
       })
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -828,10 +873,116 @@ export default function DisciplineStageArena({
           setBriefingItems([]);
           setStandingsItems([]);
           setPreviewState("unavailable");
+          setArenaVorlaufStatus(null);
         }
       });
     return () => controller.abort();
   }, [saveId, seasonId, matchdayId, ownTeamId, previewReloadNonce, lineupRevision]);
+
+  /**
+   * STILLER NACHLADE-POLL (Latenz-Fix 18.10.): solange `arenaVorlaufStatus === "in_progress"`,
+   * fragt die Buehne denselben Endpunkt in kurzem Abstand erneut ab — OHNE `previewState`
+   * anzuruehren (kein Spinner, kein Re-Mount, die bereits gezeigte PPS-Duell-Vorschau bleibt
+   * stehen). Sobald der Vorlauf "ready"/"failed" meldet (oder der Server gar keinen Vorlauf mehr
+   * kennt, `null`), ersetzt genau EIN leiser Refresh die Vorschau durch die dann echten
+   * Arena-Duell-Zeilen — der Spieler sieht den Sprung, aber nie ein Laden/Warten davor. Zaehlt NUR
+   * Versuche, keine Wanduhr: `ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE` deckt denselben Worst-Case
+   * (zwei automatische Versuche je Disziplin, zwei Disziplinen seriell hinter dem Chromium-
+   * Semaphor, grosszuegige Reserve) wie `ARENA_VORLAUF_POLL_MAX_VERSUCHE` beim Buchen
+   * (`use-foundation-shell-router-body-scope.tsx`) — nur mit kuerzerem Intervall, weil hier
+   * niemand auf einen Buchungs-Klick wartet, der Poll also ruhig oefter, aber leiser nachsehen darf.
+   */
+  useEffect(() => {
+    if (arenaVorlaufStatus !== "in_progress" || !saveId || !seasonId || !matchdayId) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    let versuch = 0;
+    const ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS = 4_000;
+    const ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE = 225; // ~15 Minuten Reserve, s. Kommentar oben.
+
+    const sessionKey = buildMatchdayArenaBaseSessionKey({
+      saveId,
+      seasonId,
+      matchdayId,
+      teamId: ownTeamId ?? "",
+      source: "sqlite",
+      includeDetails: true,
+      lineupRevision,
+    });
+    const basisParams = { saveId, seasonId, matchdayId, teamId: ownTeamId ?? "", source: "sqlite" };
+    // OPUS-REVIEW PR #1290: der STATUS-Poll fragt OHNE Details (`arenaVorlauf` liefert die Route
+    // unabhaengig davon) -- waehrend genau dieser Wartezeit rechnen auf dem 2-vCPU-CX23 bis zu zwei
+    // Chromium-Prozesse, und ein voller Detail-Payload (Resolve-Vorschau 32 Teams + Tabelle) alle 4s
+    // je offenem Tab nimmt ihnen nur CPU weg. Die Details holt GENAU EIN Abruf, sobald der Vorlauf
+    // terminal ist.
+    const statusQuery = new URLSearchParams({ ...basisParams, includeDetails: "0" });
+    const detailQuery = new URLSearchParams({ ...basisParams, includeDetails: "1" });
+    const holeJson = async (query: URLSearchParams) => {
+      const res = await fetch(`/api/matchday/arena-base?${query.toString()}`, { cache: "no-store", signal: controller.signal });
+      // OPUS-REVIEW PR #1290: eine Nicht-OK-Antwort (502 waehrend eines Deploys, 500 unter Last)
+      // ist VORUEBERGEHEND, kein terminaler Zustand -- vorher wurde sie wie "Server kennt keinen
+      // Vorlauf" behandelt und beendete den Poll fuer immer; die Arena-Zeilen kamen dann nie.
+      if (!res.ok) throw new Error(`arena-base ${res.status}`);
+      return res.json();
+    };
+    const naechsterVersuchOderAufgeben = () => {
+      if (versuch < ARENA_VORLAUF_STAGE_POLL_MAX_VERSUCHE) {
+        timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+      } else {
+        // Worst-Case-Budget ausgeschoepft -- server-seitig B1/B2 (arena-vorlauf-service.ts)
+        // haetten den Lauf laengst terminal gemacht. Aufgeben statt endlos weiterzufragen; der
+        // Hinweis-Badge verschwindet damit ebenfalls (vorher blieb er im Fehlerzweig stehen).
+        setArenaVorlaufStatus(null);
+      }
+    };
+
+    const pollEinmal = async () => {
+      versuch += 1;
+      try {
+        const statusJson = await holeJson(statusQuery);
+        if (controller.signal.aborted) return;
+        const nextStatus: ArenaVorlaufStatus | null = statusJson?.arenaVorlauf?.status ?? null;
+        if (nextStatus === "in_progress") {
+          naechsterVersuchOderAufgeben();
+          return;
+        }
+        // Fertig ("ready"/"failed") ODER der Server kennt gar keinen Vorlauf mehr (z. B. nach
+        // einer Buchung, die den Record abgeloest hat) -- genau EIN leiser Uebernahme-Schritt.
+        const payloadJson = await holeJson(detailQuery);
+        if (controller.signal.aborted) return;
+        const detailStatus: ArenaVorlaufStatus | null = payloadJson?.arenaVorlauf?.status ?? null;
+        if (detailStatus === "in_progress") {
+          // Zwischen den zwei Abrufen ist ein NEUER Vorlauf angelaufen (z. B. erzwungener Versuch
+          // nach einer Eingabe-Divergenz). Weiter pollen -- ein `setArenaVorlaufStatus("in_progress")`
+          // waere hier ein No-op ohne Re-Render, der Effekt liefe nie wieder an.
+          naechsterVersuchOderAufgeben();
+          return;
+        }
+        if (payloadJson?.context) {
+          setMatchdayArenaBaseBundle(sessionKey, payloadJson);
+        }
+        const enginePreview = payloadJson?.resolvePreview?.preview ?? null;
+        if (enginePreview) {
+          setPreview(enginePreview);
+          setBriefingItems(Array.isArray(payloadJson?.briefingStandings?.items) ? payloadJson.briefingStandings.items : []);
+          setStandingsItems(Array.isArray(payloadJson?.standingsPreview?.items) ? payloadJson.standingsPreview.items : []);
+        }
+        setArenaVorlaufStatus(detailStatus);
+      } catch {
+        // Netzwerk-/HTTP-Fehler: nicht hart scheitern lassen, der naechste Tick versucht es
+        // erneut -- die bereits gezeigte Vorschau bleibt in jedem Fall stehen.
+        if (controller.signal.aborted) return;
+        naechsterVersuchOderAufgeben();
+      }
+    };
+
+    let timerRef = window.setTimeout(() => void pollEinmal(), ARENA_VORLAUF_STAGE_POLL_INTERVAL_MS);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timerRef);
+    };
+  }, [arenaVorlaufStatus, saveId, seasonId, matchdayId, ownTeamId, lineupRevision]);
 
   const engineDiscipline = useMemo(
     () => preview?.disciplinePreviews.find((d) => d.disciplineId === disciplineId) ?? null,
@@ -1055,6 +1206,13 @@ export default function DisciplineStageArena({
       const engineTeamPoints = new Map(
         (dp.teamResults ?? []).map((tr) => [tr.teamId, Number.isFinite(tr.teamPoints ?? NaN) ? (tr.teamPoints as number) : null] as const),
       );
+      // BATTLE-DUELLE (Arena oder PPS-Duell-Bruecke, 16.10.): die Engine hat 2/1/0 je Fixture
+      // gebucht — die Rangtabelle hier wuerde stattdessen bis 19,9 Punkte fuer Rang 1 anzeigen.
+      // Dann zeigt die Buehne GENAU die gebuchte Zahl.
+      if ((dp.teamResults ?? []).some((tr) => istDuellWertung(tr))) {
+        for (const tr of dp.teamResults ?? []) map.set(tr.teamId, engineTeamPoints.get(tr.teamId) ?? 0);
+        return map;
+      }
       const scoring = (dp.teamResults ?? [])
         .map((tr) => ({ teamId: tr.teamId, score: Number.isFinite(tr.score) ? tr.score : 0 }))
         .filter((tr) => tr.score > 0)
@@ -1078,6 +1236,25 @@ export default function DisciplineStageArena({
     };
     const d1PointsByTeam = placementPointsForSide(d1, "d1");
     const d2PointsByTeam = placementPointsForSide(d2, "d2");
+    // B4 (Opus-Review, PR 3/K1): „PPS-Wertung — Arena ausgefallen: <Grund>" je Team UND
+    // Disziplin-Seite -- PR1 setzt `arenaAusfall` direkt auf dem TeamResult DER AUSGEFALLENEN
+    // Disziplin (legacy-matchday-resolve-engine.ts), nicht auf dem aggregierten
+    // `preview.teamResults`. Dieselbe `disciplinePreviews`-Suche wie `placementPointsForSide`,
+    // nur fuer dieses eine Feld statt fuer die Punkte.
+    const arenaAusfallGrundForSide = (
+      discipline: { disciplineId: string; displayName: string } | null,
+    ): Map<string, string> => {
+      const map = new Map<string, string>();
+      if (!discipline) return map;
+      const dp = (preview.disciplinePreviews ?? []).find((entry) => entry.disciplineId === discipline.disciplineId);
+      if (!dp) return map;
+      for (const tr of dp.teamResults ?? []) {
+        if (tr.arenaAusfall?.grund) map.set(tr.teamId, tr.arenaAusfall.grund);
+      }
+      return map;
+    };
+    const d1ArenaAusfallByTeam = arenaAusfallGrundForSide(d1);
+    const d2ArenaAusfallByTeam = arenaAusfallGrundForSide(d2);
     const teamResults: MatchdayPanelTeamResult[] = results.map((r) => {
       // `?? null` statt `?? 0`: liefert die Disziplin ueberhaupt kein Team-Ergebnis
       // (kein `disciplinePreview` zu dieser Disziplin — z. B. weil d1/d2 nur aus dem
@@ -1111,6 +1288,8 @@ export default function DisciplineStageArena({
         d2Points,
         totalPoints: (d1Points ?? 0) + (d2Points ?? 0),
         missingLineup: r.missingLineup,
+        d1ArenaAusfallGrund: d1ArenaAusfallByTeam.get(r.teamId) ?? null,
+        d2ArenaAusfallGrund: d2ArenaAusfallByTeam.get(r.teamId) ?? null,
       };
     });
     // Captain-/Formkarten-Einsatz je Team — 1:1 aus derselben Preview, damit die
@@ -2040,6 +2219,11 @@ export default function DisciplineStageArena({
           missingLineup: t.missingLineup,
           // Kapitän dieser Einsatzliste (falls gesetzt) → Stern am Wappen in der Arena.
           captainName: t.captainName,
+          // Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
+          // sequenziell+Reveal): Gegner-Team-ID aus dem Arena-Duell, sonst null -- treibt die
+          // paarweise Board-Sequenz + Matchup-Reveal in DisciplineStageNativeArena.tsx
+          // (`prim === "lamps"`/`"klassen"`/`"stage"`).
+          opponentTeamId: t.opponentTeamId,
           // Engine-Modus: Netto = val + Σmods trägt bereits die volle Engine-Zerlegung.
           //
           // POSITIONSGETREU, NICHT DICHT — Ticket #35 (Chris): „wenn ich in 5 + 6 Slot die spieler
@@ -2058,7 +2242,14 @@ export default function DisciplineStageArena({
             traits: [] as string[],
             mods: p.mods,
             pointsAwarded: p.pointsAwarded,
+            // Task #102: Mutator-Aufschlag 1:1 durchreichen, damit die Detail-Ergebnistabelle
+            // die VOLLE gutgeschriebene PP-Summe zeigen kann (resolveAwardedPlayerPoints),
+            // nicht nur den Team-Anteil.
+            mutatorPpsBonus: p.mutatorPpsBonus,
             ovrRank: p.playerId ? ratingByPlayerId.get(p.playerId)?.ovrRank ?? null : null,
+            // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): Körpergröße für die
+            // "2 größten Spieler/Centers"-Auswahl in DisciplineStageNativeArena.tsx.
+            height: p.playerId ? playerHeightById.get(p.playerId) ?? null : null,
           })),
         }))
       : model.teams.map((t) => ({
@@ -2071,6 +2262,9 @@ export default function DisciplineStageArena({
           missingLineup: false,
           // Ohne Engine-Preview gibt es auch keine Einsatzliste → kein Kapitän.
           captainName: null as string | null,
+          // Modell-/Random-Modus kennt kein Arena-Duell → keine Gegner-Paarung (Tasks
+          // #116/#118/#119/#126/#127).
+          opponentTeamId: null as string | null,
           players: t.slots.map((s) => ({
             playerId: s.playerId,
             val: s.base,
@@ -2083,7 +2277,12 @@ export default function DisciplineStageArena({
             // nativeTeams liest ausschließlich p.mods (SHOULD-1, Variante a).
             mods: mode === "real" ? realMods(s) : [...realMods(s), ...traitMutatorMods(s.traits, mutatorTraits)],
             pointsAwarded: null as number | null,
+            // Modell-/Random-Modus kennt keine gebuchte PP-Zuteilung (kein Engine-Preview) —
+            // bleibt konsequent null, wie pointsAwarded direkt darüber.
+            mutatorPpsBonus: null as number | null,
             ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
+            // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): s. Engine-Zweig oben.
+            height: s.playerId ? playerHeightById.get(s.playerId) ?? null : null,
           })),
         }));
     /**
@@ -2144,6 +2343,7 @@ export default function DisciplineStageArena({
     endedDisciplineIds,
     ratingByPlayerId,
     computeStageSlotCount,
+    playerHeightById,
   ]);
 
   // Betroffene Spieler (≥1 Trait-Treffer) für die Player-Points-Anzeige (+0,3 PP je).
@@ -2180,6 +2380,9 @@ export default function DisciplineStageArena({
         seasonRank: t.seasonRank,
         missingLineup: t.missingLineup,
         captainName: t.captainName,
+        // Tasks #126/#127 (Tennis/Schach sequenziell+Reveal): 1:1 durchgereicht aus der oben
+        // gebauten `teams`-Zwischenstufe → NativeStageTeam.opponentTeamId.
+        opponentTeamId: t.opponentTeamId,
         // Luecken bleiben Luecken (Ticket #35) — `null` heisst „diese Etappe ist unbesetzt".
         players: t.players.map((p) =>
           p == null
@@ -2191,6 +2394,9 @@ export default function DisciplineStageArena({
                 portraitUrl: p.portraitUrl,
                 mods: p.mods,
                 pointsAwarded: p.pointsAwarded,
+                // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): 1:1 durchgereicht aus
+                // der oben gebauten `teams`-Zwischenstufe → NativeStagePlayer.height.
+                height: p.height ?? null,
               },
         ),
       })),
@@ -2932,6 +3138,36 @@ export default function DisciplineStageArena({
         </div>
       ) : null}
 
+      {/* LATENZ-FIX 18.10.: nicht-blockierender Hinweis, solange der Arena-Vorlauf im Hintergrund
+          rechnet (`arenaVorlaufStatus`, Poll-Effekt oben). Die Buehne zeigt bis dahin die
+          PPS-Duell-Bruecke. OPUS-REVIEW PR #1290: das ist NICHT die endgueltige Wertung -- laeuft der
+          Vorlauf durch, bucht der Resolve fuer diese Disziplin das ARENA-Ergebnis
+          (`arenaTeamPointsByDisciplineId`, legacy-matchday-resolve-engine.ts), das andere Sieger
+          haben kann; nur bei einem Arena-Ausfall bleibt die Bruecke stehen. Der Text sagt deshalb
+          "vorlaeufig" statt (vorher) "die Wertung oben steht schon fest". Verschwindet von selbst,
+          sobald der Poll "ready"/"failed" meldet. */}
+      {!devMode && arenaVorlaufStatus === "in_progress" ? (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="arena-vorlauf-hintergrund-hinweis"
+          style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12.5 }}
+        >
+          <span
+            style={{
+              fontWeight: 800,
+              padding: "4px 10px",
+              borderRadius: 99,
+              color: "var(--nl-accent)",
+              border: "1px solid var(--nl-accent)",
+              background: "color-mix(in srgb, var(--nl-accent) 12%, transparent)",
+            }}
+          >
+            ⏳ Arena-Duelle werden im Hintergrund berechnet — bis dahin zeigt die Bühne die vorläufige PPS-Duell-Wertung
+          </span>
+        </div>
+      ) : null}
+
       {devMode && (
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "inline-flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--nl-line)" }}>
@@ -3060,6 +3296,7 @@ export default function DisciplineStageArena({
         topPlayers={topPlayers}
         primitive={NATIVE_PRIMITIVE[disciplineId] ?? "track"}
         disciplineId={disciplineId}
+        matchdayId={matchdayId ?? null}
         disciplineName={model.disciplineName}
         accent={DISCIPLINE_SKIN[disciplineId]?.accent}
         motif={DISCIPLINE_SKIN[disciplineId]?.motif}
