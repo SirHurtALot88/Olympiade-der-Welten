@@ -52,18 +52,25 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    39.4
+    38.5,
+    81.5
    ],
    "ppMessung": {
-    "quelle": "docs/design/gesamtstand-audit-13-10.md (n=6, Chromium-Abstuerze)",
-    "laeufe": 6
+    "befehl": "node scripts/messe-arena-einfluss.mjs hockey 24 (+ --saat-versatz=10000000)",
+    "laeufe": 24,
+    "anhebung": 15,
+    "mutatoren": "je-lauf",
+    "saatStroeme": [
+     0,
+     10000000
+    ]
    },
-   "datum": "2026-10-16",
-   "commit": "ace43062",
+   "datum": "2026-10-25",
+   "commit": "b8ed4a53",
    "rhoFrisch": true,
-   "ppFrisch": false,
+   "ppFrisch": true,
    "rhoJeSpielNurFeldspieler": 0.676,
-   "anmerkung": "Chris-Ausnahme deckt NUR rho (CLAUDE.md, vor der Pp-Pflicht vom 21.09.). Pp NICHT frisch gemessen (Doku-Wert, n=6) — Hockey ist deshalb nicht arena-gewertet, bis eine frische Pp-Messung (>= 24 Laeufe, zwei Saatstroeme, <= 25) vorliegt oder Chris die Pp-Ausnahme gibt."
+   "anmerkung": "Task #195 (25.10.): frische Pp-Messung nachgeholt, beide Saatstroeme OHNE Seitenfehler durchgelaufen (vorher n=6, Chromium-Abstuerze bei n>=12 -- Ursache war kein V8-Leck, sondern ungedeckeltes DOM-Wachstum im #protokoll-Tab, s. messLaufStumm()-Fix in battle-mode.engine.js, Commit b8ed4a53, cherry-gepickt aus einem nie gemergten frueheren Branch). ERGEBNIS: Schranke (<=25) auf BEIDEN Stroemen klar verletzt (38,5 / 81,5) -- Hockey bleibt deshalb NICHT arena-gewertet, Chris-Ausnahme deckt weiterhin nur rho. Grosse Spannweite zwischen den Stroemen (43 Pp) auffaellig: Strom 0 treibt stamina (+11,4 Pp) und power ist unterrepraesentiert (-7,5 Pp trotz Matrixgewicht 18); Strom 1 wird von awareness dominiert (+28,6 Pp, Matrixgewicht nur 8) waehrend spirit (Matrixgewicht 12) komplett auf 0% faellt. Reine Diagnose, kein Rezept-Umbau versucht (ausdruecklich nicht Teil von Task #195) -- die Streuung selbst deutet auf dieselbe Art Verlaesslichkeits-Problem wie bei Staffel (CLAUDE.md: 'mehr Ereignisse helfen fast nie' gilt fuer rho, aber Hockeys extrem niedrige Torzahl pro Spiel koennte die EINZELSPIEL-Budget-Messung selbst instabil machen -- eine Frage fuer eine kuenftige Kalibrierrunde, nicht fuer diese Messaufgabe)."
   },
   "gewichtheben": {
    "chassis": "buehne",

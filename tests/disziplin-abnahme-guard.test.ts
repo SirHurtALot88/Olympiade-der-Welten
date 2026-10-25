@@ -109,12 +109,20 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     }
   });
 
-  it("Hockey ist ohne frische Pp-Messung NICHT gewertet (die Ausnahme deckt nur rho)", () => {
+  it("Hockey ist weiterhin NICHT gewertet -- Pp ist jetzt frisch gemessen (Task #195, 25.10.), verfehlt die Schranke aber auf beiden Saatstroemen (38,5 / 81,5)", () => {
+    // Fruehere Fassung dieses Tests nahm an, eine kuenftige frische Pp-Messung wuerde automatisch
+    // bestehen (`hockey.ppFrisch ? [] : ["pp"]`) -- diese Annahme ist jetzt widerlegt: die Messung
+    // ist frisch UND verletzt die Schranke klar auf beiden unabhaengigen Stroemen. Deshalb hier
+    // gegen das tatsaechliche Ergebnis gepinnt statt gegen die blosse Frische-Flagge.
     const hockey = TABELLE.disziplinen.hockey!;
-    expect(verfehlteKriterien(hockey, ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt ?? [])).toEqual(
-      hockey.ppFrisch ? [] : ["pp"],
-    );
-    if (!hockey.ppFrisch) expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(false);
+    expect(hockey.ppFrisch).toBe(true);
+    expect(hockey.pp.length).toBeGreaterThanOrEqual(TABELLE.schranken.ppSaatstroemeMindestens);
+    expect(hockey.pp.every((wert) => wert > TABELLE.schranken.ppHoechstens)).toBe(true);
+    expect(verfehlteKriterien(hockey, ARENA_ABNAHME_AUSNAHMEN.get("hockey")?.deckt ?? [])).toEqual(["pp"]);
+    // Hockeys rho (0,64) liegt ohnehin unter der Schranke und wird nur durch die Ausnahme gedeckt --
+    // unabhaengig vom Pp-Ausgang darf Hockey deshalb in keinem Fall in ARENA_RESOLVED_DISCIPLINE_IDS
+    // stehen.
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(false);
   });
 
   it("Mini-DM ist NICHT Teil des generischen Chassis-Sets (eigener Pod-Resolve-Pfad, eigener Schalter)", () => {

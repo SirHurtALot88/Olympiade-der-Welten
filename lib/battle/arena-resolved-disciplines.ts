@@ -198,10 +198,15 @@ export type AbnahmeAusnahme = {
  * neue Eintraege und neue Kriterien NUR mit Chris' Bestaetigung.
  *
  * HOCKEY: Chris hat die Rangtreue abgenommen — vor dem 21.09., also bevor die Pp-Pruefung Pflicht
- * wurde. Eine Pp-Ausnahme gibt es nicht, und Hockeys Pp (39,4) ist weder frisch noch mit genug Laeufen
- * gemessen (n=6, Chromium-Abstuerze). Hockey steht deshalb NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS`
- * und spielt ueber die PPS-Duell-Bruecke, bis eine frische Pp-Messung (≥ 24 Laeufe, zwei Saatstroeme,
- * ≤ 25) vorliegt oder Chris die Pp-Ausnahme ausdruecklich gibt.
+ * wurde. Eine Pp-Ausnahme gibt es nicht. NACHGEHOLT (Task #195, 25.10.): die fruehere Pp-Zahl (39,4)
+ * war aus der Doku uebernommen und nur mit n=6 gemessen (Chromium-Abstuerze bei n≥12). Die frische
+ * Messung (n=24, zwei Saatstroeme) lief diesmal durch — der Absturz war ein DOM-Leck in der
+ * Messsonde selbst (`messLaufStumm()`-Fix, `public/mockups/battle-mode.engine.js`), kein Problem der
+ * Hockey-Mechanik — ERGEBNIS: 38,5 / 81,5 Pp, die 25-Pp-Schranke bleibt auf BEIDEN Stroemen klar
+ * verletzt (s. `data/generated/disziplin-abnahme.json`, Eintrag "hockey", fuer die volle
+ * Attribut-Diagnose). Hockey steht deshalb weiterhin NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` und
+ * spielt ueber die PPS-Duell-Bruecke, bis eine Rezeptkalibrierung Pp unter die Schranke bringt oder
+ * Chris die Pp-Ausnahme ausdruecklich gibt.
  */
 export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new Map([
   [
@@ -272,9 +277,10 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "time-trial",
   "spurt",
   "climbing",
-  // HOCKEY BEWUSST NICHT HIER (16.10., Projektaufsicht): Chris' Ausnahme deckt nur rho, Hockeys Pp
-  // ist nicht frisch gemessen (39,4 aus der Doku, n=6) — s. ARENA_ABNAHME_AUSNAHMEN. Bis zur frischen
-  // Pp-Messung oder Chris' Pp-Freigabe ueber die PPS-Duell-Bruecke.
+  // HOCKEY BEWUSST NICHT HIER (25.10., Task #195): Chris' Ausnahme deckt nur rho. Pp ist jetzt frisch
+  // gemessen (n=24, zwei Saatstroeme: 38,5 / 81,5) — die 25-Pp-Schranke bleibt klar verletzt, s.
+  // Kopfkommentar und ARENA_ABNAHME_AUSNAHMEN. Bis zu einer Rezeptkalibrierung oder Chris' Pp-Freigabe
+  // ueber die PPS-Duell-Bruecke.
   // BASKETBALL BEWUSST NICHT HIER (16.10.): rho je Spiel 0,795 (Median, kaderfest, 24 Spiele) — unter
   // der 0,80-Schranke. Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in
   // Battle Mode zahlt es bis zur bestandenen Abnahme ueber die PPS-Duell-Bruecke.
