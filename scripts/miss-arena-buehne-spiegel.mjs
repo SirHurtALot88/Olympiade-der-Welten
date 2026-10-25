@@ -15,6 +15,9 @@
 //   node scripts/miss-arena-buehne-spiegel.mjs                          -> 60 Laeufe je Disziplin
 //   node scripts/miss-arena-buehne-spiegel.mjs 200                       -> 200 Laeufe je Disziplin
 //   node scripts/miss-arena-buehne-spiegel.mjs 60 speed-schach showcase  -> nur diese Disziplinen
+//   node scripts/miss-arena-buehne-spiegel.mjs 1000 gewichtheben --flags=gewichthebenSandsack:1
+//                                                                         -> Gewichtheben im Weg-C-Format
+//                                                                            (drei Sandsack-Laeufe)
 //   node scripts/miss-arena-buehne-spiegel.mjs 60 "" /pfad/zu/battle-mode.html
 //                                                                         -> gegen einen
 //                                                                            eingefrorenen Entwurf
@@ -24,8 +27,9 @@ import { dirname, resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText } from "./lib/rangtreue-messung.mjs";
 
-// --flags=... / --haltung-*=... (NACHTKONZEPT-SCHALTER, 04.10., additiv, s. scripts/lib/rangtreue-
-// messung.mjs): ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
+// --flags=... / --haltung-*=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv, s. scripts/lib/rangtreue-
+// messung.mjs): schaltet Buehnen-Mechaniken hinter BUEHNE_FLAGS ein (z.B.
+// --flags=gewichthebenSandsack:1); ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
 const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
 const N = Number(args[0] || 60);

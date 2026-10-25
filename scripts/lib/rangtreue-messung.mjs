@@ -310,14 +310,15 @@ export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite, muta
 }
 
 // ===================================================================================
-// NACHTKONZEPT-SCHALTER (04.10.) — gemeinsam fuer alle Messskripte, die eine Buehne messen.
+// NACHT-PAKET-SCHALTER (04./05.10.) — gemeinsam fuer alle Messskripte, die eine Buehne messen.
+// Gleiche Namen und gleiches Format wie auf den Speed-Schach-/Wettessen-Zweigen (04.10.),
+// damit ein spaeteres Zusammenfuehren nur die Kopfkommentare vereinen muss.
 //
-// Die Mechaniken aus den Nachtkonzepten vom 03.10. (Speed-Schach-Uhr, spaeter Wettessen-Mauer)
-// liegen in battle-mode.engine.js hinter `BUEHNE_FLAGS`, standardmaessig AUS. Ohne einen der
-// Schalter unten misst jedes Skript also unveraendert den heutigen Motor — byte-identisch zu
-// vorher.
+// Die Mechaniken der Nachtpakete liegen in battle-mode.engine.js hinter `BUEHNE_FLAGS`,
+// standardmaessig AUS. Ohne einen Schalter misst jedes Skript unveraendert den heutigen Motor.
 //
-//   --flags=speedSchachUhr:2                    Flag-Stufen setzen (Wert fehlt -> 1)
+//   --flags=gewichthebenSandsack:1              Flag-Stufen setzen (Wert fehlt -> 1)
+//   --flags=speedSchachUhr:2                    mehrere Flags komma-getrennt
 //   --haltung-heim=rechnen  --haltung-gast=ki   pauschale Haltung je Seite (nur Messung;
 //                                               "ki" oder weglassen = KI-Vorgabe)
 // ===================================================================================
@@ -344,7 +345,10 @@ export async function setzeBuehneSchalter(seite, schalter) {
   if (!schalter || !schalter.aktiv) return null;
   return seite.evaluate(([f, h]) => {
     if (!window.__arena.buehneFlags) throw new Error("window.__arena.buehneFlags fehlt — Engine zu alt?");
-    return { flags: window.__arena.buehneFlags(f), haltung: window.__arena.buehneHaltungTest(h) };
+    const flags = window.__arena.buehneFlags(f);
+    for (const k of Object.keys(f)) if (!(k in flags)) throw new Error(`Unbekannter Buehnen-Schalter: ${k}`);
+    const haltung = window.__arena.buehneHaltungTest ? window.__arena.buehneHaltungTest(h) : { 0: null, 1: null };
+    return { flags, haltung };
   }, [schalter.flags, schalter.haltung]);
 }
 
