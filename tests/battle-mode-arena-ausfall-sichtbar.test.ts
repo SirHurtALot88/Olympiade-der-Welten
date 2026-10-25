@@ -5,6 +5,7 @@ import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-type
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
+import { chromiumVerfuegbar } from "@/tests/helpers/chromium-verfuegbar";
 
 /**
  * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
@@ -17,7 +18,32 @@ import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
  * Arena läuft nie im normalen Spielfluss, s. Plan Abschnitt 1.1) -- und zeigt, dass die neue
  * Markierung genau dafür anspringt, statt den Zustand (wie bisher) klaglos als PPS-Duell-Brücke
  * durchlaufen zu lassen.
+ *
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung der Mini-DM-CI-Flakiness): der untere
+ * "K1-SIMULATION ueber den ECHTEN Spielfluss"-Block faehrt ECHTES Chromium (Service-Default
+ * "inline", s. Kommentar dort) und hat bis hierhin GEFEHLT, dass er -- anders als
+ * `tests/arena-vorlauf-parity.test.ts` (dasselbe Muster, 18.10.) -- OHNE
+ * `describe.skipIf(!CHROMIUM_VERFUEGBAR)` lief. `full-test-suite`/`persistenz-suiten`
+ * installieren laut `.github/workflows/ci.yml` bewusst KEIN Chromium; der Vorlauf-Service faengt
+ * das fuer ARENA_RESOLVED_DISCIPLINE_IDS-Disziplinen zwar korrekt ab (`grund:"chromium_start"`,
+ * von den Assertions unten toleriert) -- aber Mini-DM hat seit PR 5 ("Vorlauf-Verdrahtung
+ * scharf geschaltet", 25.10., `MINI_DM_FFA_VORLAUF_AKTIV`) einen EIGENEN, ebenfalls Chromium-
+ * abhaengigen Pod-Lauf (`lib/battle/arena-vorlauf-service.ts`, Mini-DM-Zweig), dessen Ausfall
+ * trotzdem in `arenaAusfallByDisciplineId` landet und von der Resolve-Engine (`isBattleModeArenaEligible`,
+ * NICHT nach `ARENA_RESOLVED_DISCIPLINE_IDS` gefiltert) auf die Mini-DM-Zeile geschrieben wird --
+ * OBWOHL Mini-DM absichtlich NICHT in `ARENA_RESOLVED_DISCIPLINE_IDS` steht. Zieht der zufaellig
+ * gesaete Spielplan Mini-DM in die hier geprueften Spieltage, schlaegt die "Gegenprobe" weiter
+ * unten (`nichtArenaZeilen` muss `arenaAusfall === null` sein) mit genau diesem Fund fehl:
+ * `AssertionError: expected { grund: 'chromium_start', ... } to be null` -- rein zufaellig je
+ * Testlauf, ohne jede Codeaenderung (reproduziert u.a. in PR #1308/#1310/#1270-Re-Runs). Der Fix
+ * hier ist NUR der fehlende Guard (identisches Muster wie `arena-vorlauf-parity.test.ts`) -- OB
+ * Mini-DMs eigener Vorlauf ueberhaupt `arenaAusfall` auf einer Nicht-ARENA_RESOLVED-Zeile setzen
+ * darf, ist eine offene, separate Designfrage (reicht in Resolve-/Mapper-/Ledger-Pfad, loest die
+ * CLAUDE.md-Bit-Identitaetspruefung aus) und wird hier BEWUSST NICHT geloest.
  */
+const CHROMIUM_VERFUEGBAR = chromiumVerfuegbar();
+const CHROMIUM_PFLICHT = process.env.OLY_ARENA_CHROMIUM_PFLICHT === "1";
+const UEBERSPRINGEN = !CHROMIUM_VERFUEGBAR && !CHROMIUM_PFLICHT;
 
 const D1_ARENA = "gewichtheben"; // Mitglied von ARENA_RESOLVED_DISCIPLINE_IDS
 const D2_NICHT_ARENA = "battlefield"; // NICHT arena-aufgelöst
@@ -240,7 +266,23 @@ describe("Ledger-Feld · arenaAusfall kommt im DisciplineResultWritePayload an",
   );
 });
 
-describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, kein konstruierter Context)", () => {
+describe.skipIf(UEBERSPRINGEN)(
+  "K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, kein konstruierter Context)",
+  () => {
+  // OPUS-REVIEW-MUSTER (18.10., uebernommen aus arena-vorlauf-parity.test.ts): laut statt leise,
+  // wenn ein Job, der Chromium garantiert haben SOLLTE (OLY_ARENA_CHROMIUM_PFLICHT=1), trotzdem
+  // keines findet -- sonst wuerde ein kaputter Install-Schritt nur zu einer leeren, gruenen Suite
+  // fuehren, nie zu einem sichtbaren Fehler.
+  if (CHROMIUM_PFLICHT && !CHROMIUM_VERFUEGBAR) {
+    it("OLY_ARENA_CHROMIUM_PFLICHT=1, aber kein Chromium gefunden -- Install-Schritt dieses Jobs pruefen", () => {
+      throw new Error(
+        "Dieser CI-Job setzt OLY_ARENA_CHROMIUM_PFLICHT=1 (Chromium MUSS installiert sein), aber " +
+          "chromiumVerfuegbar() fand keines. Vermutlich ist der \"npx playwright install chromium\"-" +
+          "Schritt dieses Jobs fehlgeschlagen oder wurde entfernt.",
+      );
+    });
+    return;
+  }
   it(
     "PR 3 (K1 geschlossen): jede gebuchte Zeile einer arena-aufgelösten Disziplin trägt " +
       "ENTWEDER resolutionSource:\"arena\" ODER arenaAusfall — nie weder/noch " +
@@ -392,4 +434,5 @@ describe("K1-SIMULATION über den ECHTEN Spielfluss (Wizard + echter Auto-Run, k
     // Check #1) bestaetigen, dass das Budget auch mit Arena-Vorlauf reicht.
     600_000,
   );
-});
+  },
+);
