@@ -924,6 +924,36 @@ export type RunMiniDmFfaPodFixturesOptions = {
    *  Lineup-Entwurf existiert — fuer Aufrufer, die (noch) bewusst das Vorher-Verhalten wollen
    *  (z. B. eine Vergleichsmessung). Default `true`. */
   aufstellungBeachten?: boolean;
+  /**
+   * `k` (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung") — durchgereicht als Feld von
+   * `optionen` an `window.__arena.miniDmFfaEvent()`/`spieleMiniDmFfaEvent()` (battle-mode.engine.js,
+   * PR 2 #1302): die Kadergroesse 2..6 des Spielplan-Slots dieses Spieltags,
+   * `MINI_DM_FFA_SLOTS_JE_K[k]` spielt dann genau `k` Runden mit den k-spezifischen Rollenprofilen
+   * statt der festen vier. OHNE `k` EXAKT der alte Vierer-Pfad fuer die ROLLENAUSWAHL
+   * (`mdffaRollenFuerK(null)`).
+   *
+   * ACHTUNG (OPUS-REVIEW B1, Blocker-Fix): `k` alleine ist NICHT mehr "byte-identisch ohne
+   * Option" -- `runMiniDmFfaPodFixtures()` setzt seit diesem Fix IMMER zusaetzlich
+   * `optionen.formSaat` (je Pod auf dessen eigenen `seed`), unabhaengig von `k`. Das ist
+   * ABSICHTLICH: ohne eigene Formkarten je Pod bevorzugte der Motor strukturell die beiden
+   * Bootstrap-Teams (gemessen 192/200 bzw. 181/200 Events gegen einen attributgleichen Klon an
+   * anderer Pod-Position, s. Kommentar an der Aufrufstelle unten) -- ein Fehler, keine
+   * Kompatibilitaet, die es zu bewahren galt.
+   */
+  k?: number;
+  /**
+   * OPUS-REVIEW, PR 5 (Lesepfad-Robustheit, nicht blockierend): explizit uebergebener Spieltag fuer
+   * `buildArenaAufstellung()` unten -- ohne dieses Feld liest diese Funktion `gameState.matchdayState
+   * ?.matchdayId` selbst, UNABHAENGIG vom `matchdayId`, das der Aufrufer (`runMiniDmFfaMatchday()`,
+   * mini-dm-ffa-matchday.ts) fuer Hash/Teilnahme/Seed tatsaechlich verwendet. In der Praxis sind
+   * beide Werte heute immer gleich (`matchdayState.matchdayId` ist der aktuell offene Spieltag, und
+   * nur der wird vorlaeufig aufgeloest) -- aber EIN impliziter Lesepfad weniger ist robuster, falls
+   * ein kuenftiger Aufrufer (z.B. ein Nachtrag/Resolve fuer einen VERGANGENEN Spieltag) die beiden
+   * einmal auseinanderlaufen laesst. Gesetzt, gewinnt dieses Feld; `undefined` laesst das
+   * Lese-Verhalten exakt wie vor diesem Fix (byte-identisch fuer jeden bestehenden Aufrufer, der es
+   * nicht setzt).
+   */
+  matchdayId?: string | null;
 };
 
 /**
@@ -950,7 +980,7 @@ function baueEindeutigeNamenZuordnungFuerTeam(kader: ArenaSpieler[]): Map<string
  * Einschraenkungen: nur Argumente + Browser-Globale, keine Node-Closures).
  */
 async function simuliereMiniDmFfaPodsImBrowser(payload: {
-  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[] }>;
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen?: { k?: number; formSaat?: number } }>;
   timeoutMs: number;
 }): Promise<Array<RoherMiniDmFfaEventErgebnis | null>> {
   const fenster = window as unknown as {
@@ -959,6 +989,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
         vierTeams: ArenaSpieler[][],
         saat: number,
         platzJeTeam?: ArenaAufstellung[],
+        optionen?: { k?: number; formSaat?: number },
       ) => RoherMiniDmFfaEventErgebnis | null;
     };
   };
@@ -971,7 +1002,7 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 
-  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam));
+  return payload.pods.map((pod) => fenster.__arena!.miniDmFfaEvent(pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
 }
 
 /**
@@ -996,7 +1027,10 @@ export async function runMiniDmFfaPodFixtures(
   // s. Kopfkommentar). `aufstellungBeachten: false` haelt bewusst beim alten Verhalten (leere
   // `place`-Objekte -> reiner Eignungs-Reihum im Motor, s. `mdffaGesetzteRolle()`).
   const aufstellungBeachten = options.aufstellungBeachten ?? true;
-  const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+  // OPUS-REVIEW, PR 5: `options.matchdayId` gewinnt, wenn der Aufrufer ihn explizit setzt (s.
+  // Kommentar an `RunMiniDmFfaPodFixturesOptions.matchdayId`) -- `undefined` laesst exakt den alten
+  // Lesepfad (`gameState.matchdayState?.matchdayId`), byte-identisch fuer jeden bestehenden Aufrufer.
+  const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
     seed: seedZuZahl(pod.seed),
@@ -1053,7 +1087,23 @@ export async function runMiniDmFfaPodFixtures(
     await page.goto(pathToFileURL(seitenPfad).href);
 
     const rohErgebnisse = await page.evaluate(simuliereMiniDmFfaPodsImBrowser, {
-      pods: laufbarePods.map((pod) => ({ teams: pod.kaderJeTeam, seed: pod.seed, platzJeTeam: pod.platzJeTeam })),
+      // `formSaat` (OPUS-REVIEW B1, PR 5 des 6-PR-Plans 21.10., Blocker-Fix): IMMER gesetzt, je
+      // Pod auf dessen EIGENEN `seed` -- s. ausfuehrlicher Kommentar an `spieleMiniDmFfaEvent()`s
+      // `optionen.formSaat` (battle-mode.engine.js). OHNE das zog die globale `FORMKARTE` (einmalig
+      // beim Seiten-Bootstrap, nur fuer die beiden via `window.__olyArenaKader` geladenen Teams --
+      // hier `laufbarePods[0]`s Team 0/1) Formkarten fuer hoechstens ZWEI von bis zu 32 Teams je
+      // Spieltag; jedes andere Team (inkl. Team 2/3 des ERSTEN Pods selbst) bekam `formVon() = 0`
+      // -- eine strukturelle, mit echtem Chromium gemessene Bevorzugung (192/200 bzw. 181/200
+      // Events gegen einen attributgleichen Klon an anderer Pod-Position, s. PR-Bericht). Denselben
+      // `seed` wie fuer die Rundenfolge zu nehmen (statt eines zweiten, unabhaengigen Saat-Stroms)
+      // folgt demselben Muster wie beim Zweier-Duell (s. `arena-eingabe-hash.ts`-Kommentar:
+      // "Formkarten seit 15.10. in die Saat gekoppelt").
+      pods: laufbarePods.map((pod) => ({
+        teams: pod.kaderJeTeam,
+        seed: pod.seed,
+        platzJeTeam: pod.platzJeTeam,
+        optionen: { ...(options.k != null ? { k: options.k } : {}), formSaat: pod.seed },
+      })),
       timeoutMs,
     });
 

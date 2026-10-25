@@ -27,6 +27,20 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disci
 import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+
+/**
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung der Mini-DM-CI-Flakiness): diese Datei faket
+ * seit jeher NUR `runArenaFixturesImpl` -- `bauFrischenBattleSaveMitVollemFeld()` unten akzeptiert
+ * JEDE arena-aufgeloeste Disziplin an D1/D2 eines zufaelligen (unseeded) Liga-Drafts, OHNE Mini-DM
+ * auszuschliessen. Landet Mini-DM (zufaellig, unabhaengig von der gefundenen Arena-Disziplin)
+ * SELBST an diesem Spieltag, laeuft seit PR 5 ("Vorlauf-Verdrahtung") ein eigener, NICHT gefakter
+ * `runMiniDmFfaPodFixtures()`-Zweig mit echtem Chromium -- das scheitert in CI-Jobs ohne Chromium-
+ * Installation (`full-test-suite`/`persistenz-suiten`) mit `chromium_start`. `buildHarmlosenMiniDmFfaFakeRunner()`
+ * (geteilter Helfer, `tests/helpers/mini-dm-ffa-battle-save.ts`) wird deshalb ab jetzt NEBEN jedem
+ * `runArenaFixturesImpl` mitgegeben -- unabhaengig davon, ob Mini-DM an einem konkreten Testlauf
+ * tatsaechlich dabei ist.
+ */
 
 /**
  * CI-OOM-FUND (18.10., root-caused per Heap-Snapshot-Diff -- NICHT per Vermutung): dieser Datei
@@ -127,7 +141,11 @@ describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () =>
         throw new Error("Simulierter Chromium-Absturz (Testinjektion)");
       };
 
-      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+      const ergebnis = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(ergebnis.applicable).toBe(true);
       expect(ergebnis.status).toBe("failed");
       expect(ergebnis.record).not.toBeNull();
@@ -180,8 +198,16 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
       // Zwei Aufrufe "gleichzeitig" (kein await zwischen ihnen) -- GENAU der Fall aus Plan 2.7:
       // zwei Koop-Spieler speichern fast gleichzeitig ihre Aufstellung.
       const [ergebnisA, ergebnisB] = await Promise.all([
-        stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: verzoegerterRunner }, persistence),
-        stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: verzoegerterRunner }, persistence),
+        stelleArenaVorlaufSicher(
+          scope,
+          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          persistence,
+        ),
+        stelleArenaVorlaufSicher(
+          scope,
+          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          persistence,
+        ),
       ]);
 
       expect(ergebnisA.applicable).toBe(true);
@@ -233,7 +259,11 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
         }));
       };
 
-      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: einmalWerfenderRunner }, persistence);
+      const ergebnis = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: einmalWerfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(ergebnis.applicable).toBe(true);
       // DAS Versprechen dieses Fixes: EIN einziger externer Aufruf liefert bereits das
       // ENDGUELTIGE Ergebnis -- die interne Wiederholung ist fuer den Aufrufer unsichtbar.
@@ -267,7 +297,11 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
         throw new Error("Chromium kaputt (Testinjektion, B1, durchgehend)");
       };
 
-      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+      const ergebnis = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(ergebnis.applicable).toBe(true);
       expect(ergebnis.status).toBe("failed");
 
@@ -286,7 +320,11 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
       // mehr, weil "failed" seit dem Design-Fix ohne Ausnahme terminal ist (ausser
       // `erzwingeNeuenVersuch`, das hier niemand setzt).
       for (let i = 0; i < 10; i += 1) {
-        const nochEinAnstoss = kickoffArenaVorlauf(scope, { runArenaFixturesImpl: werfenderRunner }, persistence);
+        const nochEinAnstoss = kickoffArenaVorlauf(
+          scope,
+          { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          persistence,
+        );
         expect(nochEinAnstoss.status).toBe("failed");
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -327,7 +365,11 @@ describe("Arena-Vorlauf-Service · B3 (Opus-Review, kritisch): arenaEingabeHash-
           boxscore: [],
         }));
 
-      const ergebnis = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: erfolgreicherRunner }, persistence);
+      const ergebnis = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(ergebnis.status).toBe("ready");
 
       const vorStand = persistence.getSaveById(scope.saveId)!.gameState;

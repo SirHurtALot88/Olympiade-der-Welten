@@ -223,6 +223,41 @@ export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new
  * erzwungen von tests/disziplin-abnahme-guard.test.ts. Stand 16.10.: Messwerte und Begruendung je
  * Disziplin in docs/design/pps-duell-bruecke-punkteverhaeltnis-16-10.md Abschnitt 3.
  */
+/**
+ * MINI-DM-FFA-VORLAUF-SCHALTER (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung", 24.10.).
+ *
+ * Mini-DM laeuft NICHT ueber dieses generische Chassis-Set — es hat einen eigenen Pod-Resolve-Pfad
+ * (`lib/resolve/mini-dm-pod-resolve.ts`, vier Teams statt eines Zweier-Duells, 2-1-0-0 statt
+ * Sieg/Unentschieden/Niederlage) und wird deshalb hier NIEMALS eingetragen (s.
+ * `tests/disziplin-abnahme-guard.test.ts`, "Mini-DM ist NICHT arena-gewertet"). Dieser Schalter ist
+ * der Mini-DM-eigene Analog-Schalter dazu: `lib/battle/arena-vorlauf-service.ts` prueft ihn, um zu
+ * entscheiden, ob ein Mini-DM-Spieltag echte FFA-Rohdaten bekommt (`MiniDmFfaPodRohdaten`, ueber
+ * `lib/resolve/mini-dm-ffa-matchday.ts` -> `berechneMiniDmPodOverrides({ ffaRohdatenByPodId })`,
+ * mini-dm-pod-resolve.ts PR 4) oder beim bisherigen PPS-Pod-Pfad bleibt.
+ *
+ * CHRIS' ENTSCHEIDUNG (24.10., per Rueckfrage auf PR 3s ehrlichen Befund
+ * `data/generated/disziplin-abnahme.json` Schluessel "mini-dm-ffa"): die Spieler-Ebene-Rangtreue
+ * (rho je Event, die CLAUDE.md-massgebliche Zahl) liegt bei JEDEM k=2..6 unter 0,80 (0,608-0,686) —
+ * schlechter als das bereits live geschaltete Hockey (0,670). TROTZDEM werden ALLE k=2..6
+ * verdrahtet, weil CLAUDE.md ("Die Abnahme jeder Disziplin", Abschnitt zu Star-/Paartreue bei
+ * kleinem n) genau diesen Fall vorwegnimmt: eine Saison hat je Disziplin nur eine Handvoll Spiele,
+ * die nackte Rangkorrelation ist bei kleinem n die UNEHRLICHERE Abnahme. Mini-DMs Stern-/Paartreue
+ * ist durchweg GUT (Star Rang 1 76-81 %, erste zwei 93-95 %, Paare ab 15 Punkten Abstand 99 %
+ * richtig, bei jedem k) — vergleichbar mit Hockeys bereits von Chris abgenommener Star-Rangtreue
+ * (58 %/78 %, `ARENA_ABNAHME_AUSNAHMEN` oben). Diese Faelle sind nicht identisch (Hockeys Ausnahme
+ * deckt nur `rho`, Mini-DM steht nicht einmal in `ARENA_RESOLVED_DISCIPLINE_IDS` und braucht deshalb
+ * keinen Eintrag in jener Map), aber dieselbe Begruendung trifft hier zu — Chris hat sie fuer
+ * Mini-DM ausdruecklich bestaetigt, nicht diese PR von sich aus angewendet.
+ *
+ * NORMALER ROLLOUT-SCHALTER, wie jede andere Disziplin beim Scharfschalten einen hatte (hier ein
+ * eigener Boolean statt eines Mengen-Eintrags, weil Mini-DM kein Chassis-Set-Mitglied ist/wird):
+ * `false` faellt sofort und vollstaendig auf den bisherigen PPS-Pod-Pfad zurueck (Rollback in einer
+ * Zeile, kein Deploy-Wettlauf) — `berechneMiniDmPodOverrides()` behandelt fehlende
+ * `ffaRohdatenByPodId` ohnehin schon immer als "kein FFA-Ergebnis fuer diesen Pod", s. dortiger
+ * Kommentar.
+ */
+export const MINI_DM_FFA_VORLAUF_AKTIV = true;
+
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "gewichtheben",
   "speed-schach",

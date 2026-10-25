@@ -10,6 +10,17 @@ import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
+import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+
+/**
+ * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): `bauFrischenBattleSaveMitVollemFeld()`
+ * unten akzeptiert JEDE arena-aufgeloeste Disziplin an D1/D2 eines zufaelligen Liga-Drafts, OHNE
+ * Mini-DM auszuschliessen -- landet Mini-DM (zufaellig, unabhaengig von der arena-aufgeloesten
+ * Disziplin) SELBST an diesem Spieltag, laeuft seit PR 5 ein eigener, NICHT gefakter
+ * `runMiniDmFfaPodFixtures()`-Zweig mit echtem Chromium, das in `full-test-suite`/`persistenz-
+ * suiten` (kein Chromium installiert) scheitert. `buildHarmlosenMiniDmFfaFakeRunner()` wird deshalb
+ * ab jetzt NEBEN `runArenaFixturesImpl` mitgegeben.
+ */
 
 /**
  * GEGENSTUECK zu tests/arena-eingabe-instabil.test.ts (Opus-Nachtrag 18.10.): der NORMALFALL
@@ -81,7 +92,11 @@ describe("Arena-Vorlauf-Service · eingabe_instabil bleibt 0 im Normalfall (Opus
           boxscore: [],
         }));
 
-      const vorlauf = await stelleArenaVorlaufSicher(scope, { runArenaFixturesImpl: erfolgreicherRunner }, persistence);
+      const vorlauf = await stelleArenaVorlaufSicher(
+        scope,
+        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        persistence,
+      );
       expect(vorlauf.applicable).toBe(true);
       expect(vorlauf.status).toBe("ready");
 

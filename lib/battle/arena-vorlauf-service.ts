@@ -8,8 +8,16 @@ import {
   type ArenaTeamPointsOverride,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 import type { ArenaAusfall, ArenaAusfallGrund } from "@/lib/resolve/legacy-matchday-resolve-types";
-import type { runArenaFixtures, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
-import { berechneArenaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import type { runArenaFixtures, RunArenaFixturesOptions, runMiniDmFfaPodFixtures, RunMiniDmFfaPodFixturesOptions } from "@/lib/battle/arena-headless-runner";
+import { berechneArenaEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import { MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
+
+import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import {
+  runMiniDmFfaMatchday,
+  resolveMiniDmFfaPlayerCountForMatchday,
+} from "@/lib/resolve/mini-dm-ffa-matchday";
+import type { MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -24,6 +32,47 @@ import {
   type MatchdayResolveScope,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { mitChromiumSemaphor } from "@/lib/battle/arena-chromium-semaphor";
+
+/**
+ * ECHTER ROLLBACK-MECHANISMUS (OPUS-REVIEW, PR 5, Pflicht-Fix 8): `MINI_DM_FFA_VORLAUF_AKTIV`
+ * (arena-resolved-disciplines.ts) ist eine reine Code-Konstante -- ein Abschalten braucht Commit +
+ * CI + Deploy + Docker-Build, nicht "eine Zeile, kein Deploy-Wettlauf", wie der Kommentar dort es
+ * behauptet. DIESE Datei ist bewusst der Ort fuer die Umgebungsvariable (nicht
+ * arena-resolved-disciplines.ts): jene Datei ist client-importierbar (`FoundationBattleArenaHost.tsx`,
+ * s. ihr eigener Kopfkommentar) und darf deshalb kein `process.env` lesen -- `arena-vorlauf-service.ts`
+ * laeuft dagegen ausschliesslich serverseitig.
+ *
+ * `OLY_MINI_DM_FFA_VORLAUF=aus` auf dem Server (`deploy/hetzner/.env`, s. `.env.example` dort)
+ * schaltet den Mini-DM-FFA-Vorlauf ab. **KORRIGIERT nach der zweiten Opus-Review-Runde (24.10.):**
+ * ein blosser Container-NEUSTART reicht NICHT -- `docker-compose.yml` reicht die Variable per
+ * `${OLY_MINI_DM_FFA_VORLAUF:-}`-Interpolation durch, und diese Interpolation liest Compose nur
+ * beim ERSTELLEN/NEU-ERSTELLEN des Containers (`docker compose up -d`), nicht bei einem blossen
+ * `docker restart` auf dem bereits laufenden Container (der behaelt die beim letzten `up`
+ * eingefrorene Umgebung, `.env` wird dabei nicht neu gelesen). Auf dem Server also: Eintrag in
+ * `deploy/hetzner/.env` setzen, dann `docker compose up -d` im Repo-Verzeichnis -- genau derselbe
+ * Mechanismus wie beim Geschwister-Notschalter `OLY_ARENA_TIER_PARALLEL` (PR #1290,
+ * battle-mode-arena-team-points.ts). Jeder andere Wert (inkl. fehlend/leer) laesst
+ * `MINI_DM_FFA_VORLAUF_AKTIV` unveraendert wirken (Code-Konstante bleibt die Grundeinstellung).
+ *
+ * WICHTIG, UND DAS GEHOERT IN JEDE ROLLBACK-ENTSCHEIDUNG: das Abschalten wirkt nur VORWAERTS, auf
+ * Spieltage, deren Vorlauf NACH dem `docker compose up -d` beginnt. Ein Mini-DM-Spieltag, dessen
+ * Snapshot VOR dem Abschalten bereits mit `quelle: "ffa"` fertiggestellt wurde, bucht beim
+ * Season-Finish WEITERHIN mit diesem bereits berechneten FFA-Ergebnis -- `kickoffArenaMatchdayApply`
+ * liest den fertigen Snapshot, nicht den aktuellen Wert dieses Schalters. Das ist erwartbar
+ * (derselbe Snapshot-vorher, buchen-nachher-Grundsatz wie bei jeder anderen Arena-Disziplin), aber
+ * ausdruecklich festgehalten, damit niemand nach einem Abschalten einen bereits "ffa"-gebuchten
+ * Spieltag als Bug meldet.
+ */
+function istMiniDmFfaVorlaufAktiv(): boolean {
+  // Trim + Kleinschreibung, angeglichen an `resolveArenaTierParallelEnabled()`
+  // (battle-mode-arena-team-points.ts) -- derselbe Normalisierungs-Stil fuer denselben "Server-
+  // Notschalter"-Zweck.
+  const raw = typeof process !== "undefined" ? process.env?.OLY_MINI_DM_FFA_VORLAUF?.trim().toLowerCase() : undefined;
+  if (raw === "aus") {
+    return false;
+  }
+  return MINI_DM_FFA_VORLAUF_AKTIV;
+}
 
 /**
  * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
@@ -74,14 +123,28 @@ export function determineArenaDisciplineContexts(
   contexts: LegacyLineupLoadedContext[];
   arenaDisciplineIds: string[];
   mutatorTraitsByDisciplineId: Map<string, string[]>;
+  /**
+   * MINI-DM-FFA (PR 5 des 6-PR-Opus-Plans 21.10.): `true`, wenn Mini-DM an diesem Spieltag an D1
+   * ODER D2 steht UND `MINI_DM_FFA_VORLAUF_AKTIV` an ist. ABSICHTLICH NICHT Teil von `kandidaten`/
+   * `arenaDisciplineIds` -- Mini-DM hat keinen Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS` (eigener
+   * Pod-Resolve-Pfad, kein Zweier-Duell-Chassis, s. Kommentar an `MINI_DM_FFA_VORLAUF_AKTIV`,
+   * arena-resolved-disciplines.ts) und wuerde im generischen `runBattleModeArenaMatchday()`-Loop
+   * (`fuehreVorlaufAus()` unten) falsch dispatcht. `false`, solange `MINI_DM_FFA_VORLAUF_AKTIV` aus
+   * ist -- der Rollback-Schalter wirkt dadurch schon hier, nicht erst im Vorlauf selbst.
+   */
+  miniDmPresent: boolean;
 } {
   const contexts = contextResults.flatMap((result) => (result.ok ? [result.context] : []));
   const kandidaten = new Set<string>();
+  let miniDmPresent = false;
   for (const context of contexts) {
     const d1 = context.contextMeta.d1DisciplineId;
     const d2 = context.contextMeta.d2DisciplineId;
     if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1)) kandidaten.add(d1);
     if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
+    if (istMiniDmFfaVorlaufAktiv() && (d1 === MINI_DM_DISCIPLINE_ID || d2 === MINI_DM_DISCIPLINE_ID)) {
+      miniDmPresent = true;
+    }
   }
   const mutatorTraitsByDisciplineId = new Map<string, string[]>();
   const basis = contexts[0];
@@ -99,8 +162,21 @@ export function determineArenaDisciplineContexts(
         }) ?? [],
       );
     }
+    if (miniDmPresent) {
+      mutatorTraitsByDisciplineId.set(
+        MINI_DM_DISCIPLINE_ID,
+        resolveMatchdayMutatorTraitsForDiscipline({
+          saveId: basis.saveId,
+          seasonId: basis.seasonId,
+          matchdayId: basis.matchdayId,
+          d1DisciplineId: basis.contextMeta.d1DisciplineId,
+          d2DisciplineId: basis.contextMeta.d2DisciplineId,
+          disciplineId: MINI_DM_DISCIPLINE_ID,
+        }) ?? [],
+      );
+    }
   }
-  return { contexts, arenaDisciplineIds: [...kandidaten], mutatorTraitsByDisciplineId };
+  return { contexts, arenaDisciplineIds: [...kandidaten], mutatorTraitsByDisciplineId, miniDmPresent };
 }
 
 function ermittleAnwendbarkeit(persistence: PersistenceService, scope: MatchdayResolveScope) {
@@ -109,11 +185,15 @@ function ermittleAnwendbarkeit(persistence: PersistenceService, scope: MatchdayR
     return { applicable: false as const, gameState: save.gameState };
   }
   const contextResults = loadAllLocalLegacyLineupContexts(scope, persistence);
-  const { arenaDisciplineIds, mutatorTraitsByDisciplineId } = determineArenaDisciplineContexts(contextResults);
-  if (arenaDisciplineIds.length === 0) {
+  const { arenaDisciplineIds, mutatorTraitsByDisciplineId, miniDmPresent } = determineArenaDisciplineContexts(contextResults);
+  // MINI-DM-FFA (PR 5): ein Spieltag mit Mini-DM an D1/D2, aber OHNE jede andere arena-aufgeloeste
+  // Disziplin, ist jetzt EBENFALLS anwendbar -- vorher (`arenaDisciplineIds.length === 0`) haette der
+  // Vorlauf fuer einen solchen Spieltag nie angefangen, und `fuehreVorlaufAus()` haette den
+  // Mini-DM-Zweig deshalb nie erreicht.
+  if (arenaDisciplineIds.length === 0 && !miniDmPresent) {
     return { applicable: false as const, gameState: save.gameState };
   }
-  return { applicable: true as const, gameState: save.gameState, arenaDisciplineIds, mutatorTraitsByDisciplineId };
+  return { applicable: true as const, gameState: save.gameState, arenaDisciplineIds, mutatorTraitsByDisciplineId, miniDmPresent };
 }
 
 /** Grob kategorisiert eine Fehlermeldung/Warnung in einen `ArenaAusfallGrund` (Plan Abschnitt 3.1). */
@@ -171,6 +251,10 @@ type FuehreVorlaufAusInput = {
   startedAt: string;
   runArenaFixturesImpl?: typeof runArenaFixtures;
   runArenaFixturesOptions?: RunArenaFixturesOptions;
+  /** MINI-DM-FFA (PR 5), s. `determineArenaDisciplineContexts()`. */
+  miniDmPresent: boolean;
+  runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
+  runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
 };
 
 /**
@@ -210,6 +294,8 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   const arenaTeamPointsByDisciplineId = new Map<string, Map<string, ArenaTeamPointsOverride>>();
   const arenaIndividualBoxscorePpsByDisciplineId = new Map<string, Map<string, number>>();
   const arenaAusfallByDisciplineId = new Map<string, ArenaAusfall>();
+  // MINI-DM-FFA (PR 5), s. Kommentar weiter unten an der eigentlichen Verwendung.
+  const miniDmFfaPodRohdatenByDisciplineId = new Map<string, Map<string, MiniDmFfaPodRohdaten>>();
   let gesamtStatus: "ready" | "failed" = "ready";
 
   // SEQUENZIELL, NICHT PARALLEL (Plan 2.7/4.4) — D1 und D2 derselben Signatur laufen eins nach dem
@@ -313,6 +399,118 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
     });
   }
 
+  // MINI-DM-FFA (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung"). EIGENER Zweig statt eines
+  // weiteren Eintrags in `input.arenaDisciplineIds` oben -- Mini-DM ist absichtlich NICHT in
+  // `ARENA_RESOLVED_DISCIPLINE_IDS` (eigener Pod-Resolve-Pfad, vier Teams statt eines Zweier-Duells,
+  // s. `MINI_DM_FFA_VORLAUF_AKTIV`-Kommentar, arena-resolved-disciplines.ts) und darf deshalb NIE den
+  // generischen `runBattleModeArenaMatchday()`-Dispatch oben durchlaufen (der erwartet Fixtures).
+  // GLEICHE Semaphor-/Wiederholungs-Disziplin wie oben (derselbe Chromium-Druck), aber ein eigener,
+  // kleinerer Retry-Block, weil `runMiniDmFfaMatchday()` eine andere Rueckgabeform hat.
+  //
+  // FALLBACK (Opus-Plan Punkt 5, "PPS-Duell-Bruecke bleibt der Rueckfall"): ein Ausfall HIER setzt
+  // `gesamtStatus = "failed"`, GENAU wie ein Ausfall im Loop oben -- das klingt dramatischer, als es
+  // ist: `matchday-auto-run-service.ts` bucht einen `"failed"`-Vorlauf trotzdem (nur als `"warning"`
+  // statt `"ready"`, s. dortiger `vorlaufErgebnis.status === "failed" ? "warning" : "ready"`), und
+  // OHNE einen Eintrag in `miniDmFfaPodRohdatenByDisciplineId` faellt `berechneMiniDmPodOverrides()`
+  // (PR 4, mini-dm-pod-resolve.ts) fuer JEDEN Mini-DM-Pod automatisch auf den unveraenderten
+  // PPS-Pod-Pfad zurueck -- kein Spieltag bleibt wegen eines Mini-DM-FFA-Ausfalls ungebucht.
+  if (input.miniDmPresent) {
+    const gesamtStart = Date.now();
+    await mitChromiumSemaphor(async () => {
+      let erfolg: Awaited<ReturnType<typeof runMiniDmFfaMatchday>> | null = null;
+      let letzterAusfall: ArenaAusfall | null = null;
+      let versucheIntern = 0;
+      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+        versucheIntern = lokalerVersuch;
+        try {
+          const ergebnis = await runMiniDmFfaMatchday({
+            gameState: current.gameState,
+            saveId: input.saveId,
+            seasonId: input.seasonId,
+            matchdayId: input.matchdayId,
+            mutatorTraits: input.mutatorTraitsByDisciplineId.get(MINI_DM_DISCIPLINE_ID),
+            runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
+            runMiniDmFfaPodFixturesOptions: {
+              seitenTimeoutMs: resolveArenaSeitenTimeoutMs(),
+              ...input.runMiniDmFfaPodFixturesOptions,
+            },
+          });
+          // `null`: kein Mini-DM-Pod (mehr) an diesem Spieltag ODER kein gueltiges k -- ein
+          // DATENPROBLEM (derselbe Zustand liefert beim Wiederholen deterministisch wieder `null`),
+          // kein Infrastruktur-Flackern. `rohdatenByPodId.size === 0` bei NICHT-leeren Pods ist
+          // derselbe Fall wie `arena_matchday_missing_result` oben (jeder Pod ohne einsatzfaehigen
+          // Kader) -- ebenfalls kein Retry.
+          if (!ergebnis || ergebnis.rohdatenByPodId.size === 0) {
+            letzterAusfall = {
+              grund: "ergebnis_unvollstaendig",
+              detail: ergebnis ? ergebnis.warnings.join(", ").slice(0, 200) || null : "kein Mini-DM-Pod oder ungueltiges k an diesem Spieltag",
+              zeitpunkt: new Date().toISOString(),
+              versuch: lokalerVersuch,
+            };
+            break;
+          }
+          erfolg = ergebnis;
+          letzterAusfall = null;
+          break;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const ausfall: ArenaAusfall = {
+            grund: leiteGrundAusText(detail),
+            detail: detail.slice(0, 200),
+            zeitpunkt: new Date().toISOString(),
+            versuch: lokalerVersuch,
+          };
+          letzterAusfall = ausfall;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
+            console.error(`[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+            break;
+          }
+          console.warn(
+            `[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}: ${detail}) -- sofortige Wiederholung, noch nicht persistiert.`,
+          );
+        }
+      }
+
+      if (erfolg) {
+        miniDmFfaPodRohdatenByDisciplineId.set(MINI_DM_DISCIPLINE_ID, erfolg.rohdatenByPodId);
+        if (erfolg.playerPpsByPlayerId.size > 0) {
+          arenaIndividualBoxscorePpsByDisciplineId.set(MINI_DM_DISCIPLINE_ID, erfolg.playerPpsByPlayerId);
+        }
+        const eingabeHash = berechneMiniDmFfaEingabeHash({
+          gameState: current.gameState,
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          playerCount: resolveMiniDmFfaPlayerCountForMatchday(current.gameState, input.matchdayId, { saveId: input.saveId }),
+          mutatoren: input.mutatorTraitsByDisciplineId.get(MINI_DM_DISCIPLINE_ID) ?? [],
+        });
+        // OPUS-REVIEW, Pflicht-Fix 4: ein GESAMTERFOLG (mindestens ein Pod lieferte ein gueltiges
+        // Ergebnis) hat trotzdem Teilwarnungen, wenn EINZELNE Pods wegen eines unvollstaendigen
+        // Boxscores verworfen wurden (`pruefeMotorErgebnisVollstaendigkeit()`,
+        // mini-dm-ffa-matchday.ts) -- die fielen vorher komplett unter den Tisch: nicht geloggt,
+        // nicht persistiert, der betroffene Pod faellt nur still auf den PPS-Pfad zurueck.
+        // Jetzt BEIDES: console.error (sofort sichtbar in den Server-Logs) UND persistiert in
+        // `ArenaVorlaufDisziplinEintrag.teilwarnungen` (spaeter abfragbar, nicht nur ein Log-Zeitpunkt).
+        if (erfolg.warnings.length > 0) {
+          console.error(
+            `[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) Gesamterfolg mit ${erfolg.warnings.length} Teilwarnung(en): ${erfolg.warnings.join(", ")}`,
+          );
+        }
+        disziplinen[MINI_DM_DISCIPLINE_ID] = {
+          status: "arena",
+          dauerMs: Date.now() - gesamtStart,
+          eingabeHash,
+          versucheIntern,
+          ...(erfolg.warnings.length > 0 ? { teilwarnungen: erfolg.warnings } : {}),
+        };
+      } else {
+        arenaAusfallByDisciplineId.set(MINI_DM_DISCIPLINE_ID, letzterAusfall!);
+        gesamtStatus = "failed";
+        disziplinen[MINI_DM_DISCIPLINE_ID] = { status: "ausgefallen", ausfall: letzterAusfall!, dauerMs: Date.now() - gesamtStart, versucheIntern };
+      }
+    });
+  }
+
   const { record } = finishArenaVorlauf(
     scope,
     {
@@ -325,6 +523,7 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
         arenaTeamPointsByDisciplineId,
         arenaIndividualBoxscorePpsByDisciplineId,
         arenaAusfallByDisciplineId,
+        ...(miniDmFfaPodRohdatenByDisciplineId.size > 0 ? { miniDmFfaPodRohdatenByDisciplineId } : {}),
       },
     },
     input.persistence,
@@ -383,6 +582,9 @@ function starteOderTeileVorlauf(input: {
   versuch: number;
   runArenaFixturesImpl?: typeof runArenaFixtures;
   runArenaFixturesOptions?: RunArenaFixturesOptions;
+  miniDmPresent: boolean;
+  runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
+  runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
 }): Promise<ArenaVorlaufRecord | null> {
   const schluessel = laufSchluessel(input.scope, input.signature);
   const bestehend = laufendeVorlaeufe.get(schluessel);
@@ -390,7 +592,12 @@ function starteOderTeileVorlauf(input: {
 
   const begonnen = beginArenaVorlauf(
     input.scope,
-    { signature: input.signature, disciplineIds: input.arenaDisciplineIds },
+    {
+      signature: input.signature,
+      // MINI-DM-FFA (PR 5): nur fuer die SICHTBARE "laeuft gerade"-Liste des Vorlauf-Records --
+      // der eigentliche Mini-DM-Zweig in `fuehreVorlaufAus()` haengt NICHT an dieser Liste.
+      disciplineIds: input.miniDmPresent ? [...input.arenaDisciplineIds, MINI_DM_DISCIPLINE_ID] : input.arenaDisciplineIds,
+    },
     input.persistence,
   );
   if (!begonnen) return Promise.resolve(null);
@@ -407,6 +614,9 @@ function starteOderTeileVorlauf(input: {
     startedAt: begonnen.startedAt,
     runArenaFixturesImpl: input.runArenaFixturesImpl,
     runArenaFixturesOptions: input.runArenaFixturesOptions,
+    miniDmPresent: input.miniDmPresent,
+    runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
+    runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
   }).finally(() => {
     laufendeVorlaeufe.delete(schluessel);
   });
@@ -417,6 +627,9 @@ function starteOderTeileVorlauf(input: {
 export type ArenaVorlaufOptions = {
   runArenaFixturesImpl?: typeof runArenaFixtures;
   runArenaFixturesOptions?: RunArenaFixturesOptions;
+  /** MINI-DM-FFA (PR 5) -- Testhebel, analog `runArenaFixturesImpl`/`runArenaFixturesOptions`. */
+  runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
+  runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
   /**
    * NUR FUER DEN KICKOFF-MANTEL (`arena-matchday-resolve-service.ts`), NIE von den automatischen
    * Ausloesern (Lineup-Routen, Arena-Base-Route, Auto-Run-`"hintergrund"`/`"inline"`) gesetzt: ein
@@ -501,6 +714,9 @@ export function kickoffArenaVorlauf(
     versuch: (vorhandenerRecord?.signature === signature ? vorhandenerRecord.versuch : 0) + 1,
     runArenaFixturesImpl: options.runArenaFixturesImpl,
     runArenaFixturesOptions: options.runArenaFixturesOptions,
+    miniDmPresent: anwendbarkeit.miniDmPresent,
+    runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
+    runMiniDmFfaPodFixturesOptions: options.runMiniDmFfaPodFixturesOptions,
   }).catch((error) => {
     console.error(`[arena-vorlauf] unerwarteter Fehler ausserhalb des try/catch (${scope.saveId}/${scope.matchdayId}):`, error);
   });
@@ -568,6 +784,9 @@ export async function stelleArenaVorlaufSicher(
     versuch: (vorhandenerRecord?.signature === signature ? vorhandenerRecord.versuch : 0) + 1,
     runArenaFixturesImpl: options.runArenaFixturesImpl,
     runArenaFixturesOptions: options.runArenaFixturesOptions,
+    miniDmPresent: anwendbarkeit.miniDmPresent,
+    runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
+    runMiniDmFfaPodFixturesOptions: options.runMiniDmFfaPodFixturesOptions,
   });
   return { applicable: true, status: record?.status ?? null, record };
 }

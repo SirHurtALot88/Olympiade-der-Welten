@@ -1,5 +1,80 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Fuenfundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Vorlauf-Verdrahtung (PR 5 eines 6-PR-Opus-Plans,
+21.10., "das Risikoreichste" laut Plan) — scharf geschaltet.** Der Mini-DM-FFA-Pfad (Motor PR 2
+#1302, Buchungsformel PR 4 #1301, Abnahme PR 3 #1303) war bis hierher additiv und tot: kein
+Aufrufer lieferte `MiniDmFfaPodRohdaten`. Diese PR fuegt genau diesen Aufrufer hinzu und schaltet
+ihn produktiv.
+
+- **Schalter**: `MINI_DM_FFA_VORLAUF_AKTIV` (lib/battle/arena-resolved-disciplines.ts), `true`.
+  Normaler Rollout-Schalter wie bei jeder anderen Disziplin beim Scharfschalten. Mini-DM bleibt
+  dabei bewusst AUSSERHALB von `ARENA_RESOLVED_DISCIPLINE_IDS` (kein Zweier-Duell-Chassis, eigener
+  Pod-Resolve-Pfad) — der Schalter ist deshalb ein eigener Boolean, kein Mengen-Eintrag.
+  **KORRIGIERT nach der zweiten Opus-Review-Runde (24.10.): kein bloßer Code-Konstante-Schalter
+  mehr.** `lib/battle/arena-vorlauf-service.ts`s `istMiniDmFfaVorlaufAktiv()` liest zusaetzlich die
+  Server-Umgebungsvariable `OLY_MINI_DM_FFA_VORLAUF` — `=aus` schaltet den Vorlauf ab, unabhaengig
+  vom Code-Wert. Das reicht NICHT per Container-Neustart: `deploy/hetzner/docker-compose.yml`
+  interpoliert die Variable aus `deploy/hetzner/.env` nur beim ERSTELLEN des Containers
+  (`docker compose up -d`), nicht bei einem blossen `docker restart`. Richtiger Ablauf: Eintrag in
+  `.env` setzen, dann `docker compose up -d` im Repo-Verzeichnis auf dem Server — derselbe
+  Mechanismus wie beim Geschwister-Notschalter `OLY_ARENA_TIER_PARALLEL` (PR #1290). Bereits mit
+  `quelle: "ffa"` fertiggestellte Snapshots buchen nach dem Abschalten trotzdem weiter so vor.
+- **Chris' Freigabe (24.10.)**: ALLE k=2..6 werden verdrahtet, obwohl `rhoJeEvent` (die
+  CLAUDE.md-massgebliche Spieler-Ebene-Zahl, PR 3) bei jedem k unter 0,80 liegt (0,608-0,686) —
+  dieselbe Star-/Paartreue-Begruendung, mit der Chris Hockey schon frueher freigegeben hat (s.
+  CLAUDE.md "Die Abnahme jeder Disziplin"). `data/generated/disziplin-abnahme.json` traegt das
+  additiv als eigenes `freigabe`-Feld am Schluessel `mini-dm-ffa` — die gemessenen Zahlen selbst
+  bleiben unveraendert stehen.
+- **Neue Datei `lib/resolve/mini-dm-ffa-matchday.ts`**: `runMiniDmFfaMatchday()` nimmt alle Pods
+  eines Mini-DM-Spieltags, ruft `runMiniDmFfaPodFixtures()` (jetzt mit `optionen.k`, s. unten) MIT
+  der echten Aufstellung/Mutatoren/Spieltagswurf auf und uebersetzt das Ergebnis in
+  `MiniDmFfaPodRohdaten`. **Teilnahme a(t,r) kommt bewusst aus der ECHTEN Aufstellung
+  (`buildArenaAufstellung()`), NICHT aus dem Motor-Boxscore** — der Motor selbst spielt jede Rolle
+  auch ohne Lineup-Eintrag per Eignungs-Reihum (PR A), die Buchungsformel (PR 4) will davon aber nur
+  die echten Eintraege sehen. Ein Reihum-Fallback-Kaempfer bekommt deshalb `beitrag: 0`/`teilnahme:
+  false` in den Rohdaten und KEINE Spieler-PP, unabhaengig davon, was der Motor fuer ihn simuliert
+  hat.
+- **arena-vorlauf-service.ts**: eigener Mini-DM-Zweig neben (nicht in) dem generischen
+  `runBattleModeArenaMatchday()`-Loop — `determineArenaDisciplineContexts()` erkennt Mini-DMs
+  Praesenz an D1/D2 jetzt zusaetzlich zur bestehenden `ARENA_RESOLVED_DISCIPLINE_IDS`-Pruefung,
+  OHNE "mini-dm" in `arenaDisciplineIds` aufzunehmen (das wuerde den falschen, Fixture-basierten
+  Dispatch treffen). `ermittleAnwendbarkeit()` ist jetzt auch fuer einen Spieltag anwendbar, an dem
+  NUR Mini-DM steht (vorher waere der Vorlauf fuer so einen Spieltag nie angelaufen). Derselbe
+  Semaphor/derselbe Zwei-Versuche-Retry wie die anderen Disziplinen; ein Ausfall faellt defensiv auf
+  den PPS-Pod-Pfad zurueck (PR 4 war genau dafuer gebaut) und markiert den Gesamt-Vorlauf als
+  `"failed"` — bucht trotzdem (`matchday-auto-run-service.ts` behandelt `"failed"` als Warnung, nicht
+  als Blocker).
+- **arena-seed.ts/arena-eingabe-hash.ts**: `buildMiniDmFfaPodMatchSeed()` (vier-Team-Pod statt
+  Heim/Gast-Duell) und `berechneMiniDmFfaEingabeHash()` (deckt zusaetzlich `playerCount`/k und die
+  volle Aufstellung aller vier Pod-Teams ab — ohne `playerCount` im Hash wuerden zwei Spieltage mit
+  unterschiedlichem k, aber sonst identischer Aufstellung, denselben Fingerabdruck tragen).
+  `lib/foundation/matchday-resolve-snapshot.ts`s `findeArenaEingabeHashDivergenz()` dispatcht fuer
+  `disciplineId === "mini-dm"` jetzt auf diese Funktion statt auf die generische (sonst waere jede
+  Buchung mit einer arena-aufgeloesten Zweit-Disziplin UND Mini-DM am selben Spieltag faelschlich
+  als "instabil" verworfen worden, weil die generische Funktion fuer Mini-DM keine Fixtures findet).
+- **Offene Design-Frage aus PR 3 entschieden, UND KORRIGIERT nach Opus-Review an PR #1304**:
+  `ppAusMiniDmFfaBeitrag()` liest die Referenz GEPOOLT je Disziplin+k (eine p50/p995 ueber ALLE
+  sechs Rollen desselben k), nicht nach Rolle/Eignungsrang getrennt. Die erste Fassung dieses
+  Nachtrags nannte das einen "Verzerrungs-Effekt"/eine "bekannte Grenze" — das war FALSCH und ist
+  hier richtiggestellt, nicht nur ergaenzt: laut Opus-Review ist das gepoolte Referenz-je-k genau
+  der RICHTIGE Projektstandard, nicht ein Kompromiss. Eine nach Rolle getrennte Referenz wuerde
+  einen Last-Hit-Median (die laut Matrix schwaechste Rolle, intelligence/spirit-Fokus) auf
+  denselben p50 heben wie einen Frontliner-Median (die staerkste) — WIDERSPRUCH zu CLAUDE.md ("Die
+  Eignungsmatrix ist gesperrt"-Abschnitt, Chris' wortlicher Massstab "ein Spieler mit einer Stat von
+  80 ... erwarte ich auch, dass da einer der Top-Leute ist"): die Referenz muss je DISZIPLIN+k
+  gezogen werden, nicht je Rolle, sonst verschwindet genau die Eignungs-Reihenfolge zwischen den
+  Rollen, die die Matrix vorgibt. Der Selektionseffekt (hoeheres k zieht auch schwaechere Raenge
+  5/6 mit hinein, s. 24. Nachtrag unten) bleibt bestehen, ist aber keine Verzerrung, die zu beheben
+  waere — er ist genau das Verhalten, das die Budget-Methode von einer je-k gepoolten Referenz
+  erwartet.
+- **Nachweise**: Manager-Mode byte-identisch (`scripts/pruefe-resolve-bit-identitaet.ts`/
+  `scripts/pruefe-mapper-bit-identitaet.ts`, je vor/nach gegen eine frische, unabhaengige Kopie des
+  live-save-Abbilds); Battle-Mode-Mini-DM aendert sich ABSICHTLICH (eigener Integrationstest,
+  `tests/arena-vorlauf-mini-dm-ffa.test.ts`, zeigt `quelle: "ffa"` statt des alten PPS-Pod-Pfads);
+  alle anderen 19 Disziplinen unberuehrt (keine ihrer Dateien angefasst, der generische
+  `runBattleModeArenaMatchday()`-Loop ist unveraendert). Volle Begruendung, Testergebnisse und
+  bekannte Grenzen im PR-Bericht selbst.
+
 **Vierundzwanzigster Nachtrag 24.10. — Mini-DM-FFA: Abnahme + Referenzen fuer k=2..6 (PR 3 eines
 6-PR-Opus-Plans, 21.10.), additiv zur bestehenden 4er-Zeile. KORRIGIERT 24.10. nach Opus-Review an
 PR #1303: rho auf SPIELER-Ebene (die CLAUDE.md-massgebliche Zahl) besteht bei KEINEM k — die
@@ -80,14 +155,15 @@ mit (chaosdriver/lasthit), die bei k=2..4 gar nicht erst antreten, und das sind 
 schwaecheren Mini-DM-Kaempfer eines Kaders. Das zieht den POOLED Median ueber alle Runden/Raenge
 nach unten, je hoeher k.
 
-**Offene Design-Frage fuer PR 5, aus diesem Befund:** `ppAusMiniDmFfaBeitrag()` liest die
-Referenz heute gepoolt je k (eine einzige p50/p995 fuer alle Raenge). Bei GLEICHER individueller
-Leistung (derselbe rohe `beitrag`) bekaeme derselbe Spieler ueber diese Kurve bei k=6 MEHR PP als
-bei k=2, weil die gepoolte p50-Referenz bei k=6 niedriger liegt (69 statt 145) — nicht, weil er
-besser gespielt hat, sondern weil mehr schwaechere Mitspieler die Referenz nach unten ziehen. PR 5
-muss entscheiden, ob die Referenz weiter gepoolt je k bleibt (einfach, aber mit diesem Verzerrungs-
-Risiko) oder nach Rolle/Eignungsrang getrennt gezogen wird (genauer, aber sechsmal so viele
-Referenzzellen). Diese PR trifft diese Entscheidung nicht, haelt sie aber ausdruecklich fest.
+**Design-Frage aus diesem Befund — von PR 5 entschieden, s. 25. Nachtrag oben, dort nach
+Opus-Review KORRIGIERT:** `ppAusMiniDmFfaBeitrag()` liest die Referenz gepoolt je k (eine einzige
+p50/p995 fuer alle Raenge). Bei GLEICHER individueller Leistung (derselbe rohe `beitrag`) bekaeme
+derselbe Spieler ueber diese Kurve bei k=6 mehr PP als bei k=2, weil die gepoolte p50-Referenz bei
+k=6 niedriger liegt (69 statt 145) — das ist der Selektionseffekt von oben (hoeheres k zieht
+schwaechere Raenge 5/6 mit hinein), KEIN Fehler der Referenz-Methode. PR 5 hat entschieden: gepoolt
+je Disziplin+k bleibt, nicht nach Rolle/Eignungsrang getrennt — das ist laut Opus-Review der
+richtige Projektstandard (eine rollengetrennte Referenz wuerde Last-Hit- und Frontliner-Mediane
+gleichsetzen, Widerspruch zur gesperrten Eignungsmatrix, s. 25. Nachtrag).
 
 **Bleibt trotzdem toter Code**: PR 4 hat keinen produktiven Aufrufer, der
 `ffaRohdatenByPodId`/`miniDmFfaPodRohdatenByDisciplineId` befuellt (grep ueber das ganze Repo

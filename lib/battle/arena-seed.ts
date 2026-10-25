@@ -66,3 +66,20 @@ export function buildArenaMatchSeed(input: {
 }): string {
   return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:${input.disciplineId}:${input.homeTeamId}:${input.awayTeamId}`;
 }
+
+/**
+ * MINI-DM-FFA-POD-SAAT (PR 5 des 6-PR-Opus-Plans 21.10., "Vorlauf-Verdrahtung"). Eigene Funktion
+ * statt `buildArenaMatchSeed()` mit leerem `awayTeamId`: ein Mini-DM-Pod ist KEIN Zweier-Duell
+ * (vier Teams, keine Heim-/Gast-Rolle, s. `lib/season/mini-dm-pod-schedule.ts`) -- `podId` traegt
+ * schon die volle Identitaet (Save/Saison/Spieltag/Liga-Stufe/Pod-Index, s. dortiger
+ * `getMiniDmPodsForMatchday()`-Kommentar), deshalb reicht er hier als einziger Schluessel zusaetzlich
+ * zum Spieltags-Kontext. Dasselbe FNV-1a-`seedZuZahl()` wie beim 2-Team-Duell macht daraus eine Zahl.
+ */
+export function buildMiniDmFfaPodMatchSeed(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  podId: string;
+}): string {
+  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:mini-dm-ffa:${input.podId}`;
+}

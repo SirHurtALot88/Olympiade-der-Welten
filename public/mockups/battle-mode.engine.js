@@ -50984,8 +50984,8 @@
       return frei[idx];
     });
   }
-  // `optionen` (VIERTER, optionaler Parameter, PR 2 des 6-PR-Plans 21.10.): {k, nurGesetzte}.
-  // OHNE `optionen` (oder mit leerem Objekt) EXAKT der alte Vierer-Pfad -- `mdffaRollenFuerK(null)`
+  // `optionen` (VIERTER, optionaler Parameter, PR 2 des 6-PR-Plans 21.10.): {k, nurGesetzte,
+  // formSaat}. OHNE `optionen` (oder mit leerem Objekt) EXAKT der alte Vierer-Pfad -- `mdffaRollenFuerK(null)`
   // liefert `rollenDefs=null`, jede Runde bekommt also KEIN `slotDef` durchgereicht und
   // `baueMiniDmFfaRunde`/`mdffaKaempfer` fallen exakt auf ihr altes Verhalten zurueck
   // (slotAufschlagMit/betroffeneAttributeMit OHNE slotDef, s. deren Kopfkommentar) -- BYTE-
@@ -50996,12 +50996,39 @@
   // gesetzten Kaempfer hat (statt jede Rolle ueber den Eignungs-Reihum aufzufuellen) --
   // nur wirksam, wenn `platzJeTeam` ueberhaupt etwas setzt (sonst bliebe sonst JEDE Rolle
   // ungespielt statt auf den Reihum zurueckzufallen).
+  //
+  // `optionen.formSaat` (OPUS-REVIEW B1, PR 5 des 6-PR-Plans 21.10., echter Blocker mit
+  // Chromium-Messung belegt): OHNE diesen Schalter liest `formVon()` (Zeile ~8087) die
+  // GLOBALE `FORMKARTE`, die beim Seiten-Bootstrap EINMALIG per `zieheFormkarten(20260823)`
+  // NUR fuer die zwei via `window.__olyArenaKader` geladenen Teams (SQUAD/OPP, in
+  // `runMiniDmFfaPodFixtures()` die beiden Teams des ERSTEN Pods im Batch) gezogen wird --
+  // s. Zeile 50186. Fuer JEDES andere Team (alle Pods ausser dem ersten, UND die Teams 2/3
+  // selbst des ersten Pods) ist `FORMKARTE[name]` nie gesetzt, `formVon()` liefert dafuer
+  // bedingungslos 0 -- kein Fehler, aber eine einseitige Formkarten-Vergabe an zwei von (bei
+  // einem vollen Spieltag) 32 Teams. Gemessen (echtes Headless-Chromium, Pod aus zwei
+  // attributgleichen Team-Paaren, nur umbenannt, Positionstausch): Team an Pod-Position 0/1
+  // gewinnt 192/200 (k=4) bzw. 181/200 (k=6) Events gegen seinen attributgleichen Klon an
+  // Position 2/3 -- kein Messrauschen, eine strukturelle Bevorzugung der ersten Pod-Position.
+  //
+  // DIE ABNAHME-SONDE (`miniDmFfaSonde()`/`mdffaVorbereiten()`, s. deren Kommentar oben) TRIFFT
+  // DAS NICHT, weil sie `mdffaFormkartenFuer(teams, saat)` fuer ALLE VIER Kader VOR jedem Aufruf
+  // von `spieleMiniDmFfaEvent()` SELBST aufruft -- PR 3s rho/Pp-Zahlen sind deshalb ECHT (das
+  // gemessene System zieht Formkarten fuer alle 16 Spieler), entsprechen aber NICHT dem
+  // Produktionspfad, der vor diesem Fix gebaut wurde (der zog sie fuer hoechstens 2).
+  //
+  // FIX: additiv, derselbe Mechanismus wie die Sonde -- `optionen.formSaat` gesetzt zieht
+  // `mdffaFormkartenFuer(vierTeams, normalisiereSaat(optionen.formSaat))` genau HIER, VOR dem
+  // ersten Rollen-Aufruf, fuer alle vier Kader dieses EINEN Pods. OHNE `optionen.formSaat`
+  // (jeder bisherige Aufrufer: die rohe Testschnittstelle `window.__arena.miniDmFfaEvent(teams,saat)`
+  // ohne vierten Parameter, UND `miniDmFfaSonde()`s eigener Aufruf, der die Karten schon VORHER
+  // selbst gezogen hat) bleibt das Verhalten BYTE-IDENTISCH -- kein neuer Zweig wird betreten.
   function spieleMiniDmFfaEvent(vierTeams,saat,platzJeTeam,optionen){
     if(!Array.isArray(vierTeams)||vierTeams.length!==4){
       throw new Error("spieleMiniDmFfaEvent: braucht genau 4 Team-Kader, bekam "+
         (Array.isArray(vierTeams)?vierTeams.length:typeof vierTeams)+".");
     }
     const opt=optionen||{};
+    if(opt.formSaat!=null)mdffaFormkartenFuer(vierTeams,normalisiereSaat(opt.formSaat));
     const {rollen,rollenDefs}=mdffaRollenFuerK(opt.k);
     const saatBasis=normalisiereSaat(saat);
     const aufstellung=mdffaAuswahlVorbereiten(vierTeams,platzJeTeam);

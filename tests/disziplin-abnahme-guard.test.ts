@@ -117,7 +117,14 @@ describe("ARENA_RESOLVED_DISCIPLINE_IDS gegen die Abnahmetabelle", () => {
     if (!hockey.ppFrisch) expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("hockey")).toBe(false);
   });
 
-  it("Mini-DM ist NICHT arena-gewertet (Pod-Resolve fehlt, Abnahme nicht klar bestanden — Folge-Task)", () => {
+  it("Mini-DM ist NICHT Teil des generischen Chassis-Sets (eigener Pod-Resolve-Pfad, eigener Schalter)", () => {
+    // Mini-DM hat seit PR 4/PR 5 des 6-PR-Opus-Plans (21.10.) einen eigenen Pod-Resolve-Pfad
+    // (lib/resolve/mini-dm-pod-resolve.ts, vier Teams statt eines Zweier-Duells, 2-1-0-0 statt
+    // Sieg/Unentschieden/Niederlage) und einen eigenen Rollout-Schalter (MINI_DM_FFA_VORLAUF_AKTIV,
+    // arena-resolved-disciplines.ts) -- es gehoert deshalb NIE in dieses generische Chassis-Set,
+    // unabhaengig davon, ob die FFA-Verdrahtung an oder aus ist. Diese Pruefung bleibt bewusst
+    // unveraendert bestehen, nicht weil die Frage noch offen ist, sondern weil die Antwort fuer
+    // Mini-DM dauerhaft "falsches Set" lautet.
     expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("mini-dm")).toBe(false);
   });
 
