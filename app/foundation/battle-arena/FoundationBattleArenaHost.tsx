@@ -22,6 +22,13 @@ import {
   getMiniDmPodForTeam,
   resolveMiniDmFfaPlayerCountForMatchday,
 } from "@/lib/season/mini-dm-pod-schedule";
+import { buildSpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
+import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
+import {
+  buildArenaFixturesPanel,
+  buildArenaStandingsPanel,
+} from "@/lib/foundation/battle-arena/arena-live-panels";
+import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -439,6 +446,92 @@ export default function FoundationBattleArenaHost({
   const spielquelleHinweise = useMemo(
     () => buildArenaHostSpielquelleHinweise(gameState, heimTeamId),
     [gameState, heimTeamId],
+  );
+
+  /**
+   * LIVE-PANELS ("Spieltagsergebnisse" + "Tabelle") — Chris' Freigabe 26.10. zum Mockup-Artefakt.
+   * S. Dateikommentar in `lib/foundation/battle-arena/arena-live-panels.ts` für den
+   * Machbarkeits-Befund (Batch-Buchung, kein "läuft/pausiert"-Zwischenzustand zwischen Fixtures).
+   * Beide Panels bauen NUR eine Anzeige-Form aus bereits vorhandener Infrastruktur:
+   * `buildSpieltagsUebersicht()` (Task #180, unverändert wiederverwendet — dieselbe Quelle, die der
+   * Saisonstand-Tab "Spieltage" nutzt) und `/api/standings/preview` (`standings-preview-engine.ts`,
+   * dieselbe Engine, die der Saisonstand-Tab für die Projektion nutzt).
+   */
+  const [zeigeSpieltagsergebnisse, setZeigeSpieltagsergebnisse] = useState(false);
+  const [zeigeTabelle, setZeigeTabelle] = useState(false);
+
+  const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+
+  const spieltagsUebersicht = useMemo(
+    () => (matchdayId ? buildSpieltagsUebersicht(gameState, matchdayId, { saveId }) : null),
+    [gameState, matchdayId, saveId],
+  );
+
+  const teamsById = useMemo(
+    () => new Map(gameState.teams.map((team) => [team.teamId, { name: team.name, shortCode: team.shortCode }] as const)),
+    [gameState.teams],
+  );
+
+  // Freund/Feind-Einstufung (`lib/foundation/team-relationship.ts`, dieselbe, die die native
+  // Spieltags-Arena fuer Rahmenfarben nutzt) -- hier nur fuer "Rivalen-Spiel hervorheben" im
+  // Spieltagsergebnisse-Panel. Bezugspunkt ist das gemanagte Team, falls bekannt, sonst das
+  // gerade gewaehlte Heimteam.
+  const relationshipByTeamId = useMemo(
+    () =>
+      buildTeamRelationshipMap(
+        { teams: gameState.teams, teamControlSettings: gameState.seasonState?.teamControlSettings ?? {} },
+        activeManagerTeamId ?? heimTeamId,
+      ),
+    [gameState.teams, gameState.seasonState?.teamControlSettings, activeManagerTeamId, heimTeamId],
+  );
+
+  const fixturesPanel = useMemo(
+    () =>
+      buildArenaFixturesPanel({
+        uebersicht: spieltagsUebersicht,
+        teamsById,
+        heimTeamId,
+        gastTeamId,
+        relationshipByTeamId,
+      }),
+    [spieltagsUebersicht, teamsById, heimTeamId, gastTeamId, relationshipByTeamId],
+  );
+
+  // Standings-Preview nur ON-DEMAND (erst wenn das Tabelle-Panel wirklich offen ist) -- s.
+  // `useArenaStandingsPreview`-Dateikommentar.
+  const standingsPreviewAbfrage = useArenaStandingsPreview({
+    enabled: zeigeTabelle,
+    saveId,
+    seasonId: gameState.season?.id,
+    matchdayId,
+  });
+
+  const standingsPanel = useMemo(
+    () =>
+      buildArenaStandingsPanel({
+        teams: gameState.teams,
+        standings: gameState.seasonState?.standings ?? {},
+        currentMatchdayNumber: gameState.season?.currentMatchday ?? null,
+        ownTeamId: activeManagerTeamId ?? null,
+        preview: standingsPreviewAbfrage.preview
+          ? {
+              matchdayResultFound: standingsPreviewAbfrage.preview.summary.matchdayResultFound,
+              items: standingsPreviewAbfrage.preview.items.map((item) => ({
+                teamId: item.teamId,
+                projectedRank: item.projectedRank,
+                projectedPoints: item.projectedPoints,
+                resultStatus: item.resultStatus,
+              })),
+            }
+          : null,
+      }),
+    [
+      gameState.teams,
+      gameState.seasonState?.standings,
+      gameState.season?.currentMatchday,
+      activeManagerTeamId,
+      standingsPreviewAbfrage.preview,
+    ],
   );
 
   const keineTeams = teams.length === 0;
@@ -877,6 +970,176 @@ export default function FoundationBattleArenaHost({
         </p>
         <FoundationBattleArenaSpriteGallery />
       </section>
+
+      {/* LIVE-PANELS: "Spieltagsergebnisse" + "Tabelle" (Chris' Freigabe 26.10. zum
+          Mockup-Artefakt). Fixed unten rechts, damit sie beim Scrollen ueber dem eingebetteten
+          Motor stehen bleiben -- der Motor haengt als eigenes <div ref={containerRef}> daneben,
+          nicht darunter, dieser Block bleibt also ausserhalb seines DOM und blutet nirgendwohin. */}
+      <style>{`
+        .oly-arena-live-buttons{position:fixed;right:16px;bottom:16px;z-index:40;display:flex;
+          flex-direction:column;align-items:flex-end;gap:8px}
+        .oly-arena-live-knopf{min-height:40px;padding:0 16px;border-radius:999px;cursor:pointer;
+          border:1px solid rgba(255,255,255,0.16);background:#262626;color:#f4f4f4;font-size:0.82rem;
+          font-weight:600;letter-spacing:0.01em;display:inline-flex;align-items:center;gap:7px;
+          box-shadow:0 4px 14px rgba(0,0,0,0.35);transition:border-color 150ms ease,background-color 150ms ease}
+        .oly-arena-live-knopf:hover{border-color:rgba(255,255,255,0.34);background:#323232}
+        .oly-arena-live-knopf.ist-aktiv{border-color:#F2A03D;background:#3a2c17}
+        .oly-arena-live-panel{width:min(440px,calc(100vw - 32px));max-height:min(60vh,520px);
+          overflow-y:auto;border-radius:14px;border:1px solid rgba(255,255,255,0.14);
+          background:#1c1c1c;color:#f0f0f0;box-shadow:0 10px 28px rgba(0,0,0,0.45);
+          padding:12px 14px 14px}
+        .oly-arena-live-panel-kopf{display:flex;align-items:center;justify-content:space-between;
+          gap:10px;margin-bottom:8px}
+        .oly-arena-live-panel-titel{font-size:0.88rem;font-weight:700;margin:0}
+        .oly-arena-live-schliessen{background:none;border:none;color:#bdbdbd;cursor:pointer;
+          font-size:1rem;line-height:1;padding:2px 6px;border-radius:6px}
+        .oly-arena-live-schliessen:hover{color:#fff;background:rgba(255,255,255,0.08)}
+        .oly-arena-live-hinweis{font-size:0.74rem;color:#bdbdbd;margin:0 0 8px}
+        .oly-arena-live-hinweis.ist-vorlaeufig{color:#F2A03D}
+        .oly-arena-live-zeile{display:flex;align-items:center;gap:8px;padding:6px 4px;
+          border-radius:8px;font-size:0.8rem}
+        .oly-arena-live-zeile.ist-eigen{background:rgba(242,160,61,0.14)}
+        .oly-arena-live-zeile.ist-rivale:not(.ist-eigen){background:rgba(229,62,62,0.1)}
+        .oly-arena-live-chip{flex:none;font-size:0.65rem;font-weight:700;letter-spacing:0.03em;
+          text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,0.08);
+          color:#d8d8d8}
+        .oly-arena-live-chip.ist-beendet{background:rgba(72,187,120,0.18);color:#8de3ab}
+        .oly-arena-live-paarung{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+        .oly-arena-live-teams{display:flex;align-items:baseline;gap:5px;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis}
+        .oly-arena-live-ergebnis{font-size:0.72rem;color:#aeaeae}
+        .oly-arena-live-tabelle{width:100%;border-collapse:collapse;font-size:0.8rem}
+        .oly-arena-live-tabelle th{text-align:left;font-size:0.65rem;letter-spacing:0.04em;
+          text-transform:uppercase;color:#9a9a9a;padding:4px 6px;border-bottom:1px solid rgba(255,255,255,0.1)}
+        .oly-arena-live-tabelle td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,0.06)}
+        .oly-arena-live-tabelle tr.ist-eigenes-team td{background:rgba(242,160,61,0.14)}
+        .oly-arena-live-tabelle td.num{text-align:right;font-variant-numeric:tabular-nums}
+      `}</style>
+
+      <div className="oly-arena-live-buttons">
+        {zeigeSpieltagsergebnisse ? (
+          <div className="oly-arena-live-panel" data-testid="oly-arena-live-panel-spieltagsergebnisse">
+            <div className="oly-arena-live-panel-kopf">
+              <p className="oly-arena-live-panel-titel">
+                {fixturesPanel ? fixturesPanel.matchdayLabel : "Spieltagsergebnisse"}
+              </p>
+              <button
+                type="button"
+                className="oly-arena-live-schliessen"
+                onClick={() => setZeigeSpieltagsergebnisse(false)}
+                aria-label="Spieltagsergebnisse schließen"
+              >
+                ✕
+              </button>
+            </div>
+            {fixturesPanel ? (
+              <>
+                <p className="oly-arena-live-hinweis">
+                  Alle Paarungen dieses Spieltags — dein Duell und ein Rivalen-Spiel sind
+                  hervorgehoben. Ein Spieltag wird immer komplett auf einmal gewertet, es gibt
+                  also kein „läuft gerade“ einzelner Paarungen — nur „gewertet“ oder „offen“.
+                </p>
+                {fixturesPanel.rows.length === 0 ? (
+                  <p className="muted" style={{ fontSize: "0.8rem" }}>
+                    Keine Paarungen an diesem Spieltag gefunden.
+                  </p>
+                ) : (
+                  fixturesPanel.rows.map((row) => (
+                    <div
+                      key={row.fixtureId}
+                      className={[
+                        "oly-arena-live-zeile",
+                        row.isOwnMatch && "ist-eigen",
+                        row.isRivalMatch && "ist-rivale",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <span className={`oly-arena-live-chip${row.gespielt ? " ist-beendet" : ""}`}>
+                        {row.gespielt ? "Gewertet" : "Offen"}
+                      </span>
+                      <div className="oly-arena-live-paarung">
+                        <span className="oly-arena-live-teams">
+                          <strong>{row.homeTeamCode}</strong> – <strong>{row.awayTeamCode}</strong>
+                          {row.isOwnMatch ? " · dein Duell" : row.isRivalMatch ? " · Rivale" : ""}
+                        </span>
+                        {row.resultLabel ? (
+                          <span className="oly-arena-live-ergebnis">{row.resultLabel}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </>
+            ) : (
+              <p className="muted" style={{ fontSize: "0.8rem" }}>
+                Für diesen Spielstand gibt es keinen Spieltags-Spielplan (z. B. ein Manager-Save
+                ohne Battle-Fixtures).
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {zeigeTabelle ? (
+          <div className="oly-arena-live-panel" data-testid="oly-arena-live-panel-tabelle">
+            <div className="oly-arena-live-panel-kopf">
+              <p className="oly-arena-live-panel-titel">Tabelle</p>
+              <button
+                type="button"
+                className="oly-arena-live-schliessen"
+                onClick={() => setZeigeTabelle(false)}
+                aria-label="Tabelle schließen"
+              >
+                ✕
+              </button>
+            </div>
+            <p
+              className={`oly-arena-live-hinweis${standingsPanel.isProvisional ? " ist-vorlaeufig" : ""}`}
+            >
+              {standingsPreviewAbfrage.loading ? "Lädt …" : standingsPanel.hinweisText}
+            </p>
+            <table className="oly-arena-live-tabelle">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Team</th>
+                  <th style={{ textAlign: "right" }}>Sp</th>
+                  <th style={{ textAlign: "right" }}>Diff</th>
+                  <th style={{ textAlign: "right" }}>Pkt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standingsPanel.rows.map((row) => (
+                  <tr key={row.teamId} className={row.isOwnTeam ? "ist-eigenes-team" : ""}>
+                    <td>{row.rank ?? "–"}</td>
+                    <td title={row.teamName}>{row.teamCode}</td>
+                    <td className="num">{row.sp ?? "–"}</td>
+                    <td className="num">{row.diff != null ? row.diff.toFixed(1) : "–"}</td>
+                    <td className="num">{row.points != null ? row.points.toFixed(1) : "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          className={`oly-arena-live-knopf${zeigeSpieltagsergebnisse ? " ist-aktiv" : ""}`}
+          onClick={() => setZeigeSpieltagsergebnisse((wert) => !wert)}
+          data-testid="oly-arena-live-knopf-spieltagsergebnisse"
+        >
+          ⚑ Spieltagsergebnisse
+        </button>
+        <button
+          type="button"
+          className={`oly-arena-live-knopf${zeigeTabelle ? " ist-aktiv" : ""}`}
+          onClick={() => setZeigeTabelle((wert) => !wert)}
+          data-testid="oly-arena-live-knopf-tabelle"
+        >
+          ▤ Tabelle
+        </button>
+      </div>
     </>
   );
 }
