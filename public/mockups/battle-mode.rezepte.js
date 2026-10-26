@@ -297,7 +297,16 @@ window.__ARENA_REZEPTE = {
     // basketball 24 6 vorher/nachher 0,832/0,825 -> 0,877/0,883 (verbessert, nicht nur gehalten);
     // miss-alle-disziplinen.mjs 24 basketball (kaderfamilie-Median, 5 Kader) 0,832/Spannweite
     // 0,104 -- bestanden. Basketball steht seit dieser Runde deshalb in
-    // `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- 20/20.
+    // `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- als VIERZEHNTE
+    // Disziplin, NICHT 20/20 (die urspruengliche PR-Beschreibung behauptete das faelschlich; s.
+    // docs/design/stand-aller-disziplinen.md fuer die Korrektur, Opus-Review 26.10.).
+    //
+    // OPUS-REVIEW-NACHTRAG (26.10.): die obigen 22,9/17,6 kommen von n=12 auf genau den zwei
+    // Stroemen, auf denen auch zwischen den drei Fassungen ausgewaehlt wurde -- ein frischer
+    // dritter n=12-Strom riss die Schranke mit 27,7. Auf dem im Handbuch vorgeschriebenen Umfang
+    // n=48 (dem Protokollstandard fuer Feldspiel) besteht Basketball dagegen klar und robust:
+    // 15,6 / 16,7 (beide Stroeme, unabhaengig nachgemessen). Die n=48-Zahlen sind die, die in
+    // `data/generated/disziplin-abnahme.json` stehen sollten, nicht die n=12-Werte.
     ZWEITCHANCE: {torment:20,intelligence:24,spirit:23,speed:9,awareness:22,stamina:2},
     // ===========================================================================
     // VERTEIDIGER-DIFFERENZIERUNG — der eine Punkt, an dem das Rezept aus PR #680
