@@ -59,6 +59,19 @@
 // AUFRUF (s. CLAUDE.md "An die Spielstaende kommen"):
 //   OLY_APP_SQLITE_PATH=/tmp/abbild.sqlite npx tsx scripts/miss-pps-duell-bruecke-abnahme.ts \
 //     [--disziplinen=a,b,...] [--spieltage=10] [--pp-trials-je-seite=6]
+//
+// NACHTRAG 26.10. (Task #199, Folge zu Abschnitt 8.7 der Doku): `--synth-liga-split` baut statt
+// einem Save aus dem Live-Abbild einen FRISCHEN Battle-Mode-Save mit AKTIVEM Liga-Split
+// (isLeagueSplitActive() === true, 32 Teams/2x16 Ligen, echter Rundenplan-Spielplan statt der
+// alten 1-Fixture/Spieltag-Dummy-Kette) -- ueber `tests/helpers/build-battle-mode-league-split-
+// save.ts` (derselbe Wizard-Pfad wie scripts/e2e-battle-pps-duell.ts). Grund: ALLE acht Saves des
+// Live-Abbilds haben isLeagueSplitActive() === false, wodurch `findeSpieltagsFixtures()`
+// (lib/resolve/battle-mode-pps-duell.ts) fuer >90% der Team-Seiten gar keinen Gegner findet und auf
+// den alten "pps"-Rueckfall ausweicht -- jede bisherige Messung ohne diesen Schalter hat damit nie
+// ueberwiegend die Bruecke selbst (`resolutionSource: "pps_duell"`) gemessen, s. Abschnitt 8.7.
+// `--save=<id>` wird mit `--synth-liga-split` ignoriert (der Save existiert noch nicht vorher).
+//   OLY_APP_SQLITE_PATH=/tmp/beliebiger-pfad.sqlite npx tsx scripts/miss-pps-duell-bruecke-abnahme.ts \
+//     --synth-liga-split [--disziplinen=a,b,...] [--spieltage=2] [--feldgroessen=6] [--pp-trials-je-seite=4]
 // ===================================================================================
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -73,6 +86,7 @@ import {
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildAiLegacyLineupPreviewWithModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { buildInitialLeagueAssignment, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
+import { buildBattleModeLeagueSplitSave } from "@/tests/helpers/build-battle-mode-league-split-save";
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import { calculateRawDisciplineScore, buildCompetitionRanks, mapRankToDisciplineStat } from "@/lib/player-formulas/discipline-rating-engine";
 import { resolveDisciplineWeightProfile } from "@/lib/player-generator/spiel-eignung-overrides";
@@ -104,6 +118,9 @@ const SAATSTROEME = args.get("stroeme")
 // Feldgroessen-Sweep mit --skip-teil-b neben einer Teil-B-Nachmessung) sich nicht gegenseitig die
 // Ausgabedatei ueberschreiben.
 const AUSGABE = args.get("ausgabe") ? path.resolve(args.get("ausgabe")!) : path.join(WURZEL, "data/generated/pps-duell-bruecke-abnahme.json");
+// Task #199: frischen Liga-Split-Battle-Save statt eines Saves aus dem Live-Abbild verwenden (s.
+// Kopfkommentar). `--save=<id>` ist mit diesem Schalter wirkungslos.
+const SYNTH_LIGA_SPLIT = args.has("synth-liga-split");
 
 // OPUS-PRAEZISIERUNG 17.10. (Nachtrag zu PR #1277): Spearman auf einer Teamseite mit n=2 ist
 // mathematisch IMMER ±1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- ohne Erkenntniswert
@@ -226,12 +243,25 @@ function attrsOf(player: Player | undefined): Record<string, number> | null {
 
 type FixtureRow = { eignungDiff: number; korrektGeordnet: boolean | null; absEignungDiff: number };
 
-function main() {
-  const persistence = createPersistenceService();
-  const saveId = args.get("save") ?? "new-game-1787123325719-swnjlk";
-  const save = persistence.getSaveById(saveId);
-  if (!save) throw new Error(`Save ${saveId} nicht im Abbild.`);
-  const basis = save.gameState;
+async function main() {
+  let basis: GameState;
+  let saveId: string;
+  if (SYNTH_LIGA_SPLIT) {
+    // Task #199: frischer Battle-Mode-Save mit AKTIVEM Liga-Split statt eines Live-Abbild-Saves --
+    // s. Kopfkommentar der Datei und tests/helpers/build-battle-mode-league-split-save.ts. Schreibt
+    // in die SQLite, auf die `OLY_APP_SQLITE_PATH` zeigt (oder einen eigenen Temp-Pfad, wenn die
+    // Variable fehlt) -- NIE in die Live-Save-Kopie.
+    const gebaut = await buildBattleModeLeagueSplitSave({ logPrefix: "[pps-duell-abnahme]" });
+    basis = gebaut.gameState;
+    saveId = gebaut.saveId;
+    console.error(`[synth-liga-split] frischer Battle-Save ${saveId} gebaut (sqlite: ${gebaut.sqlitePath}).`);
+  } else {
+    const persistence = createPersistenceService();
+    saveId = args.get("save") ?? "new-game-1787123325719-swnjlk";
+    const save = persistence.getSaveById(saveId);
+    if (!save) throw new Error(`Save ${saveId} nicht im Abbild.`);
+    basis = save.gameState;
+  }
   const seasonId = basis.season.id;
   // ZWEI UNABHAENGIGE SAATSTROEME, AUCH FUER TEIL A (Projektaufsicht-Fund 17.10., gegenueber der
   // ersten Fassung dieses Abschnitts): ein Team-Seiten-"Spiel" (baseValue/pointsAwarded fuer Teil
@@ -298,6 +328,11 @@ function main() {
   // Teil B: Einfluss je (Disziplin, Strom, Attribut) -- Summe der positiven pointsAwarded-Deltas.
   const einflussJeDisziplinUndStrom = new Map<string, Record<string, number>>();
   const einflussLaeufeJeDisziplinUndStrom = new Map<string, number>();
+  // Task #199: Beleg, WELCHER Pfad tatsaechlich gemessen wurde -- `resolutionSource` je Team-Seite,
+  // gezaehlt wie in scripts/e2e-battle-pps-duell.ts. Ohne echte Spieltags-Fixtures (Dummy-Paarung,
+  // s. Abschnitt 8.7 der Doku) ueberwiegt "pps" (Rueckfall) klar; mit `--synth-liga-split` sollte
+  // "pps_duell" (die eigentliche Bruecke) den Hauptanteil tragen.
+  const resolutionSourceZaehler = new Map<string, number>();
 
   for (const strom of SAATSTROEME) {
     const ppRnd = mulberry32(strom + 777);
@@ -354,6 +389,8 @@ function main() {
           const fixtureKey = `${dp.disciplineId}::${strom}`;
           const gameRhos = gameRhosJeDisziplinUndStrom.get(gameRhoKey) ?? [];
           for (const teamResult of dp.teamResults) {
+            const quelle = `${strom}::${teamResult.resolutionSource}`;
+            resolutionSourceZaehler.set(quelle, (resolutionSourceZaehler.get(quelle) ?? 0) + 1);
             const eignungen: number[] = [];
             const pps: number[] = [];
             for (const entry of teamResult.entries) {
@@ -696,18 +733,24 @@ function main() {
   })();
 
   const ausgabe = {
-    hinweis: "Abnahme der PPS-Duell-Bruecke selbst (v3, Opus-Praezisierung 17.10. zu PR #1277). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), n>=3 erzwungen (spearman() verwirft kleinere Seiten), gemessen JE FELDGROESSE (3/4/5/6) UND gepoolt, am echten Live-Save-Kader mit echter KI-Aufstellung; Feldgroesse 2 analytisch (immer |rho|=1) statt simuliert. Zusaetzlich Paartreue nach Team-Eignungsabstand (sekundaere Teamgroesse, NICHT die Abnahmezahl). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung), NUR bei Feldgroesse 6. Zwei unabhaengige Saatstroeme je Teil, fuer Teil A zusaetzlich ueber DISJUNKTE Spieltags-Fenster (sonst waere der Spieler-rho-Median fuer beide Stroeme bit-identisch, da er nicht von der Zufallspaarung abhaengt).",
+    hinweis: "Abnahme der PPS-Duell-Bruecke selbst (v4, Task #199 26.10. zu Abschnitt 8.7 der Doku -- echte Spieltags-Fixtures statt Dummy-Paarung). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), n>=3 erzwungen (spearman() verwirft kleinere Seiten), gemessen JE FELDGROESSE UND gepoolt, mit echter KI-Aufstellung; Feldgroesse 2 analytisch (immer |rho|=1) statt simuliert. Zusaetzlich Paartreue nach Team-Eignungsabstand (sekundaere Teamgroesse, NICHT die Abnahmezahl). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung), NUR bei Feldgroesse 6. Zwei unabhaengige Saatstroeme je Teil, fuer Teil A zusaetzlich ueber DISJUNKTE Spieltags-Fenster (sonst waere der Spieler-rho-Median fuer beide Stroeme bit-identisch, da er nicht von der Zufallspaarung abhaengt).",
     commit,
     datum: new Date().toISOString(),
+    synthLigaSplit: SYNTH_LIGA_SPLIT,
+    saveId,
     feldgroessenTeilA: FELDGROESSEN_TEIL_A,
     ppFeldgroesse: PP_FELDGROESSE,
     spieltageFensterJeStrom: Object.fromEntries(SAATSTROEME.map((s) => [s, spieltageJeStrom.get(s) ?? []])),
     ppTrialsJeSeite: PP_TRIALS_JE_SEITE,
     saatStroeme: SAATSTROEME,
+    resolutionSourceVerteilung: Object.fromEntries(resolutionSourceZaehler),
     teilA, teilB,
   };
   writeFileSync(AUSGABE, `${JSON.stringify(ausgabe, null, 1)}\n`);
   console.error(`\n[geschrieben] ${AUSGABE} (commit ${commit})`);
 }
 
-main();
+void main().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

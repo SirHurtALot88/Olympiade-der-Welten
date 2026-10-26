@@ -1,0 +1,1329 @@
+{
+ "hinweis": "Abnahme der PPS-Duell-Bruecke selbst (v4, Task #199 26.10. zu Abschnitt 8.7 der Doku -- echte Spieltags-Fixtures statt Dummy-Paarung). Teil A: Spearman-rho zwischen Spieler-Eignung (p.d) und vergebener individueller PP, JE TEAM-SEITE EINER DISZIPLIN AN EINEM SPIELTAG (= ein Spiel/Boxscore), n>=3 erzwungen (spearman() verwirft kleinere Seiten), gemessen JE FELDGROESSE UND gepoolt, mit echter KI-Aufstellung; Feldgroesse 2 analytisch (immer |rho|=1) statt simuliert. Zusaetzlich Paartreue nach Team-Eignungsabstand (sekundaere Teamgroesse, NICHT die Abnahmezahl). Teil B: Pp-Abweichung des von der Bruecke konsumierten Score-Kanals UNTER ECHTEN BEDINGUNGEN (reale Formkarten/Mutatoren/Team-Power/Kapitaen/Fatigue/Verletzung/Moral, nur EIN Attribut eines bereits gefelderten Spielers angehoben, ueber die echte Liga-Rangabbildung), NUR bei Feldgroesse 6. Zwei unabhaengige Saatstroeme je Teil, fuer Teil A zusaetzlich ueber DISJUNKTE Spieltags-Fenster (sonst waere der Spieler-rho-Median fuer beide Stroeme bit-identisch, da er nicht von der Zufallspaarung abhaengt).",
+ "commit": "679f5812a5ce8e1ceee8f1655561238e2ba55485",
+ "datum": "2026-10-26T06:04:35.825Z",
+ "synthLigaSplit": true,
+ "saveId": "new-game-1792993685704-mrx4fk",
+ "feldgroessenTeilA": [
+  3,
+  4,
+  5,
+  6
+ ],
+ "ppFeldgroesse": 6,
+ "spieltageFensterJeStrom": {
+  "10000000": [
+   "matchday-4",
+   "matchday-5",
+   "matchday-6"
+  ]
+ },
+ "ppTrialsJeSeite": 4,
+ "saatStroeme": [
+  10000000
+ ],
+ "resolutionSourceVerteilung": {
+  "10000000::pps_duell": 2688,
+  "10000000::mini_dm_pod": 384
+ },
+ "teilA": {
+  "football": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.8097492752746035,
+      "fixtureRhoAnteilAb08": 0.6770833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7708333333333334,
+      "starTop2Pct": 0.96875,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9861325115562404,
+      "paartreueAb15N": 649,
+      "paartreueAb15SelbeSeitePct": 0.9838709677419355,
+      "paartreueAb15SelbeSeiteN": 248,
+      "paartreueAb15UeberSeitenPct": 0.9875311720698254,
+      "paartreueAb15UeberSeitenN": 401
+     },
+     "4": {
+      "median": 0.8,
+      "spannweite": 1.8,
+      "n": 96,
+      "fixtureRhoMittel": 0.7938609522046837,
+      "fixtureRhoAnteilAb08": 0.6041666666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8333333333333334,
+      "starTop2Pct": 0.9375,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9837925445705025,
+      "paartreueAb15N": 1234,
+      "paartreueAb15SelbeSeitePct": 0.996031746031746,
+      "paartreueAb15SelbeSeiteN": 504,
+      "paartreueAb15UeberSeitenPct": 0.9753424657534246,
+      "paartreueAb15UeberSeitenN": 730
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1.2051956704170308,
+      "n": 96,
+      "fixtureRhoMittel": 0.8407287742534861,
+      "fixtureRhoAnteilAb08": 0.7395833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.90625,
+      "starTop2Pct": 0.9583333333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9862946647087616,
+      "paartreueAb15N": 2043,
+      "paartreueAb15SelbeSeitePct": 0.9952830188679245,
+      "paartreueAb15SelbeSeiteN": 848,
+      "paartreueAb15UeberSeitenPct": 0.9799163179916318,
+      "paartreueAb15UeberSeitenN": 1195
+     },
+     "6": {
+      "median": 0.8857142857142857,
+      "spannweite": 1.4285714285714286,
+      "n": 96,
+      "fixtureRhoMittel": 0.8450302598371066,
+      "fixtureRhoAnteilAb08": 0.7708333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8333333333333334,
+      "starTop2Pct": 0.9166666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9790235081374322,
+      "paartreueAb15N": 2765,
+      "paartreueAb15SelbeSeitePct": 0.994661921708185,
+      "paartreueAb15SelbeSeiteN": 1124,
+      "paartreueAb15UeberSeitenPct": 0.9683120048750762,
+      "paartreueAb15UeberSeitenN": 1641
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6875,
+      "n": 16
+     },
+     "2..15": {
+      "pct": 0.7230769230769231,
+      "n": 65
+     },
+     ">=15": {
+      "pct": 0.9403973509933775,
+      "n": 302
+     }
+    }
+   }
+  ],
+  "i-spy": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.79742139582818,
+      "fixtureRhoAnteilAb08": 0.5520833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7291666666666666,
+      "starTop2Pct": 0.96875,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9948186528497409,
+      "paartreueAb15N": 386,
+      "paartreueAb15SelbeSeitePct": 0.9824561403508771,
+      "paartreueAb15SelbeSeiteN": 114,
+      "paartreueAb15UeberSeitenPct": 1,
+      "paartreueAb15UeberSeitenN": 272
+     },
+     "4": {
+      "median": 0.8,
+      "spannweite": 1.4,
+      "n": 96,
+      "fixtureRhoMittel": 0.8412495187893153,
+      "fixtureRhoAnteilAb08": 0.7083333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.75,
+      "starTop2Pct": 0.9375,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9987995198079231,
+      "paartreueAb15N": 833,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 316,
+      "paartreueAb15UeberSeitenPct": 0.9980657640232108,
+      "paartreueAb15UeberSeitenN": 517
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1,
+      "n": 96,
+      "fixtureRhoMittel": 0.8778415386667566,
+      "fixtureRhoAnteilAb08": 0.8645833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.6979166666666666,
+      "starTop2Pct": 0.9270833333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9940440738534843,
+      "paartreueAb15N": 1679,
+      "paartreueAb15SelbeSeitePct": 0.9915014164305949,
+      "paartreueAb15SelbeSeiteN": 706,
+      "paartreueAb15UeberSeitenPct": 0.9958890030832477,
+      "paartreueAb15UeberSeitenN": 973
+     },
+     "6": {
+      "median": 0.9428571428571428,
+      "spannweite": 0.5714285714285714,
+      "n": 96,
+      "fixtureRhoMittel": 0.9090460268110915,
+      "fixtureRhoAnteilAb08": 0.96875,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7083333333333334,
+      "starTop2Pct": 0.9166666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9960144927536232,
+      "paartreueAb15N": 2760,
+      "paartreueAb15SelbeSeitePct": 0.9966101694915255,
+      "paartreueAb15SelbeSeiteN": 1180,
+      "paartreueAb15UeberSeitenPct": 0.9955696202531645,
+      "paartreueAb15UeberSeitenN": 1580
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.42857142857142855,
+      "n": 7
+     },
+     "2..15": {
+      "pct": 0.5747126436781609,
+      "n": 87
+     },
+     ">=15": {
+      "pct": 0.972318339100346,
+      "n": 289
+     }
+    }
+   }
+  ],
+  "battlefield": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.798282236795781,
+      "fixtureRhoAnteilAb08": 0.5833333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.75,
+      "starTop2Pct": 0.9270833333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9978021978021978,
+      "paartreueAb15N": 455,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 182,
+      "paartreueAb15UeberSeitenPct": 0.9963369963369964,
+      "paartreueAb15UeberSeitenN": 273
+     },
+     "4": {
+      "median": 0.8,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.7628051054903984,
+      "fixtureRhoAnteilAb08": 0.5520833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7291666666666666,
+      "starTop2Pct": 0.9583333333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.980561555075594,
+      "paartreueAb15N": 926,
+      "paartreueAb15SelbeSeitePct": 0.9943502824858758,
+      "paartreueAb15SelbeSeiteN": 354,
+      "paartreueAb15UeberSeitenPct": 0.972027972027972,
+      "paartreueAb15UeberSeitenN": 572
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 0.9,
+      "n": 96,
+      "fixtureRhoMittel": 0.8073396075091769,
+      "fixtureRhoAnteilAb08": 0.6354166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7916666666666666,
+      "starTop2Pct": 0.9270833333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9855072463768116,
+      "paartreueAb15N": 1587,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 646,
+      "paartreueAb15UeberSeitenPct": 0.975557917109458,
+      "paartreueAb15UeberSeitenN": 941
+     },
+     "6": {
+      "median": 0.8857142857142857,
+      "spannweite": 1.0285714285714285,
+      "n": 96,
+      "fixtureRhoMittel": 0.8173005761740985,
+      "fixtureRhoAnteilAb08": 0.6875,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7395833333333334,
+      "starTop2Pct": 0.9479166666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9816061013907582,
+      "paartreueAb15N": 2229,
+      "paartreueAb15SelbeSeitePct": 0.9958071278825996,
+      "paartreueAb15SelbeSeiteN": 954,
+      "paartreueAb15UeberSeitenPct": 0.9709803921568627,
+      "paartreueAb15UeberSeitenN": 1275
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5,
+      "n": 14
+     },
+     "2..15": {
+      "pct": 0.7608695652173914,
+      "n": 92
+     },
+     ">=15": {
+      "pct": 0.9856115107913669,
+      "n": 278
+     }
+    }
+   }
+  ],
+  "tdm": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9428571428571428,
+    "spielerRhoSpannweiteGesamt": 1.5,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 1.5,
+      "n": 96,
+      "fixtureRhoMittel": 0.8671522313370056,
+      "fixtureRhoAnteilAb08": 0.8020833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8854166666666666,
+      "starTop2Pct": 0.9895833333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9955489614243324,
+      "paartreueAb15N": 674,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 240,
+      "paartreueAb15UeberSeitenPct": 0.9930875576036866,
+      "paartreueAb15UeberSeitenN": 434
+     },
+     "4": {
+      "median": 0.8743416490252569,
+      "spannweite": 1.4,
+      "n": 96,
+      "fixtureRhoMittel": 0.8186399932208835,
+      "fixtureRhoAnteilAb08": 0.71875,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.9052631578947369,
+      "starTop2Pct": 1,
+      "starN": 95,
+      "paartreueAb15Pct": 0.9873817034700315,
+      "paartreueAb15N": 1268,
+      "paartreueAb15SelbeSeitePct": 0.9918032786885246,
+      "paartreueAb15SelbeSeiteN": 488,
+      "paartreueAb15UeberSeitenPct": 0.9846153846153847,
+      "paartreueAb15UeberSeitenN": 780
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1.1,
+      "n": 96,
+      "fixtureRhoMittel": 0.842412117497174,
+      "fixtureRhoAnteilAb08": 0.75,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.9166666666666666,
+      "starTop2Pct": 1,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9834101382488479,
+      "paartreueAb15N": 2170,
+      "paartreueAb15SelbeSeitePct": 0.9955456570155902,
+      "paartreueAb15SelbeSeiteN": 898,
+      "paartreueAb15UeberSeitenPct": 0.9748427672955975,
+      "paartreueAb15UeberSeitenN": 1272
+     },
+     "6": {
+      "median": 0.9,
+      "spannweite": 0.6285714285714286,
+      "n": 96,
+      "fixtureRhoMittel": 0.8508707389842401,
+      "fixtureRhoAnteilAb08": 0.7604166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.90625,
+      "starTop2Pct": 0.9791666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9760498687664042,
+      "paartreueAb15N": 3048,
+      "paartreueAb15SelbeSeitePct": 0.9890453834115805,
+      "paartreueAb15SelbeSeiteN": 1278,
+      "paartreueAb15UeberSeitenPct": 0.9666666666666667,
+      "paartreueAb15UeberSeitenN": 1770
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5714285714285714,
+      "n": 14
+     },
+     "2..15": {
+      "pct": 0.6271186440677966,
+      "n": 59
+     },
+     ">=15": {
+      "pct": 0.932475884244373,
+      "n": 311
+     }
+    }
+   }
+  ],
+  "mini-dm": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9428571428571428,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.8103574530885931,
+      "fixtureRhoAnteilAb08": 0.7083333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8,
+      "starTop2Pct": 0.9368421052631579,
+      "starN": 95,
+      "paartreueAb15Pct": 0.9928057553956835,
+      "paartreueAb15N": 556,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 172,
+      "paartreueAb15UeberSeitenPct": 0.9895833333333334,
+      "paartreueAb15UeberSeitenN": 384
+     },
+     "4": {
+      "median": 0.9486832980505138,
+      "spannweite": 1.4,
+      "n": 96,
+      "fixtureRhoMittel": 0.844458679696224,
+      "fixtureRhoAnteilAb08": 0.7604166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.75,
+      "starTop2Pct": 0.9239130434782609,
+      "starN": 92,
+      "paartreueAb15Pct": 0.9928251121076234,
+      "paartreueAb15N": 1115,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 396,
+      "paartreueAb15UeberSeitenPct": 0.9888734353268428,
+      "paartreueAb15UeberSeitenN": 719
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1.1,
+      "n": 96,
+      "fixtureRhoMittel": 0.8590973385280556,
+      "fixtureRhoAnteilAb08": 0.7604166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7849462365591398,
+      "starTop2Pct": 0.946236559139785,
+      "starN": 93,
+      "paartreueAb15Pct": 0.9873556899395272,
+      "paartreueAb15N": 1819,
+      "paartreueAb15SelbeSeitePct": 0.9972451790633609,
+      "paartreueAb15SelbeSeiteN": 726,
+      "paartreueAb15UeberSeitenPct": 0.9807868252516011,
+      "paartreueAb15UeberSeitenN": 1093
+     },
+     "6": {
+      "median": 0.9352453999505301,
+      "spannweite": 0.9420228964347551,
+      "n": 96,
+      "fixtureRhoMittel": 0.8679249311847617,
+      "fixtureRhoAnteilAb08": 0.8125,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7708333333333334,
+      "starTop2Pct": 0.9166666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9791590493601463,
+      "paartreueAb15N": 2735,
+      "paartreueAb15SelbeSeitePct": 0.9930313588850174,
+      "paartreueAb15SelbeSeiteN": 1148,
+      "paartreueAb15UeberSeitenPct": 0.9691241335853812,
+      "paartreueAb15UeberSeitenN": 1587
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.38461538461538464,
+      "n": 13
+     },
+     "2..15": {
+      "pct": 0.5862068965517241,
+      "n": 58
+     },
+     ">=15": {
+      "pct": 0.952076677316294,
+      "n": 313
+     }
+    }
+   }
+  ],
+  "basketball": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9428571428571428,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 96,
+      "fixtureRhoMittel": 0.8199470090246576,
+      "fixtureRhoAnteilAb08": 0.7083333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8631578947368421,
+      "starTop2Pct": 0.9894736842105263,
+      "starN": 95,
+      "paartreueAb15Pct": 0.9893390191897654,
+      "paartreueAb15N": 469,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 172,
+      "paartreueAb15UeberSeitenPct": 0.9831649831649831,
+      "paartreueAb15UeberSeitenN": 297
+     },
+     "4": {
+      "median": 0.9743416490252569,
+      "spannweite": 1.2,
+      "n": 96,
+      "fixtureRhoMittel": 0.8312751446592306,
+      "fixtureRhoAnteilAb08": 0.7083333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.9032258064516129,
+      "starTop2Pct": 0.978494623655914,
+      "starN": 93,
+      "paartreueAb15Pct": 0.9908906882591093,
+      "paartreueAb15N": 988,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 388,
+      "paartreueAb15UeberSeitenPct": 0.985,
+      "paartreueAb15UeberSeitenN": 600
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 0.7948043295829692,
+      "n": 96,
+      "fixtureRhoMittel": 0.8769119627367058,
+      "fixtureRhoAnteilAb08": 0.8333333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.9347826086956522,
+      "starTop2Pct": 0.9782608695652174,
+      "starN": 92,
+      "paartreueAb15Pct": 0.9917446340121079,
+      "paartreueAb15N": 1817,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 696,
+      "paartreueAb15UeberSeitenPct": 0.9866190900981266,
+      "paartreueAb15UeberSeitenN": 1121
+     },
+     "6": {
+      "median": 0.9138168285219588,
+      "spannweite": 0.9714285714285714,
+      "n": 96,
+      "fixtureRhoMittel": 0.8507093443466003,
+      "fixtureRhoAnteilAb08": 0.7604166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8315789473684211,
+      "starTop2Pct": 0.9368421052631579,
+      "starN": 95,
+      "paartreueAb15Pct": 0.9811093247588425,
+      "paartreueAb15N": 2488,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 952,
+      "paartreueAb15UeberSeitenPct": 0.9694010416666666,
+      "paartreueAb15UeberSeitenN": 1536
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.5,
+      "n": 18
+     },
+     "2..15": {
+      "pct": 0.7258064516129032,
+      "n": 62
+     },
+     ">=15": {
+      "pct": 0.9668874172185431,
+      "n": 302
+     }
+    }
+   }
+  ],
+  "hockey": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9,
+    "spielerRhoSpannweiteGesamt": 2,
+    "spielerRhoSpieleGesamt": 383,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 2,
+      "n": 95,
+      "fixtureRhoMittel": 0.7920961931062771,
+      "fixtureRhoAnteilAb08": 0.65625,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8229166666666666,
+      "starTop2Pct": 0.9479166666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9957716701902748,
+      "paartreueAb15N": 473,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 144,
+      "paartreueAb15UeberSeitenPct": 0.993920972644377,
+      "paartreueAb15UeberSeitenN": 329
+     },
+     "4": {
+      "median": 0.8,
+      "spannweite": 1.8,
+      "n": 96,
+      "fixtureRhoMittel": 0.8278198296019573,
+      "fixtureRhoAnteilAb08": 0.7083333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.84375,
+      "starTop2Pct": 0.8958333333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.98914223669924,
+      "paartreueAb15N": 921,
+      "paartreueAb15SelbeSeitePct": 0.9945054945054945,
+      "paartreueAb15SelbeSeiteN": 364,
+      "paartreueAb15UeberSeitenPct": 0.9856373429084381,
+      "paartreueAb15UeberSeitenN": 557
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1.8207826816681232,
+      "n": 96,
+      "fixtureRhoMittel": 0.8317621867168628,
+      "fixtureRhoAnteilAb08": 0.6458333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.84375,
+      "starTop2Pct": 0.90625,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9828009828009828,
+      "paartreueAb15N": 1628,
+      "paartreueAb15SelbeSeitePct": 0.9906832298136646,
+      "paartreueAb15SelbeSeiteN": 644,
+      "paartreueAb15UeberSeitenPct": 0.9776422764227642,
+      "paartreueAb15UeberSeitenN": 984
+     },
+     "6": {
+      "median": 0.9,
+      "spannweite": 1.1428571428571428,
+      "n": 96,
+      "fixtureRhoMittel": 0.8351432693318972,
+      "fixtureRhoAnteilAb08": 0.71875,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.7916666666666666,
+      "starTop2Pct": 0.9166666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9899224806201551,
+      "paartreueAb15N": 2580,
+      "paartreueAb15SelbeSeitePct": 0.996309963099631,
+      "paartreueAb15SelbeSeiteN": 1084,
+      "paartreueAb15UeberSeitenPct": 0.9852941176470589,
+      "paartreueAb15UeberSeitenN": 1496
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.6428571428571429,
+      "n": 14
+     },
+     "2..15": {
+      "pct": 0.72,
+      "n": 75
+     },
+     ">=15": {
+      "pct": 0.9694915254237289,
+      "n": 295
+     }
+    }
+   }
+  ],
+  "fechten": [
+   {
+    "strom": 10000000,
+    "spielerRhoMedianGesamt": 0.9428571428571428,
+    "spielerRhoSpannweiteGesamt": 1.8660254037844388,
+    "spielerRhoSpieleGesamt": 384,
+    "spielerRhoJeFeldgroesse": {
+     "3": {
+      "median": 1,
+      "spannweite": 1.8660254037844388,
+      "n": 96,
+      "fixtureRhoMittel": 0.8775505031477088,
+      "fixtureRhoAnteilAb08": 0.8020833333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.78125,
+      "starTop2Pct": 0.9479166666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9972489683631361,
+      "paartreueAb15N": 727,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 248,
+      "paartreueAb15UeberSeitenPct": 0.9958246346555324,
+      "paartreueAb15UeberSeitenN": 479
+     },
+     "4": {
+      "median": 0.8743416490252569,
+      "spannweite": 1.4,
+      "n": 96,
+      "fixtureRhoMittel": 0.8695893736359626,
+      "fixtureRhoAnteilAb08": 0.8229166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8229166666666666,
+      "starTop2Pct": 0.9791666666666666,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9935251798561151,
+      "paartreueAb15N": 1390,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 564,
+      "paartreueAb15UeberSeitenPct": 0.9891041162227603,
+      "paartreueAb15UeberSeitenN": 826
+     },
+     "5": {
+      "median": 0.9,
+      "spannweite": 1.3,
+      "n": 96,
+      "fixtureRhoMittel": 0.8518185945962782,
+      "fixtureRhoAnteilAb08": 0.7604166666666666,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.8020833333333334,
+      "starTop2Pct": 0.96875,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9846777827850383,
+      "paartreueAb15N": 2219,
+      "paartreueAb15SelbeSeitePct": 1,
+      "paartreueAb15SelbeSeiteN": 960,
+      "paartreueAb15UeberSeitenPct": 0.9729944400317713,
+      "paartreueAb15UeberSeitenN": 1259
+     },
+     "6": {
+      "median": 0.9428571428571428,
+      "spannweite": 0.9142857142857143,
+      "n": 96,
+      "fixtureRhoMittel": 0.8829562658298219,
+      "fixtureRhoAnteilAb08": 0.8333333333333334,
+      "fixtureRhoN": 96,
+      "starRang1Pct": 0.78125,
+      "starTop2Pct": 0.9583333333333334,
+      "starN": 96,
+      "paartreueAb15Pct": 0.9801849405548216,
+      "paartreueAb15N": 3028,
+      "paartreueAb15SelbeSeitePct": 0.9910714285714286,
+      "paartreueAb15SelbeSeiteN": 1344,
+      "paartreueAb15UeberSeitenPct": 0.9714964370546318,
+      "paartreueAb15UeberSeitenN": 1684
+     }
+    },
+    "feldgroesse2Hinweis": "Nicht simuliert: Spearman bei n=2 ist mathematisch immer |rho|=1 (zwei Punkte liegen zwangslaeufig perfekt monoton) -- kein Erkenntniswert, kein Lauf noetig.",
+    "paartreueNachEignungsabstand": {
+     "<2": {
+      "pct": 0.16666666666666666,
+      "n": 6
+     },
+     "2..15": {
+      "pct": 0.5344827586206896,
+      "n": 58
+     },
+     ">=15": {
+      "pct": 0.94375,
+      "n": 320
+     }
+    }
+   }
+  ]
+ },
+ "teilB": {
+  "football": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 21.2,
+    "anteile": {
+     "power": {
+      "matrixPct": 22,
+      "gemessenPct": 16.5,
+      "deltaPp": 5.5
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 13.5,
+      "deltaPp": 4.5
+     },
+     "determination": {
+      "matrixPct": 10,
+      "gemessenPct": 11.2,
+      "deltaPp": 1.2
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 8.5,
+      "deltaPp": 2.5
+     },
+     "speed": {
+      "matrixPct": 14,
+      "gemessenPct": 13.5,
+      "deltaPp": 0.5
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 6,
+      "deltaPp": 2
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 10,
+      "deltaPp": 2
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "will": {
+      "matrixPct": 3,
+      "gemessenPct": 4.5,
+      "deltaPp": 1.5
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 3,
+      "gemessenPct": 4.2,
+      "deltaPp": 1.2
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 12.2,
+      "deltaPp": 0.2
+     }
+    }
+   }
+  ],
+  "i-spy": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 3.1,
+    "anteile": {
+     "power": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "health": {
+      "matrixPct": 2,
+      "gemessenPct": 2,
+      "deltaPp": 0
+     },
+     "determination": {
+      "matrixPct": 8,
+      "gemessenPct": 6.9,
+      "deltaPp": 1.1
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 8,
+      "gemessenPct": 7.9,
+      "deltaPp": 0.1
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 7.9,
+      "deltaPp": 0.1
+     },
+     "awareness": {
+      "matrixPct": 5,
+      "gemessenPct": 4.8,
+      "deltaPp": 0.2
+     },
+     "intelligence": {
+      "matrixPct": 18,
+      "gemessenPct": 18.3,
+      "deltaPp": 0.3
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 12,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 9,
+      "gemessenPct": 9,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 13,
+      "gemessenPct": 13.3,
+      "deltaPp": 0.3
+     },
+     "torment": {
+      "matrixPct": 17,
+      "gemessenPct": 17.9,
+      "deltaPp": 0.9
+     }
+    }
+   }
+  ],
+  "battlefield": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 10.7,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 9.5,
+      "deltaPp": 0.5
+     },
+     "health": {
+      "matrixPct": 8,
+      "gemessenPct": 7.4,
+      "deltaPp": 0.6
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 3.2,
+      "deltaPp": 0.8
+     },
+     "stamina": {
+      "matrixPct": 4,
+      "gemessenPct": 3.2,
+      "deltaPp": 0.8
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 10,
+      "gemessenPct": 9.5,
+      "deltaPp": 0.5
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 18.7,
+      "deltaPp": 2.7
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 20,
+      "gemessenPct": 22.6,
+      "deltaPp": 2.6
+     },
+     "spirit": {
+      "matrixPct": 16,
+      "gemessenPct": 13.8,
+      "deltaPp": 2.2
+     },
+     "torment": {
+      "matrixPct": 12,
+      "gemessenPct": 12,
+      "deltaPp": 0
+     }
+    }
+   }
+  ],
+  "tdm": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 6.2,
+    "anteile": {
+     "power": {
+      "matrixPct": 28,
+      "gemessenPct": 28.9,
+      "deltaPp": 0.9
+     },
+     "health": {
+      "matrixPct": 20,
+      "gemessenPct": 21.2,
+      "deltaPp": 1.2
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 5.5,
+      "deltaPp": 0.5
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 13.2,
+      "deltaPp": 0.8
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "awareness": {
+      "matrixPct": 2,
+      "gemessenPct": 2.5,
+      "deltaPp": 0.5
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 5.5,
+      "deltaPp": 0.5
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 10,
+      "gemessenPct": 8.8,
+      "deltaPp": 1.2
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 11.8,
+      "deltaPp": 0.2
+     },
+     "torment": {
+      "matrixPct": 2,
+      "gemessenPct": 2.5,
+      "deltaPp": 0.5
+     }
+    }
+   }
+  ],
+  "mini-dm": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 23,
+    "anteile": {
+     "power": {
+      "matrixPct": 14,
+      "gemessenPct": 9,
+      "deltaPp": 5
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 11.5,
+      "deltaPp": 6.5
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 14,
+      "gemessenPct": 15.8,
+      "deltaPp": 1.8
+     },
+     "speed": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "dexterity": {
+      "matrixPct": 9,
+      "gemessenPct": 11,
+      "deltaPp": 2
+     },
+     "awareness": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "intelligence": {
+      "matrixPct": 6,
+      "gemessenPct": 7.8,
+      "deltaPp": 1.8
+     },
+     "will": {
+      "matrixPct": 12,
+      "gemessenPct": 13.9,
+      "deltaPp": 1.9
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 6,
+      "gemessenPct": 7.8,
+      "deltaPp": 1.8
+     },
+     "torment": {
+      "matrixPct": 21,
+      "gemessenPct": 23.1,
+      "deltaPp": 2.1
+     }
+    }
+   }
+  ],
+  "basketball": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 3.6,
+    "anteile": {
+     "power": {
+      "matrixPct": 7,
+      "gemessenPct": 7.2,
+      "deltaPp": 0.2
+     },
+     "health": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "determination": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "stamina": {
+      "matrixPct": 6,
+      "gemessenPct": 6,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 10,
+      "gemessenPct": 10.5,
+      "deltaPp": 0.5
+     },
+     "dexterity": {
+      "matrixPct": 8,
+      "gemessenPct": 8.5,
+      "deltaPp": 0.5
+     },
+     "awareness": {
+      "matrixPct": 14,
+      "gemessenPct": 14.1,
+      "deltaPp": 0.1
+     },
+     "intelligence": {
+      "matrixPct": 16,
+      "gemessenPct": 16.2,
+      "deltaPp": 0.2
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 11,
+      "gemessenPct": 11.3,
+      "deltaPp": 0.3
+     },
+     "spirit": {
+      "matrixPct": 22,
+      "gemessenPct": 20.3,
+      "deltaPp": 1.7
+     },
+     "torment": {
+      "matrixPct": 6,
+      "gemessenPct": 6,
+      "deltaPp": 0
+     }
+    }
+   }
+  ],
+  "hockey": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 31.6,
+    "anteile": {
+     "power": {
+      "matrixPct": 18,
+      "gemessenPct": 11.7,
+      "deltaPp": 6.3
+     },
+     "health": {
+      "matrixPct": 18,
+      "gemessenPct": 8.5,
+      "deltaPp": 9.5
+     },
+     "determination": {
+      "matrixPct": 4,
+      "gemessenPct": 5.7,
+      "deltaPp": 1.7
+     },
+     "stamina": {
+      "matrixPct": 10,
+      "gemessenPct": 12.4,
+      "deltaPp": 2.4
+     },
+     "speed": {
+      "matrixPct": 12,
+      "gemessenPct": 14.6,
+      "deltaPp": 2.6
+     },
+     "dexterity": {
+      "matrixPct": 4,
+      "gemessenPct": 5.9,
+      "deltaPp": 1.9
+     },
+     "awareness": {
+      "matrixPct": 8,
+      "gemessenPct": 9.8,
+      "deltaPp": 1.8
+     },
+     "intelligence": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "will": {
+      "matrixPct": 4,
+      "gemessenPct": 5.9,
+      "deltaPp": 1.9
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 12,
+      "gemessenPct": 14.6,
+      "deltaPp": 2.6
+     },
+     "torment": {
+      "matrixPct": 10,
+      "gemessenPct": 11.1,
+      "deltaPp": 1.1
+     }
+    }
+   }
+  ],
+  "fechten": [
+   {
+    "strom": 10000000,
+    "laeufe": 4,
+    "ppAbweichung": 12.1,
+    "anteile": {
+     "power": {
+      "matrixPct": 10,
+      "gemessenPct": 10.6,
+      "deltaPp": 0.6
+     },
+     "health": {
+      "matrixPct": 4,
+      "gemessenPct": 4.8,
+      "deltaPp": 0.8
+     },
+     "determination": {
+      "matrixPct": 6,
+      "gemessenPct": 6.6,
+      "deltaPp": 0.6
+     },
+     "stamina": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "speed": {
+      "matrixPct": 16,
+      "gemessenPct": 12.8,
+      "deltaPp": 3.2
+     },
+     "dexterity": {
+      "matrixPct": 20,
+      "gemessenPct": 17.2,
+      "deltaPp": 2.8
+     },
+     "awareness": {
+      "matrixPct": 15,
+      "gemessenPct": 16.1,
+      "deltaPp": 1.1
+     },
+     "intelligence": {
+      "matrixPct": 4,
+      "gemessenPct": 4.8,
+      "deltaPp": 0.8
+     },
+     "will": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "charisma": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "spirit": {
+      "matrixPct": 0,
+      "gemessenPct": 0,
+      "deltaPp": 0
+     },
+     "torment": {
+      "matrixPct": 25,
+      "gemessenPct": 27.1,
+      "deltaPp": 2.1
+     }
+    }
+   }
+  ]
+ }
+}
