@@ -744,3 +744,162 @@ frühere harte Annahme "Mini-DM hat auf Seiten-Ebene immer n=0" war selbst ein A
 gameMode-Bugs (Mini-DM lief vor dem Fix nie über `mini_dm_pod`, s. o.) — nach dem Fix schwankt n je
 Fenster (0 oder ~30). Mini-DM bleibt von der rho-Schranke ausgenommen, die feste n/median-Erwartung
 wurde entfernt (Begründung im Testkommentar).
+
+---
+
+## 9. Nachtrag 26.10. (Task #199): echte Spieltags-Fixtures statt der Dummy-Kette — jetzt gemessen
+
+Folge-Auftrag zu Abschnitt 8.7: der dort beschriebene zweite Befund („alle acht Saves des
+Live-Abbilds haben `isLeagueSplitActive() === false`, nur 5,5 % der Team-Seiten liefen tatsächlich
+`"pps_duell"`") ist jetzt behoben, nicht nur dokumentiert — mit einer frischen, echten
+Spieltags-Fixture-Grundlage statt der alten Dummy-Kette.
+
+### 9.1 Testgrundlage: Weg (a), über den echten Wizard-Pfad
+
+Kein Save von Hand gebastelt (Weg (b) aus dem Auftrag war nicht nötig). Neuer, wiederverwendbarer
+Testhelfer **`tests/helpers/build-battle-mode-league-split-save.ts`**: baut einen frischen Save über
+denselben Pfad wie `scripts/e2e-battle-pps-duell.ts` und `tests/helpers/mini-dm-ffa-battle-save.ts`
+— `applyNewGameSetup({ presetId: "solo_1", gameMode: "battle" })` → `fuehreLigaSetupDraftAus()`
+(echte, organische KI-Draft-Engine, ~2 Minuten) — und prüft danach selbst (nicht nur hoffend):
+`isLeagueSplitActive() === true`, UND jeder geplante Spieltag hat ≥ 16 Fixtures (2 Ligen × 8
+Paarungen), nicht die alte 1-Fixture-Kette. Schreibt in eine eigene Temp-SQLite, nie in die
+Live-Save-Kopie. Verifiziert (Smoke-Lauf): 32 Teams, 2×16 Ligen, **20 Spieltage, 320 Fixtures
+gesamt, 16 je Spieltag** — ein echter Rundenplan (`buildSeasonFixtureSchedule()`/
+`buildDoubleRoundRobin()`, Task #157), nicht die Dummy-Kette aus `preseason-workflow-service.ts`.
+
+`scripts/miss-pps-duell-bruecke-abnahme.ts` bekam einen neuen Schalter **`--synth-liga-split`**: baut
+statt einen Save aus dem Live-Abbild zu lesen, genau diesen frischen Liga-Split-Save und misst
+direkt darauf — der Rest des Skripts (Teil A/B, Spearman, Pp-Einfluss, Plausibilitätstest) ist
+unverändert. Zusätzlich neu: `resolutionSourceVerteilung` in der Ausgabe zählt, welcher Pfad
+(`"pps_duell"`, `"mini_dm_pod"`, `"pps"`) tatsächlich lief — der direkte Beleg, ob die Messung
+diesmal wirklich die Brücke trifft.
+
+### 9.2 Messung und der direkte Beleg: 100 % treffen jetzt die Brücke
+
+Zwei unabhängige Ströme, **je ein eigener, unabhängig gebauter Save** (nicht derselbe Save mit zwei
+Fenstern wie bisher — noch strenger unabhängig), 8 Standarddisziplinen, Feldgrößen 3/4/5/6, je 3
+disjunkte Spieltage, Pp-Trials 4 je Seite (reduziert von Dokumentstandard 8 — s. Einschränkung
+9.4):
+
+```sh
+npx tsx scripts/miss-pps-duell-bruecke-abnahme.ts --synth-liga-split --stroeme=0 \
+  --disziplinen=football,i-spy,battlefield,tdm,mini-dm,basketball,hockey,fechten \
+  --spieltage=3 --pp-trials-je-seite=4 \
+  --ausgabe=data/generated/pps-duell-bruecke-abnahme-liga-split-26-10-strom0.json
+# analog --stroeme=10000000, …-strom1.json
+```
+
+| | Strom 0 | Strom 1 (10 000 000) |
+|---|---:|---:|
+| Team-Seiten gesamt | 3072 | 3072 |
+| davon `"pps_duell"` | 2688 | 2688 |
+| davon `"mini_dm_pod"` (Mini-DM) | 384 | 384 |
+| davon `"pps"` (alter Rückfall) | **0** | **0** |
+
+**Zum ersten Mal seit Einführung der Brücke (PR #1296): 0 % Rückfall, 100 % echte Brücke.** Vorher
+(Abschnitt 8.7, derselbe Zähler): 82 % `"pps"`, nur 5,5 % `"pps_duell"`. Das ist der direkte, nicht
+behauptete Beleg, dass diese Messung diesmal tatsächlich `ppAusSpielerScore()` trifft, nicht den
+alten Team-Rang-Pfad.
+
+### 9.3 Ergebnis Teil A (rho) — Feldgröße 6, beide Ströme
+
+| Disziplin | Seiten-rho S0 | Seiten-rho S1 | Fixture-rho Ø S0 | Fixture-rho Ø S1 | Fixture ≥0,80 S0 | Fixture ≥0,80 S1 | Paartreue ≥15 über Seiten S0 | über Seiten S1 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Football | 0,829 | 0,886 | 0,834 | 0,845 | 70 % | 77 % | 98 % | 97 % |
+| I-Spy | 0,892 | 0,943 | 0,890 | 0,909 | 88 % | 97 % | 99 % | 100 % |
+| Battlefield | 0,886 | 0,886 | 0,854 | 0,817 | 78 % | 69 % | 98 % | 97 % |
+| TDM | 0,899 | 0,900 | 0,872 | 0,851 | 81 % | 76 % | 98 % | 97 % |
+| Mini-DM | 0,914 | 0,935 | 0,881 | 0,868 | 86 % | 81 % | 97 % | 97 % |
+| Basketball | 0,943 | 0,914 | 0,901 | 0,851 | 91 % | 76 % | 99 % | 97 % |
+| Hockey | 0,935 | 0,900 | 0,856 | 0,835 | 76 % | 72 % | 98 % | 99 % |
+| Fechten | 0,943 | 0,943 | 0,893 | 0,883 | 91 % | 83 % | 98 % | 97 % |
+
+**Seiten-rho: alle 16 Werte (8 Disziplinen × 2 Ströme) über 0,80** — besteht die CLAUDE.md-Schranke
+robust, genau wie vor diesem Auftrag (dieses Maß war nie vom Dummy-Fixture-Problem betroffen, s.
+Abschnitt 8.7).
+
+**Fixture-rho — die Zahl, die Abschnitt 8 als „bestehen derzeit NICHT" eingeordnet hatte (Mittel
+0,61–0,78, nur 27–51 % ≥ 0,80) — sieht unter dieser Messung drastisch anders aus:** Mittel jetzt
+0,817–0,909 (vorher 0,61–0,78), Anteil ≥ 0,80 jetzt 69–97 % (vorher 27–51 %). Paartreue ≥15 Punkte
+**über Seiten** jetzt 97–100 % (vorher 76–94 %) — nahe an der „selbe Seite"-Idealzahl (99–100 %,
+unverändert gesund). Star Rang 1 71–94 %, Star Top 2 84–98 % über alle Zellen — in derselben
+Größenordnung wie CLAUDE.mds kaderfeste Hockey-Referenz (58 %/78 %), meist darüber.
+
+### 9.4 Ergebnis Teil B (Pp) — ein Befund, nicht nur eine Tabelle
+
+| Disziplin | Pp Strom 0 | Pp Strom 1 | Bestanden (≤25)? |
+|---|---:|---:|---|
+| Football | 6,1 | 21,2 | Ja |
+| I-Spy | 8,3 | 3,1 | Ja |
+| Battlefield | 5,6 | 10,7 | Ja |
+| TDM | 13,1 | 6,2 | Ja |
+| Mini-DM | 5,6 | 23,0 | Ja (knapp) |
+| Basketball | 16,7 | 3,6 | Ja |
+| Hockey | 6,1 | **31,6** | **Nein** |
+| Fechten | 14,6 | 12,1 | Ja |
+
+15 von 16 Zellen bestehen. **Hockey verfehlt die Schranke in Strom 1 (31,6 > 25)** — ein echter,
+hier zum ersten Mal unter realen `pps_duell`-Bedingungen gemessener Befund, keine Wiederholung
+eines alten (Hockeys Pp war laut Abschnitt 8.3 vorher nie frisch gemessen, nur der Doku-Wert 39,4
+übernommen). Ob das eine echte strukturelle Verzerrung ist oder Rauschen einer kleinen
+Stichprobe, lässt sich mit dieser Messung NICHT sauber trennen — s. Einschränkung unten.
+
+### 9.5 Einschränkung, ungeschönt: zwei Variablen ändern sich gleichzeitig
+
+**Diese Messung ist kein sauberes A/B gegenüber Abschnitt 8.2/8.7.** Zwei Dinge unterscheiden sich
+gleichzeitig vom vorherigen Lauf:
+
+1. **Echte statt Dummy-Fixtures** (die eigentlich zu prüfende Variable) — direkt belegt über
+   `resolutionSourceVerteilung` (9.2).
+2. **Ein frischer Battle-Mode-Save der Saison 1** (keine Spielgeschichte, keine angesammelte
+   Fatigue/Verletzung/Formkarten-Drift, homogenere Start-Rosterwerte aus der Liga-Draft-KI) statt
+   des reifen, Saison-2-Live-Save-Abbilds (`swnjlk`), das Abschnitt 8 verwendete.
+
+Die dramatische Verbesserung der Fixture-rho/Paartreue-Zahlen (9.3) lässt sich mit dieser Messung
+**nicht eindeutig auf (1) zurückführen** — ein Teil könnte an (2) liegen (ein frischerer, homogenerer
+Kader könnte den Team-Rang-Topf-Effekt aus Task #176 unabhängig von Duell/Brücke abschwächen).
+**Task #176 ist damit NICHT als erledigt zu lesen** — nur, dass unter DIESEN Bedingungen (frischer
+Save + echte Fixtures) das Symptom deutlich kleiner ausfällt. Eine Messung, die (1) von (2) trennt,
+bräuchte entweder einen reifen Battle-Mode-Save mit echtem Liga-Split (mehrere durchgespielte
+Saisons über denselben Wizard-Pfad) oder eine zusätzliche Kontrollmessung auf dem frischen Save MIT
+künstlich wieder eingesetzter Dummy-Kette — beides nicht Teil dieses Auftrags.
+
+**Zweite, kleinere Einschränkung:** Pp-Trials je Seite war 4 statt des Doku-Standards 8 (Laufzeit:
+~55 Minuten je Strom bei 8 Disziplinen × 4 Feldgrößen × 3 Spieltage, davon 12 Zellen mit vollem
+Teil-B-Kostenanteil je Strom — ein Verdoppeln auf 8 Trials hätte den Teil-B-Anteil allein auf ~67
+Minuten je Strom getrieben). Die Pp-Werte oben (insbesondere Hockeys 31,6 und die beiden Werte nahe
+an der Schranke, Football 21,2 und Mini-DM 23,0) stehen deshalb auf einer kleineren Stichprobe als
+sonst üblich und sollten vor einer endgültigen Einordnung mit `--pp-trials-je-seite=8` nachgezogen
+werden.
+
+### 9.6 Was dieser Auftrag NICHT war und wofür die Zahlen hier stehen
+
+Die Ausgaben (`data/generated/pps-duell-bruecke-abnahme-liga-split-26-10-strom{0,1}.json`) sind
+bewusst **separate Dateien**, nicht ein Überschreiben von `data/generated/pps-duell-bruecke-
+abnahme.json` — und `tests/pps-duell-bruecke-player-rho-guard.test.ts` bleibt unverändert gegen die
+alte (nach Abschnitt 8.7 selbst als nicht belastbar markierte) Datei. Grund: diese Messung deckt nur
+8 der 8 Standarddisziplinen mit reduzierten Pp-Trials ab (9.5) und lief auf einem strukturell
+anderen Save (9.5) — sie durch die Hauptdatei zu ersetzen würde unbemerkt sowohl die
+Vergleichsgrundlage für künftige Nachmessungen ändern als auch den konkreten Hockey-Pp-Befund (9.4)
+unkommentiert in den Wächter einschleusen. Das ist eine bewusste Entscheidung, keine Auslassung.
+
+**Für das Hauptprojekt, nicht Teil dieses Auftrags (nur beschrieben, nicht begonnen):**
+- Hockeys Pp-Befund (31,6, Strom 1) mit `--pp-trials-je-seite=8` auf einem frischen Liga-Split-Save
+  nachziehen, um Rauschen von echter Verzerrung zu trennen.
+- Eine Messung, die (1) echte Fixtures und (2) Save-Reife unabhängig variiert (9.5), um zu klären,
+  ob Task #176 (Team-Rang-Topf) durch echte Fixtures tatsächlich entschärft wird oder ob die
+  Verbesserung an der frischen Saison 1 liegt.
+- Eine Entscheidung, ob/wie die Hauptdatei (`pps-duell-bruecke-abnahme.json`) und ihr Wächter auf
+  diese Methodik (`--synth-liga-split`) umgestellt werden sollen, sobald die obigen zwei Punkte
+  geklärt sind.
+
+**Validierung dieses Auftrags:** `npx tsc --noEmit -p tsconfig.check.json` sauber; ESLint auf den
+beiden geänderten/neuen Dateien 0 Fehler (nur vorbestehende `any`/unused-vars-Warnungen,
+unverändert); `tests/pps-duell-bruecke-player-rho-guard.test.ts`,
+`tests/pps-duell-bruecke-score-kanal.test.ts`, `tests/battle-mode-pps-duell.test.ts` weiterhin grün
+(37/37) — unverändert, weil kein Produktionscode angefasst wurde (nur `scripts/miss-pps-duell-
+bruecke-abnahme.ts` und der neue Testhelfer). Gesperrte Eignungsmatrix
+(`lib/player-generator/official-discipline-weights.ts`) nicht angefasst. Kein Resolve-/Mapper-/
+Ledger-Code geändert — keine Manager-Mode-Bit-Identitätsprüfung nötig (dieselbe Begründung wie
+Abschnitt 8.7: reine Skript-/Testinfrastruktur-Änderung, keine gemeinsame Codefläche mit der
+Produktion).
