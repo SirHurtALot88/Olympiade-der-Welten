@@ -2658,3 +2658,89 @@ Gemessene/geaenderte Dateien dieser Runde: nur dieser Abschnitt
 (`docs/design/stand-aller-disziplinen.md`). `public/mockups/battle-mode.rezepte.js` wurde fuer
 beide Fassungen temporaer editiert und vor dem Commit vollstaendig zurueckgesetzt — `git diff`
 gegen `origin/main` zeigt fuer diese Datei keine Aenderung.
+
+## 17. Basketball — Pp-Kalibrierung, TEIL 2 (Task #194, 25./26.10.): ZWEITCHANCE statt ABWEHR, BESTANDEN — 20/20
+
+Fortsetzung von Abschnitt 16 (dort: sieben ABWEHR-Fassungen insgesamt verworfen, ABWEHR als Hebel
+ausgereizt; Befund am Ende: speeds Ueberrepraesentation sitzt mechanisch ueberwiegend in
+`LAUFTEMPO`, disziplinuebergreifend und deshalb kein vertretbarer Hebel fuer eine Basketball-only-
+Runde). Auftrag dieser Runde: denselben letzten Blocker (Pp) ueber einen noch unversuchten Hebel
+schliessen — eine Erfolgsformel-/Rezept-Stelle AUSSERHALB von ABWEHR und AUSSERHALB von LAUFTEMPO.
+
+**Erst neu gemessen, nicht der 14.10.-Diagnose vertraut.** Die in Abschnitt 16 zitierte Diagnose
+(awareness −7,9 Pp, torment +7,0 Pp, speed +6,5 Pp) stammte von VOR Give-and-Go (PR #1289,
+18.10.). Frisch gemessen (`messe-arena-einfluss.mjs basketball 12`, zwei Saatstroeme, Ausgangsstand
+UNVERAENDERT reproduziert — 25,9 / 30,1 Pp, deckt sich exakt mit dem in `disziplin-abnahme.json`
+eingetragenen Stand):
+
+| Attribut | Strom 1 (Diff.) | Strom 2 (Diff.) | robust? |
+|---|---:|---:|---|
+| torment | +5,0 | +1,9 | ja, beide ueber Matrix |
+| speed | +3,0 | +3,1 | ja, beide ueber Matrix |
+| stamina | +3,5 | +2,3 | ja, beide ueber Matrix |
+| awareness | −2,7 | −7,5 | ja, beide unter Matrix |
+| charisma | −1,1 | −3,7 | ja, beide unter Matrix |
+| power | −7,0 | −2,7 | ja, beide unter Matrix |
+| intelligence | −0,8 | +4,7 | nein, Vorzeichen wechselt |
+| spirit | +1,5 | −1,2 | nein, Vorzeichen wechselt |
+| dexterity | −1,3 | +3,0 | nein, Vorzeichen wechselt |
+
+Das Bild NACH Give-and-Go ist also ein anderes als das von 14.10.: power ist jetzt die
+groesste robuste Einzelabweichung (nicht mehr erwaehnt in der alten Diagnose), stamina ist neu
+robust ueber Matrix. awareness/torment/speed bleiben robust, nur mit anderen Betraegen.
+
+**Der neue Hebel: ZWEITCHANCE statt ABWEHR.** `ZWEITCHANCE` (`public/mockups/battle-mode.rezepte.js`)
+fuehrte vor dieser Runde `{torment:26,intelligence:24,spirit:20,speed:16,awareness:10,stamina:4}` —
+genau die drei robust ueberrepraesentierten Attribute (torment, speed, stamina) stehen hier mit
+hohem Budget, awareness (robust unterrepraesentiert) nur mit 10 von 100. Anders als in Abschnitt 16
+wurde ZWEITCHANCE in dieser Runde ISOLIERT gedreht — in den sieben verworfenen ABWEHR-Fassungen kam
+ZWEITCHANCE nur in Kombination mit ABWEHR-Umbauten vor (Abschnitt 16, "VERWORFEN"-Liste in
+`battle-mode.rezepte.js`), nie fuer sich allein gemessen.
+
+**Drei Fassungen gemessen** (`messe-arena-einfluss.mjs basketball 12`, zwei Saatstroeme, dasselbe
+Protokoll wie Abschnitt 16):
+
+| Fassung | ZWEITCHANCE | Pp Strom 1 | Pp Strom 2 |
+|---|---|---:|---:|
+| Ausgangsstand | torment26/intelligence24/spirit20/speed16/awareness10/stamina4 | 25,9 | 30,1 |
+| 1 | torment20/intelligence24/spirit20/speed12/awareness22/stamina2 | 24,9 | 21,4 |
+| 2 | torment20/intelligence24/spirit26/speed6/awareness22/stamina2 | 21,1 | 24,8 |
+| 3 (gewaehlt) | torment20/intelligence24/spirit23/speed9/awareness22/stamina2 | **22,9** | **17,6** |
+
+Alle drei bestehen die 25-Pp-Schranke auf BEIDEN Stroemen — aber Fassung 1 und 2 nur mit sehr
+duennem Sicherheitsabstand auf je einem Strom (24,9 bzw. 24,8, nur 0,1-0,2 Pp unter der Schranke).
+Fassung 3 ist der Mittelweg zwischen 1 und 2 (speed/spirit mittig zwischen beiden) und haelt auf
+BEIDEN Stroemen den groessten Abstand zur Schranke (2,1 / 7,4 Pp) — deshalb die gewaehlte, nicht
+Fassung 1 oder 2. Die Nicht-Monotonie, vor der Abschnitt 16 warnt, zeigt sich auch hier: Fassung 1
+gegen Fassung 2 tauschen bei Strom 1/2 fast die Rollen (24,9/21,4 gegen 21,1/24,8) — ein einzelner
+Parameter (speed/spirit-Verhaeltnis) reicht, um die beiden Stroeme gegenlaeufig zu bewegen.
+
+**rho geprueft, nicht nur gehalten — verbessert.** Pflichtschranke aus CLAUDE.md: rho je Spiel >
+0,80 nach jeder Aenderung. Zwei unabhaengige Sonden, beide vorher/nachher am selben Checkout
+gemessen (`git stash`/`git stash pop` um den Vorher-Lauf):
+
+| Sonde | vorher | nachher |
+|---|---:|---:|
+| `miss-feldspiel-rangtreue.mjs basketball 24 6` — rho(gesamt) | 0,832 | 0,877 |
+| `miss-feldspiel-rangtreue.mjs basketball 24 6` — rho(je Seite) | 0,825 | 0,883 |
+| `miss-alle-disziplinen.mjs 24 basketball` — rho je Spiel (Kaderfamilie-Median, n=24) | — (nicht erneut vorher gemessen, s. u.) | 0,832 (Spannweite 0,104) |
+
+Die dritte Zeile hat keinen direkten Vorher-Wert aus derselben Messung (nur den alten
+PR #1289-Stand 0,810 bei n=12 — anderer Stichprobenumfang, kein 1:1-Vergleich) — bestanden ist sie
+trotzdem klar. Beide Sonden zusammen zeigen: die ZWEITCHANCE-Aenderung hat rho nicht nur gehalten,
+sondern in BEIDEN Messverfahren verbessert.
+
+**Entscheidung: Fassung 3 eingebaut, Basketball jetzt vollstaendig gewertet.** Pp (25,9/30,1 ->
+22,9/17,6) und rho (0,810 -> 0,832/0,877 je nach Sonde) bestehen beide Pflichtkriterien.
+`battle-mode.rezepte.js` enthaelt die neue ZWEITCHANCE-Zeile samt Messhistorie im Kommentar.
+`data/generated/disziplin-abnahme.json` (Schluessel "basketball") ist auf den neuen Stand
+aktualisiert (`ppFrisch`/`rhoFrisch` beide `true`). `lib/battle/arena-resolved-disciplines.ts`:
+Basketball ist jetzt Mitglied von `ARENA_RESOLVED_DISCIPLINE_IDS` (vorher dort bewusst
+ausgeschlossen, s. Kommentar an der Menge) — **damit bestehen alle 20 Disziplinen beide
+Pflichtkriterien (rho > 0,80 und Pp ≤ 25).**
+
+Die Aenderung betrifft ausschliesslich `public/mockups/battle-mode.rezepte.js` (ein Sub-Skill-
+Rezept) — kein Manager-Mode-, Resolve-, Mapper- oder Ledger-Code wurde inhaltlich angefasst
+(`arena-resolved-disciplines.ts` bekommt nur einen zusaetzlichen Set-Eintrag, keine neue Logik).
+Eine Bit-Identitaets-Pruefung war deshalb nicht erforderlich, s. die entsprechende Klausel in
+CLAUDE.md/der Aufgabenstellung.

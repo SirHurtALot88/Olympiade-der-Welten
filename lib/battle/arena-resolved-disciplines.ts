@@ -164,6 +164,15 @@
  * `data/generated/disziplin-abnahme.json` (Schluessel "basketball") haelt diesen Stand (Commit
  * f6098377) fest; die 0,795 unten im Mengen-Kommentar war der Stand VOR dieser PR.
  *
+ * BASKETBALL-NACHTRAG 2 (25.10., Task #194 Teil 2, docs/design/stand-aller-disziplinen.md
+ * Abschnitt 17): letzter Blocker (Pp) geschlossen, OHNE ABWEHR oder LAUFTEMPO anzufassen -- der
+ * Hebel war ZWEITCHANCE (torment/speed runter, awareness hoch, spirit hoch, isoliert von ABWEHR
+ * gedreht, s. Kommentar dort in `public/mockups/battle-mode.rezepte.js`). Pp 25,9/30,1 -> 22,9/
+ * 17,6 (beide Stroeme unter der 25-Schranke). rho dabei NICHT nur gehalten, sondern verbessert:
+ * miss-feldspiel-rangtreue.mjs 0,832/0,825 -> 0,877/0,883, miss-alle-disziplinen.mjs (kaderfamilie-
+ * Median, 5 Kader, n=24) 0,832. Basketball ist deshalb seit dieser Runde vollstaendig gewertet --
+ * 20/20 Disziplinen bestehen jetzt beide Pflichtkriterien.
+ *
  * CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): Climbing stand
  * bis hierhin bewusst draussen (rho 0,782 je Spiel kaderfest, 0,010 unter der 0,80-Schranke) --
  * derselbe Fall wie Football unten, nur mit dem billigeren Ausgang. `scripts/messe-arena-
@@ -203,9 +212,9 @@
  *    das feste 4-Team-Chassis besteht (rho je Runde 0,80, 13.10.), die neue variable-k-FFA-
  *    Spieler-Ebene (rhoJeEvent) besteht dagegen bei KEINEM k=2..6 (0,608-0,686, 24.10.) -- s.
  *    disziplin-abnahme.json Schluessel "mini-dm"/"mini-dm-ffa" fuer beide Zahlen.
- *  - BASKETBALL bestand rho zwischenzeitlich NICHT (0,795, 16.10.) und ist seit PR #1289 (18.10.)
- *    wieder bestanden (0,810) -- s. BASKETBALL-NACHTRAG oben und den Kommentar an
- *    `ARENA_RESOLVED_DISCIPLINE_IDS` unten fuer den jetzigen Pp-Blocker.
+ *  - BASKETBALL: ab dieser Zeile NICHT mehr in dieser Liste, s. BASKETBALL-NACHTRAG 2 unten --
+ *    Task #194 Teil 2 (25.10.) hat den letzten Blocker (Pp) geschlossen und Basketball steht
+ *    seitdem in `ARENA_RESOLVED_DISCIPLINE_IDS`.
  */
 export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -333,13 +342,12 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "time-trial",
   "spurt",
   "climbing",
+  // BASKETBALL (Task #194 Teil 2, 25.10., s. BASKETBALL-NACHTRAG 2 im Kopfkommentar): letzter
+  // Blocker (Pp 25,9/30,1) auf 22,9/17,6 gesenkt, rho dabei verbessert statt nur gehalten --
+  // bestanden auf beiden Pflichtkriterien, deshalb ab jetzt gewertet.
+  "basketball",
   // HOCKEY BEWUSST NICHT HIER (25.10., Task #195): Chris' Ausnahme deckt nur rho. Pp ist jetzt frisch
   // gemessen (n=24, zwei Saatstroeme: 38,5 / 81,5) — die 25-Pp-Schranke bleibt klar verletzt, s.
   // Kopfkommentar und ARENA_ABNAHME_AUSNAHMEN. Bis zu einer Rezeptkalibrierung oder Chris' Pp-Freigabe
   // ueber die PPS-Duell-Bruecke.
-  // BASKETBALL BEWUSST NICHT HIER: rho bestand am 16.10. NICHT (0,795), besteht seit PR #1289
-  // (18.10., "Give-and-Go-Schneiden") aber WIEDER (0,810, n=12) -- der Blocker ist seither Pp
-  // (25,9/30,1, weiterhin ueber 25), nicht mehr rho, s. BASKETBALL-NACHTRAG im Kommentar oben.
-  // Angeschlossen bleibt Basketball (ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS); in Battle Mode zahlt es
-  // bis zur bestandenen Pp-Abnahme ueber die PPS-Duell-Bruecke.
 ]);
