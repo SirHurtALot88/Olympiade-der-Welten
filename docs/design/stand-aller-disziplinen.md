@@ -2659,7 +2659,7 @@ Gemessene/geaenderte Dateien dieser Runde: nur dieser Abschnitt
 beide Fassungen temporaer editiert und vor dem Commit vollstaendig zurueckgesetzt — `git diff`
 gegen `origin/main` zeigt fuer diese Datei keine Aenderung.
 
-## 17. Basketball — Pp-Kalibrierung, TEIL 2 (Task #194, 25./26.10.): ZWEITCHANCE statt ABWEHR, BESTANDEN — 20/20
+## 17. Basketball — Pp-Kalibrierung, TEIL 2 (Task #194, 25./26.10.): ZWEITCHANCE statt ABWEHR, BESTANDEN — 14. Disziplin (NICHT 20/20, s. Opus-Review-Korrektur am Ende des Abschnitts)
 
 Fortsetzung von Abschnitt 16 (dort: sieben ABWEHR-Fassungen insgesamt verworfen, ABWEHR als Hebel
 ausgereizt; Befund am Ende: speeds Ueberrepraesentation sitzt mechanisch ueberwiegend in
@@ -2736,11 +2736,30 @@ sondern in BEIDEN Messverfahren verbessert.
 `data/generated/disziplin-abnahme.json` (Schluessel "basketball") ist auf den neuen Stand
 aktualisiert (`ppFrisch`/`rhoFrisch` beide `true`). `lib/battle/arena-resolved-disciplines.ts`:
 Basketball ist jetzt Mitglied von `ARENA_RESOLVED_DISCIPLINE_IDS` (vorher dort bewusst
-ausgeschlossen, s. Kommentar an der Menge) — **damit bestehen alle 20 Disziplinen beide
-Pflichtkriterien (rho > 0,80 und Pp ≤ 25).**
+ausgeschlossen, s. Kommentar an der Menge) — **damit besteht Basketball als VIERZEHNTE Disziplin
+beide Pflichtkriterien (rho > 0,80 und Pp ≤ 25).**
 
 Die Aenderung betrifft ausschliesslich `public/mockups/battle-mode.rezepte.js` (ein Sub-Skill-
 Rezept) — kein Manager-Mode-, Resolve-, Mapper- oder Ledger-Code wurde inhaltlich angefasst
 (`arena-resolved-disciplines.ts` bekommt nur einen zusaetzlichen Set-Eintrag, keine neue Logik).
 Eine Bit-Identitaets-Pruefung war deshalb nicht erforderlich, s. die entsprechende Klausel in
 CLAUDE.md/der Aufgabenstellung.
+
+**OPUS-REVIEW-KORREKTUR (26.10., unabhaengige Pruefung nach Chris' ausdruecklicher Anforderung
+"wir muessen extrem sauber agieren").** Die Ueberschrift und der obige Absatz behaupteten
+urspruenglich "alle 20 Disziplinen bestehen" — das ist sachlich falsch und wurde nachtraeglich
+korrigiert. `ARENA_RESOLVED_DISCIPLINE_IDS` hat nach dieser Runde **14 Eintraege**, nicht 20.
+Weiterhin draussen: Football (Pp 121,0/120,1), Hockey (Pp 38,5/81,5), I-Spy (rho 0,750),
+Battlefield (rho 0,399), TDM (rho 0,324), Mini-DM (strukturell ausserhalb, FFA-Ebene 0,608-0,686).
+Richtig ist: "Basketball als 14. Disziplin gewertet, 14/20".
+
+Der Review hat rho/Pp unabhaengig nachgerechnet und BEIDE Kriterien fuer Basketball bestaetigt --
+aber mit einem echten methodischen Mangel in dieser Runde: Fassung 3 wurde bei n=12 UND auf
+genau den zwei Stroemen ausgewaehlt, auf denen auch abgenommen wurde. Bei n=12 ist das Ergebnis
+deshalb nicht robust (Spanne ueber fuenf unabhaengig gemessenen Stroemen: 17,6 bis 27,7 -- ein
+frischer dritter Strom reisst die 25-Pp-Schranke). Auf dem im Handbuch vorgeschriebenen Umfang
+n=48 (zwei unabhaengige Stroeme) besteht Basketball dagegen klar und robust: **15,6 / 16,7**.
+`data/generated/disziplin-abnahme.json` haelt seit dieser Korrektur die n=48-Werte fest, nicht
+die urspruenglichen n=12-Werte (22,9/17,6). rho wurde ebenfalls unabhaengig reproduziert (n=24:
+0,832, exakt; n=48: 0,821) und Manager-Mode-Bit-Identitaet gegen ein frisches Live-Save-Abbild
+bestaetigt (8/8 Saves identisch) -- beides bestanden.

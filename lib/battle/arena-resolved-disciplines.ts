@@ -171,7 +171,11 @@
  * 17,6 (beide Stroeme unter der 25-Schranke). rho dabei NICHT nur gehalten, sondern verbessert:
  * miss-feldspiel-rangtreue.mjs 0,832/0,825 -> 0,877/0,883, miss-alle-disziplinen.mjs (kaderfamilie-
  * Median, 5 Kader, n=24) 0,832. Basketball ist deshalb seit dieser Runde vollstaendig gewertet --
- * 20/20 Disziplinen bestehen jetzt beide Pflichtkriterien.
+ * das macht Basketball zur VIERZEHNTEN Disziplin in `ARENA_RESOLVED_DISCIPLINE_IDS`, NICHT "20/20":
+ * sechs Disziplinen bleiben weiterhin draussen (Football, Hockey, I-Spy, Battlefield, TDM, Mini-DM
+ * -- s. die Liste "WER BEWUSST DRAUSSEN BLEIBT" unten). Die urspruengliche PR-Beschreibung von
+ * Task #194 Teil 2 behauptete faelschlich "20/20"; das ist eine unabhaengig gepruefte Korrektur
+ * (Opus-Review 26.10., s. docs/design/stand-aller-disziplinen.md).
  *
  * CLIMBING-KALIBRIERUNG (16.09., docs/design/climbing-kalibrierung-16-09.md): Climbing stand
  * bis hierhin bewusst draussen (rho 0,782 je Spiel kaderfest, 0,010 unter der 0,80-Schranke) --
@@ -212,9 +216,12 @@
  *    das feste 4-Team-Chassis besteht (rho je Runde 0,80, 13.10.), die neue variable-k-FFA-
  *    Spieler-Ebene (rhoJeEvent) besteht dagegen bei KEINEM k=2..6 (0,608-0,686, 24.10.) -- s.
  *    disziplin-abnahme.json Schluessel "mini-dm"/"mini-dm-ffa" fuer beide Zahlen.
- *  - BASKETBALL: ab dieser Zeile NICHT mehr in dieser Liste, s. BASKETBALL-NACHTRAG 2 unten --
+ *  - BASKETBALL: ab dieser Zeile NICHT mehr in dieser Liste, s. BASKETBALL-NACHTRAG 2 oben --
  *    Task #194 Teil 2 (25.10.) hat den letzten Blocker (Pp) geschlossen und Basketball steht
- *    seitdem in `ARENA_RESOLVED_DISCIPLINE_IDS`.
+ *    seitdem in `ARENA_RESOLVED_DISCIPLINE_IDS` (als vierzehnte Disziplin, nicht als zwanzigste).
+ *  - HOCKEY: ab dieser Zeile NICHT mehr in dieser Liste als eigener Absatz, s. den Inline-
+ *    Kommentar direkt bei `ARENA_RESOLVED_DISCIPLINE_IDS` unten -- Chris' Ausnahme deckt nur rho,
+ *    Pp (38,5/81,5, frisch gemessen 25.10.) verletzt die 25-Schranke weiterhin klar.
  */
 export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
