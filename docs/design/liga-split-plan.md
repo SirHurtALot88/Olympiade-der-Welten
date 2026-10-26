@@ -145,12 +145,45 @@ Migrationsmarker `seasonState.leagueSplitMigrationVersion` nach bestehendem Must
 4. ✅ **BEANTWORTET (Chris, 18.10., Task #161):** Apron pro Liga rechnen — **ja**, bestätigt. Umgesetzt in Task #158 (`apronLinesSnapshotByLeague`, `lib/season/apron-service.ts` + `apron-settlement-service.ts`).
 5. **Zuordnungs-Kriterium für Bestands-Saves** (inkl. Live-Save): sportlicher Endrang der letzten Saison statt Startbudget? — gegenstandslos, s. `docs/design/auf-abstieg-konzept-vorbereitung-17-10-2026.md` Abschnitt 2: keine Bestands-Battle-Saves vorhanden, neue Saves bekommen ihre Zuordnung bereits nach Budget-Startrang (`buildInitialLeagueAssignment`).
 6. ✅ **BEANTWORTET (Chris, 18.10., Task #161):** Mehrjahres-Sponsorverträge über einen Auf-/Abstieg hinweg — **Option (a), Leiter beim Reroll auf neue Liga umbauen**. Umgesetzt in Task #158: kein neuer Code nötig, `rerollSponsorV3TermsForNewSeason` liest das neue `leagueTier` automatisch, sobald `league_movement` `seasonState.leagueByTeamId` vor dem Saisonwechsel aktualisiert hat (s. `lib/season/league-movement-service.ts`).
-7. **Punkte-Inflation vs. Historie**: Ränge 1–16 zahlen im Schnitt mehr Punkte als 1–32 — Ewige Tabelle/Rekorde nicht mehr 1:1 vergleichbar. Hinnehmen (Ära-Markierung) oder kalibrieren? — weiterhin offen, nicht Teil von Task #158/#161.
+7. **Punkte-Inflation vs. Historie**: Ränge 1–16 zahlen im Schnitt mehr Punkte als 1–32 — Ewige Tabelle/Rekorde nicht mehr 1:1 vergleichbar. Hinnehmen (Ära-Markierung) oder kalibrieren? — weiterhin offen, nicht Teil von Task #158/#161. **Nachtrag 26.10. (Task #151 Teil 2): weiterhin offen, echte Chris-Entscheidung, s. Abschnitt 11.**
 8. ✅ **BEANTWORTET (Chris, 18.10., Task #161, Bonus-Frage):** "Meister"-Begriff — Liga-2-Platz-1 zählt als **eigenständiger Titel** ("Zweitliga-Meister"), getrennt vom Liga-1-/Gesamt-Meister ausgewiesen. Umgesetzt in Task #158 (`isLiga2Champion`, `SeasonChampionEntry.liga2ChampionTeamId`, Achievement „Zweitliga-Meister").
 9. **32er-kalibrierte Sponsor-Parameter** (Stärkeklassen-Wahrscheinlichkeiten, Anker-Sigma, Kurvenformen) übernehmen wir proportional — nach 1–2 Split-Saisons am Live-Abbild nachmessen, ok?
-10. **KI-Schwellwerte** ("Top 8", "Rang ≤ 20" in diversen `lib/ai/`-Services) sind teils 32er-geeicht — eigener Sweep nötig, in dieser Recherche nicht vollständig erfasst.
-11. **Multiplayer-Interessenkonflikt** (ein Mensch mit Teams in beiden Ligen im Auf-/Abstiegsrennen): empfohlen zuzulassen, aber bewusst abnicken.
+10. **KI-Schwellwerte** ("Top 8", "Rang ≤ 20" in diversen `lib/ai/`-Services) sind teils 32er-geeicht — eigener Sweep nötig, in dieser Recherche nicht vollständig erfasst. **Nachtrag 26.10. (Task #151 Teil 2): weiterhin offen — keine Chris-Entscheidung, aber ein eigener Audit, nicht in diesem Task erledigt, s. Abschnitt 11.**
+11. **Multiplayer-Interessenkonflikt** (ein Mensch mit Teams in beiden Ligen im Auf-/Abstiegsrennen): empfohlen zuzulassen, aber bewusst abnicken. **Nachtrag 26.10. (Task #151 Teil 2): weiterhin offen, braucht Chris' bewusstes Abnicken, s. Abschnitt 11.**
 12. Test-Voraussetzung: Spiegel muss frisch sein (`npx tsx scripts/pruefe-spiegel-frische.ts`), sonst ist die Migrationsverifikation gegen ein "totes" Abbild wertlos.
+
+---
+
+## 11. Nachtrag 26.10. (Task #151 Teil 2 — die drei verbliebenen Fragen 10.7/10.10/10.11)
+
+Im Rahmen von Task #151 ("Battle Mode: direkt an Battle Arena anbinden + 2-Liga-System +
+Spieltagstabelle") wurde geprüft, ob die drei damals noch offenen Fragen aus Abschnitt 10 inzwischen
+trivial beantwortbar sind (reiner technischer Default aus bestehender Projektkonvention) oder
+weiterhin echte Chris-Entscheidungen brauchen. Ergebnis: **alle drei sind Produkt-/Design-
+Entscheidungen bzw. ein eigener Audit — keine davon wurde hier selbst entschieden.**
+
+- **10.7 Punkte-Inflation vs. Historie**: echte Design-Frage (Ewige Tabelle/Rekorde 1:1 vergleichbar
+  halten vs. „Ära" akzeptieren). Es gibt keine bestehende Projektkonvention, die das für Chris
+  vorentscheidet — **braucht Chris' Entscheidung.** Konkrete Frage an Chris: *„Soll die Ewige Tabelle
+  ab dem Liga-Split-Jahrgang mit einer Ära-Markierung weiterlaufen (Ränge 1–16 zahlen strukturell mehr
+  Punkte als die alten 1–32, nicht 1:1 vergleichbar), oder sollen die 16er-Punktwerte auf das alte
+  32er-Niveau zurückkalibriert werden?"*
+- **10.10 KI-Schwellwerte-Sweep**: keine Geschmacksfrage, sondern ein technischer Korrektheits-Audit
+  (sind "Top 8"/"Rang ≤ 20" o.ä. in `lib/ai/`-Services nach dem Split noch die richtigen Zahlen für
+  einen 16er-Rangraum?). Nicht in diesem Task erledigt — ein Sweep über alle `lib/ai/`-Schwellwerte
+  und deren Testabdeckung ist ein eigenständiger Umfang, und ein unüberprüfter Eingriff in KI-Logik
+  ohne eigene Abnahme wäre genau das Risiko, das dieses Projekt an anderer Stelle (Formkarten-LCG,
+  `p.d`-Eignungslücke) schon teuer eingekauft hat. **Empfehlung: eigenes, kleines Ticket** ("KI-
+  Schwellwerte-Sweep nach Liga-Split"), kein Chris-Entscheid nötig, nur Umsetzungszeit.
+- **10.11 Multiplayer-Interessenkonflikt**: die Empfehlung ("zulassen") steht seit dieser Recherche
+  unverändert — aber die Formulierung selbst verlangt ausdrücklich Chris' **bewusstes** Abnicken, kein
+  impliziertes. Das kann kein Agent für ihn geben. **Braucht weiterhin Chris' Ja/Nein.** Konkrete
+  Frage an Chris: *„Ein Mensch darf weiterhin Teams in beiden Ligen kontrollieren, auch wenn beide im
+  selben Auf-/Abstiegsrennen stehen — Transparenz im Season-Review statt einer Sperre. Einverstanden?"*
+
+Keine der drei blockiert die Live-Abnahme von Task #151 selbst (s. `docs/design/
+battle-arena-auto-run-anbindung-plan-16-10.md` Abschnitt 6.3) — sie betreffen Folgefragen des
+bereits aktiven Liga-Splits, nicht die Arena-Anbindung.
 
 ---
 
