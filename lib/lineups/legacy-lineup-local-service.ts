@@ -136,11 +136,24 @@ function buildDisciplineSidePlayerCounts(context: LegacyLineupLoadedContext) {
   return result;
 }
 
-function buildTeamStatus(gameState: GameState, teamId: string, seasonId: string) {
+function buildTeamStatus(gameState: GameState, teamId: string, seasonId: string, matchdayId: string) {
   const allDrafts = getStoredDrafts(gameState);
   const captainUsedSides = Array.from(
     getSeasonCaptainDisciplineSideKeys({
       lineups: allDrafts,
+      teamId,
+      seasonId,
+    }),
+  );
+  // Kapitaens-Seiten der Saison OHNE den Entwurf des aktuellen Spieltags. Die KI-Kapitaenswahl
+  // (`getCaptainUsageBeforeCurrentDraft`) braucht genau diese Menge. Sie aus `captainUsedSides`
+  // herzuleiten, indem man die Kapitaens-Seiten des aktuellen Entwurfs wieder abzieht, geht schief,
+  // sobald dieselbe Disziplin-Seite schon an einem FRUEHEREN Spieltag einen Kapitaen hatte (bei 20
+  // Spieltagen kommt jede Disziplin doppelt vor): das Abziehen loescht dann auch den frueheren
+  // Verbrauch, und die Wahl kippt bei jedem Neuberechnen zwischen "Kapitaen" und "kein Kapitaen".
+  const captainUsedSidesBeforeCurrentMatchday = Array.from(
+    getSeasonCaptainDisciplineSideKeys({
+      lineups: allDrafts.filter((draft) => draft.matchdayId !== matchdayId),
       teamId,
       seasonId,
     }),
@@ -157,6 +170,7 @@ function buildTeamStatus(gameState: GameState, teamId: string, seasonId: string)
       seasonId,
     }),
     captainUsedSides,
+    captainUsedSidesBeforeCurrentMatchday,
   };
 }
 
@@ -595,7 +609,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
   const selectableActivePlayers = activePlayers.filter(({ entry }) => !availabilityByPlayerId.get(entry.playerId)?.isUnavailable);
   const existingDraft = getStoredDraft(normalizedGameState, params);
   const existingDraftLineupId = existingDraft?.lineupId ?? null;
-  const teamStatus = buildTeamStatus(normalizedGameState, params.teamId, params.seasonId);
+  const teamStatus = buildTeamStatus(normalizedGameState, params.teamId, params.seasonId, params.matchdayId);
   const scoreByPlayerAndDiscipline = sharedBase?.scoreByPlayerAndDiscipline ?? new Map<string, number>();
   let teamDisciplineRanks = sharedBase?.teamDisciplineRanksByTeamId.get(params.teamId);
   if (!teamDisciplineRanks) {
@@ -874,6 +888,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         totalLineupSides: matchdayContract.totalDisciplineSidesInSeason,
         captainUsedCount: teamStatus.captainUsedCount,
         captainUsedSides: teamStatus.captainUsedSides,
+        captainUsedSidesBeforeCurrentMatchday: teamStatus.captainUsedSidesBeforeCurrentMatchday,
         captainSlots: SEASON_CAPTAIN_SLOTS,
         displayLabel: formatLineupTeamStatusLabel({
           team,

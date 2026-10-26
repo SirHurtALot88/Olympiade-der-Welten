@@ -1064,6 +1064,22 @@ function applyCaptainDecisions(
 }
 
 function getCaptainUsageBeforeCurrentDraft(context: LegacyLineupLoadedContext) {
+  // IDEMPOTENZ: liegt die Menge "vor diesem Spieltag" direkt vor, gilt sie. Das Abziehen unten
+  // loeschte bei einer Disziplin-Seite, die schon an einem frueheren Spieltag einen Kapitaen hatte,
+  // auch diesen frueheren Verbrauch -- die Wahl kippte dann bei jeder Neuberechnung (mit Kapitaen
+  // im Entwurf: "neuer Slot, lohnt nicht" -> kein Kapitaen; ohne: "schon verbraucht, beibehalten"
+  // -> Kapitaen). Jedes Kippen aendert die Resolve-Signatur und verwirft den fertigen Arena-Vorlauf,
+  // "Spieltag ausfuehren" antwortete deshalb endlos mit 202 `arena_vorlauf_laeuft`.
+  const beforeCurrentMatchday = context.teamStatus?.captainUsedSidesBeforeCurrentMatchday;
+  if (Array.isArray(beforeCurrentMatchday)) {
+    const sideKeys = new Set(beforeCurrentMatchday);
+    return {
+      count: sideKeys.size,
+      sideKeys,
+      hasExactSideKeys: true,
+    };
+  }
+
   const previousCaptainKeys = new Set(
     (context.existingDraft?.entries ?? [])
       .filter((entry) => entry.isCaptain)

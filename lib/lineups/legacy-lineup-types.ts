@@ -488,6 +488,11 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
     totalLineupSides: number;
     captainUsedCount: number;
     captainUsedSides?: string[];
+    /**
+     * Kapitaens-Seiten der Saison OHNE den Entwurf des aktuellen Spieltags (s. `buildTeamStatus`).
+     * Fehlt das Feld (aeltere Kontextquellen), faellt die KI auf das Abziehen aus `captainUsedSides` zurueck.
+     */
+    captainUsedSidesBeforeCurrentMatchday?: string[];
     captainSlots: number;
     displayLabel: string;
   };
