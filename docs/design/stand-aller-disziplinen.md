@@ -2583,3 +2583,78 @@ PR: `gewichtheben-weg-c-sandsack-silo-kg` gegen `main`. Geaenderte Dateien:
 (`scripts/miss-sandsack-wegc*.mjs`, `scripts/pruefe-sandsack-wegc-isolation.mjs`,
 `scripts/screenshot-sandsack-wegc-parallel.mjs`) und Doku (`docs/design/gewichtheben-sandsack-*`,
 dieser Abschnitt).
+
+---
+
+## 16. Basketball — Pp-Kalibrierungsrunde (Task #194, 25.10.), ZWEI Fassungen gemessen, BEIDE verworfen
+
+Hintergrund: PR #1289 (Give-and-Go-Schneiden, 18.10.) hatte rho auf 0,810 gehoben (Schranke
+bestanden) und Pp von 43,0/44,7 auf 25,9/30,1 gesenkt (zwei Saatstroeme, n=12) — eine deutliche
+Verbesserung, aber weiterhin ueber der 25-Pp-Schranke. Auftrag dieser Runde: den letzten
+Blocker (Pp) schliessen, ohne rho zu verlieren.
+
+**Ausgangsdiagnose** (`docs/design/basketball-tempo-passing-diagnose-14-10.md` Abschnitt 2,
+n=24, ein Saatstrom, VOR Give-and-Go, Give-and-Go aendert kein Rezeptgewicht): die drei
+groessten Einzelabweichungen waren awareness −7,9 Pp (Matrix 14, Mechanik 6,1 %), torment
++7,0 Pp (Matrix 6, Mechanik 13 %), speed +6,5 Pp (Matrix 10, Mechanik 16,5 %). `ABWEHR`
+(`battle-mode.rezepte.js`) ist genau torment/speed-gefuehrt (24-26 der 100 Punkte), awareness
+nur Dritter (20) — der naheliegende Hebel.
+
+**Fassung 1** (torment 26→22, speed 24→20, awareness 20→28, Rest unveraendert). Gemessen
+(`messe-arena-einfluss.mjs basketball 12`, zwei Saatstroeme, dasselbe Protokoll wie PR #1289):
+
+| Attribut (Auszug) | Strom 1 vorher→nachher | Strom 2 vorher→nachher |
+|---|---:|---:|
+| **Pp gesamt** | **25,9 → 29,0** | **30,1 → 23,7** |
+| awareness | (n.b.) → −4,2 | (n.b.) → −3,2 |
+| speed | (n.b.) → +5,2 | (n.b.) → +5,3 |
+| torment | (n.b.) → +3,2 | (n.b.) → +2,2 |
+| charisma (neu negativ) | → −4,3 | → −3,3 |
+| power (neu negativ) | → −2,4 | → −3,5 |
+
+Gemischtes Ergebnis: EIN Strom verbessert sich unter die Schranke, der ANDERE verschlechtert
+sich DEUTLICHER als vorher. awareness bewegt sich in beiden Stroemen wie erhofft, speed bleibt
+praktisch unveraendert ueberrepraesentiert (ABWEHRs speed-Anteil ist also nicht der
+Haupttreiber — der groessere Kanal ist `LAUFTEMPO` mit speed:52, aber **disziplinuebergreifend**
+fuer Basketball/Football/Hockey und deshalb fuer eine basketball-only-Runde kein vertretbarer
+Hebel). Zwei bisher unauffaellige Attribute (charisma, power) drehen NEU und in BEIDEN Stroemen
+gleich gerichtet ins Minus — kein Stroemrauschen, sondern ein echter, nicht vorhergesehener
+Nebeneffekt: ABWEHR steuert ueber den Rebound-/Steal-Pfad (Boxscore-Gewichte
+steals+bloecke×1,5) genug vom Spielverlauf, dass eine Verschiebung weit ausserhalb der drei
+direkt gedrehten Attribute durchschlaegt.
+
+**Fassung 2** (torment 18, speed 14, awareness 24, power NEU 12, charisma 12, intelligence 12,
+dexterity 8 — gezielt gegen GENAU die vier in Fassung 1 robust auffaelligen Attribute
+gerichtet: speed/torment weiter senken, charisma/power direkt bedienen). Ergebnis: **DEUTLICH
+schlechter** in BEIDEN Stroemen (39,3 / 37,1 Pp) — awareness faellt in Strom 1 auf −11,5 (vorher
+−4,2), torment steigt wieder auf +6,6/+5,6 (fast zurueck auf den Ausgangsstand), power in
+Strom 2 auf −7,0 (von −3,5), dexterity/stamina drehen neu ins Plus. Jede einzelne Teiländerung
+war inhaltlich begruendbar (Power fuer Low-Post-Verteidigung, Charisma fuer Kommunikation) —
+gemessen hat die Kombination die Lage trotzdem verschlechtert, nicht verbessert.
+
+**Entscheidung: beide Fassungen verworfen, nichts committet.** `battle-mode.rezepte.js` bleibt
+bit-identisch zu `origin/main` (per `git diff` gegenprüft). Das deckt sich mit der bereits im
+Rezept dokumentierten "VERWORFEN"-Liste (fünf frühere ABWEHR-Fassungen, alle schlechter als der
+Status quo) — diese Runde fügt zwei weitere hinzu, nicht weil die Methode falsch war (beide
+Fassungen folgten real gemessenen, stromrobusten Signalen, keine Vermutung), sondern weil die
+Pp-Metrik auf ABWEHR-Verschiebungen nachweislich NICHT monoton reagiert: ein logisch
+stimmiger, auf zwei Stroemen robust begruendeter Schritt verschlechtert in Fassung 2 trotzdem
+alle vier Zielattribute gleichzeitig.
+
+**Befund fuer die naechste Runde:** speeds Ueberrepraesentation sitzt mechanisch ueberwiegend
+in `LAUFTEMPO` (speed:52 von 100, disziplinuebergreifend), nicht in `ABWEHR` (hier maximal 24
+von 100) — ABWEHR allein kann speed deshalb nicht weit genug senken, ohne selbst zu kollabieren.
+Ein Fix muesste entweder `LAUFTEMPO` anfassen (Risiko: Football/Hockey/alle Feldspiel-
+Disziplinen betroffen, ausserhalb des Auftrags dieser Runde) oder einen voellig anderen,
+noch nicht versuchten Hebel finden (z. B. die Erfolgsformel selbst, nicht das Rezept — bisher
+unangetastet, s. Rezeptkommentar "Erfolgsformeln ... mit KEINER Zeile angefasst").
+
+**Konsequenz fuer `ARENA_RESOLVED_DISCIPLINE_IDS`:** keine Aenderung. Basketball bleibt draussen
+— Pp (25,9/30,1, PR #1289, unveraendert durch diese Runde) ist weiterhin der einzige offene
+Blocker, rho (0,810/0,068) bleibt bestanden. `lib/battle/arena-resolved-disciplines.ts` und
+`data/generated/disziplin-abnahme.json` sind unveraendert.
+
+Gemessene/geaenderte Dateien dieser Runde: nur dieser Abschnitt
+(`docs/design/stand-aller-disziplinen.md`). `public/mockups/battle-mode.rezepte.js` wurde fuer
+beide Fassungen temporaer editiert und vor dem Commit vollstaendig zurueckgesetzt — `git diff`
+gegen `origin/main` zeigt fuer diese Datei keine Aenderung.
