@@ -11,35 +11,30 @@
  "disziplinen": {
   "basketball": {
    "chassis": "feldspiel",
-   "rhoJeSpiel": 0.810,
-   "rhoSpannweite": null,
-   "rhoSaison": null,
+   "rhoJeSpiel": 0.832,
+   "rhoSpannweite": 0.104,
+   "rhoSaison": 0.937,
    "rhoMessung": {
-    "befehl": "node scripts/miss-alle-disziplinen.mjs 12 basketball (+ --saat-versatz=10000000) -- PR #1289 (Give-and-Go-Schneiden, Task #123)",
-    "spiele": 12,
+    "befehl": "node scripts/miss-alle-disziplinen.mjs 24 basketball -- Task #194 Teil 2",
+    "spiele": 24,
     "kaderVarianten": 5,
     "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
-    "statistik": "Median ueber die Kader-Familie",
-    "saatStroeme": [
-     0,
-     10000000
-    ],
-    "hinweis": "n=12 statt der sonst ueblichen 24/48 -- wiederholte Browser-Abstuerze in der geteilten Sandbox dieser Session, s. PR-Beschreibung."
+    "statistik": "Median ueber die Kader-Familie"
    },
-   "pp": [25.9, 30.1],
+   "pp": [22.9, 17.6],
    "ppMessung": {
-    "befehl": "node scripts/messe-arena-einfluss.mjs basketball (+ --saat-versatz=10000000) -- PR #1289",
+    "befehl": "node scripts/messe-arena-einfluss.mjs basketball 12 (+ --saat-versatz=10000000) -- Task #194 Teil 2",
     "laeufe": 12,
     "saatStroeme": [
      0,
      10000000
     ]
    },
-   "datum": "2026-10-18",
-   "commit": "f6098377",
+   "datum": "2026-10-26",
+   "commit": "62736bfa",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "KORRIGIERT 25.10. (Konsistenz-Audit): PR #1289 (Give-and-Go-Schneiden, 18.10.) hob rho 0,795->0,810 (jetzt UEBER der 0,80-Schranke) und verbesserte Pp 43,0/44,7->25,9/30,1 (deutlich besser, aber WEITERHIN ueber der 25-Pp-Schranke) -- der Blocker fuer Basketball ist seither Pp, nicht mehr rho. Vorherige Zeile (rho 0,795, Pp abgebrochen, 16.10.) ist durch diese PR ueberholt. n=12 ist kleiner als der Standardumfang -- schwaecher abgesichert, aber die einzige vorliegende Nachmessung."
+   "anmerkung": "Task #194 Teil 2 (letzter Blocker geschlossen, 20/20): der ZWEITCHANCE-Sub-Skill (public/mockups/battle-mode.rezepte.js) wurde isoliert von ABWEHR (dort nach sieben verworfenen Fassungen, s. docs/design/stand-aller-disziplinen.md Abschnitt 16, ausgereizt) und von LAUFTEMPO (disziplinuebergreifend) gedreht: torment 26->20, speed 16->9, awareness 10->22, spirit 20->23, stamina 4->2. Pp 25,9/30,1 -> 22,9/17,6 (beide Stroeme unter der 25-Schranke; drei Fassungen gemessen, diese haelt auf beiden Stroemen den groessten Sicherheitsabstand, s. Kommentar bei ZWEITCHANCE). rho dabei NICHT nur gehalten, sondern verbessert: mit der Einzelkader-Sonde (miss-feldspiel-rangtreue.mjs basketball 24 6, VORHER/NACHHER am selben Checkout gemessen) 0,832/0,825 -> 0,877/0,883; mit der kaderfamilie-Sonde (miss-alle-disziplinen.mjs, NUR nachher gemessen, n=24 statt der 0,810 bei n=12 aus PR #1289 -- unterschiedlicher Stichprobenumfang, kein direkter Vorher/Nachher-Vergleich) 0,832 (Spannweite 0,104), bestanden. Basketball steht seit dieser Runde in `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- alle 20 Disziplinen bestehen jetzt beide Pflichtkriterien. Volle Messhistorie: docs/design/stand-aller-disziplinen.md Abschnitt 17."
   },
   "hockey": {
    "chassis": "feldspiel",

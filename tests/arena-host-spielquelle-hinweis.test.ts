@@ -46,13 +46,14 @@ function matchdayResult(id: string, matchdayId: string): MatchdayResultRecord {
   } as unknown as MatchdayResultRecord;
 }
 
-// "basketball" ist bewusst NICHT in ARENA_RESOLVED_DISCIPLINE_IDS (16.10., s. dort) -- immer
-// Bruecke. "fechten" IST arena-faehig -- der zweite Testfall prueft dessen Bruecken-Zeile.
+// "hockey" ist bewusst NICHT in ARENA_RESOLVED_DISCIPLINE_IDS (25.10., Task #194 Teil 2 --
+// Basketball wechselte in diese Menge, Hockey bleibt wegen der Pp-Schranke draussen, s. dort) --
+// immer Bruecke. "fechten" IST arena-faehig -- der zweite Testfall prueft dessen Bruecken-Zeile.
 const DISCIPLINE_SCHEDULE = {
   seasonId: "s1",
   matchdayId: "md1",
   matchdayIndex: 0,
-  discipline1: { disciplineId: "basketball", displayName: "Basketball", order: 1, playerCount: 2, category: "tactics" },
+  discipline1: { disciplineId: "hockey", displayName: "Hockey", order: 1, playerCount: 2, category: "tactics" },
   discipline2: { disciplineId: "fechten", displayName: "Fechten", order: 2, playerCount: 2, category: "duell" },
 };
 
@@ -90,10 +91,10 @@ describe("buildArenaHostSpielquelleHinweise", () => {
 
   it("nicht-arena-faehige Disziplin: IMMER ein Hinweis, auch ohne jede Ergebniszeile", () => {
     const hinweise = buildArenaHostSpielquelleHinweise(buildGameState([]), "A");
-    const basketball = hinweise.find((h) => h.disciplineId === "basketball")!;
-    expect(basketball).toBeDefined();
-    expect(basketball.disciplineName).toBe("Basketball");
-    expect(basketball.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
+    const hockey = hinweise.find((h) => h.disciplineId === "hockey")!;
+    expect(hockey).toBeDefined();
+    expect(hockey.disciplineName).toBe("Hockey");
+    expect(hockey.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
     // Fechten (arena-faehig) hat ohne Ergebniszeile KEINEN Hinweis -- nichts wird vermutet.
     expect(hinweise.find((h) => h.disciplineId === "fechten")).toBeUndefined();
   });

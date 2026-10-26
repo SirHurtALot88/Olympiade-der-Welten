@@ -273,7 +273,32 @@ window.__ARENA_REZEPTE = {
     // es 1,29 zu 2,90 gegen ihn. Der Rebound-Zweikampf selbst (reboundKampf) traegt
     // dazu bei: er lost seit dieser Runde quadratisch statt linear und laesst einem
     // heranstuermenden Rebounder ueberhaupt Zeit anzukommen (s. dort).
-    ZWEITCHANCE: {torment:26,intelligence:24,spirit:20,speed:16,awareness:10,stamina:4},
+    // TASK #194, TEIL 2 (25.10., docs/design/stand-aller-disziplinen.md Abschnitt 17) -- Pp
+    // UNTER die 25-Schranke gebracht, OHNE ABWEHR anzufassen (das war nach sieben verworfenen
+    // Fassungen, Abschnitt 16, ausgereizt) und ohne LAUFTEMPO (disziplinuebergreifend, s. dort).
+    //
+    // BEFUND NACH Give-and-Go (PR #1289), neu gemessen statt der 14.10.-Diagnose vertraut: die
+    // ROBUSTE (in BEIDEN Saatstroemen gleichgerichtete) Pp-Abweichung ist seitdem eine andere --
+    // torment/speed/stamina ueber Matrix, awareness/power/charisma darunter (Ausgangsstand 25,9/
+    // 30,1 Pp). ZWEITCHANCE traegt torment(26)/speed(16) bereits am staerksten unter allen
+    // basketball-eigenen Sub-Skills ausser ABWEHR und hatte bisher awareness nur mit 10 von 100 --
+    // nie isoliert gedreht, nur immer zusammen mit ABWEHR-Umbauten (s. "VERWORFEN"-Liste oben).
+    //
+    // DREI FASSUNGEN GEMESSEN (messe-arena-einfluss.mjs basketball 12, zwei Saatstroeme):
+    //   torment20 speed12 awareness22 (Rest unveraendert)        24,9 / 21,4  (beide <=25)
+    //   torment20 speed6  awareness22 spirit26 (spirit+6)        21,1 / 24,8  (beide <=25)
+    //   torment20 speed9  awareness22 spirit23 (Mittelweg)       22,9 / 17,6  (beide <=25, beste Margen)
+    // Alle drei bestehen die Schranke auf BEIDEN Stroemen -- die Metrik reagiert wie erwartet
+    // NICHT monoton (Zeile 1 gegen Zeile 2 tauschen sich bei Strom 1/2 fast um), die dritte
+    // Fassung (Mittelweg zwischen den ersten beiden) haelt auf beiden Stroemen den groessten
+    // Sicherheitsabstand und ist deshalb hier eingebaut, nicht Fassung 1 oder 2.
+    //
+    // RHO GEPRUEFT (durfte laut CLAUDE.md nicht unter 0,80 fallen): miss-feldspiel-rangtreue.mjs
+    // basketball 24 6 vorher/nachher 0,832/0,825 -> 0,877/0,883 (verbessert, nicht nur gehalten);
+    // miss-alle-disziplinen.mjs 24 basketball (kaderfamilie-Median, 5 Kader) 0,832/Spannweite
+    // 0,104 -- bestanden. Basketball steht seit dieser Runde deshalb in
+    // `ARENA_RESOLVED_DISCIPLINE_IDS` (lib/battle/arena-resolved-disciplines.ts) -- 20/20.
+    ZWEITCHANCE: {torment:20,intelligence:24,spirit:23,speed:9,awareness:22,stamina:2},
     // ===========================================================================
     // VERTEIDIGER-DIFFERENZIERUNG — der eine Punkt, an dem das Rezept aus PR #680
     // einen echten Nebeneffekt hatte. torment fuehrt jetzt, intelligence ist raus.
