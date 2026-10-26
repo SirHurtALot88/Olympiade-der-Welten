@@ -591,6 +591,51 @@ describe("legacy ai lineup suggestion", () => {
     );
   });
 
+  // Gefunden im Browser-Durchlauf einer 20-Spieltage-Saison (26.10.): eine Disziplin-Seite, die
+  // schon an einem FRUEHEREN Spieltag einen Kapitaen hatte, kommt wieder dran. Die Neuberechnung
+  // derselben Aufstellung muss dieselbe Kapitaenswahl liefern, egal ob der gespeicherte Entwurf
+  // den Kapitaen schon traegt. Vorher kippte sie bei jedem Lauf, die Resolve-Signatur aenderte sich
+  // mit, und "Spieltag ausfuehren" bekam endlos 202 `arena_vorlauf_laeuft`.
+  it("keeps the captain choice stable when a side already consumed earlier in the season is recomputed", () => {
+    const earlierSides = ["tdm::d1", "mini-dm::d2", "speed-schach::d1"];
+    const withoutDraft = createContext();
+    withoutDraft.teamStatus = {
+      ...withoutDraft.teamStatus!,
+      captainUsedCount: 3,
+      captainUsedSides: earlierSides,
+      captainUsedSidesBeforeCurrentMatchday: earlierSides,
+    };
+    const first = buildAiLegacyLineupPreview(withoutDraft);
+    const firstCaptains = first.entries.filter((entry) => entry.isCaptain).map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`);
+    expect(firstCaptains.length).toBeGreaterThan(0);
+
+    // Zweiter Lauf: der gespeicherte Entwurf traegt jetzt die Kapitaene des ersten Laufs. Die
+    // Saison-Menge enthaelt dieselben Seiten (frueherer Spieltag UND aktueller Entwurf).
+    const withDraft = createContext();
+    withDraft.teamStatus = {
+      ...withDraft.teamStatus!,
+      captainUsedCount: 3,
+      captainUsedSides: earlierSides,
+      captainUsedSidesBeforeCurrentMatchday: earlierSides,
+    };
+    withDraft.existingDraft = {
+      saveId: withDraft.saveId,
+      seasonId: withDraft.seasonId,
+      matchdayId: withDraft.matchdayId,
+      teamId: withDraft.teamId,
+      lineupId: "lineup-existing",
+      status: "submitted",
+      entries: first.entries,
+      modifiers: {} as never,
+      createdAt: "2026-10-26T00:00:00.000Z",
+      updatedAt: "2026-10-26T00:00:00.000Z",
+    };
+    const second = buildAiLegacyLineupPreview(withDraft);
+    const secondCaptains = second.entries.filter((entry) => entry.isCaptain).map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`);
+
+    expect(secondCaptains).toEqual(firstCaptains);
+  });
+
   // Angepasst an die globale Zuteilung: Fehlen nur p3/p4/p5 die mini-dm-Scores, kann die
   // Engine inzwischen legitim ausweichen (p1/p2 nach d2, p3/p4 nach d1) und liefert ein
   // sauberes "ready". Der missing_scores-Pfad braucht daher eine Lage OHNE Ausweichroute:
