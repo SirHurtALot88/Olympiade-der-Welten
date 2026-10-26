@@ -603,8 +603,19 @@ für jede Disziplin, die neu in die Arena wechselt.
 6. **Reihenfolge Fatigue vor 20 Spieltagen** (2.3) — die 06.09.-Frage 4 war nie beantwortet.
    Soll Fatigue-PR2/PR3 jetzt priorisiert werden, damit W2 nicht mehr blockiert?
 7. **Doppel-Rundenplan: Heim/Auswärts bleibt ohne Spielwirkung** (2.2) — bestätigen, dass kein
-   Heimvorteil gewünscht ist (der Anker dafür entsteht trotzdem).
-8. **Liga 2 lesbar, nicht bedienbar** (4.4) — oder ganz unsichtbar bis zum Saisonende?
+   Heimvorteil gewünscht ist (der Anker dafür entsteht trotzdem). **Nachtrag 26.10. (Task #151 Teil
+   2): trivial beantwortet, kein Chris-Entscheid nötig — s. Abschnitt 9.** Keine der zwanzig
+   Disziplinen hat je einen Heimvorteil-Mechanismus gehabt (`grep -i Heimvorteil` über `lib/` und
+   `app/` findet außer dieser Kommentarstelle selbst keinen echten Effekt); Heim/Gast ist überall
+   sonst im Projekt nur eine Anzeige-/Seiten-Zuordnung (Seite 0/1 im Motor), nie eine Spielwirkung.
+   „Kein Heimvorteil" ist damit der bestehende Projekt-Default fortgeschrieben, keine neue
+   Design-Entscheidung — und genau so ist es bereits gebaut (`season-fixture-schedule.ts:68-69`,
+   Abschnitt 2.2 oben). Der „Anker" ist rein technisch (welche Seite im `ArenaFixtureInput`), kein
+   Gameplay-Effekt; eine spätere, eigenständig zu entscheidende Heimvorteil-Idee bliebe davon
+   unberührt.
+8. **Liga 2 lesbar, nicht bedienbar** (4.4) — oder ganz unsichtbar bis zum Saisonende? **Nachtrag
+   26.10. (Task #151 Teil 2): weiterhin offen, echte Chris-Entscheidung (UX/Produkt, keine
+   Konvention entscheidet das vor) — s. Abschnitt 9.**
 9. **Sponsor-/Finanz-Fragen aus `liga-split-plan.md` 10.3–10.4** (Topf je Liga, Apron je Liga)
    sind weiterhin offen und werden mit Auf-/Abstieg akut — hier nur erinnert, nicht neu gestellt.
 
@@ -638,3 +649,33 @@ für jede Disziplin, die neu in die Arena wechselt.
 - `app/foundation/season-v2/SeasonStandingsNewLook.tsx` (zwei Tabellen, 4.4)
 - `docs/design/battle-mode-20-spieltage-recherche-06-09.md` (W1–W7, Chris' Entscheidungen vom
   06.09.) · `docs/design/fatigue-saisonlaenge-plan.md` Teil C/D (die Abhängigkeit)
+
+---
+
+## 9. Nachtrag 26.10. (Task #151 Teil 2 — die Fragen 7.7 und 7.8)
+
+Im Rahmen von Task #151 geprüft, ob 7.7 und 7.8 inzwischen trivial beantwortbar sind (reiner
+technischer Default aus bestehender Projektkonvention) oder weiterhin eine echte
+Chris-Entscheidung brauchen:
+
+- **7.7 (kein Heimvorteil) — beantwortet, kein Chris-Entscheid nötig.** Begründung: keine der
+  zwanzig Disziplinen hat je eine Heimvorteil-Mechanik besessen; „Heim"/„Gast" ist projektweit
+  ausschließlich eine Seiten-/Anzeige-Zuordnung (welche Seite im Motor, welche Spalte in der
+  Tabelle), nie ein Punkte- oder Leistungs-Bonus. Das hier Gefragte — „bestätigen, dass kein
+  Heimvorteil gewünscht ist" — ist also keine neue Design-Entscheidung, sondern die Fortschreibung
+  des bestehenden Projekt-Defaults, und genau so ist 2.2 bereits gebaut
+  (`season-fixture-schedule.ts:68-69`: „Heim/Auswärts hat weiterhin keine Spielwirkung"). Der im
+  Fragetext erwähnte „Anker" ist rein technisch (die Seite 0/1 in `ArenaFixtureInput`), kein
+  Gameplay-Effekt — eine spätere, davon unabhängige Heimvorteil-Idee bliebe eine eigene,
+  gesondert zu entscheidende Frage.
+- **7.8 (Liga 2 sichtbar-aber-stumm vs. ganz unsichtbar) — weiterhin offen, braucht Chris.** Das
+  ist eine UX-/Produktentscheidung, keine Fortschreibung einer bestehenden Konvention (es gibt im
+  Projekt kein Präzedenzbeispiel für eine „andere Liga, nur lesbar" o.ä.). Die Empfehlung aus 4.4
+  (sichtbar, nicht bedienbar) steht unverändert, aber die endgültige Wahl braucht Chris'
+  Zustimmung. Konkrete Frage an Chris: *„Soll Liga 2 für dich als Spieler sichtbar sein (Tabelle,
+  Spielplan, Ergebnisse — ohne Aufstellungs-/Markt-Aktionen), oder lieber komplett verborgen bis
+  zum Saisonende, wo nur das Auf-/Abstiegsergebnis erscheint?"*
+
+Keine der beiden blockiert die Live-Abnahme von Task #151 selbst — 7.8 betrifft nur die UI-Gruppe
+7 aus Abschnitt 6 (Spielplan-Tab/Saisonstand-Tabellen), die laut PR-Schnitt dort ohnehin erst nach
+der Arena-Anbindung (K1/E1, dieser Plan) folgt.
