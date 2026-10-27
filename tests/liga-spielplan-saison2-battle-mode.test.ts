@@ -22,10 +22,12 @@ const {
  * Saison 1 laengst aktiv ist. Ab Saison 2 verlor ein Battle-Mode-Save damit den echten
  * Liga-Spielplan, den der Spielplan-Tab (use-foundation-cross-tab-discipline-ranks.ts) voraussetzt.
  *
- * `leagueByTeamId` wird beim Uebergang selbst NICHT neu zugeordnet (siehe Kommentar im Fix,
- * preseason-workflow-service.ts) -- es gibt noch keine Auf-/Abstiegs-Logik (RELEGATION_COUNT in
- * league-split.ts ist definiert, aber ungenutzt), das Feld traegt im Spread `...seasonState`
- * unveraendert fort. Der Test faehrt deshalb absichtlich ueber `applyPreSeasonNextSeasonSetupLightweight`
+ * STAND NACH PR #1326: `leagueByTeamId` WIRD beim Uebergang neu zugeordnet -- `applyLeagueMovementOnce`
+ * (league-movement-service.ts) laeuft jetzt auch im `next_season_setup`-Pfad (Nachholen eines noch
+ * ausstehenden Auf-/Abstiegs) und schreibt RELEGATION_COUNT (3) Auf- und Absteiger in die Zuordnung,
+ * bevor der Circle-Generator die Folgesaison-Paarung baut. Der Test vergleicht die Fixture-Tiers
+ * deshalb gegen die NEUE (nach-Uebergang) Zuordnung, nicht gegen die der Quellsaison. Der Test faehrt
+ * deshalb absichtlich ueber `applyPreSeasonNextSeasonSetupLightweight`
  * mit OLY_TRANSFER_PIPELINE_FAST=1 (derselbe FAST-Pfad, den Sim-/Long-Run-Uebergaenge nutzen) --
  * das ist ein ECHTER Saisonuebergang durch die Produktionspipeline, nur ohne die teuren
  * Season-End-Progression-Schritte, die fuer diesen Befund irrelevant sind.
@@ -291,13 +293,24 @@ describe("liga-spielplan ab saison 2 (battle mode)", () => {
     expect(schedule).toHaveLength(160);
     expect(schedule.every((fixture) => fixture.leagueTier === "liga1" || fixture.leagueTier === "liga2")).toBe(true);
 
+    // Seit PR #1326 holt `next_season_setup` einen ausstehenden Auf-/Abstieg nach, bevor die
+    // Folgesaison gebaut wird -- die Fixture-Tiers muessen deshalb gegen die NEUE Zuordnung
+    // (nach dem Uebergang) geprueft werden, nicht gegen die Ausgangszuordnung der Quellsaison.
     const teamTierById = new Map(
-      sourceSave.gameState.seasonState.leagueByTeamId ? Object.entries(sourceSave.gameState.seasonState.leagueByTeamId) : [],
+      nextGameState.seasonState.leagueByTeamId ? Object.entries(nextGameState.seasonState.leagueByTeamId) : [],
     );
     for (const fixture of schedule) {
       expect(teamTierById.get(fixture.homeTeamId)).toBe(fixture.leagueTier);
       expect(teamTierById.get(fixture.awayTeamId)).toBe(fixture.leagueTier);
     }
+
+    // Die Standings in buildSeasonOneEndSave() ranken alle Liga-1-Teams global vor allen Liga-2-
+    // Teams (Teams.length - index Punkte in Erzeugungsreihenfolge) -- innerhalb jeder Liga ergibt
+    // das dieselbe Reihenfolge wie der globale Rang. RELEGATION_COUNT (3) steigt deshalb ab/auf:
+    // L1-14..L1-16 steigen ab, L2-01..L2-03 steigen auf. Diese Zusicherung macht den Test ehrlich --
+    // ohne sie wuerde er auch bestehen, wenn applyLeagueMovementOnce gar nichts mehr bewegt.
+    expect(teamTierById.get("L1-16")).toBe("liga2");
+    expect(teamTierById.get("L2-01")).toBe("liga1");
 
     for (const matchdayId of nextGameState.season.matchdayIds) {
       for (const tier of ["liga1", "liga2"] as const) {
