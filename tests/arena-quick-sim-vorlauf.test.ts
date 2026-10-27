@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -105,11 +105,71 @@ async function bauFrischenBattleSaveMitVollemFeld() {
 
 const harmlosMiniDm = () => buildHarmlosenMiniDmFfaFakeRunner();
 
+/**
+ * CI-FIX (27.10., zweimaliger Job-Timeout bei genau diesem Dateinamen in den Logs, s. Kommentar
+ * ueber `persistenz-suiten` in `.github/workflows/ci.yml`): `bauFrischenBattleSaveMitVollemFeld()`
+ * durchlaeuft den vollen Produktionspfad (`applyNewGameSetup` -> `fuehreLigaSetupDraftAus` fuer
+ * 32 Teams -> `applyAiLegacyLineupBatchLocally` fuer den ganzen Spieltag) und brauchte GEMESSEN
+ * ca. 160-165s PRO AUFRUF -- bei vier Tests, die ihn bisher je EINZELN aufriefen, ca. 11 Minuten
+ * allein fuer diese Datei. Die vier Tests pruefen sich gegenseitig AUSSCHLIESSENDE Zustaende
+ * desselben Vorlauf-Datensatzes und duerfen sich deshalb keinen Save TEILEN -- aber sie koennen
+ * sich den teuren, zustandslosen AUFBAU teilen: der laeuft jetzt nur noch EINMAL hier in
+ * `beforeAll`, und `holeUnabhaengigeKopie()` gibt jedem Test seine eigene, unabhaengige Kopie
+ * davon (ein einzelner `saveSingleplayerState()`-Schreibvorgang statt des kompletten Pfads).
+ *
+ * WARUM NICHT EINFACH DIESELBE saveId MEHRFACH VERWENDEN: die In-Prozess-Entdopplung des
+ * Vorlaufs (`laufendeQuickSims`/`quickSimNodeFehlgeschlagen`/`laufendeVorlaeufe` in
+ * `arena-vorlauf-service.ts`) ist ein MODUL-WEITER Cache, dessen Schluessel
+ * `${saveId}|${seasonId}|${matchdayId}|${signature}` rein in-memory lebt -- unabhaengig davon,
+ * in welcher SQLite-Datei der Save liegt. Mit identischer saveId UND identischen (weil geklonten)
+ * Aufstellungen waere die Signatur in allen vier Tests ebenfalls identisch, der Schluessel also
+ * auch -- Test 3 wuerde seinen "Node bereits gescheitert"-Eintrag in diesem Cache hinterlassen,
+ * und Test 4 liefe dann NICHT mehr ueber seinen eigenen (unvollstaendigen) Node-Runner, sondern
+ * traefe nur noch zufaellig denselben Cache-Treffer -- genau die Testverschmutzung, die vermieden
+ * werden soll. Jede Kopie bekommt deshalb eine EIGENE, frische saveId.
+ *
+ * WARUM DANACH EINE EINZELNE KORREKTUR NOETIG IST: der Resolve-Snapshot
+ * (`matchdayResolveSnapshots[0]`) traegt seine saveId FEST EINGEBETTET (gestempelt beim Bau, s.
+ * `writeMatchdayResolveSnapshot()` in `matchday-resolve-snapshot.ts`) -- eine reine Kopie des
+ * GameStates unter neuer saveId wuerde dort immer noch die ALTE saveId tragen.
+ * `readMatchdayResolveSnapshot()`/`readArenaVorlaufRecord()` filtern aber nach
+ * `entry.saveId === scope.saveId` und faenden den Snapshot sonst nicht -- `ensureMatchdayResolveSnapshot()`
+ * wuerde ihn dann (unnoetig) neu berechnen, statt den bereits validierten Stand zu uebernehmen.
+ */
+type Basis = { persistence: PersistenceService; saveId: string; seasonId: string; matchdayId: string };
+
+let basis: Basis | null = null;
+let kopieZaehler = 0;
+
+beforeAll(async () => {
+  const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+  basis = { persistence, saveId: scope.saveId, seasonId: scope.seasonId, matchdayId: scope.matchdayId };
+}, 300_000);
+
+afterAll(() => {
+  if (basis) invalidateLocalTransfermarktCachesForSave(basis.saveId);
+});
+
+function holeUnabhaengigeKopie() {
+  if (!basis) throw new Error("holeUnabhaengigeKopie: beforeAll hat die Basis nicht aufgebaut.");
+  kopieZaehler += 1;
+  const neueSaveId = `${basis.saveId}-kopie-${kopieZaehler}`;
+  const geklonterZustand: GameState = structuredClone(basis.persistence.getSaveById(basis.saveId)!.gameState);
+  geklonterZustand.seasonState.matchdayResolveSnapshots = (geklonterZustand.seasonState.matchdayResolveSnapshots ?? []).map(
+    (eintrag) => (eintrag.saveId === basis!.saveId ? { ...eintrag, saveId: neueSaveId } : eintrag),
+  );
+  basis.persistence.saveSingleplayerState(neueSaveId, geklonterZustand);
+  return {
+    persistence: basis.persistence,
+    scope: { saveId: neueSaveId, seasonId: basis.seasonId, matchdayId: basis.matchdayId },
+  };
+}
+
 describe("Quick-Sim-Vorlauf", () => {
   it(
     "ohne laufenden Vorlauf: rechnet per Node, startet kein Chromium, danach 'bereits_fertig'",
     async () => {
-      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      const { persistence, scope } = holeUnabhaengigeKopie();
       const node = fakeRunner([1, 0]);
       const chromium = fakeRunner([0, 1]);
       const optionen = {
@@ -135,13 +195,13 @@ describe("Quick-Sim-Vorlauf", () => {
       expect(nochmal.status).toBe("ready");
       invalidateLocalTransfermarktCachesForSave(scope.saveId);
     },
-    420_000,
+    60_000,
   );
 
   it(
     "ueberholt einen laufenden Chromium-Vorlauf, und dessen spaeteres Ergebnis ueberschreibt nichts",
     async () => {
-      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      const { persistence, scope } = holeUnabhaengigeKopie();
       const chromiumSperre = sperre();
       const chromium = fakeRunner([0, 1], () => chromiumSperre.promise);
       const node = fakeRunner([1, 0]);
@@ -177,13 +237,13 @@ describe("Quick-Sim-Vorlauf", () => {
       expect(snapshotJson(persistence, scope.saveId)).toBe(nachQuickSim);
       invalidateLocalTransfermarktCachesForSave(scope.saveId);
     },
-    420_000,
+    60_000,
   );
 
   it(
     "scheitert Node, uebernimmt der Chromium-Vorlauf im Hintergrund -- ohne zweiten Node-Lauf",
     async () => {
-      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      const { persistence, scope } = holeUnabhaengigeKopie();
       const chromiumSperre = sperre();
       const chromium = fakeRunner([0, 1], () => chromiumSperre.promise);
       let nodeAufrufe = 0;
@@ -217,13 +277,13 @@ describe("Quick-Sim-Vorlauf", () => {
       expect(fertig.status).toBe("ready");
       invalidateLocalTransfermarktCachesForSave(scope.saveId);
     },
-    420_000,
+    60_000,
   );
 
   it(
     "ein unvollstaendiges Node-Ergebnis wird nicht gebucht, sondern faellt auf Chromium zurueck",
     async () => {
-      const { persistence, scope } = await bauFrischenBattleSaveMitVollemFeld();
+      const { persistence, scope } = holeUnabhaengigeKopie();
       const chromium = fakeRunner([0, 1]);
       // Falsche Team-IDs: jedes echte Team bliebe ohne Arena-Ergebnis.
       const fremderNode: Runner = async (_gameState, fixtures) =>
@@ -245,6 +305,6 @@ describe("Quick-Sim-Vorlauf", () => {
       expect(chromium.aufrufe).toBeGreaterThan(0);
       invalidateLocalTransfermarktCachesForSave(scope.saveId);
     },
-    420_000,
+    60_000,
   );
 });
