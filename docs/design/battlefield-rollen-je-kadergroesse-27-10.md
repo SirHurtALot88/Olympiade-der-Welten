@@ -86,8 +86,22 @@ rho, `node scripts/miss-alle-disziplinen.mjs 24 battlefield --je-seite=k`, Kader
 Spannweiten 0,5–1,1: Einzelschritte liegen im Kaderrauschen, die Richtung über k=2..5 ist
 deutlich (Saison-Validität bei k=3..5 fast verdoppelt). k=6 ist nicht besser.
 
-Pp (`node scripts/messe-arena-einfluss.mjs battlefield 12 [--je-seite=k] [--saat-versatz=10000000]`):
-s. Abschnitt 3a — eingetragen nach Abschluss der Läufe.
+Pp (`node scripts/messe-arena-einfluss.mjs battlefield 12 [--je-seite=k] [--saat-versatz=10000000]`,
+n=12; vorher bei k=2 über einen Messzweig von `main` mit nur dem additiven `--je-seite`):
+
+| k | Pp vorher | Pp nachher |
+|---|---|---|
+| 2 | 118,4 (Strom 1) | 79,1 (Strom 1) |
+| 4 | 35,7 / 48,6 | 99,6 / 107,4 |
+
+**Pp ist bei k=4 deutlich schlechter, und die beiden Ströme widersprechen sich** (Strom 1:
+torment/stamina/power/determination vorn, Strom 2: spirit/awareness/torment; Charisma und
+Intelligence in beiden 0 %). Das ist vor allem ein Messbefund: rho und Pp lesen den Spielerwert
+aus `wert()`/`beitragVon` — reiner Kampfbeitrag —, während das Spiel jetzt über Punkte entschieden
+wird und Spieler ungünstigen Kämpfen ausweichen. Der Kampfbeitrag wird damit zu einer verrauschten
+Nebengröße. Die Abhilfe ist K6 Abschnitt 6 (Spielerwert aus Haltesekunden/Eroberungen/
+Verteidigungen + Kampf); die Rohdaten dafür sammelt `u.kpd` schon. Bei k=2 ist Pp besser (Charisma
+0 % → 12 %).
 
 Rollen-Diagnose (`node scripts/miss-battlefield-domination.mjs 4`, 20 Spiele je k): jede Rolle
 trägt bei jedem k Eroberungsfortschritt bei (90–100 % der Kämpfer jeder Rolle), auch Commander und
@@ -99,8 +113,10 @@ Spotter. Jeder Kämpfer steuert im Mittel 2,0–2,9 verschiedene Orte an und wec
   (1,5–1,9 Ortswechsel), aber kaum eine Eroberung wird fertig, bevor einer liegt. Das löst nur
   Respawn plus Wegfall des Eliminationssiegs (K6 Abschnitt 5) — dort als offene Frage an Chris
   markiert („kein Eliminationssieg mehr"), deshalb hier nicht entschieden.
-- **Pp**: der Weg zum Ort läuft über TMP (awareness/intelligence/charisma), und TMP liegt außerhalb
-  der `aufEignung()`-Normierung — derselbe Chassis-Befund wie in K6 Abschnitt 1.
+- **Pp / Spielerwert**: s. Abschnitt 3 — `wert()` muss für Battlefield den Domination-Beitrag
+  enthalten (K6 Abschnitt 6), sonst misst Pp den falschen Kanal. Dazu der bekannte Chassis-Befund:
+  der Weg zum Ort läuft über TMP (awareness/intelligence/charisma), TMP liegt außerhalb der
+  `aufEignung()`-Normierung (K6 Abschnitt 1).
 - Kalibrierrunde (Respawn, Spielzeit, Spielerwert aus Haltesekunden/Eroberungen, Abnahme rho > 0,80
   und Pp ≤ 25 zweistromig) — eigene Runde, wie bei TDM.
 - `scripts/generiere-arena-daten.ts --schreiben` würde heute den von Hand eingefügten
