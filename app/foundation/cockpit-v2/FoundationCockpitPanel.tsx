@@ -183,6 +183,7 @@ export interface FoundationCockpitPanelProps {
   runCockpitCashApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitMatchdayAdvance: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitMatchdayAutoRun: (execute: boolean) => Promise<FoundationMatchdayAutoRunSummary | null>;
+  runCockpitMatchdayAutoRunWithAutoRetry: () => Promise<FoundationMatchdayAutoRunSummary | null>;
   runCockpitMatchdayMvpScoring: (execute: boolean) => Promise<CockpitMatchdayMvpScoringFeed | null>;
   runCockpitResultApply: (execute: boolean) => Promise<FoundationApplySummary | null>;
   runCockpitRosterFill: (execute: boolean) => Promise<FoundationAutoRosterFillResponse | null>;
@@ -354,6 +355,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
     runCockpitCashApply,
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
+    runCockpitMatchdayAutoRunWithAutoRetry,
     runCockpitMatchdayMvpScoring,
     runCockpitResultApply,
     runCockpitRosterFill,
@@ -1212,7 +1214,11 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                           "Jetzt den aktuellen Matchday lokal ausführen? Der Auto-Run speichert AI-Lineups, Ergebnis, Tabelle und springt danach zum nächsten Schritt. Sponsor-Auszahlung, Cash und Transferfenster bleiben beim Saisonende.",
                         );
                         if (!confirmed) return;
-                        void runCockpitMatchdayAutoRun(true);
+                        // EIN Klick reicht: läuft der Arena-Vorlauf noch (202/
+                        // `arena_vorlauf_laeuft`), fragt diese Funktion selbst automatisch
+                        // weiter nach, statt den Spieler zu einem zweiten Klick zu zwingen —
+                        // s. Erklärung an `runCockpitMatchdayAutoRunWithAutoRetry`.
+                        void runCockpitMatchdayAutoRunWithAutoRetry();
                       }}
                     >
                       Spieltag komplett ausführen
