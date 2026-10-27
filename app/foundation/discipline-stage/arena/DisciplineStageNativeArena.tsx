@@ -168,6 +168,9 @@ export type DisciplineStageNativeArenaProps = {
   onHoverTeam?: ((teamId: string | null) => void) | null; // Ladder-Hover → Team-Vorschau
   onPreviewPlayer?: ((playerId: string | null) => void) | null; // Top-Player-Hover → Vorschau
   onEnded?: (() => void) | null; // feuert einmal, sobald das Podest/Endstand erreicht ist (Spoiler-Gate)
+  // Feuert synchron beim Druck auf „⏩ Quick-Sim", VOR `onEnded` (27.10.): der Aufrufer bucht die
+  // Disziplin dann ueber den schnellen Node-Vorlauf statt auf den Chromium-Vorlauf zu warten.
+  onQuickSim?: (() => void) | null;
   // Meldet JEDES Zuruecksetzen der Buehne samt Anlass. Was der Anlass bedeutet, entscheidet der
   // Host (`replayNachArenaReset`) — ein Mount ist kein Nachspielen, ein „↻ Neu" schon.
   onReset?: ((anlass: ArenaResetAnlass) => void) | null;
@@ -1599,7 +1602,7 @@ function currentPeriodForRound(round: number, boundaries: number[], periodCount:
   return Math.min(p, periodCount);
 }
 
-export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onReset, onResults, topPlayers, primitive = "track", disciplineId, matchdayId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
+export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer, onOpenTeam, onHoverTeam, onPreviewPlayer, onEnded, onQuickSim, onReset, onResults, topPlayers, primitive = "track", disciplineId, matchdayId, progressLabel, disciplineName, accent, motif, env, roomSync, alreadyScored = false }: DisciplineStageNativeArenaProps) {
   const skinAccent = accent ?? "var(--nl-line-2, var(--nl-line))";
   const slotCount = Math.max(1, slots.length);
   // Perioden-Pause: nur fuer Disziplinen mit einem konfigurierten Vorbild (s.o.), nie erzwungen
@@ -3717,6 +3720,9 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
      * `advance()`/`doOne`) sofort ab, danach baut dieser Block den Endstand ohnehin komplett
      * neu und deterministisch auf — ein Doppel-Fortschritt ist ausgeschlossen.
      */
+    // VOR `later(showPodium)` -> `onEnded` (27.10.): der Aufrufer muss schon wissen, dass diese
+    // Disziplin per Quick-Sim endet, wenn er gleich bucht.
+    onQuickSim?.();
     clearTimers();
     // Frischer Aufbau: NICHT auf bestehende Scores addieren (sonst Doppel-Zählung
     // nach manuellen Etappen oder erneutem Quick-Sim → z.B. 420 statt 210). (B2)
@@ -3775,7 +3781,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
     if (roomSync?.active && roomSync.isHost) {
       roomSync.onHostQuickSim?.();
     }
-  }, [slotCount, clearTimers, buildRT, later, showPodium, roomSync]);
+  }, [slotCount, clearTimers, buildRT, later, showPodium, roomSync, onQuickSim]);
 
   function causeKick(cause: string, mine: boolean): string {
     const own = mine ? "DEIN LÄUFER · " : "";

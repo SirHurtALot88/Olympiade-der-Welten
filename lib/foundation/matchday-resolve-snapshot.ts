@@ -716,6 +716,24 @@ export function finishArenaVorlauf(
       return { written: false, verworfen: true, record: existing.arenaVorlauf ?? null };
     }
 
+    // ERSTES TERMINALES ERGEBNIS JE SIGNATUR+VERSUCH GEWINNT (Quick-Sim, 27.10.): der Quick-Sim-
+    // Knopf rechnet einen bereits laufenden Chromium-Vorlauf mit Node unter DERSELBEN
+    // Versuchsnummer nach und schreibt zuerst (`beschleunigeArenaVorlaufPerQuickSim()`,
+    // arena-vorlauf-service.ts). Der spaeter fertige Chromium-Lauf darf dieses Ergebnis weder
+    // ueberschreiben (die Buchung koennte schon darauf stehen) noch -- bei einem Chromium-Absturz --
+    // ein "ready" nachtraeglich zu "failed" machen. Fuer jeden anderen Lauf ist das wirkungslos:
+    // jeder normale Vorlauf beginnt mit einer EIGENEN, hochgezaehlten Versuchsnummer
+    // (`beginArenaVorlauf()`), sein Datensatz steht beim Schreiben also noch auf "in_progress".
+    const bestehenderVorlauf = existing.arenaVorlauf ?? null;
+    if (
+      bestehenderVorlauf &&
+      bestehenderVorlauf.signature === input.signature &&
+      bestehenderVorlauf.versuch === input.versuch &&
+      bestehenderVorlauf.status !== "in_progress"
+    ) {
+      return { written: false, verworfen: false, record: bestehenderVorlauf };
+    }
+
     let nextPayload: LegacyMatchdayResolvePreviewPayload | null = existing.payload as LegacyMatchdayResolvePreviewPayload | null;
     if (input.resolveOptionsForPreview) {
       const contextResults = loadAllLocalLegacyLineupContexts(scope, persistence);
