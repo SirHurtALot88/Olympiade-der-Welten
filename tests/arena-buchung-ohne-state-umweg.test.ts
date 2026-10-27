@@ -97,9 +97,15 @@ describe("Der Handler lässt Übergaben vorgehen — ohne die Cockpit-Schalter z
   });
 
   it("das Cockpit ruft weiterhin ohne Übergabe auf und behält damit seine Schalter", () => {
+    // "Spieltag komplett ausführen" ruft seit der Ein-Klick-Prüfschleife
+    // (`runCockpitMatchdayAutoRunWithAutoRetry`, s. cockpit-matchday-handlers.ts) nicht mehr
+    // `runCockpitMatchdayAutoRun(true)` direkt — die Schleife selbst übergibt aber weiterhin ein
+    // LEERES `optionOverrides` an den eigentlichen Aufruf, fällt also genauso auf die
+    // Cockpit-Schalter zurück wie vorher der direkte Aufruf.
     const panel = readFileSync(join(root, "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx"), "utf8");
-    expect(panel).toContain("runCockpitMatchdayAutoRun(true)");
+    expect(panel).toContain("runCockpitMatchdayAutoRunWithAutoRetry()");
     expect(panel).toContain("runCockpitMatchdayAutoRun(false)");
+    expect(HANDLERS).toContain('performMatchdayAutoRunCall(true, "d2", true, null, {})');
   });
 });
 

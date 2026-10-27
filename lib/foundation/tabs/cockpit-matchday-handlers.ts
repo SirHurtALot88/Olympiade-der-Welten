@@ -96,6 +96,12 @@ export type CockpitMatchdayApplyHandlers = {
       stopOnTie?: boolean;
     },
   ) => Promise<FoundationMatchdayAutoRunSummary | null>;
+  /**
+   * "Spieltag komplett ausführen" — EIN Klick statt zwei (s. Erklärung an der Implementierung).
+   * Fragt bei laufendem Arena-Vorlauf automatisch weiter nach, statt einen zweiten Klick zu
+   * verlangen.
+   */
+  runCockpitMatchdayAutoRunWithAutoRetry: () => Promise<FoundationMatchdayAutoRunSummary | null>;
 };
 
 /**
@@ -427,6 +433,72 @@ export function createCockpitMatchdayApplyHandlers(
     }
   }
 
+  type MatchdayAutoRunOptionOverrides = {
+    includeWarningLineups?: boolean;
+    overwriteExistingLineups?: boolean;
+    stopOnTie?: boolean;
+  };
+
+  /** Ein einzelner POST an `/api/season/matchday-auto-run`, ohne Busy-Key- oder Folgefahrt-Logik. */
+  async function performMatchdayAutoRunCall(
+    execute: boolean,
+    commitThroughSide: "d1" | "d2",
+    advanceAfterCashApply: boolean,
+    submittedPreview: LegacyMatchdayResolvePreview | null,
+    optionOverrides: MatchdayAutoRunOptionOverrides,
+  ): Promise<FoundationMatchdayAutoRunSummary | null> {
+    const response = await fetch("/api/season/matchday-auto-run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        withRoomBody({
+          saveId: activeSaveId,
+          seasonId,
+          matchdayId,
+          source: readMetaSource,
+          dryRun: !execute,
+          execute,
+          confirmToken: execute ? MATCHDAY_AUTO_RUN_CONFIRM_TOKEN : undefined,
+          options: {
+            includeWarningLineups: optionOverrides.includeWarningLineups ?? matchdayAutoRunIncludeWarningLineups,
+            overwriteExistingLineups:
+              optionOverrides.overwriteExistingLineups ?? matchdayAutoRunOverwriteExistingLineups,
+            stopOnTie: optionOverrides.stopOnTie ?? matchdayAutoRunStopOnTie,
+            advanceAfterCashApply,
+            commitThroughSide,
+            submittedPreview,
+          },
+        }),
+      ),
+    });
+    const payload = (await leseAntwortAlsJson(response)) as {
+      success?: boolean;
+      summary?: FoundationMatchdayAutoRunSummary;
+    };
+    if (payload.summary) {
+      setMatchdayAutoRunFeed(payload.summary);
+    }
+    return payload.summary ?? null;
+  }
+
+  /** Nachlauf nach einer AUSFUEHRENDEN Buchung (egal ob erfolgreich oder blockiert) — Caches
+   *  invalidieren und die betroffenen Feeds neu laden. Laeuft deshalb genau EINMAL je Knopfdruck
+   *  bzw. genau einmal am Ende der Pruefschleife unten, nie je Poll-Versuch — sonst wuerde ein
+   *  haengender Arena-Vorlauf alle paar Sekunden denselben vollen Reload-Schwung ausloesen. */
+  async function applyMatchdayAutoRunSideEffects() {
+    invalidateMatchdayArenaSessionCache({
+      saveId: activeSaveId,
+      seasonId,
+    });
+    clearPrefetchedMatchdayArenaBaseKeys({
+      saveId: activeSaveId,
+      seasonId,
+    });
+    await Promise.all([loadSave(activeSaveId), reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
+    bumpMarketReloadToken();
+    startAiLineupPrewarm();
+  }
+
   async function runCockpitMatchdayAutoRun(
     execute: boolean,
     // Die Arena bucht pro Disziplin: nach D1 mit `"d1"` (nur D1 landet im Saisonstand,
@@ -456,11 +528,7 @@ export function createCockpitMatchdayApplyHandlers(
      * Lauf-Optionen, die den Cockpit-Schaltern vorgehen — siehe die Erklaerung am Typ.
      * Ohne Angabe gelten die Schalter wie bisher.
      */
-    optionOverrides: {
-      includeWarningLineups?: boolean;
-      overwriteExistingLineups?: boolean;
-      stopOnTie?: boolean;
-    } = {},
+    optionOverrides: MatchdayAutoRunOptionOverrides = {},
   ) {
     if (readMetaSource === "prisma") {
       showReadOnlyNotice();
@@ -469,51 +537,121 @@ export function createCockpitMatchdayApplyHandlers(
 
     setCockpitBusyKey(execute ? "matchday-auto-run-execute" : "matchday-auto-run-dry-run");
     try {
-      const response = await fetch("/api/season/matchday-auto-run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          withRoomBody({
-            saveId: activeSaveId,
-            seasonId,
-            matchdayId,
-            source: readMetaSource,
-            dryRun: !execute,
-            execute,
-            confirmToken: execute ? MATCHDAY_AUTO_RUN_CONFIRM_TOKEN : undefined,
-            options: {
-              includeWarningLineups: optionOverrides.includeWarningLineups ?? matchdayAutoRunIncludeWarningLineups,
-              overwriteExistingLineups:
-                optionOverrides.overwriteExistingLineups ?? matchdayAutoRunOverwriteExistingLineups,
-              stopOnTie: optionOverrides.stopOnTie ?? matchdayAutoRunStopOnTie,
-              advanceAfterCashApply,
-              commitThroughSide,
-              submittedPreview,
-            },
-          }),
-        ),
-      });
-      const payload = (await leseAntwortAlsJson(response)) as {
-        success?: boolean;
-        summary?: FoundationMatchdayAutoRunSummary;
-      };
-      if (payload.summary) {
-        setMatchdayAutoRunFeed(payload.summary);
-      }
+      const summary = await performMatchdayAutoRunCall(
+        execute,
+        commitThroughSide,
+        advanceAfterCashApply,
+        submittedPreview,
+        optionOverrides,
+      );
       if (execute) {
-        invalidateMatchdayArenaSessionCache({
-          saveId: activeSaveId,
-          seasonId,
-        });
-        clearPrefetchedMatchdayArenaBaseKeys({
-          saveId: activeSaveId,
-          seasonId,
-        });
-        await Promise.all([loadSave(activeSaveId), reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
-        bumpMarketReloadToken();
-        startAiLineupPrewarm();
+        await applyMatchdayAutoRunSideEffects();
       }
-      return payload.summary ?? null;
+      return summary;
+    } finally {
+      setCockpitBusyKey(null);
+    }
+  }
+
+  // PRUEFSCHLEIFE STATT ZWEITEM KLICK — Chris, woertlich: „Kannst du denn den Fehler nicht
+  // abfangen, dass man zweimal druecken muss, sondern dass man einmal drueckt, aber der dann
+  // direkt eine Pruefschleife macht?"
+  //
+  // Solange der Arena-Vorlauf (die Disziplin-Simulation fuer den Spieltag) im Hintergrund noch
+  // rechnet, antwortet der Server mit 202 und `blockingReasons: ["arena_vorlauf_laeuft"]` (bzw.
+  // "arena_eingabe_divergenz", wenn sich die Aufstellung seither geaendert hat und ein neuer
+  // Vorlauf angestossen wurde) — s. `matchday-auto-run-service.ts`. Vorher musste der Spieler das
+  // selbst erkennen und den Knopf erneut druecken, teils mehrfach.
+  //
+  // EIN ERNEUTER POST IST DABEI GEFAHRLOS: `kickoffArenaVorlauf` (arena-vorlauf-service.ts) ist
+  // idempotent — ein laufender Vorlauf wird nicht neu angestossen, nur sein Fortschritt gelesen —,
+  // und die KI-Aufstellungen werden pro Team nur geschrieben, wenn noch kein Draft existiert.
+  // Genau dieses Muster nutzt die Arena-Buehne bereits seit PR 3 (K1, Opus-Review B4) fuer
+  // `commitArenaDiscipline` (`use-foundation-shell-router-body-scope.tsx`) — diese Funktion ist
+  // seine Entsprechung fuer den Cockpit-Knopf "Spieltag komplett ausfuehren".
+  //
+  // BUDGET bewusst identisch zur Arena-Buehne: der Server haelt serverseitig genau einen
+  // automatischen Wiederholungsversuch plus ein Gesamt-Timeout von bis zu 180s je Disziplin vor
+  // (`OLY_ARENA_GESAMT_TIMEOUT_MS`). Worst Case dort: 2 Versuche x 180s x bis zu 2 Disziplinen =
+  // 720s. 300 x 3s = 900s deckt das mit Reserve, ohne dass diese Seite endlos pollt, wenn der
+  // Vorlauf wirklich haengt.
+  const MATCHDAY_AUTO_RUN_POLL_INTERVAL_MS = 3_000;
+  const MATCHDAY_AUTO_RUN_POLL_MAX_VERSUCHE = 300;
+
+  function istArenaVorlaufNochOffen(blockingReasons: string[]) {
+    return blockingReasons.includes("arena_vorlauf_laeuft") || blockingReasons.includes("arena_eingabe_divergenz");
+  }
+
+  /**
+   * "Spieltag komplett ausfuehren" — EIN Klick statt zwei.
+   *
+   * Entspricht `runCockpitMatchdayAutoRun(true)` (D2, voller Durchlauf, Standard-Optionen,
+   * keine Preview), fragt aber, solange der Arena-Vorlauf noch laeuft, automatisch weiter nach,
+   * statt den Spieler zu einem zweiten Klick zu zwingen. Der Busy-Key bleibt ueber die GESAMTE
+   * Pruefschleife gesetzt (nicht nur je Versuch), damit der Knopf waehrenddessen gesperrt bleibt
+   * und kein Doppel-Klick dazwischenfunkt. Endet entweder mit dem fertigen Ergebnis (Erfolg oder
+   * ein echter, nicht arena-bedingter Blocker) oder — bei einem wirklich haengenden Vorlauf — nach
+   * Erreichen des Zeitbudgets mit einer klaren Rueckmeldung, dass ein manueller erneuter Versuch
+   * noetig ist.
+   */
+  async function runCockpitMatchdayAutoRunWithAutoRetry(): Promise<FoundationMatchdayAutoRunSummary | null> {
+    if (readMetaSource === "prisma") {
+      showReadOnlyNotice();
+      return null;
+    }
+
+    setCockpitBusyKey("matchday-auto-run-execute");
+    try {
+      let summary: FoundationMatchdayAutoRunSummary | null = null;
+      let versuch = 0;
+      while (true) {
+        try {
+          summary = await performMatchdayAutoRunCall(true, "d2", true, null, {});
+        } catch (error) {
+          setFoundationActionFeedback({
+            tone: "error",
+            title: "Spieltag nicht ausgeführt",
+            detail:
+              error instanceof Error
+                ? error.message
+                : "Die Anfrage an den Server ist fehlgeschlagen. Bitte erneut versuchen.",
+          });
+          return null;
+        }
+
+        const blockingReasons = summary?.blockingReasons ?? [];
+        if (!istArenaVorlaufNochOffen(blockingReasons)) {
+          break;
+        }
+        if (versuch >= MATCHDAY_AUTO_RUN_POLL_MAX_VERSUCHE) {
+          setFoundationActionFeedback({
+            tone: "warning",
+            title: "Spieltag nicht automatisch abgeschlossen",
+            detail:
+              "Der Arena-Vorlauf ist auch nach mehreren Minuten nicht fertig geworden. Bitte in Kürze erneut auf „Spieltag komplett ausführen“ klicken.",
+          });
+          break;
+        }
+        setFoundationActionFeedback({
+          tone: "info",
+          title: "Arena-Vorlauf läuft noch …",
+          detail:
+            "Die Disziplinen des Spieltags werden im Hintergrund simuliert. Der Spieltag wird automatisch gebucht, sobald der Vorlauf fertig ist — ein erneuter Klick ist nicht nötig.",
+        });
+        await new Promise((resolve) => setTimeout(resolve, MATCHDAY_AUTO_RUN_POLL_INTERVAL_MS));
+        versuch += 1;
+      }
+
+      if (versuch > 0 && summary?.status === "applied") {
+        setFoundationActionFeedback({
+          tone: "success",
+          title: "Spieltag automatisch abgeschlossen",
+          detail: "Der Arena-Vorlauf ist fertig — der Spieltag wurde ohne weiteren Klick gebucht.",
+        });
+      }
+
+      await applyMatchdayAutoRunSideEffects();
+      return summary;
     } finally {
       setCockpitBusyKey(null);
     }
@@ -526,5 +664,6 @@ export function createCockpitMatchdayApplyHandlers(
     runCockpitCashApply,
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
+    runCockpitMatchdayAutoRunWithAutoRetry,
   };
 }
