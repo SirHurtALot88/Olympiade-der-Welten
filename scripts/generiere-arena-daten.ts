@@ -55,6 +55,11 @@ const MARKER_ZU = "  // >>> ENDE GENERIERT: arena-daten";
  */
 const SLOT_ZAHL_UEBERSCHREIBUNG: Partial<Record<string, number>> = {
   spurt: 6,
+  // BATTLEFIELD (27.10., Chris: eigene Rollen je Kadergroesse): `ARENA_ART.battlefield.jeSeite`
+  // ist jetzt 6, und SLOTS_JE_DISC.battlefield muss deshalb ALLE SECHS Rollen kennen (SLOTVON,
+  // Labels, Aufstellungstafel). Welche davon bei k Spielern wirklich spielen und mit welchem
+  // Profil, steht im eigenen Block BATTLEFIELD_SLOTS_JE_K darunter.
+  battlefield: 6,
 };
 
 /** Wie viele Slots eine Disziplin in der Arena zeigt. */
@@ -177,6 +182,26 @@ function miniDmFfaSlotsJeKBlock(): string {
   return `  const MINI_DM_FFA_SLOTS_JE_K={\n${zeilen.join(",\n")}\n  };`;
 }
 
+// BATTLEFIELD-ROLLEN JE KADERGROESSE k=2..6 (Chris 27.10.: „es kann bei 2 spielern ja andere
+// slots geben als bei 6 spielern"). Anders als bei Mini-DM ist das hier nicht nur ein anderes
+// Profil derselben gekuerzten Liste, sondern eine ANDERE ZUSAMMENSETZUNG je k
+// (ROLE_THEME_IDS_BY_SLOT_COUNT in lib/lineups/matchday-slot-roles.ts): bei k=2 Siege Core +
+// Morale Anchor statt Commander + Spotter. Der Motor (build(), battle-mode.engine.js) waehlt
+// je Seite die Liste fuer ihre tatsaechliche Kopfzahl und gibt baueEinheit() das k-Profil mit.
+function battlefieldSlotsJeKBlock(): string {
+  const zeilen: string[] = [];
+  for (let k = 2; k <= 6; k += 1) {
+    const rollen = resolveSlotRolesForDiscipline("battlefield", "battlefield", k);
+    const eintraege = rollen.map((r) => {
+      const langeId = String((r as Record<string, unknown>).roleId ?? "");
+      const kurzeId = langeId.replace(new RegExp(`^battlefield-${k}-`), "");
+      return `      ${rolleEintrag(r, kurzeId)}`;
+    });
+    zeilen.push(`    ${k}:[\n${eintraege.join(",\n")}\n    ]`);
+  }
+  return `  const BATTLEFIELD_SLOTS_JE_K={\n${zeilen.join(",\n")}\n  };`;
+}
+
 function bericht(): string {
   const z: string[] = [];
   z.push("Disziplin        Slots  Attribute mit Gewicht > 0 (absteigend)");
@@ -208,11 +233,13 @@ const block = [
   "  //   lib/player-generator/official-discipline-weights.ts  (Gewichtsmatrizen)",
   "  //   lib/player-generator/spiel-eignung-overrides.ts      (Spiel-Eignung, heute Football)",
   "  //   lib/lineups/matchday-slot-roles.ts                   (Slot-Rollen, inkl. Mini-DM-FFA-",
-  "  //     Rollen je Kadergroesse k=2..6, PR 2 des 6-PR-Plans 21.10.)",
+  "  //     Rollen je Kadergroesse k=2..6, PR 2 des 6-PR-Plans 21.10.; Battlefield-Rollen",
+  "  //     je Kadergroesse k=2..6, eigene Zusammensetzung je k, 27.10.)",
   "  // Wer hier etwas von Hand ändert, verliert es beim nächsten Lauf.",
   matrixBlock(),
   slotBlock(),
   miniDmFfaSlotsJeKBlock(),
+  battlefieldSlotsJeKBlock(),
   MARKER_ZU,
 ].join("\n");
 

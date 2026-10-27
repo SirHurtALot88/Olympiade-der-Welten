@@ -42,6 +42,9 @@ const positionen = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const schalterWert = (name) => schalter.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 const MUTATOR_MODUS = schalterWert("mutatoren") ?? null;
 const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
+// --je-seite=N (27.10., additiv): Kadergroesse einer ARENA-Disziplin fuer diese Messung (z.B.
+// Battlefield 2/4/6 je Seite). Ohne den Schalter misst das Skript bei ARENA_ART[d].jeSeite wie bisher.
+const JE_SEITE = Number(schalterWert("je-seite") ?? 0) || null;
 // --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv),
 // s. scripts/lib/rangtreue-messung.mjs. Ohne sie misst das Skript den Motor mit allen Flags aus.
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
@@ -129,16 +132,16 @@ const start = Date.now();
 // sie angelegt werden: setTimeout ist fuer genau diesen Aufruf ein No-Op und wird danach
 // wiederhergestellt.
 const e = await seite.evaluate(
-  ([d, n, versatz, modus]) => {
+  ([d, n, versatz, modus, js]) => {
     const st = window.setTimeout;
     window.setTimeout = () => 0;
     try {
-      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined);
+      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined, js ?? undefined);
     } finally {
       window.setTimeout = st;
     }
   },
-  [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS],
+  [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS, JE_SEITE],
 );
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
 
@@ -148,6 +151,7 @@ const dauer = ((Date.now() - start) / 1000).toFixed(0);
 console.log(`Gemessene Datei: ${pfad}`);
 console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`
   + (e.mutatorModus ? `, Mutatoren ${e.mutatorModus}` : "") + (SAAT_VERSATZ ? `, Saatversatz ${SAAT_VERSATZ}` : ""));
+if (JE_SEITE) console.log(`Kadergroesse: ${JE_SEITE} je Seite (--je-seite)`);
 if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
 console.log(`Abweichung zur Matrix: ${e.abweichungPp} Pp\n`);

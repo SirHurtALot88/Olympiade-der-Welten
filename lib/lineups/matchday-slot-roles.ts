@@ -110,13 +110,21 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
     roleTheme("chaosdriver", "Chaos Driver", "Erzwingt Tempo über Torment und Power.", ["torment", "power"], "stamina", "high", ["berserker", "renegade"]),
     roleTheme("lasthit", "Last Hit", "Braucht Nerven für den finalen Zugriff.", ["will", "torment"], "dexterity", "medium", ["hero"]),
   ],
+  // BATTLEFIELD = DREI-PUNKTE-DOMINATION (K6, Chris 13.10.; Rollen-Entscheidung 27.10.).
+  // JEDE dieser sechs Rollen nimmt Punkte ein und verteidigt sie, bei jeder Kadergroesse
+  // (Chris 27.10.: „auch der commander und der spotter können und sollen ja felder
+  // einnehmen"). Die Texte nennen deshalb den thematischen Zusatz, den der Motor der Rolle
+  // beim Erobern/Halten gibt (ARENA_DOMINATION.battlefield.rolle in battle-mode.engine.js),
+  // statt eine Supportrolle ohne eigene Eroberung zu beschreiben. WELCHE Rollen bei k
+  // Spielern auf dem Platz stehen, steht NICHT in der Reihenfolge dieser Liste, sondern in
+  // ROLE_THEME_IDS_BY_SLOT_COUNT.battlefield weiter unten.
   battlefield: [
-    roleTheme("commander", "Commander", "Fuehrt grosse Situationen über Charisma und Intelligence.", ["charisma", "intelligence"], "health", "low", ["tactician", "bard"]),
-    roleTheme("spotter", "Spotter", "Liest Lücken und Ziele über Awareness.", ["awareness", "intelligence"], "power", "low", ["overseer"]),
-    roleTheme("siegecore", "Siege Core", "Drueckt Fronten mit Power und Torment.", ["power", "torment"], "health", "high", ["berserker"]),
-    roleTheme("moraleanchor", "Morale Anchor", "Haelt Linien über Spirit und Charisma zusammen.", ["spirit", "charisma"], "torment", "medium", ["bard", "hero"]),
-    roleTheme("fieldcontrol", "Field Control", "Kontrolliert Raum über Intelligence und Spirit.", ["intelligence", "spirit"], "power", "low", ["tactician"]),
-    roleTheme("disruptor", "Disruptor", "Stoert gegnerische Plaene mit Torment und Awareness.", ["torment", "awareness"], "health", "medium", ["rogue", "renegade"]),
+    roleTheme("commander", "Commander", "Fuehrt grosse Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.", ["charisma", "intelligence"], "health", "low", ["tactician", "bard"]),
+    roleTheme("spotter", "Spotter", "Liest Lücken über Awareness und Intelligence — rotiert zu unbewachten Punkten und nimmt neutrale Punkte besonders schnell.", ["awareness", "intelligence"], "power", "low", ["overseer"]),
+    roleTheme("siegecore", "Siege Core", "Drueckt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.", ["power", "torment"], "health", "high", ["berserker"]),
+    roleTheme("moraleanchor", "Morale Anchor", "Haelt Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.", ["spirit", "charisma"], "torment", "medium", ["bard", "hero"]),
+    roleTheme("fieldcontrol", "Field Control", "Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.", ["intelligence", "spirit"], "power", "low", ["tactician"]),
+    roleTheme("disruptor", "Disruptor", "Stoert gegnerische Plaene mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.", ["torment", "awareness"], "health", "medium", ["rogue", "renegade"]),
   ],
   gewichtheben: [
     roleTheme("poweropener", "Power Opener", "Setzt die Basis über maximale Power.", ["power", "health"], "stamina", "high", ["tank", "golem"]),
@@ -310,6 +318,81 @@ const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]
     roleTheme("reveal", "Reveal", "Setzt den Fund über Torment und Spirit um.", ["torment", "spirit"], "intelligence", "medium", ["hero"]),
   ],
 };
+
+// EIGENE ROLLENZUSAMMENSETZUNG JE KADERGROESSE statt `slice(0, k)` einer festen Liste.
+//
+// Standard fuer jede Disziplin bleibt `DISCIPLINE_ROLE_THEMES[d].slice(0, k)` (Hockeys
+// Torwart-Regel z. B. haengt genau daran). Steht eine Disziplin HIER, gilt fuer k Spieler
+// die hier genannte Liste von Rollen-Ids — in genau dieser Slot-Reihenfolge, und die LETZTE
+// ist wie ueberall der Ausgleichsslot von buildSlotWeightProfiles (sie traegt `-Σ` der
+// anderen Deltas, damit die Spaltensumme je Attribut wieder die Matrix ergibt).
+//
+// BATTLEFIELD (Chris 27.10., wörtlich): „Und vllt solltest du bei 2 Spielern dann nicht
+// commander und spotter als slot nehmen. Wichtig ist ja dass die gewichtungen passen, es kann
+// bei 2 spielern ja andere slots geben als bei 6 spielern! auch DAS ist erlaubt". Vorher ergab
+// `slice(0, 2)` immer Commander + Spotter. Jetzt:
+//   k=2  Siege Core + Morale Anchor — der schnellste Eroberer und der staerkste Halter. Als
+//        Ausgleichsslot traegt Morale Anchor Charisma/Intelligence/Spirit, also die drei
+//        schwersten Matrix-Attribute (20/16/16); die zwei Slots zusammen ergeben die Matrix.
+//   k=3  + Field Control (erobert und haelt, Intelligence/Spirit).
+//   k=4  + Commander (Charisma/Intelligence, erobert etwas schneller).
+//   k=5  + Disruptor (baut gegnerischen Fortschritt auch an umkaempften Punkten ab).
+//   k=6  + Spotter (rotiert zu unbewachten Punkten, nimmt neutrale Punkte schnell).
+// Keine dieser Rollen ist an einen festen Punkt gebunden: die Punktwahl im Motor ist
+// dynamisch (dominationZielWahl in battle-mode.engine.js).
+const ROLE_THEME_IDS_BY_SLOT_COUNT: Partial<Record<OfficialDisciplineWeightId, Partial<Record<number, readonly string[]>>>> = {
+  battlefield: {
+    1: ["siegecore"],
+    2: ["siegecore", "moraleanchor"],
+    3: ["siegecore", "fieldcontrol", "moraleanchor"],
+    4: ["siegecore", "fieldcontrol", "commander", "moraleanchor"],
+    5: ["siegecore", "fieldcontrol", "commander", "disruptor", "moraleanchor"],
+    6: ["siegecore", "fieldcontrol", "commander", "spotter", "disruptor", "moraleanchor"],
+  },
+};
+
+const MAX_SLOT_COUNT = 6;
+
+/**
+ * Die Rollen-Themen fuer `slotCount` Spieler in Slot-Reihenfolge. Fuer Disziplinen mit eigener
+ * Zusammensetzung je Kadergroesse (ROLE_THEME_IDS_BY_SLOT_COUNT) die dort genannte Liste, sonst
+ * die ersten `slotCount` Themen der Disziplin.
+ */
+function resolveRoleThemesForSlotCount(disciplineId: OfficialDisciplineWeightId, slotCount: number): SlotRoleTheme[] {
+  const themes = DISCIPLINE_ROLE_THEMES[disciplineId];
+  const ids = ROLE_THEME_IDS_BY_SLOT_COUNT[disciplineId]?.[slotCount];
+  if (!ids) {
+    return themes.slice(0, slotCount);
+  }
+  return ids.map((roleId) => {
+    const theme = themes.find((entry) => entry.roleId === roleId);
+    if (!theme) {
+      throw new Error(`ROLE_THEME_IDS_BY_SLOT_COUNT.${disciplineId}[${slotCount}] nennt unbekannte Rolle "${roleId}".`);
+    }
+    return theme;
+  });
+}
+
+/** Rollen-Ids (kurz, ohne Disziplin-/Kader-Praefix) fuer `slotCount` Spieler, in Slot-Reihenfolge. */
+export function resolveSlotRoleShortIdsForSlotCount(
+  disciplineId: string | null | undefined,
+  disciplineName: string | null | undefined,
+  slotCount: number,
+): string[] {
+  const officialDisciplineId = resolveOfficialDisciplineId(disciplineId, disciplineName);
+  if (!officialDisciplineId) return [];
+  const count = clampNumber(Math.round(slotCount), 0, MAX_SLOT_COUNT);
+  return resolveRoleThemesForSlotCount(officialDisciplineId, count).map((theme) => theme.roleId);
+}
+
+/** Hat diese Disziplin je Kadergroesse eine eigene Rollenzusammensetzung (statt `slice(0, k)`)? */
+export function hasSlotCountSpecificRoles(
+  disciplineId: string | null | undefined,
+  disciplineName: string | null | undefined,
+): boolean {
+  const officialDisciplineId = resolveOfficialDisciplineId(disciplineId, disciplineName);
+  return officialDisciplineId != null && ROLE_THEME_IDS_BY_SLOT_COUNT[officialDisciplineId] != null;
+}
 
 const OFFICIAL_DISCIPLINE_TOKEN_MAP = new Map<string, OfficialDisciplineWeightId>();
 
@@ -679,8 +762,8 @@ function buildGeneratedSlotRoles(
   disciplineId: OfficialDisciplineWeightId,
   requiredPlayers: number,
 ) {
-  const slotCount = clampNumber(Math.round(requiredPlayers), 0, 6);
-  const themes = DISCIPLINE_ROLE_THEMES[disciplineId].slice(0, slotCount);
+  const slotCount = clampNumber(Math.round(requiredPlayers), 0, MAX_SLOT_COUNT);
+  const themes = resolveRoleThemesForSlotCount(disciplineId, slotCount);
   const baseWeights = getBaseWeightProfile(disciplineId);
   const slotProfiles = buildSlotWeightProfiles(disciplineId, themes);
 
@@ -915,16 +998,28 @@ export function resolveSlotRolesForDiscipline(
  *
  * Gibt `null` zurueck, wenn die Disziplin keine echte Rollenmatrix hat (dann greift
  * anderswo die generische Rueckfall-Rolle) oder der Index daneben liegt.
+ *
+ * AUSNAHME KADERGROESSE (Battlefield, 27.10.): eine Disziplin mit eigener Rollenzusammen-
+ * setzung je k (ROLE_THEME_IDS_BY_SLOT_COUNT) kennt KEINE k-unabhaengige Index->Rolle-
+ * Zuordnung mehr — bei 2 Spielern steht auf Index 1 Morale Anchor, bei 6 Field Control.
+ * Dort MUSS der Aufrufer `slotCount` mitgeben. Ohne ihn gilt die Zusammensetzung des
+ * groessten Kaders (6), das ist die einzige Liste, die jeden Index 0..5 abdeckt.
  */
 export function resolveSlotRoleShortId(
   disciplineId: string | null | undefined,
   disciplineName: string | null | undefined,
   slotIndex: number,
+  slotCount?: number | null,
 ): string | null {
   const officialDisciplineId = resolveOfficialDisciplineId(disciplineId, disciplineName);
   if (!officialDisciplineId) return null;
   const themes = DISCIPLINE_ROLE_THEMES[officialDisciplineId];
   if (!themes) return null;
+  if (ROLE_THEME_IDS_BY_SLOT_COUNT[officialDisciplineId]) {
+    const count = slotCount != null && Number.isFinite(slotCount) ? clampNumber(Math.round(slotCount), 0, MAX_SLOT_COUNT) : MAX_SLOT_COUNT;
+    const theme = resolveRoleThemesForSlotCount(officialDisciplineId, count)[slotIndex];
+    return theme ? theme.roleId : null;
+  }
   const theme = themes[slotIndex];
   return theme ? theme.roleId : null;
 }
