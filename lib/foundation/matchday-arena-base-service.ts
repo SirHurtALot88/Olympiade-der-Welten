@@ -13,7 +13,7 @@ import {
   countSeasonCaptains,
   countSeasonLineupDisciplineSides,
   formatLineupTeamStatusLabel,
-  SEASON_CAPTAIN_SLOTS,
+  getSeasonCaptainSlots,
 } from "@/lib/lineups/lineup-discipline-contract";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -163,12 +163,13 @@ function buildArenaOptions(save: PersistedSaveGame, params: LegacyLineupKeyParam
         lineupFilledCount,
         totalLineupSides,
         captainUsedCount,
-        captainSlots: SEASON_CAPTAIN_SLOTS,
+        captainSlots: getSeasonCaptainSlots(save.gameState),
         statusLabel: formatLineupTeamStatusLabel({
           team,
           lineupFilledCount,
           totalLineupSides,
           captainUsedCount,
+          captainSlots: getSeasonCaptainSlots(save.gameState),
         }),
         currentMatchdayReady,
       };

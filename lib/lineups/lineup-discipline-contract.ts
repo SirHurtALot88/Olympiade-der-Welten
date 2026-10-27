@@ -1,5 +1,6 @@
 import type {
   Discipline,
+  GameState,
   LineupDisciplineSide,
   Matchday,
   Season,
@@ -7,8 +8,23 @@ import type {
   SeasonDisciplineScheduleSourceStatus,
   Team,
 } from "@/lib/data/olyDataTypes";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 
 export const SEASON_CAPTAIN_SLOTS = 3;
+
+/**
+ * Chris am 27.10. (offene Frage aus PR #1323): "Erstens, es gibt keine Gratis-Captains. Wir
+ * haben nur 3 Stück pro Saison. Das werden wir jetzt auf 6 im Battle Mode erhöhen, da wir ja
+ * doppelt so viele Spieltage haben." NUR das harte Saison-Limit steigt im Battle Mode auf 6 --
+ * die Wiederverwendungs-Regel ("Kapitaen auf einer schon genutzten Disziplin-Seite kostet
+ * keinen neuen Slot", s. `getSeasonCaptainDisciplineSideKeys`/`countSeasonCaptains` unten)
+ * aendert sich NICHT. Manager Mode bleibt bei `SEASON_CAPTAIN_SLOTS` (3).
+ */
+export const BATTLE_MODE_SEASON_CAPTAIN_SLOTS = 6;
+
+export function getSeasonCaptainSlots(gameState: Pick<GameState, "scenarioMeta">): number {
+  return isBattleModeSave(gameState) ? BATTLE_MODE_SEASON_CAPTAIN_SLOTS : SEASON_CAPTAIN_SLOTS;
+}
 
 export type LineupContractSourceStatus =
   | "mapped"
@@ -108,6 +124,8 @@ export function buildMatchdayLineupContract(input: {
   matchday: Matchday;
   disciplines: Discipline[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[];
+  /** Fehlt dieser, bleibt es beim Manager-Mode-Default (`SEASON_CAPTAIN_SLOTS`). */
+  gameState?: Pick<GameState, "scenarioMeta">;
 }): MatchdayLineupContract {
   const ordered = buildLineupDisciplineContract(input.disciplines);
   const hasStoredSchedule = Boolean(input.disciplineSchedule && input.disciplineSchedule.length > 0);
@@ -161,7 +179,7 @@ export function buildMatchdayLineupContract(input: {
     sourceNote,
     discipline1: toSlot(resolvedDiscipline1, "d1", scheduledEntry?.discipline1 ?? null),
     discipline2: toSlot(resolvedDiscipline2, "d2", scheduledEntry?.discipline2 ?? null),
-    seasonCaptainSlots: SEASON_CAPTAIN_SLOTS,
+    seasonCaptainSlots: getSeasonCaptainSlots(input.gameState ?? {}),
     totalDisciplineSidesInSeason:
       input.disciplineSchedule?.length != null && input.disciplineSchedule.length > 0
         ? input.disciplineSchedule.reduce(

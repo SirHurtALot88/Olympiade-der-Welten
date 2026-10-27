@@ -376,6 +376,67 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
     }
   });
 
+  it("erhoeht das Saison-Kapitaenslimit im Battle Mode auf 6 statt 3 (Chris 27.10., offene Frage aus PR #1323) -- Manager Mode bleibt bei 3", () => {
+    const persistence = createPersistenceService();
+    const save = persistence.createFreshSeasonOneSave({ name: "Lineup Captain Limit Battle Mode Test" });
+    // `createFreshSeasonOneSave` kennt keinen `gameMode`-Parameter -- Battle Mode wird deshalb
+    // nachtraeglich per direktem `scenarioMeta`-Flip gesetzt, exakt wie `resolveGameMode()`
+    // (lib/season/game-mode.ts) es liest. Der Saison-Spielplan selbst bleibt die Manager-Mode-
+    // Ziehung (repeat=1, 10 Spieltage) -- die Aktivierung von repeat=2 ist bewusst ein separates
+    // Vorhaben (s. Kommentar an `getSeasonDisciplineRepeatCount`) und hier nicht Gegenstand.
+    persistence.saveSingleplayerState(save.saveId, {
+      ...save.gameState,
+      scenarioMeta: { ...save.gameState.scenarioMeta!, gameMode: "battle" },
+    });
+    topUpRosterCoverage(save.saveId);
+
+    const refreshedSave = persistence.getSaveById(save.saveId);
+    if (!refreshedSave) {
+      throw new Error("Expected battle-mode save after gameMode flip.");
+    }
+    expect(refreshedSave.gameState.scenarioMeta?.gameMode).toBe("battle");
+
+    const teamId = pickEligibleTeamId(refreshedSave);
+    const seasonId = refreshedSave.gameState.season.id;
+    const matchdayIds = refreshedSave.gameState.season.matchdayIds.slice(0, 4);
+    expect(matchdayIds).toHaveLength(4);
+
+    for (let index = 0; index < matchdayIds.length; index += 1) {
+      const matchdayId = matchdayIds[index]!;
+      const params = { saveId: save.saveId, seasonId, matchdayId, teamId };
+      const context = loadLocalLegacyLineupContext(params);
+      expect(context.ok && context.context.teamStatus?.captainSlots).toBe(6);
+      const entries = buildEntriesFromContext(context, { d1Captain: true, d2Captain: true });
+      const saveResult = saveLocalLegacyLineupDraft(params, entries);
+
+      if (index < 3) {
+        // Spieltage 1-3: je 2 Kapitaene -> 6 von 6, noch innerhalb des Battle-Mode-Limits.
+        expect(saveResult.ok).toBe(true);
+        const afterSave = persistence.getSaveById(save.saveId);
+        if (!afterSave) {
+          throw new Error("Expected save after battle-mode captain test save.");
+        }
+        persistence.saveSingleplayerState(save.saveId, {
+          ...afterSave.gameState,
+          season: {
+            ...afterSave.gameState.season,
+            currentMatchday: index + 2,
+          },
+          matchdayState: {
+            ...afterSave.gameState.matchdayState,
+            matchdayId: matchdayIds[index + 1]!,
+          },
+        });
+      } else {
+        // Spieltag 4: der siebte Kapitaen-Slot ueberschreitet das Battle-Mode-Limit von 6.
+        expect(saveResult.ok).toBe(false);
+        if (!saveResult.ok) {
+          expect(saveResult.errors.some((error) => error.includes("Season captain limit 6 would be exceeded"))).toBe(true);
+        }
+      }
+    }
+  });
+
   it("traegt beim Speichern keine Formkarte ein, die der Spieler nicht gewaehlt hat", () => {
     // Gemeldeter Fehler: In der Wertung standen Formkarten (+19,0 Form), die nie gespielt
     // wurden. Quelle war der Autofill in diesem Schreibpfad — wer keine Karte waehlte,
