@@ -159,12 +159,11 @@ export const ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["
  * Abschnitt 2) und beide brauchen deshalb GENAU DAS BESTEHENDE Duell-Chassis -- kein Byte neuer
  * Motor-Code, exakt der "nur ein weiterer Eintrag"-Fall, den der Kommentar oben vorhersagt.
  *
- * I-SPY BLEIBT WEITERHIN AUSSEN VOR, jetzt aus einem gemessenen statt nur einem
- * Auftrags-Grund: es traegt zwar ebenfalls `duell:true`, ist aber mit rho 0,684 je Spiel die
- * einzige der vier Duell-Buehnen UNTER der 0,80-Schranke (`data/generated/
- * rangtreue-basislinie.json`) -- eine Disziplin produktiv zu schalten, die ihre eigene Abnahme
- * nicht besteht, waere genau die Vermischung der beiden Achsen (Rangtreue / Produktions-
- * anbindung), vor der das PM-Briefing in Abschnitt 1 warnt.
+ * I-SPY GEHOERT NICHT (MEHR) IN DIESE MENGE: der Absatz, der hier stand ("traegt ebenfalls
+ * `duell:true`, rho 0,684"), ist seit dem Schatzsuche-Umbau (21.09.) doppelt ueberholt —
+ * `BUEHNE_ART["i-spy"]` traegt `schatzsuche:true` statt `duell:true`, und `spieleBuehneDuell()`
+ * liefert dafuer `null`. Seit der Kalibrierrunde 3 (27.10., Task #197) laeuft I-Spy ueber
+ * `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` (s. dort).
  */
 export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "speed-schach",
@@ -196,11 +195,19 @@ export const ARENA_BUEHNE_DUELL_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
  * ab -- ein Team koennte mit weniger Ueberlebenden trotzdem die hoehere Punktsumme haben.
  * Breaking laeuft deshalb ab hier ueber `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS`/
  * `spieleBuehneGauntlet()` (s.u.), das einzige Chassis, das ueber ein `.gauntlet`-Flag geht.
+ *
+ * I-SPY DAZU (27.10., Task #197, docs/design/organisch-tdm-battlefield-ispy-27-10.md): die
+ * Schatzsuche (`BUEHNE_ART["i-spy"].schatzsuche`) traegt weder `.heben` noch `.duell` noch
+ * `.gauntlet` — `spieleBuehneAuftritt()` ist laut Motor-Kommentar dort ausdruecklich auch ihr
+ * Einstiegspunkt ("Schatzsuche laeuft technisch ueber spieleBuehneAuftritt()"). Der Seitenstand
+ * ist die Summe der eigenen Fundpunkte (`u.summe`), dieselbe Zahl, die die Buehne live zeigt.
+ * Seit der Kalibrierrunde 3 besteht I-Spy beide Pflichtkriterien (rho 0,817/0,811, Pp 14,6/15,0).
  */
 export const ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "showcase",
   "eiskunstlauf",
   "wettessen",
+  "i-spy",
 ]);
 
 /**

@@ -178,6 +178,10 @@ import footballPpsReferenzJson from "@/data/generated/football-pps-referenz.json
 // battle-mode.engine.js) hebt sie auf 0,834, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`
 // unten fuer die volle Herleitung.
 import climbingPpsReferenzJson from "@/data/generated/climbing-pps-referenz.json";
+// I-SPY (27.10., Task #197): gezogen von scripts/ziehe-buehne-pps-referenz.ts i-spy gegen das
+// live-save-Abbild vom 27.10., NACH der Kalibrierrunde 3 (32 Ticks, Tresor 45) — die Referenz
+// gehoert zu genau diesem Motorstand, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
+import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -373,6 +377,10 @@ export const TENNIS_INDIVIDUAL_PPS_MAX = 5.5;
 export const TENNIS_PPS_ANTEIL_MITTE = 0.25;
 export const FECHTEN_INDIVIDUAL_PPS_MAX = 5.5;
 export const FECHTEN_PPS_ANTEIL_MITTE = 0.25;
+// I-SPY (27.10., Task #197): dieselbe Kurve wie die anderen Buehnen — eigene Konstanten aus
+// demselben Grund wie oben (einzeln nachkalibrierbar, ohne die anderen mitzuziehen).
+export const I_SPY_INDIVIDUAL_PPS_MAX = 5.5;
+export const I_SPY_PPS_ANTEIL_MITTE = 0.25;
 
 /**
  * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER DIE DREI ANGESCHLOSSENEN BAHN-DISZIPLINEN (Bahn-
@@ -554,6 +562,8 @@ const FOOTBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(footballPpsR
 // CLIMBING-KALIBRIERUNG (16.09.): auch keine eigene Wertformel-Rolle -- `feldgroessenTorwart`
 // fehlt in der Datei, genau wie bei jeder Nicht-Hockey-Disziplin oben.
 const CLIMBING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(climbingPpsReferenzJson as ArenaPpsReferenzJson);
+// I-SPY (27.10.): keine Rolle mit eigener Wertformel -- `feldgroessenTorwart` fehlt in der Datei.
+const I_SPY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(iSpyPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -792,6 +802,19 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       // Discipline.playerCount ist 6 (dataAdapter.ts) -- hier ausnahmsweise identisch mit der
       // Motor-Feldgroesse (BAHN_ART.climbing.jeSeite ist ebenfalls 6), trotzdem einzeln
       // nachgesehen statt angenommen, aus demselben Grund wie bei jeder vorigen Bahn.
+      katalogStandardgroesse: 6,
+    },
+  ],
+  // ==================== I-SPY (27.10., Task #197) ====================
+  // Schatzsuche ueber das Auftritt-Chassis, s. ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS
+  // (arena-headless-runner.ts) und den I-SPY-Nachtrag an `ARENA_RESOLVED_DISCIPLINE_IDS`.
+  [
+    "i-spy",
+    {
+      referenzFeldgroessen: I_SPY_PPS_REFERENZ_FELDGROESSEN,
+      max: I_SPY_INDIVIDUAL_PPS_MAX,
+      anteilMitte: I_SPY_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 6 (dataAdapter.ts), einzeln nachgesehen.
       katalogStandardgroesse: 6,
     },
   ],

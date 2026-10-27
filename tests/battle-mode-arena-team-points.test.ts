@@ -9,6 +9,7 @@ import {
   ARENA_BAHN_DISCIPLINE_IDS,
   type ArenaFixtureResult,
 } from "@/lib/battle/arena-headless-runner";
+import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import {
   ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS,
   ARENA_TEAM_POINTS,
@@ -152,17 +153,22 @@ describe("ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS", () => {
   });
 
   /**
-   * I-SPY IST BEWUSST NICHT DABEI (Produktivierungswelle 2) -- und ist der schaerfere der beiden
-   * Nicht-Eintrag-Faelle, weil er NICHT an fehlender Technik scheitert: I-Spy traegt `duell:true`
-   * in `BUEHNE_ART` wie Tennis/Fechten/Speed-Schach und braeuchte technisch nur diese eine Zeile.
-   * Was fehlt, ist die ANDERE Achse: mit rho 0,684 je Spiel (`data/generated/
-   * rangtreue-basislinie.json`) besteht es seine eigene Abnahme nicht (Schranke 0,80, CLAUDE.md).
-   * Genau deshalb steht dieser Test hier: damit "es waere ja nur ein Eintrag" nicht irgendwann
-   * die Rangtreue-Achse ueberstimmt. Wird I-Spy spaeter ueber 0,80 gehoben, faellt dieser Test
-   * absichtlich rot und ist DANN mit der neuen Zahl zu aktualisieren.
+   * I-SPY IST JETZT DRIN (27.10., Task #197) -- loest den Regressionstest ab, der seit
+   * Produktivierungswelle 2 bewusst rot-bei-Anschluss angelegt war ("Wird I-Spy spaeter ueber
+   * 0,80 gehoben, faellt dieser Test absichtlich rot und ist DANN mit der neuen Zahl zu
+   * aktualisieren"). Die neue Zahl: Kalibrierrunde 3 (32 Ticks, Tresor 45) hebt rho je Spiel
+   * auf 0,817/0,811 (n=48, zwei Saatstroeme), Pp 14,6/15,0 -- s. data/generated/
+   * disziplin-abnahme.json und docs/design/organisch-tdm-battlefield-ispy-27-10.md. Der Schutz,
+   * den der alte Test leisten sollte ("es waere ja nur ein Eintrag" darf die Rangtreue-Achse
+   * nicht ueberstimmen), liegt weiter bei tests/disziplin-abnahme-guard.test.ts. Technisch laeuft
+   * I-Spy nicht ueber das Duell-, sondern ueber das Auftritt-Chassis (`schatzsuche:true`, kein
+   * `duell` mehr seit dem 21.09.).
    */
-  it("enthaelt NICHT I-Spy (traegt zwar duell:true, besteht aber die Rangtreue-Schranke nicht)", () => {
-    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(false);
+  it("enthaelt I-Spy (Kalibrierrunde 3, 27.10.) -- ueber das Auftritt-Chassis, nicht das Duell-Chassis", () => {
+    expect(ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS.has("i-spy")).toBe(true);
+    expect(ARENA_RESOLVED_DISCIPLINE_IDS.has("i-spy")).toBe(true);
+    expect(ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has("i-spy")).toBe(true);
+    expect(ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has("i-spy")).toBe(false);
   });
 
   /**

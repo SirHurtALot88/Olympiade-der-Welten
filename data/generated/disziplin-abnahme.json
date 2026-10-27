@@ -1,7 +1,8 @@
 {
  "hinweis": "Pflichtabnahme je Disziplin (CLAUDE.md): rho je Spiel (Median ueber die Kader-Familie) > 0,80 UND Pp-Abweichung <= 25 in zwei Saatstroemen. Gelesen von tests/disziplin-abnahme-guard.test.ts gegen ARENA_RESOLVED_DISCIPLINE_IDS (lib/battle/arena-resolved-disciplines.ts). Neu messen und hier eintragen, bevor eine Disziplin in die Arena-Wertung aufgenommen wird; ein Eintrag, der nicht mehr besteht, nimmt sie heraus (sie zahlt dann ueber die PPS-Duell-Bruecke). Frische JE MESSGROESSE: 'rhoFrisch'/'ppFrisch' true = am angegebenen Datum/Commit mit dem genannten Befehl gemessen; false = aus der Doku uebernommen bzw. nicht gemessen. Der Waechter zaehlt nur frische Werte.",
  "beobachtungsliste": {
-  "breaking": "rho 0,801 bei Kaderspannweite 0,289 — genau auf der Schranke; bei der naechsten Nachmessung zuerst pruefen. Die Schranke selbst bleibt unveraendert."
+  "breaking": "rho 0,801 bei Kaderspannweite 0,289 — genau auf der Schranke; bei der naechsten Nachmessung zuerst pruefen. Die Schranke selbst bleibt unveraendert.",
+  "i-spy": "rho 0,817 (Standard-Saatstrom) / 0,811 (zweiter Strom, saat0 5 000 000), n=48 — auf dem zweiten Strom nur 0,011 ueber der Schranke; der Standard-Saatstrom liegt fuer I-Spy messbar guenstiger (alter Stand 0,749 gegen 0,710). Bei der naechsten Nachmessung beide Stroeme fahren."
  },
  "schranken": {
   "rhoJeSpielUeber": 0.8,
@@ -500,16 +501,29 @@
    "anmerkung": "KORRIGIERT 25.10. (Task #196, nach dem Konsistenz-Audit vom selben Tag, Commit f9181c15): die Zeile von f9181c15 (Pp 64,6/61,7) maß gegen BASIS_JE_DISC.football -- fuer Football seit PR #934 (16.09.) der Spiel-Eignungs-Override, nicht die gesperrte Matrix (CLAUDE.md: die Pp-Pflichtpruefung muss gegen die Matrix laufen). Football ist die einzige der zwanzig Disziplinen mit dieser Abweichung. Fix: neue PP_MATRIX_JE_DISC-Konstante in battle-mode.engine.js, nur von den Pp-Messwerkzeugen gelesen (BASIS_JE_DISC/mitAufschlag()/die Kaderanzeige bleiben unveraendert auf dem Override). Frisch nachgemessen mit dem korrigierten Werkzeug: Pp 121,0/120,1 -- WEITER WEIT ueber der 25-Pp-Schranke, sogar deutlich hoeher als vorher berichtet. rho (0,807/0,902) unveraendert aus f9181c15 uebernommen, nicht in dieser Runde neu gemessen (kein rr()-konsumierender Code beruehrt). Football bleibt deshalb weiterhin ausserhalb ARENA_RESOLVED_DISCIPLINE_IDS; rhoFrisch/ppFrisch bleiben true, weil beide Werte aus einer vollen Standardmessung (n=48, zwei Saatstroeme) stammen, nur eben mit dem jetzt korrekten Vergleichstisch fuer Pp."
   },
   "i-spy": {
-   "rhoJeSpiel": 0.75,
-   "pp": [
-    13.6
-   ],
-   "datum": "2026-10-15",
-   "quelle": "docs/design/stand-aller-disziplinen.md",
-   "rhoFrisch": false,
-   "ppFrisch": false,
-   "commit": "unbekannt",
-   "anmerkung": "nicht angeschlossen; Zahl aus der Doku uebernommen, nicht neu gemessen"
+   "chassis": "buehne",
+   "rhoJeSpiel": 0.817,
+   "rhoSpannweite": 0.132,
+   "rhoSaison": 0.888,
+   "rhoMessung": {
+    "befehl": "node scripts/miss-star-paartreue.mjs 48 i-spy (Median rho je Spiel 0,817, G1* erfuellt); Kontrolle node scripts/miss-alle-disziplinen.mjs 24 i-spy = 0,816; zweiter Saatstrom (disziplinProbe saat0=5000000, n=48) = 0,811 -- Task #197, Kalibrierrunde 3",
+    "spiele": 48,
+    "kaderVarianten": 5,
+    "kaderQuelle": "data/generated/kaderfamilie-live-save.json",
+    "statistik": "Median ueber die Kader-Familie"
+   },
+   "pp": [14.6, 15.0],
+   "ppMessung": {
+    "befehl": "node scripts/messe-arena-einfluss.mjs i-spy 48 (+ --saat-versatz=10000000) -- Task #197",
+    "laeufe": 48,
+    "saatStroeme": [0, 10000000]
+   },
+   "datum": "2026-10-27",
+   "quelle": "docs/design/organisch-tdm-battlefield-ispy-27-10.md Abschnitt 2",
+   "commit": "14b15d3e",
+   "rhoFrisch": true,
+   "ppFrisch": true,
+   "anmerkung": "Gemessen auf origin/main 14b15d3e plus der Kalibrierrunde 3 dieses PRs (BUEHNE_ART['i-spy'].rundenN 8 -> 32, rundenDauer mitskaliert, ISPY_PUNKTWERT[3] 60 -> 45). Vorher (gleiche Sonden): rho je Spiel 0,749 / 0,710 (zwei Stroeme, n=48), Pp 16,6 / 12,8. Nachher: rho 0,817 / 0,811, 5 von 5 Paarungen auf beiden Stroemen besser; Saison 0,888 / 0,895; Star Rang 1 54,2 % / 52,1 %, erste zwei 84,2 % / 81,7 %, letzter 0 %, Paartreue (>=15) 96,8 % / 96,6 %. Kadergroessen je Seite 2/3/4/5 (n=24): 0,854 / 0,842 / 0,877 / 0,859. Spiegeltest (miss-arena-buehne-spiegel.mjs 480 i-spy) 247:231, Punkte 0,1 % auseinander. Pp-Profil beide Stroeme: intelligence +5,2/+5,0 die groesste Einzelabweichung, kein Matrixattribut bei 0 %. Chassis spieleBuehneAuftritt() (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), PPS-Referenz data/generated/i-spy-pps-referenz.json."
   },
   "battlefield": {
    "rhoJeSpiel": 0.399,
