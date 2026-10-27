@@ -95,7 +95,10 @@ export type AufstellungsStufung = (typeof AUFSTELLUNGS_STUFUNGEN)[number];
  */
 const MOCKUP_POS_ORDER: Record<ArenaStufungDisziplin, string[]> = {
   tdm: ["vanguard", "holdline", "breaker", "skirmisher", "shotcaller", "rallypoint"],
-  battlefield: ["siegecore", "moraleanchor", "spotter", "commander"],
+  // BATTLEFIELD (27.10.): eigene Rollen je Kadergroesse (BATTLEFIELD_SLOTS_JE_K im Motor,
+  // ROLE_THEME_IDS_BY_SLOT_COUNT in matchday-slot-roles.ts). Fuer JE_SEITE.battlefield = 4 sind
+  // das Siege Core, Field Control, Commander, Morale Anchor — hier in SLOT_ZUSATZ.pos-Folge.
+  battlefield: ["siegecore", "moraleanchor", "commander", "fieldcontrol"],
   "mini-dm": ["frontliner", "finisher", "trickfighter", "ironguard"],
 };
 
@@ -109,16 +112,21 @@ const MOCKUP_POS_ORDER: Record<ArenaStufungDisziplin, string[]> = {
  */
 const FLANK_SLOT: Record<ArenaStufungDisziplin, string> = {
   tdm: "skirmisher",
-  battlefield: "spotter",
+  // BATTLEFIELD (27.10.): bei 4 je Seite steht kein Spotter mehr auf dem Platz (k=4: Siege
+  // Core, Field Control, Commander, Morale Anchor), und in der Domination gibt es ohnehin keine
+  // Formation/Flanke mehr — die Punktwahl ersetzt sie. Field Control steht hier, wie bei
+  // Mini-DM, nur als Platzhalter ("kontrolliert Raum"), ohne eigene Flanken-Wirkung.
+  battlefield: "fieldcontrol",
   "mini-dm": "trickfighter",
 };
 
 /** slotIndex (Produktionsreihenfolge, DISCIPLINE_ROLE_THEMES) -> Kurzkennung, ueber die
  * bestehende Funktion ermittelt — keine zweite Kopie der Themenliste. */
-function baueProduktionsIndexZuKurzId(disc: ArenaStufungDisziplin): Map<string, number> {
+function baueProduktionsIndexZuKurzId(disc: ArenaStufungDisziplin, jeSeite: number): Map<string, number> {
   const karte = new Map<string, number>();
   for (let i = 0; i < 6; i++) {
-    const kurz = resolveSlotRoleShortId(disc, null, i);
+    // Kadergroesse mitgeben: Battlefield hat je k eine eigene Index->Rolle-Zuordnung (27.10.).
+    const kurz = resolveSlotRoleShortId(disc, null, i, jeSeite);
     if (kurz) karte.set(kurz, i);
   }
   return karte;
@@ -130,7 +138,7 @@ function baueKurzIdZuKopfattribut(disc: ArenaStufungDisziplin, jeSeite: number):
   const rollen = resolveSlotRolesForDiscipline(disc, null, jeSeite);
   const karte = new Map<string, string>();
   rollen.forEach((rolle, i) => {
-    const kurz = resolveSlotRoleShortId(disc, null, i);
+    const kurz = resolveSlotRoleShortId(disc, null, i, jeSeite);
     if (kurz) karte.set(kurz, rolle.majorPositiveAttribute);
   });
   return karte;
@@ -254,7 +262,7 @@ export function baueAufstellungFuerHeim(
   // Die Uebersetzung geht deshalb ausschliesslich ueber die echte Funktion
   // `resolveSlotRoleShortId` (nicht ueber eine geratene Reihenfolge).
   const posOrder = MOCKUP_POS_ORDER[disc].slice(0, geordnet.length);
-  const kurzIdZuProduktionsIndex = baueProduktionsIndexZuKurzId(disc);
+  const kurzIdZuProduktionsIndex = baueProduktionsIndexZuKurzId(disc, geordnet.length);
   const entries = geordnet.map((p, k) => {
     const kurzId = posOrder[k];
     const slotIndex = kurzIdZuProduktionsIndex.get(kurzId);

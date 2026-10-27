@@ -2789,3 +2789,25 @@ n=48 (zwei unabhaengige Stroeme) besteht Basketball dagegen klar und robust: **1
 die urspruenglichen n=12-Werte (22,9/17,6). rho wurde ebenfalls unabhaengig reproduziert (n=24:
 0,832, exakt; n=48: 0,821) und Manager-Mode-Bit-Identitaet gegen ein frisches Live-Save-Abbild
 bestaetigt (8/8 Saves identisch) -- beides bestanden.
+
+---
+
+## Nachtrag 27.10. — Battlefield: Rollen je Kadergröße, drei Orte, dynamische Punktwahl (Task #198)
+
+Chris 27.10.: bei 2 Spielern kein Commander/Spotter, jede Rolle nimmt Punkte ein, keine feste
+Rolle→Ort-Aufteilung. Umgesetzt: eigene Rollen je k (k=2 Siege Core + Morale Anchor … k=6 alle
+sechs, Matrix-Mittel bei jedem k exakt), `jeSeite` 4 → 6, drei Orte nach K6 Abschnitt 4, jede
+Rolle erobert mit mindestens 1, dynamische Punktwahl statt Formation/Offensivzwang. Weiterhin
+**nicht angeschlossen**. Details und alle Zahlen: `docs/design/battlefield-rollen-je-kadergroesse-27-10.md`.
+
+| k | rho je Spiel vorher → nachher | Saison vorher → nachher |
+|---|---|---|
+| 2 | 0,750 → 0,808 | 0,800 → 0,800 |
+| 3 | 0,521 → 0,686 | 0,600 → 0,829 |
+| 4 | 0,399 → 0,401 | 0,310 → 0,643 |
+| 5 | 0,232 → 0,556 | 0,358 → 0,661 |
+| 6 | 0,257 → 0,228 | 0,483 → 0,308 |
+
+Pp k=4 35,7/48,6 → 99,6/107,4 (Ströme widersprüchlich; `wert()` misst nur Kampf, s. Dokument),
+k=2 118,4 → 79,1. Rangtreue-Basislinie Battlefield jetzt bei der neuen Standardgröße k=6.
+

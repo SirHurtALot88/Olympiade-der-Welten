@@ -22,11 +22,11 @@
   },
   "battlefield": {
    "chassis": "arena",
-   "spielMedian": 0.399,
-   "spielSpannweite": 0.666,
-   "saisonMedian": 0.357,
-   "saisonSpannweite": 0.69,
-   "schranke": 0.2
+   "spielMedian": 0.228,
+   "spielSpannweite": 0.599,
+   "saisonMedian": 0.308,
+   "saisonSpannweite": 0.734,
+   "schranke": 0.18
   },
   "spurt": {
    "chassis": "bahn",

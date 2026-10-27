@@ -7552,10 +7552,12 @@
       {id:"ironguard",label:"Iron Guard",text:"Bleibt im Chaos stehen und frisst Druck.",gross:"stamina",klein:"health",last:"torment",mueh:"high",profil:{torment:20.4,stamina:18.9,health:16.7,power:13.7,will:11.7,intelligence:8,spirit:8,dexterity:2.8}}
     ],
     "battlefield":[
-      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
-      {id:"spotter",label:"Spotter",text:"Liest Lücken und Ziele über Awareness.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
-      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
-      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen.",gross:"spirit",klein:"health",last:"torment",mueh:"medium",profil:{spirit:21.7,charisma:18.9,torment:11.5,intelligence:10.8,health:10.7,power:8,awareness:8,determination:5.2,stamina:5.2}}
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"spotter",label:"Spotter",text:"Liest Lücken über Awareness und Intelligence — rotiert zu unbewachten Punkten und nimmt neutrale Punkte besonders schnell.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
+      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
     ],
     "gewichtheben":[
       {id:"poweropener",label:"Power Opener",text:"Setzt die Basis über maximale Power.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:19.4,charisma:19.2,determination:10.1,will:5.9,speed:5.1,dexterity:5.1,stamina:1.8}},
@@ -7731,6 +7733,45 @@
       {id:"lasthit",label:"Last Hit",text:"Braucht Nerven für den finalen Zugriff.",gross:"intelligence",klein:"spirit",last:"dexterity",mueh:"medium",profil:{torment:17.9,stamina:17.4,will:14.9,health:13.8,power:12.1,intelligence:9.5,spirit:9.5,dexterity:5.1}}
     ]
   };
+  // BATTLEFIELD-ROLLEN JE KADERGROESSE k=2..6 (Chris 27.10.: "es kann bei 2 spielern ja andere
+  // slots geben als bei 6 spielern! auch DAS ist erlaubt"). Anders als MINI_DM_FFA_SLOTS_JE_K
+  // nicht nur ein anderes Profil derselben gekuerzten Liste, sondern eine ANDERE ZUSAMMENSETZUNG
+  // je k (ROLE_THEME_IDS_BY_SLOT_COUNT in lib/lineups/matchday-slot-roles.ts): bei k=2 Siege
+  // Core + Morale Anchor statt Commander + Spotter. build() waehlt je Seite die Liste fuer ihre
+  // tatsaechliche Kopfzahl und gibt baueEinheit() das k-Profil mit (slotDef). Aus derselben
+  // echten Quelle (resolveSlotRolesForDiscipline("battlefield","battlefield",k)).
+  const BATTLEFIELD_SLOTS_JE_K={
+    2:[
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"spirit",klein:"charisma",last:"torment",mueh:"medium",profil:{charisma:22.1,intelligence:17.6,spirit:17.6,awareness:11,health:8.8,torment:8.6,power:5.6,determination:4.4,stamina:4.4}}
+    ],
+    3:[
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"charisma",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:24.8,spirit:14.2,awareness:12.3,intelligence:12.3,torment:10.2,health:9.8,power:6.9,determination:4.8,stamina:4.8}}
+    ],
+    4:[
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"awareness",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:19.4,spirit:16.5,awareness:13.7,torment:11.8,health:10.9,intelligence:8.8,power:8.3,determination:5.3,stamina:5.3}}
+    ],
+    5:[
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:21.7,spirit:18.3,health:11.8,intelligence:10.7,awareness:10.3,power:9.4,torment:6.6,determination:5.7,stamina:5.7}}
+    ],
+    6:[
+      {id:"siegecore",label:"Siege Core",text:"Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",gross:"power",klein:"torment",last:"health",mueh:"high",profil:{charisma:17.9,torment:15.4,power:14.4,intelligence:14.4,spirit:14.4,awareness:9,health:7.2,determination:3.7,stamina:3.7}},
+      {id:"fieldcontrol",label:"Field Control",text:"Kontrolliert Raum über Intelligence und Spirit — erobert schneller als der Durchschnitt und drängt Fortschritt an eigenen Punkten zurück.",gross:"intelligence",klein:"spirit",last:"power",mueh:"low",profil:{intelligence:21.4,spirit:19.4,charisma:17.3,torment:10.4,power:8.7,awareness:8.7,health:7,determination:3.5,stamina:3.5}},
+      {id:"commander",label:"Commander",text:"Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte und erobert schneller als der Durchschnitt.",gross:"charisma",klein:"intelligence",last:"health",mueh:"low",profil:{charisma:25.4,intelligence:19.4,spirit:13.7,torment:10.3,power:8.6,awareness:8.6,health:6.9,determination:3.5,stamina:3.5}},
+      {id:"spotter",label:"Spotter",text:"Liest Lücken über Awareness und Intelligence — rotiert zu unbewachten Punkten und nimmt neutrale Punkte besonders schnell.",gross:"awareness",klein:"intelligence",last:"power",mueh:"low",profil:{intelligence:19.4,charisma:17.8,awareness:14.4,spirit:14.3,torment:10.7,power:9,health:7.2,determination:3.6,stamina:3.6}},
+      {id:"disruptor",label:"Disruptor",text:"Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt auch an umkämpften Punkten ab.",gross:"torment",klein:"awareness",last:"health",mueh:"medium",profil:{charisma:17.7,torment:17.3,intelligence:14.2,spirit:14.2,awareness:13.4,power:8.9,health:7.1,determination:3.6,stamina:3.6}},
+      {id:"moraleanchor",label:"Morale Anchor",text:"Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Eroberungsfortschritt an eigenen Punkten am stärksten zurück.",gross:"health",klein:"spirit",last:"torment",mueh:"medium",profil:{charisma:23.9,spirit:20.1,health:12.6,power:10.4,torment:7.8,intelligence:7.2,determination:6.1,stamina:6.1,awareness:5.9}}
+    ]
+  };
   // >>> ENDE GENERIERT: arena-daten
   // Reihe und Befehl je Slot — die Inszenierung, nicht die Regel. Das Spiel kennt keine
   // Reihen; dass ein Breaker vorprescht und ein Skirmisher flankiert, ist eine Entscheidung
@@ -7771,7 +7812,13 @@
     // Die Reihen folgen jetzt den Slot-Texten, und `pos` folgt den Reihen: der beste
     // Spieler bekommt den vordersten Slot, wie im TDM (vanguard pos 0, reihe 0).
     siegecore:{reihe:0,ord:"mitlinie",pos:0},   moraleanchor:{reihe:0,ord:"mitlinie",pos:1},
-    spotter:{reihe:1,ord:"flanke",pos:2},       commander:{reihe:2,ord:"mitlinie",pos:3}
+    spotter:{reihe:1,ord:"flanke",pos:2},       commander:{reihe:2,ord:"mitlinie",pos:3},
+    // FIELD CONTROL UND DISRUPTOR (27.10., Battlefield spielt jetzt bis 6 je Seite, s.
+    // BATTLEFIELD_SLOTS_JE_K): bisher fielen sie lautlos weg (jeSeite 4). Reihe/pos sind nur
+    // die STARTAUFSTELLUNG — in der Domination entscheidet danach die Punktwahl
+    // (dominationZielWahl), nicht die Reihe, wohin jemand laeuft. `ord` gibt dort die
+    // Neigung: "verfolgen"/"flanke" eher erobern, "decken"/"hinter" eher halten.
+    fieldcontrol:{reihe:1,ord:"mitlinie",pos:4}, disruptor:{reihe:1,ord:"verfolgen",pos:5}
   };
   const SLOT_STELLE=(()=>{const o={};for(const d in SLOTS_JE_DISC)SLOTS_JE_DISC[d].forEach((s2,i)=>{o[s2.id]=i;});return o;})();
   const slotReihe=(id)=>SLOT_ZUSATZ[id]?SLOT_ZUSATZ[id].reihe:Math.min(2,Math.floor((SLOT_STELLE[id]||0)/2));
@@ -7782,6 +7829,25 @@
   const slotsVon=(d)=>SLOTS_SORT[d]||(SLOTS_SORT[d]=(SLOTS_JE_DISC[d]||[]).slice()
     .map((s2,i)=>[s2,SLOT_ZUSATZ[s2.id]?SLOT_ZUSATZ[s2.id].pos:i])
     .sort((x,y)=>x[1]-y[1]).map(x=>x[0]));
+
+  // BATTLEFIELD: DIE ROLLEN FUER GENAU k KOEPFE (27.10., Chris: „es kann bei 2 spielern ja
+  // andere slots geben als bei 6 spielern"). null fuer jede andere Disziplin — dort bleibt
+  // slotsVon(d) der einzige Weg, byte-identisch. Sortiert wie slotsVon (SLOT_ZUSATZ.pos), damit
+  // der Reihum-Rueckfall ohne Aufstellung wie bisher dem Eignungsbesten den vordersten Slot gibt.
+  // k=1 (nur in Messsonden denkbar) nimmt den ersten Slot der Zweier-Liste.
+  const BF_SLOTS_SORT={};
+  function bfSlotsFuer(d,k){
+    if(d!=="battlefield"||typeof BATTLEFIELD_SLOTS_JE_K==="undefined")return null;
+    const kk=Math.max(1,Math.min(6,Math.round(k||0)));
+    if(BF_SLOTS_SORT[kk])return BF_SLOTS_SORT[kk];
+    const roh=kk<2?BATTLEFIELD_SLOTS_JE_K[2].slice(0,kk):BATTLEFIELD_SLOTS_JE_K[kk];
+    return (BF_SLOTS_SORT[kk]=roh.slice()
+      .map((s2,i)=>[s2,SLOT_ZUSATZ[s2.id]?SLOT_ZUSATZ[s2.id].pos:i])
+      .sort((x,y)=>x[1]-y[1]).map(x=>x[0]));
+  }
+  // Das k-Profil eines Slots, oder undefined (dann gilt SLOTVON wie bisher) — z.B. wenn eine
+  // Aufstellung eine Rolle setzt, die es bei dieser Kopfzahl nicht gibt.
+  const bfSlotDef=(kSlots,slId)=>(kSlots&&slId)?kSlots.find(s2=>s2.id===slId):undefined;
 
   // Gewichteter Attributschnitt — dieselbe Rechnung wie resolveWeightedAttributeScore.
   function gewichtet(a,profil){ let s2=0,w=0;
@@ -7799,8 +7865,11 @@
   // bewusst NICHT angefasst -- SLOT_PROFILE_MODIFIER_SCALE (Faktor 2,2, Klemmung 8,5) bleibt fuer
   // jede andere Disziplin exakt wie vorher.
   const FOOTBALL_SLOT_AUFSCHLAG_SKALA=0.35;
-  function slotAufschlag(p,slotId,d){
-    const s2=SLOTVON[slotId]; if(!s2)return 0;
+  // `slotDef` (optional, 27.10.): ein Eintrag aus BATTLEFIELD_SLOTS_JE_K — dieselbe Rolle hat
+  // je Kadergroesse ein anderes Profil (der Ausgleichsslot traegt den Rest). Ohne `slotDef`
+  // exakt das alte Verhalten (SLOTVON-Nachschlag).
+  function slotAufschlag(p,slotId,d,slotDef){
+    const s2=slotDef||SLOTVON[slotId]; if(!s2)return 0;
     const disz=d||(Object.keys(SLOTS_JE_DISC).find(k=>SLOTS_JE_DISC[k].some(x=>x.id===slotId)));
     const basis=BASIS_JE_DISC[disz]; if(!basis)return 0;
     let roh=(gewichtet(p.a,s2.profil)-gewichtet(p.a,basis))*2.2;
@@ -8035,7 +8104,7 @@
   // aber nur, wenn sie ueberhaupt einen Kampfwert speisen. Charisma und Spirit tun das
   // nicht; ein Shotcaller-Bonus wuerde dort spurlos versickern. Dann breit: alle
   // Attribute, die die Disziplin gewichtet.
-  function betroffeneAttribute(slotId,dId,eng){
+  function betroffeneAttribute(slotId,dId,eng,slotDef){
     const W=BASIS_JE_DISC[dId]||{};
     const breit=Object.keys(W).filter(k=>W[k]>0);
     if(!eng)return breit;
@@ -8053,7 +8122,7 @@
     // und sind von dieser Zeile unberuehrt, s. Isolationsnachweis
     // (node scripts/miss-alle-disziplinen.mjs 24, alle zwanzig, vor und nach dieser Runde).
     if(dId==="football")return breit;
-    const sl=SLOTVON[slotId]; if(!sl)return breit;
+    const sl=slotDef||SLOTVON[slotId]; if(!sl)return breit;
     // WELCHE REZEPTE HIER GEFRAGT SIND. Bis eben stand hier immer REC — die KAMPFrezepte.
     // Auf einer Bahn ist das die falsche Frage: dort speist kein Attribut einen Kampfwert,
     // sondern Antritt, Technik, Stehvermoegen. Solange nur TDM und Spurt existierten, fiel
@@ -8384,7 +8453,12 @@
       // Deshalb speist Charisma hier den Angriff mit (ein Befehl richtet mehr aus als
       // ein Schlag), Spirit die Verteidigung, und das Tempo kommt aus Aufmerksamkeit und
       // Verstand statt aus den Beinen: man ist frueher da, weil man frueher weiss, wohin.
-      label:"Battlefield", jeSeite:4,
+      // JESEITE 4 -> 6 (27.10.): die Saison schickt 2 bis 6 je Seite, und die Aufstellung
+      // kennt je Kadergroesse eigene Rollen (BATTLEFIELD_SLOTS_JE_K). Mit 4 fielen Field
+      // Control und Disruptor bei 5/6 gesetzten Spielern lautlos weg (dieselbe Fehlerklasse
+      // wie Spurts F1, s. organisch-tdm-battlefield-ispy-27-10.md Abschnitt 4). Kleinere
+      // Aufstellungen spielt build() weiter mit der gesetzten Zahl.
+      label:"Battlefield", jeSeite:6,
       // PERSOENLICHKEITS-HANDWERK (P1, 07.10.): BEWUSST AUS — Abbruchregel 1 der Opus-Empfehlung
       // (Abschnitt 7: "Verfehlt eine Disziplin eines der Kriterien A-F -> nur dort
       // persHandwerk:[]"). Mit ["z","b"] (V9) bestand Battlefield A-E klar (rho je Spiel
@@ -8479,13 +8553,69 @@
   // die sich alle drei Arena-Disziplinen teilen — als Folgevorschlag im PR vermerkt (z.B.
   // ein zweiter, rueckwaertiger Kontrollpunkt eigens fuer Reihe 2), nicht in dieser Runde
   // umgesetzt.
+  //
+  // ===================================================================================
+  // NACHTRAG 27.10. (Task #198): DREI PUNKTE, JEDE ROLLE EROBERT, KEINE FESTE ZUTEILUNG.
+  //
+  // Chris am 27.10., woertlich: „bei battlefield und 2 spielern müssen alle agieren, auch der
+  // commander und der spotter können und sollen ja felder einnehmen bzw es versuchen. Spieler
+  // müssen auch rotieren und taktisch agieren, es soll keine fixe aufteilung sein wer an
+  // welchem slot ist sonst gibt es ja absolut keine dynamik und es ist wie ein 1v1 DM an jedem
+  // ort."
+  //
+  // BEFUND VORHER (gemessen/gelesen, nicht vermutet): EIN Punkt in der Mitte; niemand lief je
+  // gezielt zu ihm — erreicht wurde er nur, weil Reihe 0 ohnehin dort steht. Commander (Reihe 2)
+  // und Spotter (Reihe 1) hielt die Formationsleine (reihenAnker) hinten, s. Kommentar oben.
+  // Und bei 2 gegen 2 setzte `endspiel` (live<=2) JEDEN Kaempfer ab Sekunde 0 in den
+  // Offensivzwang (nearest(foes)) — ein reines Deathmatch, der Punkt war Kulisse.
+  //
+  // JETZT:
+  //  - DREI ORTE nach K6 Abschnitt 4 (battlefield-domination-konzept-14-10.md): Nord, Mitte,
+  //    Sued auf der Mittellinie, Radius 65, 2 Punkte/s je gehaltenem Ort (K6 Abschnitt 5:
+  //    wer alle drei haelt, kommt auf dieselben 6/s wie der alte Einzelpunkt).
+  //  - JEDE ROLLE ZAEHLT BEIM EROBERN MINDESTENS 1 (Standard), einige mehr — der thematische
+  //    Zusatz liegt OBEN DRAUF, keine Rolle ist wirkungslos:
+  //      erobern  Gewicht beim Nehmen eines gegnerischen Ortes (Standard 1)
+  //      neutral  Gewicht beim Nehmen eines neutralen Ortes (Standard = erobern)
+  //      halten   wie schnell eigene Alleinpraesenz an einem EIGENEN Ort gegnerischen
+  //               Teilfortschritt zurueckdraengt (Standard 1; vorher blieb er ewig stehen)
+  //      stoeren  wie schnell sie gegnerischen Teilfortschritt an einem UMKAEMPFTEN Ort
+  //               abbaut (Standard 0 — nur der Disruptor)
+  //  - DIE PUNKTWAHL IST DYNAMISCH (dominationZielWahl weiter unten): jeder Kaempfer waehlt
+  //    alle 1,2-2,8 s (Bindung) und sofort nach jedem Besitzwechsel neu, nach Besitz, Bedrohung,
+  //    Bedarf (wie viele Eigene schon dort sind/hinlaufen), Entfernung, Spielstand/Restzeit und
+  //    seiner Taktik (Haltung + Befehl: offensiv/verfolgen/flanke nimmt lieber, defensiv/
+  //    decken/hinter haelt lieber). Keine Rolle ist an einen Ort gebunden.
+  //  - In der Domination ersetzt der Ort die Formation: Leine, Reihenanker, "hinter"/"decken"-
+  //    Klammern und der Offensivzwang greifen bei Battlefield NICHT mehr (TDM/Mini-DM
+  //    unveraendert). Gekaempft wird, wer am eigenen Zielort steht oder einem zu nahe kommt.
+  //
+  // Bewusst NICHT in dieser Runde (eigene Kalibrier-/Baurunde nach K6): Respawn, Ende des
+  // Eliminationssiegs, laengere Spielzeit, Spielerwert aus Haltesekunden/Eroberungen.
+  // `beitragVon`/wert() bleiben unangetastet; Battlefield ist weiter NICHT an die Wertung
+  // angeschlossen.
   const ARENA_DOMINATION={
     battlefield:{
-      radius:230, kapZeit:5, punkteJeSekunde:6, punkteZumSieg:150,
-      rolleErobert:{siegecore:1.6}
+      orte:[{name:"Nord",fy:85/470},{name:"Mitte",fy:0.5},{name:"Süd",fy:385/470}],
+      radius:65, kapZeit:5, punkteJeSekunde:2, punkteZumSieg:150,
+      rolle:{
+        siegecore:{erobern:1.6},
+        fieldcontrol:{erobern:1.3,halten:1.3},
+        commander:{erobern:1.25},
+        spotter:{neutral:1.5},
+        moraleanchor:{halten:1.6},
+        disruptor:{stoeren:1}
+      }
     }
   };
   const dominationVon=(d)=>ARENA_DOMINATION[d]||null;
+  // Die vier Gewichte einer Rolle, mit Standard. JEDE Rolle (auch eine ohne Eintrag, auch
+  // ein Slot null) erobert mit mindestens 1.
+  function kpRolleVon(slot){
+    const r=(KP&&KP.rolle&&slot&&KP.rolle[slot])||{};
+    const erobern=Math.max(1,r.erobern??1);
+    return {erobern, neutral:Math.max(1,r.neutral??erobern), halten:Math.max(1,r.halten??1), stoeren:r.stoeren??0};
+  }
 
   // ===================================================================================
   // DAS BUeHNE-CHASSIS.
@@ -16321,11 +16451,15 @@
         if(disc==="battlefield"&&KP){
           const kpz=document.createElement("small");
           kpz.className="kpbug";
-          const punkt=document.createElement("i");
-          punkt.className="kpbugpunkt"+(KP.besitz!=null?" "+(KP.besitz===0?"l":"r"):"");
-          if(KP.erobertVon!=null)
-            punkt.style.setProperty("--anteil",Math.round(KP.fortschritt*100)+"%");
-          kpz.appendChild(punkt);
+          // DREI ORTE (27.10.): ein Farbpunkt je Ort (Nord, Mitte, Sued), sonst wie vorher.
+          for(const o of KP.orte){
+            const punkt=document.createElement("i");
+            punkt.className="kpbugpunkt"+(o.besitz!=null?" "+(o.besitz===0?"l":"r"):"");
+            punkt.title=o.name;
+            if(o.erobertVon!=null)
+              punkt.style.setProperty("--anteil",Math.round(o.fortschritt*100)+"%");
+            kpz.appendChild(punkt);
+          }
           kpz.appendChild(document.createTextNode(
             "KP "+Math.round(KP.punkte[0])+":"+Math.round(KP.punkte[1])));
           mitte.appendChild(kpz);
@@ -37402,7 +37536,7 @@
     const alt=p.a[ATTR_HEBUNG.attribut]||0;
     return (Math.min(100,alt+ATTR_HEBUNG.plus)-alt)*w/100;
   };
-  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId){
+  function baueEinheit(p,side,row,i,n,id,slId,ordung,zielPers,dId,slotDef){
     const d=dId||"tdm";
     // P1 (07.10.): Zusammenhalt/Bindung je Disziplin als Handwerk, s. persDefVon().
     const bh=behav(p.n,d);
@@ -37412,7 +37546,7 @@
     // eigMutator() auf die Eignung (s. MUTATOR_ORGANISCH). Beides nebeneinander waere dieselbe
     // Doppelbuchung, die das Konzeptdokument (Abschnitt 5.2) benennt — und der eng-Weg hob zwei
     // Attribute staerker als die uebrigen, verschob also Einflussanteile gegen die Matrix.
-    const engPunkte=(slId?slotAufschlag(p,slId,d):0);             // haengt an der Position
+    const engPunkte=(slId?slotAufschlag(p,slId,d,slotDef):0);     // haengt an der Position
     const breitPunkte=formVon(p.n)+stufenWert();                 // trifft jeden gleich
     // DIESELBE LUECKE WIE IM FELDSPIEL, AUF DER BUEHNE UND AUF DER BAHN — die letzte der
     // vier. `p.d` haelt nur "tdm" und "spurt" vorberechnet; fuer Fechten, Mini-DM und
@@ -37427,8 +37561,8 @@
                   +engPunkte+breitPunkte+eigHebung(p,d);
     const eigWert=eigOhneMutator+eigMutator(p,d);
     // Erst die Attribute heben, dann die Kampfwerte daraus ziehen — nicht umgekehrt.
-    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
-    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false,slotDef),d);
     // Rezepte geben die FORM, die Eignung gibt die MENGE.
     const sMod=aufEignung(stats({...p,a:attr},d),eigWert);
     const s={};
@@ -37487,11 +37621,14 @@
     // setzt statt eine tote Kontrollpunkt-Anzeige/Wertung aus dem letzten Battlefield-Kampf
     // mitzuschleppen.
     {
+      // DREI ORTE (27.10.): KP ist jetzt der Spielstand (punkte, Regeln) plus `orte`, je Ort
+      // {name,x,y,besitz,fortschritt,erobertVon} — dieselben Felder, die der Einzelpunkt hatte.
       const kf=dominationVon(disc);
-      KP=kf?{x:MID,y:H/2,radius:kf.radius,kapZeit:kf.kapZeit,
+      KP=kf?{radius:kf.radius,kapZeit:kf.kapZeit,
         punkteJeSekunde:kf.punkteJeSekunde,punkteZumSieg:kf.punkteZumSieg,
-        rolleErobert:kf.rolleErobert||{},
-        besitz:null,fortschritt:0,erobertVon:null,punkte:[0,0]}:null;
+        rolle:kf.rolle||{},
+        orte:kf.orte.map(o=>({name:o.name,x:MID,y:Math.round(H*o.fy),besitz:null,fortschritt:0,erobertVon:null})),
+        punkte:[0,0]}:null;
     }
     PLAN=schlachtplan();
     let id=0;
@@ -37506,15 +37643,18 @@
     const gesetzt=inDisc(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // BATTLEFIELD: eigene Rollen je Kadergroesse (bfSlotsFuer), sonst unveraendert slotListe.
+    const kSlotsHeim=bfSlotsFuer(d,mine.length);
+    const slotListeHeim=kSlotsHeim||slotListe;
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
-                          :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+                          :((slotListeHeim[i%Math.max(1,slotListeHeim.length)]||{}).id||null);
     const byRow={0:[],1:[],2:[]};
     mine.forEach((p,i)=>byRow[slotReihe(slotFuer(p,i))].push(p));
     for(const row of[0,1,2]){
       byRow[row].forEach((p,i)=>{
         const slId=slotFuer(p,mine.indexOf(p));
         U.push(baueEinheit(p,0,row,i,byRow[row].length,id++,slId,
-          order[p.n]||slotOrd(slId),zielOf[p.n],d));
+          order[p.n]||slotOrd(slId),zielOf[p.n],d,bfSlotDef(kSlotsHeim,slId)));
       });
     }
 
@@ -37531,6 +37671,28 @@
     // Zeichen das alte `OPP.slice(0,n)`.
     const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
     const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    // BATTLEFIELD-GASTSEITE (27.10.): derselbe Weg wie die Heimseite — Slot aus der Aufstellung,
+    // sonst reihum aus den Rollen fuer GENAU diese Kopfzahl (bfSlotsFuer), Reihe aus dem Slot.
+    // Vorher bekam die Gastseite den Slot ihrer Reihe aus der VIERER-Liste, bei 2 gegen 2 also
+    // nie die Rollen der Heimseite. Alle anderen Arena-Disziplinen laufen unveraendert unten weiter.
+    const kSlotsGast=bfSlotsFuer(d,gegner.length);
+    if(kSlotsGast){
+      const gByRow={0:[],1:[],2:[]};
+      gegner.forEach((o,i)=>{
+        const z=(PLAN&&PLAN.zuteilung[o.n])||{};
+        const slId=(place[o.n]&&place[o.n].d===d)?place[o.n].slot
+                   :(z.slot||(kSlotsGast[i%kSlotsGast.length]||{}).id||null);
+        gByRow[slotReihe(slId)].push({o,slId,z});
+      });
+      for(const row of[0,1,2]){
+        gByRow[row].forEach(({o,slId,z},i)=>{
+          U.push(baueEinheit(o,1,row,i,gByRow[row].length,id++,slId,
+            z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null),d,bfSlotDef(kSlotsGast,slId)));
+        });
+      }
+      dominationStart();
+      return;
+    }
     const oByRow={0:[],1:[],2:[]};
     // Wertung-Bug (01.09., Chris live in der Arena: Score/Feed liefen, die Wertungstabelle
     // blieb aber komplett leer — kein Standbild-Fund wie Bug 1/2, sondern ein Absturz VOR dem
@@ -38262,43 +38424,186 @@
   // 4. PUNKTE laufen, solange der Punkt jemandem gehoert — unabhaengig davon, ob gerade
   //    jemand davorsteht (ein kurz verlassener Punkt zahlt weiter, wie in jedem Domination-
   //    Vorbild).
-  function kpPraesenz(){
-    let s0=0,s1=0;
+  // DREI ORTE (27.10.): dieselbe Regel wie beim Einzelpunkt, je Ort einmal — Besitz wechselt
+  // nur, wenn genau eine Seite praesent ist; ein verlassener Ort haelt seinen Besitz.
+  // Dazu die Rollengewichte aus kpRolleVon() (JEDE Rolle erobert mit mindestens 1) und zwei
+  // Abwehrwege, die vorher fehlten: eigene Alleinpraesenz drängt gegnerischen Teilfortschritt
+  // an einem EIGENEN Ort zurueck (halten), ein Disruptor baut ihn auch an einem umkaempften
+  // Ort ab (stoeren). `u.kpd` sammelt je Kaempfer reine Diagnosewerte (Zeit am Ort,
+  // Eroberungsanteil, Haltezeit, Ortswechsel) — gelesen nur von spieleArenaDomination().
+  function kpPraesenzAm(o){
+    const P={n:[0,0],erob:[0,0],halt:[0,0],stoer:[0,0],wer:[[],[]]};
     for(const u of U){
-      if(u.down||dist(u,KP)>KP.radius)continue;
-      const erobert=KP.besitz!==u.side;
-      const w=(erobert&&KP.rolleErobert[u.slot])||1;
-      if(u.side===0)s0+=w; else s1+=w;
+      if(u.down||u.side>1||dist(u,o)>KP.radius)continue;
+      const r=kpRolleVon(u.slot);
+      const w=o.besitz==null?r.neutral:r.erobern;
+      P.n[u.side]++; P.erob[u.side]+=w; P.halt[u.side]+=r.halten; P.stoer[u.side]+=r.stoeren;
+      P.wer[u.side].push({u,w});
     }
-    return [s0,s1];
+    return P;
   }
   function kpTick(dt){
     if(!KP)return;
-    const [s0,s1]=kpPraesenz();
-    const ziel=(s0>0&&s1===0)?0:(s1>0&&s0===0)?1:null;
-    if(ziel!=null&&ziel!==KP.besitz){
-      if(KP.erobertVon!==ziel){KP.erobertVon=ziel;KP.fortschritt=0;}
-      const staerke=ziel===0?s0:s1;
-      const vorher=KP.fortschritt;
-      KP.fortschritt=Math.min(1,KP.fortschritt+dt*staerke/KP.kapZeit);
-      if(vorher<1&&KP.fortschritt>=1){
-        KP.besitz=ziel;KP.fortschritt=0;KP.erobertVon=null;
-        // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09.): probeweise auch hier durch
-        // kampfGrossDrosseln() geschickt und ueber die fuenf echten Kader-Paarungen aus
-        // data/generated/kaderfamilie-live-save.json nachgemessen -- eine Kontrollpunkt-
-        // Eroberung wechselt in diesen Spielen so gut wie nie mehrfach die Seite (anders als
-        // TDMs Respawn, der JEDEN Kaempfer beliebig oft wieder ins Spiel bringt). Das Ergebnis
-        // war im Schnitt SCHLECHTER (3,4 statt 4,0 echte Highlights/Spiel) und drueckte den
-        // ohnehin knappsten Fall (ein frueher 150:0-Stomp mit kaum Kampfhandlung) von 2 auf 1
-        // -- die Drosselung nahm dort das einzige zweite Ereignis weg, ohne irgendwo eine
-        // Flut zu verhindern, die es gar nicht gab. Deshalb bleibt diese Zeile UNVERAENDERT
-        // gegenueber dem Ausgangs-PR: immer big, wie zuvor.
-        feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt den Kontrollpunkt.",true,undefined,"kontrollpunkt");
+    KP.orte.forEach((o)=>{
+      const P=kpPraesenzAm(o);
+      for(const sd of[0,1])for(const {u} of P.wer[sd])if(u.kpd){u.kpd.amOrt+=dt; if(o.besitz===sd)u.kpd.halte+=dt;}
+      const ziel=(P.n[0]>0&&P.n[1]===0)?0:(P.n[1]>0&&P.n[0]===0)?1:null;
+      if(ziel!=null&&ziel!==o.besitz){
+        if(o.erobertVon!==ziel){o.erobertVon=ziel;o.fortschritt=0;}
+        const vorher=o.fortschritt;
+        o.fortschritt=Math.min(1,o.fortschritt+dt*P.erob[ziel]/KP.kapZeit);
+        for(const {u,w} of P.wer[ziel])if(u.kpd)u.kpd.erob+=dt*w/KP.kapZeit;
+        if(vorher<1&&o.fortschritt>=1){
+          o.besitz=ziel;o.fortschritt=0;o.erobertVon=null;
+          for(const {u} of P.wer[ziel])if(u.kpd)u.kpd.eroberungen++;
+          kpBesitzWechsel();
+          // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09., Einzelpunkt): eine Eroberung ist
+          // immer ein grosses Ereignis, s. Historie dieser Zeile.
+          feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt Punkt "+o.name+".",true,undefined,"kontrollpunkt");
+        }
+      } else if(ziel!=null&&ziel===o.besitz){
+        // HALTEN: eigener Ort, nur Eigene da, aber der Gegner hatte schon angefangen.
+        if(o.erobertVon!=null&&o.erobertVon!==ziel&&o.fortschritt>0){
+          const vorher=o.fortschritt;
+          o.fortschritt=Math.max(0,o.fortschritt-dt*P.halt[ziel]/KP.kapZeit);
+          const anteil=(vorher-o.fortschritt)/Math.max(1e-9,P.halt[ziel]);
+          for(const {u} of P.wer[ziel])if(u.kpd)u.kpd.abwehr+=anteil*kpRolleVon(u.slot).halten;
+          if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+        }
+      } else if(ziel==null&&P.n[0]>0&&P.n[1]>0&&o.erobertVon!=null){
+        // UMKAEMPFT: kein Fortschritt fuer niemanden — ausser ein Stoerer der anderen Seite ist
+        // da, dann sinkt der Teilfortschritt des Angreifers (halbe Haltegeschwindigkeit).
+        const abw=1-o.erobertVon, st=P.stoer[abw];
+        if(st>0){
+          const vorher=o.fortschritt;
+          o.fortschritt=Math.max(0,o.fortschritt-dt*0.5*st/KP.kapZeit);
+          for(const {u} of P.wer[abw]){const r=kpRolleVon(u.slot); if(u.kpd&&r.stoeren>0)u.kpd.abwehr+=(vorher-o.fortschritt)*r.stoeren/st;}
+          if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+        }
       }
+      if(o.besitz!=null)KP.punkte[o.besitz]+=KP.punkteJeSekunde*dt;
+    });
+  }
+  // Ein Besitzwechsel ist ein neuer Lageplan: alle waehlen zeitnah neu, gestaffelt nach id
+  // (deterministisch, kein Wurf), damit nicht alle im selben Bild umschwenken.
+  function kpBesitzWechsel(){
+    for(const u of U)if(!u.down&&u.kpWahlIn!=null)u.kpWahlIn=Math.min(u.kpWahlIn,0.15+(u.id%6)*0.05);
+  }
+
+  // DIE PUNKTWAHL — dynamisch und taktisch, keine feste Zuteilung (Chris 27.10.). Bewertet
+  // jeden Ort fuer genau diesen Kaempfer, deterministisch (kein rr(), damit die Kampf-Wuerfel
+  // unberuehrt bleiben), und nimmt den besten. Die Bausteine:
+  //  - LAGE: gegnerischer Ort nehmen (3,0), neutraler (2,6), eigener bedrohter verteidigen
+  //    (3,2: Gegner in der Naehe oder gegnerischer Teilfortschritt), eigener sicherer (0,7).
+  //  - TAKTIK aus Haltung und Befehl: offensiv/ungestuem/verfolgen/flanke gewichtet Nehmen
+  //    hoeher und Halten niedriger, defensiv/vorsichtig/decken/hinter umgekehrt.
+  //  - SPIELSTAND/RESTZEIT: wer nach Punkten hinten liegt, nimmt mehr (zum Ende staerker), wer
+  //    vorn liegt, haelt mehr.
+  //  - BEDARF: ein leerer Ort braucht einen, ein umkaempfter einen mehr, als Gegner dort sind.
+  //    Ist der Bedarf durch Eigene (dort oder unterwegs) schon gedeckt, sinkt der Wert — so
+  //    verteilt sich ein Team, ohne dass jemand einen Ort fest zugeteilt bekommt.
+  //  - KRAEFTEVERHAELTNIS am Ort: eigene Kampfkraft (er selbst + Eigene dort/unterwegs) gegen
+  //    die der Gegner dort, aus Lebenspunkten, Verteidigung und Angriff. Ein ausgeglichenes
+  //    oder verlorenes Duell an einem Ort ist weniger wert als eine LUECKE (ein fremder Ort ohne
+  //    Gegner) — wer angeschlagen oder schwaecher ist, rotiert weg, wer staerker ist, bleibt.
+  //    Genau das verhindert „1v1 DM an jedem Ort" (Chris 27.10.): ohne diesen Baustein trafen
+  //    sich bei 2 gegen 2 beide Siege Cores an Nord und beide Morale Anchors an Sued, Spiel fuer
+  //    Spiel, und blieben dort, bis einer lag.
+  //  - ENTFERNUNG kostet, und das aktuelle Ziel bekommt einen kleinen Bonus (kein Flattern).
+  //  - ROLLE: ein kleiner thematischer Zuschlag, nie eine Bindung — Siege Core zieht es zu
+  //    fremden Orten, Spotter zu unbewachten Luecken, Morale Anchor zu bedrohten eigenen,
+  //    Disruptor zu Orten, an denen der Gegner gerade erobert, Field Control in umkaempften
+  //    Raum, Commander dorthin, wo schon Eigene kaempfen.
+  function dominationZielWahl(u){
+    const R=KP.radius, side=u.side, feind=1-side;
+    const off=u.h==="offensiv"||u.h==="wild"||u.ord==="verfolgen"||u.ord==="flanke";
+    const def=!off&&(u.h==="defensiv"||u.h==="vorsichtig"||u.ord==="decken"||u.ord==="hinter");
+    const rest=Math.max(0,95-t), spaet=rest<40?1.5:1;
+    const vorn=KP.punkte[side]-KP.punkte[feind];
+    const drang=vorn<0?1+Math.min(0.6,-vorn/60)*spaet:1;
+    const ruhe=vorn>0?1+Math.min(0.4,vorn/80)*spaet:1;
+    const kraft=(x)=>Math.sqrt(Math.max(0,x.hp)*(1+(x.VER||0)/100)*Math.max(1,x.ANG||1));
+    let best=u.kpZiel, bestW=-Infinity;
+    KP.orte.forEach((o,i)=>{
+      let feinde=0, eigeneDa=0, unterwegs=0, kF=0, kE=kraft(u);
+      for(const x of U){
+        if(x.down||x===u)continue;
+        const nahDran=dist(x,o)<=R*1.6;
+        if(x.side===side&&(x.kpZiel===i||nahDran))kE+=kraft(x);
+        if(x.side===side&&x.kpZiel===i)unterwegs++;
+        if(!nahDran)continue;
+        if(x.side===side)eigeneDa++; else {feinde++; kF+=kraft(x);}
+      }
+      const eigen=o.besitz===side, neutral=o.besitz==null;
+      const bedroht=eigen&&(feinde>0||(o.erobertVon===feind&&o.fortschritt>0));
+      let w;
+      if(!eigen&&!neutral) w=3.0*(off?1.3:def?0.8:1)*drang;
+      else if(neutral)     w=2.6*(off?1.2:def?0.9:1)*drang;
+      else if(bedroht)     w=3.2*(def?1.3:off?0.85:1)*ruhe;
+      else                 w=0.7*(def?1.4:1)*ruhe;
+      const r=u.slot;
+      if(r==="siegecore"&&!eigen)w+=0.5;
+      if(r==="spotter"&&!eigen&&feinde===0)w+=1.0;
+      if(r==="moraleanchor"&&bedroht)w+=0.6;
+      if(r==="disruptor"&&o.erobertVon===feind&&o.fortschritt>0)w+=0.8;
+      if(r==="fieldcontrol"&&feinde>0)w+=0.5;
+      if(r==="commander"&&eigeneDa>0)w+=0.3*Math.min(2,eigeneDa);
+      if(feinde>0)w+=0.9*Math.max(-1.5,Math.min(1.5,Math.log2(kE/Math.max(1e-6,kF))));
+      else if(!eigen)w+=0.5;
+      const bedarf=feinde>0?feinde+1:eigen?(bedroht?1:0.5):1;
+      const schon=Math.max(unterwegs,eigeneDa);
+      if(schon>=bedarf)w-=0.9*(schon-bedarf+1);
+      w-=dist(u,o)/380;
+      if(u.kpZiel===i)w+=0.45;
+      if(w>bestW){bestW=w;best=i;}
+    });
+    return best;
+  }
+  // Takt der Punktwahl: Bindung entscheidet, wie oft jemand die Lage neu liest (1,2-2,8 s,
+  // dieselbe Richtung wie u.reev bei der Gegnerwahl). Ein Wechsel ist eine Rotation.
+  function dominationTakt(u,dt){
+    if(!KP||u.down)return;
+    u.kpWahlIn-=dt;
+    if(u.kpZiel!=null&&u.kpWahlIn>0)return;
+    const neu=dominationZielWahl(u);
+    if(neu!==u.kpZiel){
+      if(u.kpZiel!=null&&u.kpd)u.kpd.wechsel++;
+      u.kpZiel=neu;
+      if(u.kpd&&neu!=null)u.kpd.besucht[neu]=1;
     }
-    // ziel===KP.besitz (der eigene Punkt wird gehalten), ziel===null (umkaempft oder leer):
-    // kein Fortschritt in irgendeine Richtung — der Balken haelt seinen Stand.
-    if(KP.besitz!=null)KP.punkte[KP.besitz]+=KP.punkteJeSekunde*dt;
+    u.kpWahlIn=1.2+(100-u.opp)/100*1.6;
+  }
+  // WEN MAN IN DER DOMINATION ANGREIFT: wer am eigenen Zielort steht (der blockiert oder
+  // erobert gerade) oder einem selbst zu nahe kommt — nicht der naechste Gegner irgendwo auf
+  // dem Feld. Sonst waere es wieder das Deathmatch, das Chris nicht will. Rueckzug, Durchbruch
+  // und Zielansage gelten wie in chooseTargetKern; die Vorliebe (zielP/ziel) waehlt innerhalb.
+  function dominationGegnerWahl(u){
+    if(u.retreat>0)return null;
+    if(u.durch&&u.tgt&&!u.tgt.down)return u.tgt;
+    const angesagt=kfZielFuer(u); if(angesagt)return angesagt;
+    const foes=gegner(u); if(!foes.length)return null;
+    const o=u.kpZiel!=null?KP.orte[u.kpZiel]:null;
+    const nah=Math.max(110,u.reach*1.3);
+    const rel=foes.filter(f=>dist(u,f)<=nah||(o&&dist(f,o)<=KP.radius+70));
+    if(!rel.length)return null;
+    const nearest=(pool)=>pool.reduce((b,x)=>dist(u,x)<dist(u,b)?x:b);
+    if(u.lastHit&&!u.lastHit.down&&rel.includes(u.lastHit)&&u.opp>=45)return u.lastHit;
+    const pref=u.zielP||u.ziel;
+    if(pref==="schwach"||pref==="schwaechster")return rel.reduce((b,x)=>x.hp<b.hp?x:b);
+    if(pref==="bedrohung"||pref==="gefaehrlichster")return rel.reduce((b,x)=>bedrohungVon(x)>bedrohungVon(b)?x:b);
+    if(pref==="heiler"){const hl=rel.filter(f=>f.heiler);if(hl.length)return nearest(hl);}
+    if(o){const amOrt=rel.filter(f=>dist(f,o)<=KP.radius);if(amOrt.length)return nearest(amOrt);}
+    return nearest(rel);
+  }
+  // Am Ende von build() (nur Battlefield): Punktwahl-Zustand und Diagnosezaehler je Kaempfer.
+  // Gestaffelter erster Takt, damit die erste Wahl der Seite reihum die schon getroffenen der
+  // Kameraden sieht (Bedarf), statt dass alle blind dasselbe waehlen.
+  function dominationStart(){
+    if(!KP)return;
+    for(const u of U){
+      u.kpZiel=null; u.kpWahlIn=0;
+      u.kpd={amOrt:0,halte:0,erob:0,eroberungen:0,abwehr:0,wechsel:0,besucht:KP.orte.map(()=>0)};
+    }
   }
   // WER GEWINNT — von finish() UND renderEndstand() gelesen, damit Feed-Meldung, Score-
   // Anzeige und Endstand-Overlay denselben Sieger nennen. Elimination geht vor (der
@@ -38476,7 +38781,9 @@
   // ohne jeden Einfluss auf Rueckgabewert, Zielwahl-Entscheidung oder RNG.
   let ZIEL_DIAG=null;
   function chooseTarget(u){
-    const t=chooseTargetKern(u);
+    // BATTLEFIELD-DOMINATION (27.10.): eigene Gegnerwahl rund um den gewaehlten Ort, s.
+    // dominationGegnerWahl. KP ist ausserhalb von Battlefield null — dort exakt wie bisher.
+    const t=KP?dominationGegnerWahl(u):chooseTargetKern(u);
     if(ZIEL_DIAG&&t)ZIEL_DIAG[t.n]=(ZIEL_DIAG[t.n]||0)+1;
     return t;
   }
@@ -39271,7 +39578,11 @@
       const wirkungslos=u.leineHielt&&!kontakt[u.side];
       if((!u.tgt||wirkungslos)&&u.retreat<=0&&!flankeUnterwegs)u.leer+=dt;else u.leer=0;
       const zwangVor=u.zwang;
-      u.zwang=endspiel||u.leer>4.5;
+      // DOMINATION (KP, nur Battlefield): kein Offensivzwang. Wer keinen Gegner hat, hat
+      // trotzdem einen Auftrag — seinen Ort. Vorher machte `endspiel` (live<=2) bei 2 gegen 2
+      // JEDEN ab Sekunde 0 zum nearest(foes)-Jaeger: ein Deathmatch mit Punkt als Kulisse.
+      u.zwang=!KP&&(endspiel||u.leer>4.5);
+      dominationTakt(u,dt);
       if(u.zwang&&!zwangVor)feed(u.side,u.n+" lässt die Stellung sein und sucht den Kampf.");
 
       // ZIELWECHSEL: wie oft neu geschaut wird, haengt am Opportunismus.
@@ -39328,6 +39639,12 @@
       let gx,gy;
       if(u.retreat>0){ gx=u.side===0?u.hx-90:u.hx+90; gy=u.hy; }
       else if(tg){ gx=tg.x; gy=tg.y; }
+      else if(KP&&u.kpZiel!=null){
+        // ZUM GEWAEHLTEN ORT, nicht auf seinen Mittelpunkt: jeder auf seinen eigenen Platz im
+        // Kreis (Winkel aus der id), damit sich drei Eigene dort nicht ineinander schieben.
+        const o=KP.orte[u.kpZiel], wkl=(u.id*2.399)%6.283, rr2=KP.radius*0.45;
+        gx=o.x+Math.cos(wkl)*rr2; gy=o.y+Math.sin(wkl)*rr2;
+      }
       else if(u.ord==="flanke"){ gx=u.side===0?MID+340:MID-340; gy=u.y<H/2?46:H-46; }
       else {
         // INTRINSISCHE MOTIVATION: auch ohne Ziel geht es nach vorn. „Formation halten"
@@ -39343,7 +39660,9 @@
       // aussen herum gekommen, weil die eigene Mitte sie zurueckgehalten hat. Der Tooltip
       // versprach den Weg um das Feld, die Simulation lieferte Zappeln neben der Front.
       u.leineHielt=false;
-      if(u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
+      // DOMINATION: keine Leine — die drei Orte liegen 300 px auseinander, eine Linie gibt es
+      // dort nicht. Der Ort ist der Anker (s. oben), nicht die Reihe.
+      if(!KP&&u.ord!=="verfolgen"&&u.ord!=="flanke"&&u.retreat<=0&&!u.durch&&!u.zwang){
         const leine=40+(100-formMitFuehrung(u))*3.4;
         // Der Anker ist die eigene REIHE, nicht mehr die eine Linie fuer alle (s.
         // reihenAnker oben): Reihe 0 haelt die Linie, jede weitere ihren Abstand dahinter.
@@ -39359,7 +39678,7 @@
       // "HINTER DEN EIGENEN": nie ueber die vorderste eigene Einheit hinaus.
       // Seitlich ausweichen bleibt erlaubt — genau das, was der Tooltip verspricht.
       //
-      if(u.ord==="hinter"&&u.retreat<=0&&!u.zwang){
+      if(!KP&&u.ord==="hinter"&&u.retreat<=0&&!u.zwang){
         const vorderste=live(u.side).reduce((b,x)=>((u.side===0?x.x>b.x:x.x<b.x)?x:b),u);
         if(vorderste!==u){
           if(u.side===0)gx=Math.min(gx,vorderste.x-26);
@@ -39368,12 +39687,14 @@
       }
 
       // "RUECKEN DECKEN": bleibt in der eigenen Haelfte, auch beim Verfolgen eines Eindringlings.
-      if(u.ord==="decken"&&u.retreat<=0&&!u.zwang){
+      if(!KP&&u.ord==="decken"&&u.retreat<=0&&!u.zwang){
         if(u.side===0)gx=Math.min(gx,MID-30); else gx=Math.max(gx,MID+30);
       }
 
       // HEILER positionieren sich hinter der eigenen Gruppe, aber IN Heilreichweite.
-      if(u.heiler&&u.retreat<=0){
+      // (Domination: auch ein Heiler geht auf seinen Ort — dort stehen die, die er heilt, und
+      // er erobert/haelt mit wie jeder andere.)
+      if(!KP&&u.heiler&&u.retreat<=0){
         const eigene=live(u.side).filter(a=>a!==u);
         if(eigene.length){
           const cx=eigene.reduce((a,x)=>a+x.x,0)/eigene.length;
@@ -41948,31 +42269,34 @@
   // ein schwacher gestrichelter Ring als Praesenz-Radius (damit sichtbar bleibt, WARUM sich
   // der Besitz gerade dreht) und — nur waehrend eine Seite tatsaechlich erobert — ein
   // Fortschrittsring in der Farbe des Angreifers.
+  // DREI ORTE (27.10.): dasselbe Bild je Ort, kleiner (Radius 65 statt 230), mit dem Ortsnamen.
   function zeichneKontrollpunkt(){
     const homeC=css("--home"), awayC=css("--away");
-    const besitzFarbe=KP.besitz===0?homeC:KP.besitz===1?awayC:"rgba(255,255,255,.6)";
-    ctx.save();
-    ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.22;ctx.lineWidth=2;ctx.setLineDash([5,7]);
-    ctx.beginPath();ctx.arc(KP.x,KP.y,KP.radius,0,6.283);ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha=.28;ctx.fillStyle=besitzFarbe;
-    ctx.beginPath();ctx.ellipse(KP.x,KP.y+20,34,13,0,0,6.283);ctx.fill();
-    ctx.globalAlpha=1;
-    ctx.strokeStyle="#3a2f22";ctx.lineWidth=4;
-    ctx.beginPath();ctx.moveTo(KP.x,KP.y+18);ctx.lineTo(KP.x,KP.y-46);ctx.stroke();
-    ctx.fillStyle=besitzFarbe;
-    ctx.beginPath();ctx.moveTo(KP.x,KP.y-46);ctx.lineTo(KP.x+26,KP.y-38);ctx.lineTo(KP.x,KP.y-30);ctx.closePath();ctx.fill();
-    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=1.5;ctx.stroke();
-    if(KP.erobertVon!=null&&KP.fortschritt>0){
-      const farbe=KP.erobertVon===0?homeC:awayC;
-      ctx.strokeStyle=farbe;ctx.lineWidth=5;ctx.lineCap="round";
-      ctx.beginPath();ctx.arc(KP.x,KP.y-8,22,-Math.PI/2,-Math.PI/2+6.283*KP.fortschritt);ctx.stroke();
+    for(const o of KP.orte){
+      const besitzFarbe=o.besitz===0?homeC:o.besitz===1?awayC:"rgba(255,255,255,.6)";
+      ctx.save();
+      ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.32;ctx.lineWidth=2;ctx.setLineDash([5,7]);
+      ctx.beginPath();ctx.arc(o.x,o.y,KP.radius,0,6.283);ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha=.28;ctx.fillStyle=besitzFarbe;
+      ctx.beginPath();ctx.ellipse(o.x,o.y+14,26,10,0,0,6.283);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.strokeStyle="#3a2f22";ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(o.x,o.y+12);ctx.lineTo(o.x,o.y-34);ctx.stroke();
+      ctx.fillStyle=besitzFarbe;
+      ctx.beginPath();ctx.moveTo(o.x,o.y-34);ctx.lineTo(o.x+20,o.y-28);ctx.lineTo(o.x,o.y-22);ctx.closePath();ctx.fill();
+      ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=1.5;ctx.stroke();
+      if(o.erobertVon!=null&&o.fortschritt>0){
+        const farbe=o.erobertVon===0?homeC:awayC;
+        ctx.strokeStyle=farbe;ctx.lineWidth=4;ctx.lineCap="round";
+        ctx.beginPath();ctx.arc(o.x,o.y-6,17,-Math.PI/2,-Math.PI/2+6.283*o.fortschritt);ctx.stroke();
+      }
+      ctx.restore();
+      ctx.font="bold 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
+      const txt=o.name+" — "+(o.besitz===0?VEREIN[0].name:o.besitz===1?VEREIN[1].name:"neutral");
+      ctx.strokeText(txt,o.x,o.y+34);ctx.fillText(txt,o.x,o.y+34);
     }
-    ctx.restore();
-    ctx.font="bold 12px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
-    const txt="Kontrollpunkt — "+(KP.besitz===0?VEREIN[0].name:KP.besitz===1?VEREIN[1].name:"neutral");
-    ctx.strokeText(txt,KP.x,KP.y+46);ctx.fillText(txt,KP.x,KP.y+46);
   }
 
   // ================== TAKESHI'S CASTLE: ZEHN FALLEN-BILDER ==================
@@ -55521,11 +55845,15 @@
   // JEDER Hebungslauf sehen in Lauf i also denselben Wurf, der Vergleich bleibt gepaart und der
   // Mutator kann den Attributgewinn nicht kontaminieren. "aus": niemand trifft (Referenz A, die
   // reine Matrixfrage). "fest": der geladene Wurf bleibt stehen (das Verhalten vor dem 29.09.).
-  function einflussVon(dId,n,plus,saatVersatz,mutatorModus){
+  // `jeSeite` (optional, 27.10., additiv): Kadergroesse der Arena-Disziplin fuer diese Messung,
+  // wie disziplinProbe({jeSeite}). Ohne ihn exakt wie vorher.
+  function einflussVon(dId,n,plus,saatVersatz,mutatorModus,jeSeite){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
     const hoehe=plus||15; const versatz=saatVersatz||0;
     const modus=mutatorModus||"je-lauf";
+    const artJS=jeSeite&&ARENA_ART[dId]?ARENA_ART[dId]:null, altJeSeite=artJS?artJS.jeSeite:undefined;
+    if(artJS)artJS.jeSeite=jeSeite;
     const gesichert=M.sichern(); const hebungVorher=ATTR_HEBUNG; const mutatorenVorher=MUTATOREN;
     if(M.vorher)M.vorher();
 
@@ -55555,6 +55883,7 @@
     });
 
     ATTR_HEBUNG=hebungVorher; MUTATOREN=mutatorenVorher; M.zurueck(gesichert); zieheFormkarten(20260823);
+    if(artJS)artJS.jeSeite=altJeSeite;
     const summe=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
     const reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/summe*1000)/10}))
                     .sort((a,b)=>b.gewinn-a.gewinn);
@@ -56930,15 +57259,29 @@
     // Liefert null fuer jede Disziplin ohne Domination-Konfiguration (aktuell alle ausser
     // battlefield) -- reine Diagnose/Kalibrierung, kein Gameplay-Zugriff, keine Aenderung an
     // MOTOREN[dId] noetig, weil KP bereits ueber sichern()/zurueck() mitgefuehrt wird (s. dort).
-    spieleArenaDomination:(dId,saat)=>{
+    // `o.jeSeite` (optional, 27.10.): Kadergroesse dieses einen Spiels (2..6), wie bei
+    // disziplinProbe — ohne `o` exakt wie vorher.
+    spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
+      const art=ARENA_ART[dId], altJeSeite=art?art.jeSeite:undefined;
+      if(art&&o&&o.jeSeite)art.jeSeite=o.jeSeite;
       const g=M.sichern(); if(M.vorher)M.vorher();
-      M.bau(saat);
-      M.lauf();
+      try{ M.bau(saat); M.lauf(); }
+      catch(e){ if(art)art.jeSeite=altJeSeite; M.zurueck(g); throw e; }
+      if(art)art.jeSeite=altJeSeite;
+      // DREI ORTE + ROLLEN-DIAGNOSE (27.10.): `besitz` je Ort, und je Kaempfer seine Rolle
+      // (slot) mit Zeit am Ort, Haltezeit, Eroberungsanteil (Summe der Balkenanteile, die er
+      // beigetragen hat), abgeschlossenen Eroberungen, zurueckgedraengtem Gegnerfortschritt,
+      // Ortswechseln und wie viele verschiedene Orte er angesteuert hat. Reine Diagnose.
       const ergebnis={disziplin:dId, dauer:+t.toFixed(2),
-        punkte:KP.punkte.map(x=>+x.toFixed(1)), besitz:KP.besitz,
-        sieger:dominationSieger(), ueberlebende:[live(0).length,live(1).length]};
+        punkte:KP.punkte.map(x=>+x.toFixed(1)), besitz:KP.orte.map(o=>o.besitz),
+        sieger:dominationSieger(), ueberlebende:[live(0).length,live(1).length],
+        kaempfer:U.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+(+u.eig).toFixed(2),
+          amOrt:+(u.kpd?u.kpd.amOrt:0).toFixed(2), halte:+(u.kpd?u.kpd.halte:0).toFixed(2),
+          erob:+(u.kpd?u.kpd.erob:0).toFixed(3), eroberungen:u.kpd?u.kpd.eroberungen:0,
+          abwehr:+(u.kpd?u.kpd.abwehr:0).toFixed(3), wechsel:u.kpd?u.kpd.wechsel:0,
+          orte:u.kpd?u.kpd.besucht.reduce((a,b)=>a+b,0):0, besucht:u.kpd?u.kpd.besucht.slice():[], ko:u.st.ko}))};
       M.zurueck(g);
       return ergebnis;
     },

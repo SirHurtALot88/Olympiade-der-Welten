@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
+import { hasSlotCountSpecificRoles, resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
+import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildStaffelWechselPaarBonusByNehmer,
   STAFFEL_DISCIPLINE_ID,
@@ -99,6 +100,33 @@ export function buildArenaAufstellung(
   const spielerZuKaderzeile = new Map(gameState.rosters.map((zeile) => [zeile.id, zeile.playerId]));
   const aufstellung: ArenaAufstellung = {};
 
+  // KADERGROESSE JE DISZIPLIN (Battlefield, 27.10.): eine Disziplin mit eigener Rollen-
+  // zusammensetzung je k (`hasSlotCountSpecificRoles`) kennt keine k-unabhaengige
+  // Index->Rolle-Zuordnung mehr — Index 1 ist bei 2 Spielern Morale Anchor, bei 6 Field
+  // Control. Massgeblich ist die Kadergroesse des Spielplans fuer diesen Spieltag (dieselbe,
+  // mit der die Aufstellung ihre Slots gebaut hat); fehlt sie, zaehlt der Entwurf selbst
+  // (Eintraege bzw. hoechster slotIndex + 1 dieser Disziplinseite).
+  // Spaet und defensiv gelesen: nur wenn wirklich eine solche Disziplin im Entwurf steht, und
+  // ein unvollstaendiger Spielstand (Messsonden bauen nur players/rosters/lineupDrafts) faellt
+  // auf die Zaehlung zurueck statt zu werfen.
+  let spielplanGelesen = false;
+  let spielplan: ReturnType<typeof getSeasonDisciplineScheduleEntry> = null;
+  const kadergroesseVon = (disciplineId: string, side: "d1" | "d2"): number => {
+    if (!spielplanGelesen) {
+      spielplanGelesen = true;
+      try {
+        spielplan = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
+      } catch {
+        spielplan = null;
+      }
+    }
+    const slot = side === "d1" ? spielplan?.discipline1 : spielplan?.discipline2;
+    const ausPlan = slot?.disciplineId === disciplineId ? slot.playerCount : null;
+    if (ausPlan != null && Number.isInteger(ausPlan) && ausPlan >= 1) return ausPlan;
+    const eigene = entwurf.entries.filter((e) => e.disciplineId === disciplineId && e.disciplineSide === side);
+    return Math.max(eigene.length, ...eigene.map((e) => e.slotIndex + 1));
+  };
+
   for (const eintrag of entwurf.entries) {
     const spielerId = eintrag.activePlayerId
       ? spielerZuKaderzeile.get(eintrag.activePlayerId) ?? eintrag.playerId
@@ -106,7 +134,10 @@ export function buildArenaAufstellung(
     const name = nameVon.get(spielerId);
     if (!name) continue;
 
-    const slot = resolveSlotRoleShortId(eintrag.disciplineId, null, eintrag.slotIndex);
+    const slotCount = hasSlotCountSpecificRoles(eintrag.disciplineId, null)
+      ? kadergroesseVon(eintrag.disciplineId, eintrag.disciplineSide)
+      : undefined;
+    const slot = resolveSlotRoleShortId(eintrag.disciplineId, null, eintrag.slotIndex, slotCount);
     if (!slot) continue;
 
     aufstellung[name] = { d: eintrag.disciplineId, slot };
