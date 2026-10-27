@@ -19,6 +19,12 @@ import type {
   RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import {
+  runArenaFixturesNode,
+  runBahnPodFixturesNode,
+  runBattlefieldPodFixturesNode,
+  runMiniDmFfaPodFixturesNode,
+} from "@/lib/battle/arena-node-runner";
+import {
   berechneArenaEingabeHash,
   berechneBahnPodEingabeHash,
   berechneBattlefieldPodEingabeHash,
@@ -158,7 +164,12 @@ function istTdmGefechtVorlaufAktiv(): boolean {
  * liest nur noch, s. `matchday-resolve-snapshot.ts`).
  */
 
-export type ArenaModus = "hintergrund" | "inline" | "aus";
+/**
+ * `"quick-sim"` (27.10.): NUR der "⏩ Quick-Sim"-Knopf der Buehne -- wartet auf einen Node-Vorlauf
+ * (`beschleunigeArenaVorlaufPerQuickSim()`), nie auf Chromium; scheitert Node, verhaelt er sich wie
+ * `"hintergrund"`.
+ */
+export type ArenaModus = "hintergrund" | "inline" | "aus" | "quick-sim";
 
 export type ArenaVorlaufKickoffErgebnis = {
   /** `false`: Manager Mode oder keine arena-aufgeloeste Disziplin an D1/D2 — der Aufrufer bucht wie bisher. */
@@ -403,7 +414,39 @@ type FuehreVorlaufAusInput = {
   bahnPodDisciplineIds: string[];
   runBahnPodFixturesImpl?: typeof runBahnPodFixtures;
   runBahnPodFixturesOptions?: Omit<RunBahnPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
+  /**
+   * QUICK-SIM (27.10., s. `beschleunigeArenaVorlaufPerQuickSim()`): der Lauf rechnet mit einem
+   * Node-Runner statt Chromium. Dann (a) KEIN Chromium-Semaphor -- der Lauf startet keinen Browser
+   * und soll nicht hinter einem laufenden Chromium-Vorlauf warten, den er ja gerade ueberholen
+   * will; (b) KEINE automatische Wiederholung -- der Rueckfall ist der Chromium-Pfad, nicht ein
+   * zweiter Node-Versuch; (c) ein Ausfall wird NICHT als `"failed"` geschrieben, sondern als
+   * `ArenaQuickSimNodeFehlschlag` geworfen, damit der Aufrufer sauber auf Chromium zurueckfaellt,
+   * statt einen endgueltigen Ausfall zu persistieren, den Chromium vielleicht gar nicht haette.
+   *
+   * GILT AUCH FUER BATTLEFIELD-POD/BAHN-POD (Rebase 11.11.): `runBattlefieldPodFixturesImpl`/
+   * `runBahnPodFixturesImpl` bekommen im Quick-Sim-Pfad ebenfalls Node-Implementierungen
+   * (`beschleunigeArenaVorlaufPerQuickSim()`), nicht nur `runArenaFixturesImpl`/
+   * `runMiniDmFfaPodFixturesImpl` -- derselbe Rueckfall-Mechanismus deckt alle vier Runner.
+   */
+  quickSim?: boolean;
 };
+
+/** Ein Quick-Sim-Lauf (Node) hat nicht fuer jede Disziplin ein Arena-Ergebnis geliefert. */
+export class ArenaQuickSimNodeFehlschlag extends Error {
+  constructor(public readonly ausfaelle: Record<string, ArenaAusfall>) {
+    super(
+      `arena-vorlauf (quick-sim): Node-Lauf ohne vollstaendiges Ergebnis -- ${Object.entries(ausfaelle)
+        .map(([disziplin, ausfall]) => `${disziplin}: ${ausfall.grund}${ausfall.detail ? ` (${ausfall.detail})` : ""}`)
+        .join("; ")}`,
+    );
+    this.name = "ArenaQuickSimNodeFehlschlag";
+  }
+}
+
+/** Fuehrt `fn` direkt aus -- die Quick-Sim-Entsprechung zu `mitChromiumSemaphor()`, s. `quickSim`. */
+async function ohneSemaphor<T>(fn: () => Promise<T>): Promise<T> {
+  return fn();
+}
 
 /**
  * OPUS-REVIEW B1 (kritisch), NACHTRAG 18.10. (Design-Fix "Wiederholung gehoert in den Vorlauf
@@ -449,6 +492,9 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   // BAHN-POD (02.11.), s. Zweig weiter unten.
   const bahnPodRohdatenByDisciplineId = new Map<string, Map<string, BahnPodRohdaten>>();
   let gesamtStatus: "ready" | "failed" = "ready";
+  // QUICK-SIM (27.10.): s. `FuehreVorlaufAusInput.quickSim`.
+  const semaphor = input.quickSim ? ohneSemaphor : mitChromiumSemaphor;
+  const maxVersuche = input.quickSim ? 1 : MAX_AUTOMATISCHE_VERSUCHE;
 
   // SEQUENZIELL, NICHT PARALLEL (Plan 2.7/4.4) — D1 und D2 derselben Signatur laufen eins nach dem
   // anderen, und der globale Semaphor serialisiert zusaetzlich gegen JEDEN anderen Vorlauf im
@@ -473,11 +519,11 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
     // machte "failed" zweideutig (endgueltig ODER "gleich kommt noch ein Versuch", je nachdem WER
     // als naechstes fragt). Jetzt wird NUR NOCH das ENDGUELTIGE Ergebnis geschrieben -- "failed"
     // ist ab dem Schreiben immer terminal, kein Leser muss das Zwei-Zustaende-Raetsel mehr loesen.
-    await mitChromiumSemaphor(async () => {
+    await semaphor(async () => {
       let erfolg: { overridesByTeamId: Map<string, ArenaTeamPointsOverride>; individualBoxscorePpsByPlayerId: Map<string, number> } | null = null;
       let letzterAusfall: ArenaAusfall | null = null;
       let versucheIntern = 0;
-      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+      for (let lokalerVersuch = 1; lokalerVersuch <= maxVersuche; lokalerVersuch += 1) {
         versucheIntern = lokalerVersuch;
         try {
           const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
@@ -508,7 +554,7 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             break;
           }
           letzterAusfall = ausfall;
-          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) break;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= maxVersuche) break;
           console.warn(
             `[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}) -- sofortige Wiederholung, noch nicht persistiert.`,
           );
@@ -521,8 +567,10 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             versuch: lokalerVersuch,
           };
           letzterAusfall = ausfall;
-          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
-            console.error(`[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= maxVersuche) {
+            console.error(
+              `[arena-vorlauf] ${disziplinId} an ${input.matchdayId} (${input.saveId}) ${input.quickSim ? "im Quick-Sim-Lauf (Node) ausgefallen, Chromium uebernimmt" : "endgueltig ausgefallen"}: ${detail}`,
+            );
             break;
           }
           console.warn(
@@ -568,11 +616,11 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   // PPS-Pod-Pfad zurueck -- kein Spieltag bleibt wegen eines Mini-DM-FFA-Ausfalls ungebucht.
   if (input.miniDmPresent) {
     const gesamtStart = Date.now();
-    await mitChromiumSemaphor(async () => {
+    await semaphor(async () => {
       let erfolg: Awaited<ReturnType<typeof runMiniDmFfaMatchday>> | null = null;
       let letzterAusfall: ArenaAusfall | null = null;
       let versucheIntern = 0;
-      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+      for (let lokalerVersuch = 1; lokalerVersuch <= maxVersuche; lokalerVersuch += 1) {
         versucheIntern = lokalerVersuch;
         try {
           const ergebnis = await runMiniDmFfaMatchday({
@@ -613,8 +661,10 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             versuch: lokalerVersuch,
           };
           letzterAusfall = ausfall;
-          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
-            console.error(`[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= maxVersuche) {
+            console.error(
+              `[arena-vorlauf] mini-dm-ffa an ${input.matchdayId} (${input.saveId}) ${input.quickSim ? "im Quick-Sim-Lauf (Node) ausgefallen, Chromium uebernimmt" : "endgueltig ausgefallen"}: ${detail}`,
+            );
             break;
           }
           console.warn(
@@ -670,13 +720,18 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   // die Boxscore-Spieler-PP ueber denselben Kanal wie ein Arena-Duell
   // (`arenaIndividualBoxscorePpsByDisciplineId`). Ausfall: `arenaAusfall` fuer die Disziplin, die Pods
   // werden als PPS-Pod gebucht -- kein Spieltag bleibt ungebucht.
+  //
+  // QUICK-SIM (Rebase 11.11.): `semaphor`/`maxVersuche` statt der frueher hier hartkodierten
+  // `mitChromiumSemaphor`/`MAX_AUTOMATISCHE_VERSUCHE` -- genau dieselbe quickSim-Weiche wie beim
+  // generischen Arena-Zweig oben, jetzt, wo `input.runBahnPodFixturesImpl` im Quick-Sim-Lauf auf
+  // `runBahnPodFixturesNode()` zeigt (s. `beschleunigeArenaVorlaufPerQuickSim()`).
   for (const disziplinId of input.bahnPodDisciplineIds) {
     const gesamtStart = Date.now();
-    await mitChromiumSemaphor(async () => {
+    await semaphor(async () => {
       let erfolg: Awaited<ReturnType<typeof runBahnPodMatchday>> | null = null;
       let letzterAusfall: ArenaAusfall | null = null;
       let versucheIntern = 0;
-      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+      for (let lokalerVersuch = 1; lokalerVersuch <= maxVersuche; lokalerVersuch += 1) {
         versucheIntern = lokalerVersuch;
         try {
           const ergebnis = await runBahnPodMatchday({
@@ -714,8 +769,10 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             versuch: lokalerVersuch,
           };
           letzterAusfall = ausfall;
-          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
-            console.error(`[arena-vorlauf] ${disziplinId}-pod an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= maxVersuche) {
+            console.error(
+              `[arena-vorlauf] ${disziplinId}-pod an ${input.matchdayId} (${input.saveId}) ${input.quickSim ? "im Quick-Sim-Lauf (Node) ausgefallen, Chromium uebernimmt" : "endgueltig ausgefallen"}: ${detail}`,
+            );
             break;
           }
           console.warn(
@@ -770,13 +827,17 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   // direkt darueber (Semaphor, eine sofortige Wiederholung bei Infrastruktur-Ausfall, Rueckfall auf
   // den PPS-Pod ohne Rohdaten). Die Arena spielt dasselbe Gefecht danach ab (gleiche Saat, k,
   // Aufstellung, Mutatoren, s. FoundationBattleArenaHost.tsx) — gezeigt = gebucht.
+  //
+  // QUICK-SIM (Rebase 11.11.): dieselbe `semaphor`/`maxVersuche`-Weiche wie beim Bahn-Pod-Zweig
+  // oben, jetzt, wo `input.runBattlefieldPodFixturesImpl` im Quick-Sim-Lauf auf
+  // `runBattlefieldPodFixturesNode()` zeigt.
   if (input.battlefieldPresent) {
     const gesamtStart = Date.now();
-    await mitChromiumSemaphor(async () => {
+    await semaphor(async () => {
       let erfolg: Awaited<ReturnType<typeof runBattlefieldPodMatchday>> | null = null;
       let letzterAusfall: ArenaAusfall | null = null;
       let versucheIntern = 0;
-      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+      for (let lokalerVersuch = 1; lokalerVersuch <= maxVersuche; lokalerVersuch += 1) {
         versucheIntern = lokalerVersuch;
         try {
           const ergebnis = await runBattlefieldPodMatchday({
@@ -812,8 +873,10 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
             versuch: lokalerVersuch,
           };
           letzterAusfall = ausfall;
-          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
-            console.error(`[arena-vorlauf] battlefield-pod an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= maxVersuche) {
+            console.error(
+              `[arena-vorlauf] battlefield-pod an ${input.matchdayId} (${input.saveId}) ${input.quickSim ? "im Quick-Sim-Lauf (Node) ausgefallen, Chromium uebernimmt" : "endgueltig ausgefallen"}: ${detail}`,
+            );
             break;
           }
           console.warn(
@@ -853,6 +916,13 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
         disziplinen[BATTLEFIELD_DISCIPLINE_ID] = { status: "ausgefallen", ausfall: letzterAusfall!, dauerMs: Date.now() - gesamtStart, versucheIntern };
       }
     });
+  }
+
+  // `as`: TypeScript verfolgt die Zuweisungen in den `semaphor()`-Callbacks oben nicht und haelt
+  // `gesamtStatus` hier faelschlich fuer immer `"ready"`.
+  if (input.quickSim && (gesamtStatus as "ready" | "failed") === "failed") {
+    // Nichts schreiben -- der Aufrufer faellt auf den Chromium-Pfad zurueck (s. `quickSim`).
+    throw new ArenaQuickSimNodeFehlschlag(Object.fromEntries(arenaAusfallByDisciplineId));
   }
 
   const { record } = finishArenaVorlauf(
@@ -981,7 +1051,9 @@ function starteOderTeileVorlauf(input: {
     runBahnPodFixturesImpl: input.runBahnPodFixturesImpl,
     runBahnPodFixturesOptions: input.runBahnPodFixturesOptions,
   }).finally(() => {
-    laufendeVorlaeufe.delete(schluessel);
+    // Nur den EIGENEN Eintrag entfernen: hat ein Quick-Sim diesen Lauf bereits ueberholt und den
+    // Eintrag abgeloest (s. `beschleunigeArenaVorlaufPerQuickSim()`), gehoert er nicht mehr uns.
+    if (laufendeVorlaeufe.get(schluessel) === promise) laufendeVorlaeufe.delete(schluessel);
   });
   laufendeVorlaeufe.set(schluessel, promise);
   return promise;
@@ -1170,6 +1242,224 @@ export async function stelleArenaVorlaufSicher(
     runBahnPodFixturesOptions: options.runBahnPodFixturesOptions,
   });
   return { applicable: true, status: record?.status ?? null, record };
+}
+
+/**
+ * QUICK-SIM (Chris, 27.10.: "was ist fuer ne Quick Sim deine Loesung? Weil wir wollen ja nicht
+ * nach dem man auf Quick Sim drueckt 2 Minuten auf ein Ergebnis warten!").
+ *
+ * Der "⏩ Quick-Sim"-Knopf der Buehne springt sofort ans Ende — gebucht werden konnte danach aber
+ * erst, wenn der Arena-Vorlauf dieses Spieltags fertig war, und der lief bisher IMMER ueber
+ * Chromium (20-110 s je Spieltag, Task #212). Diese Funktion ist der Weg, den NUR der Quick-Sim-
+ * Knopf nimmt (Auto-Run-Option `arenaModus: "quick-sim"`): sie rechnet denselben Vorlauf mit dem
+ * Node-Runner (`arena-node-runner.ts`, kein Browser) und WARTET darauf — typisch wenige Sekunden.
+ * Alle anderen Ausloeser (Lineup-Routen, Arena-Base-Route, normaler Auto-Run, Skripte) bleiben
+ * unveraendert beim Chromium-Vorlauf (`kickoffArenaVorlauf()`/`stelleArenaVorlaufSicher()`).
+ *
+ * DREI LAGEN, je nachdem, was beim Druck auf den Knopf schon laeuft:
+ *  1. Vorlauf zu dieser Signatur ist schon terminal ("ready"/"failed") -> sofort zurueck, nichts
+ *     zu tun (`weg: "bereits_fertig"`).
+ *  2. Ein Chromium-Vorlauf zu dieser Signatur LAEUFT (der Normalfall: er startet, sobald das Feld
+ *     steht) -> der Node-Lauf rechnet PARALLEL dazu unter DERSELBEN Versuchsnummer und schreibt
+ *     zuerst. `finishArenaVorlauf()` laesst je Signatur+Versuch nur das ERSTE terminale Ergebnis
+ *     stehen, der spaeter fertige Chromium-Lauf ueberschreibt also nichts mehr. Der Chromium-Lauf
+ *     wird danach aus `laufendeVorlaeufe` abgeloest, damit Buchung und Buehnen-Poll sofort den
+ *     fertigen Datensatz lesen statt auf Chromium zu warten.
+ *  3. Es laeuft noch nichts -> der Node-Lauf beginnt einen neuen Versuch und steht selbst in
+ *     `laufendeVorlaeufe` (andere Aufrufer haengen sich an ihn, statt Chromium zu starten).
+ *
+ * RUECKFALL (keine Regression im Fehlerfall): scheitert der Node-Lauf -- Worker-Absturz, Timeout,
+ * unerwartetes Ergebnisformat, fehlendes Arena-Ergebnis --, wird NICHTS geschrieben, und der
+ * Chromium-Pfad uebernimmt genau wie vor diesem Knopf: in Lage 2 laeuft er ohnehin schon weiter, in
+ * Lage 3 startet er unter demselben `laufendeVorlaeufe`-Eintrag im Hintergrund. Die Funktion
+ * antwortet dann mit `status: "in_progress"` (`weg: "chromium_rueckfall"`), der Aufrufer blockiert
+ * wie bisher mit `arena_vorlauf_laeuft`, und die Buehne pollt wie bisher. Ein einmal gescheiterter
+ * Node-Lauf wird fuer dieselbe Signatur nicht wiederholt (`quickSimNodeFehlgeschlagen`), damit ein
+ * Folge-Poll nicht jedes Mal erneut rechnet.
+ */
+export type ArenaQuickSimWeg = "nicht_anwendbar" | "kein_snapshot" | "bereits_fertig" | "node" | "chromium_rueckfall";
+
+export type ArenaQuickSimErgebnis = ArenaVorlaufKickoffErgebnis & {
+  weg: ArenaQuickSimWeg;
+  /** Wandzeit dieses Aufrufs (inkl. Warten auf einen schon laufenden Quick-Sim). */
+  dauerMs: number;
+};
+
+export type ArenaQuickSimOptions = {
+  /** Testhebel: Node-Runner (Default `runArenaFixturesNode`). */
+  runArenaFixturesNodeImpl?: typeof runArenaFixtures;
+  /** Testhebel: Node-Pod-Runner (Default `runMiniDmFfaPodFixturesNode`). */
+  runMiniDmFfaPodFixturesNodeImpl?: typeof runMiniDmFfaPodFixtures;
+  /**
+   * BAHN-POD/BATTLEFIELD-POD (Rebase 11.11.): dieselben Testhebel wie oben, Default
+   * `runBahnPodFixturesNode()`/`runBattlefieldPodFixturesNode()` -- der Node-Lauf deckt seit dem
+   * Rebase auch die beiden Vier-Team-Pod-Chassis ab, nicht nur das generische Zweier-Duell-Set.
+   */
+  runBahnPodFixturesNodeImpl?: typeof runBahnPodFixtures;
+  runBattlefieldPodFixturesNodeImpl?: typeof runBattlefieldPodFixtures;
+  /** Rueckfall-Runner (Default: der echte Chromium-Runner, wie im normalen Vorlauf). */
+  runArenaFixturesImpl?: typeof runArenaFixtures;
+  runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
+  runBahnPodFixturesImpl?: typeof runBahnPodFixtures;
+  runBattlefieldPodFixturesImpl?: typeof runBattlefieldPodFixtures;
+};
+
+const laufendeQuickSims = new Map<string, Promise<ArenaQuickSimErgebnis>>();
+const quickSimNodeFehlgeschlagen = new Set<string>();
+
+export async function beschleunigeArenaVorlaufPerQuickSim(
+  scope: MatchdayResolveScope,
+  options: ArenaQuickSimOptions = {},
+  persistence: PersistenceService = createPersistenceService(),
+): Promise<ArenaQuickSimErgebnis> {
+  const start = Date.now();
+  const fertig = (ergebnis: ArenaVorlaufKickoffErgebnis, weg: ArenaQuickSimWeg): ArenaQuickSimErgebnis => ({
+    ...ergebnis,
+    weg,
+    dauerMs: Date.now() - start,
+  });
+
+  const anwendbarkeit = ermittleAnwendbarkeit(persistence, scope);
+  if (!anwendbarkeit.applicable) return fertig({ applicable: false, status: null, record: null }, "nicht_anwendbar");
+
+  const snapshot = ensureMatchdayResolveSnapshot(scope, persistence);
+  if (!snapshot) return fertig({ applicable: true, status: null, record: null }, "kein_snapshot");
+
+  const vorhandenerRecord = readArenaVorlaufRecord(anwendbarkeit.gameState, scope);
+  const signature = buildMatchdayResolveSignature(anwendbarkeit.gameState, scope);
+  if (vorhandenerRecord?.signature === signature && vorhandenerRecord.status !== "in_progress") {
+    return fertig({ applicable: true, status: vorhandenerRecord.status, record: vorhandenerRecord }, "bereits_fertig");
+  }
+
+  const schluessel = laufSchluessel(scope, signature);
+  const laufenderQuickSim = laufendeQuickSims.get(schluessel);
+  if (laufenderQuickSim) {
+    const ergebnis = await laufenderQuickSim;
+    return { ...ergebnis, dauerMs: Date.now() - start };
+  }
+  if (quickSimNodeFehlgeschlagen.has(schluessel)) {
+    // Schon einmal mit Node gescheitert -> direkt der bisherige Weg (idempotent, s. Kopfkommentar).
+    return fertig(
+      kickoffArenaVorlauf(
+        scope,
+        {
+          runArenaFixturesImpl: options.runArenaFixturesImpl,
+          runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
+          runBahnPodFixturesImpl: options.runBahnPodFixturesImpl,
+          runBattlefieldPodFixturesImpl: options.runBattlefieldPodFixturesImpl,
+        },
+        persistence,
+      ),
+      "chromium_rueckfall",
+    );
+  }
+
+  const quickSim = (async (): Promise<ArenaQuickSimErgebnis> => {
+    // Lage 2 (Chromium laeuft schon, oder ein juengst abgebrochener Lauf steht noch auf
+    // "in_progress") vs. Lage 3 (neuer Versuch), s. Kopfkommentar.
+    const mitlaufen = vorhandenerRecord?.signature === signature && vorhandenerRecord.status === "in_progress";
+    let versuch: number;
+    let startedAt: string;
+    if (mitlaufen) {
+      versuch = vorhandenerRecord.versuch;
+      startedAt = vorhandenerRecord.startedAt;
+    } else {
+      const begonnen = beginArenaVorlauf(
+        scope,
+        {
+          signature,
+          // Dieselbe vollstaendige Liste wie `starteOderTeileVorlauf()` (nur fuer die SICHTBARE
+          // "laeuft gerade"-Liste des Vorlauf-Records; der Mini-DM-/Battlefield-Pod-Zweig selbst
+          // haengt nicht an dieser Liste, s. Kommentar dort) -- Rebase 11.11.: vorher fehlten
+          // Battlefield-Pod und Bahn-Pod hier, seit es beide auf main gibt.
+          disciplineIds: [
+            ...anwendbarkeit.arenaDisciplineIds,
+            ...(anwendbarkeit.miniDmPresent ? [MINI_DM_DISCIPLINE_ID] : []),
+            ...(anwendbarkeit.battlefieldPresent ? [BATTLEFIELD_DISCIPLINE_ID] : []),
+            ...anwendbarkeit.bahnPodDisciplineIds,
+          ],
+        },
+        persistence,
+      );
+      if (!begonnen) return fertig({ applicable: true, status: null, record: null }, "kein_snapshot");
+      versuch = begonnen.versuch;
+      startedAt = begonnen.startedAt;
+    }
+
+    const gemeinsam = {
+      persistence,
+      saveId: scope.saveId,
+      seasonId: scope.seasonId,
+      matchdayId: scope.matchdayId,
+      signature,
+      arenaDisciplineIds: anwendbarkeit.arenaDisciplineIds,
+      mutatorTraitsByDisciplineId: anwendbarkeit.mutatorTraitsByDisciplineId,
+      versuch,
+      startedAt,
+      miniDmPresent: anwendbarkeit.miniDmPresent,
+      battlefieldPresent: anwendbarkeit.battlefieldPresent,
+      bahnPodDisciplineIds: anwendbarkeit.bahnPodDisciplineIds,
+    };
+    const nodeLauf = fuehreVorlaufAus({
+      ...gemeinsam,
+      quickSim: true,
+      runArenaFixturesImpl: options.runArenaFixturesNodeImpl ?? runArenaFixturesNode,
+      runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesNodeImpl ?? runMiniDmFfaPodFixturesNode,
+      runBahnPodFixturesImpl: options.runBahnPodFixturesNodeImpl ?? runBahnPodFixturesNode,
+      runBattlefieldPodFixturesImpl: options.runBattlefieldPodFixturesNodeImpl ?? runBattlefieldPodFixturesNode,
+    });
+
+    if (!mitlaufen) {
+      // Lage 3: EIN `laufendeVorlaeufe`-Eintrag deckt Node UND einen etwaigen Chromium-Rueckfall
+      // ab -- jeder andere Aufrufer (Buehnen-Poll, Lineup-Route) haengt sich daran, statt einen
+      // zweiten Lauf zu starten.
+      const gesamt: Promise<ArenaVorlaufRecord | null> = nodeLauf
+        .catch(() =>
+          fuehreVorlaufAus({
+            ...gemeinsam,
+            runArenaFixturesImpl: options.runArenaFixturesImpl,
+            runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
+            runBahnPodFixturesImpl: options.runBahnPodFixturesImpl,
+            runBattlefieldPodFixturesImpl: options.runBattlefieldPodFixturesImpl,
+          }),
+        )
+        .finally(() => {
+          if (laufendeVorlaeufe.get(schluessel) === gesamt) laufendeVorlaeufe.delete(schluessel);
+        });
+      laufendeVorlaeufe.set(schluessel, gesamt);
+      gesamt.catch((error) => {
+        console.error(`[arena-vorlauf] quick-sim: Chromium-Rueckfall ausserhalb des try/catch gescheitert (${scope.saveId}/${scope.matchdayId}):`, error);
+      });
+    }
+
+    try {
+      const record = await nodeLauf;
+      if (mitlaufen) {
+        // Den ueberholten Chromium-Lauf abloesen: er rechnet zu Ende, darf aber nichts mehr
+        // ueberschreiben (`finishArenaVorlauf()`), und niemand soll mehr auf ihn warten.
+        laufendeVorlaeufe.delete(schluessel);
+      }
+      console.info(
+        `[arena-vorlauf] quick-sim: ${scope.saveId}/${scope.matchdayId} per Node in ${Date.now() - start} ms (${mitlaufen ? "Chromium-Lauf ueberholt" : "neuer Versuch"}).`,
+      );
+      return fertig({ applicable: true, status: record?.status ?? null, record }, "node");
+    } catch (error) {
+      // Begrenzt, damit die Menge in einem langlebigen Serverprozess nicht unbegrenzt waechst --
+      // ein Eintrag ist nur fuer die Polls direkt nach DIESEM Druck auf den Knopf relevant.
+      if (quickSimNodeFehlgeschlagen.size >= 256) quickSimNodeFehlgeschlagen.clear();
+      quickSimNodeFehlgeschlagen.add(schluessel);
+      console.warn(
+        `[arena-vorlauf] quick-sim: Node-Lauf fuer ${scope.saveId}/${scope.matchdayId} gescheitert -- Chromium-Vorlauf uebernimmt (${mitlaufen ? "laeuft bereits" : "gestartet"}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+      const aktuell = persistence.getSaveById(scope.saveId);
+      const record = aktuell ? readArenaVorlaufRecord(aktuell.gameState, scope) : null;
+      return fertig({ applicable: true, status: "in_progress", record }, "chromium_rueckfall");
+    }
+  })().finally(() => {
+    laufendeQuickSims.delete(schluessel);
+  });
+  laufendeQuickSims.set(schluessel, quickSim);
+  return quickSim;
 }
 
 export { readArenaVorlaufRecord };

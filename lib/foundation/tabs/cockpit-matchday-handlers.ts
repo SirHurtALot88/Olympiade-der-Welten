@@ -94,6 +94,11 @@ export type CockpitMatchdayApplyHandlers = {
       includeWarningLineups?: boolean;
       overwriteExistingLineups?: boolean;
       stopOnTie?: boolean;
+      /**
+       * QUICK-SIM (27.10.): die Buehne bucht nach "⏩ Quick-Sim" -- der Server rechnet den
+       * Arena-Vorlauf dann per Node statt Chromium (`arenaModus: "quick-sim"`). Cockpit: nie.
+       */
+      arenaQuickSim?: boolean;
     },
   ) => Promise<FoundationMatchdayAutoRunSummary | null>;
   /**
@@ -437,6 +442,11 @@ export function createCockpitMatchdayApplyHandlers(
     includeWarningLineups?: boolean;
     overwriteExistingLineups?: boolean;
     stopOnTie?: boolean;
+    /**
+     * QUICK-SIM (27.10.): die Buehne bucht nach "⏩ Quick-Sim" -- der Server rechnet den
+     * Arena-Vorlauf dann per Node statt Chromium (`arenaModus: "quick-sim"`). Cockpit: nie.
+     */
+    arenaQuickSim?: boolean;
   };
 
   /** Ein einzelner POST an `/api/season/matchday-auto-run`, ohne Busy-Key- oder Folgefahrt-Logik. */
@@ -467,6 +477,7 @@ export function createCockpitMatchdayApplyHandlers(
             advanceAfterCashApply,
             commitThroughSide,
             submittedPreview,
+            ...(optionOverrides.arenaQuickSim ? { arenaQuickSim: true } : {}),
           },
         }),
       ),
