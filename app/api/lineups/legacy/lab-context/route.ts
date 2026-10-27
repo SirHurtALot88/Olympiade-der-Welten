@@ -24,6 +24,7 @@ import {
   countSeasonCaptains,
   countSeasonLineupDisciplineSides,
   formatLineupTeamStatusLabel,
+  getSeasonCaptainSlots,
   SEASON_CAPTAIN_SLOTS,
 } from "@/lib/lineups/lineup-discipline-contract";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -424,12 +425,13 @@ function loadSqliteOptions(save: PersistedSaveGame, persistence: ReturnType<type
         lineupFilledCount,
         totalLineupSides,
         captainUsedCount,
-        captainSlots: SEASON_CAPTAIN_SLOTS,
+        captainSlots: getSeasonCaptainSlots(save.gameState),
         statusLabel: formatLineupTeamStatusLabel({
           team,
           lineupFilledCount,
           totalLineupSides,
           captainUsedCount,
+          captainSlots: getSeasonCaptainSlots(save.gameState),
         }),
         currentMatchdayReady,
       };

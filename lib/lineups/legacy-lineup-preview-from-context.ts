@@ -71,7 +71,7 @@ function buildValidationOptions(context: LegacyLineupLoadedContext, forSubmit = 
 
   return {
     enforceCompleteness: forSubmit,
-    seasonCaptainLimit: SEASON_CAPTAIN_SLOTS,
+    seasonCaptainLimit: context.captainRule?.seasonCaptainSlots ?? context.teamStatus?.captainSlots ?? SEASON_CAPTAIN_SLOTS,
     captainUsedBeforeCurrentDraft: Math.max(0, (context.teamStatus?.captainUsedCount ?? 0) - previousCaptainKeys.size),
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsedBeforeCurrentDraftSides),
   };

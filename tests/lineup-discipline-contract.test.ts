@@ -1,14 +1,37 @@
 import { describe, expect, it } from "vitest";
 
+import type { GameState } from "@/lib/data/olyDataTypes";
 import { foundationSeedDisciplines, foundationSeedMatchdays, foundationSeedSeason } from "@/lib/data/dataAdapter";
 import {
+  BATTLE_MODE_SEASON_CAPTAIN_SLOTS,
   buildLineupDisciplineContract,
   buildMatchdayLineupContract,
   countSeasonCaptains,
   countSeasonLineupDisciplineSides,
+  getSeasonCaptainSlots,
   SEASON_CAPTAIN_SLOTS,
 } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacySeedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+
+describe("getSeasonCaptainSlots", () => {
+  // Chris am 27.10. (offene Frage aus PR #1323): Grundlimit bleibt ein hartes Limit, nur die
+  // Obergrenze selbst steigt im Battle Mode -- analog zu `getSeasonDisciplineRepeatCount()`
+  // (lib/season/season-discipline-schedule.ts), hier fuer Kapitaens-Slots statt Spieltage.
+  it("ist 3 fuer jeden Save ohne Battle-Mode-Kennzeichen (Manager Mode, jeder Alt-Save)", () => {
+    expect(getSeasonCaptainSlots({} as GameState)).toBe(3);
+    expect(getSeasonCaptainSlots({ scenarioMeta: undefined } as unknown as GameState)).toBe(3);
+    expect(getSeasonCaptainSlots({ scenarioMeta: { gameMode: "manager" } } as unknown as GameState)).toBe(
+      SEASON_CAPTAIN_SLOTS,
+    );
+  });
+
+  it("ist 6 fuer einen Battle-Mode-Save (doppelt so viele Spieltage)", () => {
+    expect(getSeasonCaptainSlots({ scenarioMeta: { gameMode: "battle" } } as unknown as GameState)).toBe(
+      BATTLE_MODE_SEASON_CAPTAIN_SLOTS,
+    );
+    expect(BATTLE_MODE_SEASON_CAPTAIN_SLOTS).toBe(6);
+  });
+});
 
 describe("lineup discipline contract", () => {
   it("covers all 20 disciplines in the seeded display order", () => {
@@ -73,6 +96,32 @@ describe("lineup discipline contract", () => {
     expect(first.sourceStatus).toBe("legacy_seed");
     expect(first.seasonCaptainSlots).toBe(SEASON_CAPTAIN_SLOTS);
     expect(first.totalDisciplineSidesInSeason).toBe(20);
+  });
+
+  it("gibt das Battle-Mode-Kapitaenslimit (6) durch, wenn ein Battle-Mode-`gameState` uebergeben wird", () => {
+    const disciplineSchedule = buildLegacySeedSeasonDisciplineSchedule({
+      seasonId: foundationSeedSeason.id,
+      disciplines: foundationSeedDisciplines,
+      matchdayIds: foundationSeedSeason.matchdayIds,
+    });
+
+    const managerModeContract = buildMatchdayLineupContract({
+      season: foundationSeedSeason,
+      matchday: foundationSeedMatchdays[0]!,
+      disciplines: foundationSeedDisciplines,
+      disciplineSchedule,
+      gameState: { scenarioMeta: { gameMode: "manager" } } as unknown as GameState,
+    });
+    expect(managerModeContract.seasonCaptainSlots).toBe(SEASON_CAPTAIN_SLOTS);
+
+    const battleModeContract = buildMatchdayLineupContract({
+      season: foundationSeedSeason,
+      matchday: foundationSeedMatchdays[0]!,
+      disciplines: foundationSeedDisciplines,
+      disciplineSchedule,
+      gameState: { scenarioMeta: { gameMode: "battle" } } as unknown as GameState,
+    });
+    expect(battleModeContract.seasonCaptainSlots).toBe(BATTLE_MODE_SEASON_CAPTAIN_SLOTS);
   });
 
   it("uses matchday schedule player counts instead of catalog defaults when they differ", () => {

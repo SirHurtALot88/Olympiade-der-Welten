@@ -16,7 +16,7 @@ import {
   ensureLocalTeamPowersForSeason,
   getTeamPowerOptions,
 } from "@/lib/lineups/team-powers";
-import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, createLineupDraftId, formatLineupTeamStatusLabel, getSeasonCaptainDisciplineSideKeys, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
+import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, createLineupDraftId, formatLineupTeamStatusLabel, getSeasonCaptainDisciplineSideKeys, getSeasonCaptainSlots, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { computeTeamDisciplineRankTable, computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import type { FormCardPlanRecord, GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
@@ -375,6 +375,7 @@ function resolveFreshMatchdayContext(
     matchday,
     disciplines: normalizedGameState.disciplines,
     disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+    gameState: normalizedGameState,
   });
 
   return { season, matchday, matchdayContract };
@@ -574,6 +575,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       matchday,
       disciplines: normalizedGameState.disciplines,
       disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+      gameState: normalizedGameState,
     });
   const requiredDisciplineIds = sharedBase?.requiredDisciplineIds ?? [
     matchdayContract.discipline1?.disciplineId,
@@ -889,12 +891,13 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         captainUsedCount: teamStatus.captainUsedCount,
         captainUsedSides: teamStatus.captainUsedSides,
         captainUsedSidesBeforeCurrentMatchday: teamStatus.captainUsedSidesBeforeCurrentMatchday,
-        captainSlots: SEASON_CAPTAIN_SLOTS,
+        captainSlots: getSeasonCaptainSlots(normalizedGameState),
         displayLabel: formatLineupTeamStatusLabel({
           team,
           lineupFilledCount: teamStatus.lineupFilledCount,
           totalLineupSides: matchdayContract.totalDisciplineSidesInSeason,
           captainUsedCount: teamStatus.captainUsedCount,
+          captainSlots: getSeasonCaptainSlots(normalizedGameState),
         }),
       },
       fatigueByPlayerId,
@@ -903,7 +906,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       teamDisciplineRanks: teamDisciplineRanks,
       teamPowerWindows,
       captainRule: {
-        seasonCaptainSlots: SEASON_CAPTAIN_SLOTS,
+        seasonCaptainSlots: getSeasonCaptainSlots(normalizedGameState),
         perDisciplineSideMaxCaptains: 1,
         sourceStatus: "mapped_with_transform",
       },
@@ -1055,6 +1058,7 @@ export function loadLocalLegacyLineupBatchPrecheckFromGameState(
     matchday,
     disciplines: normalizedGameState.disciplines,
     disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+    gameState: normalizedGameState,
   });
   const disciplinePlayerCounts = Object.fromEntries(
     lineupContract.map((entry) => [entry.disciplineId, entry.requiredPlayers ?? 0]),
@@ -1166,7 +1170,7 @@ function buildValidationOptions(context: LegacyLineupLoadedContext, forSubmit = 
 
   return {
     enforceCompleteness: forSubmit,
-    seasonCaptainLimit: SEASON_CAPTAIN_SLOTS,
+    seasonCaptainLimit: context.captainRule?.seasonCaptainSlots ?? context.teamStatus?.captainSlots ?? SEASON_CAPTAIN_SLOTS,
     captainUsedBeforeCurrentDraft: Math.max(0, (context.teamStatus?.captainUsedCount ?? 0) - previousCaptainKeys.size),
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsedBeforeCurrentDraftSides),
   };

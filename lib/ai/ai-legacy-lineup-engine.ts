@@ -48,8 +48,10 @@ type CaptainDecision = {
 // ===========================================================================================
 // Captain-Opportunismus & Pacing
 // -------------------------------------------------------------------------------------------
-// Der Captain-Boost ist knapp: SEASON_CAPTAIN_SLOTS = 3 über 10 Spieltage. Früher wurde er
-// rein gierig gesetzt (jede KI klatscht ihn an Spieltag 1 rein und verbrennt alle 3 bis
+// Der Captain-Boost ist knapp: SEASON_CAPTAIN_SLOTS = 3 über 10 Spieltage (Manager Mode) bzw.
+// BATTLE_MODE_SEASON_CAPTAIN_SLOTS = 6 über 20 Spieltage (Battle Mode, Chris 27.10. -- s.
+// `getSeasonCaptainSlots()` in lib/lineups/lineup-discipline-contract.ts). Früher wurde er
+// rein gierig gesetzt (jede KI klatscht ihn an Spieltag 1 rein und verbrennt alle Slots bis
 // Spieltag 3). Stattdessen entscheidet die KI jetzt opportunistisch, ob sich EIN Slot HEUTE
 // lohnt, gemessen an:
 //   1. Ertrag/Magnitude: Der Boost bringt exakt +0.5 x finalContribution des Spielers
