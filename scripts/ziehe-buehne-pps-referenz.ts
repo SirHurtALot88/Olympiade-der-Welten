@@ -128,6 +128,15 @@ const DISZIPLINEN = {
     wertHerkunft: "MOTOREN.breaking.wert() = u.summe, s. WERTUNG_AUFTRITT()",
     rezeptOrt: "BUEHNE_ART.breaking.rezept, gauntletRunde()/baueGauntlet()",
   },
+  // I-SPY (27.10., Task #197): Schatzsuche ueber das Auftritt-Chassis (`spieleBuehneAuftritt()`,
+  // s. ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS). `katalogStandardgroesse` 6 aus lib/data/
+  // dataAdapter.ts (`playerCount: 6`) — einzeln nachgesehen.
+  "i-spy": {
+    chassis: "auftritt",
+    katalogStandardgroesse: 6,
+    wertHerkunft: "MOTOREN[\"i-spy\"].wert() = u.summe (eigene Fundpunkte), s. ispySeiteTick()/WERTUNG_AUFTRITT()",
+    rezeptOrt: "BUEHNE_ART[\"i-spy\"].rezept, baueSchatzsuche()/ispySeiteTick()",
+  },
   wettessen: {
     chassis: "auftritt",
     katalogStandardgroesse: 5,

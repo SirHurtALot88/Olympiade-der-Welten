@@ -86,6 +86,7 @@ type FoundationCockpitHostHandlerKey =
   | "runCockpitCashApply"
   | "runCockpitMatchdayAdvance"
   | "runCockpitMatchdayAutoRun"
+  | "runCockpitMatchdayAutoRunWithAutoRetry"
   | "runCockpitMatchdayMvpScoring"
   | "runCockpitResultApply"
   | "runCockpitStandingsApply"

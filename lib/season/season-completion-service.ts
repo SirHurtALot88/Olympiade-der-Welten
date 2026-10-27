@@ -36,9 +36,13 @@ import {
   startSeasonTransition,
   type SeasonTransitionPreview,
 } from "@/lib/season/season-transition-service";
-import { applyLeagueMovement, type LeagueMovementResult } from "@/lib/season/league-movement-service";
+import {
+  applyLeagueMovementOnce,
+  computeLeagueMovement,
+  findLeagueMovementLog,
+  type LeagueMovementResult,
+} from "@/lib/season/league-movement-service";
 import { isLeagueSplitActive } from "@/lib/season/league-split";
-import { randomUUID } from "@/lib/utils/random-id";
 
 export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 
@@ -683,34 +687,21 @@ async function runLocalSeasonCompletionUnsafe(
    * ohne einen zweiten Uebergabe-Pfad.
    */
   const leagueSplitActive = isLeagueSplitActive(afterSnapshotSave.gameState);
-  const existingLeagueMovementLog = leagueSplitActive
-    ? (afterSnapshotSave.gameState.seasonState.leagueMovementLogs ?? []).find((log) => log.seasonId === seasonId) ?? null
-    : null;
+  const existingLeagueMovementLog = leagueSplitActive ? findLeagueMovementLog(afterSnapshotSave.gameState, seasonId) : null;
   const leagueMovementPreview = leagueSplitActive
-    ? applyLeagueMovement(afterSnapshotSave.gameState).result
+    ? computeLeagueMovement(afterSnapshotSave.gameState)
     : ({ applicable: false, leagueByTeamId: null, promoted: [], relegated: [], warnings: [] } as LeagueMovementResult);
   const shouldApplyLeagueMovement =
     !dryRun && blockingReasons.size === 0 && leagueSplitActive && !existingLeagueMovementLog && leagueMovementPreview.applicable;
   let leagueMovementApplied = false;
   if (shouldApplyLeagueMovement) {
-    const { gameState: movedGameState } = applyLeagueMovement(afterSnapshotSave.gameState);
-    const logRecord = {
-      id: `league-movement:${seasonId}:${randomUUID()}`,
-      saveId: afterSnapshotSave.saveId,
-      seasonId,
-      createdAt: new Date().toISOString(),
-      promotedTeamIds: leagueMovementPreview.promoted.map((team) => team.teamId),
-      relegatedTeamIds: leagueMovementPreview.relegated.map((team) => team.teamId),
-    };
-    const nextGameState = {
-      ...movedGameState,
-      seasonState: {
-        ...movedGameState.seasonState,
-        leagueMovementLogs: [logRecord, ...(movedGameState.seasonState.leagueMovementLogs ?? [])],
-      },
-    };
-    persistence.saveSingleplayerState(afterSnapshotSave.saveId, nextGameState);
-    leagueMovementApplied = true;
+    // Dieselbe Funktion, die auch der Saisonwechsel (`next_season_setup`) als Rueckfall ruft — wer
+    // ueber die Saisonende-Seite statt ueber diesen Lauf spielt, bekommt so denselben Auf-/Abstieg.
+    const moved = applyLeagueMovementOnce(afterSnapshotSave.gameState, { saveId: afterSnapshotSave.saveId, seasonId });
+    if (moved.applied) {
+      persistence.saveSingleplayerState(afterSnapshotSave.saveId, moved.gameState);
+      leagueMovementApplied = true;
+    }
   }
   addStep(
     steps,

@@ -18,6 +18,7 @@ import {
 } from "@/lib/season/season-discipline-schedule";
 import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
 import { getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
+import { applyLeagueMovementOnce } from "@/lib/season/league-movement-service";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
@@ -1010,6 +1011,43 @@ function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
   };
 }
 
+/**
+ * AUF-/ABSTIEG NACHHOLEN, BEVOR DIE NEUE SAISON GEBAUT WIRD — Battle Mode mit Liga-Split.
+ *
+ * Der Auf-/Abstieg lief bisher NUR im Cockpit-Lauf (`runLocalSeasonCompletion`, Schritt
+ * `league_movement`). Die Saisonende-Seite, auf die der Spielfluss am Saisonende fuehrt, nimmt einen
+ * anderen Weg: „Abrechnung buchen" (`cash-prize-apply`) → „Verkäufe & Verträge öffnen"
+ * (`season/transition`) → „Neue Saison starten" (hier). Auf diesem Weg stieg kein Team auf oder ab.
+ * Und weil `buildNextSeasonGameState` die Liga-Zuordnung frisch liest, rollten die Sponsorverträge
+ * (`advanceSponsorContractsForNewSeason`), die neuen Angebote (`regenerateSponsorOffersForSeason`)
+ * und der Liga-Spielplan gegen die ALTE Liga — Chris' Entscheidung vom 27.10. verlangt aber, dass
+ * beim Saisonübergang alle Mechanismen greifen, gerade die Sponsoren.
+ *
+ * Dieser Schritt ist deshalb die letzte Station vor dem Bau der neuen Saison, auf BEIDEN Wegen:
+ *   - Saisonende-Seite: hier entsteht der Auf-/Abstieg — nach dem Snapshot (der die Endtabelle mit
+ *     der ALTEN Liga einfriert, `buildSaveWithRequiredSeasonSnapshot`), genau wie im Cockpit-Lauf.
+ *   - Cockpit-Lauf: der Log-Eintrag liegt schon, `applyLeagueMovementOnce` tut nichts.
+ *
+ * Manager Mode / ohne Liga-Split: `applyLeagueMovementOnce` gibt denselben Zustand (dieselbe
+ * Referenz) zurueck — kein Feld, kein Log, kein Unterschied zum Verhalten vor diesem Schritt.
+ */
+function applyPendingLeagueMovementBeforeNextSeason(save: PersistedSaveGame): {
+  save: PersistedSaveGame;
+  warnings: string[];
+} {
+  const moved = applyLeagueMovementOnce(save.gameState, { saveId: save.saveId, seasonId: save.gameState.season.id });
+  if (!moved.applied) {
+    return { save, warnings: [] };
+  }
+  return {
+    save: { ...save, gameState: moved.gameState },
+    warnings: [
+      ...moved.result.warnings,
+      `league_movement_applied_at_next_season_setup:promoted=${moved.result.promoted.length}:relegated=${moved.result.relegated.length}`,
+    ],
+  };
+}
+
 export function buildPreSeasonNextSeasonSetupToken(save: PersistedSaveGame) {
   const { nextSeasonId, nextSeasonLabel } = buildNextSeasonContext(save.gameState);
   return {
@@ -1123,7 +1161,8 @@ export function applyPreSeasonNextSeasonSetupLightweight(
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save, { transferPipelineFast });
+  const leagueMovementResult = applyPendingLeagueMovementBeforeNextSeason(snapshotResult.save);
+  const { gameState, auditLog } = buildNextSeasonGameState(leagueMovementResult.save, { transferPipelineFast });
   persistence.saveSingleplayerState(save.saveId, gameState);
   return {
     ...basePreview,
@@ -1140,6 +1179,7 @@ export function applyPreSeasonNextSeasonSetupLightweight(
     warnings: [
       ...basePreview.warnings,
       ...snapshotResult.warnings,
+      ...leagueMovementResult.warnings,
       ...progressionResult.warnings,
       `season_end_progression_applied:teams=${progressionResult.teamsApplied}:events=${progressionResult.playerEventsCreated}`,
     ],
@@ -1454,7 +1494,8 @@ export async function applyPreSeasonNextSeasonSetup(
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
+  const leagueMovementResult = applyPendingLeagueMovementBeforeNextSeason(snapshotResult.save);
+  const { gameState, auditLog } = buildNextSeasonGameState(leagueMovementResult.save);
 
   // Re-read the persisted save immediately before writing the built next-season state. If its
   // saveVersion has moved since `expectedSaveVersion` was captured, a co-op write from the other
@@ -1490,6 +1531,7 @@ export async function applyPreSeasonNextSeasonSetup(
       ...nextPreview.warnings,
       ...penaltyResult.warnings,
       ...snapshotResult.warnings,
+      ...leagueMovementResult.warnings,
       ...progressionResult.warnings,
       `season_end_progression_applied:teams=${progressionResult.teamsApplied}:events=${progressionResult.playerEventsCreated}`,
     ],

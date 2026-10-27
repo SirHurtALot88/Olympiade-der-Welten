@@ -26,7 +26,8 @@
  * NUR BATTLE-MODE: `isLeagueSplitActive(gameState)` muss `true` sein (`leagueByTeamId` gesetzt und
  * nicht leer) — jeder Manager-Mode-/Legacy-Save liefert `applicable: false` und bleibt unangetastet.
  */
-import type { GameState, Team } from "@/lib/data/olyDataTypes";
+import type { GameState, LeagueMovementLogRecord, Team } from "@/lib/data/olyDataTypes";
+import { randomUUID } from "@/lib/utils/random-id";
 import { LEAGUE_SIZE, RELEGATION_COUNT, getLeagueTeamIds, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { resolveProjectedRankWithTiePolicy, type StandingsTieBreakItem } from "@/lib/standings/standings-tiebreaker-policy";
 
@@ -142,8 +143,8 @@ export function computeLeagueMovement(gameState: GameState): LeagueMovementResul
  * Saison (`preseason-workflow-service.ts`) — liest dieses Feld frisch aus dem persistierten Save
  * und sieht damit automatisch die neue Liga, ohne einen zweiten Übergabe-Pfad.
  *
- * NICHT idempotenz-gesichert — das ist Sache des Aufrufers (siehe `season-completion-service.ts`,
- * Schritt `league_movement`, der das genau einmal je Saison anwendet).
+ * NICHT idempotenz-gesichert — dafuer gibt es `applyLeagueMovementOnce` weiter unten, das beide
+ * Saisonende-Wege benutzen.
  */
 export function applyLeagueMovement(gameState: GameState): { gameState: GameState; result: LeagueMovementResult } {
   const result = computeLeagueMovement(gameState);
@@ -159,5 +160,83 @@ export function applyLeagueMovement(gameState: GameState): { gameState: GameStat
       },
     },
     result,
+  };
+}
+
+/** Der Idempotenz-Eintrag dieser Saison — `null`, wenn der Auf-/Abstieg fuer sie noch nicht lief. */
+export function findLeagueMovementLog(gameState: GameState, seasonId: string): LeagueMovementLogRecord | null {
+  return (gameState.seasonState.leagueMovementLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+}
+
+export type LeagueMovementOnceResult = {
+  /** Der Zustand NACH dem Schritt — bei `applied === false` exakt das uebergebene Objekt (gleiche Referenz). */
+  gameState: GameState;
+  result: LeagueMovementResult;
+  applied: boolean;
+  /** `true`, wenn fuer `seasonId` schon ein `leagueMovementLogs`-Eintrag lag. */
+  alreadyDone: boolean;
+  logRecord: LeagueMovementLogRecord | null;
+};
+
+/**
+ * AUF-/ABSTIEG GENAU EINMAL JE SAISON — Bewegung UND Idempotenz-Eintrag in einem Zug.
+ *
+ * Es gibt zwei Wege ans Saisonende (siehe `season-end-tail-settlement.ts`): den Cockpit-Lauf
+ * (`runLocalSeasonCompletion`) und die Saisonende-Seite (Abrechnung buchen → Verkäufe & Verträge →
+ * Neue Saison starten). Nur der erste kannte den Schritt `league_movement`; wer über die
+ * Saisonende-Seite spielte, startete die neue Saison mit der ALTEN Liga-Zuordnung — kein Team stieg
+ * auf oder ab, und damit rollten auch die Sponsorverträge (`advanceSponsorContractsForNewSeason`)
+ * und die neuen Angebote (`regenerateSponsorOffersForSeason`) gegen die alte Liga.
+ *
+ * Beide Wege rufen deshalb diese eine Funktion: der Cockpit-Lauf im Schritt `league_movement`, der
+ * Saisonwechsel (`preseason-workflow-service.ts`, `next_season_setup`) als letzte Station vor dem
+ * Bau der neuen Saison. Wer zuerst kommt, bewegt; der zweite findet den Log-Eintrag und tut nichts.
+ *
+ * Ohne aktiven Liga-Split (jeder Manager-Mode-/Legacy-Save) gibt die Funktion den uebergebenen
+ * Zustand UNVERAENDERT (dieselbe Referenz) zurueck — kein Feld, kein Log, bit-identisch.
+ *
+ * Reine Funktion: schreibt nichts, das Persistieren bleibt beim Aufrufer.
+ */
+export function applyLeagueMovementOnce(
+  gameState: GameState,
+  input: { saveId: string; seasonId: string; createdAt?: string; logId?: string },
+): LeagueMovementOnceResult {
+  if (!isLeagueSplitActive(gameState)) {
+    return {
+      gameState,
+      result: { applicable: false, leagueByTeamId: null, promoted: [], relegated: [], warnings: [] },
+      applied: false,
+      alreadyDone: false,
+      logRecord: null,
+    };
+  }
+  const existing = findLeagueMovementLog(gameState, input.seasonId);
+  if (existing) {
+    return { gameState, result: computeLeagueMovement(gameState), applied: false, alreadyDone: true, logRecord: existing };
+  }
+  const { gameState: movedGameState, result } = applyLeagueMovement(gameState);
+  if (!result.applicable) {
+    return { gameState, result, applied: false, alreadyDone: false, logRecord: null };
+  }
+  const logRecord: LeagueMovementLogRecord = {
+    id: input.logId ?? `league-movement:${input.seasonId}:${randomUUID()}`,
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    createdAt: input.createdAt ?? new Date().toISOString(),
+    promotedTeamIds: result.promoted.map((team) => team.teamId),
+    relegatedTeamIds: result.relegated.map((team) => team.teamId),
+  };
+  return {
+    gameState: {
+      ...movedGameState,
+      seasonState: {
+        ...movedGameState.seasonState,
+        leagueMovementLogs: [logRecord, ...(movedGameState.seasonState.leagueMovementLogs ?? [])],
+      },
+    },
+    result,
+    applied: true,
+    alreadyDone: false,
+    logRecord,
   };
 }

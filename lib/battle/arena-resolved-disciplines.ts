@@ -204,9 +204,9 @@
  *    ueber der 25-Pp-Schranke (sechs der zwoelf Matrixattribute tragen mechanisch praktisch nichts
  *    bei). Config/Referenz sind fertig, der Eintrag hier fehlt bewusst, bis eine eigene
  *    Pp-Rezeptrunde das behebt.
- *  - I-SPY (0,750, 15.10., docs/design/stand-aller-disziplinen.md Abschnitt 11 -- NICHT mehr die
- *    laengst ueberholte 0,684 aus der allerersten Produktivierungswelle): ACHSE 1 fehlt weiterhin,
- *    0,05 unter der 0,80-Schranke; Pp (13,6) bestand schon laenger.
+ *  - I-SPY: ab dieser Zeile NICHT mehr in dieser Liste (27.10., Task #197, s. I-SPY-NACHTRAG
+ *    unten) -- Kalibrierrunde 3 (32 Ticks, Tresor 45) hebt rho je Spiel auf 0,817/0,811 (n=48,
+ *    zwei Saatstroeme), Pp 14,6/15,0; I-Spy ist seitdem angeschlossen und gewertet.
  *  - BATTLEFIELD (0,399, 15.10.) und TDM (0,324, 07.10.) -- NICHT mehr 0,251/0,253, die Zahlen aus
  *    der allerersten Produktivierungswelle (05.09., ueberholt von mehreren seitherigen Messrunden,
  *    u. a. Domination-Layer 22.09. und V9-Handwerk-Versuch 07.10.): ACHSE 1 fehlt bei beiden klar.
@@ -222,6 +222,22 @@
  *  - HOCKEY: ab dieser Zeile NICHT mehr in dieser Liste als eigener Absatz, s. den Inline-
  *    Kommentar direkt bei `ARENA_RESOLVED_DISCIPLINE_IDS` unten -- Chris' Ausnahme deckt nur rho,
  *    Pp (38,5/81,5, frisch gemessen 25.10.) verletzt die 25-Schranke weiterhin klar.
+ *
+ * I-SPY-NACHTRAG (27.10., Task #197, docs/design/organisch-tdm-battlefield-ispy-27-10.md):
+ * Chris' Leitlinie vom 27.10. ("alle muessen organisch durchlaufen, die Bruecke ist nur
+ * Notfall-Backup") hat die alte offene Frage (G1*-Toleranz statt rho-Schranke, s.
+ * docs/design/i-spy-fable-empfehlung-02-10.md 10.5) ueberholt: statt einer Ausnahme eine
+ * Kalibrierrunde, die die Schranke regulaer nimmt. Zwei Hebel, beide im Motorkommentar
+ * "KALIBRIERRUNDE 3" bei BUEHNE_ART["i-spy"] hergeleitet: 32 statt 8 Ticks (Verlaesslichkeit;
+ * die alte "+0,011"-Zahl war ueberholt, und die Tick-Messung braucht mitskalierte rundenDauer
+ * wegen des 120-s-Deckels in MOTOREN.lauf()) und Tresor 45 statt 60 (Validitaet: verdiente
+ * Punktmasse je Raetselart naeher an der Matrix). Kaderfest, n=48 je Paarung: rho je Spiel
+ * 0,749 -> 0,817 (Standard-Saatstrom) / 0,710 -> 0,811 (zweiter Strom), 5 von 5 Paarungen
+ * besser; Pp 14,6 / 15,0 (messe-arena-einfluss.mjs i-spy 48, Saatversatz 0 / 10 000 000);
+ * G1* auf beiden Stroemen erfuellt; Kadergroessen 2..5 alle ueber 0,84; Spiegeltest 480 Laeufe
+ * 51,7 %. Chassis: `spieleBuehneAuftritt()` (ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS), eigene
+ * PPS-Referenz (data/generated/i-spy-pps-referenz.json). Beobachtungsliste: der Abstand zur
+ * Schranke ist auf dem zweiten Strom nur 0,011.
  */
 export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "basketball",
@@ -244,6 +260,8 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   // Climbing-Kalibrierung (16.09.): eigene Rezeptkalibrierung hebt rho ueber die Schranke,
   // s. Kommentar oben.
   "climbing",
+  // I-Spy (27.10., Task #197): Kalibrierrunde 3, s. I-SPY-NACHTRAG im Kommentar oben.
+  "i-spy",
   // Football BEWUSST NICHT HIER: rho bestand zwischenzeitlich NICHT (0,722 seit #934, 15.09.),
   // besteht seit den Kickoff/QB/Kicker-Slot-Schritten (14.10.) aber WIEDER (0,807) -- der Blocker
   // ist seither Pp (64,6/61,7, weit ueber 25), nicht mehr rho, s. FOOTBALL-NACHTRAG im Kommentar
@@ -353,6 +371,10 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // Blocker (Pp 25,9/30,1) auf 22,9/17,6 gesenkt, rho dabei verbessert statt nur gehalten --
   // bestanden auf beiden Pflichtkriterien, deshalb ab jetzt gewertet.
   "basketball",
+  // I-SPY (27.10., Task #197, s. I-SPY-NACHTRAG im Kopfkommentar): rho 0,817/0,811 (n=48, zwei
+  // Saatstroeme), Pp 14,6/15,0 -- beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
+  // Fuenfzehnte gewertete Disziplin.
+  "i-spy",
   // HOCKEY BEWUSST NICHT HIER (25.10., Task #195): Chris' Ausnahme deckt nur rho. Pp ist jetzt frisch
   // gemessen (n=24, zwei Saatstroeme: 38,5 / 81,5) — die 25-Pp-Schranke bleibt klar verletzt, s.
   // Kopfkommentar und ARENA_ABNAHME_AUSNAHMEN. Bis zu einer Rezeptkalibrierung oder Chris' Pp-Freigabe
