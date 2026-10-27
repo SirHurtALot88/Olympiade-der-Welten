@@ -4692,9 +4692,16 @@ export function useFoundationShellRouterBodyScope({
   const ARENA_VORLAUF_POLL_INTERVAL_MS = 3_000;
   const ARENA_VORLAUF_POLL_MAX_VERSUCHE = 300;
 
+  /**
+   * @param optionen.quickSim Die Buehne bucht nach "⏩ Quick-Sim" (27.10.): nur beim ERSTEN Versuch
+   *   (`pollVersuch === 0`) geht `arenaQuickSim` mit -- der Server rechnet den Arena-Vorlauf dann per
+   *   Node statt Chromium und antwortet in Sekunden. Scheitert Node, laeuft der Chromium-Vorlauf, und
+   *   die Wiederholungen unten pollen wie bisher OHNE das Flag (kein zweiter Node-Lauf je Poll).
+   */
   async function commitArenaDiscipline(
     side: "d1" | "d2",
     shownPreview: LegacyMatchdayResolvePreview | null = null,
+    optionen: { quickSim?: boolean } = {},
     pollVersuch = 0,
   ) {
     if (readMeta.readOnly) {
@@ -4742,6 +4749,7 @@ export function useFoundationShellRouterBodyScope({
       // der Arena gibt es niemanden, der eine Policy bestaetigen koennte. `stopOnTie` bleibt der
       // Cockpit-Schalter fuer den manuellen Durchlauf.
       stopOnTie: false,
+      ...(optionen.quickSim && pollVersuch === 0 ? { arenaQuickSim: true } : {}),
     });
     const booked = result?.summary?.standingsApplyAllowed ?? false;
     if (!booked) {
@@ -4767,7 +4775,7 @@ export function useFoundationShellRouterBodyScope({
           detail: "Die Punkte werden automatisch gebucht, sobald der Vorlauf fertig ist.",
         });
         await new Promise((resolve) => setTimeout(resolve, ARENA_VORLAUF_POLL_INTERVAL_MS));
-        return commitArenaDiscipline(side, shownPreview, pollVersuch + 1);
+        return commitArenaDiscipline(side, shownPreview, optionen, pollVersuch + 1);
       }
       const detail =
         blockers.length > 0
