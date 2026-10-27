@@ -1,5 +1,31 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Achtundzwanzigster Nachtrag 27.10. — I-Spy organisch und gewertet (Task #197); TDM/Battlefield
+frisch nachgemessen, eine Formatfrage an Chris (Task #198).** Auslöser ist Chris' Leitlinie vom
+27.10.: „alle müssen organisch durchlaufen, die Brücke ist nur Notfall-Backup". Volle Herleitung in
+`docs/design/organisch-tdm-battlefield-ispy-27-10.md`.
+
+- **I-Spy:** Kalibrierrunde 3 mit 32 statt 8 Ticks und Tresor 45 statt 60. Die alte
+  „+0,011 durch mehr Ticks"-Zahl aus Abschnitt 7 ist überholt. Achtung Messfalle: `rundenDauer`
+  muss mitskalieren, sonst schneidet der 120-s-Deckel in `MOTOREN.lauf()` die Spiele ab. Die
+  Tresore zogen die verdiente Punktmasse zu Logik/Verhör (42,0/38,6/19,4 % statt 37,6/36,5/25,9).
+  Kaderfest, n=48, zwei Saatströme: rho je Spiel **0,749 → 0,817** und **0,710 → 0,811**, Saison
+  0,888/0,895, Pp **14,6/15,0**, G1* auf beiden Strömen erfüllt, Kadergrößen 2..5 alle über 0,84.
+  Angeschlossen über `spieleBuehneAuftritt()` mit eigener PPS-Referenz. **Fünfzehnte gewertete
+  Disziplin.** Steht auf der Beobachtungsliste, weil der Abstand auf Strom 2 nur 0,011 beträgt.
+- **TDM** 0,324 / Saison 0,308, **Battlefield** 0,399 / Saison 0,310 (frisch, n=24, unverändert):
+  beide Spalten niedrig, die Mechanik belohnt also das Falsche. Das ist keine Rezeptfrage. TDM
+  braucht eine Mechanikrunde (Headless-Einstieg fürs Arena-Chassis, Zielwahl, V9-Pp-Messung) und
+  hat keine offene Formatfrage. Battlefield hat eine: der Motor kennt 4 Rollen und spielt 4 je
+  Seite, die Aufstellung hat 6 Rollen und die Saison schickt 2..6. Bei 5–6 Spielern fallen Field
+  Control/Disruptor lautlos weg (F1-Klasse wie Spurt). Die Frage an Chris, wie die
+  Drei-Punkte-Domination über alle Feldgrößen skaliert, steht in Abschnitt 4 des Papiers.
+
+Weiterhin außerhalb der Wertung: Football (Pp), Hockey (Pp), TDM, Battlefield (beide rho) sowie
+Mini-DM mit eigenem FFA-Pfad (nicht Teil dieses Sets).
+
+---
+
 **Siebenundzwanzigster Nachtrag 25.10. — Hockey: frische Pp-Messung nachgeholt (Task #195), Schranke
 auf beiden Stroemen klar verletzt.** CLAUDE.md (Abschnitt "Die Abnahme jeder Disziplin") und
 `lib/battle/arena-resolved-disciplines.ts` hielten Hockeys Pp-Zahl (39,4) seit der Projektaufsicht

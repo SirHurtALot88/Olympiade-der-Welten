@@ -18087,7 +18087,7 @@
       // kein `.vorteil`/Duell-Paarungsergebnis, nur befuellte `runden[]`, und die bestehende
       // Enthuellungs-Warteschlange (die generische REIHENFOLGE ganz am Ende von bauBuehne())
       // funktioniert dafuer unveraendert, exakt wie fuer jede andere Auftritt-Buehne.
-      label:"I-Spy", jeSeite:6, rundenN:8, rundenDauer:60/(8*6*2), schatzsuche:true,
+      label:"I-Spy", jeSeite:6, rundenN:32, rundenDauer:60/(32*6*2), schatzsuche:true,
       failAbzug:0.55, failWort:"übersieht das Detail", erfolgWort:"entdeckt den Hinweis",
       // SIEBEN SUB-SKILLS STATT DER GETEILTEN SIEBEN-ROLLEN-FORMEL (Konzept 1.2, Football-
       // Praezedenzfall: eigene Sub-Skill-Namen statt GRUNDLAGE/TECHNIK/... — dort acht eigene,
@@ -18164,6 +18164,36 @@
       // fuer 0,80 bei der gemessenen Validitaet waere 0,825) ist eine Konzeptfrage (Fable,
       // fable-ideen-arena-ispy-30-09.md, I-1/I-2/I-3/I-4 — allesamt Klasse M, Chris'
       // Entscheidung), keine Rezept-/Zahlenfrage mehr.
+      //
+      // KALIBRIERRUNDE 3 (27.10., Task #197, docs/design/organisch-tdm-battlefield-ispy-27-10.md
+      // Abschnitt 2): 32 STATT 8 TICKS + TRESOR 45 STATT 60 (ISPY_PUNKTWERT unten).
+      //
+      // WARUM MEHR TICKS DIESMAL HELFEN: die "8->16 Ticks bringt nur +0,011"-Zahl aus
+      // Abschnitt 7 von stand-aller-disziplinen.md stammt von einem aelteren Motorstand und gilt
+      // nicht mehr. Wichtig fuer jede kuenftige Tick-Messung: `rundenDauer` MUSS mitskaliert
+      // werden — MOTOREN[bd].lauf() bricht nach 120 s Buehnenzeit ab, und wert() liest nur
+      // ENTHUELLTE Runden. Wer nur rundenN hochsetzt, misst stillschweigend abgeschnittene Spiele
+      // (genau das liess 20/24/32 Ticks in der ersten Messreihe dieser Runde flach aussehen).
+      //
+      // WARUM TRESOR 45: die tatsaechlich verdiente Punktmasse je Raetselart lag bei Logik 42,0 /
+      // Verhoer 38,6 / Mechanik 19,4 % statt der Matrix-Zielanteile 37,6/36,5/25,9
+      // (ISPY_ZIEL_ANTEIL) — nur Logik/Verhoer haben Tresore, die 60er zogen die Masse dorthin.
+      // Gemessen bestaetigt: der Saison-Rangfehler eines Spielers korreliert positiv mit LOGIK
+      // (partiell r=+0,41) und negativ mit FINGERFERTIGKEIT/MENSCHENKENNTNIS. Mit 45 liegen die
+      // Anteile bei 39,8/35,4/24,7 %, und der Jackpot-Anteil am Einzelspielrauschen sinkt.
+      //
+      // ERGEBNIS (kaderfest, n=48 je Paarung, Standard-Saatstrom / zweiter Strom saat0=5 000 000):
+      // rho je Spiel 0,749 -> 0,817 / 0,710 -> 0,811 (5 von 5 Paarungen besser, beide Stroeme),
+      // Saison 0,839 -> 0,888 / 0,895, Star Rang 1 47,1 -> 54,2 % / 52,1 %, erste zwei
+      // 77,1 -> 84,2 % / 81,7 %, Star letzter 0 %, Paartreue (>=15) 94,5 -> 96,8 % / 96,6 % —
+      // G1* auf beiden Stroemen erfuellt. Tick-Reihe (Tresor 45, beide Stroeme): 8 0,784/0,779 ·
+      // 16 ~0,79 · 24 0,807/0,802 · 32 0,817/0,811 · 40 0,828/0,813 · 48 0,830/0,802 — ab 32 flach.
+      // Geprueft und verworfen in derselben Runde (alle flach oder schlechter): steilere Knack-/
+      // Sichtkurve, breites Matrix-Sichttor (bestaetigt Kennerblick-Befund: breiterer Zugang
+      // kostet Validitaet), Teilpunkte 0,4/0,7, NERVEN-Anteil 0,1, Nachfuellfolgen mit
+      // Mechanik-Tresor (Validitaet hoch, Verlaesslichkeit runter), Art-Punktfaktoren.
+      // rundenDauer folgt der 60-s-Konvention aller Buehnen (60/(rundenN*jeSeite*2)) — die
+      // Enthuellung laeuft dadurch viermal so schnell wie vorher (Anzeige-Frage, s. PR).
       rezept:{
         SPUERSINN:        {intelligence:60,torment:30,awareness:10},
         LOGIK:            {intelligence:22,will:48,determination:30},
@@ -24711,7 +24741,12 @@
   // niedrig aussieht -- das IST die Obergrenze, die die Rangtreue bei diesem Ausloeser vertraegt.
   const ISPY_HINWEIS_BONUS=0.15;
 
-  const ISPY_PUNKTWERT={1:10,2:25,3:60};
+  // TRESOR 45 STATT 60 (Kalibrierrunde 3, 27.10., Task #197 — Herleitung und Messung am
+  // Kommentar "KALIBRIERRUNDE 3" bei BUEHNE_ART["i-spy"]): bringt die tatsaechlich verdiente
+  // Punktmasse je Raetselart naeher an ISPY_ZIEL_ANTEIL (Mechanik hat keinen Tresor und lag
+  // bei 19,4 statt 25,9 %). Wirkt auch auf ispyAktiveFundorte() (Blockwahl bei kleinen Kadern
+  // misst die Punktmasse mit diesen Werten) — dort gemessen ebenfalls besser, s. ebenda.
+  const ISPY_PUNKTWERT={1:10,2:25,3:45};
   const ISPY_RAETSEL_SUBSKILL={logik:"LOGIK",verhoer:"MENSCHENKENNTNIS",mechanik:"FINGERFERTIGKEIT"};
   // KURZ-BESCHRIFTUNG DESSELBEN SUB-SKILLS (28c/d, Task #129 Punkt 28, Chris 13.10.: "man
   // müsste erkennen welcher Main Skill benötigt wird") — reine Anzeige-Ableitung aus

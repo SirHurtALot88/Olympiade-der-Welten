@@ -118,11 +118,11 @@
   },
   "i-spy": {
    "chassis": "buehne",
-   "spielMedian": 0.75,
-   "spielSpannweite": 0.177,
-   "saisonMedian": 0.881,
-   "saisonSpannweite": 0.21,
-   "schranke": 0.053
+   "spielMedian": 0.816,
+   "spielSpannweite": 0.15,
+   "saisonMedian": 0.895,
+   "saisonSpannweite": 0.294,
+   "schranke": 0.05
   },
   "tennis": {
    "chassis": "buehne",
