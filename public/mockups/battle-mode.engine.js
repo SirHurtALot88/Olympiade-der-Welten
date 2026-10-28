@@ -5561,24 +5561,44 @@
     }
     if(b.vollbild){
       const spec=VOLLBILD[b.vollbild];
-      const im=bHolEingefaerbt(spec.key,b.vollbildFarbe,b.vollbildFarbeModus,spec.ch);
       const r0=blickAus(u);
-      if(im&&im.width){
-        const row=vollbildRow(spec,r0);
-        const vn=spec.cols;
+      // MEHRFACH-BLAETTER (28.10., PixelLab-Sprite-Integration M-M-Team): spec.tod/
+      // spec.angriff sind NEU und OPTIONAL — ein eigenes Blatt je Kampfzustand statt des
+      // einen Gehzyklus-Blatts fuer alles ("Tod" war bisher nur das letzte Gehbild
+      // eingefroren, "Angriff" gab es als Bild gar nicht, s. Kommentar bei VOLLBILD oben).
+      // Fehlen sie (alle ~65 bisherigen Kreaturen), bleibt dieser Zweig bit-identisch zum
+      // alten Code: EIN Blatt, Tod = letztes Gehbild eingefroren, Angriff = Interpolation
+      // ueber denselben Gehzyklus.
+      let bs=spec, vn=spec.cols, vf;
+      if(spec.tod&&u.down){
+        bs=spec.tod; vn=bs.cols; vf=vn-1;
+      }else if(spec.angriff&&u.lunge>0&&!u.down){
+        bs=spec.angriff; vn=bs.cols;
+        vf=Math.max(0, Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn)));
+      }else{
         // Math.max(0,...) wie beim Standardkoerper-Bildindex `f` oben (13.09., ausfuehrliche
         // Begruendung und Messwerte dort): fuer u.lunge>0,2 — was Buehne und Feldspiel
         // setzen — wurde der Index negativ und drawImage zeichnete gar nichts. Vollbild-
         // Kreaturen verschwanden dadurch komplett, sichtbar im Gewichtheben-Duell
         // Lava Golem gegen Krag'Zul.
-        const vf=(u.lunge>0&&!u.down)
+        vf=(u.lunge>0&&!u.down)
           ? Math.max(0, Math.min(vn-1, Math.floor((1-u.lunge/0.2)*vn)))
           : (u.down?vn-1:Math.floor((t*7+u.id)%vn));
+      }
+      // Angriffs-/Todesblatt erbt Zellgroesse/Zeilenordnung vom Gehzyklus, wenn es sie
+      // selbst nicht angibt (der Normalfall bei einem selbst gebauten, geometrisch
+      // gleichen Blattsatz, z.B. allen PixelLab-Exporten — dieselbe Zellgroesse fuer
+      // Walk/Angriff/Tod, nur andere Spaltenzahl/Inhalt).
+      const bg=(k)=>bs[k]!==undefined?bs[k]:spec[k];
+      const cw=bg('cw'), ch=bg('ch');
+      const im=bHolEingefaerbt(bs.key,b.vollbildFarbe,b.vollbildFarbeModus,ch);
+      if(im&&im.width){
+        const row=vollbildRow({rowMap:bg('rowMap'),stendhal:bg('stendhal'),rows:bg('rows')},r0);
         // dh/dw UND der Boden-Anker (y-46) skalieren mit Z (s. groesseFaktor oben) — sonst
         // waechst nur die Breite/Hoehe des Bilds, aber die Fuesse rutschen relativ zum
         // Schatten weg (schwebt bei Z<1, versinkt bei Z>1).
-        const dh=64*Z, dw=spec.cw*(dh/spec.ch);
-        try{ctx.drawImage(im,vf*spec.cw,row*spec.ch,spec.cw,spec.ch,x-dw/2,y-46*Z,dw,dh);}catch(e){}
+        const dh=64*Z, dw=cw*(dh/ch);
+        try{ctx.drawImage(im,vf*cw,row*ch,cw,ch,x-dw/2,y-46*Z,dw,dh);}catch(e){}
       }
       // HOCKEYSCHLAEGER (02.09., Folgeauftrag "auch die Golems brauchen einen"): dieselbe
       // Umrechnung Zell-Koordinate->Bildschirm wie beim normalen Zeichenpfad weiter unten
