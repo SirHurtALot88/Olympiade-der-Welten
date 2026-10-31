@@ -32,15 +32,15 @@ describe("Sponsor-Achsen: erreichbare Zielmarken", () => {
     }
   });
 
-  it("bindet die Marke an den eigenen Kader statt an eine feste Zahl", () => {
-    const teamId = gameState.teams[0]!.teamId;
-    const kader = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
-    const terms = buildSponsorV4AxisTerms(gameState, teamId, "entwicklung");
-    // Ohne Kaderzeilen (der Liga-Draft laeuft spaeter) faellt die Marke auf das Kader-Minimum —
-    // nie auf eine Zahl oberhalb des Maximums.
-    expect(terms.scale).toBeLessThanOrEqual(DEFAULT_ROSTER_MAX);
-    if (kader > 0) {
-      expect(terms.scale).toBe(Math.min(DEFAULT_ROSTER_MAX, Math.max(8, kader)));
+  it("haelt die Marke fest bei 8, unabhaengig von der Kadergroesse", () => {
+    // Stand bis 2026-08-xx: `scaleFor: min(14, max(8, Kadergroesse))` — skalierte die Marke MIT dem
+    // Kader und bestrafte damit genau die Teams, die am meisten Spieler haben (s. Kommentar bei
+    // `entwicklung` in sponsor-v4-axes.ts). Seitdem ist die Marke bewusst eine feste 8, fuer jeden
+    // Kader gleich — dieser Test prueft genau das, nicht mehr die alte kadergroessen-Kopplung.
+    for (const team of gameState.teams) {
+      const terms = buildSponsorV4AxisTerms(gameState, team.teamId, "entwicklung");
+      expect(terms.scale).toBe(8);
+      expect(terms.scale).toBeLessThanOrEqual(DEFAULT_ROSTER_MAX);
     }
   });
 });
