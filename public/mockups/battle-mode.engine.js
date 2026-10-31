@@ -24870,7 +24870,7 @@
           ereignis:(uebung==="reissen"?"Reißen":"Stoßen")+", "+(v+1)+". Versuch, "+kg+" kg — "
                    +(gueltig?"gültig":"ungültig")+(kuehn?" (kühner Versuch)":"")});
       }
-    }
+   };
   }
 
   // ================== SCHATZSUCHE: DER I-SPY-TICK-RECHNER (PR 1 + PR 2) ==================
