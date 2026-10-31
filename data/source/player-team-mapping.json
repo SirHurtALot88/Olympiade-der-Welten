@@ -1305,6 +1305,1461 @@
       "playerName": "Smokie",
       "teamId": "P-S",
       "sourceNote": "manual-authoritative-2026-06"
+    },
+    {
+      "playerName": "Draco",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lava Golem",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Gram",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rhyx'Tal",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Xelara",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Jorund",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lulu",
+      "teamId": "V-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Krag'Zul",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Greenkraut",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tidesprinter",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Ralazar the Balanced",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Seraph-11",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cassandra",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Aeon Flux",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Mindtamer",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Byrnja",
+      "teamId": "A-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Valara",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Arabelle Stormtide",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Petra Brezelstein",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Terradon",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Elyon",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Gary the Keeper",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grizz",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Skull Knight",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Erna Wellenlaut",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Jara",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nimri",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sweet Dreams",
+      "teamId": "G-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grok'Na",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lizard",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Watcher",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Burster",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vaelynn",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Shroud",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Glorpix",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Haldor",
+      "teamId": "Z-H",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Brontar",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grieving Colossus",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tavascron",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Crucible Warden",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bearington",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Snow Eagle",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Wheatley",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Brobot",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hollow",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Italo-Delta",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "PixiKat",
+      "teamId": "S-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Treantos",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hippo",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Moonveil",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Velkin",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Diana",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Fyrn",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Isuzu",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Pinkypie",
+      "teamId": "R-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Midas",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Catherine",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Reefstrike",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sir Percival",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Knochenrichter",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Zeynorr Driftblade",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bladewalker",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Caldor",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lucky",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Suzuna",
+      "teamId": "C-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hargorin Todbringer",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Genta",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Die Liebenden",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Angrod",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Drop Dead",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Timantha",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Glockenfresser",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Serena",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Elum Kaa",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lumen Serene",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Etwas M",
+      "teamId": "D-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Floodspirit",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Pestilence",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cerenna Garstochter",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lady Yueqin",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Jihanna",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Katniss",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Eldara",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nahli-Ke",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Yurei",
+      "teamId": "D-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Ironhoof",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Roddox Harthelm",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Enforcer",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Omniclops",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Babuschinka",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Xerathis",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tropfina",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Melody",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rok Kyl",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Alarm",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Aurora",
+      "teamId": "C-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Dyrth",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Threnox",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Voidseer",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Crumbsage",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Prinz Faelyn",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Shadowsage",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Mindflayer",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Marzipella",
+      "teamId": "W-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Umbrafond",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Radditz",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cyrn",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nytharos",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Salvador Mare",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Umbramantis",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cogfina Skyforge",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Don Micelio Valens",
+      "teamId": "R-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tartarus",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bombblitzer",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Umbra",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tremble",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lucien Valecroft",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Verla Compliance",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nefar Safety",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Steel Sinister",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sister Ilora",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Knisterl",
+      "teamId": "L-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Floralis",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nebrauk",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Liluth",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Corsair",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Ashanti",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nyrell Winterfang",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grumpp",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Ciacia",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sloth",
+      "teamId": "V-D",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hulk",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Medibull",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kora",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Gronkslime",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Stormfang",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Moonscourge",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Whaam",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Knoedelsohn",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Mictone",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Abu-T",
+      "teamId": "T-G",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Malagor",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Voryne Darkclaw",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nocture",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Small Red Machine",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Ash",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hellvoice",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lilithara",
+      "teamId": "H-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Waechterbot",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Shield",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Teravolt",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Pandemonium",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Elea Cinnamora",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Riley Le Rogue",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lynara",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Shadowforge",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kento",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Puschelix",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Deadface",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Eike",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Delamare",
+      "teamId": "T-T",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Quarris",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Johnny Smoke",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cadrael",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Dr Ironmind",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bronzebrow",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sanctrix",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hegrun",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Becky",
+      "teamId": "T-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Buttercup",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grimflora",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Faith",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Marin Solis",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Falcon",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Frayja Accounting",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Madora",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tidesinger",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Xylaris",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Webweaver",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Whispra",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Zhyrra",
+      "teamId": "N-W",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Abysskraken",
+      "teamId": "B-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Starbound",
+      "teamId": "B-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Aegirion",
+      "teamId": "B-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Brightpaw",
+      "teamId": "B-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kreischende Kogge",
+      "teamId": "B-P",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Matcha",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Issyria",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Abyssalfin",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vexon",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Velza",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Iska",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hartmut",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sylvara",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Barkwing",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Xil'Vera",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Orichalcos",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hisihida",
+      "teamId": "M-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Varric Frankenstein",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Darkblade",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Orun Hale",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Talahon",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Skittermind",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Clara",
+      "teamId": "P-S",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Jolia Noireclair",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Zephyra",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Veza-Null",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lilly",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Grossmutter Igid",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bana",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Breeze",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vigil",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Furomar",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kloeschen",
+      "teamId": "N-N",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Mavra",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Leviathan",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Murky",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tsubaki Cleaning",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Butterfly",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Myrkos",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Arachna",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Byrd",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Othrama",
+      "teamId": "B-B",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rubio Stone",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sunken Crown",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Iron Warlord",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Sterling",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vargan",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Avatar of Slaughter",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Bloater",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vexel",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Houndmaster Riaje",
+      "teamId": "W-L",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Wahiru",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Holzfaust",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Brunhilde",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Harold",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Skenhylde",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rhazgul Icebound",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Frostseer",
+      "teamId": "V-V",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Steel Sentinel",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kelektros",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Warrior",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Minion Master",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Tollim KS",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rustfire Golem",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Chain",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Shadowwing",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Devastator",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Elyssa Nightclaw",
+      "teamId": "M-M",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Broxingar",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Maru",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Swiftfoot",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Yukine",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Wavepiercer",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Yuko",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Belandria",
+      "teamId": "P-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Terratron",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rootheart",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Rex",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Impulse",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Cyra",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Phantomblade",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Hyperion",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nhyra-Vel",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Yinen",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Emphi",
+      "teamId": "U-A",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Galactus",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Varkon Darkheed",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Asher Caligo",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Horst Schlurff",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Scavenger",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lys Puppenkopf",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Biteback",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Myrth",
+      "teamId": "S-C",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Blorgh",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nezhet",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Eternia",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lady Mournvale",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Krosis",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Gralakar",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Lord Amaranth",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nekira",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nelchael",
+      "teamId": "L-K",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Chyros",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Kyori",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Wu Tang",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Mora Schleck",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Vero",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Therella",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nemenlirea",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
+    },
+    {
+      "playerName": "Nemo",
+      "teamId": "R-R",
+      "sourceNote": "kaderfamilie-arena-erweitert-2026-10-31"
     }
   ]
 }
