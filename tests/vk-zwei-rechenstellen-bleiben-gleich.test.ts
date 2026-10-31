@@ -28,6 +28,10 @@ import { buildExpectedSellValueByPlayerId } from "@/lib/market/transfermarkt-exp
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 
 describe("VK: Vertragstabelle gegen Verkaufswert-Karte", () => {
+  // Laeuft ueber alle 32 Teams x alle Kaderzeilen der Fixture — seit die Arena-Charaktere ihren
+  // Teams zugeordnet sind (statt groesstenteils unzugeordnet im Transfermarkt zu liegen), ist das
+  // spuerbar mehr Arbeit als die vorige, fast leere Fixture. Lokal ~7s Testlaufzeit, auf dem
+  // langsameren CI-Runner reichte der Vitest-Standard von 20s nicht mehr.
   it("liefert fuer jeden Kaderspieler denselben Betrag — ueber alle Teams", () => {
     const gameState = createSingleplayerGameState();
     const ausKarte = buildExpectedSellValueByPlayerId(gameState, { saveId: "test-save" });
@@ -55,7 +59,7 @@ describe("VK: Vertragstabelle gegen Verkaufswert-Karte", () => {
 
     // Ohne diese Zeile koennte der Test gruen sein, weil er nichts verglichen hat.
     expect(verglichen, "kein einziger Spieler verglichen").toBeGreaterThan(100);
-  });
+  }, 60_000);
 
   it("vergleicht gegen den BRUTTO-Preis, nicht gegen den Netto-Erloes", () => {
     // Die Unterscheidung ist der eigentliche Fehler gewesen, den Chris gesehen hat: die

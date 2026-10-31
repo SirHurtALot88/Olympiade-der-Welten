@@ -81059,6 +81059,56 @@ span.nl-facility-ampel-chip {
   font-size: 0.72rem;
 }
 
+.ranks-league-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ranks-league-filter-toggle {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ranks-league-filter-toggle.is-active {
+  background: color-mix(in srgb, var(--nl-ink, #f2ede2) 16%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+.ranks-league-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin-right: 6px;
+}
+
+.ranks-league-badge.is-liga1 {
+  background: color-mix(in srgb, var(--nl-pow, #ff6b6b) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+.ranks-league-badge.is-liga2 {
+  background: color-mix(in srgb, var(--nl-men, #5b9bff) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
 /* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */
 .ranks-table thead .ranks-group-row .ranks-group-cell {
   position: sticky;

@@ -1077,7 +1077,7 @@ export function useFoundationShellRouterBodyScope({
     setAiPreseasonBusy, aiPreseasonFeed, setAiPreseasonFeed, aiLineupEnsureBusy, setAiLineupEnsureBusy, aiLineupEnsureFeed, setAiLineupEnsureFeed, cockpitAiBatchApplyFeed, setCockpitAiBatchApplyFeed, cockpitAiIncludeWarningTeams, setCockpitAiIncludeWarningTeams, cockpitAiOverwriteExisting, setCockpitAiOverwriteExisting, cockpitBusyKey, setCockpitBusyKey, aiPickAuditBusy, setAiPickAuditBusy, aiPickAuditFeed,
     setAiPickAuditFeed, seasonStartResetBusy, setSeasonStartResetBusy, seasonStartResetFeed, setSeasonStartResetFeed, teamProfileTeamId, setTeamProfileTeamId, historyFeed, setHistoryFeed, transferRecapFeed,
     setTransferRecapFeed, resolvePreviewFeed, setResolvePreviewFeed, matchdayMvpScoringFeed, setMatchdayMvpScoringFeed, matchdayMvpForceReplaceExisting, setMatchdayMvpForceReplaceExisting, resultApplyFeed, setResultApplyFeed, standingsPreviewFeed,
-    setStandingsPreviewFeed, standingsApplyFeed, setStandingsApplyFeed, disciplineCategoryFilter, setDisciplineCategoryFilter, seasonManagementFeed, setSeasonManagementFeed, facilityUpgradeBusy, setFacilityUpgradeBusy, facilityUpgradePreview,
+    setStandingsPreviewFeed, standingsApplyFeed, setStandingsApplyFeed, disciplineCategoryFilter, setDisciplineCategoryFilter, rankLeagueFilter, setRankLeagueFilter, seasonManagementFeed, setSeasonManagementFeed, facilityUpgradeBusy, setFacilityUpgradeBusy, facilityUpgradePreview,
     setFacilityUpgradePreview, facilityUpgradeError, setFacilityUpgradeError, facilityUpgradeSuccess, setFacilityUpgradeSuccess, facilityMaintenanceBusy, setFacilityMaintenanceBusy, facilityMaintenancePreview, setFacilityMaintenancePreview, facilityMaintenanceError,
     setFacilityMaintenanceError, facilityMaintenanceSuccess, setFacilityMaintenanceSuccess, specialistWingVariantDraft, setSpecialistWingVariantDraft, preSeasonWorkflowBusy, setPreSeasonWorkflowBusy, preSeasonWorkflowFeed, setPreSeasonWorkflowFeed, preSeasonWorkflowError,
     setPreSeasonWorkflowError, seasonTransitionBusy, setSeasonTransitionBusy, seasonTransitionFeed, setSeasonTransitionFeed, seasonCompletionFeed, setSeasonCompletionFeed, seasonTransitionError, setSeasonTransitionError, seasonStandingsFeed,
@@ -8882,6 +8882,7 @@ export function useFoundationShellRouterBodyScope({
     visibleDisciplineConfigRows,
     isViewingArchivedRanksSeason,
     ranksArchiveMissing,
+    isLeagueSplitActiveForRanks,
   } = useFoundationCrossTabDisciplineRanks({
     activeView: activeView as FoundationViewId,
     shouldBuildTeamsHeavyComparison,
@@ -8895,6 +8896,7 @@ export function useFoundationShellRouterBodyScope({
     seasonHistorySnapshots,
     tableSorts,
     activeTeamId: selectedTeamId,
+    rankLeagueFilter,
   });
   const rankLeaderCards = disciplineLeaderEntries;
 
@@ -13104,6 +13106,9 @@ export function useFoundationShellRouterBodyScope({
     preSeasonWorkflowFeed,
     prizeFinanceTab,
     rankLeaderCards,
+    rankLeagueFilter,
+    setRankLeagueFilter,
+    isLeagueSplitActiveForRanks,
     ranksArchiveMissing,
     isViewingArchivedRanksSeason,
     readMeta,

@@ -894,14 +894,19 @@ describe("foundation performance architecture helpers", () => {
     // DIESELBE ANMERKUNG WIE BEIM LETZTEN MAL: der ganze `newGame*`-Block gehoert naeher an den
     // Assistenten, der ihn verbraucht. Das ist ein eigener Umbau; die Ratsche haelt nur fest,
     // dass er weiter aussteht.
-    // 240 -> 241, wieder bewusst statt heimlich: der Liga-1/2-Picker im Anlege-Assistenten (31.10.,
-    // Chris: "alle teams in der 2. liga muss man bei erstellung auch wählen können") ergaenzt GENAU
-    // EINEN Zustand — `newGameLeagueOverride`, die vom Nutzer verschobene Liga-Zuordnung (`null` =
-    // automatische Budget-Zuteilung, unveraendertes Verhalten). Er sitzt bewusst im selben
-    // `newGame*`-Bausatz wie `newGameChrisTeamIds`/`newGameFrankyTeamIds` direkt daneben, aus dem
-    // `runNewGameSetup()` den `/api/new-game`-Payload baut — dieselbe Begruendung wie beim letzten
-    // Zugang hier.
+    // 240 -> 241, wieder bewusst statt heimlich: die Ranks-Seite (Chris, Screenshot „Ranks –
+    // Teamstärke pro Diszi": „bei den ranks muss man liga 1/2 filtern können und in der
+    // komplettansicht müssen die ranks dann auch von 1-32 gehen") ergaenzt GENAU EINEN Zustand —
+    // `rankLeagueFilter`, den Liga-1/2/Beide-Filter der Ranks-Tabelle. Gleiches Muster wie der
+    // bestehende `disciplineCategoryFilter` direkt daneben.
+    // 241 -> 242, zwei unabhaengige PRs trafen denselben Stand: der Liga-1/2-Picker im
+    // Anlege-Assistenten (31.10., Chris: "alle teams in der 2. liga muss man bei erstellung
+    // auch wählen können") ergaenzt GENAU EINEN weiteren Zustand — `newGameLeagueOverride`,
+    // die vom Nutzer verschobene Liga-Zuordnung (`null` = automatische Budget-Zuteilung,
+    // unveraendertes Verhalten). Er sitzt bewusst im selben `newGame*`-Bausatz wie
+    // `newGameChrisTeamIds`/`newGameFrankyTeamIds` direkt daneben, aus dem `runNewGameSetup()`
+    // den `/api/new-game`-Payload baut — dieselbe Begruendung wie beim vorigen Zugang hier.
     const useStateCallCount = (pageStateText.match(/=\s*useState[<(]/g) ?? []).length;
-    expect(useStateCallCount).toBeLessThanOrEqual(241);
+    expect(useStateCallCount).toBeLessThanOrEqual(242);
   });
 });
