@@ -1,0 +1,41 @@
+{
+  "note": "Wir brauchen noch eine erklärung wie Most Improved Player sich zusammmen setzt! \n\nDann brauchen wir noch verschiedene awards im Spielerprofil \n\nUnd zwar für die einzelnen Bereiche wie POW SPE MEN SOC -> das sind quasi die All Stars\n\nOVR = MVP \n\nTraining und Most Improved Award \nDafür hätte ich gerne im Spielerprofil die ICons dass man auch sptäer direkt sieht ah der spieler gehörte da zu den Top 5 und wenn man drüber hovert sieht man in welcher Saison und welchen Rang der Spieler hatte",
+  "view": "leagueLeaders",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=leagueLeaders&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T07:09:32.442Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T07-09-24-895Z-pxoa72",
+  "createdAt": "2026-08-14T07:09:24.895Z",
+  "page": {
+    "path": "/foundation",
+    "view": "leagueLeaders",
+    "tab": null,
+    "label": "Welt · Leaders"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
