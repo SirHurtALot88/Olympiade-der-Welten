@@ -148,6 +148,60 @@ export function buildStandingsModeItems(spieltageVerfuegbar: boolean): Array<{ i
 }
 
 /**
+ * Chris, wörtlich (Spieltage-Screenshot): „hier kannst du links liga 1 und rechts liga 2
+ * matchups machen" — teilt Paarungen UND Mini-DM-Pods EINES Spieltags nach Liga auf, dieselbe
+ * Drei-Spalten-Form wie `renderDatenTable()` (Liga 1 / Liga 2 / „Ohne Liga-Zuordnung"), nur hier
+ * für Paarungen/Pods statt Tabellenzeilen. Ein Eintrag ohne Liga-Zuordnung darf nicht lautlos
+ * verschwinden — eigene dritte Spalte statt stillschweigend ausgefiltert, nach demselben Prinzip
+ * wie die `unassignedRows`-Spalte der Daten-Tabelle.
+ *
+ * EXPORTIERT für einen direkten Unit-Test: die Komponente startet in dieser Test-Suite immer im
+ * SSR-Default-Modus "Daten" (kein jsdom/`act` hier, s. `tests/season-spieltage-performance-
+ * contract.test.ts`) — ein `renderToString`-Smoke kann den "Spieltage"-Modus selbst also nicht
+ * erreichen, die reine Aufteilungsfunktion schon.
+ */
+export function splitSpieltagItemsByLeague<T extends { leagueTier: LeagueTier | null }>(
+  items: T[],
+): { liga1: T[]; liga2: T[]; unassigned: T[] } {
+  const liga1: T[] = [];
+  const liga2: T[] = [];
+  const unassigned: T[] = [];
+  for (const item of items) {
+    if (item.leagueTier === "liga1") {
+      liga1.push(item);
+    } else if (item.leagueTier === "liga2") {
+      liga2.push(item);
+    } else {
+      unassigned.push(item);
+    }
+  }
+  return { liga1, liga2, unassigned };
+}
+
+/**
+ * Chris, wörtlich (Spieltage-Screenshot): „Bitte hier das eigene team hervorheben und das von
+ * franky bzw alle menschlich gesteuerten" — zwei eigene Fälle, nicht eine gemeinsame
+ * Hervorhebung. `row.isSelected` markiert das eigene (Scope-)Team (dieselbe Zusage wie in der
+ * Daten-Tabelle), `row.isFrankyTeam` Frankys Team (s. `SeasonV2StandingsRow` in
+ * `SeasonStandingsV2Client.tsx`). Präzedenz "self" > "franky", falls je beide zutreffen sollten
+ * (kommt praktisch nie vor — Chris steuert nicht zugleich Frankys Team).
+ */
+export function resolveSpieltagTeamHighlight(
+  row: { isSelected?: boolean | null; isFrankyTeam?: boolean | null } | null | undefined,
+): "self" | "franky" | null {
+  if (!row) {
+    return null;
+  }
+  if (row.isSelected) {
+    return "self";
+  }
+  if (row.isFrankyTeam) {
+    return "franky";
+  }
+  return null;
+}
+
+/**
  * Merkzettel für die zuletzt genutzte Saisonstand-Ansicht. Der Schlüssel hängt
  * am eigenen Team, damit bei mehreren menschlichen Managern auf demselben
  * Rechner (Solo-4 / Online) nicht einer die Präferenz des anderen überschreibt.
@@ -786,16 +840,6 @@ export default function SeasonStandingsNewLook({
   const effectiveMode: NlStandingsMode = mode === "spieltage" && !spieltageVerfuegbar ? NL_STANDINGS_DEFAULT_MODE : mode;
 
   const [spieltagMatchdayId, setSpieltagMatchdayId] = useState<string | null>(null);
-  /**
-   * Auftrag Chris (19.10.) Punkt 2: Default = NUR Liga 1, nicht "Beide Ligen" — lazy-init direkt
-   * aus der rohen `standingsRows`-Prop (vor `hasLeagueSplit`/`boardRows`, die erst weiter unten
-   * entstehen), damit der erste Render schon richtig startet statt erst nach einem Re-Render
-   * umzuspringen. Ein Legacy-32er-Save (`leagueTier` überall `null`) bleibt bei "alle" — "liga1"
-   * würde dort jede Paarung herausfiltern, weil keine einzige `leagueTier: "liga1"` trägt.
-   */
-  const [spieltagLeagueFilter, setSpieltagLeagueFilter] = useState<LeagueTier | "alle">(() =>
-    standingsRows.some((row) => row.leagueTier != null) ? "liga1" : "alle",
-  );
 
   // Default = letzter gespielter/aktueller Spieltag (vom Host vorgerechnet). Zieht nach, wenn
   // der Save wechselt oder noch keine Auswahl getroffen wurde — überschreibt aber NICHT, sobald
@@ -832,15 +876,6 @@ export default function SeasonStandingsNewLook({
    */
   const hasLeagueSplit = useMemo(() => boardRows.some((row) => row.leagueTier != null), [boardRows]);
 
-  // Rettungsanker fuer den Lazy-Init oben: wechselt der Save (z. B. auf ein Legacy-32er-Save ohne
-  // Liga-Split), waehrend "liga1" noch aktiv ist, faellt der Filter zurueck auf "alle" — sonst
-  // bliebe die Spieltage-Liste nach so einem Wechsel leer (keine Paarung traegt "liga1").
-  useEffect(() => {
-    if (!hasLeagueSplit && spieltagLeagueFilter !== "alle") {
-      setSpieltagLeagueFilter("alle");
-    }
-  }, [hasLeagueSplit, spieltagLeagueFilter]);
-
   /**
    * Task #159 ("Tabelle wie in der Bundesliga MIT Punkteverhältnis", Chris): `true`, sobald
    * IRGENDEINE Zeile ein `verhaeltnis` trägt. Das Feld ist nur in Battle-Saves gesetzt
@@ -865,13 +900,21 @@ export default function SeasonStandingsNewLook({
     return spieltage.getUebersicht(spieltagMatchdayId);
   }, [spieltage, spieltagMatchdayId]);
 
-  const spieltagPaarungen = useMemo(() => {
-    const alle = activeSpieltagUebersicht?.paarungen ?? [];
-    if (spieltagLeagueFilter === "alle") {
-      return alle;
-    }
-    return alle.filter((paarung) => paarung.leagueTier === spieltagLeagueFilter);
-  }, [activeSpieltagUebersicht, spieltagLeagueFilter]);
+  /**
+   * Chris, Spieltage-Screenshot, wörtlich: „hier kannst du links liga 1 und rechts liga 2
+   * matchups machen" — bei aktivem Liga-Split stehen ab jetzt BEIDE Ligen gleichzeitig (eigene
+   * Spalte je Liga in `renderSpieltageMode`), kein Umschalter mehr zwischen ihnen. Ohne Split
+   * (Legacy-32er) landet alles in `unassigned` und die Ansicht bleibt eine einzige Liste wie
+   * vorher.
+   */
+  const spieltagPaarungenByLeague = useMemo(
+    () => splitSpieltagItemsByLeague(activeSpieltagUebersicht?.paarungen ?? []),
+    [activeSpieltagUebersicht],
+  );
+  const spieltagPodsByLeague = useMemo(
+    () => splitSpieltagItemsByLeague(activeSpieltagUebersicht?.miniDmPods ?? []),
+    [activeSpieltagUebersicht],
+  );
 
   /**
    * Durchklick-Test (G2): Gibt es in dieser Saison schon IRGENDEINE Wertung?
@@ -2052,8 +2095,13 @@ export default function SeasonStandingsNewLook({
                 event.stopPropagation();
                 onOpenTeam(row.teamId);
               }}
-              title={`${row.teamName} öffnen`}
             >
+              {/* Chris' Screenshot (Bug-Report): das native `title`-Tooltip saß hier bisher
+                  zusaetzlich zum `StandingsKaderHover`-Panel auf demselben Hover-Ziel und
+                  beide feuerten gleichzeitig — das sah wie ein kaputtes, überlappendes
+                  Tooltip aus. `StandingsKaderHover` trägt per `ariaLabel`
+                  (`Kurzübersicht ${row.teamName}`) bereits ein `aria-label` auf dem
+                  Dialog-Panel, also war hier nichts an Barrierefreiheit zu ersetzen. */}
               <span className="nl-standings-teamname">
                 {row.teamName}
                 {isRivalTeam(row.teamId) ? <RivalTag /> : null}
@@ -2855,43 +2903,75 @@ export default function SeasonStandingsNewLook({
               Aktueller Spieltag
             </button>
           ) : null}
-          {hasLeagueSplit ? (
-            <NlSubTabs
-              items={[
-                { id: "alle", label: "Beide Ligen" },
-                { id: "liga1", label: "Liga 1" },
-                { id: "liga2", label: "Liga 2" },
-              ]}
-              activeId={spieltagLeagueFilter}
-              onSelect={(id) => setSpieltagLeagueFilter(id as LeagueTier | "alle")}
-              aria-label="Liga wählen"
-              className="nl-standings-spieltage-ligatabs"
-            />
-          ) : null}
         </div>
 
         {renderSpieltageHeadline(activeOption)}
 
-        {activeSpieltagUebersicht && activeSpieltagUebersicht.miniDmPods.length > 0 ? (
+        {/* Chris, wörtlich (Spieltage-Screenshot): „hier kannst du links liga 1 und rechts liga
+            2 matchups machen" — bei aktivem Split stehen beide Ligen jetzt GLEICHZEITIG
+            nebeneinander (vorher: ein Umschalter "Beide Ligen"/"Liga 1"/"Liga 2", der immer nur
+            EINE Liste zeigte). Ohne Split (Legacy-32er) bleibt es bei der einen Liste wie vorher —
+            `splitSpieltagItemsByLeague` legt dort alles in `unassigned` ab. */}
+        {hasLeagueSplit ? (
+          <div className="nl-standings-spieltage-liga-split" data-testid="nl-standings-spieltage-liga-split">
+            <NlCard
+              className="nl-standings-spieltage-liga-card"
+              eyebrow="Spieltage"
+              title="Liga 1"
+              data-testid="nl-standings-spieltage-liga1-card"
+            >
+              {renderSpieltageColumn(spieltagPodsByLeague.liga1, spieltagPaarungenByLeague.liga1, teamLabel, isViewingCurrentMatchday)}
+            </NlCard>
+            <NlCard
+              className="nl-standings-spieltage-liga-card"
+              eyebrow="Spieltage"
+              title="Liga 2"
+              data-testid="nl-standings-spieltage-liga2-card"
+            >
+              {renderSpieltageColumn(spieltagPodsByLeague.liga2, spieltagPaarungenByLeague.liga2, teamLabel, isViewingCurrentMatchday)}
+            </NlCard>
+            {spieltagPodsByLeague.unassigned.length > 0 || spieltagPaarungenByLeague.unassigned.length > 0 ? (
+              <NlCard
+                className="nl-standings-spieltage-liga-card"
+                eyebrow="Spieltage"
+                title="Ohne Liga-Zuordnung"
+                data-testid="nl-standings-spieltage-liga-unassigned-card"
+              >
+                {renderSpieltageColumn(spieltagPodsByLeague.unassigned, spieltagPaarungenByLeague.unassigned, teamLabel, isViewingCurrentMatchday)}
+              </NlCard>
+            ) : null}
+          </div>
+        ) : (
+          renderSpieltageColumn(spieltagPodsByLeague.unassigned, spieltagPaarungenByLeague.unassigned, teamLabel, isViewingCurrentMatchday)
+        )}
+      </div>
+    );
+  }
+
+  /** Pods + Paarungsliste EINER Spalte (Liga 1 / Liga 2 / ohne Zuordnung / Legacy-Einzelliste). */
+  function renderSpieltageColumn(
+    pods: SpieltagsMiniDmPod[],
+    paarungen: SpieltagsPaarung[],
+    teamLabel: (teamId: string) => string,
+    isViewingCurrentMatchday: boolean,
+  ) {
+    return (
+      <>
+        {pods.length > 0 ? (
           <ol className="nl-standings-spieltage-pods" data-testid="nl-standings-spieltage-pods">
-            {activeSpieltagUebersicht.miniDmPods
-              .filter((pod) => !hasLeagueSplit || spieltagLeagueFilter === "alle" || pod.leagueTier === spieltagLeagueFilter)
-              .map((pod, index) => renderMiniDmPodGruppe(pod, index, teamLabel))}
+            {pods.map((pod, index) => renderMiniDmPodGruppe(pod, index, teamLabel))}
           </ol>
         ) : null}
-
-        {spieltagPaarungen.length === 0 ? (
+        {paarungen.length === 0 ? (
           <NlCard className="nl-standings-empty-card">
             <p className="nl-standings-empty-text">Für diesen Spieltag liegen keine Paarungen vor.</p>
           </NlCard>
         ) : (
           <ul className="nl-standings-spieltage-list" data-testid="nl-standings-spieltage-grid">
-            {spieltagPaarungen.map((paarung) =>
-              renderSpieltagPaarungRow(paarung, teamLabel, isViewingCurrentMatchday),
-            )}
+            {paarungen.map((paarung) => renderSpieltagPaarungRow(paarung, teamLabel, isViewingCurrentMatchday))}
           </ul>
         )}
-      </div>
+      </>
     );
   }
 
@@ -2899,6 +2979,30 @@ export default function SeasonStandingsNewLook({
   function spieltagLigaLabel(leagueTier: LeagueTier | null | undefined): string | null {
     if (leagueTier === "liga1") return "Liga 1";
     if (leagueTier === "liga2") return "Liga 2";
+    return null;
+  }
+
+  /**
+   * Chris, wörtlich (Spieltage-Screenshot): „Bitte hier das eigene team hervorheben und das von
+   * franky bzw alle menschlich gesteuerten" — der kleine Text-Chip neben dem Teamnamen, analog zu
+   * `RivalTag`/`.nl-standings-titlerace-tag`: Hervorhebung allein (Kante/Hintergrund) sagt nicht,
+   * WARUM die Zeile leuchtet, der Chip schon.
+   */
+  function renderSpieltagOwnerTag(highlight: ReturnType<typeof resolveSpieltagTeamHighlight>) {
+    if (highlight === "self") {
+      return (
+        <span className="nl-standings-spieltage-owner-tag is-own" title="Dein Team">
+          Du
+        </span>
+      );
+    }
+    if (highlight === "franky") {
+      return (
+        <span className="nl-standings-spieltage-owner-tag is-franky" title="Frankys Team">
+          Franky
+        </span>
+      );
+    }
     return null;
   }
 
@@ -3077,22 +3181,31 @@ export default function SeasonStandingsNewLook({
           <span className="nl-standings-spieltage-pod-disziplin">{pod.disciplineName} · Mini-DM-Pod (2-1-0-0)</span>
         </div>
         <ol className="nl-standings-spieltage-pod-mitglieder">
-          {pod.mitglieder.map((mitglied) => (
-            <li
-              key={mitglied.teamId}
-              className="nl-standings-spieltage-pod-mitglied"
-              style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(mitglied.teamId)?.teamCode) as CSSProperties}
-            >
-              <span className="nl-standings-spieltage-pod-platz">{mitglied.platz ?? "–"}</span>
-              <span className="nl-standings-spieltage-pod-team">{teamLabel(mitglied.teamId)}</span>
-              <span className="nl-standings-spieltage-pod-wert nl-tnum">
-                {mitglied.wert != null ? mitglied.wert : "–"}
-              </span>
-              <span className="nl-standings-spieltage-pod-punkte nl-tnum" title="Liga-Punkte (2-1-0-0 nach Platz)">
-                {mitglied.teamPoints != null ? `${mitglied.teamPoints} Pkt` : ""}
-              </span>
-            </li>
-          ))}
+          {pod.mitglieder.map((mitglied) => {
+            // Chris, Spieltage-Screenshot: „das eigene team hervorheben und das von franky bzw
+            // alle menschlich gesteuerten" — gilt auch für die Mini-DM-Pod-Mitglieder, nicht nur
+            // für die 2-Team-Paarungen weiter unten.
+            const highlight = resolveSpieltagTeamHighlight(standingsRowByTeamId.get(mitglied.teamId));
+            return (
+              <li
+                key={mitglied.teamId}
+                className={`nl-standings-spieltage-pod-mitglied${highlight ? ` is-${highlight === "self" ? "selected" : "franky-team"}` : ""}`}
+                style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(mitglied.teamId)?.teamCode) as CSSProperties}
+              >
+                <span className="nl-standings-spieltage-pod-platz">{mitglied.platz ?? "–"}</span>
+                <span className="nl-standings-spieltage-pod-team">
+                  {teamLabel(mitglied.teamId)}
+                  {renderSpieltagOwnerTag(highlight)}
+                </span>
+                <span className="nl-standings-spieltage-pod-wert nl-tnum">
+                  {mitglied.wert != null ? mitglied.wert : "–"}
+                </span>
+                <span className="nl-standings-spieltage-pod-punkte nl-tnum" title="Liga-Punkte (2-1-0-0 nach Platz)">
+                  {mitglied.teamPoints != null ? `${mitglied.teamPoints} Pkt` : ""}
+                </span>
+              </li>
+            );
+          })}
         </ol>
       </li>
     );
@@ -3117,20 +3230,26 @@ export default function SeasonStandingsNewLook({
         data-testid="nl-standings-spieltage-row"
       >
         <div className="nl-standings-spieltage-row-teams">
-          {paarung.teilnehmer.map((teilnehmer, index) => (
-            <Fragment key={teilnehmer.teamId}>
-              {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
-              <span
-                className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}`}
-                style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(teilnehmer.teamId)?.teamCode) as CSSProperties}
-              >
-                <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
-                {teamLabel(teilnehmer.teamId)}
-                {renderSpieltagTeamRank(teilnehmer.teamId)}
-                {renderSpieltagForecastRank(teilnehmer.teamId, paarung.disziplinen)}
-              </span>
-            </Fragment>
-          ))}
+          {paarung.teilnehmer.map((teilnehmer, index) => {
+            // Chris, wörtlich (Spieltage-Screenshot): „Bitte hier das eigene team hervorheben
+            // und das von franky bzw alle menschlich gesteuerten".
+            const highlight = resolveSpieltagTeamHighlight(standingsRowByTeamId.get(teilnehmer.teamId));
+            return (
+              <Fragment key={teilnehmer.teamId}>
+                {index > 0 ? <span className="nl-standings-spieltage-card-vs">–</span> : null}
+                <span
+                  className={`nl-standings-spieltage-card-team is-${teilnehmer.rolle}${highlight ? ` is-${highlight === "self" ? "selected" : "franky-team"}` : ""}`}
+                  style={getSeasonV2TeamTagStyle(standingsRowByTeamId.get(teilnehmer.teamId)?.teamCode) as CSSProperties}
+                >
+                  <span className="nl-standings-spieltage-card-team-dot" aria-hidden="true" />
+                  {teamLabel(teilnehmer.teamId)}
+                  {renderSpieltagOwnerTag(highlight)}
+                  {renderSpieltagTeamRank(teilnehmer.teamId)}
+                  {renderSpieltagForecastRank(teilnehmer.teamId, paarung.disziplinen)}
+                </span>
+              </Fragment>
+            );
+          })}
           {isCurrentMatchday ? (
             <span className="nl-standings-spieltage-card-current-tag">
               <span className="nl-standings-spieltage-live-dot" aria-hidden="true" />

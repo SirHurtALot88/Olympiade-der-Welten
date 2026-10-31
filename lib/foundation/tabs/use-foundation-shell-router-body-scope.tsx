@@ -196,6 +196,7 @@ import {
   filterTeamsByControlScope,
   getGameModeOwnershipLimits,
   getTeamControlSettings,
+  isFrankyOwnedTeamSettings,
   mergeAiAutomationFromDraft,
   resolveGameModeFromState,
   type TeamControlFilter,
@@ -11276,6 +11277,11 @@ export function useFoundationShellRouterBodyScope({
           // Task #159: `null` im Legacy-32er-Modus (jeder heutige/laufende Save vor dem
           // Liga-Split) — die Tabelle rendert dann unveraendert eine einzige 32-Zeilen-Liste.
           leagueTier: getLeagueOf(gameState, row.teamId),
+          // Chris, Spieltage-Screenshot: „das eigene team hervorheben und das von franky bzw alle
+          // menschlich gesteuerten" — `isSelected` oben deckt nur das eigene (Scope-)Team ab, hier
+          // kommt Frankys Team dazu, damit die Spieltage-Paarungszeilen beide Faelle unterscheiden
+          // koennen (eigener Ton je Hervorhebung statt einer gemeinsamen Klasse).
+          isFrankyTeam: isFrankyOwnedTeamSettings(getTeamControlSettings(gameState, row.teamId)),
         };
       }),
     [resolveMatchdayRankDelta, gameState, isViewingArchivedSeason, selectedTeam?.teamId, sortedSeasonStandRows],
