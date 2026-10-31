@@ -479,6 +479,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   preSeasonWorkflowError,
   preSeasonWorkflowFeed,
   rankLeaderCards,
+  rankLeagueFilter,
+  setRankLeagueFilter,
+  isLeagueSplitActiveForRanks,
   ranksArchiveMissing,
   isViewingArchivedRanksSeason,
   readMeta,
@@ -2865,6 +2868,41 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                       ))}
                     </select>
                   </label>
+                  {/* LIGA-FILTER (Chris, Screenshot „Ranks – Teamstärke pro Diszi"): „bei den
+                      ranks muss man liga 1/2 filtern können und in der komplettansicht müssen
+                      die ranks dann auch von 1-32 gehen". "Beide Ligen" rankt jetzt echt 1-32
+                      (`rankMode:"combined"` im Rang-Engine), Liga 1/2 bleibt bei der bisherigen
+                      liga-lokalen 1-16-Rechnung. Nur sichtbar, wenn der Split ueberhaupt aktiv
+                      ist — ohne Split gibt es nur einen 1-32-Raum, ein Filter waere hier sinnlos. */}
+                  {isLeagueSplitActiveForRanks ? (
+                    <div
+                      className="ranks-league-filter"
+                      role="group"
+                      aria-label="Nach Liga filtern"
+                      data-testid="ranks-league-filter"
+                    >
+                      {(
+                        [
+                          { id: "alle" as const, label: "Beide Ligen" },
+                          { id: "liga1" as const, label: "Liga 1" },
+                          { id: "liga2" as const, label: "Liga 2" },
+                        ]
+                      ).map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          className={joinClassNames(
+                            "ranks-league-filter-toggle",
+                            rankLeagueFilter === option.id && "is-active",
+                          )}
+                          aria-pressed={rankLeagueFilter === option.id}
+                          onClick={() => setRankLeagueFilter(option.id)}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   {/* Wie auf dem Saisonstand (G5): Klartext statt der halbenglischen
                       Status-Flag-Reihe „Live · Aktive Season · lokale Results" — die
                       technische Quelle bleibt als Tooltip erreichbar. */}
@@ -3090,6 +3128,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           return (
                             <td key={column.id} className="ranks-sticky-team">
                               <span className="ranks-team-name-wrap">
+                                {/* Liga-Badge nur in der kombinierten Ansicht — bei Liga-1/2-Filter
+                                    ist die Liga schon durch den Filter selbst klar (Chris' Ask). */}
+                                {isLeagueSplitActiveForRanks && rankLeagueFilter === "alle" && row.league ? (
+                                  <span
+                                    className={joinClassNames(
+                                      "ranks-league-badge",
+                                      row.league === "liga1" ? "is-liga1" : "is-liga2",
+                                    )}
+                                    title={row.league === "liga1" ? "Liga 1" : "Liga 2"}
+                                  >
+                                    {row.league === "liga1" ? "L1" : "L2"}
+                                  </span>
+                                ) : null}
                                 {row.team.name}
                                 {row.team.teamId === activeManagerTeamId ? (
                                   <span className="ranks-own-tag">Dein Team</span>

@@ -12,7 +12,7 @@ import {
 import { getSeasonDisciplineSchedule, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import { getOpponentOf } from "@/lib/season/season-fixture-schedule";
 import { getMiniDmPodForTeam } from "@/lib/season/mini-dm-pod-schedule";
-import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import {
   shouldBuildDisciplineConfigDerivations as resolveShouldBuildDisciplineConfigDerivations,
   shouldBuildDisciplineRanks as resolveShouldBuildDisciplineRanks,
@@ -29,6 +29,8 @@ export type FoundationDisciplineRankRow = {
   team: Team;
   /** Anzahl Spieler im Kader — die Spalte „#" links von TOT. */
   rosterSize: number;
+  /** Liga der Zeile (nur bei aktivem Split + Live-Ansicht gesetzt, sonst `null`). */
+  league: LeagueTier | null;
   totalRank: number;
   powRank: number;
   speRank: number;
@@ -152,6 +154,16 @@ export function useFoundationCrossTabDisciplineRanks(input: {
   tableSorts: Record<string, SortState>;
   /** Das Team, dessen Gegner der Spielplan-Tab zeigt (typischerweise das aktuell verwaltete Team). */
   activeTeamId?: string | null;
+  /**
+   * RANKS-SEITE, LIGA-FILTER (Chris: „bei den ranks muss man liga 1/2 filtern können und in der
+   * komplettansicht müssen die ranks dann auch von 1-32 gehen"). "alle" rankt alle Teams in einem
+   * gemeinsamen 1-32-Raum (`buildTeamDisciplineRankRowsFromGameState`-Modus "combined"); "liga1"/
+   * "liga2" behält die bisherige liga-lokale 1-16-Rangrechnung und zeigt nur die eine Liga.
+   * Default "alle", damit ein Aufruf ohne dieses Feld (z. B. in Tests) bit-identisch bleibt, SOLANGE
+   * kein Split aktiv ist — bei aktivem Split ohne gesetzten Filter ist "alle" dann bewusst die neue
+   * combined-Ansicht statt der alten (fuer Nicht-Ranks-Aufrufer irrelevant, die lesen `disciplineRankRowByTeamId`).
+   */
+  rankLeagueFilter?: LeagueTier | "alle";
 }) {
   const shouldBuildDisciplineRanks = shouldBuildFoundationDisciplineRanks({
     activeView: input.activeView,
@@ -199,15 +211,23 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     const useArchivedRanks =
       isViewingArchivedRanksSeason && Boolean(selectedRanksSeasonSnapshot?.teamDisciplineRankSnapshots?.length);
 
+    // Archivierte Saisons kennen noch keine Liga-Zuordnung (Split ist neuer als jede Archivzeile) —
+    // der Filter wirkt deshalb nur auf die Live-Ansicht; das Archiv bleibt unveraendert "alle"/scoped.
+    const leagueFilter = useArchivedRanks ? "alle" : input.rankLeagueFilter ?? "alle";
+    const rankMode = leagueFilter === "alle" ? "combined" : "scoped";
+
     const coreRows = useArchivedRanks
       ? buildTeamDisciplineRankRowsFromSnapshotRecords(
           selectedRanksSeasonSnapshot!.teamDisciplineRankSnapshots!,
           teamsById,
           input.orderedDisciplines,
         )
-      : buildTeamDisciplineRankRowsFromGameState(input.gameState, input.orderedDisciplines);
+      : buildTeamDisciplineRankRowsFromGameState(input.gameState, input.orderedDisciplines, rankMode);
 
-    return coreRows
+    const scopedCoreRows =
+      leagueFilter === "alle" ? coreRows : coreRows.filter((rowCore) => rowCore.league === leagueFilter);
+
+    return scopedCoreRows
       .map((rowCore) => {
         const team =
           teamsById.get(rowCore.teamId) ??
@@ -229,6 +249,7 @@ export function useFoundationCrossTabDisciplineRanks(input: {
            * leeren Slots am Spieltag.
            */
           rosterSize: rosterSizeByTeamId.get(rowCore.teamId) ?? 0,
+          league: rowCore.league,
           totalRank: rowCore.totalRank,
           powRank: rowCore.powRank,
           speRank: rowCore.speRank,
@@ -249,6 +270,7 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     input.gameState,
     input.orderedDisciplines,
     input.ranksSeasonId,
+    input.rankLeagueFilter,
     isViewingArchivedRanksSeason,
     previousRankLookup,
     selectedRanksSeasonSnapshot,
@@ -520,5 +542,6 @@ export function useFoundationCrossTabDisciplineRanks(input: {
     isViewingArchivedRanksSeason,
     ranksArchiveMissing,
     ranksSeasonId: input.ranksSeasonId,
+    isLeagueSplitActiveForRanks: splitActive,
   };
 }
