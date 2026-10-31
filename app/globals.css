@@ -69302,6 +69302,60 @@ span.nl-facility-ampel-chip {
   color: var(--nl-ink);
 }
 
+/* --- Liga-1/2-Picker (ERWEITERUNG 31.10.) -------------------------------- */
+.is-new-look .nl-newgame-leaguepicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguecol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  padding: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguecol-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.is-new-look .nl-newgame-leaguecol-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-newgame-leaguecol-item {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  width: 100%;
+  text-align: left;
+  border-radius: var(--nl-r-sm);
+  padding: var(--nl-s1) var(--nl-s2);
+}
+
+.is-new-look .nl-newgame-leaguecol-item .nl-newgame-club-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Club-Grid ----------------------------------------------------------- */
 .is-new-look .nl-newgame-clubgrid {
   display: grid;

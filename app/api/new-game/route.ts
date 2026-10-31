@@ -7,6 +7,7 @@ import {
   previewNewGameSetup,
   type NewGamePresetId,
 } from "@/lib/game/new-game-setup-service";
+import type { LeagueTier } from "@/lib/season/league-split";
 import type { GameMode } from "@/lib/data/olyDataTypes";
 import { isAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
@@ -22,6 +23,10 @@ type NewGameRequestBody = {
   gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
+  // Optionale, im Anlege-Assistenten umstellbare Liga-1/2-Zuordnung (s. Kommentar an
+  // `leagueByTeamId` in lib/game/new-game-setup-service.ts). Nur in Battle Mode wirksam, und nur,
+  // wenn sie fuer die 32 Teams dieses neuen Saves gueltig ist -- sonst automatische Zuteilung.
+  leagueByTeamId?: Record<string, LeagueTier>;
   sandbox?: boolean;
   saveName?: string;
   dryRun?: boolean;
@@ -36,6 +41,7 @@ function normalizeBody(body: NewGameRequestBody) {
     gameMode: body.gameMode === "battle" ? "battle" : ("manager" as GameMode),
     chrisTeamIds: body.chrisTeamIds,
     frankyTeamIds: body.frankyTeamIds,
+    leagueByTeamId: body.leagueByTeamId,
     sandbox: Boolean(body.sandbox),
     saveName: body.saveName,
     confirmToken: body.confirmToken,

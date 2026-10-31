@@ -18,6 +18,7 @@ import {
   type FoundationSaveMode,
 } from "@/lib/persistence/foundation-save-mode";
 import type { SaveSummary } from "@/lib/persistence/types";
+import type { LeagueTier } from "@/lib/season/league-split";
 import type {
 	  GameState,
 	  GameInboxItem,
@@ -74,7 +75,6 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
 import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
-import type { LeagueTier } from "@/lib/season/league-split";
 import {
   canFoundationNavigateBack,
   foundationNavigateBack,
@@ -545,6 +545,14 @@ export function useFoundationPageState({
   const [newGameMode, setNewGameMode] = useState<GameMode>("manager");
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
   const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
+  /**
+   * Benutzerdefinierte Liga-1/2-Zuordnung fuer den Battle-Mode-Schritt (31.10., Chris: "alle teams
+   * in der 2. liga muss man bei erstellung auch wählen können"). `null` = automatische
+   * Budget-Zuteilung (`buildInitialLeagueAssignment`), unveraendertes Verhalten. Nur gesetzt,
+   * nachdem der Nutzer im zweispaltigen Liga-Picker mindestens ein Team verschoben hat — s.
+   * `FoundationTeamSettingsNewLook.tsx`.
+   */
+  const [newGameLeagueOverride, setNewGameLeagueOverride] = useState<Record<string, LeagueTier> | null>(null);
   const [newGameSandbox, setNewGameSandbox] = useState<boolean>(false);
   const [newGameSaveName, setNewGameSaveName] = useState<string>("");
   const [newGamePreview, setNewGamePreview] = useState<NewGameSetupPreview | null>(null);
@@ -964,6 +972,8 @@ export function useFoundationPageState({
     setNewGameChrisTeamIds,
     newGameFrankyTeamIds,
     setNewGameFrankyTeamIds,
+    newGameLeagueOverride,
+    setNewGameLeagueOverride,
     newGameSandbox,
     setNewGameSandbox,
     newGameSaveName,

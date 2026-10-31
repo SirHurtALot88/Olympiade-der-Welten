@@ -43,6 +43,12 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   no_active_team: "Kein aktives Team ausgewählt.",
   empty_roster: "Kader ist leer — erst Spieler hinzufügen.",
   transfer_window_closed: "Transferfenster ist aktuell geschlossen.",
+  // ERWEITERUNG 31.10. (Liga-1/2-Picker im New-Game-Wizard): eine eigene Liga-Aufteilung zaehlt
+  // nur, wenn sie wie die automatische Zuteilung exakt 16/16 ergibt -- sonst wuerde eine
+  // unausgeglichene Liga (z.B. 15 Liga-1-Teams) den gesamten Liga-lokalen Rang-/Spielplan-/
+  // Sponsor-Stack verzerren. Ohne dieses Label fiele die Warnung auf den Rohcode zurueck.
+  battle_mode_invalid_league_assignment_ignored:
+    "Die eigene Liga-1/2-Aufteilung ergab nicht 16/16 — es wurde stattdessen automatisch nach Budget zugeteilt. Bitte die Zuordnung im Liga-Picker so anpassen, dass jede Liga genau 16 Teams hat.",
   "resolve_status:incomplete_lineups": "Mindestens eine Einsatzliste ist noch unvollständig.",
   "resolve_status:missing_lineups": "Mindestens eine Einsatzliste fehlt noch komplett.",
   "resolve_status:missing_scores": "Mindestens ein Team hat noch fehlende Score-Quellen.",
