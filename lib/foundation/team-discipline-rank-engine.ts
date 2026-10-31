@@ -6,7 +6,7 @@ import type {
   TeamStrengthRankCaptureRecord,
 } from "@/lib/data/olyDataTypes";
 import { buildSharedRankMap, roundViewNumber } from "@/lib/foundation/season-stand-rank-helpers";
-import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { getLeagueOf, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 
 /**
  * LIGA-LOKALE TEAM-DISZIPLIN-RAENGE (docs/design/liga-split-plan.md, Abschnitt 2.2, PR 3).
@@ -58,6 +58,7 @@ export type TeamDisciplineRankRowCore = {
   socRank: number;
   disciplineRanks: Record<string, number>;
   scorePack: TeamDisciplineRankScorePack;
+  league: LeagueTier | null;
 };
 
 export type TeamDisciplineRankDeltaPack = {
@@ -130,10 +131,28 @@ function buildEmptyScorePack(orderedDisciplines: Discipline[]): TeamDisciplineRa
   };
 }
 
+export type TeamDisciplineRankMode = "scoped" | "combined";
+
+/**
+ * RANKS-SEITE, LIGA-FILTER (Chris, Screenshot „Ranks – Teamstärke pro Diszi"): „bei den ranks muss
+ * man liga 1/2 filtern können und in der komplettansicht müssen die ranks dann auch von 1-32 gehen".
+ *
+ * `buildScopedRankMap` oben rankt bei aktivem Split IMMER pro Liga (zwei 1-16-Räume) — das ist die
+ * richtige Grundlage für eine Liga-1- oder Liga-2-Ansicht, aber falsch für eine Gesamtansicht über
+ * beide Ligen: die 1-16 je Liga sähen dort wie doppelt vergebene Ränge aus. `rankMode:"combined"`
+ * ist der Opt-out dafür — er ignoriert die Liga-Gruppierung und rankt alle Teams in einem Raum
+ * (`buildSharedRankMap` direkt), ergibt also echte 1-32. Default bleibt `"scoped"`, bit-identisch
+ * zum bisherigen Verhalten — insbesondere fuer den Spielplan-Gegner-Rang-Lookup, der unveraendert
+ * bleiben muss.
+ */
 export function buildTeamDisciplineRankRowsFromGameState(
   gameState: GameState,
   orderedDisciplines: Discipline[],
+  rankMode: TeamDisciplineRankMode = "scoped",
 ): TeamDisciplineRankRowCore[] {
+  const rankValues = (values: Array<{ teamId: string; value: number }>): Map<string, number> =>
+    rankMode === "combined" ? buildSharedRankMap(values) : buildScopedRankMap(gameState, values);
+
   const rosterByTeamId = new Map<string, Array<(typeof gameState.players)[number]>>();
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
@@ -213,36 +232,31 @@ export function buildTeamDisciplineRankRowsFromGameState(
     });
   }
 
-  const totalRankMap = buildScopedRankMap(
-    gameState,
+  const totalRankMap = rankValues(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.total ?? 0,
     })),
   );
-  const powRankMap = buildScopedRankMap(
-    gameState,
+  const powRankMap = rankValues(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.pow ?? 0,
     })),
   );
-  const speRankMap = buildScopedRankMap(
-    gameState,
+  const speRankMap = rankValues(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.spe ?? 0,
     })),
   );
-  const menRankMap = buildScopedRankMap(
-    gameState,
+  const menRankMap = rankValues(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.men ?? 0,
     })),
   );
-  const socRankMap = buildScopedRankMap(
-    gameState,
+  const socRankMap = rankValues(
     gameState.teams.map((team) => ({
       teamId: team.teamId,
       value: disciplineScoresByTeam.get(team.teamId)?.soc ?? 0,
@@ -252,8 +266,7 @@ export function buildTeamDisciplineRankRowsFromGameState(
   const disciplineRankMaps = new Map(
     orderedDisciplines.map((discipline) => [
       discipline.id,
-      buildScopedRankMap(
-        gameState,
+      rankValues(
         gameState.teams.map((team) => ({
           teamId: team.teamId,
           value: disciplineScoresByTeam.get(team.teamId)?.disciplines[discipline.id] ?? 0,
@@ -283,6 +296,7 @@ export function buildTeamDisciplineRankRowsFromGameState(
         socRank: socRankMap.get(team.teamId) ?? 0,
         disciplineRanks,
         scorePack,
+        league: getLeagueOf(gameState, team.teamId),
       };
     })
     .sort((left, right) => {
@@ -389,6 +403,9 @@ export function buildTeamDisciplineRankRowsFromSnapshotRecords(
         socRank: record.socRank,
         disciplineRanks,
         scorePack,
+        // Archiv-Schnappschuss kennt keine Liga-Zuordnung zum Zeitpunkt der Erfassung (nicht
+        // mitgespeichert) — die Ranks-Seite zeigt die Liga-Badges nur in der Live-Ansicht an.
+        league: null,
       };
     })
     .sort((left, right) => {

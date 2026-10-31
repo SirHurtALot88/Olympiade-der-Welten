@@ -74,6 +74,7 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
 import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import type { LeagueTier } from "@/lib/season/league-split";
 import {
   canFoundationNavigateBack,
   foundationNavigateBack,
@@ -663,6 +664,14 @@ export function useFoundationPageState({
   const [standingsPreviewFeed, setStandingsPreviewFeed] = useState<FoundationStandingsPreviewResponse | null>(null);
   const [standingsApplyFeed, setStandingsApplyFeed] = useState<FoundationApplySummary | null>(null);
   const [disciplineCategoryFilter, setDisciplineCategoryFilter] = useState<DisciplineCategoryFilter>("all");
+  /**
+   * RANKS-SEITE, LIGA-FILTER (Chris, Screenshot „Ranks – Teamstärke pro Diszi"): „bei den ranks
+   * muss man liga 1/2 filtern können und in der komplettansicht müssen die ranks dann auch von
+   * 1-32 gehen". "alle" ist die Gesamtansicht (jetzt echte 1-32-Ränge statt liga-lokaler 1-16),
+   * "liga1"/"liga2" filtert auf die jeweilige Liga mit ihrer bisherigen liga-lokalen 1-16-Rangrechnung.
+   * Gleiches Muster wie der Liga-Filter der LeagueLeaders-Seite (`LeagueLeadersNewLook.tsx`).
+   */
+  const [rankLeagueFilter, setRankLeagueFilter] = useState<LeagueTier | "alle">("alle");
   const [seasonManagementFeed, setSeasonManagementFeed] = useState<FoundationSeasonManagementResponse | null>(null);
   const [facilityUpgradeBusy, setFacilityUpgradeBusy] = useState<boolean>(false);
   const [facilityUpgradePreview, setFacilityUpgradePreview] = useState<FacilityUpgradeSummary | null>(null);
@@ -1115,6 +1124,8 @@ export function useFoundationPageState({
     setStandingsApplyFeed,
     disciplineCategoryFilter,
     setDisciplineCategoryFilter,
+    rankLeagueFilter,
+    setRankLeagueFilter,
     seasonManagementFeed,
     setSeasonManagementFeed,
     facilityUpgradeBusy,
