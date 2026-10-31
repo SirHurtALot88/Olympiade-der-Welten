@@ -460,6 +460,38 @@
 }
 
 /*
+ * TASK #159 PUNKT 2, Folgeauftrag Chris (Spieltage-Screenshot), wörtlich: „hier kannst du links
+ * liga 1 und rechts liga 2 matchups machen". Vorher stand hier EIN Umschalter ("Beide Ligen" /
+ * "Liga 1" / "Liga 2"), der immer nur eine der beiden Listen zeigte — jetzt zwei eigene
+ * `NlCard`s nebeneinander, genau wie die Saisonstand-Tabelle ihre zwei Liga-Karten
+ * (`.nl-standings-liga-split` oben) stapelt.
+ *
+ * BEWUSST ANDERS ALS `.nl-standings-liga-split`: die Daten-Tabelle stapelt ihre zwei Karten
+ * IMMER senkrecht (eine 16-Zeilen-Tabelle ist für zwei Spalten zu breit, s. Kommentar dort) — die
+ * Fixture-Liste hier ist dagegen schmal (Teamname + Ergebnis-Chips, keine mehrspaltige Tabelle),
+ * deshalb bekommt sie ECHTES Nebeneinander auf breiten Viewports und faellt erst unterhalb der
+ * im Rest dieser Datei etablierten Grenze (1280px, s. `.nl-standings-daten-chartrow` oben) auf
+ * eine Spalte zurueck — dieselbe Zahl, nicht neu erfunden.
+ */
+.is-new-look .nl-standings-spieltage-liga-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--nl-s4);
+  align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .is-new-look .nl-standings-spieltage-liga-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.is-new-look .nl-standings-spieltage-liga-card .nl-standings-spieltage-list,
+.is-new-look .nl-standings-spieltage-liga-card .nl-standings-spieltage-pods {
+  margin: 0;
+}
+
+/*
  * KOMPAKTE LISTE statt Kachelraster (Auftrag Chris, 19.10. Punkt 2): Matchups stehen
  * UNTEREINANDER, eine Zeile je Paarung. `nl-card` auf jeder Zeile (s. Komponente) liefert Fläche/
  * Rahmen/Radius aus den globalen Regeln, hier nur die listentypischen Resets plus engerer
@@ -790,6 +822,68 @@
   align-self: center;
   border-radius: 50%;
   background: var(--team-tag-border, var(--nl-line-2));
+}
+
+/*
+ * EIGENES TEAM / FRANKYS TEAM in der Spieltage-Paarungszeile — Chris, wörtlich (Spieltage-
+ * Screenshot): „Bitte hier das eigene team hervorheben und das von franky bzw alle menschlich
+ * gesteuerten". Zwei EIGENE Töne (nicht eine gemeinsame Hervorhebung), nach demselben Muster wie
+ * `.is-rival`/`.is-title-contender` oben: eigenes Team = derselbe Akzent-Ton wie die Saisonstand-
+ * Zeile (`--nl-accent`, `.nl-standings-table-row.is-selected`); Frankys Team = ein zweiter,
+ * eigenstaendiger Ton (`--nl-warn`), damit beide Faelle optisch unterscheidbar bleiben.
+ */
+.is-new-look .nl-standings-spieltage-card-team.is-selected {
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-accent-soft);
+  box-shadow: inset 2px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-standings-spieltage-card-team.is-franky-team {
+  padding: 1px 6px;
+  border-radius: var(--nl-r-sm);
+  background: color-mix(in srgb, var(--nl-warn) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--nl-warn);
+}
+
+/* Dieselben zwei Töne für die Mini-DM-Pod-Mitgliederzeile (eigene Klassen, weil diese Zeile ein
+   eigenes Grid-Layout hat, s. `.nl-standings-spieltage-pod-mitglied` unten). */
+.is-new-look .nl-standings-spieltage-pod-mitglied.is-selected {
+  background: var(--nl-accent-soft);
+  box-shadow: inset 2px 0 0 var(--nl-accent);
+}
+
+.is-new-look .nl-standings-spieltage-pod-mitglied.is-franky-team {
+  background: color-mix(in srgb, var(--nl-warn) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--nl-warn);
+}
+
+/* Der kleine Text-Chip ("Du"/"Franky") neben dem Teamnamen — analog zu `.rival-tag`/
+   `.nl-standings-titlerace-tag`: die Hervorhebung allein sagt nicht, WARUM die Zeile leuchtet. */
+.is-new-look .nl-standings-spieltage-owner-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: var(--nl-r-pill);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.is-new-look .nl-standings-spieltage-owner-tag.is-own {
+  border: 1px solid color-mix(in srgb, var(--nl-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-accent) 18%, transparent);
+  color: var(--nl-accent);
+}
+
+.is-new-look .nl-standings-spieltage-owner-tag.is-franky {
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 62%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 20%, transparent);
+  color: var(--nl-warn);
 }
 
 /* --- 5. Paarungszeile als Mini-Scoreboard --------------------------- */

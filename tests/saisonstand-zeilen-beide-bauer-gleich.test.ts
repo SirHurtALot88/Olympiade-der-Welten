@@ -41,7 +41,16 @@ const modell = readFileSync(join(process.cwd(), "lib/foundation/tabs/use-season-
  * Felder, die BEIDE Bauer setzen müssen. Bewusst nur die, die eine eigene Ableitung mitbringen —
  * bei ihnen kostet ein Vergessen eine leere Ansicht, nicht bloß einen Strich.
  */
-const PFLICHTFELDER = ["hoverKader:", "guvPosten:", "buildingCost:", "marketValueTotal:"];
+const PFLICHTFELDER = [
+  "hoverKader:",
+  "guvPosten:",
+  "buildingCost:",
+  "marketValueTotal:",
+  // Chris, Spieltage-Screenshot: „das eigene team hervorheben und das von franky bzw alle
+  // menschlich gesteuerten" — dieselbe Falle wie `hoverKader` oben: optional/additiv, `tsc` bliebe
+  // bei einem fehlenden Zweig stumm, und im Spiel saehe man einfach keine Franky-Hervorhebung.
+  "isFrankyTeam:",
+];
 
 describe("Beide Saisonstand-Zeilenbauer befuellen dieselben Felder", () => {
   it.each(PFLICHTFELDER)("%s steht im GERENDERTEN Bauer", (feld) => {
