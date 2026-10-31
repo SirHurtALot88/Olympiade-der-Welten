@@ -95,3 +95,33 @@ export function buildInitialLeagueAssignment(teams: readonly Team[]): Record<str
   });
   return assignment;
 }
+
+/**
+ * VALIDIERT EINE (OPTIONALE) BENUTZERDEFINIERTE LIGA-ZUORDNUNG — Chris' Erweiterung vom 31.10.: der
+ * Anlege-Assistent soll Liga 1/2 nicht mehr nur automatisch nach Budget zuteilen, sondern die
+ * Zuteilung im Wizard anzeigen und Team-fuer-Team umstellbar machen, BEVOR das Spiel angelegt wird.
+ *
+ * Reine Form-Pruefung, kein Zugriff auf GameState: jedes der uebergebenen Teams muss GENAU EINER
+ * Liga zugeordnet sein (keine fehlenden, keine fremden Team-IDs), und jede Liga muss exakt
+ * LEAGUE_SIZE Teams haben -- dieselbe Invariante, die `buildInitialLeagueAssignment` automatisch
+ * erfuellt. Faellt diese Pruefung durch (z.B. ein unvollstaendiger/manipulierter Aufruf ausserhalb
+ * der UI), bleibt die automatische Zuteilung der sichere Fallback -- s. `buildNewGameStateFromBaseline`.
+ */
+export function isValidLeagueAssignment(
+  teams: readonly Team[],
+  assignment: Record<string, LeagueTier> | null | undefined,
+): boolean {
+  if (!assignment) return false;
+  const teamIds = teams.map((team) => team.teamId);
+  if (teamIds.length === 0) return false;
+  let liga1 = 0;
+  let liga2 = 0;
+  for (const teamId of teamIds) {
+    const tier = assignment[teamId];
+    if (tier !== "liga1" && tier !== "liga2") return false;
+    if (tier === "liga1") liga1 += 1;
+    else liga2 += 1;
+  }
+  if (Object.keys(assignment).length !== teamIds.length) return false;
+  return liga1 === LEAGUE_SIZE && liga2 === LEAGUE_SIZE;
+}

@@ -12,7 +12,12 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { LEAGUE_SIZE, buildInitialLeagueAssignment, type LeagueTier } from "@/lib/season/league-split";
+import {
+  LEAGUE_SIZE,
+  buildInitialLeagueAssignment,
+  isValidLeagueAssignment,
+  type LeagueTier,
+} from "@/lib/season/league-split";
 import { buildSeasonFixtureSchedule } from "@/lib/season/season-fixture-schedule";
 import { getSeasonDisciplineRepeatCount } from "@/lib/season/season-discipline-schedule";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -40,6 +45,15 @@ export type NewGameSetupInput = {
   gameMode?: GameMode;
   chrisTeamIds?: string[];
   frankyTeamIds?: string[];
+  /**
+   * OPTIONALE BENUTZERDEFINIERTE LIGA-ZUORDNUNG (Chris, 31.10.: "alle teams in der 2. liga muss man
+   * bei erstellung auch wählen können"). Nur in Battle Mode relevant; nur wirksam, wenn sie fuer
+   * GENAU die Teams dieses neuen Saves gueltig ist (`isValidLeagueAssignment`, s.u.) -- fehlt sie
+   * oder ist sie ungueltig, bleibt es bei der automatischen Budget-Zuteilung
+   * (`buildInitialLeagueAssignment`), exakt wie vor dieser Erweiterung. Manager Mode ignoriert das
+   * Feld vollstaendig.
+   */
+  leagueByTeamId?: Record<string, LeagueTier>;
   sandbox?: boolean;
   saveName?: string;
   confirmToken?: string | null;
@@ -334,7 +348,22 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
    * ohne jede Liga-Sonderbehandlung (Nachweis: `tests/game-mode-ownership.test.ts`, "laesst ein
    * Liga-2-Team nach Saisonstart (Battle Mode) ganz normal uebernehmen").
    */
-  const leagueAssignmentForNewGame = isBattleMode ? buildInitialLeagueAssignment(baseGameState.teams) : null;
+  /**
+   * BENUTZERDEFINIERTE LIGA-ZUORDNUNG (s. Kommentar an `leagueByTeamId` oben in `NewGameSetupInput`):
+   * nur in Battle Mode und nur, wenn sie `isValidLeagueAssignment` fuer GENAU diese Teams erfuellt
+   * (16/16, jedes Team genau einmal) -- sonst automatische Budget-Zuteilung wie bisher. Der Filter
+   * direkt darunter (`isLiga2TeamId`) bleibt UNVERAENDERT: er liest weiterhin einfach
+   * `leagueAssignmentForNewGame`, egal ob die Zuordnung automatisch oder benutzerdefiniert ist --
+   * verschiebt der Wizard ein Team per Hand von Liga 2 nach Liga 1, wird es dadurch genauso waehlbar,
+   * wie es ein von Natur aus budget-staerkeres Team waere.
+   */
+  const customLeagueAssignment =
+    isBattleMode && isValidLeagueAssignment(baseGameState.teams, input.leagueByTeamId)
+      ? (input.leagueByTeamId as Record<string, LeagueTier>)
+      : null;
+  const leagueAssignmentForNewGame = isBattleMode
+    ? customLeagueAssignment ?? buildInitialLeagueAssignment(baseGameState.teams)
+    : null;
   const isLiga2TeamId = (teamId: string) => leagueAssignmentForNewGame?.[teamId] === "liga2";
   const chrisTeamIds = rawChrisTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
   const frankyTeamIds = rawFrankyTeamIds.filter((teamId) => !isLiga2TeamId(teamId));
@@ -344,6 +373,10 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   const aiTeamIds = baseGameState.teams.filter((team) => !humanTeamIds.has(team.teamId)).map((team) => team.teamId);
   const warnings: string[] = [];
   const blockers: string[] = [];
+
+  if (isBattleMode && input.leagueByTeamId && !customLeagueAssignment) {
+    warnings.push("battle_mode_invalid_league_assignment_ignored");
+  }
 
   if (droppedLiga2HumanTeamIds.length > 0) {
     warnings.push(...droppedLiga2HumanTeamIds.map((teamId) => `battle_mode_liga2_team_not_selectable:${teamId}`));

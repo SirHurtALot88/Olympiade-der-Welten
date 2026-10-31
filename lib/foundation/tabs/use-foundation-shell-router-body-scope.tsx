@@ -1,6 +1,6 @@
 "use client";
 import { applyTeamCashPatch } from "@/lib/foundation/apply-team-cash-patch";
-import { buildInitialLeagueAssignment } from "@/lib/season/league-split";
+import { buildInitialLeagueAssignment, type LeagueTier } from "@/lib/season/league-split";
 import { buildSpieltagsUebersicht, istSpieltagsModusVerfuegbar } from "@/lib/foundation/season-matchday-fixtures-overview";
 import {
   springeZuElement,
@@ -1063,7 +1063,7 @@ export function useFoundationShellRouterBodyScope({
     setMarketShowTransferRecap, marketRenderLimit, setMarketRenderLimit, marketLoadingMore, setMarketLoadingMore, historyLoadingMore, setHistoryLoadingMore, bootstrapError, setBootstrapError, persistenceError,
     setPersistenceError, saveSyncError, setSaveSyncError, marketReloadToken, setMarketReloadToken, marketFeed, setMarketFeed, marketBuyBusy, setMarketBuyBusy, marketBuyError,
     setMarketBuyError, marketBuySuccess, setMarketBuySuccess, foundationActionFeedback, setFoundationActionFeedback, seasonBriefingOpen, setSeasonBriefingOpen, freshSeasonStartMessage, setFreshSeasonStartMessage, newGamePresetId,
-    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
+    setNewGamePresetId, newGameMode, setNewGameMode, newGameChrisTeamIds, setNewGameChrisTeamIds, newGameFrankyTeamIds, setNewGameFrankyTeamIds, newGameLeagueOverride, setNewGameLeagueOverride, newGameSandbox, setNewGameSandbox, newGameSaveName, setNewGameSaveName, newGamePreview,
     setNewGamePreview, newGameBusy, setNewGameBusy, newGameError, setNewGameError, newGameSuccess, setNewGameSuccess, marketBuyPreview, setMarketBuyPreview, marketBuyPreviewContext,
     setMarketBuyPreviewContext, marketNegotiationOutcome, setMarketNegotiationOutcome, marketPreviewPlayerId, setMarketPreviewPlayerId, marketPreviewPlayerSummary, setMarketPreviewPlayerSummary, marketBuySubject, setMarketBuySubject, marketSellBusy, setMarketSellBusy, marketSellError,
     setMarketSellError, marketSellSuccess, setMarketSellSuccess, marketSellPreview, setMarketSellPreview, marketSellPeekSubject, setMarketSellPeekSubject, marketSellPeekPreview, setMarketSellPeekPreview, marketSellPeekBusy, setMarketSellPeekBusy, marketSellPeekError, setMarketSellPeekError, contractRenewalBusy, setContractRenewalBusy, contractRenewalMessage, setContractRenewalMessage, contractRenewalError,
@@ -6388,8 +6388,49 @@ export function useFoundationShellRouterBodyScope({
    * Liga-Sperre (Chris' Klarstellung zu Task #155: „es ist ja möglich dass jemand ein team aus
    * liga 2 übernimmt … dann läuft es ganz normal").
    */
+  /**
+   * Effektive Liga-1/2-Zuordnung fuer den Anlege-Assistenten (31.10., Chris: "alle teams in der 2.
+   * liga muss man bei erstellung auch wählen können"): die automatische Budget-Zuteilung, oder --
+   * sobald der Nutzer im Liga-Picker mindestens ein Team verschoben hat -- `newGameLeagueOverride`.
+   * Beide Stellen, die bisher direkt `buildInitialLeagueAssignment(gameState.teams)` lasen
+   * (`selectNewGameMode`, `toggleNewGameTeam`), lesen jetzt diese Funktion -- verschiebt der Wizard
+   * ein Team von Liga 2 nach Liga 1, wird es dadurch genauso waehlbar wie jedes andere Liga-1-Team.
+   */
+  function getNewGameLeagueAssignment(): Record<string, LeagueTier> {
+    return newGameLeagueOverride ?? buildInitialLeagueAssignment(gameState.teams);
+  }
+
+  /**
+   * Verschiebt EIN Team zwischen Liga 1 und Liga 2 im Liga-Picker des Anlege-Assistenten. Reiner
+   * Einzel-Umschalter (kein atomarer Tausch) -- die 16/16-Balance wird nicht hier erzwungen, sondern
+   * serverseitig geprueft (`isValidLeagueAssignment` in lib/season/league-split.ts): faellt sie
+   * unausgeglichen aus, faellt die Vorschau automatisch auf die Budget-Zuteilung zurueck und zeigt
+   * die Warnung `battle_mode_invalid_league_assignment_ignored` an (s.
+   * `lib/foundation/game-flow-blocker-labels.ts`) -- der Nutzer sieht sofort, dass die eigene
+   * Aufteilung noch nicht 16/16 ist. Verschiebt der Nutzer ein bereits als Chris-/Franky-Team
+   * gewaehltes Team nach Liga 2, wird es konsequent aus beiden Auswahllisten entfernt -- sonst
+   * bliebe ein inzwischen nicht mehr waehlbares Team in der Auswahl stehen (derselbe Fall wie beim
+   * Wechsel in den Battle Mode in `selectNewGameMode`).
+   */
+  function toggleNewGameTeamLeague(teamId: string) {
+    const current = getNewGameLeagueAssignment();
+    const nextTier: LeagueTier = current[teamId] === "liga2" ? "liga1" : "liga2";
+    setNewGameLeagueOverride({ ...current, [teamId]: nextTier });
+    if (nextTier === "liga2") {
+      setNewGameChrisTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
+      setNewGameFrankyTeamIds((teamIds) => teamIds.filter((entry) => entry !== teamId));
+    }
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+  }
+
   function selectNewGameMode(mode: GameMode) {
     setNewGameMode(mode);
+    // Modus-Wechsel verwirft eine evtl. begonnene eigene Liga-Aufteilung -- sie bezieht sich auf
+    // den vorherigen Schritt und wuerde sonst unbeabsichtigt in einen neuen Battle-Mode-Einstieg
+    // durchrutschen.
+    setNewGameLeagueOverride(null);
     if (mode === "battle") {
       const leagueAssignment = buildInitialLeagueAssignment(gameState.teams);
       const isLiga2TeamId = (teamId: string) => leagueAssignment[teamId] === "liga2";
@@ -6417,7 +6458,7 @@ export function useFoundationShellRouterBodyScope({
     if (newGameMode === "battle") {
       const alreadySelected =
         owner === "chris" ? newGameChrisTeamIds.includes(teamId) : newGameFrankyTeamIds.includes(teamId);
-      if (!alreadySelected && buildInitialLeagueAssignment(gameState.teams)[teamId] === "liga2") {
+      if (!alreadySelected && getNewGameLeagueAssignment()[teamId] === "liga2") {
         return;
       }
     }
@@ -6486,6 +6527,11 @@ export function useFoundationShellRouterBodyScope({
           gameMode: newGameMode,
           chrisTeamIds: newGameChrisTeamIds,
           frankyTeamIds: newGameFrankyTeamIds,
+          // Nur gesetzt, sobald der Nutzer im Liga-Picker mindestens ein Team verschoben hat --
+          // sonst bleibt der Payload unveraendert und der Server faellt auf die automatische
+          // Budget-Zuteilung zurueck (s. Kommentar an `leagueByTeamId` in
+          // lib/game/new-game-setup-service.ts).
+          leagueByTeamId: newGameMode === "battle" ? newGameLeagueOverride ?? undefined : undefined,
           sandbox: newGameSandbox,
           saveName: newGameSaveName.trim() || undefined,
           dryRun,
@@ -13006,6 +13052,7 @@ export function useFoundationShellRouterBodyScope({
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameLeagueOverride,
     newGameMode,
     newGamePresetId,
     newGamePreview,
@@ -13320,6 +13367,7 @@ export function useFoundationShellRouterBodyScope({
     teamStrategyMessage,
     toggleGameModeOwnershipTeam,
     toggleNewGameTeam,
+    toggleNewGameTeamLeague,
     toggleScoutingWatch,
     toggleTableSort,
     toggleTransferSellMarker,
