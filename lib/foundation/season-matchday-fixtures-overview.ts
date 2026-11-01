@@ -58,8 +58,8 @@ import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { getLeagueOf, type LeagueTier } from "@/lib/season/league-split";
 import { berechneErgebnisNormiert, findeSpieltagsFixtures, outcomeAusPunkten } from "@/lib/resolve/battle-mode-pps-duell";
-import { getSeasonDisciplineScheduleEntry, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
-import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { getSeasonDisciplineScheduleEntry, isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
+import { getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
 export type SpieltagsPaarungTeilnehmer = {
   teamId: string;
@@ -108,7 +108,7 @@ export type SpieltagsDuellDisziplin = {
   occurrenceInSeason: 1 | 2 | null;
   /**
    * MINI-DM-POD-RESOLVE (19.10.): die Pod-ID, der das HEIMTEAM dieser Zeile angehoert, `null`
-   * ausserhalb von Mini-DM. Ein Mini-DM-Pod verschmilzt zwei normale Fixtures zu einer
+   * ausserhalb einer Vierer-Pod-Disziplin (Mini-DM, seit 01.11. auch Battlefield). Ein Mini-DM-Pod verschmilzt zwei normale Fixtures zu einer
    * Vierergruppe (`lib/season/mini-dm-pod-schedule.ts`) -- Heim- und Gastteam DIESES Fixtures
    * koennen deshalb in VERSCHIEDENEN Pods stehen (oder in gar keinem, wenn die Liga nicht durch 4
    * teilbar ist). `punkteHeim`/`punkteGast` bleiben trotzdem je TEAM korrekt (sein eigener
@@ -171,7 +171,7 @@ export type SpieltagsUebersicht = {
   matchdayId: string;
   matchdayIndex: number;
   paarungen: SpieltagsPaarung[];
-  /** MINI-DM-POD-RESOLVE (19.10.): leer an jedem Spieltag ohne Mini-DM. */
+  /** MINI-DM-POD-RESOLVE (19.10.): leer an jedem Spieltag ohne Pod-Disziplin (Mini-DM/Battlefield). */
   miniDmPods: SpieltagsMiniDmPod[];
 };
 
@@ -224,7 +224,8 @@ export function resolveSpielquelleLabel(disziplin: Pick<SpieltagsDuellDisziplin,
     return "PPS-Duell";
   }
   if (disziplin.resolutionSource === "mini_dm_pod") {
-    return "Mini-DM-Pod (4 Teams)";
+    // Seit 01.11. nicht mehr nur Mini-DM (auch Battlefield) -- disziplinneutral beschriftet.
+    return "4-Team-Pod";
   }
   // "pps": der alte Rangtabellen-Pfad -- im Spieltage-Modus (nur Battle-Saves) nicht erwartet,
   // aber kein Fehlerwurf an einer reinen Lese-/Anzeigefunktion.
@@ -397,10 +398,10 @@ function buildMiniDmPodsForSlot(
   leagueFilter?: LeagueTier,
   saveId?: string | null,
 ): SpieltagsMiniDmPod[] {
-  if (slot.disciplineId !== MINI_DM_DISCIPLINE_ID) {
+  if (!isViererPodDiscipline(slot.disciplineId)) {
     return [];
   }
-  const abgeleitet = getMiniDmPodsForMatchday(gameState, matchdayId, { saveId });
+  const abgeleitet = getPodsForMatchday(gameState, matchdayId, slot.disciplineId, { saveId });
   const leagueTierByPodId = new Map(abgeleitet.map((pod) => [pod.id, pod.leagueTier] as const));
 
   const gebucht = new Map<string, { teamIds: readonly string[] }>();
@@ -504,10 +505,14 @@ export function buildSpieltagsUebersicht(
       options?.saveId,
     ),
   );
-  const miniDmPodIdByTeamId = new Map<string, string>();
+  // JE DISZIPLIN getrennt (01.11.): stehen zwei Pod-Disziplinen am selben Spieltag (Chris: erlaubt),
+  // steckt jedes Team in ZWEI verschiedenen Pods -- eine flache teamId -> podId-Map gaebe dann fuer
+  // beide Disziplinen den Pod der zuletzt gebauten aus.
+  const podIdByDisciplineAndTeamId = new Map<string, string>();
+  const podSchluessel = (disciplineId: string, teamId: string) => `${disciplineId}::${teamId}`;
   for (const pod of miniDmPods) {
     for (const mitglied of pod.mitglieder) {
-      miniDmPodIdByTeamId.set(mitglied.teamId, pod.podId);
+      podIdByDisciplineAndTeamId.set(podSchluessel(pod.disciplineId, mitglied.teamId), pod.podId);
     }
   }
 
@@ -542,8 +547,12 @@ export function buildSpieltagsUebersicht(
         resolutionSource: gespielt ? homeRow?.resolutionSource ?? awayRow?.resolutionSource ?? null : null,
         arenaAusfall: homeRow?.arenaAusfall ?? awayRow?.arenaAusfall ?? null,
         occurrenceInSeason: slot.occurrenceInSeason ?? null,
-        miniDmPodIdHeim: slot.disciplineId === MINI_DM_DISCIPLINE_ID ? miniDmPodIdByTeamId.get(fixture.homeTeamId) ?? null : null,
-        miniDmPodIdGast: slot.disciplineId === MINI_DM_DISCIPLINE_ID ? miniDmPodIdByTeamId.get(fixture.awayTeamId) ?? null : null,
+        miniDmPodIdHeim: isViererPodDiscipline(slot.disciplineId)
+          ? podIdByDisciplineAndTeamId.get(podSchluessel(slot.disciplineId, fixture.homeTeamId)) ?? null
+          : null,
+        miniDmPodIdGast: isViererPodDiscipline(slot.disciplineId)
+          ? podIdByDisciplineAndTeamId.get(podSchluessel(slot.disciplineId, fixture.awayTeamId)) ?? null
+          : null,
       };
     });
 

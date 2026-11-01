@@ -122,20 +122,23 @@ function ScheduleSlotRow({ slot }: { slot: ScheduleSlot }) {
   );
 }
 
-/** Ein Mitglied der eigenen Mini-DM-Vierergruppe, s. `ScheduleMiniDmPodRow`. */
+/** Ein Mitglied der eigenen Vierergruppe (Pod-Disziplin), s. `ScheduleMiniDmPodRow`. */
 type ScheduleMiniDmPodTeam = { teamId: string; name: string | null; logoPath: string | null; isActiveTeam: boolean };
+/** Eine Vierergruppe EINER Pod-Disziplin (Mini-DM, seit 01.11. auch Battlefield). */
+type SchedulePodGroup = { disciplineId: string; disciplineName: string; teams: ScheduleMiniDmPodTeam[] };
 
 /**
- * Mini-DM-Pod-Zeile (Entscheidung 5, mini-dm-spielplan-verankerung, 14.09.): ein 4-Team-Pod hat
+ * Pod-Zeile (Entscheidung 5, mini-dm-spielplan-verankerung, 14.09.): ein 4-Team-Pod hat
  * kein Heim/Auswaerts-Paar, deshalb ersetzt diese Zeile die normale `ScheduleOpponentRow` fuer
- * einen Mini-DM-Spieltag komplett, statt einen der drei anderen Pod-Teams als "den" Gegner
- * misszuverstehen.
+ * einen Pod-Spieltag komplett, statt einen der drei anderen Pod-Teams als "den" Gegner
+ * misszuverstehen. Seit 01.11. gibt es mehr als eine Pod-Disziplin (Battlefield) -- die Zeile
+ * nennt deshalb die Disziplin, und an einem Spieltag mit zwei Pod-Disziplinen steht je eine Zeile.
  */
-function ScheduleMiniDmPodRow({ pod }: { pod: ScheduleMiniDmPodTeam[] }) {
+function ScheduleMiniDmPodRow({ pod, disciplineName }: { pod: ScheduleMiniDmPodTeam[]; disciplineName?: string | null }) {
   return (
     <div className="nl-diszis-md-opponent nl-diszis-md-minidm-pod">
       <span className="nl-diszis-md-opponent-name">
-        4er-Pod: {pod.map((team) => team.name ?? team.teamId).join(" · ")}
+        4er-Pod{disciplineName ? ` ${disciplineName}` : ""}: {pod.map((team) => team.name ?? team.teamId).join(" · ")}
       </span>
     </div>
   );
@@ -147,6 +150,16 @@ function ScheduleMiniDmPodRow({ pod }: { pod: ScheduleMiniDmPodTeam[] }) {
  * liefert er `opponentTeamId: null`, die Karte sieht dann exakt wie vor dieser Aenderung aus.
  */
 function ScheduleOpponentRow({ row }: { row: ScheduleRow }) {
+  const podGroups = ((row.podGroups as SchedulePodGroup[] | null | undefined) ?? []).filter((group) => group.teams.length > 0);
+  if (podGroups.length > 0) {
+    return (
+      <>
+        {podGroups.map((group) => (
+          <ScheduleMiniDmPodRow key={group.disciplineId} pod={group.teams} disciplineName={group.disciplineName} />
+        ))}
+      </>
+    );
+  }
   const miniDmPod = (row.miniDmPod as ScheduleMiniDmPodTeam[] | null | undefined) ?? null;
   if (miniDmPod && miniDmPod.length > 0) {
     return <ScheduleMiniDmPodRow pod={miniDmPod} />;

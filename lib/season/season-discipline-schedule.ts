@@ -152,6 +152,36 @@ function buildSeasonPlayerCount(discipline: Discipline, seed: string) {
  */
 export const MINI_DM_DISCIPLINE_ID = "mini-dm";
 
+/** Battlefields Disziplin-ID -- s. `VIERER_POD_DISCIPLINE_IDS`. */
+export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
+
+/**
+ * VIERER-POD-DISZIPLINEN (01.11., Chris' Freigabe "eine 4er-Diszi je Bereich pow/spe/men/soc"):
+ * jede Disziplin in dieser Menge wird in einem Battle-Save NICHT als Zweier-Duell gegen den
+ * Spielplan-Gegner gewertet, sondern als Vierergruppe ("Pod", `lib/season/mini-dm-pod-schedule.ts`)
+ * mit Liga-Punkten 2-1-0-0 nach Platz (`MINI_DM_POD_TEAM_PUNKTE`, lib/resolve/mini-dm-pod-resolve.ts).
+ *
+ * Chris' drei Entscheidungen (01.11.), alle drei hier umgesetzt:
+ *  1. Punkte: dieselbe 2-1-0-0-Form wie Mini-DM.
+ *  2. Gruppen: je Disziplin-Event FRISCH gelost -- der Pod-Seed traegt die Disziplin-ID, zwei
+ *     Pod-Disziplinen bekommen also nie automatisch dieselben vier Teams.
+ *  3. Kollisionen: zwei Pod-Disziplinen am selben Spieltag sind erlaubt, KEINE Spielplan-Regel
+ *     dagegen (`buildSeededDisciplinePairs()` bleibt unveraendert).
+ *
+ * MINI-DM: echte Pod-Disziplin seit 19.10. (PPS-Pod), mit FFA-Motor-Vorrang seit 24.10.
+ * BATTLEFIELD (01.11.): PPS-Pod -- derselbe deterministische Eignungs-Score, ueber den Battlefield
+ * schon vorher als PPS-Duell gewertet wurde (nie arena-angeschlossen, s.
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`), nur als Vierergruppe statt Zweier-Duell. Kein FFA-/Domination-
+ * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
+ * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT -- ihre Zwei-Bahnen-Motoren muessen erst
+ * auf vier Bahnen umgebaut und neu abgenommen werden.
+ */
+export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
+
+export function isViererPodDiscipline(disciplineId: string | null | undefined): boolean {
+  return disciplineId != null && VIERER_POD_DISCIPLINE_IDS.has(disciplineId);
+}
+
 /**
  * REVIDIERT (Chris, 21.10., zur Mini-DM-Kadergroesse): "natuerlich wollen wir 2-6 spieler in
  * JEDER disziplin!!!" -- nimmt die 14.09.-Entscheidung ("mini dm sind immer 4 teams mit je 1

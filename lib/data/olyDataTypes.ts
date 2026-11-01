@@ -2643,7 +2643,8 @@ export type DisciplineResultRecord = {
   /**
    * MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): additiv und optional,
    * NUR an `resolutionSource: "mini_dm_pod"`-Zeilen gesetzt -- jede andere Disziplin/jeder andere
-   * Modus bleibt unberuehrt. Traegt die echte Vierergruppe (Pod), aus der `teamPoints` (2-1-0-0)
+   * Modus bleibt unberuehrt. Seit 01.11. fuer JEDE Vierer-Pod-Disziplin (Mini-DM, Battlefield, s.
+   * `VIERER_POD_DISCIPLINE_IDS`); Feldname aus Persistenz-Gruenden unveraendert. Traegt die echte Vierergruppe (Pod), aus der `teamPoints` (2-1-0-0)
    * stammt, damit die UI (season-matchday-fixtures-overview.ts) die Gruppe als das zeigen kann, was
    * sie ist -- vier Teams, nicht ein 2-Team-Duell. `wert` ist die N-Team-0-10-Normierung dieses
    * Teams (`berechneErgebnisNormiertNTeam()`, mini-dm-pod-resolve.ts) -- dieselbe Garantie wie

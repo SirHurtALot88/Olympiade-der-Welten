@@ -1,4 +1,12 @@
 /**
+ * VERALLGEMEINERT (01.11.): diese Datei bildet seit Battlefields Umstellung die Vierergruppen fuer
+ * JEDE Disziplin in `VIERER_POD_DISCIPLINE_IDS` (season-discipline-schedule.ts), nicht mehr nur fuer
+ * Mini-DM -- `getPodsForMatchday(gameState, matchdayId, disciplineId)` ist der disziplinneutrale
+ * Einstieg, `getMiniDmPodsForMatchday()` ein duenner Wrapper darauf. Der Pod-Seed traegt fuer jede
+ * Disziplin ausser Mini-DM die Disziplin-ID (s. `podSeedTeil()`); Mini-DMs Seed und Pod-IDs sind
+ * unveraendert. Der Rest dieses Kopfkommentars beschreibt die (unveraenderte) Bildung am
+ * urspruenglichen Mini-DM-Fall.
+ *
  * MINI-DM VIERERGRUPPEN (PODS) — additiv, parallel zu `Fixture`/`RoundPairing`, ohne deren Form
  * zu aendern (Chris' Entscheidung, 14.09., "mini-dm-spielplan-verankerung": "additiver, zum
  * bestehenden Modell paralleler Datensatz", NICHT eine Erweiterung von `Fixture` selbst — siehe
@@ -51,6 +59,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   getSeasonDisciplineSchedule,
   getSeasonDisciplineScheduleEntry,
+  isViererPodDiscipline,
   MINI_DM_DISCIPLINE_ID,
 } from "@/lib/season/season-discipline-schedule";
 import { buildCircleRounds } from "@/lib/season/season-fixture-schedule";
@@ -89,17 +98,28 @@ function shuffleSeeded<T>(items: readonly T[], seed: string): T[] {
   return next;
 }
 
+/**
+ * EINE Vierergruppe EINER Pod-Disziplin (`VIERER_POD_DISCIPLINE_IDS`, season-discipline-schedule.ts)
+ * an EINEM Spieltag. Der Name ist historisch (Mini-DM war bis 01.11. die einzige Pod-Disziplin) --
+ * seit Battlefields Umstellung traegt jeder Pod seine `disciplineId` selbst; `ViererPod` ist der
+ * disziplinneutrale Alias fuer neuen Code.
+ */
 export type MiniDmPod = {
   id: string;
+  /** Die Pod-Disziplin, fuer die diese Gruppe gelost wurde (seit 01.11.; "mini-dm" oder "battlefield"). */
+  disciplineId: string;
   seasonId: string;
   matchdayId: string;
   /** `null` im Legacy-32er-Modus ohne Liga-Split (`isLeagueSplitActive() === false`) -- dort bildet
    *  sich EIN Pool aus allen `TEAM_COUNT_TOTAL` Teams statt zwei ligagetrennter Pools. */
   leagueTier: LeagueTier | null;
-  /** Welches der (bei Battle-Mode-Repeat) zwei Saison-Vorkommen von Mini-DM dieser Pod bedient. */
+  /** Welches der (bei Battle-Mode-Repeat) zwei Saison-Vorkommen der Disziplin dieser Pod bedient. */
   occurrenceInSeason: 1 | 2;
   teamIds: [string, string, string, string];
 };
+
+/** Disziplinneutraler Alias, s. `MiniDmPod`. */
+export type ViererPod = MiniDmPod;
 
 /**
  * Reine Funktion: eine Menge Team-IDs -> Liste von Vierer-Pods, per `buildCircleRounds()` auf
@@ -134,15 +154,15 @@ function getMiniDmTeamPools(gameState: GameState): Array<{ tier: LeagueTier | nu
 }
 
 /**
- * Ist `matchdayId` ein Mini-DM-Spieltag (D1 oder D2), UND welches Saison-Vorkommen ist es -- oder
- * `null`, wenn Mini-DM an diesem Spieltag gar nicht laeuft.
+ * Steht `disciplineId` an `matchdayId` (D1 oder D2), UND welches Saison-Vorkommen ist es -- oder
+ * `null`, wenn diese Disziplin an diesem Spieltag gar nicht laeuft.
  */
-function findMiniDmOccurrenceForMatchday(gameState: GameState, matchdayId: string): 1 | 2 | null {
+function findPodDisciplineOccurrenceForMatchday(gameState: GameState, matchdayId: string, disciplineId: string): 1 | 2 | null {
   const entry = getSeasonDisciplineSchedule(gameState).find((candidate) => candidate.matchdayId === matchdayId);
   if (!entry) {
     return null;
   }
-  const slot = [entry.discipline1, entry.discipline2].find((candidate) => candidate?.disciplineId === MINI_DM_DISCIPLINE_ID);
+  const slot = [entry.discipline1, entry.discipline2].find((candidate) => candidate?.disciplineId === disciplineId);
   if (!slot) {
     return null;
   }
@@ -150,18 +170,39 @@ function findMiniDmOccurrenceForMatchday(gameState: GameState, matchdayId: strin
 }
 
 /**
- * Die Mini-DM-Vierergruppen fuer EINEN Spieltag -- leer, wenn Mini-DM an diesem Spieltag nicht
- * laeuft (jeder andere Spieltag, also die weit ueberwiegende Mehrheit) oder eine Liga/der
- * Legacy-Pool nicht durch 4 teilbar ist. Deterministisch fuer denselben
- * (saveId, seasonId, matchdayId, leagueByTeamId, occurrenceInSeason) -- wiederholte Aufrufe (z. B.
- * einmal fuers Spielplan-UI, einmal fuer den Headless-Runner) liefern dieselben vier Teams je Pod.
+ * Seed und Pod-ID je Pod-Disziplin. MINI-DM BLEIBT BYTE-IDENTISCH zum Stand vor der
+ * Verallgemeinerung (01.11.): `mini-dm-pods-v1` ohne weiteren Disziplin-Teil und das Praefix
+ * `minidm-pod:` -- bestehende Spielstaende kuendigen fuer kommende Mini-DM-Spieltage also exakt
+ * dieselben Gruppen an wie vorher, und der FFA-Vorlauf (Pod-ID im Match-Seed, `buildMiniDmFfaPodMatchSeed`,
+ * und im Eingabe-Hash) bleibt gueltig. JEDE ANDERE Pod-Disziplin bekommt ihre Disziplin-ID in den
+ * Seed (Chris' Entscheidung 2, 01.11.: "je Disziplin-Event frisch gelost") -- ohne das zoegen alle
+ * Pod-Disziplinen desselben Vorkommens dieselben vier Gruppen (Konzept 01.11., Abschnitt 3).
  */
-export function getMiniDmPodsForMatchday(
+function podSeedTeil(disciplineId: string): string {
+  return disciplineId === MINI_DM_DISCIPLINE_ID ? "mini-dm-pods-v1" : `${disciplineId}-pods-v1`;
+}
+
+function podIdPraefix(disciplineId: string): string {
+  return disciplineId === MINI_DM_DISCIPLINE_ID ? "minidm-pod" : `${disciplineId}-pod`;
+}
+
+/**
+ * Die Vierergruppen EINER Pod-Disziplin fuer EINEN Spieltag -- leer, wenn `disciplineId` keine
+ * Pod-Disziplin ist (`isViererPodDiscipline`), an diesem Spieltag nicht laeuft, oder eine Liga/der
+ * Legacy-Pool nicht durch 4 teilbar ist. Deterministisch fuer denselben
+ * (saveId, seasonId, matchdayId, disciplineId, leagueByTeamId, occurrenceInSeason) -- wiederholte
+ * Aufrufe (Spielplan-UI, Resolve, Headless-Runner) liefern dieselben vier Teams je Pod.
+ */
+export function getPodsForMatchday(
   gameState: GameState,
   matchdayId: string,
+  disciplineId: string,
   options?: { saveId?: string | null },
 ): MiniDmPod[] {
-  const occurrenceInSeason = findMiniDmOccurrenceForMatchday(gameState, matchdayId);
+  if (!isViererPodDiscipline(disciplineId)) {
+    return [];
+  }
+  const occurrenceInSeason = findPodDisciplineOccurrenceForMatchday(gameState, matchdayId, disciplineId);
   if (occurrenceInSeason == null) {
     return [];
   }
@@ -175,11 +216,12 @@ export function getMiniDmPodsForMatchday(
       continue;
     }
     const tierLabel = pool.tier ?? "legacy-pool";
-    const seed = `${saveId}:${seasonId}:mini-dm-pods-v1:${tierLabel}:occurrence-${occurrenceInSeason}`;
+    const seed = `${saveId}:${seasonId}:${podSeedTeil(disciplineId)}:${tierLabel}:occurrence-${occurrenceInSeason}`;
     const groups = buildMiniDmPodGroups(pool.teamIds, seed);
     groups.forEach((teamIds, podIndex) => {
       pods.push({
-        id: `minidm-pod:${seasonId}:${tierLabel}:${matchdayId}:${podIndex}`,
+        id: `${podIdPraefix(disciplineId)}:${seasonId}:${tierLabel}:${matchdayId}:${podIndex}`,
+        disciplineId,
         seasonId,
         matchdayId,
         leagueTier: pool.tier,
@@ -192,15 +234,60 @@ export function getMiniDmPodsForMatchday(
   return pods;
 }
 
-/** Der Pod eines konkreten Teams an einem Spieltag -- `null`, wenn keiner existiert (Team nicht in
- *  Mini-DMs Spieltag involviert, oder gar kein Mini-DM-Spieltag). */
+/** Der Pod eines konkreten Teams in EINER Pod-Disziplin an einem Spieltag -- `null`, wenn keiner existiert. */
+export function getPodForTeam(
+  gameState: GameState,
+  teamId: string,
+  matchdayId: string,
+  disciplineId: string,
+  options?: { saveId?: string | null },
+): MiniDmPod | null {
+  return getPodsForMatchday(gameState, matchdayId, disciplineId, options).find((pod) => pod.teamIds.includes(teamId)) ?? null;
+}
+
+/**
+ * Welche Pod-Disziplinen stehen an `matchdayId` (in Slot-Reihenfolge D1, D2)? Leer an fast jedem
+ * Spieltag; zwei Eintraege, wenn zwei Pod-Disziplinen zusammenfallen (Chris 01.11.: erlaubt).
+ */
+export function getPodDisciplineSlotsForMatchday(
+  gameState: GameState,
+  matchdayId: string,
+  options?: { saveId?: string | null },
+): Array<{ disciplineId: string; displayName: string; disciplineSide: "d1" | "d2" }> {
+  const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId, options);
+  if (!entry) return [];
+  const slots: Array<{ disciplineId: string; displayName: string; disciplineSide: "d1" | "d2" }> = [];
+  for (const [slot, disciplineSide] of [
+    [entry.discipline1, "d1"],
+    [entry.discipline2, "d2"],
+  ] as const) {
+    if (slot && isViererPodDiscipline(slot.disciplineId)) {
+      slots.push({ disciplineId: slot.disciplineId, displayName: slot.displayName, disciplineSide });
+    }
+  }
+  return slots;
+}
+
+/**
+ * Die Mini-DM-Vierergruppen fuer EINEN Spieltag -- duenner Wrapper um `getPodsForMatchday()`
+ * (unveraenderte Signatur fuer die Mini-DM-FFA-Aufrufer: Vorlauf, Eingabe-Hash, Arena-Host).
+ */
+export function getMiniDmPodsForMatchday(
+  gameState: GameState,
+  matchdayId: string,
+  options?: { saveId?: string | null },
+): MiniDmPod[] {
+  return getPodsForMatchday(gameState, matchdayId, MINI_DM_DISCIPLINE_ID, options);
+}
+
+/** Der Mini-DM-Pod eines konkreten Teams an einem Spieltag -- s. `getPodForTeam()`. */
 export function getMiniDmPodForTeam(
   gameState: GameState,
   teamId: string,
   matchdayId: string,
   options?: { saveId?: string | null },
 ): MiniDmPod | null {
-  return getMiniDmPodsForMatchday(gameState, matchdayId, options).find((pod) => pod.teamIds.includes(teamId)) ?? null;
+  return getPodForTeam(gameState, teamId, matchdayId, MINI_DM_DISCIPLINE_ID, options);
 }
 
 /**
