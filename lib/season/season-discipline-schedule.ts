@@ -175,6 +175,16 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
  * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT -- ihre Zwei-Bahnen-Motoren muessen erst
  * auf vier Bahnen umgebaut und neu abgenommen werden.
+ *
+ * ABNAHME BATTLEFIELD IM 4ER-FORMAT (01.11., scripts/miss-battlefield-pod-abnahme.ts,
+ * data/generated/battlefield-pod-abnahme.json; 80 echte Pods je k und Saatstrom, zwei disjunkte
+ * Spieltagsfenster): Spieler-rho je Pod (4k Spieler) k=2 0,64/0,66 · k=3 0,78/0,80 · k=4 0,81/0,82 ·
+ * k=5 0,83/0,84 · k=6 0,85/0,85. Die 0,80-Schranke haelt erst ab k=4. Star auf Rang 1 nur 43-61 %,
+ * unter den ersten zwei 59-74 %, Paare ab 15 Punkten 96-99 % richtig. Auf denselben Daten als
+ * Zweier-Duell gerechnet waere es bei JEDEM k schlechter (k=2 0,31/0,44, k=4 0,75/0,78): der Pod
+ * aendert die Spieler-PP nicht (rein `ppAusSpielerScore()`), er vergroessert nur das Feld.
+ * OFFEN: k=2/3 verfehlen die Schranke -- ob dafuer eine Ausnahme wie bei Mini-DM (24.10.) gilt,
+ * entscheidet Chris; bis dahin ist das NICHT als abgenommen zu lesen.
  */
 export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
 
