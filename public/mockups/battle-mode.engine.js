@@ -45056,7 +45056,17 @@
   // oft genug kommen, um ins Gewicht zu fallen.
   // Bahnzahl und Hindernisorte kommen jetzt aus BAHN_ART. Beide Namen bleiben als
   // Funktion stehen, damit der Motor unveraendert lesen kann.
-  const BAHNEN_N=()=>BA().bahnenFest||BA().jeSeite*2;
+  // N BAHNEN STATT ZWEI SEITEN (Pod-Format, 01.11., Chris' Entscheidung: Takeshi und Staffel
+  // als 4-Team-Disziplin wie Mini-DM). `bahnPodKader` ist `null` im klassischen Duell SQUAD
+  // gegen OPP — dann ist `bahnSeitenN()` 2 und JEDE Zeile, die davon abhaengt (BAHNEN_N,
+  // Bahnvergabe in bauSpurt, Startfolge), rechnet Zeichen fuer Zeichen wie vorher. Gesetzt
+  // wird es ausschliesslich von `spieleBahnPod()`/`bahnPodSonde()` (weiter unten, im
+  // try/finally, danach immer wieder `null`): eine Liste von N Team-Kadern, Seite s = Team s.
+  // Die Bahnzahl waechst mit der Seitenzahl (je Laeufer eine Bahn wie im Duell), damit die
+  // Rempler-/Bahnwechsel-Dichte je Laeufer dieselbe bleibt.
+  let bahnPodKader=null;
+  const bahnSeitenN=()=>bahnPodKader?bahnPodKader.length:2;
+  const BAHNEN_N=()=>BA().bahnenFest?BA().bahnenFest*bahnSeitenN()/2:BA().jeSeite*bahnSeitenN();
   const HUERDEN_N=()=>BA().hindernisse;
   // FALLENFOLGE JE RENN-SAAT (Takeshi's Castle, B.4/B.6 des Plans): `BAHN_ART.kurse`
   // fuehrt nur Takeshi (Spurt/Staffel/Zeitfahren/Klettern haben kein `kurse`-Feld und
@@ -45907,7 +45917,9 @@
 
   function bauSpurt(saat){
     seed=normalisiereSaat(saat); rennT=0; done=false; LAEUFER=[]; rennFertig=[]; floats.length=0;
-    fortschrittVerlauf={0:[],1:[]};
+    // Ein Verlaufspuffer je Seite (im Duell {0:[],1:[]} wie bisher, im Pod einer je Team).
+    fortschrittVerlauf={};
+    for(let s=0;s<bahnSeitenN();s++)fortschrittVerlauf[s]=[];
     // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln, Kommentar bei bauBuehne()).
     letzterBuehneBahnGrossT=-Infinity;
     // DREI BENANNTE KURSE JE SAAT (Takeshi's Castle, B.4 des Plans, Chris' Entscheidung
@@ -46039,7 +46051,20 @@
     // einem echten 20-Spieltage-Battle-Save: ALLE 64 Staffel-Zeilen [0,0]/1:1. Ohne Aufstellung
     // (Ersatzaufstellung, jede kaderfeste Messung) laufen immer `n` = 6 Laeufer, `idx/6` bleibt
     // dort Zeichen fuer Zeichen derselbe Wert — rho/Pp-Messungen sind dadurch unberuehrt.
-    const staffelBeine=[Math.max(1,mine.length),Math.max(1,gegen.length)];
+    // POD (N Teams, s. `bahnPodKader`): jedes Team liest seine Aufstellung genau wie die
+    // Heimseite (`place` haelt dann die zusammengefuehrten Aufstellungen aller N Teams, s.
+    // spieleBahnPod()), ohne Aufstellung die besten n nach Eignung DIESER Disziplin — die
+    // Ersatzaufstellung der Heimseite, fuer alle Teams gleich. Im Duell bleibt es bei
+    // [mine, gegen], Zeichen fuer Zeichen wie vorher.
+    const seitenListen=bahnPodKader
+      ? bahnPodKader.map(kader=>{
+          const ges=kader.filter(p=>place[p.n]&&place[p.n].d===d);
+          return (ges.length?staffelNachSlot(ges)
+            :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,n);
+        })
+      : [mine,gegen];
+    const staffelBeine=seitenListen.map(l=>Math.max(1,l.length));
+    const seitenN=seitenListen.length;
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
       // BEIDE SEITEN GLEICH BAUEN. Hier stand derselbe Fehler, der im TDM die 0:6 in
@@ -46243,7 +46268,7 @@
       // wie bisher, nur eine Zwischenstufe) und die eigentliche Umkehr im Block direkt nach
       // `gegen.forEach` unten ("E5 — STARTFOLGE 'FAVORIT ZULETZT, TEAMS IM WECHSEL'"), der jedes
       // `L.startT` hier noch einmal ueberschreibt.
-      if(art.startAbstand)L.startT=(idx*2+seite)*art.startAbstand;
+      if(art.startAbstand)L.startT=(idx*seitenN+seite)*art.startAbstand;
       // TAGESFORM (Zeitfahren, K5, Recherche Abschnitt 3.6): EINMAL je Laeufer gezogen,
       // nicht je Tick — sonst waere es kein "Tagesform"-Rauschen, sondern ein zufaelliges
       // Zittern ueber das ganze Rennen. Gated hinter `art.tagesform`; ohne das Feld bleibt
@@ -46251,8 +46276,9 @@
       if(art.tagesform)L.formTag=1+(rr()-0.5)*2*art.tagesform;
       LAEUFER.push(L);
     };
-    mine.forEach((p,i)=>setz(p,0,i*2,false,i));
-    gegen.forEach((o,i)=>setz(o,1,i*2+1,true,i));
+    // Bahn i*N+s: die Teams liegen im Wechsel nebeneinander. Fuer N=2 genau die alten zwei
+    // Zeilen (Heim i*2, Gast i*2+1, erst alle Heim-, dann alle Gastlaeufer).
+    seitenListen.forEach((liste,s)=>liste.forEach((p,i)=>setz(p,s,i*seitenN+s,s>0,i)));
     // E5 — STARTFOLGE "FAVORIT ZULETZT, TEAMS IM WECHSEL" (Chris, 14.10.,
     // docs/design/fable-konzept-chris-feedback-13-10.md Abschnitt 9, Frage E5, woertlich:
     // "ja favorit zuletzt -> fahrer aus den teams abwechselnd"). Das dreht die bisherige
@@ -46694,7 +46720,9 @@
     for(const o of team){ if(o.wechselNetto!=null){ gewinn+=o.wechselGewinn||0; netto+=o.wechselNetto; } }
     const getragen=team.filter(o=>o.zugErgebnis==="getragen").length;
     const eingebrochen=team.filter(o=>o.zugErgebnis==="eingebrochen").length;
-    const text=VEREIN[seite].name+" — Rennplan-Bilanz: fliegend gewonnen −"+fmtDauer(gewinn)
+    // POD (N Teams, 01.11.): VEREIN kennt nur die zwei Duell-Seiten; Seite 2/3 eines Pods
+    // bekommt einen neutralen Namen (der Text geht ohnehin nur in den im Pod stummen Ticker).
+    const text=(VEREIN[seite]||{name:"Team "+(seite+1)}).name+" — Rennplan-Bilanz: fliegend gewonnen −"+fmtDauer(gewinn)
       +" (Wechsel netto "+(netto<0?"−":"+")+fmtDauer(Math.abs(netto))+") · Angriffe: "
       +getragen+" getragen, "+eingebrochen+" eingebrochen.";
     return {gewinn, netto, getragen, eingebrochen, text};
@@ -46960,7 +46988,7 @@
     // Puffer klein und monoton in `p`, genau was staffelZeitDelta fuer die
     // Interpolation braucht.
     if(BA().staffel){
-      for(const s of [0,1]){
+      for(let s=0;s<bahnSeitenN();s++){
         const p=gesamtfortschritt(s), buf=fortschrittVerlauf[s];
         if(!buf.length||p>buf[buf.length-1].p)buf.push({t:rennT,p});
       }
@@ -55907,6 +55935,192 @@
     const vorher=stumm; stumm=true;
     try{ M.lauf(); } finally { stumm=vorher; }
   }
+
+  // ===================================================================================
+  // BAHN IM POD-FORMAT: N TEAMS AUF EINER STRECKE (01.11.).
+  //
+  // Chris' Entscheidung (01.11., docs/design/bahn-pod-vier-teams-01-11.md): je Kernbereich
+  // eine 4-Team-Disziplin wie Mini-DM — Takeshi's Castle (men) und Staffel (spe) laufen dafuer
+  // als ECHTES Vier-Team-Rennen, nicht als Eignungs-Score. Punkte 2-1-0-0 wie Mini-DM,
+  // Gruppen je Disziplin-Event frisch gelost (das macht die Liga, nicht dieser Motor).
+  //
+  // DER MOTOR IST DERSELBE. bauSpurt()/stepSpurt() kennen seit diesem Umbau N Seiten (s.
+  // `bahnPodKader`), alles Uebrige — Rezepte, Fallen, Rempler "jeder gegen jeden", Gedraenge,
+  // Wechsel, Wertung je Laeufer (MOTOREN[bd].wert()) — laeuft unveraendert. Im Duell
+  // (`bahnPodKader===null`) ist jede beruehrte Zeile Zeichen fuer Zeichen die alte; das
+  // pruefen tests/bahn-pod-vier-teams.test.ts (Fingerabdruecke vom Stand vor dem Umbau) und die
+  // Vorher/Nachher-Messung (docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 2).
+  //
+  // Nur headless: die Zeichnung (Bahnen, HUD "X : Y", Banner) bleibt zweiseitig und wird von
+  // hier nie aufgerufen (`stumm`).
+  const BAHN_POD_DISZIPLINEN=Object.freeze(["takeshis-castle","staffel"]);
+  // Teamwert je Seite, groesser = besser, plus der Wert je Laeufer fuer den Boxscore (dieselbe
+  // Zahl, die spieleBahn() im Duell je Laeufer liefert).
+  //  - Takeshi ("burg"): Summe der Burgpunkte je Team, genau wie bahnTeamstand() im Duell.
+  //  - Staffel ("etappe"): wer zuerst im Ziel ist — Rangfolge der Zielzeiten der N Anker;
+  //    ein Team ohne Zieleinlauf liegt hinter jedem, das ankam (untereinander gleichauf).
+  function bahnPodErgebnis(N){
+    const art=BA();
+    const r1=(v)=>Math.round(v*10)/10;
+    if(art.wertung==="burg"){
+      const punkte=new Map(), summe=new Array(N).fill(0);
+      for(const u of LAEUFER){const p=burgwertung(u); punkte.set(u.id,p); summe[u.seite]+=p;}
+      const teamWert=summe.map(r1);
+      return {punkte, teamWert, anzeige:teamWert, zielzeit:null};
+    }
+    if(art.wertung==="etappe"){
+      const w=bahnRangliste();
+      const zielzeit=[];
+      for(let s=0;s<N;s++){const u=LAEUFER.find(x=>x.seite===s&&x.fertig!=null); zielzeit.push(u?u.fertig:null);}
+      return {punkte:w.punkte, teamWert:zielzeit.map(z=>z==null?-Infinity:-z), anzeige:zielzeit, zielzeit};
+    }
+    throw new Error("bahnPodErgebnis: keine Pod-Wertung fuer '"+art.wertung+"'.");
+  }
+  // Punktetabelle je Platz: 2-1-0-0 (Mini-DM) fuer vier Teams, sonst 2-1 und Rest 0.
+  const bahnPodPunkteTabelle=(N)=>Array.from({length:N},(_,i)=>MINI_DM_FFA_LIGAPUNKTE[i]??0);
+
+  // Kern beider Einstiege: setzt Kader, Aufstellung und Persoenlichkeiten fuer GENAU einen Lauf,
+  // faehrt ihn stumm und stellt danach alles wieder her (place/persOf sind Modul-Objekte, die
+  // das Duell weiter braucht). `vorbereiten()` laeuft nach dem Kadertausch und vor bau() —
+  // dort ziehen die Aufrufer Formkarten/Mutatoren.
+  function bahnPodLauf(bd,teams,saat,platzJeTeam,vorbereiten){
+    if(!BAHN_ART[bd]||!BAHN_POD_DISZIPLINEN.includes(bd))
+      throw new Error("spieleBahnPod: '"+bd+"' laeuft nicht im Pod-Format (nur "+BAHN_POD_DISZIPLINEN.join(", ")+").");
+    if(!Array.isArray(teams)||teams.length<2)
+      throw new Error("spieleBahnPod: braucht mindestens 2 Team-Kader, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
+    if(teams.some(k=>!Array.isArray(k)||!k.length))
+      throw new Error("spieleBahnPod: mindestens ein Team stellt keinen einzigen Laeufer.");
+    const M=MOTOREN[bd];
+    const g=M.sichern(); if(M.vorher)M.vorher();
+    const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm;
+    const kader=teams.map(k=>mitKit(k));
+    try{
+      for(const k in place)delete place[k];
+      for(const pl of (platzJeTeam||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+      if(vorbereiten)vorbereiten(kader);
+      bahnPodKader=kader;
+      stumm=true;
+      M.bau(saat); M.lauf();
+      const N=kader.length;
+      const e=bahnPodErgebnis(N);
+      const {punkte:ligaPunkte,platz}=verteilePlatzierungspunkte(e.teamWert,bahnPodPunkteTabelle(N));
+      const wert=M.wert();
+      const laeufer=LAEUFER.map(u=>({n:u.n,side:u.seite,
+        eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig,
+        wert:wert[u.n]||0, punkte:e.punkte?(e.punkte.get(u.id)??0):0,
+        fertig:u.fertig, raus:!!u.raus, bein:u.bein??null}));
+      return {disziplin:bd, saat:normalisiereSaat(saat),
+        teams:kader.map((_,s)=>({side:s, wert:e.anzeige[s], zielzeit:e.zielzeit?e.zielzeit[s]:null,
+          eventPlatz:platz[s], ligaPunkte:ligaPunkte[s]})),
+        laeufer};
+    } finally {
+      stumm=stummVorher; bahnPodKader=null;
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+      for(const k in persOf)delete persOf[k];
+      Object.assign(persOf,persVorher);
+      M.zurueck(g);
+    }
+  }
+
+  // PRODUKTIONS-EINSTIEG, dieselbe Form wie spieleMiniDmFfaEvent(teams,saat,platzJeTeam,optionen):
+  // `teams` N Team-Kader (ArenaSpieler[]), `platzJeTeam` je Team ein `place` (buildArenaAufstellung),
+  // `optionen.formSaat` zieht Formkarten fuer ALLE N Kader (sonst haetten nur die zwei
+  // Bootstrap-Teams eine, derselbe Fehler wie Mini-DMs OPUS-REVIEW B1, s. dort). Die globale
+  // FORMKARTE wird danach wiederhergestellt.
+  // Rueckgabe: `teams[s]` = {side, wert (Burgpunkte bzw. Zielzeit), eventPlatz, ligaPunkte 2-1-0-0},
+  // `boxscore` = je Laeufer {name, side, wert} mit DEMSELBEN `wert` wie spieleBahn() im Duell
+  // (Burgpunkte bzw. Rangpunkte der Etappe ueber alle Laeufer des Rennens).
+  function spieleBahnPod(bd,teams,saat,platzJeTeam,optionen){
+    const opt=optionen||{};
+    const formVorher=FORMKARTE;
+    try{
+      const r=bahnPodLauf(bd,teams,saat,platzJeTeam,(kader)=>{
+        FORMKARTE={...FORMKARTE};
+        if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
+      });
+      return {disziplin:r.disziplin, saat:r.saat, teams:r.teams,
+        boxscore:r.laeufer.map(u=>({name:u.n, side:u.side, wert:u.punkte}))};
+    } finally { FORMKARTE=formVorher; }
+  }
+
+  // RANGTREUE-SONDE IM POD-FORMAT, dieselbe Bauart wie disziplinProbe()/miniDmFfaSonde():
+  // `kader` = Liste von Team-Kadern, `opt.gruppen` = Liste von Gruppen (Indizes in `kader`),
+  // `opt.n` Rennen je Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` Laeufer je Team (Standard
+  // art.jeSeite), `opt.mutatoren` "je-spiel" (Standard, wie disziplinProbe) | "aus".
+  // Formkarten je Rennen fuer alle Teams der Gruppe (mdffaVorbereiten-Muster). Gemessen wird
+  // `eig` OHNE Mutator gegen MOTOREN[bd].wert() — exakt die Groessen von disziplinProbe().
+  function bahnPodSonde(bd,kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const art=BAHN_ART[bd];
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN, jeSeiteVorher=art&&art.jeSeite;
+    const events=[];
+    try{
+      if(o.jeSeite&&art)art.jeSeite=o.jeSeite;
+      (o.gruppen||[]).forEach((gr,g)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+g*104729+i*7919)>>>0;
+          const r=bahnPodLauf(bd,teams,saat,null,(k)=>{
+            FORMKARTE={};
+            mdffaFormkartenFuer(k,(20260823+versatz+g*7919+i*104729)>>>0);
+            MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+              :zieheMutatorenWieSpiel((20260823+versatz+g*7919+i*15485863)>>>0);
+          });
+          events.push({gruppe:g, i, saat, teamsIx:gr, teams:r.teams,
+            teilnehmer:r.laeufer.map(u=>({n:u.n, side:u.side, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, fertig:u.fertig, raus:u.raus, bein:u.bein}))});
+        }
+      });
+    } finally {
+      FORMKARTE=formVorher; MUTATOREN=mutVorher;
+      if(art)art.jeSeite=jeSeiteVorher;
+    }
+    return {disziplin:bd, events};
+  }
+
+  // PP-ABNAHME IM POD-FORMAT (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon()
+  // (s. unten — gleiche Hebung +15, gleiche Saaten, gleiche Mutator-Modi, gleiche Abweichungs-
+  // rechnung gegen PP_MATRIX_JE_DISC), nur dass jeder Lauf ein VIER-Team-Rennen ist: die zwei
+  // Duell-Kader SQUAD/OPP (dieselben zwoelf Messpersonen wie einflussVon) plus `extraTeams` als
+  // Seite 2/3. Gehoben und gemessen werden nur die Laeufer von SQUAD/OPP — damit ist die Zahl
+  // direkt mit der Duell-Abnahme vergleichbar; die zwei Zusatzteams stellen nur das Feld.
+  function bahnPodEinfluss(bd,extraTeams,n,plus,saatVersatz,mutatorModus){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP,...(extraTeams||[])];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>bahnPodLauf(bd,teams,1337+versatz+i*7919,null,(k)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+      else if(modus==="aus")MUTATOREN=[];
+    });
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).laeufer.filter(u=>u.side<2).map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).laeufer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=(durchlauf(wer,at)[wer]-grund[wer]);
+        return {attribut:at, gewinn:+(summe/namen.length).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC[bd]||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,k)=>acc+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:bd, format:"pod", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
   // `saatVersatz` (Pp-Fix Time-Trial, 23.09., zweiter Saatstrang): additiver Parameter,
   // default 0 -> bit-identisch zum bisherigen Aufruf. Verschiebt BEIDE Seed-Reihen
   // (Formkarten und M.bau) um denselben Betrag, sodass ein zweiter Aufruf mit grossem,
@@ -57773,6 +57987,12 @@
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
     },
+    // POD-FORMAT (01.11.): N Teams auf einer Bahn, s. spieleBahnPod()/bahnPodSonde() oben.
+    // Eigener Einstieg neben spieleBahn() — der Duell-Pfad bleibt unangefasst.
+    spieleBahnPod,
+    bahnPodSonde,
+    bahnPodEinfluss,
+    bahnPodDisziplinen:()=>[...BAHN_POD_DISZIPLINEN],
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
     // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster

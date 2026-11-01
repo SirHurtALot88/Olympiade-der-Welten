@@ -173,8 +173,12 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  * schon vorher als PPS-Duell gewertet wurde (nie arena-angeschlossen, s.
  * `ARENA_RESOLVED_DISCIPLINE_IDS`), nur als Vierergruppe statt Zweier-Duell. Kein FFA-/Domination-
  * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
- * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT -- ihre Zwei-Bahnen-Motoren muessen erst
- * auf vier Bahnen umgebaut und neu abgenommen werden.
+ * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT. Ihr Bahn-Motor kennt seit 01.11. vier
+ * Seiten (`__arena.spieleBahnPod`, battle-mode.engine.js) und ist im 4er-Format abgenommen
+ * (docs/design/bahn-pod-vier-teams-01-11.md). Ein Eintrag HIER wuerde sie aber ueber den PPS-Pod
+ * werten (der Pod schlaegt das Arena-Duell, s. legacy-matchday-resolve-engine.ts) und die Buehne
+ * spielte weiter ein Zwei-Team-Rennen gegen den Fixture-Gegner. Erst muss die Liga-Kette stehen
+ * (Runner, Spieltag, Motor-Vorrang im Pod-Resolve, Referenzen, Vorlauf, Anzeige -- Abschnitt 4 dort).
  *
  * ABNAHME BATTLEFIELD IM 4ER-FORMAT (01.11., scripts/miss-battlefield-pod-abnahme.ts,
  * data/generated/battlefield-pod-abnahme.json; 80 echte Pods je k und Saatstrom, zwei disjunkte
