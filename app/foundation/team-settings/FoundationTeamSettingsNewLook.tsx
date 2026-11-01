@@ -304,6 +304,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     newGameChrisTeamIds,
     newGameError,
     newGameFrankyTeamIds,
+    newGameLeagueOverride,
     newGameMode,
     newGamePresetId,
     newGamePreview,
@@ -369,6 +370,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
     teamStrategySportsBiasAxisMap,
     teamStrategySportsBiasFieldLabels,
     toggleNewGameTeam,
+    toggleNewGameTeamLeague,
     updateTeamControlDraft,
     updateTeamIdentityDraft,
     updateTeamStrategyDraft,
@@ -557,12 +559,28 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
      * Dieselbe reine Funktion wie im Server (`lib/game/new-game-setup-service.ts`,
      * `buildInitialLeagueAssignment`) — bewusst hier im Client noch einmal auf `gameState.teams`
      * angewendet, NICHT auf eine zweite, eigene Sortierung: Budget-Startrang 1..16 → Liga 1,
-     * 17..32 → Liga 2, exakt dieselbe Zuordnung, die ein Battle-Mode-Save beim Anlegen bekommt.
-     * Nur im Battle-Mode-Schritt relevant — Manager Mode kennt keine Liga 2 und zeigt weiterhin
-     * jeden Klub.
+     * 17..32 → Liga 2, exakt dieselbe Zuordnung, die ein Battle-Mode-Save beim Anlegen bekommt --
+     * ES SEI DENN, der Nutzer hat im Liga-Picker unten (`newGameLeagueOverride`) eigene
+     * Verschiebungen vorgenommen (ERWEITERUNG 31.10., Chris: "alle teams in der 2. liga muss man
+     * bei erstellung auch wählen können"). Nur im Battle-Mode-Schritt relevant — Manager Mode kennt
+     * keine Liga 2 und zeigt weiterhin jeden Klub.
      */
-    const newGameLeagueAssignment = newGameMode === "battle" ? buildInitialLeagueAssignment(gameState.teams) : null;
+    const newGameAutomaticLeagueAssignment = buildInitialLeagueAssignment(gameState.teams);
+    const newGameLeagueAssignment =
+      newGameMode === "battle" ? newGameLeagueOverride ?? newGameAutomaticLeagueAssignment : null;
     const isNewGameTeamSelectable = (teamId: string) => newGameLeagueAssignment?.[teamId] !== "liga2";
+    const newGameLeagueCounts =
+      newGameMode === "battle" && newGameLeagueAssignment
+        ? gameState.teams.reduce(
+            (counts: { liga1: number; liga2: number }, team: (typeof gameState.teams)[number]) => {
+              if (newGameLeagueAssignment[team.teamId] === "liga2") counts.liga2 += 1;
+              else counts.liga1 += 1;
+              return counts;
+            },
+            { liga1: 0, liga2: 0 },
+          )
+        : null;
+    const newGameLeagueBalanced = !newGameLeagueCounts || (newGameLeagueCounts.liga1 === LEAGUE_SIZE && newGameLeagueCounts.liga2 === LEAGUE_SIZE);
 
     return (
       <section
@@ -671,6 +689,74 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           </button>
         </div>
 
+        {/*
+          LIGA-1/2-PICKER (ERWEITERUNG 31.10., Chris: "alle teams in der 2. liga muss man bei
+          erstellung auch wählen können"): nur im Battle-Mode-Schritt sichtbar. Zeigt BEIDE Ligen
+          nebeneinander und lässt jedes Team per Klick in die andere Liga verschieben
+          (`toggleNewGameTeamLeague`) — der Klub-Picker darunter zeigt danach automatisch die neue
+          Liga-1-Besetzung als wählbar an (`isNewGameTeamSelectable` liest dieselbe Zuordnung).
+          Die automatische Budget-Zuteilung bleibt der Startzustand; ohne jede Verschiebung bleibt
+          alles bit-identisch zum bisherigen Verhalten.
+        */}
+        {newGameMode === "battle" ? (
+          <div className="nl-newgame-leaguepicker" data-testid="new-game-league-picker">
+            <div className="nl-newgame-pickerhead">
+              <strong>Liga-Zuordnung</strong>
+              <span className="nl-teamsettings-hint">
+                Automatisch nach Startbudget vorbelegt — tippe ein Team an, um es in die andere Liga
+                zu verschieben. Nur Liga 1 ist unten als eigenes Team wählbar; ein Liga-2-Team lässt
+                sich jederzeit hierher verschieben, um es doch zu übernehmen.
+              </span>
+            </div>
+            {newGameLeagueCounts && !newGameLeagueBalanced ? (
+              <p className="nl-teamsettings-msg is-warn" data-testid="new-game-league-unbalanced">
+                <strong>Noch nicht ausgeglichen:</strong> Liga 1 hat {newGameLeagueCounts.liga1}/{LEAGUE_SIZE}, Liga 2
+                hat {newGameLeagueCounts.liga2}/{LEAGUE_SIZE} Teams. Jede Liga braucht genau {LEAGUE_SIZE} — sonst
+                greift beim Anlegen automatisch wieder die Budget-Zuteilung.
+              </p>
+            ) : null}
+            <div className="nl-newgame-leaguegrid">
+              {(["liga1", "liga2"] as const).map((tier) => (
+                <div key={tier} className="nl-newgame-leaguecol">
+                  <div className="nl-newgame-leaguecol-head">
+                    <strong>{tier === "liga1" ? "Liga 1" : "Liga 2"}</strong>
+                    <span className="nl-tnum">
+                      {newGameLeagueCounts ? newGameLeagueCounts[tier] : 0}/{LEAGUE_SIZE}
+                    </span>
+                  </div>
+                  <div className="nl-newgame-leaguecol-list">
+                    {[...gameState.teams]
+                      .filter((team) => newGameLeagueAssignment?.[team.teamId] === tier)
+                      .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+                      .map((team) => (
+                        <button
+                          key={`new-game-league-${team.teamId}`}
+                          type="button"
+                          className="nl-newgame-leaguecol-item"
+                          disabled={newGameBusy || readMeta.readOnly}
+                          title={
+                            readMeta.readOnly
+                              ? getReadOnlyActionReason("die Liga-Zuordnung")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : tier === "liga1"
+                                  ? "Nach Liga 2 verschieben."
+                                  : "Nach Liga 1 verschieben — damit wird dieses Team unten als eigenes Team wählbar."
+                          }
+                          onClick={() => toggleNewGameTeamLeague(team.teamId)}
+                        >
+                          <span className="nl-newgame-club-code">{team.shortCode}</span>
+                          <span className="nl-newgame-club-name">{team.name}</span>
+                          <span aria-hidden="true">{tier === "liga1" ? "→ Liga 2" : "→ Liga 1"}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {/* Summary-Hero: großes, scanbares Portfolio-Signal + KPI-Chips. Sitzt bewusst NACH der
             Moduswahl oben — die Frage "welcher Modus" kommt vor der Frage "welche Klubs". */}
         <div className="nl-newgame-hero">
@@ -756,7 +842,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
           <span className="nl-teamsettings-hint">
             Karte antippen = selbst steuern · nicht gewählte Klubs übernimmt die KI
             {newGameMode === "battle"
-              ? ` · Liga 2 (Rang ${LEAGUE_SIZE + 1}–${gameState.teams.length}) startet unter KI-Kontrolle — hier nicht wählbar, später im laufenden Spiel übernehmbar — nur Liga 1 startet wählbar`
+              ? " · nur Liga 1 ist hier wählbar — willst du ein Liga-2-Team übernehmen, verschiebe es oben im Liga-Picker zuerst nach Liga 1"
               : ""}
           </span>
         </div>
@@ -828,12 +914,24 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
             })}
         </div>
 
-        <details className="nl-teamsettings-details">
-          <summary>2. Spieler (Multiplayer — später)</summary>
+        {/*
+          "2. Spieler" stand vorher hinter einem eingeklappten <details> mit dem Zusatz "— später"
+          — als waere lokale Zweitspieler-Steuerung noch nicht fertig. Das stimmt nicht mehr: ein
+          zweiter Mensch (Franky) kann heute schon ganz normal Teams am selben Geraet steuern, s.
+          `toggleNewGameTeam("franky", ...)` oben und `applyChrisFrankyOwnershipToTeamControlSettings`
+          serverseitig. "später" gilt nur noch fuer ECHTES Online-Multiplayer (separates, eigenes
+          Feature unter app/room/[roomCode], hier unberuehrt) — deshalb bleibt die Sektion jetzt
+          offen statt eingeklappt, mit einer Beschriftung, die das nicht mehr mit online-später
+          verwechselt.
+        */}
+        <details className="nl-teamsettings-details" open>
+          <summary>2. Spieler (lokal, am selben Gerät)</summary>
           <p className="nl-teamsettings-note">
-            Optional: Weise zusätzliche Teams einem zweiten menschlichen Spieler (Franky) zu. Für den
+            Optional: Weise zusätzliche Teams einem zweiten menschlichen Spieler (Franky) zu, der
+            am selben Gerät mitspielt — funktioniert bereits heute, nicht erst "später". Für den
             Single-Player-Start kannst du diesen Bereich ignorieren — ohne Auswahl bleiben alle übrigen Teams bei
-            der KI.
+            der KI. Echtes Online-Multiplayer (eigener Raum-Link) ist ein separates Feature und
+            weiterhin nicht Teil dieses Assistenten.
           </p>
           <div className="nl-teamsettings-metric-grid">
             <NlMetric

@@ -69302,6 +69302,60 @@ span.nl-facility-ampel-chip {
   color: var(--nl-ink);
 }
 
+/* --- Liga-1/2-Picker (ERWEITERUNG 31.10.) -------------------------------- */
+.is-new-look .nl-newgame-leaguepicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguegrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguecol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s2);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-md);
+  padding: var(--nl-s3);
+}
+
+.is-new-look .nl-newgame-leaguecol-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.is-new-look .nl-newgame-leaguecol-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nl-s1);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.is-new-look .nl-newgame-leaguecol-item {
+  display: flex;
+  align-items: center;
+  gap: var(--nl-s2);
+  width: 100%;
+  text-align: left;
+  border-radius: var(--nl-r-sm);
+  padding: var(--nl-s1) var(--nl-s2);
+}
+
+.is-new-look .nl-newgame-leaguecol-item .nl-newgame-club-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* --- Club-Grid ----------------------------------------------------------- */
 .is-new-look .nl-newgame-clubgrid {
   display: grid;
@@ -81003,6 +81057,56 @@ span.nl-facility-ampel-chip {
 
 .ranks-axis-groups-reset {
   font-size: 0.72rem;
+}
+
+.ranks-league-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ranks-league-filter-toggle {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--nl-mut, #93a3bd);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ranks-league-filter-toggle.is-active {
+  background: color-mix(in srgb, var(--nl-ink, #f2ede2) 16%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+.ranks-league-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin-right: 6px;
+}
+
+.ranks-league-badge.is-liga1 {
+  background: color-mix(in srgb, var(--nl-pow, #ff6b6b) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+.ranks-league-badge.is-liga2 {
+  background: color-mix(in srgb, var(--nl-men, #5b9bff) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
 }
 
 /* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */

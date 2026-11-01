@@ -153,6 +153,16 @@ export type SeasonV2StandingsRow = {
   avgContractLength: number | null;
   isSelected: boolean;
   /**
+   * Chris, wörtlich (Spieltage-Screenshot): „Bitte hier das eigene team hervorheben und das von
+   * franky bzw alle menschlich gesteuerten". `isSelected` markiert bereits das eigene Team (per
+   * Scope-`teamId`) — dieses Feld markiert zusätzlich ein Team, das Franky manuell steuert
+   * (`isFrankyOwnedTeamSettings`, `lib/foundation/team-control-settings.ts`), damit die
+   * Spieltage-Paarungszeilen beide Fälle getrennt hervorheben können. Optional/additiv: fehlt der
+   * Host das Feld (ältere Version), bleibt die Zeile ohne Franky-Hervorhebung, aber unverändert
+   * lauffähig.
+   */
+  isFrankyTeam?: boolean;
+  /**
    * Saisonübergreifende Snapshot-Historie (Rang/Punkte pro archivierter
    * Saison) — optional durchgereicht für den "Neuer Look"-Saisonstand.
    * Der bestehende Render liest dieses Feld nicht.

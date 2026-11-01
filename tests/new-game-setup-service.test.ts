@@ -6,7 +6,7 @@ import {
 } from "@/lib/game/new-game-setup-service";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
-import { isLeagueSplitActive } from "@/lib/season/league-split";
+import { buildInitialLeagueAssignment, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { isFatigueActiveRecoveryEnabled } from "@/lib/fatigue/fatigue-injury-service";
 import { formatGameFlowBlocker } from "@/lib/foundation/game-flow-blocker-labels";
 
@@ -312,6 +312,72 @@ describe("new-game-setup-service", () => {
     expect(preview.chrisTeamIds).toEqual(["R-R"]);
     expect(preview.blockers).toEqual([]);
     expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  /**
+   * ERWEITERUNG 31.10. (Chris: "alle teams in der 2. liga muss man bei erstellung auch wählen
+   * können"): der Wizard darf die automatische Budget-Zuteilung jetzt mit einer eigenen
+   * `leagueByTeamId` ueberschreiben. R-R ist automatisch Liga 2 (s. Test oben) -- wird es in der
+   * uebergebenen Zuordnung stattdessen als Liga-1-Team eingetragen (bei zugleich einem anderen
+   * Team, das dafuer nach Liga 2 wandert, damit 16/16 erhalten bleibt), ist es als chrisTeamIds
+   * waehlbar: keine `battle_mode_liga2_team_not_selectable`-Warnung mehr, kein Blocker.
+   */
+  it("laesst ein eigentlich Liga-2-Team ueber eine gueltige eigene leagueByTeamId doch als Chris-Team zu", () => {
+    const { gameState: automatic } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      now: "2026-06-13T10:00:00.000Z",
+    });
+    const customAssignment: Record<string, LeagueTier> = {
+      ...automatic.seasonState.leagueByTeamId,
+      "R-R": "liga1",
+      "M-M": "liga2",
+    };
+
+    const { preview, gameState } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["R-R"],
+      leagueByTeamId: customAssignment,
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga1");
+    expect(gameState.seasonState.leagueByTeamId?.["M-M"]).toBe("liga2");
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
+    expect(preview.warnings).not.toContain("battle_mode_liga2_team_not_selectable:R-R");
+    expect(preview.blockers).toEqual([]);
+  }, 120_000);
+
+  it("ignoriert eine ungueltige leagueByTeamId (falsche Groesse) und faellt zurueck auf die automatische Zuteilung", () => {
+    const { preview, gameState } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "battle",
+      chrisTeamIds: ["R-R"],
+      leagueByTeamId: { "R-R": "liga1" },
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(gameState.seasonState.leagueByTeamId?.["R-R"]).toBe("liga2");
+    expect(preview.warnings).toContain("battle_mode_invalid_league_assignment_ignored");
+    expect(preview.warnings).toContain("battle_mode_liga2_team_not_selectable:R-R");
+  }, 120_000);
+
+  it("ignoriert eine leagueByTeamId im Manager Mode vollstaendig (kein Liga-Split ausserhalb Battle Mode)", () => {
+    const customAssignment = buildInitialLeagueAssignment(
+      buildNewGameStateFromBaseline({ presetId: "custom", gameMode: "battle" }).gameState.teams,
+    );
+    const { preview, gameState } = buildNewGameStateFromBaseline({
+      presetId: "custom",
+      gameMode: "manager",
+      chrisTeamIds: ["R-R"],
+      leagueByTeamId: customAssignment,
+      now: "2026-06-13T10:00:00.000Z",
+    });
+
+    expect(Object.keys(gameState.seasonState.leagueByTeamId ?? {})).toHaveLength(0);
+    expect(preview.chrisTeamIds).toEqual(["R-R"]);
+    expect(preview.warnings).not.toContain("battle_mode_invalid_league_assignment_ignored");
   }, 120_000);
 
   /**

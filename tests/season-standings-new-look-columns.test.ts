@@ -125,3 +125,46 @@ describe("SeasonStandingsNewLook — Daten-Tabelle", () => {
     expect(withoutCards.length).toBeGreaterThan(500);
   });
 });
+
+/**
+ * REGRESSION — Bug-Report Chris (Screenshot): das native `title`-Tooltip auf dem Teamname-Button
+ * feuerte GLEICHZEITIG mit dem `StandingsKaderHover`-Dialogpanel auf demselben Hover-Ziel, was
+ * wie zwei überlappende, kaputt wirkende Tooltips aussah. Der Button braucht das `title` nicht
+ * für Barrierefreiheit — `StandingsKaderHover` trägt per `ariaLabel`-Prop bereits ein eigenes
+ * `aria-label` auf seinem Dialog-Panel.
+ */
+describe("SeasonStandingsNewLook — Teamname-Hover (Bug-Report: doppeltes Tooltip)", () => {
+  it("der Teamname-Button trägt kein natives title-Tooltip mehr", () => {
+    const html = render({});
+    // Vorher: `title="Team A-A öffnen"` auf dem <button class="nl-standings-table-teamlink">.
+    expect(html).not.toContain(" öffnen\"");
+    expect(html).not.toContain("Team A-A öffnen");
+    expect(html).not.toContain("Team B-B öffnen");
+  });
+
+  it("das StandingsKaderHover-Panel trägt weiterhin sein eigenes aria-label (Kurzübersicht), wenn ein Kader vorliegt", () => {
+    const html = render({
+      standingsRows: [
+        {
+          ...makeRow({ teamId: "t1", code: "A-A", mw: 300_000_000, salary: 80_000_000 }),
+          hoverKader: [
+            {
+              playerId: "p1",
+              name: "Spieler Eins",
+              className: null,
+              marketValue: 1_000_000,
+              salary: 500_000,
+              contractShape: null,
+              contractLength: null,
+              ovr: 70,
+            },
+          ],
+        },
+        makeRow({ teamId: "t2", code: "B-B", mw: 200_000_000, salary: 60_000_000 }),
+      ],
+    });
+    expect(html).toContain('aria-label="Kurzübersicht Team A-A"');
+    // Weiterhin kein title-Tooltip auf dem Button selbst, auch wenn das Panel echten Inhalt hat.
+    expect(html).not.toContain("Team A-A öffnen");
+  });
+});

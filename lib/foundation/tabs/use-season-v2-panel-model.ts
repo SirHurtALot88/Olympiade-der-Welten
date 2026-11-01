@@ -10,6 +10,7 @@ import {
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
+import { getTeamControlSettings, isFrankyOwnedTeamSettings } from "@/lib/foundation/team-control-settings";
 import { resolveSeasonDisciplineAreaTotal } from "@/lib/season/season-discipline-area-groups";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import {
@@ -239,6 +240,12 @@ export function useSeasonV2PanelModel({
           rosterCount: row.rosterCount ?? 0,
           avgContractLength: row.avgContractLength ?? null,
           isSelected: selectedTeamId === row.teamId,
+          // Chris, Spieltage-Screenshot: „das eigene team hervorheben und das von franky bzw alle
+          // menschlich gesteuerten". Dasselbe Feld wie auf dem tatsaechlich gerenderten Pfad
+          // (`use-foundation-shell-router-body-scope.tsx`) — hier ebenso ECHT berechnet, nicht als
+          // Stub, obwohl dieses Modell am nirgends gerenderten `FoundationSeasonV2Host` haengt (s.
+          // Kommentar an `computeTeamBuildingCost` oben): der Typvertrag gilt fuer beide Pfade.
+          isFrankyTeam: isFrankyOwnedTeamSettings(getTeamControlSettings(gameState, row.teamId)),
           // Saisonübergreifende Rang-/Punkte-Historie (nur vom "Neuer
           // Look"-Saisonstand gelesen; der bestehende Render ignoriert sie).
           historicalPointsBySeason: row.historicalPointsBySeason ?? [],

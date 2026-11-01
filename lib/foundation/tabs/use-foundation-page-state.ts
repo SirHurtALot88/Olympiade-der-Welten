@@ -18,6 +18,7 @@ import {
   type FoundationSaveMode,
 } from "@/lib/persistence/foundation-save-mode";
 import type { SaveSummary } from "@/lib/persistence/types";
+import type { LeagueTier } from "@/lib/season/league-split";
 import type {
 	  GameState,
 	  GameInboxItem,
@@ -544,6 +545,14 @@ export function useFoundationPageState({
   const [newGameMode, setNewGameMode] = useState<GameMode>("manager");
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
   const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
+  /**
+   * Benutzerdefinierte Liga-1/2-Zuordnung fuer den Battle-Mode-Schritt (31.10., Chris: "alle teams
+   * in der 2. liga muss man bei erstellung auch wählen können"). `null` = automatische
+   * Budget-Zuteilung (`buildInitialLeagueAssignment`), unveraendertes Verhalten. Nur gesetzt,
+   * nachdem der Nutzer im zweispaltigen Liga-Picker mindestens ein Team verschoben hat — s.
+   * `FoundationTeamSettingsNewLook.tsx`.
+   */
+  const [newGameLeagueOverride, setNewGameLeagueOverride] = useState<Record<string, LeagueTier> | null>(null);
   const [newGameSandbox, setNewGameSandbox] = useState<boolean>(false);
   const [newGameSaveName, setNewGameSaveName] = useState<string>("");
   const [newGamePreview, setNewGamePreview] = useState<NewGameSetupPreview | null>(null);
@@ -663,6 +672,14 @@ export function useFoundationPageState({
   const [standingsPreviewFeed, setStandingsPreviewFeed] = useState<FoundationStandingsPreviewResponse | null>(null);
   const [standingsApplyFeed, setStandingsApplyFeed] = useState<FoundationApplySummary | null>(null);
   const [disciplineCategoryFilter, setDisciplineCategoryFilter] = useState<DisciplineCategoryFilter>("all");
+  /**
+   * RANKS-SEITE, LIGA-FILTER (Chris, Screenshot „Ranks – Teamstärke pro Diszi"): „bei den ranks
+   * muss man liga 1/2 filtern können und in der komplettansicht müssen die ranks dann auch von
+   * 1-32 gehen". "alle" ist die Gesamtansicht (jetzt echte 1-32-Ränge statt liga-lokaler 1-16),
+   * "liga1"/"liga2" filtert auf die jeweilige Liga mit ihrer bisherigen liga-lokalen 1-16-Rangrechnung.
+   * Gleiches Muster wie der Liga-Filter der LeagueLeaders-Seite (`LeagueLeadersNewLook.tsx`).
+   */
+  const [rankLeagueFilter, setRankLeagueFilter] = useState<LeagueTier | "alle">("alle");
   const [seasonManagementFeed, setSeasonManagementFeed] = useState<FoundationSeasonManagementResponse | null>(null);
   const [facilityUpgradeBusy, setFacilityUpgradeBusy] = useState<boolean>(false);
   const [facilityUpgradePreview, setFacilityUpgradePreview] = useState<FacilityUpgradeSummary | null>(null);
@@ -955,6 +972,8 @@ export function useFoundationPageState({
     setNewGameChrisTeamIds,
     newGameFrankyTeamIds,
     setNewGameFrankyTeamIds,
+    newGameLeagueOverride,
+    setNewGameLeagueOverride,
     newGameSandbox,
     setNewGameSandbox,
     newGameSaveName,
@@ -1115,6 +1134,8 @@ export function useFoundationPageState({
     setStandingsApplyFeed,
     disciplineCategoryFilter,
     setDisciplineCategoryFilter,
+    rankLeagueFilter,
+    setRankLeagueFilter,
     seasonManagementFeed,
     setSeasonManagementFeed,
     facilityUpgradeBusy,
