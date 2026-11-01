@@ -1,0 +1,398 @@
+{
+  "datum": "2026-11-01T18:26:08.048Z",
+  "saveId": "new-game-1793557191812-los1g4",
+  "spieltageJeStrom": 10,
+  "feldgroessen": [
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "ergebnis": {
+    "battlefield": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.638,
+            "rhoPodMedian": 0.679,
+            "rhoPodAnteilAb08": 0.288,
+            "rhoZweierMittel": 0.308,
+            "rhoSeiteMedian": null,
+            "starRang1Pct": 0.425,
+            "starTop2Pct": 0.588,
+            "starN": 80,
+            "paartreueAb15Pct": 0.966,
+            "paartreueAb15N": 613,
+            "teamStaerkstesAufPlatz1Pct": 0.788,
+            "teamRhoEignungGegenPlatzMittel": 0.865
+          },
+          "3": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.78,
+            "rhoPodMedian": 0.797,
+            "rhoPodAnteilAb08": 0.488,
+            "rhoZweierMittel": 0.655,
+            "rhoSeiteMedian": 0.5,
+            "starRang1Pct": 0.425,
+            "starTop2Pct": 0.6,
+            "starN": 80,
+            "paartreueAb15Pct": 0.982,
+            "paartreueAb15N": 1543,
+            "teamStaerkstesAufPlatz1Pct": 0.756,
+            "teamRhoEignungGegenPlatzMittel": 0.839
+          },
+          "4": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.806,
+            "rhoPodMedian": 0.804,
+            "rhoPodAnteilAb08": 0.563,
+            "rhoZweierMittel": 0.749,
+            "rhoSeiteMedian": 0.8,
+            "starRang1Pct": 0.5,
+            "starTop2Pct": 0.663,
+            "starN": 80,
+            "paartreueAb15Pct": 0.984,
+            "paartreueAb15N": 3057,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.89
+          },
+          "5": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.83,
+            "rhoPodMedian": 0.833,
+            "rhoPodAnteilAb08": 0.7,
+            "rhoZweierMittel": 0.79,
+            "rhoSeiteMedian": 0.9,
+            "starRang1Pct": 0.525,
+            "starTop2Pct": 0.713,
+            "starN": 80,
+            "paartreueAb15Pct": 0.985,
+            "paartreueAb15N": 5713,
+            "teamStaerkstesAufPlatz1Pct": 0.8,
+            "teamRhoEignungGegenPlatzMittel": 0.892
+          },
+          "6": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.851,
+            "rhoPodMedian": 0.847,
+            "rhoPodAnteilAb08": 0.788,
+            "rhoZweierMittel": 0.822,
+            "rhoSeiteMedian": 0.886,
+            "starRang1Pct": 0.575,
+            "starTop2Pct": 0.738,
+            "starN": 80,
+            "paartreueAb15Pct": 0.984,
+            "paartreueAb15N": 7559,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.925
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.663,
+            "rhoPodMedian": 0.722,
+            "rhoPodAnteilAb08": 0.3,
+            "rhoZweierMittel": 0.439,
+            "rhoSeiteMedian": null,
+            "starRang1Pct": 0.538,
+            "starTop2Pct": 0.725,
+            "starN": 80,
+            "paartreueAb15Pct": 0.959,
+            "paartreueAb15N": 606,
+            "teamStaerkstesAufPlatz1Pct": 0.863,
+            "teamRhoEignungGegenPlatzMittel": 0.8
+          },
+          "3": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.795,
+            "rhoPodMedian": 0.84,
+            "rhoPodAnteilAb08": 0.65,
+            "rhoZweierMittel": 0.721,
+            "rhoSeiteMedian": 1,
+            "starRang1Pct": 0.588,
+            "starTop2Pct": 0.738,
+            "starN": 80,
+            "paartreueAb15Pct": 0.984,
+            "paartreueAb15N": 1538,
+            "teamStaerkstesAufPlatz1Pct": 0.795,
+            "teamRhoEignungGegenPlatzMittel": 0.791
+          },
+          "4": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.815,
+            "rhoPodMedian": 0.835,
+            "rhoPodAnteilAb08": 0.65,
+            "rhoZweierMittel": 0.777,
+            "rhoSeiteMedian": 0.8,
+            "starRang1Pct": 0.588,
+            "starTop2Pct": 0.713,
+            "starN": 80,
+            "paartreueAb15Pct": 0.988,
+            "paartreueAb15N": 3073,
+            "teamStaerkstesAufPlatz1Pct": 0.8,
+            "teamRhoEignungGegenPlatzMittel": 0.87
+          },
+          "5": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.836,
+            "rhoPodMedian": 0.865,
+            "rhoPodAnteilAb08": 0.675,
+            "rhoZweierMittel": 0.817,
+            "rhoSeiteMedian": 0.9,
+            "starRang1Pct": 0.6,
+            "starTop2Pct": 0.688,
+            "starN": 80,
+            "paartreueAb15Pct": 0.987,
+            "paartreueAb15N": 5728,
+            "teamStaerkstesAufPlatz1Pct": 0.763,
+            "teamRhoEignungGegenPlatzMittel": 0.845
+          },
+          "6": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.846,
+            "rhoPodMedian": 0.855,
+            "rhoPodAnteilAb08": 0.788,
+            "rhoZweierMittel": 0.834,
+            "rhoSeiteMedian": 0.9,
+            "starRang1Pct": 0.613,
+            "starTop2Pct": 0.738,
+            "starN": 80,
+            "paartreueAb15Pct": 0.988,
+            "paartreueAb15N": 7580,
+            "teamStaerkstesAufPlatz1Pct": 0.675,
+            "teamRhoEignungGegenPlatzMittel": 0.84
+          }
+        }
+      }
+    ],
+    "mini-dm": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.886,
+            "rhoPodMedian": 0.905,
+            "rhoPodAnteilAb08": 0.838,
+            "rhoZweierMittel": 0.845,
+            "rhoSeiteMedian": null,
+            "starRang1Pct": 0.85,
+            "starTop2Pct": 0.975,
+            "starN": 80,
+            "paartreueAb15Pct": 1,
+            "paartreueAb15N": 768,
+            "teamStaerkstesAufPlatz1Pct": 0.925,
+            "teamRhoEignungGegenPlatzMittel": 0.89
+          },
+          "3": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.878,
+            "rhoPodMedian": 0.897,
+            "rhoPodAnteilAb08": 0.875,
+            "rhoZweierMittel": 0.823,
+            "rhoSeiteMedian": 1,
+            "starRang1Pct": 0.875,
+            "starTop2Pct": 0.9,
+            "starN": 80,
+            "paartreueAb15Pct": 0.995,
+            "paartreueAb15N": 1911,
+            "teamStaerkstesAufPlatz1Pct": 0.975,
+            "teamRhoEignungGegenPlatzMittel": 0.905
+          },
+          "4": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.873,
+            "rhoPodMedian": 0.88,
+            "rhoPodAnteilAb08": 0.875,
+            "rhoZweierMittel": 0.846,
+            "rhoSeiteMedian": 0.974,
+            "starRang1Pct": 0.888,
+            "starTop2Pct": 0.888,
+            "starN": 80,
+            "paartreueAb15Pct": 0.99,
+            "paartreueAb15N": 3885,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.912
+          },
+          "5": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.896,
+            "rhoPodMedian": 0.906,
+            "rhoPodAnteilAb08": 0.913,
+            "rhoZweierMittel": 0.874,
+            "rhoSeiteMedian": 0.9,
+            "starRang1Pct": 0.913,
+            "starTop2Pct": 0.913,
+            "starN": 80,
+            "paartreueAb15Pct": 0.989,
+            "paartreueAb15N": 7041,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.895
+          },
+          "6": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.88,
+            "rhoPodMedian": 0.891,
+            "rhoPodAnteilAb08": 0.863,
+            "rhoZweierMittel": 0.868,
+            "rhoSeiteMedian": 0.943,
+            "starRang1Pct": 0.938,
+            "starTop2Pct": 0.975,
+            "starN": 80,
+            "paartreueAb15Pct": 0.975,
+            "paartreueAb15N": 10477,
+            "teamStaerkstesAufPlatz1Pct": 0.925,
+            "teamRhoEignungGegenPlatzMittel": 0.932
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.844,
+            "rhoPodMedian": 0.893,
+            "rhoPodAnteilAb08": 0.788,
+            "rhoZweierMittel": 0.74,
+            "rhoSeiteMedian": null,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.913,
+            "starN": 80,
+            "paartreueAb15Pct": 0.999,
+            "paartreueAb15N": 768,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.9
+          },
+          "3": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.854,
+            "rhoPodMedian": 0.888,
+            "rhoPodAnteilAb08": 0.813,
+            "rhoZweierMittel": 0.799,
+            "rhoSeiteMedian": 1,
+            "starRang1Pct": 0.8,
+            "starTop2Pct": 0.913,
+            "starN": 80,
+            "paartreueAb15Pct": 0.991,
+            "paartreueAb15N": 1889,
+            "teamStaerkstesAufPlatz1Pct": 0.838,
+            "teamRhoEignungGegenPlatzMittel": 0.857
+          },
+          "4": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.85,
+            "rhoPodMedian": 0.869,
+            "rhoPodAnteilAb08": 0.775,
+            "rhoZweierMittel": 0.825,
+            "rhoSeiteMedian": 0.8,
+            "starRang1Pct": 0.85,
+            "starTop2Pct": 0.938,
+            "starN": 80,
+            "paartreueAb15Pct": 0.984,
+            "paartreueAb15N": 3823,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.91
+          },
+          "5": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.895,
+            "rhoPodMedian": 0.907,
+            "rhoPodAnteilAb08": 0.925,
+            "rhoZweierMittel": 0.877,
+            "rhoSeiteMedian": 0.9,
+            "starRang1Pct": 0.825,
+            "starTop2Pct": 0.925,
+            "starN": 80,
+            "paartreueAb15Pct": 0.986,
+            "paartreueAb15N": 7001,
+            "teamStaerkstesAufPlatz1Pct": 0.788,
+            "teamRhoEignungGegenPlatzMittel": 0.845
+          },
+          "6": {
+            "pods": 80,
+            "quellen": {
+              "mini_dm_pod": 320
+            },
+            "rhoPodMittel": 0.89,
+            "rhoPodMedian": 0.908,
+            "rhoPodAnteilAb08": 0.9,
+            "rhoZweierMittel": 0.883,
+            "rhoSeiteMedian": 0.943,
+            "starRang1Pct": 0.825,
+            "starTop2Pct": 0.975,
+            "starN": 80,
+            "paartreueAb15Pct": 0.979,
+            "paartreueAb15N": 10472,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.872
+          }
+        }
+      }
+    ]
+  }
+}

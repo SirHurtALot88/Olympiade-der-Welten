@@ -88,9 +88,12 @@ export type DisciplineHighlightCandidate = {
  *  - `"pps_duell"`: Battle Mode, 2/1/0 aus dem PPS-Score beider Seiten desselben Fixtures
  *    (PPS-Duell-Bruecke, lib/resolve/battle-mode-pps-duell.ts) — der verbindliche Rueckfall ohne
  *    Arena-Ergebnis.
- *  - `"mini_dm_pod"`: Battle Mode, Mini-DM ausschliesslich -- 2-1-0-0 aus der echten Vierergruppe
+ *  - `"mini_dm_pod"`: Battle Mode, jede Vierer-Pod-Disziplin (`VIERER_POD_DISCIPLINE_IDS`: Mini-DM
+ *    seit 19.10., Battlefield seit 01.11.) -- 2-1-0-0 aus der echten Vierergruppe
  *    (Pod, `lib/season/mini-dm-pod-schedule.ts`), NICHT aus dem Zwei-Team-Fixture des Spieltags
  *    (lib/resolve/mini-dm-pod-resolve.ts). Chris 19.10.: "umbauen dass die 4er teams da drin sind".
+ *    Der Wert-Name bleibt aus Persistenz-Gruenden "mini_dm_pod" (steht so in gespeicherten Zeilen),
+ *    gemeint ist "Vierer-Pod", unabhaengig von der Disziplin -- `disciplineId` der Zeile sagt welche.
  */
 export type DisciplineResolutionSource = "pps" | "arena" | "pps_duell" | "mini_dm_pod";
 

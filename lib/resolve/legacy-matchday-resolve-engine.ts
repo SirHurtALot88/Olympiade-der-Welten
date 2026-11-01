@@ -36,8 +36,8 @@ import {
 // Disziplin, die hier als Vierergruppe statt als Zweier-Duell aufgeloest wird -- s. Kopfkommentar
 // an mini-dm-pod-resolve.ts fuer die volle Begruendung.
 import { berechneMiniDmPodOverrides } from "@/lib/resolve/mini-dm-pod-resolve";
-import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
-import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { isViererPodDiscipline, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 // SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
 // Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
@@ -847,9 +847,12 @@ export function buildLegacyMatchdayResolvePreview(
     // PPS-Duell-Bruecke SELBST (seiten der Bruecke sind exakt diese Werte) UND fuer das Niveau der
     // 0-10-Normierung bei Konstantsummen-Disziplinen (Teil B, s. `KONSTANTSUMME_NIVEAU_DISCIPLINE_IDS`).
     const ppsScoreByTeamId = new Map(teamResultsAfterPowers.map((result) => [result.teamId, result.score] as const));
-    // MINI-DM-POD-RESOLVE (19.10.): die EINZIGE Disziplin, die hier als echte Vierergruppe statt als
-    // Zweier-Duell gewertet wird (Chris 14.09./19.10.) -- s. Kopfkommentar an mini-dm-pod-resolve.ts.
-    // Pods kommen aus genau derselben Quelle wie der Spielplan-Tab (`getMiniDmPodsForMatchday()`),
+    // MINI-DM-POD-RESOLVE (19.10.), VERALLGEMEINERT 01.11.: JEDE Disziplin in
+    // `VIERER_POD_DISCIPLINE_IDS` (heute Mini-DM und Battlefield) wird hier als echte Vierergruppe
+    // statt als Zweier-Duell gewertet (Chris 14.09./19.10./01.11.) -- s. Kopfkommentar an
+    // mini-dm-pod-resolve.ts. Die Pods sind je Disziplin gelost (`getPodsForMatchday(..., disciplineId)`),
+    // zwei Pod-Disziplinen am selben Spieltag bekommen also eigene Gruppen.
+    // Pods kommen aus genau derselben Quelle wie der Spielplan-Tab (`getPodsForMatchday()`),
     // damit die Wertung IMMER zu dem passt, was Chris im Spielplan angekuendigt sieht. Ein Pod, fuer
     // den nicht alle vier Teams einen PPS-Score haben, liefert keine Overrides (s.
     // `berechneMiniDmPodOverride`) -- seine Teams fallen unten defensiv auf die alte PPS-Duell-
@@ -863,10 +866,10 @@ export function buildLegacyMatchdayResolvePreview(
     // dort eine TypeError. Dieser Aufruf bleibt deshalb defensiv: ein Fehler beim Pod-Ermitteln
     // bedeutet "kein Pod heute", NIE einen geworfenen Fehler -- exakt dieselbe Philosophie wie der
     // Rest dieser Datei ("additiv, faellt bei fehlenden Daten auf das Bisherige zurueck").
-    let miniDmPodsForThisMatchday: ReturnType<typeof getMiniDmPodsForMatchday> = [];
-    if (isBattleModeArenaEligible && disciplineId === MINI_DM_DISCIPLINE_ID && base.gameState) {
+    let miniDmPodsForThisMatchday: ReturnType<typeof getPodsForMatchday> = [];
+    if (isBattleModeArenaEligible && isViererPodDiscipline(disciplineId) && base.gameState) {
       try {
-        miniDmPodsForThisMatchday = getMiniDmPodsForMatchday(base.gameState, base.matchdayId, { saveId: base.saveId });
+        miniDmPodsForThisMatchday = getPodsForMatchday(base.gameState, base.matchdayId, disciplineId, { saveId: base.saveId });
       } catch {
         miniDmPodsForThisMatchday = [];
       }
@@ -875,7 +878,8 @@ export function buildLegacyMatchdayResolvePreview(
     // FFA-Rohdaten vor (kein heutiger Aufrufer liefert sie -- das ist PR 5), versucht
     // `berechneMiniDmPodOverrides()` sie ZUERST je Pod; fehlende/unvollstaendige Rohdaten fallen
     // je Pod defensiv auf den bisherigen PPS-Pod-Pfad zurueck (s. Kommentar an der Funktion,
-    // mini-dm-pod-resolve.ts). `?? null` haelt diesen Zweig heute IMMER inaktiv.
+    // mini-dm-pod-resolve.ts). BLEIBT MINI-DM-EXKLUSIV (01.11.): Battlefield ist ein reiner PPS-Pod
+    // ohne FFA-Motor -- fuer jede andere Pod-Disziplin ist dieser Wert IMMER `null`.
     const miniDmFfaRohdatenForThisDiscipline =
       disciplineId === MINI_DM_DISCIPLINE_ID
         ? resolveOptions.miniDmFfaPodRohdatenByDisciplineId?.get(disciplineId) ?? null
@@ -919,11 +923,20 @@ export function buildLegacyMatchdayResolvePreview(
       (result) => result.teamId,
       base.gameState,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => {
-      const arenaOverride = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
-      // MINI-DM-POD-RESOLVE (19.10.): nur gesetzt fuer `disciplineId === MINI_DM_DISCIPLINE_ID` --
+      const arenaOverrideRoh = arenaOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      // MINI-DM-POD-RESOLVE (19.10.): nur gesetzt fuer Pod-Disziplinen (`isViererPodDiscipline`) --
       // `ppsDuellOverridesForThisDiscipline` schliesst diese Team-IDs schon oben aus
       // (`ausgeschlosseneTeamIds`), `ppsDuell` ist fuer ein Pod-Team deshalb IMMER `null`.
-      const miniDmPod = arenaOverride ? null : miniDmPodOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      //
+      // VORRANG POD VOR ARENA (01.11., Konzept "Vier Teams je Bereich" Abschnitt 5 Punkt 3): fuer eine
+      // Pod-Disziplin schlaegt der Pod ein Arena-ZWEIER-Duell -- sonst wertete ein kuenftig
+      // angeschlossener Zweier-Motor wieder gegen den Fixture-Gegner, der oft gar nicht im Pod ist
+      // (genau Chris' Befund "0:2 bei 4 Teams" vom 19.10.). Heute liefert fuer keine Pod-Disziplin
+      // ein Aufrufer Arena-Teampunkte (Mini-DM und Battlefield stehen nicht in
+      // `ARENA_RESOLVED_DISCIPLINE_IDS`; Mini-DMs Motor kommt ueber die FFA-Rohdaten in den Pod) --
+      // die Reihenfolge ist also heute wirkungsneutral und nur fuer den kuenftigen Fall festgelegt.
+      const miniDmPod = miniDmPodOverridesForThisDiscipline?.get(item.teamId) ?? null;
+      const arenaOverride = miniDmPod ? null : arenaOverrideRoh;
       const ppsDuell = arenaOverride || miniDmPod ? null : ppsDuellOverridesForThisDiscipline?.get(item.teamId) ?? null;
       // Ausgang dieses Duells aus Sicht DIESES Teams -- ein Arena-Override traegt ihn meistens schon
       // (`arenaOverride.outcome`), sonst aus den gebuchten 2/1/0-Team-Punkten rekonstruiert (kg-
@@ -979,7 +992,7 @@ export function buildLegacyMatchdayResolvePreview(
       // gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund. Das
       // ändert NICHTS an `teamPoints`/`resolutionSource`/`pointSource` unten — die PPS-Duell-
       // Brücke rechnet unverändert weiter, die Zeile ist nur zusätzlich markiert.
-      const arenaAusfall: ArenaAusfall | null = arenaOverride
+      const arenaAusfall: ArenaAusfall | null = arenaOverrideRoh
         ? null
         : erklaerterArenaAusfallFuerDiesesDisziplin ??
           (isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)

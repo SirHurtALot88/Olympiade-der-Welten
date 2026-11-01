@@ -2959,7 +2959,11 @@ export default function SeasonStandingsNewLook({
       <>
         {pods.length > 0 ? (
           <ol className="nl-standings-spieltage-pods" data-testid="nl-standings-spieltage-pods">
-            {pods.map((pod, index) => renderMiniDmPodGruppe(pod, index, teamLabel))}
+            {pods.map((pod, index) =>
+              // Gruppenbuchstabe JE DISZIPLIN (seit 01.11. kann ein Spieltag zwei Pod-Disziplinen
+              // tragen) -- sonst hiesse Battlefields erste Gruppe "Gruppe E".
+              renderMiniDmPodGruppe(pod, pods.slice(0, index).filter((p) => p.disciplineId === pod.disciplineId).length, teamLabel),
+            )}
           </ol>
         ) : null}
         {paarungen.length === 0 ? (
@@ -3137,7 +3141,7 @@ export default function SeasonStandingsNewLook({
           className="nl-standings-spieltage-disziplin-ergebnis"
           title={[
             disziplin.disciplineName,
-            "Mini-DM-Pod-Platzierung (1.–4.) je Team — s. Gruppe oberhalb der Paarungsliste, kein Zwei-Team-Duell",
+            "4-Team-Pod-Platzierung (1.–4.) je Team — s. Gruppe oberhalb der Paarungsliste, kein Zwei-Team-Duell",
           ].join(" — ")}
         >
           <span className="nl-standings-spieltage-disziplin-kuerzel">{kuerzel}</span>
@@ -3178,7 +3182,7 @@ export default function SeasonStandingsNewLook({
       <li key={pod.podId} className="nl-card nl-standings-spieltage-pod" data-testid="nl-standings-spieltage-pod">
         <div className="nl-standings-spieltage-pod-head">
           <span className="nl-standings-spieltage-pod-label">{gruppenLabel}</span>
-          <span className="nl-standings-spieltage-pod-disziplin">{pod.disciplineName} · Mini-DM-Pod (2-1-0-0)</span>
+          <span className="nl-standings-spieltage-pod-disziplin">{pod.disciplineName} · 4-Team-Pod (2-1-0-0)</span>
         </div>
         <ol className="nl-standings-spieltage-pod-mitglieder">
           {pod.mitglieder.map((mitglied) => {

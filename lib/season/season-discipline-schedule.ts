@@ -152,6 +152,61 @@ function buildSeasonPlayerCount(discipline: Discipline, seed: string) {
  */
 export const MINI_DM_DISCIPLINE_ID = "mini-dm";
 
+/** Battlefields Disziplin-ID -- s. `VIERER_POD_DISCIPLINE_IDS`. */
+export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
+
+/**
+ * VIERER-POD-DISZIPLINEN (01.11., Chris' Freigabe "eine 4er-Diszi je Bereich pow/spe/men/soc"):
+ * jede Disziplin in dieser Menge wird in einem Battle-Save NICHT als Zweier-Duell gegen den
+ * Spielplan-Gegner gewertet, sondern als Vierergruppe ("Pod", `lib/season/mini-dm-pod-schedule.ts`)
+ * mit Liga-Punkten 2-1-0-0 nach Platz (`MINI_DM_POD_TEAM_PUNKTE`, lib/resolve/mini-dm-pod-resolve.ts).
+ *
+ * Chris' drei Entscheidungen (01.11.), alle drei hier umgesetzt:
+ *  1. Punkte: dieselbe 2-1-0-0-Form wie Mini-DM.
+ *  2. Gruppen: je Disziplin-Event FRISCH gelost -- der Pod-Seed traegt die Disziplin-ID, zwei
+ *     Pod-Disziplinen bekommen also nie automatisch dieselben vier Teams.
+ *  3. Kollisionen: zwei Pod-Disziplinen am selben Spieltag sind erlaubt, KEINE Spielplan-Regel
+ *     dagegen (`buildSeededDisciplinePairs()` bleibt unveraendert).
+ *
+ * MINI-DM: echte Pod-Disziplin seit 19.10. (PPS-Pod), mit FFA-Motor-Vorrang seit 24.10.
+ * BATTLEFIELD (01.11.): PPS-Pod -- derselbe deterministische Eignungs-Score, ueber den Battlefield
+ * schon vorher als PPS-Duell gewertet wurde (nie arena-angeschlossen, s.
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`), nur als Vierergruppe statt Zweier-Duell. Kein FFA-/Domination-
+ * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
+ * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT. Ihr Bahn-Motor kennt seit 01.11. vier
+ * Seiten (`__arena.spieleBahnPod`, battle-mode.engine.js) und ist im 4er-Format abgenommen
+ * (docs/design/bahn-pod-vier-teams-01-11.md). Ein Eintrag HIER wuerde sie aber ueber den PPS-Pod
+ * werten (der Pod schlaegt das Arena-Duell, s. legacy-matchday-resolve-engine.ts) und die Buehne
+ * spielte weiter ein Zwei-Team-Rennen gegen den Fixture-Gegner. Erst muss die Liga-Kette stehen
+ * (Runner, Spieltag, Motor-Vorrang im Pod-Resolve, Referenzen, Vorlauf, Anzeige -- Abschnitt 4 dort).
+ *
+ * ABNAHME BATTLEFIELD IM 4ER-FORMAT (01.11., scripts/miss-battlefield-pod-abnahme.ts,
+ * data/generated/battlefield-pod-abnahme.json; 80 echte Pods je k und Saatstrom, zwei disjunkte
+ * Spieltagsfenster): Spieler-rho je Pod (4k Spieler) k=2 0,64/0,66 · k=3 0,78/0,80 · k=4 0,81/0,82 ·
+ * k=5 0,83/0,84 · k=6 0,85/0,85. Die 0,80-Schranke haelt erst ab k=4. Star auf Rang 1 nur 43-61 %,
+ * unter den ersten zwei 59-74 %, Paare ab 15 Punkten 96-99 % richtig. Auf denselben Daten als
+ * Zweier-Duell gerechnet waere es bei JEDEM k schlechter (k=2 0,31/0,44, k=4 0,75/0,78): der Pod
+ * aendert die Spieler-PP nicht (rein `ppAusSpielerScore()`), er vergroessert nur das Feld.
+ *
+ * CHRIS' AUSNAHME (01.11., ausdruecklich freigegeben): Battlefield laeuft als 4er-PPS-Pod fuer ALLE
+ * Kadergroessen k=2..6, auch fuer k=2/3, die die 0,80-Schranke verfehlen. Die Begruendung ist
+ * BEWUSST EINE ANDERE als bei Mini-DMs Ausnahme vom 24.10. (dort: starke Star-Treue, Rang 1
+ * 76-81 %, Top 2 93-95 %). Battlefields Star-Treue ist dafuer zu schwach (s. oben) und traegt
+ * diese Ausnahme NICHT. Getragen wird sie von zwei anderen Gruenden:
+ *  1. Paartreue mit Abstand: Paare ab 15 Eignungspunkten werden zu 96-99 % richtig geordnet -- was
+ *     rho drueckt, sind enge Paare, die kein Motor ordnen kann (CLAUDE.md, "Die Abnahme jeder
+ *     Disziplin").
+ *  2. Nie schlechter als das ersetzte Format: das Zweier-Duell, das Battlefield vorher spielte,
+ *     liegt auf denselben Daten bei jedem k darunter (k=2 0,31/0,44, k=3 0,66/0,72).
+ * Gilt NUR fuer diesen PPS-Pod. Ein kuenftiger echter Battlefield-Motor (K6-Umbau, Domination fuer
+ * vier Seiten) braucht eine eigene, neue Abnahme; diese Ausnahme geht nicht automatisch auf ihn ueber.
+ */
+export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
+
+export function isViererPodDiscipline(disciplineId: string | null | undefined): boolean {
+  return disciplineId != null && VIERER_POD_DISCIPLINE_IDS.has(disciplineId);
+}
+
 /**
  * REVIDIERT (Chris, 21.10., zur Mini-DM-Kadergroesse): "natuerlich wollen wir 2-6 spieler in
  * JEDER disziplin!!!" -- nimmt die 14.09.-Entscheidung ("mini dm sind immer 4 teams mit je 1

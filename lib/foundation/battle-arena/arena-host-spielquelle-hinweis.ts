@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { arenaAusfallGrundLabel, findeDisziplinErgebnis } from "@/lib/foundation/season-matchday-fixtures-overview";
 import { isBattleModeSave } from "@/lib/season/game-mode";
-import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 
 /**
  * ARENA-HOST-HINWEIS ("gewertet per PPS-Duell, Arena nur Vorschau") — Task #159 Punkt 3, eigener
@@ -61,13 +61,14 @@ export function buildArenaHostSpielquelleHinweise(
       continue;
     }
     if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(slot.disciplineId)) {
-      // MINI-DM-POD-RESOLVE (19.10.): Mini-DM ist die einzige Disziplin, die hier NICHT per
-      // PPS-Duell gewertet wird, sondern als echte Vierergruppe (Pod) -- s. mini-dm-pod-resolve.ts.
+      // MINI-DM-POD-RESOLVE (19.10.), seit 01.11. fuer JEDE Vierer-Pod-Disziplin (Mini-DM,
+      // Battlefield): sie wird NICHT per PPS-Duell gewertet, sondern als echte Vierergruppe (Pod) --
+      // s. mini-dm-pod-resolve.ts und `VIERER_POD_DISCIPLINE_IDS`.
       hinweise.push({
         disciplineId: slot.disciplineId,
         disciplineName: slot.displayName,
         text:
-          slot.disciplineId === MINI_DM_DISCIPLINE_ID
+          isViererPodDiscipline(slot.disciplineId)
             ? "wird in dieser Saison als 4-Team-Gruppe (Pod) gewertet, nicht per Arena"
             : "wird in dieser Saison per PPS-Duell gewertet, nicht per Arena",
       });
