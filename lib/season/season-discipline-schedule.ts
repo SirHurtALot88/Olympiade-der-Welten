@@ -183,8 +183,19 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  * unter den ersten zwei 59-74 %, Paare ab 15 Punkten 96-99 % richtig. Auf denselben Daten als
  * Zweier-Duell gerechnet waere es bei JEDEM k schlechter (k=2 0,31/0,44, k=4 0,75/0,78): der Pod
  * aendert die Spieler-PP nicht (rein `ppAusSpielerScore()`), er vergroessert nur das Feld.
- * OFFEN: k=2/3 verfehlen die Schranke -- ob dafuer eine Ausnahme wie bei Mini-DM (24.10.) gilt,
- * entscheidet Chris; bis dahin ist das NICHT als abgenommen zu lesen.
+ *
+ * CHRIS' AUSNAHME (01.11., ausdruecklich freigegeben): Battlefield laeuft als 4er-PPS-Pod fuer ALLE
+ * Kadergroessen k=2..6, auch fuer k=2/3, die die 0,80-Schranke verfehlen. Die Begruendung ist
+ * BEWUSST EINE ANDERE als bei Mini-DMs Ausnahme vom 24.10. (dort: starke Star-Treue, Rang 1
+ * 76-81 %, Top 2 93-95 %). Battlefields Star-Treue ist dafuer zu schwach (s. oben) und traegt
+ * diese Ausnahme NICHT. Getragen wird sie von zwei anderen Gruenden:
+ *  1. Paartreue mit Abstand: Paare ab 15 Eignungspunkten werden zu 96-99 % richtig geordnet -- was
+ *     rho drueckt, sind enge Paare, die kein Motor ordnen kann (CLAUDE.md, "Die Abnahme jeder
+ *     Disziplin").
+ *  2. Nie schlechter als das ersetzte Format: das Zweier-Duell, das Battlefield vorher spielte,
+ *     liegt auf denselben Daten bei jedem k darunter (k=2 0,31/0,44, k=3 0,66/0,72).
+ * Gilt NUR fuer diesen PPS-Pod. Ein kuenftiger echter Battlefield-Motor (K6-Umbau, Domination fuer
+ * vier Seiten) braucht eine eigene, neue Abnahme; diese Ausnahme geht nicht automatisch auf ihn ueber.
  */
 export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
 
