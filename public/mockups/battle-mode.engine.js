@@ -39678,6 +39678,9 @@
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
+    // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
+    // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
+    if(KP&&KP.pod&&KP.pod.replay){ bfPodReplaySchritt(dt); return; }
     // ZIELANSAGE: die Sperre laeuft in KAMPFZEIT, nicht in Echtzeit — sonst haette das
     // Tempo (1x/2x/4x) heimlich Einfluss darauf, wie oft man eingreifen darf.
     if(KFOKUS_CD>0)KFOKUS_CD=Math.max(0,KFOKUS_CD-dt);
@@ -50229,7 +50232,7 @@
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
-    if(bfPodAktiv())zeichneBfPodTafel();
+    if(bfPodAktiv()){ if(bfPodReplayAktiv())zeichneBfPodSpuren(); zeichneBfPodTafel(); }
   }
 
   // DIE VIER-TEAM-TAFEL (Battlefield-Pod, 02.11.): oben ueber dem Feld je Team ein Kaestchen in
@@ -54525,6 +54528,10 @@
       if(pod.k)art.jeSeite=pod.k;
       bfPodKader=kader;
       build(pod.saat);
+      // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
+      // `echtzeit`), mit denselben Formkarten/Aufstellungen — die Arena spielt sie danach ab.
+      // `pod.echtzeit` zeigt zum Vergleich den alten freien Echtzeitkampf.
+      if(!pod.echtzeit)bfPodReplayStarten(bfffaFuerGebautenPod(kader,pod.saat));
     } finally {
       bfPodKader=null; art.jeSeite=jeVorher; FORMKARTE=formVorher;
       for(const k in place)delete place[k];
@@ -54892,6 +54899,145 @@
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
     return {...g, platzierung:pl, lebend, anteil};
+  }
+
+  // ===================================================================================
+  // DAS REPLAY — die sichtbare Arena spielt das fertige Gefecht ab (02.11.).
+  //
+  // Alle vier Teams stehen gleichzeitig auf demselben Feld und kaempfen gleichzeitig an allen drei
+  // Orten; nur WER WEN TRIFFT, WER FAELLT und WER WELCHEN ORT NIMMT, steht vorher fest (das
+  // Protokoll aus bfffaGefecht). Nichts davon wird hier gewuerfelt — die Anzeige zeigt genau den
+  // Kampf, den die Liga bucht. stepSim() leitet im Pod mit Replay hierher um (s. dort), das Duell
+  // erreicht diesen Code nie (KP.pod gibt es nur im Pod).
+  //
+  // Zeitachse in Kampfsekunden: zuerst ANMARSCH (die Kaempfer laufen aus ihren Ecken an ihre Orte),
+  // dann je Takt BFFFA.taktSek. Die Schlaege eines Taktes sind ueber den Takt verteilt (fester
+  // Versatz je Kaempfer, kein Wurf), K.o.s, Eroberungen und Punkte fallen ans Taktende.
+  const BF_REPLAY_ANMARSCH=6, BF_REPLAY_TEMPO=95;
+  let bfPodSpuren=[];
+  function bfPodReplayStarten(g){
+    if(!KP||!KP.pod)return;
+    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    bfPodSpuren=[];
+    g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; } });
+  }
+  const bfPodReplayAktiv=()=>!!(KP&&KP.pod&&KP.pod.replay);
+  // Wo ein Kaempfer an einem Ort steht: links (Seite 0/2) oder rechts (1/3) vom Ort, auf der Hoehe
+  // seiner Ecke versetzt, wenn ein zweites Team von derselben Seite dort steht; die Kameraden in
+  // einem Raster nach aussen (zwei Reihen), damit sich Figuren und Namen nicht decken.
+  function bfPodReplayPlatz(u,ort,stand){
+    const o=KP.orte[ort];
+    const amOrt=(x)=>x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort;
+    const am=U.filter(x=>x.side===u.side&&amOrt(x));
+    const nebenan=U.some(x=>x.side!==u.side&&x.side%2===u.side%2&&amOrt(x));
+    const j=Math.max(0,am.indexOf(u)), m=Math.max(1,am.length);
+    const sx=u.side%2===0?-1:1, cy=nebenan?(u.side<2?-1:1)*36:0;
+    const reihen=m>1&&!nebenan?2:1, spalte=Math.floor(j/reihen), reihe=j%reihen;
+    const y=o.y+cy+(reihen>1?(reihe-0.5)*58:0);
+    return {x:o.x+sx*(92+spalte*60), y:Math.max(40,Math.min(H-30,y))};
+  }
+  function bfPodReplaySchritt(dt){
+    const R=KP.pod.replay, g=R.g, D=BFFFA.taktSek;
+    // Laufender Takt (0 = Anmarsch) und der Stand, auf den die Figuren gerade zulaufen.
+    const takt=t<BF_REPLAY_ANMARSCH?0:Math.min(g.gespielt,1+Math.floor((t-BF_REPLAY_ANMARSCH)/D));
+    const standVor=takt<=1?g.start:g.takte[takt-2];
+    const imTakt=takt>=1?g.takte[takt-1]:null;
+    const taktStart=BF_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    // 1) BEWEGUNG: jeder Stehende laeuft an seinen Platz (unterwegs: an den Zielort).
+    for(const u of U){
+      if(u.bfIdx==null)continue;
+      u.lunge=Math.max(0,(u.lunge||0)-dt);
+      if(u.down)continue;
+      const k=standVor.k[u.bfIdx];
+      const ort=k.ort!=null?k.ort:k.nach;
+      if(ort==null)continue;
+      const ziel=bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
+      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=BF_REPLAY_TEMPO*dt;
+      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*BF_REPLAY_TEMPO; u.vy=ddy/weg*BF_REPLAY_TEMPO; }
+      else { u.vx=0; u.vy=0; }
+    }
+    // 2) DIE SCHLAEGE DIESES TAKTES, jeder zu seinem festen Zeitpunkt im Takt.
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=R.takt+":"+(takt)+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben"||e.typ==="leer";
+        const zeitpunkt=istSchlag?0.12+0.66*((e.wer*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        bfPodReplayEreignis(e,g);
+      });
+    }
+    // 3) ORTE UND PUNKTE: vom Stand vor dem Takt zum Stand danach, gleitend.
+    if(imTakt){
+      KP.orte.forEach((o,i)=>{
+        const a=standVor.orte[i], b=imTakt.orte[i];
+        o.besitz=anteilTakt>=0.9?b.besitz:a.besitz;
+        if(anteilTakt>=0.9){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt; }
+        else if(a.erobertVon!=null&&a.erobertVon===b.erobertVon){ o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt+(b.fortschritt-a.fortschritt)*anteilTakt/0.9; }
+        else if(b.erobertVon!=null&&a.besitz===b.besitz){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt*anteilTakt/0.9; }
+        else { o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt; }
+      });
+      for(let s=0;s<KP.punkte.length;s++)KP.punkte[s]=standVor.punkte[s]+(imTakt.punkte[s]-standVor.punkte[s])*anteilTakt;
+    }
+    for(const sp of bfPodSpuren)sp.life-=dt;
+    bfPodSpuren=bfPodSpuren.filter(sp=>sp.life>0);
+    // 4) ENDE: der Endstand ist exakt der des Gefechts (Platzierung liest KP/U).
+    if(t>=R.ende){
+      const last=g.takte[g.gespielt-1]||g.start;
+      for(const e of (g.takte.flatMap((tk,ti)=>tk.ereignisse.map((x,ei)=>({x,schl:R.takt+":"+(ti+1)+":"+ei})))))
+        if(!R.erledigt.has(e.schl)){ R.erledigt.add(e.schl); bfPodReplayEreignis(e.x,g,true); }
+      KP.orte.forEach((o,i)=>{ o.besitz=last.orte[i].besitz; o.erobertVon=last.orte[i].erobertVon; o.fortschritt=last.orte[i].fortschritt; });
+      for(let s=0;s<KP.punkte.length;s++){ KP.punkte[s]=last.punkte[s]; KP.pod.rausT[s]=last.rausTakt[s]==null?null:last.rausTakt[s]*D; }
+      U.forEach(u=>{ if(u.bfIdx!=null&&g.kaempfer[u.bfIdx].raus&&!u.down)u.down=true; });
+      finish();
+    }
+    updateHud();
+  }
+  // EIN EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN. `still`: nur den Zustand nachziehen (Endstand),
+  // keine Spuren und keine Schwebeschrift.
+  function bfPodReplayEreignis(e,g,still){
+    const U_=(i)=>U.find(u=>u.bfIdx===i)||null;
+    const name=(s)=>kampfTeamName(s);
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const k=g.kaempfer[e.ziel], anteil=e.wucht/Math.max(1e-9,k.stand0), d=anteil*Z.max;
+        Z.hp=Math.max(1,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x,y2:Z.y,farbe:kampfSeitenFarbe(A.side),life:0.5,dick:e.typ==="schwachstelle"});
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A&&Z&&!still){ A.lunge=0.16; A.tgt=Z;
+        bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x+18,y2:Z.y-14,farbe:kampfSeitenFarbe(A.side),life:0.35,dick:false}); } break; }
+      case "leer": { const Z=U_(e.ziel); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"ausgewichen",life:.8}); break; }
+      case "position": { const Z=U_(e.wer); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"stellt sich klug",life:.9,skill:true}); break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02)); if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+        feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": {
+        const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
+        Z.hp=0;
+        if(A&&!still)schalteAus(Z,A);
+        else { Z.down=true; Z.st.tode++; if(A){A.st.ko++; A.st.koAnteil+=1;} }
+        break;
+      }
+      case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
+      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+BF_ORT_NAMEN[e.ort]+".",true,undefined,"kontrollpunkt"); break;
+      default: break;
+    }
+  }
+  function zeichneBfPodSpuren(){
+    if(!bfPodSpuren.length)return;
+    ctx.save();
+    for(const sp of bfPodSpuren){
+      ctx.globalAlpha=Math.max(0,Math.min(1,sp.life/0.5))*.85;
+      ctx.strokeStyle=sp.farbe; ctx.lineWidth=sp.dick?3.5:2; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(sp.x1,sp.y1); ctx.lineTo(sp.x2,sp.y2); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ===================================================================================
