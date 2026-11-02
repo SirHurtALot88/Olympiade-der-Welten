@@ -173,6 +173,8 @@ export type SeasonV2StandingsRow = {
     seasonName: string;
     points: number | null;
     rank: number | null;
+    /** Liga in dieser Saison (`liga<N>`), `null` ohne Liga-Trennung — s. `team-management-overview`. */
+    leagueTier?: string | null;
   }>;
 };
 

@@ -81123,6 +81123,25 @@ span.nl-facility-ampel-chip {
   color: var(--nl-ink, #f2ede2);
 }
 
+/* Liga 3+ — gibt es heute noch nicht, soll aber nicht still wie Liga 2 aussehen. */
+.ranks-league-badge.is-liga-n {
+  background: color-mix(in srgb, var(--nl-soc, #c08bff) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+/* Historische Saison-Zeilen (LeagueTierBadge): der Chip steht HINTER Saison/Team, nicht davor. */
+.league-tier-badge {
+  margin-right: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* In Flex-Chips mit eigenem `gap` (Teamprofil · Saison-Verlauf) kein zusaetzlicher Abstand. */
+.nl-teamprofile-development-season .league-tier-badge {
+  margin-left: 0;
+}
+
 /* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */
 .ranks-table thead .ranks-group-row .ranks-group-cell {
   position: sticky;

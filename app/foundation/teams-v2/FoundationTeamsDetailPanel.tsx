@@ -7,6 +7,7 @@ import dynamic from "next/dynamic";
 import type { ContractAssessment } from "@/lib/foundation/tabs/use-teams-contract-derivations";
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
 import RaceIcon from "@/app/foundation/RaceIcon";
@@ -2842,6 +2843,7 @@ function FoundationTeamsDetailPanel({
                                                 <b>{entry.seasonName.replace("Season ", "S")}</b>
                                                 {formatLocalePoints(entry.points, 1)}
                                                 {entry.rank != null ? <small>#{entry.rank}</small> : null}
+                                                <LeagueTierBadge tier={entry.leagueTier} seasonLabel={entry.seasonName} />
                                               </span>
                                             ))}
                                           </div>
@@ -2903,6 +2905,7 @@ function FoundationTeamsDetailPanel({
                             return (
                               <>
                                 <strong>{row.seasonName}</strong>
+                                <LeagueTierBadge tier={row.leagueTier} seasonLabel={row.seasonName} />
                                 {row.isLive ? <span className="pill">Live</span> : null}
                               </>
                             );

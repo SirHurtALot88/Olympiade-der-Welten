@@ -83,6 +83,7 @@ import {
   type SpieltagsPaarung,
 } from "@/lib/foundation/season-matchday-fixtures-overview";
 import type { LeagueTier } from "@/lib/season/league-split";
+import { formatLeagueTierLabel, formatLeagueTierShortLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -1520,9 +1521,13 @@ export default function SeasonStandingsNewLook({
 
   function renderExpandedDetails(row: SeasonV2StandingsRow) {
     const history = row.historicalPointsBySeason ?? [];
-    const historyRanks = history
+    // Liga je archivierter Saison mitfuehren (Chris, 02.11.): bei Liga-Split ist `rank` liga-lokal,
+    // „#1" allein sagt nicht, ob Liga 1 oder Liga 2. Die Linie laeuft ueber die ligauebergreifende
+    // Position, sonst saehe ein Abstieg (#14 L1 → #2 L2) wie ein Sprung nach oben aus.
+    const historyRankEntries = history
       .filter((entry) => entry.rank != null && Number.isFinite(entry.rank))
-      .map((entry) => entry.rank as number);
+      .map((entry) => ({ rank: entry.rank as number, leagueTier: entry.leagueTier ?? null }));
+    const historyRanks = historyRankEntries.map((entry) => entry.rank);
     const historyPoints = history
       .filter((entry) => entry.points != null && Number.isFinite(entry.points))
       .map((entry) => entry.points as number);
@@ -1570,13 +1575,18 @@ export default function SeasonStandingsNewLook({
               Rang über {historyRanks.length} archivierte Saisons (oben = besser)
             </span>
             <NlSparkline
-              points={historyRanks.map((rank) => -rank)}
+              points={historyRankEntries.map((entry) => -(toLeagueSpanningPosition(entry.rank, entry.leagueTier) ?? entry.rank))}
               tone="accent"
               aria-label={`Rang-Verlauf von ${row.teamName} über ${historyRanks.length} Saisons`}
               className="nl-standings-history-spark"
             />
             <span className="nl-standings-history-values nl-tnum">
-              {historyRanks.map((rank) => `#${rank}`).join(" · ")}
+              {historyRankEntries
+                .map((entry) => {
+                  const ligaKurz = formatLeagueTierShortLabel(entry.leagueTier);
+                  return ligaKurz ? `#${entry.rank} ${ligaKurz}` : `#${entry.rank}`;
+                })
+                .join(" · ")}
             </span>
           </div>
         ) : null}
@@ -3016,9 +3026,7 @@ export default function SeasonStandingsNewLook({
 
   /** "liga1"/"liga2" → "Liga 1"/"Liga 2", für Rang-Tooltips in der Paarungszeile. */
   function spieltagLigaLabel(leagueTier: LeagueTier | null | undefined): string | null {
-    if (leagueTier === "liga1") return "Liga 1";
-    if (leagueTier === "liga2") return "Liga 2";
-    return null;
+    return formatLeagueTierLabel(leagueTier);
   }
 
   /**

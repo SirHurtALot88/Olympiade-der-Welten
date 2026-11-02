@@ -9,6 +9,8 @@ import type {
   TeamCareerSeasonEntry,
   TeamCareerSeries,
 } from "@/lib/foundation/career-series";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
+import { formatLeagueTierLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 
 /**
  * Werdegang panel — season-over-season career view for players and teams.
@@ -711,7 +713,15 @@ export default function WerdegangPanel(props: WerdegangPanelProps) {
     if (teamSeries) {
       const { bestSeason, biggestPointsSwing, peakMarketValue } = teamSeries.superlatives;
       return [
-        bestSeason ? { id: "best", label: "Beste Saison", value: `Rang ${formatNumber(bestSeason.rank, 0)} · ${bestSeason.seasonLabel}` } : null,
+        bestSeason
+          ? {
+              id: "best",
+              label: "Beste Saison",
+              value: `Rang ${formatNumber(bestSeason.rank, 0)}${
+                formatLeagueTierLabel(bestSeason.leagueTier) ? ` (${formatLeagueTierLabel(bestSeason.leagueTier)})` : ""
+              } · ${bestSeason.seasonLabel}`,
+            }
+          : null,
         biggestPointsSwing ? { id: "swing", label: "Größter Punkte-Swing", value: `${formatSigned(biggestPointsSwing.delta, 1)} · ${biggestPointsSwing.seasonLabel}` } : null,
         peakMarketValue ? { id: "peak-mw", label: "Höchster Kader-MW", value: `${formatNumber(peakMarketValue.value, 2)} · ${peakMarketValue.seasonLabel}` } : null,
       ];
@@ -787,6 +797,7 @@ export default function WerdegangPanel(props: WerdegangPanelProps) {
                       >
                         <div className="werdegang-season-head">
                           <strong className="werdegang-season-name">{entry.seasonLabel}</strong>
+                          <LeagueTierBadge tier={entry.leagueTier} seasonLabel={entry.seasonLabel} />
                           {medalGlyph(entry.rankMedal)}
                           <span className="werdegang-season-rank">{formatRank(entry.ppsRank)}</span>
                           {entry.mvpCount > 0 ? (
@@ -842,9 +853,18 @@ export default function WerdegangPanel(props: WerdegangPanelProps) {
                       >
                         <div className="werdegang-season-head">
                           <strong className="werdegang-season-name">{entry.seasonLabel}</strong>
+                          <LeagueTierBadge tier={entry.leagueTier} seasonLabel={entry.seasonLabel} />
                           {medalGlyph(entry.medal)}
                           <span className="werdegang-season-rank">{formatRank(entry.rank)}</span>
-                          <DeltaChip delta={diff(entry.rank, previous?.rank)} digits={0} invert />
+                          {/* Ligauebergreifend: ein Aufstieg (#1 L2 → #12 L1) ist eine Verbesserung. */}
+                          <DeltaChip
+                            delta={diff(
+                              toLeagueSpanningPosition(entry.rank, entry.leagueTier),
+                              previous ? toLeagueSpanningPosition(previous.rank, previous.leagueTier) : null,
+                            )}
+                            digits={0}
+                            invert
+                          />
                         </div>
                         <div className="werdegang-season-stats">
                           <span className="werdegang-season-stat">
