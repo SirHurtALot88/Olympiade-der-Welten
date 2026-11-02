@@ -1001,6 +1001,7 @@ describe("team management overview", () => {
       teamName: "Armageddon Aftermath",
       points: 100,
       disciplinePoints: 100,
+      disciplinePointsByArea: { pow: 25, spe: 25, men: 25, soc: 25 },
       cashEnd: 100,
       rosterEnd: 8,
       salaryEnd: 1000,

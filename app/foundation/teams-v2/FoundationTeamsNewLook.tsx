@@ -59,6 +59,8 @@ import type {
 } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import { formatLeagueTierLabel, formatLeagueTierShortLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
 import {
   buildCaptainCandidateProfiles,
   buildCaptainEffectExplanations,
@@ -913,10 +915,12 @@ export default function FoundationTeamsNewLook({
     if (!liveHistoryRow || !previousSeasonRow) {
       return null;
     }
+    // Ligauebergreifend (wie im Teamprofil): bei Liga-Split ist `rank` liga-lokal, ein Aufstieg von
+    // „#1 (Liga 2)" auf „#14 (Liga 1)" ist eine Verbesserung. Ohne Liga exakt die alte Rechnung.
+    const liveRankPosition = toLeagueSpanningPosition(liveHistoryRow.rank, liveHistoryRow.leagueTier);
+    const previousRankPosition = toLeagueSpanningPosition(previousSeasonRow.rank, previousSeasonRow.leagueTier);
     const rankDelta =
-      isFiniteNumber(liveHistoryRow.rank) && isFiniteNumber(previousSeasonRow.rank)
-        ? previousSeasonRow.rank - liveHistoryRow.rank
-        : null;
+      liveRankPosition != null && previousRankPosition != null ? previousRankPosition - liveRankPosition : null;
     const pointsDelta =
       isFiniteNumber(liveHistoryRow.points) && isFiniteNumber(previousSeasonRow.points)
         ? liveHistoryRow.points - previousSeasonRow.points
@@ -939,10 +943,19 @@ export default function FoundationTeamsNewLook({
     if (developmentRows.length < 2) {
       return null;
     }
-    const rankValues = developmentRows.map((row) => row.rank).filter(isFiniteNumber);
+    // Ligauebergreifende Position (Liga 2 liegt hinter Liga 1) — ohne Liga-Split = Rang.
+    const rankedRows = developmentRows
+      .map((row) => ({ row, position: toLeagueSpanningPosition(row.rank, row.leagueTier) }))
+      .filter((entry): entry is { row: (typeof developmentRows)[number]; position: number } => isFiniteNumber(entry.position));
+    const rankValues = rankedRows.map((entry) => entry.position);
     // Rang 1 = beste Saison → für die Sparkline invertieren (oben = besser).
-    const rankSpark =
-      teamCount > 0 ? developmentRows.filter((row) => isFiniteNumber(row.rank)).map((row) => teamCount - (row.rank as number) + 1) : [];
+    const rankSpark = teamCount > 0 ? rankValues.map((position) => teamCount - position + 1) : [];
+    const bestRankedRow =
+      rankedRows.length > 0 ? rankedRows.reduce((best, entry) => (entry.position < best.position ? entry : best)).row : null;
+    // Ø-Rang nur, wenn alle Saisons in derselben Liga lagen — ein Mittel aus Liga-1- und Liga-2-Raengen
+    // waere eine Zahl ohne Bedeutung.
+    const leagueTiersSeen = new Set(rankedRows.map((entry) => entry.row.leagueTier ?? null));
+    const rawRanks = rankedRows.map((entry) => entry.row.rank as number);
     const pointValues = developmentRows.map((row) => row.points).filter(isFiniteNumber);
     const pointBars = developmentRows
       .filter((row) => isFiniteNumber(row.points))
@@ -956,8 +969,12 @@ export default function FoundationTeamsNewLook({
     const cashSpark = developmentRows.filter((row) => isFiniteNumber(row.cash)).map((row) => row.cash as number);
     return {
       rankSpark,
-      bestRank: rankValues.length > 0 ? Math.min(...rankValues) : null,
-      avgRank: rankValues.length > 0 ? rankValues.reduce((sum, value) => sum + value, 0) / rankValues.length : null,
+      bestRank: bestRankedRow?.rank ?? null,
+      bestRankLeagueTier: bestRankedRow?.leagueTier ?? null,
+      avgRank:
+        rawRanks.length > 0 && leagueTiersSeen.size <= 1
+          ? rawRanks.reduce((sum, value) => sum + value, 0) / rawRanks.length
+          : null,
       pointBars,
       pointsTotal: pointValues.length > 0 ? pointValues.reduce((sum, value) => sum + value, 0) : null,
       pointsAvg: pointValues.length > 0 ? pointValues.reduce((sum, value) => sum + value, 0) / pointValues.length : null,
@@ -1887,7 +1904,11 @@ export default function FoundationTeamsNewLook({
                       <NlDeltaChip
                         value={seasonDeltas.rankDelta}
                         format={(n) => formatSignedNlNumber(n, 0)}
-                        title={`Rang: #${formatNlNumber(previousSeasonRow.rank, 0)} → #${formatNlNumber(liveHistoryRow?.rank, 0)}`}
+                        title={`Rang: #${formatNlNumber(previousSeasonRow.rank, 0)}${
+                          formatLeagueTierLabel(previousSeasonRow.leagueTier) ? ` (${formatLeagueTierLabel(previousSeasonRow.leagueTier)})` : ""
+                        } → #${formatNlNumber(liveHistoryRow?.rank, 0)}${
+                          formatLeagueTierLabel(liveHistoryRow?.leagueTier) ? ` (${formatLeagueTierLabel(liveHistoryRow?.leagueTier)})` : ""
+                        }`}
                       />
                     </span>
                   ) : null}
@@ -2081,7 +2102,13 @@ export default function FoundationTeamsNewLook({
                       <p className="nl-teams-empty">Kein Rang-Verlauf vorhanden.</p>
                     )}
                     <p className="nl-teams-development-meta">
-                      {developmentSeries.bestRank != null ? `Best #${formatNlNumber(developmentSeries.bestRank, 0)}` : "—"}
+                      {developmentSeries.bestRank != null
+                        ? `Best #${formatNlNumber(developmentSeries.bestRank, 0)}${
+                            formatLeagueTierShortLabel(developmentSeries.bestRankLeagueTier)
+                              ? ` ${formatLeagueTierShortLabel(developmentSeries.bestRankLeagueTier)}`
+                              : ""
+                          }`
+                        : "—"}
                       {developmentSeries.avgRank != null ? ` · Ø #${formatNlNumber(developmentSeries.avgRank, 1)}` : ""}
                     </p>
                   </article>
@@ -2187,9 +2214,11 @@ export default function FoundationTeamsNewLook({
                     <li
                       key={row.seasonId}
                       className={`nl-teams-development-season${row.isLive ? " is-live" : ""}`}
-                      title={`${row.seasonName}${row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""}${
-                        row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""
-                      }${row.marketValue != null ? ` · MW ${formatNlMoney(row.marketValue)}` : ""}`}
+                      title={`${row.seasonName}${formatLeagueTierLabel(row.leagueTier) ? ` · ${formatLeagueTierLabel(row.leagueTier)}` : ""}${
+                        row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""
+                      }${row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""}${
+                        row.marketValue != null ? ` · MW ${formatNlMoney(row.marketValue)}` : ""
+                      }`}
                     >
                       <span className="nl-teams-development-season-name">
                         {formatNlSeasonShortLabel(row.seasonName, row.seasonId)}
@@ -2197,6 +2226,7 @@ export default function FoundationTeamsNewLook({
                       <span className="nl-teams-development-season-rank nl-tnum">
                         {row.rank != null ? `#${formatNlNumber(row.rank, 0)}` : "—"}
                       </span>
+                      <LeagueTierBadge tier={row.leagueTier} seasonLabel={row.seasonName} />
                       {row.isLive ? <span className="nl-teams-development-season-live">Live</span> : null}
                     </li>
                   ))}

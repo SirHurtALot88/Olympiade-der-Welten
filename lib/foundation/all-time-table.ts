@@ -1,6 +1,7 @@
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 import { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -33,6 +34,11 @@ export type AllTimeSeasonPoint = {
   /** true = laufende (noch nicht archivierte) Saison. */
   isLive: boolean;
   rank: number | null;
+  /**
+   * Liga des Teams in dieser Saison (`liga<N>`), `null` ohne Liga-Trennung (Manager Mode / Legacy).
+   * Bei Liga-Split ist `rank` liga-lokal (Chris, 02.11.). Quelle: `buildHistoricalLeagueTierLookup`.
+   */
+  leagueTier?: string | null;
   points: number | null;
   marketValue: number | null;
   cash: number | null;
@@ -204,6 +210,7 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
   const allTimeAggregateByTeamId = new Map(
     buildAllTimeTableFromSnapshots(snapshots, gameState.teams).map((row) => [row.teamId, row] as const),
   );
+  const historicalLeagueTierOf = buildHistoricalLeagueTierLookup(gameState);
 
   /**
    * DIE LAUFENDE SAISON GEHOERT NICHT HINEIN — gemeldet (`6l1b0i`): „in der ewigen Tabelle sollen
@@ -253,6 +260,8 @@ export function buildAllTimeTableModel(input: BuildAllTimeTableModelInput): AllT
         seasonLabel: seasonLabelOf({ seasonId: snapshot.seasonId, seasonName: snapshot.seasonName }),
         isLive: false,
         rank: record.rank ?? null,
+        leagueTier:
+          record.leagueTier !== undefined ? record.leagueTier : historicalLeagueTierOf(snapshot.seasonId, team.teamId),
         points: record.points ?? null,
         /**
          * WELCHER STAND HIER STEHT: DER SAISON-ENDSTAND. Chris' Entscheidung vom 22.08. —

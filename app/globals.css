@@ -81137,8 +81137,9 @@ span.nl-facility-ampel-chip {
   white-space: nowrap;
 }
 
-/* In Flex-Chips mit eigenem `gap` (Teamprofil · Saison-Verlauf) kein zusaetzlicher Abstand. */
-.nl-teamprofile-development-season .league-tier-badge {
+/* In Flex-Chips mit eigenem `gap` (Saison-Verlauf in Teamprofil und Teams-Ansicht) kein zusaetzlicher Abstand. */
+.nl-teamprofile-development-season .league-tier-badge,
+.nl-teams-development-season .league-tier-badge {
   margin-left: 0;
 }
 

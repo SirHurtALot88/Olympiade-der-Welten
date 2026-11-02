@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamCareerSeries } from "@/lib/foundation/career-series";
+import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import {
   alsSchnappschussErsatz,
   projiziereSaisonHistorie,
@@ -252,5 +253,52 @@ describe("Werdegang des Teams", () => {
     ]);
     // Rang 12 in Liga 1 ist besser als Rang 1 in Liga 2.
     expect(serie.superlatives.bestSeason).toMatchObject({ rank: 12, leagueTier: "liga1" });
+  });
+});
+
+describe("Vorsaison-Podium", () => {
+  it("trennt bei Liga-Split die Podien je Liga — Liga 1 zuerst, jede Zeile mit ihrer Liga", () => {
+    const gameState = baueSpielstand({
+      seasonId: "season-2",
+      leagueByTeamId: { A: "liga1", B: "liga1", C: "liga1", D: "liga2", E: "liga2", F: "liga2" },
+      seasonSnapshots: [
+        baueSchnappschuss("season-1", [
+          { teamId: "D", rank: 1, leagueTier: "liga2" },
+          { teamId: "A", rank: 1, leagueTier: "liga1" },
+          { teamId: "E", rank: 2, leagueTier: "liga2" },
+          { teamId: "B", rank: 2, leagueTier: "liga1" },
+          { teamId: "F", rank: 3, leagueTier: "liga2" },
+          { teamId: "C", rank: 3, leagueTier: "liga1" },
+        ]),
+      ],
+    });
+
+    const podium = buildPreviousSeasonPodium(gameState);
+
+    expect(podium?.entries.map((entry) => [entry.teamId, entry.rank, entry.leagueTier])).toEqual([
+      ["A", 1, "liga1"],
+      ["B", 2, "liga1"],
+      ["C", 3, "liga1"],
+      ["D", 1, "liga2"],
+      ["E", 2, "liga2"],
+      ["F", 3, "liga2"],
+    ]);
+  });
+
+  it("Manager Mode: Podium unveraendert, ohne Liga", () => {
+    const gameState = baueSpielstand({
+      seasonId: "season-2",
+      seasonSnapshots: [
+        baueSchnappschuss("season-1", [
+          { teamId: "B", rank: 2, leagueTier: null },
+          { teamId: "A", rank: 1, leagueTier: null },
+        ]),
+      ],
+    });
+
+    expect(buildPreviousSeasonPodium(gameState)?.entries.map((entry) => [entry.teamId, entry.leagueTier])).toEqual([
+      ["A", null],
+      ["B", null],
+    ]);
   });
 });

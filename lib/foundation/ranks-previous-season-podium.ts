@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+import { buildHistoricalLeagueTierLookup, getLeagueLevel } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -27,6 +28,12 @@ export type PreviousSeasonPodiumEntry = {
   rank: number;
   /** Liga-Punkte der Vorsaison, falls im Snapshot vorhanden. */
   points: number | null;
+  /**
+   * Liga der Vorsaison (`liga<N>`), `null` ohne Liga-Trennung. Bei Liga-Split traegt jede Liga ihr
+   * eigenes Podium (Rang 1..3 je Liga) — ohne Liga staenden zwei „Meister" ununterscheidbar
+   * untereinander (Chris, 02.11.).
+   */
+  leagueTier?: string | null;
 };
 
 export type PreviousSeasonPodium = {
@@ -56,19 +63,25 @@ export function buildPreviousSeasonPodium(gameState: GameState): PreviousSeasonP
     return null;
   }
 
+  const leagueTierOf = buildHistoricalLeagueTierLookup(gameState);
   const entries = resolveSeasonSnapshotTeamRecords(last)
     .filter(
       (record): record is typeof record & { rank: number } =>
         record.rank != null && Number.isFinite(record.rank) && record.rank >= 1 && record.rank <= 3,
     )
-    .sort((left, right) => left.rank - right.rank)
     .map((record) => ({
       teamId: record.teamId,
       teamCode: record.teamCode,
       teamName: record.teamName,
       rank: record.rank,
       points: record.points != null && Number.isFinite(record.points) ? record.points : null,
-    }));
+      leagueTier: record.leagueTier !== undefined ? record.leagueTier : leagueTierOf(last.seasonId, record.teamId),
+    }))
+    // Erst nach Liga (Liga 1 oben), dann nach Rang — ohne Liga-Split bleibt es die reine Rangfolge.
+    .sort(
+      (left, right) =>
+        (getLeagueLevel(left.leagueTier) ?? 0) - (getLeagueLevel(right.leagueTier) ?? 0) || left.rank - right.rank,
+    );
   if (entries.length === 0) {
     return null;
   }
