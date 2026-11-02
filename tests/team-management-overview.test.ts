@@ -978,6 +978,63 @@ describe("team management overview", () => {
     expect(result[0]?.cash).toBe(120000);
   });
 
+  it("traegt je historischer Saison die Liga mit, in der das Team damals spielte (Battle Mode)", () => {
+    // Chris, 02.11.: „in Season 1, in welcher Liga haben sie denn gespielt zu dem Zeitpunkt".
+    // A-A gewinnt Season 1 in Liga 2 (eingefroren im Schnappschuss), steigt auf und spielt Season 2
+    // in Liga 1 — der Season-2-Schnappschuss stammt von vor #1288 und kennt `leagueTier` nicht, die
+    // Liga wird aus `leagueByTeamId` + Auf-/Abstiegs-Protokoll zurueckgerechnet.
+    const gameState = createGameState({ teams: [createTeam()] });
+    gameState.season = { ...gameState.season, id: "season-3", name: "Season 3" };
+    gameState.seasonState.leagueByTeamId = { "A-A": "liga1", "B-B": "liga2" };
+    gameState.seasonState.leagueMovementLogs = [
+      {
+        id: "league-movement:season-1:test",
+        saveId: "test",
+        seasonId: "season-1",
+        createdAt: "2026-06-05T00:00:00.000Z",
+        promotedTeamIds: ["A-A"],
+        relegatedTeamIds: ["B-B"],
+      },
+    ];
+    const standing = {
+      teamCode: "A-A",
+      teamName: "Armageddon Aftermath",
+      points: 100,
+      disciplinePoints: 100,
+      cashEnd: 100,
+      rosterEnd: 8,
+      salaryEnd: 1000,
+      marketValueEnd: 1000,
+      transferCount: 0,
+      transferBuyCount: 0,
+      transferSellCount: 0,
+      transferNet: 0,
+    };
+    gameState.seasonState.seasonSnapshots = [
+      {
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        archivedAt: "2026-06-05T00:00:00.000Z",
+        finalStandings: [{ ...standing, teamId: "A-A", rank: 1, leagueTier: "liga2" }],
+        playerPerformances: [],
+      },
+      {
+        seasonId: "season-2",
+        seasonName: "Season 2",
+        archivedAt: "2026-06-06T00:00:00.000Z",
+        finalStandings: [{ ...standing, teamId: "A-A", rank: 9 }],
+        playerPerformances: [],
+      },
+    ];
+
+    const result = buildTeamSeasonOverviewRows({ gameState });
+
+    expect(result[0]?.historicalPointsBySeason.map((entry) => [entry.seasonId, entry.rank, entry.leagueTier])).toEqual([
+      ["season-1", 1, "liga2"],
+      ["season-2", 9, "liga1"],
+    ]);
+  });
+
   it("aggregates historical area points and podium counts from archived season snapshots", () => {
     const gameState = createGameState({
       teams: [createTeam()],
@@ -1063,9 +1120,11 @@ describe("team management overview", () => {
     expect(result[0]?.historicalTop10Count).toBe(2);
     expect(result[0]?.historicalAvgRank).toBe(3.5);
     expect(result[0]?.historicalAvgPoints).toBe(99.5);
+    // Ohne Liga-Split (Manager Mode) traegt jede historische Saison `leagueTier: null` — die
+    // Anzeigen blenden den Liga-Chip dann aus.
     expect(result[0]?.historicalPointsBySeason).toEqual([
-      { seasonId: "season-1", seasonName: "Season 1", points: 109, rank: 1 },
-      { seasonId: "season-2", seasonName: "Season 2", points: 90, rank: 6 },
+      { seasonId: "season-1", seasonName: "Season 1", points: 109, rank: 1, leagueTier: null },
+      { seasonId: "season-2", seasonName: "Season 2", points: 90, rank: 6, leagueTier: null },
     ]);
     expect(result[0]?.historicalSeasonsPlayed).toBe(2);
     expect(result[0]?.historicalBestRank).toBe(1);

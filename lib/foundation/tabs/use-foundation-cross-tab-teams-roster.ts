@@ -30,6 +30,7 @@ import {
 import type { TeamsAreaRank } from "@/lib/foundation/tabs/teams-view-derivations";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { leseSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
+import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 import { resolveTeamSellProfit } from "@/lib/foundation/team-transfer-history-helpers";
 import {
   computeTeamSeasonAverageMatchdayFatigue,
@@ -640,6 +641,9 @@ export function useFoundationCrossTabTeamsRoster(input: {
        * im Browser aber ohnehin schon leer — hier wird nichts schlechter, nur Rang, Punkte, Cash,
        * Gehalt, Marktwert und GuV werden endlich gefuellt.
        */
+      // Liga je Saison (Chris, 02.11.: „in Season 1, in welcher Liga haben sie denn gespielt") —
+      // eingefroren im Schnappschuss, sonst aus den Auf-/Abstiegs-Protokollen zurueckgerechnet.
+      const historicalLeagueTierOf = buildHistoricalLeagueTierLookup(input.gameState);
       const projizierteHistorie = (input.gameState.seasonState.seasonSnapshots ?? []).length > 0
         ? []
         : (input.gameState.seasonState.foundationSeasonHistory ?? []).map((eintrag) => {
@@ -659,6 +663,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
               seasonId: eintrag.seasonId,
               seasonName: eintrag.seasonName ?? getCanonicalSeasonLabel({ seasonId: eintrag.seasonId }),
               isLive: false,
+              leagueTier: historicalLeagueTierOf(eintrag.seasonId, team.teamId),
               rank: teamEintrag.rank,
               points: teamEintrag.points,
               pps: teamEintrag.disciplinePoints,
@@ -752,6 +757,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
             seasonId: snapshot.seasonId,
             seasonName: snapshot.seasonName,
             isLive: false,
+            leagueTier: historicalLeagueTierOf(snapshot.seasonId, team.teamId),
             rank: teamSnapshot.rank ?? null,
             points: teamSnapshot.points ?? null,
             pps: teamSnapshot.disciplinePoints ?? null,
@@ -831,6 +837,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
         seasonId: input.gameState.season.id,
         seasonName: input.gameState.season.name,
         isLive: true,
+        leagueTier: historicalLeagueTierOf(input.gameState.season.id, team.teamId),
         rank: liveSeasonOverviewRow?.rank ?? null,
         points: liveSeasonOverviewRow?.points ?? null,
         pps:
@@ -884,6 +891,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
         seasonId,
         seasonName: getCanonicalSeasonLabel({ seasonId, seasonName: null }),
         isLive: false,
+        // Auch ohne Schnappschuss laesst sich die Liga aus den Auf-/Abstiegs-Protokollen zurueckrechnen.
+        leagueTier: historicalLeagueTierOf(seasonId, team.teamId),
         rank: null,
         points: null,
         pps: null,

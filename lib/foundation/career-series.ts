@@ -4,6 +4,7 @@ import {
   resolveSnapshotPlayerPerformanceRow,
   snapshotPerformanceRowHasData,
 } from "@/lib/foundation/snapshot-player-performance";
+import { buildHistoricalLeagueTierLookup, toLeagueSpanningPosition } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -33,6 +34,8 @@ export type PlayerCareerSeasonEntry = {
   rankMedal: CareerMedal | null;
   mvpCount: number;
   bestDiscipline: string | null;
+  /** Liga seines Teams in dieser Saison (`liga<N>`), `null` ohne Liga-Trennung — s. `league-history.ts`. */
+  leagueTier?: string | null;
 };
 
 export type CareerMedalCabinet = {
@@ -68,10 +71,15 @@ export type TeamCareerSeasonEntry = {
   };
   marketValueTotal: number | null;
   medal: CareerMedal | null;
+  /**
+   * Liga in dieser Saison (`liga<N>`), `null` ohne Liga-Trennung. Bei Liga-Split ist `rank`
+   * liga-lokal — ohne Liga ist „#1" nicht lesbar (Chris, 02.11.). Quelle: `league-history.ts`.
+   */
+  leagueTier?: string | null;
 };
 
 export type TeamCareerSuperlatives = {
-  bestSeason: { seasonLabel: string; rank: number } | null;
+  bestSeason: { seasonLabel: string; rank: number; leagueTier?: string | null } | null;
   biggestPointsSwing: { seasonLabel: string; delta: number } | null;
   peakMarketValue: { seasonLabel: string; value: number } | null;
 };
@@ -125,6 +133,7 @@ function getSortedSnapshots(gameState: GameState) {
 
 export function buildPlayerCareerSeries(gameState: GameState, playerId: string): PlayerCareerSeries {
   const seasons: PlayerCareerSeasonEntry[] = [];
+  const leagueTierOf = buildHistoricalLeagueTierLookup(gameState);
 
   for (const snapshot of getSortedSnapshots(gameState)) {
     const row = resolveSnapshotPlayerPerformanceRow(gameState, snapshot, playerId);
@@ -153,6 +162,7 @@ export function buildPlayerCareerSeries(gameState: GameState, playerId: string):
       rankMedal: deriveMedalFromRank(row.ppsRank ?? null),
       mvpCount: isFiniteNumber(row.mvpCount) ? row.mvpCount : 0,
       bestDiscipline: row.bestDisciplineLabel ?? row.bestDisciplineId ?? null,
+      leagueTier: leagueTierOf(snapshot.seasonId, row.teamId),
     });
   }
 
@@ -188,6 +198,7 @@ export function buildPlayerCareerSeries(gameState: GameState, playerId: string):
 
 export function buildTeamCareerSeries(gameState: GameState, teamId: string): TeamCareerSeries {
   const seasons: TeamCareerSeasonEntry[] = [];
+  const leagueTierOf = buildHistoricalLeagueTierLookup(gameState);
 
   for (const snapshot of getSortedSnapshots(gameState)) {
     const record = resolveSeasonSnapshotTeamRecords(snapshot).find((entry) => entry.teamId === teamId) ?? null;
@@ -215,7 +226,11 @@ export function buildTeamCareerSeries(gameState: GameState, teamId: string): Tea
         soc: record.disciplinePointsByArea?.soc ?? null,
       },
       marketValueTotal: record.marketValueTotalEnd ?? record.marketValueEnd ?? null,
-      medal: explicitMedal ?? deriveMedalFromRank(record.rank),
+      // Aus dem Rang nur ableiten, wenn der Schnappschuss KEINE Medaillen-Flags traegt (Altstaende).
+      // Sonst bekaeme der Liga-2-Erste (`isGold: false`, `isLiga2Champion: true`) hier still Gold —
+      // `rank` zaehlt bei Liga-Split je Liga (liga-split-plan.md 10.8).
+      medal: explicitMedal ?? (record.isGold === undefined ? deriveMedalFromRank(record.rank) : null),
+      leagueTier: leagueTierOf(snapshot.seasonId, teamId),
     });
   }
 
@@ -223,9 +238,13 @@ export function buildTeamCareerSeries(gameState: GameState, teamId: string): Tea
   let biggestPointsSwing: TeamCareerSuperlatives["biggestPointsSwing"] = null;
   let peakMarketValue: TeamCareerSuperlatives["peakMarketValue"] = null;
 
+  // „Beste Saison" ligauebergreifend: Rang 1 in Liga 2 ist schlechter als Rang 16 in Liga 1.
+  let bestSeasonPosition: number | null = null;
   seasons.forEach((entry, index) => {
-    if (entry.rank != null && (bestSeason == null || entry.rank < bestSeason.rank)) {
-      bestSeason = { seasonLabel: entry.seasonLabel, rank: entry.rank };
+    const position = toLeagueSpanningPosition(entry.rank, entry.leagueTier);
+    if (entry.rank != null && position != null && (bestSeasonPosition == null || position < bestSeasonPosition)) {
+      bestSeasonPosition = position;
+      bestSeason = { seasonLabel: entry.seasonLabel, rank: entry.rank, leagueTier: entry.leagueTier ?? null };
     }
     if (isFiniteNumber(entry.marketValueTotal) && (peakMarketValue == null || entry.marketValueTotal > peakMarketValue.value)) {
       peakMarketValue = { seasonLabel: entry.seasonLabel, value: entry.marketValueTotal };

@@ -53,6 +53,7 @@ import {
   getCurrentSeasonNumber,
 } from "@/lib/foundation/season-history-clamp";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 
 /**
  * Die Saison-Schnappschuesse fuer die Spieler-Auswertungen dieses Moduls — voll auf dem Server,
@@ -235,6 +236,13 @@ export type PlayerDrawerHistoryRow = {
   sourceLabel: string;
   teamName: string | null;
   teamCode: string | null;
+  /**
+   * Liga, in der das Team des Spielers IN DIESER Saison spielte (`"liga1"`, `"liga2"`, kuenftig
+   * `"liga<N>"`) — Chris, 02.11.: „in Season 1, in welcher Liga haben sie denn gespielt zu dem
+   * Zeitpunkt". `null` ohne Liga-Trennung (Manager Mode / Legacy) oder ohne Team. Optional, damit
+   * Fremd-Konstruktoren gueltig bleiben. Quelle: `buildHistoricalLeagueTierLookup`.
+   */
+  leagueTier?: string | null;
   appearances: number | null;
   averageFatigue: number | null;
   totalPoints: number | null;
@@ -610,6 +618,8 @@ export type PlayerDetailDrawerData = {
     seasonName: string;
     teamName: string | null;
     teamCode: string | null;
+    /** Siehe `PlayerDrawerHistoryRow.leagueTier`. */
+    leagueTier?: string | null;
     appearances: number | null;
     totalPoints: number | null;
     averageContribution: number | null;
@@ -1757,6 +1767,7 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
     left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
   );
   let previousSeasonEndMarketValue: number | null = null;
+  const leagueTierOf = buildHistoricalLeagueTierLookup(gameState);
   const rows = sortedSnapshots
     .map((snapshot) => {
       const row = resolveSnapshotPlayerPerformanceRow(gameState, snapshot, playerId);
@@ -1821,6 +1832,7 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
         seasonName: snapshot.seasonName,
         teamName: row.teamName ?? null,
         teamCode: row.teamCode ?? null,
+        leagueTier: leagueTierOf(snapshot.seasonId, row.teamId),
         appearances: row.appearances,
         totalPoints: row.totalPoints ?? row.totalContribution ?? null,
         averageContribution: row.averageContribution,
@@ -1872,6 +1884,7 @@ function mergeSeasonHistoryWithTransferFallback(
   snapshotHistory: PlayerDetailDrawerData["seasonHistory"],
 ): PlayerDetailDrawerData["seasonHistory"] {
   const bySeasonId = new Map(snapshotHistory.map((entry) => [entry.seasonId, entry] as const));
+  const leagueTierOf = buildHistoricalLeagueTierLookup(gameState);
 
   for (const transfer of clampTransferHistoryToCurrentSeason(gameState)) {
     if (transfer.playerId !== player.id) {
@@ -1936,6 +1949,7 @@ function mergeSeasonHistoryWithTransferFallback(
       seasonName: getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: transfer.seasonLabel }),
       teamName: team?.name ?? null,
       teamCode: team?.shortCode ?? null,
+      leagueTier: leagueTierOf(transfer.seasonId, teamId),
       // Transfer-Fallback ohne Performance-Snapshot: alle Leistungswerte sind unbekannt
       // (→ Striche, nicht Nullen), auch die Einsätze. Siehe warnings unten.
       appearances: null,
@@ -2014,6 +2028,7 @@ function buildEmptyHistoryRow(input: {
     sourceLabel: "Keine Saison-Results",
     teamName: null,
     teamCode: null,
+    leagueTier: null,
     appearances: null,
     averageFatigue: null,
     totalPoints: null,
@@ -2210,6 +2225,9 @@ function buildHistoryRows(input: {
     sourceLabel: hasActiveSeasonPerformance ? input.seasonPerformance?.sourceLabel ?? "Aktive Season / Live-State" : "Aktive Season / noch keine Results",
     teamName: input.teamName,
     teamCode: input.teamCode,
+    leagueTier: input.rosterEntry?.teamId
+      ? buildHistoricalLeagueTierLookup(input.gameState)(input.gameState.season.id, input.rosterEntry.teamId)
+      : null,
     appearances: hasActiveSeasonPerformance ? input.seasonPerformance?.appearances ?? null : null,
     averageFatigue:
       hasActiveSeasonPerformance && (input.seasonPerformance?.appearances ?? 0) > 0
@@ -2275,6 +2293,7 @@ function buildHistoryRows(input: {
       sourceLabel: "Season Snapshot",
       teamName: entry.teamName,
       teamCode: entry.teamCode,
+      leagueTier: entry.leagueTier ?? null,
       appearances: entry.appearances,
       averageFatigue:
         (entry.appearances ?? 0) > 0
