@@ -200,6 +200,12 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  *     liegt auf denselben Daten bei jedem k darunter (k=2 0,31/0,44, k=3 0,66/0,72).
  * Gilt NUR fuer diesen PPS-Pod. Ein kuenftiger echter Battlefield-Motor (K6-Umbau, Domination fuer
  * vier Seiten) braucht eine eigene, neue Abnahme; diese Ausnahme geht nicht automatisch auf ihn ueber.
+ *
+ * NACHTRAG 02.11.: der echte Vier-Team-Motor ist da (Arena zeigt den Pod als FFA, `spieleBattlefieldPod`,
+ * docs/design/battlefield-pod-ffa-02-11.md) und hat seine eigene Abnahme: rho je Kampf 0,13-0,27,
+ * Team-rho -0,07..0,24 (k=2..6, data/generated/battlefield-pod-ffa-abnahme.json) -- durchgefallen.
+ * Er ist deshalb NUR Anzeige; gebucht wird unveraendert ueber den PPS-Pod, fuer den diese Ausnahme
+ * weiter gilt.
  */
 export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
 
