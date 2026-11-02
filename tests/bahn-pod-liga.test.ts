@@ -495,3 +495,48 @@ describe("(f) Ledger", () => {
     expect(entry?.basePoints).toBeCloseTo(3.3, 6);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// (g) Arena-Host-Hinweis
+// ---------------------------------------------------------------------------------------------
+describe("(g) Arena-Host-Hinweis", () => {
+  function hinweisStand(quelle: "bahn" | undefined, mitAusfall: boolean): GameState {
+    return {
+      scenarioMeta: { gameMode: "battle" },
+      matchdayState: { matchdayId: "md1" },
+      seasonState: {
+        disciplineSchedule: [
+          {
+            seasonId: "s1",
+            matchdayId: "md1",
+            matchdayIndex: 0,
+            discipline1: { disciplineId: "staffel", displayName: "Staffel", order: 1, playerCount: 3, category: "speed" },
+            discipline2: null,
+          },
+        ],
+        matchdayResults: [{ id: "mr-md1", matchdayId: "md1" }],
+        disciplineResults: [
+          {
+            id: "r-A",
+            matchdayResultId: "mr-md1",
+            teamId: "A",
+            disciplineId: "staffel",
+            disciplineSide: "d1",
+            teamPoints: 2,
+            resolutionSource: "mini_dm_pod",
+            miniDmPod: { podId: "p", platz: 1, teamIds: ["A", "B", "C", "D"], wert: 8, ...(quelle ? { quelle } : {}) },
+            ...(mitAusfall ? { arenaAusfall: { grund: "timeout", zeitpunkt: "x", versuch: 2 } } : {}),
+          },
+        ],
+      },
+    } as unknown as GameState;
+  }
+  it("Rennen gebucht: kein Hinweis; PPS-Pod-Rueckfall: Hinweis mit Grund", async () => {
+    const { buildArenaHostSpielquelleHinweise } = await import("@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis");
+    expect(buildArenaHostSpielquelleHinweise(hinweisStand("bahn", false), "A")).toEqual([]);
+    const rueckfall = buildArenaHostSpielquelleHinweise(hinweisStand(undefined, true), "A");
+    expect(rueckfall).toHaveLength(1);
+    expect(rueckfall[0]!.text).toContain("Rennen fiel aus");
+    expect(rueckfall[0]!.text).toContain("4-Team-Gruppe per Eignungs-Score");
+  });
+});
