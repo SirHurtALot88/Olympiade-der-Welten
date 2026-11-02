@@ -210,6 +210,7 @@ describe("Koop-Onboarding: zwei Sitzungen am newGameFlow (Fix: byParticipant)", 
       "first_transfers",
       "fill_roster",
       "training_facilities",
+      "choose_sponsor",
       "set_lineup",
     ];
     for (const stepId of alleSchritte) {

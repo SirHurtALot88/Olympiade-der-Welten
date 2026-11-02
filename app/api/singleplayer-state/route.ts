@@ -104,6 +104,11 @@ const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
   "first_transfers",
   "fill_roster",
   "training_facilities",
+  // Fehlte bis 02.11.: der Client meldet nach der Sponsorwahl `choose_sponsor` (use-foundation-
+  // shell-router-body-scope.tsx), der Typ kennt den Schritt, `applyNewGameSetup` legt ihn an —
+  // nur diese Liste nicht. Folge: 400 „Flow-Schritt konnte nicht gespeichert werden" nach jeder
+  // Sponsorwahl, und jeder andere Schritt baute die Liste ohne `choose_sponsor` neu auf.
+  "choose_sponsor",
   "set_lineup",
 ];
 
