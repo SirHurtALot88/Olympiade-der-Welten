@@ -32,6 +32,8 @@ vi.mock("@/lib/battle/arena-eingabe-hash", () => ({
   berechneMiniDmFfaEingabeHash: () => `instabil-mini-dm-${(hashZaehler += 1)}`,
   // BAHN-POD (02.11.): derselbe Grund -- Staffel/Takeshi laufen an Pod-Tagen mit eigenem Fingerabdruck.
   berechneBahnPodEingabeHash: () => `instabil-bahn-pod-${(hashZaehler += 1)}`,
+  // BATTLEFIELD-POD (02.11. abends): dasselbe fuer das Gefecht je Ort (eigener Fingerabdruck).
+  berechneBattlefieldPodEingabeHash: () => `instabil-battlefield-pod-${(hashZaehler += 1)}`,
 }));
 
 const { applyNewGameSetup, previewNewGameSetup } = await import("@/lib/game/new-game-setup-service");

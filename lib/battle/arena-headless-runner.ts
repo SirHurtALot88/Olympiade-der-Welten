@@ -1187,8 +1187,8 @@ export async function runMiniDmFfaPodFixtures(
 // BAHN-POD-RUNNER (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6).
 //
 // Takeshi's Castle und Staffel laufen an Pod-Spieltagen als ECHTES Vier-Team-Rennen
-// (`window.__arena.spieleBahnPod`, battle-mode.engine.js) — anders als Battlefield (dessen Vier-Team-
-// Motor durchfiel und nur Anzeige ist) wird dieses Ergebnis GEBUCHT: der Motor besteht im
+// (`window.__arena.spieleBahnPod`, battle-mode.engine.js) — wie seit 02.11. abends auch Battlefield
+// (Gefecht je Ort, `runBattlefieldPodFixtures()` unten) wird dieses Ergebnis GEBUCHT: der Motor besteht im
 // Vier-Team-Format rho (0,84-0,93) und Pp (9,3-22,0), s. dortiges Dokument Abschnitt 5.3.
 //
 // DIESELBE BAUART WIE `runMiniDmFfaPodFixtures()` oben: die vier Kader gehen als explizite

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { istBahnPodDisziplin } from "@/lib/resolve/bahn-pod-resolve";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
@@ -59,7 +60,11 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD (02.11.): Staffel/Takeshi buchen an Pod-Tagen als Vierergruppe (`mini_dm_pod`,
+    // quelle "bahn"), nicht als Arena-Duell -- die Assertion unten prueft deshalb eine Duell-Disziplin.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !istBahnPodDisziplin(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       continue;
     }
