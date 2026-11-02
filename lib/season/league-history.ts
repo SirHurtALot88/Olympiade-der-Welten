@@ -113,6 +113,36 @@ function collectFrozenTiers(
 }
 
 /**
+ * NUR DIE RUECKRECHNUNG (Quelle 2 oben), ohne Schnappschuss: aktuelle Zuordnung minus jede
+ * Bewegung, die NACH der gefragten Saison protokolliert wurde. `null` ohne Liga-Split.
+ *
+ * Eigenstaendig nutzbar fuer `createSeasonSnapshot`: wird ein Schnappschuss erst NACH
+ * `league_movement` (neu) gebaut — etwa der `post_sell_fallback` beim `next_season_setup`, wenn der
+ * Cockpit-Lauf schon bewegt hat —, beschreibt `leagueByTeamId` bereits die Folgesaison. Die
+ * Rueckrechnung liefert trotzdem die Liga, in der die abgeschlossene Saison gespielt wurde.
+ */
+export function buildLeagueTierReconstruction(gameState: GameState): HistoricalLeagueTierLookup {
+  if (!isLeagueSplitActive(gameState)) return () => null;
+  const currentByTeamId = gameState.seasonState.leagueByTeamId ?? {};
+  const movementLogs = [...(gameState.seasonState.leagueMovementLogs ?? [])].sort((left, right) =>
+    compareSeasonIds(right.seasonId, left.seasonId),
+  );
+  return (seasonId, teamId) => {
+    if (!seasonId || !teamId) return null;
+    let level = getLeagueLevel(currentByTeamId[teamId]);
+    if (level == null) return null;
+    // Neueste Bewegung zuerst zuruecknehmen. Eine Bewegung NACH Saison S (Log mit seasonId >= S)
+    // hat die Liga fuer S+1 geaendert, also gehoert sie fuer S rueckgaengig gemacht.
+    for (const log of movementLogs) {
+      if (compareSeasonIds(log.seasonId, seasonId) < 0) break;
+      if (log.promotedTeamIds?.includes(teamId)) level += 1;
+      else if (log.relegatedTeamIds?.includes(teamId)) level -= 1;
+    }
+    return level >= 1 ? leagueTierForLevel(level) : null;
+  };
+}
+
+/**
  * Baut die Nachschlage-Funktion EINMAL je Spielstand — alle Anzeigen fragen dann je Zeile nur noch
  * zwei Maps ab. Liefert `null`, wenn fuer diese Saison/dieses Team keine Liga bekannt ist oder es
  * keine Liga-Trennung gab.
@@ -131,23 +161,7 @@ export function buildHistoricalLeagueTierLookup(gameState: GameState): Historica
   }
 
   const splitActive = isLeagueSplitActive(gameState);
-  const currentByTeamId = gameState.seasonState.leagueByTeamId ?? {};
-  const movementLogs = [...(gameState.seasonState.leagueMovementLogs ?? [])].sort((left, right) =>
-    compareSeasonIds(right.seasonId, left.seasonId),
-  );
-
-  const reconstruct = (seasonId: string, teamId: string): HistoricalLeagueTier | null => {
-    let level = getLeagueLevel(currentByTeamId[teamId]);
-    if (level == null) return null;
-    // Neueste Bewegung zuerst zuruecknehmen. Eine Bewegung NACH Saison S (Log mit seasonId >= S)
-    // hat die Liga fuer S+1 geaendert, also gehoert sie fuer S rueckgaengig gemacht.
-    for (const log of movementLogs) {
-      if (compareSeasonIds(log.seasonId, seasonId) < 0) break;
-      if (log.promotedTeamIds?.includes(teamId)) level += 1;
-      else if (log.relegatedTeamIds?.includes(teamId)) level -= 1;
-    }
-    return level >= 1 ? leagueTierForLevel(level) : null;
-  };
+  const reconstruct = buildLeagueTierReconstruction(gameState);
 
   return (seasonId, teamId) => {
     if (!seasonId || !teamId) return null;
