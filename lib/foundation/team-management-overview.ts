@@ -12,6 +12,7 @@ import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 
 type TeamManagementSnapshotStanding = {
   rank: number | null;
@@ -354,7 +355,12 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
   // Diese Zeilen beschreiben GENAU EINE Saison (`seasonId`) — der Transfersaldo muss sich auf
   // dieselbe beziehen, sonst steht ein Alle-Zeiten-Wert zwischen lauter Saisonwerten.
   const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState, seasonId);
-  const seasonSnapshots = gameState.seasonState.seasonSnapshots ?? [];
+  // GEFUNDEN vom Liga-Historie-Agenten (02.11.): im Browser sind die vollen Schnappschuesse
+  // gestrichen (Payload-Groesse), `leseSaisonSchnappschuesse` baut sie dort aus der Kurzfassung
+  // wieder auf. Ein direkter Zugriff auf `seasonState.seasonSnapshots` liefert im Browser deshalb
+  // immer `[]` -- `historicalPointsBySeason`, die Saisonpunkte-Spalte und der Rang-Verlauf im
+  // Saisonstand waeren dort leer, serverseitig aber befuellt.
+  const seasonSnapshots = leseSaisonSchnappschuesse(gameState);
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const rostersByTeamId = new Map<string, RosterEntry[]>();
   for (const rosterEntry of gameState.rosters) {
