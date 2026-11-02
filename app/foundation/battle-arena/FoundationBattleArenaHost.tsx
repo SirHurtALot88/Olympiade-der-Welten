@@ -12,7 +12,7 @@ import {
   buildArenaAufstellung,
   buildArenaAufstellungBeide,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
-import { buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
+import { buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { resolveArenaHostSeeds } from "@/lib/battle/arena-host-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -20,7 +20,9 @@ import { baueFixtureIndex, findeSpieltagsFixtures } from "@/lib/resolve/battle-m
 import { buildArenaHostSpielquelleHinweise } from "@/lib/foundation/battle-arena/arena-host-spielquelle-hinweis";
 import {
   getMiniDmPodForTeam,
+  getPodForTeam,
   resolveMiniDmFfaPlayerCountForMatchday,
+  resolvePodPlayerCountForMatchday,
 } from "@/lib/season/mini-dm-pod-schedule";
 import { buildSpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
 import { buildTeamRelationshipMap } from "@/lib/foundation/team-relationship";
@@ -174,6 +176,19 @@ export default function FoundationBattleArenaHost({
   const [miniDmTeamId0, miniDmTeamId1, miniDmTeamId2, miniDmTeamId3] =
     miniDmPod?.teamIds ?? (["", "", "", ""] as const);
 
+  // BATTLEFIELD 4-TEAM-FFA (02.11., docs/design/battlefield-pod-ffa-02-11.md). Chris: "auch bei
+  // battlefield reicht kein hinweistext! da sollen 4 teams gleichzeitig FFA machen". Derselbe Weg
+  // wie `miniDmPod` oben: `getPodForTeam(..., "battlefield")` ist dieselbe Funktion, mit der Resolve
+  // die Vierergruppe bucht (`getPodsForMatchday`). Gibt es an diesem Spieltag keinen Battlefield-Pod
+  // fuer `heimTeamId`, bleibt alles `null` und der Motor zeigt Battlefield wie bisher als Duell.
+  const battlefieldPod = useMemo(() => {
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, heimTeamId, matchdayId, "battlefield", { saveId });
+  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+  const [bfPodTeamId0, bfPodTeamId1, bfPodTeamId2, bfPodTeamId3] =
+    battlefieldPod?.teamIds ?? (["", "", "", ""] as const);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Die kompakte Initial-Payload streift attributeSheetStats bei jedem Team außer dem eigenen
@@ -195,9 +210,18 @@ export default function FoundationBattleArenaHost({
     // Kommentar oben) — das Set() entdoppelt.
     const teamIds = [
       ...new Set(
-        [heimTeamId, gastTeamId, miniDmTeamId0, miniDmTeamId1, miniDmTeamId2, miniDmTeamId3].filter(
-          Boolean,
-        ),
+        [
+          heimTeamId,
+          gastTeamId,
+          miniDmTeamId0,
+          miniDmTeamId1,
+          miniDmTeamId2,
+          miniDmTeamId3,
+          bfPodTeamId0,
+          bfPodTeamId1,
+          bfPodTeamId2,
+          bfPodTeamId3,
+        ].filter(Boolean),
       ),
     ];
     if (teamIds.length === 0) return;
@@ -254,6 +278,10 @@ export default function FoundationBattleArenaHost({
     miniDmTeamId1,
     miniDmTeamId2,
     miniDmTeamId3,
+    bfPodTeamId0,
+    bfPodTeamId1,
+    bfPodTeamId2,
+    bfPodTeamId3,
     activeManagerTeamId,
   ]);
 
@@ -285,6 +313,32 @@ export default function FoundationBattleArenaHost({
     () => (miniDmTeamId3 ? buildArenaTeam(gameState, miniDmTeamId3, sheetsByPlayerId) : []),
     [gameState, miniDmTeamId3, sheetsByPlayerId],
   );
+
+  // BATTLEFIELD 4-TEAM-FFA, Nutzlast fuer den Motor (`echterKader.battlefieldPod`, gelesen von
+  // `bfPodAnzeigeKontext()` in battle-mode.engine.js): vier Kader in Pod-Reihenfolge, die Kopfzahl k
+  // aus dem Spielplan-Slot, eine reproduzierbare Saat je Pod und die echte Aufstellung je Team.
+  // `null`, solange nicht alle vier Kader stehen — dann zeigt der Motor das Duell wie bisher.
+  const battlefieldPodNutzlast = useMemo(() => {
+    if (!battlefieldPod) return null;
+    const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+    const seasonId = gameState.season?.id;
+    if (!matchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
+    const podTeams = battlefieldPod.teamIds.map((teamId) => {
+      const team = teams.find((t) => t.teamId === teamId);
+      return {
+        name: team?.name ?? teamId,
+        kurz: gameState.teams.find((t) => t.teamId === teamId)?.shortCode ?? null,
+        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId),
+      };
+    });
+    if (!podTeams.every((t) => t.kader.length > 0)) return null;
+    return {
+      teams: podTeams,
+      k: resolvePodPlayerCountForMatchday(gameState, matchdayId, "battlefield", { saveId }),
+      saat: seedZuZahl(buildBattlefieldPodMatchSeed({ saveId, seasonId, matchdayId, podId: battlefieldPod.id })),
+      aufstellung: battlefieldPod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+    };
+  }, [battlefieldPod, gameState, saveId, teams, sheetsByPlayerId]);
 
   // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
   // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier
@@ -682,6 +736,9 @@ export default function FoundationBattleArenaHost({
         miniDmFfaK,
         miniDmFfaSaat,
         miniDmFfaAufstellung,
+        // BATTLEFIELD 4-TEAM-FFA (s. `battlefieldPodNutzlast` oben): nur fuer Battlefield gelesen,
+        // `null` ohne echten Pod an diesem Spieltag (dann Duell wie bisher).
+        battlefieldPod: battlefieldPodNutzlast,
         // DIE AUFSTELLUNG, die der Manager gesetzt hat — bis hierher reichte der
         // Umschlag nur Kader durch. Der Motor fragt sie in `slotFuer` (bauFeldspiel)
         // laengst ab und fiel mangels Daten immer auf Reihum zurueck; Chris' Zuweisung
@@ -753,6 +810,7 @@ export default function FoundationBattleArenaHost({
     miniDmFfaK,
     miniDmFfaSaat,
     miniDmFfaAufstellung,
+    battlefieldPodNutzlast,
   ]);
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
@@ -902,6 +960,23 @@ export default function FoundationBattleArenaHost({
             die übrigen Disziplinen; Heim/Gast muss darin nicht beide
             vorkommen — Mini-DM-Pods sind eine eigene, von der Heim/Gast-Wahl
             unabhängige Gruppierung).
+          </p>
+        ) : null}
+        {battlefieldPodNutzlast ? (
+          <p
+            className="muted"
+            data-testid="oly-arena-battlefield-pod"
+            style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
+          >
+            Battlefield läuft hier als 4-Team-FFA — alle vier Teams der gebuchten Vierergruppe
+            kämpfen gleichzeitig um Nord, Mitte und Süd:{" "}
+            {battlefieldPodNutzlast.teams.map((team, index) => (
+              <span key={team.name + index}>
+                {index > 0 ? ", " : ""}
+                <strong>{team.name}</strong>
+              </span>
+            ))}
+            .
           </p>
         ) : null}
         {spielquelleHinweise.length > 0 ? (

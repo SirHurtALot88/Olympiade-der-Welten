@@ -321,3 +321,25 @@ export function resolveMiniDmFfaPlayerCountForMatchday(
   const k = slot.legacyScorePlayerCount ?? slot.playerCount ?? null;
   return Number.isInteger(k) && k != null && k >= 2 && k <= 6 ? k : null;
 }
+
+/**
+ * DER SPIELPLAN-SLOT-K EINER BELIEBIGEN POD-DISZIPLIN (02.11.) — wie
+ * `resolveMiniDmFfaPlayerCountForMatchday()`, nur fuer `disciplineId` statt fest Mini-DM, und mit
+ * `playerCount` ZUERST: `legacyScorePlayerCount` ist ein Mini-DM-Altfeld (s. olyDataTypes.ts), fuer
+ * jede andere Disziplin ist `playerCount` die Kopfzahl der Aufstellung. Nur 2..6. Gelesen vom Arena-Host
+ * (`FoundationBattleArenaHost.tsx`) fuer die Kopfzahl je Team im sichtbaren Battlefield-Pod-Kampf.
+ * `null`, wenn die Disziplin an diesem Spieltag nicht steht oder keine gueltige Kadergroesse traegt.
+ */
+export function resolvePodPlayerCountForMatchday(
+  gameState: GameState,
+  matchdayId: string,
+  disciplineId: string,
+  options?: { saveId?: string | null },
+): number | null {
+  const entry = getSeasonDisciplineScheduleEntry(gameState, matchdayId, options);
+  if (!entry) return null;
+  const slot = [entry.discipline1, entry.discipline2].find((candidate) => candidate?.disciplineId === disciplineId);
+  if (!slot) return null;
+  const k = slot.playerCount ?? slot.legacyScorePlayerCount ?? null;
+  return Number.isInteger(k) && k != null && k >= 2 && k <= 6 ? k : null;
+}

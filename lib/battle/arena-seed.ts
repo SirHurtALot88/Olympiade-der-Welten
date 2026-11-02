@@ -83,3 +83,21 @@ export function buildMiniDmFfaPodMatchSeed(input: {
 }): string {
   return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:mini-dm-ffa:${input.podId}`;
 }
+
+/**
+ * BATTLEFIELD-POD-SAAT (02.11., docs/design/battlefield-pod-ffa-02-11.md). Seit 02.11. zeigt die Arena
+ * einen Battlefield-Pod als echten Vier-Team-Kampf (`echterKader.battlefieldPod`, battle-mode.engine.js).
+ * Dieselbe Bauart wie `buildMiniDmFfaPodMatchSeed()`: `podId` traegt schon Save/Saison/Spieltag/
+ * Liga-Stufe/Pod-Index (`getPodsForMatchday(..., "battlefield")`), der Disziplin-Teil im String haelt
+ * die Saat getrennt von der Mini-DM-Saat desselben Spieltags. Gewertet wird Battlefield weiterhin ueber
+ * den PPS-Pod (`lib/resolve/mini-dm-pod-resolve.ts`) -- die Saat macht die Anzeige reproduzierbar
+ * (dasselbe Spiel bei jedem Oeffnen), sie ist keine Wertungssaat.
+ */
+export function buildBattlefieldPodMatchSeed(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  podId: string;
+}): string {
+  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:battlefield-pod-ffa:${input.podId}`;
+}
