@@ -1,0 +1,41 @@
+{
+  "note": "Beim Verkauf vs Marktwert hat Lava Golem z.B. +10,7 oben angezeigt. Wenn ich in sein Profil schaue, steht dort vs Marktwert +9,3  vs Kaufpreis\n\nWas ist nun richtig? Er hat sich im Trianing verbessert da müsste sein MW eher hoch gehen, so dass er zum VK ein wenig gut macht + VK Faktor. Bitte mal prüfen. IN der Erklärung steht auch Gekauft für 18,8 jetzt MW 19,1 denke dann ist oben bei den auslaufenden veträgen die zahl falsch",
+  "view": "teams",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=teams&playerId=player-0180-lava-golem&team=S-C&panel=sell&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T07:31:36.648Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T07-31-29-113Z-zuxbr3",
+  "createdAt": "2026-08-14T07:31:29.113Z",
+  "page": {
+    "path": "/foundation",
+    "view": "teams",
+    "tab": null,
+    "label": "Team · Teams"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "resolved",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
