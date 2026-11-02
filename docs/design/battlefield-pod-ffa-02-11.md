@@ -317,15 +317,16 @@ darunter.
 
 Werkzeug: `scripts/miss-battlefield-pod-ffa-abnahme.mjs 4 --je-seite=2..6 --gruppen=30 [--kontrolle]
 [--pp=48 --pp-je-seite=2..6]`, kaderfest (zehn Kader der Familie, 30 der 210 Vierergruppen, je
-4 Kämpfe und Strom), zwei Saatströme. Rohdaten: `data/generated/battlefield-pod-gefecht-abnahme.json`.
+4 Kämpfe und Strom), zwei Saatströme, gemessen auf dem Endstand des Motors (mit fünftem
+Platzierungsschlüssel). Rohdaten: `data/generated/battlefield-pod-gefecht-abnahme.json`.
 
 | k | rho je Kampf, Median (Strom 0 / 1) | Gruppen < 0,80 | Saison | Star Rang 1 | Star ≤ 2 | Paare ≥ 15 richtig | Team-rho | bestes Team 1. / ≤ 2. |
 |---|---|---|---|---|---|---|---|---|
-| 2 | **0,873 / 0,861** | 4 · 7 von 30 | 0,98 / 0,96 | 53 / 53 % | 86 / 83 % | 99,7 % | 0,68 / 0,63 | 63 / 60 % · 92 / 88 % |
-| 3 | **0,881 / 0,874** | 3 · 4 | 0,97 / 0,96 | 42 / 44 % | 74 / 66 % | 99,7 % | 0,62 / 0,62 | 41 / 43 % · 91 / 89 % |
-| 4 | **0,885 / 0,864** | 3 · 5 | 0,95 / 0,94 | 56 / 51 % | 79 / 78 % | 99,5 % | 0,67 / 0,66 | 53 / 44 % · 92 / 90 % |
-| 5 | **0,919 / 0,920** | 0 · 0 | 0,97 / 0,96 | 40 / 52 % | 71 / 78 % | 99,8 % | 0,75 / 0,74 | 60 / 58 % · 98 / 96 % |
-| 6 | **0,922 / 0,923** | 0 · 0 | 0,98 / 0,98 | 64 / 68 % | 86 / 88 % | 99,8 % | 0,84 / 0,79 | 80 / 75 % · 98 / 97 % |
+| 2 | **0,873 / 0,861** | 4 · 7 von 30 | 0,98 / 0,96 | 53 / 53 % | 86 / 83 % | 99,7 % | 0,70 / 0,65 | 63 / 60 % · 92 / 88 % |
+| 3 | **0,881 / 0,874** | 3 · 4 | 0,97 / 0,96 | 42 / 44 % | 74 / 66 % | 99,7 % | 0,64 / 0,64 | 41 / 43 % · 91 / 89 % |
+| 4 | **0,885 / 0,864** | 3 · 5 | 0,95 / 0,94 | 56 / 51 % | 79 / 78 % | 99,5 % | 0,70 / 0,69 | 53 / 44 % · 92 / 90 % |
+| 5 | **0,919 / 0,920** | 0 · 0 | 0,97 / 0,96 | 40 / 52 % | 71 / 78 % | 99,8 % | 0,78 / 0,76 | 60 / 58 % · 98 / 95 % |
+| 6 | **0,922 / 0,923** | 0 · 0 | 0,98 / 0,98 | 64 / 68 % | 86 / 88 % | 99,8 % | 0,87 / 0,83 | 79 / 73 % · 98 / 97 % |
 
 Zum Vergleich der Echtzeit-Pod (Abschnitt 3): rho je Kampf 0,13–0,27, bestes Team auf Platz 1 in
 18–38 %. Das Duell auf demselben Chassis (Kontrolle, unverändert): 0,82 / 0,69 / 0,41 / 0,40 / 0,15.
@@ -397,7 +398,7 @@ mit `KP.pod` erreicht.
   aber eng. Die Schläge sind eine Spur je Angriff und Takt (rund 20 s Sendezeit je Takt bei 1x);
   wer es lebendiger will, kann je Angriff mehrere kosmetische Treffer zeigen, ohne am Ergebnis etwas
   zu ändern.
-- **Team-Ebene.** Das eignungsbeste Team gewinnt in 41–80 % (in den ersten zwei: 87–98 %, Letzter:
+- **Team-Ebene.** Das eignungsbeste Team gewinnt in 41–79 % (in den ersten zwei: 87–98 %, Letzter:
   höchstens 2,5 %). Das ist ein Vier-Team-Wettbewerb mit echtem Gegenspiel, keine Lotterie mehr
   (Echtzeit: 18–38 %), aber auch kein Abziehbild der Eignung wie der PPS-Pod.
 - **Referenz neu ziehen**, wenn `BF_FFA_GRUND` geändert wird (`scripts/ziehe-battlefield-pod-referenz.mjs`).
