@@ -4,6 +4,7 @@ import {
   DEFAULT_STANDINGS_TIEBREAKER_MODE,
   resolveProjectedRankWithTiePolicy,
 } from "@/lib/standings/standings-tiebreaker-policy";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
 
 /**
  * Audit R2/V4: Formkarten-Übernutzungs-Strafe auf die ENDTABELLE anwenden — Punktabzug UND Re-Rank —,
@@ -58,19 +59,39 @@ export function applyFormCardPenaltyWithRerank(
   // `null`. Der `!= null`-Guard unten bleibt als Absicherung, falls diese Annahme je bricht — er darf aber
   // NICHT dazu führen, dass ein Vor-Strafe-Rang stehenbleibt, weshalb der Test unten genau das festnagelt
   // (Sponsor-Settlement und Snapshot lesen `standing.rank` direkt).
-  const projectedRankByTeamId = resolveProjectedRankWithTiePolicy(
-    Object.entries(nextStandings).map(([teamId, standing]) => ({
-      teamId,
-      teamName: teamNameById.get(teamId) ?? teamId,
-      totalScore: null,
-      projectedPoints: standing.points ?? 0,
-      currentRank: standing.rank ?? null,
-      currentPoints: standing.points ?? 0,
-      matchdayRank: standing.rank ?? null,
-      cash: cashById.get(teamId) ?? null,
-    })),
-    DEFAULT_STANDINGS_TIEBREAKER_MODE,
-  );
+  //
+  // LIGA-SPLIT (Battle Mode, gefunden im Saisonlauf 02.11.): `standing.rank` ist dort LIGA-LOKAL —
+  // jede Liga hat ihre eigenen Plätze 1–16. Ein Re-Rank über alle 32 Teams machte daraus eine
+  // globale 1–32-Tabelle: der Liga-2-Erste wurde Zweiter, der Liga-1-Vierzehnte Einunddreißigster,
+  // und Sponsor-Abrechnung, Snapshot und Auf-/Abstieg lasen danach diese falschen Ränge. Deshalb
+  // wird je Liga getrennt neu gerankt. Ohne Liga-Split (Manager Mode) bleibt es EINE Gruppe — exakt
+  // die bisherige Rechnung.
+  const leagueByTeamId = isLeagueSplitActive(gameState) ? (gameState.seasonState.leagueByTeamId ?? {}) : null;
+  const gruppen = new Map<string, string[]>();
+  for (const teamId of Object.keys(nextStandings)) {
+    const gruppe = leagueByTeamId ? (leagueByTeamId[teamId] ?? "ohne_liga") : "alle";
+    gruppen.set(gruppe, [...(gruppen.get(gruppe) ?? []), teamId]);
+  }
+  const projectedRankByTeamId = new Map<string, number | null>();
+  for (const teamIds of gruppen.values()) {
+    const gruppenRaenge = resolveProjectedRankWithTiePolicy(
+      teamIds.map((teamId) => {
+        const standing = nextStandings[teamId]!;
+        return {
+          teamId,
+          teamName: teamNameById.get(teamId) ?? teamId,
+          totalScore: null,
+          projectedPoints: standing.points ?? 0,
+          currentRank: standing.rank ?? null,
+          currentPoints: standing.points ?? 0,
+          matchdayRank: standing.rank ?? null,
+          cash: cashById.get(teamId) ?? null,
+        };
+      }),
+      DEFAULT_STANDINGS_TIEBREAKER_MODE,
+    );
+    for (const [teamId, rang] of gruppenRaenge) projectedRankByTeamId.set(teamId, rang);
+  }
   for (const teamId of Object.keys(nextStandings)) {
     const newRank = projectedRankByTeamId.get(teamId);
     if (newRank != null) {
