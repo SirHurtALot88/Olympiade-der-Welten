@@ -16411,6 +16411,7 @@
     // POD (02.11.): der Bug kennt nur Heim/Gast — im Vier-Team-FFA uebernimmt die Tafel auf der
     // Leinwand (zeichneBfPodTafel) Namen, Stand und Uhr.
     bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf)||bfPodAktiv();
+    if(bahnPodAnzeigeAktiv())bug.hidden=true; // Bahn-Pod: dieselbe Rolle hat zeichneBahnPodTafel
     if(bug.hidden){
       // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
       // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
@@ -40449,9 +40450,13 @@
     tbL.textContent=""; tbR.textContent="";
     for(const seite of [0,1]){
       const tb=seite===0?tbL:tbR;
-      for(const z of zeilen.filter(z=>z.side===seite).sort(w.sortierung)){
+      // POD (sichtbares Vier-Team-Rennen der Bahn): links Team 0/2, rechts Team 1/3, Name in Teamfarbe.
+      const podBahn=istBahn(disc)&&bahnPodAnzeigeAktiv();
+      for(const z of zeilen.filter(z=>podBahn?z.side%2===seite:z.side===seite).sort(w.sortierung)){
         const tr=el("tr",(seite===0?"eigen":"gegner")+(z.raus?" raus":""));
-        tr.appendChild(el("td",null,z.n.length>10?z.n.slice(0,9)+"…":z.n));
+        const nameTd=el("td",null,z.n.length>10?z.n.slice(0,9)+"…":z.n);
+        if(podBahn)nameTd.style.color=bahnSeitenFarbe(z.side);
+        tr.appendChild(nameTd);
         for(const s of w.spalten){
           const v=s.wert(z);
           const td=el("td","n"+(s.top&&typeof v==="number"&&v>0&&v>=best[s.id]?" top":""));
@@ -41167,7 +41172,11 @@
     // Wertungsaenderung): Staffel und Takeshi's Castle bekommen HIER eine je eigene
     // Fuehrungs-Quelle statt der gemeinsamen `bahnRangliste().reihe[0]`-Heuristik unten.
     // Jede Bahn bleibt fuer sich, keine gemeinsame Ersatzformel fuer beide.
-    if(!done){
+    // POD (sichtbares Vier-Team-Rennen): die Staffel-Fuehrung kommt aus dem Vier-Team-Stand, der
+    // Duell-Teil (Zeit-Delta Seite 0 gegen 1, Wechseltafel, Bein-Duell) bleibt aus.
+    if(!done&&bahnPodAnzeigeAktiv()&&BA().staffel){
+      bahnPodStaffelFuehrung();
+    } else if(!done){
       if(BA().staffel){
         // STAFFEL: `bahnRangliste()` sortiert nach `bahnLeistung` (Etappenzeit) — das ist
         // die schnellste AKTUELLE Etappe, nicht das insgesamt fuehrende Team, und konnte
@@ -41406,6 +41415,8 @@
         if(kand&&kand.id!==bahnFokus){ bahnFokus=kand.id; ttRegieSeit=rennT; }
       }
     }
+    // POD: Kopfzeile, Balken und Endstand fuer vier Teams (s. updateHudBahnPod).
+    if(bahnPodAnzeigeAktiv()){ updateHudBahnPod(); return; }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
@@ -42924,10 +42935,12 @@
       const piktoY=H-64;
       // WEISS = im Rennen, GOLD = im Ziel, GRAU DURCHGESTRICHEN = ausgeschieden (u.raus
       // ist exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt).
-      [0,1].forEach(seite=>{
+      // POD: Seite 0/2 links, 1/3 rechts (die zweite Seite je Haelfte nach innen versetzt).
+      Array.from({length:bahnSeitenN()},(_,s)=>s).forEach(seite=>{
         const g=LAEUFER.filter(u=>u.seite===seite);
+        const innen=seite>=2?(BA().jeSeite||6)*13+10:0;
         g.forEach((u,k)=>{
-          const px=seite===0?(W/2-220+k*13):(W/2+220-k*13);
+          const px=seite%2===0?(W/2-220+innen+k*13):(W/2+220-innen-k*13);
           const farbe=u.raus?"#5c6270":(u.fertig!=null?"#f2d75a":"#e8e8e8");
           ctx.beginPath(); ctx.arc(px,piktoY,4,0,6.283); ctx.fillStyle=farbe; ctx.fill();
           if(u.raus){ ctx.strokeStyle="#232733"; ctx.lineWidth=1.3;
@@ -42954,7 +42967,10 @@
     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'RaniraSeason',Georgia,'Times New Roman',serif";
     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-    const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
+    // POD (sichtbares Vier-Team-Rennen): alle N Teamsummen statt "Heim : Gast".
+    const bpTxt=bahnPodAnzeigeAktiv()
+      ?"Burgpunkte  "+Array.from({length:bahnSeitenN()},(_,s)=>bp(s).toFixed(1).replace(".",",")).join(" · ")
+      :"Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
     ctx.strokeText(bpTxt,W/2,H-35); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,H-35);
     ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.lineWidth=3;
     const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
@@ -43100,7 +43116,9 @@
       const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.font="700 22px 'RaniraSeason',Georgia,'Times New Roman',serif";
-      const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",","); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+      const bpTxt=bahnPodAnzeigeAktiv()
+        ?"Burgpunkte  "+Array.from({length:bahnSeitenN()},(_,s)=>bp(s).toFixed(1).replace(".",",")).join(" · ")
+        :"Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",","); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
       // WAS DIE STERNE SIND — und zwar die Formel, die wirklich laeuft (W4, s. burgpunkte()
       // und MOTOREN["takeshis-castle"].wert): je Falle 1-3 Sterne nach Schwierigkeit, davon
       // haelt der passende Sub-Skill einen Anteil; ein Sturz kostet die halbe Falle; wer ins
@@ -45261,6 +45279,22 @@
   // Die Bahnzahl waechst mit der Seitenzahl (je Laeufer eine Bahn wie im Duell), damit die
   // Rempler-/Bahnwechsel-Dichte je Laeufer dieselbe bleibt.
   let bahnPodKader=null;
+  // SICHTBARER POD (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6):
+  // zeigt die Arena an einem Pod-Spieltag das Vier-Team-Rennen, bleibt `bahnPodKader` fuer die
+  // GANZE Dauer des sichtbaren Rennens gesetzt (Bahnzahl, Gedraenge und Pod-Rezept lesen ihn auch in
+  // stepSpurt/Zeichnung) — `bahnPodAnzeige` haelt dafuer, was beim naechsten reset() zurueck muss.
+  // `null` im Duell und in jedem headless Lauf. Hier oben deklariert, weil reset() schon beim Laden
+  // laeuft (s. bfPodAnzeigeVorgabe fuer denselben Grund).
+  let bahnPodAnzeige=null, bahnPodAnzeigeVorgabe=null;
+  // KOPFZAHL JE TEAM IM POD (k aus dem Spielplan-Slot), nur fuer Teams OHNE Aufstellung relevant:
+  // deren Ersatzaufstellung nimmt dann die besten k statt `art.jeSeite`. `null` = wie bisher
+  // (`art.jeSeite`). Mit Aufstellung zaehlt ohnehin, wen der Manager gesetzt hat.
+  let bahnPodJeTeam=null;
+  const bahnPodAnzeigeAktiv=()=>!!(bahnPodAnzeige&&bahnPodKader&&bahnPodKader===bahnPodAnzeige.kader);
+  // Teamfarbe je Bahnseite: 0/1 exakt die bisherigen Literale der Bahn-Zeichnung, 2/3 nur im Pod
+  // (dieselben zwei Farben wie im Battlefield-Pod, BF_POD_FARBEN).
+  const BAHN_SEITEN_FARBEN=["#f2a03d","#45b0c9","#7BC86C","#C77DDB"];
+  const bahnSeitenFarbe=(s)=>BAHN_SEITEN_FARBEN[s]||"#ddd";
   const bahnSeitenN=()=>bahnPodKader?bahnPodKader.length:2;
   const BAHNEN_N=()=>BA().bahnenFest?BA().bahnenFest*bahnSeitenN()/2:BA().jeSeite*bahnSeitenN();
   const HUERDEN_N=()=>BA().hindernisse;
@@ -46256,7 +46290,7 @@
       ? bahnPodKader.map(kader=>{
           const ges=kader.filter(p=>place[p.n]&&place[p.n].d===d);
           return (ges.length?staffelNachSlot(ges)
-            :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,n);
+            :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,ges.length?n:(bahnPodJeTeam||n));
         })
       : [mine,gegen];
     const staffelBeine=seitenListen.map(l=>Math.max(1,l.length));
@@ -49509,7 +49543,7 @@
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
-      ctx.strokeText(txt,x,nameY);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,nameY);
+      ctx.strokeText(txt,x,nameY);ctx.fillStyle=bahnSeitenFarbe(u.seite);ctx.fillText(txt,x,nameY);
       bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
       //
@@ -49772,6 +49806,7 @@
       ctx.globalAlpha=1;
     }
     zeichneStreckenband();
+    if(bahnPodAnzeigeAktiv())zeichneBahnPodTafel();
   }
 
   // G-2: STRECKENBAND / COURSE STRIP (Abschnitt 7, "groesster Einzelnutzen ueber vier
@@ -49799,10 +49834,10 @@
       const n=A.jeSeite||6;
       ctx.strokeStyle="rgba(255,225,120,.5)"; ctx.lineWidth=1;
       for(let i=1;i<n;i++){ const x=bandX(i/n); ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
-      for(const seite of [0,1]){
+      for(let seite=0;seite<bahnSeitenN();seite++){
         const x=bandX(gesamtfortschritt(seite));
         ctx.beginPath(); ctx.arc(x,by,4.5,0,6.283);
-        ctx.fillStyle=seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.fillStyle=bahnSeitenFarbe(seite); ctx.fill();
         ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineWidth=1; ctx.stroke();
       }
     } else {
@@ -49838,7 +49873,7 @@
           continue;
         }
         ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
-        ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fill();
         if(u.id===leaderId){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.6; ctx.stroke(); }
       }
     }
@@ -50658,6 +50693,7 @@
     d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
     const tSpan=el("span",(side===0?"h":"a")+(big?" big":""),txt);
     if(side>=2&&istKampf(disc))tSpan.style.color=kampfSeitenFarbe(side); // Pod-Seite 2/3
+    if(side>=2&&bahnPodAnzeigeAktiv())tSpan.style.color=bahnSeitenFarbe(side); // Bahn-Pod-Seite 2/3
     d.appendChild(tSpan);
     // PUNKT 8 (s. Kopfkommentar bei TICKER_ZEILEN_JE_MIN): erst ins vollstaendige Protokoll,
     // dann -- je nach Stufe und Budget -- eine Kopie in den sichtbaren Ticker.
@@ -52504,7 +52540,7 @@
       // nichts verloren geht, was die Leiste vorher trug (Bahn: Streckenanteil; Feldspiel:
       // der Punktestand). Reine Anzeige — renderKader wird aus dem Zeichen-Takt gerufen und
       // schreibt in keinen Simulationszustand.
-      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>bahnPodAnzeigeAktiv()?x.seite%2===seite:x.seite===seite)
           // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
           // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
           // Identitaet wie die Figur auf der Bahn.
@@ -52527,7 +52563,7 @@
           // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
           // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
           // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
-          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,seite:x.seite,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
                     // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
@@ -52593,6 +52629,7 @@
         :U.filter(x=>bfPodAktiv()?x.side%2===seite:x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
         if(istKampf(disc)&&bfPodAktiv())k.style.borderLeft="3px solid "+kampfSeitenFarbe(u.side);
+        if(istBahn(disc)&&bahnPodAnzeigeAktiv()&&u.seite!=null)k.style.borderLeft="3px solid "+bahnSeitenFarbe(u.seite);
         // Portrait, Sprite, Name — die Lebens-/Punkteleiste bleibt darunter ueber die
         // volle Kachelbreite, damit sie ablesbar bleibt. Portrait links vom Sprite (Chris,
         // 20.09., s. Kommentar bei kaderPortraet oben): beide Bilder gleichzeitig sichtbar.
@@ -52743,7 +52780,10 @@
       // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `.join(" : ")` rief
       // bei Takeshi (Burgpunkte, Dezimalwerte) den rohen JS-Zahlenstring mit Punkt auf
       // ("40.1 : 22.7") statt des Komma-Formats, das `bahnTeamstand().fmt` dafuer schon hat.
-      ? (()=>{const st=bahnTeamstand(); return st.seiten.map(v=>st.fmt?st.fmt(v):v).join(" : ");})()
+      ? (bahnPodAnzeigeAktiv()
+        // POD: der Vier-Team-Stand nach Platz statt "Heim : Gast".
+        ? bahnPodLiveStand().reihe.map(t=>t.platz+". "+t.anzeige).join(" · ")
+        : (()=>{const st=bahnTeamstand(); return st.seiten.map(v=>st.fmt?st.fmt(v):v).join(" : ");})())
       : (istBuehne(disc)&&BB().duell)
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
       // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
@@ -53225,6 +53265,9 @@
   function bahnAlternativZeilen(bd){
     const plaene=BAHN_ALT_PLAENE[bd];
     if(!plaene||!BAHN_ART[bd]||!BAHN_ART[bd].plaene)return [];
+    // Sichtbares Vier-Team-Rennen: bahnLauf() rechnet Zweitlaeufe als Duell — fuer einen Pod gaebe
+    // das keine ehrliche Zahl (und 24 Laeufer x Saaten x Plaene waeren sekundenlang). Lieber nichts.
+    if(bahnPodAnzeigeAktiv())return [];
     const heim=bahnRangliste().reihe.filter(u=>
       u.seite===0&&u.fertig!=null&&!u.raus&&plaene.includes(u.plan));
     if(!heim.length)return [];
@@ -53339,7 +53382,15 @@
     // wie in updateHudBahn() — ohne sie zeigte die Sieger-Zeile bei Takeshi rohe
     // Dezimalwerte mit Punkt.
     const fmtSeite=(v)=>stand.fmt?stand.fmt(v):v;
-    if(stand.gewertet){
+    // POD (sichtbares Vier-Team-Rennen): Banner mit allen vier Plaetzen (Wertung wie der zaehlende
+    // Lauf, bahnPodLiveStand nach `done`), Tabellen links Team 0/2, rechts Team 1/3.
+    const podStand=bahnPodAnzeigeAktiv()?bahnPodLiveStand():null;
+    if(podStand){
+      const vorn=podStand.reihe[0];
+      document.getElementById("esieger").textContent=(vorn?vorn.name.toUpperCase()+" SIEGER — ":"")
+        +podStand.N+"-Team-Rennen · "+(vorn?vorn.anzeige:"");
+      setzeEsiegerKlasse(vorn&&vorn.side<2?vorn.side:null);
+    } else if(stand.gewertet){
       const sieger=pL===pR?null:(pL>pR?0:1);
       document.getElementById("esieger").textContent=
         siegerBannerText(sieger,fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix,stand.bannerZusatz);
@@ -53362,10 +53413,16 @@
     // IMMER dieses Rennen wertet (Rangpunkte, Burgpunkte, oder mangels Wertung schlicht die
     // Zielreihenfolge) — kein zweiter Vergleich, nur derselbe Kopf der schon sortierten Liste.
     const mvpLaeufer=zeilen.length?zeilen[0]:null;
-    for(const seite of [0,1]){
-      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+    const tafelSeiten=podStand?[[0,2],[1,3]].map(l=>l.filter(s=>s<podStand.N)):[[0],[1]];
+    for(const boxSeite of [0,1]){
+      const box=document.getElementById(boxSeite===0?"etafelL":"etafelR");
       box.textContent="";
-      box.appendChild(el("h5",null,VEREIN[seite].name));
+      for(const seite of tafelSeiten[boxSeite]){
+      const kopfH5=el("h5",null,podStand
+        ?podStand.teams[seite].platz+". "+VEREIN[seite].name+" — "+podStand.teams[seite].anzeige
+        :VEREIN[seite].name);
+      if(podStand)kopfH5.style.color=bahnSeitenFarbe(seite);
+      box.appendChild(kopfH5);
       const t=el("table"), kopf=el("tr");
       // WECHSEL-/GESAMT-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`/`stand.gesamtVon`,
       // s. bahnTeamstand): fuer jede andere Bahn sind die Felder undefined, Kopf- und Datenzeile
@@ -53414,6 +53471,7 @@
         box.appendChild(el("p","ebilanz","Fliegend gewonnen −"+fmtDauer(b.gewinn)
           +" · Wechsel netto "+(b.netto<0?"−":"+")+fmtDauer(Math.abs(b.netto))
           +" · Angriffe: "+b.getragen+" getragen, "+b.eingebrochen+" eingebrochen"));
+      }
       }
     }
     renderSzeneDesSpiels();
@@ -53877,7 +53935,13 @@
     // fuer jede andere Disziplin — exakt der bisherige Aufbau; die Pod-Teamnamen werden dann
     // wieder gegen die Duell-Namen getauscht.
     const bfPodAnz=disc==="battlefield"?bfPodAnzeigeKontext():null;
+    // BAHN-POD (02.11., s. bahnPodAnzeigeKontext): dasselbe fuer Takeshi's Castle und Staffel — das
+    // Vier-Team-Rennen der gebuchten Gruppe statt des Duells. Ein sichtbarer Pod vom vorigen Aufbau
+    // wird IMMER zuerst abgebaut (Kader, Aufstellung, Formkarten, Vereinsnamen zurueck).
+    bahnPodAnzeigeAbbauen();
+    const bahnPodAnz=(disc==="takeshis-castle"||disc==="staffel")?bahnPodAnzeigeKontext():null;
     if(bfPodAnz)bfPodAnzeigeBauen(bfPodAnz);
+    else if(bahnPodAnz){ bfPodAnzeigeVereineZurueck(); bahnPodAnzeigeBauen(bahnPodAnz); }
     else{ bfPodAnzeigeVereineZurueck(); build(gebuchteSaatFuerAktuelleDisziplin()); }
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
@@ -53944,7 +54008,7 @@
     document.getElementById("arenaDisc").textContent=istMdffa
       ?(DISCS[disc]?DISCS[disc].label:disc)+" · 4-Team-FFA"
       :(DISCS[disc]?DISCS[disc].label:disc)+" · "+
-      (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
+      (istBahn(disc)?(bahnPodAnzeigeAktiv()?bahnSeitenN()+"-Team-Rennen":(BA().jeSeite+" gegen "+BA().jeSeite))
                     :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
     // OHNE "BEFEHLE" (Broadcast-Audit Runde 2, Punkt 12): die alte Zeile "Befehle sind
@@ -53959,7 +54023,9 @@
     // Viertelpause-Overlay wie Endstand zuruecksetzen — ein Reset waehrend einer laufenden
     // Pause (z.B. Disziplinwechsel mitten im Spiel) darf keine Karteileiche stehenlassen.
     const vp=document.getElementById("viertelpause"); if(vp)vp.hidden=true;
-    renderEinlauf();zeigeEinlauf(true);
+    // POD: die Einlauf-Karte kennt nur Heim/Gast — im Vier-Team-Rennen stellt die Tafel auf der
+    // Leinwand die Teams vor (zeichneBahnPodTafel), der Einlauf bleibt aus.
+    if(bahnPodAnzeigeAktiv())zeigeEinlauf(false); else { renderEinlauf();zeigeEinlauf(true); }
     // WELLE-2-FUND (time-trial-einzelzeitfahren-wertung-plan-05-09.md Abschnitt 1.5):
     // "Plan der KI" (#arenaplan) zeigte im Time-Trial den TDM-Text weiter an. Ursache war
     // nicht die istBahn-Fallunterscheidung in renderOpp() selbst (die baut fuer Bahn schon
@@ -56080,8 +56146,14 @@
   // BAHN_ART; hier ist nichts nachzutragen.
   for(const bd of Object.keys(BAHN_ART)){
     MOTOREN[bd]={
-      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern()}),
+      // POD-ZUSTAND (bahnPodKader/bahnPodJeTeam) gehoert mit dazu, seit die Arena ein Vier-Team-
+      // Rennen auch SICHTBAR zeigt (bahnPodAnzeige): ein headless Lauf mitten in diesem Rennen
+      // (spieleBahn, spieleBahnPod, Sonden) startet ueber vorher() garantiert ohne Pod-Kader und
+      // gibt den sichtbaren ueber zurueck() wieder her. Im Duell sind beide immer null.
+      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern(),
+                    podKader:bahnPodKader, podJeTeam:bahnPodJeTeam}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
+                    bahnPodKader=a.podKader??null; bahnPodJeTeam=a.podJeTeam??null;
                     rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
                     // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
                     // Rennen: ihre _laeufer-Verweise zeigen auf die Laeufer des Durchgangs,
@@ -56092,7 +56164,7 @@
                     // Anzeige-Zustand ZULETZT zurueckstellen (Time-Trial-Broadcast-Paket
                     // 07.10.): bauSpurt() im Zweitlauf hat ihn geleert, hier kommt er zurueck.
                     bahnAnzeigeZurueck(a.anzeige);},
-      vorher:()=>{disc=bd; bahnDisc=bd;},
+      vorher:()=>{disc=bd; bahnDisc=bd; bahnPodKader=null; bahnPodJeTeam=null;},
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
       namen:()=>LAEUFER.map(u=>u.n),
@@ -56527,10 +56599,167 @@
       const r=bahnPodLauf(bd,teams,saat,platzJeTeam,(kader)=>{
         FORMKARTE={...FORMKARTE};
         if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
+        // `optionen.k` (Liga-Verdrahtung 02.11.): Kopfzahl des Spielplan-Slots fuer Teams ohne
+        // Aufstellung (s. bahnPodJeTeam). M.zurueck() in bahnPodLauf setzt es danach zurueck.
+        if(Number.isInteger(opt.k)&&opt.k>=1)bahnPodJeTeam=opt.k;
       });
       return {disziplin:r.disziplin, saat:r.saat, teams:r.teams,
         boxscore:r.laeufer.map(u=>({name:u.n, side:u.side, wert:u.punkte}))};
     } finally { FORMKARTE=formVorher; }
+  }
+
+  // ===================================================================================
+  // DAS SICHTBARE VIER-TEAM-RENNEN (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+  // Abschnitt 6). Bucht die Liga an einem Spieltag fuer Takeshi's Castle oder Staffel einen Pod,
+  // zeigt die Arena dieses Rennen — alle vier Teams der gebuchten Gruppe auf einer Strecke — statt
+  // eines Duells gegen den Fixture-Gegner (sonst sahe Chris ein Rennen, dessen Ergebnis nicht zur
+  // Buchung passt: dieselbe Fehlerklasse wie "0:2 bei 4 Teams", 19.10.).
+  //
+  // Quelle ist der Host (FoundationBattleArenaHost.tsx): `echterKader.bahnPodByDisciplineId[bd]` =
+  // {teams:[{name,kurz,kader}], k, saat, aufstellung:[place je Team]} — dieselben Kader, dieselbe
+  // Saat (`buildBahnPodMatchSeed`), dieselbe Aufstellung und dieselben Formkarten (formSaat = saat)
+  // wie der zaehlende Lauf (`runBahnPodFixtures`, arena-headless-runner.ts). Fuer Standalone/Tests
+  // setzt `window.__arena.bahnPodAnzeigen(bd, pod)` dieselbe Form (null schaltet zurueck aufs Duell).
+  //
+  // Anders als headless bleibt der Pod hier fuer die ganze Dauer des sichtbaren Rennens gesetzt
+  // (`bahnPodKader`, `bahnPodJeTeam`, Aufstellung, Formkarten, Vereinsnamen 0..3); reset() baut ihn
+  // vor jedem neuen Aufbau ueber bahnPodAnzeigeAbbauen() wieder ab. Die Zeichnung liest dann
+  // bahnPodAnzeigeAktiv(): Teamfarben 0..3, Vier-Team-Tafel, HUD und Endstand fuer vier Teams.
+  function bahnPodAnzeigeKontext(){
+    const karte=echterKader&&echterKader.bahnPodByDisciplineId;
+    const roh=(bahnPodAnzeigeVorgabe&&bahnPodAnzeigeVorgabe[disc])
+      ||(karte&&typeof karte==="object"?karte[disc]:null)||null;
+    if(!roh||!Array.isArray(roh.teams)||roh.teams.length<3||roh.teams.length>4)return null;
+    if(roh.teams.some(tm=>!bfPodKaderVon(tm).length))return null;
+    return roh;
+  }
+  function bahnPodAnzeigeBauen(pod){
+    const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    bahnPodAnzeige={kader, placeVorher:{...place}, formVorher:FORMKARTE,
+      vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
+    bfPodVereineSetzen(pod.teams);
+    // Persoenlichkeiten bleiben stehen (Tooltips/Kaderleiste lesen persOf auch nach dem Aufbau).
+    for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+    for(const k in place)delete place[k];
+    for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
+    FORMKARTE={...FORMKARTE};
+    if(pod.saat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
+    bahnPodJeTeam=Number.isInteger(pod.k)&&pod.k>=1?pod.k:null;
+    bahnPodKader=kader;
+    build(pod.saat);
+  }
+  function bahnPodAnzeigeAbbauen(){
+    const a=bahnPodAnzeige;
+    if(!a)return;
+    bahnPodAnzeige=null;
+    if(bahnPodKader===a.kader){ bahnPodKader=null; bahnPodJeTeam=null; }
+    for(const k in place)delete place[k];
+    Object.assign(place,a.placeVorher);
+    FORMKARTE=a.formVorher;
+    bfPodVereinZurueck(a.vereinSnap);
+  }
+  // Stand des sichtbaren Pods, je Seite: Wert (Burgpunkte; Staffel: Zielzeit bzw. Streckenanteil),
+  // Anzeige-Text und Platz 1..N. Waehrend des Rennens vorlaeufig, nach `done` exakt die Wertung des
+  // zaehlenden Laufs (bahnPodErgebnis + verteilePlatzierungspunkte, wie bahnPodLauf).
+  function bahnPodLiveStand(){
+    const N=bahnSeitenN(), art=BA();
+    const f1=(v)=>(Math.round(v*10)/10).toFixed(1).replace(/\.0$/,"").replace(".",",");
+    const teams=[];
+    for(let s=0;s<N;s++){
+      const team=LAEUFER.filter(u=>u.seite===s);
+      if(art.wertung==="burg"){
+        const w=team.reduce((x,u)=>x+burgwertung(u),0);
+        teams.push({side:s, wert:w, anzeige:f1(w)+" P", zielzeit:null});
+      } else {
+        const ziel=team.find(u=>u.fertig!=null);
+        const z=ziel?ziel.fertig:null, p=gesamtfortschritt(s);
+        teams.push({side:s, wert:z!=null?1e6-z:p, anzeige:z!=null?fmtZielzeit(z):Math.round(p*100)+" %", zielzeit:z});
+      }
+    }
+    let werte=teams.map(t=>t.wert);
+    if(done){ const e=bahnPodErgebnis(N); werte=e.teamWert; }
+    const {punkte,platz}=verteilePlatzierungspunkte(werte,bahnPodPunkteTabelle(N));
+    teams.forEach((t,s)=>{ t.platz=platz[s]; t.ligaPunkte=punkte[s];
+      t.name=(VEREIN[s]&&VEREIN[s].name)||("Team "+(s+1)); });
+    const reihe=[...teams].sort((a,b)=>a.platz-b.platz||a.side-b.side);
+    return {N, teams, reihe, done:!!done, platz:teams.map(t=>t.platz)};
+  }
+  // FUEHRUNGSWECHSEL DER STAFFEL IM POD: staffelZeitDelta() vergleicht nur Seite 0 und 1 — im Pod
+  // fuehrt, wer im Vier-Team-Stand vorn liegt (bahnPodLiveStand), mit derselben 2-s-Sperre.
+  function bahnPodStaffelFuehrung(){
+    const st=bahnPodLiveStand(), vorn=st.reihe[0];
+    if(!vorn)return;
+    if(staffelFuehrendeSeite==null){ staffelFuehrendeSeite=vorn.side; return; }
+    if(vorn.side!==staffelFuehrendeSeite&&(rennT-bahnFuehrenderSeit)>2){
+      staffelFuehrendeSeite=vorn.side; bahnFuehrenderSeit=rennT;
+      feed(vorn.side,vorn.name+" übernimmt die Führung im 4-Team-Rennen.",true,undefined,"fuehrungswechsel");
+    }
+  }
+  // HUD IM POD (aus updateHudBahn): die DOM-Anzeigetafel kennt nur Heim/Gast — sie zeigt hier den
+  // Fuehrenden, die Leinwand-Tafel (zeichneBahnPodTafel) alle vier Teams.
+  function updateHudBahnPod(){
+    const st=bahnPodLiveStand(), art=BA();
+    const vorn=st.reihe[0];
+    document.getElementById("klsuffix").textContent="4-Team-Rennen · "
+      +(art.wertung==="burg"?"Burgpunkte":"Zieleinlauf")+(done?"":" · vorläufig");
+    const scoreEl=document.getElementById("score");
+    if(vorn){
+      scoreEl.textContent=(done?"Sieger: ":"Vorn: ")+vorn.name+" ("+vorn.anzeige+")";
+      scoreEl.style.color=bahnSeitenFarbe(vorn.side);
+    }
+    // Die DOM-Tafel traegt die Namen von Team 0 und 1 (VEREIN[0]/[1]) — Zaehler und Balken
+    // zeigen deshalb genau diese zwei Teams; alle vier stehen auf der Leinwand-Tafel.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
+    document.getElementById("aliveL").textContent=String(imZiel(0));
+    document.getElementById("aliveR").textContent=String(imZiel(1));
+    const schnitt=(s)=>{
+      if(art.staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
+    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    if(done&&!bahnEndeGemeldet){
+      bahnEndeGemeldet=true;
+      feed(vorn?vorn.side:0,(vorn?vorn.name+" gewinnt das 4-Team-Rennen — ":"Rennen beendet — ")
+        +st.reihe.map(t=>t.platz+". "+t.name+" "+t.anzeige).join(" · "),true,undefined,"endstand");
+      endstandVormerken(renderEndstandBahn,vorn&&vorn.side<2?vorn.side:null);
+    }
+    endstandNachlaufPruefen();
+    renderWertungTabelle();
+    renderKader();
+    aktualisiereBbug();
+  }
+  // DIE VIER-TEAM-TAFEL DER BAHN (wie zeichneBfPodTafel im Battlefield-Pod): oben ueber der Strecke
+  // je Team ein Kaestchen in Teamfarbe — Platz, Name, Burgpunkte bzw. Zielzeit/Streckenanteil.
+  function zeichneBahnPodTafel(){
+    const st=bahnPodLiveStand(), N=st.N;
+    // Unter dem Streckenband (zeichneStreckenband, oben bei y 6..20).
+    const uhrB=64, breite=Math.min(270,(W-40-uhrB-8)/N-8), hoehe=24, y0=24;
+    const x0=(W-(breite+8)*N-uhrB)/2;
+    ctx.save();
+    {
+      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(rennT*zeitFaktor());
+      ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(ux,y0,uhrB,hoehe);
+      ctx.globalAlpha=1; ctx.fillStyle="#f4e6c4"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillText(Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0"),ux+uhrB/2,y0+hoehe/2);
+    }
+    for(const tm of st.teams){
+      const s=tm.side, x=x0+s*(breite+8)+(s>=Math.ceil(N/2)?uhrB+8:0), farbe=bahnSeitenFarbe(s);
+      ctx.globalAlpha=.88;
+      ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(x,y0,breite,hoehe);
+      ctx.fillStyle=farbe; ctx.fillRect(x,y0,5,hoehe);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.5; ctx.strokeRect(x+.75,y0+.75,breite-1.5,hoehe-1.5);
+      ctx.globalAlpha=1; ctx.textBaseline="middle"; ctx.textAlign="left";
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle="#fff";
+      const kurz=tm.name.length>18?tm.name.slice(0,17)+"…":tm.name;
+      ctx.fillText(tm.platz+". "+kurz,x+10,y0+hoehe/2);
+      ctx.textAlign="right"; ctx.fillStyle=farbe;
+      ctx.fillText(tm.anzeige,x+breite-8,y0+hoehe/2);
+    }
+    ctx.restore();
   }
 
   // RANGTREUE-SONDE IM POD-FORMAT, dieselbe Bauart wie disziplinProbe()/miniDmFfaSonde():
@@ -58489,6 +58718,20 @@
     bahnPodSonde,
     bahnPodEinfluss,
     bahnPodDisziplinen:()=>[...BAHN_POD_DISZIPLINEN],
+    // SICHTBARES VIER-TEAM-RENNEN ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie
+    // `echterKader.bahnPodByDisciplineId[bd]`; `pod=null` schaltet zurueck aufs Duell. Liefert, ob
+    // die Arena fuer `bd` jetzt einen Pod zeigt (wirkt sofort, wenn `bd` die aktuelle Disziplin ist).
+    bahnPodAnzeigen:(bd,pod)=>{
+      if(!BAHN_POD_DISZIPLINEN.includes(bd))return false;
+      bahnPodAnzeigeVorgabe={...(bahnPodAnzeigeVorgabe||{}),[bd]:pod||null};
+      if(disc===bd)reset();
+      return disc===bd?bahnPodAnzeigeAktiv():!!pod;
+    },
+    // Stand des sichtbaren Pods (Tests): null, wenn gerade kein Pod sichtbar ist.
+    bahnPodAnzeigeStand:()=>bahnPodAnzeigeAktiv()?(()=>{const st=bahnPodLiveStand();
+      return {disziplin:disc, N:st.N, done:st.done, laeufer:LAEUFER.length,
+        teams:st.teams.map(t=>({side:t.side,name:t.name,platz:t.platz,ligaPunkte:t.ligaPunkte,
+          anzeige:t.anzeige,zielzeit:t.zielzeit,wert:t.wert}))};})():null,
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
     // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster
