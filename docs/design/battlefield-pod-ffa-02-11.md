@@ -9,6 +9,13 @@ vier Pod-Teams **gleichzeitig im selben Echtzeitkampf** um die drei Orte Nord, M
 Motor ist derselbe, der Kampf ist sichtbar. Die Buchung läuft weiter über den PPS-Pod. Warum das
 so bleibt, steht in Abschnitt 4.
 
+> **Stand 02.11. abends — überholt durch Abschnitt 7.** Chris hat Option 2 aus Abschnitt 6
+> gewählt (Mini-DM-Muster). Der Pod wird jetzt als **ein deterministisches Gefecht je Ort**
+> entschieden, die Arena spielt es mit allen vier Teams gleichzeitig ab, und die Liga **bucht genau
+> dieses Gefecht**. Abschnitte 1–6 beschreiben die erste Runde (freier Echtzeitkampf, nur Anzeige)
+> und bleiben als Befund stehen; der Echtzeit-Pod ist als `{echtzeit:true}` weiter als Kontrolle
+> erreichbar.
+
 ## 1. Was gebaut ist
 
 ### Motor (`public/mockups/battle-mode.engine.js`)
@@ -222,3 +229,176 @@ FFA vorher jedes Rezeptsignal überdeckt.
 
 **Takeshi/Staffel sichtbar machen:** Die Bahn-Zeichnung müsste vier Seiten können (Bahnen, HUD,
 Banner). Das ist eigene Arbeit, siehe Abschnitt 5.
+
+## 7. Gefecht je Ort nach dem Mini-DM-Muster — gezeigt = gebucht (02.11. abends)
+
+Chris' Entscheidung nach Abschnitt 6: Option 2. Der Vier-Team-Pod wird nicht mehr im freien
+Echtzeitkampf entschieden, sondern wie Mini-DM seit 13.10.: **Ergebnis zuerst, Bild danach.**
+
+### 7.1 Was Mini-DM gelöst hat, und was davon hier übernommen ist
+
+Mini-DMs Echtzeit-FFA stand bei rho 0,40 je Runde. Die Diagnose im Kopfkommentar an
+`mdffaSchlagwechsel()` nennt drei Ursachen, die beim Battlefield-Echtzeit-Pod genauso auftraten
+(Abschnitt 3, Punkt 3):
+
+1. **Geometrie als Lotterie.** Wer in die umkämpfte Mitte läuft, bekommt von allen Seiten Feuer.
+2. **Profil statt Summe.** `aufEignung()` normiert nur LP/ANG/VER; der Kampf misst Begegnungen von
+   Profilen, nicht die gewichtete Summe der Matrix.
+3. **Ein eigenes System neben der Matrix.** Chris am 13.10.: „auch das FFA soll nach den
+   gewichtungen geschehen die vorgegeben sind!“
+
+Mini-DMs Antwort war ein **geometriefreier Schlagwechsel in Takten**: jeder Stehende wählt ein Ziel
+und schlägt einmal zu, gleichzeitig auf dem Stand vom Taktbeginn; **jedes Matrixgewicht hat genau
+einen benannten Kanal**, dessen Stärke sein Gewicht ist; jeder Kanal liest `E + kappa·(a − E)`
+(Menge aus der Eignung, Form aus dem Profil); Würfel kommen aus einem Hash je (Saat, Kämpfer, Takt,
+Zweck), damit eine Pp-Hebung bei einem Kämpfer die übrigen Würfe nicht verschiebt. Genau das ist
+übernommen — verteilt auf drei Orte statt auf einen Ring.
+
+### 7.2 Die Mechanik (`bfffaGefecht()`, `public/mockups/battle-mode.engine.js`)
+
+- **Belegung aus der Rolle, symmetrisch.** Jedes Team hat einen Heimort (Seite 0/1 Nord, 2/3 Süd,
+  dieselbe Geometrie wie `bfPodHome`), die Mitte und einen Fernort. Morale Anchor und Commander
+  halten den Heimort, Siege Core und Field Control gehen in die Mitte, Disruptor und Spotter zum
+  Fernort — das steht so in den Rollentexten. Weil alle vier Teams bei gleichem k dieselben Rollen
+  haben, steht an jedem Ort jedes anwesende Team mit gleich vielen Köpfen.
+
+  | k | Heimort | Mitte | Fernort |
+  |---|---|---|---|
+  | 2 | Morale Anchor | Siege Core | — |
+  | 3 | Morale Anchor | Siege Core, Field Control | — |
+  | 4 | Morale Anchor, Commander | Siege Core, Field Control | — |
+  | 5 | Morale Anchor, Commander | Siege Core, Field Control | Disruptor |
+  | 6 | Morale Anchor, Commander | Siege Core, Field Control | Disruptor, Spotter |
+
+- **Je Ort ein Schlagwechsel**, alle drei Orte im selben Takt (20 Takte zu 4 Kampfsekunden). Ziel
+  ist ein Gegner am selben Ort. Bei gleichmäßiger Zielwahl bekommt jeder im Mittel **einen** Angriff
+  je Takt ab, egal ob zwei oder vier Teams am Ort stehen — das nimmt der Mitte die
+  Dritte-Partei-Lotterie, ohne sie aus dem Spiel zu nehmen.
+- **Kontrollpunkte nach der `kpTick`-Regel**, je Takt statt je Bild: Besitz wechselt nur, wenn genau
+  ein Team am Ort steht; Halten drängt fremden Fortschritt zurück; Disruptoren stören an umkämpften
+  Orten; Besitz zahlt 8 Punkte je Takt (= 2 je Kampfsekunde wie im Duell); 150 Punkte beenden.
+  Ein ausgeschiedenes Team verliert seine Orte.
+- **Rotation:** Ist ein Ort sicher (eigener Besitz, kein Gegner, kein fremder Fortschritt), bleibt
+  ein Halter (Morale Anchor zuerst) und der Rest rückt zum nächsten umkämpften Ort nach, Mitte zuerst
+  (ein Takt Weg).
+- **Platzierung** über dieselbe Regel wie bisher (`bfPodPlatzierungAus()`, von `bfPodPlatzierung()`
+  mitbenutzt): letztes Team steht > Kontrollpunkt-Punkte > Lebende > später raus; im Gefecht
+  zusätzlich die Summe der Kampfrichterwertung als fünfter Schlüssel, damit gezeigt und gebucht ohne
+  Gleichstand dieselben 2-1-0-0 sind.
+
+**Die neun Kanäle** (Stärke = Matrixgewicht, `hebel` gleicht nur aus, wie stark eine Mechanik auf
+die Wertung durchschlägt):
+
+| Attribut | Gewicht | Kanal |
+|---|---:|---|
+| Charisma | 20 | **Befehl**: Wucht des Angriffs, Eroberungstempo, Gutschrift fürs Halten |
+| Intelligence | 16 | **Lage lesen**: Schwachstelle (schlägt dorthin, wo einer wackelt), Positionierung (von zwei Angreifern kommt nur einer an) |
+| Spirit | 16 | **Zusammenhalt**: Deckung, mindert jeden erlittenen Treffer |
+| Torment | 12 | Wucht |
+| Power | 10 | Wucht |
+| Awareness | 10 | Treffer landen |
+| Health | 8 | Stand |
+| Determination | 4 | Letzter Atem (ein tödlicher Treffer lässt einmal stehen) |
+| Stamina | 4 | Ausdauer (Wucht lässt spät weniger nach) |
+
+**Wertung je Kämpfer** (Kampfrichter): verursachter Schaden + 15 je K.o. + 12 je ganzer Eroberung
+(anteilig) + Halten (3 je Takt am eigenen Ort, geteilt durch die Halter, mal Befehl) + 2 je Takt auf den Beinen. Gemeldet wird wie bisher
+der Anteil am Gesamtbeitrag (Summe 100 über alle 4k Kämpfer); die Spieler-PP lesen den rohen Wert.
+
+**Kalibrierung** (`BF_FFA_GRUND`): kappa 0,12, kappaWege 0,25, Spreizung 3; Hebel Stand 6,5, Wucht 4,
+Treffer 4, Deckung 6, Ausdauer 5, Schwachstelle 1,5, Positionierung 1,5, Atem 5, Erobern 4. Der Sweep
+(20 Gruppen × 2, Pp n=48/96): Intelligence las mit Hebel 3 zu viel (21 % bei Gewicht 16), Charisma zu
+wenig (16 %), solange eine Eroberung eine feste Gutschrift zahlte — erst seit das Halten mit dem Befehl
+wächst, trägt Charisma über seine eigene Mechanik. Mit kappa = 0 (reine Eignung) liegt die k=2-Pp-
+Messung bei 18/17,5 — das ist der Boden aus Slot-Aufschlag und Stichprobe; die Kalibrierung liegt
+darunter.
+
+### 7.3 Abnahme
+
+Werkzeug: `scripts/miss-battlefield-pod-ffa-abnahme.mjs 4 --je-seite=2..6 --gruppen=30 [--kontrolle]
+[--pp=48 --pp-je-seite=2..6]`, kaderfest (zehn Kader der Familie, 30 der 210 Vierergruppen, je
+4 Kämpfe und Strom), zwei Saatströme, gemessen auf dem Endstand des Motors (mit fünftem
+Platzierungsschlüssel). Rohdaten: `data/generated/battlefield-pod-gefecht-abnahme.json`.
+
+| k | rho je Kampf, Median (Strom 0 / 1) | Gruppen < 0,80 | Saison | Star Rang 1 | Star ≤ 2 | Paare ≥ 15 richtig | Team-rho | bestes Team 1. / ≤ 2. |
+|---|---|---|---|---|---|---|---|---|
+| 2 | **0,873 / 0,861** | 4 · 7 von 30 | 0,98 / 0,96 | 53 / 53 % | 86 / 83 % | 99,7 % | 0,70 / 0,65 | 63 / 60 % · 92 / 88 % |
+| 3 | **0,881 / 0,874** | 3 · 4 | 0,97 / 0,96 | 42 / 44 % | 74 / 66 % | 99,7 % | 0,64 / 0,64 | 41 / 43 % · 91 / 89 % |
+| 4 | **0,885 / 0,864** | 3 · 5 | 0,95 / 0,94 | 56 / 51 % | 79 / 78 % | 99,5 % | 0,70 / 0,69 | 53 / 44 % · 92 / 90 % |
+| 5 | **0,919 / 0,920** | 0 · 0 | 0,97 / 0,96 | 40 / 52 % | 71 / 78 % | 99,8 % | 0,78 / 0,76 | 60 / 58 % · 98 / 95 % |
+| 6 | **0,922 / 0,923** | 0 · 0 | 0,98 / 0,98 | 64 / 68 % | 86 / 88 % | 99,8 % | 0,87 / 0,83 | 79 / 73 % · 98 / 97 % |
+
+Zum Vergleich der Echtzeit-Pod (Abschnitt 3): rho je Kampf 0,13–0,27, bestes Team auf Platz 1 in
+18–38 %. Das Duell auf demselben Chassis (Kontrolle, unverändert): 0,82 / 0,69 / 0,41 / 0,40 / 0,15.
+
+**Pp (Budget-Methode, Pflicht)**, `--nur-pp --pp=48 --pp-je-seite=2..6`, Messpersonen SQUAD/OPP wie
+`einflussVon`, zwei Familien-Teams als Feld, Hebung +15:
+
+| k | Strom 0 | Strom 10 000 000 |
+|---|---:|---:|
+| 2 | 20,2 | 15,9 |
+| 3 | 9,8 | 5,0 |
+| 4 | 11,0 | 10,0 |
+| 5 | 8,7 | 8,0 |
+| 6 | 4,8 | 5,4 |
+
+Alle unter 25. Typisches Profil (k=4, Strom 0): Intelligence 17,4, Charisma 17,2, Spirit 14,0,
+Torment 12,9, Awareness 12,1, Power 10,4, Health 8,7, Stamina 3,7, Determination 3,6 — gegen die
+Matrix 16/20/16/12/10/10/8/4/4. Bei k=2 misst die Sonde nur vier Personen; dort streut sie am
+stärksten.
+
+**Beide Pflichtkriterien regulär bestanden, ohne Ausnahme.** Chris' Ausnahme für k=2/3 vom 01.11.
+galt dem PPS-Pod und wird für den Motor nicht gebraucht.
+
+### 7.4 Anzeige: die Arena spielt das Gefecht ab
+
+- `bfPodAnzeigeBauen()` baut den Pod wie bisher (vier Teams, Aufstellung, Formkarten aus der
+  Pod-Saat) und rechnet danach **dasselbe** Gefecht wie die Buchung (`bfffaFuerGebautenPod()`).
+- `stepSim()` leitet im Pod auf `bfPodReplaySchritt()` um (nur wenn `KP.pod.replay` gesetzt ist —
+  das Duell erreicht den Zweig nie). Zuerst laufen alle vier Teams aus ihren Ecken an ihre Orte
+  (6 Kampfsekunden), danach je Takt: Schläge über den Takt verteilt mit Spur in Teamfarbe und
+  Schadenszahl, „ausgewichen“/„stellt sich klug“/„letzter Atem“, K.o. über `schalteAus()` (Ticker,
+  Highlights, Endstand-Statistik), Eroberungsbalken gleitend, Punkte gleitend, Ticker für
+  Eroberungen und Ausscheiden.
+- Der Endstand der Arena ist **exakt** der gebuchte: Test „das Replay in der Arena endet exakt im
+  gebuchten Endstand“ (k=2/4/6, Platz, Punkte, Lebende, Ligapunkte).
+- Der Host-Hinweis sagt für Battlefield jetzt „wird als 4-Team-Gruppe (Pod) gewertet — aus genau
+  dem Gefecht, das die Arena hier zeigt“ ohne „nur Vorschau“; fiel das Gefecht aus und wurde per PPS
+  gebucht, steht das dort.
+
+### 7.5 Liga-Kette (wie Mini-DM)
+
+| Baustein | Datei |
+|---|---|
+| Runner, ein Chromium-Lauf je Spieltag | `runBattlefieldPodFixtures()` in `lib/battle/arena-headless-runner.ts` |
+| Spieltag: Pods, k, Mutatoren, Teilnahme, Spieler-PP | `runBattlefieldPodMatchday()` in `lib/resolve/battlefield-pod-matchday.ts` |
+| Buchungsformel (Platz aus dem Motor, 2-1-0-0, 0-10-Wert, `quelle: "ffa"`) | `berechneBattlefieldPodOverride()` in `lib/resolve/mini-dm-pod-resolve.ts` |
+| Motor-Vorrang je Pod, PPS-Pod als Rückfall | `berechneMiniDmPodOverrides({ battlefieldRohdatenByPodId })`, `legacy-matchday-resolve-engine.ts` |
+| Vorlauf (Semaphor, eine Wiederholung, Eingabe-Hash) | `lib/battle/arena-vorlauf-service.ts`, `berechneBattlefieldPodEingabeHash()` |
+| Rollout-Schalter | `BATTLEFIELD_POD_VORLAUF_AKTIV` (`arena-resolved-disciplines.ts`), Server-Notschalter `OLY_BATTLEFIELD_POD_VORLAUF=aus` |
+| Referenz (M90, Spieler-PP-Perzentile je k) | `data/generated/battlefield-pod-referenz.json`, `scripts/ziehe-battlefield-pod-referenz.mjs` |
+
+Gezeigt = gebucht hängt an identischen Eingaben: dieselbe Saat (`buildBattlefieldPodMatchSeed()` +
+`seedZuZahl()`), dasselbe k (`resolvePodPlayerCountForMatchday()`), dieselbe Aufstellung je Team
+(`buildArenaAufstellung()`), derselbe Mutator-Wurf (`resolveMatchdayMutatorTraitsForDiscipline()` im
+Vorlauf, `buildMatchdayMutatorTraitsBySide()` im Host), Formkarten aus der Pod-Saat. Ein Pod, in dem
+ein Team gar keine Battlefield-Aufstellung hat, wird nicht aus dem Motor gebucht (dort kämpfte ein
+Ersatzkader) und fällt mit Warnung auf den bisherigen Pfad zurück. Spieler-PP bekommen nur
+aufgestellte Spieler.
+
+### 7.6 Duell unverändert
+
+Die Fingerabdrücke aus `tests/battlefield-pod-ffa.test.ts` (Duell `spieleArenaDomination` k=2/4/6
+und `disziplinProbe` für TDM/Mini-DM/Battlefield) sind unverändert grün; der Gefecht-Code wird nur
+mit `KP.pod` erreicht.
+
+### 7.7 Offen
+
+- **Optik.** Bei k=6 stehen 24 Figuren auf einer 470 px hohen Fläche um drei Orte; das ist lesbar,
+  aber eng. Die Schläge sind eine Spur je Angriff und Takt (rund 20 s Sendezeit je Takt bei 1x);
+  wer es lebendiger will, kann je Angriff mehrere kosmetische Treffer zeigen, ohne am Ergebnis etwas
+  zu ändern.
+- **Team-Ebene.** Das eignungsbeste Team gewinnt in 41–79 % (in den ersten zwei: 87–98 %, Letzter:
+  höchstens 2,5 %). Das ist ein Vier-Team-Wettbewerb mit echtem Gegenspiel, keine Lotterie mehr
+  (Echtzeit: 18–38 %), aber auch kein Abziehbild der Eignung wie der PPS-Pod.
+- **Referenz neu ziehen**, wenn `BF_FFA_GRUND` geändert wird (`scripts/ziehe-battlefield-pod-referenz.mjs`).

@@ -38,7 +38,7 @@ import {
 import { berechneMiniDmPodOverrides, istMotorPodQuelle } from "@/lib/resolve/mini-dm-pod-resolve";
 import { berechneBahnPodOverrides, istBahnPodDisziplin } from "@/lib/resolve/bahn-pod-resolve";
 import { getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
-import { isViererPodDiscipline, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 // SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
 // Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
@@ -363,6 +363,9 @@ export function buildLegacyMatchdayResolvePreview(
     // Kommentar an `LegacyResolvePreviewOptions.miniDmFfaPodRohdatenByDisciplineId`) -- der
     // Default `null` haelt den Mini-DM-Zweig unten IMMER beim bisherigen PPS-Pod-Pfad.
     miniDmFfaPodRohdatenByDisciplineId: options?.miniDmFfaPodRohdatenByDisciplineId ?? null,
+    // BATTLEFIELD-GEFECHT (02.11. abends): vom Arena-Vorlauf geliefert (`runBattlefieldPodMatchday()`),
+    // sonst `null` -- dann bucht der Battlefield-Pod unveraendert ueber den PPS-Pod.
+    battlefieldPodRohdatenByPodId: options?.battlefieldPodRohdatenByPodId ?? null,
     // BAHN-POD-ROHDATEN (02.11.): vom Arena-Vorlauf gesetzt, s. `LegacyResolvePreviewOptions`.
     bahnPodRohdatenByDisciplineId: options?.bahnPodRohdatenByDisciplineId ?? null,
   };
@@ -881,12 +884,15 @@ export function buildLegacyMatchdayResolvePreview(
     // FFA-Rohdaten vor (kein heutiger Aufrufer liefert sie -- das ist PR 5), versucht
     // `berechneMiniDmPodOverrides()` sie ZUERST je Pod; fehlende/unvollstaendige Rohdaten fallen
     // je Pod defensiv auf den bisherigen PPS-Pod-Pfad zurueck (s. Kommentar an der Funktion,
-    // mini-dm-pod-resolve.ts). BLEIBT MINI-DM-EXKLUSIV (01.11.): Battlefield ist ein reiner PPS-Pod
-    // ohne FFA-Motor -- fuer jede andere Pod-Disziplin ist dieser Wert IMMER `null`.
+    // mini-dm-pod-resolve.ts). Der FFA-Zweig bleibt Mini-DM-exklusiv; BATTLEFIELD hat seit 02.11.
+    // abends seinen EIGENEN Motor-Vorrang (das Gefecht je Ort, `battlefieldPodRohdatenByPodId`,
+    // berechneBattlefieldPodOverride()) -- fuer jede andere Pod-Disziplin sind beide Werte `null`.
     const miniDmFfaRohdatenForThisDiscipline =
       disciplineId === MINI_DM_DISCIPLINE_ID
         ? resolveOptions.miniDmFfaPodRohdatenByDisciplineId?.get(disciplineId) ?? null
         : null;
+    const battlefieldRohdatenForThisDiscipline =
+      disciplineId === BATTLEFIELD_DISCIPLINE_ID ? resolveOptions.battlefieldPodRohdatenByPodId ?? null : null;
     // BAHN-POD-VORRANG (Liga-Verdrahtung 02.11., bahn-pod-resolve.ts): fuer Takeshi's Castle und
     // Staffel bucht die Engine je Pod ZUERST das echte Vier-Team-Rennen (`quelle: "bahn"`), sofern der
     // Vorlauf Rohdaten geliefert hat. Pods ohne Rohdaten (Vorlauf aus/ausgefallen, Team ohne Kader)
@@ -912,6 +918,7 @@ export function buildLegacyMatchdayResolvePreview(
             disciplineId,
             playerCount: legacyScorePlayerCountForThisDiscipline,
             ffaRohdatenByPodId: miniDmFfaRohdatenForThisDiscipline,
+            battlefieldRohdatenByPodId: battlefieldRohdatenForThisDiscipline,
           })
         : null;
     const miniDmPodOverridesForThisDiscipline =

@@ -2,7 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { arenaAusfallGrundLabel, findeDisziplinErgebnis } from "@/lib/foundation/season-matchday-fixtures-overview";
 import { isBattleModeSave } from "@/lib/season/game-mode";
-import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
+import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 
 /**
  * ARENA-HOST-HINWEIS ("gewertet per PPS-Duell, Arena nur Vorschau") — Task #159 Punkt 3, eigener
@@ -37,6 +37,12 @@ export type ArenaHostSpielquelleHinweis = {
   disciplineId: string;
   disciplineName: string;
   text: string;
+  /**
+   * BATTLEFIELD-GEFECHT (02.11. abends): `false`, wenn die Arena fuer diese Disziplin GENAU das
+   * zeigt, was gebucht wird (das Gefecht je Ort im Battlefield-Pod) — der Host haengt dann kein
+   * "hier nur Vorschau" an. Fehlt das Feld, gilt wie bisher "nur Vorschau".
+   */
+  nurVorschau?: boolean;
 };
 
 export function buildArenaHostSpielquelleHinweise(
@@ -58,6 +64,33 @@ export function buildArenaHostSpielquelleHinweise(
   const hinweise: ArenaHostSpielquelleHinweis[] = [];
   for (const slot of [spieltag.discipline1, spieltag.discipline2]) {
     if (!slot) {
+      continue;
+    }
+    if (slot.disciplineId === BATTLEFIELD_DISCIPLINE_ID) {
+      // BATTLEFIELD-GEFECHT (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7):
+      // gebucht wird der Pod aus dem Gefecht je Ort, und die Arena spielt genau dieses Gefecht ab
+      // (gleiche Saat, k, Aufstellung, Mutatoren). Ist die Zeile schon gebucht und kam sie NICHT aus
+      // dem Gefecht (`miniDmPod.quelle !== "ffa"`: Vorlauf ausgefallen oder abgeschaltet, PPS-Pod-
+      // Rueckfall), sagt der Hinweis das — dann ist die Arena wieder nur Vorschau.
+      const zeile = findeDisziplinErgebnis(gameState, matchdayId, heimTeamId, slot.disciplineId);
+      const gebuchtOhneGefecht =
+        zeile != null && zeile.teamPoints != null && zeile.resolutionSource === "mini_dm_pod" && zeile.miniDmPod?.quelle !== "ffa";
+      hinweise.push(
+        gebuchtOhneGefecht
+          ? {
+              disciplineId: slot.disciplineId,
+              disciplineName: slot.displayName,
+              text: zeile.arenaAusfall
+                ? `Gefecht fiel aus (${arenaAusfallGrundLabel(zeile.arenaAusfall.grund)}) — an diesem Spieltag als 4-Team-Gruppe per PPS gewertet`
+                : "wurde an diesem Spieltag als 4-Team-Gruppe per PPS gewertet",
+            }
+          : {
+              disciplineId: slot.disciplineId,
+              disciplineName: slot.displayName,
+              text: "wird als 4-Team-Gruppe (Pod) gewertet — aus genau dem Gefecht, das die Arena hier zeigt",
+              nurVorschau: false,
+            },
+      );
       continue;
     }
     if (!ARENA_RESOLVED_DISCIPLINE_IDS.has(slot.disciplineId)) {

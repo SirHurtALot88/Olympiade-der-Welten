@@ -10,7 +10,7 @@ import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
-import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+import { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): `bauFrischenBattleSaveMitVollemFeld()`
@@ -94,7 +94,7 @@ describe("Arena-Vorlauf-Service · eingabe_instabil bleibt 0 im Normalfall (Opus
 
       const vorlauf = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
         persistence,
       );
       expect(vorlauf.applicable).toBe(true);

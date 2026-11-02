@@ -322,7 +322,9 @@ describe("(e) buildSpieltagsUebersicht: Mini-DM UND Battlefield am selben Spielt
 });
 
 describe("(f) Arena-Host-Hinweis", () => {
-  it("Battlefield: 'als 4-Team-Gruppe (Pod) gewertet' statt 'per PPS-Duell'", () => {
+  // SEIT 02.11. ABENDS (Gefecht je Ort, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7): die
+  // Arena zeigt genau das gebuchte Gefecht -- der Hinweis sagt das, ohne "nur Vorschau".
+  it("Battlefield: 'als 4-Team-Gruppe (Pod) gewertet' aus dem gezeigten Gefecht, ohne 'nur Vorschau'", () => {
     const gs = {
       scenarioMeta: { gameMode: "battle" },
       matchdayState: { matchdayId: "md1" },
@@ -341,7 +343,41 @@ describe("(f) Arena-Host-Hinweis", () => {
       },
     } as unknown as GameState;
     const hinweise = buildArenaHostSpielquelleHinweise(gs, "A");
-    expect(hinweise.find((h) => h.disciplineId === "battlefield")!.text).toBe("wird in dieser Saison als 4-Team-Gruppe (Pod) gewertet, nicht per Arena");
+    const bf = hinweise.find((h) => h.disciplineId === "battlefield")!;
+    expect(bf.text).toBe("wird als 4-Team-Gruppe (Pod) gewertet — aus genau dem Gefecht, das die Arena hier zeigt");
+    expect(bf.nurVorschau).toBe(false);
     expect(hinweise.find((h) => h.disciplineId === "hockey")!.text).toBe("wird in dieser Saison per PPS-Duell gewertet, nicht per Arena");
+  });
+
+  it("Battlefield: bereits per PPS-Pod gebucht (Gefecht fiel aus) -> sagt das, wieder nur Vorschau", () => {
+    const zeile = {
+      id: "r1",
+      matchdayResultId: "mr-md1",
+      teamId: "A",
+      disciplineId: "battlefield",
+      teamPoints: 1,
+      resolutionSource: "mini_dm_pod",
+      miniDmPod: { podId: "p1", platz: 2, teamIds: ["A", "B", "C", "D"], wert: 6 },
+    };
+    const gs = {
+      scenarioMeta: { gameMode: "battle" },
+      matchdayState: { matchdayId: "md1" },
+      seasonState: {
+        disciplineSchedule: [
+          {
+            seasonId: "s1",
+            matchdayId: "md1",
+            matchdayIndex: 0,
+            discipline1: { disciplineId: "battlefield", displayName: "Battlefield", order: 1, playerCount: 2, category: "social" },
+            discipline2: null,
+          },
+        ],
+        matchdayResults: [{ id: "mr-md1", matchdayId: "md1" }],
+        disciplineResults: [zeile],
+      },
+    } as unknown as GameState;
+    const bf = buildArenaHostSpielquelleHinweise(gs, "A").find((h) => h.disciplineId === "battlefield")!;
+    expect(bf.text).toBe("wurde an diesem Spieltag als 4-Team-Gruppe per PPS gewertet");
+    expect(bf.nurVorschau).toBeUndefined();
   });
 });
