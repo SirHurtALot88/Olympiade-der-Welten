@@ -2,7 +2,10 @@
 """
 Exportiert die PixelLab-Spielfiguren (Live-API) ins Spiel.
 
-    PIXELLAB_API_KEY=... python3 -I scripts/figuren-sprites-export.py [--cache <ordner>]
+    PIXELLAB_API_KEY=... python3 -I scripts/figuren-sprites-export.py [--cache <ordner>] [--nur <slug> ...]
+
+`--nur` exportiert nur die genannten Slugs und fuehrt sie in den bestehenden Index ein; alle anderen
+Figuren (Ordner und Indexeintraege) bleiben unangetastet. Ohne `--nur` wird alles neu exportiert.
 
 Ergebnis:
   public/sprites/figuren/<slug>/{south,east,west,north}.png        Grundposen
@@ -123,6 +126,7 @@ def palettize(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cache", default=os.path.join(ROOT, ".figuren-cache"), help="Download-Zwischenspeicher")
+    ap.add_argument("--nur", nargs="+", metavar="SLUG", help="nur diese Slugs exportieren, Index wird ergaenzt")
     args = ap.parse_args()
     key = os.environ.get("PIXELLAB_API_KEY")
     if not key:
@@ -153,6 +157,11 @@ def main():
         m = re.match(r"^player-\d+-(.+)$", pid)
         if m:
             slugs.add(m.group(1))
+    if args.nur:
+        unbekannt = sorted(set(args.nur) - slugs)
+        if unbekannt:
+            sys.exit(f"Unbekannte Slugs (nicht in player-portrait-map.json): {unbekannt}")
+        slugs = set(args.nur)
     arten = json.load(open(ARTEN)) if os.path.exists(ARTEN) else {}
 
     best = {}
@@ -185,7 +194,7 @@ def main():
     with ThreadPoolExecutor(24) as ex:
         list(ex.map(fetch, jobs))
 
-    index = {}
+    index = json.load(open(INDEX)) if args.nur and os.path.exists(INDEX) else {}
     for slug, d in sorted(details.items()):
         od = os.path.join(OUT, slug)
         os.makedirs(od, exist_ok=True)
