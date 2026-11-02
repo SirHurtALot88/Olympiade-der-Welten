@@ -12,7 +12,7 @@ import {
   buildArenaAufstellung,
   buildArenaAufstellungBeide,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
-import { buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
+import { buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 import { resolveArenaHostSeeds } from "@/lib/battle/arena-host-seed";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -189,6 +189,24 @@ export default function FoundationBattleArenaHost({
   const [bfPodTeamId0, bfPodTeamId1, bfPodTeamId2, bfPodTeamId3] =
     battlefieldPod?.teamIds ?? (["", "", "", ""] as const);
 
+  // BAHN-POD (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6):
+  // Takeshi's Castle und Staffel werden an Pod-Tagen als ECHTES Vier-Team-Rennen GEBUCHT
+  // (lib/resolve/bahn-pod-resolve.ts) -- die Arena zeigt deshalb genau dieses Rennen: dieselbe
+  // Vierergruppe (`getPodForTeam`, wie die Buchung), dieselbe Saat (`buildBahnPodMatchSeed`, auch
+  // Formkarten), dieselbe Aufstellung je Team und dieselbe Kopfzahl k wie der zaehlende Lauf
+  // (`runBahnPodFixtures`). Ohne Pod fuer `heimTeamId` bleibt es beim Duell.
+  const bahnPodTakeshi = useMemo(() => {
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, heimTeamId, matchdayId, "takeshis-castle", { saveId });
+  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+  const bahnPodStaffel = useMemo(() => {
+    const matchdayId = gameState.matchdayState?.matchdayId;
+    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, heimTeamId, matchdayId, "staffel", { saveId });
+  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+  const bahnPodTeamIdsSchluessel = [...(bahnPodTakeshi?.teamIds ?? []), ...(bahnPodStaffel?.teamIds ?? [])].join("|");
+
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Die kompakte Initial-Payload streift attributeSheetStats bei jedem Team außer dem eigenen
@@ -221,6 +239,7 @@ export default function FoundationBattleArenaHost({
           bfPodTeamId1,
           bfPodTeamId2,
           bfPodTeamId3,
+          ...bahnPodTeamIdsSchluessel.split("|"),
         ].filter(Boolean),
       ),
     ];
@@ -282,6 +301,7 @@ export default function FoundationBattleArenaHost({
     bfPodTeamId1,
     bfPodTeamId2,
     bfPodTeamId3,
+    bahnPodTeamIdsSchluessel,
     activeManagerTeamId,
   ]);
 
@@ -339,6 +359,44 @@ export default function FoundationBattleArenaHost({
       aufstellung: battlefieldPod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
     };
   }, [battlefieldPod, gameState, saveId, teams, sheetsByPlayerId]);
+
+  // BAHN-POD, Nutzlast fuer den Motor (`echterKader.bahnPodByDisciplineId[bd]`, gelesen von
+  // `bahnPodAnzeigeKontext()` in battle-mode.engine.js): je Bahn-Pod-Disziplin dieses Spieltags die
+  // vier Kader in Pod-Reihenfolge, k, die Wertungssaat und die Aufstellung je Team. Fehlt ein Kader
+  // noch (Bulk-Laden laeuft), bleibt die Disziplin draussen und der Motor zeigt das Duell.
+  const bahnPodNutzlast = useMemo(() => {
+    const matchdayId = gameState.matchdayState?.matchdayId ?? null;
+    const seasonId = gameState.season?.id;
+    if (!matchdayId || !seasonId || !saveId || saveId === "loading-save") return null;
+    const karte: Record<
+      string,
+      {
+        teams: { name: string; kurz: string | null; kader: ReturnType<typeof buildArenaTeam> }[];
+        k: number | null;
+        saat: number;
+        aufstellung: ReturnType<typeof buildArenaAufstellung>[];
+      }
+    > = {};
+    for (const [disciplineId, pod] of [
+      ["takeshis-castle", bahnPodTakeshi],
+      ["staffel", bahnPodStaffel],
+    ] as const) {
+      if (!pod) continue;
+      const podTeams = pod.teamIds.map((teamId) => ({
+        name: teams.find((t) => t.teamId === teamId)?.name ?? teamId,
+        kurz: gameState.teams.find((t) => t.teamId === teamId)?.shortCode ?? null,
+        kader: buildArenaTeam(gameState, teamId, sheetsByPlayerId),
+      }));
+      if (!podTeams.every((t) => t.kader.length > 0)) continue;
+      karte[disciplineId] = {
+        teams: podTeams,
+        k: resolvePodPlayerCountForMatchday(gameState, matchdayId, disciplineId, { saveId }),
+        saat: seedZuZahl(buildBahnPodMatchSeed({ saveId, seasonId, matchdayId, disciplineId, podId: pod.id })),
+        aufstellung: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+      };
+    }
+    return Object.keys(karte).length > 0 ? karte : null;
+  }, [bahnPodTakeshi, bahnPodStaffel, gameState, saveId, teams, sheetsByPlayerId]);
 
   // MINI-DM 4-TEAM-FFA, Nutzlast fuer den Motor — NUR gesetzt, wenn ein echter Pod fuer
   // `heimTeamId` an diesem Spieltag existiert (s. `miniDmPod`-Kommentar oben) UND alle vier
@@ -739,6 +797,9 @@ export default function FoundationBattleArenaHost({
         // BATTLEFIELD 4-TEAM-FFA (s. `battlefieldPodNutzlast` oben): nur fuer Battlefield gelesen,
         // `null` ohne echten Pod an diesem Spieltag (dann Duell wie bisher).
         battlefieldPod: battlefieldPodNutzlast,
+        // BAHN-POD (s. `bahnPodNutzlast` oben): nur fuer Takeshi's Castle/Staffel gelesen, `null`
+        // ohne Pod an diesem Spieltag (dann Duell wie bisher).
+        bahnPodByDisciplineId: bahnPodNutzlast,
         // DIE AUFSTELLUNG, die der Manager gesetzt hat — bis hierher reichte der
         // Umschlag nur Kader durch. Der Motor fragt sie in `slotFuer` (bauFeldspiel)
         // laengst ab und fiel mangels Daten immer auf Reihum zurueck; Chris' Zuweisung
@@ -811,6 +872,7 @@ export default function FoundationBattleArenaHost({
     miniDmFfaSaat,
     miniDmFfaAufstellung,
     battlefieldPodNutzlast,
+    bahnPodNutzlast,
   ]);
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
@@ -979,6 +1041,26 @@ export default function FoundationBattleArenaHost({
             .
           </p>
         ) : null}
+        {bahnPodNutzlast
+          ? Object.entries(bahnPodNutzlast).map(([disciplineId, pod]) => (
+              <p
+                key={disciplineId}
+                className="muted"
+                data-testid={`oly-arena-bahn-pod-${disciplineId}`}
+                style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
+              >
+                {disciplineId === "staffel" ? "Staffel" : "Takeshi's Castle"} läuft hier als 4-Team-Rennen — gezeigt
+                wird die gebuchte Vierergruppe (2-1-0-0 nach Platz):{" "}
+                {pod.teams.map((team, index) => (
+                  <span key={team.name + index}>
+                    {index > 0 ? ", " : ""}
+                    <strong>{team.name}</strong>
+                  </span>
+                ))}
+                .
+              </p>
+            ))
+          : null}
         {spielquelleHinweise.length > 0 ? (
           <p
             className="muted"

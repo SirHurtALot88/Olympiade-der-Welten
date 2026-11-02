@@ -24,6 +24,7 @@ import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 // (mini-dm-pod-resolve.ts selbst ist zwar "rein", der Typ-Import ist hier trotzdem bewusst so
 // markiert, falls das je aendert).
 import type { MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
+import type { BahnPodRohdaten } from "@/lib/resolve/bahn-pod-resolve";
 
 export type DisciplineSide = "d1" | "d2";
 
@@ -662,4 +663,12 @@ export type LegacyResolvePreviewOptions = {
    * diese PR fuegt nur toten, aber vollstaendig getesteten Code hinzu.
    */
   miniDmFfaPodRohdatenByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, MiniDmFfaPodRohdaten>> | null;
+  /**
+   * BAHN-POD-ROHDATEN (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6)
+   * -- `disciplineId -> podId -> Rohdaten` des ECHTEN Vier-Team-Rennens fuer Takeshi's Castle und
+   * Staffel (`lib/resolve/bahn-pod-matchday.ts`, gesetzt vom Arena-Vorlauf). Liegt fuer einen Pod ein
+   * Eintrag vor, bucht die Engine ihn ueber `berechneBahnPodOverrides()` (bahn-pod-resolve.ts,
+   * `quelle: "bahn"`); ein Pod ohne Eintrag faellt auf den PPS-Pod zurueck.
+   */
+  bahnPodRohdatenByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, BahnPodRohdaten>> | null;
 };

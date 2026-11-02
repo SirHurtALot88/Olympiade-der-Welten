@@ -245,9 +245,11 @@ export type DisciplineTeamResolvePreview = {
     platz: 1 | 2 | 3 | 4;
     teamIds: readonly [string, string, string, string];
     wert: number;
-    quelle?: "pps" | "ffa";
+    quelle?: "pps" | "ffa" | "bahn";
     rundenPunkteSumme?: number;
     teilnahme?: readonly boolean[];
+    /** BAHN-POD (02.11., `quelle: "bahn"`): Teamwert des Vier-Team-Rennens (Burgpunkte bzw. Zielzeit). */
+    teamWert?: number | null;
   } | null;
   warnings: string[];
   missingLineup: boolean;

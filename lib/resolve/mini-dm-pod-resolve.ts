@@ -72,12 +72,28 @@ export type MiniDmPodOverride = {
    * das Signal, an dem `derivePlayerPointsForDuellGroup()` (season-points-ledger.ts) und die UI
    * zwischen den beiden Pod-Pfaden unterscheiden.
    */
-  quelle?: "pps" | "ffa";
+  quelle?: "pps" | "ffa" | "bahn";
   /** R_t, Summe der Rundenpunkte ueber alle k Runden (nur `quelle: "ffa"`). */
   rundenPunkteSumme?: number;
   /** a(t,r) je Runde 1..k, in Rundenreihenfolge (nur `quelle: "ffa"`). */
   teilnahme?: readonly boolean[];
+  /**
+   * BAHN-POD (02.11., `quelle: "bahn"`, lib/resolve/bahn-pod-resolve.ts): der Teamwert des echten
+   * Vier-Team-Rennens -- Takeshi's Castle Burgpunkte-Summe, Staffel Zielzeit in Sim-Sekunden (`null`
+   * ohne Zieleinlauf). Rein informativ (UI/Report), gebucht wird nach `platz`.
+   */
+  teamWert?: number | null;
 };
+
+/**
+ * MOTOR-POD (02.11.): `true`, wenn die Pod-Zeile aus einem ECHTEN Motor-Lauf stammt -- Mini-DM-FFA
+ * (`"ffa"`) oder Bahn-Pod (`"bahn"`, Takeshi's Castle/Staffel). Nur dann vertrauen Resolve-Engine und
+ * Ledger den Boxscore-Spieler-PP des Motors (wie bei `"arena"`); jeder PPS-Pod (`quelle` fehlt) bleibt
+ * beim PPS-Spieler-Score.
+ */
+export function istMotorPodQuelle(quelle: string | null | undefined): boolean {
+  return quelle === "ffa" || quelle === "bahn";
+}
 
 function clamp(wert: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, wert));

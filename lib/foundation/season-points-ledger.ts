@@ -32,7 +32,9 @@ type LedgerPointSource =
   // `performance.scoreContribution` (s. Kommentar an `derivePlayerPointsForDuellGroup()` unten),
   // statt ihn aus `finalPlayerScore` neu zu rechnen. Eigener Name fuer Logs/Reports, analog
   // `battle_mode_mini_dm_pod_player_score` oben.
-  | "battle_mode_mini_dm_ffa_player_score";
+  | "battle_mode_mini_dm_ffa_player_score"
+  // BAHN-POD (02.11.): `miniDmPod.quelle === "bahn"` -- Boxscore-PP des echten Vier-Team-Rennens.
+  | "battle_mode_bahn_pod_player_score";
 
 export type SeasonPlayerPointLedgerEntry = {
   performanceId: string;
@@ -265,12 +267,19 @@ function derivePlayerPointsForDuellGroup(
   }
 
   const istMiniDmFfa = teamResult.resolutionSource === "mini_dm_pod" && teamResult.miniDmPod?.quelle === "ffa";
-  if (teamResult.resolutionSource === "arena" || istMiniDmFfa) {
+  // BAHN-POD (02.11.): `quelle: "bahn"` (echtes Vier-Team-Rennen, Takeshi's Castle/Staffel) wie
+  // Mini-DM-FFA -- der persistierte Boxscore-PP-Wert wird vertraut, nicht neu gerechnet.
+  const istBahnPod = teamResult.resolutionSource === "mini_dm_pod" && teamResult.miniDmPod?.quelle === "bahn";
+  if (teamResult.resolutionSource === "arena" || istMiniDmFfa || istBahnPod) {
     const pointsByPerformanceId = new Map(
       performances.map((performance) => [performance.id, roundValue(performance.scoreContribution ?? 0, 4)] as const),
     );
     return {
-      pointSource: istMiniDmFfa ? "battle_mode_mini_dm_ffa_player_score" : "battle_mode_arena_boxscore_impact",
+      pointSource: istMiniDmFfa
+        ? "battle_mode_mini_dm_ffa_player_score"
+        : istBahnPod
+        ? "battle_mode_bahn_pod_player_score"
+        : "battle_mode_arena_boxscore_impact",
       pointsByPerformanceId,
     };
   }

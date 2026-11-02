@@ -173,12 +173,13 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  * schon vorher als PPS-Duell gewertet wurde (nie arena-angeschlossen, s.
  * `ARENA_RESOLVED_DISCIPLINE_IDS`), nur als Vierergruppe statt Zweier-Duell. Kein FFA-/Domination-
  * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
- * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT. Ihr Bahn-Motor kennt seit 01.11. vier
- * Seiten (`__arena.spieleBahnPod`, battle-mode.engine.js) und ist im 4er-Format abgenommen
- * (docs/design/bahn-pod-vier-teams-01-11.md). Ein Eintrag HIER wuerde sie aber ueber den PPS-Pod
- * werten (der Pod schlaegt das Arena-Duell, s. legacy-matchday-resolve-engine.ts) und die Buehne
- * spielte weiter ein Zwei-Team-Rennen gegen den Fixture-Gegner. Erst muss die Liga-Kette stehen
- * (Runner, Spieltag, Motor-Vorrang im Pod-Resolve, Referenzen, Vorlauf, Anzeige -- Abschnitt 4 dort).
+ * STAFFEL UND TAKESHI'S CASTLE (seit 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6):
+ * echte Pod-Disziplinen MIT Motor -- gebucht wird das Vier-Team-Rennen (`__arena.spieleBahnPod`,
+ * Runner `runBahnPodFixtures`, Spieltag `runBahnPodMatchday`, Buchung `berechneBahnPodOverrides`,
+ * `quelle: "bahn"`), die Arena zeigt dasselbe Rennen (`echterKader.bahnPodByDisciplineId`). Abgenommen
+ * ohne Ausnahme: rho je Rennen 0,84-0,93 bei jeder Kadergroesse, Pp 9,3-22,0 (zwei Saatstroeme), das
+ * Duell bit-identisch. Ohne Rennergebnis (Vorlauf aus/ausgefallen) faellt ein Pod auf den PPS-Pod
+ * zurueck. An Spieltagen ohne Pods (Liga nicht durch 4 teilbar) bleibt es beim Arena-Duell.
  *
  * ABNAHME BATTLEFIELD IM 4ER-FORMAT (01.11., scripts/miss-battlefield-pod-abnahme.ts,
  * data/generated/battlefield-pod-abnahme.json; 80 echte Pods je k und Saatstrom, zwei disjunkte
@@ -207,7 +208,16 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  * Er ist deshalb NUR Anzeige; gebucht wird unveraendert ueber den PPS-Pod, fuer den diese Ausnahme
  * weiter gilt.
  */
-export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
+/** Takeshi's Castle und Staffel -- s. `VIERER_POD_DISCIPLINE_IDS` (Bahn-Pod, 02.11.). */
+export const TAKESHIS_CASTLE_DISCIPLINE_ID = "takeshis-castle";
+export const STAFFEL_DISCIPLINE_ID = "staffel";
+
+export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  MINI_DM_DISCIPLINE_ID,
+  BATTLEFIELD_DISCIPLINE_ID,
+  TAKESHIS_CASTLE_DISCIPLINE_ID,
+  STAFFEL_DISCIPLINE_ID,
+]);
 
 export function isViererPodDiscipline(disciplineId: string | null | undefined): boolean {
   return disciplineId != null && VIERER_POD_DISCIPLINE_IDS.has(disciplineId);

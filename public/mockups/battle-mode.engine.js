@@ -56635,27 +56635,35 @@
   }
   function bahnPodAnzeigeBauen(pod){
     const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
-    bahnPodAnzeige={kader, placeVorher:{...place}, formVorher:FORMKARTE,
-      vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
+    bahnPodAnzeige={kader, vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
     bfPodVereineSetzen(pod.teams);
-    // Persoenlichkeiten bleiben stehen (Tooltips/Kaderleiste lesen persOf auch nach dem Aufbau).
-    for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
-    for(const k in place)delete place[k];
-    for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
-    FORMKARTE={...FORMKARTE};
-    if(pod.saat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
-    bahnPodJeTeam=Number.isInteger(pod.k)&&pod.k>=1?pod.k:null;
-    bahnPodKader=kader;
-    build(pod.saat);
+    // Aufstellung, Formkarten und Persoenlichkeiten wirken nur beim Bau (setz/formVon/`pers` in
+    // bauSpurt; stepSpurt liest keins davon, der Laeufer traegt `u.pers` selbst) — danach sofort
+    // zurueck. So sieht ein headless Lauf waehrend des sichtbaren Rennens (spieleBahn, Sonden)
+    // exakt den Duell-Zustand (tests/bahn-pod-vier-teams.test.ts, "kein Leck ins Duell").
+    const placeVorher={...place}, formVorher=FORMKARTE, persVorher={...persOf};
+    try{
+      for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+      for(const k in place)delete place[k];
+      for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      FORMKARTE={...FORMKARTE};
+      if(pod.saat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
+      bahnPodJeTeam=Number.isInteger(pod.k)&&pod.k>=1?pod.k:null;
+      bahnPodKader=kader;
+      build(pod.saat);
+    } finally {
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+      FORMKARTE=formVorher;
+      for(const k in persOf)delete persOf[k];
+      Object.assign(persOf,persVorher);
+    }
   }
   function bahnPodAnzeigeAbbauen(){
     const a=bahnPodAnzeige;
     if(!a)return;
     bahnPodAnzeige=null;
     if(bahnPodKader===a.kader){ bahnPodKader=null; bahnPodJeTeam=null; }
-    for(const k in place)delete place[k];
-    Object.assign(place,a.placeVorher);
-    FORMKARTE=a.formVorher;
     bfPodVereinZurueck(a.vereinSnap);
   }
   // Stand des sichtbaren Pods, je Seite: Wert (Burgpunkte; Staffel: Zielzeit bzw. Streckenanteil),
