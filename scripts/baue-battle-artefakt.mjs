@@ -41,7 +41,11 @@ let ausgabe = shell
   .replace(
     /<script src="battle-mode\.engine\.js"><\/script>/,
     () => `<script>\n${js}</script>`,
-  );
+  )
+  // PixelLab-Figuren (battle-mode.figuren.js) laedt der Motor als Dateien unter
+  // /sprites/figuren/ — die gibt es im Artefakt nicht. Ohne die Tabelle bleibt jeder
+  // Kaempfer beim eingebetteten Baukasten, statt 404-Anfragen zu stellen.
+  .replace(/<script src="battle-mode\.figuren\.js"><\/script>\n?/, "");
 
 if (
   ausgabe.includes('href="battle-mode.css"') ||

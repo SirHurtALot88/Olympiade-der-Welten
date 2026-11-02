@@ -1,5 +1,9 @@
 (async () => {
   "use strict";
+  // Eigene Skript-URL, solange sie noch greifbar ist (document.currentScript gilt nur im
+  // synchronen Teil, also vor dem ersten await weiter unten) — Basis fuer die Bildpfade der
+  // PixelLab-Figuren, s. PIXEL_FIGUR_BASIS.
+  const PIXEL_FIGUR_SKRIPT_SRC=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
   // ===================================================================================
   // SPRITES.
   //
@@ -4425,6 +4429,220 @@
     if(spec.rowMap)return spec.rowMap[r0];
     return (spec.stendhal?STENDHAL_ROW[r0]:r0)%(spec.rows||4);
   }
+
+  // ===================================================================================
+  // PIXEL-FIGUREN (PixelLab, 02.11.) — der ZWEITE ZEICHENPFAD neben dem Baukasten.
+  //
+  // Chris' Sichtpruefung gegen genau diesen Motor: im Profil und in der Kader-Galerie stehen
+  // seit dieser Runde die neuen 80x80-PixelLab-Figuren (public/sprites/figuren/<slug>/,
+  // lib/data/figurenSprites.ts), in der Arena aber weiter die LPC-Baukasten-Figuren. Hier
+  // kommt der Kaempfer jetzt aus seinem eigenen PixelLab-Satz, wenn er einen hat:
+  //   - Datenquelle: window.__ARENA_FIGUREN aus battle-mode.figuren.js (generiert von
+  //     scripts/baue-arena-figuren.mjs aus dem Figuren-Index; Schluessel ist der NAME, weil
+  //     der Motor seine Kaempfer nur unter u.n kennt — dieselbe Zuordnung wie BAU).
+  //   - Bilder: werden NICHT eingebettet (anders als B_SPRITES), sondern als Dateien neben
+  //     der App geladen — relativ zur URL DIESES Skripts (../sprites/figuren/), damit es
+  //     standalone (/mockups/battle-mode.html, auch file://) und eingebettet im Next-Host
+  //     (Seite unter /foundation/..., Skript unter /mockups/) gleich aufloest.
+  //   - Laden: faul je Figur beim ersten Zeichnen (plus Vorladen des Kaders beim Start).
+  //     Solange das Grundbild noch fehlt — und im Artefakt, das keine Dateien laden kann —
+  //     zeichnet zeichneSprite() unveraendert den Baukasten. Das ist auch der Weg fuer jeden
+  //     Spieler OHNE eigene Figur (die grosse Mehrheit).
+  //
+  // REIN ZEICHNEND. Nichts hier liest oder schreibt Simulationszustand: kein rr()/Zufall,
+  // keine Zuweisung an u. Die einzige "Erinnerung" (Treffer-/K.o.-Zeitpunkt fuer die
+  // Treffer- und Tod-Animation) liegt in einer WeakMap NEBEN der Einheit, abgeleitet aus
+  // u.hp/u.down, die die Simulation ohnehin setzt.
+  //
+  // Formatfakten (nachgemessen ueber alle 267 Figuren, s. PR-Beschreibung):
+  //   - Grundposen south/east/west/north.png, je ein Bild in Kantenlaenge `c`.
+  //   - Animation = waagerechter Streifen `<name>-<east|south>.png` mit `frames` Bildern;
+  //     die Bildgroesse ist NICHT immer `c` (z.B. 84 oder 104 bei c=80): gepolstert, gleicher
+  //     Pixelmassstab wie die Grundpose (Figurenhoehe Streifen/Pose = 1,00 in 767 von 767).
+  //     Bildbreite deshalb aus dem geladenen Bild (Breite/frames), Fusslinie und Mitte je
+  //     Streifen gemessen (Bild 0 ist bei allen vier Arten die stehende Ausgangspose).
+  //   - West = Ost gespiegelt (PixelLab-Kanon); Norden gibt es nur als Grundpose.
+  const PIXEL_FIGUR_BASIS=(()=>{
+    try{ if(PIXEL_FIGUR_SKRIPT_SRC)return new URL("../sprites/figuren/",PIXEL_FIGUR_SKRIPT_SRC).href; }catch(e){}
+    return "/sprites/figuren/";
+  })();
+  // NUR GLEICHE HERKUNFT UEBER HTTP(S). Unter file:// (Headless-Runner, Messskripte, direkt
+  // geoeffnete Datei) gilt jedes geladene Bild als fremd: die Leinwand, auf die es gezeichnet
+  // wird, ist danach fuer getImageData/toDataURL gesperrt — und davon leben renderProbe,
+  // hoehenKorrektur und die Handfarben-Messung. Dort bleibt es deshalb beim eingebetteten
+  // Baukasten, exakt wie vor dieser Aenderung; die Figuren erscheinen in der App
+  // (Next-Host) und in /mockups/battle-mode.html ueber den Dev-/Produktionsserver.
+  const PIXEL_FIGUR_AKTIV=(()=>{
+    try{
+      if(typeof window==="undefined"||!window.location||!/^https?:$/.test(window.location.protocol))return false;
+      return new URL(PIXEL_FIGUR_BASIS,window.location.href).origin===window.location.origin;
+    }catch(e){ return false; }
+  })();
+  const PIXEL_FIGUREN=(PIXEL_FIGUR_AKTIV&&typeof window!=="undefined"&&window.__ARENA_FIGUREN)||{};
+  // Zielhoehe einer Figur in Bildschirm-px bei groesseFaktor 1 — dieselbe Bezugshoehe, auf
+  // die hoehenKorrektur() die Baukasten-Figuren normiert, damit beide Pfade nebeneinander
+  // gleich gross stehen. Breite gedeckelt, damit ein breites Wesen (Krake, Drache) nicht
+  // ueber die Nachbarn waechst, nur weil es auf Menschenhoehe gestreckt wird.
+  const PIXEL_HOEHE=HOEHEN_BEZUG, PIXEL_BREITE_MAX=60;
+  // Fusslinie relativ zum Zeichenanker y — so steht der Baukasten (Zelle bei y-46*Z, Sohle
+  // der LPC-Figur in Zellzeile ~61-62, gemessen per renderProbe).
+  const PIXEL_FUSS=15.5;
+  const pixelFigurSpeicher=new Map();   // Name -> {fig, bilder:Map(datei->{im,mass,fehler})}
+  const pixelAnzeige=new WeakMap();     // Einheit -> {hp, trefferT, downT} (nur Anzeige)
+  function pixelMessen(im,frames){
+    const fw=Math.max(1,Math.floor(im.width/frames)), fh=im.height;
+    let mass={fw,fh,oben:fh*0.15,unten:fh*0.84,mitteX:fw/2,hoehe:fh*0.69,breite:fh*0.48,geschaetzt:true};
+    try{
+      const c=document.createElement("canvas"); c.width=fw; c.height=fh;
+      const cx=c.getContext("2d",{willReadFrequently:true});
+      cx.drawImage(im,0,0,fw,fh,0,0,fw,fh);
+      const px=cx.getImageData(0,0,fw,fh).data;
+      let o=-1,un=-1,l=fw,r=-1;
+      for(let yy=0;yy<fh;yy++)for(let xx=0;xx<fw;xx++){
+        if(px[(yy*fw+xx)*4+3]>16){ if(o<0)o=yy; un=yy; if(xx<l)l=xx; if(xx>r)r=xx; }
+      }
+      if(o>=0&&un-o>=4)mass={fw,fh,oben:o,unten:un+1,mitteX:(l+r+1)/2,hoehe:un+1-o,breite:r+1-l,geschaetzt:false};
+    }catch(e){ /* file:// oder fremde Herkunft: Leinwand gesperrt -> Schaetzwerte oben */ }
+    return mass;
+  }
+  function pixelBild(z,datei,frames){
+    let e=z.bilder.get(datei);
+    if(e)return e;
+    e={im:null,mass:null,fehler:false};
+    z.bilder.set(datei,e);
+    try{
+      const im=new Image();
+      im.onload=()=>{ e.mass=pixelMessen(im,frames); e.im=im; };
+      im.onerror=()=>{ e.fehler=true; };
+      im.src=PIXEL_FIGUR_BASIS+z.fig.s+"/"+datei;
+    }catch(err){ e.fehler=true; }
+    return e;
+  }
+  function pixelFigurLaden(name){
+    if(!name)return null;
+    let z=pixelFigurSpeicher.get(name);
+    if(z!==undefined)return z;
+    const fig=Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,name)?PIXEL_FIGUREN[name]:null;
+    if(!fig||typeof Image==="undefined"){ pixelFigurSpeicher.set(name,null); return null; }
+    z={fig,bilder:new Map()};
+    pixelFigurSpeicher.set(name,z);
+    for(const r of fig.r)pixelBild(z,r+".png",1);
+    for(const art in fig.a)for(const d in fig.a[art]){
+      const [stamm,frames]=fig.a[art][d];
+      pixelBild(z,stamm+"-"+d+".png",frames);
+    }
+    return z;
+  }
+  // Bereit = die Frontpose ist geladen und vermessen (sie traegt den Massstab). Vorher
+  // bleibt die Figur beim Baukasten — kein halbes Bild, kein Springen der Groesse.
+  function pixelFigurBereit(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return null;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    return (grund&&grund.im&&grund.mass)?z:null;
+  }
+  // Leerer Bauplan fuer Pixel-Figuren (s. zeichneSprite) und der generische Schlaeger-Griff.
+  const BAU_PIXEL={};
+  const PIXEL_SCHLAEGER={modus:"gegriffen",punkte:[0,1,2,3].map(i=>HOCKEY_HAND[i]||HOCKEY_HAND[2])};
+  // Kader-/Aufstellungs-Ikone (figur()): Frontpose, Fuesse am unteren Rand, auf die Kachel
+  // eingepasst (Hoehe zuerst, Breite gedeckelt) — wie der 40x50-Baukasten-Ausschnitt.
+  function zeichnePixelIkone(cx,z,w,h){
+    const e=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    if(!e||!e.im||!e.mass)return;
+    const m=e.mass;
+    const s=Math.min((h-4)/Math.max(1,m.hoehe),(w-2)/Math.max(1,m.breite));
+    cx.save(); cx.imageSmoothingEnabled=false;
+    try{ cx.drawImage(e.im,0,0,m.fw,m.fh,w/2-m.mitteX*s,(h-2)-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+    cx.restore();
+  }
+  function pixelFigurVorladen(namen){
+    for(const n of namen||[])pixelFigurLaden(n);
+  }
+  // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
+  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
+  // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
+    const fig=z.fig;
+    const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
+    const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
+    const fussY=y+PIXEL_FUSS*G;
+    const istUnten=!!u.down||!!u.vizSturz;
+    let rec=pixelAnzeige.get(u);
+    // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
+    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
+    if(typeof u.hp==="number"){
+      if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
+      rec.hp=u.hp;
+    }
+    if(rec.trefferT>t)rec.trefferT=-1e9;          // neue Partie: Uhr lief zurueck
+    if(istUnten){ if(rec.downT==null||rec.downT>t)rec.downT=t; } else rec.downT=null;
+    const trefferSeit=t-rec.trefferT;
+    const istAngriff=(u.lunge>0)&&!istUnten;
+    const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
+    const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
+    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt.
+    // Norden (Ruecken) hat keinen Streifen: Gehen zeigt dort die Rueckenpose mit Wippen,
+    // Angriff/Treffer/K.o. die Seitenansicht in Bewegungsrichtung.
+    const spiegel=(r0===1)||(r0===0&&(u.vx||0)<0);
+    const zeichneBild=(e,f,dx,dy,winkel,spiegeln)=>{
+      const m=e.mass;
+      ctx.save();
+      ctx.imageSmoothingEnabled=false;
+      ctx.translate(x+(dx||0),fussY+(dy||0));
+      if(winkel)ctx.rotate(winkel);
+      if(spiegeln)ctx.scale(-1,1);
+      try{ ctx.drawImage(e.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+      ctx.restore();
+    };
+    const vor=(r0===1)?-1:(r0===3)?1:0;
+    if(art){
+      const def=fig.a[art];
+      if(def){
+        const wunsch=(r0===2)?"south":"east";
+        const d=def[wunsch]?wunsch:(def.east?"east":"south");
+        const [stamm,n]=def[d];
+        const e=z.bilder.get(stamm+"-"+d+".png");
+        if(e&&e.im&&e.mass){
+          let f;
+          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
+          else{
+            const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
+            f=Math.floor(((zyklus%n)+n)%n);
+          }
+          if(!isFinite(f))f=n-1;
+          // Gespiegelt wird nur der Ost-Streifen (fuer Westen); die Front nie.
+          zeichneBild(e,f,0,0,0,spiegel&&d==="east");
+          return;
+        }
+      }
+    }
+    // Grundpose der Blickrichtung (eigene West-Pose, falls vorhanden — dann nicht spiegeln).
+    const posen=["north","west","south","east"];
+    const wunschPose=posen[r0];
+    const geladen=(e)=>!!(e&&e.im&&e.mass);
+    let pe=z.bilder.get(wunschPose+".png"), poseSpiegeln=false;
+    if(!geladen(pe)&&wunschPose==="west"&&geladen(z.bilder.get("east.png"))){ pe=z.bilder.get("east.png"); poseSpiegeln=true; }
+    if(!geladen(pe))pe=grund;
+    let dx=0,dy=0,winkel=0;
+    if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
+    else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
+    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(art==="tod"){
+      const k=Math.min(1,(t-(rec.downT??t))/0.5);
+      winkel=(vor<0?-1:1)*k*Math.PI/2;
+    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
+  }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
   // "pistole"/"schrotflinte"/"sturmgewehr" als dritte waffe-Option neben "schwert"/"bogen".
   // Nachgemessen: die Blaetter sind 576x256 = 9 Spalten x 4 Reihen zu 64px — das ist das
@@ -5037,14 +5255,25 @@
     "i-spy":     { hand:LUPE_HAND,   phasen:LUPE_PHASEN,  zeichne:zeichneLupe },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
-    const b=BAU[u.n]||BAU_STD;
+    // PIXEL-FIGUR VOR DEM BAUKASTEN (02.11., s. PIXEL_FIGUREN oben). Hat der Kaempfer einen
+    // geladenen PixelLab-Satz, laeuft er durch den Vollbild-Zweig unten (dort, wo auch die
+    // Requisiten fuer Fremdkoerper haengen: Hantel, Kufe, Mikrofon, Schlaeger, Degen ...),
+    // nur mit zeichnePixelFigur() statt des Blattes. Der Bauplan ist dann ein LEERER: die
+    // BAU-Zusaetze (Gluehriss, Hoerner, Alarmkopf, Aura ...) sind Naeherungen an das Portrait
+    // fuer den Baukasten und hatten auf der echten Figur nichts verloren. Ohne Satz oder
+    // solange er laedt: bit-identisch der alte Weg.
+    const pixFig=pixelFigurBereit(u.n);
+    const b=pixFig?BAU_PIXEL:(BAU[u.n]||BAU_STD);
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
     // Zahl statt einer zweiten. bauSkala(b) (04.09., s. Kommentar dort) haengt zusaetzlich
     // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
     // Ersatzes fuer u.groesse.
-    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    // Pixel-Figur: Hoehe normiert zeichnePixelFigur() selbst (auf dieselbe Bezugshoehe wie
+    // hoehenKorrektur()), Z ist dann nur noch die Spielergroesse — die Requisiten-Anker unten
+    // rechnen damit wie beim Standardkoerper.
+    const Z=pixFig?groesseFaktor(u.groesse):groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
     // HANTEL AN EINEM ZELLPUNKT (13.09.). Eine Stelle statt drei: den Hantel-Zeichenblock gab
     // es bisher NUR im normalen Sprite-Zeichenpfad ganz unten — der b.reiherMech- und der
     // b.vollbild-Zweig direkt darunter kehren beide vorher zurueck (`return`), und damit
@@ -5618,8 +5847,8 @@
       }
       return;
     }
-    if(b.vollbild){
-      const spec=VOLLBILD[b.vollbild];
+    if(b.vollbild||pixFig){
+      const spec=pixFig?null:VOLLBILD[b.vollbild];
       // EIGENES ANGRIFF-/TOD-BLATT (28.10., M-M-Team-Sprite-Integration): vorher kannte
       // jede b.vollbild-Kreatur nur EIN Blatt (den Gehzyklus) und simulierte Angriff/Tod
       // rein ueber die Frame-Auswahl weiter unten (vf) — ein spaeterer Frame des Gehzyklus
@@ -5631,8 +5860,9 @@
       // Verhalten BYTE-IDENTISCH zum alten Code (useSpec===spec, vfModus wie vorher).
       const r0=blickAus(u);
       const istTod=!!u.down, istAngriff=(u.lunge>0&&!u.down);
-      const useSpec=(istTod&&spec.tod)?spec.tod:(istAngriff&&spec.angriff)?spec.angriff:spec;
-      const im=bHolEingefaerbt(useSpec.key,b.vollbildFarbe,b.vollbildFarbeModus,useSpec.ch);
+      const useSpec=pixFig?null:(istTod&&spec.tod)?spec.tod:(istAngriff&&spec.angriff)?spec.angriff:spec;
+      const im=pixFig?null:bHolEingefaerbt(useSpec.key,b.vollbildFarbe,b.vollbildFarbeModus,useSpec.ch);
+      if(pixFig)zeichnePixelFigur(ctx,u,x,y,Z,pixFig,r0);
       if(im&&im.width){
         const row=vollbildRow(useSpec,r0);
         const vn=useSpec.cols;
@@ -5665,7 +5895,9 @@
       // (s. dw/dh oben). VOLLBILD_SCHLAEGER kennt nicht jeden b.vollbild-Schluessel (z.B.
       // "roboter_braun" ist registriert, aber von keiner Kreatur benutzt) — dann greift gar
       // nichts, statt mit einem falschen Punkt zu zeichnen.
-      const griff=VOLLBILD_SCHLAEGER[b.vollbild];
+      // Pixel-Figur: Standardkoerper-Hand (HOCKEY_HAND) — die Figur steht auf derselben
+      // Fusslinie und Bezugshoehe wie der Baukasten, der Griffpunkt trifft ungefaehr die Hand.
+      const griff=pixFig?PIXEL_SCHLAEGER:VOLLBILD_SCHLAEGER[b.vollbild];
       if(griff&&feldspiel&&istHockey()&&!u.down){
         const gp=griff.punkte[r0];
         const pose=griff.modus==="quer"?"quer"
@@ -6948,6 +7180,9 @@
   const mitKit=(spieler)=>spieler.map(p=>({...p,skills:MATRIARCH}));
   if(echterKader&&Array.isArray(echterKader.heim)&&echterKader.heim.length)SQUAD=mitKit(echterKader.heim);
   if(echterKader&&Array.isArray(echterKader.gast)&&echterKader.gast.length)OPP=mitKit(echterKader.gast);
+  // PixelLab-Figuren beider Kader schon jetzt anfordern (reine Anzeige, s. PIXEL_FIGUREN),
+  // damit der erste Arena-Frame nicht noch den Baukasten zeigt. Pod-Gegner laden faul.
+  try{ pixelFigurVorladen([...SQUAD,...OPP].map(p=>p&&p.n)); }catch(e){}
   // DER ECHTE SPIELTAGSWURF (MUTATOR ORGANISCH, 29.09.): optional im selben Umschlag. Fehlt das
   // Feld, bleibt alles wie vorher (die Engine zieht selbst, s. mutatorenGrundzustand()); ist es
   // da, gilt es — auch leer. `let`, weil kaderSetzen() es fuer Messungen austauschen darf.
@@ -36368,6 +36603,11 @@
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
     const mal=()=>{
       x.clearRect(0,0,40,50);
+      // PixelLab-Figur (02.11., s. PIXEL_FIGUREN): dieselbe Frontpose, die die Arena im
+      // Stehen zeigt, statt des Baukastens — sobald sie geladen ist (die Nachzeichnungen bei
+      // 300/1200 ms unten holen sie nach). Ohne Figur: unveraendert der Baukasten.
+      const pz=pixelFigurBereit(p.n);
+      if(pz){ zeichnePixelIkone(x,pz,40,50); return; }
       const b=BAU[p.n]||BAU_STD, r=3;
       // VOLLBILD-Kreaturen (Golem/Kraken/Werwolf/Spinne/Roboter) haben keinen kopf/body-
       // Bauplan — vorher fiel so ein Spieler hier durch und stand als nackter Koerper OHNE
