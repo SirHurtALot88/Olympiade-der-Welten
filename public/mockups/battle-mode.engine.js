@@ -41095,7 +41095,10 @@
   // und ein Anker-Banner auf Bein 6 waeren dann falsch. Reiner Lesezugriff auf LAEUFER; ohne
   // Laeufer (vor dem ersten bauSpurt) derselbe Rueckfall wie bisher.
   function staffelBeineVon(seite){
-    const k=LAEUFER.filter(o=>o.seite===seite).length;
+    // Unterbesetzt laufen weniger Laeufer mehr Beine (`beineGesamt`, s. bauSpurt), sonst ist
+    // die Beinzahl die Kopfzahl wie bisher.
+    const team=LAEUFER.filter(o=>o.seite===seite);
+    const k=(team[0]&&team[0].beineGesamt)||team.length;
     return k||BA().jeSeite||6;
   }
   // B4.3 BEIN-DUELL (Staffel "Marke und Zug"), s. Aufrufstelle in updateHudBahn().
@@ -46282,7 +46285,25 @@
             :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,ges.length?n:(bahnPodJeTeam||n));
         })
       : [mine,gegen];
-    const staffelBeine=seitenListen.map(l=>Math.max(1,l.length));
+    // FEHLENDE LAEUFER LAUFEN DOPPELT (Chris 02.11., Option (a) aus bahn-pod-vier-teams-01-11.md
+    // 6.7). Bis hierher bekam jede Seite so viele Beine, wie sie Laeufer gemeldet hatte — ein Team
+    // mit zwei Laeufern lief zwei lange Beine mit EINEM Wechsel gegen sechs kurze mit fuenf und
+    // gewann damit ueberdurchschnittlich oft (Liga-Abnahme 02.11.: 3 von 4 betroffenen Rennen).
+    // Jetzt laufen ALLE Seiten dieselbe Beinzahl: die groesste gemeldete Laeuferzahl, im Pod
+    // mindestens die Kopfzahl des Spielplan-Slots (`bahnPodJeTeam`). Eine unterbesetzte Seite
+    // verteilt die fehlenden Beine reihum auf ihre Laeufer (Bein j -> Laeufer j % m), und wer ein
+    // zweites Mal laeuft, laeuft MIT SEINER ERSCHOEPFUNG: Puste (`reserve`/`leer`) wird zwischen den
+    // Beinen nicht aufgefuellt, und die Ermuedung (`mued` in tempoVon) zaehlt die schon gelaufenen
+    // Beine mit (`beineFertig`). Chris dazu: "nicht, dass dann einfach der beste Spieler nochmal
+    // laufen darf und dann das Ergebnis besser ist, als wenn irgendein anderer das gemacht haette".
+    // Bei voller Besetzung (alle Seiten gleich viele Laeufer) bleibt `staffelBeine` Zeichen fuer
+    // Zeichen derselbe Wert wie vorher, und kein Laeufer bekommt `beineListe` — das abgenommene
+    // Duell (0,937) und alle Fingerabdruecke bleiben unberuehrt.
+    const staffelBeinZiel=art.staffel
+      ? Math.max(1,...seitenListen.map(l=>l.length),
+          bahnPodKader&&Number.isInteger(bahnPodJeTeam)?Math.min(n,bahnPodJeTeam):0)
+      : 0;
+    const staffelBeine=seitenListen.map(l=>art.staffel?staffelBeinZiel:Math.max(1,l.length));
     const seitenN=seitenListen.length;
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
@@ -46431,6 +46452,15 @@
         const nb=staffelBeine[seite];   // s. `staffelBeine` oben — die echte Beinzahl DIESER Seite
         L.bein=idx; L.beinVon=idx/nb; L.beinBis=(idx+1)/nb;
         L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
+        L.beineGesamt=nb;
+        // UNTERBESETZT (s. `staffelBeinZiel` oben): Laeufer idx laeuft die Beine idx, idx+m,
+        // idx+2m, ... Nur dann bekommt er die Liste; bei voller Besetzung bleibt sie weg, und
+        // jede Stelle in stepSpurt/tempoVon rechnet wie vorher.
+        const m=seitenListen[seite].length;
+        if(m<nb){
+          L.beineListe=[]; for(let b=idx;b<nb;b+=m)L.beineListe.push(b);
+          L.beineIdx=0; L.beineFertig=0; L.wechselVerlustBisher=0; L.zusatzZeiten=[];
+        }
         // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus des NEHMERS aus der Aufstellung (s.
         // Parser bei echterKader.aufstellung). Ohne die Felder bekommt der Laeufer keines der
         // drei — staffelPaarVon() im WECHSEL-Block liefert dann null, die Formel ist die alte.
@@ -46974,6 +47004,22 @@
     const laenge=(u.beinBis-u.beinVon)||1;
     return Math.max(0,Math.min(1,(u.pos-u.beinVon)/laenge));
   };
+  // UNTERBESETZTE STAFFEL, BUCHHALTUNG JE BEIN (s. `staffelBeinZiel` in bauSpurt). Nur fuer
+  // Laeufer mit `beineListe`; voll besetzte Staffeln kommen hier nie an.
+  // Der EINZELWERT eines Doppellaeufers ist sein ERSTES Bein (`etappenZeit`, wie jeder andere
+  // Laeufer genau eines hat) — er misst den Laeufer, nicht die Unterbesetzung. Die weiteren Beine
+  // stehen in `zusatzZeiten` und wirken voll ueber die Teamzeit, also dort, wo die Liga bucht.
+  function staffelBeinZeitBuchen(u){
+    const start=u.beinStartT!=null?u.beinStartT:(u.startT||0);
+    const zeit=rennT-start-(u.wechselVerlust-u.wechselVerlustBisher);
+    if(u.beineFertig===0)u.etappenZeit=zeit; else u.zusatzZeiten.push(zeit);
+    u.wechselVerlustBisher=u.wechselVerlust;
+    u.beineFertig++;
+  }
+  function staffelNaechstesBein(u){
+    const b=u.beineListe[++u.beineIdx], nb=u.beineGesamt;
+    u.bein=b; u.beinVon=b/nb; u.beinBis=(b+1)/nb;
+  }
   function kurvenFaktor(u){
     if(!BA().staffel||u.beinVon==null)return 1;
     const imBein=laufAnteil(u);
@@ -47066,7 +47112,11 @@
     // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
     // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
     // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
-    const anteil=laufAnteil(u);
+    // DOPPELTER LAEUFER BEHAELT SEINE ERSCHOEPFUNG (Staffel unterbesetzt, s. `staffelBeinZiel` in
+    // bauSpurt): `beineFertig` zaehlt die Beine, die er schon gelaufen ist. Ein zweites Bein
+    // beginnt damit dort, wo das erste aufgehoert hat, und nicht frisch bei 0. Ohne Liste (jede
+    // voll besetzte Staffel, jede andere Bahn) ist es die alte Zeile.
+    const anteil=u.beineFertig?laufAnteil(u)+u.beineFertig:laufAnteil(u);
     const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
@@ -48174,12 +48224,32 @@
       // er, verliert die MANNSCHAFT Zeit — nicht der Einzelne. Genau deshalb zaehlt in
       // dieser Disziplin die Teamzeit und nicht die eigene.
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
+        // NUR EIN LAEUFER GEMELDET (unterbesetzt, s. `staffelBeinZiel` in bauSpurt): das naechste
+        // Bein ist sein eigenes. Kein Stab, kein Wechsel — er laeuft mit seiner Erschoepfung weiter
+        // (`beineFertig` in tempoVon, Puste wird nicht aufgefuellt).
+        if(u.beineListe && u.beineListe[u.beineIdx+1]===u.bein+1){
+          staffelBeinZeitBuchen(u);
+          staffelNaechstesBein(u);
+          u.pos=u.beinVon; u.beinStartT=rennT;
+          continue;
+        }
         const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        // Unterbesetzt: das Wechselkonto (Teil des Einzelwerts) zaehlt nur die Uebergaben an
+        // seinem ERSTEN Bein, wie bei jedem anderen Laeufer; die uebrigen landen in
+        // `wechselKontoZusatz` (nur Anzeige/Diagnose). Voll besetzt sind beide Schalter true.
+        const geberErstes=!u.beineListe||u.beineIdx===0;
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
-        u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
+        if(u.beineListe)staffelBeinZeitBuchen(u);
+        else u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
         // ZUG-ERGEBNIS am Beinende (B4.6 Anweisungsbilanz) — nur Buchhaltung, s. zugBilanz.
         if(u.haltung==="angreifen")u.zugErgebnis=u.zugBilanz>=0?"getragen":"eingebrochen";
         if(naechster){
+          const nehmerErstes=!naechster.beineListe||naechster.beineIdx===0;
+          // Ein Doppellaeufer, der den Stab ein zweites Mal nimmt: wieder "unterwegs" fuer die
+          // Anzeige (u.durch kippt beim naechsten Abgeben erneut, s. vizDurchGesehen).
+          if(naechster.beineListe&&naechster.beineFertig>0){
+            naechster.durch=false; naechster.vizDurchGesehen=false; naechster.beinStartT=null;
+          }
           naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
           // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
           // Vorher war der Wechsel ein Ja/Nein: mit Wahrscheinlichkeit `gut` sauber, sonst
@@ -48288,7 +48358,10 @@
           // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
           // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
           // allein dafuer.
-          u.wechselKonto-=verlust/2; naechster.wechselKonto-=verlust/2;
+          if(geberErstes)u.wechselKonto-=verlust/2;
+          else u.wechselKontoZusatz=(u.wechselKontoZusatz||0)-verlust/2;
+          if(nehmerErstes)naechster.wechselKonto-=verlust/2;
+          else naechster.wechselKontoZusatz=(naechster.wechselKontoZusatz||0)-verlust/2;
           u.wechselN++; naechster.wechselN++;
           if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
@@ -48312,6 +48385,13 @@
             feedEreignis(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
+        // Unterbesetzt: hat er noch ein Bein, geht er (mit seiner Erschoepfung) in dessen
+        // Wechselzone und wartet dort. Erst NACH der Suche nach `naechster` umgesetzt, weil die
+        // Suche ueber `bein` laeuft.
+        if(u.beineListe&&u.beineIdx+1<u.beineListe.length){
+          staffelNaechstesBein(u);
+          u.pos=u.beinVon;
+        }
         continue;
       }
 
@@ -48320,7 +48400,8 @@
         if(BA().staffel){
           // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
           // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
-          u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
+          if(u.beineListe)staffelBeinZeitBuchen(u);   // Doppellaeufer: s. dort
+          else u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
           // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): der erste
@@ -56875,7 +56956,10 @@
         zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4), pos:+u.pos.toFixed(5),
         startT:+(u.startT||0).toFixed(3),
         zwischenzeiten:(u.zz||[]).map(v=>v==null?null:+v.toFixed(4)),
-        bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
+        bein:u.bein==null?null:(u.beineListe?u.beineListe[0]:u.bein),   // nur Staffel: welchen Abschnitt er laeuft (Doppellaeufer: sein erster)
+        // Nur unterbesetzte Staffel: alle Beine dieses Laeufers und die Zeiten der Zusatzbeine.
+        ...(u.beineListe?{beine:[...u.beineListe],
+          zusatzEtappen:u.zusatzZeiten.map(v=>+v.toFixed(4))}:{}),
         etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
         wechselKonto:+(u.wechselKonto||0).toFixed(4),
         burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
