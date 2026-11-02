@@ -44765,6 +44765,38 @@
         WUCHT:      {spirit:45,charisma:33,speed:22},
         ROBUST:     {stamina:30,will:26,health:24,spirit:20}
       },
+      // POD-REZEPT (Vier-Team-Rennen, 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5.1;
+      // Chris 01.11.: "die stats die vorgegeben sind sind verdammt wichtig, kannst du die
+      // benoetigten sachen nicht anpassen dass es mehr unsere attribute anspricht?"). Gilt NUR,
+      // wenn spieleBahnPod()/bahnPodSonde()/bahnPodEinfluss() laufen (s. spurtWerte); das Duell
+      // liest weiter `rezept` oben, unveraendert (Staffel-Duell 0,937 bleibt bit-identisch).
+      //
+      // WARUM DAS REZEPT UND NICHT DIE MATRIX: mit "Menge aus der Eignung" (f = eig / Mittel der
+      // sieben, s. bauSpurt) reicht die Matrix jedes Attribut ueber `eig` durch. Abweichen kann
+      // ein Attribut nur, weil es in einem Sub-Skill sitzt, der MEHR oder WENIGER traegt als der
+      // Schnitt der sieben: Anteil(a) ~ Matrix(a) + Summe_k (p_k - 1/7) x Rezept(k,a), p_k der
+      // Wirkungsanteil des Sub-Skills. Aus den Pp-Messungen geschaetzt (Duell und Pod, je zwei
+      // Stroeme): ANTRITT traegt weit ueber dem Schnitt, WUCHT und ROBUST fast nichts. Daraus
+      // folgten genau die drei Ausreisser: Charisma (Matrix 10, gemessen 4) sass zu einem Drittel
+      // in WUCHT, Health (2 -> 0) nur in ROBUST, Speed (24 -> 29) zu 28 % im starken ANTRITT.
+      //
+      // DIE DREI EINGRIFFE, jeder an genau einem Sub-Skill:
+      //   WUCHT  "Zug an der Spitze" = Spirit + Speed (Charisma raus). Wer vorne zieht, braucht
+      //          Beine und Haltung; das Charisma steht im Wechsel (TECHNIK) und im Antritt.
+      //   ROBUST "Verlaesslichkeit" = Stamina, Dexterity, Awareness, Spirit (Health/Will raus):
+      //          sauber laufen und den Stab sicher halten. Health und Will kommen damit voll aus
+      //          der Matrix (ueber `eig`) statt gedaempft aus einem Sub-Skill, der kaum traegt.
+      //   ANTRITT bekommt Charisma 12 (aus Speed/Spirit/Dexterity/Awareness): der fliegende Start
+      //          in der Wechselzone geht auf ZURUF los — Geber und Nehmer muessen sich verstehen.
+      //
+      // GEMESSEN (02.11., n = 48, Strom 0 / 10 000 000): Pp 22,8 / 24,9 -> 9,3 / 10,1, rho je
+      // Rennen (k = 6, 210 Gruppen) 0,878 / 0,881 -> 0,910 / 0,911, Gruppen unter 0,80 15/12 -> 0.
+      // Volle Tabellen und die Kontrollen bei k = 2..5 und n = 96: Dokument Abschnitt 5.
+      podRezept:{
+        ANTRITT:    {speed:26,spirit:32,dexterity:14,awareness:16,charisma:12},
+        WUCHT:      {spirit:45,speed:55},
+        ROBUST:     {stamina:30,dexterity:26,awareness:24,spirit:20}
+      },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Abschnittstempo",TECHNIK:"Wechsel",
             WENDIGKEIT:"Bahnarbeit",STEHEN:"Stehvermögen",WUCHT:"Zug an der Spitze",
             ROBUST:"Verlässlichkeit"},
@@ -45202,9 +45234,13 @@
   const BA=()=>BAHN_ART[bahnDisc]||BAHN_ART.spurt;
   const istBahn=(d)=>!!BAHN_ART[d];
   const SPURT_KEYS=Object.keys(BAHN_ART.spurt.rezept);
+  // POD-REZEPT (Budget-Methode im Vier-Team-Format, 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+  // Abschnitt 5): laeuft gerade ein Pod (`bahnPodKader` gesetzt, s. unten) und fuehrt die Bahn ein
+  // `podRezept`, ersetzt es die dort genannten Sub-Skills. Im Duell (`bahnPodKader===null`) und auf
+  // jeder Bahn ohne `podRezept` ist R Zeichen fuer Zeichen das alte `BA().rezept`.
   function spurtWerte(p,extra){
     const a=extra||p.a, o={};
-    const R=BA().rezept;
+    const R=(bahnPodKader&&BA().podRezept)?{...BA().rezept,...BA().podRezept}:BA().rezept;
     for(const k in R)o[k]=Math.round(mische({a},R[k]));
     return o;
   }
@@ -47588,7 +47624,16 @@
             if(A.gedraenge){
               const G=A.gedraenge;
               const andere=LAEUFER.filter(o=>o!==u&&o.fertig==null&&Math.abs(o.pos-h)<=(G.radius??0.025)).length;
-              const extra=Math.max(0,andere-(G.frei??1));
+              // POD-DICHTE (02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5.2): im
+              // Vier-Team-Rennen stehen doppelt so viele Laeufer auf derselben Strecke. Die Bahnen
+              // wachsen mit (BAHNEN_N), der Engpass an der Falle wuchs bisher NICHT mit — er zaehlt
+              // nach Streckenposition, nicht nach Bahn. Das verdoppelte den Pulk-Preis je Falle und
+              // frass den Tempo-Kanal (Speed/Stamina/Health lasen im Pod fast 0 %, Pp 26,5). Der
+              // Pulk wird deshalb auf die Duell-Dichte umgerechnet (x 2/N): der Engpass ist im
+              // Pod so viel breiter wie die Bahn. Im Duell ist der Faktor 1 (`bahnPodKader===null`),
+              // dort rechnet die Zeile Zeichen fuer Zeichen wie vorher.
+              const pulk=bahnPodKader?andere*2/bahnSeitenN():andere;
+              const extra=Math.max(0,pulk-(G.frei??1));
               if(extra>0){
                 const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
                 const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
@@ -56386,6 +56431,13 @@
   // (`bahnPodKader===null`) ist jede beruehrte Zeile Zeichen fuer Zeichen die alte; das
   // pruefen tests/bahn-pod-vier-teams.test.ts (Fingerabdruecke vom Stand vor dem Umbau) und die
   // Vorher/Nachher-Messung (docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 2).
+  //
+  // ZWEI POD-EIGENE STELLSCHRAUBEN (02.11., Pp-Pflichtpruefung, Dokument Abschnitt 5), beide nur
+  // bei gesetztem `bahnPodKader` wirksam, das Duell bleibt bit-identisch:
+  //   - POD-DICHTE: das Gedraenge an der Falle (nur Takeshi) zaehlt den Pulk auf Duell-Dichte
+  //     umgerechnet (x 2/N), s. `pulk` in stepSpurt.
+  //   - POD-REZEPT: `BAHN_ART[bd].podRezept` ersetzt einzelne Sub-Skills (nur Staffel), s.
+  //     spurtWerte.
   //
   // Nur headless: die Zeichnung (Bahnen, HUD "X : Y", Banner) bleibt zweiseitig und wird von
   // hier nie aufgerufen (`stumm`).
