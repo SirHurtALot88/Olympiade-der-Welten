@@ -345,6 +345,7 @@ import { resolveDisciplinePointsLedgerView } from "@/lib/foundation/discipline-p
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
+import { summiereSaisonBilanz } from "@/lib/standings/standings-bilanz";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import { buildSaisonstandHoverKader } from "@/lib/foundation/saisonstand-team-hover";
 import { computeTeamBuildingUpkeepRows, computeTeamBuildingCost } from "@/lib/foundation/tabs/use-season-v2-panel-model";
@@ -11449,6 +11450,15 @@ export function useFoundationShellRouterBodyScope({
     [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
   );
   /**
+   * Chris (02.11.): Sieg/Unentschieden/Niederlage je Team (`summiereSaisonBilanz`) — dieselbe
+   * Quelle wie oben (gebuchte `disciplineResults`, die vollstaendig im Payload mitfahren) und derselbe
+   * Archiv-Sonderfall: nur die LIVE-Saison traegt ihre Zeilen.
+   */
+  const seasonV2TeamBilanzByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : summiereSaisonBilanz(gameState, seasonOverviewSeasonId)),
+    [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
+  );
+  /**
    * PRO DISZIPLIN, NICHT EIN GESAMTRANG (Review-Fund 19.10. Abend, s. ausfuehrlicher Kommentar in
    * `FoundationSeasonV2Host.tsx`): `row.disciplineRanks` statt `row.totalRank` — Chris wollte je
    * Disziplin des Spieltags einen eigenen Staerke-Rang-Chip ("Staffel UND Wettessen"), nicht einen
@@ -13206,6 +13216,7 @@ export function useFoundationShellRouterBodyScope({
     seasonV2TeamTopPlayersByColumn,
     seasonV2FormCardBonusByTeamId,
     seasonV2AreaVerhaeltnisByTeamId,
+    seasonV2TeamBilanzByTeamId,
     seasonV2TeamStrengthRankByTeamId,
     seasonV2TopPlayers,
     selectNewGameMode,

@@ -541,6 +541,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   seasonV2TeamTopPlayersByColumn,
   seasonV2FormCardBonusByTeamId,
   seasonV2AreaVerhaeltnisByTeamId,
+  seasonV2TeamBilanzByTeamId,
   seasonV2TeamStrengthRankByTeamId,
   seasonV2TopPlayers,
   selectedBoardConfidence,
@@ -2790,6 +2791,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               teamTopPlayersByColumn={seasonV2TeamTopPlayersByColumn}
               teamFormCardBonusByTeamId={seasonV2FormCardBonusByTeamId}
               areaVerhaeltnisByTeamId={seasonV2AreaVerhaeltnisByTeamId}
+              teamBilanzByTeamId={seasonV2TeamBilanzByTeamId}
               teamStrengthRankByTeamId={seasonV2TeamStrengthRankByTeamId}
               playerRows={seasonV2PlayerRows}
               gmRows={seasonV2GmRows}

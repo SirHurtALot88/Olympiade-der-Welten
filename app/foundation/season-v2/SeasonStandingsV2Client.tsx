@@ -9,6 +9,7 @@ import type { SeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-c
 import type { SeasonDisciplineAreaId, SeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { LeagueTier } from "@/lib/season/league-split";
 import type { TitleRaceResult } from "@/lib/season/title-race";
+import type { SaisonBilanz } from "@/lib/standings/standings-bilanz";
 import type { SpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
 
 /**
@@ -306,6 +307,12 @@ export type SeasonStandingsV2ClientProps = {
    * Klammer-Zahl neben der Achsen-Punktzahl erscheint dann gar nicht erst.
    */
   areaVerhaeltnisByTeamId?: Map<string, Record<SeasonDisciplineAreaId, number | null>> | null;
+  /**
+   * Chris (02.11.): Sieg/Unentschieden/Niederlage je Team aus den gebuchten Duell-Zeilen
+   * (`summiereSaisonBilanz`, 2/1/0 je Disziplin-Duell; Vierer-Pods getrennt nach Platz).
+   * Optional/`null` im Manager Mode und in einer Archiv-Saison — dann gibt es keine Bilanz-Spalte.
+   */
+  teamBilanzByTeamId?: Map<string, SaisonBilanz> | null;
   /**
    * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team UND DISZIPLIN ("Staffel-Rang",
    * reine Kaderstärke unabhängig vom bisherigen Saisonverlauf — `buildTeamDisciplineRankRowsFromGameState`,

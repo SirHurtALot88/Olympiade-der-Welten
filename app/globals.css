@@ -62538,6 +62538,20 @@ button.foundation-team-portrait-card {
   color: var(--nl-bad, #dc6357);
 }
 
+/* Chris 02.11.: Spalte „S-U-N" (Sieg-Unentschieden-Niederlage, nur Battle-Saves) — dieselbe
+   ruhige Tabellenziffern-Optik wie „Verh." daneben, zentriert, weil „22-0-10" kein Vorzeichenwert ist. */
+.is-new-look .nl-standings-th-bilanz {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-bilanz {
+  text-align: center;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Finanz-Spalten im Daten-Modus: Cash · Gehälter · Gebäude · GuV */
 .is-new-look .nl-standings-th-fin {
   text-align: right;

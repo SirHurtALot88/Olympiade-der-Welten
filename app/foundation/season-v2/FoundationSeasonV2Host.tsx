@@ -8,6 +8,7 @@ import FoundationSeasonV2Panel, {
 import { buildSeasonStandingsTopPlayersByTeam } from "@/lib/foundation/season-standings-top-players";
 import { buildSeasonFormCardBonusByTeamId } from "@/lib/foundation/season-form-card-bonus";
 import { summiereSaisonVerhaeltnisProBereich } from "@/lib/standings/standings-verhaeltnis";
+import { summiereSaisonBilanz } from "@/lib/standings/standings-bilanz";
 import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
 import {
   useSeasonV2PanelModel,
@@ -144,6 +145,12 @@ export default function FoundationSeasonV2Host({
     [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
   );
 
+  /** Chris (02.11.): Sieg/Unentschieden/Niederlage je Team, s. `summiereSaisonBilanz`. */
+  const teamBilanzByTeamId = useMemo(
+    () => (isViewingArchivedSeason ? null : summiereSaisonBilanz(gameState, seasonOverviewSeasonId)),
+    [gameState, isViewingArchivedSeason, seasonOverviewSeasonId],
+  );
+
   /**
    * Saisonstand-Auftrag Chris (19.10.) Punkt 6: Stärke-Rang je Team UND DISZIPLIN ("Staffel-Rang")
    * ZUSÄTZLICH zum laufenden Tabellenrang im Spieltage-Modus — dieselbe reine Kaderstärke-Rechnung,
@@ -197,6 +204,7 @@ export default function FoundationSeasonV2Host({
       teamTopPlayersByColumn={teamTopPlayersByColumn}
       teamFormCardBonusByTeamId={teamFormCardBonusByTeamId}
       areaVerhaeltnisByTeamId={areaVerhaeltnisByTeamId}
+      teamBilanzByTeamId={teamBilanzByTeamId}
       teamStrengthRankByTeamId={teamStrengthRankByTeamId}
       gmRows={model.gmRows}
       archiveRows={model.archiveRows}
