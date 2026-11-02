@@ -1748,6 +1748,20 @@ export function buildAiLegacyLineupPreviewWithModifiers(
   return { preview, modifiers, modifierPlanningMs: planned.ms };
 }
 
+/** Ist an diesem Spieltag schon eine Disziplin-Seite gebucht (Teil-Ergebnis nach dem D1-Commit)? */
+function hasBookedMatchdaySide(
+  gameState: GameState,
+  scope: { saveId: string; seasonId: string; matchdayId: string },
+): boolean {
+  const resultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId)
+      .map((entry) => entry.id),
+  );
+  if (resultIds.size === 0) return false;
+  return (gameState.seasonState.disciplineResults ?? []).some((result) => resultIds.has(result.matchdayResultId));
+}
+
 export function applyAiLegacyLineupBatchLocally(
   input: AiBatchApplyInput,
   persistence: PersistenceService = createPersistenceService(),
@@ -1811,6 +1825,10 @@ export function applyAiLegacyLineupBatchLocally(
   // Kontext geladen wird — s. `loadLocalLegacyLineupBatchPrecheckFromGameState` fuer die Herleitung
   // (Meldung Chris: 2,25s Batch-Laufzeit, obwohl an 32 bereits vollstaendig aufgestellten Teams
   // nichts zu tun war).
+  // Laeuft der Spieltag schon (eine Seite gebucht), sind vollstaendige Entwuerfe eingefroren —
+  // s. `matchdayAlreadyStarted` an `shouldSkipExistingAiDraft` (Saisontest-Fund 02.11.).
+  const matchdayAlreadyStarted = hasBookedMatchdaySide(preparedGameState, scope);
+
   const batchPrecheck = loadLocalLegacyLineupBatchPrecheckFromGameState(preparedGameState, {
     saveId: scope.saveId,
     seasonId: scope.seasonId,
@@ -1910,6 +1928,8 @@ export function applyAiLegacyLineupBatchLocally(
           hasCompleteExistingDraft: cheapHasCompleteExistingDraft,
           overwriteExisting,
           staleFindingCount: cheapStaleFindingCount,
+          matchdayAlreadyStarted,
+          hasExistingDraftEntries: (cheapExistingDraft?.entries?.length ?? 0) > 0,
         })
       ) {
         results.push({
@@ -2076,6 +2096,8 @@ export function applyAiLegacyLineupBatchLocally(
         hasCompleteExistingDraft,
         overwriteExisting,
         staleFindingCount: staleDraftFindings.length,
+        matchdayAlreadyStarted,
+        hasExistingDraftEntries: (contextResult.context.existingDraft?.entries?.length ?? 0) > 0,
       })
     ) {
       results.push({
@@ -2246,6 +2268,8 @@ export function applyAiLegacyLineupBatchLocally(
         hasCompleteExistingDraft,
         overwriteExisting,
         staleFindingCount: staleDraftFindings.length,
+        matchdayAlreadyStarted,
+        hasExistingDraftEntries: (contextResult.context.existingDraft?.entries?.length ?? 0) > 0,
       })
     ) {
       const captainMeta = buildCaptainPreviewMeta(preview);
