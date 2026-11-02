@@ -10,6 +10,10 @@ Dieses Dokument beschreibt den **Motor-Teil** für die zwei Bahn-Disziplinen. De
 Verdrahtung in die Liga beschreibt Abschnitt 4: Takeshi und Staffel sind **noch nicht** in
 `VIERER_POD_DISCIPLINE_IDS` eingetragen.
 
+**Stand 02.11.:** Die Pp-Pflichtprüfung besteht jetzt bei beiden, ohne Ausnahme und ohne
+Matrixänderung (Abschnitt 5): Takeshi 18,9 / 16,3, Staffel 9,3 / 10,1 (n = 48, zwei Saatströme).
+rho bleibt über 0,80 bei jeder Kadergröße, das Duell ist bit-identisch.
+
 ## 1. Was gebaut ist
 
 **Das Bahn-Chassis kennt N Seiten** (`public/mockups/battle-mode.engine.js`):
@@ -137,6 +141,9 @@ Am Rezept wurde dafür bewusst nichts geändert. Jede Rezeptänderung verschiebt
 das Duell ist abgenommen (Staffel 0,937, die beste Zahl im Spiel). Ob der Pod mit diesen Pp-Werten
 in die Liga darf, entscheidet Chris; s. Abschnitt 4.
 
+**Überholt am 02.11.:** Chris wollte keine Ausnahme, sondern eine Mechanik, die die Attribute
+anspricht. Die Anpassung wirkt nur im Pod, das Duell bleibt unberührt. Neue Zahlen: Abschnitt 5.
+
 ### 3.4 Messfehler im Skript, behoben
 
 Der erste Staffel-Pp-Lauf blieb hängen: nach einigen Minuten war der Renderer tot
@@ -153,11 +160,10 @@ mit 26,5 heraus.
 
 **Zwei Fragen an Chris, bevor die Kette gebaut wird:**
 
-1. **Pp-Abnahme.** rho besteht bei beiden klar (über 0,85). Die Pp-Pflichtprüfung besteht keine
-   der beiden sauber: Takeshi verfehlt sie in einem Strom stabil um gut 1 Pp (26,2 bei n = 96),
-   Staffel steht genau auf 25 (25,0 / 25,3 bei n = 96, mit n = 48 bestanden). Das ist eine
-   Ausnahmefrage wie bei Mini-DM und Battlefield, und die Gründe sind wieder andere: hier geht es
-   um die Pp-Schranke, nicht um rho. Das Duell bleibt davon unberührt.
+1. ~~**Pp-Abnahme.**~~ **Erledigt am 02.11.** Chris' Antwort war: keine Ausnahme, sondern die
+   Mechanik anpassen („die stats die vorgegeben sind sind verdammt wichtig, kannst du die
+   benötigten sachen nicht anpassen dass es mehr unsere attribute anspricht? dann würde ich das
+   freigeben"). Das ist umgesetzt, beide bestehen (Abschnitt 5).
 2. **Live-Bühne.** Soll die Bühne an Pod-Tagen das echte Vier-Team-Rennen zeigen (Zeichnung,
    HUD und Farben für vier Seiten), oder übergangsweise nur einen Hinweis wie bei Battlefield?
 
@@ -195,3 +201,189 @@ Die Kette, nach dem Muster der Mini-DM-PRs 4–6:
    bei Battlefield („wird als 4-Team-Gruppe gewertet"), dann ohne Zwei-Team-Rennen.
 7. Erst danach Takeshi/Staffel in `VIERER_POD_DISCIPLINE_IDS` eintragen und
    `tests/vierer-pod-battlefield.test.ts` entsprechend erweitern.
+
+## 5. Pp-Pflichtprüfung über die Mechanik (02.11.)
+
+Auftrag nach Chris' Antwort auf Frage 1: keine Pp-Ausnahme, sondern die Mechanik so anpassen, dass
+sie die Matrixattribute anspricht (Budget-Methode, CLAUDE.md). Drei harte Grenzen galten dabei:
+
+- Die Matrix (`official-discipline-weights.ts`) bleibt unberührt.
+- Das Duell bleibt bit-identisch.
+- rho im Pod bleibt über 0,80.
+
+Beide Eingriffe greifen deshalb **nur bei gesetztem `bahnPodKader`**, also in `spieleBahnPod`,
+`bahnPodSonde` und `bahnPodEinfluss`.
+
+### 5.0 Woher die Abweichung im Pod kam
+
+Die zwei Disziplinen haben **verschiedene Ursachen**. Für die Diagnose wurde zuerst das Duell mit
+`messe-arena-einfluss.mjs` daneben gemessen, am selben Engine-Stand und ebenfalls mit n = 48.
+
+| Attribut (Matrix) | Staffel Duell, Strom 0 / 10 Mio. | Staffel Pod, Strom 0 / 10 Mio. |
+|---|---:|---:|
+| Speed (24) | 27,9 / 29,2 | 28,4 / 29,9 |
+| Awareness (12) | 14,8 / 14,3 | 15,1 / 14,8 |
+| Dexterity (8) | 11,3 / 10,6 | 11,5 / 11,4 |
+| Charisma (10) | 4,2 / 3,3 | 4,2 / 4,4 |
+| Health (2) | 0 / 0 | 0 / 0 |
+| **Pp** | **20,0 / 22,1** | **22,8 / 24,9** |
+
+- **Staffel: Der Pod hat nichts verzerrt.** Zwischen den Mannschaften gibt es in der Staffel keine
+  Wechselwirkung: kein Rempler, kein Windschatten, eigene Bahnen. Der Wert je Läufer (Etappenzeit
+  plus Wechselkonto) hängt nicht an der Feldgröße. Deshalb zeigt der Pod dieselben Ausreißer wie das
+  Duell. Er liegt nur durch andere Saaten und Formkarten etwas näher an der Schranke. Die Ursache
+  sitzt also im Rezept. Ohne das Duell anzufassen, lässt sie sich nur mit einem eigenen Pod-Rezept
+  beheben (5.1).
+- **Takeshi: Das Gedränge war die Ursache, und es ist pod-spezifisch.** Im Strom 10 Mio. lasen
+  Stamina, Health und Speed (Matrix 6/4/4) im Pod 0,7 / 0,4 / 0 %. Das Gedränge an der Falle zählt
+  alle Läufer im Umkreis von ±2,5 % der Strecke, und zwar nach Streckenposition, nicht nach Bahn.
+  Mit 24 statt 12 Läufern verdoppelt sich der Pulk an jeder Falle. Wer schneller läuft, läuft
+  öfter in den Pulk, und so frisst der Pulk-Preis den Tempo-Kanal.
+
+  Geprüft wurde einzeln, im Strom 10 Mio. bei n = 48:
+
+  | Variante | Pp |
+  |---|---:|
+  | Ohne Eingriff | 26,5 |
+  | Nur Pulk auf Duell-Dichte (x 2/N) | **16,3** |
+  | Nur Zielbonus auf Duell-Skala (x 2/N) | 28,1 |
+  | Beides | 18,2 |
+
+  Der Zielbonus hat im 24er-Feld ebenfalls die doppelte Spannweite, ist aber nicht die Ursache.
+  Er bleibt deshalb unverändert, und der Boxscore-Wert bleibt die Duell-Formel.
+
+### 5.1 Staffel: Pod-Rezept (`BAHN_ART.staffel.podRezept`)
+
+**Das Modell.** Unter „Menge aus der Eignung“ (`f = eig / Mittel der sieben Sub-Skills`, bauSpurt)
+reicht die Matrix jedes Attribut über `eig` durch. Hätten alle sieben Sub-Skills dieselbe Wirkung,
+käme exakt die Matrix heraus. Ein Attribut weicht nur ab, wenn es in einem Sub-Skill sitzt, der mehr
+oder weniger trägt als der Schnitt der sieben:
+
+    Anteil(a) ≈ Matrix(a) + Summe_k (p_k − 1/7) × Rezept(k, a)
+
+Dabei ist p_k der Wirkungsanteil des Sub-Skills k. Ein Attribut, das in keinem Sub-Skill steht,
+bekommt genau sein Matrixgewicht.
+
+**Die Schätzung.** Aus den vier Messungen oben (Duell und Pod, je zwei Ströme) ergibt sich für
+p_k − 1/7 ungefähr:
+
+| Sub-Skill | ANTRITT | ENDTEMPO | TECHNIK | WENDIGKEIT | STEHEN | WUCHT | ROBUST |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| p_k − 1/7 | +0,18…0,28 | +0,04 | ≈ 0 | −0,04…+0,06 | ≈ 0 | −0,09…−0,17 | −0,11 |
+
+Der Antritt trägt also weit über dem Schnitt, WUCHT und ROBUST fast nichts. Damit lassen sich die
+Ausreißer erklären:
+
+- **Charisma** saß zu einem Drittel in WUCHT. Das ergibt −5,5 Pp.
+- **Health** saß nur in ROBUST. Das ergibt −2,8 Pp.
+- **Speed** saß zu 28 % im starken ANTRITT. Das ergibt +5 Pp.
+
+**Die Gegenprobe.** Der naheliegende erste Versuch scheiterte, und das bestätigt das Modell: mehr
+Charisma im Wechsel (TECHNIK aw 30 / dex 24 / cha 46) ergab Pp 26,2 / 29,5, Charisma *fiel* auf
+3,5 / 2,7 %. TECHNIK trägt etwa den Schnitt, also bewegt eine Umschichtung innerhalb von TECHNIK
+nichts. Sie erhöht aber Charismas Gewicht im Nenner `f`.
+
+**Die drei Eingriffe**, jeder an einem Sub-Skill, die übrigen vier bleiben wie im Duell:
+
+| Sub-Skill | Duell (`rezept`) | Pod (`podRezept`) |
+|---|---|---|
+| ANTRITT | speed 28, spirit 34, dex 20, aw 18 | speed 26, spirit 32, dex 14, aw 16, **charisma 12** |
+| WUCHT („Zug an der Spitze“) | spirit 45, charisma 33, speed 22 | spirit 45, **speed 55** |
+| ROBUST („Verlässlichkeit“) | stamina 30, will 26, health 24, spirit 20 | stamina 30, **dex 26, aw 24**, spirit 20 |
+
+Zur Sache: Wer vorne zieht, braucht Beine und Haltung. Verlässlich ist, wer sauber läuft und den
+Stab sicher hält. Der fliegende Start in der Wechselzone geht auf Zuruf los. Health und Will kommen
+im Pod voll aus der Matrix über `eig`, statt gedämpft aus einem Sub-Skill, der kaum trägt.
+
+Gemessene Zwischenstufen (n = 48, Strom 0 / 10 Mio.):
+
+| Variante | Pp | rho k = 6 |
+|---|---:|---:|
+| Duell-Rezept | 22,8 / 24,9 | 0,878 / 0,881 |
+| WUCHT spirit/speed, ROBUST mit Awareness statt Health | 15,1 / 12,4 | — |
+| zusätzlich ROBUST Dexterity statt Will | 11,1 / 10,6 | 0,917 / 0,915 |
+| **zusätzlich ANTRITT mit Charisma 12 (gewählt)** | **9,3 / 10,1** | **0,910 / 0,911** |
+
+Gewählt wurde die letzte Stufe. Sie bringt Charisma auf die Matrix (11,4 statt 6,5 %) und kostet
+gegenüber der Vorstufe nur 0,005 rho.
+
+### 5.2 Takeshi: Pod-Dichte im Gedränge
+
+`pulk = andere × 2/N` statt `andere` (stepSpurt, Gedränge-Block). Der Engpass an der Falle wird im
+Pod so viel breiter wie die Bahn. Das ist dieselbe Regel, nach der `BAHNEN_N` schon mitwächst, und
+sie war im Umbau vom 01.11. am Gedränge vergessen worden. Kein `rr()`-Aufruf ändert sich. Im Duell
+ist N = 2, der Faktor also 1.
+
+**Zusätzlich verworfen:** ein Takeshi-Pod-Rezept nach dem Staffel-Modell. TECHNIK mit weniger
+Intelligence, WUCHT mit Speed 12, ROBUST mit Stamina 20 ergab Pp 29,9 / 12,8. Bei Takeshi stehen
+Will und Determination in sechs von sieben Sub-Skills, deshalb ist das Modell dort schlecht
+bestimmt; die Schätzungen der p_k kippen zwischen den Strömen. Das passt zu den älteren Befunden
+(`bahn-takeshi-pp-paket2-kalibrierung-01-10.md`). Takeshi bleibt beim Duell-Rezept.
+
+### 5.3 Abnahme (Engine-Stand mit beiden Eingriffen)
+
+**Pp-Abweichung** (`miss-bahn-pod-abnahme.mjs --nur-pp`, Schranke ≤ 25):
+
+| | n = 48, Strom 0 / 10 Mio. | n = 48, Strom 20 Mio. / 30 Mio. | n = 96, Strom 0 / 10 Mio. | vorher (n = 48 / 96) |
+|---|---:|---:|---:|---:|
+| Takeshi | **18,9 / 16,3** | 16,6 / 18,7 | **22,0 / 13,5** | 13,5 / 26,5 · 13,3 / 26,2 |
+| Staffel | **9,3 / 10,1** | 11,2 / 9,8 | **9,3 / 9,7** | 22,8 / 24,9 · 25,0 / 25,3 |
+| Duell zum Vergleich (`einflussVon`, n = 48) | Takeshi 18,9 / 17,7, Staffel 20,0 / 22,1 | | | |
+
+Takeshi liegt im Pod jetzt auf der Höhe des abgenommenen Duells. Die Staffel liegt im Pod sogar
+deutlich unter dem Duell.
+
+**Rangtreue** (rho je Rennen, Median über 210 Gruppen, 6 Rennen je Gruppe, Strom 0 / 10 Mio.):
+
+| Disziplin | k = 2 | 3 | 4 | 5 | 6 |
+|---|---:|---:|---:|---:|---:|
+| Takeshi, nachher | 0,867 / 0,849 | 0,854 / 0,853 | 0,844 / 0,839 | 0,870 / 0,873 | 0,881 / 0,882 |
+| Takeshi, vorher | 0,855 / 0,860 | 0,865 / 0,862 | 0,845 / 0,853 | 0,883 / 0,879 | 0,889 / 0,887 |
+| Staffel, nachher | 0,905 / 0,909 | 0,916 / 0,921 | 0,924 / 0,927 | 0,913 / 0,911 | 0,910 / 0,911 |
+| Staffel, vorher | 0,881 / 0,877 | 0,909 / 0,904 | 0,881 / 0,887 | 0,889 / 0,886 | 0,878 / 0,881 |
+
+Weitere Kennzahlen bei k = 6, Strom 0 / 10 Mio.:
+
+| | Takeshi nachher (vorher) | Staffel nachher (vorher) |
+|---|---|---|
+| Star auf Rang 1 | 80,1 / 79,7 % (79,5 / 80,9) | 69,2 / 71,5 % (68,8 / 69,4) |
+| Star unter den ersten zwei | 94,3 / 94,8 % (95,1 / 94,0) | 91,8 / 91,2 % (90,8 / 91,6) |
+| Paare ab 15 Punkten richtig | 99,5 / 99,6 % | 99,9 / 99,9 % |
+| Team-rho | 0,77 / 0,78 (0,79) | 0,91 / 0,91 (0,87) |
+| Eignungsstärkstes Team gewinnt | 69 / 70 % (72) | 86 / 86 % (90) |
+| Gruppen unter 0,80 | 5 / 3 (1 / 1) | 0 / 0 (15 / 12) |
+
+**Was es kostet:**
+
+- **Takeshi:** Das Gedränge belohnte über `max(WUCHT, TECHNIK)` Attribute, die mit der Eignung
+  korrelieren. Mit halbem Pulk kostet das rund 0,01 rho bei k = 3..6. k = 4 liegt jetzt bei
+  0,844 / 0,839, also unter den angestrebten 0,85, aber klar über der Pflicht von 0,80. Die
+  Star-Treue bleibt gleich.
+- **Staffel:** Gewinnt überall, nur „eignungsstärkstes Team gewinnt" sinkt von 90 auf 86 %.
+
+**Das Duell ist unverändert:**
+
+- `miss-alle-disziplinen.mjs 24 staffel takeshis-castle` liefert nach beiden Eingriffen
+  0,937 / 0,898. Das ist dieselbe Ausgabe wie vorher.
+- `tests/bahn-pod-vier-teams.test.ts`: Die Duell-Fingerabdrücke aller fünf Bahnen sind
+  unverändert. Neu sind zwei Pod-Fingerabdrücke, die den abgenommenen Pod-Stand festhalten.
+- Das Staffel-Duell nach `einflussVon` liegt weiter bei 20,0.
+
+Ein Hinweis zu `--kontrolle`: Auch der Lauf mit N = 2 setzt `bahnPodKader`, er misst also das
+Pod-Rezept mit zwei Teams. Das echte Duell (`spieleBahn`, `disziplinProbe`) setzt `bahnPodKader`
+nie.
+
+### 5.4 Was weiter offen ist
+
+- **`VIERER_POD_DISCIPLINE_IDS` bleibt bewusst ohne Takeshi und Staffel.** Mit Abschnitt 5 ist nur
+  die Pp-Frage erledigt. Der Grund aus Abschnitt 4 gilt unverändert, nachgeprüft am 02.11. in
+  `legacy-matchday-resolve-engine.ts`: Ein Eintrag würde beide heute über den **PPS-Pod**
+  (Eignungs-Score) buchen statt über diesen Motor. Der Motor-Vorrang im Pod-Resolve ist weiterhin
+  Mini-DM-exklusiv. Die Live-Bühne spielte außerdem weiter ein Zwei-Team-Rennen gegen den
+  Fixture-Gegner; die neue Vier-Team-Anzeige im Arena-Host gilt nur für Battlefield. Frage 2 an
+  Chris (Live-Bühne) und die Kette 1–6 aus Abschnitt 4 stehen also noch aus.
+- **Folgefrage, nicht in dieser Runde: das Duell-Rezept der Staffel.** Das Duell hat dieselben drei
+  Ausreißer (Pp 20,0 / 22,1). Dasselbe Rezept global gesetzt würde dort vermutlich ähnlich viel
+  bringen, verschiebt aber die abgenommenen 0,937. Das braucht eine eigene Duell-Messung und
+  Chris' Entscheidung. Solange beide Rezepte gelten, laufen dieselben Spieler in Duell und Pod mit
+  leicht anderen Sub-Skills.

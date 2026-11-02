@@ -172,6 +172,34 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
     LAUF_TIMEOUT_MS,
   );
 
+  // POD-KALIBRIERUNG (02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5): Pod-Dichte im
+  // Takeshi-Gedraenge und Pod-Rezept der Staffel machen die Pp-Pflichtpruefung im Vier-Team-Format
+  // (Takeshi 18,9/16,3, Staffel 9,3/10,1 statt 13,5/26,5 und 22,8/24,9). Beide wirken NUR im Pod —
+  // das Duell halten die Fingerabdruecke oben. Diese hier halten den abgenommenen Pod-Stand: eine
+  // Aenderung an Gedraenge, Rezept oder Pod-Einstieg verschiebt sie, dann neu messen
+  // (scripts/miss-bahn-pod-abnahme.mjs, rho UND --pp in zwei Saatstroemen) und neu ziehen.
+  // Vor der Kalibrierung lauteten sie staffel a35a2321cbb16276, takeshis-castle 6451afa5e888b0d4.
+  const POD_FINGERABDRUECKE_KALIBRIERT: Record<string, string> = {
+    staffel: "8484261a6da5ebb1",
+    "takeshis-castle": "079498743dacc99c",
+  };
+  it.each(Object.keys(POD_FINGERABDRUECKE_KALIBRIERT))(
+    "Pod %s: spieleBahnPod() liefert den abgenommenen Stand der Pp-Kalibrierung (02.11.)",
+    async (bd) => {
+      const teams = vierTeams();
+      const laeufe = await seite.evaluate(
+        ({ bd, teams }) =>
+          ["save:s1:md7:", "save:s1:md8:", 11].map((s) => {
+            const saat = typeof s === "string" ? s + bd : s;
+            return window.__arena.spieleBahnPod(bd, teams, saat, null, { formSaat: saat });
+          }),
+        { bd, teams },
+      );
+      expect(fingerabdruck(laeufe)).toBe(POD_FINGERABDRUECKE_KALIBRIERT[bd]);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
   it("ein Pod-Lauf hinterlaesst nichts im Duell-Zustand (Aufstellung, Formkarten, Bahnzahl)", async () => {
     const teams = vierTeams();
     const { vorher, nachher } = await seite.evaluate(
