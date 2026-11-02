@@ -158,6 +158,11 @@ def main():
         if m:
             slugs.add(m.group(1))
     if args.nur:
+        # Spieler ohne Eintrag in der Portrait-Map (Portrait per Override in lib/data/mediaAssets.ts,
+        # z. B. player-0154-riley-le-rouge) sind trotzdem gueltig, wenn es die Spieler-ID gibt.
+        stats = os.path.join(ROOT, "data", "generated", "oly-player-stats.json")
+        if os.path.exists(stats):
+            slugs |= set(re.findall(r'"player-\d+-([a-z0-9-]+)"', open(stats).read()))
         unbekannt = sorted(set(args.nur) - slugs)
         if unbekannt:
             sys.exit(f"Unbekannte Slugs (nicht in player-portrait-map.json): {unbekannt}")
