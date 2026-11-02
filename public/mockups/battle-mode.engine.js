@@ -47010,8 +47010,7 @@
   // Laeufer genau eines hat) — er misst den Laeufer, nicht die Unterbesetzung. Die weiteren Beine
   // stehen in `zusatzZeiten` und wirken voll ueber die Teamzeit, also dort, wo die Liga bucht.
   function staffelBeinZeitBuchen(u){
-    const start=u.beinStartT!=null?u.beinStartT:(u.startT||0);
-    const zeit=rennT-start-(u.wechselVerlust-u.wechselVerlustBisher);
+    const zeit=rennT-(u.startT||0)-(u.wechselVerlust-u.wechselVerlustBisher);
     if(u.beineFertig===0)u.etappenZeit=zeit; else u.zusatzZeiten.push(zeit);
     u.wechselVerlustBisher=u.wechselVerlust;
     u.beineFertig++;
@@ -48225,15 +48224,13 @@
       // dieser Disziplin die Teamzeit und nicht die eigene.
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
         // NUR EIN LAEUFER GEMELDET (unterbesetzt, s. `staffelBeinZiel` in bauSpurt): das naechste
-        // Bein ist sein eigenes. Kein Stab, kein Wechsel — er laeuft mit seiner Erschoepfung weiter
-        // (`beineFertig` in tempoVon, Puste wird nicht aufgefuellt).
-        if(u.beineListe && u.beineListe[u.beineIdx+1]===u.bein+1){
-          staffelBeinZeitBuchen(u);
-          staffelNaechstesBein(u);
-          u.pos=u.beinVon; u.beinStartT=rennT;
-          continue;
-        }
-        const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        // Bein ist sein eigenes, er ist also selbst `naechster`. Er geht trotzdem durch die
+        // Wechselzone wie jeder andere (Stab ablegen und neu aufnehmen, Uebergabezeit aus seinem
+        // eigenen TECHNIK) — sonst sparte ein Ein-Mann-Team alle k-1 Wechsel und lief schneller
+        // als eines mit zwei Laeufern (gemessen: 30 statt 14 Siege von 30 in einer Paarung).
+        const selbst=!!(u.beineListe&&u.beineListe[u.beineIdx+1]===u.bein+1);
+        const naechster=selbst?u:LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        const uebergabePos=u.beinBis;
         // Unterbesetzt: das Wechselkonto (Teil des Einzelwerts) zaehlt nur die Uebergaben an
         // seinem ERSTEN Bein, wie bei jedem anderen Laeufer; die uebrigen landen in
         // `wechselKontoZusatz` (nur Anzeige/Diagnose). Voll besetzt sind beide Schalter true.
@@ -48243,14 +48240,17 @@
         else u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
         // ZUG-ERGEBNIS am Beinende (B4.6 Anweisungsbilanz) — nur Buchhaltung, s. zugBilanz.
         if(u.haltung==="angreifen")u.zugErgebnis=u.zugBilanz>=0?"getragen":"eingebrochen";
+        // Allein: schon jetzt auf das naechste Bein umsetzen, damit Beingrenzen und Fliegender
+        // Start unten fuer DIESES Bein rechnen.
+        if(selbst)staffelNaechstesBein(u);
         if(naechster){
-          const nehmerErstes=!naechster.beineListe||naechster.beineIdx===0;
+          const nehmerErstes=!naechster.beineListe||(!selbst&&naechster.beineIdx===0);
           // Ein Doppellaeufer, der den Stab ein zweites Mal nimmt: wieder "unterwegs" fuer die
           // Anzeige (u.durch kippt beim naechsten Abgeben erneut, s. vizDurchGesehen).
           if(naechster.beineListe&&naechster.beineFertig>0){
-            naechster.durch=false; naechster.vizDurchGesehen=false; naechster.beinStartT=null;
+            naechster.durch=false; naechster.vizDurchGesehen=false;
           }
-          naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
+          naechster.aktiv=true; naechster.pos=uebergabePos; naechster.startT=rennT;
           // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
           // Vorher war der Wechsel ein Ja/Nein: mit Wahrscheinlichkeit `gut` sauber, sonst
           // eine feste Strafe. Das ist aus zwei Gruenden schlecht.
@@ -48371,8 +48371,12 @@
             // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
             // selten (nur bei `patzer`) und sofort verstaendlich.
             // B4.2 (Marke und Zug): bei weiter Marke sagt die Zeile, woran es lag.
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n
+            feed(u.seite,u.n+(selbst?" verliert in der Wechselzone den Stab":" verpatzt die Übergabe an "+naechster.n)
               +(naechster.marke==="angreifen"?" bei weiter Marke":"")+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
+          } else if(selbst){
+            // Allein unterwegs (unterbesetzt): kein Partner, nur die Wechselzone.
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"allein weiter",life:.8,crit:false,_laeufer:u.id});
+            feedEreignis(u.seite,u.n+" läuft allein weiter — "+fmtDauer(Math.max(0,verlust))+" in der Wechselzone.");
           } else if(mk){
             // B4.2 WECHSEL-ZEILE MIT VORZEICHEN (Konzept 3.5, die Schwimm-Zahl): gewonnen
             // oder verloren gegenueber einem Stand-Start, dazu die Marke des Nehmers.
@@ -48388,7 +48392,7 @@
         // Unterbesetzt: hat er noch ein Bein, geht er (mit seiner Erschoepfung) in dessen
         // Wechselzone und wartet dort. Erst NACH der Suche nach `naechster` umgesetzt, weil die
         // Suche ueber `bein` laeuft.
-        if(u.beineListe&&u.beineIdx+1<u.beineListe.length){
+        if(!selbst&&u.beineListe&&u.beineIdx+1<u.beineListe.length){
           staffelNaechstesBein(u);
           u.pos=u.beinVon;
         }
