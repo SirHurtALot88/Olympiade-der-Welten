@@ -19,6 +19,10 @@
 //  - Team: eignungsstaerkstes Team auf Platz 1; Spearman Team-Eignung gegen Pod-Platz.
 //  - LIGA-BALANCE: Liga-Punkte je Pod (Soll 3), Verteilung der Plaetze, und wie oft der gebuchte
 //    Sieger NICHT der PPS-Pod-Sieger ist (zeigt, dass das Rennen bucht, nicht der Eignungs-Score).
+//  - UNTERBESETZT (Staffel-Exploit, Abschnitt 6.3/6.7): Teams mit weniger gemeldeten Spielern als k
+//    gegen vollbesetzte -- Siegquote und mittlerer Platz je Gruppe, dazu die Siegquote, die ein Team
+//    nach seiner MITTLEREN Eignung je Laeufer haette (Rang 1 nach Eignung im Pod). Seit "fehlende
+//    Laeufer laufen doppelt" (02.11.) soll ein unterbesetztes Team seltener gewinnen, nicht oefter.
 //
 // AUFRUF (eigene Scratch-SQLite, nie der echte Spielstand):
 //   OLY_APP_SQLITE_PATH=<scratch>/bahn-pod-liga.sqlite npx tsx scripts/miss-bahn-pod-liga-abnahme.ts \
@@ -102,10 +106,13 @@ type Akku = {
   rhoPod: number[]; star: { n: number; rang1: number; top2: number }; paar15: { n: number; korrekt: number };
   teamStarPlatz1: { n: number; ja: number }; teamRho: number[];
   siegerAnders: number; plaetzeAnders: number;
+  unter: { teams: number; siege: number; platzSumme: number; eigBester: number; eigBesterSiege: number };
+  voll: { teams: number; siege: number; platzSumme: number };
 };
 const neuerAkku = (): Akku => ({
   pods: 0, zeilen: 0, zeilenBahn: 0, punkteSummeFalsch: 0, rhoPod: [], star: { n: 0, rang1: 0, top2: 0 },
   paar15: { n: 0, korrekt: 0 }, teamStarPlatz1: { n: 0, ja: 0 }, teamRho: [], siegerAnders: 0, plaetzeAnders: 0,
+  unter: { teams: 0, siege: 0, platzSumme: 0, eigBester: 0, eigBesterSiege: 0 }, voll: { teams: 0, siege: 0, platzSumme: 0 },
 });
 
 async function main() {
@@ -227,6 +234,20 @@ async function main() {
             }
             const tr = spearman(teamEig, jeTeam.map((t) => -t.platz));
             if (tr != null) akku.teamRho.push(tr);
+            // Unterbesetzt gegen vollbesetzt. "eigBester": das Team mit der hoechsten MITTLEREN
+            // Eignung je gemeldetem Spieler -- also das Team, das voll besetzt der Favorit waere.
+            const mittelEig = jeTeam.map((t) => (t.spieler.length ? t.spieler.reduce((s, x) => s + x.eig, 0) / t.spieler.length : 0));
+            const besterMittel = Math.max(...mittelEig);
+            jeTeam.forEach((t, i) => {
+              if (t.spieler.length < n) {
+                akku.unter.teams += 1; akku.unter.platzSumme += t.platz;
+                if (t.platz === 1) akku.unter.siege += 1;
+                if (mittelEig[i] === besterMittel) { akku.unter.eigBester += 1; if (t.platz === 1) akku.unter.eigBesterSiege += 1; }
+              } else {
+                akku.voll.teams += 1; akku.voll.platzSumme += t.platz;
+                if (t.platz === 1) akku.voll.siege += 1;
+              }
+            });
           }
           akkus.set(key, akku);
         }
@@ -253,6 +274,18 @@ async function main() {
             teamRhoEignungGegenPlatzMittel: r3(mean(a.teamRho)),
             siegerAndersAlsPpsPodPct: r3(a.pods ? a.siegerAnders / a.pods : null),
             plaetzeAndersAlsPpsPodPct: r3(a.pods ? a.plaetzeAnders / a.pods : null),
+            unterbesetzt: {
+              teams: a.unter.teams,
+              siegquote: r3(a.unter.teams ? a.unter.siege / a.unter.teams : null),
+              mittlererPlatz: r3(a.unter.teams ? a.unter.platzSumme / a.unter.teams : null),
+              davonEignungsbesterJeLaeufer: a.unter.eigBester,
+              davonEignungsbesterSiege: a.unter.eigBesterSiege,
+            },
+            vollbesetzt: {
+              teams: a.voll.teams,
+              siegquote: r3(a.voll.teams ? a.voll.siege / a.voll.teams : null),
+              mittlererPlatz: r3(a.voll.teams ? a.voll.platzSumme / a.voll.teams : null),
+            },
           }];
         }),
       ),
