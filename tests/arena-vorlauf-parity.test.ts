@@ -13,6 +13,7 @@ import { ensureMatchdayResolveSnapshot, readArenaVorlaufRecord } from "@/lib/fou
 import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 
 /**
@@ -99,7 +100,13 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD/BATTLEFIELD-POD (02.11.): Mini-DM, Battlefield, Staffel und Takeshi buchen an
+    // Pod-Tagen ueber einen eigenen Pod-Pfad (resolutionSource "mini_dm_pod"), nicht ueber den
+    // hier erwarteten PPS-Duell-Pfad -- dieser Test prueft gezielt den Duell-Pfad, deshalb muessen
+    // alle Vierer-Pod-Disziplinen ausgeschlossen werden, nicht nur Mini-DM.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       continue;
     }

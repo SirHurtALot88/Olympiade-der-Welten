@@ -45,6 +45,7 @@ const { ensureMatchdayResolveSnapshot } = await import("@/lib/foundation/matchda
 const { stelleArenaVorlaufSicher } = await import("@/lib/battle/arena-vorlauf-service");
 const { kickoffArenaMatchdayApply } = await import("@/lib/season/arena-matchday-resolve-service");
 const { ARENA_RESOLVED_DISCIPLINE_IDS } = await import("@/lib/battle/arena-resolved-disciplines");
+const { isViererPodDiscipline } = await import("@/lib/season/season-discipline-schedule");
 const { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner, buildHarmlosenBahnPodFakeRunner } = await import(
   "@/tests/helpers/mini-dm-ffa-battle-save"
 );
@@ -87,7 +88,13 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD/BATTLEFIELD-POD (02.11.): Mini-DM, Battlefield, Staffel und Takeshi buchen an
+    // Pod-Tagen ueber einen eigenen Pod-Pfad (resolutionSource "mini_dm_pod"), nicht ueber den
+    // hier erwarteten PPS-Duell-Pfad -- dieser Test prueft gezielt den Duell-Pfad, deshalb muessen
+    // alle Vierer-Pod-Disziplinen ausgeschlossen werden, nicht nur Mini-DM.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       continue;
     }
