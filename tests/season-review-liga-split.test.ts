@@ -62,7 +62,7 @@ const GLOBAL_GERANKT: Eintrag[] = [
 describe("Saisonrueckblick: Endtabelle je Liga", () => {
   it("globale gespeicherte Raenge -> je Liga 1..3, Liga 1 vorn, Champion ist der Liga-1-Erste", () => {
     const review = buildSeasonReview(stand(GLOBAL_GERANKT));
-    const zeilen = review.finalTable as Array<{ teamId: string; rank: number; leagueTier: string; label: string }>;
+    const zeilen = review.finalTable;
     expect(zeilen.map((z) => `${z.leagueTier}#${z.rank}:${z.teamId}`)).toEqual([
       "liga1#1:L1-A",
       "liga1#2:L1-B",
@@ -85,12 +85,12 @@ describe("Saisonrueckblick: Endtabelle je Liga", () => {
     ];
     const review = buildSeasonReview(stand(ligaLokal));
     expect(review.championTeam?.id).toBe("L1-A");
-    expect((review.finalTable as Array<{ rank: number }>).map((z) => z.rank)).toEqual([1, 2, 1, 2]);
+    expect(review.finalTable.map((z) => z.rank)).toEqual([1, 2, 1, 2]);
   });
 
   it("ohne Liga-Split (Manager Mode) bleibt der gespeicherte Rang unveraendert massgeblich", () => {
     const review = buildSeasonReview(stand(GLOBAL_GERANKT, false));
-    const zeilen = review.finalTable as Array<{ teamId: string; rank: number; label: string }>;
+    const zeilen = review.finalTable;
     expect(zeilen.map((z) => `${z.rank}:${z.teamId}`)).toEqual(["1:L2-A", "2:L1-A", "3:L2-B", "4:L1-B", "5:L1-C", "6:L2-C"]);
     expect(zeilen[0]!.label).toBe("#1 · 59 Punkte");
     expect(review.championTeam?.id).toBe("L2-A");

@@ -125,18 +125,21 @@ function baueStand(podZeilen: Zeile[]): { gameState: GameState; teamIds: string[
 
   // Je Zeile zwei Spieler mit grossen Spieler-PP: wuerden die irgendwo in die Tabelle durchschlagen,
   // laege jedes Team um ~20 Punkte daneben, nicht um eine Rundung.
-  const spieler = gameState.players.filter((player) => teamIds.includes(player.teamId ?? ""));
+  const kaderJeTeam = new Map<string, string[]>();
+  for (const roster of gameState.rosters) {
+    kaderJeTeam.set(roster.teamId, [...(kaderJeTeam.get(roster.teamId) ?? []), roster.playerId]);
+  }
   gameState.seasonState.playerDisciplinePerformances = zeilen.flatMap((zeile, index) => {
     const teamId = teamIds[zeile.teamIndex]!;
-    const kader = spieler.filter((player) => player.teamId === teamId);
+    const kader = kaderJeTeam.get(teamId) ?? [];
     return [0, 1].map(
       (slotIndex) =>
         ({
           id: `perf-${index}-${slotIndex}`,
           matchdayResultId: RESULT_ID,
           teamId,
-          playerId: kader[slotIndex]?.id ?? `${teamId}-spieler-${slotIndex}`,
-          activePlayerId: kader[slotIndex]?.id ?? `${teamId}-spieler-${slotIndex}`,
+          playerId: kader[slotIndex] ?? `${teamId}-spieler-${slotIndex}`,
+          activePlayerId: kader[slotIndex] ?? `${teamId}-spieler-${slotIndex}`,
           disciplineId: zeile.disciplineId,
           disciplineSide: zeile.side,
           slotIndex,
@@ -157,7 +160,7 @@ function baueStand(podZeilen: Zeile[]): { gameState: GameState; teamIds: string[
 }
 
 function teamPunkteSumme(gameState: GameState, teamId: string): number {
-  return gameState.seasonState.disciplineResults
+  return (gameState.seasonState.disciplineResults ?? [])
     .filter((row) => row.teamId === teamId)
     .reduce((summe, row) => summe + (row.teamPoints ?? 0), 0);
 }

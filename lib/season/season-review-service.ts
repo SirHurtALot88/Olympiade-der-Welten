@@ -42,6 +42,9 @@ export type SeasonReviewNamedValue = {
   value: number | string | null;
   label: string;
   source: string;
+  /** Nur Endtabelle: Platz (bei aktivem Liga-Split liga-lokal) und Liga des Teams. */
+  rank?: number | null;
+  leagueTier?: string | null;
 };
 
 export type SeasonReviewTransferHighlight = {
