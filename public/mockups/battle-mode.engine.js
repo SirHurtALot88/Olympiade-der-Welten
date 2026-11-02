@@ -38833,7 +38833,7 @@
     const lebend=Array.from({length:N},(_,s)=>live(s).length);
     // Die Regel selbst steht in bfPodPlatzierungAus() (beim Gefecht je Ort), damit Gefecht,
     // Replay und Echtzeit-Kontrolle denselben Massstab haben.
-    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT);
+    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null);
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -54372,7 +54372,7 @@
           besitz:g.orte.map(o=>o.besitz),
           teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+g.punkte[s].toFixed(1),
             lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
-            eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s]})),
+            eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s], wertung:+g.teamWert[s].toFixed(3)})),
           kaempfer:g.kaempfer.map(k=>({n:k.n, side:k.side, slot:k.slot, eig:k.eigOhneMutator,
             wert:g.anteil[k.n]||0, roh:+k.wert.toFixed(3), ko:k.st.kos, down:!!k.raus,
             erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*BFFFA.taktSek,
@@ -54418,7 +54418,8 @@
         if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
       },!!opt.echtzeit);
       const aus={disziplin:r.disziplin, saat:r.saat, dauer:r.dauer, format:r.format, teams:r.teams,
-        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert, ko:u.ko, down:u.down}))};
+        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert,
+          ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
       if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
       return aus;
     } finally { FORMKARTE=formVorher; }
@@ -54446,7 +54447,7 @@
           },!!o.echtzeit);
           events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.dauer, ende:r.ende||null, teams:r.teams,
             teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
-              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down, erob:u.erob}))});
+              wert:Math.round(u.wert*1000)/1000, ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down, erob:u.erob}))});
         }
       });
     } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
@@ -54857,10 +54858,14 @@
 
   // PLATZIERUNG AUS EINEM ENDSTAND — dieselbe Regel wie bfPodPlatzierung() (die liest KP/U und
   // ruft jetzt diese Funktion), damit Gefecht, Replay und Echtzeit-Kontrolle denselben Massstab haben.
-  function bfPodPlatzierungAus(N,punkte,lebend,rausT){
+  // `zusatz` (optional, nur das Gefecht je Ort): ein fuenfter Schluessel nach dem Ausscheidezeitpunkt —
+  // die Summe der Kampfrichterwertung je Team. Damit bleibt ein exakter Gleichstand auf allen vier
+  // Sieg-Wegen (gleiche Punkte, gleich viele Lebende, beide bis zum Ende im Spiel) praktisch aus, und
+  // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
+  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
     const nochDa=lebend.filter(x=>x>0).length;
     const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
-      rausT[s]==null?Infinity:rausT[s]];
+      rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
     const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
     const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
     const platz=new Array(N).fill(0), ligaPunkte=new Array(N).fill(0);
@@ -54894,11 +54899,12 @@
     const kaempfer=bfffaKaempferAusU(kader);
     const g=bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
     const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
-    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek));
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek),teamWert);
     const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
-    return {...g, platzierung:pl, lebend, anteil};
+    return {...g, platzierung:pl, lebend, anteil, teamWert};
   }
 
   // ===================================================================================
@@ -54918,6 +54924,8 @@
   function bfPodReplayStarten(g){
     if(!KP||!KP.pod)return;
     KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
+    KP.pod.zusatz=g.teamWert.slice();
     bfPodSpuren=[];
     g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; } });
   }

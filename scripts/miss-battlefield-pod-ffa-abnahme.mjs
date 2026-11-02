@@ -1,6 +1,11 @@
 // ===================================================================================
 // BATTLEFIELD-POD-FFA-ABNAHME — Rangtreue des ECHTEN Vier-Team-Kampfes (02.11.).
 //
+// SEIT 02.11. ABENDS misst dieses Skript standardmaessig das GEFECHT JE ORT (Mini-DM-Muster,
+// bfffaGefecht in battle-mode.engine.js, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7) —
+// das ist die Form, die gebucht und in der Arena abgespielt wird. `--echtzeit` misst zum Vergleich
+// den freien Echtzeit-Pod aus der ersten Runde (Abschnitt 3 der Notiz).
+//
 // Chris (01./02.11.): „nein auch bei battlefield reicht kein hinweistext! da sollen 4 teams
 // gleichzeitig FFA machen". Seit 02.11. laufen im Motor alle vier Pod-Teams gleichzeitig im
 // selben Echtzeitkampf um die drei Orte (`window.__arena.battlefieldPodSonde`,
@@ -29,7 +34,7 @@
 //
 //   node scripts/miss-battlefield-pod-ffa-abnahme.mjs [kaempfe je Gruppe] [--je-seite=2..6]
 //        [--gruppen=<anzahl, Standard 30 von 210>] [--kontrolle] [--stroeme=0,10000000]
-//        [--pp[=24]] [--pp-je-seite=k] [--nur-pp] [--json=<datei>]
+//        [--pp[=24]] [--pp-je-seite=k|2..6] [--nur-pp] [--echtzeit] [--json=<datei>]
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -58,7 +63,8 @@ const KONTROLLE = hat("kontrolle");
 const MIT_PP = hat("pp") || args.some((x) => x.startsWith("--pp=")) || hat("nur-pp");
 const PP_LAEUFE = Number(wert("pp") || 24);
 const NUR_PP = hat("nur-pp");
-const PP_JE_SEITE = Number(wert("pp-je-seite") || 0) || undefined;
+const PP_JE_SEITE_LISTE = wert("pp-je-seite") ? parseListe(wert("pp-je-seite")) : [undefined];
+const ECHTZEIT = hat("echtzeit");
 
 // --- Kader: zehn Teams aus der Familie ------------------------------------------------
 const familie = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8"));
@@ -118,7 +124,8 @@ function auswerten(events) {
     if (ev.teams[bester].eventPlatz <= 2) teamBesterOben2++;
     if (ev.teams[bester].eventPlatz === N) teamBesterLetzter++;
     const lebendeTeams = ev.teams.filter((tm) => tm.lebend > 0).length;
-    if (lebendeTeams <= 1) enden.allein++;
+    if (ev.ende) enden[ev.ende] = (enden[ev.ende] || 0) + 1;
+    else if (lebendeTeams <= 1) enden.allein++;
     else if (Math.max(...ev.teams.map((tm) => tm.punkte)) >= 150) enden.limit++;
     else enden.zeit++;
     dauer.push(ev.dauer);
@@ -143,7 +150,7 @@ function auswerten(events) {
 
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-const ausgabe = { disziplin: "battlefield", format: "pod-ffa", spiele: SPIELE, stroeme: STROEME, teams: TEAMNAMEN, gruppen: GRUPPEN4, laeufe: [], kontrolle: [] };
+const ausgabe = { disziplin: "battlefield", format: ECHTZEIT ? "pod-ffa-echtzeit" : "pod-gefecht-je-ort", spiele: SPIELE, stroeme: STROEME, teams: TEAMNAMEN, gruppen: GRUPPEN4, laeufe: [], kontrolle: [] };
 const fehler = [];
 try {
   const seite = await browser.newPage();
@@ -156,11 +163,11 @@ try {
   if (!NUR_PP) for (const js of JE_SEITE) {
     for (const versatz of STROEME) {
       const t0 = Date.now();
-      const roh = await seite.evaluate(([kader, gruppen, n, versatz, js]) => {
+      const roh = await seite.evaluate(([kader, gruppen, n, versatz, js, echtzeit]) => {
         const st = window.setTimeout; window.setTimeout = () => 0;
-        try { return window.__arena.battlefieldPodSonde(kader, { gruppen, n, versatz, jeSeite: js }); }
+        try { return window.__arena.battlefieldPodSonde(kader, { gruppen, n, versatz, jeSeite: js, echtzeit }); }
         finally { window.setTimeout = st; }
-      }, [KADER, GRUPPEN4, SPIELE, versatz, js]);
+      }, [KADER, GRUPPEN4, SPIELE, versatz, js, ECHTZEIT]);
       const sek = (Date.now() - t0) / 1000;
       ausgabe.laeufe.push({ format: "pod (N=4)", jeSeite: js, versatz, sekunden: sek, msJeKampf: (1000 * sek) / roh.events.length, ...auswerten(roh.events) });
       if (KONTROLLE) {
@@ -183,13 +190,13 @@ try {
   }
   if (MIT_PP) {
     ausgabe.pp = [];
-    for (const versatz of STROEME) {
+    for (const ppJs of PP_JE_SEITE_LISTE) for (const versatz of STROEME) {
       const t0 = Date.now();
-      const r = await seite.evaluate(([extra, n, v, js]) => {
+      const r = await seite.evaluate(([extra, n, v, js, echtzeit]) => {
         const st = window.setTimeout; window.setTimeout = () => 0;
-        try { return window.__arena.battlefieldPodEinfluss(extra, n, undefined, v, undefined, js); }
+        try { return window.__arena.battlefieldPodEinfluss(extra, n, undefined, v, undefined, js, echtzeit); }
         finally { window.setTimeout = st; }
-      }, [[KADER[0], KADER[1]], PP_LAEUFE, versatz, PP_JE_SEITE]);
+      }, [[KADER[0], KADER[1]], PP_LAEUFE, versatz, ppJs, ECHTZEIT]);
       ausgabe.pp.push({ ...r, sekunden: (Date.now() - t0) / 1000 });
     }
   }
@@ -199,7 +206,7 @@ try {
 
 const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : "  —  ");
 const f1 = (v) => (Number.isFinite(v) ? v.toFixed(1) : " — ");
-console.log(`Battlefield-Pod-FFA-Abnahme — ${SPIELE} Kaempfe je Gruppe, ${GRUPPEN4.length} von ${ALLE4.length} Vierergruppen, Saatstroeme ${STROEME.join(" / ")}`);
+console.log(`Battlefield-Pod-Abnahme (${ECHTZEIT ? "Echtzeit-FFA" : "Gefecht je Ort"}) — ${SPIELE} Kaempfe je Gruppe, ${GRUPPEN4.length} von ${ALLE4.length} Vierergruppen, Saatstroeme ${STROEME.join(" / ")}`);
 console.log(`Kader: ${TEAMNAMEN.length} Teams der Kader-Familie\n`);
 console.log("k  Strom     rho/Kampf Median  Mittel  min..max       <0,80  Saison  Star#1  Star<=2  letzt  Paar>=15  Team-rho  bestesTeam 1./<=2./4.   Ende allein/limit/zeit  Dauer  ms/Kampf");
 for (const l of ausgabe.laeufe) {
