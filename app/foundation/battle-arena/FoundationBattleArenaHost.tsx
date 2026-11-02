@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { ArenaSpieltagAnsicht } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
+
 import FoundationBattleArenaSpriteGallery from "@/app/foundation/battle-arena/FoundationBattleArenaSpriteGallery";
 import {
   buildArenaTeam,
@@ -117,14 +119,45 @@ function sicherstelleStylesheet(href: string) {
   document.head.appendChild(link);
 }
 
+type ArenaFenster = {
+  __arena?: {
+    setDisc?: (disziplin: string) => void;
+    schnellDurch?: () => Promise<unknown>;
+    spielEndeStand?: () => { disziplin: string; done: boolean; sieger: 0 | 1 | null };
+  };
+  __olyArenaKader?: unknown;
+};
+
+async function warteAufMotor(fristMs: number): Promise<boolean> {
+  const start = Date.now();
+  while (typeof (window as unknown as ArenaFenster).__arena === "undefined") {
+    if (Date.now() - start > fristMs) return false;
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  return true;
+}
+
 export default function FoundationBattleArenaHost({
   gameState,
   activeManagerTeamId,
   saveId,
+  spieltag = null,
 }: {
   gameState: GameState;
   activeManagerTeamId?: string | null;
   saveId?: string | null;
+  /**
+   * SPIELTAGS-ANSICHT (02.11.): gesetzt, wenn dieser Host NICHT als eigenstaendiger Entwurfsreiter
+   * laeuft, sondern in der Arena des normalen Spieltagsablaufs (`DisciplineStageArena.tsx`) das
+   * GEBUCHTE Spiel zeigt. Dann sind Heim/Gast fest (Fixture-Orientierung wie im zaehlenden Lauf),
+   * die Pods werden fuer das eigene Team gesucht, der Motor zeigt genau `disciplineId`, Eingriffe
+   * ins Spiel sind aus (`nurZuschauen`), und das Ende des Spiels meldet sich per `onEnde`. Ohne
+   * diese Prop ist alles wie bisher. S. `lib/foundation/battle-arena/arena-spieltag-ansicht.ts`.
+   */
+  spieltag?: (ArenaSpieltagAnsicht & {
+    disziplinName?: string | null;
+    onEnde?: ((info: { disziplin: string; sieger: 0 | 1 | null }) => void) | null;
+  }) | null;
 }) {
   const teams = useMemo<ArenaTeamAuswahl[]>(
     () => listeArenaTeams(gameState),
@@ -132,6 +165,7 @@ export default function FoundationBattleArenaHost({
   );
 
   const [heimTeamId, setHeimTeamId] = useState<string>(() => {
+    if (spieltag) return spieltag.heimTeamId;
     if (
       activeManagerTeamId &&
       teams.some((team) => team.teamId === activeManagerTeamId)
@@ -141,9 +175,21 @@ export default function FoundationBattleArenaHost({
     return teams[0]?.teamId ?? "";
   });
   const [gastTeamId, setGastTeamId] = useState<string>(() => {
+    if (spieltag) return spieltag.gastTeamId;
     const andere = teams.find((team) => team.teamId !== heimTeamId);
     return andere?.teamId ?? teams[0]?.teamId ?? "";
   });
+  // Spieltags-Ansicht: Heim/Gast folgen der Prop (Fixture-Orientierung), keine freie Wahl.
+  const spieltagHeim = spieltag?.heimTeamId ?? null;
+  const spieltagGast = spieltag?.gastTeamId ?? null;
+  useEffect(() => {
+    if (spieltagHeim) setHeimTeamId(spieltagHeim);
+    if (spieltagGast) setGastTeamId(spieltagGast);
+  }, [spieltagHeim, spieltagGast]);
+  // Bezugsteam fuer die Pod-Suche (Mini-DM, Battlefield, Bahn-Pod). Im Entwurfsreiter das gewaehlte
+  // Heimteam wie bisher; in der Spieltags-Ansicht das EIGENE Team -- Heim ist dort das Heimteam des
+  // Fixtures, und das kann der Gegner sein, dessen Pod ein anderer ist.
+  const podBezugTeamId = spieltag?.podTeamId ?? heimTeamId;
 
   // MINI-DM 4-TEAM-FFA, "GEZEIGT = GEBUCHT" (PR 6 des 6-PR-Opus-Plans 21.10., "Buehnen-
   // Anzeige" — Nachtrag zu PR 5s Vorlauf-Verdrahtung). Bis hierher zog dieser Block ZWEI
@@ -165,9 +211,9 @@ export default function FoundationBattleArenaHost({
   // unabhaengig davon, ob Mini-DM an diesem Spieltag ueberhaupt gespielt wird).
   const miniDmPod = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
-    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getMiniDmPodForTeam(gameState, heimTeamId, matchdayId, { saveId });
-  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getMiniDmPodForTeam(gameState, podBezugTeamId, matchdayId, { saveId });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
 
   // Primitive Strings statt des Pod-Objekts selbst als Hook-Abhaengigkeiten weiter unten —
   // `miniDmPod` ist bei gleichen Eingaben zwar bereits memoisiert (dieselbe Referenz bleibt
@@ -183,9 +229,9 @@ export default function FoundationBattleArenaHost({
   // fuer `heimTeamId`, bleibt alles `null` und der Motor zeigt Battlefield wie bisher als Duell.
   const battlefieldPod = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
-    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, heimTeamId, matchdayId, "battlefield", { saveId });
-  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "battlefield", { saveId });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
   const [bfPodTeamId0, bfPodTeamId1, bfPodTeamId2, bfPodTeamId3] =
     battlefieldPod?.teamIds ?? (["", "", "", ""] as const);
 
@@ -197,14 +243,14 @@ export default function FoundationBattleArenaHost({
   // (`runBahnPodFixtures`). Ohne Pod fuer `heimTeamId` bleibt es beim Duell.
   const bahnPodTakeshi = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
-    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, heimTeamId, matchdayId, "takeshis-castle", { saveId });
-  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "takeshis-castle", { saveId });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
   const bahnPodStaffel = useMemo(() => {
     const matchdayId = gameState.matchdayState?.matchdayId;
-    if (!heimTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
-    return getPodForTeam(gameState, heimTeamId, matchdayId, "staffel", { saveId });
-  }, [gameState, heimTeamId, gameState.matchdayState?.matchdayId, saveId]);
+    if (!podBezugTeamId || !matchdayId || !saveId || saveId === "loading-save") return null;
+    return getPodForTeam(gameState, podBezugTeamId, matchdayId, "staffel", { saveId });
+  }, [gameState, podBezugTeamId, gameState.matchdayState?.matchdayId, saveId]);
   const bahnPodTeamIdsSchluessel = [...(bahnPodTakeshi?.teamIds ?? []), ...(bahnPodStaffel?.teamIds ?? [])].join("|");
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -708,6 +754,24 @@ export default function FoundationBattleArenaHost({
   // Mount-Effekt unten).
   const motorLiefBereitsRef = useRef(false);
 
+  // SPIELTAGS-ANSICHT: welche Motor-Instanz steht gerade (Signatur der Nutzlast ohne Anzeige-Meta),
+  // welche Disziplin ihr zuletzt gesetzt wurde, und ob sie bereit ist. Ein neuer gameState nach
+  // einer Buchung (Tabellenstand, Spieltagsergebnis) aendert an der Nutzlast nichts -- der Motor
+  // darf dann NICHT neu aufgebaut werden, sonst verschwaende der Endstand, den der Spieler gerade
+  // gesehen und damit gebucht hat.
+  const istSpieltag = spieltag != null;
+  const spieltagDisziplinId = spieltag?.disciplineId ?? null;
+  const gemounteteSignaturRef = useRef<string | null>(null);
+  const mountNrRef = useRef(0);
+  const aktuelleDisziplinRef = useRef<string | null>(spieltagDisziplinId);
+  aktuelleDisziplinRef.current = spieltagDisziplinId;
+  const gesetzteDisziplinRef = useRef<string | null>(null);
+  const [motorBereit, setMotorBereit] = useState(false);
+  const onEndeRef = useRef(spieltag?.onEnde ?? null);
+  onEndeRef.current = spieltag?.onEnde ?? null;
+  const [spultVor, setSpultVor] = useState(false);
+  const [endeInfo, setEndeInfo] = useState<{ disziplin: string; sieger: 0 | 1 | null } | null>(null);
+
   // Haengt den Motor nativ ein, sobald der gerenderte Kader UND die Huelle stehen — und
   // reisst ihn komplett wieder ab, sobald sich der gerenderte Kader aendert (s. Kommentar
   // oben am Host: der Motor haelt zu viel mutablen Zustand fuer ein In-place-Update). Haengt
@@ -761,22 +825,7 @@ export default function FoundationBattleArenaHost({
           ? Math.round(wert * 10) / 10
           : null;
 
-      huelle.stylesheetHrefs.forEach(sicherstelleStylesheet);
-      container.innerHTML = huelle.markup;
-      // Der Foundation-Shell ist permanent dunkel (Velo) — der Entwurf soll seine
-      // Flaechen daran ausrichten statt an der OS-Einstellung des Browsers, sonst
-      // saesse bei hellem System ein helles Rechteck mitten in der dunklen App.
-      // `im-spiel` schaltet zusaetzlich den Einbettungs-Modus der battle-mode.css
-      // ein (kein eigener Seitengrund, kein doppelter Hero — der Host traegt die
-      // Ueberschrift schon). Standalone/Artefakt fehlen Attribut wie Klasse, dort
-      // gilt weiter prefers-color-scheme mit hellem Standard.
-      const wurzel = container.querySelector<HTMLElement>(".oly-battle-arena");
-      if (wurzel) {
-        wurzel.setAttribute("data-theme", "dark");
-        wurzel.classList.add("im-spiel");
-      }
-      delete (window as unknown as { __arena?: unknown }).__arena;
-      (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = {
+      const umschlag = {
         heim: heimKader,
         gast: gastKader,
         // MINI-DM 4-TEAM-FFA (s. `miniDmPod`-Kommentar oben): vier echte Kader des ECHTEN
@@ -811,6 +860,44 @@ export default function FoundationBattleArenaHost({
           gastTeamId,
           gameState.matchdayState?.matchdayId ?? null,
         ),
+        // A3: die gebuchte Saat je Disziplin (s. `arenaSeedByDisciplineId`-Kommentar oben) —
+        // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
+        // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
+        seedByDisciplineId: arenaSeedByDisciplineId,
+        // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
+        mutatorenByDisciplineId,
+        // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
+        nurZuschauen: istSpieltag,
+      };
+      // Spieltags-Ansicht: steht schon ein Motor mit genau dieser Nutzlast, bleibt er stehen (s.
+      // `gemounteteSignaturRef`). Die Anzeige-Meta (Tabellenplatz, Punkte) zaehlt dafuer nicht.
+      const signatur = istSpieltag ? JSON.stringify(umschlag) : null;
+      if (
+        signatur != null &&
+        signatur === gemounteteSignaturRef.current &&
+        container.querySelector(".oly-battle-arena")
+      ) {
+        return;
+      }
+
+      huelle.stylesheetHrefs.forEach(sicherstelleStylesheet);
+      container.innerHTML = huelle.markup;
+      // Der Foundation-Shell ist permanent dunkel (Velo) — der Entwurf soll seine
+      // Flaechen daran ausrichten statt an der OS-Einstellung des Browsers, sonst
+      // saesse bei hellem System ein helles Rechteck mitten in der dunklen App.
+      // `im-spiel` schaltet zusaetzlich den Einbettungs-Modus der battle-mode.css
+      // ein (kein eigener Seitengrund, kein doppelter Hero — der Host traegt die
+      // Ueberschrift schon). Standalone/Artefakt fehlen Attribut wie Klasse, dort
+      // gilt weiter prefers-color-scheme mit hellem Standard.
+      const wurzel = container.querySelector<HTMLElement>(".oly-battle-arena");
+      if (wurzel) {
+        wurzel.setAttribute("data-theme", "dark");
+        wurzel.classList.add("im-spiel");
+        if (istSpieltag) wurzel.classList.add("im-spieltag");
+      }
+      delete (window as unknown as { __arena?: unknown }).__arena;
+      (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = {
+        ...umschlag,
         // kurz/platz/punkte/spieltag sind reine ANZEIGE-Daten fuer den Motor (Einlauf-
         // Tafel, Anzeigetafel, Kopfzeilen): shortCode bestimmt dort auch das Wappen
         // unter /team-logos/<kurz>.jpg, Platz und Punkte kommen aus denselben
@@ -830,12 +917,6 @@ export default function FoundationBattleArenaHost({
           ligaGroesse: teams.length,
           spieltag: gameState.season?.currentMatchday ?? null,
         },
-        // A3: die gebuchte Saat je Disziplin (s. `arenaSeedByDisciplineId`-Kommentar oben) —
-        // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
-        // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
-        seedByDisciplineId: arenaSeedByDisciplineId,
-        // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
-        mutatorenByDisciplineId,
       };
       motorLiefBereitsRef.current = true;
       for (const src of huelle.scriptSrcs) {
@@ -850,6 +931,28 @@ export default function FoundationBattleArenaHost({
         // `async = false` stellt die Dokument-Reihenfolge wieder her.
         script.async = false;
         container.appendChild(script);
+      }
+
+      // SPIELTAGS-ANSICHT: auf den Motor warten, dann direkt in die Arena (nicht in die Aufstellung,
+      // die im Zuschau-Modus ohnehin ausgeblendet ist) und auf die Disziplin des Spieltags stellen.
+      // Ein Mount-Zaehler statt `abgebrochen`: ein spaeterer Effektlauf, der wegen gleicher
+      // Signatur NICHT neu aufbaut, darf diesen Schritt nicht verwerfen.
+      if (istSpieltag) {
+        mountNrRef.current += 1;
+        const meineNr = mountNrRef.current;
+        gemounteteSignaturRef.current = signatur;
+        gesetzteDisziplinRef.current = null;
+        setMotorBereit(false);
+        setEndeInfo(null);
+        const bereit = await warteAufMotor(15000);
+        if (!bereit || meineNr !== mountNrRef.current) return;
+        container.querySelector<HTMLElement>("#t2")?.click();
+        const disziplin = aktuelleDisziplinRef.current;
+        if (disziplin) {
+          (window as unknown as ArenaFenster).__arena?.setDisc?.(disziplin);
+          gesetzteDisziplinRef.current = disziplin;
+        }
+        setMotorBereit(true);
       }
     })();
 
@@ -873,7 +976,43 @@ export default function FoundationBattleArenaHost({
     miniDmFfaAufstellung,
     battlefieldPodNutzlast,
     bahnPodNutzlast,
+    istSpieltag,
   ]);
+
+  // SPIELTAGS-ANSICHT: Disziplinwechsel (D1 -> D2) stellt den LAUFENDEN Motor um, statt ihn neu
+  // aufzubauen -- dieselbe Nutzlast traegt Saat, Mutatoren und Pods beider Spieltags-Disziplinen.
+  useEffect(() => {
+    if (!istSpieltag || !motorBereit || !spieltagDisziplinId) return;
+    if (gesetzteDisziplinRef.current === spieltagDisziplinId) return;
+    (window as unknown as ArenaFenster).__arena?.setDisc?.(spieltagDisziplinId);
+    gesetzteDisziplinRef.current = spieltagDisziplinId;
+    setEndeInfo(null);
+  }, [istSpieltag, motorBereit, spieltagDisziplinId]);
+
+  // SPIELTAGS-ANSICHT: das Ende des sichtbaren Spiels (`oly-arena:ende`, s. meldeSpielEnde() im
+  // Motor) an die Arena melden -- nur fuer die Disziplin, die gerade gezeigt wird.
+  useEffect(() => {
+    if (!istSpieltag) return;
+    const beimEnde = (ereignis: Event) => {
+      const info = (ereignis as CustomEvent<{ disziplin?: string; sieger?: 0 | 1 | null }>).detail;
+      if (!info?.disziplin || info.disziplin !== aktuelleDisziplinRef.current) return;
+      const ende = { disziplin: info.disziplin, sieger: info.sieger === 0 || info.sieger === 1 ? info.sieger : null };
+      setEndeInfo(ende);
+      onEndeRef.current?.(ende);
+    };
+    window.addEventListener("oly-arena:ende", beimEnde);
+    return () => window.removeEventListener("oly-arena:ende", beimEnde);
+  }, [istSpieltag]);
+
+  const starteQuickSim = () => {
+    const motor = (window as unknown as ArenaFenster).__arena;
+    if (!motor?.schnellDurch || spultVor) return;
+    setSpultVor(true);
+    void motor
+      .schnellDurch()
+      .catch((error: unknown) => console.error("[Battle Arena] Quick-Sim fehlgeschlagen", error))
+      .finally(() => setSpultVor(false));
+  };
 
   // Reines Verlassen-Aufraeumen: laeuft NUR beim echten Unmount der Komponente (leeres
   // Dependency-Array), nicht bei jedem Team-Wechsel — der raeumt sich selbst auf (s. oben).
@@ -892,6 +1031,95 @@ export default function FoundationBattleArenaHost({
     setGastTeamId(heimTeamId);
   };
   const spiegelduell = heimTeamId !== "" && heimTeamId === gastTeamId;
+
+  if (spieltag) {
+    const heimName = teams.find((team) => team.teamId === heimTeamId)?.name ?? heimTeamId;
+    const gastName = teams.find((team) => team.teamId === gastTeamId)?.name ?? gastTeamId;
+    const disziplin = spieltag.disciplineId;
+    const bahnPod = bahnPodNutzlast?.[disziplin] ?? null;
+    const podTeams =
+      disziplin === "mini-dm" && miniDmFfaTeams
+        ? miniDmFfaTeams.map((team) => team.name)
+        : disziplin === "battlefield" && battlefieldPodNutzlast
+          ? battlefieldPodNutzlast.teams.map((team) => team.name)
+          : bahnPod
+            ? bahnPod.teams.map((team) => team.name)
+            : null;
+    return (
+      <>
+        <style>{`
+          .oly-arena-spieltag-kopf{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:0 0 6px}
+          .oly-arena-spieltag-kopf h3{margin:0;font-size:1.02rem}
+          .oly-arena-spieltag-knopf{min-height:40px;padding:0 16px;border-radius:10px;cursor:pointer;
+            border:1px solid var(--nl-accent,#F2A03D);background:color-mix(in srgb,var(--nl-accent,#F2A03D) 16%,transparent);
+            color:inherit;font-weight:800;font-size:0.86rem;margin-left:auto}
+          .oly-arena-spieltag-knopf[disabled]{opacity:0.55;cursor:progress}
+          .oly-arena-spieltag-status{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-top:8px;
+            border:1px dashed rgba(255,255,255,0.16);border-radius:12px;font-size:0.9rem}
+          .oly-battle-arena.im-spieltag .tabs,
+          .oly-battle-arena.im-spieltag .lede{display:none}
+        `}</style>
+        <section
+          className="panel"
+          aria-label="Battle Arena — Spieltag"
+          data-testid="oly-arena-spieltag"
+          data-disziplin={disziplin}
+          data-motor-bereit={String(motorBereit)}
+          data-spiel-ende={endeInfo ? String(endeInfo.sieger ?? "offen") : ""}
+          style={{ marginBottom: 0 }}
+        >
+          <div className="oly-arena-spieltag-kopf">
+            <h3>
+              Battle Arena · {spieltag.disziplinName ?? disziplin}
+            </h3>
+            <span className="muted" style={{ fontSize: "0.85rem" }}>
+              {podTeams ? (
+                <>Vierergruppe: {podTeams.map((name, index) => (
+                  <span key={name + index}>{index > 0 ? ", " : ""}<strong>{name}</strong></span>
+                ))}</>
+              ) : (
+                <><strong>{heimName}</strong> gegen <strong>{gastName}</strong></>
+              )}
+            </span>
+            <button
+              type="button"
+              className="oly-arena-spieltag-knopf"
+              data-testid="oly-arena-spieltag-quicksim"
+              onClick={starteQuickSim}
+              disabled={!motorBereit || spultVor || endeInfo != null}
+              title="Spult das Spiel bis zum Ende vor — derselbe Verlauf wie beim Zuschauen, nur schneller."
+            >
+              {spultVor ? "⏩ spult vor …" : endeInfo ? "✓ Spiel zu Ende" : "⏩ Quick-Sim"}
+            </button>
+          </div>
+          <p className="muted" style={{ margin: 0, fontSize: "0.82rem", maxWidth: "80ch" }}>
+            Das ist das Spiel, das für diesen Spieltag gewertet wird — gleiche Kader, gleiche Aufstellung,
+            gleiche Saat wie die Wertung im Hintergrund. „Kampf starten“ zum Zuschauen oder ⏩ Quick-Sim
+            direkt ans Ende; sobald es vorbei ist, wird die Disziplin gebucht.
+          </p>
+          {ladeKader || !motorBereit ? (
+            <div className="oly-arena-spieltag-status muted" role="status">
+              <span className="oly-arena-spin" aria-hidden />
+              {ladeKader ? "Kader werden geladen …" : "Arena wird aufgebaut …"}
+            </div>
+          ) : null}
+          {keinHeimKader || keinGastKader ? (
+            <div className="oly-arena-spieltag-status muted" role="status">
+              Ein Team dieses Spiels hat keinen Spieler mit vollständigem Attribut-Bogen.
+            </div>
+          ) : null}
+        </section>
+        <style>{`
+          .oly-arena-spin{width:14px;height:14px;flex:none;border-radius:50%;
+            border:2px solid rgba(255,255,255,0.18);border-top-color:#F2A03D;
+            animation:olyArenaDrehen 800ms linear infinite}
+          @keyframes olyArenaDrehen{to{transform:rotate(360deg)}}
+          @media (prefers-reduced-motion:reduce){.oly-arena-spin{animation:none}}
+        `}</style>
+        {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10 }} /> : null}
+      </>
+    );
+  }
 
   return (
     <>

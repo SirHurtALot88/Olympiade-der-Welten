@@ -7188,6 +7188,29 @@
   // da, gilt es — auch leer. `let`, weil kaderSetzen() es fuer Messungen austauschen darf.
   const alsMutatorListe=(m)=>Array.isArray(m)?m.map(t=>String(t==null?"":t).trim()).filter(Boolean).slice(0,2):null;
   let kaderMutatoren=echterKader?alsMutatorListe(echterKader.mutatoren):null;
+  // SPIELTAGS-ANSICHT (02.11., FoundationBattleArenaHost.tsx `spieltag`-Modus): der Host zeigt hier
+  // das Spiel, das der Hintergrund-Vorlauf schon GEBUCHT hat. Jede Hand am Spiel (Zielansage,
+  // Fokus, Rennplan) wuerde den Verlauf veraendern und damit etwas anderes zeigen, als gebucht ist
+  // -- im Zuschau-Modus sind diese Eingriffe deshalb aus. Ohne das Feld (Entwurfsreiter,
+  // Standalone, Headless-Lauf) bleibt alles wie bisher.
+  const nurZuschauen=!!(echterKader&&echterKader.nurZuschauen===true);
+  // QUICK-SIM (schnellDurch(), s. window.__arena): solange er laeuft, bleibt der Ton stumm, und der
+  // zuletzt im Endstand gezeigte Sieger wird fuer das Ende-Ereignis an den Host gemerkt. Beides
+  // reine Anzeige -- hier oben deklariert, weil sfx()/setzeEsiegerKlasse() weit unten stehen.
+  let schnelldurchAktiv=false;
+  let letzterAngezeigterSieger=null;
+  // Waehrend des Vorspulens bauten Kaderleiste und Wertungstabelle ihre Kacheln bei JEDEM Tick neu
+  // (gemessen: ~11 ms je Tick im Battlefield-Pod, fast alles erzwungene Stil-Neuberechnung) -- das
+  // Vorspulen lief damit kaum schneller als Echtzeit. Gedrosselt auf ~4 Mal je Sekunde; am Ende
+  // baut schnellDurch() beide einmal vollstaendig. Reine Anzeige.
+  let schnelldurchDomZuletzt=0;
+  function schnelldurchDomGedrosselt(){
+    if(!schnelldurchAktiv)return false;
+    const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    if(jetzt-schnelldurchDomZuletzt<250)return true;
+    schnelldurchDomZuletzt=jetzt;
+    return false;
+  }
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
   // widerspricht sich selbst, sobald echte Teams eingespeist wurden. Der Host schickt die
   // Namen im selben Umschlag mit (meta.heimName/gastName); ohne sie (Standalone/Artefakt)
@@ -40627,6 +40650,7 @@
   // etwas umlernen muss.
   let wertungKopfStand="";
   function renderWertungTabelle(){
+    if(schnelldurchDomGedrosselt())return; // Quick-Sim, s. schnelldurchDomGedrosselt()
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
     // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
@@ -42072,6 +42096,7 @@
   const bkPegel=(basis)=>bkMuted?0:basis*bkVolume/0.6; // /0.6, weil 0.6 die alte Default-Basislautstaerke war
   const bkSfxPool={};
   function bkSfx(name,vol){
+    if(schnelldurchAktiv)return; // Quick-Sim, s. sfx()
     try{
       let pool=bkSfxPool[name];
       if(!pool){pool=bkSfxPool[name]=[0,1,2].map(()=>{const a=new Audio("/sound/basketball/"+name);a.preload="auto";return a;});}
@@ -42619,6 +42644,7 @@
   // Unbekannte Disziplin/Ereignis, ein fehlender AudioContext (z.B. in Node/Playwright ohne
   // Audio-Geraet) oder ein Aufruf vor der ersten Nutzergeste sind alle stille No-Ops.
   function sfx(disziplin,ereignis,vol){
+    if(schnelldurchAktiv)return; // Quick-Sim: tausende Ereignisse in Sekunden, kein Tongewitter
     try{
       const eintrag=(TON_KATALOG[disziplin]||{})[ereignis];
       if(!eintrag||eintrag.loop)return; // Loop-Eintraege laufen ueber tonLoopStart/-Stop
@@ -51067,6 +51093,12 @@
 
   function finish(){
     if(done)return;done=true;running=false;
+    // Ende-Meldung an den Host (Spieltags-Ansicht, s. meldeSpielEnde) -- erst NACH diesem Aufruf,
+    // wenn Endstand und Sieger-Banner stehen. Reine Mitteilung, beruehrt keinen Spielzustand.
+    // `if(done)`: headless Laeufe (window.__arena.spiele*, Pod-Vorberechnungen) gehen ebenfalls
+    // durch finish(), stellen danach aber per M.zurueck() den sichtbaren Zustand wieder her -- ist
+    // das sichtbare Spiel beim Feuern nicht zu Ende, war es kein Ende, das jemand gesehen hat.
+    setTimeout(()=>{ if(done)meldeSpielEnde(); },0);
     document.getElementById("play").textContent="Vorbei";
     renderEndstand();
     // BATTLEFIELD-DOMINATION (s. ARENA_DOMINATION/dominationSieger oben): eigene Feed-
@@ -51498,8 +51530,12 @@
   let endstandNachlaufAn=true;  // Sonden-Schalter (window.__arena.endstandNachlauf)
   let endstandNachlauf=null;    // {seitMs, render, stinger}
   function endstandVormerken(render,sieger){
-    if(!endstandNachlaufAn){ render(); return; }
-    endstandNachlauf={seitMs:jetztMs(), render, stinger:false};
+    // Spieltags-Ansicht: Feldspiel/Buehne/Bahn enden nicht ueber finish(), sondern hier -- die
+    // Ende-Meldung an den Host (meldeSpielEnde) geht raus, sobald das Endstand-Overlay mit seinem
+    // Sieger-Banner wirklich steht. Reine Mitteilung, die Wertung beruehrt das nicht.
+    const renderUndMelden=()=>{ render(); setTimeout(()=>{ if(done)meldeSpielEnde(); },0); };
+    if(!endstandNachlaufAn){ renderUndMelden(); return; }
+    endstandNachlauf={seitMs:jetztMs(), render:renderUndMelden, stinger:false};
     teamFeierAusloesen(sieger,"finale",null);
     // Der Score-Bug wurde in diesem Frame schon VOR dem done-Zweig aktualisiert (und dabei,
     // weil `done` neu ist und der Nachlauf noch nicht vermerkt war, ausgeblendet) -- sofort
@@ -51515,7 +51551,12 @@
     if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
   }
 
+  let schnelldurchLetztesBild=0;
   function loop(ts){
+    // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
+    // ~5 Bilder je Sekunde, damit die Rechnung die Zeit bekommt. Reine Anzeige.
+    if(schnelldurchAktiv&&ts-schnelldurchLetztesBild<200){ last=ts; requestAnimationFrame(loop); return; }
+    schnelldurchLetztesBild=ts;
     if(!last)last=ts;
     let dt=Math.min(.05,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
@@ -52054,6 +52095,7 @@
   // gar nichts zu beeinflussen. Verallgemeinert wird, wenn die zweite Live-Disziplin
   // kommt (s. docs/design/battle-arena-multi-disziplin-plan.md), nicht vorher.
   function fokusAuswahlMoeglich(){
+    if(nurZuschauen)return false; // Spieltags-Ansicht: gebucht ist ohne Eingriff, s. nurZuschauen
     return !!LIVE()&&istFeldspiel(disc)&&!!fsLive;
   }
   // Liefert den gerade WIRKSAMEN Fokus-Spieler von Seite 0 — automatische Vorgabe oder
@@ -52178,7 +52220,7 @@
   // NUR DIE EIGENE SEITE. Einem gegnerischen Laeufer etwas anzusagen ergibt keinen Sinn
   // — das ist die genaue Umkehrung des Fokus-Doppelns, das nur Gegner zulaesst.
   const BAHN_GREIF_RADIUS=30;
-  function rennplanMoeglich(){ return istBahn(disc)&&LAEUFER.length>0; }
+  function rennplanMoeglich(){ return !nurZuschauen&&istBahn(disc)&&LAEUFER.length>0; }
   // `fertig==null` gehoert in die Abfrage, nicht nur in den Klick: wer waehrend der
   // offenen Ansage ins Ziel laeuft oder ausscheidet, ist nicht mehr ansprechbar — die
   // Zeile faellt dann von selbst auf ihren Hinweistext zurueck, statt Knoepfe zu zeigen,
@@ -52589,7 +52631,7 @@
   // deshalb hier an der Quelle statt an einer weiteren CSS-Ausnahme.
   // POD (02.11.): keine Zielansage — sie gilt fuer "Seite 0 gegen Seite 1", im Vier-Team-FFA ist
   // Seite 0 nicht zwingend das eigene Team, und Gegner gibt es drei.
-  const ansageMoeglich=()=>istKampf(disc)&&disc!=="mini-dm"&&!bfPodAktiv()&&U.length>0;
+  const ansageMoeglich=()=>!nurZuschauen&&istKampf(disc)&&disc!=="mini-dm"&&!bfPodAktiv()&&U.length>0;
   // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
   // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
   // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
@@ -52826,6 +52868,7 @@
   }
 
   function renderKader(){
+    if(schnelldurchDomGedrosselt())return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
@@ -53259,6 +53302,7 @@
   // battle-mode.css in Heim-/Gastfarbe aufleuchten; keine Klasse bleibt die alte
   // neutrale --warn-Faerbung (Unentschieden/noch keine Wertung).
   function setzeEsiegerKlasse(sieger){
+    letzterAngezeigterSieger=(sieger===0||sieger===1)?sieger:null; // fuer meldeSpielEnde()
     const e=document.getElementById("esieger");
     if(!e)return;
     e.className="esieger"+(sieger===0?" sieg-h":sieger===1?" sieg-a":"");
@@ -56760,6 +56804,9 @@
     // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
     // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
     function zeigeEndstand(){
+      // Mini-DM endet nicht ueber finish(), sondern hier -- dieselbe Ende-Meldung an den Host.
+      letzterAngezeigterSieger=null;
+      setTimeout(meldeSpielEnde,0);
       if(titelkarte)titelkarte.hidden=true;
       if(rundenbanner)rundenbanner.hidden=true;
       if(ctrlBox)ctrlBox.hidden=true;
@@ -58510,7 +58557,90 @@
     } finally { M.zurueck(g); }
   }
 
+  // ===================================================================================
+  // SPIELTAGS-ANSICHT (02.11.): QUICK-SIM UND ENDE-MELDUNG FUER DEN HOST.
+  //
+  // `FoundationBattleArenaHost.tsx` zeigt im `spieltag`-Modus (eingebettet in die Arena des
+  // normalen Spieltagsablaufs) das Spiel, das der Hintergrund-Vorlauf gebucht hat. Zwei Dinge
+  // fehlten dafuer:
+  //
+  //  1. EIN QUICK-SIM: schnellDurch() spult das laufende (oder noch nicht gestartete) Spiel bis zum
+  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe Funktion stepSim(), derselbe feste Tick
+  //     (1/60)/zeitFaktor(), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --, nur so
+  //     viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo 1x/2x/4x
+  //     aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel exakt dort,
+  //     wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine zweite Rechnung.
+  //     Mini-DM hat seine Rundenshow statt Ticks; dort ist Quick-Sim dasselbe wie "Alles zeigen".
+  //  2. EINE ENDE-MELDUNG: meldeSpielEnde() schickt `oly-arena:ende` (window-CustomEvent) mit der
+  //     Disziplin und dem im Endstand gezeigten Sieger (0 = Heim, 1 = Gast, null = offen/Pod). Der
+  //     Host bucht daraufhin den Snapshot, den die Arena gerade abgespielt hat.
+  //
+  // Beides beruehrt weder rr() noch wert()/Boxscore/Rangtreue noch einen headless Pfad
+  // (window.__arena.spiele*): die zaehlende Wertung laeuft unveraendert im Vorlauf.
+  function meldeSpielEnde(){
+    try{
+      window.dispatchEvent(new CustomEvent("oly-arena:ende",{detail:{disziplin:disc,sieger:letzterAngezeigterSieger}}));
+    }catch(e){}
+  }
+  let schnelldurchVersprechen=null;
+  function schnellDurch(){
+    if(disc==="mini-dm"){
+      const startBtn=document.getElementById("mdffaStart");
+      if(startBtn)startBtn.disabled=true;
+      if(mdffaSpringeZumEnde)mdffaSpringeZumEnde();
+      return Promise.resolve({disc,done:true,ticks:0});
+    }
+    if(done)return Promise.resolve({disc,done:true,ticks:0});
+    if(schnelldurchVersprechen)return schnelldurchVersprechen;
+    const startDisc=disc;
+    // Countdown/Einlauf weg, Echtzeit-Schleife anhalten: loop() tickt nur, solange `running`.
+    anpfiffLauf=null; anpfiffOverlayAus(); zeigeEinlauf(false); anpfiffErfolgt=true;
+    running=false;
+    bkLoopStop(); tonLoopStop();
+    schnelldurchAktiv=true;
+    const playBtn=document.getElementById("play");
+    if(playBtn){ playBtn.disabled=true; playBtn.textContent="Spult vor …"; }
+    const zf=zeitFaktor();
+    const GRENZE=600000; // Notbremse (~2,8 h Sendezeit) -- kein echtes Spiel kommt in die Naehe
+    let ticks=0;
+    schnelldurchVersprechen=new Promise((resolve)=>{
+      const ende=(ergebnis)=>{
+        schnelldurchAktiv=false; schnelldurchVersprechen=null;
+        try{ renderKader(); renderWertungTabelle(); }catch(e){}
+        if(playBtn){ playBtn.disabled=false; if(!done)playBtn.textContent="Weiter"; }
+        draw();
+        resolve(ergebnis);
+      };
+      const schritt=()=>{
+        // Disziplinwechsel/Reset mitten im Vorspulen: der neue Aufbau gehoert nicht mehr dazu.
+        if(disc!==startDisc){ ende({disc:startDisc,done:false,ticks,abgebrochen:true}); return; }
+        const bis=wandMs()+120;
+        while(!done&&ticks<GRENZE&&wandMs()<bis){
+          tickerSendeT+=1/60;
+          stepSim((1/60)/zf);
+          stepFloats();
+          ticksSeitReset++;
+          ticks++;
+          if(istFeldspiel(disc))updateHudFeldspiel();
+          else if(istBuehne(disc))updateHudBuehne();
+          else if(istBahn(disc))updateHudBahn();
+        }
+        if(done||ticks>=GRENZE){
+          // Quick-Sim springt auch ueber den Endstand-Nachlauf (3,5 s Feierpause) direkt ans Ende.
+          const n=endstandNachlauf; if(n){ endstandNachlauf=null; n.render(); }
+          ende({disc,done,ticks}); return;
+        }
+        setTimeout(schritt,0);
+      };
+      setTimeout(schritt,0);
+    });
+    return schnelldurchVersprechen;
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
+    // SPIELTAGS-ANSICHT (s. schnellDurch()/meldeSpielEnde() direkt darueber).
+    schnellDurch,
+    spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
