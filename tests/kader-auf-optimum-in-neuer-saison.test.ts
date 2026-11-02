@@ -196,6 +196,9 @@ describe("Kauffenster der neuen Saison: der organische Planer pickt, kein Fuell-
     // wieder aufrufen, ohne dass ein Test darueber stolpert.
     const quelle = readFileSync(join(process.cwd(), "app/api/ai/preseason-background/route.ts"), "utf8");
     expect(quelle).not.toContain("runAutoRosterFillForMatchdaySetup");
+    // Die Lauf-Logik steht seit dem 02.11. im Dienst — dort gilt dieselbe Sperre.
+    const dienst = readFileSync(join(process.cwd(), "lib/ai/ai-preseason-background-service.ts"), "utf8");
+    expect(dienst).not.toContain("runAutoRosterFillForMatchdaySetup");
   });
 
   it("der Fuell-Dienst selbst bleibt erhalten — Saison 1 und der Handgriff brauchen ihn", () => {

@@ -28,7 +28,9 @@ const lies = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
 
 describe("Am Saisonende wird weder gedraftet noch gekauft", () => {
   it("das Server-Gate fuer den Setup-Draft fragt nach Spieltagsergebnissen", () => {
-    const text = lies("app/api/ai/preseason-background/route.ts");
+    // Die Logik der Route steht seit dem 02.11. im Dienst (der Server stoesst sie beim Saisonwechsel
+    // selbst an); die Route reicht nur noch durch.
+    const text = lies("lib/ai/ai-preseason-background-service.ts");
     const start = text.indexOf("function shouldRunSetupDraft");
     expect(start, "shouldRunSetupDraft nicht gefunden — umbenannt?").toBeGreaterThan(-1);
     const block = text.slice(start, text.indexOf("\n}", start));
