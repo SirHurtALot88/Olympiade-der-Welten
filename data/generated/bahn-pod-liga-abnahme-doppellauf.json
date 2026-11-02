@@ -1,0 +1,559 @@
+{
+  "datum": "2026-11-02T12:56:47.099Z",
+  "saveId": "new-game-1793623735249-znpdby",
+  "spieltageJeStrom": 2,
+  "feldgroessen": [
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "rennLaufzeitMsJeDisziplinUndSpieltag": 4849,
+  "ergebnis": {
+    "staffel": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.735,
+            "rhoPodMedian": 0.869,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.972,
+            "teamStaerkstesAufPlatz1Pct": 0.625,
+            "teamRhoEignungGegenPlatzMittel": 0.725,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.438,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.82,
+            "rhoPodMedian": 0.865,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.992,
+            "teamStaerkstesAufPlatz1Pct": 0.938,
+            "teamRhoEignungGegenPlatzMittel": 0.85,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.438,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.858,
+            "rhoPodMedian": 0.874,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.993,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.825,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.625,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.859,
+            "rhoPodMedian": 0.86,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.993,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.863,
+            "siegerAndersAlsPpsPodPct": 0.188,
+            "plaetzeAndersAlsPpsPodPct": 0.438,
+            "unterbesetzt": {
+              "teams": 4,
+              "siegquote": 0,
+              "mittlererPlatz": 4,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 60,
+              "siegquote": 0.267,
+              "mittlererPlatz": 2.4
+            }
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.897,
+            "rhoPodMedian": 0.908,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.993,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.563,
+            "unterbesetzt": {
+              "teams": 14,
+              "siegquote": 0,
+              "mittlererPlatz": 3.429,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 50,
+              "siegquote": 0.32,
+              "mittlererPlatz": 2.24
+            }
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.771,
+            "rhoPodMedian": 0.774,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.986,
+            "teamStaerkstesAufPlatz1Pct": 0.625,
+            "teamRhoEignungGegenPlatzMittel": 0.638,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.831,
+            "rhoPodMedian": 0.863,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.989,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.775,
+            "siegerAndersAlsPpsPodPct": 0.188,
+            "plaetzeAndersAlsPpsPodPct": 0.625,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.857,
+            "rhoPodMedian": 0.898,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.996,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.763,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.625,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.841,
+            "rhoPodMedian": 0.866,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.987,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.8,
+            "siegerAndersAlsPpsPodPct": 0.188,
+            "plaetzeAndersAlsPpsPodPct": 0.625,
+            "unterbesetzt": {
+              "teams": 4,
+              "siegquote": 0,
+              "mittlererPlatz": 3.75,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 60,
+              "siegquote": 0.267,
+              "mittlererPlatz": 2.417
+            }
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.899,
+            "rhoPodMedian": 0.902,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.994,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.8,
+            "siegerAndersAlsPpsPodPct": 0.438,
+            "plaetzeAndersAlsPpsPodPct": 0.625,
+            "unterbesetzt": {
+              "teams": 15,
+              "siegquote": 0.067,
+              "mittlererPlatz": 3.267,
+              "davonEignungsbesterJeLaeufer": 1,
+              "davonEignungsbesterSiege": 1
+            },
+            "vollbesetzt": {
+              "teams": 49,
+              "siegquote": 0.306,
+              "mittlererPlatz": 2.265
+            }
+          }
+        }
+      }
+    ],
+    "takeshis-castle": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.785,
+            "rhoPodMedian": 0.786,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 1,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.688,
+            "siegerAndersAlsPpsPodPct": 0.5,
+            "plaetzeAndersAlsPpsPodPct": 0.813,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.755,
+            "rhoPodMedian": 0.791,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.994,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.729,
+            "rhoPodMedian": 0.773,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.75,
+            "paartreueAb15Pct": 0.982,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.738,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.793,
+            "rhoPodMedian": 0.805,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.982,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.85,
+            "siegerAndersAlsPpsPodPct": 0.188,
+            "plaetzeAndersAlsPpsPodPct": 0.438,
+            "unterbesetzt": {
+              "teams": 2,
+              "siegquote": 0,
+              "mittlererPlatz": 3.5,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 62,
+              "siegquote": 0.258,
+              "mittlererPlatz": 2.468
+            }
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.783,
+            "rhoPodMedian": 0.82,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.981,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.25,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 22,
+              "siegquote": 0,
+              "mittlererPlatz": 3.273,
+              "davonEignungsbesterJeLaeufer": 2,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 42,
+              "siegquote": 0.381,
+              "mittlererPlatz": 2.095
+            }
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.734,
+            "rhoPodMedian": 0.734,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.992,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.638,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.813,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.758,
+            "rhoPodMedian": 0.825,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.987,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.25,
+            "plaetzeAndersAlsPpsPodPct": 0.813,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.733,
+            "rhoPodMedian": 0.801,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.968,
+            "teamStaerkstesAufPlatz1Pct": 0.938,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 0,
+              "siegquote": null,
+              "mittlererPlatz": null,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 64,
+              "siegquote": 0.25,
+              "mittlererPlatz": 2.5
+            }
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.758,
+            "rhoPodMedian": 0.809,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 0.978,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.738,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.688,
+            "unterbesetzt": {
+              "teams": 2,
+              "siegquote": 0,
+              "mittlererPlatz": 4,
+              "davonEignungsbesterJeLaeufer": 0,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 62,
+              "siegquote": 0.258,
+              "mittlererPlatz": 2.452
+            }
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.767,
+            "rhoPodMedian": 0.801,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 0.75,
+            "paartreueAb15Pct": 0.974,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.838,
+            "siegerAndersAlsPpsPodPct": 0.25,
+            "plaetzeAndersAlsPpsPodPct": 0.75,
+            "unterbesetzt": {
+              "teams": 22,
+              "siegquote": 0,
+              "mittlererPlatz": 3.318,
+              "davonEignungsbesterJeLaeufer": 2,
+              "davonEignungsbesterSiege": 0
+            },
+            "vollbesetzt": {
+              "teams": 42,
+              "siegquote": 0.381,
+              "mittlererPlatz": 2.071
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -19,6 +19,11 @@ Pod-Resolve, Referenzen, Vorlauf mit Schalter, Vier-Team-Anzeige in der Arena, E
 `VIERER_POD_DISCIPLINE_IDS`. Duell weiter bit-identisch (0,937 / 0,898), echter End-to-End-Lauf
 über einen Test-Spielstand grün.
 
+**Stand 02.11. spät:** Der Exploit „unterbesetzte Staffel gewinnt“ (6.3) ist behoben, nach Chris'
+Regel (a) mit seiner Präzisierung: fehlende Läufer laufen doppelt und behalten dabei ihre
+Erschöpfung (Abschnitt 6.8). Unterbesetzt ist jetzt in jeder Messung ein Nachteil, monoton in der
+Kopfzahl. Duell bei voller Besetzung weiter bit-identisch (0,937 / 0,898).
+
 ## 1. Was gebaut ist
 
 **Das Bahn-Chassis kennt N Seiten** (`public/mockups/battle-mode.engine.js`):
@@ -494,6 +499,7 @@ nicht betroffen, dort zählt die Summe der Burgpunkte, und weniger Läufer heiß
 weil vier Teams mit verschiedener Besetzung gegeneinander laufen. Ein Manager könnte das sogar
 ausnutzen, indem er absichtlich nur zwei Läufer setzt. Eine Lösung ist eine Regelentscheidung für
 Chris, s. 6.7. Am Motor wurde dafür bewusst nichts geändert, das Duell ist abgenommen.
+**Behoben am 02.11. (Abschnitt 6.8):** Chris hat Regel (a) gewählt, fehlende Läufer laufen doppelt.
 
 ### 6.4 Echter End-to-End-Lauf über einen Test-Spielstand
 
@@ -570,10 +576,144 @@ Für Tests ohne Host gibt es `window.__arena.bahnPodAnzeigen(bd, pod)` (`null` s
 - **Namensgleichheit über Teams.** `place` ist nach Spielernamen geschlüsselt. Tragen zwei Pod-Teams
   einen Spieler mit identischem Namen, überschreibt sich ihre Aufstellung. Das betrifft auch Mini-DM
   und Battlefield und ist im Live-Abbild nicht vorgekommen.
-- **Unterbesetzte Staffel ist schneller (6.3), Frage an Chris.** Drei mögliche Regeln:
-  (a) Die Beinzahl ist die Kopfzahl des Spielplan-Slots, fehlende Beine laufen die vorhandenen
-  Läufer ein zweites Mal (realistisch, braucht Doppel-Einsätze im Motor). (b) Ein fehlendes Bein
-  kostet eine Strafzeit, z. B. die Etappenzeit des langsamsten eigenen Läufers. (c) Eine
-  unterbesetzte Staffel wird hinter allen vollbesetzten gewertet. Jede Variante gilt für Duell und
-  Pod und braucht danach eine neue Duell-Abnahme.
+- ~~**Unterbesetzte Staffel ist schneller (6.3), Frage an Chris.**~~ **Entschieden und umgesetzt
+  am 02.11., s. 6.8.** Zur Wahl standen: (a) Die Beinzahl ist die Kopfzahl des Spielplan-Slots,
+  fehlende Beine laufen die vorhandenen Läufer ein zweites Mal (realistisch, braucht Doppel-Einsätze
+  im Motor). (b) Ein fehlendes Bein kostet eine Strafzeit, z. B. die Etappenzeit des langsamsten
+  eigenen Läufers. (c) Eine unterbesetzte Staffel wird hinter allen vollbesetzten gewertet. Chris
+  hat (a) gewählt.
 - Die Folgefrage aus 5.4 (Pod-Rezept der Staffel auch im Duell) bleibt offen.
+
+### 6.8 Unterbesetzte Staffel: fehlende Läufer laufen doppelt (02.11.)
+
+**Chris' Entscheidung:** Regel (a) aus 6.7. Dazu seine Präzisierung, wörtlich: „Wichtig ist, dass
+die Läufer ihre Erschöpfung dann auch beibehalten. Also nicht, dass dann einfach der beste Spieler
+nochmal laufen darf und dann das Ergebnis besser ist, als wenn irgendein anderer das gemacht hätte.
+Weil bei allen anderen Disziplinen hättest du automatisch einen Nachteil. […] wenn du da einen
+Spieler weniger hast, dann verlierst der die Runde ja automatisch. […] Oder wenn die gleichzeitig
+kämpfen, hast du ja natürlich auch einen Nachteil bei 6-5 oder so.“
+
+Daraus folgen zwei Abnahmen: Der Exploit muss weg, und Unterbesetzung muss ein **spürbarer
+Nachteil** bleiben. Neutral reicht nicht, ein Vorteil schon gar nicht.
+
+#### Die Regel im Motor (`public/mockups/battle-mode.engine.js`)
+
+| Stelle | Was sie tut |
+|---|---|
+| `staffelBeinZiel` in `bauSpurt()` | Alle Seiten laufen **dieselbe Beinzahl**: die größte gemeldete Läuferzahl, im Pod mindestens die Kopfzahl des Spielplan-Slots (`bahnPodJeTeam`). Im Duell kennt der Motor den Slot nicht, dort gilt die größere der beiden Meldungen. Melden beide gleich viele (auch beide fünf), ändert sich nichts. |
+| `L.beineListe` in `setz()` | Eine unterbesetzte Seite mit m Läufern verteilt die Beine **reihum**: Bein j läuft Läufer j mod m, also Läufer i die Beine i, i+m, i+2m … Bei voller Besetzung bekommt niemand eine Liste, und jede andere Stelle rechnet wie vorher. |
+| Wechsel-Block in `stepSpurt()` | Nach seiner Übergabe geht der Läufer in die Wechselzone seines nächsten Beins und wartet dort. Wartende verbrauchen nichts, erholen sich aber auch nicht: **Puste (`reserve`, `leer`) wird zwischen den Beinen nicht aufgefüllt.** |
+| `tempoVon()`, Ermüdung | `anteil = laufAnteil + beineFertig`. Ein zweites Bein beginnt dort, wo das erste aufgehört hat, also mit voller Ermüdung (`mued`), und nicht frisch bei 0. Ein frischer Läufer erreicht diesen Zustand erst am Ende seines Beins. Wie hart das trifft, hängt am Stehvermögen (STEHEN, also Stamina/Will/Determination). |
+| Einzelläufer (m = 1) | Er übergibt an sich selbst und geht durch jede Wechselzone (Stab ablegen und neu aufnehmen, Zeit aus seinem eigenen TECHNIK). Ohne das sparte ein Ein-Mann-Team alle k−1 Wechsel. Gemessen schlug es in einer Paarung das Zwei-Mann-Team, 30 statt 14 Siege von 30. |
+| Einzelwert (Boxscore, Spieler-PP) | Gewertet wird das **erste** Bein (`etappenZeit`) samt den Übergaben an diesem Bein, wie bei jedem anderen Läufer. Die Zusatzbeine stehen in `zusatzZeiten` bzw. im Boxscore als `beine` / `zusatzEtappen` und wirken voll über die **Teamzeit**, also dort, wo die Liga bucht. So misst der Einzelwert den Läufer und nicht die Unterbesetzung. |
+
+Takeshi ist nicht betroffen. Dort ist der Teamwert die Summe der Burgpunkte, und weniger Läufer
+bringen ohnehin weniger Punkte.
+
+#### Abnahme 1: Voll besetzt ändert sich nichts
+
+- `scripts/miss-alle-disziplinen.mjs 24 staffel takeshis-castle`: **0,937 / 0,898**, dieselbe
+  Ausgabe wie vorher. Das Skript läuft kaderfest mit sechs gegen sechs.
+- `tests/bahn-pod-vier-teams.test.ts`: Die Duell-Fingerabdrücke aller fünf Bahnen und die
+  Pod-Fingerabdrücke sind unverändert grün.
+- Die Pp-Abnahme läuft mit voller Besetzung und ist damit ebenfalls unberührt.
+
+#### Abnahme 2: Unterbesetzt ist ein Nachteil, monoton in der Kopfzahl
+
+Werkzeug: `node scripts/miss-staffel-unterbesetzt.mjs <duell|pod>`. Mit `--wurzel=<Checkout>` misst
+es einen anderen Engine-Stand, die Spalten „vorher“ kommen so aus einem Worktree am Commit
+`e099e74ef`.
+
+**Duell-A/B** (echtes `spieleBahn`, Duell-Rezept, Aufstellung über `__olyArenaKader` wie im
+Runner). Der Gast setzt seine **besten m** nach Staffel-Eignung, der Heim läuft voll. Jede der fünf
+Familienpaarungen läuft in beiden Richtungen, mit 30 Saaten, also 300 Rennen je Zeile. Das ist der
+strengste Fall: Das unterbesetzte Team hat im Schnitt die *höhere* Eignung je Läufer als dasselbe
+Team voll besetzt, weil seine schwächsten Läufer fehlen.
+
+| Gast setzt | Siegquote Gast, vorher | Siegquote Gast, jetzt |
+|---|---:|---:|
+| 6 (voll) | 48,3 % | 48,3 % |
+| 5 | 56,7 % | 39,3 % |
+| 4 | 70,7 % | 36,0 % |
+| 3 | 81,0 % | 29,3 % |
+| 2 | **90,0 %** | 24,7 % |
+| 1 | 71,7 % | 18,3 % |
+
+Die Siegquote fällt jetzt **in jeder einzelnen Paarung** monoton mit der Kopfzahl. Ein Rest bleibt:
+In einer Paarung (Gast weit stärker als Heim, voll besetzt 30/30) gewinnt der Gast auch mit einem
+Läufer noch alle 30. Unterbesetzung kostet Zeit, sie hebt aber keinen großen Stärkeunterschied auf.
+Das ist dieselbe Logik wie bei 5 gegen 6 im Kampf.
+
+**Pod-A/B** (`spieleBahnPod`, k = 6). Ein Team in derselben Vierergruppe mit derselben Saat und
+denselben Formkarten setzt einmal alle sechs und einmal nur seine besten m. Das Team rotiert über
+die vier Positionen, 40 Gruppen × 3 Saaten = 120 Rennen je Zeile.
+
+| m | Zielzeit-Verlust, jetzt | mittlerer Platz, jetzt (voll 2,34) | Siege, jetzt (voll 40) | vorher: Zeit / Platz / Siege |
+|---:|---:|---:|---:|---|
+| 5 | +0,21 s | 2,57 | 27 | −0,20 s / 2,23 / 39 |
+| 4 | +0,45 s | 2,83 | 24 | −0,36 s / 1,96 / 55 |
+| 3 | +0,80 s | 3,07 | 16 | −0,63 s / 1,77 / 70 |
+| 2 | +1,08 s | 3,28 | 11 | −0,91 s / 1,59 / 84 |
+| 1 | +1,48 s | 3,57 | 1 | −0,87 s / 1,57 / 83 |
+
+Zum Maßstab: m90 der Staffel-Zielzeit-Lücke liegt bei k = 6 bei 1,03 s (6.2). Ein fehlender Läufer
+kostet also rund ein Fünftel einer typischen Lücke, vier fehlende kosten eine ganze.
+
+**Erschöpfung nachgemessen** (Duell, Gast mit zwei Läufern, Saat 42): Die zwei laufen je drei Beine
+(`beine` [0, 2, 4] bzw. [1, 3, 5]). Cassandra braucht für ihr erstes Bein 1,55 s, für die Zusatzbeine
+1,96 s / 1,97 s. Bei Tidesprinter sind es 1,64 s, dann 2,09 s / 2,07 s. Das sind +26 % bzw. +27 %.
+
+#### Abnahme 3: rho bleibt, auch mit Unterbesetzten
+
+Gemessen wurde rho je Rennen im selben Pod-A/B (`miss-staffel-unterbesetzt.mjs pod`, 120 Rennen je
+Zelle), Basis-Eignung gegen Boxscore-Wert, wenn ein Team nur m Läufer setzt:
+
+| rho je Rennen (Median) | m = 6 | 5 | 4 | 3 | 2 | 1 |
+|---|---:|---:|---:|---:|---:|---:|
+| vorher | 0,811 | 0,660 | 0,465 | 0,441 | 0,482 | 0,602 |
+| jetzt | 0,811 | 0,810 | 0,813 | 0,815 | 0,827 | 0,813 |
+
+Vorher zerriss ein unterbesetztes Team auch die Einzelwertung: seine Läufer liefen lange Beine, und
+eine lange Etappenzeit heißt einen schlechten Rang. Jetzt bleibt rho auf dem Niveau der vollen
+Besetzung, über 0,80 in jeder Zeile. Die Absolutwerte liegen unter der Abnahmesonde (0,91), weil diese Messung die Basis-Eignung
+`d.staffel` ohne Slot- und Formzuschlag nimmt. Für den Vergleich vorher/jetzt ist das unerheblich.
+
+#### Abnahme 4: Liga über den Produktionspfad
+
+`scripts/miss-bahn-pod-liga-abnahme.ts --spieltage=2` misst jetzt zusätzlich unterbesetzte gegen
+vollbesetzte Teams (Siegquote, mittlerer Platz). Das Ergebnis steht in
+`data/generated/bahn-pod-liga-abnahme-doppellauf.json`; die Datei aus 6.3 bleibt als Vorher-Stand
+stehen. **Achtung:** Jeder Lauf baut einen neuen Liga-Save mit eigenem KI-Draft. Die Zeilen sind
+deshalb nicht Pod für Pod mit 6.3 vergleichbar. Das zeigt sich an Takeshi, dessen Motor unverändert
+ist und der trotzdem um bis zu 0,08 wandert. Den ursächlichen Vergleich liefern die A/B-Messungen
+oben.
+
+| Staffel, k = 6, Strom 0 / 1 | jetzt |
+|---|---|
+| unterbesetzte Teams (2–5 statt 6 Läufer) | 14 / 15 |
+| davon Sieger | **0 / 1** (0 % / 6,7 %) |
+| mittlerer Platz unterbesetzt | 3,43 / 3,27 |
+| Siegquote / mittlerer Platz vollbesetzt | 32 % / 2,24 · 31 % / 2,27 |
+| rho je Pod (Median) | 0,908 / 0,902 (6.3: 0,82 / 0,83) |
+| Team-rho (Eignung gegen Platz) | 0,75 / 0,80 (6.3: 0,41 / 0,47) |
+| Paare ab 15 richtig | 99,3 % / 99,4 % (6.3: 93 % / 93 %) |
+
+Das eine unterbesetzte Team, das noch gewann, war in seinem Pod das stärkste nach mittlerer Eignung
+je Läufer. Struktur in jeder Zelle: 64/64 Zeilen mit `quelle: "bahn"`, jeder Pod mit Punktesumme 3.
+
+Bei k = 2..4 gibt es keine unterbesetzten Teams, dort rechnet der Motor wie vorher. Die
+rho-Abweichungen gegenüber 6.3 kommen dort aus dem neuen Save: Staffel k = 2 Strom 1 liegt diesmal
+bei 0,774, Takeshi k = 2..4 zwischen 0,73 und 0,83. Bei 16 Pods je Zelle ist das Stichprobenrauschen;
+die kaderfeste Abnahme (5.3) ist dafür die belastbare Zahl.
+
+#### Tests
+
+- `tests/staffel-unterbesetzt-doppellauf.test.ts` (neu, echter Chromium) prüft drei Dinge:
+  Beinverteilung und Erschöpfung im Duell (zwei Gemeldete laufen je drei Beine, die Zusatzbeine sind
+  im Mittel mehr als 10 % langsamer als das eigene erste), das Duell-A/B (5 bzw. 2 Läufer gewinnen
+  seltener als 6) und das Pod-A/B (Zeit und Platz werden monoton schlechter bis m = 1). Am alten
+  Motor schlagen alle drei fehl.
+- `tests/staffel-weniger-als-sechs-laeufer.test.ts` bleibt grün: Melden beide Seiten fünf (vier,
+  zwei), laufen beide fünf (vier, zwei) Beine wie bisher.
+
+- Messwerkzeug: `scripts/miss-staffel-unterbesetzt.mjs` (Duell- und Pod-A/B mit rho).
