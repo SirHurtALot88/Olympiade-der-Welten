@@ -101,3 +101,24 @@ export function buildBattlefieldPodMatchSeed(input: {
 }): string {
   return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:battlefield-pod-ffa:${input.podId}`;
 }
+
+/**
+ * BAHN-POD-SAAT (02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6). Takeshi's Castle und
+ * Staffel laufen an Pod-Spieltagen als echtes Vier-Team-Rennen (`__arena.spieleBahnPod`). Anders als
+ * beim Battlefield-Pod ist diese Saat eine WERTUNGSSAAT: der zaehlende Lauf
+ * (`runBahnPodFixtures`, arena-headless-runner.ts) und die Arena-Anzeige
+ * (`echterKader.bahnPodByDisciplineId`, FoundationBattleArenaHost.tsx) bauen sie identisch, Formkarten
+ * inklusive (`formSaat` = dieselbe Saat). `podId` traegt Save/Saison/Spieltag/Liga-Stufe/Pod-Index und
+ * die Disziplin (`takeshis-castle-pod:…`/`staffel-pod:…`, getPodsForMatchday); die Disziplin steht
+ * trotzdem noch einmal im String, damit zwei Pod-Disziplinen desselben Spieltags nie dieselbe Saat
+ * ziehen, selbst wenn sich ein Pod-ID-Schema einmal aendert.
+ */
+export function buildBahnPodMatchSeed(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  disciplineId: string;
+  podId: string;
+}): string {
+  return `${input.saveId}:${input.seasonId}:${input.matchdayId}:arena:${input.disciplineId}-pod:${input.podId}`;
+}

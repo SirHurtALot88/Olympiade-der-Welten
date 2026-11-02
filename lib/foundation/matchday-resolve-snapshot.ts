@@ -18,7 +18,7 @@ import {
 } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
-import { berechneArenaEingabeHash, berechneBattlefieldPodEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
+import { berechneArenaEingabeHash, berechneBahnPodEingabeHash, berechneBattlefieldPodEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
 import { resolveMatchdayMutatorTraitsForDiscipline } from "@/lib/lineups/legacy-lineup-modifiers";
 import { BATTLEFIELD_DISCIPLINE_ID, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import { resolvePodPlayerCountForMatchday } from "@/lib/season/mini-dm-pod-schedule";
@@ -371,6 +371,8 @@ function findeArenaEingabeHashDivergenz(
     // Mini-DM-eigene Fingerabdruck, s. dortiger Kommentar.
     // BATTLEFIELD-POD (02.11. abends): ebenfalls ein Vierer-Pod, eigener Fingerabdruck
     // (`berechneBattlefieldPodEingabeHash()`), s. arena-vorlauf-service.ts.
+    // BAHN-POD (02.11.): an Pod-Tagen wurde Takeshi's Castle/Staffel als Vier-Team-Rennen
+    // vorgerechnet -- dann zaehlt der Pod-Fingerabdruck (`format: "bahn_pod"`), nicht der des Duells.
     const aktuellerHash =
       disciplineId === BATTLEFIELD_DISCIPLINE_ID
         ? berechneBattlefieldPodEingabeHash({
@@ -379,6 +381,16 @@ function findeArenaEingabeHashDivergenz(
             seasonId: scope.seasonId,
             matchdayId: scope.matchdayId,
             playerCount: resolvePodPlayerCountForMatchday(gameState, scope.matchdayId, BATTLEFIELD_DISCIPLINE_ID, { saveId: scope.saveId }),
+            mutatoren,
+          })
+        : eintrag.format === "bahn_pod"
+        ? berechneBahnPodEingabeHash({
+            gameState,
+            saveId: scope.saveId,
+            seasonId: scope.seasonId,
+            matchdayId: scope.matchdayId,
+            disciplineId,
+            playerCount: resolvePodPlayerCountForMatchday(gameState, scope.matchdayId, disciplineId, { saveId: scope.saveId }),
             mutatoren,
           })
         : disciplineId === MINI_DM_DISCIPLINE_ID

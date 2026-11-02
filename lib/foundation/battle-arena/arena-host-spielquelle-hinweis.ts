@@ -108,6 +108,20 @@ export function buildArenaHostSpielquelleHinweise(
       continue;
     }
     const zeile = findeDisziplinErgebnis(gameState, matchdayId, heimTeamId, slot.disciplineId);
+    // BAHN-POD (02.11.): Takeshi's Castle/Staffel sind arena-aufgeloest UND Pod-Disziplinen. Gebucht
+    // wird normalerweise das echte Vier-Team-Rennen (`miniDmPod.quelle === "bahn"`) -- dann ist die
+    // Arena die Wertung, kein Hinweis noetig. Fiel das Rennen aus, wurde der Pod per Eignungs-Score
+    // gewertet: das sagt der Hinweis, statt die Anzeige still als Wertung auszugeben.
+    if (zeile && zeile.teamPoints != null && zeile.resolutionSource === "mini_dm_pod" && zeile.miniDmPod?.quelle !== "bahn") {
+      hinweise.push({
+        disciplineId: slot.disciplineId,
+        disciplineName: slot.displayName,
+        text: zeile.arenaAusfall
+          ? `Rennen fiel aus (${arenaAusfallGrundLabel(zeile.arenaAusfall.grund)}) — an diesem Spieltag als 4-Team-Gruppe per Eignungs-Score gewertet`
+          : "wurde an diesem Spieltag als 4-Team-Gruppe per Eignungs-Score gewertet",
+      });
+      continue;
+    }
     if (!zeile || zeile.teamPoints == null || zeile.resolutionSource !== "pps_duell") {
       continue;
     }

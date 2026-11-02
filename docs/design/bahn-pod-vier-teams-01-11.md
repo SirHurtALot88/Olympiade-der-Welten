@@ -6,13 +6,18 @@ gelost, zwei Pod-Disziplinen am selben Spieltag erlaubt. Konzept und Größen:
 Scratchpad-Recherche „Vier Teams je Bereich" (01.11.). Battlefield läuft seit `1dcf3823` als
 PPS-Pod (`VIERER_POD_DISCIPLINE_IDS`).
 
-Dieses Dokument beschreibt den **Motor-Teil** für die zwei Bahn-Disziplinen. Den Stand der
-Verdrahtung in die Liga beschreibt Abschnitt 4: Takeshi und Staffel sind **noch nicht** in
-`VIERER_POD_DISCIPLINE_IDS` eingetragen.
+Dieses Dokument beschreibt den **Motor-Teil** für die zwei Bahn-Disziplinen (Abschnitte 1–5) und
+die **Verdrahtung in die Liga** (Abschnitt 6, 02.11.): Takeshi und Staffel stehen seit 02.11. in
+`VIERER_POD_DISCIPLINE_IDS`, gebucht wird das echte Vier-Team-Rennen, und die Arena zeigt es.
 
 **Stand 02.11.:** Die Pp-Pflichtprüfung besteht jetzt bei beiden, ohne Ausnahme und ohne
 Matrixänderung (Abschnitt 5): Takeshi 18,9 / 16,3, Staffel 9,3 / 10,1 (n = 48, zwei Saatströme).
 rho bleibt über 0,80 bei jeder Kadergröße, das Duell ist bit-identisch.
+
+**Stand 02.11. abends:** Liga-Kette fertig (Abschnitt 6) — Runner, Spieltag, Motor-Vorrang im
+Pod-Resolve, Referenzen, Vorlauf mit Schalter, Vier-Team-Anzeige in der Arena, Eintrag in
+`VIERER_POD_DISCIPLINE_IDS`. Duell weiter bit-identisch (0,937 / 0,898), echter End-to-End-Lauf
+über einen Test-Spielstand grün.
 
 ## 1. Was gebaut ist
 
@@ -29,7 +34,8 @@ rho bleibt über 0,80 bei jeder Kadergröße, das Duell ist bit-identisch.
 - Alles Übrige war schon seitenneutral: Rezepte, Fallen, „jeder gegen jeden"-Rempler
   (`tackleAlleSeiten`), Gedränge, Wechsel und `MOTOREN[bd].wert()`.
 
-**Neue Einstiege**, alle stumm und nur headless (die Zeichnung bleibt zweiseitig):
+**Neue Einstiege**, alle stumm und headless (die sichtbare Vier-Team-Anzeige kam am 02.11. dazu,
+Abschnitt 6.6):
 
 | Einstieg | Zweck |
 |---|---|
@@ -156,7 +162,9 @@ gleichen Heap und gleiche Laufzeit je Lauf. Beides ist jetzt in `miss-bahn-pod-a
 eingebaut. Die Werte ändern sich dadurch nicht: Takeshi Strom 10 000 000 kam vorher und nachher
 mit 26,5 heraus.
 
-## 4. Was noch fehlt, bis Takeshi/Staffel in der Liga als Pod laufen
+## 4. Was noch fehlte, bis Takeshi/Staffel in der Liga als Pod laufen (erledigt 02.11.)
+
+**Alles aus diesem Abschnitt ist umgesetzt, s. Abschnitt 6.** Der Text bleibt als Plan stehen.
 
 **Zwei Fragen an Chris, bevor die Kette gebaut wird:**
 
@@ -164,8 +172,8 @@ mit 26,5 heraus.
    Mechanik anpassen („die stats die vorgegeben sind sind verdammt wichtig, kannst du die
    benötigten sachen nicht anpassen dass es mehr unsere attribute anspricht? dann würde ich das
    freigeben"). Das ist umgesetzt, beide bestehen (Abschnitt 5).
-2. **Live-Bühne.** Soll die Bühne an Pod-Tagen das echte Vier-Team-Rennen zeigen (Zeichnung,
-   HUD und Farben für vier Seiten), oder übergangsweise nur einen Hinweis wie bei Battlefield?
+2. ~~**Live-Bühne.**~~ **Erledigt am 02.11.:** Chris wollte das echte Vier-Team-Rennen, keinen
+   Hinweis. Die Arena zeigt es mit Zeichnung, HUD und Farben für vier Seiten (Abschnitt 6.6).
 
 Bewusst **nicht** in diesem Schritt, weil jede Hälfte allein das Spiel verschlechtert:
 
@@ -375,7 +383,8 @@ nie.
 
 ### 5.4 Was weiter offen ist
 
-- **`VIERER_POD_DISCIPLINE_IDS` bleibt bewusst ohne Takeshi und Staffel.** Mit Abschnitt 5 ist nur
+- ~~**`VIERER_POD_DISCIPLINE_IDS` bleibt bewusst ohne Takeshi und Staffel.**~~ **Erledigt am
+  02.11., Abschnitt 6.** Der folgende Absatz ist der Stand vor der Verdrahtung. Mit Abschnitt 5 ist nur
   die Pp-Frage erledigt. Der Grund aus Abschnitt 4 gilt unverändert, nachgeprüft am 02.11. in
   `legacy-matchday-resolve-engine.ts`: Ein Eintrag würde beide heute über den **PPS-Pod**
   (Eignungs-Score) buchen statt über diesen Motor. Der Motor-Vorrang im Pod-Resolve ist weiterhin
@@ -387,3 +396,184 @@ nie.
   bringen, verschiebt aber die abgenommenen 0,937. Das braucht eine eigene Duell-Messung und
   Chris' Entscheidung. Solange beide Rezepte gelten, laufen dieselben Spieler in Duell und Pod mit
   leicht anderen Sub-Skills.
+
+## 6. Verdrahtung in die Liga (02.11.)
+
+Chris' Auftrag vom 02.11.: Takeshi's Castle und Staffel vollständig als Vier-Team-Disziplin in die
+Liga — gebucht wird das **echte Rennen**, nicht ein Eignungs-Score, und die Arena zeigt dieses
+Rennen. Vorbild war die Mini-DM-Kette (PR 4–6), mit einem Unterschied: Mini-DM und Battlefield buchen
+(teils) über den PPS-Pod, Takeshi/Staffel buchen den Motor, weil er im Vier-Team-Format beide
+Pflichtprüfungen ohne Ausnahme besteht (Abschnitt 5.3).
+
+### 6.1 Die Kette
+
+| Glied | Ort | Was es tut |
+|---|---|---|
+| Motor | `spieleBahnPod(bd, teams, saat, platzJeTeam, {formSaat, k})` | Neu: `optionen.k`. Ein Team ohne Aufstellung läuft mit den besten k statt sechs (`bahnPodJeTeam`). Mit Aufstellung zählt, wen der Manager gesetzt hat. |
+| Runner | `runBahnPodFixtures()` in `lib/battle/arena-headless-runner.ts` | Gebaut nach `runMiniDmFfaPodFixtures()`: ein Chromium je Batch, vier Kader als Argumente, je Team `buildArenaAufstellung()`, `formSaat` = Pod-Saat. Ein Pod mit leerem Kader liefert `null` an seiner Position. |
+| Saat | `buildBahnPodMatchSeed()` in `lib/battle/arena-seed.ts` | `save:saison:spieltag:arena:<bd>-pod:<podId>`. Wertungssaat, Runner und Arena-Host bauen sie gleich. |
+| Spieltag | `runBahnPodMatchday()` in `lib/resolve/bahn-pod-matchday.ts` | Pods kommen aus `getPodsForMatchday(..., bd)`, also aus derselben Quelle wie Spielplan, Resolve und Anzeige. k kommt aus dem Spielplan-Slot. Die Strukturprüfung (`pruefeBahnPodErgebnis`) verwirft ein kaputtes Pod-Ergebnis einzeln. Die Spieler-PP kommen aus dem Boxscore. |
+| Buchung | `berechneBahnPodOverrides()` in `lib/resolve/bahn-pod-resolve.ts` | Platz aus dem Rennen (`eventPlatz`). Bei Gleichstand entscheidet der PPS-Score, dann die Team-ID, damit 2-1-0-0 strikt bleibt. `quelle: "bahn"`, `teamWert` (Burgpunkte bzw. Zielzeit). 0–10-Wert über `berechneErgebnisNormiertNTeam` mit m90 je k, Niveau aus dem PPS-Score (wie im Duell dieser beiden Disziplinen). |
+| Engine | `legacy-matchday-resolve-engine.ts` | Bahn-Pods mit Rohdaten werden zuerst über das Rennen gebucht. Die übrigen Pods gehen an `berechneMiniDmPodOverrides()` (PPS-Pod). Der Pod schlägt ein Zweier-Duell. Rennzeilen tragen keinen `arenaAusfall`. Spieler-PP aus dem Rennen gelten wie bei Arena und Mini-DM-FFA (`istMotorPodQuelle`). |
+| Ledger | `season-points-ledger.ts` | `quelle: "bahn"` vertraut dem persistierten Boxscore-PP-Wert (`battle_mode_bahn_pod_player_score`). |
+| Referenzen | `data/generated/bahn-pod-referenz.json` | Gezogen mit `scripts/ziehe-bahn-pod-referenz.mjs`. Je Disziplin und k: m90 der Teamwert-Lücken und p50/p99,5 des Läuferwerts. Kaderfest, 210 Gruppen × 4 Rennen × 2 Saatströme = 1680 Rennen je k. |
+| Vorlauf | `lib/battle/arena-vorlauf-service.ts` | An einem Spieltag **mit** Pods (`teileBahnPodDisziplinenAb()`) läuft die Disziplin als Rennen statt als Duell. Es gelten derselbe Semaphor und dieselbe Wiederholung wie bei Mini-DM. Der Eingabe-Hash ist `berechneBahnPodEingabeHash()` (`format: "bahn_pod"`), beim Buchen wird er neu geprüft. **Ohne** Pods (Liga nicht durch 4 teilbar) bleibt es beim Duell. |
+| Schalter | `BAHN_POD_VORLAUF_AKTIV` / `OLY_BAHN_POD_VORLAUF=aus` | Notschalter wie bei Mini-DM (`.env`, dann `docker compose up -d`). Abgeschaltet fallen die Pods auf den PPS-Pod zurück. Das Duell kommt damit nicht zurück, weil der Pod Vorrang hat. |
+| Anzeige | `echterKader.bahnPodByDisciplineId` (Host) → `bahnPodAnzeige` (Motor) | Abschnitt 6.6. |
+| Liste | `VIERER_POD_DISCIPLINE_IDS` | Jetzt `mini-dm`, `battlefield`, `takeshis-castle`, `staffel`. |
+
+**Ausfall:** Liefert das Rennen nichts (Chromium-Absturz, Timeout, kein gültiger Pod), setzt der
+Vorlauf `arenaAusfall` für die Disziplin. Die Pods werden dann als PPS-Pod gebucht, sichtbar markiert
+(`arena_ausgefallen:…`, Arena-Hinweis „Rennen fiel aus — als 4-Team-Gruppe per Eignungs-Score
+gewertet"). Kein Spieltag bleibt ungebucht.
+
+### 6.2 Referenzen (gezogen 02.11.)
+
+`node scripts/ziehe-bahn-pod-referenz.mjs 4`, Kader-Familie, ohne Mutator, je k 1680 Rennen:
+
+| k | Takeshi m90 (Burgpunkte) | Takeshi Läufer p50 / p99,5 | Staffel m90 (s) | Staffel Läufer p50 / p99,5 |
+|---:|---:|---:|---:|---:|
+| 2 | 11,2 | 12,7 / 25,8 | 1,48 | 4,5 / 8 |
+| 3 | 16,6 | 12,3 / 27,7 | 1,43 | 6,5 / 12 |
+| 4 | 21,4 | 12,5 / 29,6 | 1,20 | 8,5 / 16 |
+| 5 | 28,2 | 12,7 / 31,2 | 1,07 | 10,5 / 20 |
+| 6 | 35,8 | 13,0 / 33,1 | 1,03 | 12,5 / 24 |
+
+Die Staffel-Läuferwerte sind Rangpunkte N..1 über alle 4k Läufer. Deshalb liegt p99,5 genau bei
+4k: wer die schnellste Etappe läuft, bekommt die vollen Spieler-PP. Takeshi-Burgpunkte wachsen kaum
+mit k, der Zielbonus nach Platz verbreitert nur den oberen Rand.
+
+### 6.3 Liga-Abnahme über den Produktionspfad
+
+`scripts/miss-bahn-pod-liga-abnahme.ts --spieltage=2` (Ergebnis in
+`data/generated/bahn-pod-liga-abnahme.json`). Das Skript ist das Gegenstück zur Battlefield-Liga-Abnahme,
+nur mit dem echten Motor. Es baut einen frischen Battle-Save mit Liga-Split. Je Spieltag laufen
+**D1 = Staffel (k) und D2 = Takeshi (k)**, dazu echte KI-Aufstellung, echtes Chromium über
+`runBahnPodMatchday()` und die echte Resolve-Engine mit den Rennrohdaten. Gemessen wird für k = 2..6,
+zwei disjunkte Spieltagsfenster, je 16 Pods pro Zelle. Ein Rennen braucht rund 5 s je Disziplin und
+Spieltag (8 Pods).
+
+**Struktur, in jeder Zelle:** 64/64 Zeilen mit `quelle: "bahn"` gebucht, jeder Pod mit Punktesumme 3.
+
+| Disziplin | k | rho Pod (Median, Fenster 0 / 1) | Star Rang 1 | Star unter den ersten zwei | Paare ab 15 richtig | Team-rho (Eignung gegen Platz) | Sieger ≠ PPS-Pod-Sieger |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Takeshi | 2 | 0,85 / 0,82 | 62 % / 56 % | 81 % / 88 % | 100 % / 100 % | 0,70 / 0,65 | 25 % / 38 % |
+| Takeshi | 3 | 0,83 / 0,81 | 81 % / 81 % | 94 % / 100 % | 100 % / 97 % | 0,59 / 0,60 | 31 % / 31 % |
+| Takeshi | 4 | 0,76 / 0,80 | 62 % / 56 % | 81 % / 81 % | 98 % / 98 % | 0,75 / 0,56 | 38 % / 38 % |
+| Takeshi | 5 | 0,83 / 0,86 | 62 % / 69 % | 81 % / 81 % | 97 % / 100 % | 0,82 / 0,69 | 31 % / 12 % |
+| Takeshi | 6 | 0,88 / 0,84 | 62 % / 75 % | 88 % / 100 % | 99 % / 99 % | 0,66 / 0,81 | 12 % / 12 % |
+| Staffel | 2 | 0,82 / 0,83 | 56 % / 50 % | 81 % / 81 % | 99 % / 98 % | 0,85 / 0,94 | 12 % / 12 % |
+| Staffel | 3 | 0,88 / 0,89 | 56 % / 56 % | 81 % / 88 % | 98 % / 100 % | 0,91 / 0,96 | 38 % / 19 % |
+| Staffel | 4 | 0,90 / 0,88 | 62 % / 69 % | 81 % / 88 % | 100 % / 98 % | 0,88 / 0,85 | 31 % / 31 % |
+| Staffel | 5 | 0,85 / 0,86 | 62 % / 75 % | 88 % / 88 % | 97 % / 98 % | 0,86 / 0,86 | 44 % / 38 % |
+| Staffel | 6 | 0,82 / 0,83 | 62 % / 75 % | 81 % / 75 % | 93 % / 93 % | 0,41 / 0,47 | 81 % / 62 % |
+
+So liest sich die Tabelle:
+
+- **rho je Pod** ist hier Spieler-Eignung (`baseValue` der Aufstellung) gegen die *gebuchten*
+  Spieler-PP. Die PP-Kurve deckelt (Staffel: wer die schnellste Etappe läuft, hat die vollen
+  5,5 PP), und `baseValue` ist nicht genau die Motor-Eignung. Deshalb liegt die Zahl etwas unter der
+  kaderfesten Abnahme (Abschnitt 5.3, 0,84–0,93). Die meisten Zellen liegen trotzdem über 0,80.
+  Darunter fällt nur Takeshi k = 4 mit 0,76 / 0,80, bei 16 Pods je Zelle. Paare ab 15 Punkten
+  werden zu 93–100 % richtig geordnet, der Star landet zu 75–100 % unter den ersten zwei.
+- **Sieger ≠ PPS-Pod-Sieger** (12–81 %) zeigt, dass wirklich das Rennen bucht und nicht der
+  Eignungs-Score. Battlefield als PPS-Pod hätte hier per Konstruktion 0 %.
+- **Team-rho** ist bei Takeshi 0,56–0,82. Bei der Staffel liegt es bei k = 2..5 zwischen 0,85 und
+  0,96, bei k = 6 nur bei 0,41 / 0,47. Diese Ausreißerzelle hat eine eigene Ursache:
+
+**Befund: unterbesetzte Staffel gewinnt.** Steht an einem Spieltag D1 = Staffel 6 *und*
+D2 = Takeshi 6, braucht ein Team 12 Spieler, und die KI verteilt jeden Spieler nur auf eine Seite.
+Mehrere Teams laufen deshalb mit 2–5 statt 6 Läufern. Die Staffel teilt die Strecke nach den
+tatsächlich aufgestellten Läufern (`staffelBeine` in bauSpurt, seit PR #1295, damit niemand bei 5/6
+stehen bleibt). Ein Team mit zwei Läufern läuft also zwei lange Beine mit **einem** Wechsel statt
+sechs kurzen mit fünf Wechseln, und das ist schneller. Diagnoselauf (Spieltag 1, k = 6): Von vier
+Pods mit einem 2er- oder 3er-Team gewann dieses dreimal (8,3 s / 9,35 s / 9,7 s gegen
+10,2–10,7 s der vollbesetzten). Bei k = 5 kam ein 3er-Team einmal auf Platz 2. Takeshi ist davon
+nicht betroffen, dort zählt die Summe der Burgpunkte, und weniger Läufer heißen weniger Punkte.
+**Das gilt genauso im Zweier-Duell** und ist keine Folge des Pods; im Pod fällt es nur mehr auf,
+weil vier Teams mit verschiedener Besetzung gegeneinander laufen. Ein Manager könnte das sogar
+ausnutzen, indem er absichtlich nur zwei Läufer setzt. Eine Lösung ist eine Regelentscheidung für
+Chris, s. 6.7. Am Motor wurde dafür bewusst nichts geändert, das Duell ist abgenommen.
+
+### 6.4 Echter End-to-End-Lauf über einen Test-Spielstand
+
+`tests/bahn-pod-e2e-real-chromium.test.ts` fährt einen frischen Battle-Save (solo_1, Liga-Split,
+echter Liga-Draft). Spieltag 1 hat **Staffel (D1) und Takeshi (D2)**, also zwei Pod-Disziplinen am
+selben Tag mit je eigenen Gruppen. Danach laufen echte KI-Aufstellung, echter Vorlauf
+(`stelleArenaVorlaufSicher`, echtes Chromium) und echter Apply (`kickoffArenaMatchdayApply`). Kein
+Fake-Motor; der Runner wird nur mitgeschnitten. Geprüft:
+
+- Vorlauf `ready`, beide Disziplinen `status: "arena"`, `format: "bahn_pod"`, ohne Teilwarnung. Für
+  Staffel/Takeshi lief **kein** Zweier-Duell.
+- Gebucht: je Disziplin 32 Zeilen (8 Pods × 4), alle `mini_dm_pod` mit `quelle: "bahn"`, ohne
+  Ausfall-Marker. Je Pod genau 2-1-0-0.
+- Der gebuchte Platz ist der Platz im Rennen. Bei eindeutigem `eventPlatz` gilt das exakt, bei
+  Gleichstand ist die Reihenfolge nicht vertauscht.
+- Der Tabellenbeitrag jedes Teams entspricht seinen Pod-Punkten. Die Spieler-PP stehen im Ledger
+  als `battle_mode_bahn_pod_player_score` mit echten playerIds.
+
+Laufzeit des Tests rund 210 s, der größte Teil ist der Liga-Draft. Der Vorlauf selbst braucht für
+zwei Disziplinen à 8 Pods wenige Sekunden.
+
+### 6.5 Das Duell bleibt unverändert
+
+- `scripts/miss-alle-disziplinen.mjs 24 staffel takeshis-castle` liefert nach allen Änderungen
+  **0,937 / 0,898**, wie vorher.
+- `tests/bahn-pod-vier-teams.test.ts`: Duell-Fingerabdrücke aller fünf Bahnen und die zwei
+  Pod-Fingerabdrücke des Kalibrierungsstands sind unverändert grün. `optionen.k` ist optional, ohne
+  `k` rechnet der Pod wie vorher.
+- `MOTOREN[bahn].sichern/vorher/zurueck` führen jetzt den Pod-Zustand mit (`bahnPodKader`,
+  `bahnPodJeTeam`). Ein headless Lauf startet damit garantiert ohne Pod, auch wenn die Arena gerade
+  ein Vier-Team-Rennen zeigt. Ein eigener Test vergleicht die Duell-Ergebnisse vor, während und
+  nach einem sichtbaren Pod.
+
+### 6.6 Die Anzeige: vier Teams auf der Strecke
+
+Gibt es an einem Spieltag für das gewählte Heimteam einen Takeshi- oder Staffel-Pod, reicht
+`FoundationBattleArenaHost.tsx` dem Motor `echterKader.bahnPodByDisciplineId[bd]` = {vier Kader in
+Pod-Reihenfolge, k, Saat, Aufstellung je Team}. Das sind dieselben Eingaben wie beim zählenden Lauf.
+`reset()` baut dann statt des Duells das Rennen der gebuchten Gruppe (`bahnPodAnzeigeBauen`). Der
+Pod-Kader bleibt für das ganze sichtbare Rennen gesetzt, weil Bahnzahl, Gedränge und Pod-Rezept ihn
+auch im Rennen lesen. Aufstellung, Formkarten und Persönlichkeiten wirken nur beim Bau und werden
+sofort zurückgelegt.
+
+Was die Arena im Pod zeigt:
+
+- **Strecke:** 4k Läufer, Teamfarben 0/1 wie bisher, 2/3 Grün/Violett (wie im Battlefield-Pod).
+  Streckenband, Takeshi-„noch im Rennen"-Piktogramme und Burgpunkte zeigen alle vier Teams.
+- **Vier-Team-Tafel** auf der Leinwand: Platz, Name und Stand je Team (Burgpunkte bzw.
+  Streckenanteil, dann Zielzeit), dazu die Uhr.
+- **HUD:** Die Kopfzeile nennt den Führenden. Die Staffel-Führung kommt aus dem Vier-Team-Stand;
+  das Zeit-Delta Seite 0 gegen 1 bleibt im Pod aus. Score-Bug und Einlauf-Karte (beide nur
+  Heim/Gast) sind aus.
+- **Kaderleiste und Wertungstabelle:** links Team 0/2, rechts Team 1/3, farbig markiert.
+- **Endstand:** Banner mit Sieger und Stand, je Seite zwei Team-Tabellen mit Platz und Teamwert. Die
+  Plätze nach dem Ziel rechnen exakt wie der zählende Lauf (`bahnPodErgebnis` +
+  `verteilePlatzierungspunkte`). Der Alternativ-Rechner ist im Pod aus (er rechnet Duell-Zweitläufe).
+- Der Host nennt unter der Arena die vier Teams der gebuchten Gruppe
+  (`data-testid="oly-arena-bahn-pod-<bd>"`).
+
+Für Tests ohne Host gibt es `window.__arena.bahnPodAnzeigen(bd, pod)` (`null` schaltet zurück) und
+`bahnPodAnzeigeStand()`.
+
+### 6.7 Was offen bleibt
+
+- **Gezeigt ≈ gebucht, nicht bit-gleich.** Die Arena rechnet das Rennen sichtbar neu, mit der
+  Zeitdehnung `ZEIT_DEHNUNG` (Staffel 14,65, Takeshi 2,17) in kleineren dt-Schritten. Der zählende
+  Lauf nimmt feste 1/60 s. Eingaben, Saat, Formkarten und Aufstellung sind identisch, die Zufallsfolge
+  verschiebt sich aber leicht. Gemessen auf vier Probeläufen: zweimal dieselbe Reihenfolge, je einmal
+  Platz 3/4 (Takeshi) bzw. Platz 1/2 (Staffel) vertauscht. **Das ist dieselbe Grenze, die das
+  Bahn-Duell seit der Zeitdehnung hat** (Kommentar an `ZEIT_DEHNUNG`: „verschiebt die genaue Abfolge
+  der Zufallszüge leicht"). Exakt wäre nur eine Wiedergabe des zählenden Laufs, also Ticks
+  aufzeichnen und zeitgedehnt abspielen; das ist ein eigener Umbau. Gebucht wird immer der zählende
+  Lauf.
+- **Namensgleichheit über Teams.** `place` ist nach Spielernamen geschlüsselt. Tragen zwei Pod-Teams
+  einen Spieler mit identischem Namen, überschreibt sich ihre Aufstellung. Das betrifft auch Mini-DM
+  und Battlefield und ist im Live-Abbild nicht vorgekommen.
+- **Unterbesetzte Staffel ist schneller (6.3), Frage an Chris.** Drei mögliche Regeln:
+  (a) Die Beinzahl ist die Kopfzahl des Spielplan-Slots, fehlende Beine laufen die vorhandenen
+  Läufer ein zweites Mal (realistisch, braucht Doppel-Einsätze im Motor). (b) Ein fehlendes Bein
+  kostet eine Strafzeit, z. B. die Etappenzeit des langsamsten eigenen Läufers. (c) Eine
+  unterbesetzte Staffel wird hinter allen vollbesetzten gewertet. Jede Variante gilt für Duell und
+  Pod und braucht danach eine neue Duell-Abnahme.
+- Die Folgefrage aus 5.4 (Pod-Rezept der Staffel auch im Duell) bleibt offen.

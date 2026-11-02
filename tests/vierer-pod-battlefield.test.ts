@@ -67,12 +67,13 @@ function buildScheduleState(d1: ReturnType<typeof slot> | null, d2: ReturnType<t
 const gruppenSchluessel = (gruppen: readonly (readonly string[])[]) => gruppen.map((teamIds) => [...teamIds].sort().join(",")).sort();
 
 describe("Vierer-Pod-Disziplinen: Konfiguration", () => {
-  it("genau Mini-DM und Battlefield -- Staffel/Takeshi bewusst noch nicht", () => {
-    expect([...VIERER_POD_DISCIPLINE_IDS].sort()).toEqual(["battlefield", "mini-dm"]);
+  it("Mini-DM, Battlefield und seit 02.11. Staffel/Takeshi (Bahn-Pod, tests/bahn-pod-liga.test.ts)", () => {
+    expect([...VIERER_POD_DISCIPLINE_IDS].sort()).toEqual(["battlefield", "mini-dm", "staffel", "takeshis-castle"]);
     expect(isViererPodDiscipline("battlefield")).toBe(true);
     expect(isViererPodDiscipline("mini-dm")).toBe(true);
-    expect(isViererPodDiscipline("staffel")).toBe(false);
-    expect(isViererPodDiscipline("takeshis-castle")).toBe(false);
+    expect(isViererPodDiscipline("staffel")).toBe(true);
+    expect(isViererPodDiscipline("takeshis-castle")).toBe(true);
+    expect(isViererPodDiscipline("spurt")).toBe(false);
     expect(isViererPodDiscipline(null)).toBe(false);
   });
 });
@@ -126,8 +127,8 @@ describe("getPodsForMatchday (verallgemeinerte Gruppenbildung)", () => {
   });
 
   it("(c) Nicht-Pod-Disziplin oder Disziplin nicht am Spieltag: keine Pods", () => {
-    const gs = buildScheduleState(slot("staffel", "Staffel", 1), slot("battlefield", "Battlefield", 1));
-    expect(getPodsForMatchday(gs, "md1", "staffel", { saveId: SAVE_ID })).toEqual([]);
+    const gs = buildScheduleState(slot("spurt", "Spurt", 1), slot("battlefield", "Battlefield", 1));
+    expect(getPodsForMatchday(gs, "md1", "spurt", { saveId: SAVE_ID })).toEqual([]);
     expect(getPodsForMatchday(gs, "md1", "mini-dm", { saveId: SAVE_ID })).toEqual([]);
     expect(getPodDisciplineSlotsForMatchday(gs, "md1", { saveId: SAVE_ID }).map((s) => s.disciplineId)).toEqual(["battlefield"]);
   });
