@@ -4166,7 +4166,7 @@
   function blickAus(u){
     if(Math.abs(u.vx||0)>Math.abs(u.vy||0)*1.2)return (u.vx||0)<0?1:3;
     if(Math.abs(u.vy||0)>2)return (u.vy||0)<0?0:2;
-    return u.side===0?3:1;
+    return u.side%2===0?3:1; // Pod: Seite 0/2 links, 1/3 rechts (bfPodHome); im Duell wie side===0
   }
 
   // VOLLBILD-CHARAKTERE (24.08.): manche neuen Monster-Blaetter (Golem/Kraken/Werwolf) sind
@@ -16408,7 +16408,9 @@
     // ENDSTAND-NACHLAUF (2.6): waehrend der 3,5 s zwischen Schlusspfiff und Endstand-Overlay
     // bleibt der Bug mit dem Endstand stehen -- sonst verschwaende der Score im Moment des
     // Pfiffs und der Nachlauf zeigte eine Szene ohne Ergebnis.
-    bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf);
+    // POD (02.11.): der Bug kennt nur Heim/Gast — im Vier-Team-FFA uebernimmt die Tafel auf der
+    // Leinwand (zeichneBfPodTafel) Namen, Stand und Uhr.
+    bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf)||bfPodAktiv();
     if(bug.hidden){
       // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
       // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
@@ -37520,6 +37522,8 @@
   }
 
   function homeFor(side,row,i,n){
+    // POD (s. bfPodHome unten): nur waehrend eines Pod-build(), sonst unveraendert.
+    if(bfPodKader)return bfPodHome(side,row,i,n);
     const cols=[side===0?MID-140:MID+140,side===0?MID-300:MID+300,side===0?MID-460:MID+460];
     return{x:cols[row],y:70+(H-140)*(n<2?0.5:i/(n-1||1))};
   }
@@ -37535,6 +37539,47 @@
   // andere Disziplinen aufruft) den Kontrollpunkt einer gerade sichtbaren Battlefield-
   // Partie unter der Hand vertauschen.
   let KP=null;
+
+  // ===================================================================================
+  // BATTLEFIELD IM POD-FORMAT: VIER TEAMS GLEICHZEITIG IM SELBEN KAMPF (02.11.).
+  //
+  // Chris am 01./02.11., woertlich: „nein auch bei battlefield reicht kein hinweistext! da sollen
+  // 4 teams gleichzeitig FFA machen". Battlefield wird seit 01.11. als Vierergruppe (Pod, 2-1-0-0)
+  // gewertet; die Arena zeigte bis hierher trotzdem ein Zwei-Team-Duell. Jetzt laufen alle vier
+  // Teams als echtes Free-for-all im SELBEN Echtzeitkampf um dieselben drei Orte (Nord, Mitte,
+  // Sued) — derselbe Motor (baueEinheit, stepSim, Kit-Skills, Rueckzug, Domination-Punktwahl),
+  // nur mit N Seiten statt zwei. Konzept und Messung: docs/design/battlefield-pod-ffa-02-11.md.
+  //
+  // DAS DUELL BLEIBT BIT-IDENTISCH. Der Pod ist ausschliesslich ueber zwei Wege erreichbar:
+  //  - `bfPodKader` ist NUR waehrend eines build()-Aufrufs gesetzt (headless: bfPodLauf(), Anzeige:
+  //    bfPodAnzeigeBauen()) und sonst `null`; homeFor()/build() lesen ihn.
+  //  - `KP.pod` traegt den gebauten Pod durch das Spiel (Seitenzahl, Ausscheidezeiten). KP wird von
+  //    MOTOREN[d].sichern()/zurueck() mitgefuehrt, ein Pod-Lauf mitten in einem sichtbaren Duell
+  //    (oder umgekehrt) kann sich also nicht gegenseitig den Zustand vertauschen.
+  // Jede fuer N Seiten verallgemeinerte Zeile (kpPraesenzAm, kpTick, dominationZielWahl, ...)
+  // rechnet fuer N=2 exakt dieselben Zahlen wie vorher — nachgeprueft per Fingerabdruck
+  // (tests/battlefield-pod-ffa.test.ts, Teil 1).
+  let bfPodKader=null;
+  let bfPodAnzeigeVorgabe=null, bfPodAnzeigeVereinSnap=null; // Anzeige, s. bfPodAnzeigeKontext()
+  const bfPodAktiv=()=>!!(KP&&KP.pod);
+  const kampfSeitenN=()=>(KP&&KP.pod)?KP.pod.N:2;
+  // FARBE JE KAMPFSEITE: Seite 0/1 exakt wie bisher (--home/--away), Seite 2/3 nur im Pod.
+  // Gruen und Violett liegen im Farbkreis zwischen Orange (--home) und Tuerkis (--away) und sind
+  // auf Sand wie auf Stein gegeneinander unterscheidbar.
+  const BF_POD_FARBEN=["#7BC86C","#C77DDB"];
+  const kampfSeitenFarbe=(s)=>s===0?css("--home"):s===1?css("--away"):BF_POD_FARBEN[(s-2)%BF_POD_FARBEN.length];
+  const kampfTeamName=(s)=>(VEREIN[s]&&VEREIN[s].name)||("Team "+(s+1));
+  // AUFSTELLUNG IM POD: vier Ecken. Seite 0 oben links, 1 oben rechts, 2 unten links, 3 unten
+  // rechts. Die drei Orte liegen auf der Mittellinie (ARENA_DOMINATION) — damit hat JEDES Team
+  // dieselbe Geometrie: einen nahen Ort (geteilt mit dem Nachbarn auf derselben Hoehe), die Mitte
+  // (fuer alle gleich weit) und einen fernen Ort. Reihe 0 steht vorn (zur Mitte), Reihe 2 hinten.
+  function bfPodHome(side,row,i,n){
+    const links=side%2===0, oben=side<2;
+    const versatz=[250,370,480][row]??480;
+    // Spiegelbildlich um H/2 wie die Orte (85/235/385 von 470), oben Platz fuer die Vier-Team-Tafel.
+    const y0=oben?72:H/2+30, y1=oben?H/2-30:H-72;
+    return{x:links?MID-versatz:MID+versatz, y:n<2?(y0+y1)/2:y0+(y1-y0)*i/(n-1)};
+  }
 
   // Der Platz, den ein Kaempfer wirklich einnimmt. Das Icon ist 40 breit, der Lebensbalken
   // 44, darunter stehen Name und Befehl — deshalb quer mehr als hoch.
@@ -37707,9 +37752,17 @@
         rolle:kf.rolle||{},
         orte:kf.orte.map(o=>({name:o.name,x:MID,y:Math.round(H*o.fy),besitz:null,fortschritt:0,erobertVon:null})),
         punkte:[0,0]}:null;
+      // POD (s. bfPodKader): N Seiten statt zwei, je Seite ein Punktekonto und eine
+      // Ausscheidezeit (null = noch im Spiel). Nur Battlefield hat Orte (KP), nur dort gibt es Pods.
+      if(KP&&bfPodKader){
+        const N=bfPodKader.length;
+        KP.punkte=new Array(N).fill(0);
+        KP.pod={N, rausT:new Array(N).fill(null)};
+      }
     }
     PLAN=schlachtplan();
     let id=0;
+    if(KP&&KP.pod){ bfPodBau(); dominationStart(); return; }
 
     // UNSERE SEITE — Slot aus der Aufstellung, Befehl aus dem Slot, Ziel aus der
     // Persoenlichkeit (oder aus dem, was der Spieler von Hand gesetzt hat).
@@ -37802,6 +37855,39 @@
           z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null),d));
       });
     }
+  }
+
+  // DIE N SEITEN EINES POD-KAMPFES (s. bfPodKader oben). Jedes Team geht durch DENSELBEN Weg wie
+  // die Heimseite im Duell: Aufstellung (`place`, je Pod-Team vom Aufrufer eingesetzt), ohne
+  // Aufstellung die besten k nach Eignung DIESER Disziplin, Rollen fuer genau diese Kopfzahl
+  // (bfSlotsFuer), Reihe aus der Rolle, Befehl aus der Rolle (oder dem Befehl des Managers).
+  // Einziger bewusster Unterschied zur Heimseite: die Ersatzaufstellung sortiert nach der ECHTEN
+  // Eignung (dieselbe Formel wie baueEinheit), nicht nach `p.d[d]` — das ist fuer Battlefield
+  // nicht vorberechnet (s. Eignungsluecke in CLAUDE.md), die Sortierung waere sonst die
+  // Kaderreihenfolge, und welches Team seine Besten bringt, haenge an der Zeilenfolge.
+  function bfPodBau(){
+    const d=disc, n=jeSeiteVon(d);
+    const eigVon=(p)=>p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{});
+    let id=0;
+    bfPodKader.forEach((kader,side)=>{
+      const gesetzt=kader.filter(p=>place[p.n]&&place[p.n].d===d);
+      const ersatz=[...kader].sort((a,b)=>eigVon(b)-eigVon(a)).slice(0,n);
+      const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+      const kSlots=bfSlotsFuer(d,mine.length);
+      const liste=kSlots||slotsVon(d);
+      const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
+                            :((liste[i%Math.max(1,liste.length)]||{}).id||null);
+      const byRow={0:[],1:[],2:[]};
+      mine.forEach((p,i)=>byRow[slotReihe(slotFuer(p,i))].push(p));
+      for(const row of[0,1,2]){
+        byRow[row].forEach((p,i)=>{
+          const slId=slotFuer(p,mine.indexOf(p));
+          U.push(baueEinheit(p,side,row,i,byRow[row].length,id++,slId,
+            order[p.n]||slotOrd(slId),zielOf[p.n],d,bfSlotDef(kSlots,slId)));
+        });
+      }
+    });
+    for(let s=0;s<bfPodKader.length;s++)if(!FUEHRUNG[s])FUEHRUNG[s]={wert:0,wer:null};
   }
 
   // BEDROHUNG — wer Schaden macht, wird zum Ziel. Heilung zaehlt mit, aber schwaecher:
@@ -38509,10 +38595,13 @@
   // an einem EIGENEN Ort zurueck (halten), ein Disruptor baut ihn auch an einem umkaempften
   // Ort ab (stoeren). `u.kpd` sammelt je Kaempfer reine Diagnosewerte (Zeit am Ort,
   // Eroberungsanteil, Haltezeit, Ortswechsel) — gelesen nur von spieleArenaDomination().
+  // POD (02.11.): je Seite ein Eintrag, N=kampfSeitenN() — im Duell N=2, dieselben Felder wie vorher.
   function kpPraesenzAm(o){
-    const P={n:[0,0],erob:[0,0],halt:[0,0],stoer:[0,0],wer:[[],[]]};
+    const N=kampfSeitenN();
+    const P={n:new Array(N).fill(0),erob:new Array(N).fill(0),halt:new Array(N).fill(0),
+      stoer:new Array(N).fill(0),wer:Array.from({length:N},()=>[])};
     for(const u of U){
-      if(u.down||u.side>1||dist(u,o)>KP.radius)continue;
+      if(u.down||u.side>=N||dist(u,o)>KP.radius)continue;
       const r=kpRolleVon(u.slot);
       const w=o.besitz==null?r.neutral:r.erobern;
       P.n[u.side]++; P.erob[u.side]+=w; P.halt[u.side]+=r.halten; P.stoer[u.side]+=r.stoeren;
@@ -38520,12 +38609,19 @@
     }
     return P;
   }
+  // POD (02.11.): dieselbe Regel fuer N Seiten — Besitz wechselt nur, wenn GENAU EINE Seite am Ort
+  // steht; stehen zwei oder mehr dort, ist er umkaempft. Fuer N=2 ist "genau eine" dieselbe
+  // Abfrage wie vorher. Pod-Zusatz (bfPodAusscheiden): ein ausgeschiedenes Team verliert seine Orte.
   function kpTick(dt){
     if(!KP)return;
+    if(KP.pod)bfPodAusscheiden();
+    const N=kampfSeitenN();
     KP.orte.forEach((o)=>{
       const P=kpPraesenzAm(o);
-      for(const sd of[0,1])for(const {u} of P.wer[sd])if(u.kpd){u.kpd.amOrt+=dt; if(o.besitz===sd)u.kpd.halte+=dt;}
-      const ziel=(P.n[0]>0&&P.n[1]===0)?0:(P.n[1]>0&&P.n[0]===0)?1:null;
+      for(let sd=0;sd<N;sd++)for(const {u} of P.wer[sd])if(u.kpd){u.kpd.amOrt+=dt; if(o.besitz===sd)u.kpd.halte+=dt;}
+      let praesent=0, einzige=null;
+      for(let sd=0;sd<N;sd++)if(P.n[sd]>0){praesent++; einzige=sd;}
+      const ziel=praesent===1?einzige:null;
       if(ziel!=null&&ziel!==o.besitz){
         if(o.erobertVon!==ziel){o.erobertVon=ziel;o.fortschritt=0;}
         const vorher=o.fortschritt;
@@ -38537,7 +38633,7 @@
           kpBesitzWechsel();
           // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09., Einzelpunkt): eine Eroberung ist
           // immer ein grosses Ereignis, s. Historie dieser Zeile.
-          feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt Punkt "+o.name+".",true,undefined,"kontrollpunkt");
+          feed(ziel,kampfTeamName(ziel)+" übernimmt Punkt "+o.name+".",true,undefined,"kontrollpunkt");
         }
       } else if(ziel!=null&&ziel===o.besitz){
         // HALTEN: eigener Ort, nur Eigene da, aber der Gegner hatte schon angefangen.
@@ -38548,14 +38644,19 @@
           for(const {u} of P.wer[ziel])if(u.kpd)u.kpd.abwehr+=anteil*kpRolleVon(u.slot).halten;
           if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
         }
-      } else if(ziel==null&&P.n[0]>0&&P.n[1]>0&&o.erobertVon!=null){
-        // UMKAEMPFT: kein Fortschritt fuer niemanden — ausser ein Stoerer der anderen Seite ist
-        // da, dann sinkt der Teilfortschritt des Angreifers (halbe Haltegeschwindigkeit).
-        const abw=1-o.erobertVon, st=P.stoer[abw];
+      } else if(ziel==null&&praesent>=2&&o.erobertVon!=null){
+        // UMKAEMPFT: kein Fortschritt fuer niemanden — ausser ein Stoerer einer anderen Seite ist
+        // da, dann sinkt der Teilfortschritt des Angreifers (halbe Haltegeschwindigkeit). Im Pod
+        // zaehlen die Stoerer ALLER uebrigen Seiten (im Duell ist das genau die eine Gegenseite).
+        let st=0;
+        for(let sd=0;sd<N;sd++)if(sd!==o.erobertVon)st+=P.stoer[sd];
         if(st>0){
           const vorher=o.fortschritt;
           o.fortschritt=Math.max(0,o.fortschritt-dt*0.5*st/KP.kapZeit);
-          for(const {u} of P.wer[abw]){const r=kpRolleVon(u.slot); if(u.kpd&&r.stoeren>0)u.kpd.abwehr+=(vorher-o.fortschritt)*r.stoeren/st;}
+          for(let sd=0;sd<N;sd++){
+            if(sd===o.erobertVon)continue;
+            for(const {u} of P.wer[sd]){const r=kpRolleVon(u.slot); if(u.kpd&&r.stoeren>0)u.kpd.abwehr+=(vorher-o.fortschritt)*r.stoeren/st;}
+          }
           if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
         }
       }
@@ -38593,11 +38694,17 @@
   //    Disruptor zu Orten, an denen der Gegner gerade erobert, Field Control in umkaempften
   //    Raum, Commander dorthin, wo schon Eigene kaempfen.
   function dominationZielWahl(u){
-    const R=KP.radius, side=u.side, feind=1-side;
+    // POD (02.11.): "der Gegner" ist jede andere Seite. `vorn` misst gegen den BESTEN Gegner (im
+    // Duell ist das die eine Gegenseite), `fremdAngriff` heisst: eine andere Seite erobert gerade
+    // (im Duell dasselbe wie `erobertVon===feind`).
+    const R=KP.radius, side=u.side;
     const off=u.h==="offensiv"||u.h==="wild"||u.ord==="verfolgen"||u.ord==="flanke";
     const def=!off&&(u.h==="defensiv"||u.h==="vorsichtig"||u.ord==="decken"||u.ord==="hinter");
     const rest=Math.max(0,95-t), spaet=rest<40?1.5:1;
-    const vorn=KP.punkte[side]-KP.punkte[feind];
+    let besterGegner=-Infinity;
+    for(let s=0;s<KP.punkte.length;s++)if(s!==side&&KP.punkte[s]>besterGegner)besterGegner=KP.punkte[s];
+    const vorn=KP.punkte[side]-besterGegner;
+    const fremdAngriff=(o)=>o.erobertVon!=null&&o.erobertVon!==side&&o.fortschritt>0;
     const drang=vorn<0?1+Math.min(0.6,-vorn/60)*spaet:1;
     const ruhe=vorn>0?1+Math.min(0.4,vorn/80)*spaet:1;
     const kraft=(x)=>Math.sqrt(Math.max(0,x.hp)*(1+(x.VER||0)/100)*Math.max(1,x.ANG||1));
@@ -38613,7 +38720,7 @@
         if(x.side===side)eigeneDa++; else {feinde++; kF+=kraft(x);}
       }
       const eigen=o.besitz===side, neutral=o.besitz==null;
-      const bedroht=eigen&&(feinde>0||(o.erobertVon===feind&&o.fortschritt>0));
+      const bedroht=eigen&&(feinde>0||fremdAngriff(o));
       let w;
       if(!eigen&&!neutral) w=3.0*(off?1.3:def?0.8:1)*drang;
       else if(neutral)     w=2.6*(off?1.2:def?0.9:1)*drang;
@@ -38623,7 +38730,7 @@
       if(r==="siegecore"&&!eigen)w+=0.5;
       if(r==="spotter"&&!eigen&&feinde===0)w+=1.0;
       if(r==="moraleanchor"&&bedroht)w+=0.6;
-      if(r==="disruptor"&&o.erobertVon===feind&&o.fortschritt>0)w+=0.8;
+      if(r==="disruptor"&&fremdAngriff(o))w+=0.8;
       if(r==="fieldcontrol"&&feinde>0)w+=0.5;
       if(r==="commander"&&eigeneDa>0)w+=0.3*Math.min(2,eigeneDa);
       if(feinde>0)w+=0.9*Math.max(-1.5,Math.min(1.5,Math.log2(kE/Math.max(1e-6,kF))));
@@ -38689,12 +38796,58 @@
   // Punktelimit, zuletzt — wenn die Zeit einfach ablief — der hoehere Punktestand.
   function dominationSieger(){
     if(!KP)return undefined; // "kein Domination-Kampf" — Aufrufer soll die alte Regel nehmen
+    if(KP.pod)return bfPodPlatzierung().sieger;
     if(live(0).length===0&&live(1).length>0)return 1;
     if(live(1).length===0&&live(0).length>0)return 0;
     if(KP.punkte[0]>=KP.punkteZumSieg&&KP.punkte[0]>KP.punkte[1])return 0;
     if(KP.punkte[1]>=KP.punkteZumSieg&&KP.punkte[1]>KP.punkte[0])return 1;
     if(KP.punkte[0]===KP.punkte[1])return null;
     return KP.punkte[0]>KP.punkte[1]?0:1;
+  }
+  // POD: AUSSCHEIDEN (02.11.). Liegt ein Team komplett, ist es raus — Battlefield kennt keinen
+  // Respawn. Seine Orte fallen auf neutral zurueck, ein angefangener Eroberungsbalken verfaellt:
+  // sonst zahlte ein Ort einem Team weiter Punkte, das gar nicht mehr auf dem Platz steht (im Duell
+  // stellt sich die Frage nicht, dort endet das Spiel mit dem ersten ausgeschiedenen Team).
+  function bfPodAusscheiden(){
+    for(let s=0;s<KP.pod.N;s++){
+      if(KP.pod.rausT[s]!=null||live(s).length>0)continue;
+      KP.pod.rausT[s]=t;
+      for(const o of KP.orte){
+        if(o.besitz===s)o.besitz=null;
+        if(o.erobertVon===s){o.erobertVon=null;o.fortschritt=0;}
+      }
+      kpBesitzWechsel();
+      feed(s,kampfTeamName(s)+" ist ausgeschieden — "+(KP.orte.length)+" Orte, ein Team weniger.",true,undefined,"kontrollpunkt");
+    }
+  }
+  // POD: PLATZIERUNG 1..N UND LIGAPUNKTE 2-1-0-0 (02.11.). Dieselbe Rangfolge der Sieg-Wege wie
+  // dominationSieger() im Duell, nur fuer N Seiten:
+  //   1. Elimination geht vor: steht am Ende nur noch EIN Team, ist es Erster.
+  //   2. Kontrollpunkt-Punkte (der Domination-Sieg; auch ein ausgeschiedenes Team behaelt, was es
+  //      bis dahin geholt hat).
+  //   3. mehr Lebende, 4. spaeter ausgeschieden.
+  // Gleich auf ALLEN vier Schluesseln teilt sich den Platz und die Punkte (wie Mini-DM-Pod/Bahn-Pod,
+  // verteilePlatzierungspunkte()). `sieger` ist das Team auf Platz 1, `null` bei geteiltem Platz 1.
+  function bfPodPlatzierung(){
+    const N=KP.pod.N;
+    const lebend=Array.from({length:N},(_,s)=>live(s).length);
+    const nochDa=lebend.filter(x=>x>0).length;
+    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(KP.punkte[s]*1000)/1000, lebend[s],
+      KP.pod.rausT[s]==null?Infinity:KP.pod.rausT[s]];
+    const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
+    const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
+    const platz=new Array(N).fill(0), ligaPunkte=new Array(N).fill(0);
+    const tabelle=Array.from({length:N},(_,i)=>MINI_DM_FFA_LIGAPUNKTE[i]??0);
+    let i=0;
+    while(i<N){
+      let j=i;
+      while(j+1<N&&vergleich(reihenfolge[j+1],reihenfolge[i])===0)j++;
+      const geteilt=tabelle.slice(i,j+1).reduce((a,b)=>a+b,0)/(j-i+1);
+      for(let k=i;k<=j;k++){platz[reihenfolge[k]]=i+1; ligaPunkte[reihenfolge[k]]=geteilt;}
+      i=j+1;
+    }
+    const sieger=platz.filter(p=>p===1).length===1?reihenfolge[0]:null;
+    return {reihenfolge, platz, ligaPunkte, sieger, lebend, punkte:KP.punkte.slice(), rausT:KP.pod.rausT.slice()};
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -38733,6 +38886,8 @@
   // Abschnitt 3.2). Dasselbe Prinzip wie buehneDuellStandText() beim Buehnen-Duell (Review-Fund
   // PR #1083): EINE Funktion, zwei Aufrufer, kann nie mehr auseinanderlaufen.
   function kampfStandText(){
+    // POD (02.11.): Kontrollpunkt-Punkte aller N Teams in Seitenreihenfolge ("120 · 80 · 40 · 10").
+    if(bfPodAktiv())return KP.punkte.map(p=>Math.round(p)).join(" · ");
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     return disc==="tdm"
       ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
@@ -39326,7 +39481,7 @@
       const z=wahl.ziele[0]||u.tgt;
       let ax=0, ay=0;
       if(z&&z!==u){ax=z.x-u.x; ay=z.y-u.y;}
-      else {ax=(u.side===0?1:-1); ay=0;}
+      else {ax=(u.side%2===0?1:-1); ay=0;}
       const L=Math.hypot(ax,ay)||1;
       const vor=sk.eigenbewegung.typ==="zumZiel"?1:-1;
       let w=sk.eigenbewegung.distanz;
@@ -39501,7 +39656,9 @@
   // unnoetig, und ein Wechsel waere nicht meldbar.
   let FUEHRUNG={0:{wert:0,wer:null},1:{wert:0,wer:null}};
   function aktualisiereFuehrung(dt){
-    for(const seite of [0,1]){
+    // POD (02.11.): je Seite, N=kampfSeitenN() — im Duell wie vorher [0,1].
+    for(let seite=0;seite<kampfSeitenN();seite++){
+      if(!FUEHRUNG[seite])FUEHRUNG[seite]={wert:0,wer:null};
       const neu=fuehrungVon(seite), alt=FUEHRUNG[seite];
       if(alt.wer&&alt.wer!==neu.wer&&alt.wer.down)
         feedEreignis(seite,alt.wer.n+" ist raus — die Ordnung bricht.");
@@ -39715,7 +39872,8 @@
 
       // ZIEL DER BEWEGUNG
       let gx,gy;
-      if(u.retreat>0){ gx=u.side===0?u.hx-90:u.hx+90; gy=u.hy; }
+      // u.side%2: im Pod stehen Seite 0/2 links, 1/3 rechts (bfPodHome) — im Duell dasselbe wie side===0.
+      if(u.retreat>0){ gx=u.side%2===0?u.hx-90:u.hx+90; gy=u.hy; }
       else if(tg){ gx=tg.x; gy=tg.y; }
       else if(KP&&u.kpZiel!=null){
         // ZUM GEWAEHLTEN ORT, nicht auf seinen Mittelpunkt: jeder auf seinen eigenen Platz im
@@ -40026,7 +40184,7 @@
     // Meldung statt einer Punktemeldung.
     if(KP){
       kpTick(dt);
-      if(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)finish();
+      if(KP.punkte.some(p=>p>=KP.punkteZumSieg))finish();
     }
     // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): eine Seite, die gerade
     // komplett auf Respawn wartet, ist NICHT ausgeschieden wie in Mini-DM/Battlefield,
@@ -41542,7 +41700,9 @@
     if(kpzeile){
       if(KP){
         kpzeile.style.display="";
-        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+        document.getElementById("kpscore").textContent=KP.pod
+          ?"Lebende "+Array.from({length:KP.pod.N},(_,s)=>live(s).length).join(" · ")
+          :Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
       } else {
         kpzeile.style.display="none";
       }
@@ -42349,9 +42509,9 @@
   // Fortschrittsring in der Farbe des Angreifers.
   // DREI ORTE (27.10.): dasselbe Bild je Ort, kleiner (Radius 65 statt 230), mit dem Ortsnamen.
   function zeichneKontrollpunkt(){
-    const homeC=css("--home"), awayC=css("--away");
     for(const o of KP.orte){
-      const besitzFarbe=o.besitz===0?homeC:o.besitz===1?awayC:"rgba(255,255,255,.6)";
+      // POD (02.11.): Besitz- und Angreiferfarbe je Seite ueber kampfSeitenFarbe (0/1 wie vorher).
+      const besitzFarbe=o.besitz!=null?kampfSeitenFarbe(o.besitz):"rgba(255,255,255,.6)";
       ctx.save();
       ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.32;ctx.lineWidth=2;ctx.setLineDash([5,7]);
       ctx.beginPath();ctx.arc(o.x,o.y,KP.radius,0,6.283);ctx.stroke();
@@ -42365,14 +42525,14 @@
       ctx.beginPath();ctx.moveTo(o.x,o.y-34);ctx.lineTo(o.x+20,o.y-28);ctx.lineTo(o.x,o.y-22);ctx.closePath();ctx.fill();
       ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=1.5;ctx.stroke();
       if(o.erobertVon!=null&&o.fortschritt>0){
-        const farbe=o.erobertVon===0?homeC:awayC;
+        const farbe=kampfSeitenFarbe(o.erobertVon);
         ctx.strokeStyle=farbe;ctx.lineWidth=4;ctx.lineCap="round";
         ctx.beginPath();ctx.arc(o.x,o.y-6,17,-Math.PI/2,-Math.PI/2+6.283*o.fortschritt);ctx.stroke();
       }
       ctx.restore();
       ctx.font="bold 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
-      const txt=o.name+" — "+(o.besitz===0?VEREIN[0].name:o.besitz===1?VEREIN[1].name:"neutral");
+      const txt=o.name+" — "+(o.besitz!=null?kampfTeamName(o.besitz):"neutral");
       ctx.strokeText(txt,o.x,o.y+34);ctx.fillText(txt,o.x,o.y+34);
     }
   }
@@ -49766,7 +49926,7 @@
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();
         ctx.restore();
       } else if(dist(u,tg)<=u.reach+6){
-        ctx.strokeStyle=u.side===0?css("--home"):css("--away");
+        ctx.strokeStyle=kampfSeitenFarbe(u.side);
         ctx.globalAlpha=.28;ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();ctx.globalAlpha=1;
       }
@@ -49815,7 +49975,8 @@
     // Einheiten-Objekt (dieselbe Bauart wie u.lastHit), aber reine Anzeige-Buchhaltung --
     // kein Baustein ausser der Silhouette unten liest es, kein rr()/wert()/stepSim-Bezug.
     const NEBEL_SICHT_RADIUS=260, NEBEL_SICHT_DAUER_SEK=6;
-    if(disc==="battlefield"){
+    // POD: kein Nebel — im Vier-Team-FFA gibt es keine "eigene" Seite, aus deren Sicht er gilt.
+    if(disc==="battlefield"&&!bfPodAktiv()){
       for(const z of U){
         if(z.side!==1)continue;
         for(const u of U){
@@ -49825,8 +49986,8 @@
       }
     }
     for(const u of U){
-      const c=u.side===0?css("--home"):css("--away");
-      const imNebel=disc==="battlefield"&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+      const c=kampfSeitenFarbe(u.side);
+      const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
       let x=u.x,y=u.y;
       if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
         const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
@@ -50037,6 +50198,50 @@
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
+    if(bfPodAktiv())zeichneBfPodTafel();
+  }
+
+  // DIE VIER-TEAM-TAFEL (Battlefield-Pod, 02.11.): oben ueber dem Feld je Team ein Kaestchen in
+  // Teamfarbe — aktueller Platz, Name, Kontrollpunkt-Punkte, Lebende als Punkte. Die DOM-
+  // Anzeigetafel kennt nur zwei Seiten (Heim/Gast); diese Tafel ist der Ort, an dem man das
+  // Vier-Team-FFA auf einen Blick liest. Reine Zeichnung, liest nur KP/U.
+  function zeichneBfPodTafel(){
+    const pl=bfPodPlatzierung(), N=KP.pod.N;
+    const uhrB=64, breite=Math.min(270,(W-40-uhrB-8)/N-8), hoehe=24, y0=4;
+    const x0=(W-(breite+8)*N-uhrB)/2;
+    ctx.save();
+    // Uhr in der Mitte zwischen den Teams 0/1 und 2/3 (dieselbe Anzeige wie #clock).
+    {
+      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(t*zeitFaktor());
+      ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(ux,y0,uhrB,hoehe);
+      ctx.globalAlpha=1; ctx.fillStyle="#f4e6c4"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillText(Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0"),ux+uhrB/2,y0+hoehe/2);
+    }
+    for(let s=0;s<N;s++){
+      const x=x0+s*(breite+8)+(s>=Math.ceil(N/2)?uhrB+8:0), farbe=kampfSeitenFarbe(s), raus=KP.pod.rausT[s]!=null;
+      ctx.globalAlpha=raus?.45:.88;
+      ctx.fillStyle="rgba(8,10,14,.78)";
+      ctx.fillRect(x,y0,breite,hoehe);
+      ctx.fillStyle=farbe; ctx.fillRect(x,y0,5,hoehe);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.5; ctx.strokeRect(x+.75,y0+.75,breite-1.5,hoehe-1.5);
+      ctx.globalAlpha=raus?.55:1;
+      ctx.textBaseline="middle"; ctx.textAlign="left";
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle="#fff";
+      const name=kampfTeamName(s), kurz=name.length>18?name.slice(0,17)+"…":name;
+      ctx.fillText(pl.platz[s]+". "+kurz,x+10,y0+hoehe/2);
+      // Lebende als kleine Punkte ganz rechts, die Punkte des Teams links davon.
+      const kopf=U.filter(u=>u.side===s);
+      ctx.textAlign="right";
+      ctx.fillStyle=farbe;
+      ctx.fillText(raus?"raus":Math.round(KP.punkte[s])+" P",x+breite-10-kopf.length*7,y0+hoehe/2);
+      kopf.forEach((u,i)=>{
+        ctx.globalAlpha=u.down?.25:1; ctx.fillStyle=u.down?"#666":farbe;
+        ctx.beginPath(); ctx.arc(x+breite-8-(kopf.length-1-i)*7,y0+hoehe/2,2.6,0,6.283); ctx.fill();
+      });
+    }
+    ctx.restore();
   }
 
   // HIGHLIGHTS: alle big-Ereignisse dieses Spiels, in der Reihenfolge, in der feed() sie
@@ -50406,7 +50611,9 @@
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
     // Umrechnung wie dort, nur hier fuer den Ticker-Zeitstempel.
     d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
-    d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
+    const tSpan=el("span",(side===0?"h":"a")+(big?" big":""),txt);
+    if(side>=2&&istKampf(disc))tSpan.style.color=kampfSeitenFarbe(side); // Pod-Seite 2/3
+    d.appendChild(tSpan);
     // PUNKT 8 (s. Kopfkommentar bei TICKER_ZEILEN_JE_MIN): erst ins vollstaendige Protokoll,
     // dann -- je nach Stufe und Budget -- eine Kopie in den sichtbaren Ticker.
     // Ohne #protokoll (aeltere, zwischengespeicherte battle-mode.html-Huelle) gibt es keinen
@@ -50471,6 +50678,16 @@
     // Meldung, die den tatsaechlichen Sieg-Weg benennt (Elimination, Punktelimit oder
     // Zeitablauf) — TDM/Mini-DM/das alte Verhalten unten bleiben unberuehrt, weil KP dort
     // immer null ist.
+    if(KP&&KP.pod){
+      // POD (02.11.): Platzierung aller N Teams statt "X gewinnt" (s. bfPodPlatzierung).
+      const pl=bfPodPlatzierung();
+      const zeile=pl.reihenfolge.map(s=>pl.platz[s]+". "+kampfTeamName(s)+" ("+Math.round(pl.punkte[s])+")").join(" · ");
+      feed(pl.sieger==null?0:pl.sieger,(pl.sieger==null?"Geteilter erster Platz":kampfTeamName(pl.sieger)+" gewinnt die Vierergruppe")
+        +" — "+zeile,true,undefined,"endstand");
+      renderHighlights();
+      updateHud();
+      return;
+    }
     if(KP){
       const sieger=kampfSieger();
       const elimSieg=live(0).length===0||live(1).length===0;
@@ -51975,7 +52192,9 @@
   // Feld gibt". `#fokuszeile` selbst haengt nicht unter einem der dort ausgeblendeten
   // Container (eigenes Geschwister-Element), wird also nicht mitversteckt; der Fix sitzt
   // deshalb hier an der Quelle statt an einer weiteren CSS-Ausnahme.
-  const ansageMoeglich=()=>istKampf(disc)&&disc!=="mini-dm"&&U.length>0;
+  // POD (02.11.): keine Zielansage — sie gilt fuer "Seite 0 gegen Seite 1", im Vier-Team-FFA ist
+  // Seite 0 nicht zwingend das eigene Team, und Gegner gibt es drei.
+  const ansageMoeglich=()=>istKampf(disc)&&disc!=="mini-dm"&&!bfPodAktiv()&&U.length>0;
   // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
   // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
   // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
@@ -52326,8 +52545,9 @@
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
           leiste:fsLeisteFuer(x,fsStand)}))
-        :U.filter(x=>x.side===seite))){
+        :U.filter(x=>bfPodAktiv()?x.side%2===seite:x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
+        if(istKampf(disc)&&bfPodAktiv())k.style.borderLeft="3px solid "+kampfSeitenFarbe(u.side);
         // Portrait, Sprite, Name — die Lebens-/Punkteleiste bleibt darunter ueber die
         // volle Kachelbreite, damit sie ablesbar bleibt. Portrait links vom Sprite (Chris,
         // 20.09., s. Kommentar bei kaderPortraet oben): beide Bilder gleichzeitig sichtbar.
@@ -52792,7 +53012,10 @@
     // Werte (KP.punkte, ko-Summen, Ueberlebenspunkte) liest finish() an genau dieser Stelle
     // schon fuer denselben Zweck; keine zweite Zaehlweise, nur zweimal gelesen.
     let standText,zusatz;
-    if(KP){
+    if(KP&&KP.pod){
+      standText=kampfStandText();
+      zusatz="Kontrollpunkte (4-Team-FFA)";
+    } else if(KP){
       standText=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
       zusatz="Kontrollpunkte";
     } else if(disc==="tdm"){
@@ -52810,17 +53033,22 @@
     // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, nach demselben Impact-Wert,
     // der die Zeilen gleich darunter je Seite ohnehin schon sortiert -- kein neuer Wert.
     const mvpUnit=U.length?U.map(u=>({u,imp:impactVon(u)})).reduce((a,b)=>b.imp>a.imp?b:a):null;
+    // POD (02.11.): links die Teams 0 und 2, rechts 1 und 3 — dieselbe Seite wie auf dem Feld.
+    const tafelSeiten=bfPodAktiv()?[[0,2],[1,3]].map(g=>g.filter(s=>s<kampfSeitenN())):[[0],[1]];
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
-      box.appendChild(el("h5",null,VEREIN[seite].name));
+      for(const teamSeite of tafelSeiten[seite]){
+      const h5=el("h5",null,bfPodAktiv()?bfPodPlatzierung().platz[teamSeite]+". "+kampfTeamName(teamSeite):VEREIN[teamSeite].name);
+      if(bfPodAktiv())h5.style.color=kampfSeitenFarbe(teamSeite);
+      box.appendChild(h5);
       const t=el("table"), kopf=el("tr");
       kopf.appendChild(el("th",null,"Kämpfer"));
       for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
       kopf.appendChild(el("th",null,"IMP"));
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
-      const reihen=U.filter(u=>u.side===seite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
+      const reihen=U.filter(u=>u.side===teamSeite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
       for(const {u,imp} of reihen){
         // DURCHSTREICH-BUG (Punkt 28): `u.down` ist bei TDM ein TRANSIENTER Respawn-Status
         // (s. TDM_RESPAWN_SEK/reviveUnit oben) -- ein Kaempfer, der im Moment des Abpfiffs
@@ -52861,6 +53089,7 @@
         tb.appendChild(tr);
       }
       t.appendChild(tb); box.appendChild(t);
+      }
     }
     renderSzeneDesSpiels();
     renderHighlights();
@@ -53598,7 +53827,13 @@
     // nicht je Spiel deterministisch. Reiner Praesentationszustand, kein Einfluss auf rr().
     teamFeiern=[]; teamFeierNr=0;
     mutatorenFuerAktuelleDisziplin();
-    build(gebuchteSaatFuerAktuelleDisziplin());
+    // BATTLEFIELD-POD (02.11., s. bfPodAnzeigeKontext): hat das Heimteam an diesem Spieltag einen
+    // echten Vierer-Pod, zeigt die Arena alle vier Teams gleichzeitig im selben Kampf. Sonst — und
+    // fuer jede andere Disziplin — exakt der bisherige Aufbau; die Pod-Teamnamen werden dann
+    // wieder gegen die Duell-Namen getauscht.
+    const bfPodAnz=disc==="battlefield"?bfPodAnzeigeKontext():null;
+    if(bfPodAnz)bfPodAnzeigeBauen(bfPodAnz);
+    else{ bfPodAnzeigeVereineZurueck(); build(gebuchteSaatFuerAktuelleDisziplin()); }
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
     // (ARENA_ART["mini-dm"]) — das bleibt so, weil dieselbe Funktion auch die Pp-
@@ -54043,6 +54278,207 @@
       wert:()=>{const g=U.reduce((a,x)=>a+beitragVon(x),0)||1,o={};
         for(const u of U)o[u.n]=beitragVon(u)/g*100; return o;}
     };
+  }
+
+  // ===================================================================================
+  // BATTLEFIELD-POD: EINSTIEGE (02.11.) — headless Lauf, Rangtreue-Sonde, Pp-Messung, Anzeige.
+  // Der Motor selbst steht oben bei bfPodKader/bfPodBau/bfPodPlatzierung; hier nur, wie man ihn
+  // aufruft. Konzept und Messung: docs/design/battlefield-pod-ffa-02-11.md.
+  //
+  // TEAMNAMEN: siegerBannerText(), renderHighlights(), die Ortsbeschriftung &c. lesen VEREIN[s] —
+  // im Pod gibt es vier Seiten. Fuer die Dauer eines Laufs (bzw. solange die Anzeige einen Pod
+  // zeigt) traegt VEREIN deshalb die Namen der N Pod-Teams; danach wird der Duell-Stand
+  // zurueckgelegt (Schnappschuss, verschachtelbar).
+  function bfPodVereinSchnappschuss(){ return {0:VEREIN[0],1:VEREIN[1],2:VEREIN[2],3:VEREIN[3]}; }
+  function bfPodVereinZurueck(snap){
+    for(const s of [0,1,2,3]){ if(snap[s]===undefined)delete VEREIN[s]; else VEREIN[s]=snap[s]; }
+  }
+  function bfPodVereineSetzen(teams){
+    teams.forEach((tm,s)=>{
+      const name=String((tm&&tm.name)||("Team "+(s+1)));
+      VEREIN[s]={name, kurz:(tm&&tm.kurz)||kurzVon(name), platz:null, punkte:null};
+    });
+  }
+  function bfPodKaderVon(tm){ return Array.isArray(tm)?tm:(tm&&Array.isArray(tm.kader)?tm.kader:[]); }
+
+  // KERN aller headless Einstiege: EIN Pod-Kampf, stumm, danach ist jeder Modulzustand wieder wie
+  // vorher (place/persOf/FUEHRUNG/VEREIN/jeSeite und ueber MOTOREN.sichern() U/KP/disc/...).
+  // `teams` je Team ein Kader (ArenaSpieler[]) oder {name,kurz,kader}; `platzJeTeam` je Team ein
+  // `place` (buildArenaAufstellung, positionsgleich zu `teams`); `jeSeite` k (2..6, Standard
+  // ARENA_ART.battlefield.jeSeite); `vorbereiten(kader)` laeuft nach dem Kadertausch, vor bau() —
+  // dort ziehen die Aufrufer Formkarten und Mutatoren.
+  function bfPodLauf(teams,saat,platzJeTeam,jeSeite,vorbereiten){
+    if(!Array.isArray(teams)||teams.length<3||teams.length>4)
+      throw new Error("spieleBattlefieldPod: braucht 3 oder 4 Teams, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
+    if(teams.some(tm=>!bfPodKaderVon(tm).length))
+      throw new Error("spieleBattlefieldPod: mindestens ein Team stellt keinen einzigen Kaempfer.");
+    const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
+    const g=M.sichern(); if(M.vorher)M.vorher();
+    const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm, jeVorher=art.jeSeite;
+    const vereinVorher=bfPodVereinSchnappschuss(), fuehrungVorher={...FUEHRUNG};
+    const kader=teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    try{
+      for(const k in place)delete place[k];
+      for(const pl of (platzJeTeam||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+      if(jeSeite)art.jeSeite=jeSeite;
+      bfPodVereineSetzen(teams.map(tm=>Array.isArray(tm)?null:tm));
+      if(vorbereiten)vorbereiten(kader);
+      stumm=true;
+      bfPodKader=kader;
+      try{ M.bau(saat); } finally { bfPodKader=null; }
+      M.lauf();
+      const pl=bfPodPlatzierung(), wert=M.wert();
+      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2),
+        besitz:KP.orte.map(o=>o.besitz),
+        teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+pl.punkte[s].toFixed(1),
+          lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
+          eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s]})),
+        kaempfer:U.map(u=>({n:u.n, side:u.side, slot:u.slot,
+          eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig, wert:wert[u.n]||0,
+          ko:u.st.ko, down:!!u.down,
+          erob:+(u.kpd?u.kpd.erob:0).toFixed(3), amOrt:+(u.kpd?u.kpd.amOrt:0).toFixed(2),
+          wechsel:u.kpd?u.kpd.wechsel:0, besucht:u.kpd?u.kpd.besucht.slice():[]}))};
+    } finally {
+      stumm=stummVorher; art.jeSeite=jeVorher;
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+      for(const k in persOf)delete persOf[k];
+      Object.assign(persOf,persVorher);
+      bfPodVereinZurueck(vereinVorher);
+      FUEHRUNG=fuehrungVorher;
+      M.zurueck(g);
+    }
+  }
+
+  // PRODUKTIONS-EINSTIEG, dieselbe Form wie spieleBahnPod()/spieleMiniDmFfaEvent():
+  // `optionen.formSaat` zieht Formkarten fuer ALLE N Kader (sonst haetten nur die zwei
+  // Bootstrap-Teams SQUAD/OPP eine, s. Mini-DMs OPUS-REVIEW B1), `optionen.jeSeite` = k.
+  // Rueckgabe: `teams[s]` {side, name, punkte, lebend, rausT, eventPlatz 1..N, ligaPunkte 2-1-0-0},
+  // `boxscore` je Kaempfer {name, side, wert} mit DEMSELBEN `wert` wie MOTOREN.battlefield.wert()
+  // (Anteil am Gesamtbeitrag des Kampfes, jetzt ueber alle 4k Kaempfer).
+  function spieleBattlefieldPod(teams,saat,platzJeTeam,optionen){
+    const opt=optionen||{};
+    const formVorher=FORMKARTE;
+    try{
+      const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
+        FORMKARTE={...FORMKARTE};
+        if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
+      });
+      return {disziplin:r.disziplin, saat:r.saat, dauer:r.dauer, teams:r.teams,
+        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, wert:u.wert}))};
+    } finally { FORMKARTE=formVorher; }
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie bahnPodSonde()/miniDmFfaSonde(): `kader` Liste von
+  // Team-Kadern, `opt.gruppen` Liste von Vierergruppen (Indizes in `kader`), `opt.n` Kaempfe je
+  // Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k, `opt.mutatoren` "je-spiel" (Standard) | "aus".
+  // Formkarten je Kampf fuer alle Teams der Gruppe. Gemessen wird `eig` OHNE Mutator gegen
+  // MOTOREN.battlefield.wert() — exakt die Groessen von disziplinProbe().
+  function battlefieldPodSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          const r=bfPodLauf(teams,saat,null,o.jeSeite,(k)=>{
+            FORMKARTE={};
+            mdffaFormkartenFuer(k,(20260823+versatz+gi*7919+i*104729)>>>0);
+            MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+              :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          });
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.dauer, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down, erob:u.erob}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"battlefield", format:"pod", events};
+  }
+
+  // PP-ABNAHME IM POD (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon() —
+  // gleiche Hebung +15, gleiche Saaten, gleiche Mutator-Modi, gleiche Abweichungsrechnung gegen
+  // PP_MATRIX_JE_DISC —, nur ist jeder Lauf ein Vier-Team-Kampf: SQUAD und OPP (dieselben
+  // Messpersonen wie einflussVon) plus `extraTeams` als Seite 2/3. Gehoben und gemessen werden nur
+  // die Kaempfer von SQUAD/OPP, die zwei Zusatzteams stellen das Feld. Dieselbe Bauart wie
+  // bahnPodEinfluss().
+  function battlefieldPodEinfluss(extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP,...(extraTeams||[])];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>bfPodLauf(teams,1337+versatz+i*7919,null,jeSeite,(k)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+      else if(modus==="aus")MUTATOREN=[];
+    });
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.filter(u=>u.side<2).map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.battlefield||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,k)=>acc+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"battlefield", format:"pod", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.battlefield.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // DIE SICHTBARE ARENA IM POD (02.11.). Quelle ist der Host (FoundationBattleArenaHost.tsx,
+  // `echterKader.battlefieldPod` = {teams:[{name,kurz,kader}], k, saat, aufstellung:[place je Team]}),
+  // nur gesetzt, wenn das gewaehlte Heimteam an diesem Spieltag einen ECHTEN Battlefield-Pod hat
+  // (getPodForTeam, dieselbe Funktion wie die Buchung). Fuer Standalone/Tests setzt
+  // `window.__arena.battlefieldPodAnzeigen(pod)` dieselbe Form (null schaltet zurueck aufs Duell).
+  // Ohne beides baut reset() Battlefield exakt wie bisher als Duell.
+  // (bfPodAnzeigeVorgabe/bfPodAnzeigeVereinSnap sind oben bei bfPodKader deklariert — reset()
+  // laeuft beim Laden schon, bevor diese Zeilen erreicht sind; eine `let` hier waere dann noch tot.)
+  function bfPodAnzeigeKontext(){
+    const roh=bfPodAnzeigeVorgabe||(echterKader&&echterKader.battlefieldPod)||null;
+    if(!roh||!Array.isArray(roh.teams)||roh.teams.length<3||roh.teams.length>4)return null;
+    if(roh.teams.some(tm=>!bfPodKaderVon(tm).length))return null;
+    return roh;
+  }
+  function bfPodAnzeigeVereineZurueck(){
+    if(bfPodAnzeigeVereinSnap){ bfPodVereinZurueck(bfPodAnzeigeVereinSnap); bfPodAnzeigeVereinSnap=null; }
+  }
+  function bfPodAnzeigeBauen(pod){
+    const art=ARENA_ART.battlefield, jeVorher=art.jeSeite;
+    const placeVorher={...place}, formVorher=FORMKARTE;
+    const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    if(!bfPodAnzeigeVereinSnap)bfPodAnzeigeVereinSnap=bfPodVereinSchnappschuss();
+    bfPodVereineSetzen(pod.teams);
+    // Persoenlichkeiten bleiben stehen (Tooltips/Kaderleiste lesen persOf auch nach dem Aufbau).
+    for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+    try{
+      for(const k in place)delete place[k];
+      for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      FORMKARTE={...FORMKARTE};
+      mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
+      if(pod.k)art.jeSeite=pod.k;
+      bfPodKader=kader;
+      build(pod.saat);
+    } finally {
+      bfPodKader=null; art.jeSeite=jeVorher; FORMKARTE=formVorher;
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+    }
   }
 
   // ===================================================================================
@@ -57553,6 +57989,14 @@
     // MOTOREN[dId] noetig, weil KP bereits ueber sichern()/zurueck() mitgefuehrt wird (s. dort).
     // `o.jeSeite` (optional, 27.10.): Kadergroesse dieses einen Spiels (2..6), wie bei
     // disziplinProbe — ohne `o` exakt wie vorher.
+    // BATTLEFIELD-POD (02.11.): vier Teams gleichzeitig im selben Kampf, s. bfPodLauf() &c.
+    spieleBattlefieldPod,
+    battlefieldPodSonde,
+    battlefieldPodEinfluss,
+    // Anzeige ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie echterKader.battlefieldPod;
+    // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
+    battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
+    battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
