@@ -1,13 +1,14 @@
 /**
  * SIEG / UNENTSCHIEDEN / NIEDERLAGE IM SAISONSTAND (Chris, 02.11.: „Alle sind 1v1 Duelle zwischen den
- * teams das ist doch der punkt vom Modus").
+ * teams das ist doch der punkt vom Modus" — und, selber Tag, zweite Praezisierung nachdem die erste
+ * Fassung Vierer-Pods bewusst ausgeklammert hatte: „auch die Vierer Disziplinen sollen da reinzählen,
+ * weil es gibt ja dort einen Sieger. Das ist der mit den 2 Punkten, unentschieden kriegt der mit
+ * 1 Punkt und die anderen beiden Teams kriegen halt eine Niederlage.").
  *
- * (a) `summiereSaisonBilanz`: 2/1/0 der Duell-Zeilen -> S/U/N, Vierer-Pods getrennt nach Platz,
- *     ungewertete Spieltage und Manager-Zeilen zaehlen nicht, Manager-Save -> `null`.
+ * (a) `summiereSaisonBilanz`: 2/1/0 ALLER gewerteten Zeilen (Duell UND Vierer-Pod) -> S/U/N, Pods
+ *     zusaetzlich nach Platz gezaehlt (`podPlaetze`, fuer den Hover), ungewertete Spieltage und
+ *     Manager-Zeilen zaehlen nicht, Manager-Save -> `null`.
  * (b) SSR der Saisonstand-Tabelle: Spalte „S-U-N" nur mit Bilanz-Karte (Battle), sonst gar nicht.
- *
- * Am echten Battle-Save „Battle Mode VW – alle Figuren (02.11.)" nachgerechnet: H-R 22-0-10 + Pods
- * 5×1./3×2. -> 2·22 + 0 + 2·5 + 3 = 57 = Σ teamPoints; dieselbe Identitaet hielt bei 32 von 32 Teams.
  */
 import React from "react";
 import { renderToString } from "react-dom/server";
@@ -58,7 +59,7 @@ function stand(disciplineResults: unknown[]): Pick<GameState, "seasonState"> {
 }
 
 describe("(a) summiereSaisonBilanz", () => {
-  it("Duell-Zeilen -> S/U/N, Pods getrennt nach Platz, ungewertete Spieltage ausgelassen", () => {
+  it("Duell- UND Pod-Zeilen zaehlen in S/U/N, Pods zusaetzlich nach Platz, ungewertete Spieltage ausgelassen", () => {
     const bilanz = summiereSaisonBilanz(
       stand([
         zeile({ id: "1", resultId: "r1", teamId: "A", resolutionSource: "arena", teamPoints: 2 }),
@@ -71,11 +72,11 @@ describe("(a) summiereSaisonBilanz", () => {
       ]),
       "season-1",
     );
-    expect(bilanz?.get("A")).toEqual({ siege: 1, unentschieden: 1, niederlagen: 0, podPlaetze: [0, 1, 0, 0] });
-    expect(bilanz?.get("B")).toEqual({ siege: 0, unentschieden: 1, niederlagen: 1, podPlaetze: [0, 0, 0, 1] });
-    expect(formatiereBilanz(bilanz!.get("A")!)).toBe("1-1-0");
+    expect(bilanz?.get("A")).toEqual({ siege: 1, unentschieden: 2, niederlagen: 0, podPlaetze: [0, 1, 0, 0] });
+    expect(bilanz?.get("B")).toEqual({ siege: 0, unentschieden: 1, niederlagen: 2, podPlaetze: [0, 0, 0, 1] });
+    expect(formatiereBilanz(bilanz!.get("A")!)).toBe("1-2-0");
     expect(beschreibeBilanz(bilanz!.get("A")!)).toBe(
-      "1 Siege · 1 Unentschieden · 0 Niederlagen in 2 Duellen — Vierer-Pods (1): 0× Platz 1, 1× Platz 2, 0× Platz 3, 0× Platz 4",
+      "1 Siege · 2 Unentschieden · 0 Niederlagen in 3 Einsätzen — davon 1 Vierer-Pods: 0× Platz 1, 1× Platz 2, 0× Platz 3, 0× Platz 4",
     );
   });
 
