@@ -24,6 +24,7 @@ import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch
 import { ensureMatchdayResolveSnapshot, readArenaVorlaufRecord, resolveMatchdayPreviewToBook } from "@/lib/foundation/matchday-resolve-snapshot";
 import { kickoffArenaVorlauf, stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -106,7 +107,13 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD/BATTLEFIELD-POD (02.11.): Mini-DM, Battlefield, Staffel und Takeshi buchen an
+    // Pod-Tagen ueber einen eigenen Pod-Pfad mit eigenen (harmlosen) Fake-Runnern, nicht ueber den
+    // hier bewusst werfenden runArenaFixturesImpl -- dieser Test prueft gezielt den Ausfall-Pfad
+    // des Duells, deshalb muessen alle Vierer-Pod-Disziplinen ausgeschlossen werden.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       // Verworfener Versuch -- ohne dieses Aufraeumen bleibt der (mehrere MB grosse) Markt-
       // Kontext-Cache-Eintrag dieses Saves fuer immer im Prozess stehen (s. Kopfkommentar).
