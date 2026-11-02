@@ -573,5 +573,155 @@
         0.15270210363881148
       ]
     }
+  ],
+  "pp": [
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 8,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 4,
+      "abweichungPp": 32.1,
+      "reihen": [
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.635,
+          "anteil": 16.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.629,
+          "anteil": 16
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.624,
+          "anteil": 15.9
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.523,
+          "anteil": 13.3
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.408,
+          "anteil": 10.4
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": 0.376,
+          "anteil": 9.6
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.356,
+          "anteil": 9.1
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.321,
+          "anteil": 8.2
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.049,
+          "anteil": 1.2
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1643.733
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 8,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 4,
+      "abweichungPp": 102,
+      "reihen": [
+        {
+          "attribut": "torment",
+          "gewinn": 0.217,
+          "anteil": 36.3
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.183,
+          "anteil": 30.6
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.12,
+          "anteil": 20.1
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.072,
+          "anteil": 12
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.006,
+          "anteil": 1
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": -0.107,
+          "anteil": 0
+        },
+        {
+          "attribut": "health",
+          "gewinn": -0.111,
+          "anteil": 0
+        },
+        {
+          "attribut": "determination",
+          "gewinn": -0.244,
+          "anteil": 0
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": -0.554,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1523.751
+    }
   ]
 }

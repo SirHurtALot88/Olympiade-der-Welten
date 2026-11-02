@@ -147,7 +147,18 @@ Grund ist nicht untersucht.
    (rho 0,40) und ist auf den Schlagwechsel umgestiegen (`mini-dm-4-team-ffa-recherche-06-09.md`,
    Kopfkommentar an `mdffaSchlagwechsel`).
 
-__PP__
+**Pp (Budget-Methode, Pflicht):** `--nur-pp --pp=8 --pp-je-seite=4`. Gemessen sind SQUAD und OPP
+(je 4) in einem Vier-Team-Kampf mit zwei Familien-Teams als Feld, Hebung +15.
+- Strom 0: **32,1 Pp**. Spirit 16, Intelligence 16, Awareness 16, Power 13, Health 10, Charisma 10,
+  Torment 9, Determination 8.
+- Strom 10 000 000: **102 Pp**. Torment 36, Spirit 31, Intelligence 20, Stamina 12, alles übrige 0.
+- Beide Ströme verfehlen die Schranke von 25 Pp.
+
+Die Spannweite zwischen den Strömen zeigt: Bei 8 Läufen dominiert das Rauschen des FFA. Der
+Kampf ist so laut, dass ein Attribut +15 im Einzelkampf kaum gegen den Zufall ankommt. Das passt
+zu rho je Kampf um 0,2. Läufe mit n=24 würden die Zahl stabilisieren, kosten aber rund 5 Stunden
+je Strom (ein Vier-Team-Kampf rechnet 2 bis 4 s). Weil der Kampf nicht bucht, ist das in dieser
+Runde nicht gefahren worden. Für die Buchungsfähigkeit (Abschnitt 6) wäre es Pflicht.
 
 ## 4. Einordnung: was das für Buchung und Ausnahme heißt
 
@@ -205,8 +216,9 @@ Mini-DM-Erfahrung (dort scheiterte das Echtzeit-FFA genau so):
 3. **Oder bewusst so lassen.** Die Arena ist die Vorschau eines Vier-Team-Kampfes, gebucht wird
    über den PPS-Pod. Das ist der heutige Stand und braucht keine weitere Arbeit.
 
-**Pp:** Die Messung (Budget-Methode) steht oben. Sie ist Pflicht, auch wenn der Kampf nicht
-bucht. Ein Rezept-Tuning für den Pod lohnt erst, wenn Option 1 oder 2 gewählt ist.
+**Pp:** Die Messung steht in Abschnitt 3: 32 und 102 Pp bei n=8, beide über der Schranke von 25.
+Ein Rezept-Tuning für den Pod lohnt erst, wenn Option 1 oder 2 gewählt ist, weil das Rauschen des
+FFA vorher jedes Rezeptsignal überdeckt.
 
 **Takeshi/Staffel sichtbar machen:** Die Bahn-Zeichnung müsste vier Seiten können (Bahnen, HUD,
 Banner). Das ist eigene Arbeit, siehe Abschnitt 5.
