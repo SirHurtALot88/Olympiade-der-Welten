@@ -81415,3 +81415,14 @@ span.nl-facility-ampel-chip {
 .nl-sponsor-league-gebaeude.is-leer {
   color: var(--nl-mut);
 }
+
+/* PixelLab-Figuren (PlayerPixelSprite): ein waagerechter Animationsstreifen wird per
+   steps() durchgeschoben — background-size = Bilderzahl x 100 %, 100 % Position = letztes Bild. */
+@keyframes olyFigurStrip {
+  from { background-position: 0% 0; }
+  to { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oly-figur-sprite-frame { animation: none !important; }
+}

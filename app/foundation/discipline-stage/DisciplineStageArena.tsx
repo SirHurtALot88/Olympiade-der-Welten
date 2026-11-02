@@ -109,6 +109,7 @@ import {
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { preloadDisciplineField } from "@/app/foundation/discipline-stage/arena/disciplines/registry";
+import DisciplinePixelScene from "@/app/foundation/discipline-stage/DisciplinePixelScene";
 import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
@@ -2828,6 +2829,7 @@ export default function DisciplineStageArena({
                     </span>
                   ) : null}
                 </div>
+                <DisciplinePixelScene compact disciplineId={meta.disciplineId} ownPlayers={athleten} />
                 {athleten.length > 0 ? (
                   <ul className="arena-prematch-athletes" aria-label={`Deine Aufstellung für ${meta.displayName}`}>
                     {athleten.map((athlet) => (
@@ -3088,6 +3090,21 @@ export default function DisciplineStageArena({
           ) : null}
         </label>
       </div>
+
+      {/* PIXEL-ARENA (02.11.): die neue Pixel-Art-Szene dieser Disziplin + die eigene
+          Aufstellung als PixelLab-Figuren. Reine Anzeige über der Bühne; Score/Reveal/Wertung
+          bleiben unverändert unten. Konfiguration: lib/foundation/discipline-scenes.ts. */}
+      <DisciplinePixelScene
+        disciplineId={disciplineId}
+        ownTeamName={ownTeam?.name ?? null}
+        ownPlayers={
+          matchdaySides.d1?.disciplineId === disciplineId && ownLineupBySide.d1.length > 0
+            ? ownLineupBySide.d1
+            : matchdaySides.d2?.disciplineId === disciplineId && ownLineupBySide.d2.length > 0
+              ? ownLineupBySide.d2
+              : (ownTeam?.slots ?? []).map((slot) => ({ playerId: slot.playerId, name: slot.playerName }))
+        }
+      />
 
       {/* P1-17: Engine-Status auch AUSSERHALB des Dev-Modus sichtbar. Ohne diese Zeile bekamen
           normale Spieler bei „loading"/„unavailable" keinerlei Rückmeldung und saßen still fest.
