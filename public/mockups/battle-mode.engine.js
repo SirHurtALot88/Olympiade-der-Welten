@@ -54584,7 +54584,7 @@
   // Block wird nur im Pod (KP.pod) erreicht. Der Echtzeit-Pod bleibt als Kontrolle erreichbar
   // (`spieleBattlefieldPod(..., {echtzeit:true})`), gebucht und gezeigt wird das Gefecht hier.
   const BF_FFA_GRUND=Object.freeze({
-    takte:20, taktSek:4, mitte:50, kappa:0.12, kappaWege:0.4, spreizung:3,
+    takte:20, taktSek:4, mitte:50, kappa:0.12, kappaWege:0.25, spreizung:3,
     stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
     schwachstelle:{basis:0.4, bonus:0.25},
     position:{basis:0.2},
@@ -54594,7 +54594,7 @@
     punkteJeTakt:8, punkteZumSieg:150,
     rotation:{dauer:2},
     wertung:{ko:15, erob:12, halten:3, takt:2},
-    hebel:{stand:6.5, wucht:4, treffer:4, deckung:4, ausdauer:5, schwachstelle:3, position:3, atem:5, erobern:4}
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, position:1.5, atem:5, erobern:4}
   });
   const bfffaGrund=()=>JSON.parse(JSON.stringify(BF_FFA_GRUND));
   let BFFFA=bfffaGrund();
@@ -54646,7 +54646,11 @@
       schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
       position:klemme(P.position.basis+weg(H.position,["intelligence"]),0,0.95),
       atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
-      // Eroberung: Rolle (ARENA_DOMINATION.rolle, wie kpRolleVon) mal Befehl (Charisma).
+      // Eroberung: Rolle (ARENA_DOMINATION.rolle, wie kpRolleVon) mal Befehl (Charisma). Der Befehl
+      // traegt auch das HALTEN eines eigenen Ortes: wer dort steht, ordnet ihn je Takt — die
+      // Gutschrift waechst mit seinem Befehl (sonst brachte ein schneller eroberter Ort dieselbe
+      // feste Gutschrift wie ein langsamer, und Charisma laese im Pp fast nur ueber die Eignung).
+      befehl:klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       erob:rolle.erobern*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       neutral:rolle.neutral*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
       halten:rolle.halten*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
@@ -54800,7 +54804,7 @@
         if(o.besitz!=null){
           punkte[o.besitz]+=P.punkteJeTakt;
           const halter=da.filter(k=>k.side===o.besitz);
-          for(const k of halter){ k.wert+=P.wertung.halten/halter.length; k.st.halte++; }
+          for(const k of halter){ k.wert+=P.wertung.halten*k.befehl/halter.length; k.st.halte++; }
         }
       });
       for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
