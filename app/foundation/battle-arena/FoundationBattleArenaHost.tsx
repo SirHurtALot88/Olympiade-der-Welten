@@ -969,7 +969,7 @@ export default function FoundationBattleArenaHost({
             style={{ margin: "8px 0 0", fontSize: "0.85rem" }}
           >
             Battlefield läuft hier als 4-Team-FFA — alle vier Teams der gebuchten Vierergruppe
-            kämpfen gleichzeitig um Nord, Mitte und Süd:{" "}
+            kämpfen gleichzeitig um Nord, Mitte und Süd, und gewertet wird genau dieses Gefecht:{" "}
             {battlefieldPodNutzlast.teams.map((team, index) => (
               <span key={team.name + index}>
                 {index > 0 ? ", " : ""}
@@ -992,7 +992,8 @@ export default function FoundationBattleArenaHost({
             {spielquelleHinweise.map((hinweis, index) => (
               <span key={hinweis.disciplineId}>
                 {index > 0 ? " · " : ""}
-                <strong>{hinweis.disciplineName}</strong> {hinweis.text} — hier nur Vorschau.
+                <strong>{hinweis.disciplineName}</strong> {hinweis.text}
+                {hinweis.nurVorschau === false ? "." : " — hier nur Vorschau."}
               </span>
             ))}
           </p>

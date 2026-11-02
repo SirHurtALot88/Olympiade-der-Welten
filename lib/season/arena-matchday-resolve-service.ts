@@ -92,6 +92,9 @@ export async function kickoffArenaMatchdayApply(
       // `chromium_start` scheitert. Analog zu `runArenaFixturesImpl` direkt daneben durchgereicht.
       runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
       runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
+      // BATTLEFIELD-POD (02.11. abends): derselbe Testhebel wie fuer Mini-DM direkt darueber.
+      runBattlefieldPodFixturesImpl: input.runBattlefieldPodFixturesImpl,
+      runBattlefieldPodFixturesOptions: input.runBattlefieldPodFixturesOptions,
       allowIncompleteField: true,
     },
     persistence,
@@ -127,6 +130,9 @@ export async function kickoffArenaMatchdayApply(
         // oben -- derselbe Lauf (In-Prozess-Entdopplung), deshalb dieselbe Durchreichung hier noetig.
         runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
         runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
+        // BATTLEFIELD-POD (02.11. abends): derselbe Testhebel wie fuer Mini-DM direkt darueber.
+        runBattlefieldPodFixturesImpl: input.runBattlefieldPodFixturesImpl,
+        runBattlefieldPodFixturesOptions: input.runBattlefieldPodFixturesOptions,
         allowIncompleteField: true,
       },
       persistence,
@@ -182,6 +188,9 @@ export async function kickoffArenaMatchdayApply(
         // erzwungene Neuversuch bei einer arenaEingabeHash-Divergenz braucht denselben Testhebel.
         runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
         runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
+        // BATTLEFIELD-POD (02.11. abends): derselbe Testhebel wie fuer Mini-DM direkt darueber.
+        runBattlefieldPodFixturesImpl: input.runBattlefieldPodFixturesImpl,
+        runBattlefieldPodFixturesOptions: input.runBattlefieldPodFixturesOptions,
         erzwingeNeuenVersuch: true,
       },
       persistence,

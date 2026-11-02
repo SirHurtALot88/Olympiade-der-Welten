@@ -1182,3 +1182,192 @@ export async function runMiniDmFfaPodFixtures(
     await schliesseBrowserHart(browser);
   }
 }
+
+/**
+ * BATTLEFIELD-POD-RUNNER (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7).
+ *
+ * Seit Chris' Entscheidung fuer das Mini-DM-Muster wird ein Battlefield-Pod als GEFECHT JE ORT
+ * entschieden (`bfffaGefecht()` in battle-mode.engine.js): deterministisch aus der Eignung, die Arena
+ * spielt es danach ab. Dieser Runner ist die Bruecke in die Liga, dieselbe Bauart wie
+ * `runMiniDmFfaPodFixtures()` oben: EIN Motor-Ladevorgang fuer alle Pods eines Spieltags, die vier
+ * Kader als explizite Argumente an `window.__arena.spieleBattlefieldPod(teams, saat, platzJeTeam,
+ * {formSaat, jeSeite})` — derselbe Einstieg, dieselbe Saat (`buildBattlefieldPodMatchSeed()`), dasselbe
+ * k, dieselbe Aufstellung je Team (`buildArenaAufstellung()`) und derselbe Mutator-Wurf, mit denen
+ * `FoundationBattleArenaHost.tsx` die Arena-Anzeige baut. Gezeigt = gebucht.
+ *
+ * `formSaat` ist IMMER die Pod-Saat (dieselbe Lehre wie Mini-DMs OPUS-REVIEW B1: ohne eigene
+ * Formkarten je Pod haetten nur die zwei Bootstrap-Teams eine).
+ *
+ * Ein Pod, in dem ein Team keinen einsatzfaehigen Kader stellt, liefert `null` an seiner Position —
+ * der Aufrufer faellt fuer diesen Pod auf den PPS-Pod zurueck.
+ */
+export type BattlefieldPodFixtureInput = {
+  podId: string;
+  teamIds: readonly [string, string, string, string];
+  seed: string | number;
+};
+
+export type BattlefieldPodBoxscoreEintrag = {
+  name: string;
+  playerId: string | null;
+  teamId: string | null;
+  /** Pod-lokaler Team-Index 0..3 (Reihenfolge von `teamIds`). */
+  podSide: number;
+  slotId: string | null;
+  /** Eignung ohne Mutator, wie disziplinProbe/Abnahme sie messen. */
+  eig: number;
+  /** Anteil am Gesamtbeitrag des Gefechts in Prozent (Summe 100 ueber alle 4k Kaempfer). */
+  anteil: number;
+  /** Rohe Kampfrichterwertung (Basis der Spieler-PP). */
+  wertung: number;
+  ko: number;
+  down: boolean;
+};
+
+export type BattlefieldPodTeamResult = {
+  teamId: string;
+  podSide: number;
+  eventPlatz: number;
+  punkte: number;
+  lebend: number;
+  wertung: number;
+  ligaPunkte: number;
+};
+
+export type BattlefieldPodFixtureResult = {
+  podId: string;
+  teamIds: readonly [string, string, string, string];
+  ende: string | null;
+  teams: BattlefieldPodTeamResult[];
+  boxscore: BattlefieldPodBoxscoreEintrag[];
+};
+
+type RoherBattlefieldPodErgebnis = {
+  format?: string;
+  ende?: string;
+  teams: Array<{ side: number; punkte: number; lebend: number; eventPlatz: number; ligaPunkte: number; wertung?: number }>;
+  boxscore: Array<{ name: string; side: number; slot: string | null; eig: number; wert: number; roh?: number; ko: number; down: boolean }>;
+};
+
+export type RunBattlefieldPodFixturesOptions = {
+  attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>;
+  chromiumExecutablePath?: string;
+  seitenTimeoutMs?: number;
+  /** Der Spieltagswurf fuer Battlefield (`resolveMatchdayMutatorTraitsForDiscipline`), fuer alle Pods gleich. */
+  mutatoren?: string[];
+  /** Kadergroesse 2..6 des Spielplan-Slots (`resolvePodPlayerCountForMatchday`). */
+  k?: number;
+  /** Spieltag fuer `buildArenaAufstellung()`; ohne: `gameState.matchdayState?.matchdayId`. */
+  matchdayId?: string | null;
+};
+
+async function simuliereBattlefieldPodsImBrowser(payload: {
+  pods: Array<{ teams: ArenaSpieler[][]; seed: number; platzJeTeam: ArenaAufstellung[]; optionen: { jeSeite?: number; formSaat: number } }>;
+  timeoutMs: number;
+}): Promise<Array<RoherBattlefieldPodErgebnis | null>> {
+  const fenster = window as unknown as {
+    __arena?: {
+      spieleBattlefieldPod: (
+        teams: ArenaSpieler[][],
+        saat: number,
+        platzJeTeam?: ArenaAufstellung[],
+        optionen?: { jeSeite?: number; formSaat?: number },
+      ) => RoherBattlefieldPodErgebnis | null;
+    };
+  };
+  const start = Date.now();
+  while (typeof fenster.__arena === "undefined") {
+    if (Date.now() - start > payload.timeoutMs) {
+      throw new Error("arena-headless-runner: window.__arena wurde nicht rechtzeitig bereit.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  return payload.pods.map((pod) => fenster.__arena!.spieleBattlefieldPod(pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
+}
+
+export async function runBattlefieldPodFixtures(
+  gameState: GameState,
+  pods: BattlefieldPodFixtureInput[],
+  options: RunBattlefieldPodFixturesOptions = {},
+): Promise<Array<BattlefieldPodFixtureResult | null>> {
+  if (pods.length === 0) return [];
+  const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
+  const vorbereitet = pods.map((pod) => ({
+    ...pod,
+    seed: seedZuZahl(pod.seed),
+    kaderJeTeam: pod.teamIds.map((teamId) => buildArenaTeam(gameState, teamId, options.attributeSheetOverrides)),
+    platzJeTeam: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
+  }));
+  const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
+  const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
+  if (!existsSync(seitenPfad)) {
+    throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
+  }
+  const timeoutMs = options.seitenTimeoutMs ?? STANDARD_SEITEN_TIMEOUT_MS;
+  const laufbarePods = vorbereitet.filter((_, index) => einsatzfaehig[index]);
+  if (laufbarePods.length === 0) return vorbereitet.map(() => null);
+
+  const browser = await chromium.launch(ermittleChromiumLaunchOptions(options.chromiumExecutablePath));
+  try {
+    const page: Page = await browser.newPage();
+    await page.addInitScript(() => {
+      const fenster = window as unknown as { __name?: (fn: unknown, name?: string) => unknown };
+      if (typeof fenster.__name !== "function") {
+        fenster.__name = (fn) => fn;
+      }
+    });
+    // Bootstrap wie beim Mini-DM-Runner: irgendein gueltiger Zwei-Team-Kader, damit das Modul
+    // startet; `mutatoren` ist derselbe Spieltagswurf, den die Anzeige ueber
+    // `mutatorenByDisciplineId.battlefield` bekommt. Der Pod liest seine Kader als Argumente.
+    const bootstrapPod = laufbarePods[0]!;
+    await page.addInitScript(
+      (kader) => {
+        (window as unknown as { __olyArenaKader?: unknown }).__olyArenaKader = kader;
+      },
+      { heim: bootstrapPod.kaderJeTeam[0], gast: bootstrapPod.kaderJeTeam[1], aufstellung: {}, mutatoren: options.mutatoren ?? [] },
+    );
+    await page.goto(pathToFileURL(seitenPfad).href);
+    const rohErgebnisse = await page.evaluate(simuliereBattlefieldPodsImBrowser, {
+      pods: laufbarePods.map((pod) => ({
+        teams: pod.kaderJeTeam,
+        seed: pod.seed,
+        platzJeTeam: pod.platzJeTeam,
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed },
+      })),
+      timeoutMs,
+    });
+
+    let laufbarIndex = 0;
+    return vorbereitet.map((pod, index) => {
+      if (!einsatzfaehig[index]) return null;
+      const ergebnis = rohErgebnisse[laufbarIndex]!;
+      laufbarIndex += 1;
+      if (!ergebnis || ergebnis.format !== "gefecht") return null;
+      const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
+      const boxscore: BattlefieldPodBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => ({
+        name: eintrag.name,
+        playerId: namenJeTeam[eintrag.side]?.get(eintrag.name) ?? null,
+        teamId: pod.teamIds[eintrag.side] ?? null,
+        podSide: eintrag.side,
+        slotId: eintrag.slot ?? null,
+        eig: eintrag.eig,
+        anteil: eintrag.wert,
+        wertung: eintrag.roh ?? 0,
+        ko: eintrag.ko,
+        down: eintrag.down,
+      }));
+      const teams: BattlefieldPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
+        teamId: pod.teamIds[eintrag.side] ?? "",
+        podSide: eintrag.side,
+        eventPlatz: eintrag.eventPlatz,
+        punkte: eintrag.punkte,
+        lebend: eintrag.lebend,
+        wertung: eintrag.wertung ?? 0,
+        ligaPunkte: eintrag.ligaPunkte,
+      }));
+      return { podId: pod.podId, teamIds: pod.teamIds, ende: ergebnis.ende ?? null, teams, boxscore };
+    });
+  } finally {
+    await schliesseBrowserHart(browser);
+  }
+}

@@ -42,6 +42,7 @@ import {
 } from "@/lib/resolve/battle-mode-pps-duell";
 import type { MiniDmPod } from "@/lib/season/mini-dm-pod-schedule";
 import miniDmFfaReferenzJson from "@/data/generated/mini-dm-ffa-referenz.json";
+import battlefieldPodReferenzJson from "@/data/generated/battlefield-pod-referenz.json";
 
 /** Chris' Sonderregel fuer Mini-DM (14.09.): 2-1-0-0 nach Platzierung im Pod, Summe 3 je Pod. */
 export const MINI_DM_POD_TEAM_PUNKTE: readonly [number, number, number, number] = [2, 1, 0, 0];
@@ -281,6 +282,14 @@ export function berechneMiniDmPodOverrides(input: {
   disciplineId: string;
   playerCount: number | null | undefined;
   ffaRohdatenByPodId?: ReadonlyMap<string, MiniDmFfaPodRohdaten> | null;
+  /**
+   * BATTLEFIELD-GEFECHT (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7):
+   * liegt fuer einen Pod ein gebuchtes Gefecht je Ort vor (`runBattlefieldPodMatchday()`,
+   * battlefield-pod-matchday.ts), bucht ZUERST `berechneBattlefieldPodOverride()` daraus; sonst
+   * (fehlende/kaputte Rohdaten, Vorlauf ausgefallen oder abgeschaltet) faellt der Pod auf den
+   * PPS-Pod zurueck — genau wie bei Mini-DM. Ohne diesen Parameter byte-identisch zum Stand davor.
+   */
+  battlefieldRohdatenByPodId?: ReadonlyMap<string, BattlefieldPodRohdaten> | null;
 }): Map<string, MiniDmPodOverride> {
   const overrides = new Map<string, MiniDmPodOverride>();
   for (const pod of input.pods) {
@@ -294,8 +303,20 @@ export function berechneMiniDmPodOverrides(input: {
           playerCount: input.playerCount,
         })
       : null;
+    const battlefieldRohdaten = input.battlefieldRohdatenByPodId?.get(pod.id) ?? null;
+    const battlefieldOverrides =
+      !ffaOverrides && battlefieldRohdaten
+        ? berechneBattlefieldPodOverride({
+            pod,
+            rohdaten: battlefieldRohdaten,
+            ppsScoreByTeamId: input.scoreByTeamId,
+            disciplineId: input.disciplineId,
+            playerCount: input.playerCount,
+          })
+        : null;
     const podOverrides =
       ffaOverrides ??
+      battlefieldOverrides ??
       berechneMiniDmPodOverride({
         pod,
         scoreByTeamId: input.scoreByTeamId,
@@ -525,8 +546,9 @@ const MINI_DM_FFA_REFERENZ = miniDmFfaReferenzJson as unknown as MiniDmFfaRefere
 function resolveNaechsteMiniDmFfaFeldgroesse(
   playerCount: number | null | undefined,
   gueltigFilter: (eintrag: MiniDmFfaReferenzFeldgroesse) => boolean,
+  referenz: MiniDmFfaReferenzJson = MINI_DM_FFA_REFERENZ,
 ): MiniDmFfaReferenzFeldgroesse | null {
-  const feldgroessen = MINI_DM_FFA_REFERENZ.feldgroessen;
+  const feldgroessen = referenz.feldgroessen;
   if (!feldgroessen) return null;
   const gueltig = Object.entries(feldgroessen)
     .map(([n, eintrag]) => [Number(n), eintrag] as const)
@@ -676,6 +698,161 @@ export function berechneMiniDmFfaPodOverride(input: {
       quelle: "ffa",
       rundenPunkteSumme: akkumulator.rundenPunkteSumme,
       teilnahme: akkumulator.teilnahme,
+    });
+  });
+  return overrides;
+}
+
+// =====================================================================================
+// BATTLEFIELD-POD AUS DEM GEFECHT JE ORT (02.11. abends, Mini-DM-Muster) -- Chris hat entschieden,
+// dass Battlefield im Pod so entschieden wird wie Mini-DM: ein deterministisches Gefecht je Ort
+// (`bfffaGefecht()`, public/mockups/battle-mode.engine.js), das die Arena danach abspielt. Abnahme:
+// rho je Kampf 0,88-0,93 fuer k=2..6, Pp unter 25 in beiden Saatstroemen
+// (docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7, data/generated/battlefield-pod-gefecht-
+// abnahme.json). Diese Sektion ist die Buchungsformel dafuer -- rein, synchron, wie der Rest der
+// Datei; geliefert werden die Rohdaten vom Vorlauf (`runBattlefieldPodMatchday()`).
+//
+// PLATZ KOMMT AUS DEM MOTOR, nicht aus einer zweiten Rechnung hier: `eventPlatz` ist exakt der
+// Platz, mit dem die Arena das Gefecht enden laesst (bfPodPlatzierungAus: letztes Team steht >
+// Kontrollpunkt-Punkte > Lebende > spaeter raus > Kampfrichterwertung). Diese Funktion ordnet nur
+// noch danach und vergibt 2-1-0-0; `wertung` (der fuenfte Motor-Schluessel) und die teamId brechen
+// einen -- praktisch ausgeschlossenen -- exakten Gleichstand deterministisch.
+// =====================================================================================
+
+/** EIN Team im gebuchten Battlefield-Gefecht (Motor-Endstand). */
+export type BattlefieldPodTeamRohdaten = {
+  teamId: string;
+  /** 1..4, Platz am Ende des Gefechts (Motor). */
+  eventPlatz: number;
+  /** Kontrollpunkt-Punkte am Ende des Gefechts. */
+  punkte: number;
+  /** Stehende Kaempfer am Ende. */
+  lebend: number;
+  /** Summe der Kampfrichterwertung aller Kaempfer dieses Teams (fuenfter Platzierungsschluessel). */
+  wertung: number;
+};
+
+/** Das volle gebuchte Gefecht EINES Battlefield-Pods. */
+export type BattlefieldPodRohdaten = {
+  podId: string;
+  teamIds: readonly [string, string, string, string];
+  /** k = Kadergroesse des Spielplan-Slots, 2..6. */
+  playerCount: number;
+  teams: readonly BattlefieldPodTeamRohdaten[];
+};
+
+const BATTLEFIELD_POD_REFERENZ = battlefieldPodReferenzJson as unknown as MiniDmFfaReferenzJson;
+
+/** M90 der Punkte-Luecken zwischen aufeinanderfolgenden Plaetzen je k (`data/generated/battlefield-pod-referenz.json`). */
+export function resolveBattlefieldPodMargeReferenz(playerCount: number | null | undefined): { m90: number } | null {
+  const eintrag = resolveNaechsteMiniDmFfaFeldgroesse(
+    playerCount,
+    (e) => Number.isFinite(e.m90) && (e.m90 as number) > 0,
+    BATTLEFIELD_POD_REFERENZ,
+  );
+  return eintrag ? { m90: eintrag.m90 as number } : null;
+}
+
+/** p50/p99,5 der rohen Kampfrichterwertung je Kaempfer und k -- fuer die Spieler-PP. */
+export function resolveBattlefieldPodSpielerPpReferenz(playerCount: number | null | undefined): { p50: number; p995: number } | null {
+  const eintrag = resolveNaechsteMiniDmFfaFeldgroesse(
+    playerCount,
+    (e) => Boolean(e.spieler) && e.spieler!.p995 > e.spieler!.p50,
+    BATTLEFIELD_POD_REFERENZ,
+  );
+  return eintrag?.spieler ?? null;
+}
+
+/**
+ * SPIELER-PP aus dem Gefecht: dieselbe Impact-Kurve wie `"pps_duell"`/Arena/Mini-DM-FFA
+ * (`ppAusSpielerScore()`), nur mit der Battlefield-Referenz -- rein leistungsbasiert, unabhaengig
+ * vom Pod-Platz des eigenen Teams. Wer nicht aufgestellt ist, bekommt keine PP (regelt der Aufrufer).
+ */
+export function ppAusBattlefieldPodWertung(
+  wertung: number | null | undefined,
+  referenz: { p50: number; p995: number } | null,
+): number {
+  return ppAusSpielerScore(wertung, referenz);
+}
+
+function pruefeBattlefieldPodRohdaten(pod: Pick<MiniDmPod, "id" | "teamIds">, rohdaten: BattlefieldPodRohdaten): boolean {
+  if (rohdaten.podId !== pod.id) return false;
+  if (!Number.isInteger(rohdaten.playerCount) || rohdaten.playerCount < 1) return false;
+  if (rohdaten.teams.length !== 4) return false;
+  const podTeamIds = new Set(pod.teamIds);
+  if (podTeamIds.size !== 4) return false;
+  const gesehen = new Set<string>();
+  for (const team of rohdaten.teams) {
+    if (!podTeamIds.has(team.teamId) || gesehen.has(team.teamId)) return false;
+    gesehen.add(team.teamId);
+    if (!Number.isInteger(team.eventPlatz) || team.eventPlatz < 1 || team.eventPlatz > 4) return false;
+    if (!Number.isFinite(team.punkte) || !Number.isFinite(team.lebend) || !Number.isFinite(team.wertung)) return false;
+  }
+  return true;
+}
+
+/**
+ * EIN Pod -> die vier Overrides aus dem gebuchten Gefecht (`quelle: "ffa"` -- dasselbe Signal wie
+ * beim Mini-DM-FFA: Spieler-PP kommen aus dem Motor-Boxscore, s. season-points-ledger.ts und
+ * legacy-matchday-resolve-engine.ts). `null` bei kaputten Rohdaten oder fehlendem PPS-Score eines
+ * Teams (fuer das Niveau der 0-10-Wertung gebraucht) -- der Aufrufer faellt dann auf den PPS-Pod
+ * zurueck.
+ */
+export function berechneBattlefieldPodOverride(input: {
+  pod: MiniDmPod;
+  rohdaten: BattlefieldPodRohdaten;
+  ppsScoreByTeamId: ReadonlyMap<string, number>;
+  disciplineId: string;
+  playerCount: number | null | undefined;
+}): Map<string, MiniDmPodOverride> | null {
+  if (!pruefeBattlefieldPodRohdaten(input.pod, input.rohdaten)) return null;
+  if (input.pod.teamIds.some((teamId) => !input.ppsScoreByTeamId.has(teamId))) return null;
+
+  const k = input.rohdaten.playerCount;
+  const sortiertRoh = [...input.rohdaten.teams].sort((a, b) => {
+    if (a.eventPlatz !== b.eventPlatz) return a.eventPlatz - b.eventPlatz;
+    if (b.wertung !== a.wertung) return b.wertung - a.wertung;
+    return a.teamId.localeCompare(b.teamId);
+  });
+  const niveauReferenz = resolveNiveauReferenz("pps", input.disciplineId, input.playerCount);
+  const margeReferenz = resolveBattlefieldPodMargeReferenz(k);
+  const sortiert = sortiertRoh.map((team, index) => {
+    const naechster = sortiertRoh[index + 1];
+    const eigenePunkte = MINI_DM_POD_TEAM_PUNKTE[index] ?? 0;
+    const naechstePunkte = naechster ? MINI_DM_POD_TEAM_PUNKTE[index + 1] ?? 0 : eigenePunkte;
+    return {
+      teamId: team.teamId,
+      // Marge aus den Kontrollpunkt-Punkten; ein besser platziertes Team mit WENIGER Punkten (das
+      // letzte stehende Team) bekommt Luecke 0, die `mindestLuecke` haelt die Ordnung.
+      score: team.punkte,
+      niveauScore: input.ppsScoreByTeamId.get(team.teamId) ?? 0,
+      mindestLuecke: naechster && eigenePunkte !== naechstePunkte ? 1 : 0,
+    };
+  });
+  const werte = berechneErgebnisNormiertNTeam({ sortiert, m90: margeReferenz?.m90 ?? null, niveauReferenz });
+  const mittelwert = werte.reduce((summe, wert) => summe + wert, 0) / werte.length;
+  const abweichungenGerundet = werte.slice(0, 3).map((wert) => Math.round(wert - mittelwert));
+  const letzteAbweichung = -abweichungenGerundet.reduce((summe, wert) => summe + wert, 0);
+  const verhaeltnisse = [...abweichungenGerundet, letzteAbweichung];
+
+  const overrides = new Map<string, MiniDmPodOverride>();
+  sortiertRoh.forEach((team, index) => {
+    const vorheriger = sortiertRoh[index - 1];
+    const warnings: string[] = [];
+    if (!margeReferenz) warnings.push(`battlefield_pod_referenz_fehlt:${k}`);
+    if (team.eventPlatz !== index + 1) warnings.push("battlefield_pod_motor_gleichstand_aufgeloest");
+    overrides.set(team.teamId, {
+      teamId: team.teamId,
+      platz: (index + 1) as 1 | 2 | 3 | 4,
+      teamPoints: MINI_DM_POD_TEAM_PUNKTE[index] ?? 0,
+      score: team.punkte,
+      margeZumNaechstbesserenPlatz: vorheriger ? Math.round(Math.max(0, vorheriger.punkte - team.punkte) * 1000) / 1000 : 0,
+      verhaeltnis: verhaeltnisse[index] ?? 0,
+      wert: werte[index] ?? 0,
+      podId: input.pod.id,
+      teamIds: input.pod.teamIds,
+      warnings,
+      quelle: "ffa",
     });
   });
   return overrides;

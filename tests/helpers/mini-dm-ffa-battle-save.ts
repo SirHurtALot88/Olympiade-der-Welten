@@ -30,7 +30,7 @@ import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-p
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
-import type { runMiniDmFfaPodFixtures, runArenaFixtures } from "@/lib/battle/arena-headless-runner";
+import type { runBattlefieldPodFixtures, runMiniDmFfaPodFixtures, runArenaFixtures } from "@/lib/battle/arena-headless-runner";
 import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { expect } from "vitest";
@@ -116,6 +116,46 @@ export function buildHarmlosenArenaFakeRunner(): typeof runArenaFixtures {
       seiten: [1, 0] as [number, number],
       boxscore: [],
     }))) as typeof runArenaFixtures;
+}
+
+/**
+ * BATTLEFIELD-POD (02.11. abends): derselbe harmlose Fake fuer den Battlefield-Pod-Runner -- seit
+ * der Arena-Vorlauf das Gefecht je Ort rechnet, kann ein zufaellig gezogener Battlefield-Spieltag
+ * sonst echtes Chromium anwerfen (dieselbe "IMMER ALLE Runner faken"-Regel wie oben). Liefert je
+ * Pod einen strukturell vollstaendigen Boxscore (k Kaempfer je Team, Platz = Seite + 1).
+ */
+export function buildHarmlosenBattlefieldPodFakeRunner(): typeof runBattlefieldPodFixtures {
+  return (async (_gameState, pods, options) => {
+    const k = Math.max(2, Math.min(6, options?.k ?? 4));
+    return pods.map((pod) => ({
+      podId: pod.podId,
+      teamIds: pod.teamIds,
+      ende: "zeit",
+      teams: pod.teamIds.map((teamId, podSide) => ({
+        teamId,
+        podSide,
+        eventPlatz: podSide + 1,
+        punkte: (3 - podSide) * 40,
+        lebend: 1,
+        wertung: (3 - podSide) * 100,
+        ligaPunkte: [2, 1, 0, 0][podSide] ?? 0,
+      })),
+      boxscore: pod.teamIds.flatMap((teamId, podSide) =>
+        Array.from({ length: k }, (_v, i) => ({
+          name: `harmlos-bf-${teamId}-${i}`,
+          playerId: null,
+          teamId,
+          podSide,
+          slotId: null,
+          eig: 50,
+          anteil: 100 / (4 * k),
+          wertung: 100,
+          ko: 0,
+          down: false,
+        })),
+      ),
+    }));
+  }) as typeof runBattlefieldPodFixtures;
 }
 
 /** Default-Kadergroesse fuer Tests, die die VERDRAHTUNG pruefen (laeuft der FFA-Pfad ueberhaupt

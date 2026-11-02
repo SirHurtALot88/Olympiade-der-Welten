@@ -1,5 +1,17 @@
 # Der Stand aller zwanzig Disziplinen
 
+**Neunundzwanzigster Nachtrag 02.11. — Battlefield im Vierer-Pod: Gefecht je Ort, gezeigt = gebucht.**
+Chris hat für den Battlefield-Pod das Mini-DM-Muster gewählt: ein deterministisches Gefecht je Ort
+(Nord/Mitte/Süd, Belegung aus der Rolle, je Ort ein Schlagwechsel aus den neun Matrix-Kanälen,
+Kontrollpunkte nach der `kpTick`-Regel), das die Arena mit allen vier Teams gleichzeitig abspielt und
+das die Liga bucht (2-1-0-0, Spieler-PP aus dem Gefecht). Kaderfest, zwei Saatströme: rho je Kampf
+**0,861–0,923** für k=2..6 (Echtzeit-Pod vorher 0,13–0,27), Paare ab 15 Punkten 99,4–99,8 %, Pp
+**4,8–20,2** (n=48). Beide Pflichtkriterien regulär bestanden. Das Zwei-Team-Duell auf dem
+Arena-Chassis ist unverändert (0,399, außerhalb der Wertung) — gewertet wird Battlefield ausschließlich
+als Pod. Volle Herleitung: `docs/design/battlefield-pod-ffa-02-11.md` Abschnitt 7.
+
+---
+
 **Achtundzwanzigster Nachtrag 27.10. — I-Spy organisch und gewertet (Task #197); TDM/Battlefield
 frisch nachgemessen, eine Formatfrage an Chris (Task #198).** Auslöser ist Chris' Leitlinie vom
 27.10.: „alle müssen organisch durchlaufen, die Brücke ist nur Notfall-Backup". Volle Herleitung in

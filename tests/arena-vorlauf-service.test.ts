@@ -27,7 +27,7 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disci
 import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfermarkt-local-service";
 import type { ArenaFixtureResult, RunArenaFixturesOptions } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+import { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung der Mini-DM-CI-Flakiness): diese Datei faket
@@ -143,7 +143,7 @@ describe("Arena-Vorlauf-Service · Ausfall-Probe (Plan Abschnitt 6.2 #3)", () =>
 
       const ergebnis = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
         persistence,
       );
       expect(ergebnis.applicable).toBe(true);
@@ -200,12 +200,12 @@ describe("Arena-Vorlauf-Service · Koop/Doppellauf (Plan Abschnitt 6.2 #5)", () 
       const [ergebnisA, ergebnisB] = await Promise.all([
         stelleArenaVorlaufSicher(
           scope,
-          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
           persistence,
         ),
         stelleArenaVorlaufSicher(
           scope,
-          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          { runArenaFixturesImpl: verzoegerterRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
           persistence,
         ),
       ]);
@@ -261,7 +261,7 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
 
       const ergebnis = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: einmalWerfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        { runArenaFixturesImpl: einmalWerfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
         persistence,
       );
       expect(ergebnis.applicable).toBe(true);
@@ -299,7 +299,7 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
 
       const ergebnis = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
         persistence,
       );
       expect(ergebnis.applicable).toBe(true);
@@ -322,7 +322,7 @@ describe("Arena-Vorlauf-Service · B1 (Opus-Review, kritisch): automatische Wied
       for (let i = 0; i < 10; i += 1) {
         const nochEinAnstoss = kickoffArenaVorlauf(
           scope,
-          { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+          { runArenaFixturesImpl: werfenderRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
           persistence,
         );
         expect(nochEinAnstoss.status).toBe("failed");
@@ -367,7 +367,7 @@ describe("Arena-Vorlauf-Service · B3 (Opus-Review, kritisch): arenaEingabeHash-
 
       const ergebnis = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
         persistence,
       );
       expect(ergebnis.status).toBe("ready");
