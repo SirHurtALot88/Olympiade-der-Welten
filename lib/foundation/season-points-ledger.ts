@@ -387,6 +387,9 @@ export function buildSeasonPointsLedger(
   // Hier nur gesammelt (teamSummariesByTeamId existiert erst nach diesem Loop); angewendet gleich
   // danach, zusammen mit dem Null-Init aller Teams.
   const duellGruppenBeitraege: Array<{ teamId: string; disciplineId: string; category: DisciplineCategory | null; beitrag: number }> = [];
+  // Jede Leistung, deren Gruppe ueber `derivePlayerPointsForDuellGroup()` lief -- s. `istDuellEntry`
+  // in der Team-Summen-Schleife unten, warum das eine Menge ist und keine pointSource-Liste mehr.
+  const duellPerformanceIds = new Set<string>();
   // TAGESPUNKTE/SPIELTAGSRANG (`lib/foundation/season-matchday-points.ts`): dieselbe
   // Tabellen-Waehrung wie `totalPoints` oben, nur zusaetzlich je Spieltag aufgeschluesselt -- s.
   // `SeasonTableGroupContribution`-Kommentar.
@@ -482,6 +485,9 @@ export function buildSeasonPointsLedger(
         }
       }
     } else if (teamResult) {
+      for (const performance of performances) {
+        duellPerformanceIds.add(performance.id);
+      }
       duellGruppenBeitraege.push({
         teamId: reference.teamId,
         disciplineId: reference.disciplineId,
@@ -598,11 +604,22 @@ export function buildSeasonPointsLedger(
     // PR 4 (21.10.): "battle_mode_mini_dm_ffa_player_score" aus demselben Grund ergaenzt, BEVOR es
     // je an einem echten Save fehlen kann -- derselbe Doppelzaehlungs-Fehler wie oben waere sonst
     // nur eine Frage der Zeit, sobald PR 5 einen FFA-Aufrufer verdrahtet.
-    const istDuellEntry =
-      entry.pointSource === "battle_mode_arena_boxscore_impact" ||
-      entry.pointSource === "battle_mode_pps_duell_player_score" ||
-      entry.pointSource === "battle_mode_mini_dm_pod_player_score" ||
-      entry.pointSource === "battle_mode_mini_dm_ffa_player_score";
+    //
+    // UND GENAU DAS IST AM 02.11. PASSIERT (Chris: „Alle sind 1v1 Duelle zwischen den teams" — die
+    // Tabelle stand bei fast dem Doppelten): der Bahn-Pod (Takeshi's Castle/Staffel, `quelle: "bahn"`)
+    // brachte eine fuenfte Quelle `"battle_mode_bahn_pod_player_score"` mit, die in der Liste hier
+    // fehlte. Die Rennfahrer-PP landeten damit ZUSAETZLICH zum 2-1-0-0 in `teamSummary.totalPoints`,
+    // und `zieheSaisonstandPunkteNach()` (standings-apply-service) schrieb diese Summe nach JEDEM
+    // Spieltag in `standings[team].points`. NACHGEMESSEN am Battle-Save „Battle Mode VW – alle Figuren
+    // (02.11.)", Saison 1 komplett: H-R Σ teamPoints 57, Tabelle 109,3; die Luecke springt genau an den
+    // vier Rennspieltagen (MD6 +17,3, MD8 +9,4, MD12 +13,6, MD14 +12,0 = 52,3) und ist bei 31 von 32
+    // Teams auf ±0,05 exakt die Summe der Bahn-PP (das 32., V-W, traegt zusaetzlich seine Formkarten-
+    // Strafe). Nach dem Fix: Ledger = Σ teamPoints bei 32 von 32 Teams.
+    //
+    // Deshalb keine pointSource-Liste mehr, die man beim naechsten neuen Pod-Typ wieder vergisst:
+    // Duell-Eintrag ist, was durch `derivePlayerPointsForDuellGroup()` lief (`duellPerformanceIds`).
+    // Fuer die vier bisherigen Quellen ist das dieselbe Menge (sie entstehen nur dort).
+    const istDuellEntry = duellPerformanceIds.has(entry.performanceId);
     const category = disciplineCategoryById.get(entry.disciplineId) ?? null;
     const playerSummary = playerSummariesByPlayerId.get(entry.playerId) ?? {
       playerId: entry.playerId,
