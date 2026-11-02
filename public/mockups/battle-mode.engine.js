@@ -7203,10 +7203,27 @@
   // (gemessen: ~11 ms je Tick im Battlefield-Pod, fast alles erzwungene Stil-Neuberechnung) -- das
   // Vorspulen lief damit kaum schneller als Echtzeit. Gedrosselt auf ~4 Mal je Sekunde; am Ende
   // baut schnellDurch() beide einmal vollstaendig. Reine Anzeige.
+  //
+  // ZUSCHAUEN BEI 4x (Saisontest-Fund 02.11., Battlefield ueber 5 Minuten bei Tempo 4x): dieselbe
+  // Neubau-Last lag auch im NORMALEN Abspielen. In den Kampf-Disziplinen (TDM, Battlefield samt
+  // Pod-Replay) ruft stepSim() updateHud() bei JEDEM Tick, und updateHud() baut Kaderleiste und
+  // Wertungstabelle neu -- bei Tempo 4x also viermal je Bild. Die Bildrate fiel, und weil loop()
+  // je Bild hoechstens 50 ms Sendezeit nachholt (dt-Deckel), lief das Spiel nicht nur ruckelig,
+  // sondern LANGSAMER: gemessen Battlefield-Duell 53 s bei voller Bildrate, 227 s bei sechsfach
+  // gedrosselter CPU (Headless, ~17 Bilder/s) -- kein Haenger, nur Bildrate. Waehrend ein Spiel
+  // laeuft, bauen beide deshalb hoechstens ~10 Mal je Sekunde neu; Ende (done), Reset und
+  // Sonden-Laeufe (pixelgenaue Screenshots) bleiben ungedrosselt. Reine Anzeige: weder
+  // renderKader() noch renderWertungTabelle() beruehren rr(), Boxscore oder Wertung.
   let schnelldurchDomZuletzt=0;
+  let abspielDomZuletzt=0;
   function schnelldurchDomGedrosselt(){
-    if(!schnelldurchAktiv)return false;
     const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    if(!schnelldurchAktiv){
+      if(!running||done||sondenAktiv)return false;
+      if(jetzt-abspielDomZuletzt<100)return true;
+      abspielDomZuletzt=jetzt;
+      return false;
+    }
     if(jetzt-schnelldurchDomZuletzt<250)return true;
     schnelldurchDomZuletzt=jetzt;
     return false;
@@ -41911,7 +41928,20 @@
     return "Positionskampf: "+bestesPaar[1].n+" "+fmtDauer(kleinsteLuecke)+" hinter "+bestesPaar[0].n;
   }
 
+  // updateHud() laeuft je Tick (aus stepSim()); seine DOM-Schreibzugriffe (Uhr, Phase, Namens-
+  // Wiederherstellung per innerHTML, Balken, Score-Bug) kosten je Aufruf eine Stil-Neuberechnung.
+  // Waehrend ein Spiel laeuft, genuegt ~20 Mal je Sekunde (Quick-Sim: 4 Mal) -- s. Saisontest-Fund
+  // an schnelldurchDomGedrosselt(). Ende, Reset und Sonden-Laeufe bleiben ungedrosselt.
+  let hudZuletzt=0;
+  function hudGedrosselt(){
+    if(done||sondenAktiv||!(running||schnelldurchAktiv))return false;
+    const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    if(jetzt-hudZuletzt<(schnelldurchAktiv?250:50))return true;
+    hudZuletzt=jetzt;
+    return false;
+  }
   function updateHud(){
+    if(hudGedrosselt())return;
     // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
     // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
     // MINUTENUMBRUCH (TDM-HUD-Fix, 27.09.): vorher immer "0:"+Sekunden ohne Ueberlauf —
@@ -51558,7 +51588,12 @@
     if(schnelldurchAktiv&&ts-schnelldurchLetztesBild<200){ last=ts; requestAnimationFrame(loop); return; }
     schnelldurchLetztesBild=ts;
     if(!last)last=ts;
-    let dt=Math.min(.05,(ts-last)/1000);last=ts;
+    // Deckel je Bild: 0,05 s liess das Spiel bei niedriger Bildrate (schwere Seite, Headless) nicht
+    // nur ruckeln, sondern in Sendezeit LANGSAMER laufen -- unter ~20 Bildern/s fehlte jedem Bild
+    // Zeit, Tempo 4x wurde gemessen zu ~1,6x (Saisontest-Fund 02.11., s. schnelldurchDomGedrosselt()).
+    // 0,2 s holt bis ~5 Bilder/s voll nach und faengt einen Tab-Wechsel weiterhin ab. Die Ticks
+    // selbst bleiben fest (1/60)/zeitFaktor() -- nur ihre Zahl je Bild aendert sich, das Ergebnis nie.
+    let dt=Math.min(.2,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
     stingerPruefen();
     if(running){
