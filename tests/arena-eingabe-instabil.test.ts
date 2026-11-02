@@ -30,6 +30,8 @@ vi.mock("@/lib/battle/arena-eingabe-hash", () => ({
   // gesaete Spielplan Mini-DM-FFA in diesen Test zieht (reproduzierbar auf main selbst, s.
   // PR #1312). Dieselbe "garantiert instabil"-Eigenschaft wie oben, fuer denselben Testzweck.
   berechneMiniDmFfaEingabeHash: () => `instabil-mini-dm-${(hashZaehler += 1)}`,
+  // BAHN-POD (02.11.): derselbe Grund -- Staffel/Takeshi laufen an Pod-Tagen mit eigenem Fingerabdruck.
+  berechneBahnPodEingabeHash: () => `instabil-bahn-pod-${(hashZaehler += 1)}`,
 }));
 
 const { applyNewGameSetup, previewNewGameSetup } = await import("@/lib/game/new-game-setup-service");
