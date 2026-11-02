@@ -45,7 +45,9 @@ const { ensureMatchdayResolveSnapshot } = await import("@/lib/foundation/matchda
 const { stelleArenaVorlaufSicher } = await import("@/lib/battle/arena-vorlauf-service");
 const { kickoffArenaMatchdayApply } = await import("@/lib/season/arena-matchday-resolve-service");
 const { ARENA_RESOLVED_DISCIPLINE_IDS } = await import("@/lib/battle/arena-resolved-disciplines");
-const { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner } = await import("@/tests/helpers/mini-dm-ffa-battle-save");
+const { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner, buildHarmlosenBahnPodFakeRunner } = await import(
+  "@/tests/helpers/mini-dm-ffa-battle-save"
+);
 type ArenaFixtureResultType = Awaited<ReturnType<typeof import("@/lib/battle/arena-headless-runner").runArenaFixtures>>[number];
 
 /**
@@ -122,7 +124,12 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
 
       const vorlauf = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner() },
+        {
+          runArenaFixturesImpl: erfolgreicherRunner,
+          runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
+          runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+          runBahnPodFixturesImpl: buildHarmlosenBahnPodFakeRunner(),
+        },
         persistence,
       );
       expect(vorlauf.applicable).toBe(true);
@@ -139,7 +146,9 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
         runArenaFixturesImpl: erfolgreicherRunner,
         // CI-FIX (25.10.), s. Dateikopf-Kommentar: der erzwungene Neuversuch bei der (hier
         // kuenstlich erzeugten) Divergenz braucht denselben Mini-DM-Fake wie der erste Vorlauf.
-        runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(), runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+        runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
+        runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+        runBahnPodFixturesImpl: buildHarmlosenBahnPodFakeRunner(),
         forceReplace: true,
         allowIncompleteOverride: true,
         logPrefix: "[arena-eingabe-instabil-test]",

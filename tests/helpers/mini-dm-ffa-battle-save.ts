@@ -30,7 +30,12 @@ import { getMiniDmPodsForMatchday, type MiniDmPod } from "@/lib/season/mini-dm-p
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { MINI_DM_FFA_ROLLEN6 } from "@/lib/resolve/mini-dm-pod-resolve";
 import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
-import type { runBattlefieldPodFixtures, runMiniDmFfaPodFixtures, runArenaFixtures } from "@/lib/battle/arena-headless-runner";
+import type {
+  runBattlefieldPodFixtures,
+  runMiniDmFfaPodFixtures,
+  runArenaFixtures,
+  runBahnPodFixtures,
+} from "@/lib/battle/arena-headless-runner";
 import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { expect } from "vitest";
@@ -156,6 +161,38 @@ export function buildHarmlosenBattlefieldPodFakeRunner(): typeof runBattlefieldP
       ),
     }));
   }) as typeof runBattlefieldPodFixtures;
+}
+
+/**
+ * BAHN-POD (Staffel/Takeshi, 02.11.): derselbe harmlose Fake fuer den Bahn-Pod-Runner -- seit
+ * Staffel/Takeshi im Pod das echte Rennen buchen, kann ein zufaellig gezogener Pod-Spieltag sonst
+ * echtes Chromium anwerfen (dieselbe "IMMER ALLE Runner faken"-Regel wie oben). Liefert je Pod
+ * einen strukturell vollstaendigen Boxscore (Platz = Seite + 1, 2-1-0-0).
+ */
+export function buildHarmlosenBahnPodFakeRunner(): typeof runBahnPodFixtures {
+  return (async (_gameState, disciplineId, pods) =>
+    pods.map((pod) => ({
+      podId: pod.podId,
+      disciplineId,
+      teamIds: pod.teamIds,
+      teams: pod.teamIds.map((teamId, podSide) => ({
+        teamId,
+        podSide,
+        eventPlatz: podSide + 1,
+        ligaPunkte: [2, 1, 0, 0][podSide] ?? 0,
+        wert: (3 - podSide) * 100,
+        zielzeit: null,
+      })),
+      boxscore: pod.teamIds.flatMap((teamId, podSide) => [
+        {
+          name: `harmlos-bahn-${teamId}`,
+          playerId: null,
+          teamId,
+          podSide,
+          wert: (3 - podSide) * 100,
+        },
+      ]),
+    }))) as typeof runBahnPodFixtures;
 }
 
 /** Default-Kadergroesse fuer Tests, die die VERDRAHTUNG pruefen (laeuft der FFA-Pfad ueberhaupt
