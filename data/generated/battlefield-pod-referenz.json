@@ -1,0 +1,70 @@
+{
+ "hinweis": "Referenz fuer die Buchung des Battlefield-Pods ueber das Gefecht je Ort (02.11., scripts/ziehe-battlefield-pod-referenz.mjs). m90 = 90. Perzentil der positiven Kontrollpunkt-Punkte-Luecken zwischen aufeinanderfolgenden Pod-Plaetzen (resolveBattlefieldPodMargeReferenz), spieler.p50/p995 = Perzentile der rohen Kampfrichterwertung je Kaempfer (resolveBattlefieldPodSpielerPpReferenz/ppAusBattlefieldPodWertung), beides in lib/resolve/mini-dm-pod-resolve.ts. Neu ziehen, wenn BF_FFA_GRUND in battle-mode.engine.js geaendert wird.",
+ "feldgroessen": {
+  "2": {
+   "k": 2,
+   "pods": 2520,
+   "luecken": 5284,
+   "m90": 104,
+   "median": 48,
+   "max": 160,
+   "spieler": {
+    "p50": 153.95,
+    "p995": 413.93,
+    "stichprobe": 20160
+   }
+  },
+  "3": {
+   "k": 3,
+   "pods": 2520,
+   "luecken": 4724,
+   "m90": 120,
+   "median": 72,
+   "max": 160,
+   "spieler": {
+    "p50": 133.62,
+    "p995": 460.31,
+    "stichprobe": 30240
+   }
+  },
+  "4": {
+   "k": 4,
+   "pods": 2520,
+   "luecken": 4336,
+   "m90": 120,
+   "median": 56,
+   "max": 160,
+   "spieler": {
+    "p50": 101.95,
+    "p995": 484.26,
+    "stichprobe": 40320
+   }
+  },
+  "5": {
+   "k": 5,
+   "pods": 2520,
+   "luecken": 3557,
+   "m90": 96,
+   "median": 48,
+   "max": 168,
+   "spieler": {
+    "p50": 75.85,
+    "p995": 484.55,
+    "stichprobe": 50400
+   }
+  },
+  "6": {
+   "k": 6,
+   "pods": 2520,
+   "luecken": 1922,
+   "m90": 72,
+   "median": 32,
+   "max": 160,
+   "spieler": {
+    "p50": 62.92,
+    "p995": 550.68,
+    "stichprobe": 60480
+   }
+  }
+ }
+}

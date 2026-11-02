@@ -38832,23 +38832,9 @@
   function bfPodPlatzierung(){
     const N=KP.pod.N;
     const lebend=Array.from({length:N},(_,s)=>live(s).length);
-    const nochDa=lebend.filter(x=>x>0).length;
-    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(KP.punkte[s]*1000)/1000, lebend[s],
-      KP.pod.rausT[s]==null?Infinity:KP.pod.rausT[s]];
-    const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
-    const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
-    const platz=new Array(N).fill(0), ligaPunkte=new Array(N).fill(0);
-    const tabelle=Array.from({length:N},(_,i)=>MINI_DM_FFA_LIGAPUNKTE[i]??0);
-    let i=0;
-    while(i<N){
-      let j=i;
-      while(j+1<N&&vergleich(reihenfolge[j+1],reihenfolge[i])===0)j++;
-      const geteilt=tabelle.slice(i,j+1).reduce((a,b)=>a+b,0)/(j-i+1);
-      for(let k=i;k<=j;k++){platz[reihenfolge[k]]=i+1; ligaPunkte[reihenfolge[k]]=geteilt;}
-      i=j+1;
-    }
-    const sieger=platz.filter(p=>p===1).length===1?reihenfolge[0]:null;
-    return {reihenfolge, platz, ligaPunkte, sieger, lebend, punkte:KP.punkte.slice(), rausT:KP.pod.rausT.slice()};
+    // Die Regel selbst steht in bfPodPlatzierungAus() (beim Gefecht je Ort), damit Gefecht,
+    // Replay und Echtzeit-Kontrolle denselben Massstab haben.
+    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null);
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -39693,6 +39679,9 @@
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
+    // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
+    // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
+    if(KP&&KP.pod&&KP.pod.replay){ bfPodReplaySchritt(dt); return; }
     // ZIELANSAGE: die Sperre laeuft in KAMPFZEIT, nicht in Echtzeit — sonst haette das
     // Tempo (1x/2x/4x) heimlich Einfluss darauf, wie oft man eingreifen darf.
     if(KFOKUS_CD>0)KFOKUS_CD=Math.max(0,KFOKUS_CD-dt);
@@ -50278,7 +50267,7 @@
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
-    if(bfPodAktiv())zeichneBfPodTafel();
+    if(bfPodAktiv()){ if(bfPodReplayAktiv())zeichneBfPodSpuren(); zeichneBfPodTafel(); }
   }
 
   // DIE VIER-TEAM-TAFEL (Battlefield-Pod, 02.11.): oben ueber dem Feld je Team ein Kaestchen in
@@ -54418,7 +54407,11 @@
   // `place` (buildArenaAufstellung, positionsgleich zu `teams`); `jeSeite` k (2..6, Standard
   // ARENA_ART.battlefield.jeSeite); `vorbereiten(kader)` laeuft nach dem Kadertausch, vor bau() —
   // dort ziehen die Aufrufer Formkarten und Mutatoren.
-  function bfPodLauf(teams,saat,platzJeTeam,jeSeite,vorbereiten){
+  // `echtzeit` (02.11. abends): true faehrt den ECHTZEIT-Pod (M.lauf(), der freie Vier-Team-Kampf
+  // aus der ersten Runde) — nur noch Kontrolle/Vergleich. Standard ist das GEFECHT JE ORT
+  // (bfffaFuerGebautenPod, Mini-DM-Muster): dieselbe Aufstellung aus M.bau(), dann rechnet der
+  // Kern das Ergebnis, statt stepSim laufen zu lassen.
+  function bfPodLauf(teams,saat,platzJeTeam,jeSeite,vorbereiten,echtzeit){
     if(!Array.isArray(teams)||teams.length<3||teams.length>4)
       throw new Error("spieleBattlefieldPod: braucht 3 oder 4 Teams, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
     if(teams.some(tm=>!bfPodKaderVon(tm).length))
@@ -54438,9 +54431,23 @@
       stumm=true;
       bfPodKader=kader;
       try{ M.bau(saat); } finally { bfPodKader=null; }
+      if(!echtzeit){
+        const g=bfffaFuerGebautenPod(kader,saat), pl=g.platzierung;
+        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*BFFFA.taktSek).toFixed(2),
+          format:"gefecht", ende:g.ende, takte:g.gespielt,
+          besitz:g.orte.map(o=>o.besitz),
+          teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+g.punkte[s].toFixed(1),
+            lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
+            eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s], wertung:+g.teamWert[s].toFixed(3)})),
+          kaempfer:g.kaempfer.map(k=>({n:k.n, side:k.side, slot:k.slot, eig:k.eigOhneMutator,
+            wert:g.anteil[k.n]||0, roh:+k.wert.toFixed(3), ko:k.st.kos, down:!!k.raus,
+            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*BFFFA.taktSek,
+            wechsel:k.st.rotationen, besucht:k.st.takteAmOrt.map(x=>x>0?1:0)})),
+          gefecht:g};
+      }
       M.lauf();
       const pl=bfPodPlatzierung(), wert=M.wert();
-      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2),
+      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit",
         besitz:KP.orte.map(o=>o.besitz),
         teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+pl.punkte[s].toFixed(1),
           lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
@@ -54475,9 +54482,12 @@
       const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
         FORMKARTE={...FORMKARTE};
         if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
-      });
-      return {disziplin:r.disziplin, saat:r.saat, dauer:r.dauer, teams:r.teams,
-        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, wert:u.wert}))};
+      },!!opt.echtzeit);
+      const aus={disziplin:r.disziplin, saat:r.saat, dauer:r.dauer, format:r.format, teams:r.teams,
+        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert,
+          ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
+      if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
+      return aus;
     } finally { FORMKARTE=formVorher; }
   }
 
@@ -54500,10 +54510,10 @@
             mdffaFormkartenFuer(k,(20260823+versatz+gi*7919+i*104729)>>>0);
             MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
               :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
-          });
-          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.dauer, teams:r.teams,
+          },!!o.echtzeit);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.dauer, ende:r.ende||null, teams:r.teams,
             teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
-              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down, erob:u.erob}))});
+              wert:Math.round(u.wert*1000)/1000, ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down, erob:u.erob}))});
         }
       });
     } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
@@ -54516,7 +54526,7 @@
   // Messpersonen wie einflussVon) plus `extraTeams` als Seite 2/3. Gehoben und gemessen werden nur
   // die Kaempfer von SQUAD/OPP, die zwei Zusatzteams stellen das Feld. Dieselbe Bauart wie
   // bahnPodEinfluss().
-  function battlefieldPodEinfluss(extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite){
+  function battlefieldPodEinfluss(extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite,echtzeit){
     const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
     const teams=[SQUAD,OPP,...(extraTeams||[])];
     const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
@@ -54525,7 +54535,7 @@
       mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
       if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
       else if(modus==="aus")MUTATOREN=[];
-    });
+    },!!echtzeit);
     let reihen, abweichung;
     try{
       const namen=lauf(0).kaempfer.filter(u=>u.side<2).map(u=>u.n);
@@ -54585,11 +54595,523 @@
       if(pod.k)art.jeSeite=pod.k;
       bfPodKader=kader;
       build(pod.saat);
+      // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
+      // `echtzeit`), mit denselben Formkarten/Aufstellungen — die Arena spielt sie danach ab.
+      // `pod.echtzeit` zeigt zum Vergleich den alten freien Echtzeitkampf.
+      if(!pod.echtzeit)bfPodReplayStarten(bfffaFuerGebautenPod(kader,pod.saat));
     } finally {
       bfPodKader=null; art.jeSeite=jeVorher; FORMKARTE=formVorher;
       for(const k in place)delete place[k];
       Object.assign(place,placeVorher);
     }
+  }
+
+  // ===================================================================================
+  // BATTLEFIELD-POD NACH DEM MINI-DM-MUSTER: EIN GEFECHT JE ORT, DIE ARENA SPIELT ES AB (02.11.).
+  //
+  // Chris hat entschieden (02.11., nach der Abnahme des Echtzeit-Pods: rho je Kampf 0,13-0,27,
+  // eignungsbestes Team auf Platz 1 in 18-38 %): Battlefield im Pod wird so entschieden wie Mini-DM
+  // seit 13.10. — ERGEBNIS ZUERST, BILD DANACH. Konzept und Messung:
+  // docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7.
+  //
+  // WARUM DER ECHTZEIT-POD SCHEITERTE, ist dieselbe Diagnose wie bei Mini-DM (Kopfkommentar an
+  // mdffaSchlagwechsel): Geometrie als Lotterie (wer zur umkaempften Mitte laeuft, bekommt von drei
+  // Seiten Feuer, wer ausweicht, ueberlebt), Profile statt Summe (aufEignung() normiert nur LP/ANG/
+  // VER), und Bedrohungs-Zielwahl, die gerade die Starken gemeinsam jagt.
+  //
+  // DER NEUE KERN — dasselbe Prinzip wie der Schlagwechsel, auf drei Orte verteilt:
+  //  1. BELEGUNG AUS DER ROLLE, symmetrisch fuer alle vier Teams. Jedes Team hat einen HEIMORT
+  //     (Seite 0/1 Nord, 2/3 Sued — dieselbe Geometrie wie bfPodHome), die MITTE und einen FERNORT
+  //     (den Heimort des anderen Paares). Morale Anchor und Commander halten den Heimort, Siege Core
+  //     und Field Control gehen in die Mitte, Disruptor und Spotter zum Fernort (die Rollentexte
+  //     sagen genau das). Weil jedes Team bei gleichem k dieselben Rollen hat, steht an jedem Ort
+  //     jedes anwesende Team mit gleich vielen Koepfen — keine Seite ist geometrisch im Vorteil.
+  //  2. JE ORT EIN SCHLAGWECHSEL in Takten: jeder Stehende waehlt einen Gegner AM SELBEN ORT und
+  //     schlaegt einmal zu, gleichzeitig auf dem Stand vom Taktbeginn. Bei gleichmaessiger Zielwahl
+  //     bekommt jeder im Mittel EINEN Angriff je Takt ab, egal ob zwei oder vier Teams am Ort stehen —
+  //     genau das nimmt der umkaempften Mitte die Dritte-Partei-Lotterie.
+  //  3. KONTROLLPUNKTE nach derselben Regel wie kpTick: Besitz wechselt nur, wenn genau EIN Team am
+  //     Ort steht; Besitz zahlt Punkte je Takt; ein ausgeschiedenes Team verliert seine Orte.
+  //  4. ROTATION: hat ein Team seinen Ort sicher (Besitz, kein Gegner, kein fremder Fortschritt),
+  //     bleibt EINER als Halter, der Rest rueckt zum naechsten umkaempften Ort nach (ein Takt Weg).
+  //  5. PLATZIERUNG unveraendert ueber bfPodPlatzierungAus() (letztes Team > Punkte > Lebende >
+  //     spaeter raus), Ligapunkte 2-1-0-0.
+  //
+  // JEDES der neun Matrixgewichte (BASIS_JE_DISC.battlefield) hat einen benannten Kanal, und seine
+  // Staerke ist sein Gewicht — keine zweite Gewichtung neben der vorgegebenen (Chris 13.10. fuer
+  // Mini-DM, sinngemaess fuer jede Disziplin):
+  //   charisma 20      BEFEHL: Wucht des Angriffs (ein Befehl richtet mehr aus als ein Schlag, s.
+  //                    ARENA_ART.battlefield) und Eroberungstempo (Primaer-/Nebenweg)
+  //   intelligence 16  LAGE LESEN: Schwachstelle (schlaegt dorthin, wo einer wackelt) und
+  //                    Positionierung (von zwei Angreifern kommt nur einer an)
+  //   spirit 16        ZUSAMMENHALT: Deckung, mindert jeden erlittenen Treffer
+  //   torment 12       WUCHT je Treffer
+  //   power 10         WUCHT je Treffer
+  //   awareness 10     TREFFER landen
+  //   health 8         STAND (wie viel einer einstecken kann)
+  //   determination 4  LETZTER ATEM: ein toedlicher Treffer laesst ihn einmal stehen
+  //   stamina 4        AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)` wie in
+  // mdffaKaempfer(); E ist dieselbe Eignung wie in baueEinheit() (Slot, Form, Stufe, Mutator).
+  //
+  // BEWUSST NICHT ANGEFASST: das Zwei-Team-Duell. Es laeuft weiter ueber build()/stepSim(); dieser
+  // Block wird nur im Pod (KP.pod) erreicht. Der Echtzeit-Pod bleibt als Kontrolle erreichbar
+  // (`spieleBattlefieldPod(..., {echtzeit:true})`), gebucht und gezeigt wird das Gefecht hier.
+  const BF_FFA_GRUND=Object.freeze({
+    takte:20, taktSek:4, mitte:50, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    position:{basis:0.2},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    erobern:{bedarf:2},
+    punkteJeTakt:8, punkteZumSieg:150,
+    rotation:{dauer:2},
+    wertung:{ko:15, erob:12, halten:3, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, position:1.5, atem:5, erobern:4}
+  });
+  const bfffaGrund=()=>JSON.parse(JSON.stringify(BF_FFA_GRUND));
+  let BFFFA=bfffaGrund();
+  const BFFFA_ZWECK={ziel:11, schwachstelle:12, position:13, positionWahl:14, treffer:15, atem:16};
+  const BF_ORT_NAMEN=["Nord","Mitte","Süd"];
+  // Heim-/Fernort je Seite (Seite 0/1 stehen oben, 2/3 unten — bfPodHome). Bei drei Teams (nur in
+  // Sonden denkbar, die Liga lost immer Vierergruppen) hat Seite 2 den Sueden fuer sich.
+  const bfffaHeimOrt=(side)=>side<2?0:2;
+  const bfffaFernOrt=(side)=>side<2?2:0;
+  const BFFFA_ROLLEN_ORT={moraleanchor:"heim", commander:"heim", siegecore:"mitte", fieldcontrol:"mitte",
+    disruptor:"fern", spotter:"fern"};
+  function bfffaStartOrt(slot,side){
+    const w=BFFFA_ROLLEN_ORT[slot]||"mitte";
+    return w==="heim"?bfffaHeimOrt(side):w==="fern"?bfffaFernOrt(side):1;
+  }
+  // Wer bei einer Rotation als Halter bleibt: die Rolle, die das Halten traegt (ARENA_DOMINATION
+  // .rolle), dann die geringere Kaempfer-Nummer — deterministisch, kein Wurf.
+  const BFFFA_HALTER_RANG={moraleanchor:0, fieldcontrol:1, commander:2, spotter:3, disruptor:4, siegecore:5};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie baueEinheit() (Slot-Aufschlag mit dem
+  // k-Profil `slotDef`, Form/Stufe, Mutator, Messhebel), dieselbe Eignung, die disziplinProbe und
+  // die Pod-Sonde als `eig` melden. `idx` ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel).
+  function bfffaKaempfer(p,side,slotId,slotDef,idx){
+    const d="battlefield";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=BFFFA, R=P.mitte, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    const rolle=kpRolleVonSlot(slotId);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["charisma","torment","power"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      position:klemme(P.position.basis+weg(H.position,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      // Eroberung: Rolle (ARENA_DOMINATION.rolle, wie kpRolleVon) mal Befehl (Charisma). Der Befehl
+      // traegt auch das HALTEN eines eigenen Ortes: wer dort steht, ordnet ihn je Takt — die
+      // Gutschrift waechst mit seinem Befehl (sonst brachte ein schneller eroberter Ort dieselbe
+      // feste Gutschrift wie ein langsamer, und Charisma laese im Pp fast nur ueber die Eignung).
+      befehl:klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      erob:rolle.erobern*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      neutral:rolle.neutral*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      halten:rolle.halten*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      stoeren:rolle.stoeren,
+      // Laufzustand
+      ort:bfffaStartOrt(slotId,side), nach:null, ankunft:null, raus:false, rausTakt:null, atemWeg:false,
+      wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, erob:0, halte:0, schwachstellen:0, ausgewichen:0,
+          atem:0, rotationen:0, takteAmOrt:[0,0,0]}
+    };
+  }
+  // kpRolleVon() liest KP.rolle — im Gefecht gibt es kein KP; dieselben Gewichte direkt aus
+  // ARENA_DOMINATION.battlefield, mit denselben Untergrenzen.
+  function kpRolleVonSlot(slot){
+    const r=(ARENA_DOMINATION.battlefield.rolle&&slot&&ARENA_DOMINATION.battlefield.rolle[slot])||{};
+    const erobern=Math.max(1,r.erobern??1);
+    return {erobern, neutral:Math.max(1,r.neutral??erobern), halten:Math.max(1,r.halten??1), stoeren:r.stoeren??0};
+  }
+
+  // DAS GEFECHT. `kaempfer` sind bfffaKaempfer() (Index = idx), `N` die Teamzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente: dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Rueckgabe: Endstand je Team, Wertung je Kaempfer und das
+  // Takt-Protokoll, aus dem die Arena das Gefecht nachspielt (bfPodReplay*).
+  function bfffaGefecht(kaempfer,saat,N){
+    const P=BFFFA, Z=BFFFA_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const orte=[0,1,2].map(i=>({name:BF_ORT_NAMEN[i], besitz:null, fortschritt:0, erobertVon:null}));
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const steht=(k)=>!k.raus;
+    const lebendeTeams=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    // Anfangsbild (Takt 0) fuer die Anzeige: wer wohin geht.
+    const schnapp=()=>({
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach})),
+      orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeTeams().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ANKUNFT der Rotierenden.
+      for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
+        k.ort=k.nach; k.nach=null; k.ankunft=null;
+        ereignisse.push({typ:"ankunft", wer:k.idx, ort:k.ort});
+      }
+      // 2) ZIELWAHL je Ort, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus||A.ort==null)continue;
+        A.st.takteAmOrt[A.ort]++;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach,aktiv:true});
+      }
+      // 3) POSITIONIERUNG (Intelligence): von zwei oder mehr Angreifern kommt nur einer an.
+      for(const Zk of kaempfer){
+        if(Zk.raus)continue;
+        const auf=angriffe.filter(x=>x.ziel===Zk);
+        if(auf.length<2)continue;
+        if(wurf(Zk.idx,t,Z.position)<Zk.position){
+          const bleibt=Math.min(auf.length-1,Math.floor(wurf(Zk.idx,t,Z.positionWahl)*auf.length));
+          auf.forEach((x,i)=>{ if(i!==bleibt)x.aktiv=false; });
+          Zk.st.ausgewichen++;
+          ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
+        }
+      }
+      // 4) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit) mindert.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel}=x;
+        A.st.schlaege++;
+        if(!x.aktiv){ ereignisse.push({typ:"leer", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        const dmg=A.wucht*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
+      }
+      // 5) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; k.st.atem++;
+          ereignisse.push({typ:"atem", wer:k.idx, ort:k.ort});
+          continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx, ort:k.ort});
+      }
+      // 6) AUSSCHEIDEN: ein Team ohne Stehende ist raus, seine Orte fallen auf neutral.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t;
+        for(const o of orte){
+          if(o.besitz===s)o.besitz=null;
+          if(o.erobertVon===s){o.erobertVon=null;o.fortschritt=0;}
+        }
+        ereignisse.push({typ:"team-raus", side:s});
+      }
+      // 7) KONTROLLPUNKTE — dieselbe Regel wie kpTick, je Takt statt je Bild.
+      orte.forEach((o,oi)=>{
+        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi);
+        const seiten=[...new Set(da.map(k=>k.side))];
+        if(seiten.length===1){
+          const s=seiten[0], eigene=da;
+          if(o.besitz!==s){
+            if(o.erobertVon!==s){o.erobertVon=s;o.fortschritt=0;}
+            const neutral=o.besitz==null;
+            const kraft=eigene.reduce((a,k)=>a+(neutral?k.neutral:k.erob),0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.min(1,o.fortschritt+kraft/P.erobern.bedarf);
+            const gewonnen=o.fortschritt-vorher;
+            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt>=1){
+              o.besitz=s;o.fortschritt=0;o.erobertVon=null;
+              ereignisse.push({typ:"erobert", side:s, ort:oi});
+            }
+          }else if(o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0){
+            const kraft=eigene.reduce((a,k)=>a+k.halten,0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-kraft/P.erobern.bedarf);
+            const abgewehrt=vorher-o.fortschritt;
+            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }else if(seiten.length>=2&&o.erobertVon!=null){
+          let st=0;
+          for(const k of da)if(k.side!==o.erobertVon)st+=k.stoeren;
+          if(st>0){
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-0.5*st/P.erobern.bedarf);
+            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }
+        // Besitz zahlt; wer am eigenen Ort steht, bekommt den Halteanteil gutgeschrieben.
+        if(o.besitz!=null){
+          punkte[o.besitz]+=P.punkteJeTakt;
+          const halter=da.filter(k=>k.side===o.besitz);
+          for(const k of halter){ k.wert+=P.wertung.halten*k.befehl/halter.length; k.st.halte++; }
+        }
+      });
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      // 8) ROTATION: wessen Ort sicher ist (eigener Besitz, kein Gegner, kein fremder Fortschritt),
+      // laesst einen Halter dort und schickt den Rest zum naechsten umkaempften Ort.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null)continue;
+        for(let oi=0;oi<3;oi++){
+          const o=orte[oi];
+          const eigene=kaempfer.filter(k=>!k.raus&&k.side===s&&k.ort===oi&&k.nach==null);
+          if(eigene.length<2&&o.besitz===s)continue;
+          if(!eigene.length)continue;
+          const feinde=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===oi);
+          if(feinde||o.besitz!==s||(o.erobertVon!=null&&o.fortschritt>0))continue;
+          // Ziel: ein Ort, an dem Gegner stehen oder den ein anderes Team besitzt — die Mitte zuerst,
+          // dann der naehere. Gibt es keinen, bleiben alle.
+          const reihe=[1,oi===0?2:0,oi];
+          let ziel=null;
+          for(const zi of reihe){
+            if(zi===oi)continue;
+            const zo=orte[zi];
+            const dort=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===zi);
+            if(dort||(zo.besitz!=null&&zo.besitz!==s)||zo.besitz==null){ziel=zi;break;}
+          }
+          if(ziel==null)continue;
+          const halter=eigene.slice().sort((a,b)=>(BFFFA_HALTER_RANG[a.slot]??9)-(BFFFA_HALTER_RANG[b.slot]??9)||a.idx-b.idx)[0];
+          for(const k of eigene){
+            if(k===halter)continue;
+            k.nach=ziel; k.ankunft=t+P.rotation.dauer; k.ort=null; k.st.rotationen++;
+            ereignisse.push({typ:"rotation", wer:k.idx, von:oi, nach:ziel});
+          }
+        }
+      }
+      takte.push({t, ereignisse, ...schnapp()});
+      if(punkte.some(x=>x>=P.punkteZumSieg)){ ende="limit"; break; }
+    }
+    if(ende==="zeit"&&lebendeTeams().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte (wie im Schlagwechsel) — sonst kostete
+    // ein schneller Sieg den Sieger genau die Taktpunkte, die er sich erkaempft hat.
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // PLATZIERUNG AUS EINEM ENDSTAND — dieselbe Regel wie bfPodPlatzierung() (die liest KP/U und
+  // ruft jetzt diese Funktion), damit Gefecht, Replay und Echtzeit-Kontrolle denselben Massstab haben.
+  // `zusatz` (optional, nur das Gefecht je Ort): ein fuenfter Schluessel nach dem Ausscheidezeitpunkt —
+  // die Summe der Kampfrichterwertung je Team. Damit bleibt ein exakter Gleichstand auf allen vier
+  // Sieg-Wegen (gleiche Punkte, gleich viele Lebende, beide bis zum Ende im Spiel) praktisch aus, und
+  // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
+  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
+    const nochDa=lebend.filter(x=>x>0).length;
+    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
+      rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
+    const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
+    const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
+    const platz=new Array(N).fill(0), ligaPunkte=new Array(N).fill(0);
+    const tabelle=Array.from({length:N},(_,i)=>MINI_DM_FFA_LIGAPUNKTE[i]??0);
+    let i=0;
+    while(i<N){
+      let j=i;
+      while(j+1<N&&vergleich(reihenfolge[j+1],reihenfolge[i])===0)j++;
+      const geteilt=tabelle.slice(i,j+1).reduce((a,b)=>a+b,0)/(j-i+1);
+      for(let k=i;k<=j;k++){platz[reihenfolge[k]]=i+1; ligaPunkte[reihenfolge[k]]=geteilt;}
+      i=j+1;
+    }
+    const sieger=platz.filter(p=>p===1).length===1?reihenfolge[0]:null;
+    return {reihenfolge, platz, ligaPunkte, sieger, lebend:lebend.slice(), punkte:punkte.slice(), rausT:rausT.slice()};
+  }
+
+  // DIE KAEMPFER EINES GEBAUTEN POD-KAMPFES: U nach bfPodBau() traegt Aufstellung, Seite und Rolle;
+  // die Spielerobjekte kommen aus den Kadern. Rolle und k-Profil wie in bfPodBau.
+  function bfffaKaempferAusU(kader){
+    return U.map((u,idx)=>{
+      const p=kader[u.side].find(q=>q.n===u.n);
+      const kSlots=bfSlotsFuer("battlefield",U.filter(x=>x.side===u.side).length);
+      return bfffaKaempfer(p,u.side,u.slot,bfSlotDef(kSlots,u.slot),idx);
+    });
+  }
+  // Das ganze Gefecht fuer den gerade gebauten Pod (U/KP.pod gesetzt). Rueckgabe wie bfffaGefecht
+  // plus Platzierung und Wertung je Kaempfer als Anteil am Gesamtbeitrag (dieselbe Groesse wie
+  // MOTOREN.battlefield.wert(): Prozent, Summe 100 ueber alle 4k Kaempfer).
+  function bfffaFuerGebautenPod(kader,saat){
+    const N=kader.length;
+    const kaempfer=bfffaKaempferAusU(kader);
+    const g=bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek),teamWert);
+    const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
+    const anteil={};
+    for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
+    return {...g, platzierung:pl, lebend, anteil, teamWert};
+  }
+
+  // ===================================================================================
+  // DAS REPLAY — die sichtbare Arena spielt das fertige Gefecht ab (02.11.).
+  //
+  // Alle vier Teams stehen gleichzeitig auf demselben Feld und kaempfen gleichzeitig an allen drei
+  // Orten; nur WER WEN TRIFFT, WER FAELLT und WER WELCHEN ORT NIMMT, steht vorher fest (das
+  // Protokoll aus bfffaGefecht). Nichts davon wird hier gewuerfelt — die Anzeige zeigt genau den
+  // Kampf, den die Liga bucht. stepSim() leitet im Pod mit Replay hierher um (s. dort), das Duell
+  // erreicht diesen Code nie (KP.pod gibt es nur im Pod).
+  //
+  // Zeitachse in Kampfsekunden: zuerst ANMARSCH (die Kaempfer laufen aus ihren Ecken an ihre Orte),
+  // dann je Takt BFFFA.taktSek. Die Schlaege eines Taktes sind ueber den Takt verteilt (fester
+  // Versatz je Kaempfer, kein Wurf), K.o.s, Eroberungen und Punkte fallen ans Taktende.
+  const BF_REPLAY_ANMARSCH=6, BF_REPLAY_TEMPO=95;
+  let bfPodSpuren=[];
+  function bfPodReplayStarten(g){
+    if(!KP||!KP.pod)return;
+    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
+    KP.pod.zusatz=g.teamWert.slice();
+    bfPodSpuren=[];
+    g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; } });
+  }
+  const bfPodReplayAktiv=()=>!!(KP&&KP.pod&&KP.pod.replay);
+  // Wo ein Kaempfer an einem Ort steht: links (Seite 0/2) oder rechts (1/3) vom Ort, auf der Hoehe
+  // seiner Ecke versetzt, wenn ein zweites Team von derselben Seite dort steht; die Kameraden in
+  // einem Raster nach aussen (zwei Reihen), damit sich Figuren und Namen nicht decken.
+  function bfPodReplayPlatz(u,ort,stand){
+    const o=KP.orte[ort];
+    const amOrt=(x)=>x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort;
+    const am=U.filter(x=>x.side===u.side&&amOrt(x));
+    const nebenan=U.some(x=>x.side!==u.side&&x.side%2===u.side%2&&amOrt(x));
+    const j=Math.max(0,am.indexOf(u)), m=Math.max(1,am.length);
+    const sx=u.side%2===0?-1:1, cy=nebenan?(u.side<2?-1:1)*36:0;
+    const reihen=m>1&&!nebenan?2:1, spalte=Math.floor(j/reihen), reihe=j%reihen;
+    const y=o.y+cy+(reihen>1?(reihe-0.5)*58:0);
+    return {x:o.x+sx*(92+spalte*60), y:Math.max(40,Math.min(H-30,y))};
+  }
+  function bfPodReplaySchritt(dt){
+    const R=KP.pod.replay, g=R.g, D=BFFFA.taktSek;
+    // Laufender Takt (0 = Anmarsch) und der Stand, auf den die Figuren gerade zulaufen.
+    const takt=t<BF_REPLAY_ANMARSCH?0:Math.min(g.gespielt,1+Math.floor((t-BF_REPLAY_ANMARSCH)/D));
+    const standVor=takt<=1?g.start:g.takte[takt-2];
+    const imTakt=takt>=1?g.takte[takt-1]:null;
+    const taktStart=BF_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    // 1) BEWEGUNG: jeder Stehende laeuft an seinen Platz (unterwegs: an den Zielort).
+    for(const u of U){
+      if(u.bfIdx==null)continue;
+      u.lunge=Math.max(0,(u.lunge||0)-dt);
+      if(u.down)continue;
+      const k=standVor.k[u.bfIdx];
+      const ort=k.ort!=null?k.ort:k.nach;
+      if(ort==null)continue;
+      const ziel=bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
+      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=BF_REPLAY_TEMPO*dt;
+      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*BF_REPLAY_TEMPO; u.vy=ddy/weg*BF_REPLAY_TEMPO; }
+      else { u.vx=0; u.vy=0; }
+    }
+    // 2) DIE SCHLAEGE DIESES TAKTES, jeder zu seinem festen Zeitpunkt im Takt.
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=R.takt+":"+(takt)+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben"||e.typ==="leer";
+        const zeitpunkt=istSchlag?0.12+0.66*((e.wer*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        bfPodReplayEreignis(e,g);
+      });
+    }
+    // 3) ORTE UND PUNKTE: vom Stand vor dem Takt zum Stand danach, gleitend.
+    if(imTakt){
+      KP.orte.forEach((o,i)=>{
+        const a=standVor.orte[i], b=imTakt.orte[i];
+        o.besitz=anteilTakt>=0.9?b.besitz:a.besitz;
+        if(anteilTakt>=0.9){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt; }
+        else if(a.erobertVon!=null&&a.erobertVon===b.erobertVon){ o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt+(b.fortschritt-a.fortschritt)*anteilTakt/0.9; }
+        else if(b.erobertVon!=null&&a.besitz===b.besitz){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt*anteilTakt/0.9; }
+        else { o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt; }
+      });
+      for(let s=0;s<KP.punkte.length;s++)KP.punkte[s]=standVor.punkte[s]+(imTakt.punkte[s]-standVor.punkte[s])*anteilTakt;
+    }
+    for(const sp of bfPodSpuren)sp.life-=dt;
+    bfPodSpuren=bfPodSpuren.filter(sp=>sp.life>0);
+    // 4) ENDE: der Endstand ist exakt der des Gefechts (Platzierung liest KP/U).
+    if(t>=R.ende){
+      const last=g.takte[g.gespielt-1]||g.start;
+      for(const e of (g.takte.flatMap((tk,ti)=>tk.ereignisse.map((x,ei)=>({x,schl:R.takt+":"+(ti+1)+":"+ei})))))
+        if(!R.erledigt.has(e.schl)){ R.erledigt.add(e.schl); bfPodReplayEreignis(e.x,g,true); }
+      KP.orte.forEach((o,i)=>{ o.besitz=last.orte[i].besitz; o.erobertVon=last.orte[i].erobertVon; o.fortschritt=last.orte[i].fortschritt; });
+      for(let s=0;s<KP.punkte.length;s++){ KP.punkte[s]=last.punkte[s]; KP.pod.rausT[s]=last.rausTakt[s]==null?null:last.rausTakt[s]*D; }
+      U.forEach(u=>{ if(u.bfIdx!=null&&g.kaempfer[u.bfIdx].raus&&!u.down)u.down=true; });
+      finish();
+    }
+    updateHud();
+  }
+  // EIN EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN. `still`: nur den Zustand nachziehen (Endstand),
+  // keine Spuren und keine Schwebeschrift.
+  function bfPodReplayEreignis(e,g,still){
+    const U_=(i)=>U.find(u=>u.bfIdx===i)||null;
+    const name=(s)=>kampfTeamName(s);
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const k=g.kaempfer[e.ziel], anteil=e.wucht/Math.max(1e-9,k.stand0), d=anteil*Z.max;
+        Z.hp=Math.max(1,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x,y2:Z.y,farbe:kampfSeitenFarbe(A.side),life:0.5,dick:e.typ==="schwachstelle"});
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A&&Z&&!still){ A.lunge=0.16; A.tgt=Z;
+        bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x+18,y2:Z.y-14,farbe:kampfSeitenFarbe(A.side),life:0.35,dick:false}); } break; }
+      case "leer": { const Z=U_(e.ziel); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"ausgewichen",life:.8}); break; }
+      case "position": { const Z=U_(e.wer); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"stellt sich klug",life:.9,skill:true}); break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02)); if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+        feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": {
+        const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
+        Z.hp=0;
+        if(A&&!still)schalteAus(Z,A);
+        else { Z.down=true; Z.st.tode++; if(A){A.st.ko++; A.st.koAnteil+=1;} }
+        break;
+      }
+      case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
+      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+BF_ORT_NAMEN[e.ort]+".",true,undefined,"kontrollpunkt"); break;
+      default: break;
+    }
+  }
+  function zeichneBfPodSpuren(){
+    if(!bfPodSpuren.length)return;
+    ctx.save();
+    for(const sp of bfPodSpuren){
+      ctx.globalAlpha=Math.max(0,Math.min(1,sp.life/0.5))*.85;
+      ctx.strokeStyle=sp.farbe; ctx.lineWidth=sp.dick?3.5:2; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(sp.x1,sp.y1); ctx.lineTo(sp.x2,sp.y2); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -58282,6 +58804,14 @@
     spieleBattlefieldPod,
     battlefieldPodSonde,
     battlefieldPodEinfluss,
+    // MESS-SONDE fuer die Kalibrierung des Gefechts je Ort (wie miniDmFfaParameter): `neu` wird
+    // tief in den Grundwert BF_FFA_GRUND gemischt, null/undefined setzt zurueck. Im Spielbetrieb
+    // ruft das niemand, BFFFA ist dann immer gleich dem Grundwert.
+    battlefieldPodParameter:(neu)=>{
+      const misch=(a,b)=>{ for(const k in b){ if(b[k]&&typeof b[k]==="object"&&!Array.isArray(b[k])&&a[k]&&typeof a[k]==="object")misch(a[k],b[k]); else a[k]=b[k]; } return a; };
+      BFFFA=neu?misch(bfffaGrund(),JSON.parse(JSON.stringify(neu))):bfffaGrund();
+      return JSON.parse(JSON.stringify(BFFFA));
+    },
     // Anzeige ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie echterKader.battlefieldPod;
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },

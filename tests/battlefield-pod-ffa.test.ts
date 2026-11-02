@@ -22,6 +22,12 @@
  * 3. DIE ANZEIGE (`battlefieldPodAnzeigen`, derselbe Weg wie `echterKader.battlefieldPod` vom Host)
  *    baut Battlefield als Vier-Team-Kampf auf, laeuft ohne Seitenfehler und schaltet mit `null`
  *    wieder aufs Duell zurueck.
+ *
+ * 4. GEFECHT JE ORT (02.11. abends, Mini-DM-Muster, docs/design/battlefield-pod-ffa-02-11.md
+ *    Abschnitt 7): der Pod wird deterministisch entschieden, die Arena spielt das Ergebnis ab.
+ *    Geprueft: das Replay endet exakt im gebuchten Endstand (Platz, Punkte, Lebende, Ligapunkte);
+ *    das Gefecht rechnet mit derselben Eignung wie der echte Aufbau (baueEinheit); der Echtzeit-Pod
+ *    bleibt als `{echtzeit:true}` erreichbar.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -54,7 +60,15 @@ const FINGERABDRUECKE_VOR_DEM_UMBAU: Record<string, string> = {
 
 type KaderSpieler = { n: string; d: Record<string, number>; a: Record<string, number> };
 type PodTeam = { side: number; name: string; punkte: number; lebend: number; rausT: number | null; eventPlatz: number; ligaPunkte: number };
-type PodErgebnis = { disziplin: string; saat: number; dauer: number; teams: PodTeam[]; boxscore: { name: string; side: number; wert: number }[] };
+type PodErgebnis = {
+  disziplin: string;
+  saat: number;
+  dauer: number;
+  format: "gefecht" | "echtzeit";
+  ende?: string;
+  teams: PodTeam[];
+  boxscore: { name: string; side: number; slot: string; eig: number; wert: number }[];
+};
 type SondeEvent = { teams: PodTeam[]; teilnehmer: { n: string; side: number; slot: string; eig: number; wert: number }[] };
 type Arena = {
   spieleArenaDomination: (d: string, s: number, o: { jeSeite: number }) => unknown;
@@ -63,11 +77,11 @@ type Arena = {
     teams: Array<KaderSpieler[] | { name: string; kader: KaderSpieler[] }>,
     saat: number | string,
     platzJeTeam?: Array<Record<string, { d: string; slot: string }>> | null,
-    optionen?: { formSaat?: number | string; jeSeite?: number },
+    optionen?: { formSaat?: number | string; jeSeite?: number; echtzeit?: boolean },
   ) => PodErgebnis;
   battlefieldPodSonde: (kader: KaderSpieler[][], o: { gruppen: number[][]; n: number; jeSeite: number }) => { events: SondeEvent[] };
   battlefieldPodAnzeigen: (pod: unknown) => boolean;
-  battlefieldPodStand: () => { namen: string[]; platz: number[]; punkte: number[]; lebend: number[] } | null;
+  battlefieldPodStand: () => { namen: string[]; platz: number[]; punkte: number[]; lebend: number[]; ligaPunkte: number[]; done: boolean } | null;
   setDisc: (d: string) => void;
   sondenLauf: (ticks: number) => unknown;
 };
@@ -235,5 +249,49 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield-Pod: vier Teams gleichzeitig
     expect(stand.spaeter!.punkte).toHaveLength(4);
     expect(stand.duell).toBeNull();
     expect(seitenFehler).toEqual([]);
+  }, LAUF_TIMEOUT_MS);
+  // --- Teil 4: Gefecht je Ort + Replay --------------------------------------------------
+  it.each([2, 4, 6])(
+    "k=%i: das Replay in der Arena endet exakt im gebuchten Endstand (gezeigt = gebucht)",
+    async (k) => {
+      const teams = vierTeams();
+      const r = await seite.evaluate(
+        ({ teams, k }) => {
+          const A = (window as unknown as { __arena: Arena }).__arena;
+          const gebucht = A.spieleBattlefieldPod(teams, "save:s1:md7:bf", null, { formSaat: "save:s1:md7:bf", jeSeite: k });
+          A.setDisc("battlefield");
+          A.battlefieldPodAnzeigen({ teams, k, saat: "save:s1:md7:bf" });
+          // Kampfuhr 86 s (Anmarsch 6 s + 20 Takte zu 4 s), die Sonde tickt 1/300 s je Schritt.
+          A.sondenLauf(27000);
+          const ende = A.battlefieldPodStand()!;
+          A.battlefieldPodAnzeigen(null);
+          return { gebucht, ende };
+        },
+        { teams, k },
+      );
+      expect(r.gebucht.format).toBe("gefecht");
+      expect(r.ende.done).toBe(true);
+      expect(r.ende.platz).toEqual(r.gebucht.teams.map((t) => t.eventPlatz));
+      expect(r.ende.ligaPunkte).toEqual(r.gebucht.teams.map((t) => t.ligaPunkte));
+      expect(r.ende.lebend).toEqual(r.gebucht.teams.map((t) => t.lebend));
+      expect(r.ende.punkte.map((p) => Math.round(p * 10) / 10)).toEqual(r.gebucht.teams.map((t) => t.punkte));
+      expect(seitenFehler).toEqual([]);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  it("das Gefecht rechnet mit derselben Eignung und Aufstellung wie der echte Aufbau; Echtzeit bleibt als Kontrolle", async () => {
+    const teams = vierTeams();
+    const { gefecht, echtzeit } = await seite.evaluate((teams) => {
+      const A = (window as unknown as { __arena: Arena }).__arena;
+      return {
+        gefecht: A.spieleBattlefieldPod(teams, 4711, null, { formSaat: 4711, jeSeite: 5 }),
+        echtzeit: A.spieleBattlefieldPod(teams, 4711, null, { formSaat: 4711, jeSeite: 5, echtzeit: true }),
+      };
+    }, teams);
+    expect(gefecht.format).toBe("gefecht");
+    expect(echtzeit.format).toBe("echtzeit");
+    const schluessel = (b: PodErgebnis["boxscore"]) => b.map((e) => `${e.side}|${e.name}|${e.slot}|${e.eig}`).sort();
+    expect(schluessel(gefecht.boxscore)).toEqual(schluessel(echtzeit.boxscore));
   }, LAUF_TIMEOUT_MS);
 });
