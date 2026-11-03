@@ -1496,27 +1496,47 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                         <span className="sr-only">{save.name} auswählen</span>
                       </label>
                     ) : null}
-                    <strong>{save.name}</strong>
-                    <span className="nl-teamsettings-hint">{formatScenarioTypeLabel(meta?.scenarioType)}</span>
+                    <strong
+                      title={`${formatShortSaveId(save.saveId)} · ${formatFoundationSaveModeLabel(resolvedSaveMode)} · Angelegt ${formatGermanDateTime(save.createdAt)} von ${createdByLabel ?? "unbekannt"}`}
+                    >
+                      {save.name}
+                    </strong>
+                    {save.saveId === activeSaveId ? <span className="nl-teamsettings-status is-good">Aktiv</span> : null}
                   </header>
+                  {/* Chris, 03.11.: "bei den saves MUSS auch hinterlegt sein was ein management
+                      mode save ist und was ein battlemode" -- `scenarioMeta.gameMode` stand bisher
+                      gar nicht auf der Karte, obwohl es der Spielmodus-Schalter ist (s. Kommentar in
+                      lib/season/game-mode.ts: "DER EINE SCHALTER Manager Mode vs. Battle Mode").
+                      Dieselbe Herleitung wie resolveGameMode() (fehlendes Feld -> "manager"), damit
+                      alte Saves nicht als "unbekannt" dastehen. */}
+                  <span className={`nl-teamsettings-status${meta?.gameMode === "battle" ? " is-good" : ""}`}>
+                    {meta?.gameMode === "battle" ? "Battle Mode" : "Management Mode"}
+                  </span>
+                  {/* Aufgeraeumt (Chris, 03.11.: "da stehen noch einige infos die keiner
+                      benoetigt... raeum das mal auf dass da nur die wichtigsten infos stehen"):
+                      Save-ID und der Preset-Modus (solo_1/custom/...) sind jetzt nur noch im
+                      Tooltip des Namens, nicht mehr eigene Zeilen -- sie aendern sich nie und
+                      sagen fuer "welcher Save ist das" nichts, was der Name nicht schon sagt.
+                      Urheberschaft bleibt EIGENE sichtbare Zeile (nicht in den Tooltip verschoben):
+                      genau das wollte Chris frueher ausdruecklich ("Kannst du hier immer dazu
+                      schreiben... welcher User das Save-File erstellt hat?", s.
+                      tests/save-created-by.test.ts) und getrennt von "Update", damit Urheberschaft
+                      nicht mit "zuletzt gespeichert" verwechselt wird. */}
                   <span className="nl-teamsettings-note nl-tnum">
-                    {formatShortSaveId(save.saveId)} · {formatFoundationSaveModeLabel(resolvedSaveMode)} · {save.status}
+                    {meta?.activeSeasonId ?? "—"} · MD {meta?.activeMatchday ?? "—"}
                   </span>
                   <span className="nl-teamsettings-note nl-tnum">
-                    {meta?.activeSeasonId ?? "—"} · {meta?.gamePhase ?? "—"} · MD {meta?.activeMatchday ?? "—"}
-                  </span>
-                  <span className="nl-teamsettings-note nl-tnum">
-                    Update {formatGermanDateTime(save.updatedAt)}
+                    Zuletzt gespeichert {formatGermanDateTime(save.updatedAt)}
                   </span>
                   <span
                     className="nl-teamsettings-note nl-tnum"
                     title={
                       createdByLabel
-                        ? `Angelegt am ${formatGermanDateTime(save.createdAt)} von ${createdByLabel}. Das ist die Urheberschaft — wer zuletzt gespeichert hat, steht in „Update".`
+                        ? `Angelegt am ${formatGermanDateTime(save.createdAt)}. Das ist die Urheberschaft — wer zuletzt gespeichert hat, steht in „Update".`
                         : "Für diesen Spielstand ist kein Urheber hinterlegt: er stammt aus der Zeit vor dem Urheber-Vermerk oder wurde ohne aktivierten Login angelegt."
                     }
                   >
-                    Angelegt {formatGermanDateTime(save.createdAt)} · {createdByLabel ?? "Urheber unbekannt"}
+                    Von {createdByLabel ?? "Urheber unbekannt"}
                   </span>
                   <div className="nl-teamsettings-flag-row">
                     {/* Nicht das rohe (ggf. veraltete) Flag: ein Save mitten in Season 2 HAT
