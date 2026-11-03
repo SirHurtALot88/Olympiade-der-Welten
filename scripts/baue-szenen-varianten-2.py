@@ -68,6 +68,8 @@ def schreibe(diszi, slug, out, title, h1, lead, hook, hook_call, fx):
     out = re.sub(r"<h1>.*?</h1>", f"<h1>{h1}</h1>", out, count=1)
     if lead is not None:
         out, n = re.subn(r'<p class="lead">.*?</p>', f'<p class="lead">{lead}</p>', out, count=1, flags=re.S)
+        if not n:   # Vorlagen ohne class="lead": erster Absatz direkt unter der Ueberschrift
+            out = re.sub(r'(</h1>\s*<p[^>]*>).*?(</p>)', lambda mm: mm.group(1) + lead + mm.group(2), out, count=1, flags=re.S)
     assert out.count(hook) == 1, (diszi, hook, out.count(hook))
     out = out.replace(hook, hook + "\n  " + hook_call)
     i = out.rindex("</script>")
@@ -784,7 +786,243 @@ def climbing():
         schreibe("climbing", slug, out, title, h1, lead, "ctx.drawImage(IM.wall, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
 
 
-ALLE = {"tennis": tennis, "climbing": climbing}
+# ================================================================== SPEED-SCHACH
+# Hintergrund 576x324 = Welt 288x162 verdoppelt. Tisch, Brett, Uhr und beide Spieler (samt
+# Sitzflaeche) sind eigene Ebenen; aus dem Hintergrund werden nur die zwei Stuhlgestelle
+# uebernommen, alles andere (Saal, Nebenbretter, Publikum) ist Kulisse.
+SC_CHAIRS = ((200, 200, 252, 300), (322, 200, 376, 300))
+SC_CHAIR_COLS = {(92, 52, 30), (62, 34, 20)}
+
+
+def sc_stuehle(src, im):
+    sp, px = src.load(), im.load()
+    for (x0, y0, x1, y1) in SC_CHAIRS:
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if sp[x, y][:3] in SC_CHAIR_COLS:
+                    px[x, y] = sp[x, y][:3]
+
+
+def sitzend(d, x, y, rnd, farben, haut, rueck=None):
+    """Kleine sitzende Zuschauerfigur (Welt-Massstab): Kopf, Rumpf, Beine."""
+    c, h = rnd.choice(farben), rnd.choice(haut)
+    d.rectangle([x - 3, y - 6, x + 3, y + 1], fill=c)
+    d.rectangle([x - 2, y - 11, x + 2, y - 7], fill=h)
+    d.line([x - 2, y - 11, x + 2, y - 11], fill=rnd.choice([(50, 34, 24), (30, 26, 24), (200, 170, 90), (150, 70, 40), (220, 220, 220)]))
+    d.rectangle([x - 3, y + 2, x + 3, y + 3], fill=mix(c, (0, 0, 0), 0.4))
+    if rueck:
+        d.rectangle([x - 4, y + 4, x + 4, y + 7], fill=rueck)
+
+
+SC_FARBEN = [(180, 60, 60), (60, 90, 160), (220, 180, 70), (70, 130, 80), (140, 80, 150), (230, 230, 230), (60, 60, 70), (200, 110, 50)]
+SC_HAUT = [(240, 200, 170), (200, 150, 110), (150, 100, 70), (250, 220, 190), (120, 160, 90)]
+
+
+def sc_park():
+    """Stadtpark im Herbst: Ahornbaeume, Wiese, Parkbaenke mit Kiebitzen, Brunnen, Kiesplatz."""
+    rnd = random.Random(5101)
+    w, h = 288, 162
+    im = Image.new("RGB", (w, h))
+    px = im.load()
+    d = ImageDraw.Draw(im)
+    band_gradient(px, 0, 0, w, 70, [(120, 176, 222), (150, 196, 230), (190, 214, 232)])
+    # ferne Stadtsilhouette
+    x = 0
+    while x < w:
+        bw, bh = rnd.randint(8, 18), rnd.randint(8, 22)
+        d.rectangle([x, 66 - bh, x + bw, 70], fill=(150, 170, 190))
+        x += bw + rnd.randint(0, 3)
+    # Baumkronen im Herbstlaub
+    for (cx, cy, r) in ((20, 46, 26), (70, 38, 30), (128, 44, 24), (170, 36, 30), (226, 42, 28), (276, 48, 24)):
+        d.rectangle([cx - 2, cy, cx + 2, 88], fill=(80, 56, 40))
+        for k in range(60):
+            a, rr = rnd.random() * math.tau, r * math.sqrt(rnd.random())
+            bx, by = cx + int(math.cos(a) * rr), cy + int(math.sin(a) * rr * 0.75)
+            col = rnd.choice([(204, 96, 40), (226, 140, 50), (180, 64, 36), (236, 184, 72), (150, 120, 50)])
+            d.ellipse([bx - 5, by - 4, bx + 5, by + 4], fill=col)
+        for k in range(14):
+            a, rr = rnd.random() * math.tau, r * math.sqrt(rnd.random())
+            d.point([cx + int(math.cos(a) * rr), cy + int(math.sin(a) * rr * 0.75) - 3], fill=(250, 214, 120))
+    # Wiese + Hecke
+    for y in range(76, 100):
+        for x in range(w):
+            px[x, y] = (96, 140, 64) if (x * 7 + y * 3) % 11 else (80, 124, 54)
+    d.rectangle([0, 74, w, 79], fill=(62, 100, 52))
+    for x in range(0, w, 6):
+        d.ellipse([x - 2, 71, x + 5, 78], fill=(70, 112, 58))
+    # Brunnen links
+    d.ellipse([28, 84, 72, 96], fill=(160, 160, 168))
+    d.ellipse([31, 86, 69, 94], fill=(90, 150, 200))
+    d.rectangle([47, 70, 53, 89], fill=(176, 176, 184))
+    d.ellipse([42, 68, 58, 74], fill=(190, 190, 198))
+    # Parkbaenke mit Zuschauern
+    for bx in (88, 196, 236):
+        for k in range(3):
+            sitzend(d, bx + 6 + k * 10, 86, rnd, SC_FARBEN, SC_HAUT)
+        d.rectangle([bx, 86, bx + 34, 88], fill=(120, 76, 44))
+        d.rectangle([bx, 80, bx + 34, 82], fill=(140, 90, 52))
+        d.line([bx + 2, 88, bx + 2, 93], fill=(40, 40, 46))
+        d.line([bx + 32, 88, bx + 32, 93], fill=(40, 40, 46))
+    # Laternen
+    for lx in (150, 268):
+        d.rectangle([lx, 52, lx + 1, 96], fill=(40, 46, 50))
+        d.rectangle([lx - 3, 48, lx + 4, 53], fill=(50, 56, 60))
+        d.rectangle([lx - 2, 49, lx + 3, 52], fill=(250, 236, 180))
+    # Kiesplatz unter dem Turniertisch
+    for y in range(96, h):
+        for x in range(w):
+            v = (x * 73856093 ^ y * 19349663) & 31
+            c = (198, 182, 150) if v > 6 else (170, 152, 122) if v > 1 else (222, 210, 182)
+            px[x, y] = c
+    for y in range(96, h):       # Rasenkante rechts/links in Perspektive
+        e = int((y - 96) * 0.9)
+        for x in range(0, max(0, 14 - e)):
+            px[x, y] = (96, 140, 64)
+    # Laub auf dem Kies
+    for _ in range(220):
+        x, y = rnd.randrange(w), rnd.randrange(98, h)
+        d.point([x, y], fill=rnd.choice([(204, 96, 40), (226, 140, 50), (180, 64, 36), (236, 184, 72)]))
+    # Tauben
+    for (tx, ty) in ((60, 140), (66, 146), (232, 150), (240, 138)):
+        d.rectangle([tx, ty, tx + 3, ty + 1], fill=(120, 124, 140))
+        d.point([tx + 3, ty - 1], fill=(90, 94, 110))
+    return im
+
+
+SC_FX_PARK = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // fallendes Laub, Wasserstrahl im Brunnen
+  const cols = ['#cc6028', '#e28c32', '#b44024', '#ecb848'];
+  for (let i = 0; i < 26; i++) {
+    const sp = 14 + (i * 7) % 12, x0 = (i * 97) % 576;
+    const y = (i * 53 + t * sp) % 330 - 6, x = x0 + Math.sin(t * 1.5 + i) * 10;
+    ctx.fillStyle = cols[i % 4];
+    ctx.fillRect(Math.round(x), Math.round(y), Math.sin(t * 4 + i) > 0 ? 4 : 2, 2);
+  }
+  ctx.fillStyle = 'rgba(200,230,255,0.8)';
+  for (let i = 0; i < 10; i++) {
+    const ph = (t * 1.2 + i / 10) % 1, a = (i % 2 ? 1 : -1) * (6 + i * 1.5);
+    ctx.fillRect(Math.round(100 + a * ph), Math.round(136 - 28 * ph + 40 * ph * ph), 2, 2);
+  }
+};
+"""
+
+
+SC_WINDOWS = [(30, 44, 78, 78), (96, 44, 136, 78), (152, 44, 192, 78), (210, 44, 258, 78)]
+
+
+def sc_zug():
+    """Speisewagen eines Nachtzugs: Mahagoni-Taefelung, Fenster (Landschaft in der Effekt-Ebene),
+    Gepaeckablagen, Polsterbaenke mit Fahrgaesten, Teppich im Gang."""
+    rnd = random.Random(5202)
+    w, h = 288, 162
+    im = Image.new("RGB", (w, h))
+    px = im.load()
+    d = ImageDraw.Draw(im)
+    # Decke + Taefelung
+    band_gradient(px, 0, 0, w, 34, [(214, 196, 160), (190, 168, 128)])
+    for y in range(34, 100):
+        for x in range(w):
+            c = (96, 44, 32) if (x // 3) % 7 else (80, 36, 26)
+            if (x * 13 + y * 3) % 23 == 0:
+                c = (112, 54, 38)
+            px[x, y] = c
+    d.rectangle([0, 34, w, 37], fill=(150, 110, 50))           # Messingleiste
+    for x in range(0, w, 72):                                   # Deckenlampen
+        d.rectangle([x + 30, 22, x + 42, 26], fill=(180, 150, 80))
+        d.rectangle([x + 32, 26, x + 40, 29], fill=(255, 236, 190))
+        add_glow(px, w, h, x + 36, 28, 26, (60, 46, 20), 0.8)
+    for (x0, y0, x1, y1) in SC_WINDOWS:
+        d.rectangle([x0 - 4, y0 - 4, x1 + 4, y1 + 4], fill=(150, 110, 50))
+        d.rectangle([x0 - 2, y0 - 2, x1 + 2, y1 + 2], fill=(60, 28, 20))
+        d.rectangle([x0, y0, x1, y1], fill=(40, 60, 96))      # wird von der Effekt-Ebene ueberzeichnet
+        d.rectangle([x0 - 2, y0 - 10, x1 + 2, y0 - 6], fill=(170, 130, 60))   # Gepaeckablage
+        for k in range(x0, x1, 4):
+            d.line([k, y0 - 6, k, y0 - 4], fill=(120, 90, 40))
+        if rnd.random() < 0.8:
+            sx = rnd.randint(x0, x1 - 12)
+            d.rectangle([sx, y0 - 16, sx + 12, y0 - 10], fill=rnd.choice([(120, 60, 40), (60, 70, 100), (140, 120, 80)]))
+    for x in (88, 144, 202):                                    # Wandleuchten zwischen den Fenstern
+        d.rectangle([x - 1, 54, x + 1, 62], fill=(170, 130, 60))
+        d.ellipse([x - 3, 48, x + 3, 55], fill=(255, 226, 170))
+        add_glow(px, w, h, x, 52, 14, (70, 50, 20), 0.9)
+    # Polsterbaenke mit Fahrgaesten
+    d.rectangle([0, 80, w, 100], fill=(70, 30, 24))
+    for bx in range(4, w, 44):
+        for k in range(2):
+            if rnd.random() < 0.75:
+                sitzend(d, bx + 12 + k * 14, 88, rnd, SC_FARBEN, SC_HAUT)
+        d.rectangle([bx, 84, bx + 40, 96], outline=(40, 70, 56))
+        d.rectangle([bx + 1, 90, bx + 39, 96], fill=(46, 92, 70))
+        d.line([bx + 1, 90, bx + 39, 90], fill=(70, 124, 96))
+    d.rectangle([0, 99, w, 101], fill=(150, 110, 50))
+    # Gangteppich
+    for y in range(101, h):
+        for x in range(w):
+            c = (130, 30, 36)
+            if (x + (y - 101)) % 12 == 0 or (x - (y - 101)) % 12 == 0:
+                c = (170, 120, 60)
+            elif (x // 6 + y // 6) % 2:
+                c = (118, 26, 32)
+            if y < 104:
+                c = mix(c, (40, 10, 12), 0.4)
+            px[x, y] = c
+    return im
+
+
+SC_FX_ZUG = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // Landschaft zieht an den Fenstern vorbei (nur innerhalb der Scheiben gezeichnet)
+  const W = __WINDOWS__;
+  ctx.save();
+  ctx.beginPath(); for (const [a, b, c, d] of W) ctx.rect(a * 2, b * 2, (c - a + 1) * 2, (d - b + 1) * 2); ctx.clip();
+  const g = ctx.createLinearGradient(0, 88, 0, 156); g.addColorStop(0, '#f2a86a'); g.addColorStop(1, '#ffd9a0');
+  ctx.fillStyle = g; ctx.fillRect(0, 80, 576, 80);
+  ctx.fillStyle = '#ffe9b8'; ctx.beginPath(); ctx.arc(400, 112, 10, 0, 7); ctx.fill();
+  const layer = (sp, base, amp, fr, col) => {
+    ctx.fillStyle = col;
+    const off = (t * sp) % 2000;
+    for (let x = 0; x < 576; x += 2) {
+      const xx = x + off, y = base - amp * (0.5 + 0.5 * Math.sin(xx * fr) * Math.sin(xx * fr * 0.37 + 1));
+      ctx.fillRect(x, Math.round(y), 2, 160 - Math.round(y));
+    }
+  };
+  layer(12, 136, 20, 0.013, '#8a6a8c'); layer(40, 146, 12, 0.03, '#5a7a4a'); layer(120, 152, 4, 0.08, '#3e5a34');
+  ctx.fillStyle = '#2a2a2a';
+  const po = (t * 260) % 160;
+  for (let x = -po; x < 576; x += 160) { ctx.fillRect(Math.round(x), 96, 2, 60); ctx.fillRect(Math.round(x) - 4, 100, 10, 2); }
+  ctx.restore();
+  // leichtes Ruckeln der Lampen
+  const s = Math.sin(t * 9) > 0.95 ? 1 : 0;
+  ctx.fillStyle = 'rgba(255,236,190,0.25)'; for (const x of [72, 216, 360, 504]) ctx.fillRect(x - 6 + s, 54, 12, 4);
+};
+"""
+
+
+def speed_schach():
+    s, m, D = lade("speed-schach", "turniersaal.html", "IMGS")
+    src = dec(D["bg"]).convert("RGB")
+    for slug, painter, fx, title, h1, lead in (
+        ("park", sc_park, SC_FX_PARK, "Speed-Schach Stadtpark", "Speed-Schach: Blitzpartie im Stadtpark",
+         "Derselbe Zugwechsel wie im Turniersaal (gleiches Brett, gleiche Uhr, gleiche Z&uuml;ge), nur unter Ahornb&auml;umen "
+         "im Herbst: Kiesplatz, Brunnen, Kiebitze auf den Parkb&auml;nken, fallendes Laub."),
+        ("zug", sc_zug, SC_FX_ZUG.replace("__WINDOWS__", json.dumps(SC_WINDOWS)), "Speed-Schach Speisewagen", "Speed-Schach: Blitzpartie im Speisewagen",
+         "Derselbe Zugwechsel wie im Turniersaal (gleiches Brett, gleiche Uhr, gleiche Z&uuml;ge), nur im Speisewagen eines "
+         "Fernzugs: Mahagoni, Polsterb&auml;nke mit Fahrg&auml;sten, drau&szlig;en zieht die Abendlandschaft vorbei."),
+    ):
+        im = painter().resize((576, 324), Image.NEAREST)
+        sc_stuehle(src, im)
+        if os.environ.get("SZENEN_DEBUG"):
+            im.save(os.path.join(os.environ["SZENEN_DEBUG"], f"speed-schach-{slug}-bg.png"))
+        D2 = dict(D)
+        D2["bg"] = enc(im.convert("RGBA"))
+        out = ersetze_json(s, m, D2)
+        schreibe("speed-schach", slug, out, title, h1, lead, "ctx.drawImage(IM.bg, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
+
+
+ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach}
 
 if __name__ == "__main__":
     ziele = sys.argv[1:] or list(ALLE)

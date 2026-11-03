@@ -112,7 +112,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "speed-schach",
     title: "Speed-Schach",
     note: "Turniersaal mit echtem 8×8-Brett und mechanischer Uhr.",
-    variants: [v("speed-schach", "turniersaal", "Turniersaal")],
+    // Park + Zug: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten-2.py) — derselbe
+    // Zugwechsel an demselben Tisch, nur ein anderer Ort.
+    variants: [
+      v("speed-schach", "turniersaal", "Turniersaal"),
+      v("speed-schach", "park", "Stadtpark"),
+      v("speed-schach", "zug", "Speisewagen"),
+    ],
   },
   fechten: {
     disciplineId: "fechten",
