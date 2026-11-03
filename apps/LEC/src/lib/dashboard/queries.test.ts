@@ -102,7 +102,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(agg.marketQuote?.how).toBe("seltenheit");
   });
 
-  it("Zeile: VK-Quelle, Marktwert, Zielspanne (handgerechnet 7,13 € bis 8,68 €), Urteil und Marge bei Nachkauf", async () => {
+  it("Zeile: VK-Quelle, Marktwert, Zielspanne (handgerechnet 7,32 € bis 8,92 €), Urteil und Marge bei Nachkauf", async () => {
     const a = await seed();
     const { aggregates, costSettings } = await loadArticleAggregates(db.prisma);
     const row = buildSortimentRow(aggregates.find((x) => x.articleId === a.id)!, "beobachten", costSettings, null);
@@ -111,10 +111,10 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(row.listingVkAt).toBe("2026-10-13T12:00:00.000Z");
     expect(row.priceTrend).toBeCloseTo(2);
     expect(row.market).toMatchObject({ value: 2, quality: "eindeutig", how: "seltenheit", status: "im_korridor", rated: true });
-    expect(row.market?.targetMin).toBeCloseTo(7.125, 2);
-    expect(row.market?.targetOpt).toBeCloseTo(8.684, 2);
-    // VK 8,00 bei Nachkauf zum Marktwert: (8 - 2,349 - 3,298) / 8
-    expect(row.market?.margin).toBeCloseTo(0.294, 3);
+    expect(row.market?.targetMin).toBeCloseTo(7.3203, 2);
+    expect(row.market?.targetOpt).toBeCloseTo(8.9217, 2);
+    // VK 8,00 bei Nachkauf zum Marktwert: (8 - 2,449 - 3,298) / 8
+    expect(row.market?.margin).toBeCloseTo(0.2816, 3);
   });
 
   it("zu guenstig und zu teuer kommen als Urteil an (Grundlage des Filters)", async () => {

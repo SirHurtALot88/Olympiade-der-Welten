@@ -81,7 +81,7 @@ export const DEFAULT_COST_SETTINGS: CostSettingsValues = {
   fixedYearlyOther: 1839,
   ebayCommissionRate: 0.11,
   ebayCommissionVat: 0.19,
-  ebayCommissionFixed: 0.35,
+  ebayCommissionFixed: 0.45,
   adFeeRateSingle: 0.09,
   adFeeRateMin: 0.09,
   adFeeRateGood: 0.1,

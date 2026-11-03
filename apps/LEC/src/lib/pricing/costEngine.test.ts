@@ -185,10 +185,10 @@ describe("computeHk", () => {
   });
 });
 
-describe("computeEbayFees (unveraendert: 0,35 + 11 % + 9 %, je x1,19)", () => {
-  it("berechnet Provision = 0,35 + VK x 11% x 1,19", () => {
+describe("computeEbayFees (unveraendert: 0,45 + 11 % + 9 %, je x1,19)", () => {
+  it("berechnet Provision = 0,45 + VK x 11% x 1,19", () => {
     const fees = computeEbayFees(20, 0.09, S);
-    expect(fees.commission).toBeCloseTo(0.35 + 20 * 0.11 * 1.19, 5);
+    expect(fees.commission).toBeCloseTo(0.45 + 20 * 0.11 * 1.19, 5);
   });
 
   it("berechnet die Anzeigen-Gebuehr = VK x Ad-Rate x 1,19", () => {
@@ -219,13 +219,13 @@ function corridorFor(ek: number, vk: number, shop: ShopVolume | null = SHOP) {
 // Handrechnung (unabhaengig vom Code), Einzelkarte, EK 2,50, Shop 3.400 Stk/Jahr, 60 davon ab 30 €:
 //   Einschreiben unter der Schwelle r = (100 - 60) x 2,35 / (3.400 - 60) = 0,02814
 //   HK ohne Fixkosten = 2,50 + 0,575 (Einkaufs-Versand 1,15 x 50 %) + 0,67 + 0,053 + 0,02814 = 3,82614
-//   VK-MIN (25 %, Anzeigen 9 %):  (0,35 + 3,82614) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 8,1565
-//   VK-GUT (33 %, Anzeigen 10 %): (0,35 + 3,82614) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 9,9408
+//   VK-MIN (25 %, Anzeigen 9 %):  (0,45 + 3,82614) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 8,3518
+//   VK-GUT (33 %, Anzeigen 10 %): (0,45 + 3,82614) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 10,1789
 describe("computePriceCorridor: Zielspanne 25 % bis 33 % Deckungsbeitrag", () => {
   it("VK-MIN / VK-GUT = VK fuer 25 % / 33 % Marge vor Fixkosten (handgerechnet)", () => {
     const { corridor } = corridorFor(2.5, 10);
-    expect(corridor.vkMin).toBeCloseTo(8.1565, 3);
-    expect(corridor.vkGood).toBeCloseTo(9.9408, 3);
+    expect(corridor.vkMin).toBeCloseTo(8.3518, 3);
+    expect(corridor.vkGood).toBeCloseTo(10.1789, 3);
     expect(corridor.targetMargin).toBe(0.25);
   });
 
@@ -253,16 +253,16 @@ describe("computePriceCorridor: Zielspanne 25 % bis 33 % Deckungsbeitrag", () =>
   });
 
   it("Einschreiben: ab Zielpreis 30 € traegt der Preis die vollen 2,35 € (iteriert bis konsistent)", () => {
-    // EK 20: HK = 20 + 0,575 + 0,67 + 0,053 + 2,35 = 23,648 -> VK-MIN = (0,35 + 23,648) / 0,512 = 46,87
+    // EK 20: HK = 20 + 0,575 + 0,67 + 0,053 + 2,35 = 23,648 -> VK-MIN = (0,45 + 23,648) / 0,512 = 47,07
     const { corridor } = corridorFor(20, 50);
-    expect(corridor.vkMin).toBeCloseTo(46.871, 2);
+    expect(corridor.vkMin).toBeCloseTo(47.066, 2);
   });
 
   it("Pack: eigener Versand/Verpackung, Einkaufs-Versand nur einmal", () => {
     const hk = computeHk({ ek: 1.5, kind: "pack", packSize: 3, fixedCostPerUnit: 0, vk: null, shop: null }, S);
     const c = computePriceCorridor(hk, 5.99, S, { kind: "pack", packSize: 3, shop: null });
-    // HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> (0,35 + 2,637) / 0,512 = 5,834
-    expect(c.vkMin).toBeCloseTo(5.834, 2);
+    // HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> (0,45 + 2,637) / 0,512 = 6,029
+    expect(c.vkMin).toBeCloseTo(6.029, 2);
   });
 });
 
@@ -301,9 +301,9 @@ describe("classifyPriceStatus", () => {
     expect(classifyPriceStatus(corridor.vkGood * 1.05, corridor)).toBe("ueber_gut");
   });
 
-  it("EK 0,90 / VK 4,99: knapp unter VK-MIN (5,03 €), aber innerhalb der Toleranz -> im Korridor (frueher Dauer-Alarm 'Ziel unerreichbar')", () => {
-    // (0,35 + 0,90 + 0,575 + 0,67 + 0,053 + 0,02814) / 0,512 = 5,0315
-    const { corridor } = corridorFor(0.9, 4.99);
+  it("EK 0,80 / VK 4,99: knapp unter VK-MIN (5,03 €), aber innerhalb der Toleranz -> im Korridor (frueher Dauer-Alarm 'Ziel unerreichbar')", () => {
+    // (0,45 + 0,80 + 0,575 + 0,67 + 0,053 + 0,02814) / 0,512 = 5,0315
+    const { corridor } = corridorFor(0.8, 4.99);
     expect(corridor.vkMin).toBeCloseTo(5.0315, 3);
     expect(classifyPriceStatus(4.99, corridor)).toBe("im_korridor");
   });
@@ -317,7 +317,7 @@ describe("classifyPriceStatus", () => {
 
 // Marktdeckel (Chris, 13.10.): teure Karten gehen selten ueber das 1,5-fache vom Marktwert.
 // Handrechnung, Einzelkarte, kein Shop-Volumen (Einschreiben nur ab VK 30 €):
-//   Basiskosten ohne EK = 0,575 + 0,67 + 0,053 = 1,298, Fixgebuehr 0,35
+//   Basiskosten ohne EK = 0,575 + 0,67 + 0,053 = 1,298, Fixgebuehr 0,45
 describe("Marktdeckel fuer teure Karten", () => {
   const ctx = { kind: "single" as const, shop: null };
 
@@ -330,25 +330,25 @@ describe("Marktdeckel fuer teure Karten", () => {
 
   it("billige Karte (Marktwert 2 €): unveraendert 25-33 %-Regel, kein Deckel", () => {
     const r = computeMarketTargetRange(2, ctx, S);
-    expect(r.min).toBeCloseTo(7.125, 3);
-    expect(r.opt).toBeCloseTo(8.684, 3);
+    expect(r.min).toBeCloseTo(7.3203, 3);
+    expect(r.opt).toBeCloseTo(8.9217, 3);
     expect(r.capped).toBe(false);
     expect(r.marginReachable).toBe(true);
   });
 
   it("Marktwert 10 €: Deckel 29,57 € liegt ueber beiden Marge-Preisen (22,75 € / 27,73 €) -> keine Begrenzung", () => {
     const r = computeMarketTargetRange(10, ctx, S);
-    expect(r.min).toBeCloseTo((0.35 + 10 + 1.298) / 0.512, 3);
-    expect(r.opt).toBeCloseTo((0.35 + 10 + 1.298) / 0.4201, 2);
+    expect(r.min).toBeCloseTo((0.45 + 10 + 1.298) / 0.512, 3);
+    expect(r.opt).toBeCloseTo((0.45 + 10 + 1.298) / 0.4201, 2);
     expect(r.capped).toBe(false);
   });
 
-  it("Marktwert 20 €: 25 % erreichbar (46,87 € inkl. Einschreiben 2,35 € ab 30 €), 33 % liegt ueber dem Deckel 49,43 € -> begrenzt", () => {
-    // (0,35 + 20 + 1,298 + 2,35) / 0,512 = 46,871
+  it("Marktwert 20 €: 25 % erreichbar (47,07 € inkl. Einschreiben 2,35 € ab 30 €), 33 % liegt ueber dem Deckel 49,43 € -> begrenzt", () => {
+    // (0,45 + 20 + 1,298 + 2,35) / 0,512 = 47,066
     const r = computeMarketTargetRange(20, ctx, S);
-    expect(r.min).toBeCloseTo(46.871, 2);
-    // Deckel 49,43 € waere nur 5,5 % ueber dem 25-%-Preis -> Mindestbreite 6 %: 46,871 x 1,06 = 49,683
-    expect(r.opt).toBeCloseTo(49.683, 2);
+    expect(r.min).toBeCloseTo(47.066, 2);
+    // Deckel 49,43 € waere nur 5,0 % ueber dem 25-%-Preis -> Mindestbreite 6 %: 47,066 x 1,06 = 49,890
+    expect(r.opt).toBeCloseTo(49.890, 2);
     expect(r.capped).toBe(true);
     expect(r.marginReachable).toBe(true);
   });

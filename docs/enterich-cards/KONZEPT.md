@@ -335,7 +335,7 @@ shopweiter Wert in **jeden** Preis-Korridor ein (Dashboard, Sortiment, Marktprei
 
 **eBay-Verkaufsgebühren** (auf einen VK-Preis; gegen 70 echte Abrechnungszeilen geprüft, Abweichung < 0,06 €/Stück):
 ```
-eBay-Provision  = 0,35 € + VK × 11 % × 1,19        (11 % Provision inkl. 19 % USt)
+eBay-Provision  = 0,45 € + VK × 11 % × 1,19        (11 % Provision inkl. 19 % USt)
 Anzeigen-Gebühr = VK × 9–10 % × 1,19               (Ads; Einzel akt. 9 %, min/gut 10 %)
 VK-Kosten       = eBay-Provision + Anzeigen-Gebühr
 ```
@@ -348,7 +348,7 @@ Gewinnmarge   = Gewinn / VK
 ```
 **Zweite Korridor-Linie: Deckungsbeitrags-Grenze** (HK **ohne** Fixkostenanteil):
 ```
-VK-DB = (HK ohne Fixkosten + 0,35) / (1 − (11 % + Ads) × 1,19)     ← Gewinn vor Fixkosten = 0
+VK-DB = (HK ohne Fixkosten + 0,45) / (1 − (11 % + Ads) × 1,19)     ← Gewinn vor Fixkosten = 0
 ```
 Darunter verliert Chris bei jedem Verkauf echtes Geld (Status `unter_min`). Liegt dagegen schon die Marge
 **vor** Fixkosten bei dem aktuellen VK unter dem MIN-Ziel (z. B. EK 0,90 bei VK 4,99: Obergrenze ≈ 23 %
