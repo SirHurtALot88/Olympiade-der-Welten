@@ -166,6 +166,12 @@
   .oly-battle-arena.oly-battle-arena .eg{text-align:center;font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:12px;font-variant-numeric:tabular-nums;
     padding:2px 0;border-radius:4px;color:var(--muted)}
   .oly-battle-arena.oly-battle-arena .eg.best{background:var(--home-bg);color:var(--ink);font-weight:600}
+  /* Die 3 staerksten Positionen unter dem Eignungswert der AKTIVEN Disziplin (Chris, 03.11.:
+     "die 3 staerksten Positionen der Spieler dargestellt in klein unter dem grossen wert fuer
+     die Diszi damit es nicht zusaetzlich platz kostet") -- eigene Zeile IN derselben schmalen
+     Zelle statt einer neuen Spalte, Abkuerzungen statt der vollen Slot-Namen. */
+  .oly-battle-arena.oly-battle-arena .egposis{display:block;font-size:8px;letter-spacing:.03em;
+    color:var(--faint);font-weight:400;margin-top:1px;white-space:nowrap}
   .oly-battle-arena.oly-battle-arena .eghead{display:grid;grid-template-columns:28px 1fr 46px 46px;gap:7px;padding:0 7px 5px;
     font-family:"RaniraSeason",Georgia,"Times New Roman",serif;font-size:9px;letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
   .oly-battle-arena.oly-battle-arena .eghead span:nth-child(3), .oly-battle-arena.oly-battle-arena .eghead span:nth-child(4){text-align:center}

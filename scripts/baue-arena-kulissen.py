@@ -186,12 +186,13 @@ def hindernisse_zumalen(bild: Image.Image, objs, boden) -> Image.Image:
         maske = Image.composite(kern, weich, kern)
         # Nur auf den Boden malen: die Banner stehen direkt an der Seitenmauer, und die Mauer
         # soll Mauer bleiben.
+        # Vektorisiert statt Pixel-fuer-Pixel-Python-Schleife (Opus-Review-Fund, 03.11.): nur
+        # auf den Boden malen, die Mauer soll Mauer bleiben -- dieselbe Bedingung, einmal als
+        # Koordinatengitter statt als zwei verschachtelte range()-Schleifen ueber jeden Pixel.
         m = np.asarray(maske).copy()
-        for yy in range(m.shape[0]):
-            for xx in range(m.shape[1]):
-                tx, ty = x0 - ring + xx, y0 - ring + yy
-                if tx < bx0 or tx >= bx1 or ty < by0 or ty >= by1:
-                    m[yy, xx] = 0
+        yy, xx = np.mgrid[0 : m.shape[0], 0 : m.shape[1]]
+        tx, ty = x0 - ring + xx, y0 - ring + yy
+        m[(tx < bx0) | (tx >= bx1) | (ty < by0) | (ty >= by1)] = 0
         aus.paste(flicken, (x0 - ring, y0 - ring), Image.fromarray(m))
     return aus
 
