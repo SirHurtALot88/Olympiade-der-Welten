@@ -88,6 +88,12 @@ export type LegacyRosterPlayerRef = {
   fatigue?: number | null;
   injuryStatus?: "healthy" | "injured" | "recovering" | null;
   injuryUntilMatchday?: string | null;
+  /**
+   * Spieltag, an dem die Verletzung entstanden ist. Unterscheidet fuer die Aufstellungspruefung
+   * die Verletzung WAEHREND des laufenden Spieltags (in D1 zugezogen, kein Fehler der Aufstellung)
+   * von der Sperre aus einem Vorspieltag (echter Fehler) — s. `legacy-lineup-validator.ts`.
+   */
+  injuredAtMatchdayId?: string | null;
   injuryRiskPercent?: number | null;
   injuryRiskBand?: string | null;
   injuryRiskLabel?: string | null;

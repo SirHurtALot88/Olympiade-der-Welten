@@ -23,7 +23,26 @@ export function validateLegacyLineupContext(
     const rosterPlayer = rosterPlayerById.get(entry.playerId);
     if (rosterPlayer?.availabilityBlocker === "player_injured_unavailable") {
       const meldung = `player_injured_unavailable: Player ${entry.playerId} is injured and unavailable until ${rosterPlayer.injuryUntilMatchday ?? "next matchday"}.`;
-      if (!lineupIsLocked) {
+      /**
+       * VERLETZT WAEHREND DIESES SPIELTAGS = derselbe Fall wie ein gesperrter Entwurf (Begruendung
+       * unten), nur ohne das `locked`-Flag. KI-Entwuerfe tragen `submitted`, nie `locked` — und sind
+       * trotzdem eingefroren, sobald eine Seite gebucht ist (`shouldSkipExistingAiDraft`,
+       * `matchdayAlreadyStarted`).
+       *
+       * SAISONTEST-FUND 02.11. (Battle Mode VW): 104 D2-Zeilen trugen `invalid_lineup`, obwohl
+       * normal gewertet wurde. Ursache: der D2-Commit prueft den GANZEN Entwurf (beide Seiten), und
+       * ein Teamkollege, der sich in der bereits gebuchten D1 verletzt hatte, stand dort mit
+       * `player_injured_unavailable` (Sperre fuer die Restdisziplin). Die D1-Zeilen waren schon
+       * eingefroren, also landete das Urteil nur auf D2 — einer Disziplin, in der der Verletzte gar
+       * nicht stand. Die Punkte stimmten (Score-Engine und Readiness sind getrennt), nur das
+       * Cockpit meldete ein Problem.
+       *
+       * Eine Sperre aus einem VORSPIELTAG bleibt ein Fehler: dort hatte die Aufstellung einen
+       * Ausweg, und ein solcher Spieler wuerde gewertet (die Score-Engine kennt keine Sperre).
+       */
+      const verletztAnDiesemSpieltag =
+        rosterPlayer.injuredAtMatchdayId != null && rosterPlayer.injuredAtMatchdayId === input.matchdayId;
+      if (!lineupIsLocked && !verletztAnDiesemSpieltag) {
         // ENTWURF OFFEN: hier hat die Sperre einen Sinn UND einen Ausweg — der Spieler kann nicht
         // antreten, also stellt man jemand anderen auf.
         errors.push(meldung);

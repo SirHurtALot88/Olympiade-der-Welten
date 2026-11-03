@@ -714,6 +714,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       fatigue,
       injuryStatus: availability.injuryStatus,
       injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
+      injuredAtMatchdayId: availability.injuredAtMatchdayId ?? null,
       injuryRiskPercent: fatigue != null ? injuryRiskBand.riskPercent : null,
       injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
       injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
