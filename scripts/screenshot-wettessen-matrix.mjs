@@ -4,7 +4,13 @@
 // (public/mockups/battle-mode.html), keine Behauptungen.
 //
 // Aufruf: node scripts/screenshot-wettessen-matrix.mjs [ausgabeOrdner] [--je-seite=2,4,6]
-//         [--kulissen=jahrmarkt,nachtmarkt,bierzelt] [--minuten=1,6,10,ende] [--saat=N]
+//         [--kulissen=jahrmarkt,nachtmarkt,bierzelt] [--minuten=1,6,10,ende,guertel] [--saat=N]
+//         [--callout-warten=ms] [--echtzeit]
+// --echtzeit: ohne sondenLauf, Wanduhr; Minute m faellt 5,3 s nach ihrer Enthuellung, wenn das
+// verzoegerte Banner steht (Sonden-Zeit und Echtzeit-Timer vertragen sich nicht, s. unten).
+// "ende" = 1,4 s nach der Schlusshupe (Nachzaehlung laeuft), "guertel" = 2,8 s danach (der
+// Tagesbeste traegt den Guertel) -- beide in Echtzeit nach window.__arena.sondenAus(), weil der
+// Endstand-Nachlauf an der Wanduhr haengt.
 //
 // Zeit laeuft ueber window.__arena.sondenLauf(ticks) in festen 1/60-s-Schritten (dieselbe Tick-
 // Folge wie das Zuschauen, s. dort) -- Minute m ist nach (m-1)*rundenDauer Sekunden enthuellt,
@@ -46,6 +52,8 @@ const jeSeiten = arg("je-seite", "2,4,6").split(",").map(Number);
 const kulissen = arg("kulissen", "jahrmarkt,nachtmarkt,bierzelt").split(",");
 const minuten = arg("minuten", "1,6,10,ende").split(",");
 const saat = Number(arg("saat", "7"));
+const calloutWarten = Number(arg("callout-warten", "0"));
+const ECHTZEIT = process.argv.includes("--echtzeit");
 const RUNDEN_DAUER = 6; // BUEHNE_ART.wettessen.rundenDauer = 60/10
 mkdirSync(outDir, { recursive: true });
 
@@ -78,9 +86,40 @@ try {
       simSek = Math.max(simSek, zielSek);
       await seite.waitForTimeout(250);
     };
+    let echtzeitSeit = null;
+    if (ECHTZEIT) {
+      // ECHTZEIT-MODUS: kein sondenLauf, die Wanduhr laeuft -- Minute m wird 5,3 s nach ihrer
+      // Enthuellung fotografiert, genau wenn das (um 0,8 x rundenDauer verzoegerte) Banner steht.
+      await seite.evaluate(() => window.__arena.sondenAus());
+      echtzeitSeit = Date.now();
+      for (const m of minuten) {
+        const zielMs = m === "ende" ? 10 * RUNDEN_DAUER * 1000 + 1600
+          : m === "guertel" ? 10 * RUNDEN_DAUER * 1000 + 3000
+          : ((Number(m) - 1) * RUNDEN_DAUER + 5.3) * 1000;
+        const rest = zielMs - (Date.now() - echtzeitSeit);
+        if (rest > 0) await seite.waitForTimeout(rest);
+        const cv = await seite.$("#cv");
+        const name = `we-${je}v${je}-${kul}-min${m}-echtzeit.png`;
+        await cv.screenshot({ path: path.join(outDir, name) });
+        const stand = await seite.evaluate(() => ({ clock: document.getElementById("clock")?.textContent, callout: document.getElementById("bbugcallout")?.hidden ? "" : document.getElementById("bbugcallout")?.textContent?.slice(0, 90) }));
+        console.log(name, JSON.stringify(stand));
+      }
+      continue;
+    }
     for (const m of minuten) {
-      const ziel = m === "ende" ? 10 * RUNDEN_DAUER + 1.2 : (Number(m) - 1) * RUNDEN_DAUER + 2;
-      await laufBis(ziel);
+      if (m === "ende" || m === "guertel") {
+        // Bis kurz vor die Hupe in Sonden-Zeit, dann Wanduhr (Nachlauf/Nachzaehlung sind Echtzeit).
+        await laufBis(10 * RUNDEN_DAUER - 0.2);
+        if (echtzeitSeit == null) { await seite.evaluate(() => window.__arena.sondenAus()); echtzeitSeit = Date.now(); }
+        const zielMs = (m === "ende" ? 1400 : 2800) + 200;
+        const rest = zielMs - (Date.now() - echtzeitSeit);
+        if (rest > 0) await seite.waitForTimeout(rest);
+      } else {
+        await laufBis((Number(m) - 1) * RUNDEN_DAUER + 2);
+        // Banner kommen seit PR 3 um 0,8 x rundenDauer verzoegert (Echtzeit-Timer in feed()) --
+        // wer sie im Bild haben will, wartet hier (--callout-warten=5000).
+        if (calloutWarten > 0) await seite.waitForTimeout(calloutWarten);
+      }
       const cv = await seite.$("#cv");
       const name = `we-${je}v${je}-${kul}-min${m}.png`;
       await cv.screenshot({ path: path.join(outDir, name) });

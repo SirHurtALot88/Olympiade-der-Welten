@@ -27138,61 +27138,38 @@
           r.ereignis===bb.erfolgWort?"routine":undefined);
       } else {
         // GILT FUER WETTESSEN, die letzte verbleibende Auftritt-Buehne ohne eigenen Zweig
-        // oben -- s. buehneAuftrittBig()-Kommentar.
+        // oben.
         //
-        // W-B5: ein Big-Moment (Fuehrungswechsel, Fuehrender pausiert, letzte Minute des
-        // Fuehrenden -- buehneAuftrittBig(), UNVERAENDERT dieselbe Bedingung wie vorher)
-        // bekommt weiterhin SEINE EIGENE Zeile, genau wie bisher. Alles andere sammelt sich
-        // nur in wettBuendel -- HIGHLIGHTS/Callout haengen ausschliesslich an dieser
-        // unveraenderten Big-Bedingung, s. feed()-Kommentar dort.
-        // MAUER-ZEILE (Wettessen K1, Konzept K4 "Mauer-Banner", hier nur als Tickerzeile):
-        // `r.mauerNeu` steht nur mit BUEHNE_FLAGS.wettessenMauer>=1 auf dem Rundeneintrag (s.
-        // wettessenMauerRunden()) — die erste Minute, die dieser Esser hinter seiner Mauer
-        // beginnt. Reine Ablesung, kein rr(), keine Wirkung auf u.summe. Nicht big: zwoelf
-        // Esser, zwoelf verschiedene Mauer-Minuten — als Banner waere das Dauerfeuer.
-        // PR 2 (Uebersichts-Paket 03.11.): die ERSTE Mauer jeder Seite ist ein Banner (kind
-        // "mauer", Titel MAUER) -- hoechstens zwei je Spiel, kein Dauerfeuer; jede weitere
-        // bleibt Tickerzeile. KEIN Spoiler: `fuell>K` wurde mit den schon GEZEIGTEN Minuten
-        // erreicht, das Banner sagt nur, was die Pegel laengst zeigen.
+        // PR 3 (Uebersichts-Paket 03.11., "Callout-Dosis"): KEIN Einzel-Banner je Esser mehr.
+        // buehneAuftrittBig() feuerte hier je Esser und ohne Drossel ("Fuehrender pausiert" bei
+        // 60 % Erfolgschance in vier von zehn Minuten, dazu jeder Fuehrungswechsel innerhalb des
+        // Ticks). Jetzt sammelt die Gruppen-Schleife ALLE Esser der Minute in wettBuendel, und
+        // wettessenMinuteBewerten() (s. stepWettessen()) bewertet die Minute danach als Ganzes:
+        // Minutenbilanz (W-B5), hoechstens ein Banner (Fuehrungswechsel ueber die ganze Minute
+        // oder Bestmarke), gedrosselt und verzoegert. buehneAuftrittBig() bleibt fuer Showcase/
+        // Eiskunstlauf unveraendert.
+        // MAUER-ZEILE (Wettessen K1, Konzept K4): `r.mauerNeu` steht nur mit
+        // BUEHNE_FLAGS.wettessenMauer>=1 auf dem Rundeneintrag (s. wettessenMauerRunden()) -- die
+        // erste Minute, die dieser Esser hinter seiner Mauer beginnt. Reine Ablesung, kein rr().
+        // PR 2: die ERSTE Mauer jeder Seite ist ein Banner (kind "mauer", Titel MAUER) --
+        // hoechstens zwei je Spiel; jede weitere bleibt Tickerzeile. PR 3: auch dieses Banner
+        // laeuft durch die Drossel (sonst kollidierte es mit einem Fuehrungswechsel derselben
+        // Minute). KEIN Spoiler: `fuell>K` wurde mit den schon GEZEIGTEN Minuten erreicht.
         if(r.mauerNeu){
           const ersteDerSeite=!wettessenMauerBannerSeite[u.side];
           wettessenMauerBannerSeite[u.side]=true;
+          const big=ersteDerSeite&&buehneBahnGrossDrosseln(true,false);
           feed(u.side,"Mauer! "+u.n+" ist voll (Minute "+(u.aktuell+1)+") — ab jetzt isst nur noch der Wille"
             +(u.haltung&&u.haltung!=="gleichmaessig"?" ("+(u.haltung==="sprint"?"Sprint":"Schlussspurt")+")":"")+".",
-            ersteDerSeite,undefined,ersteDerSeite?"mauer":undefined);
+            big,undefined,big?"mauer":undefined);
         }
-        const wettBig=buehneAuftrittBig(u,r,vorherSumme);
-        if(wettBig){
-          // UEBERSICHTS-PAKET 03.11. (PR 1): Callout-Text in der Einheit des Tages und in
-          // "Minute", nicht "93 Punkte, Durchgang 2/10" -- eine Waehrung auf dem Bildschirm.
-          feed(u.side,u.n+" — "+r.ereignis+" (+"+wettessenWuerstchenText(wettessenWuerstchen(r.punkte))+" "+wettessenMenuWahl.n+", Minute "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
-        } else {
-          wettBuendel.push({u,r});
-        }
+        wettBuendel.push({u,r});
       }
       } // Ende der Gruppen-Schleife (S3, Wettessen) -- s. Kommentar oben.
-      // W-B5, ZUSAMMENFASSUNG: EINE Ticker-Zeile fuer alle in diesem Tick gesammelten Esser
-      // (typischerweise eine ganze Minute) statt bis zu zwoelf einzelner. Fuehrer/Zweiter
-      // ueber ALLE Esser dieses Ticks (das sind bei Wettessen ohnehin alle, s.
-      // buehneGruppenGroesse-Kommentar oben) -- reine Ablesung bereits geschriebener
-      // u.summe/runden[]-Werte, kein rr(), keine Wirkung auf Wertung/HIGHLIGHTS/Callout.
-      if(wettBuendel.length){
-        const minute=Math.min(BB().rundenN, wettBuendel[0].u.aktuell+1);
-        const sortiert=wettBuendel.slice().sort((a,b)=>(b.u.summe||0)-(a.u.summe||0));
-        const fuehrer=sortiert[0].u, zweiter=sortiert[1]?sortiert[1].u:null;
-        const fWu=wettessenWuerstchen(fuehrer.summe);
-        const tempo=wettessenTempo(fuehrer,fuehrer.aktuell);
-        // W-F2: Einheit kommt aus dem Gericht des Tages statt dem festen "Wü" (s.
-        // wettessenMenuWahl/bauBuehne()).
-        let text="Minute "+minute+": "+(fuehrer.n.split(" ")[0]||fuehrer.n)+" führt mit "
-          +wettessenWuerstchenText(fWu)+" "+wettessenMenuWahl.einheit;
-        if(zweiter){
-          const diff=fWu-wettessenWuerstchen(zweiter.summe);
-          if(diff>0.001)text+=" (+"+wettessenWuerstchenText(diff)+" auf "+(zweiter.n.split(" ")[0]||zweiter.n)+")";
-        }
-        if(tempo!=null)text+=", Tempo "+wettessenWuerstchenText(tempo)+"/min";
-        feed(fuehrer.side,text+".");
-      }
+      // W-B5/PR 3: EINE Bewertung fuer alle in diesem Tick gesammelten Esser (eine ganze
+      // Minute, s. buehneGruppenGroesse-Kommentar oben) -- reine Ablesung bereits geschriebener
+      // u.summe/runden[]-Werte, kein rr(), keine Wirkung auf die Wertung.
+      if(wettBuendel.length)wettessenMinuteBewerten(wettBuendel);
       buehneAkt=BB().rundenDauer;
     }
     buehnenBewegung(dt);
@@ -29149,7 +29126,7 @@
   // SEIT WANN `done` gilt (buehneT-Zeit) -- reiner Zeichenzustand, kein Einfluss auf
   // Wertung/Reihenfolge. `done` selbst wird ausschliesslich von stepBuehne() gesetzt und
   // hier nur gelesen.
-  let wettessenEndeSeit=null;
+  let wettessenEndeSeit=null, wettessenNachlaufT=0;
   // PR 2: je Seite, ob die erste Mauer schon als Banner lief (zurueckgesetzt in bauBuehne()).
   let wettessenMauerBannerSeite={0:false,1:false};
   function stepWettessen(dt,art){
@@ -29197,13 +29174,80 @@
     // stepBuehne() gesetzt, hier nur GELESEN). Eine Sekunde lang die Jubelpose fuer ALLE --
     // u.vizJubel ist ein neues, generisches viz*-Feld, das zeichneSprite() nur dann liest
     // (dasselbe u.vizPose-Muster wie bei Showcase), sonst bleibt es ueberall `undefined`.
+    // PR 3 (Uebersichts-Paket 03.11.): eigene NACHLAUF-UHR aus dt, weil buehneT nach `done` nicht
+    // mehr laeuft (stepBuehne() kehrt davor zurueck) -- die alte Bedingung `buehneT-
+    // wettessenEndeSeit<1` war deshalb immer wahr, der Jubel endete nie.
     if(done){
-      if(wettessenEndeSeit==null){ wettessenEndeSeit=buehneT; sfx("wettessen","hupe"); }
-      const jubeln=buehneT-wettessenEndeSeit<1;
+      if(wettessenEndeSeit==null){
+        wettessenEndeSeit=buehneT; wettessenNachlaufT=0; sfx("wettessen","hupe");
+        for(const u of TEILNEHMER){ u.vizZaehlSeit=null; u.vizGuertel=false; }
+      } else wettessenNachlaufT+=dt;
+      const jubeln=wettessenNachlaufT<1;
       for(const u of TEILNEHMER)u.vizJubel=jubeln;
+      // NACHZAEHLUNG UND GUERTEL (W-V8, aus platter.tsx portiert): nach dem Jubel drehen sich die
+      // Tafeln ein letztes Mal, von hinten nach vorn durch die Rangliste; zuletzt bekommt der
+      // Tagesbeste den Senfguertel. Passt in den 3,5-s-Nachlauf vor dem Endstand-Overlay (bei
+      // zwoelf Essern endet die Zaehlung nach ~2,3 s) -- keine Verlaengerung der Sendezeit.
+      const rang=[...TEILNEHMER].sort((a,b)=>(a.summe||0)-(b.summe||0));
+      const schritt=Math.min(0.15,1.6/Math.max(1,rang.length)), start=0.5;
+      rang.forEach((u,i)=>{
+        if(u.vizZaehlSeit==null&&wettessenNachlaufT>=start+i*schritt){ u.vizZaehlSeit=wettessenNachlaufT; sfx("wettessen","klapp"); }
+      });
+      const best=rang[rang.length-1];
+      if(best&&!best.vizGuertel&&wettessenNachlaufT>=start+rang.length*schritt+0.15){ best.vizGuertel=true; sfx("wettessen","hupe"); }
     } else if(wettessenEndeSeit!=null){
-      wettessenEndeSeit=null;
-      for(const u of TEILNEHMER)u.vizJubel=false;
+      wettessenEndeSeit=null; wettessenNachlaufT=0;
+      for(const u of TEILNEHMER){ u.vizJubel=false; u.vizZaehlSeit=null; u.vizGuertel=false; }
+    }
+  }
+  // MINUTENBEWERTUNG WETTESSEN (Uebersichts-Paket 03.11., PR 3 "Callout-Dosis"): wird von
+  // stepBuehne() EINMAL je enthuellter Minute mit allen Essern dieses Ticks gerufen, statt dass
+  // buehneAuftrittBig() je Esser und ohne Drossel feuert (vorher: "Fuehrender pausiert" ist bei
+  // 60 % Erfolgschance rechnerisch in vier von zehn Minuten ein Banner, dazu jeder Fuehrungs-
+  // wechsel innerhalb des Ticks -- 26 % Bannerzeit gemessen am 30.09.). Jetzt hoechstens EIN
+  // Banner je Minute: der Fuehrungswechsel ueber die GANZE Minute (Fuehrender vor der Minute
+  // gegen Fuehrender danach) oder in Minute 10 die Bestmarke -- beide durch dieselbe Drossel
+  // wie Fechten/Tennis/Schach (buehneBahnGrossDrosseln, 12 s; die Bestmarke mit Vorrang).
+  // "Fuehrender pausiert, bleibt aber vorn" ist nur noch eine Tickerzeile.
+  // KEIN SPOILER: das Banner kommt um 0,8 x rundenDauer verzoegert (feed()s verzoegerungMs),
+  // also erst, wenn die Tafeln den neuen Stand fast vollstaendig hochgezaehlt haben -- die
+  // Tickerzeile selbst steht sofort (sie ist das Protokoll). Reine Ablesung schon
+  // geschriebener u.summe/runden[]-Werte, kein rr(); setzt nur u.vizZoomSeit (Nahaufnahme).
+  function wettessenMinuteBewerten(buendel){
+    const art=BB(), n=art.rundenN;
+    const minute=Math.min(n, buendel[0].u.aktuell+1);
+    const einheit=wettessenMenuWahl.n, kurz=(u)=>u.n.split(" ")[0]||u.n;
+    const wu=(p)=>wettessenWuerstchenText(wettessenWuerstchen(p));
+    const sortiert=buendel.slice().sort((a,b)=>(b.u.summe||0)-(a.u.summe||0));
+    const fuehrer=sortiert[0].u, zweiter=sortiert[1]?sortiert[1].u:null;
+    // W-B5 MINUTENBILANZ (unveraendert): eine Routine-Zeile fuer die ganze Minute.
+    const fWu=wettessenWuerstchen(fuehrer.summe), tempo=wettessenTempo(fuehrer,fuehrer.aktuell);
+    let text="Minute "+minute+": "+kurz(fuehrer)+" führt mit "+wettessenWuerstchenText(fWu)+" "+wettessenMenuWahl.einheit;
+    if(zweiter){
+      const diff=fWu-wettessenWuerstchen(zweiter.summe);
+      if(diff>0.001)text+=" (+"+wettessenWuerstchenText(diff)+" auf "+kurz(zweiter)+")";
+    }
+    if(tempo!=null)text+=", Tempo "+wettessenWuerstchenText(tempo)+"/min";
+    feed(fuehrer.side,text+".");
+    // FUEHRENDER VOR DIESER MINUTE: Summe ohne den gerade enthuellten Eintrag.
+    const vorher=(e)=>(e.u.summe||0)-(e.r.punkte||0);
+    let vorn=null; for(const e of buendel){ if(!vorn||vorher(e)>vorher(vorn))vorn=e; }
+    const fuehrerVorher=vorn?vorn.u:null;
+    const letzte=minute>=n, verz=Math.round(art.rundenDauer*1000*0.8);
+    if(minute>1&&fuehrerVorher&&fuehrerVorher.id!==fuehrer.id){
+      const big=buehneBahnGrossDrosseln(true,letzte);
+      feed(fuehrer.side,fuehrer.n+" zieht an "+fuehrerVorher.n+" vorbei — "+wu(fuehrer.summe)+" zu "
+        +wu(fuehrerVorher.summe)+" "+einheit+" (Minute "+minute+").",big,undefined,big?"fuehrungswechsel":undefined,big?verz:undefined);
+      fuehrer.vizZoomSeit=buehneT; fuehrerVorher.vizZoomSeit=buehneT;
+    } else if(fuehrerVorher&&fuehrerVorher.id===fuehrer.id&&minute>1){
+      const eF=buendel.find(e=>e.u.id===fuehrer.id);
+      if(eF&&eF.r.ereignis===art.failWort)
+        feed(fuehrer.side,fuehrer.n+" muss kurz pausieren — bleibt vorn ("+wu(fuehrer.summe)+" "+einheit+").",false);
+    }
+    if(letzte){
+      const big=buehneBahnGrossDrosseln(true,true);
+      feed(fuehrer.side,fuehrer.n+" isst sich zum Tagesbesten — "+wu(fuehrer.summe)+" "+einheit
+        +(zweiter?", "+wu(fuehrer.summe-zweiter.summe)+" vor "+kurz(zweiter):"")+".",big,undefined,big?"bestmarke":undefined,big?verz:undefined);
     }
   }
 
@@ -32459,17 +32503,35 @@
   // WETTESSEN_ZIGZAG_Y tiefer) fuer die bis zu zwoelf Plaetze, exakt die "leichte
   // Staffelung", die der Gegencheck fuer 12 Plaetze an einem Tisch vorschlaegt (Abschnitt 5,
   // S1). REINE GEOMETRIE, liest nichts, das rr() zieht.
-  const WETTESSEN_REIHE_Y=0.575, WETTESSEN_ZIGZAG_Y=16;
+  //
+  // TISCHDUELLE (Uebersichts-Paket 03.11., PR 3; Konzept Abschnitt 3.3, Variante B -- Chris'
+  // Frage "oder sollten die spieler dort im 1v1 antreten?"): Heim und Gast sitzen ABWECHSELND,
+  // Heim i neben Gast i -- jedes Nachbarpaar ist ein Duell mit Klammer und Abstand
+  // (zeichneWettessen()), sechsmal 1 gegen 1 im selben Bild, ohne das Format (2-6 je Seite, Summe
+  // zaehlt) anzufassen. Die Paarung folgt der Aufstellungsreihenfolge (TEILNEHMER je Seite,
+  // bauBuehne(): gesetzte Aufstellung, sonst die Besten zuerst) -- bei ungleicher Kopfzahl
+  // (lineup-roster-shortfall) bleibt der letzte Platz ohne Partner und ohne Klammer. Die
+  // Staffelung (Zickzack) entfaellt: Paare brauchen eine gemeinsame Hoehe fuer die Klammer.
+  // REINE GEOMETRIE, liest nichts, das rr() zieht; wettessenPaare() ist die EINE Quelle fuer
+  // Sitzplaetze UND Klammern.
+  const WETTESSEN_REIHE_Y=0.575, WETTESSEN_RAND=70, WETTESSEN_PAAR_INNEN=44, WETTESSEN_KLAMMER_DY=104;
+  function wettessenPaare(){
+    const heim=TEILNEHMER.filter(u=>u.side===0), gast=TEILNEHMER.filter(u=>u.side===1);
+    const n=Math.max(heim.length,gast.length), paare=[];
+    if(!n)return paare;
+    const breite=(W-2*WETTESSEN_RAND)/n, innen=Math.min(WETTESSEN_PAAR_INNEN,breite*0.24);
+    for(let i=0;i<n;i++){
+      const mitte=WETTESSEN_RAND+breite*(i+0.5);
+      paare.push({heim:heim[i]||null,gast:gast[i]||null,mitte,innen});
+    }
+    return paare;
+  }
   function wettessenSitzplaetze(){
-    const y0=H*WETTESSEN_REIHE_Y, pos=new Map();
-    [0,1].forEach(seite=>{
-      const g=TEILNEHMER.filter(u=>u.side===seite);
-      const x0=seite===0?76:W/2+24, x1=seite===0?W/2-24:W-76;
-      g.forEach((u,i)=>{
-        const x=g.length>1?x0+(x1-x0)*i/(g.length-1):(x0+x1)/2;
-        pos.set(u.id,{x,y:y0+(i%2===0?0:WETTESSEN_ZIGZAG_Y)});
-      });
-    });
+    const y=H*WETTESSEN_REIHE_Y, pos=new Map();
+    for(const p of wettessenPaare()){
+      if(p.heim)pos.set(p.heim.id,{x:p.mitte-p.innen,y});
+      if(p.gast)pos.set(p.gast.id,{x:p.mitte+p.innen,y});
+    }
     return pos;
   }
 
@@ -32563,7 +32625,9 @@
     const rAkt=(u.runden&&u.aktuell>=0)?u.runden[u.aktuell]:null;
     const seitMauer=u.vizMauerSeit!=null?(buehneT-u.vizMauerSeit):null;
     let txt=null, farbe=null, skala=1;
-    if(seitMauer!=null&&seitMauer<WETTESSEN_MAUER_STEMPEL_SEK){
+    if(u.vizGuertel){
+      txt="GÜRTEL"; farbe="#b8780f";
+    } else if(seitMauer!=null&&seitMauer<WETTESSEN_MAUER_STEMPEL_SEK){
       txt="MAUER"; farbe="#b4322a"; skala=1+0.35*Math.max(0,1-seitMauer/0.35);
     } else if(rAkt&&rAkt.ereignis===art.failWort&&!done){
       txt="PAUSE"; farbe="#6b6f7a";
@@ -32623,6 +32687,12 @@
       }
       ctx.globalAlpha=gedimmt;
 
+      // NAHAUFNAHME-LIGHT (PR 3, W-V7 "Regie auf die Geschichte"): die zwei Esser eines
+      // Fuehrungswechsels wachsen fuer die laufende Minute um 18 % (um die Fuesse skaliert) --
+      // die Kamera geht zum Duell, ohne das Bild zu beschneiden. u.vizZoomSeit setzt
+      // wettessenMinuteBewerten(), reines viz*-Feld.
+      const zoom=(u.vizZoomSeit!=null&&(buehneT-u.vizZoomSeit)<art.rundenDauer)?1.18:1;
+      if(zoom>1){ ctx.save(); ctx.translate(x,y+20); ctx.scale(zoom,zoom); ctx.translate(-x,-(y+20)); }
       zeichneSprite(ctx,u,x,y);
 
       // LATZ-SERVIETTE am Hals -- platter.tsx' Serviette-Motiv. W-F2: der Farbstreifen
@@ -32631,6 +32701,12 @@
         ctx.fillStyle=s%2===0?"#f2ede2":wettessenMenuWahl.servFarbe;
         ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
       }
+      // SENFGUERTEL (PR 3, W-V8): der Tagesbeste nach der Nachzaehlung (stepWettessen()).
+      if(u.vizGuertel){
+        ctx.fillStyle="#f2c14e";ctx.fillRect(x-11,y+1,22,5);
+        ctx.fillStyle="#b4322a";ctx.fillRect(x-3,y,6,7);
+      }
+      if(zoom>1)ctx.restore();
 
       // MAGEN-PEGEL (Uebersichts-Paket 03.11., PR 2, W-V3 "Der Bauch"): links neben der Figur,
       // dort, wo bis PR 1 das Faehnchen stand. Fuellstand = dieselbe geglaettete Anzeige-Summe
@@ -32669,9 +32745,32 @@
         if(u.vizWuLetzte!=null) sfx("wettessen","klapp");
         u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
       }
-      const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
+      // PR 3 (W-V8 Nachzaehlung): nach der Hupe blitzt jede Tafel noch einmal, von hinten nach
+      // vorn (u.vizZaehlSeit aus stepWettessen(), Nachlauf-Uhr statt des nach `done`
+      // eingefrorenen buehneT).
+      const betontWu=(u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15)
+        ||(u.vizZaehlSeit!=null&&(wettessenNachlaufT-u.vizZaehlSeit)<0.3);
       zeichneWettessenTafel(x,y+WETTESSEN_TAFEL_DY,wettessenWuerstchenText(wuJetzt),wettessenMenuWahl.n.toUpperCase(),betontWu);
       zeichneWettessenNameChip(x,y+WETTESSEN_NAME_DY,u.n,c);
+    }
+
+    // TISCHDUELLE (PR 3): Klammer unter jedem vollstaendigen Paar, dazu der Abstand im direkten
+    // Duell in der Einheit des Tages, Vorzeichen in der Farbe der fuehrenden Seite. Dieselbe
+    // geglaettete Anzeige-Summe wie die Tafeln, kein rr().
+    const ky=H*WETTESSEN_REIHE_Y+WETTESSEN_KLAMMER_DY;
+    for(const p of wettessenPaare()){
+      if(!p.heim||!p.gast)continue;
+      const a=wettessenWuerstchen(wettessenAnzeigeSumme(p.heim)), b=wettessenWuerstchen(wettessenAnzeigeSumme(p.gast));
+      const d=a-b, x0=p.mitte-p.innen, x1=p.mitte+p.innen;
+      ctx.strokeStyle="rgba(255,255,255,.5)";ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(x0,ky-5);ctx.lineTo(x0,ky);ctx.lineTo(x1,ky);ctx.lineTo(x1,ky-5);ctx.stroke();
+      const gleich=Math.abs(d)<0.001;
+      const txt=gleich?"±0":(d>0?"+":"−")+wettessenWuerstchenText(Math.abs(d));
+      const farbe=gleich?"#9aa6b6":(d>0?css("--home"):css("--away"));
+      ctx.font="800 9px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      const bw=ctx.measureText(txt).width+10;
+      ctx.fillStyle="rgba(10,6,4,.85)"; wettRundrect(p.mitte-bw/2,ky+1,bw,12,3); ctx.fill();
+      ctx.fillStyle=farbe; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(txt,p.mitte,ky+7.5);
     }
 
     zeichneWettessenBand(erster,zweiter,art);
