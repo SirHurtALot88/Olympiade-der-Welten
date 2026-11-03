@@ -36517,6 +36517,25 @@
     for(const k of KEYS)o[k]=mische(p,rec[k]);
     o.MANA=mische(p,MANAREZEPT);
     return o;}
+  // ECHTE KAMPFWERTE FUER DIE VORSCHAU (Opus-Review/Fable-Audit, 03.11.): renderBoard()
+  // zeigte bisher stats(p,disc) direkt -- den ROHENTWURF vor Slot-/Form-/Mutator-Aufschlag
+  // und vor aufEignung(). Nur bei Eignung genau 50 stimmte das zufaellig; bei Eignung 80
+  // zeigte das Board z.B. "Leben 300" statt der tatsaechlichen 365, die baueEinheit() fuer
+  // den echten Kampf ausrechnet -- Stars wurden dadurch systematisch zu schwach angezeigt.
+  // Dieselben sechs Schritte wie baueEinheit() (engPunkte/breitPunkte/eigWert/attr/sMod),
+  // nur ohne die rein positionalen Felder (side/row/x/y/id/...), die eine Vorschau nicht
+  // braucht -- ABSICHTLICH eine eigene, kleine Funktion statt baueEinheit() selbst
+  // umzubauen: die Vorschau darf nie das Risiko tragen, am echten, gezaehlten Kampf (dessen
+  // Fingerabdruck in mehreren Tests bit-identisch geprueft wird) auch nur ein Bit zu aendern.
+  function kampfwerteVorschau(p,d,slId){
+    const engPunkte=slId?slotAufschlag(p,slId,d):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+engPunkte+breitPunkte+eigHebung(p,d);
+    const eigWert=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slId,d,true),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
+    return aufEignung(stats({...p,a:attr},d),eigWert);
+  }
   // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
   // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
   const dmgOf=(atk,vr)=>Math.max(1,Math.round(12*(atk/50)*(100/(100+vr))));
@@ -37055,7 +37074,11 @@
       const pl=place[p.n], anderswo=pl&&pl.d!==disc, gesetzt=pl&&pl.d===disc;
       const r=el("div","prow"+(sel===p.n?" sel":"")+(anderswo?" used":"")+(gesetzt?" gesetzt":""));
       r.tabIndex=0;r.setAttribute("role","button");
-      r.title=p.c+" · "+p.r+" · Bollwerk · Standhaft, Deckt";
+      // ECHTE PERSOENLICHKEIT STATT HARTKODIERTEM PLATZHALTER (Fable-Audit, 03.11.): stand
+      // vorher fuer JEDEN Spieler "Bollwerk · Standhaft, Deckt", unabhaengig davon, wer
+      // tatsaechlich dastand. Dieselbe Herleitung wie die persline() weiter unten.
+      r.title=p.c+" · "+p.r+" · "+PERS[persOf[p.n]||"duellant"].l
+        +((p.tp&&p.tp.length)||(p.tn&&p.tn.length)?" · "+[...(p.tp||[]),...(p.tn||[])].join(", "):"");
       // Das Kuerzel bleibt als Grund, die Figur legt sich darueber — so sieht man auf
       // einen Blick, WER da steht, und nicht nur zwei Buchstaben.
       const ico=el("div","pico"+(gesetzt||anderswo?" belegt":""),p.n.slice(0,2).toUpperCase());
@@ -37188,7 +37211,9 @@
         place[n]={d:disc,slot:rw.id}; if(!order[n])order[n]=slotOrd(rw.id);
         sel=null;renderAll();});
       drin.forEach(p=>{
-        const s=stats(p,disc);
+        // ECHTE KAMPFWERTE STATT ROHENTWURF (Task #46, s. kampfwerteVorschau oben):
+        // place[p.n].slot ist hier immer gesetzt (p steht in `drin`, also in diesem Slot).
+        const s=kampfwerteVorschau(p,disc,place[p.n]&&place[p.n].slot);
         const u=el("div","unit");
         const kopfz=el("div","ukopf");
         kopfz.appendChild(portraet(p));
@@ -37213,9 +37238,14 @@
             "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+s.ANG+"."],
           ["Minderung",Math.round(s.VER/(s.VER+100)*100)+" %",
             "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+s.VER+". Genau die Kurve, die auch im Vorbild steht."],
-          ["Tempo",pz(Math.round(((40+s.TMP*1.4)/110-1)*100)),
-            "Laufgeschwindigkeit gegenüber einem Spieler mit Tempo 50. Tempo verkürzt KEINE Abklingzeit — "
-            +"es entscheidet nur, wer zuerst da ist. Die Spanne folgt den Klassenkarten (SPD 91 bis 140 auf einer Stufe)."],
+          // KARTEN_SPD statt der alten 40+TMP*1.4-Formel (Fable-Audit, 03.11.: zeigte bei
+          // TMP 99 +62 % statt korrekt +21 %) -- dieselbe Formel wie renderProfile()
+          // (s. dort) und derselbe cdKuerzung-Wert aus baueEinheit(), hier dupliziert, weil
+          // cdKuerzung lokal in baueEinheit() lebt. "Verkuerzt KEINE Abklingzeit" stimmte
+          // bis zum 04.09. (Chris' Umkehr); seitdem kuerzt Tempo sie wieder.
+          ["Tempo",pz(Math.round((KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)/(KARTEN_SPD.fuss+50*KARTEN_SPD.je)*100-100)),
+            "Laufgeschwindigkeit gegenüber einem Spieler mit Tempo 50 ("+Math.round(KARTEN_SPD.fuss+s.TMP*KARTEN_SPD.je)+" px/s Marschtempo). "
+            +"Tempo kürzt außerdem Abklingzeiten um "+Math.round(30*s.TMP/(s.TMP+120))+" %."],
           ["Ausdauer",(s.AUS*2)+"",  "Vorrat für Ausdauer-Skills ("+s.AUS+" × 2). Die Nachfüllrate kommt aus dem Kit seiner Klasse."],
           ["Mana",(s.MANA*2)+"",  "Vorrat für Mana-Skills ("+s.MANA+" × 2), abgeleitet aus Geist 45, Verstand 35, Wille 20."],
         ];
@@ -37288,13 +37318,16 @@
             const schaden=einzel
               ? (sk.schuss?sk.schuss+" × "+einzel+" Rohschaden":einzel+" Rohschaden (Basis "+sk.basis+" "+(s.ANG>=50?"+":"")+Math.round((s.ANG/50-1)*100)+" % Angriff)")
               : "kein Schaden";
-            // Die Abklingzeit ist die des Kits, PUNKT. Hier stand vorher "Kit 0,3 s minus
-            // 27 % aus Tempo" und damit 1,09 s bei einem schnellen Spieler — eine Rechnung,
-            // die die Arena seit dem Tempo-Umbau nicht mehr fuehrt. Chris hat es an der
-            // Erklaerungsseite gesehen: "auf deiner erklaerungs seite steht es noch mit
-            // 1,09s drin, das ist einfach falsch." Genau so war es.
+            // VERALTET SEIT CHRIS' UMKEHR AM 04.09. (Fable-Audit, 03.11.): hier stand
+            // "Tempo verkuerzt sie nicht", nachdem eine fruehere, falsche Tempo-Rechnung
+            // entfernt worden war (1,09 s statt 0,3 s, s. alte Fassung dieses Kommentars).
+            // Seit dem 04.09. kuerzt Tempo Abklingzeiten wieder, ueber cdKuerzung()/abkling()
+            // (s. dort) -- u.cds[sk.id]=(t.cd||0)*(1-cdKuerzung(u))/fat wirkt direkt auf
+            // genau diese Kit-Abklingzeit. Die Erklaerung muss die aktuelle Regel zeigen,
+            // nicht die vorige Korrektur ihrer vorherigen Fassung.
+            const cdKuerzungAnzeige=Math.round(30*s.TMP/(s.TMP+120));
             const rhythmus=sk.cd
-              ? "Abklingzeit "+sk.cd.toFixed(2)+" s (fest aus dem Kit — Tempo verkürzt sie nicht)"
+              ? "Abklingzeit "+sk.cd.toFixed(2)+" s aus dem Kit, Tempo kürzt sie um "+cdKuerzungAnzeige+" %"
               : "keine Abklingzeit";
             tipOn(b,sk.name+" · "+sk.stufe,
               sk.text+" "+schaden+" · "+rhythmus+
@@ -37307,7 +37340,10 @@
           u.appendChild(sw);
         }
         if(istHeiler(p)){
-          const hb=el("span","heilbadge","HEILER · "+Math.round(12*(s.ANG/50)*0.9)+" Heilung statt Schaden");
+          // HEILUNG.basis*angFaktor(ANG) statt der alten 12*(ANG/50)*0.9 (Fable-Audit,
+          // 03.11.): dieselbe Formel wie die echte Heilung in der Simulation (s. die
+          // heal=Math.round(HEILUNG.basis*angFaktor(u.ANG))-Zeile im Kampf-Tick).
+          const hb=el("span","heilbadge","HEILER · "+Math.round(HEILUNG.basis*angFaktor(s.ANG))+" Heilung statt Schaden");
           hb.tabIndex=0;
           tipOn(hb,"Heiler",
             "Diese Unterklasse heilt statt Schaden zu machen: "+(p.sub||[]).filter(x=>HEILER.has(x)).join(", ")+
@@ -37795,6 +37831,14 @@
   function renderProfile(){
     const p=SQUAD[0],s=stats(p,"tdm");
     document.getElementById("profSub").textContent=p.c+" · "+p.r+" · Eignung TDM "+p.d.tdm.toFixed(1);
+    // Veranlagung-Panel (#p3): stand bisher fuer JEDEN Spieler fest "Bollwerk · Standhaft,
+    // Deckt, Spaet stark" im HTML, unabhaengig davon, wer gerade profiliert wird (Fable-
+    // Audit, 03.11.). Dieselbe Herleitung wie renderList()'s r.title. "Wachstum" hatte nie
+    // eine Datenquelle (Relikt aus dem entfernten Stufenaufstieg, s. Kommentar unten) und
+    // wurde deshalb ganz entfernt statt mit einem weiteren erfundenen Wert gefuellt.
+    const profPers=document.getElementById("profPers"),profNeigungen=document.getElementById("profNeigungen");
+    if(profPers)profPers.textContent=PERS[persOf[p.n]||"duellant"].l;
+    if(profNeigungen)profNeigungen.textContent=((p.tp&&p.tp.length)||(p.tn&&p.tn.length))?[...(p.tp||[]),...(p.tn||[])].join(", "):"—";
     const box=document.getElementById("profStats");box.textContent="";
     // NACHGEPRUEFT gegen die Simulation — zum zweiten Mal, und zum zweiten Mal stimmte es
     // nicht. Diese Zeilen sind der Ort, an dem die Erklaerung der Mechanik hinterherhinkt:
