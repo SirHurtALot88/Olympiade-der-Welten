@@ -229,7 +229,7 @@ model CostSettings {
   fixedYearlyOther            Float    @default(1839)
   ebayCommissionRate          Float    @default(0.11)
   ebayCommissionVat           Float    @default(0.19)
-  ebayCommissionFixed         Float    @default(0.35)
+  ebayCommissionFixed         Float    @default(0.45)
   adFeeRateSingle             Float    @default(0.09)
   adFeeRateMin                Float    @default(0.09)
   adFeeRateGood               Float    @default(0.10)

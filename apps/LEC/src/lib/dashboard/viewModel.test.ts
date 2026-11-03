@@ -363,7 +363,7 @@ describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)",
   const cheapCard = () =>
     article("Billigkarte", {
       currentVk: 4.99,
-      windows: { "365": agg({ qty: 20, revenue: 20 * 4.99, ek: 20 * 0.9, avgPrice: 4.99 }) },
+      windows: { "365": agg({ qty: 20, revenue: 20 * 4.99, ek: 20 * 0.8, avgPrice: 4.99 }) },
     });
 
   it("shopVolumeFromAggregates: N und N_T aus dem 365-Fenster (Fallback all)", () => {
@@ -400,7 +400,7 @@ describe("Kostenmodell im Sortiment (Fixkosten, Einschreiben, Korridor-Linien)",
     expect(mitShop.corridor.contribution - noShop.corridor.contribution).toBeLessThan(0.1);
   });
 
-  it("EK 0,90 / VK 4,99 steht auf der Untergrenze und ist im Korridor (kein Dauer-Alarm mehr)", () => {
+  it("EK 0,80 / VK 4,99 steht auf der Untergrenze und ist im Korridor (kein Dauer-Alarm mehr)", () => {
     const vm = buildDashboardViewModel([cheapCard(), filler()], DEFAULT_COST_SETTINGS);
     const row = vm.sortiment.find((r) => r.nameRaw === "Billigkarte")!;
     expect(row.priceStatus).toBe("im_korridor");

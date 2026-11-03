@@ -185,7 +185,7 @@ export interface EbayFeeBreakdown {
 
 /**
  * eBay-Verkaufsgebuehren fuer einen VK-Preis (KONZEPT §7.3):
- * Provision = 0,35 EUR + VK x 11% x 1,19 (Provision inkl. 19% USt-Aufschlag)
+ * Provision = 0,45 EUR + VK x 11% x 1,19 (Provision inkl. 19% USt-Aufschlag)
  * Anzeigen  = VK x Ad-Rate x 1,19
  */
 export function computeEbayFees(
@@ -340,7 +340,7 @@ export function computeMarketTargetRange(market: number, ctx: TargetContext, set
  * Marge als Minimum, 33 % als Optimum):
  * VK-MIN = VK fuer 25 % Marge vor Fixkosten, VK-GUT = VK fuer 33 %, jeweils mit dem EK des
  * Artikels, den Gebuehren AM ZIELPREIS (geschlossene Form) und mindestens 4,99 €.
- * VK-DB  = (HK ohne Fixkosten + 0,35) / (1 - Gebuehrensatz)  (Gewinn vor Fixkosten = 0)
+ * VK-DB  = (HK ohne Fixkosten + 0,45) / (1 - Gebuehrensatz)  (Gewinn vor Fixkosten = 0)
  *
  * Der HK wird als HkBreakdown uebergeben (nicht nur als Summe), weil die
  * Deckungsbeitrags-Linie den Fixkostenanteil herausrechnen muss.

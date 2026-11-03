@@ -57,13 +57,13 @@ describe("buildMarketComparisonRow", () => {
 
   // Handgerechnet (unabhaengig vom Code), Einzelkarte, Markt-EK 2,00 €, kein Shop-Volumen:
   // HK = 2,00 + 0,575 (Einkaufs-Versand 1,15 x 50 %) + 0,67 + 0,053 = 3,298
-  // 25 %: (0,35 + 3,298) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 7,125   (Anzeigen-Satz MIN 9 %)
-  // 33 %: (0,35 + 3,298) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 8,684   (Anzeigen-Satz GUT 10 %)
+  // 25 %: (0,45 + 3,298) / (1 - 0,11 x 1,19 - 0,09 x 1,19 - 0,25) = 7,320   (Anzeigen-Satz MIN 9 %)
+  // 33 %: (0,45 + 3,298) / (1 - 0,11 x 1,19 - 0,10 x 1,19 - 0,33) = 8,922   (Anzeigen-Satz GUT 10 %)
   it("Zielspanne = 25 % bis 33 % Deckungsbeitrags-Marge auf Marktwert-EK plus Einkaufs-Versand", () => {
     const row = buildMarketComparisonRow(article({ currentVk: 8 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
     expect(row.marketValue).toBeCloseTo(2);
-    expect(row.targetMin).toBeCloseTo(7.125, 2);
-    expect(row.targetOpt).toBeCloseTo(8.684, 2);
+    expect(row.targetMin).toBeCloseTo(7.3203, 2);
+    expect(row.targetOpt).toBeCloseTo(8.9217, 2);
     expect(row.status).toBe("im_korridor");
     expect(row.deltaPercent).toBe(0);
   });
@@ -71,12 +71,12 @@ describe("buildMarketComparisonRow", () => {
   it("zu guenstig unter, zu teuer ueber der Spanne (je 3 % Toleranz)", () => {
     const guenstig = buildMarketComparisonRow(article({ currentVk: 4.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
     expect(guenstig.status).toBe("zu_guenstig");
-    expect(guenstig.deltaPercent).toBeCloseTo((4.99 - 7.125) / 7.125, 3);
+    expect(guenstig.deltaPercent).toBeCloseTo((4.99 - 7.3203) / 7.3203, 3);
     const teuer = buildMarketComparisonRow(article({ currentVk: 11.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
     expect(teuer.status).toBe("zu_teuer");
-    expect(teuer.deltaPercent).toBeCloseTo((11.99 - 8.684) / 8.684, 3);
-    // knapp unter 7,125 (x,99-Rundung) ist noch keine Abweichung
-    expect(buildMarketComparisonRow(article({ currentVk: 6.99 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("im_korridor");
+    expect(teuer.deltaPercent).toBeCloseTo((11.99 - 8.9217) / 8.9217, 3);
+    // knapp unter 7,32 (Rundung) ist noch keine Abweichung
+    expect(buildMarketComparisonRow(article({ currentVk: 7.19 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("im_korridor");
   });
 
   // Nachfrage-Beweis: 12,99 € bei Marktwert 2,00 € (Zielspanne 7,125 bis 8,684) waere "zu teuer" - hat sich der
@@ -125,10 +125,10 @@ describe("buildMarketComparisonRow", () => {
   });
 
   it("Pack-Artikel: Preis je Karte x Pack-Menge, Pack-Versand und -Verpackung", () => {
-    // Markt 3 x 0,50 = 1,50; HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> 25 %: 2,987 / 0,512 = 5,834
+    // Markt 3 x 0,50 = 1,50; HK = 1,50 + 0,575 + 0,50 + 0,062 = 2,637 -> 25 %: 3,087 / 0,512 = 6,029
     const row = buildMarketComparisonRow(article({ packQty: 3, currentVk: 5.99 }), quote({ priceAvg7: 0.5 }), DEFAULT_COST_SETTINGS, null);
     expect(row.marketValue).toBeCloseTo(1.5);
-    expect(row.targetMin).toBeCloseTo(5.834, 2);
+    expect(row.targetMin).toBeCloseTo(6.029, 2);
   });
 
   it("Marktwert = 7-Tage-Schnitt, sonst 30-Tage-Schnitt, sonst Trend", () => {
@@ -139,9 +139,9 @@ describe("buildMarketComparisonRow", () => {
   });
 
   it("Marge des heutigen VK bei Nachkauf zum Marktwert (Deckungsbeitrag, vor Fixkosten)", () => {
-    // VK 8,00, Gebuehren 0,35 + 8 x (0,11 + 0,10) x 1,19 = 2,349, HK 3,298 -> (8 - 2,349 - 3,298) / 8 = 0,294
+    // VK 8,00, Gebuehren 0,45 + 8 x (0,11 + 0,10) x 1,19 = 2,449, HK 3,298 -> (8 - 2,449 - 3,298) / 8 = 0,2816
     const row = buildMarketComparisonRow(article({ currentVk: 8 }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
-    expect(row.marginAtMarket).toBeCloseTo(0.294, 3);
+    expect(row.marginAtMarket).toBeCloseTo(0.2816, 3);
   });
 
   it("rechnet Pack-Artikel mit Trend x Pack-Menge", () => {
