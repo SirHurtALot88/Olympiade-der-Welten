@@ -61,6 +61,7 @@ import {
 import type { SeasonStandingsTopPlayerEntry } from "@/lib/foundation/season-standings-top-players";
 import type { SeasonFormCardBonusEntry } from "@/lib/foundation/season-form-card-bonus";
 import { buildValueRanks as buildTeamValueRanks } from "@/lib/season/season-value-ranks";
+import { beschreibeBilanz, formatiereBilanz } from "@/lib/standings/standings-bilanz";
 import {
   resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
@@ -82,6 +83,7 @@ import {
   type SpieltagsPaarung,
 } from "@/lib/foundation/season-matchday-fixtures-overview";
 import type { LeagueTier } from "@/lib/season/league-split";
+import { formatLeagueTierLabel, formatLeagueTierShortLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 
 /**
  * "Neuer Look" Saisonstand — Liga-Board (flag-gated, additiv).
@@ -780,6 +782,7 @@ export default function SeasonStandingsNewLook({
   teamTopPlayersByColumn,
   teamFormCardBonusByTeamId,
   areaVerhaeltnisByTeamId,
+  teamBilanzByTeamId,
   teamStrengthRankByTeamId,
   onChangeSeason,
   onOpenTeam,
@@ -884,6 +887,18 @@ export default function SeasonStandingsNewLook({
    * vorher).
    */
   const hasVerhaeltnis = useMemo(() => boardRows.some((row) => row.verhaeltnis != null), [boardRows]);
+
+  /**
+   * Chris (02.11.): „Alle sind 1v1 Duelle zwischen den teams" — Sieg/Unentschieden/Niederlage je
+   * Team (`summiereSaisonBilanz`). Nur Battle-Saves liefern eine Karte; im Manager Mode und in einer
+   * Archiv-Saison ist sie `null`, und weder Spalte noch Chip erscheinen (Markup unveraendert).
+   */
+  const hasBilanz = teamBilanzByTeamId != null && teamBilanzByTeamId.size > 0;
+  function renderBilanzWert(teamId: string) {
+    const bilanz = teamBilanzByTeamId?.get(teamId) ?? null;
+    if (!bilanz) return { text: "—", title: "Noch kein Duell gewertet" };
+    return { text: formatiereBilanz(bilanz), title: beschreibeBilanz(bilanz) };
+  }
 
   // Task #159 Punkt 2: Team-Name/-Logo für die Spieltage-Paarungszeilen — keine neuen Daten,
   // dieselben Zeilen, die Board/Daten/Vereine schon zeigen.
@@ -1506,9 +1521,13 @@ export default function SeasonStandingsNewLook({
 
   function renderExpandedDetails(row: SeasonV2StandingsRow) {
     const history = row.historicalPointsBySeason ?? [];
-    const historyRanks = history
+    // Liga je archivierter Saison mitfuehren (Chris, 02.11.): bei Liga-Split ist `rank` liga-lokal,
+    // „#1" allein sagt nicht, ob Liga 1 oder Liga 2. Die Linie laeuft ueber die ligauebergreifende
+    // Position, sonst saehe ein Abstieg (#14 L1 → #2 L2) wie ein Sprung nach oben aus.
+    const historyRankEntries = history
       .filter((entry) => entry.rank != null && Number.isFinite(entry.rank))
-      .map((entry) => entry.rank as number);
+      .map((entry) => ({ rank: entry.rank as number, leagueTier: entry.leagueTier ?? null }));
+    const historyRanks = historyRankEntries.map((entry) => entry.rank);
     const historyPoints = history
       .filter((entry) => entry.points != null && Number.isFinite(entry.points))
       .map((entry) => entry.points as number);
@@ -1556,13 +1575,18 @@ export default function SeasonStandingsNewLook({
               Rang über {historyRanks.length} archivierte Saisons (oben = besser)
             </span>
             <NlSparkline
-              points={historyRanks.map((rank) => -rank)}
+              points={historyRankEntries.map((entry) => -(toLeagueSpanningPosition(entry.rank, entry.leagueTier) ?? entry.rank))}
               tone="accent"
               aria-label={`Rang-Verlauf von ${row.teamName} über ${historyRanks.length} Saisons`}
               className="nl-standings-history-spark"
             />
             <span className="nl-standings-history-values nl-tnum">
-              {historyRanks.map((rank) => `#${rank}`).join(" · ")}
+              {historyRankEntries
+                .map((entry) => {
+                  const ligaKurz = formatLeagueTierShortLabel(entry.leagueTier);
+                  return ligaKurz ? `#${entry.rank} ${ligaKurz}` : `#${entry.rank}`;
+                })
+                .join(" · ")}
             </span>
           </div>
         ) : null}
@@ -1690,6 +1714,14 @@ export default function SeasonStandingsNewLook({
               onClick={() => openRankingDrawer("points", row.teamId)}
               title={`Punkte-Rangliste — ${row.teamName}`}
             />
+            {hasBilanz ? (
+              <StatChip
+                label="S-U-N"
+                value={renderBilanzWert(row.teamId).text}
+                title={renderBilanzWert(row.teamId).title}
+                className="nl-standings-bilanz-chip"
+              />
+            ) : null}
             <StatChip
               label="MW"
               value={formatNlMoney(row.marketValueTotal)}
@@ -1832,6 +1864,14 @@ export default function SeasonStandingsNewLook({
                     "Verh.",
                     "Punkteverhältnis — Saisonsumme der ±D-Werte aller Battle-Duelle, Tiebreaker nach Punkten",
                   )}
+                </th>
+              ) : null}
+              {hasBilanz ? (
+                <th
+                  className="nl-standings-th-bilanz"
+                  title="Sieg – Unentschieden – Niederlage je Disziplin-Duell (2/1/0 Punkte). Vierer-Pods zählen nicht mit, ihre Plätze stehen im Hover."
+                >
+                  S-U-N
                 </th>
               ) : null}
               <th className="nl-standings-th-bonus">{renderTableSortHeader("bonus", "dav. Bonus", BONUS_DAVON_TITLE)}</th>
@@ -2126,6 +2166,11 @@ export default function SeasonStandingsNewLook({
               {formatNlSignedNumber(row.verhaeltnis, 0)}
             </td>
           ) : null}
+          {hasBilanz ? (
+            <td className="nl-standings-td-bilanz nl-tnum" title={renderBilanzWert(row.teamId).title}>
+              {renderBilanzWert(row.teamId).text}
+            </td>
+          ) : null}
           <td className="nl-standings-td-bonus">{formatNlNumber(row.disciplineValues.bonuspunkte, 1)}</td>
           {renderFormCardCell(row)}
           {renderFormCardLeftCell(row)}
@@ -2319,7 +2364,7 @@ export default function SeasonStandingsNewLook({
         </tr>
         {isExpanded ? (
           <tr className="nl-standings-table-detailrow">
-            <td className="nl-standings-table-detailcell" colSpan={19} id={`nl-standings-tdetails-${row.teamId}`}>
+            <td className="nl-standings-table-detailcell" colSpan={20} id={`nl-standings-tdetails-${row.teamId}`}>
               <span className="nl-standings-table-detailtitle">Disziplinen nach Bereich</span>
               {renderDisciplineGroups(row)}
             </td>
@@ -2981,9 +3026,7 @@ export default function SeasonStandingsNewLook({
 
   /** "liga1"/"liga2" → "Liga 1"/"Liga 2", für Rang-Tooltips in der Paarungszeile. */
   function spieltagLigaLabel(leagueTier: LeagueTier | null | undefined): string | null {
-    if (leagueTier === "liga1") return "Liga 1";
-    if (leagueTier === "liga2") return "Liga 2";
-    return null;
+    return formatLeagueTierLabel(leagueTier);
   }
 
   /**

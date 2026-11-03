@@ -1,5 +1,9 @@
 (async () => {
   "use strict";
+  // Eigene Skript-URL, solange sie noch greifbar ist (document.currentScript gilt nur im
+  // synchronen Teil, also vor dem ersten await weiter unten) — Basis fuer die Bildpfade der
+  // PixelLab-Figuren, s. PIXEL_FIGUR_BASIS.
+  const PIXEL_FIGUR_SKRIPT_SRC=(typeof document!=="undefined"&&document.currentScript&&document.currentScript.src)||"";
   // ===================================================================================
   // SPRITES.
   //
@@ -4166,7 +4170,7 @@
   function blickAus(u){
     if(Math.abs(u.vx||0)>Math.abs(u.vy||0)*1.2)return (u.vx||0)<0?1:3;
     if(Math.abs(u.vy||0)>2)return (u.vy||0)<0?0:2;
-    return u.side===0?3:1;
+    return u.side%2===0?3:1; // Pod: Seite 0/2 links, 1/3 rechts (bfPodHome); im Duell wie side===0
   }
 
   // VOLLBILD-CHARAKTERE (24.08.): manche neuen Monster-Blaetter (Golem/Kraken/Werwolf) sind
@@ -4424,6 +4428,268 @@
   function vollbildRow(spec,r0){
     if(spec.rowMap)return spec.rowMap[r0];
     return (spec.stendhal?STENDHAL_ROW[r0]:r0)%(spec.rows||4);
+  }
+
+  // ===================================================================================
+  // PIXEL-FIGUREN (PixelLab, 02.11.) — der ZWEITE ZEICHENPFAD neben dem Baukasten.
+  //
+  // Chris' Sichtpruefung gegen genau diesen Motor: im Profil und in der Kader-Galerie stehen
+  // seit dieser Runde die neuen 80x80-PixelLab-Figuren (public/sprites/figuren/<slug>/,
+  // lib/data/figurenSprites.ts), in der Arena aber weiter die LPC-Baukasten-Figuren. Hier
+  // kommt der Kaempfer jetzt aus seinem eigenen PixelLab-Satz, wenn er einen hat:
+  //   - Datenquelle: window.__ARENA_FIGUREN aus battle-mode.figuren.js (generiert von
+  //     scripts/baue-arena-figuren.mjs aus dem Figuren-Index; Schluessel ist der NAME, weil
+  //     der Motor seine Kaempfer nur unter u.n kennt — dieselbe Zuordnung wie BAU).
+  //   - Bilder: werden NICHT eingebettet (anders als B_SPRITES), sondern als Dateien neben
+  //     der App geladen — relativ zur URL DIESES Skripts (../sprites/figuren/), damit es
+  //     standalone (/mockups/battle-mode.html, auch file://) und eingebettet im Next-Host
+  //     (Seite unter /foundation/..., Skript unter /mockups/) gleich aufloest.
+  //   - Laden: faul je Figur beim ersten Zeichnen (plus Vorladen des Kaders beim Start).
+  //     Solange das Grundbild noch fehlt — und im Artefakt, das keine Dateien laden kann —
+  //     zeichnet zeichneSprite() unveraendert den Baukasten. Das ist auch der Weg fuer jeden
+  //     Spieler OHNE eigene Figur (die grosse Mehrheit).
+  //
+  // REIN ZEICHNEND. Nichts hier liest oder schreibt Simulationszustand: kein rr()/Zufall,
+  // keine Zuweisung an u. Die einzige "Erinnerung" (Treffer-/K.o.-Zeitpunkt fuer die
+  // Treffer- und Tod-Animation) liegt in einer WeakMap NEBEN der Einheit, abgeleitet aus
+  // u.hp/u.down, die die Simulation ohnehin setzt.
+  //
+  // Formatfakten (nachgemessen ueber alle 267 Figuren, s. PR-Beschreibung):
+  //   - Grundposen south/east/west/north.png, je ein Bild in Kantenlaenge `c`.
+  //   - Animation = waagerechter Streifen `<name>-<east|south>.png` mit `frames` Bildern;
+  //     die Bildgroesse ist NICHT immer `c` (z.B. 84 oder 104 bei c=80): gepolstert, gleicher
+  //     Pixelmassstab wie die Grundpose (Figurenhoehe Streifen/Pose = 1,00 in 767 von 767).
+  //     Bildbreite deshalb aus dem geladenen Bild (Breite/frames), Fusslinie und Mitte je
+  //     Streifen gemessen (Bild 0 ist bei allen vier Arten die stehende Ausgangspose).
+  //   - West = Ost gespiegelt (PixelLab-Kanon); Norden gibt es nur als Grundpose.
+  const PIXEL_FIGUR_BASIS=(()=>{
+    try{ if(PIXEL_FIGUR_SKRIPT_SRC)return new URL("../sprites/figuren/",PIXEL_FIGUR_SKRIPT_SRC).href; }catch(e){}
+    return "/sprites/figuren/";
+  })();
+  // NUR GLEICHE HERKUNFT UEBER HTTP(S). Unter file:// (Headless-Runner, Messskripte, direkt
+  // geoeffnete Datei) gilt jedes geladene Bild als fremd: die Leinwand, auf die es gezeichnet
+  // wird, ist danach fuer getImageData/toDataURL gesperrt — und davon leben renderProbe,
+  // hoehenKorrektur und die Handfarben-Messung. Dort bleibt es deshalb beim eingebetteten
+  // Baukasten, exakt wie vor dieser Aenderung; die Figuren erscheinen in der App
+  // (Next-Host) und in /mockups/battle-mode.html ueber den Dev-/Produktionsserver.
+  const PIXEL_FIGUR_AKTIV=(()=>{
+    try{
+      if(typeof window==="undefined"||!window.location||!/^https?:$/.test(window.location.protocol))return false;
+      return new URL(PIXEL_FIGUR_BASIS,window.location.href).origin===window.location.origin;
+    }catch(e){ return false; }
+  })();
+  const PIXEL_FIGUREN=(PIXEL_FIGUR_AKTIV&&typeof window!=="undefined"&&window.__ARENA_FIGUREN)||{};
+  // Zielhoehe einer Figur in Bildschirm-px bei groesseFaktor 1 — dieselbe Bezugshoehe, auf
+  // die hoehenKorrektur() die Baukasten-Figuren normiert, damit beide Pfade nebeneinander
+  // gleich gross stehen. Breite gedeckelt, damit ein breites Wesen (Krake, Drache) nicht
+  // ueber die Nachbarn waechst, nur weil es auf Menschenhoehe gestreckt wird.
+  const PIXEL_HOEHE=HOEHEN_BEZUG, PIXEL_BREITE_MAX=60;
+  // Fusslinie relativ zum Zeichenanker y — so steht der Baukasten (Zelle bei y-46*Z, Sohle
+  // der LPC-Figur in Zellzeile ~61-62, gemessen per renderProbe).
+  const PIXEL_FUSS=15.5;
+  const pixelFigurSpeicher=new Map();   // Name -> {fig, bilder:Map(datei->{im,mass,fehler})}
+  const pixelAnzeige=new WeakMap();     // Einheit -> {hp, trefferT, downT} (nur Anzeige)
+  function pixelMessen(im,frames){
+    const fw=Math.max(1,Math.floor(im.width/frames)), fh=im.height;
+    let mass={fw,fh,oben:fh*0.15,unten:fh*0.84,mitteX:fw/2,hoehe:fh*0.69,breite:fh*0.48,geschaetzt:true};
+    try{
+      const c=document.createElement("canvas"); c.width=fw; c.height=fh;
+      const cx=c.getContext("2d",{willReadFrequently:true});
+      cx.drawImage(im,0,0,fw,fh,0,0,fw,fh);
+      const px=cx.getImageData(0,0,fw,fh).data;
+      let o=-1,un=-1,l=fw,r=-1;
+      for(let yy=0;yy<fh;yy++)for(let xx=0;xx<fw;xx++){
+        if(px[(yy*fw+xx)*4+3]>16){ if(o<0)o=yy; un=yy; if(xx<l)l=xx; if(xx>r)r=xx; }
+      }
+      if(o>=0&&un-o>=4)mass={fw,fh,oben:o,unten:un+1,mitteX:(l+r+1)/2,hoehe:un+1-o,breite:r+1-l,geschaetzt:false};
+    }catch(e){ /* file:// oder fremde Herkunft: Leinwand gesperrt -> Schaetzwerte oben */ }
+    return mass;
+  }
+  function pixelBild(z,datei,frames,danach){
+    let e=z.bilder.get(datei);
+    if(e)return e;
+    e={im:null,mass:null,fehler:false};
+    z.bilder.set(datei,e);
+    const fertig=()=>{ if(danach){ const f=danach; danach=null; try{f();}catch(err){} } };
+    try{
+      const im=new Image();
+      im.onload=()=>{ e.mass=pixelMessen(im,frames); e.im=im; fertig(); };
+      im.onerror=()=>{ e.fehler=true; fertig(); };
+      im.src=PIXEL_FIGUR_BASIS+z.fig.s+"/"+datei;
+    }catch(err){ e.fehler=true; fertig(); }
+    return e;
+  }
+  function pixelFigurLaden(name){
+    if(!name)return null;
+    let z=pixelFigurSpeicher.get(name);
+    if(z!==undefined)return z;
+    const fig=Object.prototype.hasOwnProperty.call(PIXEL_FIGUREN,name)?PIXEL_FIGUREN[name]:null;
+    if(!fig||typeof Image==="undefined"){ pixelFigurSpeicher.set(name,null); return null; }
+    z={fig,bilder:new Map()};
+    pixelFigurSpeicher.set(name,z);
+    // REIHENFOLGE (03.11., Chris' Live-Screenshot bei 0:06: fuenf Kaempfer noch als Baukasten):
+    // je Figur kamen bisher ~12 Dateien gleichzeitig ins Netz, bei zwoelf Kaempfern ~140 — die
+    // Frontpose, ohne die die Figur gar nicht erscheint, stand dabei hinten in derselben Schlange.
+    // Jetzt zuerst nur die Grundpose (traegt den Massstab, s. pixelFigurBereit); die uebrigen
+    // Posen und Streifen erst, wenn sie da ist (oder fehlgeschlagen).
+    const grundName=fig.r.includes("south")?"south":fig.r[0];
+    const rest=()=>{
+      for(const r of fig.r)pixelBild(z,r+".png",1);
+      for(const art in fig.a)for(const d in fig.a[art]){
+        const [stamm,frames]=fig.a[art][d];
+        pixelBild(z,stamm+"-"+d+".png",frames);
+      }
+    };
+    if(grundName)pixelBild(z,grundName+".png",1,rest); else rest();
+    return z;
+  }
+  // Geladen = jede angeforderte Datei der Figur ist da oder endgueltig fehlgeschlagen (Spieler
+  // ohne eigene Figur gelten als geladen: sie bleiben ohnehin beim Baukasten).
+  function pixelFigurGeladen(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return true;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    if(!grund||!(grund.im||grund.fehler))return false;
+    if(grund.fehler)return true;
+    let soll=z.fig.r.length; for(const art in z.fig.a)soll+=Object.keys(z.fig.a[art]).length;
+    if(z.bilder.size<soll)return false;
+    for(const e of z.bilder.values())if(!e.im&&!e.fehler)return false;
+    return true;
+  }
+  // Bereit = die Frontpose ist geladen und vermessen (sie traegt den Massstab). Vorher
+  // bleibt die Figur beim Baukasten — kein halbes Bild, kein Springen der Groesse.
+  function pixelFigurBereit(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return null;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    return (grund&&grund.im&&grund.mass)?z:null;
+  }
+  // Leerer Bauplan fuer Pixel-Figuren (s. zeichneSprite) und der generische Schlaeger-Griff.
+  const BAU_PIXEL={};
+  const PIXEL_SCHLAEGER={modus:"gegriffen",punkte:[0,1,2,3].map(i=>HOCKEY_HAND[i]||HOCKEY_HAND[2])};
+  // Kader-/Aufstellungs-Ikone (figur()): Frontpose, Fuesse am unteren Rand, auf die Kachel
+  // eingepasst (Hoehe zuerst, Breite gedeckelt) — wie der 40x50-Baukasten-Ausschnitt.
+  function zeichnePixelIkone(cx,z,w,h){
+    const e=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    if(!e||!e.im||!e.mass)return;
+    const m=e.mass;
+    const s=Math.min((h-4)/Math.max(1,m.hoehe),(w-2)/Math.max(1,m.breite));
+    cx.save(); cx.imageSmoothingEnabled=false;
+    try{ cx.drawImage(e.im,0,0,m.fw,m.fh,w/2-m.mitteX*s,(h-2)-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+    cx.restore();
+  }
+  // Wer im naechsten Spiel zu sehen ist (Kader, Pod-Teams): reset() und die Pod-Aufbauten
+  // melden ihn hier an, der Anpfiff wartet auf genau diese Liste (s. anpfiffNachFiguren).
+  let pixelFigurenImSpiel=[];
+  let figurenWarten=null; // Intervall, solange der Anpfiff auf Figuren wartet (s. spielLaeuft)
+  function pixelFigurVorladen(namen){
+    for(const n of namen||[]){ if(!n)continue; pixelFigurLaden(n); if(!pixelFigurenImSpiel.includes(n))pixelFigurenImSpiel.push(n); }
+  }
+  // Gewartet wird nur auf die, die wirklich auf dem Feld stehen: im Kampf-Chassis die Einheiten
+  // (U), sonst die ganze angemeldete Liste (Bank eingeschlossen, gedeckelt durch FIGUREN_WARTE_MS).
+  function pixelFigurenFuerAnpfiff(){
+    const arenaChassis=!istFeldspiel(disc)&&!istBuehne(disc)&&!istBahn(disc);
+    const imKampf=(arenaChassis&&Array.isArray(U)&&U.length)?U.map(u=>u&&u.n).filter(Boolean):null;
+    return imKampf&&imKampf.length?imKampf:pixelFigurenImSpiel;
+  }
+  // Fuer den Anpfiff reicht die GRUNDPOSE (sie macht die Figur erkennbar und traegt den
+  // Massstab, s. pixelFigurBereit); fehlende Animationsstreifen ueberbrueckt zeichnePixelFigur()
+  // mit der Ersatzbewegung aus der Grundpose, bis sie nachkommen.
+  function pixelGrundGeladen(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return true;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    return !!grund&&!!(grund.im||grund.fehler);
+  }
+  function pixelFigurenAlleGeladen(){
+    if(!PIXEL_FIGUR_AKTIV)return true;
+    for(const n of pixelFigurenFuerAnpfiff())if(!pixelGrundGeladen(n))return false;
+    return true;
+  }
+  // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
+  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
+  // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
+    const fig=z.fig;
+    const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
+    const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
+    const fussY=y+PIXEL_FUSS*G;
+    const istUnten=!!u.down||!!u.vizSturz;
+    let rec=pixelAnzeige.get(u);
+    // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
+    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
+    if(typeof u.hp==="number"){
+      if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
+      rec.hp=u.hp;
+    }
+    if(rec.trefferT>t)rec.trefferT=-1e9;          // neue Partie: Uhr lief zurueck
+    if(istUnten){ if(rec.downT==null||rec.downT>t)rec.downT=t; } else rec.downT=null;
+    const trefferSeit=t-rec.trefferT;
+    const istAngriff=(u.lunge>0)&&!istUnten;
+    const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
+    const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
+    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt.
+    // Norden (Ruecken) hat keinen Streifen: Gehen zeigt dort die Rueckenpose mit Wippen,
+    // Angriff/Treffer/K.o. die Seitenansicht in Bewegungsrichtung.
+    const spiegel=(r0===1)||(r0===0&&(u.vx||0)<0);
+    const zeichneBild=(e,f,dx,dy,winkel,spiegeln)=>{
+      const m=e.mass;
+      ctx.save();
+      ctx.imageSmoothingEnabled=false;
+      ctx.translate(x+(dx||0),fussY+(dy||0));
+      if(winkel)ctx.rotate(winkel);
+      if(spiegeln)ctx.scale(-1,1);
+      try{ ctx.drawImage(e.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+      ctx.restore();
+    };
+    const vor=(r0===1)?-1:(r0===3)?1:0;
+    if(art){
+      const def=fig.a[art];
+      if(def){
+        const wunsch=(r0===2)?"south":"east";
+        const d=def[wunsch]?wunsch:(def.east?"east":"south");
+        const [stamm,n]=def[d];
+        const e=z.bilder.get(stamm+"-"+d+".png");
+        if(e&&e.im&&e.mass){
+          let f;
+          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
+          else{
+            const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
+            f=Math.floor(((zyklus%n)+n)%n);
+          }
+          if(!isFinite(f))f=n-1;
+          // Gespiegelt wird nur der Ost-Streifen (fuer Westen); die Front nie.
+          zeichneBild(e,f,0,0,0,spiegel&&d==="east");
+          return;
+        }
+      }
+    }
+    // Grundpose der Blickrichtung (eigene West-Pose, falls vorhanden — dann nicht spiegeln).
+    const posen=["north","west","south","east"];
+    const wunschPose=posen[r0];
+    const geladen=(e)=>!!(e&&e.im&&e.mass);
+    let pe=z.bilder.get(wunschPose+".png"), poseSpiegeln=false;
+    if(!geladen(pe)&&wunschPose==="west"&&geladen(z.bilder.get("east.png"))){ pe=z.bilder.get("east.png"); poseSpiegeln=true; }
+    if(!geladen(pe))pe=grund;
+    let dx=0,dy=0,winkel=0;
+    if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
+    else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
+    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(art==="tod"){
+      const k=Math.min(1,(t-(rec.downT??t))/0.5);
+      winkel=(vor<0?-1:1)*k*Math.PI/2;
+    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
   // "pistole"/"schrotflinte"/"sturmgewehr" als dritte waffe-Option neben "schwert"/"bogen".
@@ -5037,14 +5303,25 @@
     "i-spy":     { hand:LUPE_HAND,   phasen:LUPE_PHASEN,  zeichne:zeichneLupe },
   };
   function zeichneSprite(ctx,u,x,y,feldspiel){
-    const b=BAU[u.n]||BAU_STD;
+    // PIXEL-FIGUR VOR DEM BAUKASTEN (02.11., s. PIXEL_FIGUREN oben). Hat der Kaempfer einen
+    // geladenen PixelLab-Satz, laeuft er durch den Vollbild-Zweig unten (dort, wo auch die
+    // Requisiten fuer Fremdkoerper haengen: Hantel, Kufe, Mikrofon, Schlaeger, Degen ...),
+    // nur mit zeichnePixelFigur() statt des Blattes. Der Bauplan ist dann ein LEERER: die
+    // BAU-Zusaetze (Gluehriss, Hoerner, Alarmkopf, Aura ...) sind Naeherungen an das Portrait
+    // fuer den Baukasten und hatten auf der echten Figur nichts verloren. Ohne Satz oder
+    // solange er laedt: bit-identisch der alte Weg.
+    const pixFig=pixelFigurBereit(u.n);
+    const b=pixFig?BAU_PIXEL:(BAU[u.n]||BAU_STD);
     // Groessen-Skalierung (s. groesseFaktor oben) VOR allem anderen berechnet: der
     // vollbild-Zweig direkt unten braucht sie schon (return davor), und die spaetere
     // lokale Z-Variable im normalen Zeichenpfad (frueher hart auf 1) ist jetzt dieselbe
     // Zahl statt einer zweiten. bauSkala(b) (04.09., s. Kommentar dort) haengt zusaetzlich
     // MULTIPLIKATIV dran — ein optionaler, dritter Faktor je BAU-Eintrag statt eines
     // Ersatzes fuer u.groesse.
-    const Z=groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
+    // Pixel-Figur: Hoehe normiert zeichnePixelFigur() selbst (auf dieselbe Bezugshoehe wie
+    // hoehenKorrektur()), Z ist dann nur noch die Spielergroesse — die Requisiten-Anker unten
+    // rechnen damit wie beim Standardkoerper.
+    const Z=pixFig?groesseFaktor(u.groesse):groesseFaktor(u.groesse)*hoehenKorrektur(u)*bauSkala(b);
     // HANTEL AN EINEM ZELLPUNKT (13.09.). Eine Stelle statt drei: den Hantel-Zeichenblock gab
     // es bisher NUR im normalen Sprite-Zeichenpfad ganz unten — der b.reiherMech- und der
     // b.vollbild-Zweig direkt darunter kehren beide vorher zurueck (`return`), und damit
@@ -5618,8 +5895,8 @@
       }
       return;
     }
-    if(b.vollbild){
-      const spec=VOLLBILD[b.vollbild];
+    if(b.vollbild||pixFig){
+      const spec=pixFig?null:VOLLBILD[b.vollbild];
       // EIGENES ANGRIFF-/TOD-BLATT (28.10., M-M-Team-Sprite-Integration): vorher kannte
       // jede b.vollbild-Kreatur nur EIN Blatt (den Gehzyklus) und simulierte Angriff/Tod
       // rein ueber die Frame-Auswahl weiter unten (vf) — ein spaeterer Frame des Gehzyklus
@@ -5631,8 +5908,9 @@
       // Verhalten BYTE-IDENTISCH zum alten Code (useSpec===spec, vfModus wie vorher).
       const r0=blickAus(u);
       const istTod=!!u.down, istAngriff=(u.lunge>0&&!u.down);
-      const useSpec=(istTod&&spec.tod)?spec.tod:(istAngriff&&spec.angriff)?spec.angriff:spec;
-      const im=bHolEingefaerbt(useSpec.key,b.vollbildFarbe,b.vollbildFarbeModus,useSpec.ch);
+      const useSpec=pixFig?null:(istTod&&spec.tod)?spec.tod:(istAngriff&&spec.angriff)?spec.angriff:spec;
+      const im=pixFig?null:bHolEingefaerbt(useSpec.key,b.vollbildFarbe,b.vollbildFarbeModus,useSpec.ch);
+      if(pixFig)zeichnePixelFigur(ctx,u,x,y,Z,pixFig,r0);
       if(im&&im.width){
         const row=vollbildRow(useSpec,r0);
         const vn=useSpec.cols;
@@ -5665,7 +5943,9 @@
       // (s. dw/dh oben). VOLLBILD_SCHLAEGER kennt nicht jeden b.vollbild-Schluessel (z.B.
       // "roboter_braun" ist registriert, aber von keiner Kreatur benutzt) — dann greift gar
       // nichts, statt mit einem falschen Punkt zu zeichnen.
-      const griff=VOLLBILD_SCHLAEGER[b.vollbild];
+      // Pixel-Figur: Standardkoerper-Hand (HOCKEY_HAND) — die Figur steht auf derselben
+      // Fusslinie und Bezugshoehe wie der Baukasten, der Griffpunkt trifft ungefaehr die Hand.
+      const griff=pixFig?PIXEL_SCHLAEGER:VOLLBILD_SCHLAEGER[b.vollbild];
       if(griff&&feldspiel&&istHockey()&&!u.down){
         const gp=griff.punkte[r0];
         const pose=griff.modus==="quer"?"quer"
@@ -6948,11 +7228,54 @@
   const mitKit=(spieler)=>spieler.map(p=>({...p,skills:MATRIARCH}));
   if(echterKader&&Array.isArray(echterKader.heim)&&echterKader.heim.length)SQUAD=mitKit(echterKader.heim);
   if(echterKader&&Array.isArray(echterKader.gast)&&echterKader.gast.length)OPP=mitKit(echterKader.gast);
+  // PixelLab-Figuren beider Kader schon jetzt anfordern (reine Anzeige, s. PIXEL_FIGUREN),
+  // damit der erste Arena-Frame nicht noch den Baukasten zeigt. Pod-Gegner laden faul.
+  try{ pixelFigurVorladen([...SQUAD,...OPP].map(p=>p&&p.n)); }catch(e){}
   // DER ECHTE SPIELTAGSWURF (MUTATOR ORGANISCH, 29.09.): optional im selben Umschlag. Fehlt das
   // Feld, bleibt alles wie vorher (die Engine zieht selbst, s. mutatorenGrundzustand()); ist es
   // da, gilt es — auch leer. `let`, weil kaderSetzen() es fuer Messungen austauschen darf.
   const alsMutatorListe=(m)=>Array.isArray(m)?m.map(t=>String(t==null?"":t).trim()).filter(Boolean).slice(0,2):null;
   let kaderMutatoren=echterKader?alsMutatorListe(echterKader.mutatoren):null;
+  // SPIELTAGS-ANSICHT (02.11., FoundationBattleArenaHost.tsx `spieltag`-Modus): der Host zeigt hier
+  // das Spiel, das der Hintergrund-Vorlauf schon GEBUCHT hat. Jede Hand am Spiel (Zielansage,
+  // Fokus, Rennplan) wuerde den Verlauf veraendern und damit etwas anderes zeigen, als gebucht ist
+  // -- im Zuschau-Modus sind diese Eingriffe deshalb aus. Ohne das Feld (Entwurfsreiter,
+  // Standalone, Headless-Lauf) bleibt alles wie bisher.
+  const nurZuschauen=!!(echterKader&&echterKader.nurZuschauen===true);
+  // QUICK-SIM (schnellDurch(), s. window.__arena): solange er laeuft, bleibt der Ton stumm, und der
+  // zuletzt im Endstand gezeigte Sieger wird fuer das Ende-Ereignis an den Host gemerkt. Beides
+  // reine Anzeige -- hier oben deklariert, weil sfx()/setzeEsiegerKlasse() weit unten stehen.
+  let schnelldurchAktiv=false;
+  let letzterAngezeigterSieger=null;
+  // Waehrend des Vorspulens bauten Kaderleiste und Wertungstabelle ihre Kacheln bei JEDEM Tick neu
+  // (gemessen: ~11 ms je Tick im Battlefield-Pod, fast alles erzwungene Stil-Neuberechnung) -- das
+  // Vorspulen lief damit kaum schneller als Echtzeit. Gedrosselt auf ~4 Mal je Sekunde; am Ende
+  // baut schnellDurch() beide einmal vollstaendig. Reine Anzeige.
+  //
+  // ZUSCHAUEN BEI 4x (Saisontest-Fund 02.11., Battlefield ueber 5 Minuten bei Tempo 4x): dieselbe
+  // Neubau-Last lag auch im NORMALEN Abspielen. In den Kampf-Disziplinen (TDM, Battlefield samt
+  // Pod-Replay) ruft stepSim() updateHud() bei JEDEM Tick, und updateHud() baut Kaderleiste und
+  // Wertungstabelle neu -- bei Tempo 4x also viermal je Bild. Die Bildrate fiel, und weil loop()
+  // je Bild hoechstens 50 ms Sendezeit nachholt (dt-Deckel), lief das Spiel nicht nur ruckelig,
+  // sondern LANGSAMER: gemessen Battlefield-Duell 53 s bei voller Bildrate, 227 s bei sechsfach
+  // gedrosselter CPU (Headless, ~17 Bilder/s) -- kein Haenger, nur Bildrate. Waehrend ein Spiel
+  // laeuft, bauen beide deshalb hoechstens ~10 Mal je Sekunde neu; Ende (done), Reset und
+  // Sonden-Laeufe (pixelgenaue Screenshots) bleiben ungedrosselt. Reine Anzeige: weder
+  // renderKader() noch renderWertungTabelle() beruehren rr(), Boxscore oder Wertung.
+  let schnelldurchDomZuletzt=0;
+  let abspielDomZuletzt=0;
+  function schnelldurchDomGedrosselt(){
+    const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    if(!schnelldurchAktiv){
+      if(!running||done||sondenAktiv)return false;
+      if(jetzt-abspielDomZuletzt<100)return true;
+      abspielDomZuletzt=jetzt;
+      return false;
+    }
+    if(jetzt-schnelldurchDomZuletzt<250)return true;
+    schnelldurchDomZuletzt=jetzt;
+    return false;
+  }
   // Die Einleitung nannte bisher immer die beiden Standardkader beim Namen — das
   // widerspricht sich selbst, sobald echte Teams eingespeist wurden. Der Host schickt die
   // Namen im selben Umschlag mit (meta.heimName/gastName); ohne sie (Standalone/Artefakt)
@@ -16408,7 +16731,10 @@
     // ENDSTAND-NACHLAUF (2.6): waehrend der 3,5 s zwischen Schlusspfiff und Endstand-Overlay
     // bleibt der Bug mit dem Endstand stehen -- sonst verschwaende der Score im Moment des
     // Pfiffs und der Nachlauf zeigte eine Szene ohne Ergebnis.
-    bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf);
+    // POD (02.11.): der Bug kennt nur Heim/Gast — im Vier-Team-FFA uebernimmt die Tafel auf der
+    // Leinwand (zeichneBfPodTafel) Namen, Stand und Uhr.
+    bug.hidden=!!(einlauf&&!einlauf.hidden)||(!!done&&!endstandNachlauf)||bfPodAktiv();
+    if(bahnPodAnzeigeAktiv())bug.hidden=true; // Bahn-Pod: dieselbe Rolle hat zeichneBahnPodTafel
     if(bug.hidden){
       // B2: das Lauf-Band haengt lose neben #bbug (eigenes Overlay-Element, s.o.) und
       // wuerde ohne diesen fruehen Reset einen Lauf vom Schlusspfiff bis in den
@@ -29845,9 +30171,14 @@
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
 
     // GRUNDFLAECHE: warmes Bankett-Kerzenlicht statt bodenBuehne()s kaltem Wettkampf-Podest.
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    // KULISSE (03.11., s. kulisseZeichnen): gibt es einen illustrierten Jahrmarkt fuer dieses
+    // Spiel, steht die Tafel vor ihm statt vor dem Verlauf — alles darueber (Schild, Wimpel,
+    // Tafel, Uhr, Band) bleibt unveraendert.
+    if(!kulisseZeichnen()){
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
 
     // NEON-SCHILD "WETTESSEN" ENTFERNT (F1-Broadcast-Audit Runde 2, 30.09., Punkt 6, Bild
     // 11, "wettessen zwei uhren zwei staende"): stand bei y:4-30, exakt unter dem HTML-
@@ -36365,6 +36696,11 @@
     const x=c.getContext("2d");x.imageSmoothingEnabled=false;
     const mal=()=>{
       x.clearRect(0,0,40,50);
+      // PixelLab-Figur (02.11., s. PIXEL_FIGUREN): dieselbe Frontpose, die die Arena im
+      // Stehen zeigt, statt des Baukastens — sobald sie geladen ist (die Nachzeichnungen bei
+      // 300/1200 ms unten holen sie nach). Ohne Figur: unveraendert der Baukasten.
+      const pz=pixelFigurBereit(p.n);
+      if(pz){ zeichnePixelIkone(x,pz,40,50); return; }
       const b=BAU[p.n]||BAU_STD, r=3;
       // VOLLBILD-Kreaturen (Golem/Kraken/Werwolf/Spinne/Roboter) haben keinen kopf/body-
       // Bauplan — vorher fiel so ein Spieler hier durch und stand als nackter Koerper OHNE
@@ -37520,6 +37856,8 @@
   }
 
   function homeFor(side,row,i,n){
+    // POD (s. bfPodHome unten): nur waehrend eines Pod-build(), sonst unveraendert.
+    if(bfPodKader)return bfPodHome(side,row,i,n);
     const cols=[side===0?MID-140:MID+140,side===0?MID-300:MID+300,side===0?MID-460:MID+460];
     return{x:cols[row],y:70+(H-140)*(n<2?0.5:i/(n-1||1))};
   }
@@ -37535,6 +37873,47 @@
   // andere Disziplinen aufruft) den Kontrollpunkt einer gerade sichtbaren Battlefield-
   // Partie unter der Hand vertauschen.
   let KP=null;
+
+  // ===================================================================================
+  // BATTLEFIELD IM POD-FORMAT: VIER TEAMS GLEICHZEITIG IM SELBEN KAMPF (02.11.).
+  //
+  // Chris am 01./02.11., woertlich: „nein auch bei battlefield reicht kein hinweistext! da sollen
+  // 4 teams gleichzeitig FFA machen". Battlefield wird seit 01.11. als Vierergruppe (Pod, 2-1-0-0)
+  // gewertet; die Arena zeigte bis hierher trotzdem ein Zwei-Team-Duell. Jetzt laufen alle vier
+  // Teams als echtes Free-for-all im SELBEN Echtzeitkampf um dieselben drei Orte (Nord, Mitte,
+  // Sued) — derselbe Motor (baueEinheit, stepSim, Kit-Skills, Rueckzug, Domination-Punktwahl),
+  // nur mit N Seiten statt zwei. Konzept und Messung: docs/design/battlefield-pod-ffa-02-11.md.
+  //
+  // DAS DUELL BLEIBT BIT-IDENTISCH. Der Pod ist ausschliesslich ueber zwei Wege erreichbar:
+  //  - `bfPodKader` ist NUR waehrend eines build()-Aufrufs gesetzt (headless: bfPodLauf(), Anzeige:
+  //    bfPodAnzeigeBauen()) und sonst `null`; homeFor()/build() lesen ihn.
+  //  - `KP.pod` traegt den gebauten Pod durch das Spiel (Seitenzahl, Ausscheidezeiten). KP wird von
+  //    MOTOREN[d].sichern()/zurueck() mitgefuehrt, ein Pod-Lauf mitten in einem sichtbaren Duell
+  //    (oder umgekehrt) kann sich also nicht gegenseitig den Zustand vertauschen.
+  // Jede fuer N Seiten verallgemeinerte Zeile (kpPraesenzAm, kpTick, dominationZielWahl, ...)
+  // rechnet fuer N=2 exakt dieselben Zahlen wie vorher — nachgeprueft per Fingerabdruck
+  // (tests/battlefield-pod-ffa.test.ts, Teil 1).
+  let bfPodKader=null;
+  let bfPodAnzeigeVorgabe=null, bfPodAnzeigeVereinSnap=null; // Anzeige, s. bfPodAnzeigeKontext()
+  const bfPodAktiv=()=>!!(KP&&KP.pod);
+  const kampfSeitenN=()=>(KP&&KP.pod)?KP.pod.N:2;
+  // FARBE JE KAMPFSEITE: Seite 0/1 exakt wie bisher (--home/--away), Seite 2/3 nur im Pod.
+  // Gruen und Violett liegen im Farbkreis zwischen Orange (--home) und Tuerkis (--away) und sind
+  // auf Sand wie auf Stein gegeneinander unterscheidbar.
+  const BF_POD_FARBEN=["#7BC86C","#C77DDB"];
+  const kampfSeitenFarbe=(s)=>s===0?css("--home"):s===1?css("--away"):BF_POD_FARBEN[(s-2)%BF_POD_FARBEN.length];
+  const kampfTeamName=(s)=>(VEREIN[s]&&VEREIN[s].name)||("Team "+(s+1));
+  // AUFSTELLUNG IM POD: vier Ecken. Seite 0 oben links, 1 oben rechts, 2 unten links, 3 unten
+  // rechts. Die drei Orte liegen auf der Mittellinie (ARENA_DOMINATION) — damit hat JEDES Team
+  // dieselbe Geometrie: einen nahen Ort (geteilt mit dem Nachbarn auf derselben Hoehe), die Mitte
+  // (fuer alle gleich weit) und einen fernen Ort. Reihe 0 steht vorn (zur Mitte), Reihe 2 hinten.
+  function bfPodHome(side,row,i,n){
+    const links=side%2===0, oben=side<2;
+    const versatz=[250,370,480][row]??480;
+    // Spiegelbildlich um H/2 wie die Orte (85/235/385 von 470), oben Platz fuer die Vier-Team-Tafel.
+    const y0=oben?72:H/2+30, y1=oben?H/2-30:H-72;
+    return{x:links?MID-versatz:MID+versatz, y:n<2?(y0+y1)/2:y0+(y1-y0)*i/(n-1)};
+  }
 
   // Der Platz, den ein Kaempfer wirklich einnimmt. Das Icon ist 40 breit, der Lebensbalken
   // 44, darunter stehen Name und Befehl — deshalb quer mehr als hoch.
@@ -37707,9 +38086,17 @@
         rolle:kf.rolle||{},
         orte:kf.orte.map(o=>({name:o.name,x:MID,y:Math.round(H*o.fy),besitz:null,fortschritt:0,erobertVon:null})),
         punkte:[0,0]}:null;
+      // POD (s. bfPodKader): N Seiten statt zwei, je Seite ein Punktekonto und eine
+      // Ausscheidezeit (null = noch im Spiel). Nur Battlefield hat Orte (KP), nur dort gibt es Pods.
+      if(KP&&bfPodKader){
+        const N=bfPodKader.length;
+        KP.punkte=new Array(N).fill(0);
+        KP.pod={N, rausT:new Array(N).fill(null)};
+      }
     }
     PLAN=schlachtplan();
     let id=0;
+    if(KP&&KP.pod){ bfPodBau(); dominationStart(); return; }
 
     // UNSERE SEITE — Slot aus der Aufstellung, Befehl aus dem Slot, Ziel aus der
     // Persoenlichkeit (oder aus dem, was der Spieler von Hand gesetzt hat).
@@ -37802,6 +38189,39 @@
           z.ord||slotOrd(slId),z.zielP||(o.jagd?"bedrohung":null),d));
       });
     }
+  }
+
+  // DIE N SEITEN EINES POD-KAMPFES (s. bfPodKader oben). Jedes Team geht durch DENSELBEN Weg wie
+  // die Heimseite im Duell: Aufstellung (`place`, je Pod-Team vom Aufrufer eingesetzt), ohne
+  // Aufstellung die besten k nach Eignung DIESER Disziplin, Rollen fuer genau diese Kopfzahl
+  // (bfSlotsFuer), Reihe aus der Rolle, Befehl aus der Rolle (oder dem Befehl des Managers).
+  // Einziger bewusster Unterschied zur Heimseite: die Ersatzaufstellung sortiert nach der ECHTEN
+  // Eignung (dieselbe Formel wie baueEinheit), nicht nach `p.d[d]` — das ist fuer Battlefield
+  // nicht vorberechnet (s. Eignungsluecke in CLAUDE.md), die Sortierung waere sonst die
+  // Kaderreihenfolge, und welches Team seine Besten bringt, haenge an der Zeilenfolge.
+  function bfPodBau(){
+    const d=disc, n=jeSeiteVon(d);
+    const eigVon=(p)=>p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{});
+    let id=0;
+    bfPodKader.forEach((kader,side)=>{
+      const gesetzt=kader.filter(p=>place[p.n]&&place[p.n].d===d);
+      const ersatz=[...kader].sort((a,b)=>eigVon(b)-eigVon(a)).slice(0,n);
+      const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+      const kSlots=bfSlotsFuer(d,mine.length);
+      const liste=kSlots||slotsVon(d);
+      const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===d)?place[p.n].slot
+                            :((liste[i%Math.max(1,liste.length)]||{}).id||null);
+      const byRow={0:[],1:[],2:[]};
+      mine.forEach((p,i)=>byRow[slotReihe(slotFuer(p,i))].push(p));
+      for(const row of[0,1,2]){
+        byRow[row].forEach((p,i)=>{
+          const slId=slotFuer(p,mine.indexOf(p));
+          U.push(baueEinheit(p,side,row,i,byRow[row].length,id++,slId,
+            order[p.n]||slotOrd(slId),zielOf[p.n],d,bfSlotDef(kSlots,slId)));
+        });
+      }
+    });
+    for(let s=0;s<bfPodKader.length;s++)if(!FUEHRUNG[s])FUEHRUNG[s]={wert:0,wer:null};
   }
 
   // BEDROHUNG — wer Schaden macht, wird zum Ziel. Heilung zaehlt mit, aber schwaecher:
@@ -38509,10 +38929,13 @@
   // an einem EIGENEN Ort zurueck (halten), ein Disruptor baut ihn auch an einem umkaempften
   // Ort ab (stoeren). `u.kpd` sammelt je Kaempfer reine Diagnosewerte (Zeit am Ort,
   // Eroberungsanteil, Haltezeit, Ortswechsel) — gelesen nur von spieleArenaDomination().
+  // POD (02.11.): je Seite ein Eintrag, N=kampfSeitenN() — im Duell N=2, dieselben Felder wie vorher.
   function kpPraesenzAm(o){
-    const P={n:[0,0],erob:[0,0],halt:[0,0],stoer:[0,0],wer:[[],[]]};
+    const N=kampfSeitenN();
+    const P={n:new Array(N).fill(0),erob:new Array(N).fill(0),halt:new Array(N).fill(0),
+      stoer:new Array(N).fill(0),wer:Array.from({length:N},()=>[])};
     for(const u of U){
-      if(u.down||u.side>1||dist(u,o)>KP.radius)continue;
+      if(u.down||u.side>=N||dist(u,o)>KP.radius)continue;
       const r=kpRolleVon(u.slot);
       const w=o.besitz==null?r.neutral:r.erobern;
       P.n[u.side]++; P.erob[u.side]+=w; P.halt[u.side]+=r.halten; P.stoer[u.side]+=r.stoeren;
@@ -38520,12 +38943,19 @@
     }
     return P;
   }
+  // POD (02.11.): dieselbe Regel fuer N Seiten — Besitz wechselt nur, wenn GENAU EINE Seite am Ort
+  // steht; stehen zwei oder mehr dort, ist er umkaempft. Fuer N=2 ist "genau eine" dieselbe
+  // Abfrage wie vorher. Pod-Zusatz (bfPodAusscheiden): ein ausgeschiedenes Team verliert seine Orte.
   function kpTick(dt){
     if(!KP)return;
+    if(KP.pod)bfPodAusscheiden();
+    const N=kampfSeitenN();
     KP.orte.forEach((o)=>{
       const P=kpPraesenzAm(o);
-      for(const sd of[0,1])for(const {u} of P.wer[sd])if(u.kpd){u.kpd.amOrt+=dt; if(o.besitz===sd)u.kpd.halte+=dt;}
-      const ziel=(P.n[0]>0&&P.n[1]===0)?0:(P.n[1]>0&&P.n[0]===0)?1:null;
+      for(let sd=0;sd<N;sd++)for(const {u} of P.wer[sd])if(u.kpd){u.kpd.amOrt+=dt; if(o.besitz===sd)u.kpd.halte+=dt;}
+      let praesent=0, einzige=null;
+      for(let sd=0;sd<N;sd++)if(P.n[sd]>0){praesent++; einzige=sd;}
+      const ziel=praesent===1?einzige:null;
       if(ziel!=null&&ziel!==o.besitz){
         if(o.erobertVon!==ziel){o.erobertVon=ziel;o.fortschritt=0;}
         const vorher=o.fortschritt;
@@ -38537,7 +38967,7 @@
           kpBesitzWechsel();
           // GEPRUEFT, NICHT GEDROSSELT (Nachbesserung 27.09., Einzelpunkt): eine Eroberung ist
           // immer ein grosses Ereignis, s. Historie dieser Zeile.
-          feed(ziel,(ziel===0?VEREIN[0].name:VEREIN[1].name)+" übernimmt Punkt "+o.name+".",true,undefined,"kontrollpunkt");
+          feed(ziel,kampfTeamName(ziel)+" übernimmt Punkt "+o.name+".",true,undefined,"kontrollpunkt");
         }
       } else if(ziel!=null&&ziel===o.besitz){
         // HALTEN: eigener Ort, nur Eigene da, aber der Gegner hatte schon angefangen.
@@ -38548,14 +38978,19 @@
           for(const {u} of P.wer[ziel])if(u.kpd)u.kpd.abwehr+=anteil*kpRolleVon(u.slot).halten;
           if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
         }
-      } else if(ziel==null&&P.n[0]>0&&P.n[1]>0&&o.erobertVon!=null){
-        // UMKAEMPFT: kein Fortschritt fuer niemanden — ausser ein Stoerer der anderen Seite ist
-        // da, dann sinkt der Teilfortschritt des Angreifers (halbe Haltegeschwindigkeit).
-        const abw=1-o.erobertVon, st=P.stoer[abw];
+      } else if(ziel==null&&praesent>=2&&o.erobertVon!=null){
+        // UMKAEMPFT: kein Fortschritt fuer niemanden — ausser ein Stoerer einer anderen Seite ist
+        // da, dann sinkt der Teilfortschritt des Angreifers (halbe Haltegeschwindigkeit). Im Pod
+        // zaehlen die Stoerer ALLER uebrigen Seiten (im Duell ist das genau die eine Gegenseite).
+        let st=0;
+        for(let sd=0;sd<N;sd++)if(sd!==o.erobertVon)st+=P.stoer[sd];
         if(st>0){
           const vorher=o.fortschritt;
           o.fortschritt=Math.max(0,o.fortschritt-dt*0.5*st/KP.kapZeit);
-          for(const {u} of P.wer[abw]){const r=kpRolleVon(u.slot); if(u.kpd&&r.stoeren>0)u.kpd.abwehr+=(vorher-o.fortschritt)*r.stoeren/st;}
+          for(let sd=0;sd<N;sd++){
+            if(sd===o.erobertVon)continue;
+            for(const {u} of P.wer[sd]){const r=kpRolleVon(u.slot); if(u.kpd&&r.stoeren>0)u.kpd.abwehr+=(vorher-o.fortschritt)*r.stoeren/st;}
+          }
           if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
         }
       }
@@ -38593,11 +39028,17 @@
   //    Disruptor zu Orten, an denen der Gegner gerade erobert, Field Control in umkaempften
   //    Raum, Commander dorthin, wo schon Eigene kaempfen.
   function dominationZielWahl(u){
-    const R=KP.radius, side=u.side, feind=1-side;
+    // POD (02.11.): "der Gegner" ist jede andere Seite. `vorn` misst gegen den BESTEN Gegner (im
+    // Duell ist das die eine Gegenseite), `fremdAngriff` heisst: eine andere Seite erobert gerade
+    // (im Duell dasselbe wie `erobertVon===feind`).
+    const R=KP.radius, side=u.side;
     const off=u.h==="offensiv"||u.h==="wild"||u.ord==="verfolgen"||u.ord==="flanke";
     const def=!off&&(u.h==="defensiv"||u.h==="vorsichtig"||u.ord==="decken"||u.ord==="hinter");
     const rest=Math.max(0,95-t), spaet=rest<40?1.5:1;
-    const vorn=KP.punkte[side]-KP.punkte[feind];
+    let besterGegner=-Infinity;
+    for(let s=0;s<KP.punkte.length;s++)if(s!==side&&KP.punkte[s]>besterGegner)besterGegner=KP.punkte[s];
+    const vorn=KP.punkte[side]-besterGegner;
+    const fremdAngriff=(o)=>o.erobertVon!=null&&o.erobertVon!==side&&o.fortschritt>0;
     const drang=vorn<0?1+Math.min(0.6,-vorn/60)*spaet:1;
     const ruhe=vorn>0?1+Math.min(0.4,vorn/80)*spaet:1;
     const kraft=(x)=>Math.sqrt(Math.max(0,x.hp)*(1+(x.VER||0)/100)*Math.max(1,x.ANG||1));
@@ -38613,7 +39054,7 @@
         if(x.side===side)eigeneDa++; else {feinde++; kF+=kraft(x);}
       }
       const eigen=o.besitz===side, neutral=o.besitz==null;
-      const bedroht=eigen&&(feinde>0||(o.erobertVon===feind&&o.fortschritt>0));
+      const bedroht=eigen&&(feinde>0||fremdAngriff(o));
       let w;
       if(!eigen&&!neutral) w=3.0*(off?1.3:def?0.8:1)*drang;
       else if(neutral)     w=2.6*(off?1.2:def?0.9:1)*drang;
@@ -38623,7 +39064,7 @@
       if(r==="siegecore"&&!eigen)w+=0.5;
       if(r==="spotter"&&!eigen&&feinde===0)w+=1.0;
       if(r==="moraleanchor"&&bedroht)w+=0.6;
-      if(r==="disruptor"&&o.erobertVon===feind&&o.fortschritt>0)w+=0.8;
+      if(r==="disruptor"&&fremdAngriff(o))w+=0.8;
       if(r==="fieldcontrol"&&feinde>0)w+=0.5;
       if(r==="commander"&&eigeneDa>0)w+=0.3*Math.min(2,eigeneDa);
       if(feinde>0)w+=0.9*Math.max(-1.5,Math.min(1.5,Math.log2(kE/Math.max(1e-6,kF))));
@@ -38689,12 +39130,44 @@
   // Punktelimit, zuletzt — wenn die Zeit einfach ablief — der hoehere Punktestand.
   function dominationSieger(){
     if(!KP)return undefined; // "kein Domination-Kampf" — Aufrufer soll die alte Regel nehmen
+    if(KP.pod)return bfPodPlatzierung().sieger;
     if(live(0).length===0&&live(1).length>0)return 1;
     if(live(1).length===0&&live(0).length>0)return 0;
     if(KP.punkte[0]>=KP.punkteZumSieg&&KP.punkte[0]>KP.punkte[1])return 0;
     if(KP.punkte[1]>=KP.punkteZumSieg&&KP.punkte[1]>KP.punkte[0])return 1;
     if(KP.punkte[0]===KP.punkte[1])return null;
     return KP.punkte[0]>KP.punkte[1]?0:1;
+  }
+  // POD: AUSSCHEIDEN (02.11.). Liegt ein Team komplett, ist es raus — Battlefield kennt keinen
+  // Respawn. Seine Orte fallen auf neutral zurueck, ein angefangener Eroberungsbalken verfaellt:
+  // sonst zahlte ein Ort einem Team weiter Punkte, das gar nicht mehr auf dem Platz steht (im Duell
+  // stellt sich die Frage nicht, dort endet das Spiel mit dem ersten ausgeschiedenen Team).
+  function bfPodAusscheiden(){
+    for(let s=0;s<KP.pod.N;s++){
+      if(KP.pod.rausT[s]!=null||live(s).length>0)continue;
+      KP.pod.rausT[s]=t;
+      for(const o of KP.orte){
+        if(o.besitz===s)o.besitz=null;
+        if(o.erobertVon===s){o.erobertVon=null;o.fortschritt=0;}
+      }
+      kpBesitzWechsel();
+      feed(s,kampfTeamName(s)+" ist ausgeschieden — "+(KP.orte.length)+" Orte, ein Team weniger.",true,undefined,"kontrollpunkt");
+    }
+  }
+  // POD: PLATZIERUNG 1..N UND LIGAPUNKTE 2-1-0-0 (02.11.). Dieselbe Rangfolge der Sieg-Wege wie
+  // dominationSieger() im Duell, nur fuer N Seiten:
+  //   1. Elimination geht vor: steht am Ende nur noch EIN Team, ist es Erster.
+  //   2. Kontrollpunkt-Punkte (der Domination-Sieg; auch ein ausgeschiedenes Team behaelt, was es
+  //      bis dahin geholt hat).
+  //   3. mehr Lebende, 4. spaeter ausgeschieden.
+  // Gleich auf ALLEN vier Schluesseln teilt sich den Platz und die Punkte (wie Mini-DM-Pod/Bahn-Pod,
+  // verteilePlatzierungspunkte()). `sieger` ist das Team auf Platz 1, `null` bei geteiltem Platz 1.
+  function bfPodPlatzierung(){
+    const N=KP.pod.N;
+    const lebend=Array.from({length:N},(_,s)=>live(s).length);
+    // Die Regel selbst steht in bfPodPlatzierungAus() (beim Gefecht je Ort), damit Gefecht,
+    // Replay und Echtzeit-Kontrolle denselben Massstab haben.
+    return bfPodPlatzierungAus(N,KP.punkte,lebend,KP.pod.rausT,KP.pod.zusatz||null);
   }
   // KAMPFSIEGER — EIN Massstab fuer finish(), renderEndstand() und den Serien-Export
   // (TDM-HUD-Fix, 27.09.). Vorher benutzte renderEndstand() `live(0).length` vs
@@ -38733,6 +39206,8 @@
   // Abschnitt 3.2). Dasselbe Prinzip wie buehneDuellStandText() beim Buehnen-Duell (Review-Fund
   // PR #1083): EINE Funktion, zwei Aufrufer, kann nie mehr auseinanderlaufen.
   function kampfStandText(){
+    // POD (02.11.): Kontrollpunkt-Punkte aller N Teams in Seitenreihenfolge ("120 · 80 · 40 · 10").
+    if(bfPodAktiv())return KP.punkte.map(p=>Math.round(p)).join(" · ");
     const nL=U.filter(u=>u.side===0).length,nR=U.filter(u=>u.side===1).length;
     return disc==="tdm"
       ?U.filter(u=>u.side===0).reduce((s,u)=>s+u.st.ko,0)+" : "+U.filter(u=>u.side===1).reduce((s,u)=>s+u.st.ko,0)
@@ -39326,7 +39801,7 @@
       const z=wahl.ziele[0]||u.tgt;
       let ax=0, ay=0;
       if(z&&z!==u){ax=z.x-u.x; ay=z.y-u.y;}
-      else {ax=(u.side===0?1:-1); ay=0;}
+      else {ax=(u.side%2===0?1:-1); ay=0;}
       const L=Math.hypot(ax,ay)||1;
       const vor=sk.eigenbewegung.typ==="zumZiel"?1:-1;
       let w=sk.eigenbewegung.distanz;
@@ -39501,7 +39976,9 @@
   // unnoetig, und ein Wechsel waere nicht meldbar.
   let FUEHRUNG={0:{wert:0,wer:null},1:{wert:0,wer:null}};
   function aktualisiereFuehrung(dt){
-    for(const seite of [0,1]){
+    // POD (02.11.): je Seite, N=kampfSeitenN() — im Duell wie vorher [0,1].
+    for(let seite=0;seite<kampfSeitenN();seite++){
+      if(!FUEHRUNG[seite])FUEHRUNG[seite]={wert:0,wer:null};
       const neu=fuehrungVon(seite), alt=FUEHRUNG[seite];
       if(alt.wer&&alt.wer!==neu.wer&&alt.wer.down)
         feedEreignis(seite,alt.wer.n+" ist raus — die Ordnung bricht.");
@@ -39535,6 +40012,9 @@
     aktualisiereFuehrung(dt);
     if(done)return;
     t+=dt;
+    // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
+    // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
+    if(KP&&KP.pod&&KP.pod.replay){ bfPodReplaySchritt(dt); return; }
     // ZIELANSAGE: die Sperre laeuft in KAMPFZEIT, nicht in Echtzeit — sonst haette das
     // Tempo (1x/2x/4x) heimlich Einfluss darauf, wie oft man eingreifen darf.
     if(KFOKUS_CD>0)KFOKUS_CD=Math.max(0,KFOKUS_CD-dt);
@@ -39715,7 +40195,8 @@
 
       // ZIEL DER BEWEGUNG
       let gx,gy;
-      if(u.retreat>0){ gx=u.side===0?u.hx-90:u.hx+90; gy=u.hy; }
+      // u.side%2: im Pod stehen Seite 0/2 links, 1/3 rechts (bfPodHome) — im Duell dasselbe wie side===0.
+      if(u.retreat>0){ gx=u.side%2===0?u.hx-90:u.hx+90; gy=u.hy; }
       else if(tg){ gx=tg.x; gy=tg.y; }
       else if(KP&&u.kpZiel!=null){
         // ZUM GEWAEHLTEN ORT, nicht auf seinen Mittelpunkt: jeder auf seinen eigenen Platz im
@@ -40026,7 +40507,7 @@
     // Meldung statt einer Punktemeldung.
     if(KP){
       kpTick(dt);
-      if(KP.punkte[0]>=KP.punkteZumSieg||KP.punkte[1]>=KP.punkteZumSieg)finish();
+      if(KP.punkte.some(p=>p>=KP.punkteZumSieg))finish();
     }
     // TDM RESPAWNT (s. schalteAus/reviveUnit/TDM_RESPAWN_SEK oben): eine Seite, die gerade
     // komplett auf Respawn wartet, ist NICHT ausgeschieden wie in Mini-DM/Battlefield,
@@ -40239,6 +40720,7 @@
   // etwas umlernen muss.
   let wertungKopfStand="";
   function renderWertungTabelle(){
+    if(schnelldurchDomGedrosselt())return; // Quick-Sim, s. schnelldurchDomGedrosselt()
     const tbL=document.getElementById("wbodyL"), tbR=document.getElementById("wbodyR");
     if(!tbL||!tbR)return;
     // "LAUFEND"/"ENDSTAND" (Broadcast-Paket A, Punkt 5, 06.10.): statischer Text im HTML
@@ -40291,9 +40773,13 @@
     tbL.textContent=""; tbR.textContent="";
     for(const seite of [0,1]){
       const tb=seite===0?tbL:tbR;
-      for(const z of zeilen.filter(z=>z.side===seite).sort(w.sortierung)){
+      // POD (sichtbares Vier-Team-Rennen der Bahn): links Team 0/2, rechts Team 1/3, Name in Teamfarbe.
+      const podBahn=istBahn(disc)&&bahnPodAnzeigeAktiv();
+      for(const z of zeilen.filter(z=>podBahn?z.side%2===seite:z.side===seite).sort(w.sortierung)){
         const tr=el("tr",(seite===0?"eigen":"gegner")+(z.raus?" raus":""));
-        tr.appendChild(el("td",null,z.n.length>10?z.n.slice(0,9)+"…":z.n));
+        const nameTd=el("td",null,z.n.length>10?z.n.slice(0,9)+"…":z.n);
+        if(podBahn)nameTd.style.color=bahnSeitenFarbe(z.side);
+        tr.appendChild(nameTd);
         for(const s of w.spalten){
           const v=s.wert(z);
           const td=el("td","n"+(s.top&&typeof v==="number"&&v>0&&v>=best[s.id]?" top":""));
@@ -40943,7 +41429,10 @@
   // und ein Anker-Banner auf Bein 6 waeren dann falsch. Reiner Lesezugriff auf LAEUFER; ohne
   // Laeufer (vor dem ersten bauSpurt) derselbe Rueckfall wie bisher.
   function staffelBeineVon(seite){
-    const k=LAEUFER.filter(o=>o.seite===seite).length;
+    // Unterbesetzt laufen weniger Laeufer mehr Beine (`beineGesamt`, s. bauSpurt), sonst ist
+    // die Beinzahl die Kopfzahl wie bisher.
+    const team=LAEUFER.filter(o=>o.seite===seite);
+    const k=(team[0]&&team[0].beineGesamt)||team.length;
     return k||BA().jeSeite||6;
   }
   // B4.3 BEIN-DUELL (Staffel "Marke und Zug"), s. Aufrufstelle in updateHudBahn().
@@ -41009,7 +41498,11 @@
     // Wertungsaenderung): Staffel und Takeshi's Castle bekommen HIER eine je eigene
     // Fuehrungs-Quelle statt der gemeinsamen `bahnRangliste().reihe[0]`-Heuristik unten.
     // Jede Bahn bleibt fuer sich, keine gemeinsame Ersatzformel fuer beide.
-    if(!done){
+    // POD (sichtbares Vier-Team-Rennen): die Staffel-Fuehrung kommt aus dem Vier-Team-Stand, der
+    // Duell-Teil (Zeit-Delta Seite 0 gegen 1, Wechseltafel, Bein-Duell) bleibt aus.
+    if(!done&&bahnPodAnzeigeAktiv()&&BA().staffel){
+      bahnPodStaffelFuehrung();
+    } else if(!done){
       if(BA().staffel){
         // STAFFEL: `bahnRangliste()` sortiert nach `bahnLeistung` (Etappenzeit) — das ist
         // die schnellste AKTUELLE Etappe, nicht das insgesamt fuehrende Team, und konnte
@@ -41248,6 +41741,8 @@
         if(kand&&kand.id!==bahnFokus){ bahnFokus=kand.id; ttRegieSeit=rennT; }
       }
     }
+    // POD: Kopfzeile, Balken und Endstand fuer vier Teams (s. updateHudBahnPod).
+    if(bahnPodAnzeigeAktiv()){ updateHudBahnPod(); return; }
     // Punktestand ueber bahnTeamstand(): Rangpunkte fuer Time-Trial/Spurt/Climbing,
     // sonst weiter der alte Zieleinlauf-Zaehler (Staffel/Takeshi, unveraendert).
     const stand=bahnTeamstand();
@@ -41486,7 +41981,20 @@
     return "Positionskampf: "+bestesPaar[1].n+" "+fmtDauer(kleinsteLuecke)+" hinter "+bestesPaar[0].n;
   }
 
+  // updateHud() laeuft je Tick (aus stepSim()); seine DOM-Schreibzugriffe (Uhr, Phase, Namens-
+  // Wiederherstellung per innerHTML, Balken, Score-Bug) kosten je Aufruf eine Stil-Neuberechnung.
+  // Waehrend ein Spiel laeuft, genuegt ~20 Mal je Sekunde (Quick-Sim: 4 Mal) -- s. Saisontest-Fund
+  // an schnelldurchDomGedrosselt(). Ende, Reset und Sonden-Laeufe bleiben ungedrosselt.
+  let hudZuletzt=0;
+  function hudGedrosselt(){
+    if(done||sondenAktiv||!(running||schnelldurchAktiv))return false;
+    const jetzt=(typeof performance!=="undefined"?performance.now():Date.now());
+    if(jetzt-hudZuletzt<(schnelldurchAktiv?250:50))return true;
+    hudZuletzt=jetzt;
+    return false;
+  }
   function updateHud(){
+    if(hudGedrosselt())return;
     // t bleibt die physikalische Zeitbasis (Sudden-Death-Schwelle, Abklingzeiten); die
     // Uhr zeigt t * Zeitdehnung — die echten Sekunden, die der Zuschauer gerade erlebt.
     // MINUTENUMBRUCH (TDM-HUD-Fix, 27.09.): vorher immer "0:"+Sekunden ohne Ueberlauf —
@@ -41542,7 +42050,9 @@
     if(kpzeile){
       if(KP){
         kpzeile.style.display="";
-        document.getElementById("kpscore").textContent=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
+        document.getElementById("kpscore").textContent=KP.pod
+          ?"Lebende "+Array.from({length:KP.pod.N},(_,s)=>live(s).length).join(" · ")
+          :Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
       } else {
         kpzeile.style.display="none";
       }
@@ -41621,6 +42131,70 @@
     if(!aMuster[n])aMuster[n]=ctx.createPattern(aBild[n],"repeat");
     return aMuster[n]; };
 
+  // ILLUSTRIERTE KULISSEN (03.11.). Chris, nach einem Live-Screenshot: "Wenn ich in die battle
+  // arena gehe sieht das immernoch alles ALT aus." Die Kulissen der Asset-Runde (public/szenen/,
+  // Registry lib/foundation/discipline-scenes.ts) liefen nur in der Demo-Szene, die der Battle
+  // Mode nicht zeigt. scripts/baue-arena-kulissen.py schneidet ihre sauberen Hintergruende (ohne
+  // Demo-Figuren, Hindernisse zugemalt) auf diese Leinwand zu und listet sie in
+  // battle-mode.kulissen.js (window.__ARENA_KULISSEN = {disziplinId:[{id,label,bild}]}).
+  //
+  // Welche Variante ein Spiel zeigt, entscheidet kulisseWaehlen() beim reset(): ein eigener
+  // String-Hash aus Disziplin, Spielsaat und Paarung — dieselbe Begegnung zeigt immer dieselbe
+  // Kulisse, verschiedene Begegnungen wechseln. KEIN rr(), kein Zugriff auf `seed`: die Wahl
+  // beruehrt weder Simulation noch Wertung. Laedt das Bild nicht (oder fehlt die Liste, etwa im
+  // Headless-Runner), zeichnet der Boden unveraendert die alte Fassung.
+  const KULISSEN=(typeof window!=="undefined"&&window.__ARENA_KULISSEN&&typeof window.__ARENA_KULISSEN==="object")?window.__ARENA_KULISSEN:{};
+  const kulisseBilder={};
+  let kulisseAktiv=null;
+  // FNV-1a plus Schluss-Durchmischung (murmur3 fmix32): ohne sie verteilen sich Saaten, die sich
+  // nur in einer Ziffer unterscheiden, schlecht auf zwei oder drei Varianten.
+  function kulisseHash(s){
+    let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+    h^=h>>>16; h=Math.imul(h,0x85ebca6b); h^=h>>>13; h=Math.imul(h,0xc2b2ae35); h^=h>>>16;
+    return h>>>0;
+  }
+  function kulisseWaehlen(saat){
+    const liste=KULISSEN[disc];
+    if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
+    const meta=(echterKader&&echterKader.meta)||{};
+    const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
+    const v=liste[kulisseHash(schluessel)%liste.length];
+    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
+    if(!kulisseBilder[v.bild]){
+      const im=new Image();
+      // Steht das Spiel noch (Einlauf, vor dem Anpfiff), zeichnet niemand nach — also einmal
+      // selbst nachzeichnen, sobald das Bild da ist, statt bis zum Anpfiff den alten Boden zu zeigen.
+      im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.bild===v.bild&&kulisseAktiv.disc===disc)draw(); }catch(e){} };
+      im.src=v.bild; kulisseBilder[v.bild]=im;
+    }
+  }
+  // Fertig = keine Kulisse gewaehlt, oder ihr Bild ist geladen bzw. endgueltig fehlgeschlagen
+  // (der Anpfiff wartet darauf wie auf die Figuren, s. spielLaeuft).
+  function kulisseGeladen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return true;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    return !im||im.complete;
+  }
+  // Zeichnet die gewaehlte Kulisse samt Lesbarkeits-Schicht; false = nichts gezeichnet
+  // (keine Kulisse fuer diese Disziplin oder Bild noch nicht geladen) -> alter Boden.
+  function kulisseZeichnen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    if(!im||!im.complete||!im.naturalWidth)return false;
+    ctx.drawImage(im,0,0,W,H);
+    // LESBARKEIT: die Kulissen reichen von Schnee (hell) bis Lava (dunkel), die Kaempfer
+    // samt Namen und Ringen muessen auf jeder stehen. Eine gleichmaessige Abdunklung nimmt
+    // dem Schnee die Blendung — wie stark, rechnet der Generator je Bild aus seiner mittleren
+    // Helligkeit aus (`dunkel`), damit Lava nicht im Schwarz versinkt. Der Radialverlauf (wie
+    // im alten Sandboden) traegt die Tiefe und lenkt den Blick zur Mitte.
+    ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,H);
+    const v=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
+    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,.18)");
+    v.addColorStop(1,"rgba(0,0,0,.48)");
+    ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    return true;
+  }
+
   // Speed-Schach-Buehnenbild: dieselbe Datei-statt-base64-Idee, eigener Ordner
   // (public/sprites/buehne/, quellen.json dort — Fable-Plan 05.09., Teil A.2). Brett
   // und Tisch sind Canvas-Primitiven, nur die Figuren sind ein Blatt. Laedt es nicht,
@@ -41669,6 +42243,7 @@
   const bkPegel=(basis)=>bkMuted?0:basis*bkVolume/0.6; // /0.6, weil 0.6 die alte Default-Basislautstaerke war
   const bkSfxPool={};
   function bkSfx(name,vol){
+    if(schnelldurchAktiv)return; // Quick-Sim, s. sfx()
     try{
       let pool=bkSfxPool[name];
       if(!pool){pool=bkSfxPool[name]=[0,1,2].map(()=>{const a=new Audio("/sound/basketball/"+name);a.preload="auto";return a;});}
@@ -42216,6 +42791,7 @@
   // Unbekannte Disziplin/Ereignis, ein fehlender AudioContext (z.B. in Node/Playwright ohne
   // Audio-Geraet) oder ein Aufruf vor der ersten Nutzergeste sind alle stille No-Ops.
   function sfx(disziplin,ereignis,vol){
+    if(schnelldurchAktiv)return; // Quick-Sim: tausende Ereignisse in Sekunden, kein Tongewitter
     try{
       const eintrag=(TON_KATALOG[disziplin]||{})[ereignis];
       if(!eintrag||eintrag.loop)return; // Loop-Eintraege laufen ueber tonLoopStart/-Stop
@@ -42270,6 +42846,11 @@
 
   // TDM: Sandgrund, Steinring, Blutflecken, Fackeln an den Seiten.
   function bodenArena(){
+    // KULISSE (03.11., s. kulisseZeichnen): gibt es eine illustrierte Arena fuer diese
+    // Disziplin, ersetzt sie Sand, Flecken, Ziegelring und Fackeln. Teamhaelften und
+    // Mittellinie bleiben — sie tragen Information, nicht Schmuck.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const sand=aMust("boden_sand");
     if(sand){ ctx.fillStyle=sand;ctx.fillRect(0,0,W,H);
       // Die Kachel ist HELLER als der alte Malgrund, und das ist kein Schoenheitsfehler:
@@ -42311,6 +42892,7 @@
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
     ctx.strokeStyle="rgba(0,0,0,.55)";ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
+    }
     // FARBIGE HAELFTEN. Chris: "wir muessen auf jeden Fall beide Teams in der Arena
     // besser voneinander unterscheiden koennen, sonst ist es sehr unuebersichtlich." Im
     // Getuemmel sieht man kaum noch, wer zu wem gehoert, wenn nur ein duenner Ring am
@@ -42330,6 +42912,7 @@
     ctx.setLineDash([]);
     // Fackeln. Das Blatt hat neun Bilder zu 32x64; die Flamme laeuft nach der Wanduhr,
     // nicht nach der Simulationsuhr — sie ist Schmuck und darf keine Messung beruehren.
+    if(mitKulisse)return;
     const fk=aDa("fackel"), bild=fk?Math.floor(jetztMs()/110)%9:0; // A0.2: jetztMs(), s.o.
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
       if(fk) ctx.drawImage(aBild.fackel,bild*32,0,32,64,x-16,y-42,32,64);
@@ -42349,9 +42932,9 @@
   // Fortschrittsring in der Farbe des Angreifers.
   // DREI ORTE (27.10.): dasselbe Bild je Ort, kleiner (Radius 65 statt 230), mit dem Ortsnamen.
   function zeichneKontrollpunkt(){
-    const homeC=css("--home"), awayC=css("--away");
     for(const o of KP.orte){
-      const besitzFarbe=o.besitz===0?homeC:o.besitz===1?awayC:"rgba(255,255,255,.6)";
+      // POD (02.11.): Besitz- und Angreiferfarbe je Seite ueber kampfSeitenFarbe (0/1 wie vorher).
+      const besitzFarbe=o.besitz!=null?kampfSeitenFarbe(o.besitz):"rgba(255,255,255,.6)";
       ctx.save();
       ctx.strokeStyle=besitzFarbe;ctx.globalAlpha=.32;ctx.lineWidth=2;ctx.setLineDash([5,7]);
       ctx.beginPath();ctx.arc(o.x,o.y,KP.radius,0,6.283);ctx.stroke();
@@ -42365,14 +42948,14 @@
       ctx.beginPath();ctx.moveTo(o.x,o.y-34);ctx.lineTo(o.x+20,o.y-28);ctx.lineTo(o.x,o.y-22);ctx.closePath();ctx.fill();
       ctx.strokeStyle="rgba(0,0,0,.5)";ctx.lineWidth=1.5;ctx.stroke();
       if(o.erobertVon!=null&&o.fortschritt>0){
-        const farbe=o.erobertVon===0?homeC:awayC;
+        const farbe=kampfSeitenFarbe(o.erobertVon);
         ctx.strokeStyle=farbe;ctx.lineWidth=4;ctx.lineCap="round";
         ctx.beginPath();ctx.arc(o.x,o.y-6,17,-Math.PI/2,-Math.PI/2+6.283*o.fortschritt);ctx.stroke();
       }
       ctx.restore();
       ctx.font="bold 11px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.textAlign="center";ctx.textBaseline="middle";
       ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.fillStyle="#fff";
-      const txt=o.name+" — "+(o.besitz===0?VEREIN[0].name:o.besitz===1?VEREIN[1].name:"neutral");
+      const txt=o.name+" — "+(o.besitz!=null?kampfTeamName(o.besitz):"neutral");
       ctx.strokeText(txt,o.x,o.y+34);ctx.fillText(txt,o.x,o.y+34);
     }
   }
@@ -42764,10 +43347,12 @@
       const piktoY=H-64;
       // WEISS = im Rennen, GOLD = im Ziel, GRAU DURCHGESTRICHEN = ausgeschieden (u.raus
       // ist exklusiv Takeshi's Castle, s. nervenKosten-Zweig in stepSpurt).
-      [0,1].forEach(seite=>{
+      // POD: Seite 0/2 links, 1/3 rechts (die zweite Seite je Haelfte nach innen versetzt).
+      Array.from({length:bahnSeitenN()},(_,s)=>s).forEach(seite=>{
         const g=LAEUFER.filter(u=>u.seite===seite);
+        const innen=seite>=2?(BA().jeSeite||6)*13+10:0;
         g.forEach((u,k)=>{
-          const px=seite===0?(W/2-220+k*13):(W/2+220-k*13);
+          const px=seite%2===0?(W/2-220+innen+k*13):(W/2+220-innen-k*13);
           const farbe=u.raus?"#5c6270":(u.fertig!=null?"#f2d75a":"#e8e8e8");
           ctx.beginPath(); ctx.arc(px,piktoY,4,0,6.283); ctx.fillStyle=farbe; ctx.fill();
           if(u.raus){ ctx.strokeStyle="#232733"; ctx.lineWidth=1.3;
@@ -42794,7 +43379,10 @@
     ctx.fillStyle="rgba(8,10,14,.62)"; ctx.fillRect(W/2-230,H-50,460,44);
     ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="700 20px 'RaniraSeason',Georgia,'Times New Roman',serif";
     ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-    const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
+    // POD (sichtbares Vier-Team-Rennen): alle N Teamsummen statt "Heim : Gast".
+    const bpTxt=bahnPodAnzeigeAktiv()
+      ?"Burgpunkte  "+Array.from({length:bahnSeitenN()},(_,s)=>bp(s).toFixed(1).replace(".",",")).join(" · ")
+      :"Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",",");
     ctx.strokeText(bpTxt,W/2,H-35); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,H-35);
     ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.lineWidth=3;
     const leg=(bahnKursName?"Kurs „"+bahnKursName+"“ · ":"")
@@ -42940,7 +43528,9 @@
       const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       ctx.font="700 22px 'RaniraSeason',Georgia,'Times New Roman',serif";
-      const bpTxt="Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",","); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
+      const bpTxt=bahnPodAnzeigeAktiv()
+        ?"Burgpunkte  "+Array.from({length:bahnSeitenN()},(_,s)=>bp(s).toFixed(1).replace(".",",")).join(" · ")
+        :"Burgpunkte  "+bp(0).toFixed(1).replace(".",",")+" : "+bp(1).toFixed(1).replace(".",","); ctx.strokeText(bpTxt,W/2,oben-34); ctx.fillStyle="#f2e9d8"; ctx.fillText(bpTxt,W/2,oben-34);
       // WAS DIE STERNE SIND — und zwar die Formel, die wirklich laeuft (W4, s. burgpunkte()
       // und MOTOREN["takeshis-castle"].wert): je Falle 1-3 Sterne nach Schwierigkeit, davon
       // haelt der passende Sub-Skill einen Anteil; ein Sturz kostet die halbe Falle; wer ins
@@ -44605,6 +45195,38 @@
         WUCHT:      {spirit:45,charisma:33,speed:22},
         ROBUST:     {stamina:30,will:26,health:24,spirit:20}
       },
+      // POD-REZEPT (Vier-Team-Rennen, 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5.1;
+      // Chris 01.11.: "die stats die vorgegeben sind sind verdammt wichtig, kannst du die
+      // benoetigten sachen nicht anpassen dass es mehr unsere attribute anspricht?"). Gilt NUR,
+      // wenn spieleBahnPod()/bahnPodSonde()/bahnPodEinfluss() laufen (s. spurtWerte); das Duell
+      // liest weiter `rezept` oben, unveraendert (Staffel-Duell 0,937 bleibt bit-identisch).
+      //
+      // WARUM DAS REZEPT UND NICHT DIE MATRIX: mit "Menge aus der Eignung" (f = eig / Mittel der
+      // sieben, s. bauSpurt) reicht die Matrix jedes Attribut ueber `eig` durch. Abweichen kann
+      // ein Attribut nur, weil es in einem Sub-Skill sitzt, der MEHR oder WENIGER traegt als der
+      // Schnitt der sieben: Anteil(a) ~ Matrix(a) + Summe_k (p_k - 1/7) x Rezept(k,a), p_k der
+      // Wirkungsanteil des Sub-Skills. Aus den Pp-Messungen geschaetzt (Duell und Pod, je zwei
+      // Stroeme): ANTRITT traegt weit ueber dem Schnitt, WUCHT und ROBUST fast nichts. Daraus
+      // folgten genau die drei Ausreisser: Charisma (Matrix 10, gemessen 4) sass zu einem Drittel
+      // in WUCHT, Health (2 -> 0) nur in ROBUST, Speed (24 -> 29) zu 28 % im starken ANTRITT.
+      //
+      // DIE DREI EINGRIFFE, jeder an genau einem Sub-Skill:
+      //   WUCHT  "Zug an der Spitze" = Spirit + Speed (Charisma raus). Wer vorne zieht, braucht
+      //          Beine und Haltung; das Charisma steht im Wechsel (TECHNIK) und im Antritt.
+      //   ROBUST "Verlaesslichkeit" = Stamina, Dexterity, Awareness, Spirit (Health/Will raus):
+      //          sauber laufen und den Stab sicher halten. Health und Will kommen damit voll aus
+      //          der Matrix (ueber `eig`) statt gedaempft aus einem Sub-Skill, der kaum traegt.
+      //   ANTRITT bekommt Charisma 12 (aus Speed/Spirit/Dexterity/Awareness): der fliegende Start
+      //          in der Wechselzone geht auf ZURUF los — Geber und Nehmer muessen sich verstehen.
+      //
+      // GEMESSEN (02.11., n = 48, Strom 0 / 10 000 000): Pp 22,8 / 24,9 -> 9,3 / 10,1, rho je
+      // Rennen (k = 6, 210 Gruppen) 0,878 / 0,881 -> 0,910 / 0,911, Gruppen unter 0,80 15/12 -> 0.
+      // Volle Tabellen und die Kontrollen bei k = 2..5 und n = 96: Dokument Abschnitt 5.
+      podRezept:{
+        ANTRITT:    {speed:26,spirit:32,dexterity:14,awareness:16,charisma:12},
+        WUCHT:      {spirit:45,speed:55},
+        ROBUST:     {stamina:30,dexterity:26,awareness:24,spirit:20}
+      },
       lang:{ANTRITT:"Antritt",ENDTEMPO:"Abschnittstempo",TECHNIK:"Wechsel",
             WENDIGKEIT:"Bahnarbeit",STEHEN:"Stehvermögen",WUCHT:"Zug an der Spitze",
             ROBUST:"Verlässlichkeit"},
@@ -45042,9 +45664,13 @@
   const BA=()=>BAHN_ART[bahnDisc]||BAHN_ART.spurt;
   const istBahn=(d)=>!!BAHN_ART[d];
   const SPURT_KEYS=Object.keys(BAHN_ART.spurt.rezept);
+  // POD-REZEPT (Budget-Methode im Vier-Team-Format, 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+  // Abschnitt 5): laeuft gerade ein Pod (`bahnPodKader` gesetzt, s. unten) und fuehrt die Bahn ein
+  // `podRezept`, ersetzt es die dort genannten Sub-Skills. Im Duell (`bahnPodKader===null`) und auf
+  // jeder Bahn ohne `podRezept` ist R Zeichen fuer Zeichen das alte `BA().rezept`.
   function spurtWerte(p,extra){
     const a=extra||p.a, o={};
-    const R=BA().rezept;
+    const R=(bahnPodKader&&BA().podRezept)?{...BA().rezept,...BA().podRezept}:BA().rezept;
     for(const k in R)o[k]=Math.round(mische({a},R[k]));
     return o;
   }
@@ -45065,6 +45691,22 @@
   // Die Bahnzahl waechst mit der Seitenzahl (je Laeufer eine Bahn wie im Duell), damit die
   // Rempler-/Bahnwechsel-Dichte je Laeufer dieselbe bleibt.
   let bahnPodKader=null;
+  // SICHTBARER POD (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6):
+  // zeigt die Arena an einem Pod-Spieltag das Vier-Team-Rennen, bleibt `bahnPodKader` fuer die
+  // GANZE Dauer des sichtbaren Rennens gesetzt (Bahnzahl, Gedraenge und Pod-Rezept lesen ihn auch in
+  // stepSpurt/Zeichnung) — `bahnPodAnzeige` haelt dafuer, was beim naechsten reset() zurueck muss.
+  // `null` im Duell und in jedem headless Lauf. Hier oben deklariert, weil reset() schon beim Laden
+  // laeuft (s. bfPodAnzeigeVorgabe fuer denselben Grund).
+  let bahnPodAnzeige=null, bahnPodAnzeigeVorgabe=null;
+  // KOPFZAHL JE TEAM IM POD (k aus dem Spielplan-Slot), nur fuer Teams OHNE Aufstellung relevant:
+  // deren Ersatzaufstellung nimmt dann die besten k statt `art.jeSeite`. `null` = wie bisher
+  // (`art.jeSeite`). Mit Aufstellung zaehlt ohnehin, wen der Manager gesetzt hat.
+  let bahnPodJeTeam=null;
+  const bahnPodAnzeigeAktiv=()=>!!(bahnPodAnzeige&&bahnPodKader&&bahnPodKader===bahnPodAnzeige.kader);
+  // Teamfarbe je Bahnseite: 0/1 exakt die bisherigen Literale der Bahn-Zeichnung, 2/3 nur im Pod
+  // (dieselben zwei Farben wie im Battlefield-Pod, BF_POD_FARBEN).
+  const BAHN_SEITEN_FARBEN=["#f2a03d","#45b0c9","#7BC86C","#C77DDB"];
+  const bahnSeitenFarbe=(s)=>BAHN_SEITEN_FARBEN[s]||"#ddd";
   const bahnSeitenN=()=>bahnPodKader?bahnPodKader.length:2;
   const BAHNEN_N=()=>BA().bahnenFest?BA().bahnenFest*bahnSeitenN()/2:BA().jeSeite*bahnSeitenN();
   const HUERDEN_N=()=>BA().hindernisse;
@@ -46060,10 +46702,28 @@
       ? bahnPodKader.map(kader=>{
           const ges=kader.filter(p=>place[p.n]&&place[p.n].d===d);
           return (ges.length?staffelNachSlot(ges)
-            :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,n);
+            :[...kader].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0))).slice(0,ges.length?n:(bahnPodJeTeam||n));
         })
       : [mine,gegen];
-    const staffelBeine=seitenListen.map(l=>Math.max(1,l.length));
+    // FEHLENDE LAEUFER LAUFEN DOPPELT (Chris 02.11., Option (a) aus bahn-pod-vier-teams-01-11.md
+    // 6.7). Bis hierher bekam jede Seite so viele Beine, wie sie Laeufer gemeldet hatte — ein Team
+    // mit zwei Laeufern lief zwei lange Beine mit EINEM Wechsel gegen sechs kurze mit fuenf und
+    // gewann damit ueberdurchschnittlich oft (Liga-Abnahme 02.11.: 3 von 4 betroffenen Rennen).
+    // Jetzt laufen ALLE Seiten dieselbe Beinzahl: die groesste gemeldete Laeuferzahl, im Pod
+    // mindestens die Kopfzahl des Spielplan-Slots (`bahnPodJeTeam`). Eine unterbesetzte Seite
+    // verteilt die fehlenden Beine reihum auf ihre Laeufer (Bein j -> Laeufer j % m), und wer ein
+    // zweites Mal laeuft, laeuft MIT SEINER ERSCHOEPFUNG: Puste (`reserve`/`leer`) wird zwischen den
+    // Beinen nicht aufgefuellt, und die Ermuedung (`mued` in tempoVon) zaehlt die schon gelaufenen
+    // Beine mit (`beineFertig`). Chris dazu: "nicht, dass dann einfach der beste Spieler nochmal
+    // laufen darf und dann das Ergebnis besser ist, als wenn irgendein anderer das gemacht haette".
+    // Bei voller Besetzung (alle Seiten gleich viele Laeufer) bleibt `staffelBeine` Zeichen fuer
+    // Zeichen derselbe Wert wie vorher, und kein Laeufer bekommt `beineListe` — das abgenommene
+    // Duell (0,937) und alle Fingerabdruecke bleiben unberuehrt.
+    const staffelBeinZiel=art.staffel
+      ? Math.max(1,...seitenListen.map(l=>l.length),
+          bahnPodKader&&Number.isInteger(bahnPodJeTeam)?Math.min(n,bahnPodJeTeam):0)
+      : 0;
+    const staffelBeine=seitenListen.map(l=>art.staffel?staffelBeinZiel:Math.max(1,l.length));
     const seitenN=seitenListen.length;
     let id=0;
     const setz=(p,seite,bahn,istGegner,idx)=>{
@@ -46212,6 +46872,15 @@
         const nb=staffelBeine[seite];   // s. `staffelBeine` oben — die echte Beinzahl DIESER Seite
         L.bein=idx; L.beinVon=idx/nb; L.beinBis=(idx+1)/nb;
         L.pos=L.beinVon; L.aktiv=(idx===0); L.bahn=seite; L.bahnZ=seite; L.startT=0;
+        L.beineGesamt=nb;
+        // UNTERBESETZT (s. `staffelBeinZiel` oben): Laeufer idx laeuft die Beine idx, idx+m,
+        // idx+2m, ... Nur dann bekommt er die Liste; bei voller Besetzung bleibt sie weg, und
+        // jede Stelle in stepSpurt/tempoVon rechnet wie vorher.
+        const m=seitenListen[seite].length;
+        if(m<nb){
+          L.beineListe=[]; for(let b=idx;b<nb;b+=m)L.beineListe.push(b);
+          L.beineIdx=0; L.beineFertig=0; L.wechselVerlustBisher=0; L.zusatzZeiten=[];
+        }
         // STAFFEL O7 "EINGESPIELTE PAARE": der Paar-Bonus des NEHMERS aus der Aufstellung (s.
         // Parser bei echterKader.aufstellung). Ohne die Felder bekommt der Laeufer keines der
         // drei — staffelPaarVon() im WECHSEL-Block liefert dann null, die Formel ist die alte.
@@ -46755,6 +47424,21 @@
     const laenge=(u.beinBis-u.beinVon)||1;
     return Math.max(0,Math.min(1,(u.pos-u.beinVon)/laenge));
   };
+  // UNTERBESETZTE STAFFEL, BUCHHALTUNG JE BEIN (s. `staffelBeinZiel` in bauSpurt). Nur fuer
+  // Laeufer mit `beineListe`; voll besetzte Staffeln kommen hier nie an.
+  // Der EINZELWERT eines Doppellaeufers ist sein ERSTES Bein (`etappenZeit`, wie jeder andere
+  // Laeufer genau eines hat) — er misst den Laeufer, nicht die Unterbesetzung. Die weiteren Beine
+  // stehen in `zusatzZeiten` und wirken voll ueber die Teamzeit, also dort, wo die Liga bucht.
+  function staffelBeinZeitBuchen(u){
+    const zeit=rennT-(u.startT||0)-(u.wechselVerlust-u.wechselVerlustBisher);
+    if(u.beineFertig===0)u.etappenZeit=zeit; else u.zusatzZeiten.push(zeit);
+    u.wechselVerlustBisher=u.wechselVerlust;
+    u.beineFertig++;
+  }
+  function staffelNaechstesBein(u){
+    const b=u.beineListe[++u.beineIdx], nb=u.beineGesamt;
+    u.bein=b; u.beinVon=b/nb; u.beinBis=(b+1)/nb;
+  }
   function kurvenFaktor(u){
     if(!BA().staffel||u.beinVon==null)return 1;
     const imBein=laufAnteil(u);
@@ -46847,7 +47531,11 @@
     // Haelfte bestimmt — und damit, wie viel Wille und Entschlossenheit tragen. In
     // Spurt lasen sie zusammen 55 %, wo die Matrix 29 sagt; der Kraftvorrat war nicht
     // die Ursache (mehr Reserve aenderte 59,6 auf 58,9), sondern diese Zeile.
-    const anteil=laufAnteil(u);
+    // DOPPELTER LAEUFER BEHAELT SEINE ERSCHOEPFUNG (Staffel unterbesetzt, s. `staffelBeinZiel` in
+    // bauSpurt): `beineFertig` zaehlt die Beine, die er schon gelaufen ist. Ein zweites Bein
+    // beginnt damit dort, wo das erste aufgehoert hat, und nicht frisch bei 0. Ohne Liste (jede
+    // voll besetzte Staffel, jede andere Bahn) ist es die alte Zeile.
+    const anteil=u.beineFertig?laufAnteil(u)+u.beineFertig:laufAnteil(u);
     const mued=anteil>0.45?Math.max(0.60,1-(100-u.STEHEN)*(BA().muedGrad??0.00055)*(anteil-0.45)*100):1;
     const stolper=u.stolper>0?0.35:1;
     const sog=u.imSchatten?SCHATTEN_TEMPO:1;
@@ -47428,7 +48116,16 @@
             if(A.gedraenge){
               const G=A.gedraenge;
               const andere=LAEUFER.filter(o=>o!==u&&o.fertig==null&&Math.abs(o.pos-h)<=(G.radius??0.025)).length;
-              const extra=Math.max(0,andere-(G.frei??1));
+              // POD-DICHTE (02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5.2): im
+              // Vier-Team-Rennen stehen doppelt so viele Laeufer auf derselben Strecke. Die Bahnen
+              // wachsen mit (BAHNEN_N), der Engpass an der Falle wuchs bisher NICHT mit — er zaehlt
+              // nach Streckenposition, nicht nach Bahn. Das verdoppelte den Pulk-Preis je Falle und
+              // frass den Tempo-Kanal (Speed/Stamina/Health lasen im Pod fast 0 %, Pp 26,5). Der
+              // Pulk wird deshalb auf die Duell-Dichte umgerechnet (x 2/N): der Engpass ist im
+              // Pod so viel breiter wie die Bahn. Im Duell ist der Faktor 1 (`bahnPodKader===null`),
+              // dort rechnet die Zeile Zeichen fuer Zeichen wie vorher.
+              const pulk=bahnPodKader?andere*2/bahnSeitenN():andere;
+              const extra=Math.max(0,pulk-(G.frei??1));
               if(extra>0){
                 const schieb=G.lesen?Math.max(u.WUCHT,u.TECHNIK):u.WUCHT;
                 const preis=(G.preis??0.10)*extra*(1-0.8*schieb/100)*(bahnKursChaos||1);
@@ -47946,13 +48643,34 @@
       // er, verliert die MANNSCHAFT Zeit — nicht der Einzelne. Genau deshalb zaehlt in
       // dieser Disziplin die Teamzeit und nicht die eigene.
       if(BA().staffel && u.beinBis<1 && u.pos>=u.beinBis){
-        const naechster=LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        // NUR EIN LAEUFER GEMELDET (unterbesetzt, s. `staffelBeinZiel` in bauSpurt): das naechste
+        // Bein ist sein eigenes, er ist also selbst `naechster`. Er geht trotzdem durch die
+        // Wechselzone wie jeder andere (Stab ablegen und neu aufnehmen, Uebergabezeit aus seinem
+        // eigenen TECHNIK) — sonst sparte ein Ein-Mann-Team alle k-1 Wechsel und lief schneller
+        // als eines mit zwei Laeufern (gemessen: 30 statt 14 Siege von 30 in einer Paarung).
+        const selbst=!!(u.beineListe&&u.beineListe[u.beineIdx+1]===u.bein+1);
+        const naechster=selbst?u:LAEUFER.find(o=>o.seite===u.seite&&o.bein===u.bein+1);
+        const uebergabePos=u.beinBis;
+        // Unterbesetzt: das Wechselkonto (Teil des Einzelwerts) zaehlt nur die Uebergaben an
+        // seinem ERSTEN Bein, wie bei jedem anderen Laeufer; die uebrigen landen in
+        // `wechselKontoZusatz` (nur Anzeige/Diagnose). Voll besetzt sind beide Schalter true.
+        const geberErstes=!u.beineListe||u.beineIdx===0;
         u.aktiv=false; u.pos=u.beinBis; u.durch=true;
-        u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
+        if(u.beineListe)staffelBeinZeitBuchen(u);
+        else u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
         // ZUG-ERGEBNIS am Beinende (B4.6 Anweisungsbilanz) — nur Buchhaltung, s. zugBilanz.
         if(u.haltung==="angreifen")u.zugErgebnis=u.zugBilanz>=0?"getragen":"eingebrochen";
+        // Allein: schon jetzt auf das naechste Bein umsetzen, damit Beingrenzen und Fliegender
+        // Start unten fuer DIESES Bein rechnen.
+        if(selbst)staffelNaechstesBein(u);
         if(naechster){
-          naechster.aktiv=true; naechster.pos=u.beinBis; naechster.startT=rennT;
+          const nehmerErstes=!naechster.beineListe||(!selbst&&naechster.beineIdx===0);
+          // Ein Doppellaeufer, der den Stab ein zweites Mal nimmt: wieder "unterwegs" fuer die
+          // Anzeige (u.durch kippt beim naechsten Abgeben erneut, s. vizDurchGesehen).
+          if(naechster.beineListe&&naechster.beineFertig>0){
+            naechster.durch=false; naechster.vizDurchGesehen=false;
+          }
+          naechster.aktiv=true; naechster.pos=uebergabePos; naechster.startT=rennT;
           // ============ DIE UEBERGABE IST EINE ZEIT, KEIN MUENZWURF ============
           // Vorher war der Wechsel ein Ja/Nein: mit Wahrscheinlichkeit `gut` sauber, sonst
           // eine feste Strafe. Das ist aus zwei Gruenden schlecht.
@@ -48060,7 +48778,10 @@
           // Konto stuende der Abgebende nach seinem eigenen Patzer sauber da (seine
           // Etappenzeit ist zu dem Zeitpunkt schon gestoppt) und der Annehmende buesste
           // allein dafuer.
-          u.wechselKonto-=verlust/2; naechster.wechselKonto-=verlust/2;
+          if(geberErstes)u.wechselKonto-=verlust/2;
+          else u.wechselKontoZusatz=(u.wechselKontoZusatz||0)-verlust/2;
+          if(nehmerErstes)naechster.wechselKonto-=verlust/2;
+          else naechster.wechselKontoZusatz=(naechster.wechselKontoZusatz||0)-verlust/2;
           u.wechselN++; naechster.wechselN++;
           if(patzer){
             naechster.reserve=Math.max(0,naechster.reserve-12);
@@ -48070,8 +48791,12 @@
             // Uebergabe ist der Staffel-Moment schlechthin (die "Fumble"-Entsprechung) --
             // selten (nur bei `patzer`) und sofort verstaendlich.
             // B4.2 (Marke und Zug): bei weiter Marke sagt die Zeile, woran es lag.
-            feed(u.seite,u.n+" verpatzt die Übergabe an "+naechster.n
+            feed(u.seite,u.n+(selbst?" verliert in der Wechselzone den Stab":" verpatzt die Übergabe an "+naechster.n)
               +(naechster.marke==="angreifen"?" bei weiter Marke":"")+" — "+fmtDauer(verlust)+" verloren.",true,undefined,"uebergabeVerpatzt");
+          } else if(selbst){
+            // Allein unterwegs (unterbesetzt): kein Partner, nur die Wechselzone.
+            schwebe({...laeuferSchwebeXY(u,-20),txt:"allein weiter",life:.8,crit:false,_laeufer:u.id});
+            feedEreignis(u.seite,u.n+" läuft allein weiter — "+fmtDauer(Math.max(0,verlust))+" in der Wechselzone.");
           } else if(mk){
             // B4.2 WECHSEL-ZEILE MIT VORZEICHEN (Konzept 3.5, die Schwimm-Zahl): gewonnen
             // oder verloren gegenueber einem Stand-Start, dazu die Marke des Nehmers.
@@ -48084,6 +48809,13 @@
             feedEreignis(u.seite,u.n+" übergibt an "+naechster.n+" — "+fmtDauer(verlust)+" im Wechsel.");
           }
         }
+        // Unterbesetzt: hat er noch ein Bein, geht er (mit seiner Erschoepfung) in dessen
+        // Wechselzone und wartet dort. Erst NACH der Suche nach `naechster` umgesetzt, weil die
+        // Suche ueber `bein` laeuft.
+        if(!selbst&&u.beineListe&&u.beineIdx+1<u.beineListe.length){
+          staffelNaechstesBein(u);
+          u.pos=u.beinVon;
+        }
         continue;
       }
 
@@ -48092,7 +48824,8 @@
         if(BA().staffel){
           // Die MANNSCHAFT ist im Ziel, nicht der Schlusslaeufer. Alle sechs bekommen
           // dieselbe Zeit und denselben Platz — eine Staffel wird als Team gewertet.
-          u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
+          if(u.beineListe)staffelBeinZeitBuchen(u);   // Doppellaeufer: s. dort
+          else u.etappenZeit=rennT-(u.startT||0)-u.wechselVerlust;
           const team=LAEUFER.filter(o=>o.seite===u.seite);
           for(const o of team){ if(o.fertig==null){o.fertig=rennT; rennFertig.push(o);} }
           // HIGHLIGHT-SCHAERFUNG (Broadcast Runde 2, Vorschlag 1, 26.09.): der erste
@@ -49304,7 +50037,7 @@
       ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
       const txt=u.n.length>13?u.n.slice(0,12)+"…":u.n;
       const nameY=y-30-bahnLabelDy;
-      ctx.strokeText(txt,x,nameY);ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9";ctx.fillText(txt,x,nameY);
+      ctx.strokeText(txt,x,nameY);ctx.fillStyle=bahnSeitenFarbe(u.seite);ctx.fillText(txt,x,nameY);
       bahnLabelSchwebeBoxen.push({x,y:nameY,halbBreite:ctx.measureText(txt).width/2+4});
       // Der Rennplan steht dabei, damit man die Aufstellung im Rennen wiedererkennt.
       //
@@ -49567,6 +50300,7 @@
       ctx.globalAlpha=1;
     }
     zeichneStreckenband();
+    if(bahnPodAnzeigeAktiv())zeichneBahnPodTafel();
   }
 
   // G-2: STRECKENBAND / COURSE STRIP (Abschnitt 7, "groesster Einzelnutzen ueber vier
@@ -49594,10 +50328,10 @@
       const n=A.jeSeite||6;
       ctx.strokeStyle="rgba(255,225,120,.5)"; ctx.lineWidth=1;
       for(let i=1;i<n;i++){ const x=bandX(i/n); ctx.beginPath(); ctx.moveTo(x,by-6); ctx.lineTo(x,by+6); ctx.stroke(); }
-      for(const seite of [0,1]){
+      for(let seite=0;seite<bahnSeitenN();seite++){
         const x=bandX(gesamtfortschritt(seite));
         ctx.beginPath(); ctx.arc(x,by,4.5,0,6.283);
-        ctx.fillStyle=seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.fillStyle=bahnSeitenFarbe(seite); ctx.fill();
         ctx.strokeStyle="rgba(8,10,14,.85)"; ctx.lineWidth=1; ctx.stroke();
       }
     } else {
@@ -49633,7 +50367,7 @@
           continue;
         }
         ctx.beginPath(); ctx.arc(x,by,u.id===leaderId?4.5:2.6,0,6.283);
-        ctx.fillStyle=u.seite===0?"#f2a03d":"#45b0c9"; ctx.fill();
+        ctx.fillStyle=bahnSeitenFarbe(u.seite); ctx.fill();
         if(u.id===leaderId){ ctx.strokeStyle="#f2d75a"; ctx.lineWidth=1.6; ctx.stroke(); }
       }
     }
@@ -49766,7 +50500,7 @@
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();
         ctx.restore();
       } else if(dist(u,tg)<=u.reach+6){
-        ctx.strokeStyle=u.side===0?css("--home"):css("--away");
+        ctx.strokeStyle=kampfSeitenFarbe(u.side);
         ctx.globalAlpha=.28;ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(u.x,u.y);ctx.lineTo(tg.x,tg.y);ctx.stroke();ctx.globalAlpha=1;
       }
@@ -49815,7 +50549,8 @@
     // Einheiten-Objekt (dieselbe Bauart wie u.lastHit), aber reine Anzeige-Buchhaltung --
     // kein Baustein ausser der Silhouette unten liest es, kein rr()/wert()/stepSim-Bezug.
     const NEBEL_SICHT_RADIUS=260, NEBEL_SICHT_DAUER_SEK=6;
-    if(disc==="battlefield"){
+    // POD: kein Nebel — im Vier-Team-FFA gibt es keine "eigene" Seite, aus deren Sicht er gilt.
+    if(disc==="battlefield"&&!bfPodAktiv()){
       for(const z of U){
         if(z.side!==1)continue;
         for(const u of U){
@@ -49825,8 +50560,8 @@
       }
     }
     for(const u of U){
-      const c=u.side===0?css("--home"):css("--away");
-      const imNebel=disc==="battlefield"&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+      const c=kampfSeitenFarbe(u.side);
+      const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
       let x=u.x,y=u.y;
       if(u.lunge>0&&u.tgt){const dx=u.tgt.x-u.x,dy=u.tgt.y-u.y,L=Math.hypot(dx,dy)||1;
         const k=u.lunge/0.16*9;x+=dx/L*k;y+=dy/L*k;}
@@ -50037,6 +50772,50 @@
       ctx.fillStyle=f.skill?css("--home"):f.heil?css("--ok"):f.crit?css("--crit"):css("--ink");
       ctx.fillText(f.txt,f.x,fy);ctx.globalAlpha=1;
     }
+    if(bfPodAktiv()){ if(bfPodReplayAktiv())zeichneBfPodSpuren(); zeichneBfPodTafel(); }
+  }
+
+  // DIE VIER-TEAM-TAFEL (Battlefield-Pod, 02.11.): oben ueber dem Feld je Team ein Kaestchen in
+  // Teamfarbe — aktueller Platz, Name, Kontrollpunkt-Punkte, Lebende als Punkte. Die DOM-
+  // Anzeigetafel kennt nur zwei Seiten (Heim/Gast); diese Tafel ist der Ort, an dem man das
+  // Vier-Team-FFA auf einen Blick liest. Reine Zeichnung, liest nur KP/U.
+  function zeichneBfPodTafel(){
+    const pl=bfPodPlatzierung(), N=KP.pod.N;
+    const uhrB=64, breite=Math.min(270,(W-40-uhrB-8)/N-8), hoehe=24, y0=4;
+    const x0=(W-(breite+8)*N-uhrB)/2;
+    ctx.save();
+    // Uhr in der Mitte zwischen den Teams 0/1 und 2/3 (dieselbe Anzeige wie #clock).
+    {
+      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(t*zeitFaktor());
+      ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(ux,y0,uhrB,hoehe);
+      ctx.globalAlpha=1; ctx.fillStyle="#f4e6c4"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillText(Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0"),ux+uhrB/2,y0+hoehe/2);
+    }
+    for(let s=0;s<N;s++){
+      const x=x0+s*(breite+8)+(s>=Math.ceil(N/2)?uhrB+8:0), farbe=kampfSeitenFarbe(s), raus=KP.pod.rausT[s]!=null;
+      ctx.globalAlpha=raus?.45:.88;
+      ctx.fillStyle="rgba(8,10,14,.78)";
+      ctx.fillRect(x,y0,breite,hoehe);
+      ctx.fillStyle=farbe; ctx.fillRect(x,y0,5,hoehe);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.5; ctx.strokeRect(x+.75,y0+.75,breite-1.5,hoehe-1.5);
+      ctx.globalAlpha=raus?.55:1;
+      ctx.textBaseline="middle"; ctx.textAlign="left";
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle="#fff";
+      const name=kampfTeamName(s), kurz=name.length>18?name.slice(0,17)+"…":name;
+      ctx.fillText(pl.platz[s]+". "+kurz,x+10,y0+hoehe/2);
+      // Lebende als kleine Punkte ganz rechts, die Punkte des Teams links davon.
+      const kopf=U.filter(u=>u.side===s);
+      ctx.textAlign="right";
+      ctx.fillStyle=farbe;
+      ctx.fillText(raus?"raus":Math.round(KP.punkte[s])+" P",x+breite-10-kopf.length*7,y0+hoehe/2);
+      kopf.forEach((u,i)=>{
+        ctx.globalAlpha=u.down?.25:1; ctx.fillStyle=u.down?"#666":farbe;
+        ctx.beginPath(); ctx.arc(x+breite-8-(kopf.length-1-i)*7,y0+hoehe/2,2.6,0,6.283); ctx.fill();
+      });
+    }
+    ctx.restore();
   }
 
   // HIGHLIGHTS: alle big-Ereignisse dieses Spiels, in der Reihenfolge, in der feed() sie
@@ -50406,7 +51185,10 @@
     // "0:66"/"0:99", waehrend die Kopfzeile (updateHudBahn) korrekt "1:39" zeigt. Dieselbe
     // Umrechnung wie dort, nur hier fuer den Ticker-Zeitstempel.
     d.appendChild(el("span","tk",Math.floor(anzeigeT/60)+":"+String(Math.floor(anzeigeT%60)).padStart(2,"0")));
-    d.appendChild(el("span",(side===0?"h":"a")+(big?" big":""),txt));
+    const tSpan=el("span",(side===0?"h":"a")+(big?" big":""),txt);
+    if(side>=2&&istKampf(disc))tSpan.style.color=kampfSeitenFarbe(side); // Pod-Seite 2/3
+    if(side>=2&&bahnPodAnzeigeAktiv())tSpan.style.color=bahnSeitenFarbe(side); // Bahn-Pod-Seite 2/3
+    d.appendChild(tSpan);
     // PUNKT 8 (s. Kopfkommentar bei TICKER_ZEILEN_JE_MIN): erst ins vollstaendige Protokoll,
     // dann -- je nach Stufe und Budget -- eine Kopie in den sichtbaren Ticker.
     // Ohne #protokoll (aeltere, zwischengespeicherte battle-mode.html-Huelle) gibt es keinen
@@ -50465,12 +51247,28 @@
 
   function finish(){
     if(done)return;done=true;running=false;
+    // Ende-Meldung an den Host (Spieltags-Ansicht, s. meldeSpielEnde) -- erst NACH diesem Aufruf,
+    // wenn Endstand und Sieger-Banner stehen. Reine Mitteilung, beruehrt keinen Spielzustand.
+    // `if(done)`: headless Laeufe (window.__arena.spiele*, Pod-Vorberechnungen) gehen ebenfalls
+    // durch finish(), stellen danach aber per M.zurueck() den sichtbaren Zustand wieder her -- ist
+    // das sichtbare Spiel beim Feuern nicht zu Ende, war es kein Ende, das jemand gesehen hat.
+    setTimeout(()=>{ if(done)meldeSpielEnde(); },0);
     document.getElementById("play").textContent="Vorbei";
     renderEndstand();
     // BATTLEFIELD-DOMINATION (s. ARENA_DOMINATION/dominationSieger oben): eigene Feed-
     // Meldung, die den tatsaechlichen Sieg-Weg benennt (Elimination, Punktelimit oder
     // Zeitablauf) — TDM/Mini-DM/das alte Verhalten unten bleiben unberuehrt, weil KP dort
     // immer null ist.
+    if(KP&&KP.pod){
+      // POD (02.11.): Platzierung aller N Teams statt "X gewinnt" (s. bfPodPlatzierung).
+      const pl=bfPodPlatzierung();
+      const zeile=pl.reihenfolge.map(s=>pl.platz[s]+". "+kampfTeamName(s)+" ("+Math.round(pl.punkte[s])+")").join(" · ");
+      feed(pl.sieger==null?0:pl.sieger,(pl.sieger==null?"Geteilter erster Platz":kampfTeamName(pl.sieger)+" gewinnt die Vierergruppe")
+        +" — "+zeile,true,undefined,"endstand");
+      renderHighlights();
+      updateHud();
+      return;
+    }
     if(KP){
       const sieger=kampfSieger();
       const elimSieg=live(0).length===0||live(1).length===0;
@@ -50886,8 +51684,12 @@
   let endstandNachlaufAn=true;  // Sonden-Schalter (window.__arena.endstandNachlauf)
   let endstandNachlauf=null;    // {seitMs, render, stinger}
   function endstandVormerken(render,sieger){
-    if(!endstandNachlaufAn){ render(); return; }
-    endstandNachlauf={seitMs:jetztMs(), render, stinger:false};
+    // Spieltags-Ansicht: Feldspiel/Buehne/Bahn enden nicht ueber finish(), sondern hier -- die
+    // Ende-Meldung an den Host (meldeSpielEnde) geht raus, sobald das Endstand-Overlay mit seinem
+    // Sieger-Banner wirklich steht. Reine Mitteilung, die Wertung beruehrt das nicht.
+    const renderUndMelden=()=>{ render(); setTimeout(()=>{ if(done)meldeSpielEnde(); },0); };
+    if(!endstandNachlaufAn){ renderUndMelden(); return; }
+    endstandNachlauf={seitMs:jetztMs(), render:renderUndMelden, stinger:false};
     teamFeierAusloesen(sieger,"finale",null);
     // Der Score-Bug wurde in diesem Frame schon VOR dem done-Zweig aktualisiert (und dabei,
     // weil `done` neu ist und der Nachlauf noch nicht vermerkt war, ausgeblendet) -- sofort
@@ -50903,9 +51705,19 @@
     if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
   }
 
+  let schnelldurchLetztesBild=0;
   function loop(ts){
+    // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
+    // ~5 Bilder je Sekunde, damit die Rechnung die Zeit bekommt. Reine Anzeige.
+    if(schnelldurchAktiv&&ts-schnelldurchLetztesBild<200){ last=ts; requestAnimationFrame(loop); return; }
+    schnelldurchLetztesBild=ts;
     if(!last)last=ts;
-    let dt=Math.min(.05,(ts-last)/1000);last=ts;
+    // Deckel je Bild: 0,05 s liess das Spiel bei niedriger Bildrate (schwere Seite, Headless) nicht
+    // nur ruckeln, sondern in Sendezeit LANGSAMER laufen -- unter ~20 Bildern/s fehlte jedem Bild
+    // Zeit, Tempo 4x wurde gemessen zu ~1,6x (Saisontest-Fund 02.11., s. schnelldurchDomGedrosselt()).
+    // 0,2 s holt bis ~5 Bilder/s voll nach und faengt einen Tab-Wechsel weiterhin ab. Die Ticks
+    // selbst bleiben fest (1/60)/zeitFaktor() -- nur ihre Zahl je Bild aendert sich, das Ergebnis nie.
+    let dt=Math.min(.2,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
     stingerPruefen();
     if(running){
@@ -51442,6 +52254,7 @@
   // gar nichts zu beeinflussen. Verallgemeinert wird, wenn die zweite Live-Disziplin
   // kommt (s. docs/design/battle-arena-multi-disziplin-plan.md), nicht vorher.
   function fokusAuswahlMoeglich(){
+    if(nurZuschauen)return false; // Spieltags-Ansicht: gebucht ist ohne Eingriff, s. nurZuschauen
     return !!LIVE()&&istFeldspiel(disc)&&!!fsLive;
   }
   // Liefert den gerade WIRKSAMEN Fokus-Spieler von Seite 0 — automatische Vorgabe oder
@@ -51566,7 +52379,7 @@
   // NUR DIE EIGENE SEITE. Einem gegnerischen Laeufer etwas anzusagen ergibt keinen Sinn
   // — das ist die genaue Umkehrung des Fokus-Doppelns, das nur Gegner zulaesst.
   const BAHN_GREIF_RADIUS=30;
-  function rennplanMoeglich(){ return istBahn(disc)&&LAEUFER.length>0; }
+  function rennplanMoeglich(){ return !nurZuschauen&&istBahn(disc)&&LAEUFER.length>0; }
   // `fertig==null` gehoert in die Abfrage, nicht nur in den Klick: wer waehrend der
   // offenen Ansage ins Ziel laeuft oder ausscheidet, ist nicht mehr ansprechbar — die
   // Zeile faellt dann von selbst auf ihren Hinweistext zurueck, statt Knoepfe zu zeigen,
@@ -51975,7 +52788,9 @@
   // Feld gibt". `#fokuszeile` selbst haengt nicht unter einem der dort ausgeblendeten
   // Container (eigenes Geschwister-Element), wird also nicht mitversteckt; der Fix sitzt
   // deshalb hier an der Quelle statt an einer weiteren CSS-Ausnahme.
-  const ansageMoeglich=()=>istKampf(disc)&&disc!=="mini-dm"&&U.length>0;
+  // POD (02.11.): keine Zielansage — sie gilt fuer "Seite 0 gegen Seite 1", im Vier-Team-FFA ist
+  // Seite 0 nicht zwingend das eigene Team, und Gegner gibt es drei.
+  const ansageMoeglich=()=>!nurZuschauen&&istKampf(disc)&&disc!=="mini-dm"&&!bfPodAktiv()&&U.length>0;
   // Klick-Geometrie: die Leinwand ist per CSS skaliert, der Klick kommt in CSS-Pixeln —
   // erst auf die Zeichenflaeche zurueckrechnen (cv.width/rect.width), dann die naechste
   // Einheit aus `pool` innerhalb des Greifradius suchen. Getroffen wird die BODEN-Position
@@ -52212,6 +53027,7 @@
   }
 
   function renderKader(){
+    if(schnelldurchDomGedrosselt())return; // Quick-Sim: Kacheln nicht je Tick neu bauen, s. dort
     // Feldspiel: enthuellte Punktestaende statt der vorab durchgerechneten — siehe
     // fsBisher(). Einmal je Aufruf, nicht je Spieler.
     const fsStand=istFeldspiel(disc)?fsBisher():null;
@@ -52240,7 +53056,7 @@
       // nichts verloren geht, was die Leiste vorher trug (Bahn: Streckenanteil; Feldspiel:
       // der Punktestand). Reine Anzeige — renderKader wird aus dem Zeichen-Takt gerufen und
       // schreibt in keinen Simulationszustand.
-      for(const u of (istBahn(disc)?LAEUFER.filter(x=>x.seite===seite)
+      for(const u of (istBahn(disc)?LAEUFER.filter(x=>bahnPodAnzeigeAktiv()?x.seite%2===seite:x.seite===seite)
           // id/fertig/plan mitgegeben: die Kachel ist die zweite Auswahlflaeche fuer die
           // Rennplan-Ansage (s. verdrahteRennplanAnsage) und braucht dafuer dieselbe
           // Identitaet wie die Figur auf der Bahn.
@@ -52263,7 +53079,7 @@
           // Castle, s. nervenKosten-Zweig in stepSpurt) ist das tatsaechliche
           // "endgueltig-raus"-Feld -- fuer jede andere Bahn (kein Ausscheiden-Konzept) bleibt
           // `down` jetzt immer false, statt bei jedem Sturz faelschlich zu kippen.
-          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,
+          .map(x=>({n:x.n,down:!!x.raus,hp:1-x.pos,max:1,id:x.id,fertig:x.fertig,plan:x.plan,seite:x.seite,
             leiste:{wert:Math.max(0,x.reserve),max:Math.max(1,x.reserveMax),wort:"Puste",
                     leer:!!x.leer,art:"puste",
                     // CLIMBING: "EXE" STATT "ZONE" (Gegencheck climbing-opus-gegencheck-24-09.md
@@ -52326,8 +53142,10 @@
           hp:(fsStand.spieler.get(x.id)||{punkte:0}).punkte,
           max:Math.max(1,...FSTEAM[0].concat(FSTEAM[1]).map(y=>(fsStand.spieler.get(y.id)||{punkte:0}).punkte)),
           leiste:fsLeisteFuer(x,fsStand)}))
-        :U.filter(x=>x.side===seite))){
+        :U.filter(x=>bfPodAktiv()?x.side%2===seite:x.side===seite))){
         const k=el("div","kk"+(u.down?" tot":""));
+        if(istKampf(disc)&&bfPodAktiv())k.style.borderLeft="3px solid "+kampfSeitenFarbe(u.side);
+        if(istBahn(disc)&&bahnPodAnzeigeAktiv()&&u.seite!=null)k.style.borderLeft="3px solid "+bahnSeitenFarbe(u.seite);
         // Portrait, Sprite, Name — die Lebens-/Punkteleiste bleibt darunter ueber die
         // volle Kachelbreite, damit sie ablesbar bleibt. Portrait links vom Sprite (Chris,
         // 20.09., s. Kommentar bei kaderPortraet oben): beide Bilder gleichzeitig sichtbar.
@@ -52478,7 +53296,10 @@
       // DEUTSCHES KOMMA (Broadcast-Audit Runde 2, Punkt 12, 30.09.): `.join(" : ")` rief
       // bei Takeshi (Burgpunkte, Dezimalwerte) den rohen JS-Zahlenstring mit Punkt auf
       // ("40.1 : 22.7") statt des Komma-Formats, das `bahnTeamstand().fmt` dafuer schon hat.
-      ? (()=>{const st=bahnTeamstand(); return st.seiten.map(v=>st.fmt?st.fmt(v):v).join(" : ");})()
+      ? (bahnPodAnzeigeAktiv()
+        // POD: der Vier-Team-Stand nach Platz statt "Heim : Gast".
+        ? bahnPodLiveStand().reihe.map(t=>t.platz+". "+t.anzeige).join(" · ")
+        : (()=>{const st=bahnTeamstand(); return st.seiten.map(v=>st.fmt?st.fmt(v):v).join(" : ");})())
       : (istBuehne(disc)&&BB().duell)
       // FECHTEN LIEST `gefechtSieg`, NICHT `vorteil>0` (F1, 26.09., s. updateHudBuehne()-
       // Kommentar): derselbe Fix, dieselbe Kopfzeile wie updateHudBuehne(), hier fuer die
@@ -52640,6 +53461,7 @@
   // battle-mode.css in Heim-/Gastfarbe aufleuchten; keine Klasse bleibt die alte
   // neutrale --warn-Faerbung (Unentschieden/noch keine Wertung).
   function setzeEsiegerKlasse(sieger){
+    letzterAngezeigterSieger=(sieger===0||sieger===1)?sieger:null; // fuer meldeSpielEnde()
     const e=document.getElementById("esieger");
     if(!e)return;
     e.className="esieger"+(sieger===0?" sieg-h":sieger===1?" sieg-a":"");
@@ -52792,7 +53614,10 @@
     // Werte (KP.punkte, ko-Summen, Ueberlebenspunkte) liest finish() an genau dieser Stelle
     // schon fuer denselben Zweck; keine zweite Zaehlweise, nur zweimal gelesen.
     let standText,zusatz;
-    if(KP){
+    if(KP&&KP.pod){
+      standText=kampfStandText();
+      zusatz="Kontrollpunkte (4-Team-FFA)";
+    } else if(KP){
       standText=Math.round(KP.punkte[0])+" : "+Math.round(KP.punkte[1]);
       zusatz="Kontrollpunkte";
     } else if(disc==="tdm"){
@@ -52810,17 +53635,22 @@
     // SPIELER DES SPIELS (Punkt 28): EIN MVP ueber BEIDE Seiten, nach demselben Impact-Wert,
     // der die Zeilen gleich darunter je Seite ohnehin schon sortiert -- kein neuer Wert.
     const mvpUnit=U.length?U.map(u=>({u,imp:impactVon(u)})).reduce((a,b)=>b.imp>a.imp?b:a):null;
+    // POD (02.11.): links die Teams 0 und 2, rechts 1 und 3 — dieselbe Seite wie auf dem Feld.
+    const tafelSeiten=bfPodAktiv()?[[0,2],[1,3]].map(g=>g.filter(s=>s<kampfSeitenN())):[[0],[1]];
     for(const seite of [0,1]){
       const box=document.getElementById(seite===0?"etafelL":"etafelR");
       box.textContent="";
-      box.appendChild(el("h5",null,VEREIN[seite].name));
+      for(const teamSeite of tafelSeiten[seite]){
+      const h5=el("h5",null,bfPodAktiv()?bfPodPlatzierung().platz[teamSeite]+". "+kampfTeamName(teamSeite):VEREIN[teamSeite].name);
+      if(bfPodAktiv())h5.style.color=kampfSeitenFarbe(teamSeite);
+      box.appendChild(h5);
       const t=el("table"), kopf=el("tr");
       kopf.appendChild(el("th",null,"Kämpfer"));
       for(const [lab] of ESPALTEN)kopf.appendChild(el("th",null,lab));
       kopf.appendChild(el("th",null,"IMP"));
       const thead=el("thead");thead.appendChild(kopf);t.appendChild(thead);
       const tb=el("tbody");
-      const reihen=U.filter(u=>u.side===seite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
+      const reihen=U.filter(u=>u.side===teamSeite).map(u=>({u,imp:impactVon(u)})).sort((a,b)=>b.imp-a.imp);
       for(const {u,imp} of reihen){
         // DURCHSTREICH-BUG (Punkt 28): `u.down` ist bei TDM ein TRANSIENTER Respawn-Status
         // (s. TDM_RESPAWN_SEK/reviveUnit oben) -- ein Kaempfer, der im Moment des Abpfiffs
@@ -52861,6 +53691,7 @@
         tb.appendChild(tr);
       }
       t.appendChild(tb); box.appendChild(t);
+      }
     }
     renderSzeneDesSpiels();
     renderHighlights();
@@ -52951,6 +53782,9 @@
   function bahnAlternativZeilen(bd){
     const plaene=BAHN_ALT_PLAENE[bd];
     if(!plaene||!BAHN_ART[bd]||!BAHN_ART[bd].plaene)return [];
+    // Sichtbares Vier-Team-Rennen: bahnLauf() rechnet Zweitlaeufe als Duell — fuer einen Pod gaebe
+    // das keine ehrliche Zahl (und 24 Laeufer x Saaten x Plaene waeren sekundenlang). Lieber nichts.
+    if(bahnPodAnzeigeAktiv())return [];
     const heim=bahnRangliste().reihe.filter(u=>
       u.seite===0&&u.fertig!=null&&!u.raus&&plaene.includes(u.plan));
     if(!heim.length)return [];
@@ -53065,7 +53899,15 @@
     // wie in updateHudBahn() — ohne sie zeigte die Sieger-Zeile bei Takeshi rohe
     // Dezimalwerte mit Punkt.
     const fmtSeite=(v)=>stand.fmt?stand.fmt(v):v;
-    if(stand.gewertet){
+    // POD (sichtbares Vier-Team-Rennen): Banner mit allen vier Plaetzen (Wertung wie der zaehlende
+    // Lauf, bahnPodLiveStand nach `done`), Tabellen links Team 0/2, rechts Team 1/3.
+    const podStand=bahnPodAnzeigeAktiv()?bahnPodLiveStand():null;
+    if(podStand){
+      const vorn=podStand.reihe[0];
+      document.getElementById("esieger").textContent=(vorn?vorn.name.toUpperCase()+" SIEGER — ":"")
+        +podStand.N+"-Team-Rennen · "+(vorn?vorn.anzeige:"");
+      setzeEsiegerKlasse(vorn&&vorn.side<2?vorn.side:null);
+    } else if(stand.gewertet){
       const sieger=pL===pR?null:(pL>pR?0:1);
       document.getElementById("esieger").textContent=
         siegerBannerText(sieger,fmtSeite(pL)+" : "+fmtSeite(pR)+" "+stand.suffix,stand.bannerZusatz);
@@ -53088,10 +53930,16 @@
     // IMMER dieses Rennen wertet (Rangpunkte, Burgpunkte, oder mangels Wertung schlicht die
     // Zielreihenfolge) — kein zweiter Vergleich, nur derselbe Kopf der schon sortierten Liste.
     const mvpLaeufer=zeilen.length?zeilen[0]:null;
-    for(const seite of [0,1]){
-      const box=document.getElementById(seite===0?"etafelL":"etafelR");
+    const tafelSeiten=podStand?[[0,2],[1,3]].map(l=>l.filter(s=>s<podStand.N)):[[0],[1]];
+    for(const boxSeite of [0,1]){
+      const box=document.getElementById(boxSeite===0?"etafelL":"etafelR");
       box.textContent="";
-      box.appendChild(el("h5",null,VEREIN[seite].name));
+      for(const seite of tafelSeiten[boxSeite]){
+      const kopfH5=el("h5",null,podStand
+        ?podStand.teams[seite].platz+". "+VEREIN[seite].name+" — "+podStand.teams[seite].anzeige
+        :VEREIN[seite].name);
+      if(podStand)kopfH5.style.color=bahnSeitenFarbe(seite);
+      box.appendChild(kopfH5);
       const t=el("table"), kopf=el("tr");
       // WECHSEL-/GESAMT-SPALTE NUR, WO ES SIE GIBT (Staffel, `stand.wechselVon`/`stand.gesamtVon`,
       // s. bahnTeamstand): fuer jede andere Bahn sind die Felder undefined, Kopf- und Datenzeile
@@ -53140,6 +53988,7 @@
         box.appendChild(el("p","ebilanz","Fliegend gewonnen −"+fmtDauer(b.gewinn)
           +" · Wechsel netto "+(b.netto<0?"−":"+")+fmtDauer(Math.abs(b.netto))
           +" · Angriffe: "+b.getragen+" getragen, "+b.eingebrochen+" eingebrochen"));
+      }
       }
     }
     renderSzeneDesSpiels();
@@ -53598,7 +54447,27 @@
     // nicht je Spiel deterministisch. Reiner Praesentationszustand, kein Einfluss auf rr().
     teamFeiern=[]; teamFeierNr=0;
     mutatorenFuerAktuelleDisziplin();
-    build(gebuchteSaatFuerAktuelleDisziplin());
+    // BATTLEFIELD-POD (02.11., s. bfPodAnzeigeKontext): hat das Heimteam an diesem Spieltag einen
+    // echten Vierer-Pod, zeigt die Arena alle vier Teams gleichzeitig im selben Kampf. Sonst — und
+    // fuer jede andere Disziplin — exakt der bisherige Aufbau; die Pod-Teamnamen werden dann
+    // wieder gegen die Duell-Namen getauscht.
+    // FIGUREN DES NAECHSTEN SPIELS (03.11.): Liste neu, beide Kader sofort anfordern — so laedt
+    // es schon waehrend Einlauf und Countdown, nicht erst ab dem ersten Kampf-Frame.
+    if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; }
+    pixelFigurenImSpiel=[];
+    try{ pixelFigurVorladen([...SQUAD,...OPP].map(p=>p&&p.n)); }catch(e){}
+    const bfPodAnz=disc==="battlefield"?bfPodAnzeigeKontext():null;
+    // BAHN-POD (02.11., s. bahnPodAnzeigeKontext): dasselbe fuer Takeshi's Castle und Staffel — das
+    // Vier-Team-Rennen der gebuchten Gruppe statt des Duells. Ein sichtbarer Pod vom vorigen Aufbau
+    // wird IMMER zuerst abgebaut (Kader, Aufstellung, Formkarten, Vereinsnamen zurueck).
+    bahnPodAnzeigeAbbauen();
+    const bahnPodAnz=(disc==="takeshis-castle"||disc==="staffel")?bahnPodAnzeigeKontext():null;
+    if(bfPodAnz)bfPodAnzeigeBauen(bfPodAnz);
+    else if(bahnPodAnz){ bfPodAnzeigeVereineZurueck(); bahnPodAnzeigeBauen(bahnPodAnz); }
+    else{ bfPodAnzeigeVereineZurueck(); build(gebuchteSaatFuerAktuelleDisziplin()); }
+    // KULISSE (03.11.): reine Anzeige, nach dem Aufbau gewaehlt — dieselbe Saat, die das Spiel
+    // traegt, plus die Paarung (s. kulisseWaehlen; kein rr(), kein Einfluss auf die Wertung).
+    kulisseWaehlen(bfPodAnz?bfPodAnz.saat:bahnPodAnz?bahnPodAnz.saat:(disc==="mini-dm"&&gebuchteMiniDmFfaKontext().saat!=null)?gebuchteMiniDmFfaKontext().saat:gebuchteSaatFuerAktuelleDisziplin());
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
     // (ARENA_ART["mini-dm"]) — das bleibt so, weil dieselbe Funktion auch die Pp-
@@ -53664,7 +54533,7 @@
     document.getElementById("arenaDisc").textContent=istMdffa
       ?(DISCS[disc]?DISCS[disc].label:disc)+" · 4-Team-FFA"
       :(DISCS[disc]?DISCS[disc].label:disc)+" · "+
-      (istBahn(disc)?(BA().jeSeite+" gegen "+BA().jeSeite)
+      (istBahn(disc)?(bahnPodAnzeigeAktiv()?bahnSeitenN()+"-Team-Rennen":(BA().jeSeite+" gegen "+BA().jeSeite))
                     :(istBuehne(disc)||istFeldspiel(disc))?(jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc))
                     :(live(0).length+" gegen "+live(1).length));
     // OHNE "BEFEHLE" (Broadcast-Audit Runde 2, Punkt 12): die alte Zeile "Befehle sind
@@ -53679,7 +54548,9 @@
     // Viertelpause-Overlay wie Endstand zuruecksetzen — ein Reset waehrend einer laufenden
     // Pause (z.B. Disziplinwechsel mitten im Spiel) darf keine Karteileiche stehenlassen.
     const vp=document.getElementById("viertelpause"); if(vp)vp.hidden=true;
-    renderEinlauf();zeigeEinlauf(true);
+    // POD: die Einlauf-Karte kennt nur Heim/Gast — im Vier-Team-Rennen stellt die Tafel auf der
+    // Leinwand die Teams vor (zeichneBahnPodTafel), der Einlauf bleibt aus.
+    if(bahnPodAnzeigeAktiv())zeigeEinlauf(false); else { renderEinlauf();zeigeEinlauf(true); }
     // WELLE-2-FUND (time-trial-einzelzeitfahren-wertung-plan-05-09.md Abschnitt 1.5):
     // "Plan der KI" (#arenaplan) zeigte im Time-Trial den TDM-Text weiter an. Ursache war
     // nicht die istBahn-Fallunterscheidung in renderOpp() selbst (die baut fuer Bahn schon
@@ -53694,10 +54565,32 @@
 
   // `running` an/aus samt allem, was am Uebergang haengt -- ausgelagert, weil A4 den Anpfiff
   // jetzt auch NACH dem Klick (am Ende des Countdowns, anpfiffAusfuehren()) ausloesen kann.
-  function spielLaeuft(an){
+  // ANPFIFF ERST MIT FIGUREN (03.11.): Chris sah bei 0:06 fuenf Kaempfer noch als Baukasten-
+  // Platzhalter — die PixelLab-Bilder laden asynchron, und zeichneSprite() zeichnet bis dahin den
+  // Baukasten. Der erste Kampf-Frame wartet deshalb, bis alle Figuren des Spiels geladen sind,
+  // hoechstens FIGUREN_WARTE_MS (langsames Netz, fehlende Datei: dann wie bisher). Reine
+  // Wanduhr-Verzoegerung VOR dem ersten Tick: die Simulation tickt danach unveraendert, Quick-Sim
+  // (schnellDurch) und Sonden laufen nicht durch spielLaeuft und warten nie.
+  const FIGUREN_WARTE_MS=4000;
+  function spielLaeuft(an,ohneFigurenWarten){
+    const bereit=()=>pixelFigurenAlleGeladen()&&kulisseGeladen();
+    if(an&&!ohneFigurenWarten&&!running&&!anpfiffErfolgt&&!bereit()){
+      if(figurenWarten)return;
+      const start=wandMs(), meinDisc=disc;
+      const pb=document.getElementById("play"); if(pb)pb.textContent="Lade Figuren …";
+      figurenWarten=setInterval(()=>{
+        // Abbruch: Instanz abgeloest, Disziplin gewechselt, oder jemand anderes (Quick-Sim,
+        // Sofort-Start) hat das Spiel inzwischen selbst angepfiffen.
+        if(!document.getElementById("cv")||disc!==meinDisc||running||anpfiffErfolgt){ clearInterval(figurenWarten); figurenWarten=null; return; }
+        if(bereit()||wandMs()-start>=FIGUREN_WARTE_MS){ clearInterval(figurenWarten); figurenWarten=null; spielLaeuft(true,true); }
+      },60);
+      return;
+    }
+    if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; }
     running=an;
     if(an)anpfiffErfolgt=true;
-    document.getElementById("play").textContent=running?"Pause":"Weiter";
+    const playKnopf=document.getElementById("play"); if(!playKnopf)return;
+    playKnopf.textContent=running?"Pause":"Weiter";
     // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
     // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
     // laeuft (die Kampfschleife ruft updateHud() nur, waehrend running gerade true ist) --
@@ -54043,6 +54936,742 @@
       wert:()=>{const g=U.reduce((a,x)=>a+beitragVon(x),0)||1,o={};
         for(const u of U)o[u.n]=beitragVon(u)/g*100; return o;}
     };
+  }
+
+  // ===================================================================================
+  // BATTLEFIELD-POD: EINSTIEGE (02.11.) — headless Lauf, Rangtreue-Sonde, Pp-Messung, Anzeige.
+  // Der Motor selbst steht oben bei bfPodKader/bfPodBau/bfPodPlatzierung; hier nur, wie man ihn
+  // aufruft. Konzept und Messung: docs/design/battlefield-pod-ffa-02-11.md.
+  //
+  // TEAMNAMEN: siegerBannerText(), renderHighlights(), die Ortsbeschriftung &c. lesen VEREIN[s] —
+  // im Pod gibt es vier Seiten. Fuer die Dauer eines Laufs (bzw. solange die Anzeige einen Pod
+  // zeigt) traegt VEREIN deshalb die Namen der N Pod-Teams; danach wird der Duell-Stand
+  // zurueckgelegt (Schnappschuss, verschachtelbar).
+  function bfPodVereinSchnappschuss(){ return {0:VEREIN[0],1:VEREIN[1],2:VEREIN[2],3:VEREIN[3]}; }
+  function bfPodVereinZurueck(snap){
+    for(const s of [0,1,2,3]){ if(snap[s]===undefined)delete VEREIN[s]; else VEREIN[s]=snap[s]; }
+  }
+  function bfPodVereineSetzen(teams){
+    teams.forEach((tm,s)=>{
+      const name=String((tm&&tm.name)||("Team "+(s+1)));
+      VEREIN[s]={name, kurz:(tm&&tm.kurz)||kurzVon(name), platz:null, punkte:null};
+    });
+  }
+  function bfPodKaderVon(tm){ return Array.isArray(tm)?tm:(tm&&Array.isArray(tm.kader)?tm.kader:[]); }
+
+  // KERN aller headless Einstiege: EIN Pod-Kampf, stumm, danach ist jeder Modulzustand wieder wie
+  // vorher (place/persOf/FUEHRUNG/VEREIN/jeSeite und ueber MOTOREN.sichern() U/KP/disc/...).
+  // `teams` je Team ein Kader (ArenaSpieler[]) oder {name,kurz,kader}; `platzJeTeam` je Team ein
+  // `place` (buildArenaAufstellung, positionsgleich zu `teams`); `jeSeite` k (2..6, Standard
+  // ARENA_ART.battlefield.jeSeite); `vorbereiten(kader)` laeuft nach dem Kadertausch, vor bau() —
+  // dort ziehen die Aufrufer Formkarten und Mutatoren.
+  // `echtzeit` (02.11. abends): true faehrt den ECHTZEIT-Pod (M.lauf(), der freie Vier-Team-Kampf
+  // aus der ersten Runde) — nur noch Kontrolle/Vergleich. Standard ist das GEFECHT JE ORT
+  // (bfffaFuerGebautenPod, Mini-DM-Muster): dieselbe Aufstellung aus M.bau(), dann rechnet der
+  // Kern das Ergebnis, statt stepSim laufen zu lassen.
+  function bfPodLauf(teams,saat,platzJeTeam,jeSeite,vorbereiten,echtzeit){
+    if(!Array.isArray(teams)||teams.length<3||teams.length>4)
+      throw new Error("spieleBattlefieldPod: braucht 3 oder 4 Teams, bekam "+(Array.isArray(teams)?teams.length:typeof teams)+".");
+    if(teams.some(tm=>!bfPodKaderVon(tm).length))
+      throw new Error("spieleBattlefieldPod: mindestens ein Team stellt keinen einzigen Kaempfer.");
+    const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
+    const g=M.sichern(); if(M.vorher)M.vorher();
+    const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm, jeVorher=art.jeSeite;
+    const vereinVorher=bfPodVereinSchnappschuss(), fuehrungVorher={...FUEHRUNG};
+    const kader=teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    try{
+      for(const k in place)delete place[k];
+      for(const pl of (platzJeTeam||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+      if(jeSeite)art.jeSeite=jeSeite;
+      bfPodVereineSetzen(teams.map(tm=>Array.isArray(tm)?null:tm));
+      if(vorbereiten)vorbereiten(kader);
+      stumm=true;
+      bfPodKader=kader;
+      try{ M.bau(saat); } finally { bfPodKader=null; }
+      if(!echtzeit){
+        const g=bfffaFuerGebautenPod(kader,saat), pl=g.platzierung;
+        return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+(g.gespielt*BFFFA.taktSek).toFixed(2),
+          format:"gefecht", ende:g.ende, takte:g.gespielt,
+          besitz:g.orte.map(o=>o.besitz),
+          teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+g.punkte[s].toFixed(1),
+            lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
+            eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s], wertung:+g.teamWert[s].toFixed(3)})),
+          kaempfer:g.kaempfer.map(k=>({n:k.n, side:k.side, slot:k.slot, eig:k.eigOhneMutator,
+            wert:g.anteil[k.n]||0, roh:+k.wert.toFixed(3), ko:k.st.kos, down:!!k.raus,
+            erob:+k.st.erob.toFixed(3), amOrt:k.st.takteAmOrt.reduce((a,b)=>a+b,0)*BFFFA.taktSek,
+            wechsel:k.st.rotationen, besucht:k.st.takteAmOrt.map(x=>x>0?1:0)})),
+          gefecht:g};
+      }
+      M.lauf();
+      const pl=bfPodPlatzierung(), wert=M.wert();
+      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit",
+        besitz:KP.orte.map(o=>o.besitz),
+        teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+pl.punkte[s].toFixed(1),
+          lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
+          eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s]})),
+        kaempfer:U.map(u=>({n:u.n, side:u.side, slot:u.slot,
+          eig:u.eigOhneMutator!=null?u.eigOhneMutator:u.eig, wert:wert[u.n]||0,
+          ko:u.st.ko, down:!!u.down,
+          erob:+(u.kpd?u.kpd.erob:0).toFixed(3), amOrt:+(u.kpd?u.kpd.amOrt:0).toFixed(2),
+          wechsel:u.kpd?u.kpd.wechsel:0, besucht:u.kpd?u.kpd.besucht.slice():[]}))};
+    } finally {
+      stumm=stummVorher; art.jeSeite=jeVorher;
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+      for(const k in persOf)delete persOf[k];
+      Object.assign(persOf,persVorher);
+      bfPodVereinZurueck(vereinVorher);
+      FUEHRUNG=fuehrungVorher;
+      M.zurueck(g);
+    }
+  }
+
+  // PRODUKTIONS-EINSTIEG, dieselbe Form wie spieleBahnPod()/spieleMiniDmFfaEvent():
+  // `optionen.formSaat` zieht Formkarten fuer ALLE N Kader (sonst haetten nur die zwei
+  // Bootstrap-Teams SQUAD/OPP eine, s. Mini-DMs OPUS-REVIEW B1), `optionen.jeSeite` = k.
+  // Rueckgabe: `teams[s]` {side, name, punkte, lebend, rausT, eventPlatz 1..N, ligaPunkte 2-1-0-0},
+  // `boxscore` je Kaempfer {name, side, wert} mit DEMSELBEN `wert` wie MOTOREN.battlefield.wert()
+  // (Anteil am Gesamtbeitrag des Kampfes, jetzt ueber alle 4k Kaempfer).
+  function spieleBattlefieldPod(teams,saat,platzJeTeam,optionen){
+    const opt=optionen||{};
+    const formVorher=FORMKARTE;
+    try{
+      const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
+        FORMKARTE={...FORMKARTE};
+        if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
+      },!!opt.echtzeit);
+      const aus={disziplin:r.disziplin, saat:r.saat, dauer:r.dauer, format:r.format, teams:r.teams,
+        boxscore:r.kaempfer.map(u=>({name:u.n, side:u.side, slot:u.slot, eig:+u.eig.toFixed(2), wert:u.wert,
+          ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
+      if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
+      return aus;
+    } finally { FORMKARTE=formVorher; }
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie bahnPodSonde()/miniDmFfaSonde(): `kader` Liste von
+  // Team-Kadern, `opt.gruppen` Liste von Vierergruppen (Indizes in `kader`), `opt.n` Kaempfe je
+  // Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k, `opt.mutatoren` "je-spiel" (Standard) | "aus".
+  // Formkarten je Kampf fuer alle Teams der Gruppe. Gemessen wird `eig` OHNE Mutator gegen
+  // MOTOREN.battlefield.wert() — exakt die Groessen von disziplinProbe().
+  function battlefieldPodSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          const r=bfPodLauf(teams,saat,null,o.jeSeite,(k)=>{
+            FORMKARTE={};
+            mdffaFormkartenFuer(k,(20260823+versatz+gi*7919+i*104729)>>>0);
+            MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+              :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          },!!o.echtzeit);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.dauer, ende:r.ende||null, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down, erob:u.erob}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"battlefield", format:"pod", events};
+  }
+
+  // PP-ABNAHME IM POD (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon() —
+  // gleiche Hebung +15, gleiche Saaten, gleiche Mutator-Modi, gleiche Abweichungsrechnung gegen
+  // PP_MATRIX_JE_DISC —, nur ist jeder Lauf ein Vier-Team-Kampf: SQUAD und OPP (dieselben
+  // Messpersonen wie einflussVon) plus `extraTeams` als Seite 2/3. Gehoben und gemessen werden nur
+  // die Kaempfer von SQUAD/OPP, die zwei Zusatzteams stellen das Feld. Dieselbe Bauart wie
+  // bahnPodEinfluss().
+  function battlefieldPodEinfluss(extraTeams,n,plus,saatVersatz,mutatorModus,jeSeite,echtzeit){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP,...(extraTeams||[])];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>bfPodLauf(teams,1337+versatz+i*7919,null,jeSeite,(k)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(k,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel(20260823+versatz+i*15485863);
+      else if(modus==="aus")MUTATOREN=[];
+    },!!echtzeit);
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.filter(u=>u.side<2).map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.battlefield||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,k)=>acc+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"battlefield", format:"pod", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.battlefield.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // DIE SICHTBARE ARENA IM POD (02.11.). Quelle ist der Host (FoundationBattleArenaHost.tsx,
+  // `echterKader.battlefieldPod` = {teams:[{name,kurz,kader}], k, saat, aufstellung:[place je Team]}),
+  // nur gesetzt, wenn das gewaehlte Heimteam an diesem Spieltag einen ECHTEN Battlefield-Pod hat
+  // (getPodForTeam, dieselbe Funktion wie die Buchung). Fuer Standalone/Tests setzt
+  // `window.__arena.battlefieldPodAnzeigen(pod)` dieselbe Form (null schaltet zurueck aufs Duell).
+  // Ohne beides baut reset() Battlefield exakt wie bisher als Duell.
+  // (bfPodAnzeigeVorgabe/bfPodAnzeigeVereinSnap sind oben bei bfPodKader deklariert — reset()
+  // laeuft beim Laden schon, bevor diese Zeilen erreicht sind; eine `let` hier waere dann noch tot.)
+  function bfPodAnzeigeKontext(){
+    const roh=bfPodAnzeigeVorgabe||(echterKader&&echterKader.battlefieldPod)||null;
+    if(!roh||!Array.isArray(roh.teams)||roh.teams.length<3||roh.teams.length>4)return null;
+    if(roh.teams.some(tm=>!bfPodKaderVon(tm).length))return null;
+    return roh;
+  }
+  function bfPodAnzeigeVereineZurueck(){
+    if(bfPodAnzeigeVereinSnap){ bfPodVereinZurueck(bfPodAnzeigeVereinSnap); bfPodAnzeigeVereinSnap=null; }
+  }
+  function bfPodAnzeigeBauen(pod){
+    const art=ARENA_ART.battlefield, jeVorher=art.jeSeite;
+    const placeVorher={...place}, formVorher=FORMKARTE;
+    const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    // Pod-Gegner frueh anfordern statt faul beim ersten Zeichnen (s. pixelFigurVorladen).
+    try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
+    if(!bfPodAnzeigeVereinSnap)bfPodAnzeigeVereinSnap=bfPodVereinSchnappschuss();
+    bfPodVereineSetzen(pod.teams);
+    // Persoenlichkeiten bleiben stehen (Tooltips/Kaderleiste lesen persOf auch nach dem Aufbau).
+    for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+    try{
+      for(const k in place)delete place[k];
+      for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      FORMKARTE={...FORMKARTE};
+      mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
+      if(pod.k)art.jeSeite=pod.k;
+      bfPodKader=kader;
+      build(pod.saat);
+      // GEFECHT JE ORT (02.11. abends): dieselbe Rechnung wie die Buchung (bfPodLauf ohne
+      // `echtzeit`), mit denselben Formkarten/Aufstellungen — die Arena spielt sie danach ab.
+      // `pod.echtzeit` zeigt zum Vergleich den alten freien Echtzeitkampf.
+      if(!pod.echtzeit)bfPodReplayStarten(bfffaFuerGebautenPod(kader,pod.saat));
+    } finally {
+      bfPodKader=null; art.jeSeite=jeVorher; FORMKARTE=formVorher;
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+    }
+  }
+
+  // ===================================================================================
+  // BATTLEFIELD-POD NACH DEM MINI-DM-MUSTER: EIN GEFECHT JE ORT, DIE ARENA SPIELT ES AB (02.11.).
+  //
+  // Chris hat entschieden (02.11., nach der Abnahme des Echtzeit-Pods: rho je Kampf 0,13-0,27,
+  // eignungsbestes Team auf Platz 1 in 18-38 %): Battlefield im Pod wird so entschieden wie Mini-DM
+  // seit 13.10. — ERGEBNIS ZUERST, BILD DANACH. Konzept und Messung:
+  // docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7.
+  //
+  // WARUM DER ECHTZEIT-POD SCHEITERTE, ist dieselbe Diagnose wie bei Mini-DM (Kopfkommentar an
+  // mdffaSchlagwechsel): Geometrie als Lotterie (wer zur umkaempften Mitte laeuft, bekommt von drei
+  // Seiten Feuer, wer ausweicht, ueberlebt), Profile statt Summe (aufEignung() normiert nur LP/ANG/
+  // VER), und Bedrohungs-Zielwahl, die gerade die Starken gemeinsam jagt.
+  //
+  // DER NEUE KERN — dasselbe Prinzip wie der Schlagwechsel, auf drei Orte verteilt:
+  //  1. BELEGUNG AUS DER ROLLE, symmetrisch fuer alle vier Teams. Jedes Team hat einen HEIMORT
+  //     (Seite 0/1 Nord, 2/3 Sued — dieselbe Geometrie wie bfPodHome), die MITTE und einen FERNORT
+  //     (den Heimort des anderen Paares). Morale Anchor und Commander halten den Heimort, Siege Core
+  //     und Field Control gehen in die Mitte, Disruptor und Spotter zum Fernort (die Rollentexte
+  //     sagen genau das). Weil jedes Team bei gleichem k dieselben Rollen hat, steht an jedem Ort
+  //     jedes anwesende Team mit gleich vielen Koepfen — keine Seite ist geometrisch im Vorteil.
+  //  2. JE ORT EIN SCHLAGWECHSEL in Takten: jeder Stehende waehlt einen Gegner AM SELBEN ORT und
+  //     schlaegt einmal zu, gleichzeitig auf dem Stand vom Taktbeginn. Bei gleichmaessiger Zielwahl
+  //     bekommt jeder im Mittel EINEN Angriff je Takt ab, egal ob zwei oder vier Teams am Ort stehen —
+  //     genau das nimmt der umkaempften Mitte die Dritte-Partei-Lotterie.
+  //  3. KONTROLLPUNKTE nach derselben Regel wie kpTick: Besitz wechselt nur, wenn genau EIN Team am
+  //     Ort steht; Besitz zahlt Punkte je Takt; ein ausgeschiedenes Team verliert seine Orte.
+  //  4. ROTATION: hat ein Team seinen Ort sicher (Besitz, kein Gegner, kein fremder Fortschritt),
+  //     bleibt EINER als Halter, der Rest rueckt zum naechsten umkaempften Ort nach (ein Takt Weg).
+  //  5. PLATZIERUNG unveraendert ueber bfPodPlatzierungAus() (letztes Team > Punkte > Lebende >
+  //     spaeter raus), Ligapunkte 2-1-0-0.
+  //
+  // JEDES der neun Matrixgewichte (BASIS_JE_DISC.battlefield) hat einen benannten Kanal, und seine
+  // Staerke ist sein Gewicht — keine zweite Gewichtung neben der vorgegebenen (Chris 13.10. fuer
+  // Mini-DM, sinngemaess fuer jede Disziplin):
+  //   charisma 20      BEFEHL: Wucht des Angriffs (ein Befehl richtet mehr aus als ein Schlag, s.
+  //                    ARENA_ART.battlefield) und Eroberungstempo (Primaer-/Nebenweg)
+  //   intelligence 16  LAGE LESEN: Schwachstelle (schlaegt dorthin, wo einer wackelt) und
+  //                    Positionierung (von zwei Angreifern kommt nur einer an)
+  //   spirit 16        ZUSAMMENHALT: Deckung, mindert jeden erlittenen Treffer
+  //   torment 12       WUCHT je Treffer
+  //   power 10         WUCHT je Treffer
+  //   awareness 10     TREFFER landen
+  //   health 8         STAND (wie viel einer einstecken kann)
+  //   determination 4  LETZTER ATEM: ein toedlicher Treffer laesst ihn einmal stehen
+  //   stamina 4        AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)` wie in
+  // mdffaKaempfer(); E ist dieselbe Eignung wie in baueEinheit() (Slot, Form, Stufe, Mutator).
+  //
+  // BEWUSST NICHT ANGEFASST: das Zwei-Team-Duell. Es laeuft weiter ueber build()/stepSim(); dieser
+  // Block wird nur im Pod (KP.pod) erreicht. Der Echtzeit-Pod bleibt als Kontrolle erreichbar
+  // (`spieleBattlefieldPod(..., {echtzeit:true})`), gebucht und gezeigt wird das Gefecht hier.
+  const BF_FFA_GRUND=Object.freeze({
+    takte:20, taktSek:4, mitte:50, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    position:{basis:0.2},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    erobern:{bedarf:2},
+    punkteJeTakt:8, punkteZumSieg:150,
+    rotation:{dauer:2},
+    wertung:{ko:15, erob:12, halten:3, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, position:1.5, atem:5, erobern:4}
+  });
+  const bfffaGrund=()=>JSON.parse(JSON.stringify(BF_FFA_GRUND));
+  let BFFFA=bfffaGrund();
+  const BFFFA_ZWECK={ziel:11, schwachstelle:12, position:13, positionWahl:14, treffer:15, atem:16};
+  const BF_ORT_NAMEN=["Nord","Mitte","Süd"];
+  // Heim-/Fernort je Seite (Seite 0/1 stehen oben, 2/3 unten — bfPodHome). Bei drei Teams (nur in
+  // Sonden denkbar, die Liga lost immer Vierergruppen) hat Seite 2 den Sueden fuer sich.
+  const bfffaHeimOrt=(side)=>side<2?0:2;
+  const bfffaFernOrt=(side)=>side<2?2:0;
+  const BFFFA_ROLLEN_ORT={moraleanchor:"heim", commander:"heim", siegecore:"mitte", fieldcontrol:"mitte",
+    disruptor:"fern", spotter:"fern"};
+  function bfffaStartOrt(slot,side){
+    const w=BFFFA_ROLLEN_ORT[slot]||"mitte";
+    return w==="heim"?bfffaHeimOrt(side):w==="fern"?bfffaFernOrt(side):1;
+  }
+  // Wer bei einer Rotation als Halter bleibt: die Rolle, die das Halten traegt (ARENA_DOMINATION
+  // .rolle), dann die geringere Kaempfer-Nummer — deterministisch, kein Wurf.
+  const BFFFA_HALTER_RANG={moraleanchor:0, fieldcontrol:1, commander:2, spotter:3, disruptor:4, siegecore:5};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie baueEinheit() (Slot-Aufschlag mit dem
+  // k-Profil `slotDef`, Form/Stufe, Mutator, Messhebel), dieselbe Eignung, die disziplinProbe und
+  // die Pod-Sonde als `eig` melden. `idx` ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel).
+  function bfffaKaempfer(p,side,slotId,slotDef,idx){
+    const d="battlefield";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=BFFFA, R=P.mitte, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    const rolle=kpRolleVonSlot(slotId);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["charisma","torment","power"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      position:klemme(P.position.basis+weg(H.position,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      // Eroberung: Rolle (ARENA_DOMINATION.rolle, wie kpRolleVon) mal Befehl (Charisma). Der Befehl
+      // traegt auch das HALTEN eines eigenen Ortes: wer dort steht, ordnet ihn je Takt — die
+      // Gutschrift waechst mit seinem Befehl (sonst brachte ein schneller eroberter Ort dieselbe
+      // feste Gutschrift wie ein langsamer, und Charisma laese im Pp fast nur ueber die Eignung).
+      befehl:klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      erob:rolle.erobern*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      neutral:rolle.neutral*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      halten:rolle.halten*klemme(1+weg(H.erobern,["charisma"]),0.2,3),
+      stoeren:rolle.stoeren,
+      // Laufzustand
+      ort:bfffaStartOrt(slotId,side), nach:null, ankunft:null, raus:false, rausTakt:null, atemWeg:false,
+      wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, erob:0, halte:0, schwachstellen:0, ausgewichen:0,
+          atem:0, rotationen:0, takteAmOrt:[0,0,0]}
+    };
+  }
+  // kpRolleVon() liest KP.rolle — im Gefecht gibt es kein KP; dieselben Gewichte direkt aus
+  // ARENA_DOMINATION.battlefield, mit denselben Untergrenzen.
+  function kpRolleVonSlot(slot){
+    const r=(ARENA_DOMINATION.battlefield.rolle&&slot&&ARENA_DOMINATION.battlefield.rolle[slot])||{};
+    const erobern=Math.max(1,r.erobern??1);
+    return {erobern, neutral:Math.max(1,r.neutral??erobern), halten:Math.max(1,r.halten??1), stoeren:r.stoeren??0};
+  }
+
+  // DAS GEFECHT. `kaempfer` sind bfffaKaempfer() (Index = idx), `N` die Teamzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente: dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Rueckgabe: Endstand je Team, Wertung je Kaempfer und das
+  // Takt-Protokoll, aus dem die Arena das Gefecht nachspielt (bfPodReplay*).
+  function bfffaGefecht(kaempfer,saat,N){
+    const P=BFFFA, Z=BFFFA_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const orte=[0,1,2].map(i=>({name:BF_ORT_NAMEN[i], besitz:null, fortschritt:0, erobertVon:null}));
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const steht=(k)=>!k.raus;
+    const lebendeTeams=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    // Anfangsbild (Takt 0) fuer die Anzeige: wer wohin geht.
+    const schnapp=()=>({
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach})),
+      orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeTeams().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ANKUNFT der Rotierenden.
+      for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
+        k.ort=k.nach; k.nach=null; k.ankunft=null;
+        ereignisse.push({typ:"ankunft", wer:k.idx, ort:k.ort});
+      }
+      // 2) ZIELWAHL je Ort, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus||A.ort==null)continue;
+        A.st.takteAmOrt[A.ort]++;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.ort===A.ort&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach,aktiv:true});
+      }
+      // 3) POSITIONIERUNG (Intelligence): von zwei oder mehr Angreifern kommt nur einer an.
+      for(const Zk of kaempfer){
+        if(Zk.raus)continue;
+        const auf=angriffe.filter(x=>x.ziel===Zk);
+        if(auf.length<2)continue;
+        if(wurf(Zk.idx,t,Z.position)<Zk.position){
+          const bleibt=Math.min(auf.length-1,Math.floor(wurf(Zk.idx,t,Z.positionWahl)*auf.length));
+          auf.forEach((x,i)=>{ if(i!==bleibt)x.aktiv=false; });
+          Zk.st.ausgewichen++;
+          ereignisse.push({typ:"position", wer:Zk.idx, ort:Zk.ort, gegen:auf.filter((x,i)=>i!==bleibt).map(x=>x.A.idx)});
+        }
+      }
+      // 4) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit) mindert.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel}=x;
+        A.st.schlaege++;
+        if(!x.aktiv){ ereignisse.push({typ:"leer", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx, ort:A.ort}); continue; }
+        const dmg=A.wucht*muede(A)*(x.schwach?1+P.schwachstelle.bonus:1)*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:x.schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, ort:A.ort, wucht:Math.round(dmg*10)/10});
+      }
+      // 5) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; k.st.atem++;
+          ereignisse.push({typ:"atem", wer:k.idx, ort:k.ort});
+          continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx, ort:k.ort});
+      }
+      // 6) AUSSCHEIDEN: ein Team ohne Stehende ist raus, seine Orte fallen auf neutral.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t;
+        for(const o of orte){
+          if(o.besitz===s)o.besitz=null;
+          if(o.erobertVon===s){o.erobertVon=null;o.fortschritt=0;}
+        }
+        ereignisse.push({typ:"team-raus", side:s});
+      }
+      // 7) KONTROLLPUNKTE — dieselbe Regel wie kpTick, je Takt statt je Bild.
+      orte.forEach((o,oi)=>{
+        const da=kaempfer.filter(k=>!k.raus&&k.ort===oi);
+        const seiten=[...new Set(da.map(k=>k.side))];
+        if(seiten.length===1){
+          const s=seiten[0], eigene=da;
+          if(o.besitz!==s){
+            if(o.erobertVon!==s){o.erobertVon=s;o.fortschritt=0;}
+            const neutral=o.besitz==null;
+            const kraft=eigene.reduce((a,k)=>a+(neutral?k.neutral:k.erob),0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.min(1,o.fortschritt+kraft/P.erobern.bedarf);
+            const gewonnen=o.fortschritt-vorher;
+            for(const k of eigene){const a=gewonnen*(neutral?k.neutral:k.erob)/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt>=1){
+              o.besitz=s;o.fortschritt=0;o.erobertVon=null;
+              ereignisse.push({typ:"erobert", side:s, ort:oi});
+            }
+          }else if(o.erobertVon!=null&&o.erobertVon!==s&&o.fortschritt>0){
+            const kraft=eigene.reduce((a,k)=>a+k.halten,0);
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-kraft/P.erobern.bedarf);
+            const abgewehrt=vorher-o.fortschritt;
+            for(const k of eigene){const a=abgewehrt*k.halten/Math.max(1e-9,kraft); k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }else if(seiten.length>=2&&o.erobertVon!=null){
+          let st=0;
+          for(const k of da)if(k.side!==o.erobertVon)st+=k.stoeren;
+          if(st>0){
+            const vorher=o.fortschritt;
+            o.fortschritt=Math.max(0,o.fortschritt-0.5*st/P.erobern.bedarf);
+            for(const k of da)if(k.side!==o.erobertVon&&k.stoeren>0){const a=(vorher-o.fortschritt)*k.stoeren/st; k.st.erob+=a; k.wert+=a*P.wertung.erob;}
+            if(o.fortschritt<=0){o.fortschritt=0;o.erobertVon=null;}
+          }
+        }
+        // Besitz zahlt; wer am eigenen Ort steht, bekommt den Halteanteil gutgeschrieben.
+        if(o.besitz!=null){
+          punkte[o.besitz]+=P.punkteJeTakt;
+          const halter=da.filter(k=>k.side===o.besitz);
+          for(const k of halter){ k.wert+=P.wertung.halten*k.befehl/halter.length; k.st.halte++; }
+        }
+      });
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      // 8) ROTATION: wessen Ort sicher ist (eigener Besitz, kein Gegner, kein fremder Fortschritt),
+      // laesst einen Halter dort und schickt den Rest zum naechsten umkaempften Ort.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null)continue;
+        for(let oi=0;oi<3;oi++){
+          const o=orte[oi];
+          const eigene=kaempfer.filter(k=>!k.raus&&k.side===s&&k.ort===oi&&k.nach==null);
+          if(eigene.length<2&&o.besitz===s)continue;
+          if(!eigene.length)continue;
+          const feinde=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===oi);
+          if(feinde||o.besitz!==s||(o.erobertVon!=null&&o.fortschritt>0))continue;
+          // Ziel: ein Ort, an dem Gegner stehen oder den ein anderes Team besitzt — die Mitte zuerst,
+          // dann der naehere. Gibt es keinen, bleiben alle.
+          const reihe=[1,oi===0?2:0,oi];
+          let ziel=null;
+          for(const zi of reihe){
+            if(zi===oi)continue;
+            const zo=orte[zi];
+            const dort=kaempfer.some(k=>!k.raus&&k.side!==s&&k.ort===zi);
+            if(dort||(zo.besitz!=null&&zo.besitz!==s)||zo.besitz==null){ziel=zi;break;}
+          }
+          if(ziel==null)continue;
+          const halter=eigene.slice().sort((a,b)=>(BFFFA_HALTER_RANG[a.slot]??9)-(BFFFA_HALTER_RANG[b.slot]??9)||a.idx-b.idx)[0];
+          for(const k of eigene){
+            if(k===halter)continue;
+            k.nach=ziel; k.ankunft=t+P.rotation.dauer; k.ort=null; k.st.rotationen++;
+            ereignisse.push({typ:"rotation", wer:k.idx, von:oi, nach:ziel});
+          }
+        }
+      }
+      takte.push({t, ereignisse, ...schnapp()});
+      if(punkte.some(x=>x>=P.punkteZumSieg)){ ende="limit"; break; }
+    }
+    if(ende==="zeit"&&lebendeTeams().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte (wie im Schlagwechsel) — sonst kostete
+    // ein schneller Sieg den Sieger genau die Taktpunkte, die er sich erkaempft hat.
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, orte, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // PLATZIERUNG AUS EINEM ENDSTAND — dieselbe Regel wie bfPodPlatzierung() (die liest KP/U und
+  // ruft jetzt diese Funktion), damit Gefecht, Replay und Echtzeit-Kontrolle denselben Massstab haben.
+  // `zusatz` (optional, nur das Gefecht je Ort): ein fuenfter Schluessel nach dem Ausscheidezeitpunkt —
+  // die Summe der Kampfrichterwertung je Team. Damit bleibt ein exakter Gleichstand auf allen vier
+  // Sieg-Wegen (gleiche Punkte, gleich viele Lebende, beide bis zum Ende im Spiel) praktisch aus, und
+  // die Liga bucht dieselben 2-1-0-0, die die Arena zeigt, ohne einen zweiten Tiebreak daneben.
+  function bfPodPlatzierungAus(N,punkte,lebend,rausT,zusatz){
+    const nochDa=lebend.filter(x=>x>0).length;
+    const schl=(s)=>[nochDa===1&&lebend[s]>0?1:0, Math.round(punkte[s]*1000)/1000, lebend[s],
+      rausT[s]==null?Infinity:rausT[s], zusatz?Math.round(zusatz[s]*1000)/1000:0];
+    const vergleich=(a,b)=>{const A=schl(a),B=schl(b);for(let i=0;i<A.length;i++)if(A[i]!==B[i])return B[i]>A[i]?1:-1;return 0;};
+    const reihenfolge=Array.from({length:N},(_,s)=>s).sort((a,b)=>vergleich(a,b)||a-b);
+    const platz=new Array(N).fill(0), ligaPunkte=new Array(N).fill(0);
+    const tabelle=Array.from({length:N},(_,i)=>MINI_DM_FFA_LIGAPUNKTE[i]??0);
+    let i=0;
+    while(i<N){
+      let j=i;
+      while(j+1<N&&vergleich(reihenfolge[j+1],reihenfolge[i])===0)j++;
+      const geteilt=tabelle.slice(i,j+1).reduce((a,b)=>a+b,0)/(j-i+1);
+      for(let k=i;k<=j;k++){platz[reihenfolge[k]]=i+1; ligaPunkte[reihenfolge[k]]=geteilt;}
+      i=j+1;
+    }
+    const sieger=platz.filter(p=>p===1).length===1?reihenfolge[0]:null;
+    return {reihenfolge, platz, ligaPunkte, sieger, lebend:lebend.slice(), punkte:punkte.slice(), rausT:rausT.slice()};
+  }
+
+  // DIE KAEMPFER EINES GEBAUTEN POD-KAMPFES: U nach bfPodBau() traegt Aufstellung, Seite und Rolle;
+  // die Spielerobjekte kommen aus den Kadern. Rolle und k-Profil wie in bfPodBau.
+  function bfffaKaempferAusU(kader){
+    return U.map((u,idx)=>{
+      const p=kader[u.side].find(q=>q.n===u.n);
+      const kSlots=bfSlotsFuer("battlefield",U.filter(x=>x.side===u.side).length);
+      return bfffaKaempfer(p,u.side,u.slot,bfSlotDef(kSlots,u.slot),idx);
+    });
+  }
+  // Das ganze Gefecht fuer den gerade gebauten Pod (U/KP.pod gesetzt). Rueckgabe wie bfffaGefecht
+  // plus Platzierung und Wertung je Kaempfer als Anteil am Gesamtbeitrag (dieselbe Groesse wie
+  // MOTOREN.battlefield.wert(): Prozent, Summe 100 ueber alle 4k Kaempfer).
+  function bfffaFuerGebautenPod(kader,saat){
+    const N=kader.length;
+    const kaempfer=bfffaKaempferAusU(kader);
+    const g=bfffaGefecht(kaempfer,normalisiereSaat(saat),N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s&&!k.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(k=>k.side===s).reduce((a,k)=>a+k.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt.map(x=>x==null?null:x*BFFFA.taktSek),teamWert);
+    const summe=kaempfer.reduce((a,k)=>a+Math.max(0,k.wert),0)||1;
+    const anteil={};
+    for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
+    return {...g, platzierung:pl, lebend, anteil, teamWert};
+  }
+
+  // ===================================================================================
+  // DAS REPLAY — die sichtbare Arena spielt das fertige Gefecht ab (02.11.).
+  //
+  // Alle vier Teams stehen gleichzeitig auf demselben Feld und kaempfen gleichzeitig an allen drei
+  // Orten; nur WER WEN TRIFFT, WER FAELLT und WER WELCHEN ORT NIMMT, steht vorher fest (das
+  // Protokoll aus bfffaGefecht). Nichts davon wird hier gewuerfelt — die Anzeige zeigt genau den
+  // Kampf, den die Liga bucht. stepSim() leitet im Pod mit Replay hierher um (s. dort), das Duell
+  // erreicht diesen Code nie (KP.pod gibt es nur im Pod).
+  //
+  // Zeitachse in Kampfsekunden: zuerst ANMARSCH (die Kaempfer laufen aus ihren Ecken an ihre Orte),
+  // dann je Takt BFFFA.taktSek. Die Schlaege eines Taktes sind ueber den Takt verteilt (fester
+  // Versatz je Kaempfer, kein Wurf), K.o.s, Eroberungen und Punkte fallen ans Taktende.
+  const BF_REPLAY_ANMARSCH=6, BF_REPLAY_TEMPO=95;
+  let bfPodSpuren=[];
+  function bfPodReplayStarten(g){
+    if(!KP||!KP.pod)return;
+    KP.pod.replay={g, takt:0, erledigt:new Set(), ende:BF_REPLAY_ANMARSCH+g.gespielt*BFFFA.taktSek};
+    // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
+    KP.pod.zusatz=g.teamWert.slice();
+    bfPodSpuren=[];
+    g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; } });
+  }
+  const bfPodReplayAktiv=()=>!!(KP&&KP.pod&&KP.pod.replay);
+  // Wo ein Kaempfer an einem Ort steht: links (Seite 0/2) oder rechts (1/3) vom Ort, auf der Hoehe
+  // seiner Ecke versetzt, wenn ein zweites Team von derselben Seite dort steht; die Kameraden in
+  // einem Raster nach aussen (zwei Reihen), damit sich Figuren und Namen nicht decken.
+  function bfPodReplayPlatz(u,ort,stand){
+    const o=KP.orte[ort];
+    const amOrt=(x)=>x.bfIdx!=null&&!x.down&&stand.k[x.bfIdx]&&stand.k[x.bfIdx].ort===ort;
+    const am=U.filter(x=>x.side===u.side&&amOrt(x));
+    const nebenan=U.some(x=>x.side!==u.side&&x.side%2===u.side%2&&amOrt(x));
+    const j=Math.max(0,am.indexOf(u)), m=Math.max(1,am.length);
+    const sx=u.side%2===0?-1:1, cy=nebenan?(u.side<2?-1:1)*36:0;
+    const reihen=m>1&&!nebenan?2:1, spalte=Math.floor(j/reihen), reihe=j%reihen;
+    const y=o.y+cy+(reihen>1?(reihe-0.5)*58:0);
+    return {x:o.x+sx*(92+spalte*60), y:Math.max(40,Math.min(H-30,y))};
+  }
+  function bfPodReplaySchritt(dt){
+    const R=KP.pod.replay, g=R.g, D=BFFFA.taktSek;
+    // Laufender Takt (0 = Anmarsch) und der Stand, auf den die Figuren gerade zulaufen.
+    const takt=t<BF_REPLAY_ANMARSCH?0:Math.min(g.gespielt,1+Math.floor((t-BF_REPLAY_ANMARSCH)/D));
+    const standVor=takt<=1?g.start:g.takte[takt-2];
+    const imTakt=takt>=1?g.takte[takt-1]:null;
+    const taktStart=BF_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    // 1) BEWEGUNG: jeder Stehende laeuft an seinen Platz (unterwegs: an den Zielort).
+    for(const u of U){
+      if(u.bfIdx==null)continue;
+      u.lunge=Math.max(0,(u.lunge||0)-dt);
+      if(u.down)continue;
+      const k=standVor.k[u.bfIdx];
+      const ort=k.ort!=null?k.ort:k.nach;
+      if(ort==null)continue;
+      const ziel=bfPodReplayPlatz(u,ort,{k:standVor.k.map(x=>({ort:x.ort!=null?x.ort:x.nach}))});
+      const ddx=ziel.x-u.x, ddy=ziel.y-u.y, weg=Math.hypot(ddx,ddy), schritt=BF_REPLAY_TEMPO*dt;
+      if(weg>0.5){ const f=Math.min(1,schritt/weg); u.x+=ddx*f; u.y+=ddy*f; u.vx=ddx/weg*BF_REPLAY_TEMPO; u.vy=ddy/weg*BF_REPLAY_TEMPO; }
+      else { u.vx=0; u.vy=0; }
+    }
+    // 2) DIE SCHLAEGE DIESES TAKTES, jeder zu seinem festen Zeitpunkt im Takt.
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=R.takt+":"+(takt)+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben"||e.typ==="leer";
+        const zeitpunkt=istSchlag?0.12+0.66*((e.wer*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        bfPodReplayEreignis(e,g);
+      });
+    }
+    // 3) ORTE UND PUNKTE: vom Stand vor dem Takt zum Stand danach, gleitend.
+    if(imTakt){
+      KP.orte.forEach((o,i)=>{
+        const a=standVor.orte[i], b=imTakt.orte[i];
+        o.besitz=anteilTakt>=0.9?b.besitz:a.besitz;
+        if(anteilTakt>=0.9){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt; }
+        else if(a.erobertVon!=null&&a.erobertVon===b.erobertVon){ o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt+(b.fortschritt-a.fortschritt)*anteilTakt/0.9; }
+        else if(b.erobertVon!=null&&a.besitz===b.besitz){ o.erobertVon=b.erobertVon; o.fortschritt=b.fortschritt*anteilTakt/0.9; }
+        else { o.erobertVon=a.erobertVon; o.fortschritt=a.fortschritt; }
+      });
+      for(let s=0;s<KP.punkte.length;s++)KP.punkte[s]=standVor.punkte[s]+(imTakt.punkte[s]-standVor.punkte[s])*anteilTakt;
+    }
+    for(const sp of bfPodSpuren)sp.life-=dt;
+    bfPodSpuren=bfPodSpuren.filter(sp=>sp.life>0);
+    // 4) ENDE: der Endstand ist exakt der des Gefechts (Platzierung liest KP/U).
+    if(t>=R.ende){
+      const last=g.takte[g.gespielt-1]||g.start;
+      for(const e of (g.takte.flatMap((tk,ti)=>tk.ereignisse.map((x,ei)=>({x,schl:R.takt+":"+(ti+1)+":"+ei})))))
+        if(!R.erledigt.has(e.schl)){ R.erledigt.add(e.schl); bfPodReplayEreignis(e.x,g,true); }
+      KP.orte.forEach((o,i)=>{ o.besitz=last.orte[i].besitz; o.erobertVon=last.orte[i].erobertVon; o.fortschritt=last.orte[i].fortschritt; });
+      for(let s=0;s<KP.punkte.length;s++){ KP.punkte[s]=last.punkte[s]; KP.pod.rausT[s]=last.rausTakt[s]==null?null:last.rausTakt[s]*D; }
+      U.forEach(u=>{ if(u.bfIdx!=null&&g.kaempfer[u.bfIdx].raus&&!u.down)u.down=true; });
+      finish();
+    }
+    updateHud();
+  }
+  // EIN EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN. `still`: nur den Zustand nachziehen (Endstand),
+  // keine Spuren und keine Schwebeschrift.
+  function bfPodReplayEreignis(e,g,still){
+    const U_=(i)=>U.find(u=>u.bfIdx===i)||null;
+    const name=(s)=>kampfTeamName(s);
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const k=g.kaempfer[e.ziel], anteil=e.wucht/Math.max(1e-9,k.stand0), d=anteil*Z.max;
+        Z.hp=Math.max(1,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x,y2:Z.y,farbe:kampfSeitenFarbe(A.side),life:0.5,dick:e.typ==="schwachstelle"});
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A&&Z&&!still){ A.lunge=0.16; A.tgt=Z;
+        bfPodSpuren.push({x1:A.x,y1:A.y,x2:Z.x+18,y2:Z.y-14,farbe:kampfSeitenFarbe(A.side),life:0.35,dick:false}); } break; }
+      case "leer": { const Z=U_(e.ziel); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"ausgewichen",life:.8}); break; }
+      case "position": { const Z=U_(e.wer); if(Z&&!still)schwebe({x:Z.x,y:Z.y-40,txt:"stellt sich klug",life:.9,skill:true}); break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02)); if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+        feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": {
+        const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
+        Z.hp=0;
+        if(A&&!still)schalteAus(Z,A);
+        else { Z.down=true; Z.st.tode++; if(A){A.st.ko++; A.st.koAnteil+=1;} }
+        break;
+      }
+      case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
+      case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+BF_ORT_NAMEN[e.ort]+".",true,undefined,"kontrollpunkt"); break;
+      default: break;
+    }
+  }
+  function zeichneBfPodSpuren(){
+    if(!bfPodSpuren.length)return;
+    ctx.save();
+    for(const sp of bfPodSpuren){
+      ctx.globalAlpha=Math.max(0,Math.min(1,sp.life/0.5))*.85;
+      ctx.strokeStyle=sp.farbe; ctx.lineWidth=sp.dick?3.5:2; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(sp.x1,sp.y1); ctx.lineTo(sp.x2,sp.y2); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ===================================================================================
@@ -55366,6 +56995,9 @@
     // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
     // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
     function zeigeEndstand(){
+      // Mini-DM endet nicht ueber finish(), sondern hier -- dieselbe Ende-Meldung an den Host.
+      letzterAngezeigterSieger=null;
+      setTimeout(meldeSpielEnde,0);
       if(titelkarte)titelkarte.hidden=true;
       if(rundenbanner)rundenbanner.hidden=true;
       if(ctrlBox)ctrlBox.hidden=true;
@@ -55599,8 +57231,14 @@
   // BAHN_ART; hier ist nichts nachzutragen.
   for(const bd of Object.keys(BAHN_ART)){
     MOTOREN[bd]={
-      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern()}),
+      // POD-ZUSTAND (bahnPodKader/bahnPodJeTeam) gehoert mit dazu, seit die Arena ein Vier-Team-
+      // Rennen auch SICHTBAR zeigt (bahnPodAnzeige): ein headless Lauf mitten in diesem Rennen
+      // (spieleBahn, spieleBahnPod, Sonden) startet ueber vorher() garantiert ohne Pod-Kader und
+      // gibt den sichtbaren ueber zurueck() wieder her. Im Duell sind beide immer null.
+      sichern:()=>({disc, bahnDisc, LAEUFER, rennFertig, rennT, done, anzeige:bahnAnzeigeSichern(),
+                    podKader:bahnPodKader, podJeTeam:bahnPodJeTeam}),
       zurueck:(a)=>{disc=a.disc; bahnDisc=a.bahnDisc; LAEUFER=a.LAEUFER;
+                    bahnPodKader=a.podKader??null; bahnPodJeTeam=a.podJeTeam??null;
                     rennFertig=a.rennFertig; rennT=a.rennT; done=a.done;
                     // Die Schwebetexte der MESSUNG gehoeren nicht zum wiederhergestellten
                     // Rennen: ihre _laeufer-Verweise zeigen auf die Laeufer des Durchgangs,
@@ -55611,7 +57249,7 @@
                     // Anzeige-Zustand ZULETZT zurueckstellen (Time-Trial-Broadcast-Paket
                     // 07.10.): bauSpurt() im Zweitlauf hat ihn geleert, hier kommt er zurueck.
                     bahnAnzeigeZurueck(a.anzeige);},
-      vorher:()=>{disc=bd; bahnDisc=bd;},
+      vorher:()=>{disc=bd; bahnDisc=bd; bahnPodKader=null; bahnPodJeTeam=null;},
       bau:(saat)=>{bahnDisc=bd; bauSpurt(saat);},
       lauf:()=>{let g=0; while(!done&&g<90){ stepSpurt(1/60); g+=1/60; }},
       namen:()=>LAEUFER.map(u=>u.n),
@@ -55800,7 +57438,10 @@
         zeit:(u.fertig==null||u.raus)?null:+bahnZeit(u).toFixed(4), pos:+u.pos.toFixed(5),
         startT:+(u.startT||0).toFixed(3),
         zwischenzeiten:(u.zz||[]).map(v=>v==null?null:+v.toFixed(4)),
-        bein:u.bein==null?null:u.bein,   // nur Staffel: welchen Abschnitt er laeuft
+        bein:u.bein==null?null:(u.beineListe?u.beineListe[0]:u.bein),   // nur Staffel: welchen Abschnitt er laeuft (Doppellaeufer: sein erster)
+        // Nur unterbesetzte Staffel: alle Beine dieses Laeufers und die Zeiten der Zusatzbeine.
+        ...(u.beineListe?{beine:[...u.beineListe],
+          zusatzEtappen:u.zusatzZeiten.map(v=>+v.toFixed(4))}:{}),
         etappe:u.etappenZeit==null?null:+u.etappenZeit.toFixed(4),
         wechselKonto:+(u.wechselKonto||0).toFixed(4),
         burg:BAHN_ART[bd].takeshi?{stern:+burgpunkte(u).toFixed(3),bonus:zielbonus(u)}:null,
@@ -55951,6 +57592,13 @@
   // pruefen tests/bahn-pod-vier-teams.test.ts (Fingerabdruecke vom Stand vor dem Umbau) und die
   // Vorher/Nachher-Messung (docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 2).
   //
+  // ZWEI POD-EIGENE STELLSCHRAUBEN (02.11., Pp-Pflichtpruefung, Dokument Abschnitt 5), beide nur
+  // bei gesetztem `bahnPodKader` wirksam, das Duell bleibt bit-identisch:
+  //   - POD-DICHTE: das Gedraenge an der Falle (nur Takeshi) zaehlt den Pulk auf Duell-Dichte
+  //     umgerechnet (x 2/N), s. `pulk` in stepSpurt.
+  //   - POD-REZEPT: `BAHN_ART[bd].podRezept` ersetzt einzelne Sub-Skills (nur Staffel), s.
+  //     spurtWerte.
+  //
   // Nur headless: die Zeichnung (Bahnen, HUD "X : Y", Banner) bleibt zweiseitig und wird von
   // hier nie aufgerufen (`stumm`).
   const BAHN_POD_DISZIPLINEN=Object.freeze(["takeshis-castle","staffel"]);
@@ -56039,10 +57687,176 @@
       const r=bahnPodLauf(bd,teams,saat,platzJeTeam,(kader)=>{
         FORMKARTE={...FORMKARTE};
         if(opt.formSaat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(opt.formSaat));
+        // `optionen.k` (Liga-Verdrahtung 02.11.): Kopfzahl des Spielplan-Slots fuer Teams ohne
+        // Aufstellung (s. bahnPodJeTeam). M.zurueck() in bahnPodLauf setzt es danach zurueck.
+        if(Number.isInteger(opt.k)&&opt.k>=1)bahnPodJeTeam=opt.k;
       });
       return {disziplin:r.disziplin, saat:r.saat, teams:r.teams,
         boxscore:r.laeufer.map(u=>({name:u.n, side:u.side, wert:u.punkte}))};
     } finally { FORMKARTE=formVorher; }
+  }
+
+  // ===================================================================================
+  // DAS SICHTBARE VIER-TEAM-RENNEN (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+  // Abschnitt 6). Bucht die Liga an einem Spieltag fuer Takeshi's Castle oder Staffel einen Pod,
+  // zeigt die Arena dieses Rennen — alle vier Teams der gebuchten Gruppe auf einer Strecke — statt
+  // eines Duells gegen den Fixture-Gegner (sonst sahe Chris ein Rennen, dessen Ergebnis nicht zur
+  // Buchung passt: dieselbe Fehlerklasse wie "0:2 bei 4 Teams", 19.10.).
+  //
+  // Quelle ist der Host (FoundationBattleArenaHost.tsx): `echterKader.bahnPodByDisciplineId[bd]` =
+  // {teams:[{name,kurz,kader}], k, saat, aufstellung:[place je Team]} — dieselben Kader, dieselbe
+  // Saat (`buildBahnPodMatchSeed`), dieselbe Aufstellung und dieselben Formkarten (formSaat = saat)
+  // wie der zaehlende Lauf (`runBahnPodFixtures`, arena-headless-runner.ts). Fuer Standalone/Tests
+  // setzt `window.__arena.bahnPodAnzeigen(bd, pod)` dieselbe Form (null schaltet zurueck aufs Duell).
+  //
+  // Anders als headless bleibt der Pod hier fuer die ganze Dauer des sichtbaren Rennens gesetzt
+  // (`bahnPodKader`, `bahnPodJeTeam`, Aufstellung, Formkarten, Vereinsnamen 0..3); reset() baut ihn
+  // vor jedem neuen Aufbau ueber bahnPodAnzeigeAbbauen() wieder ab. Die Zeichnung liest dann
+  // bahnPodAnzeigeAktiv(): Teamfarben 0..3, Vier-Team-Tafel, HUD und Endstand fuer vier Teams.
+  function bahnPodAnzeigeKontext(){
+    const karte=echterKader&&echterKader.bahnPodByDisciplineId;
+    const roh=(bahnPodAnzeigeVorgabe&&bahnPodAnzeigeVorgabe[disc])
+      ||(karte&&typeof karte==="object"?karte[disc]:null)||null;
+    if(!roh||!Array.isArray(roh.teams)||roh.teams.length<3||roh.teams.length>4)return null;
+    if(roh.teams.some(tm=>!bfPodKaderVon(tm).length))return null;
+    return roh;
+  }
+  function bahnPodAnzeigeBauen(pod){
+    const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
+    bahnPodAnzeige={kader, vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
+    bfPodVereineSetzen(pod.teams);
+    // Aufstellung, Formkarten und Persoenlichkeiten wirken nur beim Bau (setz/formVon/`pers` in
+    // bauSpurt; stepSpurt liest keins davon, der Laeufer traegt `u.pers` selbst) — danach sofort
+    // zurueck. So sieht ein headless Lauf waehrend des sichtbaren Rennens (spieleBahn, Sonden)
+    // exakt den Duell-Zustand (tests/bahn-pod-vier-teams.test.ts, "kein Leck ins Duell").
+    const placeVorher={...place}, formVorher=FORMKARTE, persVorher={...persOf};
+    try{
+      for(const k of kader)for(const p of k)persOf[p.n]=leitePers(p).key;
+      for(const k in place)delete place[k];
+      for(const pl of (pod.aufstellung||[]))if(pl)for(const name in pl)place[name]=pl[name];
+      FORMKARTE={...FORMKARTE};
+      if(pod.saat!=null)mdffaFormkartenFuer(kader,normalisiereSaat(pod.saat));
+      bahnPodJeTeam=Number.isInteger(pod.k)&&pod.k>=1?pod.k:null;
+      bahnPodKader=kader;
+      build(pod.saat);
+    } finally {
+      for(const k in place)delete place[k];
+      Object.assign(place,placeVorher);
+      FORMKARTE=formVorher;
+      for(const k in persOf)delete persOf[k];
+      Object.assign(persOf,persVorher);
+    }
+  }
+  function bahnPodAnzeigeAbbauen(){
+    const a=bahnPodAnzeige;
+    if(!a)return;
+    bahnPodAnzeige=null;
+    if(bahnPodKader===a.kader){ bahnPodKader=null; bahnPodJeTeam=null; }
+    bfPodVereinZurueck(a.vereinSnap);
+  }
+  // Stand des sichtbaren Pods, je Seite: Wert (Burgpunkte; Staffel: Zielzeit bzw. Streckenanteil),
+  // Anzeige-Text und Platz 1..N. Waehrend des Rennens vorlaeufig, nach `done` exakt die Wertung des
+  // zaehlenden Laufs (bahnPodErgebnis + verteilePlatzierungspunkte, wie bahnPodLauf).
+  function bahnPodLiveStand(){
+    const N=bahnSeitenN(), art=BA();
+    const f1=(v)=>(Math.round(v*10)/10).toFixed(1).replace(/\.0$/,"").replace(".",",");
+    const teams=[];
+    for(let s=0;s<N;s++){
+      const team=LAEUFER.filter(u=>u.seite===s);
+      if(art.wertung==="burg"){
+        const w=team.reduce((x,u)=>x+burgwertung(u),0);
+        teams.push({side:s, wert:w, anzeige:f1(w)+" P", zielzeit:null});
+      } else {
+        const ziel=team.find(u=>u.fertig!=null);
+        const z=ziel?ziel.fertig:null, p=gesamtfortschritt(s);
+        teams.push({side:s, wert:z!=null?1e6-z:p, anzeige:z!=null?fmtZielzeit(z):Math.round(p*100)+" %", zielzeit:z});
+      }
+    }
+    let werte=teams.map(t=>t.wert);
+    if(done){ const e=bahnPodErgebnis(N); werte=e.teamWert; }
+    const {punkte,platz}=verteilePlatzierungspunkte(werte,bahnPodPunkteTabelle(N));
+    teams.forEach((t,s)=>{ t.platz=platz[s]; t.ligaPunkte=punkte[s];
+      t.name=(VEREIN[s]&&VEREIN[s].name)||("Team "+(s+1)); });
+    const reihe=[...teams].sort((a,b)=>a.platz-b.platz||a.side-b.side);
+    return {N, teams, reihe, done:!!done, platz:teams.map(t=>t.platz)};
+  }
+  // FUEHRUNGSWECHSEL DER STAFFEL IM POD: staffelZeitDelta() vergleicht nur Seite 0 und 1 — im Pod
+  // fuehrt, wer im Vier-Team-Stand vorn liegt (bahnPodLiveStand), mit derselben 2-s-Sperre.
+  function bahnPodStaffelFuehrung(){
+    const st=bahnPodLiveStand(), vorn=st.reihe[0];
+    if(!vorn)return;
+    if(staffelFuehrendeSeite==null){ staffelFuehrendeSeite=vorn.side; return; }
+    if(vorn.side!==staffelFuehrendeSeite&&(rennT-bahnFuehrenderSeit)>2){
+      staffelFuehrendeSeite=vorn.side; bahnFuehrenderSeit=rennT;
+      feed(vorn.side,vorn.name+" übernimmt die Führung im 4-Team-Rennen.",true,undefined,"fuehrungswechsel");
+    }
+  }
+  // HUD IM POD (aus updateHudBahn): die DOM-Anzeigetafel kennt nur Heim/Gast — sie zeigt hier den
+  // Fuehrenden, die Leinwand-Tafel (zeichneBahnPodTafel) alle vier Teams.
+  function updateHudBahnPod(){
+    const st=bahnPodLiveStand(), art=BA();
+    const vorn=st.reihe[0];
+    document.getElementById("klsuffix").textContent="4-Team-Rennen · "
+      +(art.wertung==="burg"?"Burgpunkte":"Zieleinlauf")+(done?"":" · vorläufig");
+    const scoreEl=document.getElementById("score");
+    if(vorn){
+      scoreEl.textContent=(done?"Sieger: ":"Vorn: ")+vorn.name+" ("+vorn.anzeige+")";
+      scoreEl.style.color=bahnSeitenFarbe(vorn.side);
+    }
+    // Die DOM-Tafel traegt die Namen von Team 0 und 1 (VEREIN[0]/[1]) — Zaehler und Balken
+    // zeigen deshalb genau diese zwei Teams; alle vier stehen auf der Leinwand-Tafel.
+    const imZiel=(s)=>rennFertig.filter(x=>x.seite===s&&!x.raus).length;
+    document.getElementById("aliveL").textContent=String(imZiel(0));
+    document.getElementById("aliveR").textContent=String(imZiel(1));
+    const schnitt=(s)=>{
+      if(art.staffel)return gesamtfortschritt(s);
+      const g=LAEUFER.filter(u=>u.seite===s);
+      return g.length?g.reduce((a,u)=>a+u.pos,0)/g.length:0;
+    };
+    document.getElementById("thpL").style.width=(schnitt(0)*100)+"%";
+    document.getElementById("thpR").style.width=(schnitt(1)*100)+"%";
+    if(done&&!bahnEndeGemeldet){
+      bahnEndeGemeldet=true;
+      feed(vorn?vorn.side:0,(vorn?vorn.name+" gewinnt das 4-Team-Rennen — ":"Rennen beendet — ")
+        +st.reihe.map(t=>t.platz+". "+t.name+" "+t.anzeige).join(" · "),true,undefined,"endstand");
+      endstandVormerken(renderEndstandBahn,vorn&&vorn.side<2?vorn.side:null);
+    }
+    endstandNachlaufPruefen();
+    renderWertungTabelle();
+    renderKader();
+    aktualisiereBbug();
+  }
+  // DIE VIER-TEAM-TAFEL DER BAHN (wie zeichneBfPodTafel im Battlefield-Pod): oben ueber der Strecke
+  // je Team ein Kaestchen in Teamfarbe — Platz, Name, Burgpunkte bzw. Zielzeit/Streckenanteil.
+  function zeichneBahnPodTafel(){
+    const st=bahnPodLiveStand(), N=st.N;
+    // Unter dem Streckenband (zeichneStreckenband, oben bei y 6..20).
+    const uhrB=64, breite=Math.min(270,(W-40-uhrB-8)/N-8), hoehe=24, y0=24;
+    const x0=(W-(breite+8)*N-uhrB)/2;
+    ctx.save();
+    {
+      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(rennT*zeitFaktor());
+      ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(ux,y0,uhrB,hoehe);
+      ctx.globalAlpha=1; ctx.fillStyle="#f4e6c4"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillText(Math.floor(klSek/60)+":"+String(klSek%60).padStart(2,"0"),ux+uhrB/2,y0+hoehe/2);
+    }
+    for(const tm of st.teams){
+      const s=tm.side, x=x0+s*(breite+8)+(s>=Math.ceil(N/2)?uhrB+8:0), farbe=bahnSeitenFarbe(s);
+      ctx.globalAlpha=.88;
+      ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(x,y0,breite,hoehe);
+      ctx.fillStyle=farbe; ctx.fillRect(x,y0,5,hoehe);
+      ctx.strokeStyle=farbe; ctx.lineWidth=1.5; ctx.strokeRect(x+.75,y0+.75,breite-1.5,hoehe-1.5);
+      ctx.globalAlpha=1; ctx.textBaseline="middle"; ctx.textAlign="left";
+      ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.fillStyle="#fff";
+      const kurz=tm.name.length>18?tm.name.slice(0,17)+"…":tm.name;
+      ctx.fillText(tm.platz+". "+kurz,x+10,y0+hoehe/2);
+      ctx.textAlign="right"; ctx.fillStyle=farbe;
+      ctx.fillText(tm.anzeige,x+breite-8,y0+hoehe/2);
+    }
+    ctx.restore();
   }
 
   // RANGTREUE-SONDE IM POD-FORMAT, dieselbe Bauart wie disziplinProbe()/miniDmFfaSonde():
@@ -56935,7 +58749,99 @@
     } finally { M.zurueck(g); }
   }
 
+  // ===================================================================================
+  // SPIELTAGS-ANSICHT (02.11.): QUICK-SIM UND ENDE-MELDUNG FUER DEN HOST.
+  //
+  // `FoundationBattleArenaHost.tsx` zeigt im `spieltag`-Modus (eingebettet in die Arena des
+  // normalen Spieltagsablaufs) das Spiel, das der Hintergrund-Vorlauf gebucht hat. Zwei Dinge
+  // fehlten dafuer:
+  //
+  //  1. EIN QUICK-SIM: schnellDurch() spult das laufende (oder noch nicht gestartete) Spiel bis zum
+  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe Funktion stepSim(), derselbe feste Tick
+  //     (1/60)/zeitFaktor(), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --, nur so
+  //     viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo 1x/2x/4x
+  //     aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel exakt dort,
+  //     wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine zweite Rechnung.
+  //     Mini-DM hat seine Rundenshow statt Ticks; dort ist Quick-Sim dasselbe wie "Alles zeigen".
+  //  2. EINE ENDE-MELDUNG: meldeSpielEnde() schickt `oly-arena:ende` (window-CustomEvent) mit der
+  //     Disziplin und dem im Endstand gezeigten Sieger (0 = Heim, 1 = Gast, null = offen/Pod). Der
+  //     Host bucht daraufhin den Snapshot, den die Arena gerade abgespielt hat.
+  //
+  // Beides beruehrt weder rr() noch wert()/Boxscore/Rangtreue noch einen headless Pfad
+  // (window.__arena.spiele*): die zaehlende Wertung laeuft unveraendert im Vorlauf.
+  function meldeSpielEnde(){
+    try{
+      window.dispatchEvent(new CustomEvent("oly-arena:ende",{detail:{disziplin:disc,sieger:letzterAngezeigterSieger}}));
+    }catch(e){}
+  }
+  let schnelldurchVersprechen=null;
+  function schnellDurch(){
+    if(disc==="mini-dm"){
+      const startBtn=document.getElementById("mdffaStart");
+      if(startBtn)startBtn.disabled=true;
+      if(mdffaSpringeZumEnde)mdffaSpringeZumEnde();
+      return Promise.resolve({disc,done:true,ticks:0});
+    }
+    if(done)return Promise.resolve({disc,done:true,ticks:0});
+    if(schnelldurchVersprechen)return schnelldurchVersprechen;
+    const startDisc=disc;
+    // Countdown/Einlauf weg, Echtzeit-Schleife anhalten: loop() tickt nur, solange `running`.
+    anpfiffLauf=null; anpfiffOverlayAus(); zeigeEinlauf(false); anpfiffErfolgt=true;
+    running=false;
+    bkLoopStop(); tonLoopStop();
+    schnelldurchAktiv=true;
+    const playBtn=document.getElementById("play");
+    if(playBtn){ playBtn.disabled=true; playBtn.textContent="Spult vor …"; }
+    const zf=zeitFaktor();
+    const GRENZE=600000; // Notbremse (~2,8 h Sendezeit) -- kein echtes Spiel kommt in die Naehe
+    let ticks=0;
+    schnelldurchVersprechen=new Promise((resolve)=>{
+      const ende=(ergebnis)=>{
+        schnelldurchAktiv=false; schnelldurchVersprechen=null;
+        try{ renderKader(); renderWertungTabelle(); }catch(e){}
+        if(playBtn){ playBtn.disabled=false; if(!done)playBtn.textContent="Weiter"; }
+        draw();
+        resolve(ergebnis);
+      };
+      const schritt=()=>{
+        // Disziplinwechsel/Reset mitten im Vorspulen: der neue Aufbau gehoert nicht mehr dazu.
+        if(disc!==startDisc){ ende({disc:startDisc,done:false,ticks,abgebrochen:true}); return; }
+        const bis=wandMs()+120;
+        while(!done&&ticks<GRENZE&&wandMs()<bis){
+          tickerSendeT+=1/60;
+          stepSim((1/60)/zf);
+          stepFloats();
+          ticksSeitReset++;
+          ticks++;
+          if(istFeldspiel(disc))updateHudFeldspiel();
+          else if(istBuehne(disc))updateHudBuehne();
+          else if(istBahn(disc))updateHudBahn();
+        }
+        if(done||ticks>=GRENZE){
+          // Quick-Sim springt auch ueber den Endstand-Nachlauf (3,5 s Feierpause) direkt ans Ende.
+          const n=endstandNachlauf; if(n){ endstandNachlauf=null; n.render(); }
+          ende({disc,done,ticks}); return;
+        }
+        setTimeout(schritt,0);
+      };
+      setTimeout(schritt,0);
+    });
+    return schnelldurchVersprechen;
+  }
+
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
+    // SPIELTAGS-ANSICHT (s. schnellDurch()/meldeSpielEnde() direkt darueber).
+    schnellDurch,
+    // KULISSE (03.11., s. kulisseWaehlen): welche illustrierte Arena gerade gezeichnet wird, und
+    // fuer Screenshot-QA die Wahl zu einer anderen Saat. Reine Anzeige, kein Einfluss auf rr().
+    kulisse:()=>kulisseAktiv?{...kulisseAktiv}:null,
+    // FIGUREN-STAND (03.11., s. spielLaeuft/ANPFIFF ERST MIT FIGUREN): wer im Spiel ist und wessen
+    // PixelLab-Bilder noch fehlen; `laeuft` = der erste Tick ist freigegeben. Reine Anzeige-Sonde.
+    figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
+      ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
+      ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
+    kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
+    spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
@@ -57553,6 +59459,22 @@
     // MOTOREN[dId] noetig, weil KP bereits ueber sichern()/zurueck() mitgefuehrt wird (s. dort).
     // `o.jeSeite` (optional, 27.10.): Kadergroesse dieses einen Spiels (2..6), wie bei
     // disziplinProbe — ohne `o` exakt wie vorher.
+    // BATTLEFIELD-POD (02.11.): vier Teams gleichzeitig im selben Kampf, s. bfPodLauf() &c.
+    spieleBattlefieldPod,
+    battlefieldPodSonde,
+    battlefieldPodEinfluss,
+    // MESS-SONDE fuer die Kalibrierung des Gefechts je Ort (wie miniDmFfaParameter): `neu` wird
+    // tief in den Grundwert BF_FFA_GRUND gemischt, null/undefined setzt zurueck. Im Spielbetrieb
+    // ruft das niemand, BFFFA ist dann immer gleich dem Grundwert.
+    battlefieldPodParameter:(neu)=>{
+      const misch=(a,b)=>{ for(const k in b){ if(b[k]&&typeof b[k]==="object"&&!Array.isArray(b[k])&&a[k]&&typeof a[k]==="object")misch(a[k],b[k]); else a[k]=b[k]; } return a; };
+      BFFFA=neu?misch(bfffaGrund(),JSON.parse(JSON.stringify(neu))):bfffaGrund();
+      return JSON.parse(JSON.stringify(BFFFA));
+    },
+    // Anzeige ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie echterKader.battlefieldPod;
+    // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
+    battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
+    battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
@@ -57993,6 +59915,20 @@
     bahnPodSonde,
     bahnPodEinfluss,
     bahnPodDisziplinen:()=>[...BAHN_POD_DISZIPLINEN],
+    // SICHTBARES VIER-TEAM-RENNEN ohne Host (Standalone/Tests/Screenshots): dieselbe Form wie
+    // `echterKader.bahnPodByDisciplineId[bd]`; `pod=null` schaltet zurueck aufs Duell. Liefert, ob
+    // die Arena fuer `bd` jetzt einen Pod zeigt (wirkt sofort, wenn `bd` die aktuelle Disziplin ist).
+    bahnPodAnzeigen:(bd,pod)=>{
+      if(!BAHN_POD_DISZIPLINEN.includes(bd))return false;
+      bahnPodAnzeigeVorgabe={...(bahnPodAnzeigeVorgabe||{}),[bd]:pod||null};
+      if(disc===bd)reset();
+      return disc===bd?bahnPodAnzeigeAktiv():!!pod;
+    },
+    // Stand des sichtbaren Pods (Tests): null, wenn gerade kein Pod sichtbar ist.
+    bahnPodAnzeigeStand:()=>bahnPodAnzeigeAktiv()?(()=>{const st=bahnPodLiveStand();
+      return {disziplin:disc, N:st.N, done:st.done, laeufer:LAEUFER.length,
+        teams:st.teams.map(t=>({side:t.side,name:t.name,platz:t.platz,ligaPunkte:t.ligaPunkte,
+          anzeige:t.anzeige,zielzeit:t.zielzeit,wert:t.wert}))};})():null,
     // Reine Daten-Sonde fuer den HOCKEY-SCHUSSABLAUF (s. HOCKEY_SCHUSS/hockeySchussPhase
     // oben, Zeile ~3588): kein Gameplay, kein Rendering — nur der Zustandsrechner selbst,
     // damit sich der Ablauf ohne UI und ohne Hockey-Live-Motor pruefen laesst (naechster

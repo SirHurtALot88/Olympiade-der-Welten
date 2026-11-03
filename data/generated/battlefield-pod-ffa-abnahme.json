@@ -1,0 +1,727 @@
+{
+  "disziplin": "battlefield",
+  "format": "pod-ffa",
+  "spiele": 2,
+  "stroeme": [
+    0,
+    10000000
+  ],
+  "teams": [
+    "Vigilante Wranglers",
+    "Armageddon Aftermath",
+    "Cold Steel",
+    "Dire Legion",
+    "Golden Gladiators",
+    "Silver Soldiers",
+    "Mortal Sin",
+    "Natures Wrath",
+    "Pirate Crew",
+    "Raging Lunatics"
+  ],
+  "gruppen": [
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      3,
+      7
+    ],
+    [
+      0,
+      1,
+      5,
+      8
+    ],
+    [
+      0,
+      2,
+      3,
+      6
+    ],
+    [
+      0,
+      2,
+      5,
+      7
+    ],
+    [
+      0,
+      3,
+      4,
+      6
+    ],
+    [
+      0,
+      3,
+      6,
+      9
+    ],
+    [
+      0,
+      4,
+      6,
+      9
+    ],
+    [
+      0,
+      6,
+      7,
+      8
+    ],
+    [
+      1,
+      2,
+      4,
+      5
+    ],
+    [
+      1,
+      2,
+      6,
+      8
+    ],
+    [
+      1,
+      3,
+      5,
+      6
+    ],
+    [
+      1,
+      4,
+      5,
+      6
+    ],
+    [
+      1,
+      5,
+      6,
+      7
+    ],
+    [
+      2,
+      3,
+      4,
+      5
+    ],
+    [
+      2,
+      3,
+      6,
+      8
+    ],
+    [
+      2,
+      4,
+      6,
+      8
+    ],
+    [
+      2,
+      5,
+      8,
+      9
+    ],
+    [
+      3,
+      4,
+      6,
+      8
+    ],
+    [
+      3,
+      5,
+      8,
+      9
+    ]
+  ],
+  "laeufe": [
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 2,
+      "versatz": 0,
+      "sekunden": 40.934,
+      "msJeKampf": 1023.35,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.25627413416704903,
+      "rhoMittel": 0.2798427613999226,
+      "rhoMin": -0.2619047619047619,
+      "rhoMax": 0.8452380952380952,
+      "gruppenUnter80": 19,
+      "rhoSaison": 0.5984962406015037,
+      "star1": 27.5,
+      "star2": 35,
+      "starLetzt": 2.5,
+      "paarGross": 71.3768115942029,
+      "paarMittel": 61.51012891344383,
+      "paarKlein": 51.16279069767442,
+      "teamRho": 0.17500000000000002,
+      "teamBesterGewinnt": 27.5,
+      "teamBesterOben2": 57.5,
+      "teamBesterLetzter": 17.5,
+      "endeAllein": 90,
+      "endeLimit": 10,
+      "endeZeit": 0,
+      "dauerMittel": 39.7665
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 2,
+      "versatz": 10000000,
+      "sekunden": 31.186,
+      "msJeKampf": 779.65,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.12499999999999999,
+      "rhoMittel": 0.17269769840485535,
+      "rhoMin": -0.2857142857142857,
+      "rhoMax": 0.6071428571428572,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.5037593984962406,
+      "star1": 15,
+      "star2": 32.5,
+      "starLetzt": 10,
+      "paarGross": 67.55725190839695,
+      "paarMittel": 58.25602968460111,
+      "paarKlein": 42.00626959247649,
+      "teamRho": -0.03628291754873716,
+      "teamBesterGewinnt": 22.5,
+      "teamBesterOben2": 37.5,
+      "teamBesterLetzter": 42.5,
+      "endeAllein": 92.5,
+      "endeLimit": 7.5,
+      "endeZeit": 0,
+      "dauerMittel": 39.43675
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 3,
+      "versatz": 0,
+      "sekunden": 80.979,
+      "msJeKampf": 2024.475,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.1993006993006993,
+      "rhoMittel": 0.21056581461210405,
+      "rhoMin": -0.523202258229361,
+      "rhoMax": 0.6993006993006993,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.2854282536151279,
+      "star1": 12.5,
+      "star2": 22.5,
+      "starLetzt": 2.5,
+      "paarGross": 63.40852130325815,
+      "paarMittel": 58.047016274864376,
+      "paarKlein": 50.54347826086956,
+      "teamRho": 0.10581138830084191,
+      "teamBesterGewinnt": 22.5,
+      "teamBesterOben2": 52.5,
+      "teamBesterLetzter": 10,
+      "endeAllein": 80,
+      "endeLimit": 20,
+      "endeZeit": 0,
+      "dauerMittel": 51.19574999999999
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 3,
+      "versatz": 10000000,
+      "sekunden": 74.317,
+      "msJeKampf": 1857.925,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.24300699300699297,
+      "rhoMittel": 0.18130893248487714,
+      "rhoMin": -0.5664335664335665,
+      "rhoMax": 0.5804195804195804,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.325027808676307,
+      "star1": 15,
+      "star2": 32.5,
+      "starLetzt": 7.5,
+      "paarGross": 64.82412060301507,
+      "paarMittel": 55.67567567567568,
+      "paarKlein": 49.7275204359673,
+      "teamRho": 0.23500000000000004,
+      "teamBesterGewinnt": 37.5,
+      "teamBesterOben2": 60,
+      "teamBesterLetzter": 25,
+      "endeAllein": 92.5,
+      "endeLimit": 7.5,
+      "endeZeit": 0,
+      "dauerMittel": 50.899249999999995
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 4,
+      "versatz": 0,
+      "sekunden": 98.493,
+      "msJeKampf": 2462.325,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.2691658187079455,
+      "rhoMittel": 0.2527696123552508,
+      "rhoMin": -0.2647058823529412,
+      "rhoMax": 0.5794117647058823,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.36191369606003754,
+      "star1": 17.5,
+      "star2": 25,
+      "starLetzt": 0,
+      "paarGross": 65.21452145214522,
+      "paarMittel": 58.503054989816704,
+      "paarKlein": 53.82286146858441,
+      "teamRho": 0.20982369496812106,
+      "teamBesterGewinnt": 32.5,
+      "teamBesterOben2": 70,
+      "teamBesterLetzter": 15,
+      "endeAllein": 60,
+      "endeLimit": 40,
+      "endeZeit": 0,
+      "dauerMittel": 53.83275000000001
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 4,
+      "versatz": 10000000,
+      "sekunden": 96.79,
+      "msJeKampf": 2419.75,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.24393104962507078,
+      "rhoMittel": 0.24987227749790844,
+      "rhoMin": -0.0707148888434945,
+      "rhoMax": 0.5752489770628776,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.32532833020637897,
+      "star1": 2.5,
+      "star2": 5,
+      "starLetzt": 2.5,
+      "paarGross": 67.90205162144275,
+      "paarMittel": 56.390977443609025,
+      "paarKlein": 51.70015455950541,
+      "teamRho": 0.15918861169915807,
+      "teamBesterGewinnt": 22.5,
+      "teamBesterOben2": 52.5,
+      "teamBesterLetzter": 20,
+      "endeAllein": 70,
+      "endeLimit": 30,
+      "endeZeit": 0,
+      "dauerMittel": 54.435
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 5,
+      "versatz": 0,
+      "sekunden": 128.132,
+      "msJeKampf": 3203.3,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.27241133914493776,
+      "rhoMittel": 0.1979716744072128,
+      "rhoMin": -0.19774436090225564,
+      "rhoMax": 0.5609871019500821,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.2855702280912365,
+      "star1": 5,
+      "star2": 10,
+      "starLetzt": 0,
+      "paarGross": 62.271448663853725,
+      "paarMittel": 55.13767629281397,
+      "paarKlein": 50.81552305961755,
+      "teamRho": 0.18790569415042088,
+      "teamBesterGewinnt": 30,
+      "teamBesterOben2": 65,
+      "teamBesterLetzter": 22.5,
+      "endeAllein": 50,
+      "endeLimit": 50,
+      "endeZeit": 0,
+      "dauerMittel": 57.130500000000005
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 5,
+      "versatz": 10000000,
+      "sekunden": 129.711,
+      "msJeKampf": 3242.7750000000005,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.23082706766917294,
+      "rhoMittel": 0.20722530179061965,
+      "rhoMin": -0.08646616541353383,
+      "rhoMax": 0.4433146765758301,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.2938295318127251,
+      "star1": 5,
+      "star2": 7.5,
+      "starLetzt": 0,
+      "paarGross": 63.18510858324716,
+      "paarMittel": 55.69556451612903,
+      "paarKlein": 51.4219384793964,
+      "teamRho": 0.12500000000000003,
+      "teamBesterGewinnt": 25,
+      "teamBesterOben2": 45,
+      "teamBesterLetzter": 27.5,
+      "endeAllein": 50,
+      "endeLimit": 50,
+      "endeZeit": 0,
+      "dauerMittel": 56.4015
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 6,
+      "versatz": 0,
+      "sekunden": 175.128,
+      "msJeKampf": 4378.2,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.2276371548381616,
+      "rhoMittel": 0.1955430387583062,
+      "rhoMin": -0.3189823950162076,
+      "rhoMax": 0.430969063004206,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.19233120311197555,
+      "star1": 7.5,
+      "star2": 10,
+      "starLetzt": 2.5,
+      "paarGross": 60.803825277849576,
+      "paarMittel": 56.960913482652614,
+      "paarKlein": 51.719526175009555,
+      "teamRho": -0.07290569415042093,
+      "teamBesterGewinnt": 17.5,
+      "teamBesterOben2": 47.5,
+      "teamBesterLetzter": 25,
+      "endeAllein": 30,
+      "endeLimit": 70,
+      "endeZeit": 0,
+      "dauerMittel": 58.230500000000006
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 6,
+      "versatz": 10000000,
+      "sekunden": 188.123,
+      "msJeKampf": 4703.075,
+      "events": 40,
+      "gruppen": 20,
+      "rhoMedian": 0.1875142059557962,
+      "rhoMittel": 0.194029202763169,
+      "rhoMin": -0.0415307685399425,
+      "rhoMax": 0.5141936406491627,
+      "gruppenUnter80": 20,
+      "rhoSaison": 0.19972214504028896,
+      "star1": 2.5,
+      "star2": 2.5,
+      "starLetzt": 0,
+      "paarGross": 62.00762388818298,
+      "paarMittel": 54.99120492524187,
+      "paarKlein": 51.29057489245209,
+      "teamRho": 0.07418861169915812,
+      "teamBesterGewinnt": 27.5,
+      "teamBesterOben2": 55,
+      "teamBesterLetzter": 20,
+      "endeAllein": 35,
+      "endeLimit": 60,
+      "endeZeit": 5,
+      "dauerMittel": 58.92025000000001
+    }
+  ],
+  "kontrolle": [
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 2,
+      "versatz": 0,
+      "rhoMedian": 0.8166666666666668,
+      "rhoMittel": 0.8133333333333335,
+      "jeVariante": [
+        0.7999999999999999,
+        0.9666666666666668,
+        0.9500000000000002,
+        0.8166666666666668,
+        0.5333333333333334
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 2,
+      "versatz": 10000000,
+      "rhoMedian": 0.8166666666666668,
+      "rhoMittel": 0.8133333333333335,
+      "jeVariante": [
+        0.7999999999999999,
+        0.9666666666666668,
+        0.9500000000000002,
+        0.8166666666666668,
+        0.5333333333333334
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 3,
+      "versatz": 0,
+      "rhoMedian": 0.6904761904761906,
+      "rhoMittel": 0.46539104041553303,
+      "jeVariante": [
+        0.6904761904761906,
+        0.7285714285714286,
+        0.7698123449348078,
+        0.4761904761904761,
+        -0.33809523809523806
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 3,
+      "versatz": 10000000,
+      "rhoMedian": 0.6904761904761906,
+      "rhoMittel": 0.46539104041553303,
+      "jeVariante": [
+        0.6904761904761906,
+        0.7285714285714286,
+        0.7698123449348078,
+        0.4761904761904761,
+        -0.33809523809523806
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 4,
+      "versatz": 0,
+      "rhoMedian": 0.4140420213694654,
+      "rhoMittel": 0.4549239730478116,
+      "jeVariante": [
+        0.6351351370637469,
+        0.4140420213694654,
+        0.7698412698412698,
+        0.28993279218283713,
+        0.16566864478173893
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 4,
+      "versatz": 10000000,
+      "rhoMedian": 0.4140420213694654,
+      "rhoMittel": 0.4549239730478116,
+      "jeVariante": [
+        0.6351351370637469,
+        0.4140420213694654,
+        0.7698412698412698,
+        0.28993279218283713,
+        0.16566864478173893
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 5,
+      "versatz": 0,
+      "rhoMedian": 0.4037144673975188,
+      "rhoMittel": 0.45116415330132575,
+      "jeVariante": [
+        0.6373737373737374,
+        0.4037144673975188,
+        0.706060606060606,
+        0.27230831931113025,
+        0.23636363636363641
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 5,
+      "versatz": 10000000,
+      "rhoMedian": 0.4037144673975188,
+      "rhoMittel": 0.45116415330132575,
+      "jeVariante": [
+        0.6373737373737374,
+        0.4037144673975188,
+        0.706060606060606,
+        0.27230831931113025,
+        0.23636363636363641
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 6,
+      "versatz": 0,
+      "rhoMedian": 0.15270210363881148,
+      "rhoMittel": 0.3121486549192688,
+      "jeVariante": [
+        0.4642961844920794,
+        0.14860139860139862,
+        0.7134910081263212,
+        0.08165257973773354,
+        0.15270210363881148
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 6,
+      "versatz": 10000000,
+      "rhoMedian": 0.15270210363881148,
+      "rhoMittel": 0.3121486549192688,
+      "jeVariante": [
+        0.4642961844920794,
+        0.14860139860139862,
+        0.7134910081263212,
+        0.08165257973773354,
+        0.15270210363881148
+      ]
+    }
+  ],
+  "pp": [
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 8,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 4,
+      "abweichungPp": 32.1,
+      "reihen": [
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.635,
+          "anteil": 16.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.629,
+          "anteil": 16
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.624,
+          "anteil": 15.9
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.523,
+          "anteil": 13.3
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.408,
+          "anteil": 10.4
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": 0.376,
+          "anteil": 9.6
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.356,
+          "anteil": 9.1
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.321,
+          "anteil": 8.2
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.049,
+          "anteil": 1.2
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1643.733
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 8,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 4,
+      "abweichungPp": 102,
+      "reihen": [
+        {
+          "attribut": "torment",
+          "gewinn": 0.217,
+          "anteil": 36.3
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.183,
+          "anteil": 30.6
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.12,
+          "anteil": 20.1
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.072,
+          "anteil": 12
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.006,
+          "anteil": 1
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": -0.107,
+          "anteil": 0
+        },
+        {
+          "attribut": "health",
+          "gewinn": -0.111,
+          "anteil": 0
+        },
+        {
+          "attribut": "determination",
+          "gewinn": -0.244,
+          "anteil": 0
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": -0.554,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1523.751
+    }
+  ]
+}

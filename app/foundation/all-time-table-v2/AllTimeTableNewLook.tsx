@@ -26,6 +26,8 @@ import type { AllTimeTableClientProps } from "@/app/foundation/all-time-table-v2
 import type { AllTimeTableRow } from "@/lib/foundation/all-time-table";
 import AllTimeLeagueChart, { type AllTimeLeagueChartMetric } from "@/app/foundation/all-time-table-v2/AllTimeLeagueChart";
 import { baueSaisonSpalten, getSaisonWert, parseSaisonSpalte } from "@/lib/foundation/all-time-season-columns";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
+import { formatLeagueTierLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 import { isFiniteNumber } from "@/lib/foundation/foundation-number-utils";
 
 /**
@@ -307,8 +309,13 @@ function getChartSeries(
   return {
     values: paare.map((eintrag) => eintrag.value),
     labels: paare.map((eintrag) => {
-      // Der Rang steckt negiert in der Reihe (siehe unten) — im Hover wieder als echter Platz.
-      const anzeige = metric === "rank" ? `Platz ${Math.abs(eintrag.value)}` : formatNlMoney(eintrag.value);
+      // Der Rang steckt negiert (und bei Liga-Split ligauebergreifend) in der Reihe — im Hover
+      // wieder als echter, liga-lokaler Platz samt Liga.
+      const liga = formatLeagueTierLabel(eintrag.season.leagueTier);
+      const anzeige =
+        metric === "rank"
+          ? `Platz ${eintrag.season.rank ?? Math.abs(eintrag.value)}${liga ? ` (${liga})` : ""}`
+          : formatNlMoney(eintrag.value);
       const zahl = metric === "points" ? `${eintrag.value} Punkte` : anzeige;
       return `${eintrag.season.seasonLabel} · ${zahl}`;
     }),
@@ -322,7 +329,9 @@ function getChartValueForSeason(season: AllTimeTableRow["seasons"][number], metr
     return season.marketValue != null || season.cash != null ? (season.marketValue ?? 0) + (season.cash ?? 0) : null;
   }
   if (metric === "points") return season.points;
-  return season.rank != null ? -season.rank : null;
+  // Ligauebergreifend: Rang 1 in Liga 2 liegt hinter Rang 16 in Liga 1. Ohne Liga = Rang.
+  const position = toLeagueSpanningPosition(season.rank, season.leagueTier);
+  return position != null ? -position : null;
 }
 
 function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] {
@@ -335,8 +344,10 @@ function getChartValues(row: AllTimeTableRow, metric: ChartMetricKey): number[] 
     }
     if (metric === "points") return season.points;
     // Rang invertiert (kleinere Zahl = besser) → -rang, damit "hoch" in der
-    // Sparkline immer "besser" bedeutet, wie bei MW/Cash/Punkte.
-    return season.rank != null ? -season.rank : null;
+    // Sparkline immer "besser" bedeutet, wie bei MW/Cash/Punkte. Bei Liga-Split
+    // ligauebergreifend, sonst liest sich ein Abstieg als Sprung nach oben.
+    const position = toLeagueSpanningPosition(season.rank, season.leagueTier);
+    return position != null ? -position : null;
   });
   return raw.filter(isFiniteNumber);
 }
@@ -348,7 +359,17 @@ function renderAllTimeCell(row: AllTimeTableRow, column: NlTableColumn<AllTimeTa
   if (saisonSpalte) {
     const wert = getSaisonWert(row, saisonSpalte.seasonId, saisonSpalte.metrik);
     // „—" heisst hier wirklich „diese Saison nicht gespielt" und nicht „0" — deshalb kein Nullwert.
-    return wert == null ? "—" : formatNlMoney(wert);
+    if (wert == null) return "—";
+    // Liga je Saison (Chris, 02.11.) — einmal je Saison, an der ersten Spalte (MW), nicht doppelt.
+    const saison = saisonSpalte.metrik === "mw" ? row.seasons.find((entry) => entry.seasonId === saisonSpalte.seasonId) : null;
+    return saison?.leagueTier ? (
+      <>
+        {formatNlMoney(wert)}
+        <LeagueTierBadge tier={saison.leagueTier} seasonLabel={saison.seasonLabel} />
+      </>
+    ) : (
+      formatNlMoney(wert)
+    );
   }
   switch (column.key) {
     case "allTimeRank":

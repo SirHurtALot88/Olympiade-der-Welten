@@ -27,7 +27,7 @@ import {
   applyPreSeasonNextSeasonSetupLightweight,
   buildPreSeasonNextSeasonSetupToken,
 } from "@/lib/season/preseason-workflow-service";
-import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
+import { buildSeasonSnapshot, patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { vertragsjahrAus } from "@/lib/sponsor/sponsor-leih-lifecycle";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import {
@@ -424,6 +424,24 @@ describe("league_movement — Saisonende-Seite ohne Cockpit-Lauf (next_season_se
     }
     expect(checked).toBeGreaterThanOrEqual(2);
   }, 240000);
+
+  it("ein Schnappschuss, der erst NACH dem Auf-/Abstieg (neu) gebaut wird, friert trotzdem die Liga der gespielten Saison ein", () => {
+    // Der `post_sell_fallback` beim `next_season_setup` baut den Schnappschuss neu, wenn keiner als
+    // `completed` vorliegt — hat der Cockpit-Lauf da schon bewegt, beschreibt `leagueByTeamId` die
+    // FOLGESAISON. Chris, 02.11.: die Historie soll zeigen, in welcher Liga die Saison GESPIELT wurde.
+    const battleState = createCompletedTwoLeagueSeasonState(true);
+    const moved = applyLeagueMovementOnce(battleState, { saveId: SAVE_ID, seasonId: battleState.season.id });
+    expect(moved.applied).toBe(true);
+
+    const snapshot = buildSeasonSnapshot(moved.gameState, battleState.season.id);
+    const tierOf = (teamId: string) => snapshot.finalStandings.find((row) => row.teamId === teamId)?.leagueTier;
+    for (const change of moved.result.promoted) expect(tierOf(change.teamId)).toBe("liga2");
+    for (const change of moved.result.relegated) expect(tierOf(change.teamId)).toBe("liga1");
+    // Und der Liga-2-Erste bleibt Zweitliga-Meister, nicht Gold.
+    const liga2Champion = snapshot.finalStandings.find((row) => row.isLiga2Champion);
+    expect(liga2Champion?.leagueTier).toBe("liga2");
+    expect(liga2Champion?.isGold).toBe(false);
+  });
 
   it("Cockpit-Lauf zuerst, dann Saisonwechsel: kein zweiter Auf-/Abstieg, gleiche Liga wie auf der Saisonende-Seite", async () => {
     const cockpitPersistence = createPersistence(createSeasonEndPageState(true));

@@ -138,6 +138,34 @@ export function shouldSkipExistingAiDraft(input: {
   hasCompleteExistingDraft: boolean;
   overwriteExisting: boolean;
   staleFindingCount: number;
+  /**
+   * Der Spieltag LAEUFT schon: mindestens eine Disziplin-Seite ist gebucht (D1-Commit der Arena).
+   * Dann ist ein vollstaendiger Entwurf eingefroren, auch wenn die Frischepruefung anschlaegt.
+   *
+   * SAISONTEST-FUND 02.11. (Battle Mode, Spieltag 19, Gewichtheben an D2 ohne Arena-Ergebnis):
+   * nach dem D1-Commit tragen die gerade in D1 gelaufenen Spieler ihre Nach-Spiel-Fatigue, die
+   * Frischepruefung sieht sie ueber der Schonschwelle — und der Batch im D2-Commit rechnete die
+   * GANZE Aufstellung neu (gemessen am Nachbau: 14 KI-Teams an Spieltag 12, auch die D2-Seite und
+   * die Formkarten der laengst gebuchten D1-Seite). Damit passte der Arena-Vorlauf fuer D2 nicht
+   * mehr zur Aufstellung, die Vorberechnung war verworfen, und gebucht wurde die PPS-Bruecke mit
+   * `arena_ausgefallen:nicht_ausgefuehrt`. Fuer die gebuchte Seite ist die Neuberechnung sinnlos,
+   * fuer die offene widerspricht sie „was du siehst, wird gebucht" (Vorlauf und Anzeige laufen mit
+   * der abgegebenen Aufstellung). Verletzungen werden erst beim D2-Commit gewuerfelt; zwischen den
+   * beiden Commits entsteht also kein neuer Ausfall, den die KI auffangen muesste.
+   */
+  matchdayAlreadyStarted?: boolean;
+  /**
+   * Der Entwurf traegt ueberhaupt Eintraege — auch einen TEILBESETZTEN. Nur zusammen mit
+   * `matchdayAlreadyStarted` von Belang: am Nachbau waren die 14 neu gerechneten Teams von
+   * Spieltag 12 durchweg duenne Kader mit teilbesetzter Aufstellung („Only 4/6 players available
+   * for staffel d2"), die der Batch bei JEDEM Aufruf neu versucht — nach dem D1-Commit mit der
+   * Fatigue der D1-Spieler und deshalb mit anderer Belegung.
+   */
+  hasExistingDraftEntries?: boolean;
 }): boolean {
-  return input.hasCompleteExistingDraft && !input.overwriteExisting && input.staleFindingCount === 0;
+  if (input.overwriteExisting) return false;
+  if (input.matchdayAlreadyStarted === true && (input.hasCompleteExistingDraft || input.hasExistingDraftEntries === true)) {
+    return true;
+  }
+  return input.hasCompleteExistingDraft && input.staleFindingCount === 0;
 }

@@ -82,4 +82,36 @@ describe("applyFormCardPenaltyWithRerank (audit R2/V4)", () => {
     expect(twice.gameState.seasonState.standings!.A.points).toBe(7);
     expect(twice.gameState.seasonState.standings!.A.rank).toBe(2);
   });
+  it("rankt im Liga-Split je Liga getrennt neu (Battle Mode: Ränge bleiben liga-lokal 1..n)", () => {
+    // Saisonlauf 02.11. auf dem VW-Battle-Save: nach „Abrechnung buchen" waren aus den liga-lokalen
+    // Rängen (je Liga 1–16) globale 1–32 geworden. Hier: zwei Ligen à zwei Teams, Strafe auf L1-A.
+    const gameState = {
+      season: { id: "S1" },
+      teams: [
+        { teamId: "L1A", name: "Liga1 A", cash: 100 },
+        { teamId: "L1B", name: "Liga1 B", cash: 100 },
+        { teamId: "L2A", name: "Liga2 A", cash: 100 },
+        { teamId: "L2B", name: "Liga2 B", cash: 100 },
+      ],
+      seasonState: {
+        leagueByTeamId: { L1A: "liga1", L1B: "liga1", L2A: "liga2", L2B: "liga2" },
+        standings: {
+          L1A: { points: 10, rank: 1 },
+          L1B: { points: 8, rank: 2 },
+          L2A: { points: 20, rank: 1 },
+          L2B: { points: 5, rank: 2 },
+        },
+        formCards: [{ id: "c1", seasonId: "S1", teamId: "L1A", cardValue: -6 }],
+      },
+    } as unknown as GameState;
+
+    const standings = applyFormCardPenaltyWithRerank(gameState, "S1").gameState.seasonState.standings!;
+    expect(standings.L1A.points).toBe(7);
+    // Liga 1: die Strafe dreht die Reihenfolge — innerhalb der Liga.
+    expect(standings.L1B.rank).toBe(1);
+    expect(standings.L1A.rank).toBe(2);
+    // Liga 2 bleibt liga-lokal 1/2, obwohl L2A mehr Punkte hat als alle Liga-1-Teams und L2B weniger.
+    expect(standings.L2A.rank).toBe(1);
+    expect(standings.L2B.rank).toBe(2);
+  });
 });

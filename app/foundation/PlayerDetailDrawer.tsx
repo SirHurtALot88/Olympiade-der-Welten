@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } 
 import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { formatTrainingAttributeLabel } from "@/lib/foundation/player-attribute-history";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
 import type { PlayerSeasonTrainingForecast } from "@/lib/foundation/player-matchday-training-history";
 import type { PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -3945,7 +3946,16 @@ export default function PlayerDetailDrawer({
                             </>
                           );
                         case "team":
-                          return row.teamCode ?? row.teamName ?? "—";
+                          // Liga, in der das Team IN DIESER Saison spielte (Chris, 02.11.) — ohne
+                          // Liga-Trennung (Manager Mode) rendert der Chip nichts.
+                          return (
+                            <>
+                              {row.teamCode ?? row.teamName ?? "—"}
+                              {row.teamCode ?? row.teamName ? (
+                                <LeagueTierBadge tier={row.leagueTier} seasonLabel={row.seasonName} />
+                              ) : null}
+                            </>
+                          );
                         case "appearances":
                           return formatValue(row.appearances);
                         case "averageFatigue":

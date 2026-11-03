@@ -22,6 +22,8 @@ import { getSeasonV2TeamTagStyle } from "@/app/foundation/season-v2/SeasonStandi
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import type { FoundationRanksPanelProps } from "@/app/foundation/ranks-v2/FoundationRanksPanel";
 import { getTeamLogoModel } from "@/lib/data/mediaAssets";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
+import { formatLeagueTierLabel } from "@/lib/season/league-history";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 
 /**
@@ -271,7 +273,9 @@ export default function FoundationRanksNewLook({
                     <li key={entry.teamId} className="nl-ranks-prev-podium-row">
                       <NlMedalBadge
                         kind={entry.rank === 1 ? "gold" : entry.rank === 2 ? "silver" : "bronze"}
-                        title={`Endrang ${entry.rank} · ${previousSeasonPodium.seasonLabel}`}
+                        title={`Endrang ${entry.rank}${
+                          formatLeagueTierLabel(entry.leagueTier) ? ` (${formatLeagueTierLabel(entry.leagueTier)})` : ""
+                        } · ${previousSeasonPodium.seasonLabel}`}
                       />
                       <button
                         type="button"
@@ -280,7 +284,10 @@ export default function FoundationRanksNewLook({
                         title={`${entry.teamName} öffnen`}
                       >
                         <strong>{entry.teamName}</strong>
-                        <small>{entry.teamCode}</small>
+                        <small>
+                          {entry.teamCode}
+                          <LeagueTierBadge tier={entry.leagueTier} seasonLabel={previousSeasonPodium.seasonLabel} />
+                        </small>
                       </button>
                       <span className="nl-ranks-prev-podium-value nl-tnum">
                         {entry.points != null

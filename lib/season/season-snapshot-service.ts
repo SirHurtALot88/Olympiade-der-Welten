@@ -9,7 +9,8 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { isSeasonCoverageComplete } from "@/lib/season/season-completion-state";
-import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { buildLeagueTierReconstruction } from "@/lib/season/league-history";
+import { getLeagueOf, isLeagueSplitActive, type LeagueTier } from "@/lib/season/league-split";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
@@ -217,10 +218,17 @@ function buildSeasonSnapshotRecord(
   // Legacy-Save) `leagueTier` immer `null` -- `isGold`/`isLiga2Champion` unten bleiben dann
   // bit-identisch zu vor dieser Aenderung (`isGold: rank === 1`, `isLiga2Champion` immer `false`).
   const leagueSplitActiveForSnapshot = isLeagueSplitActive(gameState);
+  // Die Liga, in der DIESE Saison gespielt wurde — nicht blind `leagueByTeamId`: wird der
+  // Schnappschuss erst nach `league_movement` (neu) gebaut (z. B. `post_sell_fallback` beim
+  // `next_season_setup`, nachdem der Cockpit-Lauf schon bewegt hat), beschreibt das Feld bereits die
+  // Folgesaison. Ohne Bewegungsprotokoll fuer diese Saison ist das Ergebnis identisch zu `getLeagueOf`.
+  const leagueTierOfThisSeason = buildLeagueTierReconstruction(gameState);
   const finalStandings: SeasonSnapshotTeamRecord[] = [...gameState.teams]
     .map((team) => {
       const standing = gameState.seasonState.standings[team.teamId] ?? null;
-      const leagueTier = leagueSplitActiveForSnapshot ? getLeagueOf(gameState, team.teamId) : null;
+      const leagueTier = leagueSplitActiveForSnapshot
+        ? ((leagueTierOfThisSeason(seasonId, team.teamId) as LeagueTier | null) ?? getLeagueOf(gameState, team.teamId))
+        : null;
       const roster = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const teamResults = seasonDisciplineResults.filter((entry) => entry.teamId === team.teamId);
       const teamTransfers = seasonTransfers.filter(

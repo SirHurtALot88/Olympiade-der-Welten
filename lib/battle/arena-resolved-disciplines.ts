@@ -353,6 +353,41 @@ export const ARENA_ABNAHME_AUSNAHMEN: ReadonlyMap<string, AbnahmeAusnahme> = new
  */
 export const MINI_DM_FFA_VORLAUF_AKTIV = true;
 
+/**
+ * BATTLEFIELD-POD-VORLAUF-SCHALTER (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md
+ * Abschnitt 7). Battlefield laeuft wie Mini-DM NICHT ueber das generische Chassis-Set (vier Teams je
+ * Pod, 2-1-0-0) und steht deshalb NIE in `ARENA_RESOLVED_DISCIPLINE_IDS`. Dieser Schalter entscheidet,
+ * ob der Arena-Vorlauf fuer einen Battlefield-Spieltag das GEFECHT JE ORT rechnet
+ * (`runBattlefieldPodMatchday()`) und der Pod daraus gebucht wird, oder ob er beim PPS-Pod bleibt.
+ *
+ * ABNAHME (Chris' Entscheidung fuer das Mini-DM-Muster, 02.11.; beide Pflichtkriterien regulaer
+ * bestanden, KEINE Ausnahme noetig): rho je Kampf k=2..6 0,861-0,923 (zwei Saatstroeme, kaderfest),
+ * Pp 4,8-20,2 (n=48, zwei Stroeme), data/generated/battlefield-pod-gefecht-abnahme.json. Chris'
+ * Ausnahme fuer k=2/3 vom 01.11. galt nur dem PPS-Pod und wird fuer den Motor nicht gebraucht.
+ *
+ * `false` (oder `OLY_BATTLEFIELD_POD_VORLAUF=aus` auf dem Server, s. arena-vorlauf-service.ts) faellt
+ * sofort auf den PPS-Pod zurueck; bereits fertig gerechnete Snapshots buchen wie bei Mini-DM weiter
+ * mit ihrem Ergebnis.
+ */
+export const BATTLEFIELD_POD_VORLAUF_AKTIV = true;
+
+/**
+ * BAHN-POD-VORLAUF-SCHALTER (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+ * Abschnitt 6). Takeshi's Castle und Staffel stehen in `VIERER_POD_DISCIPLINE_IDS` UND hier in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`: an einem Spieltag MIT Pods faehrt der Arena-Vorlauf fuer sie kein
+ * Zweier-Duell mehr, sondern das echte Vier-Team-Rennen (`lib/resolve/bahn-pod-matchday.ts`), und die
+ * Liga bucht dessen Platzierung (`lib/resolve/bahn-pod-resolve.ts`). An einem Spieltag OHNE Pods
+ * (Liga nicht durch 4 teilbar) laeuft wie bisher das Duell.
+ *
+ * Abgenommen im Vier-Team-Format ohne Ausnahme: rho je Rennen 0,84-0,93 bei jeder Kadergroesse,
+ * Pp 9,3-22,0 in zwei Saatstroemen (Dokument Abschnitt 5.3), das Duell bleibt bit-identisch.
+ *
+ * `false` (bzw. `OLY_BAHN_POD_VORLAUF=aus` auf dem Server, s. arena-vorlauf-service.ts) laesst das
+ * Rennen weg: die Pods fallen dann auf den PPS-Pod zurueck (Eignungs-Score, wie Battlefield) -- das
+ * Zweier-Duell kommt dadurch NICHT zurueck, weil der Pod in der Wertung Vorrang hat.
+ */
+export const BAHN_POD_VORLAUF_AKTIV = true;
+
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "gewichtheben",
   "speed-schach",

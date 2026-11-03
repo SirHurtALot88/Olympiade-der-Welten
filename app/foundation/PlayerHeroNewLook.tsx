@@ -23,6 +23,7 @@
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { PlayerAwardStrip } from "@/components/foundation/player-awards/PlayerAwardStrip";
 import { getPlayerPortraitInitials } from "@/lib/data/mediaAssets";
+import PlayerPixelSprite from "@/app/foundation/PlayerPixelSprite";
 import {
   NlRadar,
   StatChip,
@@ -198,6 +199,10 @@ export default function PlayerHeroNewLook({
   return (
     <section className="is-new-look nl-player-hero" data-testid="player-hero-new-look" data-new-look="true">
       <div className="nl-player-hero-identity">
+        {/* Portrait + PixelLab-Figur (02.11.): die animierte Pixel-Figur steht unten rechts
+            vor dem Kartenbild. Klick wechselt Gehen/Aktion/Treffer/K.o.; ohne gebaute Figur
+            bleibt nur das Portrait (PlayerPixelSprite rendert dann nichts). */}
+        <div style={{ position: "relative", flex: "0 0 auto", lineHeight: 0 }}>
         {data.portraitUrl ? (
           <BudgetedMediaImage
             className={heroPortraitClassName}
@@ -223,6 +228,19 @@ export default function PlayerHeroNewLook({
             {buildHeroInitials(data.name)}
           </div>
         )}
+          <PlayerPixelSprite
+            playerId={data.playerId}
+            size={104}
+            anim="walk"
+            cycleOnClick
+            style={{
+              position: "absolute",
+              right: -26,
+              bottom: -14,
+              filter: "drop-shadow(0 3px 4px color-mix(in srgb, var(--nl-bg) 70%, transparent))",
+            }}
+          />
+        </div>
         <div className="nl-player-hero-copy">
           <span className="nl-player-hero-eyebrow">
             {data.transferStatus}

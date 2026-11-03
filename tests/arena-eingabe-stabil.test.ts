@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { istBahnPodDisziplin } from "@/lib/resolve/bahn-pod-resolve";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
@@ -10,7 +11,11 @@ import { stelleArenaVorlaufSicher } from "@/lib/battle/arena-vorlauf-service";
 import { kickoffArenaMatchdayApply } from "@/lib/season/arena-matchday-resolve-service";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
 import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
-import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+import {
+  buildHarmlosenMiniDmFfaFakeRunner,
+  buildHarmlosenBattlefieldPodFakeRunner,
+  buildHarmlosenBahnPodFakeRunner,
+} from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * CI-FIX (25.10., dedizierte Root-Cause-Untersuchung): `bauFrischenBattleSaveMitVollemFeld()`
@@ -59,7 +64,11 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD (02.11.): Staffel/Takeshi buchen an Pod-Tagen als Vierergruppe (`mini_dm_pod`,
+    // quelle "bahn"), nicht als Arena-Duell -- die Assertion unten prueft deshalb eine Duell-Disziplin.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !istBahnPodDisziplin(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       continue;
     }
@@ -94,7 +103,12 @@ describe("Arena-Vorlauf-Service · eingabe_instabil bleibt 0 im Normalfall (Opus
 
       const vorlauf = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        {
+          runArenaFixturesImpl: erfolgreicherRunner,
+          runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
+          runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+          runBahnPodFixturesImpl: buildHarmlosenBahnPodFakeRunner(),
+        },
         persistence,
       );
       expect(vorlauf.applicable).toBe(true);

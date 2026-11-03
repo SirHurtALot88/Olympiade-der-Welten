@@ -18,6 +18,8 @@ import {
   formatMostImprovedValue,
   resolveMostImprovedWinner,
 } from "@/lib/foundation/most-improved-service";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { resolveProjectedRankWithTiePolicy } from "@/lib/standings/standings-tiebreaker-policy";
 
 export type SeasonReviewAward = {
   awardId: string;
@@ -40,6 +42,9 @@ export type SeasonReviewNamedValue = {
   value: number | string | null;
   label: string;
   source: string;
+  /** Nur Endtabelle: Platz (bei aktivem Liga-Split liga-lokal) und Liga des Teams. */
+  rank?: number | null;
+  leagueTier?: string | null;
 };
 
 export type SeasonReviewTransferHighlight = {
@@ -134,28 +139,109 @@ function getSeasonMatchdayResultIds(gameState: GameState) {
   );
 }
 
+const LIGA_REIHENFOLGE: Record<string, number> = { liga1: 0, liga2: 1 };
+const LIGA_LABEL: Record<string, string> = { liga1: "Liga 1", liga2: "Liga 2" };
+
+/**
+ * ENDTABELLE DES SAISONRUECKBLICKS — LIGA-LOKAL, SOBALD DER LIGA-SPLIT AKTIV IST (02.11.).
+ *
+ * Bis hier las die Funktion `standing.rank` blind durch und sortierte danach. Im Battle Mode mit
+ * zwei Ligen gibt das eine von zwei falschen Tabellen, je nachdem, wie der gespeicherte Rang
+ * entstanden ist:
+ *   - globale Raenge 1..32 (jede Abrechnung vor `ef4e81c56`, Formkarten-Strafe rankte global): die
+ *     Liga-1-Tabelle zeigt 1, 5, 6, 7, 9, 11, 13 … — GEMESSEN am Battle-Save „Battle Mode VW – alle
+ *     Figuren (02.11.)": Liga 1 trug die Raenge 1,5,6,7,9,10,11,13,16,19,20,23,25,26,31,32.
+ *   - liga-lokale Raenge 1..16: zwei Teams auf Rang 1, die Sortierung mischt beide Ligen
+ *     reissverschlussartig, und `finalTable[0]` (= Champion-Award) ist zufaellig der Liga-1- ODER der
+ *     Liga-2-Erste, je nach Einfuegereihenfolge der Standings.
+ *
+ * Deshalb vergibt der Rueckblick die Raenge bei aktivem Split selbst, je Liga aus den Punkten
+ * (dieselbe Sortierung wie Buchung und Nachbuchung: Punkte -> Punkteverhaeltnis -> …), und stellt
+ * Liga 1 vor Liga 2 — der Champion ist damit immer der Liga-1-Erste. Dasselbe Muster wie
+ * `applyFormCardPenaltyWithRerank` (form-card-penalty-service.ts, Commit ef4e81c56).
+ *
+ * OHNE SPLIT (Manager Mode, jeder Save ohne `leagueByTeamId`) bleibt der Pfad bit-identisch: der
+ * gespeicherte Rang wird unveraendert gelesen.
+ */
 function buildFinalTable(gameState: GameState) {
   const teamsById = new Map(gameState.teams.map((team) => [team.teamId, team]));
-  return Object.entries(gameState.seasonState.standings ?? {})
-    .map(([teamId, standing]) => {
-      const team = teamsById.get(teamId) ?? null;
-      return {
-        id: teamId,
-        name: teamLabel(team),
-        teamId,
-        teamName: teamLabel(team),
-        value: standing.points,
-        rank: standing.rank ?? null,
-        label: standing.rank != null ? `#${standing.rank} · ${standing.points} Punkte` : `${standing.points} Punkte`,
-        source: "seasonState.standings",
-      };
-    })
-    .sort((left, right) => {
-      if (left.rank != null && right.rank != null && left.rank !== right.rank) return left.rank - right.rank;
-      if (left.rank != null) return -1;
-      if (right.rank != null) return 1;
-      return (Number(right.value) || 0) - (Number(left.value) || 0);
-    });
+  const standings = gameState.seasonState.standings ?? {};
+
+  if (!isLeagueSplitActive(gameState)) {
+    return Object.entries(standings)
+      .map(([teamId, standing]) => {
+        const team = teamsById.get(teamId) ?? null;
+        return {
+          id: teamId,
+          name: teamLabel(team),
+          teamId,
+          teamName: teamLabel(team),
+          value: standing.points,
+          rank: standing.rank ?? null,
+          label: standing.rank != null ? `#${standing.rank} · ${standing.points} Punkte` : `${standing.points} Punkte`,
+          source: "seasonState.standings",
+        };
+      })
+      .sort((left, right) => {
+        if (left.rank != null && right.rank != null && left.rank !== right.rank) return left.rank - right.rank;
+        if (left.rank != null) return -1;
+        if (right.rank != null) return 1;
+        return (Number(right.value) || 0) - (Number(left.value) || 0);
+      });
+  }
+
+  const gruppen = new Map<string, string[]>();
+  for (const teamId of Object.keys(standings)) {
+    const liga = getLeagueOf(gameState, teamId) ?? "ohne_liga";
+    gruppen.set(liga, [...(gruppen.get(liga) ?? []), teamId]);
+  }
+  const ligen = [...gruppen.keys()].sort(
+    (left, right) => (LIGA_REIHENFOLGE[left] ?? 9) - (LIGA_REIHENFOLGE[right] ?? 9),
+  );
+
+  return ligen.flatMap((liga) => {
+    const teamIds = gruppen.get(liga) ?? [];
+    // `deterministic_sort`: der Rueckblick braucht fuer jedes Team einen Platz, auch bei exaktem
+    // Gleichstand (die Buchung laesst den dann bewusst offen, `block_on_tie`). Die Reihenfolge ist
+    // dieselbe `sortForProjectedPoints`-Sortierung, nur ohne die offene Luecke.
+    const rangJeTeam = resolveProjectedRankWithTiePolicy(
+      teamIds.map((teamId) => {
+        const standing = standings[teamId]!;
+        return {
+          teamId,
+          teamName: teamLabel(teamsById.get(teamId)),
+          totalScore: null,
+          projectedPoints: standing.points ?? 0,
+          currentRank: standing.rank ?? null,
+          currentPoints: standing.points ?? 0,
+          matchdayRank: null,
+          cash: teamsById.get(teamId)?.cash ?? null,
+          verhaeltnis: typeof standing.verhaeltnis === "number" ? standing.verhaeltnis : null,
+        };
+      }),
+      "deterministic_sort",
+    );
+    const ligaLabel = LIGA_LABEL[liga] ?? null;
+    return teamIds
+      .map((teamId) => {
+        const standing = standings[teamId]!;
+        const team = teamsById.get(teamId) ?? null;
+        const rank = rangJeTeam.get(teamId) ?? null;
+        const praefix = [rank != null ? `#${rank}` : null, ligaLabel].filter(Boolean).join(" ");
+        return {
+          id: teamId,
+          name: teamLabel(team),
+          teamId,
+          teamName: teamLabel(team),
+          value: standing.points,
+          rank,
+          leagueTier: liga === "ohne_liga" ? null : liga,
+          label: praefix ? `${praefix} · ${standing.points} Punkte` : `${standing.points} Punkte`,
+          source: "seasonState.standings",
+        };
+      })
+      .sort((left, right) => (left.rank ?? Number.POSITIVE_INFINITY) - (right.rank ?? Number.POSITIVE_INFINITY));
+  });
 }
 
 function buildTeamAxisHighlights(gameState: GameState) {

@@ -29,6 +29,7 @@ import type { GameState, SeasonSnapshotRecord, SeasonSnapshotTeamRecord, Transfe
 import { getTeamGeneralManagerProfile } from "@/lib/foundation/team-general-managers";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
+import { formatLeagueTierLabel } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 export type SeasonRecapSlot =
@@ -110,12 +111,16 @@ function buildZeugnis(input: {
         : diff > 0
           ? `${diff} Plätze gutgemacht`
           : `${Math.abs(diff)} Plätze verloren`;
+    // Bei Liga-Split ist `rank` liga-lokal — „Platz 1" ohne Liga liest sich wie die Meisterschaft
+    // (Chris, 02.11.). Ohne Liga-Trennung bleibt der Text unveraendert.
+    const liga = formatLeagueTierLabel(record.leagueTier);
+    const platz = `${rang ?? "—"}${liga ? ` (${liga})` : ""}`;
     entries.push({
       slot: "zeugnis",
       teamId: record.teamId,
-      title: `Dein Saison-Zeugnis: Platz ${rang ?? "—"}`,
+      title: `Dein Saison-Zeugnis: Platz ${platz}`,
       description: [
-        start != null ? `Start als Nummer ${start}, Ende auf Platz ${rang ?? "—"} — ${bewegung}.` : `Endplatz ${rang ?? "—"}.`,
+        start != null ? `Start als Nummer ${start}, Ende auf Platz ${platz} — ${bewegung}.` : `Endplatz ${platz}.`,
         `Kasse ${money(record.cashEnd)} · Transferbilanz ${signed(record.transferNet)}.`,
       ].join(" "),
       targetView: "seasonV2",
@@ -241,8 +246,12 @@ function buildKletterer(input: {
   if ((auf.rankDiff ?? 0) <= 0 && (ab.rankDiff ?? 0) >= 0) return null;
 
   const teile: string[] = [];
-  if ((auf.rankDiff ?? 0) > 0) teile.push(`${nameOf(auf)} klettert ${auf.rankDiff} Plätze auf Rang ${auf.rank ?? "—"}`);
-  if ((ab.rankDiff ?? 0) < 0) teile.push(`${nameOf(ab)} verliert ${Math.abs(ab.rankDiff ?? 0)} Plätze auf Rang ${ab.rank ?? "—"}`);
+  const ligaZusatz = (record: SeasonSnapshotTeamRecord) => {
+    const liga = formatLeagueTierLabel(record.leagueTier);
+    return liga ? ` (${liga})` : "";
+  };
+  if ((auf.rankDiff ?? 0) > 0) teile.push(`${nameOf(auf)} klettert ${auf.rankDiff} Plätze auf Rang ${auf.rank ?? "—"}${ligaZusatz(auf)}`);
+  if ((ab.rankDiff ?? 0) < 0) teile.push(`${nameOf(ab)} verliert ${Math.abs(ab.rankDiff ?? 0)} Plätze auf Rang ${ab.rank ?? "—"}${ligaZusatz(ab)}`);
 
   return {
     slot: "kletterer",

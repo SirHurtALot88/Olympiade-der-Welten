@@ -4,6 +4,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
+import { isViererPodDiscipline } from "@/lib/season/season-discipline-schedule";
 import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { chromiumVerfuegbar } from "@/tests/helpers/chromium-verfuegbar";
 
@@ -376,7 +377,14 @@ describe.skipIf(UEBERSPRINGEN)(
         expect(lauf.ok, `Spieltag ${versuch} (${matchdayId}): ${lauf.blockingReasons.join(" | ")}`).toBe(true);
 
         zeilen = filtereArenaZeilen(persistence.getSaveById(saveId)!.gameState);
-        arenaDisziplinenZeilen = zeilen.filter((z) => ARENA_RESOLVED_DISCIPLINE_IDS.has(z.disciplineId));
+        // VIERER-POD-FUND (03.11., vierte Instanz derselben Fehlerklasse wie u.a. 623e6e8c9): eine
+        // Vierer-Pod-Disziplin (Mini-DM/Battlefield/Staffel/Takeshi) ist zwar arena-aufgeloest,
+        // bucht aber ueber ihren eigenen Pod-Pfad (resolutionSource "mini_dm_pod", "quelle":"bahn"
+        // o.ae.), nie ueber "arena" oder arenaAusfall -- genau das wollte dieser Test gar nicht
+        // pruefen (er prueft den Arena-Duell-Vorlauf), muss Pod-Disziplinen also ausschliessen.
+        arenaDisziplinenZeilen = zeilen.filter(
+          (z) => ARENA_RESOLVED_DISCIPLINE_IDS.has(z.disciplineId) && !isViererPodDiscipline(z.disciplineId),
+        );
         if (arenaDisziplinenZeilen.length > 0) break;
         if (versuch === MAX_SPIELTAGE_BIS_ARENA_DISZIPLIN) break;
 

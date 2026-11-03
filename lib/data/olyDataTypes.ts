@@ -2665,9 +2665,11 @@ export type DisciplineResultRecord = {
      * weiter der PPS-Pfad (Rueckwaertskompatibilitaet, jeder bestehende Battle-Save bleibt
      * unberuehrt). `rundenPunkteSumme`/`teilnahme` sind rein informativ (UI/Report).
      */
-    quelle?: "pps" | "ffa";
+    quelle?: "pps" | "ffa" | "bahn";
     rundenPunkteSumme?: number;
     teilnahme?: readonly boolean[];
+    /** BAHN-POD (02.11., `quelle: "bahn"`): Teamwert des Vier-Team-Rennens (Burgpunkte bzw. Zielzeit). */
+    teamWert?: number | null;
   } | null;
   /**
    * "SPIEL DES TAGES" (Task #31 Paket 1, docs/design/fable-ideen-feldspiel-30-09.md Abschnitt 2.1,
@@ -2759,6 +2761,13 @@ export type ArenaVorlaufStatus = "in_progress" | "ready" | "failed";
 
 export type ArenaVorlaufDisziplinEintrag = {
   status: "arena" | "ausgefallen";
+  /**
+   * BAHN-POD (02.11.): `"bahn_pod"`, wenn diese Disziplin an diesem Spieltag als Vier-Team-Rennen
+   * vorgerechnet wurde (Takeshi's Castle/Staffel an Pod-Tagen, `lib/resolve/bahn-pod-matchday.ts`) --
+   * dann ist `eingabeHash` der Pod-Fingerabdruck (`berechneBahnPodEingabeHash`), nicht der des
+   * Zweier-Duells. Fehlt es, gilt wie bisher das Duell bzw. (Mini-DM) der FFA-Fingerabdruck.
+   */
+  format?: "bahn_pod";
   ausfall?: ArenaAusfall | null;
   dauerMs?: number | null;
   /**

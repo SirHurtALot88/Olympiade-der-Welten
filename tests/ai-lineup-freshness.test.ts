@@ -180,4 +180,35 @@ describe("Uebersprung-Entscheidung fuer vorhandene KI-Entwuerfe", () => {
       }),
     ).toBe(false);
   });
+
+  it("laufender Spieltag (eine Seite gebucht): vollstaendiger Entwurf bleibt eingefroren, auch wenn er veraltet wirkt", () => {
+    // Saisontest 02.11.: nach dem D1-Commit tragen die D1-Spieler Nach-Spiel-Fatigue; ohne diese
+    // Sperre rechnete der D2-Commit 14 KI-Aufstellungen neu und verwarf damit den Arena-Vorlauf fuer D2.
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: true, overwriteExisting: false, staleFindingCount: 3, matchdayAlreadyStarted: true }),
+    ).toBe(true);
+    // Unvollstaendig bleibt unvollstaendig — fuellen darf die KI weiterhin, und ein ausdrueckliches
+    // Ueberschreiben bleibt ein Ueberschreiben.
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: false, overwriteExisting: false, staleFindingCount: 0, matchdayAlreadyStarted: true }),
+    ).toBe(false);
+    // Teilbesetzt, aber abgegeben (duenner Kader, „Only 4/6 players available"): ebenfalls
+    // eingefroren — genau diese Teams rechnete der D2-Commit am Nachbau neu.
+    expect(
+      shouldSkipExistingAiDraft({
+        hasCompleteExistingDraft: false,
+        hasExistingDraftEntries: true,
+        overwriteExisting: false,
+        staleFindingCount: 2,
+        matchdayAlreadyStarted: true,
+      }),
+    ).toBe(true);
+    // Vor dem ersten Commit gilt die bisherige Regel: teilbesetzt wird weiter aufgefuellt.
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: false, hasExistingDraftEntries: true, overwriteExisting: false, staleFindingCount: 0 }),
+    ).toBe(false);
+    expect(
+      shouldSkipExistingAiDraft({ hasCompleteExistingDraft: true, overwriteExisting: true, staleFindingCount: 0, matchdayAlreadyStarted: true }),
+    ).toBe(false);
+  });
 });

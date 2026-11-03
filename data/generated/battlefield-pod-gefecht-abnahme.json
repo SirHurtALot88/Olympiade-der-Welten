@@ -1,0 +1,2122 @@
+{
+  "disziplin": "battlefield",
+  "format": "pod-gefecht-je-ort",
+  "spiele": 4,
+  "stroeme": [
+    0,
+    10000000
+  ],
+  "teams": [
+    "Vigilante Wranglers",
+    "Armageddon Aftermath",
+    "Cold Steel",
+    "Dire Legion",
+    "Golden Gladiators",
+    "Silver Soldiers",
+    "Mortal Sin",
+    "Natures Wrath",
+    "Pirate Crew",
+    "Raging Lunatics"
+  ],
+  "gruppen": [
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1,
+      3,
+      4
+    ],
+    [
+      0,
+      1,
+      4,
+      6
+    ],
+    [
+      0,
+      1,
+      5,
+      9
+    ],
+    [
+      0,
+      2,
+      3,
+      4
+    ],
+    [
+      0,
+      2,
+      4,
+      6
+    ],
+    [
+      0,
+      2,
+      5,
+      9
+    ],
+    [
+      0,
+      3,
+      4,
+      5
+    ],
+    [
+      0,
+      3,
+      5,
+      8
+    ],
+    [
+      0,
+      3,
+      8,
+      9
+    ],
+    [
+      0,
+      4,
+      6,
+      9
+    ],
+    [
+      0,
+      5,
+      7,
+      8
+    ],
+    [
+      1,
+      2,
+      3,
+      4
+    ],
+    [
+      1,
+      2,
+      4,
+      6
+    ],
+    [
+      1,
+      2,
+      5,
+      9
+    ],
+    [
+      1,
+      3,
+      4,
+      5
+    ],
+    [
+      1,
+      3,
+      5,
+      8
+    ],
+    [
+      1,
+      3,
+      8,
+      9
+    ],
+    [
+      1,
+      4,
+      6,
+      9
+    ],
+    [
+      1,
+      5,
+      7,
+      8
+    ],
+    [
+      2,
+      3,
+      4,
+      5
+    ],
+    [
+      2,
+      3,
+      5,
+      8
+    ],
+    [
+      2,
+      3,
+      8,
+      9
+    ],
+    [
+      2,
+      4,
+      6,
+      9
+    ],
+    [
+      2,
+      5,
+      7,
+      8
+    ],
+    [
+      3,
+      4,
+      5,
+      6
+    ],
+    [
+      3,
+      4,
+      7,
+      8
+    ],
+    [
+      3,
+      5,
+      7,
+      9
+    ],
+    [
+      4,
+      5,
+      6,
+      8
+    ],
+    [
+      4,
+      6,
+      8,
+      9
+    ]
+  ],
+  "laeufe": [
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 2,
+      "versatz": 0,
+      "sekunden": 0.468,
+      "msJeKampf": 3.9,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8726494407745531,
+      "rhoMittel": 0.8670211963939861,
+      "rhoMin": 0.6828167567276987,
+      "rhoMax": 0.9464285714285715,
+      "gruppenUnter80": 4,
+      "rhoSaison": 0.9789473684210527,
+      "star1": 53.333333333333336,
+      "star2": 85.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.72451790633609,
+      "paarMittel": 94.05272838749234,
+      "paarKlein": 69.49152542372882,
+      "teamRho": 0.6966666666666664,
+      "teamBesterGewinnt": 62.5,
+      "teamBesterOben2": 91.66666666666667,
+      "teamBesterLetzter": 0,
+      "endeAllein": 2.5,
+      "endeLimit": 4.166666666666667,
+      "endeZeit": 93.33333333333333,
+      "dauerMittel": 79.66666666666667
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 2,
+      "versatz": 10000000,
+      "sekunden": 0.436,
+      "msJeKampf": 3.6333333333333333,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8607089285126057,
+      "rhoMittel": 0.8509188765633254,
+      "rhoMin": 0.7038467170255515,
+      "rhoMax": 0.9464285714285714,
+      "gruppenUnter80": 7,
+      "rhoSaison": 0.956390977443609,
+      "star1": 53.333333333333336,
+      "star2": 82.5,
+      "starLetzt": 0,
+      "paarGross": 99.73579920739762,
+      "paarMittel": 93.63867684478372,
+      "paarKlein": 66.63433559650825,
+      "teamRho": 0.646666666666667,
+      "teamBesterGewinnt": 60,
+      "teamBesterOben2": 87.5,
+      "teamBesterLetzter": 2.5,
+      "endeAllein": 1.6666666666666667,
+      "endeLimit": 7.5,
+      "endeZeit": 90.83333333333333,
+      "dauerMittel": 79.66666666666667
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 3,
+      "versatz": 0,
+      "sekunden": 0.481,
+      "msJeKampf": 4.008333333333334,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8808756429108962,
+      "rhoMittel": 0.8795643978438329,
+      "rhoMin": 0.7814685314685315,
+      "rhoMax": 0.958458719514758,
+      "gruppenUnter80": 3,
+      "rhoSaison": 0.9733036707452726,
+      "star1": 41.666666666666664,
+      "star2": 74.16666666666667,
+      "starLetzt": 0,
+      "paarGross": 99.68777876895629,
+      "paarMittel": 92.77439907326962,
+      "paarKlein": 65.79775280898876,
+      "teamRho": 0.643333333333333,
+      "teamBesterGewinnt": 40.833333333333336,
+      "teamBesterOben2": 90.83333333333333,
+      "teamBesterLetzter": 0.8333333333333334,
+      "endeAllein": 0,
+      "endeLimit": 5,
+      "endeZeit": 95,
+      "dauerMittel": 80
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 3,
+      "versatz": 10000000,
+      "sekunden": 0.422,
+      "msJeKampf": 3.5166666666666666,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8744062418423628,
+      "rhoMittel": 0.8639015298467775,
+      "rhoMin": 0.676203398216033,
+      "rhoMax": 0.944055944055944,
+      "gruppenUnter80": 4,
+      "rhoSaison": 0.9626251390433815,
+      "star1": 44.166666666666664,
+      "star2": 65.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.5965934558494,
+      "paarMittel": 91.3391557496361,
+      "paarKlein": 64.72937000887312,
+      "teamRho": 0.6383333333333331,
+      "teamBesterGewinnt": 42.5,
+      "teamBesterOben2": 89.16666666666667,
+      "teamBesterLetzter": 0.8333333333333334,
+      "endeAllein": 0,
+      "endeLimit": 7.5,
+      "endeZeit": 92.5,
+      "dauerMittel": 80
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 4,
+      "versatz": 0,
+      "sekunden": 0.433,
+      "msJeKampf": 3.6083333333333334,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8853701639021334,
+      "rhoMittel": 0.8714985891472355,
+      "rhoMin": 0.7196463173267907,
+      "rhoMax": 0.9435528481037991,
+      "gruppenUnter80": 3,
+      "rhoSaison": 0.949718574108818,
+      "star1": 55.833333333333336,
+      "star2": 79.16666666666667,
+      "starLetzt": 0,
+      "paarGross": 99.57042731177934,
+      "paarMittel": 90.71010860484544,
+      "paarKlein": 65.5811623246493,
+      "teamRho": 0.6966666666666668,
+      "teamBesterGewinnt": 53.333333333333336,
+      "teamBesterOben2": 91.66666666666667,
+      "teamBesterLetzter": 0.8333333333333334,
+      "endeAllein": 0,
+      "endeLimit": 5.833333333333333,
+      "endeZeit": 94.16666666666667,
+      "dauerMittel": 79.76666666666667
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 4,
+      "versatz": 10000000,
+      "sekunden": 0.515,
+      "msJeKampf": 4.291666666666667,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.8642018968852041,
+      "rhoMittel": 0.8624660176051168,
+      "rhoMin": 0.7088235294117646,
+      "rhoMax": 0.9496159800428041,
+      "gruppenUnter80": 5,
+      "rhoSaison": 0.9422138836772983,
+      "star1": 50.833333333333336,
+      "star2": 77.5,
+      "starLetzt": 0,
+      "paarGross": 99.43846513804398,
+      "paarMittel": 90.7009657009657,
+      "paarKlein": 64.51456310679612,
+      "teamRho": 0.6899999999999998,
+      "teamBesterGewinnt": 44.166666666666664,
+      "teamBesterOben2": 90,
+      "teamBesterLetzter": 0,
+      "endeAllein": 0,
+      "endeLimit": 1.6666666666666667,
+      "endeZeit": 98.33333333333333,
+      "dauerMittel": 79.93333333333334
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 5,
+      "versatz": 0,
+      "sekunden": 0.54,
+      "msJeKampf": 4.5,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.919025405814251,
+      "rhoMittel": 0.9153757875941186,
+      "rhoMin": 0.8473198693494514,
+      "rhoMax": 0.9572202771941687,
+      "gruppenUnter80": 0,
+      "rhoSaison": 0.9662905162064825,
+      "star1": 40,
+      "star2": 70.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.75136159128581,
+      "paarMittel": 91.96908233746299,
+      "paarKlein": 65.75578062296961,
+      "teamRho": 0.7816666666666663,
+      "teamBesterGewinnt": 60,
+      "teamBesterOben2": 97.5,
+      "teamBesterLetzter": 0,
+      "endeAllein": 0,
+      "endeLimit": 0,
+      "endeZeit": 100,
+      "dauerMittel": 80
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 5,
+      "versatz": 10000000,
+      "sekunden": 0.506,
+      "msJeKampf": 4.216666666666667,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.9195336352037513,
+      "rhoMittel": 0.9109682467879693,
+      "rhoMin": 0.8200911107996044,
+      "rhoMax": 0.9614504658938542,
+      "gruppenUnter80": 0,
+      "rhoSaison": 0.9636974789915966,
+      "star1": 51.666666666666664,
+      "star2": 78.33333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.68974327777102,
+      "paarMittel": 92.38694284784731,
+      "paarKlein": 64.38432835820896,
+      "teamRho": 0.7633333333333331,
+      "teamBesterGewinnt": 57.5,
+      "teamBesterOben2": 95,
+      "teamBesterLetzter": 0.8333333333333334,
+      "endeAllein": 0,
+      "endeLimit": 0,
+      "endeZeit": 100,
+      "dauerMittel": 80
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 6,
+      "versatz": 0,
+      "sekunden": 0.548,
+      "msJeKampf": 4.566666666666666,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.922186151752868,
+      "rhoMittel": 0.9179549174487508,
+      "rhoMin": 0.8566382684950624,
+      "rhoMax": 0.9524912986829209,
+      "gruppenUnter80": 0,
+      "rhoSaison": 0.9833287024173382,
+      "star1": 64.16666666666667,
+      "star2": 85.83333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.79741379310344,
+      "paarMittel": 92.73060029282577,
+      "paarKlein": 66.79389312977099,
+      "teamRho": 0.8716666666666661,
+      "teamBesterGewinnt": 79.16666666666667,
+      "teamBesterOben2": 97.5,
+      "teamBesterLetzter": 0,
+      "endeAllein": 0.8333333333333334,
+      "endeLimit": 0,
+      "endeZeit": 99.16666666666667,
+      "dauerMittel": 79.86666666666666
+    },
+    {
+      "format": "pod (N=4)",
+      "jeSeite": 6,
+      "versatz": 10000000,
+      "sekunden": 0.607,
+      "msJeKampf": 5.058333333333334,
+      "events": 120,
+      "gruppen": 30,
+      "rhoMedian": 0.9225033213812256,
+      "rhoMittel": 0.9118381666729667,
+      "rhoMin": 0.8106131555488661,
+      "rhoMax": 0.9564600809618918,
+      "gruppenUnter80": 0,
+      "rhoSaison": 0.9779383161989441,
+      "star1": 68.33333333333333,
+      "star2": 88.33333333333333,
+      "starLetzt": 0,
+      "paarGross": 99.77432514538668,
+      "paarMittel": 92.55257009345794,
+      "paarKlein": 64.95001898013413,
+      "teamRho": 0.8299999999999995,
+      "teamBesterGewinnt": 73.33333333333333,
+      "teamBesterOben2": 96.66666666666667,
+      "teamBesterLetzter": 0.8333333333333334,
+      "endeAllein": 0,
+      "endeLimit": 0,
+      "endeZeit": 100,
+      "dauerMittel": 80
+    }
+  ],
+  "kontrolle": [
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 2,
+      "versatz": 0,
+      "rhoMedian": 0.8166666666666668,
+      "rhoMittel": 0.8133333333333335,
+      "jeVariante": [
+        0.7999999999999999,
+        0.9666666666666668,
+        0.9500000000000002,
+        0.8166666666666668,
+        0.5333333333333334
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 2,
+      "versatz": 10000000,
+      "rhoMedian": 0.8166666666666668,
+      "rhoMittel": 0.8133333333333335,
+      "jeVariante": [
+        0.7999999999999999,
+        0.9666666666666668,
+        0.9500000000000002,
+        0.8166666666666668,
+        0.5333333333333334
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 3,
+      "versatz": 0,
+      "rhoMedian": 0.6904761904761906,
+      "rhoMittel": 0.46539104041553303,
+      "jeVariante": [
+        0.6904761904761906,
+        0.7285714285714286,
+        0.7698123449348078,
+        0.4761904761904761,
+        -0.33809523809523806
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 3,
+      "versatz": 10000000,
+      "rhoMedian": 0.6904761904761906,
+      "rhoMittel": 0.46539104041553303,
+      "jeVariante": [
+        0.6904761904761906,
+        0.7285714285714286,
+        0.7698123449348078,
+        0.4761904761904761,
+        -0.33809523809523806
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 4,
+      "versatz": 0,
+      "rhoMedian": 0.4140420213694654,
+      "rhoMittel": 0.4549239730478116,
+      "jeVariante": [
+        0.6351351370637469,
+        0.4140420213694654,
+        0.7698412698412698,
+        0.28993279218283713,
+        0.16566864478173893
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 4,
+      "versatz": 10000000,
+      "rhoMedian": 0.4140420213694654,
+      "rhoMittel": 0.4549239730478116,
+      "jeVariante": [
+        0.6351351370637469,
+        0.4140420213694654,
+        0.7698412698412698,
+        0.28993279218283713,
+        0.16566864478173893
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 5,
+      "versatz": 0,
+      "rhoMedian": 0.4037144673975188,
+      "rhoMittel": 0.45116415330132575,
+      "jeVariante": [
+        0.6373737373737374,
+        0.4037144673975188,
+        0.706060606060606,
+        0.27230831931113025,
+        0.23636363636363641
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 5,
+      "versatz": 10000000,
+      "rhoMedian": 0.4037144673975188,
+      "rhoMittel": 0.45116415330132575,
+      "jeVariante": [
+        0.6373737373737374,
+        0.4037144673975188,
+        0.706060606060606,
+        0.27230831931113025,
+        0.23636363636363641
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 6,
+      "versatz": 0,
+      "rhoMedian": 0.15270210363881148,
+      "rhoMittel": 0.3121486549192688,
+      "jeVariante": [
+        0.4642961844920794,
+        0.14860139860139862,
+        0.7134910081263212,
+        0.08165257973773354,
+        0.15270210363881148
+      ]
+    },
+    {
+      "format": "duell (N=2, Familienpaarungen, disziplinProbe)",
+      "jeSeite": 6,
+      "versatz": 10000000,
+      "rhoMedian": 0.15270210363881148,
+      "rhoMittel": 0.3121486549192688,
+      "jeVariante": [
+        0.4642961844920794,
+        0.14860139860139862,
+        0.7134910081263212,
+        0.08165257973773354,
+        0.15270210363881148
+      ]
+    }
+  ],
+  "pp": [
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 2,
+      "abweichungPp": 20.2,
+      "reihen": [
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.944,
+          "anteil": 17.5
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": 1.833,
+          "anteil": 16.5
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.599,
+          "anteil": 14.4
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.418,
+          "anteil": 12.8
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.239,
+          "anteil": 11.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.048,
+          "anteil": 9.4
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.948,
+          "anteil": 8.5
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.547,
+          "anteil": 4.9
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.529,
+          "anteil": 4.8
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1.968
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 2,
+      "abweichungPp": 15.9,
+      "reihen": [
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.548,
+          "anteil": 19.1
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": 1.51,
+          "anteil": 18.6
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.127,
+          "anteil": 13.9
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.975,
+          "anteil": 12
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.882,
+          "anteil": 10.9
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.781,
+          "anteil": 9.6
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.646,
+          "anteil": 8
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.321,
+          "anteil": 4
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.309,
+          "anteil": 3.8
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1.387
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 3,
+      "abweichungPp": 9.8,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 2.262,
+          "anteil": 18.8
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.882,
+          "anteil": 15.6
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.8,
+          "anteil": 14.9
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.495,
+          "anteil": 12.4
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.426,
+          "anteil": 11.8
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.285,
+          "anteil": 10.7
+        },
+        {
+          "attribut": "health",
+          "gewinn": 1.206,
+          "anteil": 10
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.349,
+          "anteil": 2.9
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.344,
+          "anteil": 2.9
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 3.422
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 3,
+      "abweichungPp": 5,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.902,
+          "anteil": 18.9
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.702,
+          "anteil": 16.9
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.555,
+          "anteil": 15.4
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.205,
+          "anteil": 12
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.995,
+          "anteil": 9.9
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.947,
+          "anteil": 9.4
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.932,
+          "anteil": 9.3
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.418,
+          "anteil": 4.1
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.417,
+          "anteil": 4.1
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 3.743
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 4,
+      "abweichungPp": 11,
+      "reihen": [
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.688,
+          "anteil": 17.4
+        },
+        {
+          "attribut": "charisma",
+          "gewinn": 1.666,
+          "anteil": 17.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.358,
+          "anteil": 14
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.255,
+          "anteil": 12.9
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.178,
+          "anteil": 12.1
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.009,
+          "anteil": 10.4
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.841,
+          "anteil": 8.7
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.362,
+          "anteil": 3.7
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.351,
+          "anteil": 3.6
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 5.36
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 4,
+      "abweichungPp": 10,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.631,
+          "anteil": 17.8
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.479,
+          "anteil": 16.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.254,
+          "anteil": 13.7
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.222,
+          "anteil": 13.4
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.095,
+          "anteil": 12
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.014,
+          "anteil": 11.1
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.759,
+          "anteil": 8.3
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.345,
+          "anteil": 3.8
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.339,
+          "anteil": 3.7
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 6.762
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 5,
+      "abweichungPp": 8.7,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.538,
+          "anteil": 18.4
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.393,
+          "anteil": 16.6
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.186,
+          "anteil": 14.2
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.066,
+          "anteil": 12.7
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.021,
+          "anteil": 12.2
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.887,
+          "anteil": 10.6
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.689,
+          "anteil": 8.2
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.297,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.295,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 8.414
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 5,
+      "abweichungPp": 8,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.524,
+          "anteil": 18.2
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.347,
+          "anteil": 16.1
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.192,
+          "anteil": 14.2
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.104,
+          "anteil": 13.2
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.943,
+          "anteil": 11.3
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.93,
+          "anteil": 11.1
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.697,
+          "anteil": 8.3
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.318,
+          "anteil": 3.8
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.318,
+          "anteil": 3.8
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 8.385
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 6,
+      "abweichungPp": 4.8,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.39,
+          "anteil": 19.3
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.198,
+          "anteil": 16.7
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.133,
+          "anteil": 15.8
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.918,
+          "anteil": 12.8
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.778,
+          "anteil": 10.8
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.727,
+          "anteil": 10.1
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.525,
+          "anteil": 7.3
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.261,
+          "anteil": 3.6
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.26,
+          "anteil": 3.6
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 10.623
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 6,
+      "abweichungPp": 5.4,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.504,
+          "anteil": 18.4
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.289,
+          "anteil": 15.8
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.253,
+          "anteil": 15.3
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.065,
+          "anteil": 13
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.882,
+          "anteil": 10.8
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.874,
+          "anteil": 10.7
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.674,
+          "anteil": 8.2
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.322,
+          "anteil": 3.9
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.32,
+          "anteil": 3.9
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 8.466
+    }
+  ],
+  "ppHinweis": "pp: Messpersonen SQUAD/OPP wie einflussVon (Standard-Arena-Kader), 48 Laeufe je k und Strom, Feld = zwei Familien-Teams. ppNachKontrolle: derselbe Lauf direkt nach --kontrolle, dort waren SQUAD/OPP bereits auf die letzte Familienpaarung umgesetzt (kaderSetzen) -- andere Messpersonen, deshalb getrennt ausgewiesen.",
+  "ppNachKontrolle": [
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 2,
+      "abweichungPp": 5.2,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 3.168,
+          "anteil": 21.6
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 2.429,
+          "anteil": 16.5
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 2.114,
+          "anteil": 14.4
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.711,
+          "anteil": 11.6
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.448,
+          "anteil": 9.9
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.396,
+          "anteil": 9.5
+        },
+        {
+          "attribut": "health",
+          "gewinn": 1.241,
+          "anteil": 8.4
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.6,
+          "anteil": 4.1
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.588,
+          "anteil": 4
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1.341
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 2,
+      "abweichungPp": 6.2,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 3.226,
+          "anteil": 22.1
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 2.427,
+          "anteil": 16.6
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 2.154,
+          "anteil": 14.8
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.678,
+          "anteil": 11.5
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.514,
+          "anteil": 10.4
+        },
+        {
+          "attribut": "power",
+          "gewinn": 1.421,
+          "anteil": 9.7
+        },
+        {
+          "attribut": "health",
+          "gewinn": 1.172,
+          "anteil": 8
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.513,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.492,
+          "anteil": 3.4
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 1.251
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 3,
+      "abweichungPp": 5.6,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 2.292,
+          "anteil": 22.2
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.637,
+          "anteil": 15.9
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.515,
+          "anteil": 14.7
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.231,
+          "anteil": 11.9
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 1.034,
+          "anteil": 10
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.988,
+          "anteil": 9.6
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.888,
+          "anteil": 8.6
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.375,
+          "anteil": 3.6
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.358,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 2.248
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 3,
+      "abweichungPp": 9.2,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 2.1,
+          "anteil": 22.9
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.506,
+          "anteil": 16.4
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.395,
+          "anteil": 15.2
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 1.058,
+          "anteil": 11.5
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.998,
+          "anteil": 10.9
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.855,
+          "anteil": 9.3
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.769,
+          "anteil": 8.4
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.256,
+          "anteil": 2.8
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.242,
+          "anteil": 2.6
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 2.93
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 4,
+      "abweichungPp": 5.7,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.744,
+          "anteil": 21.4
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.36,
+          "anteil": 16.7
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.205,
+          "anteil": 14.8
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.968,
+          "anteil": 11.9
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.854,
+          "anteil": 10.5
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.804,
+          "anteil": 9.9
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.679,
+          "anteil": 8.3
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.273,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.271,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 3.926
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 4,
+      "abweichungPp": 4.8,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.718,
+          "anteil": 21
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 1.362,
+          "anteil": 16.6
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 1.232,
+          "anteil": 15
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.969,
+          "anteil": 11.8
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.861,
+          "anteil": 10.5
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.812,
+          "anteil": 9.9
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.678,
+          "anteil": 8.3
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.286,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.276,
+          "anteil": 3.4
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 3.507
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 5,
+      "abweichungPp": 6.2,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.327,
+          "anteil": 21.9
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.995,
+          "anteil": 16.4
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.927,
+          "anteil": 15.3
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.721,
+          "anteil": 11.9
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.658,
+          "anteil": 10.8
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.591,
+          "anteil": 9.7
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.451,
+          "anteil": 7.4
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.201,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.2,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 5.778
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 5,
+      "abweichungPp": 3.9,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.308,
+          "anteil": 21.3
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.984,
+          "anteil": 16
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.932,
+          "anteil": 15.2
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.734,
+          "anteil": 12
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.651,
+          "anteil": 10.6
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.588,
+          "anteil": 9.6
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.489,
+          "anteil": 8
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.228,
+          "anteil": 3.7
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.217,
+          "anteil": 3.5
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 6.158
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 0,
+      "jeSeite": 6,
+      "abweichungPp": 7.2,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.028,
+          "anteil": 23
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.715,
+          "anteil": 16
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.69,
+          "anteil": 15.4
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.507,
+          "anteil": 11.3
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.462,
+          "anteil": 10.3
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.406,
+          "anteil": 9.1
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.367,
+          "anteil": 8.2
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.148,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.144,
+          "anteil": 3.2
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 8.784
+    },
+    {
+      "disziplin": "battlefield",
+      "format": "pod",
+      "teams": 4,
+      "laeufe": 48,
+      "anhebung": 15,
+      "mutatorModus": "je-lauf",
+      "saatVersatz": 10000000,
+      "jeSeite": 6,
+      "abweichungPp": 5,
+      "reihen": [
+        {
+          "attribut": "charisma",
+          "gewinn": 1.018,
+          "anteil": 21.6
+        },
+        {
+          "attribut": "spirit",
+          "gewinn": 0.758,
+          "anteil": 16.1
+        },
+        {
+          "attribut": "intelligence",
+          "gewinn": 0.727,
+          "anteil": 15.4
+        },
+        {
+          "attribut": "torment",
+          "gewinn": 0.565,
+          "anteil": 12
+        },
+        {
+          "attribut": "awareness",
+          "gewinn": 0.489,
+          "anteil": 10.4
+        },
+        {
+          "attribut": "power",
+          "gewinn": 0.447,
+          "anteil": 9.5
+        },
+        {
+          "attribut": "health",
+          "gewinn": 0.4,
+          "anteil": 8.5
+        },
+        {
+          "attribut": "determination",
+          "gewinn": 0.16,
+          "anteil": 3.4
+        },
+        {
+          "attribut": "stamina",
+          "gewinn": 0.154,
+          "anteil": 3.3
+        },
+        {
+          "attribut": "speed",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "dexterity",
+          "gewinn": 0,
+          "anteil": 0
+        },
+        {
+          "attribut": "will",
+          "gewinn": 0,
+          "anteil": 0
+        }
+      ],
+      "sekunden": 10.916
+    }
+  ]
+}

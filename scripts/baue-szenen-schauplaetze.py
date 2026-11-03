@@ -1,0 +1,1130 @@
+#!/usr/bin/env python3
+"""
+Zweite SCHAUPLAETZE fuer bestehende Pixel-Szenen (gestaffelter Ausbau vom 03.11.).
+
+    python3 -I scripts/baue-szenen-schauplaetze.py [basketball hockey football eiskunstlauf fechten battlefield]
+    node scripts/baue-szenen-poster.mjs basketball/streetcourt ...
+
+Chris, 03.11.: „mach nicht nur ne Tag- und Nachtszene, sondern wirklich andere Settings.“
+Jede Variante ist deshalb ein anderer ORT, nicht dieselbe Halle bei anderem Licht:
+
+  basketball/streetcourt   Halle mit Parkett       -> Kaefig-Platz zwischen Backsteinhaeusern
+  hockey/bergsee           Eishalle                -> Freiluft-Eisfeld im verschneiten Gebirge
+  football/strand          Flutlicht-Stadion       -> Beach-Football an der Kueste
+  eiskunstlauf/waldsee     ISU-Eishalle            -> zugefrorener Waldsee mit Schneewaellen
+  fechten/schlosshof       Fechthalle              -> Burghof mit Zinnen, Bergfried und Bannern
+  battlefield/wuestenruine Wiese mit Fluss         -> Wuestenruine mit ausgetrocknetem Wadi
+
+Grundsatz wie in scripts/baue-szenen-varianten.py: dieselbe selbstlaufende Szene wie die
+Vorlage — gleicher Demo-Ablauf, gleiche Demo-Figuren, gleiche Spielfeld-Geometrie, gleiches HUD.
+Ausgetauscht werden nur die eingebetteten Kulissenbilder: alles ausserhalb des Spielfelds wird
+prozedural neu gemalt (feste Palette, ganzzahlige Pixel, Bayer-Dithering, Licht in Stufen), das
+Spielfeld selbst bleibt deckungsgleich und wird hoechstens umgefaerbt (Parkett -> Hartplatz,
+Rasen -> Sand). Bei den 2x-Szenen (Basketball, Football, Fechten) wird auf dem halben Raster
+gemalt und verdoppelt, damit das Pixelraster der Vorlage erhalten bleibt. Nichts davon beruehrt
+Wertung oder Spielcode.
+"""
+import base64
+import importlib.util
+import io
+import math
+import os
+import random
+import re
+import sys
+
+from PIL import Image, ImageDraw
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SZ = os.path.join(ROOT, "public", "szenen")
+
+_spec = importlib.util.spec_from_file_location("szv", os.path.join(ROOT, "scripts", "baue-szenen-varianten.py"))
+szv = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(szv)
+band_gradient, add_glow, mix, clamp, sat, luma, BAYER4 = (
+    szv.band_gradient, szv.add_glow, szv.mix, szv.clamp, szv.sat, szv.luma, szv.BAYER4)
+
+
+# ------------------------------------------------------------------ Bild-Schluessel in den Szenen
+B64 = r"data:image/(?:png|jpeg);base64,[A-Za-z0-9+/=]+"
+
+
+def get_img(s, key):
+    m = re.search(r'"%s":\s*"(%s)"' % (key, B64), s)
+    assert m, key
+    return Image.open(io.BytesIO(base64.b64decode(m.group(1).split(",", 1)[1]))), m
+
+
+def set_img(s, key, im):
+    _, m = get_img(s, key)
+    buf = io.BytesIO()
+    if im.mode == "RGB":
+        im = im.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
+    im.save(buf, "PNG", optimize=True)
+    uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    return s[: m.start(1)] + uri + s[m.end(1):]
+
+
+def retitle(s, title, h1=None):
+    s = re.sub(r"<title>.*?</title>", f"<title>{title}</title>", s, count=1)
+    if h1:
+        s = re.sub(r"<h1>.*?</h1>", f"<h1>{h1}</h1>", s, count=1, flags=re.S)
+    return s
+
+
+def write(diszi, slug, s):
+    path = os.path.join(SZ, diszi, f"{slug}.html")
+    open(path, "w", encoding="utf-8").write(s)
+    print("geschrieben:", os.path.relpath(path, ROOT), f"{len(s) / 1e6:.2f} MB")
+
+
+def debug(name, im):
+    if os.environ.get("SZENEN_DEBUG"):
+        im.save(os.path.join(os.environ["SZENEN_DEBUG"], name + ".png"))
+
+
+def half(im):
+    return im.resize((im.width // 2, im.height // 2), Image.NEAREST)
+
+
+def double(im):
+    return im.resize((im.width * 2, im.height * 2), Image.NEAREST)
+
+
+def in_poly(x, y, poly):
+    ins = False
+    n = len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % n]
+        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+            ins = not ins
+    return ins
+
+
+def tint_luma(p, dark, light, lo=20, hi=200):
+    """Farbe durch eine Rampe dark->light ersetzen, Helligkeit (Licht, Kanten) bleibt erhalten."""
+    u = (luma(p) - lo) / (hi - lo)
+    u = 0 if u < 0 else 1 if u > 1 else u
+    return mix(dark, light, u)
+
+
+def noise(x, y, seed=0):
+    v = math.sin(x * 12.9898 + y * 78.233 + seed * 37.719) * 43758.5453
+    return v - math.floor(v)
+
+
+# ------------------------------------------------------------------ gemeinsame Kulissen-Bausteine
+def sky(px, w, y0, y1, stops):
+    band_gradient(px, 0, y0, w, y1, stops)
+
+
+def mountains(px, w, base, amp, col, snow, seed, fr=0.012, snow_line=0.55, top_lim=0):
+    rnd = random.Random(seed)
+    ph = [rnd.random() * 6.28 for _ in range(3)]
+    hgt = lambda x: amp * (0.55 + 0.25 * math.sin(x * fr + ph[0]) + 0.15 * math.sin(x * fr * 2.7 + ph[1])
+                           + 0.08 * math.sin(x * fr * 6.1 + ph[2]))
+    for x in range(w):
+        h = hgt(x)
+        shade = hgt(x + 3) < h - 0.4          # nach rechts abfallender Hang liegt im Schatten
+        top = max(top_lim, int(base - h))
+        for y in range(top, base):
+            c = col
+            # Schneekappe: unregelmaessige Unterkante (mehrere Wellen statt Saegezahn)
+            depth = (base - top) * snow_line * (0.55 + 0.25 * math.sin(x * 0.043 + ph[2])
+                                                 + 0.15 * math.sin(x * 0.11 + ph[0]) + 0.08 * math.sin(x * 0.29))
+            if snow and (y - top) < depth:
+                c = snow
+                if (y - top) > depth - 2 or (noise(x, y, seed) > 0.9 and (y - top) > 3):
+                    c = mix(snow, col, 0.35)
+            # Lichtseite links, Schattenseite rechts der Grate
+            if shade:
+                c = mix(c, (0, 0, 0), 0.18)
+            px[x, y] = c + (255,) if len(px[x, y]) == 4 else c
+
+
+def pine(d, x, base, h, dark, light, snow=None):
+    for k in range(h):
+        wdt = int((k / h) * h * 0.38) + 1
+        y = base - h + k
+        if k % 3 == 2:
+            wdt += 1
+        d.line([x - wdt, y, x + wdt, y], fill=dark)
+        d.line([x - wdt, y, x - wdt // 2, y], fill=light)
+        if snow and k % 4 == 0 and wdt > 1:
+            d.line([x - wdt + 1, y, x + wdt // 3, y], fill=snow)
+    d.rectangle([x, base, x + 1, base + max(1, h // 8)], fill=(60, 40, 30))
+
+
+# ================================================================== BASKETBALL — Street-Court
+BB_SRC = os.path.join(SZ, "basketball", "parkett.html")
+BB_COURT = [(123, 181), (911, 181), (837, 394), (48, 394)]   # Spielfeld (halbes Raster), etwas grosszuegig
+BB_JUMBO = (366, 0, 594, 60)
+BB_BENCH = (228, 104, 832, 180)
+BB_HEADS = [(326, 100, 380, 124), (390, 100, 432, 124), (680, 100, 720, 124)]
+BB_LED = (122, 141)
+BB_REF = (506, 326, 552, 402)   # eingebrannter Schiedsrichter auf dem Feld
+BB_HC = 426
+
+
+def bb_heads_mask(src):
+    """Pixel der drei Bankfiguren, die in die Tribuene ragen: je Zeile die Spanne zwischen
+    linkem und rechtem schwarzen Umriss."""
+    keep = set()
+    px = src.load()
+    for (x0, y0, x1, y1) in BB_HEADS:
+        for y in range(y0, y1):
+            xs = [x for x in range(x0, x1) if luma(px[x, y]) < 24 and sat(px[x, y]) < 30]
+            if len(xs) >= 2 and xs[-1] - xs[0] < 36:
+                for x in range(xs[0], xs[-1] + 1):
+                    keep.add((x, y))
+    return keep
+
+
+def bb_world(world):
+    src = half(world.convert("RGB"))
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(4471)
+    heads = bb_heads_mask(src)
+    # ---- Himmel (Spaetnachmittag) + Hinterhaus-Silhouette
+    sky(px, W, 0, BB_LED[0], [(96, 150, 206), (128, 172, 214), (170, 194, 214), (226, 196, 160), (240, 176, 120)])
+    d = ImageDraw.Draw(im)
+    sx, sy = 820, 30
+    add_glow(px, W, H, sx, sy, 40, (70, 50, 20), 0.9, y_min=0)
+    d.ellipse([sx - 8, sy - 8, sx + 8, sy + 8], fill=(255, 236, 190))
+    # ferne Hochhaeuser
+    x = 0
+    while x < W:
+        bw, bh = rnd.randint(16, 40), rnd.randint(30, 70)
+        top = 96 - bh
+        c = rnd.choice([(118, 134, 160), (132, 146, 170), (108, 122, 150)])
+        d.rectangle([x, top, x + bw, 100], fill=c)
+        for wy in range(top + 4, 98, 5):
+            for wx in range(x + 3, x + bw - 2, 4):
+                if rnd.random() < 0.5:
+                    d.point([wx, wy], fill=mix(c, (220, 230, 240), 0.35))
+        x += bw + rnd.randint(1, 5)
+    # Backstein-Mietshaeuser davor (mit Feuertreppen und Wassertank)
+    x = -6
+    while x < W:
+        bw, bh = rnd.randint(70, 120), rnd.randint(54, 84)
+        top = BB_LED[0] - bh
+        base = rnd.choice([(150, 70, 52), (126, 58, 44), (170, 96, 62), (110, 82, 70)])
+        for yy in range(top, BB_LED[0]):
+            for xx in range(max(0, x), min(W, x + bw)):
+                c = base
+                if (yy - top) % 4 == 0 or (xx + ((yy - top) // 4 % 2) * 4) % 8 == 0:
+                    c = mix(base, (60, 30, 24), 0.35)
+                px[xx, yy] = c
+        d.rectangle([x, top - 3, x + bw, top - 1], fill=mix(base, (40, 30, 30), 0.5))
+        for wy in range(top + 8, BB_LED[0] - 14, 16):
+            for wx in range(x + 8, x + bw - 10, 16):
+                lit = rnd.random() < 0.25
+                d.rectangle([wx, wy, wx + 7, wy + 9], fill=(40, 46, 60))
+                d.rectangle([wx + 1, wy + 1, wx + 6, wy + 8], fill=(232, 196, 120) if lit else (88, 112, 140))
+                d.line([wx + 1, wy + 4, wx + 6, wy + 4], fill=(40, 46, 60))
+                d.line([wx - 1, wy + 10, wx + 8, wy + 10], fill=mix(base, (230, 220, 200), 0.4))
+        if rnd.random() < 0.7:   # Feuertreppe
+            fx = x + bw // 2 - 12
+            for wy in range(top + 18, BB_LED[0] - 10, 16):
+                d.rectangle([fx, wy, fx + 24, wy], fill=(36, 36, 40))
+                for k in range(0, 25, 3):
+                    d.point([fx + k, wy - 1], fill=(36, 36, 40))
+                d.line([fx + 2, wy, fx + 20, wy + 16], fill=(46, 46, 52))
+        if rnd.random() < 0.35:  # Wassertank auf dem Dach
+            tx = x + rnd.randint(10, max(11, bw - 30))
+            d.rectangle([tx + 3, top - 10, tx + 4, top - 3], fill=(60, 44, 34))
+            d.rectangle([tx + 17, top - 10, tx + 18, top - 3], fill=(60, 44, 34))
+            d.rectangle([tx, top - 26, tx + 21, top - 10], fill=(122, 86, 58))
+            for k in range(tx, tx + 22, 3):
+                d.line([k, top - 25, k, top - 11], fill=(100, 70, 46))
+            d.polygon([(tx - 1, top - 26), (tx + 22, top - 26), (tx + 10, top - 33)], fill=(80, 60, 44))
+        x += bw + rnd.randint(0, 3)
+    # Graffiti-Mauer direkt hinter dem Platz
+    wall_top = 96
+    for yy in range(wall_top, BB_LED[0]):
+        for xx in range(W):
+            c = (150, 150, 146) if (xx // 24 + yy // 6) % 2 else (140, 140, 136)
+            if xx % 24 == 0:
+                c = (112, 112, 108)
+            px[xx, yy] = c
+    tags = [(222, 70, 120), (60, 170, 210), (250, 200, 60), (90, 200, 110), (170, 90, 210), (240, 120, 50)]
+    gx = 6
+    while gx < W:
+        col = rnd.choice(tags)
+        gw = rnd.randint(30, 70)
+        for k in range(gw):
+            yy = wall_top + 12 + int(5 * math.sin((gx + k) * 0.25 + gx))
+            d.rectangle([gx + k, yy - 3, gx + k, yy + 3], fill=col)
+            if k % 9 == 0:
+                d.rectangle([gx + k, yy - 6, gx + k + 1, yy + 6], fill=mix(col, (255, 255, 255), 0.3))
+        d.line([gx, wall_top + 20, gx + gw, wall_top + 20], fill=mix(col, (0, 0, 0), 0.4))
+        gx += gw + rnd.randint(12, 40)
+    # Kaefig: Zaunpfosten + Maschendraht vor allem, was hinter dem Platz liegt
+    for yy in range(30, BB_LED[0]):
+        for xx in range(W):
+            if (xx + yy) % 6 == 0 or (xx - yy) % 6 == 0:
+                c = px[xx, yy]
+                px[xx, yy] = mix(c, (210, 214, 220), 0.55)
+    for pxx in range(0, W, 80):
+        d.rectangle([pxx, 26, pxx + 2, BB_LED[0] - 1], fill=(120, 124, 132))
+        d.line([pxx, 26, pxx, BB_LED[0] - 1], fill=(176, 180, 188))
+    d.rectangle([0, 28, W, 29], fill=(150, 154, 162))
+    # Anzeigetafel haengt jetzt an zwei Masten
+    for mx in (BB_JUMBO[0] + 30, BB_JUMBO[2] - 32):
+        d.rectangle([mx, BB_JUMBO[3], mx + 3, BB_LED[0] - 1], fill=(70, 74, 84))
+        d.line([mx, BB_JUMBO[3], mx, BB_LED[0] - 1], fill=(120, 126, 138))
+    im.paste(src.crop(BB_JUMBO), BB_JUMBO[:2])
+    for (x, y) in heads:
+        px[x, y] = src.getpixel((x, y))
+    # ---- Boden: Asphalt ausserhalb, Hartplatz (blau, Zone terrakotta) innerhalb der Linien
+    asp_d, asp_l = (34, 36, 40), (118, 118, 116)
+    for y in range(BB_LED[1], BB_HC):
+        for x in range(W):
+            p = px[x, y]
+            inside = in_poly(x, y, BB_COURT)
+            bench = BB_BENCH[0] <= x < BB_BENCH[2] and y < BB_BENCH[3]
+            ref = BB_REF[0] <= x < BB_REF[2] and BB_REF[1] <= y < BB_REF[3]
+            if ref or bench:
+                # Figuren, Stuehle, Kampfgericht: nur, was eindeutig Boden ist, wird umgefaerbt
+                if inside and sat(p) > 30 and p[0] > p[2] and abs(p[0] - p[1]) < 70 and luma(p) > 120:
+                    px[x, y] = tint_luma(p, (28, 70, 132), (92, 150, 210), 120, 230)
+                elif not inside and sat(p) < 30 and 6 <= p[2] - p[0] <= 30 and 30 < luma(p) < 85:
+                    px[x, y] = tint_luma(p, asp_d, asp_l, 20, 120)
+                elif inside and sat(p) < 30 and 6 <= p[2] - p[0] <= 30 and 55 < luma(p) < 130:
+                    px[x, y] = tint_luma(p, (120, 50, 36), (214, 104, 70), 50, 140)
+                continue
+            if inside:
+                L = luma(p)
+                if sat(p) > 30 and p[0] > p[2]:              # Parkett -> blauer Acryl-Hartplatz
+                    c = tint_luma(p, (28, 70, 132), (92, 150, 210), 120, 230)
+                elif L > 190:                                # Linien bleiben weiss
+                    c = p
+                else:                                        # graue Zone + Mittelkreis -> terrakotta
+                    c = tint_luma(p, (120, 50, 36), (214, 104, 70), 50, 140)
+                px[x, y] = c
+            elif sat(p) < 30 and luma(p) < 120:
+                c = tint_luma(p, asp_d, asp_l, 20, 120)
+                if not bench:
+                    n = noise(x, y, 3)
+                    if n > 0.93:
+                        c = mix(c, (150, 150, 146), 0.5)
+                    elif n < 0.06:
+                        c = mix(c, (10, 10, 12), 0.5)
+                px[x, y] = c
+    # Risse und Kreide im Asphalt
+    for _ in range(26):
+        x, y = rnd.randrange(W), rnd.randrange(BB_LED[1] + 40, BB_HC - 4)
+        if in_poly(x, y, BB_COURT) or (BB_BENCH[0] <= x < BB_BENCH[2] and y < BB_BENCH[3]):
+            continue
+        for k in range(rnd.randint(6, 18)):
+            x += rnd.choice((-1, 0, 1))
+            y += rnd.choice((0, 1))
+            if 0 <= x < W and BB_LED[1] < y < BB_HC and not in_poly(x, y, BB_COURT):
+                px[x, y] = (22, 22, 26)
+    return double(im)
+
+
+def bb_fg(fg):
+    """Vordergrund: statt Zuschauerkoepfen der untere Zaunrand mit Bordstein und Unkraut."""
+    W, H = fg.width // 2, fg.height // 2
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    px = im.load()
+    rnd = random.Random(88)
+    for y in range(H):
+        for x in range(W):
+            if y >= H - 6:
+                px[x, y] = (96, 96, 94, 255) if y == H - 6 else (70, 70, 70, 255)
+            elif (x + y) % 6 == 0 or (x - y) % 6 == 0:
+                px[x, y] = (196, 200, 206, 200)
+    d = ImageDraw.Draw(im)
+    d.rectangle([0, 0, W, 1], fill=(150, 154, 162, 255))
+    for pxx in range(40, W, 80):
+        d.rectangle([pxx, 0, pxx + 2, H - 6], fill=(120, 124, 132, 255))
+    for _ in range(60):
+        x = rnd.randrange(W)
+        for k in range(rnd.randint(2, 5)):
+            d.line([x, H - 6, x + rnd.randint(-2, 2), H - 7 - rnd.randint(1, 4)], fill=(76, 120, 52, 255))
+    return double(im)
+
+
+def build_basketball():
+    s = open(BB_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    fg, _ = get_img(s, "src")   # erstes "src" im SC-Objekt ist der Vordergrund (fg.src)
+    new = bb_world(world)
+    debug("basketball-streetcourt-world", new)
+    s = set_img(s, "world", new)
+    m = re.search(r'"fg": \{"src": "(%s)"' % B64, s)
+    buf = io.BytesIO()
+    bb_fg(fg).save(buf, "PNG", optimize=True)
+    s = s[: m.start(1)] + "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode() + s[m.end(1):]
+    s = retitle(s, "Basketball Street-Court", "Basketball &mdash; Street-Court im K&auml;fig")
+    write("basketball", "streetcourt", s)
+
+
+# ================================================================== HOCKEY — Freiluft-Eisfeld im Gebirge
+HK_SRC = os.path.join(SZ, "hockey", "eis.html")
+HK_STANDS = 163          # bis hierher reicht die Tribuene der Vorlage
+HK_RAIL = 118            # Oberkante der Bandenverglasung auf der Geraden
+HK_GLASS_X = (235, 1605)  # Geraden-Abschnitt der Verglasung, ausserhalb Viertelellipsen bis zur Bande
+
+
+def hk_floor_mask(clean):
+    """Flutfuellung des dunklen Hallenbodens (inkl. Boden hinter Glas) ab den Raendern."""
+    W, H = clean.size
+    px = clean.load()
+    ok = lambda p: sat(p) < 28 and luma(p) < 100
+    seen = bytearray(W * H)
+    stack = [(x, H - 1) for x in range(0, W, 7)] + [(0, y) for y in range(HK_STANDS, H, 5)] + \
+            [(W - 1, y) for y in range(HK_STANDS, H, 5)] + [(x, HK_STANDS) for x in range(0, W, 5)]
+    # Boden hinter dem gebogenen Glas an den Stirnseiten ist von Handlauf und Pfosten eingeschlossen
+    glass = px[150, 200]
+    for y in range(HK_STANDS, 470):
+        for x in list(range(40, 245)) + list(range(1595, 1800)):
+            if sum(abs(a - b) for a, b in zip(px[x, y], glass)) < 24:
+                stack.append((x, y))
+    while stack:
+        x, y = stack.pop()
+        if not (0 <= x < W and HK_STANDS <= y < H) or seen[y * W + x] or not ok(px[x, y]):
+            continue
+        seen[y * W + x] = 1
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    return seen
+
+
+def hk_glass_top(x):
+    x0, x1 = HK_GLASS_X
+    if x0 <= x <= x1:
+        return HK_RAIL
+    cx = x0 if x < x0 else x1
+    u = min(1.0, abs(x - cx) / 185)
+    return int(360 - 242 * math.sqrt(max(0.0, 1 - u * u)))
+
+
+def hk_backdrop(W, H):
+    im = Image.new("RGB", (W, H))
+    px = im.load()
+    rnd = random.Random(1907)
+    sky(px, W, 0, 140, [(108, 156, 214), (138, 178, 224), (170, 200, 232), (204, 222, 238), (226, 234, 242)])
+    d = ImageDraw.Draw(im)
+    sx, sy = 1480, 34
+    add_glow(px, W, H, sx, sy, 50, (50, 46, 30), 0.8)
+    d.ellipse([sx - 9, sy - 9, sx + 9, sy + 9], fill=(255, 248, 222))
+    for (cx, cy, wl) in ((220, 30, 120), (640, 52, 90), (1100, 22, 140), (1700, 58, 80)):
+        for k in range(wl):
+            if (k * 5) % 7:
+                px[cx + k, cy] = (240, 244, 248)
+            if 10 < k < wl - 10:
+                px[cx + k, cy + 1] = (226, 234, 244)
+            if 25 < k < wl - 30 and k % 2:
+                px[cx + k, cy - 1] = (248, 250, 252)
+    mountains(px, W, 132, 112, (122, 138, 168), (236, 242, 250), 11, fr=0.006, snow_line=0.5)
+    mountains(px, W, 150, 70, (92, 108, 132), (222, 232, 244), 23, fr=0.011, snow_line=0.35)
+    # Nadelwald mit Schnee
+    for x in range(-10, W + 10, 9):
+        h = 22 + int(12 * noise(x, 1, 5)) + int(8 * math.sin(x * 0.03))
+        pine(d, x + rnd.randint(-3, 3), 158, h, (34, 70, 56), (52, 96, 74), (236, 242, 248))
+    for x in range(-6, W + 6, 13):
+        h = 28 + int(14 * noise(x, 2, 9))
+        pine(d, x + rnd.randint(-4, 4), 166, h, (24, 56, 44), (40, 82, 62), (240, 246, 250))
+    # Holzhuette mit Lichterkette links, Glühweinstand rechts
+    for (hx, w_, label) in ((70, 120, 0), (1640, 130, 1)):
+        top = 112
+        d.rectangle([hx, top + 14, hx + w_, 166], fill=(120, 74, 44))
+        for yy in range(top + 16, 166, 5):
+            d.line([hx, yy, hx + w_, yy], fill=(92, 54, 32))
+        d.polygon([(hx - 10, top + 16), (hx + w_ + 10, top + 16), (hx + w_ // 2, top - 12)], fill=(236, 242, 250))
+        d.line([(hx - 10, top + 16), (hx + w_ // 2, top - 12), (hx + w_ + 10, top + 16)], fill=(150, 160, 178))
+        d.rectangle([hx + 18, top + 30, hx + 40, top + 46], fill=(255, 210, 120))
+        d.rectangle([hx + w_ - 40, top + 30, hx + w_ - 18, top + 46], fill=(255, 210, 120))
+        d.line([hx + 29, top + 30, hx + 29, top + 46], fill=(92, 54, 32))
+        d.line([hx + w_ - 29, top + 30, hx + w_ - 29, top + 46], fill=(92, 54, 32))
+        add_glow(px, W, H, hx + 29, top + 38, 18, (90, 60, 20), 0.7)
+        add_glow(px, W, H, hx + w_ - 29, top + 38, 18, (90, 60, 20), 0.7)
+        d.rectangle([hx + w_ - 30, top - 20, hx + w_ - 22, top + 2], fill=(90, 80, 76))
+        for k in range(0, w_ + 20, 6):
+            col = [(255, 90, 90), (255, 220, 120), (120, 220, 255), (150, 255, 150)][k // 6 % 4]
+            px[hx - 10 + k, top + 17 + int(2 * math.sin(k * 0.3))] = col
+    # Schneefeld rund um die Bahn
+    band_gradient(px, 0, HK_STANDS, W, H, [(208, 220, 236), (220, 230, 242), (232, 238, 246), (226, 234, 244)])
+    for _ in range(900):
+        x, y = rnd.randrange(W), rnd.randrange(HK_STANDS + 2, H)
+        px[x, y] = rnd.choice([(196, 208, 226), (244, 248, 252), (186, 200, 220)])
+    for _ in range(40):   # Fussspuren
+        x, y = rnd.randrange(W), rnd.randrange(HK_STANDS + 10, H - 10)
+        for k in range(rnd.randint(4, 10)):
+            d.rectangle([x + k * 7, y + (k % 2) * 4, x + k * 7 + 2, y + (k % 2) * 4 + 1], fill=(178, 192, 214))
+    # Schneewall direkt unter dem Waldrand
+    for x in range(W):
+        top = HK_STANDS - 3 + int(2 * math.sin(x * 0.07))
+        for y in range(top, HK_STANDS + 4):
+            px[x, y] = (244, 248, 252) if y == top else (230, 238, 248)
+    return im
+
+
+def hk_compose(src, clean, back, floor, keep_diff):
+    W, H = src.size
+    out = src.copy()
+    po, ps, pb = out.load(), src.load(), back.load()
+    pc = clean.load()
+    x0g, x1g = 40, W - 40
+    for y in range(H):
+        for x in range(W):
+            if keep_diff and ps[x, y] != pc[x, y]:
+                continue      # eingebrannte Bankfiguren
+            surround = y < HK_STANDS or floor[y * W + x]
+            if not surround:
+                continue
+            c = pb[x, y]
+            if x0g <= x <= x1g and y >= hk_glass_top(x) and y < 470:
+                c = mix(c, (214, 230, 244), 0.22)        # hinter der Verglasung
+                if y >= HK_STANDS and luma(pc[x, y]) > 70:
+                    c = mix(c, (236, 244, 252), 0.15)
+            po[x, y] = c
+    # Schatten der Bande auf den Schnee
+    for y in range(HK_STANDS + 1, H):
+        for x in range(W):
+            if floor[y * W + x] and not floor[(y - 1) * W + x] and (y - 1) >= HK_STANDS:
+                for k in range(6):
+                    if y + k < H and floor[(y + k) * W + x]:
+                        po[x, y + k] = mix(po[x, y + k], (120, 140, 170), 0.35 * (1 - k / 6))
+    # Verglasung oben: Handlauf und Pfosten neu, da die Tribuene darunter ersetzt ist
+    d = ImageDraw.Draw(out)
+    for x in range(HK_GLASS_X[0] - 180, HK_GLASS_X[1] + 181):
+        y = hk_glass_top(x)
+        if y < HK_STANDS:
+            po[x, y] = (236, 242, 250)
+            po[x, y + 1] = (170, 184, 204)
+    for x in range(HK_GLASS_X[0], HK_GLASS_X[1] + 1, 114):
+        d.line([x, HK_RAIL + 2, x, HK_STANDS - 1], fill=(176, 190, 210))
+    return out
+
+
+def build_hockey():
+    s = open(HK_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    clean, _ = get_img(s, "clean")
+    world, clean = world.convert("RGB"), clean.convert("RGB")
+    floor = hk_floor_mask(clean)
+    back = hk_backdrop(*clean.size)
+    new_clean = hk_compose(clean, clean, back, floor, False)
+    new_world = hk_compose(world, clean, back, floor, True)
+    debug("hockey-bergsee-world", new_world)
+    s = set_img(s, "world", new_world)
+    s = set_img(s, "clean", new_clean)
+    # Draussen gibt es keine Tribuene, die beim Tor hochspringt (die Sprung-Animation schneidet
+    # Streifen aus der Kulisse und wuerde sonst die Berge huepfen lassen).
+    hook = "function drawCrowd(t, x0, x1) {"
+    assert s.count(hook) == 1
+    s = s.replace(hook, hook + " return;")
+    s = retitle(s, "Eishockey Bergsee", "Eishockey &mdash; Freiluft-Eisfeld im Gebirge")
+    write("hockey", "bergsee", s)
+
+
+# ================================================================== FOOTBALL — Beach-Football an der Kueste
+FB_SRC = os.path.join(SZ, "football", "feld.html")
+FB_BOARD = (350, 4, 610, 50)
+FB_RIBBON = (136, 147)
+FB_PANEL = 596
+FB_ENDZONE = [(745, 181), (922, 181), (852, 567), (673, 567)]
+
+
+def fb_world(world):
+    src = half(world.convert("RGB"))
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(5150)
+    d = ImageDraw.Draw(im)
+    horizon = 58
+    sky(px, W, 0, horizon, [(70, 140, 214), (96, 160, 224), (128, 184, 232), (168, 206, 236), (206, 226, 240)])
+    sx, sy = 160, 20
+    add_glow(px, W, H, sx, sy, 34, (60, 56, 30), 0.9)
+    d.ellipse([sx - 8, sy - 8, sx + 8, sy + 8], fill=(255, 248, 210))
+    for (cx, cy, wl) in ((40, 34, 70), (300, 16, 50), (660, 26, 90), (840, 12, 60)):
+        for k in range(wl):
+            r = int(4 * math.sin(k / wl * math.pi))
+            for yy in range(cy - r, cy + 1):
+                px[cx + k, yy] = (250, 252, 252) if yy < cy else (214, 228, 238)
+    # Meer mit Wellenkaemmen und Segelboot
+    for y in range(horizon, 100):
+        u = (y - horizon) / 42
+        base = mix((34, 108, 168), (52, 170, 186), u)
+        for x in range(W):
+            c = base
+            if (y % 4 == 0) and ((x * 3 + y * 7) % 23) < 6:
+                c = mix(base, (220, 240, 246), 0.55)
+            px[x, y] = c
+    d.line([0, horizon, W, horizon], fill=(28, 84, 140))
+    bx = 560
+    d.polygon([(bx, 52), (bx + 22, 52), (bx + 18, 57), (bx + 4, 57)], fill=(250, 250, 246))
+    d.polygon([(bx + 10, 30), (bx + 10, 50), (bx + 22, 50)], fill=(250, 250, 246))
+    d.polygon([(bx + 9, 34), (bx + 9, 50), (bx + 1, 50)], fill=(230, 110, 70))
+    # Brandung + Strand-Hintergrund
+    for x in range(W):
+        top = 98 + int(2 * math.sin(x * 0.08))
+        for y in range(top, top + 3):
+            px[x, y] = (244, 248, 246)
+        for y in range(top + 3, FB_RIBBON[0]):
+            px[x, y] = (224, 196, 138) if (x + y) % 9 else (210, 180, 122)
+    # Sonnenschirme mit Badegaesten, Strandhuetten, Rettungsturm, Palmen
+    cols = [(230, 70, 70), (250, 200, 60), (60, 150, 220), (90, 190, 110), (240, 130, 190), (250, 250, 246)]
+    for ux in range(20, W, 46):
+        if FB_BOARD[0] - 20 < ux < FB_BOARD[2] + 10 and rnd.random() < 0.5:
+            continue
+        c1, c2 = rnd.sample(cols, 2)
+        top = 104 + rnd.randint(-2, 3)
+        d.line([ux, top, ux, top + 22], fill=(110, 90, 70))
+        for k in range(-14, 15):
+            hgt = int(6 * (1 - (k / 14) ** 2))
+            d.line([ux + k, top - hgt, ux + k, top], fill=c1 if (k + 14) // 5 % 2 else c2)
+        for kk in range(rnd.randint(1, 3)):     # Badegaeste
+            gx = ux + rnd.randint(-12, 12)
+            skin = rnd.choice([(240, 200, 160), (200, 150, 110), (150, 100, 70), (110, 70, 50)])
+            d.rectangle([gx, top + 14, gx + 2, top + 16], fill=skin)
+            d.rectangle([gx - 1, top + 17, gx + 3, top + 21], fill=rnd.choice(cols))
+    for hx in (80, 250, 690):
+        d.rectangle([hx, 104, hx + 26, 126], fill=(250, 246, 236))
+        for k in range(hx, hx + 27, 6):
+            d.rectangle([k, 104, k + 2, 126], fill=(60, 140, 200))
+        d.polygon([(hx - 3, 104), (hx + 29, 104), (hx + 13, 94)], fill=(200, 70, 60))
+        d.rectangle([hx + 9, 114, hx + 17, 126], fill=(90, 66, 44))
+    tx = 800
+    for lx in (tx, tx + 22):
+        d.line([lx, 104, lx + 4, 134], fill=(250, 250, 246))
+    d.rectangle([tx - 2, 88, tx + 28, 104], fill=(230, 70, 60))
+    d.rectangle([tx + 4, 92, tx + 22, 100], fill=(250, 240, 220))
+    d.polygon([(tx - 5, 88), (tx + 31, 88), (tx + 13, 80)], fill=(250, 250, 246))
+    def palme(x0, h):
+        for k in range(h):
+            xx = x0 + int(4 * math.sin(k / h * 1.6))
+            d.rectangle([xx - 1, 134 - k, xx + 1, 134 - k], fill=(130, 92, 56) if k % 4 else (100, 70, 40))
+        tx_, ty_ = x0 + int(4 * math.sin(1.6)), 134 - h
+        for ang in range(0, 360, 36):
+            for r in range(1, 18):
+                fx = tx_ + int(math.cos(math.radians(ang)) * r)
+                fy = ty_ + int(math.sin(math.radians(ang)) * r * 0.5 + (r * r) / 36)
+                if 0 <= fx < W and 0 <= fy < H:
+                    px[fx, fy] = (60, 140, 60) if r % 3 else (40, 104, 46)
+                    if fy + 1 < H:
+                        px[fx, fy + 1] = (40, 104, 46)
+    for x0 in (8, 150, 330, 640, 760, 930):
+        palme(x0, rnd.randint(48, 66))
+    # Anzeigetafel auf zwei Masten
+    for mx in (FB_BOARD[0] + 26, FB_BOARD[2] - 30):
+        d.rectangle([mx, FB_BOARD[3], mx + 3, FB_RIBBON[0] - 1], fill=(80, 84, 94))
+        d.line([mx, FB_BOARD[3], mx, FB_RIBBON[0] - 1], fill=(140, 146, 160))
+    im.paste(src.crop(FB_BOARD), FB_BOARD[:2])
+    # ---- Spielfeld + Seitenlinie: Rasen -> Sand (Linien, Zahlen, Endzone bleiben)
+    for y in range(FB_RIBBON[1], FB_PANEL):
+        for x in range(W):
+            p = px[x, y]
+            if in_poly(x, y, FB_ENDZONE):
+                continue
+            if p[1] > p[0] + 8 and p[1] > p[2] + 4:
+                c = tint_luma(p, (176, 138, 86), (252, 232, 182), 50, 140)
+                n = noise(x, y, 7)
+                if n > 0.9:
+                    c = mix(c, (255, 240, 200), 0.4)
+                elif n < 0.08:
+                    c = mix(c, (130, 96, 58), 0.4)
+                px[x, y] = c
+    # Fussspuren und Muscheln im Sand neben dem Feld
+    for _ in range(140):
+        x, y = rnd.randrange(W), rnd.choice([rnd.randrange(150, 178), rnd.randrange(583, FB_PANEL - 1)])
+        p = px[x, y]
+        if sat(p) > 40 and p[0] > p[2] + 30:
+            px[x, y] = rnd.choice([(250, 240, 226), (196, 160, 110), (232, 170, 150)])
+    return double(im)
+
+
+def build_football():
+    s = open(FB_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    new = fb_world(world)
+    debug("football-strand-world", new)
+    s = set_img(s, "world", new)
+    s = retitle(s, "Football Strand", "Football &mdash; Beach-Football an der K&uuml;ste")
+    write("football", "strand", s)
+
+
+# ================================================================== EISKUNSTLAUF — zugefrorener Waldsee
+EK_SRC = os.path.join(SZ, "eiskunstlauf", "kuer.html")
+EK_STANDS = 150
+EK_KEEP = [(1192, 80, 1448, 134), (1104, 128, 1537, 194),   # Technisches Panel mit Preisrichtern
+           (84, 88, 278, 246),      # Kiss & Cry
+           (386, 150, 416, 198), (756, 152, 786, 200), (1856, 156, 1886, 204), (2216, 156, 2246, 204)]  # Offizielle
+
+
+def flood(img, seeds, ok, step=None):
+    W, H = img.size
+    px = img.load()
+    seen = bytearray(W * H)
+    st = list(seeds)
+    while st:
+        x, y = st.pop()
+        if not (0 <= x < W and 0 <= y < H) or seen[y * W + x] or not ok(px[x, y]):
+            continue
+        seen[y * W + x] = 1
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < W and 0 <= ny < H and not seen[ny * W + nx] and (step is None or step(px[x, y], px[nx, ny])):
+                st.append((nx, ny))
+    return seen
+
+
+def ek_panel_crowd(x, y):
+    """Neben dem schwarzen Panelkasten sitzen die Preisrichter vor der Tribuene: dort nur die
+    Figuren (je Richter eine schmale Spalte ab Kopfhoehe) behalten, die Zuschauer dahinter nicht."""
+    if not (1104 <= x < 1537 and 128 <= y < 150) or 1195 <= x < 1448:
+        return False
+    k = round((x - 1136) / 46)
+    return not (abs(x - (1136 + 46 * k)) <= 10 and y >= 131)
+
+
+def ek_backdrop(W, H):
+    im = Image.new("RGB", (W, H))
+    px = im.load()
+    rnd = random.Random(2203)
+    d = ImageDraw.Draw(im)
+    # Alpengluehen am spaeten Nachmittag
+    sky(px, W, 0, EK_STANDS, [(92, 120, 186), (130, 140, 196), (186, 154, 190), (236, 170, 160), (250, 196, 150)])
+    mountains(px, W, 118, 104, (132, 122, 160), (250, 222, 214), 41, fr=0.004, snow_line=0.55)
+    mountains(px, W, 138, 62, (96, 94, 128), (238, 214, 216), 53, fr=0.009, snow_line=0.4)
+    # Kapelle auf einer Anhoehe
+    cx = 1760
+    for x in range(cx - 120, cx + 120):
+        top = 128 - int(14 * math.cos((x - cx) / 120 * math.pi / 2))
+        for y in range(top, 140):
+            px[x, y] = (236, 240, 248) if y < top + 2 else (214, 222, 238)
+    d.rectangle([cx - 14, 92, cx + 14, 116], fill=(246, 240, 228))
+    d.polygon([(cx - 18, 92), (cx + 18, 92), (cx, 78)], fill=(150, 70, 60))
+    d.rectangle([cx + 6, 66, cx + 14, 92], fill=(246, 240, 228))
+    d.polygon([(cx + 4, 66), (cx + 16, 66), (cx + 10, 52)], fill=(150, 70, 60))
+    d.rectangle([cx - 4, 104, cx + 2, 116], fill=(110, 76, 50))
+    d.rectangle([cx + 8, 74, cx + 11, 78], fill=(255, 214, 140))
+    # dichter verschneiter Nadelwald am Seeufer
+    for x in range(-10, W + 10, 8):
+        h = 26 + int(16 * noise(x, 3, 4)) + int(8 * math.sin(x * 0.02))
+        pine(d, x + rnd.randint(-3, 3), 142, h, (30, 62, 58), (48, 90, 80), (246, 240, 246))
+    for x in range(-6, W + 6, 12):
+        h = 32 + int(14 * noise(x, 6, 2))
+        pine(d, x + rnd.randint(-4, 4), 152, h, (22, 50, 46), (38, 76, 66), (250, 246, 250))
+    # verschneites Ufer
+    band_gradient(px, 0, EK_STANDS, W, H, [(214, 214, 232), (226, 226, 240), (236, 236, 246), (230, 232, 244)])
+    for _ in range(1600):
+        x, y = rnd.randrange(W), rnd.randrange(EK_STANDS + 2, H)
+        px[x, y] = rnd.choice([(204, 204, 226), (248, 248, 252), (196, 198, 222)])
+    for x in range(W):   # Schneekante unterm Waldrand
+        top = EK_STANDS - 4 + int(2 * math.sin(x * 0.05))
+        for y in range(top, EK_STANDS + 3):
+            px[x, y] = (250, 248, 252) if y == top else (234, 234, 246)
+    return im
+
+
+def ek_snowbank(x, y, p):
+    """Bande -> Schneewall: hell oben, blauer Schatten unten, ein paar Eiskristalle."""
+    L = luma(p)
+    c = mix((176, 186, 214), (248, 250, 254), min(1.0, max(0.0, (L - 30) / 200)) * 0.08 + 0.80)
+    n = noise(x, y, 11)
+    if n > 0.94:
+        c = (255, 255, 255)
+    elif n < 0.05:
+        c = mix(c, (150, 164, 200), 0.5)
+    return c
+
+
+def build_eiskunstlauf():
+    s = open(EK_SRC, encoding="utf-8").read()
+    bg, _ = get_img(s, "bg")
+    fg, _ = get_img(s, "fg")
+    bg = bg.convert("RGB")
+    W, H = bg.size
+    floor = flood(bg, [(5, H - 1), (5, 300), (W - 5, 300), (W // 2, H - 1), (W // 2, 160), (1300, 170)],
+                  lambda p: sat(p) < 30 and luma(p) < 90 and p[2] > p[0])
+    ice = flood(bg, [(W // 2, 450)], lambda p: luma(p) > 195 and sat(p) < 40,
+                lambda a, b: sum(abs(i - j) for i, j in zip(a, b)) < 28)
+    back = ek_backdrop(W, H)
+    out = bg.copy()
+    po, pb, ps = out.load(), back.load(), bg.load()
+    rnd = random.Random(9)
+    keep = lambda x, y: any(x0 <= x < x1 and y0 <= y < y1 for (x0, y0, x1, y1) in EK_KEEP)
+    for y in range(H):
+        for x in range(W):
+            i = y * W + x
+            if keep(x, y) and not floor[i] and not ek_panel_crowd(x, y):
+                continue
+            if y < EK_STANDS or floor[i]:
+                po[x, y] = pb[x, y]
+            elif ice[i]:
+                p = ps[x, y]
+                po[x, y] = mix(p, (176, 206, 228), 0.22)     # Seeeis: etwas tiefer, gruenlich-blau
+            else:
+                po[x, y] = ek_snowbank(x, y, ps[x, y])
+    # Risse und dunkle Stellen im Seeeis
+    for _ in range(46):
+        x, y = rnd.randrange(300, W - 300), rnd.randrange(300, 760)
+        a = rnd.random() * math.tau
+        for k in range(rnd.randint(30, 90)):
+            a += rnd.uniform(-0.5, 0.5)
+            x += math.cos(a) * 1.6
+            y += math.sin(a) * 0.8
+            xi, yi = int(x), int(y)
+            if 0 <= xi < W - 1 and 0 <= yi < H - 1 and ice[yi * W + xi]:
+                po[xi, yi] = (248, 252, 255)
+                if ice[(yi + 1) * W + xi]:
+                    po[xi, yi + 1] = mix(po[xi, yi + 1], (120, 160, 196), 0.45)
+    for _ in range(18):
+        cx, cy, r = rnd.randrange(400, W - 400), rnd.randrange(320, 740), rnd.randint(30, 90)
+        for y in range(cy - r // 3, cy + r // 3):
+            for x in range(cx - r, cx + r):
+                if ((x - cx) / r) ** 2 + ((y - cy) / (r / 3)) ** 2 < 1 and ice[y * W + x] and \
+                        (BAYER4[y & 3][x & 3] + 0.5) / 16 < 0.5:
+                    po[x, y] = mix(po[x, y], (130, 176, 204), 0.25)
+    # Schatten des Schneewalls aufs Ufer
+    for y in range(EK_STANDS + 1, H):
+        for x in range(W):
+            if floor[y * W + x] and not floor[(y - 1) * W + x] and not keep(x, y - 1) and y - 1 > EK_STANDS:
+                for k in range(8):
+                    if y + k < H and floor[(y + k) * W + x]:
+                        po[x, y + k] = mix(po[x, y + k], (150, 156, 196), 0.4 * (1 - k / 8))
+    debug("eiskunstlauf-waldsee-bg", out)
+    s = set_img(s, "bg", out)
+    # vordere Bande (eigene Ebene) ebenfalls als Schneewall; das Kiss-&-Cry-Stueck bleibt
+    fg = fg.convert("RGBA")
+    pf = fg.load()
+    for y in range(fg.height):
+        for x in range(320, fg.width):
+            p = pf[x, y]
+            if p[3]:
+                pf[x, y] = ek_snowbank(x, y, p) + (p[3],)
+    s = set_img(s, "fg", fg)
+    s = retitle(s, "Eiskunstlauf Waldsee", "Eiskunstlauf &mdash; K&uuml;r auf dem zugefrorenen Waldsee")
+    write("eiskunstlauf", "waldsee", s)
+
+
+# ================================================================== FECHTEN — Burghof
+FE_SRC = os.path.join(SZ, "fechten", "piste.html")
+FE_BACK = 107                     # bis hierher reicht die Hallen-Tribuene (halbes Raster)
+FE_KEEP = [(276, 18, 364, 46), (265, 26, 279, 38), (361, 26, 375, 38),   # Anzeigetafel + Seitenlampen
+           (101, 56, 115, 69), (525, 56, 539, 69)]                         # Trefferlampen
+FE_PISTE = (82, 111, 558, 130)
+FE_POLES = [108, 532]
+FE_LED = (137, 142)
+
+
+def fe_world(world):
+    src = half(world.convert("RGB"))
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(1415)
+    d = ImageDraw.Draw(im)
+    sky(px, W, 0, 60, [(92, 150, 210), (118, 170, 222), (150, 192, 230), (186, 212, 234)])
+    for (cx, cy, wl) in ((30, 12, 46), (180, 22, 34), (420, 8, 52), (560, 20, 40)):
+        for k in range(wl):
+            r = int(3 * math.sin(k / wl * math.pi))
+            for yy in range(cy - r, cy + 1):
+                px[cx + k, yy] = (250, 252, 252) if yy < cy else (220, 232, 240)
+    stone, stone_d, stone_l = (150, 140, 124), (112, 102, 90), (182, 172, 154)
+
+    def blocks(x0, y0, x1, y1, base):
+        for yy in range(max(0, y0), y1):
+            for xx in range(max(0, x0), min(W, x1)):
+                row = (yy - y0) // 5
+                mort = (yy - y0) % 5 == 0 or (xx + (row % 2) * 6) % 12 == 0
+                c = mix(base, (70, 62, 54), 0.45) if mort else base
+                if not mort and noise(xx, yy, 2) > 0.9:
+                    c = mix(base, (255, 250, 236), 0.15)
+                px[xx, yy] = c
+
+    def zinnen(x0, x1, top, base):
+        for xx in range(x0, x1, 8):
+            blocks(xx, top - 5, xx + 5, top, base)
+
+    # Bergfried hinter der Mitte (die Anzeigetafel haengt an seiner Front)
+    blocks(282, 2, 358, 60, stone_d)
+    zinnen(282, 358, 2, stone_d)
+    for wy in (12, 30):
+        d.rectangle([316, wy, 323, wy + 9], fill=(40, 34, 30))
+        d.ellipse([316, wy - 3, 323, wy + 3], fill=(40, 34, 30))
+    # Ecktuerme mit Kegeldach
+    for (tx, tw) in ((14, 46), (580, 46)):
+        blocks(tx, 18, tx + tw, FE_BACK, stone)
+        d.polygon([(tx - 4, 18), (tx + tw + 4, 18), (tx + tw // 2, -6)], fill=(70, 74, 110))
+        for k in range(0, 24, 4):
+            d.line([(tx + tw // 2, -6 + k), (tx - 4 + k * 2 // 3, 18)], fill=(56, 60, 92))
+        d.line([tx + tw // 2, -6, tx + tw // 2, -14], fill=(60, 50, 40))
+        d.polygon([(tx + tw // 2, -14), (tx + tw // 2 + 9, -11), (tx + tw // 2, -8)],
+                  fill=(206, 52, 58) if tx < W // 2 else (44, 168, 92))
+        for wy in (34, 60):
+            d.rectangle([tx + tw // 2 - 2, wy, tx + tw // 2 + 2, wy + 7], fill=(40, 34, 30))
+    # Ringmauer mit Zinnen und Wehrgang (auch aussen neben den Ecktuermen)
+    wall_top = 52
+    blocks(0, wall_top, 14, FE_BACK, stone)
+    blocks(626, wall_top, W, FE_BACK, stone)
+    zinnen(0, 14, wall_top, stone)
+    zinnen(626, W, wall_top, stone)
+    blocks(60, wall_top, 580, FE_BACK, stone)
+    zinnen(60, 580, wall_top, stone)
+    d.line([60, wall_top + 8, 580, wall_top + 8], fill=stone_l)
+    # Burgtor in der Mitte mit Fallgitter
+    d.rectangle([300, 70, 340, FE_BACK], fill=(36, 30, 28))
+    d.ellipse([300, 60, 340, 80], fill=(36, 30, 28))
+    for gx in range(303, 340, 5):
+        d.line([gx, 66, gx, FE_BACK - 14], fill=(90, 84, 80))
+    for gy in range(70, FE_BACK - 14, 5):
+        d.line([302, gy, 338, gy], fill=(90, 84, 80))
+    # Banner in Teamfarben an der Mauer
+    for bx in (92, 150, 208, 252, 388, 432, 490, 548):
+        team = (206, 52, 58) if bx < W // 2 else (44, 168, 92)
+        d.rectangle([bx - 1, wall_top + 9, bx + 13, wall_top + 10], fill=(80, 60, 40))
+        d.rectangle([bx, wall_top + 11, bx + 12, wall_top + 36], fill=team)
+        d.polygon([(bx, wall_top + 36), (bx + 12, wall_top + 36), (bx + 6, wall_top + 42)], fill=team)
+        d.rectangle([bx + 1, wall_top + 11, bx + 2, wall_top + 36], fill=mix(team, (255, 255, 255), 0.25))
+        d.rectangle([bx + 4, wall_top + 20, bx + 8, wall_top + 24], fill=(236, 196, 72))
+    # Fackeln
+    for fx in (122, 230, 410, 518):
+        d.rectangle([fx, wall_top + 30, fx + 1, wall_top + 38], fill=(70, 50, 30))
+        d.rectangle([fx - 1, wall_top + 26, fx + 2, wall_top + 29], fill=(255, 170, 60))
+        d.point([fx, wall_top + 25], fill=(255, 236, 140))
+        add_glow(px, W, H, fx, wall_top + 27, 10, (80, 50, 10), 0.6)
+    # Garten: Hecke mit Rosen am Mauerfuss
+    for xx in range(60, 580):
+        top = 97 + int(2 * math.sin(xx * 0.3) + noise(xx, 1, 4) * 2)
+        for yy in range(top, FE_BACK):
+            c = (48, 104, 52) if (xx + yy) % 5 else (36, 84, 42)
+            if yy == top:
+                c = (76, 140, 70)
+            px[xx, yy] = c
+        if noise(xx, 3, 8) > 0.88:
+            px[xx, top + 2] = (220, 60, 80)
+            px[xx, top + 3] = (180, 40, 60)
+    # Trefferlampen-Masten neu (die alten standen vor der Tribuene)
+    for x in FE_POLES:
+        d.rectangle([x - 1, 69, x + 1, 112], fill=(70, 66, 62))
+        d.line([x - 1, 69, x - 1, 112], fill=(120, 114, 106))
+    for box in FE_KEEP:
+        im.paste(src.crop(box), box[:2])
+    for cx in (290, 350):              # Ketten, an denen die Tafel am Bergfried haengt
+        for yy in range(2, 18, 2):
+            px[cx, yy] = (60, 58, 56)
+            px[cx + 1, yy + 1] = (100, 96, 92)
+    # ---- Boden: Kopfsteinpflaster statt Hallenpodest (Piste, Baenke, LED-Band bleiben)
+    for y in range(FE_BACK, H):
+        if FE_LED[0] <= y < FE_LED[1]:
+            continue
+        for x in range(W):
+            p = px[x, y]
+            if FE_PISTE[0] <= x < FE_PISTE[2] and FE_PISTE[1] <= y < FE_PISTE[3]:
+                continue
+            if luma(p) < 62 and p[2] >= p[0]:
+                L = luma(p)
+                if y < 131:                    # Hofpflaster
+                    r_ = (y - FE_BACK) // 4
+                    sx_ = (x + (r_ % 2) * 3) % 6
+                    base = mix((120, 110, 96), (168, 156, 136), noise(x // 6, r_, 5))
+                    c = mix(base, (70, 62, 54), 0.55) if (sx_ == 0 or (y - FE_BACK) % 4 == 0) else base
+                    c = mix(c, (60, 54, 48), max(0.0, 0.35 - L / 120))
+                elif y < FE_LED[0]:            # Stufe vor dem Podest
+                    c = (128, 118, 102) if y == 131 else (104, 94, 82)
+                else:                          # Kies und Gras vorn
+                    c = (96, 120, 64) if noise(x, y, 6) > 0.3 else (120, 140, 80)
+                px[x, y] = c
+    return double(im)
+
+
+def build_fechten():
+    s = open(FE_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    new = fe_world(world)
+    debug("fechten-schlosshof-world", new)
+    s = set_img(s, "world", new)
+    s = retitle(s, "Fechten Schlosshof", "Fechten &mdash; Gefecht im Burghof")
+    write("fechten", "schlosshof", s)
+
+
+# ================================================================== BATTLEFIELD — Wuestenruine
+BF_SRC = os.path.join(SZ, "battlefield", "eroberung.html")
+BF_WALLS = [(36, 70), (1210, 1244)]       # Palisaden links/rechts -> Sandsteinmauern
+BF_RIVER = (782, 828)                      # Flussband unten -> ausgetrocknetes Wadi
+
+
+def bf_bg(bg):
+    src = bg.convert("RGB")
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(6061)
+    for y in range(H):
+        for x in range(W):
+            p = px[x, y]
+            r, g, b = p
+            wall = any(a <= x < c for a, c in BF_WALLS) and y < BF_RIVER[0]
+            if wall and not (g > r + 6 and g > b):
+                # Holzpalisade -> Sandsteinquader
+                row = y // 6
+                mort = y % 6 == 0 or (x + (row % 2) * 7) % 14 == 0
+                c = tint_luma(p, (150, 112, 70), (232, 196, 140), 20, 160)
+                px[x, y] = mix(c, (110, 80, 50), 0.4) if mort else c
+                continue
+            if b > r + 14 and b > g - 10 and BF_RIVER[0] - 6 <= y <= BF_RIVER[1] + 6:
+                # Wasser -> rissiger Lehm im Wadi
+                c = tint_luma(p, (150, 112, 74), (206, 168, 116), 40, 200)
+                cell = (int(x / 9 + 0.5 * math.sin(y * 0.7)) + int(y / 5)) % 3
+                if noise(x // 9, y // 5, 3) > 0.75 or (x % 9 == 0 and cell == 0):
+                    c = mix(c, (96, 66, 40), 0.6)
+                px[x, y] = c
+            elif g > r + 4 and g > b + 10:
+                # Gras -> Sand mit Rippeln (Gras-Buescheln werden trockenes Gestruepp)
+                c = tint_luma(p, (186, 148, 96), (246, 222, 170), 60, 190)
+                v = math.sin(x * 0.11 + y * 0.42 + 2.2 * math.sin(x * 0.017 + y * 0.01))
+                if v > 0.88:
+                    c = mix(c, (176, 134, 86), 0.35)
+                elif v < -0.92:
+                    c = mix(c, (255, 240, 200), 0.3)
+                if luma(p) > 175 and sat(p) > 60:
+                    c = (160, 140, 80)
+                px[x, y] = c
+            elif r > g > b and sat(p) > 20 and luma(p) < 150:
+                # Erdwege -> rotbrauner, festgetretener Lehm
+                px[x, y] = tint_luma(p, (110, 64, 40), (196, 126, 80), 30, 140)
+    d = ImageDraw.Draw(im)
+    # Kakteen, Palmen am Wadi, Saeulenstuempfe, Tierschaedel — nur auf freien Sandflaechen
+    def free(x, y, r):
+        for yy in range(y - r, y + r):
+            for xx in range(x - r, x + r):
+                if not (0 <= xx < W and 0 <= yy < H):
+                    return False
+                p = px[xx, yy]
+                if not (p[0] > 175 and p[1] > 135 and p[2] > 80 and p[0] - p[2] > 50):
+                    return False
+        return True
+
+    def cactus(x, y):
+        d.rectangle([x - 2, y - 18, x + 2, y], fill=(70, 120, 60))
+        d.line([x - 2, y - 18, x - 2, y], fill=(100, 150, 80))
+        d.rectangle([x - 8, y - 12, x - 6, y - 5], fill=(70, 120, 60))
+        d.rectangle([x - 8, y - 5, x - 2, y - 3], fill=(70, 120, 60))
+        d.rectangle([x + 6, y - 15, x + 8, y - 8], fill=(70, 120, 60))
+        d.rectangle([x + 2, y - 8, x + 8, y - 6], fill=(70, 120, 60))
+        d.ellipse([x - 4, y - 1, x + 4, y + 2], fill=(170, 130, 84))
+
+    def column(x, y, h):
+        d.rectangle([x - 6, y - 3, x + 6, y], fill=(150, 120, 86))
+        d.rectangle([x - 4, y - h, x + 4, y - 3], fill=(226, 206, 168))
+        for k in range(x - 3, x + 4, 3):
+            d.line([k, y - h, k, y - 3], fill=(196, 172, 134))
+        d.polygon([(x - 4, y - h), (x + 4, y - h), (x + 1, y - h - 4), (x - 2, y - h + 2)], fill=(226, 206, 168))
+        d.rectangle([x + 8, y - 4, x + 16, y], fill=(214, 194, 156))
+
+    def skull(x, y):
+        d.ellipse([x - 3, y - 3, x + 3, y + 2], fill=(244, 238, 222))
+        d.point([x - 1, y - 1], fill=(60, 50, 40))
+        d.point([x + 1, y - 1], fill=(60, 50, 40))
+        d.line([x - 7, y - 3, x - 3, y - 1], fill=(244, 238, 222))
+        d.line([x + 7, y - 3, x + 3, y - 1], fill=(244, 238, 222))
+
+    def palme(x0, base, h):
+        for k in range(h):
+            xx = x0 + int(4 * math.sin(k / h * 1.5))
+            d.rectangle([xx - 1, base - k, xx + 1, base - k], fill=(130, 92, 56) if k % 4 else (100, 70, 40))
+        tx, ty = x0 + int(4 * math.sin(1.5)), base - h
+        for ang in range(0, 360, 36):
+            for r in range(1, 20):
+                fx = tx + int(math.cos(math.radians(ang)) * r)
+                fy = ty + int(math.sin(math.radians(ang)) * r * 0.5 + (r * r) / 40)
+                if 0 <= fx < W and 0 <= fy < H:
+                    px[fx, fy] = (60, 140, 60) if r % 3 else (40, 104, 46)
+
+    placed = 0
+    tries = 0
+    while placed < 22 and tries < 4000:
+        tries += 1
+        x, y = rnd.randrange(90, W - 90), rnd.randrange(40, BF_RIVER[0] - 30)
+        if free(x, y - 8, 12):
+            [cactus, column, skull][placed % 3](x, y) if placed % 3 != 1 else column(x, y, rnd.randint(16, 30))
+            placed += 1
+    for x0 in (120, 330, 420, 870, 980, 1150):
+        palme(x0, 780, rnd.randint(30, 42))
+    # Duenenkaemme ausserhalb der Mauern
+    for (a, c) in ((0, BF_WALLS[0][0]), (BF_WALLS[1][1], W)):
+        for y in range(0, BF_RIVER[0]):
+            for x in range(a, c):
+                v = math.sin(y * 0.05 + x * 0.3)
+                px[x, y] = (214, 170, 110) if v > 0.6 else (232, 196, 136) if v > -0.2 else (198, 154, 98)
+    return im
+
+
+BF_FX = r"""
+// Wuestenruine: Flugsand und flirrende Hitze ueber dem Platz (rein optisch, eigene Ebene)
+(() => {
+  const c = document.getElementById('fx').getContext('2d');
+  const W = 1280, H = 840;
+  const draw = c.fillRect.bind(c);
+  function sand(t) {
+    for (let i = 0; i < 70; i++) {
+      const sp = 30 + (i * 13) % 40, y0 = 40 + (i * 97) % 760;
+      const x = (i * 271 + t * sp) % (W + 60) - 30, y = y0 + Math.sin(t * 2 + i) * 3;
+      c.fillStyle = i % 3 ? 'rgba(250,232,190,0.55)' : 'rgba(210,170,120,0.6)';
+      draw(Math.round(x), Math.round(y), i % 4 === 0 ? 3 : 2, 1);
+    }
+  }
+  window.__sandFx = sand;
+})();
+"""
+
+
+def build_battlefield():
+    s = open(BF_SRC, encoding="utf-8").read()
+    bg, _ = get_img(s, "bg")
+    new = bf_bg(bg)
+    debug("battlefield-wuestenruine-bg", new)
+    s = set_img(s, "bg", new)
+    # Objekt-Sprites (Brueckenkopf-Huegel u. a.) tragen eigenes Gras: dort ebenfalls Sand
+    i0 = s.index('"objs":[')
+    i1 = s.index('"sets":', i0)
+    part = s[i0:i1]
+
+    def sandify(m):
+        im = Image.open(io.BytesIO(base64.b64decode(m.group(0).split(",", 1)[1]))).convert("RGBA")
+        pp = im.load()
+        hit = False
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = pp[x, y]
+                if a and g > r + 4 and g > b + 10:
+                    pp[x, y] = tint_luma((r, g, b), (186, 148, 96), (246, 222, 170), 60, 190) + (a,)
+                    hit = True
+        if not hit:
+            return m.group(0)
+        buf = io.BytesIO()
+        im.save(buf, "PNG", optimize=True)
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+    s = s[:i0] + re.sub(B64, sandify, part) + s[i1:]
+    # Flugsand auf der vorhandenen Partikel-Ebene: direkt nach dem Leeren des fx-Canvas zeichnen
+    hook = "fx.clearRect(0,0,W,H);"
+    assert s.count(hook) == 1
+    s = s.replace(hook, hook + "if(window.__sandFx)window.__sandFx(t/1000);")
+    s = s.replace("</script>\n</body>", BF_FX + "</script>\n</body>", 1) if "</script>\n</body>" in s else \
+        s.replace("</body>", "<script>" + BF_FX + "</script>\n</body>", 1)
+    s = retitle(s, "Battlefield Wuestenruine", "Battlefield &mdash; Eroberung in der W&uuml;stenruine")
+    write("battlefield", "wuestenruine", s)
+
+
+BUILDERS = {
+    "basketball": build_basketball,
+    "hockey": build_hockey,
+    "football": build_football,
+    "eiskunstlauf": build_eiskunstlauf,
+    "fechten": build_fechten,
+    "battlefield": build_battlefield,
+}
+
+if __name__ == "__main__":
+    wanted = sys.argv[1:] or list(BUILDERS)
+    for k in wanted:
+        BUILDERS[k]()

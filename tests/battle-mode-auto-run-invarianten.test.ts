@@ -255,11 +255,16 @@ describe.skipIf(UEBERSPRINGEN)(
       const arenaDisziplinenZeilen = zeilen.filter((zeile) => ARENA_RESOLVED_DISCIPLINE_IDS.has(zeile.disciplineId));
       expect(gespielteArenaSlots.length, `kein arena-aufgeloester Slot in ${gespielteSpieltage.join(", ")} (saveId ${saveId})`).toBeGreaterThan(0);
       expect(arenaDisziplinenZeilen.length, `gespielte Arena-Slots: ${gespielteArenaSlots.join(", ")}`).toBeGreaterThan(0);
+      // BAHN-POD (02.11.): Takeshi's Castle/Staffel sind arena-aufgeloest UND Pod-Disziplinen -- an
+      // Pod-Tagen lief die Arena als Vier-Team-Rennen (`resolutionSource: "mini_dm_pod"` mit
+      // `miniDmPod.quelle === "bahn"`). Das zaehlt hier wie `"arena"`: der Motor lief, gebucht ist sein Ergebnis.
+      const istArenaGelaufen = (zeile: DisciplineResultRecord) =>
+        zeile.resolutionSource === "arena" || (zeile.resolutionSource === "mini_dm_pod" && zeile.miniDmPod?.quelle === "bahn");
       const wederNoch = arenaDisziplinenZeilen.filter(
-        (zeile) => zeile.resolutionSource !== "arena" && !(zeile.arenaAusfall as ArenaAusfall | null | undefined),
+        (zeile) => !istArenaGelaufen(zeile) && !(zeile.arenaAusfall as ArenaAusfall | null | undefined),
       );
       expect(wederNoch, JSON.stringify(wederNoch.slice(0, 3))).toHaveLength(0);
-      const arenaZeilen = arenaDisziplinenZeilen.filter((zeile) => zeile.resolutionSource === "arena");
+      const arenaZeilen = arenaDisziplinenZeilen.filter(istArenaGelaufen);
       const ausfallZeilen = arenaDisziplinenZeilen.filter((zeile) => zeile.arenaAusfall);
       // Nur selbst gemessene Zahlen (CLAUDE.md): dieser Lauf hat {arenaZeilen.length} von
       // {arenaDisziplinenZeilen.length} arena-aufgelösten Zeilen über die Arena gebucht.

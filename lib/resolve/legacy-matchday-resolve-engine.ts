@@ -35,9 +35,10 @@ import {
 // MINI-DM-POD-RESOLVE (19.10., docs/design/mini-dm-pod-resolve-19-10.md): Mini-DM ist die EINZIGE
 // Disziplin, die hier als Vierergruppe statt als Zweier-Duell aufgeloest wird -- s. Kopfkommentar
 // an mini-dm-pod-resolve.ts fuer die volle Begruendung.
-import { berechneMiniDmPodOverrides } from "@/lib/resolve/mini-dm-pod-resolve";
+import { berechneMiniDmPodOverrides, istMotorPodQuelle } from "@/lib/resolve/mini-dm-pod-resolve";
+import { berechneBahnPodOverrides, istBahnPodDisziplin } from "@/lib/resolve/bahn-pod-resolve";
 import { getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
-import { isViererPodDiscipline, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { BATTLEFIELD_DISCIPLINE_ID, isViererPodDiscipline, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 // SICHTBARE ARENA-AUSFÄLLE (Plan battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 3.2
 // Punkt 4): arena-resolved-disciplines.ts hat ABSICHTLICH keine Fremd-Importe (s. Dateikopf dort),
 // der Import hier ist deshalb erlaubt und unproblematisch -- die Engine braucht die Menge, um zu
@@ -362,6 +363,11 @@ export function buildLegacyMatchdayResolvePreview(
     // Kommentar an `LegacyResolvePreviewOptions.miniDmFfaPodRohdatenByDisciplineId`) -- der
     // Default `null` haelt den Mini-DM-Zweig unten IMMER beim bisherigen PPS-Pod-Pfad.
     miniDmFfaPodRohdatenByDisciplineId: options?.miniDmFfaPodRohdatenByDisciplineId ?? null,
+    // BATTLEFIELD-GEFECHT (02.11. abends): vom Arena-Vorlauf geliefert (`runBattlefieldPodMatchday()`),
+    // sonst `null` -- dann bucht der Battlefield-Pod unveraendert ueber den PPS-Pod.
+    battlefieldPodRohdatenByPodId: options?.battlefieldPodRohdatenByPodId ?? null,
+    // BAHN-POD-ROHDATEN (02.11.): vom Arena-Vorlauf gesetzt, s. `LegacyResolvePreviewOptions`.
+    bahnPodRohdatenByDisciplineId: options?.bahnPodRohdatenByDisciplineId ?? null,
   };
   // SICHTBARE ARENA-AUSFÄLLE: EIN Zeitstempel fuer die ganze Vorschau (statt je Team neu
   // `new Date().toISOString()` zu rufen) -- rein kosmetisch (Log/Tooltip), aber so bekommen nicht
@@ -878,22 +884,47 @@ export function buildLegacyMatchdayResolvePreview(
     // FFA-Rohdaten vor (kein heutiger Aufrufer liefert sie -- das ist PR 5), versucht
     // `berechneMiniDmPodOverrides()` sie ZUERST je Pod; fehlende/unvollstaendige Rohdaten fallen
     // je Pod defensiv auf den bisherigen PPS-Pod-Pfad zurueck (s. Kommentar an der Funktion,
-    // mini-dm-pod-resolve.ts). BLEIBT MINI-DM-EXKLUSIV (01.11.): Battlefield ist ein reiner PPS-Pod
-    // ohne FFA-Motor -- fuer jede andere Pod-Disziplin ist dieser Wert IMMER `null`.
+    // mini-dm-pod-resolve.ts). Der FFA-Zweig bleibt Mini-DM-exklusiv; BATTLEFIELD hat seit 02.11.
+    // abends seinen EIGENEN Motor-Vorrang (das Gefecht je Ort, `battlefieldPodRohdatenByPodId`,
+    // berechneBattlefieldPodOverride()) -- fuer jede andere Pod-Disziplin sind beide Werte `null`.
     const miniDmFfaRohdatenForThisDiscipline =
       disciplineId === MINI_DM_DISCIPLINE_ID
         ? resolveOptions.miniDmFfaPodRohdatenByDisciplineId?.get(disciplineId) ?? null
         : null;
-    const miniDmPodOverridesForThisDiscipline =
-      miniDmPodsForThisMatchday.length > 0
-        ? berechneMiniDmPodOverrides({
+    const battlefieldRohdatenForThisDiscipline =
+      disciplineId === BATTLEFIELD_DISCIPLINE_ID ? resolveOptions.battlefieldPodRohdatenByPodId ?? null : null;
+    // BAHN-POD-VORRANG (Liga-Verdrahtung 02.11., bahn-pod-resolve.ts): fuer Takeshi's Castle und
+    // Staffel bucht die Engine je Pod ZUERST das echte Vier-Team-Rennen (`quelle: "bahn"`), sofern der
+    // Vorlauf Rohdaten geliefert hat. Pods ohne Rohdaten (Vorlauf aus/ausgefallen, Team ohne Kader)
+    // gehen unveraendert an `berechneMiniDmPodOverrides()` und werden dort als PPS-Pod gewertet.
+    const bahnPodOverridesForThisDiscipline =
+      miniDmPodsForThisMatchday.length > 0 && istBahnPodDisziplin(disciplineId)
+        ? berechneBahnPodOverrides({
             pods: miniDmPodsForThisMatchday,
+            rohdatenByPodId: resolveOptions.bahnPodRohdatenByDisciplineId?.get(disciplineId) ?? null,
+            ppsScoreByTeamId,
+            disciplineId,
+            playerCount: legacyScorePlayerCountForThisDiscipline,
+          })
+        : null;
+    const podsOhneBahnErgebnis = bahnPodOverridesForThisDiscipline?.size
+      ? miniDmPodsForThisMatchday.filter((pod) => !bahnPodOverridesForThisDiscipline.has(pod.teamIds[0]))
+      : miniDmPodsForThisMatchday;
+    const ppsOderFfaPodOverrides =
+      podsOhneBahnErgebnis.length > 0
+        ? berechneMiniDmPodOverrides({
+            pods: podsOhneBahnErgebnis,
             scoreByTeamId: ppsScoreByTeamId,
             disciplineId,
             playerCount: legacyScorePlayerCountForThisDiscipline,
             ffaRohdatenByPodId: miniDmFfaRohdatenForThisDiscipline,
+            battlefieldRohdatenByPodId: battlefieldRohdatenForThisDiscipline,
           })
         : null;
+    const miniDmPodOverridesForThisDiscipline =
+      bahnPodOverridesForThisDiscipline?.size
+        ? new Map([...bahnPodOverridesForThisDiscipline, ...(ppsOderFfaPodOverrides ?? [])])
+        : ppsOderFfaPodOverrides;
     const ppsDuellOverridesForThisDiscipline = duellFixtureIndex
       ? berechnePpsDuellOverrides({
           fixtures: [...new Set(duellFixtureIndex.values())],
@@ -931,10 +962,10 @@ export function buildLegacyMatchdayResolvePreview(
       // VORRANG POD VOR ARENA (01.11., Konzept "Vier Teams je Bereich" Abschnitt 5 Punkt 3): fuer eine
       // Pod-Disziplin schlaegt der Pod ein Arena-ZWEIER-Duell -- sonst wertete ein kuenftig
       // angeschlossener Zweier-Motor wieder gegen den Fixture-Gegner, der oft gar nicht im Pod ist
-      // (genau Chris' Befund "0:2 bei 4 Teams" vom 19.10.). Heute liefert fuer keine Pod-Disziplin
-      // ein Aufrufer Arena-Teampunkte (Mini-DM und Battlefield stehen nicht in
-      // `ARENA_RESOLVED_DISCIPLINE_IDS`; Mini-DMs Motor kommt ueber die FFA-Rohdaten in den Pod) --
-      // die Reihenfolge ist also heute wirkungsneutral und nur fuer den kuenftigen Fall festgelegt.
+      // (genau Chris' Befund "0:2 bei 4 Teams" vom 19.10.). Seit 02.11. ist der Fall real: Takeshi's
+      // Castle und Staffel sind arena-aufgeloest UND Pod-Disziplinen. Der Arena-Vorlauf faehrt fuer
+      // sie an Pod-Tagen kein Zweier-Duell mehr (sondern das Vier-Team-Rennen, Rohdaten s. oben) --
+      // sollte trotzdem ein Duell-Override vorliegen (aelterer Snapshot), schlaegt ihn der Pod hier.
       const miniDmPod = miniDmPodOverridesForThisDiscipline?.get(item.teamId) ?? null;
       const arenaOverride = miniDmPod ? null : arenaOverrideRoh;
       const ppsDuell = arenaOverride || miniDmPod ? null : ppsDuellOverridesForThisDiscipline?.get(item.teamId) ?? null;
@@ -992,7 +1023,9 @@ export function buildLegacyMatchdayResolvePreview(
       // gebuchte Zeile einer arena-aufgelösten Disziplin in einem Battle-Save diesen Grund. Das
       // ändert NICHTS an `teamPoints`/`resolutionSource`/`pointSource` unten — die PPS-Duell-
       // Brücke rechnet unverändert weiter, die Zeile ist nur zusätzlich markiert.
-      const arenaAusfall: ArenaAusfall | null = arenaOverrideRoh
+      // BAHN-POD (02.11.): eine Pod-Zeile aus dem echten Vier-Team-Rennen (`quelle: "bahn"`) IST ein
+      // Motor-Ergebnis -- kein Ausfall, auch ohne Zweier-Duell-Override.
+      const arenaAusfall: ArenaAusfall | null = arenaOverrideRoh || miniDmPod?.quelle === "bahn"
         ? null
         : erklaerterArenaAusfallFuerDiesesDisziplin ??
           (isBattleModeArenaEligible && ARENA_RESOLVED_DISCIPLINE_IDS.has(disciplineId)
@@ -1088,7 +1121,9 @@ export function buildLegacyMatchdayResolvePreview(
                 // `undefined`, dieser Zweig bleibt dadurch inert (kein neuer Schluessel im Objekt,
                 // `JSON.stringify` liesse `undefined`-Werte ohnehin weg -- hier zusaetzlich gar nicht
                 // erst erzeugt, s. Bit-Identitaets-Pflicht).
-                ...(miniDmPod.quelle
+                ...(miniDmPod.quelle === "bahn"
+                  ? { quelle: miniDmPod.quelle, teamWert: miniDmPod.teamWert ?? null }
+                  : miniDmPod.quelle
                   ? { quelle: miniDmPod.quelle, rundenPunkteSumme: miniDmPod.rundenPunkteSumme, teilnahme: miniDmPod.teilnahme }
                   : {}),
               },
@@ -1197,7 +1232,7 @@ export function buildLegacyMatchdayResolvePreview(
           // ODER ein Mini-DM-Pod MIT `quelle === "ffa"` duerfen die Boxscore-PP tatsaechlich ziehen.
           const arenaIndividualPpsGueltig =
             rankedTeam.resolutionSource === "arena" ||
-            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa");
+            (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle));
           const arenaPps = arenaIndividualPpsGueltig ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId) ?? null : null;
           const ppsDuellPps = ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ?? null;
           return {
@@ -1244,7 +1279,7 @@ export function buildLegacyMatchdayResolvePreview(
         pointsAwarded:
           (rankedTeam &&
           (rankedTeam.resolutionSource === "arena" ||
-            (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa"))
+            (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle)))
             ? arenaIndividualPpsForThisDiscipline?.get(entry.playerId)
             : null) ??
           ppsDuellSpielerPpByPlayerId?.get(entry.playerId) ??
@@ -1256,7 +1291,7 @@ export function buildLegacyMatchdayResolvePreview(
         arenaBoxscoreImpactApplied: Boolean(
           rankedTeam &&
             (rankedTeam.resolutionSource === "arena" ||
-              (rankedTeam.resolutionSource === "mini_dm_pod" && rankedTeam.miniDmPod?.quelle === "ffa")) &&
+              (rankedTeam.resolutionSource === "mini_dm_pod" && istMotorPodQuelle(rankedTeam.miniDmPod?.quelle))) &&
             arenaIndividualPpsForThisDiscipline?.get(entry.playerId) != null,
         ),
         rankInTeam,

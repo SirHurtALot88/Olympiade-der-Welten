@@ -36,6 +36,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 
 import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
+import { getLeagueLevel } from "@/lib/season/league-history";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 /**
@@ -83,6 +84,15 @@ export type FoundationSeasonHistoryTeamEntry = {
   startplatz: number | null;
   rankDiff: number | null;
   transferNet: number | null;
+  /**
+   * LIGA DIESES TEAMS IN DIESER SAISON — eingefroren im Schnappschuss (`season-snapshot-service`,
+   * vor `league_movement`). Ohne dieses Feld wuesste der Browser nach einem Auf-/Abstieg nicht mehr,
+   * in welcher Liga Rang und Punkte der alten Saison entstanden sind (Chris, 02.11.: „in Season 1,
+   * in welcher Liga haben sie denn gespielt zu dem Zeitpunkt"), und Liga-2-Erster und Liga-1-Erster
+   * waeren in der Ewigen Tabelle beide „Gold". Optional: Kurzfassungen von vor dieser Aenderung
+   * tragen es nicht. `null` = keine Liga-Trennung (Manager Mode / Legacy).
+   */
+  leagueTier?: string | null;
 };
 
 /**
@@ -218,6 +228,7 @@ function projiziereTeam(record: {
   startplatz?: number | null;
   rankDiff?: number | null;
   transferNet?: number | null;
+  leagueTier?: string | null;
 }): FoundationSeasonHistoryTeamEntry {
   const bereich = record.disciplinePointsByArea ?? {};
   return {
@@ -255,6 +266,9 @@ function projiziereTeam(record: {
     startplatz: zahlOderNull(record.startplatz),
     rankDiff: zahlOderNull(record.rankDiff),
     transferNet: zahlOderNull(record.transferNet),
+    // Nur mitnehmen, wenn der Schnappschuss das Feld kennt — ein fehlendes Feld bleibt fehlend
+    // (dann rechnet `buildHistoricalLeagueTierLookup` zurueck), ein `null` bleibt „keine Liga".
+    ...(record.leagueTier !== undefined ? { leagueTier: textOderNull(record.leagueTier) } : {}),
   };
 }
 
@@ -401,9 +415,12 @@ export function alsSchnappschussErsatz(
         startplatz: team.startplatz,
         rankDiff: team.rankDiff,
         transferNet: team.transferNet,
+        ...(team.leagueTier !== undefined ? { leagueTier: team.leagueTier } : {}),
         // Aus dem Rang abgeleitet, nicht mitgefahren: dieselbe Regel wie im echten
-        // Schnappschuss (`season-snapshot-service`), also keine zweite Rechenstelle.
-        isGold: team.rank === 1,
+        // Schnappschuss (`season-snapshot-service`). Bei Liga-Split zaehlt `rank` je Liga — der
+        // Liga-2-Erste ist dort Zweitliga-Meister, nicht Gold (liga-split-plan.md 10.8).
+        isGold: team.rank === 1 && (getLeagueLevel(team.leagueTier) ?? 1) === 1,
+        isLiga2Champion: team.rank === 1 && getLeagueLevel(team.leagueTier) === 2,
         isSilver: team.rank === 2,
         isBronze: team.rank === 3,
         isTop5: team.rank != null ? team.rank <= 5 : false,

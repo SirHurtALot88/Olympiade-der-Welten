@@ -169,16 +169,19 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  *     dagegen (`buildSeededDisciplinePairs()` bleibt unveraendert).
  *
  * MINI-DM: echte Pod-Disziplin seit 19.10. (PPS-Pod), mit FFA-Motor-Vorrang seit 24.10.
- * BATTLEFIELD (01.11.): PPS-Pod -- derselbe deterministische Eignungs-Score, ueber den Battlefield
- * schon vorher als PPS-Duell gewertet wurde (nie arena-angeschlossen, s.
- * `ARENA_RESOLVED_DISCIPLINE_IDS`), nur als Vierergruppe statt Zweier-Duell. Kein FFA-/Domination-
- * Motor dahinter; der FFA-Vorrang (`miniDmFfaPodRohdatenByDisciplineId`) bleibt Mini-DM-exklusiv.
- * Staffel und Takeshi's Castle stehen hier BEWUSST NICHT. Ihr Bahn-Motor kennt seit 01.11. vier
- * Seiten (`__arena.spieleBahnPod`, battle-mode.engine.js) und ist im 4er-Format abgenommen
- * (docs/design/bahn-pod-vier-teams-01-11.md). Ein Eintrag HIER wuerde sie aber ueber den PPS-Pod
- * werten (der Pod schlaegt das Arena-Duell, s. legacy-matchday-resolve-engine.ts) und die Buehne
- * spielte weiter ein Zwei-Team-Rennen gegen den Fixture-Gegner. Erst muss die Liga-Kette stehen
- * (Runner, Spieltag, Motor-Vorrang im Pod-Resolve, Referenzen, Vorlauf, Anzeige -- Abschnitt 4 dort).
+ * BATTLEFIELD (01.11.): zuerst PPS-Pod -- derselbe deterministische Eignungs-Score, ueber den
+ * Battlefield schon vorher als PPS-Duell gewertet wurde, nur als Vierergruppe statt Zweier-Duell.
+ * SEIT 02.11. ABENDS MIT MOTOR-VORRANG wie Mini-DM: das GEFECHT JE ORT (`bfffaGefecht()` in
+ * battle-mode.engine.js, `runBattlefieldPodMatchday()`, `berechneBattlefieldPodOverride()`), s.
+ * NACHTRAG unten. Der PPS-Pod bleibt der Rueckfall je Pod (Vorlauf ausgefallen, abgeschaltet,
+ * unvollstaendige Rohdaten).
+ * STAFFEL UND TAKESHI'S CASTLE (seit 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6):
+ * echte Pod-Disziplinen MIT Motor -- gebucht wird das Vier-Team-Rennen (`__arena.spieleBahnPod`,
+ * Runner `runBahnPodFixtures`, Spieltag `runBahnPodMatchday`, Buchung `berechneBahnPodOverrides`,
+ * `quelle: "bahn"`), die Arena zeigt dasselbe Rennen (`echterKader.bahnPodByDisciplineId`). Abgenommen
+ * ohne Ausnahme: rho je Rennen 0,84-0,93 bei jeder Kadergroesse, Pp 9,3-22,0 (zwei Saatstroeme), das
+ * Duell bit-identisch. Ohne Rennergebnis (Vorlauf aus/ausgefallen) faellt ein Pod auf den PPS-Pod
+ * zurueck. An Spieltagen ohne Pods (Liga nicht durch 4 teilbar) bleibt es beim Arena-Duell.
  *
  * ABNAHME BATTLEFIELD IM 4ER-FORMAT (01.11., scripts/miss-battlefield-pod-abnahme.ts,
  * data/generated/battlefield-pod-abnahme.json; 80 echte Pods je k und Saatstrom, zwei disjunkte
@@ -200,8 +203,35 @@ export const BATTLEFIELD_DISCIPLINE_ID = "battlefield";
  *     liegt auf denselben Daten bei jedem k darunter (k=2 0,31/0,44, k=3 0,66/0,72).
  * Gilt NUR fuer diesen PPS-Pod. Ein kuenftiger echter Battlefield-Motor (K6-Umbau, Domination fuer
  * vier Seiten) braucht eine eigene, neue Abnahme; diese Ausnahme geht nicht automatisch auf ihn ueber.
+ *
+ * NACHTRAG 02.11.: der echte Vier-Team-Motor ist da (Arena zeigt den Pod als FFA, `spieleBattlefieldPod`,
+ * docs/design/battlefield-pod-ffa-02-11.md) und hat seine eigene Abnahme: rho je Kampf 0,13-0,27,
+ * Team-rho -0,07..0,24 (k=2..6, data/generated/battlefield-pod-ffa-abnahme.json) -- durchgefallen.
+ *
+ * NACHTRAG 02.11. ABENDS -- ANZEIGE UND BUCHUNG SIND JETZT DASSELBE. Chris hat sich fuer das
+ * Mini-DM-Muster entschieden: der Pod wird nicht mehr im freien Echtzeitkampf entschieden, sondern
+ * als ein deterministisches Gefecht je Ort (Nord/Mitte/Sued, Belegung aus der Rolle, je Ort ein
+ * Schlagwechsel aus den Matrix-Kanaelen, Kontrollpunkte nach der kpTick-Regel), das die Arena danach
+ * mit allen vier Teams gleichzeitig ABSPIELT. Eigene Abnahme, beide Pflichtkriterien regulaer
+ * bestanden (docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7,
+ * data/generated/battlefield-pod-gefecht-abnahme.json): rho je Kampf k=2 0,873/0,861 · k=3
+ * 0,881/0,874 · k=4 0,885/0,864 · k=5 0,919/0,920 · k=6 0,922/0,923; Pp 4,8-20,2 (n=48, zwei
+ * Stroeme); Paare ab 15 Punkten 99,4-99,8 % richtig. Der Arena-Vorlauf rechnet das Gefecht
+ * (`BATTLEFIELD_POD_VORLAUF_AKTIV`, arena-resolved-disciplines.ts), die Liga bucht daraus Platz 1-4
+ * mit 2-1-0-0 und die Spieler-PP; die Arena zeigt genau dieses Gefecht (gleiche Saat, k, Aufstellung,
+ * Mutatoren). Chris' Ausnahme oben (k=2/3) wird fuer den Motor NICHT gebraucht; sie gilt nur noch fuer
+ * den PPS-Pod-Rueckfall.
  */
-export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([MINI_DM_DISCIPLINE_ID, BATTLEFIELD_DISCIPLINE_ID]);
+/** Takeshi's Castle und Staffel -- s. `VIERER_POD_DISCIPLINE_IDS` (Bahn-Pod, 02.11.). */
+export const TAKESHIS_CASTLE_DISCIPLINE_ID = "takeshis-castle";
+export const STAFFEL_DISCIPLINE_ID = "staffel";
+
+export const VIERER_POD_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
+  MINI_DM_DISCIPLINE_ID,
+  BATTLEFIELD_DISCIPLINE_ID,
+  TAKESHIS_CASTLE_DISCIPLINE_ID,
+  STAFFEL_DISCIPLINE_ID,
+]);
 
 export function isViererPodDiscipline(disciplineId: string | null | undefined): boolean {
   return disciplineId != null && VIERER_POD_DISCIPLINE_IDS.has(disciplineId);

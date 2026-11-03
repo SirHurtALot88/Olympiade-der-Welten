@@ -70,6 +70,16 @@ declare global {
         optionen?: { formSaat?: number | string },
       ) => PodErgebnis;
       bahnPodDisziplinen: () => string[];
+      bahnPodAnzeigen: (bd: string, pod: unknown) => boolean;
+      bahnPodAnzeigeStand: () => {
+        disziplin: string;
+        N: number;
+        done: boolean;
+        laeufer: number;
+        teams: { side: number; name: string; platz: number; ligaPunkte: number; anzeige: string }[];
+      } | null;
+      setDisc: (d: string) => void;
+      sondenLauf: (ticks: number) => unknown;
     };
   }
 }
@@ -167,6 +177,92 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("Bahn im Pod-Format (N Teams) -- Duell unv
             expect(t.wert!).toBeCloseTo(Math.round(summe * 10) / 10, 6);
           }
         }
+      }
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  // POD-KALIBRIERUNG (02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 5): Pod-Dichte im
+  // Takeshi-Gedraenge und Pod-Rezept der Staffel machen die Pp-Pflichtpruefung im Vier-Team-Format
+  // (Takeshi 18,9/16,3, Staffel 9,3/10,1 statt 13,5/26,5 und 22,8/24,9). Beide wirken NUR im Pod —
+  // das Duell halten die Fingerabdruecke oben. Diese hier halten den abgenommenen Pod-Stand: eine
+  // Aenderung an Gedraenge, Rezept oder Pod-Einstieg verschiebt sie, dann neu messen
+  // (scripts/miss-bahn-pod-abnahme.mjs, rho UND --pp in zwei Saatstroemen) und neu ziehen.
+  // Vor der Kalibrierung lauteten sie staffel a35a2321cbb16276, takeshis-castle 6451afa5e888b0d4.
+  const POD_FINGERABDRUECKE_KALIBRIERT: Record<string, string> = {
+    staffel: "8484261a6da5ebb1",
+    "takeshis-castle": "079498743dacc99c",
+  };
+  it.each(Object.keys(POD_FINGERABDRUECKE_KALIBRIERT))(
+    "Pod %s: spieleBahnPod() liefert den abgenommenen Stand der Pp-Kalibrierung (02.11.)",
+    async (bd) => {
+      const teams = vierTeams();
+      const laeufe = await seite.evaluate(
+        ({ bd, teams }) =>
+          ["save:s1:md7:", "save:s1:md8:", 11].map((s) => {
+            const saat = typeof s === "string" ? s + bd : s;
+            return window.__arena.spieleBahnPod(bd, teams, saat, null, { formSaat: saat });
+          }),
+        { bd, teams },
+      );
+      expect(fingerabdruck(laeufe)).toBe(POD_FINGERABDRUECKE_KALIBRIERT[bd]);
+    },
+    LAUF_TIMEOUT_MS,
+  );
+
+  // DAS SICHTBARE VIER-TEAM-RENNEN (Liga-Verdrahtung 02.11., Abschnitt 6 des Dokuments): die Arena
+  // zeigt an Pod-Tagen die gebuchte Vierergruppe statt eines Duells. Geprueft: vier Teams auf der
+  // Strecke (4k Laeufer), Lauf bis ins Ziel ohne Seitenfehler, Vier-Team-Endstand (Platz 1..4,
+  // 2-1-0-0), headless Laeufe sehen den sichtbaren Pod NICHT (Duell-Fingerabdruecke gleich, solange
+  // er laeuft), und `null` schaltet zurueck aufs Duell.
+  it.each(["takeshis-castle", "staffel"])(
+    "Anzeige %s: Vier-Team-Rennen sichtbar, bis ins Ziel, Endstand vier Teams, kein Leck ins Duell",
+    async (bd) => {
+      const teams = vierTeams();
+      const fehler: string[] = [];
+      const lauscher = (e: Error) => fehler.push(String(e));
+      seite.on("pageerror", lauscher);
+      try {
+        const r = await seite.evaluate(
+          ({ bd, teams, saaten }) => {
+            const duell = () => saaten.map((s) => window.__arena.spieleBahn(bd, s));
+            // Erst dieselbe Disziplin OHNE Pod aufbauen: setDisc() zieht den Mutator-Wurf der
+            // Disziplin, der auch spieleBahn() beeinflusst -- verglichen wird bei gleicher Disziplin.
+            window.__arena.bahnPodAnzeigen(bd, null);
+            window.__arena.setDisc(bd);
+            const vorher = duell();
+            const pod = { teams: teams.map((kader, i) => ({ name: "Team " + "ABCD"[i], kader })), k: 3, saat: 4242, aufstellung: null };
+            window.__arena.bahnPodAnzeigen(bd, pod);
+            window.__arena.setDisc(bd);
+            const start = window.__arena.bahnPodAnzeigeStand();
+            const waehrend = duell();
+            let st = start;
+            for (let n = 0; n < 200000 && st && !st.done; n += 1000) {
+              window.__arena.sondenLauf(1000);
+              st = window.__arena.bahnPodAnzeigeStand();
+            }
+            const endstandText = document.getElementById("esieger")?.textContent ?? "";
+            const tafeln = ["etafelL", "etafelR"].map((id) => document.getElementById(id)?.querySelectorAll("h5").length ?? 0);
+            window.__arena.bahnPodAnzeigen(bd, null);
+            window.__arena.setDisc(bd);
+            const nachher = window.__arena.bahnPodAnzeigeStand();
+            return { vorher, waehrend, start, ende: st, endstandText, tafeln, nachher, nachDuell: duell() };
+          },
+          { bd, teams, saaten: SAATEN },
+        );
+        expect(r.start?.N).toBe(4);
+        expect(r.start?.laeufer).toBe(12); // k = 3 je Team, ohne Aufstellung die besten drei
+        expect(r.ende?.done).toBe(true);
+        expect(r.ende!.teams.map((t) => t.platz).sort()).toEqual([1, 2, 3, 4]);
+        expect(r.ende!.teams.reduce((x, t) => x + t.ligaPunkte, 0)).toBeCloseTo(3, 9);
+        expect(r.endstandText).toContain("4-Team-Rennen");
+        expect(r.tafeln).toEqual([2, 2]); // links Team 0/2, rechts Team 1/3
+        expect(r.waehrend).toEqual(r.vorher);
+        expect(r.nachDuell).toEqual(r.vorher);
+        expect(r.nachher).toBeNull();
+        expect(fehler).toEqual([]);
+      } finally {
+        seite.off("pageerror", lauscher);
       }
     },
     LAUF_TIMEOUT_MS,

@@ -89,6 +89,13 @@ export type TeamDetailDrawerHistoryRow = {
   seasonId: string;
   seasonName: string;
   isLive: boolean;
+  /**
+   * Liga, in der das Team IN DIESER Saison spielte (`"liga1"`, `"liga2"`, kuenftig `"liga<N>"`).
+   * Bei Liga-Split ist `rank` liga-lokal — ohne Liga ist „#1" nicht lesbar. `null` ohne
+   * Liga-Trennung (Manager Mode / Legacy) und in Platzhalterzeilen. Optional, damit
+   * Fremd-Konstruktoren gueltig bleiben. Quelle: `buildHistoricalLeagueTierLookup`.
+   */
+  leagueTier?: string | null;
   rank: number | null;
   points: number | null;
   pps: number | null;

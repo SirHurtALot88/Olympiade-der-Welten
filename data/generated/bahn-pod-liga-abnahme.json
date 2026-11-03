@@ -1,0 +1,319 @@
+{
+  "datum": "2026-11-02T11:47:16.331Z",
+  "saveId": "new-game-1793619508768-cn2u0r",
+  "spieltageJeStrom": 2,
+  "feldgroessen": [
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "rennLaufzeitMsJeDisziplinUndSpieltag": 5008,
+  "ergebnis": {
+    "staffel": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.803,
+            "rhoPodMedian": 0.821,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.989,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.85,
+            "siegerAndersAlsPpsPodPct": 0.125,
+            "plaetzeAndersAlsPpsPodPct": 0.625
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.856,
+            "rhoPodMedian": 0.881,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.985,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.913,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.75
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.873,
+            "rhoPodMedian": 0.896,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.995,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.875,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.625
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.852,
+            "rhoPodMedian": 0.853,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.973,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.863,
+            "siegerAndersAlsPpsPodPct": 0.438,
+            "plaetzeAndersAlsPpsPodPct": 0.5
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.762,
+            "rhoPodMedian": 0.817,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.929,
+            "teamStaerkstesAufPlatz1Pct": 0.438,
+            "teamRhoEignungGegenPlatzMittel": 0.413,
+            "siegerAndersAlsPpsPodPct": 0.813,
+            "plaetzeAndersAlsPpsPodPct": 0.938
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.812,
+            "rhoPodMedian": 0.833,
+            "starRang1Pct": 0.5,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.983,
+            "teamStaerkstesAufPlatz1Pct": 0.938,
+            "teamRhoEignungGegenPlatzMittel": 0.938,
+            "siegerAndersAlsPpsPodPct": 0.125,
+            "plaetzeAndersAlsPpsPodPct": 0.438
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.873,
+            "rhoPodMedian": 0.889,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 1,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.962,
+            "siegerAndersAlsPpsPodPct": 0.188,
+            "plaetzeAndersAlsPpsPodPct": 0.313
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.855,
+            "rhoPodMedian": 0.88,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.985,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.85,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.625
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.853,
+            "rhoPodMedian": 0.86,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.976,
+            "teamStaerkstesAufPlatz1Pct": 0.813,
+            "teamRhoEignungGegenPlatzMittel": 0.863,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.563
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.754,
+            "rhoPodMedian": 0.834,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 0.75,
+            "paartreueAb15Pct": 0.929,
+            "teamStaerkstesAufPlatz1Pct": 0.625,
+            "teamRhoEignungGegenPlatzMittel": 0.475,
+            "siegerAndersAlsPpsPodPct": 0.625,
+            "plaetzeAndersAlsPpsPodPct": 0.813
+          }
+        }
+      }
+    ],
+    "takeshis-castle": [
+      {
+        "strom": 0,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.823,
+            "rhoPodMedian": 0.848,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 1,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.7,
+            "siegerAndersAlsPpsPodPct": 0.25,
+            "plaetzeAndersAlsPpsPodPct": 0.563
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.796,
+            "rhoPodMedian": 0.832,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 0.938,
+            "paartreueAb15Pct": 1,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.588,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.625
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.779,
+            "rhoPodMedian": 0.763,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.979,
+            "teamStaerkstesAufPlatz1Pct": 0.875,
+            "teamRhoEignungGegenPlatzMittel": 0.75,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.688
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.817,
+            "rhoPodMedian": 0.835,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.973,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.825,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.563
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.86,
+            "rhoPodMedian": 0.875,
+            "starRang1Pct": 0.625,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 0.988,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.663,
+            "siegerAndersAlsPpsPodPct": 0.125,
+            "plaetzeAndersAlsPpsPodPct": 0.75
+          }
+        }
+      },
+      {
+        "strom": 1,
+        "jeFeldgroesse": {
+          "2": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.801,
+            "rhoPodMedian": 0.821,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.875,
+            "paartreueAb15Pct": 1,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.65,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.563
+          },
+          "3": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.745,
+            "rhoPodMedian": 0.808,
+            "starRang1Pct": 0.813,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.974,
+            "teamStaerkstesAufPlatz1Pct": 0.625,
+            "teamRhoEignungGegenPlatzMittel": 0.6,
+            "siegerAndersAlsPpsPodPct": 0.313,
+            "plaetzeAndersAlsPpsPodPct": 0.75
+          },
+          "4": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.814,
+            "rhoPodMedian": 0.795,
+            "starRang1Pct": 0.563,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.983,
+            "teamStaerkstesAufPlatz1Pct": 0.688,
+            "teamRhoEignungGegenPlatzMittel": 0.563,
+            "siegerAndersAlsPpsPodPct": 0.375,
+            "plaetzeAndersAlsPpsPodPct": 0.688
+          },
+          "5": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.835,
+            "rhoPodMedian": 0.858,
+            "starRang1Pct": 0.688,
+            "starTop2Pct": 0.813,
+            "paartreueAb15Pct": 0.995,
+            "teamStaerkstesAufPlatz1Pct": 0.75,
+            "teamRhoEignungGegenPlatzMittel": 0.688,
+            "siegerAndersAlsPpsPodPct": 0.125,
+            "plaetzeAndersAlsPpsPodPct": 0.438
+          },
+          "6": {
+            "pods": 16,
+            "zeilenMitRennen": "64/64",
+            "podsMitFalscherPunktesumme": 0,
+            "rhoPodMittel": 0.838,
+            "rhoPodMedian": 0.84,
+            "starRang1Pct": 0.75,
+            "starTop2Pct": 1,
+            "paartreueAb15Pct": 0.988,
+            "teamStaerkstesAufPlatz1Pct": 0.938,
+            "teamRhoEignungGegenPlatzMittel": 0.813,
+            "siegerAndersAlsPpsPodPct": 0.125,
+            "plaetzeAndersAlsPpsPodPct": 0.625
+          }
+        }
+      }
+    ]
+  }
+}

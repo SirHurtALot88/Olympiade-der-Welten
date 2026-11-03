@@ -11,6 +11,8 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { starteKiSaisonstartKaufLaufImHintergrund } from "@/lib/ai/ai-preseason-background-service";
+import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
 
 type PreSeasonWorkflowBody = {
   saveId?: string;
@@ -78,6 +80,7 @@ export async function POST(request: Request) {
     }
 
     const success = "applied" in summary ? summary.applied : summary.ok;
+    const kiKauflaufHinweise: string[] = [];
     if (!dryRun && success) {
       notifyRoomGameplayWrite(writeAuth, {
         saveId,
@@ -88,12 +91,35 @@ export async function POST(request: Request) {
         dryRun: false,
         success: true,
       });
+      /**
+       * DAS KAUFFENSTER DER NEUEN SAISON STOESST JETZT DER SERVER AN.
+       *
+       * Saisontest 02.11. (Battle Mode, VW-Spielstand): der Saisonwechsel lief ueber genau diese
+       * Route, danach war die Shell nicht offen — und Saison 2 begann mit 8-11 Spielern je
+       * KI-Kader, null Kaeufen, null Krediten, ohne Lauf-Datensatz. Der einzige Ausloeser fuer den
+       * KI-Kauflauf der Folgesaison sass im Browser. Detached: die ~2 Minuten wartet hier niemand
+       * ab; oeffnet der Spieler die Shell, sieht sie den laufenden Datensatz und stoesst keinen
+       * zweiten an (gemeinsame Sperre im Dienst).
+       */
+      if (body.stepId === "next_season_setup") {
+        try {
+          const kickoff = starteKiSaisonstartKaufLaufImHintergrund({
+            saveId,
+            scope: { room: writeAuth.room, participant: writeAuth.participant, activeOwnerId: await resolveAuthoritativeWriteOwnerId() },
+            logPrefix: "[preseason-workflow]",
+            persistence,
+          });
+          kiKauflaufHinweise.push(`ki_saisonstart_kauflauf:${kickoff.grund}`);
+        } catch (error) {
+          kiKauflaufHinweise.push(`ki_saisonstart_kauflauf_fehler:${error instanceof Error ? error.message : "unbekannt"}`);
+        }
+      }
     }
     return NextResponse.json(
       {
         success,
         summary,
-        warnings: [...writeAuth.warnings, ...summary.warnings],
+        warnings: [...writeAuth.warnings, ...summary.warnings, ...kiKauflaufHinweise],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

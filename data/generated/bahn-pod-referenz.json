@@ -1,0 +1,146 @@
+{
+ "hinweis": "BAHN-POD-REFERENZ (02.11., scripts/ziehe-bahn-pod-referenz.mjs). Je Disziplin und Kadergroesse k: m90 = 90. Perzentil der positiven Teamwert-Luecken zwischen Nachbarplaetzen eines Vier-Team-Rennens (Takeshi Burgpunkte, Staffel Sekunden Zielzeit-Abstand) -- gelesen von resolveBahnPodMargeReferenz(); spieler.p50/p995 = Perzentile des Laeuferwerts im Boxscore (Burgpunkte bzw. Rangpunkte der Etappe ueber 4k Laeufer) -- gelesen von resolveBahnPodSpielerPpReferenz() (lib/resolve/bahn-pod-resolve.ts). Kaderfest ueber die Kader-Familie (210 Vierergruppen, zwei Saatstroeme), __arena.spieleBahnPod mit formSaat und k wie im Liga-Vorlauf, ohne Mutator. Neu ziehen nach jeder Aenderung an BAHN_ART.staffel/takeshis-castle, bauSpurt/stepSpurt oder dem Pod-Einstieg.",
+ "disziplinen": {
+  "takeshis-castle": {
+   "feldgroessen": {
+    "2": {
+     "k": 2,
+     "rennen": 1680,
+     "luecken": 4996,
+     "m90": 11.2,
+     "median": 4.3,
+     "p95": 13.3,
+     "spieler": {
+      "p50": 12.67,
+      "p995": 25.78,
+      "stichprobe": 13440
+     }
+    },
+    "3": {
+     "k": 3,
+     "rennen": 1680,
+     "luecken": 5020,
+     "m90": 16.6,
+     "median": 6.4,
+     "p95": 19.81,
+     "spieler": {
+      "p50": 12.26,
+      "p995": 27.66,
+      "stichprobe": 20160
+     }
+    },
+    "4": {
+     "k": 4,
+     "rennen": 1680,
+     "luecken": 5022,
+     "m90": 21.4,
+     "median": 7.9,
+     "p95": 26,
+     "spieler": {
+      "p50": 12.47,
+      "p995": 29.59,
+      "stichprobe": 26880
+     }
+    },
+    "5": {
+     "k": 5,
+     "rennen": 1680,
+     "luecken": 5024,
+     "m90": 28.2,
+     "median": 10.7,
+     "p95": 34.9,
+     "spieler": {
+      "p50": 12.71,
+      "p995": 31.16,
+      "stichprobe": 33600
+     }
+    },
+    "6": {
+     "k": 6,
+     "rennen": 1680,
+     "luecken": 5029,
+     "m90": 35.82,
+     "median": 14.4,
+     "p95": 42.86,
+     "spieler": {
+      "p50": 13,
+      "p995": 33.06,
+      "stichprobe": 40320
+     }
+    }
+   }
+  },
+  "staffel": {
+   "feldgroessen": {
+    "2": {
+     "k": 2,
+     "rennen": 1680,
+     "luecken": 5000,
+     "m90": 1.48,
+     "median": 0.5,
+     "p95": 1.85,
+     "spieler": {
+      "p50": 4.5,
+      "p995": 8,
+      "stichprobe": 13440
+     }
+    },
+    "3": {
+     "k": 3,
+     "rennen": 1680,
+     "luecken": 4986,
+     "m90": 1.43,
+     "median": 0.48,
+     "p95": 1.78,
+     "spieler": {
+      "p50": 6.5,
+      "p995": 12,
+      "stichprobe": 20160
+     }
+    },
+    "4": {
+     "k": 4,
+     "rennen": 1680,
+     "luecken": 4989,
+     "m90": 1.2,
+     "median": 0.45,
+     "p95": 1.55,
+     "spieler": {
+      "p50": 8.5,
+      "p995": 16,
+      "stichprobe": 26880
+     }
+    },
+    "5": {
+     "k": 5,
+     "rennen": 1680,
+     "luecken": 4998,
+     "m90": 1.07,
+     "median": 0.47,
+     "p95": 1.28,
+     "spieler": {
+      "p50": 10.5,
+      "p995": 20,
+      "stichprobe": 33600
+     }
+    },
+    "6": {
+     "k": 6,
+     "rennen": 1680,
+     "luecken": 4982,
+     "m90": 1.03,
+     "median": 0.48,
+     "p95": 1.2,
+     "spieler": {
+      "p50": 12.5,
+      "p995": 24,
+      "stichprobe": 40320
+     }
+    }
+   }
+  }
+ },
+ "gezogenAm": "2026-11-02T11:22:21.244Z",
+ "repoCommit": "ee887c9de951ae21c32884aba1ec3b60cc401ed0",
+ "rennenJeGruppeUndStrom": 4
+}

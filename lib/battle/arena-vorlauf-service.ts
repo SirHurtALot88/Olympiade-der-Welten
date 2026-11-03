@@ -8,16 +8,34 @@ import {
   type ArenaTeamPointsOverride,
 } from "@/lib/resolve/battle-mode-arena-team-points";
 import type { ArenaAusfall, ArenaAusfallGrund } from "@/lib/resolve/legacy-matchday-resolve-types";
-import type { runArenaFixtures, RunArenaFixturesOptions, runMiniDmFfaPodFixtures, RunMiniDmFfaPodFixturesOptions } from "@/lib/battle/arena-headless-runner";
-import { berechneArenaEingabeHash, berechneMiniDmFfaEingabeHash } from "@/lib/battle/arena-eingabe-hash";
-import { MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
+import type {
+  runArenaFixtures,
+  RunArenaFixturesOptions,
+  runBahnPodFixtures,
+  RunBahnPodFixturesOptions,
+  runBattlefieldPodFixtures,
+  RunBattlefieldPodFixturesOptions,
+  runMiniDmFfaPodFixtures,
+  RunMiniDmFfaPodFixturesOptions,
+} from "@/lib/battle/arena-headless-runner";
+import {
+  berechneArenaEingabeHash,
+  berechneBahnPodEingabeHash,
+  berechneBattlefieldPodEingabeHash,
+  berechneMiniDmFfaEingabeHash,
+} from "@/lib/battle/arena-eingabe-hash";
+import { BAHN_POD_VORLAUF_AKTIV, BATTLEFIELD_POD_VORLAUF_AKTIV, MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
+import { runBahnPodMatchday } from "@/lib/resolve/bahn-pod-matchday";
+import { istBahnPodDisziplin, type BahnPodRohdaten } from "@/lib/resolve/bahn-pod-resolve";
+import { getPodsForMatchday, resolvePodPlayerCountForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
-import { MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { BATTLEFIELD_DISCIPLINE_ID, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { runBattlefieldPodMatchday } from "@/lib/resolve/battlefield-pod-matchday";
 import {
   runMiniDmFfaMatchday,
   resolveMiniDmFfaPlayerCountForMatchday,
 } from "@/lib/resolve/mini-dm-ffa-matchday";
-import type { MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
+import type { BattlefieldPodRohdaten, MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
 import { isBattleModeSave } from "@/lib/season/game-mode";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -63,6 +81,20 @@ import { mitChromiumSemaphor } from "@/lib/battle/arena-chromium-semaphor";
  * ausdruecklich festgehalten, damit niemand nach einem Abschalten einen bereits "ffa"-gebuchten
  * Spieltag als Bug meldet.
  */
+/**
+ * BAHN-POD-NOTSCHALTER (02.11.), dieselbe Bauart wie `OLY_MINI_DM_FFA_VORLAUF` direkt darunter:
+ * `OLY_BAHN_POD_VORLAUF=aus` in `deploy/hetzner/.env`, dann `docker compose up -d`. Wirkt nur
+ * vorwaerts (bereits fertige Snapshots buchen weiter mit ihrem Rennen). Abgeschaltet werden die Pods
+ * von Takeshi's Castle/Staffel ueber den PPS-Pod gewertet, s. `BAHN_POD_VORLAUF_AKTIV`.
+ */
+function istBahnPodVorlaufAktiv(): boolean {
+  const raw = typeof process !== "undefined" ? process.env?.OLY_BAHN_POD_VORLAUF?.trim().toLowerCase() : undefined;
+  if (raw === "aus") {
+    return false;
+  }
+  return BAHN_POD_VORLAUF_AKTIV;
+}
+
 function istMiniDmFfaVorlaufAktiv(): boolean {
   // Trim + Kleinschreibung, angeglichen an `resolveArenaTierParallelEnabled()`
   // (battle-mode-arena-team-points.ts) -- derselbe Normalisierungs-Stil fuer denselben "Server-
@@ -72,6 +104,20 @@ function istMiniDmFfaVorlaufAktiv(): boolean {
     return false;
   }
   return MINI_DM_FFA_VORLAUF_AKTIV;
+}
+
+/**
+ * BATTLEFIELD-POD (02.11. abends): derselbe Server-Notschalter wie oben, eigene Variable
+ * `OLY_BATTLEFIELD_POD_VORLAUF=aus` (in `deploy/hetzner/.env`, danach `docker compose up -d`, s. die
+ * Anmerkung oben zum blossen Neustart). Schaltet nur das Gefecht je Ort ab; der Battlefield-Pod bucht
+ * dann wieder ueber den PPS-Pod. Wirkt wie bei Mini-DM nur vorwaerts.
+ */
+function istBattlefieldPodVorlaufAktiv(): boolean {
+  const raw = typeof process !== "undefined" ? process.env?.OLY_BATTLEFIELD_POD_VORLAUF?.trim().toLowerCase() : undefined;
+  if (raw === "aus") {
+    return false;
+  }
+  return BATTLEFIELD_POD_VORLAUF_AKTIV;
 }
 
 /**
@@ -133,10 +179,17 @@ export function determineArenaDisciplineContexts(
    * ist -- der Rollback-Schalter wirkt dadurch schon hier, nicht erst im Vorlauf selbst.
    */
   miniDmPresent: boolean;
+  /**
+   * BATTLEFIELD-POD (02.11. abends): `true`, wenn Battlefield an D1 ODER D2 steht UND
+   * `BATTLEFIELD_POD_VORLAUF_AKTIV` an ist — dieselbe Rolle wie `miniDmPresent`, eigener Zweig in
+   * `fuehreVorlaufAus()` (kein Eintrag in `ARENA_RESOLVED_DISCIPLINE_IDS`).
+   */
+  battlefieldPresent: boolean;
 } {
   const contexts = contextResults.flatMap((result) => (result.ok ? [result.context] : []));
   const kandidaten = new Set<string>();
   let miniDmPresent = false;
+  let battlefieldPresent = false;
   for (const context of contexts) {
     const d1 = context.contextMeta.d1DisciplineId;
     const d2 = context.contextMeta.d2DisciplineId;
@@ -144,6 +197,9 @@ export function determineArenaDisciplineContexts(
     if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
     if (istMiniDmFfaVorlaufAktiv() && (d1 === MINI_DM_DISCIPLINE_ID || d2 === MINI_DM_DISCIPLINE_ID)) {
       miniDmPresent = true;
+    }
+    if (istBattlefieldPodVorlaufAktiv() && (d1 === BATTLEFIELD_DISCIPLINE_ID || d2 === BATTLEFIELD_DISCIPLINE_ID)) {
+      battlefieldPresent = true;
     }
   }
   const mutatorTraitsByDisciplineId = new Map<string, string[]>();
@@ -175,8 +231,51 @@ export function determineArenaDisciplineContexts(
         }) ?? [],
       );
     }
+    if (battlefieldPresent) {
+      mutatorTraitsByDisciplineId.set(
+        BATTLEFIELD_DISCIPLINE_ID,
+        resolveMatchdayMutatorTraitsForDiscipline({
+          saveId: basis.saveId,
+          seasonId: basis.seasonId,
+          matchdayId: basis.matchdayId,
+          d1DisciplineId: basis.contextMeta.d1DisciplineId,
+          d2DisciplineId: basis.contextMeta.d2DisciplineId,
+          disciplineId: BATTLEFIELD_DISCIPLINE_ID,
+        }) ?? [],
+      );
+    }
   }
-  return { contexts, arenaDisciplineIds: [...kandidaten], mutatorTraitsByDisciplineId, miniDmPresent };
+  return { contexts, arenaDisciplineIds: [...kandidaten], mutatorTraitsByDisciplineId, miniDmPresent, battlefieldPresent };
+}
+
+/**
+ * BAHN-POD (02.11.): Takeshi's Castle/Staffel an einem Spieltag MIT Pods laufen nicht als Zweier-Duell
+ * (`arenaDisciplineIds`), sondern als Vier-Team-Rennen (`bahnPodDisciplineIds`) -- das Duell wuerde
+ * ohnehin vom Pod ueberstimmt (Pod-Vorrang in der Resolve-Engine) und kostete nur einen Chromium-Lauf.
+ * Mit abgeschaltetem Notschalter faellt die Disziplin aus beiden Listen (PPS-Pod in der Engine).
+ * Ohne Pods (Liga nicht durch 4 teilbar) bleibt sie beim Duell. Exportiert fuer Tests.
+ */
+export function teileBahnPodDisziplinenAb(
+  gameState: GameState,
+  scope: MatchdayResolveScope,
+  arenaDisciplineIds: readonly string[],
+  bahnPodVorlaufAktiv: boolean = istBahnPodVorlaufAktiv(),
+): { arenaDisciplineIds: string[]; bahnPodDisciplineIds: string[] } {
+  const duell: string[] = [];
+  const pod: string[] = [];
+  for (const disciplineId of arenaDisciplineIds) {
+    let hatPods = false;
+    if (istBahnPodDisziplin(disciplineId)) {
+      try {
+        hatPods = getPodsForMatchday(gameState, scope.matchdayId, disciplineId, { saveId: scope.saveId }).length > 0;
+      } catch {
+        hatPods = false;
+      }
+    }
+    if (!hatPods) duell.push(disciplineId);
+    else if (bahnPodVorlaufAktiv) pod.push(disciplineId);
+  }
+  return { arenaDisciplineIds: duell, bahnPodDisciplineIds: pod };
 }
 
 function ermittleAnwendbarkeit(persistence: PersistenceService, scope: MatchdayResolveScope) {
@@ -185,15 +284,26 @@ function ermittleAnwendbarkeit(persistence: PersistenceService, scope: MatchdayR
     return { applicable: false as const, gameState: save.gameState };
   }
   const contextResults = loadAllLocalLegacyLineupContexts(scope, persistence);
-  const { arenaDisciplineIds, mutatorTraitsByDisciplineId, miniDmPresent } = determineArenaDisciplineContexts(contextResults);
+  const ermittelt = determineArenaDisciplineContexts(contextResults);
+  const { mutatorTraitsByDisciplineId, miniDmPresent, battlefieldPresent } = ermittelt;
+  const { arenaDisciplineIds, bahnPodDisciplineIds } = teileBahnPodDisziplinenAb(save.gameState, scope, ermittelt.arenaDisciplineIds);
   // MINI-DM-FFA (PR 5): ein Spieltag mit Mini-DM an D1/D2, aber OHNE jede andere arena-aufgeloeste
   // Disziplin, ist jetzt EBENFALLS anwendbar -- vorher (`arenaDisciplineIds.length === 0`) haette der
   // Vorlauf fuer einen solchen Spieltag nie angefangen, und `fuehreVorlaufAus()` haette den
-  // Mini-DM-Zweig deshalb nie erreicht.
-  if (arenaDisciplineIds.length === 0 && !miniDmPresent) {
+  // Mini-DM-Zweig deshalb nie erreicht. Dasselbe gilt seit 02.11. fuer einen Bahn-Pod- und einen
+  // Battlefield-Pod-Spieltag.
+  if (arenaDisciplineIds.length === 0 && !miniDmPresent && bahnPodDisciplineIds.length === 0 && !battlefieldPresent) {
     return { applicable: false as const, gameState: save.gameState };
   }
-  return { applicable: true as const, gameState: save.gameState, arenaDisciplineIds, mutatorTraitsByDisciplineId, miniDmPresent };
+  return {
+    applicable: true as const,
+    gameState: save.gameState,
+    arenaDisciplineIds,
+    bahnPodDisciplineIds,
+    mutatorTraitsByDisciplineId,
+    miniDmPresent,
+    battlefieldPresent,
+  };
 }
 
 /** Grob kategorisiert eine Fehlermeldung/Warnung in einen `ArenaAusfallGrund` (Plan Abschnitt 3.1). */
@@ -255,6 +365,14 @@ type FuehreVorlaufAusInput = {
   miniDmPresent: boolean;
   runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
   runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
+  /** BATTLEFIELD-POD (02.11. abends), s. `determineArenaDisciplineContexts()`. */
+  battlefieldPresent?: boolean;
+  runBattlefieldPodFixturesImpl?: typeof runBattlefieldPodFixtures;
+  runBattlefieldPodFixturesOptions?: Omit<RunBattlefieldPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
+  /** BAHN-POD (02.11.), s. `teileBahnPodDisziplinenAb()`. */
+  bahnPodDisciplineIds: string[];
+  runBahnPodFixturesImpl?: typeof runBahnPodFixtures;
+  runBahnPodFixturesOptions?: Omit<RunBahnPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
 };
 
 /**
@@ -296,6 +414,10 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
   const arenaAusfallByDisciplineId = new Map<string, ArenaAusfall>();
   // MINI-DM-FFA (PR 5), s. Kommentar weiter unten an der eigentlichen Verwendung.
   const miniDmFfaPodRohdatenByDisciplineId = new Map<string, Map<string, MiniDmFfaPodRohdaten>>();
+  // BATTLEFIELD-POD (02.11. abends), s. den eigenen Zweig weiter unten.
+  let battlefieldPodRohdatenByPodId: Map<string, BattlefieldPodRohdaten> | null = null;
+  // BAHN-POD (02.11.), s. Zweig weiter unten.
+  const bahnPodRohdatenByDisciplineId = new Map<string, Map<string, BahnPodRohdaten>>();
   let gesamtStatus: "ready" | "failed" = "ready";
 
   // SEQUENZIELL, NICHT PARALLEL (Plan 2.7/4.4) — D1 und D2 derselben Signatur laufen eins nach dem
@@ -511,6 +633,198 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
     });
   }
 
+  // BAHN-POD (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6): je
+  // Takeshi's-Castle-/Staffel-Disziplin mit Pods an diesem Spieltag EIN Batch ueber alle Pods
+  // (`runBahnPodMatchday`), unter demselben Semaphor und mit derselben Wiederholungs-Disziplin wie
+  // die Zweige oben. Erfolg: Rohdaten fuer `berechneBahnPodOverrides()` (Engine bucht das Rennen) und
+  // die Boxscore-Spieler-PP ueber denselben Kanal wie ein Arena-Duell
+  // (`arenaIndividualBoxscorePpsByDisciplineId`). Ausfall: `arenaAusfall` fuer die Disziplin, die Pods
+  // werden als PPS-Pod gebucht -- kein Spieltag bleibt ungebucht.
+  for (const disziplinId of input.bahnPodDisciplineIds) {
+    const gesamtStart = Date.now();
+    await mitChromiumSemaphor(async () => {
+      let erfolg: Awaited<ReturnType<typeof runBahnPodMatchday>> | null = null;
+      let letzterAusfall: ArenaAusfall | null = null;
+      let versucheIntern = 0;
+      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+        versucheIntern = lokalerVersuch;
+        try {
+          const ergebnis = await runBahnPodMatchday({
+            gameState: current.gameState,
+            saveId: input.saveId,
+            seasonId: input.seasonId,
+            matchdayId: input.matchdayId,
+            disciplineId: disziplinId,
+            mutatorTraits: input.mutatorTraitsByDisciplineId.get(disziplinId),
+            runBahnPodFixturesImpl: input.runBahnPodFixturesImpl,
+            runBahnPodFixturesOptions: {
+              seitenTimeoutMs: resolveArenaSeitenTimeoutMs(),
+              ...input.runBahnPodFixturesOptions,
+            },
+          });
+          // `null`/kein einziger gueltiger Pod: Datenproblem, kein Flackern -- keine Wiederholung.
+          if (!ergebnis || ergebnis.rohdatenByPodId.size === 0) {
+            letzterAusfall = {
+              grund: "ergebnis_unvollstaendig",
+              detail: ergebnis ? ergebnis.warnings.join(", ").slice(0, 200) || null : "kein Bahn-Pod an diesem Spieltag",
+              zeitpunkt: new Date().toISOString(),
+              versuch: lokalerVersuch,
+            };
+            break;
+          }
+          erfolg = ergebnis;
+          letzterAusfall = null;
+          break;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const ausfall: ArenaAusfall = {
+            grund: leiteGrundAusText(detail),
+            detail: detail.slice(0, 200),
+            zeitpunkt: new Date().toISOString(),
+            versuch: lokalerVersuch,
+          };
+          letzterAusfall = ausfall;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
+            console.error(`[arena-vorlauf] ${disziplinId}-pod an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+            break;
+          }
+          console.warn(
+            `[arena-vorlauf] ${disziplinId}-pod an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}: ${detail}) -- sofortige Wiederholung, noch nicht persistiert.`,
+          );
+        }
+      }
+
+      if (erfolg) {
+        bahnPodRohdatenByDisciplineId.set(disziplinId, erfolg.rohdatenByPodId);
+        if (erfolg.playerPpsByPlayerId.size > 0) {
+          arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, erfolg.playerPpsByPlayerId);
+        }
+        const eingabeHash = berechneBahnPodEingabeHash({
+          gameState: current.gameState,
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          disciplineId: disziplinId,
+          playerCount: erfolg.playerCount,
+          mutatoren: input.mutatorTraitsByDisciplineId.get(disziplinId) ?? [],
+        });
+        if (erfolg.warnings.length > 0) {
+          console.error(
+            `[arena-vorlauf] ${disziplinId}-pod an ${input.matchdayId} (${input.saveId}) Gesamterfolg mit ${erfolg.warnings.length} Teilwarnung(en): ${erfolg.warnings.join(", ")}`,
+          );
+        }
+        disziplinen[disziplinId] = {
+          status: "arena",
+          format: "bahn_pod",
+          dauerMs: Date.now() - gesamtStart,
+          eingabeHash,
+          versucheIntern,
+          ...(erfolg.warnings.length > 0 ? { teilwarnungen: erfolg.warnings } : {}),
+        };
+      } else {
+        arenaAusfallByDisciplineId.set(disziplinId, letzterAusfall!);
+        gesamtStatus = "failed";
+        disziplinen[disziplinId] = {
+          status: "ausgefallen",
+          format: "bahn_pod",
+          ausfall: letzterAusfall!,
+          dauerMs: Date.now() - gesamtStart,
+          versucheIntern,
+        };
+      }
+    });
+  }
+
+  // BATTLEFIELD-POD (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7): das
+  // GEFECHT JE ORT fuer alle Battlefield-Pods des Spieltags. Dieselbe Bauart wie der Mini-DM-Zweig
+  // direkt darueber (Semaphor, eine sofortige Wiederholung bei Infrastruktur-Ausfall, Rueckfall auf
+  // den PPS-Pod ohne Rohdaten). Die Arena spielt dasselbe Gefecht danach ab (gleiche Saat, k,
+  // Aufstellung, Mutatoren, s. FoundationBattleArenaHost.tsx) — gezeigt = gebucht.
+  if (input.battlefieldPresent) {
+    const gesamtStart = Date.now();
+    await mitChromiumSemaphor(async () => {
+      let erfolg: Awaited<ReturnType<typeof runBattlefieldPodMatchday>> | null = null;
+      let letzterAusfall: ArenaAusfall | null = null;
+      let versucheIntern = 0;
+      for (let lokalerVersuch = 1; lokalerVersuch <= MAX_AUTOMATISCHE_VERSUCHE; lokalerVersuch += 1) {
+        versucheIntern = lokalerVersuch;
+        try {
+          const ergebnis = await runBattlefieldPodMatchday({
+            gameState: current.gameState,
+            saveId: input.saveId,
+            seasonId: input.seasonId,
+            matchdayId: input.matchdayId,
+            mutatorTraits: input.mutatorTraitsByDisciplineId.get(BATTLEFIELD_DISCIPLINE_ID),
+            runBattlefieldPodFixturesImpl: input.runBattlefieldPodFixturesImpl,
+            runBattlefieldPodFixturesOptions: {
+              seitenTimeoutMs: resolveArenaSeitenTimeoutMs(),
+              ...input.runBattlefieldPodFixturesOptions,
+            },
+          });
+          if (!ergebnis || ergebnis.rohdatenByPodId.size === 0) {
+            letzterAusfall = {
+              grund: "ergebnis_unvollstaendig",
+              detail: ergebnis ? ergebnis.warnings.join(", ").slice(0, 200) || null : "kein Battlefield-Pod oder ungueltiges k an diesem Spieltag",
+              zeitpunkt: new Date().toISOString(),
+              versuch: lokalerVersuch,
+            };
+            break;
+          }
+          erfolg = ergebnis;
+          letzterAusfall = null;
+          break;
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          const ausfall: ArenaAusfall = {
+            grund: leiteGrundAusText(detail),
+            detail: detail.slice(0, 200),
+            zeitpunkt: new Date().toISOString(),
+            versuch: lokalerVersuch,
+          };
+          letzterAusfall = ausfall;
+          if (!RETRYBARE_AUSFALL_GRUENDE.has(ausfall.grund) || lokalerVersuch >= MAX_AUTOMATISCHE_VERSUCHE) {
+            console.error(`[arena-vorlauf] battlefield-pod an ${input.matchdayId} (${input.saveId}) endgueltig ausgefallen: ${detail}`);
+            break;
+          }
+          console.warn(
+            `[arena-vorlauf] battlefield-pod an ${input.matchdayId} (${input.saveId}) Versuch ${lokalerVersuch} ausgefallen (${ausfall.grund}: ${detail}) -- sofortige Wiederholung, noch nicht persistiert.`,
+          );
+        }
+      }
+
+      if (erfolg) {
+        battlefieldPodRohdatenByPodId = erfolg.rohdatenByPodId;
+        if (erfolg.playerPpsByPlayerId.size > 0) {
+          arenaIndividualBoxscorePpsByDisciplineId.set(BATTLEFIELD_DISCIPLINE_ID, erfolg.playerPpsByPlayerId);
+        }
+        const eingabeHash = berechneBattlefieldPodEingabeHash({
+          gameState: current.gameState,
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          playerCount: resolvePodPlayerCountForMatchday(current.gameState, input.matchdayId, BATTLEFIELD_DISCIPLINE_ID, { saveId: input.saveId }),
+          mutatoren: input.mutatorTraitsByDisciplineId.get(BATTLEFIELD_DISCIPLINE_ID) ?? [],
+        });
+        if (erfolg.warnings.length > 0) {
+          console.error(
+            `[arena-vorlauf] battlefield-pod an ${input.matchdayId} (${input.saveId}) Gesamterfolg mit ${erfolg.warnings.length} Teilwarnung(en): ${erfolg.warnings.join(", ")}`,
+          );
+        }
+        disziplinen[BATTLEFIELD_DISCIPLINE_ID] = {
+          status: "arena",
+          dauerMs: Date.now() - gesamtStart,
+          eingabeHash,
+          versucheIntern,
+          ...(erfolg.warnings.length > 0 ? { teilwarnungen: erfolg.warnings } : {}),
+        };
+      } else {
+        arenaAusfallByDisciplineId.set(BATTLEFIELD_DISCIPLINE_ID, letzterAusfall!);
+        gesamtStatus = "failed";
+        disziplinen[BATTLEFIELD_DISCIPLINE_ID] = { status: "ausgefallen", ausfall: letzterAusfall!, dauerMs: Date.now() - gesamtStart, versucheIntern };
+      }
+    });
+  }
+
   const { record } = finishArenaVorlauf(
     scope,
     {
@@ -524,6 +838,8 @@ async function fuehreVorlaufAus(input: FuehreVorlaufAusInput): Promise<ArenaVorl
         arenaIndividualBoxscorePpsByDisciplineId,
         arenaAusfallByDisciplineId,
         ...(miniDmFfaPodRohdatenByDisciplineId.size > 0 ? { miniDmFfaPodRohdatenByDisciplineId } : {}),
+        ...(battlefieldPodRohdatenByPodId ? { battlefieldPodRohdatenByPodId } : {}),
+        ...(bahnPodRohdatenByDisciplineId.size > 0 ? { bahnPodRohdatenByDisciplineId } : {}),
       },
     },
     input.persistence,
@@ -585,6 +901,12 @@ function starteOderTeileVorlauf(input: {
   miniDmPresent: boolean;
   runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
   runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
+  battlefieldPresent?: boolean;
+  runBattlefieldPodFixturesImpl?: typeof runBattlefieldPodFixtures;
+  runBattlefieldPodFixturesOptions?: Omit<RunBattlefieldPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
+  bahnPodDisciplineIds: string[];
+  runBahnPodFixturesImpl?: typeof runBahnPodFixtures;
+  runBahnPodFixturesOptions?: Omit<RunBahnPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
 }): Promise<ArenaVorlaufRecord | null> {
   const schluessel = laufSchluessel(input.scope, input.signature);
   const bestehend = laufendeVorlaeufe.get(schluessel);
@@ -596,7 +918,12 @@ function starteOderTeileVorlauf(input: {
       signature: input.signature,
       // MINI-DM-FFA (PR 5): nur fuer die SICHTBARE "laeuft gerade"-Liste des Vorlauf-Records --
       // der eigentliche Mini-DM-Zweig in `fuehreVorlaufAus()` haengt NICHT an dieser Liste.
-      disciplineIds: input.miniDmPresent ? [...input.arenaDisciplineIds, MINI_DM_DISCIPLINE_ID] : input.arenaDisciplineIds,
+      disciplineIds: [
+        ...input.arenaDisciplineIds,
+        ...(input.miniDmPresent ? [MINI_DM_DISCIPLINE_ID] : []),
+        ...(input.battlefieldPresent ? [BATTLEFIELD_DISCIPLINE_ID] : []),
+        ...input.bahnPodDisciplineIds,
+      ],
     },
     input.persistence,
   );
@@ -617,6 +944,12 @@ function starteOderTeileVorlauf(input: {
     miniDmPresent: input.miniDmPresent,
     runMiniDmFfaPodFixturesImpl: input.runMiniDmFfaPodFixturesImpl,
     runMiniDmFfaPodFixturesOptions: input.runMiniDmFfaPodFixturesOptions,
+    battlefieldPresent: input.battlefieldPresent ?? false,
+    runBattlefieldPodFixturesImpl: input.runBattlefieldPodFixturesImpl,
+    runBattlefieldPodFixturesOptions: input.runBattlefieldPodFixturesOptions,
+    bahnPodDisciplineIds: input.bahnPodDisciplineIds,
+    runBahnPodFixturesImpl: input.runBahnPodFixturesImpl,
+    runBahnPodFixturesOptions: input.runBahnPodFixturesOptions,
   }).finally(() => {
     laufendeVorlaeufe.delete(schluessel);
   });
@@ -630,6 +963,12 @@ export type ArenaVorlaufOptions = {
   /** MINI-DM-FFA (PR 5) -- Testhebel, analog `runArenaFixturesImpl`/`runArenaFixturesOptions`. */
   runMiniDmFfaPodFixturesImpl?: typeof runMiniDmFfaPodFixtures;
   runMiniDmFfaPodFixturesOptions?: Omit<RunMiniDmFfaPodFixturesOptions, "k" | "mutatoren">;
+  /** BATTLEFIELD-POD (02.11. abends) -- Testhebel, analog zu Mini-DM. */
+  runBattlefieldPodFixturesImpl?: typeof runBattlefieldPodFixtures;
+  runBattlefieldPodFixturesOptions?: Omit<RunBattlefieldPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
+  /** BAHN-POD (02.11.) -- Testhebel, analog. */
+  runBahnPodFixturesImpl?: typeof runBahnPodFixtures;
+  runBahnPodFixturesOptions?: Omit<RunBahnPodFixturesOptions, "k" | "mutatoren" | "matchdayId">;
   /**
    * NUR FUER DEN KICKOFF-MANTEL (`arena-matchday-resolve-service.ts`), NIE von den automatischen
    * Ausloesern (Lineup-Routen, Arena-Base-Route, Auto-Run-`"hintergrund"`/`"inline"`) gesetzt: ein
@@ -717,6 +1056,12 @@ export function kickoffArenaVorlauf(
     miniDmPresent: anwendbarkeit.miniDmPresent,
     runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
     runMiniDmFfaPodFixturesOptions: options.runMiniDmFfaPodFixturesOptions,
+    battlefieldPresent: anwendbarkeit.battlefieldPresent,
+    runBattlefieldPodFixturesImpl: options.runBattlefieldPodFixturesImpl,
+    runBattlefieldPodFixturesOptions: options.runBattlefieldPodFixturesOptions,
+    bahnPodDisciplineIds: anwendbarkeit.bahnPodDisciplineIds,
+    runBahnPodFixturesImpl: options.runBahnPodFixturesImpl,
+    runBahnPodFixturesOptions: options.runBahnPodFixturesOptions,
   }).catch((error) => {
     console.error(`[arena-vorlauf] unerwarteter Fehler ausserhalb des try/catch (${scope.saveId}/${scope.matchdayId}):`, error);
   });
@@ -787,6 +1132,12 @@ export async function stelleArenaVorlaufSicher(
     miniDmPresent: anwendbarkeit.miniDmPresent,
     runMiniDmFfaPodFixturesImpl: options.runMiniDmFfaPodFixturesImpl,
     runMiniDmFfaPodFixturesOptions: options.runMiniDmFfaPodFixturesOptions,
+    battlefieldPresent: anwendbarkeit.battlefieldPresent,
+    runBattlefieldPodFixturesImpl: options.runBattlefieldPodFixturesImpl,
+    runBattlefieldPodFixturesOptions: options.runBattlefieldPodFixturesOptions,
+    bahnPodDisciplineIds: anwendbarkeit.bahnPodDisciplineIds,
+    runBahnPodFixturesImpl: options.runBahnPodFixturesImpl,
+    runBahnPodFixturesOptions: options.runBahnPodFixturesOptions,
   });
   return { applicable: true, status: record?.status ?? null, record };
 }

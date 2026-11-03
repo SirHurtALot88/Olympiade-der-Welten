@@ -62538,6 +62538,20 @@ button.foundation-team-portrait-card {
   color: var(--nl-bad, #dc6357);
 }
 
+/* Chris 02.11.: Spalte „S-U-N" (Sieg-Unentschieden-Niederlage, nur Battle-Saves) — dieselbe
+   ruhige Tabellenziffern-Optik wie „Verh." daneben, zentriert, weil „22-0-10" kein Vorzeichenwert ist. */
+.is-new-look .nl-standings-th-bilanz {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.is-new-look .nl-standings-td-bilanz {
+  text-align: center;
+  color: var(--nl-mut);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* Finanz-Spalten im Daten-Modus: Cash · Gehälter · Gebäude · GuV */
 .is-new-look .nl-standings-th-fin {
   text-align: right;
@@ -81109,6 +81123,26 @@ span.nl-facility-ampel-chip {
   color: var(--nl-ink, #f2ede2);
 }
 
+/* Liga 3+ — gibt es heute noch nicht, soll aber nicht still wie Liga 2 aussehen. */
+.ranks-league-badge.is-liga-n {
+  background: color-mix(in srgb, var(--nl-soc, #c08bff) 22%, transparent);
+  color: var(--nl-ink, #f2ede2);
+}
+
+/* Historische Saison-Zeilen (LeagueTierBadge): der Chip steht HINTER Saison/Team, nicht davor. */
+.league-tier-badge {
+  margin-right: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* In Flex-Chips mit eigenem `gap` (Saison-Verlauf in Teamprofil und Teams-Ansicht) kein zusaetzlicher Abstand. */
+.nl-teamprofile-development-season .league-tier-badge,
+.nl-teams-development-season .league-tier-badge {
+  margin-left: 0;
+}
+
 /* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */
 .ranks-table thead .ranks-group-row .ranks-group-cell {
   position: sticky;
@@ -81414,4 +81448,15 @@ span.nl-facility-ampel-chip {
 }
 .nl-sponsor-league-gebaeude.is-leer {
   color: var(--nl-mut);
+}
+
+/* PixelLab-Figuren (PlayerPixelSprite): ein waagerechter Animationsstreifen wird per
+   steps() durchgeschoben — background-size = Bilderzahl x 100 %, 100 % Position = letztes Bild. */
+@keyframes olyFigurStrip {
+  from { background-position: 0% 0; }
+  to { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oly-figur-sprite-frame { animation: none !important; }
 }

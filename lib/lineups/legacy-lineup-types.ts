@@ -23,7 +23,8 @@ import type { ArenaAusfall } from "@/lib/resolve/legacy-matchday-resolve-types";
 // `import type` -- zieht KEINE Laufzeitabhaengigkeit, s. Kommentar an `ArenaMomentEintrag` oben
 // (mini-dm-pod-resolve.ts selbst ist zwar "rein", der Typ-Import ist hier trotzdem bewusst so
 // markiert, falls das je aendert).
-import type { MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
+import type { BattlefieldPodRohdaten, MiniDmFfaPodRohdaten } from "@/lib/resolve/mini-dm-pod-resolve";
+import type { BahnPodRohdaten } from "@/lib/resolve/bahn-pod-resolve";
 
 export type DisciplineSide = "d1" | "d2";
 
@@ -87,6 +88,12 @@ export type LegacyRosterPlayerRef = {
   fatigue?: number | null;
   injuryStatus?: "healthy" | "injured" | "recovering" | null;
   injuryUntilMatchday?: string | null;
+  /**
+   * Spieltag, an dem die Verletzung entstanden ist. Unterscheidet fuer die Aufstellungspruefung
+   * die Verletzung WAEHREND des laufenden Spieltags (in D1 zugezogen, kein Fehler der Aufstellung)
+   * von der Sperre aus einem Vorspieltag (echter Fehler) — s. `legacy-lineup-validator.ts`.
+   */
+  injuredAtMatchdayId?: string | null;
   injuryRiskPercent?: number | null;
   injuryRiskBand?: string | null;
   injuryRiskLabel?: string | null;
@@ -662,4 +669,20 @@ export type LegacyResolvePreviewOptions = {
    * diese PR fuegt nur toten, aber vollstaendig getesteten Code hinzu.
    */
   miniDmFfaPodRohdatenByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, MiniDmFfaPodRohdaten>> | null;
+  /**
+   * BATTLEFIELD-GEFECHT (02.11. abends, docs/design/battlefield-pod-ffa-02-11.md Abschnitt 7) --
+   * `podId -> Rohdaten` des gebuchten Gefechts je Ort (`runBattlefieldPodMatchday()`, vom Arena-
+   * Vorlauf geliefert). Liegt fuer einen Battlefield-Pod ein Eintrag vor, bucht die Engine ihn ueber
+   * `berechneBattlefieldPodOverride()` (mini-dm-pod-resolve.ts) statt ueber den PPS-Pod; fehlende
+   * oder kaputte Rohdaten fallen defensiv auf den PPS-Pod zurueck. `undefined`/leer aendert nichts.
+   */
+  battlefieldPodRohdatenByPodId?: ReadonlyMap<string, BattlefieldPodRohdaten> | null;
+  /**
+   * BAHN-POD-ROHDATEN (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md Abschnitt 6)
+   * -- `disciplineId -> podId -> Rohdaten` des ECHTEN Vier-Team-Rennens fuer Takeshi's Castle und
+   * Staffel (`lib/resolve/bahn-pod-matchday.ts`, gesetzt vom Arena-Vorlauf). Liegt fuer einen Pod ein
+   * Eintrag vor, bucht die Engine ihn ueber `berechneBahnPodOverrides()` (bahn-pod-resolve.ts,
+   * `quelle: "bahn"`); ein Pod ohne Eintrag faellt auf den PPS-Pod zurueck.
+   */
+  bahnPodRohdatenByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, BahnPodRohdaten>> | null;
 };

@@ -10,7 +10,9 @@ import { saisonstandDisciplineColumns } from "@/lib/foundation/saisonstand-colum
 import { buildTeamSeasonAreaPoints } from "@/lib/foundation/season-area-points";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { buildHistoricalLeagueTierLookup } from "@/lib/season/league-history";
 import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
+import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 
 type TeamManagementSnapshotStanding = {
   rank: number | null;
@@ -198,6 +200,13 @@ export type TeamManagementSnapshotRow = {
     seasonName: string;
     points: number | null;
     rank: number | null;
+    /**
+     * Liga dieses Teams IN DIESER Saison (`"liga1"`, `"liga2"`, kuenftig `"liga<N>"`) — `rank` ist
+     * bei Liga-Split ein liga-lokaler Rang und ohne Liga nicht lesbar. `null` ohne Liga-Trennung
+     * (Manager Mode / Legacy). Optional, damit Fremd-Konstruktoren und Fixtures gueltig bleiben.
+     * Quelle: `buildHistoricalLeagueTierLookup` (lib/season/league-history.ts).
+     */
+    leagueTier?: string | null;
   }>;
   // Optional gehalten, damit bestehende Test-Fixtures/Fremd-Konstruktoren gültig
   // bleiben; die produktiven Builder setzen es immer, Konsumenten nutzen `?? []`.
@@ -346,7 +355,12 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
   // Diese Zeilen beschreiben GENAU EINE Saison (`seasonId`) — der Transfersaldo muss sich auf
   // dieselbe beziehen, sonst steht ein Alle-Zeiten-Wert zwischen lauter Saisonwerten.
   const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState, seasonId);
-  const seasonSnapshots = gameState.seasonState.seasonSnapshots ?? [];
+  // GEFUNDEN vom Liga-Historie-Agenten (02.11.): im Browser sind die vollen Schnappschuesse
+  // gestrichen (Payload-Groesse), `leseSaisonSchnappschuesse` baut sie dort aus der Kurzfassung
+  // wieder auf. Ein direkter Zugriff auf `seasonState.seasonSnapshots` liefert im Browser deshalb
+  // immer `[]` -- `historicalPointsBySeason`, die Saisonpunkte-Spalte und der Rang-Verlauf im
+  // Saisonstand waeren dort leer, serverseitig aber befuellt.
+  const seasonSnapshots = leseSaisonSchnappschuesse(gameState);
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const rostersByTeamId = new Map<string, RosterEntry[]>();
   for (const rosterEntry of gameState.rosters) {
@@ -357,6 +371,7 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
     }
     rostersByTeamId.set(rosterEntry.teamId, [rosterEntry]);
   }
+  const historicalLeagueTierOf = buildHistoricalLeagueTierLookup(gameState);
   const historicalStandingsByTeamId = new Map<
     string,
     Array<{
@@ -525,6 +540,7 @@ function buildTeamSeasonOverviewRowsUncached(input: TeamManagementSnapshotInput)
               ? roundValue(entry.standing.points, 1)
               : null,
         rank: entry.standing.rank ?? null,
+        leagueTier: historicalLeagueTierOf(entry.snapshot.seasonId, team.teamId),
       }));
     // Ökonomie je abgeschlossener Saison (echte Snapshot-Endwerte, chronologisch).
     // Gleiche Feld-Präzedenz wie die Team-Detail-Historie (…TotalEnd → …End),

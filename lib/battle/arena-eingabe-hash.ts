@@ -6,8 +6,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildArenaTeam } from "@/lib/foundation/battle-arena/arena-kader-adapter";
 import { buildArenaAufstellung, buildArenaAufstellungBeide } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
-import { buildArenaMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
-import { getMiniDmPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
+import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
+import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
 /**
  * OPUS-AUFLAGE B2 (`docs/design/battle-arena-auto-run-anbindung-plan-16-10.md` Abschnitt 9,
@@ -135,6 +135,95 @@ export function berechneMiniDmFfaEingabeHash(input: {
     .update(
       JSON.stringify({
         disciplineId: "mini-dm",
+        playerCount: input.playerCount,
+        teile,
+        mutatoren,
+        motorHash: leseMotorDateiHash(),
+      }),
+    )
+    .digest("hex");
+}
+
+/**
+ * BAHN-POD-EINGABE-HASH (Liga-Verdrahtung 02.11., docs/design/bahn-pod-vier-teams-01-11.md
+ * Abschnitt 6): wie `berechneMiniDmFfaEingabeHash()`, fuer das Vier-Team-Rennen von Takeshi's Castle
+ * und Staffel -- jede Pod-Saat (`buildBahnPodMatchSeed`), Kader und Aufstellung ALLER VIER Teams je
+ * Pod, k des Spielplan-Slots, der Mutator-Wurf und der Motor-Datei-Hash. Gespeichert im Vorlauf
+ * (`ArenaVorlaufDisziplinEintrag.format === "bahn_pod"`) und beim Buchen neu gerechnet
+ * (`findeArenaEingabeHashDivergenz()`, matchday-resolve-snapshot.ts).
+ */
+export function berechneBahnPodEingabeHash(input: {
+  gameState: GameState;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  disciplineId: string;
+  playerCount: number | null;
+  mutatoren: readonly string[];
+}): string {
+  const pods = getPodsForMatchday(input.gameState, input.matchdayId, input.disciplineId, { saveId: input.saveId });
+  const teile: string[] = [];
+  for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
+    const seed = buildBahnPodMatchSeed({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      disciplineId: input.disciplineId,
+      podId: pod.id,
+    });
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
+    teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
+  }
+  const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        disciplineId: input.disciplineId,
+        format: "bahn_pod",
+        playerCount: input.playerCount,
+        teile,
+        mutatoren,
+        motorHash: leseMotorDateiHash(),
+      }),
+    )
+    .digest("hex");
+}
+
+/**
+ * BATTLEFIELD-POD-EINGABE-HASH (02.11. abends): derselbe Fingerabdruck wie
+ * `berechneMiniDmFfaEingabeHash()`, fuer die Battlefield-Pods (`getPodsForMatchday(...,
+ * "battlefield")`, Saat `buildBattlefieldPodMatchSeed()`) — Kader und Aufstellung aller vier Teams
+ * je Pod, k, der Mutator-Wurf und der Motor-Datei-Hash. Deckt alles, was das Gefecht je Ort
+ * bestimmt; weicht er beim Buchen ab, ist die Vorberechnung veraltet.
+ */
+export function berechneBattlefieldPodEingabeHash(input: {
+  gameState: GameState;
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  playerCount: number | null;
+  mutatoren: readonly string[];
+}): string {
+  const pods = getPodsForMatchday(input.gameState, input.matchdayId, "battlefield", { saveId: input.saveId });
+  const teile: string[] = [];
+  for (const pod of [...pods].sort((left, right) => left.id.localeCompare(right.id))) {
+    const seed = buildBattlefieldPodMatchSeed({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      podId: pod.id,
+    });
+    const kaderJeTeam = pod.teamIds.map((teamId) => buildArenaTeam(input.gameState, teamId));
+    const aufstellungJeTeam = pod.teamIds.map((teamId) => buildArenaAufstellung(input.gameState, teamId, input.matchdayId));
+    teile.push(JSON.stringify({ podId: pod.id, seed, kaderJeTeam, aufstellungJeTeam }));
+  }
+  const mutatoren = [...input.mutatoren].map((trait) => String(trait).trim()).filter(Boolean).sort();
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        disciplineId: "battlefield",
+        format: "pod-gefecht-je-ort",
         playerCount: input.playerCount,
         teile,
         mutatoren,

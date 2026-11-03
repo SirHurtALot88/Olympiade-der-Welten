@@ -6,6 +6,8 @@ import FoundationPlayerPortraitCard, {
   type FoundationPlayerPortraitEconomyStat,
 } from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
+import { formatLeagueTierLabel, toLeagueSpanningPosition } from "@/lib/season/league-history";
 import WerdegangPanel from "@/components/foundation/werdegang/WerdegangPanel";
 import {
   NlBarChart,
@@ -1003,10 +1005,13 @@ export default function TeamProfileNewLook({
     if (!liveHistoryRow || !previousSeasonRow || liveHistoryRow === previousSeasonRow) {
       return null;
     }
+    // Ligauebergreifend gerechnet: bei Liga-Split ist `rank` liga-lokal, ein Aufsteiger von „#1
+    // (Liga 2)" auf „#14 (Liga 1)" hat sich verbessert, nicht um 13 Plaetze verschlechtert. Ohne
+    // Liga oder in derselben Liga ist das exakt die alte Rechnung.
+    const liveRankPosition = toLeagueSpanningPosition(liveHistoryRow.rank, liveHistoryRow.leagueTier);
+    const previousRankPosition = toLeagueSpanningPosition(previousSeasonRow.rank, previousSeasonRow.leagueTier);
     const rankDelta =
-      isFiniteNumber(liveHistoryRow.rank) && isFiniteNumber(previousSeasonRow.rank)
-        ? previousSeasonRow.rank - liveHistoryRow.rank
-        : null;
+      liveRankPosition != null && previousRankPosition != null ? previousRankPosition - liveRankPosition : null;
     const pointsDelta =
       isFiniteNumber(liveHistoryRow.points) && isFiniteNumber(previousSeasonRow.points)
         ? liveHistoryRow.points - previousSeasonRow.points
@@ -1029,7 +1034,11 @@ export default function TeamProfileNewLook({
     if (developmentRows.length < 2) {
       return null;
     }
-    const rankValues = developmentRows.map((row) => row.rank).filter(isFiniteNumber);
+    // Ligauebergreifende Position (Liga 2 liegt hinter Liga 1), sonst springt die Linie bei jedem
+    // Auf-/Abstieg in die falsche Richtung. Ohne Liga-Split unveraendert der Rang.
+    const rankValues = developmentRows
+      .map((row) => toLeagueSpanningPosition(row.rank, row.leagueTier))
+      .filter(isFiniteNumber);
     // Rang 1 = beste Saison → für die Sparkline invertieren (oben = besser).
     // Bezugsgröße ist die echte Teamanzahl, sonst der schlechteste Rang der Serie.
     const rankInversionBase = teamCount > 0 ? teamCount : rankValues.length > 0 ? Math.max(...rankValues) : 0;
@@ -1693,7 +1702,11 @@ export default function TeamProfileNewLook({
                       <NlDeltaChip
                         value={seasonDeltas.rankDelta}
                         format={(n) => formatSignedNlNumber(n, 0)}
-                        title={`Rang: #${formatNlNumber(previousSeasonRow.rank, 0)} → #${formatNlNumber(liveHistoryRow?.rank, 0)}`}
+                        title={`Rang: #${formatNlNumber(previousSeasonRow.rank, 0)}${
+                          formatLeagueTierLabel(previousSeasonRow.leagueTier) ? ` (${formatLeagueTierLabel(previousSeasonRow.leagueTier)})` : ""
+                        } → #${formatNlNumber(liveHistoryRow?.rank, 0)}${
+                          formatLeagueTierLabel(liveHistoryRow?.leagueTier) ? ` (${formatLeagueTierLabel(liveHistoryRow?.leagueTier)})` : ""
+                        }`}
                       />
                     </span>
                   ) : null}
@@ -1960,9 +1973,9 @@ export default function TeamProfileNewLook({
                 <li
                   key={row.seasonId}
                   className={`nl-teamprofile-development-season${row.isLive ? " is-live" : ""}`}
-                  title={`${row.seasonName}${row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""}${
-                    row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""
-                  }`}
+                  title={`${row.seasonName}${formatLeagueTierLabel(row.leagueTier) ? ` · ${formatLeagueTierLabel(row.leagueTier)}` : ""}${
+                    row.rank != null ? ` · Rang #${formatNlNumber(row.rank, 0)}` : ""
+                  }${row.points != null ? ` · ${formatNlNumber(row.points, 1)} Punkte` : ""}`}
                 >
                   <span className="nl-teamprofile-development-season-name">
                     {formatNlSeasonShortLabel(row.seasonName, row.seasonId)}
@@ -1970,6 +1983,7 @@ export default function TeamProfileNewLook({
                   <span className="nl-teamprofile-development-season-rank nl-tnum">
                     {row.rank != null ? `#${formatNlNumber(row.rank, 0)}` : "—"}
                   </span>
+                  <LeagueTierBadge tier={row.leagueTier} seasonLabel={row.seasonName} />
                   {row.isLive ? <span className="nl-teamprofile-development-season-live">Live</span> : null}
                 </li>
               ))}
@@ -2497,6 +2511,7 @@ export default function TeamProfileNewLook({
                   return (
                     <>
                       <strong>{row.seasonName}</strong>
+                      <LeagueTierBadge tier={row.leagueTier} seasonLabel={row.seasonName} />
                       {row.isLive ? <span className="player-drawer-history-tag">Live</span> : null}
                     </>
                   );

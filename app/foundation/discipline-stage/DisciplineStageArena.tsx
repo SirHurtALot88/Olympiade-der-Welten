@@ -59,6 +59,12 @@ import type { DisciplineStageDrawerTarget } from "@/app/foundation/discipline-st
 const DisciplineStageDrawer = dynamic(() => import("@/app/foundation/discipline-stage/DisciplineStageDrawer"), {
   ssr: false,
 });
+// BATTLE ARENA IM SPIELTAG (02.11., lib/foundation/battle-arena/arena-spieltag-ansicht.ts): der
+// echte Motor mit den PixelLab-Figuren. Nur in Battle-Saves mit Motor-Wertung im Baum, deshalb
+// dynamisch -- Manager-Saves laden den Chunk nie.
+const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
+  ssr: false,
+});
 // PERF-GEGENPROBE: DisciplineStageMatchdayPanel (~1.187 Zeilen) bleibt bewusst STATISCH.
 // Anders als der Drawer ist es NICHT dauerhaft im Baum (siehe `{mode === "real" && preview
 // && matchdayPanel ? … : null}` weiter unten) — es erscheint, sobald die Resolve-Preview
@@ -109,6 +115,15 @@ import {
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { preloadDisciplineField } from "@/app/foundation/discipline-stage/arena/disciplines/registry";
+import DisciplinePixelScene from "@/app/foundation/discipline-stage/DisciplinePixelScene";
+import {
+  bestimmeArenaSpieltagAnsicht,
+  beschreibeGebuchtesArenaErgebnis,
+  findeEigeneWertungsZeilen,
+  grundOhneMotorSpiel,
+  zeigtArenaDenGebuchtenSieger,
+} from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
+import { isBattleModeSave } from "@/lib/season/game-mode";
 import { prefetchDisciplineStageMedia } from "@/lib/foundation/foundation-panel-prefetch";
 
 // Disziplinen mit fertigem nativem Renderer (löst schrittweise das iframe ab).
@@ -2642,6 +2657,74 @@ export default function DisciplineStageArena({
     [commitStateByDiscipline, matchdaySides, onCommitDiscipline, preview, scoringProgress, roomContext, roomArenaSync.isRoomHost],
   );
 
+  /**
+   * BATTLE MODE: DIE ARENA IST DIE BATTLE ARENA (02.11., Chris: "du sollst die battle Arena anbinden
+   * und die normale Arena in dem Modus deaktivieren").
+   *
+   * Weiche am Spielmodus (`isBattleModeSave`), nicht am Code: in einem Battle-Save zeigt die Arena
+   * des Spieltags NIE mehr die alte Disziplin-Buehne (Demo-Pixel-Szene + Reveal-Buehne). Manager-
+   * Saves, der Admin-Testmodus (`devMode`) und der Zufallsmodus bleiben bei der bisherigen Buehne.
+   *
+   *  - Steht fuer die offene Disziplin ein MOTOR-SPIEL im Snapshot (`bestimmeArenaSpieltagAnsicht`:
+   *    Arena-Duell aus dem Hintergrund-Vorlauf oder Motor-Pod), zeigt die Arena genau dieses Spiel
+   *    mit den PixelLab-Figuren; sein Ende (zugeschaut oder per Quick-Sim) bucht die Disziplin ueber
+   *    denselben Weg wie frueher der Zieleinlauf der Buehne (`commitFinishedDiscipline` mit dem
+   *    Snapshot, der hier angezeigt wird).
+   *  - Steht KEIN Motor-Spiel im Snapshot -- die Disziplin ist in Battle Mode noch nicht arena-
+   *    gewertet (PPS-Duell-Bruecke: TDM, Hockey, Football, Battlefield ohne Pod; PPS-Pods), oder der
+   *    Vorlauf rechnet noch --, zeigt die Arena KEIN erfundenes Spiel, sondern sagt das und zeigt die
+   *    gebuchte Wertung; gewertet wird per Knopf ueber denselben Buchungsweg. Offener Punkt, s.
+   *    docs/design/battle-arena-spieltag-anbindung-02-11.md.
+   *
+   * An der Wertung aendert nichts davon etwas: gebucht wird in jedem Fall der Snapshot.
+   */
+  const battleModusArena = mode === "real" && !devMode && isBattleModeSave(gameState);
+  const battleArenaSpieltag = useMemo(
+    () =>
+      battleModusArena
+        ? bestimmeArenaSpieltagAnsicht({ gameState, matchdayId, disciplineId, ownTeamId, preview })
+        : null,
+    [battleModusArena, gameState, matchdayId, disciplineId, ownTeamId, preview],
+  );
+  const battleWertungsZeilen = useMemo(
+    () => (battleModusArena && !battleArenaSpieltag ? findeEigeneWertungsZeilen({ preview, disciplineId, ownTeamId }) : null),
+    [battleModusArena, battleArenaSpieltag, preview, disciplineId, ownTeamId],
+  );
+  const battleOhneMotorGrund = battleModusArena && !battleArenaSpieltag
+    ? grundOhneMotorSpiel({ zeilen: battleWertungsZeilen, vorlaufLaeuft: arenaVorlaufStatus === "in_progress" })
+    : null;
+  const istSpieltagsDisziplin =
+    matchdaySides.d1?.disciplineId === disciplineId || matchdaySides.d2?.disciplineId === disciplineId;
+  const [battleArenaSieger, setBattleArenaSieger] = useState<{ disziplin: string; sieger: 0 | 1 | null } | null>(null);
+  useEffect(() => {
+    setBattleArenaSieger(null);
+  }, [disciplineId]);
+  const gebuchtesBattleErgebnis = useMemo(() => {
+    const zeilen = battleArenaSpieltag ?? battleWertungsZeilen;
+    return zeilen
+      ? beschreibeGebuchtesArenaErgebnis(
+          zeilen,
+          (teamId) => gameState?.teams?.find((team) => team.teamId === teamId)?.name ?? teamId,
+        )
+      : null;
+  }, [battleArenaSpieltag, battleWertungsZeilen, gameState?.teams]);
+  const battleArenaPasst =
+    battleArenaSpieltag && gebuchtesBattleErgebnis && battleArenaSieger?.disziplin === disciplineId
+      ? zeigtArenaDenGebuchtenSieger(battleArenaSpieltag, gebuchtesBattleErgebnis, battleArenaSieger.sieger)
+      : null;
+  const beimBattleArenaEnde = useCallback(
+    (info: { disziplin: string; sieger: 0 | 1 | null }) => {
+      if (info.disziplin !== disciplineId) return;
+      setBattleArenaSieger(info);
+      // Dasselbe wie `onEnded` der klassischen Buehne unten -- ein Ende, ein Buchungsweg.
+      setArenaEnded(true);
+      setReplayingDisciplineId(null);
+      setEndedDisciplineIds((prev) => (prev.has(disciplineId) ? prev : new Set(prev).add(disciplineId)));
+      commitFinishedDiscipline(disciplineId);
+    },
+    [disciplineId, commitFinishedDiscipline],
+  );
+
   // S2: Doppel-Klick-Schutz für „Spieltag auswerten & weiter".
   // Der State allein reicht dafür nicht: zwei Klicks im selben React-Batch lesen beide das
   // `advancing` aus derselben Render-Closure (also `false`), und `disabled` wirkt erst nach dem
@@ -2785,7 +2868,7 @@ export default function DisciplineStageArena({
                 onClick={() => setPreMatchdayDismissed(true)}
                 data-testid="arena-prematch-start-cta"
               >
-                Zur Bühne →
+                {battleModusArena ? "Zur Battle Arena →" : "Zur Bühne →"}
                 {/* Die Warnung steht auch AUF dem Knopf: wer die Tafel überfliegt, liest
                     trotzdem, was dieser Klick kostet. */}
                 <small className="nl-tnum">
@@ -2828,6 +2911,10 @@ export default function DisciplineStageArena({
                     </span>
                   ) : null}
                 </div>
+                {/* Battle Mode: keine Demo-Szene im Vorlauf-Kasten -- die echte Arena kommt nach dem Anpfiff. */}
+                {battleModusArena ? null : (
+                  <DisciplinePixelScene compact disciplineId={meta.disciplineId} ownPlayers={athleten} />
+                )}
                 {athleten.length > 0 ? (
                   <ul className="arena-prematch-athletes" aria-label={`Deine Aufstellung für ${meta.displayName}`}>
                     {athleten.map((athlet) => (
@@ -3089,6 +3176,121 @@ export default function DisciplineStageArena({
         </label>
       </div>
 
+      {battleArenaSpieltag ? (
+        <div data-testid="arena-battle-spieltag" data-art={battleArenaSpieltag.art} style={{ marginBottom: 14 }}>
+          <FoundationBattleArenaHost
+            gameState={gameState}
+            activeManagerTeamId={ownTeamId}
+            saveId={saveId}
+            spieltag={{
+              disciplineId: battleArenaSpieltag.disciplineId,
+              heimTeamId: battleArenaSpieltag.heimTeamId,
+              gastTeamId: battleArenaSpieltag.gastTeamId,
+              podTeamId: battleArenaSpieltag.podTeamId,
+              disziplinName: model.disciplineName,
+              onEnde: beimBattleArenaEnde,
+            }}
+          />
+          {gebuchtesBattleErgebnis && (disciplineEnded || battleArenaSieger) ? (
+            <div
+              role="status"
+              data-testid="arena-battle-gebucht"
+              data-passt={battleArenaPasst == null ? "" : String(battleArenaPasst)}
+              data-ausgang={gebuchtesBattleErgebnis.ausgang ?? ""}
+              style={{
+                marginTop: 10,
+                padding: "9px 12px",
+                borderRadius: 12,
+                fontSize: 13,
+                fontWeight: 700,
+                border: `1px solid ${battleArenaPasst === false ? "var(--nl-risk)" : "var(--nl-line)"}`,
+                background: "var(--nl-panel)",
+              }}
+            >
+              Gewertet: {gebuchtesBattleErgebnis.text}
+              {battleArenaPasst === false ? (
+                <span style={{ display: "block", marginTop: 4, color: "var(--nl-risk)", fontWeight: 600 }}>
+                  Die Wiedergabe endete mit einem anderen Sieger als die gebuchte Wertung — gezählt wird die
+                  gebuchte. (Bekannte Lücke der Bahn-Wiedergabe, s. arena-spieltag-ansicht.ts.)
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : battleModusArena ? (
+        /* BATTLE MODE OHNE MOTOR-SPIEL: keine alte Buehne, kein erfundenes Spiel -- s. `battleModusArena`. */
+        <div
+          role="status"
+          data-testid="arena-battle-ohne-motor"
+          data-grund={battleOhneMotorGrund ?? ""}
+          style={{
+            marginBottom: 14,
+            padding: "14px 16px",
+            borderRadius: 14,
+            border: "1px solid var(--nl-line)",
+            background: "var(--nl-panel)",
+            fontSize: 13.5,
+            lineHeight: 1.5,
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 4 }}>Battle Arena · {model.disciplineName}</div>
+          {battleOhneMotorGrund === "vorlauf" ? (
+            <span>
+              ⏳ Die Arena-Duelle dieses Spieltags werden im Hintergrund berechnet. Sobald das gebuchte Spiel feststeht,
+              erscheint es hier in der Battle Arena.
+            </span>
+          ) : battleOhneMotorGrund === "bruecke" ? (
+            <span>
+              {model.disciplineName} wird im Battle Mode noch nicht über die Battle Arena gewertet, sondern über die
+              PPS-Duell-Brücke (die Disziplin hat die Arena-Abnahme noch nicht bestanden). Ein Arena-Spiel, das zählt, gibt
+              es deshalb nicht — die Arena zeigt hier keins, statt ein beliebiges vorzuspielen.
+            </span>
+          ) : (
+            <span>Die Wertung dieses Spieltags wird geladen …</span>
+          )}
+          {gebuchtesBattleErgebnis && battleOhneMotorGrund === "bruecke" ? (
+            <div data-testid="arena-battle-gebucht" data-passt="" data-ausgang={gebuchtesBattleErgebnis.ausgang ?? ""} style={{ marginTop: 8, fontWeight: 700 }}>
+              {disciplineEnded ? "Gewertet" : "Wird gewertet"}: {gebuchtesBattleErgebnis.text}
+            </div>
+          ) : null}
+          {istSpieltagsDisziplin && battleOhneMotorGrund === "bruecke" && !disciplineEnded ? (
+            <button
+              type="button"
+              data-testid="arena-battle-ohne-motor-werten"
+              onClick={() => beimBattleArenaEnde({ disziplin: disciplineId, sieger: null })}
+              style={{
+                marginTop: 10,
+                padding: "8px 16px",
+                fontWeight: 800,
+                fontSize: 13,
+                borderRadius: 10,
+                border: "1px solid var(--nl-accent)",
+                background: "color-mix(in srgb, var(--nl-accent) 16%, transparent)",
+                color: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              Disziplin werten
+            </button>
+          ) : null}
+        </div>
+      ) : (
+      /* PIXEL-ARENA (02.11.): die neue Pixel-Art-Szene dieser Disziplin + die eigene
+          Aufstellung als PixelLab-Figuren. Reine Anzeige über der Bühne; Score/Reveal/Wertung
+          bleiben unverändert unten. Konfiguration: lib/foundation/discipline-scenes.ts. */
+      <DisciplinePixelScene
+        disciplineId={disciplineId}
+        ownTeamName={ownTeam?.name ?? null}
+        ownPlayers={
+          matchdaySides.d1?.disciplineId === disciplineId && ownLineupBySide.d1.length > 0
+            ? ownLineupBySide.d1
+            : matchdaySides.d2?.disciplineId === disciplineId && ownLineupBySide.d2.length > 0
+              ? ownLineupBySide.d2
+              : (ownTeam?.slots ?? []).map((slot) => ({ playerId: slot.playerId, name: slot.playerName }))
+        }
+      />
+      )}
+
       {/* P1-17: Engine-Status auch AUSSERHALB des Dev-Modus sichtbar. Ohne diese Zeile bekamen
           normale Spieler bei „loading"/„unavailable" keinerlei Rückmeldung und saßen still fest.
           Nur eingeblendet, solange NICHT engine-echt gerendert wird (sonst wäre es Rauschen). */}
@@ -3146,7 +3348,7 @@ export default function DisciplineStageArena({
           haben kann; nur bei einem Arena-Ausfall bleibt die Bruecke stehen. Der Text sagt deshalb
           "vorlaeufig" statt (vorher) "die Wertung oben steht schon fest". Verschwindet von selbst,
           sobald der Poll "ready"/"failed" meldet. */}
-      {!devMode && arenaVorlaufStatus === "in_progress" ? (
+      {!devMode && !battleModusArena && arenaVorlaufStatus === "in_progress" ? (
         <div
           role="status"
           aria-live="polite"
@@ -3267,6 +3469,7 @@ export default function DisciplineStageArena({
         data-md-top={String(Boolean(matchdayTopPlayers))}
         hidden
       />
+      {battleModusArena ? null : (
       <DisciplineStageNativeArena
         key={`${disciplineId}-${mode}-${seed}`}
         slots={payload.slots}
@@ -3305,6 +3508,7 @@ export default function DisciplineStageArena({
         /* B2: Der Host wusste das laengst — die Buehne erfaehrt es jetzt auch. */
         alreadyScored={activeSideScoredInSave}
       />
+      )}
 
       {/* Team-Matchday-PP-Panel (Ticket 205 · Pflicht-Feature Ticket 219): unter der Arena, IMMER
           sichtbar sobald echte Spieltags-Daten vorliegen — in JEDER Disziplin, nicht nur den

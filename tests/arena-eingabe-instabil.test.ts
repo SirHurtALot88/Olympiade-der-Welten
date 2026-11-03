@@ -30,6 +30,10 @@ vi.mock("@/lib/battle/arena-eingabe-hash", () => ({
   // gesaete Spielplan Mini-DM-FFA in diesen Test zieht (reproduzierbar auf main selbst, s.
   // PR #1312). Dieselbe "garantiert instabil"-Eigenschaft wie oben, fuer denselben Testzweck.
   berechneMiniDmFfaEingabeHash: () => `instabil-mini-dm-${(hashZaehler += 1)}`,
+  // BAHN-POD (02.11.): derselbe Grund -- Staffel/Takeshi laufen an Pod-Tagen mit eigenem Fingerabdruck.
+  berechneBahnPodEingabeHash: () => `instabil-bahn-pod-${(hashZaehler += 1)}`,
+  // BATTLEFIELD-POD (02.11. abends): dasselbe fuer das Gefecht je Ort (eigener Fingerabdruck).
+  berechneBattlefieldPodEingabeHash: () => `instabil-battlefield-pod-${(hashZaehler += 1)}`,
 }));
 
 const { applyNewGameSetup, previewNewGameSetup } = await import("@/lib/game/new-game-setup-service");
@@ -41,7 +45,10 @@ const { ensureMatchdayResolveSnapshot } = await import("@/lib/foundation/matchda
 const { stelleArenaVorlaufSicher } = await import("@/lib/battle/arena-vorlauf-service");
 const { kickoffArenaMatchdayApply } = await import("@/lib/season/arena-matchday-resolve-service");
 const { ARENA_RESOLVED_DISCIPLINE_IDS } = await import("@/lib/battle/arena-resolved-disciplines");
-const { buildHarmlosenMiniDmFfaFakeRunner } = await import("@/tests/helpers/mini-dm-ffa-battle-save");
+const { isViererPodDiscipline } = await import("@/lib/season/season-discipline-schedule");
+const { buildHarmlosenMiniDmFfaFakeRunner, buildHarmlosenBattlefieldPodFakeRunner, buildHarmlosenBahnPodFakeRunner } = await import(
+  "@/tests/helpers/mini-dm-ffa-battle-save"
+);
 type ArenaFixtureResultType = Awaited<ReturnType<typeof import("@/lib/battle/arena-headless-runner").runArenaFixtures>>[number];
 
 /**
@@ -81,7 +88,13 @@ async function bauFrischenBattleSaveMitVollemFeld() {
     const spieltag = (aktuell.gameState.seasonState.disciplineSchedule ?? []).find((e) => e.matchdayId === matchdayId);
     const d1 = spieltag?.discipline1?.disciplineId;
     const d2 = spieltag?.discipline2?.disciplineId;
-    const arenaDisciplineIds = [d1, d2].filter((id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id));
+    // BAHN-POD/BATTLEFIELD-POD (02.11.): Mini-DM, Battlefield, Staffel und Takeshi buchen an
+    // Pod-Tagen ueber einen eigenen Pod-Pfad (resolutionSource "mini_dm_pod"), nicht ueber den
+    // hier erwarteten PPS-Duell-Pfad -- dieser Test prueft gezielt den Duell-Pfad, deshalb muessen
+    // alle Vierer-Pod-Disziplinen ausgeschlossen werden, nicht nur Mini-DM.
+    const arenaDisciplineIds = [d1, d2].filter(
+      (id): id is string => id != null && ARENA_RESOLVED_DISCIPLINE_IDS.has(id) && !isViererPodDiscipline(id),
+    );
     if (arenaDisciplineIds.length === 0) {
       continue;
     }
@@ -118,7 +131,12 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
 
       const vorlauf = await stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: erfolgreicherRunner, runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner() },
+        {
+          runArenaFixturesImpl: erfolgreicherRunner,
+          runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
+          runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+          runBahnPodFixturesImpl: buildHarmlosenBahnPodFakeRunner(),
+        },
         persistence,
       );
       expect(vorlauf.applicable).toBe(true);
@@ -136,6 +154,8 @@ describe("Arena-Vorlauf-Service · eingabe_instabil (Opus-Review, B3-Nachtrag)",
         // CI-FIX (25.10.), s. Dateikopf-Kommentar: der erzwungene Neuversuch bei der (hier
         // kuenstlich erzeugten) Divergenz braucht denselben Mini-DM-Fake wie der erste Vorlauf.
         runMiniDmFfaPodFixturesImpl: buildHarmlosenMiniDmFfaFakeRunner(),
+        runBattlefieldPodFixturesImpl: buildHarmlosenBattlefieldPodFakeRunner(),
+        runBahnPodFixturesImpl: buildHarmlosenBahnPodFakeRunner(),
         forceReplace: true,
         allowIncompleteOverride: true,
         logPrefix: "[arena-eingabe-instabil-test]",

@@ -34,6 +34,8 @@ import {
   type LeagueLeaderTone,
 } from "@/lib/foundation/league-leaders-service";
 import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
+import { LeagueTierBadge } from "@/components/foundation/LeagueTierBadge";
+import { formatLeagueTierLabel } from "@/lib/season/league-history";
 import { useFoundationStateOptional } from "@/lib/foundation/foundation-state-context";
 import { getPlayerStarTier, type PlayerStarTier } from "@/lib/foundation/player-star-tier";
 import {
@@ -1008,11 +1010,16 @@ export default function LeagueLeadersNewLook({
                   <li key={entry.teamId} className="nl-leaders-prev-podium-row">
                     <NlMedalBadge
                       kind={entry.rank === 1 ? "gold" : entry.rank === 2 ? "silver" : "bronze"}
-                      title={`Endrang ${entry.rank} · ${previousSeasonPodium.seasonLabel}`}
+                      title={`Endrang ${entry.rank}${
+                        formatLeagueTierLabel(entry.leagueTier) ? ` (${formatLeagueTierLabel(entry.leagueTier)})` : ""
+                      } · ${previousSeasonPodium.seasonLabel}`}
                     />
                     <span className="nl-leaders-prev-podium-team">
                       <strong>{entry.teamName}</strong>
-                      <small>{entry.teamCode}</small>
+                      <small>
+                        {entry.teamCode}
+                        <LeagueTierBadge tier={entry.leagueTier} seasonLabel={previousSeasonPodium.seasonLabel} />
+                      </small>
                     </span>
                     <span className="nl-leaders-prev-podium-value nl-tnum">
                       {entry.points != null
