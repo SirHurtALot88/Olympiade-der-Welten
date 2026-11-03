@@ -42078,6 +42078,63 @@
     if(!aMuster[n])aMuster[n]=ctx.createPattern(aBild[n],"repeat");
     return aMuster[n]; };
 
+  // ILLUSTRIERTE KULISSEN (03.11.). Chris, nach einem Live-Screenshot: "Wenn ich in die battle
+  // arena gehe sieht das immernoch alles ALT aus." Die Kulissen der Asset-Runde (public/szenen/,
+  // Registry lib/foundation/discipline-scenes.ts) liefen nur in der Demo-Szene, die der Battle
+  // Mode nicht zeigt. scripts/baue-arena-kulissen.py schneidet ihre sauberen Hintergruende (ohne
+  // Demo-Figuren, Hindernisse zugemalt) auf diese Leinwand zu und listet sie in
+  // battle-mode.kulissen.js (window.__ARENA_KULISSEN = {disziplinId:[{id,label,bild}]}).
+  //
+  // Welche Variante ein Spiel zeigt, entscheidet kulisseWaehlen() beim reset(): ein eigener
+  // String-Hash aus Disziplin, Spielsaat und Paarung — dieselbe Begegnung zeigt immer dieselbe
+  // Kulisse, verschiedene Begegnungen wechseln. KEIN rr(), kein Zugriff auf `seed`: die Wahl
+  // beruehrt weder Simulation noch Wertung. Laedt das Bild nicht (oder fehlt die Liste, etwa im
+  // Headless-Runner), zeichnet der Boden unveraendert die alte Fassung.
+  const KULISSEN=(typeof window!=="undefined"&&window.__ARENA_KULISSEN&&typeof window.__ARENA_KULISSEN==="object")?window.__ARENA_KULISSEN:{};
+  const kulisseBilder={};
+  let kulisseAktiv=null;
+  // FNV-1a plus Schluss-Durchmischung (murmur3 fmix32): ohne sie verteilen sich Saaten, die sich
+  // nur in einer Ziffer unterscheiden, schlecht auf zwei oder drei Varianten.
+  function kulisseHash(s){
+    let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+    h^=h>>>16; h=Math.imul(h,0x85ebca6b); h^=h>>>13; h=Math.imul(h,0xc2b2ae35); h^=h>>>16;
+    return h>>>0;
+  }
+  function kulisseWaehlen(saat){
+    const liste=KULISSEN[disc];
+    if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
+    const meta=(echterKader&&echterKader.meta)||{};
+    const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
+    const v=liste[kulisseHash(schluessel)%liste.length];
+    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
+    if(!kulisseBilder[v.bild]){
+      const im=new Image();
+      // Steht das Spiel noch (Einlauf, vor dem Anpfiff), zeichnet niemand nach — also einmal
+      // selbst nachzeichnen, sobald das Bild da ist, statt bis zum Anpfiff den alten Boden zu zeigen.
+      im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.bild===v.bild&&kulisseAktiv.disc===disc)draw(); }catch(e){} };
+      im.src=v.bild; kulisseBilder[v.bild]=im;
+    }
+  }
+  // Zeichnet die gewaehlte Kulisse samt Lesbarkeits-Schicht; false = nichts gezeichnet
+  // (keine Kulisse fuer diese Disziplin oder Bild noch nicht geladen) -> alter Boden.
+  function kulisseZeichnen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    if(!im||!im.complete||!im.naturalWidth)return false;
+    ctx.drawImage(im,0,0,W,H);
+    // LESBARKEIT: die Kulissen reichen von Schnee (hell) bis Lava (dunkel), die Kaempfer
+    // samt Namen und Ringen muessen auf jeder stehen. Eine gleichmaessige Abdunklung nimmt
+    // dem Schnee die Blendung — wie stark, rechnet der Generator je Bild aus seiner mittleren
+    // Helligkeit aus (`dunkel`), damit Lava nicht im Schwarz versinkt. Der Radialverlauf (wie
+    // im alten Sandboden) traegt die Tiefe und lenkt den Blick zur Mitte.
+    ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,H);
+    const v=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
+    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,.18)");
+    v.addColorStop(1,"rgba(0,0,0,.48)");
+    ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    return true;
+  }
+
   // Speed-Schach-Buehnenbild: dieselbe Datei-statt-base64-Idee, eigener Ordner
   // (public/sprites/buehne/, quellen.json dort — Fable-Plan 05.09., Teil A.2). Brett
   // und Tisch sind Canvas-Primitiven, nur die Figuren sind ein Blatt. Laedt es nicht,
@@ -42729,6 +42786,11 @@
 
   // TDM: Sandgrund, Steinring, Blutflecken, Fackeln an den Seiten.
   function bodenArena(){
+    // KULISSE (03.11., s. kulisseZeichnen): gibt es eine illustrierte Arena fuer diese
+    // Disziplin, ersetzt sie Sand, Flecken, Ziegelring und Fackeln. Teamhaelften und
+    // Mittellinie bleiben — sie tragen Information, nicht Schmuck.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const sand=aMust("boden_sand");
     if(sand){ ctx.fillStyle=sand;ctx.fillRect(0,0,W,H);
       // Die Kachel ist HELLER als der alte Malgrund, und das ist kein Schoenheitsfehler:
@@ -42770,6 +42832,7 @@
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
     ctx.strokeStyle="rgba(0,0,0,.55)";ctx.lineWidth=2;
     ctx.beginPath();ctx.ellipse(MID,H/2,W*0.46,H*0.44,0,0,6.283);ctx.stroke();
+    }
     // FARBIGE HAELFTEN. Chris: "wir muessen auf jeden Fall beide Teams in der Arena
     // besser voneinander unterscheiden koennen, sonst ist es sehr unuebersichtlich." Im
     // Getuemmel sieht man kaum noch, wer zu wem gehoert, wenn nur ein duenner Ring am
@@ -42789,6 +42852,7 @@
     ctx.setLineDash([]);
     // Fackeln. Das Blatt hat neun Bilder zu 32x64; die Flamme laeuft nach der Wanduhr,
     // nicht nach der Simulationsuhr — sie ist Schmuck und darf keine Messung beruehren.
+    if(mitKulisse)return;
     const fk=aDa("fackel"), bild=fk?Math.floor(jetztMs()/110)%9:0; // A0.2: jetztMs(), s.o.
     for(const x of [40,W-40])for(const y of [70,H/2,H-70]){
       if(fk) ctx.drawImage(aBild.fackel,bild*32,0,32,64,x-16,y-42,32,64);
@@ -54336,6 +54400,9 @@
     if(bfPodAnz)bfPodAnzeigeBauen(bfPodAnz);
     else if(bahnPodAnz){ bfPodAnzeigeVereineZurueck(); bahnPodAnzeigeBauen(bahnPodAnz); }
     else{ bfPodAnzeigeVereineZurueck(); build(gebuchteSaatFuerAktuelleDisziplin()); }
+    // KULISSE (03.11.): reine Anzeige, nach dem Aufbau gewaehlt — dieselbe Saat, die das Spiel
+    // traegt, plus die Paarung (s. kulisseWaehlen; kein rr(), kein Einfluss auf die Wertung).
+    kulisseWaehlen(bfPodAnz?bfPodAnz.saat:bahnPodAnz?bahnPodAnz.saat:(disc==="mini-dm"&&gebuchteMiniDmFfaKontext().saat!=null)?gebuchteMiniDmFfaKontext().saat:gebuchteSaatFuerAktuelleDisziplin());
     // MINI-DM 4-TEAM-FFA (Bugfix 22.09., s. Kopfkommentar bei renderMiniDmFfa oben):
     // `build()` lief gerade eben UNVERAENDERT durch das klassische Zwei-Seiten-Chassis
     // (ARENA_ART["mini-dm"]) — das bleibt so, weil dieselbe Funktion auch die Pp-
@@ -58675,6 +58742,10 @@
   window.__arena={ serie, serieVon, spurtSerie, bahnSerie, arenen:()=>Object.keys(ARENA_ART), spurtEinfluss, einflussVon, einflussVonSandsackFinale, einflussVonMitSlot, formEinflussVon, formAttrEigSonde, boxscoreSerie,
     // SPIELTAGS-ANSICHT (s. schnellDurch()/meldeSpielEnde() direkt darueber).
     schnellDurch,
+    // KULISSE (03.11., s. kulisseWaehlen): welche illustrierte Arena gerade gezeichnet wird, und
+    // fuer Screenshot-QA die Wahl zu einer anderen Saat. Reine Anzeige, kein Einfluss auf rr().
+    kulisse:()=>kulisseAktiv?{...kulisseAktiv}:null,
+    kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
