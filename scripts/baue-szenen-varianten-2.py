@@ -528,7 +528,7 @@ def tennis():
     def fertig(im, slug, title, h1, lead, fx, umfaerben):
         tn_figuren_einsetzen(im, figs, strip, umfaerben)
         D2 = dict(D)
-        D2["world"] = enc(quant(im))
+        D2["world"] = enc(im)
         out = ersetze_json(s, m, D2)
         if os.environ.get("SZENEN_DEBUG"):
             im.save(os.path.join(os.environ["SZENEN_DEBUG"], f"tennis-{slug}-bg.png"))
@@ -544,7 +544,247 @@ def tennis():
            TN_FX_DACH.replace("__TOWERS__", json.dumps(towers)), TN_STRIP_DACH)
 
 
-ALLE = {"tennis": tennis}
+# ================================================================== CLIMBING
+CL_SRC = ("climbing", "wand.html")
+CL_WALL = (28, 24, 672, 576)       # Wandflaeche mit Griffen/Expressen (D.WALL_X0..X1, TOP_Y..WALL_Y1)
+CL_MATS = (14, 588, 686, 654)
+CL_TIMER = (636, 668, 680, 722)
+CL_CROWD_Y = 728
+
+
+def cl_lade():
+    s = open(os.path.join(SZ, *CL_SRC), encoding="utf-8").read()
+    m = re.search(r'const WALL_SRC = (".*?");', s, re.S)
+    return s, m, dec(json.loads(m.group(1))).convert("RGB")
+
+
+def rampe(stops, u):
+    u = min(0.999, max(0.0, u)) * (len(stops) - 1)
+    i = int(u)
+    return mix(stops[i], stops[i + 1], u - i)
+
+
+def cl_wand(src, ramp, strata, extra, seed):
+    """Graue Kletterwand -> neues Material. Griffe (gesaettigt) bleiben, Expressen (dunkel)
+    bleiben dunkel, Volumen werden ueber ihre Helligkeit zu Felsbuckeln/Eisnasen."""
+    rnd = random.Random(seed)
+    im = src.copy()
+    sp, px = src.load(), im.load()
+    x0, y0, x1, y1 = CL_WALL
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            p = sp[x, y]
+            if sat(p) >= 55:
+                continue
+            L = luma(p)
+            if L < 70:            # dunkle Volumen, Expressen, Griffschatten: dunkle Stufe des Materials
+                px[x, y] = rampe(ramp, 0.02 + L / 260)
+                continue
+            u = 0.52 + (L - 160) / 170 + strata(x, y)
+            u += ((BAYER4[y & 3][x & 3] + 0.5) / 16 - 0.5) * 0.12
+            px[x, y] = rampe(ramp, u)
+    extra(im, rnd)
+    # Griffe, die durch den Strich geraten sind, wieder obenauf
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            if sat(sp[x, y]) >= 55:
+                px[x, y] = sp[x, y]
+    return im
+
+
+def riss(px, rnd, x, y, n, dark, light, box):
+    for _ in range(n):
+        if box[0] < x < box[2] - 1 and box[1] < y < box[3] - 1:
+            if sat(px[x, y]) < 55:
+                px[x, y] = dark
+            if sat(px[x + 1, y]) < 55:
+                px[x + 1, y] = light
+        y += 1
+        x += rnd.choice((-1, 0, 0, 1))
+
+
+def cl_rest(im, src, sky, ground, mats, sockel):
+    """Alles ausser Wand: Himmel/Ueberhang oben, Raender, Sockel, Matten, Boden. Zeitanzeige und
+    Publikum unten bleiben aus der Vorlage."""
+    px, sp = im.load(), src.load()
+    W, H = im.size
+    sky(im)
+    for y in range(CL_WALL[3], CL_MATS[1]):
+        for x in range(W):
+            px[x, y] = sockel(x, y)
+    for y in range(CL_MATS[1], CL_CROWD_Y):
+        for x in range(W):
+            p = sp[x, y]
+            inmat = CL_MATS[0] <= x < CL_MATS[2] and y < CL_MATS[3] and (p[2] > p[0] + 60)
+            if inmat:
+                px[x, y] = mats(p, x, y)
+            elif not (CL_TIMER[0] <= x < CL_TIMER[2] and CL_TIMER[1] <= y < CL_TIMER[3]):
+                px[x, y] = ground(x, y)
+
+
+def cl_fels(src):
+    """Sandsteinwand in der Schlucht: Felsbaender, Risse, Wuestenhimmel, Crashpads auf Sand."""
+    ramp = [(78, 38, 30), (124, 62, 42), (166, 88, 56), (198, 118, 74), (222, 152, 100), (240, 190, 140)]
+    strata = lambda x, y: 0.16 * math.sin(y * 0.11 + 1.6 * math.sin(x * 0.013)) + 0.07 * math.sin(y * 0.37 + x * 0.02)
+
+    def extra(im, rnd):
+        px = im.load()
+        for _ in range(26):
+            riss(px, rnd, rnd.randrange(40, 660), rnd.randrange(30, 520), rnd.randint(20, 70), (70, 34, 28), (226, 160, 110), CL_WALL)
+        for _ in range(1600):   # Kiesel/Flechten
+            x, y = rnd.randrange(30, 670), rnd.randrange(26, 574)
+            if sat(px[x, y]) < 90:
+                px[x, y] = rnd.choice([(150, 70, 44), (232, 176, 120), (120, 120, 70), (104, 52, 36)])
+        d = ImageDraw.Draw(im)
+        for (bx, by) in ((70, 300), (630, 160), (600, 470), (90, 520)):   # Wuestenstraeucher in Ritzen
+            for k in range(7):
+                a = math.radians(190 + k * 22)
+                d.line([bx, by, bx + int(math.cos(a) * 7), by + int(math.sin(a) * 5)], fill=(96, 112, 52))
+
+    im = cl_wand(src, ramp, strata, extra, 4101)
+
+    def sky(im):
+        px = im.load()
+        band_gradient(px, 0, 0, 700, CL_WALL[1], [(88, 150, 214), (128, 178, 226)])
+        for x in list(range(0, CL_WALL[0])) + list(range(CL_WALL[2], 700)):
+            for y in range(0, CL_WALL[3]):
+                if x < CL_WALL[0] and px[x, y][1] > 120 and y > CL_WALL[1]:
+                    continue          # Meterskala links bleibt
+                u = 0.45 + 0.12 * math.sin(y * 0.09 + x * 0.3)
+                px[x, y] = rampe(ramp, u - 0.25)
+        d = ImageDraw.Draw(im)
+        # Ueberhangkante oben + ferne Tafelberge
+        for x in range(0, 700):
+            top = int(12 + 6 * math.sin(x * 0.02) + 3 * math.sin(x * 0.11))
+            for y in range(top, CL_WALL[1]):
+                px[x, y] = rampe(ramp, 0.25 + (y - top) / 40)
+        d.ellipse([600, 2, 612, 14], fill=(255, 244, 200))
+
+    def ground(x, y):
+        v = (x * 73856093 ^ y * 19349663) & 15
+        base = (214, 170, 112) if v > 2 else (176, 130, 84)
+        if (y - CL_MATS[1]) < 4:
+            base = mix(base, (120, 70, 44), 0.5)
+        return base
+
+    def mats(p, x, y):
+        L = luma(p) / 140
+        col = (196, 54, 46) if (x // 96) % 2 == 0 else (60, 64, 76)
+        return (clamp(col[0] * L), clamp(col[1] * L), clamp(col[2] * L))
+
+    cl_rest(im, src, sky, ground, mats, lambda x, y: rampe(ramp, 0.2 + (y - CL_WALL[3]) / 30 + 0.05 * math.sin(x * 0.2)))
+    return im
+
+
+CL_FX_FELS = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // Adler kreist vor der Wand, Staubkoerner treiben im Aufwind
+  const gx = 350 + Math.cos(t * 0.4) * 220, gy = 220 + Math.sin(t * 0.4) * 60, f = Math.sin(t * 5) > 0 ? -2 : 1;
+  ctx.fillStyle = '#3b2618';
+  ctx.fillRect(Math.round(gx) - 1, Math.round(gy), 3, 2);
+  ctx.fillRect(Math.round(gx) - 8, Math.round(gy) + f, 7, 1); ctx.fillRect(Math.round(gx) + 2, Math.round(gy) + f, 7, 1);
+  for (let i = 0; i < 50; i++) {
+    const x = (i * 131 + Math.sin(t + i) * 20) % 700, y = 580 - ((t * (10 + i % 7) + i * 97) % 600);
+    ctx.fillStyle = i % 2 ? 'rgba(240,200,150,0.55)' : 'rgba(190,130,90,0.5)';
+    ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+  }
+};
+"""
+
+
+def cl_eis(src):
+    """Gefrorener Wasserfall am Gletscher: Eiszapfen-Strukturen, Schnee auf den Kanten."""
+    ramp = [(28, 56, 104), (52, 102, 164), (96, 156, 210), (150, 204, 236), (204, 236, 250), (242, 252, 255)]
+    cols = [random.Random(4202 + k).random() for k in range(64)]
+    strata = lambda x, y: 0.18 * math.sin(x * 0.09 + 2.2 * math.sin(y * 0.01 + cols[(x // 11) % 64] * 6)) + 0.06 * math.sin(y * 0.05)
+
+    def extra(im, rnd):
+        px = im.load()
+        for _ in range(30):
+            riss(px, rnd, rnd.randrange(40, 660), rnd.randrange(30, 520), rnd.randint(20, 80), (30, 60, 110), (240, 252, 255), CL_WALL)
+        for _ in range(900):   # Luftblaeschen im Eis
+            x, y = rnd.randrange(30, 670), rnd.randrange(26, 574)
+            if sat(px[x, y]) < 140 and px[x, y][2] > 150:
+                px[x, y] = (236, 248, 255)
+        d = ImageDraw.Draw(im)
+        for yy in (120, 300, 430):       # Schneebaender auf Absaetzen
+            for x in range(30, 670):
+                h = int(2 + 2 * math.sin(x * 0.07 + yy))
+                for k in range(h):
+                    if sat(px[x, yy + k]) < 55 or px[x, yy + k][2] > 150:
+                        px[x, yy + k] = (246, 250, 255) if k < h - 1 else (200, 220, 236)
+
+    im = cl_wand(src, ramp, strata, extra, 4202)
+
+    def sky(im):
+        px = im.load()
+        band_gradient(px, 0, 0, 700, CL_WALL[1], [(150, 180, 214), (190, 210, 230)])
+        for x in list(range(0, CL_WALL[0])) + list(range(CL_WALL[2], 700)):
+            for y in range(0, CL_WALL[3]):
+                if x < CL_WALL[0] and px[x, y][1] > 120 and y > CL_WALL[1]:
+                    continue
+                px[x, y] = rampe(ramp, 0.3 + 0.1 * math.sin(x * 0.4 + y * 0.05))
+        d = ImageDraw.Draw(im)
+        for x in range(0, 700, 9):       # Eiszapfen an der Oberkante
+            ln = 6 + (x * 7) % 14
+            d.polygon([(x, CL_WALL[1] - 4), (x + 6, CL_WALL[1] - 4), (x + 3, CL_WALL[1] - 4 + ln)], fill=(214, 238, 252))
+            d.line([x + 1, CL_WALL[1] - 4, x + 3, CL_WALL[1] - 4 + ln], fill=(250, 254, 255))
+        d.rectangle([0, 0, 700, CL_WALL[1] - 5], fill=(236, 244, 252))
+        d.line([0, CL_WALL[1] - 5, 700, CL_WALL[1] - 5], fill=(200, 220, 238))
+
+    def ground(x, y):
+        v = (x * 73856093 ^ y * 19349663) & 15
+        base = (236, 242, 250) if v > 3 else (206, 218, 234)
+        if (y - CL_MATS[1]) < 4:
+            base = (176, 196, 220)
+        return base
+
+    def mats(p, x, y):
+        L = luma(p) / 140
+        col = (84, 92, 110) if (x // 96) % 2 == 0 else (200, 120, 40)
+        return (clamp(col[0] * L), clamp(col[1] * L), clamp(col[2] * L))
+
+    cl_rest(im, src, sky, ground, mats, lambda x, y: (220, 232, 246) if (y - CL_WALL[3]) < 3 else rampe(ramp, 0.35 + 0.05 * math.sin(x * 0.3)))
+    return im
+
+
+CL_FX_EIS = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // Schneefall vor der Wand, Eis glitzert
+  for (let i = 0; i < 140; i++) {
+    const sp = 18 + (i * 7) % 22;
+    const x = (i * 173 + Math.sin(t * 0.8 + i) * 12 + 700) % 700, y = (i * 59 + t * sp) % 780;
+    ctx.fillStyle = i % 3 ? 'rgba(255,255,255,0.85)' : 'rgba(220,236,255,0.7)';
+    ctx.fillRect(Math.round(x), Math.round(y), i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1);
+  }
+  for (let i = 0; i < 30; i++) {
+    const ph = (t * 0.7 + i * 0.37) % 1;
+    if (ph < 0.15) { ctx.fillStyle = '#ffffff'; const x = 40 + (i * 977) % 620, y = 40 + (i * 613) % 520; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); }
+  }
+};
+"""
+
+
+def climbing():
+    s, m, src = cl_lade()
+    for slug, painter, fx, title, h1, lead in (
+        ("fels", cl_fels, CL_FX_FELS, "Climbing Sandsteinschlucht", "Climbing: Sandsteinwand in der Schlucht",
+         "Dieselbe Route wie in der Halle (gleiche Griffe, Expressen und H&ouml;hen), nur drau&szlig;en am Fels: "
+         "Sandsteinb&auml;nder und Risse statt Platten, Crashpads auf dem Sand, ein Adler kreist."),
+        ("eis", cl_eis, CL_FX_EIS, "Climbing Eisfall", "Climbing: Gefrorener Wasserfall am Gletscher",
+         "Dieselbe Route wie in der Halle (gleiche Griffe, Expressen und H&ouml;hen), nur an einem gefrorenen "
+         "Wasserfall: Eis mit Rissen und Schneeb&auml;ndern, Eiszapfen oben, Schneefall."),
+    ):
+        im = painter(src)
+        if os.environ.get("SZENEN_DEBUG"):
+            im.save(os.path.join(os.environ["SZENEN_DEBUG"], f"climbing-{slug}-bg.png"))
+        out = s[: m.start(1)] + json.dumps(enc(im)) + s[m.end(1):]  # ohne Quantisierung: die Griff-Farben muessen exakt bleiben
+        schreibe("climbing", slug, out, title, h1, lead, "ctx.drawImage(IM.wall, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
+
+
+ALLE = {"tennis": tennis, "climbing": climbing}
 
 if __name__ == "__main__":
     ziele = sys.argv[1:] or list(ALLE)

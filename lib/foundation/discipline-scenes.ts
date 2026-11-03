@@ -153,7 +153,9 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "basketball",
     title: "Basketball",
     note: "Parkett mit Maserung, Ballphysik, voller Boxscore.",
-    variants: [v("basketball", "parkett", "Parkett")],
+    // Zweiter Schauplatz vom 03.11. (scripts/baue-szenen-schauplaetze.py): dasselbe Feld, derselbe
+    // Ablauf, aber draussen im Käfig zwischen Backsteinhäusern statt in der Halle.
+    variants: [v("basketball", "parkett", "Parkett"), v("basketball", "streetcourt", "Street-Court")],
   },
   gewichtheben: {
     disciplineId: "gewichtheben",
@@ -171,7 +173,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "climbing",
     title: "Climbing",
     note: "7-m-Wand im echten Maßstab mit Seilsicherung.",
-    variants: [v("climbing", "wand", "Kletterwand")],
+    // Fels + Eis: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten-2.py) — dieselbe
+    // Route, dieselben Griffe und Expressen, nur ein anderes Material und ein anderer Ort.
+    variants: [
+      v("climbing", "wand", "Kletterhalle"),
+      v("climbing", "fels", "Sandsteinschlucht"),
+      v("climbing", "eis", "Eisfall"),
+    ],
   },
   eiskunstlauf: {
     disciplineId: "eiskunstlauf",
