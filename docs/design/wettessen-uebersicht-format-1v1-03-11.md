@@ -325,3 +325,70 @@ antreten").
 Armageddon Aftermath, Minute 3/10, Jahrmarkt), `wettessen-uebersicht-03-11-skizze.png` (Layout-Studie,
 HTML + Playwright auf `jahrmarkt.jpg`, 1240 × 470), `szenen-varianten-kostprobe-03-11-wettessen.png`,
 `szenen-varianten-staffel2-03-11-wettessen.png`.
+
+---
+
+## 8. Umsetzungsnachtrag (03.11., Branch `claude/wettessen-uebersicht-paket-031126`)
+
+Chris, nach Befund und Skizze: „klingt gut dann setz fables vorschläge bitte diesmal auch um."
+Die drei PRs aus Abschnitt 5.2 sind als drei Commits auf einem Branch gebaut, dazu das optionale
+Paket 4 (Nachzählung/Gürtel, Nahaufnahme-light) im dritten Commit.
+
+| Commit | Inhalt | Klasse |
+|---|---|---|
+| PR 1 „Ebenen entwirren" | Uhr in den Bug, Teamstand in der Einheit des Tages in den Seitenkästen, „MINUTE x/10" als kleine Zeile; Canvas-Band und Canvas-Kopfuhr weg (Zone B gehört dem Callout); je Esser nur zweizeilige Tafel + Namens-Chip; Bauchbinde „Kopf an Kopf" unten statt Magen-Meter; eine Währung in Scoreline, Kaderleiste, Callout, Sieger-Banner; „0 am Tisch" zählt Sitzende. Nebenbei behoben: Uhr/Minute liefen eine Minute voraus, `done` fiel vor der Zählung der letzten Minute. | A |
+| PR 2 „Mauer sichtbar" | Magen-Pegel je Esser (Füllstand gegen `u.mauerK`, Kapazitätslinie, rot über der Linie, Puls), Stempel MAUER / PAUSE / SPRINT / SCHLUSSSPURT, erste Mauer je Seite als Banner (Titel MAUER). | A |
+| PR 3 „Tischduelle, Dosis, Ende" | Sitzordnung Heim i neben Gast i mit Klammer und Abstand je Paar; Minute als Ganzes bewertet statt Einzel-Banner je Esser (Führungswechsel über die ganze Minute, Bestmarke in Minute 10, Drossel wie Fechten/Tennis, Banner 0,8 × rundenDauer verzögert = kein Spoiler); Nahaufnahme-light (+18 % für das Duellpaar eines Führungswechsels); Nachzählung von hinten nach vorn und Senfgürtel im 3,5-s-Nachlauf. | A |
+
+**Entscheidungen zu den offenen Fragen (Abschnitt 6), weil Chris „setz um" ohne Einzelantwort
+sagte:** Tischduelle ja (B); Uhr im Bug, nicht auf dem Kulissen-Brett (kulissenunabhängig,
+keine Verdeckung durch die mittleren Esser, Audit-Punkt 10); kein Stechen (Klasse W, bei 4–12
+Essern fast nie); Nachlauf bleibt 3,5 s (die Zählung passt hinein: bei zwölf Essern ~2,3 s);
+Haltungsfeld in der Einsatzliste bleibt beim Grundgerüst-Fahrplan (das Schild am Platz ist
+jetzt da, die Buchse folgt dort).
+
+**Was aus `platter.tsx` portiert ist (13.10.-Rework):** W-V2 (Tafel gehört dem Esser,
+bestand im Motor), W-V5 (Tischduelle), W-V6 (Hochrechnung, bestand), W-V7 als Nahaufnahme-light,
+W-V8 (Zählung und Gürtel). W-V1 (Ranglisten-Turm) ist bewusst nicht in den Canvas portiert: die
+Rangfolge steht im Bug (Teamstand), in der Bauchbinde (die zwei Führenden), an den Klammern und in
+der Wertungstabelle rechts neben der Leinwand — ein Turm im Bild wäre wieder die vierte Zone.
+W-V3/W-V4 sind in PR 2 erstmals überhaupt gebaut.
+
+### Abnahme
+
+- `node scripts/miss-alle-disziplinen.mjs 24 wettessen`: **0,910 je Spiel / 0,937 Saison** nach
+  jedem der drei Commits, bit-identisch zur Basislinie auf `origin/main` (705f216b6).
+- `node scripts/pruefe-wettessen-identisch.mjs` (neu): `spieleBuehneAuftritt("wettessen", s)`
+  für die Saaten 1–6, 77, 1337 — Seiten und Boxscore **byte-identisch** zu `origin/main` nach jedem
+  Commit (auch mit dem verschobenen `done`).
+- Sicht-QA mit `node scripts/screenshot-wettessen-matrix.mjs` (neu): 2/4/6 je Seite × Jahrmarkt/
+  Nachtmarkt/Festzelt × Minute 1/6/10 (27 Bilder, Sonden-Zeit) plus 6 gegen 6 auf allen drei
+  Kulissen in Echtzeit (Minute 3/6/10, Ende, Gürtel) — keine Seitenfehler. Belege neben diesem
+  Papier: `wettessen-uebersicht-03-11-nachher-*.png`.
+- Messbare Ziele aus 5.3 gegenüber dem Live-Bild: Textelemente je Esser 5 → 2 (+ Pegel);
+  Minutenanzeigen 15 → 2 (Scoreline, Bug); Währungen im Canvas-HUD 3 → 1; Überlappungen
+  Callout/Canvas 2 → 0; Banner je Minute höchstens eins, gedrosselt.
+
+![Nachher, 6 gegen 6, Jahrmarkt, Minute 6](wettessen-uebersicht-03-11-nachher-6v6-jahrmarkt-min6.png)
+
+![Nachher, 4 gegen 4, Nachtmarkt, Minute 6, Mauer-Banner](wettessen-uebersicht-03-11-nachher-4v4-nachtmarkt-min6.png)
+
+![Nachher, 2 gegen 2, Jahrmarkt, letzte Minute](wettessen-uebersicht-03-11-nachher-2v2-jahrmarkt-min10.png)
+
+![Nachher, 6 gegen 6, Festzelt, Bestmarke in Minute 10](wettessen-uebersicht-03-11-nachher-6v6-bierzelt-bestmarke.png)
+
+![Nachher, Festzelt, Gürtel nach der Nachzählung](wettessen-uebersicht-03-11-nachher-6v6-bierzelt-guertel.png)
+
+### Live-Save-Test
+
+Dev-Server aus diesem Branch gegen eine Kopie des aktuellen Hetzner-Abbilds (`origin/live-save`,
+03.11. 11:00 UTC, `OLY_APP_SQLITE_PATH` auf die Kopie, Auto-Export aus), Chris' Battle-Mode-Save
+„Oly New Game Custom 31.10.2026" (Saison 1, Spieltag 1). Sein Team N-N hat vor den „Ersten
+Transfers" noch keinen Kader — deshalb im Battle-Arena-Entwurf zwei volle Kader desselben Saves
+(Golden Gladiators gegen Terrible Teachers, 6 gegen 6, Jahrmarkt), Echtzeit über die vollen 60 s
+plus Nachlauf: keine Seitenfehler; Scoreline, Bug, Tafeln, Klammern, Bauchbinde und Endstand in
+einer Währung; Höhepunkte MAUER und FÜHRUNGSWECHSEL, Szene des Spiels BESTMARKE.
+
+![Live-Save, echter Foundation-Host, Minute 6](wettessen-uebersicht-03-11-nachher-live-min6.png)
+
+![Live-Save, Endstand](wettessen-uebersicht-03-11-nachher-live-endstand.png)
