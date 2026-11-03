@@ -124,7 +124,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "tennis",
     title: "Tennis",
     note: "Echte ITF-Maße, Ballphysik mit Schwerkraft.",
-    variants: [v("tennis", "court", "Court")],
+    // Riviera + Dach: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten-2.py) — derselbe
+    // Matchball, dieselben Platzmaße und Ballwege, nur ein anderer Ort.
+    variants: [
+      v("tennis", "court", "Centre Court"),
+      v("tennis", "riviera", "Sandplatz Riviera"),
+      v("tennis", "dach", "Hochhausdach"),
+    ],
   },
   wettessen: {
     disciplineId: "wettessen",
