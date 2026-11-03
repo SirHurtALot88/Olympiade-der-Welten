@@ -4505,17 +4505,18 @@
     }catch(e){ /* file:// oder fremde Herkunft: Leinwand gesperrt -> Schaetzwerte oben */ }
     return mass;
   }
-  function pixelBild(z,datei,frames){
+  function pixelBild(z,datei,frames,danach){
     let e=z.bilder.get(datei);
     if(e)return e;
     e={im:null,mass:null,fehler:false};
     z.bilder.set(datei,e);
+    const fertig=()=>{ if(danach){ const f=danach; danach=null; try{f();}catch(err){} } };
     try{
       const im=new Image();
-      im.onload=()=>{ e.mass=pixelMessen(im,frames); e.im=im; };
-      im.onerror=()=>{ e.fehler=true; };
+      im.onload=()=>{ e.mass=pixelMessen(im,frames); e.im=im; fertig(); };
+      im.onerror=()=>{ e.fehler=true; fertig(); };
       im.src=PIXEL_FIGUR_BASIS+z.fig.s+"/"+datei;
-    }catch(err){ e.fehler=true; }
+    }catch(err){ e.fehler=true; fertig(); }
     return e;
   }
   function pixelFigurLaden(name){
@@ -4526,12 +4527,34 @@
     if(!fig||typeof Image==="undefined"){ pixelFigurSpeicher.set(name,null); return null; }
     z={fig,bilder:new Map()};
     pixelFigurSpeicher.set(name,z);
-    for(const r of fig.r)pixelBild(z,r+".png",1);
-    for(const art in fig.a)for(const d in fig.a[art]){
-      const [stamm,frames]=fig.a[art][d];
-      pixelBild(z,stamm+"-"+d+".png",frames);
-    }
+    // REIHENFOLGE (03.11., Chris' Live-Screenshot bei 0:06: fuenf Kaempfer noch als Baukasten):
+    // je Figur kamen bisher ~12 Dateien gleichzeitig ins Netz, bei zwoelf Kaempfern ~140 — die
+    // Frontpose, ohne die die Figur gar nicht erscheint, stand dabei hinten in derselben Schlange.
+    // Jetzt zuerst nur die Grundpose (traegt den Massstab, s. pixelFigurBereit); die uebrigen
+    // Posen und Streifen erst, wenn sie da ist (oder fehlgeschlagen).
+    const grundName=fig.r.includes("south")?"south":fig.r[0];
+    const rest=()=>{
+      for(const r of fig.r)pixelBild(z,r+".png",1);
+      for(const art in fig.a)for(const d in fig.a[art]){
+        const [stamm,frames]=fig.a[art][d];
+        pixelBild(z,stamm+"-"+d+".png",frames);
+      }
+    };
+    if(grundName)pixelBild(z,grundName+".png",1,rest); else rest();
     return z;
+  }
+  // Geladen = jede angeforderte Datei der Figur ist da oder endgueltig fehlgeschlagen (Spieler
+  // ohne eigene Figur gelten als geladen: sie bleiben ohnehin beim Baukasten).
+  function pixelFigurGeladen(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return true;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    if(!grund||!(grund.im||grund.fehler))return false;
+    if(grund.fehler)return true;
+    let soll=z.fig.r.length; for(const art in z.fig.a)soll+=Object.keys(z.fig.a[art]).length;
+    if(z.bilder.size<soll)return false;
+    for(const e of z.bilder.values())if(!e.im&&!e.fehler)return false;
+    return true;
   }
   // Bereit = die Frontpose ist geladen und vermessen (sie traegt den Massstab). Vorher
   // bleibt die Figur beim Baukasten — kein halbes Bild, kein Springen der Groesse.
@@ -4555,8 +4578,33 @@
     try{ cx.drawImage(e.im,0,0,m.fw,m.fh,w/2-m.mitteX*s,(h-2)-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
     cx.restore();
   }
+  // Wer im naechsten Spiel zu sehen ist (Kader, Pod-Teams): reset() und die Pod-Aufbauten
+  // melden ihn hier an, der Anpfiff wartet auf genau diese Liste (s. anpfiffNachFiguren).
+  let pixelFigurenImSpiel=[];
+  let figurenWarten=null; // Intervall, solange der Anpfiff auf Figuren wartet (s. spielLaeuft)
   function pixelFigurVorladen(namen){
-    for(const n of namen||[])pixelFigurLaden(n);
+    for(const n of namen||[]){ if(!n)continue; pixelFigurLaden(n); if(!pixelFigurenImSpiel.includes(n))pixelFigurenImSpiel.push(n); }
+  }
+  // Gewartet wird nur auf die, die wirklich auf dem Feld stehen: im Kampf-Chassis die Einheiten
+  // (U), sonst die ganze angemeldete Liste (Bank eingeschlossen, gedeckelt durch FIGUREN_WARTE_MS).
+  function pixelFigurenFuerAnpfiff(){
+    const arenaChassis=!istFeldspiel(disc)&&!istBuehne(disc)&&!istBahn(disc);
+    const imKampf=(arenaChassis&&Array.isArray(U)&&U.length)?U.map(u=>u&&u.n).filter(Boolean):null;
+    return imKampf&&imKampf.length?imKampf:pixelFigurenImSpiel;
+  }
+  // Fuer den Anpfiff reicht die GRUNDPOSE (sie macht die Figur erkennbar und traegt den
+  // Massstab, s. pixelFigurBereit); fehlende Animationsstreifen ueberbrueckt zeichnePixelFigur()
+  // mit der Ersatzbewegung aus der Grundpose, bis sie nachkommen.
+  function pixelGrundGeladen(name){
+    const z=pixelFigurLaden(name);
+    if(!z)return true;
+    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    return !!grund&&!!(grund.im||grund.fehler);
+  }
+  function pixelFigurenAlleGeladen(){
+    if(!PIXEL_FIGUR_AKTIV)return true;
+    for(const n of pixelFigurenFuerAnpfiff())if(!pixelGrundGeladen(n))return false;
+    return true;
   }
   // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
   //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
@@ -30123,9 +30171,14 @@
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
 
     // GRUNDFLAECHE: warmes Bankett-Kerzenlicht statt bodenBuehne()s kaltem Wettkampf-Podest.
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    // KULISSE (03.11., s. kulisseZeichnen): gibt es einen illustrierten Jahrmarkt fuer dieses
+    // Spiel, steht die Tafel vor ihm statt vor dem Verlauf — alles darueber (Schild, Wimpel,
+    // Tafel, Uhr, Band) bleibt unveraendert.
+    if(!kulisseZeichnen()){
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,"#2a1a12");g.addColorStop(1,"#120b08");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
 
     // NEON-SCHILD "WETTESSEN" ENTFERNT (F1-Broadcast-Audit Runde 2, 30.09., Punkt 6, Bild
     // 11, "wettessen zwei uhren zwei staende"): stand bei y:4-30, exakt unter dem HTML-
@@ -42114,6 +42167,13 @@
       im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.bild===v.bild&&kulisseAktiv.disc===disc)draw(); }catch(e){} };
       im.src=v.bild; kulisseBilder[v.bild]=im;
     }
+  }
+  // Fertig = keine Kulisse gewaehlt, oder ihr Bild ist geladen bzw. endgueltig fehlgeschlagen
+  // (der Anpfiff wartet darauf wie auf die Figuren, s. spielLaeuft).
+  function kulisseGeladen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return true;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    return !im||im.complete;
   }
   // Zeichnet die gewaehlte Kulisse samt Lesbarkeits-Schicht; false = nichts gezeichnet
   // (keine Kulisse fuer diese Disziplin oder Bild noch nicht geladen) -> alter Boden.
@@ -54391,6 +54451,11 @@
     // echten Vierer-Pod, zeigt die Arena alle vier Teams gleichzeitig im selben Kampf. Sonst — und
     // fuer jede andere Disziplin — exakt der bisherige Aufbau; die Pod-Teamnamen werden dann
     // wieder gegen die Duell-Namen getauscht.
+    // FIGUREN DES NAECHSTEN SPIELS (03.11.): Liste neu, beide Kader sofort anfordern — so laedt
+    // es schon waehrend Einlauf und Countdown, nicht erst ab dem ersten Kampf-Frame.
+    if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; }
+    pixelFigurenImSpiel=[];
+    try{ pixelFigurVorladen([...SQUAD,...OPP].map(p=>p&&p.n)); }catch(e){}
     const bfPodAnz=disc==="battlefield"?bfPodAnzeigeKontext():null;
     // BAHN-POD (02.11., s. bahnPodAnzeigeKontext): dasselbe fuer Takeshi's Castle und Staffel — das
     // Vier-Team-Rennen der gebuchten Gruppe statt des Duells. Ein sichtbarer Pod vom vorigen Aufbau
@@ -54500,10 +54565,32 @@
 
   // `running` an/aus samt allem, was am Uebergang haengt -- ausgelagert, weil A4 den Anpfiff
   // jetzt auch NACH dem Klick (am Ende des Countdowns, anpfiffAusfuehren()) ausloesen kann.
-  function spielLaeuft(an){
+  // ANPFIFF ERST MIT FIGUREN (03.11.): Chris sah bei 0:06 fuenf Kaempfer noch als Baukasten-
+  // Platzhalter — die PixelLab-Bilder laden asynchron, und zeichneSprite() zeichnet bis dahin den
+  // Baukasten. Der erste Kampf-Frame wartet deshalb, bis alle Figuren des Spiels geladen sind,
+  // hoechstens FIGUREN_WARTE_MS (langsames Netz, fehlende Datei: dann wie bisher). Reine
+  // Wanduhr-Verzoegerung VOR dem ersten Tick: die Simulation tickt danach unveraendert, Quick-Sim
+  // (schnellDurch) und Sonden laufen nicht durch spielLaeuft und warten nie.
+  const FIGUREN_WARTE_MS=4000;
+  function spielLaeuft(an,ohneFigurenWarten){
+    const bereit=()=>pixelFigurenAlleGeladen()&&kulisseGeladen();
+    if(an&&!ohneFigurenWarten&&!running&&!anpfiffErfolgt&&!bereit()){
+      if(figurenWarten)return;
+      const start=wandMs(), meinDisc=disc;
+      const pb=document.getElementById("play"); if(pb)pb.textContent="Lade Figuren …";
+      figurenWarten=setInterval(()=>{
+        // Abbruch: Instanz abgeloest, Disziplin gewechselt, oder jemand anderes (Quick-Sim,
+        // Sofort-Start) hat das Spiel inzwischen selbst angepfiffen.
+        if(!document.getElementById("cv")||disc!==meinDisc||running||anpfiffErfolgt){ clearInterval(figurenWarten); figurenWarten=null; return; }
+        if(bereit()||wandMs()-start>=FIGUREN_WARTE_MS){ clearInterval(figurenWarten); figurenWarten=null; spielLaeuft(true,true); }
+      },60);
+      return;
+    }
+    if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; }
     running=an;
     if(an)anpfiffErfolgt=true;
-    document.getElementById("play").textContent=running?"Pause":"Weiter";
+    const playKnopf=document.getElementById("play"); if(!playKnopf)return;
+    playKnopf.textContent=running?"Pause":"Weiter";
     // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
     // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
     // laeuft (die Kampfschleife ruft updateHud() nur, waehrend running gerade true ist) --
@@ -55054,6 +55141,8 @@
     const art=ARENA_ART.battlefield, jeVorher=art.jeSeite;
     const placeVorher={...place}, formVorher=FORMKARTE;
     const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    // Pod-Gegner frueh anfordern statt faul beim ersten Zeichnen (s. pixelFigurVorladen).
+    try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
     if(!bfPodAnzeigeVereinSnap)bfPodAnzeigeVereinSnap=bfPodVereinSchnappschuss();
     bfPodVereineSetzen(pod.teams);
     // Persoenlichkeiten bleiben stehen (Tooltips/Kaderleiste lesen persOf auch nach dem Aufbau).
@@ -57634,6 +57723,7 @@
   }
   function bahnPodAnzeigeBauen(pod){
     const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
     bahnPodAnzeige={kader, vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
     bfPodVereineSetzen(pod.teams);
     // Aufstellung, Formkarten und Persoenlichkeiten wirken nur beim Bau (setz/formVon/`pers` in
@@ -58745,6 +58835,11 @@
     // KULISSE (03.11., s. kulisseWaehlen): welche illustrierte Arena gerade gezeichnet wird, und
     // fuer Screenshot-QA die Wahl zu einer anderen Saat. Reine Anzeige, kein Einfluss auf rr().
     kulisse:()=>kulisseAktiv?{...kulisseAktiv}:null,
+    // FIGUREN-STAND (03.11., s. spielLaeuft/ANPFIFF ERST MIT FIGUREN): wer im Spiel ist und wessen
+    // PixelLab-Bilder noch fehlen; `laeuft` = der erste Tick ist freigegeben. Reine Anzeige-Sonde.
+    figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
+      ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
+      ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),

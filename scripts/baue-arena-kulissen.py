@@ -53,15 +53,28 @@ ZIEL_JS = WURZEL / "public" / "mockups" / "battle-mode.kulissen.js"
 # Leinwand des Motors (public/mockups/battle-mode.html, <canvas id="cv" width=1240 height=470>).
 LW, LH = 1240, 470
 
-# WELCHES CHASSIS ZEICHNET WELCHE DISZIPLIN (Spiegel von zeichneBoden() im Motor). Nur "arena"
-# ist heute gebaut; die anderen stehen hier, damit der Lauf sagt, was offen ist, statt still
-# nichts zu tun.
+# WELCHES CHASSIS ZEICHNET WELCHE DISZIPLIN (Spiegel von zeichneBoden() im Motor) und wie die
+# Kulisse dafuer zugeschnitten wird. Gebaut sind "arena" (bodenArena: Boden samt Seitenmauern,
+# Hindernisse zugemalt) und "buehne" (eine Buehnen-Disziplin, deren eigener Boden nur eine
+# Grundflaeche malt und die Kulisse darunter legen kann: deckender Zuschnitt, `y_anteil` sagt,
+# wie weit unten der Ausschnitt sitzt — 0 oben, 1 unten). Die anderen stehen hier, damit der
+# Lauf sagt, was offen ist, statt still nichts zu tun.
 CHASSIS = {
-    "tdm": "arena",
-    "mini-dm": "arena",
-    "battlefield": "arena-kontrollpunkte",
+    "tdm": {"art": "arena"},
+    "mini-dm": {"art": "arena"},
+    # Wettessen: Sitzreihe und Tafel liegen im unteren Drittel der Leinwand — der Ausschnitt
+    # nimmt Zelte und Publikum (Mitte/oben) und die Buehnenbretter (unten), nicht das
+    # WETTESSEN-Schild ganz oben (der Motor hat sein eigenes Schild, s. bodenWettessen()).
+    "wettessen": {"art": "buehne", "y_anteil": 1.0, "dunkel_plus": 0.08},
+    # Battlefield: die drei Eroberungspunkte der Szene liegen anders als die des Motors
+    # (ARENA_DOMINATION.orte: senkrechte Reihe bei x=MID, y=85/235/385) — ein Bild mit Turm,
+    # Altar und Brueckenkopf an anderer Stelle wuerde die Kontrollpunkte verfaelschen.
+    "battlefield": {"art": "arena-kontrollpunkte"},
+    # Gewichtheben (Sandsack-Schicht): die Szene ist ein vollstaendiger Stationsplan (Bahnen,
+    # Silo, Rampen), der nicht deckungsgleich mit den Reihen des Motors liegt.
+    "gewichtheben": {"art": "buehne-stationsplan"},
 }
-CHASSIS_GEBAUT = {"arena"}
+CHASSIS_GEBAUT = {"arena", "buehne"}
 
 # DAS LAYOUT DER ARENA-SZENEN (TDM, Mini-DM: alle 1280x790, gleicher Grundriss). Spielboden
 # innerhalb der Mauern, und der Ausschnitt, der auf die Leinwand kommt: die volle Bodenbreite
@@ -198,13 +211,28 @@ def baue_arena(bild: Image.Image, objs) -> Image.Image:
     return aus.resize((LW, LH), Image.LANCZOS)
 
 
-def deckend_zuschneiden(bild: Image.Image) -> Image.Image:
+def deckend_zuschneiden(bild: Image.Image, y_anteil: float = 0.5) -> Image.Image:
     w, h = bild.size
     if w / h > LW / LH:
         nb = round(h * LW / LH)
         return bild.crop(((w - nb) // 2, 0, (w - nb) // 2 + nb, h))
     nh = round(w * LH / LW)
-    return bild.crop((0, (h - nh) // 2, w, (h - nh) // 2 + nh))
+    y0 = round((h - nh) * y_anteil)
+    return bild.crop((0, y0, w, y0 + nh))
+
+
+def skaliere(bild: Image.Image) -> Image.Image:
+    """Auf Leinwandgroesse. Pixel-Art, die stark vergroessert wird (Buehnen-Szenen sind 640x360),
+    erst ganzzahlig per naechstem Nachbarn verdoppeln und dann weich verkleinern — sonst
+    verschwimmt jede Kante."""
+    if LW / bild.size[0] > 1.5:
+        f = int(LW / bild.size[0]) + 1
+        bild = bild.resize((bild.size[0] * f, bild.size[1] * f), Image.NEAREST)
+    return bild.resize((LW, LH), Image.LANCZOS)
+
+
+def baue_buehne(bild: Image.Image, y_anteil: float) -> Image.Image:
+    return skaliere(deckend_zuschneiden(bild, y_anteil))
 
 
 def main() -> None:
@@ -212,9 +240,9 @@ def main() -> None:
     tabelle: dict[str, list[dict]] = {}
     offen: list[str] = []
     for d_id in sorted(registry):
-        chassis = CHASSIS.get(d_id)
-        if chassis not in CHASSIS_GEBAUT:
-            offen.append(f"{d_id} ({chassis or 'feldspiel/buehne/bahn'})")
+        chassis = CHASSIS.get(d_id) or {"art": None}
+        if chassis["art"] not in CHASSIS_GEBAUT:
+            offen.append(f"{d_id} ({chassis['art'] or 'feldspiel/buehne/bahn'})")
             continue
         eintraege = []
         for v in registry[d_id]["variants"]:
@@ -223,14 +251,16 @@ def main() -> None:
             if bild is None:
                 print(f"  {d_id}/{v['id']}: keine saubere Kulisse in der Szene, uebersprungen")
                 continue
-            fertig = baue_arena(bild, objs)
+            fertig = baue_arena(bild, objs) if chassis["art"] == "arena" else baue_buehne(bild, chassis.get("y_anteil", 0.5))
             ziel = ZIEL_BILDER / d_id / f"{v['id']}.jpg"
             ziel.parent.mkdir(parents=True, exist_ok=True)
             fertig.save(ziel, "JPEG", quality=86, optimize=True, progressive=True)
             # Abdunklung fuer die Lesbarkeit der Kaempfer (kulisseZeichnen() im Motor): helle
             # Kulissen (Schnee, Sand) brauchen mehr, dunkle (Lava) fast keine.
             hell = sum(fertig.convert("L").resize((62, 24)).tobytes()) / (62 * 24 * 255)
-            dunkel = round(min(0.3, max(0.06, (hell - 0.25) * 0.55)), 2)
+            # Buehnen tragen mehr kleine Schrift direkt auf dem Bild (Zaehler, Namen, Uhr) und
+            # bekommen deshalb einen Aufschlag (`dunkel_plus`).
+            dunkel = round(min(0.3, max(0.06, (hell - 0.25) * 0.55)) + chassis.get("dunkel_plus", 0), 2)
             eintraege.append({"id": v["id"], "label": v["label"], "bild": f"/sprites/kulissen/{d_id}/{v['id']}.jpg", "dunkel": dunkel})
             print(f"  {d_id}/{v['id']}: {len(objs)} Hindernisse zugemalt -> {ziel.relative_to(WURZEL)} ({ziel.stat().st_size // 1024} KB)")
         if eintraege:

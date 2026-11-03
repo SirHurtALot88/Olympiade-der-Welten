@@ -41,5 +41,25 @@ window.__ARENA_KULISSEN={
    "bild": "/sprites/kulissen/tdm/frost.jpg",
    "dunkel": 0.3
   }
+ ],
+ "wettessen": [
+  {
+   "id": "jahrmarkt",
+   "label": "Jahrmarkt",
+   "bild": "/sprites/kulissen/wettessen/jahrmarkt.jpg",
+   "dunkel": 0.27
+  },
+  {
+   "id": "nachtmarkt",
+   "label": "Nachtmarkt",
+   "bild": "/sprites/kulissen/wettessen/nachtmarkt.jpg",
+   "dunkel": 0.14
+  },
+  {
+   "id": "bierzelt",
+   "label": "Festzelt",
+   "bild": "/sprites/kulissen/wettessen/bierzelt.jpg",
+   "dunkel": 0.18
+  }
  ]
 };
