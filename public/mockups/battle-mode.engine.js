@@ -16770,10 +16770,15 @@
     // C2: Wappen vor dem Namen, wie im Einlauf -- bbugWappenHtml() cached das Ergebnis
     // selbst (s. dort), aktualisiereBbug() ruft es trotz des 60x/Sekunde-Takts hier also
     // unbesorgt bei jedem Tick auf.
-    if(bl)bl.innerHTML=bbugWappenHtml(0)+zeile("tnameL")+pipsHtml(0);
-    if(br)br.innerHTML=bbugWappenHtml(1)+zeile("tnameR")+pipsHtml(1);
+    // WETTESSEN (Uebersichts-Paket 03.11., PR 1, Zone A): der Teamstand steht in der Einheit des
+    // Tages IN DEN SEITENKAESTEN (wettessenBugStandHtml()), die Mitte traegt nur die Uhr und
+    // darunter klein die Minute -- so sieht der Bug aus wie die Skizze des Konzepts, und der
+    // Stand steht nirgends doppelt.
+    const wett=istBuehne(disc)&&!!BB().wettessen;
+    if(bl)bl.innerHTML=(wett?wettessenBugStandHtml(0):"")+bbugWappenHtml(0)+zeile("tnameL")+pipsHtml(0);
+    if(br)br.innerHTML=(wett?wettessenBugStandHtml(1):"")+bbugWappenHtml(1)+zeile("tnameR")+pipsHtml(1);
     if(mitte){
-      const scoreTxt=txt("score"), istFs=istFeldspiel(disc);
+      const scoreTxt=wett?"":txt("score"), istFs=istFeldspiel(disc);
       let fuehrend=null;
       if(istFs&&scoreTxt){
         const m=scoreTxt.match(/^(\d+)\s*:\s*(\d+)$/);
@@ -16798,7 +16803,13 @@
       const clockTxt=txt("clock");
       if(clockTxt){
         if(scoreTxt)mitte.appendChild(document.createTextNode(" · "));
-        mitte.appendChild(document.createTextNode(clockTxt));
+        if(wett){ const uhr=document.createElement("b"); uhr.textContent=clockTxt; mitte.appendChild(uhr); }
+        else mitte.appendChild(document.createTextNode(clockTxt));
+      }
+      if(wett){
+        const klein=document.createElement("small");
+        klein.textContent=wettessenMinuteText();
+        mitte.appendChild(klein);
       }
       if(istFs){
         if(fuehrend!=null&&bbugLetzteFuehrung!=null&&fuehrend!==bbugLetzteFuehrung){
@@ -26535,7 +26546,9 @@
           const symS=(r.ereignis===BB().failWort&&elS.typ==="sprung")?(r.knapp?"<":"F"):"";
           schwebe({x:0,y:0,txt:elS.kuerzel+symS+" +"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
         }
-        else schwebe({x:0,y:0,txt:"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
+        // WETTESSEN (Uebersichts-Paket 03.11., PR 1): "+Delta" in der Einheit des Tages, nicht in
+        // Punkten -- dieselbe Skala wie die Tafel, ueber der der Schweber jetzt steht.
+        else schwebe({x:0,y:0,txt:BB().wettessen?"+"+wettessenWuerstchenText(wettessenWuerstchen(r.punkte)):"+"+r.punkte,life:1,crit:versuchBig,_teilnehmer:u.id});
       }
       // KUEHNER VERSUCH — PUNKTESIEG!/VERLETZT!-Pops: aus demselben Grund wie der kg/X-
       // Schweber oben jetzt in hebenTickerAmUrteil() (Lampen-Moment), nicht mehr hier.
@@ -27142,7 +27155,9 @@
         }
         const wettBig=buehneAuftrittBig(u,r,vorherSumme);
         if(wettBig){
-          feed(u.side,u.n+" — "+r.ereignis+" ("+r.punkte+" Punkte, Durchgang "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
+          // UEBERSICHTS-PAKET 03.11. (PR 1): Callout-Text in der Einheit des Tages und in
+          // "Minute", nicht "93 Punkte, Durchgang 2/10" -- eine Waehrung auf dem Bildschirm.
+          feed(u.side,u.n+" — "+r.ereignis+" (+"+wettessenWuerstchenText(wettessenWuerstchen(r.punkte))+" "+wettessenMenuWahl.n+", Minute "+(u.aktuell+1)+"/"+BB().rundenN+").",true,undefined,wettBig);
         } else {
           wettBuendel.push({u,r});
         }
@@ -27177,7 +27192,14 @@
     // das Ergebnis steht seit bauBuehne() fest. Im Live-Spiel haelt die laufende Szene `done`
     // zurueck, bis die Schicht gezeigt ist. Ohne Szene (jedes andere Flag, jeder Messlauf)
     // unveraendert.
-    if(buehneZeiger>=buehneQueue.length&&!(SANDSACK_PAR_SZENE&&!SANDSACK_PAR_SZENE.fertig))done=true;
+    // WETTESSEN (Uebersichts-Paket 03.11., PR 1): die letzte Minute wird erst ZU ENDE GEZAEHLT
+    // (buehneAkt laeuft nach der letzten Gruppen-Enthuellung noch rundenDauer Sekunden ab),
+    // bevor `done` faellt -- vorher fiel es im Tick der letzten Enthuellung, die zehnte Minute
+    // sprang als Ganzes auf die Tafeln, "LETZTE MINUTE" und der 10..1-Countdown liefen eine
+    // Minute zu frueh. Reine Anzeigezeit: jeder runden[]-Eintrag ist laengst gerechnet, kein rr(),
+    // Seiten/Boxscore bleiben byte-identisch (spieleBuehneAuftritt-Vergleich, s. PR-Abnahme).
+    if(buehneZeiger>=buehneQueue.length&&!(SANDSACK_PAR_SZENE&&!SANDSACK_PAR_SZENE.fertig)
+      &&!(BB().wettessen&&buehneGruppenGroesse>1&&buehneAkt>0))done=true;
   }
 
   // BEWEGUNGS-EINSTIEGSPUNKT (PR 0, Opus-Plan Abschnitt 3.3). Der Dispatcher ist absichtlich
@@ -29287,12 +29309,14 @@
       // Sekunden), die Leinwand gleichzeitig die grosse, dramatische "10:00-Uhr" (Chris'
       // eigene Vorgabe, S3-Gegencheck Abschnitt 5: "eine grosse Countdown-Uhr ueber dem
       // Tisch") samt Minutenlabel und Rot-Puls in den letzten zehn Sekunden -- zwei
-      // widerspruechliche Uhrzeiten fuer denselben Moment. Die Leinwand bleibt die EINE
-      // sichtbare Uhr (`zeichneWettessenUhr`, unveraendert); der Bug zeigt hier stattdessen
-      // nur noch die Minute als Kontext, keine zweite Sekundenanzeige mehr.
-      const minutenFertig=Math.max(0,(TEILNEHMER[0]&&TEILNEHMER[0].aktuell+1)||0);
+      // widerspruechliche Uhrzeiten fuer denselben Moment.
+      // UEBERSICHTS-PAKET 03.11. (PR 1, Zone A): die EINE Uhr ist jetzt der Bug -- #clock traegt
+      // die laufende 10:00-Uhr (dieselbe Quelle wettessenRestSek() wie Bauchbinde und
+      // Countdown), die Canvas-Kopfuhr ist weg (ihre Zone gehoert dem Callout). Die Minute
+      // steht als kleine Zeile unter der Uhr (aktualisiereBbug(), wettessenMinuteText()).
+      const restSek=wettessenRestSek(BB());
       document.getElementById("clock").textContent=
-        "Minute "+Math.min(BB().rundenN,minutenFertig+(done?0:1))+"/"+BB().rundenN;
+        Math.floor(restSek/60)+":"+String(Math.floor(restSek%60)).padStart(2,"0");
     } else if(BB().heben&&SANDSACK_PAR_SZENE){
       // WEG C PARALLEL (Stufe 3): die Schichtuhr zaehlt die verbleibende Zeit bis zur Hupe.
       const sz=SANDSACK_PAR_SZENE, tau=sspTau(sz), rest=done?0:(tau<0?sz.T:Math.max(0,sz.T-tau));
@@ -29363,7 +29387,10 @@
     // zeigt dort die Verbliebenen, nicht die Folterpunkte (die vergeben gar keinen Mannschafts-
     // sieg, s. `spieleBuehneGauntlet()`). Der Endstand-Banner sagt bereits "Verbliebene"
     // (`buehneEinheitLabel()`); jetzt heisst es ueberall gleich.
-    document.getElementById("klsuffix").textContent=parHud?"Silo-kg":BB().gauntlet?"Verbliebene":"Punkte";
+    // WETTESSEN (Uebersichts-Paket 03.11., PR 1): EINE Waehrung -- die Scoreline sagt wie Tafel,
+    // Bauchbinde, Bug und Endstand die Einheit des Tages, nicht "Punkte" (die stehen nur noch in
+    // der Wertungstabelle, Spalte Pkt).
+    document.getElementById("klsuffix").textContent=parHud?"Silo-kg":BB().gauntlet?"Verbliebene":BB().wettessen?wettessenMenuWahl.n:"Punkte";
     // GENERALISIERT (22.09.): `u.runden.length` statt der festen `BB().rundenN` -- fuer jede
     // Nicht-Gauntlet-Disziplin ist das bit-identisch (`baueHebenDuelle()`/der generische
     // Auftritt-/Duell-Block bauen IMMER exakt `art.rundenN` Runden je Teilnehmer, s. dortige
@@ -29383,6 +29410,11 @@
       ? (s)=>{ const sz=SANDSACK_PAR_SZENE; return sz&&sspAbschnitt(sz)!=="auftakt"?(sz.seiten[s]?sz.seiten[s].traeger.length:0):0; }
       : BB().gauntlet
       ?(s)=>TEILNEHMER.filter(u=>u.side===s&&gauntletRausJetzt(u)).length
+      // WETTESSEN (Uebersichts-Paket 03.11., PR 1, Befund 1.2 Punkt 1): "0 am Tisch" zaehlte die
+      // FERTIGEN Esser, die bis Minute 10 immer 0 sind -- der Zuschauer las "niemand am Tisch",
+      // waehrend sechs sassen. Alle essen gleichzeitig, also zaehlt, wer sitzt.
+      : BB().wettessen
+      ?(s)=>TEILNEHMER.filter(u=>u.side===s).length
       :(s)=>TEILNEHMER.filter(u=>u.side===s&&u.aktuell+1>=u.runden.length).length;
     document.getElementById("aliveL").textContent=String(fertig(0));
     document.getElementById("aliveR").textContent=String(fertig(1));
@@ -29422,8 +29454,11 @@
       // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.), KONSISTENZ: derselbe stetig
       // hochzaehlende Wert wie an Tafel/Band, statt des springenden Minutenendstands --
       // sonst zeigt der Bug schon den Minutenendstand, waehrend die Tafeln noch zaehlen.
+      // UEBERSICHTS-PAKET 03.11. (PR 1): in der EINHEIT DES TAGES (wettessenWuerstchen(), dieselbe
+      // Skala wie Tafel und Bauchbinde) statt in Punkten -- vorher stand "218 : 260 Punkte" ueber
+      // einer Leinwand voller "Austern", und der Teamstand in Austern stand nirgends.
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+wettessenAnzeigeSumme(u),0);
-      document.getElementById("score").textContent=Math.round(summe(0))+" : "+Math.round(summe(1));
+      document.getElementById("score").textContent=wettessenWuerstchenText(wettessenWuerstchen(summe(0)))+" : "+wettessenWuerstchenText(wettessenWuerstchen(summe(1)));
     } else {
       const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((a,u)=>a+u.summe,0);
       document.getElementById("score").textContent=summe(0)+" : "+summe(1);
@@ -30185,8 +30220,8 @@
     // Score-Bug (.bbug, top:8px), der Stand+Uhr fuer JEDE Disziplin ohnehin schon zeigt --
     // und die Disziplin selbst steht bereits dauerhaft in der Fbar oben (#arenaDisc), auch
     // wenn dieses Schild verschwindet. Die 10:00-Uhr (S3) und das Kopf-an-Kopf-Band (S3)
-    // haben eigene Zonen weiter unten im Bild, s. zeichneWettessenUhr()/
-    // zeichneWettessenBand() -- unveraendert.
+    // haben eigene Zonen im Bild: die Uhr im Bug, das Band als Bauchbinde unten
+    // (Uebersichts-Paket 03.11., PR 1, s. zeichneWettessenBand()/zeichneWettessenCountdown()).
     //
     // W-F2 BRINGT EIN NEUES, EIGENES SCHILD ZURUECK -- AN EINER ANDEREN STELLE. Nicht bei
     // y:4-30 (der Grund fuer die Entfernung oben gilt unveraendert), sondern links aussen,
@@ -32276,9 +32311,11 @@
   // u.summe, PPs/Teamstand/rho lesen diese Funktion nirgends, exakt wie die Tafel-PR vom
   // 17.09. es fuer die alte "Pkt"-Anzeige schon vormachte (rho blieb bit-identisch).
   //
-  // S3 -- UHR UND KOPF-AN-KOPF-BAND (Abschnitt 5, S3): zeichneWettessenUhr()/
-  // zeichneWettessenBand() sind eigene Funktionen weiter unten, beide REIN LESEND auf
-  // TEILNEHMER/u.summe/u.aktuell/buehneAkt/buehneGruppenGroesse. Das "gleichzeitige Essen"
+  // S3 -- UHR UND KOPF-AN-KOPF-BAND (Abschnitt 5, S3), seit dem Uebersichts-Paket 03.11. (PR 1)
+  // umgezogen: die Uhr steht im Bug (updateHudBuehne()), vom Canvas-Uhrblock bleibt
+  // zeichneWettessenCountdown(), das Band ist die Bauchbinde zeichneWettessenBand() am unteren
+  // Rand -- beide REIN LESEND auf TEILNEHMER/u.summe/u.aktuell/buehneAkt/buehneGruppenGroesse,
+  // die gemeinsame Zeitquelle ist wettessenRestSek(). Das "gleichzeitige Essen"
   // selbst ist NICHT nur eine Anzeige-Illusion, sondern echt: `buehneGruppenGroesse`
   // (bauBuehne()/stepBuehne(), s. dort) laesst bei Wettessen einen ganzen Runden-Block auf
   // einmal enthuellen, wodurch `u.aktuell` fuer ALLE Teilnehmer synchron laeuft -- diese
@@ -32291,9 +32328,9 @@
   //      Canvas-Primitiv oberhalb der Figur gezeichnet.
   //   2. TELLERSTAPEL unter jedem Esser -- waechst mit u.aktuell+1, genau der Zahl bereits
   //      enthuellter Durchgaenge (jetzt Minuten, s. BUEHNE_ART.wettessen.rundenN:10).
-  //   3. MAGEN-METER mit Gabel-Marker des FUEHRENDEN (hoechstes u.summe ueber BEIDE Seiten)
-  //      am unteren Bildrand, platter.tsx' "Magen-Meter unten mit Gabel-Marker des
-  //      Fuehrenden" -- zeigt jetzt Minuten (S3), unveraendert in der Herleitung.
+  //   3. (ENTFALLEN, Uebersichts-Paket 03.11., PR 1) Das "Magen-Meter" am unteren Rand zeigte
+  //      keinen Magen, sondern den Anteil der gespielten Minuten -- dieselbe Information wie
+  //      die Uhr; sein Platz gehoert jetzt der Bauchbinde (zeichneWettessenBand()).
   //   4. SPOTLIGHT auf die zwei Fuehrenden (S3, "das 1-gegen-1-Gefuehl, das Chris sucht,
   //      ohne jemanden vom Tisch zu nehmen") -- ein warmer Lichtkegel ueber ihren Plaetzen,
   //      alle uebrigen Plaetze bleiben im normalen Tafellicht statt komplett ausgeblendet.
@@ -32344,7 +32381,7 @@
   // Wettessen einmal je Minute um den GANZEN Minutenwert (buehneGruppenGroesse enthuellt
   // die ganze Gruppe auf einmal, s. Kommentar bei stepBuehne()). Diese Funktion zaehlt die
   // laufende Minute stattdessen STETIG hoch, mit genau dem Fortschritt `f`, den
-  // zeichneWettessenUhr() ohnehin schon rechnet (1-buehneAkt/rundenDauer) -- KEINE neue Uhr,
+  // wettessenRestSek() ohnehin schon rechnet (1-buehneAkt/rundenDauer) -- KEINE neue Uhr,
   // KEIN neuer Rundenwert. Die Wertung selbst (u.summe/PPs/Teamstand/rho) liest diese
   // Funktion nirgends, exakt wie wettessenWuerstchen() es fuer die alte "Pkt"-Anzeige schon
   // vormachte.
@@ -32366,15 +32403,38 @@
     if(idx<0||!u.runden||!u.runden[idx])return null;
     return wettessenWuerstchen(u.runden[idx].punkte);
   }
-  // RESTZEIT (W-B3): EINE Quelle statt zweier Kopien -- zeichneWettessenUhr() UND
-  // zeichneWettessenBand() (fuer die Schlussminuten-Umschaltung) muessen dieselbe Zahl
-  // sehen. Woertlich dieselbe Formel wie bisher in zeichneWettessenUhr(), nur benannt.
-  function wettessenRestSek(art){
+  // RESTZEIT (W-B3): EINE Quelle statt mehrerer Kopien -- die Bug-Uhr (updateHudBuehne()), die
+  // Bauchbinde zeichneWettessenBand() (Schlussminuten-Umschaltung) und der Countdown
+  // zeichneWettessenCountdown() muessen dieselbe Zahl sehen.
+  // OFF-BY-ONE BEHOBEN (Uebersichts-Paket 03.11., PR 1): die Enthuellung von runden[k] STARTET
+  // die Zaehlung der Minute k+1 (wettessenAnzeigeSumme() zaehlt genau diesen Eintrag ueber die
+  // folgenden rundenDauer Sekunden hoch) -- fertig sind also `aktuell` Minuten, nicht
+  // `aktuell+1`. Die alte Formel liess Uhr und Minutenlabel eine Minute vorauslaufen: beim
+  // Anpfiff stand "9:00 / MINUTE 2", waehrend die Tafeln die erste Minute zaehlten (Live-Bild
+  // 03.11.: Bug "Minute 3/10" zu Callout "Durchgang 2/10"). Nach `done` (erst nach der letzten
+  // Zaehlung, s. stepBuehne()) ist alles fertig.
+  function wettessenMinutenFertig(){
+    if(done)return BB().rundenN;
     const irgendeiner=TEILNEHMER[0];
-    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
-    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done)
+    return irgendeiner?Math.max(0,irgendeiner.aktuell):0;
+  }
+  function wettessenRestSek(art){
+    const minutenFertig=wettessenMinutenFertig();
+    const inLaufenderMinute=(buehneGruppenGroesse>1&&!done&&TEILNEHMER[0]&&TEILNEHMER[0].aktuell>=0)
       ?Math.min(1,Math.max(0,1-buehneAkt/(art.rundenDauer||1))):0;
     return Math.max(0,art.rundenN*60-(minutenFertig*60+inLaufenderMinute*60));
+  }
+  // MINUTE x/10 (Uebersichts-Paket 03.11., PR 1): EINE Quelle fuer die kleine Zeile im Bug --
+  // vorher stand dieselbe Zahl in Scoreline, Bug, Canvas-Uhr und zwoelfmal je Esser.
+  function wettessenMinuteText(){
+    const art=BB();
+    return "MINUTE "+Math.min(art.rundenN,wettessenMinutenFertig()+(done?0:1))+"/"+art.rundenN;
+  }
+  // TEAMSTAND IM BUG (Zone A): die Seitensumme in der Einheit des Tages, dieselbe geglaettete
+  // Quelle wie #score (wettessenAnzeigeSumme()). Reiner Text fuer aktualisiereBbug().
+  function wettessenBugStandHtml(seite){
+    const s=TEILNEHMER.filter(u=>u.side===seite).reduce((a,u)=>a+wettessenAnzeigeSumme(u),0);
+    return "<span class=\"bbugstand\">"+wettessenWuerstchenText(wettessenWuerstchen(s))+" "+wettessenMenuWahl.einheit+"</span>";
   }
 
   // SITZPLAETZE (S1): EINE Quelle statt zweier Literale -- die Figuren-/Wendetafel-/
@@ -32403,35 +32463,77 @@
   // Zaehltafel-Bildmotiv (Gegencheck Abschnitt 1.1: "hinter jedem Esser eine eigene, gut
   // sichtbare Zaehltafel") -- ein zweigeteiltes Rechteck (Trennlinie = Kipp-Falz) statt der
   // reinen Textzeile, die vorher an dieser Stelle stand.
-  function zeichneWettessenTafel(x,y,text,betont){
-    const b=46,h=19;
+  // ZWEIZEILIG (Uebersichts-Paket 03.11., PR 1): die Zahl gross (15 px), die Einheit des Tages
+  // klein darunter -- EIN Element je Esser statt Tafel + Balken + "Min x/10" + Tempozeile.
+  function zeichneWettessenTafel(x,y,zahl,einheit,betont){
+    const b=58,h=32;
     ctx.fillStyle="#1c1108";ctx.fillRect(x-b/2,y-h/2,b,h);
     // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): `betont` markiert den Moment, in dem
-    // die Tafel gerade um ein halbes Wuerstchen umklappt -- ein kurzer Aufhellblitz statt
+    // die Tafel gerade um ein halbes Stueck umklappt -- ein kurzer Aufhellblitz statt
     // eines harten Zahlensprungs, s. Aufrufstelle (zeichneWettessen()).
-    ctx.strokeStyle=betont?"rgba(242,193,78,.95)":"rgba(242,193,78,.55)";
+    ctx.strokeStyle=betont?"rgba(242,193,78,.95)":"rgba(242,193,78,.6)";
     ctx.lineWidth=betont?1.6:1;ctx.strokeRect(x-b/2,y-h/2,b,h);
-    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y);ctx.lineTo(x+b/2,y);ctx.stroke();
+    ctx.strokeStyle="rgba(0,0,0,.5)";ctx.beginPath();ctx.moveTo(x-b/2,y+4);ctx.lineTo(x+b/2,y+4);ctx.stroke();
     ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.font="700 "+(betont?11:10)+"px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
-    ctx.fillText(text,x,y-1);
+    ctx.font="800 "+(betont?16:15)+"px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle=betont?"#fff6df":"#f2ede2";
+    ctx.fillText(zahl,x,y-4);
+    ctx.font="700 6.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="rgba(242,193,78,.9)";
+    ctx.fillText(einheit,x,y+10);
   }
 
+  // ================== WETTESSEN: ZEICHNUNG -- VIER ZONEN (Uebersichts-Paket 03.11., PR 1) ==========
+  // docs/design/wettessen-uebersicht-format-1v1-03-11.md, Abschnitt 5.1. Chris (03.11.): "wettessen
+  // sieht generell sehr unuebersichtlich aus". Befund 1.2 dort: HTML-Bug, HTML-Callout, das
+  // Canvas-Band (0,115-0,205 H) und die Canvas-Uhr (0,275 H) lagen in denselben 130 px
+  // uebereinander -- positioniereCallout() kennt nur #bbug/#ispyZugUhr/#bahnHud als Kanten, der
+  // Callout stand deshalb in jeder zweiten Minute genau auf "VS"/Abstand/Uhr. Dazu fuenf Textzeilen
+  // je Esser (60 Elemente bei 6 gegen 6), die Minute fuenfzehnmal im Bild, der Stand in drei
+  // Waehrungen und ein "Magen-Meter", das keinen Magen, sondern die Uhr zeigte.
+  //
+  // JETZT VIER ZONEN:
+  //   A  Kopf (HTML-Bug): Uhr in der Mitte, Teamstand in der Einheit des Tages an den Seiten,
+  //      "MINUTE x/10" als kleine Zeile -- s. updateHudBuehne()/aktualisiereBbug().
+  //   B  60-130 px: NUR der HTML-Callout und das Menueschild links aussen. Hier zeichnet der
+  //      Canvas NICHTS mehr -- die alte Kopf-Uhr entfaellt (die Uhr steht im Bug), vom Uhr-Block
+  //      bleibt nur der 10..1-Countdown der letzten zehn Sekunden (zeichneWettessenCountdown()).
+  //   C  Der Tisch: je Esser GENAU Tafel (zweizeilig: Zahl gross, Einheit klein) und Namens-Chip
+  //      in Teamfarbe. Balken, "Min x/10" (zwoelfmal dieselbe Zahl) und die Tempozeile entfallen.
+  //   D  Bauchbinde am unteren Rand: Kopf an Kopf mit Abstand, Trend/Hochrechnung/"braucht +X"
+  //      -- dieselben Funktionen wie im alten Band, nur dort, wo das Magen-Meter stand.
+  // Rein zeichnerisch wie bisher: liest u.summe/u.aktuell/u.runden ueber dieselben Helfer
+  // (wettessenAnzeigeSumme/wettessenWuerstchen/wettessenRestSek), schreibt nur viz*-Felder,
+  // kein rr(). `miss-alle-disziplinen.mjs 24 wettessen` bleibt bit-identisch (0,910).
+  const WETTESSEN_TAFEL_DY=60, WETTESSEN_NAME_DY=92, WETTESSEN_FLOAT_DY=34;
+  function wettRundrect(x,y,w,h,r){
+    ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);
+    ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+  }
+  // NAMENS-CHIP in Teamfarbe (Zone C): ersetzt den konturierten 9,5-px-Schriftzug -- die Farbe
+  // des Chips ist jetzt die zweite, vom Trikot unabhaengige Teamkennung am Platz (vorher das
+  // Faehnchen am Stab, dessen Platz in PR 2 der Magen-Pegel bekommt).
+  function zeichneWettessenNameChip(x,y,name,farbe){
+    const txt=name.length>13?name.slice(0,12)+"…":name;
+    ctx.font="700 9px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    const w=ctx.measureText(txt).width+12, h=13;
+    ctx.fillStyle=farbe; wettRundrect(x-w/2,y-h/2,w,h,6.5); ctx.fill();
+    ctx.fillStyle="#10141a"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(txt,x,y+0.5);
+  }
   function zeichneWettessen(art){
-    const maxSumme=Math.max(1,...TEILNEHMER.map(u=>u.summe));
     const sitz=wettessenSitzplaetze();
 
     // KOPF AN KOPF: die zwei Fuehrenden ueber BEIDE Seiten -- dieselbe Sortierung wie
     // WERTUNG_AUFTRITT (b.u.summe-a.u.summe), hier nur auf die ersten zwei gekappt. Traegt
-    // sowohl das Spotlight (unten) als auch das Band (zeichneWettessenBand()).
+    // sowohl das Spotlight (unten) als auch die Bauchbinde (zeichneWettessenBand()).
     const rangfolge=[...TEILNEHMER].sort((a,b)=>b.summe-a.summe);
     const erster=rangfolge[0]||null, zweiter=rangfolge[1]||null;
     const spotIds=new Set([erster,zweiter].filter(Boolean).map(u=>u.id));
 
     // SPOTLIGHT (S3), HINTER den Figuren gezeichnet: ein warmer Lichtkegel ueber den zwei
     // Fuehrenden-Plaetzen -- "das 1-gegen-1-Gefuehl ... ohne jemanden vom Tisch zu nehmen"
-    // (Gegencheck Abschnitt 5, S3). Die uebrigen Plaetze werden weiter unten nur LEICHT
-    // abgedunkelt (0,82 statt 1 Alpha), nicht ausgeblendet -- am Tisch bleiben alle sichtbar.
+    // (Gegencheck Abschnitt 5, S3). Die uebrigen Plaetze werden nur LEICHT abgedunkelt
+    // (0,82 statt 1 Alpha), nicht ausgeblendet -- am Tisch bleiben alle sichtbar.
     for(const u of [erster,zweiter]){
       if(!u)continue;
       const p=sitz.get(u.id); if(!p)continue;
@@ -32440,300 +32542,166 @@
       ctx.fillStyle=beam;ctx.beginPath();ctx.arc(p.x,p.y-10,72,0,6.2832);ctx.fill();
     }
 
-    [0,1].forEach(side=>{
-      const g=TEILNEHMER.filter(u=>u.side===side);
-      g.forEach((u)=>{
-        const p=sitz.get(u.id); const x=p.x,y=p.y;
-        const gedimmt=spotIds.has(u.id)?1:0.82;
-        ctx.globalAlpha=(u.lunge>0?1:0.92)*gedimmt;
-        const c=side===0?css("--home"):css("--away");
-        ctx.fillStyle=c;ctx.globalAlpha=0.20*gedimmt;
-        ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
-        ctx.globalAlpha=gedimmt;
+    for(const u of TEILNEHMER){
+      const p=sitz.get(u.id); if(!p)continue;
+      const x=p.x,y=p.y, side=u.side;
+      const gedimmt=spotIds.has(u.id)?1:0.82;
+      const c=side===0?css("--home"):css("--away");
+      ctx.fillStyle=c;ctx.globalAlpha=0.20*gedimmt;
+      ctx.beginPath();ctx.ellipse(x,y+19,16,6,0,0,6.3);ctx.fill();
+      ctx.globalAlpha=gedimmt;
 
-        // FAEHNCHEN AM PLATZ (S1): ein Team-Wimpel auf duennem Stab links neben dem Platz --
-        // die zweite, vom Trikot unabhaengige Art, ein Team an der langen Tafel zu erkennen
-        // ("Trikotfarbe UND ein Faehnchen am Platz", Gegencheck Abschnitt 5, S1).
-        ctx.strokeStyle="rgba(200,190,175,.6)";ctx.lineWidth=1;
-        ctx.beginPath();ctx.moveTo(x-20,y+6);ctx.lineTo(x-20,y-24);ctx.stroke();
-        ctx.fillStyle=c;ctx.beginPath();
-        ctx.moveTo(x-20,y-24);ctx.lineTo(x-8,y-19);ctx.lineTo(x-20,y-14);ctx.closePath();ctx.fill();
-
-        // TELLERSTAPEL, VOR der Figur gezeichnet (liegt hinter ihr auf dem Tisch) --
-        // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
-        // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
-        const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
-        for(let pl=0;pl<teller;pl++){
-          ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
-          ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
-          ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
-        }
-        ctx.globalAlpha=gedimmt;
-
-        zeichneSprite(ctx,u,x,y);
-
-        // LATZ-SERVIETTE am Hals -- platter.tsx' Serviette-Motiv. W-F2: der Farbstreifen
-        // kommt aus dem Gericht des Tages (wettessenMenuWahl.servFarbe) statt des fest
-        // einprogrammierten Wuerstchen-Rot -- dieselbe "Tischrequisite ändert sich mit dem
-        // Menü"-Idee wie das Neon-Schild (zeichneWettessenMenuSchild(), s. dort).
-        for(let s=0;s<4;s++){
-          ctx.fillStyle=s%2===0?"#f2ede2":wettessenMenuWahl.servFarbe;
-          ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
-        }
-
-        // KAU-/SCHLING-WIPPER: ein kleiner, an vizEssPhase gebundener Ausschlag, damit ein
-        // wartender Esser nicht als Standbild einfriert -- dasselbe Anti-Freeze-Prinzip wie
-        // stepFechten()s vizFechtBob, hier ohne eigenes Zeitfeld direkt aus vizEssT/
-        // vizEssPhase abgeleitet (kein weiteres viz*-Feld noetig).
-        const essPhase=u.vizEssPhase, essT=u.vizEssT||0;
-        let wipp=0;
-        if(essPhase==="schlingen")wipp=Math.sin(essT*26)*2.2;
-        else if(essPhase==="kauen")wipp=Math.sin(essT*18)*1.4;
-        if(wipp){
-          ctx.save();ctx.translate(x,y-8+wipp);
-          ctx.fillStyle="rgba(0,0,0,.18)";ctx.beginPath();ctx.ellipse(0,0,5,3,0,0,6.3);ctx.fill();
-          ctx.restore();
-        }
-
-        ctx.globalAlpha=1;
-        ctx.textAlign="center";ctx.textBaseline="middle";
-        const schrift=(txt,dy,farbe,groesse)=>{
-          ctx.font="400 "+groesse+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
-          ctx.lineWidth=3;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
-          ctx.strokeText(txt,x,y+dy);ctx.fillStyle=farbe;ctx.fillText(txt,x,y+dy);
-        };
-        schrift(u.n.length>13?u.n.slice(0,12)+"…":u.n,44,c,9.5);
-
-        // WENDETAFEL, EINHEIT WUERSTCHEN (S2) -- ersetzt das alte "412 Pkt". Reine
-        // Anzeige-Skala aus u.summe (wettessenWuerstchen(), s. dort), NICHT die Wertung
-        // selbst (die bleibt u.summe, PPs/Teamstand/rho unveraendert).
-        // W-B1 (Broadcast-Optik Buehne-Auftritt 27.09.): zaehlt jetzt STETIG hoch statt
-        // einmal je Minute zu springen (wettessenAnzeigeSumme(), s. dort). `betont` markiert
-        // den Moment, in dem der gerundete Anzeigewert um ein halbes Wuerstchen umklappt --
-        // ein kurzer Klick + Aufhellblitz statt eines stillen Zahlensprungs.
-        const wuJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(u));
-        if(u.vizWuLetzte!==wuJetzt){
-          if(u.vizWuLetzte!=null) sfx("wettessen","klapp");
-          u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
-        }
-        const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
-        // W-F2: Einheit kommt aus dem Gericht des Tages (wettessenMenuWahl), statt des
-        // fest einprogrammierten "Wü".
-        zeichneWettessenTafel(x,y+59,wettessenWuerstchenText(wuJetzt)+" "+wettessenMenuWahl.einheit,betontWu);
-
-        const w=30,pFuell=Math.min(1,u.summe/maxSumme);
-        ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+71,w,3);
-        ctx.fillStyle=css("--ok");ctx.fillRect(x-w/2,y+71,w*pFuell,3);
-        ctx.font="400 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-        ctx.fillText("Min "+(u.aktuell+1)+"/"+art.rundenN,x,y+81);
-
-        // W-B2 (Tempo je Esser): Wuerstchen der zuletzt ABGESCHLOSSENEN Minute, mit einem
-        // kleinen Dreieck gegen die Minute davor (Vektor-Primitiv statt Emoji-Pfeil, wie
-        // ueberall sonst in diesem Renderer). Erst sichtbar, sobald eine Minute steht.
-        const tempoJetzt=wettessenTempo(u,u.aktuell), tempoVor=wettessenTempo(u,u.aktuell-1);
-        if(tempoJetzt!=null){
-          let farbeT="#8a93a3", hoch=null;
-          if(tempoVor!=null&&Math.abs(tempoJetzt-tempoVor)>0.001){
-            hoch=tempoJetzt>tempoVor; farbeT=hoch?"#5fd38a":"#e0645f";
-          }
-          ctx.textAlign="left"; ctx.font="400 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle=farbeT;
-          const txtT=wettessenWuerstchenText(tempoJetzt)+"/min";
-          ctx.fillText(txtT,x-16,y+91);
-          if(hoch!=null){
-            const tx=x-16+ctx.measureText(txtT).width+6, ty=y+91;
-            ctx.fillStyle=farbeT; ctx.beginPath();
-            if(hoch){ ctx.moveTo(tx,ty-3); ctx.lineTo(tx-3,ty+2); ctx.lineTo(tx+3,ty+2); }
-            else { ctx.moveTo(tx,ty+3); ctx.lineTo(tx-3,ty-2); ctx.lineTo(tx+3,ty-2); }
-            ctx.closePath(); ctx.fill();
-          }
-          ctx.textAlign="center";
-        }
-      });
-    });
-
-    // KOPF-AN-KOPF-BAND UND 10:00-UHR (S3) -- eigene Funktionen, s. dort.
-    zeichneWettessenBand(erster,zweiter,art);
-    zeichneWettessenUhr(art);
-
-    // MAGEN-METER, unterer Bildrand, mit Gabel-Marker des Fuehrenden (platter.tsx' Magen-
-    // Meter + Gabel-Marker) — der Fuehrende ist, ueber BEIDE Seiten hinweg, wer die meisten
-    // Punkte hat. FUELLSTAND kommt bewusst NICHT aus leader.summe/maxSumme: `maxSumme` ist
-    // per Definition das Maximum ueber alle u.summe, der Fuehrende TRAeGT also immer genau
-    // diesen Wert — die Gabel stuende schon beim allerersten Biss am rechten Anschlag, statt
-    // sich ueber den Auftritt hinweg zu fuellen. Stattdessen (leader.aktuell+1)/art.rundenN:
-    // wie viele der zehn Minuten der Fuehrende schon geschafft hat (S3: rundenN ist jetzt
-    // eine Minute je Durchgang) — ein "Magen"-Fuellstand, der ueber den Auftritt hinweg
-    // tatsaechlich waechst, unabhaengig vom Punktestand.
-    const meterX0=90, meterX1=W-90, meterY=H-24;
-    ctx.fillStyle="rgba(16,9,6,.55)";ctx.strokeStyle="rgba(242,193,78,.4)";ctx.lineWidth=0.8;
-    ctx.fillRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
-    ctx.strokeRect(meterX0-8,meterY-11,meterX1-meterX0+16,22);
-    ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="rgba(242,193,78,.75)";
-    ctx.textAlign="left";ctx.fillText("MAGEN-METER",meterX0-4,meterY-15);
-    ctx.fillStyle="rgba(0,0,0,.5)";ctx.fillRect(meterX0,meterY-3,meterX1-meterX0,6);
-    const leader=TEILNEHMER.reduce((best,u)=>(!best||u.summe>best.summe)?u:best,null);
-    if(leader){
-      const lx=meterX0+(meterX1-meterX0)*Math.min(1,(leader.aktuell+1)/art.rundenN);
-      ctx.fillStyle="rgba(242,193,78,.4)";ctx.fillRect(meterX0,meterY-3,lx-meterX0,6);
-      // GABEL-MARKER: eine kleine gezeichnete Gabel statt eines Emoji — dieser Canvas-
-      // Renderer zeichnet ueberall ausschliesslich Vektor-Primitiven, kein einziges
-      // Ereignis im ganzen Motor nutzt eine Emoji-Glyphe (nachgezaehlt).
-      ctx.strokeStyle="#f2c14e";ctx.lineWidth=1.4;
-      ctx.beginPath();ctx.moveTo(lx,meterY-11);ctx.lineTo(lx,meterY-2);ctx.stroke();
-      for(const tx of [-2,0,2]){
-        ctx.beginPath();ctx.moveTo(lx+tx,meterY-11);ctx.lineTo(lx+tx,meterY-6);ctx.stroke();
+      // TELLERSTAPEL, VOR der Figur gezeichnet (liegt hinter ihr auf dem Tisch) --
+      // dieselbe "je Durchgang ein Teller"-Idee wie platter.tsx' updateStackHeight(),
+      // hier direkt aus u.aktuell statt einer animierten DOM-Ref abgeleitet.
+      const teller=Math.max(0,Math.min(art.rundenN,u.aktuell+1));
+      for(let pl=0;pl<teller;pl++){
+        ctx.fillStyle="#f2ede2";ctx.strokeStyle="#b9ae9c";ctx.lineWidth=0.6;
+        ctx.globalAlpha=gedimmt*(0.65+pl*0.03);
+        ctx.beginPath();ctx.ellipse(x,y+22-pl*1.6,7,2.6,0,0,6.3);ctx.fill();ctx.stroke();
       }
+      ctx.globalAlpha=gedimmt;
+
+      zeichneSprite(ctx,u,x,y);
+
+      // LATZ-SERVIETTE am Hals -- platter.tsx' Serviette-Motiv. W-F2: der Farbstreifen
+      // kommt aus dem Gericht des Tages (wettessenMenuWahl.servFarbe).
+      for(let s=0;s<4;s++){
+        ctx.fillStyle=s%2===0?"#f2ede2":wettessenMenuWahl.servFarbe;
+        ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
+      }
+
+      // KAU-/SCHLING-WIPPER: ein kleiner, an vizEssPhase gebundener Ausschlag, damit ein
+      // wartender Esser nicht als Standbild einfriert (Anti-Freeze wie stepFechten()s vizFechtBob).
+      const essPhase=u.vizEssPhase, essT=u.vizEssT||0;
+      let wipp=0;
+      if(essPhase==="schlingen")wipp=Math.sin(essT*26)*2.2;
+      else if(essPhase==="kauen")wipp=Math.sin(essT*18)*1.4;
+      if(wipp){
+        ctx.save();ctx.translate(x,y-8+wipp);
+        ctx.fillStyle="rgba(0,0,0,.18)";ctx.beginPath();ctx.ellipse(0,0,5,3,0,0,6.3);ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha=1;
+
+      // WENDETAFEL, EINHEIT DES TAGES (S2/W-F2): reine Anzeige-Skala aus u.summe
+      // (wettessenWuerstchen()), NICHT die Wertung selbst. Zaehlt stetig hoch (W-B1,
+      // wettessenAnzeigeSumme()); `betont` markiert das Umklappen um ein halbes Stueck --
+      // kurzer Klick + Aufhellblitz statt eines stillen Zahlensprungs.
+      const wuJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(u));
+      if(u.vizWuLetzte!==wuJetzt){
+        if(u.vizWuLetzte!=null) sfx("wettessen","klapp");
+        u.vizWuFlipSeit=buehneT; u.vizWuLetzte=wuJetzt;
+      }
+      const betontWu=u.vizWuFlipSeit!=null&&(buehneT-u.vizWuFlipSeit)<0.15;
+      zeichneWettessenTafel(x,y+WETTESSEN_TAFEL_DY,wettessenWuerstchenText(wuJetzt),wettessenMenuWahl.n.toUpperCase(),betontWu);
+      zeichneWettessenNameChip(x,y+WETTESSEN_NAME_DY,u.n,c);
     }
 
+    zeichneWettessenBand(erster,zweiter,art);
+    zeichneWettessenCountdown(art);
+
+    // SCHWEBEZAHLEN "+Delta" (stepBuehne() setzt den Text, fuer Wettessen in der Einheit des
+    // Tages): UEBER der Tafel des Essers, nicht mehr bei p.y-30 im Publikum der Kulisse.
     for(const f of floats){
       ctx.globalAlpha=Math.max(0,f.life);
       ctx.fillStyle=f.crit?css("--ok"):css("--ink");
-      ctx.font=(f.crit?"700 15px":"600 13px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
-      ctx.textAlign="center";
+      ctx.font=(f.crit?"700 12px":"600 11px")+" 'RaniraSeason',Georgia,'Times New Roman',serif";
+      ctx.textAlign="center";ctx.textBaseline="alphabetic";
       if(f._teilnehmer!=null){
         const u=TEILNEHMER.find(x=>x.id===f._teilnehmer);
         const p=u?sitz.get(u.id):null;
-        if(p)ctx.fillText(f.txt,p.x,p.y-30-((1-f.life)*20));
+        if(p)ctx.fillText(f.txt,p.x,p.y+WETTESSEN_FLOAT_DY-((1-f.life)*12));
       }
       ctx.globalAlpha=1;
     }
   }
 
-  // KOPF-AN-KOPF-BAND (S3, Gegencheck Abschnitt 5): "oben, im Stil einer
-  // Sportuebertragung: die zwei Fuehrenden ueber beide Teams, gross, mit Portraet, Zahl und
-  // Abstand" -- Portraet ersetzt durch Name+Trikotfarbe (dieser Renderer zeichnet keine
-  // Gesichter), Zahl/Abstand in Wuerstchen (S2). Liest ausschliesslich u.summe/u.side/u.n,
-  // aendert nichts an ihnen.
+  // BAUCHBINDE "KOPF AN KOPF" (Zone D): die zwei Fuehrenden ueber beide Teams mit Name, Stand
+  // und Abstand, dazu EINE Kontextzeile -- "LETZTE MINUTE: X braucht +N" (W-B3), sonst der
+  // Tempo-Trend "holt auf"/"faellt zurueck" (W-B2), sonst die Hochrechnung "auf Kurs fuer N"
+  // (W-B4). Inhaltlich das alte Band, nur am unteren Rand als Lower Third, damit die Kopfzone
+  // dem Callout gehoert. Liest ausschliesslich u.summe/u.side/u.n/u.runden, aendert nichts.
   function zeichneWettessenBand(erster,zweiter,art){
     if(!erster||!zweiter)return; // Wettessen hat min. 2 je Seite; defensiv trotzdem.
-    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): letzte Minute -- Band faerbt sich um
-    // und wechselt Kopfzeile/Titel, dieselbe Restzeit-Quelle wie die Uhr (wettessenRestSek).
     const restSek=art?wettessenRestSek(art):null;
     const letzteMinute=restSek!=null&&restSek<=60&&!done;
-    const bandY0=H*0.115, bandY1=H*0.205, mitteY=(bandY0+bandY1)/2;
-    ctx.fillStyle=letzteMinute?"rgba(60,10,8,.72)":"rgba(10,6,4,.68)";
-    ctx.fillRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
-    ctx.strokeStyle=letzteMinute?"rgba(230,67,46,.7)":"rgba(242,193,78,.5)";
-    ctx.lineWidth=1;ctx.strokeRect(W*0.14,bandY0,W*0.72,bandY1-bandY0);
+    const bx0=W*0.07, bx1=W*0.93, bandY0=H-44, bandY1=H-8, mitteY=(bandY0+bandY1)/2;
+    ctx.fillStyle=letzteMinute?"rgba(60,10,8,.82)":"rgba(10,6,4,.80)";
+    ctx.fillRect(bx0,bandY0,bx1-bx0,bandY1-bandY0);
+    ctx.strokeStyle=letzteMinute?"rgba(230,67,46,.7)":"rgba(242,193,78,.55)";
+    ctx.lineWidth=1;ctx.strokeRect(bx0,bandY0,bx1-bx0,bandY1-bandY0);
+    ctx.textBaseline="alphabetic";
     ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
-    ctx.fillStyle=letzteMinute?"rgba(255,150,130,.9)":"rgba(242,193,78,.75)";
-    ctx.textAlign="center";ctx.fillText(letzteMinute?"LETZTE MINUTE":"KOPF AN KOPF",W/2,bandY0-4);
+    ctx.fillStyle=letzteMinute?"rgba(255,150,130,.95)":"rgba(242,193,78,.85)";
+    ctx.textAlign="left";ctx.fillText(letzteMinute?"LETZTE MINUTE":"KOPF AN KOPF",bx0+10,bandY0-3);
 
     const zeile=(u,links)=>{
       const c=u.side===0?css("--home"):css("--away");
-      const tx=links?W*0.20:W*0.80;
+      const tx=links?bx0+14:bx1-14;
       ctx.textAlign=links?"left":"right";
       ctx.font="700 12px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle=c;
-      ctx.fillText(u.n.length>16?u.n.slice(0,15)+"…":u.n,tx,mitteY-6);
-      ctx.font="400 9px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#dfe6ef";
-      // W-B1: dieselbe stetig hochzaehlende Anzeige wie an der Wendetafel, statt des
-      // springenden Minutenendstands (wettessenAnzeigeSumme(), s. dort). W-F2: der volle
-      // Gerichtname (wettessenMenuWahl.n) statt des fest einprogrammierten "Würstchen".
+      ctx.fillText(u.n.length>18?u.n.slice(0,17)+"…":u.n,tx,mitteY-5);
+      ctx.font="400 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#dfe6ef";
       ctx.fillText(wettessenWuerstchenText(wettessenWuerstchen(wettessenAnzeigeSumme(u)))+" "+wettessenMenuWahl.n,tx,mitteY+9);
     };
     zeile(erster,true); zeile(zweiter,false);
 
     ctx.textAlign="center";
-    ctx.font="800 13px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c14e";
-    ctx.fillText("VS",W/2,mitteY-2);
     const abstandJetzt=wettessenWuerstchen(wettessenAnzeigeSumme(erster))-wettessenWuerstchen(wettessenAnzeigeSumme(zweiter));
-    ctx.font="400 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#8a93a3";
-    ctx.fillText(abstandJetzt<=0?"punktgleich":"+"+wettessenWuerstchenText(abstandJetzt),W/2,mitteY+12);
+    ctx.font="800 13px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#f2c14e";
+    ctx.fillText(abstandJetzt<=0?"punktgleich":"+"+wettessenWuerstchenText(abstandJetzt),W/2,mitteY-4);
 
+    // KONTEXTZEILE (eine von dreien, dieselbe Position, 9,5 px -- Mikrotext-Fund 30.09.: nie
+    // unter 9 px).
+    ctx.font="700 9.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
     if(letzteMinute){
-      // W-B3: "braucht +X" gegen den STAND VOR DER LETZTEN MINUTE -- gerechnet vor deren
-      // Enthuellung, damit die Zahl waehrend der laufenden letzten Minute nicht mitspoilert
-      // (s. Broadcast-Optik-Papier Abschnitt 2.2/4.3).
+      // "braucht +X" gegen den STAND VOR DER LETZTEN MINUTE, damit die Zahl waehrend der
+      // laufenden letzten Minute nicht mitspoilert (Broadcast-Optik-Papier 2.2/4.3).
       const vorLetzter=(u)=>(u.aktuell>=art.rundenN-1&&u.runden[art.rundenN-1])
         ?(u.summe-u.runden[art.rundenN-1].punkte):u.summe;
       const luecke=wettessenWuerstchen(vorLetzter(erster))-wettessenWuerstchen(vorLetzter(zweiter));
       if(luecke>0){
-        // MIKROTEXT-FUND (Broadcast-Audit Runde 2, Punkt 24, 30.09.): 8px lag unter der
-        // 9px-Lesbarkeitsschwelle -- alle drei Varianten dieser Zeile ("braucht +X"/"holt
-        // auf"/"fällt zurück"/"auf Kurs für X" weiter unten) teilen sich dieselbe Position
-        // (mitteY+24) und stehen deshalb auf 10px vereinheitlicht, sonst wuerde ein
-        // Zeilenwechsel zwischen den Varianten die Schriftgroesse sichtbar springen lassen.
-        ctx.font="700 10px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="#ff9a7a";
-        ctx.fillText((zweiter.n.split(" ")[0]||"?")+" braucht +"+wettessenWuerstchenText(luecke),W/2,mitteY+24);
+        ctx.fillStyle="#ff9a7a";
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+" braucht +"+wettessenWuerstchenText(luecke),W/2,mitteY+10);
       }
     } else {
-      // W-B2: TEMPO-TREND -- Abstand VOR der zuletzt enthuellten Minute gegen den Abstand
-      // JETZT, mindestens ein Wuerstchen Veraenderung, sonst bleibt die Zeile leer.
       const vorMinute=(u)=>(u.aktuell>=0&&u.runden[u.aktuell])?(u.summe-u.runden[u.aktuell].punkte):u.summe;
       const abstandVorher=wettessenWuerstchen(vorMinute(erster))-wettessenWuerstchen(vorMinute(zweiter));
       const trend=abstandJetzt-abstandVorher;
       if(Math.abs(trend)>=1){
-        ctx.font="700 10px 'RaniraSeason',Georgia,'Times New Roman',serif";
         ctx.fillStyle=trend<0?"#5fd38a":"#e0645f";
-        ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+24);
+        ctx.fillText((zweiter.n.split(" ")[0]||"?")+(trend<0?" holt auf":" fällt zurück"),W/2,mitteY+10);
       } else {
-        // W-B4 (Hochrechnung, Broadcast-Optik Buehne-Auftritt 27.09., Prio 2, Klasse A):
-        // "auf Kurs fuer N" -- dieselbe on-pace-Erzaehlung wie bei ESPN ("30 nach drei
-        // Minuten"), NUR gezeigt, wenn es (noch) keinen nennenswerten Tempo-Trend gibt
-        // (|Trend|<1 Wuerstchen) -- sonst stuenden zwei Zeilen uebereinander im selben,
-        // knappen Bandbereich. `erster` ist bereits der Fuehrende (Aufrufer sortiert danach,
-        // s. zeichneWettessen()). Erst ab abgeschlossener erster Minute, sonst waere die
-        // Hochrechnung nur Rauschen aus einem einzigen Zwischenwert.
-        //
-        // BEWUSST WEGGELASSEN: der zweite Teil des Papiers (Abschnitt 4.2, "Tempo-Geist"
-        // als zweiter Marker im Magen-Meter). Der Meter-Fuellstand ist dort NICHT der
-        // Punktestand, sondern der Anteil der schon absolvierten Minuten
-        // ((leader.aktuell+1)/art.rundenN, s. Kommentar an der Meter-Stelle) -- ein
-        // punktebasierter "wo wuerde er am Ende stehen"-Marker auf einer Zeitachse waere
-        // eine andere Groesse auf derselben Skala und damit irrefuehrend statt informativ.
+        // Hochrechnung NUR aus bereits gezeigten Minuten (W-V6/W-B4), nie aus der Zukunft.
         const minutenFertig=Math.max(0,erster.aktuell+1);
         if(minutenFertig>0){
           const aufKurs=Math.round(wettessenWuerstchen(erster.summe)/minutenFertig*art.rundenN);
-          ctx.font="700 10px 'RaniraSeason',Georgia,'Times New Roman',serif"; ctx.fillStyle="#9aa6b6";
-          ctx.fillText((erster.n.split(" ")[0]||"?")+" auf Kurs für "+aufKurs,W/2,mitteY+24);
+          ctx.fillStyle="#9aa6b6";
+          ctx.fillText((erster.n.split(" ")[0]||"?")+" auf Kurs für "+aufKurs,W/2,mitteY+10);
         }
       }
     }
   }
 
-  // 10:00-UHR (S3, Gegencheck Abschnitt 5): "eine grosse Countdown-Uhr ueber dem Tisch,
-  // jeder Durchgang ist eine Minute". Liest genau EINEN Teilnehmer, um die verstrichene Zeit
-  // abzuleiten -- das ist keine Vereinfachung, sondern eine Folge davon, dass
-  // `buehneGruppenGroesse` (bauBuehne()/stepBuehne(), s. dort) bei Wettessen einen ganzen
-  // Runden-Block auf einmal enthuellt: `u.aktuell` laeuft deshalb fuer ALLE Teilnehmer
-  // synchron, jeder von ihnen traegt also dieselbe "vergangene Minute" fuer den ganzen Tisch.
-  function zeichneWettessenUhr(art){
-    const irgendeiner=TEILNEHMER[0];
-    const minutenFertig=irgendeiner?Math.max(0,irgendeiner.aktuell+1):0;
+  // GROSSER COUNTDOWN 10..1 IN DER BILDMITTE (W-B3) -- der einzige Rest der alten Canvas-Uhr.
+  // Die laufende Uhr selbst steht im Bug (updateHudBuehne(): #clock aus wettessenRestSek()),
+  // damit Wettessen wie jede Disziplin GENAU EINE sichtbare Uhr hat (Broadcast-Audit 30.09.,
+  // Punkt 10) und die Kopfzone frei fuer den Callout bleibt. Rein aus restSek, kein rr().
+  function zeichneWettessenCountdown(art){
     const restSek=wettessenRestSek(art);
-    const mm=Math.floor(restSek/60), ss=Math.floor(restSek%60);
-    const uhrY=H*0.275;
-    // W-B3 (Broadcast-Optik Buehne-Auftritt 27.09.): roter Ring in den letzten zehn
-    // Sekunden -- reine Anzeige aus restSek, das die Uhr ohnehin schon rechnet.
-    if(restSek<=10&&restSek>0){
-      ctx.strokeStyle="rgba(230,67,46,.85)";ctx.lineWidth=3;
-      ctx.beginPath();ctx.arc(W/2,uhrY-8,26,0,6.2832);ctx.stroke();
-    }
-    ctx.textAlign="center";
-    ctx.font="800 28px 'RaniraSeason',Georgia,'Times New Roman',serif";
-    ctx.lineWidth=3;ctx.strokeStyle="rgba(0,0,0,.6)";ctx.lineJoin="round";
-    const text=mm+":"+(ss<10?"0":"")+ss;
-    ctx.strokeText(text,W/2,uhrY);
-    ctx.fillStyle=restSek<=60?"#e6432e":"#f2ede2";
-    ctx.fillText(text,W/2,uhrY);
-    ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";ctx.fillStyle="rgba(242,193,78,.7)";
-    ctx.fillText("MINUTE "+Math.min(art.rundenN,minutenFertig+(done?0:1))+"/"+art.rundenN,W/2,uhrY+16);
-
-    // GROSSER COUNTDOWN 10..1 IN DER BILDMITTE (W-B3): eigener Puls je Sekunde, rein aus
-    // restSek abgeleitet, kein neuer Wert, kein rr().
-    if(restSek<=10&&restSek>0){
-      const restGanz=Math.ceil(restSek-0.001);
-      const bruch=restSek-Math.floor(restSek);
-      const puls=1+0.22*Math.sin(bruch*Math.PI);
-      ctx.save();
-      ctx.translate(W/2,H*0.46);ctx.scale(puls,puls);
-      ctx.textAlign="center";ctx.textBaseline="middle";
-      ctx.font="900 52px 'RaniraSeason',Georgia,'Times New Roman',serif";
-      ctx.lineWidth=4;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.lineJoin="round";
-      ctx.strokeText(String(restGanz),0,0);
-      ctx.fillStyle="#e6432e";ctx.fillText(String(restGanz),0,0);
-      ctx.restore();
-    }
+    if(!(restSek<=10&&restSek>0))return;
+    const restGanz=Math.ceil(restSek-0.001);
+    const bruch=restSek-Math.floor(restSek);
+    const puls=1+0.22*Math.sin(bruch*Math.PI);
+    ctx.save();
+    ctx.translate(W/2,H*0.42);ctx.scale(puls,puls);
+    ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="900 52px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    ctx.lineWidth=4;ctx.strokeStyle="rgba(0,0,0,.7)";ctx.lineJoin="round";
+    ctx.strokeText(String(restGanz),0,0);
+    ctx.fillStyle="#e6432e";ctx.fillText(String(restGanz),0,0);
+    ctx.restore();
   }
 
   // ================== SHOWCASE: TALENTSHOW-GERUEST (PR S0, Konzept 17.09.) ==================
@@ -42153,12 +42121,16 @@
     h^=h>>>16; h=Math.imul(h,0x85ebca6b); h^=h>>>13; h=Math.imul(h,0xc2b2ae35); h^=h>>>16;
     return h>>>0;
   }
+  // SICHT-QA (Uebersichts-Paket Wettessen 03.11.): window.__arena.kulisseQa(id) pinnt eine Variante
+  // ueber jeden reset() hinweg (kulisseProbe(saat) allein wurde vom naechsten reset() beim
+  // Anpfiff wieder ueberschrieben). null = wieder die Hash-Wahl. Reine Screenshot-Hilfe.
+  let kulisseQaId=null;
   function kulisseWaehlen(saat){
     const liste=KULISSEN[disc];
     if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
     const meta=(echterKader&&echterKader.meta)||{};
     const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
-    const v=liste[kulisseHash(schluessel)%liste.length];
+    const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))||liste[kulisseHash(schluessel)%liste.length];
     kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
     if(!kulisseBilder[v.bild]){
       const im=new Image();
@@ -53326,8 +53298,9 @@
       // Ableitung aus bereits vorhandenem Zustand, kein rr(), kein neuer Simulationswert.
       : istBuehne(disc)
       ? (BB().wettessen
-        ? (Math.round(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0))+" : "+
-           Math.round(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0)))
+        // UEBERSICHTS-PAKET 03.11. (PR 1): dieselbe Einheit des Tages wie #score (updateHudBuehne()).
+        ? (wettessenWuerstchenText(wettessenWuerstchen(TEILNEHMER.filter(x=>x.side===0).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0)))+" : "+
+           wettessenWuerstchenText(wettessenWuerstchen(TEILNEHMER.filter(x=>x.side===1).reduce((a,x)=>a+wettessenAnzeigeSumme(x),0))))
         // PUNKT 2 (derselbe Audit): nicht `x.summe` (der fertige Zweikampf, steht ab dem
         // Einlauf fest), sondern der bis zur letzten gezeigten Lampe aufgebaute Wert, s.
         // hebenSichtbareSumme(). Startet bei "KG 0 : 0" und waechst Versuch fuer Versuch.
@@ -54054,7 +54027,11 @@
       const a=alive(0),b=alive(1); return {a,b,text:a+" : "+b};
     }
     const summe=(s)=>TEILNEHMER.filter(u=>u.side===s).reduce((acc,u)=>acc+u.summe,0);
-    const a=summe(0),b=summe(1); return {a,b,text:a+" : "+b};
+    const a=summe(0),b=summe(1);
+    // WETTESSEN (Uebersichts-Paket 03.11., PR 1): der Sieger-Banner nennt den Stand in der Einheit
+    // des Tages (Text), entschieden wird weiter ueber die rohen Punktsummen a/b.
+    if(art.wettessen)return {a,b,text:wettessenWuerstchenText(wettessenWuerstchen(a))+" : "+wettessenWuerstchenText(wettessenWuerstchen(b))};
+    return {a,b,text:a+" : "+b};
   }
   function buehneSieger(){ const {a,b,sieger}=buehneStand(); if(sieger!==undefined)return sieger; return a===b?null:(a>b?0:1); }
   // EINHEIT DES STANDS (Punkt 17): welches Wort die beiden Zahlen aus buehneStand()
@@ -54065,6 +54042,7 @@
     if(art.heben)return "Duelle";
     if(art.duell)return art.tennis?"Plätze":art.fechten?"Bahnen":"Bretter";
     if(art.gauntlet)return "Verbliebene";
+    if(art.wettessen)return wettessenMenuWahl.n;
     return "Punkte";
   }
   function renderEndstandBuehne(){
@@ -58841,6 +58819,13 @@
       ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
+    kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
+    // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
+    // Entwurf setzen (die Saison spielt 2-6 je Seite, der Entwurf ohne Aufstellung immer
+    // art.jeSeite=6) -- dieselbe Mutation, die disziplinProbe()/spieleBattlefieldPod() fuer
+    // Messlaeufe vornehmen (`art.jeSeite=jeSeite`), nur mit anschliessendem reset(). Reine
+    // Screenshot-Hilfe, kein Leser im Spiel.
+    buehneJeSeiteQa:(n)=>{ const a=BUEHNE_ART[disc]; if(!a)return null; const v=Math.max(1,Math.floor(Number(n)||0)); if(v)a.jeSeite=v; reset(); return a.jeSeite; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):

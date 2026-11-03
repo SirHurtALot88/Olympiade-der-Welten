@@ -950,6 +950,11 @@
   .oly-battle-arena.oly-battle-arena .bbug .seite b{color:#fff;font-weight:600}
   .oly-battle-arena.oly-battle-arena .bbug .seite small{display:block;color:#c3ccd8;font-size:9px;
     white-space:normal}
+  /* WETTESSEN-TEAMSTAND IM SEITENKASTEN (Uebersichts-Paket 03.11., PR 1, Zone A): die
+     Seitensumme in der Einheit des Tages rechts neben dem Teamnamen, gross -- der Stand wandert
+     aus der Bug-Mitte (die nur noch die Uhr traegt) in die Seiten, s. aktualisiereBbug(). */
+  .oly-battle-arena.oly-battle-arena .bbug .seite .bbugstand{float:right;margin-left:12px;
+    font-size:15px;font-weight:800;color:#fff;line-height:1.25;font-variant-numeric:tabular-nums}
   /* C2 (Fable-Ideen-Broadcast-Praesentation 30.09., Abschnitt 4): Wappen vor dem Namen im
      Score-Bug, wie jeder TV-Bug eins zeigt -- `wappen()`/`bbugWappenHtml()` im Motor liefern
      entweder dieses <img> oder, ohne Logo-Datei, ein <i class="mono"> mit dem Kuerzel. */
