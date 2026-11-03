@@ -98,7 +98,7 @@ Daten vorhanden. Verfügbar aus `SaleWindow` (je Fenster 30/90/365/all) + `Artic
 ## 5. `/einstellungen` — Kostensätze & Konto (§7.3)
 **Zweck:** Alle Parameter der Preis-Engine editieren, Datenstand einsehen, Session verwalten.
 - **Kostensätze-Formular** (`.card` je Gruppe): Einkaufs-Versand (<5 / ≥5) · Versand & Verpackung
-  (Einzel|Pack) · Einschreiben (2,35 € ab 30 € Warenkorb, 100 Marken/Jahr) · eBay-Gebühren (0,35 € fix, 11 % Provision, 19 % USt,
+  (Einzel|Pack) · Einschreiben (2,35 € ab 30 € Warenkorb, 100 Marken/Jahr) · eBay-Gebühren (0,45 € fix, 11 % Provision, 19 % USt,
   Anzeigen 9/9/10 %) · Fixkosten p.a. (eBay-Shop 1.140, Billbee 840, Lexoffice 360, Verpackungslizenz 50, Sonstige 1.839 – alles JAHRESwerte) · Margen-Ziele
   (×1,33 ≈ 25 % MIN, ×1,66 ≈ 35 % GUT) mit Klartext-Ableitung. %-Felder als Prozent anzeigen,
   als Faktor speichern.
