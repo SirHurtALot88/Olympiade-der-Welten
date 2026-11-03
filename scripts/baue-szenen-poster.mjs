@@ -45,7 +45,14 @@ for (const ziel of ziele) {
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
       .filter((o) => o.r.width >= 240 && o.r.height >= 120)
       .sort((a, b) => b.r.width * b.r.height - a.r.width * a.r.height);
-    return media[0].el;
+    // Wie measureFocus in DisciplinePixelScene: ragt das Element (Kamera-Zoom) ueber einen
+    // beschneidenden Rahmen hinaus, zaehlt der Rahmen (sonst wird die ganze Seite fotografiert).
+    const el = media[0].el, r = media[0].r;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const pr = p.getBoundingClientRect();
+      if (getComputedStyle(p).overflow !== "visible" && pr.width * pr.height < r.width * r.height && pr.width >= 240) return p;
+    }
+    return el;
   });
   const out = path.join(ROOT, "public", "szenen", `${ziel}.jpg`);
   await handle.asElement().screenshot({ path: out, type: "jpeg", quality: 88 });

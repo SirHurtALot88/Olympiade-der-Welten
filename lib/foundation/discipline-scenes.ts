@@ -94,7 +94,10 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "battlefield",
     title: "Battlefield",
     note: "Drei Eroberungspunkte mit eigenen Landmarken (Turm, Altar, Brückenkopf).",
-    variants: [v("battlefield", "eroberung", "Eroberung")],
+    // Zweiter Schauplatz vom 03.11.: Wüstenruine (Sand statt Wiese, Lehmwege, Sandsteinmauern,
+    // ausgetrocknetes Wadi, Kakteen, Säulenstümpfe, Flugsand) — Heimorte, Punkte A/B/C, Wege und
+    // die ganze Vierer-Pod-Logik unverändert, nur die Kulisse ist neu.
+    variants: [v("battlefield", "eroberung", "Eroberung"), v("battlefield", "wuestenruine", "Wüstenruine")],
   },
   "time-trial": {
     disciplineId: "time-trial",

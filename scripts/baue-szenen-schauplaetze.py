@@ -946,12 +946,182 @@ def build_fechten():
     write("fechten", "schlosshof", s)
 
 
+# ================================================================== BATTLEFIELD — Wuestenruine
+BF_SRC = os.path.join(SZ, "battlefield", "eroberung.html")
+BF_WALLS = [(36, 70), (1210, 1244)]       # Palisaden links/rechts -> Sandsteinmauern
+BF_RIVER = (782, 828)                      # Flussband unten -> ausgetrocknetes Wadi
+
+
+def bf_bg(bg):
+    src = bg.convert("RGB")
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(6061)
+    for y in range(H):
+        for x in range(W):
+            p = px[x, y]
+            r, g, b = p
+            wall = any(a <= x < c for a, c in BF_WALLS) and y < BF_RIVER[0]
+            if wall and not (g > r + 6 and g > b):
+                # Holzpalisade -> Sandsteinquader
+                row = y // 6
+                mort = y % 6 == 0 or (x + (row % 2) * 7) % 14 == 0
+                c = tint_luma(p, (150, 112, 70), (232, 196, 140), 20, 160)
+                px[x, y] = mix(c, (110, 80, 50), 0.4) if mort else c
+                continue
+            if b > r + 14 and b > g - 10 and BF_RIVER[0] - 6 <= y <= BF_RIVER[1] + 6:
+                # Wasser -> rissiger Lehm im Wadi
+                c = tint_luma(p, (150, 112, 74), (206, 168, 116), 40, 200)
+                cell = (int(x / 9 + 0.5 * math.sin(y * 0.7)) + int(y / 5)) % 3
+                if noise(x // 9, y // 5, 3) > 0.75 or (x % 9 == 0 and cell == 0):
+                    c = mix(c, (96, 66, 40), 0.6)
+                px[x, y] = c
+            elif g > r + 4 and g > b + 10:
+                # Gras -> Sand mit Rippeln (Gras-Buescheln werden trockenes Gestruepp)
+                c = tint_luma(p, (186, 148, 96), (246, 222, 170), 60, 190)
+                v = math.sin(x * 0.11 + y * 0.42 + 2.2 * math.sin(x * 0.017 + y * 0.01))
+                if v > 0.88:
+                    c = mix(c, (176, 134, 86), 0.35)
+                elif v < -0.92:
+                    c = mix(c, (255, 240, 200), 0.3)
+                if luma(p) > 175 and sat(p) > 60:
+                    c = (160, 140, 80)
+                px[x, y] = c
+            elif r > g > b and sat(p) > 20 and luma(p) < 150:
+                # Erdwege -> rotbrauner, festgetretener Lehm
+                px[x, y] = tint_luma(p, (110, 64, 40), (196, 126, 80), 30, 140)
+    d = ImageDraw.Draw(im)
+    # Kakteen, Palmen am Wadi, Saeulenstuempfe, Tierschaedel — nur auf freien Sandflaechen
+    def free(x, y, r):
+        for yy in range(y - r, y + r):
+            for xx in range(x - r, x + r):
+                if not (0 <= xx < W and 0 <= yy < H):
+                    return False
+                p = px[xx, yy]
+                if not (p[0] > 175 and p[1] > 135 and p[2] > 80 and p[0] - p[2] > 50):
+                    return False
+        return True
+
+    def cactus(x, y):
+        d.rectangle([x - 2, y - 18, x + 2, y], fill=(70, 120, 60))
+        d.line([x - 2, y - 18, x - 2, y], fill=(100, 150, 80))
+        d.rectangle([x - 8, y - 12, x - 6, y - 5], fill=(70, 120, 60))
+        d.rectangle([x - 8, y - 5, x - 2, y - 3], fill=(70, 120, 60))
+        d.rectangle([x + 6, y - 15, x + 8, y - 8], fill=(70, 120, 60))
+        d.rectangle([x + 2, y - 8, x + 8, y - 6], fill=(70, 120, 60))
+        d.ellipse([x - 4, y - 1, x + 4, y + 2], fill=(170, 130, 84))
+
+    def column(x, y, h):
+        d.rectangle([x - 6, y - 3, x + 6, y], fill=(150, 120, 86))
+        d.rectangle([x - 4, y - h, x + 4, y - 3], fill=(226, 206, 168))
+        for k in range(x - 3, x + 4, 3):
+            d.line([k, y - h, k, y - 3], fill=(196, 172, 134))
+        d.polygon([(x - 4, y - h), (x + 4, y - h), (x + 1, y - h - 4), (x - 2, y - h + 2)], fill=(226, 206, 168))
+        d.rectangle([x + 8, y - 4, x + 16, y], fill=(214, 194, 156))
+
+    def skull(x, y):
+        d.ellipse([x - 3, y - 3, x + 3, y + 2], fill=(244, 238, 222))
+        d.point([x - 1, y - 1], fill=(60, 50, 40))
+        d.point([x + 1, y - 1], fill=(60, 50, 40))
+        d.line([x - 7, y - 3, x - 3, y - 1], fill=(244, 238, 222))
+        d.line([x + 7, y - 3, x + 3, y - 1], fill=(244, 238, 222))
+
+    def palme(x0, base, h):
+        for k in range(h):
+            xx = x0 + int(4 * math.sin(k / h * 1.5))
+            d.rectangle([xx - 1, base - k, xx + 1, base - k], fill=(130, 92, 56) if k % 4 else (100, 70, 40))
+        tx, ty = x0 + int(4 * math.sin(1.5)), base - h
+        for ang in range(0, 360, 36):
+            for r in range(1, 20):
+                fx = tx + int(math.cos(math.radians(ang)) * r)
+                fy = ty + int(math.sin(math.radians(ang)) * r * 0.5 + (r * r) / 40)
+                if 0 <= fx < W and 0 <= fy < H:
+                    px[fx, fy] = (60, 140, 60) if r % 3 else (40, 104, 46)
+
+    placed = 0
+    tries = 0
+    while placed < 22 and tries < 4000:
+        tries += 1
+        x, y = rnd.randrange(90, W - 90), rnd.randrange(40, BF_RIVER[0] - 30)
+        if free(x, y - 8, 12):
+            [cactus, column, skull][placed % 3](x, y) if placed % 3 != 1 else column(x, y, rnd.randint(16, 30))
+            placed += 1
+    for x0 in (120, 330, 420, 870, 980, 1150):
+        palme(x0, 780, rnd.randint(30, 42))
+    # Duenenkaemme ausserhalb der Mauern
+    for (a, c) in ((0, BF_WALLS[0][0]), (BF_WALLS[1][1], W)):
+        for y in range(0, BF_RIVER[0]):
+            for x in range(a, c):
+                v = math.sin(y * 0.05 + x * 0.3)
+                px[x, y] = (214, 170, 110) if v > 0.6 else (232, 196, 136) if v > -0.2 else (198, 154, 98)
+    return im
+
+
+BF_FX = r"""
+// Wuestenruine: Flugsand und flirrende Hitze ueber dem Platz (rein optisch, eigene Ebene)
+(() => {
+  const c = document.getElementById('fx').getContext('2d');
+  const W = 1280, H = 840;
+  const draw = c.fillRect.bind(c);
+  function sand(t) {
+    for (let i = 0; i < 70; i++) {
+      const sp = 30 + (i * 13) % 40, y0 = 40 + (i * 97) % 760;
+      const x = (i * 271 + t * sp) % (W + 60) - 30, y = y0 + Math.sin(t * 2 + i) * 3;
+      c.fillStyle = i % 3 ? 'rgba(250,232,190,0.55)' : 'rgba(210,170,120,0.6)';
+      draw(Math.round(x), Math.round(y), i % 4 === 0 ? 3 : 2, 1);
+    }
+  }
+  window.__sandFx = sand;
+})();
+"""
+
+
+def build_battlefield():
+    s = open(BF_SRC, encoding="utf-8").read()
+    bg, _ = get_img(s, "bg")
+    new = bf_bg(bg)
+    debug("battlefield-wuestenruine-bg", new)
+    s = set_img(s, "bg", new)
+    # Objekt-Sprites (Brueckenkopf-Huegel u. a.) tragen eigenes Gras: dort ebenfalls Sand
+    i0 = s.index('"objs":[')
+    i1 = s.index('"sets":', i0)
+    part = s[i0:i1]
+
+    def sandify(m):
+        im = Image.open(io.BytesIO(base64.b64decode(m.group(0).split(",", 1)[1]))).convert("RGBA")
+        pp = im.load()
+        hit = False
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = pp[x, y]
+                if a and g > r + 4 and g > b + 10:
+                    pp[x, y] = tint_luma((r, g, b), (186, 148, 96), (246, 222, 170), 60, 190) + (a,)
+                    hit = True
+        if not hit:
+            return m.group(0)
+        buf = io.BytesIO()
+        im.save(buf, "PNG", optimize=True)
+        return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+    s = s[:i0] + re.sub(B64, sandify, part) + s[i1:]
+    # Flugsand auf der vorhandenen Partikel-Ebene: direkt nach dem Leeren des fx-Canvas zeichnen
+    hook = "fx.clearRect(0,0,W,H);"
+    assert s.count(hook) == 1
+    s = s.replace(hook, hook + "if(window.__sandFx)window.__sandFx(t/1000);")
+    s = s.replace("</script>\n</body>", BF_FX + "</script>\n</body>", 1) if "</script>\n</body>" in s else \
+        s.replace("</body>", "<script>" + BF_FX + "</script>\n</body>", 1)
+    s = retitle(s, "Battlefield Wuestenruine", "Battlefield &mdash; Eroberung in der W&uuml;stenruine")
+    write("battlefield", "wuestenruine", s)
+
+
 BUILDERS = {
     "basketball": build_basketball,
     "hockey": build_hockey,
     "football": build_football,
     "eiskunstlauf": build_eiskunstlauf,
     "fechten": build_fechten,
+    "battlefield": build_battlefield,
 }
 
 if __name__ == "__main__":
