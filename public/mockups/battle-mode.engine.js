@@ -8299,10 +8299,19 @@
   const besterFuer=(slotId,frei,d)=>frei.map(p=>({p,m:slotAufschlag(p,slotId,d)}))
     .sort((x,y)=>y.m-x.m)[0]||null;
   // TOP 3 STATT NUR DEM EINEN BESTEN (Chris, 03.11.: "hier kannst du immer die top 3 zeigen
-  // nicht nur den besten sonst hat man ja keine auswahl") -- dieselbe Sortierung wie
-  // besterFuer(), nur nicht bei [0] abgeschnitten.
-  const bestenFuer=(slotId,frei,d,n=3)=>frei.map(p=>({p,m:slotAufschlag(p,slotId,d)}))
-    .sort((x,y)=>y.m-x.m).slice(0,n);
+  // nicht nur den besten sonst hat man ja keine auswahl"). SORTIERT NACH `abs`, NICHT NACH
+  // `m` (Chris, zweiter Fund, direkt am Skirmisher-Beispiel: "bei skirmisher ist die
+  // riehenfolge falsch"): `m` ist nur der Slot-Zuschlag, `abs` (Basis-Eignung + m) ist die
+  // Zahl, die tatsaechlich daneben steht -- bei einem Spieler mit hoher Slot-Passung aber
+  // niedriger Basis-Eignung konnte "1." so eine KLEINERE Zahl zeigen als "2.". Dieselbe
+  // Eignungsluecke/Rueckfall wie am Renderort (CLAUDE.md: "p.d haelt nur tdm und spurt
+  // vorberechnet") -- `abs` wird hier einmal mitgeliefert, damit render es nicht doppelt
+  // rechnen muss.
+  const bestenFuer=(slotId,frei,d,n=3)=>frei.map(p=>{
+      const m=slotAufschlag(p,slotId,d);
+      const abs=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+m;
+      return {p,m,abs};
+    }).sort((x,y)=>y.abs-x.abs).slice(0,n);
   // UMGEKEHRTE RICHTUNG: nicht "wer passt am besten auf DIESEN Slot" (besterFuer/bestenFuer
   // oben), sondern "welche Slots passen am besten zu DIESEM Spieler" -- fuer die Kader-Liste
   // (Chris, 03.11.: "die 3 staerksten Positionen der Spieler dargestellt ... unter dem
@@ -37066,15 +37075,18 @@
         r.appendChild(b);
       }
       const t=p.d.tdm,s=p.d.spurt;
-      // 3 STAERKSTE POSITIONEN UNTER DEM WERT DER AKTIVEN DISZIPLIN (Chris, 03.11., s.
-      // topSlotsFuer/slotKuerzel oben): in derselben schmalen eg-Zelle statt einer eigenen
-      // Spalte, deshalb nur unter TDM bzw. SPURT moeglich -- die beiden einzigen Disziplinen,
-      // die diese Liste ueberhaupt als Spalte zeigt (s. CLAUDE.md "p.d haelt nur tdm und spurt
-      // vorberechnet"). Fuer die anderen 18 Disziplinen gibt es hier keinen passenden Wert,
-      // an den sich die Positionen haengen liessen.
+      // 3 STAERKSTE POSITIONEN UNTER JEDEM WERT, FUER BEIDE DISZIPLINEN (Chris, 03.11.:
+      // "nicht nur in der rolle auch bei der player card im kader links ... bei eignung und
+      // dann unterteilung in seine top 3 eignungen fuer beide diszis" -- die Zuordnung galt
+      // zuerst nur fuer die GERADE AKTIVE Disziplin, Chris wollte aber beide Spalten immer
+      // zugleich, unabhaengig vom gewaehlten Tab). In derselben schmalen eg-Zelle statt einer
+      // eigenen Spalte, deshalb nur unter TDM/SPURT moeglich -- die beiden einzigen
+      // Disziplinen, die diese Liste ueberhaupt als Spalte zeigt (s. CLAUDE.md "p.d haelt nur
+      // tdm und spurt vorberechnet"). Fuer die anderen 18 Disziplinen gibt es hier keinen
+      // passenden Wert, an den sich die Positionen haengen liessen.
       const posZelle=(cls,d)=>{
         const c=el("div",cls,(d==="tdm"?t:s).toFixed(0));
-        if(disc===d&&slotsVon(d).length){
+        if(slotsVon(d).length){
           const top=topSlotsFuer(p,d,3);
           const sub=el("span","egposis",top.map(x=>slotKuerzel(x.rw.label)).join(" · "));
           sub.title="Staerkste Positionen in "+DISCS[d].label+": "+top.map(x=>x.rw.label).join(", ");
@@ -37141,17 +37153,22 @@
         const besten=bestenFuer(rw.id,kandidaten,disc,3);
         besten.forEach((b,i)=>{
           const v=el("div","slotvorschlag");
-          v.appendChild(el("span","vlabel",i>0?String(i+1)+".":drin.length?"Besser wäre":"Bester Freier"));
+          // "1./2./3." statt "Bester Freier"/"Besser waere" (Chris, 03.11.: "schreib nicht
+          // BESTER FREIER das ist viel zu lang mach doch einfach 1. 2. 3. und halte die
+          // slots kompakt") -- durchgehend numerisch, kein Sonderfall fuer Platz 1.
+          v.appendChild(el("span","vlabel",String(i+1)+"."));
+          // SPRITE STATT NUR TEXT (Chris, 03.11.: "kannst du ggf auch die sprites der
+          // spieler zeigen? dann bekommt man auch optisch nen eindruck das ist bei
+          // kampfdiszis wichtig wenn wir zwischen nahkampf fernkampf und heiler
+          // unterscheiden") -- figur() statt figurKlein(): figurKlein ist absolut
+          // positioniert (fuer die .pico-Box der Kader-Liste gebaut), hier steht die
+          // Figur in einer normalen Flex-Zeile. Feste kleine Groesse (statt der
+          // figurFaktor-Skalierung von figur()), damit die Zeile kompakt bleibt, egal
+          // wie gross die Figur im Kampf selbst gezeichnet wird.
+          const ic=figur(b.p); ic.style.width="20px"; ic.style.height="25px";
+          v.appendChild(ic);
           v.appendChild(el("b",null,b.p.n));
-          // Dieselbe Eignungsluecke wie in bauFeldspiel/bauBuehne/bauSpurt/baueEinheit
-          // (CLAUDE.md: "p.d haelt nur tdm und spurt vorberechnet"), fuenfte Fundstelle
-          // (Opus-Projektueberwachung, 03.09.): `p.d[disc]||0` ist fuer die anderen 18
-          // Disziplinen immer 0, die angezeigte "absolute" Eignung war also nur der kleine
-          // Slot-Modifikator (b.m, Spanne +/-8,5) statt einer echten ~0-99-Eignung — der
-          // Vorschlag "Bester Freier"/"Besser waere" zeigte eine fast bedeutungslose Zahl.
-          // Gleicher Rueckfall wie ueberall sonst: gewichtet(p.a, BASIS_JE_DISC[...]).
-          const abs=(b.p.d[disc]!=null?b.p.d[disc]:gewichtet(b.p.a,BASIS_JE_DISC[disc]||{}))+b.m;
-          v.appendChild(el("s",null,abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
+          v.appendChild(el("s",null,b.abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
           v.addEventListener("click",()=>{
             const raus=here.find(x=>place[x.n].slot===rw.id);
             if(raus)delete place[raus.n];
