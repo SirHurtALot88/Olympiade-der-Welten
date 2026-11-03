@@ -127,7 +127,7 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "wettessen",
     title: "Wettessen",
     note: "Jahrmarkt-Bühne mit der echten Wertungstabelle live eingeblendet.",
-    variants: [v("wettessen", "jahrmarkt", "Jahrmarkt")],
+    variants: [v("wettessen", "jahrmarkt", "Jahrmarkt"), v("wettessen", "nachtmarkt", "Nachtmarkt")],
   },
   "i-spy": {
     disciplineId: "i-spy",
@@ -150,7 +150,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "gewichtheben",
     title: "Gewichtheben (Sandsack-Rennen)",
     note: "Drei Stationen nach echten Engine-Werten (35/80/115 kg), Silo-Rampe.",
-    variants: [v("gewichtheben", "sandsack", "Sandsack-Rennen")],
+    // Hafen + Oase: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten.py) — dieselbe
+    // Schicht, dieselben Stationen und Gewichte, nur eine andere Umgebung.
+    variants: [
+      v("gewichtheben", "sandsack", "Lagerhalle"),
+      v("gewichtheben", "hafen", "Hafenkai bei Nacht"),
+      v("gewichtheben", "oase", "Oase"),
+    ],
   },
   climbing: {
     disciplineId: "climbing",
