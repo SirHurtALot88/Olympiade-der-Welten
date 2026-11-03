@@ -651,10 +651,165 @@ def build_football():
     write("football", "strand", s)
 
 
+# ================================================================== EISKUNSTLAUF — zugefrorener Waldsee
+EK_SRC = os.path.join(SZ, "eiskunstlauf", "kuer.html")
+EK_STANDS = 150
+EK_KEEP = [(1192, 80, 1448, 134), (1104, 128, 1537, 194),   # Technisches Panel mit Preisrichtern
+           (84, 88, 278, 246),      # Kiss & Cry
+           (386, 150, 416, 198), (756, 152, 786, 200), (1856, 156, 1886, 204), (2216, 156, 2246, 204)]  # Offizielle
+
+
+def flood(img, seeds, ok, step=None):
+    W, H = img.size
+    px = img.load()
+    seen = bytearray(W * H)
+    st = list(seeds)
+    while st:
+        x, y = st.pop()
+        if not (0 <= x < W and 0 <= y < H) or seen[y * W + x] or not ok(px[x, y]):
+            continue
+        seen[y * W + x] = 1
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= nx < W and 0 <= ny < H and not seen[ny * W + nx] and (step is None or step(px[x, y], px[nx, ny])):
+                st.append((nx, ny))
+    return seen
+
+
+def ek_panel_crowd(x, y):
+    """Neben dem schwarzen Panelkasten sitzen die Preisrichter vor der Tribuene: dort nur die
+    Figuren (je Richter eine schmale Spalte ab Kopfhoehe) behalten, die Zuschauer dahinter nicht."""
+    if not (1104 <= x < 1537 and 128 <= y < 150) or 1195 <= x < 1448:
+        return False
+    k = round((x - 1136) / 46)
+    return not (abs(x - (1136 + 46 * k)) <= 10 and y >= 131)
+
+
+def ek_backdrop(W, H):
+    im = Image.new("RGB", (W, H))
+    px = im.load()
+    rnd = random.Random(2203)
+    d = ImageDraw.Draw(im)
+    # Alpengluehen am spaeten Nachmittag
+    sky(px, W, 0, EK_STANDS, [(92, 120, 186), (130, 140, 196), (186, 154, 190), (236, 170, 160), (250, 196, 150)])
+    mountains(px, W, 118, 104, (132, 122, 160), (250, 222, 214), 41, fr=0.004, snow_line=0.55)
+    mountains(px, W, 138, 62, (96, 94, 128), (238, 214, 216), 53, fr=0.009, snow_line=0.4)
+    # Kapelle auf einer Anhoehe
+    cx = 1760
+    for x in range(cx - 120, cx + 120):
+        top = 128 - int(14 * math.cos((x - cx) / 120 * math.pi / 2))
+        for y in range(top, 140):
+            px[x, y] = (236, 240, 248) if y < top + 2 else (214, 222, 238)
+    d.rectangle([cx - 14, 92, cx + 14, 116], fill=(246, 240, 228))
+    d.polygon([(cx - 18, 92), (cx + 18, 92), (cx, 78)], fill=(150, 70, 60))
+    d.rectangle([cx + 6, 66, cx + 14, 92], fill=(246, 240, 228))
+    d.polygon([(cx + 4, 66), (cx + 16, 66), (cx + 10, 52)], fill=(150, 70, 60))
+    d.rectangle([cx - 4, 104, cx + 2, 116], fill=(110, 76, 50))
+    d.rectangle([cx + 8, 74, cx + 11, 78], fill=(255, 214, 140))
+    # dichter verschneiter Nadelwald am Seeufer
+    for x in range(-10, W + 10, 8):
+        h = 26 + int(16 * noise(x, 3, 4)) + int(8 * math.sin(x * 0.02))
+        pine(d, x + rnd.randint(-3, 3), 142, h, (30, 62, 58), (48, 90, 80), (246, 240, 246))
+    for x in range(-6, W + 6, 12):
+        h = 32 + int(14 * noise(x, 6, 2))
+        pine(d, x + rnd.randint(-4, 4), 152, h, (22, 50, 46), (38, 76, 66), (250, 246, 250))
+    # verschneites Ufer
+    band_gradient(px, 0, EK_STANDS, W, H, [(214, 214, 232), (226, 226, 240), (236, 236, 246), (230, 232, 244)])
+    for _ in range(1600):
+        x, y = rnd.randrange(W), rnd.randrange(EK_STANDS + 2, H)
+        px[x, y] = rnd.choice([(204, 204, 226), (248, 248, 252), (196, 198, 222)])
+    for x in range(W):   # Schneekante unterm Waldrand
+        top = EK_STANDS - 4 + int(2 * math.sin(x * 0.05))
+        for y in range(top, EK_STANDS + 3):
+            px[x, y] = (250, 248, 252) if y == top else (234, 234, 246)
+    return im
+
+
+def ek_snowbank(x, y, p):
+    """Bande -> Schneewall: hell oben, blauer Schatten unten, ein paar Eiskristalle."""
+    L = luma(p)
+    c = mix((176, 186, 214), (248, 250, 254), min(1.0, max(0.0, (L - 30) / 200)) * 0.08 + 0.80)
+    n = noise(x, y, 11)
+    if n > 0.94:
+        c = (255, 255, 255)
+    elif n < 0.05:
+        c = mix(c, (150, 164, 200), 0.5)
+    return c
+
+
+def build_eiskunstlauf():
+    s = open(EK_SRC, encoding="utf-8").read()
+    bg, _ = get_img(s, "bg")
+    fg, _ = get_img(s, "fg")
+    bg = bg.convert("RGB")
+    W, H = bg.size
+    floor = flood(bg, [(5, H - 1), (5, 300), (W - 5, 300), (W // 2, H - 1), (W // 2, 160), (1300, 170)],
+                  lambda p: sat(p) < 30 and luma(p) < 90 and p[2] > p[0])
+    ice = flood(bg, [(W // 2, 450)], lambda p: luma(p) > 195 and sat(p) < 40,
+                lambda a, b: sum(abs(i - j) for i, j in zip(a, b)) < 28)
+    back = ek_backdrop(W, H)
+    out = bg.copy()
+    po, pb, ps = out.load(), back.load(), bg.load()
+    rnd = random.Random(9)
+    keep = lambda x, y: any(x0 <= x < x1 and y0 <= y < y1 for (x0, y0, x1, y1) in EK_KEEP)
+    for y in range(H):
+        for x in range(W):
+            i = y * W + x
+            if keep(x, y) and not floor[i] and not ek_panel_crowd(x, y):
+                continue
+            if y < EK_STANDS or floor[i]:
+                po[x, y] = pb[x, y]
+            elif ice[i]:
+                p = ps[x, y]
+                po[x, y] = mix(p, (176, 206, 228), 0.22)     # Seeeis: etwas tiefer, gruenlich-blau
+            else:
+                po[x, y] = ek_snowbank(x, y, ps[x, y])
+    # Risse und dunkle Stellen im Seeeis
+    for _ in range(46):
+        x, y = rnd.randrange(300, W - 300), rnd.randrange(300, 760)
+        a = rnd.random() * math.tau
+        for k in range(rnd.randint(30, 90)):
+            a += rnd.uniform(-0.5, 0.5)
+            x += math.cos(a) * 1.6
+            y += math.sin(a) * 0.8
+            xi, yi = int(x), int(y)
+            if 0 <= xi < W - 1 and 0 <= yi < H - 1 and ice[yi * W + xi]:
+                po[xi, yi] = (248, 252, 255)
+                if ice[(yi + 1) * W + xi]:
+                    po[xi, yi + 1] = mix(po[xi, yi + 1], (120, 160, 196), 0.45)
+    for _ in range(18):
+        cx, cy, r = rnd.randrange(400, W - 400), rnd.randrange(320, 740), rnd.randint(30, 90)
+        for y in range(cy - r // 3, cy + r // 3):
+            for x in range(cx - r, cx + r):
+                if ((x - cx) / r) ** 2 + ((y - cy) / (r / 3)) ** 2 < 1 and ice[y * W + x] and \
+                        (BAYER4[y & 3][x & 3] + 0.5) / 16 < 0.5:
+                    po[x, y] = mix(po[x, y], (130, 176, 204), 0.25)
+    # Schatten des Schneewalls aufs Ufer
+    for y in range(EK_STANDS + 1, H):
+        for x in range(W):
+            if floor[y * W + x] and not floor[(y - 1) * W + x] and not keep(x, y - 1) and y - 1 > EK_STANDS:
+                for k in range(8):
+                    if y + k < H and floor[(y + k) * W + x]:
+                        po[x, y + k] = mix(po[x, y + k], (150, 156, 196), 0.4 * (1 - k / 8))
+    debug("eiskunstlauf-waldsee-bg", out)
+    s = set_img(s, "bg", out)
+    # vordere Bande (eigene Ebene) ebenfalls als Schneewall; das Kiss-&-Cry-Stueck bleibt
+    fg = fg.convert("RGBA")
+    pf = fg.load()
+    for y in range(fg.height):
+        for x in range(320, fg.width):
+            p = pf[x, y]
+            if p[3]:
+                pf[x, y] = ek_snowbank(x, y, p) + (p[3],)
+    s = set_img(s, "fg", fg)
+    s = retitle(s, "Eiskunstlauf Waldsee", "Eiskunstlauf &mdash; K&uuml;r auf dem zugefrorenen Waldsee")
+    write("eiskunstlauf", "waldsee", s)
+
+
 BUILDERS = {
     "basketball": build_basketball,
     "hockey": build_hockey,
     "football": build_football,
+    "eiskunstlauf": build_eiskunstlauf,
 }
 
 if __name__ == "__main__":

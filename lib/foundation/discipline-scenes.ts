@@ -197,7 +197,9 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "eiskunstlauf",
     title: "Eiskunstlauf",
     note: "ISU-Eisfläche, Paarlauf mit Spin, Sprung und Sturz.",
-    variants: [v("eiskunstlauf", "kuer", "Kür")],
+    // Zweiter Schauplatz vom 03.11.: Kür auf dem zugefrorenen Waldsee (Alpenglühen, Nadelwald,
+    // Kapelle, Schneewall statt Werbebande) statt Eishalle — Eisfläche, Panel und Ablauf unverändert.
+    variants: [v("eiskunstlauf", "kuer", "Kür"), v("eiskunstlauf", "waldsee", "Waldsee")],
   },
   showcase: {
     disciplineId: "showcase",
