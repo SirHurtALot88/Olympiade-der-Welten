@@ -130,7 +130,9 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "fechten",
     title: "Fechten",
     note: "14-m-Piste, Ampellichter, Zeitlupe beim entscheidenden Treffer.",
-    variants: [v("fechten", "piste", "Piste")],
+    // Zweiter Schauplatz vom 03.11.: Gefecht im Burghof (Ringmauer, Bergfried, Ecktürme, Banner in
+    // Teamfarben, Kopfsteinpflaster) statt Fechthalle — Piste, Lampen, Bänke und Ablauf unverändert.
+    variants: [v("fechten", "piste", "Piste"), v("fechten", "schlosshof", "Schlosshof")],
   },
   tennis: {
     disciplineId: "tennis",

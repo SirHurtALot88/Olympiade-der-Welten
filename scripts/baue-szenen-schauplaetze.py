@@ -805,11 +805,153 @@ def build_eiskunstlauf():
     write("eiskunstlauf", "waldsee", s)
 
 
+# ================================================================== FECHTEN — Burghof
+FE_SRC = os.path.join(SZ, "fechten", "piste.html")
+FE_BACK = 107                     # bis hierher reicht die Hallen-Tribuene (halbes Raster)
+FE_KEEP = [(276, 18, 364, 46), (265, 26, 279, 38), (361, 26, 375, 38),   # Anzeigetafel + Seitenlampen
+           (101, 56, 115, 69), (525, 56, 539, 69)]                         # Trefferlampen
+FE_PISTE = (82, 111, 558, 130)
+FE_POLES = [108, 532]
+FE_LED = (137, 142)
+
+
+def fe_world(world):
+    src = half(world.convert("RGB"))
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(1415)
+    d = ImageDraw.Draw(im)
+    sky(px, W, 0, 60, [(92, 150, 210), (118, 170, 222), (150, 192, 230), (186, 212, 234)])
+    for (cx, cy, wl) in ((30, 12, 46), (180, 22, 34), (420, 8, 52), (560, 20, 40)):
+        for k in range(wl):
+            r = int(3 * math.sin(k / wl * math.pi))
+            for yy in range(cy - r, cy + 1):
+                px[cx + k, yy] = (250, 252, 252) if yy < cy else (220, 232, 240)
+    stone, stone_d, stone_l = (150, 140, 124), (112, 102, 90), (182, 172, 154)
+
+    def blocks(x0, y0, x1, y1, base):
+        for yy in range(max(0, y0), y1):
+            for xx in range(max(0, x0), min(W, x1)):
+                row = (yy - y0) // 5
+                mort = (yy - y0) % 5 == 0 or (xx + (row % 2) * 6) % 12 == 0
+                c = mix(base, (70, 62, 54), 0.45) if mort else base
+                if not mort and noise(xx, yy, 2) > 0.9:
+                    c = mix(base, (255, 250, 236), 0.15)
+                px[xx, yy] = c
+
+    def zinnen(x0, x1, top, base):
+        for xx in range(x0, x1, 8):
+            blocks(xx, top - 5, xx + 5, top, base)
+
+    # Bergfried hinter der Mitte (die Anzeigetafel haengt an seiner Front)
+    blocks(282, 2, 358, 60, stone_d)
+    zinnen(282, 358, 2, stone_d)
+    for wy in (12, 30):
+        d.rectangle([316, wy, 323, wy + 9], fill=(40, 34, 30))
+        d.ellipse([316, wy - 3, 323, wy + 3], fill=(40, 34, 30))
+    # Ecktuerme mit Kegeldach
+    for (tx, tw) in ((14, 46), (580, 46)):
+        blocks(tx, 18, tx + tw, FE_BACK, stone)
+        d.polygon([(tx - 4, 18), (tx + tw + 4, 18), (tx + tw // 2, -6)], fill=(70, 74, 110))
+        for k in range(0, 24, 4):
+            d.line([(tx + tw // 2, -6 + k), (tx - 4 + k * 2 // 3, 18)], fill=(56, 60, 92))
+        d.line([tx + tw // 2, -6, tx + tw // 2, -14], fill=(60, 50, 40))
+        d.polygon([(tx + tw // 2, -14), (tx + tw // 2 + 9, -11), (tx + tw // 2, -8)],
+                  fill=(206, 52, 58) if tx < W // 2 else (44, 168, 92))
+        for wy in (34, 60):
+            d.rectangle([tx + tw // 2 - 2, wy, tx + tw // 2 + 2, wy + 7], fill=(40, 34, 30))
+    # Ringmauer mit Zinnen und Wehrgang (auch aussen neben den Ecktuermen)
+    wall_top = 52
+    blocks(0, wall_top, 14, FE_BACK, stone)
+    blocks(626, wall_top, W, FE_BACK, stone)
+    zinnen(0, 14, wall_top, stone)
+    zinnen(626, W, wall_top, stone)
+    blocks(60, wall_top, 580, FE_BACK, stone)
+    zinnen(60, 580, wall_top, stone)
+    d.line([60, wall_top + 8, 580, wall_top + 8], fill=stone_l)
+    # Burgtor in der Mitte mit Fallgitter
+    d.rectangle([300, 70, 340, FE_BACK], fill=(36, 30, 28))
+    d.ellipse([300, 60, 340, 80], fill=(36, 30, 28))
+    for gx in range(303, 340, 5):
+        d.line([gx, 66, gx, FE_BACK - 14], fill=(90, 84, 80))
+    for gy in range(70, FE_BACK - 14, 5):
+        d.line([302, gy, 338, gy], fill=(90, 84, 80))
+    # Banner in Teamfarben an der Mauer
+    for bx in (92, 150, 208, 252, 388, 432, 490, 548):
+        team = (206, 52, 58) if bx < W // 2 else (44, 168, 92)
+        d.rectangle([bx - 1, wall_top + 9, bx + 13, wall_top + 10], fill=(80, 60, 40))
+        d.rectangle([bx, wall_top + 11, bx + 12, wall_top + 36], fill=team)
+        d.polygon([(bx, wall_top + 36), (bx + 12, wall_top + 36), (bx + 6, wall_top + 42)], fill=team)
+        d.rectangle([bx + 1, wall_top + 11, bx + 2, wall_top + 36], fill=mix(team, (255, 255, 255), 0.25))
+        d.rectangle([bx + 4, wall_top + 20, bx + 8, wall_top + 24], fill=(236, 196, 72))
+    # Fackeln
+    for fx in (122, 230, 410, 518):
+        d.rectangle([fx, wall_top + 30, fx + 1, wall_top + 38], fill=(70, 50, 30))
+        d.rectangle([fx - 1, wall_top + 26, fx + 2, wall_top + 29], fill=(255, 170, 60))
+        d.point([fx, wall_top + 25], fill=(255, 236, 140))
+        add_glow(px, W, H, fx, wall_top + 27, 10, (80, 50, 10), 0.6)
+    # Garten: Hecke mit Rosen am Mauerfuss
+    for xx in range(60, 580):
+        top = 97 + int(2 * math.sin(xx * 0.3) + noise(xx, 1, 4) * 2)
+        for yy in range(top, FE_BACK):
+            c = (48, 104, 52) if (xx + yy) % 5 else (36, 84, 42)
+            if yy == top:
+                c = (76, 140, 70)
+            px[xx, yy] = c
+        if noise(xx, 3, 8) > 0.88:
+            px[xx, top + 2] = (220, 60, 80)
+            px[xx, top + 3] = (180, 40, 60)
+    # Trefferlampen-Masten neu (die alten standen vor der Tribuene)
+    for x in FE_POLES:
+        d.rectangle([x - 1, 69, x + 1, 112], fill=(70, 66, 62))
+        d.line([x - 1, 69, x - 1, 112], fill=(120, 114, 106))
+    for box in FE_KEEP:
+        im.paste(src.crop(box), box[:2])
+    for cx in (290, 350):              # Ketten, an denen die Tafel am Bergfried haengt
+        for yy in range(2, 18, 2):
+            px[cx, yy] = (60, 58, 56)
+            px[cx + 1, yy + 1] = (100, 96, 92)
+    # ---- Boden: Kopfsteinpflaster statt Hallenpodest (Piste, Baenke, LED-Band bleiben)
+    for y in range(FE_BACK, H):
+        if FE_LED[0] <= y < FE_LED[1]:
+            continue
+        for x in range(W):
+            p = px[x, y]
+            if FE_PISTE[0] <= x < FE_PISTE[2] and FE_PISTE[1] <= y < FE_PISTE[3]:
+                continue
+            if luma(p) < 62 and p[2] >= p[0]:
+                L = luma(p)
+                if y < 131:                    # Hofpflaster
+                    r_ = (y - FE_BACK) // 4
+                    sx_ = (x + (r_ % 2) * 3) % 6
+                    base = mix((120, 110, 96), (168, 156, 136), noise(x // 6, r_, 5))
+                    c = mix(base, (70, 62, 54), 0.55) if (sx_ == 0 or (y - FE_BACK) % 4 == 0) else base
+                    c = mix(c, (60, 54, 48), max(0.0, 0.35 - L / 120))
+                elif y < FE_LED[0]:            # Stufe vor dem Podest
+                    c = (128, 118, 102) if y == 131 else (104, 94, 82)
+                else:                          # Kies und Gras vorn
+                    c = (96, 120, 64) if noise(x, y, 6) > 0.3 else (120, 140, 80)
+                px[x, y] = c
+    return double(im)
+
+
+def build_fechten():
+    s = open(FE_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    new = fe_world(world)
+    debug("fechten-schlosshof-world", new)
+    s = set_img(s, "world", new)
+    s = retitle(s, "Fechten Schlosshof", "Fechten &mdash; Gefecht im Burghof")
+    write("fechten", "schlosshof", s)
+
+
 BUILDERS = {
     "basketball": build_basketball,
     "hockey": build_hockey,
     "football": build_football,
     "eiskunstlauf": build_eiskunstlauf,
+    "fechten": build_fechten,
 }
 
 if __name__ == "__main__":
