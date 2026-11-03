@@ -207,7 +207,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "showcase",
     title: "Showcase",
     note: "Talentshow-Bühne mit LED-Wand, Jury-Buzzer und Golden-Buzzer-Konfetti.",
-    variants: [v("showcase", "buehne", "Bühne")],
+    // Festival + Zirkus: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten-2.py) — derselbe
+    // Auftritt mit derselben Jury und LED-Wertung, nur ein anderer Auftrittsort (die Vorlage ist das Theater).
+    variants: [
+      v("showcase", "buehne", "Theater"),
+      v("showcase", "festival", "Freiluft-Festival"),
+      v("showcase", "zirkus", "Zirkuszelt"),
+    ],
   },
   football: {
     disciplineId: "football",

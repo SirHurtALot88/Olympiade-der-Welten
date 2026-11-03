@@ -1407,7 +1407,322 @@ def takeshis_castle():
                  "ctx.drawImage(IM.base, camX, VY0, VW, VH, 0, 0, VW * S, VH * S);", "if (window.__fx) window.__fx(ctx, camX);", fx)
 
 
-ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach, "takeshis-castle": takeshis_castle}
+# ================================================================== SHOWCASE
+# Ebenen 640x360: bg (Buehnenraum, LED-Rahmen, Traverse, Boden, Rampe), fg (Proszenium mit
+# Logen + Publikum, Buehnenoeffnung transparent), judges, chairs. Die Vorlage IST schon ein
+# Theater mit rotem Samtvorhang — die Varianten sind deshalb Freiluft-Festival und Zirkuszelt.
+# Bleiben: LED-Flaeche, Traverse samt Lampen, Buehnenboden-Geometrie, Jurytisch mit Mikrofonen,
+# die Form der Buehnenoeffnung (gleiche Verdeckung der wartenden Acts).
+SH_LED = (186, 30, 454, 150)
+SH_TRUSS = (100, 16, 540, 36)
+SH_DESK = (154, 254, 488, 294)
+SH_FLOOR_Y = (150, 262)
+SH_EDGE_Y = (262, 286)
+
+
+def sh_offen(fg):
+    a = fg.split()[3].load()
+    return lambda x, y: a[x, y] == 0
+
+
+def sh_publikum(d, rnd, y0, farbe, rand, arme=False, sticks=None, schritt=22):
+    """Silhouetten-Reihen von hinten (wie die Vorlage), optional mit erhobenen Armen/Leuchtstaeben."""
+    for row, (yy, sc) in enumerate(((y0, 0.8), (y0 + 16, 0.95), (y0 + 34, 1.15))):
+        x = -10 + (row * 9)
+        while x < 660:
+            r = int(9 * sc)
+            if arme and rnd.random() < 0.35:
+                side = rnd.choice((-1, 1))
+                ax = x + side * (r + 2)
+                d.line([ax, yy + r, ax + side * 4, yy - r - 10], fill=farbe, width=3)
+                if sticks:
+                    c = rnd.choice(sticks)
+                    d.line([ax + side * 4, yy - r - 10, ax + side * 6, yy - r - 18], fill=c, width=2)
+            d.ellipse([x - r, yy - r, x + r, yy + r], fill=farbe)
+            d.rectangle([x - r - 6, yy + r - 2, x + r + 6, 360], fill=farbe)
+            d.arc([x - r, yy - r, x + r, yy + r], 200, 330, fill=rand)
+            x += int(schritt * sc) + rnd.randint(-2, 3)
+
+
+def sh_desk(fg_src, fg_new):
+    sp, np_ = fg_src.load(), fg_new.load()
+    x0, y0, x1, y1 = SH_DESK
+    for y in range(y0, y1):
+        for x in range(x0, x1):
+            p = sp[x, y]
+            if p[3] and (y < 282 or 152 <= x < 490):
+                np_[x, y] = p
+
+
+def sh_bg_umbau(bg, rueckwand, boden, rampe):
+    im = bg.copy()
+    sp, px = bg.load(), im.load()
+    rueckwand(im)                 # malt alles; danach werden LED, Traverse und Boden zurueckgesetzt
+    for y in range(SH_TRUSS[1], SH_TRUSS[3]):
+        for x in range(SH_TRUSS[0], SH_TRUSS[2]):
+            p = sp[x, y]
+            if luma(p) > 30:
+                px[x, y] = p
+    for y in range(SH_LED[1], SH_LED[3]):
+        for x in range(SH_LED[0], SH_LED[2]):
+            px[x, y] = sp[x, y]
+    for y in range(SH_FLOOR_Y[0], SH_EDGE_Y[1]):
+        for x in range(640):
+            p = sp[x, y]
+            if y < SH_FLOOR_Y[1]:
+                u = (y - SH_FLOOR_Y[0]) / (SH_FLOOR_Y[1] - SH_FLOOR_Y[0])
+                if 110 - 58 * u <= x < 530 + 58 * u:     # Bodentrapez (floorBackX -> floorFrontX)
+                    px[x, y] = boden(p, x, y)
+            elif p[:3] != (10, 9, 16):
+                px[x, y] = rampe(p, x, y)
+    return im
+
+
+def sh_festival(bg, fg):
+    rnd = random.Random(7101)
+    offen = sh_offen(fg)
+
+    def himmel(im):
+        px = im.load()
+        band_gradient(px, 0, 0, 640, 290, [(8, 10, 34), (16, 18, 56), (34, 26, 80), (70, 36, 96), (120, 50, 100)])
+        for _ in range(160):
+            x, y = rnd.randrange(640), rnd.randrange(0, 160)
+            px[x, y] = rnd.choice([(200, 206, 240), (150, 160, 210), (255, 240, 200)])
+        d = ImageDraw.Draw(im)
+        # Festivalgelaende am Horizont: Zeltspitzen, Riesenrad, Lichterkette
+        for k, cx in enumerate(range(20, 640, 70)):
+            hgt = 20 + (k * 7) % 14
+            d.polygon([(cx - 30, 150), (cx + 30, 150), (cx, 150 - hgt)], fill=(40, 26, 60) if k % 2 else (54, 30, 70))
+        cx, cy, r = 560, 104, 40
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(90, 70, 120))
+        for k in range(12):
+            a = k / 12 * math.tau
+            d.line([cx, cy, cx + int(math.cos(a) * r), cy + int(math.sin(a) * r)], fill=(70, 56, 100))
+            d.rectangle([cx + int(math.cos(a) * r) - 1, cy + int(math.sin(a) * r) - 1, cx + int(math.cos(a) * r) + 1, cy + int(math.sin(a) * r) + 1], fill=rnd.choice([(255, 200, 90), (255, 110, 160), (110, 220, 255)]))
+        d.line([cx - 20, 150, cx, cy], fill=(70, 56, 100)); d.line([cx + 20, 150, cx, cy], fill=(70, 56, 100))
+        # Buehnendach (Traversen-Giebel) ueber der Rueckwand
+        d.polygon([(96, 18), (544, 18), (320, 2)], outline=(90, 92, 104))
+        for x in range(100, 540, 16):
+            d.line([x, 18, 320 + (x - 320) * 0.0, 18 - (16 - abs(x - 320) * 16 // 224)], fill=(60, 62, 74))
+        # Rueckwand: Gitter aus Traversen-Pfosten links/rechts der LED
+        for x in (110, 150, 470, 510):
+            d.rectangle([x, 26, x + 4, 150], fill=(52, 54, 66))
+            for y in range(28, 150, 8):
+                d.line([x, y, x + 4, y + 6], fill=(80, 82, 96))
+
+    boden = lambda p, x, y: (clamp(p[0] * 1.1 + 4), clamp(p[1] * 1.1 + 6), clamp(p[2] * 1.2 + 12))
+    rampe = lambda p, x, y: (clamp(luma(p) * 0.55 + 8), clamp(luma(p) * 0.58 + 10), clamp(luma(p) * 0.66 + 16)) if (p[0] < 160 or p[1] < 100) else p
+    nbg = sh_bg_umbau(bg, himmel, boden, rampe)
+
+    nfg = Image.new("RGBA", (640, 360), (0, 0, 0, 0))
+    lay = Image.new("RGB", (640, 360))
+    px = lay.load()
+    band_gradient(px, 0, 0, 640, 300, [(8, 10, 34), (16, 18, 56), (34, 26, 80), (70, 36, 96), (120, 50, 100)])
+    for _ in range(120):
+        x, y = rnd.randrange(640), rnd.randrange(0, 200)
+        px[x, y] = (200, 206, 240)
+    d = ImageDraw.Draw(lay)
+    # Lautsprecher-Tuerme in Geruesten links/rechts
+    for (x0, x1) in ((6, 100), (540, 634)):
+        for x in (x0, x1 - 4):
+            d.rectangle([x, 0, x + 3, 300], fill=(70, 72, 86))
+        for y in range(0, 300, 14):
+            d.line([x0, y, x1 - 1, y + 14], fill=(56, 58, 70))
+            d.line([x1 - 1, y, x0, y + 14], fill=(56, 58, 70))
+            d.line([x0, y, x1, y], fill=(86, 88, 102))
+        for k, y in enumerate(range(40, 236, 34)):
+            d.rectangle([x0 + 10, y, x1 - 10, y + 30], fill=(24, 24, 30))
+            d.rectangle([x0 + 10, y, x1 - 10, y + 1], fill=(60, 60, 72))
+            for cx in (x0 + 30, x1 - 30):
+                d.ellipse([cx - 11, y + 4, cx + 11, y + 26], fill=(40, 40, 50))
+                d.ellipse([cx - 5, y + 10, cx + 5, y + 20], fill=(14, 14, 18))
+        for k, y in enumerate((8, 22)):
+            for cx in range(x0 + 10, x1 - 6, 14):
+                d.rectangle([cx, y, cx + 8, y + 8], fill=(30, 30, 40))
+                d.ellipse([cx + 1, y + 1, cx + 7, y + 7], fill=[(255, 90, 200), (90, 220, 255), (255, 220, 90)][(cx // 14 + k) % 3])
+    # obere Traverse mit Wimpeln
+    d.rectangle([0, 0, 640, 10], fill=(60, 62, 76))
+    for x in range(0, 640, 8):
+        d.line([x, 0, x + 8, 10], fill=(90, 92, 108))
+    for k, x in enumerate(range(104, 536, 16)):
+        d.polygon([(x, 11), (x + 14, 11), (x + 7, 22)], fill=[(255, 90, 160), (90, 210, 255), (255, 210, 80), (140, 255, 130)][k % 4])
+    add_glow(px, 640, 360, 50, 120, 70, (40, 20, 60), 0.6)
+    add_glow(px, 640, 360, 590, 120, 70, (20, 40, 60), 0.6)
+    # Publikum mit Armen + Leuchtstaeben, vom Buehnenlicht angestrahlt
+    sh_publikum(d, rnd, 300, (8, 8, 22), (120, 80, 160), arme=True, sticks=[(120, 255, 120), (255, 90, 200), (90, 220, 255), (255, 230, 90)])
+    lp, fp = lay.load(), nfg.load()
+    for y in range(360):
+        for x in range(640):
+            if not offen(x, y) or y >= 294:
+                fp[x, y] = lp[x, y] + (255,)
+    sh_desk(fg, nfg)
+    return nbg, nfg
+
+
+SH_FX_FESTIVAL = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // Suchscheinwerfer kreuzen ueber dem Gelaende, Sterne funkeln, Riesenrad-Lichter laufen
+  for (const [x0, ph, col] of [[170, 0, '180,120,255'], [470, 1.7, '90,220,255']]) {
+    const a = -Math.PI / 2 + Math.sin(t * 0.6 + ph) * 0.7;
+    ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = `rgb(${col})`;
+    ctx.beginPath(); ctx.moveTo(x0, 150);
+    ctx.lineTo(x0 + Math.cos(a - 0.06) * 260, 150 + Math.sin(a - 0.06) * 260);
+    ctx.lineTo(x0 + Math.cos(a + 0.06) * 260, 150 + Math.sin(a + 0.06) * 260); ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  for (let i = 0; i < 30; i++) {
+    if ((t * 1.3 + i * 0.37) % 1 < 0.2) { ctx.fillStyle = '#fff6d8'; const x = (i * 211) % 640, y = (i * 47) % 140; ctx.fillRect(x, y, 1, 1); }
+  }
+  for (let k = 0; k < 12; k++) {
+    if ((k + Math.floor(t * 6)) % 3) continue;
+    const a = k / 12 * Math.PI * 2; ctx.fillStyle = '#ffffff';
+    ctx.fillRect(Math.round(560 + Math.cos(a) * 40) - 1, Math.round(104 + Math.sin(a) * 40) - 1, 3, 3);
+  }
+};
+"""
+
+
+def sh_zirkus(bg, fg):
+    rnd = random.Random(7202)
+    offen = sh_offen(fg)
+    rot, weiss = (178, 34, 44), (236, 226, 206)
+
+    def zelt(im):
+        px = im.load()
+        for y in range(0, SH_FLOOR_Y[0] + 2):
+            for x in range(640):
+                # Zeltbahnen laufen zur Kuppel ueber der Buehnenmitte zusammen
+                ang = math.atan2(x - 320, y + 120)
+                band = int((ang + 2) * 9) % 2
+                c = rot if band else weiss
+                k = 0.42 + 0.25 * (1 - y / 160)
+                px[x, y] = (clamp(c[0] * k), clamp(c[1] * k), clamp(c[2] * k))
+        d = ImageDraw.Draw(im)
+        # Strickleiter + Netz-Masten neben der LED-Wand
+        for x in (130, 508):
+            d.line([x, 26, x, 150], fill=(150, 120, 80))
+            d.line([x + 8, 26, x + 8, 150], fill=(150, 120, 80))
+            for y in range(30, 150, 7):
+                d.line([x, y, x + 8, y], fill=(120, 96, 60))
+        # Girlanden mit Gluehbirnen
+        for (x0, x1) in ((100, 320), (320, 540)):
+            for i in range(23):
+                u = i / 22
+                x = int(x0 + (x1 - x0) * u)
+                y = int(30 + 14 * 4 * u * (1 - u))
+                px[x, y] = (255, 214, 120)
+                if i % 2 == 0:
+                    add_glow(px, 640, 360, x, y, 5, (90, 70, 30), 0.9)
+        # Manege-Vorhang in der Mitte hinter der LED (Artisteneingang links)
+        d.rectangle([152, 70, 182, 150], fill=(90, 14, 30))
+        for x in range(152, 183, 5):
+            d.line([x, 70, x, 150], fill=(120, 24, 40))
+        d.rectangle([150, 66, 184, 70], fill=(200, 160, 60))
+
+    def boden(p, x, y):
+        k = 0.45 + luma(p) / 40
+        v = (x * 73856093 ^ y * 19349663) & 7
+        c = (196, 150, 96) if v else (220, 176, 120)
+        return (clamp(c[0] * k), clamp(c[1] * k), clamp(c[2] * k))
+
+    def rampe(p, x, y):
+        if p[0] > 160 and p[1] > 100:          # Gluehbirnen bleiben
+            return p
+        k = luma(p) / 60
+        return (clamp(180 * k + 20), clamp(36 * k + 10), clamp(40 * k + 12)) if (y - 262) % 10 < 7 else (clamp(210 * k + 30), clamp(170 * k + 20), clamp(60 * k + 10))
+
+    nbg = sh_bg_umbau(bg, zelt, boden, rampe)
+
+    nfg = Image.new("RGBA", (640, 360), (0, 0, 0, 0))
+    lay = Image.new("RGB", (640, 360))
+    px = lay.load()
+    d = ImageDraw.Draw(lay)
+    for y in range(360):
+        for x in range(640):
+            ang = math.atan2(x - 320, y + 160)
+            c = rot if int((ang + 2) * 11) % 2 else weiss
+            px[x, y] = mix(c, (20, 10, 16), 0.25)
+    # Tribuenen links/rechts mit Zuschauerkoepfen
+    for (x0, x1, sgn) in ((0, 104, 1), (536, 640, -1)):
+        for row, y in enumerate(range(70, 250, 20)):
+            d.rectangle([x0, y + 12, x1, y + 19], fill=(70, 40, 30))
+            d.line([x0, y + 12, x1, y + 12], fill=(140, 96, 60))
+            for cx in range(x0 + 6 + (row % 2) * 6, x1 - 4, 12):
+                c, h = rnd.choice(SC_FARBEN), rnd.choice(SC_HAUT)
+                d.rectangle([cx - 4, y + 4, cx + 4, y + 12], fill=c)
+                d.ellipse([cx - 3, y - 4, cx + 3, y + 3], fill=h)
+        pole = x1 - 8 if sgn > 0 else x0 + 2
+        for y in range(0, 300):
+            d.line([pole, y, pole + 6, y], fill=rot if (y // 6) % 2 else (240, 220, 170))
+    # Volant mit Goldfransen oben
+    for x in range(0, 640):
+        hgt = 22 + int(7 * abs(math.sin(x / 32 * math.pi)))
+        for y in range(0, hgt):
+            px[x, y] = rot if (x // 32) % 2 else (40, 70, 150)
+        px[x, hgt] = (230, 190, 70)
+        if x % 3 == 0:
+            px[x, hgt + 1] = (200, 160, 50)
+            px[x, hgt + 2] = (170, 130, 40)
+    for x in range(16, 640, 32):
+        d.polygon([(x, 6), (x + 3, 12), (x, 18), (x - 3, 12)], fill=(250, 214, 90))
+    # Manegen-Bande + Publikum vorn
+    d.rectangle([0, 286, 640, 300], fill=(160, 24, 34))
+    d.line([0, 286, 640, 286], fill=(240, 200, 90))
+    for x in range(10, 640, 40):
+        d.polygon([(x, 289), (x + 3, 293), (x, 297), (x - 3, 293)], fill=(250, 214, 90))
+    sh_publikum(d, rnd, 310, (22, 10, 18), (220, 150, 80))
+    lp, fp = lay.load(), nfg.load()
+    for y in range(360):
+        for x in range(640):
+            if not offen(x, y) or y >= 294:
+                fp[x, y] = lp[x, y] + (255,)
+    sh_desk(fg, nfg)
+    return nbg, nfg
+
+
+SH_FX_ZIRKUS = r"""
+window.__fx = (ctx) => {
+  const t = performance.now() / 1000;
+  // Trapez schwingt links neben der LED-Wand, zwei Verfolger kreisen ueber das Zeltdach
+  const a = Math.sin(t * 1.6) * 0.6, px = 134, py = 26, L = 70;
+  const bx = px + Math.sin(a) * L, by = py + Math.cos(a) * L;
+  ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(bx - 6, by); ctx.moveTo(px + 6, py); ctx.lineTo(bx + 6, by); ctx.stroke();
+  ctx.fillStyle = '#e8d8b0'; ctx.fillRect(Math.round(bx) - 7, Math.round(by), 14, 2);
+  ctx.fillStyle = '#20141a';
+  ctx.fillRect(Math.round(bx) - 2, Math.round(by) + 2, 4, 10); ctx.fillRect(Math.round(bx) - 3, Math.round(by) - 5, 6, 6);
+  for (const [cx, ph] of [[240, 0], [400, 2.1]]) {
+    const x = cx + Math.sin(t * 0.9 + ph) * 70, y = 60 + Math.cos(t * 0.7 + ph) * 20;
+    const g = ctx.createRadialGradient(x, y, 2, x, y, 34);
+    g.addColorStop(0, 'rgba(255,240,200,0.30)'); g.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = g; ctx.fillRect(x - 34, y - 34, 68, 68);
+  }
+};
+"""
+
+
+def showcase():
+    s, m, D = lade("showcase", "buehne.html", "DATA")
+    bg, fg = dec(D["layers"]["bg"]).convert("RGB"), dec(D["layers"]["fg"])
+    for slug, painter, fx, title, h1, lead in (
+        ("festival", sh_festival, SH_FX_FESTIVAL, "Showcase Freiluft-Festival", "Showcase &mdash; Hauptb&uuml;hne beim Freiluft-Festival",
+         "Derselbe Auftritt wie im Theater (gleiche Acts, gleiche Jury, gleiche LED-Wertung), nur unter freiem Himmel: "
+         "Lautsprechert&uuml;rme, Riesenrad am Horizont, Publikum mit Leuchtst&auml;ben, Suchscheinwerfer."),
+        ("zirkus", sh_zirkus, SH_FX_ZIRKUS, "Showcase Zirkuszelt", "Showcase &mdash; Manege im Zirkuszelt",
+         "Derselbe Auftritt wie im Theater (gleiche Acts, gleiche Jury, gleiche LED-Wertung), nur in der Manege: "
+         "rot-wei&szlig;es Zeltdach, S&auml;gemehl, Trib&uuml;nen ringsum, ein Trapez schwingt im Hintergrund."),
+    ):
+        nbg, nfg = painter(bg, fg)
+        if os.environ.get("SZENEN_DEBUG"):
+            c = nbg.convert("RGBA"); c.alpha_composite(nfg); c.save(os.path.join(os.environ["SZENEN_DEBUG"], f"showcase-{slug}-bg.png"))
+        D2 = json.loads(json.dumps(D))
+        D2["layers"]["bg"] = enc(nbg)
+        D2["layers"]["fg"] = enc(nfg)
+        out = ersetze_json(s, m, D2)
+        schreibe("showcase", slug, out, title, h1, None, "ctx.drawImage(IMG.L_bg, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
+
+
+ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach, "takeshis-castle": takeshis_castle, "showcase": showcase}
 
 if __name__ == "__main__":
     ziele = sys.argv[1:] or list(ALLE)
