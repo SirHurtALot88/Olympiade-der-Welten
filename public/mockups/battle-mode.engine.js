@@ -4543,14 +4543,25 @@
     if(grundName)pixelBild(z,grundName+".png",1,rest); else rest();
     return z;
   }
+  // GRUNDPOSE EINER FIGUR (Opus-Review-Fund, 03.11.: dieselbe Abfrage stand vorher einzeln in
+  // pixelFigurGeladen/pixelFigurBereit/pixelGrundGeladen/zeichnePixelIkone -- vier Stellen, die
+  // bei einer Aenderung an der Rueckfall-Reihenfolge (z.B. falls "south" einmal nicht mehr der
+  // erste Eintrag in fig.r waere) alle vier einzeln haetten mitgezogen werden muessen).
+  const pixelGrundBild=(z)=>z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
   // Geladen = jede angeforderte Datei der Figur ist da oder endgueltig fehlgeschlagen (Spieler
   // ohne eigene Figur gelten als geladen: sie bleiben ohnehin beim Baukasten).
   function pixelFigurGeladen(name){
     const z=pixelFigurLaden(name);
     if(!z)return true;
-    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    const grund=pixelGrundBild(z);
     if(!grund||!(grund.im||grund.fehler))return false;
-    if(grund.fehler)return true;
+    // KEIN FRUEHER return true BEI grund.fehler (Opus-Review-Fund, 03.11.): pixelBild() stoesst
+    // beim Fehlschlag der Grundpose synchron im selben Handler rest() an (s. fertig() dort),
+    // das die uebrigen ~11 Dateien der Figur anfordert -- deren eigene im/fehler sind dann aber
+    // noch nicht gesetzt. Der fruehe return meldete die Figur deshalb als komplett geladen,
+    // waehrend diese Dateien noch unterwegs waren. Jetzt zaehlt derselbe Vollstaendigkeits-Check
+    // wie im Erfolgsfall -- er behandelt grund.fehler ohnehin schon korrekt (ein `e` mit
+    // `e.fehler` gilt als fertig, s. die Schleife unten).
     let soll=z.fig.r.length; for(const art in z.fig.a)soll+=Object.keys(z.fig.a[art]).length;
     if(z.bilder.size<soll)return false;
     for(const e of z.bilder.values())if(!e.im&&!e.fehler)return false;
@@ -4561,7 +4572,7 @@
   function pixelFigurBereit(name){
     const z=pixelFigurLaden(name);
     if(!z)return null;
-    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    const grund=pixelGrundBild(z);
     return (grund&&grund.im&&grund.mass)?z:null;
   }
   // Leerer Bauplan fuer Pixel-Figuren (s. zeichneSprite) und der generische Schlaeger-Griff.
@@ -4570,7 +4581,7 @@
   // Kader-/Aufstellungs-Ikone (figur()): Frontpose, Fuesse am unteren Rand, auf die Kachel
   // eingepasst (Hoehe zuerst, Breite gedeckelt) — wie der 40x50-Baukasten-Ausschnitt.
   function zeichnePixelIkone(cx,z,w,h){
-    const e=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    const e=pixelGrundBild(z);
     if(!e||!e.im||!e.mass)return;
     const m=e.mass;
     const s=Math.min((h-4)/Math.max(1,m.hoehe),(w-2)/Math.max(1,m.breite));
@@ -4598,7 +4609,7 @@
   function pixelGrundGeladen(name){
     const z=pixelFigurLaden(name);
     if(!z)return true;
-    const grund=z.bilder.get("south.png")||z.bilder.get(z.fig.r[0]+".png");
+    const grund=pixelGrundBild(z);
     return !!grund&&!!(grund.im||grund.fehler);
   }
   function pixelFigurenAlleGeladen(){
@@ -8287,6 +8298,35 @@
   }
   const besterFuer=(slotId,frei,d)=>frei.map(p=>({p,m:slotAufschlag(p,slotId,d)}))
     .sort((x,y)=>y.m-x.m)[0]||null;
+  // TOP 3 STATT NUR DEM EINEN BESTEN (Chris, 03.11.: "hier kannst du immer die top 3 zeigen
+  // nicht nur den besten sonst hat man ja keine auswahl"). SORTIERT NACH `abs`, NICHT NACH
+  // `m` (Chris, zweiter Fund, direkt am Skirmisher-Beispiel: "bei skirmisher ist die
+  // riehenfolge falsch"): `m` ist nur der Slot-Zuschlag, `abs` (Basis-Eignung + m) ist die
+  // Zahl, die tatsaechlich daneben steht -- bei einem Spieler mit hoher Slot-Passung aber
+  // niedriger Basis-Eignung konnte "1." so eine KLEINERE Zahl zeigen als "2.". Dieselbe
+  // Eignungsluecke/Rueckfall wie am Renderort (CLAUDE.md: "p.d haelt nur tdm und spurt
+  // vorberechnet") -- `abs` wird hier einmal mitgeliefert, damit render es nicht doppelt
+  // rechnen muss.
+  const bestenFuer=(slotId,frei,d,n=3)=>frei.map(p=>{
+      const m=slotAufschlag(p,slotId,d);
+      const abs=(p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))+m;
+      return {p,m,abs};
+    }).sort((x,y)=>y.abs-x.abs).slice(0,n);
+  // UMGEKEHRTE RICHTUNG: nicht "wer passt am besten auf DIESEN Slot" (besterFuer/bestenFuer
+  // oben), sondern "welche Slots passen am besten zu DIESEM Spieler" -- fuer die Kader-Liste
+  // (Chris, 03.11.: "die 3 staerksten Positionen der Spieler dargestellt ... unter dem
+  // grossen wert fuer die Diszi"). Dieselbe slotAufschlag()-Grundlage wie oben.
+  const topSlotsFuer=(p,d,n=3)=>slotsVon(d).map(rw=>({rw,m:slotAufschlag(p,rw.id,d)}))
+    .sort((x,y)=>y.m-x.m).slice(0,n);
+  // KUERZEL STATT VOLLEM SLOT-NAMEN (Chris: "fuer die Posis kannst du dann auch Abkuerzungen
+  // verwenden"): zwei Woerter -> beide Anfangsbuchstaben ("Hold Line" -> HL, "Rally Point" ->
+  // RP), ein Wort -> die ersten zwei Buchstaben ("Vanguard" -> VA, "Breaker" -> BR). Deckt alle
+  // heutigen Slot-Label ab (SLOTS_JE_DISC), ohne Disziplin fuer Disziplin eine eigene Liste zu
+  // pflegen -- wo zwei Kuerzel derselben Disziplin kollidieren, bleibt der volle Name im Tooltip.
+  const slotKuerzel=(label)=>{
+    const w=label.split(" ");
+    return (w.length>=2?w[0][0]+w[1][0]:label.slice(0,2)).toUpperCase();
+  };
   // Angeklickter Slot: danach sortiert die Spielerliste und zeigt das Plus/Minus.
   let slotFokus=null;
 
@@ -37035,8 +37075,27 @@
         r.appendChild(b);
       }
       const t=p.d.tdm,s=p.d.spurt;
-      r.appendChild(el("div","eg"+(t>=s?" best":""),t.toFixed(0)));
-      r.appendChild(el("div","eg"+(s>t?" best":""),s.toFixed(0)));
+      // 3 STAERKSTE POSITIONEN UNTER JEDEM WERT, FUER BEIDE DISZIPLINEN (Chris, 03.11.:
+      // "nicht nur in der rolle auch bei der player card im kader links ... bei eignung und
+      // dann unterteilung in seine top 3 eignungen fuer beide diszis" -- die Zuordnung galt
+      // zuerst nur fuer die GERADE AKTIVE Disziplin, Chris wollte aber beide Spalten immer
+      // zugleich, unabhaengig vom gewaehlten Tab). In derselben schmalen eg-Zelle statt einer
+      // eigenen Spalte, deshalb nur unter TDM/SPURT moeglich -- die beiden einzigen
+      // Disziplinen, die diese Liste ueberhaupt als Spalte zeigt (s. CLAUDE.md "p.d haelt nur
+      // tdm und spurt vorberechnet"). Fuer die anderen 18 Disziplinen gibt es hier keinen
+      // passenden Wert, an den sich die Positionen haengen liessen.
+      const posZelle=(cls,d)=>{
+        const c=el("div",cls,(d==="tdm"?t:s).toFixed(0));
+        if(slotsVon(d).length){
+          const top=topSlotsFuer(p,d,3);
+          const sub=el("span","egposis",top.map(x=>slotKuerzel(x.rw.label)).join(" · "));
+          sub.title="Staerkste Positionen in "+DISCS[d].label+": "+top.map(x=>x.rw.label).join(", ");
+          c.appendChild(sub);
+        }
+        return c;
+      };
+      r.appendChild(posZelle("eg"+(t>=s?" best":""),"tdm"));
+      r.appendChild(posZelle("eg"+(s>t?" best":""),"spurt"));
       const go=()=>{sel=sel===p.n?null:p.n;renderAll();};
       r.addEventListener("click",go);
       r.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go();}});
@@ -37088,24 +37147,34 @@
       // absoluten Wert, den er in diesem Slot haette.
       {
         const kandidaten=drin.length?SQUAD.filter(p=>!place[p.n]||place[p.n].d!==disc):frei;
-        const b=besterFuer(rw.id,kandidaten,disc);
-        if(b){const v=el("div","slotvorschlag");
-          v.appendChild(el("span","vlabel",drin.length?"Besser wäre":"Bester Freier"));
+        // TOP 3 statt nur dem einen Besten (Chris, 03.11.: "hier kannst du immer die top 3
+        // zeigen nicht nur den besten sonst hat man ja keine auswahl") -- echte Auswahl statt
+        // eines einzigen Vorschlags, den man nur annehmen oder ignorieren kann.
+        const besten=bestenFuer(rw.id,kandidaten,disc,3);
+        besten.forEach((b,i)=>{
+          const v=el("div","slotvorschlag");
+          // "1./2./3." statt "Bester Freier"/"Besser waere" (Chris, 03.11.: "schreib nicht
+          // BESTER FREIER das ist viel zu lang mach doch einfach 1. 2. 3. und halte die
+          // slots kompakt") -- durchgehend numerisch, kein Sonderfall fuer Platz 1.
+          v.appendChild(el("span","vlabel",String(i+1)+"."));
+          // SPRITE STATT NUR TEXT (Chris, 03.11.: "kannst du ggf auch die sprites der
+          // spieler zeigen? dann bekommt man auch optisch nen eindruck das ist bei
+          // kampfdiszis wichtig wenn wir zwischen nahkampf fernkampf und heiler
+          // unterscheiden") -- figur() statt figurKlein(): figurKlein ist absolut
+          // positioniert (fuer die .pico-Box der Kader-Liste gebaut), hier steht die
+          // Figur in einer normalen Flex-Zeile. Feste kleine Groesse (statt der
+          // figurFaktor-Skalierung von figur()), damit die Zeile kompakt bleibt, egal
+          // wie gross die Figur im Kampf selbst gezeichnet wird.
+          const ic=figur(b.p); ic.style.width="20px"; ic.style.height="25px";
+          v.appendChild(ic);
           v.appendChild(el("b",null,b.p.n));
-          // Dieselbe Eignungsluecke wie in bauFeldspiel/bauBuehne/bauSpurt/baueEinheit
-          // (CLAUDE.md: "p.d haelt nur tdm und spurt vorberechnet"), fuenfte Fundstelle
-          // (Opus-Projektueberwachung, 03.09.): `p.d[disc]||0` ist fuer die anderen 18
-          // Disziplinen immer 0, die angezeigte "absolute" Eignung war also nur der kleine
-          // Slot-Modifikator (b.m, Spanne +/-8,5) statt einer echten ~0-99-Eignung — der
-          // Vorschlag "Bester Freier"/"Besser waere" zeigte eine fast bedeutungslose Zahl.
-          // Gleicher Rueckfall wie ueberall sonst: gewichtet(p.a, BASIS_JE_DISC[...]).
-          const abs=(b.p.d[disc]!=null?b.p.d[disc]:gewichtet(b.p.a,BASIS_JE_DISC[disc]||{}))+b.m;
-          v.appendChild(el("s",null,abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
+          v.appendChild(el("s",null,b.abs.toFixed(1)+" ("+(b.m>0?"+":"")+b.m.toFixed(1)+")"));
           v.addEventListener("click",()=>{
             const raus=here.find(x=>place[x.n].slot===rw.id);
             if(raus)delete place[raus.n];
             place[b.p.n]={d:disc,slot:rw.id};if(!order[b.p.n])order[b.p.n]=slotOrd(rw.id);sel=null;renderAll();});
-          z.appendChild(v);}
+          z.appendChild(v);
+        });
       }
       // Ablegen per Ziehen.
       z.addEventListener("dragover",ev=>{ev.preventDefault();z.classList.add("ueber");});
@@ -42146,13 +42215,14 @@
   const KULISSEN=(typeof window!=="undefined"&&window.__ARENA_KULISSEN&&typeof window.__ARENA_KULISSEN==="object")?window.__ARENA_KULISSEN:{};
   const kulisseBilder={};
   let kulisseAktiv=null;
-  // FNV-1a plus Schluss-Durchmischung (murmur3 fmix32): ohne sie verteilen sich Saaten, die sich
-  // nur in einer Ziffer unterscheiden, schlecht auf zwei oder drei Varianten.
-  function kulisseHash(s){
-    let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
-    h^=h>>>16; h=Math.imul(h,0x85ebca6b); h^=h>>>13; h=Math.imul(h,0xc2b2ae35); h^=h>>>16;
-    return h>>>0;
-  }
+  // FNV-1a plus Schluss-Durchmischung: ohne sie verteilen sich Saaten, die sich nur in einer
+  // Ziffer unterscheiden, schlecht auf zwei oder drei Varianten. KEINE DRITTE EIGENE
+  // IMPLEMENTIERUNG (Opus-Review-Fund, 03.11.: stand hier als dritter, fast identischer
+  // FNV-1a-plus-Avalanche-Hash neben normalisiereSaat() -- dieselbe FNV-1a-Schleife -- und
+  // ispyMischeHash() -- derselbe Zweck "Saat deterministisch streuen, kein rr()" -- obwohl
+  // beide schon existieren): der Text-Teil ist wortwoertlich normalisiereSaat(), die
+  // Durchmischung ist ispyMischeHash().
+  const kulisseHash=(s)=>ispyMischeHash(normalisiereSaat(s));
   function kulisseWaehlen(saat){
     const liste=KULISSEN[disc];
     if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
@@ -42837,6 +42907,14 @@
     }catch(e){}
   }
 
+  // KULISSEN-STAND (Opus-Review-Notiz, 03.11.): kulisseZeichnen() wird bisher per Hand in
+  // bodenArena() (unten) und einzeln in bodenWettessen() aufgerufen, NICHT hier im
+  // Dispatcher — deshalb zeigen heute nur TDM/Mini-DM (beide ueber bodenArena) und Wettessen
+  // (eigene Funktion, nicht das gemeinsame bodenBuehne) eine illustrierte Kulisse. Eine
+  // weitere Buehne-Disziplin (z.B. Eiskunstlauf) braucht deshalb noch einen eigenen Eingriff
+  // in bodenBuehne() statt nur eines neuen Eintrags in window.__ARENA_KULISSEN; der
+  // Generator (scripts/baue-arena-kulissen.py, CHASSIS-Tabelle) ist fuer "arena"/"buehne"
+  // schon vorbereitet, der Motor zieht es nur noch nicht durch den Dispatcher hier.
   function zeichneBoden(){
     if(istFeldspiel(disc))return bodenFeldspiel();
     if(istBuehne(disc))return bodenBuehne();
@@ -54572,9 +54650,17 @@
   // Wanduhr-Verzoegerung VOR dem ersten Tick: die Simulation tickt danach unveraendert, Quick-Sim
   // (schnellDurch) und Sonden laufen nicht durch spielLaeuft und warten nie.
   const FIGUREN_WARTE_MS=4000;
+  // SONDEN-SCHALTER (Opus-Review-Fund, 03.11.): sendungsrahmenAus() in scripts/lib/
+  // arena-anpfiff.mjs versprach bisher "das alte, sofortige Verhalten", kannte dieses vierte
+  // Wandzeit-Element aber nicht -- ein Skript, das nach sendungsrahmenAus() fest statt per
+  // warteAufAnpfiff() wartet, haette ab jetzt zufaellig bis zu FIGUREN_WARTE_MS zu frueh
+  // zugegriffen. Derselbe Schalter-Stil wie anpfiffCountdown/finaleEchtzeit/endstandNachlauf
+  // oben: window.__arena.figurenWarten(false) schaltet ihn fuer diese Seite ab, sendungs-
+  // rahmenAus() tut das jetzt serienmaessig mit.
+  let figurenWartenAn=true;
   function spielLaeuft(an,ohneFigurenWarten){
     const bereit=()=>pixelFigurenAlleGeladen()&&kulisseGeladen();
-    if(an&&!ohneFigurenWarten&&!running&&!anpfiffErfolgt&&!bereit()){
+    if(an&&figurenWartenAn&&!ohneFigurenWarten&&!running&&!anpfiffErfolgt&&!bereit()){
       if(figurenWarten)return;
       const start=wandMs(), meinDisc=disc;
       const pb=document.getElementById("play"); if(pb)pb.textContent="Lade Figuren …";
@@ -54589,8 +54675,12 @@
     if(figurenWarten){ clearInterval(figurenWarten); figurenWarten=null; }
     running=an;
     if(an)anpfiffErfolgt=true;
-    const playKnopf=document.getElementById("play"); if(!playKnopf)return;
-    playKnopf.textContent=running?"Pause":"Weiter";
+    // KEIN FRUEHER return BEIM FEHLENDEN KNOPF (Opus-Review-Fund, 03.11.): running/
+    // anpfiffErfolgt sind oben schon gesetzt -- ein return hier liesse aktualisiereTdmNotizen()
+    // und den Basketball-/Breaking-Ton-Sync unten aus, obwohl der Zustand laengst umgeschaltet
+    // ist. #play fehlt im normalen Markup nie; nur das Knopf-Textupdate selbst braucht ihn.
+    const playKnopf=document.getElementById("play");
+    if(playKnopf)playKnopf.textContent=running?"Pause":"Weiter";
     // s. aktualisiereTdmNotizen() oben: Play/Pause ist der zweite Ort (neben reset()),
     // an dem sich `running` aendert, ohne dass zwingend noch derselben Tick updateHud()
     // laeuft (die Kampfschleife ruft updateHud() nur, waehrend running gerade true ist) --
@@ -55142,6 +55232,13 @@
     const placeVorher={...place}, formVorher=FORMKARTE;
     const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
     // Pod-Gegner frueh anfordern statt faul beim ersten Zeichnen (s. pixelFigurVorladen).
+    // ERST LEEREN (Opus-Review-Fund, 03.11.): reset() hat pixelFigurenImSpiel schon mit dem
+    // 1v1-Duell-Kader (SQUAD/OPP) gefuellt, BEVOR bekannt war, dass dieser Spieltag ein
+    // Pod ist. Battlefield ist arenaChassis (pixelFigurenFuerAnpfiff liest dort U, nicht
+    // diese Liste), die stehengebliebenen Duell-Namen koennen den Anpfiff hier also nicht
+    // verzoegern -- geleert wird trotzdem, zur selben Stelle wie bei bahnPodAnzeigeBauen
+    // (dort IST es noetig, s. dort) und weil figurenStand() sonst falsche Duell-Namen zeigt.
+    pixelFigurenImSpiel=[];
     try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
     if(!bfPodAnzeigeVereinSnap)bfPodAnzeigeVereinSnap=bfPodVereinSchnappschuss();
     bfPodVereineSetzen(pod.teams);
@@ -57723,6 +57820,14 @@
   }
   function bahnPodAnzeigeBauen(pod){
     const kader=pod.teams.map(tm=>mitKit(bfPodKaderVon(tm)));
+    // ERST LEEREN (Opus-Review-Fund, 03.11.): reset() preloadet den 1v1-Duell-Kader
+    // (SQUAD/OPP), bevor bekannt ist, dass dieser Spieltag ein Bahn-Pod (Takeshi's
+    // Castle/Staffel) ist. Bahn ist NICHT arenaChassis (istBahn(disc) in
+    // pixelFigurenFuerAnpfiff) -- ohne dieses Leeren faellt der Anpfiff-Gate auf die
+    // ganze pixelFigurenImSpiel-Liste zurueck, die dann noch die irrelevanten Duell-
+    // Namen enthaelt, und kann unnoetig bis FIGUREN_WARTE_MS auf Spieler warten, die
+    // in diesem Rennen gar nicht laufen.
+    pixelFigurenImSpiel=[];
     try{ pixelFigurVorladen(kader.flat().map(p=>p&&p.n)); }catch(e){}
     bahnPodAnzeige={kader, vereinSnap:bfPodVereinSchnappschuss(), saat:pod.saat};
     bfPodVereineSetzen(pod.teams);
@@ -58938,13 +59043,16 @@
       return finaleEchtzeitAn;
     },
     endstandNachlauf:(an)=>{ if(an!==undefined)endstandNachlaufAn=!!an; return endstandNachlaufAn; },
-    // Bequemer Sammelschalter: alle drei Wandzeit-Bausteine an/aus.
+    // Vierter Baustein neben den drei obigen (03.11., s. figurenWartenAn-Kommentar bei
+    // spielLaeuft): der Anpfiff-Wartegate auf geladene Figuren/Kulisse.
+    figurenWarten:(an)=>{ if(an!==undefined)figurenWartenAn=!!an; return figurenWartenAn; },
+    // Bequemer Sammelschalter: alle vier Wandzeit-Bausteine an/aus.
     sendungsrahmen:(an)=>{
       // finaleEchtzeit beim Wiedereinschalten auf die gespeicherte Wahl des Zuschauers
       // zuruecksetzen statt sie fuer diese Seite pauschal auf "an" zu zwingen.
-      const a=!!an; anpfiffCountdownAn=a; endstandNachlaufAn=a; finaleEchtzeitAn=a&&lsLesen("finaleEchtzeit")!=="0";
+      const a=!!an; anpfiffCountdownAn=a; endstandNachlaufAn=a; figurenWartenAn=a; finaleEchtzeitAn=a&&lsLesen("finaleEchtzeit")!=="0";
       finaleSchalterAnzeige(); tempoAnzeigeAktualisieren();
-      return {anpfiffCountdown:a, finaleEchtzeit:finaleEchtzeitAn, endstandNachlauf:a};
+      return {anpfiffCountdown:a, finaleEchtzeit:finaleEchtzeitAn, endstandNachlauf:a, figurenWarten:a};
     },
     // Fuer scripts/lib/arena-anpfiff.mjs (warteAufAnpfiff): "laeuft und erster Tick ist durch".
     anpfiffStatus:()=>({laeuft:running, countdown:!!anpfiffLauf, angepfiffen:anpfiffErfolgt,
