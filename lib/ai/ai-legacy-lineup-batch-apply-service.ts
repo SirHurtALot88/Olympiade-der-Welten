@@ -1,3 +1,4 @@
+import { listBookedMatchdaySides, repairFrozenAiDraftsWithBlockedPlayers } from "@/lib/ai/ai-frozen-draft-blocked-repair";
 import {
   buildAiFormCardSeasonPlan,
   getPlannedCardIdsForSlot,
@@ -1753,13 +1754,7 @@ function hasBookedMatchdaySide(
   gameState: GameState,
   scope: { saveId: string; seasonId: string; matchdayId: string },
 ): boolean {
-  const resultIds = new Set(
-    (gameState.seasonState.matchdayResults ?? [])
-      .filter((entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId)
-      .map((entry) => entry.id),
-  );
-  if (resultIds.size === 0) return false;
-  return (gameState.seasonState.disciplineResults ?? []).some((result) => resultIds.has(result.matchdayResultId));
+  return listBookedMatchdaySides(gameState, scope).size > 0;
 }
 
 export function applyAiLegacyLineupBatchLocally(
@@ -1814,6 +1809,15 @@ export function applyAiLegacyLineupBatchLocally(
 	    formCardEnsure.warnings.push(error instanceof Error ? `team_power_prepare_skipped:${error.message}` : "team_power_prepare_skipped");
 	  }
 	  performanceBreakdown.teamPowerPlanningMs += elapsedSince(powerStartedAt);
+	  // Netz unter dem Einfrieren (s. `matchdayAlreadyStarted` weiter unten): steht in der noch
+	  // offenen Seite eines eingefrorenen KI-Entwurfs ein gesperrter Spieler, wird er gezielt
+	  // nachbesetzt — gewertet wuerde er sonst (die Score-Engine kennt keine Sperre). Herleitung in
+	  // `lib/ai/ai-frozen-draft-blocked-repair.ts`.
+	  preparedGameState = repairFrozenAiDraftsWithBlockedPlayers({
+	    gameState: preparedGameState,
+	    scope: { saveId: scope.saveId, seasonId: scope.seasonId, matchdayId: scope.matchdayId },
+	    repairableTeamIds: new Set(scope.teams.filter((team) => team.controlMode !== "manual").map((team) => team.teamId)),
+	  }).gameState;
 	  if (!dryRun && typeof persistence.saveSingleplayerState === "function") {
 	    persistence.saveSingleplayerState(scope.saveId, preparedGameState);
 	  }
