@@ -122,20 +122,23 @@ def sky(px, w, y0, y1, stops):
 def mountains(px, w, base, amp, col, snow, seed, fr=0.012, snow_line=0.55, top_lim=0):
     rnd = random.Random(seed)
     ph = [rnd.random() * 6.28 for _ in range(3)]
+    hgt = lambda x: amp * (0.55 + 0.25 * math.sin(x * fr + ph[0]) + 0.15 * math.sin(x * fr * 2.7 + ph[1])
+                           + 0.08 * math.sin(x * fr * 6.1 + ph[2]))
     for x in range(w):
-        h = amp * (0.55 + 0.25 * math.sin(x * fr + ph[0]) + 0.15 * math.sin(x * fr * 2.7 + ph[1])
-                   + 0.08 * math.sin(x * fr * 6.1 + ph[2]))
+        h = hgt(x)
+        shade = hgt(x + 3) < h - 0.4          # nach rechts abfallender Hang liegt im Schatten
         top = max(top_lim, int(base - h))
         for y in range(top, base):
-            rel = (y - top) / max(1, base - top)
             c = col
-            if snow and rel < snow_line * (0.6 + 0.4 * math.sin(x * 0.21 + y * 0.05)):
+            # Schneekappe: unregelmaessige Unterkante (mehrere Wellen statt Saegezahn)
+            depth = (base - top) * snow_line * (0.55 + 0.25 * math.sin(x * 0.043 + ph[2])
+                                                 + 0.15 * math.sin(x * 0.11 + ph[0]) + 0.08 * math.sin(x * 0.29))
+            if snow and (y - top) < depth:
                 c = snow
-                if (x + y) % 7 == 0 or (math.sin(x * 0.9) > 0.6 and rel > 0.1):
+                if (y - top) > depth - 2 or (noise(x, y, seed) > 0.9 and (y - top) > 3):
                     c = mix(snow, col, 0.35)
             # Lichtseite links, Schattenseite rechts der Grate
-            slope = math.cos(x * fr * 2.7 + ph[1])
-            if slope < -0.3:
+            if shade:
                 c = mix(c, (0, 0, 0), 0.18)
             px[x, y] = c + (255,) if len(px[x, y]) == 4 else c
 
@@ -362,8 +365,168 @@ def build_basketball():
     write("basketball", "streetcourt", s)
 
 
+# ================================================================== HOCKEY — Freiluft-Eisfeld im Gebirge
+HK_SRC = os.path.join(SZ, "hockey", "eis.html")
+HK_STANDS = 163          # bis hierher reicht die Tribuene der Vorlage
+HK_RAIL = 118            # Oberkante der Bandenverglasung auf der Geraden
+HK_GLASS_X = (235, 1605)  # Geraden-Abschnitt der Verglasung, ausserhalb Viertelellipsen bis zur Bande
+
+
+def hk_floor_mask(clean):
+    """Flutfuellung des dunklen Hallenbodens (inkl. Boden hinter Glas) ab den Raendern."""
+    W, H = clean.size
+    px = clean.load()
+    ok = lambda p: sat(p) < 28 and luma(p) < 100
+    seen = bytearray(W * H)
+    stack = [(x, H - 1) for x in range(0, W, 7)] + [(0, y) for y in range(HK_STANDS, H, 5)] + \
+            [(W - 1, y) for y in range(HK_STANDS, H, 5)] + [(x, HK_STANDS) for x in range(0, W, 5)]
+    # Boden hinter dem gebogenen Glas an den Stirnseiten ist von Handlauf und Pfosten eingeschlossen
+    glass = px[150, 200]
+    for y in range(HK_STANDS, 470):
+        for x in list(range(40, 245)) + list(range(1595, 1800)):
+            if sum(abs(a - b) for a, b in zip(px[x, y], glass)) < 24:
+                stack.append((x, y))
+    while stack:
+        x, y = stack.pop()
+        if not (0 <= x < W and HK_STANDS <= y < H) or seen[y * W + x] or not ok(px[x, y]):
+            continue
+        seen[y * W + x] = 1
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    return seen
+
+
+def hk_glass_top(x):
+    x0, x1 = HK_GLASS_X
+    if x0 <= x <= x1:
+        return HK_RAIL
+    cx = x0 if x < x0 else x1
+    u = min(1.0, abs(x - cx) / 185)
+    return int(360 - 242 * math.sqrt(max(0.0, 1 - u * u)))
+
+
+def hk_backdrop(W, H):
+    im = Image.new("RGB", (W, H))
+    px = im.load()
+    rnd = random.Random(1907)
+    sky(px, W, 0, 140, [(108, 156, 214), (138, 178, 224), (170, 200, 232), (204, 222, 238), (226, 234, 242)])
+    d = ImageDraw.Draw(im)
+    sx, sy = 1480, 34
+    add_glow(px, W, H, sx, sy, 50, (50, 46, 30), 0.8)
+    d.ellipse([sx - 9, sy - 9, sx + 9, sy + 9], fill=(255, 248, 222))
+    for (cx, cy, wl) in ((220, 30, 120), (640, 52, 90), (1100, 22, 140), (1700, 58, 80)):
+        for k in range(wl):
+            if (k * 5) % 7:
+                px[cx + k, cy] = (240, 244, 248)
+            if 10 < k < wl - 10:
+                px[cx + k, cy + 1] = (226, 234, 244)
+            if 25 < k < wl - 30 and k % 2:
+                px[cx + k, cy - 1] = (248, 250, 252)
+    mountains(px, W, 132, 112, (122, 138, 168), (236, 242, 250), 11, fr=0.006, snow_line=0.5)
+    mountains(px, W, 150, 70, (92, 108, 132), (222, 232, 244), 23, fr=0.011, snow_line=0.35)
+    # Nadelwald mit Schnee
+    for x in range(-10, W + 10, 9):
+        h = 22 + int(12 * noise(x, 1, 5)) + int(8 * math.sin(x * 0.03))
+        pine(d, x + rnd.randint(-3, 3), 158, h, (34, 70, 56), (52, 96, 74), (236, 242, 248))
+    for x in range(-6, W + 6, 13):
+        h = 28 + int(14 * noise(x, 2, 9))
+        pine(d, x + rnd.randint(-4, 4), 166, h, (24, 56, 44), (40, 82, 62), (240, 246, 250))
+    # Holzhuette mit Lichterkette links, Glühweinstand rechts
+    for (hx, w_, label) in ((70, 120, 0), (1640, 130, 1)):
+        top = 112
+        d.rectangle([hx, top + 14, hx + w_, 166], fill=(120, 74, 44))
+        for yy in range(top + 16, 166, 5):
+            d.line([hx, yy, hx + w_, yy], fill=(92, 54, 32))
+        d.polygon([(hx - 10, top + 16), (hx + w_ + 10, top + 16), (hx + w_ // 2, top - 12)], fill=(236, 242, 250))
+        d.line([(hx - 10, top + 16), (hx + w_ // 2, top - 12), (hx + w_ + 10, top + 16)], fill=(150, 160, 178))
+        d.rectangle([hx + 18, top + 30, hx + 40, top + 46], fill=(255, 210, 120))
+        d.rectangle([hx + w_ - 40, top + 30, hx + w_ - 18, top + 46], fill=(255, 210, 120))
+        d.line([hx + 29, top + 30, hx + 29, top + 46], fill=(92, 54, 32))
+        d.line([hx + w_ - 29, top + 30, hx + w_ - 29, top + 46], fill=(92, 54, 32))
+        add_glow(px, W, H, hx + 29, top + 38, 18, (90, 60, 20), 0.7)
+        add_glow(px, W, H, hx + w_ - 29, top + 38, 18, (90, 60, 20), 0.7)
+        d.rectangle([hx + w_ - 30, top - 20, hx + w_ - 22, top + 2], fill=(90, 80, 76))
+        for k in range(0, w_ + 20, 6):
+            col = [(255, 90, 90), (255, 220, 120), (120, 220, 255), (150, 255, 150)][k // 6 % 4]
+            px[hx - 10 + k, top + 17 + int(2 * math.sin(k * 0.3))] = col
+    # Schneefeld rund um die Bahn
+    band_gradient(px, 0, HK_STANDS, W, H, [(208, 220, 236), (220, 230, 242), (232, 238, 246), (226, 234, 244)])
+    for _ in range(900):
+        x, y = rnd.randrange(W), rnd.randrange(HK_STANDS + 2, H)
+        px[x, y] = rnd.choice([(196, 208, 226), (244, 248, 252), (186, 200, 220)])
+    for _ in range(40):   # Fussspuren
+        x, y = rnd.randrange(W), rnd.randrange(HK_STANDS + 10, H - 10)
+        for k in range(rnd.randint(4, 10)):
+            d.rectangle([x + k * 7, y + (k % 2) * 4, x + k * 7 + 2, y + (k % 2) * 4 + 1], fill=(178, 192, 214))
+    # Schneewall direkt unter dem Waldrand
+    for x in range(W):
+        top = HK_STANDS - 3 + int(2 * math.sin(x * 0.07))
+        for y in range(top, HK_STANDS + 4):
+            px[x, y] = (244, 248, 252) if y == top else (230, 238, 248)
+    return im
+
+
+def hk_compose(src, clean, back, floor, keep_diff):
+    W, H = src.size
+    out = src.copy()
+    po, ps, pb = out.load(), src.load(), back.load()
+    pc = clean.load()
+    x0g, x1g = 40, W - 40
+    for y in range(H):
+        for x in range(W):
+            if keep_diff and ps[x, y] != pc[x, y]:
+                continue      # eingebrannte Bankfiguren
+            surround = y < HK_STANDS or floor[y * W + x]
+            if not surround:
+                continue
+            c = pb[x, y]
+            if x0g <= x <= x1g and y >= hk_glass_top(x) and y < 470:
+                c = mix(c, (214, 230, 244), 0.22)        # hinter der Verglasung
+                if y >= HK_STANDS and luma(pc[x, y]) > 70:
+                    c = mix(c, (236, 244, 252), 0.15)
+            po[x, y] = c
+    # Schatten der Bande auf den Schnee
+    for y in range(HK_STANDS + 1, H):
+        for x in range(W):
+            if floor[y * W + x] and not floor[(y - 1) * W + x] and (y - 1) >= HK_STANDS:
+                for k in range(6):
+                    if y + k < H and floor[(y + k) * W + x]:
+                        po[x, y + k] = mix(po[x, y + k], (120, 140, 170), 0.35 * (1 - k / 6))
+    # Verglasung oben: Handlauf und Pfosten neu, da die Tribuene darunter ersetzt ist
+    d = ImageDraw.Draw(out)
+    for x in range(HK_GLASS_X[0] - 180, HK_GLASS_X[1] + 181):
+        y = hk_glass_top(x)
+        if y < HK_STANDS:
+            po[x, y] = (236, 242, 250)
+            po[x, y + 1] = (170, 184, 204)
+    for x in range(HK_GLASS_X[0], HK_GLASS_X[1] + 1, 114):
+        d.line([x, HK_RAIL + 2, x, HK_STANDS - 1], fill=(176, 190, 210))
+    return out
+
+
+def build_hockey():
+    s = open(HK_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    clean, _ = get_img(s, "clean")
+    world, clean = world.convert("RGB"), clean.convert("RGB")
+    floor = hk_floor_mask(clean)
+    back = hk_backdrop(*clean.size)
+    new_clean = hk_compose(clean, clean, back, floor, False)
+    new_world = hk_compose(world, clean, back, floor, True)
+    debug("hockey-bergsee-world", new_world)
+    s = set_img(s, "world", new_world)
+    s = set_img(s, "clean", new_clean)
+    # Draussen gibt es keine Tribuene, die beim Tor hochspringt (die Sprung-Animation schneidet
+    # Streifen aus der Kulisse und wuerde sonst die Berge huepfen lassen).
+    hook = "function drawCrowd(t, x0, x1) {"
+    assert s.count(hook) == 1
+    s = s.replace(hook, hook + " return;")
+    s = retitle(s, "Eishockey Bergsee", "Eishockey &mdash; Freiluft-Eisfeld im Gebirge")
+    write("hockey", "bergsee", s)
+
+
 BUILDERS = {
     "basketball": build_basketball,
+    "hockey": build_hockey,
 }
 
 if __name__ == "__main__":

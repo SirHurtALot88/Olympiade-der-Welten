@@ -209,7 +209,9 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "hockey",
     title: "Eishockey",
     note: "Eisbahn nach IIHF-Maßen, Strafbank, Schussgeschwindigkeit.",
-    variants: [v("hockey", "eis", "Eisbahn")],
+    // Zweiter Schauplatz vom 03.11.: Freiluft-Eisfeld zwischen verschneiten Bergen, Wald und
+    // Hütten statt der Halle — Bahn, Banden, Strafbank und Ablauf unverändert.
+    variants: [v("hockey", "eis", "Eisbahn"), v("hockey", "bergsee", "Bergsee")],
   },
   breaking: {
     disciplineId: "breaking",
