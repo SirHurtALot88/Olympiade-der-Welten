@@ -20075,6 +20075,7 @@
     hebenKreideKnallBisT=-Infinity;
     LASTEN_FINALE=null; SANDSACK_WEGC=null; SANDSACK_PAR_FILM=null; SANDSACK_PAR_SZENE=null;
     tennisFokus=0; fechtenFokus=0; tennisDruck=[];
+    wettessenMauerBannerSeite={0:false,1:false};
     schachMattGehoert=false;
     buehneEndeGemeldet=false;
     // BUEHNE/BAHN-DROSSEL NEU AUFSETZEN (s. buehneBahnGrossDrosseln oben) -- derselbe Grund
@@ -27149,9 +27150,16 @@
         // wettessenMauerRunden()) — die erste Minute, die dieser Esser hinter seiner Mauer
         // beginnt. Reine Ablesung, kein rr(), keine Wirkung auf u.summe. Nicht big: zwoelf
         // Esser, zwoelf verschiedene Mauer-Minuten — als Banner waere das Dauerfeuer.
+        // PR 2 (Uebersichts-Paket 03.11.): die ERSTE Mauer jeder Seite ist ein Banner (kind
+        // "mauer", Titel MAUER) -- hoechstens zwei je Spiel, kein Dauerfeuer; jede weitere
+        // bleibt Tickerzeile. KEIN Spoiler: `fuell>K` wurde mit den schon GEZEIGTEN Minuten
+        // erreicht, das Banner sagt nur, was die Pegel laengst zeigen.
         if(r.mauerNeu){
+          const ersteDerSeite=!wettessenMauerBannerSeite[u.side];
+          wettessenMauerBannerSeite[u.side]=true;
           feed(u.side,"Mauer! "+u.n+" ist voll (Minute "+(u.aktuell+1)+") — ab jetzt isst nur noch der Wille"
-            +(u.haltung&&u.haltung!=="gleichmaessig"?" ("+(u.haltung==="sprint"?"Sprint":"Schlussspurt")+")":"")+".",false);
+            +(u.haltung&&u.haltung!=="gleichmaessig"?" ("+(u.haltung==="sprint"?"Sprint":"Schlussspurt")+")":"")+".",
+            ersteDerSeite,undefined,ersteDerSeite?"mauer":undefined);
         }
         const wettBig=buehneAuftrittBig(u,r,vorherSumme);
         if(wettBig){
@@ -29142,6 +29150,8 @@
   // Wertung/Reihenfolge. `done` selbst wird ausschliesslich von stepBuehne() gesetzt und
   // hier nur gelesen.
   let wettessenEndeSeit=null;
+  // PR 2: je Seite, ob die erste Mauer schon als Banner lief (zurueckgesetzt in bauBuehne()).
+  let wettessenMauerBannerSeite={0:false,1:false};
   function stepWettessen(dt,art){
     if(!TEILNEHMER.length)return;
     // ERKENNUNG "FRISCH ENTHUELLT" (Vorbild vizFechtAktuell bei stepFechten oben):
@@ -29154,6 +29164,10 @@
         const r=u.runden[u.aktuell];
         u.vizEssErfolg=!!r && r.ereignis===art.erfolgWort;
         u.vizEssPhase="greifen"; u.vizEssT=0;
+        // MAUER-STEMPEL (Uebersichts-Paket 03.11., PR 2, W-V3): `r.mauerNeu` steht nur mit
+        // BUEHNE_FLAGS.wettessenMauer>=1 auf dem Rundeneintrag (wettessenMauerRunden()) -- der
+        // Zeitstempel traegt den 1,6-s-Stempel in zeichneWettessen(). Reines viz*-Feld.
+        if(r&&r.mauerNeu){ u.vizMauerSeit=buehneT; sfx("wettessen","pause"); }
         sfx("wettessen","biss");
       }
     }
@@ -32520,6 +32534,53 @@
     ctx.fillStyle="#10141a"; ctx.textAlign="center"; ctx.textBaseline="middle";
     ctx.fillText(txt,x,y+0.5);
   }
+  // MAGEN-PEGEL (PR 2, W-V3): 8 x 48 px, die Kapazitaetslinie K bei 70 % der Hoehe, damit der
+  // Pegel sichtbar DARUEBER hinauslaufen kann (voll = ueber der Linie, rot). Unter 85 % gruen, kurz
+  // vor der Mauer gelb. Ohne `u.mauerK` (Flag 0) wird nichts gezeichnet.
+  const WETTESSEN_MAGEN_DX=-25, WETTESSEN_MAGEN_H=48, WETTESSEN_MAGEN_B=8, WETTESSEN_MAGEN_K=0.7;
+  function zeichneWettessenMagen(x,y,u,gedimmt){
+    if(!(u.mauerK>0))return;
+    const gx=x+WETTESSEN_MAGEN_DX, gy0=y-30, gh=WETTESSEN_MAGEN_H, gw=WETTESSEN_MAGEN_B;
+    const anteil=wettessenAnzeigeSumme(u)/u.mauerK;
+    const fuell=Math.min(1,anteil*WETTESSEN_MAGEN_K), hinter=anteil>1;
+    ctx.globalAlpha=gedimmt;
+    ctx.fillStyle="rgba(0,0,0,.55)";ctx.fillRect(gx,gy0,gw,gh);
+    ctx.fillStyle=hinter?"#e0645f":(anteil>0.85?"#f2c14e":"#5fd38a");
+    ctx.fillRect(gx,gy0+gh*(1-fuell),gw,gh*fuell);
+    const ky=gy0+gh*(1-WETTESSEN_MAGEN_K);
+    ctx.strokeStyle="rgba(242,193,78,.95)";ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(gx-2,ky);ctx.lineTo(gx+gw+2,ky);ctx.stroke();
+    // HINTER DER MAUER: der Rand pulsiert rot (W-V3 "roter Puls"), rein aus buehneT.
+    const puls=hinter?0.55+0.45*Math.abs(Math.sin(buehneT*4)):0;
+    ctx.strokeStyle=hinter?"rgba(230,67,46,"+(0.4+0.6*puls)+")":"rgba(0,0,0,.6)";
+    ctx.lineWidth=hinter?1.5:1;ctx.strokeRect(gx,gy0,gw,gh);
+    ctx.globalAlpha=1;
+  }
+  // STEMPEL UEBER DEM KOPF (PR 2): kleines Schild mit Grossbuchstaben in Signalfarbe; der
+  // MAUER-Stempel kommt mit kurzem Aufpuls (Skalierung aus der Zeit seit der Enthuellung).
+  const WETTESSEN_MAUER_STEMPEL_SEK=1.6;
+  function zeichneWettessenStempel(x,y,u,art){
+    const rAkt=(u.runden&&u.aktuell>=0)?u.runden[u.aktuell]:null;
+    const seitMauer=u.vizMauerSeit!=null?(buehneT-u.vizMauerSeit):null;
+    let txt=null, farbe=null, skala=1;
+    if(seitMauer!=null&&seitMauer<WETTESSEN_MAUER_STEMPEL_SEK){
+      txt="MAUER"; farbe="#b4322a"; skala=1+0.35*Math.max(0,1-seitMauer/0.35);
+    } else if(rAkt&&rAkt.ereignis===art.failWort&&!done){
+      txt="PAUSE"; farbe="#6b6f7a";
+    } else if(u.haltung==="sprint"&&u.aktuell<WETTESSEN_SPRINT_MINUTEN&&!done){
+      txt="SPRINT"; farbe="#1f7a4a";
+    } else if(u.haltung==="schlussspurt"&&u.aktuell+1>=WETTESSEN_SCHLUSS_AB_MINUTE&&!done){
+      txt="SCHLUSSSPURT"; farbe="#b8780f";
+    }
+    if(!txt)return;
+    ctx.save();ctx.translate(x,y-46);ctx.scale(skala,skala);
+    ctx.font="800 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
+    const w=ctx.measureText(txt).width+10, h=12;
+    ctx.fillStyle=farbe; wettRundrect(-w/2,-h/2,w,h,3); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(txt,0,0.5);
+    ctx.restore();
+  }
   function zeichneWettessen(art){
     const sitz=wettessenSitzplaetze();
 
@@ -32571,6 +32632,14 @@
         ctx.fillRect(x-7+s*3.5,y-21,3.2,5);
       }
 
+      // MAGEN-PEGEL (Uebersichts-Paket 03.11., PR 2, W-V3 "Der Bauch"): links neben der Figur,
+      // dort, wo bis PR 1 das Faehnchen stand. Fuellstand = dieselbe geglaettete Anzeige-Summe
+      // wie die Tafel gegen die Kapazitaet `u.mauerK` (wettessenMauerSetz(), Flag >= 1) -- der
+      // Rundeneintrag fuehrt `fuell` als kumulierte Punktsumme, also ist die Tafelzahl der
+      // Fuellstand. Ueber der Kapazitaetslinie wird der Pegel rot: "voll, ab jetzt isst nur
+      // noch der Wille". Reine Ablesung, kein rr().
+      zeichneWettessenMagen(x,y,u,gedimmt);
+
       // KAU-/SCHLING-WIPPER: ein kleiner, an vizEssPhase gebundener Ausschlag, damit ein
       // wartender Esser nicht als Standbild einfriert (Anti-Freeze wie stepFechten()s vizFechtBob).
       const essPhase=u.vizEssPhase, essT=u.vizEssT||0;
@@ -32583,6 +32652,13 @@
         ctx.restore();
       }
       ctx.globalAlpha=1;
+
+      // STEMPEL UEBER DEM KOPF (PR 2): genau EINER je Esser, in dieser Rangfolge -- MAUER (1,6 s
+      // nach der Enthuellung, in der er voll ist), PAUSE (die ganze Minute, in der er "kurz
+      // pausieren muss" -- Chris' Wort fuer den Fehlschlag), SPRINT (Minute 1-4, W-V4) oder
+      // SCHLUSSSPURT (ab Minute 8, W-V4). Gleichmaessig ist der Standard und traegt kein Schild;
+      // vor Minute 8 ebenso wenig der Schlussspurt (zwoelf Dauer-Schilder waeren wieder Laerm).
+      zeichneWettessenStempel(x,y,u,art);
 
       // WENDETAFEL, EINHEIT DES TAGES (S2/W-F2): reine Anzeige-Skala aus u.summe
       // (wettessenWuerstchen()), NICHT die Wertung selbst. Zaehlt stetig hoch (W-B1,
@@ -50976,6 +51052,7 @@
     gebrochen:"GEBROCHEN",
     angeschlagen:"ANGESCHLAGEN",
     tresor:"TRESOR",
+    mauer:"MAUER",        // Wettessen, erste Mauer je Seite (Uebersichts-Paket 03.11., PR 2)
     kippZug:"KIPP-ZUG",
     // T-F1a (Fable-Ideen Buehne-Duell 30.09., Paket 2 "Tennis-Punkt"), NUR Tennis.
     tennisBreak:"BREAK!",
