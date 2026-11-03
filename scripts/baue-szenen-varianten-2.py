@@ -1022,7 +1022,392 @@ def speed_schach():
         schreibe("speed-schach", slug, out, title, h1, lead, "ctx.drawImage(IM.bg, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
 
 
-ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach}
+# ================================================================== TAKESHI'S CASTLE
+# Basisbild 2560x720 (Weltmassstab, Kamera zeigt y 300..700). Ueber der Laufbahn (y < 516) wird die
+# Natur der Vorlage (Himmel, Kirschbaeume, Berge, Wiese) durch die neue Kulisse ersetzt — erkannt an
+# ihren Farbfamilien; Schilder, Startbogen, Nummernpfosten, Tribuene und Kugel-Trichter bleiben.
+# Darunter werden nur Sandweg, Wasser und Uferwiese umgefaerbt; Bloecke, Bruecken, Ponton bleiben.
+TC_GROUND_Y = 516
+TC_STANDS = (676, 268, 1484, 482)
+TC_CASTLE = (2036, 268, 2528, 536)
+TC_TREE_ZONES = ((0, 700), (1480, 2040), (2500, 2560))
+TC_LAWN = (190, 420, 690, 482)
+TC_TRUNK = {(57, 29, 41), (65, 37, 45), (70, 34, 49), (132, 90, 89), (100, 65, 70), (92, 39, 60), (34, 19, 30),
+            (116, 81, 82), (78, 45, 53), (76, 58, 61), (65, 45, 49), (54, 61, 53)}
+TC_SAND = {(228, 198, 138): 1, (240, 214, 160): 2, (206, 174, 114): 0}
+TC_GAPS = ((280, 620), (690, 1110), (1180, 1560))
+
+
+def hsv(p):
+    r, g, b = p[0] / 255, p[1] / 255, p[2] / 255
+    mx, mn = max(r, g, b), min(r, g, b)
+    if mx == mn:
+        return 0.0, 0.0, mx
+    d = mx - mn
+    if mx == r:
+        hh = ((g - b) / d) % 6
+    elif mx == g:
+        hh = (b - r) / d + 2
+    else:
+        hh = (r - g) / d + 4
+    return hh * 60, d / mx, mx
+
+
+TC_GRAS = {(124, 204, 66), (158, 228, 92), (98, 174, 54), (129, 207, 74), (102, 186, 92)}
+TC_ZIEL = (2078, 438, 2142, 522)     # gruenes Schild "ZIEL / FALLE 14" samt Pfosten
+
+
+def tc_burg_innen(x, y):
+    return (2076 <= x < 2500 and TC_CASTLE[1] <= y < 470) or (2090 <= x < 2492 and 470 <= y < TC_CASTLE[3])
+
+
+def tc_natur(p, x, y):
+    hh, ss, vv = hsv(p)
+    if 172 <= hh <= 205 and p[1] > 200 and vv > 0.85:            # Himmel
+        return True
+    if TC_STANDS[0] <= x < TC_STANDS[2] and TC_STANDS[1] <= y < TC_STANDS[3]:
+        return False
+    if p[:3] in TC_GRAS and not (TC_ZIEL[0] <= x < TC_ZIEL[2] and TC_ZIEL[1] <= y < TC_ZIEL[3]):
+        return True
+    if tc_burg_innen(x, y) or (TC_ZIEL[0] <= x < TC_ZIEL[2] and TC_ZIEL[1] <= y < TC_ZIEL[3]):
+        return False
+    if 70 <= hh < 182 and ss > 0.18 and p[1] < 225:               # Laub, Berge
+        return True
+    if (300 <= hh < 350 and p[0] > 200 and ss < 0.78) or p[:3] in ((251, 197, 216), (250, 204, 216), (246, 215, 217), (251, 242, 237), (251, 172, 200), (251, 187, 212)):
+        return True                                               # Kirschbluete (nicht das rote Schild)
+    if p[:3] in ((226, 132, 182), (244, 164, 204), (255, 206, 228), (176, 84, 128)):
+        return True
+    if p[:3] in TC_TRUNK and any(a <= x < b for a, b in TC_TREE_ZONES):
+        return True
+    if TC_LAWN[0] <= x < TC_LAWN[2] and TC_LAWN[1] <= y < TC_LAWN[3] and p[:3] in ((246, 242, 217), (251, 242, 237), (191, 219, 119), (169, 194, 129), (221, 229, 144), (132, 172, 83)):
+        return True
+    return False
+
+
+def tc_ist_wasser(p, x, y):
+    if y >= 688 or not (p[2] > p[0] + 50 and p[2] > 120):
+        return False
+    return y >= 592 or (y >= 556 and any(a <= x < b for a, b in TC_GAPS))
+
+
+def tc_umbau(base, kulisse, wasser, sand, wiese, burg, tribuene, deko):
+    W, H = base.size
+    im = base.copy()
+    bp, kp, px = base.load(), kulisse.load(), im.load()
+    maske = [[False] * W for _ in range(TC_GROUND_Y)]
+    for y in range(0, TC_GROUND_Y):
+        for x in range(W):
+            if tc_natur(bp[x, y], x, y):
+                px[x, y] = kp[x, y]
+                maske[y][x] = True
+    for y in range(400, TC_GROUND_Y):          # Sandkuppe des Kugelhangs ragt ueber die Grundlinie
+        for x in range(1600, 2040):
+            if bp[x, y][:3] in TC_SAND:
+                px[x, y] = sand[TC_SAND[bp[x, y][:3]]]
+    for y in range(TC_GROUND_Y, H):
+        for x in range(W):
+            p = bp[x, y]
+            if p[:3] in TC_SAND:
+                px[x, y] = sand[TC_SAND[p[:3]]]
+            elif tc_ist_wasser(p, x, y):
+                px[x, y] = wasser(p, x, y)
+            elif y >= 688 and p[1] > p[0] + 30 and p[1] > p[2] + 30:
+                px[x, y] = wiese(p, x, y)
+    for y in range(TC_CASTLE[1], TC_CASTLE[3]):
+        for x in range(TC_CASTLE[0], TC_CASTLE[2]):
+            if not (y < TC_GROUND_Y and maske[y][x]) and bp[x, y][:3] not in TC_SAND:
+                px[x, y] = burg(px[x, y], x, y)
+    for y in range(TC_STANDS[1], TC_STANDS[3]):
+        for x in range(TC_STANDS[0], TC_STANDS[2]):
+            if y < TC_GROUND_Y and not maske[y][x]:
+                px[x, y] = tribuene(px[x, y], x, y)
+    deko(im, maske)
+    return im
+
+
+def tc_kanten(maske, y0=280):
+    """Oberkanten stehengebliebener Bauten: Pixel, ueber denen Kulisse liegt."""
+    out = []
+    for y in range(max(1, y0), TC_GROUND_Y):
+        row, up = maske[y], maske[y - 1]
+        for x in range(len(row)):
+            if not row[x] and up[x]:
+                out.append((x, y))
+    return out
+
+
+def tc_berge(px, W, rnd, base_y, amp, cols, schnee=None, seed=0.0, fr=0.004):
+    tops = []
+    for x in range(W):
+        u = x * fr + seed
+        top = int(base_y - amp * (0.55 + 0.25 * math.sin(u) + 0.2 * math.sin(u * 2.7 + 1.3) + 0.12 * math.sin(u * 6.1)))
+        tops.append(top)
+    for x in range(W):
+        top = tops[x]
+        lit = tops[min(W - 1, x + 3)] >= tops[max(0, x - 3)]   # Flanke zur Sonne (links) hell
+        for y in range(top, TC_GROUND_Y):
+            c = cols[0] if lit else cols[1]
+            if schnee and y < top + schnee + int(4 * math.sin(x * 0.05)):
+                c = (246, 250, 255) if lit else (196, 214, 236)
+            px[x, y] = c
+    return tops
+
+
+def tc_kulisse_eis():
+    rnd = random.Random(6101)
+    W = 2560
+    im = Image.new("RGB", (W, TC_GROUND_Y))
+    px = im.load()
+    d = ImageDraw.Draw(im)
+    band_gradient(px, 0, 0, W, 420, [(96, 150, 210), (124, 172, 222), (156, 196, 232), (190, 218, 240), (220, 234, 246)])
+    add_glow(px, W, TC_GROUND_Y, 1900, 300, 180, (40, 40, 30), 0.8)
+    for _ in range(14):
+        wolke(d, rnd.randrange(W), rnd.randint(285, 340), rnd.randint(40, 90), (246, 250, 255), (210, 224, 240))
+    tc_berge(px, W, rnd, 420, 110, ((170, 196, 226), (132, 160, 200)), schnee=40, seed=0.4, fr=0.006)
+    tc_berge(px, W, rnd, 450, 70, ((120, 150, 190), (92, 120, 166)), schnee=18, seed=2.1, fr=0.011)
+    # Gletscherkante + Eisklippen
+    for x in range(W):
+        top = int(462 + 5 * math.sin(x * 0.03) + 3 * math.sin(x * 0.13))
+        for y in range(top, TC_GROUND_Y):
+            px[x, y] = (210, 232, 248) if y < top + 2 else (176, 210, 236) if (x // 7 + y // 5) % 5 else (150, 190, 226)
+    # verschneite Tannen
+    for _ in range(170):
+        x, b = rnd.randrange(W), rnd.randint(452, 486)
+        hgt = rnd.randint(18, 40)
+        for k in range(hgt):
+            half = int((k / hgt) * hgt * 0.32)
+            y = b - hgt + k
+            d.line([x - half, y, x + half, y], fill=(34, 74, 70) if k % 5 else (26, 60, 58))
+            if k % 5 == 0:
+                d.line([x - half, y, x + half - 1, y], fill=(240, 246, 252))
+        d.line([x, b, x, b + 3], fill=(70, 50, 40))
+    # Schneefeld
+    for y in range(486, TC_GROUND_Y):
+        for x in range(W):
+            v = (x * 73856093 ^ y * 19349663) & 31
+            px[x, y] = (244, 248, 255) if v > 4 else (210, 224, 240) if v > 0 else (255, 255, 255)
+    for _ in range(40):                               # Eiskristalle
+        x, y = rnd.randrange(W), rnd.randint(470, 512)
+        d.polygon([(x, y - 9), (x + 3, y), (x, y + 2), (x - 3, y)], fill=(170, 220, 250))
+        d.line([x, y - 8, x, y], fill=(240, 252, 255))
+    return im
+
+
+def tc_eis(base):
+    ramp = [(14, 44, 78), (28, 74, 116), (60, 120, 160), (120, 176, 206), (200, 232, 246)]
+
+    def wasser(p, x, y):
+        u = (luma(p) - 60) / 180
+        q = rampe(ramp, u)
+        if (x * 7 + y * 13) % 97 == 0:
+            q = (230, 244, 252)
+        return q
+
+    def burg(p, x, y):
+        if p[0] > p[1] + 40 and p[0] > p[2] + 30:          # rote Daecher/Balken -> Eisblau
+            return (clamp(p[0] * 0.35 + 30), clamp(p[0] * 0.65 + 50), clamp(p[0] * 0.9 + 60))
+        if sat(p) < 40 and 60 < luma(p) < 200:              # Mauersteine -> Eisquader
+            return mix(p, (196, 222, 244), 0.55)
+        return p
+
+    def tribuene(p, x, y):
+        if p[0] > p[2] + 40 and p[1] > p[2] + 10 and sat(p) < 150 and luma(p) < 190:   # Holz -> Eisbloecke
+            return mix(p, (176, 210, 236), 0.6)
+        return p
+
+    def deko(im, maske):
+        px = im.load()
+        for (x, y) in tc_kanten(maske):                     # Schneehauben auf allem, was stehenblieb
+            for k in range(2):
+                if y + k < TC_GROUND_Y and not maske[y + k][x]:
+                    px[x, y + k] = (250, 252, 255) if k == 0 else (214, 230, 246)
+        d = ImageDraw.Draw(im)
+        for x in range(0, 2560, 7):                          # Eiszapfen unter der Bahnkante
+            if any(a <= x < b for a, b in TC_GAPS):
+                continue
+            ln = 3 + (x * 13) % 7
+            d.polygon([(x, 590), (x + 4, 590), (x + 2, 590 + ln)], fill=(214, 238, 252))
+
+    sand = [(186, 210, 228), (214, 232, 244), (236, 246, 252)]
+    wiese = lambda p, x, y: (244, 248, 255) if p[1] > 200 else (214, 228, 244) if p[1] > 180 else (186, 206, 230)
+    return tc_umbau(base, tc_kulisse_eis(), wasser, sand, wiese, burg, tribuene, deko), wasser
+
+
+def tc_kulisse_dschungel():
+    rnd = random.Random(6202)
+    W = 2560
+    im = Image.new("RGB", (W, TC_GROUND_Y))
+    px = im.load()
+    d = ImageDraw.Draw(im)
+    band_gradient(px, 0, 0, W, 420, [(150, 196, 170), (176, 210, 168), (208, 222, 160), (232, 226, 156)])
+    add_glow(px, W, TC_GROUND_Y, 1300, 330, 260, (40, 36, 10), 0.8)
+    # ferne Stufenpyramide im Dunst + Wasserfall-Klippe
+    for (cx, base_y, steps, sw) in ((560, 430, 7, 150), (1880, 436, 5, 100)):
+        for k in range(steps):
+            hw = sw - k * (sw // steps)
+            y0 = base_y - (k + 1) * 12
+            d.rectangle([cx - hw, y0, cx + hw, y0 + 12], fill=(132, 150, 120))
+            d.line([cx - hw, y0, cx + hw, y0], fill=(156, 172, 140))
+        d.rectangle([cx - 14, base_y - steps * 12 - 14, cx + 14, base_y - steps * 12], fill=(120, 140, 110))
+        d.rectangle([cx - 6, base_y - steps * 12 - 10, cx + 6, base_y - steps * 12], fill=(70, 86, 70))
+    for x in range(1100, 1260):
+        top = int(330 + 20 * math.sin((x - 1100) / 160 * math.pi * 0.8))
+        for y in range(top, TC_GROUND_Y):
+            px[x, y] = (88, 100, 80) if (x + y // 3) % 9 else (70, 82, 64)
+    for x in range(1160, 1196):
+        for y in range(345, TC_GROUND_Y):
+            px[x, y] = (226, 244, 246) if (y + x * 3) % 7 else (180, 216, 226)
+    # Schichten Dschungelkronen
+    for layer, (cols, y_lo, y_hi, rr, n) in enumerate((
+        (((70, 122, 86), (58, 104, 74)), 380, 430, (22, 40), 120),
+        (((44, 100, 58), (34, 82, 48), (60, 120, 64)), 400, 460, (18, 34), 170),
+        (((26, 76, 40), (36, 92, 46), (20, 62, 34)), 430, 490, (14, 28), 220),
+    )):
+        for _ in range(n):
+            x, y, r = rnd.randrange(-20, W + 20), rnd.randint(y_lo, y_hi), rnd.randint(*rr)
+            if 1150 < x < 1210 and layer < 2:
+                continue
+            d.rectangle([x - 2, y, x + 2, TC_GROUND_Y], fill=(60, 44, 32))
+            d.ellipse([x - r, y - r * 2 // 3, x + r, y + r * 2 // 3], fill=rnd.choice(cols))
+            d.ellipse([x - r // 2, y - r * 2 // 3, x + r // 3, y - r // 4], fill=mix(cols[0], (200, 230, 140), 0.25))
+    for x0 in range(30, W, 230):
+        palme(px, d, x0 + rnd.randint(-40, 40), 492, rnd.randint(46, 64), blatt=((58, 128, 52), (34, 92, 40)))
+    # Waldboden mit Farnen
+    for y in range(486, TC_GROUND_Y):
+        for x in range(W):
+            v = (x * 73856093 ^ y * 19349663) & 15
+            px[x, y] = (58, 92, 40) if v > 3 else (44, 74, 32) if v > 0 else (90, 70, 40)
+    for _ in range(260):
+        x, y = rnd.randrange(W), rnd.randint(488, 514)
+        for k in range(5):
+            a = math.radians(200 + k * 35)
+            d.line([x, y, x + int(math.cos(a) * 7), y + int(math.sin(a) * 5)], fill=rnd.choice([(80, 150, 60), (60, 128, 50)]))
+    return im
+
+
+def tc_dschungel(base):
+    ramp = [(14, 50, 44), (24, 84, 70), (40, 120, 96), (90, 170, 140), (190, 230, 210)]
+
+    def wasser(p, x, y):
+        q = rampe(ramp, (luma(p) - 60) / 180)
+        if (x * 11 + y * 7) % 131 == 0:
+            q = (60, 140, 70)          # treibende Seerosenblaetter
+        return q
+
+    def burg(p, x, y):
+        if p[0] > p[1] + 40 and p[0] > p[2] + 30:          # rote Daecher -> bemoostes Steindach
+            return (clamp(p[0] * 0.30 + 40), clamp(p[0] * 0.48 + 40), clamp(p[0] * 0.26 + 30))
+        if sat(p) < 40 and 50 < luma(p) < 200:
+            k = luma(p) / 255
+            return (clamp(150 * k + 20), clamp(160 * k + 20), clamp(118 * k + 10))
+        return p
+
+    def tribuene(p, x, y):
+        return p
+
+    def deko(im, maske):
+        px = im.load()
+        rnd = random.Random(6203)
+        d = ImageDraw.Draw(im)
+        kanten = tc_kanten(maske)
+        for (x, y) in kanten:                               # Moos auf den Oberkanten
+            if rnd.random() < 0.6:
+                px[x, y] = rnd.choice([(70, 130, 50), (90, 150, 60)])
+        lianen = [(x, y) for (x, y) in kanten if sat(px[x, y]) < 110]   # nicht ueber die Schilder
+        for (x, y) in rnd.sample(lianen, min(len(lianen), 260)):   # Lianen haengen herab
+            ln = rnd.randint(6, 26)
+            for k in range(ln):
+                yy = y + k
+                if yy >= 700:
+                    break
+                xx = x + int(1.5 * math.sin(k * 0.5 + x))
+                px[xx, yy] = (46, 110, 46) if k % 4 else (80, 150, 60)
+            if rnd.random() < 0.4:
+                d.rectangle([x - 1, y + ln - 1, x + 1, y + ln], fill=(230, 80, 120))
+        for _ in range(140):                                # Ranken an der Burg
+            x, y = rnd.randrange(TC_CASTLE[0], TC_CASTLE[2]), rnd.randrange(330, 520)
+            if not maske[min(y, TC_GROUND_Y - 1)][x]:
+                ln = rnd.randint(8, 30)
+                for k in range(ln):
+                    xx, yy = x + int(2 * math.sin(k * 0.4 + x)), y + k
+                    if yy < 534 and not (yy < TC_GROUND_Y and maske[yy][xx]):
+                        px[xx, yy] = (54, 118, 50) if k % 3 else (84, 150, 62)
+
+    sand = [(98, 72, 46), (122, 92, 58), (144, 112, 72)]
+    wiese = lambda p, x, y: (64, 112, 44) if p[1] > 200 else (52, 96, 38) if p[1] > 180 else (40, 80, 30)
+    return tc_umbau(base, tc_kulisse_dschungel(), wasser, sand, wiese, burg, tribuene, deko), wasser
+
+
+TC_FX_EIS = r"""
+window.__fx = (ctx, camX) => {
+  const t = performance.now() / 1000, W = ctx.canvas.width, H = ctx.canvas.height;
+  // Schneefall (Bildschirmraum, leicht gegen die Kamera versetzt)
+  for (let i = 0; i < 160; i++) {
+    const sp = 30 + (i * 13) % 40, sz = i % 6 === 0 ? 4 : 2;
+    const x = ((i * 211 - camX * 1.2 + Math.sin(t + i) * 20) % W + W) % W, y = (i * 97 + t * sp) % H;
+    ctx.fillStyle = i % 3 ? 'rgba(255,255,255,0.9)' : 'rgba(214,232,250,0.8)';
+    ctx.fillRect(Math.round(x), Math.round(y), sz, sz);
+  }
+};
+"""
+
+TC_FX_DSCHUNGEL = r"""
+window.__fx = (ctx, camX) => {
+  const t = performance.now() / 1000, W = ctx.canvas.width, H = ctx.canvas.height;
+  // Papageien ueber den Kronen, Gluehwuermchen und Blaetter im Vordergrund
+  for (let k = 0; k < 3; k++) {
+    const wx = ((t * (60 + k * 15) + k * 900) % 3000) - 200, wy = 330 + k * 18 + Math.sin(t * 2 + k) * 6;
+    const x = (wx - camX) * 2, y = (wy - 300) * 2, f = Math.sin(t * 10 + k) > 0 ? -4 : 2;
+    if (x < -20 || x > W + 20) continue;
+    ctx.fillStyle = ['#e23b3b', '#3b8ee2', '#f2c23b'][k];
+    ctx.fillRect(x, y, 8, 4); ctx.fillRect(x - 8, y + f, 8, 2); ctx.fillRect(x + 6, y + f, 8, 2);
+    ctx.fillStyle = '#2e9e44'; ctx.fillRect(x + 8, y, 4, 2);
+  }
+  for (let i = 0; i < 40; i++) {
+    const ph = (t * 0.6 + i * 0.13) % 1;
+    const x = ((i * 337 - camX * 2 + Math.sin(t * 0.7 + i) * 30) % W + W) % W, y = 200 + (i * 53) % 220 + Math.cos(t + i) * 10;
+    if (ph < 0.5) { ctx.fillStyle = 'rgba(230,255,140,0.85)'; ctx.fillRect(Math.round(x), Math.round(y), 2, 2); }
+  }
+  ctx.fillStyle = 'rgba(70,140,60,0.9)';
+  for (let i = 0; i < 12; i++) {
+    const x = ((i * 523 + Math.sin(t + i) * 40 - camX * 2) % W + W) % W, y = (i * 71 + t * (20 + i % 5 * 6)) % H;
+    ctx.fillRect(Math.round(x), Math.round(y), 4, 2);
+  }
+};
+"""
+
+
+def tc_ebene(uri, fn, ab_y):
+    im = dec(uri)
+    px = im.load()
+    for y in range(im.size[1]):
+        for x in range(im.size[0]):
+            p = px[x, y]
+            if p[3] and p[2] > p[0] + 50 and p[2] > 120:
+                px[x, y] = fn(p, x, ab_y + y) + (p[3],)
+    return enc(im)
+
+
+def takeshis_castle():
+    s, m, L = lade("takeshis-castle", "burg.html", "L")
+    base = dec(L["base"]).convert("RGB")
+    for slug, painter, fx, title, h1 in (
+        ("eisfestung", tc_eis, TC_FX_EIS, "Takeshi's Castle Eisfestung", "Takeshi's Castle: Eisfestung im Gletschertal"),
+        ("dschungel", tc_dschungel, TC_FX_DSCHUNGEL, "Takeshi's Castle Dschungeltempel", "Takeshi's Castle: Tempelruine im Dschungel"),
+    ):
+        im, wasser = painter(base)
+        if os.environ.get("SZENEN_DEBUG"):
+            im.save(os.path.join(os.environ["SZENEN_DEBUG"], f"takeshis-castle-{slug}-bg.png"))
+        L2 = json.loads(json.dumps(L))
+        L2["base"] = enc(im)
+        L2["water"]["src"] = tc_ebene(L["water"]["src"], lambda p, x, y: wasser(p, x, max(y, 600)), L["water"]["y"])
+        L2["splash"]["src"] = tc_ebene(L["splash"]["src"], lambda p, x, y: wasser(p, 0, 600), 0)
+        out = ersetze_json(s, m, L2)
+        schreibe("takeshis-castle", slug, out, title, h1, None,
+                 "ctx.drawImage(IM.base, camX, VY0, VW, VH, 0, 0, VW * S, VH * S);", "if (window.__fx) window.__fx(ctx, camX);", fx)
+
+
+ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach, "takeshis-castle": takeshis_castle}
 
 if __name__ == "__main__":
     ziele = sys.argv[1:] or list(ALLE)

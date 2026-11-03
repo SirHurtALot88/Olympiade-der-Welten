@@ -72,7 +72,13 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "takeshis-castle",
     title: "Takeshi's Castle",
     note: "14 Fallen von der Wackelbrücke bis zum Schlosstor, Nerven-Meter, „AUS“-Floß im Wassergraben.",
-    variants: [v("takeshis-castle", "burg", "Burg-Parcours")],
+    // Eisfestung + Dschungel: Kulissen-Varianten vom 03.11. (scripts/baue-szenen-varianten-2.py) —
+    // dieselben 14 Fallen an denselben Stellen, nur ein anderer Ort rund um die Bahn.
+    variants: [
+      v("takeshis-castle", "burg", "Burg-Parcours"),
+      v("takeshis-castle", "eisfestung", "Eisfestung"),
+      v("takeshis-castle", "dschungel", "Dschungeltempel"),
+    ],
   },
   "mini-dm": {
     disciplineId: "mini-dm",
