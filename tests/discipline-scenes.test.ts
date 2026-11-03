@@ -22,7 +22,7 @@ describe("Pixel-Szenen-Registry", () => {
 
   // Gestaffelter Ausbau vom 03.11. (Chris: „wirklich andere Settings“, nicht nur Tag/Nacht):
   // diese Disziplinen tragen neben der Original-Kulisse einen zweiten Schauplatz.
-  const ZWEI_SCHAUPLAETZE: string[] = ["basketball", "hockey"];
+  const ZWEI_SCHAUPLAETZE: string[] = ["basketball", "hockey", "football"];
   for (const id of ZWEI_SCHAUPLAETZE) {
     it(`${id}: zweiter Schauplatz eingetragen`, () => {
       const scene = DISCIPLINE_SCENES[id]!;

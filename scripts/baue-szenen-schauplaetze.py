@@ -524,9 +524,137 @@ def build_hockey():
     write("hockey", "bergsee", s)
 
 
+# ================================================================== FOOTBALL — Beach-Football an der Kueste
+FB_SRC = os.path.join(SZ, "football", "feld.html")
+FB_BOARD = (350, 4, 610, 50)
+FB_RIBBON = (136, 147)
+FB_PANEL = 596
+FB_ENDZONE = [(745, 181), (922, 181), (852, 567), (673, 567)]
+
+
+def fb_world(world):
+    src = half(world.convert("RGB"))
+    W, H = src.size
+    im = src.copy()
+    px = im.load()
+    rnd = random.Random(5150)
+    d = ImageDraw.Draw(im)
+    horizon = 58
+    sky(px, W, 0, horizon, [(70, 140, 214), (96, 160, 224), (128, 184, 232), (168, 206, 236), (206, 226, 240)])
+    sx, sy = 160, 20
+    add_glow(px, W, H, sx, sy, 34, (60, 56, 30), 0.9)
+    d.ellipse([sx - 8, sy - 8, sx + 8, sy + 8], fill=(255, 248, 210))
+    for (cx, cy, wl) in ((40, 34, 70), (300, 16, 50), (660, 26, 90), (840, 12, 60)):
+        for k in range(wl):
+            r = int(4 * math.sin(k / wl * math.pi))
+            for yy in range(cy - r, cy + 1):
+                px[cx + k, yy] = (250, 252, 252) if yy < cy else (214, 228, 238)
+    # Meer mit Wellenkaemmen und Segelboot
+    for y in range(horizon, 100):
+        u = (y - horizon) / 42
+        base = mix((34, 108, 168), (52, 170, 186), u)
+        for x in range(W):
+            c = base
+            if (y % 4 == 0) and ((x * 3 + y * 7) % 23) < 6:
+                c = mix(base, (220, 240, 246), 0.55)
+            px[x, y] = c
+    d.line([0, horizon, W, horizon], fill=(28, 84, 140))
+    bx = 560
+    d.polygon([(bx, 52), (bx + 22, 52), (bx + 18, 57), (bx + 4, 57)], fill=(250, 250, 246))
+    d.polygon([(bx + 10, 30), (bx + 10, 50), (bx + 22, 50)], fill=(250, 250, 246))
+    d.polygon([(bx + 9, 34), (bx + 9, 50), (bx + 1, 50)], fill=(230, 110, 70))
+    # Brandung + Strand-Hintergrund
+    for x in range(W):
+        top = 98 + int(2 * math.sin(x * 0.08))
+        for y in range(top, top + 3):
+            px[x, y] = (244, 248, 246)
+        for y in range(top + 3, FB_RIBBON[0]):
+            px[x, y] = (224, 196, 138) if (x + y) % 9 else (210, 180, 122)
+    # Sonnenschirme mit Badegaesten, Strandhuetten, Rettungsturm, Palmen
+    cols = [(230, 70, 70), (250, 200, 60), (60, 150, 220), (90, 190, 110), (240, 130, 190), (250, 250, 246)]
+    for ux in range(20, W, 46):
+        if FB_BOARD[0] - 20 < ux < FB_BOARD[2] + 10 and rnd.random() < 0.5:
+            continue
+        c1, c2 = rnd.sample(cols, 2)
+        top = 104 + rnd.randint(-2, 3)
+        d.line([ux, top, ux, top + 22], fill=(110, 90, 70))
+        for k in range(-14, 15):
+            hgt = int(6 * (1 - (k / 14) ** 2))
+            d.line([ux + k, top - hgt, ux + k, top], fill=c1 if (k + 14) // 5 % 2 else c2)
+        for kk in range(rnd.randint(1, 3)):     # Badegaeste
+            gx = ux + rnd.randint(-12, 12)
+            skin = rnd.choice([(240, 200, 160), (200, 150, 110), (150, 100, 70), (110, 70, 50)])
+            d.rectangle([gx, top + 14, gx + 2, top + 16], fill=skin)
+            d.rectangle([gx - 1, top + 17, gx + 3, top + 21], fill=rnd.choice(cols))
+    for hx in (80, 250, 690):
+        d.rectangle([hx, 104, hx + 26, 126], fill=(250, 246, 236))
+        for k in range(hx, hx + 27, 6):
+            d.rectangle([k, 104, k + 2, 126], fill=(60, 140, 200))
+        d.polygon([(hx - 3, 104), (hx + 29, 104), (hx + 13, 94)], fill=(200, 70, 60))
+        d.rectangle([hx + 9, 114, hx + 17, 126], fill=(90, 66, 44))
+    tx = 800
+    for lx in (tx, tx + 22):
+        d.line([lx, 104, lx + 4, 134], fill=(250, 250, 246))
+    d.rectangle([tx - 2, 88, tx + 28, 104], fill=(230, 70, 60))
+    d.rectangle([tx + 4, 92, tx + 22, 100], fill=(250, 240, 220))
+    d.polygon([(tx - 5, 88), (tx + 31, 88), (tx + 13, 80)], fill=(250, 250, 246))
+    def palme(x0, h):
+        for k in range(h):
+            xx = x0 + int(4 * math.sin(k / h * 1.6))
+            d.rectangle([xx - 1, 134 - k, xx + 1, 134 - k], fill=(130, 92, 56) if k % 4 else (100, 70, 40))
+        tx_, ty_ = x0 + int(4 * math.sin(1.6)), 134 - h
+        for ang in range(0, 360, 36):
+            for r in range(1, 18):
+                fx = tx_ + int(math.cos(math.radians(ang)) * r)
+                fy = ty_ + int(math.sin(math.radians(ang)) * r * 0.5 + (r * r) / 36)
+                if 0 <= fx < W and 0 <= fy < H:
+                    px[fx, fy] = (60, 140, 60) if r % 3 else (40, 104, 46)
+                    if fy + 1 < H:
+                        px[fx, fy + 1] = (40, 104, 46)
+    for x0 in (8, 150, 330, 640, 760, 930):
+        palme(x0, rnd.randint(48, 66))
+    # Anzeigetafel auf zwei Masten
+    for mx in (FB_BOARD[0] + 26, FB_BOARD[2] - 30):
+        d.rectangle([mx, FB_BOARD[3], mx + 3, FB_RIBBON[0] - 1], fill=(80, 84, 94))
+        d.line([mx, FB_BOARD[3], mx, FB_RIBBON[0] - 1], fill=(140, 146, 160))
+    im.paste(src.crop(FB_BOARD), FB_BOARD[:2])
+    # ---- Spielfeld + Seitenlinie: Rasen -> Sand (Linien, Zahlen, Endzone bleiben)
+    for y in range(FB_RIBBON[1], FB_PANEL):
+        for x in range(W):
+            p = px[x, y]
+            if in_poly(x, y, FB_ENDZONE):
+                continue
+            if p[1] > p[0] + 8 and p[1] > p[2] + 4:
+                c = tint_luma(p, (176, 138, 86), (252, 232, 182), 50, 140)
+                n = noise(x, y, 7)
+                if n > 0.9:
+                    c = mix(c, (255, 240, 200), 0.4)
+                elif n < 0.08:
+                    c = mix(c, (130, 96, 58), 0.4)
+                px[x, y] = c
+    # Fussspuren und Muscheln im Sand neben dem Feld
+    for _ in range(140):
+        x, y = rnd.randrange(W), rnd.choice([rnd.randrange(150, 178), rnd.randrange(583, FB_PANEL - 1)])
+        p = px[x, y]
+        if sat(p) > 40 and p[0] > p[2] + 30:
+            px[x, y] = rnd.choice([(250, 240, 226), (196, 160, 110), (232, 170, 150)])
+    return double(im)
+
+
+def build_football():
+    s = open(FB_SRC, encoding="utf-8").read()
+    world, _ = get_img(s, "world")
+    new = fb_world(world)
+    debug("football-strand-world", new)
+    s = set_img(s, "world", new)
+    s = retitle(s, "Football Strand", "Football &mdash; Beach-Football an der K&uuml;ste")
+    write("football", "strand", s)
+
+
 BUILDERS = {
     "basketball": build_basketball,
     "hockey": build_hockey,
+    "football": build_football,
 }
 
 if __name__ == "__main__":

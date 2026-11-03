@@ -203,7 +203,9 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "football",
     title: "Football",
     note: "NFL-Feldmaße, First-Down-Catch, Boxscore.",
-    variants: [v("football", "feld", "Feld")],
+    // Zweiter Schauplatz vom 03.11.: Beach-Football an der Küste (Meer, Palmen, Strandhütten,
+    // Sand statt Rasen) statt Flutlicht-Stadion — Feld, Linien, Endzone und Ablauf unverändert.
+    variants: [v("football", "feld", "Feld"), v("football", "strand", "Strand")],
   },
   hockey: {
     disciplineId: "hockey",
