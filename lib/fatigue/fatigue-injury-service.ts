@@ -1443,6 +1443,14 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   // nicht aus `pendingLaterSideKeys` abgeleitet, denn ein verletzter Spieler aus dieser Menge
   // bekommt sehr wohl seine Erholung und ist damit NICHT ausgelassen.
   const deferredPlayerIds = new Set<string>();
+  // Wer zu Beginn dieser Buchung gesperrt war, ist an diesem Spieltag NICHT gelaufen — auch wenn
+  // der Erholungs-Loop ihn gleich auf `recovering` stellt (letzter Sperr-Spieltag). Der Einsatz-
+  // Loop darf ihn deshalb nicht ueber die frisch geschriebene Verfuegbarkeit wieder "einsatzfaehig"
+  // sehen: sonst bekaeme ein gesperrter Spieler, der noch im Entwurf steht, Last UND einen
+  // Verletzungswurf (Saisontest 02.11.: Brunhilde, V-V, verletzte sich am Sperr-Spieltag erneut).
+  // Die Roll-Map (`buildMatchdayInjuryRollMap`) und die Rueckrechnung (`restorePreMatchdayAvailability`)
+  // klassifizieren ihn ebenfalls am Vor-Buchungs-Stand als gesperrt.
+  const unavailableAtStartKeys = new Set<string>();
 
   for (const roster of gameState.rosters) {
     const playerIndex = playerIndexById.get(roster.playerId);
@@ -1456,6 +1464,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       input.matchdayId,
       { matchdayBookkeeping: true },
     );
+    if (view.isUnavailable) unavailableAtStartKeys.add(usedKey);
     // Einsatz-Spieler werden hier weiterhin übersprungen — ihre Erholung ist nicht die volle
     // Bank-Erholung, sondern der aktive Anteil, und der wird unten im Einsatz-Loop VERRECHNET
     // (`getPlayerMatchdayFatigueDelta`), nicht hier als eigener Abzug gebucht. Zwei Buchungen für
@@ -1473,11 +1482,34 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     );
     const recoveryValue = view.isUnavailable ? recovery.injuryRecovery : recovery.normalRecovery;
     const fatigueAfterRecovery = clampFatigue(currentFatigue - recoveryValue);
+    /**
+     * DIE SPERRE ENDET MIT DEM SPIELTAG, NICHT MIT SEINER ERSTEN DISZIPLIN.
+     *
+     * `injured -> recovering` am letzten Sperr-Spieltag (`injuryUntilMatchday === matchdayId`) ist
+     * richtig, sobald dieser Spieltag KOMPLETT gebucht ist. Die Arena bucht aber nach D1 ein
+     * Teil-Ergebnis (`commitThroughSide: "d1"`) — und genau dieser Teil-Commit stellte den Status
+     * schon um. Ab da sah jede Verfuegbarkeitspruefung den noch gesperrten Spieler fuer D2 als
+     * einsatzfaehig (`isUnavailableInLaterMatchday` verlangt `injured`): Kontext-Loader, KI-Batch,
+     * Frischepruefung.
+     *
+     * SAISONTEST-FUND 02.11. (Battle Mode VW): die KI rechnete im D2-Commit die Aufstellungen
+     * duenner Kader neu und stellte so am Vortag Verletzte in D2 auf — 35 gesperrte Plaetze an den
+     * Spieltagen 12, 17 und 19, gewertet u. a. Grok-Na (Z-H, Sp. 17), Moonga und Brunhilde (V-V,
+     * Sp. 19; Brunhilde verletzte sich am Sperr-Spieltag sogar erneut). Die Score-Engine wertet
+     * jeden Entwurfs-Eintrag, sie kennt keine Sperre — die Verfuegbarkeit MUSS also vorher stimmen.
+     *
+     * Nach einem Teil-Commit bleibt der Status deshalb `injured`; erst der Commit, der den
+     * Spieltag abschliesst, stellt auf `recovering`. Die Rueckrechnung beim D2-Commit
+     * (`restorePreMatchdayAvailability`, Pass 1) setzt ohnehin auf `injured` zurueck — sie findet
+     * jetzt schlicht nichts mehr zu tun.
+     */
+    const sperreEndetMitDiesemCommit =
+      view.injuryUntilMatchday === input.matchdayId && (input.commitThroughSide ?? "d2") === "d2";
     nextAvailability = updateAvailability(nextAvailability, {
       playerId: roster.playerId,
       teamId: roster.teamId,
       fatigue: fatigueAfterRecovery,
-      injuryStatus: view.injuryUntilMatchday === input.matchdayId ? "recovering" : view.injuryStatus,
+      injuryStatus: sperreEndetMitDiesemCommit ? "recovering" : view.injuryStatus,
       injuryUntilMatchday: view.injuryUntilMatchday,
       injuredAtSeasonId: view.injuredAtSeasonId,
       injuredAtMatchdayId: view.injuredAtMatchdayId,
@@ -1498,7 +1530,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       input.matchdayId,
       { matchdayBookkeeping: true },
     );
-    if (availabilityView.isUnavailable) continue;
+    if (availabilityView.isUnavailable || unavailableAtStartKeys.has(buildMatchdayUseKey(use.teamId, use.playerId))) continue;
 
     const recovery = calculatePlayerRecovery(gameState, use.teamId, player.trainingMode);
     /**
