@@ -63,7 +63,10 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "spurt",
     title: "Spurt (HYROX)",
     note: "Laufschleife mit Stationen, Zuschauern und wartenden Teamkollegen.",
-    variants: [v("spurt", "hyrox", "HYROX-Kurs", { demo: null })],
+    // Bis 03.11. nur das Standbild hyrox.jpg (demo: null). kurs.html ist die erste abspielbare
+    // Szene: dasselbe Bild als Kulisse, die eingebrannten Figuren herausgenommen, Demo-Figuren
+    // laufen darauf (scripts/baue-spurt-szene.py).
+    variants: [v("spurt", "kurs", "HYROX-Kurs")],
   },
   "takeshis-castle": {
     disciplineId: "takeshis-castle",

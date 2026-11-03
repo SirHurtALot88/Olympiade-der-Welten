@@ -14,6 +14,23 @@ describe("Pixel-Szenen-Registry", () => {
     expect(Object.keys(DISCIPLINE_SCENES)).toHaveLength(20);
   });
 
+  it("jede Disziplin hat mindestens eine abspielbare Szene (Spurt seit 03.11. auch)", () => {
+    for (const scene of Object.values(DISCIPLINE_SCENES)) {
+      expect(scene.variants.some((v) => v.demo), scene.disciplineId).toBe(true);
+    }
+  });
+
+  // Gestaffelter Ausbau vom 03.11. (Chris: „wirklich andere Settings“, nicht nur Tag/Nacht):
+  // diese Disziplinen tragen neben der Original-Kulisse einen zweiten Schauplatz.
+  const ZWEI_SCHAUPLAETZE: string[] = [];
+  for (const id of ZWEI_SCHAUPLAETZE) {
+    it(`${id}: zweiter Schauplatz eingetragen`, () => {
+      const scene = DISCIPLINE_SCENES[id]!;
+      expect(scene.variants.length).toBeGreaterThanOrEqual(2);
+      expect(scene.variants.every((v) => v.demo)).toBe(true);
+    });
+  }
+
   for (const scene of Object.values(DISCIPLINE_SCENES)) {
     it(`${scene.disciplineId}: Varianten eindeutig, Dateien vorhanden`, () => {
       const ids = scene.variants.map((v) => v.id);
