@@ -153,7 +153,12 @@ export const DISCIPLINE_SCENES: Record<string, DisciplineScene> = {
     disciplineId: "wettessen",
     title: "Wettessen",
     note: "Jahrmarkt-Bühne mit der echten Wertungstabelle live eingeblendet.",
-    variants: [v("wettessen", "jahrmarkt", "Jahrmarkt"), v("wettessen", "nachtmarkt", "Nachtmarkt")],
+    // Bierzelt: dritter Ort vom 03.11. (scripts/baue-szenen-varianten-2.py), dieselbe Minute an derselben Tafel.
+    variants: [
+      v("wettessen", "jahrmarkt", "Jahrmarkt"),
+      v("wettessen", "nachtmarkt", "Nachtmarkt"),
+      v("wettessen", "bierzelt", "Festzelt"),
+    ],
   },
   "i-spy": {
     disciplineId: "i-spy",

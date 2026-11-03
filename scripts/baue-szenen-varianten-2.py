@@ -1722,7 +1722,156 @@ def showcase():
         schreibe("showcase", slug, out, title, h1, None, "ctx.drawImage(IMG.L_bg, 0, 0);", "if (window.__fx) window.__fx(ctx);", fx)
 
 
-ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach, "takeshis-castle": takeshis_castle, "showcase": showcase}
+# ================================================================== WETTESSEN: Bierzelt
+# Dritter Ort neben Jahrmarkt und Nachtmarkt (Staffel 1). Ersetzt wird alles oberhalb der
+# Buehnenbretter (y < 275) ausser dem Schild WETTESSEN und der Minutenuhr samt Pfosten; Bretter,
+# Wimpel vorn und die Tisch-Ebene mit den Namensschildern bleiben.
+WE_FLOOR_Y = 275
+WE_KEEP = ((230, 72, 412, 110), (286, 226, 354, 262), (316, 262, 324, 275))
+
+
+def we_bierzelt(bg):
+    rnd = random.Random(8101)
+    W, H = bg.size
+    lo = Image.new("RGB", (W, WE_FLOOR_Y))
+    px = lo.load()
+    d = ImageDraw.Draw(lo)
+    # Zeltdach: Stoffbahnen in Bahnen, zur Mitte durchhaengend
+    for y in range(0, 120):
+        for x in range(W):
+            sag = 10 * math.sin(((x % 80) / 80) * math.pi)
+            band = (x // 40) % 2
+            c = (236, 228, 206) if band else (196, 214, 232)
+            k = 0.55 + 0.45 * min(1, (y + sag) / 120)
+            px[x, y] = (clamp(c[0] * k), clamp(c[1] * k), clamp(c[2] * k))
+    for x in range(0, W, 80):                       # Dachbalken
+        d.rectangle([x - 3, 0, x + 3, 150], fill=(110, 70, 40))
+        d.line([x - 3, 0, x - 3, 150], fill=(140, 96, 56))
+    d.rectangle([0, 112, W, 118], fill=(110, 70, 40))
+    d.line([0, 112, W, 112], fill=(150, 104, 60))
+    # Rueckwand Holz + Musikbuehne mit Blaskapelle
+    for y in range(118, 200):
+        for x in range(W):
+            px[x, y] = (128, 84, 50) if (x // 4) % 6 else (110, 70, 40)
+    d.rectangle([180, 150, 460, 200], fill=(90, 56, 34))
+    d.rectangle([180, 150, 460, 153], fill=(170, 120, 70))
+    for k, cx in enumerate(range(200, 450, 30)):
+        c = rnd.choice([(30, 60, 40), (40, 40, 60), (60, 30, 30)])
+        d.rectangle([cx - 5, 168, cx + 5, 186], fill=c)
+        d.rectangle([cx - 3, 158, cx + 3, 166], fill=rnd.choice(SC_HAUT))
+        d.rectangle([cx - 4, 156, cx + 4, 158], fill=(40, 60, 40))   # Hut
+        inst = k % 3
+        if inst == 0:          # Tuba
+            d.ellipse([cx + 2, 160, cx + 12, 172], outline=(230, 190, 80))
+            d.line([cx + 4, 172, cx + 2, 182], fill=(230, 190, 80))
+        elif inst == 1:        # Trompete
+            d.line([cx + 3, 166, cx + 14, 164], fill=(240, 200, 90))
+            d.polygon([(cx + 14, 161), (cx + 18, 159), (cx + 18, 169), (cx + 14, 167)], fill=(240, 200, 90))
+        else:                  # Trommel
+            d.ellipse([cx - 7, 176, cx + 7, 186], fill=(220, 210, 190))
+            d.rectangle([cx - 7, 180, cx + 7, 186], fill=(170, 40, 40))
+    # Hopfengirlanden
+    for x0 in range(0, W, 80):
+        for i in range(41):
+            u = i / 40
+            x = int(x0 + 80 * u)
+            y = int(118 + 18 * 4 * u * (1 - u))
+            d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(80, 140, 60) if i % 3 else (150, 190, 90))
+    # Lange Bierbaenke mit Gaesten (zwei Reihen) + Masskruege
+    for row, (y, sc) in enumerate(((206, 0.9), (232, 1.0))):
+        d.rectangle([0, y + 8, W, y + 12], fill=(170, 120, 70))
+        d.line([0, y + 8, W, y + 8], fill=(210, 160, 100))
+        x = 6 + row * 7
+        while x < W:
+            if rnd.random() < 0.88:
+                c, h = rnd.choice(SC_FARBEN + [(60, 90, 50), (230, 230, 230), (120, 70, 40)]), rnd.choice(SC_HAUT)
+                d.rectangle([x - 4, y - 2, x + 4, y + 8], fill=c)
+                d.rectangle([x - 3, y - 10, x + 3, y - 3], fill=h)
+                d.line([x - 3, y - 10, x + 3, y - 10], fill=rnd.choice([(60, 40, 30), (30, 26, 24), (200, 170, 90), (150, 70, 40)]))
+                if rnd.random() < 0.3:
+                    d.rectangle([x - 4, y - 12, x + 4, y - 11], fill=(50, 80, 50))   # Trachtenhut
+                if rnd.random() < 0.5:
+                    d.rectangle([x + 4, y + 2, x + 8, y + 8], fill=(240, 220, 150))
+                    d.rectangle([x + 4, y + 2, x + 8, y + 3], fill=(255, 255, 250))
+            x += int(14 * sc) + rnd.randint(-1, 2)
+    # Bruestung vor der Buehne
+    d.rectangle([0, 252, W, WE_FLOOR_Y], fill=(120, 76, 44))
+    for x in range(0, W, 10):
+        d.rectangle([x + 2, 256, x + 6, 272], fill=(150, 100, 60))
+        d.line([x + 2, 256, x + 2, 272], fill=(180, 130, 80))
+    d.rectangle([0, 250, W, 254], fill=(170, 120, 70))
+    # Wagenrad-Leuchter unter dem Dach
+    lampen = []
+    for cx in (80, 240, 400, 560):
+        d.line([cx, 0, cx, 40], fill=(60, 40, 30))
+        d.ellipse([cx - 22, 38, cx + 22, 50], outline=(90, 60, 36))
+        for k in range(8):
+            a = k / 8 * math.tau
+            lx, ly = cx + int(math.cos(a) * 22), 44 + int(math.sin(a) * 6)
+            d.rectangle([lx - 1, ly - 3, lx + 1, ly], fill=(255, 236, 180))
+            add_glow(px, W, WE_FLOOR_Y, lx, ly, 10, (70, 54, 20), 0.9)
+            lampen.append((lx, ly))
+    for x in (252, 390):                             # Schild haengt an zwei Seilen vom Dachbalken
+        d.line([x, 0, x, 76], fill=(70, 50, 34))
+    im = bg.copy()
+    im.paste(lo, (0, 0))
+    sp, ip = bg.load(), im.load()
+    for k, (x0, y0, x1, y1) in enumerate(WE_KEEP):
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                p = sp[x, y]
+                if k == 0 and not ((p[0] > 150 and p[1] < 130) or (luma(p) > 235 and sat(p) < 25) or luma(p) < 60):
+                    continue          # Schild ohne Himmel/Wimpel drumherum
+                ip[x, y] = p
+    # warmes Zeltlicht auf den Brettern
+    for y in range(WE_FLOOR_Y, H):
+        for x in range(W):
+            p = ip[x, y]
+            ip[x, y] = (clamp(p[0] * 0.96 + 4), clamp(p[1] * 0.90), clamp(p[2] * 0.78))[:3] + tuple(p[3:])
+    return im, lampen
+
+
+WE_FX_ZELT = r"""
+window.__fx = (ctx, t0) => {
+  const t = performance.now() / 1000;
+  // Leuchter pendeln leicht im Takt der Blaskapelle, Masskruege gehen hoch
+  const L = __LAMPEN__;
+  for (const [x, y] of L) {
+    const f = 0.5 + 0.5 * Math.sin(t * 3 + x * 0.1);
+    ctx.fillStyle = `rgba(255,230,160,${0.12 + 0.18 * f})`; ctx.fillRect(x - 3, y - 5, 7, 7);
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = 20 + (i * 151) % 600, row = i % 2, y = row ? 222 : 196;
+    const up = Math.max(0, Math.sin(t * 2.2 + i * 1.3));
+    const yy = Math.round(y - up * 6);
+    ctx.fillStyle = '#f0dc96'; ctx.fillRect(x, yy, 4, 6);
+    ctx.fillStyle = '#fffffa'; ctx.fillRect(x, yy, 4, 1);
+  }
+  // Noten ueber der Kapelle
+  ctx.fillStyle = 'rgba(60,40,30,0.8)';
+  for (let k = 0; k < 4; k++) {
+    const ph = (t * 0.5 + k / 4) % 1, x = 230 + k * 55 + Math.sin(t + k) * 6, y = 150 - ph * 30;
+    if (ph < 0.8) { ctx.fillRect(Math.round(x), Math.round(y), 3, 2); ctx.fillRect(Math.round(x) + 2, Math.round(y) - 6, 1, 6); }
+  }
+};
+"""
+
+
+def wettessen():
+    s, m, D = lade("wettessen", "jahrmarkt.html", "DATA")
+    im, lampen = we_bierzelt(dec(D["layers"]["bg"]).convert("RGB"))
+    if os.environ.get("SZENEN_DEBUG"):
+        im.save(os.path.join(os.environ["SZENEN_DEBUG"], "wettessen-bierzelt-bg.png"))
+    D2 = json.loads(json.dumps(D))
+    D2["layers"]["bg"] = enc(im)
+    out = ersetze_json(s, m, D2)
+    schreibe("wettessen", "bierzelt", out, "Wettessen Bierzelt", "Wettessen &mdash; Festzelt mit Blaskapelle",
+             "Dieselbe Minute an derselben Tafel wie auf dem Jahrmarkt (gleiche Esser, gleiche Wertung), nur im Festzelt: "
+             "Stoffdach mit Hopfengirlanden, Wagenrad-Leuchter, Blaskapelle und volle Bierb&auml;nke.",
+             "ctx.drawImage(IMG.bg, 0, 0);", "if (window.__fx) window.__fx(ctx, t);", WE_FX_ZELT.replace("__LAMPEN__", json.dumps(lampen)))
+
+
+ALLE = {"tennis": tennis, "climbing": climbing, "speed-schach": speed_schach, "takeshis-castle": takeshis_castle, "showcase": showcase, "wettessen": wettessen}
 
 if __name__ == "__main__":
     ziele = sys.argv[1:] or list(ALLE)
