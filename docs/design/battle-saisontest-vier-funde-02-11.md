@@ -126,3 +126,46 @@ Der Lauf war etwa 53 Sekunden nach dem Wechsel abgeschlossen.
 - **Fehlender Rückweg nach dem D1-Commit:** Wird die D2-Seite nach dem D1-Commit aus einem anderen
   Grund ungültig, gibt es weiterhin keinen neuen Vorlauf, und D2 wird sichtbar als
   `nicht_ausgefuehrt` gebucht. Der bekannte Auslöser dafür ist jetzt zu.
+
+## Nachtrag 03.11.: Gesperrte Spieler in D2 und falsches `invalid_lineup`: zwei Bugs, behoben
+
+**Befund am Testabbild (nach der Abrechnung):** 35 Plätze für gesperrte Spieler in KI-Aufstellungen
+(Spieltage 12, 17, 19), 6 Verletzungswürfe für Gesperrte, 3 gewertet (Grok-Na Z-H Sp. 17, Moonga und
+Brunhilde V-V Sp. 19), alle auf D2. Dazu 104 D2-Zeilen mit `invalid_lineup`, alle mit einer
+D1-Verletzung im selben Team und Spieltag.
+
+**Ursache Sperre:** `applyFatigueAndInjuryAfterMatchday` stellte am letzten Sperr-Spieltag
+(`injuryUntilMatchday === matchdayId`) schon beim **D1-Teil-Commit** `injured → recovering`. Ab da
+galt der Spieler für D2 als einsatzfähig (`isUnavailableInLaterMatchday` verlangt `injured`). Vor
+`cbd52cc3b` stellte der KI-Batch im D2-Commit dünne Kader neu auf und setzte die Gesperrten ein; die
+Score-Engine wertet jeden Entwurfs-Eintrag, eine Sperre kennt sie nicht. Zweiter Fehler im selben
+Durchlauf: Der Einsatz-Loop las die eben geschriebene `recovering`-Verfügbarkeit und gab einem noch
+im Entwurf stehenden Gesperrten Last und einen Verletzungswurf (Brunhilde). Der Freeze aus
+`cbd52cc3b` hat das nur verdeckt: Am Nachbau mit dem Stand von `cbd52cc3b` waren nach dem D1-Commit
+weiterhin **232 von 232** Gesperrten für D2 freigegeben.
+
+**Ursache `invalid_lineup`:** Der D2-Commit prüft den ganzen Entwurf. Ein Teamkollege, der sich in
+der gebuchten D1 verletzt hatte, steht dort mit `player_injured_unavailable`. Die Ausnahme dafür galt
+nur für `locked`, KI-Entwürfe sind aber `submitted`. Die Punkte waren richtig. Allerdings wird aus
+`invalid_lineup` im Standings-Preview `incomplete_result`, und das blockiert den Standings-Apply ohne
+`forceReplace`. Dazu kamen 5 Zeilen dünner Kader: Dort brach die Kurz-Aufstellungs-Regel, weil der
+Gesperrte nach D1 wieder als verfügbar zählte.
+
+**Fix:** (1) Erst der Commit, der den Spieltag abschließt, stellt auf `recovering`. Wer zu Beginn der
+Buchung gesperrt war, wird im Einsatz-Loop übersprungen. (2) Eine Verletzung, die an diesem Spieltag
+entstanden ist, erzeugt nur eine Warnung (`injuredAtMatchdayId` an den Kader-Refs). Eine Sperre aus
+einem Vorspieltag bleibt ein Fehler. (3) Als Netz darunter besetzt
+`repairFrozenAiDraftsWithBlockedPlayers` gesperrte Einträge auf der offenen Seite eines eingefrorenen
+KI-Entwurfs gezielt nach.
+
+**Nachbau** (unberührter Ausgangsstand, alle 32 Teams KI, 20 Spieltage, UI-Takt mit Fake-Runnern):
+
+| | vor `cbd52cc3b` | Stand `cbd52cc3b` | nachher |
+|---|---:|---:|---:|
+| Gesperrte nach D1-Commit für D2 frei | – | 232/232 | 0/232 |
+| Gesperrte gewertet | 11 | 0 | 0 |
+| Würfe für Gesperrte | 19 | 0 | 0 |
+| `invalid_lineup`-Zeilen | 112 | 135 | 0 |
+
+Buchungsquellen, Verletzungen (249), Würfe (5097) und Punkte (1216) sind im Stand `cbd52cc3b` und
+nachher identisch. Die Wertung ändert sich am Nachbau also nicht, nur die Kennzeichnung.
