@@ -30,7 +30,7 @@ const ARTEN = ["walk", "angriff", "treffer", "tod"];
 /**
  * @param {Record<string, {canvas:number, rotationen:string[], animationen:{name:string,kind:string,frames:number,dirs:string[]}[]}>} index
  * @param {{id:string,name:string}[]} spieler
- * @returns {Record<string, {s:string,c:number,r:string[],a:Record<string,Partial<Record<"east"|"south",[string,number]>>>}>}
+ * @returns {Record<string, {s:string,c:number,r:string[],a:Record<string,Partial<Record<"east"|"south"|"north",[string,number]>>>}>}
  */
 export function baueArenaFigurenTabelle(index, spieler) {
   const tabelle = {};
@@ -45,10 +45,12 @@ export function baueArenaFigurenTabelle(index, spieler) {
     const e = index[slug];
     const a = {};
     // Je Art UND Richtung die erste Gruppe, die diese Richtung hat: bei Draco etwa hat "walk"
-    // nur einen Sued-Streifen, der Ost-Streifen steckt erst in "walk2".
+    // nur einen Sued-Streifen, der Ost-Streifen steckt erst in "walk2". "north" ist optional
+    // (Chris, 06.11.: echte Ruecken-Animation statt der Ost-Naeherung beim Nordlauf) — fehlt
+    // sie einer Figur, liest zeichnePixelFigur() im Motor weiterhin die bisherige Ost-Naeherung.
     for (const art of ARTEN) {
       const je = {};
-      for (const dir of ["east", "south"]) {
+      for (const dir of ["east", "south", "north"]) {
         const gruppe = e.animationen.find((g) => g.kind === art && g.dirs.includes(dir));
         if (gruppe) je[dir] = [gruppe.name, gruppe.frames];
       }

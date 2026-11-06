@@ -7,8 +7,10 @@ import figurenSpriteIndex from "@/data/generated/figuren-sprites.json";
  * `public/sprites/figuren/<slug>/` und indiziert in `data/generated/figuren-sprites.json`.
  * Je Figur liegen dort:
  *   - `south.png`, `east.png`, `west.png`, `north.png` — die Grundposen (Rotationen),
- *   - `<name>-south.png`, `<name>-east.png` — je Animation ein waagerechter Streifen mit
- *     `frames` Bildern zu `canvas` x `canvas` px (West = Ost gespiegelt, wie im PixelLab-Kanon).
+ *   - `<name>-south.png`, `<name>-east.png`, optional `<name>-north.png` — je Animation ein
+ *     waagerechter Streifen mit `frames` Bildern zu `canvas` x `canvas` px (West = Ost gespiegelt,
+ *     wie im PixelLab-Kanon; Nord ist seit 06.11. eine echte Animation, wo vorhanden — fehlt sie
+ *     einer aelteren Figur, zeigt der Motor ersatzweise den Ost-Streifen).
  *
  * Zuordnung Spieler -> Figur genau wie bei den Portraits (`public/portraits/README.md`):
  * der Slug ist der Namensteil der Spieler-ID (`player-0001-umbros` -> `umbros`).
@@ -24,7 +26,7 @@ export type FigurAnimation = {
   name: string;
   kind: FigurAnimationKind;
   frames: number;
-  dirs: Array<"south" | "east">;
+  dirs: Array<"south" | "east" | "north">;
   /** Woher die Art-Zuordnung stammt (gid/text = aus den Bau-Skripten belegt, heur/frames = geschaetzt). */
   quelle?: string;
 };
@@ -79,7 +81,7 @@ export function figurPoseUrl(sprite: FigurSprite, dir: "south" | "east" | "west"
   return `${FIGUREN_SPRITE_DIR}/${sprite.slug}/${has}.png`;
 }
 
-export function figurStripUrl(sprite: FigurSprite, anim: FigurAnimation, dir: "south" | "east"): string {
+export function figurStripUrl(sprite: FigurSprite, anim: FigurAnimation, dir: "south" | "east" | "north"): string {
   const has = anim.dirs.includes(dir) ? dir : anim.dirs[0] ?? "south";
   return `${FIGUREN_SPRITE_DIR}/${sprite.slug}/${anim.name}-${has}.png`;
 }

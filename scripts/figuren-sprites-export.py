@@ -9,7 +9,7 @@ Figuren (Ordner und Indexeintraege) bleiben unangetastet. Ohne `--nur` wird alle
 
 Ergebnis:
   public/sprites/figuren/<slug>/{south,east,west,north}.png        Grundposen
-  public/sprites/figuren/<slug>/<name>-{south,east}.png             je Animation ein Streifen
+  public/sprites/figuren/<slug>/<name>-{south,east,north}.png       je Animation ein Streifen (north optional, s.u.)
   data/generated/figuren-sprites.json                               Index fuer lib/data/figurenSprites.ts
   data/generated/figuren-sprites-animationsarten.json               animation_group_id -> Art (bleibt stabil)
 
@@ -17,6 +17,14 @@ Zuordnung Figur -> Spieler: ein Tag der Figur ist der Namens-Slug der Spieler-ID
 (`player-0001-umbros` -> Tag `umbros`, so legt der PixelLab-Kanon die Figuren an). Figuren mit
 `superseded` im Tag sind ersetzt und werden ausgelassen. Ohne passenden Tag zaehlt der Name
 (vor dem ersten Komma). Bei mehreren Figuren je Slug gewinnt: getaggt > mehr Animationen > neuer.
+
+Richtungen (Chris, 06.11.: "er kann ja auch einfach von oben nach unten laufen... dass er dann nicht
+seitlich gezeigt wird, sondern geradeaus"): bis 06.11. kannte der Export nur Sued+Ost (West wird im
+Motor aus Ost gespiegelt, PixelLab-Kanon); fehlte eine Nord-Animation, zeigte der Motor ersatzweise
+den Ost-Streifen, gespiegelt je nach Laufrichtung links/rechts -- bei reiner Nordbewegung (kein
+Links/Rechts-Anteil) lief die Figur dadurch sichtbar seitwaerts nach oben. Jetzt exportiert dieses
+Skript auch echte Nord-Streifen, wenn PixelLab sie liefert (`ANIM_DIRS` um "north" erweitert); ohne
+Nord-Streifen bleibt die alte Ost-Naeherung als Ruecksprung (battle-mode.engine.js, zeichnePixelFigur()).
 
 Animationsart (walk/angriff/tod/treffer): PixelLab kennt nur den auf ~37 Zeichen gekuerzten
 Aktionstext als Label. Reihenfolge: (1) gespeicherte Art aus der Arten-Datei, (2) Schluesselwoerter
@@ -44,7 +52,7 @@ ARTEN = os.path.join(ROOT, "data", "generated", "figuren-sprites-animationsarten
 PORTRAIT_MAP = os.path.join(ROOT, "data", "generated", "player-portrait-map.json")
 API = "https://api.pixellab.ai/v2"
 ROTS = ["south", "east", "west", "north"]
-ANIM_DIRS = ["south", "east"]
+ANIM_DIRS = ["south", "east", "north"]
 
 WALK = ["walks", "walk ", "waddle", "strides", "stride ", "inches forward", "glides", "glide ", "marches",
         "crawls", "slithers", "hops forward", "moves forward", "steps forward", "trudges", "lumbers",
