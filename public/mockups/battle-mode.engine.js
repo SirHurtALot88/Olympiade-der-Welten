@@ -4647,9 +4647,12 @@
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
     const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
-    // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt.
-    // Norden (Ruecken) hat keinen Streifen: Gehen zeigt dort die Rueckenpose mit Wippen,
-    // Angriff/Treffer/K.o. die Seitenansicht in Bewegungsrichtung.
+    // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
+    // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
+    // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
+    // geradeaus"). Fehlt einer Figur die Nord-Animation (aeltere Figuren, bis die
+    // Nachgenerierung durch ist), bleibt die bisherige Naeherung: der Ost-Streifen, gespiegelt
+    // je nach Lauf-/Blickrichtung links/rechts (`wunsch` unten faellt dann auf "east" zurueck).
     const spiegel=(r0===1)||(r0===0&&(u.vx||0)<0);
     const zeichneBild=(e,f,dx,dy,winkel,spiegeln)=>{
       const m=e.mass;
@@ -4665,7 +4668,7 @@
     if(art){
       const def=fig.a[art];
       if(def){
-        const wunsch=(r0===2)?"south":"east";
+        const wunsch=(r0===2)?"south":(r0===0)?"north":"east";
         const d=def[wunsch]?wunsch:(def.east?"east":"south");
         const [stamm,n]=def[d];
         const e=z.bilder.get(stamm+"-"+d+".png");
