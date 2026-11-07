@@ -5,7 +5,8 @@
   },
   "chyros": {
     "subjekt": "a giant armored hermit crab, dark rust-red segmented crab body on eight jointed legs with two massive heavy pincer claws, carrying a huge spiral stone shell carved with glowing teal runes on its back, small black stalk eyes",
-    "angriff": "rears up and slams both massive pincer claws down in a crushing double strike, cracking the ground with teal rune sparks, then settles back onto its legs"
+    "angriff": "rears up and slams both massive pincer claws down in a crushing double strike, cracking the ground with teal rune sparks, then settles back onto its legs",
+    "tod": "is struck down hard, its legs buckle, it topples over sideways and flips onto its back with the spiral shell underneath, claws and legs curled up limp in the air, stops moving and lies dead"
   },
   "nekira": {
     "subjekt": "an undead skeletal cat-creature standing upright on two legs, bleached bone skull with pointed feline ears and empty black eye sockets, exposed ribcage, long bony whip-like tail, tattered strips of grey fur and dry skin, long bony clawed hands",
@@ -13,7 +14,8 @@
   },
   "terratron": {
     "subjekt": "a colossal ancient tortoise construct on four thick stone legs, cracked grey stone shell plates with mossy green bushes and a small tree growing on top, weathered rocky skin, heavy wrinkled reptile head, slow massive stance",
-    "angriff": "rears up on its hind legs and slams its massive front legs and stone shell down in a ground-shaking stomp, dust and small rocks flying, then settles back down"
+    "angriff": "rears up on its hind legs and slams its massive front legs and stone shell down in a ground-shaking stomp, dust and small rocks flying, then settles back down",
+    "tod": "is struck down hard, rocks and lurches, topples over and flips onto its back with the stone shell on the ground, all four legs and head dangling limp in the air, stops moving and lies dead"
   },
   "elyon": {
     "subjekt": "a holy angelic knight in full golden-bronze plate armor with a closed great helm, a glowing golden halo floating above the helmet, two large white feathered wings spread from the back, a long two-handed greatsword, a flowing tattered white cloak",
