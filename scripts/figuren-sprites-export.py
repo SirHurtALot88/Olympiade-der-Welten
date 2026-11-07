@@ -313,7 +313,19 @@ def main():
             if f.endswith(".png"):
                 palettize(os.path.join(od, f))
 
+    if args.nur and os.path.exists(INDEX):
+        # Index ebenfalls frisch mergen: nur die eigenen Slugs ersetzen, alles andere so lassen, wie
+        # es ein parallel gelaufener --nur-Export inzwischen geschrieben hat.
+        frisch = json.load(open(INDEX))
+        frisch.update({s: index[s] for s in details})
+        index = frisch
     json.dump(index, open(INDEX, "w"), ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    # Arten-Datei frisch von der Platte mergen statt die Kopie vom Start zu ueberschreiben: ein
+    # parallel laufender Bestell-Lauf traegt dort neue Gruppen ein, die sonst verloren gingen.
+    if os.path.exists(ARTEN):
+        frisch = json.load(open(ARTEN))
+        frisch.update({g: k for g, k in arten.items() if g not in frisch})
+        arten = frisch
     json.dump(arten, open(ARTEN, "w"), ensure_ascii=False, indent=0, sort_keys=True)
     print("Figuren:", len(index))
     for slug, gid, typ, dirs, leer in uebersprungen:

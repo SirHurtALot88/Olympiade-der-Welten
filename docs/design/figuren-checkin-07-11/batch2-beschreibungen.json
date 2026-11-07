@@ -1,0 +1,22 @@
+{
+  "becky": {
+    "subjekt": "a slender angelic huntress with long wavy green hair, tanned skin, two white feathered wings, a short emerald-green leather top and green-gold ranger skirt with a white loincloth, bare arms with green bracers, a thin silver rapier in her right hand",
+    "angriff": "lunges forward and thrusts her thin silver rapier in a quick precise stab, wings flaring open, then springs back to the starting pose"
+  },
+  "blorgh": {
+    "subjekt": "a hulking undead ogre warrior with pale grey rotting skin, a bald skull-like head with hollow black eye sockets and a gaping mouth, massive shoulders, ragged mossy brown rags, a huge rusty two-handed sledgehammer carried in both hands",
+    "angriff": "raises the huge rusty sledgehammer high overhead with both hands and slams it down with a heavy crushing blow, then drags it back up"
+  },
+  "knoedelsohn": {
+    "subjekt": "a small bright green dragon standing on two legs, leaf-like scales, large yellow-green bat wings spread wide, a long curling tail, a thin pointed snout with small horns, yellow eyes, no clothing or armor",
+    "angriff": "rears its head back and spits a burst of green acid fire forward from its snout, wings flapping once, then returns to the starting pose"
+  },
+  "kyori": {
+    "subjekt": "an anthropomorphic orca creature standing upright on a thick finned tail, glossy black and white orca skin with a white belly and eye patches, a dorsal fin on the back, wearing a black leather jacket with silver trim and a red sash, holding a long katana",
+    "angriff": "draws the katana in one fluid motion and slashes diagonally across in a swift swordsman's cut, tail bracing, then sheathes back to the starting pose"
+  },
+  "mictone": {
+    "subjekt": "a dark forest centaur-like tauren with the lower body of a black four-legged beast and the upper body of a pale dark-haired woman, long black horns, tangled black hair, dark green and black bark-like armor, carrying a long wooden bow",
+    "angriff": "draws the long wooden bow, aims and looses an arrow forward with a sharp snap of the string, then lowers the bow to the starting pose"
+  }
+}
