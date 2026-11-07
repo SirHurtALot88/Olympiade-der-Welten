@@ -1,0 +1,42 @@
+{
+  "note": "in den Top Disziplinen sieht man nur die aktuelle Season in die Punkte eingepreist! All Time fehlt komplett! bitte fixen",
+  "view": "playerProfile",
+  "path": "/foundation",
+  "tab": "details",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=playerProfile&tab=details&playerId=player-2417-morak&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-14T09:56:23.107Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T09-56-15-529Z-l4835p",
+  "createdAt": "2026-08-14T09:56:15.529Z",
+  "page": {
+    "path": "/foundation",
+    "view": "playerProfile",
+    "tab": "details",
+    "label": "Team · Spieler"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 3,
+    "matchdayId": "season-2-matchday-3",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "C-C",
+      "S-C"
+    ]
+  }
+}

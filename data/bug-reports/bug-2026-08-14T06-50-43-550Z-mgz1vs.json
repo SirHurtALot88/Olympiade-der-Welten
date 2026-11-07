@@ -1,0 +1,41 @@
+{
+  "note": "In der Training History sollte auch drin stehen welche Klasse in der Season mainly trainiert wurde!",
+  "view": "playerProfile",
+  "path": "/foundation",
+  "tab": "career",
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=playerProfile&tab=career&playerId=player-0372-vraccs&team=S-C&saveId=new-game-1786626914058-hwz8fk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1156
+  },
+  "clientTime": "2026-08-14T06:50:51.150Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-14T06-50-43-550Z-mgz1vs",
+  "createdAt": "2026-08-14T06:50:43.550Z",
+  "page": {
+    "path": "/foundation",
+    "view": "playerProfile",
+    "tab": "career",
+    "label": "Team · Spieler"
+  },
+  "game": {
+    "saveId": "new-game-1786626914058-hwz8fk",
+    "saveName": "Oly New Game Custom 13.8.2026, 15:15:14",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}

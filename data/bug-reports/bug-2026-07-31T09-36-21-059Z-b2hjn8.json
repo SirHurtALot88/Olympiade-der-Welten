@@ -1,0 +1,41 @@
+{
+  "note": "in der eigneen Team Ansicht fehlt unten die History wie bei anderen teams! bitte ergänzen",
+  "view": "teams",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=teams&team=S-C&saveId=new-game-1785174792968-8d7mdx",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3127,
+    "height": 1155
+  },
+  "clientTime": "2026-07-31T09:36:20.939Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-07-31T09-36-21-059Z-b2hjn8",
+  "createdAt": "2026-07-31T09:36:21.059Z",
+  "page": {
+    "path": "/foundation",
+    "view": "teams",
+    "tab": null,
+    "label": "Team · Teams"
+  },
+  "game": {
+    "saveId": "new-game-1785174792968-8d7mdx",
+    "saveName": "Oly New Game Custom 27.7.2026, 19:53:12",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 10,
+    "matchdayId": "matchday-10",
+    "matchdayStatus": "resolved",
+    "activeTeamIds": [
+      "C-C"
+    ]
+  }
+}

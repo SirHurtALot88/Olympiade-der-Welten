@@ -1,0 +1,41 @@
+{
+  "note": "für den Draft müssen wir die Wishlist auf bis zu 15 Slots erhöhen! das gilt aber nur für den Draft, danach muss die Wishlist auf den Level vom Scouting angepasst werden",
+  "view": "marketV2",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=marketV2&team=L-K&saveId=new-game-1785476771457-e4yvyl",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 3440,
+    "height": 1271
+  },
+  "clientTime": "2026-07-31T06:52:47.366Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-07-31T06-52-47-563Z-ntw1fx",
+  "createdAt": "2026-07-31T06:52:47.563Z",
+  "page": {
+    "path": "/foundation",
+    "view": "marketV2",
+    "tab": null,
+    "label": "Markt · Transfermarkt"
+  },
+  "game": {
+    "saveId": "new-game-1785476771457-e4yvyl",
+    "saveName": "Oly New Game Custom 31.7.2026, 07:46:11",
+    "saveSource": "url",
+    "seasonId": "season-1",
+    "seasonYear": 1,
+    "currentMatchday": 1,
+    "matchdayId": "matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "L-K"
+    ]
+  }
+}
