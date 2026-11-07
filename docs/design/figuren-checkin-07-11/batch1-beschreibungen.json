@@ -1,0 +1,22 @@
+{
+  "abyssalfin": {
+    "subjekt": "a slender deep-sea merman with a long finned eel-like tail instead of legs, dark teal and electric-blue skin with glowing cyan bioluminescent stripes, translucent ragged fins along the arms and spine, webbed clawed hands, large pale glowing eyes, no armor or clothing",
+    "angriff": "whips its long finned tail forward and lashes out with both glowing clawed hands, a burst of cyan water spray around the strike, then returns to the starting pose"
+  },
+  "chyros": {
+    "subjekt": "a giant armored hermit crab, dark rust-red segmented crab body on eight jointed legs with two massive heavy pincer claws, carrying a huge spiral stone shell carved with glowing teal runes on its back, small black stalk eyes",
+    "angriff": "rears up and slams both massive pincer claws down in a crushing double strike, cracking the ground with teal rune sparks, then settles back onto its legs"
+  },
+  "nekira": {
+    "subjekt": "an undead skeletal cat-creature standing upright on two legs, bleached bone skull with pointed feline ears and empty black eye sockets, exposed ribcage, long bony whip-like tail, tattered strips of grey fur and dry skin, long bony clawed hands",
+    "angriff": "pounces forward and slashes with its long bony claws in a frenzied double swipe, tail lashing, then springs back to the starting pose"
+  },
+  "terratron": {
+    "subjekt": "a colossal ancient tortoise construct on four thick stone legs, cracked grey stone shell plates with mossy green bushes and a small tree growing on top, weathered rocky skin, heavy wrinkled reptile head, slow massive stance",
+    "angriff": "rears up on its hind legs and slams its massive front legs and stone shell down in a ground-shaking stomp, dust and small rocks flying, then settles back down"
+  },
+  "elyon": {
+    "subjekt": "a holy angelic knight in full golden-bronze plate armor with a closed great helm, a glowing golden halo floating above the helmet, two large white feathered wings spread from the back, a long two-handed greatsword, a flowing tattered white cloak",
+    "angriff": "raises the greatsword overhead with both hands and brings it down in a powerful vertical slash with a flash of golden light, wings flaring, then returns to a guard stance"
+  }
+}
