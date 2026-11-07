@@ -37,7 +37,13 @@ jobs:
   # Übersprungene Jobs gelten als bestanden, Pflicht-Checks blockieren den Merge also nicht. Stirbt
   # die Weiche selbst, laufen die Oly-Jobs trotzdem (`!cancelled()` statt stillem Überspringen).
   weiche:
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 statt ubuntu-latest (07.11.): GitHub hat ubuntu-latest auf 26.04
+    # vorgezogen, Playwright 1.60.0 kennt "ubuntu26.04-x64" noch nicht und bricht beim
+    # Chromium-Install ab ("ERROR: Playwright does not support chromium on
+    # ubuntu26.04-x64", PR #1345). Betraf JEDEN Job dieser Datei, nicht nur Chromium-
+    # lastige — alle neun auf dieselbe feste Version gepinnt, damit main nicht ebenfalls
+    # umkippt, sobald der naechste Lauf den neuen Standard-Runner zieht.
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       nur_kartenschmiede: ${{ steps.pruefe.outputs.nur_kartenschmiede }}
@@ -51,7 +57,7 @@ jobs:
   kartenschmiede:
     needs: weiche
     if: needs.weiche.outputs.nur_kartenschmiede == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +80,7 @@ jobs:
   test-and-smoke:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # ZEITGRENZE AUF 40 MINUTEN — nachgemessen, nicht geraten (04.09., mehrere unabhaengige Laeufe
     # auf main und offenen PRs). Bei 30 Minuten lag der Job praktisch immer knapp DARUNTER statt
     # weit darunter: 26:50, 28:53, 29:25 (34s Puffer) waren alles GRUENE Laeufe, und zwei weitere
@@ -313,7 +319,7 @@ jobs:
   full-test-suite:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -360,7 +366,7 @@ jobs:
   # bestaetigt. Nach ein paar gruenen Laeufen gehoert er auf Chris' Branch-Schutz-Liste (Settings
   # -> Branches -> Require status checks), genau wie `persistenz-suiten` es vorher war.
   arena-chromium-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -449,7 +455,7 @@ jobs:
   persistenz-suiten:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -486,7 +492,7 @@ jobs:
   pps-referenz-frische:
     needs: weiche
     if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -552,7 +558,7 @@ jobs:
   # Differenz aus -- das ist die Zahl, die zur Plan-Schaetzung (Abschnitt 4.2: +0,6-0,75 GB)
   # passt, nicht die 3,7-3,8 GB fuer sich allein.
   arena-image-chromium-probe:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -654,7 +660,7 @@ jobs:
   # (z. B. `npm install -g npm@12` vor `npm install`/`npm install --package-lock-only`), sonst
   # wirft genau dieser Check es wieder raus.
   lockfile-libc-waechter:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
