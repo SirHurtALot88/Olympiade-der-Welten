@@ -166,6 +166,18 @@ diesen Satz naheliegend nach Breakdance klingt. Jeder Agent, der an dieser Diszi
 recherchiert Folter-/Survival-Formate (Slap-Fighting, Kendo-Kachinuki, K.o.-Teamformate), nicht
 Breakdance-Battles.
 
+## PixelLab-Tod-Animationen: zum Charakter passend wählen, nicht generisch kippen lassen
+
+Chris am 07.11., im Kontext der 360-Charaktere-Animationsreparatur, wörtlich: „Generell darfst du
+passend zum Charakter auch den Tod wählen. Also auch blutiger und brutal möglich. Das einfach nach
+hinten oder vorne kippen sieht manchmal aus wie hinfallen." Gilt für alle PixelLab-Figuren, nicht
+nur für den Anlass-Fall (genta, Batch 11 der Animationsreparatur): die Tod-Animation darf — wenn
+es zum Charakter passt — explizit blutig/brutal ausfallen (Belege dafür: Kanonen-Panzertiere
+kippen auf den Rücken statt kurz zu blinken, Batch 1; ein gewöhnlicher Büro-Typ bekommt einen
+Herzinfarkt-Tod statt Kampf-K.o., Batch 10). Ein reines Vorne-/Hinten-Kippen ist nur dann in
+Ordnung, wenn es wirklich wie ein K.o. wirkt — wirkt es nur wie ein Hinfallen, zählt das als
+Mangel und braucht eine charakterspezifischere Pose, kein 0815-Umkippen.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
