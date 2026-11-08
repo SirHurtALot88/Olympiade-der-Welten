@@ -117,6 +117,21 @@ AUFTRAEGE = {
     # --- Speed-Schach: sechs Figuren in einer Reihe, damit sie aus einem Guss sind ---
     "schach": dict(art="schach", gen=(288, 48),
         prompt=f"row of six ivory white chess pieces side by side, evenly spaced, from left to right: small round pawn, castle tower rook, horse head knight, bishop with pointed mitre, queen with a spiked crown, tallest king with a cross on top, front view, {STIL}"),
+
+    # --- Takeshi's Castle: Kulissen-QS 08.11. (Rahmen statt Material, Rang 1). Drei NEUE
+    # Requisiten (kein Sprite-Tausch wie oben, art="neu": kein altes Format zu treffen,
+    # Ziel ist die eigene gen-Box) fuer die Draufsicht-Route: ein Torii am Routenanfang,
+    # Kirschbaeume entlang des Wegs, Tribuenenbloecke an zwei, drei Stellen. Alle drei im
+    # selben DRAUF-Stil wie baum_1..4/zaun_holz, damit die Karte EINE Perspektive haelt
+    # (docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.1: "Perspektive
+    # vereinheitlichen" -- gewaehlter Weg: 3/4-Sicht durchhalten, nicht die Fallen-
+    # Piktogramme auf strenge Draufsicht umstellen, s. Batch-13-Notiz).
+    "takeshi_torii": dict(art="neu", datei="arena/takeshi_torii.png", gen=(84, 64),
+        prompt=f"a wooden red japanese torii shrine gate, two upright pillars and a curved crossbeam on top, standalone, {DRAUF}, {STIL}"),
+    "takeshi_kirschbaum": dict(art="neu", datei="arena/takeshi_kirschbaum.png", gen=(40, 58),
+        prompt=f"blooming japanese cherry blossom tree with a round pink and white flower crown, {DRAUF}, {STIL}"),
+    "takeshi_tribuene": dict(art="neu", datei="arena/takeshi_tribuene.png", gen=(72, 46),
+        prompt=f"small wooden spectator grandstand bleacher stand full of tiny cheering fans in colourful clothes, {DRAUF}, {STIL}"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -413,7 +428,27 @@ def baue_korb(name, a):
     return True
 
 
-BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach}
+def baue_neu(name, a):
+    """Brandneue Requisiten ohne Vorgaenger-Datei (kein ALTE_BOX-Eintrag noetig): der Rohkandidat
+    wird auf seine Alpha-Begrenzung beschnitten, in die eigene gen-Box eingepasst und mittig
+    (anker="mitte") oder unten buendig (Default, wie baum_1..4/zaun_holz) auf eine neue,
+    transparente Leinwand genau dieser Box gesetzt."""
+    q = roh(name)
+    if q is None:
+        return False
+    bw, bh = a["gen"]
+    inh = einpassen(zuschnitt(q), bw, bh)
+    neu = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    ox = (bw - inh.width) // 2
+    oy = (bh - inh.height) // 2 if a.get("anker") == "mitte" else bh - inh.height
+    neu.alpha_composite(inh, (ox, oy))
+    os.makedirs(os.path.join(SPRITES, os.path.dirname(a["datei"])), exist_ok=True)
+    neu.save(os.path.join(SPRITES, a["datei"]))
+    return True
+
+
+BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach,
+         "neu": baue_neu}
 
 
 def einsetzen(args):

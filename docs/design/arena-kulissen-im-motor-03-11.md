@@ -384,3 +384,97 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
 **Stand nach Batch 11:** 20 von 20 Disziplinen zeigen PixelLab-Grafik im Motor: 19 mit Kulisse, Takeshi
 mit PixelLab-Bodenkacheln und PixelLab-Fallen auf seiner Draufsicht-Route. Dazu sind alle Requisiten, die der
 Motor auf die Kulissen zeichnet, PixelLab statt OpenGameArt.
+
+## Batch 13: Takeshi's Castle — "Rahmen statt Material" fuer Rang 1 des Audits (08.11.)
+
+Anlass ist derselbe Audit wie bei Batch 12 (`docs/design/kulissen-qualitaets-audit-08-11.md`, PR #1357),
+diesmal dessen Rang 1 — "die größte Lücke zwischen Asset und Spiel": eine 70 % einfarbige Wiesenkachel mit
+sichtbarem Raster, mechanisch getaktete Zaunpfosten, und Seitenansicht-Requisiten (Tür, Wagenrad, Mauer,
+Turm) auf einer Draufsicht-Karte. `bodenTakeshiRoute()` (`routeTabelle`, `routeXY`, `Zonen`,
+Fallenpositionen, `cam.zoom`/`camR`, `HUERDEN_N()`) ist in diesem Batch an KEINER Stelle angetastet — jede
+Aenderung betrifft nur, womit die Flaechen gefuellt und was um die Route herum gezeichnet wird.
+
+**Erster Befund vor dem Zeichnen: Takeshi hat gar keine Kulissen-Variante im Motor.** "Burg"/"Dschungel"/
+"Eisfestung" sind Namen aus der Szenen-Registry (`lib/foundation/discipline-scenes.ts`, fuer die Demo-Szene
+und die Asset-Generierung), aber `BAHN_ART["takeshis-castle"]` hat nur EINE `zonen`/`route`-Tabelle, die in
+jedem Rennen gleich ist; die ebenfalls "drei" genannten `kurse` ("Nordhof", "Sumpfpfad", "Die Mauern") sind
+nur drei Reihenfolgen derselben vierzehn Fallentypen (Teil B.4, vgl. BAHN_ART-Kommentar), keine Kulissen-
+Wahl wie `kulisseWaehlen()` sie fuer TDM/Wettessen/etc. trifft. Der Takeshi-Boden aus Batch 11 (PixelLab-
+Draufsicht-Kacheln) war entsprechend schon immer EIN Satz fuer alle Begegnungen. Dieser Batch baut deshalb
+EINE durchgaengige, reichere Kulisse statt drei Varianten; `screenshot-kulisse.mjs takeshis-castle - <ms>`
+("-" = keine Variantenwahl) ist dafuer der richtige, einzig moegliche Aufruf — nicht drei Varianten-IDs.
+
+**Perspektive, Audit Abschnitt 4.1, Punkt 3 ("Perspektive vereinheitlichen"), gewaehlter Weg:** die
+Fallen-Piktogramme (Tuer, Walzen, Spitzen, Honeycomb-Mauer …) bleiben in ihrer bisherigen Ansicht — das
+sind winzige, 24..48 px hohe Anzeige-Icons mit eigener Animation (Tuer schwingt auf, Walzen wippen), die
+als strenge Draufsicht unlesbar wuerden, und das Muster "aufrecht stehende Mini-Icons auf einer
+Draufsicht-Karte" ist genau die Konvention echter Hindernislauf-Sendungskarten (Takeshi's Castle,
+Total Wipeout). Vereinheitlicht wird stattdessen die UMGEBUNG auf durchgehende 3/4-Sicht (wie
+`baum_1..4`/`zaun_holz` es schon waren) — die zweite der beiden vom Audit genannten Optionen, nicht die
+erste (Fallen/Burg auf strenge Draufsicht umbestellen). Burg, Tuer, Walze bleiben deshalb unveraendert;
+der Perspektivbruch verschwindet, weil jetzt auch das UMFELD (Baeume, Torii, Tribuenen) dieselbe 3/4-Sicht
+zeigt statt einer flachen Kachel darunter.
+
+**Was neu ist, in `bodenTakeshiRoute()`:**
+- **Blumenflecken und Trampelpfade** (Schritt 1b, neu): eine saatfeste Deckschicht aus kleinen
+  Bluetentupfen (drei Farben) und hellen Pfadstrichen UEBER dem bestehenden `boden_wiese`-Pattern bricht
+  das Kachelraster, ohne eine neue Kachel zu bestellen.
+- **Dichteres, gemischtes Blaetterdach** (Schritt 5, `wald_`-Cache): 210 statt 130 Kandidaten, jeder
+  wegnahe Punkt mit 40 % Chance ein Kirschbaum (neue Requisite `takeshi_kirschbaum`) statt einer Kiefer.
+  Jede Krone bekommt denselben weichen Schlagschatten-Versatz — "Waldstücke als zusammenhängende Kronen
+  mit Schlagschatten statt dunkelgrüner Kachel" (Audit).
+- **Schilf am Seeufer** (im See-Block von Schritt 2): vierzehn kleine Grasklingen-Buendel im Schlammring
+  um den See, dieselbe `bodenSaat`-Deterministik wie die Pfuetzen weiter unten.
+- **Torii statt Palisadentor** (Schritt 6): `takeshi_torii` ersetzt die zwei `hind_wand`-Pfosten am
+  Sammelplatz, mit `hind_wand` als Rueckfall, falls die Requisite einmal nicht laedt. Die weisse
+  Startlinie quer zur Route bleibt unveraendert.
+- **Zaun nur noch an Fallen, Absperrband sonst** (Schritt 4): `zaun_holz` steht nur noch bei den
+  `HUERDEN_N()`-Stationen innerhalb der Holzbauten-Zone; der Rest der Zonenkante ist ein gestreiftes
+  Absperrband (zwei versetzte gestrichelte Linien, Schwarz/Gelb) statt der alle 30 Welteinheiten
+  wiederholten Zaunpfosten.
+- **Tribuenenbloecke, Wimpelketten, Kamerakran** (neuer Schritt 8b): drei `takeshi_tribuene`-Bloecke an
+  festen Bogenlaengen (0,20 / 0,68 / 0,90, die Seezone 0,36..0,60 ausgespart), sieben Wimpelketten als
+  durchhaengende Kurven mit kleinen Dreiecksflaggen quer ueber dem Weg, ein rein prozedural gezeichneter
+  Kamerakran (keine neue PixelLab-Bestellung) nahe dem Start.
+- **Tiefe beim Zoom** (neuer Schritt 8c, Bildschirmraum nach `ctx.restore()`): ab `cam.zoom>1,05` vier
+  dunkle Eckformen, die mit dem Zoom etwas groesser/deckender werden (vereinfachtes Vordergrund-Mittel,
+  s. Grenzen), plus eine radiale Vignette — beide VOR dem HUD gezeichnet, damit Burgpunkte-Band und
+  Fallen-Lower-Third unveraendert lesbar bleiben (Audit: "Lesbarkeit ... darf durch mehr Kulisse nicht
+  leiden").
+- **Licht**: ein einheitlicher Schlagschatten-Versatz unter Torii, Baumkronen und Tribuenen simuliert
+  Nachmittagssonne aus einer Richtung, ohne eine flaechige Abdunklung zu aendern (dieselbe Lehre wie
+  Batch 12: Licht gezielt, nicht flaechig).
+
+**Neue PixelLab-Requisiten** (`scripts/pixellab-requisiten.py`, neue Auftragsart `art="neu"` fuer
+brandneue Sprites ohne Vorgaenger-Datei — `baue_neu()` passt den Rohkandidaten direkt in die eigene
+`gen`-Box ein, statt wie `baue_standard()` eine Alpha-Box einer alten Datei zu treffen):
+`takeshi_torii` (84×64), `takeshi_kirschbaum` (40×58), `takeshi_tribuene` (72×46), alle im selben
+3/4-Top-down-Stil wie `baum_1..4`/`zaun_holz` (`DRAUF`-Konstante). Herkunft in
+`public/sprites/arena/quellen.json`.
+
+Vorher/Nachher (echte Leinwand, `node scripts/screenshot-kulisse.mjs takeshis-castle - <ms> <png>`):
+`docs/design/kulissen-rework-takeshi-08-11/takeshi-{uebersicht,zoom}-{vorher,nachher}.png` (100 ms bzw.
+3500 ms) sowie `takeshi-zoom2-nachher.png` (8000 ms, tiefster Zoom).
+
+PixelLab-Verbrauch: drei Auftraege (`generate-image-v2`, 9/25/16 Kandidaten), Abo-Stand 2335 → 2300
+Generationen.
+
+**Grenzen (ehrlich, wie bei jedem Batch):**
+- Die Burg (`burg_mauer`/`burg_turm`/`burg_tor`) bleibt die bisherige, aufrecht stehende Seitenansicht —
+  bewusst unveraendert (Perspektiv-Entscheidung oben), nicht neu als Draufsicht-Anlage mit Hof bestellt.
+  Der Burghof selbst (Kopfsteinpflaster) ist unveraendert, nur jetzt von derselben Deckschicht-Logik wie
+  der Rest umgeben.
+- Die Vordergrund-Parallax ist eine vereinfachte Annaeherung (vier feste Eckformen, die mit dem Zoom
+  wachsen), kein echter, zur Kamera versetzt mitlaufender Sprite-Layer — fuer eine Draufsicht ohne eigene
+  Vordergrund-Ebene in der Szene war das der mit vertretbarem Aufwand erreichbare Teil des Audit-Punkts.
+- Keine eigene Eisfestung-Beleuchtung (blaues Licht, Schneeverwehungen): dafuer muesste Takeshi zuerst
+  ueberhaupt eine waehlbare Kulissen-Variante bekommen (s. Befund oben) — das ist ein groesserer,
+  eigenstaendiger Schritt (etwa eine `kulisseWaehlen()`-Anbindung analog zu den Arena-Chassis), nicht Teil
+  dieses rein-visuellen Batches.
+- Die Wackelbruecke der PixelLab-Rohszene ist weiterhin nicht im Spiel; die Route nutzt stattdessen ihre
+  eigene, bereits vorhandene Steg-Zeichnung (`boden==="planken"`), die unveraendert blieb.
+
+Tests: `npx vitest run tests/arena-kulissen.test.ts` gruen (14/14).
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285` (69 Eintraege) — vor und nach
+diesem Batch gemessen, keine Nachkommastelle bewegt sich.
