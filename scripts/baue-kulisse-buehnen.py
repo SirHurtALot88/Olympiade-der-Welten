@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """BUEHNEN-KULISSEN FUER DEN MOTOR (Kulissen-Integration 07.11., Batch 2: Tennis, Fechten, Speed-Schach;
-Batch 3: Showcase, Eiskunstlauf, Breaking, I-Spy).
+Batch 3: Showcase, Eiskunstlauf, Breaking, I-Spy; Batch 12 (08.11.): Showcase und Breaking als
+"Rahmen statt Material" mit Licht, s. baue_showcase()/baue_breaking()).
 
 Die Szenen der Asset-Runde (public/szenen/<disziplin>/<variante>.html) sind Demo-Bilder mit eigener
 Geometrie: der Tennisplatz liegt quer statt laengs, die Fechtbahn sitzt anders als die des Motors, und
@@ -234,9 +235,137 @@ def deckend_mit_kante(bild: Image.Image, kante_szene: float, kante_motor: float)
     return aus.resize((LW, LH), Image.LANCZOS)
 
 
+# ---------------------------------------------------------------------------- Licht (Batch 12, 08.11.)
+# "Rahmen statt Material" (docs/design/kulissen-qualitaets-audit-08-11.md, Abschnitt 4.5/4.6): Licht
+# als Gestaltungsmittel statt flaechiger Abdunklung. Alles in Szenen-px, Ueberblendung "Screen"
+# (hellt nur auf, nie ab, Schwarz bleibt Schwarz an Stellen ohne Licht).
+def _gitter(a: np.ndarray):
+    return np.mgrid[0:a.shape[0], 0:a.shape[1]].astype(np.float32)
+
+
+def screen(a: np.ndarray, w: np.ndarray, farbe) -> np.ndarray:
+    """a (h,w,3) float 0..255, w (h,w) Deckung 0..1, farbe RGB: Screen-Ueberblendung."""
+    f = np.asarray(farbe, np.float32)[None, None, :] / 255.0
+    return 255.0 - (255.0 - a) * (1.0 - np.clip(w, 0, 1)[..., None] * f)
+
+
+def licht_rund(a: np.ndarray, cx, cy, rx, ry, farbe, staerke, haerte=2.0) -> np.ndarray:
+    yy, xx = _gitter(a)
+    d = np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2)
+    return screen(a, np.clip(1 - d, 0, 1) ** haerte * staerke, farbe)
+
+
+def licht_kegel(a: np.ndarray, x0, y0, halb0, x1, y1, halb1, farbe, staerke) -> np.ndarray:
+    """Weicher Lichtkegel von (x0,y0) nach (x1,y1), Halbbreite halb0 -> halb1, zur Mitte hin heller."""
+    yy, xx = _gitter(a)
+    t = np.clip((yy - y0) / max(1.0, y1 - y0), 0, 1)
+    innen = (yy >= y0) & (yy <= y1)
+    c = x0 + (x1 - x0) * t
+    halb = halb0 + (halb1 - halb0) * t
+    w = np.clip(1 - np.abs(xx - c) / halb, 0, 1) ** 1.6 * staerke * (0.75 + 0.25 * t) * innen
+    return screen(a, w, farbe)
+
+
+# ---------------------------------------------------------------------------------------- Showcase
+# Szene (bg/fg 640x360, alle drei Varianten gleicher Grundriss): Buehnenraum mit Traverse, in der Mitte
+# eine schwarze Demo-LED-Wand (die Szene schrieb per DOM "ALS NAECHSTES DRACO" darauf; im bg ist sie
+# leer und schwarz), davor der Buehnenboden als Trapez, vorne die Rampe mit Fusslichtern; fg traegt
+# Vorhaenge, Raenge und Publikum. Bis Batch 3 kam das unveraendert in den Motor: schwarzer Raum,
+# schwarze Tafel, der Kuenstler in einem Lichtfleck im Nichts (Audit 08.11., Rang 5).
+# Batch 12 baut den Rahmen in drei Ebenen um die unveraenderte Motor-Geometrie (Rampe H*0.86):
+#   fern  - Buehnenprospekt statt LED-Loch: Theater = gemalte Mondnacht, Zirkus = roter Samtvorhang
+#           mit Goldstern (beide PixelLab, roh/showcase_prospekt_*.png), Festival = leuchtende
+#           LED-Punktmatrix wie im Poster der Szene (ohne Schrift);
+#   mitte - Buehnenboden: Theater warmes Holz, Festival dunkler Glanzboden mit Spiegelung der Wand;
+#           Lichtkegel von den Traversen-Scheinwerfern, Lichtpfuetzen auf dem Boden;
+#   vorne - Rampe, Vorhaenge, Raenge, Publikum der Szene (fg), unbeleuchtet davor.
+SC_LED_SUCHE = (180, 25, 460, 155)  # dort liegt die LED-Wand; innen ist sie schwarz (Summe RGB <= 40)
+SC_BODEN = (149, 262, (100, 540), (52, 588))  # Zeile oben/unten, Trapez x oben, x unten (Szenen-px)
+SC_SCHEINWERFER = [150, 210, 270, 370, 430, 490]  # Traversen-Lampen (Szenenzeile ~32)
+SC_POOLS = [(200, 205, 54, 15), (320, 182, 62, 17), (440, 205, 54, 15)]  # Mitte = Motor-Kuenstler
+PROSPEKT_ROH = WURZEL / "data" / "generated" / "pixellab-requisiten" / "roh"
+
+
+def led_box(bg: Image.Image) -> tuple[int, int, int, int]:
+    a = np.asarray(bg.convert("RGB")).astype(int).sum(2)
+    x0, y0, x1, y1 = SC_LED_SUCHE
+    m = a[y0:y1, x0:x1] <= 40
+    ys, xs = np.where(m)
+    return x0 + xs.min(), y0 + ys.min(), x0 + xs.max() + 1, y0 + ys.max() + 1
+
+
+def prospekt_pixellab(name: str, w: int, h: int) -> Image.Image:
+    p = Image.open(PROSPEKT_ROH / f"{name}.png").convert("RGB")
+    a = np.asarray(p).astype(int)
+    # PixelLab hat beim Zirkus graue Randspalten (177,177,177) stehen lassen: weg damit
+    grau = (np.abs(a - 177).sum(2) <= 6).all(axis=0)
+    xs = np.where(~grau)[0]
+    p = p.crop((xs.min(), 0, xs.max() + 1, p.height))
+    return p.resize((w, h), Image.NEAREST)
+
+
+def prospekt_led(w: int, h: int) -> Image.Image:
+    """Festival: LED-Wand in Betrieb, Punktmatrix im 3-px-Raster, Sonnenstrahlen von unten, Bernstein
+    oben nach Magenta unten (Farben aus dem Poster der Szene). Ohne Schrift."""
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    t = yy / max(1, h - 1)
+    oben, unten = np.array([255, 176, 70.0]), np.array([236, 70, 150.0])
+    farbe = oben[None, None] * (1 - t[..., None]) + unten[None, None] * t[..., None]
+    winkel = np.arctan2(yy - h * 1.15, xx - w / 2)
+    strahl = 0.55 + 0.45 * np.cos(winkel * 14)
+    rad = np.clip(1.15 - np.hypot((xx - w / 2) / (w * 0.62), (yy - h * 1.05) / (h * 1.3)), 0.25, 1)
+    staerke = (strahl * rad)[..., None]
+    punkt = ((xx % 3 == 1) & (yy % 3 == 1))[..., None]
+    grund = np.array([24, 10, 26.0])[None, None]
+    bild = np.where(punkt, grund + farbe * staerke * 0.95, grund + farbe * staerke * 0.10)
+    return Image.fromarray(np.clip(bild, 0, 255).astype(np.uint8))
+
+
+def boden_maske(shape) -> np.ndarray:
+    y0, y1, (xo0, xo1), (xu0, xu1) = SC_BODEN
+    yy, xx = np.mgrid[0:shape[0], 0:shape[1]].astype(np.float32)
+    t = (yy - y0) / (y1 - y0)
+    links, rechts = xo0 + (xu0 - xo0) * t, xo1 + (xu1 - xo1) * t
+    return (yy >= y0) & (yy < y1) & (xx >= links) & (xx <= rechts)
+
+
 def baue_showcase(variante: str) -> Image.Image:
     b = lade_szenenbilder(SZENEN / "showcase" / f"{variante}.html")
-    bild = b["bg"].copy()
+    bg = b["bg"].convert("RGB")
+    # fern: Buehnenprospekt in die LED-Wand
+    x0, y0, x1, y1 = led_box(bg)
+    if variante == "festival":
+        prospekt = prospekt_led(x1 - x0, y1 - y0)
+    else:
+        prospekt = prospekt_pixellab(f"showcase_prospekt_{variante}", x1 - x0, y1 - y0)
+    bg.paste(prospekt, (x0, y0))
+    a = np.asarray(bg).astype(np.float32)
+    # mitte: Buehnenboden (Zirkus hat schon hellen Holzboden, dort nur Licht)
+    m = boden_maske(a.shape)
+    if variante != "zirkus":
+        lum = a[..., :3].mean(2)
+        rel = np.clip(lum / max(1.0, float(np.median(lum[m]))), 0.6, 1.5)
+        if variante == "buehne":
+            holz = np.array([112, 72, 46.0])
+            neu = holz[None, None] * rel[..., None] * 0.62
+        else:
+            glanz = np.array([44, 46, 78.0])
+            neu = glanz[None, None] * rel[..., None]
+            # Spiegelung der leuchtenden Wand im Glanzboden, zur Rampe hin auslaufend
+            yy, xx = _gitter(a)
+            sp = np.clip(1 - (yy - SC_BODEN[0]) / 46, 0, 1) ** 1.5 * np.clip(1 - np.abs(xx - 320) / 150, 0, 1)
+            neu = screen(neu, sp * 0.55, (240, 120, 120))
+        a = np.where(m[..., None], neu, a)
+    # Lichtkegel von der Traverse auf den Boden, Lichtpfuetzen
+    warm = (255, 226, 170) if variante != "festival" else (255, 190, 220)
+    kegel_st = 0.13 if variante != "zirkus" else 0.08
+    for sx in SC_SCHEINWERFER:
+        ziel = min(SC_POOLS, key=lambda p: abs(p[0] - sx))
+        a = licht_kegel(a, sx, 32, 4, ziel[0] + (sx - ziel[0]) * 0.35, ziel[1], ziel[2] * 0.7, warm, kegel_st)
+    for px, py, rx, ry in SC_POOLS:
+        a = licht_rund(a, px, py, rx, ry, warm, 0.42 if variante != "zirkus" else 0.22, haerte=1.4)
+    bild = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)).convert("RGBA")
+    # vorne: Vorhaenge, Raenge, Publikum (fg) unbeleuchtet davor
     bild.alpha_composite(b["fg"])
     return deckend_mit_kante(bild.convert("RGB"), SC_KANTE_SZENE, SC_KANTE_MOTOR)
 
@@ -309,9 +438,43 @@ BR_AUSSCHNITT = (96, 312)  # Szenenzeilen
 BR_MARKEN = [(347, 283, 364, 315), (417, 283, 434, 315)]
 
 
+# Batch 12 (08.11., Audit Rang 6 "Schleier ueber guter Szene"): Ausschnitt bleibt, dazu Licht. Die
+# Fackeln leuchten (Glut um die Flamme, gesucht als hellorange Pixel links/rechts), der Lichtschacht
+# von oben laeuft weiter bis auf die Mitte des Motor-Druck-Runds (zeichneBreaking: cx=W/2, cy=H*0.54
+# -> Szene ~384/213) und bildet dort eine Helligkeitsinsel; die Schatten sind leicht angehoben, damit
+# Publikum und Pfeiler lesbar werden. Der Motor legt sein Violett dafuer nur noch zu 20 % darueber.
+BR_FACKEL_SUCHE = [(60, 70, 200, 150), (580, 70, 720, 150)]
+BR_RUND_MITTE = (384, 213)
+
+
+def fackeln(welt: np.ndarray) -> list[tuple[float, float]]:
+    out = []
+    for x0, y0, x1, y1 in BR_FACKEL_SUCHE:
+        s = welt[y0:y1, x0:x1].astype(int)
+        m = (s[..., 0] > 215) & (s[..., 1] > 110) & (s[..., 2] < 110)
+        ys, xs = np.where(m)
+        if len(xs):
+            out.append((x0 + xs.mean(), y0 + ys.mean()))
+    return out
+
+
+def breaking_licht(welt: Image.Image) -> Image.Image:
+    a = np.asarray(welt).astype(np.float32)
+    flammen = fackeln(a)
+    a = 255.0 * (a / 255.0) ** 0.78  # Schatten anheben
+    for fx, fy in flammen:
+        a = licht_rund(a, fx, fy + 6, 105, 85, (255, 140, 60), 0.55, haerte=1.7)
+        a = licht_rund(a, fx, fy, 18, 18, (255, 214, 130), 0.6)
+    cx, cy = BR_RUND_MITTE
+    a = licht_kegel(a, cx, 0, 40, cx, cy, 96, (255, 238, 205), 0.20)
+    a = licht_rund(a, cx, cy, 130, 98, (255, 226, 176), 0.45, haerte=1.3)
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+
 def baue_breaking(variante: str) -> Image.Image:
     welt = lade_szenenbilder(SZENEN / "breaking" / f"{variante}.html")["world"].convert("RGB")
     welt = flicken(welt, BR_MARKEN, [], (150, 255, 620, 318), ring=4, schritt=1)
+    welt = breaking_licht(welt)
     y0, y1 = BR_AUSSCHNITT
     f = LH / (y1 - y0)
     nb = LW / f

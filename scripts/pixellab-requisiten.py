@@ -117,6 +117,14 @@ AUFTRAEGE = {
     # --- Speed-Schach: sechs Figuren in einer Reihe, damit sie aus einem Guss sind ---
     "schach": dict(art="schach", gen=(288, 48),
         prompt=f"row of six ivory white chess pieces side by side, evenly spaced, from left to right: small round pawn, castle tower rook, horse head knight, bishop with pointed mitre, queen with a spiked crown, tallest king with a cross on top, front view, {STIL}"),
+
+    # --- Kulissen-Rohbilder (Batch 12, Showcase-Rework 08.11.): KEIN Sprite-Tausch. Nur roh/<name>.png;
+    # scripts/baue-kulisse-buehnen.py setzt sie als Buehnenprospekt in die Szene (dort, wo die Szene
+    # eine schwarze Demo-LED-Wand hat, 264x115 Szenen-px). Mit Hintergrund (hintergrund=True). ---
+    "showcase_prospekt_buehne": dict(art="kulisse", hintergrund=True, gen=(264, 116),
+        prompt="painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors"),
+    "showcase_prospekt_zirkus": dict(art="kulisse", hintergrund=True, gen=(264, 116),
+        prompt="deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit"),
 }
 
 # Alpha-Begrenzung der ALTEN LPC/Kenney-Datei innerhalb des gelesenen Ausschnitts (gemessen am 08.11.
@@ -148,8 +156,8 @@ def bestellen(args):
         a = AUFTRAEGE[name]
         w, h = a["gen"]
         prompt = args.prompt or a["prompt"]
-        body = {"description": prompt, "image_size": {"width": w, "height": h}, "no_background": True,
-                "seed": args.seed}
+        body = {"description": prompt, "image_size": {"width": w, "height": h},
+                "no_background": not a.get("hintergrund", False), "seed": args.seed}
         r = api("POST", "/generate-image-v2", body)
         j = warte_job(r["background_job_id"])
         ims = [bild_aus(x) for x in j["last_response"]["images"]]
@@ -413,7 +421,13 @@ def baue_korb(name, a):
     return True
 
 
-BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach}
+def baue_kulisse(name, a):
+    """Kulissen-Rohbild: hier wird nichts gebaut, baue-kulisse-buehnen.py liest roh/<name>.png."""
+    return roh(name) is not None
+
+
+BAUER = {"korb": baue_korb, "wasser": baue_wasser, "feuer": baue_feuer, "mauer": baue_mauer, "schach": baue_schach,
+         "kulisse": baue_kulisse}
 
 
 def einsetzen(args):
