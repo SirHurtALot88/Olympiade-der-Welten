@@ -1068,5 +1068,65 @@
    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
    "url": "https://opengameart.org/content/lpc-terrains"
   }
+ },
+ "takeshi_torii.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a wooden red japanese torii shrine gate, two upright pillars and a curved crossbeam on top, standalone, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    84,
+    64
+   ],
+   "job": "29405f96-b415-4acb-9b53-2b546c373e14",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/takeshi_torii*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen takeshi_torii (art=\"neu\": brandneue Requisite, eigene gen-Box statt Alpha-Box einer alten Datei)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Takeshi's Castle, Kulissen-QS Batch 13 (Rang 1 des Audits 08.11.) — Torii am Routenanfang statt zweier Palisadenstuecke, s. bodenTakeshiRoute() Schritt 6"
+ },
+ "takeshi_kirschbaum.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "blooming japanese cherry blossom tree with a round pink and white flower crown, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    40,
+    58
+   ],
+   "job": "182188ab-0632-4938-9c2d-447e508394de",
+   "kandidat": 8,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/takeshi_kirschbaum*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen takeshi_kirschbaum (art=\"neu\": brandneue Requisite, eigene gen-Box statt Alpha-Box einer alten Datei)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Takeshi's Castle, Kulissen-QS Batch 13 — Kirschbaeume entlang des Wegs, ersetzen die Kiefer (baum_1..4) bei einem Teil der wegnahen Punkte im Baumkronen-Cache (wald_, kirsch-Flagge)"
+ },
+ "takeshi_tribuene.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small wooden spectator grandstand bleacher stand full of tiny cheering fans in colourful clothes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    72,
+    46
+   ],
+   "job": "4a330af1-901d-4988-abed-5166b9bfc606",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/takeshi_tribuene*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen takeshi_tribuene (art=\"neu\": brandneue Requisite, eigene gen-Box statt Alpha-Box einer alten Datei)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Takeshi's Castle, Kulissen-QS Batch 13 — drei Tribuenenbloecke entlang der Route (s. bodenTakeshiRoute() Schritt 8b, 'Publikum und Fernsehshow')"
  }
 }

@@ -411,6 +411,39 @@
    "endpunkt": "/v2/generate-image-v2"
   }
  },
+ "takeshi_kirschbaum": {
+  "prompt": "blooming japanese cherry blossom tree with a round pink and white flower crown, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   40,
+   58
+  ],
+  "job": "182188ab-0632-4938-9c2d-447e508394de",
+  "kandidat": 8,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "takeshi_torii": {
+  "prompt": "a wooden red japanese torii shrine gate, two upright pillars and a curved crossbeam on top, standalone, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   84,
+   64
+  ],
+  "job": "29405f96-b415-4acb-9b53-2b546c373e14",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "takeshi_tribuene": {
+  "prompt": "small wooden spectator grandstand bleacher stand full of tiny cheering fans in colourful clothes, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   72,
+   46
+  ],
+  "job": "4a330af1-901d-4988-abed-5166b9bfc606",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "zaun_holz": {
   "prompt": "short wooden fence segment, two posts and two horizontal rails, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,

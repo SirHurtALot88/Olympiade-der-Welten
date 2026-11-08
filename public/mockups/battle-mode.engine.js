@@ -42460,7 +42460,12 @@
     // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
     // Abschnitt 5): die Untergruende der fuenf Gelaende-Zonen und ihrer Umgebungen.
     "boden_wiese","boden_wald","boden_pfad","boden_kies","boden_schlamm","boden_see",
-    "boden_sumpf","boden_hang","boden_pflaster"];
+    "boden_sumpf","boden_hang","boden_pflaster",
+    // KULISSEN-QS 08.11. (Batch 13, Rang 1 des Audits docs/design/kulissen-qualitaets-audit-08-11.md):
+    // drei neue Requisiten fuer "Rahmen statt Material" -- Torii am Routenanfang, Kirschbaeume
+    // entlang des Wegs, Tribuenenbloecke an der Strecke. Alle drei fehlen-tolerant wie jede andere
+    // Kachel hier (aDa()-Wache), fallen also nie auf eine leere Flaeche zurueck.
+    "takeshi_torii","takeshi_kirschbaum","takeshi_tribuene"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -43388,10 +43393,64 @@
     }
     return aus;
   }
-  function zeichneFalleTakeshi(i,x,y,b){
+  // KULISSEN-QS NACHBESSERUNG (08.11., zu PR #1362): Chris am Vorher/Nachher-Screenshot,
+  // woertlich: "da ist ja einfach nur so ein Viereck Wasser, das ist ja gar nicht in die
+  // Karte integriert ... Kann man das irgendwie noch anpassen und drehen, dass es wenigstens
+  // auch der Neigung der Strecke entspricht und dass das sauber aussieht". `wasser()` und der
+  // `fillRect`-Block von "eis" zeichneten bildschirm-achsenparallel, ohne jede Ruecksicht auf
+  // die lokale Streckenrichtung -- und mit einer harten Rechteckkante obendrauf. Zwei
+  // unabhaengige Korrekturen, beide rein zeichnerisch, keine Positions-/Trefferlogik:
+  //  1. ROTATION: `zeichneFalleTakeshi` bekommt den optionalen Parameter `winkel` (Radiant,
+  //     Default 0 -- der zweite Aufrufer, die Burgpunkte-Spur mit ihren geraden, parallelen
+  //     Bahnen, bleibt damit unveraendert). Der Routen-Aufrufer uebergibt
+  //     Math.atan2(r.ty,r.tx) -- `r.tx,r.ty` ist die Tangente, die routeXY() (nur lesend
+  //     benutzt) an der Fallen-Position ohnehin schon liefert.
+  //  2. WEICHE KANTE: `weicheFlaeche()` ersetzt die harte Rechteckkante durch eine leicht
+  //     unregelmaessige Uferlinie (Vorbild: der Ellipse-Clip, den "steine" fuer die
+  //     einzelnen Trittsteine schon nutzt, Zeile ~43421 unten) plus einen weichen
+  //     Schlagschatten/Vignette-Rand -- damit die Flaeche wie ins Gelaende eingelassen wirkt
+  //     statt wie ein Sticker obendrauf. `i` (die Fallen-Nummer) liefert den Formzufall
+  //     deterministisch, keine neue Zufallsquelle.
+  // Systematisch durchgesehen: "schlamm" (Dragon God Lake) hat denselben Fehler (reiner
+  // `fillRect`, keine Rotation, harte Kante) und bekommt dieselbe Behandlung. Alle anderen
+  // Faelle (tuer, raeder, seilwand, walzen, spitzen, labyrinth) zeichnen aufrecht stehende
+  // oder ohnehin schon rotierte/animierte Objekte (Tuer, Rad, Leiter, Walze, Pfahl, Mauer) --
+  // keine flaechige Boden-Textur, also kein Fall fuer diese Behandlung.
+  const uferPfad=(cx,cy,rx,ry,i)=>{
+    ctx.beginPath();
+    const n=14;
+    for(let k=0;k<=n;k++){ const ang=(k/n)*6.283;
+      const j=1+0.09*Math.sin(ang*3+i*2.3)+0.05*Math.sin(ang*5+i*1.1);
+      const px=cx+Math.cos(ang)*rx*j, py=cy+Math.sin(ang)*ry*j;
+      if(k===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    ctx.closePath();
+  };
+  const weicheFlaeche=(cx,cy,rx,ry,i,zeichnen)=>{
+    ctx.save();
+    uferPfad(cx,cy,rx,ry,i);
+    ctx.save(); ctx.clip();
+    zeichnen();
+    // weicher Schlagschatten/Vignette am Rand -- eingelassen statt aufgeklebt.
+    const grad=ctx.createRadialGradient(cx,cy,Math.min(rx,ry)*0.45,cx,cy,Math.max(rx,ry)*1.05);
+    grad.addColorStop(0,"rgba(0,0,0,0)"); grad.addColorStop(1,"rgba(0,0,0,.40)");
+    ctx.fillStyle=grad; ctx.fillRect(cx-rx*1.3,cy-ry*1.3,rx*2.6,ry*2.6);
+    ctx.restore();
+    // dunkler, leicht unregelmaessiger Uferrand (Kiesel-/Schlamm-Andeutung).
+    uferPfad(cx,cy,rx,ry,i);
+    ctx.strokeStyle="rgba(28,20,12,.55)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.restore();
+  };
+  function zeichneFalleTakeshi(i,x,y,b,winkel=0){
     const look=fallenLook(i), t=rennT;
     const aus=fallenAusgang(i);
-    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
+    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false;
+      const yo=Math.round(y-15);
+      ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+      weicheFlaeche(x+16,y+1,48,15,i,()=>{
+        ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo);
+      });
+      ctx.restore();
+      return true; };
     switch(look){
       case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders.
         // REAGIERT AUF DEN AUSGANG (Item 4): bei durchbruch wackeln die stehenbleibenden
@@ -43445,10 +43504,15 @@
       case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur.
         // REAGIERT AUF DEN AUSGANG: bei sturz eine zusaetzliche, dunklere Rutschspur quer
         // ueber die Bahn — die Linie, die der Sturz auf dem Eis hinterlassen haette.
-        const e=aMust("boden_eis"); ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
-        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();}
-        if(aus==="sturz"){ ctx.strokeStyle="rgba(70,110,140,.55)"; ctx.lineWidth=3;
-          ctx.beginPath(); ctx.moveTo(x-20,y-6); ctx.lineTo(x+20,y-14); ctx.stroke(); }
+        const e=aMust("boden_eis");
+        ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+        weicheFlaeche(x,y-9,24,15,i,()=>{
+          ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
+          ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();}
+          if(aus==="sturz"){ ctx.strokeStyle="rgba(70,110,140,.55)"; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.moveTo(x-20,y-6); ctx.lineTo(x+20,y-14); ctx.stroke(); }
+        });
+        ctx.restore();
         break; }
       case "raeder": { // High Rollers: ein rollendes Rad pendelt ueber die Spur.
         // REAGIERT AUF DEN AUSGANG: schneller/weiter bei durchbruch, dazu ein paar Funken;
@@ -43483,7 +43547,16 @@
       case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen.
         // REAGIERT AUF DEN AUSGANG: ein Sturz loest statt der ruhigen Blasen einen kurzen
         // Spritzer aus (mehr, groessere Blasen, kurzzeitig) — ausgeloest statt zeitgesteuert.
-        const er=aMust("boden_erde"); ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+        // Dasselbe Muster wie "eis"/"wasser" (reiner fillRect, keine Rotation, harte Kante),
+        // im Kulissen-QS-Nachtrag 08.11. systematisch gefunden -- dieselbe Behandlung. Die
+        // Blasen bleiben bewusst ausserhalb der Rotation: sie sind kreisrund und saisonal
+        // unabhaengig von der Streckenneigung, eine Drehung aendert an ihnen nichts Sichtbares.
+        const er=aMust("boden_erde");
+        ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+        weicheFlaeche(x,y-9,28,15,i,()=>{
+          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+        });
+        ctx.restore();
         const spritzer=aus==="sturz";
         ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
         if(spritzer){ ctx.strokeStyle="rgba(255,255,255,.6)";
@@ -43557,6 +43630,22 @@
     //    Gelaende, kein Studio-Parcours. Grosszuegig ueber den Weltausschnitt hinaus, weil
     //    die Kamera bei Zoom 1 die ganze Karte zeigt und an den Raendern nichts fehlen darf.
     ctx.fillStyle=M("boden_wiese","#2f6b2a"); ctx.fillRect(-W,-H,3*W,3*H);
+    // 1b. BLUMENFLECKEN UND TRAMPELPFADE (Kulissen-QS 08.11., Rang 1 des Audits
+    //     docs/design/kulissen-qualitaets-audit-08-11.md: "70% einfarbige Wiesenkachel mit
+    //     sichtbarem Raster"). Keine neue Kachel -- nur eine saatfeste Deckschicht UEBER dem
+    //     bestehenden createPattern-Fill, die das Raster bricht: Bluetenflecken (drei bis sechs
+    //     Tupfen je Fleck) und ein paar helle Trampelpfad-Striche abseits der eigentlichen Route.
+    //     Rein dekorativ, liest nichts aus BA()/routeXY() ausser der Weltgroesse.
+    for(let i=0;i<46;i++){ const x=(bodenSaat(i+2000)*3-1)*W, y=(bodenSaat(i+2010)*3-1)*H;
+      const n=3+Math.floor(bodenSaat(i+2020)*4), farbe=["#e8d9e0","#f2e37a","#d8eaa0"][Math.floor(bodenSaat(i+2030)*3)];
+      ctx.globalAlpha=0.45; ctx.fillStyle=farbe;
+      for(let k=0;k<n;k++){ const dx=(bodenSaat(i*7+k+2100)-0.5)*20, dy=(bodenSaat(i*7+k+2140)-0.5)*14;
+        ctx.beginPath(); ctx.ellipse(x+dx,y+dy,2.2,1.6,0,0,6.283); ctx.fill(); }
+      ctx.globalAlpha=1; }
+    for(let i=0;i<9;i++){ const x0=bodenSaat(i+2300)*W, y0=bodenSaat(i+2320)*H;
+      const a0=bodenSaat(i+2340)*6.283, len=50+bodenSaat(i+2360)*80;
+      ctx.strokeStyle="rgba(180,160,100,.16)"; ctx.lineWidth=6+bodenSaat(i+2380)*4; ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x0+Math.cos(a0)*len,y0+Math.sin(a0)*len); ctx.stroke(); }
     // 2. UMGEBUNGEN je Zone. Wald um die Holzbauten und an den Kartenraendern, trockener
     //    Hang unter dem Anstieg zur Burg, der See mit Schlammufer, Pflaster im Burghof.
     if(huellePfad("waelle",92)){ ctx.fillStyle=M("boden_wald","#1f3a2a"); ctx.fill(); }
@@ -43571,7 +43660,16 @@
       ell(hSee,M("boden_schlamm","#5a3b22"),0,0,1.14); ell(hSee,M("boden_see","#2d6d8a"));
       ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
       for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath();
-        ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();} }
+        ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();}
+      // SCHILF AM UFER (Kulissen-QS 08.11., Audit-Wunsch "See mit Ufer, Schilf und Steg"): kein
+      // neuer Download, nur ein paar Grasklingen-Buendel im Schlammring knapp ausserhalb der
+      // Wasserflaeche. Saatfest, deshalb an jedem Spieltag dieselben Buendel.
+      for(let i=0;i<14;i++){ const ang=bodenSaat(i+960)*6.283, rr=0.98+bodenSaat(i+980)*0.16;
+        const rx=hSee.cx+Math.cos(ang)*hSee.rx*rr, ry=hSee.cy+Math.sin(ang)*hSee.ry*rr;
+        ctx.strokeStyle="rgba(70,110,56,.8)"; ctx.lineWidth=1.3; ctx.lineCap="round";
+        for(let b=0;b<4;b++){ const bx=rx+(bodenSaat(i*5+b+1700)-0.5)*8, by=ry+(bodenSaat(i*5+b+1740)-0.5)*5;
+          const h=5+bodenSaat(i*5+b+1780)*5, lean=(bodenSaat(i*5+b+1820)-0.5)*4;
+          ctx.beginPath(); ctx.moveTo(bx,by); ctx.quadraticCurveTo(bx+lean*0.5,by-h*0.6,bx+lean,by-h); ctx.stroke(); } } }
     for(const [fx,fy,rx,ry] of (BA().tuempel||[])){ const x=fx*W,y=fy*H;
       ctx.fillStyle="#3a2816"; ctx.beginPath(); ctx.ellipse(x,y,rx+7,ry+6,0,0,6.283); ctx.fill();
       ctx.fillStyle=M("boden_sumpf","#3d6b78"); ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,6.283); ctx.fill(); }
@@ -43604,11 +43702,22 @@
       const r=routeXY(s), qq=(bodenSaat(i+540)-0.5)*(breite-18);
       ctx.fillStyle="rgba(90,130,170,"+(0.16+bodenSaat(i+560)*0.22)+")"; ctx.beginPath();
       ctx.ellipse(r.x+r.nx*qq,r.y+r.ny*qq,4+bodenSaat(i+580)*7,2+bodenSaat(i+620)*3,0,0,6.283); ctx.fill(); }
-    // 4. BAUTEN UND FELS: Palisadenzaun beiderseits der Holzbauten-Zone, Felsbrocken am Hang.
-    if(aDa("zaun_holz")){ const zn=aBild.zaun_holz;
-      for(const q of Z){ if(q.um!=="waelle")continue; const a=zoneVon(q), n=Math.ceil((q.bis-a)*R.len/30);
-        for(let k=0;k<=n;k++){const r=routeXY(a+(q.bis-a)*k/n);
-          for(const sg of [-1,1])ctx.drawImage(zn,Math.round(r.x+sg*r.nx*(breite/2+12)-16),Math.round(r.y+sg*r.ny*(breite/2+12)-26));} } }
+    // 4. BAUTEN UND FELS: Zaun nur noch an Fallen, Absperrband sonst (Kulissen-QS 08.11., Audit
+    //    docs/design/kulissen-qualitaets-audit-08-11.md: "Zaunpfosten mechanisch im Takt" ->
+    //    "Absperrbänder statt des mechanischen Zaun-Takts (Zaun nur noch an Fallen)"). HUERDEN_N()
+    //    sind dieselben Fallen-Bogenlaengen wie Schritt 8 unten, hier auf die Holzbauten-Zone
+    //    ("waelle") gefiltert -- reine Anzeige, HUERDEN_N()/zoneBei() bleiben unveraendert.
+    { const fallenS=HUERDEN_N().filter(h=>zoneBei(h).um==="waelle");
+      if(aDa("zaun_holz")){ const zn=aBild.zaun_holz;
+        for(const h of fallenS){ const r=routeXY(h);
+          for(const sg of [-1,1])ctx.drawImage(zn,Math.round(r.x+sg*r.nx*(breite/2+12)-16),Math.round(r.y+sg*r.ny*(breite/2+12)-26)); } }
+      for(const q of Z){ if(q.um!=="waelle")continue; const a=zoneVon(q), b=q.bis, n=Math.ceil((b-a)*R.len/4);
+        for(const sg of [-1,1]){ const pts=[];
+          for(let k=0;k<=n;k++){ const r=routeXY(a+(b-a)*k/n), d=breite/2+9; pts.push({x:r.x+sg*r.nx*d,y:r.y+sg*r.ny*d}); }
+          const band=(farbe,versatz)=>{ ctx.strokeStyle=farbe; ctx.lineWidth=3; ctx.setLineDash([9,9]); ctx.lineDashOffset=versatz;
+            ctx.beginPath(); pts.forEach((p,k)=>k?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke(); };
+          band("#1a1a1a",0); band("#e2b414",9); } }
+      ctx.setLineDash([]); ctx.lineDashOffset=0; }
     { const st=aMust("boden_stein");
       for(const q of Z){ if(q.um!=="huegel")continue; const a=zoneVon(q);
         for(let i=0;i<16;i++){ const r=routeXY(a+bodenSaat(i+1000)*(q.bis-a));
@@ -43636,20 +43745,37 @@
     } else {
       const nahe=(x,y)=>{ let m=1e9; for(let i=0;i<R.pts.length;i+=2){const d=Math.hypot(R.pts[i].x-x,R.pts[i].y-y); if(d<m)m=d;} return m; };
       wald_=[];
-      for(let i=0;i<130;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
-        if(nahe(x,y)<breite*0.5+22||nahe(x,y-30)<breite*0.5+22)continue;
+      // KULISSEN-QS 08.11. (Audit: "Waldstücke als zusammenhängende Kronen ... statt dunkelgrüner
+      // Kachel", "Kirschbäume entlang des Weges"): 210 statt 130 Kandidaten -- dichteres Blaetterdach
+      // -- und jeder Punkt naeher am Weg ist mit 40% Chance ein Kirschbaum statt einer Kiefer
+      // (`kirsch`-Flagge, gelesen im Zeichenschritt "Baeume zuletzt" unten). Reiner Darstellungs-
+      // Cache wie vorher, bleibt an `R`/`breite` gebunden, ruehrt rr()/wert()/Boxscore nicht an.
+      for(let i=0;i<210;i++){ const x=bodenSaat(i+700)*W, y=bodenSaat(i+760)*H;
+        const d=Math.min(nahe(x,y),nahe(x,y-30));
+        if(d<breite*0.5+22)continue;
         if(x>W*0.42&&y<H*0.36)continue;                                   // Platz fuer die Burg
         if(inEll(hSee,x,y,1.2)||inEll(hSee,x,y-30,1.2)||inEll(hHof,x,y,1.05)||inEll(hHof,x,y-30,1.05))continue;
         if((BA().tuempel||[]).some(([fx,fy,rx,ry])=>Math.hypot((x-fx*W)/(rx+12),(y-fy*H)/(ry+12))<1
           ||Math.hypot((x-fx*W)/(rx+12),(y-30-fy*H)/(ry+12))<1))continue;
         if(inEll(hHang,x,y,1.0)&&bodenSaat(i+800)<0.7)continue;           // am Hang nur wenige
-        wald_.push({x,y,i}); }
+        const kirsch=d<breite*0.5+95&&bodenSaat(i+840)<0.4;
+        wald_.push({x,y,i,kirsch}); }
       wald_.sort((a,b)=>a.y-b.y);
       waldCache={R,breite,wald_};
     }
-    // 6. DAS TOR am Sammelplatz: zwei Palisadenstuecke, Startlinie quer zur Route.
+    // 6. DAS TOR am Sammelplatz: ein Torii statt zweier Palisadenstuecke (Kulissen-QS 08.11.,
+    //    Audit docs/design/kulissen-qualitaets-audit-08-11.md: "ein Torii am Routenanfang").
+    //    hind_wand bleibt der Rueckfall, falls die neue Requisite einmal nicht laedt --
+    //    dasselbe Fehlen-tolerant-Muster wie ueberall sonst in dieser Funktion.
     { const r=routeXY(0);
-      if(aDa("hind_wand"))for(const sg of [-1,1])ctx.drawImage(aBild.hind_wand,Math.round(r.x+sg*r.nx*(breite/2+10)-16),Math.round(r.y+sg*r.ny*(breite/2+10)-58));
+      if(aDa("takeshi_torii")){ const to=aBild.takeshi_torii, s=Math.max(1,(breite+34)/to.naturalWidth);
+        const tw=to.naturalWidth*s, th=to.naturalHeight*s;
+        ctx.globalAlpha=0.22; ctx.fillStyle="#0a0e08"; ctx.beginPath();
+        ctx.ellipse(r.x+6,r.y+4,tw*0.4,th*0.14,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+        ctx.drawImage(to,Math.round(r.x-tw/2),Math.round(r.y-th),tw,th);
+      } else if(aDa("hind_wand")){
+        for(const sg of [-1,1])ctx.drawImage(aBild.hind_wand,Math.round(r.x+sg*r.nx*(breite/2+10)-16),Math.round(r.y+sg*r.ny*(breite/2+10)-58));
+      }
       ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=3; ctx.beginPath();
       ctx.moveTo(r.x-r.nx*breite/2,r.y-r.ny*breite/2); ctx.lineTo(r.x+r.nx*breite/2,r.y+r.ny*breite/2); ctx.stroke(); }
     // 7. DIE BURG am Routenende: Torhaus auf dem Endpunkt, Mauer und Tuerme links und
@@ -43673,7 +43799,11 @@
     //    Burgpunkte wert ist: damit liest sich die Karte als Kurs ("da vorne kommt eine
     //    Drei-Sterne-Falle") statt als Bahn mit Saeulen.
     HUERDEN_N().forEach((h,i)=>{ const r=routeXY(h);
-      zeichneFalleTakeshi(i,r.x,r.y+12,i%3);
+      // KULISSEN-QS NACHTRAG 08.11.: Math.atan2(r.ty,r.tx) ist die Richtung der Streckentangente
+      // an dieser Stelle (routeXY() liefert sie, nur lesend benutzt) -- damit folgt die Wasser-/
+      // Eis-/Schlammflaeche in zeichneFalleTakeshi() der lokalen Neigung der Route statt starr
+      // bildschirm-achsenparallel zu liegen.
+      zeichneFalleTakeshi(i,r.x,r.y+12,i%3,Math.atan2(r.ty,r.tx));
       const st=(BA().fallenStufe||{})[HUERDEN_TYP(i)]||1;
       const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
       ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);
@@ -43689,10 +43819,61 @@
           ctx.fillText(name,px-2,py-28); }
       }
     });
-    // Baeume zuletzt (ueber Route und Fallen), nach y sortiert wie eine Tiefenreihe.
-    for(const b of wald_){ if(!baeume.length)break; const im=aBild[baeume[b.i%baeume.length]];
-      ctx.drawImage(im,Math.round(b.x-im.naturalWidth/2),Math.round(b.y-im.naturalHeight)); }
+    // 8b. PUBLIKUM UND FERNSEHSHOW (Kulissen-QS 08.11., Audit: "Tribünenblöcke ... an zwei, drei
+    //     Stellen entlang der Route, Wimpelketten über dem Weg, ein Kamerakran"). Liest nur
+    //     routeXY()/breite, die bestehende Routen-Geometrie -- keine neue Station, kein Treffer-
+    //     oder Wertungscode. Platzierung meidet die Seezone (0,36..0,60), damit kein Block auf
+    //     dem Wasser steht.
+    if(aDa("takeshi_tribuene")){ const tb=aBild.takeshi_tribuene;
+      for(const [s,sg] of [[0.20,-1],[0.68,1],[0.90,-1]]){ const r=routeXY(s), d=breite/2+54;
+        const x=r.x+sg*r.nx*d, y=r.y+sg*r.ny*d;
+        ctx.globalAlpha=0.22; ctx.fillStyle="#0a0e08"; ctx.beginPath();
+        ctx.ellipse(x+6,y+4,tb.naturalWidth*0.42,tb.naturalHeight*0.16,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+        ctx.drawImage(tb,Math.round(x-tb.naturalWidth/2),Math.round(y-tb.naturalHeight*0.82)); } }
+    { const FARBEN=["#d3453b","#e8c23a","#3f8f5c","#3a6fb0"];
+      for(let k=0;k<7;k++){ const s=0.08+k*0.125, r=routeXY(s), half=breite/2+14;
+        const ax=r.x-r.nx*half, ay=r.y-r.ny*half-34, bx=r.x+r.nx*half, by=r.y+r.ny*half-34;
+        const mx=(ax+bx)/2, my=(ay+by)/2+10;
+        ctx.strokeStyle="rgba(60,44,20,.7)"; ctx.lineWidth=1.2; ctx.beginPath();
+        ctx.moveTo(ax,ay); ctx.quadraticCurveTo(mx,my,bx,by); ctx.stroke();
+        for(let j=1;j<9;j++){ const tt=j/9;
+          const px=(1-tt)*(1-tt)*ax+2*(1-tt)*tt*mx+tt*tt*bx, py=(1-tt)*(1-tt)*ay+2*(1-tt)*tt*my+tt*tt*by;
+          ctx.fillStyle=FARBEN[(k*9+j)%FARBEN.length];
+          ctx.beginPath(); ctx.moveTo(px-3,py); ctx.lineTo(px+3,py); ctx.lineTo(px,py+6); ctx.closePath(); ctx.fill(); } } }
+    { const r=routeXY(0.03), sg=1, d=breite/2+90, bx=r.x+sg*r.nx*d, by=r.y+sg*r.ny*d;
+      ctx.globalAlpha=0.2; ctx.fillStyle="#0a0e08"; ctx.beginPath(); ctx.ellipse(bx+5,by+3,20,7,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+      ctx.fillStyle="#4a4f57"; ctx.fillRect(bx-9,by-6,18,10);
+      ctx.strokeStyle="#363b42"; ctx.lineWidth=4; ctx.lineCap="round"; ctx.beginPath();
+      ctx.moveTo(bx,by-4); ctx.lineTo(bx-54,by-62); ctx.stroke();
+      ctx.fillStyle="#1c1f24"; ctx.fillRect(bx-62,by-68,14,10);
+      ctx.strokeStyle="#262a30"; ctx.lineWidth=1; ctx.beginPath();
+      ctx.moveTo(bx-6,by-8); ctx.lineTo(bx-50,by-60); ctx.moveTo(bx+2,by-10); ctx.lineTo(bx-46,by-56); ctx.stroke(); }
+    // Baeume zuletzt (ueber Route und Fallen), nach y sortiert wie eine Tiefenreihe. Jede Krone
+    // bekommt denselben Schlagschatten-Versatz wie Torii/Tribuene (Kulissen-QS 08.11., Audit
+    // "Licht ... weiche Schatten aller Bauten in eine Richtung"); Kirschbaeume ersetzen die
+    // Kiefer, wenn der Punkt beim Cache-Bau als wegnah markiert wurde (s.o.).
+    { const kirschDa=aDa("takeshi_kirschbaum");
+      for(const b of wald_){ const im=(b.kirsch&&kirschDa)?aBild.takeshi_kirschbaum:(baeume.length?aBild[baeume[b.i%baeume.length]]:null);
+        if(!im)continue; const iw=im.naturalWidth, ih=im.naturalHeight;
+        ctx.globalAlpha=0.22; ctx.fillStyle="#0a0e08"; ctx.beginPath();
+        ctx.ellipse(b.x+6,b.y+4,iw*0.34,ih*0.14,0,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+        ctx.drawImage(im,Math.round(b.x-iw/2),Math.round(b.y-ih)); } }
     ctx.restore();
+    // 8c. TIEFE BEIM ZOOM: Vordergrund-Silhouetten plus Vignette (Kulissen-QS 08.11., Audit:
+    //     "Eine Vordergrund-Ebene ... die bei cam.zoom>1 leicht versetzt zur Route mitläuft, plus
+    //     eine Vignette am Leinwandrand. Das ist das Parallax-Mittel, das die Draufsicht hergibt.").
+    //     Reiner Bildschirmraum-Nachtrag NACH ctx.restore(), bevor das HUD zeichnet -- die
+    //     Vordergrund-Formen stehen fest an den Ecken (kein Weltbezug, keine neue Kamera-Variable),
+    //     nur ihre Groesse/Deckkraft waechst mit `cam.zoom`, was den Mitlauf-Eindruck simuliert.
+    if(cam.zoom>1.05){ const p=Math.min(1,(cam.zoom-1)/2);
+      ctx.save();
+      const ecke=(x,y)=>{ ctx.globalAlpha=0.5*p; ctx.fillStyle="#132013";
+        ctx.beginPath(); ctx.ellipse(x,y,70*(0.7+0.5*p),46*(0.7+0.5*p),0,0,6.283); ctx.fill(); };
+      ecke(-10,-6); ecke(W+10,-6); ecke(-10,H+6); ecke(W+10,H+6);
+      ctx.globalAlpha=1; ctx.restore();
+      const vg=ctx.createRadialGradient(W/2,H/2,H*0.32,W/2,H/2,H*0.74);
+      vg.addColorStop(0,"rgba(0,0,0,0)"); vg.addColorStop(1,"rgba(0,0,0,"+(0.30*p)+")");
+      ctx.fillStyle=vg; ctx.fillRect(0,0,W,H); }
     // 9. HUD im BILDSCHIRMRAUM: Burgpunkte, Kursname, Legende, Zoomstufe. Dieselben
     //    Groessen wie auf der alten Bahn, nur auf einem Band statt ueber der Zinnenmauer.
     // Das Band liegt UNTEN, nicht oben wie auf der geraden Bahn: die Burg steht auf der
