@@ -44,6 +44,26 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.06
   }
  ],
+ "climbing": [
+  {
+   "id": "wand",
+   "label": "Kletterhalle",
+   "bild": "/sprites/kulissen/climbing/wand.jpg",
+   "dunkel": 0.17
+  },
+  {
+   "id": "fels",
+   "label": "Sandsteinschlucht",
+   "bild": "/sprites/kulissen/climbing/fels.jpg",
+   "dunkel": 0.1
+  },
+  {
+   "id": "eis",
+   "label": "Eisfall",
+   "bild": "/sprites/kulissen/climbing/eis.jpg",
+   "dunkel": 0.18
+  }
+ ],
  "eiskunstlauf": [
   {
    "id": "kuer",
@@ -213,7 +233,7 @@ window.__ARENA_KULISSEN={
    "id": "arena",
    "label": "Die Runde",
    "bild": "/sprites/kulissen/staffel/arena.jpg",
-   "dunkel": 0.15
+   "dunkel": 0.14
   }
  ],
  "tdm": [

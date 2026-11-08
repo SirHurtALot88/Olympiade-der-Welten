@@ -220,3 +220,20 @@ Motor aus `HUERDEN_N()`/`camX()` bzw. `bahnPfad()`, also aus genau den Werten, m
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`. Er enthält `spiele` für Spurt und
 Staffel über je 3 Saaten sowie den Bahn-Pod für Staffel.
+
+## Batch 7: Climbing; Staffel in Ziegelrot (07.11.)
+
+- **Staffel**: Der Tartan der Szene ist auf das klassische Ziegelrot `#b5442f` umgefärbt, den bisherigen
+  Motor-Ton. Die Körnung bleibt, nur der Farbton wechselt. Entschieden mit Chris: Laufbahnen sind rot.
+- **Climbing** (wand/fels/eis): Die Kulisse ist nur das **Wandmaterial** der Szene. Griffe, Bolzen und Volumen
+  sind über einen laufenden Median entlang der Maserung herausgenommen (Eis senkrecht, Fels waagerecht,
+  Hallenwand beides), danach kommt die feine Körnung zurück. Das Bild ist eine senkrecht nahtlose Kachel
+  (obere Hälfte plus gespiegelte Kopie). `kulisseZeichnen(versatzY)` zeichnet sie mit dem Kamera-Versatz der
+  Wand, so läuft sie mit, während die Griffe wandern. Überhang-Schatten, Bahnen, Griffe
+  (`BA().hindernisse`/`HUERDEN_TYP`) und Sicherung zeichnet der Motor.
+- **Takeshi's Castle: noch nicht.** Die Szene ist ein Seitenpanorama. Der Motor zeigt eine Route in Draufsicht
+  mit Zoomkamera, und ihr Gelände (Wiese, Wald, Pfad, Kies, Schlamm, Pflaster, See, Hang, Sumpf) besteht aus
+  LPC-Kacheln (OpenGameArt). Aus dem Panorama lässt sich keine Draufsicht schneiden. Dafür braucht es neue
+  PixelLab-Draufsicht-Kacheln, siehe Bericht an Chris.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.

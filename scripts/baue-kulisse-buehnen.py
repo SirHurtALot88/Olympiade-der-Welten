@@ -558,6 +558,7 @@ ST_CX, ST_CY, ST_HL, ST_RA, ST_BA, ST_N, ST_ST = LW / 2, LH * 0.615, 263, 288, 2
 ST_TRIBUENE = (0, 0, 3360, 76)
 ST_RASEN = (840, 672, 2352, 1176)
 ST_TARTAN = (1344, 218, 2100, 270)
+ST_ZIEGEL = (181, 68, 47)
 
 
 def oval_maske(r: float) -> Image.Image:
@@ -593,7 +594,13 @@ def baue_staffel(variante: str) -> Image.Image:
     tartan = welt.crop(ST_TARTAN)
     tartan = linien_entfernen(tartan, linien_maske(tartan))
     tartan = tartan.resize((round(tartan.width * 0.6), round(tartan.height * 0.6)), Image.LANCZOS)
-    ring = kacheln_gespiegelt(tartan, LW, LH)
+    # Klassisches Ziegelrot (Mondo-Bahn, #b5442f wie bisher im Motor) statt des Tuerkis des Assets:
+    # die Koernung bleibt (Helligkeit relativ zum Mittel), nur der Farbton wird getauscht.
+    t = np.asarray(tartan, dtype=np.float32)
+    hell = t.mean(axis=2, keepdims=True)
+    rel = hell / max(float(hell.mean()), 1.0)
+    rot = np.clip(rel * np.array(ST_ZIEGEL, dtype=np.float32), 0, 255).astype(np.uint8)
+    ring = kacheln_gespiegelt(Image.fromarray(rot), LW, LH)
     r_innen = ST_RA - ST_N * ST_BA
     m = np.asarray(oval_maske(ST_RA + 2)).copy()
     m[np.asarray(oval_maske(r_innen - 1)) > 0] = 0
@@ -601,11 +608,71 @@ def baue_staffel(variante: str) -> Image.Image:
     return lein
 
 
+# ---------------------------------------------------------------------------------------- Climbing
+# Motor (bodenWand): senkrecht scrollende Wand (camY), Griffe aus BA().hindernisse und HUERDEN_TYP —
+# genau die Werte, mit denen das Rennen rechnet —, Bahnlinien wandX, Sicherungsfiguren zeichnet der
+# Motor. Szene (700x780): Kletterwand (Halle, Fels, Eis) mit Griffen, Volumen, Hoehenskala, Matten.
+# Kulisse: nur das WANDMATERIAL — Griffe, Bolzen und Volumen herausgenommen —, als Kachel, die sich
+# senkrecht nahtlos wiederholt (obere Haelfte + gespiegelte Kopie): der Motor zieht sie mit der Kamera
+# mit (kulisseZeichnen(versatzY)), damit die Wand nicht stehen bleibt, waehrend die Griffe wandern.
+CL_WAND = (30, 24, 670, 574)
+CL_ACHSEN = {"wand": (0, 1), "fels": (1,), "eis": (0,)}
+
+
+def laufender_median(a: np.ndarray, achse: int, fenster: int) -> np.ndarray:
+    """Median ueber `fenster` Pixel entlang `achse` (0 = senkrecht), Raender gespiegelt."""
+    h = fenster // 2
+    pad = [(h, h) if i == achse else (0, 0) for i in range(a.ndim)]
+    p = np.pad(a, pad, mode="reflect")
+    aus = np.empty_like(a)
+    n = a.shape[achse]
+    for i in range(0, n, 32):
+        j = min(n, i + 32)
+        if achse == 0:
+            fenst = np.lib.stride_tricks.sliding_window_view(p[i:j + 2 * h], fenster, axis=0)
+            aus[i:j] = np.median(fenst, axis=-1).astype(a.dtype)
+        else:
+            fenst = np.lib.stride_tricks.sliding_window_view(p[:, i:j + 2 * h], fenster, axis=1)
+            aus[:, i:j] = np.median(fenst, axis=-1).astype(a.dtype)
+    return aus
+
+
+def baue_climbing(variante: str) -> Image.Image:
+    import base64
+    import io
+    import re
+
+    s = (SZENEN / "climbing" / f"{variante}.html").read_text(encoding="utf-8")
+    b64 = re.search(r'data:image/[a-z]+;base64,([A-Za-z0-9+/=]{5000,})', s).group(1)
+    wand = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB").crop(CL_WAND)
+    # Griffe und Volumen sind klein gegen die Wand: ein laufender Median entlang der Maserung nimmt sie
+    # heraus und laesst die Maserung stehen (Eis: senkrechte Zapfen -> senkrecht; Fels: waagerechte
+    # Schichten -> waagerecht; Hallenwand: beides, die Plattenfugen bleiben).
+    a = np.asarray(wand, dtype=np.uint8)
+    for achse in CL_ACHSEN[variante]:
+        a = laufender_median(a, achse, 201 if variante == "eis" else 121)
+    # Feine Koernung der Szene zurueck (Hochpass, nur kleine Ausschlaege — Griffkanten sind gross)
+    roh = np.asarray(wand, dtype=np.float32)
+    hp = roh - np.asarray(wand.filter(ImageFilter.GaussianBlur(2)), dtype=np.float32)
+    # nur wo das Original schon nahe am Median liegt: sonst kaemen Volumen-/Griffkanten als Geister zurueck
+    nah = np.abs(roh - a.astype(np.float32)).max(axis=2, keepdims=True) < 18
+    ruhig = (np.abs(hp).max(axis=2, keepdims=True) < 10) & nah
+    a = np.clip(a.astype(np.float32) + hp * ruhig, 0, 255).astype(np.uint8)
+    wand = Image.fromarray(a)
+    f = LW / wand.width
+    wand = wand.resize((LW, round(wand.height * f)), Image.LANCZOS)
+    halb = wand.crop((0, 0, LW, LH // 2))
+    lein = Image.new("RGB", (LW, LH))
+    lein.paste(halb, (0, 0))
+    lein.paste(halb.transpose(Image.FLIP_TOP_BOTTOM), (0, LH // 2))
+    return lein
+
+
 BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
          "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy,
          "gewichtheben": baue_gewichtheben, "basketball": baue_basketball,
          "football": baue_football, "hockey": baue_hockey,
-         "spurt": baue_spurt, "staffel": baue_staffel}
+         "spurt": baue_spurt, "staffel": baue_staffel, "climbing": baue_climbing}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
@@ -615,7 +682,7 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"],
              "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"],
              "football": ["feld", "strand"], "hockey": ["eis", "bergsee"],
-             "spurt": ["kurs"], "staffel": ["arena"]}
+             "spurt": ["kurs"], "staffel": ["arena"], "climbing": ["wand", "fels", "eis"]}
 
 
 def main() -> None:

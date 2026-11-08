@@ -42510,11 +42510,17 @@
   }
   // Zeichnet die gewaehlte Kulisse samt Lesbarkeits-Schicht; false = nichts gezeichnet
   // (keine Kulisse fuer diese Disziplin oder Bild noch nicht geladen) -> alter Boden.
-  function kulisseZeichnen(){
+  // versatzY (Kulissen-Integration 07.11., Climbing): die Kulisse ist dann eine senkrecht nahtlose
+  // Kachel und wird um versatzY nach oben verschoben gezeichnet (zwei Kopien), damit eine scrollende
+  // Wand mit der Kamera mitlaeuft. Reine Anzeige.
+  function kulisseZeichnen(versatzY){
     if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
     const im=kulisseBilder[kulisseAktiv.bild];
     if(!im||!im.complete||!im.naturalWidth)return false;
-    ctx.drawImage(im,0,0,W,H);
+    if(Number.isFinite(versatzY)&&versatzY!==0){
+      const y0=-(((versatzY%H)+H)%H);
+      ctx.drawImage(im,0,y0,W,H); ctx.drawImage(im,0,y0+H,W,H);
+    } else ctx.drawImage(im,0,0,W,H);
     // LESBARKEIT: die Kulissen reichen von Schnee (hell) bis Lava (dunkel), die Kaempfer
     // samt Namen und Ringen muessen auf jeder stehen. Eine gleichmaessige Abdunklung nimmt
     // dem Schnee die Blendung — wie stark, rechnet der Generator je Bild aus seiner mittleren
@@ -44199,9 +44205,16 @@
   function bodenWand(){
     // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
     // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Wandmaterial der
+    // PixelLab-Szene (Halle, Fels, Eis) ohne deren Griffe und Volumen, laeuft mit der Kamera mit
+    // (gleicher Versatz wie die Risse unten). Ersetzt Verlauf und Risse; Ueberhang-Schatten, Bahnen,
+    // Griffe (BA().hindernisse/HUERDEN_TYP) und Sicherung zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen(camViewV().oben*cam.zoom);
+    if(!mitKulisse){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
 
     const n=BAHNEN_N(), steigung=BA().steigung??0.85;
     const griffe=BA().hindernisse||[];
@@ -44246,6 +44259,7 @@
     // Griffe/Kletterer selbst) -- die Risse sind Teil der Wandoberflaeche, nicht des
     // Hintergrunds, muessen also mit ihr mitlaufen. TILE_RISS deutlich groesser als H, damit
     // beim Kacheln nicht dieselben 22 Risse im selben Bildausschnitt doppelt auftauchen.
+    if(!mitKulisse){
     ctx.save();
     ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
@@ -44259,6 +44273,7 @@
       }
     }
     ctx.restore();
+    }
 
     // ---- Schicht 2: zwoelf schwache Spaltentrenner -- bei zwoelf belegten Routen soll die
     // Bahnzugehoerigkeit trotz Kamera-Zoom lesbar bleiben (dasselbe Bild wie Fahrbahnlinien).

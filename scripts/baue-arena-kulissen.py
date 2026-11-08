@@ -97,6 +97,8 @@ CHASSIS = {
     # Batch 6 (07.11.): Bahn-Chassis, Stationen/Linien weiter vom Motor nach den Renn-Werten.
     "spurt": {"art": "quelle"},
     "staffel": {"art": "quelle"},
+    # Batch 7 (07.11.): Wandmaterial als senkrecht nahtlose Kachel (Motor scrollt sie mit).
+    "climbing": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
