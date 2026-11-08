@@ -10,12 +10,25 @@
 // Kante gegen den mittleren Sprung im Inneren). Jede Wahl ist danach als 3x3-Kachelung
 // angesehen worden — die Zahl allein haette zweimal Wasser statt Sand ausgewaehlt.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
 
 const ZIEL = 'public/sprites/arena';
+
+// Seit 08.11. sind die Requisiten und die Takeshi-Bodenkacheln PixelLab-Erzeugnisse
+// (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py). Was quellen.json als
+// "paket": "PixelLab" fuehrt, wird hier NICHT mehr ueberschrieben — sonst holte ein Lauf dieses
+// Skripts die alten LPC-Schnitte zurueck. Mit --lpc schneidet es trotzdem alles (Vergleich).
+const ALLES_LPC = process.argv.includes('--lpc');
+const PIXELLAB = new Set(Object.entries(JSON.parse(readFileSync(join(ZIEL, 'quellen.json'), 'utf8')))
+  .filter(([, v]) => v && v.paket === 'PixelLab').map(([k]) => k.replace(/\.png$/, '')));
+const ueberspringen = (name) => {
+  if (ALLES_LPC || !PIXELLAB.has(name)) return false;
+  console.log(`  ${name}.png  bleibt (PixelLab, s. quellen.json)`);
+  return true;
+};
 
 const QUELLEN = [
   { datei: 'lpc-terrains.zip',        url: 'https://opengameart.org/sites/default/files/lpc-terrains.zip' },
@@ -110,6 +123,7 @@ for (const q of QUELLEN) {
 if (!existsSync(ZIEL)) mkdirSync(ZIEL, { recursive: true });
 
 for (const [name, blatt, left, top, width, height, trimmen] of SCHNITTE) {
+  if (ueberspringen(name)) continue;
   let bild = sharp(join(arbeit, BLATT[blatt])).extract({ left, top, width, height });
   if (trimmen) bild = bild.trim();
   const info = await bild.png().toFile(join(ZIEL, `${name}.png`));
@@ -118,6 +132,7 @@ for (const [name, blatt, left, top, width, height, trimmen] of SCHNITTE) {
 
 // Fackel und Adler kommen unveraendert ins Ziel — sie sind schon fertige Blaetter.
 for (const [name, datei] of [['fackel', 'animated_torch.png'], ['vogel_adler', 'bird_2_eagle.png']]) {
+  if (ueberspringen(name)) continue;
   const info = await sharp(join(arbeit, datei)).png().toFile(join(ZIEL, `${name}.png`));
   console.log(`  ${name}.png  ${info.width}x${info.height}`);
 }

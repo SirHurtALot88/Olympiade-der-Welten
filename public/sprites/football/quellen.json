@@ -1,35 +1,107 @@
 {
-  "_hinweis": "Football: Ball und Helm (drei Blickwinkel). Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Beschafft am 03.09. ueber OpenGameArt (opengameart.org/content/sports-pack-350), unveraendert aus dem Original-ZIP entnommen (kein eigener Schnitt/keine Skalierung noetig, PNGs liegen in Originalgroesse vor). Dieselbe Quelle liefert bereits public/sprites/basketball/korb_topdown.png u.a. (s. dort), gefunden und vorverifiziert in docs/design/football-rollout-plan.md Abschnitt C.",
-  "ball_football.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Equipment/ball_football.png, unveraendert, 14x16",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Football-Ball-Sprite; braun mit zwei weissen Schnuersenkel-Streifen, korrekt oval. Deutlich kleiner als Basketballs ball.png (32x32) oder korb_topdown.png (64x64) — beim Einbau verlustfrei per Nearest-Neighbor auf 32x32 oder 64x64 hochskalieren, kein neuer Download noetig."
+ "_hinweis": "Football: Ball und Helm (drei Blickwinkel). Zu jeder Datei: Herkunft, Schnitt, Urheber, Lizenz. Beschafft am 03.09. ueber OpenGameArt (opengameart.org/content/sports-pack-350), unveraendert aus dem Original-ZIP entnommen (kein eigener Schnitt/keine Skalierung noetig, PNGs liegen in Originalgroesse vor). Dieselbe Quelle liefert bereits public/sprites/basketball/korb_topdown.png u.a. (s. dort), gefunden und vorverifiziert in docs/design/football-rollout-plan.md Abschnitt C. — 08.11.: die vom Motor gezeichneten Requisiten (und in arena/ die Takeshi-Bodenkacheln) sind auf PixelLab umgestellt (scripts/pixellab-requisiten.py, scripts/pixellab-boden-kacheln.py); bei diesen Eintraegen steht die fruehere Quelle unter 'vorher'.",
+ "ball_football.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "brown american football with white laces, oval, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    16,
+    16
+   ],
+   "job": "7d95dd42-9085-4ddc-936f-00ba1cedf40f",
+   "kandidat": 11
   },
-  "helmet_white1.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Equipment/helmet_white1.png, unveraendert, 19x19",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Football-Helm, ein Blickwinkel von drei. Weiss mit blauem Gesichtsschutz-/Seitenstreifen. Welcher der drei Winkel zu welcher blickAus()-Richtung passt, ist noch nicht zugeordnet (Namen selbst tragen keine Blickwinkel-Angabe) — das ist Teil der spaeteren Verdrahtung, nicht dieser Beschaffungsrunde."
-  },
-  "helmet_white2.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Equipment/helmet_white2.png, unveraendert, 21x19",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Football-Helm, zweiter Blickwinkel. Siehe helmet_white1.png."
-  },
-  "helmet_white3.png": {
-    "paket": "Sports pack (350+)",
-    "blatt": "PNG/Equipment/helmet_white3.png, unveraendert, 26x22",
-    "urheber": "Kenney (kenney.nl)",
-    "lizenz": "CC0",
-    "url": "https://opengameart.org/content/sports-pack-350",
-    "verwendung": "Football-Helm, dritter Blickwinkel. Siehe helmet_white1.png."
+  "roh": "data/generated/pixellab-requisiten/roh/ball_football*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen ball_football (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Football-Ball-Sprite; braun mit zwei weissen Schnuersenkel-Streifen, korrekt oval. Deutlich kleiner als Basketballs ball.png (32x32) oder korb_topdown.png (64x64) — beim Einbau verlustfrei per Nearest-Neighbor auf 32x32 oder 64x64 hochskalieren, kein neuer Download noetig.",
+  "vorher": {
+   "paket": "Sports pack (350+)",
+   "blatt": "PNG/Equipment/ball_football.png, unveraendert, 14x16",
+   "urheber": "Kenney (kenney.nl)",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/sports-pack-350"
   }
+ },
+ "helmet_white1.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "white american football helmet with blue stripe and face mask, side view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    19,
+    19
+   ],
+   "job": "906370dd-428a-4a45-899e-143471d2e537",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/helmet_white1*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen helmet_white1 (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Football-Helm, ein Blickwinkel von drei. Weiss mit blauem Gesichtsschutz-/Seitenstreifen. Welcher der drei Winkel zu welcher blickAus()-Richtung passt, ist noch nicht zugeordnet (Namen selbst tragen keine Blickwinkel-Angabe) — das ist Teil der spaeteren Verdrahtung, nicht dieser Beschaffungsrunde.",
+  "vorher": {
+   "paket": "Sports pack (350+)",
+   "blatt": "PNG/Equipment/helmet_white1.png, unveraendert, 19x19",
+   "urheber": "Kenney (kenney.nl)",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/sports-pack-350"
+  }
+ },
+ "helmet_white2.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "white american football helmet with blue stripe and face mask, three-quarter view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    21,
+    19
+   ],
+   "job": "50c09042-b9f7-4e48-a7eb-acd3314a6ef7",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/helmet_white2*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen helmet_white2 (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Football-Helm, zweiter Blickwinkel. Siehe helmet_white1.png.",
+  "vorher": {
+   "paket": "Sports pack (350+)",
+   "blatt": "PNG/Equipment/helmet_white2.png, unveraendert, 21x19",
+   "urheber": "Kenney (kenney.nl)",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/sports-pack-350"
+  }
+ },
+ "helmet_white3.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "white american football helmet with blue stripe and grey face mask, front three-quarter view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    26,
+    22
+   ],
+   "job": "c4084e2e-437c-4142-96e8-2b28a379bd80",
+   "kandidat": 0
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/helmet_white3*.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen helmet_white3 (Inhalt in die Alpha-Box der alten Datei, Pixelmasse unveraendert)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Football-Helm, dritter Blickwinkel. Siehe helmet_white1.png.",
+  "vorher": {
+   "paket": "Sports pack (350+)",
+   "blatt": "PNG/Equipment/helmet_white3.png, unveraendert, 26x22",
+   "urheber": "Kenney (kenney.nl)",
+   "lizenz": "CC0",
+   "url": "https://opengameart.org/content/sports-pack-350"
+  }
+ }
 }
