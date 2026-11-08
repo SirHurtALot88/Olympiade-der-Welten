@@ -210,6 +210,39 @@ nichts zu tun. Eine Trait-Trainingsfunktion wäre also entweder eine Erweiterung
 Fazilität oder ein neues Gebäude — offene Frage für eine spätere, eigene Recherche-Runde, nicht
 Teil der aktuellen Rempler-Umsetzung.
 
+### Scope-Korrektur 08.11. (dritte Runde): Persönlichkeit muss GENERELL sein, nicht arena-spezifisch
+
+Wichtige Klarstellung, nachdem Fables erste Taxonomie vorlag. Chris stellt klar, dass sein
+Verständnis von „Persönlichkeit" breiter ist, als das bisherige Fundament hergibt: „Bisher sind
+die abgeleiteten Persönlichkeiten ja für die Kampfarena und so. Ich möchte generelle
+Persönlichkeiten." Die bestehenden sechs Kampfstile (`leitePers()`/`PW`: Bollwerk, Draufgänger,
+Duellant, Schleicher, Beschützer, Opportunist) sind laut Chris zu eng auf Arena-Verhalten
+zugeschnitten — sein Beispiel: „Draufgänger ist sowas wie Renegade-Egomaniac" — das sind
+Kampf-Rollen, keine Charaktereigenschaften.
+
+**Was Chris stattdessen will:** allgemeine Spieler-Persönlichkeiten, die auch außerhalb der Arena
+Sinn ergeben — professionell, unprofessionell, meckerig/nörglerisch usw. — nach dem Vorbild von
+Spielen wie Football Manager (dort gibt es ein breites Set an Persönlichkeitstypen, die sich aus
+mehreren verdeckten Eigenschaften zusammensetzen: Professionalität, Ambition, Temperament,
+Drucktoleranz, Sportsgeist, Loyalität und mehr — Chris kennt die genaue FM-Zahl selbst nicht,
+schätzt aber „ich weiß nicht, wie viele... aber wir brauchen definitiv mehr"). **Zielgröße: eher
+um die 20 Persönlichkeiten statt Fables bisherigen 13**, gespeist aus den Traits, breiter
+gefächert als reines Kampf-/Rempel-Verhalten.
+
+**Wichtig für die Einordnung:** das ist kein Widerspruch zu Fables Dokument, sondern eine
+Erweiterung seines Ansatzes (volle Trait-Matrix, benannte Persönlichkeiten als zweite Schicht über
+den sechs Kampfstilen) — nur dass die Persönlichkeiten selbst breiter/allgemeiner gefasst sein
+müssen als bisher gedacht, und dass einige von Fables 13 (die durchaus schon allgemeiner sind als
+die sechs Kampfstile, z. B. Pedant, Phlegmatiker, Mannschaftsspieler) als Ausgangspunkt taugen,
+aber die Liste um generelle, nicht-kampfbezogene Eigenschaften (Professionalität, Lernbereitschaft,
+Nörgel-/Meckerneigung, Medien-/Öffentlichkeitsverhalten o. Ä.) ergänzt werden muss.
+
+**Auftrag für die nächste Runde:** kurze Recherche zu Referenz-Systemen (Football Manager und
+ähnliche Management-Spiele) für übliche Persönlichkeits-Attribute/-Typen, dann eine erweiterte
+Taxonomie (~20 Persönlichkeiten), die sowohl Kampf-/Wettkampf-Verhalten als auch generelles
+Spieler-Charakterverhalten (Training, Moral, Medien, Teamklima) abdeckt — weiterhin aus den
+bestehenden 36 Traits hergeleitet, keine neuen Spieler-Datenfelder ohne Not.
+
 ### Rückmeldung zu Teil 1 (Oberflächen-Effekte): Deckel-Höhe
 
 Zur offenen Frage „Deckel bei ±5 oder ±8 Eignungspunkten" aus dem Fable-Konzept: Chris hält
