@@ -203,3 +203,20 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
   alte Boden.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 6: Spurt, Staffel (07.11.)
+
+Bahn-Chassis. Die Kulisse liefert nur Umgebung und Belag. Bahnlinien, Stationen und Hürden zeichnet weiter der
+Motor aus `HUERDEN_N()`/`camX()` bzw. `bahnPfad()`, also aus genau den Werten, mit denen das Rennen rechnet.
+
+- **Spurt** (kurs): HYROX-Halle der Szene. Oben und unten liegt Publikum, im Bahnband `H*0.14..H*0.94` der blaue
+  Laufbahnbelag der Schleife (das Stück zwischen den Pfeilen, gespiegelt gekachelt). Die Stationen der Szene
+  (Schlitten, Rudergeräte …) kommen nicht mit. `bodenSpurtGerade()` lässt mit Kulisse Rasen, Bäume,
+  Bahnfüllung und Zaun weg.
+- **Staffel** (arena): Stadion der Szene. Überall liegt Rasen, oben die Tribüne, im Bahnring von `bahnPfad()`
+  (Außenradius 288, 6 Bahnen à 26, Stauchung 0,57) der türkise Tartan der Szene ohne Linien, im Innenfeld der
+  gestreifte Rasen. Die Variante `stabwechsel` ist dasselbe Stadion in Nahsicht und kommt deshalb nicht dazu.
+  Der Belag wechselt damit von Ziegelrot zum Türkis des PixelLab-Assets.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`. Er enthält `spiele` für Spurt und
+Staffel über je 3 Saaten sowie den Bahn-Pod für Staffel.

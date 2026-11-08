@@ -200,6 +200,22 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.06
   }
  ],
+ "spurt": [
+  {
+   "id": "kurs",
+   "label": "HYROX-Kurs",
+   "bild": "/sprites/kulissen/spurt/kurs.jpg",
+   "dunkel": 0.06
+  }
+ ],
+ "staffel": [
+  {
+   "id": "arena",
+   "label": "Die Runde",
+   "bild": "/sprites/kulissen/staffel/arena.jpg",
+   "dunkel": 0.15
+  }
+ ],
  "tdm": [
   {
    "id": "basis",

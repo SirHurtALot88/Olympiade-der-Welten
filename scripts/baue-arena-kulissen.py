@@ -94,6 +94,9 @@ CHASSIS = {
     # Hockey: das Eis war im Motor immer hell (Linien und Kaempfer sind darauf gebaut) — nur leicht
     # abdunkeln, sonst wird es grau.
     "hockey": {"art": "quelle", "dunkel_fest": 0.06},
+    # Batch 6 (07.11.): Bahn-Chassis, Stationen/Linien weiter vom Motor nach den Renn-Werten.
+    "spurt": {"art": "quelle"},
+    "staffel": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.

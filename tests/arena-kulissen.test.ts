@@ -66,6 +66,17 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(skript).toContain("FB_FELD = (round(LW * 0.04), 50, round(LW * 0.96), LH - 50)");
     expect(motor).toContain("l:W*0.045, r:W*0.955, o:44, u:H-44,");
     expect(skript).toContain('HK_K = {"l": LW * 0.045, "r": LW * 0.955, "o": 44, "u": LH - 44, "ecke": 64}');
+    // Spurt: Bahnband H*0.14..H*0.94; Staffel: Oval aus bahnPfad()
+    expect(motor).toContain("const oben=H*0.14, unten=H*0.94;");
+    expect(skript).toContain("SP_OBEN, SP_UNTEN = round(LH * 0.14), round(LH * 0.94)");
+    expect(motor).toContain("const OVAL_CX=W/2, OVAL_CY=H*0.615;");
+    expect(motor).toContain("const OVAL_HL=263;");
+    expect(motor).toContain("const OVAL_R_AUSSEN=288;");
+    expect(motor).toContain("const OVAL_BAHN_ABSTAND=26;");
+    expect(motor).toContain("const OVAL_STAUCH=0.57;");
+    expect(skript).toContain("ST_CX, ST_CY, ST_HL, ST_RA, ST_BA, ST_N, ST_ST = LW / 2, LH * 0.615, 263, 288, 26, 6, 0.57");
+    expect(kulissen.spurt?.length ?? 0).toBeGreaterThanOrEqual(1);
+    expect(kulissen.staffel?.length ?? 0).toBeGreaterThanOrEqual(1);
     // Gewichtheben: Kulisse nur im Hantel-Duell (bodenHeben), der Sandsack-Pfad bleibt aus
     expect(motor).toMatch(/gewichthebenSandsack\s*:\s*0/);
   });

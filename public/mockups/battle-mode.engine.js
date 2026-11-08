@@ -43789,6 +43789,12 @@
     // bekommt stattdessen ihre eigene Bahnfarbe als Flaeche — sonst stuende an einer
     // Steinwand ploetzlich Wiese, nur weil dieselbe Zeichenfunktion beide bedient.
     const grasHintergrund=BA().baeume!==false;
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): HYROX-Halle der
+    // PixelLab-Szene -- Publikum oben/unten, blauer Laufbahnbelag genau im Bahnband oben..unten.
+    // Ersetzt Rasen, Baeume, Bahnfuellung und Zaun; Bahnlinien, Stationen (aus HUERDEN_N/camX, also
+    // genau wie das Rennen rechnet), Start, Ziel und Beschriftung zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     if(grasHintergrund){
       const rasen=aMust("rasen");
       if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H);
@@ -43808,7 +43814,9 @@
       v.addColorStop(1,"rgba(0,0,0,.35)");
       ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     }
+    }
     const oben=H*0.14, unten=H*0.94;
+    if(!mitKulisse){
     // Baumreihe ueber der Bahn. Vier Nadelbaum-Blaetter im Wechsel; die Wahl haengt am
     // Platz in der Reihe, nicht am Zufall — sonst tanzt der Wald bei jedem Bild. An einer
     // Kletterwand steht kein Wald (BA().baeume===false), da bleibt die Schleife leer.
@@ -43874,6 +43882,7 @@
     // `oben-28` bis `oben+4` und hat die Legendenzeile bei `oben-18` vorher vollstaendig
     // uebermalt — sie stand im Code, war im Bild aber nie zu sehen (nachgemessen am
     // Screenshot, 1240x470: Zaunkachel 32 px hoch bei `oben-z.naturalHeight+4`).
+    }
     if(BA().takeshi&&aDa("burg_mauer")){
       const bp=(seite)=>LAEUFER.filter(u=>u.seite===seite).reduce((a,u)=>a+burgwertung(u),0);
       ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.strokeStyle="rgba(8,10,14,.85)";ctx.lineJoin="round";
@@ -44488,6 +44497,12 @@
   let staffelPublikumAn=false;
   function bodenSpurtOval(){
     if(!staffelPublikumAn){ tonLoopStart("staffel"); staffelPublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Stadion der PixelLab-
+    // Szene, Tartan genau im Bahnring von bahnPfad(), gestreifter Rasen innen. Ersetzt Rasen, Verlauf,
+    // Innenfeld und Bahnfuellung; Linien, Wechselzonen-Marken und Ziel zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
+    if(!mitKulisse){
     const rasen=aMust("rasen");
     if(rasen){ ctx.fillStyle=rasen;ctx.fillRect(0,0,W,H); }
     else { const g=ctx.createLinearGradient(0,0,0,H);
@@ -44497,7 +44512,6 @@
     v.addColorStop(0,"rgba(0,0,0,.28)");v.addColorStop(0.5,"rgba(0,0,0,0)");
     v.addColorStop(1,"rgba(0,0,0,.30)");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
-    const rAussen=OVAL_R_AUSSEN, rInnen=OVAL_R_AUSSEN-OVAL_BAHNEN*OVAL_BAHN_ABSTAND;
 
     // ---- 1. INNENFELD, zuerst. Dunkleres, kuehleres Gruen als der Rasen aussen — der
     // Stadioninnenraum liegt im Schatten der Tribuenen. Ohne ihn ginge die Bahn in einer
@@ -44531,6 +44545,7 @@
       ctx.fillRect(x,y,2,2);
     }
     ctx.restore();
+    }
 
     // ---- 3. BAHNLINIEN. Jetzt echte Parallelkurven (gleiche Geradenlaenge, Radius je
     // Spurgrenze) — der Abstand ist ueberall gleich, statt an den Scheiteln auf Null zu

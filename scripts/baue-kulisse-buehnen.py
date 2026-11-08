@@ -513,10 +513,99 @@ def baue_hockey(variante: str) -> Image.Image:
     return lein
 
 
+# ---------------------------------------------------------------------------------------- Spurt
+# Motor (bodenSpurtGerade): Bahnband oben=H*0.14 .. unten=H*0.94, Bahnlinien, Stationen (Huerden,
+# Balken, Mauer, Seil …), Start/Ziel zeichnet der Motor nach den Renn-Werten (HUERDEN_N, camX). Szene
+# (bg 1680x960, HYROX-Halle in Draufsicht): Publikum oben/unten, Asphalt, blaue Laufbahn. Kulisse: oben
+# Publikum + Hallenboden, im Bahnband der blaue Belag der Laufschleife (Stueck zwischen den Pfeilen),
+# unten Publikum. Die Stationen der Szene (Schlitten, Rudergeraete …) kommen nicht mit.
+SP_OBEN, SP_UNTEN = round(LH * 0.14), round(LH * 0.94)
+SP_PUBLIKUM_OBEN = (0, 0, 1680, 40)
+SP_PUBLIKUM_UNTEN = (0, 912, 1680, 960)
+SP_ASPHALT = (640, 440, 820, 480)
+SP_BELAG = (520, 66, 760, 134)
+
+
+def band_breit(stueck: Image.Image, breite: int) -> Image.Image:
+    aus = Image.new("RGB", (breite, stueck.height))
+    for i, x in enumerate(range(0, breite, stueck.width)):
+        aus.paste(stueck if i % 2 == 0 else stueck.transpose(Image.FLIP_LEFT_RIGHT), (x, 0))
+    return aus
+
+
+def baue_spurt(variante: str) -> Image.Image:
+    bg = lade_szenenbilder(SZENEN / "spurt" / f"{variante}.html")["bg"].convert("RGB")
+    lein = kacheln_gespiegelt(bg.crop(SP_ASPHALT), LW, LH)
+    po = bg.crop(SP_PUBLIKUM_OBEN)
+    po = po.resize((round(po.width * 0.9), round(po.height * 0.9)), Image.LANCZOS)
+    lein.paste(band_breit(po, LW), (0, 0))
+    pu = bg.crop(SP_PUBLIKUM_UNTEN)
+    pu = pu.resize((round(pu.width * 0.9), round(pu.height * 0.9)), Image.LANCZOS)
+    lein.paste(band_breit(pu, LW), (0, LH - pu.height))
+    belag = bg.crop(SP_BELAG)
+    belag = belag.resize((belag.width * 2, belag.height * 2), Image.NEAREST)
+    lein.paste(kacheln_gespiegelt(belag, LW, SP_UNTEN - SP_OBEN), (0, SP_OBEN))
+    return lein
+
+
+# ---------------------------------------------------------------------------------------- Staffel
+# Motor (bodenSpurtOval): Oval um OVAL_CX=W/2, OVAL_CY=H*0.615, halbe Gerade 263, Aussenradius 288,
+# 6 Bahnen a 26, Stauchung 0,57 (bahnPfad). Linien, Wechselzonen-Marken, Ziel zeichnet der Motor.
+# Szene (arena, 3360x1864): Stadion mit Tribuenen, Rasen, Tartanbahn (tuerkis) in Draufsicht.
+# Kulisse: Rasen der Szene ueberall, Tribuene oben, im Bahnring der Tartan der Szene ohne Linien,
+# im Innenfeld der gestreifte Rasen. Nur die Variante "arena": "stabwechsel" ist dasselbe Stadion.
+ST_CX, ST_CY, ST_HL, ST_RA, ST_BA, ST_N, ST_ST = LW / 2, LH * 0.615, 263, 288, 26, 6, 0.57
+ST_TRIBUENE = (0, 0, 3360, 76)
+ST_RASEN = (840, 672, 2352, 1176)
+ST_TARTAN = (1344, 218, 2100, 270)
+
+
+def oval_maske(r: float) -> Image.Image:
+    from PIL import ImageDraw
+
+    ry = r * ST_ST
+    m = Image.new("L", (LW, LH), 0)
+    d = ImageDraw.Draw(m)
+    d.rectangle((ST_CX - ST_HL, ST_CY - ry, ST_CX + ST_HL, ST_CY + ry), fill=255)
+    d.ellipse((ST_CX + ST_HL - r, ST_CY - ry, ST_CX + ST_HL + r, ST_CY + ry), fill=255)
+    d.ellipse((ST_CX - ST_HL - r, ST_CY - ry, ST_CX - ST_HL + r, ST_CY + ry), fill=255)
+    return m
+
+
+def baue_staffel(variante: str) -> Image.Image:
+    import base64
+    import io
+    import re
+
+    s = (SZENEN / "staffel" / f"{variante}.html").read_text(encoding="utf-8")
+    b64 = re.search(r'data:image/[a-z]+;base64,([A-Za-z0-9+/=]{5000,})', s).group(1)
+    welt = Image.open(io.BytesIO(base64.b64decode(b64))).convert("RGB")
+    rasen = welt.crop(ST_RASEN).resize((round(1512 * 0.6), round(504 * 0.6)), Image.LANCZOS)
+    lein = Image.new("RGB", (LW, LH))
+    flaeche = Image.new("RGB", (LW, LH))
+    for y in range(0, LH, rasen.height):
+        for x in range(0, LW, rasen.width):
+            flaeche.paste(rasen, (x, y))
+    lein.paste(flaeche, (0, 0))
+    trib = welt.crop(ST_TRIBUENE)
+    trib = trib.resize((LW, round(trib.height * LW / trib.width * 1.6)), Image.LANCZOS)
+    lein.paste(trib, (0, 0))
+    tartan = welt.crop(ST_TARTAN)
+    tartan = linien_entfernen(tartan, linien_maske(tartan))
+    tartan = tartan.resize((round(tartan.width * 0.6), round(tartan.height * 0.6)), Image.LANCZOS)
+    ring = kacheln_gespiegelt(tartan, LW, LH)
+    r_innen = ST_RA - ST_N * ST_BA
+    m = np.asarray(oval_maske(ST_RA + 2)).copy()
+    m[np.asarray(oval_maske(r_innen - 1)) > 0] = 0
+    lein.paste(ring, (0, 0), Image.fromarray(m))
+    return lein
+
+
 BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
          "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy,
          "gewichtheben": baue_gewichtheben, "basketball": baue_basketball,
-         "football": baue_football, "hockey": baue_hockey}
+         "football": baue_football, "hockey": baue_hockey,
+         "spurt": baue_spurt, "staffel": baue_staffel}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
@@ -525,7 +614,8 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "eiskunstlauf": ["kuer", "waldsee"], "breaking": ["standard", "brutal"],
              "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"],
              "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"],
-             "football": ["feld", "strand"], "hockey": ["eis", "bergsee"]}
+             "football": ["feld", "strand"], "hockey": ["eis", "bergsee"],
+             "spurt": ["kurs"], "staffel": ["arena"]}
 
 
 def main() -> None:
