@@ -44054,14 +44054,21 @@
     // IN-Bogen am Startpunkt, der FINISH-Bogen an der Ziellinie, genau an camX(0)/camX(1) -- denselben
     // Werten, die die Start-/Ziellinie zwei Bloecke darueber schon zeichnet. Ersetzt nichts an Start/
     // Ziel selbst (die Linien bleiben), gibt dem Band nur sichtbar Anfang und Ende. Beide Sprites aus
-    // der HYROX-Rohszene freigestellt (s. A_TEILE-Kommentar oben), auf die volle Bandhoehe skaliert.
+    // der HYROX-Rohszene freigestellt (s. A_TEILE-Kommentar oben).
+    //
+    // NACHBESSERUNG (Chris, 08.11., zum ersten Stand dieses Batches): "komsiche riesige Tore!
+    // Das sieht richtig weird aus" -- auf die VOLLE Bandhoehe skaliert (alle zwoelf Bahnen
+    // uebereinander, ~80 % von H) wirkte der Bogen wie ein Rohr quer durchs Bild, nicht wie ein
+    // Ziel-Bogen. Ein echter Start-/Zielbogen ist ein Landmark am oberen Bandrand, keine
+    // Wand ueber die ganze Bahnbreite -- gedeckelt auf einen Bruchteil der Bandhoehe, anstatt
+    // sie auszufuellen.
     if(mitKulisse&&BA().spurt){
       if(aDa("spurt_bogen_in")&&xStart>-220&&xStart<W+220){
-        const im=aBild.spurt_bogen_in, bh=unten-oben, bw=bh*im.naturalWidth/im.naturalHeight;
+        const im=aBild.spurt_bogen_in, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
         ctx.drawImage(im,Math.round(xStart-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
       }
       if(aDa("spurt_bogen_finish")&&xZiel>-220&&xZiel<W+220){
-        const im=aBild.spurt_bogen_finish, bh=unten-oben, bw=bh*im.naturalWidth/im.naturalHeight;
+        const im=aBild.spurt_bogen_finish, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
         ctx.drawImage(im,Math.round(xZiel-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
       }
     }

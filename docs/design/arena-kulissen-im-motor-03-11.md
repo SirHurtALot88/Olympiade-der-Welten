@@ -435,7 +435,11 @@ enges Feld zieht die Kamera heran — `camView()`, s. Kommentar dort). Alles, wa
 das zeichnet, wie schon bei jeder Hürden-/Mauer-/Wasser-Kachel zuvor, der Motor selbst, bei `camX(h)`:
 
 - **Bögen an Start und Ziel** (Audit wörtlich): der IN-Bogen (gelb-schwarz) bei `camX(0)`, der FINISH-Bogen
-  (rot) bei `camX(1)`, auf die volle Bandhöhe skaliert. Beide Sprites sind **nicht bei PixelLab bestellt** —
+  (rot) bei `camX(1)`. Erster Stand skalierte auf die volle Bandhöhe (alle zwölf Bahnen übereinander) —
+  Chris, 08.11., zu genau diesem Stand: „komsiche riesige Tore! Das sieht richtig weird aus." Nachgebessert
+  noch am selben Tag: Höhe auf `min(Bandhöhe, 32 % der Leinwandhöhe)` gedeckelt, Position unverändert am
+  oberen Bandrand — der Bogen liest jetzt als Landmark am Rand, nicht als Rohr quer durchs ganze Bild. Beide
+  Sprites sind **nicht bei PixelLab bestellt** —
   die Rohszene führt sie bereits (Audit: "stehen alle in der Rohszene") —, sondern per Kettenflutung
   freigestellt (`kulissen_werkzeug.freistellen()`, neu in diesem Batch: wächst vom Bildrand über ähnlich
   gefärbte Nachbarn nach innen, jeder Schritt gegen den zuletzt akzeptierten Nachbarn statt gegen den
