@@ -44,7 +44,7 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
   it("Buehnen-Kulissen (Batch 2/3) passen zur Motor-Geometrie (Tennis-Trapez, Eis-Rundweg, I-Spy-Steg)", () => {
     // scripts/baue-kulisse-buehnen.py rechnet mit tennisPlatzGeometrie() (topY=H*0.17, botY=H*0.615,
     // halbe Breite W*0.145..W*0.30). Aendert sich die Motor-Geometrie, muss die Kulisse neu gebaut werden.
-    for (const d of ["tennis", "fechten", "speed-schach", "showcase", "eiskunstlauf", "breaking", "i-spy"]) {
+    for (const d of ["tennis", "fechten", "speed-schach", "showcase", "eiskunstlauf", "breaking", "i-spy", "gewichtheben", "basketball"]) {
       expect(kulissen[d]?.length ?? 0, d).toBeGreaterThanOrEqual(2);
     }
     const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
@@ -58,6 +58,11 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(motor).toContain("const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};");
     // I-Spy: die beiden Raeume enden am Steg W*0.465 / W*0.535
     expect(motor).toContain("const stegX0=W*0.465, stegX1=W*0.535;");
+    // Basketball: das Feld der Kulisse liegt auf W*0.06..W*0.94 x 60..H-60
+    expect(motor).toContain("ctx.fillRect(W*0.06,60,W*0.88,H-120);");
+    expect(skript).toContain("BB_FELD = (round(LW * 0.06), 60, round(LW * 0.94), LH - 60)");
+    // Gewichtheben: Kulisse nur im Hantel-Duell (bodenHeben), der Sandsack-Pfad bleibt aus
+    expect(motor).toMatch(/gewichthebenSandsack\s*:\s*0/);
   });
 
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {

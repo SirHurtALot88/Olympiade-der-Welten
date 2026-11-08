@@ -77,7 +77,7 @@ CHASSIS = {
     "battlefield": {"art": "quelle"},
     # Gewichtheben (Sandsack-Schicht): die Szene ist ein vollstaendiger Stationsplan (Bahnen,
     # Silo, Rampen), der nicht deckungsgleich mit den Reihen des Motors liegt.
-    "gewichtheben": {"art": "buehne-stationsplan"},
+    "gewichtheben": {"art": "quelle"},
     # Batch 2 (07.11.): Umgebung aus der Szene, Demo-Zutaten weg, Flaeche nach Motor-Geometrie —
     # gebaut von scripts/baue-kulisse-buehnen.py.
     "tennis": {"art": "quelle"},
@@ -88,6 +88,8 @@ CHASSIS = {
     "eiskunstlauf": {"art": "quelle"},
     "breaking": {"art": "quelle"},
     "i-spy": {"art": "quelle"},
+    # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
+    "basketball": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.

@@ -17302,12 +17302,17 @@
     // Disziplin zeichnen, ohne dass zwischendurch reset() lief — dasselbe Bookkeeping wie
     // bodenBuehne() fuer hebenPublikumAn bzw. bodenSpurt() fuer takeshiPublikumAn.
     if(feldspielDisc!=="hockey"&&hockeyPublikumAn){ tonLoopStop(); hockeyPublikumAn=false; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Basketball bekommt
+    // Tribuene und Belag (Parkett bzw. Streetcourt) der PixelLab-Szene; das Feld liegt in der Kulisse
+    // genau auf W*0.06..W*0.94 x 60..H-60. Ersetzt Verlauf, Zuschauer-Sprites und Parkett-Kachel;
+    // Linien, Zonen und Koerbe zeichnet der Motor weiter. Football/Hockey: noch ohne Kulisse.
+    const mitKulisse=feldspielDisc==="basketball"&&kulisseZeichnen();
     const g=ctx.createLinearGradient(0,0,0,H);
     // Ausserhalb der Spielflaeche: Rasenton fuer die Feldsportarten, kalte Halle fuer
     // das Eis. Ein gruener Rand um eine Eisflaeche liest sich sofort falsch.
     if(feldspielDisc==="hockey"){ g.addColorStop(0,"#141c26"); g.addColorStop(1,"#0d141c"); }
     else { g.addColorStop(0,"#1c2e1e"); g.addColorStop(1,"#152418"); }
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    if(!mitKulisse){ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
     if(feldspielDisc==="football"){
       // Ein echtes Football-Feld: zwei Endzonen, Yard-Linien alle 10 %, Mittellinie
       // betont — zeichnerisch sogar einfacher als der Basketball-Court, weil es nur
@@ -17362,7 +17367,7 @@
     // und unten. Zwei Wipp-Bilder im Blatt (je 40x66 bei x=0/40) — welches gerade zeigt,
     // haengt an `t` (Spielzeit), damit die Menge im Takt der Zeit "atmet", ohne einen
     // eigenen Animationszustand fuehren zu muessen.
-    if(bkDa("zuschauer")){
+    if(!mitKulisse&&bkDa("zuschauer")){
       const zFrame=Math.floor(t*2)%2, zw=40, zh=66;
       const zReihen=[{y:60-zh*0.55},{y:H-60-zh*0.45}];
       for(const {y} of zReihen)
@@ -17373,8 +17378,10 @@
     // LINKS↔RECHTS: die beiden Koerbe haengen an den Schmalseiten (X), nicht an den
     // Grund-/Deckenlinien eines hochkant gedachten Courts.
     const parkett=bkMust("parkett");
+    if(!mitKulisse){
     ctx.fillStyle=parkett||"rgba(120,84,46,.18)";
     ctx.fillRect(W*0.06,60,W*0.88,H-120);
+    }
     ctx.strokeStyle="rgba(255,255,255,.55)";ctx.lineWidth=2;
     ctx.strokeRect(W*0.06,60,W*0.88,H-120);
     ctx.beginPath();ctx.moveTo(W/2,60);ctx.lineTo(W/2,H-60);ctx.stroke();
@@ -30820,9 +30827,21 @@
     // dieselbe BB()-Quelle, die jede andere Uhr dieser Buehne schon liest (z.B.
     // updateHudBuehne()), rein lesend, kein rr().
     const art=BB();
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): fuer das LIVE
+    // laufende Hantel-Duell der Kopfstreifen der PixelLab-Szenen (Hafen, Oase, Lagerhalle) als
+    // Hintergrund der Tribuene, darunter ihr Boden. Ersetzt Verlauf, Tribuenenflaeche und
+    // Rueckwand; die Zuschauerreihen (wippen mit dem Heben) und die Plattform bleiben.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#181c24");g.addColorStop(0.55,"#101319");g.addColorStop(1,"#0a0b0e");
     ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    } else {
+      // Duell-Zeile und Kilo-Anzeige stehen frei ueber dem Kopfstreifen (Himmel der Oase ist hell)
+      const kopf=ctx.createLinearGradient(0,0,0,130);
+      kopf.addColorStop(0,"rgba(8,6,12,.55)");kopf.addColorStop(1,"rgba(8,6,12,0)");
+      ctx.fillStyle=kopf;ctx.fillRect(0,0,W,130);
+    }
     // PUBLIKUMS-REAKTION. Merge 01.10. (PR #1007 auf main): die frueheren 26 Punkt-
     // Silhouetten sind durch die Tribuene weiter unten ersetzt; die H3-Reaktion unten wirkt
     // seitdem unveraendert auf deren Zuschauerreihen (s. zuschauerReihe()).
@@ -30872,6 +30891,7 @@
     // links/rechts der Plattform stehen. Die Scheinwerfer bei W*0.30/0.70 rahmen die Wand.
     const tribueneH=H*0.34;
     const wandX0=W*0.29, wandX1=W*0.71;
+    if(!mitKulisse){
     ctx.fillStyle="#20242e"; ctx.fillRect(0,0,W,tribueneH);
     ctx.strokeStyle="rgba(255,255,255,.07)"; ctx.lineWidth=1;
     for(let i=1;i<12;i++){ ctx.beginPath(); ctx.moveTo(i*W/12,0); ctx.lineTo(i*W/12,tribueneH); ctx.stroke(); }
@@ -30879,6 +30899,7 @@
     ctx.strokeStyle="rgba(255,255,255,.09)"; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(wandX0+0.5,0); ctx.lineTo(wandX0+0.5,tribueneH);
     ctx.moveTo(wandX1-0.5,0); ctx.lineTo(wandX1-0.5,tribueneH); ctx.stroke();
+    }
     const TRIB_FARBEN=["#6b7690","#8a7a63","#6f8878","#8a6b76","#5f7488"];
     const zuschauerReihe=(rowY,n,r,phase)=>{
       for(let i=0;i<n;i++){

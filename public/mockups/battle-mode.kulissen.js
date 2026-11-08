@@ -2,6 +2,20 @@
 // Illustrierte Kulissen je Disziplin fuer den Boden der Battle Arena (s. kulisseWaehlen()
 // in battle-mode.engine.js). Reine Anzeige-Daten, nie in der Simulation gelesen.
 window.__ARENA_KULISSEN={
+ "basketball": [
+  {
+   "id": "parkett",
+   "label": "Parkett",
+   "bild": "/sprites/kulissen/basketball/parkett.jpg",
+   "dunkel": 0.18
+  },
+  {
+   "id": "streetcourt",
+   "label": "Street-Court",
+   "bild": "/sprites/kulissen/basketball/streetcourt.jpg",
+   "dunkel": 0.1
+  }
+ ],
  "battlefield": [
   {
    "id": "eroberung",
@@ -56,6 +70,26 @@ window.__ARENA_KULISSEN={
    "label": "Schlosshof",
    "bild": "/sprites/kulissen/fechten/schlosshof.jpg",
    "dunkel": 0.13
+  }
+ ],
+ "gewichtheben": [
+  {
+   "id": "sandsack",
+   "label": "Lagerhalle",
+   "bild": "/sprites/kulissen/gewichtheben/sandsack.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "hafen",
+   "label": "Hafenkai bei Nacht",
+   "bild": "/sprites/kulissen/gewichtheben/hafen.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "oase",
+   "label": "Oase",
+   "bild": "/sprites/kulissen/gewichtheben/oase.jpg",
+   "dunkel": 0.23
   }
  ],
  "i-spy": [

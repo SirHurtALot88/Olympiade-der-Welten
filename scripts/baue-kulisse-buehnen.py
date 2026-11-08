@@ -344,15 +344,111 @@ def baue_ispy(variante: str) -> Image.Image:
     return lein
 
 
+# ---------------------------------------------------------------------------------------- Gewichtheben
+# LIVE laeuft das Hantel-Duell (zeichneHeben/bodenHeben); der Sandsack-Pfad ist per BUEHNE_FLAGS aus und
+# bekommt hier nichts. Die drei Szenen sind Sandsack-Stationsplaene — brauchbar ist nur ihr Kopfstreifen
+# (Hafen-Skyline, Lagerhallen, Wueste mit Pyramiden) und das Bodenmaterial. Kopfstreifen ohne die drei
+# Demo-Tafeln (V-W/A-A ARBEITSWERT, SANDSACK-SCHICHT) als Tribuenenhintergrund (bis H*0.34), darunter
+# der Boden der Szene. Die Plattform zeichnet weiter der Motor.
+G_KOPF = (0, 148)  # Szenenzeilen des Kopfstreifens
+G_TAFELN = [(336, 30, 468, 110), (714, 4, 886, 86), (1137, 30, 1269, 110)]
+G_PFOSTEN = [(397, 100, 407, 148), (735, 76, 745, 148), (858, 76, 868, 148), (1158, 100, 1168, 148), (1240, 100, 1250, 148)]
+G_BODEN = (250, 584, 600, 628)
+G_HIMMELSKOERPER = [(975, 0, 1130, 60)]  # Mond (Hafen) bzw. Sonne (Oase): nie als Flickquelle, sonst zwei davon
+G_TRIBUENE_H = round(LH * 0.34)
+
+
+def baue_gewichtheben(variante: str) -> Image.Image:
+    bg = lade_szenenbilder(SZENEN / "gewichtheben" / f"{variante}.html")["bg"].convert("RGB")
+    # Tafeln: bestpassendes Stueck aus dem Kopfstreifen (seitliches Fuellen verdoppelte Leuchtturm,
+    # Pyramide und Lampenkegel daneben); die schmalen Pfosten vom linken Nachbarn.
+    bg = flicken(bg, G_TAFELN, G_PFOSTEN + G_HIMMELSKOERPER, (0, 0, bg.width, 150), ring=6, schritt=2)
+    bg = seitlich_fuellen(bg, G_PFOSTEN)
+    y0, y1 = G_KOPF
+    nb = round((y1 - y0) * LW / G_TRIBUENE_H)  # Szenenbreite fuer die Tribuenenhoehe
+    x0 = (bg.width - nb) // 2
+    kopf = bg.crop((x0, y0, x0 + nb, y1)).resize((LW, G_TRIBUENE_H), Image.LANCZOS)
+    band = bg.crop(G_BODEN)
+    band = band.resize((round(band.width * 1.4), round(band.height * 1.4)), Image.NEAREST)
+    lein = Image.new("RGB", (LW, LH))
+    # breiteres Band fuer streifen_kacheln (braucht mehr Breite als die Leinwand)
+    breit = Image.new("RGB", (LW, band.height))
+    x = 0
+    while x < LW:
+        breit.paste(band if (x // band.width) % 2 == 0 else band.transpose(Image.FLIP_LEFT_RIGHT), (x, 0))
+        x += band.width
+    lein.paste(streifen_kacheln(breit, LW, LH - G_TRIBUENE_H, saat=31), (0, G_TRIBUENE_H))
+    lein.paste(kopf, (0, 0))
+    return lein
+
+
+# ---------------------------------------------------------------------------------------- Basketball
+# Motor (bodenFeldspiel, Basketball): Feld in Draufsicht W*0.06..W*0.94 x 60..H-60, Linien, Zonen und
+# Koerbe zeichnet der Motor. Szene (world 1920x1000): Halle bzw. Streetcourt in Schraegsicht mit
+# Anzeigetafel (V-W/A-A), Teambaenken samt Demo-Figuren, Kampfgericht. Die Kulisse: oben und unten ein
+# Tribuenenstreifen aus der Szene (nur Publikum bzw. Haeuser/Zaun, unterhalb der Anzeigetafel), im
+# Feld der Belag der Szene ohne Linien (Parkett bzw. blauer Court), um das Feld der Hallen-/Asphaltboden.
+BB_TRIBUENE = (124, 204)  # Szenenzeilen: Publikum unter der Anzeigetafel, ueber den Demo-Bankfiguren
+BB_TAFEL_X = (733, 1188)  # Anzeigetafel reicht bis Zeile ~120, Rest frei
+BB_BELAG = (1060, 368, 1330, 470)
+BB_UMLAUF = (8, 420, 150, 760)
+BB_FELD = (round(LW * 0.06), 60, round(LW * 0.94), LH - 60)
+
+
+def kacheln_gespiegelt(stueck: Image.Image, breite: int, hoehe: int) -> Image.Image:
+    """Flaeche aus einem Musterstueck, abwechselnd gespiegelt (keine Kanten), Helligkeit je Zeile und
+    Spalte angeglichen (kein Lichtfleck der Szene wiederholt sich)."""
+    a = np.asarray(stueck, dtype=np.float32)
+    a = a - a.mean(axis=1, keepdims=True) + a.mean(axis=(0, 1), keepdims=True)
+    a = a - a.mean(axis=0, keepdims=True) + a.mean(axis=(0, 1), keepdims=True)
+    st = Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+    aus = Image.new("RGB", (breite, hoehe))
+    for j, y in enumerate(range(0, hoehe, st.height)):
+        for i, x in enumerate(range(0, breite, st.width)):
+            t = st
+            if i % 2:
+                t = t.transpose(Image.FLIP_LEFT_RIGHT)
+            if j % 2:
+                t = t.transpose(Image.FLIP_TOP_BOTTOM)
+            aus.paste(t, (x, y))
+    return aus
+
+
+def baue_basketball(variante: str) -> Image.Image:
+    welt = lade_szenenbilder(SZENEN / "basketball" / f"{variante}.html")["world"].convert("RGB")
+    lein = Image.new("RGB", (LW, LH))
+    # Umlauf (Hallenboden/Asphalt) ueberall
+    um = welt.crop(BB_UMLAUF)
+    um = um.resize((um.width * 2, um.height * 2), Image.NEAREST)
+    lein.paste(kacheln_gespiegelt(um, LW, LH), (0, 0))
+    # Tribuenenstreifen oben und unten (unten gespiegelt: Publikum "gegenueber")
+    t0, t1 = BB_TRIBUENE
+    trib = welt.crop((0, t0, 1920, t1))
+    th = 54
+    trib = trib.resize((LW, th), Image.LANCZOS)
+    lein.paste(trib, (0, 0))
+    lein.paste(trib, (0, LH - th))
+    # Belag ohne Linien im Feld
+    belag = welt.crop(BB_BELAG)
+    m = linien_maske(belag)
+    belag = linien_entfernen(belag, m)
+    belag = belag.resize((round(belag.width * 1.5), round(belag.height * 1.5)), Image.NEAREST)
+    fx0, fy0, fx1, fy1 = BB_FELD
+    lein.paste(kacheln_gespiegelt(belag, fx1 - fx0, fy1 - fy0), (fx0, fy0))
+    return lein
+
+
 BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
-         "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy}
+         "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy,
+         "gewichtheben": baue_gewichtheben, "basketball": baue_basketball}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
 VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlosshof"],
              "speed-schach": ["park", "zug"], "showcase": ["buehne", "festival", "zirkus"],
              "eiskunstlauf": ["kuer", "waldsee"], "breaking": ["standard", "brutal"],
-             "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"]}
+             "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"],
+             "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"]}
 
 
 def main() -> None:

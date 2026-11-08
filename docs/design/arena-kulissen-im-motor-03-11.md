@@ -169,3 +169,21 @@ der Szene, Fläche und Linien zeichnet der Motor.
   Lichtinseln weg, Steg und Führungssaum bleiben.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 4: Gewichtheben (Hantel-Duell), Basketball (07.11.)
+
+- **Gewichtheben** (hafen/oase/sandsack): nur für das **live laufende Hantel-Duell**. Der Sandsack-Pfad
+  (`BUEHNE_FLAGS.gewichthebenSandsack=0`) bekommt nichts, das ist mit Chris bestätigt. Die drei Szenen sind
+  Sandsack-Stationspläne, brauchbar sind nur ihr Kopfstreifen (Hafen-Skyline, Wüste mit Pyramiden,
+  Lagerhalle) und das Bodenmaterial. Der Kopfstreifen kommt ohne die drei Demo-Tafeln (V-W/A-A ARBEITSWERT,
+  SANDSACK-SCHICHT) als Tribünenhintergrund bis H*0.34, darunter liegt der Boden der Szene. `bodenHeben()` lässt
+  Verlauf, Tribünenfläche und Rückwand weg. Die mitwippenden Zuschauerreihen und die Plattform bleiben, oben
+  hält ein dunkler Verlauf die Duell-Zeile lesbar. `tests/arena-kulissen.test.ts` schlägt an, sobald der
+  Sandsack-Schalter umgelegt wird: dann braucht der Sandsack-Pfad seine eigene Kulisse.
+- **Basketball** (parkett/streetcourt): Oben und unten liegt ein Tribünenstreifen aus der Szene (Publikum bzw.
+  Häuser mit Zaun), unterhalb der Demo-Anzeigetafel und oberhalb der Demo-Bankfiguren. Im Feld des Motors
+  (W*0.06..W*0.94 × 60..H-60) liegt der Belag der Szene ohne Linien, gespiegelt gekachelt und in der Helligkeit
+  angeglichen. Um das Feld liegt Hallenboden bzw. Asphalt. `bodenFeldspiel()` lässt mit Kulisse (nur Basketball)
+  Verlauf, Zuschauer-Sprites und Parkett-Kachel weg. Linien, Zonen, Körbe und Wurfuhr zeichnet der Motor.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
