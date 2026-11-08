@@ -754,3 +754,172 @@ voller Platte im Container ab.
   oder bleibt es beim Sprung in die Arena?
 - Bühnen-Paarung nach Slot (Task, 7.3): Danach werden die Bühnen-Marken zu „Motor“, und
   Duell-Fäden sind erlaubt.
+
+---
+
+## 8. Paket F4 (08.11.): Erklär-Tooltips + 16:9/4K-Verdichtung
+
+Chris, wörtlich (zwei Sätze als Auftrag nach der Sichtprüfung von F1–F3): „arbeite bei dem +/-
+auch mit tooltipps damit nicht so viel text auf anhieb dort steht aber beim hovern die
+erklärungen kommen“ — und: „nutze das 16:9 4k format auch aus, beim FM27 muss zb auch nicht ewig
+gescrollt werden im bildschirm wo die aufstellung ist, das muss alles kompakt auf einen screen!
+informiere dich online von mir aus opus oder so aber das muss sauber sein“.
+
+### 8.1 Recherche: was FM27 wirklich macht (mit Quellen)
+
+Vor dem Bauen online recherchiert (offizielle SI/Sega-Seite + unabhängige Previews), weil FM27 am
+10.11.2026 erscheint und ein reiner Namens-Treffer aus dem Training nicht reicht:
+
+- **Die linke Seitenleiste ist raus, die Navigation sitzt oben.** SI nennt es explizit
+  „Top Navigation Is Staying“ — der alte linke Sidebar entfällt zugunsten horizontaler
+  Bildschirmbreite für große Tabellen und datenlastige Screens.
+  [FM27: Clearer Interface & Smoother Navigation](https://www.footballmanager.com/fm27/features/fm27-clearer-interface-smoother-navigation),
+  [Football Manager 27's first deep dive video is all about the UI and navigation](https://www.thesixthaxis.com/2026/09/22/football-manager-27s-first-deep-dive-video-is-all-about-the-ui-and-navigation/).
+- **Das Layout liest Bildschirmgröße/-auflösung und passt sich an.** Auf großen Displays zeigt es
+  mehr Zeilen/Spalten, auf kleinen verbraucht es weniger Platz — explizit auch 4K und
+  Ultrawide als Zielauflösungen genannt.
+  [FM27 SI reveals improved UI (SortitOutSi)](https://sortitoutsi.net/content/77773/fm27-si-reveals-improved-ui),
+  [Football Manager 27 launches November 10th … revamped interface](https://gamingonphone.com/news/football-manager-27-launches-november-10th-across-multiple-platforms-with-a-revamped-interface-and-deeper-matchday-experience/).
+- **Weniger Klicks bis zur Taktik-/Kaderseite** (Primär- und Sekundärnavigation zusammengelegt,
+  „Squad“ und „Tactics“ liegen direkt eine Ebene höher als vorher).
+  [FM27: Klareres Interface & leichtgängigere Navigation](https://www.footballmanager.com/de/fm27/features/fm27-klareres-interface-leichtgaengigere-navigation).
+- **Farbcodierte Attribut-Kreise/-Balken statt Zahl+Label+Erklärung in einer Zeile sind KEIN
+  bestätigtes FM27-Serienfeature**, sondern seit Jahren ein verbreitetes Community-Skin-Muster
+  (z. B. „Just Attributeless“, „Statman NUMBERLESS“) — FM26 ist offiziell sogar den
+  entgegengesetzten Weg gegangen (Wörter statt Zahlen als Default).
+  [a-star-attributes-fm23-skin](https://www.fmscout.com/a-star-attributes-fm23-skin.html),
+  [a-statman-numberless-fm24-skin](https://www.fmscout.com/a-statman-numberless-fm24-skin.html),
+  [FM26 Staff Attributes not shown as numbers](https://www.fmscout.com/q-33957-FM26-Staff-Attributes-not-shown-as-numbers.html).
+
+**Was übernommen wurde:** die beiden bestätigten Prinzipien — Breite statt Seitenleiste nutzen,
+und das Layout nach Bildschirmgröße gestaffelt umschalten (mehr nebeneinander auf großen
+Displays) — Abschnitt 8.3. **Was bewusst NICHT übernommen wurde:** ein 1:1-FM-Look mit
+Attribut-Kreisen oder -Balken. Unser ±±-Glyphen-Schema (6.1, Architektur 1.3) transportiert schon
+Richtung UND Stärke in einem Zeichen und ist durch `tests/einsatzliste-anzeige.test.ts` /
+`nl-accent-text-regel.test.ts` abgesichert; es durch Kreise zu ersetzen wäre eine zweite,
+unbestätigte Sprache für dieselbe Information. Verdichtet wurde stattdessen die vorhandene Sprache
+(8.2) — derselbe Unterschied wie zwischen „FM kopieren“ und „FM-Prinzip auf unsere Mechanik
+anwenden“, den der Auftrag so auch formuliert hat.
+
+### 8.2 Erklär-Tooltip (Teil A)
+
+Neue Komponente `NlTooltip` in `EinsatzlisteMiniFeld.tsx` (keine neue Abhängigkeit, reines
+CSS/React — das Projekt lädt grundsätzlich keine neuen npm-Pakete ohne Grund):
+
+- **Hover UND Tastaturfokus** öffnen (`onMouseEnter`/`onFocus`, kein `:hover`-only-CSS); die
+  sichtbare Fläche selbst ist der Trigger (`tabIndex=0`), die Erklärung hängt per
+  `aria-describedby` an einem `role="tooltip"`-Panel, nicht an `title` — Screenreader lesen die
+  Erklärung weiterhin, nur nicht mehr verzögert und nicht mehr wie ein Browser-Systemdialog.
+- **Clamping statt Positionierungs-Bibliothek:** Nach dem Öffnen misst ein `useLayoutEffect` die
+  Bubble und verschiebt sie horizontal zurück in den Viewport, wenn sie links/rechts
+  herausragen würde, und klappt sie nach unten, wenn oben kein Platz ist.
+- **Styling** über die bestehenden `--nl-*`-Tokens (`--nl-panel-2`-Grund, `--nl-line`-Rand,
+  `--nl-e2`-Schatten, `--nl-ink`-Text) — passt zum dunklen Theme, kein Fremdkörper.
+- **Ratchet beachtet:** kein neues `color: var(--nl-accent)` oder `color: var(--nl-mut-2)` —
+  `tests/nl-accent-text-regel.test.ts` zählt nach Änderung exakt denselben Stand (196 / 66).
+
+Eingesetzt an den Stellen, die Chris nannte oder die beim Durchgehen denselben Zweck hatten:
+
+| Stelle | Vorher | Nachher |
+|---|---|---|
+| Rollenkarte, Attributliste | Volles Label „Determination“ + Glyphe + Zahl, Erklärung in `title` | Drei-Buchstaben-Kürzel `DET` + Glyphe sichtbar (neuer Helfer `attributKuerzel` in `einsatzliste-anzeige.ts`), volle Erklärung im Tooltip |
+| Rollenkarte, „Attribute in dieser Rolle“-Kopfzeile | `title` mit dem ganzen ±-Schema-Satz | Tooltip auf der Kopfzeile |
+| Rollenkarte, Besetzt-Zeile: Rollen-Aufschlag | Text „Rolle +3,2“, Erklärsatz in `title` | Chip „R +3,2“, Erklärung im Tooltip |
+| Rollenkarte, Besetzt-Zeile: Gold / Gold verschenkt | `title` auf „◆ optimal“ / „◇ nicht optimal“ | Dieselben Chips, Tooltip statt `title` |
+| Rollenkarte, Verbindlichkeits-Badge (Motor/Startort/Darstellung) | `title` mit Erklärung + Beleg | Tooltip mit demselben Text |
+| Mini-Feld-Legende (Motor hält/Startort/Darstellung/Gegner geschätzt) | `title` je Legenden-Eintrag | Tooltip je Eintrag |
+
+**Bewusst NICHT umgestellt:** die große `title`-Zeile auf der Feld-Marke selbst (der Slot-Button
+mit Name/Wert/Glyphe) und die Gegner-Geister. Beide sind schon die kompakte Darstellung (keine
+„viel Text auf einen Blick“-Situation wie bei der Attributliste), der Marken-Button trägt zugleich
+Click/Drag/Drop-Verhalten, und `aria-label` deckt dort den Screenreader-Fall bereits ab. Ein
+Umbau wäre zusätzliches Risiko für wenig Zugewinn — offen für eine spätere Runde, falls Chris das
+anders sieht.
+
+### 8.3 16:9/4K-Verdichtung (Teil B)
+
+Drei CSS-Änderungen, alle in `app/globals.css`, additiv zur bestehenden Responsive-Kette
+(Phone-Container-Query, 1100-px-Rail-Umbruch bleiben unverändert):
+
+1. **D1 und D2 nebeneinander statt übereinander ab 1500 px** (`.nl-lineup-board` wird zum
+   Zwei-Spalten-Grid). Das ist der größte Hebel: Vorher stapelte das Board beide volle
+   Seiten-Panels (Kopf, Formkarten, Mini-Feld, eingeklappte Slot-Liste) untereinander; jetzt
+   stehen sie nebeneinander, die Board-Höhe halbiert sich näherungsweise.
+2. **Das Mini-Feld wird flacher, je breiter sein eigener Rahmen ist** — über die
+   Container-Query, die `.nl-feld` schon für die Phone-Verdichtung trägt
+   (`container-type: inline-size`), zwei neue obere Stufen (ab 620 px / 1000 px Container-Breite:
+   Seitenverhältnis × 1,3 bzw. × 1,6). Dasselbe FM27-Prinzip „die Breite nutzen, nicht die Höhe
+   quadratisch mitwachsen lassen“, nur auf unsere eigene Feld-Geometrie angewendet statt auf
+   FM-Fußballfelder.
+3. **Rollenkarte: drei Spalten für die ±-Attribute ab 1280 px Viewport-Breite**, zusätzlich eine
+   etwas breitere Fokus-Rail ab 2200 px (340–420 px statt 300–360 px) — nur lesbar, weil Teil A
+   (8.2) die Attribute vorher auf Kürzel+Glyphe verdichtet hat. Absichtlich an die
+   Viewport-Breite gebunden, nicht an die Rail-Container-Breite: unter 1100 px rutscht die Rail
+   auf Board-Breite (bis zu ~360 px auf Phone), eine Container-Query hätte dort fälschlich auch
+   auf Phone ausgelöst.
+
+### 8.4 Messung: Playwright, lokaler Dev-Server, frischer Spielstand
+
+Aufbau wie bei F3 (7.4): lokaler Dev-Server (`tsx server.ts`), eigene leere SQLite, Login aus
+(`OLY_AUTH_ENABLED` nicht gesetzt), `OLY_AUTO_EXPORT_SAVES=0` / `OLY_AUTO_EXPORT_PUSH=0`, Live-
+Server nicht berührt. `/foundation` legt beim ersten Aufruf automatisch einen Solo-Spielstand an
+(„Armageddon Aftermath“, Spieltag 1: Hockey/Climbing). Gemessen mit `playwright-core` + dem im
+Container vorinstallierten Chromium (`/opt/pw-browsers/chromium-1243`), Rollenkarte durch Klick
+auf die erste Feld-Marke geöffnet, **ohne** die eingeklappte Slot-Liste zusätzlich aufzuklappen.
+
+**Festplatte:** Derselbe Engpass wie beim vorherigen Agenten (Root-Partition bei 13 MB frei).
+`node_modules`, `.next`-Cache, npm-Cache, die Spielstand-SQLite und das Chromium-Profil liefen
+über Bind-Mounts auf `/dev/shm` (`mount --bind … node_modules`, `… .next`) statt über einen
+Symlink — ein reiner Symlink nach `/dev/shm` ließ Turbopack mit „Symlink is invalid, it points out
+of the filesystem root“ abbrechen, ein Bind-Mount umgeht das, weil Next dort ein echtes
+Verzeichnis sieht. Alles unter `/dev/shm` wurde am Ende abgebaut (9.1).
+
+`document.documentElement.scrollHeight` gegen die Viewport-Höhe, Spieltag 1 (Hockey/Climbing),
+Rollenkarte offen:
+
+| Breite | Vorher (scrollHeight / Überschuss) | Nachher (scrollHeight / Überschuss) |
+|---|---:|---:|
+| 1920 × 1080 (16:9) | 2301 / **1221 px** | 1920 / **840 px** |
+| 2560 × 1440 (QHD) | 2362 / 922 px | 1867 / 427 px |
+| 3840 × 2160 (4K) | 2362 / 202 px | 2160 / **0 px** |
+| 390 × 844 (Phone) | 4789 / 3945 px | 4789 / 3945 px (unverändert, wie gewollt) |
+
+Rohdaten: `docs/design/einsatzliste-revamp-08-11/f4/` (Screenshots `a`–`e`), die Messwerte selbst
+sind nicht Teil des Commits (Playwright-Skript lief aus dem Scratchpad, nicht aus dem Repo).
+
+**Ergebnis:** Bei 4K ist das Ziel exakt erreicht — **kein Pixel Überschuss**, die komplette
+Einsatzliste (Mini-Feld beider Disziplinen nebeneinander + offene Rollenkarte + Kandidatenliste)
+passt auf einen Screen. Bei 16:9/FHD bleibt ein Rest-Überschuss von 840 px, aber 31 % weniger als
+vorher. Bei Phone bewusst unverändert — die Verdichtung ist an Viewport- bzw. Container-Breiten
+gebunden, die auf 390 px nicht greifen (8.3), damit die Phone-Darstellung aus F3 nicht angefasst
+wird. Stichprobe auf eine zweite/dritte Disziplin (Fechten/Takeshi, Battlefield/Basketball)
+ausgeweitet, aber der Spieltag-Wechsel im UI zeigte nur den aktuellen Spieltag (1) an — die
+Dropdown-Auswahl änderte den React-State nicht (vermutlich zeigt sie nur künftige Spieltage an,
+ohne sie aktiv anwählbar zu machen; nicht weiter untersucht, da außerhalb des Auftrags). Die
+CSS-Änderungen selbst sind Feldart-unabhängig (generische `.nl-feld`/`.nl-rollenkarte`-Klassen,
+keine Disziplin-Fallunterscheidung) und werden vom bestehenden Formations-Drift-Wächter
+(`tests/einsatzliste-formation.test.ts`, 20 Disziplinen × k = 1…6) mitgeprüft; eine Sichtprüfung
+an allen Feldarten ist trotzdem nur mit dem Hockey/Climbing-Spieltag abgedeckt — **offen für
+Chris**, ob eine spätere Runde das an weiteren Spieltagen nachzieht, sobald das Dropdown-Problem
+verstanden ist.
+
+**Woher der Rest-Überschuss bei FHD kommt — ehrlich, nicht im Auftrag dieser Runde:** Der
+verbleibende 840-px-Überschuss liegt zu einem großen Teil VOR dem Mini-Feld/Rollenkarte-Bereich
+(Status-Leiste „Bereit“, Breadcrumb, „Weiter“-Button-Zeile, die große Einsatzliste-Kopfkarte mit
+Ring/Kennzahlen/Buttons, Spieltag-/Team-Auswahl, „KI-Vorschlag“-Buttonzeile) — alles oberhalb von
+`.nl-lineup-layout` und damit außerhalb des Auftrags „Mini-Feld + Rollenkarte + eingeklappte
+Slot-Liste“. Diese Kopfzone weiter zu verdichten wäre der nächste Hebel, wenn FHD ebenfalls auf 0
+soll, ist aber eine eigene, größere Entscheidung (diese Kopfkarte gehört mehreren Paketen, nicht
+nur F3/F4) — **Geschmacks-/Scope-Frage für Chris**, nicht in dieser Runde mitentschieden.
+
+### 8.5 Was an Chris vorgelegt werden sollte
+
+1. **Tooltip-Look** (Screenshots `d`/`e`): passt der dunkle Panel-Tooltip, oder soll er enger an
+   die Rollenkarte gebunden wirken (z. B. mit kleinem Pfeil zur Trigger-Fläche)?
+2. **Attribut-Kürzel** (`DET`, `STA`, `AWA`, …) statt voller Wörter auf den ersten Blick — lesbar
+   genug, oder lieber Icons/andere Kürzel?
+3. **FHD-Rest-Überschuss (840 px):** Soll die Kopfzone oberhalb des Boards (8.4) in einer
+   eigenen Runde mit verdichtet werden, damit auch 16:9 ohne Rest auskommt?
+4. **Spieltag-Dropdown** in der Einsatzliste scheint keinen Spieltag-Wechsel auszulösen (8.4) —
+   gewollt (nur Vorschau künftiger Spieltage) oder ein Bug, den ein separater Agent aufnehmen
+   soll?

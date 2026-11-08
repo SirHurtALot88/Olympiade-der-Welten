@@ -81790,7 +81790,16 @@ span.nl-facility-ampel-chip {
   list-style: none;
 }
 .is-new-look .nl-rollenkarte-attribute li { display: flex; align-items: center; gap: 6px; }
-.is-new-look .nl-rollenkarte-attribute li > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.is-new-look .nl-rollenkarte-attribute li > .nl-tip:first-child { flex: 1; min-width: 0; }
+.is-new-look .nl-rollenkarte-attr-kuerzel {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--nl-ink) 8%, transparent);
+  color: var(--nl-mut);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
 .is-new-look .nl-rollenkarte-spielerwert { min-width: 2ch; text-align: right; color: var(--nl-ink); font-weight: 700; }
 .is-new-look .nl-rollenkarte-besetzt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; }
 .is-new-look .nl-rollenkarte-aufschlag { color: var(--nl-mut); font-size: 11px; }
@@ -81811,4 +81820,90 @@ span.nl-facility-ampel-chip {
   .is-new-look .nl-feld-marke { transition: none; }
   .is-new-look .nl-feld-marke:hover,
   .is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%); }
+}
+
+/* --- Erklär-Tooltip (Paket F4) -------------------------------------------------------------- */
+/* Ersetzt natives title= an dicht beschrifteten Stellen (±-Attribute, Verbindlichkeits-Badges,
+   Besetzt-Zeile): eigenes gestyltes Panel statt Browser-Systemdialog, Hover UND Tastaturfokus
+   öffnen (EinsatzlisteMiniFeld.tsx, NlTooltip). Reiner Deko-Rahmen auf --nl-panel-2/--nl-line;
+   Körpertext auf --nl-ink (kein Akzent als Schrift, Ratchet tests/nl-accent-text-regel.test.ts). */
+
+.is-new-look .nl-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  border-radius: 4px;
+  cursor: help;
+}
+.is-new-look .nl-tip.is-block { display: block; }
+.is-new-look .nl-tip:focus-visible { outline: var(--nl-focus-ring, 2px solid var(--nl-accent)); outline-offset: 2px; }
+
+.is-new-look .nl-tip-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(calc(-50% + var(--nl-tip-dx, 0px)));
+  z-index: 40;
+  width: max-content;
+  max-width: min(280px, 72vw);
+  padding: 7px 10px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  box-shadow: var(--nl-e2);
+  color: var(--nl-ink);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+.is-new-look .nl-tip-bubble.is-unten { bottom: auto; top: calc(100% + 8px); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .is-new-look .nl-tip-bubble { animation: nl-tip-ein 90ms var(--nl-ease, ease-out); }
+}
+@keyframes nl-tip-ein {
+  from { opacity: 0; transform: translateX(calc(-50% + var(--nl-tip-dx, 0px))) translateY(2px); }
+  to { opacity: 1; transform: translateX(calc(-50% + var(--nl-tip-dx, 0px))) translateY(0); }
+}
+
+/* --- 16:9/4K ausnutzen (Paket F4, Chris 08.11.): Breite statt Höhe, FM27-Prinzip ------------- */
+/* Quelle/Begründung: docs/design/einsatzliste-revamp-architektur-08-11.md Abschnitt 8.
+   Unter 1500px bleibt die bisherige Spalte (D1 über D2) — sie ist dann schmaler als die beiden
+   Seiten-Panels vertragen. Ab 1500px (normale 16:9-Fenster, erst recht 4K) stehen D1 und D2
+   NEBENEINANDER: das allein halbiert die Board-Höhe, der größte Scroll-Treiber der Seite. */
+@media (min-width: 1500px) {
+  .is-new-look .nl-lineup-board {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--nl-s4);
+  }
+}
+
+/* Rail etwas breiter auf 4K: mehr Platz für die Rollenkarte, ohne dass sie auf 1920 schon
+   mit dem Board um Breite konkurriert. */
+@media (min-width: 2200px) {
+  .is-new-look .nl-lineup-layout { grid-template-columns: minmax(0, 1fr) minmax(340px, 420px); }
+}
+
+/* Mini-Feld flacher, je breiter sein eigener Rahmen ist (Container-Query auf .nl-feld, das schon
+   container-type: inline-size trägt) — dasselbe Prinzip wie FM27s Taktikfeld: die Höhe sinkt,
+   wenn die Breite sie nicht mehr braucht, statt dass das Feld quadratisch bleibt und nur breiter
+   wird. */
+@container (min-width: 620px) {
+  .is-new-look .nl-feld-flaeche { aspect-ratio: calc(var(--nl-feld-ratio, 2.3) * 1.3); min-height: 170px; }
+}
+@container (min-width: 1000px) {
+  .is-new-look .nl-feld-flaeche { aspect-ratio: calc(var(--nl-feld-ratio, 2.3) * 1.6); min-height: 190px; }
+}
+
+/* Rollenkarte: dritte Spalte für die ±-Attribute auf Desktop-Breiten (Viewport, nicht Container —
+   unter 1100px rutscht die Rail auf Board-Breite, das wäre auf Phone-Breite trotzdem zu eng).
+   Dieselbe Verdichtung wie Teil A (Kürzel statt Fließtext) macht das überhaupt erst lesbar. */
+@media (min-width: 1280px) {
+  .is-new-look .nl-rollenkarte-attribute { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }

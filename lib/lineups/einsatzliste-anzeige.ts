@@ -356,3 +356,17 @@ export function passungsGlyphe(rollenAufschlag: number): Glyphe {
 export function glyphenTon(glyphe: Glyphe): "gut" | "neutral" | "schlecht" {
   return glyphe === "++" || glyphe === "+" ? "gut" : glyphe === "·" ? "neutral" : "schlecht";
 }
+
+// ================================================================================================
+// TOOLTIP-DICHTE (Paket F4): auf den ersten Blick wenig Text, die Erklärung kommt beim Hovern.
+// ================================================================================================
+
+/**
+ * Drei-Buchstaben-Kürzel eines Attributs für die dichte Rollenkarte. Der Attribut-Key ist immer
+ * englisch (power, health, determination, stamina, speed, dexterity, awareness, intelligence,
+ * will, charisma, spirit, torment) und in den ersten drei Buchstaben eindeutig — POW/HEA/DET/
+ * STA/SPE/DEX/AWA/INT/WIL/CHA/SPI/TOR, keine Kollision. Der volle Name bleibt im Tooltip.
+ */
+export function attributKuerzel(key: string): string {
+  return key.slice(0, 3).toUpperCase();
+}

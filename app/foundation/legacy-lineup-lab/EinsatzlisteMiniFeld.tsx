@@ -11,10 +11,11 @@
  * Resolve oder Arena. Der Renderer kennt keine Disziplin: er zeichnet den Hintergrund nach
  * `feld` und setzt Marken an `x/y`. Das Aussehen der Marke hängt an `verbindlichkeit`.
  */
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, DragEvent as ReactDragEvent, ReactNode } from "react";
 
 import type { Glyphe } from "@/lib/lineups/einsatzliste-anzeige";
-import { glyphenTon, slotFarbe } from "@/lib/lineups/einsatzliste-anzeige";
+import { attributKuerzel, glyphenTon, slotFarbe } from "@/lib/lineups/einsatzliste-anzeige";
 import type { FeldArt, GelegteFormation, GelegterPlatz, Verbindlichkeit } from "@/lib/lineups/formation/formation-registry";
 
 export type MiniFeldMarke = {
@@ -52,6 +53,69 @@ const py = (y: number) => 9 + y * 82;
 
 function GlyphenChip({ glyphe }: { glyphe: Glyphe }) {
   return <span className={`nl-feld-glyphe is-${glyphenTon(glyphe)}`}>{glyphe}</span>;
+}
+
+/**
+ * ERKLÄR-TOOLTIP (Paket F4, Chris 08.11.: „beim Hovern die Erklärungen"). Ersetzt natives
+ * `title=` an Stellen, die auf den ersten Blick dicht bleiben sollen (±-Attribute,
+ * Verbindlichkeits-Badges, Besetzt-Zeile). Natives title kommt verzögert, bricht nicht um und
+ * wirkt im dunklen Theme wie ein Systemdialog statt wie ein Teil der Oberfläche.
+ *
+ * - Hover UND Tastaturfokus öffnen (kein `:hover`-only CSS) — die sichtbare Fläche ist selbst der
+ *   Trigger (`tabIndex=0`), die Erklärung hängt per `aria-describedby` daran, nicht an `title`.
+ * - Clamping statt Positionierungs-Bibliothek: nach dem Öffnen wird die Bubble gemessen und bei
+ *   Bedarf horizontal zurück in den Viewport verschoben; ragt sie oben hinaus, klappt sie nach
+ *   unten.
+ */
+function NlTooltip({ label, children, block }: { label: ReactNode; children: ReactNode; block?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const bubbleId = useId();
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const bubbleRef = useRef<HTMLSpanElement>(null);
+  const [pos, setPos] = useState<{ dx: number; unten: boolean }>({ dx: 0, unten: false });
+
+  useLayoutEffect(() => {
+    if (!open || typeof window === "undefined") return;
+    const wrap = wrapRef.current;
+    const bubble = bubbleRef.current;
+    if (!wrap || !bubble) return;
+    const rand = 8;
+    const wrapRect = wrap.getBoundingClientRect();
+    const bubbleRect = bubble.getBoundingClientRect();
+    let dx = 0;
+    const linksRoh = wrapRect.left + wrapRect.width / 2 - bubbleRect.width / 2;
+    const rechtsRoh = linksRoh + bubbleRect.width;
+    if (linksRoh < rand) dx = rand - linksRoh;
+    else if (rechtsRoh > window.innerWidth - rand) dx = window.innerWidth - rand - rechtsRoh;
+    const unten = wrapRect.top - bubbleRect.height - rand < 0;
+    setPos((prev) => (prev.dx === dx && prev.unten === unten ? prev : { dx, unten }));
+  }, [open]);
+
+  return (
+    <span
+      ref={wrapRef}
+      className={`nl-tip${block ? " is-block" : ""}`}
+      tabIndex={0}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      aria-describedby={open ? bubbleId : undefined}
+    >
+      {children}
+      {open ? (
+        <span
+          ref={bubbleRef}
+          id={bubbleId}
+          role="tooltip"
+          className={`nl-tip-bubble${pos.unten ? " is-unten" : ""}`}
+          style={{ "--nl-tip-dx": `${pos.dx}px` } as CSSProperties}
+        >
+          {label}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 /** Hintergrund je Feldart. Ein kleines SVG, kein Bild — die Vignetten aus den Kulissen sind Paket 0 (offen). */
@@ -236,10 +300,26 @@ export function EinsatzlisteMiniFeld({
       <div className="nl-feld-kopf">
         <span className="nl-feld-kopfzeile">{def.kopfzeile}</span>
         <span className="nl-feld-legende" aria-label="Legende">
-          {zaehlung.motor > 0 ? <span title={VERBINDLICHKEIT_TEXT.motor}><i className="nl-feld-legende-punkt is-motor" />Motor hält</span> : null}
-          {zaehlung.start > 0 ? <span title={VERBINDLICHKEIT_TEXT.start}><i className="nl-feld-legende-punkt is-start" />Startort</span> : null}
-          {zaehlung.darstellung > 0 ? <span title={VERBINDLICHKEIT_TEXT.darstellung}><i className="nl-feld-legende-punkt is-darstellung" />Darstellung</span> : null}
-          {hatGegnerseite && geister ? <span title="Gegner-Schätzung, nie exakt (Scouting-Stufe)"><i className="nl-feld-legende-punkt is-geist" />Gegner (geschätzt)</span> : null}
+          {zaehlung.motor > 0 ? (
+            <NlTooltip label={VERBINDLICHKEIT_TEXT.motor}>
+              <i className="nl-feld-legende-punkt is-motor" aria-hidden="true" />Motor hält
+            </NlTooltip>
+          ) : null}
+          {zaehlung.start > 0 ? (
+            <NlTooltip label={VERBINDLICHKEIT_TEXT.start}>
+              <i className="nl-feld-legende-punkt is-start" aria-hidden="true" />Startort
+            </NlTooltip>
+          ) : null}
+          {zaehlung.darstellung > 0 ? (
+            <NlTooltip label={VERBINDLICHKEIT_TEXT.darstellung}>
+              <i className="nl-feld-legende-punkt is-darstellung" aria-hidden="true" />Darstellung
+            </NlTooltip>
+          ) : null}
+          {hatGegnerseite && geister ? (
+            <NlTooltip label="Gegner-Schätzung, nie exakt (Scouting-Stufe)">
+              <i className="nl-feld-legende-punkt is-geist" aria-hidden="true" />Gegner (geschätzt)
+            </NlTooltip>
+          ) : null}
         </span>
       </div>
       {bedingungOffen ? (
@@ -420,9 +500,11 @@ export function EinsatzlisteRollenkarte({
           </small>
         </div>
         {daten.platz ? (
-          <span className={`nl-rollenkarte-verbindlich is-${daten.platz.verbindlichkeit}`} title={`${VERBINDLICHKEIT_TEXT[daten.platz.verbindlichkeit]} Beleg: ${daten.platz.beleg}`}>
-            {daten.platz.verbindlichkeit === "motor" ? "Motor" : daten.platz.verbindlichkeit === "start" ? "Startort" : "Darstellung"}
-          </span>
+          <NlTooltip label={`${VERBINDLICHKEIT_TEXT[daten.platz.verbindlichkeit]} Beleg: ${daten.platz.beleg}`}>
+            <span className={`nl-rollenkarte-verbindlich is-${daten.platz.verbindlichkeit}`}>
+              {daten.platz.verbindlichkeit === "motor" ? "Motor" : daten.platz.verbindlichkeit === "start" ? "Startort" : "Darstellung"}
+            </span>
+          </NlTooltip>
         ) : null}
       </header>
       {daten.beschreibung ? <p className="nl-rollenkarte-text">{daten.beschreibung}</p> : null}
@@ -434,14 +516,19 @@ export function EinsatzlisteRollenkarte({
 
       {daten.attribute.length > 0 ? (
         <div className="nl-rollenkarte-block">
-          <span className="nl-rollenkarte-label" title="Slot-Gewicht gegen Disziplin-Basis: ++ ≥ +3 Pp, + ≥ +1, · dazwischen, − ≤ −1, −− ≤ −3. In Klammern: Wert des Gesetzten.">
-            Attribute in dieser Rolle
-          </span>
+          <NlTooltip
+            block
+            label="Slot-Gewicht gegen Disziplin-Basis: ++ ≥ +3 Pp, + ≥ +1, · dazwischen, − ≤ −1, −− ≤ −3. In Klammern: Wert des Gesetzten."
+          >
+            <span className="nl-rollenkarte-label">Attribute in dieser Rolle</span>
+          </NlTooltip>
           <ul className="nl-rollenkarte-attribute">
             {[...positiv, ...negativ].map((a) => (
-              <li key={a.key} title={`${a.label}: Gewicht ${fmt(a.gewicht)} % (${a.delta >= 0 ? "+" : ""}${fmt(a.delta)} Pp gegen Basis)`}>
-                <span>{a.label}</span>
-                <GlyphenChip glyphe={a.glyphe} />
+              <li key={a.key}>
+                <NlTooltip label={`${a.label}: Gewicht ${fmt(a.gewicht)} % (${a.delta >= 0 ? "+" : ""}${fmt(a.delta)} Pp gegen Basis)`}>
+                  <span className="nl-rollenkarte-attr-kuerzel">{attributKuerzel(a.key)}</span>
+                  <GlyphenChip glyphe={a.glyphe} />
+                </NlTooltip>
                 {a.spielerWert != null ? <span className="nl-tnum nl-rollenkarte-spielerwert">{Math.round(a.spielerWert)}</span> : null}
               </li>
             ))}
@@ -458,13 +545,23 @@ export function EinsatzlisteRollenkarte({
             <span className="nl-tnum">{fmt(daten.besetzt.wert)}</span>
             {daten.besetzt.glyphe ? <GlyphenChip glyphe={daten.besetzt.glyphe} /> : null}
             {daten.besetzt.rollenAufschlag != null ? (
-              <span className="nl-tnum nl-rollenkarte-aufschlag" title="Rollen-Aufschlag dieses Spielers in diesem Slot (Teil der Slot-Projektion)">
-                Rolle {daten.besetzt.rollenAufschlag >= 0 ? "+" : ""}
-                {fmt(daten.besetzt.rollenAufschlag)}
-              </span>
+              <NlTooltip label="Rollen-Aufschlag dieses Spielers in diesem Slot (Teil der Slot-Projektion).">
+                <span className="nl-tnum nl-rollenkarte-aufschlag">
+                  R {daten.besetzt.rollenAufschlag >= 0 ? "+" : ""}
+                  {fmt(daten.besetzt.rollenAufschlag)}
+                </span>
+              </NlTooltip>
             ) : null}
-            {daten.besetzt.goldTitel ? <span className="nl-feld-raute" title={daten.besetzt.goldTitel}>◆ optimal</span> : null}
-            {daten.besetzt.goldVerschenktTitel ? <span className="nl-rollenkarte-verschenkt" title={daten.besetzt.goldVerschenktTitel}>◇ nicht optimal</span> : null}
+            {daten.besetzt.goldTitel ? (
+              <NlTooltip label={daten.besetzt.goldTitel}>
+                <span className="nl-feld-raute">◆ optimal</span>
+              </NlTooltip>
+            ) : null}
+            {daten.besetzt.goldVerschenktTitel ? (
+              <NlTooltip label={daten.besetzt.goldVerschenktTitel}>
+                <span className="nl-rollenkarte-verschenkt">◇ nicht optimal</span>
+              </NlTooltip>
+            ) : null}
           </p>
         ) : (
           <p className="nl-rollenkarte-text">Noch frei.</p>
