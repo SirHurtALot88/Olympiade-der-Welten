@@ -99,6 +99,10 @@ CHASSIS = {
     "staffel": {"art": "quelle"},
     # Batch 7 (07.11.): Wandmaterial als senkrecht nahtlose Kachel (Motor scrollt sie mit).
     "climbing": {"art": "quelle"},
+    # Batch 8 (08.11.): Zeitfahren — Panorama der Streckenkarte im Kopfstreifen, Asphalt im Bahnband,
+    # ohne das eingebrannte Demo-Profil; das Hoehenprofil aus BAHN_ART["time-trial"].gelaende zeichnet
+    # der Motor (bodenZeitfahren). Gebaut von scripts/baue-kulisse-zeitfahren.py.
+    "time-trial": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.

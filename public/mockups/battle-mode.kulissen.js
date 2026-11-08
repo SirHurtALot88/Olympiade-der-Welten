@@ -276,6 +276,74 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.06
   }
  ],
+ "time-trial": [
+  {
+   "id": "standard",
+   "label": "Standard",
+   "bild": "/sprites/kulissen/time-trial/standard.jpg",
+   "dunkel": 0.09
+  },
+  {
+   "id": "bergzeitfahren-alpen",
+   "label": "Bergzeitfahren Alpen",
+   "bild": "/sprites/kulissen/time-trial/bergzeitfahren-alpen.jpg",
+   "dunkel": 0.07
+  },
+  {
+   "id": "etappe-pass",
+   "label": "Etappe Pass",
+   "bild": "/sprites/kulissen/time-trial/etappe-pass.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "abfahrt-kamm",
+   "label": "Abfahrt Kamm",
+   "bild": "/sprites/kulissen/time-trial/abfahrt-kamm.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "etappe-kueste",
+   "label": "Etappe Küste",
+   "bild": "/sprites/kulissen/time-trial/etappe-kueste.jpg",
+   "dunkel": 0.09
+  },
+  {
+   "id": "flachsprint-kueste",
+   "label": "Flachsprint Küste",
+   "bild": "/sprites/kulissen/time-trial/flachsprint-kueste.jpg",
+   "dunkel": 0.09
+  },
+  {
+   "id": "etappe-mittelgebirge",
+   "label": "Mittelgebirge",
+   "bild": "/sprites/kulissen/time-trial/etappe-mittelgebirge.jpg",
+   "dunkel": 0.08
+  },
+  {
+   "id": "huegel-weinberge",
+   "label": "Hügel & Weinberge",
+   "bild": "/sprites/kulissen/time-trial/huegel-weinberge.jpg",
+   "dunkel": 0.09
+  },
+  {
+   "id": "etappe-strade-bianche",
+   "label": "Strade Bianche",
+   "bild": "/sprites/kulissen/time-trial/etappe-strade-bianche.jpg",
+   "dunkel": 0.09
+  },
+  {
+   "id": "etappe-vulkan",
+   "label": "Vulkan",
+   "bild": "/sprites/kulissen/time-trial/etappe-vulkan.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "wueste-hitze",
+   "label": "Wüste & Hitze",
+   "bild": "/sprites/kulissen/time-trial/wueste-hitze.jpg",
+   "dunkel": 0.12
+  }
+ ],
  "wettessen": [
   {
    "id": "jahrmarkt",

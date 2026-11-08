@@ -44060,6 +44060,11 @@
   //     um die Zonenmitte) — die Kontur braucht eine monotone Rampe, keinen Buckel je Zone.
   const ZF_HUEGEL_PX=34;
   function bodenZeitfahren(){
+    // KULISSE (Kulissen-Integration Batch 8, 08.11., s. scripts/baue-kulisse-zeitfahren.py): kommt
+    // ueber bodenSpurtGerade() -> kulisseZeichnen(), kein eigener Aufruf noetig. Sie bringt nur das
+    // Panorama der Streckenkarte (Kopfstreifen) und deren Asphalt (Bahnband) mit, NICHT das in die
+    // PixelLab-Szene eingebrannte Demo-Profil -- sichtbar bleibt allein das Profil aus `gelaende`
+    // (Schicht 1 und 2 unten, beide unveraendert). Reine Anzeige.
     bodenSpurtGerade();
     const zonen=BA().gelaende; if(!zonen||!zonen.length)return;
     const oben=H*0.14, unten=H*0.94;

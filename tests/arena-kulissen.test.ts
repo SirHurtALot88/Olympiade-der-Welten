@@ -84,6 +84,36 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(motor).toMatch(/gewichthebenSandsack\s*:\s*0/);
   });
 
+  it("Zeitfahren (Batch 8): alle elf Streckenkarten, Kulisse nur Panorama + Asphalt, Profil aus gelaende", () => {
+    // scripts/baue-kulisse-zeitfahren.py: Kopfstreifen bis H*0.14, Asphalt im Bahnband bis H*0.94 —
+    // dasselbe Band wie bodenSpurtGerade()/bodenZeitfahren(). Das Hoehenprofil zeichnet allein der
+    // Motor aus BAHN_ART["time-trial"].gelaende; das Demo-Profil der Szene kommt nicht mit.
+    const varianten = DISCIPLINE_SCENES["time-trial"].variants.map((v) => v.id);
+    expect(varianten.length).toBe(11);
+    expect((kulissen["time-trial"] ?? []).map((k) => k.id).sort()).toEqual([...varianten].sort());
+    for (const id of varianten) {
+      const quelle = path.join(wurzel, "data/generated/kulissen-quellen/time-trial", `${id}.png`);
+      expect(existsSync(quelle), quelle).toBe(true);
+      const png = readFileSync(quelle);
+      expect(png.readUInt32BE(16)).toBe(1240);
+      expect(png.readUInt32BE(20)).toBe(470);
+    }
+    const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
+    const start = motor.indexOf("function bodenZeitfahren(){");
+    const koerper = motor.slice(start, motor.indexOf("const ZW_UEBERHANG_MAX", start));
+    expect(koerper).toContain("bodenSpurtGerade();");
+    expect(koerper).toContain("const oben=H*0.14, unten=H*0.94;");
+    expect(koerper).toContain("const zonen=BA().gelaende;");
+    const skript = readFileSync(path.join(wurzel, "scripts/baue-kulisse-zeitfahren.py"), "utf8");
+    expect(skript).toContain("ZF_OBEN, ZF_UNTEN = round(LH * 0.14), round(LH * 0.94)");
+    // Die Physik des Gelaendes kennt keine Kulisse.
+    for (const fn of ["function gelaendeFaktor(", "function gelaendeZehrFaktor("]) {
+      const i = motor.indexOf(fn);
+      expect(i, fn).toBeGreaterThan(-1);
+      expect(motor.slice(i, motor.indexOf("\n  }", i))).not.toMatch(/kulisse/i);
+    }
+  });
+
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {
     for (const [dId, liste] of Object.entries(kulissen)) {
       const varianten = DISCIPLINE_SCENES[dId]?.variants.map((v) => v.id) ?? [];

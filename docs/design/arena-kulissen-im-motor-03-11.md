@@ -237,3 +237,42 @@ Staffel über je 3 Saaten sowie den Bahn-Pod für Staffel.
   PixelLab-Draufsicht-Kacheln, siehe Bericht an Chris.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 8: Zeitfahren (08.11.)
+
+Die Zeitfahren-Szenen sind anders gebaut als alle bisherigen: keine eingebetteten Bilder in einer HTML,
+sondern je Streckenkarte vier Parallax-Ebenen als PNG (`far`, `mid`, `course`, `front`, 4000 px breit,
+432..760 px hoch), elf Varianten (Standard + 10 Karten). Sie sind eine **Seitenansicht mit eingebranntem
+Demo-Profil**: die Strasse in `course.png` steigt und faellt nach der Demo-Strecke, nicht nach
+`BAHN_ART["time-trial"].gelaende`. Deshalb ein eigenes Skript, `python3 -I scripts/baue-kulisse-zeitfahren.py`.
+
+Die Kulisse bringt kein Profil mit. Sichtbar bleibt allein das Profil aus `gelaende`, das
+`bodenZeitfahren()` schon zeichnete: Zonen-Toenung mit Schraffur und Glyphen auf der Bahn, die
+Hoehensilhouette (`ZF_HUEGEL_PX`) im Kopfstreifen. `gelaendeFaktor()`/`gelaendeZehrFaktor()` sind nicht
+angefasst.
+
+- **Kopfstreifen** (0..H*0.14): Panorama der Karte aus `far` + `mid` (Alpen, Kueste, Windpark,
+  Weinberge, Strade-Bianche-Felder, Vulkan, Tafelberge …), ohne Strasse und ohne `front` (Zwischenzeit-
+  Tafeln, Schilder). Bezug ist die Zeile, ab der `mid` dicht wird, nicht die Strasse (die liegt je Karte
+  zwischen y = 152 und 662). Das linke, ausgemalte Startbild jeder `far`-Ebene (bis x ~ 800) geht mit
+  harter Kante ins wiederholte Band ueber und bleibt deshalb weg; das Band wird auf 0,25 verkleinert und
+  gespiegelt fortgesetzt. Darunter ein 8 px Grasrand der Karte. Die Hoehensilhouette des Motors liegt davor.
+- **Bahnband** (H*0.14..H*0.94): Asphalt der Karte aus dem flachen Stueck hinter der Startrampe
+  (x 350..478, zwischen den beiden weissen Randlinien im Abstand 34 px; die Hoehe sucht das Skript je
+  Karte), Mittelstriche entfernt, Zeilen/Spalten in der Helligkeit angeglichen, doppelt gross, gespiegelt
+  gekachelt. So bekommt jede Karte ihren eigenen Belag (Vulkan dunkler, Wueste sandig).
+- **Fussstreifen** (H*0.94..H): Grasrand unter der Strasse der Karte.
+- **Motor**: kein neuer Aufruf. `bodenZeitfahren()` ruft `bodenSpurtGerade()`, und dort greift
+  `kulisseZeichnen()` seit Batch 6 schon (Rasen, Baeume und Zaun fallen mit Kulisse weg). Nur ein
+  Kommentar ist dazugekommen.
+- **Test**: `tests/arena-kulissen.test.ts` prueft alle elf Varianten (Registry = Kulissenliste, Quelle
+  1240x470), das Band H*0.14/H*0.94 in Motor und Skript, und dass `gelaendeFaktor()`/
+  `gelaendeZehrFaktor()` keine Kulisse kennen.
+
+Sichtprobe: `node scripts/screenshot-kulisse.mjs time-trial <variante>` fuer alle elf, ohne Seitenfehler.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+**Stand nach Batch 8:** 18 von 20 Disziplinen haben eine PixelLab-Kulisse im Motor. Offen sind nur
+Mini-DM im Vierer-Pod (DOM-Tabelle, wartet auf Chris) und Takeshi's Castle (Seitenpanorama gegen
+Draufsicht-Route, braucht neue Draufsicht-Kacheln, wartet auf Chris).
