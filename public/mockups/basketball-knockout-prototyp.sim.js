@@ -188,8 +188,10 @@
     const r=rng(saat);
     const reihe=[];
     for(let i=0;i<Math.max(heim.length,gast.length);i++){
-      if(heim[i])reihe.push({...heim[i],seite:0,...teilwerte(heim[i].a)});
-      if(gast[i])reihe.push({...gast[i],seite:1,...teilwerte(gast[i].a)});
+      // `tw`: fertige Teilwerte aus dem Motor (Slot-/Trait-/Form-Aufschlag schon drin, s.
+      // scripts/miss-basketball-knockout-motorkader.mjs). Ohne `tw` mischt die Sim selbst.
+      if(heim[i])reihe.push({...heim[i],seite:0,...(heim[i].tw||teilwerte(heim[i].a))});
+      if(gast[i])reihe.push({...gast[i],seite:1,...(gast[i].tw||teilwerte(gast[i].a))});
     }
     const stat=new Map(reihe.map((w)=>[w,{versuche:0,treffer:0,rauswuerfe:0,geknockt:0,platz:0,marge:0,besitze:0,besitzZeit:0}]));
     const filme=[]; let dauer=0;

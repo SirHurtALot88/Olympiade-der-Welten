@@ -22,7 +22,8 @@ nicht. `battle-mode.engine.js`, `battle-mode.rezepte.js` und die Matrix sind unb
 | Was kostet die Reparatur? | Spielzeit und steile Wurfkurven. Die Spielzeit steigt im Median von ~1:35 auf **~5:10** (p10 4:14, p90 6:25), im Bereich des Live-Basketballs (4 × 90 s) und unter dem Hantel-Duell (7:11). Die Trefferkurven sind etwa **doppelt so steil** wie der Freiwurf im Live-Motor. Bei flacher Kurve kommen auch drei Leben nur auf ~0,6 (Abschnitt 3.2). |
 | Pp im Detail | spirit liegt über der Matrix (28,5 statt 22), awareness darunter (7,7 statt 14). Jedes Basketball-Rezept enthält spirit, awareness fehlt im Freiwurf ganz. Kein Nullattribut trägt (health, will, determination je 0,0). |
 | Prototyp | `public/mockups/basketball-knockout-prototyp.html`: echte PixelLab-Figuren in der PixelLab-Parketthalle der Basketball-Szene, zwei Bälle, Abpraller, Korbleger, Knockout-Einblendung, Leben-Punkte, spoilerfreier Boxscore und Ticker (Abschnitt 5). |
-| Einschränkung | Die Konstanten sind an denselben fünf Paarungen kalibriert, auf denen die Sonde misst. Slot-, Trait- und Formkanäle fehlen. Die Zahlen sind deshalb **optimistisch**. Mit 0,81–0,83 ist der Abstand zur 0,80-Schranke klein, kleiner als beim Tauziehen (0,853 / 0,857). Die Pflichtabnahme im Motor kann das Format noch kippen. |
+| Mit Motor-Kadern (Abschnitt 4) | Mit echter Slotwahl, Formkarten und Mutatoren aus dem Motor: rho **0,832 / 0,818 / 0,825**, Pp **21,2 / 24,6 / 29,4**. rho hält, Pp ist in einem von drei Strömen über 25. Das ist der offene Punkt. |
+| Einschränkung | Die Konstanten sind an denselben fünf Paarungen kalibriert, auf denen die Sonde misst. Slot-, Trait- und Formkanäle fehlen. Die Zahlen sind deshalb **optimistisch**. Die Pflichtabnahme im Motor kann das Format noch kippen. |
 
 ---
 
@@ -201,26 +202,68 @@ Nachbar das Ergebnis bestimmt.
 
 ---
 
-## 4. Einordnung neben dem Tauziehen
+## 4. Zweite Sonde: echte Motor-Kader (Slot, Form, Mutatoren)
 
-| | Tauziehen (Gewichtheben) | Knockout (Basketball) |
-|---|---|---|
-| Fables Original | Ring: 0,636 (strukturell, Validität bis 0,53) | 1 Leben: 0,605 (Validität bis 0,67 **und** zu wenig Würfe) |
-| Reparatur | Schweizer Runden, Eins-gegen-eins-Seile | Drei Leben, Neuauslosung je Umlauf |
-| rho repariert | 0,853 / 0,857 | 0,825 / 0,811 / 0,811 |
-| Pp repariert | 11,3 / 9,9 | 20,9 / 21,1 / 22,7 |
-| Sendezeit | ~1:35 | ~5:10 |
-| Abstand zur Schranke | komfortabel | knapp |
+**Maßstab.** Knockout wird nur an Basketball gemessen: rho über 0,80 und Pp höchstens 25 für
+Basketball selbst. Ein Vergleich mit dem Tauziehen ist kein Maßstab, das ist ein anderes Format für
+eine andere Disziplin (Chris, Nachschärfung 08.11. in der Vision-Datei, PR #1353). Die frühere
+Gegenüberstellung in diesem Abschnitt ist deshalb entfernt.
 
-Knockout ist billiger zu bauen als das Tauziehen (keine Seilphysik, ein Korb), aber mechanisch der
-schwächere Kandidat. Mit drei Leben hält das Format die Schranke im Vorab-Modell, wenn auch knapp.
-Ob es im Motor mit Slot-, Form- und Trait-Rauschen bei über 0,80 bleibt, zeigt erst die
-Pflichtabnahme. **Meine Empfehlung:** Den Motor-Builder erst bauen, wenn Chris das Format mit drei
-Leben und ~5 Minuten will. Vorher lohnt ein billiger Zwischenschritt: dieselbe Sonde mit den echten
-Slot-Aufschlägen und Formkarten. Liegt sie dann unter 0,78, ist Knockout als **folgenloses
-Zusatzspektakel** besser aufgehoben, zum Beispiel als Halbzeit- oder Finalshow wie das
-Sandsack-Finale, das heute „bewusst folgenlos für `seiten`“ ist. Als Wertungsformat taugt es dann
-nicht.
+`node scripts/miss-basketball-knockout-motorkader.mjs 48 [--saat-versatz=N] [--pp=48]`
+
+**Was anders ist als in Abschnitt 3.** Die Teilwerte mischt nicht mehr die Sim aus den nackten
+Attributen. Sie kommen aus dem echten Motor, der für jede Paarung und jedes Spiel die
+Basketball-Aufstellung baut, genau wie `disziplinProbe()` und `einflussVon()`:
+- die KI-Slotwahl entscheidet, welche sechs je Seite spielen und auf welchem Slot (gesehen:
+  floorgeneral, rimpressure, perimeter, helpdefense, clutchshot, fastbreak),
+- Slot-Aufschlag und `BASKETBALL_POS_MOD`,
+- Formkarten des Spiels (`zieheFormkarten`),
+- Mutator-Traits je Spiel (`zieheMutatorenWieSpiel`),
+- als Eignung gilt `eigOhneMutator`, wie in `disziplinProbe()`.
+
+Auch Pp läuft über den Motor: `ATTR_HEBUNG` hebt ein Attribut eines Spielers um +15, mit denselben
+Saaten für Form, Mutatoren und Aufbau, dann wird dasselbe Knockout gespielt. Die Knockout-Mechanik
+ist unverändert. FSTEAM ist im Motor nicht exportiert. Die Sonde hängt deshalb **nur im Speicher**
+eine Lesefunktion neben `feldspielSubskills()` in die ausgelieferte Motordatei ein (Playwright
+`route`). Die Datei im Repo bleibt unberührt.
+
+### 4.1 Ergebnisse (n = 48 je Paarung, drei Saatströme)
+
+| Fassung | rho je Spiel (0 / 1 / 2) | Validität je Paarung | Star Rang 1 / Top 2 | Pp (0 / 1 / 2) |
+|---|---:|---|---:|---:|
+| **Empfohlene Fassung** (3 Leben, Neuauslosung, Platz + Marge), Konstanten wie in der Sim | **0,832 / 0,818 / 0,825** | 0,87–0,97 | 61 % / 80 % | **21,2 / 24,6 / 29,4** |
+| dieselbe, Freiwurf flacher (`ftK` 0,008) und Sprungwurf steiler (`jumpK` 0,075) | 0,818 / 0,804 / 0,818 | — | — | 23,0 / 23,4 / 25,9 |
+| Fables Original (1 Leben, feste Reihe) | 0,724 / 0,706 | — | 49–51 % / 69–74 % | — |
+
+Pp-Anteile der empfohlenen Fassung, Strom 2 (der schlechteste): spirit 33,4 (Matrix 22),
+intelligence 14,9 (16), awareness 6,2 (14), charisma 12,8 (11), speed 9,7 (10), dexterity 8,6 (8),
+power 2,6 (7), stamina 6,8 (6), torment 4,9 (6), health / will / determination 0,0.
+
+### 4.2 Was das heißt
+
+- **rho hält mit echten Kadern.** 0,818–0,832 auf drei Strömen, nicht unter 0,78. Das
+  Format bleibt ein Kandidat für ein **gewertetes** Format. Der Rückfall „wertungsfreies
+  Zusatzspektakel“ ist nicht nötig.
+- **Der Star steht öfter oben als in der Vorab-Sonde** (61 % statt 31–40 %). Der Motor wählt je
+  Seite die besten sechs eines ganzen Kaders, nicht die ersten sechs der Liste. Dadurch liegen
+  stärkere und schwächere Werfer weiter auseinander. Aus demselben Grund liegt auch Fables Original
+  hier höher (0,72 statt 0,60), bleibt aber klar unter der Schranke.
+- **Pp ist der knappe Punkt.** Zwei Ströme bestehen, der dritte reißt mit 29,4. Ursache ist
+  dieselbe strukturelle Schieflage wie in Abschnitt 3.4: spirit zu hoch, awareness und power zu
+  niedrig. Ein flacherer Freiwurf und ein steilerer Sprungwurf drücken den schlechtesten Strom auf
+  25,9 und kosten 0,01–0,015 rho. Das ist eine Richtung, keine Lösung. Ich habe diese Variante
+  bewusst **nicht** als neuen Standard übernommen. Sie ist auf denselben Daten gedreht, auf denen
+  gemessen wird, und den Strom-2-Wert drückt sie nur knapp unter die Grenze.
+- **Nächster Hebel für Pp**, falls Chris weitermachen will: Der Sprungwurf ist der einzige Kanal mit
+  viel awareness und wenig spirit (TECHNIK: intelligence 50, awareness 22, spirit 16). Mehr lange
+  Abpraller, also mehr Sprungwürfe, und ein kleinerer Freiwurf-Anteil schieben die Anteile in die
+  richtige Richtung. power (7) hat nur im Korbleger eine Heimat. Danach braucht es einen frischen
+  Saatstrom und andere Kader zur Gegenprobe.
+
+**Stand:** Zwischenstand, mit dem man weiterarbeiten kann. rho ist mit echten Kadern stabil über
+der Schranke, Pp liegt in zwei von drei Strömen darunter und ist der offene Punkt vor einem
+Motor-Builder. Die Pflichtabnahme mit `miss-alle-disziplinen.mjs` / `messe-arena-einfluss.mjs`
+(Abschnitt 5 der Machbarkeit) ersetzt diese Sonde weiterhin nicht. Sie braucht den Builder im Motor.
 
 ---
 
