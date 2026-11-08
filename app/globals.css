@@ -81731,6 +81731,21 @@ span.nl-facility-ampel-chip {
 .is-new-look .nl-lineup-slot-details > summary em { font-style: normal; color: var(--nl-warn); }
 .is-new-look .nl-lineup-slot-details[open] > summary { margin-bottom: 6px; }
 
+/* --- Gegner (Schätzung), eingeklappt (Chris, 08.11.: mehr Platz für die eigene Seite) --- */
+
+.is-new-look .nl-gegner-details { margin-top: 2px; }
+.is-new-look .nl-gegner-details > summary {
+  cursor: pointer;
+  padding: 3px 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+  list-style-position: inside;
+}
+.is-new-look .nl-gegner-details[open] > summary { margin-bottom: 4px; }
+
 /* --- Rollenkarte (Ebene B) ----------------------------------------------------- */
 
 .is-new-look .nl-rollenkarte {

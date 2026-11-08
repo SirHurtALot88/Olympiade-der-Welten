@@ -541,10 +541,14 @@ function NlSlotKuerzel({
 
 /**
  * GEGNER (SCHÄTZUNG) — Einsatzliste-Revamp, ITERATION 1 (`lib/lineups/gegner-schaetzung.ts`).
- * Kompakter Streifen je Disziplin-Seite über dem Slot-Raster: wer der Gegner ist, wie gut das
- * eigene Scouting ihn kennt, und je Position (gleiches Kürzel, gleiche Farbe wie die eigene Seite)
- * der vermutete Spieler mit Werte-SPANNE. Nie eine exakte Zahl. Platzhalter für die Gegner-Marken
- * des späteren Mini-Felds (F3).
+ * Chris, 08.11. (zu einem Screenshot ohne bekannten Gegner): "du kannst hier die gegner
+ * aufstellugn weg lassen, dann hat man mehr platz für seine eigenen spieler" — beim Einsetzen
+ * zählt zuerst der eigene Kader, der Gegner ist zweitrangig. Statt die Funktion zu entfernen
+ * (Chris wollte die Gegner-Schätzung selbst ausdrücklich, s. Konzept oben), steckt sie jetzt in
+ * einem `<details>`, zu wie die Slot-Liste darunter (`nl-lineup-slot-details`): eingeklappt
+ * nimmt sie nur eine schmale Kopfzeile, aufgeklappt zeigt sie alles wie bisher. Die Gold-Bilanz
+ * (eigene Seite, kein Gegner-Bezug) bleibt davon unabhängig immer sichtbar — sie gehörte nur aus
+ * Platzgründen in denselben Streifen, nicht inhaltlich zum Gegner.
  */
 function NlGegnerStreifen({
   schaetzung,
@@ -577,29 +581,14 @@ function NlGegnerStreifen({
         `Werte ±${schaetzung.unschaerfe}, Treffsicherheit der Zuordnung ~${schaetzung.treffsicherheitPct} %. ${quelleText}. ` +
         `Werte = rohe Disziplin-Eignung, nicht die Slot-Projektion der eigenen Seite. Nie exakt.`
       : schaetzung.grund;
+  const kurzStatus =
+    schaetzung.status === "geschaetzt" ? `${schaetzung.gegnerName} · ${schaetzung.steuerung === "ki" ? "KI" : "Mensch"}` : schaetzung.grund;
   return (
-    <div
-      data-testid="nl-lineup-gegner-schaetzung"
-      data-gegner-status={schaetzung.status}
-      title={titel}
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: "6px 10px",
-        margin: "6px 0 8px",
-        padding: "6px 8px",
-        borderRadius: "var(--nl-r-sm)",
-        border: "1px dashed color-mix(in srgb, var(--nl-ink) 22%, transparent)",
-        background: "color-mix(in srgb, var(--nl-ink) 4%, transparent)",
-        fontSize: "11px",
-        lineHeight: 1.35,
-      }}
-    >
+    <div style={{ margin: "6px 0 8px", display: "flex", flexDirection: "column", gap: "2px" }}>
       <span
         data-testid="nl-lineup-gold-bilanz"
         title="Gold = der Spieler steht dort, wo die optimale Gesamtverteilung des ganzen Kaders ihn hinstellen würde."
-        style={{ color: "var(--nl-gold)", fontWeight: 700 }}
+        style={{ color: "var(--nl-gold)", fontWeight: 700, fontSize: "11px" }}
       >
         ◆ {goldBilanz.goldCount}/{goldBilanz.besetzt} optimal verteilt
         {goldBilanz.gesamtLuecke != null ? (
@@ -608,45 +597,58 @@ function NlGegnerStreifen({
           </span>
         ) : null}
       </span>
-      <span aria-hidden="true" style={{ opacity: 0.4 }}>|</span>
-      <strong style={{ fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "10px" }}>
-        Gegner (Schätzung)
-      </strong>
-      {schaetzung.status !== "geschaetzt" ? (
-        <span style={{ opacity: 0.75 }}>{schaetzung.grund}</span>
-      ) : (
-        <>
-          <span>
-            {schaetzung.gegnerName} · {schaetzung.steuerung === "ki" ? "KI" : "Mensch"}
-          </span>
-          <span className="nl-tnum" style={{ opacity: 0.8 }}>
-            Scouting {schaetzung.stufe}/5 · ±{schaetzung.unschaerfe} · ~{schaetzung.treffsicherheitPct} %
-          </span>
-          {seite?.schnitt ? (
-            <span className="nl-tnum">
-              Ø {seite.schnitt.min}–{seite.schnitt.max}
-              {eigenerSchnitt != null ? <span style={{ opacity: 0.75 }}> (wir Ø {formatScore(eigenerSchnitt)})</span> : null}
-            </span>
-          ) : null}
-          <span style={{ opacity: 0.7, fontStyle: "italic" }}>{quelleText}</span>
-          {seite && schaetzung.quelle !== "verdeckt" ? (
-            <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", flexBasis: "100%" }}>
-              {seite.slots.map((slot) => (
-                <span key={slot.slotIndex} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  <NlSlotKuerzel kuerzel={kuerzelJeSlotIndex[slot.slotIndex] ?? "–"} slotIndex={slot.slotIndex} />
-                  <span style={{ opacity: slot.spielerName ? 1 : 0.6 }}>{slot.spielerName ?? "?"}</span>
-                  {slot.spanne ? (
-                    <span className="nl-tnum" style={{ opacity: 0.8 }}>
-                      {slot.spanne.min}–{slot.spanne.max}
-                    </span>
-                  ) : null}
+      <details className="nl-gegner-details" data-testid="nl-lineup-gegner-schaetzung" data-gegner-status={schaetzung.status}>
+        <summary title={titel}>
+          Gegner (Schätzung) · <span style={{ fontWeight: 400 }}>{kurzStatus}</span>
+        </summary>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "6px 10px",
+            padding: "6px 8px",
+            borderRadius: "var(--nl-r-sm)",
+            border: "1px dashed color-mix(in srgb, var(--nl-ink) 22%, transparent)",
+            background: "color-mix(in srgb, var(--nl-ink) 4%, transparent)",
+            fontSize: "11px",
+            lineHeight: 1.35,
+          }}
+        >
+          {schaetzung.status !== "geschaetzt" ? (
+            <span style={{ opacity: 0.75 }}>{schaetzung.grund}</span>
+          ) : (
+            <>
+              <span className="nl-tnum" style={{ opacity: 0.8 }}>
+                Scouting {schaetzung.stufe}/5 · ±{schaetzung.unschaerfe} · ~{schaetzung.treffsicherheitPct} %
+              </span>
+              {seite?.schnitt ? (
+                <span className="nl-tnum">
+                  Ø {seite.schnitt.min}–{seite.schnitt.max}
+                  {eigenerSchnitt != null ? <span style={{ opacity: 0.75 }}> (wir Ø {formatScore(eigenerSchnitt)})</span> : null}
                 </span>
-              ))}
-            </span>
-          ) : null}
-        </>
-      )}
-      <span style={{ marginLeft: "auto", fontSize: "9px", opacity: 0.55 }}>Iteration 1</span>
+              ) : null}
+              <span style={{ opacity: 0.7, fontStyle: "italic" }}>{quelleText}</span>
+              {seite && schaetzung.quelle !== "verdeckt" ? (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", flexBasis: "100%" }}>
+                  {seite.slots.map((slot) => (
+                    <span key={slot.slotIndex} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <NlSlotKuerzel kuerzel={kuerzelJeSlotIndex[slot.slotIndex] ?? "–"} slotIndex={slot.slotIndex} />
+                      <span style={{ opacity: slot.spielerName ? 1 : 0.6 }}>{slot.spielerName ?? "?"}</span>
+                      {slot.spanne ? (
+                        <span className="nl-tnum" style={{ opacity: 0.8 }}>
+                          {slot.spanne.min}–{slot.spanne.max}
+                        </span>
+                      ) : null}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </>
+          )}
+          <span style={{ marginLeft: "auto", fontSize: "9px", opacity: 0.55 }}>Iteration 1</span>
+        </div>
+      </details>
     </div>
   );
 }
