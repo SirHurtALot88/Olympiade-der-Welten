@@ -1,0 +1,341 @@
+# Einsatzliste-Revamp: Architektur und Umsetzungsplan (08.11.)
+
+Grundlage ist Fables Konzept `docs/design/aufstellung-screen-rework-08-11.md` (Branch
+`claude/aufstellung-screen-rework-0811`, PR #1356), vor allem Abschnitt 0b. Dort ist festgelegt,
+dass das Ziel die **echte Foundation-Einsatzliste** ist (`app/foundation/legacy-lineup-lab/LineupNewLook.tsx`)
+und nicht nur das Arena-Board im Mockup. Dieses Dokument prüft, was die Foundation-Seite dafür
+schon hat. Es legt eine erweiterbare Formations-Datenquelle fest, übersetzt Fables Pakete auf
+`LineupNewLook.tsx` und entscheidet die fünf offenen Fragen aus Abschnitt 13. Paket F1 ist im
+selben PR schon gebaut (Abschnitt 6).
+
+Alle Zeilennummern gelten für `main` @ `ecc12ccb6`. Wo „neu“ steht, ist der Stand nach diesem PR
+gemeint. Nach jedem Merge verschieben sie sich, also per `grep` suchen.
+
+Verbindlich bleibt: **alles hier ist Anzeige.** Die Eignungsmatrix ist gesperrt (CLAUDE.md). Kein
+Paket F1–F4 berührt Resolve, Slot-Profile oder Motor. Wo ein Paket eine gemeinsame Rechenfunktion
+braucht (F2), wird sie neben die bestehende gestellt und per Identitätstest abgesichert. Die
+bestehende Rechnung wird dabei nicht umgebaut.
+
+---
+
+## 1. Befund mit Belegen
+
+### 1.1 `LineupNewLook.tsx`: was da ist
+
+- **Umfang:** 2936 Zeilen (neu 3068). Es ist eine reine Darstellungskomponente: Die Props sind ein
+  `Pick<LegacyLineupFocusV2BoardProps, …>` (Z. 103–229), alle Handlungen laufen über Handler des
+  Clients (`onAssignPlayer`, `onClearSlot`, `onSaveDraft` …, Kopfkommentar Z. 33–48). Die
+  Komponente rechnet keine Spiellogik.
+- **Slot-Raster:** `renderSide(d1|d2)` (Z. 1544) rendert je Seite ein `nl-lineup-slot-grid`
+  (Z. 1996). Die Reihenfolge ist `slots.filter(side)`, also nach `slotIndex`. Das ist eine
+  Kartenliste ohne jede Geometrie.
+- **Rollenlabel:** Z. 2077, `<span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>`.
+  Mehr wird von der Rolle nicht gezeigt. Dazu kommt Z. 2574 im Fokus-Kopf, wieder nur `label`.
+- **Was die Rolle mitbringt, aber ungenutzt bleibt:** `slotRoleByKey: Map<string,
+  MatchdaySlotRoleDefinition | null>` (Board-Props Z. 169, gebaut in `LegacyLineupLabClient.tsx`
+  Z. 2008–2036 aus `resolveSlotRolesForDiscipline`). Jede Definition trägt `slotWeightProfile`,
+  `baseWeightProfile`, `keyAttributes`, `description`, `majorPositive/minorPositive/strainAttribute`
+  (`matchday-slot-roles.ts` Z. 25–39). Für das ±-Schema (F2) ist also alles schon im Prop
+  vorhanden, nur nicht angezeigt.
+- **Spieler gegen jeden Slot:** `playerBestSlotSummaryByActivePlayerId` hält je Spieler eine
+  **vollständige** Rangliste über alle Slots beider Seiten mit `projectedScore` und `projectedDelta`
+  (`lineup-candidate-model.ts` Z. 853–910). Die Kader-Liste zeigte davon bisher nur den ersten
+  Eintrag („Bester Slot D1-3 · 72,4“, alt Z. 2866–2871). Fables „Top-3 mit Zahl“ (Backlog 6.1)
+  braucht deshalb keine neue Rechnung.
+- **Disziplin-Eignung je Spieler:** `LineupBoardRosterCard.discipline1Score/discipline2Score`
+  (`legacy-lineup-board-props.ts` Z. 25–41). Das ist die Grundlage für den Gold-Rahmen.
+- **Attributwerte:** Im Board-Typ `LineupBoardRosterCard` fehlen sie. Zur Laufzeit liegen sie aber
+  schon in denselben Map-Werten, denn der Client übergibt `MatchdayRosterCard`, und
+  `LineupPlayerTableRow` trägt `attributeStats` (`lineup-candidate-model.ts` Z. 45 ff.,
+  gelesen in Z. 874). Für F2 reicht ein optionales Feld im Board-Typ, ohne Datenumbau.
+
+### 1.2 Kennt die Foundation-Seite die Formationsgeometrie? **Nein, überhaupt nicht.**
+
+Gesucht in `lib/`, `app/`, `components/`, `scripts/`, `public/`:
+
+| Größe (Fables Quelle) | Fundort | Foundation/TS? |
+|---|---|---|
+| `SLOT_ZUSATZ` (reihe/ord/pos) | `battle-mode.engine.js` Z. 8201 | nein; nur zwei Messskripte lesen es als Text (`scripts/lib/aufstellungs-stufungen.ts`, `scripts/miss-preis-der-aufstellung.ts`) |
+| `ROWS` (Front/Mitte/Backrow) | ebd. Z. 8336 | nein |
+| `BASKETBALL_ROLLE_SLOT` | ebd. Z. 10855 | nein |
+| `TORWART_SLOTS` / `QB_SLOTS` / `KICKER_SLOTS` | ebd. Z. 12144 / 12488 / 12678 | nein; `matchday-slot-roles.ts` nennt `KICKER_SLOTS` nur im Kommentar (Z. 290) |
+| `HEBEN_ROLLEN` | ebd. Z. 20904 | nein |
+| `planJeSlot` (Spurt/Time-Trial/Climbing/Staffel/Takeshi) | ebd. Z. 44756, 45031, 45375, 45519, 45862 | nein |
+| `BF_ORT_NAMEN`, `BFFFA_ROLLEN_ORT` | ebd. Z. 55534, 55539 | nein |
+
+**Folge:** Eine gemeinsame Datenquelle muss **extrahiert** werden. Die Foundation-Seite hat heute
+nur die Reihenfolge der Slots (`slotIndex`) und die Rollenprofile, aber keinen einzigen Platz.
+
+### 1.3 Zwei Fallen, die die Architektur bestimmen
+
+**a) Slot-Index ist nicht Feldposition und auch nicht Motor-Reihenfolge.** Die Foundation zählt
+Slots in der Reihenfolge von `DISCIPLINE_ROLE_THEMES`. Bei TDM ist das Vanguard, Skirmisher,
+Shotcaller, Hold Line, Rally Point, Breaker (`matchday-slot-roles.ts` Z. 97–104). Der Motor
+sortiert dieselben Rollen für TDM, Spurt und Battlefield per `slotsVon(d)` nach `SLOT_ZUSATZ.pos`
+um (Engine Z. 8244). Daraus ergibt sich Vanguard, Hold Line, Breaker, Skirmisher, Shotcaller,
+Rally Point. Battlefield setzt je Kadergröße zusätzlich eine eigene Zusammensetzung ein
+(`ROLE_THEME_IDS_BY_SLOT_COUNT`, Z. 343). **Geometrie muss deshalb über die kurze Rollenkennung
+geschlüsselt werden und nie über den Index.** Diese Kennung liefert
+`resolveSlotRoleShortId(disciplineId, null, slotIndex, slotCount)`, dieselbe Funktion, mit der
+der Arena-Adapter `place` füllt (`arena-aufstellung-adapter.ts` Z. 137–143). So steht die Marke
+auf dem Mini-Feld garantiert für dieselbe Rolle, die die Arena bekommt.
+
+**b) Der Slot-Aufschlag ist nicht überall dieselbe Formel.** `slotAufschlag()` im Motor (Z. 8286)
+multipliziert für Football mit `FOOTBALL_SLOT_AUFSCHLAG_SKALA = 0,35` (Z. 8282). Die
+Foundation-Rechnung `resolveProfileRoleModifier` (`matchday-slot-roles.ts` Z. 846–856, Grundlage
+von Projektion und Resolve) kennt diesen Faktor nicht. Für die Beitrags-Zerlegung in F2 heißt das:
+**In der Einsatzliste wird gegen die TS-Formel zerlegt**, denn die zeigt die Einsatzliste und die
+rechnet der Spieltag. Fables Summen-Invariante (Konzept 6.3) gilt dann gegen
+`resolveProfileRoleModifier` vor der Klemmung. Die Abweichung selbst ist ein Befund für die
+Football-Leute, kein Teil dieses Reworks. **Offen, nicht angefasst.**
+
+Kleiner Nachtrag zu Konzept 6.1: `resolveKeyAttributes` (Z. 718–747) zeigt nur positive
+Slot-Attribute und kappt nach vier Einträgen. „primary/secondary“ hängt dort zusätzlich am
+Fokus-Index, nicht nur an Δ ≥ 3 bzw. Δ ≥ 1. Für die ±-Glyphen deshalb **direkt**
+`slotWeightProfile − baseWeightProfile` je Attribut nehmen (beides liegt auf der Rollendefinition)
+und nicht `keyAttributes`. Sonst fehlen genau die `−`/`−−`, die Fable zeigen will.
+
+### 1.4 Vorbild für die Datenrichtung: TS ist Quelle, der Motor bekommt generiert
+
+`scripts/generiere-arena-daten.ts` schreibt `BASIS_JE_DISC`, `SLOTS_JE_DISC` und
+`BATTLEFIELD_SLOTS_JE_K` aus `matchday-slot-roles.ts` zwischen Markern in `battle-mode.engine.js`
+(Z. 257–272 im Skript). Die Rollenprofile haben also schon heute **eine** Quelle in TS. Die
+Formations-Datenquelle soll denselben Weg gehen (Abschnitt 2.4).
+
+---
+
+## 2. Formations-Datenquelle: so geschnitten, dass neue Formate nur Daten brauchen
+
+### 2.1 Anforderungen
+
+1. Alle 20 heutigen Disziplinen haben eine Feldform (Fables Tabelle 3.1).
+2. **Format-Varianten derselben Disziplin** können eine eigene Geometrie haben. Das ist kein
+   Gedankenspiel: Gewichtheben hat schon ein Hantel-Duell (Reihenfolge-Leiste, n gegen n) und ein
+   Sandsack-Rennen (Stationen, Engine `SANDSACK_SZENE`; `lib/foundation/discipline-scenes.ts`
+   Z. 184–189). Mit „Die Grube“ (`docs/design/format-varianten-brainstorm-08-11.md` Abschnitt 2)
+   käme ein drittes Format dazu. Chris’ Tauziehen-Bild „die Slots stehen hintereinander“ ist ein
+   weiteres Feld für dieselbe Disziplin. **Der Schlüssel ist deshalb (Disziplin, Variante), nicht
+   nur die Disziplin.**
+3. Jede Marke sagt, **wie verbindlich** ihr Platz ist. Fable unterscheidet drei Fälle: Der Motor
+   hält den Platz (gefüllte Marke). Der Platz ist nur der Start (Domination, Marke mit
+   Rotationspfeil). Der Platz ist reine Darstellung (Hockey/Football ohne Torwart/QB/Kicker, hohle
+   Marke).
+4. Eine unbekannte Disziplin oder Variante **bricht nie**, sondern fällt auf eine generische
+   Reihenfolge-Leiste zurück.
+
+### 2.2 Datentyp (Skizze, Ort `lib/lineups/formation/`)
+
+```ts
+/** Wie die Fläche gezeichnet wird: ein kleiner, abgeschlossener Satz Hintergründe. */
+type FeldArt =
+  | { art: "leiste" }                                     // Bühne: Plätze 1..n nebeneinander
+  | { art: "reihen"; reihen: readonly string[] }          // Arena: Front/Mitte/Backrow
+  | { art: "strecke"; richtung: "waagrecht" | "senkrecht" } // Bahn, Climbing (Wand)
+  | { art: "kette" }                                      // Tauziehen: Seil, Zieher hintereinander
+  | { art: "flaeche"; flaeche: "basketball-halbfeld" | "eis" | "football" | "domination-3" | "grube" };
+
+type Verbindlichkeit = "motor" | "start" | "darstellung";
+
+type SlotPlatz = {
+  x: number; y: number;              // normiert 0..1 auf der EIGENEN Hälfte/Fläche
+  verbindlichkeit: Verbindlichkeit;
+  beleg: string;                     // z. B. "SLOT_ZUSATZ.reihe=0", "BASKETBALL_ROLLE_SLOT=paint"
+  rolleZeile?: string;               // Fakt für die Rollenkarte ("Von vorn", "Eröffnung 92 %")
+};
+
+type FormationsDefinition = {
+  schluessel: { disziplin: string; variante?: string };  // variante fehlt = Standardformat
+  feld: FeldArt;
+  plaetze: Readonly<Record<string /* kurze Rollen-Id */, SlotPlatz>>;
+  gegner?: "spiegel" | "n-gegen-n" | null;                // wie der Gegner gezeigt wird
+  bedingung?: { minBesetzt: number; text: string };       // Basketball: „greift ab 6“
+  kopfzeile?: string;                                     // „Hier zählt die Reihenfolge, kein Platz.“
+};
+
+function resolveFormation(disziplin: string, variante: string | null, slotCount: number): FormationsDefinition;
+```
+
+Die Auflösung läuft so: Zuerst wird `(disziplin, variante)` gesucht, dann `(disziplin)`, dann die
+generische Leiste. Jede Rolle ohne Eintrag bekommt einen Platz auf der Leiste mit
+`verbindlichkeit: "darstellung"`. Eine fehlende Geometrie macht also eine Marke hohl, aber nie
+unsichtbar.
+
+### 2.3 Rendering: eine Komponente, keine Disziplin-Weichen
+
+`<FormationsFeld definition slots selections …/>` zeichnet den Hintergrund nach `feld.art` (je
+Art ein kleines SVG) und setzt die Marken an `x/y`. Das Aussehen der Marke hängt allein an
+`verbindlichkeit` (gefüllt / Start mit Pfeil / hohl). Im Renderer steht **kein**
+`if (disziplin === …)`.
+
+**Neues Format = neuer Eintrag in der Registry.** Neuer Code ist nur nötig, wenn das Format eine
+noch nie dagewesene Fläche braucht, und auch dann nur ein Hintergrund-SVG, kein Umbau. Die
+Tauziehen-Variante mit „hintereinander“ ist `feld: { art: "kette" }`: Die Plätze liegen auf einer
+Linie (x = 0,15 … 0,9), und die Gegenseite wird gespiegelt (`gegner: "spiegel"`). „Die Grube“ mit
+zwölf Podesten im Kreis wäre `flaeche: "grube"` mit Plätzen auf einem Kreis. Beides entsteht ohne
+Renderer-Änderung, sobald die Variante Rollen-Ids hat.
+
+**Was die Variante auswählt:** Heute gibt es im Spieltags-Vertrag
+(`context.matchdayContract.discipline1/2`) kein Variantenfeld, die Wahl trifft nur der Motor
+(Szenen). Bis eine Variante produktiv wird, ist `variante = null`. Wird eine produktiv, braucht der
+Vertrag **ein** optionales Feld `formatVariante`, das der Client durchreicht. Am Feld ändert sich
+dann nichts.
+
+### 2.4 Verhältnis zum Motor: Anzeige-Kopie mit Drift-Wächter statt Umbau
+
+`SLOT_ZUSATZ.reihe` ist **simulationsrelevant**: `homeFor()` setzt die Reihen beim Kampfstart, und
+die Formationsleine hält sie (Fable 1c). Würde man den Block jetzt aus TS generieren, wäre das eine
+Mechanik-Änderung mit Pflichtabnahme rho/Pp. Deshalb in zwei Stufen:
+
+1. **F3:** Die TS-Registry ist eine **Anzeige-Kopie** der Motorfakten. Ein Vitest liest
+   `battle-mode.engine.js` als Text und vergleicht `SLOT_ZUSATZ` (reihe, ord),
+   `BASKETBALL_ROLLE_SLOT`, `BFFFA_ROLLEN_ORT`, die `planJeSlot`-Schlüssel, `TORWART_SLOTS`,
+   `QB_SLOTS` und `KICKER_SLOTS` mit der Registry. Jeder Eintrag mit
+   `verbindlichkeit: "motor" | "start"` muss dort einen Beleg haben. Vorbild für Tests, die die
+   Engine lesen: `tests/battlefield-rollen-je-kadergroesse.test.ts`,
+   `tests/staffel-weniger-als-sechs-laeufer.test.ts`. Ändert jemand den Motor, wird der Test rot,
+   und die Tafel zeigt nie wieder etwas, das der Kampf nicht hält.
+2. **Später, optional:** Ein Block `FORMATION_JE_DISC`, nur zur Anzeige, wird per
+   `generiere-arena-daten.ts` in die Engine geschrieben, damit das Arena-Board dieselbe Registry
+   rendert. Die Simulation liest ihn nicht. Dazu die Identitätsprüfung (`spiele(d, saat)`
+   byte-gleich) nach dem Muster `scripts/pruefe-wettessen-identisch.mjs`. Erst wenn das steht,
+   kann man erwägen, `SLOT_ZUSATZ` selbst daraus zu speisen. Das wäre dann Mechanik und fällt
+   **nicht** unter dieses Rework.
+
+---
+
+## 3. Governance: speist der Adapter Anzeige zurück in die Simulation? **Nein, geprüft.**
+
+- `buildArenaAufstellung` (`arena-aufstellung-adapter.ts` Z. 73–163) ist eine reine Funktion. Sie
+  liest `gameState.seasonState.lineupDrafts` (den **gespeicherten** Entwurf, nicht den
+  Anzeigezustand), `players`, `rosters`, die Kadergröße aus dem Spielplan
+  (`getSeasonDisciplineScheduleEntry`) und die Staffel-Paargeschichte. Sie gibt ein neues Objekt
+  `{Name → {d, slot, …}}` zurück und schreibt nichts.
+- Aufrufer gibt es nur in `app/foundation/battle-arena/FoundationBattleArenaHost.tsx` (Z. 405,
+  441, 500, 857). Alle bauen den Umschlag Richtung Motor. Kein Pfad führt vom Motor zurück zu
+  `lineupDrafts`. `grep lineupDrafts` in `lib/foundation/battle-arena` und
+  `app/foundation/battle-arena` findet nur die Lesestelle im Adapter.
+- Der Motor übernimmt die Aufstellung nur lesend in `place`/`order` (Engine Z. 36789–36815).
+- `LineupNewLook.tsx` importiert den Adapter nicht und spricht nur über die Handler des Clients.
+  Paket F1 ändert keinen Handler und kein Prop des Board-Vertrags. Die Datei
+  `lib/lineups/einsatzliste-anzeige.ts` hat keinen einzigen Import, das sichert ein Test
+  (`tests/einsatzliste-anzeige.test.ts`).
+- Das Feld `haltung?` im `ArenaAufstellungEintrag` (Z. 53–60) bleibt ungesetzt. Erst wenn Stufe 3
+  gebucht wird, käme ein Rückkanal aus der Einsatzliste. Das wäre Mechanik und liegt außerhalb
+  dieses Reworks.
+
+**Der Vertrag `ArenaAufstellungEintrag` bleibt in allen Paketen unverändert.** Gesetzt wird
+weiterhin über `onAssignPlayer` → Entwurf → `onSaveDraft`, und die Arena liest den gespeicherten
+Entwurf.
+
+---
+
+## 4. Die fünf offenen Fragen (Fable Abschnitt 13): Entscheidungen
+
+Chris hat die Entscheidung delegiert. Jede Entscheidung unten ist begründet und lässt sich
+überstimmen, ohne dass sich an der Architektur etwas ändert.
+
+1. **Slotfarbe je Position 1–6, nicht je Rolle.** *Entschieden wie Fable vorschlägt, mit einer
+   Präzisierung:* Position heißt **Foundation-`slotIndex`**, also genau die Zahl, die als „D1-3“
+   schon auf der Karte steht und aus der der Arena-Adapter die Rolle liest. Fable nahm die
+   `slotsVon(d)`-Reihenfolge des Motors, aber die weicht bei TDM, Spurt und Battlefield vom
+   Foundation-Index ab (1.3a). Dann trüge dieselbe Rolle auf beiden Screens verschiedene Farben.
+   Für das Arena-Board heißt das: Paket 1 dort färbt nach `SLOT_STELLE[id]` (Engine Z. 8238), nicht
+   nach `slotsVon`. Kosten: Bei Battlefield wechselt eine Rolle mit k ihre Farbe (Morale Anchor ist
+   bei k = 2 Position 2, bei k = 6 Position 6). Das ist hinnehmbar, weil das Kürzel immer daneben
+   steht. *Überstimmen:* Farbe je Rolle wäre eine Tabelle `rolle → farbe` in
+   `einsatzliste-anzeige.ts`, kein Umbau.
+   Die Palette ist mit der dataviz-Prüfung validiert (dunkles Thema, `--nl-panel` und
+   `--nl-panel-2`, benachbarte Paare: CVD-Abstand 12,1, Normalsicht 17,8, Kontrast ≥ 3:1).
+   Über **alle** Paare trennt sie nicht sauber, und das gilt für jede Sechserpalette, die die
+   reservierten Töne meidet. Das Kürzel ist deshalb Pflicht und kein Schmuck, vor allem auf dem
+   späteren Mini-Feld.
+2. **Gold nach Basis-Eignung**, nicht nach Slotwert. *Entschieden wie Fable.* Gold beantwortet
+   „gehört er in diese Disziplin?“, die Slotzahl daneben beantwortet „wohin genau?“. Zwei Fragen
+   brauchen zwei Zeichen. In der Foundation ist die Eignung `discipline1Score/discipline2Score`
+   der Kaderkarte, N ist die Slotzahl der Seite. Farbe ist das vorhandene `--nl-gold`. Das ist
+   laut `globals.css` ausdrücklich die Farbe der *Rangskala*, und Top-N ist eine Rangaussage, also
+   wird kein neues Token gebraucht.
+3. **Gegner-Geister auf dem Feld:** *In der Foundation-Einsatzliste vorerst nicht.* Die
+   Einsatzliste hat keine Späh-Vorhersage in ihren Props, nur die Saison-Rivalen
+   (`teamPowerWindows.top8Rivals`). Geister dort wären erfundene Information, und das widerspricht
+   der Transparenz-Leitlinie (nur zeigen, was gemessen ist). Im **Arena-Board**, wo Späh-Gewissheit
+   und Gegnerliste existieren, bleibt Fables Vorschlag richtig (sein Paket 5). In der Foundation
+   bleibt die Gegnerhälfte des Mini-Felds leer bzw. zeigt bei n-gegen-n-Formaten nur „vs Platz n“
+   ohne Namen. *Überstimmen:* sobald es eine Späh-Quelle für die Einsatzliste gibt, ist das ein
+   neues Prop plus `gegner: "spiegel"`. Das Feld kann es schon.
+4. **Rollenkarte rechts.** *Entschieden: rechts, und zwar in der vorhandenen Fokus-Rail*
+   (`nl-lineup-focus`, Z. 2568–2739). Die Einsatzliste hat dort schon den Platz „aktiver Slot“
+   mit Kopf, Radar, Bandbreite und „Top-Pick setzen“. Die Rollenkarte ersetzt/erweitert diesen
+   Kopf, statt eine dritte Spalte aufzumachen. Auf Mobil rutscht die Rail unter das Feld, wie
+   heute auch. Fables Platzfrage beim Arena-Board (Gegnerliste ersetzen) stellt sich hier nicht.
+5. **Bekommt die Foundation-Einsatzliste dasselbe Mini-Feld?** *Ja.* Chris hat das schon
+   beantwortet (Konzept 0b). Sie ist der eigentliche Zielort.
+
+Zusätzlich geklärt: **Fables Ebene C (Feinjustierung) gibt es in der Foundation nicht.** Befehl,
+Haltung und Zusammenhalt sind Entwurfskampf-Regler des Mockups, und die Einsatzliste hat keine.
+Das „zu viele Einstellungen“ trifft in der Einsatzliste andere Bedienelemente: je Seite
+Intensität, zwei Formkarten-Selects, Team-Power-Select und Captain-Chips. Der Vorschlag dazu
+steht als optionales Paket F5 unten und braucht Chris’ Ja, weil er Bedienwege verschiebt.
+
+---
+
+## 5. Umsetzungsplan für `LineupNewLook.tsx`
+
+Jedes Paket ist reine Anzeige und kann als eigener PR laufen. Prüfung je Paket: die
+Einsatzliste-Vertragstests (`tests/*` mit `LineupNewLook`, 15 Dateien) bleiben grün, und
+`tsc`/`eslint` laufen ohne neue Meldungen. Ab F2 zusätzlich: Die Resolve-Ausgabe ist vor und nach
+dem Paket identisch (`calculateSideSlotRoleModifierBreakdown` auf einem festen Kader, alle 20
+Disziplinen).
+
+| Paket | Inhalt | Braucht Geometrie? | Voraussetzung |
+|---|---|---|---|
+| **F1** ✅ (dieser PR) | Kürzel in Positionsfarbe an Slotkarte, Fokus-Kopf und Kader-Zeile; Kader-Zeile „Top-3 Slots mit Zahl“ statt nur „Bester Slot“; Gold-Rahmen Top-N nach Eignung an Slot- und Kader-Avatar | nein | keine |
+| **F2** | ±-Schema + Beitrags-Zerlegung als **Rollenkarte v1 in der Fokus-Rail**: Attributtafel `++/+/·/−/−−` aus `slotWeightProfile − baseWeightProfile`; „warum +8,5?“ als die 3 größten positiven und 2 größten negativen Beiträge, Klemmung sichtbar; Passungsglyphe neben jeder Slotzahl | nein | optionales `attributeStats` im Board-Typ `LineupBoardRosterCard` (Laufzeit hat es schon); eine reine Funktion `resolveSlotRoleContributions(role, stats)` **neben** `resolveProfileRoleModifier` in `matchday-slot-roles.ts` plus Vitest auf die Summen-Invariante (Σ Beiträge = Rohwert vor Klemmung, ±0,05, 20 Disziplinen × alle Slots). Die Schwellen als Konstanten in `einsatzliste-anzeige.ts` |
+| **F3** | Formations-Datenquelle `lib/lineups/formation/` (Abschnitt 2) mit Drift-Wächter gegen die Engine. `<FormationsFeld>` ersetzt `nl-lineup-slot-grid` als Ansicht; die Kartendetails (Fatigue, Verletzungsrisiko, Drag-Fit) bleiben an der Marke bzw. in der Rail. Zuerst **Arena-Chassis (TDM/Mini-DM/Battlefield-Duell) und Basketball** (Chris’ Beispiel, mit Hinweis „Formation greift ab 6 Spielern“); alle übrigen Disziplinen bekommen sofort die generische Leiste | **ja** | F1 (Farben), sinnvoll nach F2 |
+| **F4** | Übrige Feldformen: Bahn-Band aus `planJeSlot`, Climbing-Wand, Bühnen-Leiste mit „vs Platz n“, Hockey/Football hohl außer Torwart/QB/Kicker, Battlefield-Domination als Startort + Neigung. Rolle-Zeilen aus den Motortabellen (Verhalten-Befund Abschnitt 4) | **ja** | F3 |
+| **F5** (optional, Chris fragen) | Einstellungen entschlacken: Formkarten, Team-Power und Captain je Seite in einen einklappbaren Block „Spieltag-Einstellungen“ mit Kurzfassung im eingeklappten Zustand; Intensität bleibt sichtbar | nein | Chris’ Ja |
+| **F6** (Arena-Board) | Dasselbe im Mockup über einen generierten `FORMATION_JE_DISC`-Block (2.4 Stufe 2), Identitätsprüfung `spiele()` byte-gleich | ja | F3 |
+
+**Kleinster sinnvoller Schritt mit sichtbarem Mehrwert: F1.** Der Schritt ist schon gebaut, weil
+er keine offene Designfrage hat und ohne neue Datenquelle auskommt.
+
+**Zwingend erst die Formations-Datenquelle:** F3, F4 und F6. F1 und F2 sind davon unabhängig. F2
+lässt sich parallel zu F3 bauen.
+
+Mit F3 wird die Kader↔Feld-Zuordnung über die Rollen-Id hergestellt
+(`resolveSlotRoleShortId`, 1.3a). Die Marke liest also dieselbe Rolle wie der Arena-Adapter. Dazu
+gehört ein Test, der für alle 20 Disziplinen und k = 1…6 prüft, dass jede Rolle, die
+`resolveSlotRoleShortId` liefert, in der Registry einen Platz hat oder bewusst auf die Leiste
+fällt.
+
+---
+
+## 6. Was in diesem PR gebaut ist (F1)
+
+- `lib/lineups/einsatzliste-anzeige.ts` (neu, ohne Importe):
+  - `EINSATZLISTE_SLOTFARBEN` / `slotFarbe(slotIndex)`: sechs validierte Positionsfarben.
+  - `slotKuerzel` / `slotKuerzelFuerListe`: Arena-Regel, Kollisionen eindeutig aufgelöst. Die
+    Grundregel kollidiert heute in **Staffel** (Curve Runner und Chase Runner, beide „CR“) und in
+    **Breaking** (Standhalten und Steingesicht, beide „ST“). Neu heißen sie CH und SE. Das
+    Mockup-`slotKuerzel` hat dieselbe Kollision und sollte beim Arena-Paket 1 dieselbe Funktion
+    bekommen.
+  - `topNNachEignung`: Top-N nach Eignung, Gleichstand stabil nach Name, ohne Wert nie Gold.
+- `LineupNewLook.tsx`:
+  - Slotkarte: Kürzel-Chip in Positionsfarbe vor dem Rollenlabel; Gold-Ring am Avatar, wenn der
+    gesetzte Spieler zu den Top-N dieser Seite gehört (Tooltip „Top 6 im Kader für TDM (Eignung
+    69,0)“).
+  - Fokus-Kopf: Kürzel-Chip vor dem Rollennamen.
+  - Kader-Zeile: Statt „Bester Slot D1-3 · 72,4“ stehen jetzt die drei stärksten Slots als
+    `VA 78,4 · BR 77,9 · SK 72,0`, mit aktivem Slot innerhalb seiner Seite, sonst über beide Seiten
+    mit Seitenkürzel. Die Zahl ist dieselbe Slot-Projektion (`projectedScore`), die überall sonst
+    steht. Gold-Ring am Avatar für die Top-N der aktiven Seite.
+- `tests/einsatzliste-anzeige.test.ts`: Kürzel eindeutig in allen 20 Disziplinen × k = 1…6,
+  Kollisionsauflösung, Farben, Gold-Ordnung, keine Importe im Helfer.
+
+Nicht gebaut: Fables gestrichelter Gold-Rahmen für „Gold-Spieler steht in der anderen Disziplin“.
+Die Kaderkarte führt `selectedSides` als Array (`lineup-candidate-model.ts` Z. 88), ein Spieler
+kann also je nach Spieltagsregel auf beiden Seiten stehen. Ob „verschenkt“ dann eine richtige
+Aussage ist, hängt an dieser Regel und wurde hier nicht geklärt. Neu bewerten, wenn F3 steht.
+
+Nicht im Browser angesehen: Die Änderung ist mit den Vertragstests, `tsc` und `eslint` geprüft.
+Sichtprüfung am Live-Server mit Testbenutzer Franky steht noch aus.

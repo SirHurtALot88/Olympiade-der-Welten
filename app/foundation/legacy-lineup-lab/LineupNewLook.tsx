@@ -29,6 +29,7 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+import { slotFarbe, slotKuerzelFuerListe, topNNachEignung } from "@/lib/lineups/einsatzliste-anzeige";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -299,10 +300,16 @@ function NlPlayerAvatar({
   portraitUrl,
   name,
   size = 22,
+  goldTitle = null,
 }: {
   portraitUrl?: string | null;
   name: string;
   size?: number;
+  /**
+   * Einsatzliste-Revamp Paket 1: goldener Rahmen für die Top-N des Kaders in dieser
+   * Disziplin (s. `topNNachEignung`). Der Text ist zugleich der Tooltip; `null` = kein Rahmen.
+   */
+  goldTitle?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   const initials = getPlayerPortraitInitials(name);
@@ -310,7 +317,10 @@ function NlPlayerAvatar({
   return (
     <span
       aria-hidden="true"
+      title={goldTitle ?? undefined}
+      data-einsatz-gold={goldTitle ? "true" : undefined}
       style={{
+        ...(goldTitle ? { boxShadow: "0 0 0 2px var(--nl-gold)" } : null),
         position: "relative",
         flex: "0 0 auto",
         width: `${size}px`,
@@ -463,6 +473,39 @@ function reasonChipTone(axis: string): NlTone {
 }
 
 /* --- Kleinteile ------------------------------------------------------- */
+
+/**
+ * Slot-Kürzel in der festen Positionsfarbe (Einsatzliste-Revamp Paket 1). Die Farbe sitzt nur
+ * im Rand und in einer schwachen Tönung, der Text bleibt Tinte — das Kürzel selbst ist das
+ * zweite Merkmal, damit die Zuordnung Kader <-> Slot auch ohne Farbsehen klappt.
+ */
+function NlSlotKuerzel({ kuerzel, slotIndex, title }: { kuerzel: string; slotIndex: number; title?: string }) {
+  const farbe = slotFarbe(slotIndex);
+  return (
+    <span
+      className="nl-tnum"
+      data-einsatz-slotfarbe={slotIndex + 1}
+      title={title}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "0 4px",
+        minWidth: "20px",
+        justifyContent: "center",
+        borderRadius: "var(--nl-r-sm)",
+        border: `1px solid ${farbe}`,
+        background: `color-mix(in srgb, ${farbe} 24%, transparent)`,
+        color: "var(--nl-ink)",
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+        lineHeight: "14px",
+      }}
+    >
+      {kuerzel}
+    </span>
+  );
+}
 
 /**
  * Ring-Zähler (#Ring-Label-Klarheit): EINE eindeutige Bruchzahl
@@ -1454,6 +1497,49 @@ export default function LineupNewLook({
     return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
   }, [filteredCandidates]);
 
+  /*
+   * EINSATZLISTE-REVAMP PAKET 1 (docs/design/einsatzliste-revamp-architektur-08-11.md):
+   * Slot-Kürzel je Slot (eindeutig je Disziplin-Seite) und der goldene Rahmen für die Top-N
+   * des Kaders nach Basis-Eignung (N = Slotzahl der Seite). Nur Nachschlagen in Props, die
+   * schon da sind — keine neue Rechnung, kein Rückweg in Resolve oder Arena.
+   */
+  const slotKuerzelByKey = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const side of ["d1", "d2"] as const) {
+      const sideSlots = slots.filter((slot) => slot.disciplineSide === side).sort((a, b) => a.slotIndex - b.slotIndex);
+      const kuerzel = slotKuerzelFuerListe(sideSlots.map((slot) => slotRoleByKey.get(slot.key)?.label ?? `Slot ${slot.slotIndex + 1}`));
+      sideSlots.forEach((slot, index) => next.set(slot.key, kuerzel[index] ?? "–"));
+    }
+    return next;
+  }, [slots, slotRoleByKey]);
+
+  const goldBySide = useMemo(() => {
+    const karten = [...rosterCardByActivePlayerId.values()].filter((card) => card.activePlayerId);
+    const fuer = (side: "d1" | "d2") => {
+      const n = slots.filter((slot) => slot.disciplineSide === side).length;
+      const ids = topNNachEignung(
+        karten.map((card) => ({
+          id: card.activePlayerId as string,
+          name: card.name,
+          eignung: side === "d1" ? card.discipline1Score : card.discipline2Score,
+        })),
+        n,
+      );
+      return { n, ids };
+    };
+    return { d1: fuer("d1"), d2: fuer("d2") };
+  }, [rosterCardByActivePlayerId, slots]);
+
+  const goldTitleFor = (activePlayerId: string | null | undefined, side: "d1" | "d2"): string | null => {
+    if (!activePlayerId || !goldBySide[side].ids.has(activePlayerId)) return null;
+    const card = rosterCardByActivePlayerId.get(activePlayerId);
+    const eignung = side === "d1" ? card?.discipline1Score : card?.discipline2Score;
+    const disziplin =
+      (side === "d1" ? context?.matchdayContract?.discipline1?.displayName : context?.matchdayContract?.discipline2?.displayName) ??
+      side.toUpperCase();
+    return `Top ${goldBySide[side].n} im Kader für ${disziplin}${eignung != null ? ` (Eignung ${formatScore(eignung)})` : ""}`;
+  };
+
   // Captain-Infos je Disziplin-Seite. Frueher war hier nur die AKTIVE Slot-Seite aufgeloest
   // — der Picker sass in der Fokus-Rail und wechselte seine Bedeutung, je nachdem welcher
   // Slot gerade fokussiert war. Jetzt bekommt jeder Disziplin-Block seinen eigenen Picker,
@@ -2074,7 +2160,14 @@ export default function LineupNewLook({
                     <span className="nl-lineup-slot-index">
                       {slot.disciplineSide.toUpperCase()}-{slot.slotIndex + 1}
                     </span>
-                    <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                      <NlSlotKuerzel
+                        kuerzel={slotKuerzelByKey.get(slot.key) ?? "–"}
+                        slotIndex={slot.slotIndex}
+                        title={`${role?.label ?? "Slot"} · Position ${slot.slotIndex + 1}`}
+                      />
+                      <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
+                    </span>
                   </span>
 
                   {player ? (
@@ -2084,7 +2177,12 @@ export default function LineupNewLook({
                             Hover ⇒ volle Portrait-Karte (wie v2). `strong` ist bereits Flex-Row
                             mit gap — Score/Fatigue rutschen dadurch nicht raus. */}
                         {wrapNlPortraitPreview(
-                          <NlPlayerAvatar portraitUrl={player.portraitUrl} name={player.name} size={22} />,
+                          <NlPlayerAvatar
+                            portraitUrl={player.portraitUrl}
+                            name={player.name}
+                            size={22}
+                            goldTitle={goldTitleFor(selectedId, slot.disciplineSide)}
+                          />,
                           player,
                           isReadOnly || isBusy,
                         )}
@@ -2571,7 +2669,12 @@ export default function LineupNewLook({
                 <span className="nl-lineup-eyebrow">
                   {activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Fokus"}
                 </span>
-                <strong>{activeSlot ? slotRoleByKey.get(activeSlot.key)?.label ?? "Slot" : "Slot wählen"}</strong>
+                <strong style={activeSlot ? { display: "inline-flex", alignItems: "center", gap: "6px" } : undefined}>
+                  {activeSlot ? (
+                    <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(activeSlot.key) ?? "–"} slotIndex={activeSlot.slotIndex} />
+                  ) : null}
+                  {activeSlot ? slotRoleByKey.get(activeSlot.key)?.label ?? "Slot" : "Slot wählen"}
+                </strong>
               </div>
               {activeSlot && !activeSelectionId && topPickForActiveSlot?.player.activePlayerId && !isReadOnly ? (
                 <button
@@ -2813,7 +2916,13 @@ export default function LineupNewLook({
                   const isBlocked = Boolean(entry.activeSlotCandidate?.blockReason);
                   const isAssignedHere = Boolean(candidateId) && activeSelectionId === candidateId;
                   const bestSlots: NlBestSlotEntry[] = candidateId ? playerBestSlotSummaryByActivePlayerId.get(candidateId) ?? [] : [];
-                  const bestSlot = bestSlots[0] ?? null;
+                  // Paket 1: die drei stärksten Slots des Spielers — mit aktivem Slot innerhalb
+                  // DIESER Disziplin-Seite (die Liste ist die Kandidatenliste des aktiven Slots),
+                  // sonst über beide Seiten mit Seitenkürzel. Die Zahl ist dieselbe Slot-
+                  // Projektion, die der Slot selbst zeigt (projectedScore).
+                  const topSlots = (activeSlot ? bestSlots.filter((entry) => entry.disciplineSide === activeSlot.disciplineSide) : bestSlots).slice(0, 3);
+                  const goldSide = activeSlot?.disciplineSide ?? null;
+                  const candidateGoldTitle = goldSide ? goldTitleFor(candidateId, goldSide) : null;
                   // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
                   const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
                   const candidateRange = entry.activeSlotCandidate ?? null;
@@ -2853,7 +2962,12 @@ export default function LineupNewLook({
                           Hover ⇒ volle Karte). Klick fällt weiterhin auf den Button-Handler
                           durch (Zuweisung); Drag-Quelle bleibt der gesamte Button. */}
                       {wrapNlPortraitPreview(
-                        <NlPlayerAvatar portraitUrl={candidate.portraitUrl} name={candidate.name} size={20} />,
+                        <NlPlayerAvatar
+                          portraitUrl={candidate.portraitUrl}
+                          name={candidate.name}
+                          size={20}
+                          goldTitle={candidateGoldTitle}
+                        />,
                         candidate,
                         isReadOnly || isBlocked,
                       )}
@@ -2863,10 +2977,28 @@ export default function LineupNewLook({
                           {entry.groupMeta.label}
                           {entry.shortReason ? ` · ${entry.shortReason}` : ""}
                         </small>
-                        {bestSlot ? (
-                          <small className="nl-lineup-candidate-bestslot">
-                            Bester Slot {bestSlot.disciplineSide.toUpperCase()}-{bestSlot.slotIndex + 1} ·{" "}
-                            {formatNullableScore(bestSlot.projectedScore)}
+                        {topSlots.length > 0 ? (
+                          <small
+                            className="nl-lineup-candidate-bestslot"
+                            data-testid="nl-lineup-candidate-topslots"
+                            style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: "4px" }}
+                            title={topSlots
+                              .map(
+                                (entry) =>
+                                  `${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1} ${
+                                    slotRoleByKey.get(entry.slotKey)?.label ?? "Slot"
+                                  }: ${formatNullableScore(entry.projectedScore)}`,
+                              )
+                              .join(" · ")}
+                          >
+                            {topSlots.map((entry, topIndex) => (
+                              <span key={entry.slotKey} style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                {topIndex > 0 ? <span aria-hidden="true">·</span> : null}
+                                {!activeSlot ? <span>{entry.disciplineSide.toUpperCase()}</span> : null}
+                                <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(entry.slotKey) ?? "–"} slotIndex={entry.slotIndex} />
+                                <span className="nl-tnum">{formatNullableScore(entry.projectedScore)}</span>
+                              </span>
+                            ))}
                           </small>
                         ) : null}
                         {/* Reason-Chips (Feature 2): Top 1–2 Achsen-Begründungen als
