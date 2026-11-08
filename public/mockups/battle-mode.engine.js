@@ -20155,6 +20155,21 @@
     const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
     const slotFuer=(p,i)=>(place[p.n]&&place[p.n].d===buehneDisc)?place[p.n].slot
                           :((slotListe[i%Math.max(1,slotListe.length)]||{}).id||null);
+    // NACH SLOT GEORDNET, NICHT NACH KADERLISTE (Chris, 08.11.): `mine`/`gegner` stehen in
+    // SQUAD-Reihenfolge (`inDisc()` filtert nur, sortiert nicht nach dem GESETZTEN Slot) --
+    // fuer `art.duell` (Speed-Schach/Tennis/Fechten) entscheidet aber, welches Brett i auf
+    // beiden Seiten denselben Slot zusammenbringt (Serve gegen Serve, nicht Serve gegen
+    // Tiebreak, nur weil beide zufaellig an Kaderlistenplatz i stehen). Ausdruecklich NICHT
+    // hier in `mine`/`gegner` selbst umsortiert -- die speisen `setz()`/`slotFuer(p,idx)`
+    // weiter unten, und fuer die ERSATZ-Bank (keine echte Aufstellung, `place[p.n]` leer)
+    // IST `idx` der einzige Slot-Anker; eine Vorab-Umsortierung waere dort zirkulaer. Nur
+    // die drei Stellen, die Bretter wirklich PAAREN (unten im `art.duell`-Block, im
+    // Tennis-Doppel-Paket und in der Fechtstaffel-Warteschlange), lesen stattdessen diese
+    // beiden Kopien. Fuer die Ersatzbank (bereits nach Diszi-Wert sortiert, kein echter Slot)
+    // ist `slotFuer` von Anfang an index-basiert -- der Sort hier ist dort ein No-Op.
+    const slotRang=(s)=>{const pos=slotListe.findIndex(x=>x.id===s);return pos>=0?pos:slotListe.length;};
+    const nachSlotgeordnet=(arr)=>arr.map((p,i)=>({p,r:slotRang(slotFuer(p,i))})).sort((x,y)=>x.r-y.r).map(x=>x.p);
+    const mineGeordnet=nachSlotgeordnet(mine), gegnerGeordnet=nachSlotgeordnet(gegner);
     let id=0;
     // BEIDE SEITEN GLEICH BAUEN — derselbe Fehler wie im Feldspiel vor seiner Korrektur:
     // `istGegner` schaltete Slot-Aufschlag und Stufenwert fuer die Gastseite komplett ab.
@@ -20349,12 +20364,21 @@
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=6){ baueSandsackParallel(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=2){ baueSandsack6v6(art,mine,gegner,saat); return; }
     if(art.heben&&BUEHNE_FLAGS.gewichthebenSandsack>=1){ baueSandsackWegC(art,mine,gegner,saat); return; }
-    if(art.heben){ baueHebenDuelle(art,mine,gegner); baueSandsackFinale(art,mine,gegner,saat); return; }
+    // baueHebenDuelle() PAART SELBST SCHON "UEBER DEN SLOT" (s. Kommentar dort) -- das setzt
+    // aber voraus, dass Index i wirklich Rolle i ist, und genau das stimmte bisher nicht
+    // (dieselbe Kaderlisten-statt-Slot-Luecke wie im `art.duell`-Block oben): `mineGeordnet`/
+    // `gegnerGeordnet` lösen das ein. `baueSandsackFinale` bleibt bei `mine`/`gegner` -- sie
+    // paart keine Einzelduelle, sondern verteilt Stationen INNERHALB einer Teamseite
+    // (`sandsackZuteilung`), unberuehrt von dieser Korrektur.
+    if(art.heben){ baueHebenDuelle(art,mineGeordnet,gegnerGeordnet); baueSandsackFinale(art,mine,gegner,saat); return; }
     // GAUNTLET (Breaking) -- eigener Rueckkehrpunkt wie Heben direkt darueber: baueGauntlet()
     // fuellt runden[]/summe/hp/raus fuer jeden Teilnehmer und baut die eigene buehneQueue
     // selbst (chronologische Kampf-Reihenfolge statt der generischen REIHENFOLGE ganz unten,
     // die fuer unabhaengige Einzelauftritte gedacht ist).
-    if(art.gauntlet){ baueGauntlet(art,mine,gegner); return; }
+    // baueGauntlet() haelt die Kettenreihenfolge fuer Chris' Slot-6-Anker-Dramaturgie
+    // (s. Kommentar dort) fuer bereits slot-echt -- dieselbe falsche Annahme wie beim
+    // `art.duell`-Block oben. `mineGeordnet`/`gegnerGeordnet` lösen das ein.
+    if(art.gauntlet){ baueGauntlet(art,mineGeordnet,gegnerGeordnet); return; }
     // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
     // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
     // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
@@ -20375,9 +20399,12 @@
       // diese Zeile fehlte hier bisher, weil die Duell-Variante (anders als Heben) inline
       // in bauBuehne() steht statt in einer eigenen Funktion.
       const duellBretter=Math.min(mine.length,gegner.length);
+      // Brett i paart jetzt denselben Slot-Rang auf beiden Seiten (`mineGeordnet`/
+      // `gegnerGeordnet`, s. Kommentar bei ihrer Definition oben) statt der i-ten Position
+      // in der Kaderliste.
       for(let i=0;i<duellBretter;i++){
-        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
-        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[i].n);
         if(!a||!b)continue;
         let lauf=0; const verlauf=[];
         for(let r=0;r<art.rundenN;r++){
@@ -20555,10 +20582,10 @@
       // Paar) ist eine Ausbaustufe, kein Teil dieses Paketes (s. PR-Beschreibung).
       if(art.tennis&&duellBretter>=2){
         const dbA=duellBretter-2, dbB=duellBretter-1;
-        const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbA].n);
-        const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mine[dbB].n);
-        const b0=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbA].n);
-        const b1=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[dbB].n);
+        const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbA].n);
+        const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbB].n);
+        const b0=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[dbA].n);
+        const b1=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[dbB].n);
         if(a0&&a1&&b0&&b1){
           const rubberIdx=dbA;
           const verlaufPaar=a0.verlauf.map((v,ri)=>v+(a1.verlauf[ri]??0));
@@ -20583,8 +20610,9 @@
     // dann Gefecht 2, ... statt des generischen "Durchgang 1 aller Bahnen, dann Durchgang
     // 2"-Rhythmus (REIHENFOLGE-Block unten) -- dasselbe Startreihenfolge-Muster, das
     // Eiskunstlauf (E-F1)/Showcase (S-F1) oben schon nutzen (eigener fruehzeitiger `return`,
-    // bevor der generische Block greift). `mine[i]`/`gegner[i]` stehen bereits in Chris'
-    // Aufstellungsreihenfolge (Slot 1 zuerst, s. `slotFuer()` oben) -- Slot 1 eroeffnet die
+    // bevor der generische Block greift). `mineGeordnet[i]`/`gegnerGeordnet[i]` (s. Kommentar
+    // bei ihrer Definition oben) stehen in Chris'
+    // Aufstellungsreihenfolge (Slot 1 zuerst) -- Slot 1 eroeffnet die
     // Staffel, der letzte gesetzte Slot ist der Anker, der real einen Rueckstand noch drehen
     // kann, genau das Drama, das Chris am 22.09. fuer Breaking bestellt hat ("so kann zb ein
     // starker spieler auf slot 6 noch mal richtig aufholen"), hier aber das REALE Format der
@@ -20606,12 +20634,17 @@
     // "PERIODE BEENDET", "BRETT ENTSCHIEDEN"), die `gegner.aktuell` gegen `u.aktuell`
     // vergleichen, vergleichen beide Seiten DESSELBEN Gefechts und bleiben deshalb unveraendert
     // korrekt -- veraendert ist nur, WANN das naechste Gefecht ueberhaupt an die Reihe kommt.
+    //
+    // `mineGeordnet[i]`/`gegnerGeordnet[i]` (nicht `mine[i]`/`gegner[i]`) -- dieselbe
+    // Slot-Paarung wie im `art.duell`-Block oben, sonst zeigt die Warteschlange ein anderes
+    // Gefecht i, als dort tatsaechlich auf Brett i stand (Chris, 08.11., s. Kommentar bei
+    // der Definition von `mineGeordnet` oben).
     if(art.fechten){
       buehneQueue=[];
       const duellBretter=Math.min(mine.length,gegner.length);
       for(let i=0;i<duellBretter;i++){
-        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mine[i].n);
-        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
+        const a=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[i].n);
+        const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegnerGeordnet[i].n);
         for(let r=0;r<art.rundenN;r++){
           if(a)buehneQueue.push(a);
           if(b)buehneQueue.push(b);
@@ -24914,9 +24947,10 @@
       const b=TEILNEHMER.find(x=>x.side===1&&x.n===gegner[i].n);
       if(!a||!b)continue;
       // PAARUNG UEBER DEN SLOT, nicht ueber die Punktzahl: mein Power Opener gegen ihren
-      // Power Opener. Beide Seiten bekommen ihre Rollen in derselben Listenreihenfolge
-      // (slotsVon), der Index ist damit die Rolle. Ein bewusst schwach besetzter Slot ist
-      // dadurch ein Zug und kein Unfall.
+      // Power Opener. `mine`/`gegner` sind hier (seit 08.11.) die nach Slot geordneten
+      // Kopien (`mineGeordnet`/`gegnerGeordnet`, s. Aufrufstelle in bauBuehne()), der Index
+      // ist damit wirklich die Rolle, nicht mehr nur die Kaderlisten-Position. Ein bewusst
+      // schwach besetzter Slot ist dadurch ein Zug und kein Unfall.
       const plan=HEBEN_ROLLEN[i%HEBEN_ROLLEN.length];
       a.rolle=plan.rolle; b.rolle=plan.rolle; a.duellNr=i; b.duellNr=i;
       a.gegnerN=b.n; b.gegnerN=a.n;
@@ -26265,8 +26299,10 @@
   }
 
   // Baut die gesamte Kette VOR dem ersten Frame (wie jeder andere Buehnen-Baustein: bauen,
-  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind die feste Aufstellungsreihenfolge
-  // (Team-Slot 1..n, s. bauBuehne()) -- "Kampfreihenfolge: Team-Slots in fester Reihenfolge".
+  // dann ueber die Zeit enthuellen). `mine`/`gegner` sind hier (seit 08.11.) die nach Slot
+  // geordneten Kopien (`mineGeordnet`/`gegnerGeordnet`, s. Aufrufstelle und Kommentar bei
+  // ihrer Definition in bauBuehne()) -- Team-Slot 1..n in echter Aufstellungsreihenfolge,
+  // nicht mehr Kaderlisten-Reihenfolge.
   function baueGauntlet(art,mine,gegner){
     const A=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
     const B=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
