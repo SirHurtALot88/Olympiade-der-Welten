@@ -48,7 +48,10 @@
     ZWEITCHANCE: {torment:20,intelligence:24,spirit:23,speed:9,awareness:22,stamina:2},
     LAUFTEMPO:   {speed:52,stamina:32,dexterity:16},
     SCHUSS_NAH:  {power:34,spirit:30,stamina:16,awareness:12,dexterity:6,torment:2},
-    TECHNIK:     {intelligence:50,awareness:22,spirit:16,dexterity:12}
+    TECHNIK:     {intelligence:50,awareness:22,spirit:16,dexterity:12},
+    // AUFBAU (Ballhandling) als Nebenweg zum Korbleger: wer den Ball sicher fuehrt, ist schneller
+    // am Ring. Einziger charisma-Traeger ohne nennenswertes spirit (4) — s. Dokument 6.
+    AUFBAU:      {charisma:36,dexterity:26,intelligence:14,awareness:12,speed:8,spirit:4}
   };
   const MATRIX={spirit:22,intelligence:16,awareness:14,charisma:11,speed:10,dexterity:8,power:7,
     stamina:6,torment:6,health:0,will:0,determination:0};
@@ -63,25 +66,33 @@
   // ---------------------------------------------------------------- Konstanten (PLATZHALTER)
   // Kalibriert nur gegen die Vorab-Sonde. Jede Zahl ist ein Hebel fuer die echte Runde.
   const K={
-    // Stand nach der Kalibrierung (Dokument Abschnitt 3.3). Die Steigungen sind STEILER als im
-    // Live-Motor (FW_STEIGUNG 0,0055): ein Wurfwettbewerb hat je Werfer nur ~15 Wuerfe, und ohne
-    // steile Kurven reicht das fuer keine Einzelspiel-Rangfolge (Abschnitt 3.2).
-    ftBasis:0.35, ftK:0.0112,         // Freiwurf: 35 % bei FREIWURF 50, +1,1 Pp je Punkt
-    druckK:0.0085,                    // TEAMGEIST Hintermann minus eigener TEAMGEIST, je Punkt
+    // STAND 2 (08.11., Pp-Runde, Dokument Abschnitt 6). Stand 1 (Abschnitt 3) hatte einen steilen
+    // Freiwurf (ftK 0,0112) und starken Druck (druckK 0,0085): rho gut, aber spirit 28-33 % statt
+    // 22, Pp 21-29 mit Motor-Kadern. Stand 2 nimmt dem Freiwurf und dem Druck Gewicht (beide fast
+    // nur spirit/intelligence bzw. charisma/spirit) und gibt es dem Kampf um den Abpraller, dem
+    // Sprungwurf und dem Ballhandling auf dem Weg zum Korbleger (AUFBAU, Nebenweg mit charisma
+    // ohne spirit). Dafuer braucht es vier Leben statt drei, sonst faellt rho auf ~0,80.
+    // Stand 1 zum Nachmessen: {ftK:0.0112, druckK:0.0085, aufbK:0, kurzBasis:0.25, layZeit:0.9,
+    //   jumpK:0.065, layLtK:0.032, leben:3, zeitSkala:1}
+    ftBasis:0.35, ftK:0.006,          // Freiwurf: 35 % bei FREIWURF 50, +0,6 Pp je Punkt
+    druckK:0.004,                     // TEAMGEIST Hintermann minus eigener TEAMGEIST, je Punkt
     druckMax:9,                       // Deckel fuer den Druckterm (9 = ungedeckelt, s. Dokument 3.4)
+    aufbK:0.12,                       // AUFBAU: s weniger Weg zum Korbleger je Punkt ueber 50
     ftMin:0.05, ftMax:0.95,
     wurfZeit:1.2,                     // Ausholen/Abwurf von der Linie (s)
     flugZeit:0.9,                     // Ball in der Luft bis Ring
     rebBasis:2.6, rebZcK:0.15, rebLtK:0.08, // Zeit bis Abpraller gesichert, schneller mit ZC/LT
-    kurzBasis:0.25, kurzZcK:0.048,   // Chance auf kurzen Abpraller (Korbleger) aus ZWEITCHANCE
-    layBasis:0.62, layK:0.024, layZeit:0.9, layLtK:0.032,  // Korbleger: Chance, Weg (LAUFTEMPO)
-    jumpBasis:0.42, jumpK:0.065, jumpZeit:0.6,             // Sprungwurf nach langem Abpraller
+    kurzBasis:0.12, kurzZcK:0.048,    // Chance auf kurzen Abpraller (Korbleger) aus ZWEITCHANCE
+    layBasis:0.62, layK:0.024, layZeit:3.0, layLtK:0.04,  // Korbleger: Chance, Weg (LAUFTEMPO, AUFBAU)
+    jumpBasis:0.42, jumpK:0.08, jumpZeit:0.6,             // Sprungwurf nach langem Abpraller
     rauschZeit:0.25,                  // relatives Zeitrauschen je Aktion
     pass:0.8,                         // Ball nach vorn, naechster nimmt an
-    // Empfohlene Fassung: drei Leben, Neuauslosung je Umlauf, Wert = Platz + Marge.
+    // Empfohlene Fassung: vier Leben, Neuauslosung je Umlauf, Wert = Platz + Marge.
     // Fables Original: {leben:1, losen:"fest", wert:"platz"}.
-    leben:3, losen:"umlauf", durchgaenge:1, wert:"marge",
-    wertRauswurf:1.0, wertNote:4.0, wertMarge:1.0, margeDeckel:4, zeitLimit:0, wertTempo:1.0
+    leben:4, losen:"umlauf", durchgaenge:1, wert:"marge",
+    wertRauswurf:1.0, wertNote:4.0, wertMarge:1.0, margeDeckel:4,
+    zeitSkala:0.65,                   // nur Darstellung (s. lauf()), Ergebnis exakt unabhaengig davon
+    zeitLimit:0, wertTempo:1.0
   };
 
   function teilwerte(a){const o={};for(const k in REZEPT)o[k]=mische(a,REZEPT[k]);return o;}
@@ -105,14 +116,19 @@
       // Sprungwurf, sonst wird zum Korb gezogen (Weg kostet LAUFTEMPO-abhaengig Zeit).
       const pLay=clamp(K.layBasis+K.layK*(w.SCHUSS_NAH-50),0.15,0.95);
       const pJump=clamp(K.jumpBasis+K.jumpK*(w.TECHNIK-50),0.08,0.85);
-      const wegLay=Math.max(0.3,K.layZeit-K.layLtK*(w.LAUFTEMPO-50));
+      const wegLay=Math.max(0.3,K.layZeit-K.layLtK*(w.LAUFTEMPO-50)-K.aufbK*((w.AUFBAU??50)-50));
       let art,p;
       if(kurz){art="leger";p=pLay;t+=z(0.4);}
       else if(pJump/K.jumpZeit>=pLay/(wegLay+0.4)){art="sprung";p=pJump;t+=z(K.jumpZeit);}
       else{art="leger";p=pLay;t+=z(wegLay+0.4);}
       treffer=r()<p; wuerfe.push({art,t,treffer});
     }
-    return {zeit:t+K.flugZeit*0.6,start:s,wuerfe};
+    // zeitSkala: rein darstellerisch. Alle Zeiten eines Ballbesitzes, alle Abstaende (Pass,
+    // Hintermann-Start) und der Margendeckel skalieren gemeinsam, die Marge zaehlt unskaliert —
+    // Reihenfolge und Spielerwert sind dadurch exakt dieselben, nur die Uhr laeuft schneller.
+    const sk=K.zeitSkala||1;
+    for(const x of wuerfe)x.t=s+(x.t-s)*sk;
+    return {zeit:s+(t+K.flugZeit*0.6-s)*sk,start:s,wuerfe};
   }
 
   // Ein kompletter Knockout. reihe: Array von Werfern (Objekte mit Teilwerten).
@@ -132,7 +148,8 @@
     let V=schlange.shift(), H=schlange.shift();
     // Druck kommt immer vom Naechsten dahinter (Hintermann bzw. der Wartende mit dem Ball).
     let lV=lauf(V,0,H,r,K);
-    let lH=lauf(H,lV.wuerfe[0].t+0.2,schlange[0]||V,r,K);
+    const SK=K.zeitSkala||1;
+    let lH=lauf(H,lV.wuerfe[0].t+0.2*SK,schlange[0]||V,r,K);
     const zaehle=(w,l,bis)=>{const s=stat.get(w);for(const x of l.wuerfe){if(x.t>bis)break;s.versuche++;if(x.treffer)s.treffer++;}};
     bild(0);
     const besitz=(w,l)=>{const s=stat.get(w);s.besitze++;s.besitzZeit+=l.zeit-l.start;};
@@ -142,7 +159,7 @@
       const hTrifftZuerst=lH.zeit<lV.zeit;
       // Marge des Duells (s): positiv = V war schneller. Gedeckelt, damit ein verkorkster
       // Ballbesitz (zwoelf Fehlwuerfe) nicht alles andere ueberstimmt.
-      const marge=clamp(lH.zeit-lV.zeit,-K.margeDeckel,K.margeDeckel);
+      const marge=clamp(lH.zeit-lV.zeit,-K.margeDeckel*SK,K.margeDeckel*SK)/SK;
       stat.get(V).marge+=marge; stat.get(H).marge-=marge;
       let jetzt;
       if(hTrifftZuerst){
@@ -159,8 +176,8 @@
         if(schlange.length===1){V=null;H=null;bild(jetzt);break;}
         if(K.losen==="umlauf"&&umlaufZaehler>=schlange.length){umlaufZaehler=0;mischen(schlange,r);}
         V=schlange.shift(); H=schlange.shift();
-        lV=lauf(V,jetzt+K.pass,H,r,K);
-        lH=lauf(H,lV.wuerfe[0].t+0.2,schlange[0]||V,r,K);
+        lV=lauf(V,jetzt+K.pass*SK,H,r,K);
+        lH=lauf(H,lV.wuerfe[0].t+0.2*SK,schlange[0]||V,r,K);
         bild(jetzt);
       }else{
         // V trifft zuerst: hinten an; H wird Vordermann (sein Versuch laeuft weiter), Neuer dahinter.
@@ -173,7 +190,7 @@
         if(K.losen==="umlauf"&&umlaufZaehler>=schlange.length+1){umlaufZaehler=0;mischen(schlange,r);}
         const N=schlange.shift();
         V=H; lV=lH; H=N;
-        lH=lauf(H,jetzt+K.pass,schlange[0]||V,r,K);
+        lH=lauf(H,jetzt+K.pass*SK,schlange[0]||V,r,K);
         bild(jetzt);
       }
     }

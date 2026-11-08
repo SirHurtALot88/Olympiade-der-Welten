@@ -15,7 +15,7 @@
 //   node scripts/miss-basketball-knockout-prototyp.mjs [spiele=48] [--saat-versatz=N]
 //        [--leben=3] [--losen=fest|start|umlauf] [--durchgaenge=N]
 //        [--wert=platz|marge|mix|konto|tempo] [--zeit=S] [--ohne-pp]
-//   Standard = empfohlene Fassung (3 Leben, umlauf, marge). Fables Original:
+//   Standard = empfohlene Fassung (4 Leben, umlauf, marge; Konstanten Stand 2). Fables Original:
 //   --leben=1 --losen=fest --wert=platz
 //   KO_K='{"ftK":0.012}' ueberschreibt Konstanten fuer einen Lauf (Kalibrier-Hilfe).
 // ===================================================================================
@@ -29,7 +29,7 @@ const require = createRequire(import.meta.url);
 const T = require(resolve(wurzel, "public/mockups/basketball-knockout-prototyp.sim.js"));
 if (process.env.KO_K) Object.assign(T.K, JSON.parse(process.env.KO_K));
 const opt = (name, def) => { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.split("=")[1] : def; };
-const OPT = { leben: Number(opt("leben", 3)), losen: opt("losen", "umlauf"), durchgaenge: Number(opt("durchgaenge", 1)), wert: opt("wert", "marge"), zeitLimit: Number(opt("zeit", 0)) };
+const OPT = { leben: Number(opt("leben", 4)), losen: opt("losen", "umlauf"), durchgaenge: Number(opt("durchgaenge", 1)), wert: opt("wert", "marge"), zeitLimit: Number(opt("zeit", 0)) };
 const FORMAT = `leben=${OPT.leben} losen=${OPT.losen} durchgaenge=${OPT.durchgaenge} wert=${OPT.wert}${OPT.zeitLimit ? ` zeit=${OPT.zeitLimit}s` : ""}`;
 const OHNE_PP = process.argv.includes("--ohne-pp");
 const spiele = (h, g, s) => T.spiele(h, g, s, OPT);

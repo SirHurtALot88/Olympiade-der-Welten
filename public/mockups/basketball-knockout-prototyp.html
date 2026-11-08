@@ -6,7 +6,7 @@
 <title>Basketball Knockout</title>
 <!--
   PROTOTYP der Format-Variante "Knockout" fuer Basketball (08.11.). Kein Produktionscode, von der App
-  nicht verlinkt. Mechanik: basketball-knockout-prototyp.sim.js (empfohlene Fassung: drei Leben,
+  nicht verlinkt. Mechanik: basketball-knockout-prototyp.sim.js (empfohlene Fassung: vier Leben,
   Neuauslosung je Umlauf), Kulisse: basketball-knockout-prototyp/halle.png
   (scripts/baue-kulisse-knockout-prototyp.py aus public/szenen/basketball/parkett.html), Figuren: die
   echten PixelLab-Sprites aus battle-mode.figuren.js. Einordnung und Sonde:
@@ -45,7 +45,7 @@ td.heim { color:var(--heim); } td.gast { color:var(--gast); } tr.raus td { opaci
 <body>
 <div class="wrap">
   <h1>Knockout: Prototyp einer Basketball-Format-Variante</h1>
-  <p class="lead">Alle zwölf Spieler der Begegnung stehen in einer Reihe an der Freiwurflinie, mit zwei Bällen. Der Vordermann wirft. Trifft er nicht, holt er den Abpraller und versucht es weiter, bis der Ball drin ist. Der Hintermann darf werfen, sobald der Vordermann geworfen hat. <b>Trifft der Hintermann zuerst, ist der Vordermann geknockt.</b> Wer trifft, stellt sich hinten an. Jeder hat <b>drei Leben</b>, und nach jedem Umlauf wird die Reihe neu ausgelost. Wer am Ende allein übrig bleibt, gewinnt. Es gelten dieselben Basketball-Teilwerte wie im Live-Spiel: Freiwurf, Teamgeist, Zweitchance, Lauftempo, Schuss nah, Technik. Nur der Ablauf ist ein anderer.</p>
+  <p class="lead">Alle zwölf Spieler der Begegnung stehen in einer Reihe an der Freiwurflinie, mit zwei Bällen. Der Vordermann wirft. Trifft er nicht, holt er den Abpraller und versucht es weiter, bis der Ball drin ist. Der Hintermann darf werfen, sobald der Vordermann geworfen hat. <b>Trifft der Hintermann zuerst, ist der Vordermann geknockt.</b> Wer trifft, stellt sich hinten an. Jeder hat <b>vier Leben</b>, und nach jedem Umlauf wird die Reihe neu ausgelost. Wer am Ende allein übrig bleibt, gewinnt. Es gelten dieselben Basketball-Teilwerte wie im Live-Spiel: Freiwurf, Teamgeist, Zweitchance, Lauftempo, Schuss nah, Technik und Aufbau (Ballhandling auf dem Weg zum Korbleger). Nur der Ablauf ist ein anderer.</p>
   <div class="stage"><canvas id="c" width="1920" height="852"></canvas></div>
   <div class="controls">
     <button id="play">Pause</button>
@@ -60,7 +60,7 @@ td.heim { color:var(--heim); } td.gast { color:var(--gast); } tr.raus td { opaci
     <div class="card"><h2>Boxscore <span id="bxs" style="color:var(--muted);font-weight:400"></span></h2><table id="box"></table></div>
     <div class="card"><h2>Ticker</h2><div class="ticker" id="ticker"></div></div>
   </div>
-  <p class="cap">Prototyp, nicht im Spiel. Die Mechanik liegt in <code>basketball-knockout-prototyp.sim.js</code> und liest nur Teilwerte, die der Motor für Basketball ohnehin aus der gesperrten Matrix mischt. Das sind die Rezepte aus <code>battle-mode.rezepte.js</code> und der Freiwurf-Kanal des Motors. Die Vorab-Sonde <code>scripts/miss-basketball-knockout-prototyp.mjs</code> kommt für diese Fassung auf rho je Spiel 0,81 bis 0,83 und eine Pp-Abweichung von 21 bis 23. Fables Original mit einem Leben und fester Reihe liegt bei rho 0,59 bis 0,61. Die Sonde misst ohne Slot-, Trait- und Formkanäle und ist deshalb noch keine Abnahme. Die Kader sind fünf echte Paarungen aus dem live-save-Abbild. Die Halle ist die PixelLab-Parkett-Szene, umgebaut mit <code>scripts/baue-kulisse-knockout-prototyp.py</code>.</p>
+  <p class="cap">Prototyp, nicht im Spiel. Die Mechanik liegt in <code>basketball-knockout-prototyp.sim.js</code> und liest nur Teilwerte, die der Motor für Basketball ohnehin aus der gesperrten Matrix mischt. Das sind die Rezepte aus <code>battle-mode.rezepte.js</code> und der Freiwurf-Kanal des Motors. Mit echten Motor-Kadern (Slotwahl, Formkarten, Mutatoren; <code>scripts/miss-basketball-knockout-motorkader.mjs</code>) kommt diese Fassung auf rho je Spiel 0,82 bis 0,85 und eine Pp-Abweichung von 18 bis 22. Fables Original mit einem Leben und fester Reihe liegt bei rho 0,71 bis 0,72. Eine Abnahme ist das noch nicht, die braucht den Builder im Motor. Die Kader sind fünf echte Paarungen aus dem live-save-Abbild. Die Halle ist die PixelLab-Parkett-Szene, umgebaut mit <code>scripts/baue-kulisse-knockout-prototyp.py</code>.</p>
 </div>
 <script src="battle-mode.figuren.js"></script>
 <script src="basketball-knockout-prototyp.sim.js"></script>
@@ -166,7 +166,7 @@ function aktiv(b,t){
   // i = naechster Wurf (oder w.length = alle geworfen)
   const vorher=i>0?w[i-1]:null, naechst=i<w.length?w[i]:null;
   let pos, zustand=null, ballXY=null;
-  const flug=spiel.K.flugZeit;
+  const flug=spiel.K.flugZeit*(spiel.K.zeitSkala||1);
   if(!vorher){ // vor dem ersten Wurf: an die Linie gehen, ausholen
     // Hintermann wartet einen Schritt hinter der Linie und tritt erst kurz vor dem eigenen Wurf vor.
     const vor=naechst&&naechst.t-t<0.7, zx=vor?FT.x:FT.x-0.9, zz=vor?FT.z:-0.5;
@@ -232,7 +232,7 @@ function draw(){
       text(be.w.slice(0,13),a.pos.x,a.pos.y+24,FARBE[info[be.w].seite],18,"center",true);
       lebenPunkte(be.w,a.pos.x,a.pos.y+40,b.leben[be.w]); }});
     if(a.ballXY&&!(tt>be.ende&&be.ergebnis!=="knock"&&be.ergebnis!=="sicher"))baelle.push(a.ballXY);
-    const lw=be.wuerfe.filter(x=>!x.nachEnde).pop(); if(lw&&lw.treffer){const s=tt-lw.t-spiel.K.flugZeit; if(s>0&&s<0.8)netz=Math.max(netz,1-s/0.8);}
+    const lw=be.wuerfe.filter(x=>!x.nachEnde).pop(); if(lw&&lw.treffer){const s=tt-lw.t-spiel.K.flugZeit*(spiel.K.zeitSkala||1); if(s>0&&s<0.8)netz=Math.max(netz,1-s/0.8);}
   }
   // Wartende in der Reihe
   b.schlange.filter(n=>!aktivSet.has(n)).forEach((n,i)=>{
@@ -295,10 +295,10 @@ function boxscore(t,fertig){
   boxEl.innerHTML="<tr>"+k("Werfer","")+k("L","Leben übrig")+k("KO+","andere geknockt")+k("KO−","selbst geknockt")+k("W","Würfe")+k("T","Treffer")
     +k("FW","Freiwurf (spirit 48, intelligence 35, dexterity 17)")+k("TG","Teamgeist: Druck auf den Vordermann, Ruhe an der Linie (charisma 56, spirit 44)")
     +k("ZC","Zweitchance: wie schnell und wie nah man den Abpraller hat (torment, intelligence, spirit, awareness …)")+k("LT","Lauftempo: Sprint zum Abpraller (speed 52, stamina 32, dexterity 16)")
-    +k("NAH","Schuss nah: Korbleger (power 34, spirit 30 …)")+k("TECH","Technik: Sprungwurf nach langem Abpraller (intelligence 50, awareness 22 …)")
+    +k("NAH","Schuss nah: Korbleger (power 34, spirit 30 …)")+k("TECH","Technik: Sprungwurf nach langem Abpraller (intelligence 50, awareness 22 …)")+k("AUF","Aufbau: Ballhandling auf dem Weg zum Korbleger (charisma 36, dexterity 26 …)")
     +k("Eig","Basketball-Eignung (Matrix)")+k("Pl","Platz, erst am Ende")+"</tr>"
     +z.map(r=>"<tr class='"+(r.raus?"raus":"")+"'><td class='"+(r.u.seite?"gast":"heim")+"'>"+r.u.n+"</td><td>"+r.leben+"</td><td>"+(r.kn||"")+"</td><td>"+(r.gk||"")+"</td><td>"+r.w+"</td><td>"+r.tr+"</td><td>"
-      +r.u.FREIWURF+"</td><td>"+r.u.TEAMGEIST+"</td><td>"+r.u.ZWEITCHANCE+"</td><td>"+r.u.LAUFTEMPO+"</td><td>"+r.u.SCHUSS_NAH+"</td><td>"+r.u.TECHNIK+"</td><td>"+Math.round(r.u.eig)+"</td><td>"+(fertig?r.u.platz:"")+"</td></tr>").join("");
+      +r.u.FREIWURF+"</td><td>"+r.u.TEAMGEIST+"</td><td>"+r.u.ZWEITCHANCE+"</td><td>"+r.u.LAUFTEMPO+"</td><td>"+r.u.SCHUSS_NAH+"</td><td>"+r.u.TECHNIK+"</td><td>"+r.u.AUFBAU+"</td><td>"+Math.round(r.u.eig)+"</td><td>"+(fertig?r.u.platz:"")+"</td></tr>").join("");
 }
 
 // ------------------------------------------------------------------ Schleife + Bedienung

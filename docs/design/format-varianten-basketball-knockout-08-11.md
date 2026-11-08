@@ -16,13 +16,14 @@ nicht. `battle-mode.engine.js`, `battle-mode.rezepte.js` und die Matrix sind unb
 
 | Frage | Antwort |
 |---|---|
+| **Aktueller Stand (Stand 2, Abschnitt 6)** | **Vier Leben**, Neuauslosung je Umlauf, Freiwurf und Druck schwächer gewichtet, Sprungwurf stärker, AUFBAU (Ballhandling auf dem Weg zum Korbleger) als neuer Nebenweg. Mit echten Motor-Kadern sind es **8 von 8 Läufen über beiden Schranken**: rho **0,818–0,846**, Pp **17,7–21,5**, auch auf einem nie zur Kalibrierung genutzten Saatstrom und auf gekreuzten Paarungen. Spielzeit im Median ~6:00 (rein darstellerisch skalierbar). Die Zeilen darunter beschreiben Stand 1 und bleiben als Verlauf stehen. |
 | Welche Teilwerte hat Basketball? | **Zehn**, nicht neun: AUFBAU, ABSCHLUSS, TECHNIK, SCHUSS_NAH, SCHUSS_FERN, ZWEITCHANCE, ABWEHR, TEAMGEIST, AUSDAUER und **LAUFTEMPO** (speed 52, stamina 32, dexterity 16). Dazu kommt der Freiwurf-Kanal im Motor (spirit 48, intelligence 35, dexterity 17). Abschnitt 8 der Machbarkeit irrt hier, Fables Kanalliste stimmt (Abschnitt 1). |
 | Trägt Fables Knockout mit einem Leben? | **Nein.** Die Sonde misst rho je Spiel **0,605 / 0,591**. Das hat zwei Ursachen, die sich getrennt messen lassen. Erstens die Reihenposition: Man wird immer vom selben Nachbarn gejagt, deshalb liegt die Validität nur bei 0,67–0,88. Zweitens gibt es zu wenig Daten: 4,5 Würfe je Werfer, der Erstausgeschiedene hat 1,2. Fables eigenes Risiko bestätigt sich (Abschnitt 3). |
-| Gibt es eine Reparatur? | Ja: **drei Leben und eine Neuauslosung der Reihe nach jedem Umlauf**, als Spielerwert Platz plus Sekunden-Marge. Das ergibt rho **0,825 / 0,811**, auf einem frischen dritten Saatstrom **0,811**, die Validität liegt bei 0,90–0,97. Die Pp-Abweichung beträgt **20,9 / 21,1 / 22,7**. Das Bild bleibt Fables Bild: eine Reihe, ein Korb, „Knockout!“. |
+| Gibt es eine Reparatur? (Stand 1) | Ja: **drei Leben und eine Neuauslosung der Reihe nach jedem Umlauf**, als Spielerwert Platz plus Sekunden-Marge. Das ergibt rho **0,825 / 0,811**, auf einem frischen dritten Saatstrom **0,811**, die Validität liegt bei 0,90–0,97. Die Pp-Abweichung beträgt **20,9 / 21,1 / 22,7**. Das Bild bleibt Fables Bild: eine Reihe, ein Korb, „Knockout!“. |
 | Was kostet die Reparatur? | Spielzeit und steile Wurfkurven. Die Spielzeit steigt im Median von ~1:35 auf **~5:10** (p10 4:14, p90 6:25), im Bereich des Live-Basketballs (4 × 90 s) und unter dem Hantel-Duell (7:11). Die Trefferkurven sind etwa **doppelt so steil** wie der Freiwurf im Live-Motor. Bei flacher Kurve kommen auch drei Leben nur auf ~0,6 (Abschnitt 3.2). |
 | Pp im Detail | spirit liegt über der Matrix (28,5 statt 22), awareness darunter (7,7 statt 14). Jedes Basketball-Rezept enthält spirit, awareness fehlt im Freiwurf ganz. Kein Nullattribut trägt (health, will, determination je 0,0). |
 | Prototyp | `public/mockups/basketball-knockout-prototyp.html`: echte PixelLab-Figuren in der PixelLab-Parketthalle der Basketball-Szene, zwei Bälle, Abpraller, Korbleger, Knockout-Einblendung, Leben-Punkte, spoilerfreier Boxscore und Ticker (Abschnitt 5). |
-| Mit Motor-Kadern (Abschnitt 4) | Mit echter Slotwahl, Formkarten und Mutatoren aus dem Motor: rho **0,832 / 0,818 / 0,825**, Pp **21,2 / 24,6 / 29,4**. rho hält, Pp ist in einem von drei Strömen über 25. Das ist der offene Punkt. |
+| Mit Motor-Kadern, Stand 1 (Abschnitt 4) | Mit echter Slotwahl, Formkarten und Mutatoren aus dem Motor: rho **0,832 / 0,818 / 0,825**, Pp **21,2 / 24,6 / 29,4**. rho hält, Pp ist in einem von drei Strömen über 25. Das ist der offene Punkt. |
 | Einschränkung | Die Konstanten sind an denselben fünf Paarungen kalibriert, auf denen die Sonde misst. Slot-, Trait- und Formkanäle fehlen. Die Zahlen sind deshalb **optimistisch**. Die Pflichtabnahme im Motor kann das Format noch kippen. |
 
 ---
@@ -71,6 +72,8 @@ Die Freiwurf-Basis steht deshalb bei 35 %.
 ---
 
 ## 2. Die Mechanik
+
+*Beschreibt Stand 1. Die Änderungen von Stand 2 (vier Leben, AUFBAU, andere Konstanten) stehen in Abschnitt 6.*
 
 Datei: `public/mockups/basketball-knockout-prototyp.sim.js`.
 
@@ -121,7 +124,9 @@ Spielerwert, Anteile gegen die Matrix). Kader sind die fünf echten Paarungen au
 `data/generated/kaderfamilie-live-save.json` (je Seite die ersten sechs), Eignung ist
 `d.basketball`.
 
-### 3.1 Ergebnisse (Konstanten wie in der Sim, n = 48, Strom 0 / Strom 1)
+### 3.1 Ergebnisse (Konstanten Stand 1, n = 48, Strom 0 / Strom 1)
+
+*Stand 1 lässt sich nachmessen: Die Konstanten stehen im Kopfkommentar von `K` in der Sim und werden per `KO_K='{…}'` gesetzt. Ohne Schalter misst die Sonde inzwischen Stand 2 (Abschnitt 6).*
 
 | Fassung | Würfe je Spiel | Spielzeit (Median) | rho je Spiel | Validität je Paarung | Star Rang 1 / Top 2 | Pp |
 |---|---:|---:|---:|---|---:|---:|
@@ -231,7 +236,7 @@ eine Lesefunktion neben `feldspielSubskills()` in die ausgelieferte Motordatei e
 
 | Fassung | rho je Spiel (0 / 1 / 2) | Validität je Paarung | Star Rang 1 / Top 2 | Pp (0 / 1 / 2) |
 |---|---:|---|---:|---:|
-| **Empfohlene Fassung** (3 Leben, Neuauslosung, Platz + Marge), Konstanten wie in der Sim | **0,832 / 0,818 / 0,825** | 0,87–0,97 | 61 % / 80 % | **21,2 / 24,6 / 29,4** |
+| **Stand 1** (3 Leben, Neuauslosung, Platz + Marge) | **0,832 / 0,818 / 0,825** | 0,87–0,97 | 61 % / 80 % | **21,2 / 24,6 / 29,4** |
 | dieselbe, Freiwurf flacher (`ftK` 0,008) und Sprungwurf steiler (`jumpK` 0,075) | 0,818 / 0,804 / 0,818 | — | — | 23,0 / 23,4 / 25,9 |
 | Fables Original (1 Leben, feste Reihe) | 0,724 / 0,706 | — | 49–51 % / 69–74 % | — |
 
@@ -264,6 +269,99 @@ power 2,6 (7), stamina 6,8 (6), torment 4,9 (6), health / will / determination 0
 der Schranke, Pp liegt in zwei von drei Strömen darunter und ist der offene Punkt vor einem
 Motor-Builder. Die Pflichtabnahme mit `miss-alle-disziplinen.mjs` / `messe-arena-einfluss.mjs`
 (Abschnitt 5 der Machbarkeit) ersetzt diese Sonde weiterhin nicht. Sie braucht den Builder im Motor.
+
+---
+
+## 6. Pp-Runde: Stand 2 (08.11., nach der Motor-Kader-Sonde)
+
+**Ausgangslage.** Mit Motor-Kadern hielt Stand 1 rho (0,81–0,83), riss Pp aber in einem von drei
+Strömen (29,4). spirit lag bei 28–33 % statt 22.
+
+### 6.1 Werkzeug: Kanal-Einfluss statt Attribut-Einfluss
+
+Eine Hilfsrechnung (nicht im Repo, in der Sitzung gerechnet) hebt statt eines Attributs einen
+**Teilwert** eines Spielers um 8 und misst den Gewinn im eigenen Spielerwert. Damit sieht man direkt,
+welcher Kanal wie viel trägt. Über die Rezeptzeilen umgerechnet ergibt das die Attributanteile.
+Diese „lineare Pp“ traf die gemessene Pp von Stand 1 gut (27 gegen 21–29). Stand 1 sah so aus:
+
+| Kanal | Freiwurf | Teamgeist | Zweitchance | Lauftempo | Schuss nah | Technik |
+|---|---:|---:|---:|---:|---:|---:|
+| Stand 1, gemessen | 22 % | 25 % | 19 % | 15 % | 14 % | **5 %** |
+| was die Matrix verlangt (Abschnitt 1) | 0–3 % | 18 % | 29 % | 14 % | 18 % | 20 % |
+
+Freiwurf und Druck trugen zusammen 47 %, beide fast nur spirit mit intelligence bzw. charisma. Der
+Sprungwurf, der einzige Kanal mit viel awareness und wenig spirit, trug fast nichts.
+
+### 6.2 Ist das strukturell?
+
+**Zum Teil.** In den sechs Kanälen von Stand 1 hängt spirit an intelligence (Freiwurf, Technik,
+Zweitchance) und an charisma (Teamgeist, 56 : 44). Wer spirit senkt, verliert intelligence oder
+charisma mit. Genau das zeigte der erste Versuch, Freiwurf und Druck einfach abzuschwächen: spirit
+fiel auf ~25, charisma auf 8–9, Pp blieb bei 22–26, rho sank auf ~0,80. Mit diesen sechs Kanälen
+liegt eine Pp-Hochebene bei etwa 22–26.
+
+**Der Ausweg ist ein siebter Kanal, der charisma ohne spirit trägt:** AUFBAU (charisma 36,
+dexterity 26, intelligence 14, awareness 12, speed 8, spirit 4). Das ist ein Teilwert, den
+Basketball ohnehin mischt. Im Knockout ist er das **Ballhandling auf dem Weg zum Korbleger**: Wer
+den Ball sicher führt, ist schneller am Ring. Das ist zugleich ein Nebenweg im Sinn von Chris'
+Leitlinie „mehrere Wege zum Erfolg“: Ein guter Ballführer mit schwachem Wurf kommt über den
+Korbleger, ein Werfer über den Sprungwurf.
+
+### 6.3 Stand 2
+
+| Konstante | Stand 1 | Stand 2 | Wirkung |
+|---|---:|---:|---|
+| `ftK` (Freiwurf-Steigung) | 0,0112 | 0,006 | Linie weniger entscheidend, spirit und intelligence runter |
+| `druckK` (Teamgeist-Druck) | 0,0085 | 0,004 | spirit runter. Charisma kommt jetzt auch über AUFBAU. Nebenbei entschärft das den 18-von-18-Effekt aus Abschnitt 3.4 |
+| `aufbK` (neu) | – | 0,12 s je Punkt | AUFBAU verkürzt den Weg zum Korbleger |
+| `layZeit` / `layLtK` | 0,9 / 0,032 | 3,0 / 0,04 | Der Weg zum Korb ist lang genug, dass Handling und Tempo zählen |
+| `kurzBasis` | 0,25 | 0,12 | mehr lange Abpraller, also mehr Wurfwahl |
+| `jumpK` | 0,065 | 0,08 | Sprungwurf steiler (darüber sättigt die Kappung bei 85 %, mehr bringt nichts) |
+| `leben` | 3 | **4** | ohne das vierte Leben fällt rho auf ~0,80 |
+| `zeitSkala` (neu) | 1 | 0,65 | **nur Darstellung**: Alle Zeiten und Abstände skalieren gemeinsam, die Marge zählt unskaliert. Ergebnis und Spielerwerte sind exakt dieselben (nachgemessen: 0,825 / 20,9 mit 1 wie mit 0,6). |
+
+Kanal-Anteile in Stand 2 (Hilfsrechnung): Freiwurf 12, Teamgeist 12, Zweitchance 21, Lauftempo 13,
+Schuss nah 17, Technik 14, Aufbau 11 %.
+
+### 6.4 Messung
+
+**Vorab-Sonde** (eigene Mischung, erste sechs je Seite): rho **0,839 / 0,839**, Pp **13,4 / 13,9**,
+Star auf Rang 1 / Top 2: 55 % / 83 %.
+
+**Motor-Kader-Sonde** (`scripts/miss-basketball-knockout-motorkader.mjs`, n = 48, Pp mit 48 Spielen
+je Paarung). Neu ist der Schalter `--kreuz=K`: Heim von Paarung i spielt gegen Gast von Paarung i+K.
+Dieselben Teams treten so in Begegnungen an, die keine Kalibrierung gesehen hat.
+
+| Lauf | rho je Spiel | Pp |
+|---|---:|---:|
+| Paarungen wie gezogen, Strom 0 | 0,832 | 19,9 |
+| Strom 1 | 0,818 | 19,0 |
+| Strom 2 | 0,846 | 18,5 |
+| **Strom 3 (nie zur Kalibrierung genutzt)** | **0,839** | **18,9** |
+| gekreuzt K=1, Strom 0 | 0,829 | 18,9 |
+| gekreuzt K=1, Strom 1 | 0,828 | 20,4 |
+| gekreuzt K=2, Strom 0 | 0,846 | 17,7 |
+| gekreuzt K=2, Strom 1 | 0,839 | 21,5 |
+
+Star auf Rang 1 / Top 2: 60–65 % / 77–82 %. Spielzeit im Median 557 s Simulationszeit, mit
+`zeitSkala` 0,65 also ~6:00 (das Beispiel in den Bildern dauert 7:38).
+
+**Zum Vergleich: Stand 2 mit nur drei Leben** erreichte Pp 16,8–23,3 in 7 von 7 Läufen, rho aber nur
+0,790–0,811. Das vierte Leben kauft die rho-Marge.
+
+### 6.5 Einschätzung
+
+- **Beide Schranken halten jetzt mit Abstand**: rho ~+0,02 bis +0,05, Pp ~3,5 bis 7. Das gilt auf
+  echten Motor-Kadern, auf einem frischen Strom und auf neuen Paarungen. Das ist ein brauchbarer
+  Zwischenstand, auf dem ein Motor-Builder aufsetzen kann.
+- **Pp ist nicht mehr strukturell an spirit gebunden**, sobald AUFBAU mitspielt. spirit liegt mit
+  Motor-Kadern noch bei 23–27 (Matrix 22), awareness bei 9–11 (Matrix 14). Beides ist im Rahmen.
+- **Was noch fehlt**, ehrlich benannt: Kalibriert wurde wieder auf denselben fünf Teams, nur die
+  Paarungen sind gekreuzt. Ein zweiter Spielstand fehlt. Kleinere Kader (2–6 je Seite) sind nicht
+  gemessen. Die Pflichtabnahme braucht weiterhin den Builder im Motor (Abschnitt 5).
+- **Designfolgen für Chris:** Der Freiwurf ist jetzt der Auftakt, nicht die Entscheidung. Der Kampf
+  um den Abpraller, der Sprungwurf und das Handling auf dem Weg zum Korb entscheiden. Vier Leben
+  heißen ~265 Würfe und ~6 Minuten Sendezeit.
 
 ---
 

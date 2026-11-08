@@ -20,7 +20,7 @@
 // zusaetzliche Lesefunktion neben feldspielSubskills(). Die Datei im Repo aendert sich nicht.
 //
 //   node scripts/miss-basketball-knockout-motorkader.mjs [spiele=48] [--saat-versatz=N]
-//        [--pp=SPIELE] [--leben=3] [--losen=umlauf] [--wert=marge]
+//        [--pp=SPIELE] [--kreuz=1..4] [--leben=4] [--losen=umlauf] [--wert=marge]
 // ===================================================================================
 import { createRequire } from "node:module";
 import { readFileSync, existsSync } from "node:fs";
@@ -40,11 +40,17 @@ const opt = (name, def) => { const a = args.find((x) => x.startsWith(`--${name}=
 const N = Number(args.find((a) => !a.startsWith("--")) ?? 48);
 const VERSATZ = Number(opt("saat-versatz", 0));
 const PP_N = Number(opt("pp", 0));
-const OPT = { leben: Number(opt("leben", 3)), losen: opt("losen", "umlauf"), wert: opt("wert", "marge") };
+const OPT = { leben: Number(opt("leben", 4)), losen: opt("losen", "umlauf"), wert: opt("wert", "marge") };
 
-const familie = JSON.parse(readFileSync(resolve(wurzel, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten;
+const familieRoh = JSON.parse(readFileSync(resolve(wurzel, "data/generated/kaderfamilie-live-save.json"), "utf8")).varianten;
+// --kreuz=K: Gegenprobe mit ANDEREN Paarungen aus demselben Spielstand — Heim von Paarung i gegen
+// Gast von Paarung i+K (K=1..4). So spielen dieselben Teams in Begegnungen, die die Kalibrierung
+// nie gesehen hat.
+const KREUZ = Number(opt("kreuz", 0));
+const familie = KREUZ ? familieRoh.map((v, i) => { const w = familieRoh[(i + KREUZ) % familieRoh.length];
+  return { label: `${v.label.split("-")[0]}-x-${w.label.split("-")[1]}`, heim: v.heim, gast: w.gast }; }) : familieRoh;
 const SEITE = pathToFileURL(join(wurzel, "public/mockups/battle-mode.html")).href;
-const KANAELE = ["TEAMGEIST", "ZWEITCHANCE", "LAUFTEMPO", "SCHUSS_NAH", "TECHNIK"];
+const KANAELE = ["TEAMGEIST", "ZWEITCHANCE", "LAUFTEMPO", "SCHUSS_NAH", "TECHNIK", "AUFBAU"];
 
 // Lesefunktion, die nur im Speicher eingehaengt wird (s. Kopf). Laeuft im Motor-Closure.
 const HAKEN = `knockoutKader:(familie,o)=>{
@@ -90,7 +96,7 @@ await seite.waitForFunction(() => window.__arena && window.__arena.knockoutKader
 async function hole(von, bis, pp) {
   return seite.evaluate(([f, o]) => window.__arena.knockoutKader(f, o), [familie, { von, bis, versatz: VERSATZ, pp }]);
 }
-const zuSpieler = (zeile) => ({ n: zeile[0], seite: zeile[1], eig: zeile[2], slot: zeile[9],
+const zuSpieler = (zeile) => ({ n: zeile[0], seite: zeile[1], eig: zeile[2], slot: zeile[4 + KANAELE.length],
   tw: { FREIWURF: zeile[3], ...Object.fromEntries(KANAELE.map((k, j) => [k, zeile[4 + j]])) } });
 const spiel = (zeilen, saat) => {
   const sp = zeilen.map(zuSpieler);
@@ -122,7 +128,7 @@ for (const v of basis) {
     for (const u of z) { summeW.set(u.n, (summeW.get(u.n) ?? 0) + u.wert); summeE.set(u.n, (summeE.get(u.n) ?? 0) + u.eig); }
     const st = [...z].sort((a, b) => b.eig - a.eig)[0], pl = [...z].sort((a, b) => b.wert - a.wert).indexOf(st);
     if (pl === 0) stern1++; if (pl <= 1) stern2++; sternN++;
-    for (const r of s.grund) { tw.push(r.slice(3, 9)); slotsGesehen.add(r[9]); }
+    for (const r of s.grund) { tw.push(r.slice(3, 9)); slotsGesehen.add(r[4 + KANAELE.length]); }
   }
   const namen = [...summeW.keys()];
   const val = spearman(namen.map((n) => summeE.get(n)), namen.map((n) => summeW.get(n)));
