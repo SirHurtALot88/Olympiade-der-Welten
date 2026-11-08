@@ -29,7 +29,7 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
-import { slotFarbe, slotKuerzelFuerListe, topNNachEignung } from "@/lib/lineups/einsatzliste-anzeige";
+import { bestbesetzungJeSlot, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -479,14 +479,27 @@ function reasonChipTone(axis: string): NlTone {
  * im Rand und in einer schwachen Tönung, der Text bleibt Tinte — das Kürzel selbst ist das
  * zweite Merkmal, damit die Zuordnung Kader <-> Slot auch ohne Farbsehen klappt.
  */
-function NlSlotKuerzel({ kuerzel, slotIndex, title }: { kuerzel: string; slotIndex: number; title?: string }) {
+function NlSlotKuerzel({
+  kuerzel,
+  slotIndex,
+  title,
+  goldVerschenktTitle = null,
+}: {
+  kuerzel: string;
+  slotIndex: number;
+  title?: string;
+  /** Gestrichelter Goldring: der Kader-Beste für diesen Slot steht woanders (Tooltip-Text). */
+  goldVerschenktTitle?: string | null;
+}) {
   const farbe = slotFarbe(slotIndex);
   return (
     <span
       className="nl-tnum"
       data-einsatz-slotfarbe={slotIndex + 1}
-      title={title}
+      data-einsatz-gold-verschenkt={goldVerschenktTitle ? "true" : undefined}
+      title={goldVerschenktTitle ? `${title ? `${title} · ` : ""}${goldVerschenktTitle}` : title}
       style={{
+        ...(goldVerschenktTitle ? { outline: "1.5px dashed var(--nl-gold)", outlineOffset: "2px" } : null),
         display: "inline-flex",
         alignItems: "center",
         padding: "0 4px",
@@ -1513,31 +1526,42 @@ export default function LineupNewLook({
     return next;
   }, [slots, slotRoleByKey]);
 
-  const goldBySide = useMemo(() => {
-    const karten = [...rosterCardByActivePlayerId.values()].filter((card) => card.activePlayerId);
-    const fuer = (side: "d1" | "d2") => {
-      const n = slots.filter((slot) => slot.disciplineSide === side).length;
-      const ids = topNNachEignung(
-        karten.map((card) => ({
-          id: card.activePlayerId as string,
-          name: card.name,
-          eignung: side === "d1" ? card.discipline1Score : card.discipline2Score,
-        })),
-        n,
-      );
-      return { n, ids };
-    };
-    return { d1: fuer("d1"), d2: fuer("d2") };
-  }, [rosterCardByActivePlayerId, slots]);
+  // Gold = BESTBESETZUNG NACH DEM SLOTWERT (Chris 08.11. „nach dem Slotwert", Lesart aus Fables
+  // Gesamtkonzept Abschnitt 5): je Slot der Kader-Beste nach Projektion in genau diesem Slot.
+  // Quelle ist dieselbe Rangliste, die auch Drag-Vorschau und Top-3-Slots der Kader-Zeile lesen.
+  const bestbesetzungBySlotKey = useMemo(
+    () =>
+      bestbesetzungJeSlot({
+        slotKeys: slots.map((slot) => slot.key),
+        slotWerteJeSpieler: playerBestSlotSummaryByActivePlayerId.entries(),
+        nameVon: (id) => rosterCardByActivePlayerId.get(id)?.name ?? id,
+      }),
+    [slots, playerBestSlotSummaryByActivePlayerId, rosterCardByActivePlayerId],
+  );
 
-  const goldTitleFor = (activePlayerId: string | null | undefined, side: "d1" | "d2"): string | null => {
-    if (!activePlayerId || !goldBySide[side].ids.has(activePlayerId)) return null;
-    const card = rosterCardByActivePlayerId.get(activePlayerId);
-    const eignung = side === "d1" ? card?.discipline1Score : card?.discipline2Score;
-    const disziplin =
-      (side === "d1" ? context?.matchdayContract?.discipline1?.displayName : context?.matchdayContract?.discipline2?.displayName) ??
-      side.toUpperCase();
-    return `Top ${goldBySide[side].n} im Kader für ${disziplin}${eignung != null ? ` (Eignung ${formatScore(eignung)})` : ""}`;
+  const slotNameFor = (slotKey: string) => {
+    const slot = slots.find((entry) => entry.key === slotKey);
+    return slot ? `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} ${slotRoleByKey.get(slotKey)?.label ?? ""}`.trim() : "diesen Slot";
+  };
+
+  /** Voller Goldring: dieser Spieler ist in diesem Slot der Kader-Beste. */
+  const goldTitleFor = (activePlayerId: string | null | undefined, slotKey: string | null | undefined): string | null => {
+    if (!activePlayerId || !slotKey) return null;
+    const beste = bestbesetzungBySlotKey.get(slotKey);
+    if (!beste || beste.id !== activePlayerId) return null;
+    return `Bestbesetzung: niemand im Kader wäre auf ${slotNameFor(slotKey)} besser (Slotwert ${formatScore(beste.wert)})`;
+  };
+
+  /**
+   * Gestrichelter Goldring („Gold verschenkt"): auf einem Slot, dessen Kader-Bester NICHT dort
+   * steht. Gibt den Tooltip zurück („Buttercup wäre hier 81,0 — steht auf D1-4 Hold Line"), sonst null.
+   */
+  const goldVerschenktTitleFor = (slotKey: string): string | null => {
+    const beste = bestbesetzungBySlotKey.get(slotKey);
+    if (!beste || selections[slotKey] === beste.id) return null;
+    const andererSlotKey = Object.entries(selections).find(([, id]) => id === beste.id)?.[0] ?? null;
+    const wo = andererSlotKey ? `steht auf ${slotNameFor(andererSlotKey)}` : "ist nicht aufgestellt";
+    return `Gold verschenkt: ${beste.name} wäre hier ${formatScore(beste.wert)} — ${wo}`;
   };
 
   // Captain-Infos je Disziplin-Seite. Frueher war hier nur die AKTIVE Slot-Seite aufgeloest
@@ -2165,6 +2189,7 @@ export default function LineupNewLook({
                         kuerzel={slotKuerzelByKey.get(slot.key) ?? "–"}
                         slotIndex={slot.slotIndex}
                         title={`${role?.label ?? "Slot"} · Position ${slot.slotIndex + 1}`}
+                        goldVerschenktTitle={player ? goldVerschenktTitleFor(slot.key) : null}
                       />
                       <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
                     </span>
@@ -2181,7 +2206,7 @@ export default function LineupNewLook({
                             portraitUrl={player.portraitUrl}
                             name={player.name}
                             size={22}
-                            goldTitle={goldTitleFor(selectedId, slot.disciplineSide)}
+                            goldTitle={goldTitleFor(selectedId, slot.key)}
                           />,
                           player,
                           isReadOnly || isBusy,
@@ -2921,8 +2946,7 @@ export default function LineupNewLook({
                   // sonst über beide Seiten mit Seitenkürzel. Die Zahl ist dieselbe Slot-
                   // Projektion, die der Slot selbst zeigt (projectedScore).
                   const topSlots = (activeSlot ? bestSlots.filter((entry) => entry.disciplineSide === activeSlot.disciplineSide) : bestSlots).slice(0, 3);
-                  const goldSide = activeSlot?.disciplineSide ?? null;
-                  const candidateGoldTitle = goldSide ? goldTitleFor(candidateId, goldSide) : null;
+                  const candidateGoldTitle = activeSlot ? goldTitleFor(candidateId, activeSlot.key) : null;
                   // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
                   const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
                   const candidateRange = entry.activeSlotCandidate ?? null;
@@ -2997,6 +3021,15 @@ export default function LineupNewLook({
                                 {!activeSlot ? <span>{entry.disciplineSide.toUpperCase()}</span> : null}
                                 <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(entry.slotKey) ?? "–"} slotIndex={entry.slotIndex} />
                                 <span className="nl-tnum">{formatNullableScore(entry.projectedScore)}</span>
+                                {candidateId && bestbesetzungBySlotKey.get(entry.slotKey)?.id === candidateId ? (
+                                  <span
+                                    data-einsatz-gold-raute="true"
+                                    style={{ color: "var(--nl-gold)" }}
+                                    title={`Bestbesetzung für ${slotNameFor(entry.slotKey)}`}
+                                  >
+                                    ◆
+                                  </span>
+                                ) : null}
                               </span>
                             ))}
                           </small>

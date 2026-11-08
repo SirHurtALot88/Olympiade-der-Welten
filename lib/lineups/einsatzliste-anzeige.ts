@@ -6,7 +6,7 @@
  *
  * NUR ANZEIGE. Nichts hier wird von Resolve, Arena-Adapter oder Motor gelesen; die Datei
  * importiert bewusst nichts aus dem Simulations- oder Matrixpfad. Sie bekommt fertige Zahlen
- * (Slot-Projektionen, Disziplin-Eignung) und entscheidet nur, wie sie aussehen.
+ * (Slot-Projektionen) und entscheidet nur, wie sie aussehen.
  */
 
 /**
@@ -79,24 +79,45 @@ export function slotKuerzelFuerListe(labels: readonly string[]): string[] {
   });
 }
 
+
 /**
- * GOLDENER RAHMEN: die Top-N des Kaders nach BASIS-EIGNUNG in dieser Disziplin
- * (N = Slotzahl der Seite). Gold sagt „gehört in diese Disziplin", unabhängig vom Slot —
- * die Slot-Passung zeigt die Zahl daneben.
+ * GOLDENER RAHMEN = BESTBESETZUNG, NACH DEM SLOTWERT.
+ *
+ * Chris 08.11. (Fable-Rework Abschnitt 13 Frage 2): „Zu Punkt 2, den Rahmen machen wir nach dem
+ * Slotwert." Lesart nach Fables visuellem Gesamtkonzept
+ * (`docs/design/einsatzliste-gesamtkonzept-visuell-08-11.md` Abschnitt 5): Gold trägt, wer in
+ * DIESEM Slot den höchsten Wert des GANZEN Kaders hat — „niemand im Kader wäre hier besser".
+ * Höchstens ein Gold je Slot, bei perfekter Aufstellung genau N (= Slotzahl) auf dem Feld.
+ * Steht der Kader-Beste woanders oder gar nicht im Aufgebot, zeigt der Slot das gestrichelt
+ * („Gold verschenkt").
+ *
+ * Wert = `projectedScore` aus `playerBestSlotSummaryByActivePlayerId`: dieselbe Projektion, die
+ * die Einsatzliste an Slot, Kader-Zeile und Drag-Vorschau zeigt.
+ *
+ * Diese Lesart ist Fables Vorschlag und noch nicht von Chris bestätigt. Meint er stattdessen
+ * „die N höchsten Slotwerte auf dem Feld", ändert sich nur diese Funktion.
  *
  * Gleichstand: der Name entscheidet (stabil, sonst flackert das Gold zwischen Renders).
- * Spieler ohne Eignungswert zählen nicht mit.
+ * Spieler ohne Wert in einem Slot zählen dort nicht mit.
  */
-export function topNNachEignung(
-  spieler: Iterable<{ id: string; name: string; eignung: number | null | undefined }>,
-  n: number,
-): Set<string> {
-  const anzahl = Math.max(0, Math.trunc(n));
-  if (anzahl === 0) return new Set();
-  const mitWert = [...spieler].filter(
-    (eintrag): eintrag is { id: string; name: string; eignung: number } =>
-      eintrag.eignung != null && Number.isFinite(eintrag.eignung),
-  );
-  mitWert.sort((a, b) => (b.eignung !== a.eignung ? b.eignung - a.eignung : a.name.localeCompare(b.name, "de")));
-  return new Set(mitWert.slice(0, anzahl).map((eintrag) => eintrag.id));
+export type Bestbesetzung = { id: string; name: string; wert: number };
+
+export function bestbesetzungJeSlot(input: {
+  slotKeys: Iterable<string>;
+  slotWerteJeSpieler: Iterable<[string, ReadonlyArray<{ slotKey: string; projectedScore: number | null }>]>;
+  nameVon: (activePlayerId: string) => string;
+}): Map<string, Bestbesetzung | null> {
+  const beste = new Map<string, Bestbesetzung>();
+  for (const [id, eintraege] of input.slotWerteJeSpieler) {
+    const name = input.nameVon(id);
+    for (const eintrag of eintraege) {
+      const wert = eintrag.projectedScore;
+      if (wert == null || !Number.isFinite(wert)) continue;
+      const bisher = beste.get(eintrag.slotKey);
+      if (!bisher || wert > bisher.wert || (wert === bisher.wert && name.localeCompare(bisher.name, "de") < 0)) {
+        beste.set(eintrag.slotKey, { id, name, wert });
+      }
+    }
+  }
+  return new Map([...input.slotKeys].map((key) => [key, beste.get(key) ?? null] as const));
 }

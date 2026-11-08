@@ -8,7 +8,7 @@ import {
   slotFarbe,
   slotKuerzel,
   slotKuerzelFuerListe,
-  topNNachEignung,
+  bestbesetzungJeSlot,
 } from "@/lib/lineups/einsatzliste-anzeige";
 import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
@@ -51,18 +51,35 @@ describe("Einsatzliste-Anzeige (Paket 1)", () => {
     expect(slotFarbe(Number.NaN)).toBe(EINSATZLISTE_SLOTFARBEN[0]);
   });
 
-  it("Gold: Top-N nach Eignung, Gleichstand stabil nach Name, ohne Wert nie Gold", () => {
-    const kader = [
-      { id: "a", name: "Zora", eignung: 70 },
-      { id: "b", name: "Anton", eignung: 70 },
-      { id: "c", name: "Bert", eignung: 80 },
-      { id: "d", name: "Cleo", eignung: null },
-      { id: "e", name: "Dana", eignung: 50 },
-    ];
-    expect([...topNNachEignung(kader, 2)]).toEqual(["c", "b"]);
-    expect(topNNachEignung(kader, 0).size).toBe(0);
-    expect(topNNachEignung(kader, 10).has("d")).toBe(false);
-    expect(topNNachEignung(kader, 10).size).toBe(4);
+  it("Gold = Bestbesetzung nach SLOTWERT (Chris 08.11.): je Slot der Kader-Beste, nicht nach Basis-Eignung", () => {
+    // p3 ist im Slot d1-0 der Beste, in d1-1 der Schwächste — Gold hängt am Slot, nicht am Spieler.
+    const werte = new Map([
+      ["p1", [{ slotKey: "d1-0", projectedScore: 60 }, { slotKey: "d1-1", projectedScore: 75 }, { slotKey: "d2-0", projectedScore: 40 }]],
+      ["p2", [{ slotKey: "d1-0", projectedScore: 62 }, { slotKey: "d1-1", projectedScore: 70 }, { slotKey: "d2-0", projectedScore: 55 }]],
+      ["p3", [{ slotKey: "d1-0", projectedScore: 80 }, { slotKey: "d1-1", projectedScore: 50 }, { slotKey: "d2-0", projectedScore: null }]],
+    ]);
+    const beste = bestbesetzungJeSlot({
+      slotKeys: ["d1-0", "d1-1", "d2-0", "d2-1"],
+      slotWerteJeSpieler: werte.entries(),
+      nameVon: (id) => id,
+    });
+    expect(beste.get("d1-0")).toEqual({ id: "p3", name: "p3", wert: 80 });
+    expect(beste.get("d1-1")?.id).toBe("p1");
+    expect(beste.get("d2-0")?.id).toBe("p2"); // p3 ohne Wert zählt nicht
+    expect(beste.get("d2-1")).toBeNull(); // Slot ohne irgendeinen Wert
+  });
+
+  it("Bestbesetzung: Gleichstand stabil nach Name", () => {
+    const werte = new Map([
+      ["z", [{ slotKey: "s", projectedScore: 70 }]],
+      ["a", [{ slotKey: "s", projectedScore: 70 }]],
+    ]);
+    const beste = bestbesetzungJeSlot({
+      slotKeys: ["s"],
+      slotWerteJeSpieler: werte.entries(),
+      nameVon: (id) => (id === "z" ? "Zora" : "Anton"),
+    });
+    expect(beste.get("s")?.id).toBe("a");
   });
 
   it("Helfer-Modul importiert nichts aus Resolve, Arena oder Matrix (reine Anzeige)", () => {

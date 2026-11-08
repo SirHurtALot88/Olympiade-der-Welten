@@ -5,8 +5,9 @@ Grundlage ist Fables Konzept `docs/design/aufstellung-screen-rework-08-11.md` (B
 dass das Ziel die **echte Foundation-Einsatzliste** ist (`app/foundation/legacy-lineup-lab/LineupNewLook.tsx`)
 und nicht nur das Arena-Board im Mockup. Dieses Dokument prüft, was die Foundation-Seite dafür
 schon hat. Es legt eine erweiterbare Formations-Datenquelle fest, übersetzt Fables Pakete auf
-`LineupNewLook.tsx` und entscheidet die fünf offenen Fragen aus Abschnitt 13. Paket F1 ist im
-selben PR schon gebaut (Abschnitt 6).
+`LineupNewLook.tsx` und arbeitet Chris’ Antworten auf die fünf Fragen aus Abschnitt 13 ein
+(Abschnitt 4). Dazu gehört auch die Prüfung, ob die Gegner-Daten zur Aufstellungszeit vorliegen
+(4a). Paket F1 ist im selben PR schon gebaut (Abschnitt 6).
 
 Alle Zeilennummern gelten für `main` @ `ecc12ccb6`. Wo „neu“ steht, ist der Stand nach diesem PR
 gemeint. Nach jedem Merge verschieben sie sich, also per `grep` suchen.
@@ -229,53 +230,105 @@ Entwurf.
 
 ---
 
-## 4. Die fünf offenen Fragen (Fable Abschnitt 13): Entscheidungen
+## 4. Die fünf Fragen (Fable Abschnitt 13): Chris’ Antworten und was daraus folgt
 
-Chris hat die Entscheidung delegiert. Jede Entscheidung unten ist begründet und lässt sich
-überstimmen, ohne dass sich an der Architektur etwas ändert.
+Chris hat die Fragen am 08.11. selbst beantwortet (Rework-Konzept Abschnitt 13, „beantwortet
+08.11.“). Eine erste Fassung dieses Dokuments ging noch von der unbeantworteten Version aus. Bei
+Frage 2 und 3 lag sie damit falsch, bei Frage 4 hatte sie vorgegriffen. Das ist hier korrigiert,
+und F1 ist entsprechend umgebaut.
 
-1. **Slotfarbe je Position 1–6, nicht je Rolle.** *Entschieden wie Fable vorschlägt, mit einer
-   Präzisierung:* Position heißt **Foundation-`slotIndex`**, also genau die Zahl, die als „D1-3“
-   schon auf der Karte steht und aus der der Arena-Adapter die Rolle liest. Fable nahm die
-   `slotsVon(d)`-Reihenfolge des Motors, aber die weicht bei TDM, Spurt und Battlefield vom
-   Foundation-Index ab (1.3a). Dann trüge dieselbe Rolle auf beiden Screens verschiedene Farben.
-   Für das Arena-Board heißt das: Paket 1 dort färbt nach `SLOT_STELLE[id]` (Engine Z. 8238), nicht
-   nach `slotsVon`. Kosten: Bei Battlefield wechselt eine Rolle mit k ihre Farbe (Morale Anchor ist
-   bei k = 2 Position 2, bei k = 6 Position 6). Das ist hinnehmbar, weil das Kürzel immer daneben
-   steht. *Überstimmen:* Farbe je Rolle wäre eine Tabelle `rolle → farbe` in
-   `einsatzliste-anzeige.ts`, kein Umbau.
-   Die Palette ist mit der dataviz-Prüfung validiert (dunkles Thema, `--nl-panel` und
-   `--nl-panel-2`, benachbarte Paare: CVD-Abstand 12,1, Normalsicht 17,8, Kontrast ≥ 3:1).
-   Über **alle** Paare trennt sie nicht sauber, und das gilt für jede Sechserpalette, die die
-   reservierten Töne meidet. Das Kürzel ist deshalb Pflicht und kein Schmuck, vor allem auf dem
-   späteren Mini-Feld.
-2. **Gold nach Basis-Eignung**, nicht nach Slotwert. *Entschieden wie Fable.* Gold beantwortet
-   „gehört er in diese Disziplin?“, die Slotzahl daneben beantwortet „wohin genau?“. Zwei Fragen
-   brauchen zwei Zeichen. In der Foundation ist die Eignung `discipline1Score/discipline2Score`
-   der Kaderkarte, N ist die Slotzahl der Seite. Farbe ist das vorhandene `--nl-gold`. Das ist
-   laut `globals.css` ausdrücklich die Farbe der *Rangskala*, und Top-N ist eine Rangaussage, also
-   wird kein neues Token gebraucht.
-3. **Gegner-Geister auf dem Feld:** *In der Foundation-Einsatzliste vorerst nicht.* Die
-   Einsatzliste hat keine Späh-Vorhersage in ihren Props, nur die Saison-Rivalen
-   (`teamPowerWindows.top8Rivals`). Geister dort wären erfundene Information, und das widerspricht
-   der Transparenz-Leitlinie (nur zeigen, was gemessen ist). Im **Arena-Board**, wo Späh-Gewissheit
-   und Gegnerliste existieren, bleibt Fables Vorschlag richtig (sein Paket 5). In der Foundation
-   bleibt die Gegnerhälfte des Mini-Felds leer bzw. zeigt bei n-gegen-n-Formaten nur „vs Platz n“
-   ohne Namen. *Überstimmen:* sobald es eine Späh-Quelle für die Einsatzliste gibt, ist das ein
-   neues Prop plus `gegner: "spiegel"`. Das Feld kann es schon.
-4. **Rollenkarte rechts.** *Entschieden: rechts, und zwar in der vorhandenen Fokus-Rail*
-   (`nl-lineup-focus`, Z. 2568–2739). Die Einsatzliste hat dort schon den Platz „aktiver Slot“
-   mit Kopf, Radar, Bandbreite und „Top-Pick setzen“. Die Rollenkarte ersetzt/erweitert diesen
-   Kopf, statt eine dritte Spalte aufzumachen. Auf Mobil rutscht die Rail unter das Feld, wie
-   heute auch. Fables Platzfrage beim Arena-Board (Gegnerliste ersetzen) stellt sich hier nicht.
-5. **Bekommt die Foundation-Einsatzliste dasselbe Mini-Feld?** *Ja.* Chris hat das schon
-   beantwortet (Konzept 0b). Sie ist der eigentliche Zielort.
+1. **Slotfarbe je Position, „aber passend zu der jeweiligen Disziplin“.** Die Zuordnung Position
+   → Farbton gilt über alle 20 Disziplinen. Sättigung, Wärme und Helligkeit dürfen sich an die
+   Disziplin anpassen; Fables Gesamtkonzept löst das mit fünf „Stimmungen“ je Kulisse
+   (`einsatzliste-gesamtkonzept-visuell-08-11.md` Abschnitt 4).
+   - **Präzisierung aus der Architektur:** Position heißt **Foundation-`slotIndex`**, also die
+     Zahl, die als „D1-3“ auf der Karte steht und aus der der Arena-Adapter die Rolle liest. Die
+     `slotsVon(d)`-Reihenfolge des Motors weicht bei TDM, Spurt und Battlefield davon ab (1.3a).
+     Das Arena-Board muss deshalb nach `SLOT_STELLE[id]` färben (Engine Z. 8238), sonst trägt
+     dieselbe Rolle auf beiden Screens verschiedene Farben.
+   - **F1 nutzt die Grundpalette ohne Stimmung.** Die sechs Töne in `EINSATZLISTE_SLOTFARBEN` sind
+     mit der dataviz-Prüfung validiert (dunkles Thema, benachbarte Paare: CVD-Abstand 12,1,
+     Normalsicht 17,8, Kontrast ≥ 3:1). Über alle Paare trennen sie nicht sauber, deshalb steht
+     das Kürzel immer daneben.
+   - **Abgleich nötig:** Fables Farbnamen (P1 Weinrot … P6 Umbra) und meine validierten Werte sind
+     noch nicht dasselbe Set. Die Stimmungsfilter gehören als zweiter Parameter in `slotFarbe`.
+     Jede Stimmungsvariante muss vor dem Bau wieder durch dieselbe Prüfung.
+2. **Gold nach dem Slotwert**, ausdrücklich nicht nach Basis-Eignung. Chris: „Zu Punkt 2, den
+   Rahmen machen wir nach dem Slotwert.“
+   - **Umgesetzt nach Fables Lesart** (Gesamtkonzept Abschnitt 5): Gold heißt *Bestbesetzung*.
+     Der Spieler hat in genau diesem Slot den höchsten Wert des ganzen Kaders, gemessen an
+     derselben Projektion, die die Einsatzliste überall zeigt.
+   - **Gestrichelter Goldring** („Gold verschenkt“): Der Kader-Beste für diesen Slot steht
+     woanders oder nicht im Aufgebot. Der Tooltip sagt, wer es wäre und wo er steht.
+   - **Kader-Liste:** Eine Raute ◆ steht hinter jedem Slot, in dem der Spieler Kader-Bester ist.
+   - **Noch nicht von Chris bestätigt.** Meint er stattdessen „die N höchsten Slotwerte auf dem
+     Feld“, ändert sich nur `bestbesetzungJeSlot`.
+3. **Gegner auf dem Feld, mit Counter-Einschätzung.** Das ist Chris’ Vorgabe, keine offene Frage.
+   Meine erste Fassung hatte das für die Foundation mit „keine Späh-Daten, also erfunden“
+   verworfen. Das war voreilig. Die Datenlage ist geprüft und steht in **Abschnitt 4a**. Kurz:
+   Gegner und gegnerischer Kader sind zur Aufstellungszeit bekannt, nur noch nicht verdrahtet.
+   Offen ist eine Spielregel-Frage an Chris, keine Datenfrage.
+4. **Rollenkarte rechts oder darunter:** Chris hat das **bewusst vertagt**, bis ein Bild vorliegt
+   („hängt davon ab, wie es dann aussieht“). Meine erste Fassung hatte „rechts in der
+   Fokus-Rail“ entschieden; das ist zurückgenommen. Fables Gesamtkonzept schlägt inzwischen rechts
+   vor, mit einem Faden von der Marke zur Karte. Architektonisch kostet beides gleich viel, denn
+   die Rollenkarte ist eine Komponente, und wo sie steht, entscheidet das Layout. F2 kann sie
+   vorläufig in die bestehende Fokus-Rail setzen, ohne die Entscheidung vorwegzunehmen.
+5. **Foundation-Einsatzliste bekommt das Mini-Feld:** Ja, bestätigt. Bindend ist auch die Kopplung:
+   Wer in der Einsatzliste eingesetzt wird, steht genau so in der Arena. Das leistet heute schon
+   der Adapter (Abschnitt 3), und die Formations-Registry hängt an derselben Rollen-Id (1.3a).
 
-Zusätzlich geklärt: **Fables Ebene C (Feinjustierung) gibt es in der Foundation nicht.** Befehl,
-Haltung und Zusammenhalt sind Entwurfskampf-Regler des Mockups, und die Einsatzliste hat keine.
-Das „zu viele Einstellungen“ trifft in der Einsatzliste andere Bedienelemente: je Seite
-Intensität, zwei Formkarten-Selects, Team-Power-Select und Captain-Chips. Der Vorschlag dazu
-steht als optionales Paket F5 unten und braucht Chris’ Ja, weil er Bedienwege verschiebt.
+Zusätzlich gilt weiterhin: **Fables Ebene C (Feinjustierung) gibt es in der Foundation nicht.**
+Befehl, Haltung und Zusammenhalt sind Entwurfskampf-Regler des Mockups, und die Einsatzliste hat
+keine. Das „zu viele Einstellungen“ trifft in der Einsatzliste andere Bedienelemente: je Seite
+Intensität, zwei Formkarten-Selects, Team-Power-Select und Captain-Chips. Dazu gibt es das
+optionale Paket F5 unten. Es braucht Chris’ Ja, weil es Bedienwege verschiebt.
+
+### 4a. Gegner-Daten: weiß die Foundation zur Aufstellungszeit, gegen wen und mit wem?
+
+**Ja, beides liegt im Spielstand. Es ist nur nicht an die Einsatzliste angeschlossen.**
+
+- **Wer der Gegner ist**, steht im Spielplan: `getOpponentOf(gameState, teamId, matchdayId)`
+  (`lib/season/season-fixture-schedule.ts` Z. 195) liest `seasonState.schedule`. Das ist derselbe
+  Spielplan, aus dem die Arena ihre Heim/Gast-Paarung baut (`findeSpieltagsFixtures`,
+  `lib/foundation/season-matchday-fixtures-overview.ts` Kopfkommentar). Pod-Disziplinen
+  (Mini-DM, Battlefield, Takeshi/Staffel) haben einen eigenen 4-Team-Pod-Spielplan
+  (`lib/season/mini-dm-pod-schedule.ts` u. a.).
+  - **Einschränkung:** Bei alten Spielständen ohne Liga-Split ist der Spielplan nur ein
+    Platzhalter. Im lokalen Abbild (Saison 2, nur 10 Spielplaneinträge) liefert
+    `getOpponentOf` für das menschliche Team `null`. Die Anzeige muss das abfangen („Gegner noch
+    nicht bekannt“), statt etwas zu erfinden.
+- **Mit welchem Kader**, steht in den Aufstellungen der KI-Teams. Sie werden **vor** der eigenen
+  Aufstellung geschrieben:
+  - `POST /api/lineups/legacy/ai-batch-prewarm` (angestoßen aus dem Cockpit nach dem
+    Spieltagswechsel, `lib/foundation/tabs/cockpit-matchday-handlers.ts` Z. 172) erzeugt alle
+    KI-Aufstellungen des anstehenden Spieltags.
+  - Spätestens beim Speichern der eigenen Aufstellung holt `app/api/lineups/legacy/route.ts`
+    (Z. 175 ff.) fehlende nach.
+  - Im Normalfall liegt die gegnerische `lineupDraft` also schon fest, wenn der Spieler aufstellt.
+    Sie reagiert auch nicht auf seine Aufstellung (`overwriteExisting: false`).
+- **Zwei Grenzen, die keine Datenlücke sind, sondern Spielregeln:**
+  1. **Menschliche Gegner** (Koop, Franky; `getManualControlTeamIds`): Deren Entwurf zu zeigen,
+     verriete eine Aufstellung, die der andere Mensch noch ändert. Für menschliche Gegner gibt es
+     bis zur Abgabe keine Gegnerdaten, höchstens den Kader ohne Slots.
+  2. **Wie genau die KI-Aufstellung sichtbar sein soll:** exakt oder nur als Späh-Schätzung mit
+     Unschärfe, wie Fables Arena-Board es mit der Späh-Gewissheit vorsieht. Wird die exakte
+     Gegneraufstellung gezeigt, wird Countern zur reinen Rechenaufgabe. Das ist eine
+     Balance-Entscheidung. **Offener Punkt für Chris** (siehe unten), nicht von uns zu kippen.
+- **Was die Einsatzliste dafür bräuchte:** Der Kontext (`lab-context`-Route, Typ
+  `LegacyLineupLoadedContext`) bekäme ein optionales Feld `gegner`: Team, und je Disziplin-Seite
+  Slots mit Spieler, Slotwert und Rolle. Es wird serverseitig aus Spielplan + gegnerischer
+  `lineupDraft` gebaut, mit derselben `resolveSlotRoleShortId`-Abbildung wie der Adapter. Für die
+  Counter-Einschätzung (Fables „Live-Delta“) reichen zunächst die Slotwerte beider Seiten je
+  Position. Eine echte Duell-Projektion (eigener gegen gegnerischen Slot) gibt es im Resolve heute
+  **nicht**: Gewertet wird die Seitensumme, nicht Slot gegen Slot. Jede „wer gewinnt dieses Duell“-
+  Anzeige darf deshalb nur behaupten, was der Motor der jeweiligen Disziplin wirklich paart (z. B.
+  n gegen n bei Gewichtheben, Tennis, Fechten, Speed-Schach). Für die Feldspiel- und Arena-
+  Disziplinen ist das eine eigene Recherche.
+
+**Offene Punkte für Chris (Gegner):**
+- (a) KI-Gegneraufstellung exakt zeigen oder nur als Schätzung?
+- (b) Menschliche Gegner vor ihrer Abgabe verbergen? Vorschlag: ja.
 
 ---
 
@@ -289,12 +342,13 @@ Disziplinen).
 
 | Paket | Inhalt | Braucht Geometrie? | Voraussetzung |
 |---|---|---|---|
-| **F1** ✅ (dieser PR) | Kürzel in Positionsfarbe an Slotkarte, Fokus-Kopf und Kader-Zeile; Kader-Zeile „Top-3 Slots mit Zahl“ statt nur „Bester Slot“; Gold-Rahmen Top-N nach Eignung an Slot- und Kader-Avatar | nein | keine |
+| **F1** ✅ (dieser PR) | Kürzel in Positionsfarbe an Slotkarte, Fokus-Kopf und Kader-Zeile; Kader-Zeile „Top-3 Slots mit Zahl“ statt nur „Bester Slot“; Gold = Bestbesetzung nach Slotwert (voll / gestrichelt „verschenkt“ / Raute ◆ in der Kader-Zeile) | nein | keine |
 | **F2** | ±-Schema + Beitrags-Zerlegung als **Rollenkarte v1 in der Fokus-Rail**: Attributtafel `++/+/·/−/−−` aus `slotWeightProfile − baseWeightProfile`; „warum +8,5?“ als die 3 größten positiven und 2 größten negativen Beiträge, Klemmung sichtbar; Passungsglyphe neben jeder Slotzahl | nein | optionales `attributeStats` im Board-Typ `LineupBoardRosterCard` (Laufzeit hat es schon); eine reine Funktion `resolveSlotRoleContributions(role, stats)` **neben** `resolveProfileRoleModifier` in `matchday-slot-roles.ts` plus Vitest auf die Summen-Invariante (Σ Beiträge = Rohwert vor Klemmung, ±0,05, 20 Disziplinen × alle Slots). Die Schwellen als Konstanten in `einsatzliste-anzeige.ts` |
 | **F3** | Formations-Datenquelle `lib/lineups/formation/` (Abschnitt 2) mit Drift-Wächter gegen die Engine. `<FormationsFeld>` ersetzt `nl-lineup-slot-grid` als Ansicht; die Kartendetails (Fatigue, Verletzungsrisiko, Drag-Fit) bleiben an der Marke bzw. in der Rail. Zuerst **Arena-Chassis (TDM/Mini-DM/Battlefield-Duell) und Basketball** (Chris’ Beispiel, mit Hinweis „Formation greift ab 6 Spielern“); alle übrigen Disziplinen bekommen sofort die generische Leiste | **ja** | F1 (Farben), sinnvoll nach F2 |
 | **F4** | Übrige Feldformen: Bahn-Band aus `planJeSlot`, Climbing-Wand, Bühnen-Leiste mit „vs Platz n“, Hockey/Football hohl außer Torwart/QB/Kicker, Battlefield-Domination als Startort + Neigung. Rolle-Zeilen aus den Motortabellen (Verhalten-Befund Abschnitt 4) | **ja** | F3 |
 | **F5** (optional, Chris fragen) | Einstellungen entschlacken: Formkarten, Team-Power und Captain je Seite in einen einklappbaren Block „Spieltag-Einstellungen“ mit Kurzfassung im eingeklappten Zustand; Intensität bleibt sichtbar | nein | Chris’ Ja |
 | **F6** (Arena-Board) | Dasselbe im Mockup über einen generierten `FORMATION_JE_DISC`-Block (2.4 Stufe 2), Identitätsprüfung `spiele()` byte-gleich | ja | F3 |
+| **F7** (Gegner) | Gegnerhälfte des Mini-Felds und Counter-Einschätzung (Chris’ Vorgabe, Abschnitt 4a): optionales Feld `gegner` im Lineup-Kontext aus Spielplan + gegnerischer `lineupDraft`, Rollen über `resolveSlotRoleShortId`; Geister-Marken mit Slotwert, Vergleich je Position | ja | F3 + Chris’ Antwort auf (a) exakt oder Schätzung und (b) menschliche Gegner |
 
 **Kleinster sinnvoller Schritt mit sichtbarem Mehrwert: F1.** Der Schritt ist schon gebaut, weil
 er keine offene Designfrage hat und ohne neue Datenquelle auskommt.
@@ -319,23 +373,72 @@ fällt.
     **Breaking** (Standhalten und Steingesicht, beide „ST“). Neu heißen sie CH und SE. Das
     Mockup-`slotKuerzel` hat dieselbe Kollision und sollte beim Arena-Paket 1 dieselbe Funktion
     bekommen.
-  - `topNNachEignung`: Top-N nach Eignung, Gleichstand stabil nach Name, ohne Wert nie Gold.
+  - `bestbesetzungJeSlot`: je Slot der Kader-Beste nach Slotwert (Gleichstand nach Name, ohne Wert
+    zählt nicht). Eine erste Fassung rankte nach Basis-Eignung; das widersprach Chris’ Antwort und
+    ist ersetzt (Abschnitt 4, Frage 2).
 - `LineupNewLook.tsx`:
-  - Slotkarte: Kürzel-Chip in Positionsfarbe vor dem Rollenlabel; Gold-Ring am Avatar, wenn der
-    gesetzte Spieler zu den Top-N dieser Seite gehört (Tooltip „Top 6 im Kader für TDM (Eignung
-    69,0)“).
+  - Slotkarte: Kürzel-Chip in Positionsfarbe vor dem Rollenlabel.
+    - Voller Goldring am Avatar, wenn der Gesetzte hier Kader-Bester ist („Bestbesetzung: niemand
+      im Kader wäre auf D1-1 Vanguard besser (Slotwert 78,4)“).
+    - Gestrichelter Goldring um das Kürzel, wenn der Kader-Beste woanders steht oder fehlt
+      („Gold verschenkt: Buttercup wäre hier 81,0 — steht auf D1-4 Hold Line“).
   - Fokus-Kopf: Kürzel-Chip vor dem Rollennamen.
   - Kader-Zeile: Statt „Bester Slot D1-3 · 72,4“ stehen jetzt die drei stärksten Slots als
-    `VA 78,4 · BR 77,9 · SK 72,0`, mit aktivem Slot innerhalb seiner Seite, sonst über beide Seiten
-    mit Seitenkürzel. Die Zahl ist dieselbe Slot-Projektion (`projectedScore`), die überall sonst
-    steht. Gold-Ring am Avatar für die Top-N der aktiven Seite.
+    `VA 78,4◆ · BR 77,9 · SK 72,0`.
+    - Mit aktivem Slot innerhalb seiner Seite, sonst über beide Seiten mit Seitenkürzel.
+    - Die Zahl ist dieselbe Slot-Projektion (`projectedScore`), die überall sonst steht.
+    - ◆ steht hinter jedem Slot, in dem der Spieler Kader-Bester ist.
+    - Goldring am Avatar für den Kader-Besten des aktiven Slots.
 - `tests/einsatzliste-anzeige.test.ts`: Kürzel eindeutig in allen 20 Disziplinen × k = 1…6,
-  Kollisionsauflösung, Farben, Gold-Ordnung, keine Importe im Helfer.
+  Kollisionsauflösung, Farben, Bestbesetzung je Slot, keine Importe im Helfer.
 
-Nicht gebaut: Fables gestrichelter Gold-Rahmen für „Gold-Spieler steht in der anderen Disziplin“.
-Die Kaderkarte führt `selectedSides` als Array (`lineup-candidate-model.ts` Z. 88), ein Spieler
-kann also je nach Spieltagsregel auf beiden Seiten stehen. Ob „verschenkt“ dann eine richtige
-Aussage ist, hängt an dieser Regel und wurde hier nicht geklärt. Neu bewerten, wenn F3 steht.
+### 6.1 Sichtprüfung im Browser (lokaler Dev-Server, frischer Spielstand)
 
-Nicht im Browser angesehen: Die Änderung ist mit den Vertragstests, `tsc` und `eslint` geprüft.
-Sichtprüfung am Live-Server mit Testbenutzer Franky steht noch aus.
+Aufbau: lokaler Dev-Server mit leerer SQLite, also frisch angelegtem Spielstand (S1, Spieltag 1,
+Hockey (6) / Climbing (6), Team Armageddon Aftermath). Automatischer Save-Export war
+abgeschaltet. Die Aufstellung kam über „KI-Vorschlag für dieses Team“ (nur im Browserzustand,
+nicht gespeichert). Der Live-Server wurde nicht berührt.
+
+Screenshots:
+- `einsatzliste-revamp-08-11/f1-leer-kaderliste.png`: leere Aufstellung, Kader-Liste mit
+  Top-3-Slots und ◆
+- `einsatzliste-revamp-08-11/f1-ki-aufstellung-gold.png`: volle KI-Aufstellung mit vollem und
+  gestricheltem Gold
+
+**Was aussieht wie gedacht:**
+- **Kürzel-Chips** in sechs Positionsfarben an allen 12 Slots, im Fokus-Kopf und in der
+  Kader-Zeile. Die Zuordnung Kader ↔ Slot ist ohne Lesen der Rollennamen möglich.
+- **Kader-Zeile:** zeigt „TR 70,8◆ · SF 69,5◆ · PL 67,2◆“. Die Zeile bleibt eine Zeile hoch.
+- **Voller Goldring** am Avatar von Tidesprinter auf D2-1 Route Reader (Bestbesetzung, Slotwert
+  86,4).
+
+**Was nicht passt, ehrlich:**
+1. **Die Bestbesetzungs-Lesart kippt, wenn ein Spieler den Kader dominiert.** Im frischen
+   Spielstand ist Tidesprinter in **allen 12 Slots** der Kader-Beste. Er kann aber nur einen
+   Slot besetzen; die Kader-Liste zeigt ihn danach als „schon eingesetzt“.
+   - Folge: **11 von 12 Slots tragen den gestrichelten Ring** „Gold verschenkt: Tidesprinter wäre
+     hier 66,7 — steht auf D2-1 Route Reader“.
+   - Daneben steht auf denselben Karten der bestehende Chip „Bester Pick ✓“, der gegen die noch
+     *verfügbaren* Spieler misst. Zwei Signale widersprechen sich auf derselben Karte, und das
+     gestrichelte ist nicht umsetzbar.
+   - Das ist kein Bug in F1, sondern eine Lücke in der Definition (Fables Vorschlag, nicht von
+     Chris bestätigt). Drei Lesarten, alle nur eine Funktion:
+     - (a) **Optimale Zuteilung:** Gold, wenn der Slot so besetzt ist, wie die beste
+       Gesamtzuteilung des Kaders ihn besetzen würde. „Verschenkt“ hieße dann: eine andere
+       Verteilung brächte mehr.
+     - (b) **Bestbesetzung unter den Verfügbaren:** deckt sich mit „Bester Pick ✓“, wäre also
+       doppelt.
+     - (c) **„Verschenkt“ nur bei Bank:** gestrichelt nur, wenn der Kader-Beste gar nicht
+       aufgestellt ist.
+   - Empfehlung: **(a)**. Sie beantwortet „habe ich gut verteilt?“, und das ist genau der
+     Konflikt, den Fable mit „Gold wandert“ zeigen will. **Entscheidung bei Chris/Fable.** F1 zeigt
+     bis dahin Fables Lesart unverändert.
+2. **Rost (Position 3) und Kupfer (Position 5) liegen im Bild näher beieinander als im
+   Validator.** Im Raster mit drei Spalten stehen sie diagonal benachbart (D1-3 / D1-5). Der
+   Validator prüft nur Listen-Nachbarn. Für das Mini-Feld (F3) muss die Palette über alle Paare
+   nachgeschärft werden. Das passt ohnehin zu Fables Stimmungs-Varianten.
+3. **Der gestrichelte Ring am kleinen Kürzel-Chip ist dezent.** Er ist bei 100 % Zoom erkennbar,
+   aber kein starkes Signal. Auf der Marke des Mini-Felds (F3) gehört er an den Kartenrand, wie
+   Fable es zeichnet.
+4. **Schrift:** Im Container fehlen die Webfonts (Proxy), die Screenshots zeigen eine
+   Ersatzschrift. Das betrifft nicht den Code.
