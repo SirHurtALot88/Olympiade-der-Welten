@@ -1,43 +1,70 @@
 #!/usr/bin/env python3
-"""Erzeugt bei PixelLab eine NEUE Basis-Figur aus einer Textbeschreibung (die erste Pose/das
-Grundbild, aus der sich Animationen ableiten) -- anders als figuren-bestelle-animationen.py, das
-NUR fehlende Animationen fuer eine BEREITS EXISTIERENDE Figur nachbestellt. Dieses Skript hier
-fehlte im Repo (fruehere Sitzungen haben Basis-Erzeugung offenbar nur im Scratchpad gemacht, nie
-committet, s. CLAUDE.md-Auftrag vom 08.11.) -- jetzt fuer den Corsair-Koerperform-Kandidaten
-geschrieben und als eigenstaendiges, wiederverwendbares Werkzeug committet.
+"""Erzeugt bei PixelLab eine NEUE Basis-Figur aus einer Textbeschreibung/einem Konzeptbild (die
+erste Pose/das Grundbild, aus der sich Animationen ableiten) -- anders als
+figuren-bestelle-animationen.py, das NUR fehlende Animationen fuer eine BEREITS EXISTIERENDE Figur
+nachbestellt. Dieses Skript hier fehlte im Repo (fruehere Sitzungen haben Basis-Erzeugung offenbar
+nur im Scratchpad gemacht, nie committet, s. CLAUDE.md-Auftrag vom 08.11.).
 
     PIXELLAB_API_KEY=... python3 -I scripts/figuren-erzeuge-basis-charakter.py <subjekte.json> <slug>
-        [--trocken] [--warte-basis] [--warte-animationen] [--tag <tag>]
+        [--trocken] [--nur-basis] [--character-id <cid>]
+        [--warte-basis] [--warte-animationen] [--tag <tag>]
 
-<subjekte.json>: {slug: {"beschreibung": "<Erzeugungs-Prompt fuer die Basis-Figur, reich, frei>",
-                         "subjekt": "<kurze Nominalphrase <=300 Zeichen, fuer spaetere
-                                      pixminimax-Animationen -- z.B. 'a knight in silver plate
-                                      armour'>",
-                         "proportionen": {"legs_length": 1.1, ...}  (optional, CharacterProportions),
-                         "angriff": "<optionaler Angriffstext>"  (optional, sonst Kanon-Default)}}
+<subjekte.json>: {slug: {
+    "beschreibung": "<Erzeugungs-Prompt, Kanon-Vorlage: '<Name>, a <Klasse> of race <Rasse>,
+                      archetype <Archetyp(en)>. <reiche visuelle Beschreibung>. Full body pixel
+                      art character.'>",
+    "subjekt": "<kurze Nominalphrase <=300 Zeichen, fuer spaetere pixminimax-Animationen -- z.B.
+                 'a knight in silver plate armour'>",
+    "konzeptbild": "<lokaler Pfad zu einem Konzept-/Referenzbild, optional -- s.u.>",
+    "style_character_id": "<pixellabId einer bestehenden 8-Richtungs-Figur als Stil-Anker,
+                             optional, nur mit 'konzeptbild'>",
+    "proportionen": {"legs_length": 1.1, ...}  (optional, CharacterProportions -- NUR im
+                     Textweg ohne 'konzeptbild' nutzbar, s.u.),
+    "angriff": "<optionaler Angriffstext>"  (optional, sonst Kanon-Default)}}
 
-Ablauf, Kanon wie bei den ~360 bestehenden Figuren im Projekt (nachgemessen per GET
-/characters/{id} an mehreren Stichproben am 08.11.: alle zeigen size 80x80, directions=8,
-view='low top-down'):
+ZWEI Erzeugungswege, je nachdem ob 'konzeptbild' gesetzt ist:
 
-  1. POST /create-character-with-8-directions  (mode='standard' -- Template-Skelett-Erzeugung,
-     1 Generation, nicht 'pro' mit 10-25 Generationen/Richtung -- s. OpenAPI-Beschreibung des
-     Feldes 'mode'). Canvas 80x80, template_id='mannequin' (humanoid), view='low top-down'.
-  2. GET /characters/{character_id} pollen, bis status=='completed' (rotation_urls stehen erst
-     dann; die Basis-Erzeugung ist selbst schon ein Background-Job).
-  3. POST /characters/animations fuer die vier Kanon-Animationsgruppen (walk/angriff/treffer/tod,
-     je 16/16/8/16 Aktionsbilder -- ARTEN_KANON, identisch zu figuren-bestelle-animationen.py),
-     Richtungen south+east+north (west wird im Spiel-Motor aus Ost gespiegelt, PixelLab-Kanon),
-     mode='pixminimax'.
-  4. Optional --warte-animationen: pollen, bis alle vier Gruppen Frames in allen drei Richtungen
-     haben.
+  A) MIT 'konzeptbild' (der kanonische Weg -- so sind alle ~360 Bestandsfiguren entstanden,
+     nachgewiesen per Git-Archaeologie am 08.11.: Commit 4b66f8156 "PixelLab-Figuren fuer 14
+     fehlende Spieler", Commit-Text woertlich "/create-character-pro 80x80, create_from_concept
+     mit rohem Portrait-JPG, template custom, kein name"; GET /characters/{id} an mehreren
+     Stichproben (gram, elara, cassandra, tidesprinter, corsair) bestaetigt identisch: size 80x80,
+     template_id='custom', view='low top-down', style_settings leer):
 
-Schreibt NICHTS in data/generated/figuren-sprites.json und ruehrt keine bestehende Figur an --
-das bleibt bewusst ein separater, manueller Schritt (Export/Download fuer einen einzelnen neuen
-Kandidaten ist nicht derselbe Pfad wie figuren-sprites-export.py, das nur echte Spieler-Slugs
-kennt). Der Schluessel wird nur auf Vorhandensein geprueft und nie ausgegeben.
+       POST /create-character-pro
+         description=<beschreibung>, image_size={80,80}, method='create_from_concept',
+         concept_image=<konzeptbild, base64>, template_id='custom', view='low top-down',
+         style_character_id=<optional, Stil-Anker>.
+
+     'custom' ueberspringt das 3D-Skelett (laut OpenAPI-Doku: "such a character can't use
+     skeleton-based animations") -- unproblematisch, weil im ganzen Projekt ausschliesslich
+     skelettfreie 'pixminimax'-Animationen bestellt werden (wie hier in Schritt 3).
+
+     image_size ist hier KEIN fester Deckel: "The persisted rotations share a square canvas whose
+     side is at least max(width, height) and may grow up to 256 pixels to fit generated content."
+     80x80 angefragt ergibt bei den Bestandsfiguren nachweislich 80x80 -- aber bei ungewoehnlich
+     ausladendem Inhalt (z.B. wehende Flammen/Effekte ueber den Figurenrand hinaus) KANN der
+     tatsaechliche Canvas groesser werden. Deshalb --nur-basis: nach der (billigen) Basis-Erzeugung
+     stoppen, GET /characters/{id} pruefen, und erst bei bestaetigter Groesse mit --character-id
+     die (teureren) Animationen bestellen.
+
+  B) OHNE 'konzeptbild' (Rueckfall -- NICHT der kanonische Weg, nur wenn kein Konzeptbild
+     vorliegt): POST /create-character-with-8-directions, mode='standard', template_id='mannequin'.
+     Dieser Endpunkt legt dokumentiert automatisch +40% Rand auf die angefragte Groesse (bestaetigt
+     am corsair-v2-Lauf vom 08.11.: 80 angefragt -> 112 geliefert) -- fuer exakt 80x80 muesste hier
+     mit einer kleineren Anfragegroesse kompensiert werden. Nur 'proportionen' (CharacterProportions)
+     ist ein Feld dieses Zweigs, 'create-character-pro' hat kein solches Feld.
+
+Nach der Basis-Figur (beide Wege): POST /characters/animations fuer die vier Kanon-
+Animationsgruppen (walk/angriff/treffer/tod, je 16/16/8/16 Aktionsbilder -- ARTEN_KANON, identisch
+zu figuren-bestelle-animationen.py), Richtungen south+east+north (west wird im Spiel-Motor aus Ost
+gespiegelt, PixelLab-Kanon), mode='pixminimax'.
+
+Schreibt NICHTS in data/generated/figuren-sprites.json und ruehrt keine bestehende Figur an -- das
+bleibt ein separater, manueller Schritt. Der Schluessel wird nur auf Vorhandensein geprueft und nie
+ausgegeben.
 """
-import argparse, json, os, sys, time, urllib.request, urllib.error
+import argparse, base64, json, os, sys, time, urllib.request, urllib.error
 
 API = "https://api.pixellab.ai/v2"
 DIRS = ["south", "east", "north"]
@@ -86,11 +113,20 @@ def api(method, path, body=None):
             raise
 
 
+def b64_image(pfad):
+    ext = os.path.splitext(pfad)[1].lower().lstrip(".")
+    fmt = "jpeg" if ext in ("jpg", "jpeg") else ext or "png"
+    with open(pfad, "rb") as f:
+        return {"type": "base64", "format": fmt, "base64": base64.b64encode(f.read()).decode("ascii")}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("subjekte")
     ap.add_argument("slug")
     ap.add_argument("--trocken", action="store_true", help="nur den Plan zeigen, keine kostenpflichtigen Calls")
+    ap.add_argument("--nur-basis", action="store_true", help="nach der Basis-Figur stoppen (vor den Animationen) -- impliziert --warte-basis")
+    ap.add_argument("--character-id", default=None, help="Basis-Figur NICHT neu anlegen, sondern mit dieser bestehenden character_id direkt die Animationen bestellen")
     ap.add_argument("--warte-basis", action="store_true", help="pollen, bis die Basis-Figur status=='completed' ist")
     ap.add_argument("--warte-animationen", action="store_true", help="pollen, bis alle vier Gruppen fertig sind (impliziert --warte-basis)")
     ap.add_argument("--tag", default=None, help="Tag, das der neuen Figur per PATCH gesetzt wird (nur Organisation, keine Spielanbindung)")
@@ -103,38 +139,59 @@ def main():
     if "beschreibung" not in s or "subjekt" not in s:
         sys.exit(f"{args.slug}: braucht 'beschreibung' und 'subjekt' in {args.subjekte}")
 
-    basis_body = {
-        "description": s["beschreibung"],
-        "image_size": {"width": 80, "height": 80},
-        "mode": "standard",
-        "view": "low top-down",
-        "template_id": "mannequin",
-    }
-    if s.get("proportionen"):
-        basis_body["proportions"] = {"type": "custom", **s["proportionen"]}
-    print(f"{args.slug}: Basis-Figur anlegen")
-    print(f"  beschreibung: {s['beschreibung']!r}")
-    print(f"  body (ohne description): {json.dumps({k: v for k, v in basis_body.items() if k != 'description'})}")
-    if args.trocken:
-        print("--trocken: kein Call gesendet.")
-        return
+    cid = args.character_id
+    if not cid:
+        kanonisch = bool(s.get("konzeptbild"))
+        if kanonisch:
+            basis_body = {
+                "description": s["beschreibung"],
+                "image_size": {"width": 80, "height": 80},
+                "method": "create_from_concept",
+                "concept_image": b64_image(s["konzeptbild"]),
+                "template_id": "custom",
+                "view": "low top-down",
+            }
+            if s.get("style_character_id"):
+                basis_body["style_character_id"] = s["style_character_id"]
+            endpoint = "/create-character-pro"
+            print(f"{args.slug}: Basis-Figur anlegen -- KANONISCHER WEG (create-character-pro, create_from_concept, wie alle ~360 Bestandsfiguren)")
+        else:
+            basis_body = {
+                "description": s["beschreibung"],
+                "image_size": {"width": 80, "height": 80},
+                "mode": "standard",
+                "view": "low top-down",
+                "template_id": "mannequin",
+            }
+            if s.get("proportionen"):
+                basis_body["proportions"] = {"type": "custom", **s["proportionen"]}
+            endpoint = "/create-character-with-8-directions"
+            print(f"{args.slug}: Basis-Figur anlegen -- RUECKFALL (kein 'konzeptbild' in {args.subjekte}, NICHT der kanonische Weg -- Canvas wird vermutlich +40% zu gross)")
+        print(f"  beschreibung: {s['beschreibung']!r}")
+        log_body = {k: v for k, v in basis_body.items() if k not in ("description", "concept_image")}
+        print(f"  endpoint={endpoint} body (ohne description/concept_image): {json.dumps(log_body)}")
+        if args.trocken:
+            print("--trocken: kein Call gesendet.")
+            return
 
-    r = api("POST", "/create-character-with-8-directions", basis_body)
-    cid = r["character_id"]
-    print(f"  -> character_id={cid} status={r.get('status')} usage={r.get('usage')} job={r.get('background_job_id')}")
+        r = api("POST", endpoint, basis_body)
+        cid = r["character_id"]
+        print(f"  -> character_id={cid} status={r.get('status')} usage={r.get('usage')} job={r.get('background_job_id')}")
 
-    if args.tag:
-        try:
-            api("PATCH", f"/characters/{cid}/tags", {"tags": [args.tag]})
-            print(f"  tag gesetzt: {args.tag}")
-        except SystemExit as e:
-            print(f"  WARNUNG: Tag setzen fehlgeschlagen ({e}) -- character_id bleibt gueltig")
+        if args.tag:
+            try:
+                api("PATCH", f"/characters/{cid}/tags", {"tags": [args.tag]})
+                print(f"  tag gesetzt: {args.tag}")
+            except SystemExit as e:
+                print(f"  WARNUNG: Tag setzen fehlgeschlagen ({e}) -- character_id bleibt gueltig")
+    else:
+        print(f"{args.slug}: nutze bestehende character_id={cid} (keine neue Basis-Figur)")
 
-    warte_basis = args.warte_basis or args.warte_animationen
+    warte_basis = args.warte_basis or args.warte_animationen or args.nur_basis
+    d = None
     if warte_basis:
         print("  warte auf Basis-Figur (status=='completed') ...")
         t0 = time.time()
-        d = None
         while time.time() - t0 < 20 * 60:
             d = api("GET", f"/characters/{cid}")
             if d.get("status") == "completed":
@@ -144,9 +201,17 @@ def main():
             time.sleep(20)
         if not d or d.get("status") != "completed":
             sys.exit(f"Basis-Figur nach 20 min nicht fertig (status={d.get('status') if d else None}), character_id={cid} bleibt bestehen -- spaeter mit GET /characters/{cid} weiterverfolgen")
-        print(f"  fertig: rotation_urls fuer {sorted(k for k, v in d['rotation_urls'].items() if v)}")
+        print(f"  fertig: size={d.get('size')} rotation_urls fuer {sorted(k for k, v in d['rotation_urls'].items() if v)}")
+        groesse = d.get("size") or {}
+        if groesse.get("width") != 80 or groesse.get("height") != 80:
+            print(f"  ACHTUNG: Canvas ist {groesse}, NICHT 80x80 -- vor den Animationen pruefen/entscheiden!")
     else:
         print("  (kein --warte-basis: Animationen werden sofort bestellt, auch wenn die Basis noch verarbeitet -- die API erlaubt das laut Doku, da character_id sofort gueltig ist)")
+
+    if args.nur_basis:
+        print(f"\n--nur-basis: gestoppt. character_id={cid}")
+        print("Weiter mit: ... --character-id " + cid + " --warte-animationen")
+        return
 
     bestellt = []
     for art, frames, default_text in ARTEN_KANON:
