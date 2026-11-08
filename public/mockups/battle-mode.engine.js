@@ -36751,6 +36751,15 @@
     attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slId,d,false),d);
     return aufEignung(stats({...p,a:attr},d),eigWert);
   }
+  // NUR GANZE ZAHLEN ANZEIGEN (Chris, 08.11.: "bitte nur gerade Zahlen zeigen").
+  // aufEignung() skaliert LP/ANG/VER mit einem krummen Faktor; die aufgeklappte Karte
+  // in der Aufstellung zeigte deshalb "LP 89.48130901737728 · ANG 82.36347761826772".
+  // Gerundet wird NUR fuer die Anzeige -- kampfwerteVorschau() und der Kampf rechnen
+  // weiter mit den ungerundeten Werten.
+  const kampfzahl=(x)=>String(Math.round(Number(x)||0));
+  function kampfwerteZeile(s){
+    return "LP "+kampfzahl(s.LP)+" · ANG "+kampfzahl(s.ANG)+" · VER "+kampfzahl(s.VER)+" · TMP "+kampfzahl(s.TMP);
+  }
   // Anzeige-Hilfe: was ein Grundschlag dieses Spielers gegen eine bestimmte Verteidigung
   // wirklich abzieht. Dieselbe Rechnung, die die Arena fuehrt.
   const dmgOf=(atk,vr)=>Math.max(1,Math.round(12*(atk/50)*(100/(100+vr))));
@@ -37442,17 +37451,17 @@
         rm.addEventListener("click",ev=>{ev.stopPropagation();delete place[p.n];renderAll();});
         u.appendChild(rm);
         u.appendChild(el("b",null,p.n));
-        u.appendChild(el("span",null,"LP "+s.LP+" · ANG "+s.ANG+" · VER "+s.VER+" · TMP "+s.TMP));
+        u.appendChild(el("span",null,kampfwerteZeile(s)));
         // DIESELBE LESART WIE IM VORBILD: die Kampfwerte als Prozente, damit man sofort
         // sieht, was sie bewirken, statt eine nackte Zahl zwischen 1 und 99 zu deuten.
         const pz=(x)=>(x>=0?"+":"")+x+" %";
         const wz=el("span","prozente");
         const teile=[
-          ["Leben",Math.round(s.LP*LEBEN_JE_LP)+"",  "Er hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus, bevor er ausscheidet ("+s.LP+" × "+LEBEN_JE_LP+")."],
+          ["Leben",Math.round(s.LP*LEBEN_JE_LP)+"",  "Er hält "+Math.round(s.LP*LEBEN_JE_LP)+" Schaden aus, bevor er ausscheidet ("+kampfzahl(s.LP)+" × "+LEBEN_JE_LP+")."],
           ["Angriff",pz(Math.round((s.ANG/50-1)*100)),
-            "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+s.ANG+"."],
+            "Jeder Skill trägt seinen Basisschaden mal diesem Wert. Bei Angriff 50 wäre es genau der Basisschaden; er steht bei "+kampfzahl(s.ANG)+"."],
           ["Minderung",Math.round(s.VER/(s.VER+100)*100)+" %",
-            "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+s.VER+". Genau die Kurve, die auch im Vorbild steht."],
+            "So viel Schaden nimmt seine Verteidigung von jedem Treffer weg: VER/(VER+100) mit VER "+kampfzahl(s.VER)+". Genau die Kurve, die auch im Vorbild steht."],
           // KARTEN_SPD statt der alten 40+TMP*1.4-Formel (Fable-Audit, 03.11.: zeigte bei
           // TMP 99 +62 % statt korrekt +21 %) -- dieselbe Formel wie renderProfile()
           // (s. dort) und derselbe cdKuerzung-Wert aus baueEinheit(), hier dupliziert, weil
