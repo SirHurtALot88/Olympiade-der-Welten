@@ -27,8 +27,14 @@ export type FigurAnimation = {
   kind: FigurAnimationKind;
   frames: number;
   dirs: Array<"south" | "east" | "north">;
-  /** Woher die Art-Zuordnung stammt (gid/text = aus den Bau-Skripten belegt, heur/frames = geschaetzt). */
+  /**
+   * Woher die Art-Zuordnung stammt: gespeichert = Arten-Datei (verbindlich), gid/text = aus den
+   * Bau-Skripten des Erst-Exports (02.11.), display/label = aus dem PixelLab-Namen geraten,
+   * heur/frames/bild = aus dem Bild geschaetzt (unzuverlaessig, s. figuren-sprites-export.py).
+   */
   quelle?: string;
+  /** PixelLab animation_group_id (seit 07.11.) — Schluessel in figuren-sprites-animationsarten.json. */
+  gid?: string;
 };
 
 export type FigurSprite = {

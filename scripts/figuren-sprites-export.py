@@ -27,10 +27,18 @@ Skript auch echte Nord-Streifen, wenn PixelLab sie liefert (`ANIM_DIRS` um "nort
 Nord-Streifen bleibt die alte Ost-Naeherung als Ruecksprung (battle-mode.engine.js, zeichnePixelFigur()).
 
 Animationsart (walk/angriff/tod/treffer): PixelLab kennt nur den auf ~37 Zeichen gekuerzten
-Aktionstext als Label. Reihenfolge: (1) gespeicherte Art aus der Arten-Datei, (2) Schluesselwoerter
-im Label, (3) Bildanalyse des Sued-Streifens (letztes Bild deutlich flacher = K.o., stark
-wechselnde Breite = Aktion, sonst Gehen). Alles, was nicht aus (1) kommt, ist eine Schaetzung und
-wird so im Index markiert (`quelle`). Wer eine Art korrigiert, traegt sie in die Arten-Datei ein.
+Aktionstext als Label (`animation_type`) und einen optionalen Anzeigenamen (`display_name`).
+Reihenfolge: (1) gespeicherte Art aus der Arten-Datei, (2) display_name, (3) Schluesselwoerter im
+Label (Treffer, Tod, Angriff, Gehen — in dieser Reihenfolge), (4) Bildanalyse des Sued-Streifens
+(letztes Bild deutlich flacher = K.o., stark wechselnde Breite = Aktion, sonst Gehen). Alles, was
+nicht aus (1) kommt, ist eine Schaetzung, wird so im Index markiert (`quelle`) und am Ende des Laufs
+aufgelistet. Wer eine Art korrigiert, traegt sie unter der `gid` (steht seit 07.11. im Index) in die
+Arten-Datei ein und exportiert die Figur mit `--nur` neu; Streifen alter Namen werden dabei entfernt.
+
+Die Bildanalyse (4) ist unzuverlaessig: beim Erst-Export (02.11.) hielt sie 19 Angriffe/Tode fuer
+Gehen (brontar, fyrn, vorrak, darkblade, nachtschatten ...) und kann nie "treffer" liefern. Gruppen
+ohne exportierbare Richtung (nur Diagonalen, oder leere `frames` = noch in Arbeit) werden nicht mehr
+stumm verworfen, sondern am Ende gemeldet.
 
 PNGs werden verlustfrei auf eine Palette reduziert, wenn sie <= 256 Farben haben (halbiert die Groesse).
 """
@@ -65,6 +73,22 @@ DEATH = ["dies", "death", "dying", "collapse", "crumple", "struck down", "fatall
          "defeated", "expires", "withers", "wilts", "disintegrat", "sinks to", "drops dead", "knocked out",
          "crashes to", "stumbles and", "stumbles backward", "staggers on", "curls into", "curls up", "shudders"]
 RECOIL = ["recoil", "flinch", "reels back", "is hit", "takes a hit"]
+# Angriff (07.11.): bis dahin gab es KEINE Angriffs-Woerter — "angriff" war nur der Rueckfall der
+# Bildanalyse, und die hielt Angriffe mit langem Aufholen (12 Bilder Stand, dann Hieb) fuer Gehen.
+# So lagen brontar/fyrn/vorrak/suzuna/... mit falsch benannten Angriffen im Index, s.
+# docs/design/figuren-reparatur-nord-07-11.md. Die Woerter stammen aus den 290 als Angriff
+# bestaetigten PixelLab-Labels (lunges 30x, swings 23x, raises 16x, holds 12x, draws/thrusts 10x).
+ATTACK = ["lunges", "lunge ", "swings", "swing ", "thrusts", "thrust ", "slashes", "slash ", "draws",
+          "raises", "unleashes", "sweeps", "strikes", "attacks", "punches", "stabs", "smashes", "slams",
+          "fires", "shoots", "casts", "hurls", "throws", "bites", "snaps at", "spits", "breathes fire",
+          "spins and", "whips", "kicks", "charges and", "rears", "holds a", "stands sideways", "fencing",
+          "racket", "spreads its", "opens its"]
+# display_name (PixelLab-Website: eigener Anzeigename) — kurz und eindeutig, wenn gesetzt.
+DISPLAY = {"walk": "walk", "gehen": "walk", "run": "walk", "attack": "angriff", "angriff": "angriff",
+           "hit": "treffer", "hurt": "treffer", "treffer": "treffer", "recoil": "treffer",
+           "death": "tod", "die": "tod", "tod": "tod", "ko": "tod", "k.o.": "tod"}
+# Streifen-Dateien einer Figur: <name>-<richtung>.png (Grundposen heissen nur <richtung>.png).
+STREIFEN = re.compile(r"^[a-z]+\d*-(" + "|".join(ANIM_DIRS) + r")\.png$")
 
 
 def api_get(path, key):
@@ -90,9 +114,23 @@ def label_kind(label):
         return "treffer"
     if any(k in t for k in DEATH):
         return "tod"
+    # Angriff VOR Gehen: "lunges forward and slashes" traegt kein Gehwort, "strides forward and
+    # swings" ist trotzdem ein Angriff. Reine Gehlabels ("walks forward, arms swinging") treffen
+    # die Angriffsverben nicht (swinging != swings).
+    if any(k in t for k in ATTACK):
+        return "angriff"
     if any(k in t for k in WALK):
         return "walk"
     return None
+
+
+def display_kind(display_name):
+    if not display_name:
+        return None
+    t = display_name.strip().lower()
+    if t in DISPLAY:
+        return DISPLAY[t]
+    return label_kind(t)
 
 
 def frame_kind(frames):
@@ -177,7 +215,7 @@ def main():
         slugs = set(args.nur)
     arten = json.load(open(ARTEN)) if os.path.exists(ARTEN) else {}
 
-    best = {}
+    best, alle = {}, {}
     for c in list_characters(key):
         tags = c.get("tags") or []
         if any("superseded" in t for t in tags):
@@ -190,8 +228,17 @@ def main():
         if not slug:
             continue
         score = (1 if tagged else 0, c.get("animation_count", 0), c.get("updated_at", ""))
+        alle.setdefault(slug, []).append((score, c["id"]))
         if slug not in best or score > best[slug][0]:
             best[slug] = (score, c["id"])
+    # Der Tag entscheidet (PixelLab-Kanon) — aber ein ungetaggter Doppelgaenger mit MEHR
+    # Animationen ist ein Hinweis auf einen vergessenen Tag (voidrake, 07.11.: getaggt 64px ohne
+    # Animation, ungetaggt 128px-Rochen mit vieren). Nur melden, nicht umentscheiden.
+    for slug, ks in alle.items():
+        (score, cid) = best[slug]
+        for sc, other in ks:
+            if other != cid and sc[1] > score[1]:
+                print(f"HINWEIS {slug}: ungetaggter Kandidat {other} hat {sc[1]} Animationen, gewaehlt {cid} mit {score[1]} (Tag gewinnt)")
 
     with ThreadPoolExecutor(6) as ex:
         details = dict(zip(best, ex.map(lambda cid: api_get(f"/characters/{cid}", key), [v[1] for v in best.values()])))
@@ -208,7 +255,10 @@ def main():
         list(ex.map(fetch, jobs))
 
     index = json.load(open(INDEX)) if args.nur and os.path.exists(INDEX) else {}
+    geschaetzt, uebersprungen = [], []
     for slug, d in sorted(details.items()):
+        if d.get("status") and d["status"] != "completed":
+            print(f"WARNUNG {slug}: Charakter-Status {d['status']!r} (nicht fertig?)")
         od = os.path.join(OUT, slug)
         os.makedirs(od, exist_ok=True)
         rots = []
@@ -217,18 +267,26 @@ def main():
             if u:
                 Image.open(fetch(u)).convert("RGBA").save(os.path.join(od, f"{r}.png"), optimize=True)
                 rots.append(r)
-        anims, used = [], {}
+        anims, used, geschrieben = [], {}, set()
         for a in d.get("animations", []):
+            gid = a.get("animation_group_id")
             dirs = {dd["direction"]: dd["frames"] for dd in a["directions"] if dd["direction"] in ANIM_DIRS and dd["frames"]}
             if not dirs:
+                # Frueher stumm verworfen. Jetzt sichtbar: eine Gruppe nur mit Diagonalen ist
+                # normal (5-Richtungs-Erzeugung), leere `frames` heissen "noch in Arbeit".
+                leer = [dd["direction"] for dd in a["directions"] if not dd["frames"]]
+                uebersprungen.append((slug, gid, a["animation_type"], [dd["direction"] for dd in a["directions"]], leer))
                 continue
-            gid = a.get("animation_group_id")
             kind, quelle = arten.get(gid), "gespeichert"
+            if not kind:
+                kind, quelle = display_kind(a.get("display_name")), "display"
             if not kind:
                 kind, quelle = label_kind(a["animation_type"]), "label"
             if not kind:
                 first = dirs.get("south") or next(iter(dirs.values()))
                 kind, quelle = frame_kind([Image.open(fetch(u)).convert("RGBA") for u in first]), "bild"
+            if quelle != "gespeichert":
+                geschaetzt.append((slug, gid, kind, quelle, a.get("display_name") or a["animation_type"]))
             arten.setdefault(gid, kind)
             used[kind] = used.get(kind, 0) + 1
             name = kind if used[kind] == 1 else f"{kind}{used[kind]}"
@@ -239,17 +297,43 @@ def main():
                 sheet = Image.new("RGBA", (w * len(ims), h))
                 for i, im in enumerate(ims):
                     sheet.paste(im, (i * w, 0))
-                sheet.save(os.path.join(od, f"{name}-{dirn}.png"), optimize=True)
+                datei = f"{name}-{dirn}.png"
+                sheet.save(os.path.join(od, datei), optimize=True)
+                geschrieben.add(datei)
                 frames = len(ims)
-            anims.append({"name": name, "kind": kind, "frames": frames, "dirs": sorted(dirs), "quelle": quelle})
+            anims.append({"name": name, "kind": kind, "frames": frames, "dirs": sorted(dirs), "quelle": quelle, "gid": gid})
         index[slug] = {"pixellabId": d["id"], "canvas": d["size"]["width"], "rotationen": rots, "animationen": anims}
+        # Streifen aus frueheren Laeufen, die es jetzt nicht mehr gibt (umbenannte Art, geloeschte
+        # Gruppe), raeumen — sonst liegt neben "angriff-south.png" weiter ein totes "walk2-south.png".
+        for f in os.listdir(od):
+            if STREIFEN.match(f) and f not in geschrieben:
+                os.remove(os.path.join(od, f))
+                print(f"entfernt {slug}/{f} (Streifen ohne Gruppe)")
         for f in os.listdir(od):
             if f.endswith(".png"):
                 palettize(os.path.join(od, f))
 
+    if args.nur and os.path.exists(INDEX):
+        # Index ebenfalls frisch mergen: nur die eigenen Slugs ersetzen, alles andere so lassen, wie
+        # es ein parallel gelaufener --nur-Export inzwischen geschrieben hat.
+        frisch = json.load(open(INDEX))
+        frisch.update({s: index[s] for s in details})
+        index = frisch
     json.dump(index, open(INDEX, "w"), ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    # Arten-Datei frisch von der Platte mergen statt die Kopie vom Start zu ueberschreiben: ein
+    # parallel laufender Bestell-Lauf traegt dort neue Gruppen ein, die sonst verloren gingen.
+    if os.path.exists(ARTEN):
+        frisch = json.load(open(ARTEN))
+        frisch.update({g: k for g, k in arten.items() if g not in frisch})
+        arten = frisch
     json.dump(arten, open(ARTEN, "w"), ensure_ascii=False, indent=0, sort_keys=True)
     print("Figuren:", len(index))
+    for slug, gid, typ, dirs, leer in uebersprungen:
+        print(f"uebersprungen {slug} {gid} {typ[:40]!r} Richtungen={dirs}" + (f" LEERE FRAMES={leer}" if leer else ""))
+    if geschaetzt:
+        print(f"\n{len(geschaetzt)} Arten GESCHAETZT (nicht aus der Arten-Datei) — bitte am Bild pruefen und ggf. in {os.path.relpath(ARTEN, ROOT)} korrigieren:")
+        for slug, gid, kind, quelle, label in geschaetzt:
+            print(f"  {slug:22} {kind:8} ({quelle}) {gid} {label[:50]!r}")
 
 
 if __name__ == "__main__":
