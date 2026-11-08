@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Basketball Knockout</title>
+<!--
+  PROTOTYP der Format-Variante "Knockout" fuer Basketball (08.11.). Kein Produktionscode, von der App
+  nicht verlinkt. Mechanik: basketball-knockout-prototyp.sim.js (empfohlene Fassung: drei Leben,
+  Neuauslosung je Umlauf), Kulisse: basketball-knockout-prototyp/halle.png
+  (scripts/baue-kulisse-knockout-prototyp.py aus public/szenen/basketball/parkett.html), Figuren: die
+  echten PixelLab-Sprites aus battle-mode.figuren.js. Einordnung und Sonde:
+  docs/design/format-varianten-basketball-knockout-08-11.md.
+-->
+<style>
+:root { --bg:#0b0c12; --panel:#141621; --fg:#eef0f6; --muted:#9ba2b8; --line:#272b3a; --heim:#e0574f; --gast:#3fbf7a; --gold:#f0c95a; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="light"]) { --bg:#0b0c12; } }
+:root[data-theme="dark"] { --bg:#0b0c12; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.wrap { max-width:1280px; margin:0 auto; padding:20px 16px 40px; }
+h1 { font-size:1.3rem; margin:0 0 4px; text-wrap:balance; }
+p.lead { color:var(--muted); font-size:0.9rem; line-height:1.55; max-width:92ch; margin:0 0 14px; }
+.stage { position:relative; width:100%; aspect-ratio:1920/852; border-radius:10px; overflow:hidden; background:#000; box-shadow:0 8px 28px rgba(0,0,0,.55); }
+canvas { display:block; width:100%; height:100%; image-rendering:pixelated; }
+.controls { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; align-items:center; }
+button, select { font:inherit; font-weight:600; font-size:0.85rem; padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#191c29; color:var(--fg); cursor:pointer; }
+button.on { border-color:var(--gold); color:var(--gold); }
+.t { font-variant-numeric:tabular-nums; color:var(--muted); font-size:0.85rem; margin-left:auto; }
+.grid { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:14px; }
+@media (max-width:900px){ .grid { grid-template-columns:1fr; } }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; overflow-x:auto; }
+.card h2 { font-size:0.95rem; margin:0 0 8px; }
+table { border-collapse:collapse; width:100%; font-size:0.8rem; font-variant-numeric:tabular-nums; }
+th, td { padding:4px 6px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+th { color:var(--muted); font-weight:600; cursor:help; }
+td:first-child, th:first-child { text-align:left; }
+td.heim { color:var(--heim); } td.gast { color:var(--gast); } tr.raus td { opacity:.5; }
+.ticker { font-size:0.8rem; line-height:1.5; max-height:380px; overflow-y:auto; color:var(--muted); }
+.ticker b { color:var(--fg); font-weight:600; }
+.cap { color:var(--muted); font-size:0.82rem; line-height:1.55; margin-top:14px; max-width:100ch; }
+.cap code { color:var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Knockout: Prototyp einer Basketball-Format-Variante</h1>
+  <p class="lead">Alle zwölf Spieler der Begegnung stehen in einer Reihe an der Freiwurflinie, mit zwei Bällen. Der Vordermann wirft. Trifft er nicht, holt er den Abpraller und versucht es weiter, bis der Ball drin ist. Der Hintermann darf werfen, sobald der Vordermann geworfen hat. <b>Trifft der Hintermann zuerst, ist der Vordermann geknockt.</b> Wer trifft, stellt sich hinten an. Jeder hat <b>drei Leben</b>, und nach jedem Umlauf wird die Reihe neu ausgelost. Wer am Ende allein übrig bleibt, gewinnt. Es gelten dieselben Basketball-Teilwerte wie im Live-Spiel: Freiwurf, Teamgeist, Zweitchance, Lauftempo, Schuss nah, Technik. Nur der Ablauf ist ein anderer.</p>
+  <div class="stage"><canvas id="c" width="1920" height="852"></canvas></div>
+  <div class="controls">
+    <button id="play">Pause</button>
+    <button data-sp="1">1×</button>
+    <button data-sp="2" class="on">2×</button>
+    <button data-sp="4">4×</button>
+    <button id="neu">Neue Saat</button>
+    <select id="paarung" aria-label="Paarung"></select>
+    <span class="t" id="tt"></span>
+  </div>
+  <div class="grid">
+    <div class="card"><h2>Boxscore <span id="bxs" style="color:var(--muted);font-weight:400"></span></h2><table id="box"></table></div>
+    <div class="card"><h2>Ticker</h2><div class="ticker" id="ticker"></div></div>
+  </div>
+  <p class="cap">Prototyp, nicht im Spiel. Die Mechanik liegt in <code>basketball-knockout-prototyp.sim.js</code> und liest nur Teilwerte, die der Motor für Basketball ohnehin aus der gesperrten Matrix mischt. Das sind die Rezepte aus <code>battle-mode.rezepte.js</code> und der Freiwurf-Kanal des Motors. Die Vorab-Sonde <code>scripts/miss-basketball-knockout-prototyp.mjs</code> kommt für diese Fassung auf rho je Spiel 0,81 bis 0,83 und eine Pp-Abweichung von 21 bis 23. Fables Original mit einem Leben und fester Reihe liegt bei rho 0,59 bis 0,61. Die Sonde misst ohne Slot-, Trait- und Formkanäle und ist deshalb noch keine Abnahme. Die Kader sind fünf echte Paarungen aus dem live-save-Abbild. Die Halle ist die PixelLab-Parkett-Szene, umgebaut mit <code>scripts/baue-kulisse-knockout-prototyp.py</code>.</p>
+</div>
+<script src="battle-mode.figuren.js"></script>
+<script src="basketball-knockout-prototyp.sim.js"></script>
+<script>
+(function(){
+"use strict";
+const KO=window.KnockoutSim, FIG=window.__ARENA_FIGUREN||{};
+const cv=document.getElementById("c"), g=cv.getContext("2d");
+g.imageSmoothingEnabled=false;
+const W=1920, H=852, ZELLE=230, INTRO=3;
+const FARBE=["#e0574f","#3fbf7a"];
+// Weltkoordinaten der Szene (SC in parkett.html: CX 480, GY0 287, PX 28, DZ 14, SH 5, UP 37,14, Skala 2)
+const X=(x,z)=>2*(480+28*x+5*z), Y=(z,h)=>2*(287-14*z-37.142857*(h||0));
+const RING={x:12.375,z:0,h:3.05}, FT={x:8.0,z:0};
+const ringX=X(RING.x,0), ringY=Y(0,RING.h);
+
+const bild=(src)=>{const im=new Image(); im.src=src; return im;};
+const HALLE=bild("basketball-knockout-prototyp/halle.png");
+const spriteCache={};
+function sprite(name){
+  if(spriteCache[name]!==undefined)return spriteCache[name];
+  const f=FIG[name]; if(!f){spriteCache[name]=null;return null;}
+  const basis="/sprites/figuren/"+f.s+"/";
+  const anim=(art)=>{const a=f.a&&f.a[art]&&f.a[art].east; return a?{im:bild(basis+a[0]+"-east.png"),n:a[1]}:null;};
+  return spriteCache[name]={c:f.c, east:bild(basis+"east.png"), south:bild(basis+"south.png"),
+    walk:anim("walk"), wurf:anim("angriff"), treffer:anim("treffer")};
+}
+// Deterministischer Hash fuer Anzeige-Positionen (zieht KEINE Zufallszahl aus der Sim).
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%10000)/10000;}
+
+// ------------------------------------------------------------------ Daten / Spiel
+let KADER=null, paarungIdx=0, saat=20261108, spiel=null, uhr=0, tempo=2, laeuft=true, ticker=[], gemeldet=new Set();
+const tickerEl=document.getElementById("ticker"), boxEl=document.getElementById("box");
+let film=null, info={}, ENDE=0;
+
+function neuesSpiel(){
+  const p=KADER.paarungen[paarungIdx];
+  spiel=KO.spiele(p.heim,p.gast,saat,{film:true});
+  spiel.namen=[p.heimName,p.gastName];
+  film=spiel.filme[0].film;
+  info={}; spiel.reihe.forEach(u=>{info[u.n]=u; sprite(u.n);});
+  spiel.teilnehmer.forEach(u=>Object.assign(info[u.n],{wert:u.wert}));
+  // Platz aus der Ausscheide-Reihenfolge
+  const rf=spiel.filme[0].reihenfolge; rf.forEach((w,i)=>{info[w.n].platz=rf.length-i;});
+  // Wurfpositionen festlegen (Anzeige)
+  for(const b of film.besitze){
+    b.wuerfe.forEach((w,i)=>{
+      const h1=hash(b.w+w.t.toFixed(3)), h2=hash(w.t.toFixed(3)+b.w);
+      if(w.art==="linie"){ w.x=FT.x; w.z=FT.z; }
+      else if(w.art==="leger"){ w.x=11.1+h1*0.9; w.z=(h2-0.5)*3.0; }
+      else { w.x=8.6+h1*2.2; w.z=(h2-0.5)*7.0; }
+    });
+  }
+  ENDE=INTRO+spiel.dauer+1.5;
+  uhr=0; ticker=[]; gemeldet=new Set(); tickerEl.innerHTML=""; boxscore(0);
+}
+
+// ------------------------------------------------------------------ Zeichnen
+function zeichneFigur(name,x,y,zustand,t,extra){
+  const s=sprite(name); extra=extra||{}; const u=info[name];
+  g.save(); g.translate(Math.round(x),Math.round(y));
+  if(extra.alpha!=null)g.globalAlpha=extra.alpha;
+  if(extra.dreh)g.rotate(extra.dreh);
+  let im=null, sx=0, c=s?s.c:80;
+  if(s){
+    const anim=zustand==="walk"?s.walk:zustand==="wurf"?s.wurf:zustand==="treffer"?s.treffer:null;
+    // Animationsblaetter haben groessere, quadratische Zellen als das Standbild (z. B. 104 statt 80,
+    // zentriert gepolstert): Zellbreite = Blatthoehe, Massstab wie beim Standbild.
+    if(anim&&anim.im.complete&&anim.im.naturalWidth){ im=anim.im; const fw=im.naturalHeight; sx=(Math.floor(t*12)%anim.n)*fw;
+      const gr=ZELLE*fw/c; g.drawImage(im,sx,0,fw,fw,-gr/2,-ZELLE+16-(gr-ZELLE)/2,gr,gr); im=null; c=-1; }
+    else { im=s.east; if(!(im.complete&&im.naturalWidth))im=null; }
+  }
+  if(im)g.drawImage(im,sx,0,c,c,-ZELLE/2,-ZELLE+16,ZELLE,ZELLE);
+  else if(c!==-1){ g.fillStyle=FARBE[u.seite]; g.fillRect(-14,-70,28,70); }
+  g.restore();
+}
+function text(s,x,y,farbe,gr,ausr,fett){
+  g.font=(fett?"700 ":"600 ")+(gr||16)+"px ui-monospace,Menlo,monospace"; g.textAlign=ausr||"center";
+  g.fillStyle="rgba(0,0,0,.7)"; g.fillText(s,x+2,y+2); g.fillStyle=farbe||"#eee"; g.fillText(s,x,y);
+}
+function lebenPunkte(name,x,y,leben){
+  const k=spiel.K.leben;
+  for(let i=0;i<k;i++){ g.fillStyle=i<leben?"#f0c95a":"rgba(255,255,255,.18)"; g.beginPath(); g.arc(x+(i-(k-1)/2)*13,y,4.5,0,Math.PI*2); g.fill(); }
+}
+function ball(x,y){ g.fillStyle="#d9752b"; g.beginPath(); g.arc(x,y,9,0,Math.PI*2); g.fill(); g.strokeStyle="#5a2a0e"; g.lineWidth=2; g.beginPath(); g.arc(x,y,9,0,Math.PI*2); g.moveTo(x-9,y); g.lineTo(x+9,y); g.stroke(); }
+function ringZeichnen(netzWackel){
+  // Ring + Netz (die Szene zeichnet beides zur Laufzeit, die Kulisse hat nur das Brett)
+  g.strokeStyle="#e8e8ee"; g.lineWidth=2;
+  for(let i=0;i<7;i++){ const a=i/6; const x0=ringX-16+a*32, x1=ringX-9+a*18+Math.sin(netzWackel*12+i)*netzWackel*6;
+    g.beginPath(); g.moveTo(x0,ringY+3); g.lineTo(x1,ringY+34); g.stroke(); }
+  g.strokeStyle="#d8452a"; g.lineWidth=5; g.beginPath(); g.ellipse(ringX,ringY,17,5,0,0,Math.PI*2); g.stroke();
+}
+// Parabel von (x0,y0) nach (x1,y1), Scheitel hoch ueber beiden
+function bogen(x0,y0,x1,y1,k,hoehe){ const x=x0+(x1-x0)*k, y=y0+(y1-y0)*k-4*hoehe*k*(1-k); return [x,y]; }
+
+function bildBei(t){ let b=film.bilder[0]; for(const x of film.bilder){ if(x.t<=t+1e-9)b=x; else break; } return b; }
+function reihePos(i){ const x=FT.x-1.5-i*1.55, z=-1.0-i*0.3; return {x:X(x,z), y:Y(z,0)}; }
+function rausPos(i){ const x=-12.2+i*1.75, z=-8.4; return {x:X(x,z), y:Y(z,0)}; }
+
+// Position und Zustand eines aktiven Werfers zur Zeit t in seinem Ballbesitz b.
+function aktiv(b,t){
+  const w=b.wuerfe; let i=0; while(i<w.length&&w[i].t<t)i++;
+  // i = naechster Wurf (oder w.length = alle geworfen)
+  const vorher=i>0?w[i-1]:null, naechst=i<w.length?w[i]:null;
+  let pos, zustand=null, ballXY=null;
+  const flug=spiel.K.flugZeit;
+  if(!vorher){ // vor dem ersten Wurf: an die Linie gehen, ausholen
+    // Hintermann wartet einen Schritt hinter der Linie und tritt erst kurz vor dem eigenen Wurf vor.
+    const vor=naechst&&naechst.t-t<0.7, zx=vor?FT.x:FT.x-0.9, zz=vor?FT.z:-0.5;
+    const ziel={x:X(zx,zz),y:Y(zz,0)}; const von=reihePos(0), k=Math.min(1,Math.max(0,(t-b.start)/0.5));
+    pos={x:von.x+(ziel.x-von.x)*k,y:von.y+(ziel.y-von.y)*k}; zustand=k<1?"walk":(naechst&&naechst.t-t<0.35?"wurf":null);
+    ballXY=[pos.x+26,pos.y-96];
+  } else {
+    const p0={x:X(vorher.x,vorher.z),y:Y(vorher.z,0)};
+    const seit=t-vorher.t;
+    if(naechst){
+      const p1={x:X(naechst.x,naechst.z),y:Y(naechst.z,0)};
+      const lauf=Math.max(0.3,naechst.t-vorher.t-0.45), k=Math.min(1,Math.max(0,(seit-0.25)/lauf));
+      pos={x:p0.x+(p1.x-p0.x)*k,y:p0.y+(p1.y-p0.y)*k};
+      zustand=seit<0.3?"wurf":(k<1?"walk":(naechst.t-t<0.35?"wurf":null));
+      // Ball: Flug zum Ring, dann Abpraller zur naechsten Wurfposition
+      if(seit<flug){ ballXY=bogen(p0.x+24,p0.y-120,ringX,ringY-6,seit/flug,naechst&&vorher.art==="leger"?40:170); }
+      else { const ank=naechst.t-0.4-(vorher.t+flug); const kk=Math.min(1,(seit-flug)/Math.max(0.2,ank));
+        ballXY=kk<1?bogen(ringX+(vorher.art==="sprung"?10:-6),ringY,p1.x+26,p1.y-96,kk,90):[pos.x+26,pos.y-96]; }
+    } else { // letzter Wurf ist geworfen (Treffer oder Besitz endet)
+      pos=p0; zustand=seit<0.3?"wurf":null;
+      if(seit<flug)ballXY=bogen(p0.x+24,p0.y-120,ringX,ringY-6,seit/flug,vorher.art==="leger"?40:170);
+      else if(vorher.treffer&&seit<flug+0.45)ballXY=[ringX,ringY+((seit-flug)/0.45)*70];
+    }
+  }
+  return {pos,zustand,ballXY};
+}
+
+function zeichneTafel(titel,unter,b){
+  // Anzeigetafel der Halle (x 747..1180, y 30..86): Teamkuerzel ueberdecken, eigene Werte
+  g.fillStyle="#0a0d18"; g.fillRect(752,30,58,40); g.fillRect(1112,30,60,40); g.fillRect(812,30,300,52);
+  const uebrig=[0,0]; for(const n of Object.keys(info)) if(!b.raus.includes(n))uebrig[info[n].seite]++;
+  text(String(uebrig[0]),782,64,FARBE[0],26,"center",true); text(String(uebrig[1]),1142,64,FARBE[1],26,"center",true);
+  text(titel,962,56,"#f0c95a",20,"center",true); text(unter,962,78,"#c9cfe0",13,"center");
+  text(spiel.namen[0].slice(0,18),560,120,FARBE[0],15,"center",true); text(spiel.namen[1].slice(0,18),1360,120,FARBE[1],15,"center",true);
+}
+
+function draw(){
+  g.clearRect(0,0,W,H);
+  if(HALLE.complete&&HALLE.naturalWidth)g.drawImage(HALLE,0,0); else { g.fillStyle="#1b1d27"; g.fillRect(0,0,W,H); }
+  if(!spiel)return;
+  const t=uhr-INTRO;
+  const b=bildBei(Math.max(0,t));
+  if(t<0){
+    zeichneTafel("KNOCKOUT",spiel.K.leben+" Leben · 12 Werfer",b);
+    b.schlange.concat([b.V,b.H]).filter(Boolean).forEach((n,i)=>{});
+  } else if(t<spiel.dauer+0.8){
+    zeichneTafel("KNOCKOUT","noch "+(12-b.raus.length)+" im Spiel",b);
+  } else {
+    zeichneTafel("ENDSTAND","Sieger: "+(b.schlange[0]||""),b);
+  }
+  const zeichnen=[]; // {y,f}
+  const tt=Math.max(0,t);
+  // aktive Ballbesitze
+  const aktivSet=new Set(), baelle=[]; let netz=0;
+  for(const be of film.besitze){
+    if(tt<be.start-0.05||tt>be.ende+0.9)continue;
+    if(tt>be.ende&&be.ergebnis==="geknockt")continue;
+    aktivSet.add(be.w);
+    const a=aktiv(be,Math.min(tt,be.ende+0.9));
+    let zustand=a.zustand;
+    if(tt>be.ende){ zustand=be.ergebnis==="knock"?"wurf":null; }
+    zeichnen.push({y:a.pos.y,f:()=>{ zeichneFigur(be.w,a.pos.x,a.pos.y,zustand,tt+hash(be.w));
+      text(be.w.slice(0,13),a.pos.x,a.pos.y+24,FARBE[info[be.w].seite],18,"center",true);
+      lebenPunkte(be.w,a.pos.x,a.pos.y+40,b.leben[be.w]); }});
+    if(a.ballXY&&!(tt>be.ende&&be.ergebnis!=="knock"&&be.ergebnis!=="sicher"))baelle.push(a.ballXY);
+    const lw=be.wuerfe.filter(x=>!x.nachEnde).pop(); if(lw&&lw.treffer){const s=tt-lw.t-spiel.K.flugZeit; if(s>0&&s<0.8)netz=Math.max(netz,1-s/0.8);}
+  }
+  // Wartende in der Reihe
+  b.schlange.filter(n=>!aktivSet.has(n)).forEach((n,i)=>{
+    const p=reihePos(i+ (aktivSet.size?0:0));
+    zeichnen.push({y:p.y,f:()=>{ zeichneFigur(n,p.x,p.y,null,tt+hash(n)); text(n.slice(0,11),p.x,p.y+24,FARBE[info[n].seite],16,"center",true);
+      lebenPunkte(n,p.x,p.y+38,b.leben[n]); }});
+  });
+  if(b.V&&!aktivSet.has(b.V)){ const p=reihePos(-1); zeichnen.push({y:p.y,f:()=>{zeichneFigur(b.V,p.x,p.y,null,tt);}}); }
+  // Ausgeschiedene an der vorderen Seitenlinie
+  b.raus.forEach((n,i)=>{ const p=rausPos(i);
+    zeichnen.push({y:p.y,f:()=>{ zeichneFigur(n,p.x,p.y,null,tt,{alpha:0.55}); text((12-i)+". "+n.slice(0,9),p.x,p.y+20,FARBE[info[n].seite],12,"center"); }}); });
+  zeichnen.sort((a,c)=>a.y-c.y).forEach(z=>z.f());
+  ringZeichnen(netz);
+  baelle.forEach(p=>ball(p[0],p[1]));
+  // Ereignis-Einblendung
+  const ev=[...film.ereignisse].reverse().find(e=>e.typ==="knock"&&tt>=e.t&&tt<e.t+2.2);
+  if(ev&&t<=spiel.dauer+0.5){
+    const raus=ev.rest<=0;
+    g.fillStyle="rgba(8,10,18,.62)"; g.fillRect(470,372,984,110);
+    text("KNOCKOUT!",962,420,"#f0c95a",46,"center",true);
+    text(ev.taeter+" knockt "+ev.opfer+(raus?" · RAUS (Platz "+info[ev.opfer].platz+")":" · noch "+ev.rest+(ev.rest===1?" Leben":" Leben")),962,456,"#fff",22,"center",true);
+  }
+  if(t>=spiel.dauer+0.8){
+    g.fillStyle="rgba(8,10,18,.72)"; g.fillRect(560,170,800,330);
+    text("Beste Werfer",962,215,"#fff",26,"center",true);
+    const top=Object.values(info).sort((a,c)=>a.platz-c.platz).slice(0,3);
+    top.forEach((u,i)=>{ const x=962+(i-1)*250, y=420; zeichneFigur(u.n,x,y,i===0?"wurf":null,uhr+i*0.2);
+      text((i+1)+". "+u.n.slice(0,14),x,y+28,FARBE[u.seite],17,"center",true); });
+    const tp=[0,0]; Object.values(info).forEach(u=>tp[u.seite]+=u.platz?13-u.platz:0);
+    text("Rangpunkte  "+spiel.namen[0]+" "+tp[0]+" : "+tp[1]+" "+spiel.namen[1],962,488,"#c9cfe0",16,"center");
+  }
+  melde(tt);
+}
+
+// ------------------------------------------------------------------ Ticker + Boxscore (spoilerfrei)
+function melde(t){
+  for(const e of film.ereignisse){
+    if(e.t>t)break; const key="e"+e.t; if(gemeldet.has(key))continue; gemeldet.add(key);
+    if(e.typ==="knock"){
+      const raus=e.rest<=0, u=info[e.taeter], v=info[e.opfer];
+      zeile(fmt(e.t)+" <b style='color:"+FARBE[u.seite]+"'>"+e.taeter+"</b> knockt "+e.opfer+(raus?" · <b>raus</b> (Platz "+v.platz+")":" · noch "+e.rest)+(u.seite===v.seite?" · teamintern":""));
+      boxscore(t);
+    }
+  }
+  if(t>=spiel.dauer&&!gemeldet.has("ende")){ gemeldet.add("ende"); const sieger=Object.values(info).find(u=>u.platz===1);
+    zeile("<b style='color:"+FARBE[sieger.seite]+"'>"+sieger.n+" gewinnt das Knockout</b>"); boxscore(t,true); }
+}
+const fmt=(s)=>Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0");
+function zeile(html){ ticker.unshift(html); tickerEl.innerHTML=ticker.map(x=>"<div>"+x+"</div>").join(""); }
+function boxscore(t,fertig){
+  const b=bildBei(t);
+  document.getElementById("bxs").textContent=t?(fertig?"Endstand":"Stand "+fmt(t)):"(füllt sich während des Spiels)";
+  const z=Object.values(info).map(u=>{
+    let w=0,tr=0; for(const be of film.besitze){ if(be.w!==u.n||be.start>t)continue; for(const x of be.wuerfe)if(x.t<=t&&!x.nachEnde){w++;if(x.treffer)tr++;} }
+    const kn=film.ereignisse.filter(e=>e.typ==="knock"&&e.t<=t&&e.taeter===u.n).length;
+    const gk=film.ereignisse.filter(e=>e.typ==="knock"&&e.t<=t&&e.opfer===u.n).length;
+    return {u,w,tr,kn,gk,leben:b.leben[u.n],raus:b.raus.includes(u.n)};
+  }).sort((a,c)=>(fertig?a.u.platz-c.u.platz:0)||(c.leben-a.leben)||(c.kn-a.kn)||(c.u.eig-a.u.eig));
+  const k=(s,titel)=>"<th title='"+titel+"'>"+s+"</th>";
+  boxEl.innerHTML="<tr>"+k("Werfer","")+k("L","Leben übrig")+k("KO+","andere geknockt")+k("KO−","selbst geknockt")+k("W","Würfe")+k("T","Treffer")
+    +k("FW","Freiwurf (spirit 48, intelligence 35, dexterity 17)")+k("TG","Teamgeist: Druck auf den Vordermann, Ruhe an der Linie (charisma 56, spirit 44)")
+    +k("ZC","Zweitchance: wie schnell und wie nah man den Abpraller hat (torment, intelligence, spirit, awareness …)")+k("LT","Lauftempo: Sprint zum Abpraller (speed 52, stamina 32, dexterity 16)")
+    +k("NAH","Schuss nah: Korbleger (power 34, spirit 30 …)")+k("TECH","Technik: Sprungwurf nach langem Abpraller (intelligence 50, awareness 22 …)")
+    +k("Eig","Basketball-Eignung (Matrix)")+k("Pl","Platz, erst am Ende")+"</tr>"
+    +z.map(r=>"<tr class='"+(r.raus?"raus":"")+"'><td class='"+(r.u.seite?"gast":"heim")+"'>"+r.u.n+"</td><td>"+r.leben+"</td><td>"+(r.kn||"")+"</td><td>"+(r.gk||"")+"</td><td>"+r.w+"</td><td>"+r.tr+"</td><td>"
+      +r.u.FREIWURF+"</td><td>"+r.u.TEAMGEIST+"</td><td>"+r.u.ZWEITCHANCE+"</td><td>"+r.u.LAUFTEMPO+"</td><td>"+r.u.SCHUSS_NAH+"</td><td>"+r.u.TECHNIK+"</td><td>"+Math.round(r.u.eig)+"</td><td>"+(fertig?r.u.platz:"")+"</td></tr>").join("");
+}
+
+// ------------------------------------------------------------------ Schleife + Bedienung
+let letzt=performance.now();
+function schleife(jetzt){
+  const dt=Math.min(0.1,(jetzt-letzt)/1000); letzt=jetzt;
+  if(laeuft&&spiel)uhr+=dt*tempo;
+  draw();
+  if(spiel)document.getElementById("tt").textContent=fmt(Math.min(uhr,ENDE))+" / "+fmt(ENDE)+" Sendezeit (1×)";
+  requestAnimationFrame(schleife);
+}
+document.getElementById("play").onclick=(e)=>{ laeuft=!laeuft; e.target.textContent=laeuft?"Pause":"Weiter"; };
+document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{ tempo=+b.dataset.sp; document.querySelectorAll("[data-sp]").forEach(x=>x.classList.toggle("on",x===b)); });
+document.getElementById("neu").onclick=()=>{ saat=(saat*1103515245+12345)>>>0; neuesSpiel(); };
+const sel=document.getElementById("paarung");
+sel.onchange=()=>{ paarungIdx=+sel.value; neuesSpiel(); };
+// Sicht-QA: ?t=SEKUNDEN springt in der Sendezeit vor (&halt=1 haelt an), ?p=PAARUNG, ?saat=N
+const q=new URLSearchParams(location.search);
+fetch("basketball-knockout-prototyp/kader.json").then(r=>r.json()).then(k=>{
+  KADER=k;
+  sel.innerHTML=k.paarungen.map((p,i)=>"<option value='"+i+"'>"+p.heimName+" – "+p.gastName+"</option>").join("");
+  if(q.has("p"))paarungIdx=+q.get("p"); sel.value=paarungIdx;
+  if(q.has("saat"))saat=+q.get("saat");
+  neuesSpiel();
+  if(q.has("t")){ uhr=+q.get("t"); if(q.has("halt"))laeuft=false; }
+  requestAnimationFrame(schleife);
+});
+})();
+</script>
+</body>
+</html>
