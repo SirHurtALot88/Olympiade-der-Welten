@@ -276,3 +276,31 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
 **Stand nach Batch 8:** 18 von 20 Disziplinen haben eine PixelLab-Kulisse im Motor. Offen sind nur
 Mini-DM im Vierer-Pod (DOM-Tabelle, wartet auf Chris) und Takeshi's Castle (Seitenpanorama gegen
 Draufsicht-Route, braucht neue Draufsicht-Kacheln, wartet auf Chris).
+
+## Batch 9: Mini-DM im Vierer-Pod auf der Leinwand (08.11.)
+
+Chris zu der Frage aus PR #1351 („Tabelle behalten und Kulisse dahinter, oder umbauen?“): „umbauen“. Mini-DM-FFA
+zeigte bis dahin im Vierer-Pod nur DOM-Karten und Tabellen (`renderMiniDmFfa`), die Leinwand samt Kulisse war
+ausgeblendet. Jetzt hat das FFA eine eigene Leinwand.
+
+- **`mdffaBuehne`** (Motor, vor `reset()` deklariert) zeichnet auf `#mdffaCv` (1240×470, in `battle-mode.html`
+  oberhalb der Eckkarten) einen Vier-Ecken-Kampf vor der Mini-DM-Kulisse (PixelLab, dieselbe Wahl über
+  `kulisseWaehlen`). Ecke 1 steht oben, 2 rechts, 3 unten und 4 links, die Farben sind die Eckfarben der Karten.
+  Die PixelLab-Figuren drehen sich zur Mitte. Beim Schlag stoßen sie aufs Ziel vor (Angriffs-Animation), beim
+  Treffer zucken sie, nach K.o. oder Finisher läuft die Tod-Animation. Eingeblendet werden Schaden, Schwachstelle,
+  Zange, daneben, ausgewichen, angeschlagen, hält stand, FINISHER und K.O. Das Zweckbündnis erscheint als
+  gestrichelte Linie mit Zielring auf dem Gejagten. Der Ring zieht sich sichtbar zu. Je Ecke gibt es ein Schild
+  mit Stand-Balken, eine Punktetafel und einen Rundentitel. Zum Endstand stehen alle wieder auf und tragen ihre
+  Platzierung #1 bis #4.
+- **Reine Anzeige:** Die Bühne wird von genau den Stellen in `renderMiniDmFfa()` angestoßen, die auch die
+  DOM-Karten fortschreiben (`einlauf`, `titel`, `runde`, `takt`, `rundenEnde`, `punkte`, `endstand`, `abbau`). Sie
+  liest nur das fertige Ereignis (`runde.takte[].ereignisse/stand/pakt`). Es gibt kein `rr()` und keinen Zugriff
+  auf Saat, Formkarten oder Mutatoren. Die Uhr ist `performance.now()`, nicht die Spielzeit. Das
+  Zwei-Seiten-Chassis (`build`/`draw`/`MOTOREN["mini-dm"]`) ist unberührt. Ein eigener N=4-Zeichner daneben
+  vermeidet genau das Risiko, das der Kopfkommentar von `renderMiniDmFfa()` beschreibt.
+- Die Eckkarten, der Ticker und die Rundentafeln bleiben unter der Leinwand als Boxscore.
+- Sichtprobe: `node scripts/screenshot-mdffa-buehne.mjs [präfix] [variante]` (Einlauf, Runde 1, Endstand).
+- Test: `tests/arena-kulissen.test.ts` prüft, dass die Bühne vor `reset()` steht, nichts aus der Simulation
+  anfasst und alle Anstöße verdrahtet sind.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.

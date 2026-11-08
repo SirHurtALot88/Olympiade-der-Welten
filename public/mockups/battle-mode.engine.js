@@ -54674,6 +54674,351 @@
   // naechsten Mini-DM-Besuch), wird aber nie von traegheitsarm()/prefers-reduced-motion
   // ueberschrieben -- diese Pruefung sitzt in renderMiniDmFfa() selbst.
   let mdffaTempo=1;
+  // ===================================================================================
+  // MINI-DM-FFA AUF DER LEINWAND (Kulissen-Integration, Chris 08.11.: "umbauen"). Bis hierher zeigte
+  // Mini-DM im Vierer-Pod nur DOM-Karten und Tabellen; die Leinwand samt Kulisse war ausgeblendet.
+  // Jetzt laeuft der Kampf als Vier-Ecken-Szene auf einer eigenen Leinwand (#mdffaCv, 1240x470) vor
+  // der Mini-DM-Kulisse (PixelLab, s. kulisseWaehlen): vier Kaempfer, eine Ecke je Team, Schlaege,
+  // Treffer, Zweckbuendnisse, Ring und K.o. Takt fuer Takt so, wie `spieleMiniDmFfaEvent()` sie
+  // GERECHNET hat. Die DOM-Karten darunter bleiben als Punktestand/Boxscore.
+  //
+  // REINE ANZEIGE: Die Buehne liest nur das fertige Ereignis (`runde.takte[].ereignisse/stand/pakt`)
+  // und wird von genau den Stellen in renderMiniDmFfa() angestossen, die auch die DOM-Karten
+  // fortschreiben. Kein rr(), kein Zugriff auf Saat, Formkarten oder Mutatoren; Uhr ist
+  // performance.now(), nicht die Spielzeit `t`. Das Zwei-Seiten-Chassis (build/draw/MOTOREN) bleibt
+  // unberuehrt -- die Begruendung im Kopfkommentar von renderMiniDmFfa() gilt weiter, die Buehne
+  // ist ein eigener, N=4-Zeichner neben ihm statt eines Umbaus darin.
+  // Deklariert HIER, vor reset() (das sie beim Verlassen von Mini-DM abbaut), aus demselben Grund
+  // wie mdffaOffenbarungsTimer oben: reset() laeuft schon beim Start.
+  const mdffaBuehne=(()=>{
+    const BW=1240, BH=470, BMID=BW/2;
+    // Ecke 1 oben, 2 rechts, 3 unten, 4 links (dieselbe Reihenfolge wie ECKEN in renderMiniDmFfa)
+    const ECK=[{x:BMID,y:178,blick:"south"},{x:BW-250,y:292,blick:"west"},{x:BMID,y:402,blick:"north"},{x:250,y:292,blick:"east"}];
+    const MITTE={x:BMID,y:290};
+    const FARBE_HELL=["#F2A03D","#45B0C9","#8FCB5C","#C58CE0"];
+    const FIG_H=86;
+    let cv=null, cx=null, z=null, raf=0;
+    const jetzt=()=>(typeof performance!=="undefined"?performance.now():Date.now())/1000;
+    const tempo=()=>Math.max(1,mdffaTempo||1);
+
+    function leinwand(){
+      if(!cv){ cv=document.getElementById("mdffaCv"); cx=cv?cv.getContext("2d"):null; }
+      return cx;
+    }
+    function laeuft(){
+      return !!(z&&cv&&cv.isConnected&&!cv.closest("[hidden]"));
+    }
+    function anstossen(){
+      if(raf||!laeuft())return;
+      const schritt=()=>{ raf=0; if(!laeuft())return; zeichne(); raf=requestAnimationFrame(schritt); };
+      raf=requestAnimationFrame(schritt);
+    }
+
+    function einlauf(eintraege,ereignis){
+      if(!leinwand())return;
+      const namen=new Set();
+      for(const r of ereignis.runden)for(const t of r.teams)namen.add(t.n);
+      for(const n of namen)pixelFigurLaden(n);
+      z={teams:eintraege.map(e=>e.name), runden:ereignis.runden.length, kaempfer:null,
+        punkte:[0,0,0,0], nachRunde:0, titel:"Vier Ecken, vier Teams — bereit", unterzeile:"Mini-DM · Free-for-All",
+        effekte:[], pakt:null, ringStufe:0, ende:null, sieger:null};
+      anstossen(); zeichne();
+    }
+    function titel(text,unter){ if(!z)return; z.titel=text; z.unterzeile=unter||""; anstossen(); }
+    function runde(r,nr,rolle){
+      if(!z)return;
+      z.kaempfer=[0,1,2,3].map(side=>{
+        const t=r.teams.find(tt=>tt.side===side);
+        return {side, n:t.n, max:t.max, hp:t.max, hpZiel:t.max, raus:false, rausT:null, rausArt:null,
+          angeschlagen:false, lunge:null, treffer:-1e9, reihum:t.gesetzt===false};
+      });
+      z.titel="Runde "+nr+" von "+z.runden; z.unterzeile=rolle; z.pakt=null; z.ringStufe=0; z.effekte=[];
+      anstossen();
+    }
+    function effekt(e){ z.effekte.push(e); }
+    function takt(r,tk){
+      if(!z||!z.kaempfer)return;
+      const t0=jetzt(), dauer=0.24/tempo();
+      const ev=(tk.ereignisse||[]).filter(e=>e.wer!=null||e.ziel!=null||e.typ==="ring");
+      const n=Math.max(1,ev.filter(e=>["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)).length);
+      let i=0;
+      for(const e of tk.ereignisse||[]){
+        const k=z.kaempfer;
+        if(["treffer","schwachstelle","zange","daneben","leer","finisher"].includes(e.typ)){
+          const ta=t0+dauer*(i++)/n;
+          k[e.wer].lunge={ziel:e.ziel, t:ta, d:Math.min(0.2,dauer*0.9)};
+          if(e.typ==="daneben"||e.typ==="leer")effekt({art:"text", side:e.ziel, t:ta+0.08, text:e.typ==="leer"?"ins Leere":"daneben", farbe:"#d8dde6"});
+          else if(e.typ==="finisher")effekt({art:"text", side:e.ziel, t:ta+0.08, text:"FINISHER", farbe:"#ffd36b", gross:true});
+          else{
+            effekt({art:"hieb", von:e.wer, side:e.ziel, t:ta+0.08, farbe:FARBE_HELL[e.wer], schwach:e.typ==="schwachstelle"});
+            effekt({art:"text", side:e.ziel, t:ta+0.08, text:"−"+Math.round(e.wucht||0)+(e.typ==="schwachstelle"?" Schwachstelle":e.typ==="zange"?" Zange":""), farbe:e.typ==="schwachstelle"?"#ffd36b":"#ff8a80"});
+            k[e.ziel].treffer=ta+0.08;
+          }
+        }else if(e.typ==="position")effekt({art:"text", side:e.wer, t:t0, text:"weicht aus", farbe:"#9fe0ff"});
+        else if(e.typ==="uebersteht")effekt({art:"text", side:e.wer, t:t0+dauer*0.6, text:"hält stand!", farbe:"#b6f0a0"});
+        else if(e.typ==="bruchpunkt")effekt({art:"text", side:e.wer, t:t0+dauer*0.7, text:"angeschlagen", farbe:"#ffb26b"});
+        else if(e.typ==="buendnis")effekt({art:"banner", t:t0, text:"Zweckbündnis gegen "+z.teams[e.gegen]});
+        else if(e.typ==="ring"){ z.ringStufe++; effekt({art:"ring", t:t0}); }
+        else if(e.typ==="ko"||e.typ==="ring-aus")effekt({art:"text", side:e.ziel, t:t0+dauer, text:e.typ==="ko"?"K.O.":"bleibt liegen", farbe:"#ff5a52", gross:true});
+      }
+      z.pakt=tk.pakt||null;
+      for(const s of tk.stand||[]){
+        const k=z.kaempfer[s.side];
+        k.hpZiel=s.stand; k.max=s.max; k.angeschlagen=!!s.angeschlagen;
+        if(s.raus&&!k.raus){
+          k.raus=true; k.rausT=t0+dauer;
+          const tm=r.teams.find(tt=>tt.side===s.side); k.rausArt=tm?tm.rausArt:null;
+        }
+      }
+      anstossen();
+    }
+    function rundenEnde(r){
+      if(!z||!z.kaempfer)return;
+      const sieger=r.teams.find(t=>t.rundenPlatz===1);
+      for(const t of r.teams){
+        const k=z.kaempfer[t.side]; k.hpZiel=t.hp; k.max=t.max;
+        if(t.down&&!k.raus){ k.raus=true; k.rausT=jetzt()-1; k.rausArt=t.rausArt; }
+      }
+      z.pakt=null;
+      if(sieger)effekt({art:"banner", t:jetzt(), text:"Rundensieg: "+sieger.n+" ("+z.teams[sieger.side]+")", lang:true});
+      anstossen();
+    }
+    function punkte(summe,nr){ if(!z)return; z.punkte=summe.slice(); z.nachRunde=nr; anstossen(); }
+    function endstand(ereignis){
+      if(!z)return;
+      const erg=ereignis.teams.slice().sort((a,b)=>a.eventPlatz-b.eventPlatz);
+      z.ende=erg; z.punkte=[0,1,2,3].map(s=>ereignis.teams.find(t=>t.side===s).rundenPunkteSumme);
+      z.titel=z.teams[erg[0].side].toUpperCase()+" GEWINNT"; z.unterzeile="Endstand · Ligapunkte 2-1-0-0";
+      z.pakt=null; z.effekte=[]; z.ringStufe=0;
+      // Zum Endstand stehen alle vier wieder auf (die Platzierung gilt fuer das Team ueber alle Runden,
+      // nicht fuer den Stand am Ende der letzten Runde).
+      if(z.kaempfer)for(const k of z.kaempfer){ k.raus=false; k.rausT=null; k.hp=k.hpZiel=k.max; k.angeschlagen=false; k.lunge=null; }
+      anstossen();
+    }
+    function abbau(){
+      z=null; if(raf){ cancelAnimationFrame(raf); raf=0; }
+      if(leinwand())cx.clearRect(0,0,BW,BH);
+    }
+
+    // ---------------------------------------------------------------- Zeichnen
+    function boden(){
+      const ka=kulisseAktiv&&kulisseAktiv.disc==="mini-dm"?kulisseAktiv:null;
+      const im=ka?kulisseBilder[ka.bild]:null;
+      if(im&&im.complete&&im.naturalWidth){
+        cx.drawImage(im,0,0,BW,BH);
+        cx.fillStyle="rgba(10,10,16,"+Math.min(0.5,(ka.dunkel||0.2)+0.1)+")"; cx.fillRect(0,0,BW,BH);
+      }else{
+        const g=cx.createRadialGradient(BMID,BH/2,40,BMID,BH/2,BW*0.6);
+        g.addColorStop(0,"#5a4a36"); g.addColorStop(1,"#241c14");
+        cx.fillStyle=g; cx.fillRect(0,0,BW,BH);
+      }
+      const v=cx.createRadialGradient(MITTE.x,MITTE.y,80,MITTE.x,MITTE.y,BW*0.6);
+      v.addColorStop(0,"rgba(0,0,0,0)"); v.addColorStop(1,"rgba(0,0,0,.5)");
+      cx.fillStyle=v; cx.fillRect(0,0,BW,BH);
+      // vier Eckplaetze: farbiger Kreis am Boden je Team
+      ECK.forEach((e,side)=>{
+        cx.save(); cx.translate(e.x,e.y); cx.scale(1,0.42);
+        cx.beginPath(); cx.arc(0,0,58,0,Math.PI*2);
+        cx.fillStyle=FARBE_HELL[side]+"33"; cx.fill();
+        cx.lineWidth=4; cx.strokeStyle=FARBE_HELL[side]+"cc"; cx.stroke();
+        cx.restore();
+      });
+      // Ring: zieht sich mit jeder Stufe zu
+      if(z.ringStufe>0){
+        const r=Math.max(150,420-z.ringStufe*55);
+        cx.save(); cx.translate(MITTE.x,MITTE.y); cx.scale(1,0.55);
+        cx.beginPath(); cx.arc(0,0,r,0,Math.PI*2); cx.setLineDash([14,10]);
+        cx.lineWidth=5; cx.strokeStyle="rgba(255,90,82,.75)"; cx.stroke();
+        cx.restore();
+      }
+    }
+    function position(k,now){
+      const e=ECK[k.side]; let x=e.x, y=e.y;
+      const l=k.lunge;
+      if(l&&now>=l.t&&now<=l.t+l.d*2){
+        const p=(now-l.t)/(l.d*2), hub=Math.sin(p*Math.PI);
+        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y, d=Math.hypot(dx,dy)||1;
+        const weg=Math.min(d*0.38,170)*hub;
+        x+=dx/d*weg; y+=dy/d*weg;
+      }else if(now<k.treffer+0.25&&now>=k.treffer)x+=Math.sin((now-k.treffer)*70)*4;
+      return {x,y};
+    }
+    function figur(k,now,p){
+      const zf=pixelFigurBereit(k.n);
+      const e=ECK[k.side];
+      const unten=k.raus&&now>=k.rausT;
+      if(!zf){
+        cx.save(); cx.translate(p.x,p.y);
+        if(unten)cx.rotate(Math.PI/2*Math.min(1,(now-k.rausT)/0.4));
+        cx.fillStyle=FARBE_HELL[k.side]; cx.beginPath(); cx.ellipse(0,-34,18,34,0,0,Math.PI*2); cx.fill();
+        cx.fillStyle="#111"; cx.font="700 14px system-ui,sans-serif"; cx.textAlign="center";
+        cx.fillText((k.n||"?").slice(0,2).toUpperCase(),0,-30); cx.restore();
+        return;
+      }
+      const fig=zf.fig;
+      const geladen=(b)=>!!(b&&b.im&&b.mass);
+      const grund=pixelGrundBild(zf);
+      const s=Math.max(0.3,Math.min(2.4,Math.min(FIG_H/grund.mass.hoehe,72/Math.max(1,grund.mass.breite))));
+      const male=(b,f,spiegeln,winkel)=>{
+        const m=b.mass;
+        cx.save(); cx.imageSmoothingEnabled=false; cx.translate(p.x,p.y);
+        if(winkel)cx.rotate(winkel);
+        if(spiegeln)cx.scale(-1,1);
+        try{ cx.drawImage(b.im,f*m.fw,0,m.fw,m.fh,-m.mitteX*s,-m.unten*s,m.fw*s,m.fh*s); }catch(err){}
+        cx.restore();
+      };
+      const l=k.lunge, imAngriff=l&&now>=l.t&&now<=l.t+l.d*2&&!unten;
+      const imTreffer=!unten&&!imAngriff&&now>=k.treffer&&now<k.treffer+0.3;
+      const art=unten?"tod":imAngriff?"angriff":imTreffer?"treffer":null;
+      // Blickrichtung: zur Mitte, beim Angriff zum Ziel
+      let blick=e.blick;
+      if(imAngriff){
+        const zi=ECK[l.ziel], dx=zi.x-e.x, dy=zi.y-e.y;
+        blick=Math.abs(dx)>Math.abs(dy)*1.2?(dx>0?"east":"west"):(dy>0?"south":"north");
+      }
+      if(art&&fig.a[art]){
+        const def=fig.a[art];
+        const wunsch=blick==="west"?"east":blick;
+        const d=def[wunsch]?wunsch:(def.east?"east":def.south?"south":Object.keys(def)[0]);
+        const [stamm,n]=def[d];
+        const b=zf.bilder.get(stamm+"-"+d+".png");
+        if(geladen(b)){
+          let f;
+          if(art==="tod")f=Math.min(n-1,Math.floor((now-k.rausT)/0.9*n));
+          else if(art==="angriff")f=Math.min(n-1,Math.floor((now-l.t)/(l.d*2)*n));
+          else f=Math.min(n-1,Math.floor((now-k.treffer)/0.3*n));
+          male(b,Math.max(0,f),blick==="west"&&d==="east",0);
+          return;
+        }
+      }
+      let b=zf.bilder.get(blick+".png"), sp=false;
+      if(!geladen(b)&&blick==="west"&&geladen(zf.bilder.get("east.png"))){ b=zf.bilder.get("east.png"); sp=true; }
+      if(!geladen(b))b=grund;
+      const winkel=unten?(k.side===1?-1:1)*Math.PI/2*Math.min(1,(now-k.rausT)/0.5):0;
+      male(b,0,sp,winkel);
+    }
+    function schild(k,p){
+      // Oben/unten steht das Schild NEBEN der Figur (sonst laege es unter der Kopfzeile bzw. am
+      // unteren Rand), links/rechts darunter.
+      const e=ECK[k.side], seitlich=k.side===0||k.side===2, w=170;
+      const x0=seitlich?e.x+52:p.x-w/2, y=seitlich?e.y-40:e.y+22;
+      cx.save();
+      cx.fillStyle="rgba(10,12,18,.78)"; cx.fillRect(x0,y,w,34);
+      cx.fillStyle=FARBE_HELL[k.side]; cx.fillRect(x0,y,4,34);
+      cx.font="700 12px system-ui,sans-serif"; cx.textAlign="left"; cx.fillStyle="#eef1f6";
+      const name=(k.n+(k.reihum?" (Reihum)":"")).slice(0,22);
+      cx.fillText(name,x0+10,y+13);
+      cx.font="600 10px system-ui,sans-serif"; cx.fillStyle="#aab3c2";
+      cx.fillText(String(z.teams[k.side]).slice(0,26),x0+10,y+26);
+      // Stand-Balken
+      const q=Math.max(0,Math.min(1,k.hp/Math.max(1,k.max)));
+      cx.fillStyle="#2a2f3c"; cx.fillRect(x0+10,y+29,w-20,3);
+      cx.fillStyle=k.raus?"#6b7280":k.angeschlagen?"#ffb26b":FARBE_HELL[k.side]; cx.fillRect(x0+10,y+29,(w-20)*q,3);
+      cx.restore();
+    }
+    function kopf(){
+      // Titel rechts oben (die Mitte oben gehoert dem Kaempfer in Ecke 1 und seinen Einblendungen)
+      cx.save();
+      cx.textAlign="right";
+      cx.font="800 18px system-ui,sans-serif";
+      const tb=Math.max(220,cx.measureText(z.titel).width+28);
+      cx.fillStyle="rgba(10,12,18,.72)"; cx.fillRect(BW-10-tb,10,tb,46);
+      cx.fillStyle="#eef1f6"; cx.fillText(z.titel,BW-24,32);
+      cx.font="600 12px system-ui,sans-serif"; cx.fillStyle="#aab3c2"; cx.fillText(z.unterzeile||"",BW-24,49);
+      // Punkte-Tafel links oben
+      const reihe=[0,1,2,3].slice().sort((a,b)=>z.punkte[b]-z.punkte[a]||a-b);
+      cx.textAlign="left"; cx.fillStyle="rgba(10,12,18,.72)"; cx.fillRect(10,10,230,22+reihe.length*18);
+      cx.font="700 10px system-ui,sans-serif"; cx.fillStyle="#97a1b3";
+      cx.fillText(z.ende?"ENDSTAND":z.nachRunde?"PUNKTE NACH RUNDE "+z.nachRunde:"PUNKTE",18,25);
+      reihe.forEach((side,i)=>{
+        const y=43+i*18;
+        cx.fillStyle=FARBE_HELL[side]; cx.fillRect(18,y-9,8,8);
+        cx.font="700 12px system-ui,sans-serif"; cx.fillStyle="#eef1f6";
+        cx.fillText(String(z.teams[side]).slice(0,22),32,y);
+        cx.textAlign="right";
+        const erg=z.ende&&z.ende.find(t=>t.side===side);
+        cx.fillText(erg?erg.ligaPunkte+" Liga":String(z.punkte[side]),232,y);
+        cx.textAlign="left";
+      });
+      cx.restore();
+    }
+    function effekteZeichnen(now){
+      z.effekte=z.effekte.filter(e=>now<e.t+(e.lang?2.6:e.art==="banner"?1.6:0.9));
+      const stapel=[0,0,0,0];   // gleichzeitige Texte derselben Ecke uebereinander statt aufeinander
+      for(const e of z.effekte){
+        if(now<e.t)continue;
+        const a=now-e.t;
+        if(e.art==="hieb"){
+          const k=ECK[e.side], q=Math.min(1,a/0.25);
+          cx.save(); cx.globalAlpha=1-q; cx.strokeStyle=e.schwach?"#ffd36b":"#ffffff"; cx.lineWidth=4;
+          cx.beginPath(); cx.moveTo(k.x-26,k.y-FIG_H*0.75); cx.lineTo(k.x+26,k.y-FIG_H*0.25); cx.stroke();
+          cx.beginPath(); cx.arc(k.x,k.y-FIG_H*0.5,10+q*26,0,Math.PI*2); cx.strokeStyle=e.farbe; cx.lineWidth=3; cx.stroke();
+          cx.restore();
+        }else if(e.art==="text"){
+          const k=ECK[e.side], q=Math.min(1,a/0.9);
+          cx.save(); cx.globalAlpha=1-q*q; cx.textAlign="center";
+          cx.font=(e.gross?"900 26px":"800 15px")+" system-ui,sans-serif";
+          cx.lineWidth=4; cx.strokeStyle="rgba(8,10,14,.85)";
+          const y=k.y-FIG_H-6-q*26-(stapel[e.side]++)*19;
+          cx.strokeText(e.text,k.x,y); cx.fillStyle=e.farbe; cx.fillText(e.text,k.x,y);
+          cx.restore();
+        }else if(e.art==="banner"){
+          cx.save(); cx.globalAlpha=Math.min(1,a/0.15)*(1-Math.max(0,a-(e.lang?2.2:1.2))/0.4);
+          cx.textAlign="center"; cx.fillStyle="rgba(10,12,18,.8)"; cx.fillRect(BMID-260,MITTE.y-20,520,34);
+          cx.font="800 15px system-ui,sans-serif"; cx.fillStyle="#ffd36b"; cx.fillText(e.text,BMID,MITTE.y+2);
+          cx.restore();
+        }else if(e.art==="ring"){
+          cx.save(); cx.globalAlpha=Math.max(0,0.35-a*0.5); cx.fillStyle="#ff5a52"; cx.fillRect(0,0,BW,BH); cx.restore();
+        }
+      }
+    }
+    function zeichne(){
+      if(!z||!leinwand())return;
+      const now=jetzt();
+      boden();
+      if(z.kaempfer){
+        // Zweckbuendnis: gestrichelte Linie zwischen den Partnern, Zielmarke auf dem Gejagten
+        if(z.pakt){
+          const a=ECK[z.pakt.a], b=ECK[z.pakt.b], g=ECK[z.pakt.gegen];
+          cx.save(); cx.setLineDash([8,8]); cx.lineWidth=3; cx.strokeStyle="rgba(255,211,107,.8)";
+          cx.beginPath(); cx.moveTo(a.x,a.y-30); cx.lineTo(b.x,b.y-30); cx.stroke();
+          cx.setLineDash([]); cx.strokeStyle="rgba(255,90,82,.9)";
+          cx.beginPath(); cx.arc(g.x,g.y-FIG_H*0.5,FIG_H*0.62,0,Math.PI*2); cx.stroke();
+          cx.restore();
+        }
+        for(const k of z.kaempfer)k.hp+=(k.hpZiel-k.hp)*0.18;
+        const reihe=z.kaempfer.slice().sort((a,b)=>position(a,now).y-position(b,now).y);
+        for(const k of reihe){
+          const p=position(k,now);
+          cx.save(); cx.fillStyle="rgba(0,0,0,.35)"; cx.beginPath(); cx.ellipse(p.x,p.y,26,7,0,0,Math.PI*2); cx.fill(); cx.restore();
+          figur(k,now,p);
+        }
+        for(const k of z.kaempfer)schild(k,ECK[k.side]);
+      }else{
+        // Einlauf: Teamnamen in den Ecken
+        ECK.forEach((e,side)=>{
+          cx.save(); cx.textAlign="center"; cx.font="800 16px system-ui,sans-serif";
+          cx.lineWidth=4; cx.strokeStyle="rgba(8,10,14,.85)";
+          cx.strokeText(z.teams[side],e.x,e.y-20); cx.fillStyle=FARBE_HELL[side]; cx.fillText(z.teams[side],e.x,e.y-20);
+          cx.restore();
+        });
+      }
+      if(z.ende){
+        cx.save(); cx.textAlign="center";
+        z.ende.forEach((t,i)=>{
+          const e=ECK[t.side];
+          cx.font="900 22px system-ui,sans-serif"; cx.lineWidth=5; cx.strokeStyle="rgba(8,10,14,.9)";
+          const y=t.side===0?e.y+44:t.side===2?e.y-FIG_H-14:e.y-FIG_H-24;
+          cx.strokeText("#"+t.eventPlatz,e.x,y); cx.fillStyle=i===0?"#ffd36b":"#eef1f6"; cx.fillText("#"+t.eventPlatz,e.x,y);
+        });
+        cx.restore();
+      }
+      effekteZeichnen(now);
+      kopf();
+    }
+    return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau};
+  })();
+
 
   // TDM-ENTWICKLERPANELS: SICHTBAR NUR AUSSERHALB EINES LAUFENDEN SPIELS (Phase 5,
   // 28.09., kritischer Audit). "Nutzwert je Skill"/"Das Verhaltensmodell" (#tdmEntwurfNotes)
@@ -54890,6 +55235,7 @@
     else{
       if(mdffaOffenbarungsTimer){clearTimeout(mdffaOffenbarungsTimer);mdffaOffenbarungsTimer=null;}
       mdffaNaechsteRunde=null; mdffaSpringeZumEnde=null;
+      mdffaBuehne.abbau();
     }
     // TDM-ENTWICKLERPANELS NUR FUER TDM (Opus-Review 27.09.): "Nutzwert je Skill",
     // "Das Verhaltensmodell" und "Das Kit, das gerade alle tragen" (battle-mode.html,
@@ -57088,11 +57434,13 @@
       if(titelkarte)titelkarte.hidden=true;
       if(rundenbanner)rundenbanner.hidden=true;
       if(endstandKopf)endstandKopf.hidden=true;
+      mdffaBuehne.abbau();
       return;
     }finally{
       FORMKARTE=formVorher;
     }
     const ECKEN=["Ecke 1 (oben)","Ecke 2 (rechts)","Ecke 3 (unten)","Ecke 4 (links)"];
+    mdffaBuehne.einlauf(eintraege,ereignis);
     const bySide=(side)=>ereignis.teams.find(t=>t.side===side);
 
     // AB HIER NUR NOCH ANZEIGE-CHORAGRAFIE. `ereignis` steht bereits vollstaendig fest —
@@ -57241,6 +57589,7 @@
     // als Endzustand nach der Runde beschriftet (.mdffa-hplabel-Text), nicht als Live-
     // Kampfverlauf: die Simulation ist zu diesem Zeitpunkt laengst vollstaendig gelaufen.
     function aktualisiereHpBalken(runde){
+      mdffaBuehne.rundenEnde(runde);
       runde.teams.forEach(t=>{
         const karte=eckKarten[t.side];
         const hpwrap=karte.querySelector(".mdffa-hpwrap");
@@ -57275,6 +57624,7 @@
       while(tickerBox.childNodes.length>60)tickerBox.removeChild(tickerBox.lastChild);
     }
     function setzeKaempfer(runde,rundenNr){
+      mdffaBuehne.runde(runde,rundenNr,mdffaRollenLabel(runde.slotId));
       tickerKopf(runde,rundenNr);
       runde.teams.forEach(t=>{
         const karte=eckKarten[t.side];
@@ -57300,6 +57650,7 @@
       });
     }
     function zeigeTakt(runde,tk){
+      mdffaBuehne.takt(runde,tk);
       const bilanz=mdffaTaktBilanz(tk);
       for(const z of mdffaTaktZeilen(tk,nameIn(runde)))tickerZeile(tk.t,z);
       tk.stand.forEach(s=>{
@@ -57343,6 +57694,7 @@
     }
 
     function aktualisiereEckKarte(side,rundenNr){
+      mdffaBuehne.punkte(laufendeSumme,rundenNr);
       const karte=eckKarten[side];
       karte.classList.remove("mdffa-wartet");
       const punkte=karte.querySelector(".mdffa-punkte");
@@ -57385,6 +57737,7 @@
     // TITELKARTE PRO RUNDE (C2): "Runde X von 4 · <Rolle>", kurz fuer sich allein sichtbar,
     // bevor die Rundentafel/Lebensbalken/der Rundensieger dazukommen.
     function zeigeTitelkarte(rundenNr,rolle){
+      mdffaBuehne.titel("Runde "+rundenNr+" von "+ereignis.runden.length,rolle);
       if(!titelkarte)return;
       titelkarte.textContent="";
       titelkarte.appendChild(el("b",null,"Runde "+rundenNr+" von "+ereignis.runden.length));
@@ -57406,6 +57759,7 @@
     // --warn), Podest fuer Platz 1-4 mit MVP-Stern, PLUS die bestehende Ergebnistabelle
     // unveraendert darunter (Werte/Sortierung/Sieger-Markierung wie zuvor).
     function zeigeEndstand(){
+      mdffaBuehne.endstand(ereignis);
       // Mini-DM endet nicht ueber finish(), sondern hier -- dieselbe Ende-Meldung an den Host.
       letzterAngezeigterSieger=null;
       setTimeout(meldeSpielEnde,0);

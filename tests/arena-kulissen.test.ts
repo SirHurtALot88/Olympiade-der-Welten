@@ -114,6 +114,27 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     }
   });
 
+  it("Mini-DM-FFA (Batch 9): Vier-Ecken-Leinwand vor der Kulisse, reine Anzeige", () => {
+    // mdffaBuehne zeichnet das fertig gerechnete Ereignis (runde.takte) auf #mdffaCv — ohne rr(), ohne
+    // Saat, ohne Spielzeit t. Deklariert vor reset(), das sie beim Verlassen von Mini-DM abbaut.
+    const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
+    const start = motor.indexOf("const mdffaBuehne=(()=>{");
+    expect(start).toBeGreaterThan(-1);
+    expect(start).toBeLessThan(motor.indexOf("  function reset(){"));
+    const ende = motor.indexOf("return {einlauf, titel, runde, takt, rundenEnde, punkte, endstand, abbau};", start);
+    expect(ende).toBeGreaterThan(start);
+    const buehne = motor.slice(start, ende);
+    expect(buehne).not.toMatch(/\brr\(/);
+    expect(buehne).not.toMatch(/\bseed\b/);
+    expect(buehne).not.toMatch(/FORMKARTE|MUTATOREN|spieleMiniDmFfaEvent/);
+    for (const aufruf of ["mdffaBuehne.einlauf(", "mdffaBuehne.runde(", "mdffaBuehne.takt(", "mdffaBuehne.endstand(", "mdffaBuehne.abbau("]) {
+      expect(motor, aufruf).toContain(aufruf);
+    }
+    const html = readFileSync(path.join(wurzel, "public/mockups/battle-mode.html"), "utf8");
+    expect(html).toContain('id="mdffaCv" width="1240" height="470"');
+    expect(kulissen["mini-dm"]?.length ?? 0).toBeGreaterThanOrEqual(2);
+  });
+
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {
     for (const [dId, liste] of Object.entries(kulissen)) {
       const varianten = DISCIPLINE_SCENES[dId]?.variants.map((v) => v.id) ?? [];
