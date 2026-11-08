@@ -9,7 +9,10 @@ import {
   slotKuerzel,
   slotKuerzelFuerListe,
   goldPruefung,
+  glyphenTon,
   optimaleZuteilung,
+  passungsGlyphe,
+  rollenGlyphe,
 } from "@/lib/lineups/einsatzliste-anzeige";
 import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
@@ -147,5 +150,23 @@ describe("Einsatzliste-Anzeige (Paket 1)", () => {
   it("Helfer-Modul importiert nichts aus Resolve, Arena oder Matrix (reine Anzeige)", () => {
     const quelle = readFileSync(join(process.cwd(), "lib/lineups/einsatzliste-anzeige.ts"), "utf8");
     expect(quelle).not.toMatch(/^import /m);
+  });
+});
+
+describe("±-Schema (Rework 6.1/6.2)", () => {
+  it("Rollen-Glyphe: Δ Pp ≥ 3 ++, ≥ 1 +, dazwischen ·, ≤ −1 −, ≤ −3 −−", () => {
+    expect([5.4, 3, 2.7, 1, 0.9, 0, -0.9, -1, -2.5, -3, -8.8].map(rollenGlyphe)).toEqual(["++", "++", "+", "+", "·", "·", "·", "−", "−", "−−", "−−"]);
+  });
+
+  it("Passungs-Glyphe: dieselben Schwellen wie passung() im Motor (≥ 6 / ≥ 2 / ≥ −2), fünfte Stufe ≤ −6", () => {
+    expect([8.5, 6, 5.9, 2, 1.9, -2, -2.1, -5.9, -6, -8.5].map(passungsGlyphe)).toEqual(["++", "++", "+", "+", "·", "·", "−", "−", "−−", "−−"]);
+    const engine = readFileSync(join(process.cwd(), "public/mockups/battle-mode.engine.js"), "utf8");
+    expect(engine).toContain("if(m>=6)   return {k:\"perfekt\"");
+    expect(engine).toContain("if(m>=2)   return {k:\"gut\"");
+    expect(engine).toContain("if(m>=-2)  return {k:\"okay\"");
+  });
+
+  it("Ton je Glyphe", () => {
+    expect(["++", "+", "·", "−", "−−"].map((g) => glyphenTon(g as "++"))).toEqual(["gut", "gut", "neutral", "schlecht", "schlecht"]);
   });
 });

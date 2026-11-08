@@ -318,3 +318,41 @@ export function goldPruefung(input: {
   };
   return { zuteilung, kostenVon };
 }
+
+// ================================================================================================
+// ±-SCHEMA (Rework-Konzept 6.1/6.2): eine Glyphen-Sprache für „Rolle“ und „Spieler in Rolle“.
+// ================================================================================================
+
+export type Glyphe = "++" | "+" | "·" | "−" | "−−";
+
+/**
+ * Was eine Rolle mit einem Attribut macht: Δ = Slot-Gewicht − Basis-Gewicht in Prozentpunkten
+ * (`slotWeightProfile − baseWeightProfile`, beides auf der Rollendefinition). Schwellen wie
+ * `resolveKeyAttributes` (primary ≥ 3, secondary ≥ 1), gespiegelt ins Negative — damit auch die
+ * Abwertungen sichtbar werden, die `keyAttributes` verschweigt (Architektur 1.3, Nachtrag).
+ */
+export function rollenGlyphe(deltaPp: number): Glyphe {
+  if (deltaPp >= 3) return "++";
+  if (deltaPp >= 1) return "+";
+  if (deltaPp > -1) return "·";
+  if (deltaPp > -3) return "−";
+  return "−−";
+}
+
+/**
+ * Wie gut ein Spieler auf einen Slot passt: der Rollen-Aufschlag in Punkten (`roleModifier` der
+ * Slot-Projektion). Dieselben Schwellen wie `passung()` im Arena-Motor (≥ 6 / ≥ 2 / ≥ −2), mit
+ * einer fünften Stufe ≤ −6 nur für die Anzeige.
+ */
+export function passungsGlyphe(rollenAufschlag: number): Glyphe {
+  if (rollenAufschlag >= 6) return "++";
+  if (rollenAufschlag >= 2) return "+";
+  if (rollenAufschlag >= -2) return "·";
+  if (rollenAufschlag > -6) return "−";
+  return "−−";
+}
+
+/** Ton einer Glyphe: positiv, neutral, negativ. */
+export function glyphenTon(glyphe: Glyphe): "gut" | "neutral" | "schlecht" {
+  return glyphe === "++" || glyphe === "+" ? "gut" : glyphe === "·" ? "neutral" : "schlecht";
+}

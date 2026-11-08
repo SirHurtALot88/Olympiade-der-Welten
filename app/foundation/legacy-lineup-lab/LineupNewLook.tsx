@@ -29,8 +29,10 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
-import { GOLD_TOLERANZ, goldPruefung, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
+import { GOLD_TOLERANZ, goldPruefung, passungsGlyphe, rollenGlyphe, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
 import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/gegner-schaetzung";
+import { MOTOR_BFFFA_ROLLEN_ORT, MOTOR_SLOT_ZUSATZ, ORD_TEXT, formationFuerSeite, hatFeinjustierung, type GelegteFormation } from "@/lib/lineups/formation";
+import { EinsatzlisteMiniFeld, EinsatzlisteRollenkarte, type MiniFeldGeist, type MiniFeldMarke, type RollenkarteDaten } from "./EinsatzlisteMiniFeld";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -398,6 +400,22 @@ function rivalStrengthLabel(relationship: number): string {
 }
 
 /* --- v1-Entscheidungs-Signale (Schwellen synchron zu LegacyLineupFocusV2Board) --- */
+
+/** Attributnamen der Rollenkarte — die Spielnamen, wie Matrix und Spielerprofil sie zeigen. */
+const NL_ATTRIBUT_LABEL = {
+  power: "Power",
+  health: "Health",
+  determination: "Determination",
+  stamina: "Stamina",
+  speed: "Speed",
+  dexterity: "Dexterity",
+  awareness: "Awareness",
+  intelligence: "Intelligence",
+  will: "Will",
+  charisma: "Charisma",
+  spirit: "Spirit",
+  torment: "Torment",
+} as const;
 
 const NL_LEAD_ALTERNATIVLOS_MIN = 10;
 const NL_LEAD_KLAR_MIN = 4;
@@ -1724,6 +1742,22 @@ export default function LineupNewLook({
     }
   }, [context, slots]);
 
+  /*
+   * FORMATION JE SEITE (Ebene A). Einmal je (Disziplin, Slotzahl) gelegt; der Schlüssel enthält
+   * die Slotzahl, weil Battlefield je Kadergröße andere Rollen setzt.
+   */
+  const formationBySideKey = useMemo(() => {
+    const next = new Map<string, GelegteFormation>();
+    for (const side of ["d1", "d2"] as const) {
+      const disciplineId = (side === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2)?.disciplineId ?? null;
+      const count = slots.filter((slot) => slot.disciplineSide === side).length;
+      next.set(`${side}|${disciplineId}|${count}`, formationFuerSeite(disciplineId, count));
+    }
+    return next;
+  }, [context?.matchdayContract?.discipline1, context?.matchdayContract?.discipline2, slots]);
+  const formationFor = (side: "d1" | "d2", disciplineId: string | null, count: number): GelegteFormation =>
+    formationBySideKey.get(`${side}|${disciplineId}|${count}`) ?? formationFuerSeite(disciplineId, count);
+
   /** Eigener Schnitt je Seite auf DERSELBEN Skala wie die Gegner-Spanne (rohe Disziplin-Eignung). */
   const eigenerRohSchnittFor = (disciplineSide: "d1" | "d2", disciplineId: string | null): number | null => {
     if (!context || !disciplineId) return null;
@@ -1844,6 +1878,84 @@ export default function LineupNewLook({
     d2: context.matchdayContract?.discipline2 ?? null,
   } as const;
 
+  /*
+   * EBENE B — Daten der Rollenkarte für den fokussierten Slot. Die ±-Glyphen kommen direkt aus
+   * `slotWeightProfile − baseWeightProfile` der Rollendefinition (nicht aus `keyAttributes`, das
+   * Abwertungen verschweigt). Spielerwerte: `attributeStats` liegt zur Laufzeit an der Kaderkarte
+   * (der Client reicht `MatchdayRosterCard` durch), im Board-Typ ist es optional.
+   */
+  const rollenkarteDaten: RollenkarteDaten | null = (() => {
+    if (!activeSlot) return null;
+    const role = slotRoleByKey.get(activeSlot.key) ?? null;
+    const side = activeSlot.disciplineSide;
+    const disciplineId = disciplineBySide[side]?.disciplineId ?? null;
+    const count = slots.filter((slot) => slot.disciplineSide === side).length;
+    const platz = formationFor(side, disciplineId, count).plaetze.find((p) => p.slotIndex === activeSlot.slotIndex) ?? null;
+    const selectedId = selections[activeSlot.key] ?? "";
+    const player = selectedId ? rosterCardByActivePlayerId.get(selectedId) ?? null : null;
+    const stats = (player as { attributeStats?: Record<string, number | null | undefined> | null } | null)?.attributeStats ?? null;
+    const slotProfil = role?.slotWeightProfile ?? null;
+    const basisProfil = role?.baseWeightProfile ?? null;
+    const attribute =
+      slotProfil && basisProfil
+        ? (Object.keys(NL_ATTRIBUT_LABEL) as Array<keyof typeof NL_ATTRIBUT_LABEL>)
+            .map((key) => {
+              const gewicht = slotProfil[key] ?? 0;
+              const delta = gewicht - (basisProfil[key] ?? 0);
+              const wert = stats?.[key];
+              return { key, label: NL_ATTRIBUT_LABEL[key], delta, gewicht, glyphe: rollenGlyphe(delta), spielerWert: typeof wert === "number" ? wert : null };
+            })
+            .filter((a) => a.glyphe !== "·")
+            .sort((a, b) => b.delta - a.delta)
+        : [];
+    const projected = slotPreviewByKey.get(activeSlot.key)?.projected ?? null;
+    const top = slotCandidateSummaryByKey.get(activeSlot.key)?.topCandidates ?? [];
+    let feinjustierung: RollenkarteDaten["feinjustierung"] = null;
+    if (hatFeinjustierung(disciplineId) && platz?.rolleId) {
+      const ord = MOTOR_SLOT_ZUSATZ[platz.rolleId]?.ord ?? "mitlinie";
+      feinjustierung = {
+        zeilen:
+          disciplineId === "battlefield"
+            ? [
+                `Startort: ${platz.gruppenLabel ?? "—"} (${MOTOR_BFFFA_ROLLEN_ORT[platz.rolleId] ?? "mitte"}).`,
+                `Neigung aus dem Standardbefehl: ${ORD_TEXT[ord] ?? ord}.`,
+                "Zielpriorität, Haltung, Zusammenhalt und Bindung stellst du in der Battle Arena ein.",
+              ]
+            : [
+                `Reihe: ${platz.gruppenLabel ?? "—"}.`,
+                `Standardbefehl (★): ${ORD_TEXT[ord] ?? ord}.`,
+                "Zielpriorität, Haltung, Zusammenhalt und Bindung stellst du in der Battle Arena ein.",
+              ],
+      };
+    }
+    return {
+      slotLabel: `${side.toUpperCase()}-${activeSlot.slotIndex + 1} · ${disciplineBySide[side]?.displayName ?? ""}`.trim(),
+      slotIndex: activeSlot.slotIndex,
+      kuerzel: slotKuerzelByKey.get(activeSlot.key) ?? "–",
+      rollenLabel: role?.label ?? "Slot",
+      beschreibung: role?.description ?? null,
+      platz,
+      attribute,
+      besetzt: player
+        ? {
+            name: player.name,
+            wert: projected?.totalProjected ?? null,
+            rollenAufschlag: projected?.roleModifier ?? null,
+            glyphe: projected?.roleModifier != null ? passungsGlyphe(projected.roleModifier) : null,
+            goldTitel: goldTitleFor(selectedId, activeSlot.key),
+            goldVerschenktTitel: goldVerschenktTitleFor(activeSlot.key),
+          }
+        : null,
+      alternativen: top.slice(0, 3).map((candidate) => ({
+        id: candidate.activePlayerId,
+        name: candidate.name,
+        wert: candidate.projectedScore,
+        aktuell: candidate.activePlayerId === selectedId,
+      })),
+      feinjustierung,
+    };
+  })();
+
   const renderSide = (disciplineSide: "d1" | "d2") => {
     const discipline = disciplineBySide[disciplineSide];
     const axis = getAxisForCategory(discipline?.category ?? null);
@@ -1890,6 +2002,64 @@ export default function LineupNewLook({
         if (spiele > 0) staffelPairBySlotKey.set(nehmer.slotKey, { spiele, geberName: geber.name });
       }
     }
+
+    /*
+     * EBENE A — MINI-FELD (Einsatzliste-Revamp F3/F4). Die Geometrie kommt aus
+     * `lib/lineups/formation/` (Motor-Kopie mit Drift-Wächter), die Rolle je Slot über
+     * `resolveSlotRoleShortId` — dieselbe Abbildung wie der Arena-Adapter. Die Marken tragen nur,
+     * was die Slotkarten unten ohnehin zeigen (Projektion, Gold, Captain, Warnungen).
+     */
+    const formation = formationFor(disciplineSide, disciplineId, sideSlots.length);
+    const sortierteSlots = [...sideSlots].sort((left, right) => left.slotIndex - right.slotIndex);
+    const sideBesetzt = sortierteSlots.filter((slot) => selections[slot.key]).length;
+    let sideWarnungen = 0;
+    const marken: MiniFeldMarke[] = sortierteSlots.map((slot) => {
+      const role = slotRoleByKey.get(slot.key) ?? null;
+      const selectedId = selections[slot.key] ?? "";
+      const player = selectedId ? rosterCardByActivePlayerId.get(selectedId) ?? null : null;
+      const projected = slotPreviewByKey.get(slot.key)?.projected ?? null;
+      const top = slotCandidateSummaryByKey.get(slot.key)?.topCandidates[0] ?? null;
+      const voll = player ? goldTitleFor(selectedId, slot.key) : null;
+      const verschenkt = player ? goldVerschenktTitleFor(slot.key) : null;
+      const issue = (slotIssuesByKey.get(slot.key) ?? [])[0] ?? null;
+      const meta = player ? getSelectedOptionMeta(selectedId) : null;
+      const injury = meta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+      const nachSpieltag = injury?.fatigueBeforeRoll ?? null;
+      const warnungen = [
+        issue?.tone === "blocked" && player ? `${issue.label}: ${issue.detail}` : null,
+        injury && getNlInjuryProjectionTone(injury.bandLabel) === "risk" ? `Verletzungsrisiko ${formatScore(injury.riskPercent)} % (${injury.bandLabel})` : null,
+        nachSpieltag != null && nachSpieltag >= FATIGUE_HIGH ? "nach diesem Spieltag hoch belastet" : null,
+      ].filter((text): text is string => Boolean(text));
+      if (warnungen.length > 0) sideWarnungen += 1;
+      return {
+        slotKey: slot.key,
+        slotIndex: slot.slotIndex,
+        kuerzel: slotKuerzelByKey.get(slot.key) ?? "–",
+        rollenLabel: role?.label ?? "Slot",
+        spielerId: player ? selectedId : null,
+        spielerName: player?.name ?? null,
+        wert: player ? projected?.totalProjected ?? null : null,
+        glyphe: player && projected?.roleModifier != null ? passungsGlyphe(projected.roleModifier) : null,
+        gold: voll ? "voll" : verschenkt ? "verschenkt" : null,
+        goldTitel: voll ?? verschenkt,
+        vorschlag: !player && top ? { name: top.name, wert: top.projectedScore } : null,
+        kapitaen: Boolean(player) && captains[slot.disciplineSide] === selectedId,
+        warnung: warnungen.length > 0 ? warnungen.join(" · ") : null,
+        aktiv: activeSlotKey === slot.key,
+        naechster: !player && nextOpenSlotKey === slot.key,
+      };
+    });
+    // Gegner auf dem Feld: dieselbe Schätzung wie der Streifen (nie exakt). Slot i des Gegners ist
+    // dieselbe Rolle wie der eigene Slot i (gleiche Disziplin, gleiche Kadergröße).
+    const gegnerSeite = gegnerSchaetzung.status === "geschaetzt" ? gegnerSchaetzung.seiten[disciplineSide] ?? null : null;
+    const geister: MiniFeldGeist[] | null =
+      gegnerSchaetzung.status === "geschaetzt" && gegnerSchaetzung.quelle !== "verdeckt" && gegnerSeite && gegnerSeite.slots.length > 0
+        ? gegnerSeite.slots.map((slot) => ({ slotIndex: slot.slotIndex, name: slot.spielerName, spanne: slot.spanne }))
+        : null;
+    const geisterHinweis =
+      gegnerSchaetzung.status === "geschaetzt" && !geister
+        ? `${gegnerSchaetzung.gegnerName}: zu wenig gespäht${gegnerSeite?.schnitt ? ` · Ø ${gegnerSeite.schnitt.min}–${gegnerSeite.schnitt.max}` : ""}`
+        : null;
 
     return (
       <section
@@ -2309,6 +2479,35 @@ export default function LineupNewLook({
           goldBilanz={goldBilanzFor(disciplineSide)}
         />
 
+        <EinsatzlisteMiniFeld
+          seite={disciplineSide}
+          disziplinName={discipline?.displayName ?? disciplineId ?? ""}
+          formation={formation}
+          marken={marken}
+          geister={geister}
+          geisterHinweis={geisterHinweis}
+          besetzt={sideBesetzt}
+          dnd={{
+            enabled: dndEnabled,
+            dragOverSlotKey,
+            dragSourceSlotKey,
+            onDragStart: handleSlotDragStart,
+            onDragOver: handleSlotDragOver,
+            onDragLeave: handleSlotDragLeave,
+            onDrop: handleSlotDrop,
+            onDragEnd: clearDragState,
+          }}
+          onSelect={onActiveSlotChange}
+        />
+
+        {/* Die Slotkarten bleiben vollständig (Fatigue, Verletzungsmeter, Staffel-Paare, Drag),
+            aber unter dem Feld und eingeklappt: das Feld ist die Ansicht, die Liste das Detail.
+            Die Kurzfassung sagt, ob darin etwas Warnendes steht — nichts verschwindet lautlos. */}
+        <details className="nl-lineup-slot-details" data-testid={`nl-lineup-slot-details-${disciplineSide}`}>
+          <summary>
+            Slot-Liste mit Fatigue &amp; Verletzungsrisiko · {sideBesetzt}/{sortierteSlots.length} besetzt
+            {sideWarnungen > 0 ? <em> · {sideWarnungen} mit Warnung</em> : null}
+          </summary>
         <div className="nl-lineup-slot-grid">
           {sideSlots.map((slot, slotRevealIndex) => {
             const role = slotRoleByKey.get(slot.key) ?? null;
@@ -2620,6 +2819,7 @@ export default function LineupNewLook({
             );
           })}
         </div>
+        </details>
       </section>
     );
   };
@@ -2937,6 +3137,18 @@ export default function LineupNewLook({
                 </button>
               ) : null}
             </header>
+
+            {/* EBENE B — ROLLENKARTE. Entschieden nach Fables Bild (Gesamtkonzept Abschnitt 7):
+                rechts neben dem Feld, in der bestehenden Fokus-Rail; unter 1100 px rutscht die
+                Rail ohnehin unter das Board. Erscheint, sobald eine Marke/ein Slot fokussiert ist. */}
+            {activeSlot && rollenkarteDaten ? (
+              <EinsatzlisteRollenkarte
+                daten={rollenkarteDaten}
+                readOnly={isReadOnly || isBusy}
+                onUebernehmen={(activePlayerId) => onAssignPlayer(activeSlot.key, activePlayerId)}
+                onNavigateArena={arenaReady ? onNavigateArena : undefined}
+              />
+            ) : null}
 
             {compareActive && compareA?.player && compareB?.player ? (
               // Compare-Tray (Feature 3): angeheftet (A) vs. gehovert (B) —

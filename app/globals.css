@@ -81460,3 +81460,355 @@ span.nl-facility-ampel-chip {
 @media (prefers-reduced-motion: reduce) {
   .oly-figur-sprite-frame { animation: none !important; }
 }
+
+/* ==========================================================================
+   EINSATZLISTE EBENE A + B — Mini-Feld und Rollenkarte (08.11.)
+   app/foundation/legacy-lineup-lab/EinsatzlisteMiniFeld.tsx,
+   Geometrie: lib/lineups/formation/. Bauplan: docs/design/einsatzliste-gesamtkonzept-visuell-08-11.md
+   Farben nur aus --nl-*-Tokens; die Positionsfarbe kommt je Marke als --nl-pos-farbe.
+   ========================================================================== */
+
+.is-new-look .nl-feld {
+  --nl-feld-linie: color-mix(in srgb, var(--nl-ink) 16%, transparent);
+  --nl-feld-linie-stark: color-mix(in srgb, var(--nl-ink) 30%, transparent);
+  --nl-feld-band: color-mix(in srgb, var(--nl-ink) 5%, transparent);
+  --nl-feld-blau: color-mix(in srgb, #4f8dff 70%, transparent);
+  --nl-feld-boden: var(--nl-panel-2);
+  container-type: inline-size;
+  margin: 2px 0 10px;
+}
+
+/* Boden je Feldart: eine Stimmung, kein Bild (Vignetten = Fable Paket 0, offen). */
+.is-new-look .nl-feld.is-feld-reihen,
+.is-new-look .nl-feld.is-feld-ring { --nl-feld-boden: color-mix(in srgb, #7a2e1c 22%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-halbfeld { --nl-feld-boden: color-mix(in srgb, #c9a06b 20%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-eis,
+.is-new-look .nl-feld.is-feld-bogen { --nl-feld-boden: color-mix(in srgb, #9cc4e4 16%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-football,
+.is-new-look .nl-feld.is-feld-domination { --nl-feld-boden: color-mix(in srgb, #3f7a3a 24%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-strecke,
+.is-new-look .nl-feld.is-feld-staffel { --nl-feld-boden: color-mix(in srgb, #b4533a 18%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-wand { --nl-feld-boden: color-mix(in srgb, #8a7a66 18%, var(--nl-panel-2)); }
+.is-new-look .nl-feld.is-feld-leiste,
+.is-new-look .nl-feld.is-feld-tafel { --nl-feld-boden: color-mix(in srgb, #2b3f6b 26%, var(--nl-panel-2)); }
+
+.is-new-look .nl-feld-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-feld-kopfzeile { color: var(--nl-ink); font-weight: 600; }
+
+.is-new-look .nl-feld-legende { display: inline-flex; flex-wrap: wrap; gap: 10px; font-size: 10px; }
+.is-new-look .nl-feld-legende > span { display: inline-flex; align-items: center; gap: 4px; }
+.is-new-look .nl-feld-legende-punkt {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 2px solid var(--nl-ink);
+}
+.is-new-look .nl-feld-legende-punkt.is-start { border-style: solid; box-shadow: inset 0 0 0 2px var(--nl-panel); }
+.is-new-look .nl-feld-legende-punkt.is-darstellung { border-style: dashed; opacity: 0.8; }
+.is-new-look .nl-feld-legende-punkt.is-geist { border-style: dotted; border-radius: 50%; opacity: 0.7; }
+
+.is-new-look .nl-feld-bedingung {
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border-radius: var(--nl-r-sm);
+  border: 1px solid color-mix(in srgb, var(--nl-warn) 50%, transparent);
+  background: color-mix(in srgb, var(--nl-warn) 12%, transparent);
+  color: var(--nl-warn);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.is-new-look .nl-feld-flaeche {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--nl-feld-ratio, 2.3);
+  min-height: 150px;
+  border-radius: var(--nl-r-md, 12px);
+  border: 1px solid var(--nl-line);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--nl-ink) 6%, transparent), transparent 60%),
+    var(--nl-feld-boden);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.is-new-look .nl-feld-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.is-new-look .nl-feld-etikett {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nl-ink) 55%, transparent);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.is-new-look .nl-feld-etikett.is-gegner { color: color-mix(in srgb, var(--nl-ink) 32%, transparent); }
+
+/* --- Marke ---------------------------------------------------------------- */
+
+.is-new-look .nl-feld-marke {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: clamp(66px, 15cqw, 132px);
+  padding: 4px 6px 5px;
+  border-radius: 9px;
+  border: 2px solid var(--nl-pos-farbe);
+  background: color-mix(in srgb, var(--nl-panel) 88%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--nl-bg) 80%, transparent),
+    0 4px 10px rgba(0, 0, 0, 0.45);
+  color: var(--nl-ink);
+  font: inherit;
+  font-size: clamp(9px, 1.35cqw, 11.5px);
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--nl-t-fast, 120ms) ease, box-shadow var(--nl-t-fast, 120ms) ease, border-color var(--nl-t-fast, 120ms) ease;
+}
+.is-new-look .nl-feld-marke:hover { transform: translate(-50%, -50%) scale(1.04); z-index: 4; }
+.is-new-look .nl-feld-marke:focus-visible { outline: 2px solid var(--nl-focus-ring, var(--nl-accent)); outline-offset: 3px; }
+
+.is-new-look .nl-feld-marke.is-darstellung { border-style: dashed; }
+.is-new-look .nl-feld-marke.is-leer {
+  background: color-mix(in srgb, var(--nl-panel) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--nl-bg) 60%, transparent);
+}
+.is-new-look .nl-feld-marke.is-leer .nl-feld-marke-name { color: var(--nl-mut); font-style: italic; font-weight: 600; }
+.is-new-look .nl-feld-marke.is-naechster { box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent) 60%, transparent), 0 4px 10px rgba(0, 0, 0, 0.45); }
+.is-new-look .nl-feld-marke.is-aktiv {
+  border-width: 3px;
+  z-index: 5;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--nl-pos-farbe) 45%, transparent),
+    0 6px 16px rgba(0, 0, 0, 0.55);
+}
+/* Gold außerhalb des Positionsrings (Fable 5): voll = optimal verteilt, gestrichelt = verschenkt. */
+.is-new-look .nl-feld-marke.is-gold { outline: 2px solid var(--nl-gold); outline-offset: 2px; }
+.is-new-look .nl-feld-marke.is-gold-verschenkt { outline: 2px dashed var(--nl-gold); outline-offset: 2px; }
+.is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%) scale(1.08); border-color: var(--nl-accent); z-index: 6; }
+.is-new-look .nl-feld-marke.is-dragging { opacity: 0.45; }
+
+.is-new-look .nl-feld-marke-kopf { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.is-new-look .nl-feld-marke-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.is-new-look .nl-feld-marke-fuss { display: flex; align-items: center; gap: 4px; min-height: 1.2em; }
+.is-new-look .nl-feld-wert { font-weight: 800; }
+.is-new-look .nl-feld-vorschlag {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nl-mut);
+  font-size: 0.92em;
+}
+
+.is-new-look .nl-feld-kuerzel {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--nl-pos-farbe);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+
+.is-new-look .nl-feld-kapitaen {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--nl-gold);
+  color: #1a1408;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 14px;
+}
+
+.is-new-look .nl-feld-glyphe { font-weight: 800; letter-spacing: -0.02em; }
+.is-new-look .nl-feld-glyphe.is-gut { color: var(--nl-good); }
+.is-new-look .nl-feld-glyphe.is-neutral { color: var(--nl-mut); }
+.is-new-look .nl-feld-glyphe.is-schlecht { color: var(--nl-risk); }
+.is-new-look .nl-feld-raute { color: var(--nl-gold); font-weight: 800; }
+
+.is-new-look .nl-feld-start {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--nl-panel);
+  border: 1px solid var(--nl-pos-farbe);
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}
+.is-new-look .nl-feld-warnpunkt {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--nl-risk);
+  box-shadow: 0 0 0 2px var(--nl-panel);
+}
+
+/* --- Gegner-Geist ----------------------------------------------------------- */
+
+.is-new-look .nl-feld-geist {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: clamp(60px, 13cqw, 116px);
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1.5px dashed color-mix(in srgb, var(--nl-pos-farbe, var(--nl-ink)) 60%, transparent);
+  background: color-mix(in srgb, var(--nl-bg) 35%, transparent);
+  color: color-mix(in srgb, var(--nl-ink) 72%, transparent);
+  font-size: clamp(8px, 1.2cqw, 10px);
+  line-height: 1.15;
+  pointer-events: auto;
+}
+.is-new-look .nl-feld-geist-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.is-new-look .nl-feld-geist-spanne { opacity: 0.85; }
+.is-new-look .nl-feld-geist.is-wolke { max-width: 40%; padding: 6px 12px; border-color: var(--nl-feld-linie-stark); font-style: italic; }
+
+/* --- Phone-Breite: Feld höher, Marken kompakter ------------------------------ */
+
+@container (max-width: 560px) {
+  .is-new-look .nl-feld-flaeche { aspect-ratio: calc(var(--nl-feld-ratio, 2.3) * 0.62); }
+  .is-new-look .nl-feld-marke { width: clamp(48px, 18cqw, 84px); padding: 2px 3px; border-radius: 7px; font-size: 8.5px; }
+  .is-new-look .nl-feld-etikett { font-size: 7px; letter-spacing: 0.02em; }
+  .is-new-look .nl-feld-geist { max-width: 22cqw; }
+  .is-new-look .nl-feld-kuerzel { min-width: 16px; font-size: 8px; line-height: 12px; }
+  .is-new-look .nl-feld-legende { display: none; }
+}
+
+/* --- Slot-Liste unter dem Feld (Details: Fatigue, Verletzungsrisiko) -------- */
+
+.is-new-look .nl-lineup-slot-details { margin-top: 2px; }
+.is-new-look .nl-lineup-slot-details > summary {
+  cursor: pointer;
+  padding: 4px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nl-mut);
+  list-style-position: inside;
+}
+.is-new-look .nl-lineup-slot-details > summary em { font-style: normal; color: var(--nl-warn); }
+.is-new-look .nl-lineup-slot-details[open] > summary { margin-bottom: 6px; }
+
+/* --- Rollenkarte (Ebene B) ----------------------------------------------------- */
+
+.is-new-look .nl-rollenkarte {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px 12px 15px;
+  border-radius: var(--nl-r-md, 12px);
+  border: 1px solid var(--nl-line);
+  background: var(--nl-panel-2);
+  font-size: 12px;
+}
+.is-new-look .nl-rollenkarte::before {
+  content: "";
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--nl-pos-farbe);
+}
+.is-new-look .nl-rollenkarte-kopf { display: flex; align-items: center; gap: 8px; }
+.is-new-look .nl-rollenkarte-kopf > div { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.is-new-look .nl-rollenkarte-kopf strong { font-size: 14px; }
+.is-new-look .nl-rollenkarte-kopf small { color: var(--nl-mut); font-size: 11px; }
+.is-new-look .nl-rollenkarte-verbindlich {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--nl-line-2, var(--nl-line));
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-rollenkarte-verbindlich.is-motor { color: var(--nl-good); border-color: color-mix(in srgb, var(--nl-good) 50%, transparent); }
+.is-new-look .nl-rollenkarte-verbindlich.is-start { color: var(--nl-accent-text, var(--nl-accent)); }
+.is-new-look .nl-rollenkarte-verbindlich.is-darstellung { border-style: dashed; }
+.is-new-look .nl-rollenkarte-text { margin: 0; color: var(--nl-mut); line-height: 1.4; }
+.is-new-look .nl-rollenkarte-zeile { margin: 0; line-height: 1.4; }
+.is-new-look .nl-rollenkarte-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--nl-mut);
+}
+.is-new-look .nl-rollenkarte-zeile .nl-rollenkarte-label { display: inline; margin-right: 4px; }
+.is-new-look .nl-rollenkarte-attribute {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.is-new-look .nl-rollenkarte-attribute li { display: flex; align-items: center; gap: 6px; }
+.is-new-look .nl-rollenkarte-attribute li > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.is-new-look .nl-rollenkarte-spielerwert { min-width: 2ch; text-align: right; color: var(--nl-ink); font-weight: 700; }
+.is-new-look .nl-rollenkarte-besetzt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; }
+.is-new-look .nl-rollenkarte-aufschlag { color: var(--nl-mut); font-size: 11px; }
+.is-new-look .nl-rollenkarte-verschenkt { color: var(--nl-gold); opacity: 0.85; }
+.is-new-look .nl-rollenkarte-hinweis { margin: 4px 0 0; font-size: 11px; color: var(--nl-gold); line-height: 1.35; }
+.is-new-look .nl-rollenkarte-alternativen { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.is-new-look .nl-rollenkarte-alternativen li > * { vertical-align: middle; }
+.is-new-look .nl-rollenkarte-alternativen li { display: list-item; }
+.is-new-look .nl-rollenkarte-alternativen li span + span { margin-left: 6px; color: var(--nl-mut); }
+.is-new-look .nl-rollenkarte-alternativen li button { margin-left: 8px; }
+.is-new-look .nl-rollenkarte-alternativen li em { margin-left: 8px; font-style: normal; color: var(--nl-good); font-size: 11px; }
+.is-new-look .nl-rollenkarte-alternativen li.is-aktuell > span:first-child { font-weight: 700; }
+.is-new-look .nl-rollenkarte-fein { border-top: 1px dashed var(--nl-line); padding-top: 6px; }
+.is-new-look .nl-rollenkarte-fein > summary { cursor: pointer; font-size: 11px; font-weight: 700; color: var(--nl-mut); }
+.is-new-look .nl-rollenkarte-fein ul { margin: 6px 0; padding-left: 16px; color: var(--nl-ink); line-height: 1.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .is-new-look .nl-feld-marke { transition: none; }
+  .is-new-look .nl-feld-marke:hover,
+  .is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%); }
+}

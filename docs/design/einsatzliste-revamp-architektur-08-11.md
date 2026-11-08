@@ -365,8 +365,8 @@ Disziplinen).
 |---|---|---|---|
 | **F1** ✅ (dieser PR) | Kürzel in Positionsfarbe an Slotkarte, Fokus-Kopf und Kader-Zeile; Kader-Zeile „Top-3 Slots mit Zahl“ statt nur „Bester Slot“; Gold = Bestbesetzung nach Slotwert (voll / gestrichelt „verschenkt“ / Raute ◆ in der Kader-Zeile) | nein | keine |
 | **F2** | ±-Schema + Beitrags-Zerlegung als **Rollenkarte v1 in der Fokus-Rail**: Attributtafel `++/+/·/−/−−` aus `slotWeightProfile − baseWeightProfile`; „warum +8,5?“ als die 3 größten positiven und 2 größten negativen Beiträge, Klemmung sichtbar; Passungsglyphe neben jeder Slotzahl | nein | optionales `attributeStats` im Board-Typ `LineupBoardRosterCard` (Laufzeit hat es schon); eine reine Funktion `resolveSlotRoleContributions(role, stats)` **neben** `resolveProfileRoleModifier` in `matchday-slot-roles.ts` plus Vitest auf die Summen-Invariante (Σ Beiträge = Rohwert vor Klemmung, ±0,05, 20 Disziplinen × alle Slots). Die Schwellen als Konstanten in `einsatzliste-anzeige.ts` |
-| **F3** | Formations-Datenquelle `lib/lineups/formation/` (Abschnitt 2) mit Drift-Wächter gegen die Engine. `<FormationsFeld>` ersetzt `nl-lineup-slot-grid` als Ansicht; die Kartendetails (Fatigue, Verletzungsrisiko, Drag-Fit) bleiben an der Marke bzw. in der Rail. Zuerst **Arena-Chassis (TDM/Mini-DM/Battlefield-Duell) und Basketball** (Chris’ Beispiel, mit Hinweis „Formation greift ab 6 Spielern“); alle übrigen Disziplinen bekommen sofort die generische Leiste | **ja** | F1 (Farben), sinnvoll nach F2 |
-| **F4** | Übrige Feldformen: Bahn-Band aus `planJeSlot`, Climbing-Wand, Bühnen-Leiste mit „vs Platz n“, Hockey/Football hohl außer Torwart/QB/Kicker, Battlefield-Domination als Startort + Neigung. Rolle-Zeilen aus den Motortabellen (Verhalten-Befund Abschnitt 4) | **ja** | F3 |
+| **F3** ✅ (dritte Runde, Abschnitt 7) | Formations-Datenquelle `lib/lineups/formation/` (Abschnitt 2) mit Drift-Wächter gegen die Engine. `<FormationsFeld>` ersetzt `nl-lineup-slot-grid` als Ansicht; die Kartendetails (Fatigue, Verletzungsrisiko, Drag-Fit) bleiben an der Marke bzw. in der Rail. Zuerst **Arena-Chassis (TDM/Mini-DM/Battlefield-Duell) und Basketball** (Chris’ Beispiel, mit Hinweis „Formation greift ab 6 Spielern“); alle übrigen Disziplinen bekommen sofort die generische Leiste | **ja** | F1 (Farben), sinnvoll nach F2 |
+| **F4** ✅ (dritte Runde, Abschnitt 7; Bühnen vorerst als Darstellung) | Übrige Feldformen: Bahn-Band aus `planJeSlot`, Climbing-Wand, Bühnen-Leiste mit „vs Platz n“, Hockey/Football hohl außer Torwart/QB/Kicker, Battlefield-Domination als Startort + Neigung. Rolle-Zeilen aus den Motortabellen (Verhalten-Befund Abschnitt 4) | **ja** | F3 |
 | **F5** (optional, Chris fragen) | Einstellungen entschlacken: Formkarten, Team-Power und Captain je Seite in einen einklappbaren Block „Spieltag-Einstellungen“ mit Kurzfassung im eingeklappten Zustand; Intensität bleibt sichtbar | nein | Chris’ Ja |
 | **F6** (Arena-Board) | Dasselbe im Mockup über einen generierten `FORMATION_JE_DISC`-Block (2.4 Stufe 2), Identitätsprüfung `spiele()` byte-gleich | ja | F3 |
 | **F7** (Gegner) | Gegnerhälfte des Mini-Felds und Counter-Einschätzung (Chris’ Vorgabe, Abschnitt 4a): optionales Feld `gegner` im Lineup-Kontext aus Spielplan + gegnerischer `lineupDraft`, Rollen über `resolveSlotRoleShortId`; Geister-Marken mit Slotwert, Vergleich je Position | ja | F3 + Chris’ Antwort auf (a) exakt oder Schätzung und (b) menschliche Gegner |
@@ -604,3 +604,153 @@ optimal.**
 - Gegner-Streifen: Passen Ort und Dichte für jetzt? Im Mini-Feld (F3) wird daraus die Gegner-Reihe.
 - Später: eine echte Gegner-Scouting-Mechanik statt des Kader-Mittelwerts und serverseitiges
   Verbergen für Koop/PvP.
+
+---
+
+## 7. Dritte Runde (08.11.): Ebene A (Mini-Feld), Ebene B (Rollenkarte), Ebene C (Feinjustierung)
+
+Chris: „Das machst du aber noch.“ Das Mini-Feld mit der echten Feldposition je Disziplin war der
+Kern seiner ursprünglichen Beschwerde. Mit dieser Runde sind F3 und F4 gebaut, F2 teilweise:
+Rollenkarte v1 mit ±-Schema, noch ohne Beitrags-Zerlegung.
+
+### 7.1 Formations-Datenquelle `lib/lineups/formation/`
+
+- `formation-registry.ts` hat **keinen Import**, wie `einsatzliste-anzeige.ts`. Die Datei
+  enthält:
+  - die Motor-Kopien `MOTOR_*`: `SLOT_ZUSATZ`, die Spaltenabstände aus `homeFor()` (140/300/460),
+    den Mini-DM-Rückfall `floor(SLOT_STELLE/2)`, `BASKETBALL_ROLLE_SLOT`, `SLOTS`, `SLOTS_HOCKEY`,
+    `TORWART_/QB_/KICKER_SLOTS`, die fünf `planJeSlot`-Tabellen samt Plan-Label, Tempo und Text,
+    `BF_ORT_NAMEN`, `BFFFA_ROLLEN_ORT` und `HEBEN_ROLLEN`;
+  - die Registry mit allen 20 Disziplinen;
+  - `legeFormation({disziplinId, variante, rollen})`, das die Plätze liefert (x/y 0..1, Gruppe,
+    Verbindlichkeit, Beleg, Rollenkarten-Zeile, Gegnerplatz).
+- `index.ts` ist der einzige Ort, der die Rollen-Id auflöst: `formationFuerSeite()` über
+  **`resolveSlotRoleShortId(d, null, i, slotCount)`**. Das ist dieselbe Abbildung wie in
+  `buildArenaAufstellung`, inklusive der Battlefield-Rollen je Kadergröße. Marke und
+  Arena-Figur stehen damit für dieselbe Rolle.
+- Der Renderer kennt keine Disziplin, nur die Feldart:
+
+| Feldart | Disziplinen | Plätze aus | Verbindlichkeit |
+|---|---|---|---|
+| `reihen` | TDM, Mini-DM | `SLOT_ZUSATZ.reihe` bzw. Rückfall, x wie `homeFor()` | **motor** (die Reihe; in der Reihe ordnet der Motor nach Kader) |
+| `domination` | Battlefield | `BFFFA_ROLLEN_ORT` (Nord/Mitte/Süd), Neigung aus `ord` | **start** (Marke mit ↻) |
+| `halbfeld` | Basketball | `SLOTS[BASKETBALL_ROLLE_SLOT]`, Formel wie `bewegeSpielerLive` | **motor**; ist nicht jeder Slot besetzt: Darstellung plus Hinweis |
+| `eis` | Hockey | `SLOTS_HOCKEY`, Torwart im Tor | Torwart **motor**, Feldspieler Darstellung (Zuteilung nach `SCHUSS_NAH`) |
+| `football` | Football | QB in der Pocket, Kicker abseits, Line, Tight End, Wide, Safety | QB und Kicker **motor**, Rest Darstellung |
+| `strecke` | Spurt, Zeitfahren, Takeshi | `planJeSlot`, x = Plan-Tempo im ersten Drittel | **motor** (der Plan) |
+| `wand` | Climbing | `planJeSlot`, Höhe = Plan-Tempo | **motor** |
+| `staffel` | Staffel | Bein = Slot (`staffelNachSlot`) + Rennplan | **motor** |
+| `leiste` | Gewichtheben, Tennis, Fechten, Speed-Schach, Showcase, I-Spy | Reihenfolge 1..n | Darstellung (Befund 7.3) |
+| `bogen` | Eiskunstlauf | Startreihenfolge als Bogen | Darstellung |
+| `tafel` | Wettessen | Heim und Gast verschränkt an einem Tisch | Darstellung |
+| `ring` | Breaking (Folter-Kette) | Platz 1 im Ring, Kette dahinter | Darstellung |
+
+- **Varianten:** Gesucht wird erst nach (Disziplin, Variante), dann nach (Disziplin), dann gilt die
+  Leiste als Rückfall. Die Variante bleibt `null`, bis der Spieltags-Vertrag eine trägt (2.3). Eine
+  Tauziehen-Grube wäre ein neuer Registry-Eintrag ohne Renderer-Umbau.
+- **Drift-Wächter** `tests/einsatzliste-formation.test.ts` (22 Tests) prüft:
+  - 20 Disziplinen × k = 1…6: jede Rolle hat einen Platz, keine zwei Marken liegen übereinander;
+  - dieselbe Rollen-Id wie im Adapter;
+  - jede `MOTOR_*`-Tabelle gegen den Text von `battle-mode.engine.js`, einschließlich der
+    Plan-Labels und Tempi und der obersten Schlüssel von `ARENA_ART` (die `istArena` liest);
+  - dass die Registry keine Importe hat.
+
+  Stufe 1 aus 2.4 ist damit umgesetzt. Stufe 2 (ein generierter `FORMATION_JE_DISC`-Block für das
+  Arena-Board, F6) ist **nicht** gebaut, weil das Board noch kein Mini-Feld hat, das ihn lesen
+  würde.
+
+### 7.2 Ebene A + B in `LineupNewLook.tsx`
+
+- **Neue Komponente** `app/foundation/legacy-lineup-lab/EinsatzlisteMiniFeld.tsx`. Sie zeichnet
+  ein SVG-Feld je Feldart und setzt die Marken an x/y.
+  - Jede Marke trägt das Kürzel in Positionsfarbe, den Spieler, den Slotwert und eine
+    Passungsglyphe (`++ … −−` aus `roleModifier`, gleiche Schwellen wie `passung()`).
+  - Zusatzzeichen: ◆ für Gold, C für Captain, ein roter Punkt bei Blocker, Verletzungsrisiko oder
+    hoher Belastung nach dem Spieltag, ↻ bei Startorten.
+  - Gold liegt **außerhalb** des Positionsrings. Voll heißt optimal verteilt, gestrichelt heißt
+    verschenkt; beides kommt aus derselben `goldPruefung` wie bisher.
+  - Eine leere Marke zeigt den Top-Kandidaten.
+  - Ein Klick fokussiert den Slot. Drag & Drop läuft über dieselben Handler wie die Karten; es
+    gibt keinen neuen Schreibpfad.
+- **Gegner auf dem Feld:** Die Geister kommen aus derselben Schätzung wie der Streifen (nie
+  exakt), mit Name und Spanne am Gegnerplatz.
+  - Ist das Scouting zu schwach, steht dort eine Wolke „zu wenig gespäht · Ø …“.
+  - Keine Geister bei Hockey, Football, Domination-Pod und den Bühnen ohne Paarung (Fable 6.2).
+  - Bei Basketball stehen sie als Verteidiger-Schatten vor der eigenen Marke.
+- **Slotkarten:** Sie bleiben vollständig (Fatigue, Verletzungsmeter, Staffel-Paare). Sie stehen
+  aber eingeklappt unter dem Feld („Slot-Liste mit Fatigue & Verletzungsrisiko“). Die Kurzfassung
+  zählt die Slots mit Warnung.
+- **Rollenkarte rechts.** Das war Chris’ vertagte Frage 4; entschieden nach Fables Bild. Sie sitzt
+  in der bestehenden Fokus-Rail; unter 1100 px rutscht die Rail unter das Board. Inhalt:
+  - Rolle und Platz-Zeile mit Verbindlichkeit (der Beleg steht im Tooltip);
+  - ±-Attribute aus `slotWeightProfile − baseWeightProfile`, jeweils mit dem Wert des Gesetzten;
+  - Besetzung mit Slotwert, Rollen-Aufschlag und Gold;
+  - die Top 3 mit „Setzen“.
+- **Ebene C** gibt es nur bei `hatFeinjustierung(d)`, also bei TDM, Mini-DM und Battlefield (=
+  `ARENA_ART`, testgesichert). Sie ist eingeklappt.
+  - Inhalt: Reihe bzw. Startort, Standardbefehl ★ aus `SLOT_ZUSATZ.ord`, der Satz „Gilt im
+    Entwurfskampf. Am Spieltag zählt nur der Slot.“ und ein Sprung in die Arena, sobald gespeichert
+    ist.
+  - **Bewusst keine Regler in der Foundation.** Ein Regler bräuchte den Rückkanal `haltung?`, und
+    das wäre Mechanik (Abschnitt 3).
+- Die Stile stehen in `app/globals.css` (Block „EINSATZLISTE EBENE A + B“). Sie nutzen nur
+  `--nl-*`-Tokens und eine Container-Query für Phone-Breite.
+
+### 7.3 Befund: Die Bühnen paaren im Motor nicht nach Slot
+
+Gefunden beim Extrahieren, **nicht** behoben, weil es Mechanik ist.
+
+Die Bühnen-Teilnehmer kommen aus `inDisc(d)`. Das filtert den Arena-Kader, und der ist nach
+TDM-Eignung sortiert (`arena-kader-adapter.ts`). Gepaart bzw. gereiht wird nach dieser
+Listenposition. Betroffen sind:
+- Gewichtheben, inklusive `HEBEN_ROLLEN[i]`;
+- Fechten (der Kommentar dort behauptet die Slotfolge);
+- Tennis, Speed-Schach, Breaking-Gauntlet;
+- alle Auftrittsreihenfolgen.
+
+Die Staffel hatte denselben Fehler und hat seit 11.10. `staffelNachSlot`. Bis die Bühnen das auch
+haben, zeichnet das Mini-Feld ihre Plätze als „Darstellung“ (gestrichelt). Für die Reparatur gibt
+es einen eigenen Task; sie braucht die rho- und Pp-Abnahme.
+
+### 7.4 Sichtprüfung (lokaler Dev-Server, frische Spielstände, nichts gespeichert)
+
+Aufbau:
+- eigene SQLite im Scratchpad;
+- drei frisch gebaute Spielstände (`solo_1` + Liga-Draft), per Auto-Run bis Spieltag 1, 2 und 4;
+- `OLY_AUTO_EXPORT_SAVES=0` und `OLY_AUTO_EXPORT_PUSH=0`, kein Login;
+- KI-Vorschlag nur in die Slots übernommen. Die Flow-Speicherungen der Shell liefen auf 403,
+  weil im Solo-Stand niemandem ein Team gehört;
+- Live-Server nicht berührt.
+
+Screenshots `einsatzliste-revamp-08-11/f3/`:
+- `a-md1-*`: Speed-Schach (Leiste) + **Football** (QB in der Pocket, Line, Route Burst außen).
+- `b-md2-*`: **Fechten** (Leiste, Kampf) + **Takeshi** (Strecke nach Plan), Rollenkarte Duelist.
+- `c-md4-*`: **Mini-DM** (drei Reihen, Gegnerhälfte gespiegelt) + **Battlefield** (Domination mit
+  ↻), Rollenkarte Frontliner mit Ebene C.
+- `b-md2-phone-*`: dasselbe bei 390 px Breite.
+
+Nur per Test abgedeckt, nicht im Browser gesehen: Basketball, Hockey, TDM, Spurt, Zeitfahren,
+Climbing, Staffel, Gewichtheben, Tennis, Breaking, Wettessen, Showcase, Eiskunstlauf, I-Spy. Der
+Grund: Basketball kam in den frischen Plänen erst ab Spieltag 10, und das Vorspielen brach wegen
+voller Platte im Container ab.
+
+**Was nicht passt, ehrlich:**
+1. Auf Phone-Breite berühren sich auf der Strecke zwei Marken, und die Namen werden stark gekürzt.
+2. Gestricheltes Gold ist häufig, weil der KI-Vorschlag die optimale Verteilung verfehlt (6.2).
+   Auf dem Feld fällt das stärker auf als vorher auf den Karten.
+3. Keine Kulissen-Vignette (Fable Paket 0). Stattdessen gibt es SVG-Feldformen mit einer
+   Bodenstimmung je Feldart. Die Szenen sind 1–2 MB groß, eine Miniatur-Pipeline fehlt, und welche
+   Variante ein Spieltag hat, steht nicht im Vertrag.
+4. Kein Faden von der Marke zur Rollenkarte, keine Duell-Fäden, keine Erwartungs-Waage, kein
+   Live-Delta (Fable 6.2–6.4). Duell-Fäden wären bei den Bühnen heute ohnehin falsch (7.3).
+
+**Offen für Chris:**
+- Bild ansehen (`f3/b-md2-ki.png`, `f3/c-md4-ki.png`): Stimmt die Richtung, und ist es in
+  Ordnung, dass die Slot-Liste eingeklappt unter dem Feld steht?
+- Rollenkarte rechts in der Fokus-Rail: passt das?
+- Feinschliff der Rollenkarte im FM-Stil (#51): Beitrags-Zerlegung „warum +8,5?“ (F2) und
+  Persönlichkeitszeile.
+- Ebene C: Sollen Befehl und Haltung in der Einsatzliste einstellbar werden (das wäre Mechanik),
+  oder bleibt es beim Sprung in die Arena?
+- Bühnen-Paarung nach Slot (Task, 7.3): Danach werden die Bühnen-Marken zu „Motor“, und
+  Duell-Fäden sind erlaubt.
