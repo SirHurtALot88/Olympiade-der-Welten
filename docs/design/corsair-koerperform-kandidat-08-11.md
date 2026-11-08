@@ -288,15 +288,86 @@ Portrait, `corsair` (alt, unverändert), `corsair-v2` (Kandidat 1, verworfen), `
    diesen Kandidaten zu verwerfen — die Basis-Pipeline (Endpunkt, Canvas, Kosten) ist jetzt belegt
    und reproduzierbar.
 
-Nichts davon wurde vorentschieden oder verdrahtet — weder `corsair-v2` noch `corsair-v3` ersetzen
-an irgendeiner Stelle im Spiel die bestehende `corsair`-Figur.
+Bis zu diesem Punkt wurde nichts vorentschieden oder verdrahtet — weder `corsair-v2` noch
+`corsair-v3` ersetzten an irgendeiner Stelle im Spiel die bestehende `corsair`-Figur. Chris'
+Entscheidung dazu und ihre Umsetzung stehen im nächsten Abschnitt.
+
+## Übernahme: Chris' Entscheidung, `corsair-v3` wird live
+
+Chris: **„V3 ist am besten"** — `corsair-v3` wird die echte, im Spiel verwendete Corsair.
+
+**1. Wie Spieler „Corsair" (`player-1005-corsair`) auf die Sprite-Figur zeigt** (geprüft, nicht
+geraten, `lib/data/figurenSprites.ts`): `getFigurSpriteForPlayer(playerId)` schneidet aus der
+Spieler-ID per Regex `^player-\d+-(.+)$` den **Slug** heraus (`player-1005-corsair` → `corsair`)
+und schlägt ihn als Schlüssel in `data/generated/figuren-sprites.json` nach
+(`getFigurSpriteBySlug`). Dieselbe Slug-Regel nutzt `scripts/baue-arena-figuren.mjs`, das daraus
+`public/mockups/battle-mode.figuren.js` baut (Name → Slug-Eintrag), die der Arena-Mockup-Motor
+(`battle-mode.engine.js`) tatsächlich zeichnet. **Folge: die Zuordnung hängt ausschließlich am
+Schlüssel `corsair` selbst** — kein Code musste geändert werden, nur die Daten UNTER diesem
+Schlüssel.
+
+**2. Live-Umzug (nur Daten/Dateien, keine Zuordnungslogik angefasst):**
+
+- `public/sprites/figuren/corsair/*.png` (alte Grundposen + Animations-Streifen) zuerst **gesichert
+  nach `public/sprites/figuren/corsair-legacy/`** (reiner Datei-Backup, bewusst OHNE eigenen
+  Eintrag in `figuren-sprites.json` — ein zusätzlicher unbenutzter Index-Schlüssel ohne passenden
+  Spieler hätte den Test unten zum Scheitern gebracht, s. Prüfung). Die alte `pixellabId`
+  (`9f913ed5-a980-40c8-81b5-af5fcd7c42c9`) und ihre vier Animations-`gid`s stehen weiterhin oben in
+  diesem Dokument (Abschnitt „Auftrag") — damit bleibt die alte Figur über die PixelLab-API jederzeit
+  erneut abrufbar, falls Chris sie noch einmal sehen will.
+- Danach `public/sprites/figuren/corsair-v3/*.png` nach `public/sprites/figuren/corsair/`
+  kopiert (überschrieben) — identischer Dateisatz (16 Dateien je Figur), per `md5sum` geprüft, dass
+  `corsair/south.png` danach byteidentisch zu `corsair-v3/south.png` ist und *nicht* mehr zur alten
+  Version.
+- `data/generated/figuren-sprites.json`: der Wert unter `"corsair"` wurde durch den Wert unter
+  `"corsair-v3"` ersetzt (`pixellabId 35d0e3dd-…`, canvas 80, alle vier Animationsgruppen), dann
+  wurden die Schlüssel `"corsair-v2"` und `"corsair-v3"` komplett entfernt (vorher 362 Einträge,
+  danach wieder 360 — derselbe Stand wie vor der gesamten Kandidatenrunde).
+- `data/generated/figuren-sprites-animationsarten.json`: die vier `corsair-v2`-`gid`s
+  (`01084b28…`, `12425d38…`, `68a1ad4c…`, `daa0e14f…`) entfernt. Die alten `corsair`-`gid`s
+  bleiben stehen (harmloser, historischer Verweis auf die weiterhin bei PixelLab existierende
+  Alt-Figur).
+- `public/sprites/figuren/corsair-v2/` und `public/sprites/figuren/corsair-v3/` als Ordner
+  komplett gelöscht (corsair-v2: nicht mehr gebraucht, Begutachtung ist vorbei; corsair-v3: Inhalt
+  lebt jetzt unter `corsair/`, ein zweiter identischer Ordner wäre nur verwirrend).
+- `node scripts/baue-arena-figuren.mjs` neu laufen lassen → `public/mockups/battle-mode.figuren.js`
+  neu geschrieben (360 Figuren, unverändert viele — der `"Corsair"`-Eintrag zeigt weiterhin auf
+  Slug `"corsair"`, nur dessen Dateien sind jetzt andere).
+
+**3. Prüfung:**
+
+- `npx vitest run tests/arena-pixel-figuren.test.ts` — alle 6 Tests grün. Vorher (mit den noch
+  unbereinigten `corsair-v2`/`corsair-v3`-Einträgen) schlug „jede Figur im Index ist genau einem
+  Spielernamen zugeordnet" fehl (keine Spieler-Slugs `corsair-v2`/`corsair-v3`) — ein Beleg, dass
+  die Bereinigung nicht nur Aufräumarbeit, sondern für die Testsuite nötig war.
+- Gezielte Suche nach weiteren betroffenen Tests (`figuren-sprites`, `figurenSprites`,
+  `battle-mode.figuren`, `baue-arena-figuren`, `player-1005`, `PlayerPixelSprite`,
+  `DisciplinePixelScene`, Dateien mit „figur"/„sprite" im Namen): außer
+  `tests/arena-pixel-figuren.test.ts` referenziert keine weitere Testdatei im Repo diese Dateien.
+- `grep` über `.ts/.tsx/.js/.mjs/.json` bestätigt: keine verbleibenden Referenzen auf
+  `corsair-v2`/`corsair-v3` irgendwo im Code oder den Daten.
+- **Sichtprobe im echten Render-Pfad** (nicht nur Datenstruktur): lokalen Server für `public/`
+  gestartet (`python3 -m http.server`), `public/mockups/battle-mode.html` per Playwright über
+  `http://` geladen (bewusst NICHT `file://` — der Pixel-Figuren-Pfad ist unter `file://`
+  hart abgeschaltet, s. Kommentar bei `PIXEL_FIGUR_AKTIV` in `battle-mode.engine.js`) und
+  `window.__arena.renderProbe("Corsair", …)` aufgerufen — genau der Zeichenpfad
+  (`zeichneSprite()`), den das echte Spiel für Kämpfer benutzt. Ergebnis:
+  `docs/design/corsair-koerperform-kandidat-08-11-live-check.png` — Corsair erscheint dort mit der
+  neuen v3-Figur (schwarzer Anzug, blaue Energie, Flammen-Füße, Hornkopfschmuck), nicht mehr mit
+  der alten Figur und nicht mit dem generischen Baukasten-Rückfall.
+
+**Ergebnis:** Spieler „Corsair" zeigt ab sofort überall, wo `figurenSprites.ts`/
+`battle-mode.figuren.js` greifen (Spielerprofil, Kader-Aufstellung, Battle-Arena-Galerie,
+Arena-Mockup), die neue `corsair-v3`-Figur — ohne dass an der Slug-Zuordnung selbst etwas geändert
+wurde. Die alte Figur ist unter `public/sprites/figuren/corsair-legacy/` gesichert und über ihre
+dokumentierte `pixellabId`/`gid`s bei PixelLab weiterhin abrufbar, falls sie noch gebraucht wird.
 
 ## Was bewusst NICHT gemacht wurde
 
-- Keine Verdrahtung ins Spiel: kein Rename, keine Referenzänderung an irgendeiner Stelle, die
-  `corsair` nutzt. `corsair-v2` und `corsair-v3` sind reine Begutachtungskandidaten.
-- `corsair-v2` wurde NICHT gelöscht, obwohl verworfen — dokumentiert den ersten, weniger treffenden
-  Anlauf und bleibt als Beleg stehen, bis Chris entscheidet.
-- Kein dritter Generierungsversuch "auf Verdacht" für `corsair-v3` — die Basis-Figur wurde separat
-  erzeugt und auf 80×80 geprüft, BEVOR die teureren Animationen bestellt wurden, um genau das zu
-  vermeiden (s. Budget-Vorsicht im Auftrag).
+- Keine Änderung an der Zuordnungslogik selbst (`lib/data/figurenSprites.ts`,
+  `scripts/baue-arena-figuren.mjs`) — die Übernahme lief ausschließlich über die Daten unter dem
+  Schlüssel `corsair`, wie von Chris verlangt.
+- Die alte `corsair`-Figur wurde nicht einfach überschrieben, ohne sie zu sichern — sie liegt
+  vollständig unter `corsair-legacy/` und bleibt über ihre `pixellabId` bei PixelLab abrufbar.
+- Kein eigenmächtiger Merge: der Branch wird gepusht und als PR geöffnet, gemergt wird er erst auf
+  Chris' ausdrückliches Wort hin.
