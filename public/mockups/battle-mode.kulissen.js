@@ -2,6 +2,20 @@
 // Illustrierte Kulissen je Disziplin fuer den Boden der Battle Arena (s. kulisseWaehlen()
 // in battle-mode.engine.js). Reine Anzeige-Daten, nie in der Simulation gelesen.
 window.__ARENA_KULISSEN={
+ "battlefield": [
+  {
+   "id": "eroberung",
+   "label": "Eroberung",
+   "bild": "/sprites/kulissen/battlefield/eroberung.jpg",
+   "dunkel": 0.13
+  },
+  {
+   "id": "wuestenruine",
+   "label": "Wüstenruine",
+   "bild": "/sprites/kulissen/battlefield/wuestenruine.jpg",
+   "dunkel": 0.24
+  }
+ ],
  "mini-dm": [
   {
    "id": "basis",

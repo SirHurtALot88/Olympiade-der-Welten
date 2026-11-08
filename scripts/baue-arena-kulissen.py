@@ -25,9 +25,11 @@ Reine Anzeige-Daten: der Motor liest sie nur beim Zeichnen des Bodens, nie in de
 Welche Variante ein Spiel zeigt, entscheidet der Motor deterministisch aus Saat und Paarung
 (kulisseWaehlen() in battle-mode.engine.js) — ohne rr(), ohne Einfluss auf die Wertung.
 
-Heute gebaut: das Arena-Chassis (bodenArena: TDM, Mini-DM). Andere Chassis (Feldspiel, Buehne,
-Bahn) und Battlefield brauchen eine Kulisse, deren Linien/Stationen/Kontrollpunkte zur
-Motor-Geometrie passen — s. CHASSIS_OFFEN unten und docs/design/arena-kulissen-im-motor-03-11.md.
+Gebaut: das Arena-Chassis (bodenArena: TDM, Mini-DM), Buehnen mit Grundflaeche (Wettessen) und
+Chassis "quelle" (07.11.): eine Kulisse, die ein eigenes Bestellskript schon passend zur
+Motor-Geometrie gebaut hat (Battlefield: scripts/bestelle-kulisse-battlefield.py), wird nur
+uebernommen. Andere Chassis (Feldspiel, Bahn, uebrige Buehnen) brauchen eine Kulisse, deren
+Linien/Stationen zur Motor-Geometrie passen — s. docs/design/arena-kulissen-im-motor-03-11.md.
 
 Neu bauen nach jeder neuen Szenen-Variante:
     python3 scripts/baue-arena-kulissen.py
@@ -66,15 +68,20 @@ CHASSIS = {
     # nimmt Zelte und Publikum (Mitte/oben) und die Buehnenbretter (unten), nicht das
     # WETTESSEN-Schild ganz oben (der Motor hat sein eigenes Schild, s. bodenWettessen()).
     "wettessen": {"art": "buehne", "y_anteil": 1.0, "dunkel_plus": 0.08},
-    # Battlefield: die drei Eroberungspunkte der Szene liegen anders als die des Motors
-    # (ARENA_DOMINATION.orte: senkrechte Reihe bei x=MID, y=85/235/385) — ein Bild mit Turm,
-    # Altar und Brueckenkopf an anderer Stelle wuerde die Kontrollpunkte verfaelschen.
-    "battlefield": {"art": "arena-kontrollpunkte"},
+    # Battlefield: die drei Eroberungspunkte der Szene liegen in anderem Massstab und Ausschnitt
+    # als die des Motors (ARENA_DOMINATION.orte: senkrechte Reihe bei x=MID, y=85/235/385) — ein
+    # Zuschnitt wie bei TDM setzte Turm, Altar und Brueckenkopf neben die Fahnen. Die passende
+    # Kulisse baut scripts/bestelle-kulisse-battlefield.py (Szene auf Ortsabstand skaliert,
+    # Demo-Ringe/-Banner/-Kisten weg, Raender per PixelLab nachgemalt) nach
+    # data/generated/kulissen-quellen/battlefield/<variante>.png; hier wird sie nur uebernommen.
+    "battlefield": {"art": "quelle"},
     # Gewichtheben (Sandsack-Schicht): die Szene ist ein vollstaendiger Stationsplan (Bahnen,
     # Silo, Rampen), der nicht deckungsgleich mit den Reihen des Motors liegt.
     "gewichtheben": {"art": "buehne-stationsplan"},
 }
-CHASSIS_GEBAUT = {"arena", "buehne"}
+CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
+# Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
+QUELLEN = WURZEL / "data" / "generated" / "kulissen-quellen"
 
 # DAS LAYOUT DER ARENA-SZENEN (TDM, Mini-DM: alle 1280x790, gleicher Grundriss). Spielboden
 # innerhalb der Mauern, und der Ausschnitt, der auf die Leinwand kommt: die volle Bodenbreite
@@ -247,12 +254,23 @@ def main() -> None:
             continue
         eintraege = []
         for v in registry[d_id]["variants"]:
+            if chassis["art"] == "quelle":
+                q = QUELLEN / d_id / f"{v['id']}.png"
+                if not q.exists():
+                    print(f"  {d_id}/{v['id']}: keine Quelle {q.relative_to(WURZEL)}, uebersprungen")
+                    continue
+                fertig, objs = Image.open(q).convert("RGB"), []
+                if fertig.size != (LW, LH):
+                    fertig = fertig.resize((LW, LH), Image.LANCZOS)
+            else:
+                fertig = None
             demo = v.get("demo")
-            bild, objs = lade_szene(SZENEN / demo.lstrip("/")) if demo else (None, [])
-            if bild is None:
-                print(f"  {d_id}/{v['id']}: keine saubere Kulisse in der Szene, uebersprungen")
-                continue
-            fertig = baue_arena(bild, objs) if chassis["art"] == "arena" else baue_buehne(bild, chassis.get("y_anteil", 0.5))
+            if fertig is None:
+                bild, objs = lade_szene(SZENEN / demo.lstrip("/")) if demo else (None, [])
+                if bild is None:
+                    print(f"  {d_id}/{v['id']}: keine saubere Kulisse in der Szene, uebersprungen")
+                    continue
+                fertig = baue_arena(bild, objs) if chassis["art"] == "arena" else baue_buehne(bild, chassis.get("y_anteil", 0.5))
             ziel = ZIEL_BILDER / d_id / f"{v['id']}.jpg"
             ziel.parent.mkdir(parents=True, exist_ok=True)
             fertig.save(ziel, "JPEG", quality=86, optimize=True, progressive=True)

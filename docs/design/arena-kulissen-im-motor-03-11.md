@@ -76,11 +76,7 @@ Der Abgleich lief vorher und nachher über dieselben Aufrufe, das Ergebnis ist b
 
 ## Offen (nächste Schritte)
 
-- **Battlefield**:
-  - Die Szene hat ihre Eroberungspunkte A/B/C an anderer Stelle als der Motor. Der Motor hat sie in einer senkrechten Reihe bei
-    x=MID, y=85/235/385.
-  - Gebraucht wird eine Kulisse, deren Landmarken auf dieser Reihe liegen. Zum Beispiel: Turm, Altar und Brückenkopf aus der
-    Szene ausschneiden und auf die Motor-Orte setzen.
+- ~~**Battlefield**~~ — erledigt am 07.11., s. Abschnitt „Battlefield: Landmarken auf den Motor-Orten“ unten.
 - **Gewichtheben (Sandsack-Schicht)**:
   - Die Szene ist ein vollständiger Stationsplan mit Bahnen, Silo und Rampen. Er liegt nicht deckungsgleich mit den Reihen
     von `zeichneSandsackParBuehne()`.
@@ -96,3 +92,35 @@ Der Abgleich lief vorher und nachher über dieselben Aufrufe, das Ergebnis ist b
   - Der Generator braucht dafür nur einen Eintrag in `CHASSIS`, der Motor einen `kulisseZeichnen()`-Aufruf.
 - **Mini-DM im Battle Mode**: Mit echtem Vierer-Pod zeigt Mini-DM das FFA-Ereignis als DOM-Ansicht (`renderMiniDmFfa`), nicht
   die Leinwand. Die Kulisse sieht man dort nur ohne Pod.
+
+## Battlefield: Landmarken auf den Motor-Orten (07.11.)
+
+Die Szene hat ihre drei Punkte ebenfalls senkrecht übereinander, aber im Demo-Maßstab: y = 221,5 / 445,5 / 669,5 auf
+1280×840, Abstand 224 px. Der Motor rechnet sie bei x = MID, y = 85 / 235 / 385 (Abstand 150, `ARENA_DOMINATION`).
+Ein TDM-Zuschnitt hätte Turm, Altar und Brückenkopf deshalb neben die Fahnen gesetzt.
+
+`python3 -I scripts/baue-kulisse-battlefield.py` baut die passende Kulisse, nur aus Pixeln der PixelLab-Szene
+(keine API, deterministisch):
+
+1. **Demo-Zutaten weg** (in Szenenauflösung): die eingebrannten Besitz-Ringe (Demo-Spielstand) und die gestrichelten
+   Heimkreise werden an der Ringkante gespiegelt, damit die Körnung von Gras und Erde durchläuft. A/B/C-Platten
+   (der Motor sagt Nord/Mitte/Süd), Demo-Fahnenmasten, Kisten, Sandsäcke, Fluss und Steg werden geflickt.
+2. **Turm 26 px tiefer**: an seinem Szenenplatz ragte er bei y = −39 aus der Leinwand und läge unter der
+   Vier-Team-Tafel.
+3. **Gleichmäßig skaliert** mit S = 150/224. Szenen-Ort B fällt auf (MID, 235), damit liegen A auf (MID, 85) und
+   C auf (MID, 385). Nichts wird verzerrt.
+4. **Palisaden weg, Seiten gespiegelt**: Die Palisaden stünden bei x ≈ 220/1020 mitten in den Heimfeldern des
+   Vierer-Pods. Gespiegelt wird mitten durch die Heimplätze, innen an den Demo-Bannern (V-W/A-A) vorbei. Der
+   halbe Heimplatz wird so zum ganzen Rund, und die Wege laufen aus dem Bild.
+
+Das Ergebnis liegt unter `data/generated/kulissen-quellen/battlefield/<variante>.png` (1240×470, verlustfrei).
+`baue-arena-kulissen.py` übernimmt es über das neue Chassis `"quelle"`. Im Motor ändert sich nichts:
+Battlefield läuft über `bodenArena()`, und dort greift `kulisseZeichnen()` schon.
+
+Wertung: `node scripts/pruefe-wertung-fingerabdruck.mjs` (20 Disziplinen × 3 Saaten, `disziplinProbe`,
+Domination, Bahn-Pod, Battlefield-Pod; 69 Einträge) ist vorher und nachher byte-identisch. Sichtprobe:
+`node scripts/screenshot-kulisse.mjs battlefield <variante> 2500 <png> --pod`.
+
+Ein erster Anlauf ließ die Ränder per PixelLab-Inpaint (`/inpaint-v3`) nachmalen. Das Ergebnis schwankte zu stark:
+ein schwarzes Rechteck, eine unbemalte Sandfläche, erfundene Straßen, und unter der Maske zeichnete das Modell
+Palisade und Fluss wieder nach. Deshalb der deterministische Weg.

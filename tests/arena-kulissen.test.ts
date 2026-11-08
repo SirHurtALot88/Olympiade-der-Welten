@@ -26,6 +26,21 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(kulissen["mini-dm"]?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
+  it("Battlefield hat Kulissen in Leinwandgroesse aus der eigenen Quelle (Landmarken auf den Motor-Orten)", () => {
+    // scripts/bestelle-kulisse-battlefield.py: Szene auf den Ortsabstand des Motors skaliert
+    // (ARENA_DOMINATION.battlefield.orte bei y=85/235/385), Quelle 1240x470 verlustfrei.
+    expect(kulissen.battlefield?.length ?? 0).toBeGreaterThanOrEqual(2);
+    for (const k of kulissen.battlefield ?? []) {
+      const quelle = path.join(wurzel, "data/generated/kulissen-quellen/battlefield", `${k.id}.png`);
+      expect(existsSync(quelle), quelle).toBe(true);
+      const png = readFileSync(quelle);
+      expect(png.readUInt32BE(16)).toBe(1240);
+      expect(png.readUInt32BE(20)).toBe(470);
+    }
+    const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
+    expect(motor).toContain('orte:[{name:"Nord",fy:85/470},{name:"Mitte",fy:0.5},{name:"Süd",fy:385/470}]');
+  });
+
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {
     for (const [dId, liste] of Object.entries(kulissen)) {
       const varianten = DISCIPLINE_SCENES[dId]?.variants.map((v) => v.id) ?? [];
