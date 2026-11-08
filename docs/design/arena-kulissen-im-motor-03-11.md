@@ -187,3 +187,19 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
   Verlauf, Zuschauer-Sprites und Parkett-Kachel weg. Linien, Zonen, Körbe und Wurfuhr zeichnet der Motor.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 5: Football, Hockey (07.11.)
+
+- **Football** (feld/strand): Oben und unten liegt ein Tribünen- bzw. Strandstreifen aus der Szene, ohne
+  Anzeigetafel samt Pfosten, Torstange, Kettenmasten und die Demo-Kettencrew. Im Feld des Motors
+  (W*0.04..W*0.96 × 50..H-50) liegt der Belag der Szene ohne Linien (Rasen bzw. Sand), um das Feld der
+  Seitenstreifen der Szene. Yard-Linien, Zahlen und Endzonen zeichnet der Motor.
+- **Hockey** (eis/bergsee): Oben liegt das Publikum bzw. die Berge, drumherum Hallenboden bzw. Schnee. Im
+  `RINK`-Rundweg liegt das Eis der Szene: die ganze Spielfläche, ohne Stern-Logo und mit allen Linien,
+  Kreisen und Schriftzügen herausgenommen. `eisflaeche()` lässt mit Kulisse nur seine Eisfüllung weg. Bande,
+  Linien, Kreise und Tore zeichnet der Motor. Die Abdunklung ist fest auf 0,06 gesetzt (`dunkel_fest` im
+  Generator), sonst würde das Eis grau.
+- `bodenFeldspiel()` ruft `kulisseZeichnen()` jetzt für alle Feldspiele auf. Ohne Kulissenliste bleibt es der
+  alte Boden.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.

@@ -438,9 +438,85 @@ def baue_basketball(variante: str) -> Image.Image:
     return lein
 
 
+# ---------------------------------------------------------------------------------------- Football
+# Motor (bodenFeldspiel, Football): Feld W*0.04..W*0.96 x 50..H-50, Endzonen, Yard-Linien und Zahlen
+# zeichnet der Motor. Szene (world 1920x1416): Stadion bzw. Strand in Schraegsicht mit Anzeigetafel,
+# Torstangen, Kettencrew/Bank (Demo), Feld mit eingebrannten Linien und Demo-Endzone A-A.
+# Kulisse: Tribuenen-/Strandstreifen oben und unten (ohne Tafel, Pfosten, Torstange, Kettenmasten),
+# im Feld der Belag der Szene ohne Linien, um das Feld der Seitenstreifen der Szene (Rasen bzw. Sand).
+FB_TRIBUENE = (126, 262)
+FB_STOERER = [(1752, 0, 1790, 262), (460, 160, 475, 262), (808, 160, 823, 262), (748, 96, 766, 262), (1156, 96, 1174, 262),
+              (240, 236, 290, 262), (425, 212, 498, 262), (772, 232, 842, 262)]
+FB_BELAG = (1322, 412, 1425, 700)
+FB_RAND = (900, 338, 1450, 358)
+FB_FELD = (round(LW * 0.04), 50, round(LW * 0.96), LH - 50)
+
+
+def baue_football(variante: str) -> Image.Image:
+    welt = lade_szenenbilder(SZENEN / "football" / f"{variante}.html")["world"].convert("RGB")
+    welt = seitlich_fuellen(welt, sorted(FB_STOERER))
+    rand = welt.crop(FB_RAND)
+    rand = rand.resize((round(rand.width * 0.8), round(rand.height * 1.6)), Image.NEAREST)
+    breit = Image.new("RGB", (LW + 400, rand.height))
+    x = 0
+    while x < breit.width:
+        breit.paste(rand if (x // rand.width) % 2 == 0 else rand.transpose(Image.FLIP_LEFT_RIGHT), (x, 0))
+        x += rand.width
+    lein = streifen_kacheln(breit, LW, LH, saat=41)
+    t0, t1 = FB_TRIBUENE
+    th = 46
+    trib = welt.crop((0, t0, 1920, t1)).resize((LW, th), Image.LANCZOS)
+    lein.paste(trib, (0, 0))
+    lein.paste(trib, (0, LH - th))
+    belag = welt.crop(FB_BELAG)
+    belag = linien_entfernen(belag, linien_maske(belag))
+    belag = belag.resize((round(belag.width * 1.4), round(belag.height * 1.4)), Image.NEAREST)
+    fx0, fy0, fx1, fy1 = FB_FELD
+    lein.paste(kacheln_gespiegelt(belag, fx1 - fx0, fy1 - fy0), (fx0, fy0))
+    return lein
+
+
+# ---------------------------------------------------------------------------------------- Hockey
+# Motor (eisflaeche): RINK = l W*0.045, r W*0.955, o 44, u H-44, Ecke 64 — eisRundweg(k). Linien, Kreise,
+# Tore, Bande zeichnet der Motor. Szene (clean 1840x632): Halle mit Publikum bzw. Bergsee mit Bergen,
+# Eis mit eingebrannten Linien. Kulisse: Tribuenen-/Bergstreifen oben, Hallenboden bzw. Schnee drumherum,
+# im Rundweg des Motors das Eis der Szene ohne Linien.
+HK_K = {"l": LW * 0.045, "r": LW * 0.955, "o": 44, "u": LH - 44, "ecke": 64}
+HK_OBEN = {"eis": (38, 162), "bergsee": (0, 118)}
+HK_EIS = (252, 230, 1588, 540)  # die ganze Spielflaeche zwischen den Torraeumen
+HK_LOGO = [(850, 362, 992, 440), (904, 328, 938, 352), (904, 450, 938, 474)]  # Stern, Kreuzungen Kreis/Mittellinie
+HK_BODEN = (0, 596, 1840, 630)
+
+
+def baue_hockey(variante: str) -> Image.Image:
+    welt = lade_szenenbilder(SZENEN / "hockey" / f"{variante}.html")["clean"].convert("RGB")
+    b = welt.crop(HK_BODEN)
+    b = b.resize((LW + 400, round(b.height * 1.2)), Image.LANCZOS)
+    lein = streifen_kacheln(b, LW, LH, saat=53)
+    o0, o1 = HK_OBEN[variante]
+    oben = welt.crop((0, o0, 1840, o1))
+    oh = round(oben.height * LW / 1840)
+    lein.paste(oben.resize((LW, oh), Image.LANCZOS), (0, 0))
+    # Erst das Logo flicken, dann alle Linien (weiss, rot, blau, auch die blassen Schriftzuege) aus der
+    # ganzen Spielflaeche nehmen — ein kleines Musterstueck gespiegelt ergab ein Kaleidoskop.
+    welt = flicken(welt, HK_LOGO, [], (252, 230, 1588, 540), ring=6, schritt=3)
+    eis = welt.crop(HK_EIS)
+    a = np.asarray(eis, dtype=np.int32)
+    weich = np.asarray(eis.filter(ImageFilter.GaussianBlur(6)), dtype=np.int32)
+    farbig = (a[..., 0] - a[..., 2] > 40) | (a[..., 2] - a[..., 0] > 45) | (np.abs(a - weich).sum(axis=2) > 90)
+    m = np.asarray(Image.fromarray(farbig.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(5))) > 0
+    eis = linien_entfernen(eis, m | linien_maske(eis), schritte=(5, 8, 12, 16, 22))
+    eis = eis.resize((round(HK_K["r"] - HK_K["l"]), round(HK_K["u"] - HK_K["o"])), Image.LANCZOS)
+    flaeche = eis.resize((LW, LH), Image.LANCZOS)  # Grund unter der Maskenkante: auch Eis
+    flaeche.paste(eis, (round(HK_K["l"]), round(HK_K["o"])))
+    lein.paste(flaeche, (0, 0), rundweg_maske(HK_K))
+    return lein
+
+
 BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
          "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy,
-         "gewichtheben": baue_gewichtheben, "basketball": baue_basketball}
+         "gewichtheben": baue_gewichtheben, "basketball": baue_basketball,
+         "football": baue_football, "hockey": baue_hockey}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
@@ -448,7 +524,8 @@ VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlo
              "speed-schach": ["park", "zug"], "showcase": ["buehne", "festival", "zirkus"],
              "eiskunstlauf": ["kuer", "waldsee"], "breaking": ["standard", "brutal"],
              "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"],
-             "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"]}
+             "gewichtheben": ["hafen", "oase", "sandsack"], "basketball": ["parkett", "streetcourt"],
+             "football": ["feld", "strand"], "hockey": ["eis", "bergsee"]}
 
 
 def main() -> None:

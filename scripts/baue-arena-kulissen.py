@@ -90,6 +90,10 @@ CHASSIS = {
     "i-spy": {"art": "quelle"},
     # Batch 4 (07.11.): Gewichtheben nur fuer das LIVE laufende Hantel-Duell (Sandsack-Pfad aus).
     "basketball": {"art": "quelle"},
+    "football": {"art": "quelle"},
+    # Hockey: das Eis war im Motor immer hell (Linien und Kaempfer sind darauf gebaut) — nur leicht
+    # abdunkeln, sonst wird es grau.
+    "hockey": {"art": "quelle", "dunkel_fest": 0.06},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.
@@ -292,6 +296,8 @@ def main() -> None:
             # Buehnen tragen mehr kleine Schrift direkt auf dem Bild (Zaehler, Namen, Uhr) und
             # bekommen deshalb einen Aufschlag (`dunkel_plus`).
             dunkel = round(min(0.3, max(0.06, (hell - 0.25) * 0.55)) + chassis.get("dunkel_plus", 0), 2)
+            if "dunkel_fest" in chassis:
+                dunkel = chassis["dunkel_fest"]
             eintraege.append({"id": v["id"], "label": v["label"], "bild": f"/sprites/kulissen/{d_id}/{v['id']}.jpg", "dunkel": dunkel})
             print(f"  {d_id}/{v['id']}: {len(objs)} Hindernisse zugemalt -> {ziel.relative_to(WURZEL)} ({ziel.stat().st_size // 1024} KB)")
         if eintraege:

@@ -72,6 +72,20 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.13
   }
  ],
+ "football": [
+  {
+   "id": "feld",
+   "label": "Feld",
+   "bild": "/sprites/kulissen/football/feld.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "strand",
+   "label": "Strand",
+   "bild": "/sprites/kulissen/football/strand.jpg",
+   "dunkel": 0.22
+  }
+ ],
  "gewichtheben": [
   {
    "id": "sandsack",
@@ -90,6 +104,20 @@ window.__ARENA_KULISSEN={
    "label": "Oase",
    "bild": "/sprites/kulissen/gewichtheben/oase.jpg",
    "dunkel": 0.23
+  }
+ ],
+ "hockey": [
+  {
+   "id": "eis",
+   "label": "Eisbahn",
+   "bild": "/sprites/kulissen/hockey/eis.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "bergsee",
+   "label": "Bergsee",
+   "bild": "/sprites/kulissen/hockey/bergsee.jpg",
+   "dunkel": 0.06
   }
  ],
  "i-spy": [

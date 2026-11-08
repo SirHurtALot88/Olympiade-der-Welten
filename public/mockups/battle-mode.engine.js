@@ -17153,7 +17153,7 @@
     // wie Papier und das Feld verliert jede Tiefe.
     const eis=ctx.createLinearGradient(0,k.o,0,k.u);
     eis.addColorStop(0,"#dce9f2"); eis.addColorStop(0.5,"#eef5fa"); eis.addColorStop(1,"#d3e2ee");
-    eisRundweg(k,0); ctx.fillStyle=eis; ctx.fill();
+    if(!kulisseSichtbar()){ eisRundweg(k,0); ctx.fillStyle=eis; ctx.fill(); }
     // Bande: aussen der Rahmen, innen die gelbe Kickleiste am Boden — dieselbe Ordnung
     // wie in echt (Plexiglas oben, gelbe Leiste unten).
     ctx.lineWidth=7; ctx.strokeStyle="#f2f4f7"; eisRundweg(k,0); ctx.stroke();
@@ -17305,8 +17305,10 @@
     // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Basketball bekommt
     // Tribuene und Belag (Parkett bzw. Streetcourt) der PixelLab-Szene; das Feld liegt in der Kulisse
     // genau auf W*0.06..W*0.94 x 60..H-60. Ersetzt Verlauf, Zuschauer-Sprites und Parkett-Kachel;
-    // Linien, Zonen und Koerbe zeichnet der Motor weiter. Football/Hockey: noch ohne Kulisse.
-    const mitKulisse=feldspielDisc==="basketball"&&kulisseZeichnen();
+    // Linien, Zonen und Koerbe zeichnet der Motor weiter. Football (Batch 5): Belag im Feld
+    // W*0.04..W*0.96 x 50..H-50, Yard-Linien/Zahlen vom Motor. Hockey (Batch 5): Eis der Szene im
+    // RINK-Rundweg, eisflaeche() laesst dann nur seine Eisfuellung weg.
+    const mitKulisse=kulisseZeichnen();
     const g=ctx.createLinearGradient(0,0,0,H);
     // Ausserhalb der Spielflaeche: Rasenton fuer die Feldsportarten, kalte Halle fuer
     // das Eis. Ein gruener Rand um eine Eisflaeche liest sich sofort falsch.
