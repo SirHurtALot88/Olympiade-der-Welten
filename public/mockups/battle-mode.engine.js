@@ -36018,7 +36018,10 @@
     bg.addColorStop(1,"hsl(280 45% 7%)");
     // KULISSE (Kulissen-Integration 07.11.): liegt der Kerker der PixelLab-Szene darunter, kommt der
     // violette Verlauf nur durchscheinend darueber -- die Folter-Stimmung bleibt, der Ort wird sichtbar.
-    if(kulisseSichtbar())ctx.globalAlpha=0.45;
+    // Batch 12 (08.11., Kulissen-Audit Rang 6): 45 % -> 20 %. Bei 45 % lag ein Schleier ueber der
+    // Szene, Fackeln und Publikum waren nur Schemen; das Licht (Fackelglut, Lichtinsel auf dem Rund)
+    // steckt jetzt in der Kulisse selbst (scripts/baue-kulisse-buehnen.py, breaking_licht()).
+    if(kulisseSichtbar())ctx.globalAlpha=0.2;
     ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
     ctx.globalAlpha=1;
 
@@ -42492,7 +42495,10 @@
     const meta=(echterKader&&echterKader.meta)||{};
     const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
     const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))||liste[kulisseHash(schluessel)%liste.length];
-    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
+    // rand (Batch 12, 08.11.): Staerke der Rand-Vignette, 1 = wie bisher; Showcase/Breaking 0.5, weil
+    // ihr Licht jetzt im Bild steckt (Prospekt, Kegel, Fackeln) und der Rand sonst Raenge/Fackeln schluckt.
+    kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25,
+      rand:Number.isFinite(v.rand)?v.rand:1};
     if(!kulisseBilder[v.bild]){
       const im=new Image();
       // Steht das Spiel noch (Einlauf, vor dem Anpfiff), zeichnet niemand nach — also einmal
@@ -42528,8 +42534,9 @@
     // im alten Sandboden) traegt die Tiefe und lenkt den Blick zur Mitte.
     ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,H);
     const v=ctx.createRadialGradient(MID,H/2,60,MID,H/2,W*0.62);
-    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,.18)");
-    v.addColorStop(1,"rgba(0,0,0,.48)");
+    const rd=kulisseAktiv.rand;
+    v.addColorStop(0,"rgba(0,0,0,0)");v.addColorStop(0.6,"rgba(0,0,0,"+(0.18*rd)+")");
+    v.addColorStop(1,"rgba(0,0,0,"+(0.48*rd)+")");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     return true;
   }

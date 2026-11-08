@@ -384,3 +384,53 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
 **Stand nach Batch 11:** 20 von 20 Disziplinen zeigen PixelLab-Grafik im Motor: 19 mit Kulisse, Takeshi
 mit PixelLab-Bodenkacheln und PixelLab-Fallen auf seiner Draufsicht-Route. Dazu sind alle Requisiten, die der
 Motor auf die Kulissen zeichnet, PixelLab statt OpenGameArt.
+
+## Batch 12: Showcase und Breaking als „Rahmen statt Material“ (08.11.)
+
+Anlass ist der Kulissen-Audit vom 08.11. (`docs/design/kulissen-qualitaets-audit-08-11.md`, PR #1357). Er fand 7 von 20
+Disziplinen unter dem Zeitfahren/TDM-Niveau. Showcase (Rang 5) und Breaking (Rang 6) sind die beiden billigen Fälle:
+Ihnen fehlte keine Komposition, sondern Licht. Der Leitgedanke heißt „Rahmen statt Material“: Die Kulisse liefert den
+Ort um die Motor-Geometrie herum, in drei Ebenen (fern, mitte, vorne) und mit Licht. Rampe (H*0.86), Druck-Rund
+(`zeichneBreaking`: cx=W/2, cy=H*0.54) und alle Mechanik bleiben unangetastet.
+
+- **Showcase** (buehne/festival/zirkus), `baue_showcase()` in `scripts/baue-kulisse-buehnen.py`:
+  - **fern**: Die schwarze Demo-LED-Wand der Szene (x 188..452, y 33..148 in Szenen-px, per Helligkeit gesucht)
+    wird zum Bühnenprospekt. Das Theater bekommt eine gemalte Mondnacht mit Burgsilhouette, der Zirkus einen roten
+    Samtvorhang mit Goldstern und Glühbirnenrahmen. Beide sind neu von PixelLab (`/v2/generate-image-v2`, 264×116,
+    mit Hintergrund) und liegen unter `data/generated/pixellab-requisiten/roh/showcase_prospekt_*.png`. Bestellt
+    wurden sie über `scripts/pixellab-requisiten.py`, das dafür die neue Auftragsart `"kulisse"` hat: nur ein
+    Rohbild, kein Sprite-Tausch, `hintergrund=True`. Beim Festival läuft die LED-Wand: eine Punktmatrix im
+    3-px-Raster mit Strahlen, oben Bernstein, unten Magenta (Farben aus dem Poster der Szene), ohne Schrift.
+  - **mitte**: Der Bühnenboden ist im Theater jetzt warmes Holz, beim Festival ein dunkler Glanzboden, in dem sich
+    die LED-Wand spiegelt. Die Fugen des Szenenbodens bleiben erhalten. Von den sechs Traversen-Scheinwerfern fallen
+    weiche Lichtkegel auf drei Lichtpfützen; die mittlere liegt dort, wo der Motor den Künstler zeichnet. Der
+    Zirkusboden war schon hell, er bekommt nur sanfte Kegel.
+  - **vorne**: Vorhänge, Ränge und Publikum der Szene (`fg`) liegen unbeleuchtet davor.
+- **Breaking** (standard/brutal), `breaking_licht()`: Der Ausschnitt bleibt gleich. Die Schatten sind angehoben
+  (Gamma 0,78), die beiden Fackeln haben eine Glut (die Flamme wird als hellorange Pixel gesucht), und der Lichtschacht
+  von oben läuft bis auf die Mitte des Motor-Druck-Runds weiter. Dort bildet er eine Helligkeitsinsel unter den
+  beiden Kämpfern.
+- **Motor** (reine Anzeige, drei Stellen):
+  - `zeichneBreaking()` legt seinen violetten Verlauf über die Kulisse nur noch zu 20 % statt 45 %.
+  - `kulisseWaehlen()`/`kulisseZeichnen()` lesen ein neues, optionales Feld `rand` je Kulisse und skalieren damit die
+    Rand-Vignette (Default 1, also für alle anderen Disziplinen wie bisher).
+- **Generator** (`scripts/baue-arena-kulissen.py`): Showcase bekommt `dunkel_fest: 0.04, rand: 0.5`, Breaking
+  `dunkel_fest: 0.04, rand: 0.35`. Flächige Abdunklung hatte genau das Licht geschluckt. Die Kulissen der übrigen
+  Disziplinen kommen aus dem Lauf byte-gleich heraus.
+- **Herkunft**: Neu ist `public/sprites/kulissen/quellen.json` mit den fünf Bildern, die alte Fassung steht dort
+  unter `vorher`.
+
+Vorher/Nachher (echte Leinwand, `node scripts/screenshot-kulisse.mjs <disziplin> <variante> 2500 <png>`):
+`docs/design/kulissen-rework-08-11/{showcase-buehne,showcase-festival,showcase-zirkus,breaking-standard,breaking-brutal}-{vorher,nachher}.png`.
+
+Grenzen:
+- Beim Breaking sitzen die Fackeln im Ausschnitt ganz in den oberen Ecken, unter Kopfverlauf und HP-Balken. Ihre
+  Glut sieht man nur als warmen Schein. Sie weiter hereinzuholen hieße, den Zuschnitt zu ändern, und damit wäre es
+  kein reiner Lichtfix mehr.
+- Die Ränge im Theater bleiben Randstreifen, weil die Szene sie nur dort hat. Mehr Rang bräuchte neue Pixel.
+
+PixelLab-Verbrauch: zwei Aufträge, 20 Generationen (Abo-Stand 2405 → 2385).
+
+Tests: `tests/arena-kulissen.test.ts` ist grün, die Sichtprobe läuft für alle fünf Varianten ohne Seitenfehler.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285` (69 Einträge).

@@ -411,6 +411,28 @@
    "endpunkt": "/v2/generate-image-v2"
   }
  },
+ "showcase_prospekt_buehne": {
+  "prompt": "painted theatre stage backdrop canvas, deep blue night sky with a large pale full moon and soft drifting clouds, small stars, dark silhouette of rolling hills and a distant castle along the bottom edge, flat painted scenery look, no people, no text, pixel art, 16-bit, muted colors",
+  "seed": 11,
+  "gen": [
+   264,
+   116
+  ],
+  "job": "278784ac-cecc-412d-b126-098371786044",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "showcase_prospekt_zirkus": {
+  "prompt": "deep red velvet circus curtain backdrop with gold fringe at the bottom, a large golden star emblem in the center, a frame of glowing warm marquee light bulbs around the edge, warm stage light, no people, no text, pixel art, 16-bit",
+  "seed": 11,
+  "gen": [
+   264,
+   116
+  ],
+  "job": "738e1118-b586-4a97-9592-2a9630c91b18",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "zaun_holz": {
   "prompt": "short wooden fence segment, two posts and two horizontal rails, 3/4 top-down view as in a classic top-down RPG, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
