@@ -129,6 +129,101 @@ ein Recherche-Auftrag (Opus: technische Machbarkeit und Architektur, Fable: Pers
 Taxonomie und wie sich Kombinationen auswirken sollen) — Ergebnis fließt zurück an Chris, bevor
 irgendetwas umgesetzt wird.
 
+### Nachschärfung 08.11. (zweite Runde), nach Opus'/Fables erster Recherche
+
+Beide Recherche-Dokumente (`rempler-persoenlichkeit-machbarkeit-08-11.md` von Opus,
+`persoenlichkeits-taxonomie-konzept-08-11.md` von Fable) waren fertig, bevor Chris diese
+Rückmeldung gab. Bemerkenswert: Chris kommt unabhängig auf dieselbe Grundidee, die Fable bereits
+vorgeschlagen hatte (volle Matrix über alle 36 Traits, aggregiert zu benannten Persönlichkeiten) —
+das bestätigt die Richtung, verschärft aber die konkreten Anforderungen:
+
+- **Die Matrix muss ALLE 36 Traits abdecken**, nicht nur eine Teilmenge — analog dazu, wie
+  Attribute heute schon in eine Klasse münden. Chris wörtlich: „Alle 36 Traits, die wir besitzen,
+  müssen in so einer riesen Matrix letztendlich drin sein und irgendwo reinfließen." Fables
+  Entwurf deckt bereits alle 36 Traits ab (Abschnitt 2 seines Dokuments) — das ist also schon
+  erfüllt, nur zur Klarheit hier festgehalten.
+- **Ausgabe als Rangliste, nicht nur Haupt+Neben.** Chris will explizit „Platz 1 ist das, Platz 2
+  ist das, Platz 3 ist das" — drei benannte Persönlichkeits-Ränge, nicht nur Fables bisheriges
+  Haupt/Neben-Paar (Podium von zwei). Offene Frage für die nächste Runde: ob ein dritter Rang
+  wirklich eigenständig wirkt oder nur zur Anzeige dient.
+- **Aggregation statt granularer Einzel-Trait-Wirkung — Chris' eigene erste Einschätzung.** Er
+  erwägt explizit die Alternative (jeder Trait wirkt einzeln, ganz unten in der Mechanik, ohne
+  benannte Persönlichkeiten), entscheidet sich aber selbst für den aggregierten Weg mit
+  benannten Persönlichkeiten, wie Fable ihn vorgeschlagen hat — mit der Einschränkung, dass es
+  dafür eine definierte Menge an Persönlichkeiten braucht, in die aggregiert werden kann (Fables
+  13 + Rückfall „Unauffällig" erfüllt das bereits).
+- **Scope bestätigt: nur Battle-Mode.** Chris wörtlich: „Mir ist klar, dass Rempler im
+  Manager-Modus nichts bewirken... wir reden ja jetzt auch nur vom Battle-Mode." Beantwortet
+  Opus' erste Rückfrage — keine Persönlichkeits-Wirkung im unsimulierten Manager-Pfad nötig.
+- **Attribute als Sekundärkanal bestätigt, mit konkreten Beispielen.** „Attribute dürfen auch in
+  die Persönlichkeit einfließen... aber nicht als primäres, sondern eher als sekundäres. Primär
+  wären auch für mich die Traits." Zwei konkrete Attribut-Beispiele, die Chris selbst nennt:
+  **Torment** (Bereitschaft, andere zu verletzen) und **Determination** (sich nicht abbringen
+  lassen) als sinnvolle sekundäre Einflüsse auf die Persönlichkeit. Deckt sich mit Fables bereits
+  gewähltem Ansatz (Attribute nur als gedeckelter Form-Modifikator, nicht primär).
+- **Governance-Haltung geklärt — Varianz ist teils gewollt, nicht nur ein Risiko.** Auf Opus'
+  gemessenen Befund (Persönlichkeit kostete 02.10. 0,1–0,2 rho in TDM über Zusammenhalt/Bindung,
+  Battlefield-Aktivierung verfehlte das Pp-Delta-Kriterium) antwortet Chris: „Ja, soll es
+  potenziell auch [Spieler stärker oder schwächer machen]... Vielleicht ist es in der Hinsicht
+  gut, dass er plötzlich andere Kräfte entwickelt und alles an sich reißt, aber damit auch den
+  Scheiß rockt. Oder es kann halt sein, dass er alles alleine machen will und das grandios
+  scheitert." Die Dosierung (wie stark der Effekt ausfällt) bleibt ein Stellrad, das man nach dem
+  ersten Messen „runterdosieren" kann — aber die Grundidee, dass Persönlichkeit ein Spiel klar zum
+  Besseren oder Schlechteren wenden kann, ist gewollter Teil des Designs, kein zu vermeidender
+  Nebeneffekt. Die bestehenden rho-/Pp-Schranken aus CLAUDE.md gelten weiterhin als Abnahme-Maß,
+  aber als Ziel für die gewählte Dosierung, nicht als Totalverbot jeder Verschiebung.
+
+### Neue, verwandte Ideen aus derselben Nachricht (noch nicht recherchiert, eigene Themen)
+
+Drei weitere Gedanken, die Chris in derselben Nachricht anschließt — jeweils eigenständig genug,
+dass sie in der nächsten Runde separat recherchiert werden sollten, nicht einfach in die
+Rempler-Mechanik hineingemischt:
+
+**1. Sichtbares Konfliktverhalten → Rivalitäten-System-Anknüpfung.** Persönlichkeits-Reibung
+soll sich nicht nur in Rempel-Häufigkeit zeigen, sondern z. B. auch darin, dass eigene Spieler
+sich gegenseitig anrempeln/anschubsen oder aufeinander sauer werden. Chris verknüpft das explizit
+mit einer älteren, bereits einmal angedachten Idee: „Wir hatten doch damals mal überlegt, dieses
+System zu bauen mit so Rivalitäten unter den Spielern. Und das könnte das dann ja auch befüttern
+oder auch die Moral von Spielern beeinflussen." Ein Egomaniac, der ständig Teamkollegen anrempelt
+oder negativ auffällt, soll die Teammoral drücken können. Das ist ein Anknüpfungspunkt an ein
+bereits früher diskutiertes Rivalitäten-Konzept (noch zu identifizieren, welches Dokument das
+war, falls eins existiert) — eigenes Recherche-Thema, nicht Teil der Kern-Rempler-Mechanik.
+
+**2. Transparenz-/Statistik-Anspruch, FM-Vergleich.** Chris zieht den Vergleich zu Football
+Manager explizit: „Das ist ja nicht bei Fußballmanager, will ich ja auch sehen. Wie sind die
+Statistiken vom Spieler? ... Seine Durchschnittsnoten und so." Er will für die Olympiade
+dieselbe Nachvollziehbarkeit: auf welcher Position ein Spieler am besten ist, wie man ihn am
+besten trainiert, und — speziell für die neue Persönlichkeits-Mechanik — dass jede
+persönlichkeitsgetriebene Aktion (Rempler, Konflikt, Moral-Einfluss) nachvollziehbar getrackt
+wird, nicht nur als Spielmoment passiert und wieder verschwindet. Knüpft an den bestehenden
+Transparenz-Grundsatz des Projekts an (+/-/Farb-Schema), geht hier aber über reine
+Eignungsanzeige hinaus in Richtung Verlaufsstatistik/Historie.
+
+**3. Idee: Gebäude zum Ab-/Antrainieren von Traits.** Noch unausgereift, Chris selbst unsicher:
+„Weiß nicht, ob wir noch eins haben, wo man das machen kann, oder in die Academy." Die Idee: ein
+Spieler mit unerwünschtem Trait (z. B. Egomaniac) könnte in ein Gebäude gesteckt werden, um ihm
+das Trait abzutrainieren (oder gezielt ein neues anzutrainieren) — vermutlich mit Kosten (z. B.
+vorübergehend weniger Leistung). Zum Faktencheck: im Code existiert bereits eine „Academy"-Fazilität
+(`lib/facilities/facility-catalog.ts`, `facilityId: "academy"`), aber sie beschleunigt aktuell nur
+die organische Entwicklung junger/Low-Tier-Spieler (F/E/D) — mit Trait-Training hat sie bisher
+nichts zu tun. Eine Trait-Trainingsfunktion wäre also entweder eine Erweiterung dieser bestehenden
+Fazilität oder ein neues Gebäude — offene Frage für eine spätere, eigene Recherche-Runde, nicht
+Teil der aktuellen Rempler-Umsetzung.
+
+### Rückmeldung zu Teil 1 (Oberflächen-Effekte): Deckel-Höhe
+
+Zur offenen Frage „Deckel bei ±5 oder ±8 Eignungspunkten" aus dem Fable-Konzept: Chris hält
+„fünf bis acht... erstmal okay" als Ausgangsspanne, besteht aber auf einem echten Test statt einer
+Papier-Entscheidung: „Das müsste man halt einfach mal testen und gucken, was rauskommt." Seine
+eigene Einschätzung zur Wirkung: die meisten Spieler wären nur ein bis zwei Punkte besser/
+schlechter, aber am Rand (ein Spieler bei −5/−8, ein anderer bei +5/+8 auf derselben Variante)
+können daraus schnell 10+ Punkte Unterschied werden — das ist gewollt möglich, aber muss beim
+Testen beobachtet werden. Bestätigt außerdem noch einmal explizit die bereits im Fable-Konzept
+verankerte Regel: über alle Varianten einer Disziplin gemittelt muss es wieder zur Matrix passen
+(„im Mittel... muss es ja wieder irgendwo passen"), ein Spieler darf auf einem Untergrund
+schlechter und auf einem anderen dafür besser sein — keine Variante darf einen Spieler über alle
+Varianten hinweg einseitig benachteiligen.
+
 ## Teil 3: Format-Varianten je Disziplin — echtes anderes Gameplay, nicht nur eine andere Kulisse (Brainstorming-Auftrag)
 
 Dritter Gedanke, den Chris direkt im Anschluss an Teil 1/2 mitgegeben hat, ausdrücklich als
