@@ -129,6 +129,78 @@ ein Recherche-Auftrag (Opus: technische Machbarkeit und Architektur, Fable: Pers
 Taxonomie und wie sich Kombinationen auswirken sollen) — Ergebnis fließt zurück an Chris, bevor
 irgendetwas umgesetzt wird.
 
+## Teil 3: Format-Varianten je Disziplin — echtes anderes Gameplay, nicht nur eine andere Kulisse (Brainstorming-Auftrag)
+
+Dritter Gedanke, den Chris direkt im Anschluss an Teil 1/2 mitgegeben hat, ausdrücklich als
+Ergänzung zu „wenn dir verschiedene Sachen einfallen, kannst du die auch gerne einbauen."
+
+### Abgrenzung zu Teil 1
+
+Teil 1 (Oberflächen-Effekte) ändert, WIE gut ein Attribut auf einer Kulissen-Variante wirkt —
+dieselbe Disziplin, dieselbe Handlung, nur verschobene Gewichte. Teil 3 geht weiter: hier soll
+es für manche Disziplinen eine **komplett andere Aktivität** geben, die trotzdem dieselbe
+Eignungsmatrix bedient. Chris' eigenes Beispiel, bereits real im Spiel: Gewichtheben ist nicht
+mehr nur „Hantel hochdrücken" (Hantel-Duell, `zeichneHeben()`), sondern hat mit dem
+Sandsack-Schleppen/-Lauf schon einmal genau das vorgemacht — eine andere Aktivität für dieselbe
+Kraft-Disziplin. Das ist der Präzedenzfall, den Teil 3 verallgemeinert.
+
+**Explizit kein Skin-Auftrag.** Chris wörtlich: „Mir geht es jetzt nicht darum, dass ich drei
+verschiedene Skins quasi einfach nur habe... Es geht nicht darum, Skins zu bauen, sondern
+Gameplay-Changes mit dem zu verbinden, was ich sehe, und dass das, was ich sehe, auch teils
+unterschiedlich ist." Eine Format-Variante muss sich spielen anders anfühlen — anderer Ablauf,
+andere Siegbedingung, anderes Tempo — nicht nur eine andere Arena für denselben Ablauf.
+
+### Konkretes Beispiel, das Chris selbst nennt: Tauziehen
+
+Eine mögliche weitere Kraft-Format-Variante neben Hantel-Duell und Sandsack-Lauf: **Tauziehen**.
+Chris: „Ein Tauziehen spricht ja vielleicht andere körperliche Stärken an, ohne komplett von den
+Basis-Stats des Gewichthebens oder dieser Matrix dann abzuweichen." Besonderheit, die er selbst
+hervorhebt: Tauziehen wäre nicht zwingend 1v1 oder Team-vs-Team wie die bisherigen Formate,
+sondern könnte **alle vorhandenen Spieler gegeneinander** antreten lassen, ggf. über mehrere
+Runden — eine andere Teilnehmerstruktur als die bisherigen Gewichtheben-Formate, nicht nur eine
+andere Kulisse für dieselbe Struktur.
+
+### Genereller Auftrag: pro Disziplin prüfen, ob ein „Twist" sich lohnt
+
+Chris will, dass für möglichst viele der zwanzig Disziplinen überlegt wird, ob es ein alternatives
+Format gibt, das (a) erkennbar anders aussieht/sich anders spielt, aber (b) dieselbe Eignungsmatrix
+bedient. Er nennt explizit, dass das nicht überall gleich gut geht: „Eiskunstlauf wird
+wahrscheinlich immer ähnlich aussehen wie Eiskunstlauf" — aber z. B. bei Hockey könnte es „auch
+irgendwie mal einen Twist" geben. Tonvorgabe, mit der jede Idee abgeglichen werden soll: „Die
+Olympiade ist ja ein brutaler Sport... Das sind Gladiatoren." Als Stil-Referenz nennt er brutale
+Gameshow-Formate — sinngemäß Takeshi's-Castle-/Wipeout-artige Gladiator-Shows, als Beispiel ein
+Hai-Becken bei einer Football-ähnlichen Disziplin.
+
+**Vorgehen, von Chris selbst vorgeschlagen:** Opus und Fable sollen dazu brainstormen (Fable für
+die kreative Breite über alle Disziplinen, Opus für Machbarkeit/Matrix-Treue und technischen
+Aufwand), die vielversprechendsten Ideen **testweise optisch umsetzen** (Prototyp, keine fertige
+Produktionsversion), und Chris sucht sich aus dem, was er sieht, die besten aus. Kein Auftrag,
+alle zwanzig Disziplinen zwingend mit einem Twist zu versehen — nur eine offene Suche, wo es sich
+lohnt.
+
+**Dieselben Leitplanken wie Teil 1/2 gelten auch hier:** keine Änderung an
+`lib/player-generator/official-discipline-weights.ts`; ein neues Format bedient weiterhin exakt
+die Attribute, die die Disziplin laut Matrix schon gewichtet (Tauziehen nutzt KRAFT/AUSDAUER wie
+Gewichtheben, nicht neue Attribute); nach jeder ernsthaften Umsetzung gilt wieder rho>0,80 je
+Einzelspiel und Pp-Abweichung≤25.
+
+### Offene Fragen für das Brainstorming
+
+1. Welche der zwanzig Disziplinen haben überhaupt Potenzial für ein zweites, spielerisch
+   unterschiedliches Format (wie Gewichtheben), und welche nicht (wie vermutlich Eiskunstlauf)?
+2. Tauziehen für Gewichtheben konkret ausarbeiten: Teilnehmerstruktur (alle vs. alle, wie viele
+   Runden), welche Attribute genau, wie sich das vom bestehenden Hantel-Duell/Sandsack-Lauf
+   spielerisch unterscheidet.
+3. Für die vielversprechendsten 2-4 weiteren Kandidaten: konkrete Formatidee + grobe
+   Visualisierung, die sich mit vorhandenen Werkzeugen (PixelLab-Kulissen-Pipeline aus der
+   laufenden Kulissen-Integration) als Prototyp zeigen lässt.
+4. Wie wählt der Spieler/die Saison künftig zwischen mehreren Formaten einer Disziplin — fest
+   pro Saison, zufällig wie die Kulissen-Varianten, oder von Chris manuell festgelegt?
+
+**Status:** Brainstorming-Auftrag an Fable (kreative Ideen-Breite) und Opus (Machbarkeit +
+Prototyp der konkretesten Kandidaten), noch keine Produktionsentscheidung. Ergebnis geht an
+Chris zur Auswahl.
+
 ---
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
