@@ -463,15 +463,44 @@ liefern).
 
 Pakete 1–2 sind unabhängig von 3; 4 und 5 bauen auf 3 auf.
 
-## 13. Fragen an Chris (kurz, vor Paket 3)
+## 13. Fragen an Chris (kurz, vor Paket 3) — beantwortet 08.11.
 
 1. Slotfarbe **je Position 1–6** über alle Disziplinen (Vorschlag) — oder je Rolle innerhalb einer
    Disziplin, mit neuen Farben je Reiter?
+   → **Je Position, bestätigt** — aber die konkrete Farbwahl/Gestaltung je Position soll zur
+   jeweiligen Disziplin passen (Chris: „nach den Positionen machen, aber passend dann zu der
+   jeweiligen Disziplin"). Heißt: dieselbe Positions-Zuordnung (Slot 1 = Farbe A usw.) bleibt über
+   alle 20 Disziplinen konsistent, aber der Farbton/Stil darf sich an das visuelle Thema der
+   Disziplin anpassen (z. B. andere Sättigung/Wärme bei Breaking vs. Eiskunstlauf) — kein starres,
+   disziplinblindes Sechser-Set.
 2. Gold nach **Basis-Eignung** (Vorschlag) oder nach dem Wert im zugewiesenen Slot?
+   → **Nach dem Slot-Wert**, explizit gegen den ursprünglichen Vorschlag entschieden: „Zu Punkt 2,
+   den Rahmen machen wir nach dem Slotwert." Der goldene Rahmen zeigt also, wer im TATSÄCHLICH
+   zugewiesenen Slot am besten abschneidet, nicht wer die höchste rohe Basis-Eignung hat.
 3. Gegner **auf dem Feld** als Geister (Vorschlag) oder weiter als Liste rechts?
+   → **Ja, auf dem Feld zeigen**, mit einer zusätzlichen Anforderung: die Darstellung soll eine
+   Einschätzung erlauben, „was dabei rauskommt, damit man so ein bisschen countern kann" — der
+   Nutzer soll aus der Gegner-Darstellung ableiten können, wie sich eine eigene Aufstellungs-
+   Änderung gegen genau diesen Gegner auswirkt (Counter-Play), nicht nur sehen, wo der Gegner
+   grob steht.
 4. Rollenkarte **rechts** (ersetzt die Gegnerliste) oder unter dem Feld?
+   → **Noch offen, bewusst vertagt.** Chris: „Das hängt konzeptmäßig davon ab, wie es dann
+   aussieht. Kann ich jetzt noch nicht beantworten." Diese Entscheidung soll erst fallen, wenn ein
+   visuelles Konzept (Fable) vorliegt, an dem man es beurteilen kann — nicht vorher erzwingen.
 5. Soll die Foundation-Einsatzliste (`LineupNewLook`) dasselbe Mini-Feld bekommen, oder bleibt
    das ein Arena-Board-Thema?
+   → **Ja, bestätigt (siehe bereits Abschnitt 0b).** Chris bekräftigt zusätzlich die
+   Kopplungsanforderung: „Die Einsatzliste und die Battle Arena sollen ja miteinander sprechen...
+   Das ist ja dann die Einsatzliste, da setzt du ja die Leute ein, die dann später auf dem Feld
+   stehen." Die konkrete technische Umsetzung dieser Kopplung bleibt uns überlassen („Wie du das
+   Konzept umsetzt, bleibt dir jetzt erstmal überlassen") — die Anforderung selbst (Einsatz in der
+   Einsatzliste wirkt sich sichtbar und korrekt auf die Battle Arena aus) ist aber bindend.
+
+**Übergeordneter Auftrag aus derselben Nachricht**: Chris will das Ganze „als Gesamtkonzept"
+ausgearbeitet haben, „dass es auch optisch sehr ansprechend aussieht, beziehungsweise von Fable
+dann aufgearbeitet" — die nächste Runde ist also explizit eine visuelle Gesamtkonzept-Runde durch
+Fable, aufbauend auf den jetzt beantworteten Fragen und der Opus-Architektur-Recherche (siehe
+`docs/design/einsatzliste-revamp-architektur-08-11.md`, falls zu diesem Zeitpunkt schon vorhanden).
 
 ## Anhang: Fundstellen
 
