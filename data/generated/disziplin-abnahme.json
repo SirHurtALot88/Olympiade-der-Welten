@@ -283,7 +283,7 @@
     ]
    },
    "datum": "2026-11-08",
-   "commit": "oberflaechen-effekte-tennis-pilot",
+   "commit": "e9c4db90",
    "kulissenHinweis": "Mittel ueber die drei Kulissen-Varianten (ungepinnt); je Variante s. docs/design/oberflaechen-effekte-tennis-pilot-08-11.md und scripts/miss-kulisse-abnahme.mjs",
    "rhoFrisch": true,
    "ppFrisch": true
