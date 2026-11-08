@@ -14,7 +14,7 @@
 // sagen, ob die MECHANIK die Matrix grundsaetzlich durchreicht — nicht, ob das fertige Feature
 // die Abnahme besteht.
 //
-//   node scripts/miss-tauziehen-prototyp.mjs [spiele=48] [--saat-versatz=N]
+//   node scripts/miss-tauziehen-prototyp.mjs [spiele=48] [--saat-versatz=N] [--format=schweizer|grube]
 // ===================================================================================
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -25,7 +25,9 @@ const wurzel = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const T = require(resolve(wurzel, "public/mockups/tauziehen-prototyp.sim.js"));
 // Kalibrier-Hilfe: TAUZ_K='{"lastExp":1.1}' ueberschreibt einzelne Konstanten nur fuer diesen Lauf.
-if (process.env.TAUZ_K) Object.assign(T.K, JSON.parse(process.env.TAUZ_K));
+const FORMAT = (process.argv.find((a) => a.startsWith("--format=")) ?? "=schweizer").split("=")[1];
+const spiele = FORMAT === "grube" ? T.spieleGrube : T.spiele;
+if (process.env.TAUZ_K) Object.assign(FORMAT === "grube" ? T.KG : T.K, JSON.parse(process.env.TAUZ_K));
 
 const args = process.argv.slice(2);
 const N = Number(args.find((a) => !a.startsWith("--")) ?? 48);
@@ -62,7 +64,7 @@ for (const v of familie) {
   const heim = kader(v.heim), gast = kader(v.gast);
   const einzel = [], summe = new Map();
   for (let i = 0; i < N; i++) {
-    const e = T.spiele(heim, gast, saat(i));
+    const e = spiele(heim, gast, saat(i));
     const z = e.teilnehmer;
     einzel.push(spearman(z.map((u) => u.eig), z.map((u) => u.wert)));
     for (const u of z) summe.set(u.n, (summe.get(u.n) ?? 0) + u.wert / N);
@@ -84,7 +86,7 @@ function einfluss(heim, gast) {
     const w = new Map();
     for (let i = 0; i < N; i++) {
       const hebe = (l) => l.map((p) => p.n === wer ? { ...p, a: { ...p.a, [attr]: Math.min(100, (p.a[attr] ?? 0) + plus) } } : p);
-      const e = T.spiele(hebe(heim), hebe(gast), saat(i));
+      const e = spiele(hebe(heim), hebe(gast), saat(i));
       for (const u of e.teilnehmer) w.set(u.n, (w.get(u.n) ?? 0) + u.wert / N);
     }
     return w;
@@ -103,7 +105,7 @@ const pos = [...gesamt.values()].reduce((s, g) => s + Math.max(0, g), 0) || 1;
 const anteile = T.ATTRIBUTE.map((at) => ({ at, anteil: (100 * Math.max(0, gesamt.get(at))) / pos, matrix: T.MATRIX[at] }));
 const pp = anteile.reduce((s, r) => s + Math.abs(r.anteil - r.matrix), 0);
 
-console.log(`Tauziehen-Prototyp, Vorab-Sonde — ${N} Spiele je Paarung, Saatversatz ${VERSATZ}`);
+console.log(`Tauziehen-Prototyp (${FORMAT}), Vorab-Sonde — ${N} Spiele je Paarung, Saatversatz ${VERSATZ}`);
 console.log("paarung                      rho/Spiel  Validitaet");
 for (const z of zeilen) console.log(`${z.paarung.padEnd(28)} ${z.rhoJeSpiel.toFixed(3).padStart(9)}  ${z.validitaet.toFixed(3).padStart(10)}`);
 console.log(`MEDIAN rho je Spiel ueber alle ${alleEinzel.length} Spiele: ${median(alleEinzel).toFixed(3)}  (Ziel > 0,80)`);

@@ -178,7 +178,97 @@
     return {teilnehmer:z, runden, finale, team, K};
   }
 
-  const api={REZEPT,MATRIX,ATTRIBUTE,K,teilwerte,spiele,rng};
+  // =================================================================================
+  // VARIANTE B: "DIE GRUBE" — Fables Entwurf (docs/design/format-varianten-brainstorm-08-11.md
+  // Abschnitt 2), hier zum ersten Mal gerechnet. Zwoelf Zieher sternfoermig um eine Grube, alle
+  // Seile an EINEM Eisenring. Vier Zuege 12 -> 8 -> 5 -> 3 -> 1 (es fallen 4, 3, 2, 2), dazwischen
+  // Erholung. Kanalbelegung wie bei Fable:
+  //   Zug = LAST · Stand/Rutscher = TECHNIK · Aufbaeumen an der Kante = NERVEN ·
+  //   Ruf (Vollzug/Halten) + Grubenblick = ANSAGE · Puste zwischen den Zuegen = ERHOLUNG.
+  // Geometrie: der Ring liegt bei r (2D); jeder Zieher i steht auf seiner Speiche u_i (Einheits-
+  // vektor nach aussen) mit Restboden s_i (1 = voll, 0 = Kante). Bewegt sich der Ring um dr, aendert
+  // sich s_i um dot(dr, u_i): kommt der Ring auf ihn zu, tritt er zurueck, entfernt er sich, rutscht
+  // er Richtung Kante. Wer s_i <= 0 erreicht, haengt ueber der Grube und ist raus.
+  // =================================================================================
+  const KG={
+    dt:0.2, zugMaxT:20, staffel:[4,3,2,2],
+    ringK:0.10,                 // Ringweg je Tick und Einheit Nettokraft
+    lastExp:0.9,
+    standMin:0.85, standK:0.30, // TECHNIK: wie viel Zugkraft am Seil ankommt
+    rutschChance:0.5, rutschBoden:0.18, // nach jedem Fall ruckt der Ring: (1-TECHNIK) * Chance
+    kanteSchwelle:0.15, aufbaeumK:1.35, // NERVEN: einmal je Zug, Kraftstoss fuer 1 s (NERVEN 100 -> +135 %)
+    vollzugSchwelle:55, vollzugK:1.15, haltenK:0.95, vollzugErm:1.5, haltenErm:0.7,
+    rufK:0.9,                   // ANSAGE als Takt-Wirkungsgrad (wie Variante A), sonst traegt charisma zu wenig
+    blickK:0.05,                // Grubenblick: ANSAGE > NERVEN des Gegenuebers -> -5 % Zugkraft
+    ermJeS:0.006, erholungK:0.9,
+    rauschen:0.10, formRauschen:0.03
+  };
+
+  function spieleGrube(heim,gast,saat,opt){
+    opt=opt||{};
+    const r=rng(saat);
+    let id=0;
+    const z=[...heim.map(p=>({p,side:0})),...gast.map(p=>({p,side:1}))].map(({p,side})=>({
+      id:id++, n:p.n, side, a:p.a, eig:p.eig, ...teilwerte(p.a),
+      raus:false, platz:null, bodenBeiFall:0, zuege:0, aufbaeumer:0, rutscher:0, erm:0
+    }));
+    const zuegeFilm=[];
+    let platzFrei=z.length;
+    for(let zi=0;zi<KG.staffel.length;zi++){
+      const dabei=z.filter(u=>!u.raus);
+      if(dabei.length<=1)break;
+      // Aufstellung am Ring: Heim/Gast im Wechsel, Reihenfolge nach Slot (= Listenreihenfolge).
+      const h=dabei.filter(u=>u.side===0), g=dabei.filter(u=>u.side===1), ring=[];
+      while(h.length||g.length){ if(h.length)ring.push(h.shift()); if(g.length)ring.push(g.shift()); }
+      const n=ring.length;
+      ring.forEach((u,i)=>{ const w=2*Math.PI*i/n; u.ux=Math.cos(w); u.uy=Math.sin(w); u.s=1; u.aufb=false; u.aufbT=0;
+        u.vollzug=u.ANSAGE>=KG.vollzugSchwelle; u.zuege++;
+        u.form=1+gauss(r)*KG.formRauschen; });
+      // Grubenblick gegen das direkte Gegenueber (gegenueberliegender Platz am Ring)
+      ring.forEach((u,i)=>{ const o=ring[(i+Math.floor(n/2))%n]; u.blickMalus=(o!==u&&o.ANSAGE>u.NERVEN)?KG.blickK:0; });
+      let rx=0, ry=0, t=0, gefallen=0;
+      const soll=Math.min(KG.staffel[zi], n-1);
+      const film=opt.film?{zieher:ring.map(u=>({id:u.id,ux:u.ux,uy:u.uy})),frames:[],faelle:[]}:null;
+      const fall=(u,grund)=>{ u.raus=true; u.bodenBeiFall=u.s; u.platz=platzFrei--; gefallen++;
+        if(film)film.faelle.push({t:+t.toFixed(2),id:u.id,grund});
+        // Ruck am Ring: Rutscher-Wurf fuer alle anderen
+        for(const v of ring)if(!v.raus&&r()<KG.rutschChance*(1-v.TECHNIK/100)){ v.s-=KG.rutschBoden; v.rutscher++; if(film)film.faelle.push({t:+t.toFixed(2),id:v.id,grund:"rutscher"}); }
+      };
+      while(gefallen<soll&&t<KG.zugMaxT){
+        t+=KG.dt;
+        let fx=0, fy=0;
+        for(const u of ring){ if(u.raus)continue;
+          let f=Math.pow(u.LAST/50,KG.lastExp)*(KG.standMin+KG.standK*u.TECHNIK/100)
+            *(1-KG.rufK+KG.rufK*u.ANSAGE/100)*(u.vollzug?KG.vollzugK:KG.haltenK)
+            *(1-u.blickMalus)*(1-u.erm)*u.form*(1+gauss(r)*KG.rauschen);
+          if(!u.aufb&&u.s<KG.kanteSchwelle){ u.aufb=true; u.aufbT=1.0; u.aufbaeumer++; }
+          if(u.aufbT>0){ f*=1+KG.aufbaeumK*u.NERVEN/100; u.aufbT-=KG.dt; }
+          u.f=f; fx+=f*u.ux; fy+=f*u.uy;
+          u.erm+=KG.ermJeS*KG.dt*(u.vollzug?KG.vollzugErm:KG.haltenErm);
+        }
+        const dx=KG.ringK*KG.dt*fx, dy=KG.ringK*KG.dt*fy;
+        rx+=dx; ry+=dy;
+        for(const u of ring){ if(u.raus)continue; u.s+=dx*u.ux+dy*u.uy; u.s=Math.min(1.3,u.s); }
+        // Faelle in Reihenfolge des Restbodens (wer tiefer steht, faellt zuerst)
+        const unter=ring.filter(u=>!u.raus&&u.s<=0).sort((a,b)=>a.s-b.s);
+        for(const u of unter){ if(gefallen>=soll)break; fall(u,"kante"); }
+        if(film)film.frames.push({t:+t.toFixed(2),rx,ry,s:ring.map(u=>u.raus?null:+u.s.toFixed(3))});
+      }
+      // Zeitlimit: die mit dem wenigsten Restboden gehen, bis die Staffel voll ist
+      const rest=ring.filter(u=>!u.raus).sort((a,b)=>a.s-b.s);
+      while(gefallen<soll)fall(rest.shift(),"zeit");
+      for(const u of z)if(!u.raus)u.erm*=1-KG.erholungK*u.ERHOLUNG/100;
+      if(film){ film.dauer=t; zuegeFilm.push(film); }
+    }
+    const letzte=z.filter(u=>!u.raus); letzte.forEach(u=>{u.platz=1;});
+    // Spielerwert: Rang (12..1 -> 0..11 Punkte) plus Restboden beim Fall als Feintrenner.
+    // (Fables Zugnote per Referenz-Inversion waere der Produktionsweg; hier bewusst einfach.)
+    for(const u of z)u.wert=10*(z.length-u.platz)+5*Math.max(-0.5,Math.min(1,u.bodenBeiFall));
+    const team=[0,1].map(s=>z.filter(u=>u.side===s).reduce((x,u)=>x+(z.length+1-u.platz),0));
+    return {teilnehmer:z, zuege:zuegeFilm, team, K:KG, format:"grube"};
+  }
+
+  const api={REZEPT,MATRIX,ATTRIBUTE,K,KG,teilwerte,spiele,spieleGrube,rng};
   if(typeof module!=="undefined"&&module.exports)module.exports=api;
   else root.__TAUZIEHEN=api;
 })(typeof window!=="undefined"?window:globalThis);
