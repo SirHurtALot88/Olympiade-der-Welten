@@ -43393,10 +43393,64 @@
     }
     return aus;
   }
-  function zeichneFalleTakeshi(i,x,y,b){
+  // KULISSEN-QS NACHBESSERUNG (08.11., zu PR #1362): Chris am Vorher/Nachher-Screenshot,
+  // woertlich: "da ist ja einfach nur so ein Viereck Wasser, das ist ja gar nicht in die
+  // Karte integriert ... Kann man das irgendwie noch anpassen und drehen, dass es wenigstens
+  // auch der Neigung der Strecke entspricht und dass das sauber aussieht". `wasser()` und der
+  // `fillRect`-Block von "eis" zeichneten bildschirm-achsenparallel, ohne jede Ruecksicht auf
+  // die lokale Streckenrichtung -- und mit einer harten Rechteckkante obendrauf. Zwei
+  // unabhaengige Korrekturen, beide rein zeichnerisch, keine Positions-/Trefferlogik:
+  //  1. ROTATION: `zeichneFalleTakeshi` bekommt den optionalen Parameter `winkel` (Radiant,
+  //     Default 0 -- der zweite Aufrufer, die Burgpunkte-Spur mit ihren geraden, parallelen
+  //     Bahnen, bleibt damit unveraendert). Der Routen-Aufrufer uebergibt
+  //     Math.atan2(r.ty,r.tx) -- `r.tx,r.ty` ist die Tangente, die routeXY() (nur lesend
+  //     benutzt) an der Fallen-Position ohnehin schon liefert.
+  //  2. WEICHE KANTE: `weicheFlaeche()` ersetzt die harte Rechteckkante durch eine leicht
+  //     unregelmaessige Uferlinie (Vorbild: der Ellipse-Clip, den "steine" fuer die
+  //     einzelnen Trittsteine schon nutzt, Zeile ~43421 unten) plus einen weichen
+  //     Schlagschatten/Vignette-Rand -- damit die Flaeche wie ins Gelaende eingelassen wirkt
+  //     statt wie ein Sticker obendrauf. `i` (die Fallen-Nummer) liefert den Formzufall
+  //     deterministisch, keine neue Zufallsquelle.
+  // Systematisch durchgesehen: "schlamm" (Dragon God Lake) hat denselben Fehler (reiner
+  // `fillRect`, keine Rotation, harte Kante) und bekommt dieselbe Behandlung. Alle anderen
+  // Faelle (tuer, raeder, seilwand, walzen, spitzen, labyrinth) zeichnen aufrecht stehende
+  // oder ohnehin schon rotierte/animierte Objekte (Tuer, Rad, Leiter, Walze, Pfahl, Mauer) --
+  // keine flaechige Boden-Textur, also kein Fall fuer diese Behandlung.
+  const uferPfad=(cx,cy,rx,ry,i)=>{
+    ctx.beginPath();
+    const n=14;
+    for(let k=0;k<=n;k++){ const ang=(k/n)*6.283;
+      const j=1+0.09*Math.sin(ang*3+i*2.3)+0.05*Math.sin(ang*5+i*1.1);
+      const px=cx+Math.cos(ang)*rx*j, py=cy+Math.sin(ang)*ry*j;
+      if(k===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    ctx.closePath();
+  };
+  const weicheFlaeche=(cx,cy,rx,ry,i,zeichnen)=>{
+    ctx.save();
+    uferPfad(cx,cy,rx,ry,i);
+    ctx.save(); ctx.clip();
+    zeichnen();
+    // weicher Schlagschatten/Vignette am Rand -- eingelassen statt aufgeklebt.
+    const grad=ctx.createRadialGradient(cx,cy,Math.min(rx,ry)*0.45,cx,cy,Math.max(rx,ry)*1.05);
+    grad.addColorStop(0,"rgba(0,0,0,0)"); grad.addColorStop(1,"rgba(0,0,0,.40)");
+    ctx.fillStyle=grad; ctx.fillRect(cx-rx*1.3,cy-ry*1.3,rx*2.6,ry*2.6);
+    ctx.restore();
+    // dunkler, leicht unregelmaessiger Uferrand (Kiesel-/Schlamm-Andeutung).
+    uferPfad(cx,cy,rx,ry,i);
+    ctx.strokeStyle="rgba(28,20,12,.55)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.restore();
+  };
+  function zeichneFalleTakeshi(i,x,y,b,winkel=0){
     const look=fallenLook(i), t=rennT;
     const aus=fallenAusgang(i);
-    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false; const yo=Math.round(y-15); ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo); return true; };
+    const wasser=()=>{ if(!(aDa("hind_wasser_l")&&aDa("hind_wasser_r")))return false;
+      const yo=Math.round(y-15);
+      ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+      weicheFlaeche(x+16,y+1,48,15,i,()=>{
+        ctx.drawImage(aBild.hind_wasser_l,Math.round(x-32),yo); ctx.drawImage(aBild.hind_wasser_r,Math.round(x),yo);
+      });
+      ctx.restore();
+      return true; };
     switch(look){
       case "labyrinth": { // Honeycomb Maze: zwei Mauerstuecke, die Luecke sitzt je Bahn woanders.
         // REAGIERT AUF DEN AUSGANG (Item 4): bei durchbruch wackeln die stehenbleibenden
@@ -43450,10 +43504,15 @@
       case "eis": { // Slip Way: eine Eisbahn quer ueber die Spur.
         // REAGIERT AUF DEN AUSGANG: bei sturz eine zusaetzliche, dunklere Rutschspur quer
         // ueber die Bahn — die Linie, die der Sturz auf dem Eis hinterlassen haette.
-        const e=aMust("boden_eis"); ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
-        ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();}
-        if(aus==="sturz"){ ctx.strokeStyle="rgba(70,110,140,.55)"; ctx.lineWidth=3;
-          ctx.beginPath(); ctx.moveTo(x-20,y-6); ctx.lineTo(x+20,y-14); ctx.stroke(); }
+        const e=aMust("boden_eis");
+        ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+        weicheFlaeche(x,y-9,24,15,i,()=>{
+          ctx.globalAlpha=0.9; ctx.fillStyle=e||"#bfe9ff"; ctx.fillRect(x-24,y-24,48,30); ctx.globalAlpha=1;
+          ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=1; for(let k=0;k<3;k++){ctx.beginPath();ctx.moveTo(x-20+k*14,y-20);ctx.lineTo(x-8+k*14,y-2);ctx.stroke();}
+          if(aus==="sturz"){ ctx.strokeStyle="rgba(70,110,140,.55)"; ctx.lineWidth=3;
+            ctx.beginPath(); ctx.moveTo(x-20,y-6); ctx.lineTo(x+20,y-14); ctx.stroke(); }
+        });
+        ctx.restore();
         break; }
       case "raeder": { // High Rollers: ein rollendes Rad pendelt ueber die Spur.
         // REAGIERT AUF DEN AUSGANG: schneller/weiter bei durchbruch, dazu ein paar Funken;
@@ -43488,7 +43547,16 @@
       case "schlamm": { // Dragon God Lake: Schlammgrube mit Blasen.
         // REAGIERT AUF DEN AUSGANG: ein Sturz loest statt der ruhigen Blasen einen kurzen
         // Spritzer aus (mehr, groessere Blasen, kurzzeitig) — ausgeloest statt zeitgesteuert.
-        const er=aMust("boden_erde"); ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+        // Dasselbe Muster wie "eis"/"wasser" (reiner fillRect, keine Rotation, harte Kante),
+        // im Kulissen-QS-Nachtrag 08.11. systematisch gefunden -- dieselbe Behandlung. Die
+        // Blasen bleiben bewusst ausserhalb der Rotation: sie sind kreisrund und saisonal
+        // unabhaengig von der Streckenneigung, eine Drehung aendert an ihnen nichts Sichtbares.
+        const er=aMust("boden_erde");
+        ctx.save(); ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y);
+        weicheFlaeche(x,y-9,28,15,i,()=>{
+          ctx.fillStyle=er||"#4a3a28"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="multiply"; ctx.fillStyle="#6a5a44"; ctx.fillRect(x-28,y-24,56,30); ctx.globalCompositeOperation="source-over";
+        });
+        ctx.restore();
         const spritzer=aus==="sturz";
         ctx.strokeStyle="rgba(255,255,255,.35)"; for(let k=0;k<3;k++){const ph=(t*0.9+k*0.37+b*0.11)%1; ctx.beginPath(); ctx.arc(x-16+k*16,y-4-ph*14,2+ph*3,0,6.283); ctx.stroke();}
         if(spritzer){ ctx.strokeStyle="rgba(255,255,255,.6)";
@@ -43731,7 +43799,11 @@
     //    Burgpunkte wert ist: damit liest sich die Karte als Kurs ("da vorne kommt eine
     //    Drei-Sterne-Falle") statt als Bahn mit Saeulen.
     HUERDEN_N().forEach((h,i)=>{ const r=routeXY(h);
-      zeichneFalleTakeshi(i,r.x,r.y+12,i%3);
+      // KULISSEN-QS NACHTRAG 08.11.: Math.atan2(r.ty,r.tx) ist die Richtung der Streckentangente
+      // an dieser Stelle (routeXY() liefert sie, nur lesend benutzt) -- damit folgt die Wasser-/
+      // Eis-/Schlammflaeche in zeichneFalleTakeshi() der lokalen Neigung der Route statt starr
+      // bildschirm-achsenparallel zu liegen.
+      zeichneFalleTakeshi(i,r.x,r.y+12,i%3,Math.atan2(r.ty,r.tx));
       const st=(BA().fallenStufe||{})[HUERDEN_TYP(i)]||1;
       const px=r.x+r.nx*(breite/2+10), py=r.y+r.ny*(breite/2+10);
       ctx.fillStyle="#3a2a18"; ctx.fillRect(px-2,py-18,4,20);

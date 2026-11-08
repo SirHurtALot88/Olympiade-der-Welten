@@ -478,3 +478,65 @@ Tests: `npx vitest run tests/arena-kulissen.test.ts` gruen (14/14).
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285` (69 Eintraege) — vor und nach
 diesem Batch gemessen, keine Nachkommastelle bewegt sich.
+
+### Nachtrag 08.11.: Wasser/Eis "nur dahin geklatscht" — Rotation + weiche Kante (zu PR #1362)
+
+Chris nach dem Vorher/Nachher-Screenshot von oben, woertlich: „da sehen die Assets drauf ja immer noch
+sehr matschig aus [...] das, was auf dem Boden ist, da ist ja einfach nur so ein Viereck Wasser, das ist
+ja gar nicht in die Karte integriert. Oder dass das ein Asset ist, was irgendwie mal passend zur Strecke
+ist, das ist ja einfach nur dahin geklatscht. Kann man das irgendwie noch anpassen und drehen, dass es
+wenigstens auch der Neigung der Strecke entspricht und dass das sauber aussieht, weil so wirkt das ja
+alles falsch."
+
+**Ursache:** die `wasser()`-Closure (genutzt von den Fallen "steine"/Skipping Stones UND
+"brueckenball"/Bridge Ball) zeichnete zwei `hind_wasser_l/r`-Kacheln, und der `ctx.fillRect`-Block der
+Falle "eis"/Slip Way zeichnete seine Eisflaeche, beide bildschirm-achsenparallel — ohne jede Ruecksicht
+auf die lokale Streckenrichtung, die `routeXY()` an der Fallen-Position laengst mitliefert (`r.tx,r.ty`,
+die Tangente), und mit einer harten Rechteckkante obendrauf. Systematisch durchgesehen fand sich derselbe
+Fehler ein drittes Mal bei "schlamm"/Dragon God Lake (ebenfalls reiner `fillRect`, keine Rotation, harte
+Kante) und wurde gleich mitbehoben. Alle anderen Fallen (Tuer, Raeder, Seilwand, Walzen, Spitzen,
+Wabenlabyrinth) zeichnen aufrecht stehende oder ohnehin schon rotierte/animierte Objekte, keine flaechige
+Boden-Textur — kein Fall fuer diese Behandlung.
+
+**Behoben, rein zeichnerisch (`zeichneFalleTakeshi`, `public/mockups/battle-mode.engine.js`):**
+- Neuer optionaler Parameter `winkel` (Radiant, Default 0). Der Routen-Aufrufer
+  (`bodenTakeshiRoute()`) uebergibt `Math.atan2(r.ty,r.tx)` — die Tangente, die `routeXY()` (nur lesend
+  benutzt) an der Fallen-Position ohnehin liefert. Der zweite Aufrufer (`bodenSpurtGerade()`, die
+  "Burgpunkte"-Spur mit geraden, parallelen Bahnen) wurde NICHT geaendert und uebergibt weiterhin keinen
+  vierten Parameter — `winkel` bleibt dort beim Default 0, also bitidentisch zum alten Verhalten. Bei der
+  Code-Durchsicht zeigte sich zudem: `BAHN_ART["takeshis-castle"]` setzt `route` immer zusammen mit
+  `takeshi:true` (eine einzige Konfiguration, kein zweiter Eintrag ohne `route`), `istRoute()` ist fuer
+  Takeshi also in jedem heute erreichbaren Spielpfad (normales Rennen wie Burgpunkte-Pod) immer wahr —
+  der Burgpunkte-Spur-Zweig in `bodenSpurtGerade()` ist damit toter Code, der fuer Takeshi aktuell gar
+  nicht gezeichnet wird. Der Default-Parameter macht ihn trotzdem zukunftssicher unveraendert, falls das
+  einmal anders konfiguriert wird.
+- `wasser()` und der `fillRect`-Block von "eis"/"schlamm" rotieren jetzt um die Fallen-Position
+  (`ctx.translate(x,y); ctx.rotate(winkel); ctx.translate(-x,-y)`), bevor sie wie zuvor zeichnen.
+- Neue Hilfsfunktion `weicheFlaeche()` (Vorbild: der Ellipse-Clip, den "steine" fuer seine einzelnen
+  Trittsteine schon nutzt) clippt die Flaeche auf eine leicht unregelmaessige Uferlinie statt eines
+  harten Rechtecks, legt einen weichen Schlagschatten/Vignette-Gradienten an den Rand und zieht einen
+  dunklen, leicht unregelmaessigen Uferrand (Kiesel-/Schlamm-Andeutung) — damit wirkt die Flaeche wie ins
+  Gelaende eingelassen statt wie ein Sticker obendrauf. Der Formzufall ist deterministisch aus der
+  Fallen-Nummer abgeleitet, keine neue Zufallsquelle.
+
+**Keine Positions-/Trefferlogik beruehrt:** `routeXY()`/`HUERDEN_N()` bleiben nur lesend benutzt,
+`fallenStufe`/`fallenAusgang`, `rr()`-Verbrauch und alle Simulationswerte unveraendert — reine
+Zeichenaenderung, wie der Wertungs-Fingerabdruck unten belegt.
+
+**Bildbeleg** (`node scripts/screenshot-kulisse.mjs takeshis-castle - <ms> <png>`, exakt dieselbe
+Weltposition vorher/nachher durch Austausch nur von `battle-mode.engine.js` bei gleichem `<ms>`):
+- "Springende Steine" im Wabenlabyrinth-Bereich (`<ms>=1200`, unobstruiert) — genau die Stelle aus Chris'
+  Original-Screenshot: vorher ein axenparalleles Rechteck quer zur diagonal verlaufenden Strecke, danach
+  der Wasserfleck auf den Streckenwinkel gedreht, mit weicher Uferlinie und dunklem Rand statt harter
+  Kante.
+- Bridge Ball an einer spaeteren, staerker geneigten Kurve (`<ms>=10000`): derselbe Wasserfleck, jetzt um
+  einen ANDEREN Winkel gedreht als bei den Springenden Steinen — Beleg, dass die Rotation wirklich der
+  jeweils LOKALEN Tangente folgt, nicht einem festen Wert.
+- Dragon God Lake/Schlammgrube (`<ms>=24000`): dieselbe Behandlung, jetzt auf dem sandigen Hangabschnitt,
+  deutlich rotiert gegenueber der vorherigen achsenparallelen Fassung.
+- Burgpunkte-Spur-Ansicht (zweiter Aufrufer): nicht separat screenshotbar, weil — s. oben — fuer Takeshi
+  in keinem heute erreichbaren Spielpfad gezeichnet wird; der Code-Pfad bleibt durch den Default-Parameter
+  nachweislich unveraendert (keine vierte Argumentuebergabe am Aufruf).
+
+Pflichtpruefungen erneut gruen nach dieser Nachbesserung: `node scripts/pruefe-wertung-fingerabdruck.mjs`
+weiterhin `22f04e06e285` (69 Eintraege), `npx vitest run tests/arena-kulissen.test.ts` 14/14.
