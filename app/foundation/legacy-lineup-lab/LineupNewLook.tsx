@@ -29,7 +29,8 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
-import { bestbesetzungJeSlot, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
+import { GOLD_TOLERANZ, goldPruefung, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
+import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/gegner-schaetzung";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -306,8 +307,8 @@ function NlPlayerAvatar({
   name: string;
   size?: number;
   /**
-   * Einsatzliste-Revamp Paket 1: goldener Rahmen für die Top-N des Kaders in dieser
-   * Disziplin (s. `topNNachEignung`). Der Text ist zugleich der Tooltip; `null` = kein Rahmen.
+   * Einsatzliste-Revamp Paket 1: goldener Rahmen = der Spieler steht hier wie in der optimalen
+   * Gesamtverteilung des Kaders (s. `goldPruefung`). Der Text ist zugleich der Tooltip; `null` = kein Rahmen.
    */
   goldTitle?: string | null;
 }) {
@@ -517,6 +518,118 @@ function NlSlotKuerzel({
     >
       {kuerzel}
     </span>
+  );
+}
+
+/**
+ * GEGNER (SCHÄTZUNG) — Einsatzliste-Revamp, ITERATION 1 (`lib/lineups/gegner-schaetzung.ts`).
+ * Kompakter Streifen je Disziplin-Seite über dem Slot-Raster: wer der Gegner ist, wie gut das
+ * eigene Scouting ihn kennt, und je Position (gleiches Kürzel, gleiche Farbe wie die eigene Seite)
+ * der vermutete Spieler mit Werte-SPANNE. Nie eine exakte Zahl. Platzhalter für die Gegner-Marken
+ * des späteren Mini-Felds (F3).
+ */
+function NlGegnerStreifen({
+  schaetzung,
+  disciplineSide,
+  kuerzelJeSlotIndex,
+  eigenerSchnitt,
+  goldBilanz,
+}: {
+  schaetzung: GegnerSchaetzung;
+  disciplineSide: "d1" | "d2";
+  kuerzelJeSlotIndex: string[];
+  eigenerSchnitt: number | null;
+  goldBilanz: { goldCount: number; besetzt: number; gesamtLuecke: number | null };
+}) {
+  const seite = schaetzung.status === "geschaetzt" ? schaetzung.seiten[disciplineSide] ?? null : null;
+  const quelleText =
+    schaetzung.status !== "geschaetzt"
+      ? null
+      : schaetzung.quelle === "verdeckt"
+        ? "Scouting zu schwach — Aufstellung nicht erkennbar"
+        : schaetzung.quelle === "ki-muster"
+          ? "KI-Einsatzmuster erkannt"
+          : schaetzung.steuerung === "mensch"
+            ? "Prognose der wahrscheinlich besten Aufstellung — ein Mensch kann abweichen"
+            : "Prognose aus dem bekannten Kader";
+  const titel =
+    schaetzung.status === "geschaetzt"
+      ? `Gegner-Schätzung (Iteration 1): ${schaetzung.gegnerName} (${schaetzung.steuerung === "ki" ? "KI" : "Mensch"}). ` +
+        `Scouting-Stufe ${schaetzung.stufe}/5 (Mittel über den gegnerischen Kader: Scouting-Büro + Gewissheit je Spieler), ` +
+        `Werte ±${schaetzung.unschaerfe}, Treffsicherheit der Zuordnung ~${schaetzung.treffsicherheitPct} %. ${quelleText}. ` +
+        `Werte = rohe Disziplin-Eignung, nicht die Slot-Projektion der eigenen Seite. Nie exakt.`
+      : schaetzung.grund;
+  return (
+    <div
+      data-testid="nl-lineup-gegner-schaetzung"
+      data-gegner-status={schaetzung.status}
+      title={titel}
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        gap: "6px 10px",
+        margin: "6px 0 8px",
+        padding: "6px 8px",
+        borderRadius: "var(--nl-r-sm)",
+        border: "1px dashed color-mix(in srgb, var(--nl-ink) 22%, transparent)",
+        background: "color-mix(in srgb, var(--nl-ink) 4%, transparent)",
+        fontSize: "11px",
+        lineHeight: 1.35,
+      }}
+    >
+      <span
+        data-testid="nl-lineup-gold-bilanz"
+        title="Gold = der Spieler steht dort, wo die optimale Gesamtverteilung des ganzen Kaders ihn hinstellen würde."
+        style={{ color: "var(--nl-gold)", fontWeight: 700 }}
+      >
+        ◆ {goldBilanz.goldCount}/{goldBilanz.besetzt} optimal verteilt
+        {goldBilanz.gesamtLuecke != null ? (
+          <span className="nl-tnum" style={{ fontWeight: 600, opacity: 0.85 }}>
+            {goldBilanz.gesamtLuecke <= GOLD_TOLERANZ ? " · beste Verteilung" : ` · gesamt −${formatScore(goldBilanz.gesamtLuecke)} zur besten Verteilung`}
+          </span>
+        ) : null}
+      </span>
+      <span aria-hidden="true" style={{ opacity: 0.4 }}>|</span>
+      <strong style={{ fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", fontSize: "10px" }}>
+        Gegner (Schätzung)
+      </strong>
+      {schaetzung.status !== "geschaetzt" ? (
+        <span style={{ opacity: 0.75 }}>{schaetzung.grund}</span>
+      ) : (
+        <>
+          <span>
+            {schaetzung.gegnerName} · {schaetzung.steuerung === "ki" ? "KI" : "Mensch"}
+          </span>
+          <span className="nl-tnum" style={{ opacity: 0.8 }}>
+            Scouting {schaetzung.stufe}/5 · ±{schaetzung.unschaerfe} · ~{schaetzung.treffsicherheitPct} %
+          </span>
+          {seite?.schnitt ? (
+            <span className="nl-tnum">
+              Ø {seite.schnitt.min}–{seite.schnitt.max}
+              {eigenerSchnitt != null ? <span style={{ opacity: 0.75 }}> (wir Ø {formatScore(eigenerSchnitt)})</span> : null}
+            </span>
+          ) : null}
+          <span style={{ opacity: 0.7, fontStyle: "italic" }}>{quelleText}</span>
+          {seite && schaetzung.quelle !== "verdeckt" ? (
+            <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", flexBasis: "100%" }}>
+              {seite.slots.map((slot) => (
+                <span key={slot.slotIndex} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <NlSlotKuerzel kuerzel={kuerzelJeSlotIndex[slot.slotIndex] ?? "–"} slotIndex={slot.slotIndex} />
+                  <span style={{ opacity: slot.spielerName ? 1 : 0.6 }}>{slot.spielerName ?? "?"}</span>
+                  {slot.spanne ? (
+                    <span className="nl-tnum" style={{ opacity: 0.8 }}>
+                      {slot.spanne.min}–{slot.spanne.max}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </>
+      )}
+      <span style={{ marginLeft: "auto", fontSize: "9px", opacity: 0.55 }}>Iteration 1</span>
+    </div>
   );
 }
 
@@ -1512,9 +1625,9 @@ export default function LineupNewLook({
 
   /*
    * EINSATZLISTE-REVAMP PAKET 1 (docs/design/einsatzliste-revamp-architektur-08-11.md):
-   * Slot-Kürzel je Slot (eindeutig je Disziplin-Seite) und der goldene Rahmen für die Top-N
-   * des Kaders nach Basis-Eignung (N = Slotzahl der Seite). Nur Nachschlagen in Props, die
-   * schon da sind — keine neue Rechnung, kein Rückweg in Resolve oder Arena.
+   * Slot-Kürzel je Slot (eindeutig je Disziplin-Seite) und der goldene Rahmen nach der optimalen
+   * Gesamtzuteilung des Kaders (unten). Gerechnet wird nur auf Props, die schon da sind — kein
+   * Rückweg in Resolve, KI-Vorschlag oder Arena.
    */
   const slotKuerzelByKey = useMemo(() => {
     const next = new Map<string, string>();
@@ -1526,17 +1639,29 @@ export default function LineupNewLook({
     return next;
   }, [slots, slotRoleByKey]);
 
-  // Gold = BESTBESETZUNG NACH DEM SLOTWERT (Chris 08.11. „nach dem Slotwert", Lesart aus Fables
-  // Gesamtkonzept Abschnitt 5): je Slot der Kader-Beste nach Projektion in genau diesem Slot.
-  // Quelle ist dieselbe Rangliste, die auch Drag-Vorschau und Top-3-Slots der Kader-Zeile lesen.
-  const bestbesetzungBySlotKey = useMemo(
+  // Gold = OPTIMALE GESAMTZUTEILUNG DES KADERS (Chris 08.11., zweite Antwort nach der
+  // Sichtprüfung): nicht „Kader-Bester je Slot", sondern „steht hier, wo die beste Verteilung des
+  // ganzen Kaders ihn hinstellen würde". Ein dominanter Spieler nimmt so EINEN Slot, die übrigen
+  // Slots vergeben ihr Gold an den Besten unter den verbleibenden Spielern. Quelle ist dieselbe
+  // Rangliste, die auch Drag-Vorschau und Top-3-Slots der Kader-Zeile lesen. Verletzte zählen nicht.
+  const verletzteActivePlayerIds = useMemo(() => {
+    const verletztePlayerIds = new Set(
+      (context?.rosterPlayers ?? [])
+        .filter((player) => player.availabilityBlocker === "player_injured_unavailable" || player.injuryStatus === "injured")
+        .map((player) => player.id),
+    );
+    return new Set((context?.activePlayers ?? []).filter((entry) => verletztePlayerIds.has(entry.playerId)).map((entry) => entry.id));
+  }, [context?.rosterPlayers, context?.activePlayers]);
+
+  const gold = useMemo(
     () =>
-      bestbesetzungJeSlot({
+      goldPruefung({
         slotKeys: slots.map((slot) => slot.key),
         slotWerteJeSpieler: playerBestSlotSummaryByActivePlayerId.entries(),
         nameVon: (id) => rosterCardByActivePlayerId.get(id)?.name ?? id,
+        ausgeschlossen: verletzteActivePlayerIds,
       }),
-    [slots, playerBestSlotSummaryByActivePlayerId, rosterCardByActivePlayerId],
+    [slots, playerBestSlotSummaryByActivePlayerId, rosterCardByActivePlayerId, verletzteActivePlayerIds],
   );
 
   const slotNameFor = (slotKey: string) => {
@@ -1544,24 +1669,92 @@ export default function LineupNewLook({
     return slot ? `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} ${slotRoleByKey.get(slotKey)?.label ?? ""}`.trim() : "diesen Slot";
   };
 
-  /** Voller Goldring: dieser Spieler ist in diesem Slot der Kader-Beste. */
+  /** Voller Goldring: dieser Spieler steht (bzw. stünde) hier wie in der optimalen Gesamtverteilung. */
   const goldTitleFor = (activePlayerId: string | null | undefined, slotKey: string | null | undefined): string | null => {
     if (!activePlayerId || !slotKey) return null;
-    const beste = bestbesetzungBySlotKey.get(slotKey);
-    if (!beste || beste.id !== activePlayerId) return null;
-    return `Bestbesetzung: niemand im Kader wäre auf ${slotNameFor(slotKey)} besser (Slotwert ${formatScore(beste.wert)})`;
+    const kosten = gold.kostenVon(activePlayerId, slotKey);
+    if (kosten == null || kosten > GOLD_TOLERANZ) return null;
+    const wert = playerBestSlotSummaryByActivePlayerId.get(activePlayerId)?.find((entry) => entry.slotKey === slotKey)?.projectedScore ?? null;
+    return `Gold: Optimale Verteilung des ganzen Kaders — auf ${slotNameFor(slotKey)} gehört ${
+      rosterCardByActivePlayerId.get(activePlayerId)?.name ?? "dieser Spieler"
+    }${wert != null ? ` (Slotwert ${formatScore(wert)})` : ""}`;
   };
 
   /**
-   * Gestrichelter Goldring („Gold verschenkt"): auf einem Slot, dessen Kader-Bester NICHT dort
-   * steht. Gibt den Tooltip zurück („Buttercup wäre hier 81,0 — steht auf D1-4 Hold Line"), sonst null.
+   * Gestrichelter Goldring („Gold verschenkt"): der Gesetzte steht NICHT dort, wo die beste
+   * Gesamtverteilung ihn hätte. Der Tooltip sagt, was die Besetzung kostet und wer laut optimaler
+   * Verteilung hier stünde („Optimal hier: Buttercup 81,0 — steht auf D1-4 Hold Line").
    */
   const goldVerschenktTitleFor = (slotKey: string): string | null => {
-    const beste = bestbesetzungBySlotKey.get(slotKey);
-    if (!beste || selections[slotKey] === beste.id) return null;
-    const andererSlotKey = Object.entries(selections).find(([, id]) => id === beste.id)?.[0] ?? null;
-    const wo = andererSlotKey ? `steht auf ${slotNameFor(andererSlotKey)}` : "ist nicht aufgestellt";
-    return `Gold verschenkt: ${beste.name} wäre hier ${formatScore(beste.wert)} — ${wo}`;
+    const gesetzt = selections[slotKey];
+    if (!gesetzt) return null;
+    const kosten = gold.kostenVon(gesetzt, slotKey);
+    if (kosten == null || kosten <= GOLD_TOLERANZ) return null;
+    const optimal = gold.zuteilung.jeSlot.get(slotKey) ?? null;
+    const andererSlotKey = optimal ? Object.entries(selections).find(([, id]) => id === optimal.id)?.[0] ?? null : null;
+    const wo = optimal ? (andererSlotKey ? ` — steht auf ${slotNameFor(andererSlotKey)}` : " — ist nicht aufgestellt") : "";
+    return `Gold verschenkt: Diese Besetzung kostet die beste Gesamtverteilung −${formatScore(kosten)}.${
+      optimal ? ` Optimal hier: ${optimal.name} ${formatScore(optimal.wert)}${wo}` : ""
+    }`;
+  };
+
+  /*
+   * GEGNER (SCHÄTZUNG), ITERATION 1 — `lib/lineups/gegner-schaetzung.ts`. Nie exakt, Präzision je
+   * Scouting-Stufe; KI-Muster erst ab Stufe 3, menschliche Gegner nur als Prognose. Liest den
+   * Spielstand, der ohnehin im Kontext liegt (`context.gameState`), keine neue Route.
+   */
+  const gegnerSchaetzung = useMemo<GegnerSchaetzung>(() => {
+    if (!context) return { status: "unbekannt", grund: "Kontext nicht geladen" };
+    const seiten = (["d1", "d2"] as const).flatMap((seite) => {
+      const disciplineId = (seite === "d1" ? context.matchdayContract?.discipline1 : context.matchdayContract?.discipline2)?.disciplineId ?? null;
+      const slotCount = slots.filter((slot) => slot.disciplineSide === seite).length;
+      return disciplineId && slotCount > 0 ? [{ seite, disciplineId, slotCount }] : [];
+    });
+    try {
+      return schaetzeGegnerAufstellung({
+        gameState: context.gameState,
+        eigenesTeamId: context.team.id,
+        seasonId: context.season.id,
+        matchdayId: context.matchday.id,
+        seiten,
+      });
+    } catch {
+      // Altstände mit lückenhaftem Spielstand: lieber „unbekannt" als eine kaputte Einsatzliste.
+      return { status: "unbekannt", grund: "Gegner noch nicht bekannt" };
+    }
+  }, [context, slots]);
+
+  /** Eigener Schnitt je Seite auf DERSELBEN Skala wie die Gegner-Spanne (rohe Disziplin-Eignung). */
+  const eigenerRohSchnittFor = (disciplineSide: "d1" | "d2", disciplineId: string | null): number | null => {
+    if (!context || !disciplineId) return null;
+    const playerIdByActive = new Map(context.activePlayers.map((entry) => [entry.id, entry.playerId] as const));
+    const werte = slots
+      .filter((slot) => slot.disciplineSide === disciplineSide && selections[slot.key])
+      .flatMap((slot) => {
+        const playerId = playerIdByActive.get(selections[slot.key]!);
+        const score = context.disciplineScores.find((entry) => entry.playerId === playerId && entry.disciplineId === disciplineId)?.score;
+        return typeof score === "number" ? [score] : [];
+      });
+    return werte.length > 0 ? werte.reduce((sum, value) => sum + value, 0) / werte.length : null;
+  };
+
+  /** Kopfzeile je Seite: wie viele der Besetzten stehen dort, wo die optimale Gesamtverteilung sie hätte. */
+  const goldBilanzFor = (disciplineSide: "d1" | "d2") => {
+    const besetzt = slots.filter((slot) => slot.disciplineSide === disciplineSide && selections[slot.key]);
+    const goldCount = besetzt.filter((slot) => (gold.kostenVon(selections[slot.key]!, slot.key) ?? Infinity) <= GOLD_TOLERANZ).length;
+    // Gesamtlücke zur besten Verteilung (beide Seiten zusammen, weil ein Spieler nur EINE
+    // Disziplin spielt) — nur bei voller Aufstellung, sonst wäre die Zahl ein Vergleich mit Lücken.
+    const alleBesetzt = slots.length > 0 && slots.every((slot) => selections[slot.key]);
+    let gesamtLuecke: number | null = null;
+    if (alleBesetzt) {
+      let aktuell = 0;
+      for (const slot of slots) {
+        const wert = playerBestSlotSummaryByActivePlayerId.get(selections[slot.key]!)?.find((entry) => entry.slotKey === slot.key)?.projectedScore;
+        aktuell += typeof wert === "number" ? wert : 0;
+      }
+      gesamtLuecke = Math.max(0, Number((gold.zuteilung.summe - aktuell).toFixed(1)));
+    }
+    return { goldCount, besetzt: besetzt.length, gesamtLuecke };
   };
 
   // Captain-Infos je Disziplin-Seite. Frueher war hier nur die AKTIVE Slot-Seite aufgeloest
@@ -2103,6 +2296,19 @@ export default function LineupNewLook({
           );
         })()}
 
+        <NlGegnerStreifen
+          schaetzung={gegnerSchaetzung}
+          disciplineSide={disciplineSide}
+          kuerzelJeSlotIndex={[...sideSlots]
+            .sort((left, right) => left.slotIndex - right.slotIndex)
+            .reduce<string[]>((acc, slot) => {
+              acc[slot.slotIndex] = slotKuerzelByKey.get(slot.key) ?? "–";
+              return acc;
+            }, [])}
+          eigenerSchnitt={eigenerRohSchnittFor(disciplineSide, disciplineId)}
+          goldBilanz={goldBilanzFor(disciplineSide)}
+        />
+
         <div className="nl-lineup-slot-grid">
           {sideSlots.map((slot, slotRevealIndex) => {
             const role = slotRoleByKey.get(slot.key) ?? null;
@@ -2118,7 +2324,17 @@ export default function LineupNewLook({
                 ? Number((topCandidate.projectedScore - (secondCandidate?.projectedScore ?? topCandidate.projectedScore)).toFixed(1))
                 : null;
             const openLeadTier = openLead != null ? getNlLineupLeadTier(openLead) : null;
-            const readiness = player ? getNlSlotReadiness(projected, topCandidate?.projectedScore ?? null) : null;
+            const readinessRoh = player ? getNlSlotReadiness(projected, topCandidate?.projectedScore ?? null) : null;
+            // „Bester Pick ✓" misst nur gegen die NOCH FREIEN Spieler. Steht auf derselben Karte der
+            // gestrichelte Goldring (die optimale Gesamtverteilung hätte hier jemand anderen), sagt
+            // der Chip ehrlich „Bester freier Pick" — sonst widersprechen sich die zwei Signale.
+            const slotGoldVerschenkt = player ? goldVerschenktTitleFor(slot.key) : null;
+            const readiness =
+              readinessRoh && slotGoldVerschenkt && readinessRoh.tone === "good"
+                ? { label: "Bester freier Pick", tone: "neutral" as const, title: slotGoldVerschenkt }
+                : readinessRoh
+                  ? { ...readinessRoh, title: undefined as string | undefined }
+                  : null;
             const issue = (slotIssuesByKey.get(slot.key) ?? [])[0] ?? null;
             const isActive = activeSlotKey === slot.key;
             const isNextTarget = !player && nextOpenSlotKey === slot.key;
@@ -2184,12 +2400,15 @@ export default function LineupNewLook({
                     <span className="nl-lineup-slot-index">
                       {slot.disciplineSide.toUpperCase()}-{slot.slotIndex + 1}
                     </span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                    <span
+                      style={{ display: "inline-flex", alignItems: "center", gap: "5px", minWidth: 0 }}
+                      data-einsatz-optimal={gold.zuteilung.jeSlot.get(slot.key)?.name ?? undefined}
+                    >
                       <NlSlotKuerzel
                         kuerzel={slotKuerzelByKey.get(slot.key) ?? "–"}
                         slotIndex={slot.slotIndex}
                         title={`${role?.label ?? "Slot"} · Position ${slot.slotIndex + 1}`}
-                        goldVerschenktTitle={player ? goldVerschenktTitleFor(slot.key) : null}
+                        goldVerschenktTitle={slotGoldVerschenkt}
                       />
                       <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
                     </span>
@@ -2238,7 +2457,9 @@ export default function LineupNewLook({
 
                   <span className="nl-lineup-slot-foot">
                     {player && readiness ? (
-                      <span className={`nl-lineup-chip is-${readiness.tone}`}>{readiness.label}</span>
+                      <span className={`nl-lineup-chip is-${readiness.tone}`} title={readiness.title}>
+                        {readiness.label}
+                      </span>
                     ) : openLeadTier ? (
                       <span
                         className={`nl-lineup-chip is-${openLeadTier.tone}`}
@@ -2945,7 +3166,16 @@ export default function LineupNewLook({
                   // DIESER Disziplin-Seite (die Liste ist die Kandidatenliste des aktiven Slots),
                   // sonst über beide Seiten mit Seitenkürzel. Die Zahl ist dieselbe Slot-
                   // Projektion, die der Slot selbst zeigt (projectedScore).
-                  const topSlots = (activeSlot ? bestSlots.filter((entry) => entry.disciplineSide === activeSlot.disciplineSide) : bestSlots).slice(0, 3);
+                  const topSlotsRoh = (activeSlot ? bestSlots.filter((entry) => entry.disciplineSide === activeSlot.disciplineSide) : bestSlots).slice(0, 3);
+                  // Liegt der Slot, auf den die optimale Gesamtverteilung den Spieler setzt, NICHT
+                  // unter seinen eigenen Top 3 (typisch: der Top-Slot gehört schon einem Stärkeren),
+                  // wird er als vierter Eintrag mit ◆ angehängt — sonst sähe man das Gold nie.
+                  const optimalSlotKey = candidateId ? gold.zuteilung.slotVonSpieler.get(candidateId) ?? null : null;
+                  const optimalSlotEntry =
+                    optimalSlotKey && !topSlotsRoh.some((entry) => entry.slotKey === optimalSlotKey)
+                      ? bestSlots.find((entry) => entry.slotKey === optimalSlotKey && (!activeSlot || entry.disciplineSide === activeSlot.disciplineSide)) ?? null
+                      : null;
+                  const topSlots = optimalSlotEntry ? [...topSlotsRoh, optimalSlotEntry] : topSlotsRoh;
                   const candidateGoldTitle = activeSlot ? goldTitleFor(candidateId, activeSlot.key) : null;
                   // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
                   const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
@@ -3021,11 +3251,11 @@ export default function LineupNewLook({
                                 {!activeSlot ? <span>{entry.disciplineSide.toUpperCase()}</span> : null}
                                 <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(entry.slotKey) ?? "–"} slotIndex={entry.slotIndex} />
                                 <span className="nl-tnum">{formatNullableScore(entry.projectedScore)}</span>
-                                {candidateId && bestbesetzungBySlotKey.get(entry.slotKey)?.id === candidateId ? (
+                                {candidateId && gold.zuteilung.slotVonSpieler.get(candidateId) === entry.slotKey ? (
                                   <span
                                     data-einsatz-gold-raute="true"
                                     style={{ color: "var(--nl-gold)" }}
-                                    title={`Bestbesetzung für ${slotNameFor(entry.slotKey)}`}
+                                    title={`Optimale Verteilung: gehört auf ${slotNameFor(entry.slotKey)}`}
                                   >
                                     ◆
                                   </span>

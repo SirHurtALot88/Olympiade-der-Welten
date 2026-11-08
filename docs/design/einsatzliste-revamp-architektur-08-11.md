@@ -261,8 +261,12 @@ und F1 ist entsprechend umgebaut.
    - **Gestrichelter Goldring** („Gold verschenkt“): Der Kader-Beste für diesen Slot steht
      woanders oder nicht im Aufgebot. Der Tooltip sagt, wer es wäre und wo er steht.
    - **Kader-Liste:** Eine Raute ◆ steht hinter jedem Slot, in dem der Spieler Kader-Bester ist.
-   - **Noch nicht von Chris bestätigt.** Meint er stattdessen „die N höchsten Slotwerte auf dem
-     Feld“, ändert sich nur `bestbesetzungJeSlot`.
+   - **Am 08.11. ersetzt (zweite Runde, Abschnitt 6.2).** Die Sichtprüfung hatte gezeigt:
+     Tidesprinter war in allen 12 Slots Kader-Bester, also waren 11 von 12 Slots gestrichelt.
+     Daraufhin hat Chris entschieden, dass Gold nach der **optimalen Gesamtzuteilung des Kaders**
+     vergeben wird, und zwar dynamisch. Steht der dominante Spieler optimal auf Slot X, geht das
+     Gold von Slot Y an den Besten unter den übrigen Spielern. `bestbesetzungJeSlot` ist
+     entfernt; an seine Stelle treten `optimaleZuteilung` und `goldPruefung`.
 3. **Gegner auf dem Feld, mit Counter-Einschätzung.** Das ist Chris’ Vorgabe, keine offene Frage.
    Meine erste Fassung hatte das für die Foundation mit „keine Späh-Daten, also erfunden“
    verworfen. Das war voreilig. Die Datenlage ist geprüft und steht in **Abschnitt 4a**. Kurz:
@@ -326,9 +330,26 @@ optionale Paket F5 unten. Es braucht Chris’ Ja, weil es Bedienwege verschiebt.
   n gegen n bei Gewichtheben, Tennis, Fechten, Speed-Schach). Für die Feldspiel- und Arena-
   Disziplinen ist das eine eigene Recherche.
 
-**Offene Punkte für Chris (Gegner):**
-- (a) KI-Gegneraufstellung exakt zeigen oder nur als Schätzung?
-- (b) Menschliche Gegner vor ihrer Abgabe verbergen? Vorschlag: ja.
+**Chris’ Entscheidung (08.11., zweite Runde). Beide Punkte sind beantwortet:**
+- (a) Die Gegneraufstellung wird **nie exakt** gezeigt, immer nur geschätzt. Wie genau die
+  Schätzung ist, hängt an der Scouting-Qualität. Das ist dasselbe Prinzip wie beim Nebel über
+  fremdem Potenzial. Gegen KI-Teams darf sie bei guter Stufe sehr treffsicher sein, weil die KI
+  nach festen Mustern einsetzt.
+- (b) Gegen **menschliche** Gegner gibt es auch auf der besten Stufe nur eine Prognose der
+  wahrscheinlich besten Aufstellung. Sie wird mit derselben optimalen Zuteilung berechnet wie das
+  Gold. Den echten Entwurf sieht man nie, und wenn der Mensch abweicht, ist das gewollt.
+- Umgesetzt als Iteration 1, siehe Abschnitt 6.2.
+
+**Zwischenschritt für die Scouting-Stufe (Iteration 1).** Eine Scouting-Stufe *pro Gegnerteam*
+gibt es im Code nicht. Es gibt nur eine Stufe pro Paar aus eigenem Team und fremdem Spieler:
+`getEffectiveScoutingLevel` ist Scouting-Büro (Facility 0–5) plus `floor(Gewissheit / 25)`,
+gedeckelt auf 5 (`lib/scouting/facility-scout-pipeline-service.ts`). Daraus wird die Team-Stufe
+abgeleitet, und so ist es auch umgesetzt: Sie ist der **gerundete Mittelwert dieser Spieler-Stufen
+über den gegnerischen Kader**. Jede Slot-Spanne nutzt dagegen die Stufe ihres eigenen Spielers.
+Die Unschärfe folgt genau der Skala von `getScoutingUncertainty` (±16 / 10 / 8 / 6 / 4 / 3), die
+Treffsicherheit der von `getScoutingConfidencePct` (20 … 90 %). Dafür braucht es keine neue
+Wirtschaft und keine neuen Spielstand-Felder. Eine echte Gegner-Scouting-Mechanik, zum Beispiel
+eine „Spielvorbereitung“ als Auftrag an das Scouting-Büro, wäre eine eigene, spätere Entscheidung.
 
 ---
 
@@ -373,9 +394,8 @@ fällt.
     **Breaking** (Standhalten und Steingesicht, beide „ST“). Neu heißen sie CH und SE. Das
     Mockup-`slotKuerzel` hat dieselbe Kollision und sollte beim Arena-Paket 1 dieselbe Funktion
     bekommen.
-  - `bestbesetzungJeSlot`: je Slot der Kader-Beste nach Slotwert (Gleichstand nach Name, ohne Wert
-    zählt nicht). Eine erste Fassung rankte nach Basis-Eignung; das widersprach Chris’ Antwort und
-    ist ersetzt (Abschnitt 4, Frage 2).
+  - ~~`bestbesetzungJeSlot`~~ (je Slot der Kader-Beste): in der zweiten Runde durch
+    `optimaleZuteilung` / `goldPruefung` ersetzt, siehe 6.2.
 - `LineupNewLook.tsx`:
   - Slotkarte: Kürzel-Chip in Positionsfarbe vor dem Rollenlabel.
     - Voller Goldring am Avatar, wenn der Gesetzte hier Kader-Bester ist („Bestbesetzung: niemand
@@ -442,3 +462,145 @@ Screenshots:
    Fable es zeichnet.
 4. **Schrift:** Im Container fehlen die Webfonts (Proxy), die Screenshots zeigen eine
    Ersatzschrift. Das betrifft nicht den Code.
+
+**Nachtrag zweite Runde:** Punkt 1 ist durch die optimale Gesamtzuteilung gelöst (6.2). Punkt 2
+und 3 bleiben für das Mini-Feld (F3) offen.
+
+### 6.2 Zweite Runde (08.11.): Gold nach optimaler Gesamtzuteilung, Gegner-Schätzung Iteration 1
+
+**Gold: was gebaut ist.**
+- `lib/lineups/einsatzliste-anzeige.ts` (weiterhin ohne Importe):
+  - `optimaleZuteilung` löst das Zuordnungsproblem (Maximum-Weight-Bipartite-Matching) mit der
+    Ungarischen Methode. Slots stehen gegen Spieler, das Kantengewicht ist `projectedScore`, also
+    dieselbe Slot-Projektion, die überall in der Einsatzliste steht. Ein Spieler belegt höchstens
+    einen Slot über beide Disziplinen, wie im Drag & Drop. Verletzte sind ausgeschlossen. Der
+    Aufwand ist O(n³) mit n = max(Slots, Spieler); bei 12 Slots und ~20 Spielern sind das ein
+    paar tausend Schritte.
+  - `goldPruefung` entscheidet über Gold. Ein besetzter Slot ist Gold, wenn es **eine** optimale
+    Gesamtzuteilung gibt, die genau diesen Spieler auf diesem Slot hat. Geprüft wird per
+    Fixierung: Spieler P wird fest auf Slot S gesetzt, der Rest neu optimal verteilt. Gegenüber
+    der reinen Frage „steht er da, wo der Algorithmus ihn hinlegt?“ hat das zwei Vorteile:
+    1. Gold kippt nicht an Gleichständen. Zwei gleich starke Spieler sind in beiden Anordnungen
+       Gold.
+    2. Die Abweichung bekommt eine Zahl. Der Tooltip am gestrichelten Ring sagt zum Beispiel
+       „Diese Besetzung kostet die beste Gesamtverteilung −3,8. Optimal hier: Leira 55,9 — steht
+       auf D1-3 Style Tech“. Das erklärt den Ring und sagt zugleich, was zu tun ist.
+- `LineupNewLook.tsx`:
+  - Ein voller Goldring am Avatar erscheint, wenn die Fixierung nichts kostet (≤ 0,05, dieselbe
+    Schwelle wie bei „Bester Pick ✓“). Sonst ist der Ring gestrichelt und trägt Kosten und
+    Tausch-Hinweis.
+  - Die ◆ in der Kader-Zeile steht genau einmal je Spieler, am Slot seiner optimalen Zuteilung.
+    Oft liegt dieser Slot nicht unter seinen eigenen Top 3, typischerweise weil ein Stärkerer den
+    besten Platz hat. Dann wird er als vierter Eintrag angehängt.
+  - Neu ist eine Bilanz je Seite, etwa „◆ 4/4 optimal verteilt · beste Verteilung“ oder
+    „· gesamt −40,4 zur besten Verteilung“. Die Gesamtzahl gilt über beide Seiten und erscheint
+    nur bei voller Aufstellung.
+  - Der Widerspruch mit „Bester Pick ✓“ ist aufgelöst. Dieser Chip misst nur gegen die *noch
+    freien* Spieler. Trägt dieselbe Karte den gestrichelten Ring, heißt der Chip jetzt „Bester
+    freier Pick“ (neutral, der Tooltip ist der Gold-Hinweis).
+- Tests (`tests/einsatzliste-anzeige.test.ts`) decken ab:
+  - den Tidesprinter-Fall: Der dominante Spieler nimmt einen Slot, die anderen geben ihr Gold weiter;
+  - Gleichstände;
+  - Verletzte und einen zu kleinen Kader;
+  - einen **Brute-Force-Abgleich auf 200 Zufallsinstanzen**, bei dem die Summe jedes Mal dem
+    Optimum entspricht.
+
+**Warum dieses Konzept und nicht Chris’ erster Gedanke wörtlich.** Chris war offen für Besseres.
+Der Unterschied ist klein, entscheidet aber über die Lesbarkeit. Bei „Gold = steht, wo der
+Algorithmus ihn hinlegt“ wirkte Gold bei Gleichständen zufällig, und „verschenkt“ hätte keine
+Größe. Die Fixierungsprüfung beantwortet die Frage, die der Spieler wirklich hat: *Kostet mich
+diese Besetzung etwas, und wie viel?* Dynamisch bleibt sie trotzdem. Zieht der Spieler bewusst
+jemanden um, wird nur der Slot gestrichelt, der dadurch wirklich verliert, nicht die ganze Seite
+(Screenshot 2 unten).
+
+**Gegner-Schätzung, Iteration 1: was gebaut ist** (`lib/lineups/gegner-schaetzung.ts`).
+- Der Gegner kommt aus `getOpponentOf`, also aus dem Spielplan. Die `lab-context`-Route liefert
+  den vollen Spielstand ohnehin im Kontext mit (`context.gameState`), deshalb war keine neue Route
+  nötig.
+- Ist der Gegner `null` (Altstand ohne Liga-Split, kein Spielplan-Eintrag) oder der Spielstand
+  lückenhaft, zeigt der Streifen „Gegner noch nicht bekannt“ statt abzustürzen. Der Aufruf steht
+  zusätzlich in einem `try/catch`.
+- Was je Stufe sichtbar ist:
+  - **Stufe 0:** der Name des Gegners und der Disziplin-Schnitt als grobe Spanne (±16), keine
+    Spielernamen.
+  - **Stufe 1–2:** Namen und Spannen je Position, aufgestellt nach der **Prognose**, also der
+    optimalen Zuteilung des gegnerischen Kaders über beide Seiten.
+  - **Stufe ≥ 3, KI-Gegner:** Die Slots kommen aus dem bereits geschriebenen KI-Entwurf
+    („KI-Einsatzmuster erkannt“). Die Werte bleiben eine Spanne von mindestens ±3, die
+    Treffsicherheit ist auf 95 % gedeckelt.
+  - **Menschlicher Gegner:** Den Entwurf gibt es nie, immer nur die Prognose. Die Treffsicherheit
+    ist auf 60 % gedeckelt, mit dem Hinweis „ein Mensch kann abweichen“.
+- Die Spannen sind **nicht um den wahren Wert zentriert**, denn sonst wäre ihre Mitte die
+  Wahrheit. Ihr Mittelpunkt ist um einen festen Versatz verschoben, je Betrachter, Spieler und
+  Disziplin, höchstens um die halbe Unschärfe. Der wahre Wert liegt trotzdem immer in der Spanne.
+  Der bestehende Potenzial-Nebel zentriert noch; das wäre eine eigene Nachschärfung.
+- Die Werte sind die rohe Disziplin-Eignung (`player.disciplineRatings`), nicht die Slot-Projektion
+  mit Rolle und Intensität. Deshalb steht daneben „wir Ø …“ auf derselben Skala.
+- Angezeigt wird das als kompakter, gestrichelter Streifen je Disziplin-Seite über dem
+  Slot-Raster. Er nutzt dieselben Positions-Kürzel und -Farben wie die eigene Seite und trägt die
+  Marke „Iteration 1“. Er hält den Platz für die Gegner-Marken des Mini-Felds (F3).
+- Tests (`tests/einsatzliste-gegner-schaetzung.test.ts`) prüfen:
+  - ohne Spielplan oder ohne Spielstand wird „unbekannt“ gemeldet;
+  - die Spanne enthält immer den wahren Wert und ist nie exakt;
+  - Stufe 0 verdeckt die Namen;
+  - bei einem KI-Gegner auf Stufe 5 kommt der Entwurf, aber weiter als Spanne;
+  - bei einem Menschen kommt die Prognose, gedeckelt, und jeder Spieler steht höchstens einmal
+    darin.
+
+**Grenzen von Iteration 1, ehrlich:**
+- **Pod-Disziplinen** (Mini-DM, Battlefield, Takeshi/Staffel) laufen in Vierergruppen mit eigenem
+  Spielplan. Der Streifen zeigt dort den Gegner aus dem Haupt-Spielplan, nicht die Gruppe.
+- Verletzte Gegner werden in der Prognose noch nicht ausgeschlossen.
+- Der volle Spielstand liegt heute ohnehin im Browser, fremde Entwürfe eingeschlossen. Für echtes
+  Verbergen (Koop/PvP) müsste die Route die Schätzung serverseitig bauen und `gameState` nicht
+  mehr ausliefern. Das gehört in eine spätere Iteration.
+
+**Sichtprüfung zweite Runde.**
+
+Aufbau:
+- lokaler Dev-Server mit eigener, leerer SQLite im Scratchpad;
+- zwei frisch angelegte Spielstände (Neues Spiel „solo_1“ plus Liga-Draft);
+- Export, Push und Login abgeschaltet;
+- alles nur im Browser eingesetzt, nichts gespeichert, der Live-Server nicht berührt;
+- in Save B ein Scouting-Büro der Stufe 5 im Spielstand, um den treffsicheren Fall zu zeigen.
+
+Screenshots (`einsatzliste-revamp-08-11/`):
+1. `f2-gold-optimal-dominanter-spieler.png`: Stronghold Crusaders mit dem dominanten Spieler
+   *Bearington*. Er ist in beiden Disziplinen Kader-Bester, das ist der Tidesprinter-Fall. Die
+   optimale Verteilung ist im Browser nachgeklickt, Ergebnis: **10/10 Gold, „beste Verteilung“.**
+   - Bearington trägt genau einen Goldring (D1-3 Style Tech, 60,2).
+   - Leira bekommt D1-1, obwohl Bearington dort mehr hätte.
+   - Alle Fechten-Slots tragen Gold für die jeweils Besten unter den Übrigen.
+   - Vorher (`f1-ki-aufstellung-gold.png`) waren in derselben Lage 11 von 12 Slots gestrichelt.
+2. `f2-gold-dynamik-nach-fehlgriff.png`: dieselbe Aufstellung, danach Bearington bewusst auf
+   D1-1 gesetzt. **Nur D1-1 wird gestrichelt** („kostet −3,8. Optimal hier: Leira 55,9“), alle
+   anderen Slots behalten ihr Gold.
+3. `f2-ki-vorschlag-dominanter-spieler-gegner-scouting5.png`: KI-Vorschlag für denselben Kader.
+   Gegner Death Peaches mit „KI-Einsatzmuster erkannt“, Namen und Spannen ±3, ~90 %.
+4. `f2-ki-vorschlag-normaler-kader-gegner-scouting0.png`: Death Peaches (ohne dominanten
+   Spieler) mit KI-Vorschlag. D1 ist 4/4 Gold. Der Gegner zeigt bei Scouting 0 nur „Ø 35–68“,
+   keine Namen.
+5. `f2-automatisch-fuellen-abweichungen-chip.png`: Hell Raisers nach „Automatisch füllen“. Auf
+   den gestrichelten Slots steht „Bester freier Pick“ statt „Bester Pick ✓“.
+
+**Neuer Befund für Chris: Der KI-Vorschlag ist nach der angezeigten Projektion klar nicht
+optimal.**
+- In beiden KI-Fällen liegt die KI-Aufstellung **insgesamt rund 40 Punkte** unter der optimalen
+  Verteilung: Stronghold Crusaders −40,4 bei 0/10 Gold, Death Peaches −43,3 bei 5/10. Das sind
+  gut 9 % der Seitensummen.
+- Den KI-Pfad (`ai-lineup`) habe ich in dieser Runde nicht untersucht. Zwei Erklärungen sind
+  möglich: Die KI plant bewusst nach etwas anderem als dieser Slot-Projektion (Frische, Rotation,
+  Kapitäne, Saisonstrategie), oder sie gewichtet Rollen und Slot-Fit schwächer.
+- „Automatisch füllen“ geht gierig in Slot-Reihenfolge vor und verfehlt die beste Verteilung
+  ebenfalls deutlich, mit Einzelposten bis −14.
+- Das Gold macht das jetzt sichtbar. Ob die KI oder das Füllen nachgezogen wird, ist eine eigene
+  Entscheidung: Das wäre Spielmechanik der KI, keine Anzeige.
+
+**Offen für Chris:**
+- Gold-Konzept ansehen und bewerten (Screenshots 1 und 2).
+- Soll „Automatisch füllen“ künftig die optimale Zuteilung nehmen? Das betrifft nur die Bedienung,
+  keine Spielregel, und wäre ein naheliegender kleiner nächster Schritt. Und soll der KI-Vorschlag
+  untersucht werden (Befund oben)?
+- Gegner-Streifen: Passen Ort und Dichte für jetzt? Im Mini-Feld (F3) wird daraus die Gegner-Reihe.
+- Später: eine echte Gegner-Scouting-Mechanik statt des Kader-Mittelwerts und serverseitiges
+  Verbergen für Koop/PvP.

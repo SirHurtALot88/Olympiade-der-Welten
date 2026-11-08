@@ -8,7 +8,8 @@ import {
   slotFarbe,
   slotKuerzel,
   slotKuerzelFuerListe,
-  bestbesetzungJeSlot,
+  goldPruefung,
+  optimaleZuteilung,
 } from "@/lib/lineups/einsatzliste-anzeige";
 import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
@@ -51,35 +52,96 @@ describe("Einsatzliste-Anzeige (Paket 1)", () => {
     expect(slotFarbe(Number.NaN)).toBe(EINSATZLISTE_SLOTFARBEN[0]);
   });
 
-  it("Gold = Bestbesetzung nach SLOTWERT (Chris 08.11.): je Slot der Kader-Beste, nicht nach Basis-Eignung", () => {
-    // p3 ist im Slot d1-0 der Beste, in d1-1 der Schwächste — Gold hängt am Slot, nicht am Spieler.
+  it("Gold = optimale Gesamtzuteilung (Chris 08.11.): ein dominanter Spieler nimmt EINEN Slot, die anderen vergeben ihr Gold weiter", () => {
+    // Tidesprinter-Fall: "tide" ist in allen drei Slots der Kader-Beste, kann aber nur einen besetzen.
     const werte = new Map([
-      ["p1", [{ slotKey: "d1-0", projectedScore: 60 }, { slotKey: "d1-1", projectedScore: 75 }, { slotKey: "d2-0", projectedScore: 40 }]],
-      ["p2", [{ slotKey: "d1-0", projectedScore: 62 }, { slotKey: "d1-1", projectedScore: 70 }, { slotKey: "d2-0", projectedScore: 55 }]],
-      ["p3", [{ slotKey: "d1-0", projectedScore: 80 }, { slotKey: "d1-1", projectedScore: 50 }, { slotKey: "d2-0", projectedScore: null }]],
+      ["tide", [{ slotKey: "a", projectedScore: 90 }, { slotKey: "b", projectedScore: 88 }, { slotKey: "c", projectedScore: 80 }]],
+      ["p1", [{ slotKey: "a", projectedScore: 70 }, { slotKey: "b", projectedScore: 60 }, { slotKey: "c", projectedScore: 50 }]],
+      ["p2", [{ slotKey: "a", projectedScore: 65 }, { slotKey: "b", projectedScore: 75 }, { slotKey: "c", projectedScore: 55 }]],
+      ["p3", [{ slotKey: "a", projectedScore: 40 }, { slotKey: "b", projectedScore: 45 }, { slotKey: "c", projectedScore: 72 }]],
     ]);
-    const beste = bestbesetzungJeSlot({
-      slotKeys: ["d1-0", "d1-1", "d2-0", "d2-1"],
-      slotWerteJeSpieler: werte.entries(),
-      nameVon: (id) => id,
-    });
-    expect(beste.get("d1-0")).toEqual({ id: "p3", name: "p3", wert: 80 });
-    expect(beste.get("d1-1")?.id).toBe("p1");
-    expect(beste.get("d2-0")?.id).toBe("p2"); // p3 ohne Wert zählt nicht
-    expect(beste.get("d2-1")).toBeNull(); // Slot ohne irgendeinen Wert
+    const { zuteilung, kostenVon } = goldPruefung({ slotKeys: ["a", "b", "c"], slotWerteJeSpieler: werte.entries(), nameVon: (id) => id });
+    // Optimum: tide auf a (90) + p2 auf b (75) + p3 auf c (72) = 237.
+    expect(zuteilung.jeSlot.get("a")?.id).toBe("tide");
+    expect(zuteilung.jeSlot.get("b")?.id).toBe("p2");
+    expect(zuteilung.jeSlot.get("c")?.id).toBe("p3");
+    expect(zuteilung.summe).toBe(237);
+    expect(zuteilung.slotVonSpieler.get("tide")).toBe("a");
+    // Gold je Slot: genau der Spieler der Zuteilung; tide auf b kostet etwas.
+    expect(kostenVon("tide", "a")).toBe(0);
+    expect(kostenVon("p2", "b")).toBe(0);
+    expect(kostenVon("p3", "c")).toBe(0);
+    // tide auf b: 88 + p1 auf a 70 + p3 auf c 72 = 230 -> kostet 7.
+    expect(kostenVon("tide", "b")).toBe(7);
+    expect(kostenVon("p1", "a")).toBeGreaterThan(0);
   });
 
-  it("Bestbesetzung: Gleichstand stabil nach Name", () => {
+  it("Gold kippt nicht an Gleichständen: jede optimale Verteilung ist Gold", () => {
     const werte = new Map([
-      ["z", [{ slotKey: "s", projectedScore: 70 }]],
-      ["a", [{ slotKey: "s", projectedScore: 70 }]],
+      ["x", [{ slotKey: "a", projectedScore: 70 }, { slotKey: "b", projectedScore: 70 }]],
+      ["y", [{ slotKey: "a", projectedScore: 70 }, { slotKey: "b", projectedScore: 70 }]],
     ]);
-    const beste = bestbesetzungJeSlot({
-      slotKeys: ["s"],
+    const { kostenVon } = goldPruefung({ slotKeys: ["a", "b"], slotWerteJeSpieler: werte.entries(), nameVon: (id) => id });
+    for (const id of ["x", "y"]) for (const slot of ["a", "b"]) expect(kostenVon(id, slot)).toBe(0);
+  });
+
+  it("Zuteilung: Spieler ohne Wert oder verletzt zählen nicht, zu wenige Spieler lassen Slots leer", () => {
+    const werte = new Map([
+      ["p1", [{ slotKey: "a", projectedScore: 60 }, { slotKey: "b", projectedScore: null }]],
+      ["verletzt", [{ slotKey: "a", projectedScore: 99 }, { slotKey: "b", projectedScore: 99 }]],
+    ]);
+    const z = optimaleZuteilung({
+      slotKeys: ["a", "b", "c"],
       slotWerteJeSpieler: werte.entries(),
-      nameVon: (id) => (id === "z" ? "Zora" : "Anton"),
+      nameVon: (id) => id,
+      ausgeschlossen: new Set(["verletzt"]),
     });
-    expect(beste.get("s")?.id).toBe("a");
+    expect(z.jeSlot.get("a")?.id).toBe("p1");
+    expect(z.jeSlot.get("b")).toBeNull();
+    expect(z.jeSlot.get("c")).toBeNull();
+    expect(z.besetzt).toBe(1);
+  });
+
+  it("Zuteilung ist optimal (Abgleich mit Brute Force auf 200 Zufallsinstanzen)", () => {
+    let saat = 12345;
+    const zufall = () => {
+      saat = (saat * 1103515245 + 12345) % 2147483648;
+      return saat / 2147483648;
+    };
+    const permutationsMax = (wert: number[][], slots: number, spieler: number): number => {
+      let beste = Number.NEGATIVE_INFINITY;
+      const benutzt = new Array<boolean>(spieler).fill(false);
+      const rek = (s: number, summe: number) => {
+        if (s === slots) {
+          beste = Math.max(beste, summe);
+          return;
+        }
+        for (let p = 0; p < spieler; p += 1) {
+          if (benutzt[p]) continue;
+          benutzt[p] = true;
+          rek(s + 1, summe + wert[s]![p]!);
+          benutzt[p] = false;
+        }
+      };
+      rek(0, 0);
+      return beste;
+    };
+    for (let runde = 0; runde < 200; runde += 1) {
+      const slots = 1 + Math.floor(zufall() * 5);
+      const spieler = slots + Math.floor(zufall() * 3);
+      const wert = Array.from({ length: slots }, () => Array.from({ length: spieler }, () => Math.round(zufall() * 1000) / 10));
+      const eintraege = Array.from({ length: spieler }, (_, p) => [
+        `p${p}`,
+        Array.from({ length: slots }, (_, s) => ({ slotKey: `s${s}`, projectedScore: wert[s]![p]! })),
+      ] as [string, Array<{ slotKey: string; projectedScore: number }>]);
+      const z = optimaleZuteilung({
+        slotKeys: Array.from({ length: slots }, (_, s) => `s${s}`),
+        slotWerteJeSpieler: eintraege,
+        nameVon: (id) => id,
+      });
+      expect(z.summe).toBeCloseTo(permutationsMax(wert, slots, spieler), 6);
+      expect(z.besetzt).toBe(slots);
+    }
   });
 
   it("Helfer-Modul importiert nichts aus Resolve, Arena oder Matrix (reine Anzeige)", () => {
