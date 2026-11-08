@@ -81603,7 +81603,7 @@ span.nl-facility-ampel-chip {
 /* Gold außerhalb des Positionsrings (Fable 5): voll = optimal verteilt, gestrichelt = verschenkt. */
 .is-new-look .nl-feld-marke.is-gold { outline: 2px solid var(--nl-gold); outline-offset: 2px; }
 .is-new-look .nl-feld-marke.is-gold-verschenkt { outline: 2px dashed var(--nl-gold); outline-offset: 2px; }
-.is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%) scale(1.08); border-color: var(--nl-accent); z-index: 6; }
+.is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%) scale(1.08); border: 2px solid var(--nl-accent); z-index: 6; }
 .is-new-look .nl-feld-marke.is-dragging { opacity: 0.45; }
 
 .is-new-look .nl-feld-marke-kopf { display: flex; align-items: center; gap: 4px; min-width: 0; }
