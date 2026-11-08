@@ -83,6 +83,11 @@ CHASSIS = {
     "tennis": {"art": "quelle"},
     "fechten": {"art": "quelle"},
     "speed-schach": {"art": "quelle"},
+    # Batch 3 (07.11.), ebenfalls aus scripts/baue-kulisse-buehnen.py.
+    "showcase": {"art": "quelle"},
+    "eiskunstlauf": {"art": "quelle"},
+    "breaking": {"art": "quelle"},
+    "i-spy": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.

@@ -41,10 +41,10 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(motor).toContain('orte:[{name:"Nord",fy:85/470},{name:"Mitte",fy:0.5},{name:"Süd",fy:385/470}]');
   });
 
-  it("Tennis, Fechten, Speed-Schach haben Kulissen; der Tennis-Belag sitzt im Platz-Trapez des Motors", () => {
+  it("Buehnen-Kulissen (Batch 2/3) passen zur Motor-Geometrie (Tennis-Trapez, Eis-Rundweg, I-Spy-Steg)", () => {
     // scripts/baue-kulisse-buehnen.py rechnet mit tennisPlatzGeometrie() (topY=H*0.17, botY=H*0.615,
     // halbe Breite W*0.145..W*0.30). Aendert sich die Motor-Geometrie, muss die Kulisse neu gebaut werden.
-    for (const d of ["tennis", "fechten", "speed-schach"]) {
+    for (const d of ["tennis", "fechten", "speed-schach", "showcase", "eiskunstlauf", "breaking", "i-spy"]) {
       expect(kulissen[d]?.length ?? 0, d).toBeGreaterThanOrEqual(2);
     }
     const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
@@ -53,6 +53,11 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     const skript = readFileSync(path.join(wurzel, "scripts/baue-kulisse-buehnen.py"), "utf8");
     expect(skript).toContain("T_TOP, T_BOT = LH * 0.17, LH * 0.615");
     expect(skript).toContain("T_HALB_TOP, T_HALB_BOT = LW * 0.145, LW * 0.30");
+    // Eiskunstlauf: das Eis der Kulisse liegt im eisRundweg(k) aus kuerFlaeche()
+    expect(motor).toContain("return {cx:W*0.5, cy:H*0.5, ax:W*0.35, ay:H*0.28};");
+    expect(motor).toContain("const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};");
+    // I-Spy: die beiden Raeume enden am Steg W*0.465 / W*0.535
+    expect(motor).toContain("const stegX0=W*0.465, stegX1=W*0.535;");
   });
 
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {

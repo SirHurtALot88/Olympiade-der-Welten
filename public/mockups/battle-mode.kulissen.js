@@ -16,6 +16,34 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.24
   }
  ],
+ "breaking": [
+  {
+   "id": "brutal",
+   "label": "Gauntlet",
+   "bild": "/sprites/kulissen/breaking/brutal.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "standard",
+   "label": "Erste Fassung",
+   "bild": "/sprites/kulissen/breaking/standard.jpg",
+   "dunkel": 0.06
+  }
+ ],
+ "eiskunstlauf": [
+  {
+   "id": "kuer",
+   "label": "Kür",
+   "bild": "/sprites/kulissen/eiskunstlauf/kuer.jpg",
+   "dunkel": 0.24
+  },
+  {
+   "id": "waldsee",
+   "label": "Waldsee",
+   "bild": "/sprites/kulissen/eiskunstlauf/waldsee.jpg",
+   "dunkel": 0.3
+  }
+ ],
  "fechten": [
   {
    "id": "piste",
@@ -28,6 +56,32 @@ window.__ARENA_KULISSEN={
    "label": "Schlosshof",
    "bild": "/sprites/kulissen/fechten/schlosshof.jpg",
    "dunkel": 0.13
+  }
+ ],
+ "i-spy": [
+  {
+   "id": "ruinengarten",
+   "label": "Ruinengarten",
+   "bild": "/sprites/kulissen/i-spy/ruinengarten.jpg",
+   "dunkel": 0.12
+  },
+  {
+   "id": "aztec",
+   "label": "Aztekentempel",
+   "bild": "/sprites/kulissen/i-spy/aztec.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "lostplace",
+   "label": "Lost Place",
+   "bild": "/sprites/kulissen/i-spy/lostplace.jpg",
+   "dunkel": 0.12
+  },
+  {
+   "id": "horror",
+   "label": "Horror",
+   "bild": "/sprites/kulissen/i-spy/horror.jpg",
+   "dunkel": 0.06
   }
  ],
  "mini-dm": [
@@ -47,6 +101,26 @@ window.__ARENA_KULISSEN={
    "id": "strom-kaefig",
    "label": "Strom-Käfig",
    "bild": "/sprites/kulissen/mini-dm/strom-kaefig.jpg",
+   "dunkel": 0.06
+  }
+ ],
+ "showcase": [
+  {
+   "id": "buehne",
+   "label": "Theater",
+   "bild": "/sprites/kulissen/showcase/buehne.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "festival",
+   "label": "Freiluft-Festival",
+   "bild": "/sprites/kulissen/showcase/festival.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "zirkus",
+   "label": "Zirkuszelt",
+   "bild": "/sprites/kulissen/showcase/zirkus.jpg",
    "dunkel": 0.06
   }
  ],

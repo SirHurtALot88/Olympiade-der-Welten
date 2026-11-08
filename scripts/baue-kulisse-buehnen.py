@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""BUEHNEN-KULISSEN FUER DEN MOTOR (Kulissen-Integration 07.11., Batch 2: Tennis, Fechten, Speed-Schach).
+"""BUEHNEN-KULISSEN FUER DEN MOTOR (Kulissen-Integration 07.11., Batch 2: Tennis, Fechten, Speed-Schach;
+Batch 3: Showcase, Eiskunstlauf, Breaking, I-Spy).
 
 Die Szenen der Asset-Runde (public/szenen/<disziplin>/<variante>.html) sind Demo-Bilder mit eigener
 Geometrie: der Tennisplatz liegt quer statt laengs, die Fechtbahn sitzt anders als die des Motors, und
@@ -16,7 +17,7 @@ Nur Pixel der PixelLab-Szenen, deterministisch, ohne API. Ergebnis:
 data/generated/kulissen-quellen/<disziplin>/<variante>.png (1240x470); baue-arena-kulissen.py
 (Chassis "quelle") macht daraus die Motor-Kulisse.
 
-    python3 -I scripts/baue-kulisse-buehnen.py [tennis fechten speed-schach]
+    python3 -I scripts/baue-kulisse-buehnen.py [tennis fechten speed-schach showcase eiskunstlauf breaking i-spy]
 """
 
 from __future__ import annotations
@@ -213,12 +214,145 @@ def baue_schach(variante: str) -> Image.Image:
     return aus.resize((LW, LH), Image.LANCZOS)
 
 
-BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach}
+# ---------------------------------------------------------------------------------------- Showcase
+# Szene: bg (Buehne mit leerer LED-Wand) + fg (Rang/Zirkuszelt/Boxentuerme, Publikum vorn), 640x360.
+# Die Demo-Jury (Ebene `judges`) bleibt weg — der Motor zeichnet sein eigenes Jury-Pult.
+# Ausschnitt so, dass die Buehnenkante (Szene y~265) auf die Rampe des Motors faellt (H*0.86 = 404).
+SC_KANTE_SZENE, SC_KANTE_MOTOR = 265, LH * 0.86
+
+
+def deckend_mit_kante(bild: Image.Image, kante_szene: float, kante_motor: float) -> Image.Image:
+    """Deckend auf die Leinwand skaliert (Pixel-Art erst ganzzahlig), so verschoben, dass Szenenzeile
+    kante_szene auf Leinwandzeile kante_motor liegt."""
+    w, h = bild.size
+    f = LW / w
+    nh = LH / f
+    y0 = min(max(0.0, kante_szene - kante_motor / f), h - nh)
+    aus = bild.crop((0, round(y0), w, round(y0 + nh)))
+    g = int(f) + 1
+    aus = aus.resize((aus.width * g, aus.height * g), Image.NEAREST)
+    return aus.resize((LW, LH), Image.LANCZOS)
+
+
+def baue_showcase(variante: str) -> Image.Image:
+    b = lade_szenenbilder(SZENEN / "showcase" / f"{variante}.html")
+    bild = b["bg"].copy()
+    bild.alpha_composite(b["fg"])
+    return deckend_mit_kante(bild.convert("RGB"), SC_KANTE_SZENE, SC_KANTE_MOTOR)
+
+
+# ---------------------------------------------------------------------------------------- Eiskunstlauf
+# Motor: Eisflaeche = eisRundweg(k) mit k aus kuerFlaeche(): l=W/2-W*0.35*1.18, r=..., o=H/2-H*0.28*1.34,
+# u=..., Ecke 56 (quadratische Kurven). Szene (bg+fg 2640x855): Tribuene, Technisches Panel,
+# Sponsorbande, Kiss&Cry oben; Eis mit Bande darunter; Boden ausserhalb (Halle dunkel, Waldsee Schnee).
+# Die Kulisse: oben die Tribuene mit Bande bis an die obere Eiskante, darum der Boden der Szene, im
+# Rundweg des Motors das Eis der Szene. Die Bande des Motors (weiss + Gold) zeichnet weiter der Motor.
+E_K = {"l": LW / 2 - LW * 0.35 * 1.18, "r": LW / 2 + LW * 0.35 * 1.18,
+       "o": LH / 2 - LH * 0.28 * 1.34, "u": LH / 2 + LH * 0.28 * 1.34, "ecke": 56}
+E_TRIBUENE = (330, 60, 2310, 226)  # Szenen-Ausschnitt: gerade Bandenstrecke samt Tribuene und Panel
+E_EIS = (400, 262, 2240, 736)  # Eis ohne Bande (unten vor der Bandenlinie des Waldsees)
+E_BODEN = (0, 820, 2640, 855)  # Boden vor der vorderen Bande
+
+
+def rundweg_maske(k: dict, ein: float = 0.0) -> Image.Image:
+    """Dieselbe Form wie eisRundweg(k,ein) im Motor (Geraden + quadratische Ecken), als Maske."""
+    from PIL import ImageDraw
+
+    l, r, o, u = k["l"] + ein, k["r"] - ein, k["o"] + ein, k["u"] - ein
+    e = max(4, k["ecke"] - ein)
+
+    def quad(p0, p1, p2, n=16):
+        return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
+                 (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1]) for t in np.linspace(0, 1, n)]
+
+    pts = [(l + e, o), (r - e, o)] + quad((r - e, o), (r, o), (r, o + e)) + [(r, u - e)] \
+        + quad((r, u - e), (r, u), (r - e, u)) + [(l + e, u)] + quad((l + e, u), (l, u), (l, u - e)) \
+        + [(l, o + e)] + quad((l, o + e), (l, o), (l + e, o))
+    m = Image.new("L", (LW, LH), 0)
+    ImageDraw.Draw(m).polygon(pts, fill=255)
+    return m
+
+
+def baue_eiskunstlauf(variante: str) -> Image.Image:
+    b = lade_szenenbilder(SZENEN / "eiskunstlauf" / f"{variante}.html")
+    welt = b["bg"].copy()
+    welt.alpha_composite(b["fg"])
+    welt = welt.convert("RGB")
+    # Boden
+    b0 = welt.crop(E_BODEN)
+    band = b0.resize((LW, max(8, round(b0.height * LW / b0.width * 3))), Image.LANCZOS)
+    lein = streifen_kacheln(band, LW, LH, saat=23)
+    # Tribuene: Unterkante (Bande) an die obere Eiskante des Motors
+    t = welt.crop(E_TRIBUENE)
+    th = round(t.height * LW / t.width)
+    t = t.resize((LW, th), Image.LANCZOS)
+    lein.paste(t, (0, round(E_K["o"]) - th + 2))
+    # Eis im Rundweg
+    eis = welt.crop(E_EIS)
+    breite, hoehe = E_K["r"] - E_K["l"], E_K["u"] - E_K["o"]
+    f = max(breite / eis.width, hoehe / eis.height)
+    eis = eis.resize((round(eis.width * f), round(eis.height * f)), Image.LANCZOS)
+    ex = round((E_K["l"] + E_K["r"]) / 2 - eis.width / 2)
+    ey = round((E_K["o"] + E_K["u"]) / 2 - eis.height / 2)
+    voll = Image.new("RGB", (LW, LH))
+    voll.paste(eis, (ex, ey))
+    lein.paste(voll, (0, 0), rundweg_maske(E_K))
+    return lein
+
+
+# ---------------------------------------------------------------------------------------- Breaking
+# Szene (world 768x432): Kerker mit Publikum, Lichtkegel, Ketten; darunter eine flache Rundbuehne mit
+# Rock in den Demo-Teamfarben rot/gruen und Demo-HUD (BREAKING-Schild, ZUG-Tafel, Uhr). Der Motor
+# zeichnet sein eigenes Druck-Rund (zeichneBreaking). Die Kulisse nimmt Kerker, Publikum und die
+# Oberflaeche der Rundbuehne — unten abgeschnitten vor Rock und HUD —, die weissen Startmarken weg.
+BR_AUSSCHNITT = (96, 312)  # Szenenzeilen
+BR_MARKEN = [(347, 283, 364, 315), (417, 283, 434, 315)]
+
+
+def baue_breaking(variante: str) -> Image.Image:
+    welt = lade_szenenbilder(SZENEN / "breaking" / f"{variante}.html")["world"].convert("RGB")
+    welt = flicken(welt, BR_MARKEN, [], (150, 255, 620, 318), ring=4, schritt=1)
+    y0, y1 = BR_AUSSCHNITT
+    f = LH / (y1 - y0)
+    nb = LW / f
+    x0 = (welt.width - nb) / 2
+    aus = welt.crop((round(x0), y0, round(x0 + nb), y1))
+    g = int(f) + 1
+    aus = aus.resize((aus.width * g, aus.height * g), Image.NEAREST)
+    return aus.resize((LW, LH), Image.LANCZOS)
+
+
+# ---------------------------------------------------------------------------------------- I-Spy
+# Motor (bodenSchatzsuche): zwei Raeume, links 0..W*0.465, rechts W*0.535..W, dazwischen der Steg.
+# Szene (bg 1280x840, Draufsicht): Garten/Hof/Halle mit Rueckwand oben. Jede Raumhaelfte bekommt die
+# Szene deckend; die beiden Demo-Truhen unten (die Fundorte zeichnet der Motor selbst) sind weg.
+IS_TRUHEN = [(138, 694, 199, 739), (1081, 694, 1142, 739)]
+IS_STEG = (LW * 0.465, LW * 0.535)
+
+
+def baue_ispy(variante: str) -> Image.Image:
+    bg = lade_szenenbilder(SZENEN / "i-spy" / f"{variante}.html")["bg"].convert("RGB")
+    bg = flicken(bg, IS_TRUHEN, [], (0, 560, 1280, 800), ring=8, schritt=2)
+    halb = round(IS_STEG[0])
+    f = max(halb / bg.width, LH / bg.height)
+    raum = bg.resize((round(bg.width * f), round(bg.height * f)), Image.LANCZOS)
+    rx = (raum.width - halb) // 2
+    raum = raum.crop((rx, 0, rx + halb, LH))
+    lein = Image.new("RGB", (LW, LH))
+    lein.paste(raum, (0, 0))
+    lein.paste(raum, (LW - halb, 0))
+    return lein
+
+
+BAUER = {"tennis": baue_tennis, "fechten": baue_fechten, "speed-schach": baue_schach,
+         "showcase": baue_showcase, "eiskunstlauf": baue_eiskunstlauf, "breaking": baue_breaking, "i-spy": baue_ispy}
 # Speed-Schach "turniersaal" fehlt bewusst: im Saal sitzen zwei eingebrannte Demo-Partien (Spieler an
 # Seitentischen mit Brett) genau in Hoehe der Motor-Spieler — sie laesst sich nicht sauber freistellen
 # und saehe aus wie zwei weitere Duelle. Kommt sie spaeter linienfrei neu, reicht ein Eintrag hier.
 VARIANTEN = {"tennis": ["court", "dach", "riviera"], "fechten": ["piste", "schlosshof"],
-             "speed-schach": ["park", "zug"]}
+             "speed-schach": ["park", "zug"], "showcase": ["buehne", "festival", "zirkus"],
+             "eiskunstlauf": ["kuer", "waldsee"], "breaking": ["standard", "brutal"],
+             "i-spy": ["aztec", "horror", "lostplace", "ruinengarten"]}
 
 
 def main() -> None:

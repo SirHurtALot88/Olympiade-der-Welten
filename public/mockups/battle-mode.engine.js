@@ -30185,6 +30185,12 @@
     if(eiskunstlaufPublikumAn){ tonLoopStop(); eiskunstlaufPublikumAn=false; }
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
     if(!showcasePublikumAn){ tonLoopStart("showcase"); showcasePublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Theater, Festival-
+    // buehne oder Zirkus aus der PixelLab-Szene, Buehnenkante auf der Rampe (H*0.86). Ersetzt Verlauf,
+    // Vorhaenge, Rampenlicht und Publikums-Silhouetten; Fuehrungssaum und Jury-Pult bleiben.
+    const vorhangH=H*0.16;
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
 
     // GRUNDFLAECHE: waermeres, violetteres Theaterlicht statt bodenBuehne()s neutralem
     // Wettkampf-Podest.
@@ -30194,7 +30200,6 @@
 
     // ROTER VORHANG oben, zwei Portale mit je vier gerafften Falten (showcase.tsx' Curtain-
     // Motiv, hier als Canvas-Primitiv statt SVG-Pfad).
-    const vorhangH=H*0.16;
     [[0,W*0.18],[W*0.82,W]].forEach(([x0,x1])=>{
       const falten=4, fw=(x1-x0)/falten;
       for(let i=0;i<falten;i++){
@@ -30213,6 +30218,7 @@
     // wie bodenEis() (dezent, beim Fuehrungswechsel kurz voll gesaettigt), Chris'
     // "ohne Stats sehen, wer fuehrt" jetzt auch fuer Showcase. Solange niemand gepunktet
     // hat, bleibt die alte, neutrale Goldlinie stehen.
+    }
     const fuehrungSide=showcaseFuehrung();
     if(fuehrungSide!=null){
       if(showcaseSaumSide!==fuehrungSide){ showcaseSaumSide=fuehrungSide; showcaseSaumSeit=buehneT; }
@@ -30230,6 +30236,7 @@
     // damit die Silhouetten (naeher an der Kamera, s. unten) davor stehen statt darin zu
     // versinken.
     const rampY=H*0.86;
+    if(!mitKulisse){
     ctx.fillStyle="#2a2233";ctx.fillRect(0,rampY-4,W,10);
     for(let i=0;i<11;i++){
       const rx=W*0.06+i*(W*0.88)/10;
@@ -30237,6 +30244,7 @@
       beam.addColorStop(0,"rgba(255,232,180,.20)");beam.addColorStop(1,"rgba(255,232,180,0)");
       ctx.fillStyle=beam;ctx.beginPath();ctx.arc(rx,rampY,H*0.28,Math.PI,0);ctx.fill();
       ctx.fillStyle="#f6c750";ctx.beginPath();ctx.arc(rx,rampY,2.4,0,6.2832);ctx.fill();
+    }
     }
 
     // JURY-PULT MIT DREI BUZZERN am unteren Rand -- showcase.tsx' "JURY BUZZER-PULT"-Zeile,
@@ -30259,6 +30267,7 @@
     // (dort zuletzt/vorne gezeichnet, Kommentar "Audience silhouette at bottom"). Ragt bewusst
     // etwas ueber den unteren Bildrand hinaus, wie ein Publikum im Vordergrund einer
     // Kamera-Perspektive.
+    if(mitKulisse)return; // das Publikum sitzt schon in der Kulisse
     const publikumY=showcasePublikumY();
     ctx.fillStyle="rgba(0,0,0,.85)";
     const kn=22;
@@ -30592,6 +30601,10 @@
     if(!ispyRaumAn){ tonLoopStart("i-spy"); ispyRaumAn=true; }
 
     const art=BB();
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): beide Raeume als
+    // Draufsicht aus der PixelLab-Szene (Garten, Hof, Halle), ohne deren Demo-Truhen. Ersetzt Verlauf,
+    // Dielen, Buecherregale und Lichtinseln; Steg, Fuehrungssaum und Fundorte zeichnet der Motor weiter.
+    if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Holz-/Steinboden statt bodenBuehne()s violettem Podest.
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#241c14"); g.addColorStop(1,"#100c08");
@@ -30630,6 +30643,8 @@
     // GDQ-Race-Layout, "zwei getrennte Spiele, ein Rennen" -- die Luecke zwischen den
     // beiden Fundort-Haelften (46-54 % der Breite, s. ispyFundortXY()), rein dekorativ,
     // steht nie mit einem Fundort oder einer Figur in Konflikt.
+    }
+
     const stegX0=W*0.465, stegX1=W*0.535;
     ctx.fillStyle="#0a0805"; ctx.fillRect(stegX0,0,stegX1-stegX0,H);
 
@@ -31138,6 +31153,12 @@
   let eiskunstlaufPublikumAn=false;
   function bodenEis(){
     if(!eiskunstlaufPublikumAn){ tonLoopStart("eiskunstlauf"); eiskunstlaufPublikumAn=true; }
+    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Halle bzw. Waldsee
+    // aus der PixelLab-Szene, das Eis der Szene schon genau im eisRundweg(k) unten. Ersetzt Verlauf,
+    // Lichtkegel, Bodenband und die gemalte Eisflaeche; Bande, Fuehrungssaum, Balken, Kampfgericht,
+    // Startbereich und Kiss-and-Cry zeichnet der Motor weiter.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     const bg=ctx.createLinearGradient(0,0,0,H);
     bg.addColorStop(0,"#11151f");bg.addColorStop(1,"#080a10");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
@@ -31153,13 +31174,14 @@
     ctx.fillStyle="#171c26";ctx.fillRect(0,H*0.90,W,H*0.10);
     ctx.strokeStyle="rgba(255,255,255,.08)";ctx.lineWidth=1;
     for(let i=1;i<10;i++){ctx.beginPath();ctx.moveTo(i*W/10,H*0.90);ctx.lineTo(i*W/10,H);ctx.stroke();}
+    }
 
     const F=kuerFlaeche();
     const k={l:F.cx-F.ax*1.18,r:F.cx+F.ax*1.18,o:F.cy-F.ay*1.34,u:F.cy+F.ay*1.34,ecke:56};
     // Eisflaeche: derselbe kalte Verlauf wie eisflaeche() (Hockey), eigene Grenzen.
     const eis=ctx.createLinearGradient(0,k.o,0,k.u);
     eis.addColorStop(0,"#dce9f2");eis.addColorStop(0.5,"#eef5fa");eis.addColorStop(1,"#d3e2ee");
-    eisRundweg(k,0);ctx.fillStyle=eis;ctx.fill();
+    if(!mitKulisse){eisRundweg(k,0);ctx.fillStyle=eis;ctx.fill();}
     ctx.lineWidth=6;ctx.strokeStyle="#f2f4f7";eisRundweg(k,0);ctx.stroke();
     // Goldene Bandenkante — der eine Farbakzent, den der Plan ausdruecklich nennt.
     ctx.lineWidth=2;ctx.strokeStyle="rgba(214,172,54,.85)";eisRundweg(k,4);ctx.stroke();
@@ -35971,7 +35993,11 @@
     bg.addColorStop(0,"hsl(275 55% 22%)");
     bg.addColorStop(0.55,"hsl(278 50% 13%)");
     bg.addColorStop(1,"hsl(280 45% 7%)");
+    // KULISSE (Kulissen-Integration 07.11.): liegt der Kerker der PixelLab-Szene darunter, kommt der
+    // violette Verlauf nur durchscheinend darueber -- die Folter-Stimmung bleibt, der Ort wird sichtbar.
+    if(kulisseSichtbar())ctx.globalAlpha=0.45;
     ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=1;
 
     // B. Vier Druck-Ringe, exakt breaking.tsx:62-67s vier Zonen und Radien.
     const zonen=[[1.0,"GEBROCHEN"],[0.72,"SCHMERZGRENZE"],[0.46,"STONE FACE"],[0.22,"MIND FORTRESS"]];
@@ -42477,6 +42503,15 @@
     v.addColorStop(1,"rgba(0,0,0,.48)");
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
     return true;
+  }
+
+  // Liegt gerade eine geladene Kulisse unter dieser Disziplin? Fuer Zeichnungen, die nach dem Boden
+  // noch eine eigene vollflaechige Grundfarbe legen (zeichneBreaking) und sie dann durchscheinend
+  // statt deckend zeichnen muessen. Reine Anzeige-Abfrage.
+  function kulisseSichtbar(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return false;
+    const im=kulisseBilder[kulisseAktiv.bild];
+    return !!(im&&im.complete&&im.naturalWidth);
   }
 
   // Speed-Schach-Buehnenbild: dieselbe Datei-statt-base64-Idee, eigener Ordner

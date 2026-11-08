@@ -147,3 +147,25 @@ Füllen, Linien entfernen); Battlefield nutzt sie mit.
   unten bleibt als halbdurchsichtiges Podest, und ein dunkler Verlauf oben hält die Kopfzeile lesbar.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 3: Showcase, Eiskunstlauf, Breaking, I-Spy (07.11.)
+
+Gebaut mit demselben Skript (`scripts/baue-kulisse-buehnen.py`) und nach demselben Grundsatz: Die Umgebung kommt aus
+der Szene, Fläche und Linien zeichnet der Motor.
+
+- **Showcase** (buehne/festival/zirkus): Szene aus `bg` + `fg`, ohne die Demo-Jury-Ebene. Die Bühnenkante
+  liegt auf der Rampe des Motors (H*0.86). `bodenShowcase()` lässt mit Kulisse Verlauf, Vorhänge, Rampenlicht
+  und Publikums-Silhouetten weg. Führungssaum und Jury-Pult bleiben.
+- **Eiskunstlauf** (kuer/waldsee): Die Tribüne mit Sponsorbande endet an der oberen Eiskante. Darum liegt der
+  Boden der Szene, im `eisRundweg(k)` aus `kuerFlaeche()` das Eis der Szene (gleiche Form, Geraden und
+  quadratische Ecken). Bande, Führungssaum, Balken, Kampfgericht, Startbereich und Kiss-and-Cry zeichnet der
+  Motor.
+- **Breaking** (standard/brutal): Kerker mit Publikum, Lichtkegel und der Oberfläche der Rundbühne. Unten ist
+  das Bild vor dem rot/grünen Demo-Rock und dem Demo-HUD (BREAKING-Schild, ZUG-Tafel) abgeschnitten, die
+  weißen Startmarken sind weg. `zeichneBreaking()` legt seinen violetten Verlauf über die Kulisse nur noch zu
+  45 % deckend (`kulisseSichtbar()`).
+- **I-Spy** (aztec/horror/lostplace/ruinengarten): Jeder der beiden Räume zeigt die Szene als Draufsicht, ohne
+  die zwei Demo-Truhen. Die Fundorte zeichnet der Motor. `bodenSchatzsuche()` lässt Dielen, Regale und
+  Lichtinseln weg, Steg und Führungssaum bleiben.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
