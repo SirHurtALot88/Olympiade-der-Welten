@@ -8,6 +8,8 @@ nur mit Pixeln der PixelLab-Szenen (public/szenen/), deterministisch, ohne API.
   passt (Verfahren wie hindernisse_zumalen() in baue-arena-kulissen.py).
 - linien_entfernen(): helle, ungesaettigte Linien (Spielfeld-/Platzlinien) aus einer Flaeche nehmen,
   jedes Linienpixel nimmt das naechste freie Pixel quer zur Linie.
+- freistellen(): ein Requisit (Bogen, Schild …) vom Rand her kettengeflutet freistellen, ohne dass
+  jemand die Hintergrundfarbe(n) von Hand nennen muss (Kulissen Batch 15, Spurt).
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ import base64
 import io
 import re
 import sys
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -127,6 +130,43 @@ def linien_entfernen(bild: Image.Image, maske: np.ndarray, schritte=(4, 6, 9, 13
             a[yy[frei], xx[frei]] = a[qy[frei], qx[frei]]
             offen[yy[frei], xx[frei]] = False
     return Image.fromarray(a)
+
+
+def freistellen(bild: Image.Image, schwelle: int = 26) -> Image.Image:
+    """Requisit vor einfarbigem/flachem Hintergrund freistellen (Alpha), ohne die Hintergrundfarbe(n)
+    zu kennen: eine Kette von Nachbarpixeln waechst von allen vier Raendern her nach innen, jeder
+    Schritt vergleicht gegen den ZULETZT AKZEPTIERTEN Nachbarn (nicht gegen den Randwert selbst) —
+    so vertraegt das Verfahren JPEG-Rauschen und weiche Verlaeufe, bleibt an echten Kanten (Bogen-
+    Streifen, Schrift) aber stehen. Fuer Formen, die am Fuss offen zum Rand stehen (ein Torbogen auf
+    dem Boden), lassen die Beine innen typischerweise eine schmale Luecke, durch die die Flut auch
+    den umschlossenen Durchblick erreicht — erwuenscht, das soll transparent bleiben."""
+    rgb = bild.convert("RGB")
+    a = np.asarray(rgb, dtype=np.int16)
+    h, w, _ = a.shape
+    bg = np.zeros((h, w), dtype=bool)
+    seen = np.zeros((h, w), dtype=bool)
+    dq: deque[tuple[int, int]] = deque()
+    for x in range(w):
+        for y in (0, h - 1):
+            if not seen[y, x]:
+                seen[y, x] = True
+                dq.append((x, y))
+    for y in range(h):
+        for x in (0, w - 1):
+            if not seen[y, x]:
+                seen[y, x] = True
+                dq.append((x, y))
+    while dq:
+        x, y = dq.popleft()
+        bg[y, x] = True
+        c = a[y, x]
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < w and 0 <= ny < h and not seen[ny, nx] and int(np.abs(a[ny, nx] - c).sum()) < schwelle:
+                seen[ny, nx] = True
+                dq.append((nx, ny))
+    alpha = np.where(bg, 0, 255).astype(np.uint8)
+    return Image.fromarray(np.dstack([np.asarray(rgb), alpha]), "RGBA")
 
 
 def speichere_quelle(disziplin: str, variante: str, bild: Image.Image) -> Path:
