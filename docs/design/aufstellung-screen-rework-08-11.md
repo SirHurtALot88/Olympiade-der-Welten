@@ -27,6 +27,51 @@ goldener Rahmen um die Top-N je Disziplin (N = Slotzahl); Rollenkarten im FM27-S
 Dieses Konzept baut die vier Backlog-Punkte **ein**, statt sie einzeln nachzurüsten — sie sind
 genau die Bausteine, die Punkt 2 braucht.
 
+### 0b. Nachschärfung 08.11. (zweite Nachricht): Scope ist die echte Foundation-Einsatzliste, nicht nur das Arena-Board
+
+Chris hat direkt im Anschluss präzisiert, dass es ihm nicht nur um das Arena-Board
+(`public/mockups/battle-mode.engine.js`, der Screen aus den Screenshots) geht, sondern um die
+**echte, produktive Einsatzliste** (`app/foundation/legacy-lineup-lab/LineupNewLook.tsx`), die
+heute laut Fables Befund oben nur das nackte Rollenlabel zeigt. Chris wörtlich: „Die ganze
+Darstellung der Einsatzliste sollte mehr zeigen, wie die Position der Spieler auf dem Feld auch
+ist... Das ist sogar jetzt in der Battle Arena schon ein bisschen besser dargestellt. Aber diese
+Ansicht, die ich vorhin geschickt habe, für die von der Battle Arena, das ist ja eigentlich die
+Einsatzliste, nur dass es da jetzt zusammenhängt, weil wir das ja testweise mal zusammengefügt
+haben. Aber jetzt muss ja auch noch die Einsatzliste verbessert werden. Quasi ein dickes Upgrade
+bekommen. Und angebunden sein mit der Battle Arena, dass die miteinander sprechen und man
+weiterhin dann in der Einsatzliste auch seine Leute einsetzen kann und die dann in der Battle
+Arena übernommen werden."
+
+**Konkrete Anforderungen aus dieser Nachricht:**
+- **Jede Disziplin zeigt ihre eigene Feld-/Formationslogik**, nicht nur eine generische Slot-
+  Liste. Chris' eigene Beispiele: Tauziehen — die Slots stehen **hintereinander** (passend zum
+  neuen Tauziehen-Format-Varianten-Prototyp, PR #1350/#1352-Umfeld, „Die Grube"/Schweizer Runden —
+  diese Struktur existiert als Formatidee, noch nicht als produktive Disziplin); Basketball — die
+  fünf Slots stehen **auf dem Court**, wie er tatsächlich bespielt wird.
+- **Interaktiver und optisch besser**, damit man direkt in der Einsatzliste erkennt, wo ein
+  Spieler am besten eingesetzt wird — weil sich der Einsatz zwischen z. B. Takeshi und Staffel
+  spürbar unterscheidet.
+- **Transparenz bleibt die Leitlinie**: erkennbar, warum ein Spieler in welcher Disziplin/welchem
+  Slot eingesetzt wird, welche Faktoren ihn besser und welche ihn schlechter machen — identisch
+  zur Design-Linie aus Teil 1 der Oberflächen-Effekte-Vision.
+- **Datenfluss bleibt erhalten**: die bestehende Übergabe über
+  `lib/foundation/battle-arena/arena-aufstellung-adapter.ts` (`ArenaAufstellungEintrag`) MUSS
+  weiter funktionieren — Spieler werden weiterhin in der Einsatzliste eingesetzt, und die Battle
+  Arena übernimmt genau diese Zuweisung. Das Rework ändert die Darstellung, nicht den Vertrag
+  zwischen Einsatzliste und Arena.
+- Chris nennt das selbst „ein komplettes Revamp" der Einsatzliste, nicht nur eine kleine
+  Verbesserung — das ist dieselbe Drei-Ebenen-Idee aus diesem Dokument (Abschnitt 2), nur jetzt
+  ausdrücklich auf `LineupNewLook.tsx` als Zielort bestätigt. Beantwortet damit auch Frage 5 aus
+  Abschnitt 13 („Soll die Foundation-Einsatzliste dasselbe Mini-Feld bekommen?") — ja, das ist
+  jetzt der eigentliche Zielort, das Arena-Board war nur die erste sichtbare Bewährung derselben
+  Idee.
+
+**Offener Punkt für die Architektur-Recherche**: die Tauziehen-„hintereinander"-Formation
+existiert als Formatidee, noch nicht als gebaute Disziplin mit eigenen Slot-Definitionen — das
+Mini-Feld-Konzept muss deshalb erweiterbar für künftige Format-Varianten-Strukturen sein, nicht
+nur für die 20 heute bestehenden Disziplinen, damit es nicht wieder angepasst werden muss, sobald
+Tauziehen (oder andere Formate) produktiv wird.
+
 ## 1. Befund: warum der Screen überladen wirkt
 
 Inventar bei voller TDM-Aufstellung (6 gesetzte Einheiten), gezählt am Code:
