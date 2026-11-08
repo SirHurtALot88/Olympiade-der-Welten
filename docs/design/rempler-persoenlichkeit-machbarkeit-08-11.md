@@ -7,6 +7,29 @@ Teil (Persönlichkeits-Taxonomie, wie Kombinationen wirken sollen) macht Fable p
 Dokument beantwortet die technische Seite: Was gibt es schon, wo würde es leben, was kostet es, und
 wie misst man es.
 
+> **Stand nach Chris' Rückmeldung (zweite Runde, 08.11.)**, siehe Vision-Dokument, Abschnitt
+> „Nachschärfung 08.11. (zweite Runde)“. Drei Punkte verändern dieses Dokument:
+>
+> 1. **Scope: nur Battle-Mode.** Eine Persönlichkeitswirkung im unsimulierten Manager-Pfad ist
+>    nicht nötig. Damit entfallen diese Rückfrage und jede Architektur-Überlegung für
+>    `legacy-score-engine.ts`.
+> 2. **Varianz ist gewollt, nicht nur geduldet.** Chris: „Ja, soll es potenziell auch [Spieler
+>    stärker oder schwächer machen] … dass er plötzlich andere Kräfte entwickelt und alles an sich
+>    reißt, aber damit auch den Scheiß rockt. Oder es kann halt sein, dass er alles alleine machen
+>    will und das grandios scheitert.“ Die Dosierung bleibt ein Stellrad („runterdosieren
+>    später“). Der Befund vom 02.10. ist deshalb hier nicht mehr das zentrale **Risiko**. Er ist die
+>    **Kalibrierungsgrundlage** für eine Zielgröße, die man misst und bewusst einstellt. Die
+>    Neufassung steht in Abschnitt 3.5 (Dosis statt Verbot) und 5.4 (Rollentreue). Kurzfassung,
+>    Tabelle, Abschnitt 6 und 7 sind angepasst.
+> 3. **Zwei Zusatzfragen:** Academy als Erweiterungspunkt für Trait-Training (Abschnitt 9) und
+>    Protokollierung persönlichkeitsgetriebener Momente im FM-Stil (Abschnitt 10).
+>
+> Fables Taxonomie liegt inzwischen vor (`persoenlichkeits-taxonomie-konzept-08-11.md`: 13
+> Persönlichkeiten plus Rückfall „Unauffällig“, sechs Regler, Haupt/Neben 65/35, alle 36 Traits).
+> Chris will die Ausgabe als Rangliste mit drei Plätzen. Attribute fließen sekundär ein, als
+> Beispiele nennt er Torment und Determination. Die Ableitungsschicht in 5.2 nimmt das auf, ohne
+> dass sich ihr Aufbau ändert: Eine Rangliste ist nur eine sortierte Ausgabe derselben Punktestapel.
+
 `engine.js` meint `public/mockups/battle-mode.engine.js`. Die Zeilennummern gelten für den
 Arbeitsbaum vom 08.11. (Commit `a4d7dd3ad`). Darin liegt eine fremde, nicht eingecheckte Änderung
 von +2 Zeilen bei ~17308. Für `HEAD` ziehen Zeilen über 17310 also 2 ab. Funktionsnamen stehen immer
@@ -34,13 +57,18 @@ dabei, weil sich Zeilen in dieser Datei täglich verschieben.
    `versucheSteal()` (15012), läuft nur hinter `istHockey()` und trifft nur den Puckführer. Er
    rechnet ausschließlich ABWEHR gegen wirksame AUSDAUER. Als Vorlage für andere Disziplinen taugt
    er weniger als der Bahn-Rempler.
-4. **Die größte Gefahr ist belegt, nicht vermutet.** In der Arena war die Persönlichkeit
-   nachgemessen die **größte eignungsfremde Störquelle** der Rangfolge, mit ε² = 0,229 in TDM.
-   Getragen haben das genau die zwei Verhaltenskanäle „Zusammenhalt“ und „Bindung“. Sie mussten am
-   07.10. für Mini-DM neutralisiert werden (`persHandwerk`). In Battlefield hob dieselbe
-   Neutralisierung rho, riss aber die Pp-Schranke um +27 bis +37 Pp
-   (`arena-zielwahl-opus-empfehlung-02-10.md` 0, 1.1, 10.3). Ein „Egomaniac bricht seine Rolle“ ist
-   genau so ein Kanal.
+4. **Wie stark Persönlichkeit wirken kann, ist schon gemessen. Das ist die Eichung für das
+   Stellrad, kein Stoppschild.** In der Arena war die Persönlichkeit nachgemessen der größte
+   eignungsfremde Faktor der Rangfolge, mit ε² = 0,229 in TDM. Getragen haben das die
+   Verhaltenskanäle „Zusammenhalt“ und „Bindung“ (`arena-zielwahl-opus-empfehlung-02-10.md` 0, 1.1,
+   10.3). Chris will diese Art Wirkung ausdrücklich („rockt“ oder „scheitert grandios“). Die
+   Frage ist also nicht mehr, *ob* Persönlichkeit Ergebnisse verschiebt, sondern *wie stark* und
+   *in welche Richtung*.
+   **Der wichtigste technische Hebel:** Den Ausgang einer eigenmächtigen Aktion entscheidet die
+   Eignung. Dann rockt der starke Egoist und der schwache scheitert. Das ist genau Chris' Bild, und
+   es verschiebt Ergebnisse spürbar, ohne die Rangtreue zu zerstören (Abschnitt 3.5). Die
+   CLAUDE.md-Schranken (rho > 0,80, Pp ≤ 25) bleiben die Abnahme, aber als Obergrenze der Dosis:
+   gesucht ist die **stärkste** Dosierung, die noch besteht, nicht die vorsichtigste.
 5. **Eiskunstlauf hat heute keine Interaktion, die ein Rempler stören könnte.** Das Bühnen-Chassis
    würfelt alle Durchgänge vorab in `bauBuehne()`. Die Bewegung (`stepKuer`, 27696) darf vertraglich
    nie `rr()` rufen und nie Punkte schreiben. **Vier Aktive gleichzeitig zu zeigen ist billig
@@ -49,18 +77,27 @@ dabei, weil sich Zeilen in dieser Datei täglich verschieben.
 6. **Empfohlene Reihenfolge:** (a) Persönlichkeitsschicht als reine Funktion aus der Engine lösen,
    Egomaniac und die fehlenden 13 Traits aufnehmen, Nebenpersönlichkeit ergänzen. Bit-identisch
    machbar, klein. (b) Den Bahn-Rempler per Flag auf Staffel und Climbing ausweiten. Mittel, mit
-   Abnahme. (c) Eiskunstlauf mit vier Aktiven, erst als reine Anzeige. (d) „Rollentreue“ als
-   eigener Kanal zuletzt, mit dem höchsten Risiko.
+   Abnahme. (c) **Rollentreue mit Stellrad** in den Bahn-Disziplinen, wo der Slot ein echtes
+   Verhalten vorgibt. Nach Chris' Antwort ist das kein Nachzügler mehr, sondern der Kern der
+   Vision. (d) Eiskunstlauf mit vier Aktiven, erst als reine Anzeige.
 
-| Teilaspekt | Aufwand | Risiko für rho/Pp |
+Neue Spalte nach der zweiten Runde: Die Wirkung auf rho/Pp ist kein „Risiko“ mehr, sondern eine
+**Zielgröße mit Stellrad**. Die Spalte sagt, wie viel Spielraum die Disziplin für eine spürbare Dosis
+hat, und ob die Wirkung eignungsgebunden gebaut werden kann (dann ist sie für die Rangtreue billig).
+
+| Teilaspekt | Aufwand | Spielraum für spürbare Wirkung (Stellrad) |
 |---|---|---|
-| Persönlichkeits-Ableitung erweitern (Egomaniac, alle 36 Traits, Neben-Persönlichkeit) | **klein** | keins, solange nur abgeleitet und nirgends neu gelesen |
-| Rempler auf weitere Bahn-Disziplinen (Staffel, Climbing) | **mittel** | mittel, bewiesenes Muster, aber Staffel steht auf separaten Bahnen |
-| Rempler im Feldspiel generalisieren (Hockey-Check persönlichkeitsabhängig, Basketball) | **mittel–groß** | hoch, Hockey verfehlt Pp schon heute (38,5 / 81,5) |
-| Eiskunstlauf: vier Aktive **anzeigen** | **klein–mittel** | keins (Anzeige, Warteschlangen-Argument) |
-| Eiskunstlauf: Rempler zwischen den vier **mechanisch** | **mittel–groß** | mittel–hoch, neuer Kanal im vorgewürfelten Chassis |
-| „Rollentreue“ (Egomaniac ignoriert den Slot) | **groß** | **hoch**, der in der Arena nachgewiesene Fehlordnungstyp |
-| Anzeige im Kader/Picker | klein (Text), mittel (ehrlich je Disziplin) | keins |
+| Persönlichkeits-Ableitung erweitern (alle 36 Traits, Rangliste mit 3 Plätzen, Attribute sekundär) | **klein** | keine Wirkung, solange nur abgeleitet und nirgends neu gelesen |
+| Rempel-Neigung als Kanal mit Stellrad (Spurt, Takeshi) | **klein–mittel** | groß (rho 0,91 / 0,90 bieten Puffer, Muster bewiesen) |
+| Rempler auf weitere Bahn-Disziplinen (Staffel, Climbing) | **mittel** | Staffel groß bei rho, knapp bei Pp; Climbing knapp bei rho |
+| „Rollentreue“ mit eignungsgebundenem Ausgang (Bahn: Rennplan, Staffel-Haltung) | **mittel** (vorher: groß) | mittel–groß, sofern der Ausgang an der Eignung hängt (3.5) |
+| „Rollentreue“ in Arena/Basketball | **groß** | Arena zählt im Battle-Mode noch nicht (PPS-Brücke); Basketball mittel |
+| Rempler im Feldspiel (Hockey persönlichkeitsabhängig) | **mittel–groß** | reine Optik, solange Hockey wegen Pp nicht gewertet wird (38,5 / 81,5) |
+| Eiskunstlauf: vier Aktive **anzeigen** | **klein–mittel** | keine Wirkung (Anzeige, Warteschlangen-Argument) |
+| Eiskunstlauf: Rempler zwischen den vier **mechanisch** | **mittel–groß** | mittel, aber nur über Matrixattribute der Disziplin (4.2) |
+| Anzeige im Kader/Picker | klein (Text), mittel (ehrlich je Disziplin) | keine Wirkung |
+| Protokoll/Statistik persönlichkeitsgetriebener Momente (Abschnitt 10) | **mittel** | keine Wirkung (Nachlese, kein `rr()`) |
+| Trait-Training über die Academy (Abschnitt 9) | **mittel–groß** | Manager-Ökonomie, kein Spieltagskanal |
 
 ---
 
@@ -170,7 +207,8 @@ Motorergebnis. Das sind heute 15: alle Bühnen, alle Bahnen, Basketball und I-Sp
 TDM, Mini-DM und Battlefield laufen weiter über die PPS-Duell-Brücke.
 
 **Ein persönlichkeitsgesteuerter Rempler wirkt sich also nur dort auf Ergebnisse aus, wo der Motor
-gewertet wird. Überall sonst ist er reine Anzeige im Live-Zuschauen.** Für Hockey heißt das: Selbst
+gewertet wird. Überall sonst ist er reine Anzeige im Live-Zuschauen.** *Zweite Runde: Chris hat
+bestätigt, dass es nur um den Battle-Mode geht. Der Manager-Pfad bleibt ausdrücklich außen vor.* Für Hockey heißt das: Selbst
 ein perfekter Check-Umbau zählt erst, wenn Hockey die Pp-Schranke besteht (Abschnitt 3.3).
 
 ---
@@ -369,6 +407,75 @@ Abbruchkriterien, aus P1 übertragen (`arena-zielwahl-opus-empfehlung-02-10.md` 
 - (F) Pp ≤ 25 **und** höchstens +6 Pp gegen Ist, je Strom.
 - (S) keine `pageerror`.
 
+### 3.5 Zweite Runde: Dosis statt Verbot, wenn spürbare Verschiebung erwünscht ist
+
+Chris will ausdrücklich, dass Persönlichkeit ein Spiel zum Besseren oder Schlechteren wenden kann.
+An der Technik ändert das wenig, an der **Haltung** der Messung viel.
+
+**1. Die Messung wird eine Dosis-Wirkungs-Kurve statt eines Ja/Nein.** Jeder Persönlichkeitskanal
+bekommt je Disziplin eine Stärke `staerke ∈ [0, 1]`. 0 ist bit-identisch zum heutigen Stand, 1
+ist die volle Taxonomie-Wirkung. Gemessen wird bei mehreren Stufen, etwa 0, 0,25, 0,5, 0,75 und 1,
+jeweils mit:
+
+- rho je Spiel und Saison,
+- Star/Paartreue,
+- Pp auf zwei Strömen,
+- **und einer neuen Wirkungsgröße**: Wie weit verschiebt Persönlichkeit die Ergebnisse
+  tatsächlich? Das ist ε² der Persönlichkeit (`miss-arena-rangvarianz-aufschluesselung.mjs`) bzw.
+  der mittlere Rangsprung zwischen Kanal an und aus bei gleicher Saat.
+
+Eingestellt wird die **stärkste** Stufe, die die CLAUDE.md-Schranken noch besteht. Bisher galt die
+schwächste Stufe, die man nicht vermeiden kann. Das Stellrad „runterdosieren später“ ist damit
+eine Zahl je Disziplin, kein Umbau.
+
+**2. Das Abbruchkriterium wandert vom Delta zur absoluten Schranke.** Die Kriterien in 3.4 waren
+konservativ gegen den Ist-Stand formuliert: (A′) „rho höchstens −0,02 gegen Ist“ und (F)
+„höchstens +6 Pp gegen Ist“. Nach Chris' Antwort ist ein spürbares Minus beabsichtigt. Es gelten
+die absoluten Schranken: rho je Spiel > 0,80, Pp ≤ 25 auf beiden Strömen, Star/Paartreue als
+Beobachtung. Das Delta-Kriterium bleibt nur als **Diagnose**. Ein Pp-Sprung zeigt, dass die
+Persönlichkeit über einen Nebenpfad Attribute belohnt, die die Matrix nicht trägt. Das ist dann
+ein Konstruktionsfehler des Kanals, kein Zeichen für zu viel Persönlichkeit.
+
+**3. Der Konstruktionsgrundsatz, der Wirkung und Rangtreue zugleich ermöglicht.** Chris' zwei Bilder
+(„reißt alles an sich und rockt“ gegen „will alles allein machen und scheitert grandios“) sind
+**dieselbe Aktion mit verschiedenem Ausgang**. Hängt der Ausgang an der Eignung, gilt:
+
+```
+Persoenlichkeit -> WIE OFT er eigenmaechtig handelt   (Neigung, eignungsfremd, Stellrad)
+Eignung/Sub-Skill -> OB es gelingt                    (Duell wie stark = WUCHT/(WUCHT+ROBUST))
+Gelingt es:  mehr eigene Punkte/Leistung (er reisst es an sich)
+Misslingt:   eigener Malus + Teammalus   (er scheitert grandios)
+```
+
+Damit **spreizt** die Persönlichkeit die Ergebnisse entlang der Eignung, statt quer dazu zu
+streuen. Der starke Egoist steigt, der schwache fällt. Für die Einzel-Rangtreue ist das neutral
+bis günstig: Es vergrößert die Abstände in der richtigen Richtung. Kosten entstehen bei der
+Verlässlichkeit, weil ein Alles-oder-nichts-Wurf das Einzelspiel lauter macht, und bei der
+Team-Ergebnistreue. Beides ist genau die Dosis, die man mit `staerke` einstellt.
+
+**Das ist der Unterschied zum Fehler vom 02.10.** Damals hat die Persönlichkeit die **Ausführung
+für alle gleich verschlechtert**: Der Draufgänger lief allein los und ließ sich stellen, egal wie
+gut er war. Das ist Streuung quer zur Eignung, und die kostet rho, ohne Chris' Bild zu erzeugen.
+Ein rockender Egoist kommt in diesem Bau gar nicht vor.
+
+**4. Was sich am Vorschlag konkret ändert:**
+
+| Vorher (erste Runde) | Jetzt |
+|---|---|
+| Rempel-Rate je Disziplin normieren, nur die Verteilung verschieben (5.3) | Normieren bleibt **Option**. Die Rate darf mit der Dosis steigen, wo Ereignisse fehlen (Rempler kosten keine Verlässlichkeit, solange der Ausgang eignungsgebunden ist). Hockey bleibt normiert, die Checkdichte liegt schon über der NHL |
+| Rollentreue zuletzt, „höchstes Risiko“ | Rollentreue als **Kernkanal**, früh, aber mit eignungsgebundenem Ausgang und Stellrad (5.4) |
+| Abbruch bei −0,02 rho / +6 Pp gegen Ist | absolute Schranken, stärkste bestehende Dosis gewinnt |
+| Disziplinen ohne Puffer (Breaking, Climbing, Tennis, I-Spy) „zuletzt oder gar nicht“ | dort niedrigere Startdosis, nicht ausgeschlossen. Breaking (rho 0,801) bleibt praktisch bei 0, bis sein Puffer wächst |
+| Erfolg = Persönlichkeit stört die Ordnung möglichst wenig | Erfolg = Persönlichkeit ist **sichtbar wirksam** (ε² > 0, Rangsprünge messbar) **und** die Disziplin besteht |
+
+**5. Was trotz der neuen Haltung bindend bleibt:** rho > 0,80 je Einzelspiel und Pp ≤ 25 sind
+CLAUDE.md-Pflicht für jede gewertete Disziplin. Chris hat sie in der Nachschärfung ausdrücklich
+als Abnahmemaß bestätigt („als Ziel für die gewählte Dosierung, nicht als Totalverbot“). Eine
+Dosis, die eine Disziplin unter 0,80 drückt, nimmt sie laut `disziplin-abnahme.json` aus der
+Arena-Wertung. Dann zahlt sie über die PPS-Brücke, und die Persönlichkeit wirkt im gewerteten Spiel
+gar nicht mehr. **Die Schranke ist damit kein Gegner der Vision, sondern die Bedingung, unter der
+die Persönlichkeit überhaupt zählt.**
+
 ---
 
 ## 4. Eiskunstlauf: vier Aktive gleichzeitig
@@ -495,6 +602,15 @@ ich **nicht im Detail geprüft**. Die Weichen stehen in `zeichneBuehne()` (31285
   **Vorschlag:** Attribute nur als **Feinanteil** in einzelnen Achsen zulassen (etwa Torment hebt
   die Wucht-Achse ein wenig) und das je Disziplin mit Pp prüfen. Den Archetyp selbst weiter aus
   Klasse, Rasse, Unterklasse und Traits bestimmen. Das muss Chris entscheiden.
+  *Zweite Runde: Chris hat entschieden, dass Traits primär und Attribute sekundär einfließen. Als
+  Beispiele nennt er Torment (Bereitschaft zu verletzen) und Determination (lässt sich nicht
+  abbringen). Das deckt sich mit Fables gedeckeltem Form-Modifikator. Technisch heißt das: Die
+  Attributanteile wirken nur als gedeckelte Zuschläge auf die Achsen und kippen nie allein den
+  Rang 1 der Persönlichkeit. Die Pp-Messung je Disziplin zeigt, ob Torment dabei in Disziplinen
+  ohne Torment-Matrixgewicht unerlaubt trägt.* Die Ausgabe wird außerdem eine **Rangliste mit drei
+  Plätzen** (`rang:[p1,p2,p3]` mit Punktwerten) statt `{haupt, neben[]}`. Das ist dieselbe
+  Sortierung, nur nicht abgeschnitten. Ob Platz 3 mechanisch mitwirkt (etwa 65/25/10) oder nur
+  angezeigt wird, lässt sich je Disziplin über dieselbe Mischfunktion schalten.
 
 ### 5.3 Wie sie Simulationsentscheidungen beeinflusst
 
@@ -514,16 +630,25 @@ rempelNeigung(u, dId) =
 // Buehne Eis:        in bauBuehne(), je gemeinsamem Besuch und Durchgang, vorab gewuerfelt
 ```
 
-**Normieren statt addieren.** Damit der Kanal keine Disziplin lauter macht, wird die mittlere
-Rempel-Rate je Disziplin festgehalten (Mittel über die Kaderfamilie) und nur die **Verteilung**
-nach Persönlichkeit verschoben. Für Hockey ist das zwingend: Die Checkdichte liegt schon über der
-NHL (2.2). Die Zahl der Ereignisse bleibt dann gleich, und CLAUDE.md sagt, dass mehr Ereignisse
-ohnehin fast nie helfen.
+**Normieren als Option, nicht als Pflicht (zweite Runde).** Man kann die mittlere Rempel-Rate je
+Disziplin festhalten (Mittel über die Kaderfamilie) und nur die **Verteilung** nach Persönlichkeit
+verschieben. Für Hockey bleibt das richtig: Die Checkdichte liegt schon über der NHL (2.2).
+Anderswo darf die Rate mit der Dosis steigen, denn Chris will spürbare Wirkung. Solange der Ausgang
+eignungsgebunden ist (3.5 Punkt 3), kosten zusätzliche Rempler wenig Rangtreue. Jeder Leser
+bekommt dafür den Faktor `staerke[dId][kanal]`:
 
-### 5.4 Rollentreue („Egomaniac im Teamslot“) ohne Grundordnung zu zerstören
+```
+neigung = basis + staerke * (mische(TABELLE, u.pers.rang) - basis)   // staerke 0 -> bit-identisch
+```
 
-Das ist der riskanteste Teil, weil er genau der in der Arena gemessene Fehlordnungstyp ist (3.2).
-Drei Leitplanken machen ihn trotzdem baubar:
+### 5.4 Rollentreue („Egomaniac im Teamslot“): spürbar, aber entlang der Eignung
+
+*Zweite Runde: Das ist nicht mehr „der riskanteste Teil“, sondern der Kern von Chris' Vision. Er
+soll Spiele erkennbar kippen lassen. Die frühere Warnung bleibt nur als Bauhinweis: Der in der
+Arena gemessene Fehler entstand, weil die Abweichung für alle gleich schadete (3.5 Punkt 3). Die
+Leitplanken unten sorgen dafür, dass sie stattdessen entlang der Eignung spreizt.*
+
+Drei Leitplanken:
 
 1. **Abweichen kostet das Team, nicht zwingend den Spieler.** Der Sandsack-Plan „anker“ zeigt die
    Form: Der Egoist nimmt sich mehr Anteil, ob er der Bessere ist oder nicht (engine.js 21681).
@@ -541,10 +666,17 @@ Drei Leitplanken machen ihn trotzdem baubar:
      Den konkreten Entscheidungsknoten im Code habe ich **nicht** gefunden.
    - Arena: Befehl gegen `PERSORD` tauschen, wie in `verhalten-drei-stufen-…` 5.7 skizziert. Wirkt
      aber nur im Entwurfskampf, solange TDM, Mini-DM und Battlefield über die PPS-Brücke laufen.
-3. **Wahrscheinlichkeit, kein Schalter.** Etwa „Egomaniac in einem Teamslot hält sich mit 60–80 %
-   an den Plan“, gemischt mit der Nebenpersönlichkeit (ein Loyal-Neben senkt die Abweichung). Wie
-   die Arena-Messung zeigt, sind kontinuierliche Abweichungen messbar steuerbar. Das P1-Muster
-   (Skala auf Mitte zwingen) liefert die Nullprobe.
+3. **Wahrscheinlichkeit, kein Schalter, mit Stellrad.** Etwa „Egomaniac in einem Teamslot hält
+   sich mit 60–80 % an den Plan“, gemischt mit Rang 2/3 (ein Loyal auf Platz 2 senkt die
+   Abweichung). Die Abweichquote ist `staerke × Grundneigung`. Wie die Arena-Messung zeigt, sind
+   kontinuierliche Abweichungen messbar steuerbar. Das P1-Muster (Skala auf Mitte zwingen) liefert
+   bei `staerke=0` die Nullprobe.
+4. **Konkretes Beispiel Staffel** (so liest sich Chris' Satz im Code): Der Slot verlangt
+   „absichern“, der Egomaniac läuft mit Wahrscheinlichkeit p „angreifen“ (weite Marke, mehr Zug).
+   Ob die weite Marke gelingt, entscheidet wie heute TECHNIK, also Matrixattribute. Gelingt sie,
+   holt er Zeit für das Team (er rockt). Misslingt sie, kostet der Wechsel die ganze Mannschaft Zeit
+   (er scheitert grandios). Die vorhandene Kader-Regel „unter TECHNIK 45 immer absichern“ (47575ff.)
+   wird dafür bei Egoisten **aufgeweicht statt gestrichen**. Die Dosis steckt in genau dieser Regel.
 
 ### 5.5 Anzeige
 
@@ -570,44 +702,62 @@ sagt.
 
 ---
 
-## 6. Risiken, ehrlich
+## 6. Risiken und Stellräder (zweite Runde neu gefasst)
 
-1. **Fehlordnung durch Rollentreue** (hoch, belegt): siehe 3.2. Gegenmittel sind 5.4 Punkt 1, die
-   Nullprobe und die Abbruchkriterien.
-2. **Pp-Verschiebung durch neue Kontaktkanäle** (hoch in Bühnen-Disziplinen): Rempel-Duelle laden
-   dazu ein, Power, Torment und Health zu nutzen. Die haben in Eiskunstlauf, Tennis und Fechten
-   wenig oder kein Matrixgewicht. Die Wirkung muss je Disziplin aus deren eigenen Matrixattributen
-   kommen (4.2 Problem 1).
-3. **Disziplinen ohne Puffer** (mittel): Breaking (0,801), Climbing (0,833), Tennis (0,813) und
-   I-Spy (0,811 auf Strom 2) vertragen kaum zusätzliches Rauschen. Dort zuletzt oder gar nicht.
+Seit Chris' Antwort sind die ersten drei Punkte keine Risiken im Sinne von „vermeiden“ mehr. Sie
+sind **Stellräder mit einer Obergrenze**. Echte Risiken bleiben die technischen Punkte ab 4.
+
+1. **Wirkung durch Rollentreue und Rempler** (gewollt, Stellrad): Die gemessene Größenordnung vom
+   02.10. (ε² bis 0,229) zeigt, dass Persönlichkeit stark wirken *kann*. Wie stark, regelt
+   `staerke[dId][kanal]`. Obergrenze ist die stärkste Dosis, die rho > 0,80 noch hält.
+   Konstruktionspflicht: Der Ausgang ist eignungsgebunden (3.5 Punkt 3), sonst entsteht Streuung
+   quer zur Eignung statt Chris' „rockt/scheitert“.
+2. **Pp-Verschiebung durch neue Kontaktkanäle** (Konstruktionsfehler, kein Dosisproblem):
+   Rempel-Duelle laden dazu ein, Power, Torment und Health zu nutzen. Die haben in Eiskunstlauf,
+   Tennis und Fechten wenig oder kein Matrixgewicht. Die Wirkung muss je Disziplin aus deren
+   eigenen Matrixattributen kommen (4.2 Problem 1). Das gilt auch für Torment und Determination als
+   sekundären Persönlichkeitseingang (5.2): Sie dürfen die Neigung färben, nicht den Ausgang.
+3. **Disziplinen mit wenig Puffer** (Stellrad niedriger starten): Breaking (0,801), Climbing
+   (0,833), Tennis (0,813) und I-Spy (0,811 auf Strom 2). Dort klein anfangen und hochmessen, statt
+   auszuschließen.
 4. **Hockey zählt ohnehin nicht** (strukturell): Solange Pp 38,5 / 81,5 beträgt, ist ein
    Hockey-Rempler reine Live-Optik. Der Aufwand lohnt sich erst nach der Rezeptkalibrierung.
-5. **Manager-Modus sieht nichts davon** (strukturell): kein Motor, kein Rempler (1.4). Ob Chris das
-   so erwartet, ist **offen** und eine Frage an ihn.
+5. ~~Manager-Modus~~: geklärt, nur Battle-Mode (Chris, zweite Runde).
 6. **RNG-Strom-Kaskade** (technisch): Jeder neue `rr()` verschiebt alle folgenden Würfe. Ohne
-   Flag-Disziplin sind Vorher/Nachher-Messungen nicht mehr bit-vergleichbar.
+   Flag-Disziplin sind Vorher/Nachher-Messungen nicht mehr bit-vergleichbar. `staerke=0` muss
+   *auch keinen Wurf mehr* ziehen, nicht nur wirkungslos sein.
 7. **Zwei Quellen für die Persönlichkeit** (technisch): engine.js und TS dürfen nicht
    auseinanderlaufen (5.2a).
 8. **Paralleler Umbau von engine.js** (organisatorisch): Kulissen-Integration und
    Oberflächen-Effekte fassen dieselbe Datei an. Persönlichkeits-PRs klein halten, Ableitung zuerst
    außerhalb von engine.js.
+9. **Die Schranke als Kippschalter** (neu): Wer eine Disziplin über die Dosis unter 0,80 drückt,
+   nimmt sie aus der Arena-Wertung (`tests/disziplin-abnahme-guard.test.ts`). Dann wirkt die
+   Persönlichkeit im gewerteten Spiel gar nicht mehr. Die stärkste Dosis ist also die
+   *letzte bestehende*, nicht die erste durchfallende.
 
-## 7. Was ich zuerst angehen würde
+## 7. Was ich zuerst angehen würde (zweite Runde)
 
-1. **PR 1, Ableitung (klein, bit-identisch):** `PW` in eine gemeinsame Datei auslagern. Die 13
-   fehlenden Traits bekommen Punkte (Taxonomie von Fable), dazu Nebenpersönlichkeit und Ego-Achse
-   als **reine Ableitung**, ohne neuen Leser. Das ist zunächst nicht ganz bit-identisch: Ein Spieler
-   mit Egomaniac kann den Archetyp wechseln und damit in Spurt, Takeshi und Staffel anders handeln.
-   **Deshalb in zwei Teilen:** zuerst Auslagerung plus Nullprobe, dann die neuen Punkte, gemessen
-   in genau diesen drei Disziplinen.
-2. **PR 2, Rempel-Neigung als Disziplinkanal (mittel):** `willTackeln` durch die gemischte Neigung
-   ersetzen (Spurt, Takeshi), die Schlüssel `taktiker`/`beschuetzer` bereinigen und normieren.
-   Abnahme wie in 3.4.
-3. **PR 3, Eiskunstlauf vier Aktive als Anzeige (klein–mittel, bit-identisch).** Vorher Chris
-   fragen, ob „vier“ auch für das Kurzprogramm gilt, und ob das seinem Einwand vom 13.09. gegen
-   „alle gleichzeitig“ nicht widerspricht.
-4. **Erst danach** Staffel- und Climbing-Rempler, ein Eiskunstlauf-Rempler (vorab gewürfelt) und
-   die Rollentreue, jeweils einzeln mit Abnahme.
+1. **PR 1, Ableitung (klein):** `PW` in eine gemeinsame Datei auslagern, mit Nullprobe
+   (bit-identisch). Danach Fables Matrix über alle 36 Traits, eine Rangliste mit drei Plätzen und
+   Torment/Determination als gedeckelter Sekundäranteil, alles als **reine Ableitung** ohne neuen
+   Leser. Achtung: Weil Spurt, Takeshi und Staffel die Persönlichkeit schon lesen, ist der zweite
+   Teil dort *nicht* bit-identisch. Er wird in genau diesen drei Disziplinen gemessen.
+2. **PR 2, Stellrad-Gerüst plus Rempel-Neigung (klein–mittel):** `staerke[dId][kanal]` einführen
+   (0 = heute), `willTackeln` durch die gemischte Neigung ersetzen, `taktiker`/`beschuetzer`
+   bereinigen. Dosis-Wirkungs-Kurve für Spurt und Takeshi messen (3.5 Punkt 1). Das erste
+   Ergebnis für Chris ist eine Tabelle „bei Dosis x verschiebt sich das so, rho bleibt bei y“.
+3. **PR 3, Rollentreue auf der Bahn (mittel):** Staffel-Haltung und `planJeSlot` mit
+   eignungsgebundenem Ausgang (5.4 Punkt 4), wieder mit Dosiskurve. Damit wird Chris'
+   Egomaniac-Beispiel zum ersten Mal im gewerteten Spiel sichtbar.
+4. **Parallel und unabhängig: Protokoll der Momente** (Abschnitt 10, Schritt 1). Ohne Protokoll
+   kann niemand sehen, *ob* der Egoist gerockt oder versagt hat. Es gehört deshalb früh dazu und
+   kostet keine Rangtreue.
+5. **Eiskunstlauf vier Aktive als Anzeige (klein–mittel, bit-identisch).** Vorher Chris fragen, ob
+   „vier“ auch für das Kurzprogramm gilt und wie es zu seinem Einwand vom 13.09. gegen „alle
+   gleichzeitig“ steht.
+6. **Danach** Climbing-Rempler (eigene Form), Eiskunstlauf-Rempler (vorab gewürfelt),
+   Basketball-Rollentreue und Hockey nach dessen Pp-Kalibrierung.
 
 ## 8. Was ich nicht geprüft habe
 
@@ -618,5 +768,88 @@ sagt.
 - Ob der Headless-Runner im gebuchten Battle-Spiel `neuPersBerechnen` für den echten Kader aufruft.
   Die Messung vom 03.11. (Spurt ändert sich mit Traits) spricht dafür. Den Runner-Pfad
   `lib/battle/arena-headless-runner.ts` habe ich dafür nicht gelesen.
-- Fables Taxonomie liegt noch nicht im Repo. Die Vorschläge zu Egomaniac und Co. sind deshalb nur
-  strukturell, nicht inhaltlich.
+- Fables Taxonomie (`persoenlichkeits-taxonomie-konzept-08-11.md`) habe ich nur in der Gliederung
+  gelesen, nicht inhaltlich gegen die Architektur hier abgeglichen.
+
+---
+
+## 9. Zusatzfrage: Academy als Ort für Trait-Training? (kurze Ersteinschätzung)
+
+**Befund im Code:**
+
+- `lib/facilities/facility-catalog.ts` 209–227: `facilityId: "academy"`, Effekttyp
+  `"low_tier_upgrade_discount"` (der Name ist historisch). Der reale Effekt ist `modifierPct`
+  6–30 % auf das organische Trainingsbudget berechtigter F/E/D-Spieler (Rating < 45), gelesen über
+  `getAcademyDevelopmentBoostPct` in `lib/training/organic-season-progression.ts` 1041.
+  `discountPct` ist laut Kommentar tot. **Mit Traits hat die Academy nichts zu tun.**
+- **Traits sind heute statisch.** Ich habe keine Stelle gefunden, die einem bestehenden Spieler
+  einen Trait hinzufügt oder wegnimmt. Gesucht habe ich nach Zuweisungen auf
+  `traitsPositive`/`traitsNegative` in `lib/` außerhalb von Tests. Gelesen werden sie vielfach
+  (Training, Moral, Verhandlung). `lib/players/player-baseline-service.ts` 160/192/426/687 führt
+  sie als Teil der **Spieler-Baseline**. Eine Trait-Änderung müsste deshalb auch die Baseline bzw.
+  deren Rücksetzpfade berücksichtigen, sonst setzt ein Baseline-Lauf sie zurück. Ob das so ist,
+  habe ich **nicht** im Detail geprüft.
+- Die Fazilitäten haben ein sauberes Erweiterungsmuster: `FacilityEffectType` als Union,
+  `levels[]` mit `modifierPct`/`upgradeCost`/`seasonUpkeep`, und der Specialist Wing zeigt
+  **Varianten** innerhalb eines Gebäudes (`SpecialistWingVariant`).
+
+**Einschätzung:** Die Academy ist ein **plausibler Erweiterungspunkt, kein neues Gebäude nötig**,
+aber als neue *Funktion*, nicht als Umdeutung des bestehenden Effekts:
+
+- **Technisch** ließe sich ein zweiter Effekttyp oder eine Variante ergänzen (Muster Specialist
+  Wing), etwa „Trait-Kurs: einen Spieler je Saison zuweisen“. Die Abwicklung gehört an den
+  Saisonend-Pfad, an dem `organic-season-progression.ts` ohnehin je Spieler entscheidet. Er kennt
+  dort schon den Trait-Faktor (`traitModifierPct`, 1302).
+- **Die Kosten**, die Chris andeutet (weniger Leistung), passen technisch zum vorhandenen
+  Trainingsbudget. Ein Spieler im Trait-Kurs verzichtet auf einen Teil seiner organischen
+  Entwicklung, statt dass eine neue Währung entsteht.
+- **Was es wirklich teuer macht, ist nicht das Gebäude**, sondern die Folgewirkung. Ein Trait
+  speist Mutator-Pool, Training, Moral, Verhandlung und künftig die Persönlichkeit. Ein
+  Trait-Wechsel verschiebt also mehrere Systeme gleichzeitig, und die Persönlichkeits-Rangliste
+  kann kippen. Das ist gewollt, muss aber in der Kader- und Picker-Anzeige erklärt werden.
+- **Grob mittel bis groß, je nach Regelwerk.** Offene Designfragen, die nicht technisch sind:
+  Welche Traits sind ab- oder antrainierbar (alle 36 oder nur „Charakterschwächen“ wie
+  Egomaniac/Lazy)? Wahrscheinlichkeit oder Garantie? Wie lange dauert es?
+
+## 10. Zusatzfrage: persönlichkeitsgetriebene Momente nachvollziehbar protokollieren (Architektur-Notiz)
+
+**Was heute durch die Leitung kommt und was nicht:**
+
+- Der Motor zählt schon: `u.tackles`, `u.getackelt`, `u.ausgewichen` (Bahn, engine.js 47207ff.),
+  `decker.checks` (Hockey). Dazu kommt ein Ereignisprotokoll `logZug(seite, art, extra)`
+  (engine.js 13773) im Feldspiel.
+- Bei der App kommt davon **fast nichts an.** `ArenaFixtureResult` (`lib/battle/arena-headless-runner.ts`
+  ~280–340) trägt nur `seiten`, `boxscore[{name, wert, playerId, side, torwart?}]`, also **einen
+  Skalar je Spieler**, sowie im Feldspiel `momente` (drei „Spiel des Tages“-Momente aus
+  `berechneFeldspielMomente`, 13824). In `lib/battle` und `lib/resolve` steht kein einziger
+  Rempler-/Tackle-Zähler. In der Saisonbuchhaltung landet nur `battle_mode_arena_boxscore_impact`
+  (`lib/foundation/season-points-ledger.ts` 25/282).
+
+**Skizze in drei Schichten** (keine Umsetzung):
+
+1. **Motor: strukturierte Ereignisse statt nur Zähler.** Jeder persönlichkeitsgetriebene Moment
+   bekommt beim Entstehen einen Eintrag, z. B.:
+   ```
+   {typ:"rempler"|"rollenbruch"|"konflikt", akteur, ziel?, persRang1, kanal,
+    ausgang:"gelungen"|"misslungen", wirkung:{zeit?, punkte?}, t}
+   ```
+   Wichtig ist das Feld **„Kanal plus Ausgang“**: Nur so lässt sich später „er riss es an sich und
+   rockte“ von „scheiterte grandios“ unterscheiden. Vertragsregel wie bei `momente`: reine
+   Nachlese, **kein `rr()`**, damit es bit-identisch und rangtreue-neutral ist.
+2. **Brücke: ein neues optionales Feld am Ergebnis**, nach dem Vorbild `momente`, etwa
+   `ArenaFixtureResult.persoenlichkeitsEreignisse` plus ein verdichteter Zähler je Spieler.
+   Die Zuordnung zur echten Spieler-ID nutzt dieselbe Namensauflösung wie `boxscore.playerId`, mit
+   derselben `null`-Regel bei Kollisionen.
+3. **Persistenz: je Spieler und Spieltag eine Statistikzeile**, nicht nur der Saison-Skalar. Das
+   ist das, was „Durchschnittsnoten wie im FM“ technisch braucht: eine Tabelle
+   `(saison, spieltag, disziplin, playerId) → {wert, slot, rempler+/-, rollenbrueche gelungen/misslungen, …}`.
+   Durchschnitte, Formkurven und „bester Slot“ entstehen dann als Abfrage, nicht als
+   Zusatzlogik. Rohereignisse lassen sich optional je Spiel komprimiert ablegen, für ein
+   Spielbericht-Replay.
+
+**Wo das Protokoll den Rest der Vision füttert:** Dieselben Ereignisse sind der natürliche Eingang
+für Chris' Rivalitäten- und Moral-Idee (Vision, Nachschärfung „Neue Ideen“ 1). Ein „Konflikt“
+zwischen eigenen Spielern würde dort von `lib/morale/player-morale-service.ts` gelesen statt neu
+erfunden. Ein Rivalitäten-Konzept habe ich im Repo nicht als eigenes Dokument gefunden. Kandidat
+für die Vorgeschichte ist `docs/team-abilities-redesign.md`, ungeprüft. Grober Aufwand: Motor und
+Brücke **klein–mittel**, Persistenz und Anzeige **mittel** (neue Tabelle, Migration, UI).
