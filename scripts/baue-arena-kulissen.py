@@ -78,6 +78,11 @@ CHASSIS = {
     # Gewichtheben (Sandsack-Schicht): die Szene ist ein vollstaendiger Stationsplan (Bahnen,
     # Silo, Rampen), der nicht deckungsgleich mit den Reihen des Motors liegt.
     "gewichtheben": {"art": "buehne-stationsplan"},
+    # Batch 2 (07.11.): Umgebung aus der Szene, Demo-Zutaten weg, Flaeche nach Motor-Geometrie —
+    # gebaut von scripts/baue-kulisse-buehnen.py.
+    "tennis": {"art": "quelle"},
+    "fechten": {"art": "quelle"},
+    "speed-schach": {"art": "quelle"},
 }
 CHASSIS_GEBAUT = {"arena", "buehne", "quelle"}
 # Fertige Motor-Kulissen aus einem eigenen Bestellskript (Chassis "quelle"): schon 1240x470.

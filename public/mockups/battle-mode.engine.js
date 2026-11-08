@@ -29625,6 +29625,12 @@
   }
 
   function bodenBuehne(){
+    // KULISSE (Kulissen-Integration 07.11., s. kulisseZeichnen und scripts/baue-kulisse-
+    // buehnen.py): gibt es fuer diese Buehne eine illustrierte Umgebung (Fechthalle/Schlosshof,
+    // Park/Abteil beim Speed-Schach), ersetzt sie Verlauf und Scheinwerferkegel. Die Bank unten
+    // (die anderen Bahnen/Bretter) bleibt als halbdurchsichtiges Podest lesbar darueber.
+    const mitKulisse=kulisseZeichnen();
+    if(!mitKulisse){
     // BUeHNE STATT SANDPLATZ. Ein Podest mit Scheinwerferkegeln statt der Kampfarena —
     // die Kosmetik sagt sofort, dass hier niemand kaempft.
     const g=ctx.createLinearGradient(0,0,0,H);
@@ -29636,7 +29642,15 @@
       ctx.fillStyle=s;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x-90,H);ctx.lineTo(x+90,H);
       ctx.closePath();ctx.fill();
     }
-    ctx.fillStyle="#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
+    }
+    if(mitKulisse){
+      // Kopfzeile ("Bahn 1 von 6", "Brett 4 von 6 · Zug ...") steht ohne eigenen Kasten im Bild:
+      // ueber Laub, Tribuene oder Abteildecke braucht sie einen dunklen Himmel.
+      const kopf=ctx.createLinearGradient(0,0,0,110);
+      kopf.addColorStop(0,"rgba(8,6,12,.62)");kopf.addColorStop(1,"rgba(8,6,12,0)");
+      ctx.fillStyle=kopf;ctx.fillRect(0,0,W,110);
+    }
+    ctx.fillStyle=mitKulisse?"rgba(24,19,32,.78)":"#2a2233";ctx.fillRect(0,H*0.78,W,H*0.22);
     ctx.strokeStyle="rgba(255,255,255,.10)";ctx.lineWidth=1;
     for(let i=1;i<8;i++){ctx.beginPath();ctx.moveTo(i*W/8,H*0.78);ctx.lineTo(i*W/8,H);ctx.stroke();}
     // Publikums-Loop beenden, falls wir GERADE von Gewichtheben herkommen (s. bodenHeben
@@ -30110,17 +30124,22 @@
     if(showcasePublikumAn){ tonLoopStop(); showcasePublikumAn=false; }
     if(ispyRaumAn){ tonLoopStop(); ispyRaumAn=false; }
 
+    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
+    // eine echte Grundlinien-Uebertragung. Linien jetzt aus tennisPlatzGeometrie() (s.
+    // Kommentar dort), nicht mehr lokal dupliziert.
+    const {topY,botY,netY,breiteBei,einzugAussen}=tennisPlatzGeometrie();
+
+    // KULISSE (Kulissen-Integration 07.11., s. kulisseZeichnen und scripts/baue-kulisse-
+    // buehnen.py): Tribuene und Belag der PixelLab-Szene (Rasen, Sand, Hartplatz). Der Belag
+    // liegt in der Kulisse schon genau im Trapez von tennisPlatzGeometrie() -- deshalb faellt
+    // hier nur die gemalte Grundflaeche weg; Linien und Netz zeichnet der Motor weiter selbst.
+    if(!kulisseZeichnen()){
     // GRUNDFLAECHE: dunkler Umraum -- der Platz selbst (unten) traegt schon genug Farbe,
     // anders als bodenBuehne()s neutrales violettes Podest braucht es hier keinen eigenen
     // Scheinwerferkegel-Akzent.
     const g=ctx.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"#141826"); g.addColorStop(1,"#0a0c14");
     ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-
-    // TRAPEZ-PERSPEKTIVE: schmal oben (fern), breit unten (nah) -- dieselbe Kamera-Logik wie
-    // eine echte Grundlinien-Uebertragung. Linien jetzt aus tennisPlatzGeometrie() (s.
-    // Kommentar dort), nicht mehr lokal dupliziert.
-    const {topY,botY,netY,breiteBei,einzugAussen}=tennisPlatzGeometrie();
 
     // Gruener Auslauf, dann blauer Hartplatz obendrauf (US-Open-Palette).
     ctx.fillStyle="#1c5c3a";
@@ -30133,6 +30152,7 @@
     ctx.moveTo(W/2-breiteBei(topY),topY); ctx.lineTo(W/2+breiteBei(topY),topY);
     ctx.lineTo(W/2+breiteBei(botY),botY); ctx.lineTo(W/2-breiteBei(botY),botY);
     ctx.closePath(); ctx.fill();
+    }
 
     // WEISSE LINIEN: Aussenlinie (Doppel), Einzel-Seitenlinien, Aufschlaglinien,
     // Mittelaufschlaglinie -- keine erfundene Form, das Standard-Tennisplatzbild.

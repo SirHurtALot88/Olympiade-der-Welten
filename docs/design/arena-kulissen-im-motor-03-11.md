@@ -124,3 +124,26 @@ Domination, Bahn-Pod, Battlefield-Pod; 69 Einträge) ist vorher und nachher byte
 Ein erster Anlauf ließ die Ränder per PixelLab-Inpaint (`/inpaint-v3`) nachmalen. Das Ergebnis schwankte zu stark:
 ein schwarzes Rechteck, eine unbemalte Sandfläche, erfundene Straßen, und unter der Maske zeichnete das Modell
 Palisade und Fluss wieder nach. Deshalb der deterministische Weg.
+
+## Batch 2: Tennis, Fechten, Speed-Schach (07.11.)
+
+`python3 -I scripts/baue-kulisse-buehnen.py` nimmt aus jeder Szene nur die **Umgebung**: Tribüne, Mauer, Saal und
+Boden als Material. Platz, Bahn und Brett zeichnet weiter der Motor aus seiner eigenen Geometrie, die Kulisse zeigt
+nichts davon doppelt. Gemeinsame Werkzeuge liegen in `scripts/lib/kulissen_werkzeug.py` (Flicken, seitliches
+Füllen, Linien entfernen); Battlefield nutzt sie mit.
+
+- **Tennis** (court/riviera/dach): Oben steht ein Tribünenband. Daraus entfernt sind Anzeigetafel samt Pfosten
+  (Kiti/Wurzelbert), Schiedsrichter mit Stuhl, Balljungen, TEMPO-Anzeige und die Banner V-W/A-A. Darunter liegt der
+  Belag der Szene ohne Platzlinien. Beim Hartplatz liegt der blaue Belag genau im Trapez von `tennisPlatzGeometrie()`,
+  der grüne Auslauf darum. `bodenTennis()` lässt mit Kulisse nur seine gemalten Flächen weg, Linien und Netz bleiben.
+- **Fechten** (piste/schlosshof): Der Hintergrund der Szene endet knapp unter der Motor-Bahn. Weg sind die
+  Demo-Anzeigetafel (im Schlosshof samt Torturm dahinter), die Kampfrichtertische und die Teamstreifen in Rot/Grün.
+  Die Schlosshof-Banner in den Demo-Teamfarben sind auf Heim/Gast des Motors umgefärbt (orange/türkis). Der Boden
+  ist der Bodenstreifen der Szene, versetzt gekachelt.
+- **Speed-Schach** (park/zug): Die Szene deckt die Leinwand und ist ganz unten ausgeschnitten, ohne die beiden
+  Demo-Stühle. Die Spieler stehen auf dem Boden, das Publikum sitzt dahinter. Die Variante `turniersaal` fehlt
+  bewusst: Im Saal sitzen zwei eingebrannte Demo-Partien in Höhe der Motor-Spieler.
+- **`bodenBuehne()`** (Fechten, Speed-Schach): Mit Kulisse fallen Verlauf und Scheinwerferkegel weg. Die Bank
+  unten bleibt als halbdurchsichtiges Podest, und ein dunkler Verlauf oben hält die Kopfzeile lesbar.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.

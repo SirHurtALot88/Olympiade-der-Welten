@@ -41,6 +41,20 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(motor).toContain('orte:[{name:"Nord",fy:85/470},{name:"Mitte",fy:0.5},{name:"Süd",fy:385/470}]');
   });
 
+  it("Tennis, Fechten, Speed-Schach haben Kulissen; der Tennis-Belag sitzt im Platz-Trapez des Motors", () => {
+    // scripts/baue-kulisse-buehnen.py rechnet mit tennisPlatzGeometrie() (topY=H*0.17, botY=H*0.615,
+    // halbe Breite W*0.145..W*0.30). Aendert sich die Motor-Geometrie, muss die Kulisse neu gebaut werden.
+    for (const d of ["tennis", "fechten", "speed-schach"]) {
+      expect(kulissen[d]?.length ?? 0, d).toBeGreaterThanOrEqual(2);
+    }
+    const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
+    expect(motor).toContain("const topY=H*0.17, botY=H*0.615, netY=(topY+botY)/2;");
+    expect(motor).toContain("const topHalfAus=W*0.145, botHalfAus=W*0.30;");
+    const skript = readFileSync(path.join(wurzel, "scripts/baue-kulisse-buehnen.py"), "utf8");
+    expect(skript).toContain("T_TOP, T_BOT = LH * 0.17, LH * 0.615");
+    expect(skript).toContain("T_HALB_TOP, T_HALB_BOT = LW * 0.145, LW * 0.30");
+  });
+
   it("jede Kulisse ist eine Variante der Szenen-Registry, und ihr Bild liegt unter public/", () => {
     for (const [dId, liste] of Object.entries(kulissen)) {
       const varianten = DISCIPLINE_SCENES[dId]?.variants.map((v) => v.id) ?? [];

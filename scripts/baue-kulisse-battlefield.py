@@ -51,6 +51,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 WURZEL = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(WURZEL / "scripts" / "lib"))
+from kulissen_werkzeug import flicken  # noqa: E402
 ZIEL = WURZEL / "data" / "generated" / "kulissen-quellen" / "battlefield"
 
 LW, LH = 1240, 470
@@ -134,50 +136,6 @@ def ringe_spiegeln(a: np.ndarray, schutz: np.ndarray, halb: float = 9.0) -> None
         qy = np.where(blockiert, np.where(nah_aussen, innen[1], aussen[1]), qy)
         ok = band & ~schutz_weit[qy, qx]
         a[ok] = a[qy[ok], qx[ok]]
-
-
-def ueberlappt(a, b) -> bool:
-    return not (a[2] <= b[0] or b[2] <= a[0] or a[3] <= b[1] or b[3] <= a[1])
-
-
-def flicken(bild: Image.Image, ziele, verboten, bereich, ring: int = 8, schritt: int = 3) -> Image.Image:
-    """Jedes Zielrechteck bekommt das Bodenstueck gleicher Groesse, dessen Umrandung (8-px-Ring) am
-    besten passt — verglichen vor allem im Muster (Bild minus Unschaerfe), wie hindernisse_zumalen()
-    in baue-arena-kulissen.py. Quellen duerfen kein Ziel und nichts aus `verboten` beruehren."""
-    roh = np.asarray(bild, dtype=np.float32)
-    weich = np.asarray(bild.filter(ImageFilter.GaussianBlur(6)), dtype=np.float32)
-    arr = (roh - weich) + 0.35 * weich
-    aus = bild.copy()
-    bx0, by0, bx1, by1 = bereich
-    sperre = list(ziele) + list(verboten)
-    for x0, y0, x1, y1 in ziele:
-        w, h = x1 - x0, y1 - y0
-        innen = np.ones((h + 2 * ring, w + 2 * ring), bool)
-        innen[ring:ring + h, ring:ring + w] = False
-
-        def umrandung(px, py):
-            return arr[py - ring: py + h + ring, px - ring: px + w + ring][innen]
-
-        ziel = umrandung(x0, y0)
-        best, quelle = None, None
-        for qy in range(by0 + ring, by1 - h - ring, schritt):
-            for qx in range(bx0 + ring, bx1 - w - ring, schritt):
-                q = (qx - ring, qy - ring, qx + w + ring, qy + h + ring)
-                if any(ueberlappt(q, o) for o in sperre):
-                    continue
-                dd = float(np.mean((umrandung(qx, qy) - ziel) ** 2))
-                if best is None or dd < best:
-                    best, quelle = dd, (qx, qy)
-        if quelle is None:
-            print(f"    WARNUNG: kein freies Bodenstueck fuer {(x0, y0, x1, y1)}", file=sys.stderr)
-            continue
-        qx, qy = quelle
-        stueck = bild.crop((qx - ring, qy - ring, qx + w + ring, qy + h + ring))
-        kern = Image.new("L", stueck.size, 0)
-        ImageDraw.Draw(kern).rectangle((ring, ring, ring + w - 1, ring + h - 1), fill=255)
-        maske = Image.composite(kern, kern.filter(ImageFilter.GaussianBlur(ring / 2)), kern)
-        aus.paste(stueck, (x0 - ring, y0 - ring), maske)
-    return aus
 
 
 def senkrecht_fuellen(bild: Image.Image, r, dy: int, rand: int = 5) -> None:

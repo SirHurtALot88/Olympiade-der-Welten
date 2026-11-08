@@ -16,6 +16,20 @@ window.__ARENA_KULISSEN={
    "dunkel": 0.24
   }
  ],
+ "fechten": [
+  {
+   "id": "piste",
+   "label": "Piste",
+   "bild": "/sprites/kulissen/fechten/piste.jpg",
+   "dunkel": 0.06
+  },
+  {
+   "id": "schlosshof",
+   "label": "Schlosshof",
+   "bild": "/sprites/kulissen/fechten/schlosshof.jpg",
+   "dunkel": 0.13
+  }
+ ],
  "mini-dm": [
   {
    "id": "basis",
@@ -33,6 +47,20 @@ window.__ARENA_KULISSEN={
    "id": "strom-kaefig",
    "label": "Strom-Käfig",
    "bild": "/sprites/kulissen/mini-dm/strom-kaefig.jpg",
+   "dunkel": 0.06
+  }
+ ],
+ "speed-schach": [
+  {
+   "id": "park",
+   "label": "Stadtpark",
+   "bild": "/sprites/kulissen/speed-schach/park.jpg",
+   "dunkel": 0.21
+  },
+  {
+   "id": "zug",
+   "label": "Speisewagen",
+   "bild": "/sprites/kulissen/speed-schach/zug.jpg",
    "dunkel": 0.06
   }
  ],
@@ -54,6 +82,26 @@ window.__ARENA_KULISSEN={
    "label": "Frost",
    "bild": "/sprites/kulissen/tdm/frost.jpg",
    "dunkel": 0.3
+  }
+ ],
+ "tennis": [
+  {
+   "id": "court",
+   "label": "Centre Court",
+   "bild": "/sprites/kulissen/tennis/court.jpg",
+   "dunkel": 0.11
+  },
+  {
+   "id": "riviera",
+   "label": "Sandplatz Riviera",
+   "bild": "/sprites/kulissen/tennis/riviera.jpg",
+   "dunkel": 0.13
+  },
+  {
+   "id": "dach",
+   "label": "Hochhausdach",
+   "bild": "/sprites/kulissen/tennis/dach.jpg",
+   "dunkel": 0.06
   }
  ],
  "wettessen": [
