@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tauziehen an der Hafenkante</title>
+<!--
+  PROTOTYP der Format-Variante "Tauziehen" fuer Gewichtheben (08.11.). Kein Produktionscode, von der
+  App nicht verlinkt. Mechanik: tauziehen-prototyp.sim.js, Kulisse: tauziehen-prototyp/hafenkante.png
+  (scripts/baue-kulisse-tauziehen-prototyp.py), Figuren: die echten PixelLab-Sprites aus
+  battle-mode.figuren.js. Einordnung: docs/design/format-varianten-machbarkeit-08-11.md.
+-->
+<style>
+:root { --bg:#0d0c10; --panel:#16141b; --fg:#eeeae4; --muted:#a39d94; --line:#2c2930; --heim:#d68a2c; --gast:#34aab4; --gut:#7fc77a; --schlecht:#e0675c; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.wrap { max-width:1280px; margin:0 auto; padding:20px 16px 40px; }
+h1 { font-size:1.3rem; margin:0 0 4px; text-wrap:balance; }
+p.lead { color:var(--muted); font-size:0.9rem; line-height:1.55; max-width:90ch; margin:0 0 14px; }
+.stage { position:relative; width:100%; aspect-ratio:1240/470; border-radius:10px; overflow:hidden; background:#000; box-shadow:0 8px 28px rgba(0,0,0,.55); }
+canvas { display:block; width:100%; height:100%; image-rendering:pixelated; }
+.controls { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; align-items:center; }
+button, select { font:inherit; font-weight:600; font-size:0.85rem; padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:#1a181e; color:var(--fg); cursor:pointer; }
+button.on { border-color:var(--heim); color:var(--heim); }
+.t { font-variant-numeric:tabular-nums; color:var(--muted); font-size:0.85rem; margin-left:auto; }
+.grid { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:14px; }
+@media (max-width:900px){ .grid { grid-template-columns:1fr; } }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; overflow-x:auto; }
+.card h2 { font-size:0.95rem; margin:0 0 8px; }
+table { border-collapse:collapse; width:100%; font-size:0.8rem; font-variant-numeric:tabular-nums; }
+th, td { padding:4px 6px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+th { color:var(--muted); font-weight:600; cursor:help; }
+td:first-child, th:first-child { text-align:left; }
+td.heim { color:var(--heim); } td.gast { color:var(--gast); }
+.ticker { font-size:0.8rem; line-height:1.5; max-height:360px; overflow-y:auto; color:var(--muted); }
+.ticker b { color:var(--fg); font-weight:600; }
+.cap { color:var(--muted); font-size:0.82rem; line-height:1.55; margin-top:14px; max-width:100ch; }
+.cap code { color:var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tauziehen an der Hafenkante — Prototyp einer Gewichtheben-Format-Variante</h1>
+  <p class="lead">Alle zwölf Zieher der Begegnung treten gegeneinander an: fünf Schweizer Runden, je sechs Taue gleichzeitig. Die Gegner stehen sich an einem Schacht im Kai gegenüber, ihre sechs Seile kreuzen sich über der Grube (Fables Bild „Die Grube“). Mit „Ansicht“ lässt sich auf die Kaimauer-Reihen umschalten, die Mechanik bleibt dieselbe. Runde&nbsp;1 paart Slot gegen Slot, danach Sieger gegen Sieger, auch Teamkollegen untereinander. Wer verliert, wird über die Kante gezogen und geht baden. Zum Schluss kommt das <b>Große Tau</b>, sechs gegen sechs, um zwei Bonuspunkte. Es gelten dieselben fünf Gewichtheben-Teilwerte wie beim Hantel-Duell (LAST, TECHNIK, NERVEN, ANSAGE, ERHOLUNG), nur die Handlung ist eine andere.</p>
+  <div class="stage"><canvas id="c" width="1240" height="470"></canvas></div>
+  <div class="controls">
+    <button id="play">Pause</button>
+    <button data-sp="1">1×</button>
+    <button data-sp="2" class="on">2×</button>
+    <button data-sp="4">4×</button>
+    <button id="neu">Neue Saat</button>
+    <button id="ansicht">Ansicht: Grube</button>
+    <select id="paarung" aria-label="Paarung"></select>
+    <span class="t" id="tt"></span>
+  </div>
+  <div class="grid">
+    <div class="card"><h2>Boxscore <span id="bxs" style="color:var(--muted);font-weight:400"></span></h2><table id="box"></table></div>
+    <div class="card"><h2>Ticker</h2><div class="ticker" id="ticker"></div></div>
+  </div>
+  <p class="cap">Prototyp, nicht im Spiel. Die Mechanik liegt in <code>tauziehen-prototyp.sim.js</code> und liest nur die fünf Teilwerte, die der Motor für Gewichtheben ohnehin aus der gesperrten Matrix mischt. Die Vorab-Sonde <code>scripts/miss-tauziehen-prototyp.mjs</code> kommt auf rho je Spiel 0,85 und eine Pp-Abweichung von 10 bis 11. Sie misst allerdings ohne Slot-, Trait- und Formkanäle und ist deshalb noch keine Abnahme. Die Kader sind fünf echte Paarungen aus dem live-save-Abbild (<code>kaderfamilie-live-save.json</code>). Die Kulisse ist die PixelLab-Hafenszene der Sandsack-Runde, umgebaut mit <code>scripts/baue-kulisse-tauziehen-prototyp.py</code>.</p>
+</div>
+<script src="battle-mode.figuren.js"></script>
+<script src="tauziehen-prototyp.sim.js"></script>
+<script>
+(function(){
+"use strict";
+const T=window.__TAUZIEHEN, FIG=window.__ARENA_FIGUREN||{};
+const cv=document.getElementById("c"), g=cv.getContext("2d");
+g.imageSmoothingEnabled=false;
+const W=1240, H=470, MITTE=620, KANTE_A=553, KANTE_B=687, ABSTAND=92, ZELLE=74;
+const ROW_Y=i=>205+i*47;
+const FARBE=["#d68a2c","#34aab4"];
+
+const bild=(src)=>{const im=new Image(); im.src=src; return im;};
+const KULISSEN={grube:bild("tauziehen-prototyp/hafengrube.png"), kai:bild("tauziehen-prototyp/hafenkante.png")};
+let ansicht="grube";
+// Grube: Schachtmitte und Halbachsen wie GRUBE in scripts/baue-kulisse-tauziehen-prototyp.py
+const GM={x:620,y:318}, G_KANTE={x:172,y:74}, G_STAND={x:440,y:136};
+const spriteCache={};
+function sprite(name){
+  if(spriteCache[name]!==undefined)return spriteCache[name];
+  const f=FIG[name]; if(!f){spriteCache[name]=null;return null;}
+  const basis="/sprites/figuren/"+f.s+"/";
+  const anim=(art,richtung)=>{const a=f.a&&f.a[art]&&f.a[art][richtung]; return a?{im:bild(basis+a[0]+"-"+richtung+".png"),n:a[1]}:null;};
+  return spriteCache[name]={c:f.c, east:bild(basis+"east.png"), west:bild(basis+"west.png"),
+    walk:anim("walk","east"), jubel:anim("angriff","east"), treffer:anim("treffer","east")};
+}
+
+// ------------------------------------------------------------------ Daten / Spiel
+let KADER=null, paarungIdx=0, saat=20261108, spiel=null, programm=[], uhr=0, tempo=2, laeuft=true, ticker=[];
+const tickerEl=document.getElementById("ticker"), boxEl=document.getElementById("box");
+
+function neuesSpiel(){
+  const p=KADER.paarungen[paarungIdx];
+  spiel=T.spiele(p.heim,p.gast,saat,{film:true});
+  spiel.namen=[p.heimName,p.gastName];
+  // Sprites vorladen
+  spiel.teilnehmer.forEach(u=>sprite(u.n));
+  programm=[{typ:"intro",dauer:3}];
+  spiel.runden.forEach((taue,ri)=>{
+    const d=Math.max(...taue.map(t=>t.dauer));
+    programm.push({typ:"runde",ri,dauer:d+2.6});
+  });
+  programm.push({typ:"finale",dauer:spiel.finale.dauer+4});
+  programm.push({typ:"ende",dauer:Infinity});
+  let t=0; for(const ph of programm){ph.start=t; t+=ph.dauer;}
+  uhr=0; ticker=[]; gemeldet=new Set(); tickerEl.innerHTML=""; boxscore();
+}
+const tn=(id)=>spiel.teilnehmer[id];
+
+// ------------------------------------------------------------------ Zeichnen
+function zeichneFigur(u,x,y,richtung,zustand,t,extra){
+  const s=sprite(u.n); extra=extra||{};
+  g.save();
+  g.translate(Math.round(x),Math.round(y));
+  if(extra.dreh)g.rotate(extra.dreh);
+  if(extra.alpha!=null)g.globalAlpha=extra.alpha;
+  const spiegeln=richtung==="west";
+  let im=null, sx=0, c=s?s.c:80;
+  if(s){
+    const anim=zustand==="walk"?s.walk:zustand==="jubel"?s.jubel:zustand==="treffer"?s.treffer:null;
+    if(anim&&anim.im.complete&&anim.im.naturalWidth){ im=anim.im; sx=(Math.floor(t*10)%anim.n)*c; }
+    else { im=spiegeln?s.west:s.east; if(!(im.complete&&im.naturalWidth))im=null; }
+    if(anim&&im===anim.im&&spiegeln){ g.scale(-1,1); }
+  }
+  // Lehnen: Zieher haengen sich nach hinten ins Seil (Drehpunkt Fuesse)
+  if(extra.lehne){ g.rotate((richtung==="east"?-1:1)*extra.lehne); }
+  if(im){ g.drawImage(im,sx,0,c,c,-ZELLE/2,-ZELLE+6,ZELLE,ZELLE); }
+  else { g.fillStyle=FARBE[u.side]; g.fillRect(-9,-40,18,40); }
+  g.restore();
+}
+function seil(x1,y1,x2,y2,durch){
+  g.strokeStyle="#5a3d1f"; g.lineWidth=4; g.beginPath(); g.moveTo(x1,y1);
+  g.quadraticCurveTo((x1+x2)/2,(y1+y2)/2+durch,x2,y2); g.stroke();
+  g.strokeStyle="#a8814a"; g.lineWidth=1.5; g.setLineDash([4,3]); g.beginPath(); g.moveTo(x1,y1-1);
+  g.quadraticCurveTo((x1+x2)/2,(y1+y2)/2+durch-1,x2,y2-1); g.stroke(); g.setLineDash([]);
+}
+function text(s,x,y,farbe,gr,ausr,fett){
+  g.font=(fett?"700 ":"600 ")+(gr||11)+"px ui-monospace,Menlo,monospace"; g.textAlign=ausr||"center";
+  g.fillStyle="rgba(0,0,0,.65)"; g.fillText(s,x+1,y+1); g.fillStyle=farbe||"#eee"; g.fillText(s,x,y);
+}
+function platschRing(x,y,t){
+  if(t<0||t>1.4)return;
+  g.strokeStyle="rgba(200,230,255,"+(1-t/1.4)+")"; g.lineWidth=2;
+  g.beginPath(); g.ellipse(x,y,8+t*30,3+t*9,0,0,Math.PI*2); g.stroke();
+  for(let k=0;k<6;k++){ const a=k/6*Math.PI*2, r=6+t*26; g.fillStyle="rgba(220,240,255,"+(1-t/1.4)+")";
+    g.fillRect(x+Math.cos(a)*r, y-Math.abs(Math.sin(a))*r*0.9-t*18+t*t*24, 3,3); }
+}
+function filmBei(film,t){
+  let f=film[0]; for(const x of film){ if(x.t<=t)f=x; else break; } return f;
+}
+function letztesEreignis(film,t){
+  for(let i=film.length-1;i>=0;i--)if(film[i].t<=t&&film[i].ev&&film[i].t>t-0.6)return film[i].ev;
+  return null;
+}
+
+// Ein Tau in einer Reihe. pos>0: A (links) gewinnt Boden, B rutscht Richtung Kante.
+function zeichneTau(tau,A,B,y,t,nachEnde){
+  const film=tau.film, f=filmBei(film,Math.min(t,tau.dauer)), pos=f.pos;
+  const fertig=t>=tau.dauer, nach=t-tau.dauer;
+  const ev=letztesEreignis(film,Math.min(t,tau.dauer));
+  const xA=KANTE_A-ABSTAND-ABSTAND*Math.max(0,pos)+ABSTAND*Math.max(0,-pos);
+  const xB=KANTE_B+ABSTAND-ABSTAND*Math.max(0,pos)+ABSTAND*Math.max(0,-pos);
+  const siegerA=tau.sieger===A.id, platsch=tau.platsch;
+  const zug=Math.min(1,t/0.8), wackel=Math.sin(t*9+y)*0.015;
+  // Verlierer ins Becken
+  let fallA=null, fallB=null;
+  if(fertig&&platsch){ const k=Math.min(1,nach/0.7); const fall={k, dx:(k*48), dy:k*k*34, dreh:k*1.2, alpha:1-Math.max(0,(nach-0.9))/0.8};
+    if(siegerA)fallB=fall; else fallA=fall; }
+  // Seil (bis zum Fall gespannt)
+  const hA=[xA+16,y-26], hB=[xB-16,y-26];
+  if(!(fertig&&platsch&&nach>0.5)){
+    seil(hA[0],hA[1],hB[0],hB[1],fertig?10:3+Math.abs(pos)*2);
+    const mx=(hA[0]+hB[0])/2; g.fillStyle="#d8352a"; g.fillRect(mx-2,y-30+Math.max(0,(fertig?10:3))/2,5,11);
+  }
+  // Figuren
+  const zA=fertig?(siegerA?"jubel":(platsch?null:"treffer")):(pos<-0.15&&ev!=="ruckA"?"walk":null);
+  const zB=fertig?(!siegerA?"jubel":(platsch?null:"treffer")):(pos>0.15&&ev!=="ruckB"?"walk":null);
+  const lehneA=fertig?0:(ev==="ruckA"?0.32:0.16+wackel)*zug, lehneB=fertig?0:(ev==="ruckB"?0.32:0.16-wackel)*zug;
+  if(fallA){ zeichneFigur(A,KANTE_A+fallA.dx*0.6,y+fallA.dy,"east",null,t,{dreh:fallA.dreh,alpha:Math.max(0,fallA.alpha)}); platschRing(KANTE_A+38,y+8,nach-0.55); }
+  else zeichneFigur(A,xA,y,"east",zA,t,{lehne:lehneA});
+  if(fallB){ zeichneFigur(B,KANTE_B-fallB.dx*0.6,y+fallB.dy,"west",null,t,{dreh:-fallB.dreh,alpha:Math.max(0,fallB.alpha)}); platschRing(KANTE_B-38,y+8,nach-0.55); }
+  else zeichneFigur(B,xB,y,"west",zB,t,{lehne:lehneB});
+  // Namen + Ereignis
+  text(A.n.slice(0,14),Math.min(xA,KANTE_A-60),y+12,FARBE[A.side],10,"center");
+  text(B.n.slice(0,14),Math.max(xB,KANTE_B+60),y+12,FARBE[B.side],10,"center");
+  if(!fertig&&(ev==="ruckA"||ev==="ruckB"))text("RUCK!",ev==="ruckA"?xA:xB,y-62,"#ffd25a",10,"center",true);
+  if(fertig){
+    const wer=siegerA?A:B;
+    text(platsch?"PLATSCH!":"Punktsieg",MITTE,y-36,platsch?"#9fd8ff":"#ddd",platsch?13:10,"center",true);
+    text("▲ "+wer.n.slice(0,12),siegerA?KANTE_A-150:KANTE_B+150,y-60,FARBE[wer.side],9,"center");
+  }
+}
+
+
+// ------------------------------------------------------------------ Stern-Ansicht ("Die Grube")
+// Zwoelf Zieher rund um den Schacht, je zwei Gegner auf gegenueberliegenden Speichen: die sechs
+// Seile kreuzen sich ueber der Grube (Fables Bild). Mechanisch sind es sechs Eins-gegen-eins-Taue
+// (Schweizer Runden), s. Machbarkeitsdokument Abschnitt 4.3, warum nicht ein gemeinsamer Ring.
+// Winkel der sechs A-Speichen (Grad): an den Seiten dichter, oben/unten nicht senkrecht, damit sich
+// die Figuren auf der flachen Ellipse nicht vor dem Schacht stapeln.
+const STERN_WINKEL=[165,195,140,220,112,248];
+function speichenPunkt(w,d){ // d=1: Stand, d=0: Kante, d<0: ueber der Kante
+  const rx=G_KANTE.x+(G_STAND.x-G_KANTE.x)*d, ry=G_KANTE.y+(G_STAND.y-G_KANTE.y)*d;
+  return {x:GM.x+Math.cos(w)*rx, y:GM.y+Math.sin(w)*ry};
+}
+function zeichneStern(taue,t){
+  const figuren=[], seile=[], labels=[];
+  taue.forEach((tau,b)=>{
+    const A=tn(tau.a), B=tn(tau.b), wA=STERN_WINKEL[b]*Math.PI/180, wB=wA+Math.PI;
+    const f=filmBei(tau.film,Math.min(t,tau.dauer)), pos=f.pos, fertig=t>=tau.dauer, nach=t-tau.dauer;
+    const ev=letztesEreignis(tau.film,Math.min(t,tau.dauer));
+    const dA=1+0.18*Math.max(0,pos)-Math.max(0,-pos), dB=1+0.18*Math.max(0,-pos)-Math.max(0,pos);
+    const siegerA=tau.sieger===A.id;
+    for(const [u,w,d,istA] of [[A,wA,dA,true],[B,wB,dB,false]]){
+      let p=speichenPunkt(w,d), extra={}, zustand=null;
+      const richtung=Math.cos(w)<0?"east":"west";
+      const verlierer=fertig&&(istA?!siegerA:siegerA);
+      if(verlierer&&tau.platsch){
+        const k=Math.min(1,nach/0.7); p=speichenPunkt(w,-0.35*k); p.y+=k*k*30;
+        extra={dreh:(richtung==="east"?1:-1)*k*1.1, alpha:Math.max(0,1-Math.max(0,nach-0.9)/0.8)};
+        const rand=speichenPunkt(w,-0.3); labels.push(()=>platschRing(rand.x,rand.y+10,nach-0.55));
+      } else if(fertig){ zustand=verlierer?"treffer":"jubel"; }
+      else {
+        const ruck=ev===(istA?"ruckA":"ruckB"), verliert=istA?pos<-0.15:pos>0.15;
+        zustand=verliert&&!ruck?"walk":null;
+        extra={lehne:(ruck?0.32:0.16+Math.sin(t*9+b)*0.015)*Math.min(1,t/0.8)};
+      }
+      figuren.push({y:p.y,f:()=>zeichneFigur(u,p.x,p.y,richtung,zustand,t+b*0.07,extra)});
+      if(!(verlierer&&tau.platsch))labels.push(()=>text(u.n.slice(0,11),p.x,p.y+12,FARBE[u.side],9,"center"));
+      if(!fertig&&ev===(istA?"ruckA":"ruckB"))labels.push(()=>text("RUCK!",p.x,p.y-64,"#ffd25a",10,"center",true));
+      if(istA)var hA={x:p.x,y:p.y-26}; else var hB={x:p.x,y:p.y-26};
+    }
+    if(!(fertig&&tau.platsch&&nach>0.5)){
+      seile.push(()=>{ seil(hA.x,hA.y,hB.x,hB.y,fertig?12:4);
+        const mx=hA.x+(hB.x-hA.x)*(0.5-0.12*pos), my=hA.y+(hB.y-hA.y)*(0.5-0.12*pos);
+        g.fillStyle="#d8352a"; g.fillRect(mx-2,my-4,5,10); });
+    }
+    if(fertig){ const w=siegerA?wA:wB, p=speichenPunkt(w,1.25);
+      labels.push(()=>text(tau.platsch?"PLATSCH!":"Punktsieg",p.x,p.y-70,tau.platsch?"#9fd8ff":"#ddd",tau.platsch?11:9,"center",true)); }
+  });
+  // hintere Haelfte zuerst, Seile ueber die Grube, dann vordere Haelfte
+  figuren.sort((a,b)=>a.y-b.y);
+  figuren.filter(x=>x.y<GM.y).forEach(x=>x.f());
+  seile.forEach(f=>f());
+  figuren.filter(x=>x.y>=GM.y).forEach(x=>x.f());
+  labels.forEach(f=>f());
+  g.fillStyle="#3a3a40"; g.beginPath(); g.ellipse(GM.x,GM.y-26,7,4,0,0,Math.PI*2); g.fill();
+}
+
+function zeichneTafeln(titel,unter,stand){
+  // mittlere Tafel (Kulisse: x 551..689, y 18..72), Seitentafeln 171..275 / 971..1075, y 44..96
+  text(titel,MITTE,40,"#ffd25a",13,"center",true);
+  text(unter,MITTE,62,"#cfc8bd",10,"center");
+  [0,1].forEach(s=>{
+    const x=s?1023:223;
+    text(spiel.namen[s].slice(0,15),x,60,FARBE[s],10,"center",true);
+    text(String(stand[s]),x,86,FARBE[s],18,"center",true);
+  });
+}
+
+function stand(bisRunde,mitFinale){
+  const s=[0,0];
+  spiel.runden.forEach((taue,ri)=>{ if(ri<bisRunde)taue.forEach(t=>{ s[tn(t.sieger).side]++; }); });
+  if(mitFinale)s[spiel.finale.siegerSeite]+=spiel.K.finaleBonus;
+  return s;
+}
+
+function zeichneFinale(t){
+  const KANTE_A=ansicht==="kai"?553:GM.x-G_KANTE.x, KANTE_B=ansicht==="kai"?687:GM.x+G_KANTE.x;
+  const f=filmBei(spiel.finale.film,Math.min(t,spiel.finale.dauer)), pos=f.pos, fertig=t>=spiel.finale.dauer, nach=t-spiel.finale.dauer;
+  const heim=spiel.teilnehmer.filter(u=>u.side===0), gast=spiel.teilnehmer.filter(u=>u.side===1);
+  const y0=ansicht==="kai"?330:GM.y+6, verschub=ABSTAND*pos, s=spiel.finale.siegerSeite;
+  const sp=ansicht==="kai"?62:50, vs=ansicht==="kai"?1:0.6;
+  const xa=(i)=>KANTE_A-50-i*sp-verschub*vs, xb=(i)=>KANTE_B+50+i*sp-verschub*vs;
+  if(!(fertig&&spiel.finale.platsch&&nach>0.6)) seil(xa(5)-10,y0-26,xb(5)+10,y0-26,4);
+  heim.forEach((u,i)=>{
+    const y=y0+(i%2?8:-4);
+    if(fertig&&spiel.finale.platsch&&s===1&&i<3&&nach>i*0.25){ const k=Math.min(1,(nach-i*0.25)/0.7);
+      zeichneFigur(u,KANTE_A+k*40,y+k*k*40,"east",null,t,{dreh:k*1.2,alpha:Math.max(0,1-Math.max(0,nach-i*0.25-0.9)/0.8)}); platschRing(KANTE_A+36,y0+14,nach-i*0.25-0.55); }
+    else zeichneFigur(u,xa(i),y,"east",fertig?(s===0?"jubel":"treffer"):null,t+i*0.13,{lehne:fertig?0:0.2+Math.sin(t*8+i)*0.03});
+  });
+  gast.forEach((u,i)=>{
+    const y=y0+(i%2?8:-4);
+    if(fertig&&spiel.finale.platsch&&s===0&&i<3&&nach>i*0.25){ const k=Math.min(1,(nach-i*0.25)/0.7);
+      zeichneFigur(u,KANTE_B-k*40,y+k*k*40,"west",null,t,{dreh:-k*1.2,alpha:Math.max(0,1-Math.max(0,nach-i*0.25-0.9)/0.8)}); platschRing(KANTE_B-36,y0+14,nach-i*0.25-0.55); }
+    else zeichneFigur(u,xb(i),y,"west",fertig?(s===1?"jubel":"treffer"):null,t+i*0.11,{lehne:fertig?0:0.2+Math.sin(t*8+i+1)*0.03});
+  });
+  const takt=[0,1].map(sd=>spiel.teilnehmer.filter(u=>u.side===sd).sort((a,b)=>b.ANSAGE-a.ANSAGE)[0]);
+  text("Takt: "+takt[0].n,300,y0+60,FARBE[0],11); text("Takt: "+takt[1].n,940,y0+60,FARBE[1],11);
+  if(fertig)text(spiel.finale.platsch?"PLATSCH! "+spiel.namen[s]+" holt das Große Tau":spiel.namen[s]+" gewinnt das Große Tau nach Punkten",MITTE,y0-110,FARBE[s],15,"center",true);
+}
+
+function draw(){
+  g.clearRect(0,0,W,H);
+  const kulisse=KULISSEN[ansicht];
+  if(kulisse.complete&&kulisse.naturalWidth)g.drawImage(kulisse,0,0); else { g.fillStyle="#1b1d27"; g.fillRect(0,0,W,H); }
+  if(!spiel)return;
+  const ph=programm.find(p=>uhr>=p.start&&uhr<p.start+p.dauer)||programm[programm.length-1];
+  const t=uhr-ph.start;
+  if(ph.typ==="intro"){
+    zeichneTafeln("TAUZIEHEN","5 Runden · Großes Tau",[0,0]);
+    text("Zwölf Zieher, jeder gegen jeden",MITTE,250,"#fff",20,"center",true);
+    text("Wer verliert, geht baden.",MITTE,280,"#9fd8ff",14,"center");
+  } else if(ph.typ==="runde"){
+    const taue=spiel.runden[ph.ri];
+    const fertig=t>=Math.max(...taue.map(x=>x.dauer));
+    zeichneTafeln("RUNDE "+(ph.ri+1)+" / "+spiel.runden.length, ph.ri===0?"Slot gegen Slot":"Schweizer System", stand(ph.ri+(fertig?1:0),false));
+    if(ansicht==="kai")taue.forEach((tau,i)=>zeichneTau(tau,tn(tau.a),tn(tau.b),ROW_Y(i),t));
+    else zeichneStern(taue,t);
+  } else if(ph.typ==="finale"){
+    zeichneTafeln("GROSSES TAU","6 gegen 6 · +"+spiel.K.finaleBonus,stand(spiel.runden.length,t>=spiel.finale.dauer));
+    zeichneFinale(t);
+  } else {
+    const st=stand(spiel.runden.length,true), s=st[0]===st[1]?-1:(st[0]>st[1]?0:1);
+    zeichneTafeln("ENDSTAND",s<0?"Unentschieden":"Sieger: "+spiel.namen[s],st);
+    const top=[...spiel.teilnehmer].sort((a,b)=>b.wert-a.wert).slice(0,3);
+    const py=ansicht==="kai"?330:236, abst=ansicht==="kai"?150:230;
+    text("Beste Zieher",MITTE,ansicht==="kai"?220:150,"#fff",16,"center",true);
+    top.forEach((u,i)=>{ const x=MITTE+(i-1)*abst; zeichneFigur(u,x,py,"east","jubel",uhr+i*0.2); text((i+1)+". "+u.n+" · "+u.siege+" Siege",x,py+16,FARBE[u.side],11); });
+  }
+  melde(ph,t);
+}
+
+// ------------------------------------------------------------------ Ticker + Boxscore (spoilerfrei)
+let gemeldet=new Set();
+function melde(ph,t){
+  if(ph.typ==="runde"){
+    spiel.runden[ph.ri].forEach((tau,i)=>{
+      const key="r"+ph.ri+"b"+i; if(gemeldet.has(key)||t<tau.dauer)return; gemeldet.add(key);
+      const s=tn(tau.sieger), v=tn(tau.sieger===tau.a?tau.b:tau.a);
+      zeile("R"+(ph.ri+1)+": <b style='color:"+FARBE[s.side]+"'>"+s.n+"</b> "+(tau.platsch?"zieht "+v.n+" ins Becken":"schlägt "+v.n+" nach Punkten")+" ("+tau.dauer.toFixed(1)+" s)"+(s.side===v.side?" · Teamduell":""));
+    });
+    const key="rundeEnde"+ph.ri; const d=Math.max(...spiel.runden[ph.ri].map(x=>x.dauer));
+    if(!gemeldet.has(key)&&t>=d){ gemeldet.add(key); boxscore(ph.ri+1,false); }
+  }
+  if(ph.typ==="finale"&&t>=spiel.finale.dauer&&!gemeldet.has("fin")){ gemeldet.add("fin");
+    zeile("<b style='color:"+FARBE[spiel.finale.siegerSeite]+"'>Großes Tau: "+spiel.namen[spiel.finale.siegerSeite]+"</b> (+"+spiel.K.finaleBonus+")"+(spiel.finale.platsch?" · drei gehen baden":""));
+    boxscore(spiel.runden.length,true); }
+}
+function zeile(html){ ticker.unshift(html); tickerEl.innerHTML=ticker.map(x=>"<div>"+x+"</div>").join(""); }
+function boxscore(bisRunde,fertig){
+  bisRunde=bisRunde||0;
+  document.getElementById("bxs").textContent=bisRunde?("nach Runde "+bisRunde+(fertig?" · Endstand":"")):"(füllt sich Runde für Runde)";
+  const z=spiel.teilnehmer.map(u=>{
+    const v=u.verlauf.filter(x=>x.runde<bisRunde);
+    return {u, siege:v.filter(x=>x.sieg).length, gemacht:v.filter(x=>x.sieg&&x.platsch).length, gefallen:v.filter(x=>!x.sieg&&x.platsch).length};
+  }).sort((a,b)=>b.siege-a.siege||(fertig?b.u.wert-a.u.wert:0)||b.u.eig-a.u.eig);
+  const k=(s,titel)=>"<th title='"+titel+"'>"+s+"</th>";
+  boxEl.innerHTML="<tr>"+k("Zieher","")+k("S","Siege")+k("Pl+","Gegner ins Becken gezogen")+k("Pl−","selbst ins Becken gegangen")
+    +k("LAST","Zugkraft (power 60, health 25, determination 15)")+k("ANS","Ansage/Takt: Hau-Ruck und Publikum (charisma 53 …)")
+    +k("NERV","Gegenhalt an der Kante (charisma 35, will 35 …)")+k("TECH","Ruck-Timing (speed 70, dexterity 45 …)")+k("ERH","Erholung zwischen den Runden (stamina 40, health 35, will 25)")
+    +k("Eig","Gewichtheben-Eignung (Matrix)")+k("Wert","Spielerwert = 10×Siege + 3×Marge, erst am Ende")+"</tr>"
+    +z.map(r=>"<tr><td class='"+(r.u.side?"gast":"heim")+"'>"+r.u.n+"</td><td>"+r.siege+"</td><td>"+(r.gemacht||"")+"</td><td>"+(r.gefallen||"")+"</td><td>"+r.u.LAST+"</td><td>"+r.u.ANSAGE+"</td><td>"+r.u.NERVEN+"</td><td>"+r.u.TECHNIK+"</td><td>"+r.u.ERHOLUNG+"</td><td>"+Math.round(r.u.eig)+"</td><td>"+(fertig?r.u.wert.toFixed(0):"")+"</td></tr>").join("");
+}
+
+// ------------------------------------------------------------------ Schleife + Bedienung
+let letzt=performance.now();
+function schleife(jetzt){
+  const dt=Math.min(0.1,(jetzt-letzt)/1000); letzt=jetzt;
+  if(laeuft&&spiel)uhr+=dt*tempo;
+  draw();
+  if(spiel){ const end=programm[programm.length-1].start; document.getElementById("tt").textContent=Math.floor(Math.min(uhr,end)/60)+":"+String(Math.floor(Math.min(uhr,end)%60)).padStart(2,"0")+" / "+Math.floor(end/60)+":"+String(Math.floor(end%60)).padStart(2,"0")+" Sendezeit (1×)"; }
+  requestAnimationFrame(schleife);
+}
+document.getElementById("play").onclick=(e)=>{ laeuft=!laeuft; e.target.textContent=laeuft?"Pause":"Weiter"; };
+document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{ tempo=+b.dataset.sp; document.querySelectorAll("[data-sp]").forEach(x=>x.classList.toggle("on",x===b)); });
+document.getElementById("ansicht").onclick=(e)=>{ ansicht=ansicht==="grube"?"kai":"grube"; e.target.textContent="Ansicht: "+(ansicht==="grube"?"Grube":"Kaimauer"); };
+document.getElementById("neu").onclick=()=>{ saat=(saat*1103515245+12345)>>>0; neuesSpiel(); };
+const sel=document.getElementById("paarung");
+sel.onchange=()=>{ paarungIdx=+sel.value; neuesSpiel(); };
+// Sicht-QA: ?t=SEKUNDEN springt in der Sendezeit vor, ?p=PAARUNG, ?saat=N
+const q=new URLSearchParams(location.search);
+fetch("tauziehen-prototyp/kader.json").then(r=>r.json()).then(k=>{
+  KADER=k;
+  sel.innerHTML=k.paarungen.map((p,i)=>"<option value='"+i+"'>"+p.heimName+" – "+p.gastName+"</option>").join("");
+  if(q.has("p"))paarungIdx=+q.get("p"); sel.value=paarungIdx;
+  if(q.has("saat"))saat=+q.get("saat");
+  if(q.get("ansicht")==="kai"){ ansicht="kai"; document.getElementById("ansicht").textContent="Ansicht: Kaimauer"; }
+  neuesSpiel();
+  if(q.has("t")){ uhr=+q.get("t"); if(q.has("halt"))laeuft=false;
+    for(const ph of programm){ if(ph.typ==="runde"&&uhr>=ph.start+ph.dauer-2.6)boxscore(ph.ri+1,false);
+      if(ph.typ==="finale"&&uhr>=ph.start+spiel.finale.dauer)boxscore(spiel.runden.length,true); }
+  }
+  requestAnimationFrame(schleife);
+});
+})();
+</script>
+</body>
+</html>
