@@ -12,6 +12,7 @@ import {
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
+import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
 
 /**
  * HEADLESS-RUNNER FUER window.__arena.spieleFeldspiel() (Plan Abschnitt 3.4, PR 6 von 9).
@@ -275,6 +276,12 @@ export type ArenaFixtureInput = {
   awayTeamId: string;
   /** Deterministischer Seed, s. Plan Abschnitt 3.3c: `${saveId}:${seasonId}:${matchdayId}:arena:${homeTeamId}:${awayTeamId}`. */
   seed: string | number;
+  /**
+   * OBERFLAECHEN-EFFEKTE (08.11.): der Spieltag dieser Begegnung -- kanonische Eingabe fuer
+   * `waehleKulisseFuerFixture()` (s. `lib/battle/arena-kulisse.ts`). Fehlt er, nimmt der Runner
+   * `gameState.matchdayState.matchdayId` (derselbe Wert, aus dem auch die Aufstellung kommt).
+   */
+  matchdayId?: string;
 };
 
 export type ArenaFixtureBoxscoreEintrag = {
@@ -421,6 +428,12 @@ type VorbereitetesFixture = {
    * verhaelt sich wie vor dieser Aenderung.
    */
   aufstellung: ArenaAufstellung;
+  /**
+   * OBERFLAECHEN-EFFEKTE (08.11.): die gebuchte Kulissen-Variante je Disziplin (nur Disziplinen
+   * mit Kulissen-Profil, sonst leer). Reist im Bootstrap-Umschlag als `kulisseByDisciplineId` --
+   * dasselbe Feld, das der Host fuer die Anzeige setzt.
+   */
+  kulisseByDisciplineId: Record<string, string>;
 };
 
 /**
@@ -519,6 +532,7 @@ function bereiteFixturesVor(
   gameState: GameState,
   fixtures: ArenaFixtureInput[],
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>,
+  disziplin?: string,
 ): VorbereitetesFixture[] {
   return fixtures.map((fixture) => {
     const heim = buildArenaTeam(gameState, fixture.homeTeamId, attributeSheetOverrides);
@@ -536,7 +550,24 @@ function bereiteFixturesVor(
         `arena-headless-runner: weder ${fixture.homeTeamId} noch ${fixture.awayTeamId} stellen einen einsatzfaehigen Kader (fehlende Attribut-Boegen?).`,
       );
     }
-    return { ...fixture, seed: seedZuZahl(fixture.seed), heim, gast, aufstellung };
+    const seed = seedZuZahl(fixture.seed);
+    const kulisse = disziplin
+      ? waehleKulisseFuerFixture({
+          disziplin,
+          saat: seed,
+          homeTeamId: fixture.homeTeamId,
+          awayTeamId: fixture.awayTeamId,
+          matchdayId: fixture.matchdayId ?? gameState.matchdayState?.matchdayId ?? "",
+        })
+      : null;
+    return {
+      ...fixture,
+      seed,
+      heim,
+      gast,
+      aufstellung,
+      kulisseByDisciplineId: kulisse && disziplin ? { [disziplin]: kulisse.id } : {},
+    };
   });
 }
 
@@ -577,6 +608,7 @@ async function simuliereFixturesImBrowser(payload: {
     gast: ArenaSpieler[];
     seed: number;
     aufstellung: ArenaAufstellung;
+    kulisseByDisciplineId: Record<string, string>;
   }[];
   disziplin: string;
   /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
@@ -614,12 +646,14 @@ async function simuliereFixturesImBrowser(payload: {
     heim: ArenaSpieler[];
     gast: ArenaSpieler[];
     aufstellung: ArenaAufstellung;
+    kulisseByDisciplineId: Record<string, string>;
   }) => {
     fenster.__olyArenaKader = {
       heim: kader.heim,
       gast: kader.gast,
       aufstellung: kader.aufstellung,
       mutatoren: payload.mutatoren,
+      kulisseByDisciplineId: kader.kulisseByDisciplineId,
     };
     delete fenster.__arena;
     document.querySelectorAll("script[data-oly-headless-engine]").forEach((el) => el.remove());
@@ -683,7 +717,7 @@ export async function runArenaFixtures(
 ): Promise<ArenaFixtureResult[]> {
   if (fixtures.length === 0) return [];
 
-  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides);
+  const vorbereitet = bereiteFixturesVor(gameState, fixtures, options.attributeSheetOverrides, disziplin);
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
@@ -759,6 +793,7 @@ export async function runArenaFixtures(
       gast: vorbereitet[0].gast,
       aufstellung: vorbereitet[0].aufstellung,
       mutatoren,
+      kulisseByDisciplineId: vorbereitet[0].kulisseByDisciplineId,
     });
 
     await page.goto(pathToFileURL(seitenPfad).href);
@@ -777,11 +812,12 @@ export async function runArenaFixtures(
       ? "bahn"
       : "feldspiel";
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
-      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
+      fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung, kulisseByDisciplineId }) => ({
         heim,
         gast,
         seed,
         aufstellung,
+        kulisseByDisciplineId,
       })),
       disziplin,
       mutatoren,

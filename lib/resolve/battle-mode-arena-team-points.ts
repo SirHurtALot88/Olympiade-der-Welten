@@ -1479,7 +1479,7 @@ export async function runBattleModeArenaMatchday(
         awayTeamId: fixture.awayTeamId,
       });
       seedByFixtureKey.set(`${fixture.homeTeamId}::${fixture.awayTeamId}`, seed);
-      return { homeTeamId: fixture.homeTeamId, awayTeamId: fixture.awayTeamId, seed };
+      return { homeTeamId: fixture.homeTeamId, awayTeamId: fixture.awayTeamId, seed, matchdayId };
     });
     return { tier, fixtures, seedByFixtureKey, fixtureInputs };
   }).filter((lauf): lauf is NonNullable<typeof lauf> => lauf !== null);
