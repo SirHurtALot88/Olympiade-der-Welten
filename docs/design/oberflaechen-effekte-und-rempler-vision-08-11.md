@@ -329,6 +329,46 @@ Einzelspiel und Pp-Abweichung≤25.
 Prototyp der konkretesten Kandidaten), noch keine Produktionsentscheidung. Ergebnis geht an
 Chris zur Auswahl.
 
+### Nachschärfung 08.11. (nach dem Tauziehen- und Basketball-Knockout-Prototyp)
+
+Chris' Reaktion auf die ersten beiden Prototypen (Tauziehen für Gewichtheben, PR #1350; Basketball
+„Knockout", PR #1352): „Ich finde deine Idee gar nicht schlecht mit dem Basketball-Knockout... Das
+finde ich echt cool." Zwei Korrekturen/Ergänzungen dazu, wichtig für alle künftigen Format-
+Varianten-Runden:
+
+**1. Format-Varianten verschiedener Disziplinen nicht gegeneinander ausspielen.** Die Aussage
+„Knockout ist schlechter als Tauziehen" (aus dem rho-Vergleich 0,81 vs. 0,85) war eine falsche
+Rahmung. Chris wörtlich: „Tauziehen wäre ja was für Gewichtheben-Alternative. Und der Knockout-
+Modus im Basketball... das kann man ja beides umsetzen." Formate verschiedener Disziplinen stehen
+nicht in Konkurrenz zueinander — jedes wird für sich an seiner eigenen Disziplin gemessen (rho>0,80,
+Pp≤25 für GENAU diese Disziplin), nicht gegen die Zahlen eines Formats einer anderen Disziplin
+verglichen. Ein Vergleich über Disziplinen hinweg ist nur als grobe Einordnung sinnvoll, nie als
+Entscheidungsgrundlage „das eine lohnt sich mehr als das andere".
+
+**2. Muss nicht perfekt sein, um nützlich zu sein.** Chris: „Das muss ja auch noch nicht perfekt
+sein. Aber so hat man was, mit dem man arbeiten kann." Ein Prototyp, der die rho/Pp-Schranke noch
+nicht sauber erreicht (wie Knockouts erste Messung, knapp über 0,80, aber optimistisch gemessen),
+ist trotzdem ein legitimer Zwischenstand, an dem weitergearbeitet werden darf — kein Grund, die
+Idee zu verwerfen. Die Schranke selbst bleibt aber die Bedingung dafür, dass ein Format am Ende als
+GEWERTETES Format läuft, nicht nur als Kosmetik — das ändert sich nicht.
+
+**3. Neuer, älterer Gedanke wieder aufgegriffen: „Solo"- und „Team"-Varianten je Disziplin.** Chris
+erinnert an eine frühere Idee, die nicht für alle Disziplinen umgesetzt werden konnte: dass jede
+Disziplin sowohl eine mehr individuelle/Einzel-Variante als auch eine Team-Variante haben könnte.
+Ausdrücklich **keine starre Regel** („ich will auch nicht unbedingt, dass es eine One-on-One-
+Variante ist und eine Team-Variante" als Pflicht für jede Disziplin) — eher eine Richtung, die man
+im Hinterkopf behält, wenn ohnehin ein neues Format für eine Disziplin entsteht. Das Basketball-
+Knockout-Format ist ein Beispiel, das in diese Richtung geht (eine andere Teilnehmerstruktur als
+das normale X-gegen-X-Teamspiel), auch wenn es selbst nicht strikt 1-gegen-1 ist. Leitlinie: **jede
+Disziplin bleibt variabel, passend zur eigenen Logik** — nicht jede Disziplin bekommt zwangsläufig
+beide Varianten, und der bestehende Standard-Modus (z. B. Basketball X-gegen-X) bleibt in jedem
+Fall erhalten; ein neues Format ist immer zusätzlich, nie ein Ersatz.
+
+**4. Kosten-Beobachtung:** grafische Assets (PixelLab-Generierungen) kosten laut Chris vergleichsweise
+wenig, der eigentliche Aufwand steckt im Konzept (Opus-/Fable-Recherche- und Denkarbeit). Das
+spricht dafür, bei vielversprechenden Formatideen eher großzügig mit visuellen Prototypen zu sein,
+sobald das Konzept/die Sonde schon grünes Licht zeigt.
+
 ---
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
