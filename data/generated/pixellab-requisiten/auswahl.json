@@ -98,6 +98,39 @@
   "kandidat": 0,
   "endpunkt": "/v2/generate-image-v2"
  },
+ "climbing_eiszapfen": {
+  "prompt": "a cluster of hanging translucent light blue ice icicles pointing downward, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   30,
+   42
+  ],
+  "job": "6d645eaf-89f4-4532-b50f-94dce49f7bb8",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "climbing_kreidebeutel": {
+  "prompt": "small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   20,
+   26
+  ],
+  "job": "94397d27-04cd-4c99-9d8f-2840b961352c",
+  "kandidat": 6,
+  "endpunkt": "/v2/generate-image-v2"
+ },
+ "climbing_matte": {
+  "prompt": "square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+  "seed": 11,
+  "gen": [
+   48,
+   48
+  ],
+  "job": "172b67f2-df39-41f2-983c-8d85bd583bc5",
+  "kandidat": 0,
+  "endpunkt": "/v2/generate-image-v2"
+ },
  "deko_banner": {
   "prompt": "two wooden poles with red heraldic banners hanging between them, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
   "seed": 11,
