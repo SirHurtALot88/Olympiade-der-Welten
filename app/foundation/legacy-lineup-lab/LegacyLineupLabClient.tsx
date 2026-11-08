@@ -84,6 +84,7 @@ import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-r
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 import { buildStaffelPairGamesLookup, STAFFEL_DISCIPLINE_ID } from "@/lib/season/staffel-wechsel-paar-bonus-service";
+import { buildLineupKulisseAnzeige } from "@/lib/lineups/lineup-kulisse";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
 // verschoben (siehe dortige Kommentare). Diese Komponente behaelt nur noch duenne
@@ -2159,6 +2160,29 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     context?.matchdayContract?.discipline2?.disciplineId,
     params.teamId,
     params.seasonId,
+    params.matchdayId,
+  ]);
+
+  // OBERFLAECHEN-EFFEKTE (08.11., lib/lineups/lineup-kulisse.ts): auf welchem Platz D1/D2 gespielt
+  // werden und wem er liegt -- nur im Battle-Modus fuer Disziplinen mit Kulissen-Profil, sonst null.
+  const kulisseBySide = useMemo(() => {
+    const gs = props.embeddedGameState ?? context?.gameState ?? null;
+    const teamId = context?.teamId ?? params.teamId;
+    const seasonId = gs?.season?.id ?? params.seasonId;
+    const fuer = (disciplineId: string | null | undefined) =>
+      buildLineupKulisseAnzeige({ gameState: gs, saveId: params.saveId, seasonId, matchdayId: params.matchdayId, teamId, disciplineId });
+    const d1 = fuer(context?.matchdayContract?.discipline1?.disciplineId);
+    const d2 = fuer(context?.matchdayContract?.discipline2?.disciplineId);
+    return d1 || d2 ? { d1, d2 } : null;
+  }, [
+    props.embeddedGameState,
+    context?.gameState,
+    context?.teamId,
+    context?.matchdayContract?.discipline1?.disciplineId,
+    context?.matchdayContract?.discipline2?.disciplineId,
+    params.teamId,
+    params.seasonId,
+    params.saveId,
     params.matchdayId,
   ]);
 
@@ -6326,6 +6350,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         }}
         onAssignDisciplineFormCard={assignDisciplineFormCardFromLineup}
         staffelPairGamesByKey={staffelPairGamesByKey}
+        kulisseBySide={kulisseBySide}
         formCardSavePendingSide={{
           d1: formCardPlanPendingKey === `${params.matchdayId}:d1`,
           d2: formCardPlanPendingKey === `${params.matchdayId}:d2`,

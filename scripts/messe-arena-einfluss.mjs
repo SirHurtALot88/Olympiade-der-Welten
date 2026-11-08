@@ -25,6 +25,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
 import {
   buehneSchalterAusArgs, setzeBuehneSchalter, buehneSchalterText,
   staffelPaarSchalterAusArgs, setzeStaffelPaarSonde, staffelPaarSchalterText,
@@ -45,6 +46,12 @@ const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
 // --je-seite=N (27.10., additiv): Kadergroesse einer ARENA-Disziplin fuer diese Messung (z.B.
 // Battlefield 2/4/6 je Seite). Ohne den Schalter misst das Skript bei ARENA_ART[d].jeSeite wie bisher.
 const JE_SEITE = Number(schalterWert("je-seite") ?? 0) || null;
+// --kulisse=<id>|alle und --ziel=matrix|variante (Oberflaechen-Effekte 08.11., Konzept Abschnitt
+// 7): pinnt die Kulissen-Variante fuer die ganze Messung; "alle" misst jede Variante der
+// Disziplin einzeln. --ziel=variante misst gegen W_variante = Matrix + K[d][v] statt gegen die
+// Matrix (ohne --kulisse wirkungslos). Ohne beide Schalter exakt wie vorher.
+const KULISSE = schalterWert("kulisse") ?? null;
+const ZIEL = schalterWert("ziel") ?? null;
 // --flags=... / --haltung-heim=... / --haltung-gast=... (NACHT-PAKET-SCHALTER, 04./05.10., additiv),
 // s. scripts/lib/rangtreue-messung.mjs. Ohne sie misst das Skript den Motor mit allen Flags aus.
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(schalter);
@@ -83,9 +90,8 @@ const pfad = process.argv[4]
   : resolve(dirname(fileURLToPath(import.meta.url)), "..", "public", "mockups", "battle-mode.html");
 const datei = pathToFileURL(pfad).href;
 
-const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
-});
+const FEST = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const browser = await chromium.launch(existsSync(FEST) ? { executablePath: FEST } : {});
 const seite = await browser.newPage();
 // KEIN AUDIOCONTEXT IM MESSLAUF (Speicherleck-Fix, 01.10.). einflussVon() laeuft als EIN
 // synchroner evaluate()-Aufruf ueber (1 + 12 x Teilnehmer) x n Spiele. Die Ton-Schicht
@@ -123,40 +129,37 @@ if (!motoren.includes(disziplin)) {
 const chassisWarnung = generischeChassisWarnung(disziplin);
 if (chassisWarnung) console.log(chassisWarnung + "\n");
 
+const profile = KULISSE ? await seite.evaluate(() => (window.__arena.kulisseProfile ? window.__arena.kulisseProfile() : {})) : {};
+const kulissen = !KULISSE ? [null]
+  : KULISSE === "alle" ? (profile[disziplin] ? profile[disziplin].varianten : [null])
+  : [KULISSE];
+for (const kulisse of kulissen) {
+const opt = kulisse ? { kulisse, ...(ZIEL ? { ziel: ZIEL } : {}) } : undefined;
 const start = Date.now();
-// ZWEITE HAELFTE DESSELBEN LECKS: Timer. Auch ohne AudioContext legt die Anzeige-Schicht
-// je Ereignis einen setTimeout an (Breaking: der zweite Herzschlag-Ton, ~30 000 je Lauf, dazu
-// das Ausblenden der Callouts). Waehrend des einen synchronen Aufrufs kann keiner davon
-// feuern -- sie stapeln sich (n=48: ~1,5 Mio., gemessen ~1,5-2 GB nach elf Minuten) und
-// liefen erst NACH dem fertigen Ergebnis los. Deshalb ist es fuer die Messwerte gleich, ob
-// sie angelegt werden: setTimeout ist fuer genau diesen Aufruf ein No-Op und wird danach
-// wiederhergestellt.
 const e = await seite.evaluate(
-  ([d, n, versatz, modus, js]) => {
+  ([d, n, versatz, modus, js, opt]) => {
     const st = window.setTimeout;
     window.setTimeout = () => 0;
     try {
-      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined, js ?? undefined);
+      return window.__arena.einflussVon(d, n, undefined, versatz, modus ?? undefined, js ?? undefined, opt ?? undefined);
     } finally {
       window.setTimeout = st;
     }
   },
-  [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS, JE_SEITE],
+  [disziplin, laeufe, SAAT_VERSATZ, MUTATOR_MODUS, JE_SEITE, opt ?? null],
 );
 const dauer = ((Date.now() - start) / 1000).toFixed(0);
 
-// Der gemessene Pfad gehoert in die Ausgabe, nicht nur in den Aufruf: wer eine Zahl aus
-// diesem Skript in einen Plan oder PR schreibt, muss belegen koennen, WELCHE Datei sie
-// erzeugt hat. Genau das fehlte, als das Skript still den Haupt-Checkout mass (s. oben).
 console.log(`Gemessene Datei: ${pfad}`);
 console.log(`${e.disziplin} — ${e.laeufe} Laeufe, Anhebung +${e.anhebung}, ${dauer}s`
   + (e.mutatorModus ? `, Mutatoren ${e.mutatorModus}` : "") + (SAAT_VERSATZ ? `, Saatversatz ${SAAT_VERSATZ}` : ""));
+if (kulisse) console.log(`Kulisse: ${kulisse} (Ziel: ${e.ziel === "variante" ? "W_variante = Matrix + Kulissen-Profil" : "Matrix"})`);
 if (JE_SEITE) console.log(`Kadergroesse: ${JE_SEITE} je Seite (--je-seite)`);
 if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
 if (staffelPaarGesetzt) console.log(staffelPaarSchalterText(staffelPaarGesetzt));
-console.log(`Abweichung zur Matrix: ${e.abweichungPp} Pp\n`);
-console.log("Attribut          Anteil   Matrix   Differenz");
-const matrix = await seite.evaluate((d) => window.__arena.matrix(d), disziplin);
+console.log(`Abweichung zur ${e.ziel === "variante" ? "Variantengewichtung" : "Matrix"}: ${e.abweichungPp} Pp\n`);
+console.log(`Attribut          Anteil   ${e.ziel === "variante" ? "  Ziel" : "Matrix"}   Differenz`);
+const matrix = e.zielGewichte || await seite.evaluate((d) => window.__arena.matrix(d), disziplin);
 for (const r of e.reihen) {
   const soll = matrix[r.attribut] || 0;
   const diff = r.anteil - soll;
@@ -164,6 +167,8 @@ for (const r of e.reihen) {
     `${r.attribut.padEnd(15)} ${String(r.anteil).padStart(6)} % ${String(soll).padStart(6)}   ` +
       `${(diff > 0 ? "+" : "") + diff.toFixed(1)}`,
   );
+}
+if (kulissen.length > 1) console.log("");
 }
 console.log("\nSeitenfehler:", fehler.length ? fehler.slice(0, 5) : "keine");
 if (chassisWarnung) console.log("\n" + chassisWarnung);

@@ -545,7 +545,11 @@ export default function FoundationBattleArenaHost({
     const seasonId = gameState.season?.id;
     const matchdayId = gameState.matchdayState?.matchdayId;
     if (!saveId || saveId === "loading-save" || !seasonId || !matchdayId) {
-      return { seedByDisciplineId: {} as Record<string, number>, istKeinGewertetesDuell: false };
+      return {
+        seedByDisciplineId: {} as Record<string, number>,
+        kulisseByDisciplineId: {} as Record<string, string>,
+        istKeinGewertetesDuell: false,
+      };
     }
     return resolveArenaHostSeeds({
       saveId,
@@ -566,6 +570,10 @@ export default function FoundationBattleArenaHost({
     spieltagFixtureIndex,
   ]);
   const arenaSeedByDisciplineId = arenaHostSeed.seedByDisciplineId;
+  // OBERFLAECHEN-EFFEKTE (08.11., lib/battle/arena-kulisse.ts): die gebuchte Kulissen-Variante je
+  // Disziplin -- dieselbe, die der Runner der Wertung mitgibt, damit die Arena genau den Platz
+  // zeigt, auf dem gewertet wird. Leer fuer Disziplinen ohne Kulissen-Profil.
+  const arenaKulisseByDisciplineId = arenaHostSeed.kulisseByDisciplineId;
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
   // sonst gibt es nichts, dessen Saat falsch sein koennte.
   const keinGewertetesDuell =
@@ -864,6 +872,8 @@ export default function FoundationBattleArenaHost({
         // leer, wenn dieses Team-Paar an diesem Spieltag keine gebuchte Arena-Disziplin ist.
         // Gelesen von `gebuchteSaatFuerAktuelleDisziplin()` in battle-mode.engine.js.
         seedByDisciplineId: arenaSeedByDisciplineId,
+        // Gelesen von `kulisseSpielId()`/`kulisseWaehlen()` in battle-mode.engine.js.
+        kulisseByDisciplineId: arenaKulisseByDisciplineId,
         // MUTATOR ORGANISCH (29.09.): der echte Wurf je Disziplin, s. `mutatorenByDisciplineId` oben.
         mutatorenByDisciplineId,
         // SPIELTAGS-ANSICHT: keine Eingriffe ins gebuchte Spiel (s. `nurZuschauen` im Motor).
@@ -969,6 +979,7 @@ export default function FoundationBattleArenaHost({
     teams,
     gameState,
     arenaSeedByDisciplineId,
+    arenaKulisseByDisciplineId,
     mutatorenByDisciplineId,
     miniDmFfaTeams,
     miniDmFfaK,

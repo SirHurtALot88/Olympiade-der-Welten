@@ -29,6 +29,7 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+import type { LineupKulisseAnzeige } from "@/lib/lineups/lineup-kulisse";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -196,6 +197,13 @@ export type LineupNewLookProps = Pick<
    */
   staffelPairGamesByKey?: Record<string, number> | null;
   /**
+   * OBERFLAECHEN-EFFEKTE (optional, additiv; lib/lineups/lineup-kulisse.ts): je Disziplin-Seite
+   * der Platz, auf dem gespielt wird, und je Spieler (Schluessel Player.id) die Tendenz
+   * `++ / + / 0 / - / --`. Nur gesetzt, wo die Arena den Effekt wirklich rechnet (Battle-Modus,
+   * Disziplin mit Kulissen-Profil). Fehlt die Prop, bleibt die Ansicht unveraendert.
+   */
+  kulisseBySide?: { d1: LineupKulisseAnzeige | null; d2: LineupKulisseAnzeige | null } | null;
+  /**
    * Team-Power-Auswahl je Diszi (optional, additiv). Fehlt die Prop, bleibt die
    * Ansicht unverändert — dieselbe Konvention wie bei den Formkarten.
    */
@@ -295,6 +303,27 @@ type NlPortraitPlayer = {
 };
 
 /** Runder Mini-Avatar: Portrait falls vorhanden, sonst Initialen (Fallback bleibt bei Bildfehler sichtbar). */
+/**
+ * OBERFLAECHEN-EFFEKT-CHIP (Konzept 4.2 b): "Sand ++" am Kandidaten und am gesetzten Spieler.
+ * `0` wird im Kompakt-Chip ausgeblendet (Konzept 4.1); der Tooltip nennt die groessten Beitraege.
+ */
+function NlKulisseChip({ kulisse, playerId }: { kulisse: LineupKulisseAnzeige | null; playerId: string | null | undefined }) {
+  const eintrag = kulisse && playerId ? kulisse.spieler[playerId] : null;
+  if (!kulisse || !eintrag || eintrag.tendenz === "0") return null;
+  const gut = eintrag.tendenz === "+" || eintrag.tendenz === "++";
+  const kraeftig = eintrag.tendenz.length === 2;
+  return (
+    <span
+      className={`nl-lineup-chip is-${gut ? "good" : "risk"}`}
+      data-testid="nl-lineup-kulisse-chip"
+      title={eintrag.tooltip}
+      style={{ marginLeft: "4px", fontWeight: kraeftig ? 800 : 600 }}
+    >
+      {kulisse.kurz} {eintrag.tendenz}
+    </span>
+  );
+}
+
 function NlPlayerAvatar({
   portraitUrl,
   name,
@@ -1091,6 +1120,7 @@ export default function LineupNewLook({
   onAssignDisciplineFormCard,
   formCardSavePendingSide,
   staffelPairGamesByKey = null,
+  kulisseBySide = null,
   teamPowerControlsBySide,
   onAssignTeamPower,
 }: LineupNewLookProps) {
@@ -1740,6 +1770,46 @@ export default function LineupNewLook({
         </header>
 
         {(() => {
+          // OBERFLAECHEN-EFFEKT (Konzept 4.2 a): auf welchem Platz gespielt wird und was er will,
+          // BEVOR man einen Spieler anschaut. Glyphe + Farbe + Text immer zusammen.
+          const kulisse = kulisseBySide?.[disciplineSide] ?? null;
+          if (!kulisse) return null;
+          return (
+            <div
+              className="nl-lineup-kulisse"
+              data-testid={`nl-lineup-kulisse-${disciplineSide}`}
+              title={kulisse.tooltip}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: "6px",
+                margin: "0 0 8px",
+                padding: "6px 10px",
+                borderRadius: "var(--nl-r-card, 10px)",
+                border: "1px solid var(--nl-line)",
+                background: "var(--nl-panel-2)",
+                fontSize: "11px",
+              }}
+            >
+              <strong style={{ color: "var(--nl-ink)", fontWeight: 800 }}>{kulisse.label}</strong>
+              <span style={{ color: "var(--nl-mut)" }}>· {kulisse.untertitel}</span>
+              <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px", flex: "1 1 100%" }}>
+                {kulisse.chips.map((chip) => (
+                  <span
+                    key={chip.label}
+                    className={`nl-lineup-chip is-${chip.richtung === "auf" ? "good" : "risk"}`}
+                    aria-label={`${chip.label} zählt hier ${chip.richtung === "auf" ? "mehr" : "weniger"}`}
+                  >
+                    {chip.label} {chip.richtung === "auf" ? "↑" : "↓"}
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })()}
+
+        {(() => {
           // Formkarten-Direktzuweisung (Feature): zwei Dropdowns je Diszi (primär/sekundär).
           // Nur zeigen, wenn es tatsächlich etwas auszuwählen/anzuzeigen gibt, sonst kein Clutter.
           const control = formCardControlsBySide?.[disciplineSide] ?? null;
@@ -2104,6 +2174,7 @@ export default function LineupNewLook({
                         {fatigue != null ? (
                           <NlFatigueGauge value={fatigue} label="F" title={`Fatigue ${Math.round(fatigue)}/100`} />
                         ) : null}
+                        <NlKulisseChip kulisse={kulisseBySide?.[slot.disciplineSide] ?? null} playerId={player.id} />
                       </span>
                     </span>
                   ) : (
@@ -2858,7 +2929,12 @@ export default function LineupNewLook({
                         isReadOnly || isBlocked,
                       )}
                       <span className="nl-lineup-candidate-main">
-                        <strong>{candidate.name}</strong>
+                        <strong>
+                          {candidate.name}
+                          {activeSlot ? (
+                            <NlKulisseChip kulisse={kulisseBySide?.[activeSlot.disciplineSide] ?? null} playerId={candidate.id} />
+                          ) : null}
+                        </strong>
                         <small>
                           {entry.groupMeta.label}
                           {entry.shortReason ? ` · ${entry.shortReason}` : ""}

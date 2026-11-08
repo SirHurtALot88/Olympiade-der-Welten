@@ -270,18 +270,21 @@ function feldOnlyZusatz(gruppen) {
  * Einzelkader-Weg) und fasst sie zu Median/Spannweite zusammen. `seite` ist eine
  * Playwright-Page mit bereits geladenem `window.__arena`.
  */
-export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite, mutatoren }) {
+// `kulisse` (Oberflaechen-Effekte 08.11.): pinnt die Kulissen-Variante fuer alle Spiele (s.
+// disziplinProbe({kulisse}) in battle-mode.engine.js). Weggelassen -> jedes Spiel waehlt seine
+// Variante selbst aus der Saat (Mittel ueber die Varianten).
+export async function disziplinMessen(seite, d, { n, kaderFamilie, jeSeite, mutatoren, kulisse }) {
   let x;
   try {
     // `mutatoren` (MUTATOR ORGANISCH, 29.09.): "je-spiel" | "aus" | "fest", s. disziplinProbe in
     // battle-mode.engine.js. Weggelassen -> der Standard der Engine ("je-spiel"; eine Engine von
     // vor dem 29.09. kennt die Option nicht und ignoriert sie).
     x = await seite.evaluate(
-      ([d, n, familie, js, mut]) => window.__arena.disziplinProbe(d, {
+      ([d, n, familie, js, mut, kul]) => window.__arena.disziplinProbe(d, {
         n, ...(familie ? { kaderFamilie: familie } : {}), ...(js ? { jeSeite: js } : {}),
-        ...(mut ? { mutatoren: mut } : {}),
+        ...(mut ? { mutatoren: mut } : {}), ...(kul ? { kulisse: kul } : {}),
       }),
-      [d, n, kaderFamilie || null, jeSeite || null, mutatoren || null],
+      [d, n, kaderFamilie || null, jeSeite || null, mutatoren || null, kulisse || null],
     );
   } catch (e) {
     return { d, fehler: String(e).slice(0, 60) };

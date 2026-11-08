@@ -31,7 +31,10 @@ import { IST_BUEHNE_SCHALTER, buehneSchalterAusArgs, setzeBuehneSchalter, buehne
 // messung.mjs): schaltet Buehnen-Mechaniken hinter BUEHNE_FLAGS ein (z.B.
 // --flags=gewichthebenSandsack:1); ohne sie unveraendertes Verhalten (alle BUEHNE_FLAGS aus).
 const BUEHNE_SCHALTER = buehneSchalterAusArgs(process.argv.slice(2));
-const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a));
+// --kulisse=<id>|aus (Oberflaechen-Effekte 08.11., Konzept Regel 6): pinnt die Kulissen-Variante
+// fuer alle Spiele -- der Spiegeltest muss je Variante halten (gleicher Platz fuer beide Seiten).
+const KULISSE = process.argv.slice(2).find((a) => a.startsWith("--kulisse="))?.split("=")[1] ?? null;
+const args = process.argv.slice(2).filter((a) => !IST_BUEHNE_SCHALTER(a) && !a.startsWith("--kulisse="));
 const N = Number(args[0] || 60);
 const disziplinen = args[1] ? args[1].split(",").filter(Boolean) : ["speed-schach", "showcase", "gewichtheben"];
 const hier = dirname(fileURLToPath(import.meta.url));
@@ -70,6 +73,7 @@ await page.goto(pathToFileURL(seitePfad).href);
 await page.waitForFunction(() => Boolean(window.__arena), null, { timeout: 15000 });
 const schalterGesetzt = await setzeBuehneSchalter(page, BUEHNE_SCHALTER);
 if (schalterGesetzt) console.log(buehneSchalterText(schalterGesetzt));
+if (KULISSE) console.log("Kulisse gepinnt: " + await page.evaluate((k) => window.__arena.kulissePin(k), KULISSE));
 
 let gesamtFehlgeschlagen = 0;
 

@@ -258,9 +258,9 @@
   },
   "tennis": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.813,
-   "rhoSpannweite": 0.199,
-   "rhoSaison": 0.944,
+   "rhoJeSpiel": 0.807,
+   "rhoSpannweite": 0.194,
+   "rhoSaison": 0.937,
    "rhoMessung": {
     "befehl": "node scripts/miss-alle-disziplinen.mjs 24 tennis",
     "spiele": 24,
@@ -269,8 +269,8 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    6.9,
-    4.4
+    6.2,
+    5.5
    ],
    "ppMessung": {
     "befehl": "node scripts/messe-arena-einfluss.mjs tennis (+ --saat-versatz=10000000)",
@@ -282,8 +282,9 @@
      10000000
     ]
    },
-   "datum": "2026-10-16",
-   "commit": "ace43062",
+   "datum": "2026-11-08",
+   "commit": "oberflaechen-effekte-tennis-pilot",
+   "kulissenHinweis": "Mittel ueber die drei Kulissen-Varianten (ungepinnt); je Variante s. docs/design/oberflaechen-effekte-tennis-pilot-08-11.md und scripts/miss-kulisse-abnahme.mjs",
    "rhoFrisch": true,
    "ppFrisch": true
   },

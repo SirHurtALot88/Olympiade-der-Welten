@@ -1,4 +1,5 @@
 import type { Fixture } from "@/lib/data/olyDataTypes";
+import { waehleKulisseFuerFixture } from "@/lib/battle/arena-kulisse";
 import { buildArenaMatchSeed, seedZuZahl } from "@/lib/battle/arena-seed";
 
 /**
@@ -38,6 +39,12 @@ export type ArenaHostSeedResult = {
   /** Je Disziplin der normalisierte Zahl-Seed — nur gesetzt, wenn heim/gast das echte Fixture sind. */
   seedByDisciplineId: Record<string, number>;
   /**
+   * OBERFLAECHEN-EFFEKTE (08.11.): je Disziplin MIT Kulissen-Profil die gebuchte Variante
+   * (`waehleKulisseFuerFixture`, kanonische Fixture-Eingaben) -- dieselbe, die der Runner der
+   * Wertung mitgibt. Der Motor liest sie als `kulisseByDisciplineId`; leer wie `seedByDisciplineId`.
+   */
+  kulisseByDisciplineId: Record<string, string>;
+  /**
    * `true`, wenn fuer `heimTeamId` an diesem Spieltag KEIN Fixture existiert, oder es existiert,
    * aber `gastTeamId` ist nicht dessen Gegner (in beliebiger Orientierung). In diesem Fall bleibt
    * `seedByDisciplineId` leer und der Motor faellt auf seine eigene Ersatzsaat (1337) zurueck —
@@ -50,7 +57,7 @@ export type ArenaHostSeedResult = {
 
 export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedResult {
   const { saveId, seasonId, matchdayId, disciplineIds, heimTeamId, gastTeamId, fixtureIndex } = input;
-  const leer: ArenaHostSeedResult = { seedByDisciplineId: {}, istKeinGewertetesDuell: false };
+  const leer: ArenaHostSeedResult = { seedByDisciplineId: {}, kulisseByDisciplineId: {}, istKeinGewertetesDuell: false };
   if (!saveId || !seasonId || !matchdayId || !heimTeamId || !gastTeamId || heimTeamId === gastTeamId) {
     return leer;
   }
@@ -63,10 +70,11 @@ export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedR
 
   if (!istDasGewaehltePaar || !echtesFixture) {
     // Kein Fixture dieses Spieltags fuer dieses Paar -- kein Eintrag, Motor faellt auf 1337.
-    return { seedByDisciplineId: {}, istKeinGewertetesDuell: true };
+    return { seedByDisciplineId: {}, kulisseByDisciplineId: {}, istKeinGewertetesDuell: true };
   }
 
   const seedByDisciplineId: Record<string, number> = {};
+  const kulisseByDisciplineId: Record<string, string> = {};
   for (const disciplineId of disciplineIds) {
     // IMMER `echtesFixture.homeTeamId`/`.awayTeamId`, NIE `heimTeamId`/`gastTeamId` direkt --
     // orientierungsunabhaengig von der UI-Auswahl, s. Dateikommentar.
@@ -80,6 +88,14 @@ export function resolveArenaHostSeeds(input: ArenaHostSeedInput): ArenaHostSeedR
         awayTeamId: echtesFixture.awayTeamId,
       }),
     );
+    const kulisse = waehleKulisseFuerFixture({
+      disziplin: disciplineId,
+      saat: seedByDisciplineId[disciplineId],
+      homeTeamId: echtesFixture.homeTeamId,
+      awayTeamId: echtesFixture.awayTeamId,
+      matchdayId,
+    });
+    if (kulisse) kulisseByDisciplineId[disciplineId] = kulisse.id;
   }
-  return { seedByDisciplineId, istKeinGewertetesDuell: false };
+  return { seedByDisciplineId, kulisseByDisciplineId, istKeinGewertetesDuell: false };
 }

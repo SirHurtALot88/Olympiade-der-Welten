@@ -7951,6 +7951,57 @@
   // Mess-/Berichtsseite misst jetzt gegen das richtige Ziel.
   const PP_MATRIX_JE_DISC={...BASIS_JE_DISC,
     football:{power:6,health:14,determination:8,stamina:6,awareness:11,will:10,charisma:4,spirit:25,torment:16}};
+  // =====================================================================================
+  // OBERFLAECHEN-EFFEKTE (08.11., docs/design/oberflaechen-effekte-konzept-08-11.md, Stufe 1-3).
+  // Eine Kulissen-Variante ist ein kleiner, NULLSUMMIGER Versatz auf die Matrixgewichte
+  // (W_variante = W_matrix + K[d][v], Konzept 2.1) -- die Matrix selbst bleibt unangetastet
+  // (BASIS_JE_DISC/PP_MATRIX_JE_DISC oben, lib/player-generator/official-discipline-weights.ts).
+  // Der Oberflaechenwert eines Spielers ist OW = Summe K[k]*a[k]/100, gedeckelt auf +/-deckel
+  // Eignungspunkte (Regel 9). Weil Summe K = 0, haengt OW nur von der FORM des Profils ab, nicht
+  // von seiner Hoehe: ein Spezialist fuer diesen Platz bekommt plus, ein gleichmaessiger Spieler
+  // null -- der Effekt sitzt im Mittelfeld, nicht an der Spitze (Konzept 3.3).
+  //
+  // WO ES WIRKT (Buehne): OW wird ADDITIV auf JEDEN Rezept-Sub-Skill gelegt (bauBuehne, setz).
+  // Das ist dasselbe wie "alle Attribute dieses Spielers um OW heben" (mische() ist ein
+  // normierter Mittelwert) und verschiebt die mechanisch wirksamen Attributanteile damit um
+  // genau K -- Anzeige = Mechanik per Konstruktion, gemessen mit einflussVon(...,{kulisse,
+  // ziel:"variante"}). Bewusst KEIN Faktor auf einzelne Kanaele (Konzept 2.3: ein Faktor auf
+  // einen toten Kanal wie AUSDAUER bewirkt nichts).
+  //
+  // DIE ZEILE UNTEN IST STRIKTES JSON und wird von tests/arena-kulisse.test.ts gegen
+  // lib/battle/arena-kulisse.ts geprueft (gleiche Varianten, gleiche Reihenfolge, gleiche Zahlen).
+  // Die Reihenfolge der Varianten MUSS der in battle-mode.kulissen.js entsprechen (dieselbe
+  // Hash-Wahl liest denselben Index). Ohne Eintrag hier hat eine Disziplin keinen Effekt und
+  // bleibt bit-identisch zu vorher.
+  const KULISSEN_PROFILE={"tennis":{"deckel":5,"varianten":["court","riviera","dach"],"profil":{"court":{"awareness":3,"speed":3,"intelligence":1,"stamina":-4,"dexterity":-1,"determination":-2},"riviera":{"awareness":-2,"speed":-3,"intelligence":-2,"stamina":4,"dexterity":3,"determination":1,"charisma":-1},"dach":{"awareness":-1,"intelligence":1,"dexterity":-2,"determination":1,"charisma":1}}}};
+  // Sonden-Pinning (Konzept Abschnitt 7): einflussVon(...,{kulisse}) / disziplinProbe({kulisse})
+  // setzen das fuer die Dauer der Messung. null = normale Wahl (gebucht oder Hash).
+  let kulisseSondenPin=null;
+  // Dieselbe Hash-Wahl wie kulisseWaehlen() weiter unten (FNV-1a ueber den Text, dann
+  // ispyMischeHash) -- bit-identisch zu lib/battle/arena-kulisse.ts `kulisseHash`. Vorrang:
+  // Sonden-Pin, dann die vom Host/Runner GEBUCHTE Variante (`kulisseByDisciplineId`, aus
+  // waehleKulisseFuerFixture() -- dieselbe Variante, die Spielplan und Picker zeigen), zuletzt
+  // der eigene Hash aus Disziplin|Saat|Heim|Gast|Spieltag.
+  function kulisseSpielId(d,saat){
+    const P=KULISSEN_PROFILE[d];
+    if(!P)return null;
+    // "aus" = Referenzlauf ohne Oberflaechen-Effekt (der Stand vor dem 08.11.), nur fuer Sonden.
+    if(kulisseSondenPin==="aus")return null;
+    if(kulisseSondenPin&&P.varianten.includes(kulisseSondenPin))return kulisseSondenPin;
+    const gebucht=echterKader&&echterKader.kulisseByDisciplineId&&echterKader.kulisseByDisciplineId[d];
+    if(typeof gebucht==="string"&&P.varianten.includes(gebucht))return gebucht;
+    const meta=(echterKader&&echterKader.meta)||{};
+    const schluessel=[d, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
+    return P.varianten[ispyMischeHash(normalisiereSaat(schluessel))%P.varianten.length];
+  }
+  // OW roh (ungedeckelt) und gedeckelt. `a` sind die Attribute, aus denen auch die Sub-Skills
+  // entstehen (gehoben(p): inkl. Messhebung; der flache Mutator ist wegen Summe K = 0 neutral).
+  function kulisseOW(a,d,id){
+    const P=KULISSEN_PROFILE[d]; const K=P&&P.profil[id];
+    if(!K)return 0;
+    let s=0; for(const k in K)s+=K[k]*(a[k]||0)/100;
+    return Math.max(-P.deckel,Math.min(P.deckel,s));
+  }
   const SLOTS_JE_DISC={
     "tdm":[
       {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
@@ -20095,6 +20146,8 @@
   // BUEHNE_ART.fechten oben bleiben Zeichen fuer Zeichen unveraendert -- diese PR fasst keine
   // einzige Wanduhr-Taktungskonstante an, braucht also keine gesonderte Freigabe ausserhalb
   // der normalen Klasse-B-Messrunde.
+  // Variante des zuletzt gebauten Buehnen-Spiels (null ohne Kulissen-Profil) -- reine Anzeige.
+  let buehneKulisseId=null;
   function bauBuehne(saat){
     seed=normalisiereSaat(saat); buehneT=0; done=false; TEILNEHMER=[]; buehneZeiger=0; buehneAkt=0;
     buehneGruppenGroesse=1;
@@ -20143,6 +20196,10 @@
     // an der Heben-Mechanik selbst.
     feldspielDisc="";
     const art=BB(), n=art.jeSeite, R=art.rezept;
+    // OBERFLAECHEN-EFFEKT (08.11., s. KULISSEN_PROFILE): die Variante dieses Spiels. null fuer
+    // jede Disziplin ohne Profil -- dann laeuft setz() unten bit-identisch zu vorher.
+    const kulisseId=kulisseSpielId(buehneDisc,saat);
+    buehneKulisseId=kulisseId;
     const slotListe=slotsVon(buehneDisc);
     const gesetzt=inDisc(buehneDisc);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[buehneDisc]||0)-(a.d[buehneDisc]||0)).slice(0,n);
@@ -20173,6 +20230,11 @@
       let attr=mitAufschlag(gehoben(p),engP,betroffeneAttribute(sl,buehneDisc,true),buehneDisc);
       attr=mitAufschlag(attr,breitP,betroffeneAttribute(sl,buehneDisc,false),buehneDisc);
       const R2={}; for(const k in R)R2[k]=Math.round(mische({a:attr},R[k]));
+      // OBERFLAECHEN-EFFEKT: OW (gedeckelt) additiv auf jeden Sub-Skill -- gleichwertig zu
+      // "alle Attribute um OW heben", verschiebt die wirksamen Anteile also um genau K. Ohne
+      // Kulissen-Profil ist ow===null und R2 bleibt unangetastet (bit-identisch).
+      const ow=kulisseId?kulisseOW(gehoben(p),buehneDisc,kulisseId):null;
+      if(ow!=null)for(const k in R2)R2[k]=Math.max(1,Math.min(99,R2[k]+ow));
       // Q3 (Broadcast-Optik-Dokument 27-09, Abschnitt 3, "Spieler-Kamera"): reines
       // Anzeige-Metadatenfeld fuer die Bauchbinde -- der zugewiesene Slot ist bereits
       // vorab bekannt (steht schon in der Aufstellung, bevor der Kampf beginnt) und
@@ -20197,6 +20259,9 @@
         eig:(p.d[buehneDisc]!=null?p.d[buehneDisc]:gewichtet(p.a,BASIS_JE_DISC[buehneDisc]||{}))
             +engP+breitP,mutatorTreffer:mutatorTreffer(p),...R2,
         runden:[], summe:0, aktuell:-1};
+      // Nur mit Kulissen-Profil: die Variante, OW und die Varianten-Eignung (Transparenz-Probe,
+      // Konzept Abschnitt 7: rho gegen eig+OW). `eig` selbst bleibt die Matrix-Eignung.
+      if(ow!=null){ L.kulisse=kulisseId; L.kulisseOW=ow; L.eigKulisse=L.eig+ow; }
       // ALLE DURCHGAENGE SOFORT DURCHRECHNEN, dann ueber die Zeit ENTHUeLLEN. Das haelt
       // die Logik einfach — kein "wer ist als naechstes dran" ueber mehrere Frames — und
       // ist ehrlich: die Formkarte und der Disziplinwert stehen fest, bevor der Auftritt
@@ -42422,7 +42487,14 @@
     if(!Array.isArray(liste)||!liste.length){ kulisseAktiv=null; return; }
     const meta=(echterKader&&echterKader.meta)||{};
     const schluessel=[disc, saat==null?"":String(saat), meta.heimTeamId||"", meta.gastTeamId||"", meta.spieltag??""].join("|");
-    const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))||liste[kulisseHash(schluessel)%liste.length];
+    // GEBUCHTE VARIANTE ZUERST (Oberflaechen-Effekte 08.11.): reichen Host/Runner je Disziplin
+    // eine Kulisse mit (`kulisseByDisciplineId`, aus waehleKulisseFuerFixture()), zeigt die Arena
+    // genau den Platz, auf dem die Wertung gespielt wird (s. kulisseSpielId). Ohne das Feld --
+    // jede bisherige Einbettung -- exakt die bisherige Hash-Wahl.
+    const gebucht=echterKader&&echterKader.kulisseByDisciplineId&&echterKader.kulisseByDisciplineId[disc];
+    const v=(kulisseQaId&&liste.find(k=>k.id===kulisseQaId))
+      ||(typeof gebucht==="string"&&liste.find(k=>k.id===gebucht))
+      ||liste[kulisseHash(schluessel)%liste.length];
     kulisseAktiv={disc, id:v.id, label:v.label, bild:v.bild, dunkel:Number.isFinite(v.dunkel)?v.dunkel:0.25};
     if(!kulisseBilder[v.bild]){
       const im=new Image();
@@ -58259,9 +58331,17 @@
   // reine Matrixfrage). "fest": der geladene Wurf bleibt stehen (das Verhalten vor dem 29.09.).
   // `jeSeite` (optional, 27.10., additiv): Kadergroesse der Arena-Disziplin fuer diese Messung,
   // wie disziplinProbe({jeSeite}). Ohne ihn exakt wie vorher.
-  function einflussVon(dId,n,plus,saatVersatz,mutatorModus,jeSeite){
+  // `opt` (optional, 08.11., Oberflaechen-Effekte, Konzept Abschnitt 7): {kulisse, ziel}.
+  // `kulisse` pinnt die Kulissen-Variante fuer die ganze Messung (Grund- UND Hebungslaeufe),
+  // `ziel:"variante"` misst die Abweichung gegen W_variante = Matrix + K[d][kulisse] statt
+  // gegen die Matrix. Ohne `opt` exakt wie vorher.
+  function einflussVon(dId,n,plus,saatVersatz,mutatorModus,jeSeite,opt){
     const M=MOTOREN[dId];
     if(!M)return {disziplin:dId,fehler:"kein Motor angemeldet",reihen:[]};
+    const eo=opt||{};
+    const pinVorher=kulisseSondenPin;
+    if(eo.kulisse!=null)kulisseSondenPin=eo.kulisse;
+    try{
     const hoehe=plus||15; const versatz=saatVersatz||0;
     const modus=mutatorModus||"je-lauf";
     const artJS=jeSeite&&ARENA_ART[dId]?ARENA_ART[dId]:null, altJeSeite=artJS?artJS.jeSeite:undefined;
@@ -58306,11 +58386,20 @@
     // statt BASIS_JE_DISC (s. Kommentar bei dessen Definition): die Pp-Pflichtpruefung misst
     // ausdruecklich gegen die gesperrte Matrix, nicht gegen einen Anzeige-Override — fuer
     // alle Disziplinen ausser football bit-identisch.
-    const W=PP_MATRIX_JE_DISC[dId]||{};
+    const W=eo.ziel==="variante"?kulisseZielgewichte(dId,eo.kulisse):(PP_MATRIX_JE_DISC[dId]||{});
     const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
       s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);
     return {disziplin:dId, laeufe:n, anhebung:hoehe, mutatorModus:modus, saatVersatz:versatz,
+      ...(eo.kulisse!=null?{kulisse:eo.kulisse}:{}), ...(eo.ziel?{ziel:eo.ziel, zielGewichte:W}:{}),
       abweichungPp:Math.round(abweichung*10)/10, reihen};
+    } finally { kulisseSondenPin=pinVorher; }
+  }
+  // W_variante = PP_MATRIX_JE_DISC + K[d][id] (Konzept 2.1). Ohne Profil/Variante: die Matrix.
+  function kulisseZielgewichte(d,id){
+    const W={...(PP_MATRIX_JE_DISC[d]||{})};
+    const P=KULISSEN_PROFILE[d]; const K=P&&id&&P.profil[id];
+    if(K)for(const k in K)W[k]=(W[k]||0)+K[k];
+    return W;
   }
   const spurtEinfluss=(n)=>einflussVon("spurt",n);
 
@@ -59148,6 +59237,17 @@
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
+    // OBERFLAECHEN-EFFEKTE (08.11.): die Profile (Kopie), die Varianten-Wahl fuer eine Saat ohne
+    // Bau, die Variante des zuletzt gebauten Buehnen-Spiels und W_variante -- reine Lesezugriffe
+    // fuer Messskripte und Tests.
+    kulisseProfile:()=>JSON.parse(JSON.stringify(KULISSEN_PROFILE)),
+    kulisseFuerSaat:(d,saat)=>kulisseSpielId(d,saat),
+    buehneKulisse:()=>buehneKulisseId,
+    kulisseZielgewichte:(d,id)=>kulisseZielgewichte(d,id),
+    // Sonden-Pin fuer Skripte ohne eigene Option (z.B. pruefe-wertung-fingerabdruck.mjs
+    // --kulissen-effekt=aus): "aus" = Wertung ohne Oberflaechen-Effekt, eine Varianten-Id pinnt sie,
+    // null = normale Wahl. Gibt den gesetzten Stand zurueck.
+    kulissePin:(id)=>{ kulisseSondenPin=id||null; return kulisseSondenPin; },
     // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
     // Entwurf setzen (die Saison spielt 2-6 je Seite, der Entwurf ohne Aufstellung immer
     // art.jeSeite=6) -- dieselbe Mutation, die disziplinProbe()/spieleBattlefieldPod() fuer
@@ -61108,6 +61208,11 @@
       // Mutator-Ziehungsrauschen von einer echten Wirkung, ohne Formkarten/Bau-Saaten zu aendern.
       const mutatorSaat=o.mutatorSaat||0;
       const mutatorenVorher=MUTATOREN;
+      // `o.kulisse` (Oberflaechen-Effekte 08.11.): pinnt die Kulissen-Variante fuer alle Spiele
+      // dieser Probe (s. kulisseSpielId). Ohne die Option unveraendert: dann waehlt jedes Spiel
+      // seine Variante selbst aus der Saat (gleichverteilt -- das Mittel ueber die Varianten).
+      const pinVorher=kulisseSondenPin;
+      if(o.kulisse!=null)kulisseSondenPin=o.kulisse;
       const gesichert=M.sichern();
       if(M.vorher)M.vorher();
       // `o.jeSeite` faehrt dieselbe Kadergroessen-Probe wie feldspielProbe (2v2/4v4/6v6):
@@ -61161,7 +61266,9 @@
           const eigVon=(u)=>u.eigOhneMutator!=null?u.eigOhneMutator:u.eig;
           const feld=istBahn(dId)?LAEUFER.map(u=>({n:u.n,seite:u.seite,eig:eigVon(u),
             bein:u.bein??null, etappe:u.etappenZeit??null, startT:u.startT??null}))
-            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:eigVon(u)}))
+            :istBuehne(dId)?TEILNEHMER.map(u=>({n:u.n,seite:u.side,eig:eigVon(u),
+              // Nur mit Kulissen-Profil gesetzt (sonst fehlen beide Felder, Rueckgabe wie vorher).
+              ...(u.kulisseOW!=null?{eigKulisse:u.eigKulisse,kulisse:u.kulisse,kulisseOW:u.kulisseOW}:{})}))
             // `torwart` kommt mit (Feldspieler-only-Rangtreue, Fable-Recherche 3.1/1.1):
             // in jeder Feldspiel-Disziplin ausser Hockey ist er an jeder Einheit `false`
             // und macht die Teilnehmerliste dort ununterscheidbar von vorher.
@@ -61203,6 +61310,8 @@
               // Zeile haette das Feld oben die Einheit NIE erreicht, weil GENAU hier aus
               // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
               ...(u.slotId!=null?{slotId:u.slotId}:{}),
+              ...(u.kulisseOW!=null?{eigKulisse:Math.round(u.eigKulisse*100)/100,kulisse:u.kulisse,
+                kulisseOW:Math.round(u.kulisseOW*100)/100}:{}),
               // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine
               // Zahl (>=0) wenn `o.zielDiag` gesetzt war, deshalb reicht `!=null` als Schalter.
               ...(u.zugang!=null?{zugang:u.zugang,persTyp:u.persTyp??null,heilerSub:u.heilerSub??null}:{})}))});
@@ -61318,6 +61427,7 @@
         if(art&&o.kursIndex!=null)art.kurse=altKurse;
         if(familie){SQUAD=kaderVorher.SQUAD;OPP=kaderVorher.OPP;neuPersBerechnen();}
         ZIEL_DIAG=null;
+        kulisseSondenPin=pinVorher;
       }
       const chassis=istBahn(dId)?"bahn":istBuehne(dId)?"buehne"
         :istFeldspiel(dId)?"feldspiel":"arena";
