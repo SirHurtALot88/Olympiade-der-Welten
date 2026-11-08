@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import { DISCIPLINE_SCENES } from "@/lib/foundation/discipline-scenes";
@@ -164,5 +165,105 @@ describe("Arena-Kulissen fuer die Battle Arena", () => {
     expect(waehlen).not.toMatch(/\brr\(/);
     expect(waehlen).not.toMatch(/\bseed\b/);
     expect(motor).toContain("window.__ARENA_KULISSEN&&typeof window.__ARENA_KULISSEN===\"object\"");
+  });
+});
+
+// PIXELLAB-REQUISITEN UND TAKESHI-BODEN (Batch 10, 08.11.): reiner Asset-Tausch. Der Motor zeichnet
+// viele Kacheln mit naturalWidth/naturalHeight oder festen Quell-Ausschnitten; deshalb muss jede
+// neue Datei exakt die Pixelmasse der alten LPC/Kenney-Datei haben, und die Ausschnitte im Motor
+// bleiben dieselben Zahlen.
+const REQUISITEN_MASSE: Record<string, [number, number]> = {
+  "arena/hind_huerde.png": [32, 32], "arena/hind_balken.png": [64, 32], "arena/hind_wand.png": [32, 64],
+  "arena/hind_seil.png": [64, 32], "arena/hind_wasser_l.png": [32, 32], "arena/hind_wasser_r.png": [32, 32],
+  "arena/hind_mauer.png": [40, 32], "arena/hind_heu.png": [64, 32], "arena/hind_feuer.png": [160, 32],
+  "arena/falle_tuer.png": [32, 64], "arena/falle_strickleiter.png": [64, 64], "arena/falle_spitzen.png": [96, 128],
+  "arena/falle_walze.png": [32, 32], "arena/deko_rad.png": [32, 32], "arena/falle_fass.png": [32, 64],
+  "arena/burg_mauer.png": [160, 64], "arena/burg_turm.png": [96, 150], "arena/burg_tor.png": [96, 150],
+  "arena/deko_banner.png": [192, 80], "arena/deko_pranger.png": [64, 88], "arena/deko_stock.png": [64, 38],
+  "arena/deko_holz.png": [64, 64], "arena/zaun_holz.png": [32, 32], "arena/baum_1.png": [36, 62],
+  "arena/baum_2.png": [32, 60], "arena/baum_3.png": [30, 59], "arena/baum_4.png": [30, 42],
+  "basketball/korb_topdown.png": [64, 64], "basketball/ball.png": [32, 32],
+  "football/ball_football.png": [14, 16], "football/helmet_white1.png": [19, 19],
+  "football/helmet_white2.png": [21, 19], "football/helmet_white3.png": [26, 22],
+  "buehne/schach_weiss.png": [288, 96], "buehne/schach_schwarz.png": [288, 96],
+};
+const TAKESHI_BODEN = ["boden_wiese", "boden_wald", "boden_pfad", "boden_kies", "boden_schlamm", "boden_pflaster",
+  "boden_see", "boden_hang", "boden_sumpf", "boden_eis"];
+
+function pngMass(datei: string): [number, number] {
+  const png = readFileSync(datei);
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
+}
+
+describe("PixelLab-Requisiten und Takeshi-Bodenkacheln (Batch 10)", () => {
+  it("jede getauschte Datei hat die Pixelmasse der alten und ist in quellen.json als PixelLab belegt", () => {
+    for (const [rel, mass] of Object.entries(REQUISITEN_MASSE)) {
+      const datei = path.join(wurzel, "public/sprites", rel);
+      expect(pngMass(datei), rel).toEqual(mass);
+      const [ordner, name] = rel.split("/");
+      const quellen = JSON.parse(readFileSync(path.join(wurzel, "public/sprites", ordner, "quellen.json"), "utf8"));
+      expect(quellen[name]?.paket, rel).toBe("PixelLab");
+    }
+  });
+
+  it("die neun Takeshi-Bodenarten (und das Slip-Way-Eis) sind 32er-PixelLab-Draufsicht-Kacheln", () => {
+    const quellen = JSON.parse(readFileSync(path.join(wurzel, "public/sprites/arena/quellen.json"), "utf8"));
+    for (const n of TAKESHI_BODEN) {
+      expect(pngMass(path.join(wurzel, "public/sprites/arena", `${n}.png`)), n).toEqual([32, 32]);
+      expect(quellen[`${n}.png`]?.paket, n).toBe("PixelLab");
+      expect(quellen[`${n}.png`]?.quelle, n).toMatch(/create-tiles-pro/);
+    }
+  });
+
+  it("die Bodenkacheln setzen sich nahtlos fort (Randsprung hoechstens doppelt so gross wie innen)", async () => {
+    for (const n of TAKESHI_BODEN) {
+      const { data, info } = await sharp(path.join(wurzel, "public/sprites/arena", `${n}.png`))
+        .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const w = info.width, h = info.height, px = (x: number, y: number, c: number) => data[(y * w + x) * 3 + c];
+      const d = (x1: number, y1: number, x2: number, y2: number) =>
+        Math.abs(px(x1, y1, 0) - px(x2, y2, 0)) + Math.abs(px(x1, y1, 1) - px(x2, y2, 1)) + Math.abs(px(x1, y1, 2) - px(x2, y2, 2));
+      let innen = 0, rand = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w - 1; x++) innen += d(x, y, x + 1, y) / (h * (w - 1));
+      for (let y = 0; y < h - 1; y++) for (let x = 0; x < w; x++) innen += d(x, y, x, y + 1) / ((h - 1) * w);
+      for (let y = 0; y < h; y++) rand += d(w - 1, y, 0, y) / h;
+      for (let x = 0; x < w; x++) rand += d(x, h - 1, x, 0) / w;
+      expect(rand / innen, n).toBeLessThan(2);
+    }
+  });
+
+  it("der Spurt-Wassergraben ist oben und unten offen und senkrecht nahtlos (durchgehender Graben)", async () => {
+    for (const seite of ["l", "r"]) {
+      const { data, info } = await sharp(path.join(wurzel, "public/sprites/arena", `hind_wasser_${seite}.png`))
+        .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const w = info.width, h = info.height;
+      // oberste und unterste Zeile: gleiche Deckung, damit uebereinander gesetzte Felder anschliessen
+      for (let x = 0; x < w; x++) {
+        expect(data[x * 4 + 3] > 0, `${seite} x=${x}`).toBe(data[((h - 1) * w + x) * 4 + 3] > 0);
+      }
+    }
+  });
+
+  it("der Korbring sitzt dort, wo der Ballflug hinzielt (Ringmitte wie beim alten Korb)", async () => {
+    const { data, info } = await sharp(path.join(wurzel, "public/sprites/basketball/korb_topdown.png"))
+      .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) {
+      const i = (y * info.width + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      if (a > 128 && r > 180 && g > 60 && g < 170 && b < 90) { sx += x; sy += y; n++; }
+    }
+    expect(n).toBeGreaterThan(10);
+    expect(Math.abs(sx / n - 31.6)).toBeLessThan(1);
+    expect(Math.abs(sy / n - 13.4)).toBeLessThan(1);
+  });
+
+  it("die Quell-Ausschnitte im Motor sind unveraendert (kein Mechanik- oder Geometrie-Eingriff)", () => {
+    const motor = readFileSync(path.join(wurzel, "public/mockups/battle-mode.engine.js"), "utf8");
+    expect(motor).toContain("ctx.drawImage(aBild.falle_spitzen,0,96,32,32,");
+    expect(motor).toContain("ctx.drawImage(aBild.falle_strickleiter,8,0,24,64,");
+    expect(motor).toContain("ctx.drawImage(m,k*40,8,36,56,");
+    expect(motor).toContain("ctx.drawImage(bn,0,0,96,80,");
+    expect(motor).toContain("ctx.drawImage(f,fr*32,0,32,32,");
+    expect(motor).toContain("ctx.drawImage(bkBild.korb_topdown,-28,-20,56,56)");
+    expect(motor).toContain("ctx.drawImage(sbBild[blatt],SCHACH_IDX[p[1]]*48,0,48,48,");
   });
 });

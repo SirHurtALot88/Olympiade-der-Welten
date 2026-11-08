@@ -90,7 +90,7 @@ Der Abgleich lief vorher und nachher über dieselben Aufrufe, das Ergebnis ist b
   - Sie haben eigene `boden*()`-Funktionen mit Platz- und Brettgeometrie.
   - Je Disziplin ist zu prüfen, ob die Kulisse wie bei Wettessen als Grundfläche darunter passt.
   - Der Generator braucht dafür nur einen Eintrag in `CHASSIS`, der Motor einen `kulisseZeichnen()`-Aufruf.
-- **Mini-DM im Battle Mode**: Mit echtem Vierer-Pod zeigt Mini-DM das FFA-Ereignis als DOM-Ansicht (`renderMiniDmFfa`), nicht
+- ~~**Mini-DM im Battle Mode**~~ — erledigt am 08.11., s. Batch 9. Mit echtem Vierer-Pod zeigt Mini-DM das FFA-Ereignis als DOM-Ansicht (`renderMiniDmFfa`), nicht
   die Leinwand. Die Kulisse sieht man dort nur ohne Pod.
 
 ## Battlefield: Landmarken auf den Motor-Orten (07.11.)
@@ -304,3 +304,83 @@ ausgeblendet. Jetzt hat das FFA eine eigene Leinwand.
   anfasst und alle Anstöße verdrahtet sind.
 
 Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 10: Requisiten von OpenGameArt/LPC auf PixelLab (08.11.)
+
+Chris: „ja auch auf die besseren PixelLabs umstellen!“ Die Spielobjekte, die der Motor direkt auf die Kulisse
+zeichnet, kamen bis dahin aus OpenGameArt (LPC, Kenney, Catacomb Chess). Jetzt sind sie PixelLab-Erzeugnisse:
+
+- **Spurt-Stationen**: Hürde, Balken, Palisade, Seil, Wassergraben (l/r), Bruchsteinmauer, Strohballen,
+  Feuersprung (fünf Bilder aus einer PixelLab-Animation, `/animate-with-text-v3`).
+- **Takeshi's Castle**: Tür, Strickleiter, Spanischer Reiter, Walze, Wagenrad, Fass; Burgmauer, Turm, Torhaus,
+  Bannerstange, Pranger, Fußblock, Holzstapel; dazu Zaun und die vier Nadelbäume der Routenkarte.
+- **Basketball**: Korb (Draufsicht) und Ball. **Football**: Ball und die drei Helme (geladen, im Motor derzeit
+  nicht gezeichnet). **Speed-Schach**: die sechs Figuren, Weiß und Schwarz.
+
+**Reiner Asset-Tausch, keine Zeile im Motor geändert.** Der Motor zeichnet viele Kacheln mit
+`naturalWidth/naturalHeight` oder mit festen Quell-Ausschnitten (`falle_spitzen` 0/96 32×32, `falle_strickleiter`
+8/0 24×64, `deko_banner` 0/0 96×80, `burg_mauer` k·40/8 36×56, `hind_feuer` fr·32, Schach `SCHACH_IDX·48`).
+Deshalb hat jede neue Datei exakt die Pixelmaße der alten, und der Inhalt sitzt in derselben Box: der
+Alpha-Begrenzung der alten Datei innerhalb des Ausschnitts, den der Motor liest (fest eingetragen als
+`ALTE_BOX`, damit ein zweiter Lauf nicht wandert). Zwei Stellen brauchten mehr als die Box:
+
+- **Korb**: Der Ballflug zielt auf `korbX`, das Sprite hängt mit `drawImage(…,-28,-20,56,56)` daran. Der
+  Ringmittelpunkt des PixelLab-Korbs liegt pixelgenau auf dem des alten Kenney-Korbs (31,6 / 13,4 im 64er-Bild).
+- **Wassergraben**: Die alten LPC-Kacheln hatten Ufer nur links und rechts; übereinander gesetzt (eine je Bahn)
+  ergaben sie einen durchgehenden Graben. Ein erster Tausch mit einem rundum umrandeten PixelLab-Becken sah aus
+  wie zwölf einzelne Kästen. Jetzt: Ufer aus dem Becken, Wasser aus der nahtlosen PixelLab-Seekachel
+  (Batch 11), oben und unten offen.
+
+Ablauf (`scripts/pixellab-requisiten.py`, API-Client `scripts/lib/pixellab_api.py`):
+
+1. `bestellen <name>`: `/v2/generate-image-v2` in der Zielgröße, freigestellt. Je nach Größe 4 bis 64
+   Kandidaten pro Auftrag (10 Generationen).
+2. `waehlen <name> <index>`: Kandidat nach `data/generated/pixellab-requisiten/roh/`, Prompt, Saat, Job-ID und
+   Index nach `auswahl.json`.
+3. `einsetzen`: baut `public/sprites/…` aus `roh/`, ohne Netz und deterministisch.
+
+Nachgebessert nach der Sichtprobe: Die Hürde ist jetzt frontal statt schräg (schräg schrumpfte sie in der
+32×23-Box auf ein Strichmännchen), die Walze liegt waagerecht, und Dame und König sind einzeln mit dem
+Reihenbild als Stilvorlage erzeugt (in der Sechserreihe waren sie oben abgeschnitten).
+
+`scripts/arena-assets-schneiden.mjs` und `scripts/buehne-schach-assets-schneiden.mjs` überschreiben Dateien,
+die `quellen.json` als `"paket": "PixelLab"` führt, nicht mehr (mit `--lpc` schon, zum Vergleich). Herkunft je
+Datei: `public/sprites/<ordner>/quellen.json`, die frühere LPC-Quelle steht dort unter `vorher`.
+
+Nicht getauscht, weil keine Requisiten: die Flächentexturen `boden_sand/stein/erde`, `bahn_ocker`, `rasen`,
+`mauer_ziegel` (Rückfall-Boden von TDM und Spurt, Trittsteine und Schlammgrube in Takeshi), die TDM-Fackel, der
+Deko-Adler und das Basketball-Publikum.
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+## Batch 11: Takeshi's Castle — PixelLab-Draufsicht-Kacheln für die Route (08.11.)
+
+Bisher der einzige offene Punkt neben Mini-DM (Batch 7: „Seitenpanorama gegen Draufsicht-Route“). Die Route
+durch Midoriyama (`bodenTakeshiRoute()`) füllt ihre Flächen mit `ctx.createPattern(…,"repeat")` aus neun
+Bodenkacheln. Die sind jetzt PixelLab-Draufsicht-Kacheln (`/v2/create-tiles-pro`, `square_topdown`, 32 px,
+Blickwinkel top-down, `outline_mode: "segmentation"` für nahtlose Ränder): Wiese, Wald, Pfad, Kies, Schlamm,
+Pflaster, See, Hang, Sumpf, dazu das Eis der Slip-Way-Falle. Route, Zonen, Fallen und Kamera sind unangetastet.
+
+Chris hat die Stilwahl freigegeben („probier ruhig und nimm das was am besten aussieht“). Probiert wurden drei
+Sätze zu je 16 Kacheln, im Motor nebeneinander fotografiert:
+
+| Satz | Ansatz | Ergebnis |
+|---|---|---|
+| a | freier Prompt, PixelLab-Palette | Wiese mit sichtbarem Kachelraster, Wald fast schwarz |
+| **c** | **Stilvorlage: drei 32er-Ausschnitte (Gras, Wasser, Sand) aus der PixelLab-Takeshi-Szene** | **gewählt** |
+| d | Prompt „muted natural colors“ | Pfad und Hang mit eingebrannten Mustern, See mit Streifen |
+
+Satz c trägt dieselbe helle, gesättigte Palette wie die Takeshi-Szene, und seine Ränder sind am ruhigsten
+(Randsprung geteilt durch mittleren Innensprung: 0,1 bis 1,6; ab etwa 2 sieht man die Naht). Fürs Eis malte
+das Modell mit Vorlage nur Gras, Wasser und Sand nach; das Eis kommt deshalb aus einem Satz ohne Vorlage.
+
+`python3 -I scripts/pixellab-boden-kacheln.py einsetzen c` setzt die Wahl (`WAHL` im Skript) ohne Netz; die
+drei Rohsätze liegen unter `data/generated/pixellab-boden/{a,c,d,eis}/`.
+
+Sichtprobe: `node scripts/screenshot-kulisse.mjs takeshis-castle - 100` (Übersicht) und `… - 3500` (Zoom).
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
+
+**Stand nach Batch 11:** 20 von 20 Disziplinen zeigen PixelLab-Grafik im Motor: 19 mit Kulisse, Takeshi
+mit PixelLab-Bodenkacheln und PixelLab-Fallen auf seiner Draufsicht-Route. Dazu sind alle Requisiten, die der
+Motor auf die Kulissen zeichnet, PixelLab statt OpenGameArt.
