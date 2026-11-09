@@ -3,7 +3,28 @@
 Auftrag, Chris wörtlich: „ja nicht nur sagen was fehlt, opus ist doch PM, der soll mal sagen was
 gemacht werden muss damit alle 20 diszis am ende auf so nem top level sind!" Dieses Dokument ist
 deshalb **kein weiteres Audit**, sondern ein Bauplan: was wofür gebaut wird, in welcher
-Reihenfolge, mit welchem Aufwand, und welche Entscheidungen vorher bei Chris liegen.
+Reihenfolge und mit welchem Aufwand.
+
+**Zweite Fassung (09.11., abends): aus den offenen Fragen sind Entscheidungen geworden.** Chris
+auf die Absicht, ihm E1–E6 zur Wahl vorzulegen: „opus is dein PM der kann sowas und darf es
+entscheiden!" Abschnitt 5 hält deshalb keine Optionen mehr fest, sondern Entscheidungen mit
+Begründung. Abschnitt 4 ist eine Auftragsliste, die ein Koordinator direkt an Bau-Agenten geben
+kann. **Zwei Dinge bleiben ausdrücklich bei Chris und sind von der Ermächtigung nicht gedeckt:**
+jede neue PixelLab-Figur, -Animation oder -Requisite, und jeder Merge. Die Merge-Reihenfolge in
+Abschnitt 4 ist eine Empfehlung. Ob etwas gemergt ist, steht in diesem Dokument nirgends als
+Tatsache.
+
+### Die Entscheidungen auf einen Blick
+
+| # | Frage | Entschieden (Begründung: Abschnitt 5) |
+|---|---|---|
+| E1 | Welches Spurt-Format im echten Spiel, und wie wird gewählt? | **Fest im Saisonkalender über den Durchgang** (Option A, über das schon vorhandene `occurrenceInSeason`). **1. Durchgang HYROX, 2. Durchgang klassisch.** Die Hatz kommt erst nach ihrer Nacharbeit dazu und wechselt sich dann im 2. Durchgang saisonweise mit klassisch ab. Kein Hash, keine Liga-Einstellung. Gilt ab der nächsten neu angelegten Saison. |
+| E2 | Zielbänder der Sendedauer | Zielwert je Disziplin und Format, **Toleranz ±15 %**, Leitplanke **0:50–5:00** ohne ausdrückliche Vorgabe von Chris. **Hatz 3:00** (30 s je Welle), **Battlefield-Pod 3:30**, **Climbing 1:30**, **Spurt klassisch zurück auf 3:00**, HYROX 3:30 (3:52 liegt im Band). Alle anderen: Ist ist Ziel. |
+| E3 | Takeshi: Einzelrangliste? | **Nein.** Takeshi bleibt teamzentriert. P2.5 ist gestrichen. |
+| E4 | Rangliste im Bild oder daneben? | **Im Bild, auf der Leinwand**, oben rechts nach dem HYROX-Muster. Die Ecke ist ein Parameter. Die DOM-Tabellen bleiben als Zusatz bestehen, `#ttroster` wird nicht umgebaut. |
+| E5 | Kulissen-Politur Football/Hockey/TDM | **Zurückgestellt**, bis Strang M sie in die organische Wertung bringt. Ausnahme: Fehlerbehebung. |
+| E6 | PixelLab | **Die Hatz geht ohne neue Figur live.** Der Fegearm bleibt ein unbestellter Vorschlag an Chris. Die kahlen Grundfiguren werden erst untersucht (Auftrag A2). |
+| E7 | Bau-Reihenfolge und Zuständigkeit | Elf Aufträge in fünf Wellen (0–4), zwei Engine-Slots mit festen Zonen in `battle-mode.engine.js` (Abschnitt 4). |
 
 **Grundlage.** Drei Achsen, die der Koordinator am 09.11. selbst nachgespielt hat:
 
@@ -37,8 +58,8 @@ habe ich nicht geändert. PixelLab ist nicht angefasst, die Matrix auch nicht.
 3. **Der größte Hebel ist eine generische Bahn-Rangleiste.** Sie entsteht aus der HYROX-Leiste
    (`zeichneHyroxRangleiste()`, PR #1369/#1371). Die Funktion ist zu etwa 80 % generisch. An HYROX
    hängen nur die Sortierung, die Statusspalte, die Kopfzeile und die Hervorhebung „im Bild". Wer
-   diese vier Punkte als Parameter herauszieht, bekommt Spurt klassisch, Hatz und Climbing (und
-   bei Bedarf Takeshi) für etwa 40–60 Zeilen je Disziplin. **Wichtig:** `bahnRangliste()` ist als
+   diese vier Punkte als Parameter herauszieht, bekommt Spurt klassisch, Hatz und Climbing (Takeshi
+   bewusst nicht, E3) für etwa 40–60 Zeilen je Disziplin. **Wichtig:** `bahnRangliste()` ist als
    Live-Sortierung nicht überall richtig. Bei Takeshi rutschen Ausgeschiedene nach vorn, bei HYROX
    war die Liste ein Spoiler, bei Climbing zählt die Höchstmarke. Der Sortierschlüssel muss
    deshalb ein Pflichtparameter sein (Abschnitt 3.1).
@@ -59,10 +80,11 @@ habe ich nicht geändert. PixelLab ist nicht angefasst, die Matrix auch nicht.
    dort hat geringeren Wert, solange die Disziplin nicht organisch gewertet wird. Das ist kein
    Bestandteil dieses Fahrplans, aber eine Abhängigkeit, die ich nicht verschweigen will.
 
-**Empfohlene Reihenfolge in einem Satz:** Chris arbeitet erst die Merge-Warteschlange ab und
-trifft die Format- und Dauer-Entscheidungen. Dann folgt eine kleine Fundament-Sitzung
-(Sendedauer-Sonde und Zeitdehnung je Format), danach die Bahn-Rangleiste mit Ausrollung, dann die
-Hatz-Nacharbeit. Parallel dazu laufen Eiskunstlauf und anschließend Fechten.
+**Reihenfolge in einem Satz (entschieden, Abschnitt 4):** Sofort und ohne Merge laufen die
+Sendedauer-Sonde und die Prüfung der kahlen Figuren. Nach Chris' Merges folgen der Rahmen
+(Zeitdehnung je Format, dann die Format-Weiche, mit der HYROX ins echte Spiel geht), danach die
+Bahn-Rangleiste und zuletzt die Hatz. Daneben läuft in einem zweiten Slot erst Eiskunstlauf,
+dann Fechten, dann die Staffel.
 
 ---
 
@@ -107,7 +129,7 @@ nicht. Das ist ein Artefakt der Sonde und kein Befund.
 
 | Disziplin (Format) | Chassis | `ZEIT_DEHNUNG` | Sendedauer | Bezugsgröße | Einordnung |
 |---|---|---:|---:|---|---|
-| Climbing | Bahn | 4,38 | **0:48** | Faktor war auf 60 s gerechnet | **Ausreißer nach unten** |
+| Climbing | Bahn | 4,38 | **0:48** | Faktor war auf 60 s gerechnet | **Ausreißer nach unten** → E2: Ziel 1:30 |
 | Showcase | Bühne | – | 1:00 | ~60 s Bühnen-Standard | ok |
 | Eiskunstlauf | Bühne | – | 1:02 | ~60 s | ok (12 Elemente parallel je Paar, ~5 s je Element) |
 | Wettessen | Bühne | – | 1:02 | ~60 s | ok |
@@ -124,14 +146,14 @@ nicht. Das ist ein Artefakt der Sonde und kein Befund.
 | Staffel (**Pod**, Liga) | Bahn | 14,65 | 2:58 | Chris: ~3 min | ok |
 | Staffel (Duell) | Bahn | 14,65 | 3:20 | Chris: ~3 min | ok |
 | Battlefield (Duell, ungewertet) | Arena | 5,00 | 3:28 | – | – |
-| Spurt klassisch | Bahn | 11,14 | 3:36 | Chris 06.09.: ~3 min (damals 3:03 gemessen) | **+20 % Drift**, leicht |
-| Spurt HYROX (Flag) | Bahn | 11,14 | 3:52 | ~3 min | ok |
+| Spurt klassisch | Bahn | 11,14 | 3:36 | Chris 06.09.: ~3 min (damals 3:03 gemessen) | **+20 % Drift** → E2: zurück auf 3:00 |
+| Spurt HYROX (Flag) | Bahn | 11,14 | 3:52 | E2: Ziel 3:30 | ok (+10 %, im Band) |
 | Football | Feld | 1 | 4:44 | – | ok |
 | Basketball | Feld | 1 | 6:08 | Chris: 4 × 1:30 | ok, so bestellt |
-| **Battlefield (Pod, Liga)** | Arena | 5,00 | **7:12** | Faktor stammt vom Duell (41 Sim-s); der Pod läuft 86 Sim-s | **Ausreißer nach oben**, Chris-Frage |
+| **Battlefield (Pod, Liga)** | Arena | 5,00 | **7:12** | Faktor stammt vom Duell (41 Sim-s); der Pod läuft 86 Sim-s | **Ausreißer nach oben** → E2: Ziel 3:30 |
 | Gewichtheben | Bühne | 4 | 7:22 | Chris' Zielspanne 4–8 s je Versuch (06.09.), daraus ~7,4 min | ok, aus Chris' Vorgabe |
 | Hockey | Feld | 2 | 8:06 | Faktor 2 aus Chris' Hektik-Fund, „240 s werden rund 8 Minuten" | ok, aus Chris' Vorgabe |
-| **Spurt „Die Hatz" (Flag)** | Bahn | 11,14 | **10:36** (10 Läufer) / **13:22** (12 Läufer, gerechnet) | ~3 min wie Spurt | **schwerer Ausreißer** |
+| **Spurt „Die Hatz" (Flag)** | Bahn | 11,14 | **10:36** (10 Läufer) / **13:22** (12 Läufer, gerechnet) | ~3 min wie Spurt | **schwerer Ausreißer** → E2: 30 s je Welle, 3:00 bei 12 |
 
 Die Hatz-Rechnung: `baueHatz()` (`:48581`) wirft je Welle zwei Läufer raus, bis vier übrig sind.
 Die letzte Welle entscheidet Rang 1–4 auf einmal. Zwölf Läufer ergeben fünf Wellen à
@@ -140,7 +162,7 @@ Die letzte Welle entscheidet Rang 1–4 auf einmal. Zwölf Läufer ergeben fünf
 Wellen und drei Pausen, also 57 Sim-s und gemessen 636 s. Die 13 Minuten des Koordinators gelten
 für ein volles Feld.
 
-**Abweichung zum Koordinator, offen gelassen:** Er hat Takeshi mit ~100 s und HYROX mit ~5 min
+**Abweichung zum Koordinator, wird von Auftrag A1 geklärt:** Er hat Takeshi mit ~100 s und HYROX mit ~5 min
 gesehen, ich messe 62 s bzw. 3:52. Countdown und Nachlauf erklären zusammen nur ~6 s. Plausibel
 sind ein anderer Kader oder eine andere Feldgröße. Die Sendedauer-Sonde aus Abschnitt 3.3 würde
 das in einem Lauf klären.
@@ -235,7 +257,7 @@ Simulationszeit und ergibt bei `ZEIT_DEHNUNG.spurt=11,14` real ~39 s zwischen zw
 Kameraschnitten. Die Halle hat dafür eine eigene Konstante bekommen (`HYROX_HALLE_SCHNITT_SEK`,
 `:48725`). Für die Bahn-Ansicht von HYROX und für jede künftige Konstante, die etwas Sichtbares
 taktet (Wellendauer, Banner-Haltezeit, Kameraschnitt), gilt dasselbe. Wird der Faktor für die
-Hatz geändert (Abschnitt 4, P2), ändern sich alle diese Zeiten automatisch mit. Das ist gewollt,
+Hatz geändert (Auftrag A3), ändern sich alle diese Zeiten automatisch mit. Das ist gewollt,
 muss aber im Bild gegengeprüft werden.
 
 ### 2.4 Die vierte Achse: Wertung
@@ -267,7 +289,7 @@ ohne sichtbaren Gewinn.
 richtige Vorlage: Kasten oben rechts, „1. Name … Status", Fertige grün, Zeilen im Kamerabild
 hell, der Rest gedimmt, aber lesbar. An HYROX gebunden sind nur vier Stellen:
 
-| Parameter | HYROX heute | Spurt klassisch | Hatz | Climbing | Takeshi (Duell, optional) |
+| Parameter | HYROX heute | Spurt klassisch | Hatz | Climbing | Takeshi (Duell; gestrichen, E3) |
 |---|---|---|---|---|---|
 | `sortierung(a,b)` | fertig nach Zeit, sonst `hyroxZustand(u).s` | fertig nach Zeit, sonst `u.pos` | aus dem Fahrplan (B4), Ausgeschiedene nach `hatzRang` unten | `u.hoch` (Höchstmarke) | `burgwertung(u)` |
 | `status(u)` | L1/L2/TECH/KLET/KRAFT/✓ | Station 1–7 bzw. ✓/„liegt" | „W3", „GEFÄHRDET" (untere zwei), „RAUS", ✓ | Höhe in m / „TOP" / „STURZ" | „Falle 7/14" / „raus" |
@@ -282,7 +304,7 @@ trotzdem `scripts/pruefe-wertung-fingerabdruck.mjs` byte-identisch, wie in allen
 Batches.
 
 **Bauort:** auf der Spitze des Spurt-Stapels (#1371), weil `zeichneHyroxRangleiste()` erst dort
-existiert. Das ist ein Grund mehr, den Stapel vorher zu mergen (Abschnitt 4, P0).
+existiert. Das ist ein Grund mehr, den Stapel vorher zu mergen (Abschnitt 4.1).
 
 ### 3.2 B2 — Zeitdehnung je Format
 
@@ -299,11 +321,22 @@ im Kommentar über der Tabelle (`:52894ff.`). Bei der Hatz ist es sogar trivial:
 nach `baueHatz()` fest, bevor der erste Tick läuft. Anders als bei der Staffel-Kalibrierung
 (13,86 → 14,65) kann eine feinere dt-Teilung dort keine Zufallszüge verschieben.
 
+**Korrektur zur ersten Fassung (beim erneuten Lesen des Tabellenkommentars):** „Wertungsneutral"
+gilt für die **Buchung**, aber nicht automatisch für das **angezeigte** Rennen. Der Kommentar über
+`ZEIT_DEHNUNG` belegt es an der Staffel selbst: Ein größerer Faktor teilt den Tick in kleinere
+dt-Schritte und verschiebt damit „die genaue Abfolge der Zufallszüge (rr(), z. B.
+Wechselpatzer/Windschatten-Wechsel)". Deshalb landete 13,86 nicht auf 3:00 und musste auf 14,65
+nachkalibriert werden. Bei Formaten mit durchgehender Physik (Spurt klassisch, Climbing,
+Battlefield-Pod) kann eine Faktoränderung deshalb auch die **gezeigte** Endrangfolge verändern.
+Hatz und HYROX sind davon frei, weil ihr Ergebnis vorab feststeht. Jede Faktoränderung bekommt
+darum zusätzlich die Anzeige-Treue-Prüfung aus Abschnitt 5, E2.
+
 ### 3.3 B3 — Sendedauer-Sonde mit Zielband
 
 Die Sonde aus Abschnitt 1.2 als `scripts/miss-sendedauer.mjs [disziplin[:format]] …`, dazu
-eine kleine Tabelle mit Zielbändern je Disziplin (Chris-Entscheidung E2). Ausgabe: Ist, Band,
-Abweichung. Zunächst als Bericht, nicht als harte CI-Schranke. **Warum ein Fundament:** Die Hatz
+eine kleine Tabelle mit Zielbändern je Disziplin (entschieden in Abschnitt 5, E2). Ausgabe: Ist,
+Band, Abweichung, **dazu die Anzeige-Treue** (Endrangfolge des angezeigten Laufs gegen die
+gebuchte, siehe die Korrektur in 3.2). Zunächst als Bericht, nicht als harte CI-Schranke. **Warum ein Fundament:** Die Hatz
 wäre damit am Tag ihres PRs aufgefallen. Die +20 % Drift bei Spurt klassisch (3:03 → 3:36,
 seit dem 06.09. unbemerkt) und die Kürze von Climbing ebenso. Jede Formatvariante aus
 `format-varianten-brainstorm-08-11.md` (14 Kandidaten) wird dieselbe Frage aufwerfen.
@@ -341,143 +374,308 @@ leer."**
 
 ---
 
-## 4. Der Fahrplan
+## 4. Der Fahrplan: Auftragsliste für Bau-Agenten
 
 Aufwand in **Sitzungen** (eine Sitzung ≈ ein Bau-Agent, ein PR; Bezugspunkte aus den echten
 Engine-Diffs: Climbing-Wand 285 Zeilen, Takeshi 204, HYROX-Halle 368, Nahkamera 277,
 HYROX-Fahrplan 196, Hatz-Format 238, Showcase/Breaking-Lichtfix 15). Die Zeilenzahlen sind
 Schätzungen ±50 %.
 
-### P0 — Chris, vor jedem neuen Bau (keine Agentenarbeit)
+### 4.1 P0 — Chris: Merge-Warteschlange (Empfehlung, keine Agentenarbeit)
 
-| | Was | Warum zuerst |
+Mergen ist Chris' eigene Handlung. Empfohlene Reihenfolge, unverändert gegenüber der ersten
+Fassung: **#1359** (Showcase/Breaking, Basis noch `8a0dad736`, also älter als `main`) → **#1362**
+(Takeshi) → **#1363** (Climbing) → Spurt-Stapel **#1364 → #1367 → #1368 → #1369 → #1371** (acht
+Commits, linear aufeinander). Grund: Alle Aufträge ab Welle 1 setzen auf diesen Zweigen auf, und
+`battle-mode.engine.js` hat 63 000 Zeilen in einer Datei. Jeder weitere offene Zweig erhöht das
+Konfliktrisiko.
+
+**Entschieden: Bau-Agenten stapeln nicht auf ungemergte PRs.** Jeder Auftrag ab Welle 1 startet
+erst, wenn die in seiner Zeile genannten PRs auf `main` sind, und zweigt von `main` ab. Welle 0
+braucht keinen Merge.
+
+### 4.2 Zonen in `battle-mode.engine.js`
+
+Maßgeblich sind die **Funktionsnamen**. Die Zeilen gelten für `14a18a72b` (Spitze #1371) und
+dienen nur der Orientierung. Nach den Merges verschieben sie sich.
+
+| Zone | Funktionen | Zeilen (`14a18a72b`) |
 |---|---|---|
-| P0.1 | **Merge-Warteschlange abarbeiten:** #1359 (Showcase/Breaking, Basis noch `8a0dad736`, also älter als `main`), #1362 (Takeshi), #1363 (Climbing), dann der Spurt-Stapel #1364 → #1367 → #1368 → #1369 → #1371 (acht Commits, linear aufeinander) | Alle Bausteine unten setzen auf diesen Zweigen auf. `battle-mode.engine.js` hat 62 000 Zeilen in einer Datei, jeder weitere offene Zweig erhöht das Konfliktrisiko. B1 kann erst auf #1371 gebaut werden. |
-| P0.2 | **Entscheidungen E1–E4** (Abschnitt 5) | E1 entscheidet, ob die Hatz Priorität 2 oder geparkt ist. E2 liefert die Zielbänder für B3. |
+| **B — Bühnen-Zeichnung** | `bodenBuehne`, `bodenTennis`, `bodenShowcase`, `bodenWettessen`, `bodenSchatzsuche`, `bodenHeben`, `bodenEis`, `zeichneBuehne`, `zeichneTennis`, `zeichneFechten`, `zeichneShowcase`, `zeichneEisstaub`, `zeichneEisStand`, `zeichneBreaking` | ~29 650–38 410 |
+| **A-HUD — Bahn-Anzeige** | `updateHudBahn`; in `bauSpurt` nur Anzeige-Zustand; `baueHatz`/`stepSpurtHatz` (nur Bahnposition, nicht `hatzRang`); `hyroxFahrplan`, `zeichneHyroxRangleiste`, die neue B1-Funktion, `zeichneSpurt` | ~41 800–42 500 und ~47 385–52 340 |
+| **A-Boden — Bahn-Kulisse** | `bodenArena`, `bodenHyroxHalle`, `bodenTakeshiRoute`, `bodenSpurt`, `bodenSpurtGerade`, `bodenZeitfahren`, `bodenWand`, `bodenSpurtOval` | ~43 245–44 900 |
+| **C — Rahmen** | `ZEIT_DEHNUNG`, `zeitFaktor`, `loop`, `gebuchteSaatFuerAktuelleDisziplin` und die gebuchten Kontexte daneben, `reset` | ~52 950–56 500 |
+| **Tabu für jeden Fahrplan-Agenten** | Bau und Motoren der Bühne (`bauBuehne` bis vor `bodenBuehne`, ~20 125–29 650), `MOTOREN`, die Physik in `stepSim`/`stepSpurt`, die Logik von `bahnRangliste()` (nur lesen), `BAHN_ART`, `BAHN_FLAGS`-Definition, `KULISSEN`/`kulisseWaehlen` (~42 505–42 600), Feldspiel/Arena-Kampf (Strang M) | – |
 
-### P1 — Fundament (1 Sitzung, ein Agent)
+**Slot-Regel (entschieden):**
 
-| Baustein | Inhalt | Aufwand | Abhängig von |
+1. **Höchstens zwei Fahrplan-Agenten gleichzeitig an der Engine:** Slot 1 arbeitet in C oder
+   A-HUD, Slot 2 in B oder A-Boden. Nie zwei Agenten in derselben Zone.
+2. A-HUD und A-Boden dürfen gleichzeitig laufen, weil ihre Funktionen getrennt liegen. Braucht
+   ein Agent trotzdem eine Zeile in der fremden Zone, macht er sie **nicht** selbst, sondern
+   meldet sie in seinem Bericht. Der nächste Auftrag in jener Zone nimmt sie mit.
+3. Läuft ein Strang-M-Agent an der Engine (Feldspiel, Arena-Kampf), pausiert Slot 2. Das
+   Zwei-Agenten-Limit gilt für die ganze Datei, nicht nur für diesen Fahrplan.
+4. Pflicht in jedem Engine-PR: `scripts/pruefe-wertung-fingerabdruck.mjs` byte-identisch; Bilder
+   bei 30 % und 75 % der Sendedauer; ab Welle 1 ein Lauf von `miss-sendedauer.mjs` (A1) für die
+   berührten Disziplinen.
+
+### 4.3 Die Aufträge
+
+In Klammern steht die Bezeichnung aus der ersten Fassung (P1–P4), damit ältere Verweise auffindbar
+bleiben.
+
+**Welle 0 — sofort, ohne Merge, keine Engine-Zeile**
+
+| Auftrag | Inhalt | Ort | Aufwand | Abnahme |
+|---|---|---|---|---|
+| **A1 Sendedauer- und Anzeige-Treue-Sonde** (B3) | `scripts/miss-sendedauer.mjs [disziplin[:format]] …` mit der Zielband-Tabelle aus E2. Je Lauf Ist, Band, Abweichung. Dazu die **Anzeige-Treue**: Endrangfolge des Laufs über `sondenLauf()` mit Faktor gegen die gebuchte Rangfolge, 24 Saaten. Abgedeckt: alle 20 Disziplinen, Pods, die Formate `spurt:hatz`/`spurt:hyrox` (bis zum Merge gegen die Spitze von #1371) und der Mini-DM-FFA (eigene Leinwand `#mdffaCv`). Je Disziplin ein frischer Browser, bis zu drei Wiederholungen (Absturzfalle aus 3.3). Ein Lauf mit Kaderfamilie klärt nebenbei die Koordinator-Abweichung (Takeshi ~100 s, HYROX ~5 min). | `scripts/`, Basis `main` | ~150 Zeilen, 1 Sitzung | Tabelle aller 20 plus Formate plus Pods im PR-Text; nur ein Bericht, keine CI-Schranke |
+| **A2 Kahle Grundfiguren prüfen** | Treten die kahlen Grundfiguren aus den Pod-Bildern im echten Spiel auf (Abbild `live-save`, echte Kader) oder nur mit dem Testkader `kaderfamilie-live-save.json`? Welche Spieler sind betroffen, und welche Sprite-Zuordnung fehlt? **Nur lesen, kein PixelLab.** | lesend | ½ Sitzung | Bericht mit Spielerliste; eine Bestellung schlägt er höchstens vor, Chris gibt frei |
+
+**Welle 1 — nach #1359 und dem Spurt-Stapel bis #1371 auf `main`**
+
+| Auftrag | Slot / Zone | Inhalt | Aufwand | Abnahme |
+|---|---|---|---|---|
+| **A3 Rahmen I: Zeitdehnung je Format** (B2 + Faktoren) | Slot 1 / C | `zeitFaktor()` liest zuerst `ZEIT_DEHNUNG["<disc>:<format>"]`, sonst `ZEIT_DEHNUNG[disc]`. Pod-Schlüssel `battlefield:pod`. Startwerte: `spurt:hatz` **2,50**, `spurt:hyrox` **11,14** (festgeschrieben, damit die Korrektur von klassisch es nicht mitzieht), `spurt` **11,14 → ~9,3**, `climbing` **4,38 → ~8,2**, `battlefield:pod` **5 → ~2,4**. Jeder Wert wird mit A1 ins Band nachkalibriert, wie bei der Staffel (13,86 → 14,65). Die Sandsack-Weiche `SANDSACK_PAR_SZENE` nur dann mitnehmen, wenn sie trivial auf das neue Muster passt. | ~20 Zeilen, ½ Sitzung | Alle fünf im Band (E2); Anzeige-Treue-Regel (E2) eingehalten; `miss-alle-disziplinen.mjs 24 <diszi>` vorher und nachher identisch; Fingerabdruck; Bilder 30/75 % mit Blick auf Sim-Zeit-Konstanten (2.3) |
+| **A4 Rahmen II: Format-Weiche** (F1) | Slot 1 / C, nach A3 | Siehe E1, „Bauvorgabe". Format im Spielplan-Slot, Plan-Tabelle `spurt: [hyrox, klassisch]`, Kanal `formatByDisciplineId` in Host und Headless-Runner, Engine liest ihn in Zone C und setzt `BAHN_FLAGS.spurtFormat` vor dem Bau. Abnahme-Einträge je Format, Guard-Test, Spielplan-Etikett. | ~150–250 Zeilen über lib/app/engine, 1 Sitzung | Bestehende Saves und die laufende Saison bit-identisch (kein `format` → klassisch); `e2e-saisonende-am-save-abbild.ts` am Abbild grün; `spurt:hyrox` in `disziplin-abnahme.json` mit frisch gemessenem rho/Pp (zwei Saatströme); Guard-Test schlägt fehl, wenn ein Planformat ohne Abnahme ist |
+| **A5 Eiskunstlauf** (P3.1) | Slot 2 / B | „Rahmen statt Material" nach Audit 4.4: Waldsee-Horizont auf voller Höhe, Kür-Hallenrang mit Publikum, Spots auf die Läufer, Eis mit Spiegelung, Kufenspuren und Verlauf. Kulissenbild aus der vorhandenen Rohszene `public/szenen/eiskunstlauf/`. Zwischenstand-Tafel (`zeichneEisStand`) und Wiederholungsfenster bleiben unangetastet. Ein neuer Eintrag in `KULISSEN` kommt über die Kulissen-Daten, nicht über `kulisseWaehlen`. | ~300–450 Zeilen, 1 Sitzung | Audit-Note B+ an den fünf Merkmalen aus Audit Abschnitt 1; Fingerabdruck |
+
+**Welle 2 — nach A4 bzw. A5 auf `main`**
+
+| Auftrag | Slot / Zone | Inhalt | Aufwand | Abnahme |
+|---|---|---|---|---|
+| **A6 Bahn-Rangleiste B1, HYROX und Spurt klassisch** | Slot 1 / A-HUD | `zeichneHyroxRangleiste()` herauslösen in eine Funktion mit den Parametern `sortierung`, `status`, `kopf`, `imBild`, `ecke` (Tabelle 3.1). HYROX pixelgleich darauf umstellen (Screenshot-Vergleich). Als erster neuer Abnehmer kommt Spurt klassisch dazu: Sortierung fertig nach Zeit, sonst `u.pos`; Status Station n/7, ✓ oder „liegt"; Kopf „SPURT · Station 4/7". `bahnRangliste()` bleibt unangetastet. | ~200 Zeilen, 1 Sitzung | HYROX pixelgleich; Interface-Abnahme (4.5, Punkt 2) für Spurt klassisch; Fingerabdruck |
+| **A7 Climbing an B1** | Slot 1 / A-HUD, nach A6 | Sortierung `u.hoch`, Status Höhe in m/TOP/STURZ, Kopf „ZEITLIMIT 0:32". Mit dem neuen Faktor aus A3 prüfen, ob im ersten Drittel Unterschiede sichtbar sind. | ~60 Zeilen, ½ Sitzung | Interface- und Pacing-Abnahme (4.5) |
+| **A8 Fechten** (P3.2) | Slot 2 / B, nach A5 | Zuschnitt nach Audit 4.7: unter der Bahn Hofmauer mit Tor bzw. vordere Tribünenreihen und Kampfrichtertische. | ~120–200 Zeilen, ½ Sitzung | Audit-Note B+; Fingerabdruck |
+
+**Welle 3**
+
+| Auftrag | Slot / Zone | Inhalt | Aufwand | Abnahme |
+|---|---|---|---|---|
+| **A9 Hatz-Nacharbeit** (P2.4) | Slot 1 / A-HUD, nach A6 und A3 | Fahrplan B4: Die Wellen-Note aus `hatzWelleScore()` bestimmt die Position innerhalb der Welle, die zwei Schwächsten fallen im Lauf der Welle sichtbar zurück. `hatzRang` bleibt unangetastet. Dazu der Wellenzähler „WELLE 3/5 · noch 8 im Rennen", eine Gefahrenmarke für die unteren zwei und die Leiste über B1 mit Status W/GEFÄHRDET/RAUS/✓. Erwischte Läufer bekommen ihre vorhandene, charakterpassende `tod`-Animation, keine neue. **Erst wenn die Hatz alle fünf Punkte aus 4.5 erfüllt**, trägt derselbe PR sie in den Formatplan ein (E1: 2. Durchgang, saisonweise im Wechsel mit klassisch). | ~250–300 Zeilen, 1 Sitzung | Fünf Punkte aus 4.5; rho/Pp mit `miss-spurt-hatz-rangtreue.mjs`/`messe-spurt-hatz-einfluss.mjs` unverändert (0,840; 23,6/24,6); Abnahme-Eintrag `spurt:hatz` |
+| **A10 Staffel-Politur** (P3.3) | Slot 2 / A-Boden | Bahnnummern, zweite Tribüne unten, Tageszeit-Ton in `bodenSpurtOval`. Darf neben A9 laufen, weil A-Boden und A-HUD getrennt liegen. | ~80–150 Zeilen, ½ Sitzung | Fingerabdruck; Bilder Pod und Duell |
+
+**Welle 4 — frei einplanbar, je ein Slot**
+
+| Auftrag | Slot / Zone | Inhalt | Aufwand |
 |---|---|---|---|
-| B3 | Sendedauer-Sonde plus Zielband-Tabelle, erster Lauf über alle 20 und alle Formate/Pods | ~120 Zeilen Skript | E2 (Bänder; vorläufig mit der Tabelle 1.3 starten) |
-| B2 | `ZEIT_DEHNUNG` je Format | ~15 Zeilen | – |
-| P1.a | **Hatz-Dehnung:** Startwert 11,14 × 180/802 ≈ **2,5** (volles Feld, Ziel 3:00), mit B3 nachmessen | ~2 Zeilen | B2, E1/E2 |
-| P1.b | Battlefield-Pod-Dehnung, **nur wenn Chris 7:12 zu lang findet** (Startwert 5 × 210/432 ≈ 2,4 für ~3:30) | ~2 Zeilen | B2, E2 |
-| P1.c | Climbing-Dehnung, **nur wenn Chris es will** (4,38 → ~8,2 für ~1:30) | ~1 Zeile | E2 |
-| P1.d | Spurt-klassisch-Drift auf 3:00 zurückholen (11,14 → ~9,3), falls E2 das Band eng fasst | ~1 Zeile | E2 |
+| **A11 Bühnen-Interface-Politur** | Slot 2 / B | I-Spy: eine „Top 3 bisher"-Ecke nach dem Showcase-Muster statt zwölf unsortierter Zahlen (B → A-). Tennis: Kopfzeile „Platz 1 von 6 · Ballwechsel …" größer bzw. als Tafel. | ~60–100 Zeilen, ½ Sitzung |
+| *(niedrig)* Spurt-Band (P3.4) | Slot 2 / A-Boden | Stationsumfeld im Belag, zweite Outdoor-Variante. Rückt nach hinten, weil klassisch nach E1 nur noch den 2. Durchgang bestreitet. | ~200 Zeilen, 1 Sitzung |
+| **gestrichen** | – | Takeshi-Duell an B1 (frühere P2.5, siehe E3); Kulissen-Politur Football/Hockey/TDM und der TDM-Spielstand im Bild (bis Strang M, siehe E5) | – |
 
-Jede Faktoränderung: Fingerabdruck byte-identisch, `miss-alle-disziplinen.mjs 24 <diszi>`
-vorher/nachher gleich, und ein Bild bei 30/75 % zur Kontrolle der Sim-Zeit-Konstanten (2.3).
-
-### P2 — Lesbarkeit der Bahn-Einzelrennen (2 Sitzungen, nacheinander, ein Agent oder zwei hintereinander)
-
-| Schritt | Inhalt | Aufwand | Abhängig von |
-|---|---|---|---|
-| P2.1 | **B1 herauslösen**, HYROX pixelgleich umstellen | ~150 Zeilen, ½ Sitzung | P0.1 |
-| P2.2 | **Spurt klassisch** an B1 (das live gespielte Format zuerst) | ~50 Zeilen | P2.1 |
-| P2.3 | **Climbing** an B1: Sortierung nach `u.hoch`, Status Höhe/TOP/STURZ; dazu prüfen, ob die Differenzierung im ersten Drittel mit Leiste schon reicht oder P1.c nötig ist | ~60 Zeilen | P2.1 |
-| P2.4 | **Hatz-Nacharbeit**: Fahrplan (B4), Wellenzähler „WELLE 3/5 · noch 8 im Rennen", Gefahrenmarke für die unteren zwei, Leiste über B1 mit Status W/GEFÄHRDET/RAUS | ~250–300 Zeilen, 1 Sitzung | P2.1, P1.a, E1 |
-| P2.5 | *(optional, E3)* Takeshi-Duell an B1 nach `burgwertung` | ~40 Zeilen | P2.1, E3 |
-
-Die Schritte P2.1–P2.5 liegen alle im Spurt-/Bahn-HUD-Bereich der Engine (`:41400–49200`).
-**Nicht parallelisieren**, sonst Konflikte.
-
-### P3 — Visuell (parallel zu P2 möglich, anderer Engine-Bereich: `boden*()`, Kulissen, Generator)
-
-| Schritt | Inhalt | Aufwand | Abhängig von |
-|---|---|---|---|
-| P3.1 | **Eiskunstlauf** „Rahmen statt Material" nach Audit 4.4: Waldsee-Horizont auf voller Höhe, Kür-Hallenrang mit Publikum, Spots auf die Läufer, Eis mit Spiegelung, Kufenspuren und Verlauf. Die gute Zwischenstand-Tafel und das Wiederholungsfenster bleiben unangetastet. | ~300–450 Zeilen plus Kulissenbild aus der vorhandenen Rohszene, 1 Sitzung | P0.1 (#1359 berührt dieselben Bühnen-Kulissenfunktionen) |
-| P3.2 | **Fechten** Zuschnitt nach Audit 4.7: unter der Bahn Hofmauer mit Tor bzw. vordere Tribünenreihen und Kampfrichtertische | ~120–200 Zeilen, ½ Sitzung | P3.1 (gleicher Bereich, nacheinander) |
-| P3.3 | **Staffel-Politur:** Bahnnummern, zweite Tribüne unten, Tageszeit-Ton | ~80–150 Zeilen, ½ Sitzung | – |
-| P3.4 | **Spurt-Band** (Rest aus Audit 4.3): Stationsumfeld im Belag, zweite Outdoor-Variante | ~200 Zeilen plus Kulisse, 1 Sitzung | P2.2 (gleicher Bereich) und E1 (lohnt nur, wenn klassisch das Hauptformat bleibt) |
-
-### P4 — Politur (niedrig, frei einplanbar)
-
-- **I-Spy:** eine kleine „Top 3 bisher"-Ecke nach dem Showcase-Muster statt zwölf unsortierter
-  Zahlen. ~40–60 Zeilen. Hebt das Interface von B auf A-.
-- **Tennis:** Kopfzeile „Platz 1 von 6 · Ballwechsel …" größer bzw. als Tafel. ~20–40 Zeilen.
-- **Feldspiele und Tennis visuell:** Tribünen aus drei Blöcken mischen, Licht je Variante (Audit
-  4.8). ~100–200 Zeilen für alle zusammen. **Football und Hockey erst nach Strang M.**
-- **TDM:** ein kleiner Spielstand im Bild (heute nur DOM-Scorezeile); TDM-Basis-Bodenmerkmale.
-  **Erst nach Strang M.**
-
-### Strang M — Wertung (parallel, eigene Fachrunden, hier nicht ausgeplant)
-
-Football Pp, Hockey rho/Pp, TDM-Mechanik, Mini-DM variabel-k. Er ist Voraussetzung dafür, dass
-P4 für diese Disziplinen lohnt. Siehe `docs/design/stand-aller-disziplinen.md`.
-
-### Zeitlinie (Vorschlag)
+### 4.4 Zeitlinie
 
 ```
-Woche 1   P0 (Chris: Merges, E1-E4)
-          P1  Fundament  ─────────────┐
-Woche 2   P2.1 → P2.2 → P2.3          │   P3.1 Eiskunstlauf   (parallel, anderer Bereich)
-Woche 3   P2.4 Hatz (falls E1 = live) │   P3.2 Fechten → P3.3 Staffel
-danach    P3.4 Spurt-Band, P4 Politur nach Bedarf;  Strang M läuft unabhängig
+Welle 0  sofort        A1 Sonde   ·   A2 Figurenprüfung          (keine Engine)
+         Chris         Merges #1359 → #1362 → #1363 → #1364…#1371
+Welle 1  Slot 1        A3 Zeitdehnung  →  A4 Format-Weiche (HYROX live ab nächster Saison)
+         Slot 2        A5 Eiskunstlauf
+Welle 2  Slot 1        A6 Rangleiste + Spurt klassisch  →  A7 Climbing
+         Slot 2        A8 Fechten
+Welle 3  Slot 1        A9 Hatz (danach im Formatplan)
+         Slot 2        A10 Staffel
+Welle 4  Slot 2        A11 I-Spy/Tennis, später Spurt-Band
+Strang M läuft unabhängig; solange ein M-Agent an der Engine ist, pausiert Slot 2.
 ```
 
-**Höchstens zwei Bau-Agenten gleichzeitig an `battle-mode.engine.js`**, und zwar nur in
-getrennten Bereichen (Bahn-HUD gegenüber Bühnen-Kulisse). Die Kulissen-Batches 13–15 und der
-Spurt-Stapel haben gezeigt, dass mehr gleichzeitige Zweige an dieser Datei vor allem
-Merge-Arbeit für Chris erzeugen.
-
-### Was „fertig" heißt (Abnahme je Disziplin, vorgeschlagen)
+### 4.5 Was „fertig" heißt (Abnahme je Disziplin, verbindlich)
 
 1. **Visuell:** Audit-Note B+ oder besser, gemessen an den fünf Merkmalen aus Audit Abschnitt 1.
 2. **Interface:** An drei beliebigen Zeitpunkten (25/50/75 %) beantwortet ein Standbild ohne DOM:
    Wer führt (Name), wer liegt hinten bzw. ist gefährdet, wie viel kommt noch (Uhr, Runde, Welle,
    Bahn n/6).
-3. **Pacing:** Sendedauer laut B3 im Zielband aus E2. Bei 20 % der Dauer sind schon sichtbare
+3. **Pacing:** Sendedauer laut A1 im Zielband aus E2. Bei 20 % der Dauer sind schon sichtbare
    Unterschiede im Bild.
-4. **Wertung:** organisch gewertet (rho > 0,80, Pp ≤ 25), unverändert die Pflicht aus CLAUDE.md.
+4. **Wertung:** organisch gewertet (rho > 0,80, Pp ≤ 25), unverändert die Pflicht aus CLAUDE.md,
+   **je Format** gemessen.
 5. **Bei jedem Schritt:** Fingerabdruck byte-identisch, wenn nur Anzeige geändert wurde.
+
+### Strang M — Wertung (parallel, eigene Fachrunden, hier nicht ausgeplant)
+
+Football Pp, Hockey rho/Pp, TDM-Mechanik, Mini-DM variabel-k. Er ist Voraussetzung dafür, dass
+sich visuelle Politur bei Football, Hockey und TDM lohnt (E5). Siehe
+`docs/design/stand-aller-disziplinen.md`.
 
 ---
 
-## 5. Offene Entscheidungen für Chris
+## 5. Entscheidungen (PM, 09.11.)
 
-**E1 — Welche Spurt-Formate gehen ins echte Spiel, und wie wird gewählt?** *(die wichtigste)*
-Hatz und HYROX sind gebaut, aber nur über `BAHN_FLAGS` (Mess-/Vorschau-Schalter) erreichbar. Im
-Spiel läuft immer „klassisch". Dieselbe Frage ist beim Gewichtheben-Sandsack seit Oktober offen
-(Format-Brainstorm Abschnitt 6: drei Optionen, Saisonkalender, Hash oder Liga-Einstellung). Davon
-hängt ab, ob die Hatz-Nacharbeit (P2.4, eine volle Sitzung) jetzt kommt oder geparkt wird. Ebenso
-hängt davon ab, ob sich die Spurt-Band-Politur (P3.4) noch lohnt, wenn HYROX das Hauptformat
-wird. Mein Vorschlag als Diskussionsgrundlage: HYROX als Standardformat (es ist auf allen drei
-Achsen das beste), Hatz erst nach P2.4. Die Wahl zwischen den Formaten entscheidet Chris.
+### E1 — Spurt-Format: HYROX im 1. Durchgang, klassisch im 2., Hatz nach der Nacharbeit
 
-**E2 — Zielbänder für die Sendedauer.** Heute gibt es Einzelentscheidungen (Spurt und Staffel
-~3 min, Basketball 4 × 1:30, Gewichtheben ~7 min, Hockey ~8 min), aber keine Regel. Konkret zu
-entscheiden:
-- Die Hatz auf ~3 min wie Spurt? (Empfehlung: ja.)
-- Der Battlefield-Pod mit 7:12, so lassen oder ~3:30? Im Bild passiert zwischen Minute 2 und 5
-  wenig, siehe `battlefield-pod-2-09-und-5-23.jpg`. (Empfehlung: kürzen, aber erst selbst
-  ansehen.)
-- Climbing mit 0:48 lassen oder auf ~1:30? Der Koordinator fand das erste Drittel undeutlich.
-  (Empfehlung: erst die Rangleiste P2.3, dann neu ansehen.)
-- Toleranz für Drift, z. B. ±15 % um den Zielwert?
+**Entschieden.** Das Format wird **fest im Saisonkalender** gewählt (Option A aus
+`format-varianten-brainstorm-08-11.md` Abschnitt 6), und zwar über den Durchgang:
 
-**E3 — Generische Rangleiste: für welche Bahn-Disziplinen?** Mein Vorschlag: ja für Spurt
-klassisch, Hatz und Climbing. Dort ist die Einzelplatzierung die Wertung. Nein für die Staffel,
-die als Teamrennen schon Pod-Tafel, Bein-Delta und `#bahnHud` hat. **Offen ist Takeshi:** Im
-Liga-Pod gibt es die Vier-Team-Tafel schon. Eine Einzelliste würde den Team-Charakter
-(Burgpunkte) überlagern. Soll Takeshi bewusst teamzentriert bleiben?
+| Durchgang | Format | Ab wann |
+|---|---|---|
+| 1. Durchgang (und jede Saison ohne Durchgangs-Markierung, z. B. Manager Mode) | **HYROX** | ab der nächsten neu angelegten Saison, sobald A4 auf `main` ist |
+| 2. Durchgang | **klassisch** | sofort mit A4 |
+| 2. Durchgang, ab Abnahme der Hatz | **klassisch und Hatz saisonweise im Wechsel** | mit A9, erst wenn die Hatz alle fünf Punkte aus 4.5 erfüllt |
 
-**E4 — Wo die Rangliste sitzt: im Bild oder daneben?** Zeitfahren hat sie als DOM-Leiste unter
-dem Bild (`#ttroster`), HYROX auf der Leinwand. Beides funktioniert, aber das Spiel sollte sich
-für eine Form entscheiden. Mein Vorschlag ist die Leinwand: Sie wirkt wie eine
-Fernsehübertragung, und auf kleinen Bildschirmen landet die DOM-Leiste unterhalb des
-sichtbaren Bereichs.
+**Warum HYROX als Hauptformat (die erste Fassung hält der Nachprüfung stand):**
 
-**E5 — Visuelle Politur bei ungewerteten Disziplinen (Football, Hockey, TDM) zurückstellen?**
-Empfehlung: ja, bis Strang M durch ist.
+- HYROX besteht beide Pflichtabnahmen: rho/Spiel **0,895**, Pp **20,2/20,5** (zwei Saatströme,
+  `spurt-format-hyrox-stationen-08-11.md`), und das schon im ersten Anlauf.
+- Auf den drei Anzeige-Achsen ist HYROX bereits heute das beste Spurt-Format: visuell B+ (Halle),
+  Interface A (es ist die Referenz, aus der B1 entsteht), Pacing 3:52, im Band (E2).
+- HYROX ist das einzige Spurt-Format, das nach Chris' Leitlinie vom 21.09. gebaut ist:
+  Stationsgruppen mit Primär- und Nebenweg. Jeder Spieler hat dort einen Weg, in irgendetwas gut
+  zu sein.
 
-**E6 — PixelLab (nur Vorschläge, nichts bestellt).** Der Fahrplan kommt ohne neue Assets aus.
-Zwei Stellen, an denen Chris über eine Freigabe nachdenken könnte:
-- Ein **Fegearm-Bedroher** für die Hatz (heute ein prozeduraler roter Balken). Das ist eine
-  Figur mit einer Lauf- und einer Fang-Animation. Nur sinnvoll, wenn die Hatz live geht (E1).
-- In den Pod-Bildern (Battlefield, Takeshi) erscheinen für einige Spieler der Kaderfamilie
-  **kahle Grundfiguren**. Ich habe nicht geprüft, ob das im echten Spiel auch passiert oder nur
-  am Testkader liegt. Vor jeder Bestellung sollte das jemand untersuchen.
+**Warum klassisch bleibt und nicht abgelöst wird:** klassisch hat die höchste Rangtreue der drei
+(0,910, Pp 19,4|14,9) und ist das Format, das die Manager seit September kennen. Der Abstand zu
+HYROX (0,015) ist bei beiden Werten über 0,85 bedeutungslos. Der Grund für die Rangfolge ist also
+nicht die Wertung, sondern das Bild. Klassisch bekommt mit A6 die Rangleiste und damit die
+Interface-Lücke geschlossen.
+
+**Warum die Hatz noch nicht:** Ihre Zahlen bestehen (0,840, Pp 23,6/24,6), liegen aber am
+nächsten an beiden Schranken. Interface und Pacing stehen auf C (2.1, 1.3). Ein Format, das im
+Bild nicht zeigt, wer gefährdet ist, und dreimal so lang läuft wie bestellt, geht nicht in die
+Liga. Nach A9 kommt sie in den 2. Durchgang, im Wechsel mit klassisch. So läuft HYROX jede Saison,
+und klassisch und Hatz laufen jede zweite.
+
+**Warum Option A und nicht Hash (B) oder Liga-Einstellung (C):**
+
+- In einer Battle-Mode-Saison läuft jede Disziplin zweimal (`getSeasonDisciplineRepeatCount` → 2).
+  Der Spielplan markiert das schon heute je Slot mit `occurrenceInSeason: 1 | 2`, und die
+  Spielplan-Übersicht zeigt daraus „2. Durchgang" (`season-matchday-fixtures-overview.ts`). Ein
+  Format je Durchgang ist damit die natürliche Lesart von Chris' „pro season nur 2x". Es kostet
+  kaum mehr als ein Hash, weil die Markierung schon existiert.
+- Ein Hash kann in einer Saison zweimal dasselbe Format ziehen, und der Manager kann nicht planen.
+- Eine Liga-Einstellung braucht eine Admin-Oberfläche. Ein Heimrecht-Wahlrecht wäre ein neuer
+  Faktor in der Rangtreue, den erst jemand messen müsste, und die KI-Teams müssten mitwählen. Das
+  bleibt eine mögliche spätere Übersteuerung über A, ist aber kein Teil dieses Fahrplans.
+
+**Bauvorgabe für A4 (Format-Weiche):**
+
+1. Das Format wird **beim Anlegen der Saison** in den Spielplan-Slot geschrieben (neues
+   optionales Feld `format`, bestimmt aus einer Plan-Tabelle je Disziplin und `occurrenceInSeason`).
+   Fehlt das Feld, gilt klassisch. Damit bleiben alle bestehenden Saves und die laufende Saison
+   **bit-identisch**, ohne Migration, nach demselben Grundsatz wie `isDoubledBattleSeason`
+   („keine stille Migration").
+2. Host (`FoundationBattleArenaHost.tsx`) und Headless-Runner (`arena-headless-runner.ts`)
+   reichen das Format auf demselben Weg wie `seedByDisciplineId` weiter (neu:
+   `formatByDisciplineId`). **Gezeigt = gebucht** setzt voraus, dass beide dasselbe Format bauen.
+3. Die Engine liest den Kanal in Zone C und setzt `BAHN_FLAGS.spurtFormat` vor dem Bau, ohne
+   Kanal „klassisch". Den Mess-Schalter `window.__olyBahnFlags` benutzt die App dafür nicht. Er
+   ist global, der Kanal gilt je Disziplin.
+4. **Abnahme je Format:** `disziplin-abnahme.json` bekommt Einträge `spurt:hyrox` (und mit A9
+   `spurt:hatz`), frisch gemessen mit den Format-Skripten in zwei Saatströmen. Der Guard-Test
+   schlägt fehl, wenn ein Format im Plan keine bestandene Abnahme hat.
+5. **Die Eignungszahl im Kaderbildschirm bleibt die Matrixzahl**, unabhängig vom Format
+   (Matrix-Sperre). Sichtbar wird das Format nur als Etikett im Spielplan, z. B. „Spurt · HYROX",
+   damit der Manager es vor dem Spieltag kennt.
+
+Das Muster gilt später für jede Disziplin mit zweitem Format (Gewichtheben-Sandsack, Grube,
+Durchbruch usw.). Es nimmt aber kein weiteres Format in den Plan auf, bevor dessen Stufe 3 (Bild,
+HUD) steht und die fünf Punkte aus 4.5 erfüllt sind. Der Sandsack gehört nicht zu diesem
+Fahrplan.
+
+### E2 — Zielbänder der Sendedauer
+
+**Entschieden. Regel:** Jede Disziplin und jedes Format hat einen Zielwert. Die Toleranz beträgt
+**±15 %**. Ohne ausdrückliche Vorgabe von Chris dauert kein Spiel **kürzer als 0:50 oder länger
+als 5:00**. Ausdrücklich vorgegeben sind Basketball (4 × 1:30), Gewichtheben (4–8 s je Versuch)
+und Hockey (~8 min); diese drei bleiben, wie sie sind. Bei Ausscheidungsformaten wird die Dauer
+**je Runde** festgelegt, nicht je Spiel, weil die Feldgröße die Rundenzahl bestimmt.
+
+| Disziplin (Format) | Zielwert | Band (±15 %) | Ist (1.3) | Maßnahme (A3) |
+|---|---:|---|---:|---|
+| **Spurt klassisch** | 3:00 | 2:33–3:27 | 3:36 | `spurt` 11,14 → ~9,3. Chris hat ~3 min bestellt, die +20 % sind unbemerkte Drift |
+| **Spurt HYROX** | 3:30 | 2:59–4:01 | 3:52 | keine; eigener Schlüssel `spurt:hyrox` = 11,14, damit die Korrektur von klassisch ihn nicht mitzieht |
+| **Spurt Hatz** | 30 s je Welle, 7,5 s je Neuordnung; 3:00 bei 12 Läufern | 2:33–3:27 bei 12 | 10:36 / 13:22 | `spurt:hatz` = 11,14 × 180/802 = **2,50** |
+| **Climbing** | 1:30 | 1:17–1:44 | 0:48 | `climbing` 4,38 → ~8,2 |
+| **Battlefield-Pod** | 3:30 | 2:59–4:01 | 7:12 | `battlefield:pod` 5 → ~2,4 |
+| Mini-DM-FFA | Ist = Ziel, sobald A1 gemessen hat | ±15 % | nicht gemessen | keine, solange in der Leitplanke |
+| alle anderen (1.3) | Ist = Ziel | ±15 % | – | keine |
+
+**Begründungen:**
+
+- **Hatz 3:00 bei vollem Feld:** Die Hatz ist ein Spurt-Format und bekommt dieselbe Länge, die
+  Chris für Spurt bestellt hat. Die Festlegung je Welle (30 s) heißt: Bei zehn Läufern dauert sie
+  2:23. Das ist gewollt, denn weniger Läufer bedeuten weniger zu sehen. Die Ränge stehen nach
+  `baueHatz()` fest, der Faktor ist dort deshalb ohne Risiko.
+- **Battlefield-Pod 3:30:** Faktor 5 wurde für das Duell gesetzt (41 Sim-s → 3:28). Der Pod läuft
+  86 Sim-s, und zwischen 2:09 und 5:23 ändert sich im Bild kaum etwas
+  (`battlefield-pod-2-09-und-5-23.jpg`). Der neue Faktor ~2,4 liegt zwischen TDM (1,88) und
+  Mini-DM (2,86). Die Arena bekommt also kein neues Hektik-Niveau, nur eins, das sie schon zeigt.
+- **Climbing 1:30, nicht 3:00:** Chris' Begründung für Spurt („in Ruhe angucken und kleine
+  Unterschiede erkennen") gilt für jedes Bahn-Einzelrennen. Mit ~8,2 liegt Climbing auf
+  derselben Zeitlupenstufe wie Spurt klassisch (~9,3), und das erste Drittel wächst von 16 s auf
+  30 s. 3:00 wären bei einer einzigen Wand Faktor 16 und zu viel Leerlauf.
+- **HYROX 3:30 statt 3:00:** acht Stationen, Halle und Nahkamera-Schnitte brauchen mehr Zeit als
+  eine Gerade. 3:52 liegt im Band. Misst A1 mit Kaderfamilie deutlich mehr (der Koordinator sah
+  ~5 min), entscheidet das Band, nicht meine Einzelmessung: dann wird `spurt:hyrox` nachgezogen.
+
+**Pflicht bei jeder Faktoränderung, die Anzeige-Treue** (siehe Korrektur in 3.2): A1 misst für
+24 Saaten, ob die Endrangfolge des angezeigten Laufs der gebuchten entspricht, einmal vorher und
+einmal nachher.
+
+- War sie vorher gleich und weicht nachher ab, **ist die Änderung nicht erlaubt.** Dann wird der
+  Faktor in kleineren Schritten gesucht oder der Fall an mich zurückgegeben.
+- Weicht sie schon vorher ab, ist das ein eigener Befund (gezeigt ≠ gebucht) für Chris und ein
+  eigenes Ticket. Die Faktoränderung darf trotzdem kommen, weil sie keine neue Art von Abweichung
+  erzeugt.
+
+### E3 — Takeshi bleibt teamzentriert, keine Einzelrangliste
+
+**Entschieden: keine Einzelrangliste, P2.5 ist gestrichen.** In der Liga läuft Takeshi
+ausschließlich als Vierer-Pod (`VIERER_POD_DISCIPLINE_IDS` in
+`lib/season/season-discipline-schedule.ts`), und dort steht das Interface schon auf B+
+(Vier-Team-Tafel, „noch 16 im Rennen", Fallen-Banner). Gewertet wird je Team
+(`bahnTeamstand()` → `wertung:"burg"`). Eine Einzelliste würde eine Rangfolge zeigen, die nicht
+die Wertung ist, und mit der Team-Tafel um dieselbe Bildecke konkurrieren. Die Einzelleistung ist
+über die Sterne je Name schon sichtbar. Das Duell (Interface B) ist kein Liga-Format und bekommt
+deshalb keinen Aufwand.
+
+### E4 — Die Rangliste sitzt im Bild, auf der Leinwand
+
+**Entschieden: Leinwand, oben rechts nach dem HYROX-Muster, Ecke als Parameter.** Technische
+Begründung:
+
+1. **Es ist die bestehende Architektur.** Sechs der sieben vorhandenen Ranglisten-Lösungen
+   zeichnen auf die Leinwand (`zeichneHyroxRangleiste`, `zeichneBahnPodTafel`,
+   `zeichneBfPodTafel`, `zeichneEisStand`, die Showcase-Top-3, `zeichneWettessenTafel`). Nur
+   `#ttroster` ist DOM. Auf der Leinwand ist B1 **eine** Funktion in der Engine. Eine DOM-Leiste
+   bräuchte dagegen einen neuen Zustandskanal von der Engine in die Seite und Änderungen an
+   `/mockups/battle-mode.html` und `FoundationBattleArenaHost.tsx`, also genau die neue
+   UI-Architektur, die dieser Fahrplan vermeiden soll.
+2. **Nur die Leinwand ist automatisch abnehmbar.** Punkt 2 der Abnahme (4.5) verlangt ein
+   Standbild ohne DOM. `sondenLauf`, `screenshot-kulisse.mjs` und alle Belegbilder fotografieren
+   die Leinwand.
+3. **Kleine Bildschirme:** Die Leinwand skaliert als Ganzes. Eine DOM-Leiste unter dem Bild landet
+   unterhalb des sichtbaren Bereichs.
+
+**Grenzen, die der Bau-Agent einhält:** höchstens zwölf Zeilen (mehr Läufer hat kein Feld), kein
+Scrollen, keine Interaktion (die bräuchte DOM). Die Schriftgröße skaliert mit der Leinwandbreite
+und unterschreitet die der HYROX-Leiste nicht. Die Ecke wird je Disziplin so gewählt, dass weder
+Kamera-Kennzeichnung („Kamera 3.3×") noch Zeitlimit-Kasten verdeckt werden. **Bestehende
+DOM-Tabellen bleiben** (Spurt-Läufertabelle, Teamstand, `#ttroster`): Sie sind die Detailansicht
+und funktionieren. `#ttroster` wird nicht auf die Leinwand umgezogen, weil das Aufwand ohne
+sichtbaren Gewinn wäre.
+
+### E5 — Kulissen-Politur bei Football, Hockey und TDM ruht bis Strang M
+
+**Entschieden: zurückgestellt.** Alle drei bestehen die Pflichtabnahme nicht (2.4) und laufen in
+Battle Mode über die PPS-Duell-Brücke statt über ihr Arena-Ergebnis. Eine Mechanikrunde wird
+dort mit hoher Wahrscheinlichkeit Bau- und Zeichencode anfassen. Politur jetzt hieße Nacharbeit
+und zusätzliche Merge-Last in einer Datei mit 63 000 Zeilen. Die zwei Engine-Slots sind auf
+gewerteten Disziplinen mehr wert. **Ausnahmen:** Fehlerbehebungen und Chris' In-Game-Meldungen
+(`bug-reports`) laufen davon unabhängig weiter. Sobald eine der drei die Abnahme besteht, geht
+ihre Politur in Welle 4.
+
+### E6 — PixelLab: nichts bestellt, die Hatz braucht keine neue Figur
+
+**Entschieden (die Bedarfsfrage, nicht die Beschaffung):** Die Hatz geht **ohne** neue Figur
+live. Tragend sind der Fahrplan (sichtbares Zurückfallen), die Gefahrenmarke, der Wellenzähler und
+die vorhandenen, charakterpassenden `tod`-Animationen der Erwischten. Der prozedurale Fegearm
+reicht dafür.
+
+**Vorschlag an Chris, nicht bestellt:** Eine Fegearm-Figur mit Lauf- und Fang-Animation wäre eine
+Aufwertung, wenn die Hatz im Spiel ist. Freigeben kann das nur Chris. Auch als PM gebe ich
+PixelLab nicht frei.
+
+**Kahle Grundfiguren:** Zuerst untersucht A2, ob sie im echten Spiel überhaupt auftreten. Ergibt
+sich daraus ein Asset-Bedarf, geht er als Vorschlag an Chris.
 
 ---
 
@@ -492,6 +690,10 @@ Zwei Stellen, an denen Chris über eine Freigabe nachdenken könnte:
   im Spiel.
 - **rho/Pp der Formate Hatz und HYROX:** nicht nachgemessen. Stand siehe die jeweiligen
   Format-Dokumente.
+- **Anzeige-Treue** (gezeigte gegen gebuchte Endrangfolge) habe ich für keine Disziplin gemessen.
+  Das holt A1 nach, bevor A3 einen Faktor anfasst.
+- **Feldgröße im echten Spiel:** Für die Hatz-Rechnung nehme ich zwölf Läufer an
+  (`BAHN_ART.spurt.jeSeite` = 6). Stellt ein Team weniger, wird die Hatz nach E2 kürzer.
 - **Tempo 2×/4×:** Alle Dauern gelten bei 1×. Wer im Spiel standardmäßig vorspult, sieht
   entsprechend weniger. Das ändert an den Ausreißern nichts.
 
