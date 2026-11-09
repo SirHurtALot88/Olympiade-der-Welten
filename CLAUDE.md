@@ -178,6 +178,23 @@ Herzinfarkt-Tod statt Kampf-K.o., Batch 10). Ein reines Vorne-/Hinten-Kippen ist
 Ordnung, wenn es wirklich wie ein K.o. wirkt — wirkt es nur wie ein Hinfallen, zählt das als
 Mangel und braucht eine charakterspezifischere Pose, kein 0815-Umkippen.
 
+## PixelLab-Animationen: keine neuen ohne Freigabe — Kostenfrage
+
+Chris am 09.11., nachdem ein Agent für ein neues Spurt-Format ungefragt drei neue PixelLab-
+Animationen für eine einzelne Figur bestellt hatte, wörtlich: „moment du darfst nicht einfach
+irgendwelche animationen anlegen!!! die sind sau teuer wenn wir das für [den ganzen
+Figuren-Bestand] machen deswegen haben wir nur die basis animationen bisher! du musst erstmal
+auskommen damit bis ich es dir erlaube!" **Keine neue PixelLab-Animation für eine bestehende
+Figur — auch nicht „nur für eine Testfigur" oder „nur probeweise" — ohne Chris' ausdrückliche
+Freigabe für genau diesen Fall.** Das gilt unabhängig davon, wie viel besser eine Mechanik oder
+eine neue Kamera-Ansicht mit ihr aussähe: der bestehende Animationsbestand (Grundposen plus die
+bereits abgeschlossene „Nord"-Ergänzung) ist das, womit jede neue Disziplin, jedes neue Format
+und jede neue Kameraperspektive auskommen muss, bis er selbst grünes Licht für mehr gibt. Ein
+Agent, der eine fehlende Pose bemerkt, schlägt sie vor (mit Umfang-/Kostenschätzung wie seinerzeit
+bei der Nord-Animation-Kampagne) statt sie selbst zu bestellen. Das gilt für PixelLab-Aufrufe
+jeder Art (neue Animation, neuer Charakter, neue Requisite) — nicht nur für Tod-Animationen, auf
+die sich der Abschnitt oben beschränkt.
+
 ## An die Spielstände kommen
 
 Der Server pusht seine **komplette** SQLite (also alle Spielstände) per Cron auf den Branch
