@@ -17,6 +17,9 @@
 //                   docs/design/spurt-format-hyrox-stationen-08-11.md). Dieses Skript brauchte
 //                   dafuer KEINE Codeaenderung -- `format` geht ungeprueft an bahnFlags() durch,
 //                   das seit 08.11. auch "hyrox" als gueltigen Wert kennt.
+//   --hyrox-ansicht=bahn  nur Spurt im Format "hyrox" (Hallenrunde-PR, Design-Dokument 7.1):
+//                   schaltet auf die alte gerade Bahn zurueck (Vorher-Bild) statt der seit
+//                   Stufe 2 standardmaessigen Hallenrunde. Ohne den Schalter "halle".
 //
 // Reine Anzeige-Sonde: liest nichts in die Simulation zurueck. HTTP statt file:// (absolute
 // Sprite-Pfade, s. screenshot-disziplin.mjs).
@@ -51,6 +54,7 @@ function starteServer() {
 const POD = process.argv.includes("--pod");
 const OHNE = process.argv.includes("--ohne-kulisse");
 const FORMAT = process.argv.find((a) => a.startsWith("--format="))?.split("=")[1] || null;
+const HYROX_ANSICHT = process.argv.find((a) => a.startsWith("--hyrox-ansicht="))?.split("=")[1] || null;
 const arg = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const disziplin = arg[0];
 if (!disziplin) { console.error("Nutzung: node scripts/screenshot-kulisse.mjs <disziplin> [variante|-] [wartenMs] [ausgabe] [--pod] [--ohne-kulisse]"); process.exit(1); }
@@ -81,13 +85,14 @@ try {
   }
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
-  await seite.evaluate(({ d, v, pod, format }) => {
+  await seite.evaluate(({ d, v, pod, format, hyroxAnsicht }) => {
     const A = window.__arena;
     if (format && A.bahnFlags) A.bahnFlags({ spurtFormat: format });
+    if (hyroxAnsicht && A.bahnFlags) A.bahnFlags({ hyroxAnsicht });
     A.setDisc(d);
     if (pod && A.battlefieldPodAnzeigen) A.battlefieldPodAnzeigen(pod);
     if (A.kulisseQa) A.kulisseQa(v);
-  }, { d: disziplin, v: variante, pod, format: FORMAT });
+  }, { d: disziplin, v: variante, pod, format: FORMAT, hyroxAnsicht: HYROX_ANSICHT });
   await seite.click("#t2");
   await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false, figuren: false });
   await seite.click("#play");

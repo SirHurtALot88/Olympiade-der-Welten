@@ -2,6 +2,11 @@
  * ABNAHME DES HYROX-FAHRPLANS (Hallenrunde-PR, Design-Dokument
  * `docs/design/spurt-hyrox-routen-design-opus-09-11.md`, Abschnitt 11, Pruefpunkt 4).
  *
+ * Laeuft seit Stufe 2 (Hallenrunde) standardmaessig gegen die 29-Abschnitte-Wegtabelle der
+ * Halle (BAHN_FLAGS.hyroxAnsicht==="halle", der neue Standard) -- `hyroxVerteileZeit()` ist
+ * dieselbe Funktion wie fuer die 1-D-Fassung der geraden Bahn (Stufe 1), die Pruefungen
+ * unten gelten deshalb unveraendert fuer beide Wegtabellen.
+ *
  * `hyroxFahrplan(u)` zerlegt die bereits feststehende Zielzeit `u.hyroxZeit` -- bitgleich,
  * kein neuer rr()-Aufruf -- in Lauf-/Roxzone-/Stationsabschnitte, damit eine Figur an einer
  * Station sichtbar laenger braucht statt mit konstantem Tempo durchzugleiten (Befund 2.1 des
@@ -140,6 +145,21 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("HYROX-Fahrplan -- Stufe 1 (Design-Dokumen
     const abschnitte = proben[0].abschnitte;
     expect(abschnitte.length).toBeGreaterThan(0);
     expect(abschnitte[abschnitte.length - 1].art).toBe("lauf");
+  });
+
+  it("Stufe 2 (Hallenrunde) ist standardmaessig aktiv: 29 Abschnitte, drei Laufrunden plus Schluss, sieben Arbeitsabschnitte in der Reihenfolge der sieben Stationen", () => {
+    for (const p of proben) {
+      expect(p.halle).toBe(true);
+      const abschnitte = p.abschnitte;
+      expect(abschnitte.length).toBe(29);
+      const laufAbschnitte = abschnitte.filter((a) => a.art === "lauf");
+      expect(laufAbschnitte.length).toBe(4); // 3 Laufrunden + Schlussstueck
+      const arbeit = abschnitte.filter((a) => a.art === "arbeit");
+      expect(arbeit.map((a) => a.station)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+      expect(arbeit.map((a) => a.gruppe)).toEqual([
+        "technik", "technik", "kletter", "kletter", "kraft", "kraft", "kraft",
+      ]);
+    }
   });
 
   it("je Stationsgruppe ist die Summe der Arbeitsdauern monoton fallend im Teilwert dieser Gruppe (Matrixtreue im Bild)", () => {
