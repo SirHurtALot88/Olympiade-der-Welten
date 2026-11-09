@@ -4626,6 +4626,17 @@
   // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
   // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
   // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  //
+  // HYROX-ARBEITSPOSEN (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md
+  // Abschnitt 2): drei zusaetzliche, OPTIONALE Arten -- `u.hyroxPose` (gesetzt in zeichneSpurt()
+  // aus dem rein kosmetischen `u.hyroxGruppe`/`u.stolper`, s. dort) nennt TECHNIK/KLETTERN/KRAFT,
+  // HYROX_PIXEL_ART uebersetzt das in den Art-Schluessel der Figur. Hat die Figur KEINE eigene
+  // Animation dieser Art (die grosse Mehrheit -- bisher nur "cassandra" bestellt, s. PR-
+  // Beschreibung fuer den Fahrplan zum vollen Bestand), faellt zeichnePixelFigur() auf den
+  // bestehenden "angriff"-Zweig zurueck (ausgeloest ueber denselben `u.lunge`-Wert, den
+  // zeichneSpurt() fuer genau diesen Fall mitgibt) -- eine Ausfallschritt-Pose statt der
+  // vorherigen liegenden "tod"-Pose, ohne dass diese Funktion dafuer eine eigene Formel braucht.
+  const HYROX_PIXEL_ART={technik:"hyroxTechnik", kletter:"hyroxKletter", kraft:"hyroxKraft"};
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
@@ -4646,7 +4657,13 @@
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
-    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    // HYROX-EIGENE ARBEITSPOSE, WENN VORHANDEN (s. Kommentar an HYROX_PIXEL_ART oben): hat diese
+    // Figur keine eigene Animation der gerade aktiven Gruppe, bleibt `hyroxGid` falsy und `art`
+    // faellt unveraendert auf den bestehenden istAngriff-Zweig zurueck (`u.lunge` steht waehrend
+    // einer Hyrox-Station ohnehin schon >0, s. zeichneSpurt()).
+    const hyroxGid=u.hyroxPose&&HYROX_PIXEL_ART[u.hyroxPose];
+    const hyroxEigen=hyroxGid&&fig.a[hyroxGid];
+    const art=istUnten?"tod":hyroxEigen?hyroxGid:istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4675,6 +4692,7 @@
         if(e&&e.im&&e.mass){
           let f;
           if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art===hyroxGid)f=Math.max(0,Math.min(n-1,Math.floor((u.hyroxProg||0)*n)));
           else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
@@ -46253,6 +46271,12 @@
   // hindernisNamen) -- die eigentliche ZEITWIRKUNG steht je Laeufer in `u.hyroxZeit`
   // (s. baueHyroxStationen()). `null` ausserhalb von Hyrox.
   let bahnHyroxAktiv=false, HYROX_STATIONEN=null;
+  // NAHKAMERA-ZUSTAND (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md und
+  // der eigene kameraUpdate()-Zweig weiter unten): welche Station die Kamera gerade zeigt und
+  // wann sie das naechste Mal neu entscheidet. Reine Anzeige, von keinem Motor-Wert gelesen --
+  // zurueckgesetzt in baueHyroxStationen() wie jedes andere Hyrox-Feld, deshalb auch hier (nicht
+  // erst in kameraUpdate()), damit ein zweites Rennen nicht den Schnitt-Takt des vorigen erbt.
+  let hyroxCamStationIdx=-1, hyroxCamNaechsterSchnitt=0, hyroxCamGruppe=null;
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -46999,6 +47023,103 @@
       cam.zoom+=(zielZoom-cam.zoom)*t;
       cam.cx+=(zielCx-cam.cx)*t;
       return;
+    }
+    // ================== HYROX-STATIONEN: NAHKAMERA STATT ZWOELF-BAHNEN-UEBERSICHT (Nahkamera-
+    // PR, 08.11., Chris woertlich: "ne ganz andere ... ansicht als das kleine mit den mini
+    // Hindernissen Sondern näher dran wo man die einzelnen Stationen abarbeitet Da wären ja
+    // nicht alle spieler gleichzeitig dabei oder?") ==================
+    //
+    // Der generische Zweig unten (jede andere Spurt-Variante inkl. Klassisch/Hatz) zoomt auf
+    // die Spanne ALLER noch laufenden Bahnen -- bei HYROX-Stationen ist das nach wenigen
+    // Sekunden fast immer das GANZE Feld (sieben Stationen auf 0,14..0,86 der Strecke, zwoelf
+    // Laeufer laufen sie nacheinander ab, s. Design-Dokument), die Kamera zeigt dann dieselbe
+    // breite Zwoelf-Bahnen-Uebersicht mit winzigen Figuren wie vorher -- genau das Bild, das
+    // Chris nicht mehr wollte. EIGENER, climbing-artiger Zweig (wie `istWand()` oben), NICHT der
+    // generische unten geaendert: jede andere Bahn bleibt Zeichen fuer Zeichen unberuehrt.
+    //
+    // ENTSCHEIDUNG 1 -- WESSEN STATION: nicht der Spitzenreiter (der ist nach dem Start fast
+    // immer allein unterwegs, eine reine Einzelkamera liesse das Feld dahinter verschwinden,
+    // genau der Fehler, den die Zeitfahren-Einzelkamera fuer EINEN Laeufer schon kennt -- s.
+    // ZF_NACHBAR_FENSTER-Kommentar oben), sondern die Station mit der MEISTEN gleichzeitigen
+    // Aktivitaet -- das ist die Station, an der gerade am meisten zu sehen ist (ein Pulk, der
+    // sich an einer Huerde oder am Seil staut), genau wie eine echte HYROX-Regie auf den
+    // dichtesten Punkt schneidet statt stur dem Ersten zu folgen.
+    //
+    // JEDER LAEUFER ZAEHLT FUER SEINE NAECHSTE STATION (`hyroxNaechsteStation()`, per Minimal-
+    // abstand, KEIN Schwellwert) statt nur innerhalb eines festen Fensters mitgezaehlt zu
+    // werden -- ein fester Fensteransatz (erster Anlauf dieser PR, per `hyroxKameraProbe()`
+    // nachgemessen und verworfen) konnte bei einem bereits auseinandergezogenen Feld eine
+    // Station mit nur einem einzelnen Nachzuegler waehlen UND, schlimmer, den Ausschnitt dann
+    // bis zum naechsten Schnitt auf eine laengst verlassene, leere Stationsmarke einfrieren,
+    // weil alle anderen Laeufer bereits ausserhalb des Fensters lagen. Die Minimalabstand-
+    // Zuordnung ordnet dagegen IMMER jedem Laeufer genau eine Station zu (die Summe der
+    // Zaehlungen ist immer die volle Feldgroesse), die gewaehlte Station hat also nie weniger
+    // als einen fairen Anteil des Feldes und der Ausschnitt ist nie leer. Bei einem Gleichstand
+    // gewinnt die FRUEHERE Station (kleinerer Index) -- dort steht typischerweise noch die
+    // Verfolgergruppe, waehrend der Spitzenreiter schon einzeln weiterzieht.
+    //
+    // ENTSCHEIDUNG 2 -- SCHNITT-RHYTHMUS: alle HYROX_CAM_SCHNITT_SEK Sekunden neu entscheiden
+    // (Auftrag: "Broadcast-Schnitt-Rhythmus ... alle 3-4s", hier 3,5s als Mittelwert), NICHT
+    // jeden Frame -- sonst würde die Kamera bei zwei Stationen mit gleich viel Aktivitaet
+    // zwischen ihnen flackern. Der UEBERGANG zur neuen Station bleibt trotzdem WEICH: derselbe
+    // zielCx/zielZoom-Anziehungsmechanismus wie ueberall sonst in dieser Funktion (`t=...*dt`),
+    // nur mit einem etwas hoeheren Faktor (2,2 statt der sonst ueblichen 1,8) fuer einen
+    // zuegigeren Schwenk, der sich wie ein Kameraschwenk anfuehlt statt wie ein hartes Schnitt-
+    // Bild zu springen -- genau das vom Auftrag verlangte "nicht ruckartig".
+    //
+    // ENTSCHEIDUNG 3 -- WER NICHT IM BILD IST: zeigt `zeichneHyroxUeberlagerung()`s Rangleiste
+    // (neuer Teil derselben Funktion, s. dort) am rechten Bildrand -- alle zwoelf Laeufer nach
+    // Rang, der Rest des Feldes bleibt damit sichtbar, auch wenn die Kamera nur einen
+    // Stationsausschnitt zeigt. Dasselbe Prinzip wie die Roster-Leiste der Zeitfahren-
+    // Einzelkamera (`#ttroster`, s. `renderZeitfahrenPanel`), hier als Canvas-Zeichnung statt
+    // DOM-Panel, weil die Bahn sonst keine DOM-Overlays fuehrt (anders als Zeitfahren/Staffel).
+    //
+    // Reine Anzeige: liest nur u.pos/u.fertig (die `laeuferXY()`/`stepSpurtHyrox()` ohnehin
+    // schon lesen/schreiben), schreibt nichts in die Simulation, kein rr()-Aufruf. `cam.zoom`/
+    // `cam.cx` bleiben die exakt gleichen zwei Zahlen, die camX()/camView() fuer JEDE Bahn
+    // schon lesen -- laeuferXY()/zeichneBoden() etc. brauchen deshalb KEINE Aenderung, sie
+    // zeichnen einfach in den jetzt engeren Ausschnitt hinein.
+    if(bahnHyroxAktiv && HYROX_STATIONEN && HYROX_STATIONEN.length){
+      const laufend=LAEUFER.filter(u=>u.fertig==null);
+      if(laufend.length){
+        if(hyroxCamStationIdx<0||rennT>=hyroxCamNaechsterSchnitt){
+          const zaehler=new Array(HYROX_STATIONEN.length).fill(0);
+          for(const u of laufend)zaehler[hyroxNaechsteStation(u.pos)]++;
+          let beste=0, bester=-1;
+          for(let i=0;i<zaehler.length;i++)if(zaehler[i]>bester){bester=zaehler[i];beste=i;}
+          hyroxCamStationIdx=beste;
+          hyroxCamNaechsterSchnitt=rennT+HYROX_CAM_SCHNITT_SEK;
+          // GRUPPE BEIM SCHNITT EINFRIEREN (Review-Fund waehrend der Bildbeleg-Pruefung dieser
+          // PR, per `hyroxKameraProbe()`/Screenshot nachgemessen): "wem ist diese Station
+          // gerade am naechsten" JEDEN Frame neu auszuwerten liess die Gruppe schon VOR dem
+          // naechsten Schnitt leerlaufen, sobald sich alle ihr zugeordneten Laeufer ueber den
+          // Mittelpunkt zur naechsten Station hinausbewegt hatten -- der Ausschnitt zeigte dann
+          // bis zum naechsten Schnitt nur noch leere Bahn. Jetzt wird die Mitgliedschaft NUR
+          // beim Schnitt selbst bestimmt und bis zum naechsten Schnitt festgehalten (IDs, nicht
+          // Objekte, s. bahnAnzeigeSichern/-Zurueck) -- dieselben Laeufer bleiben fuer das ganze
+          // Zeitfenster im Bild, auch wenn sie dabei ueber die naechste Stationsmarke hinaus-
+          // laufen (genau das Bild, das ein echter Kameraschwenk zeigen wuerde).
+          hyroxCamGruppe=new Set(laufend.filter(u=>hyroxNaechsteStation(u.pos)===beste).map(u=>u.id));
+        }
+        const st=HYROX_STATIONEN[hyroxCamStationIdx];
+        // AUSSCHNITT: die Station selbst plus jeder Laufende aus der beim Schnitt eingefrorenen
+        // Gruppe (s. oben) -- nie leer, weil die gewaehlte Station per Konstruktion mindestens
+        // einen Laeufer in ihre Gruppe bekommen hat.
+        let von=st.pos-0.045, bis=st.pos+0.045;
+        for(const u of laufend)if(hyroxCamGruppe&&hyroxCamGruppe.has(u.id)){von=Math.min(von,u.pos);bis=Math.max(bis,u.pos);}
+        von=Math.max(0,von-0.03); bis=Math.min(1,bis+0.03);
+        const spanne=Math.max(0.10,bis-von);
+        const zielZoom=Math.max(1,Math.min(5.5,1/spanne));
+        const zielCx=Math.max(0,Math.min(1,(von+bis)/2));
+        const t=Math.min(1,dt*2.2);
+        cam.zoom+=(zielZoom-cam.zoom)*t;
+        cam.cx+=(zielCx-cam.cx)*t;
+        return;
+      }
+      // NIEMAND LAEUFT MEHR (letzter Zieleinlauf): kein `return` hier -- die Funktion faellt
+      // durch in den generischen Zweig unten, der bei leerem `aktiv` auf `LAEUFER` zurueckfaellt
+      // und die Kamera wieder auf das volle, jetzt stehende Feld zieht (derselbe Zielbild-
+      // Moment wie bei jeder anderen Bahn).
     }
     // EINZELKAMERA (Zeitfahren-Fokus, Recherche Abschnitt 4.3): zoomt eng auf GENAU einen
     // Laeufer, wie ein Kamerawagen, der neben ihm herfaehrt — statt der Bounding-Box aller
@@ -48404,6 +48525,23 @@
   // Bahn-Zweig, unveraendert) sortiert danach aufsteigend nach `bahnZeit(u)=u.fertig`
   // (startT ist bei Spurt immer 0) und vergibt -(Platz). Kein eigener wert()-Zweig noetig.
   const HYROX_MIN_SEK=6;
+  // NAHKAMERA-KONSTANTEN/-HELFER (Nahkamera-PR, 08.11.): hier statt lokal in kameraUpdate()
+  // deklariert, weil zeichneHyroxUeberlagerung() (Rangleiste, s. dort) dieselbe Stations-
+  // zuordnung braucht, um zu markieren, wer gerade im Kamera-Ausschnitt steht -- eine Quelle
+  // statt zweier Kopien, die auseinanderlaufen koennten.
+  const HYROX_CAM_SCHNITT_SEK=3.5;
+  // Naechstgelegene Station zu einer Rennposition, per Minimalabstand (kein Schwellwert) -- s.
+  // ausfuehrliche Begruendung am kameraUpdate()-Hyrox-Zweig (Entscheidung 1): ordnet JEDEN
+  // Laeufer genau einer Station zu, auch wenn er weit von allen entfernt zwischen zwei
+  // Stationen steht.
+  function hyroxNaechsteStation(pos){
+    let bi=0, bd=Infinity;
+    for(let i=0;i<HYROX_STATIONEN.length;i++){
+      const d=Math.abs(pos-HYROX_STATIONEN[i].pos);
+      if(d<bd){bd=d;bi=i;}
+    }
+    return bi;
+  }
   // BASIS/SKALA MUTIERBAR NUR UEBER window.__arena.hyroxGewichte({...}) -- Objekte statt
   // simplen `const`s, dasselbe Muster wie HATZ_RAUSCHEN_AKTUELL (s. dort).
   const HYROX_BASIS_SEK_AKTUELL={wert:26}, HYROX_SKALA_SEK_AKTUELL={wert:0.165};
@@ -48446,10 +48584,15 @@
     const art=BA(), pos=art.hindernisse||[], bilder=art.hindernisBilder||[], namen=art.hindernisNamen||[];
     HYROX_STATIONEN=pos.map((p,i)=>({pos:p, bild:bilder[i]||null, name:namen[i]||("Station "+(i+1)),
       gruppe:HYROX_GRUPPE_JE_STATION[i%HYROX_GRUPPE_JE_STATION.length]}));
+    // NAHKAMERA NEU AUFSETZEN (Nahkamera-PR, 08.11.): wie jedes andere Hyrox-Feld hier, nicht
+    // erst in kameraUpdate() -- sonst erbt ein zweites Rennen den Schnitt-Zeitpunkt/die Station
+    // des vorigen (s. Kommentar an der Deklaration oben).
+    hyroxCamStationIdx=-1; hyroxCamNaechsterSchnitt=0; hyroxCamGruppe=null;
     for(const u of LAEUFER){
       const score=hyroxScore(u);
       u.hyroxZeit=Math.max(HYROX_MIN_SEK, HYROX_BASIS_SEK_AKTUELL.wert-HYROX_SKALA_SEK_AKTUELL.wert*score);
       u.hyroxStationIdx=-1;   // kosmetisch: welche Station zuletzt eine Arbeits-Pose ausgeloest hat
+      u.hyroxGruppe=null;     // kosmetisch: TECHNIK/KLETTERN/KRAFT dieser Station, s. stepSpurtHyrox
     }
   }
   function stepSpurtHyrox(dt){
@@ -48464,37 +48607,93 @@
       // nie rr()/wert()/u.hyroxZeit, dasselbe Prinzip wie die Positions-Animation der Hatz).
       u.pos=Math.max(0,Math.min(0.99, rennT/z));
       u.bahn=u.bahnZ;
-      // ARBEITS-POSE AN JEDER STATION: beim Ueberschreiten einer Stationsmarke kurz dieselbe
-      // "liegt"/Stolper-Pose zeigen, mit der ein Huerdensturz im klassischen Format schon
-      // arbeitet (CLAUDE.md, PixelLab-Tod-Animationen -- hier kein Sturz, aber dasselbe
-      // Wiederverwendungsprinzip: bestehende Pose statt neuer Animation). Rein kosmetisch,
-      // die Zeit steht durch `u.hyroxZeit` schon fest.
+      // ARBEITS-POSE AN JEDER STATION: beim Ueberschreiten einer Stationsmarke kurz eine zur
+      // Gruppe (TECHNIK/KLETTERN/KRAFT) passende Pose zeigen, statt wie zuvor (08.11., erste
+      // Fassung) immer dieselbe liegende "Stolper"-Pose (Nahkamera-PR, s. docs/design/
+      // spurt-hyrox-nahkamera-08-11.md Abschnitt 2): `u.stolper` bleibt EXAKT derselbe 0,4-s-
+      // Zeitgeber wie vorher (rein kosmetisch, die Zeit steht durch `u.hyroxZeit` schon fest),
+      // `u.hyroxGruppe` sagt der Zeichnung zusaetzlich, WELCHE der drei Posen zu zeigen ist --
+      // ausgewertet in zeichneSpurt()/zeichneSprite()/zeichnePixelFigur(), hier nur gesetzt.
       for(let i=0;i<HYROX_STATIONEN.length;i++){
         const st=HYROX_STATIONEN[i];
-        if(vorher<st.pos&&u.pos>=st.pos){ u.stolper=Math.max(u.stolper||0,0.4); u.hyroxStationIdx=i; }
+        if(vorher<st.pos&&u.pos>=st.pos){ u.stolper=Math.max(u.stolper||0,0.4); u.hyroxStationIdx=i; u.hyroxGruppe=st.gruppe; }
       }
       if(rennT>=z){ u.pos=1; u.fertig=z; rennFertig.push(u); }
     }
     if(rennFertig.length>=LAEUFER.length)done=true;
+    // KAMERA-TICK (Nahkamera-PR, 08.11.): `stepSpurt()`s gemeinsamer Nachlauf ruft
+    // `kameraUpdate(dt)` erst NACH der Hatz/Hyrox-Weiche auf (`if(bahnHyroxAktiv){
+    // stepSpurtHyrox(dt); return; }`, s. dort) -- ein Hyrox-Rennen erreichte diesen Aufruf also
+    // nie, `cam` blieb die ganze Zeit auf ihrem Startwert {zoom:1,cx:0.5} stehen (nachgemessen:
+    // derselbe Leerlauf gilt schon fuer die Hatz, s. docs/design/spurt-hyrox-nahkamera-08-11.md
+    // Abschnitt 1 -- dort bewusst NICHT mitbehoben, der Auftrag gilt nur Hyrox). Hier statt dort
+    // behoben, NUR fuer Hyrox: `stepSpurt()`s eigener Aufruf bleibt unangetastet (Klassisch
+    // unveraendert), `stepSpurtHatz()` bekommt keinen eigenen Aufruf (Hatz bleibt exakt wie
+    // heute, auch mit ihrer eigenen Kamera-Luecke -- s. Auftrag: "Klassisch/Hatz bleiben exakt
+    // wie heute"). Reine Anzeige, kein rr()-Aufruf, kein Einfluss auf u.pos/wert()/rho.
+    kameraUpdate(dt);
   }
   // STATIONS-UEBERLAGERUNG (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
-  // u.pos/wert()/rho). Kein neues PixelLab-Asset: die sieben Sprites zeichnet `zeichneBoden()`
-  // bereits (Batch 15 Kulissen-Rework); diese Funktion ergaenzt nur ein kleines Gruppen-
-  // Schild ueber jeder Station, damit sichtbar ist, dass TECHNIK/KLETTERN/KRAFT jetzt
-  // echte Checks sind, nicht nur ein Bild.
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset fuer die Schilder: die sieben Sprites zeichnet
+  // `zeichneBoden()` bereits (Batch 15 Kulissen-Rework); diese Funktion ergaenzt nur ein
+  // kleines Gruppen-Schild ueber jeder Station, damit sichtbar ist, dass TECHNIK/KLETTERN/KRAFT
+  // jetzt echte Checks sind, nicht nur ein Bild.
+  const HYROX_GRUPPEN_LABEL={technik:"TECHNIK", kletter:"KLETTERN", kraft:"KRAFT"};
+  const HYROX_GRUPPEN_FARBE={technik:"rgba(69,176,201,0.85)", kletter:"rgba(242,160,61,0.85)", kraft:"rgba(199,68,68,0.9)"};
   function zeichneHyroxUeberlagerung(){
     if(!HYROX_STATIONEN||!HYROX_STATIONEN.length)return;
-    const GRUPPEN_LABEL={technik:"TECHNIK", kletter:"KLETTERN", kraft:"KRAFT"};
-    const GRUPPEN_FARBE={technik:"rgba(69,176,201,0.85)", kletter:"rgba(242,160,61,0.85)", kraft:"rgba(199,68,68,0.9)"};
     ctx.save();
     ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
     for(const st of HYROX_STATIONEN){
       const x=camX(st.pos), y=bahnY(0)-34;
-      ctx.fillStyle=GRUPPEN_FARBE[st.gruppe]||"rgba(120,120,120,0.85)";
+      ctx.fillStyle=HYROX_GRUPPEN_FARBE[st.gruppe]||"rgba(120,120,120,0.85)";
       ctx.fillRect(x-28,y-14,56,16);
       ctx.fillStyle="#fff";
-      ctx.fillText(GRUPPEN_LABEL[st.gruppe]||"", x, y-2);
+      ctx.fillText(HYROX_GRUPPEN_LABEL[st.gruppe]||"", x, y-2);
     }
+    ctx.restore();
+    zeichneHyroxRangleiste();
+  }
+  // RANGLEISTE (Nahkamera-PR, 08.11., Entscheidung 3 im kameraUpdate()-Kommentar oben): die
+  // Nahkamera zeigt immer nur einen Stationsausschnitt -- ohne diese Leiste wuesste der
+  // Zuschauer nicht mehr, wer insgesamt fuehrt, waehrend neun der zwoelf Laeufer gerade
+  // ausserhalb des Bildes unterwegs sind. Dasselbe Bedarfsmuster wie die Roster-Leiste der
+  // Zeitfahren-Einzelkamera (`#ttroster`/`renderZeitfahrenPanel`, verlinkt vom Auftrag als
+  // bestehendes Muster) -- hier als Canvas-Zeichnung statt DOM-Panel: die Bahn fuehrt fuer
+  // Spurt kein eigenes DOM-Overlay (anders als Zeitfahren/Staffel mit `#ttfokus`/`#bahnHud`),
+  // ein drittes DOM-Panel nur fuer dieses eine Format haette mehr Flaechen angefasst
+  // (battle-mode.html/.css) als diese eine Zeichenfunktion.
+  //
+  // Reine Anzeige: `bahnRangliste()` ist dieselbe Quelle, die Endstand/HUD ueberall sonst in
+  // der Bahn lesen (s. Kommentare dort) -- kein zweiter Rang wird hier erfunden.
+  function zeichneHyroxRangleiste(){
+    const rang=bahnRangliste().reihe;
+    if(!rang.length)return;
+    const st=hyroxCamStationIdx>=0?HYROX_STATIONEN[hyroxCamStationIdx]:null;
+    const ZEILE=15.5, OBEN=58, BREITE=142;
+    const x0=W-BREITE-10;
+    ctx.save();
+    ctx.fillStyle="rgba(15,15,20,.62)";
+    ctx.fillRect(x0,OBEN-18,BREITE,18+rang.length*ZEILE+4);
+    ctx.font="bold 10px sans-serif"; ctx.textAlign="left"; ctx.fillStyle="#fff";
+    // KOPFZEILE: welche Station/Gruppe die Nahkamera gerade zeigt -- sagt dem Zuschauer, WARUM
+    // der Ausschnitt gerade hier ist, bevor er in der Leiste nach dem Gesamtstand sucht.
+    ctx.fillText(st?(st.name.toUpperCase()+" · "+(HYROX_GRUPPEN_LABEL[st.gruppe]||"")):"STATIONEN",
+      x0+6, OBEN-5);
+    ctx.font="10px sans-serif";
+    rang.forEach((u,i)=>{
+      const y=OBEN+i*ZEILE;
+      // IM BILD: derselbe Fenstertest wie kameraUpdate() fuer die Kamera-Spanne selbst (s.
+      // hyroxCamGruppe-Kommentar dort) -- wer gerade zu sehen ist, bekommt eine helle Zeile,
+      // der Rest bleibt gedimmt lesbar statt zu verschwinden.
+      const imBild=st && u.fertig==null && hyroxCamGruppe && hyroxCamGruppe.has(u.id);
+      if(imBild){ ctx.fillStyle="rgba(255,255,255,.16)"; ctx.fillRect(x0+2,y-11,BREITE-4,ZEILE-1); }
+      ctx.fillStyle=u.fertig!=null?"rgba(140,220,150,.9)":(imBild?"#fff":"rgba(220,220,230,.62)");
+      const platz=(i+1)+". ";
+      const name=u.n.length>14?u.n.slice(0,13)+"…":u.n;
+      ctx.fillText(platz+name, x0+6, y);
+      if(u.fertig!=null){ ctx.textAlign="right"; ctx.fillText("✓", x0+BREITE-7, y); ctx.textAlign="left"; }
+    });
     ctx.restore();
   }
 
@@ -50598,6 +50797,22 @@
       // zeichneSprite()-Aufruf direkt darunter, damit Band und Laeufer nie auseinanderlaufen.
       const parcRicht=parcTakeshi
         ? blickAus({vx:u.stolper>0?0:(tg?tg.tx*4:(wartet?0:4)),vy:tg?tg.ty*4:0,side:u.seite}) : 0;
+      // HYROX-ARBEITSPOSE (Nahkamera-PR, 08.11., s. docs/design/spurt-hyrox-nahkamera-08-11.md
+      // Abschnitt 2, ersetzt die erste Fassung "immer dieselbe liegende Stolper-Pose" aus
+      // PR #1368): `u.hyroxGruppe`/`u.stolper` sind rein kosmetische Felder, die ausschliesslich
+      // stepSpurtHyrox() an der Stationsmarke setzt (s. dort) -- diese Zeichnung liest sie nur.
+      // `hyroxProg` laeuft 0..1 ueber genau dasselbe 0,4-s-Fenster, das `u.stolper` schon vorher
+      // fuer die alte Pose mass (keine neue Zeitgroesse). `hyroxLunge` faellt von 0,2 auf 0 (statt
+      // umgekehrt), weil zeichneSprite()/zeichnePixelFigur() `u.lunge` genau so lesen (Ausfall-
+      // schritt-Windup zu -Treffer, s. dortige Formel `(1-u.lunge/0.2)*n`) -- derselbe bestehende
+      // Kanal liefert damit fuer ALLE DREI Gruppen eine vorwaerts laufende Ausfallschritt-/
+      // "angriff"-Pose (Baukasten: ani="slash", s. dortiger `u.lunge>0`-Zweig; PixelLab-Figuren:
+      // "angriff", s. istAngriff in zeichnePixelFigur), OHNE dass diese Funktion selbst zwischen
+      // Baukasten und PixelLab unterscheiden muesste -- "bestehende Animationsart nutzen, bevor
+      // man neu generiert" (Auftrag), hier durch Wiederverwendung des Lunge-Kanals.
+      const hyroxAktivPose=(bahnHyroxAktiv&&u.stolper>0)?u.hyroxGruppe:null;
+      const hyroxProg=hyroxAktivPose?Math.max(0,Math.min(1,1-(u.stolper||0)/0.4)):0;
+      const hyroxLunge=hyroxAktivPose?Math.max(0.001,(1-hyroxProg)*0.2):0;
       // Sprite-Argumentobjekt in einer Variablen (statt inline wie zuvor), weil das
       // Startnummernband unten DIESELBE Z-Formel braucht, die zeichneSprite() intern fuer
       // GENAU dieses Objekt berechnet (Review-Fund 12.09.: ohne sie driftete das Band 5-10px
@@ -50616,8 +50831,16 @@
         vizAniPhase:u.vizSchritt,
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
-        // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben. Max() mit `hyroxLunge`, nicht
+        // Summe: beide sind unabhaengige Ausloeser fuer dieselbe Pose, sollen sich aber nicht
+        // gegenseitig verstaerken, falls sie je zusammenfielen.
+        lunge:Math.max(u.lungeVis>0?0.15:0,hyroxLunge),
+        // DOWN NUR AUSSERHALB VON HYROX: die alte liegende "tod"-Pose soll fuer eine
+        // Stationsarbeit nicht mehr erscheinen (s. Kommentar oben) -- in Hyrox ist u.stolper>0
+        // NIE ein echter Sturz, sondern immer genau dieser Arbeitspose-Zeitgeber.
+        down:bahnHyroxAktiv?false:(u.stolper>0),
+        hyroxPose:hyroxAktivPose, hyroxProg,
+        hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
@@ -50637,13 +50860,27 @@
       // Muster (PR #948, zwei Zeilen darueber) gebaut: eine kleine Sprunghoehe (nach oben
       // verschoben) plus eine minimal gestreckte Silhouette waehrend des Huerdensprungs --
       // "leicht", nicht eine neue Silhouette, wie schon bei zfTilt/zfHaltung.
-      const huerdeAusschlag=BA().spurt?(u.vizHuerde||0):0;
+      // HYROX TECHNIK-STATION (Nahkamera-PR, 08.11.): reiner Zeichen-Zuschlag auf exakt dieselbe
+      // Sprunghoehe/-Streckung wie die bestehende Huerdenflug-Pose direkt darueber -- ein
+      // Sinusbogen ueber `hyroxProg` (0..1, s. Kommentar an der Deklaration oben) statt der
+      // ausklingenden Exponentialkurve von `u.vizHuerde`, weil hier kein echter Huerdenkontakt
+      // dahintersteht, den `stepHuerden()` ausloest, sondern ein rein kosmetisches Zeitfenster.
+      // Fuer Baukasten-Figuren OHNE eigene PixelLab-Animation ist das die sichtbare Differenz
+      // zur KLETTERN-/KRAFT-Pose (beide nutzen stattdessen `u.lunge`/`hyroxKraftHaltung`, s.u.).
+      const hyroxTechnikHop=(hyroxAktivPose==="technik")?Math.sin(Math.PI*hyroxProg):0;
+      const huerdeAusschlag=BA().spurt?Math.max(u.vizHuerde||0,hyroxTechnikHop):0;
       const huerdeHop=huerdeAusschlag*6*sk0;
       const huerdeHaltung=1-huerdeAusschlag*0.06;
+      // HYROX KRAFT-STATION: eine kurze Stauchung (statt Streckung) waehrend des Schiebens/
+      // Tragens -- dieselbe Sinusbogen-Form wie der Technik-Hop oben, nur als Skalierungs-
+      // Multiplikator statt als Versatz, damit die Figur sichtbar in die Knie geht statt zu
+      // hopsen. Nur fuer Baukasten-Figuren sichtbar (PixelLab-Figuren tragen ihre eigene oder
+      // die generische "angriff"-Pose, s. zeichnePixelFigur/HYROX_PIXEL_ART oben).
+      const hyroxKraftHaltung=(hyroxAktivPose==="kraft")?(1-0.16*Math.sin(Math.PI*hyroxProg)):1;
       // feierDy (Team-Feier Staffel, s. `feierFigur` oben): Bildschirm-Pixel VOR der Skalierung,
       // der Fussschatten oben bleibt am Boden -- genau das macht den Sprung lesbar.
       ctx.save(); ctx.translate(x,y+16-parcHop-huerdeHop+feierDy); if(parcTaumel||zfTilt)ctx.rotate(parcTaumel+zfTilt);
-      ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung); ctx.translate(-x,-(y+16));
+      ctx.scale(sk,sk*parcDuck*zfHaltung*huerdeHaltung*hyroxKraftHaltung); ctx.translate(-x,-(y+16));
       // ENTSAETTIGT STATT VOLLFARBIG (s. Kommentar an `raus` oben): `ctx.filter` gilt nur
       // innerhalb dieses save/restore-Blocks, also nur fuer die Figur selbst -- Name, Plan
       // und Puste-Leiste (ausserhalb dieses Blocks gezeichnet) bleiben scharf und tragen
@@ -58431,12 +58668,18 @@
       bahnHatzAktiv, HATZ_WELLEN,
       // HYROX-STATIONEN: dieselbe Begruendung wie bei den zwei Zeilen direkt darueber --
       // ohne sie wuerde ein headless Messlauf ein sichtbares Hyrox-Rennen verwechseln.
-      bahnHyroxAktiv, HYROX_STATIONEN};
+      bahnHyroxAktiv, HYROX_STATIONEN,
+      // NAHKAMERA-ZUSTAND (Nahkamera-PR, 08.11.): gehoert hier dazu wie bahnHyroxAktiv direkt
+      // darueber -- sonst wuerde ein headless Messlauf mitten in einem sichtbaren Hyrox-Rennen
+      // dessen Schnitt-Takt verwerfen.
+      hyroxCamStationIdx, hyroxCamNaechsterSchnitt, hyroxCamGruppe};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
     bahnHatzAktiv=!!a.bahnHatzAktiv; HATZ_WELLEN=a.HATZ_WELLEN??null;
     bahnHyroxAktiv=!!a.bahnHyroxAktiv; HYROX_STATIONEN=a.HYROX_STATIONEN??null;
+    hyroxCamStationIdx=a.hyroxCamStationIdx??-1; hyroxCamNaechsterSchnitt=a.hyroxCamNaechsterSchnitt??0;
+    hyroxCamGruppe=a.hyroxCamGruppe??null;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -60141,6 +60384,20 @@
       }
       return {...HYROX_W, rauschen:HYROX_RAUSCHEN_AKTUELL.wert, basis:HYROX_BASIS_SEK_AKTUELL.wert, skala:HYROX_SKALA_SEK_AKTUELL.wert};
     },
+    // NAHKAMERA-SONDE (nur Messung/QA, Nahkamera-PR 08.11.): reiner Lesezugriff auf den
+    // Kamera-Zustand, den kameraUpdate()s eigener Hyrox-Zweig pflegt (s. docs/design/
+    // spurt-hyrox-nahkamera-08-11.md) -- fuer Screenshot-/Bildbeleg-Skripte, die sonst nur aus
+    // Pixeln raten koennten, ob die Kamera wirklich zwischen Stationen wechselt. Kein echtes
+    // Spiel ruft das auf, kein rr()-Aufruf, keine Schreibzugriffe.
+    hyroxKameraProbe:()=>({
+      aktiv:!!bahnHyroxAktiv, stationIdx:hyroxCamStationIdx,
+      station:(bahnHyroxAktiv&&HYROX_STATIONEN&&hyroxCamStationIdx>=0)?HYROX_STATIONEN[hyroxCamStationIdx].name:null,
+      naechsterSchnitt:hyroxCamNaechsterSchnitt, rennT, zoom:cam.zoom, cx:cam.cx,
+      laufend:LAEUFER.filter(u=>u.fertig==null).length, gesamt:LAEUFER.length,
+      // JE LAEUFER: Name/Fortschritt/aktuelle Arbeitspose -- fuer den Posen-Bildbeleg dieser PR
+      // (Screenshot-Skripte koennten sonst nur raten, WANN genau u.stolper>0/u.hyroxGruppe
+      // gesetzt ist, ein 0,4-s-Fenster). Reiner Lesezugriff, nichts hier schreibt.
+      laeufer:LAEUFER.map(u=>({n:u.n, pos:u.pos, stolper:u.stolper, hyroxGruppe:u.hyroxGruppe||null, fertig:u.fertig!=null})) }),
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
     buehneHaltungTest:(neu)=>{
