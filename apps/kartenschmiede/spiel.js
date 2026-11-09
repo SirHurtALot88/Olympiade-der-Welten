@@ -30,6 +30,15 @@
     ["eine Kartenlänge", "Lange Seite einer Gegnerkarte, 15 cm (etwa 6 Zoll). So weit geht eine normale Bewegung."],
     ["zwei Kartenlängen", "30 cm (etwa 12 Zoll): Sprint, kurze Fernkampf-Reichweite."],
   ];
+  // Deckung, wie Chris sie spielt (08.11.): Treffen bleibt möglich, das Ziel verteidigt besser
+  const DECKUNG = [
+    ["Wann", "Das Ziel steht in Deckungsgelände, oder die Linie vom Schützen zum Ziel geht durch ein solches Teil (Baum, Gräber, Zaun, Mauer, Werktisch …)."],
+    ["Wirkung", "Getroffen wird normal, das Ziel bekommt +1 auf den Verteidigungswurf (aus 4+ wird 3+). Eine 1 misslingt immer."],
+    ["Nicht stapelbar", "Zwei Teile im Weg geben trotzdem nur +1."],
+    ["Nahkampf", "Zählt nicht."],
+    ["Ganz verdeckt", "Hinter Gelände, das die Sicht blockiert (Haus, Ruine, Glastank), sieht man das Ziel nicht: kein Beschuss möglich."],
+    ["Für alle", "Gilt für Helden und Gegner. „Zielsuchend“ und „Ignoriert Deckung“ heben sie auf."],
+  ];
   const FARBE = { held: "#6fb0ff", gegner: "#ff6a4a", freund: "#4fd1a5", figur: "#f2cf4a", tot: "#77736b" };
 
   let map = null, motor = null, stand = null, standId = null, karte = null;
@@ -529,11 +538,12 @@
   function aufbauLegende(erzaehlen) {
     if (!karte) return "";
     const MARKER = window.KartenschmiedeSzenarien.MARKER || {}, nummern = new Map();
-    for (const g of karte.gelaende) { const n = g.label || (S.GELAENDE[g.art] || {}).name || g.art; if (!nummern.has(n)) nummern.set(n, nummern.size + 1); }
+    for (const g of karte.gelaende) { const n = g.label || (S.GELAENDE[g.art] || {}).name || g.art; if (!nummern.has(n)) nummern.set(n, (S.GELAENDE[g.art] || {}).arten || []); }
+    const schutz = arten => arten.includes("sicht") ? " <small>· Deckung, blockiert Sicht</small>" : arten.includes("deckung") ? " <small>· Deckung</small>" : "";
     const auf = motor.aufgedeckt(stand);
     // Alle Marker, auch die verdeckten: Chris muss wissen, was offen hinkommt und was er sich nur merkt
     const marker = karte.marker.filter(m => m.typ !== "ausgang");
-    return `<div class="sp-legende"><div><h4>${erzaehlen ? "Gelände (nur beschreiben)" : "Gelände (frei hinstellen)"}</h4><ul class="sp-gel">${[...nummern.keys()].map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>
+    return `<div class="sp-legende"><div><h4>${erzaehlen ? "Gelände (nur beschreiben)" : "Gelände (frei hinstellen)"}</h4><ul class="sp-gel">${[...nummern].map(([n, arten]) => `<li>${esc(n)}${schutz(arten)}</li>`).join("")}</ul></div>
       <div><h4>${erzaehlen ? "Marker (was die Spieler sehen)" : "Marker (genau dort)"}</h4><ul class="sp-markerliste">${marker.map(m => {
         const [z, f, name] = MARKER[m.typ] || ["•", "#fff", m.typ], ev = markerEreignis(m), zu = markerVerdeckt(m, auf);
         const wof = (ev && ev[1].wofuer) || markerInfo(m);
@@ -933,7 +943,8 @@
           <section>${motor.auftraege(stand).length ? `<h4>Aufträge der Spieler</h4><ul class="sp-ziele">${motor.auftraege(stand).map(a => `<li class="${a.erledigtJetzt ? "ja" : ""}">${a.erledigtJetzt ? "✓" : "○"} <b>${esc(a.titel)}</b> „${esc(a.spieler || "")}“ <small>· ${esc(a.quelle || "")}</small></li>`).join("")}</ul>` : ""}
             <h4>Ziele</h4>${l.ziele.length ? `<ul class="sp-ziele">${l.ziele.map(z => `<li class="${z.ist ? "ja" : ""}">${z.ist ? "✓" : "○"} <b>${esc(z.art || "")}</b> ${esc(z.text)}</li>`).join("")}</ul>` : `<p class="hint">Keine Ziele hinterlegt.</p>`}
             <h4>Flucht</h4>${l.flucht ? `<p>${esc(l.flucht.wie || "")}</p>${gm(l.flucht.folge ? `Folge: ${l.flucht.folge}` : "")}` : `<p class="hint">Kein Fluchtweg hinterlegt.</p>`}
-            <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
+            <h4>Messen ohne Zollstock</h4><table class="sz-tab"><tbody>${MESSEN.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table>
+            <h4>Deckung</h4><table class="sz-tab"><tbody>${DECKUNG.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</tbody></table></section>
           <section><h4>Schwierigkeit: ${esc(motor.schwierigkeit(stand).name)}</h4><p>Gegnerwelle ${Math.round(motor.schwierigkeit(stand).anteil * 100)} % von ${stand.heldenpunkte || "?"} Heldenpunkten. ${esc(motor.schwierigkeit(stand).text)}</p>
             <h4>Zähler · nur du siehst sie</h4>${zaehlerHtml()}
             <h4>Sporenpunkte: woran man es sieht, was gilt</h4><table class="sz-tab sp-sporentab"><tbody>${motor.SPOREN.filter(x => x.ab > 0).map(x => `<tr><td><b>ab ${x.ab}</b><br><small>${esc(x.stufe)}</small></td><td>${esc(x.aussehen)} <i>${esc(x.koerper)}</i><br><b>${esc(x.regel)}</b></td></tr>`).join("")}</tbody></table>
