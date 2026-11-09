@@ -697,6 +697,97 @@ sich daraus ein Asset-Bedarf, geht er als Vorschlag an Chris.
 - **Tempo 2×/4×:** Alle Dauern gelten bei 1×. Wer im Spiel standardmäßig vorspult, sieht
   entsprechend weniger. Das ändert an den Ausreißern nichts.
 
+## A2: Kahle Platzhalterfiguren — Befund
+
+Auftrag: reproduzieren, Ursache finden, und klären, ob es ein Artefakt des Test-/Mess-Kaders ist
+oder ein echter Bug im echten Spiel. Rein lesend, kein PixelLab-Aufruf, kein Fix.
+
+**Reproduziert.** `node scripts/screenshot-kulisse.mjs battlefield - 6000 <ziel> --pod` mit dem
+Test-Kader `data/generated/kaderfamilie-live-save.json` (Vigilante Wranglers/Armageddon
+Aftermath/Cold Steel/Dire Legion, Saat 42) liefert einen vollständigen Battlefield-Pod-Screenshot.
+Bei zwei Läufen (früher Tick 0:01 und 0:06) zeigten **alle ~20 sichtbaren Kämpfer korrekt
+geladene, individuelle PixelLab-Figuren** — darunter auch bewusst haarlose (z. B. „Midas", ein
+Skelett-Design, bei dem Haarlosigkeit zum Charakter gehört, nicht die generische Platzhalterfigur).
+Keine kahle Platzhalterfigur in meiner Reproduktion.
+
+**Datenabdeckung ist vollständig, nicht das Problem.** Geprüft gegen `lib/data/figurenSprites.ts`
+(`getFigurSpriteForPlayer()`, Regex `^player-\d+-(.+)$`) und den Index
+`data/generated/figuren-sprites.json` (360 Einträge):
+- Alle 110 Spieler aus dem Standard-Test-Kader (`kaderfamilie-live-save.json`, 5 Paarungen) haben
+  einen Treffer — 110/110.
+- Alle 328 Spieler aus dem erweiterten Test-Kader (`kaderfamilie-arena-erweitert.json`, 32 echte
+  Teams komplett) haben ebenfalls einen Treffer — 328/328.
+- Beide Kader stammen laut eigenem `hinweis`-Feld **nicht** aus einer synthetischen Mischung,
+  sondern wurden „über `buildArenaTeam()`" aus einem echten `live-save`-Abbild gezogen — derselben
+  Brücke, die auch der echte Arena-Host benutzt (`scripts/ziehe-kader-familie.ts`). Die
+  fantasievoll klingenden Namen („Draco", „Lava Golem", „Seraph-11") sind keine Test-Artefakte,
+  sondern die echten, vom Spiel selbst generierten Spielernamen.
+- `data/generated/figuren-sprites.json` hat exakt 360 Einträge — das deckt sich mit der Zahl der
+  Spieler im erweiterten Kader (328) plus Reserve und bestätigt den Verdacht: die 360 exportierten
+  PixelLab-Figuren sind erkennbar genau für den **aktuell aktiven Liga-Kader** (alle 32 Teams
+  dieses Spielstands) gebaut, nicht für einen Bruchteil davon. Ein Test-Kader-Artefakt im Sinne
+  „Testkader hat Spieler-IDs, für die nie eine Figur vorgesehen war" liegt **nicht** vor.
+
+**Die eigentliche Ursache steht bereits im Code dokumentiert, als Kommentar zu einem früheren,
+beinahe identischen Fund.** `public/mockups/battle-mode.engine.js` (Zeilen um `FIGUREN_WARTE_MS`,
+Fund vom 03.11.), wörtlich: „Chris sah bei 0:06 fünf Kämpfer noch als Baukasten-Platzhalter — die
+PixelLab-Bilder laden asynchron, und `zeichneSprite()` zeichnet bis dahin den Baukasten." Das ist
+exakt das Symptom, das die PM-Recherche jetzt wieder in Pod-Screenshots sah: ein Spieler MIT
+zugeordneter Figur (Datenlage korrekt) zeigt trotzdem kurzzeitig den alten, handgepflegten
+„Baukasten"-Platzhalter (das LPC-Baukastensystem von vor den PixelLab-Figuren), solange dessen
+Bild noch über das Netz lädt. Der Fix vom 03.11. (`FIGUREN_WARTE_MS = 4000`) lässt den ersten
+Kampf-Tick erst laufen, wenn entweder alle Grundposen geladen sind oder 4 Sekunden Wanduhrzeit
+vergangen sind — „langsames Netz, fehlende Datei: dann wie bisher" (= Baukasten-Rückfall bleibt
+möglich, wenn das Laden länger als 4 s dauert).
+
+**Warum der Baukasten-Rückfall ausgerechnet „kahl" aussieht:** Der Baukasten-Katalog `B_FIGUR`
+(dieselbe Datei, Namen wie „Draco" sind Schlüssel) ist ein manuell gepflegter Katalog aus der
+Zeit vor den PixelLab-Figuren. Stichprobe über die 40 Spieler der ersten beiden Paarungen des
+Test-Kaders: 13 Namen fehlen komplett in `B_FIGUR` (z. B. „Sir Percival", „Suzuna", „Genta",
+„Hargorin Todbringer" — generische Default-Figur), und von den gefundenen Einträgen haben weitere
+13 **kein** `haar`-Attribut gesetzt (z. B. „Draco", „Lava Golem", „Krolach", „Seraph-11" — oft
+by design, weil es Drachen/Golems/Konstrukte sind, aber eben auch ohne Haar-Layer). Zusammen über
+60 % der Stichprobe landen im Baukasten-Rückfall ohne jedes Haar — **das** ergibt den „kahlen"
+Eindruck, nicht ein fehlendes PixelLab-Asset.
+
+**Kein Testkader-Artefakt — ein echter, aber bereits teilweise behobener Zeitfenster-Bug im
+echten Spiel.** Die Begründung:
+1. `public/mockups/battle-mode.engine.js` ist keine Test-Fixture, sondern derselbe Motor, den die
+   echte App lädt (`app/foundation/battle-arena/FoundationBattleArenaHost.tsx` und ein gutes
+   Dutzend weiterer `lib/`-Module binden exakt diese Datei ein, s. Quellen-Grep unten).
+2. Die Datenabdeckung ist für den echten, aktiven Kader vollständig (s. oben) — das Problem ist
+   nicht „fehlende Figur", sondern „Figur noch nicht fertig geladen, als das Spielfeld gezeichnet
+   wurde".
+3. **Pods sind hier strukturell anfälliger als Duelle, für die `FIGUREN_WARTE_MS` ursprünglich
+   kalibriert wurde**: ein Battlefield-Pod zeigt 3–4 Teams gleichzeitig (in meiner Stichprobe 20
+   Kämpfer), ein normales 1v1-Duell nur 2 Kader — das sind grob 3–4× so viele gleichzeitige
+   Bildanfragen (pro Figur ~12 Dateien: vier Grundposen plus Animationsstreifen), die sich die
+   wenigen parallelen HTTP-Verbindungen eines Browsers teilen müssen. Das 4-Sekunden-Budget wurde
+   am Duell-Fall gemessen und validiert, nicht am Pod-Fall.
+4. Dass meine eigene Reproduktion (lokaler Node-Static-Server auf `127.0.0.1`, praktisch
+   latenzfrei) keine kahlen Figuren zeigte, spricht nicht gegen den Bug, sondern bestätigt die
+   Diagnose: er ist netzwerk-/lastabhängig, und ein lokaler Loopback-Server ohne echte Latenz ist
+   der denkbar güns­tigste Fall. Die PM-Recherche dürfte über die echte App (echter Server, echte
+   Netzwerklatenz, kälterer Browser-Cache beim ersten Aufruf einer Sitzung) gelaufen sein — genau
+   die Bedingungen, unter denen das 4-Sekunden-Budget eher reißt.
+
+**Betroffener Kreis, grob geschätzt:** potenziell jeder Spieler in jedem Pod-Format
+(Battlefield-Pod, Mini-DM-FFA-Pod, Bahn-Pod), nicht auf eine Teilmenge eingegrenzt — es trifft
+zufällig, wessen Bild beim ersten Tick noch nicht fertig geladen ist, nicht eine fest bestimmte
+Spielergruppe. Am sichtbarsten bei Spielern, deren Baukasten-Rückfall ohnehin kein Haar hat
+(s. oben, >60 % der Stichprobe) — bei den übrigen fiele derselbe Rückfall vermutlich weniger auf,
+weil der Baukasten dort wenigstens eine Frisur zeigt, auch wenn Hautfarbe/Ausrüstung dann falsch
+wären. Am ehesten beim allerersten Aufruf einer Sitzung (kalter Cache) und bei Pods mit vielen
+Teams/großen Kadern.
+
+**Kein Fix in diesem Auftrag.** Falls das angegangen wird: naheliegende Stellschrauben sind ein
+höheres `FIGUREN_WARTE_MS` speziell für Pod-Formate (mehr gleichzeitige Downloads brauchen mehr
+Zeit), ein serverseitiges Vorab-Preload der Pod-Kader-Bilder vor dem ersten Tick, oder — unabhängig
+von der Ladezeit — ein `haar`-Nachtrag in den betroffenen `B_FIGUR`-Einträgen, damit der
+Baukasten-Rückfall selbst (der ja laut Kommentar bewusst als kurze Übergangsanzeige vorgesehen
+ist) nicht komplett haarlos aussieht, falls er doch einmal zu sehen ist. Das ist ein Vorschlag,
+keine Freigabe — Chris entscheidet, ob und wie das angegangen wird.
+
 ## Quellen
 
 - `docs/design/kulissen-qualitaets-audit-08-11.md` (visuelle Achse, PR #1357)
