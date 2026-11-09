@@ -44804,6 +44804,25 @@
   // gewichtet sie in deren Richtung. Ob das aufgeht, sagt nicht die Absicht, sondern
   //   node scripts/messe-arena-einfluss.mjs <disziplin> 12
   // ===================================================================================
+  // FORMAT-FUNDAMENT (08.11., docs/design/spurt-format-die-hatz-08-11.md): dasselbe Muster
+  // wie BUEHNE_FLAGS oben (s. dort) — ein Schalter fuer ein ZWEITES Format EINER Disziplin,
+  // der NUR ueber window.__arena.bahnFlags({...}) (Messskripte) oder, fuer den Headless-
+  // Runner, window.__olyBahnFlags VOR dem Laden gesetzt wird. Die echte App setzt beides
+  // nie, deshalb bleibt `spurtFormat` immer "klassisch" und bauSpurt()/stepSpurt() laufen
+  // bit-identisch zu vorher (s. scripts/pruefe-wertung-fingerabdruck.mjs, GESAMT-Hash
+  // unveraendert). "hatz" baut stattdessen das Wellen-Ausscheidungsformat (baueHatz(),
+  // stepSpurtHatz() -- beide nahe stepSpurt() unten). Bewusst NUR fuer Spurt (einziger
+  // heute vorhandener Schluessel) -- ein kuenftiges zweites Format (HYROX-Stationen, s.
+  // Design-Dokument) ergaenzt hier einen weiteren Wert, keinen weiteren Schalter. Die GROSSE
+  // Entscheidung "wie waehlt das Spiel das Format" (Saisonkalender/Hash/Liga-Einstellung,
+  // Design-Dokument Abschnitt 6) ist ausdruecklich NICHT Teil dieses Schalters -- er ist nur
+  // der Mess-/Vorschau-Zugriff, den noch niemand hatte.
+  const BAHN_FLAGS={spurtFormat:"klassisch"};
+  try{
+    const startFlags=window.__olyBahnFlags;
+    if(startFlags&&typeof startFlags==="object"&&typeof startFlags.spurtFormat==="string")
+      BAHN_FLAGS.spurtFormat=startFlags.spurtFormat;
+  }catch(e){}
   const BAHN_ART={
     spurt:{
       // `spurt:true` VORAB ERGAENZT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt
@@ -46217,6 +46236,13 @@
   let bahnKoennenGemeldet=new Set();
   const HUERDEN_TYP=(i)=>{ const T=bahnFallenTypen||BA().hindernisTypen; return T[i%T.length]; };
   let LAEUFER=[], rennFertig=[], rennT=0;
+  // DIE HATZ (Format-Fundament, s. BAHN_FLAGS/baueHatz/stepSpurtHatz): `bahnHatzAktiv` ist
+  // NUR waehrend eines mit BAHN_FLAGS.spurtFormat==="hatz" gebauten Spurt-Rennens true --
+  // bauSpurt() setzt es bei JEDEM Aufruf neu (s. dort, Ende der Funktion), stepSpurt()/
+  // zeichneSpurt() lesen es nur, um auf die Hatz-Varianten umzuschalten. `HATZ_WELLEN` ist
+  // der vorab (baueHatz(), deterministisch aus derselben Saat) berechnete Wellenplan:
+  // {welle, finale, ende, rausIds, revealed}. `null` ausserhalb der Hatz.
+  let bahnHatzAktiv=false, HATZ_WELLEN=null;
   // ALTERNATIV-RECHNER (Klasse A*, 01.10., docs/design/fable-ideen-bahn-30-09.md Abschnitt
   // 1.3): die SAAT des gerade gebuchten/interaktiven Rennens — gesetzt EINZIG in build()s
   // Bahn-Zweig (s. dort), NICHT von MOTOREN[bd].bau()/bahnLauf() selbst beruehrt, die ihre
@@ -47505,6 +47531,13 @@
     // einer unterwegs ist.
     if(art.startAbstand&&LAEUFER.length)
       bahnFokus=[...LAEUFER].sort((a,b)=>(a.startT||0)-(b.startT||0))[0].id;
+    // DIE HATZ (Format-Fundament, 08.11.): NUR fuer Spurt (`art.spurt`) und nur, wenn
+    // explizit angefordert (BAHN_FLAGS.spurtFormat, s. dort) -- ohne das Flag bleibt
+    // `bahnHatzAktiv` false und bauSpurt() endet hier bit-identisch zu vorher. `art.spurt`
+    // statt `d==="spurt"`, dasselbe Gate wie bei spurtSaeuleSetzen() direkt darueber.
+    bahnHatzAktiv=!!(art.spurt&&BAHN_FLAGS.spurtFormat==="hatz");
+    HATZ_WELLEN=null;
+    if(bahnHatzAktiv)baueHatz();
   }
 
   // Wie schnell einer GERADE laeuft. Antritt traegt die ersten Sekunden, danach uebernimmt
@@ -48150,8 +48183,177 @@
     return {seite:fuehrend, delta:Math.max(0,rennT-zeitFuehrendBeiPH), unklar:false};
   }
 
+  // ===================================================================================
+  // DIE HATZ — FORMAT 2 FUER SPURT (08.11., docs/design/spurt-format-die-hatz-08-11.md).
+  //
+  // ZEICHENFRAGE AUS DEM ENTWURF, HIER ENTSCHIEDEN: Rundkurs bleibt eine THEMATISCHE
+  // Umdeutung, das Bahn-Chassis bleibt linear. `istOval()` (s. dort, "!!BA().staffel")
+  // zeichnet zwar schon einen Rundkurs, ist aber fest an die Staffel verdrahtet -- genau
+  // ZWEI Bahnen fuer zwei MANNSCHAFTEN (ovalPunkt() liest `OVAL_SPUR0+u.bahnZ`, bahnZ nur
+  // 0/1). Zwoelf EINZELNE Laeufer auf einem echten Rundkurs zu zeigen (eigene Spurzuteilung,
+  // Ueberrunden, Start/Ziel-Geometrie fuer zwoelf statt zwei) ist ein eigenes Zeichenprojekt,
+  // kein Format-Fundament. Der "Rundkurs" bleibt deshalb eine THEMATISCHE Umdeutung: der
+  // Fegearm jagt auf der GERADEN Bahn von hinten nach vorn, "eine Runde" ist eine Welle.
+  //
+  // ABLAUF. Wellen zu je HATZ_WELLEN_DAUER Sim-Sekunden (Entwurf: ~12), dazwischen
+  // HATZ_NEUORDNUNG_DAUER Sekunden Neuordnung (keine Ausdauer-Belohnung ueber Wellen
+  // hinweg -- stamina ist mit 4 das schwaechste Matrixgewicht, s. CLAUDE.md). Jede Welle
+  // bewertet alle noch aktiven Laeufer mit `hatzWelleScore()` und entfernt die beiden mit
+  // der schwaechsten Note -- AUSSER der letzten Welle (<=4 noch aktiv): die bewertet ALLE
+  // Verbliebenen auf einen Schlag, die unteren zwei werden Rang 3/4, die oberen zwei direkt
+  // Rang 1/2 (der "Sprint der verbliebenen zwei um Platz 1" aus dem Entwurf -- eine Welle
+  // entscheidet beides, keine sechste Phase).
+  //
+  // SUB-SKILLS: ausschliesslich das bestehende Spurt-Rezept (BAHN_ART.spurt.rezept, s.
+  // "DIE SIEBEN ROLLEN" am Kopf von BAHN_ART) -- ANTRITT/TECHNIK/WENDIGKEIT/WUCHT/ROBUST/
+  // STEHEN/ENDTEMPO werden NICHT neu gewichtet (die Matrix ist gesperrt, CLAUDE.md), nur
+  // anders KOMBINIERT: ANTRITT in jeder Welle ausser der letzten ("jede Welle ein
+  // Neustart"), ENDTEMPO nur in der letzten. HATZ_W/HATZ_RAUSCHEN sind das einzige freie
+  // Rad dieser Kalibrierung -- Kalibrierweg (Startwerte, Messwerte, Korrekturen) steht in
+  // docs/design/spurt-format-die-hatz-08-11.md.
+  //
+  // `u.fertig` TRAEGT HIER DEN RANG, NICHT EINE ZEIT. MOTOREN["spurt"].wert() (der
+  // generische Bahn-Zweig, unveraendert) sortiert nach `bahnZeit(u)=u.fertig-(u.startT||0)`
+  // aufsteigend und vergibt -(Platz) -- fuer Spurt ist `u.startT` immer 0 (kein
+  // `art.startAbstand`), also bahnZeit(u)===u.fertig. Weil `baueHatz()` JEDEM Laeufer einen
+  // EINDEUTIGEN Rang 1..N zuweist (`u.hatzRang`) und `stepSpurtHatz()` genau diesen Rang
+  // als `u.fertig` eintraegt, reproduziert der bestehende, unveraenderte Zweig exakt die
+  // Ausscheidereihenfolge -- kein eigener wert()-Zweig fuer "hatz" noetig.
+  const HATZ_WELLEN_DAUER=12, HATZ_NEUORDNUNG_DAUER=3;
+  // KOMBINATIONSGEWICHTE (Kalibrierweg: docs/design/spurt-format-die-hatz-08-11.md).
+  // ZWEI KOMBINATIONS-PROFILE, nicht eines: eine fruehe Welle entscheidet nur 2 von N
+  // Raengen (Gedraenge, viel Chaos/Rauschen passt dazu) -- die letzte Welle entscheidet
+  // Rang 1-4 auf einen Schlag und soll dabei hoeren lassen, WER wirklich besser ist (wenig
+  // Rauschen, mehr ENDTEMPO/STEHEN statt ANTRITT/WUCHT). Kalibrierweg im Design-Dokument.
+  const HATZ_W={haupt:0.36, technik:0.16, wendig:0.06, wucht:0.08, robust:0.20, stehen:0.14};
+  const HATZ_W_FINALE={haupt:0.52, technik:0.10, wendig:0.00, wucht:0.00, robust:0.12, stehen:0.26};
+  // MUTIERBAR NUR UEBER window.__arena.hatzGewichte({...}) (s. dort) -- Objekte statt
+  // simplen `const`s, damit die Kalibrierungs-Schnittstelle sie innerhalb einer Sitzung
+  // aendern kann, ohne die Seite neu zu laden.
+  const HATZ_RAUSCHEN_AKTUELL={nichtFinale:0.25, finale:0.02};
+  // FUENF UNABHAENGIGE WUERFE STATT EINEM (Kalibrierweg, s. Design-Dokument): eine Welle hat
+  // laut Entwurf "zwei Huerden, ein Rempel-Fenster" -- EIN einzelner verrauschter
+  // Gesamt-Score (ein rr()-Wurf) machte das Messergebnis instabil (Pp schwankte zwischen 20
+  // und 37 je nach Laufzahl, s. PR-Beschreibung): bei nur einem Wurf entscheidet eine
+  // einzelne ungluecklich gezogene Zahl ueber die ganze Welle, und WELCHES Attribut davon
+  // profitiert, haengt empfindlich von der genauen Gewichtsmischung ab. Fuenf separat
+  // gewuerfelte Teilereignisse (Antritt/Endtempo, zwei Huerden, Rempel-Fenster, Stehen)
+  // glaetten das genauso, wie die sieben Huerden/hundert Ticks des klassischen Formats es
+  // tun -- derselbe Grund, aus dem CLASSISCH ueberhaupt stabil misst.
+  function hatzWelleScore(u,finale){
+    const W=finale?HATZ_W_FINALE:HATZ_W;
+    const rauschen=finale?HATZ_RAUSCHEN_AKTUELL.finale:HATZ_RAUSCHEN_AKTUELL.nichtFinale;
+    const wurf=(basis)=>basis*(1+(rr()-0.5)*2*rauschen);
+    const haupt=finale?(u.ENDTEMPO||0):(u.ANTRITT||0);
+    // SECHS UNABHAENGIGE WUERFE statt einem gemeinsamen (Kalibrierweg, s. Design-Dokument):
+    // je einer fuer Antritt/Endtempo, die zwei Huerden (Technik/Wendigkeit), den Rempler
+    // (Wucht), das Wegstecken (Robust) und das Stehen -- dieselbe Glaettung, die das
+    // klassische Format ueber Dutzende Ticks/sieben Huerden ohnehin bekommt.
+    return wurf(haupt*W.haupt) + wurf((u.TECHNIK||0)*W.technik) + wurf((u.WENDIGKEIT||0)*W.wendig)
+         + wurf((u.WUCHT||0)*W.wucht) + wurf((u.ROBUST||0)*W.robust) + wurf((u.STEHEN||0)*W.stehen);
+  }
+  function baueHatz(){
+    let aktiv=[...LAEUFER], naechsterRang=aktiv.length, welleIdx=0, letzteBleibt=null, t=0;
+    HATZ_WELLEN=[];
+    while(aktiv.length>2){
+      const finale=aktiv.length<=4;
+      const bewertet=aktiv.map(u=>({u,score:hatzWelleScore(u,finale)})).sort((a,b)=>a.score-b.score);
+      const rausN=finale?(aktiv.length-2):Math.min(2,aktiv.length-2);
+      const raus=bewertet.slice(0,rausN), bleibt=bewertet.slice(rausN);
+      // Innerhalb der Rausgruppe: der schwaechste (Index 0, Note am niedrigsten) bekommt den
+      // schlechtesten noch freien Rang.
+      for(let i=0;i<raus.length;i++)raus[raus.length-1-i].u.hatzRang=naechsterRang--;
+      t+=HATZ_WELLEN_DAUER;
+      HATZ_WELLEN.push({welle:welleIdx, finale, ende:t, rausIds:raus.map(x=>x.u.id), revealed:false});
+      aktiv=bleibt.map(x=>x.u); letzteBleibt=bleibt;
+      if(!finale)t+=HATZ_NEUORDNUNG_DAUER;
+      welleIdx++;
+    }
+    if(!HATZ_WELLEN.length)HATZ_WELLEN.push({welle:0, finale:true, ende:HATZ_WELLEN_DAUER, rausIds:[], revealed:false});
+    // Die letzten (<=2) Laeufer: Reihenfolge aus der zuletzt berechneten Wellen-Note oben
+    // ("letzteBleibt") -- oder, falls das Feld mit <=2 Laeufern startet (sehr kleine
+    // Ersatzaufstellung, Edge-Case), eine letzte eigene Bewertung.
+    const rest=(letzteBleibt?letzteBleibt.filter(x=>aktiv.includes(x.u))
+      :aktiv.map(u=>({u,score:hatzWelleScore(u,true)}))).sort((a,b)=>a.score-b.score);
+    for(let i=0;i<rest.length;i++)rest[rest.length-1-i].u.hatzRang=naechsterRang--;
+    for(const u of LAEUFER)if(u.hatzRang==null)u.hatzRang=naechsterRang--; // Sicherheitsnetz
+  }
+  function hatzAktuelleWelle(){
+    if(!HATZ_WELLEN)return null;
+    return HATZ_WELLEN.find(w=>!w.revealed)||HATZ_WELLEN[HATZ_WELLEN.length-1]||null;
+  }
+  function stepSpurtHatz(dt){
+    if(done)return;
+    rennT+=dt;
+    const letzte=HATZ_WELLEN[HATZ_WELLEN.length-1];
+    for(const w of HATZ_WELLEN){
+      if(w.revealed||rennT<w.ende)continue;
+      w.revealed=true;
+      for(const id of w.rausIds){
+        const u=LAEUFER.find(x=>x.id===id); if(!u)continue;
+        // `u.fertig`=Rang (s. Kopfkommentar), `u.raus`/`u.stolper` sind reine Anzeige --
+        // dieselbe Dimm-/"liegt"-Behandlung, die Takeshi's Castle/ein Hürdensturz schon
+        // bekommen (s. zeichneSpurt, "AUSGESCHIEDEN"/`down:u.stolper>0`). Niemand faellt
+        // hier generisch nach vorn/hinten um (CLAUDE.md, PixelLab-Tod-Animationen): die
+        // vom Fegearm Erwischten liegen sichtbar auf der Bahn, dieselbe Pose wie ein
+        // Huerdensturz -- nicht die 0815-Umkipp-Variante, die der Abschnitt ausschliesst.
+        u.fertig=u.hatzRang; u.raus=true; u.stolper=Math.max(u.stolper||0,1);
+        rennFertig.push(u);
+      }
+      if(w===letzte){
+        const rest=LAEUFER.filter(x=>x.fertig==null).sort((a,b)=>(a.hatzRang||99)-(b.hatzRang||99));
+        for(const u of rest){ u.fertig=u.hatzRang; rennFertig.push(u); }
+      }
+    }
+    // KOSMETISCHE POSITIONS-ANIMATION (reine Anzeige -- schreibt nur `u.pos`, nie
+    // `u.fertig`/rr()/MOTOREN["spurt"].wert()). Ausgeschiedene bleiben stehen, wo der Arm
+    // sie erwischt hat.
+    const gesamtWellen=HATZ_WELLEN.length;
+    for(const u of LAEUFER){
+      if(u.raus)continue;
+      const w=hatzAktuelleWelle();
+      const localStart=w?w.ende-HATZ_WELLEN_DAUER:0;
+      const frac=w?Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER)):1;
+      const basis=w?(w.welle+frac)/gesamtWellen:1;
+      const jitter=((u.id*53)%37)/37*0.015;
+      u.pos=Math.max(0,Math.min(0.97, basis*0.92+jitter));
+      u.bahn=u.bahnZ;
+    }
+    if(rennT>=letzte.ende+0.05||rennFertig.length>=LAEUFER.length)done=true;
+  }
+  // SWEEP-ARM/BEDROHUNGS-OVERLAY (reine Zeichnung, kein rr()-Aufruf, kein Einfluss auf
+  // u.pos/wert()/rho). Kein neues PixelLab-Asset (Auftrag: "zuerst pruefen, ob ein
+  // bestehendes Panzertier wiederverwendbar ist" -- geprueft, s. PR-Beschreibung: kein
+  // passendes vorhanden, "medibull" ist ein Sanitaeter-Maskottchen, kein Bedroher) --
+  // stattdessen derselbe prozedurale Balken, mit dem das Bahn-Chassis auch sonst Zustand
+  // zeichnet (Hot-Seat-Podest, Ziellinie), damit kein Asset-Generierungsprojekt an einem
+  // Format-Fundament haengt.
+  function zeichneHatzUeberlagerung(){
+    const w=hatzAktuelleWelle(); if(!w)return;
+    const localStart=w.ende-HATZ_WELLEN_DAUER;
+    const frac=Math.max(0,Math.min(1,(rennT-localStart)/HATZ_WELLEN_DAUER));
+    // ETWAS HINTER DEM NACHZUEGLER, NIE AUF GLEICHER HOEHE (sonst verschwindet der duenne
+    // Balken optisch unter den Laeufer-Sprites, die ERST NACH diesem Aufruf gezeichnet
+    // werden, s. Kopfkommentar/PR-Beschreibung "Screenshot-Beleg"): der Arm bleibt 0,05
+    // Streckenanteile HINTER der Welle, bis er sie im letzten Fuenftel der Welle einholt.
+    const n=Math.max(1,BAHNEN_N());
+    const y0=bahnY(0)-26, y1=bahnY(n-1)+26;
+    const welleZielPos=Math.min(0.95,((w.welle+1)/Math.max(1,HATZ_WELLEN.length))*0.92);
+    const armPos=Math.max(0,welleZielPos-0.06+frac*0.06);
+    const xPos=camX(armPos);
+    ctx.save();
+    ctx.fillStyle="rgba(200,20,20,"+(0.30+0.45*frac*frac).toFixed(3)+")";
+    ctx.fillRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.strokeStyle="rgba(255,220,60,0.9)"; ctx.lineWidth=2;
+    ctx.strokeRect(xPos-9,y0,18,Math.max(1,y1-y0));
+    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(w.finale?"ENDSPURT":"FEGEARM",xPos,y0-8);
+    ctx.restore();
+  }
+
   function stepSpurt(dt){
     if(done)return;
+    if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
     rennT+=dt;
     // BROADCAST-HUD: Verlaufspuffer je Seite mitschreiben (nur push, s. Deklaration
     // an fortschrittVerlauf oben). Push-only bei echtem Fortschritt haelt den
@@ -50109,6 +50311,10 @@
   }
   function zeichneSpurt(){
     zeichneBoden();
+    // DIE HATZ (s. BAHN_FLAGS/stepSpurtHatz): nur die zusaetzliche Bedrohungs-Zeichnung,
+    // ohne `bahnHatzAktiv` ist das ein No-Op -- die Figuren selbst zeichnet der Rest dieser
+    // Funktion unveraendert (u.raus/u.pos tragen die Hatz-Information schon, s. dort).
+    if(bahnHatzAktiv)zeichneHatzUeberlagerung();
     // TEAM-FEIER STAFFEL (Konzept 3.3): Teamfarben einmal je Frame (Befund B5). Nur Staffel --
     // jede andere Bahn zeichnet ohne Feier-Publikum und bleibt Zeichen fuer Zeichen wie vorher.
     const staffelFeier=!!BA().staffel;
@@ -58066,10 +58272,16 @@
       staffelWechselAnzeige, staffelVerlauf, staffelBeinMarken, staffelAnkerGezeigt,
       staffelBeinDuellGemeldet, spurtStationBest, spurtFotofinishGezeigt,
       spurtStationStats, cam, camR, bahnWahl, bahnFokus, bahnFokusAuto, ttPanelSig,
-      routeCache, waldCache};
+      routeCache, waldCache,
+      // DIE HATZ (s. BAHN_FLAGS/baueHatz): gehoert hier dazu wie jedes andere Bahn-
+      // Anzeigefeld -- ohne diese zwei Zeilen wuerde ein headless Messlauf MITTEN in einem
+      // sichtbaren Hatz-Rennen (M.sichern()/M.bau()/.../M.zurueck()) das sichtbare Rennen
+      // nach der Messung faelschlich wieder als Hatz (oder umgekehrt) zeigen.
+      bahnHatzAktiv, HATZ_WELLEN};
   }
   function bahnAnzeigeZurueck(a){
     if(!a)return;
+    bahnHatzAktiv=!!a.bahnHatzAktiv; HATZ_WELLEN=a.HATZ_WELLEN??null;
     fortschrittVerlauf=a.fortschrittVerlauf; letzterBuehneBahnGrossT=a.letzterBuehneBahnGrossT;
     bahnFallenTypen=a.bahnFallenTypen; bahnKursName=a.bahnKursName; bahnKursChaos=a.bahnKursChaos;
     bahnGedraengeGemeldet=a.bahnGedraengeGemeldet; bahnKoennenGemeldet=a.bahnKoennenGemeldet;
@@ -59734,6 +59946,31 @@
         for(const k of Object.keys(BUEHNE_FLAGS))
           if(Number.isFinite(Number(neu[k])))BUEHNE_FLAGS[k]=Number(neu[k]);
       return {...BUEHNE_FLAGS};
+    },
+    // FORMAT-FUNDAMENT SPURT (s. BAHN_FLAGS/baueHatz, 08.11.): dasselbe Muster wie
+    // buehneFlags direkt darueber, nur fuer die Bahn. {spurtFormat:"hatz"} schaltet "Die
+    // Hatz" fuer den naechsten bauSpurt()-Aufruf an dieser Seite ein, {spurtFormat:"klassisch"}
+    // (oder weglassen) ist der unveraenderte Standard. Unbekannte Werte werden ignoriert.
+    // Ohne Argument nur lesen. Kein echtes Spiel ruft das auf.
+    bahnFlags:(neu)=>{
+      if(neu&&typeof neu==="object"&&(neu.spurtFormat==="klassisch"||neu.spurtFormat==="hatz"))
+        BAHN_FLAGS.spurtFormat=neu.spurtFormat;
+      return {...BAHN_FLAGS};
+    },
+    // KALIBRIERUNGS-SCHNITTSTELLE "DIE HATZ" (nur Messung/QA, s. HATZ_W/HATZ_RAUSCHEN nahe
+    // stepSpurt): erlaubt scripts/messe-spurt-hatz-einfluss.mjs/miss-spurt-hatz-rangtreue.mjs,
+    // die Kombinationsgewichte INNERHALB einer Browser-Sitzung durchzuprobieren, ohne die
+    // Engine jedes Mal neu zu laden. Kein echtes Spiel ruft das auf; die Matrix-Gewichte
+    // selbst (BAHN_ART.spurt.rezept) bleiben unberuehrt.
+    hatzGewichte:(neu)=>{
+      if(neu&&typeof neu==="object"){
+        for(const k of Object.keys(HATZ_W))if(Number.isFinite(Number(neu[k])))HATZ_W[k]=Number(neu[k]);
+        if(neu.finale&&typeof neu.finale==="object")
+          for(const k of Object.keys(HATZ_W_FINALE))if(Number.isFinite(Number(neu.finale[k])))HATZ_W_FINALE[k]=Number(neu.finale[k]);
+        if(Number.isFinite(Number(neu.rauschen)))HATZ_RAUSCHEN_AKTUELL.nichtFinale=Number(neu.rauschen);
+        if(Number.isFinite(Number(neu.rauschenFinale)))HATZ_RAUSCHEN_AKTUELL.finale=Number(neu.rauschenFinale);
+      }
+      return {...HATZ_W, finale:{...HATZ_W_FINALE}, rauschen:HATZ_RAUSCHEN_AKTUELL.nichtFinale, rauschenFinale:HATZ_RAUSCHEN_AKTUELL.finale};
     },
     // PAUSCHALE HALTUNG JE SEITE (nur Messung, s. buehneHaltungTest oben): {0:"rechnen",
     // 1:null} usw.; null/"ki" = keine Vorgabe. Ohne Argument nur lesen.
