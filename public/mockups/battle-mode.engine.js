@@ -42460,7 +42460,12 @@
     // Takeshi's Castle, die Route durch Midoriyama (docs/design/takeshi-schlammroute-plan-06-09.md,
     // Abschnitt 5): die Untergruende der fuenf Gelaende-Zonen und ihrer Umgebungen.
     "boden_wiese","boden_wald","boden_pfad","boden_kies","boden_schlamm","boden_see",
-    "boden_sumpf","boden_hang","boden_pflaster"];
+    "boden_sumpf","boden_hang","boden_pflaster",
+    // KULISSEN-QS 08.11. (Batch 14, Rang 2 des Audits docs/design/kulissen-qualitaets-audit-08-11.md):
+    // drei neue Requisiten fuer "Rahmen statt Material" an der Kletterwand -- Hallenmatte als
+    // Bodenkachel, Kreidebeutel am Wandfuss, Eiszapfen am Eisfall-Ueberhang. Fehlen-tolerant wie
+    // jede andere Kachel hier (aDa()-Wache), s. bodenWand() unten.
+    "climbing_matte","climbing_kreidebeutel","climbing_eiszapfen"];
   const aBild={}, aMuster={};
   for(const n of A_TEILE){const im=new Image();im.src="/sprites/arena/"+n+".png";aBild[n]=im;}
   const aDa=n=>{const im=aBild[n];return !!im&&im.complete&&im.naturalWidth>0;};
@@ -44216,22 +44221,165 @@
     const von=Math.max(0,Math.min(1,u.vizFallVon));
     return von+(ziel-von)*(t*t);   // ease-in: ein Sturz beschleunigt statt konstant zu fallen
   }
-  function bodenWand(){
-    // ---- Hintergrund: Felswand statt Rasen/Asphalt -- keine Laufbahn, also kein `boden`-Feld
-    // der Art wie bei bodenSpurtGerade(), reiner eigener Fels-Verlauf.
-    // KULISSE (Kulissen-Integration 07.11., s. scripts/baue-kulisse-buehnen.py): Wandmaterial der
-    // PixelLab-Szene (Halle, Fels, Eis) ohne deren Griffe und Volumen, laeuft mit der Kamera mit
-    // (gleicher Versatz wie die Risse unten). Ersetzt Verlauf und Risse; Ueberhang-Schatten, Bahnen,
-    // Griffe (BA().hindernisse/HUERDEN_TYP) und Sicherung zeichnet der Motor weiter.
-    const mitKulisse=kulisseZeichnen(camViewV().oben*cam.zoom);
-    if(!mitKulisse){
-    const g=ctx.createLinearGradient(0,0,0,H);
-    g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
-    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
-    }
 
+  // ===================== KLETTER-KULISSE "RAHMEN STATT MATERIAL" ======================
+  // ===================== (Kulissen-QS 08.11., Batch 14, Rang 2 des Audits) ============
+  // docs/design/kulissen-qualitaets-audit-08-11.md Abschnitt 4.2, Befund woertlich: "Fels liest
+  // sich als Holzmaserung, Eis als blauer Vorhang, Wand als grauer Beton ... Es gibt kein Oben
+  // und kein Unten: kein Boden mit Matten und Sicherern, kein Himmel oder Hallendach, keine
+  // Wandkante, nichts, das Hoehe vermittelt". Diese PR haengt keine neue Mechanik an: alles hier
+  // liest nur `camY()`/`wandX()`/`BAHNEN_N()`/`kulisseAktiv` (reine Anzeige-Groessen) und schreibt
+  // nirgends in `u.*`/`BA()`/`hindernisse`/`rr()` -- bit-identische Rangtreue vor/nach dieser PR
+  // (node scripts/pruefe-wertung-fingerabdruck.mjs, s. PR-Beschreibung).
+  const KLETTER_PALETTE={
+    wand:{ // Kletterhalle
+      himmelOben:"#14161c", fernAkzent:"rgba(150,165,195,.45)",
+      kante:"#5c6372", kanteHell:"rgba(235,240,255,.22)",
+      bodenA:"#232a3a", bodenB:"#2c3650", bodenLinie:"rgba(255,255,255,.14)",
+      dachA:"#0e1016", dachB:"#1a1e27", lichtband:"rgba(255,244,210,.55)",
+    },
+    fels:{ // Sandsteinschlucht
+      himmelOben:"#e8884a", fernAkzent:"rgba(140,80,40,.5)",
+      kante:"#8a5a30", kanteHell:"rgba(255,224,170,.3)",
+      bodenA:"#6b4a2a", bodenB:"#7e5a34", bodenLinie:"rgba(0,0,0,.18)",
+      dachA:"#d9733e", dachB:"#f6c179", lichtband:"rgba(255,214,150,.4)",
+    },
+    eis:{ // Eisfall
+      himmelOben:"#aee0f6", fernAkzent:"rgba(150,205,235,.5)",
+      kante:"#cdeaf7", kanteHell:"rgba(240,252,255,.4)",
+      bodenA:"#d7e8ef", bodenB:"#c3dbe4", bodenLinie:"rgba(30,70,100,.3)",
+      dachA:"#8fd0ee", dachB:"#eaf8ff", lichtband:"rgba(200,236,255,.4)",
+    },
+  };
+  // Drei Routenfarben wie in der PixelLab-Rohszene (public/szenen/climbing/*.jpg, Routenlabel
+  // "Route 4 - gruen" usw.): orange/gruen/violett, zyklisch ueber die zwoelf Bahnen -- reine
+  // Zeichenaenderung im Griff-Loop unten, s. "ROUTENFARBE STATT GRAU".
+  const KLETTER_ROUTE_FARBEN=[{h:"#e8923c",d:"#a8641f"},{h:"#5cb878",d:"#34804e"},{h:"#9b6bd1",d:"#6a429c"}];
+
+  function bodenWand(){
     const n=BAHNEN_N(), steigung=BA().steigung??0.85;
     const griffe=BA().hindernisse||[];
+    // VARIANTE/PALETTE: `kulisseAktiv.id` ("wand"/"fels"/"eis", aus battle-mode.kulissen.js) ist
+    // auch VOR dem Laden des Fotos gesetzt (kulisseWaehlen() beim reset()) -- dieselbe Variable,
+    // die kulisseZeichnen() unten schon fuer `dunkel` liest. Faellt auf "wand" zurueck, wenn keine
+    // Kulissenliste existiert (Headless-Runner/alte Fassung ohne battle-mode.kulissen.js).
+    const variante=(kulisseAktiv&&kulisseAktiv.disc==="climbing")?kulisseAktiv.id:"wand";
+    const pal=KLETTER_PALETTE[variante]||KLETTER_PALETTE.wand;
+    const kv=camViewV(), versatzY=kv.oben*cam.zoom;
+    const wandX0=wandX(-0.5), wandX1=wandX(n-0.5);
+    // DREI ZONEN IN DER HOEHE (Audit 4.2): camY(0)=Wandfuss, camY(1)=Top-out. camY faellt, wenn
+    // posFrac steigt, also topY<bottomY immer -- Boden liegt UNTER bottomY, Top-out UEBER topY.
+    const topY=camY(1), bottomY=camY(0);
+    const wallY0=Math.max(0,Math.min(H,topY)), wallY1=Math.max(0,Math.min(H,bottomY));
+
+    // ---- Zone 0: FERNE EBENE -- Halle/Schlucht/Eisklippe im Gegenlicht, HALBER Versatz (Audit
+    // 4.2: "ferne Ebene, mit halbem Versatz scrollend = echtes Parallax"). Volle Leinwand, auch
+    // hinter den Boden-/Top-out-Zonen, die gleich darueber gezeichnet werden.
+    {
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,pal.himmelOben); g.addColorStop(1,pal.bodenA);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      const fernV=versatzY*0.5, TILE=H+260;
+      ctx.save(); ctx.globalAlpha=0.55;
+      for(let i=0;i<8;i++){
+        const fy=bodenSaat(i+7000);
+        const y=(((fy*TILE-fernV)%TILE)+TILE)%TILE-40;
+        if(variante==="wand"){                          // Hallen-Dachbinder, waagerecht
+          ctx.strokeStyle=pal.fernAkzent; ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+        } else if(variante==="fels"){                   // Schluchtwand-Baender
+          ctx.fillStyle=pal.fernAkzent;
+          ctx.fillRect(0,y,W,10+bodenSaat(i+7050)*14);
+        } else {                                        // Eisklippen-Kanten, schraeg
+          ctx.strokeStyle=pal.fernAkzent; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(0,y+14); ctx.lineTo(W,y-10); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- Zone BODEN (unten, Audit: "Matten, Sicherer, Kreidebeutel, Hallenboden bzw. Geroell
+    // bzw. Gletscherfuss"). Volle Breite -- der Boden liegt unter der ganzen Halle/Schlucht, nicht
+    // nur unter den zwoelf Bahnen. Nur gezeichnet, wenn der Wandfuss ueberhaupt im Bild ist.
+    if(bottomY<H+2){
+      const y0=Math.max(0,bottomY);
+      ctx.save(); ctx.beginPath(); ctx.rect(0,y0,W,H-y0); ctx.clip();
+      if(variante==="wand"){
+        if(aDa("climbing_matte")){ ctx.fillStyle=aMust("climbing_matte"); ctx.fillRect(0,y0,W,H-y0); }
+        else {
+          const kach=48;
+          for(let gx=0;gx<W;gx+=kach)for(let gy=Math.floor(y0/kach)*kach;gy<H;gy+=kach){
+            ctx.fillStyle=((Math.round(gx/kach)+Math.round(gy/kach))%2)?pal.bodenA:pal.bodenB;
+            ctx.fillRect(gx,gy,kach,kach);
+          }
+        }
+        ctx.strokeStyle=pal.bodenLinie; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(0,y0+3); ctx.lineTo(W,y0+3); ctx.stroke();
+      } else if(variante==="fels"){                     // Geroell/Schotter am Schluchtfuss
+        ctx.fillStyle=pal.bodenA; ctx.fillRect(0,y0,W,H-y0);
+        for(let i=0;i<60;i++){
+          const x=bodenSaat(i+7100)*W, y=y0+bodenSaat(i+7140)*(H-y0), r=2+bodenSaat(i+7180)*4;
+          ctx.fillStyle=bodenSaat(i+7220)<0.5?pal.bodenB:"rgba(0,0,0,.22)";
+          ctx.beginPath(); ctx.ellipse(x,y,r*1.3,r*0.8,0,0,6.283); ctx.fill();
+        }
+      } else {                                          // Gletscherfuss mit Spaltenrissen
+        ctx.fillStyle=pal.bodenA; ctx.fillRect(0,y0,W,H-y0);
+        for(let i=0;i<10;i++){
+          const x0=bodenSaat(i+7300)*W, y1=y0+10+bodenSaat(i+7340)*(H-y0-10);
+          ctx.strokeStyle=pal.bodenLinie; ctx.lineWidth=1.5;
+          ctx.beginPath(); ctx.moveTo(x0,y1);
+          ctx.lineTo(x0+(bodenSaat(i+7380)-0.5)*40,y1+10+bodenSaat(i+7420)*18);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- Zone TOP-OUT (oben, Audit: "Hallendach mit Lichtbaendern bzw. Himmel ueber der
+    // Schluchtkante bzw. Gipfel mit Wolken"). Volle Breite, nur wenn sichtbar.
+    if(topY>-2){
+      const y1=Math.max(0,Math.min(H,topY));
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,y1); ctx.clip();
+      const g=ctx.createLinearGradient(0,0,0,y1);
+      g.addColorStop(0,pal.dachA); g.addColorStop(1,pal.dachB);
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,y1);
+      if(variante==="wand"){                            // Hallendach mit Lichtbaendern
+        for(let i=0;i<3;i++){ ctx.fillStyle=pal.lichtband; ctx.fillRect(0,y1*(0.25+i*0.28),W,4); }
+      } else if(variante==="fels"){                     // Himmel ueber der Schluchtkante
+        const sun=ctx.createRadialGradient(W*0.78,y1*0.3,4,W*0.78,y1*0.3,W*0.26);
+        sun.addColorStop(0,"rgba(255,235,190,.8)"); sun.addColorStop(1,"rgba(255,235,190,0)");
+        ctx.fillStyle=sun; ctx.fillRect(0,0,W,y1);
+        ctx.fillStyle="rgba(50,28,14,.75)"; ctx.beginPath(); ctx.moveTo(0,y1);
+        for(let i=0;i<=10;i++)ctx.lineTo(i*W/10,y1-6-bodenSaat(i+7500)*16);
+        ctx.lineTo(W,y1); ctx.closePath(); ctx.fill();
+      } else {                                          // Gipfel mit Wolken
+        for(let i=0;i<5;i++){
+          const cx=bodenSaat(i+7600)*W, cy=y1*(0.2+bodenSaat(i+7640)*0.5), r=18+bodenSaat(i+7680)*22;
+          ctx.fillStyle="rgba(255,255,255,.55)";
+          ctx.beginPath(); ctx.ellipse(cx,cy,r,r*0.45,0,0,6.283); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // ---- WAND ALS KOERPER, NICHT ALS TAPETE: Material nur noch zwischen den Routenraendern
+    // (`wandX0..wandX1`), nicht mehr formatfuellend -- bisher fuellten Fotokulisse/Verlauf die
+    // GANZE Leinwand (der Audit-Befund "Fels liest sich als Holzmaserung" u.ae. kam genau daher).
+    // KULISSE (Kulissen-Integration 07.11.): Wandmaterial der PixelLab-Szene (Halle, Fels, Eis)
+    // ohne deren Griffe und Volumen, laeuft mit der Kamera mit. Die Boden-/Top-out-Zonen von oben
+    // ueberdecken gleich wieder, was hier oberhalb/unterhalb der Wandhoehe mitgemalt wird.
+    ctx.save(); ctx.beginPath(); ctx.rect(wandX0,0,wandX1-wandX0,H); ctx.clip();
+    const mitKulisse=kulisseZeichnen(versatzY);
+    if(!mitKulisse){
+      const g=ctx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,"#413d38");g.addColorStop(1,"#242220");
+      ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    }
+    ctx.restore();
+    if(bottomY<H+2){ const y0=Math.max(0,bottomY);
+      ctx.fillStyle=pal.bodenA; ctx.fillRect(wandX0,y0,wandX1-wandX0,H-y0); }
+    if(topY>-2){ const y1=Math.max(0,Math.min(H,topY));
+      ctx.fillStyle=pal.dachA; ctx.fillRect(wandX0,0,wandX1-wandX0,y1); }
 
     // ================== FERNE FELSKULISSE/PARALLAX ENTFERNT (Chris, 13.10.,
     // docs/design/chris-feedback-breite-runde-13-10.md Abschnitt "Climbing" Punkt 7,
@@ -44262,7 +44410,27 @@
       if(y1<-20||y0>H+20)continue;
       const alpha=steigung*ZW_UEBERHANG_MAX*((i+1)/UEBERHANG_BAENDER);
       ctx.fillStyle="rgba(12,10,9,"+alpha.toFixed(3)+")";
-      ctx.fillRect(0,y0,W,Math.max(1,y1-y0));
+      // KULISSEN-QS 08.11.: auf den Wandstreifen begrenzt (vorher W-breit) -- die Schattierung
+      // gehoert zur Wandoberflaeche, nicht zu den neuen Boden-/Top-out-Zonen daneben.
+      ctx.fillRect(wandX0,y0,wandX1-wandX0,Math.max(1,y1-y0));
+    }
+    // EISZAPFEN AM OBERSTEN UEBERHANG-BAND (Audit 4.2, nur Eisfall: "Eisfall mit blauem
+    // Durchlicht und Eiszapfen am Ueberhang"). Reine Deko ueber die ganze Wandbreite verteilt,
+    // unabhaengig von den zwoelf Routen -- kein `hindernisse`-Bezug.
+    if(variante==="eis"){
+      const topBandY=camY((UEBERHANG_BAENDER-1)/UEBERHANG_BAENDER);
+      if(topBandY>-40&&topBandY<H+40){
+        for(let i=0;i<9;i++){
+          const ex=wandX0+(wandX1-wandX0)*((i+0.5)/9), el=10+bodenSaat(i+9500)*14;
+          if(aDa("climbing_eiszapfen")){
+            const im=aBild.climbing_eiszapfen, s=el/im.naturalHeight;
+            ctx.drawImage(im,Math.round(ex-im.naturalWidth*s/2),Math.round(topBandY-2),im.naturalWidth*s,im.naturalHeight*s);
+          } else {
+            ctx.fillStyle="rgba(200,235,250,.55)";
+            ctx.beginPath(); ctx.moveTo(ex-4,topBandY); ctx.lineTo(ex+4,topBandY); ctx.lineTo(ex,topBandY+el); ctx.closePath(); ctx.fill();
+          }
+        }
+      }
     }
     // Riss-/Kantenlinien, dieselbe Koernung wie vorher (bodenSaat), nur um 90 Grad gedreht --
     // die Wand steht jetzt, sie liegt nicht mehr. SCROLLT JETZT MIT (Climbing-Audit-Fund
@@ -44275,13 +44443,15 @@
     // beim Kacheln nicht dieselben 22 Risse im selben Bildausschnitt doppelt auftauchen.
     if(!mitKulisse){
     ctx.save();
-    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+    // KULISSEN-QS 08.11.: Clip auf den Wandstreifen statt die ganze Leinwand (vorher 0,0,W,H).
+    ctx.beginPath();ctx.rect(wandX0,0,wandX1-wandX0,H);ctx.clip();
     ctx.strokeStyle="rgba(0,0,0,.22)";ctx.lineWidth=1;
     {
       const vView=camViewV(), scrollPx=vView.oben*cam.zoom, TILE_RISS=H+240;
       for(let i=0;i<22;i++){
+        // KULISSEN-QS 08.11.: x nur noch ueber den Wandstreifen gestreut (vorher fx*W).
         const fx=bodenSaat(i+900), fy=bodenSaat(i+940), len=40+bodenSaat(i+960)*70;
-        const x0=fx*W, y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
+        const x0=wandX0+fx*(wandX1-wandX0), y0=(((fy*TILE_RISS-60-scrollPx)%TILE_RISS)+TILE_RISS)%TILE_RISS-60;
         const ang=(bodenSaat(i+980)-0.5)*0.9-0.3+Math.PI/2;
         ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+len*Math.cos(ang),y0+len*Math.sin(ang));ctx.stroke();
       }
@@ -44289,18 +44459,91 @@
     ctx.restore();
     }
 
+    // ---- WANDKANTEN links/rechts (Audit 4.2: "Wandkanten links und rechts ... Wand als Koerper,
+    // nicht als Tapete"), nur innerhalb der sichtbaren Wandhoehe -- sonst liefen sie in die neuen
+    // Boden-/Top-out-Zonen hinein, wo sie nichts mehr zu suchen haben.
+    if(wallY1>wallY0){
+      ctx.save(); ctx.beginPath(); ctx.rect(0,wallY0,W,wallY1-wallY0); ctx.clip();
+      for(const [kx,innen] of [[wandX0,1],[wandX1,-1]]){
+        ctx.fillStyle=pal.kante; ctx.fillRect(innen>0?kx:kx-7,wallY0,7,wallY1-wallY0);
+        ctx.fillStyle=pal.kanteHell; ctx.fillRect(innen>0?kx:kx-2,wallY0,2,wallY1-wallY0);
+      }
+      ctx.restore();
+    }
+
+    // ---- LICHT (Audit 4.2: "Hallenscheinwerfer von oben, Felsschlucht mit Sonnenstreifen,
+    // Eisfall mit blauem Durchlicht"). Innerhalb des Wandstreifens, ueber dem Material, unter den
+    // Griffen (Schicht 3 unten zeichnet darueber).
+    if(wallY1>wallY0){
+      ctx.save(); ctx.beginPath(); ctx.rect(wandX0,wallY0,wandX1-wandX0,wallY1-wallY0); ctx.clip();
+      const wallH=wallY1-wallY0;
+      if(variante==="wand"){                            // Hallenscheinwerfer von oben
+        for(const fx of [0.22,0.5,0.78]){
+          const cx=wandX0+(wandX1-wandX0)*fx;
+          const g=ctx.createLinearGradient(cx,wallY0,cx,wallY0+wallH*0.6);
+          g.addColorStop(0,"rgba(255,246,210,.22)"); g.addColorStop(1,"rgba(255,246,210,0)");
+          ctx.fillStyle=g; ctx.beginPath();
+          ctx.moveTo(cx-6,wallY0); ctx.lineTo(cx+6,wallY0);
+          ctx.lineTo(cx+46,wallY0+wallH*0.6); ctx.lineTo(cx-46,wallY0+wallH*0.6);
+          ctx.closePath(); ctx.fill();
+        }
+      } else if(variante==="fels"){                     // Sonnenstreifen diagonal ueber den Fels
+        ctx.strokeStyle="rgba(255,214,150,.22)"; ctx.lineWidth=14;
+        for(let i=0;i<4;i++){
+          const x0=wandX0+(wandX1-wandX0)*(i/3);
+          ctx.beginPath(); ctx.moveTo(x0-40,wallY0); ctx.lineTo(x0+40,wallY1); ctx.stroke();
+        }
+      } else {                                          // blaues Durchlicht von der Seite
+        const g=ctx.createLinearGradient(wandX1,0,wandX0,0);
+        g.addColorStop(0,"rgba(190,230,255,.28)"); g.addColorStop(1,"rgba(190,230,255,0)");
+        ctx.fillStyle=g; ctx.fillRect(wandX0,wallY0,wandX1-wandX0,wallH);
+      }
+      ctx.restore();
+    }
+
     // ---- Schicht 2: zwoelf schwache Spaltentrenner -- bei zwoelf belegten Routen soll die
     // Bahnzugehoerigkeit trotz Kamera-Zoom lesbar bleiben (dasselbe Bild wie Fahrbahnlinien).
+    // KULISSEN-QS 08.11.: y auf die sichtbare Wandhoehe begrenzt (vorher 0..H durchgehend).
     ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;
     for(let i=0;i<=n;i++){
       const x=wandX(i-0.5);
-      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,wallY0);ctx.lineTo(x,wallY1);ctx.stroke();
     }
 
     // ---- Schicht 3: je Route Griffe, Sicherer, Seil und Exen.
     const routeBreite=BA().routeBreite||30;
     for(let bz=0;bz<n;bz++){
       const x=wandX(bz);
+      // VOLUMEN: ein grosses graues Dreieck je Route (Audit 4.2: "Volumen als grosse Dreiecke in
+      // Grau", genau die Form, die public/szenen/climbing/*.jpg schon zeigt). Reiner Vektor,
+      // Position pseudo-zufaellig entlang der Route -- eigene bodenSaat-Indizes (+9000..+9150),
+      // keine Kollision mit den Griff-Indizes (+1200+bz*37, max. ~1620) oder den Kreidespuren
+      // unten (+9300..).
+      { const vf=0.12+bodenSaat(bz+9000)*0.7, vy=camY(vf);
+        if(vy>-60&&vy<H+60){
+          const vx=x+(bodenSaat(bz+9050)-0.5)*routeBreite*1.6, vs=16+bodenSaat(bz+9090)*10;
+          const vr=(bodenSaat(bz+9120)-0.5)*1.4;
+          ctx.save(); ctx.translate(vx,vy); ctx.rotate(vr);
+          ctx.fillStyle="rgba(0,0,0,.22)"; ctx.beginPath();
+          ctx.moveTo(1.5,-vs+1.5); ctx.lineTo(vs*0.9+1.5,vs*0.55+1.5); ctx.lineTo(-vs*0.9+1.5,vs*0.55+1.5);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle="rgba(150,148,142,.55)"; ctx.beginPath();
+          ctx.moveTo(0,-vs); ctx.lineTo(vs*0.9,vs*0.55); ctx.lineTo(-vs*0.9,vs*0.55);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(0,-vs); ctx.lineTo(vs*0.9,vs*0.55); ctx.stroke();
+          ctx.restore();
+        }
+      }
+      // KREIDESPUREN nahe ein paar Griffen (Audit 4.2, letzter Punkt). Eigene Indizes +9300..,
+      // liest nur `griffe`/`camY` -- keine neue Motor-Groesse.
+      ctx.fillStyle="rgba(255,255,255,.14)";
+      for(let k=0;k<4;k++){ const gi=griffe.length?Math.floor(bodenSaat(bz*4+k+9300)*griffe.length):-1;
+        const posFrac=gi>=0?griffe[gi]:null; if(posFrac==null)continue; const gy=camY(posFrac);
+        if(gy<-20||gy>H+20)continue;
+        const gx=x+(bodenSaat(gi+1200+bz*37)-0.5)*2*routeBreite+(bodenSaat(bz*4+k+9340)-0.5)*14;
+        ctx.beginPath(); ctx.ellipse(gx,gy-9,3.2,2,0,0,6.283); ctx.fill();
+      }
       // GRIFFE, x-Streuung wie vorher (bodenSaat), jetzt entlang y statt x. GRIFFART ALS
       // FORM (Bug 3 / Recherche C3): PR 2 hat fuenf Griffarten mit eigenem Sub-Skill
       // eingefuehrt (`HUERDEN_TYP(i)`), gezeichnet wurden bis hierhin zehn gleiche
@@ -44312,8 +44555,16 @@
         const y=camY(posFrac);
         if(y<-24||y>H+24)return;
         const gx=x+(bodenSaat(i+1200+bz*37)-0.5)*2*routeBreite;
-        const typ=HUERDEN_TYP(i);
-        ctx.fillStyle=i%2?"#e8c468":"#cfa46b";
+        // ROUTENFARBE STATT GRAU, MIT SCHATTEN (Kulissen-QS 08.11., Audit 4.2: "Griffe farbig je
+        // Route ... in der Routenfarbe und mit Schatten statt als graue Punkte"). Reine Zeichen-
+        // aenderung -- `gx`/`y`/`typ`/die Form je Griffart bleiben wort fuer wort unveraendert,
+        // nur `fillStyle` und eine Schatten-Ellipse davor sind neu. `KLETTER_ROUTE_FARBEN[bz%3]`,
+        // NICHT `i%3`: die Farbe gehoert der ROUTE (bz), nicht dem einzelnen Griff -- deckt sich
+        // mit den drei Routenfarben orange/gruen/violett der PixelLab-Rohszene.
+        const typ=HUERDEN_TYP(i), rf=KLETTER_ROUTE_FARBEN[bz%3];
+        ctx.fillStyle="rgba(0,0,0,.38)";
+        ctx.beginPath();ctx.ellipse(gx+1.6,y+2.2,7,4.2,0,0,6.283);ctx.fill();
+        ctx.fillStyle=i%2?rf.h:rf.d;
         if(typ==="TECHNIK"){                          // Leiste: flaches Rechteck
           ctx.fillRect(gx-7,y-1.5,14,3);
         } else if(typ==="WENDIGKEIT"){                // Sloper: halbe Kugel mit Glanz
@@ -44345,6 +44596,20 @@
       ctx.beginPath();ctx.moveTo(x,sy-8);ctx.lineTo(x,sy+7);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x,sy+7);ctx.lineTo(x-6,sy+17);ctx.moveTo(x,sy+7);ctx.lineTo(x+6,sy+17);ctx.stroke();
       ctx.beginPath();ctx.moveTo(x,sy-3);ctx.lineTo(x-8,sy+3);ctx.stroke();   // Bremshand am Seil
+
+      // KREIDEBEUTEL am Wandfuss (Audit 4.2: "Matten, Sicherer, Kreidebeutel ..."), nur an jeder
+      // dritten Route -- Deko-Requisite, kein Einfluss auf Sicherer-/Seil-Geometrie oben.
+      if(bz%3===0){
+        if(aDa("climbing_kreidebeutel")){
+          const kb=aBild.climbing_kreidebeutel;
+          ctx.drawImage(kb,Math.round(x-9-kb.naturalWidth),Math.round(sy+5-kb.naturalHeight));
+        } else {
+          ctx.fillStyle="#3a3630"; ctx.beginPath();
+          ctx.moveTo(x-13,sy+2); ctx.lineTo(x-7,sy+2); ctx.lineTo(x-6,sy+13); ctx.lineTo(x-15,sy+13);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle="rgba(255,255,255,.4)"; ctx.beginPath(); ctx.ellipse(x-10,sy+1,3,2,0,0,6.283); ctx.fill();
+        }
+      }
 
       // SEIL vom Sicherer durch die bereits geklinkten Exen zum Kletterer. "Geklinkt" heisst
       // BUG 2 (Broadcast-Optik-Recherche 27.09., C2): `u.hoch` (die Hoechstmarke, nach der

@@ -384,3 +384,106 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
 **Stand nach Batch 11:** 20 von 20 Disziplinen zeigen PixelLab-Grafik im Motor: 19 mit Kulisse, Takeshi
 mit PixelLab-Bodenkacheln und PixelLab-Fallen auf seiner Draufsicht-Route. Dazu sind alle Requisiten, die der
 Motor auf die Kulissen zeichnet, PixelLab statt OpenGameArt.
+
+## Batch 14: Climbing — "Rahmen statt Material" fuer Rang 2 des Audits (08.11.)
+
+Derselbe Audit wie Batch 12/13 (`docs/design/kulissen-qualitaets-audit-08-11.md`, PR #1357), diesmal
+dessen Rang 2, Befund woertlich: "Die Kulisse ist eine formatfuellende Materialtextur: Fels liest sich
+als Holzmaserung, Eis als blauer Vorhang, Wand als grauer Beton. Die Griffe sind blasse graue Punkte
+(Motor), die farbigen Griffe, Volumen und Routenfarben der Rohszene sind absichtlich herausgerechnet. Es
+gibt kein Oben und kein Unten: kein Boden mit Matten und Sicherern, kein Himmel oder Hallendach, keine
+Wandkante, nichts, das Hoehe vermittelt — obwohl die Kamera mit der Wand scrollt und genau das zeigen
+koennte." `bodenWand()` ist in diesem Batch nur beim ZEICHNEN angefasst: `wandX`, `camY`, die Griffe aus
+`BA().hindernisse`, die Bahnen (`BAHNEN_N()`), `u.pos`/`u.hoch`/`rr()`/`BAHN_ART.climbing.rezept` bleiben
+Wort fuer Wort unangetastet. "Griffe farbig je Route" ist, wie das Audit selbst sagt, eine reine
+Zeichenaenderung ohne Einfluss auf `hindernisse` — die Positionsdaten bleiben, nur Farbe/Zeichnung der
+bestehenden Griffe aendert sich.
+
+**Drei Zonen in der Hoehe, scrollend mit `camY`:** `camY(0)` ist der Wandfuss, `camY(1)` der Top-out —
+beide Werte existierten schon lange (sie steuern Sicherer-Position und Top-Lampe). Neu ist, dass sie jetzt
+auch die GRENZE zwischen drei Zeichenzonen ziehen: unterhalb von `camY(0)` liegt der Boden (volle
+Leinwandbreite, nicht nur unter den zwoelf Bahnen — der Boden gehoert der ganzen Halle/Schlucht), oberhalb
+von `camY(1)` der Top-out, dazwischen bleibt die eigentliche Wand. Weil `camY()` faellt, wenn `posFrac`
+steigt, wandert `camY(0)` beim Hochklettern nach unten aus dem Bild (der Boden verschwindet), waehrend
+`camY(1)` von oben hereinwandert (der Himmel/das Hallendach kommt) — genau der Audit-Wunsch "Beim
+Hochscrollen wandert der Boden aus dem Bild und der Himmel kommt", ganz ohne neue Kamera-Variable, nur aus
+der bestehenden `camViewV()`/`camY()`-Formel gelesen. Sichtprobe `climbing-wand-nachher-topout.png` (55 s
+Spielzeit, mehrere Kletterer schon getoppt): das dunkle Hallendach mit den TOP-Zeiten der Sicherer-Zeile
+steht oben, der Boden ist komplett aus dem Bild gescrollt.
+
+**Wand als Koerper, nicht als Tapete:** Die Fotokulisse (`kulisseZeichnen()`) bzw. der Verlaufs-Rueckfall
+fuellten bisher die GANZE Leinwand (0..W) — genau das erzeugte den Audit-Befund "Fels liest sich als
+Holzmaserung" usw., weil die Materialtextur auch dort stand, wo eigentlich Boden oder Himmel hingehoeren.
+Jetzt ist sie auf den Wandstreifen (`wandX(-0.5)..wandX(BAHNEN_N()-0.5)`, deckungsgleich mit den zwoelf
+Spaltentrennern) geclippt; links und rechts davon zeigt eine FERNE EBENE (Gradient + ein paar grobe
+Baender/Kanten, HALBER Versatz — `versatzY*0.5` statt `versatzY` — fuer echtes Parallax) Halle, Schlucht
+oder Eisklippe im Gegenlicht. Zwei schmale Streifen an `wandX0`/`wandX1` (`pal.kante`/`pal.kanteHell`)
+rahmen die Wand sichtbar als eigenen Koerper statt als nahtlosen Bildschirm-Fuellstoff.
+
+**Griffe farbig je Route, mit Schatten statt grauer Punkte:** `KLETTER_ROUTE_FARBEN[bz%3]` (orange/gruen/
+violett, wie die PixelLab-Rohszene unter `public/szenen/climbing/*.jpg` mit ihren Labels "Route 4 ·
+gruen" usw.) ersetzt das alte `i%2?"#e8c468":"#cfa46b"` — Farbe haengt an der ROUTE (`bz`), nicht am
+einzelnen Griff (`i`), deckt sich also mit den drei Rohszenen-Farben. Jede Griffform (Leiste/Sloper/
+Zange/Dyno/Henkel, `HUERDEN_TYP(i)`) bekommt zusaetzlich eine dunkle Schatten-Ellipse davor — dieselben
+fuenf Formzweige wie vorher, nur `fillStyle` und der neue Schatten sind neu.
+
+**Was sonst neu ist, alles reiner Vektor ausser den drei PixelLab-Requisiten unten:**
+- **Volumen als grosse graue Dreiecke** (Audit, woertlich genau diese Form): eins je Route, Position
+  pseudo-zufaellig entlang der Route (`bodenSaat(bz+9000..)`), mit eigenem Schlagschatten-Versatz.
+- **Kreidespuren**: ein paar blasse Tupfen nahe zufaellig gewaehlten Griffen je Route.
+- **Ueberhang-Schattierung/Risslinien**: bestehende Schicht, jetzt auf den Wandstreifen begrenzt (vorher
+  `W`-breit) statt in die neuen Boden-/Top-out-Zonen hineinzulaufen.
+- **Licht je Variante**: Halle — drei Scheinwerferkegel von oben (lineare Verlaeufe, an festen
+  Wandanteilen 0,22/0,5/0,78); Schlucht — vier diagonale Sonnenstreifen quer ueber den Fels; Eisfall —
+  ein seitlicher blauer Durchlicht-Verlauf.
+- **Bodenzone je Variante**: Halle — Kreidebeutel-Matten-Kachel (`climbing_matte`, Vektor-Schachbrett als
+  Rueckfall) mit heller Mattenkante; Schlucht — Geroell/Schotter (60 kleine Ellipsen); Eisfall —
+  Gletscherfuss mit Spaltenrissen (zehn kurze Risslinien).
+- **Top-out-Zone je Variante**: Halle — dunkles Hallendach mit drei Lichtbaendern; Schlucht — warmer
+  Himmel mit Sonnen-Radialverlauf und einer Schluchtkanten-Silhouette; Eisfall — heller Himmel mit fuenf
+  weichen Wolkenellipsen ("Gipfel mit Wolken").
+- **Kreidebeutel am Wandfuss** (`climbing_kreidebeutel`, jede dritte Route) und **Eiszapfen am obersten
+  Ueberhang-Band** (`climbing_eiszapfen`, nur Eisfall, neun Stueck ueber die Wandbreite verteilt) — die
+  beiden vom Audit explizit genannten Requisiten ("Kreidebeutel", "Eiszapfen am Ueberhang").
+
+**Neue PixelLab-Requisiten** (`scripts/pixellab-requisiten.py`, dieselbe `art="neu"`-Auftragsart wie
+Batch 13/Takeshi — `baue_neu()` aus dem dortigen Branch uebernommen, da Batch 12/13 bei der Arbeit an
+diesem Batch noch nicht auf `main` lagen): `climbing_matte` (48×48, Bodenkachel), `climbing_kreidebeutel`
+(20×26, Front-/Seitenansicht wie `hind_huerde`/`falle_tuer` — die Wand ist eine Flaeche von vorn, keine
+Draufsicht-Karte wie bei Takeshi), `climbing_eiszapfen` (30×42, Front-/Seitenansicht). Herkunft in
+`public/sprites/arena/quellen.json`.
+
+Vorher/Nachher (echte Leinwand, `node scripts/screenshot-kulisse.mjs climbing <variante> <ms> <png>`):
+`docs/design/kulissen-rework-climbing-08-11/climbing-{wand,fels,eis}-{vorher,nachher}.png` (1500 ms),
+dazu `climbing-wand-nachher-topout.png` (55 s, Hallendach + TOP-Zeiten sichtbar, Boden aus dem Bild
+gescrollt) und `climbing-eis-nachher-eiszapfen.png` (25 s, Eiszapfen am obersten Ueberhang-Band sichtbar).
+
+PixelLab-Verbrauch: drei Auftraege (`generate-image-v2`, 25/64/36 Kandidaten), Abo-Stand 2300 → 2265
+Generationen (35 Generationen fuer drei Requisiten — dieselbe Groessenordnung wie Batch 13/Takeshi).
+
+**Grenzen (ehrlich, wie bei jedem Batch):**
+- Die Boden-/Top-out-Zonen sind innerhalb des Wandstreifens (`wandX0..wandX1`) eine einfache Flaechenfarbe
+  (`pal.bodenA`/`pal.dachA`), nicht dieselbe texturierte Flaeche wie in den Randspalten (Mattenkachel,
+  Geroell-Ellipsen, Spaltenrisse, Wolken) — die volle Textur ist dort am besten sichtbar, wo sie zuerst
+  hinfaellt (die Randspalten links/rechts der Wand), eine zweite vollstaendige Zeichnung nur fuer den
+  schmalen Wandstreifen haette den Umfang dieses Batches verdoppelt, ohne dass sie durch Sicherer/Griffe/
+  Lampen ohnehin groesstenteils verdeckt wuerde.
+- Die ferne Parallax-Ebene ist wie bei Takeshi (Batch 13) eine vereinfachte Annaeherung (Gradient plus ein
+  paar grobe Baender/Kanten mit halbem Versatz), kein fotografischer, echt versetzter Hintergrund-Layer —
+  die Rohszenen unter `public/szenen/climbing/*.jpg` liefern keine eigene ferne Ebene, nur die
+  Wandaufsicht selbst.
+- Die Halle-Variante bekam keine eigene neue Requisite fuer die Dachtraeger/Lichtbaender (reiner
+  Vektor-Verlauf + drei duenne Rechtecke); fuer ein fotorealistischeres Hallendach braeuchte es eine
+  eigene PixelLab-Bestellung, die dieser Batch aus Budget-Vorsicht nicht zusaetzlich aufgemacht hat.
+- Chris' Beleuchtungs-Lehre aus Batch 12 (Breaking/Showcase: "Licht gezielt, nicht flaechig") gilt auch
+  hier — die Scheinwerferkegel/Sonnenstreifen/Durchlicht sind bewusst subtil (niedrige Deckkraft), damit
+  Namen, Lampen und das Duell-Band weiter lesbar bleiben; das heisst aber auch, dass sie bei flüchtigem
+  Hinsehen leicht uebersehen werden koennen.
+
+Tests: `npx vitest run tests/arena-kulissen.test.ts` gruen (14/14) — eine Assertion musste angepasst
+werden (`const mitKulisse=kulisseZeichnen(camViewV().oben*cam.zoom);` existiert als Literal nicht mehr,
+`versatzY` ist jetzt eine eigene Variable, die auch die ferne Ebene und die Boden-/Top-out-Zonen brauchen;
+der Wert bleibt wortwoertlich `camViewV().oben*cam.zoom`, nur in zwei Zeilen statt einer).
+
+Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285` (69 Eintraege) — vor und nach
+diesem Batch gemessen, keine Nachkommastelle bewegt sich.

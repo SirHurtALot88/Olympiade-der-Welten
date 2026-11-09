@@ -1068,5 +1068,65 @@
    "lizenz": "CC-BY-SA 3.0 / CC-BY-SA 4.0",
    "url": "https://opengameart.org/content/lpc-terrains"
   }
+ },
+ "climbing_matte.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "square gym crash mat pattern with padded cells and visible seams, blue and dark blue, top-down view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    48,
+    48
+   ],
+   "job": "172b67f2-df39-41f2-983c-8d85bd583bc5",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_matte.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_matte (art=\"neu\": brandneue Requisite, eigene gen-Box statt Alpha-Box einer alten Datei)",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 (Rang 2 des Audits docs/design/kulissen-qualitaets-audit-08-11.md) — Kachel fuer die Hallenmatten-Bodenzone der Variante \"wand\", s. bodenWand()"
+ },
+ "climbing_kreidebeutel.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "small open climbing chalk bag pouch with a drawstring, white chalk dust visible inside, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    20,
+    26
+   ],
+   "job": "94397d27-04cd-4c99-9d8f-2840b961352c",
+   "kandidat": 6,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_kreidebeutel.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_kreidebeutel (art=\"neu\")",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 — Kreidebeutel am Wandfuss neben einzelnen Sicherern, s. bodenWand()"
+ },
+ "climbing_eiszapfen.png": {
+  "paket": "PixelLab",
+  "quelle": "api.pixellab.ai /v2/generate-image-v2",
+  "auftrag": {
+   "prompt": "a cluster of hanging translucent light blue ice icicles pointing downward, front view, pixel art game asset, 16-bit RPG style, clean single color dark outline",
+   "seed": 11,
+   "gen": [
+    30,
+    42
+   ],
+   "job": "6d645eaf-89f4-4532-b50f-94dce49f7bb8",
+   "kandidat": 0,
+   "endpunkt": "/v2/generate-image-v2"
+  },
+  "roh": "data/generated/pixellab-requisiten/roh/climbing_eiszapfen.png",
+  "einsetzen": "python3 -I scripts/pixellab-requisiten.py einsetzen climbing_eiszapfen (art=\"neu\")",
+  "lizenz": "PixelLab-Abonnement (Tier 3), eigene Erzeugung fuer dieses Projekt",
+  "erzeugt": "2026-11-08",
+  "verwendung": "Climbing, Kulissen-QS Batch 14 — Eiszapfen am obersten Ueberhang-Band der Variante \"eis\", s. bodenWand()"
  }
 }
