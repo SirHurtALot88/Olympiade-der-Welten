@@ -1223,3 +1223,28 @@ describe("Kartenschmiede – Moosgrab-Balancing über alle fünf Maps", () => {
     });
   }
 });
+
+// Chris am 18.10.: reine Moosgrab-Änderungen fahren nicht die Oly-CI. Jeder neue Job muss deshalb an die
+// Weiche (scripts/ci-nur-kartenschmiede.sh); am 08.11. waren drei später ergänzte Jobs daran vorbeigerutscht.
+describe("CI-Weiche für die Kartenschmiede", () => {
+  const jobs = (datei: string) => {
+    const text = fs.readFileSync(path.join(process.cwd(), ".github/workflows", datei), "utf8");
+    const teil = text.slice(text.indexOf("\njobs:\n"));
+    return [...teil.matchAll(/^  ([A-Za-z0-9_-]+):\n([\s\S]*?)(?=^  [A-Za-z0-9_-]+:\n|(?![\s\S]))/gm)].map(m => ({ name: m[1], rumpf: m[2] }));
+  };
+  const amGleis = (rumpf: string) => /^    needs: weiche$/m.test(rumpf) && /^    if: .*needs\.weiche\.outputs\.nur_kartenschmiede != 'true'/m.test(rumpf);
+
+  it("jeder Oly-Job in ci.yml hängt an der Weiche", () => {
+    const liste = jobs("ci.yml");
+    expect(liste.map(j => j.name)).toContain("kartenschmiede");
+    const ohne = liste.filter(j => !["weiche", "kartenschmiede"].includes(j.name) && !amGleis(j.rumpf)).map(j => j.name);
+    expect(ohne).toEqual([]);
+  });
+
+  it("die Rangtreue-Schranke im Nightly hängt an der Weiche", () => {
+    const liste = jobs("ci-nightly.yml");
+    // full-season-playthrough läuft nur manuell und braucht keine Weiche
+    const ohne = liste.filter(j => !["weiche", "full-season-playthrough"].includes(j.name) && !amGleis(j.rumpf)).map(j => j.name);
+    expect(ohne).toEqual([]);
+  });
+});

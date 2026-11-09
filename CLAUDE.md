@@ -297,3 +297,6 @@ statt Build, Browser-Smokes, voller Suite, Persistenz-Suiten und Rangtreue-Schra
 `scripts/ci-nur-kartenschmiede.sh`; liegt auch nur eine Datei außerhalb (auch die Routen unter
 `app/`), läuft die volle CI. Website und Deploy bleiben unverändert: der Server baut jeden neuen
 `main`-Commit wie bisher.
+
+**Jeder neue CI-Job braucht die Weiche** (`needs: weiche` und `if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}`).
+Sonst läuft er bei jedem Moosgrab-PR mit; `tests/kartenschmiede.test.ts` („CI-Weiche“) wird dann rot.
