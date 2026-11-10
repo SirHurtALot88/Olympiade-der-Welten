@@ -1,5 +1,4 @@
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
-import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import {
   computeCandidateAxisTeamRankEstimates,
@@ -9,6 +8,9 @@ import {
   TRANSFERMARKT_AXIS_KEYS,
   type TransfermarktAxisKey,
 } from "@/lib/market/transfermarkt-roster-impact";
+import { getPotentialBand } from "@/lib/progression/player-potential-service";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
+import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { getScoutingProgressPercent } from "@/lib/scouting/scouting-reveal-state";
 
 /**
@@ -21,19 +23,39 @@ import { getScoutingProgressPercent } from "@/lib/scouting/scouting-reveal-state
  *
  * Der Empfehlungswert (0..100) wird IMMER aus den echten Werten gerechnet; der Nebel betrifft nur
  * die ANZEIGE (Note als Spanne/ungefähr, vorsichtige Sätze) — so dreht sich die Note beim
- * Weiterscouten nicht, sie wird nur schärfer.
+ * Weiterscouten nicht, sie wird nur schärfer. EINZIGE Ausnahme: Potenzial (siehe unten) — das
+ * zählt per Chris' Entscheidung erst mit, wenn der Spieler komplett gescoutet ist.
+ *
+ * Die Note-Sichtbarkeit (`visibility`/`gradeDisplay`) ist bewusst UNABHÄNGIG vom globalen
+ * Bauphasen-Schalter `DEBUG_FORCE_PLAYER_VISIBILITY`. CHRIS (10.11.): der Schalter soll nur
+ * steuern, ob man überhaupt gescoutete/unsichtbare SPIELER sieht — nicht, ob man die Note
+ * vorzeitig sieht. `forceVisible` bleibt deshalb ein expliziter Parameter (für Tests oder eine
+ * künftige Admin-Ansicht), hat aber keinen Default mehr aus dem Debug-Flag.
  */
 
-/** Gewichte des Empfehlungswerts (Summe 100). Stellschraube, siehe Konzept Abschnitt 6. */
+/**
+ * Gewichte des Empfehlungswerts (Summe 100). Stellschraube, siehe Konzept Abschnitt 6.
+ *
+ * CHRIS (10.11.): Potenzial soll in die Note einfließen, aber erst, wenn der Spieler komplett
+ * gescoutet ist (`visibility === "exact"`) — vorher bleibt es ein reiner Hinweis und zählt
+ * nicht, sonst verzerrt ein noch unsicheres Potenzial die Note. Die ursprünglichen fünf
+ * Gewichte (35/20/20/15/10, von Chris bestätigt) wurden dafür proportional mit 0,9 skaliert
+ * (sie summieren jetzt auf 90), die freien 10 Punkte gehen an `potential`. Ist ein Spieler noch
+ * nicht komplett gescoutet, zählt Potenzial nicht — die Basis-Kriterien werden dann mit 100/90
+ * wieder auf 100 hochskaliert, was rechnerisch EXAKT die alte 35/20/20/15/10-Verteilung ergibt
+ * (31,5 × 100/90 = 35, 18 × 100/90 = 20, 13,5 × 100/90 = 15, 9 × 100/90 = 10). Ein noch nicht
+ * voll gescouteter Spieler bekommt also bitidentisch dieselbe Note wie vor diesem Patch.
+ */
 export const SCOUT_VERDICT_WEIGHTS = {
-  skill: 35,
-  gap: 20,
-  price: 20,
-  complement: 15,
-  fit: 10,
+  skill: 31.5,
+  gap: 18,
+  price: 18,
+  complement: 13.5,
+  fit: 9,
+  potential: 10,
 } as const;
 
-export type ScoutVerdictCriterionId = keyof typeof SCOUT_VERDICT_WEIGHTS | "potential";
+export type ScoutVerdictCriterionId = keyof typeof SCOUT_VERDICT_WEIGHTS;
 
 export type ScoutVerdictTone = "positive" | "neutral" | "negative";
 
@@ -45,7 +67,7 @@ export type ScoutVerdictCriterion = {
   text: string;
   /** Kurzform für den Fazit-Satz („schließt unsere SOC-Lücke"). */
   short: string;
-  /** 0..1, null = ohne Gewicht (Potenzial-Hinweis). */
+  /** 0..1; null nur, wenn der Wert gar nicht ermittelbar ist (z. B. kein Potenzial-Record). */
   score: number | null;
 };
 
@@ -195,7 +217,11 @@ export function buildScoutVerdict(input: {
   gameState: GameState;
   teamId: string;
   playerId: string;
-  /** Default: Bauphasen-Schalter DEBUG_FORCE_PLAYER_VISIBILITY (wie der Scouting-Report). */
+  /**
+   * Explizites Erzwingen der vollen Sichtbarkeit — z. B. für Tests. Default `false`: die
+   * Note folgt IMMER dem echten Scouting-Fortschritt, unabhängig vom Bauphasen-Schalter
+   * `DEBUG_FORCE_PLAYER_VISIBILITY` (CHRIS, 10.11., siehe Moduldoku oben).
+   */
   forceVisible?: boolean;
 }): ScoutVerdict | null {
   const { gameState, teamId } = input;
@@ -203,7 +229,7 @@ export function buildScoutVerdict(input: {
   if (!player) {
     return null;
   }
-  const forceVisible = input.forceVisible ?? DEBUG_FORCE_PLAYER_VISIBILITY;
+  const forceVisible = input.forceVisible ?? false;
   const scoutingPercent = getScoutingProgressPercent(gameState, teamId, player.id);
   const visibility = getScoutGradeVisibility(scoutingPercent, forceVisible);
   const seen = visibility !== "unknown";
@@ -369,14 +395,19 @@ export function buildScoutVerdict(input: {
         ? { id: "fit", label: "Fit", tone: "neutral", text: `Fit ${fmt(teamFit, 1)} — kein Problem, aber auch kein Bonus für die Harmonie.`, short: "", score: fitScore }
         : { id: "fit", label: "Fit", tone: "negative", text: `Passt schlecht zu uns (Fit ${fmt(teamFit, 1)}) — das kann die Harmonie kosten.`, short: "passt schlecht zu uns", score: fitScore };
 
-  // ── Preis (Marktwert gegen vergleichbar starke Spieler) ──────────────────────────────────────
-  const candidateMean = axisMean(player);
+  // ── Preis (Preis/Leistung: Marktwert gegen Spieler mit vergleichbarer CA) ────────────────────
+  // CHRIS (10.11.): „scout braucht ein gefühl davon ob ein spieler für das was er leistet teuer
+  // oder günstig ist" — kein reiner Budget-Check. Vergleichsgruppe ist die kanonische,
+  // ligaunabhängige Current-Ability (`computeCurrentAbilityScore`, dieselbe Zahl wie bei den
+  // CA-Sternen im Transfermarkt/Vergleichs-Overlay), nicht ein rohes Achsen-Mittel nur dieser
+  // Datei — so misst „vergleichbar stark" dasselbe wie überall sonst im Projekt.
+  const candidateCA = computeCurrentAbilityScore(player.coreStats) ?? axisMean(player);
   const marketValue = typeof player.marketValue === "number" && Number.isFinite(player.marketValue) ? player.marketValue : null;
-  const pricedPool = gameState.players.filter(
-    (entry) => entry.id !== player.id && typeof entry.marketValue === "number" && Number.isFinite(entry.marketValue) && entry.marketValue > 0,
-  );
-  let peers = pricedPool.filter((entry) => Math.abs(axisMean(entry) - candidateMean) <= 4);
-  if (peers.length < 5) peers = pricedPool.filter((entry) => Math.abs(axisMean(entry) - candidateMean) <= 8);
+  const pricedPool = gameState.players
+    .filter((entry) => entry.id !== player.id && typeof entry.marketValue === "number" && Number.isFinite(entry.marketValue) && entry.marketValue > 0)
+    .map((entry) => ({ entry, ca: computeCurrentAbilityScore(entry.coreStats) ?? axisMean(entry) }));
+  let peers = pricedPool.filter((row) => Math.abs(row.ca - candidateCA) <= 4).map((row) => row.entry);
+  if (peers.length < 5) peers = pricedPool.filter((row) => Math.abs(row.ca - candidateCA) <= 8).map((row) => row.entry);
   const peerMedian = peers.length >= 3 ? median(peers.map((entry) => entry.marketValue)) : null;
   let priceCriterion: ScoutVerdictCriterion;
   if (marketValue == null || peerMedian == null || peerMedian <= 0) {
@@ -400,24 +431,56 @@ export function buildScoutVerdict(input: {
     }
   }
 
-  // ── Potenzial (Hinweis, ohne Gewicht) ────────────────────────────────────────────────────────
-  const potentialBand = gameState.playerPotential?.find((entry) => entry.playerId === player.id)?.potentialBand ?? null;
+  // ── Potenzial (eigenes Kriterium — zählt erst, wenn der Spieler komplett gescoutet ist) ──────
+  // CHRIS (10.11.): „JA!" Potenzial soll in die Note einfließen, aber solange nicht komplett
+  // gescoutet wurde, bleibt es unsicher/gefoggt und darf die Note nicht verzerren. `firm`
+  // (== visibility "exact") ist hier dieselbe Schwelle wie überall sonst im Modul — unabhängig
+  // vom Debug-Flag (siehe Moduldoku oben). Die EINE gültige Quelle für den numerischen Wert ist
+  // `resolvePlayerPotentialScoreFromGameState` (lib/scouting/player-attribute-ceiling-service.ts),
+  // nicht `player.potential` (Altfeld) oder das `potentialBand`-Feld direkt.
+  const potentialValue = resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id });
+  const potentialBand = potentialValue != null ? getPotentialBand(potentialValue) : null;
+  const potentialScore = potentialValue != null ? clamp01((potentialValue - 45) / 50) : null;
+  const potentialTone = potentialScore != null ? toneFromScore(potentialScore) : "neutral";
+  const potentialCounts = firm && potentialScore != null;
   const potentialCriterion: ScoutVerdictCriterion | null =
-    potentialBand && (forceVisible || scoutingPercent >= 50)
-      ? potentialBand === "elite" || potentialBand === "high"
-        ? { id: "potential", label: "Potenzial", tone: "positive", text: hedge(`Da ist noch viel Luft nach oben (Potenzial ${potentialBand === "elite" ? "Elite" : "hoch"}).`), short: "hat viel Potenzial", score: null }
-        : potentialBand === "low"
-          ? { id: "potential", label: "Potenzial", tone: "negative", text: hedge("Viel mehr wird aus ihm nicht mehr."), short: "", score: null }
-          : { id: "potential", label: "Potenzial", tone: "neutral", text: hedge("Etwas Entwicklung ist noch drin."), short: "", score: null }
+    potentialBand && (firm || scoutingPercent >= 50)
+      ? (() => {
+          const bandLabel = potentialBand === "elite" ? "Elite" : potentialBand === "high" ? "hoch" : potentialBand === "low" ? "niedrig" : "mittel";
+          const base =
+            potentialTone === "positive"
+              ? `Da ist noch viel Luft nach oben (Potenzial ${bandLabel}).`
+              : potentialTone === "negative"
+                ? "Viel mehr wird aus ihm nicht mehr."
+                : "Etwas Entwicklung ist noch drin.";
+          const text = firm
+            ? `${base} Das fließt jetzt in die Note mit ein.`
+            : `${hedge(base)} Zählt erst in die Note, wenn er komplett gescoutet ist (aktuell ${scoutingPercent} %).`;
+          return {
+            id: "potential" as const,
+            label: "Potenzial",
+            tone: potentialTone,
+            text,
+            short: potentialTone === "positive" ? "hat viel Potenzial" : potentialTone === "negative" ? "hat kaum noch Luft nach oben" : "",
+            score: potentialScore,
+          };
+        })()
       : null;
 
   // ── Empfehlungswert & Note ───────────────────────────────────────────────────────────────────
-  const weighted =
+  const baseWeighted =
     SCOUT_VERDICT_WEIGHTS.skill * skillScore +
     SCOUT_VERDICT_WEIGHTS.gap * gapScore +
     SCOUT_VERDICT_WEIGHTS.complement * complementScore +
     SCOUT_VERDICT_WEIGHTS.fit * fitScore +
     SCOUT_VERDICT_WEIGHTS.price * (priceCriterion.score ?? 0.5);
+  const baseWeightSum =
+    SCOUT_VERDICT_WEIGHTS.skill + SCOUT_VERDICT_WEIGHTS.gap + SCOUT_VERDICT_WEIGHTS.complement + SCOUT_VERDICT_WEIGHTS.fit + SCOUT_VERDICT_WEIGHTS.price;
+  // Zählt Potenzial noch nicht mit, wird auf 100 hochskaliert — siehe Gewichte-Kommentar oben:
+  // das ergibt rechnerisch exakt die alte 35/20/20/15/10-Verteilung ohne Potenzial-Einfluss.
+  const weighted = potentialCounts
+    ? baseWeighted + SCOUT_VERDICT_WEIGHTS.potential * (potentialScore ?? 0)
+    : (baseWeighted / baseWeightSum) * 100;
   const score = Math.round(Math.min(100, Math.max(0, weighted)) * 10) / 10;
   const exact = scoreToScoutGrade(score);
   const { display, wholeForLabel } = formatScoutGradeDisplay({

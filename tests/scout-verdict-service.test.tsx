@@ -1,6 +1,12 @@
 /**
  * Scout-Urteil (Note 1+ bis 6, Empfehlung, Bericht) und seine Anzeige (FM27-Bewertungskreis).
  * Konzept: docs/design/scouting-ausbau-konzept-11-11.md, Abschnitte 1–3.
+ *
+ * CHRIS (10.11.) hat drei der fünf offenen Fragen aus dem PR beantwortet und hier als eigene
+ * `describe`-Blöcke nachgezogen: Potenzial fließt jetzt gewichtet in die Note ein, aber erst bei
+ * vollem Scouting (unten: „Potenzial …"); Preis vergleicht jetzt gegen Current Ability statt
+ * rohem Achsen-Mittel (unten: „Preis/Leistung …"); und die Note-Sichtbarkeit darf nicht mehr vom
+ * globalen Bauphasen-Schalter `DEBUG_FORCE_PLAYER_VISIBILITY` abhängen (unten: „Note-Fog …").
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -50,8 +56,17 @@ function player(id: string, axes: { pow: number; spe: number; men: number; soc: 
 /**
  * Kader: acht solide, aber auf SOC schwache Spieler. Markt: Vergleichsspieler aller Stärken zu
  * einem Preis, der mit der Stärke steigt (Ø-Achse 40 → 10 Mio, 60 → 30 Mio).
+ *
+ * `potentialByPlayerId` setzt `hiddenPotentialScore` (1..99, DIE Quelle laut
+ * `resolvePlayerPotentialScoreFromGameState`) — bewusst mit `confidence: 0`, damit der
+ * Potenzial-Record NICHT nebenbei den Scouting-Fortschritt (Auto-Reveal) anhebt; der Fortschritt
+ * kommt in diesen Tests ausschließlich aus `certaintyByPlayerId`.
  */
-function buildState(candidates: Player[], certaintyByPlayerId: Record<string, number> = {}): GameState {
+function buildState(
+  candidates: Player[],
+  certaintyByPlayerId: Record<string, number> = {},
+  potentialByPlayerId: Record<string, number> = {},
+): GameState {
   const roster = Array.from({ length: 8 }, (_, index) => player(`r-${index}`, { pow: 50, spe: 48, men: 46, soc: 30 }, 15));
   const market = Array.from({ length: 30 }, (_, index) => {
     const level = 35 + index; // Ø-Achse 35..64
@@ -84,6 +99,13 @@ function buildState(candidates: Player[], certaintyByPlayerId: Record<string, nu
     players: [...roster, ...market, ...candidates],
     rosters: roster.map((entry) => ({ id: entry.id, teamId: TEAM, playerId: entry.id })),
     disciplines: [],
+    playerPotential: Object.entries(potentialByPlayerId).map(([playerId, hiddenPotentialScore]) => ({
+      playerId,
+      potentialBand: "unknown" as const,
+      hiddenPotentialScore,
+      confidence: 0,
+      source: "generated" as const,
+    })),
   } as unknown as GameState;
 }
 
@@ -182,6 +204,101 @@ describe("buildScoutVerdict", () => {
     expect(half.gradeDisplay).toMatch(/^\d–\d$/);
     expect(half.axisComparison.every((row) => row.value == null)).toBe(true);
     expect(half.axisComparison.find((row) => row.axis === "soc")?.rankLabel).toMatch(/^ca\. #/);
+  });
+});
+
+describe("Potenzial fließt erst bei vollem Scouting in die Note ein (Chris, 10.11.)", () => {
+  // Mittelstarker Kandidat (nicht an der Score-Obergrenze) — so zeigt ein Elite-Potenzial auch
+  // sichtbar eine andere Note, statt an einer schon gekappten 100 zu verschwinden.
+  const mid = player("pot-mid", { pow: 45, spe: 44, men: 40, soc: 35 }, 12);
+
+  it("zählt ohne Potenzial-Record gar nicht mit — Basis-Kriterien werden exakt auf 100 hochskaliert", () => {
+    const withoutRecord = buildScoutVerdict({ gameState: buildState([mid]), teamId: TEAM, playerId: "pot-mid", forceVisible: true })!;
+    expect(withoutRecord.criteria.find((entry) => entry.id === "potential")).toBeUndefined();
+    // Dieselbe Zahl, die auch vor dem Potenzial-Ausbau herauskam: die alten Gewichte
+    // 35/20/20/15/10 sind exakt die mit 100/90 hochskalierten neuen Basis-Gewichte.
+    expect(withoutRecord.score).toBeCloseTo(47.3, 1);
+  });
+
+  it("zeigt Potenzial ab 50 % nur als Hinweis — die Note bleibt dieselbe wie ohne Record", () => {
+    const withoutRecord = buildScoutVerdict({ gameState: buildState([mid]), teamId: TEAM, playerId: "pot-mid", forceVisible: false })!;
+    const state = buildState([mid], { "pot-mid": 60 }, { "pot-mid": 95 });
+    const hinted = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "pot-mid", forceVisible: false })!;
+    expect(hinted.visibility).toBe("approx");
+    const potential = hinted.criteria.find((entry) => entry.id === "potential");
+    expect(potential?.tone).toBe("positive");
+    expect(potential?.text).toContain("Zählt erst in die Note");
+    expect(potential?.text).toContain("60 %");
+    // Die Note selbst ist trotz Elite-Potenzial-Hinweis unverändert gegenüber „kein Record".
+    expect(hinted.score).toBe(withoutRecord.score);
+  });
+
+  it("zählt gewichtet mit (Weight 10), sobald der Spieler komplett gescoutet ist", () => {
+    const state = buildState([mid], {}, { "pot-mid": 95 });
+    const notFull = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "pot-mid", forceVisible: false })!;
+    const full = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "pot-mid", forceVisible: true })!;
+    expect(notFull.score).toBeCloseTo(47.3, 1);
+    // full = baseWeighted + Weight(potential) × Score(potential) = baseWeighted + 10 × 1,
+    // waehrend notFull = baseWeighted × 100/90 ist — der Zuwachs ist also NICHT einfach 10
+    // Punkte, sondern 10 − baseWeighted/9 (hier: 10 − 42,57/9 ≈ 5,3).
+    expect(full.score).toBeGreaterThan(notFull.score);
+    expect(full.score).toBeCloseTo(52.6, 1);
+    const potential = full.criteria.find((entry) => entry.id === "potential");
+    expect(potential?.score).toBeCloseTo(1, 5);
+    expect(potential?.text).toContain("fließt jetzt in die Note mit ein");
+  });
+
+  it("niedriges Potenzial drückt die Note nach unten, sobald es voll gescoutet mitzählt", () => {
+    const state = buildState([mid], {}, { "pot-mid": 20 });
+    const notFull = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "pot-mid", forceVisible: false })!;
+    const full = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "pot-mid", forceVisible: true })!;
+    expect(full.score).toBeLessThan(notFull.score);
+    expect(full.criteria.find((entry) => entry.id === "potential")?.tone).toBe("negative");
+  });
+});
+
+describe("Preis/Leistung statt reiner Budget-Check (Chris, 10.11.)", () => {
+  const star = player("star", { pow: 52, spe: 50, men: 50, soc: 72 }, 6);
+  const dud = player("dud", { pow: 36, spe: 34, men: 33, soc: 22 }, 25);
+
+  it("vergleicht gegen Spieler mit ähnlicher Current Ability, nicht gegen rohe Achsen-Mittel", () => {
+    const verdict = buildScoutVerdict({ gameState: buildState([star, dud]), teamId: TEAM, playerId: "star", forceVisible: true })!;
+    const price = verdict.criteria.find((entry) => entry.id === "price")!;
+    expect(price.tone).toBe("positive");
+    expect(price.text).toContain("vergleichbar starke Spieler kosten im Schnitt");
+    expect(price.score).toBeGreaterThan(0.5);
+  });
+
+  it("der Budget-Hinweis bleibt ein Zusatztext und ändert die Note nicht", () => {
+    const expensiveStar = player("expensive-star", { pow: 52, spe: 50, men: 50, soc: 72 }, 600);
+    const state = buildState([expensiveStar]);
+    const withBudgetHint = buildScoutVerdict({ gameState: state, teamId: TEAM, playerId: "expensive-star", forceVisible: true })!;
+    const price = withBudgetHint.criteria.find((entry) => entry.id === "price")!;
+    expect(price.text).toContain("übersteigt er unser Cash");
+    // Teuer im Vergleich zu seiner CA UND über dem Cash — beides steckt im selben Score, kein
+    // separater Budget-Bonus/-Malus.
+    expect(price.tone).toBe("negative");
+  });
+});
+
+describe("Note-Fog ist unabhängig vom Bauphasen-Schalter DEBUG_FORCE_PLAYER_VISIBILITY (Chris, 10.11.)", () => {
+  const star = player("star", { pow: 52, spe: 50, men: 50, soc: 72 }, 6);
+
+  it("zeigt die Note weiterhin als „?“ bei 0 % — auch im Dev-Standard, wo der Schalter an ist", () => {
+    // Ohne gesetzte Env-Variable ist der Schalter per Default AN (Standard in Dev, siehe
+    // lib/foundation/debug-player-visibility.ts) — exakt der Zustand, in dem der Bug vorher
+    // auftrat. `buildScoutVerdict` bekommt hier KEIN forceVisible übergeben, genau wie bei den
+    // echten Aufrufen aus scouting-hub-targets-service.ts und scouting-report-service.ts.
+    expect(process.env.NEXT_PUBLIC_DEBUG_PLAYER_ATTRIBUTES).not.toBe("0");
+    const verdict = buildScoutVerdict({ gameState: buildState([star]), teamId: TEAM, playerId: "star" })!;
+    expect(verdict.visibility).toBe("unknown");
+    expect(verdict.gradeDisplay).toBe("?");
+  });
+
+  it("der Ring zeigt trotzdem immer den echten Fortschritt, nicht die Note", () => {
+    const verdict = buildScoutVerdict({ gameState: buildState([star], { star: 40 }), teamId: TEAM, playerId: "star" })!;
+    expect(verdict.scoutingPercent).toBe(40);
+    expect(verdict.visibility).toBe("range");
   });
 });
 
