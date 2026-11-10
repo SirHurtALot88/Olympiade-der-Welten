@@ -60717,6 +60717,47 @@
     figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
       ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
+    // AUFKLAERUNGS-NEBEL-SONDE (Bugticket #69, 10.11.: "Seraph-11 zeigt schwarzen Platzhalter
+    // ('?') statt PixelLab-Figur in Battlefield" -- Nachpruefung ergab: kein Verdrahtungsfehler
+    // und keine fehlende PixelLab-Figur (Seraph-11 hat eine vollstaendige, s.
+    // data/generated/figuren-sprites.json), sondern der AUFKLAERUNGS-NEBEL selbst, s. dessen
+    // Kommentar bei NEBEL_SICHT_RADIUS oben: jede gegnerische Figur bleibt in Battlefield
+    // Silhouette mit "?", bis eine eigene Figur ihr nahegekommen ist. Reine Lesesonde, identische
+    // Formel wie dort bei "imNebel" -- kein rr()/wert()/stepSim-Bezug, kein Einfluss auf eine
+    // Messung. Erzwingt wie kulisseProbe() einen frischen draw(), damit nebelSichtBis die
+    // aktuellen Positionen widerspiegelt, auch wenn gerade kein rAF-Frame lief.
+    battlefieldNebelStand:()=>{
+      try{draw();}catch(e){}
+      return U.map(u=>({n:u.n, side:u.side, down:!!u.down, nebelSichtBis:u.nebelSichtBis||0, t,
+        imNebel:disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t)}));
+    },
+    // Dieselbe Sonde, aber DETERMINISTISCH und headless (wie arenaFormationsProbe() oben):
+    // baut Battlefield mit `saat` ueber den aktuell geladenen SQUAD/OPP, laesst stepSimStumm()
+    // +draw() (fuer die Nebel-Buchhaltung) `sekunden` virtuelle Sekunden laufen und meldet je
+    // Figur, ob sie IRGENDWANN ("jeFogged") bzw. am ENDE des Fensters ("amEndeFogged") als
+    // Silhouette galt. Sichert/stellt wie arenaFormationsProbe() den Motorzustand wieder her --
+    // reine Messsonde, kein Einfluss auf eine echte Messung.
+    battlefieldNebelProbe:(saat,sekunden)=>{
+      const M=MOTOREN.battlefield; if(!M)return null;
+      const g=M.sichern();
+      try{
+        if(M.vorher)M.vorher();
+        M.bau(saat);
+        const schritte=Math.max(0,Math.round((sekunden||0)*60));
+        const spuren=new Map();
+        for(let i=0;i<schritte&&!done;i++){
+          stepSimStumm(1/60);
+          try{draw();}catch(e){}
+          for(const u of U){
+            const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+            const eintrag=spuren.get(u.n)||{side:u.side,jeFogged:false,amEndeFogged:false};
+            eintrag.amEndeFogged=imNebel; eintrag.jeFogged=eintrag.jeFogged||imNebel;
+            spuren.set(u.n,eintrag);
+          }
+        }
+        return [...spuren.entries()].map(([n,v])=>({n,...v}));
+      } finally { M.zurueck(g); }
+    },
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
