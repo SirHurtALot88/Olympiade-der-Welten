@@ -500,7 +500,11 @@ export type VorbereitetesFixture = {
 // Mehrfach-Fixture-Lastprobe mit dem tatsaechlichen Canvas-/Pixel-Motor ist das Stabilitaetsrisiko
 // nicht seriös einzuschaetzen -- der zusaetzliche RSS-Gewinn gegenueber `--disable-gpu` +
 // `--no-zygote` steht im CI-Log, aber als Datenpunkt, nicht als Freigabe.
-const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
+// Exportiert (Rebase 11.11.), damit Tests, die GEZIELT eine bestimmte Chromium-Revision starten
+// statt ueber `ermittleChromiumLaunchOptions()` (z. B. `launcheValidierteChromiumRevision()`,
+// tests/helpers/chromium-validierte-version.ts), dieselbe Netzwerk-Abriegelung bekommen, ohne sie
+// ein zweites Mal zu pflegen.
+export const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
   "--proxy-server=direct://",
   "--host-resolver-rules=MAP * 0.0.0.0",
   "--disable-dev-shm-usage",

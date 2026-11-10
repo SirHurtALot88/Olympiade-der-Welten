@@ -5,12 +5,19 @@ import { describe, expect, it } from "vitest";
 import { chromiumCos, chromiumPow, chromiumSin } from "@/lib/battle/arena-node-chromium-mathe.mjs";
 import { baueMotorKontext } from "@/lib/battle/arena-node-motor.mjs";
 import { chromiumVerfuegbar } from "@/tests/helpers/chromium-verfuegbar";
+import { launcheValidierteChromiumRevision, pruefeChromiumMajorVersion } from "@/tests/helpers/chromium-validierte-version";
 
 /**
- * QUICK-SIM (27.10.): Node 22 rechnet `Math.sin`/`Math.cos`/`Math.pow` mit fdlibm, Chromium 141
- * mit glibc — `arena-node-chromium-mathe.mjs` bildet Chromium nach. Gefunden am Basketball-
+ * QUICK-SIM (27.10.): Node 22 rechnet `Math.sin`/`Math.cos`/`Math.pow` mit fdlibm, Chromium mit
+ * glibc — `arena-node-chromium-mathe.mjs` bildet Chromium nach. Gefunden am Basketball-
  * Paritaetsfall: `Math.cos(0.7330382858376183)` (42 Grad) ist in Node `…942`, in Chromium `…944`,
  * und dieses eine Bit wuchs ueber die Positionsrechnung bis in die Boxscore.
+ *
+ * WELCHE CHROMIUM-VERSION (Opus-PM-Review, Rebase 11.11.): der Live-Vergleich unten startet
+ * GEZIELT die Playwright-eigene, in `package.json` gepinnte Revision (`launcheValidierteChromiumRevision()`,
+ * s. dort) statt `ermittleChromiumLaunchOptions()`s lokale Pfad-Praeferenz, und prueft deren Major-
+ * Version explizit (`pruefeChromiumMajorVersion()`) -- s. `tests/helpers/chromium-validierte-version.ts`
+ * fuer die volle Begruendung (Fehlalarm in einer Sandbox mit abweichender lokaler Chromium-Version).
  */
 
 /** Deterministische Testargumente ueber mehrere Groessenordnungen (inkl. branred-Bereich). */
@@ -32,7 +39,8 @@ function argumente(saat: number, anzahl: number): number[] {
 
 describe("arena-node-chromium-mathe", () => {
   it("trifft die in Chromium gemessenen Werte, wo Node abweicht", () => {
-    // Werte aus Chromium 141 (Playwright chromium-1194), Node 22 liefert jeweils das Nachbar-Double.
+    // Werte aus Chromium (Chrome for Testing 148.0.7778.96, Playwright-Revision 1223, s. Kopfkommentar
+    // und tests/helpers/chromium-validierte-version.ts), Node 22 liefert jeweils das Nachbar-Double.
     expect(chromiumCos(0.7330382858376183)).toBe(0.7431448254773944);
     expect(chromiumSin(690664.2373651266)).toBe(-0.7176602593456426);
     expect(chromiumCos(101.01673984900117)).toBe(0.8843134027425213);
@@ -88,12 +96,15 @@ describe("arena-node-chromium-mathe", () => {
   it.skipIf(!chromiumVerfuegbar())(
     "sin/cos sind bitgleich zu Chromium, pow bis auf seltene FMA-Grenzfaelle",
     async () => {
-      const { chromium } = await import("playwright");
-      const { ermittleChromiumLaunchOptions } = await import("@/lib/battle/arena-headless-runner");
       const werte = argumente(42, 200_000);
       const paare = werte.slice(0, 50_000).map((x, i) => [i % 3 === 0 ? Math.abs(x) % 50 : Math.abs(x) % 3, i % 4 === 0 ? Math.round(x % 7) : (x % 7) / 1.3]);
-      const browser = await chromium.launch(ermittleChromiumLaunchOptions());
+      // GEZIELT die validierte Revision, NICHT `ermittleChromiumLaunchOptions()` -- deren lokale
+      // Pfad-Praeferenz kann in einer Dev-Sandbox auf eine andere Chromium-Version zeigen (s.
+      // Kopfkommentar). `pruefeChromiumMajorVersion()` macht einen Versions-Sprung sofort als
+      // solchen erkennbar, statt dass er wie ein echter Regressionsbefund aussieht.
+      const browser = await launcheValidierteChromiumRevision();
       try {
+        pruefeChromiumMajorVersion(browser.version());
         const page = await browser.newPage();
         const referenz = await page.evaluate(
           ({ werte, paare }) => ({ sin: werte.map(Math.sin), cos: werte.map(Math.cos), pow: paare.map(([x, y]) => Math.pow(x!, y!)) }),
