@@ -38107,6 +38107,22 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  // ANZEIGE-TREUE-FIX A1 (09.11.) + B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs,
+  // 24 Saaten je Disziplin): eigener Akkumulator fuer jedes Chassis, dessen Physik sich
+  // ueber die Dauer eines Spiels per `rr()` summiert -- Bahn (istBahn(disc), A1), Kampf
+  // (istKampf(disc): TDM/Mini-DM/Battlefield, B1-Nachtrag) UND Feldspiel (istFeldspiel(disc):
+  // Hockey, B1-Nachtrag) --, getrennt von `acc`. Alle drei nachgemessen 24/24 Saaten
+  // abweichend vor diesem Fix (Battlefield sogar im SIEGER). `acc` zaehlt weiterhin in
+  // ECHTZEIT-Sechzigsteln (unveraendert, speist tickerSendeT/ticksSeitReset genau wie
+  // vorher); `bahnSimAcc` zaehlt dieselben Echtzeit-Sechzigstel ein zweites Mal, aber loest
+  // einen stepSim()-Aufruf erst aus, wenn `zeitFaktor()/60` davon zusammen sind -- und
+  // dieser Aufruf bekommt dann den FESTEN Takt `1/60`, nicht `(1/60)/zeitFaktor()`. Buehne
+  // bleibt AUSSEN VOR: derselbe B1-Nachtrag bestaetigt fuer Fechten/Gewichtheben (beide
+  // ZEIT_DEHNUNG!=1) 24/24 Saaten UEBEREINSTIMMEND -- rundenbasierte Entscheidungspunkte
+  // (stepBuehne()) sind tick-granularitaets-invariant, anders als die kontinuierliche
+  // Positions-/Kontakt-Simulation in Kampf/Feldspiel (wie bei der Bahn).
+  // s. ausfuehrliche Begruendung am Kommentar in loop() direkt vor seiner Verwendung.
+  let bahnSimAcc=0;
   // SONDEN-MODUS (A0.2, docs/design/deterministischer-sonden-modus-19-09.md): additiver
   // Schalter fuer Screenshot-QA. `sondenAktiv` schaltet jetztMs() (s. dort, unten bei den
   // performance.now()-Lesestellen) von der echten Wanduhr auf eine SIMULATIONSGEBUNDENE Uhr
@@ -52100,6 +52116,65 @@
     if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
   }
 
+  // ANZEIGE-TREUE-FIX A1 (09.11., docs/design/sendedauer-messung-09-11.md Abschnitt 2,
+  // Auftrag "Anzeige-Treue-Fix"). ROOT CAUSE, nachgewiesen fuer Spurt/Takeshi's Castle/
+  // Staffel/Climbing: `stepSim()` rief fuer die Bahn `stepSpurt((1/60)/zeitFaktor())` auf --
+  // JEDES Bild bekam einen KLEINEREN dt (die Physik lief in kleineren Haeppchen), waehrend
+  // der Buchungspfad (bahnLauf()/MOTOREN[bd].lauf()/bahnPodLauf() -- "M.lauf()") IMMER mit
+  // festem `stepSpurt(1/60)` rechnet, unabhaengig von zeitFaktor(). stepSpurt() wuerfelt pro
+  // TICK (nicht pro Sim-Sekunde) an mindestens zwei Stellen mit einer auf `dt` skalierten
+  // Wahrscheinlichkeit -- Bahnwechsel/Windschatten-Wechsel (`rr()<(0.25+...)* dt*3`, s.
+  // dortiger Kommentar "WECHSELPATZER") und Tackle/Rempler (`rr()<willTackeln*dt*...`, nur
+  // Spurt/Takeshi). Ein kleinerer dt bei GLEICHER Sim-Zeit bedeutet MEHR Ticks bis zum Ziel
+  // und damit MEHR rr()-Ziehungen an exakt diesen beiden Stellen als die Buchung macht --
+  // die Zufallsfolge divergiert dadurch schon nach dem ersten Bahnwechsel-Check, selbst bei
+  // identischer Saat (nachgemessen: Spurt/Takeshi 24/24 Saaten weichen ab, s. Dokument).
+  // Time-Trial blieb fast immun, weil `BA().schatten=false`, ALLE Time-Trial-Plaene
+  // `sucht:0` fuehren UND `hindernisse:[]` ist -- `wunsch` im Bahnwechsel-Block bleibt
+  // dadurch STRUKTURELL immer null (kein Windschatten-Ziel, kein `gefallen`-Nachbar, kein
+  // `tackle`), der dt-skalierte rr()-Wurf also toter Code. GENAU DAS macht dieser Fix fuer
+  // ALLE FUENF Bahn-Disziplinen zur Regel, statt es dem Zufall zu ueberlassen: die Physik
+  // laeuft jetzt fuer `istBahn(disc)` IMMER mit dem FESTEN `1/60`-Takt wie die Buchung
+  // (gleich viele, gleich geformte Ticks -> dieselbe rr()-Folge, dieselbe Saat -> dasselbe
+  // Ergebnis), und NUR noch die ZEICHENHAEUFIGKEIT (wie oft dieser Takt in Echtzeit feuert)
+  // wird weiter von zeitFaktor() gestreckt -- Weg (a) aus der Auftragsbeschreibung, nicht
+  // Weg (b) ("am Ende an die Buchung ranziehen"): (a) aendert nichts am GEBUCHTEN Ergebnis
+  // und zeigt waehrend des ganzen Rennens konsistente Zwischenstaende, waehrend (b) einen
+  // ploetzlichen Sprung in der letzten Phase brauchen wuerde, der selbst wie ein Bug wirkt.
+  // Jede andere Bahn-Disziplin-Eigenschaft (Rezept, Matrix, MOTOREN[bd].wert()) bleibt
+  // unangetastet -- s. Fingerabdruck-Beleg in der PR-Beschreibung.
+  //
+  // `tickerSendeT`/`ticksSeitReset` zaehlen WEITERHIN reale Sechzigstelsekunden (eine
+  // Erhoehung je Aufruf dieser Funktion), NICHT stepSim()-Aufrufe -- sonst waere das
+  // Ticker-Zeilenbudget (s. Kommentar an TICKER_ZEILEN_JE_MIN oben, "tickerSendeT waechst um
+  // GENAU 1/60 je stepSim()-Aufruf") fuer die Bahn plötzlich `zeitFaktor()`-mal so langsam
+  // gefuettert, nur weil `stepSim()` jetzt seltener feuert -- ein eigener, hier bewusst
+  // vermiedener Darstellungsfehler. `bahnSimAcc` (s. Deklaration bei `acc` oben) ist der
+  // GETRENNTE Akkumulator, der stattdessen entscheidet, wann die Physik tatsaechlich einen
+  // Schritt macht.
+  function anzeigeSechzigstel(zf){
+    tickerSendeT+=1/60; ticksSeitReset++;
+    // B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs, 24 Saaten je Disziplin):
+    // `istKampf(disc)` UND `istFeldspiel(disc)` ergaenzt -- TDM/Mini-DM/Battlefield (Duell)
+    // UND Hockey haben dieselbe Divergenz wie die Bahn vor A1 (24/24 Saaten abweichend je
+    // Disziplin, bei Battlefield sogar der SIEGER, s. Kommentar an der Deklaration von
+    // `bahnSimAcc` oben). Buehne (Fechten/Gewichtheben, ebenfalls ZEIT_DEHNUNG!=1) bleibt
+    // AUSSEN VOR -- dieselbe Messung ergab dort 24/24 UEBEREINSTIMMEND: `stepBuehne()`
+    // trifft seine Entscheidungen an diskreten Rundengrenzen (Zeit-Schwellenwerte), die
+    // tick-granularitaets-invariant sind, waehrend Kampf/Feldspiel kontinuierliche
+    // Positions-/Kontakt-Simulationen sind wie die Bahn (kleinerer dt -> mehr Ticks bei
+    // gleicher Sim-Zeit -> mehr/andere rr()-Ziehungen entlang des Wegs, selbst ohne einen
+    // explizit dt-skalierten Wurf wie bei stepSpurt() -- die Positionsintegration selbst
+    // (`u.x+=...*dt`) akkumuliert bei anderer Schrittzahl einen anderen Rundungs-/Kontakt-
+    // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
+    if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
+      bahnSimAcc+=1/60;
+      while(bahnSimAcc>=zf/60){ stepSim(1/60); bahnSimAcc-=zf/60; }
+    } else {
+      stepSim((1/60)/zf);
+    }
+  }
+
   let schnelldurchLetztesBild=0;
   function loop(ts){
     // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
@@ -52111,7 +52186,9 @@
     // nur ruckeln, sondern in Sendezeit LANGSAMER laufen -- unter ~20 Bildern/s fehlte jedem Bild
     // Zeit, Tempo 4x wurde gemessen zu ~1,6x (Saisontest-Fund 02.11., s. schnelldurchDomGedrosselt()).
     // 0,2 s holt bis ~5 Bilder/s voll nach und faengt einen Tab-Wechsel weiterhin ab. Die Ticks
-    // selbst bleiben fest (1/60)/zeitFaktor() -- nur ihre Zahl je Bild aendert sich, das Ergebnis nie.
+    // selbst bleiben fest -- (1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix
+    // A1 das FESTE 1/60 der Buchung fuer die Bahn (s. anzeigeSechzigstel() oben) -- nur ihre
+    // Zahl je Bild aendert sich, das Ergebnis nie.
     let dt=Math.min(.2,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
     stingerPruefen();
@@ -52120,8 +52197,11 @@
       acc+=dt*wirksamesTempo();
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
-      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
-      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;ticksSeitReset++;}
+      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest. ANZEIGE-TREUE-
+      // FIX A1 (s. anzeigeSechzigstel() oben): fuer die Bahn feuert stepSim() hier nicht
+      // mehr bei jedem Sechzigstel, sondern erst, wenn `bahnSimAcc` genug Sechzigstel
+      // gesammelt hat -- `zf` bleibt deshalb unveraendert an jeden Aufruf weitergereicht.
+      while(acc>=1/60){anzeigeSechzigstel(zf);acc-=1/60;}
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
@@ -55044,7 +55124,7 @@
   }
 
   function reset(){
-    running=false;done=false;last=0;acc=0;pfeile=[];
+    running=false;done=false;last=0;acc=0;bahnSimAcc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
     // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
     // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
@@ -59539,11 +59619,13 @@
   // fehlten dafuer:
   //
   //  1. EIN QUICK-SIM: schnellDurch() spult das laufende (oder noch nicht gestartete) Spiel bis zum
-  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe Funktion stepSim(), derselbe feste Tick
-  //     (1/60)/zeitFaktor(), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --, nur so
-  //     viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo 1x/2x/4x
-  //     aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel exakt dort,
-  //     wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine zweite Rechnung.
+  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe `anzeigeSechzigstel()` (s. dort), derselbe
+  //     feste Tick ((1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix A1 das feste
+  //     1/60 der Buchung fuer die Bahn), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --,
+  //     nur so viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo
+  //     1x/2x/4x aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel
+  //     exakt dort, wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine
+  //     zweite Rechnung.
   //     Mini-DM hat seine Rundenshow statt Ticks; dort ist Quick-Sim dasselbe wie "Alles zeigen".
   //  2. EINE ENDE-MELDUNG: meldeSpielEnde() schickt `oly-arena:ende` (window-CustomEvent) mit der
   //     Disziplin und dem im Endstand gezeigten Sieger (0 = Heim, 1 = Gast, null = offen/Pod). Der
@@ -59589,11 +59671,14 @@
         // Disziplinwechsel/Reset mitten im Vorspulen: der neue Aufbau gehoert nicht mehr dazu.
         if(disc!==startDisc){ ende({disc:startDisc,done:false,ticks,abgebrochen:true}); return; }
         const bis=wandMs()+120;
+        // ANZEIGE-TREUE-FIX A1: ueber `anzeigeSechzigstel()` statt direktem stepSim()-Aufruf
+        // (s. Kommentar dort, vor loop()) -- fuer die Bahn feuert die Physik dadurch mit dem
+        // FESTEN 1/60-Takt der Buchung, nicht mit (1/60)/zf; Quick-Sim bleibt sonst derselbe
+        // vorgespulte Echtzeit-Lauf wie vorher, nur jetzt mit derselben Zufallsfolge wie die
+        // Buchung fuer jede Bahn-Disziplin.
         while(!done&&ticks<GRENZE&&wandMs()<bis){
-          tickerSendeT+=1/60;
-          stepSim((1/60)/zf);
+          anzeigeSechzigstel(zf);
           stepFloats();
-          ticksSeitReset++;
           ticks++;
           if(istFeldspiel(disc))updateHudFeldspiel();
           else if(istBuehne(disc))updateHudBuehne();
@@ -59631,6 +59716,34 @@
     // Screenshot-Hilfe, kein Leser im Spiel.
     buehneJeSeiteQa:(n)=>{ const a=BUEHNE_ART[disc]; if(!a)return null; const v=Math.max(1,Math.floor(Number(n)||0)); if(v)a.jeSeite=v; reset(); return a.jeSeite; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
+    // ANZEIGE-TREUE-SONDE B1 (10.11., scripts/miss-anzeige-treue-rest.mjs): eigene, additive
+    // Funktion statt einer Erweiterung von spieleDisziplin()/`A.spiele()` -- deren Rueckgabeform
+    // ist Teil des Wertungs-Fingerabdrucks (scripts/pruefe-wertung-fingerabdruck.mjs hasht
+    // `A.spiele(d,s)` fuer alle zwanzig Disziplinen wholesale), ein zusaetzliches Feld dort
+    // haette JEDEN Fingerabdruck-Eintrag veraendert, obwohl an keiner einzigen Wertung etwas
+    // geaendert wird (nachgemessen: GESAMT-Hash aenderte sich, reiner Formfehler, kein Befund --
+    // deshalb dieser separate Einstiegspunkt, der spieleDisziplin() NICHT beruehrt). GENAU
+    // DASSELBE Sichern/Vorher/Bau/Lauf/Zurueck-Muster, nur mit `sieger` statt `protokoll`/
+    // `punkte`: kampfSieger()/fsSieger()/buehneSieger() sind dieselben Funktionen, die auch
+    // finish() beim ECHTEN Spielende synchron liest -- kein neuer Wertungsbegriff. `null` fuer
+    // jede Disziplin ohne Motor oder ohne Zweiseiten-Sieger-Begriff (Bahn hat ihre eigene Sonde,
+    // s. bahnLauf()).
+    anzeigeTreueSonde:(dId,saat)=>{
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat||1337);
+      M.lauf();
+      const ergebnis={disziplin:dId, wert:M.wert(), namen:M.namen(),
+        sieger:istKampf(dId)?kampfSieger():istFeldspiel(dId)?fsSieger():istBuehne(dId)?buehneSieger():null};
+      M.zurueck(g);
+      return ergebnis;
+    },
+    // Liest MOTOREN[disc].wert()/den Sieger-Begriff am AKTUELLEN (z.B. per sondenLauf()
+    // durchlaufenen) Zustand, ohne selbst zu bauen/zu laufen -- das Gegenstueck zu
+    // anzeigeTreueSonde() fuer die ANGEZEIGTE Seite des Vergleichs. Reiner Lese-Durchgriff,
+    // dieselben Sieger-Funktionen wie oben.
+    anzeigeTreueAktuell:()=>(MOTOREN[disc]?{disziplin:disc, wert:MOTOREN[disc].wert(), namen:MOTOREN[disc].namen(),
+      sieger:istKampf(disc)?kampfSieger():istFeldspiel(disc)?fsSieger():istBuehne(disc)?buehneSieger():null}:null),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
@@ -60834,12 +60947,17 @@
     // (`acc+=dt*speed`) und fuehrt stepSim() aus, sobald 1/60 davon zusammenkommen; wie viele
     // Sechzigstel bis zum Ablauf der Wartezeit zusammenkommen, streut je nach Bildwiederhol-
     // rate und Prozesslast um ein bis zwei Ticks. sondenLauf(ticks) umgeht diese Kopplung
-    // vollstaendig: es ruft stepSim() GENAU `ticks`-mal mit der immer gleichen festen
-    // Tick-Groesse (1/60)/zeitFaktor() auf — derselben Groesse, die loop() auch verwendet, nur
-    // ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Zwei Aufrufe mit demselben
-    // Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit exakt dieselbe
-    // Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig davon, wie lange der
-    // Prozess vorher lief oder wie schnell die Maschine ist.
+    // vollstaendig: es ruft `anzeigeSechzigstel()` (s. dort, Kommentar vor loop()) GENAU
+    // `ticks`-mal auf — ein Aufruf je reale Sechzigstelsekunde, exakt die Rechnung, die auch
+    // loop() macht, nur ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Fuer
+    // jede Nicht-Bahn-Disziplin loest das weiterhin GENAU EINEN stepSim()-Aufruf mit der
+    // festen Tick-Groesse (1/60)/zeitFaktor() je `ticks`-Schritt aus; fuer die Bahn (seit dem
+    // Anzeige-Treue-Fix A1) loest es stepSim(1/60) erst aus, wenn `bahnSimAcc` genug
+    // Sechzigstel gesammelt hat (`zeitFaktor()` Sechzigstel je Tick) — in beiden Faellen
+    // deterministisch an der Tick-Zahl `n`, nicht an Wanduhr/Bildrate. Zwei Aufrufe mit
+    // demselben Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit
+    // exakt dieselbe Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig
+    // davon, wie lange der Prozess vorher lief oder wie schnell die Maschine ist.
     //
     // WAS SONST NOCH AN DER WANDUHR HING (alle drei Fundstellen, s. jetztMs() bei der
     // Deklaration von sondenAktiv oben): die Viertelpause-Overlay-Restsekunden (vpSichtbarBis/
@@ -60865,7 +60983,7 @@
     // Lebensdauer ausschliesslich von der Tick-Zahl abhaengt, nicht von der Bildwiederholrate.
     //
     // Ruehrt weder rr() noch wert()/Boxscore-/Rangtreue-Logik an: stepSim() ist dieselbe
-    // Funktion, die auch loop() aufruft, mit derselben Tick-Groesse (1/60)/zeitFaktor() — kein
+    // Funktion, die auch loop() aufruft, ueber dieselbe `anzeigeSechzigstel()` — kein
     // zweiter Motor, keine Kopie. Nur die AUSSENSTEUERUNG (wie oft, mit welchem dt) ist neu,
     // rein additiv wie renderProbe/figurProbe/bahnVizProbe daneben.
     //
@@ -60884,8 +61002,7 @@
       const zf=zeitFaktor();
       for(let i=0;i<n;i++){
         sondenSimMs+=1000/60;
-        tickerSendeT+=1/60;
-        stepSim((1/60)/zf);
+        anzeigeSechzigstel(zf);
         stepFloats();
         // Dieselbe HUD-Nachfuehrung wie in loop() (s. dort): fuer den Kampf ruft stepSim()
         // updateHud() selbst, Feldspiel/Buehne/Bahn brauchen den Aufruf von aussen.
