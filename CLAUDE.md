@@ -141,6 +141,11 @@ jedes Rezept** — genauso verbindlich wie die rho-über-0,80-Schranke oben, nic
 Zeit ist". Beide Abnahmen gehören zusammen: rho sagt, ob das RICHTIGE Ergebnis am Ende steht, die
 Pp-Abweichung sagt, ob es aus den RICHTIGEN Gründen (den vorgegebenen Attributen) zustande kommt.
 
+Chris am 10.11.: **<15 ist das angestrebte Optimum**, sofern ohne rho-Verlust erreichbar — ≤25 bleibt
+aber die verbindliche Pflichtschranke. Wo ein Rezept zwischen "knapp unter 25" und "unter 15, aber
+rho sinkt" wählen muss, hat die rho-Schranke (>0,80, angestrebt 0,85) Vorrang: nicht die Pp-Zahl auf
+Kosten von rho optimieren.
+
 **Design-Leitlinie, nicht nur für eine Disziplin: mehrere Wege zum Erfolg.** Chris am 21.09., im
 Kontext der I-Spy-Konzeptrunde (`docs/design/i-spy-schatzsuche-konzept-21-09.md`, Mehrwege-Truhen),
 danach ausdrücklich verallgemeinert: „das ist jetzt auch nur ein Beispiel — auf genau diese Art und
