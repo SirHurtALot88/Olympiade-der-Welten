@@ -384,3 +384,128 @@ Wertung: Der Fingerabdruck ist byte-identisch, Gesamt-Hash `22f04e06e285`.
 **Stand nach Batch 11:** 20 von 20 Disziplinen zeigen PixelLab-Grafik im Motor: 19 mit Kulisse, Takeshi
 mit PixelLab-Bodenkacheln und PixelLab-Fallen auf seiner Draufsicht-Route. Dazu sind alle Requisiten, die der
 Motor auf die Kulissen zeichnet, PixelLab statt OpenGameArt.
+
+## Batch 15: Spurt — "Rahmen statt Material" für Rang 3 des Audits (08.11.)
+
+`docs/design/kulissen-qualitaets-audit-08-11.md` (PR #1357), Rang 3 (Showcase/Breaking in PR #1359, Takeshi's
+Castle in PR #1362, Climbing in PR #1363 bereits erledigt), Befund wörtlich: „Das Bild ist zu 80 % ein
+einfarbig blaues Band mit zwölf parallelen Linien; oben und unten je 6 % gekacheltes Publikum. […] Keine
+Tiefe, kein Licht, kein Horizont, kein einziges Gerät der HYROX-Halle (Schlitten, Rudergeräte, Bögen
+IN/OUT/FINISH, Anzeigetafel, Lichtkegel stehen alle in der Rohszene). Das Vorher-Bild (Erdbahn, Zaun,
+Baumreihe) hatte mehr Charakter. Das ist exakt der Fall 'alte Komposition, neue Textur'." Batch 6 (07.11.)
+hatte von der HYROX-Rohszene (`public/szenen/spurt/hyrox.jpg`) nur den Asphalt und zwei 40-px-Publikumsstreifen
+genommen — alles andere aus der Szene (Schlitten, Rudergeräte, Kettlebell-Racks, Anzeigetafel, die drei Bögen,
+die Scheinwerferkegel über der Wall-Ball-Station) blieb ungenutzt. Band-Geometrie (`H*0.14..H*0.94`), zwölf
+Bahnen, Stationen aus `HUERDEN_N()`/`camX()`, `BAHN_ART.spurt.hindernisse`/`.hindernisBilder` — **alles
+unangetastet**, wie bei jedem Batch dieser Reihe. Der Rework ändert nur, was auf und um das Band gezeichnet
+wird, und holt die Halle über zwei getrennte Wege ins Bild:
+
+### Kopfstreifen/Fußstreifen (`scripts/baue-kulisse-buehnen.py`, `baue_spurt()`), statisch
+
+Der Kopfstreifen (0..`H*0.14`) bekommt drei Ebenen statt der alten 40-px-Publikumszeile:
+
+- **Fern:** ein gemaltes Hallendach mit Trägern und vier Lichtbändern — reiner Vektor, die Szene zeigt in
+  Draufsicht keine Decke. Die Farben (`#16171D`→`#242830`, Lichtband `#F2EFE6`) wurden unabhängig von
+  `docs/design/einsatzliste-gesamtkonzept-visuell-08-11.md` Abschnitt 3.2 gewählt (ein Konzeptdokument für
+  einen ganz anderen Screen, die Einsatzliste) — dass dessen "HALLE"-Stimmung für Spurt HYROX wörtlich
+  "Hallendach mit Trägern #2B2F36 und vier Lichtbändern #F2EFE6" fordert, deckt sich zufällig mit dieser
+  Entscheidung und bestätigt sie im Nachhinein, statt sie vorzugeben.
+- **Mitte:** die Tribüne der Szene (`SP_PUBLIKUM_OBEN`, wie bisher), plus die Anzeigetafel der Szene
+  (`SP_ANZEIGETAFEL`, "FINISH"-Uhr samt Lautsprecher-Sockel) als eigenes, höheres Landmark rechts außen — sie
+  hängt bewusst bis in die Gerätezeilen-Ebene herunter, wie in der Rohszene.
+- **Vorne, knapp über der Bahn:** eine Gerätezeile aus einer Reihe Rudergeräten (`SP_RUDER_ROW`) und
+  Schlitten-Symbolen (`SP_SLED`, Gewichtsscheibe inklusive), auf 72 % Helligkeit abgedunkelt, damit sie als
+  Silhouette liest statt als zweite Grundfläche. Erste Anläufe skalierten die komplette Zwei-Reihen-Geräte-
+  zeile (700×232 Szenen-px) auf 24 Leinwand-px herunter — ein Faktor 9,7, bei dem aus den Geräten Matsch
+  wurde. Eine einzelne, enger geschnittene Reihe (576×98) bei Faktor 3,3 blieb als Rudergerät erkennbar; das
+  ist der Unterschied zwischen "Textur" und "Requisit", den der Audit-Befund selbst beschreibt.
+
+Der Fußstreifen (`H*0.94..H`) bekommt eine Sponsoren-Bande (fünf farbige Vektor-Segmente mit hellem
+Platzhalter-Logo, kein Vorbild in der Szene — dieselbe Idee wie die Bandenschilder bei Tennis/Football) und
+sechs kleine Betreuer-Silhouetten (Vektor, Kopf+Schulterschräge+Beine, ~12 px hoch) **statt eines zweiten
+Publikumsstreifens** — der Audit sagt das wörtlich ("kein zweites Publikum"). Das Bahnband selbst bleibt beim
+blauen Loop-Belag aus Batch 6 (`SP_BELAG`, gespiegelt gekachelt); daran ändert dieser Batch nichts, der
+Belag war nie der Vorwurf.
+
+### Boegen, Stationsumfeld, Licht (`battle-mode.engine.js`, `bodenSpurtGerade()`), dynamisch
+
+Die Kulisse-Bilddatei ist ein statisches Vollbild, die Bahn aber scrollt/zoomt mit `cam.zoom`/`cam.cx` (ein
+enges Feld zieht die Kamera heran — `camView()`, s. Kommentar dort). Alles, was an einer Welt-Position
+(Start, Ziel, eine Station) stehen und mit der Kamera mitlaufen muss, kann deshalb NICHT im PNG liegen —
+das zeichnet, wie schon bei jeder Hürden-/Mauer-/Wasser-Kachel zuvor, der Motor selbst, bei `camX(h)`:
+
+- **Bögen an Start und Ziel** (Audit wörtlich): der IN-Bogen (gelb-schwarz) bei `camX(0)`, der FINISH-Bogen
+  (rot) bei `camX(1)`. Erster Stand skalierte auf die volle Bandhöhe (alle zwölf Bahnen übereinander) —
+  Chris, 08.11., zu genau diesem Stand: „komsiche riesige Tore! Das sieht richtig weird aus." Nachgebessert
+  noch am selben Tag: Höhe auf `min(Bandhöhe, 32 % der Leinwandhöhe)` gedeckelt, Position unverändert am
+  oberen Bandrand — der Bogen liest jetzt als Landmark am Rand, nicht als Rohr quer durchs ganze Bild. Beide
+  Sprites sind **nicht bei PixelLab bestellt** —
+  die Rohszene führt sie bereits (Audit: "stehen alle in der Rohszene") —, sondern per Kettenflutung
+  freigestellt (`kulissen_werkzeug.freistellen()`, neu in diesem Batch: wächst vom Bildrand über ähnlich
+  gefärbte Nachbarn nach innen, jeder Schritt gegen den zuletzt akzeptierten Nachbarn statt gegen den
+  Randwert — toleriert JPEG-Rauschen, bleibt an echten Kanten stehen, kennt die Hintergrundfarbe vorher nicht,
+  weder Hallenboden-Grau noch Bahn-Blau). `scripts/baue-kulisse-buehnen.py --spurt-requisiten` schreibt sie
+  nach `public/sprites/arena/spurt_bogen_{in,finish}.png`, zwei neue `A_TEILE`-Einträge.
+- **Stationsumfeld im Belag** (Audit wörtlich, alle sieben `BAHN_ART.spurt.hindernisBilder`-Typen bedacht,
+  nicht nur die vier Beispiele des Audits): nasse Pfütze+helle Spritzer am Wassergraben, Kiesbett um die
+  Bruchsteinmauer, Mattenstreifen unter der Hürde, Sägemehl-Landefläche unter dem Balken, festgetretener
+  Sandwall vor der Palisade, ausgetretener Erdpfad unter dem Seil, lose Strohhalme um den Strohballen —
+  jeweils in Bahnbreite (`oben..unten`), seedbasiert verteilt (`bodenSaat(i*<primzahlartig>+k)`, an den
+  Stationsindex `i` gehängt, rein kosmetisch, kein `rr()`). Dieselbe Idee auch am Feuersprung: ein russiger
+  Fleck hinter der Ziellinie, nur wenn `BA().feuerZiel` (U3) UND die Kulisse aktiv ist.
+- **Scheinwerferkegel** (Audit: "wie Gewichtheben") auf jede der sieben Stationen: ein schmaler, nach unten
+  breiter werdender Verlauf von der Traverse auf die Bahn, niedrige Deckkraft (16 % an der Spitze, 0 am
+  Bahnrand) — dieselbe Lehre wie Batch 12/14 ("Licht gezielt, nicht flächig", Chris' Breaking/Showcase-
+  Befund): Läufer, Ringe und Namen bleiben lesbar, es entsteht ein hell/dunkel-Rhythmus entlang der Bahn
+  statt des gleichförmigen Blaus, das der Audit bemängelte.
+
+Alle drei Blöcke stehen hinter derselben Weiche `if(mitKulisse&&BA().spurt)`: `bodenSpurtGerade()` bedient
+als Fallback auch Staffel (Warteschlange), Climbing (Fallback) und Takeshi ohne Route — deren Kulissen und
+Stationstypen sind etwas ganz anderes, die Weiche verhindert, dass ein HYROX-Bogen auf einem Stadion-Rasen
+landet. Ohne Kulisse (Bild lädt nicht, Headless-Runner) bleibt der alte, gezeichnete Boden bit-identisch —
+nichts in diesem Batch rührt den `!mitKulisse`-Zweig an.
+
+### PixelLab-Verbrauch: null Generationen
+
+Alle neuen Pixel dieses Batches kommen entweder aus der bereits bezahlten Rohszene (Bögen, Anzeigetafel,
+Gerätezeile — reine Schnitt-/Freistell-Arbeit) oder aus reinem Vektor (Hallendach, Sponsoren-Bande,
+Betreuer, Stationsumfeld, Lichtkegel). `GET /balance` vor und nach diesem Batch: unverändert 2265
+Generationen (Stand nach Batch 14). Das ist kein Zufall, sondern der Kern des Audit-Befunds für Spurt: Der
+Rohszene fehlte nie Material, nur der Schnitt.
+
+### Grenzen (ehrlich, wie bei jedem Batch)
+
+- **Nur eine Variante.** Das Audit nennt explizit eine zweite, outdoor spielende Kurs-Variante (Stadion-
+  vorplatz oder Strand bei Abendlicht) als nächsten Schritt, "damit Spurt wie Zeitfahren je Begegnung
+  wechselt. Eine einzige Variante fällt gegen elf Zeitfahren-Karten sofort ab." Dieser Batch liefert sie
+  **bewusst nicht**: Die Halle solide zu Ende zu bringen (Kopfstreifen-Komposition, zwei neue Motor-
+  Requisiten, sieben Stationsumfelder, Lichtkegel, alles gegenprobiert) war für sich schon ein voller
+  Durchgang; eine zweite, komplett neue Außenszene hätte ein eigenes Rohbild (keine Vorlage in der
+  bestehenden Szenen-Sammlung — anders als bei den Bögen gäbe es hier nichts freizustellen, sondern eine
+  echte PixelLab-Bestellung mit eigener Horizont-/Lichtstimmung) und eine zweite komplette
+  Kopf-/Fußstreifen-Komposition gebraucht, mit eigenem Pp-Vergleich zur Halle. Lieber eine Variante fertig
+  und geprüft als zwei halbfertige — dieselbe Abwägung, die der Audit selbst für den Umsetzungsauftrag nahelegt
+  (Abschnitt 5: "Reihenfolge-Empfehlung … erst … dann Spurt … dann Climbing"), nur eine Ebene tiefer, innerhalb
+  dieses einen Batches. Offen für eine Folge-Runde.
+- **Die Gerätezeile ist eine Wiederholung aus zwei Motiven** (Rudergerät, Schlitten), nicht die volle
+  Motiv-Vielfalt der Halle (Kettlebell-Racks fielen durch, s. oben — sie lesen bei 30 px Höhe nur als dünner
+  dunkler Strich, nicht als Gerät). Mit mehr Zeit ließe sich ein drittes, kompakteres Motiv (z. B. ein
+  Wandball) ergänzen.
+- **Die Anzeigetafel zeigt eine eingebrannte Demo-Zeit** ("FINISH 1:02:37") aus der Rohszene. Bei der
+  gewählten Größe (~60 px) ist der Text ohnehin kaum lesbar, wirkt aber aus der Nähe (`cam.zoom` hoch) als
+  Zahl, die nichts mit dem laufenden Rennen zu tun hat — dieselbe Klasse Schwäche wie die Zwischenzeit-Tafeln,
+  die Batch 8 (Zeitfahren) bei der Kopfstreifen-Übernahme bewusst ausließ. Für Spurt ist das Bild zu klein,
+  um es zu stören; ein größerer Zoomgrad könnte es zeigen.
+- **Die Betreuer- und Sponsoren-Elemente haben kein Vorbild in der Szene** (reiner Vektor, wie die Volumen/
+  Kreidespuren bei Climbing Batch 14) — die Rohszene liefert an dieser Stelle nichts Passendes.
+
+Sichtprobe (echte Leinwand, `node scripts/screenshot-kulisse.mjs spurt kurs <ms> <png>`): `docs/design/
+kulissen-rework-spurt-08-11/spurt-kurs-{vorher,nachher,nachher-8s}.png` (100 ms: volle Übersicht mit beiden
+Bögen und allen sieben Stationen; 8000 ms: Rennen in Fahrt, Kamera auf 2,8×, IN-Bogen in der Kurve) sowie
+`spurt-kurs-ohne-kulisse.png` (`--ohne-kulisse`, der alte Erdbahn/Zaun/Baumreihe-Maßstab aus dem Audit).
+
+Tests: `npx vitest run tests/arena-kulissen.test.ts` grün (14/14).
+
+Wertung: Fingerabdruck vor und nach diesem Batch gemessen — byte-identisch, Gesamt-Hash `22f04e06e285`
+(69 Einträge). Reine Zeichenänderung: `HUERDEN_N()`, `camX()`, `BAHN_ART.spurt.hindernisse`/
+`.hindernisBilder` und jede Simulationsfunktion (`bauSpurt`/`stepSpurt`) stehen Wort für Wort wie vorher.

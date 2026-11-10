@@ -42548,6 +42548,10 @@
     // Spurt-Stationen (U3) — je eine Kachel je hindernisse[i], s. BAHN_ART.spurt.hindernisBilder
     "hind_huerde","hind_balken","hind_wand","hind_seil","hind_wasser_l","hind_wasser_r",
     "hind_mauer","hind_heu","hind_feuer",
+    // Kulissen Batch 15 (Spurt, Rang 3 des Audits): IN-/FINISH-Bogen, aus der HYROX-Rohszene
+    // freigestellt (scripts/baue-kulisse-buehnen.py bogen_requisiten(), kulissen_werkzeug.freistellen),
+    // nicht aus PixelLab bestellt -- die Rohszene fuehrte sie laut Audit ohnehin schon.
+    "spurt_bogen_in","spurt_bogen_finish",
     // Takeshi's Castle: zehn Fallen-Typen + Burg-Kulisse auf vierzehn Stationen, s.
     // BAHN_ART["takeshis-castle"].fallenBild und zeichneFalleTakeshi() weiter unten
     // (docs/design/takeshi-schach-optik-gameplay-plan-05-09.md, Teil B).
@@ -44014,6 +44018,60 @@
         +"je Falle 1–3 Sterne nach Schwierigkeit, davon hält der passende Skill seinen Anteil · Sturz kostet die halbe Falle · Ziel bringt Bonus nach Platz";
       ctx.lineWidth=3; ctx.strokeText(leg,W/2,oben-16); ctx.fillStyle="#dfe4ee"; ctx.fillText(leg,W/2,oben-16);
     }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Stationsumfeld im Belag" +
+    // "Licht"): unter jeder Station ein Bodenmerkmal in Bahnbreite, darueber ein Scheinwerferkegel
+    // -- beides VOR den Bahnlinien/Stationskacheln gezeichnet (Z-Reihenfolge unten unveraendert),
+    // damit die Station sichtbar AUF ihrem eigenen Fleck steht statt auf gleichfoermigem Blau.
+    // Exakt an camX(HUERDEN_N()[i]), also denselben Weltkoordinaten, mit denen stepSpurt rechnet
+    // (HUERDEN_N()/camX() selbst bleiben unangetastet) -- reine Anzeige, liest nur BA()/bodenSaat,
+    // schreibt nichts, kein rr()-Aufruf. Nur bei aktiver Kulisse und nur fuer Spurt selbst: dieselbe
+    // Funktion bedient als Fallback auch Staffel/Climbing/Takeshi-ohne-Route (s. Kommentar an
+    // bodenSpurtGerade() oben), deren Kulisse und Stationstypen etwas ganz anderes sind.
+    if(mitKulisse&&BA().spurt){
+      const stationsBoden={
+        // Audit woertlich: "nasse Pfuetze und Spritzer am Wassergraben". Die Spritzer hell/weiss
+        // statt blau: Wasser-auf-Wasser gibt sonst kaum Kontrast gegen den Bahnbelag.
+        wasser:(x,i)=>{ ctx.fillStyle="rgba(40,95,150,.5)"; ctx.fillRect(x-34,oben,68,unten-oben);
+          for(let k=0;k<16;k++){ const sy=oben+(unten-oben)*bodenSaat(i*97+k), sx=x+(bodenSaat(i*97+k+500)-0.5)*60;
+            ctx.fillStyle="rgba(226,242,250,"+(0.30+bodenSaat(i*97+k+900)*0.30)+")";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.6+bodenSaat(i*97+k+300)*2.6,1.1+bodenSaat(i*97+k+700)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Kiesbett um die Bruchsteinmauer".
+        mauer:(x,i)=>{ for(let k=0;k<28;k++){ const sy=oben+(unten-oben)*bodenSaat(i*131+k), sx=x+(bodenSaat(i*131+k+500)-0.5)*54;
+            const t=bodenSaat(i*131+k+200);
+            ctx.fillStyle="rgba("+Math.round(168+t*40)+","+Math.round(150+t*34)+","+Math.round(120+t*28)+",.78)";
+            ctx.beginPath(); ctx.ellipse(sx,sy,1.8+bodenSaat(i*131+k+300)*2.8,1.2+bodenSaat(i*131+k+330)*1.8,0,0,6.283); ctx.fill(); } },
+        // Audit woertlich: "Mattenstreifen unter Huerden".
+        huerde:(x)=>{ ctx.fillStyle="rgba(122,59,53,.5)"; ctx.fillRect(x-20,oben,40,unten-oben);
+          ctx.fillStyle="rgba(210,100,78,.24)"; ctx.fillRect(x-20,oben,40,3); ctx.fillRect(x-20,unten-3,40,3); },
+        // Saegemehl-Landeflaeche unter dem Balancier-Balken, dieselbe Idee wie die Huerdenmatte.
+        balken:(x,i)=>{ ctx.fillStyle="rgba(214,188,132,.14)"; ctx.fillRect(x-22,oben,44,unten-oben);
+          for(let k=0;k<22;k++){ const sy=oben+(unten-oben)*bodenSaat(i*151+k), sx=x+(bodenSaat(i*151+k+500)-0.5)*40;
+            ctx.fillStyle="rgba(230,206,150,"+(0.30+bodenSaat(i*151+k+700)*0.28)+")"; ctx.fillRect(sx,sy,2.2,2.2); } },
+        // Festgetretener Sandwall vor der Palisadenwand.
+        wand:(x)=>{ const g=ctx.createRadialGradient(x,unten-18,4,x,unten-18,38);
+          g.addColorStop(0,"rgba(104,76,50,.55)"); g.addColorStop(1,"rgba(104,76,50,0)");
+          ctx.fillStyle=g; ctx.fillRect(x-44,oben,88,unten-oben); },
+        // Ausgetretener Erdpfad unter dem Schwingseil.
+        seil:(x)=>{ ctx.fillStyle="rgba(86,66,44,.48)"; ctx.fillRect(x-17,oben,34,unten-oben);
+          ctx.fillStyle="rgba(140,112,76,.26)"; ctx.fillRect(x-6,oben,12,unten-oben); },
+        // Lose Strohhalme um den Strohballen.
+        heu:(x,i)=>{ for(let k=0;k<20;k++){ const sy=oben+(unten-oben)*bodenSaat(i*181+k), sx=x+(bodenSaat(i*181+k+500)-0.5)*48;
+            ctx.strokeStyle="rgba(232,206,112,"+(0.42+bodenSaat(i*181+k+700)*0.3)+")"; ctx.lineWidth=1.3;
+            ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+6+bodenSaat(i*181+k+300)*5,sy-1.5); ctx.stroke(); } },
+      };
+      const bilderSt=BA().hindernisBilder||[];
+      HUERDEN_N().forEach((h,i)=>{
+        const x=camX(h); if(x<-80||x>W+80)return;
+        const fn=stationsBoden[bilderSt[i]]; if(fn)fn(x,i);
+        // Scheinwerferkegel von oben auf jede Station (Audit: "wie Gewichtheben") -- hell/dunkel
+        // Rhythmus entlang der Bahn statt gleichfoermigem Blau. Niedrige Deckkraft (Lehre aus
+        // Batch 12/14): Laeufer, Ringe und Namen bleiben lesbar.
+        const kegel=ctx.createLinearGradient(x,oben-10,x,unten);
+        kegel.addColorStop(0,"rgba(255,244,214,.16)"); kegel.addColorStop(1,"rgba(255,244,214,0)");
+        ctx.fillStyle=kegel; ctx.beginPath();
+        ctx.moveTo(x,oben-10); ctx.lineTo(x-54,unten); ctx.lineTo(x+54,unten); ctx.closePath(); ctx.fill();
+      });
+    }
     // Eine Linie je Bahngrenze — so viele, wie es Bahnen gibt.
     ctx.strokeStyle="rgba(255,255,255,.42)";ctx.lineWidth=1.5;
     const BN=BAHNEN_N();
@@ -44089,6 +44147,28 @@
       ctx.beginPath();ctx.moveTo(xZiel,oben);ctx.lineTo(xZiel,unten);ctx.stroke();
       ctx.setLineDash([]);
     }
+    // KULISSEN BATCH 15 (Spurt, Rang 3 des Audits, Abschnitt 4.3 "Boegen an Start und Ziel"): der
+    // IN-Bogen am Startpunkt, der FINISH-Bogen an der Ziellinie, genau an camX(0)/camX(1) -- denselben
+    // Werten, die die Start-/Ziellinie zwei Bloecke darueber schon zeichnet. Ersetzt nichts an Start/
+    // Ziel selbst (die Linien bleiben), gibt dem Band nur sichtbar Anfang und Ende. Beide Sprites aus
+    // der HYROX-Rohszene freigestellt (s. A_TEILE-Kommentar oben).
+    //
+    // NACHBESSERUNG (Chris, 08.11., zum ersten Stand dieses Batches): "komsiche riesige Tore!
+    // Das sieht richtig weird aus" -- auf die VOLLE Bandhoehe skaliert (alle zwoelf Bahnen
+    // uebereinander, ~80 % von H) wirkte der Bogen wie ein Rohr quer durchs Bild, nicht wie ein
+    // Ziel-Bogen. Ein echter Start-/Zielbogen ist ein Landmark am oberen Bandrand, keine
+    // Wand ueber die ganze Bahnbreite -- gedeckelt auf einen Bruchteil der Bandhoehe, anstatt
+    // sie auszufuellen.
+    if(mitKulisse&&BA().spurt){
+      if(aDa("spurt_bogen_in")&&xStart>-220&&xStart<W+220){
+        const im=aBild.spurt_bogen_in, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xStart-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+      if(aDa("spurt_bogen_finish")&&xZiel>-220&&xZiel<W+220){
+        const im=aBild.spurt_bogen_finish, bh=Math.min(unten-oben,H*0.32), bw=bh*im.naturalWidth/im.naturalHeight;
+        ctx.drawImage(im,Math.round(xZiel-bw/2),Math.round(oben-6),Math.round(bw),Math.round(bh+10));
+      }
+    }
     if(BA().takeshi&&aDa("burg_tor")&&xZiel>-60&&xZiel<W+60){
       // DAS BURGTOR am Ziel (Teil B.3) — unter der Kamera wie die Ziellinie selbst, und
       // die Ruestkammer-Deko der Emperor's Guards davor (Pranger, Fussblock, Holzstapel, Fass).
@@ -44115,6 +44195,14 @@
     // FEUERSPRUNG AM ZIEL (U3, nur Bild): ein Lagerfeuer je Bahn hinter der Ziellinie, fuenf
     // Bilder ueber rennT. Kein Zeitpreis — die Mechanik bekommt kein achtes Ereignis.
     if(BA().feuerZiel&&aDa("hind_feuer")&&xZiel>-40&&xZiel<W+40){
+      // Verbrannter Boden am Feuersprung (Kulissen Batch 15, Audit-Beispiel woertlich uebernommen):
+      // ein russiger Fleck in Bahnbreite hinter der Ziellinie, VOR den Flammen gezeichnet, nur bei
+      // aktiver Kulisse (ohne Kulisse blieb dieser Ausschnitt bit-identisch zum Vorherstand).
+      if(mitKulisse){
+        const g=ctx.createRadialGradient(xZiel-20,(oben+unten)/2,6,xZiel-20,(oben+unten)/2,(unten-oben)*0.6);
+        g.addColorStop(0,"rgba(18,14,12,.5)"); g.addColorStop(1,"rgba(18,14,12,0)");
+        ctx.fillStyle=g; ctx.fillRect(xZiel-80,oben,100,unten-oben);
+      }
       const f=aBild.hind_feuer, fr=Math.floor(rennT*8)%5;
       for(let b=0;b<BAHNEN_N();b++){
         const y=bahnY(b)+16;
