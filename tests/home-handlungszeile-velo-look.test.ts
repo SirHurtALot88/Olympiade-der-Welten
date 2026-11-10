@@ -92,7 +92,7 @@ describe("Chris-Overrides: Karten bleiben, Sterne bleiben, 0 wird erklärt", () 
   it("die großen Spielerkarten samt CA/PO-Sternen bleiben", () => {
     expect(HOME).toContain("FoundationPlayerPortraitCard");
     expect(HOME).toContain("caStars={player.caStars}");
-    expect(HOME).toContain("poStars={player.poStars}");
+    expect(HOME).toContain("poStarRange={player.poStarRange}");
   });
 
   it("PPs/MVS werden bei 0/— erklärt statt versteckt", () => {
