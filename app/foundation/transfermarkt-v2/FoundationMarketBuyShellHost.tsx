@@ -224,6 +224,9 @@ export default function FoundationMarketBuyShellHost({
    * bei blockiertem Deal auf ±0 geklemmten Server-`*After`-Felder.
    */
   const dealReceipt = buildTransfermarktDealReceipt(buyPreview);
+  const sichtbareVerhandlungsRisiken = (buyPreview?.negotiationWarnings ?? []).filter(
+    (warning) => warning !== "defiance_surcharge_pending",
+  );
 
   return (
     <FoundationDecisionSurface
@@ -446,10 +449,11 @@ export default function FoundationMarketBuyShellHost({
               ) : null}
 
               {/*
-                Trotz (verhandlung-rework.md Abschnitt 9.1) — zwei getrennte Zustände, und die
-                Trennung ist der Punkt: der obere Banner sagt, was SCHON gilt, der untere, was
-                ein Klick auslösen WÜRDE. Ohne den zweiten wäre der Aufschlag eine Überraschung
-                nach dem Klick; ohne den ersten wäre die erhöhte Forderung unerklärt.
+                Trotz (verhandlung-rework.md Abschnitt 9.1, Nachtrag 10.11.) — nur der Zustand, der
+                SCHON gilt: ein Aufschlag aus einer bereits geführten Verhandlungsrunde. Eine
+                Vorab-Ankündigung, was ein Klick auslösen WÜRDE (früher "transfer-buy-defiance-pending"),
+                gibt es bewusst nicht mehr: Chris will, dass Verhandeln ein echtes Risiko ist und der
+                beleidigte Spieler erst NACH dem Klick sichtbar wird.
               */}
               {(buyPreview?.defianceSurchargePct ?? 0) > 0 ? (
                 <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-active">
@@ -459,20 +463,6 @@ export default function FoundationMarketBuyShellHost({
                     {formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)} statt{" "}
                     {formatTransfermarktCurrency(buyPreview?.baseDemandSalary ?? null)}
                     {" "}(+{Math.round((buyPreview?.defianceSurchargePct ?? 0) * 1000) / 10} %). Eine neue Season setzt das zurück.
-                  </span>
-                </div>
-              ) : null}
-              {(buyPreview?.pendingDefianceSurchargePct ?? 0) > (buyPreview?.defianceSurchargePct ?? 0) ? (
-                <div className="transfer-feedback-banner is-warning" data-testid="transfer-buy-defiance-pending">
-                  <strong>Dieses Angebot nimmt er persönlich</strong>
-                  <span>
-                    Wenn du so verhandelst, steigt seine Forderung auf{" "}
-                    {formatTransfermarktCurrency(
-                      buyPreview?.baseDemandSalary != null
-                        ? Number((buyPreview.baseDemandSalary * (1 + (buyPreview.pendingDefianceSurchargePct ?? 0))).toFixed(2))
-                        : null,
-                    )}{" "}
-                    (+{Math.round((buyPreview?.pendingDefianceSurchargePct ?? 0) * 1000) / 10} %) — und bleibt dort. Tippen ist frei, verhandeln nicht.
                   </span>
                 </div>
               ) : null}
@@ -797,11 +787,14 @@ export default function FoundationMarketBuyShellHost({
                       ) : (
                         <p className="nl-market-muted">Noch keine Verhandlungsdaten verfügbar.</p>
                       )}
-                      {buyPreview.negotiationWarnings?.length ? (
+                      {/* Ohne "defiance_surcharge_pending": der drohende Trotz-Aufschlag ist eine
+                          Vorhersage des Klick-Ergebnisses und bleibt bis zum Klick verborgen
+                          (Chris, 10.11., verhandlung-rework.md Nachtrag zu 9.1). */}
+                      {sichtbareVerhandlungsRisiken.length ? (
                         <>
                           <p className="market-v2-buy-subhead-inline">Risiken</p>
                           <ul className="negotiation-factor-list">
-                            {buyPreview.negotiationWarnings.map((warning) => (
+                            {sichtbareVerhandlungsRisiken.map((warning) => (
                               <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
                             ))}
                           </ul>

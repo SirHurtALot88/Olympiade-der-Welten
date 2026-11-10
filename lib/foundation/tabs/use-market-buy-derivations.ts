@@ -219,12 +219,8 @@ export function buildNegotiationTooltip(buyPreview: TransfermarktBuyPreview | nu
           : `Trotz: euer Lowball hat seine Forderung um ${Math.round(defiance * 1000) / 10} % gehoben — bis zum Ende dieser Verhandlung.`,
       );
     }
-    const pending = buyPreview.pendingDefianceSurchargePct ?? 0;
-    if (pending > defiance) {
-      items.push(
-        `Dieses Angebot würde ihn zusätzlich verärgern: verhandelst du so, steigt seine Forderung auf +${Math.round(pending * 1000) / 10} %. Tippen ist folgenlos, verhandeln nicht.`,
-      );
-    }
+    // Kein Vorab-Hinweis auf pendingDefianceSurchargePct (Chris, 10.11.): ob ein Angebot ihn
+    // beleidigt, soll erst das Verhandeln zeigen, nicht das Tippen am Regler.
     if (buyPreview.concededFromLastCounter) {
       items.push("Er hat auf euer Entgegenkommen reagiert und seine Forderung gegenüber der letzten Runde gesenkt.");
     }
@@ -249,6 +245,9 @@ const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set([
   "market_bracket_factor_preview_pending", // wie grob unsere Marktklassen-Schaetzung gerade ist
   "preview_only_contract_negotiation", // dass die Verhandlung eine Simulation ist
   "trait_salary_factor_source_missing", // dass Trait-Effekte noch unscharf sind
+  // Chris, 10.11.: „die warnung darf doch nicht auftauchen bevor ich verhandle!!!" — der drohende
+  // Trotz-Aufschlag ist eine Vorhersage des Klick-Ergebnisses und bleibt bis zum Klick verborgen.
+  "defiance_surcharge_pending",
 ]);
 
 function filterVisibleNegotiationWarnings(warnings: string[] | null | undefined): string[] {

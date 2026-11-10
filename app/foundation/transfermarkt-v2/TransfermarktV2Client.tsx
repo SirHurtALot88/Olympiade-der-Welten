@@ -446,6 +446,9 @@ const SUPPRESSED_NEGOTIATION_WARNING_CODES = new Set([
   "market_bracket_factor_preview_pending", // wie grob unsere Marktklassen-Schaetzung gerade ist
   "preview_only_contract_negotiation", // dass die Verhandlung eine Simulation ist
   "trait_salary_factor_source_missing", // dass Trait-Effekte noch unscharf sind
+  // Chris, 10.11.: „die warnung darf doch nicht auftauchen bevor ich verhandle!!!" — der drohende
+  // Trotz-Aufschlag ist eine Vorhersage des Klick-Ergebnisses und bleibt bis zum Klick verborgen.
+  "defiance_surcharge_pending",
 ]);
 
 function filterVisibleNegotiationWarnings(warnings: string[] | null | undefined): string[] {
@@ -722,6 +725,19 @@ export default function TransfermarktV2Client({
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewVersionRef = useRef(0);
+  /**
+   * Der Verhandlungs-Schreibzugriff, der gerade unterwegs ist (oder `null`).
+   *
+   * GEMELDET (Chris, 10.11.): „wenn ich im transfermarkt nachverhandle, und dem spieler entgegen
+   * komme beharren alle immer auf ihrer forderung". Die Erwiderung (verhandlung-rework.md 9.3) liest
+   * sein letztes Wort aus dem Draft, den der Verhandeln-Klick schreibt — und dieser Klick schrieb
+   * per `void fetch` ohne Rückmeldung. Das Speichern braucht am vollen Spielstand Sekunden; wer
+   * danach sofort am Regler nachlegt, bekam eine Vorschau, die der Server noch OHNE den Draft
+   * gerechnet hatte: kein Gedächtnis, kein Entgegenkommen, nur die gedächtnislose Formel, die fast
+   * dieselbe Zahl nennt wie vorher. Und genau diese Vorschau entscheidet den nächsten Klick.
+   * Die Vorschau wartet deshalb auf den laufenden Schreibzugriff, bevor sie fragt.
+   */
+  const negotiationWriteRef = useRef<Promise<void> | null>(null);
   // New Look rendert die Kandidaten-Karte als `<div role="button">`, kein `<button>` — der Typ
   // hier folgt dem tatsaechlich gerenderten Element (siehe `setCandidateButtonRef` unten).
   const candidateButtonRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -1188,6 +1204,22 @@ export default function TransfermarktV2Client({
       return;
     }
 
+    const write = writeNegotiationOutcome(summary, status, extraWarnings);
+    negotiationWriteRef.current = write;
+    try {
+      await write;
+    } finally {
+      if (negotiationWriteRef.current === write) {
+        negotiationWriteRef.current = null;
+      }
+    }
+  }
+
+  async function writeNegotiationOutcome(
+    summary: TransfermarktBuyPreview,
+    status: "ready_for_review" | "countered" | "accepted_pending_confirm" | "rejected_bad_experience",
+    extraWarnings: string[],
+  ) {
     try {
       await fetch(
         `/api/singleplayer-state?${new URLSearchParams({
@@ -1202,7 +1234,7 @@ export default function TransfermarktV2Client({
             withWriteContext({
               action: "contract-negotiation-outcome",
               saveId: defaultSaveId,
-              teamId: summary.team.id,
+              teamId: summary.team?.id,
               summary,
               status,
               extraWarnings,
@@ -1881,6 +1913,15 @@ export default function TransfermarktV2Client({
 
     const timer = window.setTimeout(async () => {
       try {
+        // Erst den laufenden Verhandeln-Schreibzugriff abwarten (siehe `negotiationWriteRef`):
+        // sonst rechnet der Server die Vorschau ohne das Verhandlungsgedächtnis dieser Runde.
+        const pendingWrite = negotiationWriteRef.current;
+        if (pendingWrite) {
+          await pendingWrite.catch(() => {});
+          if (cancelled || controller.signal.aborted || requestVersion !== previewVersionRef.current) {
+            return;
+          }
+        }
         const response = await fetch("/api/transfermarkt/buy", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2066,7 +2107,12 @@ export default function TransfermarktV2Client({
     }
 
     if (verdict === "counter_money") {
-      void persistNegotiationOutcome(buyPreview, "countered");
+      // Nach dem Speichern die Vorschau neu holen: erst DANN kennt sie den Draft dieser Runde —
+      // sein letztes Wort (9.3) und einen jetzt festgeschriebenen Trotz-Aufschlag (9.1), den der
+      // Dialog seit 10.11. erst nach dem Klick zeigt, nicht mehr vorher.
+      void persistNegotiationOutcome(buyPreview, "countered").then(() =>
+        setBuyPreviewRefreshNonce((current) => current + 1),
+      );
       const counterSalary = buyPreview.counterSalary ?? null;
       const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? null;
       const counterDelta =
@@ -2094,7 +2140,9 @@ export default function TransfermarktV2Client({
     }
 
     if (verdict === "counter_conditions") {
-      void persistNegotiationOutcome(buyPreview, "countered");
+      void persistNegotiationOutcome(buyPreview, "countered").then(() =>
+        setBuyPreviewRefreshNonce((current) => current + 1),
+      );
       const conditions = buyPreview.counterConditions ?? null;
       const lengthLabel = conditions ? `${conditions.contractLength} Saison${conditions.contractLength === 1 ? "" : "en"}` : "eine andere Laufzeit";
       const shapeLabel = conditions ? formatContractShapeLabel(conditions.contractShape) : "eine andere Form";

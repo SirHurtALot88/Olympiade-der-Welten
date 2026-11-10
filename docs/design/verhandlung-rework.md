@@ -593,6 +593,8 @@ selbst misst gegen `D0` — sonst würde der Aufschlag seinen eigenen Trigger ve
 Persistiert wird `s` **nur beim Klick auf „Verhandeln"** (9.4); beim Tippen zeigt die
 Vorschau `s_offer` als Hypothese an („Wenn du DAS verhandelst, steigt seine Forderung auf
 X"). Was die Vorschau zeigt, ist exakt das Klick-Ergebnis — WYSIWYG wie beim Verdikt.
+**Zurückgenommen am 10.11. (Abschnitt 12.1):** die Hypothese wird weiter gerechnet, aber
+nicht mehr angezeigt — der Aufschlag wird erst nach dem Klick sichtbar.
 
 ### Warum genau diese Konstanten
 
@@ -616,7 +618,7 @@ X"). Was die Vorschau zeigt, ist exakt das Klick-Ergebnis — WYSIWYG wie beim V
 - **Rundung 0,005:** Anzeige in halben Prozentpunkten, keine krummen Zahlen im Tooltip.
 - **Monotones `max`:** Neuöffnen des Dialogs, Umtippen, Konditionenwechsel — nichts
   schüttelt den Aufschlag ab. Es zählt der tiefste je **verhandelte** Griff. Tippen ist
-  frei (die Vorschau warnt), Verhandeln klebt.
+  frei, Verhandeln klebt. (Bis 10.11. warnte die Vorschau vorher — siehe 12.1.)
 
 ### Rücknehmbar oder klebrig?
 
@@ -1092,7 +1094,8 @@ naheliegenden Lesarten sind kaputt:
 Gebaut ist deshalb: **Auslöser misst gegen `D0`, Verdikt rechnet gegen `D′` mit dem bereits
 VERHANDELTEN Aufschlag.** Die Vorschau weist den neuen Aufschlag als Hypothese aus
 (`pendingDefianceSurchargePct`), der Klick schreibt ihn fest. Das ist zugleich das WYSIWYG, das
-Abschnitt 9.1 verlangt: was der Banner ankündigt, ist exakt das Klick-Ergebnis.
+Abschnitt 9.1 verlangt: was der Banner ankündigt, ist exakt das Klick-Ergebnis. (Der Banner ist
+seit 10.11. weg, die Rechnung bleibt — Abschnitt 12.1.)
 
 **Und: der Abbruch misst ebenfalls gegen `D0`.** Sonst könnte ein Aufschlag, den der Spieler
 selbst ausgelöst hat, dasselbe Angebot eine Runde später zum Vertrauensbruch machen — zweimal
@@ -1155,9 +1158,114 @@ Dazu im Kaufdialog zwei Banner, und die Trennung ist der Punkt: einer sagt, was 
 andere, was ein Klick auslösen WÜRDE. Ohne den zweiten wäre der Aufschlag eine Überraschung nach
 dem Klick; ohne den ersten wäre die erhöhte Forderung unerklärt.
 
+**Stand 10.11.:** der zweite Banner (und sein Tooltip-Satz) ist entfernt — die Überraschung nach
+dem Klick ist jetzt gewollt. Siehe 12.1.
+
 ## 11.7 Weiterhin offen
 
 - `base_interest` ist weiterhin eine Konstante 45 (Abschnitt 10.5).
 - Vier W-Zutaten bleiben an diesem Spielstand stumm, weil ihm die Ausbaustufen und die
   Verhandlungshistorie fehlen (Abschnitt 10.5) — kein Defekt, aber beim nächsten Kalibrieren zu
   beachten.
+
+---
+
+# 12. Nachtrag 10.11.: Verhandeln ist ein Risiko, und Entgegenkommen kommt an
+
+## 12.1 Keine Vorab-Warnung mehr vor dem Trotz-Aufschlag
+
+Chris, per Screenshot einer Kandidatenkarte, wörtlich: „die warnung darf doch nicht auftauchen
+bevor ich verhandle!!! das macht es ja sonst zu einfach das ist eher wenn ich verhandle und der
+spieler dadurch beleidigt ist".
+
+Damit ist das WYSIWYG aus 9.1/11.2 („was der Banner ankündigt, ist exakt das Klick-Ergebnis")
+**bewusst zurückgenommen.** Wer vorher sieht, ab welchem Angebot ein Sturer beleidigt ist, tastet
+sich gefahrlos bis an die Linie heran — Verhandeln hätte kein Risiko. Jetzt gilt:
+
+- **Die Mechanik bleibt unverändert.** `pendingDefianceSurchargePct` wird weiter in der Vorschau
+  gerechnet und beim Klick auf „Verhandeln" zu `defianceSurchargePct` festgeschrieben (monoton,
+  klebrig für den Draft, genullt bei Vertrauensbruch). Dieselbe Zahl, nur unsichtbar bis zum Klick.
+- **Entfernt** sind alle drei Vorab-Stellen: der Banner „Dieses Angebot nimmt er persönlich"
+  (`transfer-buy-defiance-pending` in `FoundationMarketBuyShellHost.tsx`), der Tooltip-Satz „Dieses
+  Angebot würde ihn zusätzlich verärgern" (`use-market-buy-derivations.ts`) und der Warncode
+  `defiance_surcharge_pending` in den Listen „Hinweise"/„Risiken" — der Code steht weiter in den
+  Vorschau-Daten, wird aber nicht mehr angezeigt.
+- **Geblieben** ist der Banner „Er trägt euch euer Lowball-Angebot nach"
+  (`transfer-buy-defiance-active`): das ist Nachher-Feedback über einen Aufschlag, der schon gilt.
+  Damit er direkt nach dem Klick erscheint und nicht erst beim nächsten Tippen, holt der Dialog
+  nach einem Gegenangebot die Vorschau neu, sobald der Draft gespeichert ist (12.2).
+
+## 12.2 „Alle beharren auf ihrer Forderung": das Gedächtnis kam zu spät
+
+Chris, wörtlich: „wenn ich im transfermarkt nachverhandle, und dem spieler entgegen komme beharren
+alle immer auf ihrer forderung, sie verhandlne gar nicht richtig".
+
+Die Erwiderung aus 9.3 war gebaut und an der reinen Vorschau-Funktion getestet. Live nachgestellt
+(Dev-Server, Playwright, Kandidat öffnen → 0,88 × Forderung → Verhandeln → Angebot um 40 % der
+Lücke erhöhen → Verhandeln):
+
+- **Wartet man nach dem ersten Klick, bis gespeichert ist, kommt er entgegen** (z. B. Voidshard:
+  Konter 4,87, nachgelegt 4,80 → Erwiderung drückt die Lücke unter die Bagatelle, Zusage). Der
+  Schreib- und Lesepfad selbst (Draft mit `status: "countered"`, `lastCounterSalary`, gleichen
+  Konditionen) war in Ordnung.
+- **Legt man sofort nach, wie ein Mensch am Regler, kommt niemand entgegen** (z. B. Shadowgrave:
+  Konter 3,50, nachgelegt 3,28 → Konter wieder 3,50). Im Server-Log: die Vorschau zum neuen
+  Angebot war nach wenigen Millisekunden fertig, das Speichern des Verhandeln-Klicks brauchte
+  1,3–4,7 s (der ganze Spielstand wird geschrieben). Die Vorschau rechnete also **ohne Draft** —
+  gedächtnislos, und die gedächtnislose Formel nennt beim Nachlegen fast dieselbe Zahl (genau der
+  Befund aus 9.3). Diese Vorschau entschied dann den zweiten Klick, und der schrieb ihren
+  gedächtnislosen Konter als neues „letztes Wort" fest.
+
+**Ursache: ein Wiring-Fehler im Client, nicht die Kalibrierung.** `negotiateBuy()` schrieb den
+Draft per `void fetch` ohne Rückmeldung, und nichts hinderte die nächste Vorschau daran, vorher zu
+fragen. Behoben in `TransfermarktV2Client.tsx`: der laufende Schreibzugriff wird gemerkt
+(`negotiationWriteRef`), die Vorschau wartet vor ihrem `fetch` darauf, und nach einem Gegenangebot
+wird die Vorschau nach dem Speichern neu geholt.
+
+Zwei Nebenbefunde derselben Runde, beide mitbehoben:
+
+- **Cache-Schlüssel der Vorschau.** `buildLocalTransfermarktBuyPreviewFromContext` schlüsselte „kein
+  Angebot" als `salary` (Grundgehalt). Ohne Angebot rechnet die Vorschau aber mit der FORDERUNG als
+  Angebot. Wer genau das Grundgehalt tippte, bekam die Vorschau des Forderungs-Angebots — und der
+  Verhandeln-Klick schrieb die Forderung als eigenes Angebot in den Draft, worauf jedes spätere
+  Nachlegen als Rückzieher (`reject_affront`) galt. Gefunden an Nekara (Forderung 2,81, Angebot
+  0,9 × Forderung = 2,53 = Grundgehalt): Draft-Angebot 2,81, Nachlegen auf 2,67 → Absage wegen
+  Rückzieher. Jetzt: Platzhalter `"no-offer"`.
+- **Budget-Boden der Erwiderung.** `T_min = D·(min(R_full, P) − ρ)` misst gegen den Zielpunkt. Die
+  erste Runde nennt mit Härte `h < 1` aber einen Konter UNTER dem Ziel, bei flachen Angeboten oft
+  schon unter `T_min` — dann hob der Boden die Erwiderung bis an sein letztes Wort zurück. Neu:
+
+  ```
+  T_min = min( D·(min(R_full, P) − ρ),  C_formel − ρ·D )      // ohne geltenden Trotz-Aufschlag
+  T_min = D·(min(R_full, P) − ρ)                               // mit Trotz-Aufschlag (wie bisher)
+  ```
+
+  Das Budget `ρ` (1/2/3 %) bleibt dasselbe, es wird nur gegen das gemessen, was er ohne Gedächtnis
+  ohnehin nennen würde. Nach einem Lowball bleibt der alte Boden, damit Invariante 6 aus 9.5
+  (Lowball + Entgegenkommen nie billiger als ehrlich direkt) unangetastet bleibt. Invariante 5
+  lautet damit `C ≥ T_min` mit dem neuen `T_min`.
+
+Gemessen am Spielstand `swnjlk` (Team A-A, je bis 120 Kandidaten, Draft wirklich gespeichert,
+Runde 2 mit Schritt `max(1,1 % D, 40 % der Lücke)`):
+
+```
+Start   normal: kommt entgegen       stur: kommt entgegen
+        vorher       nachher          vorher      nachher
+0,86    92/97 −1,4%  97/97 −2,1%      0/15        0/15    (Lowball: Trotz, gewollt)
+0,90    92/98 −1,3%  97/98 −1,7%      16/20 −0,7% 20/20 −0,9%
+0,94    79/91 −1,2%  79/91 −1,3%      20/22 −0,7% 22/22 −0,8%
+```
+
+(Prozent = mittlere Senkung des Gegenangebots in % der Forderung. Wer bei 0,94 nicht „entgegen"
+kommt, ist beim Gehalt schon einig und verhandelt über die Vertragsform, `counter_conditions`.)
+Beides, was Chris erwartet, ist damit im Spiel sichtbar: Normale und Willige gehen mit, Sture
+nach einem Lowball nicht — die sind sauer und fordern mehr (Trotz, 9.1), was man jetzt erst
+NACH dem Klick erfährt.
+
+**Warum der alte Test grün war:** `tests/verhandlung-trotz-erwiderung.test.ts` füttert
+`lastCounterSalary` von Hand in die reine Vorschau. Die Lücke lag zwischen den Schichten. Neu ist
+`tests/verhandlung-nachverhandeln-roundtrip.test.ts`: Vorschau über den Markt-Service →
+Verhandeln über die echte Route `/api/singleplayer-state` → höheres Angebot → Vorschau über den
+Service, mit einem Persistenz-Double, das den Spielstand hält; dazu der Fall „Vorschau vor dem
+Speichern" und die Client-Reihenfolge (warten, dann neu holen).
+
