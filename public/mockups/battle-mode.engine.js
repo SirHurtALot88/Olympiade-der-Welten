@@ -38107,12 +38107,20 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
-  // ANZEIGE-TREUE-FIX A1 (09.11., docs/design/sendedauer-messung-09-11.md Abschnitt 2):
-  // eigener Akkumulator NUR fuer die Bahn (istBahn(disc)), getrennt von `acc`. `acc` zaehlt
-  // weiterhin in ECHTZEIT-Sechzigsteln (unveraendert, speist tickerSendeT/ticksSeitReset
-  // genau wie vorher); `bahnSimAcc` zaehlt dieselben Echtzeit-Sechzigstel ein zweites Mal,
-  // aber loest einen stepSim()-Aufruf erst aus, wenn `zeitFaktor()/60` davon zusammen sind
-  // -- und dieser Aufruf bekommt dann den FESTEN Takt `1/60`, nicht `(1/60)/zeitFaktor()`.
+  // ANZEIGE-TREUE-FIX A1 (09.11.) + B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs,
+  // 24 Saaten je Disziplin): eigener Akkumulator fuer jedes Chassis, dessen Physik sich
+  // ueber die Dauer eines Spiels per `rr()` summiert -- Bahn (istBahn(disc), A1), Kampf
+  // (istKampf(disc): TDM/Mini-DM/Battlefield, B1-Nachtrag) UND Feldspiel (istFeldspiel(disc):
+  // Hockey, B1-Nachtrag) --, getrennt von `acc`. Alle drei nachgemessen 24/24 Saaten
+  // abweichend vor diesem Fix (Battlefield sogar im SIEGER). `acc` zaehlt weiterhin in
+  // ECHTZEIT-Sechzigsteln (unveraendert, speist tickerSendeT/ticksSeitReset genau wie
+  // vorher); `bahnSimAcc` zaehlt dieselben Echtzeit-Sechzigstel ein zweites Mal, aber loest
+  // einen stepSim()-Aufruf erst aus, wenn `zeitFaktor()/60` davon zusammen sind -- und
+  // dieser Aufruf bekommt dann den FESTEN Takt `1/60`, nicht `(1/60)/zeitFaktor()`. Buehne
+  // bleibt AUSSEN VOR: derselbe B1-Nachtrag bestaetigt fuer Fechten/Gewichtheben (beide
+  // ZEIT_DEHNUNG!=1) 24/24 Saaten UEBEREINSTIMMEND -- rundenbasierte Entscheidungspunkte
+  // (stepBuehne()) sind tick-granularitaets-invariant, anders als die kontinuierliche
+  // Positions-/Kontakt-Simulation in Kampf/Feldspiel (wie bei der Bahn).
   // s. ausfuehrliche Begruendung am Kommentar in loop() direkt vor seiner Verwendung.
   let bahnSimAcc=0;
   // SONDEN-MODUS (A0.2, docs/design/deterministischer-sonden-modus-19-09.md): additiver
@@ -52146,7 +52154,20 @@
   // Schritt macht.
   function anzeigeSechzigstel(zf){
     tickerSendeT+=1/60; ticksSeitReset++;
-    if(istBahn(disc)){
+    // B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs, 24 Saaten je Disziplin):
+    // `istKampf(disc)` UND `istFeldspiel(disc)` ergaenzt -- TDM/Mini-DM/Battlefield (Duell)
+    // UND Hockey haben dieselbe Divergenz wie die Bahn vor A1 (24/24 Saaten abweichend je
+    // Disziplin, bei Battlefield sogar der SIEGER, s. Kommentar an der Deklaration von
+    // `bahnSimAcc` oben). Buehne (Fechten/Gewichtheben, ebenfalls ZEIT_DEHNUNG!=1) bleibt
+    // AUSSEN VOR -- dieselbe Messung ergab dort 24/24 UEBEREINSTIMMEND: `stepBuehne()`
+    // trifft seine Entscheidungen an diskreten Rundengrenzen (Zeit-Schwellenwerte), die
+    // tick-granularitaets-invariant sind, waehrend Kampf/Feldspiel kontinuierliche
+    // Positions-/Kontakt-Simulationen sind wie die Bahn (kleinerer dt -> mehr Ticks bei
+    // gleicher Sim-Zeit -> mehr/andere rr()-Ziehungen entlang des Wegs, selbst ohne einen
+    // explizit dt-skalierten Wurf wie bei stepSpurt() -- die Positionsintegration selbst
+    // (`u.x+=...*dt`) akkumuliert bei anderer Schrittzahl einen anderen Rundungs-/Kontakt-
+    // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
+    if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
       bahnSimAcc+=1/60;
       while(bahnSimAcc>=zf/60){ stepSim(1/60); bahnSimAcc-=zf/60; }
     } else {
