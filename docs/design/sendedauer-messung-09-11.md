@@ -178,3 +178,52 @@ Vorher/nachher-Vergleich: lief die Anzeige-Treue für ein Ziel vorher „abweich
 sie es nachher, ist das kein neuer Befund. Wird aus „übereinstimmend" ein „abweichend", ist
 die Faktoränderung laut Fahrplan-Regel NICHT erlaubt, ohne sie in kleineren Schritten zu
 suchen oder den Fall an den PM zurückzugeben.
+
+## 6. Nachtrag 10.11.: die sechs "Rest"-Disziplinen zu Ende gemessen (Fechten/Gewichtheben voll)
+
+Fortsetzung von `scripts/miss-anzeige-treue-rest.mjs` (Commit `5fa5d1105`, Kopfkommentar dort
+für Methode/Architektur-Befund): die Vorgänger-Session hatte für Fechten nur n=4 Saaten als
+Rauchtest geschafft, der volle 24-Saaten-Lauf für alle sechs Ziele war beim Abgeben noch offen.
+Dieser Auftrag hat **nur die beiden praktisch relevanten Ziele** nachgeholt — Fechten und
+Gewichtheben sind die einzigen der sechs, die heute tatsächlich über `MOTOREN[d].lauf()`
+produktionsgebucht werden (`lib/battle/arena-resolved-disciplines.ts`,
+`ARENA_RESOLVED_DISCIPLINE_IDS`, nachgeprüft: `gewichtheben` und `fechten` stehen drin; `tdm`/
+`mini-dm`/`battlefield` nie, weil ihr Saisonergebnis aus der PPS-Duell-Brücke bzw. dem
+vorab entschiedenen Pod-Gefecht kommt; `hockey` ist "angeschlossen", aber wegen der 25-Pp-
+Schranke ausdrücklich NICHT in der Menge — Kommentar dort: "HOCKEY BEWUSST NICHT HIER").
+
+```
+node scripts/miss-anzeige-treue-rest.mjs fechten gewichtheben --saaten=24
+```
+
+| Ziel | Saaten mit Abweichung |
+|---|---:|
+| Fechten | 0 / 24 |
+| Gewichtheben | 0 / 24 |
+
+**Entwarnung für beide.** "Gezeigt = gebucht" stimmt über alle 24 Saaten exakt überein, sowohl
+beim Sieger als auch bei der nach `wert()` sortierten Rangliste — der Architektur-Befund im
+Skript-Kopfkommentar (nur zwei dt-skalierte `rr()`-Würfe im ganzen Motor, beide in `stepSpurt()`
+und bereits durch PR #1372 behoben; keine weitere Stelle in `stepFeldspiel()`/`stepBuehne()`/dem
+Kampf-Teil von `stepSim()`) hält damit auch für die Buehne, nicht nur in der Theorie.
+
+Vorher/Nachher-Beleg, dass die additive Sonde (reine Lesefunktion, kein `rr()`-Aufruf) die
+Wertung nicht berührt — gemessen an Commit `a66cb12ef` (vor der Sonde) gegen den aktuellen Stand
+(`5fa5d1105`, mit Sonde), beide Mal `node scripts/miss-alle-disziplinen.mjs 24 fechten
+gewichtheben`:
+
+| Disziplin | rho je Spiel vorher | rho je Spiel nachher |
+|---|---:|---:|
+| Gewichtheben | 0,865 | 0,865 |
+| Fechten | 0,860 | 0,860 |
+
+Bit-identisch, wie erwartet. Dazu `node scripts/pruefe-wertung-fingerabdruck.mjs` am aktuellen
+Stand bestätigt: GESAMT `22f04e06e285` (69 Einträge) — unverändert gegenüber dem bei der Sonde
+selbst schon dokumentierten Wert.
+
+**Weiterhin offen, falls jemand daran weiterarbeitet:** TDM, Mini-DM, Battlefield (Duell) und
+Hockey sind mit `miss-anzeige-treue-rest.mjs` noch nicht über die vollen 24 Saaten gemessen —
+für die ersten drei fehlt dafür ohnehin ein echter "gebucht"-Begriff aus der Produktion (die
+Sonde baut sich für sie nur einen Ad-hoc-Vergleich über `diszSonde()`, s. Skript-Kopfkommentar
+Abschnitt "WICHTIG"), für Hockey läuft die Saison bis zur Pp-Korrektur sowieso noch über die
+PPS-Brücke. Keiner der vier war Teil dieses Auftrags.
