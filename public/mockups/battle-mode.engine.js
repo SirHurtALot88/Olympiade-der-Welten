@@ -45336,10 +45336,13 @@
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
         negativ: {label:"Negativ-Split", tempo:0.88, sucht:0, ab:0.55,
                   text:"Erste Hälfte verhalten, zweite Hälfte alles. Verlangt Kopf und Reserve."},
-        // ANZEIGENAME "Vollgas" statt "Attacke" (Chris' Screenshot 10.11.): ueber dem Fahrer
-        // las sich "Attacke" wie ein Kampf-Status. Nur der angezeigte Name; Schluessel `attacke`,
-        // `planJeSlot` und alle Werte bleiben, die Wertung liest das Label nirgends.
-        attacke: {label:"Vollgas",       tempo:1.00, sucht:0, ab:0.60,
+        // Label "Attacke" bewusst NICHT umbenannt (Gegencheck 10.11.): `spiele()` schreibt das
+        // Plan-Label mit in sein Ergebnis, ein geaenderter Name verschiebt dadurch trotz
+        // identischer Zeiten/Raenge/Punkte den Fingerabdruck-Hash (GESAMT) -- s. Befund im
+        // Nachtrag unten. Um die Pflicht-Regressionsschranke strikt byte-identisch zu halten,
+        // bleibt der Schluessel UND das angezeigte Label "Attacke"; Chris kann das separat
+        // entscheiden, falls ihm der Name noch wichtig ist.
+        attacke: {label:"Attacke",       tempo:1.00, sucht:0, ab:0.60,
                   text:"Von Beginn an über der eigenen Schwelle. Geht auf oder geht schief."}
       },
       planJeSlot:{pacer:"gleich", linereader:"gleich", aerodrive:"attacke",
