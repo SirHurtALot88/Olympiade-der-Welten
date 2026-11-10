@@ -19,7 +19,6 @@ import { setFoundationView } from "@/lib/foundation/foundation-navigation";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   getScoutingWishlistSlotLimit,
-  getTeamTransferWishlistEntries,
   isTeamSetupDraftWishlistPhase,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
@@ -162,6 +161,7 @@ export default function FoundationMarketV2ShellHost({
     transferMarketScoutingWatchPlayerIds,
     transferMarketScoutingIntelByPlayerId,
     transferMarketActiveWishlistPlayerIds,
+    transferMarketCompletedWishlistPlayerIds,
     selectedTransfermarktBoardObjectives,
     transferMarketDisciplineRanksByTeamId,
   } = useMarketV2Derivations({
@@ -228,9 +228,12 @@ export default function FoundationMarketV2ShellHost({
         scoutingWatchPlayerIds: transferMarketScoutingWatchPlayerIds,
         scoutingIntelByPlayerId: transferMarketScoutingIntelByPlayerId,
         scoutingActiveWishlistPlayerIds: transferMarketActiveWishlistPlayerIds,
+        scoutingCompletedWishlistPlayerIds: transferMarketCompletedWishlistPlayerIds,
         scoutingPipelineCapacity: activeManagerTeamId
           ? {
-              occupied: getTeamTransferWishlistEntries(gameState, activeManagerTeamId).length,
+              // Seit 11.11. zählen nur die AKTIV gescouteten Einträge — die Wunschliste selbst ist
+              // unbegrenzt (Chris: „endlos viele Spieler").
+              occupied: transferMarketActiveWishlistPlayerIds.length,
               max: getScoutingWishlistSlotLimit(gameState, activeManagerTeamId),
               draftSuspended: isTeamSetupDraftWishlistPhase(gameState, activeManagerTeamId),
             }

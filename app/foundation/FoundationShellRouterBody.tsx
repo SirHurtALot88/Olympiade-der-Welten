@@ -76,6 +76,7 @@ import {
   getTransfermarktScoutingDisclosure,
   getViewSourceBadgeLabel,
   HOME_HIDDEN_WARNING_KEYS,
+  getScoutingWishlistSlotLimit,
   isTeamSetupDraftWishlistPhase,
   joinClassNames,
   normalizeFoundationSaveMode,
@@ -2237,6 +2238,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onOpenFacilities={() => setFoundationView("facilitiesOverviewV2", setActiveView)}
                 onOpenPlayer={(playerId) => void openPlayerDrawerById(playerId)}
                 queueEntries={scoutingQueueEntries}
+                wishlistSlotLimit={selectedTeam ? getScoutingWishlistSlotLimit(gameState, selectedTeam.teamId) : null}
                 focusEtaLabel={
                   scoutingFocusSummary && Number.isFinite(scoutingFocusSummary.etaMatchdays)
                     ? `noch ${scoutingFocusSummary.etaMatchdays} Spieltag${scoutingFocusSummary.etaMatchdays === 1 ? "" : "e"}`
