@@ -50179,10 +50179,35 @@
         // darunter.
         u.vizHuerdeTon=false; u.vizRissTon=false; u.vizZielTon=false; u.vizHuerde=0;
       }
-      // WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL — derselbe Gedanke wie
-      // stepZeitfahrens Startrampe, hier an `u.huerde>0` statt an `u.startT` gegated.
-      const faehrt=u.fertig==null && !(u.huerde>0);
-      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
+      // BUGFIX (Chris' Meldung, Screenshot "Von vorn"/Nahili-Ke: "sie hat beim rennen
+      // teilweise immer die stand animation noch mit drin"): die Zeile stand bis hierher
+      // als `const faehrt=u.fertig==null && !(u.huerde>0); if(faehrt)u.vizSchritt+=...` —
+      // "WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL, derselbe Gedanke wie
+      // stepZeitfahrens Startrampe". Das stimmte, SOLANGE `u.huerde>0` auch wirklich
+      // `u.v===0` bedeutete. Seit dem "Kriechen"-Paket (spurtSaeule.kriechen, per Default
+      // AN, s. `let spurtSaeule={aktiv:true,...,kriechen:true}` oben und Chris' Freigabe
+      // 04.10.) ist das nicht mehr so: tempoVon() multipliziert waehrend `u.huerde>0` mit
+      // `(u.kriechK||0)` statt mit 0 (Spurt: `kriechAnteil:0.25`, s. BAHN_ART.spurt) — der
+      // Laeufer KRIECHT mit 25% Tempo weiter vorwaerts, steht also nicht mehr wirklich.
+      // Nachgemessen (Playwright, echtes Spurt-Rennen): `u.pos` ruckelt an jeder der sieben
+      // Huerden-Stationen sichtbar weiter (v ~25% statt 0), waehrend `u.vizSchritt` hier
+      // exakt einfriert (gemessen: 20 Frames in Folge exakt derselbe Wert) — die Figur
+      // gleitet die ganze Stationsdauer (`huerdePreis`, hier 1,45s) im eingefrorenen
+      // Gehbild voran: genau die "Stand-Animation mitten im Rennen", die Chris sah, und das
+      // an JEDER der sieben Stationen, nicht nur bei einem echten Sturz (den zeigt ohnehin
+      // schon `u.down` -> "hurt"/"tod", unabhaengig von dieser Zeile).
+      //
+      // FIX: derselbe Lesezugriff wie bei stepParcours/stepClimbing (`u.v`, das tempoVon()
+      // bereits korrekt auf die Kriech-Geschwindigkeit herunterskaliert hat) OHNE die
+      // zusaetzliche `!(u.huerde>0)`-Bremse — ist `u.v` durch das Kriechen klein, aber
+      // nicht 0, laeuft die Schrittphase proportional langsam mit statt stillzustehen; ist
+      // `u.v` (z. B. ohne das Kriechen-Paket, QA-Schalter aus) wirklich 0, bleibt die
+      // Schrittphase trotzdem von selbst stehen (0*dt=0) — bit-identisch zum alten
+      // Verhalten fuer genau den Fall, fuer den es gedacht war. Reine Praesentation: liest
+      // nur `u.v`/`u.fertig`, schreibt ausschliesslich `u.vizSchritt` (dasselbe Feld wie
+      // vorher), kein rr(), keine Ruecklesung durch tempoVon()/MOTOREN.spurt.wert() —
+      // derselbe Vertrag wie der Rest dieser Funktion.
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
       // ---- HUERDEN-TON (TON_KATALOG.spurt.huerde), an der KANTE `u.huerde>0`: feuert nur
       // beim EINTRITT in den Hindernis-Stopp, nicht in jedem Frame, waehrend er anhaelt.
       const huerdeAktiv=u.huerde>0;
