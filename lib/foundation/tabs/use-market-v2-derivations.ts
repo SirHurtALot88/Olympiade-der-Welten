@@ -20,7 +20,7 @@ import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scou
 import { buildPlayerDevelopmentInsight } from "@/lib/progression/player-potential-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
-import { getActiveScoutingWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
+import { getActiveScoutingWishlistEntries, getScoutingWishlistQueue } from "@/lib/scouting/scouting-wishlist-slots";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
 
 export type TransferMarketV2RosterRow = {
@@ -183,6 +183,17 @@ export function buildTransferMarketActiveWishlistPlayerIds(
   return getActiveScoutingWishlistEntries(gameState, activeManagerTeamId).map((entry) => entry.playerId);
 }
 
+/** Voll gescoutete Wunschlisten-Spieler (belegen seit 11.11. keinen Scout-Slot mehr). */
+export function buildTransferMarketCompletedWishlistPlayerIds(
+  gameState: GameState,
+  activeManagerTeamId: string | null,
+): string[] {
+  if (!activeManagerTeamId) {
+    return [];
+  }
+  return getScoutingWishlistQueue(gameState, activeManagerTeamId).completed.map((entry) => entry.playerId);
+}
+
 export function buildSelectedTransfermarktBoardObjectives(
   selectedTeamObjectives: TeamSeasonObjectiveRecord[],
 ): TeamSeasonObjectiveRecord[] {
@@ -263,6 +274,11 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
     [input.activeManagerTeamId, input.gameState],
   );
 
+  const transferMarketCompletedWishlistPlayerIds = useMemo(
+    () => buildTransferMarketCompletedWishlistPlayerIds(input.gameState, input.activeManagerTeamId),
+    [input.activeManagerTeamId, input.gameState],
+  );
+
   const selectedTransfermarktBoardObjectives = useMemo(
     () => buildSelectedTransfermarktBoardObjectives(input.selectedTeamObjectives),
     [input.selectedTeamObjectives],
@@ -286,6 +302,7 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
     transferMarketScoutingWatchPlayerIds,
     transferMarketScoutingIntelByPlayerId,
     transferMarketActiveWishlistPlayerIds,
+    transferMarketCompletedWishlistPlayerIds,
     selectedTransfermarktBoardObjectives,
     transferMarketDisciplineRanksByTeamId,
   };

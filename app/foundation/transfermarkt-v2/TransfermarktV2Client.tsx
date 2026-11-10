@@ -66,6 +66,7 @@ export type TransfermarktV2ClientProps = {
   scoutingIntelByPlayerId?: Record<string, number>;
   scoutingPipelineCapacity?: { occupied: number; max: number | null; draftSuspended?: boolean } | null;
   scoutingActiveWishlistPlayerIds?: string[];
+  scoutingCompletedWishlistPlayerIds?: string[];
   onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
   /**
    * `gameStateAfter` ist der bereits vom Kauf-Endpunkt berechnete Folgezustand (kompakt, siehe
@@ -653,6 +654,7 @@ export default function TransfermarktV2Client({
   scoutingIntelByPlayerId = {},
   scoutingPipelineCapacity = null,
   scoutingActiveWishlistPlayerIds = [],
+  scoutingCompletedWishlistPlayerIds = [],
   onToggleScoutingWatch,
   onBuyCompleted,
   initialPlayerId = null,
@@ -1056,22 +1058,10 @@ export default function TransfermarktV2Client({
     selectedPlayer && scoutingIntelByPlayerId[selectedPlayer.playerId] != null
       ? scoutingIntelByPlayerId[selectedPlayer.playerId]!
       : null;
-  // Anders als die Scouting-Pipeline unten (im Draft praktisch unbegrenzt,
-  // Grenze 999) hat die Wunschliste selbst im Draft eine echte Grenze (15,
-  // siehe DRAFT_TRANSFER_WISHLIST_SLOT_LIMIT) — die Voll-Prüfung gilt also in
-  // beiden Phasen, nur die Meldung unterscheidet sich.
-  const wishlistSlotsFull = Boolean(
-    scoutingPipelineCapacity &&
-      scoutingPipelineCapacity.max != null &&
-      scoutingPipelineCapacity.max > 0 &&
-      scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
-      !selectedPlayerWishlisted,
-  );
-  const wishlistDisabledReason = !wishlistSlotsFull
-    ? null
-    : scoutingPipelineCapacity?.draftSuspended
-      ? `Wunschliste im Draft voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — erst einen Spieler entfernen.`
-      : `Wunschliste voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`;
+  // Seit 11.11. ist die Wunschliste unbegrenzt (Chris: „endlos viele Spieler") — der Knopf wird
+  // nie mehr gesperrt. Sind die aktiven Scout-Slots belegt, wartet ein neuer Eintrag nur, bis oben
+  // einer fertig wird; das sagt der Tooltip, statt den Knopf zu sperren.
+  const wishlistDisabledReason: string | null = null;
   const scoutingPipelineFull = Boolean(
     scoutingPipelineCapacity &&
       !scoutingPipelineCapacity.draftSuspended &&
@@ -2482,6 +2472,7 @@ export default function TransfermarktV2Client({
         wishlistEntries={selectedWishlistEntries}
         scoutingIntelByPlayerId={scoutingIntelByPlayerId}
         scoutingActiveWishlistPlayerIds={scoutingActiveWishlistPlayerIds}
+        scoutingCompletedWishlistPlayerIds={scoutingCompletedWishlistPlayerIds}
         scoutingPipelineCapacity={scoutingPipelineCapacity}
         onFocusWishlistEntry={(entry) => {
           void focusWishlistEntry(entry);

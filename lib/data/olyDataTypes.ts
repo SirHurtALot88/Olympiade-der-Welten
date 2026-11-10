@@ -1769,6 +1769,12 @@ export type PlayerScoutIntelRecord = {
   startedAt: string;
   lastTickAt: string | null;
   ticksCompleted: number;
+  /**
+   * Geparkt (seit 11.11.): Wunschlisten-Eintrag außerhalb der aktiven Scouting-Queue (fertig
+   * gescoutet oder unter die aktiven Plätze sortiert). Fortschritt bleibt erhalten, tickt aber
+   * nicht und belegt keinen Slot. Fehlt bei alten Saves = aktiv.
+   */
+  parked?: boolean;
 };
 
 export type SponsorPayoutLogRecord = {

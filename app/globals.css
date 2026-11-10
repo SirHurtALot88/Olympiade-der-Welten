@@ -81460,3 +81460,203 @@ span.nl-facility-ampel-chip {
 @media (prefers-reduced-motion: reduce) {
   .oly-figur-sprite-frame { animation: none !important; }
 }
+
+/* ── Scouting-Ausbau 11.11.: Bewertungskreis (FM27-Ring) + Scout-Bericht ──────────────────────
+   Konzept: docs/design/scouting-ausbau-konzept-11-11.md. Ring = Scouting-%, Mitte = Note. */
+.scout-grade-ring {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.scout-grade-ring.is-clickable {
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.scout-grade-ring.is-clickable:focus-visible {
+  outline: 2px solid var(--nl-accent, #5b9bff);
+  outline-offset: 2px;
+}
+
+.scout-grade-ring-disc {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(9, 15, 27, 0.65);
+}
+
+.scout-grade-ring-disc svg {
+  position: absolute;
+  inset: 0;
+}
+
+.scout-grade-ring-track {
+  stroke: rgba(148, 163, 184, 0.22);
+}
+
+.scout-grade-ring-fill {
+  transition: stroke-dasharray 320ms ease;
+}
+
+.scout-grade-ring-copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.scout-grade-ring-grade {
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: -0.02em;
+}
+
+.scout-grade-ring.is-md .scout-grade-ring-grade {
+  font-size: 1.35rem;
+}
+
+.scout-grade-ring-percent {
+  font-size: 0.55rem;
+  opacity: 0.7;
+  margin-top: 1px;
+}
+
+.scout-grade-ring.is-md .scout-grade-ring-percent {
+  font-size: 0.68rem;
+  margin-top: 3px;
+}
+
+.scout-grade-ring-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.scouting-queue-row {
+  grid-template-columns: auto auto auto 1fr auto auto auto;
+}
+
+.scouting-queue-row.is-completed {
+  border-color: rgba(76, 197, 107, 0.35);
+}
+
+.scout-verdict-report {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 138, 187, 0.22);
+  background: rgba(11, 18, 32, 0.78);
+}
+
+.scout-verdict-report.is-compact {
+  margin: 6px 0 4px 44px;
+}
+
+.scout-verdict-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.scout-verdict-head-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.scout-verdict-summary {
+  margin: 0;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.scout-verdict-criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.scout-verdict-criterion {
+  display: grid;
+  grid-template-columns: 18px 84px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.scout-verdict-criterion-mark {
+  display: inline-flex;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.scout-verdict-criterion.is-positive .scout-verdict-criterion-mark {
+  color: var(--nl-good, #4cc56b);
+}
+
+.scout-verdict-criterion.is-negative .scout-verdict-criterion-mark {
+  color: var(--nl-risk, #e5615a);
+}
+
+.scout-verdict-criterion.is-neutral .scout-verdict-criterion-mark {
+  color: var(--nl-mut, #93a3bd);
+}
+
+.scout-verdict-axes {
+  display: grid;
+  gap: 8px;
+}
+
+.scout-verdict-axis-ranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scout-verdict-axis-rank {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 138, 187, 0.25);
+  font-size: 0.78rem;
+}
+
+.scout-verdict-axis-rank b {
+  color: var(--nl-tone, inherit);
+}
+
+@media (max-width: 900px) {
+  .scouting-queue-row {
+    grid-template-columns: auto auto 1fr auto auto;
+  }
+
+  .scout-verdict-report.is-compact {
+    margin-left: 0;
+  }
+
+  .scout-verdict-criterion {
+    grid-template-columns: 18px 1fr;
+  }
+
+  .scout-verdict-criterion > span:last-child {
+    grid-column: 2;
+  }
+}
