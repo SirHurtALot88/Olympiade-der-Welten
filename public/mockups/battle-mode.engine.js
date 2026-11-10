@@ -4618,23 +4618,43 @@
     return true;
   }
   // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
-  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
-  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
-  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
-  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
-  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  //   u.down (ohne vizSturz) -> "tod"    (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.vizSturz             -> "treffer" (dieselbe Einmal-dann-halten-Formel, aber auf dem
+  //                              treffer-Streifen -- s. STURZ STATT TOD unten)
+  //   u.lunge>0              -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken          -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung            -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst                  -> Grundpose der Blickrichtung (Stehen)
   // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
   // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
-  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o./Sturz.
+  //
+  // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3): die
+  // 360-Pixel-Figuren haben vier Animationsarten (walk/angriff/treffer/tod), und Chris hat
+  // Tod-Animationen am 07.11. ausdruecklich blutig/dramatisch freigegeben (CLAUDE.md, Abschnitt
+  // "PixelLab-Tod-Animationen"). Vorher bildete diese Funktion JEDES `u.down`/`u.vizSturz` auf
+  // "tod" ab -- ein Abrutschen am Klettergriff, ein Eiskunstlauf-Sturz, ein Showcase-Patzer und
+  // ein Hockey-Bodycheck sahen damit wie ein echter K.o./Tod aus, und wuerden mit jeder
+  // kuenftigen Politur an den Tod-Animationen zunehmend blutiger. `u.vizSturz` ist seit
+  // stepKuer() (Eiskunstlauf) und der Showcase-Akrobatik ohnehin das eigene, rein
+  // praesentationale Sturz-Feld (bewusst GETRENNT vom Kampf-/Simulationsfeld `u.down`, s. die
+  // Kommentare an den Setzstellen) -- jetzt setzen Climbing (zeichneSpurt, `u.stolper>0`) und
+  // Hockey (HK_STURZ) es ebenfalls, und diese Funktion liest es: ein Sturz zeigt die
+  // treffer- (Hit-/Taumel-)Animation statt der Tod-Animation. Ein ECHTER K.o. (Arena/TDM/
+  // Battlefield, `u.down` OHNE `vizSturz`) bleibt unveraendert "tod". Rein praesentational --
+  // `istUnten` fasst beide Faelle weiterhin zusammen (haelt Laufzyklus/Waffen/Effekte an, s.
+  // unten), nur die ART-Wahl und die Standbild-Ersatzpose unterscheiden jetzt zusaetzlich nach
+  // `istSturz`.
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
     const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
     const fussY=y+PIXEL_FUSS*G;
-    const istUnten=!!u.down||!!u.vizSturz;
+    const istSturz=!!u.vizSturz;
+    const istUnten=!!u.down||istSturz;
     let rec=pixelAnzeige.get(u);
     // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
-    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    // Ansicht): gleich das Endbild der K.o./Sturz-Animation statt sie von vorn abzuspielen.
     if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
     if(typeof u.hp==="number"){
       if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
@@ -4646,7 +4666,7 @@
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
-    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    const art=istUnten?(istSturz?"treffer":"tod"):istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4674,7 +4694,12 @@
         const e=z.bilder.get(stamm+"-"+d+".png");
         if(e&&e.im&&e.mass){
           let f;
-          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          // `istUnten` statt des literalen art==="tod": ein Sturz waehlt oben den
+          // treffer-Streifen (`art="treffer"`), spielt ihn aber mit derselben
+          // Einmal-dann-letztes-Bild-Formel wie ein echter K.o. ab (ueber `rec.downT`, nicht
+          // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
+          // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
+          if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
           else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
@@ -4698,11 +4723,14 @@
     let dx=0,dy=0,winkel=0;
     if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
     else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
-    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
-    else if(art==="tod"){
+    // `istUnten` vor dem literalen art==="treffer"-Zweig: ohne Animationsstreifen (Grundpose-
+    // Ersatzbewegung) soll ein Sturz genauso umkippen wie ein echter K.o. (neutraler als die
+    // HP-Zuck-Wobble unten, die bei einem zeitlich unbegrenzten Sturz nie zur Ruhe kaeme).
+    else if(istUnten){
       const k=Math.min(1,(t-(rec.downT??t))/0.5);
       winkel=(vor<0?-1:1)*k*Math.PI/2;
-    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    }else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
     zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
@@ -11536,6 +11564,22 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // STURZ STATT TOD, NICHT-AUFZAEHLBAR GESETZT (Opus-Review 10.11., Fingerabdruck-Fund): ein
+  // einfaches `traeger.vizSturz=true` haette den Wertungs-Fingerabdruck verschoben, OBWOHL
+  // wert()/sieger()/punkte NICHT ein einziges Bit anders ausfallen (nachgemessen,
+  // scripts/pruefe-wertung-fingerabdruck.mjs) -- `A.spiele("hockey",s).protokoll` (fsZuege)
+  // haengt an manchen Eintraegen eine rohe Objektreferenz auf den Spieler (`deckt`, s. die
+  // Zyklus-Behandlung im Fingerabdruck-Skript), und ein neues AUFZAEHLBARES Feld auf diesem
+  // Objekt taucht dort beim JSON.stringify() prompt wieder auf, rein als Artefakt der
+  // Protokoll-Rohreferenz, nicht als Wertungsaenderung. `Object.defineProperty(...,{enumerable:
+  // false})` haelt `u.vizSturz` fuer zeichnePixelFigur()/jeden gewoehnlichen Lesezugriff
+  // unveraendert lesbar, aber unsichtbar fuer JSON.stringify()/{...u}/for-in -- genau das macht
+  // aus einer zufaelligen Protokoll-Verschiebung wieder ein bit-identisches Protokoll.
+  function vizSturzSetzen(u,wert){
+    if(!Object.getOwnPropertyDescriptor(u,"vizSturz"))
+      Object.defineProperty(u,"vizSturz",{value:wert,writable:true,configurable:true,enumerable:false});
+    else u.vizSturz=wert;
+  }
   // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
   // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
   // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
@@ -15090,7 +15134,13 @@
         // Bully in der Zone des bestraften Teams, und der Gefoulte bekommt die Scheibe.
         if(rr()<HK_FOUL_ANTEIL&&verhaengeStrafe(decker,traeger,"Bandencheck")){
           traeger.taumeltBis=fsT+HK_TAUMEL;
-          traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+          // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt
+          // 5.3): `down` bleibt das Simulationsfeld (sperrt den Spieler fuer Passziel-/
+          // Deckungs-Filter wie bisher, bit-identisch). `vizSturz` ist ZUSAETZLICH rein
+          // praesentational, genau wie bei stepKuer()/Showcase -- zeichnePixelFigur() liest es,
+          // um einen Hockey-Sturz auf die treffer- statt die tod-Animation zu legen. Fuer jede
+          // andere Disziplin bleibt das Feld immer undefined, also ohne jede Wirkung.
+          traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
           traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
           // DIE UEBERZAHL BEGINNT MIT DEM PUCK. Ein Bully tief in der Zone war der erste
           // Entwurf und ist gemessen falsch: der Anspielpunkt lag regelmaessig weiter als
@@ -15108,7 +15158,8 @@
           return;
         }
         traeger.taumeltBis=fsT+HK_TAUMEL;
-        traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+        // Sturz statt Tod: s. Kommentar im Foul-Zweig direkt oberhalb.
+        traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
         decker.checks++;
         // TON (Assets 80->100, TON_KATALOG.hockey.treffer): der sitzende, nicht gepfiffene
         // Bodycheck — der zu harte Zweig oben endet stattdessen in verhaengeStrafe()/pfiff.
@@ -16054,7 +16105,7 @@
     // 12 Spielen endete so, 3 von 6 mit noch laufendem Taumeln). Diese beiden Zeilen sind
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
-      if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.down&&fsT>=u.downBis){u.down=false;vizSturzSetzen(u,false);}
       // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
@@ -50514,7 +50565,12 @@
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
         // S-N5b: dieselbe Pose auch im Stationsduell (stationsDuellStoss, rein kosmetisch).
-        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3):
+        // `down` bleibt wie bisher (haelt die Figur an, s. die down-gesperrten Zweige oben in
+        // dieser Funktion) -- `vizSturz` ist zusaetzlich, rein praesentational, genauso wie bei
+        // stepKuer()/Showcase, und laesst zeichnePixelFigur() beim Abrutschen (Climbing) bzw.
+        // Stolpern (Huerden/Staffel) die treffer- statt die tod-Animation zeigen.
+        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,vizSturz:u.stolper>0,hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
