@@ -24,12 +24,17 @@ import {
   berechneBattlefieldPodEingabeHash,
   berechneMiniDmFfaEingabeHash,
 } from "@/lib/battle/arena-eingabe-hash";
-import { BAHN_POD_VORLAUF_AKTIV, BATTLEFIELD_POD_VORLAUF_AKTIV, MINI_DM_FFA_VORLAUF_AKTIV } from "@/lib/battle/arena-resolved-disciplines";
+import {
+  BAHN_POD_VORLAUF_AKTIV,
+  BATTLEFIELD_POD_VORLAUF_AKTIV,
+  MINI_DM_FFA_VORLAUF_AKTIV,
+  TDM_GEFECHT_VORLAUF_AKTIV,
+} from "@/lib/battle/arena-resolved-disciplines";
 import { runBahnPodMatchday } from "@/lib/resolve/bahn-pod-matchday";
 import { istBahnPodDisziplin, type BahnPodRohdaten } from "@/lib/resolve/bahn-pod-resolve";
 import { getPodsForMatchday, resolvePodPlayerCountForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 
-import { BATTLEFIELD_DISCIPLINE_ID, MINI_DM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
+import { BATTLEFIELD_DISCIPLINE_ID, MINI_DM_DISCIPLINE_ID, TDM_DISCIPLINE_ID } from "@/lib/season/season-discipline-schedule";
 import { runBattlefieldPodMatchday } from "@/lib/resolve/battlefield-pod-matchday";
 import {
   runMiniDmFfaMatchday,
@@ -121,6 +126,26 @@ function istBattlefieldPodVorlaufAktiv(): boolean {
 }
 
 /**
+ * TDM-GEFECHT (TDM-Gefecht-Verdrahtung 11.11.): derselbe Server-Notschalter-Typ wie die drei
+ * oben, eigene Variable `OLY_TDM_GEFECHT_VORLAUF=aus` (in `deploy/hetzner/.env`, danach
+ * `docker compose up -d`, s. die Anmerkung oben zum blossen Neustart). ANDERS ALS Mini-DM/
+ * Battlefield/Bahn-Pod schaltet dieser Schalter keinen eigenen Zweig in `fuehreVorlaufAus()`
+ * ab, sondern nimmt "tdm" aus `kandidaten` heraus (s. `determineArenaDisciplineContexts()`
+ * unten) -- TDM ist ein normales Zweier-Duell und steht deshalb selbst in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`; ohne diese zusaetzliche Pruefung wuerde der generische Weg B
+ * (Zeile "if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1))") TDM auch bei `aus` weiter aufnehmen.
+ * `false` laesst den Spieltag auf die PPS-Duell-Bruecke zurueckfallen (keine Mitgliedschaft in
+ * `arenaDisciplineIds` fuer diesen einen Aufruf).
+ */
+function istTdmGefechtVorlaufAktiv(): boolean {
+  const raw = typeof process !== "undefined" ? process.env?.OLY_TDM_GEFECHT_VORLAUF?.trim().toLowerCase() : undefined;
+  if (raw === "aus") {
+    return false;
+  }
+  return TDM_GEFECHT_VORLAUF_AKTIV;
+}
+
+/**
  * ARENA-VORLAUF (PR 3, K1 — `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
  * Abschnitt 2, insb. 2.2/2.6/2.7/5.2). DER EINE ORT, an dem ein Battle-Spieltag die Arena
  * tatsaechlich anwirft — Auto-Run (`matchday-auto-run-service.ts`), Kickoff
@@ -190,11 +215,16 @@ export function determineArenaDisciplineContexts(
   const kandidaten = new Set<string>();
   let miniDmPresent = false;
   let battlefieldPresent = false;
+  // TDM-GEFECHT (s. istTdmGefechtVorlaufAktiv() oben): "tdm" ist Mitglied von
+  // `ARENA_RESOLVED_DISCIPLINE_IDS` (normales Zweier-Duell, kein eigener Pod-Zweig wie Mini-DM/
+  // Battlefield), der Notschalter muss die generische Mitgliedschaftspruefung deshalb HIER
+  // zusaetzlich einschraenken statt (wie bei den Pod-Disziplinen) einen separaten Zweig zu gaten.
+  const tdmGefechtAktiv = istTdmGefechtVorlaufAktiv();
   for (const context of contexts) {
     const d1 = context.contextMeta.d1DisciplineId;
     const d2 = context.contextMeta.d2DisciplineId;
-    if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1)) kandidaten.add(d1);
-    if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2)) kandidaten.add(d2);
+    if (d1 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d1) && (d1 !== TDM_DISCIPLINE_ID || tdmGefechtAktiv)) kandidaten.add(d1);
+    if (d2 && ARENA_RESOLVED_DISCIPLINE_IDS.has(d2) && (d2 !== TDM_DISCIPLINE_ID || tdmGefechtAktiv)) kandidaten.add(d2);
     if (istMiniDmFfaVorlaufAktiv() && (d1 === MINI_DM_DISCIPLINE_ID || d2 === MINI_DM_DISCIPLINE_ID)) {
       miniDmPresent = true;
     }
