@@ -308,6 +308,14 @@ export type ArenaFixtureBoxscoreEintrag = {
    * `undefined` bedeutet dasselbe wie `false` fuer jeden Aufrufer, der dieses Feld liest.
    */
   torwart?: boolean;
+  /**
+   * GEWONNENE STATIONSDUELLE (Spurt, docs/design/spurt-stationsduell-sichtbar-10-11.md): direktes
+   * Passthrough von `window.__arena.spieleBahn()`s `duelle`-Feld, das der Motor nur fuer Spurt
+   * fuehrt. Reine PP-Nebenspur fuer `computeIndividualBoxscorePpsFromFixtureResults()` -- Chris
+   * 10.11.: "bringen dem team aber keine zusaetzlichen punkte fuers scoring". `seiten` (die
+   * Team-Wertung) und `wert` wissen davon nichts. Fehlt bei jeder anderen Disziplin.
+   */
+  duelle?: number;
 };
 
 /**
@@ -547,7 +555,7 @@ function bereiteFixturesVor(
  * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten). `torwart` fehlt im rohen Objekt ganz,
  * wenn `false` (s. battle-mode.engine.js, `spieleFeldspiel()`) -- deshalb optional hier.
  */
-type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean };
+type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean; duelle?: number };
 /** Rohform von `ArenaMomentEintrag` vor der `teamId`-Aufloesung (s. dort): `seite` ist hier noch 0/1. */
 type RoherBrowserMomentEintrag = { typ: ArenaMomentEintrag["typ"]; seite: 0 | 1; spieler: string | null };
 type RoherBrowserFixtureErgebnis = {
@@ -825,6 +833,8 @@ export async function runArenaFixtures(
           playerId: treffer?.playerId ?? null,
           side: treffer?.side ?? null,
           torwart: !!eintrag.torwart,
+          // Nur gesetzt, wenn der Motor es liefert (Spurt) -- jede andere Disziplin bleibt zeichengleich.
+          ...(typeof eintrag.duelle === "number" ? { duelle: eintrag.duelle } : {}),
         };
       });
       // "SPIEL DES TAGES" (Task #31 Paket 1, s. `ArenaMomentEintrag`): `seite` 0/1 wird hier,

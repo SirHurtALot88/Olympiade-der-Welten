@@ -419,6 +419,25 @@ export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
 export const SPURT_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * STATIONSDUELL-BONUS (Spurt, Chris 10.11., docs/design/spurt-stationsduell-sichtbar-10-11.md):
+ * "Gewonnene duelle koennen fuer die Spieler auch in die PPs mit beitragen, bringen dem team aber
+ * keine zusaetzlichen punkte fuers scoring". Ein Stationsduell gewinnt, wer eine Station, an der
+ * gleichzeitig ein Gegner steht, zuerst verlaesst (Motor: `stationsDuellSchritt()`). Je Sieg
+ * `JE_SIEG` PPs obendrauf, gedeckelt bei `MAX` je Rennen -- additiv NACH der Impact-Kurve, also
+ * hoechstens 5,5 + 0,5 = 6,0 (Chris' "max 5-6"). Gemessen (40 Saaten, 6 gegen 6): im Mittel 33,5
+ * Duelle je Rennen, 2,8 Siege je Laeufer, 0-6 Siege -- der Deckel greift ab dem fuenften Sieg.
+ * Ausschliesslich Spieler-PPs: `seiten` und damit `arenaTeamPointsForFixture()` lesen das nie.
+ */
+export const SPURT_STATIONSDUELL_PPS_JE_SIEG = 0.1;
+export const SPURT_STATIONSDUELL_PPS_MAX = 0.5;
+
+/** Der Duell-Bonus in PPs fuer `duelle` gewonnene Stationsduelle (0 ausser bei Spurt). */
+export function ppsAusStationsduellen(disciplineId: string, duelle: number | undefined): number {
+  if (disciplineId !== "spurt" || typeof duelle !== "number" || !(duelle > 0)) return 0;
+  return roundPps(Math.min(SPURT_STATIONSDUELL_PPS_MAX, duelle * SPURT_STATIONSDUELL_PPS_JE_SIEG));
+}
+
+/**
  * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER FOOTBALL (PPS-Referenz-Vorarbeit 15.09., NOCH NICHT
  * produktiv geschaltet -- s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve wie Basketball/Hockey
  * (`ppsAusArenaImpact()`) -- Football teilt sich mit ihnen das Feldspiel-Chassis und denselben
@@ -1222,7 +1241,11 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
         torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz;
         ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, torwartReferenz, konfig.max, konfig.anteilMitte));
       } else {
-        ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, feldReferenz, konfig.max, konfig.anteilMitte));
+        // + STATIONSDUELL-BONUS (nur Spurt, sonst 0): reine Spieler-Nebenspur, s. `ppsAusStationsduellen()`.
+        // Ohne Bonus bleibt der Wert bit-identisch zum Vorherstand (kein zweites Runden).
+        const basisPps = ppsAusArenaImpact(eintrag.wert, feldReferenz, konfig.max, konfig.anteilMitte);
+        const duellPps = ppsAusStationsduellen(disciplineId, eintrag.duelle);
+        ppsByPlayerId.set(eintrag.playerId, duellPps > 0 ? roundPps(basisPps + duellPps) : basisPps);
       }
     }
   }
