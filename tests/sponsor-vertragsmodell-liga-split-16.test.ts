@@ -324,3 +324,77 @@ describe("Bestandsvertraege — 32er-Leitern brechen nicht", () => {
     });
   });
 });
+
+describe("Migration M3 — unterschriebene 32er-Vertraege der laufenden Saison auf 16 Sprossen", () => {
+  function vertrag32(teamId: string, startRank: number, shape: SponsorCurveShape, extra: Partial<TeamSponsorContract> = {}) {
+    const terms = buildSponsorV3TermsCore({
+      baseLadder: sponsorKurvenLeiter({ shape, startRank, salaryFactor: 1, leagueTier: Number(teamId.slice(1)) <= 16 ? "liga1" : "liga2" }),
+      startRank,
+      rarity: "magisch",
+      card: sponsorV3CardByKey("basis"),
+      goalKey: null,
+      curveShape: shape,
+      salaryFactor: 1,
+      floor: SPONSOR_BODEN,
+    });
+    return {
+      seasonId: "season-2", teamId, offerId: `${teamId}-o`, archetype: "cash", curveShape: shape, name: "Test",
+      chosenAt: "2026-10-01T00:00:00.000Z", startRank, components: [], payouts: {}, termSeasons: 1, seasonsRemaining: 1,
+      rarity: "magisch", sponsorV3: terms, lockedRankPayoutLadder: terms.rankLadder, ...extra,
+    } as unknown as TeamSponsorContract;
+  }
+
+  it("baut nicht abgerechnete 32er-Vertraege um — ein Jahr-1-Vertrag wird exakt die heutige Karte", async () => {
+    const { migrateSponsorLadderToLeagueRankSpace } = await import("@/lib/sponsor/sponsor-v3-migration");
+    const gameState = splitGameState({
+      sponsorContractsByTeamId: { T3: vertrag32("T3", 3, "titeljaeger"), T20: vertrag32("T20", 4, "stetig") },
+    });
+    const { gameState: next, umgebauteTeamIds } = migrateSponsorLadderToLeagueRankSpace(gameState);
+    expect(umgebauteTeamIds.sort()).toEqual(["T20", "T3"]);
+    const t3 = getSponsorV3Terms(next.seasonState.sponsorContractsByTeamId?.T3)!;
+    expect(t3.rankLadder).toHaveLength(16);
+    expect(next.seasonState.sponsorContractsByTeamId?.T3?.lockedRankPayoutLadder).toHaveLength(16);
+    const frisch = baueVertrag(gameState, "T3", 3, "titeljaeger");
+    t3.rankLadder.forEach((wert, index) => expect(wert).toBeCloseTo(frisch.rankLadder[index]!, 9));
+    expect(t3.anchor).toBeCloseTo(frisch.anchor, 9);
+    // Idempotent: ein zweiter Lauf aendert nichts mehr.
+    expect(migrateSponsorLadderToLeagueRankSpace(next).umgebauteTeamIds).toEqual([]);
+  });
+
+  it("Mehrjahresvertrag in Jahr 2 behaelt seine Erosion", async () => {
+    const { migrateSponsorLadderToLeagueRankSpace } = await import("@/lib/sponsor/sponsor-v3-migration");
+    const contract = vertrag32("T5", 5, "europapokal", { termSeasons: 3, seasonsRemaining: 2 });
+    const gameState = splitGameState({ sponsorContractsByTeamId: { T5: contract } });
+    const umgebaut = getSponsorV3Terms(migrateSponsorLadderToLeagueRankSpace(gameState).gameState.seasonState.sponsorContractsByTeamId?.T5)!;
+    const erwartet = rerollSponsorV3TermsForNewSeason(getSponsorV3Terms(contract)!, {
+      newSalaryFactor: 1, contractYear: 2, leagueTier: "liga1", leagueSize: 16,
+    });
+    expect(umgebaut.rankLadder).toEqual(erwartet.rankLadder);
+    const jahr1 = rerollSponsorV3TermsForNewSeason(getSponsorV3Terms(contract)!, {
+      newSalaryFactor: 1, contractYear: 1, leagueTier: "liga1", leagueSize: 16,
+    });
+    expect(umgebaut.rankLadder[0]!).toBeLessThan(jahr1.rankLadder[0]!);
+  });
+
+  it("laesst abgerechnete Vertraege, Spielstaende ohne Split und Altvertraege ohne Kurvenform stehen", async () => {
+    const { migrateSponsorLadderToLeagueRankSpace } = await import("@/lib/sponsor/sponsor-v3-migration");
+    const abgerechnet = splitGameState({
+      sponsorContractsByTeamId: { T3: vertrag32("T3", 3, "titeljaeger") },
+      sponsorPayoutLogs: [{ seasonId: "season-2", teamId: "T3", phase: "season_end" }] as never,
+    });
+    const r1 = migrateSponsorLadderToLeagueRankSpace(abgerechnet);
+    expect(r1.umgebauteTeamIds).toEqual([]);
+    expect(r1.bereitsAbgerechneteTeamIds).toEqual(["T3"]);
+
+    const legacy = { ...legacyGameState() } as GameState;
+    legacy.seasonState = { ...legacy.seasonState, sponsorContractsByTeamId: { T3: vertrag32("T3", 3, "titeljaeger") } };
+    expect(migrateSponsorLadderToLeagueRankSpace(legacy).gameState).toBe(legacy);
+
+    const ohneForm = vertrag32("T3", 3, "titeljaeger");
+    const { curveShape: _weg, ...termsOhneForm } = getSponsorV3Terms(ohneForm)!;
+    const r3 = migrateSponsorLadderToLeagueRankSpace(
+      splitGameState({ sponsorContractsByTeamId: { T3: { ...ohneForm, sponsorV3: termsOhneForm } as TeamSponsorContract } }),
+    );
+    expect(r3.umgebauteTeamIds).toEqual([]);
+  });
+});
