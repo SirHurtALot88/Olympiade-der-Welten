@@ -59695,6 +59695,34 @@
     // Screenshot-Hilfe, kein Leser im Spiel.
     buehneJeSeiteQa:(n)=>{ const a=BUEHNE_ART[disc]; if(!a)return null; const v=Math.max(1,Math.floor(Number(n)||0)); if(v)a.jeSeite=v; reset(); return a.jeSeite; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
+    // ANZEIGE-TREUE-SONDE B1 (10.11., scripts/miss-anzeige-treue-rest.mjs): eigene, additive
+    // Funktion statt einer Erweiterung von spieleDisziplin()/`A.spiele()` -- deren Rueckgabeform
+    // ist Teil des Wertungs-Fingerabdrucks (scripts/pruefe-wertung-fingerabdruck.mjs hasht
+    // `A.spiele(d,s)` fuer alle zwanzig Disziplinen wholesale), ein zusaetzliches Feld dort
+    // haette JEDEN Fingerabdruck-Eintrag veraendert, obwohl an keiner einzigen Wertung etwas
+    // geaendert wird (nachgemessen: GESAMT-Hash aenderte sich, reiner Formfehler, kein Befund --
+    // deshalb dieser separate Einstiegspunkt, der spieleDisziplin() NICHT beruehrt). GENAU
+    // DASSELBE Sichern/Vorher/Bau/Lauf/Zurueck-Muster, nur mit `sieger` statt `protokoll`/
+    // `punkte`: kampfSieger()/fsSieger()/buehneSieger() sind dieselben Funktionen, die auch
+    // finish() beim ECHTEN Spielende synchron liest -- kein neuer Wertungsbegriff. `null` fuer
+    // jede Disziplin ohne Motor oder ohne Zweiseiten-Sieger-Begriff (Bahn hat ihre eigene Sonde,
+    // s. bahnLauf()).
+    anzeigeTreueSonde:(dId,saat)=>{
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat||1337);
+      M.lauf();
+      const ergebnis={disziplin:dId, wert:M.wert(), namen:M.namen(),
+        sieger:istKampf(dId)?kampfSieger():istFeldspiel(dId)?fsSieger():istBuehne(dId)?buehneSieger():null};
+      M.zurueck(g);
+      return ergebnis;
+    },
+    // Liest MOTOREN[disc].wert()/den Sieger-Begriff am AKTUELLEN (z.B. per sondenLauf()
+    // durchlaufenen) Zustand, ohne selbst zu bauen/zu laufen -- das Gegenstueck zu
+    // anzeigeTreueSonde() fuer die ANGEZEIGTE Seite des Vergleichs. Reiner Lese-Durchgriff,
+    // dieselben Sieger-Funktionen wie oben.
+    anzeigeTreueAktuell:()=>(MOTOREN[disc]?{disziplin:disc, wert:MOTOREN[disc].wert(), namen:MOTOREN[disc].namen(),
+      sieger:istKampf(disc)?kampfSieger():istFeldspiel(disc)?fsSieger():istBuehne(disc)?buehneSieger():null}:null),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
