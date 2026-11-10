@@ -29,6 +29,10 @@ import { getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { filterLegacyLineupCandidateEntries } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupPreviewResult, LegacyLineupScoreResult } from "@/lib/lineups/legacy-lineup-types";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+import { GOLD_TOLERANZ, goldPruefung, passungsGlyphe, rollenGlyphe, slotFarbe, slotKuerzelFuerListe } from "@/lib/lineups/einsatzliste-anzeige";
+import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/gegner-schaetzung";
+import { MOTOR_BFFFA_ROLLEN_ORT, MOTOR_SLOT_ZUSATZ, ORD_TEXT, formationFuerSeite, hatFeinjustierung, type GelegteFormation } from "@/lib/lineups/formation";
+import { EinsatzlisteMiniFeld, EinsatzlisteRollenkarte, type MiniFeldGeist, type MiniFeldMarke, type RollenkarteDaten } from "./EinsatzlisteMiniFeld";
 
 /**
  * "Neuer Look" Einsatzliste — flag-gated Squad-Builder (additiv).
@@ -299,10 +303,16 @@ function NlPlayerAvatar({
   portraitUrl,
   name,
   size = 22,
+  goldTitle = null,
 }: {
   portraitUrl?: string | null;
   name: string;
   size?: number;
+  /**
+   * Einsatzliste-Revamp Paket 1: goldener Rahmen = der Spieler steht hier wie in der optimalen
+   * Gesamtverteilung des Kaders (s. `goldPruefung`). Der Text ist zugleich der Tooltip; `null` = kein Rahmen.
+   */
+  goldTitle?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   const initials = getPlayerPortraitInitials(name);
@@ -310,7 +320,10 @@ function NlPlayerAvatar({
   return (
     <span
       aria-hidden="true"
+      title={goldTitle ?? undefined}
+      data-einsatz-gold={goldTitle ? "true" : undefined}
       style={{
+        ...(goldTitle ? { boxShadow: "0 0 0 2px var(--nl-gold)" } : null),
         position: "relative",
         flex: "0 0 auto",
         width: `${size}px`,
@@ -388,6 +401,22 @@ function rivalStrengthLabel(relationship: number): string {
 
 /* --- v1-Entscheidungs-Signale (Schwellen synchron zu LegacyLineupFocusV2Board) --- */
 
+/** Attributnamen der Rollenkarte — die Spielnamen, wie Matrix und Spielerprofil sie zeigen. */
+const NL_ATTRIBUT_LABEL = {
+  power: "Power",
+  health: "Health",
+  determination: "Determination",
+  stamina: "Stamina",
+  speed: "Speed",
+  dexterity: "Dexterity",
+  awareness: "Awareness",
+  intelligence: "Intelligence",
+  will: "Will",
+  charisma: "Charisma",
+  spirit: "Spirit",
+  torment: "Torment",
+} as const;
+
 const NL_LEAD_ALTERNATIVLOS_MIN = 10;
 const NL_LEAD_KLAR_MIN = 4;
 const NL_LEAD_KNAPP_MIN = 1.5;
@@ -463,6 +492,166 @@ function reasonChipTone(axis: string): NlTone {
 }
 
 /* --- Kleinteile ------------------------------------------------------- */
+
+/**
+ * Slot-Kürzel in der festen Positionsfarbe (Einsatzliste-Revamp Paket 1). Die Farbe sitzt nur
+ * im Rand und in einer schwachen Tönung, der Text bleibt Tinte — das Kürzel selbst ist das
+ * zweite Merkmal, damit die Zuordnung Kader <-> Slot auch ohne Farbsehen klappt.
+ */
+function NlSlotKuerzel({
+  kuerzel,
+  slotIndex,
+  title,
+  goldVerschenktTitle = null,
+}: {
+  kuerzel: string;
+  slotIndex: number;
+  title?: string;
+  /** Gestrichelter Goldring: der Kader-Beste für diesen Slot steht woanders (Tooltip-Text). */
+  goldVerschenktTitle?: string | null;
+}) {
+  const farbe = slotFarbe(slotIndex);
+  return (
+    <span
+      className="nl-tnum"
+      data-einsatz-slotfarbe={slotIndex + 1}
+      data-einsatz-gold-verschenkt={goldVerschenktTitle ? "true" : undefined}
+      title={goldVerschenktTitle ? `${title ? `${title} · ` : ""}${goldVerschenktTitle}` : title}
+      style={{
+        ...(goldVerschenktTitle ? { outline: "1.5px dashed var(--nl-gold)", outlineOffset: "2px" } : null),
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "0 4px",
+        minWidth: "20px",
+        justifyContent: "center",
+        borderRadius: "var(--nl-r-sm)",
+        border: `1px solid ${farbe}`,
+        background: `color-mix(in srgb, ${farbe} 24%, transparent)`,
+        color: "var(--nl-ink)",
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+        lineHeight: "14px",
+      }}
+    >
+      {kuerzel}
+    </span>
+  );
+}
+
+/**
+ * GEGNER (SCHÄTZUNG) — Einsatzliste-Revamp, ITERATION 1 (`lib/lineups/gegner-schaetzung.ts`).
+ * Chris, 08.11. (zu einem Screenshot ohne bekannten Gegner): "du kannst hier die gegner
+ * aufstellugn weg lassen, dann hat man mehr platz für seine eigenen spieler" — beim Einsetzen
+ * zählt zuerst der eigene Kader, der Gegner ist zweitrangig. Statt die Funktion zu entfernen
+ * (Chris wollte die Gegner-Schätzung selbst ausdrücklich, s. Konzept oben), steckt sie jetzt in
+ * einem `<details>`, zu wie die Slot-Liste darunter (`nl-lineup-slot-details`): eingeklappt
+ * nimmt sie nur eine schmale Kopfzeile, aufgeklappt zeigt sie alles wie bisher. Die Gold-Bilanz
+ * (eigene Seite, kein Gegner-Bezug) bleibt davon unabhängig immer sichtbar — sie gehörte nur aus
+ * Platzgründen in denselben Streifen, nicht inhaltlich zum Gegner.
+ */
+function NlGegnerStreifen({
+  schaetzung,
+  disciplineSide,
+  kuerzelJeSlotIndex,
+  eigenerSchnitt,
+  goldBilanz,
+}: {
+  schaetzung: GegnerSchaetzung;
+  disciplineSide: "d1" | "d2";
+  kuerzelJeSlotIndex: string[];
+  eigenerSchnitt: number | null;
+  goldBilanz: { goldCount: number; besetzt: number; gesamtLuecke: number | null };
+}) {
+  const seite = schaetzung.status === "geschaetzt" ? schaetzung.seiten[disciplineSide] ?? null : null;
+  const quelleText =
+    schaetzung.status !== "geschaetzt"
+      ? null
+      : schaetzung.quelle === "verdeckt"
+        ? "Scouting zu schwach — Aufstellung nicht erkennbar"
+        : schaetzung.quelle === "ki-muster"
+          ? "KI-Einsatzmuster erkannt"
+          : schaetzung.steuerung === "mensch"
+            ? "Prognose der wahrscheinlich besten Aufstellung — ein Mensch kann abweichen"
+            : "Prognose aus dem bekannten Kader";
+  const titel =
+    schaetzung.status === "geschaetzt"
+      ? `Gegner-Schätzung (Iteration 1): ${schaetzung.gegnerName} (${schaetzung.steuerung === "ki" ? "KI" : "Mensch"}). ` +
+        `Scouting-Stufe ${schaetzung.stufe}/5 (Mittel über den gegnerischen Kader: Scouting-Büro + Gewissheit je Spieler), ` +
+        `Werte ±${schaetzung.unschaerfe}, Treffsicherheit der Zuordnung ~${schaetzung.treffsicherheitPct} %. ${quelleText}. ` +
+        `Werte = rohe Disziplin-Eignung, nicht die Slot-Projektion der eigenen Seite. Nie exakt.`
+      : schaetzung.grund;
+  const kurzStatus =
+    schaetzung.status === "geschaetzt" ? `${schaetzung.gegnerName} · ${schaetzung.steuerung === "ki" ? "KI" : "Mensch"}` : schaetzung.grund;
+  return (
+    <div style={{ margin: "6px 0 8px", display: "flex", flexDirection: "column", gap: "2px" }}>
+      <span
+        data-testid="nl-lineup-gold-bilanz"
+        title="Gold = der Spieler steht dort, wo die optimale Gesamtverteilung des ganzen Kaders ihn hinstellen würde."
+        style={{ color: "var(--nl-gold)", fontWeight: 700, fontSize: "11px" }}
+      >
+        ◆ {goldBilanz.goldCount}/{goldBilanz.besetzt} optimal verteilt
+        {goldBilanz.gesamtLuecke != null ? (
+          <span className="nl-tnum" style={{ fontWeight: 600, opacity: 0.85 }}>
+            {goldBilanz.gesamtLuecke <= GOLD_TOLERANZ ? " · beste Verteilung" : ` · gesamt −${formatScore(goldBilanz.gesamtLuecke)} zur besten Verteilung`}
+          </span>
+        ) : null}
+      </span>
+      <details className="nl-gegner-details" data-testid="nl-lineup-gegner-schaetzung" data-gegner-status={schaetzung.status}>
+        <summary title={titel}>
+          Gegner (Schätzung) · <span style={{ fontWeight: 400 }}>{kurzStatus}</span>
+        </summary>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "6px 10px",
+            padding: "6px 8px",
+            borderRadius: "var(--nl-r-sm)",
+            border: "1px dashed color-mix(in srgb, var(--nl-ink) 22%, transparent)",
+            background: "color-mix(in srgb, var(--nl-ink) 4%, transparent)",
+            fontSize: "11px",
+            lineHeight: 1.35,
+          }}
+        >
+          {schaetzung.status !== "geschaetzt" ? (
+            <span style={{ opacity: 0.75 }}>{schaetzung.grund}</span>
+          ) : (
+            <>
+              <span className="nl-tnum" style={{ opacity: 0.8 }}>
+                Scouting {schaetzung.stufe}/5 · ±{schaetzung.unschaerfe} · ~{schaetzung.treffsicherheitPct} %
+              </span>
+              {seite?.schnitt ? (
+                <span className="nl-tnum">
+                  Ø {seite.schnitt.min}–{seite.schnitt.max}
+                  {eigenerSchnitt != null ? <span style={{ opacity: 0.75 }}> (wir Ø {formatScore(eigenerSchnitt)})</span> : null}
+                </span>
+              ) : null}
+              <span style={{ opacity: 0.7, fontStyle: "italic" }}>{quelleText}</span>
+              {seite && schaetzung.quelle !== "verdeckt" ? (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 8px", flexBasis: "100%" }}>
+                  {seite.slots.map((slot) => (
+                    <span key={slot.slotIndex} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <NlSlotKuerzel kuerzel={kuerzelJeSlotIndex[slot.slotIndex] ?? "–"} slotIndex={slot.slotIndex} />
+                      <span style={{ opacity: slot.spielerName ? 1 : 0.6 }}>{slot.spielerName ?? "?"}</span>
+                      {slot.spanne ? (
+                        <span className="nl-tnum" style={{ opacity: 0.8 }}>
+                          {slot.spanne.min}–{slot.spanne.max}
+                        </span>
+                      ) : null}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
+            </>
+          )}
+          <span style={{ marginLeft: "auto", fontSize: "9px", opacity: 0.55 }}>Iteration 1</span>
+        </div>
+      </details>
+    </div>
+  );
+}
 
 /**
  * Ring-Zähler (#Ring-Label-Klarheit): EINE eindeutige Bruchzahl
@@ -1454,6 +1643,156 @@ export default function LineupNewLook({
     return { min: Math.min(...values) - 2, max: Math.max(...values) + 2 };
   }, [filteredCandidates]);
 
+  /*
+   * EINSATZLISTE-REVAMP PAKET 1 (docs/design/einsatzliste-revamp-architektur-08-11.md):
+   * Slot-Kürzel je Slot (eindeutig je Disziplin-Seite) und der goldene Rahmen nach der optimalen
+   * Gesamtzuteilung des Kaders (unten). Gerechnet wird nur auf Props, die schon da sind — kein
+   * Rückweg in Resolve, KI-Vorschlag oder Arena.
+   */
+  const slotKuerzelByKey = useMemo(() => {
+    const next = new Map<string, string>();
+    for (const side of ["d1", "d2"] as const) {
+      const sideSlots = slots.filter((slot) => slot.disciplineSide === side).sort((a, b) => a.slotIndex - b.slotIndex);
+      const kuerzel = slotKuerzelFuerListe(sideSlots.map((slot) => slotRoleByKey.get(slot.key)?.label ?? `Slot ${slot.slotIndex + 1}`));
+      sideSlots.forEach((slot, index) => next.set(slot.key, kuerzel[index] ?? "–"));
+    }
+    return next;
+  }, [slots, slotRoleByKey]);
+
+  // Gold = OPTIMALE GESAMTZUTEILUNG DES KADERS (Chris 08.11., zweite Antwort nach der
+  // Sichtprüfung): nicht „Kader-Bester je Slot", sondern „steht hier, wo die beste Verteilung des
+  // ganzen Kaders ihn hinstellen würde". Ein dominanter Spieler nimmt so EINEN Slot, die übrigen
+  // Slots vergeben ihr Gold an den Besten unter den verbleibenden Spielern. Quelle ist dieselbe
+  // Rangliste, die auch Drag-Vorschau und Top-3-Slots der Kader-Zeile lesen. Verletzte zählen nicht.
+  const verletzteActivePlayerIds = useMemo(() => {
+    const verletztePlayerIds = new Set(
+      (context?.rosterPlayers ?? [])
+        .filter((player) => player.availabilityBlocker === "player_injured_unavailable" || player.injuryStatus === "injured")
+        .map((player) => player.id),
+    );
+    return new Set((context?.activePlayers ?? []).filter((entry) => verletztePlayerIds.has(entry.playerId)).map((entry) => entry.id));
+  }, [context?.rosterPlayers, context?.activePlayers]);
+
+  const gold = useMemo(
+    () =>
+      goldPruefung({
+        slotKeys: slots.map((slot) => slot.key),
+        slotWerteJeSpieler: playerBestSlotSummaryByActivePlayerId.entries(),
+        nameVon: (id) => rosterCardByActivePlayerId.get(id)?.name ?? id,
+        ausgeschlossen: verletzteActivePlayerIds,
+      }),
+    [slots, playerBestSlotSummaryByActivePlayerId, rosterCardByActivePlayerId, verletzteActivePlayerIds],
+  );
+
+  const slotNameFor = (slotKey: string) => {
+    const slot = slots.find((entry) => entry.key === slotKey);
+    return slot ? `${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} ${slotRoleByKey.get(slotKey)?.label ?? ""}`.trim() : "diesen Slot";
+  };
+
+  /** Voller Goldring: dieser Spieler steht (bzw. stünde) hier wie in der optimalen Gesamtverteilung. */
+  const goldTitleFor = (activePlayerId: string | null | undefined, slotKey: string | null | undefined): string | null => {
+    if (!activePlayerId || !slotKey) return null;
+    const kosten = gold.kostenVon(activePlayerId, slotKey);
+    if (kosten == null || kosten > GOLD_TOLERANZ) return null;
+    const wert = playerBestSlotSummaryByActivePlayerId.get(activePlayerId)?.find((entry) => entry.slotKey === slotKey)?.projectedScore ?? null;
+    return `Gold: Optimale Verteilung des ganzen Kaders — auf ${slotNameFor(slotKey)} gehört ${
+      rosterCardByActivePlayerId.get(activePlayerId)?.name ?? "dieser Spieler"
+    }${wert != null ? ` (Slotwert ${formatScore(wert)})` : ""}`;
+  };
+
+  /**
+   * Gestrichelter Goldring („Gold verschenkt"): der Gesetzte steht NICHT dort, wo die beste
+   * Gesamtverteilung ihn hätte. Der Tooltip sagt, was die Besetzung kostet und wer laut optimaler
+   * Verteilung hier stünde („Optimal hier: Buttercup 81,0 — steht auf D1-4 Hold Line").
+   */
+  const goldVerschenktTitleFor = (slotKey: string): string | null => {
+    const gesetzt = selections[slotKey];
+    if (!gesetzt) return null;
+    const kosten = gold.kostenVon(gesetzt, slotKey);
+    if (kosten == null || kosten <= GOLD_TOLERANZ) return null;
+    const optimal = gold.zuteilung.jeSlot.get(slotKey) ?? null;
+    const andererSlotKey = optimal ? Object.entries(selections).find(([, id]) => id === optimal.id)?.[0] ?? null : null;
+    const wo = optimal ? (andererSlotKey ? ` — steht auf ${slotNameFor(andererSlotKey)}` : " — ist nicht aufgestellt") : "";
+    return `Gold verschenkt: Diese Besetzung kostet die beste Gesamtverteilung −${formatScore(kosten)}.${
+      optimal ? ` Optimal hier: ${optimal.name} ${formatScore(optimal.wert)}${wo}` : ""
+    }`;
+  };
+
+  /*
+   * GEGNER (SCHÄTZUNG), ITERATION 1 — `lib/lineups/gegner-schaetzung.ts`. Nie exakt, Präzision je
+   * Scouting-Stufe; KI-Muster erst ab Stufe 3, menschliche Gegner nur als Prognose. Liest den
+   * Spielstand, der ohnehin im Kontext liegt (`context.gameState`), keine neue Route.
+   */
+  const gegnerSchaetzung = useMemo<GegnerSchaetzung>(() => {
+    if (!context) return { status: "unbekannt", grund: "Kontext nicht geladen" };
+    const seiten = (["d1", "d2"] as const).flatMap((seite) => {
+      const disciplineId = (seite === "d1" ? context.matchdayContract?.discipline1 : context.matchdayContract?.discipline2)?.disciplineId ?? null;
+      const slotCount = slots.filter((slot) => slot.disciplineSide === seite).length;
+      return disciplineId && slotCount > 0 ? [{ seite, disciplineId, slotCount }] : [];
+    });
+    try {
+      return schaetzeGegnerAufstellung({
+        gameState: context.gameState,
+        eigenesTeamId: context.team.id,
+        seasonId: context.season.id,
+        matchdayId: context.matchday.id,
+        seiten,
+      });
+    } catch {
+      // Altstände mit lückenhaftem Spielstand: lieber „unbekannt" als eine kaputte Einsatzliste.
+      return { status: "unbekannt", grund: "Gegner noch nicht bekannt" };
+    }
+  }, [context, slots]);
+
+  /*
+   * FORMATION JE SEITE (Ebene A). Einmal je (Disziplin, Slotzahl) gelegt; der Schlüssel enthält
+   * die Slotzahl, weil Battlefield je Kadergröße andere Rollen setzt.
+   */
+  const formationBySideKey = useMemo(() => {
+    const next = new Map<string, GelegteFormation>();
+    for (const side of ["d1", "d2"] as const) {
+      const disciplineId = (side === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2)?.disciplineId ?? null;
+      const count = slots.filter((slot) => slot.disciplineSide === side).length;
+      next.set(`${side}|${disciplineId}|${count}`, formationFuerSeite(disciplineId, count));
+    }
+    return next;
+  }, [context?.matchdayContract?.discipline1, context?.matchdayContract?.discipline2, slots]);
+  const formationFor = (side: "d1" | "d2", disciplineId: string | null, count: number): GelegteFormation =>
+    formationBySideKey.get(`${side}|${disciplineId}|${count}`) ?? formationFuerSeite(disciplineId, count);
+
+  /** Eigener Schnitt je Seite auf DERSELBEN Skala wie die Gegner-Spanne (rohe Disziplin-Eignung). */
+  const eigenerRohSchnittFor = (disciplineSide: "d1" | "d2", disciplineId: string | null): number | null => {
+    if (!context || !disciplineId) return null;
+    const playerIdByActive = new Map(context.activePlayers.map((entry) => [entry.id, entry.playerId] as const));
+    const werte = slots
+      .filter((slot) => slot.disciplineSide === disciplineSide && selections[slot.key])
+      .flatMap((slot) => {
+        const playerId = playerIdByActive.get(selections[slot.key]!);
+        const score = context.disciplineScores.find((entry) => entry.playerId === playerId && entry.disciplineId === disciplineId)?.score;
+        return typeof score === "number" ? [score] : [];
+      });
+    return werte.length > 0 ? werte.reduce((sum, value) => sum + value, 0) / werte.length : null;
+  };
+
+  /** Kopfzeile je Seite: wie viele der Besetzten stehen dort, wo die optimale Gesamtverteilung sie hätte. */
+  const goldBilanzFor = (disciplineSide: "d1" | "d2") => {
+    const besetzt = slots.filter((slot) => slot.disciplineSide === disciplineSide && selections[slot.key]);
+    const goldCount = besetzt.filter((slot) => (gold.kostenVon(selections[slot.key]!, slot.key) ?? Infinity) <= GOLD_TOLERANZ).length;
+    // Gesamtlücke zur besten Verteilung (beide Seiten zusammen, weil ein Spieler nur EINE
+    // Disziplin spielt) — nur bei voller Aufstellung, sonst wäre die Zahl ein Vergleich mit Lücken.
+    const alleBesetzt = slots.length > 0 && slots.every((slot) => selections[slot.key]);
+    let gesamtLuecke: number | null = null;
+    if (alleBesetzt) {
+      let aktuell = 0;
+      for (const slot of slots) {
+        const wert = playerBestSlotSummaryByActivePlayerId.get(selections[slot.key]!)?.find((entry) => entry.slotKey === slot.key)?.projectedScore;
+        aktuell += typeof wert === "number" ? wert : 0;
+      }
+      gesamtLuecke = Math.max(0, Number((gold.zuteilung.summe - aktuell).toFixed(1)));
+    }
+    return { goldCount, besetzt: besetzt.length, gesamtLuecke };
+  };
+
   // Captain-Infos je Disziplin-Seite. Frueher war hier nur die AKTIVE Slot-Seite aufgeloest
   // — der Picker sass in der Fokus-Rail und wechselte seine Bedeutung, je nachdem welcher
   // Slot gerade fokussiert war. Jetzt bekommt jeder Disziplin-Block seinen eigenen Picker,
@@ -1541,6 +1880,84 @@ export default function LineupNewLook({
     d2: context.matchdayContract?.discipline2 ?? null,
   } as const;
 
+  /*
+   * EBENE B — Daten der Rollenkarte für den fokussierten Slot. Die ±-Glyphen kommen direkt aus
+   * `slotWeightProfile − baseWeightProfile` der Rollendefinition (nicht aus `keyAttributes`, das
+   * Abwertungen verschweigt). Spielerwerte: `attributeStats` liegt zur Laufzeit an der Kaderkarte
+   * (der Client reicht `MatchdayRosterCard` durch), im Board-Typ ist es optional.
+   */
+  const rollenkarteDaten: RollenkarteDaten | null = (() => {
+    if (!activeSlot) return null;
+    const role = slotRoleByKey.get(activeSlot.key) ?? null;
+    const side = activeSlot.disciplineSide;
+    const disciplineId = disciplineBySide[side]?.disciplineId ?? null;
+    const count = slots.filter((slot) => slot.disciplineSide === side).length;
+    const platz = formationFor(side, disciplineId, count).plaetze.find((p) => p.slotIndex === activeSlot.slotIndex) ?? null;
+    const selectedId = selections[activeSlot.key] ?? "";
+    const player = selectedId ? rosterCardByActivePlayerId.get(selectedId) ?? null : null;
+    const stats = (player as { attributeStats?: Record<string, number | null | undefined> | null } | null)?.attributeStats ?? null;
+    const slotProfil = role?.slotWeightProfile ?? null;
+    const basisProfil = role?.baseWeightProfile ?? null;
+    const attribute =
+      slotProfil && basisProfil
+        ? (Object.keys(NL_ATTRIBUT_LABEL) as Array<keyof typeof NL_ATTRIBUT_LABEL>)
+            .map((key) => {
+              const gewicht = slotProfil[key] ?? 0;
+              const delta = gewicht - (basisProfil[key] ?? 0);
+              const wert = stats?.[key];
+              return { key, label: NL_ATTRIBUT_LABEL[key], delta, gewicht, glyphe: rollenGlyphe(delta), spielerWert: typeof wert === "number" ? wert : null };
+            })
+            .filter((a) => a.glyphe !== "·")
+            .sort((a, b) => b.delta - a.delta)
+        : [];
+    const projected = slotPreviewByKey.get(activeSlot.key)?.projected ?? null;
+    const top = slotCandidateSummaryByKey.get(activeSlot.key)?.topCandidates ?? [];
+    let feinjustierung: RollenkarteDaten["feinjustierung"] = null;
+    if (hatFeinjustierung(disciplineId) && platz?.rolleId) {
+      const ord = MOTOR_SLOT_ZUSATZ[platz.rolleId]?.ord ?? "mitlinie";
+      feinjustierung = {
+        zeilen:
+          disciplineId === "battlefield"
+            ? [
+                `Startort: ${platz.gruppenLabel ?? "—"} (${MOTOR_BFFFA_ROLLEN_ORT[platz.rolleId] ?? "mitte"}).`,
+                `Neigung aus dem Standardbefehl: ${ORD_TEXT[ord] ?? ord}.`,
+                "Zielpriorität, Haltung, Zusammenhalt und Bindung stellst du in der Battle Arena ein.",
+              ]
+            : [
+                `Reihe: ${platz.gruppenLabel ?? "—"}.`,
+                `Standardbefehl (★): ${ORD_TEXT[ord] ?? ord}.`,
+                "Zielpriorität, Haltung, Zusammenhalt und Bindung stellst du in der Battle Arena ein.",
+              ],
+      };
+    }
+    return {
+      slotLabel: `${side.toUpperCase()}-${activeSlot.slotIndex + 1} · ${disciplineBySide[side]?.displayName ?? ""}`.trim(),
+      slotIndex: activeSlot.slotIndex,
+      kuerzel: slotKuerzelByKey.get(activeSlot.key) ?? "–",
+      rollenLabel: role?.label ?? "Slot",
+      beschreibung: role?.description ?? null,
+      platz,
+      attribute,
+      besetzt: player
+        ? {
+            name: player.name,
+            wert: projected?.totalProjected ?? null,
+            rollenAufschlag: projected?.roleModifier ?? null,
+            glyphe: projected?.roleModifier != null ? passungsGlyphe(projected.roleModifier) : null,
+            goldTitel: goldTitleFor(selectedId, activeSlot.key),
+            goldVerschenktTitel: goldVerschenktTitleFor(activeSlot.key),
+          }
+        : null,
+      alternativen: top.slice(0, 3).map((candidate) => ({
+        id: candidate.activePlayerId,
+        name: candidate.name,
+        wert: candidate.projectedScore,
+        aktuell: candidate.activePlayerId === selectedId,
+      })),
+      feinjustierung,
+    };
+  })();
+
   const renderSide = (disciplineSide: "d1" | "d2") => {
     const discipline = disciplineBySide[disciplineSide];
     const axis = getAxisForCategory(discipline?.category ?? null);
@@ -1587,6 +2004,64 @@ export default function LineupNewLook({
         if (spiele > 0) staffelPairBySlotKey.set(nehmer.slotKey, { spiele, geberName: geber.name });
       }
     }
+
+    /*
+     * EBENE A — MINI-FELD (Einsatzliste-Revamp F3/F4). Die Geometrie kommt aus
+     * `lib/lineups/formation/` (Motor-Kopie mit Drift-Wächter), die Rolle je Slot über
+     * `resolveSlotRoleShortId` — dieselbe Abbildung wie der Arena-Adapter. Die Marken tragen nur,
+     * was die Slotkarten unten ohnehin zeigen (Projektion, Gold, Captain, Warnungen).
+     */
+    const formation = formationFor(disciplineSide, disciplineId, sideSlots.length);
+    const sortierteSlots = [...sideSlots].sort((left, right) => left.slotIndex - right.slotIndex);
+    const sideBesetzt = sortierteSlots.filter((slot) => selections[slot.key]).length;
+    let sideWarnungen = 0;
+    const marken: MiniFeldMarke[] = sortierteSlots.map((slot) => {
+      const role = slotRoleByKey.get(slot.key) ?? null;
+      const selectedId = selections[slot.key] ?? "";
+      const player = selectedId ? rosterCardByActivePlayerId.get(selectedId) ?? null : null;
+      const projected = slotPreviewByKey.get(slot.key)?.projected ?? null;
+      const top = slotCandidateSummaryByKey.get(slot.key)?.topCandidates[0] ?? null;
+      const voll = player ? goldTitleFor(selectedId, slot.key) : null;
+      const verschenkt = player ? goldVerschenktTitleFor(slot.key) : null;
+      const issue = (slotIssuesByKey.get(slot.key) ?? [])[0] ?? null;
+      const meta = player ? getSelectedOptionMeta(selectedId) : null;
+      const injury = meta?.injuryRiskProjection?.[getDisciplineIntensity(slot.disciplineSide)] ?? null;
+      const nachSpieltag = injury?.fatigueBeforeRoll ?? null;
+      const warnungen = [
+        issue?.tone === "blocked" && player ? `${issue.label}: ${issue.detail}` : null,
+        injury && getNlInjuryProjectionTone(injury.bandLabel) === "risk" ? `Verletzungsrisiko ${formatScore(injury.riskPercent)} % (${injury.bandLabel})` : null,
+        nachSpieltag != null && nachSpieltag >= FATIGUE_HIGH ? "nach diesem Spieltag hoch belastet" : null,
+      ].filter((text): text is string => Boolean(text));
+      if (warnungen.length > 0) sideWarnungen += 1;
+      return {
+        slotKey: slot.key,
+        slotIndex: slot.slotIndex,
+        kuerzel: slotKuerzelByKey.get(slot.key) ?? "–",
+        rollenLabel: role?.label ?? "Slot",
+        spielerId: player ? selectedId : null,
+        spielerName: player?.name ?? null,
+        wert: player ? projected?.totalProjected ?? null : null,
+        glyphe: player && projected?.roleModifier != null ? passungsGlyphe(projected.roleModifier) : null,
+        gold: voll ? "voll" : verschenkt ? "verschenkt" : null,
+        goldTitel: voll ?? verschenkt,
+        vorschlag: !player && top ? { name: top.name, wert: top.projectedScore } : null,
+        kapitaen: Boolean(player) && captains[slot.disciplineSide] === selectedId,
+        warnung: warnungen.length > 0 ? warnungen.join(" · ") : null,
+        aktiv: activeSlotKey === slot.key,
+        naechster: !player && nextOpenSlotKey === slot.key,
+      };
+    });
+    // Gegner auf dem Feld: dieselbe Schätzung wie der Streifen (nie exakt). Slot i des Gegners ist
+    // dieselbe Rolle wie der eigene Slot i (gleiche Disziplin, gleiche Kadergröße).
+    const gegnerSeite = gegnerSchaetzung.status === "geschaetzt" ? gegnerSchaetzung.seiten[disciplineSide] ?? null : null;
+    const geister: MiniFeldGeist[] | null =
+      gegnerSchaetzung.status === "geschaetzt" && gegnerSchaetzung.quelle !== "verdeckt" && gegnerSeite && gegnerSeite.slots.length > 0
+        ? gegnerSeite.slots.map((slot) => ({ slotIndex: slot.slotIndex, name: slot.spielerName, spanne: slot.spanne }))
+        : null;
+    const geisterHinweis =
+      gegnerSchaetzung.status === "geschaetzt" && !geister
+        ? `${gegnerSchaetzung.gegnerName}: zu wenig gespäht${gegnerSeite?.schnitt ? ` · Ø ${gegnerSeite.schnitt.min}–${gegnerSeite.schnitt.max}` : ""}`
+        : null;
 
     return (
       <section
@@ -1993,6 +2468,48 @@ export default function LineupNewLook({
           );
         })()}
 
+        <NlGegnerStreifen
+          schaetzung={gegnerSchaetzung}
+          disciplineSide={disciplineSide}
+          kuerzelJeSlotIndex={[...sideSlots]
+            .sort((left, right) => left.slotIndex - right.slotIndex)
+            .reduce<string[]>((acc, slot) => {
+              acc[slot.slotIndex] = slotKuerzelByKey.get(slot.key) ?? "–";
+              return acc;
+            }, [])}
+          eigenerSchnitt={eigenerRohSchnittFor(disciplineSide, disciplineId)}
+          goldBilanz={goldBilanzFor(disciplineSide)}
+        />
+
+        <EinsatzlisteMiniFeld
+          seite={disciplineSide}
+          disziplinName={discipline?.displayName ?? disciplineId ?? ""}
+          formation={formation}
+          marken={marken}
+          geister={geister}
+          geisterHinweis={geisterHinweis}
+          besetzt={sideBesetzt}
+          dnd={{
+            enabled: dndEnabled,
+            dragOverSlotKey,
+            dragSourceSlotKey,
+            onDragStart: handleSlotDragStart,
+            onDragOver: handleSlotDragOver,
+            onDragLeave: handleSlotDragLeave,
+            onDrop: handleSlotDrop,
+            onDragEnd: clearDragState,
+          }}
+          onSelect={onActiveSlotChange}
+        />
+
+        {/* Die Slotkarten bleiben vollständig (Fatigue, Verletzungsmeter, Staffel-Paare, Drag),
+            aber unter dem Feld und eingeklappt: das Feld ist die Ansicht, die Liste das Detail.
+            Die Kurzfassung sagt, ob darin etwas Warnendes steht — nichts verschwindet lautlos. */}
+        <details className="nl-lineup-slot-details" data-testid={`nl-lineup-slot-details-${disciplineSide}`}>
+          <summary>
+            Slot-Liste mit Fatigue &amp; Verletzungsrisiko · {sideBesetzt}/{sortierteSlots.length} besetzt
+            {sideWarnungen > 0 ? <em> · {sideWarnungen} mit Warnung</em> : null}
+          </summary>
         <div className="nl-lineup-slot-grid">
           {sideSlots.map((slot, slotRevealIndex) => {
             const role = slotRoleByKey.get(slot.key) ?? null;
@@ -2008,7 +2525,17 @@ export default function LineupNewLook({
                 ? Number((topCandidate.projectedScore - (secondCandidate?.projectedScore ?? topCandidate.projectedScore)).toFixed(1))
                 : null;
             const openLeadTier = openLead != null ? getNlLineupLeadTier(openLead) : null;
-            const readiness = player ? getNlSlotReadiness(projected, topCandidate?.projectedScore ?? null) : null;
+            const readinessRoh = player ? getNlSlotReadiness(projected, topCandidate?.projectedScore ?? null) : null;
+            // „Bester Pick ✓" misst nur gegen die NOCH FREIEN Spieler. Steht auf derselben Karte der
+            // gestrichelte Goldring (die optimale Gesamtverteilung hätte hier jemand anderen), sagt
+            // der Chip ehrlich „Bester freier Pick" — sonst widersprechen sich die zwei Signale.
+            const slotGoldVerschenkt = player ? goldVerschenktTitleFor(slot.key) : null;
+            const readiness =
+              readinessRoh && slotGoldVerschenkt && readinessRoh.tone === "good"
+                ? { label: "Bester freier Pick", tone: "neutral" as const, title: slotGoldVerschenkt }
+                : readinessRoh
+                  ? { ...readinessRoh, title: undefined as string | undefined }
+                  : null;
             const issue = (slotIssuesByKey.get(slot.key) ?? [])[0] ?? null;
             const isActive = activeSlotKey === slot.key;
             const isNextTarget = !player && nextOpenSlotKey === slot.key;
@@ -2074,7 +2601,18 @@ export default function LineupNewLook({
                     <span className="nl-lineup-slot-index">
                       {slot.disciplineSide.toUpperCase()}-{slot.slotIndex + 1}
                     </span>
-                    <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
+                    <span
+                      style={{ display: "inline-flex", alignItems: "center", gap: "5px", minWidth: 0 }}
+                      data-einsatz-optimal={gold.zuteilung.jeSlot.get(slot.key)?.name ?? undefined}
+                    >
+                      <NlSlotKuerzel
+                        kuerzel={slotKuerzelByKey.get(slot.key) ?? "–"}
+                        slotIndex={slot.slotIndex}
+                        title={`${role?.label ?? "Slot"} · Position ${slot.slotIndex + 1}`}
+                        goldVerschenktTitle={slotGoldVerschenkt}
+                      />
+                      <span className="nl-lineup-slot-role">{role?.label ?? "Slot"}</span>
+                    </span>
                   </span>
 
                   {player ? (
@@ -2084,7 +2622,12 @@ export default function LineupNewLook({
                             Hover ⇒ volle Portrait-Karte (wie v2). `strong` ist bereits Flex-Row
                             mit gap — Score/Fatigue rutschen dadurch nicht raus. */}
                         {wrapNlPortraitPreview(
-                          <NlPlayerAvatar portraitUrl={player.portraitUrl} name={player.name} size={22} />,
+                          <NlPlayerAvatar
+                            portraitUrl={player.portraitUrl}
+                            name={player.name}
+                            size={22}
+                            goldTitle={goldTitleFor(selectedId, slot.key)}
+                          />,
                           player,
                           isReadOnly || isBusy,
                         )}
@@ -2115,7 +2658,9 @@ export default function LineupNewLook({
 
                   <span className="nl-lineup-slot-foot">
                     {player && readiness ? (
-                      <span className={`nl-lineup-chip is-${readiness.tone}`}>{readiness.label}</span>
+                      <span className={`nl-lineup-chip is-${readiness.tone}`} title={readiness.title}>
+                        {readiness.label}
+                      </span>
                     ) : openLeadTier ? (
                       <span
                         className={`nl-lineup-chip is-${openLeadTier.tone}`}
@@ -2276,6 +2821,7 @@ export default function LineupNewLook({
             );
           })}
         </div>
+        </details>
       </section>
     );
   };
@@ -2571,7 +3117,12 @@ export default function LineupNewLook({
                 <span className="nl-lineup-eyebrow">
                   {activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Fokus"}
                 </span>
-                <strong>{activeSlot ? slotRoleByKey.get(activeSlot.key)?.label ?? "Slot" : "Slot wählen"}</strong>
+                <strong style={activeSlot ? { display: "inline-flex", alignItems: "center", gap: "6px" } : undefined}>
+                  {activeSlot ? (
+                    <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(activeSlot.key) ?? "–"} slotIndex={activeSlot.slotIndex} />
+                  ) : null}
+                  {activeSlot ? slotRoleByKey.get(activeSlot.key)?.label ?? "Slot" : "Slot wählen"}
+                </strong>
               </div>
               {activeSlot && !activeSelectionId && topPickForActiveSlot?.player.activePlayerId && !isReadOnly ? (
                 <button
@@ -2588,6 +3139,18 @@ export default function LineupNewLook({
                 </button>
               ) : null}
             </header>
+
+            {/* EBENE B — ROLLENKARTE. Entschieden nach Fables Bild (Gesamtkonzept Abschnitt 7):
+                rechts neben dem Feld, in der bestehenden Fokus-Rail; unter 1100 px rutscht die
+                Rail ohnehin unter das Board. Erscheint, sobald eine Marke/ein Slot fokussiert ist. */}
+            {activeSlot && rollenkarteDaten ? (
+              <EinsatzlisteRollenkarte
+                daten={rollenkarteDaten}
+                readOnly={isReadOnly || isBusy}
+                onUebernehmen={(activePlayerId) => onAssignPlayer(activeSlot.key, activePlayerId)}
+                onNavigateArena={arenaReady ? onNavigateArena : undefined}
+              />
+            ) : null}
 
             {compareActive && compareA?.player && compareB?.player ? (
               // Compare-Tray (Feature 3): angeheftet (A) vs. gehovert (B) —
@@ -2813,7 +3376,21 @@ export default function LineupNewLook({
                   const isBlocked = Boolean(entry.activeSlotCandidate?.blockReason);
                   const isAssignedHere = Boolean(candidateId) && activeSelectionId === candidateId;
                   const bestSlots: NlBestSlotEntry[] = candidateId ? playerBestSlotSummaryByActivePlayerId.get(candidateId) ?? [] : [];
-                  const bestSlot = bestSlots[0] ?? null;
+                  // Paket 1: die drei stärksten Slots des Spielers — mit aktivem Slot innerhalb
+                  // DIESER Disziplin-Seite (die Liste ist die Kandidatenliste des aktiven Slots),
+                  // sonst über beide Seiten mit Seitenkürzel. Die Zahl ist dieselbe Slot-
+                  // Projektion, die der Slot selbst zeigt (projectedScore).
+                  const topSlotsRoh = (activeSlot ? bestSlots.filter((entry) => entry.disciplineSide === activeSlot.disciplineSide) : bestSlots).slice(0, 3);
+                  // Liegt der Slot, auf den die optimale Gesamtverteilung den Spieler setzt, NICHT
+                  // unter seinen eigenen Top 3 (typisch: der Top-Slot gehört schon einem Stärkeren),
+                  // wird er als vierter Eintrag mit ◆ angehängt — sonst sähe man das Gold nie.
+                  const optimalSlotKey = candidateId ? gold.zuteilung.slotVonSpieler.get(candidateId) ?? null : null;
+                  const optimalSlotEntry =
+                    optimalSlotKey && !topSlotsRoh.some((entry) => entry.slotKey === optimalSlotKey)
+                      ? bestSlots.find((entry) => entry.slotKey === optimalSlotKey && (!activeSlot || entry.disciplineSide === activeSlot.disciplineSide)) ?? null
+                      : null;
+                  const topSlots = optimalSlotEntry ? [...topSlotsRoh, optimalSlotEntry] : topSlotsRoh;
+                  const candidateGoldTitle = activeSlot ? goldTitleFor(candidateId, activeSlot.key) : null;
                   // Achsen-Begründung (Feature 2) + Confidence-Band (Feature 1) je Kandidat.
                   const reasonChips = candidateId ? reasonChipsByPlayerId.get(candidateId) ?? [] : [];
                   const candidateRange = entry.activeSlotCandidate ?? null;
@@ -2853,7 +3430,12 @@ export default function LineupNewLook({
                           Hover ⇒ volle Karte). Klick fällt weiterhin auf den Button-Handler
                           durch (Zuweisung); Drag-Quelle bleibt der gesamte Button. */}
                       {wrapNlPortraitPreview(
-                        <NlPlayerAvatar portraitUrl={candidate.portraitUrl} name={candidate.name} size={20} />,
+                        <NlPlayerAvatar
+                          portraitUrl={candidate.portraitUrl}
+                          name={candidate.name}
+                          size={20}
+                          goldTitle={candidateGoldTitle}
+                        />,
                         candidate,
                         isReadOnly || isBlocked,
                       )}
@@ -2863,10 +3445,37 @@ export default function LineupNewLook({
                           {entry.groupMeta.label}
                           {entry.shortReason ? ` · ${entry.shortReason}` : ""}
                         </small>
-                        {bestSlot ? (
-                          <small className="nl-lineup-candidate-bestslot">
-                            Bester Slot {bestSlot.disciplineSide.toUpperCase()}-{bestSlot.slotIndex + 1} ·{" "}
-                            {formatNullableScore(bestSlot.projectedScore)}
+                        {topSlots.length > 0 ? (
+                          <small
+                            className="nl-lineup-candidate-bestslot"
+                            data-testid="nl-lineup-candidate-topslots"
+                            style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: "4px" }}
+                            title={topSlots
+                              .map(
+                                (entry) =>
+                                  `${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1} ${
+                                    slotRoleByKey.get(entry.slotKey)?.label ?? "Slot"
+                                  }: ${formatNullableScore(entry.projectedScore)}`,
+                              )
+                              .join(" · ")}
+                          >
+                            {topSlots.map((entry, topIndex) => (
+                              <span key={entry.slotKey} style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                {topIndex > 0 ? <span aria-hidden="true">·</span> : null}
+                                {!activeSlot ? <span>{entry.disciplineSide.toUpperCase()}</span> : null}
+                                <NlSlotKuerzel kuerzel={slotKuerzelByKey.get(entry.slotKey) ?? "–"} slotIndex={entry.slotIndex} />
+                                <span className="nl-tnum">{formatNullableScore(entry.projectedScore)}</span>
+                                {candidateId && gold.zuteilung.slotVonSpieler.get(candidateId) === entry.slotKey ? (
+                                  <span
+                                    data-einsatz-gold-raute="true"
+                                    style={{ color: "var(--nl-gold)" }}
+                                    title={`Optimale Verteilung: gehört auf ${slotNameFor(entry.slotKey)}`}
+                                  >
+                                    ◆
+                                  </span>
+                                ) : null}
+                              </span>
+                            ))}
                           </small>
                         ) : null}
                         {/* Reason-Chips (Feature 2): Top 1–2 Achsen-Begründungen als
