@@ -6357,20 +6357,40 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 sourceReadOnly ? "Dieser Modus ist nur zum Anschauen — hier wird nichts geschrieben." : null
               }
             />
-            <label>
-              <span>Spieltag</span>
-              <select
-                className={`input legacy-lineup-select${selectedMatchdayIsReady ? " is-complete" : ""}`}
-                value={params.matchdayId}
-                onChange={(event) => void loadContext({ matchdayId: event.target.value }, source)}
-              >
-                {options.matchdays.map((matchday) => (
-                  <option key={matchday.id} value={matchday.id}>
-                    {formatMatchdayOptionLabel(matchday)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {/* Korrektur 1d (10.11., bestaetigter Bug, bereits vor #1358 auf main): im
+                eingebetteten Modus (Shell-Flow waehrend des laufenden Spielstands) ist der
+                Spieltag KEINE frei waehlbare Groesse wie das Team — er ist der eine aktuelle
+                Spieltag aus `gameState.matchdayState.matchdayId`, den der eingebettete Effekt
+                weiter oben (ca. Zeile 3728) bei jeder Kontextaenderung erzwingt (`loadContext`
+                mit `props.defaultMatchdayId`). Anders als beim Team gibt es dafuer KEINEN
+                Rueckkanal in die Shell (kein `onMatchdayChange`/`setActiveMatchday` — anders als
+                `onTeamChange`/`setActiveManagerTeam`, s. FoundationShellRouterBody.tsx) und
+                architektonisch auch keinen sinnvollen: der aktuelle Spieltag ist der
+                Fortschritts-Zeiger der laufenden Saison (Arena, Saisonstand, "Weiter" haengen
+                alle an genau diesem einen Wert), kein frei waehlbarer Vorschau-Zustand. Ein Klick
+                auf die Auswahl setzte hier also kein echtes "anderer Spieltag", sondern sprang
+                sofort sichtbar zurueck — genau der gemeldete Bug. Die Dropdown-Liste
+                (`options.matchdays`) zeigt ALLE Spieltage der Saison (inkl. laengst gespielter);
+                das ist fuer die STANDALONE Lab-Seite (`/foundation/legacy-lineup-lab`, kein
+                `embedded`) richtig und bleibt dort unveraendert — nur im eingebetteten
+                Shell-Flow wird sie ausgeblendet statt einen Rueckkanal vorzutaeuschen, den es
+                nicht gibt. */}
+            {!props.embedded ? (
+              <label>
+                <span>Spieltag</span>
+                <select
+                  className={`input legacy-lineup-select${selectedMatchdayIsReady ? " is-complete" : ""}`}
+                  value={params.matchdayId}
+                  onChange={(event) => void loadContext({ matchdayId: event.target.value }, source)}
+                >
+                  {options.matchdays.map((matchday) => (
+                    <option key={matchday.id} value={matchday.id}>
+                      {formatMatchdayOptionLabel(matchday)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label>
               <span>Team</span>
               <select

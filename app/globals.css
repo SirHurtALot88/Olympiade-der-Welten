@@ -81837,11 +81837,16 @@ span.nl-facility-ampel-chip {
   .is-new-look .nl-feld-marke.is-drag-over { transform: translate(-50%, -50%); }
 }
 
-/* --- Erklär-Tooltip (Paket F4) -------------------------------------------------------------- */
+/* --- Erklär-Tooltip (Paket F4, Korrektur 1a) ------------------------------------------------- */
 /* Ersetzt natives title= an dicht beschrifteten Stellen (±-Attribute, Verbindlichkeits-Badges,
    Besetzt-Zeile): eigenes gestyltes Panel statt Browser-Systemdialog, Hover UND Tastaturfokus
    öffnen (EinsatzlisteMiniFeld.tsx, NlTooltip). Reiner Deko-Rahmen auf --nl-panel-2/--nl-line;
-   Körpertext auf --nl-ink (kein Akzent als Schrift, Ratchet tests/nl-accent-text-regel.test.ts). */
+   Körpertext auf --nl-ink (kein Akzent als Schrift, Ratchet tests/nl-accent-text-regel.test.ts).
+   Primäre Richtung ist UNTEN statt OBEN (1a: verdeckte vorher Inhalte über dem Auslöser, z.B. die
+   Überschrift „Attribute in dieser Rolle") — JS wählt unten/rechts/links/oben in dieser
+   Reihenfolge je nach Platz (NlTooltip), die vier Richtungsklassen tragen nur noch Position +
+   Pfeil. Der Pfeil ist ein reines CSS-Dreieck (border-Trick), zeigt stets zum Auslöser und
+   wandert bei dx/dy mit, damit er auch bei verschobener Bubble noch auf den Trigger zeigt. */
 
 .is-new-look .nl-tip {
   position: relative;
@@ -81857,9 +81862,6 @@ span.nl-facility-ampel-chip {
 
 .is-new-look .nl-tip-bubble {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(calc(-50% + var(--nl-tip-dx, 0px)));
   z-index: 40;
   width: max-content;
   max-width: min(280px, 72vw);
@@ -81876,14 +81878,75 @@ span.nl-facility-ampel-chip {
   white-space: normal;
   pointer-events: none;
 }
-.is-new-look .nl-tip-bubble.is-unten { bottom: auto; top: calc(100% + 8px); }
+
+/* Richtung: unten (primär) / oben (letzter Ausweg) — horizontal zentriert, dx schiebt zurück in den Viewport. */
+.is-new-look .nl-tip-bubble.is-unten,
+.is-new-look .nl-tip-bubble.is-oben {
+  left: 50%;
+  transform: translateX(calc(-50% + var(--nl-tip-dx, 0px)));
+}
+.is-new-look .nl-tip-bubble.is-unten { top: calc(100% + 8px); }
+.is-new-look .nl-tip-bubble.is-oben { bottom: calc(100% + 8px); }
+
+/* Richtung: rechts / links (Ausweich-Positionen, wenn unten nicht passt) — vertikal zentriert, dy schiebt zurück. */
+.is-new-look .nl-tip-bubble.is-rechts,
+.is-new-look .nl-tip-bubble.is-links {
+  top: 50%;
+  transform: translateY(calc(-50% + var(--nl-tip-dy, 0px)));
+}
+.is-new-look .nl-tip-bubble.is-rechts { left: calc(100% + 8px); }
+.is-new-look .nl-tip-bubble.is-links { right: calc(100% + 8px); }
+
+/* Pfeil: reines CSS-Dreieck via border, zeigt von der Bubble zum Auslöser und folgt dx/dy. */
+.is-new-look .nl-tip-bubble::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+.is-new-look .nl-tip-bubble.is-unten::after {
+  bottom: 100%;
+  left: 50%;
+  margin-left: calc(-6px - var(--nl-tip-dx, 0px));
+  border-top-width: 0;
+  border-bottom-color: var(--nl-panel-2);
+}
+.is-new-look .nl-tip-bubble.is-oben::after {
+  top: 100%;
+  left: 50%;
+  margin-left: calc(-6px - var(--nl-tip-dx, 0px));
+  border-bottom-width: 0;
+  border-top-color: var(--nl-panel-2);
+}
+.is-new-look .nl-tip-bubble.is-rechts::after {
+  right: 100%;
+  top: 50%;
+  margin-top: calc(-6px - var(--nl-tip-dy, 0px));
+  border-left-width: 0;
+  border-right-color: var(--nl-panel-2);
+}
+.is-new-look .nl-tip-bubble.is-links::after {
+  left: 100%;
+  top: 50%;
+  margin-top: calc(-6px - var(--nl-tip-dy, 0px));
+  border-right-width: 0;
+  border-left-color: var(--nl-panel-2);
+}
 
 @media (prefers-reduced-motion: no-preference) {
-  .is-new-look .nl-tip-bubble { animation: nl-tip-ein 90ms var(--nl-ease, ease-out); }
+  .is-new-look .nl-tip-bubble.is-unten,
+  .is-new-look .nl-tip-bubble.is-oben { animation: nl-tip-ein-vertikal 90ms var(--nl-ease, ease-out); }
+  .is-new-look .nl-tip-bubble.is-rechts,
+  .is-new-look .nl-tip-bubble.is-links { animation: nl-tip-ein-horizontal 90ms var(--nl-ease, ease-out); }
 }
-@keyframes nl-tip-ein {
+@keyframes nl-tip-ein-vertikal {
   from { opacity: 0; transform: translateX(calc(-50% + var(--nl-tip-dx, 0px))) translateY(2px); }
   to { opacity: 1; transform: translateX(calc(-50% + var(--nl-tip-dx, 0px))) translateY(0); }
+}
+@keyframes nl-tip-ein-horizontal {
+  from { opacity: 0; transform: translateY(calc(-50% + var(--nl-tip-dy, 0px))) translateX(2px); }
+  to { opacity: 1; transform: translateY(calc(-50% + var(--nl-tip-dy, 0px))) translateX(0); }
 }
 
 /* --- 16:9/4K ausnutzen (Paket F4, Chris 08.11.): Breite statt Höhe, FM27-Prinzip ------------- */
@@ -81896,6 +81959,73 @@ span.nl-facility-ampel-chip {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--nl-s4);
+  }
+}
+
+/* --- Kopfzone verdichten (Korrektur 1c, 10.11.) ---------------------------------------------- */
+/* Nur die drei EINSATZLISTEN-EIGENEN Kopfzonen-Elemente (`.nl-lineup-hud`, `.nl-lineup-controls`,
+   `.nl-lineup-status`) — bewusst NICHT die geteilte Foundation-Shell-Chrome darüber (Status-Chip
+   „Bereit", Breadcrumb/„Weiter"-Zeile, Einsatzliste/Formplan-Tabs, „Nur Ansicht"-Banner aus
+   `FoundationShellRouterBody.tsx`): die läuft auf jeder Foundation-Seite, eine Änderung dort wäre
+   keine „geringes Risiko"-Anzeigeänderung dieser Runde mehr, sondern eine App-weite.
+   Gemessen (Playwright, 1920×1080, Spieltag 1 Hockey/Climbing, Rollenkarte offen, lokaler
+   Dev-Server, frischer Spielstand): `.nl-lineup-hud` vorher 151px, `.nl-lineup-controls` vorher
+   105px, dazu zwei 16-px-Lücken (`.nl-lineup-root` gap) — zusammen 288px oberhalb des
+   Mini-Feld/Rollenkarte-Bereichs. Die Kopfkarte selbst ist zweizeilig (HUD-Aktionen und
+   Fatigue-Kosten-Chip brechen um), weil Ring + Teamstärke + Aktionen zusammen breiter sind als
+   die verfügbare Breite — das wird hier enger gepackt, nicht umgebaut (die Kopfkarte passt danach
+   auf eine Zeile statt zwei). Ergebnis (dieselbe Methode, Abschnitt 8.4-Nachtrag der
+   Architektur-Doku): FHD 1920×1080 Überschuss 840 px → **750 px** (−90 px), QHD 2560×1440
+   427 px → **390 px** (−37 px), 4K weiterhin **0 px** (unverändert, war schon am Boden), Phone
+   390 px unverändert (Breakpoint greift dort bewusst nicht). NICHT 0 px bei FHD/QHD, weil
+   `.nl-lineup-layout` (Mini-Feld + offene Rollenkarte) allein schon höher als 1080 px ist — das zu
+   ändern wäre der Mini-Feld/Rollenkarte-Bereich selbst, ausdrücklich außerhalb dieser Runde. */
+@media (min-width: 1500px) {
+  .is-new-look .nl-lineup-root {
+    gap: var(--nl-s3);
+  }
+
+  .is-new-look .nl-lineup-hud {
+    padding: 10px var(--nl-s4);
+    gap: var(--nl-s3);
+  }
+
+  .is-new-look .nl-lineup-hud-strength {
+    gap: var(--nl-s3);
+  }
+
+  .is-new-look .nl-lineup-hud-actions {
+    gap: 6px;
+  }
+
+  .is-new-look .nl-lineup-ring {
+    width: 48px;
+    height: 48px;
+  }
+
+  .is-new-look .nl-lineup-ring-copy strong {
+    font-size: 11px;
+  }
+
+  .is-new-look .nl-lineup-hud-radar {
+    width: 72px;
+  }
+
+  .is-new-look .nl-lineup-controls {
+    gap: var(--nl-s2);
+  }
+
+  .is-new-look .nl-lineup-controls label {
+    min-width: 160px;
+  }
+
+  .is-new-look .nl-lineup-status {
+    padding: 5px var(--nl-s3);
+  }
+
+  .legacy-lineup-my-teams-readiness {
+    padding: 6px 9px;
+    gap: 4px;
   }
 }
 

@@ -362,11 +362,42 @@ export function glyphenTon(glyphe: Glyphe): "gut" | "neutral" | "schlecht" {
 // ================================================================================================
 
 /**
- * Drei-Buchstaben-Kürzel eines Attributs für die dichte Rollenkarte. Der Attribut-Key ist immer
- * englisch (power, health, determination, stamina, speed, dexterity, awareness, intelligence,
- * will, charisma, spirit, torment) und in den ersten drei Buchstaben eindeutig — POW/HEA/DET/
- * STA/SPE/DEX/AWA/INT/WIL/CHA/SPI/TOR, keine Kollision. Der volle Name bleibt im Tooltip.
+ * Drei-Buchstaben-Kürzel eines Attributs für die dichte Rollenkarte. Feste Tabelle statt
+ * `key.slice(0, 3)` (Korrektur 1b): der simple Slice ergab für "torment" "TOR", und das liest
+ * sich im Hockey-Kontext (Mini-Feld derselben Rolle) wie "Tor" — ein Treffer, nicht die
+ * Gemütszustand-Eigenschaft. Fix: `torment` → `TRM`.
+ *
+ * Die übrigen elf Attribute (power, health, determination, stamina, speed, dexterity, awareness,
+ * intelligence, will, charisma, spirit) bleiben beim bisherigen 3-Buchstaben-Slice — POW/HEA/DET/
+ * STA/SPE/DEX/AWA/INT/WIL/CHA/SPI — ausdrücklich geprüft (Korrektur 1b verlangt das) und ohne
+ * weiteren Fehldeutungs-Fund über alle 20 Disziplinen:
+ * - POW/SPE kollidieren mit den Achsen-Kürzeln "Power"/"Speed" (POW/SPE/MEN/SOC, z. B.
+ *   `lib/board/team-season-objectives-service.ts`) — laut Entscheidung ausdrücklich in Ordnung,
+ *   weil Attribut und Achse hier dasselbe meinen.
+ * - INT läuft im Projekt sonst überall als "Intelligence" (`lineup-candidate-model.ts`,
+ *   `player-attribute-history.ts`, `transfermarkt-attribute-filter.ts`), nirgends als
+ *   "Interception" o. Ä.; im Football-Mini-Feld steht kein konkurrierendes "INT"-Label.
+ * - Für die übrigen neun (HEA, DET, STA, DEX, AWA, WIL, CHA, SPI) ist kein disziplinspezifischer
+ *   Begriff mit derselben Abkürzung in den Arena-/Mini-Feld-Texten gefunden worden (u. a. Tennis
+ *   "Spiel"/"Satz", Battlefield-Begriffe, Eishockey-Rollen durchsucht).
+ * Taucht künftig doch eine Kollision auf, kommt sie als weiterer Eintrag in diese Tabelle, nicht
+ * als Sonderfall im Aufrufer.
  */
+const ATTRIBUT_KUERZEL: Record<string, string> = {
+  power: "POW",
+  health: "HEA",
+  determination: "DET",
+  stamina: "STA",
+  speed: "SPE",
+  dexterity: "DEX",
+  awareness: "AWA",
+  intelligence: "INT",
+  will: "WIL",
+  charisma: "CHA",
+  spirit: "SPI",
+  torment: "TRM",
+};
+
 export function attributKuerzel(key: string): string {
-  return key.slice(0, 3).toUpperCase();
+  return ATTRIBUT_KUERZEL[key] ?? key.slice(0, 3).toUpperCase();
 }

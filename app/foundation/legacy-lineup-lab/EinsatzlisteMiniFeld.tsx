@@ -55,24 +55,33 @@ function GlyphenChip({ glyphe }: { glyphe: Glyphe }) {
   return <span className={`nl-feld-glyphe is-${glyphenTon(glyphe)}`}>{glyphe}</span>;
 }
 
+/** Seite, auf der die Bubble gegenüber dem Auslöser aufgeht. */
+type NlTipRichtung = "unten" | "oben" | "rechts" | "links";
+
 /**
- * ERKLÄR-TOOLTIP (Paket F4, Chris 08.11.: „beim Hovern die Erklärungen"). Ersetzt natives
- * `title=` an Stellen, die auf den ersten Blick dicht bleiben sollen (±-Attribute,
+ * ERKLÄR-TOOLTIP (Paket F4, Chris 08.11.: „beim Hovern die Erklärungen"; Korrektur 1a: „bevorzugt
+ * unten oder neben dem Auslöser, nicht über ihm" — im Screenshot verdeckte die above-Bubble die
+ * Überschrift „Attribute in dieser Rolle" und wirkte dem Auslöser nicht zugeordnet). Ersetzt
+ * natives `title=` an Stellen, die auf den ersten Blick dicht bleiben sollen (±-Attribute,
  * Verbindlichkeits-Badges, Besetzt-Zeile). Natives title kommt verzögert, bricht nicht um und
  * wirkt im dunklen Theme wie ein Systemdialog statt wie ein Teil der Oberfläche.
  *
  * - Hover UND Tastaturfokus öffnen (kein `:hover`-only CSS) — die sichtbare Fläche ist selbst der
  *   Trigger (`tabIndex=0`), die Erklärung hängt per `aria-describedby` daran, nicht an `title`.
- * - Clamping statt Positionierungs-Bibliothek: nach dem Öffnen wird die Bubble gemessen und bei
- *   Bedarf horizontal zurück in den Viewport verschoben; ragt sie oben hinaus, klappt sie nach
- *   unten.
+ * - Clamping statt Positionierungs-Bibliothek: nach dem Öffnen wird die Bubble gemessen.
+ *   Primäre Richtung ist UNTEN (passt fast immer und verdeckt nie etwas, das über dem Auslöser
+ *   steht). Passt unten nicht in den Viewport, weicht sie seitlich aus (rechts, sonst links —
+ *   verdeckt dabei nie den Auslöser selbst). Erst wenn auch seitlich kein Platz ist, geht sie
+ *   OBEN auf (letzter Ausweg, nicht die Vorgabe). Quer zur gewählten Richtung bleibt das alte
+ *   Zurückschieben in den Viewport erhalten. Ein reiner CSS-Pfeil (Dreieck via `border`) zeigt
+ *   von der Bubble auf den Auslöser, in jeder der vier Richtungen.
  */
 function NlTooltip({ label, children, block }: { label: ReactNode; children: ReactNode; block?: boolean }) {
   const [open, setOpen] = useState(false);
   const bubbleId = useId();
   const wrapRef = useRef<HTMLSpanElement>(null);
   const bubbleRef = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<{ dx: number; unten: boolean }>({ dx: 0, unten: false });
+  const [pos, setPos] = useState<{ dx: number; dy: number; richtung: NlTipRichtung }>({ dx: 0, dy: 0, richtung: "unten" });
 
   useLayoutEffect(() => {
     if (!open || typeof window === "undefined") return;
@@ -82,13 +91,34 @@ function NlTooltip({ label, children, block }: { label: ReactNode; children: Rea
     const rand = 8;
     const wrapRect = wrap.getBoundingClientRect();
     const bubbleRect = bubble.getBoundingClientRect();
+
+    const platzUnten = window.innerHeight - wrapRect.bottom - rand;
+    const platzOben = wrapRect.top - rand;
+    const platzRechts = window.innerWidth - wrapRect.right - rand;
+    const platzLinks = wrapRect.left - rand;
+
+    let richtung: NlTipRichtung;
+    if (bubbleRect.height + rand <= platzUnten) richtung = "unten";
+    else if (bubbleRect.width + rand <= platzRechts) richtung = "rechts";
+    else if (bubbleRect.width + rand <= platzLinks) richtung = "links";
+    else if (platzOben > platzUnten) richtung = "oben";
+    else richtung = "unten";
+
     let dx = 0;
-    const linksRoh = wrapRect.left + wrapRect.width / 2 - bubbleRect.width / 2;
-    const rechtsRoh = linksRoh + bubbleRect.width;
-    if (linksRoh < rand) dx = rand - linksRoh;
-    else if (rechtsRoh > window.innerWidth - rand) dx = window.innerWidth - rand - rechtsRoh;
-    const unten = wrapRect.top - bubbleRect.height - rand < 0;
-    setPos((prev) => (prev.dx === dx && prev.unten === unten ? prev : { dx, unten }));
+    let dy = 0;
+    if (richtung === "unten" || richtung === "oben") {
+      const linksRoh = wrapRect.left + wrapRect.width / 2 - bubbleRect.width / 2;
+      const rechtsRoh = linksRoh + bubbleRect.width;
+      if (linksRoh < rand) dx = rand - linksRoh;
+      else if (rechtsRoh > window.innerWidth - rand) dx = window.innerWidth - rand - rechtsRoh;
+    } else {
+      const obenRoh = wrapRect.top + wrapRect.height / 2 - bubbleRect.height / 2;
+      const untenRoh = obenRoh + bubbleRect.height;
+      if (obenRoh < rand) dy = rand - obenRoh;
+      else if (untenRoh > window.innerHeight - rand) dy = window.innerHeight - rand - untenRoh;
+    }
+
+    setPos((prev) => (prev.dx === dx && prev.dy === dy && prev.richtung === richtung ? prev : { dx, dy, richtung }));
   }, [open]);
 
   return (
@@ -108,8 +138,8 @@ function NlTooltip({ label, children, block }: { label: ReactNode; children: Rea
           ref={bubbleRef}
           id={bubbleId}
           role="tooltip"
-          className={`nl-tip-bubble${pos.unten ? " is-unten" : ""}`}
-          style={{ "--nl-tip-dx": `${pos.dx}px` } as CSSProperties}
+          className={`nl-tip-bubble is-${pos.richtung}`}
+          style={{ "--nl-tip-dx": `${pos.dx}px`, "--nl-tip-dy": `${pos.dy}px` } as CSSProperties}
         >
           {label}
         </span>

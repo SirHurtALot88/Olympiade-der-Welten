@@ -923,3 +923,27 @@ nur F3/F4) — **Geschmacks-/Scope-Frage für Chris**, nicht in dieser Runde mit
 4. **Spieltag-Dropdown** in der Einsatzliste scheint keinen Spieltag-Wechsel auszulösen (8.4) —
    gewollt (nur Vorschau künftiger Spieltage) oder ein Bug, den ein separater Agent aufnehmen
    soll?
+
+### 8.6 Vierte Korrekturrunde (10.11., PM-Review): alle vier offenen Punkte entschieden
+
+Zu den vier Fragen aus 8.5 kamen Chris' Entscheidungen zurück (PM-Review-Agent), hier nur kurz,
+Details in den jeweiligen Commit-Nachrichten:
+
+1. **Tooltip:** Panel-Look bleibt, aber Pfeil zum Auslöser (reines CSS-Dreieck) UND primäre
+   Richtung von OBEN auf UNTEN/NEBEN gedreht (`NlTooltip` in `EinsatzlisteMiniFeld.tsx`) — im
+   Screenshot hatte „oben" die Überschrift „Attribute in dieser Rolle" verdeckt.
+2. **Attribut-Kürzel:** feste Tabelle statt `slice(0,3)` in `attributKuerzel()`
+   (`einsatzliste-anzeige.ts`); `torment` → `TRM` statt `TOR` (las sich im Hockey-Kontext wie
+   „Tor"). Die anderen elf Kürzel bleiben (POW/SPE kollidieren bewusst mit den Achsen-Kürzeln,
+   das ist in Ordnung; kein weiterer Fund über alle 20 Disziplinen).
+3. **FHD-Rest-Überschuss:** ja, in dieser Runde mit erledigt — `.nl-lineup-hud`,
+   `.nl-lineup-controls`, `.nl-lineup-status` ab 1500 px dichter gepackt (Details im CSS-Kommentar
+   direkt über der Regel, `app/globals.css`). Gemessen (dieselbe Playwright-Methode wie 8.4):
+   FHD 840 px → 750 px, QHD 427 px → 390 px, 4K weiterhin 0 px. Bewusst NICHT auf 0 px bei FHD/QHD
+   gebracht — das Mini-Feld/Rollenkarte-Layout selbst (`.nl-lineup-layout`, Rollenkarte offen) ist
+   mit 1248 px allein schon höher als der 1080-px-Viewport, kein Header-Verdichten kommt da drunter.
+   Ebenso bewusst NICHT angefasst: die geteilte Foundation-Shell-Chrome oberhalb (Status-Chip
+   „Bereit", Breadcrumb/„Weiter"-Zeile, Einsatzliste/Formplan-Tabs, „Nur Ansicht"-Banner) — die
+   läuft auf jeder Foundation-Seite, nicht nur hier.
+4. **Spieltag-Dropdown-Bug:** bestätigt als echter, vorbestehender Bug (nicht gewollt), siehe
+   separate Fundstelle/Fix in `LegacyLineupLabClient.tsx` (Commit-Nachricht dieser Runde).
