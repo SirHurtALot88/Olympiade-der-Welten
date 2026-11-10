@@ -16,7 +16,11 @@ import { invalidateLocalTransfermarktCachesForSave } from "@/lib/market/transfer
 import type { ArenaFixtureInput, ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PersistenceService } from "@/lib/persistence/types";
-import { buildHarmlosenMiniDmFfaFakeRunner } from "@/tests/helpers/mini-dm-ffa-battle-save";
+import {
+  buildHarmlosenBahnPodFakeRunner,
+  buildHarmlosenBattlefieldPodFakeRunner,
+  buildHarmlosenMiniDmFfaFakeRunner,
+} from "@/tests/helpers/mini-dm-ffa-battle-save";
 
 /**
  * QUICK-SIM-VORLAUF (`beschleunigeArenaVorlaufPerQuickSim()`, 27.10.) — die Ablauflogik mit
@@ -104,6 +108,14 @@ async function bauFrischenBattleSaveMitVollemFeld() {
 }
 
 const harmlosMiniDm = () => buildHarmlosenMiniDmFfaFakeRunner();
+// REBASE 11.11.: `runBahnPodFixturesNode()`/`runBattlefieldPodFixturesNode()` (neu, s.
+// arena-node-runner.ts) sind jetzt die Defaults im Node-Zweig von
+// `beschleunigeArenaVorlaufPerQuickSim()`, wenn `runBahnPodFixturesNodeImpl`/
+// `runBattlefieldPodFixturesNodeImpl` fehlen -- GENAU wie `arena-vorlauf-service.test.ts` das fuer
+// den Chromium-Pfad seit der CI-Fix-Kommit "Bahn-Pod-Runner in allen Vorlauf-Tests faken" tut,
+// deshalb hier dieselben harmlosen Fakes fuer BEIDE Zweige (Node UND Chromium-Rueckfall).
+const harmlosBahnPod = () => buildHarmlosenBahnPodFakeRunner();
+const harmlosBattlefieldPod = () => buildHarmlosenBattlefieldPodFakeRunner();
 
 /**
  * CI-FIX (27.10., zweimaliger Job-Timeout bei genau diesem Dateinamen in den Logs, s. Kommentar
@@ -175,8 +187,12 @@ describe("Quick-Sim-Vorlauf", () => {
       const optionen = {
         runArenaFixturesNodeImpl: node,
         runMiniDmFfaPodFixturesNodeImpl: harmlosMiniDm(),
+        runBahnPodFixturesNodeImpl: harmlosBahnPod(),
+        runBattlefieldPodFixturesNodeImpl: harmlosBattlefieldPod(),
         runArenaFixturesImpl: chromium,
         runMiniDmFfaPodFixturesImpl: harmlosMiniDm(),
+        runBahnPodFixturesImpl: harmlosBahnPod(),
+        runBattlefieldPodFixturesImpl: harmlosBattlefieldPod(),
       };
 
       const ergebnis = await beschleunigeArenaVorlaufPerQuickSim(scope, optionen, persistence);
@@ -209,7 +225,12 @@ describe("Quick-Sim-Vorlauf", () => {
       // Der Normalfall: der Chromium-Vorlauf laeuft schon, als der Knopf gedrueckt wird.
       const chromiumLauf = stelleArenaVorlaufSicher(
         scope,
-        { runArenaFixturesImpl: chromium, runMiniDmFfaPodFixturesImpl: harmlosMiniDm() },
+        {
+          runArenaFixturesImpl: chromium,
+          runMiniDmFfaPodFixturesImpl: harmlosMiniDm(),
+          runBahnPodFixturesImpl: harmlosBahnPod(),
+          runBattlefieldPodFixturesImpl: harmlosBattlefieldPod(),
+        },
         persistence,
       );
       await bisWahr(() => chromium.aufrufe > 0);
@@ -218,7 +239,13 @@ describe("Quick-Sim-Vorlauf", () => {
 
       const quickSim = await beschleunigeArenaVorlaufPerQuickSim(
         scope,
-        { runArenaFixturesNodeImpl: node, runMiniDmFfaPodFixturesNodeImpl: harmlosMiniDm(), runArenaFixturesImpl: chromium },
+        {
+          runArenaFixturesNodeImpl: node,
+          runMiniDmFfaPodFixturesNodeImpl: harmlosMiniDm(),
+          runBahnPodFixturesNodeImpl: harmlosBahnPod(),
+          runBattlefieldPodFixturesNodeImpl: harmlosBattlefieldPod(),
+          runArenaFixturesImpl: chromium,
+        },
         persistence,
       );
       expect(quickSim.weg).toBe("node");
@@ -254,8 +281,12 @@ describe("Quick-Sim-Vorlauf", () => {
       const optionen = {
         runArenaFixturesNodeImpl: kaputterNode,
         runMiniDmFfaPodFixturesNodeImpl: harmlosMiniDm(),
+        runBahnPodFixturesNodeImpl: harmlosBahnPod(),
+        runBattlefieldPodFixturesNodeImpl: harmlosBattlefieldPod(),
         runArenaFixturesImpl: chromium,
         runMiniDmFfaPodFixturesImpl: harmlosMiniDm(),
+        runBahnPodFixturesImpl: harmlosBahnPod(),
+        runBattlefieldPodFixturesImpl: harmlosBattlefieldPod(),
       };
 
       const ergebnis = await beschleunigeArenaVorlaufPerQuickSim(scope, optionen, persistence);
@@ -294,8 +325,12 @@ describe("Quick-Sim-Vorlauf", () => {
         {
           runArenaFixturesNodeImpl: fremderNode,
           runMiniDmFfaPodFixturesNodeImpl: harmlosMiniDm(),
+          runBahnPodFixturesNodeImpl: harmlosBahnPod(),
+          runBattlefieldPodFixturesNodeImpl: harmlosBattlefieldPod(),
           runArenaFixturesImpl: chromium,
           runMiniDmFfaPodFixturesImpl: harmlosMiniDm(),
+          runBahnPodFixturesImpl: harmlosBahnPod(),
+          runBattlefieldPodFixturesImpl: harmlosBattlefieldPod(),
         },
         persistence,
       );

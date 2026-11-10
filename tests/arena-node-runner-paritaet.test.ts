@@ -11,9 +11,15 @@ import {
   ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS,
   ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS,
   runArenaFixtures,
+  runBahnPodFixtures,
+  runBattlefieldPodFixtures,
   runMiniDmFfaPodFixtures,
   type ArenaFixtureInput,
   type ArenaFixtureResult,
+  type BahnPodFixtureInput,
+  type BahnPodFixtureResult,
+  type BattlefieldPodFixtureInput,
+  type BattlefieldPodFixtureResult,
   type MiniDmFfaPodFixtureInput,
   type MiniDmFfaPodFixtureResult,
 } from "@/lib/battle/arena-headless-runner";
@@ -21,6 +27,8 @@ import {
   pruefeRohesDuellErgebnis,
   pruefeRohesMiniDmErgebnis,
   runArenaFixturesNode,
+  runBahnPodFixturesNode,
+  runBattlefieldPodFixturesNode,
   runMiniDmFfaPodFixturesNode,
 } from "@/lib/battle/arena-node-runner";
 import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disciplines";
@@ -46,12 +54,19 @@ import { chromiumVerfuegbar } from "@/tests/helpers/chromium-verfuegbar";
  * (`buildArenaMatchSeed`, wie der Vorlauf) und echten Spieltags-Mutatoren
  * (`rollMatchdayMutatorTraitsForSide`), fuer jede Disziplin mit Arena-Einstieg.
  *
- * ABDECKUNG (17 von 20 Disziplinen): alle 14 gewerteten (`ARENA_RESOLVED_DISCIPLINE_IDS`), dazu
- * Football und Hockey (Feldspiel-Chassis, heute ueber die PPS-Bruecke gewertet, aber derselbe
- * Motor-Einstieg wie Basketball) und Mini-DM ueber den Pod-Runner. NICHT abgedeckt, weil sie gar
- * keinen Arena-Einstieg im Runner haben und deshalb auch nie ueber Quick-Sim laufen: TDM und
- * Battlefield (kein Produktions-Einstieg, nur Sonden) sowie I-Spy (bewusst nicht in
- * `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`).
+ * ABDECKUNG (Rebase 11.11., main-Stand nach PR #1372/#1376/#1387): alle gewerteten Zweier-Duell-
+ * Disziplinen (`ARENA_RESOLVED_DISCIPLINE_IDS`, SEIT PR #1387 inklusive TDM ueber das Kampf-
+ * Chassis, `window.__arena.spieleTdmGefecht()`), dazu Football und Hockey (Feldspiel-Chassis,
+ * heute ueber die PPS-Bruecke gewertet, aber derselbe Motor-Einstieg wie Basketball). NICHT
+ * abgedeckt: I-Spy (bewusst nicht in `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS`).
+ *
+ * POD-CHASSIS (eigene Beschreibung unten, separat von den Zweier-Duellen): Mini-DM (`miniDmFfaEvent()`),
+ * seit dem Rebase zusaetzlich Bahn-Pod (Staffel/Takeshi's Castle, `spieleBahnPod()`,
+ * `runBahnPodFixturesNode()`) und Battlefield-Pod (Gefecht je Ort, `spieleBattlefieldPod()`,
+ * `runBattlefieldPodFixturesNode()`) -- beide Node-Runner-Funktionen gab es im urspruenglichen
+ * PR (27.10.) noch nicht, sie kamen erst mit den main-Commits vom 02.11. dazu und wurden in
+ * diesem Rebase nachgezogen (`lib/battle/arena-node-runner.ts`, `arena-node-motor.mjs`,
+ * `arena-node-worker.mjs`).
  *
  * WAS EXAKT GLEICH SEIN MUSS: Teams, `seiten` (der Duell-Ausgang -> Teampunkte), `gesamtKg`
  * (Gewichtheben-Tiebreak), `momente`, Reihenfolge/Namen/Spieler-IDs/Seiten/Torwart-Kennung der
@@ -185,6 +200,69 @@ function miniDmPods(): MiniDmFfaPodFixtureInput[] {
   }));
 }
 
+/** Wie `miniDmPods()`, fuer die Bahn-/Battlefield-Vier-Team-Pods (dieselbe Team-Gruppierung). */
+function vierTeamPods(disziplin: string): BahnPodFixtureInput[] & BattlefieldPodFixtureInput[] {
+  const { gameState, saveId, matchdayId } = kontext!;
+  const teamIds = [...new Set(findLeagueFixturesForMatchday(gameState, "liga1", matchdayId).flatMap((f) => [f.homeTeamId, f.awayTeamId]))];
+  return [0, 4].map((start) => ({
+    podId: `pod-${disziplin}-${start / 4}`,
+    teamIds: teamIds.slice(start, start + 4) as [string, string, string, string],
+    seed: `${saveId}:${matchdayId}:${disziplin}:${start}`,
+  })) as BahnPodFixtureInput[] & BattlefieldPodFixtureInput[];
+}
+
+function vergleicheBahnPod(chromium: Array<BahnPodFixtureResult | null>, node: Array<BahnPodFixtureResult | null>) {
+  expect(node.length).toBe(chromium.length);
+  chromium.forEach((c, i) => {
+    const n = node[i];
+    if (c === null) {
+      expect(n).toBeNull();
+      return;
+    }
+    expect(n).not.toBeNull();
+    expect(
+      n!.teams.map(({ teamId, podSide, eventPlatz, ligaPunkte }) => ({ teamId, podSide, eventPlatz, ligaPunkte })),
+      `Bahn-Pod ${c.podId}: Teams`,
+    ).toEqual(c.teams.map(({ teamId, podSide, eventPlatz, ligaPunkte }) => ({ teamId, podSide, eventPlatz, ligaPunkte })));
+    c.teams.forEach((t, j) => {
+      expect(wertGleich(t.wert ?? 0, n!.teams[j]!.wert ?? 0), `Bahn-Pod ${c.podId}: Team ${j} wert`).toBe(true);
+      expect(wertGleich(t.zielzeit ?? 0, n!.teams[j]!.zielzeit ?? 0), `Bahn-Pod ${c.podId}: Team ${j} zielzeit`).toBe(true);
+    });
+    expect(
+      n!.boxscore.map(({ name, playerId, teamId, podSide }) => ({ name, playerId, teamId, podSide })),
+      `Bahn-Pod ${c.podId}: Boxscore-Zuordnung`,
+    ).toEqual(c.boxscore.map(({ name, playerId, teamId, podSide }) => ({ name, playerId, teamId, podSide })));
+    c.boxscore.forEach((b, j) => expect(wertGleich(b.wert, n!.boxscore[j]!.wert), `Bahn-Pod ${c.podId}: Boxscore-Wert ${b.name}`).toBe(true));
+  });
+}
+
+function vergleicheBattlefieldPod(chromium: Array<BattlefieldPodFixtureResult | null>, node: Array<BattlefieldPodFixtureResult | null>) {
+  expect(node.length).toBe(chromium.length);
+  chromium.forEach((c, i) => {
+    const n = node[i];
+    if (c === null) {
+      expect(n).toBeNull();
+      return;
+    }
+    expect(n).not.toBeNull();
+    expect(n!.ende, `Battlefield-Pod ${c.podId}: ende`).toBe(c.ende);
+    expect(
+      n!.teams.map(({ teamId, podSide, eventPlatz, punkte, lebend }) => ({ teamId, podSide, eventPlatz, punkte, lebend })),
+      `Battlefield-Pod ${c.podId}: Teams`,
+    ).toEqual(c.teams.map(({ teamId, podSide, eventPlatz, punkte, lebend }) => ({ teamId, podSide, eventPlatz, punkte, lebend })));
+    c.teams.forEach((t, j) => expect(wertGleich(t.wertung, n!.teams[j]!.wertung), `Battlefield-Pod ${c.podId}: Team ${j} wertung`).toBe(true));
+    expect(
+      n!.boxscore.map(({ name, playerId, teamId, podSide, slotId, ko, down }) => ({ name, playerId, teamId, podSide, slotId, ko, down })),
+      `Battlefield-Pod ${c.podId}: Boxscore-Zuordnung`,
+    ).toEqual(c.boxscore.map(({ name, playerId, teamId, podSide, slotId, ko, down }) => ({ name, playerId, teamId, podSide, slotId, ko, down })));
+    c.boxscore.forEach((b, j) => {
+      expect(wertGleich(b.eig, n!.boxscore[j]!.eig), `Battlefield-Pod ${c.podId}: Boxscore ${b.name} eig`).toBe(true);
+      expect(wertGleich(b.anteil, n!.boxscore[j]!.anteil), `Battlefield-Pod ${c.podId}: Boxscore ${b.name} anteil`).toBe(true);
+      expect(wertGleich(b.wertung, n!.boxscore[j]!.wertung), `Battlefield-Pod ${c.podId}: Boxscore ${b.name} wertung`).toBe(true);
+    });
+  });
+}
+
 beforeAll(async () => {
   const built = await buildBattleModeLeagueSplitSave({
     sqlitePath: path.join(os.tmpdir(), `oly-arena-node-paritaet-${randomUUID()}.sqlite`),
@@ -279,5 +357,28 @@ describe.skipIf(!CHROMIUM_VERFUEGBAR)("arena-node-runner · Paritaet zu Chromium
     const node = await runMiniDmFfaPodFixturesNode(kontext!.gameState, pods, { mutatoren, k: 4, nodeTimeoutMs: 540_000 });
     expect(chromium.some((pod) => pod !== null)).toBe(true);
     vergleicheMiniDm(chromium, node);
+  }, 600_000);
+
+  // BAHN-POD/BATTLEFIELD-POD (Rebase 11.11.): main hat diese beiden Vier-Team-Pod-Chassis erst
+  // nach der PR-Basis bekommen (02.11.) -- `runBahnPodFixturesNode()`/`runBattlefieldPodFixturesNode()`
+  // sind deshalb neu in diesem Rebase (s. Kopfkommentar). Beide laufen, GENAU wie Mini-DM, ueber
+  // GENAU dasselbe Motor-Skript (`battle-mode.engine.js` im `node:vm`-Kontext mit der Chromium-
+  // Mathe-Nachbildung) -- keine eigene Mathe-Nachbildung noetig, nur die Worker-Verdrahtung.
+  it.each(["staffel", "takeshis-castle"])("%s-pod: Node und Chromium werten identisch", async (disziplin) => {
+    const pods = vierTeamPods(disziplin);
+    const mutatoren = mutatorenFuer(disziplin);
+    const chromium = await runBahnPodFixtures(kontext!.gameState, disziplin, pods, { mutatoren, k: 4 });
+    const node = await runBahnPodFixturesNode(kontext!.gameState, disziplin, pods, { mutatoren, k: 4, nodeTimeoutMs: 540_000 });
+    expect(chromium.some((pod) => pod !== null)).toBe(true);
+    vergleicheBahnPod(chromium, node);
+  }, 600_000);
+
+  it("battlefield-pod: Node und Chromium werten identisch", async () => {
+    const pods = vierTeamPods("battlefield");
+    const mutatoren = mutatorenFuer("battlefield");
+    const chromium = await runBattlefieldPodFixtures(kontext!.gameState, pods, { mutatoren, k: 4 });
+    const node = await runBattlefieldPodFixturesNode(kontext!.gameState, pods, { mutatoren, k: 4, nodeTimeoutMs: 540_000 });
+    expect(chromium.some((pod) => pod !== null)).toBe(true);
+    vergleicheBattlefieldPod(chromium, node);
   }, 600_000);
 });
