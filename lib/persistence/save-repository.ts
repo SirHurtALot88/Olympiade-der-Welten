@@ -6,6 +6,7 @@ import type {
   GameState,
   MappingReport,
   MatchdayState,
+  MerklisteEintrag,
   Player,
   PlayerBaselineRecord,
   PlayerBaselineWriteGuardEvent,
@@ -153,6 +154,12 @@ type GameMetadata = {
   teamCaptains?: GameState["teamCaptains"];
   // #8: Nutzer-Entscheidungen (erledigt/verworfen) auf Inbox-Items müssen den Reload überleben.
   gameInboxItems?: GameState["gameInboxItems"];
+  // MERKLISTE: Lesezeichen auf Teams/Spieler (lib/merkliste/merkliste-service.ts) fehlten hier
+  // komplett — weder im Schreib- noch im Lesezweig dieser Datei stand `merkliste` je drin. Der
+  // Stern wirkte innerhalb der Sitzung (React hielt ihn im lokalen `gameState`), aber jeder Kalt-
+  // Load (Reload, neue Sitzung, Serverneustart) baute den Spielstand ohne dieses Feld neu auf —
+  // "0 Einträge. Noch nichts gemerkt.", obwohl gerade gemerkt wurde.
+  merkliste?: MerklisteEintrag[];
 };
 
 type PlayerSavePayload =
@@ -1382,6 +1389,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.teamCaptains ? { teamCaptains: gameMetadata.teamCaptains } : {}),
     // #8: Persistierte Inbox-Status-Overrides (erledigt/verworfen) wiederherstellen.
     ...(gameMetadata?.gameInboxItems ? { gameInboxItems: gameMetadata.gameInboxItems } : {}),
+    // Merkliste (Lesezeichen auf Teams/Spieler) wiederherstellen — siehe Begründung am Typ
+    // `GameMetadata` oben.
+    ...(gameMetadata?.merkliste ? { merkliste: gameMetadata.merkliste } : {}),
     season,
     seasonState,
     matchdayState,
@@ -1830,6 +1840,9 @@ function createPersistedSaveRecord(input: {
       teamCaptains: guardedGameState.teamCaptains,
       // #8: Inbox-Status-Overrides (erledigt/verworfen) dauerhaft schreiben.
       gameInboxItems: guardedGameState.gameInboxItems,
+      // Merkliste (Lesezeichen auf Teams/Spieler) dauerhaft schreiben — siehe Begründung am Typ
+      // `GameMetadata` oben. Ohne diese Zeile ueberlebt kein Stern einen Kalt-Load.
+      merkliste: guardedGameState.merkliste,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
     replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);
