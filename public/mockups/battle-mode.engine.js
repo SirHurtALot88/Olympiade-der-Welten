@@ -56760,6 +56760,291 @@
   }
 
   // ===================================================================================
+  // TDM-GEFECHT — PROTOTYP, NOCH NICHT VERDRAHTET (10.11.).
+  //
+  // Chris woertlich: „Das was auf dem Feld passiert soll auch das in den Stats sein! Und
+  // das in jeder Disziplin!" TDM laeuft produktiv weiterhin ueber die PPS-Duell-Bruecke
+  // (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte Zweikampf
+  // (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s. Kommentar bei
+  // ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. DIESER Block ist NUR der
+  // Mess-/Prototyp-Schritt aus der Aufgabe vom 10.11.: eine reine, vorab entschiedene
+  // Gefecht-Funktion nach dem Vorbild von bfffaGefecht() (Battlefield-Pod, 02.11., bestand
+  // rho 0,861-0,923 / Pp 4,8-20,2 bei k=2..6) — NICHT in die Buchung, die Arena-Anzeige oder
+  // irgendeinen bestehenden Pfad eingehaengt. Jede Zeile hier ist additiv: kein bestehender
+  // Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen (slotAufschlag,
+  // mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert, eigHebung, eigMutator,
+  // gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus, normalisiereSaat — alle
+  // schon vorher da). `node scripts/pruefe-wertung-fingerabdruck.mjs` liefert vor und nach
+  // diesem Block denselben GESAMT-Hash (s. docs/design/tdm-gefecht-abnahme-10-11.md).
+  //
+  // ANDERS ALS BATTLEFIELD: TDM ist "reines Deathmatch" (ARENA_ART.tdm-Kommentar sagt das
+  // ausdruecklich, ebenso der Kommentar bei ARENA_DOMINATION oben: "TDM und Mini-DM bleiben
+  // reines Deathmatch"), kein Kontrollpunkt-Gefecht — also kein `orte`, kein Erobern, keine
+  // Rotation. Die Rollen sind ebenfalls FEST (SLOTS_JE_DISC.tdm, sechs Stueck, unabhaengig von
+  // der Kadergroesse k — derselbe feste Pfad, den Mini-DM vor seiner Sechs-Rollen-Erweiterung
+  // hatte), nicht wie Battlefields BATTLEFIELD_SLOTS_JE_K.
+  //
+  // JEDES der neun TDM-Matrixgewichte (BASIS_JE_DISC.tdm, bit-identisch zur gesperrten Matrix
+  // — TDM hat KEINEN Eintrag in spiel-eignung-overrides.ts) bekommt einen eigenen, benannten
+  // Kanal — Budget-Methode, CLAUDE.md:
+  //   health 20         STAND: die Lebenspunkte.
+  //   power 28, torment 2  WUCHT: Schadenshoehe je Treffer (der dominante Kanal, wie die
+  //                      Matrix es vorgibt — Power ist mit Abstand das schwerste Attribut).
+  //   awareness 2        TREFFER: Chance, dass ein Schlag ueberhaupt landet.
+  //   stamina 14         AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst.
+  //   spirit 12          DECKUNG: mindert jeden erlittenen Treffer.
+  //   intelligence 6     SCHWACHSTELLE: Zielwahl trifft den angeschlagensten Gegner statt
+  //                      zufaellig.
+  //   determination 6    LETZTER ATEM: ein toedlicher Treffer laesst einmal stehen.
+  //   charisma 10        BEFEHL: eigener Wucht-Multiplikator — ein Anfuehrer schlaegt mit mehr
+  //                      Nachdruck zu (es gibt in TDM keine Eroberung, auf die Charisma sonst
+  //                      ginge, vgl. Battlefield/`erobern`).
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)`, exakt
+  // wie in bfffaKaempfer()/mdffaKaempfer(). `kappa` fuer die Grundkanaele (Stand, Wucht,
+  // Treffer, Ausdauer), `kappaWege` fuer die taktischen Kanaele (Deckung, Schwachstelle, Atem,
+  // Befehl) — dieselbe Aufteilung wie bei Battlefield.
+  const TDM_GEFECHT_GRUND=Object.freeze({
+    takte:20, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    befehl:{basis:1},
+    wertung:{ko:15, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4}
+  });
+  const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
+  let TDM_GEFECHT=tdmGefechtGrund();
+  const TDM_ZWECK={ziel:21, schwachstelle:22, treffer:23, atem:24};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie bfffaKaempfer()/mdffaKaempfer(). `idx`
+  // ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel fuer mdffaZufall).
+  function tdmKaempfer(p,side,slotId,slotDef,idx){
+    const d="tdm";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=TDM_GEFECHT, R=P.mitte||50, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["power","torment"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      befehl:klemme(P.befehl.basis+weg(H.befehl,["charisma"]),0.2,3),
+      // Laufzustand
+      raus:false, rausTakt:null, atemWeg:false, wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, schwachstellen:0}
+    };
+  }
+
+  // DAS GEFECHT. `kaempfer` sind tdmKaempfer() (Index = idx), `N` die Seitenzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente — dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Jeder Takt: Zielwahl (Schwachstelle via Intelligence, sonst
+  // gleichverteilt unter allen lebenden Gegnern JEDER anderen Seite — bei den zwei Seiten, die
+  // ein echtes TDM-Spiel hat, einfach "der Gegner"), gleichzeitige Schlaege, K.o. mit einmaligem
+  // letzten Atem (Determination), Seiten-Ausscheiden. Rueckgabe wie bfffaGefecht, ohne `orte`.
+  function tdmSchlagwechsel(kaempfer,saat,N){
+    const P=TDM_GEFECHT, Z=TDM_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const lebendeSeiten=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    const schnapp=()=>({k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeSeiten().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ZIELWAHL, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus)continue;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach});
+      }
+      // 2) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit)
+      // mindert, Befehl (Charisma) hebt den eigenen Schlag, Schwachstelle gibt Bonus.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel,schwach}=x;
+        A.st.schlaege++;
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx}); continue; }
+        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, wucht:Math.round(dmg*10)/10});
+      }
+      // 3) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; ereignisse.push({typ:"atem", wer:k.idx}); continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; punkte[bester.side]++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx});
+      }
+      // 4) AUSSCHEIDEN: eine Seite ohne Stehende ist raus.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t; ereignisse.push({typ:"seite-raus", side:s});
+      }
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      takte.push({t, ereignisse, ...schnapp()});
+    }
+    if(ende==="zeit"&&lebendeSeiten().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte — sonst kostete ein schneller Sieg
+    // den Sieger genau die Taktpunkte, die er sich erkaempft hat (dieselbe Regel wie bfffaGefecht).
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // DIE OEFFENTLICHE FUNKTION AUS DER AUFGABE: `tdmGefecht(seiten, saat, jeSeite)`. `seiten` ist
+  // eine Liste von Spielerlisten (ArenaSpieler[], je Seite ein Kader — im echten Spiel immer
+  // zwei, s. Kopfkommentar), `saat` die Kampfsaat, `jeSeite` (optional) die Kadergroesse k
+  // (steuert nur, wie viele der sechs festen Rollen SLOTS_JE_DISC.tdm vergeben werden — ohne
+  // Angabe die Rosterlaenge der ersten Seite). Baut die Kaempfer (liest FORMKARTE/MUTATOREN/
+  // ATTR_HEBUNG wie jede andere Gefecht-Bau-Funktion dieses Motors — dieselben Eingaben liefern
+  // dasselbe Ergebnis) und entscheidet das Gefecht in einem Schritt. Rueckgabe im selben Format
+  // wie bfPodLauf()s "gefecht"-Zweig (ohne die Battlefield-eigenen Felder besitz/erob/amOrt/
+  // wechsel/besucht, die TDM nicht hat), damit Mess-Sonden sie identisch lesen koennen.
+  function tdmGefecht(seiten,saat,jeSeite){
+    const N=seiten.length;
+    if(N<2)throw new Error("tdmGefecht: braucht mindestens zwei Seiten, bekam "+N+".");
+    const k=jeSeite||seiten[0].length||ARENA_ART.tdm.jeSeite;
+    const rollen=slotsVon("tdm").slice(0,Math.max(1,Math.min(6,Math.round(k))));
+    const saatN=normalisiereSaat(saat);
+    let idx=0;
+    const kaempfer=[];
+    seiten.forEach((team,side)=>{
+      team.forEach((p,i)=>{
+        const slotId=rollen[i%rollen.length].id;
+        kaempfer.push(tdmKaempfer(p,side,slotId,SLOTVON[slotId],idx++));
+      });
+    });
+    const g=tdmSchlagwechsel(kaempfer,saatN,N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s&&!x.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s).reduce((a,x)=>a+x.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt,teamWert);
+    const summe=kaempfer.reduce((a,x)=>a+Math.max(0,x.wert),0)||1;
+    return {disziplin:"tdm", saat:saatN, format:"gefecht", ende:g.ende, takte:g.gespielt,
+      teams:Array.from({length:N},(_,s)=>({side:s, punkte:+g.punkte[s].toFixed(1),
+        lebend:pl.lebend[s], rausT:pl.rausT[s], eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s],
+        wertung:+teamWert[s].toFixed(3)})),
+      kaempfer:kaempfer.map(x=>({n:x.n, side:x.side, slot:x.slot, eig:x.eigOhneMutator,
+        wert:+(Math.max(0,x.wert)/summe*100).toFixed(3), roh:+x.wert.toFixed(3), ko:x.st.kos, down:!!x.raus})),
+      gefecht:g};
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie battlefieldPodSonde(): `kader` Liste von Team-Kadern,
+  // `opt.gruppen` Liste von ZWEIERGRUPPEN (Indizes in `kader` — TDM ist zwei Seiten, nicht vier),
+  // `opt.n` Kaempfe je Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k. Gemessen wird `eig` OHNE
+  // Mutator gegen `wert` (Anteil am Gesamtbeitrag) — exakt die Groessen von disziplinProbe().
+  function tdmGefechtSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          FORMKARTE={};
+          mdffaFormkartenFuer(teams,(20260823+versatz+gi*7919+i*104729)>>>0);
+          MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+            :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          const r=tdmGefecht(teams,saat,o.jeSeite);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.takte, ende:r.ende, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"tdm", format:"gefecht", events};
+  }
+
+  // PP-ABNAHME (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon()/
+  // battlefieldPodEinfluss(), aber mit SQUAD/OPP direkt als die zwei TDM-Seiten — TDM braucht,
+  // anders als Battlefields Vier-Team-Pod, keine Zusatzteams, weil es schon im echten Spiel nur
+  // zwei Seiten hat.
+  function tdmGefechtEinfluss(n,plus,saatVersatz,mutatorModus,jeSeite){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(teams,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel((20260823+versatz+i*15485863)>>>0);
+      else if(modus==="aus")MUTATOREN=[];
+      return tdmGefecht(teams,1337+versatz+i*7919,jeSeite);
+    };
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.tdm||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,kk)=>acc+Math.abs((reihen.find(r=>r.attribut===kk)||{anteil:0}).anteil-(W[kk]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"tdm", format:"gefecht", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.tdm.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // MESS-SONDE fuer die Kalibrierung (wie battlefieldPodParameter/miniDmFfaParameter): `neu` wird
+  // tief in den Grundwert TDM_GEFECHT_GRUND gemischt, null/undefined setzt zurueck. Ruft im
+  // Spielbetrieb niemand (TDM ist nicht an diese Funktionen angeschlossen) — nur die Mess-/
+  // Kalibrierskripte dieses Prototyps.
+  function tdmGefechtParameter(neu){
+    const misch=(a,b)=>{ for(const k2 in b){ if(b[k2]&&typeof b[k2]==="object"&&!Array.isArray(b[k2])&&a[k2]&&typeof a[k2]==="object")misch(a[k2],b[k2]); else a[k2]=b[k2]; } return a; };
+    TDM_GEFECHT=neu?misch(tdmGefechtGrund(),JSON.parse(JSON.stringify(neu))):tdmGefechtGrund();
+    return JSON.parse(JSON.stringify(TDM_GEFECHT));
+  }
+
+  // ===================================================================================
   // DAS REPLAY — die sichtbare Arena spielt das fertige Gefecht ab (02.11.).
   //
   // Alle vier Teams stehen gleichzeitig auf demselben Feld und kaempfen gleichzeitig an allen drei
@@ -60760,6 +61045,13 @@
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
+    // TDM-GEFECHT-PROTOTYP (10.11., s. Kopfkommentar bei TDM_GEFECHT_GRUND oben): NUR fuer die
+    // Mess-/Kalibrierskripte dieses Prototyps. Nicht an irgendeinen Buchungs- oder Anzeigepfad
+    // angeschlossen -- TDM laeuft produktiv unveraendert ueber die PPS-Duell-Bruecke.
+    tdmGefecht,
+    tdmGefechtSonde,
+    tdmGefechtEinfluss,
+    tdmGefechtParameter,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
