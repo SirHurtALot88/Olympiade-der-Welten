@@ -27,7 +27,7 @@ import type {
 import { mapArchetypeToCurveShape, mapStarTierToRarity } from "@/lib/sponsor/sponsor-curve-shapes";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
-import { withMigratedSponsorLadders } from "@/lib/sponsor/sponsor-v3-migration";
+import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
@@ -1419,7 +1419,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // berücksichtigt werden"): jeder noch nicht abgerechnete Vertrag traegt danach den Faktor der
   // LAUFENDEN Saison. Steht AUSSERHALB von M1, damit er auch die von M1 frisch gebauten Leitern
   // sieht, und innerhalb des Faktor-Seeds, damit er den echten Saisonfaktor liest statt der 1,0.
+  // MIGRATION M3 (PR #1384): bei Liga-Split noch nicht abgerechnete 32er-Vertragsleitern auf die
+  // liga-lokalen 16 Sprossen umbauen. Aussen um den Gehaltsfaktor-Nachtrag, damit sie den Faktor der
+  // laufenden Saison am Vertrag schon vorfindet; idempotent (eine 16er-Leiter ist kein Kandidat).
   const gameStateWithoutBaseline = withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+    withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
     // Endsaison-Nachtrag: Bestandsvertraege ohne `contractEndSeasonNumber` bekommen sie hier
@@ -1435,6 +1439,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
           saveId,
         }),
       ),
+    ),
     ),
     ),
     ),

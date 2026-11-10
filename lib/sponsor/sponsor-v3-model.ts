@@ -160,6 +160,39 @@ export const SPONSOR_V3_TILT_CLAMP = 0.3;
 /** Ligagroesse, ueber die die Leiter laeuft. Der Benchmark ist eine 32er-Tabelle. */
 export const SPONSOR_V3_RANKS = 32;
 
+/**
+ * DAS ANKER-SIGMA FUER EINEN RANGRAUM VON `ranks` PLAETZEN — proportional zum 32er-Messwert.
+ *
+ * `SPONSOR_V3_ANCHOR_SIGMA` ist in 32er-Raengen gemessen (sd(Startrang − Endrang) ~ 3,3 ueber die
+ * ganze Liga). Bei aktivem Liga-Split rechnet ein Vertrag liga-lokal 1..16: dieselbe sportliche
+ * Bewegung ist dort halb so viele Plaetze. Ein Sigma von 4 ueber 16 Plaetze haette fast die ganze
+ * Liga als „erwartbar" gewichtet — der Anker (und damit der Erwartungswert jeder Karte) waere ueber
+ * eine viel zu breite Spanne gemittelt. docs/design/liga-split-plan.md Abschnitt 10, Frage 9:
+ * 32er-kalibrierte Sponsor-Parameter werden proportional uebernommen und nach 1–2 Split-Saisons am
+ * Live-Abbild nachgemessen.
+ *
+ * Bei `ranks = 32` exakt `SPONSOR_V3_ANCHOR_SIGMA` — Legacy-Spielstaende bit-identisch.
+ */
+export function sponsorV3AnchorSigmaFor(ranks: number): number {
+  if (!Number.isFinite(ranks) || ranks <= 0 || ranks === SPONSOR_V3_RANKS) return SPONSOR_V3_ANCHOR_SIGMA;
+  return (SPONSOR_V3_ANCHOR_SIGMA * ranks) / SPONSOR_V3_RANKS;
+}
+
+/**
+ * Die Leiterlaengen, die ein eingefrorener V3-Vertrag haben darf: 32 (ein gemeinsamer Rangraum —
+ * Altstaende und Spielstaende ohne Liga-Split) und 16 (`LEAGUE_SIZE`, liga-lokal bei aktivem Split).
+ *
+ * WARUM EINE LISTE UND NICHT „JEDE LAENGE ≥ 2": die Laengenpruefung in `getSponsorV3Terms` ist die
+ * Wache gegen eine kaputte oder halb geschriebene Leiter. Faellt ein Vertrag durch sie hindurch,
+ * baut das Settlement ihm still die Preisgeld-Benchmark nach (`buildMigratedSponsorV3Terms`) — eine
+ * ganz andere Zahl als auf der Karte. Eine 31er-Leiter ist kein gueltiger Vertrag, sondern ein Fehler.
+ */
+export const SPONSOR_V3_LEITER_LAENGEN: readonly number[] = [16, SPONSOR_V3_RANKS];
+
+export function sponsorV3IstGueltigeLeiterLaenge(length: number): boolean {
+  return SPONSOR_V3_LEITER_LAENGEN.includes(length);
+}
+
 // ── Der Karten-Slate ───────────────────────────────────────────────────────────────────────────
 
 export type SponsorV3CardKey =
@@ -348,9 +381,14 @@ export const SPONSOR_V3_PRICED_GOAL_KEYS: readonly string[] = Object.keys(GOAL_P
 export const SPONSOR_V3_GOAL_P_DEFAULT = 0.45;
 
 /** Rohe Schaetzung OHNE Band — Grundlage der Katalog-Filterung. */
-export function sponsorV3GoalProbabilityRaw(specialKey: string | null | undefined, expectedRank: number): number {
+export function sponsorV3GoalProbabilityRaw(
+  specialKey: string | null | undefined,
+  expectedRank: number,
+  /** Rangraum, in dem `expectedRank` steht — 16 liga-lokal bei Liga-Split, Default 32. */
+  leagueSize: number = SPONSOR_V3_RANKS,
+): number {
   const row = specialKey ? GOAL_PROBABILITY[specialKey] : undefined;
-  return row ? row[sponsorV3StrengthClassOf(expectedRank)]! : SPONSOR_V3_GOAL_P_DEFAULT;
+  return row ? row[sponsorV3StrengthClassOf(expectedRank, leagueSize)]! : SPONSOR_V3_GOAL_P_DEFAULT;
 }
 
 /**
@@ -359,8 +397,12 @@ export function sponsorV3GoalProbabilityRaw(specialKey: string | null | undefine
  * unerreichbares Ziel wird damit gar nicht erst erzeugt — statt es mit hochgeklammertem p als
  * wertlose Karte anzubieten.
  */
-export function sponsorV3IsGoalOfferable(specialKey: string | null | undefined, expectedRank: number): boolean {
-  const raw = sponsorV3GoalProbabilityRaw(specialKey, expectedRank);
+export function sponsorV3IsGoalOfferable(
+  specialKey: string | null | undefined,
+  expectedRank: number,
+  leagueSize: number = SPONSOR_V3_RANKS,
+): boolean {
+  const raw = sponsorV3GoalProbabilityRaw(specialKey, expectedRank, leagueSize);
   return raw >= SPONSOR_V3_GOAL_P_MIN && raw <= SPONSOR_V3_GOAL_P_MAX;
 }
 
@@ -369,8 +411,12 @@ export function sponsorV3IsGoalOfferable(specialKey: string | null | undefined, 
  * der rohen Schaetzung (der Filter oben laesst nur Ziele im Band durch); die Klammer bleibt als
  * Sicherheitsnetz fuer Altvertraege und fuer Ziele, die ausserhalb des Angebotspfads gesetzt werden.
  */
-export function sponsorV3GoalProbability(specialKey: string | null | undefined, expectedRank: number): number {
-  const raw = sponsorV3GoalProbabilityRaw(specialKey, expectedRank);
+export function sponsorV3GoalProbability(
+  specialKey: string | null | undefined,
+  expectedRank: number,
+  leagueSize: number = SPONSOR_V3_RANKS,
+): number {
+  const raw = sponsorV3GoalProbabilityRaw(specialKey, expectedRank, leagueSize);
   return Math.min(SPONSOR_V3_GOAL_P_MAX, Math.max(SPONSOR_V3_GOAL_P_MIN, raw));
 }
 
@@ -413,10 +459,13 @@ export function sponsorV3BenchmarkLadder(input: {
  * EXAKT EV-neutral, ohne Naeherung und ohne Liga-K.
  */
 export function sponsorV3AnchorWeights(
-  startRank: number, sigma: number = SPONSOR_V3_ANCHOR_SIGMA, ranks: number = SPONSOR_V3_RANKS,
+  startRank: number,
+  /** Ohne Angabe `sponsorV3AnchorSigmaFor(ranks)` — bei 32 Raengen exakt `SPONSOR_V3_ANCHOR_SIGMA`. */
+  sigma?: number,
+  ranks: number = SPONSOR_V3_RANKS,
 ): number[] {
   const center = clampRank(startRank, ranks);
-  const spread = Math.max(0.5, sigma);
+  const spread = Math.max(0.5, sigma ?? sponsorV3AnchorSigmaFor(ranks));
   const raw = Array.from({ length: ranks }, (_, index) =>
     Math.exp(-((index + 1 - center) ** 2) / (2 * spread * spread)));
   const sum = raw.reduce((acc, value) => acc + value, 0);
@@ -551,7 +600,10 @@ export function buildSponsorV3TermsCore(input: {
   // fuer eine kuenftige 16er-Leiter (Liga-Split, docs/design/liga-split-plan.md) — sonst wuerde der
   // Anker ueber Gewichte fuer 32 Raenge gemittelt, obwohl die Leiter nur 16 Sprossen hat.
   const ranks = baseLadder.length || SPONSOR_V3_RANKS;
-  const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma ?? SPONSOR_V3_ANCHOR_SIGMA, ranks);
+  // Sigma ohne explizite Vorgabe aus dem Rangraum (`sponsorV3AnchorSigmaFor`) — DIESELBE Regel wie
+  // in `sponsorKurvenLeiter`, die ihre Kurvenform gegen genau diesen Anker normiert, und wie in
+  // `sponsorV3ExpectedPayout`/`sponsorV3StandardDeviation`, die ihn spaeter zurueckrechnen.
+  const weights = sponsorV3AnchorWeights(input.startRank, input.anchorSigma, ranks);
   const anchor = sponsorV3Anchor(baseLadder, weights);
   const beta = sponsorV3TiltFor(input.rarity) * input.card.tiltFactor * (input.tiltScale ?? 1);
   const rankLadder = sponsorV3TiltedLadder(baseLadder, anchor, beta);
@@ -567,7 +619,7 @@ export function buildSponsorV3TermsCore(input: {
       : axis != null
         ? SPONSOR_V4_AXIS_PBAR
         : hasGoal
-          ? sponsorV3GoalProbability(input.goalKey, input.startRank)
+          ? sponsorV3GoalProbability(input.goalKey, input.startRank, ranks)
           : 0;
   const goalSize =
     festesZiel != null
