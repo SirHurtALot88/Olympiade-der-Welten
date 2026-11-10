@@ -493,27 +493,46 @@ window.__ARENA_REZEPTE = {
   // gleich gut oder besser als beim alten Handrezept, dort war nichts zu reparieren.
   // PARADE bleibt wie zuvor unangetastet (Torwart-Rolle, eigene Messung/Rangtreue-nach-Rolle).
   // ===============================================================================
+  // ===============================================================================
+  // PP-REBALANCE 10.11.2026 (Matrixgewichte als harte Obergrenze, Chris 10.11.;
+  // Messvorschrift docs/design/hockey-pp-messbasis-10-11.md: drei Saatstroeme, gepoolt).
+  // Das Rezept darunter trug gemessen Health, Spirit und Will zu schwach und Stamina /
+  // Awareness / Dexterity weit ueber ihrer Matrix. Neu: Spirit bekommt Heimat in AUFBAU,
+  // Health fuehrt ZWEITCHANCE und SCHUSS_NAH noch deutlicher, TECHNIK teilt sich
+  // Awareness/Determination, LAUFTEMPO/AUSDAUER geben Stamina an Speed/Will ab.
+  // Fuehrende Attribute laut B.2 bleiben fuehrend (ABSCHLUSS/SCHUSS_FERN power,
+  // SCHUSS_NAH health, TEAMGEIST spirit, AUSDAUER stamina). ABWEHR und PARADE unveraendert.
+  //
+  // Gemessen, n=48 je Strom, Saatversatz 0 / 1e7 / 2e7, gepoolt (poole-arena-einfluss.mjs):
+  //   Pp 10,4 (Stroeme 29,3 / 14,3 / 14,0). Ueber Matrix nur noch power +1,5, health
+  //   +2,4, dexterity +0,9, torment +0,4, speed +0,1 — alle unter 1,2 SE.
+  //   Zwischenstaende derselben Runde: 29,5 / 17,6 / 16,8 Pp.
+  // Rangtreue (miss-alle-disziplinen.mjs 24 hockey, 5 Kader-Varianten): rho je Spiel
+  //   0,587 (Spannweite 0,201), Feldspieler 0,661; main vorher 0,640 / 0,676 — innerhalb
+  //   der Kader-Spannweite (0,17-0,22), also von Null nicht unterscheidbar.
+  // Die Kommentare unten zu einzelnen Sub-Skills beschreiben den Stand VOR dieser Runde.
+  // ===============================================================================
   hockey:{
-    AUFBAU:      {stamina:57,speed:23,awareness:13,power:7},
+    AUFBAU:      {spirit:30,stamina:20,speed:20,health:15,awareness:8,power:7},
     // Sinkhorn gab hier 63/37 (Power/Spirit) — auf dem Testkader korreliert Spirit mit der
     // Eignung NEGATIV (rho -0,34), Power stark positiv (rho 0,68). Nachjustiert auf 82/18,
     // ohne die von B.2 vorgesehenen Attribute zu verlassen (s. Blockkommentar oben).
-    ABSCHLUSS:   {power:82,spirit:18},
-    TECHNIK:     {awareness:46,determination:31,dexterity:23},
-    ZWEITCHANCE: {health:62,power:23,torment:15},
+    ABSCHLUSS:   {power:76,spirit:24},
+    TECHNIK:     {awareness:39,determination:36,dexterity:25},
+    ZWEITCHANCE: {health:70,torment:15,power:9,spirit:6},
     ABWEHR:      {speed:26,health:24,will:24,determination:11,power:9,torment:6},
-    TEAMGEIST:   {torment:53,spirit:47},
-    AUSDAUER:    {stamina:57,health:20,will:19,spirit:4},
+    TEAMGEIST:   {spirit:54,torment:46},
+    AUSDAUER:    {stamina:51,health:22,will:22,spirit:5},
     // SCHUSS_NAH fuehrt jetzt Health statt Power — gemessen BESSER als beim alten Rezept
     // (Sub-Skill-Korrelation zur Eignung 0,36 -> 0,76 auf dem Testkader), deshalb hier vom
     // Sinkhorn-Lauf unveraendert uebernommen.
-    SCHUSS_NAH:  {health:63,dexterity:22,torment:15},
+    SCHUSS_NAH:  {health:70,torment:22,dexterity:8},
     // Sinkhorn gab hier 53/30/17 (Speed/Awareness/Power) und verletzte damit B.2 ("SCHUSS_FERN
     // fuehrt power") als Nebenwirkung der Power-Konkurrenz mit ABSCHLUSS/ZWEITCHANCE (s.
     // Blockkommentar oben) — Speed korreliert auf dem Testkader praktisch gar nicht mit der
     // Eignung (rho -0,06). Nachjustiert auf 47/30/23, Power wieder fuehrend wie geplant.
-    SCHUSS_FERN: {power:47,awareness:30,speed:23},
-    LAUFTEMPO:   {stamina:66,speed:26,dexterity:8},
+    SCHUSS_FERN: {power:52,speed:27,awareness:21},
+    LAUFTEMPO:   {stamina:52,speed:44,dexterity:4},
     // PARADE FUEHRT HEALTH, nicht Awareness — nachgezogen, weil der Slot es so ausweist.
     // Der Torwart-Slot (SLOTS_JE_DISC.hockey, aus dem Generator) traegt gross:"health",
     // klein:"awareness" und hebt im Profil health auf 26. Im Aufstellungsbildschirm steht
