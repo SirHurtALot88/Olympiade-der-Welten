@@ -2342,7 +2342,8 @@ export type ContractNegotiationDraft = {
    * Abschnitt 9.1.
    *
    * Wächst nur monoton (`max`): es zählt der tiefste je VERHANDELTE Griff, nicht der zuletzt
-   * getippte. Tippen ist frei, die Vorschau warnt vorher; Verhandeln klebt. Klebrig für die
+   * getippte. Tippen ist frei (die Vorschau rechnet ihn, zeigt ihn aber seit 10.11. nicht
+   * mehr vorher an — verhandlung-rework.md 12.1); Verhandeln klebt. Klebrig für die
    * Dauer dieses Drafts (Season/Team/Spieler) — wäre er durch anschließendes Wohlverhalten
    * abbaubar, wäre Lowball-zuerst gratis.
    *
