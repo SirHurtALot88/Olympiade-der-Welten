@@ -23,6 +23,7 @@ import {
   buildHomePlayerCardsFromRoster,
   formatLocalePoints,
   HOME_V2_FACILITY_IDS,
+  pickHomeTopPlayerStarFields,
   type HomeV2RosterTableRow,
 } from "@/lib/foundation/tabs/home-v2-ui-helpers";
 
@@ -279,8 +280,12 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         caRating: developmentInsight?.currentRating ?? null,
         poRangeMin: developmentInsight?.potentialRangeDisplay?.min ?? null,
         poRangeMax: developmentInsight?.potentialRangeDisplay?.max ?? null,
-        caStars: forecast?.currentAbilityStars ?? null,
-        poStars: forecast?.potentialStars ?? null,
+        // CA/PO-Sterne: unverändert aus der Kaderzeile (`buildRosterCaPoStarFields`), derselben
+        // Quelle wie die Portraitkarten auf Kaderprofil/Teams. Früher kamen sie hier aus dem
+        // Trainings-Forecast: PO als `potentialRangeDisplay` einer UNGESCOUTETEN Scout-Spanne
+        // (z. B. 52–78) und dazu `known` fest auf true — die Karte zeichnete dann das MAXIMUM
+        // der Spanne als sicheren Stern (Samsuin 5★ statt 4,5★, Duskwhisper 5★ statt 4★).
+        ...pickHomeTopPlayerStarFields(row),
         // Saison-PPs je Achse samt Ligarang — direkt aus der Rating-Zeile
         // (`ppPow`/`ppPowRank`/…), derselben Quelle wie die POW/SPE/MEN/SOC-
         // Spalten der Ranks-Seite. Hier wird nichts nachgerechnet.
