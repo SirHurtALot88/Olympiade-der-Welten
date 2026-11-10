@@ -44076,6 +44076,12 @@
     // (Schicht 1 und 2 unten, beide unveraendert). Reine Anzeige.
     bodenSpurtGerade();
     const zonen=BA().gelaende; if(!zonen||!zonen.length)return;
+    // STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11., s. zfStreckenbild unten): liegt eine
+    // Kulisse unter dem Rennen, zeichnet der Motor die Zonen als Strassenbild der Tour (Parolen,
+    // Pfeile, Curbs, Warnschilder, Leitpfosten) und das Panorama als Parallaxe aus den echten
+    // PixelLab-Ebenen. Ohne Kulisse (Headless-Runner, Bild fehlt) bleibt der alte Weg darunter
+    // Wort fuer Wort stehen.
+    if(kulisseSichtbar())return zfStreckenbild(zonen);
     const oben=H*0.14, unten=H*0.94;
     // ---- Schicht 1: Terrain-Toenung + Schraffur, Zone fuer Zone ueber der fertigen Bahn.
     for(const z of zonen){
@@ -44144,6 +44150,189 @@
     for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
     ctx.stroke();
     ctx.restore();
+  }
+
+  // ================== ZEITFAHREN: STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11.) ====
+  // Chris, 10.11., nach einem Screenshot: "was ist das ingame für ein time trial? dachte da sind
+  // schon überall die neuen assets und dass es gut aussieht? aber das ist auch trash wie spurt".
+  // Befund (docs/design/zeitfahren-kulissen-rework-10-11.md): die PixelLab-Streckenkarten liegen
+  // seit der Asset-Runde vollstaendig vor (public/szenen/time-trial/<karte>/assets: far/mid/course/
+  // front, je 4000 px breit), der Motor nutzte davon aber nur einen 58 px hohen, STARREN Ausschnitt
+  // (baue-kulisse-zeitfahren.py) -- und legte ueber den Asphalt die alten, lauten Zonenbaender mit
+  // Schraffur und ▲/▼/S-Glyphen. Was das Bild beherrschte, war also die Fallback-Grafik, nicht die
+  // Kulisse.
+  //
+  // Jetzt, NUR wenn eine Kulisse sichtbar ist (sonst der alte Weg oben, bit-identisch):
+  //  1. PANORAMA ALS PARALLAXE aus den echten Ebenen `far` und `mid` der gewaehlten Karte: beide
+  //     wandern mit der Kamera (0,12 bzw. 0,30 ihrer Fahrt), gespiegelt gekachelt ab x=1000 (links
+  //     davon traegt jede Karte ein Startbild mit harter Kante, s. ZF_PANORAMA_X0 im Builder).
+  //  2. HOEHENPROFIL ALS STRASSE: dieselbe Kontur aus `gelaende` wie oben (ZF_HUEGEL_PX), jetzt als
+  //     Wiesenhuegel mit Asphaltband und Mittelstrich statt brauner Flaeche.
+  //  3. ZONEN ALS STRASSENBILD statt Farbband + Schraffur + Glyphe: Steigung = auf den Asphalt
+  //     gemalte Fan-Parolen wie an jedem Tour-Anstieg (ALLEZ/HOPP/… und die Namen der Fahrer),
+  //     Abfahrt = gemalte Richtungspfeile, Kurve = rot-weisse Curbs an beiden Bahnraendern. Dazu je
+  //     Zonenbeginn ein Warnschild am Strassenrand (Dreieck mit Rampe bzw. Richtungstafel) und
+  //     Leitpfosten entlang der Bahn. Die Toenung bleibt als leise dritte Kodierung (Farbe + Muster
+  //     + Schildform), damit die Zonen auch ohne Farbunterscheidung lesbar sind.
+  // Reine Anzeige: liest `BA().gelaende`, `LAEUFER[].n`, camX/camView -- kein rr(), kein Schreiben
+  // in den Rennzustand. Laden die Ebenen (noch) nicht, bleibt der Kopfstreifen der Kulisse stehen.
+  //
+  // Horizont je Karte: erste Zeile, ab der `mid` dicht wird (dieselbe Regel wie `dicht` in
+  // scripts/baue-kulisse-zeitfahren.py), nachgemessen am 10.11.
+  const ZF_PANO_HORIZONT={standard:199,"bergzeitfahren-alpen":476,"etappe-pass":372,"abfahrt-kamm":373,
+    "etappe-kueste":221,"flachsprint-kueste":215,"etappe-mittelgebirge":199,"huegel-weinberge":202,
+    "etappe-strade-bianche":205,"etappe-vulkan":281,"wueste-hitze":211};
+  const ZF_PANO_X0=1000, ZF_PANO_UNTER=30, ZF_PANO_SKALA=0.24;
+  const ZF_PAROLEN=["ALLEZ","HOPP","VAMOS","FORZA","ALLEZ ALLEZ","GO GO","HOPP HOPP"];
+  const zfEbenenCache={};
+  function zfEbenen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return null;
+    const id=kulisseAktiv.id; if(!(id in ZF_PANO_HORIZONT))return null;
+    let e=zfEbenenCache[id];
+    if(!e){
+      const ordner="/szenen/time-trial/"+(id==="standard"?"demo-assets":id+"/assets")+"/";
+      e=zfEbenenCache[id]={};
+      for(const n of ["far","mid"]){
+        const im=new Image();
+        im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.id===id&&kulisseAktiv.disc===disc)draw(); }catch(_){} };
+        im.src=ordner+n+".png"; e[n]=im;
+      }
+    }
+    const da=im=>!!im&&im.complete&&im.naturalWidth>0;
+    return da(e.far)&&da(e.mid)?e:null;
+  }
+  function zfPanorama(e,panH){
+    const id=kulisseAktiv.id;
+    const unter=Math.min(e.far.naturalHeight,ZF_PANO_HORIZONT[id]+ZF_PANO_UNTER);
+    const hs=Math.min(unter,Math.round(panH/ZF_PANO_SKALA));
+    const sy=unter-hs, sw=e.far.naturalWidth-ZF_PANO_X0, bw=sw*panH/hs;
+    const weg=camView().links*cam.zoom;     // Kamerafahrt in Bildschirm-Pixeln
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,panH);ctx.clip();
+    ctx.imageSmoothingEnabled=false;
+    for(const [im,par] of [[e.far,0.12],[e.mid,0.30]]){
+      const off=((weg*par)%(2*bw)+2*bw)%(2*bw);
+      for(let i=0,x=-off;x<W;i++,x+=bw){
+        if(x+bw<=0)continue;
+        if(i%2){ ctx.save();ctx.translate(x+bw,0);ctx.scale(-1,1);
+          ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,0,0,bw,panH);ctx.restore(); }
+        else ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,x,0,bw,panH);
+      }
+    }
+    // Dieselbe Lesbarkeits-Abdunklung wie kulisseZeichnen() sie ueber die ganze Leinwand legt.
+    ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,panH);
+    ctx.restore();
+  }
+  // Warnschild am Strassenrand, Fuss auf der Bahnoberkante.
+  function zfSchild(x,fuss,art){
+    ctx.save();
+    ctx.fillStyle="#6b6f78";ctx.fillRect(Math.round(x)-1,fuss-24,2,24);
+    const cy=fuss-32;
+    if(art==="kurve"){
+      ctx.fillStyle="#c0392b";ctx.fillRect(x-13,cy-7,26,14);
+      ctx.strokeStyle="#1a1a1a";ctx.lineWidth=1;ctx.strokeRect(x-13+0.5,cy-7+0.5,25,13);
+      ctx.strokeStyle="#f4f1e8";ctx.lineWidth=2.4;ctx.lineJoin="miter";
+      for(const dx of [-7,0,7]){ctx.beginPath();ctx.moveTo(x+dx-3,cy-4);ctx.lineTo(x+dx+2,cy);ctx.lineTo(x+dx-3,cy+4);ctx.stroke();}
+    } else {
+      ctx.beginPath();ctx.moveTo(x,cy-11);ctx.lineTo(x+12,cy+9);ctx.lineTo(x-12,cy+9);ctx.closePath();
+      ctx.fillStyle="#f4f1e8";ctx.fill();ctx.strokeStyle="#c0392b";ctx.lineWidth=3;ctx.lineJoin="round";ctx.stroke();
+      ctx.fillStyle="#1a1a1a";ctx.beginPath();
+      if(art==="steigung"){ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x+7,cy-2);}
+      else {ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x-7,cy-2);}
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+  function zfStreckenbild(zonen){
+    const oben=H*0.14, unten=H*0.94;
+    // ---- 1. Panorama-Parallaxe im Kopfstreifen (ueber dem schmalen Grasrand der Kulisse).
+    const e=zfEbenen();
+    if(e)zfPanorama(e,Math.round(oben)-8);
+    // ---- 3. Zonen als Strassenbild (vor dem Profil, damit Schilder obenauf stehen).
+    const namen=LAEUFER.map(u=>String(u.n||"").split(" ")[0].toUpperCase()).filter(n=>n&&n.length<=10);
+    const worte=ZF_PAROLEN.concat(namen);
+    const bandH=unten-oben;
+    zonen.forEach((z,zi)=>{
+      const x0=camX(z.von), x1=camX(z.bis);
+      if(x1<-40||x0>W+40)return;
+      const steig=z.art==="steigung", ab=z.art==="abfahrt";
+      ctx.save();
+      ctx.beginPath();ctx.rect(x0,oben,Math.max(1,x1-x0),bandH);ctx.clip();
+      ctx.fillStyle=steig?"rgba(196,120,70,.10)":ab?"rgba(90,150,220,.09)":"rgba(242,215,90,.06)";
+      ctx.fillRect(x0,oben,x1-x0,bandH);
+      if(steig){
+        // Gemalte Parolen, an der Strecke verankert (wandern mit der Kamera), drei Reihen versetzt.
+        // Abstand in Bildschirm-Pixeln (eine Parole je ~230 px und Reihe), damit sie sich bei keiner
+        // Zoomstufe ueberlappen; was nicht ganz in die Zone passt, entfaellt statt abgeschnitten.
+        ctx.font="900 21px 'Arial Black',Impact,'Helvetica Neue',Arial,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillStyle="rgba(244,241,232,.27)";
+        const n=Math.max(1,Math.floor((x1-x0)/230)), schritt=(z.bis-z.von)/n;
+        for(let k=0;k<n;k++)for(let r=0;r<3;r++){
+          const p=z.von+schritt*(k+(r%2?0.7:0.3));
+          const wx=camX(p), wy=oben+bandH*(0.2+0.3*r);
+          if(wx<-160||wx>W+160)continue;
+          const wort=worte[(zi*5+k*3+r)%worte.length], hb=ctx.measureText(wort).width/2+4;
+          if(wx-hb<x0||wx+hb>x1)continue;
+          ctx.save();ctx.translate(wx,wy);ctx.rotate(r===1?0.04:-0.04);
+          ctx.fillText(wort,0,0);ctx.restore();
+        }
+        ctx.textBaseline="alphabetic";
+      } else if(ab){
+        // Gemalte Richtungspfeile in Fahrtrichtung.
+        ctx.strokeStyle="rgba(244,241,232,.30)";ctx.lineWidth=4;ctx.lineJoin="miter";ctx.lineCap="butt";
+        const schritt=0.02, n=Math.max(1,Math.ceil((z.bis-z.von)/schritt));
+        for(let k=0;k<n;k++)for(const fy of [0.3,0.7]){
+          const px=camX(z.von+schritt*(k+0.5)), py=oben+bandH*fy;
+          if(px<-30||px>W+30)continue;
+          for(const dx of [-9,0]){ctx.beginPath();ctx.moveTo(px+dx-6,py-14);ctx.lineTo(px+dx+6,py);ctx.lineTo(px+dx-6,py+14);ctx.stroke();}
+        }
+      } else {
+        // Rot-weisse Curbs an beiden Bahnraendern, an der Strecke verankert.
+        const sb=12, start=Math.floor((Math.max(x0,-sb)-x0)/sb);
+        for(let i=start,x=x0+start*sb;x<Math.min(x1,W+sb);i++,x+=sb){
+          ctx.fillStyle=i%2?"rgba(244,241,232,.88)":"rgba(192,57,43,.88)";
+          ctx.fillRect(x,oben,sb,6);ctx.fillRect(x,unten-6,sb,6);
+        }
+      }
+      ctx.restore();
+    });
+    // ---- 2. Hoehenprofil als Strasse ueber einen Wiesenhuegel (Kontur wie im alten Weg).
+    let h=0; const pts=[[0,0]];
+    for(const z of zonen){
+      pts.push([z.von,h]);
+      if(z.art==="steigung")h+=ZF_HUEGEL_PX; else if(z.art==="abfahrt")h=Math.max(0,h-ZF_HUEGEL_PX);
+      pts.push([z.bis,h]);
+    }
+    pts.push([1,h]);
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,oben);ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(camX(pts[0][0]),oben);
+    for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
+    ctx.lineTo(camX(pts[pts.length-1][0]),oben);
+    ctx.closePath();
+    const hg=ctx.createLinearGradient(0,oben,0,oben-ZF_HUEGEL_PX*2.2);
+    hg.addColorStop(0,"rgba(44,78,40,.96)");hg.addColorStop(1,"rgba(92,136,66,.94)");
+    ctx.fillStyle=hg;ctx.fill();
+    const strasse=()=>{ctx.beginPath();ctx.moveTo(camX(pts[0][0]),oben-pts[0][1]-2);
+      for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]-2);};
+    ctx.lineJoin="round";ctx.lineCap="round";
+    strasse();ctx.strokeStyle="#24262b";ctx.lineWidth=7;ctx.stroke();
+    strasse();ctx.strokeStyle="#5b5e66";ctx.lineWidth=5;ctx.stroke();
+    strasse();ctx.strokeStyle="rgba(244,241,232,.75)";ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // ---- Leitpfosten entlang der Bahnoberkante und Warnschilder je Zonenbeginn.
+    const fuss=Math.round(oben);
+    for(let p=0;p<=1.0001;p+=0.025){
+      const x=Math.round(camX(p)); if(x<-4||x>W+4)continue;
+      ctx.fillStyle="#f4f1e8";ctx.fillRect(x-1,fuss-10,3,10);
+      ctx.fillStyle="#1a1a1a";ctx.fillRect(x-1,fuss-8,3,3);
+    }
+    for(const z of zonen){
+      const x=camX(z.von)+10; if(x<-20||x>W+20)continue;
+      zfSchild(x,fuss,z.art);
+    }
   }
 
   // ================== CLIMBING: EINE ECHTE WAND STATT EINER GERAUTEN BAHN (bodenWand, =======
@@ -45147,7 +45336,10 @@
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
         negativ: {label:"Negativ-Split", tempo:0.88, sucht:0, ab:0.55,
                   text:"Erste Hälfte verhalten, zweite Hälfte alles. Verlangt Kopf und Reserve."},
-        attacke: {label:"Attacke",       tempo:1.00, sucht:0, ab:0.60,
+        // ANZEIGENAME "Vollgas" statt "Attacke" (Chris' Screenshot 10.11.): ueber dem Fahrer
+        // las sich "Attacke" wie ein Kampf-Status. Nur der angezeigte Name; Schluessel `attacke`,
+        // `planJeSlot` und alle Werte bleiben, die Wertung liest das Label nirgends.
+        attacke: {label:"Vollgas",       tempo:1.00, sucht:0, ab:0.60,
                   text:"Von Beginn an über der eigenen Schwelle. Geht auf oder geht schief."}
       },
       planJeSlot:{pacer:"gleich", linereader:"gleich", aerodrive:"attacke",
