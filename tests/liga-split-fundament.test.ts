@@ -309,34 +309,34 @@ describe("sponsor-liga-leiter.ts — Default unveraendert, leagueSize=16 sinnvol
 // ── lib/sponsor/sponsor-rangmarke.ts ───────────────────────────────────────────────────────────
 
 describe("sponsor-rangmarke.ts — Default unveraendert, leagueSize=16 sinnvoll", () => {
-  it("blockFuerRang: Default identisch zum alten Verhalten", () => {
-    expect(blockFuerRang(1)).toBe(1);
-    expect(blockFuerRang(3)).toBe(4);
-    expect(blockFuerRang(14)).toBe(16);
-    expect(blockFuerRang(30)).toBe(28);
-    expect(blockFuerRang(99)).toBe(28);
+  it("blockFuerRang(rang, 32): Legacy-32er-Modus identisch zum alten Verhalten", () => {
+    expect(blockFuerRang(1, 32)).toBe(1);
+    expect(blockFuerRang(3, 32)).toBe(4);
+    expect(blockFuerRang(14, 32)).toBe(16);
+    expect(blockFuerRang(30, 32)).toBe(28);
+    expect(blockFuerRang(99, 32)).toBe(28);
   });
 
-  it("blockFuerRang(rang, 16): auf 1..16 geklammert statt 1..32", () => {
-    expect(blockFuerRang(99, LEAGUE_SIZE)).toBe(16);
+  it("blockFuerRang: Default ist die 16er-Liga mit 2er-Bloecken, auf 1..16 geklammert", () => {
+    expect(blockFuerRang(99)).toBe(14);
+    expect(blockFuerRang(99, LEAGUE_SIZE)).toBe(14);
     expect(blockFuerRang(1, LEAGUE_SIZE)).toBe(1);
+    expect(blockFuerRang(7, LEAGUE_SIZE)).toBe(8);
   });
 
-  it("baueRangmarke: Default identisch zum alten Verhalten (inkl. Rueckfall 32)", () => {
-    expect(baueRangmarke({ startRang: 14, haerte: "hart" })).toBe(16);
-    expect(baueRangmarke({ startRang: 14, haerte: "mild" })).toBe(20);
-    expect(baueRangmarke({ startRang: 30, haerte: "mild" })).toBe(32);
+  it("baueRangmarke({leagueSize:32}): Legacy identisch zum alten Verhalten (inkl. Rueckfall 32)", () => {
+    expect(baueRangmarke({ startRang: 14, haerte: "hart", leagueSize: 32 })).toBe(16);
+    expect(baueRangmarke({ startRang: 14, haerte: "mild", leagueSize: 32 })).toBe(20);
+    expect(baueRangmarke({ startRang: 30, haerte: "mild", leagueSize: 32 })).toBe(32);
   });
 
-  it("baueRangmarke({leagueSize:16}) reicht die Ligagroesse an blockFuerRang durch", () => {
-    // Der interne 32er-Rueckfall (`index<=0 ? leagueSize`) greift nur, wenn `blockFuerRang` den
-    // loesesten Block (28) liefert — bei leagueSize=16 ist der Rang immer <= 16 geklammert und
-    // erreicht Block 28 nie (RANGMARKEN_BLOECKE selbst bleibt unveraendert, siehe Datei-Kommentar).
-    // Geprueft wird deshalb die tatsaechlich erreichbare Weitergabe der Ligagroesse an blockFuerRang.
+  it("baueRangmarke({leagueSize:16}) reicht die Ligagroesse an blockFuerRang durch (Rueckfall 16)", () => {
     expect(baueRangmarke({ startRang: 15, haerte: "hart", leagueSize: LEAGUE_SIZE })).toBe(
       blockFuerRang(15, LEAGUE_SIZE),
     );
     expect(baueRangmarke({ startRang: 1, haerte: "hart", leagueSize: LEAGUE_SIZE })).toBe(1);
+    expect(baueRangmarke({ startRang: 15, haerte: "mild", leagueSize: LEAGUE_SIZE })).toBe(16);
+    expect(baueRangmarke({ startRang: 15, haerte: "mild" })).toBe(16);
   });
 });
 

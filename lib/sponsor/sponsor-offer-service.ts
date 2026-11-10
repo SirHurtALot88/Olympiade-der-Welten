@@ -43,7 +43,7 @@ import {
   VERZICHT_ANTEIL_DER_LEITER,
   verteileLeihgabenAufSlate,
 } from "@/lib/sponsor/sponsor-leih-slate";
-import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
+import { baueRangmarke, sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import {
   ACADEMY_RATING_GRENZE,
   sponsorLeihPassungFuerTeam,
@@ -437,7 +437,13 @@ export function buildSponsorOffersForTeam(input: {
         leihwertJeSaison: leihe.leihwertJeSaison,
         startZustandPct: leihe.startZustandPct,
         katalogkostenEndstufe: leihe.katalogkostenEndstufe,
-        rangmarke: baueRangmarke({ startRang: startRangFuerMarke, haerte }),
+        // Rangraum des Spielstands: liga-lokal 16 bei Liga-Split, sonst Legacy-32 — sonst laegen die
+        // Marken einer 16er-Liga auf der 32er-Leiter (Schritt 4 statt 2, „mild" teils unreissbar).
+        rangmarke: baueRangmarke({
+          startRang: startRangFuerMarke,
+          haerte,
+          leagueSize: sponsorRangraumFuer(input.gameState),
+        }),
         rangmarkenHaerte: haerte,
       },
     };
