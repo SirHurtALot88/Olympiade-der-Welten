@@ -4645,6 +4645,50 @@
   // `istUnten` fasst beide Faelle weiterhin zusammen (haelt Laufzyklus/Waffen/Effekte an, s.
   // unten), nur die ART-Wahl und die Standbild-Ersatzpose unterscheiden jetzt zusaetzlich nach
   // `istSturz`.
+  //
+  // PIXEL-FIGUR ANGRIFF-AUSNAHMEN (10.11., Backlog #52 "Enforcer greift nur mit Fluegeln an,
+  // keine echte Angriffsanimation"): die Angriff-Animation EXISTIERT fuer Enforcer (und wird
+  // korrekt geladen/ausgewaehlt, s. die Zustandswahl oben) -- der Fehler sitzt im BLATT selbst,
+  // nicht in der Auswahllogik. Per Augenschein an den einzelnen Spalten (identify/crop, 80x80 je
+  // Spalte): enforcer/angriff-south.png zerfaellt an Spalte 15 von 17 in ein generisches, vom
+  // Charakter abgekoppeltes Fluegel-Aufleuchten -- kein Koerper, keine Ruestung, kein Hammer mehr
+  // sichtbar, nur ein goldener Fluegel-Umriss. Spalte 16 (das rechnerische Ende der Lunge-Animation,
+  // s. `f` unten -- also genau die Spalte, die beim Treffer-Moment am laengsten zu sehen ist) zeigt
+  // die Figur zwar wieder, aber mit demselben unpassenden Fluegel-Hintergrund. Ost/Nord zeigen an
+  // ihrer letzten Spalte nur einen goldenen Schwung-/Bewegungsschleier HINTER der weiterhin
+  // sichtbaren Figur (wie bei anderen Figuren, z.B. eradicator/zhyrak -- s. dortige Blaetter),
+  // keinen Koerperverlust, deshalb dort KEINE Sperre.
+  //
+  // Systematisch nachgeprueft (10.11.): alle 19 Figuren, die laut der alten B_FIGUR-Fluegel-Liste
+  // (Kommentar bei DISZIPLIN_WAFFE/VOLLBILD_SCHLAEGER weiter unten, "Othrama, Enforcer, Elyon, ...")
+  // gefluegelt sind UND ein eigenes 360-PixelLab-Blatt (public/sprites/figuren/<slug>) haben. Nur
+  // Lumen Serene zeigt denselben Fehler, dort sogar ausgepraegter: angriff-south.png verliert den
+  // Koerper bereits ab Spalte 7 von 17 (statt erst ab 15) und bekommt ihn bis Spalte 16 nur
+  // bruchstueckhaft zurueck. Othrama/Whispra/Harbinger/Hellvoice/Sunny/Xylaris/Cadrael/Raven/Nimri/
+  // Yuko/Mushu/Brobot/Sanctrix/Leviathan/Butterfly zeigen an ihrer letzten Spalte durchgehend eine
+  // ECHTE, zum Charakter passende Waffen-/Elementareffekt-Spalte (Schwert, Feuer, Eis, Funken...),
+  // keinen Koerperverlust -- keine Sperre noetig. Dyrth zeigt eine abweichende, aber in sich
+  // stimmige Sturzflug-/Tauch-Pose (kein Fluegel-Abbruch) -- ebenfalls keine Sperre.
+  //
+  // Eine NEUE PixelLab-Bestellung fuer die kaputten Spalten braucht Chris' ausdrueckliche Freigabe
+  // (CLAUDE.md "PixelLab-Tod-Animationen": Charaktere/Animationen sind freigabepflichtig) und ist
+  // hier bewusst NICHT erfolgt. Bis dahin reines Wiederverwenden bestehender, bereits freigegebener
+  // Spalten desselben Blatts -- dieselbe Reuse-statt-Neubau-Philosophie wie beim Sturz-statt-Tod-Fix
+  // (PR #1386): PIXEL_ANGRIFF_SPERRFRAMES listet je Figur/Richtung die gesperrten Spalten
+  // (0-basiert), angriffFrameSicher() faellt von einer gesperrten Spalte auf die naechstniedrigere
+  // ungesperrte zurueck (Minimum 0 -- eine Figur ohne jede gute Spalte ab 0 wuerde dort einfrieren,
+  // kommt in der Tabelle unten aber nicht vor). Rein praesentational: veraendert nur, welche
+  // vorhandene Spalte gezeichnet wird, nichts an u.lunge/der Simulation/dem Wertungs-Fingerabdruck.
+  const PIXEL_ANGRIFF_SPERRFRAMES={
+    "Enforcer":{south:[15]},
+    "Lumen Serene":{south:[7,8,9,10,11,12,13]},
+  };
+  function angriffFrameSicher(name,dir,f){
+    const sperr=name&&PIXEL_ANGRIFF_SPERRFRAMES[name]&&PIXEL_ANGRIFF_SPERRFRAMES[name][dir];
+    if(!sperr||!sperr.length)return f;
+    while(f>0&&sperr.includes(f))f--;
+    return f;
+  }
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
@@ -4700,7 +4744,7 @@
           // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
           // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
           if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
-          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
             const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
