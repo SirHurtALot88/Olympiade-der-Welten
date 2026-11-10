@@ -272,6 +272,19 @@ Ohne Schalter gibt es **nur den Bericht**, die App läuft weiter. `--apply` fäh
 `--zurueck` dreht auf die letzte Sicherung zurück. Gekauft wird über denselben Produktionspfad, den
 das Spiel selbst nimmt — keine zweite Kauflogik.
 
+## PRs mergen — Agenten dürfen das jetzt selbst
+
+Chris am 10.11., wörtlich, nachdem ich noch dachte das Mergen bliebe sein Schritt: „ne das ist
+nicht mein schritt, du lässt doch eh CI laufen etc. wenn sachen fertig sind und ready sollst du
+auto mergen!" Das kehrt die bis dahin gelebte Praxis um — Draft-PR erstellen und auf Chris'
+eigenen Merge warten.
+
+**Ab jetzt gilt:** sobald eine PR grün ist (CI durchgelaufen, `mergeable_state: clean`, keine
+offenen Findings/Reviews, die eine Entscheidung brauchen), aus dem Draft-Status nehmen und selbst
+mergen — nicht mehr auf Chris warten. Das löst automatisch `auto-deploy.sh` auf dem Server aus
+(s. unten), der neue Commits auf `main` baut und ausrollt — das ist beabsichtigt, kein Nebeneffekt
+zum Vermeiden.
+
 ## Deploy
 
 `deploy/hetzner/auto-deploy.sh` pollt per Cron `main` und baut bei neuen Commits neu. Er zieht mit
