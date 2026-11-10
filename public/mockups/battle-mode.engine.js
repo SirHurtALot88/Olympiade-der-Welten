@@ -7927,30 +7927,33 @@
     "fechten": {torment:25,dexterity:20,speed:16,awareness:15,power:10,determination:6,health:4,intelligence:4},
     "i-spy": {intelligence:18,torment:17,spirit:13,will:12,charisma:9,determination:8,speed:8,dexterity:8,awareness:5,health:2}
   };
-  // PP_MATRIX_JE_DISC — die GESPERRTE Eignungsmatrix fuer die Pp-Pflichtpruefung, CLAUDE.md
-  // woertlich: "die Pp-Pflichtpruefung laeuft ausdruecklich gegen die Matrix, nicht gegen den
-  // Override" (Abschnitt "Die Eignungsmatrix ist gesperrt"). BASIS_JE_DISC ist dafuer NICHT
-  // immer die richtige Quelle: seit PR #934 (16.09., football-balance-runde-nach-e3-15-09.md
-  // Abschnitt 6) speist BASIS_JE_DISC.football bewusst aus `spiel-eignung-overrides.ts`
-  // (power 22/health 18/speed 14/torment 12/determination 10/awareness 8/stamina 6/dexterity 4/
-  // will 3/spirit 3) statt aus der Matrix — legitim fuer `mitAufschlag()`/die Kaderanzeige
-  // (genau der Zweck, fuer den der Override eingefuehrt wurde), aber eine STILLE
-  // Falschmessung fuer jedes Skript, das `window.__arena.matrix()`/einflussVon()s
-  // abweichungPp als Pp-Abnahmezahl nimmt: football ist die EINZIGE Disziplin mit einem
-  // Override, jede andere Zeile in BASIS_JE_DISC ist bereits bit-identisch zur Matrix in
-  // lib/player-generator/official-discipline-weights.ts. Gefunden bei der Football-Pp-
-  // Diagnose (Task #196, 25.10.): die seit Monaten berichteten Football-Pp-Zahlen (47,3 bis
-  // 71,1, zuletzt 64,6/61,7) massen alle gegen DIESEN Override, nicht gegen die echte,
-  // gesperrte Matrix (power 6/health 14/determination 8/stamina 6/awareness 11/will 10/
-  // charisma 4/spirit 25/torment 16) — macht die bisherigen Zahlen UNGUELTIG als Pp-
-  // Pflichtpruefung, nicht nur ungenau (spirit allein wiegt in der echten Matrix 25 Pp,
-  // im Override nur 3; charisma fehlt im Override komplett). NUR die Pp-Messwerkzeuge
-  // (einflussVon()s `W`, der `matrix()`-Export) lesen ab jetzt diese Tabelle;
-  // BASIS_JE_DISC selbst, `mitAufschlag()` und `betroffeneAttribute()` bleiben UNVERAENDERT
-  // auf dem Override — Produktions-/Kaderverhalten ist dadurch bit-identisch, nur die
-  // Mess-/Berichtsseite misst jetzt gegen das richtige Ziel.
-  const PP_MATRIX_JE_DISC={...BASIS_JE_DISC,
-    football:{power:6,health:14,determination:8,stamina:6,awareness:11,will:10,charisma:4,spirit:25,torment:16}};
+  // PP_MATRIX_JE_DISC — die Eignungsquelle fuer die Pp-Pflichtpruefung, CLAUDE.md woertlich:
+  // "die Pp-Pflichtpruefung laeuft ausdruecklich gegen die Matrix, nicht gegen den Override".
+  // Fuer neunzehn der zwanzig Disziplinen ist BASIS_JE_DISC bit-identisch zur gesperrten Matrix
+  // in lib/player-generator/official-discipline-weights.ts, also tut der Spread unten exakt das.
+  //
+  // FOOTBALL IST DIE EINZIGE AUSNAHME, UND DAS IST JETZT ABSICHTLICH SO. Seit PR #934 (16.09.)
+  // speist BASIS_JE_DISC.football aus `spiel-eignung-overrides.ts` (power 22/health 18/speed 14/
+  // torment 12/determination 10/awareness 8/stamina 6/dexterity 4/will 3/spirit 3), nicht aus der
+  // rohen Matrix (power 6/health 14/determination 8/stamina 6/awareness 11/will 10/charisma 4/
+  // spirit 25/torment 16) — das ist dieselbe Gewichtsquelle, gegen die auch rho misst (Kaderan-
+  // zeige, KI-Kauf UND Minispiel-Rezept lesen seit #934 EINE Wahrheit, s. Kopfkommentar dieser
+  // Datei bei football:{...}). Diese Tabelle hatte frueher (Task #196, 25.10.) football trotzdem
+  // HART auf die rohe Matrix zurueckgesetzt, mit der Begruendung "football ist die einzige
+  // Disziplin mit einem Override, also muss Pp bei football gegen die echte Matrix laufen" —
+  // DAS GALT NUR BIS CHRIS' ENTSCHEIDUNG ZUR FRAGE Q-F (10.11., PM-Fahrplan, woertlich):
+  // "(a) Override gilt auch fuer Pp". Pp wird fuer football damit ab jetzt GEGEN DEN OVERRIDE
+  // gemessen, konsistent mit rho — nicht weil die Matrix sich aendert (sie bleibt gesperrt UND
+  // unangetastet, s. CLAUDE.md "Die Eignungsmatrix ist gesperrt"), sondern weil football, anders
+  // als die anderen neunzehn Disziplinen, eine EIGENE, von Chris bestaetigte zweite Gewichtsquelle
+  // hat und beide Pflichtkriterien (rho, Pp) jetzt konsistent gegen DIESELBE Quelle laufen sollen.
+  // Der football-Sonderfall in dieser Tabelle entfaellt deshalb ab jetzt ersatzlos: ohne eigenen
+  // Eintrag liefert der Spread unten fuer football BASIS_JE_DISC.football, also den Override —
+  // genau das will Chris' Entscheidung. (Vorher gemessene Football-Pp-Zahlen gegen die rohe
+  // Matrix, zuletzt 121,0/120,1, sind damit UNGUELTIG fuer die Pflichtpruefung — nicht weil die
+  // Messung falsch war, sondern weil sie seit dem 10.11. die falsche Referenz benutzt; s.
+  // docs/design/football-pp-rezept-10-11.md fuer die neue, korrekte Baseline.)
+  const PP_MATRIX_JE_DISC={...BASIS_JE_DISC};
   const SLOTS_JE_DISC={
     "tdm":[
       {id:"vanguard",label:"Vanguard",text:"Öffnet Teamfights mit Power und Health.",gross:"power",klein:"health",last:"stamina",mueh:"high",profil:{power:33.4,health:23.4,stamina:11.5,spirit:9.9,charisma:8.3,determination:5,intelligence:5,awareness:1.8,torment:1.8}},
@@ -9603,12 +9606,107 @@
       // bewusst konservativ, sie tragen die am genauesten gegen den Korridor (Yards/Carry,
       // Sack-/Interception-Quote) gefitteten Kanaele.
       //
-      // GEMESSEN (node scripts/miss-alle-disziplinen.mjs 48 football, kaderfest, ZWEIMAL
-      // unabhaengig reproduziert, bit-identisch): rho je Spiel 0,804 (Baseline) -> 0,808
-      // (bestanden, MEHR Marge als die Baseline selbst). Pp (messe-arena-einfluss.mjs, n=48,
-      // 2 Saatstroeme): Mittel 57,05 -> 54,75 — kleiner als in der zurueckgezogenen ersten
-      // Fassung (die rho gekostet haette), aber real und sicher. Siehe PR-Dokument fuer die
-      // vollen Vorher/Nachher-Zahlen inkl. Pp je Attribut.
+      // GEMESSEN VOR DIESER RUNDE (node scripts/miss-alle-disziplinen.mjs 48 football,
+      // kaderfest, ZWEIMAL unabhaengig reproduziert, bit-identisch): rho je Spiel 0,804
+      // (Baseline) -> 0,808 (bestanden). Pp war damals NIE gegen die richtige Quelle
+      // gemessen worden (s. naechster Absatz) — dieses Rezept (REZEPT C) ist der
+      // Ausgangspunkt der folgenden Runde, nicht mehr der aktuelle Stand.
+      //
+      // REZEPT D — Pp-FIRST-KALIBRIERRUNDE (10.11., Chris' Q-F-Entscheidung "Override gilt
+      // auch fuer Pp", docs/design/football-pp-rezept-10-11.md). AUSGANGSLAGE: Pp korrekt
+      // gegen den Override gemessen (nicht die rohe Matrix, s. PP_MATRIX_JE_DISC-Kommentar
+      // oben in dieser Datei) lag bei REZEPT C bei 64,6/61,7 (zwei Saatstroeme,
+      // messe-arena-einfluss.mjs football 48, LIVE bestaetigt) — sechs Attribute lasen exakt
+      // 0 % mechanisches Gewicht (awareness, will, spirit, stamina, charisma, intelligence;
+      // charisma/intelligence tragen im Override ohnehin 0 Gewicht, also kein Problem),
+      // health/speed/torment waren weit ueber ihrem Override-Gewicht ueberrepraesentiert.
+      //
+      // ERSTER VERSUCH VERWORFEN — EIN KOMPLETTER SINKHORN-NEUBAU ALLER ACHT SUB-SKILLS
+      // KOSTETE RHO. `scripts/baue-feldspiel-rezept.mjs` (MATRIX.football auf den Override,
+      // ERLAUBT.football mit speed/dexterity/stamina/spirit/will in mehreren Sub-Skills, s.
+      // Git-Historie dieser Datei) loeste das volle Transportproblem und ergab rechnerisch
+      // ~16 Pp — ABER kaderfest GEMESSEN (node scripts/miss-alle-disziplinen.mjs 48 football):
+      // rho je Spiel 0,760 (n=48) / 0,783 (n=24), BEIDE unter der 0,80-Schranke. Wahrscheinlichste
+      // Ursache: der Neubau senkte HEALTH (bester Einzelkorrelator zur echten Football-Eignung,
+      // Spearman 0,535) drastisch in GENAU den beiden schwersten Kanaelen (TEAMGEIST 45 %->25 %,
+      // LAUFKRAFT 33 %->16 %) UND ersetzte die drei spezifisch rho-gefitteten Kanaele
+      // PASSGENAUIGKEIT/ABWEHR_PASS/ABWEHR_LAUF (rho zur Eignung 0,801/0,848/0,873, s. Kommentare
+      // weiter oben an REZEPT C) durch unvalidierte, teils dexterity-dominierte Mischungen.
+      // CLAUDE.md gibt rho ausdruecklich Vorrang vor der Pp-Zahl — dieser Versuch ist deshalb
+      // NICHT die Fassung unten, sondern nur als gemessene Negativ-Erfahrung dokumentiert, damit
+      // eine kuenftige Runde denselben Weg nicht noch einmal geht.
+      //
+      // ZWEITER, KONSERVATIVERER VERSUCH (DIESE FASSUNG): nur EIN Sub-Skill neu, alle anderen
+      // UNVERAENDERT. PASSGENAUIGKEIT/LAUFKRAFT/ABWEHR_PASS/ABWEHR_LAUF/BALLSICHERHEIT/AUSDAUER
+      // bleiben BYTE-IDENTISCH zu REZEPT C — exakt die Kanaele, die schon einzeln gegen die echte
+      // Football-Eignung rho-gefittet und validiert sind (s. Kommentare dort). PASSSCHUTZ verliert
+      // nur das riskante awareness:20 (schon in REZEPT C als "Erhoehung kaderfest durchgefallen"
+      // dokumentiert) — ersetzt durch mehr stamina, bereits vorhandenes, sicheres Attribut dort.
+      // Der GESAMTE Pp-Hebel liegt bei TEAMGEIST — nicht kuenstlich, sondern weil das genau der
+      // EINZIGE Kanal ist, der schon einmal (zwischen den aelteren 04.09.-Messungen und dem
+      // heutigen Stand) komplett umgebaut wurde, OHNE dass das rho gemessen gekostet hat (von
+      // charisma:82/torment:18 zur heutigen health:45/torment:30/speed:25-Fassung) — ein Beleg,
+      // dass dieser eine Kanal die Mechanik strukturell vertraegt, waehrend die anderen fuenf
+      // nachweislich fragil sind (s. REZEPT-C-Kommentare: schon 8 % spirit in TEAMGEIST kostete
+      // fruehrer rho 0,814->0,788, ABER das war VOR dieser Runde und mit einer anderen Baseline —
+      // die neue TEAMGEIST-Mischung unten ist bewusst vorsichtiger: kein einzelnes "fremdes"
+      // Attribut auf einmal, sondern das rechnerisch fehlende Stueck jedes Override-Attributs in
+      // kleinen Anteilen, mit dem GROESSTEN Einzelposten bei determination (0,532 Korrelation,
+      // fast so gut wie health) statt bei einem schwachen Korrelator.
+      //
+      // WILL/SPIRIT/STAMINA JETZT IN MEHREREN KANAELEN, Chris' Vorgabe zur Methode (10.11.,
+      // woertlich: "wenn mehrere attribute irgendwo rein fliessen ist es automatisch
+      // einfacher... spirit... das kann ja in mehreren bereichen wichtig sein") — aber NUR in
+      // den Kanaelen, die dadurch nicht veraendert werden muessen: BALLSICHERHEIT/AUSDAUER
+      // fuehrten will/stamina schon in REZEPT C (dort als "sicher" befundene Ergaenzungen),
+      // PASSSCHUTZ bekommt stamina statt awareness, TEAMGEIST bekommt den Rest (stamina, spirit,
+      // will, determination, power, torment, speed, health, dexterity — alle neun verbleibenden
+      // Override-Attribute, in der Groesse, die die rechnerische Luecke schliesst).
+      //
+      // AWARENESS BLEIBT ABSICHTLICH AUSSEN VOR — nicht aus Versehen, sondern weil JEDE bisher
+      // getestete Erhoehung (PASSSCHUTZ 20 % in REZEPT C, UND der komplette Sinkhorn-Neubau mit
+      // awareness=0 oben, dessen rho-Ausfall aber NICHT an awareness lag, s.o.) auf der echten
+      // Kaderfamilie kaderfest GEMESSEN rho gekostet hat, UND weil awareness auf dieser
+      // Kaderfamilie NEGATIV mit der echten Football-Eignung korreliert (Spearman -0,34,
+      // docs/design/football-rezept-kalibrierung.md Abschnitt 4.2). Der Override gewichtet
+      // awareness mit 8 (statt 11 in der rohen Matrix) — ein bewusst offen gelassener, auf
+      // maximal 8 Pp begrenzter Rest, klar innerhalb der 25-Pp-Schranke.
+      //
+      // SONDIERUNG FRISCH GEZOGEN (10.11., node scripts/sondiere-feldspiel-subskills.mjs
+      // football 24 — die alten Werte von 04.09./02.10. waren nach den Kickoff-/QB-/
+      // Punter-Slot-Schritten vom 14.10. veraltet): TEAMGEIST 52,3 % (weiterhin der mit
+      // Abstand schwerste Kanal), LAUFKRAFT 26,4 %, ABWEHR_LAUF 10,7 % (NEU bedeutsam — war
+      // vorher ~0 %), ABWEHR_PASS 6,7 %, PASSGENAUIGKEIT/PASSSCHUTZ je nur noch 1,6 % (NEU fast
+      // bedeutungslos — der QB-Kanal von REZEPT C traegt dadurch praktisch nichts mehr zum
+      // Boxscore bei, ein Motorbefund der Kickoff-/QB-Slot-Aenderungen, keine Rezeptfrage dieser
+      // Runde), BALLSICHERHEIT/AUSDAUER je <1 %.
+      //
+      // RECHNERISCHE Pp-SCHAETZUNG fuer DIESE (konservative) Fassung, mit der frischen
+      // Sondierung: **~16,7 Pp** (power -0,1/health -0,2/speed +0,1/torment +0,1/
+      // determination +7,9/stamina +0,2/dexterity +0,0/spirit +0,1/will -0,0, plus awareness
+      // bei -8,0 bewusst offen gelassen) — praktisch derselbe Pp-Wert wie der verworfene
+      // komplette Neubau (~16,0), aber mit nur EINEM statt ACHT geaenderten Sub-Skills und ohne
+      // die drei nachweislich rho-validierten Kanaele anzufassen. Reale Messung kann wegen
+      // Motor-Nichtlinearitaeten (fkLos()-Lotterien mit kappa=3) davon abweichen — massgeblich
+      // ist die TATSAECHLICHE Messung mit messe-arena-einfluss.mjs/miss-alle-disziplinen.mjs,
+      // nicht diese Schaetzung (s. Bericht/PR fuer die echten Zahlen).
+      // REZEPT D BLEIBT AM ENDE DIESER RUNDE UNVERAENDERT AUF REZEPT C STEHEN — beide
+      // versuchten Pp-Fixe (voller Sinkhorn-Neubau UND der konservativere TEAMGEIST-only-
+      // Umbau direkt oben) sind kaderfest GESCHEITERT, nicht nur knapp: rho je Spiel 0,760
+      // bzw. 0,668 (n=24/48, beide "durchgefallen"). Mathematischer Beleg, WARUM eine dritte,
+      // noch vorsichtigere Variante keinen Ausweg mehr hat: selbst wenn health in TEAMGEIST/
+      // LAUFKRAFT KOMPLETT unangetastet bleibt (45 %/33 %, exakt wie hier) UND jedes andere
+      // Override-Attribut rechnerisch optimal verteilt wird, bleibt der Pp-BODEN bei ~38,6 —
+      // allein health (+16,3, weil es mit 0,535 Spearman der beste Einzelkorrelator zur
+      // echten Football-Eignung UND das mit Abstand ueberrepraesentierteste Attribut ist)
+      // plus das bewusst offen gelassene awareness (-8,0) liegen schon bei 24,3 von den
+      // erlaubten 25 Pp, VOR jedem anderen Attribut. Health laesst sich nicht ohne Weiteres
+      // aus der Mechanik entfernen, ohne genau das zu zerstoeren, was football ueberhaupt rho
+      // > 0,80 bringt — eine STRUKTURELLE, keine kalibrierbare Kollision der beiden
+      // Pflichtkriterien unter der HEUTIGEN Feldspiel-Mechanik (TEAMGEIST/LAUFKRAFT als die
+      // beiden einzigen schweren Kanaele, beide health-dominiert). Volle Herleitung, beide
+      // gescheiterten Versuche mit Zahlen und der naechste moegliche Hebel (eine echte
+      // Mechanik-Aenderung, kein Rezept mehr) in docs/design/football-pp-rezept-10-11.md.
       rezept:{
         PASSGENAUIGKEIT: {power:40,determination:35,dexterity:25},  // rho zur Eignung 0,801 (vorher 0,135) — QB-Kanal repariert, UNVERAENDERT
         LAUFKRAFT:       {power:41,health:33,speed:26},             // rho 0,909  UNVERAENDERT (Yards/Carry-Korridor daran gefittet)
@@ -9616,7 +9714,7 @@
         ABWEHR_PASS:     {torment:40,power:35,speed:25},            // rho 0,848 (vorher 0,363) — CB/S: Aggression + Wucht + Antritt, UNVERAENDERT
         ABWEHR_LAUF:     {torment:55,power:30,health:15},           // rho 0,873 (vorher 0,618) — reines torment war Sinkhorn-Blindfleck, UNVERAENDERT
         BALLSICHERHEIT:  {power:33,health:33,determination:28,will:6}, // will NEU (6, reduziert von urspruenglich erwogenen 15 — s. Kommentar oben), power/health/determination nur leicht gesenkt
-        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788)
+        TEAMGEIST:       {health:45,torment:30,speed:25},           // UNVERAENDERT — spirit-Nachschlag GEPRUEFT UND VERWORFEN, s. Kommentar oben (schon 8% spirit: rho 0,788); diese Runde (10.11.) zwei WEITERE, groessere TEAMGEIST-Umbauten geprueft und ebenfalls verworfen, s.o.
         AUSDAUER:        {stamina:67,will:33},                      // UNVERAENDERT (weiterhin KEIN eigener Kanal — stamina/will haben jetzt anderswo einen, s.o.)
         LAUFTEMPO:       {speed:52,stamina:32,dexterity:16}         // UNVERAENDERT, disziplinuebergreifend (Bug-Fix 03.09.)
       },
@@ -58779,9 +58877,9 @@
     // ABWEICHUNG ZUR MATRIX. Die eine Zahl, an der eine neue Disziplin haengt: Summe der
     // Betraege aus (gemessener Anteil minus Gewicht). Null hiesse, die Mechanik loest die
     // Wertung exakt ein; je hoeher, desto mehr belohnt sie etwas anderes. PP_MATRIX_JE_DISC
-    // statt BASIS_JE_DISC (s. Kommentar bei dessen Definition): die Pp-Pflichtpruefung misst
-    // ausdruecklich gegen die gesperrte Matrix, nicht gegen einen Anzeige-Override — fuer
-    // alle Disziplinen ausser football bit-identisch.
+    // ist bis auf football bit-identisch zu BASIS_JE_DISC (s. Kommentar bei dessen Definition)
+    // — und seit Chris' Q-F-Entscheidung (10.11., "Override gilt auch fuer Pp") auch fuer
+    // football: der Spread liefert dort jetzt den Override, dieselbe Quelle wie rho.
     const W=PP_MATRIX_JE_DISC[dId]||{};
     const abweichung=EINFLUSS_ATTR.reduce((s,k)=>
       s+Math.abs((reihen.find(r=>r.attribut===k)||{anteil:0}).anteil-(W[k]||0)),0);

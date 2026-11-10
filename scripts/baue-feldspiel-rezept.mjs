@@ -30,8 +30,19 @@ const SONDIERUNG = process.argv[3];
 const MATRIX = {
   hockey: { power: 18, health: 18, speed: 12, spirit: 12, stamina: 10, torment: 10,
             awareness: 8, determination: 4, dexterity: 4, will: 4 },
-  football: { spirit: 25, torment: 16, health: 14, awareness: 11, will: 10,
-              determination: 8, power: 6, stamina: 6, charisma: 4 },
+  // FOOTBALL — UMGESTELLT AUF DEN OVERRIDE (Chris' Entscheidung zur Frage Q-F, 10.11., PM-
+  // Fahrplan: "Override gilt auch fuer Pp"). Bis zu dieser Runde stand hier die rohe, gesperrte
+  // Matrix (spirit 25/torment 16/health 14/awareness 11/will 10/determination 8/power 6/
+  // stamina 6/charisma 4) — das war schon beim allerersten Rezeptbau (04.09.) die falsche
+  // Zielspalte fuer DIESE Disziplin, weil Football seit PR #934 (16.09.) ueber
+  // `lib/player-generator/spiel-eignung-overrides.ts` eine eigene, von Chris bestaetigte zweite
+  // Gewichtsquelle hat, gegen die rho SCHON IMMER misst. Jetzt zieht auch die Pp-Pflichtpruefung
+  // nach, s. PP_MATRIX_JE_DISC-Kommentar in battle-mode.engine.js. Override:
+  // power 22/health 18/speed 14/torment 12/determination 10/awareness 8/stamina 6/dexterity 4/
+  // spirit 3/will 3 — KEIN charisma mehr (Override fuehrt es nicht), DAFUER speed/dexterity neu
+  // (die rohe Matrix fuehrte beide mit 0, der Override gewichtet sie real).
+  football: { power: 22, health: 18, speed: 14, torment: 12, determination: 10,
+              awareness: 8, stamina: 6, dexterity: 4, spirit: 3, will: 3 },
 };
 
 // WO EIN ATTRIBUT UEBERHAUPT HINGEHOEREN DARF. Aus der Sub-Skill-Tabelle des
@@ -72,15 +83,41 @@ const ERLAUBT = {
   // fachliche Rolle, sondern das disziplinuebergreifend erwartete Bewegungstempo
   // (battle-mode.rezepte.js-Konvention 1:1 mit Basketball/Hockey), speed/dexterity
   // tragen dafuer ohnehin kein Football-Matrixgewicht — bleibt unangetastet.
+  // FOOTBALL — ZWEITE FASSUNG (Pp-first-Kalibrierrunde, 10.11., Chris' Q-F-Entscheidung).
+  // AWARENESS BLEIBT AUSGESCHLOSSEN, ABSICHTLICH (wie in der ersten Fassung oben
+  // begruendet): -0,34 Spearman gegen die echte Football-Eignung auf der Kaderfamilie,
+  // UND bereits zweifach kaderfest GEMESSEN durchgefallen, wenn ihr Anteil steigt (s.
+  // Kommentar bei PASSSCHUTZ in battle-mode.engine.js). Der Override gewichtet awareness
+  // nur noch mit 8 (statt 11 in der rohen Matrix) — ein bewusst offen gelassener, maximal
+  // 8 Pp grosser Rest, kleiner als die gesamte restliche Luecke vorher. "charisma" entfaellt
+  // komplett (der Override fuehrt es nicht mehr).
+  //
+  // NEU GEGENUEBER DER ERSTEN FASSUNG: speed/dexterity/stamina/spirit/will werden JETZT
+  // zugelassen, wo sie vorher fehlten — nicht als EIN kuenstlicher Kanal, sondern anteilig
+  // ueber MEHRERE bestehende, fachlich plausible Sub-Skills verteilt (Chris' Vorgabe zur
+  // Methode, 10.11., woertlich: "wenn mehrere attribute irgendwo rein fliessen ist es
+  // automatisch einfacher... spirit... das kann ja in mehreren bereichen wichtig sein").
+  // WILL als "Clutch-Momente/Verteidigungseinsatz/Durchhalten bei Ruckstand": RB, der sich
+  // durch einen Tackle kaempft (LAUFKRAFT), OL, der seinen Block haelt (PASSSCHUTZ),
+  // Verteidiger, der sich gegen den Lauf nicht wegdruecken laesst (ABWEHR_LAUF), Ballfuehrer,
+  // der den Ball durch Kontakt festhaelt (BALLSICHERHEIT), zaeh bis zum Schlusspfiff
+  // (AUSDAUER) — fuenf plausible Heimaten statt einer. SPIRIT bleibt bei TEAMGEIST (der
+  // Name ist woertlich "Team-Geist") plus AUSDAUER (Mannschaftsgeist, der bis zum Ende
+  // durchhaelt). STAMINA verteilt sich auf PASSGENAUIGKEIT (Arm-Ausdauer im vierten
+  // Viertel), PASSSCHUTZ (Blocks ueber eine lange Drive-Folge halten), TEAMGEIST
+  // (Routen-Laufen) und AUSDAUER. DEXTERITY bleibt bei PASSGENAUIGKEIT (Grip/Touch) und
+  // bekommt mit ABWEHR_PASS eine zweite, football-plausible Heimat (Ballgefuehl/Interception-
+  // Haende). power/health/determination/torment bleiben dort, wo sie schon stehen und die
+  // kaderfeste Korrelation (0,42-0,54 fuer power/health/determination) am besten traegt.
   football: {
-    PASSGENAUIGKEIT: ["determination", "will"],
-    LAUFKRAFT:       ["power", "health", "spirit"],
-    PASSSCHUTZ:      ["health", "determination", "will"],
-    ABWEHR_PASS:     ["torment", "power"],
-    ABWEHR_LAUF:     ["torment", "power", "health"],
-    BALLSICHERHEIT:  ["health", "will"],
-    TEAMGEIST:       ["spirit", "charisma", "torment"],
-    AUSDAUER:        ["stamina", "health", "will"],
+    PASSGENAUIGKEIT: ["power", "determination", "dexterity", "stamina"],
+    LAUFKRAFT:       ["power", "health", "speed", "determination", "will"],
+    PASSSCHUTZ:      ["power", "health", "stamina", "will"],
+    ABWEHR_PASS:     ["torment", "power", "speed", "dexterity"],
+    ABWEHR_LAUF:     ["torment", "power", "health", "will"],
+    BALLSICHERHEIT:  ["power", "health", "determination", "will"],
+    TEAMGEIST:       ["health", "torment", "speed", "spirit", "determination", "stamina"],
+    AUSDAUER:        ["stamina", "will", "spirit", "health"],
   },
 };
 
