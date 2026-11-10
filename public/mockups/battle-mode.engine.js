@@ -38461,6 +38461,29 @@
     const gesetzt=inDisc(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // TDM-GEFECHT (Verdrahtung 11.11., s. Kopfkommentar bei tdmDuellRoster() weiter unten):
+    // das vorab entschiedene Gefecht ersetzt den alten kontinuierlichen Zweikampf-Aufbau
+    // unten vollstaendig fuer TDM -- frueher Return, kein Byte der Reihen-/Slot-Logik darunter
+    // wird fuer diese Disziplin noch erreicht. `tdmDuellRoster()` (statt einer zweiten Kopie
+    // der Rollenauswahl hier) ist dieselbe Funktion, die auch `spieleTdmGefecht()` fuer die
+    // Headless-Buchung ruft -- GARANTIERT dieselben zwei Seiten, "gezeigt = gebucht".
+    if(d==="tdm"){
+      const {mine:mineTdm,gegner:gegnerTdm}=tdmDuellRoster();
+      if(mineTdm.length&&gegnerTdm.length){
+        const alleTdm=[...mineTdm,...gegnerTdm];
+        const g=tdmGefecht([mineTdm,gegnerTdm],seed,n);
+        const seitenZaehlerTdm=[0,0];
+        U=g.kaempfer.map((k,i)=>{
+          const p=alleTdm[i];
+          const idxSeite=seitenZaehlerTdm[k.side]++;
+          const seitenGroesse=k.side===0?mineTdm.length:gegnerTdm.length;
+          return baueEinheit(p,k.side,1,idxSeite,seitenGroesse,i,k.slot,
+            order[p.n]||slotOrd(k.slot),zielOf[p.n],d,SLOTVON[k.slot]);
+        });
+        tdmReplayStarten(g);
+      }
+      return;
+    }
     // BATTLEFIELD: eigene Rollen je Kadergroesse (bfSlotsFuer), sonst unveraendert slotListe.
     const kSlotsHeim=bfSlotsFuer(d,mine.length);
     const slotListeHeim=kSlotsHeim||slotListe;
@@ -40364,6 +40387,13 @@
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
+    // TDM-GEFECHT (Verdrahtung 11.11.): das Gefecht steht fest, die Arena spielt es nur ab
+    // (tdmReplaySchritt, s. dort) -- dasselbe Abfang-Muster wie Battlefields KP.pod.replay
+    // direkt darunter. `tdmReplay` gibt es nur, wenn build()s TDM-Zweig die Rollenauswahl zu
+    // zwei nichtleeren Seiten aufloesen konnte (s. tdmDuellRoster/tdmReplayStarten) -- sonst
+    // bleibt `U` leer und der alte Zweig unten wird (wirkungslos, weil `U` dann leer ist)
+    // trotzdem erreicht, statt dass hier ein Fehler entsteht.
+    if(tdmReplayAktiv()){ tdmReplaySchritt(dt); return; }
     t+=dt;
     // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
     // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
@@ -55915,7 +55945,13 @@
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   mutatorenGrundzustand();
   zieheFormkarten(20260823);
-  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
+  // BOOTSTRAP-AUFRUF VERSCHOBEN (Verdrahtung 11.11., s. Kommentar bei seiner neuen Stelle
+  // ganz am Modulende): `reset()` baut hier synchron die Standarddisziplin ("tdm", s.
+  // `let disc="tdm"` oben) -- seit TDM ueber `tdmGefecht()`/`tdmSchlagwechsel()` laeuft, braucht
+  // dieser Bau Funktionen/Konstanten (mdffaZufall, mdffaMisch, bfPodPlatzierungAus, TDM_GEFECHT
+  // u.a.), die TEXTLICH erst weiter unten im Modul stehen -- an DIESER Stelle waeren sie noch
+  // in ihrer Temporal-Dead-Zone (`let`/`const`, kein `function`). Der Aufruf selbst steht
+  // deshalb jetzt ganz am Ende der Datei, nach jeder Deklaration.
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
   // schreibgeschuetzt zum Nachmessen bereit; das Spiel liest davon nichts.
@@ -56760,22 +56796,33 @@
   }
 
   // ===================================================================================
-  // TDM-GEFECHT — PROTOTYP, NOCH NICHT VERDRAHTET (10.11.).
+  // TDM-GEFECHT — SEIT 11.11. DER ECHTE WERTUNGSPFAD (Verdrahtung, s.
+  // lib/battle/arena-headless-runner.ts "ARENA_KAMPF_DISCIPLINE_IDS" und
+  // lib/battle/arena-resolved-disciplines.ts "TDM_GEFECHT_VORLAUF_AKTIV").
   //
   // Chris woertlich: „Das was auf dem Feld passiert soll auch das in den Stats sein! Und
-  // das in jeder Disziplin!" TDM laeuft produktiv weiterhin ueber die PPS-Duell-Bruecke
-  // (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte Zweikampf
-  // (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s. Kommentar bei
-  // ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. DIESER Block ist NUR der
-  // Mess-/Prototyp-Schritt aus der Aufgabe vom 10.11.: eine reine, vorab entschiedene
-  // Gefecht-Funktion nach dem Vorbild von bfffaGefecht() (Battlefield-Pod, 02.11., bestand
-  // rho 0,861-0,923 / Pp 4,8-20,2 bei k=2..6) — NICHT in die Buchung, die Arena-Anzeige oder
-  // irgendeinen bestehenden Pfad eingehaengt. Jede Zeile hier ist additiv: kein bestehender
-  // Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen (slotAufschlag,
-  // mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert, eigHebung, eigMutator,
-  // gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus, normalisiereSaat — alle
-  // schon vorher da). `node scripts/pruefe-wertung-fingerabdruck.mjs` liefert vor und nach
-  // diesem Block denselben GESAMT-Hash (s. docs/design/tdm-gefecht-abnahme-10-11.md).
+  // das in jeder Disziplin!" TDM lief bis zu dieser Verdrahtung produktiv ueber die
+  // PPS-Duell-Bruecke (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte
+  // Zweikampf (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s.
+  // Kommentar bei ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. Dieser Block entstand
+  // 10.11. als reiner Mess-/Prototyp-Schritt (additiv, an nichts angeschlossen) und ist seit
+  // 11.11. der tatsaechliche Wertungspfad: `spieleTdmGefecht()` (s.u.) ist der Headless-
+  // Einstiegspunkt fuer die Buchung, `build()`s TDM-Zweig (s. dort, tdmReplayStarten) spielt
+  // GENAU DASSELBE Gefecht fuer die Live-Anzeige ab — "gezeigt = gebucht" durch dieselbe
+  // Berechnung auf beiden Seiten, nicht durch einen Tick-Taktabgleich (TDM braucht den
+  // Anzeige-Treue-Fix aus PR #1372/`anzeigeSechzigstel()` deshalb NICHT: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick, ruft `stepSim()`/`anzeigeSechzigstel()` nie).
+  // Nach demselben Vorbild wie bfffaGefecht() (Battlefield-Pod, 02.11., bestand rho
+  // 0,861-0,923 / Pp 4,8-20,2 bei k=2..6). Jede Zeile des urspruenglichen Prototyp-Blocks blieb
+  // additiv: kein bestehender Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen
+  // (slotAufschlag, mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert,
+  // eigHebung, eigMutator, gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus,
+  // normalisiereSaat — alle schon vorher da). Neu durch die Verdrahtung kommen NUR
+  // `spieleTdmGefecht()`, `tdmReplayStarten()`/`tdmReplaySchritt()`/`tdmReplayEreignis()` und die
+  // EINE Zeile in `stepSim()` dazu, die bei aktivem Replay frueh zurueckkehrt (s. dort) — exakt
+  // das Muster, mit dem `KP.pod.replay` dort schon Battlefield abfaengt.
+  // `node scripts/pruefe-wertung-fingerabdruck.mjs` zeigt deshalb ab dieser PR eine Aenderung
+  // NUR in den TDM-Zeilen (s. docs/design/tdm-gefecht-abnahme-10-11.md fuer die Abnahmezahlen).
   //
   // ANDERS ALS BATTLEFIELD: TDM ist "reines Deathmatch" (ARENA_ART.tdm-Kommentar sagt das
   // ausdruecklich, ebenso der Kommentar bei ARENA_DOMINATION oben: "TDM und Mini-DM bleiben
@@ -56811,7 +56858,14 @@
     atem:{basis:0.1},
     befehl:{basis:1},
     wertung:{ko:15, takt:2},
-    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4}
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4},
+    // ANZEIGE-TAKT (Verdrahtung 11.11., s. tdmReplaySchritt() weiter unten): reine
+    // Sekunden-pro-Takt-Vorgabe fuer die Live-Wiedergabe, beeinflusst tdmSchlagwechsel()
+    // selbst NICHT (die rechnet taktlos in diskreten Runden) -- dieselbe Rolle wie
+    // BFFFA.taktSek fuer Battlefields Replay. Additiv: kein bestehender Leser dieses Objekts
+    // (tdmGefechtEinfluss/-Sonde/-Parameter) liest `taktSek`, die schon gemessenen rho-/
+    // Pp-Zahlen bleiben deshalb unberuehrt.
+    taktSek:4
   });
   const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
   let TDM_GEFECHT=tdmGefechtGrund();
@@ -57042,6 +57096,153 @@
     const misch=(a,b)=>{ for(const k2 in b){ if(b[k2]&&typeof b[k2]==="object"&&!Array.isArray(b[k2])&&a[k2]&&typeof a[k2]==="object")misch(a[k2],b[k2]); else a[k2]=b[k2]; } return a; };
     TDM_GEFECHT=neu?misch(tdmGefechtGrund(),JSON.parse(JSON.stringify(neu))):tdmGefechtGrund();
     return JSON.parse(JSON.stringify(TDM_GEFECHT));
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT-VERDRAHTUNG (11.11.): `spieleTdmGefecht()` ist jetzt der Headless-
+  // Einstiegspunkt fuer die Buchung (s. lib/battle/arena-headless-runner.ts,
+  // "ARENA_KAMPF_DISCIPLINE_IDS"), `tdmReplay*` spielt dasselbe Gefecht fuer die Live-Anzeige
+  // ab (build()s TDM-Zweig, s. dort) -- nach demselben Muster wie Battlefields "DAS REPLAY"
+  // weiter unten, aber ohne Orte/Eroberung/Rotation (TDM ist reines Deathmatch, kein
+  // Kontrollpunkt-Gefecht) und ohne Respawn (tdmSchlagwechsel() kennt keinen, anders als der
+  // alte Echtzeit-Zweikampf -- `schalteAus()`s TDM-Zweig (disc==="tdm", oben) bleibt deshalb
+  // fuer das neue Gefecht ABSICHTLICH ungenutzt: er plant einen Respawn (`downBis`), den es
+  // im neuen Protokoll nicht mehr gibt, und seine Ticker-Zeile ("faellt — zurueck in Xs")
+  // waere hier schlicht falsch. s. tdmReplayKo() unten fuer die eigene, respawnfreie
+  // Buchfuehrung.
+  //
+  // "GEZEIGT = GEBUCHT" ENTSTEHT HIER NICHT UEBER EINEN TICK-TAKTABGLEICH (anders als der
+  // Anzeige-Treue-Fix PR #1372/`anzeigeSechzigstel()` fuer die kontinuierliche Bahn-/Kampf-/
+  // Feldspiel-Physik), SONDERN UEBER DIESELBE BERECHNUNG AUF BEIDEN SEITEN: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick (reines Takt-Protokoll, kein `stepSim()`-Aufruf
+  // in `tdmSchlagwechsel()`), Headless und Live-Anzeige rufen sie mit DERSELBEN Saat und
+  // DENSELBEN zwei Seiten (`tdmDuellRoster()`, EINE Implementierung fuer beide) -- `stepSim()`
+  // tickt fuer TDM danach nur noch den FERTIGEN Ablauf ab (`tdmReplaySchritt`), wuerfelt
+  // nichts mehr. `anzeigeSechzigstel()` braucht deshalb KEINE eigene TDM-Gefecht-Behandlung
+  // (nachgesehen, nicht angenommen): ihr `istKampf(disc)`-Zweig greift nur, solange
+  // `stepSim()` den alten kontinuierlichen Pfad erreicht -- der Replay-Abfang gleich am Kopf
+  // von `stepSim()` (s. dort) kehrt fuer TDM vorher zurueck.
+
+  // DIESELBE ROLLENAUSWAHL WIE build()s TDM-Zweig, hier als eigene Funktion, damit Headless-
+  // Buchung (spieleTdmGefecht) und Live-Anzeige (build()) garantiert dieselben zwei Seiten
+  // sehen — "gezeigt = gebucht" entsteht aus DIESER einen Implementierung, nicht aus zwei
+  // Kopien, die auseinanderlaufen koennten. SQUAD/OPP/place sind globale, aus
+  // `window.__olyArenaKader` gefuellte Singletons (s. "BRUECKE ZUR ECHTEN APP"), deshalb ohne
+  // `disc`-Abhaengigkeit aufrufbar.
+  function tdmDuellRoster(){
+    const d="tdm", n=jeSeiteVon(d);
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    return {mine,gegner,n};
+  }
+
+  // HEADLESS-EINSTIEGSPUNKT, exakt im Format von `spieleFeldspiel()`/`spieleBuehneDuell()`
+  // (s. arena-headless-runner.ts, "ARENA_KAMPF_DISCIPLINE_IDS"): EIN Aufruf, EIN fertiges
+  // Ergebnis, unabhaengig von der aktuell gezeigten `disc`. `seiten`/`boxscore` tragen
+  // dieselben Groessen, die `computeIndividualBoxscorePpsFromFixtureResults()`/
+  // `runBattleModeArenaMatchday()` (battle-mode-arena-team-points.ts) fuer jede andere
+  // resolved Disziplin schon lesen.
+  function spieleTdmGefecht(fd,saat){
+    if(fd!=="tdm")return null;
+    const {mine,gegner,n}=tdmDuellRoster();
+    if(!mine.length||!gegner.length)return null;
+    const g=tdmGefecht([mine,gegner],saat,n);
+    return {disziplin:fd, seiten:[g.teams[0].punkte,g.teams[1].punkte],
+      boxscore:g.kaempfer.map(k=>({name:k.n, wert:k.wert}))};
+  }
+
+  // ANMARSCH (Sekunden): keine "Orte", zu denen gelaufen wird (anders als Battlefields
+  // BF_REPLAY_ANMARSCH=6) -- nur eine kurze Pause, bevor der erste Takt faellt.
+  const TDM_REPLAY_ANMARSCH=3;
+  // `null` ausserhalb TDM oder vor dem ersten `tdmReplayStarten()`-Aufruf.
+  let tdmReplay=null;
+
+  // build()s TDM-Zweig ruft dies NACH dem Bau von U (s. dort) -- `g` ist dasselbe Objekt, das
+  // `tdmGefecht()` zurueckgibt; `g.gefecht.takte` ist das fertige Takt-Protokoll aus
+  // `tdmSchlagwechsel()`. `taktSek` kommt aus `TDM_GEFECHT` (additiv ergaenzt, s.
+  // TDM_GEFECHT_GRUND oben) -- reiner Anzeige-Takt, beeinflusst `tdmGefecht()` selbst nicht.
+  function tdmReplayStarten(g){
+    tdmReplay={g, erledigt:new Set(), ende:TDM_REPLAY_ANMARSCH+g.gefecht.gespielt*TDM_GEFECHT.taktSek};
+  }
+  const tdmReplayAktiv=()=>disc==="tdm"&&!!tdmReplay;
+
+  // EIN KO OHNE RESPAWN (s. Kopfkommentar oben): schlanke eigene Buchfuehrung statt
+  // `schalteAus()`. `still`: nur die Zahlen nachziehen (Endstand-Aufholen beim Replay-Ende),
+  // ohne Ticker-Zeile/Highlight-Drosselung anzufassen.
+  function tdmReplayKo(tg,von,still){
+    tg.st.tode++;
+    if(von){ von.st.ko++; verteileKo(tg,von); }
+    tg.down=true;
+    if(still)return;
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+    // ANDERS ALS schalteAus()s `disc!=="tdm"`-Ausschluss: im neuen, respawnfreien Protokoll
+    // IST "Seite ohne Stehende" ein echter, endgueltiger Zustand (nicht mehr ein Zufallsbild
+    // zwischen zwei Respawns) -- "entscheidend" gilt deshalb hier bewusst auch fuer TDM.
+    const entscheidend=live(tg.side).length===0;
+    const big=kampfGrossDrosseln(ersteAusschaltung||entscheidend, ersteAusschaltung||entscheidend);
+    const kind=kampfKoKind(entscheidend,false,false,ersteAusschaltung);
+    feed(tg.side,tg.n+" fällt.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von?von.n:undefined,"ereignis");
+  }
+
+  // EIN TAKT-EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN — dieselbe Bauart wie
+  // `bfPodReplayEreignis()`, ohne Orte/Eroberung (TDM hat beides nicht). `still`: nur den
+  // Endzustand nachziehen (Zahlen, ohne Spur/Schwebeschrift/Feed-Zeile).
+  function tdmReplayEreignis(e,still){
+    const U_=(i)=>i!=null?U[i]:null;
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const d=e.wucht||0;
+        Z.hp=Math.max(0,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A){A.tgt=Z; if(!still)A.lunge=0.16;} break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02));
+        if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+          feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": { const Z=U_(e.ziel); if(Z&&!Z.down)tdmReplayKo(Z,U_(e.wer),still); break; }
+      default: break;
+    }
+  }
+
+  // DER REPLAY-TAKT. `dt` wie jeder andere `stepSim()`-Aufruf. Bewegung bleibt bewusst
+  // einfach (kein Orte-System wie bei Battlefield): wer noch steht, ruckt beim eigenen
+  // Treffer kurz auf sein Ziel zu (`lunge`, s. tdmReplayEreignis) — dieselbe Anzeige-Geste,
+  // die der alte Echtzeit-Zweikampf fuer Nahkampf-Treffer ohnehin schon nutzt.
+  function tdmReplaySchritt(dt){
+    t+=dt;
+    const R=tdmReplay, g=R.g, D=TDM_GEFECHT.taktSek, takte=g.gefecht.takte, gespielt=g.gefecht.gespielt;
+    const takt=t<TDM_REPLAY_ANMARSCH?0:Math.min(gespielt,1+Math.floor((t-TDM_REPLAY_ANMARSCH)/D));
+    const imTakt=takt>=1?takte[takt-1]:null;
+    const taktStart=TDM_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    for(const u of U)u.lunge=Math.max(0,(u.lunge||0)-dt);
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=takt+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben";
+        const zeitpunkt=istSchlag?0.12+0.66*(((e.wer??0)*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        tdmReplayEreignis(e,false);
+      });
+    }
+    if(t>=R.ende){
+      takte.forEach((tk,ti)=>tk.ereignisse.forEach((e,ei)=>{
+        const schl=(ti+1)+":"+ei;
+        if(!R.erledigt.has(schl)){ R.erledigt.add(schl); tdmReplayEreignis(e,true); }
+      }));
+      finish();
+    }
+    updateHud();
   }
 
   // ===================================================================================
@@ -61045,13 +61246,15 @@
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
-    // TDM-GEFECHT-PROTOTYP (10.11., s. Kopfkommentar bei TDM_GEFECHT_GRUND oben): NUR fuer die
-    // Mess-/Kalibrierskripte dieses Prototyps. Nicht an irgendeinen Buchungs- oder Anzeigepfad
-    // angeschlossen -- TDM laeuft produktiv unveraendert ueber die PPS-Duell-Bruecke.
+    // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
+    // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine
+    // Rechenfunktion (auch von den Mess-/Kalibrierskripten direkt genutzt), `spieleTdmGefecht`
+    // ist der Headless-Einstiegspunkt (s. arena-headless-runner.ts).
     tdmGefecht,
     tdmGefechtSonde,
     tdmGefechtEinfluss,
     tdmGefechtParameter,
+    spieleTdmGefecht,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
@@ -62693,5 +62896,18 @@
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>PP_MATRIX_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
+
+  // BOOTSTRAP-AUFRUF (verschoben hierher bei der TDM-Gefecht-Verdrahtung 11.11., urspruenglich
+  // direkt nach `zieheFormkarten(20260823)` weit oben im Modul, s. Kommentar dort): `reset()`
+  // ruft `build()` synchron fuer die Standarddisziplin ("tdm", `let disc="tdm"` oben) auf, und
+  // TDM baut seit dieser PR ueber `tdmGefecht()`/`tdmSchlagwechsel()` -- Funktionen, die ERST
+  // HIER, am Modulende, lexikalisch alle initialisiert sind (mdffaZufall/mdffaMisch,
+  // bfPodPlatzierungAus, TDM_GEFECHT u.a. sind `let`/`const`, keine gehobenen `function`-
+  // Deklarationen). An der alten Stelle waere jeder dieser Bezeichner noch in seiner Temporal-
+  // Dead-Zone gewesen -- nachgemessen beim ersten Playwright-Smoke-Test dieser PR
+  // ("Cannot access 'TDM_GEFECHT'/'mdffaMisch' before initialization"). Reine Verschiebung,
+  // keine inhaltliche Aenderung: `window.__arena` steht jetzt sogar schon VOR diesem Aufruf
+  // (vorher erst danach), jeder bestehende Aufrufer wartet ohnehin erst auf dessen Erscheinen.
+  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
 
 })();

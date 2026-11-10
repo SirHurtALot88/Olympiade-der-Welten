@@ -197,3 +197,57 @@ Bestehendes sich geändert hat. Ob TDM damit produktiv auf dieses Gefecht umgest
 Anbindung über `MOTOREN.tdm`/Headless-Runner, Abgleich mit der PPS-Brücke,
 `ARENA_RESOLVED_DISCIPLINE_IDS`-Eintrag, Anzeige in der Arena) ist der Folgeauftrag, den die
 Aufgabe ausdrücklich NICHT verlangt hat.
+
+## 9. Verdrahtung (11.11.) — der Folgeauftrag ist jetzt erledigt
+
+**Neu nachgemessen auf dem aktuellen `main`-Stand** (seit 10.11. u. a. der „gezeigt = gebucht"-Fix
+PR #1372, `anzeigeSechzigstel()`): rho je Gefecht (Median) 0,800–0,827 über k=2..6 und beiden
+Saatströmen — leicht niedriger als die ursprünglichen 0,808–0,829 vom Prototyp-Tag, aber weiterhin
+klar über der 0,80-Schranke. Pp-Abweichung (k=6, 24 Läufe) 16,8 / 14,2 — unverändert klar unter 25.
+Befehl: `node scripts/miss-tdm-gefecht-abnahme.mjs 24 --je-seite=2..6 --pp --stroeme=0,10000000`.
+
+**Geprüft und verneint: `tdmGefecht()` braucht den Anzeige-Treue-Fix (PR #1372) nicht.** Jener Fix
+behebt eine Tick-Granularitäts-Divergenz zwischen `anzeigeSechzigstel()` (Live-Anzeige) und der
+Buchung für Disziplinen, die kontinuierliche Physik über `stepSim()` fahren (`istKampf(disc)`u.a.
+TDMs ALTE Echtzeit-Simulation). `tdmGefecht()`/`tdmSchlagwechsel()` rufen `stepSim()` nie — das
+Gefecht ist VOR dem ersten Tick fertig entschieden (ein geschlossener, diskreter Takt-Loop ohne
+`dt`-Abhängigkeit). Nachgemessen, nicht angenommen: `tdmReplaySchritt()` (s. unten) liest nur das
+fertige Protokoll ab, ruft nirgends `anzeigeSechzigstel()`.
+
+**Verdrahtet, analog zu Battlefield-Pod/Mini-DM-FFA im Prinzip ("Gefecht statt Echtzeit-Tick"),
+aber architektonisch wie Bühne/Bahn** (TDM ist ein normales Zweier-Duell, kein Vier-Team-Pod):
+
+- **Neues Kampf-Chassis** `ARENA_KAMPF_DISCIPLINE_IDS` (`lib/battle/arena-headless-runner.ts`),
+  dispatcht auf `window.__arena.spieleTdmGefecht(fd, saat)` — derselbe Rückgabe-Vertrag
+  (`{disziplin, seiten, boxscore}`) wie `spieleFeldspiel()`/`spieleBuehneDuell()`.
+- **`spieleTdmGefecht()`** (battle-mode.engine.js): selbstständiger Headless-Einstiegspunkt, liest
+  SQUAD/OPP/place direkt (unabhängig von `disc`), baut dieselben zwei Seiten wie `build()`s
+  TDM-Zweig (`tdmDuellRoster()`, EINE Implementierung für Headless UND Live-Anzeige).
+- **`TDM_GEFECHT_VORLAUF_AKTIV`** (`lib/battle/arena-resolved-disciplines.ts`) plus
+  `istTdmGefechtVorlaufAktiv()`/`OLY_TDM_GEFECHT_VORLAUF=aus` (`lib/battle/arena-vorlauf-service.ts`):
+  derselbe Server-Notschalter-Typ wie bei Mini-DM-FFA/Battlefield-Pod/Bahn-Pod, hier aber als
+  zusätzliche Einschränkung der generischen `ARENA_RESOLVED_DISCIPLINE_IDS`-Mitgliedschaft (TDM
+  ist, anders als die drei Pod-Disziplinen, tatsächlich Mitglied dieser Menge).
+- **`ARENA_RESOLVED_DISCIPLINE_IDS`/`ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS`**: TDM ist jetzt
+  Mitglied beider Mengen — sechzehnte gewertete Disziplin.
+- **PPS-Referenz gezogen** (`scripts/ziehe-buehne-pps-referenz.ts tdm`, Chassis `"kampf"`) gegen
+  das live-save-Abbild vom 10.11., `data/generated/tdm-pps-referenz.json`, Eintrag in
+  `ARENA_IMPACT_KONFIG_JE_DISZIPLIN` (`lib/resolve/battle-mode-arena-team-points.ts`).
+- **Live-Anzeige**: `build()`s TDM-Zweig ruft jetzt `tdmGefecht()` mit derselben Saat/denselben
+  Seiten wie `spieleTdmGefecht()` und übergibt das Ergebnis an `tdmReplayStarten()`/
+  `tdmReplaySchritt()`/`tdmReplayEreignis()` (neue Funktionen, Vorbild `bfPodReplay*`, aber ohne
+  Orte/Eroberung/Rotation und ohne Respawn — `tdmSchlagwechsel()` kennt keinen). Ein einziger
+  früher Return am Kopf von `stepSim()` (`if(tdmReplayAktiv()){tdmReplaySchritt(dt);return;}`,
+  dasselbe Muster wie `KP.pod.replay`) fängt TDM ab, bevor die alte kontinuierliche Physik
+  erreicht wird — die alte Echtzeit-Simulation bleibt im Motor stehen, ist für TDM aber
+  unerreichbar geworden. "Gezeigt = gebucht" entsteht hier NICHT über einen Tick-Taktabgleich,
+  sondern dadurch, dass Headless und Live-Anzeige dieselbe Funktion mit denselben Eingaben rufen.
+
+**Fingerabdruck** (`node scripts/pruefe-wertung-fingerabdruck.mjs`, main vs. dieser Branch, 69
+Einträge): **nur** `spiele tdm 1/7/42` und `disziplinProbe tdm` ändern sich (von der alten
+Echtzeit-Simulation zum neuen Gefecht, erwartet, da `MOTOREN.tdm.lauf()` denselben
+`stepSim()`-Abfang nutzt) — alle übrigen 66 Einträge, inklusive Mini-DM, Battlefield,
+`spieleArenaDomination`, `spieleBahnPod`, `spieleBattlefieldPod`, bleiben bit-identisch.
+
+**Merge-Status**: beide Pflichtkriterien bestehen auf dem aktuellen `main`-Stand ohne Ausnahme —
+PR ist mergebar nach Chris' Merge-Politik vom 10.11.

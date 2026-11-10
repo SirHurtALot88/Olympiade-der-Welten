@@ -202,6 +202,18 @@ const DISZIPLINEN = {
     wertHerkunft: "bahnTeamstand().punkte, wertung:\"rang\" -- Rangpunkte aus bahnRangliste(), s. spieleBahn()",
     rezeptOrt: "BAHN_ART.climbing, stepSpurt()/bauSpurt()",
   },
+  // ====================== TDM-GEFECHT-VERDRAHTUNG (11.11.) ======================
+  // SECHSTES CHASSIS, `chassis:"kampf"` -- `window.__arena.spieleTdmGefecht()` statt einer der
+  // Buehnen-/Bahn-Funktionen oben (s. ARENA_KAMPF_DISCIPLINE_IDS, arena-headless-runner.ts).
+  // `katalogStandardgroesse` aus lib/data/dataAdapter.ts (Discipline.playerCount tdm = 3) --
+  // NICHT 6 (ARENA_ART.tdm.jeSeite, die Motor-Feldgroesse, waere hier wie bei jeder anderen
+  // Disziplin der falsche Wert), einzeln nachgesehen.
+  tdm: {
+    chassis: "kampf",
+    katalogStandardgroesse: 3,
+    wertHerkunft: "g.kaempfer[].wert (Anteil am Gesamtbeitrag des Gefechts, 0..100), s. tdmGefecht()/spieleTdmGefecht()",
+    rezeptOrt: "TDM_GEFECHT_GRUND, tdmKaempfer()/tdmSchlagwechsel()",
+  },
 } as const;
 
 type DisziplinId = keyof typeof DISZIPLINEN;
@@ -401,6 +413,8 @@ function schreibeErgebnis(
       ? "spieleBuehneDuell"
       : konfig.chassis === "gauntlet"
       ? "spieleBuehneGauntlet"
+      : konfig.chassis === "kampf"
+      ? "spieleTdmGefecht"
       : "spieleBuehneAuftritt";
   const feldgroessen: Record<string, unknown> = {};
   for (const n of FELDGROESSEN) {
