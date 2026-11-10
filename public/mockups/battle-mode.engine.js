@@ -46985,6 +46985,109 @@
     return {x:p.x+vx, y:p.y+vy};
   }
 
+  // ================= S-N5b STATIONSDUELL MIT SIEGER (Chris 10.11.) =================
+  // Chris' Befund, woertlich: "hier steht immer was von duellen, die sieht man aber gar nicht".
+  // Die alte S-N5-Tafel zeigte zwei UNABHAENGIGE Rest-Stationsbalken -- kein Sieger, keine
+  // Auseinandersetzung. Jetzt: stehen ein Heim- und ein Gastlaeufer gleichzeitig an derselben
+  // Station, ist das ein Duell mit Ausgang. SIEGER = wer die Station ZUERST verlaesst. Das ist
+  // kein zweiter Wuerfel, sondern die Station selbst: ihre Dauer haengt am Sub-Skill des
+  // Stationstyps (`hindernisTypen`: HUERDE/STROHBALLEN -> TECHNIK, BALKEN/WASSERGRABEN ->
+  // WENDIGKEIT, PALISADE/SEIL/MAUER -> WUCHT; s. Stationspreis in stepSpurt), plus Ankunftszeit
+  // und Kriechanteil. Gleichstand im selben Schritt: wer tiefer unter 0 gerutscht ist (frueher
+  // im Schritt frei war), dann der hoehere Stations-Sub-Skill, dann Heim.
+  // DESIGN-VORGABE (Chris 10.11.): "Gewonnene duelle koennen fuer die Spieler auch in die PPs mit
+  // beitragen, bringen dem team aber keine zusaetzlichen punkte fuers scoring". Darum:
+  //  - REINE BUCHHALTUNG: liest u.huerde/u.stationIdx/u.pos/u.fertig, schreibt NICHTS am Laeufer
+  //    und ruft kein rr(). Der Zustand liegt in einer WeakMap NEBEN dem Laeufer -- so bleibt
+  //    sogar das Rennprotokoll (rennFertig, serialisiert vom Wertungs-Fingerabdruck)
+  //    zeichengleich, und Rennordnung/Teamstand (`bahnTeamstand()`) koennen es nicht sehen.
+  //  - Die Siege gehen nur in spieleBahn()s Boxscore als `duelle` hinaus; die PP-Gutschrift
+  //    passiert Node-seitig (`computeIndividualBoxscorePpsFromFixtureResults()`), `seiten`
+  //    (die Team-Wertung) bleibt unberuehrt.
+  const STATIONSDUELL=new WeakMap();
+  const STATIONSDUELL_ANZEIGE_S=1.6;   // so lange steht "X GEWINNT DAS DUELL" nach dem Ausgang
+  function stationsDuellZustand(u){
+    let z=STATIONSDUELL.get(u);
+    if(!z){ z={gegner:null,station:-1,seit:0,siege:0,letzter:null}; STATIONSDUELL.set(u,z); }
+    return z;
+  }
+  function stationsDuellGegner(u){ const z=STATIONSDUELL.get(u); return z?z.gegner:null; }
+  function stationsDuellSiege(u){ const z=STATIONSDUELL.get(u); return z?z.siege:0; }
+  function stationsDuellTyp(idx){ const T=BA().hindernisTypen; return T&&idx>=0?T[idx%T.length]:null; }
+  function stationsDuellSkill(u,idx){ const t=stationsDuellTyp(idx); return t?(u[t]||0):0; }
+  // Je Schritt einmal (Anfang von stepSpurt): erst offene Duelle aufloesen, dann neue Paare bilden.
+  function stationsDuellSchritt(){
+    if(!BA().spurt||!spurtSaeule.aktiv||istRoute())return;
+    for(const u of LAEUFER){
+      const z=STATIONSDUELL.get(u);
+      if(!z||!z.gegner||u.seite!==0)continue;
+      const g=z.gegner, zg=stationsDuellZustand(g);
+      const uFrei=!(u.huerde>0)||u.fertig!=null, gFrei=!(g.huerde>0)||g.fertig!=null;
+      if(!uFrei&&!gFrei)continue;
+      let sieger;
+      if(uFrei!==gFrei)sieger=uFrei?u:g;
+      else { const hu=u.huerde||0, hg=g.huerde||0;
+        sieger=hu<hg?u:hg<hu?g:(stationsDuellSkill(g,z.station)>stationsDuellSkill(u,z.station)?g:u); }
+      const verlierer=sieger===u?g:u;
+      stationsDuellZustand(sieger).siege++;
+      const ergebnis={sieger,verlierer,station:z.station,t:rennT};
+      z.letzter=ergebnis; zg.letzter=ergebnis; z.gegner=null; zg.gegner=null;
+      if(!stumm)feedRoutine(sieger.seite,sieger.n+" gewinnt das Duell am "+
+        (((BA().hindernisNamen||[])[z.station])||"Hindernis")+" gegen "+verlierer.n+".");
+    }
+    const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0
+      &&!stationsDuellGegner(o));
+    for(const a of an){
+      if(a.seite!==0||stationsDuellGegner(a))continue;
+      let b=null, best=0.03;
+      for(const o of an){
+        if(o.seite!==1||o.stationIdx!==a.stationIdx||stationsDuellGegner(o))continue;
+        const d=Math.abs(o.pos-a.pos); if(d<best){ b=o; best=d; }
+      }
+      if(!b)continue;
+      const za=stationsDuellZustand(a), zb=stationsDuellZustand(b);
+      za.gegner=b; zb.gegner=a; za.station=zb.station=a.stationIdx; za.seit=zb.seit=rennT;
+    }
+  }
+  // ANZEIGE (nur gelesen von laeuferXY/Sprite/Tafel): wie weit der Zug zum Vorne-Liegenden steht.
+  // Vorne liegt, wer weniger Rest-Stationszeit hat -- also genau der, der zuerst frei sein wird.
+  // Der Zeiger startet in der Mitte und laeuft ueber die Duelldauer bis zum vollen Abstand, so
+  // dass er beim Ausgang beim Sieger steht. Rueckgabe -1..1 aus Sicht des Heimlaeufers (+ = vorn).
+  function stationsDuellZug(a,b){
+    const za=STATIONSDUELL.get(a); if(!za)return 0;
+    const ha=Math.max(0,a.huerde||0), hb=Math.max(0,b.huerde||0);
+    const norm=0.35*Math.max(a.stationDauer||0,b.stationDauer||0,0.2);
+    const lauf=Math.max(0,rennT-za.seit), fortschritt=lauf/(lauf+Math.min(ha,hb)+1e-6);
+    return Math.max(-1,Math.min(1,(hb-ha)/norm))*fortschritt;
+  }
+  // Sprite-Versatz in Laufrichtung: im Duell schiebt sich der Vorne-Liegende sichtbar nach vorn,
+  // der andere wird zurueckgedrueckt (Tauzieh-Muster wie buehneTauziehVersatz); nach dem Ausgang
+  // springt der Sieger kurz nach vorn. Rein kosmetisch, u.pos bleibt der Motor-Wert.
+  function stationsDuellVersatz(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return 0;
+    const z=STATIONSDUELL.get(u); if(!z)return 0;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug;
+      return buehneTauziehVersatz(meins,1,6)+Math.sin(rennT*22+u.seite*Math.PI)*1.2;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; if(da>=0&&da<0.45)return 8*(1-da/0.45); }
+    return 0;
+  }
+  // Stoss-Pose (dieselbe vorhandene Pose wie beim Rempler, `lunge`): im Duell drueckt abwechselnd
+  // jeder, der Vorne-Liegende laenger; beim Ausgang stoesst sich der Sieger kurz ab.
+  function stationsDuellStoss(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return false;
+    const z=STATIONSDUELL.get(u); if(!z)return false;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug, phase=((rennT/0.6)+(u.seite?0.5:0))%1;
+      return phase<0.5+0.3*meins;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; return da>=0&&da<0.3; }
+    return false;
+  }
+
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
@@ -47005,7 +47108,7 @@
       const L=BA().jokerLaenge||1, p=Math.max(0,Math.min(1,1-u.umwegRest/L));
       return {x:camX(u.pos)+Math.sin(p*Math.PI)*14, y:bahnY(u.bahnZ)+Math.sin(p*Math.PI)*34};
     }
-    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
+    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0)+stationsDuellVersatz(u), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
     // Spurwechsel weich interpoliert) wird zum Versatz QUER zur Route. Die Spur-Mechanik
@@ -48276,6 +48379,8 @@
   function stepSpurt(dt){
     if(done)return;
     rennT+=dt;
+    // S-N5b: Stationsduelle buchen (reine Buchhaltung neben dem Laeufer, s. stationsDuellSchritt).
+    stationsDuellSchritt();
     // BROADCAST-HUD: Verlaufspuffer je Seite mitschreiben (nur push, s. Deklaration
     // an fortschrittVerlauf oben). Push-only bei echtem Fortschritt haelt den
     // Puffer klein und monoton in `p`, genau was staffelZeitDelta fuer die
@@ -50408,7 +50513,8 @@
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // S-N5b: dieselbe Pose auch im Stationsduell (stationsDuellStoss, rein kosmetisch).
+        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
@@ -50733,32 +50839,86 @@
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
-    // S-N5 STATIONSDUELL-TAFEL (Spurt, Klasse A, nur mit QA-Schalter `spurtSaeule`): stehen
-    // ein Heim- und ein Gastlaeufer gleichzeitig an DERSELBEN Station (innerhalb 0,03
-    // Strecke), zeigt eine kleine Tafel beider Rest-Stationszeiten als Balken — "wer kommt
-    // zuerst los?", der Positionskampf, der sonst unsichtbar im Hindernis passiert. Liest nur
-    // u.huerde/u.stationDauer/u.stationIdx, schreibt nichts.
+    // S-N5b STATIONSDUELL-TAFEL MIT SIEGER (Chris 10.11.: "hier steht immer was von duellen, die
+    // sieht man aber gar nicht"). `spurtSaeule.aktiv` ist der STANDARD (true), die Tafel laeuft
+    // also live. Vorher: zwei unabhaengige Rest-Stationsbalken ohne Ausgang. Jetzt EIN
+    // Tauzieh-Balken (Heim links/orange, Gast rechts/blau), dessen Zeiger sich ueber die
+    // Duelldauer zum Vorne-Liegenden schiebt (stationsDuellZug), dazu der entscheidende Skill der
+    // Station; nach dem Ausgang ein Aufblitzen am Sieger und "NAME GEWINNT DAS DUELL" fuer
+    // STATIONSDUELL_ANZEIGE_S Sekunden. Liest nur, schreibt nichts (s. stationsDuellSchritt).
     if(BA().spurt && spurtSaeule.aktiv && !istRoute()){
-      const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0);
-      let paar=null;
-      for(const a of an){ if(a.seite!==0)continue;
-        const b=an.find(o=>o.seite===1&&o.stationIdx===a.stationIdx&&Math.abs(o.pos-a.pos)<0.03);
-        if(b){ paar=[a,b]; break; } }
-      if(paar){
-        const sx=camX(BA().hindernisse[paar[0].stationIdx]);
-        const sy=Math.min(bahnY(paar[0].bahnZ),bahnY(paar[1].bahnZ))-58;
-        const name=(BA().hindernisNamen||[])[paar[0].stationIdx]||("STATION "+(paar[0].stationIdx+1));
-        ctx.save(); ctx.globalAlpha=0.92;
-        ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(sx-62,sy-12,124,38);
-        ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
-        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+name,sx,sy-3);
-        paar.forEach((o,k)=>{
-          const rest=Math.max(0,Math.min(1,o.huerde/o.stationDauer)), yy=sy+5+k*11;
-          ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(sx-20,yy,76,6);
-          ctx.fillStyle=o.seite===0?"#f2a03d":"#45b0c9"; ctx.fillRect(sx-20,yy,76*rest,6);
-          ctx.textAlign="right"; ctx.font="600 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
-          ctx.fillStyle="#dfe4ee"; ctx.fillText(o.n.slice(0,9),sx-23,yy+6);
-        });
+      const SKILLWORT={TECHNIK:"TECHNIK",WENDIGKEIT:"WENDIGKEIT",WUCHT:"WUCHT"};
+      const namen=BA().hindernisNamen||[];
+      const stName=i=>namen[i]||("STATION "+(i+1));
+      const schrift=(g,px)=>g+" "+px+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      const farbe=s=>s===0?"#f2a03d":"#45b0c9";
+      // ORT DER TAFEL: frueher 58 px UEBER der hoeheren der beiden Bahnen -- bei den oberen
+      // Bahnen lag sie damit unter der Anzeigetafel (nachgemessen im Standbild). Jetzt rechts
+      // neben der Station (dort ist die Bahn frei, beide stehen ja an der Station), auf halber
+      // Hoehe zwischen den beiden Duellanten und in die Spielflaeche geklemmt; zwei duenne
+      // Linien in Teamfarbe zeigen, WER gegen wen ringt.
+      const tafelOrt=(st,a,b)=>({
+        sx:Math.max(80,Math.min(W-80,camX(BA().hindernisse[st])+96)),
+        sy:Math.max(72,Math.min(H-40,(bahnY(a.bahnZ)+bahnY(b.bahnZ))/2-8))});
+      const verbinde=(sx,sy,o)=>{ const p=laeuferXY(o);
+        ctx.strokeStyle=farbe(o.seite); ctx.lineWidth=1.2; ctx.globalAlpha=0.55;
+        ctx.beginPath(); ctx.moveTo(p.x+6,p.y-14); ctx.lineTo(sx-70,sy+7); ctx.stroke(); ctx.globalAlpha=0.94; };
+      const belegt=new Set();
+      // 1) laufende Duelle: je Station die erste Paarung
+      for(const a of LAEUFER){
+        const b=a.seite===0?stationsDuellGegner(a):null;
+        if(!b)continue;
+        const st=STATIONSDUELL.get(a).station;
+        if(belegt.has(st))continue; belegt.add(st);
+        const {sx,sy}=tafelOrt(st,a,b);
+        const zug=stationsDuellZug(a,b);            // + = Heim vorn
+        const typ=stationsDuellTyp(st);
+        ctx.save(); ctx.globalAlpha=0.94;
+        verbinde(sx,sy,a); verbinde(sx,sy,b);
+        ctx.fillStyle="rgba(8,10,14,.84)"; ctx.fillRect(sx-70,sy-13,140,40);
+        ctx.textAlign="center"; ctx.font=schrift(700,8);
+        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+stName(st)+(typ?" · "+(SKILLWORT[typ]||typ):""),sx,sy-3);
+        // Tauzieh-Balken: Mitte = offen, Zeiger wandert zum Vorne-Liegenden.
+        const bw=56, by=sy+4;
+        ctx.fillStyle="rgba(242,160,61,.22)"; ctx.fillRect(sx-bw,by,bw,7);
+        ctx.fillStyle="rgba(69,176,201,.22)"; ctx.fillRect(sx,by,bw,7);
+        const zx=sx-buehneTauziehVersatz(zug,1,bw);
+        ctx.fillStyle=zug>=0?farbe(0):farbe(1);
+        ctx.fillRect(Math.min(sx,zx),by,Math.abs(zx-sx),7);
+        ctx.fillStyle="#ffffff"; ctx.fillRect(zx-1.5,by-2,3,11);
+        ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillRect(sx-0.5,by-1,1,9);
+        ctx.font=schrift(600,7.5);
+        ctx.textAlign="left"; ctx.fillStyle=zug>0.05?farbe(0):"#dfe4ee"; ctx.fillText(a.n.slice(0,11),sx-bw,by+18);
+        ctx.textAlign="right"; ctx.fillStyle=zug<-0.05?farbe(1):"#dfe4ee"; ctx.fillText(b.n.slice(0,11),sx+bw,by+18);
+        ctx.restore();
+      }
+      // 2) frisch entschiedene Duelle: Aufblitzen am Sieger + Siegerzeile
+      const gezeigt=new Set();
+      for(const u of LAEUFER){
+        const z=STATIONSDUELL.get(u); const e=z&&z.letzter;
+        if(!e||e.sieger!==u||gezeigt.has(e.station)||belegt.has(e.station))continue;
+        const da=rennT-e.t; if(da<0||da>STATIONSDUELL_ANZEIGE_S)continue;
+        gezeigt.add(e.station);
+        const p=laeuferXY(u), {sx,sy}=tafelOrt(e.station,e.sieger,e.verlierer);
+        const aus=Math.max(0,Math.min(1,(STATIONSDUELL_ANZEIGE_S-da)/0.4));
+        ctx.save();
+        if(da<0.4){
+          const k=da/0.4;
+          ctx.globalAlpha=1-k; ctx.strokeStyle=farbe(u.seite); ctx.lineWidth=3;
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,10+26*k,0,Math.PI*2); ctx.stroke();
+          ctx.fillStyle="rgba(255,255,255,"+(0.55*(1-k)).toFixed(3)+")";
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,9*(1-k)+3,0,Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha=aus;
+        const z1=u.n.toUpperCase()+" GEWINNT DAS DUELL", z2=stName(e.station)+" · gegen "+e.verlierer.n+" · +Duell-PP";
+        ctx.font=schrift(700,9.5); const w1=ctx.measureText(z1).width;
+        ctx.font=schrift(600,7.5); const w2=ctx.measureText(z2).width;
+        const bw=Math.max(w1,w2)/2+8;
+        ctx.fillStyle="rgba(8,10,14,.86)"; ctx.fillRect(sx-bw,sy-13,bw*2,30);
+        ctx.fillStyle=farbe(u.seite); ctx.fillRect(sx-bw,sy-13,3,30);
+        ctx.textAlign="center";
+        ctx.font=schrift(700,9.5); ctx.fillStyle=farbe(u.seite); ctx.fillText(z1,sx,sy);
+        ctx.font=schrift(600,7.5); ctx.fillStyle="#dfe4ee"; ctx.fillText(z2,sx,sy+11);
         ctx.restore();
       }
     }
@@ -61029,7 +61189,12 @@
       const st=bahnTeamstand();
       const namen=M.namen();
       const punkteVonName=new Map(LAEUFER.map(u=>[u.n, st.punkte?(st.punkte.get(u.id)??0):0]));
-      const boxscore=namen.map(n=>({name:n, wert:punkteVonName.get(n)??0}));
+      // S-N5b: gewonnene Stationsduelle als EIGENES Feld (nur Spurt) -- reine PP-Nebenspur fuer
+      // computeIndividualBoxscorePpsFromFixtureResults(); `wert` und `seiten` bleiben unberuehrt.
+      const duelleVonName=BAHN_ART[bd].spurt?new Map(LAEUFER.map(u=>[u.n, stationsDuellSiege(u)])):null;
+      const boxscore=namen.map(n=>duelleVonName
+        ?({name:n, wert:punkteVonName.get(n)??0, duelle:duelleVonName.get(n)??0})
+        :({name:n, wert:punkteVonName.get(n)??0}));
       const seiten=[st.seiten[0], st.seiten[1]];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
