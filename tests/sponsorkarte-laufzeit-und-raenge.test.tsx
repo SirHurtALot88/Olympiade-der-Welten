@@ -25,6 +25,7 @@ import {
   buildSponsorOfferTermForecast,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { buildSponsorOfferPresentation, buildSponsorRankTierRows } from "@/lib/sponsor/sponsor-offer-presenter";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import type { GameState, SponsorOffer } from "@/lib/data/olyDataTypes";
@@ -151,25 +152,43 @@ describe("Der Laufzeit-Ausblick sagt, WOHER der Faktor kommt", () => {
 describe("Die Rangtabelle einer Vertragssaison", () => {
   const zahlen = Array.from({ length: 32 }, (_, index) => 70 - index * 0.5);
 
-  it("nennt Meister bis Platz 32 mit dem Betrag DIESER Saison", () => {
+  it("nennt Meister bis Platz 16 mit dem Betrag DIESER Saison (16er-Liga, alle 2 Plaetze)", () => {
     const html = renderToStaticMarkup(
-      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={25} formatCash={(v) => v.toFixed(1)} />,
+      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={11} formatCash={(v) => v.toFixed(1)} />,
+    );
+    for (const label of ["Meister", "Top 2", "Top 4", "Top 6", "Top 8", "Top 10", "Top 12", "Top 14", "Platz 16"]) {
+      expect(html).toContain(label);
+    }
+    expect(html).not.toContain("Top 28");
+    expect(html).not.toContain("Platz 32");
+    // Meister = Rang 1 = 70,0; Platz 16 = 70 − 15·0,5 = 62,5.
+    expect(html).toContain(">70.0<");
+    expect(html).toContain(">62.5<");
+  });
+
+  it("nennt im Legacy-32er-Modus weiter Meister bis Platz 32", () => {
+    const html = renderToStaticMarkup(
+      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={25} formatCash={(v) => v.toFixed(1)} leagueSize={32} />,
     );
     for (const label of ["Meister", "Top 4", "Top 8", "Top 12", "Top 16", "Top 20", "Top 24", "Top 28", "Platz 32"]) {
       expect(html).toContain(label);
     }
-    // Meister = Rang 1 = 70,0; Platz 32 = 70 − 31·0,5 = 54,5.
-    expect(html).toContain(">70.0<");
+    // Platz 32 = 70 − 31·0,5 = 54,5.
     expect(html).toContain(">54.5<");
   });
 
   it("hebt die Stufe hervor, die der aktuelle Rang gerade haelt", () => {
-    // Rang 25 haelt „Top 28", nicht „Top 24".
+    // Rang 11 haelt „Top 12", nicht „Top 10".
     const html = renderToStaticMarkup(
-      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={25} formatCash={(v) => v.toFixed(1)} />,
+      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={11} formatCash={(v) => v.toFixed(1)} />,
     );
     const zeile = html.slice(html.indexOf('<tr class="is-current">'));
-    expect(zeile.slice(0, 200)).toContain("Top 28");
+    expect(zeile.slice(0, 200)).toContain("Top 12");
+    // Legacy: Rang 25 haelt „Top 28", nicht „Top 24".
+    const legacy = renderToStaticMarkup(
+      <SponsorSeasonRankTable rankPayouts={zahlen} currentTeamRank={25} formatCash={(v) => v.toFixed(1)} leagueSize={32} />,
+    );
+    expect(legacy.slice(legacy.indexOf('<tr class="is-current">')).slice(0, 200)).toContain("Top 28");
   });
 
   it("kommt ohne bekannten Rang aus, statt eine Stufe zu erfinden", () => {
@@ -250,6 +269,8 @@ describe("Der Mittelteil der Sponsorkarte zeigt die Zahlen, die die lib liefert"
         baseCash: offer.components.find((component) => component.kind === "base")?.rewardCash ?? 0,
         rankLadder: buildOfferRankPayoutLadderPreview(gameState, offer),
         includeFloorRung: true,
+        // Derselbe Rangraum wie die Karte: Legacy-32 hier, liga-lokal 16 bei Liga-Split.
+        leagueSize: sponsorRangraumFuer(gameState),
       });
       expect(stufen.length).toBeGreaterThan(5);
       const text = nurText(aufklapper);

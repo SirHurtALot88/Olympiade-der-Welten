@@ -1,10 +1,7 @@
 "use client";
 
-import {
-  SPONSOR_RANK_FLOOR_AT,
-  SPONSOR_RANK_FLOOR_LABEL,
-  SPONSOR_RANK_LADDER_RUNGS,
-} from "@/lib/sponsor/sponsor-offer-presenter";
+import { LEAGUE_SIZE } from "@/lib/season/league-split";
+import { buildSponsorRankLadderRungs, sponsorRankFloorLabel } from "@/lib/sponsor/sponsor-offer-presenter";
 
 /**
  * GEFRAGT: „Wenn man über das jahr drüber hovert würde ich dann auch erwarten dass die rangtabelle
@@ -23,26 +20,29 @@ export function SponsorSeasonRankTable({
   rankPayouts,
   currentTeamRank,
   formatCash,
+  leagueSize = LEAGUE_SIZE,
 }: {
   /** Auszahlung je Liga-Rang 1..32 fuer genau diese Vertragssaison. */
   rankPayouts: number[];
   /** Aktueller Liga-Rang des Teams; `null` blendet die Hervorhebung aus. */
   currentTeamRank: number | null;
   formatCash: (value: number) => string;
+  /** Rangraum des Spielstands (`sponsorRangraumFuer`): 16 bei Liga-Split, 32 bei Legacy-Spielstaenden. */
+  leagueSize?: number;
 }) {
   if (rankPayouts.length === 0) {
     return null;
   }
   const zahlung = (rang: number) => rankPayouts[Math.min(rankPayouts.length, Math.max(1, rang)) - 1] ?? 0;
   // Stark → schwach, wie die Liga sie liest.
-  const zeilen: Array<{ label: string; rankAt: number }> = SPONSOR_RANK_LADDER_RUNGS.map((rung) => ({
+  const zeilen: Array<{ label: string; rankAt: number }> = buildSponsorRankLadderRungs(leagueSize).map((rung) => ({
     label: rung.label,
     rankAt: rung.maxRank,
   })).sort((links, rechts) => links.rankAt - rechts.rankAt);
-  zeilen.push({ label: SPONSOR_RANK_FLOOR_LABEL, rankAt: SPONSOR_RANK_FLOOR_AT });
+  zeilen.push({ label: sponsorRankFloorLabel(leagueSize), rankAt: leagueSize });
 
   // Die BESTE Stufe, deren Schwelle der aktuelle Rang noch haelt. Die Zeilen stehen aufsteigend
-  // nach Schwelle (Meister 1 … Platz 32), also ist das die erste passende — nicht die letzte.
+  // nach Schwelle (Meister 1 … Platz 16), also ist das die erste passende — nicht die letzte.
   const erreicht = currentTeamRank == null ? null : zeilen.find((zeile) => currentTeamRank <= zeile.rankAt) ?? null;
 
   return (

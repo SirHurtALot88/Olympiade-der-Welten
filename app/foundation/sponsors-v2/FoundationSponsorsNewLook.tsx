@@ -33,6 +33,7 @@ import {
   type LeagueSponsorSort,
 } from "@/lib/sponsor/sponsor-offer-presenter";
 import { readContractRankPayoutLadder } from "@/lib/sponsor/sponsor-economy-calibration";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
   getTeamActualSalaryTotal,
@@ -1751,6 +1752,7 @@ export default function FoundationSponsorsNewLook({
                         rankLadder={leagueDetail.rankLadder}
                         currentTeamRank={leagueDetail.row.rank}
                         formatCash={formatSponsorMoney}
+                        leagueSize={sponsorRangraumFuer(gameState)}
                       />
                     </div>
                   ) : null}
