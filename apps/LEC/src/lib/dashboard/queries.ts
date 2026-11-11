@@ -139,6 +139,8 @@ export async function loadArticleAggregates(
       }
     }
 
+    const billbeeVk = article.currentVk !== null && article.currentVk > 0;
+
     return {
       articleId: article.id,
       nameRaw: article.nameRaw,
@@ -147,10 +149,11 @@ export async function loadArticleAggregates(
       stock: article.stock,
       active: article.active,
       hidden: article.hidden,
-      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
-      currentVk: article.ebayPrice ?? article.currentVk,
-      vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
-      vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
+      // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
+      // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
+      currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),
+      vkSource: billbeeVk ? "billbee" : article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
+      vkAt: !billbeeVk && article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
       ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
       codeNameEn: article.codeNameEn,

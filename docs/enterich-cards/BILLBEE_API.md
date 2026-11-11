@@ -1,7 +1,7 @@
 # Billbee-API-Anbindung (LEC)
 
 Die App holt Artikelstamm (Bestand, VK, EK) und die Bestellungen der letzten 365 Tage selbst aus
-Billbee. Beim Serverstart, alle 3 Stunden und per Knopf „Jetzt aktualisieren“ unter Einstellungen.
+Billbee. Beim Serverstart, einmal täglich und per Knopf „Jetzt aktualisieren“ unter Einstellungen.
 Der Datei-Import unter `/import` bleibt als Rückfall.
 
 ## Einrichten (einmalig, im Browser)

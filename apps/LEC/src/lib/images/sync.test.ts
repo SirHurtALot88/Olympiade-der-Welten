@@ -47,8 +47,8 @@ async function article(name: string, extra: { currentVk?: number } = {}) {
 const opts = (f: typeof fetch) => ({ imageDir: dir, fetchFn: f, pageDelayMs: 0, skipFallback: true });
 
 describe("syncArticleImages: aktueller VK live aus dem eBay-Shop", () => {
-  it("setzt den Angebotspreis, und er hat Vorrang vor dem Billbee-Artikelstamm-Preis", async () => {
-    const a = await article("Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st", { currentVk: 5.99 });
+  it("setzt den Angebotspreis; er gilt als VK, wenn Billbee keinen hat", async () => {
+    const a = await article("Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st");
     const f = fakeFetch([tile("111111111", "Yu-Gi-Oh! TST-DE001 Testkarte Ultra Rare NM 1st", "AAAAAAAAAA", "7,49")]);
     const report = await syncArticleImages(db.prisma, opts(f));
     expect(report.priced).toBe(1);
