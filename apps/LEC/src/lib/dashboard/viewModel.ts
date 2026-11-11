@@ -207,6 +207,8 @@ export interface SortimentMarket {
   provenByDemand: boolean;
   soldAt: { qty: number; avg: number; days: 90 | 365 } | null;
   fetchedAt: string;
+  /** Ø 7 Tage gegen Ø 30 Tage am Markt (z. B. -0,12 = 12 % darunter); null ohne beide Werte. */
+  trend7vs30?: number | null;
 }
 
 export interface OperatingQuotas {
@@ -225,6 +227,10 @@ export interface RecommendationLotItem {
    * (`active === false`): dann ist der Bestand per Definition unbekannt, nicht 0 --
    * eine erfundene 0 waere hier schlimmer als eine ehrliche Luecke. */
   boundCapital: number | null;
+  /** Marktwert (Cardmarket) je Stueck, falls bekannt: was ein Abverkauf zum Marktpreis braucht. */
+  marketValue?: number | null;
+  /** Warum der Artikel in der Liste steht (Ladenhueter, langsam, kein Verkauf in 90 T). */
+  why?: string;
 }
 
 export interface Recommendation {
@@ -603,6 +609,7 @@ export function buildSortimentRow(
       provenByDemand: m.provenByDemand,
       soldAt: m.soldAtVk,
       fetchedAt: m.fetchedAt.toISOString(),
+      trend7vs30: a.marketQuote.priceAvg7 != null && a.marketQuote.priceAvg30 != null && a.marketQuote.priceAvg30 > 0 ? a.marketQuote.priceAvg7 / a.marketQuote.priceAvg30 - 1 : null,
     };
   }
 
@@ -854,6 +861,12 @@ export function buildRecommendations(
   // heute noch bringt (siehe KONZEPT §2 Bundle-Falle: Lebenszeit-Zahlen taeuschen).
   for (const c of classified.filter((c) => c.articleClass === "champion")) {
     const row = sortimentByArticleId.get(c.article.articleId);
+    // Nur nachkaufen, wenn der Bestand knapp wird: leer bei laufendem Absatz oder Reichweite unter 1,5 Monaten.
+    // Reicht der Bestand fuer viele Monate, ist ein Nachkauf kein Gewinn, sondern gebundenes Kapital.
+    const cover = row?.stockMonthsCover ?? null;
+    const q90 = c.article.windows["90"]?.qty ?? 0;
+    const lowStock = c.article.stock <= 0 ? q90 > 0 : cover !== null && cover < 1.5;
+    if (row && !lowStock) continue;
     const dbIIPerUnit = row?.dbIIPerUnit ?? 0;
     const dbIIPercentLifetime = row?.dbIIPercent ?? 0;
     const qty90 = c.article.windows["90"]?.qty ?? 0;
@@ -862,7 +875,9 @@ export function buildRecommendations(
       id: `nachkaufen:${c.article.articleId}`,
       kind: "nachkaufen",
       title: `${shortName(c.article.nameRaw)} nachkaufen.`,
-      detail: c.reason,
+      detail:
+        c.reason +
+        (row?.today ? ` Bestand ${c.article.stock} Stk${cover !== null ? ` (reicht ca. ${cover.toFixed(1).replace(".", ",")} Monate)` : ""}. Nachkauf höchstens zu ${row.today.maxEk25 !== null ? row.today.maxEk25.toFixed(2) : "–"} € EK${row.market?.value != null ? `, Marktwert ${row.market.value.toFixed(2)} €` : ""}.` : ""),
       effect: `≈ € ${expectedDbII.toFixed(0)} / 90 T erwartet (DB II ${(dbIIPercentLifetime * 100).toFixed(0)}% · ${dbIIPerUnit.toFixed(2)} €/Stk × ${qty90} Stk)`,
       effectValue: expectedDbII,
       linkQuery: c.article.setCode ?? c.article.nameRaw,
@@ -875,14 +890,24 @@ export function buildRecommendations(
   // FIX 2: boundCapital = Bestand x EK/Stk (siehe `boundCapitalOf`), NICHT mehr der
   // Lebenszeit-EK bereits verkaufter Stuecke. Artikel ohne Bestandsimport (`null`) werden
   // NICHT als 0 mitsummiert (siehe Filter unten), sondern separat ausgewiesen.
+  // Dazu die langsamen Kapitalbinder: Bestand reicht ueber 12 Monate oder seit 90 Tagen nichts verkauft.
   const ladenhueter = classified.filter((c) => c.articleClass === "ladenhueter");
-  if (ladenhueter.length > 0) {
-    const items: RecommendationLotItem[] = ladenhueter
-      .map((c) => ({
+  const slow = classified.filter((c) => {
+    if (c.articleClass === "ladenhueter" || !c.article.active || c.article.stock <= 0) return false;
+    const r = sortimentByArticleId.get(c.article.articleId);
+    const noSale90 = (c.article.windows["90"]?.qty ?? 0) === 0 && (c.article.windows["365"]?.qty ?? 0) > 0;
+    return noSale90 || (r?.stockMonthsCover ?? 0) > 12;
+  });
+  if (ladenhueter.length + slow.length > 0) {
+    const lotRows = [...ladenhueter.map((c) => ({ c, why: "Ladenhüter" })), ...slow.map((c) => ({ c, why: (sortimentByArticleId.get(c.article.articleId)?.stockMonthsCover ?? 0) > 12 ? "Bestand reicht über 12 Monate" : "kein Verkauf in 90 Tagen" }))];
+    const items: RecommendationLotItem[] = lotRows
+      .map(({ c, why }) => ({
         articleId: c.article.articleId,
         nameRaw: c.article.nameRaw,
         setCode: c.article.setCode,
         boundCapital: boundCapitalOf(c.article),
+        marketValue: sortimentByArticleId.get(c.article.articleId)?.market?.value ?? null,
+        why,
       }))
       .sort((a, b) => (b.boundCapital ?? -1) - (a.boundCapital ?? -1));
     const knownItems = items.filter((i): i is RecommendationLotItem & { boundCapital: number } => i.boundCapital !== null);
@@ -895,8 +920,8 @@ export function buildRecommendations(
     recommendations.push({
       id: "lot_bilden",
       kind: "lot_bilden",
-      title: "Ladenhüter zu Lots bündeln.",
-      detail: `${ladenhueter.length} Artikel ohne Velocity (0 Verk. in 365 T trotz Historie) — als Sammlungs-Lot abverkaufen.${unknownNote}`,
+      title: "Kapitalbinder abverkaufen.",
+      detail: `${ladenhueter.length} Ladenhüter (0 Verk. in 365 T) und ${slow.length} langsame Kapitalbinder (Bestand reicht über 12 Monate oder seit 90 Tagen kein Verkauf) — abverkaufen oder als Lot bündeln.${unknownNote}`,
       effect: `≈ € ${boundCapital.toFixed(0)} gebunden`,
       effectValue: boundCapital,
       items: items.slice(0, 50),

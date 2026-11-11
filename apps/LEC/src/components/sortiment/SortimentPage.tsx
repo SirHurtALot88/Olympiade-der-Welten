@@ -223,6 +223,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
   const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
+  const [onlySoldOut, setOnlySoldOut] = useState(false);
+  const [onlyMarketFalling, setOnlyMarketFalling] = useState(false);
   const [onlyNameCheck, setOnlyNameCheck] = useState(false);
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
@@ -330,6 +332,12 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyNameCheck) {
       result = result.filter((r) => r.codeName?.mismatch);
     }
+    if (onlySoldOut) {
+      result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
+    }
+    if (onlyMarketFalling) {
+      result = result.filter((r) => r.stock > 0 && r.market?.trend7vs30 != null && r.market.trend7vs30 < -0.05);
+    }
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
@@ -337,11 +345,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
       result = result.filter((r) => r.active);
     }
     // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
-    if (stockFilter && !showHidden && !normalizedQuery) {
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyMarketFalling, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -357,7 +365,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyMarketFalling || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -475,6 +483,28 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           }}
         >
           nur Ladenhüter
+        </button>
+        <button
+          type="button"
+          className={`chip${onlySoldOut ? " on" : ""}`}
+          onClick={() => {
+            setOnlySoldOut((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Bestand 0, aber in den letzten 90 Tagen verkauft: Nachkauf prüfen"
+        >
+          ausverkauft, lief gut
+        </button>
+        <button
+          type="button"
+          className={`chip${onlyMarketFalling ? " on" : ""}`}
+          onClick={() => {
+            setOnlyMarketFalling((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Marktpreis (Ø 7 Tage) mehr als 5 % unter Ø 30 Tage, Bestand liegt: Preis prüfen, nicht nachkaufen"
+        >
+          Markt fällt, Bestand liegt
         </button>
         <button
           type="button"

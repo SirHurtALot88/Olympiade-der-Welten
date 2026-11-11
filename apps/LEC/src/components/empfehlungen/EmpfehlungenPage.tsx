@@ -227,9 +227,10 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
                         <span style={{ minWidth: 0 }}>
                           {item.nameRaw}
                           {item.setCode && <span className="code" style={{ marginLeft: 8 }}>{item.setCode}</span>}
+                          {item.why && <span style={{ marginLeft: 8, color: "var(--faint)" }}>· {item.why}</span>}
                         </span>
                         <span className="num" style={{ flex: "none", color: "var(--faint)" }}>
-                          {item.boundCapital !== null ? `€ ${item.boundCapital.toFixed(0)}` : "Bestand unbekannt"}
+                          {item.boundCapital !== null ? `€ ${item.boundCapital.toFixed(0)} gebunden` : "Bestand unbekannt"}{item.marketValue != null ? ` · Markt ${item.marketValue.toFixed(2).replace(".", ",")} €` : ""}
                         </span>
                       </div>
                     ))}

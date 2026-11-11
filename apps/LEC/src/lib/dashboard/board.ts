@@ -31,7 +31,7 @@ export function boardGap(row: SortimentRow): BoardGap | null {
   return { euro: 0, percent: 0, target: null };
 }
 
-export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "name";
+export type BoardSortKey = "abweichung" | "marktwert" | "vk" | "marge" | "verkaeufe" | "bestand" | "gewinnMonat" | "kapital" | "reichweite" | "name";
 
 export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   abweichung: "Größte Abweichung",
@@ -40,6 +40,9 @@ export const BOARD_SORT_LABEL: Record<BoardSortKey, string> = {
   marge: "Marge bei Nachkauf",
   verkaeufe: "Verkäufe (365 T)",
   bestand: "Bestand",
+  gewinnMonat: "Gewinn je Monat",
+  kapital: "Gebundenes Kapital",
+  reichweite: "Reichweite (längste zuerst)",
   name: "Name",
 };
 
@@ -75,6 +78,12 @@ export function sortBoard(rows: readonly SortimentRow[], key: BoardSortKey): Sor
         return (b.windows["365"]?.qty ?? 0) - (a.windows["365"]?.qty ?? 0) || byName(a, b);
       case "bestand":
         return b.stock - a.stock || byName(a, b);
+      case "gewinnMonat":
+        return (b.today?.perMonth ?? -1e9) - (a.today?.perMonth ?? -1e9) || byName(a, b);
+      case "kapital":
+        return (b.today?.capitalBound ?? -1) - (a.today?.capitalBound ?? -1) || byName(a, b);
+      case "reichweite":
+        return (b.stockMonthsCover ?? -1) - (a.stockMonthsCover ?? -1) || byName(a, b);
       case "name":
         return byName(a, b);
     }
