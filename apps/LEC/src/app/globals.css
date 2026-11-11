@@ -474,6 +474,10 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 .bd-dt-stat.info b { color: var(--market); }
 .bd-dt-stat.crit { background: var(--crit-bg); border-color: var(--crit); }
 .bd-dt-stat.crit b { color: var(--crit); }
+.bd-dt-t tr.age-green td { background: var(--good-bg); color: var(--good); }
+.bd-dt-t tr.age-yellow td { background: var(--warn-bg); color: var(--warn); }
+.bd-dt-t tr.age-red td { background: var(--crit-bg); color: var(--crit); }
+.bd-dt-t tr.age-green td:first-child, .bd-dt-t tr.age-yellow td:first-child, .bd-dt-t tr.age-red td:first-child { padding-left: 8px; font-weight: 600; }
 .bd-dt-trend { margin-left: 8px; font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); }
 .bd-dt-trend.good { color: var(--good); }
 .bd-dt-trend.warn { color: var(--warn); }

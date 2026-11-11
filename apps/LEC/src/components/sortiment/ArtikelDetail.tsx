@@ -294,7 +294,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
 
         {detail && detail.sales.length > 0 && (
           <>
-            <h4>Letzte Verkäufe</h4>
+            <h4>
+              Letzte Verkäufe <span className="bd-dt-trend"><span style={{ color: "var(--good)" }}>● 90 T</span> <span style={{ color: "var(--warn)" }}>● 365 T</span> <span style={{ color: "var(--crit)" }}>● älter</span></span>
+            </h4>
             <table className="bd-dt-t">
               <thead>
                 <tr>
@@ -304,13 +306,17 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 </tr>
               </thead>
               <tbody>
-                {detail.sales.slice(0, 15).map((x, i) => (
-                  <tr key={i}>
-                    <td>{day(x.soldAt)}</td>
-                    <td className="r">{x.qty}</td>
-                    <td className="r">{eur(x.unitPrice)}</td>
-                  </tr>
-                ))}
+                {detail.sales.slice(0, 15).map((x, i) => {
+                  const age = (Date.now() - new Date(x.soldAt).getTime()) / 86_400_000;
+                  const tone = age <= 90 ? "age-green" : age <= 365 ? "age-yellow" : "age-red";
+                  return (
+                    <tr key={i} className={tone} title={age <= 90 ? "in den letzten 90 Tagen" : age <= 365 ? "vor 91 bis 365 Tagen" : "vor mehr als 365 Tagen"}>
+                      <td>{day(x.soldAt)}</td>
+                      <td className="r">{x.qty}</td>
+                      <td className="r">{eur(x.unitPrice)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} geladenen Verkäufen.</p>}
