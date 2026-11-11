@@ -6,6 +6,8 @@ import { DEFAULT_COST_SETTINGS, type CostSettingsValues } from "../pricing/costS
 
 export interface ArticleAggregatesResult {
   aggregates: ArticleAggregate[];
+  /** Alle Artikel, auch manuell ausgeblendete: Grundlage fuer Shop-Summen (Umsatz, Stueck), die nicht schrumpfen duerfen. */
+  allAggregates: ArticleAggregate[];
   costSettings: CostSettingsValues;
 }
 
@@ -57,7 +59,7 @@ export async function loadArticleAggregates(
 ): Promise<ArticleAggregatesResult> {
   const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
-      where: opts.includeHidden ? { isCard: true } : { isCard: true, hidden: false },
+      where: { isCard: true },
       include: { saleWindows: true },
     }),
     prisma.marketPrice.findMany({
@@ -166,7 +168,7 @@ export async function loadArticleAggregates(
     };
   });
 
-  return { aggregates, costSettings };
+  return { aggregates: opts.includeHidden ? aggregates : aggregates.filter((a) => !a.hidden), allAggregates: aggregates, costSettings };
 }
 
 /**

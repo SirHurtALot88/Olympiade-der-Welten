@@ -83,8 +83,8 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
-  // Aktueller VK = Angebotspreis aus dem eBay-Shop (live, alle 6 Stunden), sonst Billbee-Artikelstamm.
-  { id: "listingvk", label: "Akt. VK (eBay)", def: 104, min: 80, align: "r" },
+  // Aktueller VK = Preis aus dem Billbee-Artikelstamm; der eBay-Shop-Preis ist nur Rückfall.
+  { id: "listingvk", label: "Akt. VK", def: 104, min: 80, align: "r" },
   // Cardmarket-Block: was kostet die Karte heute (Marktwert), wo sollte der VK stehen (25-33 %
   // Deckungsbeitrag bei Nachkauf zum Marktwert), und stimmt dein VK damit ueberein.
   { id: "marktwert", label: "Marktwert", def: 112, min: 80, align: "r" },
@@ -636,7 +636,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                         row.listingVkSource === "ebay"
                           ? `Aktueller Angebotspreis aus deinem eBay-Shop${row.listingVkAt ? ` (Stand ${new Date(row.listingVkAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : ""}`
                           : row.listingVkSource === "billbee"
-                            ? "Aus dem Billbee-Artikelstamm (bei eBay gerade nicht gelistet)"
+                            ? "Aus dem Billbee-Artikelstamm (dort pflegen, beim nächsten Abgleich übernommen)"
                             : undefined
                       }
                     >

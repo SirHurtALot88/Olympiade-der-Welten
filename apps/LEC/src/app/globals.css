@@ -38,7 +38,7 @@
     --panel2: #241d30;
     --ink: #ece7f3;
     --muted: #a79eb7;
-    --faint: #746b86;
+    --faint: #8f86a3;
     --border: #2f2540;
     --line: #271e35;
     --accent: #d8ab45;
@@ -85,7 +85,7 @@
   --panel2: #241d30;
   --ink: #ece7f3;
   --muted: #a79eb7;
-  --faint: #746b86;
+  --faint: #8f86a3;
   --border: #2f2540;
   --line: #271e35;
   --accent: #d8ab45;
@@ -445,7 +445,7 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 /* ---- Preis-Board: Detail-Fenster ---- */
 .bd tbody tr { cursor: pointer; }
 .bd-dt-back { position: fixed; inset: 0; z-index: 60; background: rgba(8, 5, 14, .55); display: flex; justify-content: flex-end; }
-.bd-dt { position: relative; width: min(480px, 100%); height: 100%; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 22px 22px 40px; box-shadow: -12px 0 40px rgba(0, 0, 0, .35); }
+.bd-dt { position: relative; width: min(100%, max(480px, 50vw)); height: 100%; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 22px 22px 40px; box-shadow: -12px 0 40px rgba(0, 0, 0, .35); }
 .bd-dt-x { position: absolute; top: 10px; right: 14px; background: none; border: 0; font-size: 26px; color: var(--muted); cursor: pointer; line-height: 1; }
 .bd-dt-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 18px; padding-right: 24px; }
 .bd-dt-img { width: 120px; border-radius: 8px; flex: none; }
@@ -455,11 +455,14 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 .bd-dt-stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; display: flex; flex-direction: column; gap: 0; }
 .bd-dt-stat span { font-size: 10.5px; color: var(--muted); }
 .bd-dt-stat b { font-size: 13.5px; }
-.bd-dt-stat small { font-size: 10.5px; color: var(--faint); }
+.bd-dt-stat small { display: none; font-size: 10.5px; color: var(--muted); line-height: 1.3; }
+@media (min-width: 1000px) { .bd-dt-stat small { display: block; } }
 .bd-dt-stat.good { background: var(--good-bg); border-color: var(--good); }
 .bd-dt-stat.good b { color: var(--good); }
 .bd-dt-stat.warn { background: var(--warn-bg); border-color: var(--warn); }
 .bd-dt-stat.warn b { color: var(--warn); }
+.bd-dt-stat.info { background: var(--market-bg); border-color: var(--market); }
+.bd-dt-stat.info b { color: var(--market); }
 .bd-dt-stat.crit { background: var(--crit-bg); border-color: var(--crit); }
 .bd-dt-stat.crit b { color: var(--crit); }
 .bd-dt-trend { margin-left: 8px; font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); }
@@ -493,7 +496,7 @@ button.bd-bar-seg:hover { filter: brightness(1.2); }
 /* ---- eBay-Links ---- */
 .bd-ebay { margin-left: 8px; font-size: 11px; color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
 .bd-ebay:hover { color: inherit; border-color: var(--muted); }
-.bd-dt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.bd-dt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; position: sticky; top: -22px; z-index: 2; background: var(--panel); padding: 8px 0; }
 .bd-dt-actions .chip { text-decoration: none; display: inline-block; }
 .bd-dt-primary { border-color: var(--market) !important; color: var(--market) !important; }
 

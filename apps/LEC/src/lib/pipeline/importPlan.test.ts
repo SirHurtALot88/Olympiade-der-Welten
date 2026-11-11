@@ -231,3 +231,21 @@ describe("buildImportPlan", () => {
     expect(plan.stats.exactMatchRate).toBe(1);
   });
 });
+
+describe("Gebuehren-Rueckfall fuer Artikel ohne eBay-Report", () => {
+  it("nimmt den Satz aehnlicher Artikel (Preisband) statt 0", () => {
+    const known = new Map<string, number>();
+    const a = billbeeRow("Yu-Gi-Oh! AAA-DE001 Bekannt Ultra Rare NM", { qty: 20, revenue: 400, ek: 100 }); // 20 € je Stück
+    const b = billbeeRow("Yu-Gi-Oh! BBB-DE002 Unbekannt Ultra Rare NM", { qty: 2, revenue: 44, ek: 10 }); // 22 € je Stück
+    known.set(a.nameNormalized, 3); // 3 € je Stück = 15 % Satz bei 20 €
+    const plan = buildImportPlan([billbeeResult("365", [a, b])], null, DEFAULT_COST_SETTINGS, { knownFeePerUnit: known });
+    const wb = plan.saleWindows.find((w) => w.nameNormalized === b.nameNormalized)!;
+    expect(wb.ebayFeeTotal).toBeCloseTo(0.15 * 44, 2);
+    expect(wb.dbII).toBeLessThan(wb.dbI);
+  });
+  it("ohne jede Vergleichsgebuehr gilt die Formel aus den Kostensaetzen", () => {
+    const b = billbeeRow("Yu-Gi-Oh! BBB-DE002 Unbekannt Ultra Rare NM", { qty: 1, revenue: 10, ek: 3 });
+    const plan = buildImportPlan([billbeeResult("365", [b])], null, DEFAULT_COST_SETTINGS);
+    expect(plan.saleWindows[0].ebayFeeTotal).toBeGreaterThan(1);
+  });
+});

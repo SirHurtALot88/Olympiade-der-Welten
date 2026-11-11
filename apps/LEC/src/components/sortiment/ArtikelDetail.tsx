@@ -78,16 +78,30 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
     ? [
         ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `${eur(x.unitPrice)} je Stück` })),
         ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `${eur(p.unitEk)} EK · ${p.source}` })),
-        ...detail.stockLog.map((m) => ({ at: m.at, kind: "Bestand laut Billbee", delta: m.after - m.before, note: `${m.before} → ${m.after} Stk` })),
+        // Bestandsaenderungen laut Billbee nur, soweit Verkaeufe sie NICHT schon erklaeren (Zugang, Korrektur, Schwund).
+        ...detail.stockLog
+          .filter((m) => {
+            const delta = m.after - m.before;
+            if (delta >= 0) return true;
+            const at = new Date(m.at).getTime();
+            const explained = detail.sales.filter((x) => { const t = new Date(x.soldAt).getTime(); return t <= at + 86_400_000 && t >= at - 3 * 86_400_000; }).reduce((sum, x) => sum + x.qty, 0);
+            return explained < -delta;
+          })
+          .map((m) => ({ at: m.at, kind: m.after > m.before ? "Zugang laut Billbee" : "Abgang laut Billbee", delta: m.after - m.before, note: `${m.before} → ${m.after} Stk${m.after > m.before && row.currentEk != null ? ` · ca. ${eur((m.after - m.before) * row.currentEk)} Wareneinsatz` : ""}` })),
       ]
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 25)
     : [];
-  const vkTone: Tone = m?.status === "im_korridor" ? "good" : m?.status === "zu_guenstig" ? "warn" : m?.status === "zu_teuer" ? "crit" : undefined;
+  const lastSale = detail?.sales[0] ? Math.max(0, Math.floor((Date.now() - new Date(detail.sales[0].soldAt).getTime()) / 86_400_000)) : null;
+  const mk = detail?.market;
+  const marketDir = mk && mk.avg7 != null && mk.avg30 != null && mk.avg30 > 0 ? (mk.avg7 > mk.avg30 * 1.05 ? { label: "↑ Markt steigt", tone: "good" as Tone } : mk.avg7 < mk.avg30 * 0.95 ? { label: "↓ Markt fällt", tone: "warn" as Tone } : { label: "→ Markt stabil", tone: undefined }) : null;
+  const vkTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : m.status === "zu_guenstig" ? "warn" : "info";
   const w30 = row.windows["30"]?.qty ?? 0;
   const w90 = row.windows["90"]?.qty ?? 0;
+  const prev60 = w90 - w30;
   const trend: { label: string; tone: Tone } | null =
-    w90 === 0 ? null : w30 / 30 > (w90 / 90) * 1.15 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (w90 / 90) * 0.85 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
+    w90 < 3 ? null : w30 / 30 > (prev60 / 60) * 1.25 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (prev60 / 60) * 0.75 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
+  const noSale90 = row.stock > 0 && w90 === 0;
   const boughtCost = detail?.purchases.reduce((s, p) => s + p.qty * p.unitEk, 0) ?? 0;
 
   return (
@@ -140,16 +154,16 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} />
 
         <section className="bd-dt-grid">
-          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
+          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "aus eBay (Stand des letzten Shop-Abrufs)" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Cardmarket Ø 7 Tage" />
           <Stat
-            tone={m?.margin == null ? undefined : m.margin >= 0.25 ? "good" : m.margin >= 0.15 ? "warn" : "crit"}
+            tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}
             label="Marge Nachkauf"
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
           />
-          <Stat tone={row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={noSale90 ? "kein Verkauf in 90 Tagen" : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
           <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 
@@ -160,6 +174,22 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             </b>{" "}
             – {m.provenByDemand ? "der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : "Preis wird gezahlt."}
           </p>
+        )}
+
+        {row.today && (
+          <>
+            <h4>Was ein Verkauf heute bringt</h4>
+            <table className="bd-dt-t">
+              <tbody>
+                <tr><td>Gewinn je Stück (heutiger VK und EK, vor Fixkosten)</td><td className="r"><b style={{ color: row.today.profitPerUnit < 0 ? "var(--crit)" : undefined }}>{eur(row.today.profitPerUnit)}</b> · {formatPercent(row.today.marginPct)} %</td></tr>
+                {row.today.perMonth != null && <tr><td>Gewinn je Monat bei aktuellem Tempo ({row.perMonth?.toFixed(1).replace(".", ",")} Stk/Monat)</td><td className="r">{eur(row.today.perMonth)}</td></tr>}
+                {row.today.inStock != null && <tr><td>Gewinn, wenn der Bestand ({row.stock} Stk) weg ist</td><td className="r">{eur(row.today.inStock)}</td></tr>}
+                {row.today.capitalBound != null && <tr><td>Gebundenes Kapital (Bestand × EK)</td><td className="r">{eur(row.today.capitalBound)}</td></tr>}
+                {row.today.maxEk25 != null && <tr><td>Höchster EK für 25 % Marge beim heutigen VK</td><td className="r">{eur(row.today.maxEk25)}</td></tr>}
+                {lastSale != null && <tr><td>Letzter Verkauf</td><td className="r" style={{ color: row.stock > 0 && lastSale > 90 ? "var(--crit)" : undefined }}>vor {lastSale} Tagen</td></tr>}
+              </tbody>
+            </table>
+          </>
         )}
 
         <h4>
@@ -192,7 +222,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         <h4>Ergebnis je Stück</h4>
         <table className="bd-dt-t">
           <tbody>
-            <tr><td>DB I (nach Gebühren)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
+            <tr><td>DB I (nach Wareneinsatz)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
             <tr><td>DB II</td><td className="r">{eur(row.dbIIPerUnit)} · {formatPercent(row.dbIIPercent)} %</td></tr>
             <tr><td>DB III (mit Fixkosten)</td><td className="r">{eur(row.dbIIIPerUnit)} · {formatPercent(row.dbIIIPercent)} %</td></tr>
           </tbody>
@@ -219,7 +249,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 ))}
               </tbody>
             </table>
-            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} Verkäufen der letzten 365 Tage.</p>}
+            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} geladenen Verkäufen.</p>}
           </>
         )}
 
@@ -242,7 +272,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 ))}
               </tbody>
             </table>
-            <p className="bd-fig-note">Verkäufe und Einkäufe stammen aus Billbee bzw. dem Einkaufsimport. „Bestand laut Billbee“ wird seit heute bei jedem Abgleich mitgeschrieben (Billbee liefert keine Lagerhistorie).</p>
+            <p className="bd-fig-note">Verkäufe stammen aus Billbee. Bestandsänderungen schreibt die App bei jedem Billbee-Abgleich selbst mit (Billbee liefert keine Lagerhistorie) und zeigt sie nur, soweit Verkäufe sie nicht erklären. Einkäufe gibt es nur, wenn sie importiert wurden.</p>
           </>
         )}
 
@@ -296,7 +326,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
 
         {detail?.market && (
           <>
-            <h4>Cardmarket</h4>
+            <h4>
+              Cardmarket {marketDir && <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span>}
+            </h4>
             <table className="bd-dt-t">
               <tbody>
                 <tr><td>Tiefstpreis</td><td className="r">{eur(detail.market.low)}</td></tr>
@@ -312,13 +344,14 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   );
 }
 
-type Tone = "good" | "warn" | "crit" | undefined;
+type Tone = "good" | "warn" | "crit" | "info" | undefined;
 
 function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: Tone }) {
   return (
     <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
+      {hint && <small>{hint}</small>}
     </div>
   );
 }

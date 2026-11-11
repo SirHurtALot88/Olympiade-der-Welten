@@ -5,7 +5,9 @@ import { titleNameMismatch } from "../market/names";
 import { buildMarketComparisonRow, type LatestQuote } from "./marketComparison";
 import { classifyArticle, type ArticleClass } from "../pricing/classification";
 import {
+  computeEbayFees,
   computeHk,
+  DB_MARGIN_MIN,
   computePriceCorridor,
   classifyPriceStatus,
   computeShopVolume,
@@ -156,6 +158,10 @@ export interface SortimentRow {
   active: boolean;
   /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
   hidden?: boolean;
+  /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
+  today?: { profitPerUnit: number; marginPct: number; perMonth: number | null; inStock: number | null; maxEk25: number | null; capitalBound: number | null };
+  /** Verkaeufe je Monat (aus 90 Tagen) -- Basis fuer Gewinn je Monat. */
+  perMonth?: number;
   /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
   stock: number;
   /** Stk x aktueller Listen-VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
@@ -553,7 +559,26 @@ export function buildSortimentRow(
   }
 
   const velocityPerMonth = monthlyVelocity(a);
-  const stockMonthsCover = a.stock > 0 && velocityPerMonth > 0 ? a.stock / velocityPerMonth : null;
+  // Rueckfall auf das 365-Tage-Tempo, wenn in 90 Tagen nichts lief -- sonst bekommt gerade der schlechteste Fall keine Reichweite.
+  const paceMonth = velocityPerMonth > 0 ? velocityPerMonth : (a.windows["365"]?.qty ?? 0) / 12;
+  const stockMonthsCover = a.stock > 0 && paceMonth > 0 ? a.stock / paceMonth : null;
+
+  // "Was bringt ein Verkauf heute": heutiger VK und heutiger EK, nur variable Kosten (DB II, ohne Fixkosten).
+  let today: SortimentRow["today"];
+  if (vkForCorridor > 0 && !ekMissing) {
+    const ekNow = a.currentEk ?? ekPerUnit;
+    const varNonEk = Math.max(0, hk.total - hk.ek - hk.fixedCostShare);
+    const fees = computeEbayFees(vkForCorridor, costSettings.adFeeRateGood, costSettings).total;
+    const profit = vkForCorridor - fees - varNonEk - ekNow;
+    today = {
+      profitPerUnit: profit,
+      marginPct: profit / vkForCorridor,
+      perMonth: paceMonth > 0 ? profit * paceMonth : null,
+      inStock: a.stock > 0 ? profit * a.stock : null,
+      maxEk25: Math.max(0, vkForCorridor * (1 - DB_MARGIN_MIN) - fees - varNonEk),
+      capitalBound: a.active && a.stock > 0 ? a.stock * ekNow : null,
+    };
+  }
 
   // Cardmarket-Marktwert und Zielspanne: dieselbe Zeile wie auf /marktpreise (eine Rechnung, keine zweite).
   let marketInfo: SortimentMarket | null = null;
@@ -582,6 +607,8 @@ export function buildSortimentRow(
   }
 
   return {
+    today,
+    perMonth: paceMonth,
     articleId: a.articleId,
     nameRaw: a.nameRaw,
     setCode: a.setCode,
@@ -782,7 +809,7 @@ export function buildRecommendations(
       kind: "auslisten",
       title: `${shortName(c.article.nameRaw)} auslisten.`,
       detail: c.reason,
-      effect: `bindet € ${Math.abs(dbIILifetime).toFixed(0)}`,
+      effect: `Verlust bisher € ${Math.abs(dbIILifetime).toFixed(0)}`,
       effectValue: Math.abs(dbIILifetime),
       linkQuery: c.article.setCode ?? c.article.nameRaw,
     });

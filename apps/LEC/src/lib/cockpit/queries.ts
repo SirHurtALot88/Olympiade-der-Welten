@@ -86,12 +86,12 @@ export async function loadLatestQuotes(prisma: PrismaClient): Promise<Map<string
 }
 
 export async function loadCockpitViewModel(prisma: PrismaClient, window: SaleWindowKey): Promise<CockpitViewModel> {
-  const [{ aggregates, costSettings }, images, purchases, imports, quotes] = await Promise.all([
+  const [{ aggregates, allAggregates, costSettings }, images, purchases, imports, quotes] = await Promise.all([
     loadArticleAggregates(prisma),
     loadArticleImages(prisma),
     loadPurchaseFacts(prisma),
     loadImportStatus(prisma),
     loadLatestQuotes(prisma),
   ]);
-  return buildCockpitViewModel({ aggregates, costSettings, window, images, purchases, imports, quotes });
+  return buildCockpitViewModel({ aggregates, sumAggregates: allAggregates, costSettings, window, images, purchases, imports, quotes });
 }

@@ -184,7 +184,7 @@ model MarketPrice {
 }
 
 /// Einzelverkauf (eine Bestellposition) aus der Billbee-API: Datum, Menge, Preis je Stueck (brutto).
-/// Wird je Abruf fuer die letzten 365 Tage ersetzt (source "billbee-api").
+/// Wird je Abruf komplett ersetzt (gesamte Historie) (source "billbee-api").
 model Sale {
   id        String   @id @default(cuid())
   articleId String

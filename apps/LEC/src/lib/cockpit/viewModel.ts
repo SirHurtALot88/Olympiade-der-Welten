@@ -74,6 +74,8 @@ export interface CockpitViewModel {
 
 export interface CockpitInputs {
   aggregates: ArticleAggregate[];
+  /** Mit ausgeblendeten Artikeln, nur fuer Shop-Summen (Umsatz-Leitplanke). */
+  sumAggregates?: ArticleAggregate[];
   costSettings: CostSettingsValues;
   window: SaleWindowKey;
   images?: ImageMap;
@@ -100,7 +102,7 @@ export function buildCockpitViewModel(input: CockpitInputs): CockpitViewModel {
 
   const dashboard = buildDashboardViewModel(aggregates, costSettings);
   const classified = classifyArticles(aggregates);
-  const sums = sumAllWindows(aggregates);
+  const sums = sumAllWindows(input.sumAggregates ?? aggregates);
   const bands = computeRunRateBands(sums);
 
   return {

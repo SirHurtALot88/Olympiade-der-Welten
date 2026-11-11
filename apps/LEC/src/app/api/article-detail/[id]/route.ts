@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     prisma.purchase.findMany({ where: { articleId: id }, orderBy: { date: "desc" }, take: 50 }),
     prisma.ebayListingFact.findMany({ where: { articleId: id }, orderBy: { reportTo: "desc" }, take: 20 }),
     prisma.marketPrice.findFirst({ where: { articleId: id, source: "cardmarket-priceguide" }, orderBy: { fetchedAt: "desc" } }),
-    prisma.sale.findMany({ where: { articleId: id }, orderBy: { soldAt: "desc" }, take: 40 }),
+    prisma.sale.findMany({ where: { articleId: id }, orderBy: { soldAt: "desc" }, take: 60 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 40 }),
   ]);
   return NextResponse.json({
