@@ -137,6 +137,9 @@ describe("buildMarketComparisonRow", () => {
     expect(v({ priceTrend: 5.94, priceAvg1: 5.99, priceAvg7: 5.9, priceAvg30: 5.35 })).toBeCloseTo(5.795, 3);
     expect(v({ priceAvg7: 2, priceAvg30: 4 })).toBe(3);
     expect(v({ priceTrend: 4 })).toBe(4);
+    // mit letztem EK (7,00) als weiterer Wert: (5,94 + 5,99 + 5,90 + 5,35 + 7) / 5 = 6,036
+    const withEk = buildMarketComparisonRow(article({ currentVk: 8, currentEk: 7 }), quote({ priceTrend: 5.94, priceAvg1: 5.99, priceAvg7: 5.9, priceAvg30: 5.35 }), DEFAULT_COST_SETTINGS, null).marketValue;
+    expect(withEk).toBeCloseTo(6.036, 3);
   });
 
   it("Marge des heutigen VK bei Nachkauf zum Marktwert (Deckungsbeitrag, vor Fixkosten)", () => {

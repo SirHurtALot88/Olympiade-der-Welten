@@ -35,16 +35,19 @@ export interface LatestQuote {
 
 /**
  * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
- * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage (Chris, 11.11.: ein einzelner Wert, vor allem der
- * 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
+ * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage und, wenn bekannt, deinem letzten EK (Chris, 11.11.:
+ * ein einzelner Wert, vor allem der 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
  * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
  */
-export function marketValueOf(quote: LatestQuote, packQty: number): number | null {
+export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
-  const parts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
-  if (parts.length === 0) return null;
-  const perCard = parts.reduce((s, v) => s + v, 0) / parts.length;
-  return perCard * Math.max(1, packQty);
+  const pack = Math.max(1, packQty);
+  const cardParts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
+  if (cardParts.length === 0) return null;
+  // Je Artikel (Karte x Pack-Menge); der letzte EK steht schon je Artikel und federt Ausreisser ab (Chris, 11.11.).
+  const parts = cardParts.map((v) => v * pack);
+  if (lastEk != null && lastEk > 0) parts.push(lastEk);
+  return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
 export function marketRangeOf(quote: LatestQuote, packQty: number): { min: number; max: number; variants: number } | null {
@@ -66,7 +69,7 @@ export interface MarketComparisonRow {
   /** Cardmarket-Werte JE KARTE, wie in der Preisliste. */
   marketFrom: number | null;
   marketTrend: number | null;
-  /** Marktwert des ARTIKELS = Mittelwert aus Trend, Ø 1, 7 und 30 Tage x Pack-Menge. Null wenn mehrdeutig. */
+  /** Marktwert des ARTIKELS = Mittelwert aus Trend, Ø 1, 7, 30 Tage (x Pack-Menge) und letztem EK. Null wenn mehrdeutig. */
   marketValue: number | null;
   /** Mehrdeutig: Spanne des Artikel-Marktwerts (billigste..teuerste Variante, x Pack). */
   marketRange: { min: number; max: number; variants: number } | null;
@@ -143,7 +146,7 @@ export function buildMarketComparisonRow(
   const corridor = computePriceCorridor(hk, ownVk || hk.total, costSettings, { kind, packSize: a.packQty, shop });
 
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
-  const marketValue = marketValueOf(quote, pack);
+  const marketValue = marketValueOf(quote, pack, a.currentEk);
   const marketRange = marketRangeOf(quote, pack);
 
   const rangeFor = (marketPerUnit: number): MarketTargetRange =>
@@ -207,7 +210,9 @@ export function buildMarketComparisonRow(
     lastEk !== null && ownVk > 0
       ? contributionMarginForPrice(ownVk, { ek: lastEk, kind, packSize: a.packQty, shop }, costSettings.adFeeRateGood, costSettings)
       : null;
-  const ekAboveMarket = marketValue !== null && marketValue > 0 && ek > marketValue * 1.5;
+  // Gegen den reinen Cardmarket-Wert pruefen (ohne den eigenen EK), sonst zoege der EK die Messlatte selbst mit hoch.
+  const cardOnlyValue = marketValueOf(quote, pack);
+  const ekAboveMarket = cardOnlyValue !== null && cardOnlyValue > 0 && ek > cardOnlyValue * 1.5;
 
   const marketEk = quote.priceFrom !== null ? computeMarketEk(quote.priceFrom, a.packQty, hk.buyShipping) : null;
 

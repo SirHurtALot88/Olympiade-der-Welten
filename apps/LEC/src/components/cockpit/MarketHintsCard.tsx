@@ -39,7 +39,7 @@ export function MarketHintsCard({ market }: { market: MarketHints }) {
           </>
         )}
         <p className="ck-note">
-          Marktwert = Mittelwert aus Cardmarket-Trend und Ø 1/7/30 Tage × Packgröße; mehrdeutige Zuordnungen werden nur bewertet, wenn das Urteil für jede
+          Marktwert = Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage (× Packgröße) und letztem EK; mehrdeutige Zuordnungen werden nur bewertet, wenn das Urteil für jede
           Variante gilt. Keine erfundenen Preise: ohne Marktwert kein Urteil.
         </p>
       </div>

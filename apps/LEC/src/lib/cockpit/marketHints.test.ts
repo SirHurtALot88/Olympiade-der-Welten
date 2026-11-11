@@ -38,9 +38,10 @@ describe("marketHints", () => {
     const hk = 5 + 0.575 + 0.67 + 0.053 + registered;
     const min = (0.45 + hk) / (1 - (0.11 + 0.09) * 1.19 - 0.25);
     const opt = (0.45 + hk) / (1 - (0.11 + 0.1) * 1.19 - 0.33);
-    const cheap = article("1", 8, 4, 6); // deutlich unter der Spanne
-    const ok = article("2", Math.round((min + opt) / 2 * 100) / 100, 1);
-    const dear = article("3", 40, 2);
+    // letzter EK = Marktwert, damit er den Mittelwert nicht verschiebt (der EK zaehlt als weiterer Wert mit)
+    const cheap = { ...article("1", 8, 4, 6), currentEk: market }; // deutlich unter der Spanne
+    const ok = { ...article("2", Math.round((min + opt) / 2 * 100) / 100, 1), currentEk: market };
+    const dear = { ...article("3", 40, 2), currentEk: market };
     const noQuote = article("4", 9, 1);
     const filler: ArticleAggregate = { ...article("9", 6, 0), active: false, windows: { "365": win(3400, 3400 * 6, 0) } };
     const ekHigh: ArticleAggregate = { ...article("5", Math.round((min + opt) / 2 * 100) / 100, 1), currentEk: 20, windows: {} };
@@ -54,13 +55,15 @@ describe("marketHints", () => {
     expect(h.withQuote).toBe(4);
     expect(h.activeTotal).toBe(5);
     expect(h.coverage).toBeCloseTo(0.8);
-    expect(h.tooCheap).toBe(1);
+    // der teuer eingekaufte Artikel (EK 20) zieht seinen Marktwert auf (5 x 4 + 20) / 5 = 8 hoch: sein VK wirkt dann zu guenstig
+    expect(h.tooCheap).toBe(2);
     expect(h.tooExpensive).toBe(1);
     expect(h.ekAboveMarket).toBe(1);
     expect(h.stale).toBe(1);
     expect(h.topTooCheap[0].articleId).toBe("1");
     expect(h.topTooCheap[0].lever).toBe(6);
-    expect(h.tooCheapEffect).toBeCloseTo((min - 8) * 6, 1);
+    // Artikel 1 allein: (min - 8) x 6; dazu kommt der Beitrag des hochgezogenen Artikels
+    expect(h.tooCheapEffect).toBeGreaterThan((min - 8) * 6 + 1);
     expect(h.topTooCheap[0].targetMin).toBeCloseTo(min, 2);
     expect(h.topTooCheap[0].targetOpt).toBeCloseTo(opt, 2);
     expect(h.topTooExpensive[0].articleId).toBe("3");
