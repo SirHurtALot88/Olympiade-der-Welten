@@ -83,6 +83,11 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 25)
     : [];
+  const vkTone: Tone = m?.status === "im_korridor" ? "good" : m?.status === "zu_guenstig" ? "warn" : m?.status === "zu_teuer" ? "crit" : undefined;
+  const w30 = row.windows["30"]?.qty ?? 0;
+  const w90 = row.windows["90"]?.qty ?? 0;
+  const trend: { label: string; tone: Tone } | null =
+    w90 === 0 ? null : w30 / 30 > (w90 / 90) * 1.15 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (w90 / 90) * 0.85 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
   const boughtCost = detail?.purchases.reduce((s, p) => s + p.qty * p.unitEk, 0) ?? 0;
 
   return (
@@ -135,21 +140,17 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} />
 
         <section className="bd-dt-grid">
-          <Stat label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
+          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Cardmarket Ø 7 Tage" />
           <Stat
+            tone={m?.margin == null ? undefined : m.margin >= 0.25 ? "good" : m.margin >= 0.15 ? "warn" : "crit"}
             label="Marge Nachkauf"
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
           />
-          <Stat
-            label="Marge letzter EK"
-            value={m?.marginLastEk != null ? `${formatPercent(m.marginLastEk)} %` : "—"}
-            hint={m?.lastEk != null ? `zuletzt gekauft für ${eur(m.lastEk)}` : "kein EK bekannt"}
-          />
-          <Stat label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
-          <Stat label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
+          <Stat tone={row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 
         {m?.soldAt && (
@@ -161,7 +162,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </p>
         )}
 
-        <h4>Verkäufe</h4>
+        <h4>
+          Verkäufe {trend && <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span>}
+        </h4>
         <table className="bd-dt-t">
           <thead>
             <tr>
@@ -309,9 +312,11 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+type Tone = "good" | "warn" | "crit" | undefined;
+
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: Tone }) {
   return (
-    <div className="bd-dt-stat" title={hint}>
+    <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
     </div>

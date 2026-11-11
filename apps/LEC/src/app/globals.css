@@ -456,6 +456,15 @@ table.bd tbody tr:last-child td { border-bottom: 0; }
 .bd-dt-stat span { font-size: 10.5px; color: var(--muted); }
 .bd-dt-stat b { font-size: 13.5px; }
 .bd-dt-stat small { font-size: 10.5px; color: var(--faint); }
+.bd-dt-stat.good { background: var(--good-bg); border-color: var(--good); }
+.bd-dt-stat.good b { color: var(--good); }
+.bd-dt-stat.warn { background: var(--warn-bg); border-color: var(--warn); }
+.bd-dt-stat.warn b { color: var(--warn); }
+.bd-dt-stat.crit { background: var(--crit-bg); border-color: var(--crit); }
+.bd-dt-stat.crit b { color: var(--crit); }
+.bd-dt-trend { margin-left: 8px; font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--muted); }
+.bd-dt-trend.good { color: var(--good); }
+.bd-dt-trend.warn { color: var(--warn); }
 .bd-dt h4 { margin: 20px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .bd-dt-t { width: 100%; min-width: 0; border-collapse: collapse; font-size: 12.5px; }
 .bd-dt-t th { text-align: left; font-weight: 500; color: var(--faint); padding: 3px 0; }
