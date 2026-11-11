@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
 import { boardVk, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
@@ -13,6 +14,7 @@ interface Detail {
   purchases: { date: string; qty: number; unitEk: number; buyShipping: number; source: string }[];
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
+  stockLog: { at: string; before: number; after: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
 }
 
@@ -28,6 +30,25 @@ const WINDOWS = [
 export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; imageSrc: string | null; onClose: () => void }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  async function setHidden(hidden: boolean) {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/article-hide/${encodeURIComponent(row.articleId)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hidden }),
+      });
+      if (r.ok) {
+        router.refresh();
+        onClose();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +74,20 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const rarity = rarityFromTitle(row.nameRaw);
   const vk = boardVk(row);
   const bought = detail?.purchases.reduce((s, p) => s + p.qty, 0) ?? 0;
+  const movements = detail
+    ? [
+        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `${eur(x.unitPrice)} je Stück` })),
+        ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `${eur(p.unitEk)} EK · ${p.source}` })),
+        ...detail.stockLog.map((m) => ({ at: m.at, kind: "Bestand laut Billbee", delta: m.after - m.before, note: `${m.before} → ${m.after} Stk` })),
+      ]
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 25)
+    : [];
+  const vkTone: Tone = m?.status === "im_korridor" ? "good" : m?.status === "zu_guenstig" ? "warn" : m?.status === "zu_teuer" ? "crit" : undefined;
+  const w30 = row.windows["30"]?.qty ?? 0;
+  const w90 = row.windows["90"]?.qty ?? 0;
+  const trend: { label: string; tone: Tone } | null =
+    w90 === 0 ? null : w30 / 30 > (w90 / 90) * 1.15 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (w90 / 90) * 0.85 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
   const boughtCost = detail?.purchases.reduce((s, p) => s + p.qty * p.unitEk, 0) ?? 0;
 
   return (
@@ -102,24 +137,20 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             Den Code in Billbee und bei eBay korrigieren.
           </div>
         )}
-        <EbayActions row={row} />
+        <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} />
 
         <section className="bd-dt-grid">
-          <Stat label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
+          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Cardmarket Ø 7 Tage" />
           <Stat
-            label="Marge bei Wiederbeschaffung"
+            tone={m?.margin == null ? undefined : m.margin >= 0.25 ? "good" : m.margin >= 0.15 ? "warn" : "crit"}
+            label="Marge Nachkauf"
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
           />
-          <Stat
-            label="Marge zum letzten EK"
-            value={m?.marginLastEk != null ? `${formatPercent(m.marginLastEk)} %` : "—"}
-            hint={m?.lastEk != null ? `zuletzt gekauft für ${eur(m.lastEk)}` : "kein EK bekannt"}
-          />
-          <Stat label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
-          <Stat label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
+          <Stat tone={row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 
         {m?.soldAt && (
@@ -131,7 +162,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </p>
         )}
 
-        <h4>Verkäufe</h4>
+        <h4>
+          Verkäufe {trend && <span className={`bd-dt-trend${trend.tone ? ` ${trend.tone}` : ""}`}>{trend.label}</span>}
+        </h4>
         <table className="bd-dt-t">
           <thead>
             <tr>
@@ -187,6 +220,29 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
             {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} Verkäufen der letzten 365 Tage.</p>}
+          </>
+        )}
+
+        <h4>Warenbewegungen</h4>
+        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen.</p>}
+        {movements.length > 0 && (
+          <>
+            <table className="bd-dt-t">
+              <thead>
+                <tr><th>Datum</th><th>Art</th><th className="r">Stück</th><th>Detail</th></tr>
+              </thead>
+              <tbody>
+                {movements.map((x, i) => (
+                  <tr key={i}>
+                    <td>{day(x.at)}</td>
+                    <td>{x.kind}</td>
+                    <td className="r">{x.delta > 0 ? `+${x.delta}` : x.delta}</td>
+                    <td>{x.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="bd-fig-note">Verkäufe und Einkäufe stammen aus Billbee bzw. dem Einkaufsimport. „Bestand laut Billbee“ wird seit heute bei jedem Abgleich mitgeschrieben (Billbee liefert keine Lagerhistorie).</p>
           </>
         )}
 
@@ -256,17 +312,18 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+type Tone = "good" | "warn" | "crit" | undefined;
+
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: Tone }) {
   return (
-    <div className="bd-dt-stat">
+    <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
-      {hint && <small>{hint}</small>}
     </div>
   );
 }
 
-function EbayActions({ row }: { row: SortimentRow }) {
+function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void }) {
   const l = ebayLinks(row);
   return (
     <div className="bd-dt-actions">
@@ -287,6 +344,9 @@ function EbayActions({ row }: { row: SortimentRow }) {
       >
         Bei Cardmarket ansehen ↗
       </a>
+      <button type="button" className="chip" onClick={onToggleHidden} disabled={busy} title={hidden ? "Artikel wieder in die Listen aufnehmen" : "Artikel aus allen Listen ausblenden (Daten bleiben erhalten)"}>
+        {hidden ? "Wieder einblenden" : "Ausblenden"}
+      </button>
     </div>
   );
 }

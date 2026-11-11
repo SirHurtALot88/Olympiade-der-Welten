@@ -51,10 +51,13 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
  * eigenstaendigen Seiten (/sortiment, /top-flop, /empfehlungen, …), damit
  * nicht jede Seite ihre eigene Prisma-Query schreibt.
  */
-export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
+export async function loadArticleAggregates(
+  prisma: PrismaClient,
+  opts: { includeHidden?: boolean } = {}
+): Promise<ArticleAggregatesResult> {
   const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
-      where: { isCard: true },
+      where: opts.includeHidden ? { isCard: true } : { isCard: true, hidden: false },
       include: { saleWindows: true },
     }),
     prisma.marketPrice.findMany({
@@ -136,6 +139,8 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       }
     }
 
+    const billbeeVk = article.currentVk !== null && article.currentVk > 0;
+
     return {
       articleId: article.id,
       nameRaw: article.nameRaw,
@@ -143,10 +148,12 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
-      // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
-      currentVk: article.ebayPrice ?? article.currentVk,
-      vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
-      vkAt: article.ebayPrice !== null ? article.ebayPriceAt : null,
+      hidden: article.hidden,
+      // Der VK aus Billbee gilt (Chris pflegt ihn dort); der eBay-Shop-Preis ist nur Rueckfall,
+      // wenn Billbee keinen hat -- der Shop-Abruf ist derzeit gesperrt, sein Preis veraltet.
+      currentVk: billbeeVk ? article.currentVk : (article.ebayPrice ?? article.currentVk),
+      vkSource: billbeeVk ? "billbee" : article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,
+      vkAt: !billbeeVk && article.ebayPrice !== null ? article.ebayPriceAt : null,
       currentEk: article.currentEk,
       ebayItemId: article.ebayItemId ?? factItemByArticle.get(article.id) ?? null,
       codeNameEn: article.codeNameEn,

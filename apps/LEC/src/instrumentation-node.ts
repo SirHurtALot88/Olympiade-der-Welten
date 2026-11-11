@@ -27,6 +27,6 @@ if (process.env.NODE_ENV === "production") {
     startMarketSync(prisma);
   }, 60_000);
   setInterval(runShop, 6 * HOUR_MS);
-  setInterval(() => void startBillbeeSync(prisma), 3 * HOUR_MS);
+  setInterval(() => void startBillbeeSync(prisma), 24 * HOUR_MS);
   setInterval(() => startMarketSync(prisma), 24 * HOUR_MS);
 }

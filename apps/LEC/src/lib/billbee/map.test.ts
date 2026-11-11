@@ -46,7 +46,7 @@ describe("mapOrders", () => {
   const by = (w: string, name: string) => res.find((r) => r.window === w)!.rows.find((r) => r.nameRaw === name);
 
   it("teilt in 30/90/365 Tage", () => {
-    expect(res.map((r) => r.window)).toEqual(["30", "90", "365"]);
+    expect(res.map((r) => r.window)).toEqual(["30", "90", "365", "all"]);
     expect(res[0].windowFrom.toISOString().slice(0, 10)).toBe("2026-09-13");
     expect(res[0].windowTo.toISOString().slice(0, 10)).toBe("2026-10-13");
   });

@@ -36,7 +36,7 @@ describe("syncBillbee", () => {
     await expect(syncBillbee(db.prisma, { config: null })).rejects.toBeInstanceOf(BillbeeNotConfigured);
   });
 
-  it("schreibt Bestand, VK, EK und die drei Fenster; Rest wird ausgelaufen", async () => {
+  it("schreibt Bestand, VK, EK und die vier Fenster; Rest wird ausgelaufen", async () => {
     // B existiert schon (aktiv), steht aber nicht mehr im Stamm.
     await db.prisma.article.create({ data: { nameNormalized: "abcd-de002 beta rare", nameRaw: B, setCode: "ABCD-DE002", packQty: 1, isCard: true, active: true } });
 
@@ -50,7 +50,7 @@ describe("syncBillbee", () => {
 
     expect(report.products).toBe(1);
     expect(report.orders).toBe(1);
-    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2"]);
+    expect(report.windows.map((w) => `${w.window}:${w.units}`)).toEqual(["30:2", "90:2", "365:2", "all:2"]);
 
     const articles = await db.prisma.article.findMany({ orderBy: { nameRaw: "asc" } });
     const a = articles.find((x) => x.nameRaw === A)!;
@@ -71,7 +71,7 @@ describe("syncBillbee", () => {
 
     // zweiter Lauf: idempotent, genau ein Snapshot je Fenster
     await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn: fakeBillbee([{ Id: 1, SKU: "A", Title: A, Price: 6.99, CostPrice: 2.5, StockCurrent: 3 }]) });
-    expect(await db.prisma.saleWindow.count({ where: { articleId: a.id } })).toBe(3);
+    expect(await db.prisma.saleWindow.count({ where: { articleId: a.id } })).toBe(4);
     expect(await db.prisma.sale.count({ where: { articleId: a.id } })).toBe(1);
     expect((await db.prisma.article.findUnique({ where: { id: a.id } }))!.stock).toBe(3);
   });

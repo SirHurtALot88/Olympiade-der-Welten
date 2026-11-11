@@ -231,6 +231,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
   const [showDiscontinued, setShowDiscontinued] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const hiddenCount = useMemo(() => rows.filter((r) => r.hidden).length, [rows]);
   // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
   // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
   const [showNoStock, setShowNoStock] = useState(false);
@@ -300,7 +302,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().length > 0 ? normalizedNameKey(query) : "";
     const upperQuery = query.trim().toUpperCase();
-    let result = rows;
+    // Ausgeblendete nur in der eigenen Ansicht (zum Wieder-Einblenden), sonst nirgends.
+    let result = rows.filter((r) => (showHidden ? r.hidden === true : r.hidden !== true));
 
     if (normalizedQuery) {
       result = result.filter(
@@ -330,14 +333,14 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
-    if (!showDiscontinued) {
+    if (!showDiscontinued && !showHidden) {
       result = result.filter((r) => r.active);
     }
-    if (stockFilter) {
+    if (stockFilter && !showHidden) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -353,7 +356,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -506,6 +509,17 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           title="Artikel zeigen, die nur in der Verkaufshistorie stehen (nicht im aktuellen Billbee-Artikelstamm)"
         >
           auch ausgelaufene zeigen
+        </button>
+        <button
+          type="button"
+          className={`chip${showHidden ? " on" : ""}`}
+          onClick={() => {
+            setShowHidden((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Manuell ausgeblendete Artikel zeigen – im Detailfenster lassen sie sich wieder einblenden"
+        >
+          Ausgeblendete ({hiddenCount})
         </button>
       </div>
       </details>

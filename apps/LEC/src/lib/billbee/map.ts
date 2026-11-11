@@ -75,13 +75,16 @@ export function mapProduct(p: Json): MasterProduct | null {
   };
 }
 
+/** So weit zurueck werden Bestellungen geholt (Basis fuer das Fenster "Gesamt"). */
+export const LOOKBACK_DAYS = 3650;
+
 const WINDOW_DAYS: { key: SaleWindowKey; days: number }[] = [
   { key: "30", days: 30 },
   { key: "90", days: 90 },
   { key: "365", days: 365 },
+  // "Gesamt": ebenfalls aus den Bestellungen, damit es keine zweite Quelle mit abweichenden Zahlen gibt.
+  { key: "all", days: LOOKBACK_DAYS },
 ];
-
-export const LOOKBACK_DAYS = 365;
 
 /** Billbee-Bestellnummer/-Id; Grundlage, um doppelt gelieferte Bestellungen zu erkennen. */
 function orderKey(o: Json): string | null {

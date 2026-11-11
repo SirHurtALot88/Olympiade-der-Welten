@@ -65,7 +65,7 @@ describe("saveCostSettings", () => {
 });
 
 describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () => {
-  async function seed(extra: { ebayPrice?: number | null; packQty?: number; setCode?: string } = {}) {
+  async function seed(extra: { currentVk?: number | null; ebayPrice?: number | null; packQty?: number; setCode?: string } = {}) {
     const article = await db.prisma.article.create({
       data: {
         nameNormalized: "yu-gi-oh! tst-de001 testkarte ultra rare nm 1st",
@@ -73,7 +73,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
         setCode: extra.setCode ?? "TST-DE001",
         packQty: extra.packQty ?? 1,
         active: true,
-        currentVk: 5.99,
+        currentVk: extra.currentVk ?? null,
         ebayPrice: extra.ebayPrice ?? 8,
         ebayPriceAt: new Date("2026-10-13T12:00:00Z"),
       },
@@ -92,7 +92,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     return article;
   }
 
-  it("Aggregat: eBay-Preis ersetzt den Billbee-Preis, Marktwert ist der 7-Tage-Schnitt (nicht der Trend)", async () => {
+  it("Aggregat: ohne Billbee-VK gilt der eBay-Preis, Marktwert ist der 7-Tage-Schnitt (nicht der Trend)", async () => {
     const a = await seed();
     const { aggregates } = await loadArticleAggregates(db.prisma);
     const agg = aggregates.find((x) => x.articleId === a.id)!;
@@ -100,6 +100,14 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(agg.vkSource).toBe("ebay");
     expect(agg.latestMarketTrend).toBeCloseTo(2);
     expect(agg.marketQuote?.how).toBe("seltenheit");
+  });
+
+  it("hat Billbee einen VK, gilt er vor dem (evtl. veralteten) eBay-Preis", async () => {
+    const a = await seed({ currentVk: 5.99 });
+    const { aggregates } = await loadArticleAggregates(db.prisma);
+    const agg = aggregates.find((x) => x.articleId === a.id)!;
+    expect(agg.currentVk).toBe(5.99);
+    expect(agg.vkSource).toBe("billbee");
   });
 
   it("Zeile: VK-Quelle, Marktwert, Zielspanne (handgerechnet 7,32 € bis 8,92 €), Urteil und Marge bei Nachkauf", async () => {
@@ -143,5 +151,30 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(row.market).toBeNull();
     expect(row.priceTrend).toBeNull();
     expect(row.listingVkSource).toBe("billbee");
+  });
+});
+
+describe("Artikel ausblenden und Bestandslog", () => {
+  it("blendet ausgeblendete Artikel standardmaessig aus und liefert sie mit includeHidden", async () => {
+    await db.prisma.article.create({ data: { nameNormalized: "a", nameRaw: "A", isCard: true } });
+    await db.prisma.article.create({ data: { nameNormalized: "b", nameRaw: "B", isCard: true, hidden: true } });
+    const normal = await loadArticleAggregates(db.prisma);
+    expect(normal.aggregates.map((a) => a.nameRaw)).toEqual(["A"]);
+    const all = await loadArticleAggregates(db.prisma, { includeHidden: true });
+    expect(all.aggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]);
+    expect(all.aggregates.find((a) => a.nameRaw === "B")?.hidden).toBe(true);
+  });
+
+  it("schreibt Bestandsaenderungen beim Artikelstamm-Import mit, den ersten Stand nicht, und setzt hidden nicht zurueck", async () => {
+    const { persistBillbeeArtikel } = await import("../pipeline/persist");
+    const row = (stock: number) => ({ nameNormalized: "x", nameRaw: "X", setCode: null, packQty: 1, isCard: true, stock, currentVk: 5, currentEk: 2, statusRaw: "" });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    expect(await db.prisma.stockMovement.count()).toBe(0);
+    await db.prisma.article.updateMany({ data: { hidden: true } });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    await persistBillbeeArtikel(db.prisma, [row(3)]);
+    const log = await db.prisma.stockMovement.findMany();
+    expect(log.map((m) => [m.before, m.after])).toEqual([[4, 3]]);
+    expect((await db.prisma.article.findFirst())?.hidden).toBe(true);
   });
 });

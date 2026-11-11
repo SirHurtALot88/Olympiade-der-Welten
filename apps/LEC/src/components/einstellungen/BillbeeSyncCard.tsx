@@ -93,8 +93,8 @@ export function BillbeeSyncCard() {
     <div className="card" style={{ padding: "15px 16px 16px" }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Billbee: Artikel, Bestand und Verkäufe</div>
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
-        Holt Artikelstamm (Bestand, VK, EK) und die Bestellungen der letzten 365 Tage direkt aus Billbee und rechnet die Fenster 30, 90 und
-        365 Tage neu. Läuft beim Start und alle 3 Stunden. Die Datei-Importe bleiben als Rückfall.
+        Holt Artikelstamm (Bestand, VK, EK) und alle Bestellungen direkt aus Billbee und rechnet die Fenster 30, 90, 365 Tage und
+        die gesamte Historie neu. Läuft beim Start und einmal täglich. Die Datei-Importe bleiben als Rückfall.
       </div>
 
       {showForm && (
