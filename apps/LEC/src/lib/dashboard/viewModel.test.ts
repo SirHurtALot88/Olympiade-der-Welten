@@ -2,6 +2,7 @@ import { registeredRateBelowThreshold } from "../pricing/costEngine";
 import { describe, expect, it } from "vitest";
 import {
   buildDashboardViewModel,
+  buildFullSortiment,
   buildRecommendations,
   buildSortimentRow,
   shopVolumeFromAggregates,
@@ -453,5 +454,24 @@ describe("DB III (Vollkosten-Ergebnis)", () => {
     });
     const row = buildSortimentRow(card, "beobachten", DEFAULT_COST_SETTINGS, null);
     expect(row.dbIIIPerUnit).toBeCloseTo(row.dbIIPerUnit, 5);
+  });
+});
+
+describe("Plaetze im Vergleich zu den aktiven Artikeln", () => {
+  it("zaehlt nur aktive Artikel, Platz 1 = bester, ohne Verkauf kein Platz", () => {
+    const articles: ArticleAggregate[] = [
+      article("A", { windows: { "90": agg({ qty: 5, revenue: 50 }) } }),
+      article("B", { windows: { "90": agg({ qty: 9, revenue: 90 }) } }),
+      article("Alt", { active: false, windows: { "90": agg({ qty: 99, revenue: 990 }) } }), // ausgelaufen zaehlt nicht
+      article("C"),
+    ];
+    const classified = articles.map((a) => ({ article: a, articleClass: "beobachten" as const, reason: "", label: "Beobachten" }));
+    const rows = buildFullSortiment(articles, classified, DEFAULT_COST_SETTINGS);
+    const by = (n: string) => rows.find((r) => r.nameRaw === n)!;
+    expect(by("B").ranks?.windows["90"]?.qty).toBe(1);
+    expect(by("A").ranks?.windows["90"]?.qty).toBe(2);
+    expect(by("A").ranks?.total).toBe(3);
+    expect(by("C").ranks?.windows["90"]?.qty).toBeNull();
+    expect(by("Alt").ranks).toBeUndefined();
   });
 });

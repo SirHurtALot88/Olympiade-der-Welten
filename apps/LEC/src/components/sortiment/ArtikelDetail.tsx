@@ -182,7 +182,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}
             label="Marge Nachkauf"
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
-            hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
+            hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}${row.ranks?.marge ? ` · Platz #${row.ranks.marge}/${row.ranks.total}` : ""}` : undefined}
           />
           <Stat tone={noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={noSale90 ? "kein Verkauf in 90 Tagen" : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
           <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
@@ -237,7 +237,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 tone={row.today.perMonth != null && row.today.perMonth < 0 ? "crit" : undefined}
                 label="Gewinn je Monat"
                 value={row.today.perMonth != null ? eur(row.today.perMonth) : "—"}
-                hint={row.perMonth ? `${row.perMonth.toFixed(1).replace(".", ",")} Stk/Monat` : "kein Absatz"}
+                hint={row.perMonth ? `${row.perMonth.toFixed(1).replace(".", ",")} Stk/Monat${row.ranks?.gewinnMonat ? ` · Platz #${row.ranks.gewinnMonat}/${row.ranks.total}` : ""}` : "kein Absatz"}
               />
               <Stat
                 label="Gebundenes Kapital"
@@ -272,8 +272,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               return (
                 <tr key={w.key}>
                   <td>{w.label}</td>
-                  <td className="r">{x ? x.qty : "—"}</td>
-                  <td className="r">{x ? eur(x.revenue) : "—"}</td>
+                  <td className="r">{x ? x.qty : "—"}<RankTag n={row.ranks?.windows[w.key]?.qty} total={row.ranks?.total} /></td>
+                  <td className="r">{x ? eur(x.revenue) : "—"}<RankTag n={row.ranks?.windows[w.key]?.revenue} total={row.ranks?.total} /></td>
                   <td className="r">{x ? eur(x.avgPrice) : "—"}</td>
                 </tr>
               );
@@ -413,6 +413,16 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         )}
       </aside>
     </div>
+  );
+}
+
+/** Platz unter allen aktiven Artikeln, klein neben der Zahl: #359/1000. */
+function RankTag({ n, total }: { n?: number | null; total?: number }) {
+  if (!n || !total) return null;
+  return (
+    <small className="bd-rank" title={`Platz ${n} von ${total} aktiven Artikeln`}>
+      #{n}/{total}
+    </small>
   );
 }
 
