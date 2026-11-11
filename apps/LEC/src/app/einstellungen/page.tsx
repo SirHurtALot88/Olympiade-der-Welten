@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/client";
 import { loadActiveCostSettings, loadArticleAggregates, listRecentImportBatches } from "@/lib/dashboard/queries";
 import { shopVolumeFromAggregates } from "@/lib/dashboard/viewModel";
 import { getAuthConfig } from "@/lib/auth/config";
+import { loadFeeCheck } from "@/lib/pricing/feeCheck";
 import { EinstellungenPage } from "@/components/einstellungen/EinstellungenPage";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export default async function Page() {
     windowFrom: b.windowFrom ? b.windowFrom.toISOString() : null,
     windowTo: b.windowTo ? b.windowTo.toISOString() : null,
   }));
+  const feeCheck = await loadFeeCheck(prisma, costSettings);
   const auth = getAuthConfig();
 
   return (
@@ -26,6 +28,7 @@ export default async function Page() {
       importBatches={importBatches}
       authEnabled={auth.enabled}
       shopVolume={shopVolume}
+      feeCheck={feeCheck}
     />
   );
 }
