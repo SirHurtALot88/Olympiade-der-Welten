@@ -121,6 +121,7 @@ import {
   beschreibeGebuchtesArenaErgebnis,
   findeEigeneWertungsZeilen,
   grundOhneMotorSpiel,
+  waehleArenaFlaeche,
   zeigtArenaDenGebuchtenSieger,
 } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
 import { isBattleModeSave } from "@/lib/season/game-mode";
@@ -2692,14 +2693,24 @@ export default function DisciplineStageArena({
    *
    * An der Wertung aendert nichts davon etwas: gebucht wird in jedem Fall der Snapshot.
    */
-  const battleModusArena = mode === "real" && !devMode && isBattleModeSave(gameState);
+  // KEINE DEMOS MEHR (11.11.): das gebuchte Motor-Spiel wird in einem Battle-Save AUCH im
+  // Admin-Testmodus gesucht und gezeigt -- s. `waehleArenaFlaeche()` (arena-spieltag-ansicht.ts).
+  const battleSaveEcht = mode === "real" && isBattleModeSave(gameState);
   const battleArenaSpieltag = useMemo(
     () =>
-      battleModusArena
+      battleSaveEcht
         ? bestimmeArenaSpieltagAnsicht({ gameState, matchdayId, disciplineId, ownTeamId, preview })
         : null,
-    [battleModusArena, gameState, matchdayId, disciplineId, ownTeamId, preview],
+    [battleSaveEcht, gameState, matchdayId, disciplineId, ownTeamId, preview],
   );
+  const arenaFlaeche = waehleArenaFlaeche({
+    istBattleSave: isBattleModeSave(gameState),
+    echteWerte: mode === "real",
+    adminTestmodus: devMode,
+    hatMotorSpiel: battleArenaSpieltag != null,
+  });
+  // true = die alte Buehne (samt Pixel-Arena-Kasten) wird NICHT gezeigt.
+  const battleModusArena = arenaFlaeche !== "buehne";
   const battleWertungsZeilen = useMemo(
     () => (battleModusArena && !battleArenaSpieltag ? findeEigeneWertungsZeilen({ preview, disciplineId, ownTeamId }) : null),
     [battleModusArena, battleArenaSpieltag, preview, disciplineId, ownTeamId],

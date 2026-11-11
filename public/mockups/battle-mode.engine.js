@@ -62564,6 +62564,39 @@
         fertig:u.fertig!=null, aktiv:!!u.aktiv, raus:!!u.raus,
         vizSchritt:u.vizSchritt==null?null:+u.vizSchritt.toFixed(3)}))
     }),
+    // GEZEIGT = GEBUCHT, FIGUR FUER FIGUR (Chris 11.11.: "KEINE DEMOS mehr! das soll nicht einfach
+    // abgespult werden! das muss sauber simuliert sein durch unsere engine"; Pilot Climbing,
+    // docs/design/bahn-echte-simulation-rollout-11-11.md). Zwei reine Lese-Sonden, kein rr(),
+    // kein Schreibzugriff auf LAEUFER/Saat/Wertung:
+    //   bahnFigurenProbe()   die Bahn, wie sie GERADE gezeichnet wird: je Laeufer Name (= die
+    //                        PixelLab-Figur, pixelFigurLaden(u.n)), Seite, Motor-Fortschritt
+    //                        `pos`, die gezeichnete Stelle laeuferXY() und -- an der Wand -- der
+    //                        gezeichnete Hoehenanteil climbAnzeigeAnteil().
+    //   bahnSpurProbe(bd,s)  der GEBUCHTE Lauf (dieselbe Schleife wie bahnLauf(): M.bau(saat),
+    //                        stepSpurt(1/60) bis done/rennT>=90), aber mit `pos` je Laeufer nach
+    //                        JEDEM Tick mitgeschrieben. Danach M.zurueck() wie bahnLauf().
+    // tests/bahn-climbing-gezeigt-gleich-gebucht.test.ts legt beide nebeneinander.
+    bahnFigurenProbe:()=>{
+      if(!istBahn(disc)||typeof LAEUFER==="undefined")return null;
+      const wand=istWand();
+      return {disc, rennT, wand,
+        laeufer:LAEUFER.map(u=>{ const p=laeuferXY(u);
+          return {id:u.id, n:u.n, seite:u.seite, pos:u.pos, fertig:u.fertig!=null, x:p.x, y:p.y,
+            anzeige:wand?climbAnzeigeAnteil(u):null, sturz:wand?u.vizFallVon!=null:false,
+            figurAngemeldet:pixelFigurenImSpiel.includes(u.n)}; })};
+    },
+    bahnSpurProbe:(bd,saat)=>{
+      if(typeof BAHN_ART==="undefined"||!BAHN_ART[bd])return null;
+      const M=MOTOREN[bd]; if(!M)return null;
+      const gesichert=M.sichern(); M.vorher(); M.bau(saat||1337);
+      const spur=[]; let guard=0;
+      stumm=true;
+      try{ while(!done&&rennT<90&&guard<20000){ stepSpurt(1/60); guard++; spur.push(LAEUFER.map(u=>u.pos)); } }
+      finally { stumm=false; }
+      const namen=LAEUFER.map(u=>({id:u.id, n:u.n, seite:u.seite}));
+      M.zurueck(gesichert);
+      return {disziplin:bd, saat:saat||1337, namen, spur};
+    },
     // TON-SCHICHT-PROBE (PR 0, Abschnitt 3.1): rein diagnostisch, wie renderProbe/figurProbe
     // daneben — ruft sfx()/tonLoopStart()/tonLoopStop() von aussen auf (Playwright, ohne
     // UI-Klick) und meldet zurueck, ob dabei ein Fehler geworfen wurde. Ein Aufruf VOR der
