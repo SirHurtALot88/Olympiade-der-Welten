@@ -276,6 +276,29 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </>
         )}
 
+        <h4>Warenbewegungen</h4>
+        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen.</p>}
+        {movements.length > 0 && (
+          <>
+            <table className="bd-dt-t">
+              <thead>
+                <tr><th>Datum</th><th>Art</th><th className="r">Stück</th><th>Detail</th></tr>
+              </thead>
+              <tbody>
+                {movements.map((x, i) => (
+                  <tr key={i}>
+                    <td>{day(x.at)}</td>
+                    <td>{x.kind}</td>
+                    <td className="r">{x.delta > 0 ? `+${x.delta}` : x.delta}</td>
+                    <td>{x.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="bd-fig-note">Verkäufe und Einkäufe stammen aus Billbee bzw. dem Einkaufsimport. „Bestand laut Billbee“ wird seit heute bei jedem Abgleich mitgeschrieben (Billbee liefert keine Lagerhistorie).</p>
+          </>
+        )}
+
         <h4>Einkäufe</h4>
         {failed && <p className="bd-none">Details konnten nicht geladen werden.</p>}
         {!detail && !failed && <p className="bd-none">Lädt …</p>}
@@ -351,7 +374,6 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
     <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
-      {hint && <small>{hint}</small>}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export async function loadArticleAggregates(
 ): Promise<ArticleAggregatesResult> {
   const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
-      where: { isCard: true },
+      where: opts.includeHidden ? { isCard: true } : { isCard: true, hidden: false },
       include: { saleWindows: true },
     }),
     prisma.marketPrice.findMany({
