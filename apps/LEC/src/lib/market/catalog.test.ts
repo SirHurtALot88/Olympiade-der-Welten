@@ -76,3 +76,24 @@ describe("resolveMarket", () => {
     expect(resolveMarket(index, "AC11-DE012", "x", rarityMap)).toEqual({ quality: "keiner", reason: "set_code_unbekannt" });
   });
 });
+
+describe("25th-Anniversary-Neuauflage gegen Original (LOB, MRD ...)", () => {
+  const cards = Array.from({ length: 45 }, (_, i) => ({ name: `Karte ${i + 1}`, card_sets: [{ set_code: `LOB-EN${String(i + 1).padStart(3, "0")}` }] }));
+  const prods = [
+    ...cards.map((c, i) => ({ idProduct: 1000 + i, name: c.name, idExpansion: 1064, dateAdded: "2007-01-01 00:00:00" })),
+    ...cards.map((c, i) => ({ idProduct: 2000 + i, name: c.name, idExpansion: 5339, dateAdded: "2023-04-14 10:00:00" })),
+  ];
+  const prs = prods.map((p) => price(p.idProduct, p.idProduct < 2000 ? 4.33 : 1.0));
+  const idx = buildCatalogIndex(cards, prods, prs);
+
+  it("erkennt die Neuauflage aus Expansion, Anlagedatum und Vollstaendigkeit", () => {
+    expect(idx.reprint25ByPrefix.get("LOB")).toEqual([5339]);
+  });
+  it("-DE im Set-Code = Neuauflage", () => {
+    expect(resolveMarket(idx, "LOB-DE008", "Yu-Gi-Oh! LOB-DE008 Karte 8 Super Rare NM", {})).toMatchObject({ quality: "eindeutig", idProduct: 2007, edition: "25th" });
+  });
+  it("alter Code mit G (auch ohne erkannten Set-Code im Artikel) = Original", () => {
+    expect(resolveMarket(idx, null, "Yu-Gi-Oh! LOB-G008 Karte 8 Super Rare NM", {})).toMatchObject({ quality: "eindeutig", idProduct: 1007, edition: "original" });
+    expect(resolveMarket(idx, null, "Yu-Gi-Oh! LOB-E008 Card 8 Super Rare NM", {})).toMatchObject({ idProduct: 1007 });
+  });
+});
