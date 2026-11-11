@@ -92,6 +92,8 @@ export interface DeadCapital {
   count: number;
   totalArticles: number;
   percent: number;
+  /** Gebundenes Kapital (Bestand x EK) der Ladenhueter in Euro; null, wenn kein Bestand bekannt. */
+  euro?: number | null;
 }
 
 export interface MoverItem {
@@ -334,6 +336,10 @@ export function buildDashboardViewModel(
     count: deadArticles.length,
     totalArticles: withHistory.length,
     percent: pct(deadArticles.length, withHistory.length),
+    euro: (() => {
+      const caps = deadArticles.map((a) => boundCapitalOf(a)).filter((v): v is number => v !== null);
+      return caps.length > 0 ? caps.reduce((s, v) => s + v, 0) : null;
+    })(),
   };
 
   // Klassifikation je Artikel (regelbasiert, KONZEPT §8 Stufe 1).

@@ -226,16 +226,31 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         {row.today && (
           <>
             <h4>Was ein Verkauf heute bringt</h4>
-            <table className="bd-dt-t">
-              <tbody>
-                <tr><td>Gewinn je Stück ({row.listingVk ? "heutiger VK" : "Ø-VK, kein Listenpreis"} und aktueller EK, vor Fixkosten)</td><td className="r"><b style={{ color: row.today.profitPerUnit < 0 ? "var(--crit)" : undefined }}>{eur(row.today.profitPerUnit)}</b> · {formatPercent(row.today.marginPct)} %</td></tr>
-                {row.today.perMonth != null && <tr><td>Gewinn je Monat bei aktuellem Tempo ({row.perMonth?.toFixed(1).replace(".", ",")} Stk/Monat)</td><td className="r">{eur(row.today.perMonth)}</td></tr>}
-                {row.today.inStock != null && <tr><td>Gewinn, wenn der Bestand ({row.stock} Stk) weg ist</td><td className="r">{eur(row.today.inStock)}</td></tr>}
-                {row.today.capitalBound != null && <tr><td>Gebundenes Kapital (Bestand × EK)</td><td className="r">{eur(row.today.capitalBound)}</td></tr>}
-                {row.today.maxEk25 != null && <tr><td>Höchster EK für 25 % Marge beim heutigen VK</td><td className="r">{eur(row.today.maxEk25)}</td></tr>}
-                {lastSale != null && <tr><td>Letzter Verkauf</td><td className="r" style={{ color: row.stock > 0 && lastSale > 90 ? "var(--crit)" : undefined }}>vor {lastSale} Tagen</td></tr>}
-              </tbody>
-            </table>
+            <section className="bd-dt-grid today">
+              <Stat
+                tone={row.today.profitPerUnit < 0 ? "crit" : row.today.marginPct < 0.25 ? "warn" : "good"}
+                label="Gewinn je Stück"
+                value={`${eur(row.today.profitPerUnit)} · ${formatPercent(row.today.marginPct)} %`}
+                hint={`${row.listingVk ? "heutiger VK" : "Ø-VK, kein Listenpreis"}, aktueller EK, vor Fixkosten`}
+              />
+              <Stat
+                tone={row.today.perMonth != null && row.today.perMonth < 0 ? "crit" : undefined}
+                label="Gewinn je Monat"
+                value={row.today.perMonth != null ? eur(row.today.perMonth) : "—"}
+                hint={row.perMonth ? `${row.perMonth.toFixed(1).replace(".", ",")} Stk/Monat` : "kein Absatz"}
+              />
+              <Stat
+                label="Gebundenes Kapital"
+                value={row.today.capitalBound != null ? eur(row.today.capitalBound) : "—"}
+                hint={row.today.inStock != null ? `Bestand ergibt ${eur(row.today.inStock)} Gewinn` : undefined}
+              />
+              <Stat
+                label="Max. EK für 25 %"
+                value={row.today.maxEk25 != null ? eur(row.today.maxEk25) : "—"}
+                hint={lastSale != null ? `letzter Verkauf vor ${lastSale} Tagen` : undefined}
+                tone={lastSale != null && row.stock > 0 && lastSale > 90 ? "crit" : undefined}
+              />
+            </section>
           </>
         )}
 
@@ -266,7 +281,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </tbody>
         </table>
 
-        <h4>Ergebnis je Stück</h4>
+        <details>
+        <summary>Ergebnis je Stück (historischer Schnitt)</summary>
         <table className="bd-dt-t">
           <tbody>
             <tr><td>DB I (nach Wareneinsatz)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
@@ -274,6 +290,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <tr><td>DB III (mit Fixkosten)</td><td className="r">{eur(row.dbIIIPerUnit)} · {formatPercent(row.dbIIIPercent)} %</td></tr>
           </tbody>
         </table>
+        </details>
 
         {detail && detail.sales.length > 0 && (
           <>
@@ -352,7 +369,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
 
         {detail && detail.reports.length > 0 && (
           <>
-            <h4>eBay-Verkaufsberichte</h4>
+            <details>
+            <summary>eBay-Verkaufsberichte</summary>
             <table className="bd-dt-t">
               <thead>
                 <tr><th>Zeitraum</th><th className="r">Stück</th><th className="r">Ø Preis</th></tr>
@@ -368,6 +386,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
             <p className="bd-fig-note">Verkaufsdaten liegen nur je Berichtszeitraum vor, nicht je Einzelverkauf.</p>
+            </details>
           </>
         )}
 

@@ -217,6 +217,15 @@ tbody td.r { white-space: nowrap; }
 tbody td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--panel2); }
+.bd-row-click { cursor: pointer; }
+/* Artikelspalte der Tabelle "Alle Spalten" bleibt beim Querscrollen stehen */
+table.resizable th:first-child, table.resizable td:first-child { position: sticky; left: 0; z-index: 2; background: var(--panel); }
+table.resizable tbody tr:hover td:first-child { background: var(--panel2); }
+@media (max-width: 600px) { .bd-dt-grid { grid-template-columns: repeat(2, 1fr) !important; } .bd-dt-stat small { display: block !important; } }
+.bd-dt details { margin-top: 14px; }
+.bd-dt details > summary { cursor: pointer; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 4px 0; }
+.bd-dt-grid.today { grid-template-columns: repeat(4, 1fr); margin-top: 6px; }
+@media (max-width: 760px) { .bd-dt-grid.today { grid-template-columns: repeat(2, 1fr); } }
 /* --- Resizable-Spalten (Sortiment) --- */
 table.resizable th { position: relative; overflow: hidden; }
 table.resizable th .th-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }

@@ -583,13 +583,6 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
             </span>
           </div>
           <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
-          {detailRow && (
-            <ArtikelDetail
-              row={detailRow}
-              imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
-              onClose={() => setDetailId(null)}
-            />
-          )}
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
@@ -621,7 +614,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                 // Fallback realisierter Ø-VK, wenn kein Artikelstamm-Preis vorliegt.
                 const vkForCorridor = row.listingVk ?? row.avgVkRealized;
                 return (
-                  <tr key={row.articleId}>
+                  <tr key={row.articleId} className="bd-row-click" onClick={() => setDetailId(row.articleId)}>
                     <td>
                       <div className="artcell">
                         {imageVersions[row.articleId] ? (
@@ -778,6 +771,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </div>
         )}
       </section>
+      )}
+      {detailRow && (
+        <ArtikelDetail
+          row={detailRow}
+          imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
+          onClose={() => setDetailId(null)}
+        />
       )}
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
