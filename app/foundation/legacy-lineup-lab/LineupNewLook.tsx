@@ -167,6 +167,12 @@ export type LineupNewLookProps = Pick<
    */
   rosterShortfall?: LineupRosterShortfall | null;
   /**
+   * GEGNER DES SPIELTAGS (11.11., Chris: "man sollte auch in der Einsatzliste sehen, wer die Gegner
+   * am aktuellen Spieltag sind"). Je Disziplin-Slot die Vierergruppe bzw. der Duell-Gegner aus dem
+   * Spielplan (`getSpieltagsGegnerFuerTeam`, dieselbe Quelle wie Resolve). Leer/null = nichts zeigen.
+   */
+  spieltagsGegner?: Array<{ disciplineSide: "d1" | "d2"; displayName: string; art: "pod" | "duell"; gegnerNamen: string[] }> | null;
+  /**
    * Letztes Preview-Ergebnis des Clients (derselbe Feed, den die klassische
    * Einsatzliste für ihren Scoreboard-Reveal nutzt). Treibt die Resolve-Show —
    * null/nicht-ok => Show wird gar nicht angeboten (progressive Enhancement).
@@ -1086,6 +1092,7 @@ export default function LineupNewLook({
   statusMessage,
   errors,
   rosterShortfall = null,
+  spieltagsGegner = null,
   resolvePreview,
   formCardControlsBySide,
   onAssignDisciplineFormCard,
@@ -2299,6 +2306,19 @@ export default function LineupNewLook({
             <span className={`nl-lineup-nextstep is-${matchdayPreviewCards.openSlots > 0 ? "warn" : "good"}`} title={lineupFlowSummary.nextStep.detail}>
               {lineupFlowSummary.nextStep.label}
             </span>
+            {spieltagsGegner && spieltagsGegner.some((slot) => slot.gegnerNamen.length > 0) ? (
+              <ul className="nl-lineup-gegner" data-testid="nl-lineup-spieltags-gegner" aria-label="Gegner an diesem Spieltag">
+                {spieltagsGegner.map((slot) => (
+                  <li key={slot.disciplineSide} data-art={slot.art}>
+                    <span className="nl-lineup-gegner-diszi">
+                      {slot.disciplineSide.toUpperCase()} {slot.displayName}
+                      {slot.art === "pod" ? " · Gruppe" : " · vs."}
+                    </span>{" "}
+                    {slot.gegnerNamen.length > 0 ? slot.gegnerNamen.join(", ") : "—"}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         </div>
 

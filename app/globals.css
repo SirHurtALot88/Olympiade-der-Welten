@@ -60232,6 +60232,27 @@ button.foundation-team-portrait-card {
   border-color: color-mix(in srgb, var(--nl-warn) 45%, transparent);
 }
 
+.is-new-look .nl-lineup-gegner {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+  color: var(--nl-ink);
+  min-width: 0;
+}
+
+.is-new-look .nl-lineup-gegner li {
+  overflow-wrap: anywhere;
+}
+
+.is-new-look .nl-lineup-gegner-diszi {
+  color: var(--nl-mut);
+  font-weight: 600;
+}
+
 .is-new-look .nl-lineup-nextstep.is-good {
   color: var(--nl-good);
   border-color: color-mix(in srgb, var(--nl-good) 45%, transparent);
