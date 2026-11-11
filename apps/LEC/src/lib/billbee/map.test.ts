@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractSales, mapOrders, mapProduct, titleOf } from "./map";
+import { ebayItemIdOf, extractSales, mapOrders, mapProduct, titleOf } from "./map";
 
 const NOW = new Date("2026-10-13T12:00:00Z");
 
@@ -101,5 +101,13 @@ describe("Bestell-Pruefung", () => {
     const d = diagnoseOrders(orders, 0);
     expect(d.fractionalItems).toBe(1);
     expect(d.top[0]).toMatchObject({ units: 3.5, orders: 2, maxLine: 2 });
+  });
+});
+
+describe("ebayItemIdOf", () => {
+  it("liest die eBay-Artikelnummer aus den Quellen, nicht andere Marktplaetze oder krumme IDs", () => {
+    expect(ebayItemIdOf({ Sources: [{ Source: "Amazon", SourceId: "B0123456789" }, { Source: "eBay", ApiAccountName: "lec", SourceId: "226616298122" }] })).toBe("226616298122");
+    expect(ebayItemIdOf({ Sources: [{ Source: "eBay", SourceId: "abc" }] })).toBeNull();
+    expect(ebayItemIdOf({})).toBeNull();
   });
 });

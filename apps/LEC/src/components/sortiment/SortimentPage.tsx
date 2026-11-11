@@ -83,8 +83,8 @@ const COLS: ColumnDef<ColId>[] = [
   { id: "umsatz", label: "Umsatz", def: 96, min: 70, align: "r" },
   { id: "avgpreis", label: "Ø Preis", def: 84, min: 65, align: "r" },
   { id: "avgvk", label: "Ø-VK (real.)", def: 96, min: 70, align: "r" },
-  // Aktueller VK = Angebotspreis aus dem eBay-Shop (live, alle 6 Stunden), sonst Billbee-Artikelstamm.
-  { id: "listingvk", label: "Akt. VK (eBay)", def: 104, min: 80, align: "r" },
+  // Aktueller VK = Preis aus dem Billbee-Artikelstamm; der eBay-Shop-Preis ist nur Rückfall.
+  { id: "listingvk", label: "Akt. VK", def: 104, min: 80, align: "r" },
   // Cardmarket-Block: was kostet die Karte heute (Marktwert), wo sollte der VK stehen (25-33 %
   // Deckungsbeitrag bei Nachkauf zum Marktwert), und stimmt dein VK damit ueberein.
   { id: "marktwert", label: "Marktwert", def: 112, min: 80, align: "r" },
@@ -201,7 +201,10 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
 
 export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions, band }: Props) {
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const searchParams0 = useSearchParams();
+  // Weitere Filter stehen als kommagetrennte Flags in der Adresse, damit Neuladen und Zurueck sie behalten.
+  const initialFlags = new Set((searchParams0.get("flags") ?? "").split(",").filter(Boolean));
+  const [detailId, setDetailId] = useState<string | null>(searchParams0.get("artikel"));
   const detailRow = useMemo(() => (detailId ? rows.find((r) => r.articleId === detailId) ?? null : null), [detailId, rows]);
   const router = useRouter();
   const pathname = usePathname();
@@ -222,20 +225,22 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   });
   // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
-  const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
-  const [onlyNameCheck, setOnlyNameCheck] = useState(false);
+  const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
+  const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
+  const [onlyMarketFalling, setOnlyMarketFalling] = useState(initialFlags.has("marktfaellt"));
+  const [onlyNameCheck, setOnlyNameCheck] = useState(initialFlags.has("namecheck"));
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
-  const [boardSort, setBoardSort] = useState<BoardSortKey>("abweichung");
+  const [boardSort, setBoardSort] = useState<BoardSortKey>(((searchParams.get("sort") as BoardSortKey | null) && (searchParams.get("sort") as string) in BOARD_SORT_LABEL ? searchParams.get("sort") : "abweichung") as BoardSortKey);
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
-  const [showDiscontinued, setShowDiscontinued] = useState(false);
-  const [showHidden, setShowHidden] = useState(false);
+  const [showDiscontinued, setShowDiscontinued] = useState(initialFlags.has("ausgelaufen"));
+  const [showHidden, setShowHidden] = useState(initialFlags.has("ausgeblendet"));
   const hiddenCount = useMemo(() => rows.filter((r) => r.hidden).length, [rows]);
   // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
   // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
-  const [showNoStock, setShowNoStock] = useState(false);
+  const [showNoStock, setShowNoStock] = useState(initialFlags.has("ohnebestand"));
   const stockKnown = useMemo(() => rows.some((r) => r.stock > 0), [rows]);
   const stockFilter = !showNoStock && stockKnown;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -252,10 +257,21 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
     if (view === "alles") params.set("ansicht", "alles");
+    if (boardSort !== "abweichung") params.set("sort", boardSort);
+    const flags = [
+      onlyLadenhueter && "ladenhueter",
+      onlySoldOut && "ausverkauft",
+      onlyMarketFalling && "marktfaellt",
+      onlyNameCheck && "namecheck",
+      showNoStock && "ohnebestand",
+      showDiscontinued && "ausgelaufen",
+      showHidden && "ausgeblendet",
+    ].filter(Boolean);
+    if (flags.length > 0) params.set("flags", flags.join(","));
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, onlyLadenhueter, onlySoldOut, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {
@@ -330,17 +346,24 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (onlyNameCheck) {
       result = result.filter((r) => r.codeName?.mismatch);
     }
+    if (onlySoldOut) {
+      result = result.filter((r) => r.stock <= 0 && r.active && r.velocity[1] > 0);
+    }
+    if (onlyMarketFalling) {
+      result = result.filter((r) => r.stock > 0 && r.market?.trend7vs30 != null && r.market.trend7vs30 < -0.05);
+    }
     if (onlyLadenhueter) {
       result = result.filter((r) => r.articleClass === "ladenhueter");
     }
     if (!showDiscontinued && !showHidden) {
       result = result.filter((r) => r.active);
     }
-    if (stockFilter && !showHidden) {
+    // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
+    if (stockFilter && !showHidden && !normalizedQuery && !onlySoldOut) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
-  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, showDiscontinued, showHidden, stockFilter]);
+  }, [rows, query, classFilter, statusFilter, marketFilter, valueRange, onlyNameCheck, onlyLadenhueter, onlySoldOut, onlyMarketFalling, showDiscontinued, showHidden, stockFilter]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -352,11 +375,11 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   }, [filtered, sort, selectedWindow]);
 
   // Zaehler je Markt-Filter ueber die aktiven Artikel (ohne die anderen Filter), damit man sieht, wie viele es sind.
-  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
+  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => !r.hidden && r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);
-  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
+  const extraFiltersActive = showNoStock || onlyNameCheck || classFilter.size > 0 || statusFilter.size > 0 || onlyLadenhueter || onlySoldOut || onlyMarketFalling || showDiscontinued || showHidden || marketFilter.has("ek_ueber");
   const maxVelocity = Math.max(1, ...visible.flatMap((r) => r.velocity));
   const { widths, total, startResize, resetWidths } = columnWidths;
 
@@ -477,6 +500,28 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
         </button>
         <button
           type="button"
+          className={`chip${onlySoldOut ? " on" : ""}`}
+          onClick={() => {
+            setOnlySoldOut((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Bestand 0, aber in den letzten 90 Tagen verkauft: Nachkauf prüfen"
+        >
+          ausverkauft, lief gut
+        </button>
+        <button
+          type="button"
+          className={`chip${onlyMarketFalling ? " on" : ""}`}
+          onClick={() => {
+            setOnlyMarketFalling((v) => !v);
+            setVisibleCount(PAGE_SIZE);
+          }}
+          title="Marktpreis (Ø 7 Tage) mehr als 5 % unter Ø 30 Tage, Bestand liegt: Preis prüfen, nicht nachkaufen"
+        >
+          Markt fällt, Bestand liegt
+        </button>
+        <button
+          type="button"
           className={`chip${onlyNameCheck ? " on" : ""}`}
           onClick={() => {
             setOnlyNameCheck((v) => !v);
@@ -552,13 +597,6 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
             </span>
           </div>
           <PreisBoard rows={boardRows} imageVersions={imageVersions} imageSrc={imageSrc} onPreview={setPreview} onOpen={setDetailId} />
-          {detailRow && (
-            <ArtikelDetail
-              row={detailRow}
-              imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
-              onClose={() => setDetailId(null)}
-            />
-          )}
           {filtered.length > boardRows.length && (
             <div className="bd-more-rows">
               <button type="button" className="chip" onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}>
@@ -590,7 +628,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                 // Fallback realisierter Ø-VK, wenn kein Artikelstamm-Preis vorliegt.
                 const vkForCorridor = row.listingVk ?? row.avgVkRealized;
                 return (
-                  <tr key={row.articleId}>
+                  <tr key={row.articleId} className="bd-row-click" onClick={() => setDetailId(row.articleId)}>
                     <td>
                       <div className="artcell">
                         {imageVersions[row.articleId] ? (
@@ -636,7 +674,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
                         row.listingVkSource === "ebay"
                           ? `Aktueller Angebotspreis aus deinem eBay-Shop${row.listingVkAt ? ` (Stand ${new Date(row.listingVkAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })})` : ""}`
                           : row.listingVkSource === "billbee"
-                            ? "Aus dem Billbee-Artikelstamm (bei eBay gerade nicht gelistet)"
+                            ? "Aus dem Billbee-Artikelstamm (dort pflegen, beim nächsten Abgleich übernommen)"
                             : undefined
                       }
                     >
@@ -747,6 +785,13 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
           </div>
         )}
       </section>
+      )}
+      {detailRow && (
+        <ArtikelDetail
+          row={detailRow}
+          imageSrc={imageVersions[detailRow.articleId] ? imageSrc(detailRow.articleId, imageVersions[detailRow.articleId]) : null}
+          onClose={() => setDetailId(null)}
+        />
       )}
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element

@@ -185,7 +185,7 @@ export function PreisBoard({ rows, imageVersions, imageSrc, onPreview, onOpen }:
                 <td data-label="Ø VK" className="r bd-num bd-c-avg">
                   {row.avgVkRealized > 0 ? eur(row.avgVkRealized) : <span className="bd-none">—</span>}
                 </td>
-                <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "Aktueller Angebotspreis aus deinem eBay-Shop" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm (bei eBay nicht gelistet)" : undefined}>
+                <td data-label="Dein VK" className="r bd-vk bd-c-vk" title={row.listingVkSource === "ebay" ? "eBay-Shoppreis (Rückfall, wenn Billbee keinen VK hat)" : row.listingVkSource === "billbee" ? "Aus dem Billbee-Artikelstamm" : undefined}>
                   {boardVk(row) > 0 ? eur(boardVk(row)) : "—"}
                   {row.listingVkSource === "ebay" && <span className="vksrc" />}
                   <EbayLink row={row} />

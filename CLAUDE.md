@@ -343,5 +343,9 @@ statt Build, Browser-Smokes, voller Suite, Persistenz-Suiten und Rangtreue-Schra
 `app/`), läuft die volle CI. Website und Deploy bleiben unverändert: der Server baut jeden neuen
 `main`-Commit wie bisher.
 
+**LEC-Cockpit (apps/LEC, docs/enterich-cards) hängt an derselben Weiche** (Chris, 11.11.): ein Push, der nur dort etwas ändert, fährt
+statt der Oly-CI nur den Job `lec` (Prisma, Typen, Vitest). Berührt ein Push `apps/LEC`, läuft `lec` immer mit, auch neben der
+Oly-CI. `scripts/ci-beruehrt.sh` sagt, welches Nebenprojekt angefasst wurde.
+
 **Jeder neue CI-Job braucht die Weiche** (`needs: weiche` und `if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}`).
 Sonst läuft er bei jedem Moosgrab-PR mit; `tests/kartenschmiede.test.ts` („CI-Weiche“) wird dann rot.

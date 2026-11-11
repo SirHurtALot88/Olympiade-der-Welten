@@ -14,6 +14,7 @@ interface Detail {
   purchases: { date: string; qty: number; unitEk: number; buyShipping: number; source: string }[];
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
+  priceLog: { at: string; before: number; after: number }[];
   stockLog: { at: string; before: number; after: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
 }
@@ -74,20 +75,54 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const rarity = rarityFromTitle(row.nameRaw);
   const vk = boardVk(row);
   const bought = detail?.purchases.reduce((s, p) => s + p.qty, 0) ?? 0;
+  const consumed = new Map<object, number>();
   const movements = detail
     ? [
-        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `${eur(x.unitPrice)} je Stück` })),
-        ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `${eur(p.unitEk)} EK · ${p.source}` })),
-        ...detail.stockLog.map((m) => ({ at: m.at, kind: "Bestand laut Billbee", delta: m.after - m.before, note: `${m.before} → ${m.after} Stk` })),
+        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: row.currentEk != null && row.currentEk > 0 ? `EK ca. ${eur(row.currentEk)} je Stück` : "" })),
+        ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `gekauft zu ${eur(p.unitEk)} EK je Stück · ${p.source}` })),
+        // Bestandsaenderungen laut Billbee nur, soweit Verkaeufe sie NICHT schon erklaeren (Zugang, Korrektur, Schwund).
+        ...detail.stockLog
+          .map((m) => {
+            const delta = m.after - m.before;
+            if (delta >= 0) return { at: m.at, kind: "Zugang (Einkauf/Korrektur)", delta, note: `Bestand ${m.before} → ${m.after}${row.currentEk != null && delta > 0 ? ` · ca. ${eur(delta * row.currentEk)} zum aktuellen EK` : ""}` };
+            // Verkaeufe, die den Abgang erklaeren (3 Tage davor bis 1 Tag danach), werden verbraucht; nur der Rest bleibt "Abgang".
+            const at = new Date(m.at).getTime();
+            let rest = -delta;
+            for (const x of detail.sales) {
+              if (rest <= 0) break;
+              const t = new Date(x.soldAt).getTime();
+              if (t > at + 86_400_000 || t < at - 3 * 86_400_000 || consumed.get(x) === x.qty) continue;
+              const take = Math.min(rest, x.qty - (consumed.get(x) ?? 0));
+              consumed.set(x, (consumed.get(x) ?? 0) + take);
+              rest -= take;
+            }
+            return rest > 0 ? { at: m.at, kind: "Abgang laut Billbee", delta: -rest, note: `Bestand ${m.before} → ${m.after}, nicht durch Verkäufe erklärt` } : null;
+          })
+          .filter((x): x is { at: string; kind: string; delta: number; note: string } => x !== null),
       ]
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 25)
     : [];
-  const vkTone: Tone = m?.status === "im_korridor" ? "good" : m?.status === "zu_guenstig" ? "warn" : m?.status === "zu_teuer" ? "crit" : undefined;
+  const lastChange = detail?.priceLog[0] ?? null;
+    const soldSinceChange = lastChange && detail ? detail.sales.filter((x) => x.soldAt >= lastChange.at).reduce((sum, x) => sum + x.qty, 0) : 0;
+  const chg = lastChange && detail ? (() => {
+    const t0 = new Date(lastChange.at).getTime();
+    const daysSince = Math.max(1, (Date.now() - t0) / 86_400_000);
+    const before = detail.sales.filter((x) => { const t = new Date(x.soldAt).getTime(); return t < t0 && t >= t0 - 60 * 86_400_000; }).reduce((s, x) => s + x.qty, 0);
+    const after = detail.sales.filter((x) => new Date(x.soldAt).getTime() >= t0).reduce((s, x) => s + x.qty, 0);
+    return daysSince >= 7 ? { before: (before / 60) * 30, after: (after / daysSince) * 30, daysSince: Math.round(daysSince) } : null;
+  })() : null;
+  const lastSale = detail?.sales[0] ? Math.max(0, Math.floor((Date.now() - new Date(detail.sales[0].soldAt).getTime()) / 86_400_000)) : null;
+  const mk = detail?.market;
+  const lastSalePrice = detail?.sales[0] ?? null;
+  const marketDir = mk && mk.avg7 != null && mk.avg30 != null && mk.avg30 > 0 ? (mk.avg7 > mk.avg30 * 1.05 ? { label: "↑ Markt steigt", tone: "good" as Tone } : mk.avg7 < mk.avg30 * 0.95 ? { label: "↓ Markt fällt", tone: "warn" as Tone } : { label: "→ Markt stabil", tone: undefined }) : null;
+  const vkTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : m.status === "zu_guenstig" ? "warn" : "info";
   const w30 = row.windows["30"]?.qty ?? 0;
   const w90 = row.windows["90"]?.qty ?? 0;
+  const prev60 = w90 - w30;
   const trend: { label: string; tone: Tone } | null =
-    w90 === 0 ? null : w30 / 30 > (w90 / 90) * 1.15 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (w90 / 90) * 0.85 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
+    w90 < 3 ? null : w30 / 30 > (prev60 / 60) * 1.25 ? { label: "↑ Verkäufe steigen", tone: "good" } : w30 / 30 < (prev60 / 60) * 0.75 ? { label: "↓ Verkäufe lassen nach", tone: "warn" } : { label: "→ stabil", tone: undefined };
+  const noSale90 = row.stock > 0 && w90 === 0;
   const boughtCost = detail?.purchases.reduce((s, p) => s + p.qty * p.unitEk, 0) ?? 0;
 
   return (
@@ -140,16 +175,16 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} />
 
         <section className="bd-dt-grid">
-          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "live aus eBay" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
+          <Stat tone={vkTone} label="Dein VK" value={vk > 0 ? eur(vk) : "—"} hint={row.listingVkSource === "ebay" ? "aus eBay (Stand des letzten Shop-Abrufs)" : row.listingVkSource === "billbee" ? "aus Billbee" : undefined} />
           <Stat label="Empfohlen" value={m?.targetMin != null && m.targetOpt != null ? `${formatEuroCents(m.targetMin)} – ${eur(m.targetOpt)}` : "—"} hint={m?.capped ? "mit Marktdeckel" : "25–33 % Marge"} />
           <Stat label="Marktwert" value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"} hint="Cardmarket Ø 7 Tage" />
           <Stat
-            tone={m?.margin == null ? undefined : m.margin >= 0.25 ? "good" : m.margin >= 0.15 ? "warn" : "crit"}
+            tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}
             label="Marge Nachkauf"
             value={m?.margin != null ? `${formatPercent(m.margin)} %` : "—"}
             hint={m?.value != null ? `Nachkauf zum Marktwert ${eur(m.value)}` : undefined}
           />
-          <Stat tone={row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
+          <Stat tone={noSale90 ? "crit" : row.stockMonthsCover && row.stockMonthsCover > 12 ? "warn" : undefined} label="Bestand" value={row.stock > 0 ? `${row.stock} Stk` : "—"} hint={noSale90 ? "kein Verkauf in 90 Tagen" : row.stockMonthsCover ? `reicht ca. ${row.stockMonthsCover.toFixed(1).replace(".", ",")} Monate` : undefined} />
           <Stat tone={row.ekMissing ? "warn" : undefined} label="Ø EK" value={row.ekMissing ? "fehlt" : eur(row.ek)} hint={row.currentEk != null ? `Liste: ${eur(row.currentEk)}` : undefined} />
         </section>
 
@@ -160,6 +195,63 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             </b>{" "}
             – {m.provenByDemand ? "der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : "Preis wird gezahlt."}
           </p>
+        )}
+
+        {detail && (
+          <p className="bd-dt-note">
+            {lastChange ? (
+              <>
+                <b>Letzte VK-Änderung am {day(lastChange.at)}:</b> {eur(lastChange.before)} → {eur(lastChange.after)}
+                {lastChange.after > lastChange.before ? " (erhöht)" : " (gesenkt)"} · seitdem {soldSinceChange} {soldSinceChange === 1 ? "Verkauf" : "Verkäufe"}.
+                {chg && (
+                  <>
+                    {" "}
+                    Tempo: {chg.before.toFixed(1).replace(".", ",")} Stk/Monat in den 60 Tagen davor, {chg.after.toFixed(1).replace(".", ",")} Stk/Monat in den {chg.daysSince} Tagen danach
+                    {chg.before > 0 && chg.after < chg.before * 0.6 ? " – Absatz eingebrochen." : chg.before > 0 && chg.after >= chg.before * 0.9 ? " – Absatz gehalten." : "."}
+                  </>
+                )}
+              </>
+            ) : (
+              <>Noch keine VK-Änderung erfasst – Billbee liefert keine Preishistorie, die App schreibt Änderungen ab jetzt bei jedem Abgleich mit.</>
+            )}
+            {lastSalePrice && vk > 0 && Math.abs(lastSalePrice.unitPrice - vk) > 0.01 && (
+              <>
+                {" "}
+                Letzter Verkauf am {day(lastSalePrice.soldAt)} zu {eur(lastSalePrice.unitPrice)}, dein VK heute {eur(vk)}.
+              </>
+            )}
+          </p>
+        )}
+
+        {row.today && (
+          <>
+            <h4>Was ein Verkauf heute bringt</h4>
+            <section className="bd-dt-grid today">
+              <Stat
+                tone={row.today.profitPerUnit < 0 ? "crit" : row.today.marginPct < 0.25 ? "warn" : "good"}
+                label="Gewinn je Stück"
+                value={`${eur(row.today.profitPerUnit)} · ${formatPercent(row.today.marginPct)} %`}
+                hint={`${row.listingVk ? "heutiger VK" : "Ø-VK, kein Listenpreis"}, aktueller EK, vor Fixkosten`}
+              />
+              <Stat
+                tone={row.today.perMonth != null && row.today.perMonth < 0 ? "crit" : undefined}
+                label="Gewinn je Monat"
+                value={row.today.perMonth != null ? eur(row.today.perMonth) : "—"}
+                hint={row.perMonth ? `${row.perMonth.toFixed(1).replace(".", ",")} Stk/Monat` : "kein Absatz"}
+              />
+              <Stat
+                label="Gebundenes Kapital"
+                value={row.today.capitalBound != null ? eur(row.today.capitalBound) : "—"}
+                hint={row.today.inStock != null ? `Bestand ergibt ${eur(row.today.inStock)} Gewinn` : undefined}
+              />
+              <Stat
+                label="Max. EK für 25 %"
+                value={row.today.maxEk25 != null ? eur(row.today.maxEk25) : "—"}
+                hint={lastSale != null ? `letzter Verkauf vor ${lastSale} Tagen` : undefined}
+                tone={lastSale != null && row.stock > 0 && lastSale > 90 ? "crit" : undefined}
+              />
+            </section>
+          </>
         )}
 
         <h4>
@@ -189,14 +281,16 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </tbody>
         </table>
 
-        <h4>Ergebnis je Stück</h4>
+        <details>
+        <summary>Ergebnis je Stück (historischer Schnitt)</summary>
         <table className="bd-dt-t">
           <tbody>
-            <tr><td>DB I (nach Gebühren)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
+            <tr><td>DB I (nach Wareneinsatz)</td><td className="r">{eur(row.dbIPerUnit)}</td></tr>
             <tr><td>DB II</td><td className="r">{eur(row.dbIIPerUnit)} · {formatPercent(row.dbIIPercent)} %</td></tr>
             <tr><td>DB III (mit Fixkosten)</td><td className="r">{eur(row.dbIIIPerUnit)} · {formatPercent(row.dbIIIPercent)} %</td></tr>
           </tbody>
         </table>
+        </details>
 
         {detail && detail.sales.length > 0 && (
           <>
@@ -219,30 +313,30 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
                 ))}
               </tbody>
             </table>
-            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} Verkäufen der letzten 365 Tage.</p>}
+            {detail.sales.length > 15 && <p className="bd-fig-note">Die letzten 15 von {detail.sales.length} geladenen Verkäufen.</p>}
           </>
         )}
 
         <h4>Warenbewegungen</h4>
-        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen.</p>}
+        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen. Startbestand: {row.stock} Stk – Änderungen werden ab dem nächsten Billbee-Abgleich festgehalten.</p>}
         {movements.length > 0 && (
           <>
             <table className="bd-dt-t">
               <thead>
-                <tr><th>Datum</th><th>Art</th><th className="r">Stück</th><th>Detail</th></tr>
+                <tr><th>Datum</th><th>Art</th><th className="r">Menge</th><th style={{ paddingLeft: 16 }}>Preis / Detail</th></tr>
               </thead>
               <tbody>
                 {movements.map((x, i) => (
                   <tr key={i}>
                     <td>{day(x.at)}</td>
                     <td>{x.kind}</td>
-                    <td className="r">{x.delta > 0 ? `+${x.delta}` : x.delta}</td>
-                    <td>{x.note}</td>
+                    <td className="r" style={{ whiteSpace: "nowrap", color: x.delta > 0 ? "var(--good)" : undefined }}>{x.delta > 0 ? "+" : "−"}{Math.abs(x.delta)} Stk</td>
+                    <td style={{ paddingLeft: 16 }}>{x.note}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="bd-fig-note">Verkäufe und Einkäufe stammen aus Billbee bzw. dem Einkaufsimport. „Bestand laut Billbee“ wird seit heute bei jedem Abgleich mitgeschrieben (Billbee liefert keine Lagerhistorie).</p>
+            <p className="bd-fig-note">Verkäufe stammen aus Billbee. Bestandsänderungen schreibt die App bei jedem Billbee-Abgleich selbst mit (Billbee liefert keine Lagerhistorie) und zeigt sie nur, soweit Verkäufe sie nicht erklären. Einkäufe gibt es nur, wenn sie importiert wurden.</p>
           </>
         )}
 
@@ -275,7 +369,8 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
 
         {detail && detail.reports.length > 0 && (
           <>
-            <h4>eBay-Verkaufsberichte</h4>
+            <details>
+            <summary>eBay-Verkaufsberichte</summary>
             <table className="bd-dt-t">
               <thead>
                 <tr><th>Zeitraum</th><th className="r">Stück</th><th className="r">Ø Preis</th></tr>
@@ -291,12 +386,15 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               </tbody>
             </table>
             <p className="bd-fig-note">Verkaufsdaten liegen nur je Berichtszeitraum vor, nicht je Einzelverkauf.</p>
+            </details>
           </>
         )}
 
         {detail?.market && (
           <>
-            <h4>Cardmarket</h4>
+            <h4>
+              Cardmarket {marketDir && <span className={`bd-dt-trend${marketDir.tone ? ` ${marketDir.tone}` : ""}`}>{marketDir.label}</span>}
+            </h4>
             <table className="bd-dt-t">
               <tbody>
                 <tr><td>Tiefstpreis</td><td className="r">{eur(detail.market.low)}</td></tr>
@@ -312,19 +410,21 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   );
 }
 
-type Tone = "good" | "warn" | "crit" | undefined;
+type Tone = "good" | "warn" | "crit" | "info" | undefined;
 
 function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: Tone }) {
   return (
     <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
+      {hint && <small>{hint}</small>}
     </div>
   );
 }
 
 function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void }) {
   const l = ebayLinks(row);
+  const cm = cardmarketLink(row, cleanTitle(row.nameRaw).pack);
   return (
     <div className="bd-dt-actions">
       {l.revise && (
@@ -335,15 +435,11 @@ function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow;
       <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
         {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
       </a>
-      <a
-        className="chip"
-        href={cardmarketLink(row, cleanTitle(row.nameRaw).pack)}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Sucht die Karte bei Cardmarket (deutsch, ab NM)"
-      >
-        Bei Cardmarket ansehen ↗
-      </a>
+      {cm && (
+        <a className="chip" href={cm} target="_blank" rel="noopener noreferrer" title="Sucht die Karte bei Cardmarket (Sprache der Karte, ab NM)">
+          Bei Cardmarket ansehen ↗
+        </a>
+      )}
       <button type="button" className="chip" onClick={onToggleHidden} disabled={busy} title={hidden ? "Artikel wieder in die Listen aufnehmen" : "Artikel aus allen Listen ausblenden (Daten bleiben erhalten)"}>
         {hidden ? "Wieder einblenden" : "Ausblenden"}
       </button>
