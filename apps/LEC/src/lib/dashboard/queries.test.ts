@@ -84,7 +84,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
         source: "cardmarket-priceguide",
         matchQuality: "eindeutig",
         priceAvg7: 2,
-        priceTrend: 0.02,
+        priceTrend: 2,
         raw: JSON.stringify({ how: "seltenheit" }),
         fetchedAt: new Date("2026-10-12T00:00:00Z"),
       },
@@ -92,7 +92,7 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     return article;
   }
 
-  it("Aggregat: ohne Billbee-VK gilt der eBay-Preis, Marktwert ist der 7-Tage-Schnitt (nicht der Trend)", async () => {
+  it("Aggregat: ohne Billbee-VK gilt der eBay-Preis, Marktwert ist der Mittelwert der Cardmarket-Werte", async () => {
     const a = await seed();
     const { aggregates } = await loadArticleAggregates(db.prisma);
     const agg = aggregates.find((x) => x.articleId === a.id)!;

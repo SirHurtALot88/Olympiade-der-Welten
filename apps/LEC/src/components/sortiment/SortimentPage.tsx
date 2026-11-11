@@ -46,9 +46,9 @@ const MARKET_PILL: Record<SortimentMarket["status"], { cls: string; label: strin
 
 function marketHow(m: SortimentMarket): string {
   if (m.range) return `${m.range.variants} Varianten im Set, die Seltenheit lässt sich nicht eindeutig zuordnen — Spanne statt Einzelwert`;
-  if (m.how === "seltenheit") return "Cardmarket-7-Tage-Schnitt der Variante mit der Seltenheit aus deinem Titel";
-  if (m.how === "einzige_variante") return "Cardmarket-7-Tage-Schnitt (die Karte hat im Set nur eine Variante)";
-  return "Cardmarket-7-Tage-Schnitt";
+  if (m.how === "seltenheit") return "Cardmarket-Mittelwert (Trend, Ø 1/7/30 Tage) der Variante mit der Seltenheit aus deinem Titel";
+  if (m.how === "einzige_variante") return "Cardmarket-Mittelwert (die Karte hat im Set nur eine Variante)";
+  return "Cardmarket-Mittelwert aus Trend und Ø 1/7/30 Tage";
 }
 
 type ColId =
