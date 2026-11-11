@@ -78,13 +78,13 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const consumed = new Map<object, number>();
   const movements = detail
     ? [
-        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `${eur(x.unitPrice)} je Stück` })),
-        ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `${eur(p.unitEk)} EK · ${p.source}` })),
+        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `verkauft zu ${eur(x.unitPrice)} je Stück` })),
+        ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `gekauft zu ${eur(p.unitEk)} EK je Stück · ${p.source}` })),
         // Bestandsaenderungen laut Billbee nur, soweit Verkaeufe sie NICHT schon erklaeren (Zugang, Korrektur, Schwund).
         ...detail.stockLog
           .map((m) => {
             const delta = m.after - m.before;
-            if (delta >= 0) return { at: m.at, kind: "Zugang laut Billbee", delta, note: `${m.before} → ${m.after} Stk${row.currentEk != null && delta > 0 ? ` · ca. ${eur(delta * row.currentEk)} Wareneinsatz` : ""}` };
+            if (delta >= 0) return { at: m.at, kind: "Zugang (Einkauf/Korrektur)", delta, note: `Bestand ${m.before} → ${m.after}${row.currentEk != null && delta > 0 ? ` · ca. ${eur(delta * row.currentEk)} zum aktuellen EK` : ""}` };
             // Verkaeufe, die den Abgang erklaeren (3 Tage davor bis 1 Tag danach), werden verbraucht; nur der Rest bleibt "Abgang".
             const at = new Date(m.at).getTime();
             let rest = -delta;
@@ -96,7 +96,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               consumed.set(x, (consumed.get(x) ?? 0) + take);
               rest -= take;
             }
-            return rest > 0 ? { at: m.at, kind: "Abgang laut Billbee", delta: -rest, note: `${m.before} → ${m.after} Stk, nicht durch Verkäufe erklärt` } : null;
+            return rest > 0 ? { at: m.at, kind: "Abgang laut Billbee", delta: -rest, note: `Bestand ${m.before} → ${m.after}, nicht durch Verkäufe erklärt` } : null;
           })
           .filter((x): x is { at: string; kind: string; delta: number; note: string } => x !== null),
       ]
@@ -323,15 +323,15 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           <>
             <table className="bd-dt-t">
               <thead>
-                <tr><th>Datum</th><th>Art</th><th className="r">Stück</th><th>Detail</th></tr>
+                <tr><th>Datum</th><th>Art</th><th className="r">Menge</th><th style={{ paddingLeft: 16 }}>Preis / Detail</th></tr>
               </thead>
               <tbody>
                 {movements.map((x, i) => (
                   <tr key={i}>
                     <td>{day(x.at)}</td>
                     <td>{x.kind}</td>
-                    <td className="r">{x.delta > 0 ? `+${x.delta}` : x.delta}</td>
-                    <td>{x.note}</td>
+                    <td className="r" style={{ whiteSpace: "nowrap", color: x.delta > 0 ? "var(--good)" : undefined }}>{x.delta > 0 ? "+" : "−"}{Math.abs(x.delta)} Stk</td>
+                    <td style={{ paddingLeft: 16 }}>{x.note}</td>
                   </tr>
                 ))}
               </tbody>
