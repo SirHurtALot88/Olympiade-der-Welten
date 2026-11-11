@@ -5,6 +5,7 @@ import {
   bestimmeArenaSpieltagAnsicht,
   findeEigeneWertungsZeilen,
   grundOhneMotorSpiel,
+  waehleArenaFlaeche,
   zeigtArenaDenGebuchtenSieger,
 } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
 import type { LegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
@@ -70,5 +71,27 @@ describe("bestimmeArenaSpieltagAnsicht", () => {
   it("Snapshot eines anderen Spieltags zeigt nichts", () => {
     const p = { ...preview([zeile("EIG", { resolutionSource: "arena", opponentTeamId: "GEG" })]), matchdayId: "matchday-2" };
     expect(bestimmeArenaSpieltagAnsicht({ gameState, matchdayId: MD, disciplineId: "spurt", ownTeamId: "EIG", preview: p })).toBeNull();
+  });
+});
+
+describe("waehleArenaFlaeche (Keine Demos mehr, 11.11.)", () => {
+  const basis = { istBattleSave: true, echteWerte: true, adminTestmodus: false, hatMotorSpiel: true };
+
+  it("Battle-Save mit gebuchtem Motor-Spiel: echte Battle Arena", () => {
+    expect(waehleArenaFlaeche(basis)).toBe("battle-motor");
+  });
+
+  it("Admin-Testmodus schaltet die echte Battle Arena NICHT mehr ab (Chris' Climbing-Fund 11.11.)", () => {
+    expect(waehleArenaFlaeche({ ...basis, adminTestmodus: true })).toBe("battle-motor");
+  });
+
+  it("Battle-Save ohne Motor-Spiel: ehrlicher Hinweis, im Testmodus die Buehne", () => {
+    expect(waehleArenaFlaeche({ ...basis, hatMotorSpiel: false })).toBe("battle-ohne-motor");
+    expect(waehleArenaFlaeche({ ...basis, hatMotorSpiel: false, adminTestmodus: true })).toBe("buehne");
+  });
+
+  it("Manager-Save und Zufallsmodus bleiben bei der Buehne", () => {
+    expect(waehleArenaFlaeche({ ...basis, istBattleSave: false })).toBe("buehne");
+    expect(waehleArenaFlaeche({ ...basis, echteWerte: false })).toBe("buehne");
   });
 });

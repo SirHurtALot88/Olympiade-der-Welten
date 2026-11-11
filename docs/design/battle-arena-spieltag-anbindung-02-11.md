@@ -25,6 +25,11 @@ mehr gerendert. Die Spieltags-Wertung, der Endscreen und „Spieltag abschließe
 
 **Manager Mode, Admin-Testmodus und Zufallsmodus**: unverändert, dort läuft die alte Bühne.
 
+> **Nachtrag 11.11.** (`bahn-echte-simulation-rollout-11-11.md`): Der Admin-Testmodus zeigt in einem
+> Battle-Save die echte Battle Arena, sobald ein Motor-Spiel gebucht ist (`waehleArenaFlaeche`).
+> Die Pixel-Arena über der alten Bühne spielt keine Demo-Seite mehr, sie zeigt nur noch Kulisse und
+> Aufstellung.
+
 ## Quick-Sim
 
 `window.__arena.schnellDurch()` (battle-mode.engine.js) tickt wie `loop()`: dieselbe Funktion
@@ -44,7 +49,7 @@ Deploy rechnet offene Vorläufe deshalb einmal neu, mit denselben Ergebnissen.
 
 ## Offene Punkte
 
-1. **Bahn-Wiedergabe weicht in den Zahlen ab.** Die zuschaubare Wiedergabe tickt mit
+1. ~~**Bahn-Wiedergabe weicht in den Zahlen ab.**~~ **Erledigt** durch den Anzeige-Treue-Fix A1 (#1372); für Climbing seit 11.11. Tick für Tick getestet (`tests/bahn-climbing-gezeigt-gleich-gebucht.test.ts`). Die zuschaubare Wiedergabe tickt mit
    `(1/60)/ZEIT_DEHNUNG`, der zählende Lauf mit `1/60`. Gemessen über 12 Saaten (Demo-Kader):
    - Bühne, Basketball, Staffel und Time-Trial: bitgleich.
    - Spurt und Takeshi: gleicher Sieger, andere Punktzahlen.

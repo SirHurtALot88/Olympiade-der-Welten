@@ -48,6 +48,35 @@ export type ArenaSpieltagEntscheidung = ArenaSpieltagAnsicht & {
   gegnerZeile: DisciplineTeamResolvePreview | null;
 };
 
+/**
+ * WELCHE FLAECHE DIE SPIELTAGS-ARENA ZEIGT (11.11., "Keine Demos mehr").
+ *
+ *  - `"battle-motor"`: die echte Battle Arena mit dem gebuchten Motor-Spiel (echte Figuren, echter
+ *    Lauf, Tick fuer Tick die gebuchte Simulation).
+ *  - `"battle-ohne-motor"`: Battle-Save, aber fuer diese Disziplin ist kein Motor-Spiel gebucht
+ *    (PPS-Duell-Bruecke, Vorlauf rechnet noch) -- ehrlicher Hinweis statt eines erfundenen Spiels.
+ *  - `"buehne"`: die alte Disziplin-Buehne (Manager-Saves, Zufallsmodus).
+ *
+ * NEU GEGENUEBER 02.11.: der Admin-Testmodus (`?dev` bzw. localStorage `oly-stage-dev`) schaltet die
+ * echte Battle Arena NICHT mehr ab. Vorher galt `battleModusArena = echt && !devMode && battleSave` --
+ * wer das Flag einmal gesetzt hatte, sah in seinem Battle-Save fuer JEDE Disziplin die alte Buehne
+ * samt Demo-Szene, obwohl fuer genau diesen Spieltag ein echtes Motor-Spiel gebucht war (so am 11.11.
+ * bei Climbing, Spieltag 1 des Battle-Saves). Ohne gebuchtes Motor-Spiel bleibt der Testmodus bei der
+ * Buehne (dort testet man sie), sonst gibt es nie beides zugleich -- also auch keine zweite Buchung.
+ */
+export type ArenaFlaeche = "battle-motor" | "battle-ohne-motor" | "buehne";
+
+export function waehleArenaFlaeche(input: {
+  istBattleSave: boolean;
+  echteWerte: boolean;
+  adminTestmodus: boolean;
+  hatMotorSpiel: boolean;
+}): ArenaFlaeche {
+  if (!input.istBattleSave || !input.echteWerte) return "buehne";
+  if (input.hatMotorSpiel) return "battle-motor";
+  return input.adminTestmodus ? "buehne" : "battle-ohne-motor";
+}
+
 /** Dieselbe Pruefung wie `istMotorPodQuelle()` (lib/resolve/mini-dm-pod-resolve.ts) — dort mit
  *  schweren Referenz-Importen, die hier im Client-Bundle nichts verloren haben. */
 export function istMotorPodQuelleClient(quelle: string | null | undefined): boolean {
