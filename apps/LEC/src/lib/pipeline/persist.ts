@@ -175,14 +175,18 @@ export async function persistBillbeeArtikel(
   let upserted = 0;
   // Bestand VOR dem Import merken: jede Abweichung wird als Warenbewegung mitgeschrieben
   // (Billbee liefert keine Lagerhistorie; der erste Stand eines Artikels ist nur Ausgangswert).
-  const before = new Map<string, { id: string; stock: number; active: boolean }>();
-  for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true } })) {
-    before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active });
+  const before = new Map<string, { id: string; stock: number; active: boolean; vk: number | null }>();
+  for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true, currentVk: true } })) {
+    before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active, vk: a.currentVk });
   }
   for (const row of rows) {
     const prev = before.get(row.nameNormalized);
     if (prev && prev.active && prev.stock !== row.stock) {
       await prisma.stockMovement.create({ data: { articleId: prev.id, before: prev.stock, after: row.stock } });
+    }
+    // VK-Aenderung mitschreiben (nur wenn beide Staende bekannt sind; der erste Stand ist nur Ausgangswert).
+    if (prev && prev.vk !== null && row.currentVk !== null && Math.abs(prev.vk - row.currentVk) > 0.004) {
+      await prisma.priceChange.create({ data: { articleId: prev.id, before: prev.vk, after: row.currentVk } });
     }
     await prisma.article.upsert({
       where: { nameNormalized: row.nameNormalized },

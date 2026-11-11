@@ -60,6 +60,7 @@ model Article {
   purchases    Purchase[]
   sales        Sale[]
   stockLog     StockMovement[]
+  priceLog     PriceChange[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -206,6 +207,18 @@ model StockMovement {
   at        DateTime @default(now())
   before    Int
   after     Int
+
+  @@index([articleId, at])
+}
+
+/// Aenderung des Listen-VK eines Artikels, bei jedem Billbee-Abgleich festgehalten (Billbee liefert keine Preishistorie).
+model PriceChange {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  before    Float
+  after     Float
 
   @@index([articleId, at])
 }

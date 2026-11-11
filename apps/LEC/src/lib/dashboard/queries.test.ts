@@ -176,5 +176,9 @@ describe("Artikel ausblenden und Bestandslog", () => {
     const log = await db.prisma.stockMovement.findMany();
     expect(log.map((m) => [m.before, m.after])).toEqual([[4, 3]]);
     expect((await db.prisma.article.findFirst())?.hidden).toBe(true);
+    // VK-Aenderung wird mitgeschrieben, der erste Stand nicht
+    await persistBillbeeArtikel(db.prisma, [{ ...row(3), currentVk: 7.5 }]);
+    const prices = await db.prisma.priceChange.findMany();
+    expect(prices.map((c) => [c.before, c.after])).toEqual([[5, 7.5]]);
   });
 });

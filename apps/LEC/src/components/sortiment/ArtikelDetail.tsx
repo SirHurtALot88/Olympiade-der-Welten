@@ -14,6 +14,7 @@ interface Detail {
   purchases: { date: string; qty: number; unitEk: number; buyShipping: number; source: string }[];
   sales: { soldAt: string; qty: number; unitPrice: number }[];
   reports: { from: string; to: string; qtySold: number; revenue: number; avgPrice: number }[];
+  priceLog: { at: string; before: number; after: number }[];
   stockLog: { at: string; before: number; after: number }[];
   market: { avg1: number | null; avg7: number | null; avg30: number | null; trend: number | null; low: number | null; fetchedAt: string } | null;
 }
@@ -94,6 +95,9 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
     : [];
   const lastSale = detail?.sales[0] ? Math.max(0, Math.floor((Date.now() - new Date(detail.sales[0].soldAt).getTime()) / 86_400_000)) : null;
   const mk = detail?.market;
+  const lastChange = detail?.priceLog[0] ?? null;
+  const soldSinceChange = lastChange && detail ? detail.sales.filter((x) => x.soldAt >= lastChange.at).reduce((sum, x) => sum + x.qty, 0) : 0;
+  const lastSalePrice = detail?.sales[0] ?? null;
   const marketDir = mk && mk.avg7 != null && mk.avg30 != null && mk.avg30 > 0 ? (mk.avg7 > mk.avg30 * 1.05 ? { label: "↑ Markt steigt", tone: "good" as Tone } : mk.avg7 < mk.avg30 * 0.95 ? { label: "↓ Markt fällt", tone: "warn" as Tone } : { label: "→ Markt stabil", tone: undefined }) : null;
   const vkTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : m.status === "zu_guenstig" ? "warn" : "info";
   const w30 = row.windows["30"]?.qty ?? 0;
@@ -173,6 +177,25 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               {m.soldAt.qty} {m.soldAt.qty === 1 ? "Verkauf" : "Verkäufe"} in {m.soldAt.days} Tagen im Schnitt für {eur(m.soldAt.avg)}
             </b>{" "}
             – {m.provenByDemand ? "der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : "Preis wird gezahlt."}
+          </p>
+        )}
+
+        {detail && (
+          <p className="bd-dt-note">
+            {lastChange ? (
+              <>
+                <b>Letzte VK-Änderung am {day(lastChange.at)}:</b> {eur(lastChange.before)} → {eur(lastChange.after)}
+                {lastChange.after > lastChange.before ? " (erhöht)" : " (gesenkt)"} · seitdem {soldSinceChange} {soldSinceChange === 1 ? "Verkauf" : "Verkäufe"}.
+              </>
+            ) : (
+              <>Noch keine VK-Änderung erfasst – Billbee liefert keine Preishistorie, die App schreibt Änderungen ab jetzt bei jedem Abgleich mit.</>
+            )}
+            {lastSalePrice && vk > 0 && Math.abs(lastSalePrice.unitPrice - vk) > 0.01 && (
+              <>
+                {" "}
+                Letzter Verkauf am {day(lastSalePrice.soldAt)} zu {eur(lastSalePrice.unitPrice)}, dein VK heute {eur(vk)}.
+              </>
+            )}
           </p>
         )}
 
