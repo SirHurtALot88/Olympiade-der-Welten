@@ -1,5 +1,6 @@
 import type { SortimentRow } from "./viewModel";
 import { RARITY_NAMES, rarityKey } from "../market/rarity";
+import { buildCardmarketSearchUrl } from "../pricing/marketPrice";
 
 /**
  * Preis-Board (Sortiment, Ansicht "Kompakt"): was ist zu tun, und wie gross ist der Hebel?
@@ -149,6 +150,16 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
     revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
     search: `${SHOP}?_nkw=${encodeURIComponent(term)}`,
   };
+}
+
+/**
+ * Cardmarket-Suche zur Karte: Cardmarket-Code ohne DE/EN (MAMA-DE047 -> MAMA-047), bei Name/Code-Konflikt der
+ * eindeutige Code zum Namen, ohne Set-Code der Titel. Gleiche harten Filter wie ueberall (deutsch, ab NM).
+ */
+export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string {
+  const code = row.codeName?.usedCode || row.setCode;
+  const term = code ? cardmarketCode(code) : cleanTitle(row.nameRaw).name;
+  return buildCardmarketSearchUrl(term, packQty);
 }
 
 /** Mengen ohne Nachkommastellen, wenn ganz; sonst auf zwei Stellen (krumme Mengen sollen auffallen). */
