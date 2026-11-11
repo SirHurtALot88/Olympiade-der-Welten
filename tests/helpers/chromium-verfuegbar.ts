@@ -13,12 +13,29 @@ import { join } from "node:path";
 
 const CHROMIUM_PFAD = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 
+/**
+ * Verzeichnisse, in denen Playwright installierte Browser ablegt -- `~/.cache/ms-playwright` ist
+ * der Standardort, `PLAYWRIGHT_BROWSERS_PATH` (gesetzt in manchen Sandboxes/CI-Images) ueberschreibt
+ * ihn. NACHTRAG (Opus-PM-Review, Rebase 11.11.): der fest einprogrammierte `CHROMIUM_PFAD` oben
+ * zeigt auf eine Revision, die `npx playwright install chromium` beim naechsten Lauf als "unused"
+ * entfernt (sie gehoert keiner in diesem `package.json` gepinnten Playwright-Version mehr) -- ohne
+ * diesen zweiten Ort waere `chromiumVerfuegbar()` danach in genau der Sandbox falsch (alle davon
+ * abhaengigen Tests wuerden STILL uebersprungen statt zu laufen), die den Browser per
+ * `PLAYWRIGHT_BROWSERS_PATH` statt `~/.cache/ms-playwright` ablegt.
+ */
+function playwrightBrowserVerzeichnisse(): string[] {
+  const verzeichnisse = [join(homedir(), ".cache", "ms-playwright")];
+  if (process.env.PLAYWRIGHT_BROWSERS_PATH) verzeichnisse.push(process.env.PLAYWRIGHT_BROWSERS_PATH);
+  return verzeichnisse;
+}
+
 export function chromiumVerfuegbar(): boolean {
   if (existsSync(CHROMIUM_PFAD)) return true;
-  const cache = join(homedir(), ".cache", "ms-playwright");
-  try {
-    return readdirSync(cache).some((eintrag) => eintrag.startsWith("chromium"));
-  } catch {
-    return false;
-  }
+  return playwrightBrowserVerzeichnisse().some((verzeichnis) => {
+    try {
+      return readdirSync(verzeichnis).some((eintrag) => eintrag.startsWith("chromium"));
+    } catch {
+      return false;
+    }
+  });
 }

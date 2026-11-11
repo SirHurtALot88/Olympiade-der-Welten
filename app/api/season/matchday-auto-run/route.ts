@@ -32,6 +32,11 @@ type MatchdayAutoRunBody = {
     commitThroughSide?: "d1" | "d2";
     /** Die Preview, die die Arena gezeigt hat — sie wird gebucht statt neu gerechnet. */
     submittedPreview?: LegacyMatchdayResolvePreview | null;
+    /**
+     * QUICK-SIM (27.10.): `true` nur, wenn die Buehne nach einem Druck auf "⏩ Quick-Sim" bucht --
+     * dann rechnet der Arena-Vorlauf per Node statt Chromium (s. `arenaModus` unten).
+     */
+    arenaQuickSim?: boolean;
   };
 };
 
@@ -112,7 +117,9 @@ export async function POST(request: Request) {
         // PR 3 (K1, Plan Abschnitt 2.3/2.4): der HTTP-Pfad wartet NIE auf Chromium — fest verdrahtet,
         // nicht vom Request-Body ueberschreibbar. Skripte (Smoke, Admin-Simulation) rufen
         // `runLocalMatchdayAutoRun()` direkt und nutzen dafuer den Service-Default `"inline"`.
-        arenaModus: "hintergrund",
+        // QUICK-SIM (27.10.): die einzige Ausnahme waehlt `"quick-sim"` -- das wartet auf einen
+        // Node-Vorlauf (begrenzt durch `OLY_ARENA_NODE_TIMEOUT_MS`), weiterhin NIE auf Chromium.
+        arenaModus: body.options?.arenaQuickSim === true ? "quick-sim" : "hintergrund",
       },
     });
 

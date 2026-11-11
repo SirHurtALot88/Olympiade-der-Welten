@@ -438,7 +438,7 @@ export type RunArenaFixturesOptions = {
   buehneFlags?: Readonly<Record<string, number>>;
 };
 
-type VorbereitetesFixture = {
+export type VorbereitetesFixture = {
   homeTeamId: string;
   awayTeamId: string;
   /** Bereits durch `seedZuZahl()` normalisiert -- das ist der Wert, der an `spieleFeldspiel()` geht. */
@@ -500,7 +500,11 @@ type VorbereitetesFixture = {
 // Mehrfach-Fixture-Lastprobe mit dem tatsaechlichen Canvas-/Pixel-Motor ist das Stabilitaetsrisiko
 // nicht seriös einzuschaetzen -- der zusaetzliche RSS-Gewinn gegenueber `--disable-gpu` +
 // `--no-zygote` steht im CI-Log, aber als Datenpunkt, nicht als Freigabe.
-const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
+// Exportiert (Rebase 11.11.), damit Tests, die GEZIELT eine bestimmte Chromium-Revision starten
+// statt ueber `ermittleChromiumLaunchOptions()` (z. B. `launcheValidierteChromiumRevision()`,
+// tests/helpers/chromium-validierte-version.ts), dieselbe Netzwerk-Abriegelung bekommen, ohne sie
+// ein zweites Mal zu pflegen.
+export const ARENA_NETZWERK_ABRIEGELUNG_ARGS = [
   "--proxy-server=direct://",
   "--host-resolver-rules=MAP * 0.0.0.0",
   "--disable-dev-shm-usage",
@@ -545,7 +549,7 @@ export function ermittleChromiumLaunchOptions(executablePathOverride?: string) {
  * NUR eine Seite betrifft) — der Lauf bricht dafuer kontrolliert ab, statt ein 0:0 zwischen
  * zwei leeren Feldern zu erzeugen.
  */
-function bereiteFixturesVor(
+export function bereiteFixturesVor(
   gameState: GameState,
   fixtures: ArenaFixtureInput[],
   attributeSheetOverrides?: ReadonlyMap<string, Player["attributeSheetStats"]>,
@@ -580,7 +584,7 @@ function bereiteFixturesVor(
 type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean; duelle?: number };
 /** Rohform von `ArenaMomentEintrag` vor der `teamId`-Aufloesung (s. dort): `seite` ist hier noch 0/1. */
 type RoherBrowserMomentEintrag = { typ: ArenaMomentEintrag["typ"]; seite: 0 | 1; spieler: string | null };
-type RoherBrowserFixtureErgebnis = {
+export type RoherBrowserFixtureErgebnis = {
   disziplin: string;
   seiten: [number, number];
   boxscore: RoherBrowserBoxscoreEintrag[];
@@ -691,6 +695,107 @@ async function simuliereFixturesImBrowser(payload: {
   return ergebnisse;
 }
 
+/**
+ * WELCHES CHASSIS (= welche `window.__arena`-Funktion) eine Disziplin braucht — NUR ueber die
+ * Mengen oben entschieden, keine Disziplins-ID-Kenntnis anderswo. Ausgelagert (Quick-Sim, 27.10.),
+ * damit der Chromium-Runner und `arena-node-runner.ts` GARANTIERT dieselbe Weiche nehmen; die
+ * Logik ist unveraendert die vorherige Inline-Kette in `runArenaFixtures()`.
+ */
+export type ArenaChassis =
+  | "feldspiel"
+  | "buehneHeben"
+  | "buehneDuell"
+  | "buehneAuftritt"
+  | "buehneGauntlet"
+  | "bahn"
+  | "kampf";
+
+export function waehleArenaChassis(disziplin: string): ArenaChassis {
+  return ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(disziplin)
+    ? "buehneHeben"
+    : ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has(disziplin)
+    ? "buehneDuell"
+    : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
+    ? "buehneAuftritt"
+    : ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS.has(disziplin)
+    ? "buehneGauntlet"
+    : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
+    ? "bahn"
+    : ARENA_KAMPF_DISCIPLINE_IDS.has(disziplin)
+    ? "kampf"
+    : "feldspiel";
+}
+
+/** Motor-Einstieg je Chassis — fuer Fehlermeldungen und als Gegenprobe zu `arena-node-motor.mjs`. */
+export const ARENA_CHASSIS_MOTOR_EINSTIEG: Readonly<Record<ArenaChassis, string>> = {
+  feldspiel: "spieleFeldspiel",
+  buehneHeben: "spieleBuehneHeben",
+  buehneDuell: "spieleBuehneDuell",
+  buehneAuftritt: "spieleBuehneAuftritt",
+  buehneGauntlet: "spieleBuehneGauntlet",
+  bahn: "spieleBahn",
+  kampf: "spieleTdmGefecht",
+};
+
+/**
+ * Rohe Motor-Ergebnisse -> `ArenaFixtureResult[]` (Spieler-IDs, Seiten, Team-IDs der Momente).
+ * Ausgelagert (Quick-Sim, 27.10.) aus `runArenaFixtures()`, unveraendert — der Node-Runner
+ * (`arena-node-runner.ts`) bereitet seine Rohdaten mit GENAU dieser Funktion auf, damit beide Wege
+ * dasselbe Ergebnisformat liefern, nicht nur ein aehnliches.
+ */
+export function baueArenaFixtureErgebnisse(
+  vorbereitet: VorbereitetesFixture[],
+  rohErgebnisse: Array<RoherBrowserFixtureErgebnis | null>,
+  disziplin: string,
+  chassis: ArenaChassis,
+): ArenaFixtureResult[] {
+  // Review-Fund (PR #776): die Fehlermeldung unten muss die TATSAECHLICH aufgerufene
+  // Browser-Funktion nennen -- vor der Chassis-Weiche stand hier "spieleFeldspiel"
+  // hartkodiert, obwohl derselbe Codepfad seit der Gewichtheben-Produktivierung auch
+  // "spieleBuehneHeben" aufruft. Ein Fehler im Buehnen-Pfad haette damit faelschlich auf die
+  // falsche Funktion gezeigt und beim Debuggen eines echten Produktionsfehlers in die Irre
+  // gefuehrt.
+  const aufgerufeneFunktion = ARENA_CHASSIS_MOTOR_EINSTIEG[chassis];
+  return rohErgebnisse.map((ergebnis, index) => {
+    if (!ergebnis) {
+      throw new Error(
+        `arena-headless-runner: ${aufgerufeneFunktion}("${disziplin}", ...) lieferte null fuer Fixture ${index} (${vorbereitet[index].homeTeamId} vs. ${vorbereitet[index].awayTeamId}) — unbekannte Disziplin?`,
+      );
+    }
+    // Namenszuordnung PRO FIXTURE (nicht global): derselbe Name in zwei VERSCHIEDENEN
+    // Fixtures desselben Batches ist unproblematisch (jedes Duell hat sein eigenes Kader-Paar),
+    // nur eine Kollision INNERHALB dieses einen Duells zaehlt.
+    const zuordnung = baueEindeutigeNamenZuordnung(vorbereitet[index].heim, vorbereitet[index].gast);
+    const boxscore: ArenaFixtureBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => {
+      const treffer = zuordnung.get(eintrag.name);
+      return {
+        name: eintrag.name,
+        wert: eintrag.wert,
+        playerId: treffer?.playerId ?? null,
+        side: treffer?.side ?? null,
+        torwart: !!eintrag.torwart,
+        // Nur gesetzt, wenn der Motor es liefert (Spurt) -- jede andere Disziplin bleibt zeichengleich.
+        ...(typeof eintrag.duelle === "number" ? { duelle: eintrag.duelle } : {}),
+      };
+    });
+    // "SPIEL DES TAGES" (Task #31 Paket 1, s. `ArenaMomentEintrag`): `seite` 0/1 wird hier,
+    // genau wie `side` bei der Boxscore oben, auf die echte `teamId` dieses Fixtures aufgeloest.
+    const momente: ArenaMomentEintrag[] | undefined = ergebnis.momente?.map((moment) => ({
+      typ: moment.typ,
+      teamId: moment.seite === 0 ? vorbereitet[index].homeTeamId : vorbereitet[index].awayTeamId,
+      spieler: moment.spieler,
+    }));
+    return {
+      homeTeamId: vorbereitet[index].homeTeamId,
+      awayTeamId: vorbereitet[index].awayTeamId,
+      seiten: ergebnis.seiten,
+      boxscore,
+      ...(ergebnis.gesamtKg ? { gesamtKg: ergebnis.gesamtKg } : {}),
+      ...(momente ? { momente } : {}),
+    };
+  });
+}
+
 async function schliesseBrowserHart(browser: Browser) {
   // Playwright schliesst den Chromium-Prozess mit `browser.close()` normalerweise sauber;
   // ein zweiter, erzwungener Versuch ist hier bewusst NICHT eingebaut — ein Fehlschlag von
@@ -796,21 +901,7 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" | "kampf" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
-      disziplin,
-    )
-      ? "buehneHeben"
-      : ARENA_BUEHNE_DUELL_DISCIPLINE_IDS.has(disziplin)
-      ? "buehneDuell"
-      : ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS.has(disziplin)
-      ? "buehneAuftritt"
-      : ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS.has(disziplin)
-      ? "buehneGauntlet"
-      : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
-      ? "bahn"
-      : ARENA_KAMPF_DISCIPLINE_IDS.has(disziplin)
-      ? "kampf"
-      : "feldspiel";
+    const chassis = waehleArenaChassis(disziplin);
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
       fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
         heim,
@@ -824,64 +915,7 @@ export async function runArenaFixtures(
       timeoutMs,
     });
 
-    // Review-Fund (PR #776): die Fehlermeldung unten muss die TATSAECHLICH aufgerufene
-    // Browser-Funktion nennen -- vor der Chassis-Weiche stand hier "spieleFeldspiel"
-    // hartkodiert, obwohl derselbe Codepfad seit der Gewichtheben-Produktivierung auch
-    // "spieleBuehneHeben" aufruft. Ein Fehler im Buehnen-Pfad haette damit faelschlich auf die
-    // falsche Funktion gezeigt und beim Debuggen eines echten Produktionsfehlers in die Irre
-    // gefuehrt.
-    const aufgerufeneFunktion =
-      chassis === "buehneHeben"
-        ? "spieleBuehneHeben"
-        : chassis === "buehneDuell"
-        ? "spieleBuehneDuell"
-        : chassis === "buehneAuftritt"
-        ? "spieleBuehneAuftritt"
-        : chassis === "buehneGauntlet"
-        ? "spieleBuehneGauntlet"
-        : chassis === "bahn"
-        ? "spieleBahn"
-        : chassis === "kampf"
-        ? "spieleTdmGefecht"
-        : "spieleFeldspiel";
-    return rohErgebnisse.map((ergebnis, index) => {
-      if (!ergebnis) {
-        throw new Error(
-          `arena-headless-runner: ${aufgerufeneFunktion}("${disziplin}", ...) lieferte null fuer Fixture ${index} (${vorbereitet[index].homeTeamId} vs. ${vorbereitet[index].awayTeamId}) — unbekannte Disziplin?`,
-        );
-      }
-      // Namenszuordnung PRO FIXTURE (nicht global): derselbe Name in zwei VERSCHIEDENEN
-      // Fixtures desselben Batches ist unproblematisch (jedes Duell hat sein eigenes Kader-Paar),
-      // nur eine Kollision INNERHALB dieses einen Duells zaehlt.
-      const zuordnung = baueEindeutigeNamenZuordnung(vorbereitet[index].heim, vorbereitet[index].gast);
-      const boxscore: ArenaFixtureBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => {
-        const treffer = zuordnung.get(eintrag.name);
-        return {
-          name: eintrag.name,
-          wert: eintrag.wert,
-          playerId: treffer?.playerId ?? null,
-          side: treffer?.side ?? null,
-          torwart: !!eintrag.torwart,
-          // Nur gesetzt, wenn der Motor es liefert (Spurt) -- jede andere Disziplin bleibt zeichengleich.
-          ...(typeof eintrag.duelle === "number" ? { duelle: eintrag.duelle } : {}),
-        };
-      });
-      // "SPIEL DES TAGES" (Task #31 Paket 1, s. `ArenaMomentEintrag`): `seite` 0/1 wird hier,
-      // genau wie `side` bei der Boxscore oben, auf die echte `teamId` dieses Fixtures aufgeloest.
-      const momente: ArenaMomentEintrag[] | undefined = ergebnis.momente?.map((moment) => ({
-        typ: moment.typ,
-        teamId: moment.seite === 0 ? vorbereitet[index].homeTeamId : vorbereitet[index].awayTeamId,
-        spieler: moment.spieler,
-      }));
-      return {
-        homeTeamId: vorbereitet[index].homeTeamId,
-        awayTeamId: vorbereitet[index].awayTeamId,
-        seiten: ergebnis.seiten,
-        boxscore,
-        ...(ergebnis.gesamtKg ? { gesamtKg: ergebnis.gesamtKg } : {}),
-        ...(momente ? { momente } : {}),
-      };
-    });
+    return baueArenaFixtureErgebnisse(vorbereitet, rohErgebnisse, disziplin, chassis);
     } finally {
       await schliesseEinmal();
       if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -982,7 +1016,7 @@ type RoherMiniDmFfaRundenTeamEintrag = {
   down: boolean;
 };
 type RoherMiniDmFfaRunde = { slotId: string; seed: number; dauer: number; teams: RoherMiniDmFfaRundenTeamEintrag[] };
-type RoherMiniDmFfaEventErgebnis = {
+export type RoherMiniDmFfaEventErgebnis = {
   saat: number;
   runden: RoherMiniDmFfaRunde[];
   teams: Array<{ side: number; rundenPunkteSumme: number; beitragSumme: number; eventPlatz: number; ligaPunkte: number }>;
@@ -1081,23 +1115,14 @@ async function simuliereMiniDmFfaPodsImBrowser(payload: {
 }
 
 /**
- * Fuehrt eine Menge Mini-DM-Pods (typischerweise alle Pods eines Mini-DM-Spieltags, s.
- * `getMiniDmPodsForMatchday()`) headless aus und liefert je Pod einen echten, simulierten
- * Boxscore — PRAESENTATIONSZWECK, s. Kopfkommentar oben. Ein Pod, dessen Team KEINEN einzigen
- * einsatzfaehigen Kader stellt (fehlende Attribut-Boegen, leeres Roster), wird NICHT geworfen,
- * sondern als `null` an derselben Position zurueckgegeben — anders als `runArenaFixtures()`
- * (das bei EINEM leeren Kader auf eine 1-gegen-0-Notaufstellung ausweicht), weil
- * `spieleMiniDmFfaEvent()` selbst hart abbricht, sobald ein Team keinen Mini-DM-Kaempfer stellt,
- * und ein einzelner unvollstaendiger Pod (z. B. ein frisch angelegtes Team ohne Kader) den Rest
- * des Batches nicht mitreissen soll.
+ * Kader und Aufstellung je Pod-Team, VOR dem Motor-Start — ausgelagert (Quick-Sim, 27.10.) aus
+ * `runMiniDmFfaPodFixtures()`, unveraendert, damit `arena-node-runner.ts` dieselben Eingaben baut.
  */
-export async function runMiniDmFfaPodFixtures(
+export function bereiteMiniDmPodsVor(
   gameState: GameState,
   pods: MiniDmFfaPodFixtureInput[],
-  options: RunMiniDmFfaPodFixturesOptions = {},
-): Promise<Array<MiniDmFfaPodFixtureResult | null>> {
-  if (pods.length === 0) return [];
-
+  options: Pick<RunMiniDmFfaPodFixturesOptions, "attributeSheetOverrides" | "aufstellungBeachten" | "matchdayId"> = {},
+) {
   // AUFSTELLUNG (20.10., PR A) — je Team EIN `place` (buildArenaAufstellung(), kein Merge noetig,
   // s. Kopfkommentar). `aufstellungBeachten: false` haelt bewusst beim alten Verhalten (leere
   // `place`-Objekte -> reiner Eignungs-Reihum im Motor, s. `mdffaGesetzteRolle()`).
@@ -1116,6 +1141,77 @@ export async function runMiniDmFfaPodFixtures(
   }));
 
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
+  return { vorbereitet, einsatzfaehig };
+}
+
+export type VorbereiteterMiniDmPod = ReturnType<typeof bereiteMiniDmPodsVor>["vorbereitet"][number];
+
+/**
+ * Rohe `miniDmFfaEvent()`-Ergebnisse -> `MiniDmFfaPodFixtureResult[]` (je Pod an seiner Position,
+ * `null` fuer nicht einsatzfaehige Pods) — ausgelagert (Quick-Sim, 27.10.), unveraendert.
+ * `rohErgebnisse` enthaelt NUR die laufbaren Pods, in ihrer Reihenfolge.
+ */
+export function baueMiniDmPodErgebnisse(
+  vorbereitet: VorbereiteterMiniDmPod[],
+  einsatzfaehig: boolean[],
+  rohErgebnisse: Array<RoherMiniDmFfaEventErgebnis | null>,
+): Array<MiniDmFfaPodFixtureResult | null> {
+  let laufbarIndex = 0;
+  return vorbereitet.map((pod, index) => {
+    if (!einsatzfaehig[index]) {
+      return null;
+    }
+    const ergebnis = rohErgebnisse[laufbarIndex]!;
+    laufbarIndex += 1;
+    if (!ergebnis) {
+      return null;
+    }
+
+    const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
+    const boxscore: MiniDmFfaPodBoxscoreEintrag[] = ergebnis.runden.flatMap((runde) =>
+      runde.teams.map((eintrag) => ({
+        slotId: runde.slotId,
+        name: eintrag.n,
+        playerId: namenJeTeam[eintrag.side]?.get(eintrag.n) ?? null,
+        teamId: pod.teamIds[eintrag.side] ?? null,
+        podSide: eintrag.side,
+        rundenPlatz: eintrag.rundenPlatz,
+        rundenPunkte: eintrag.rundenPunkte,
+        beitrag: eintrag.beitrag,
+      })),
+    );
+    const teams: MiniDmFfaPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
+      teamId: pod.teamIds[eintrag.side] ?? "",
+      podSide: eintrag.side,
+      rundenPunkteSumme: eintrag.rundenPunkteSumme,
+      beitragSumme: eintrag.beitragSumme,
+      eventPlatz: eintrag.eventPlatz,
+      ligaPunkte: eintrag.ligaPunkte,
+    }));
+
+    return { podId: pod.podId, teamIds: pod.teamIds, teams, boxscore };
+  });
+}
+
+/**
+ * Fuehrt eine Menge Mini-DM-Pods (typischerweise alle Pods eines Mini-DM-Spieltags, s.
+ * `getMiniDmPodsForMatchday()`) headless aus und liefert je Pod einen echten, simulierten
+ * Boxscore — PRAESENTATIONSZWECK, s. Kopfkommentar oben. Ein Pod, dessen Team KEINEN einzigen
+ * einsatzfaehigen Kader stellt (fehlende Attribut-Boegen, leeres Roster), wird NICHT geworfen,
+ * sondern als `null` an derselben Position zurueckgegeben — anders als `runArenaFixtures()`
+ * (das bei EINEM leeren Kader auf eine 1-gegen-0-Notaufstellung ausweicht), weil
+ * `spieleMiniDmFfaEvent()` selbst hart abbricht, sobald ein Team keinen Mini-DM-Kaempfer stellt,
+ * und ein einzelner unvollstaendiger Pod (z. B. ein frisch angelegtes Team ohne Kader) den Rest
+ * des Batches nicht mitreissen soll.
+ */
+export async function runMiniDmFfaPodFixtures(
+  gameState: GameState,
+  pods: MiniDmFfaPodFixtureInput[],
+  options: RunMiniDmFfaPodFixturesOptions = {},
+): Promise<Array<MiniDmFfaPodFixtureResult | null>> {
+  if (pods.length === 0) return [];
+
+  const { vorbereitet, einsatzfaehig } = bereiteMiniDmPodsVor(gameState, pods, options);
 
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
@@ -1182,41 +1278,7 @@ export async function runMiniDmFfaPodFixtures(
       timeoutMs,
     });
 
-    let laufbarIndex = 0;
-    return vorbereitet.map((pod, index) => {
-      if (!einsatzfaehig[index]) {
-        return null;
-      }
-      const ergebnis = rohErgebnisse[laufbarIndex]!;
-      laufbarIndex += 1;
-      if (!ergebnis) {
-        return null;
-      }
-
-      const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
-      const boxscore: MiniDmFfaPodBoxscoreEintrag[] = ergebnis.runden.flatMap((runde) =>
-        runde.teams.map((eintrag) => ({
-          slotId: runde.slotId,
-          name: eintrag.n,
-          playerId: namenJeTeam[eintrag.side]?.get(eintrag.n) ?? null,
-          teamId: pod.teamIds[eintrag.side] ?? null,
-          podSide: eintrag.side,
-          rundenPlatz: eintrag.rundenPlatz,
-          rundenPunkte: eintrag.rundenPunkte,
-          beitrag: eintrag.beitrag,
-        })),
-      );
-      const teams: MiniDmFfaPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
-        teamId: pod.teamIds[eintrag.side] ?? "",
-        podSide: eintrag.side,
-        rundenPunkteSumme: eintrag.rundenPunkteSumme,
-        beitragSumme: eintrag.beitragSumme,
-        eventPlatz: eintrag.eventPlatz,
-        ligaPunkte: eintrag.ligaPunkte,
-      }));
-
-      return { podId: pod.podId, teamIds: pod.teamIds, teams, boxscore };
-    });
+    return baueMiniDmPodErgebnisse(vorbereitet, einsatzfaehig, rohErgebnisse);
   } finally {
     await schliesseBrowserHart(browser);
   }
@@ -1289,7 +1351,7 @@ export type RunBahnPodFixturesOptions = {
   matchdayId?: string | null;
 };
 
-type RoherBahnPodErgebnis = {
+export type RoherBahnPodErgebnis = {
   disziplin: string;
   saat: number;
   teams: Array<{ side: number; wert: number | null; zielzeit: number | null; eventPlatz: number; ligaPunkte: number }>;
@@ -1322,13 +1384,17 @@ async function simuliereBahnPodsImBrowser(payload: {
   return payload.pods.map((pod) => fenster.__arena!.spieleBahnPod(payload.disziplin, pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
 }
 
-export async function runBahnPodFixtures(
+/**
+ * Kader und Aufstellung je Pod-Team, VOR dem Motor-Start — ausgelagert (Quick-Sim-Node-Runner-
+ * Nachtrag fuer Bahn-Pod/Battlefield-Pod), analog `bereiteMiniDmPodsVor()` oben, unveraendert,
+ * damit `arena-node-runner.ts` dieselben Eingaben fuer `spieleBahnPod()` baut wie dieser
+ * Chromium-Pfad.
+ */
+export function bereiteBahnPodsVor(
   gameState: GameState,
-  disciplineId: string,
   pods: BahnPodFixtureInput[],
-  options: RunBahnPodFixturesOptions = {},
-): Promise<Array<BahnPodFixtureResult | null>> {
-  if (pods.length === 0) return [];
+  options: Pick<RunBahnPodFixturesOptions, "attributeSheetOverrides" | "matchdayId"> = {},
+) {
   const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
@@ -1337,6 +1403,60 @@ export async function runBahnPodFixtures(
     platzJeTeam: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
   }));
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
+  return { vorbereitet, einsatzfaehig };
+}
+
+export type VorbereiteterBahnPod = ReturnType<typeof bereiteBahnPodsVor>["vorbereitet"][number];
+
+/**
+ * Rohe `spieleBahnPod()`-Ergebnisse -> `BahnPodFixtureResult[]` — ausgelagert, analog
+ * `baueMiniDmPodErgebnisse()`, unveraendert. `rohErgebnisse` enthaelt NUR die einsatzfaehigen
+ * Pods, in ihrer Reihenfolge.
+ */
+export function baueBahnPodErgebnisse(
+  vorbereitet: VorbereiteterBahnPod[],
+  einsatzfaehig: boolean[],
+  disciplineId: string,
+  rohErgebnisse: Array<RoherBahnPodErgebnis | null>,
+): Array<BahnPodFixtureResult | null> {
+  let laufbarIndex = 0;
+  return vorbereitet.map((pod, index) => {
+    if (!einsatzfaehig[index]) return null;
+    const ergebnis = rohErgebnisse[laufbarIndex] ?? null;
+    laufbarIndex += 1;
+    if (!ergebnis) return null;
+    const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
+    return {
+      podId: pod.podId,
+      disciplineId,
+      teamIds: pod.teamIds,
+      teams: ergebnis.teams.map((eintrag) => ({
+        teamId: pod.teamIds[eintrag.side] ?? "",
+        podSide: eintrag.side,
+        eventPlatz: eintrag.eventPlatz,
+        ligaPunkte: eintrag.ligaPunkte,
+        wert: eintrag.wert,
+        zielzeit: eintrag.zielzeit,
+      })),
+      boxscore: ergebnis.boxscore.map((eintrag) => ({
+        name: eintrag.name,
+        playerId: namenJeTeam[eintrag.side]?.get(eintrag.name) ?? null,
+        teamId: pod.teamIds[eintrag.side] ?? null,
+        podSide: eintrag.side,
+        wert: eintrag.wert,
+      })),
+    };
+  });
+}
+
+export async function runBahnPodFixtures(
+  gameState: GameState,
+  disciplineId: string,
+  pods: BahnPodFixtureInput[],
+  options: RunBahnPodFixturesOptions = {},
+): Promise<Array<BahnPodFixtureResult | null>> {
+  if (pods.length === 0) return [];
+  const { vorbereitet, einsatzfaehig } = bereiteBahnPodsVor(gameState, pods, options);
   const laufbarePods = vorbereitet.filter((_, index) => einsatzfaehig[index]);
   if (laufbarePods.length === 0) return vorbereitet.map(() => null);
 
@@ -1379,34 +1499,7 @@ export async function runBahnPodFixtures(
       timeoutMs,
     });
 
-    let laufbarIndex = 0;
-    return vorbereitet.map((pod, index) => {
-      if (!einsatzfaehig[index]) return null;
-      const ergebnis = rohErgebnisse[laufbarIndex] ?? null;
-      laufbarIndex += 1;
-      if (!ergebnis) return null;
-      const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
-      return {
-        podId: pod.podId,
-        disciplineId,
-        teamIds: pod.teamIds,
-        teams: ergebnis.teams.map((eintrag) => ({
-          teamId: pod.teamIds[eintrag.side] ?? "",
-          podSide: eintrag.side,
-          eventPlatz: eintrag.eventPlatz,
-          ligaPunkte: eintrag.ligaPunkte,
-          wert: eintrag.wert,
-          zielzeit: eintrag.zielzeit,
-        })),
-        boxscore: ergebnis.boxscore.map((eintrag) => ({
-          name: eintrag.name,
-          playerId: namenJeTeam[eintrag.side]?.get(eintrag.name) ?? null,
-          teamId: pod.teamIds[eintrag.side] ?? null,
-          podSide: eintrag.side,
-          wert: eintrag.wert,
-        })),
-      };
-    });
+    return baueBahnPodErgebnisse(vorbereitet, einsatzfaehig, disciplineId, rohErgebnisse);
   } finally {
     await schliesseBrowserHart(browser);
   }
@@ -1471,7 +1564,7 @@ export type BattlefieldPodFixtureResult = {
   boxscore: BattlefieldPodBoxscoreEintrag[];
 };
 
-type RoherBattlefieldPodErgebnis = {
+export type RoherBattlefieldPodErgebnis = {
   format?: string;
   ende?: string;
   teams: Array<{ side: number; punkte: number; lebend: number; eventPlatz: number; ligaPunkte: number; wertung?: number }>;
@@ -1514,12 +1607,15 @@ async function simuliereBattlefieldPodsImBrowser(payload: {
   return payload.pods.map((pod) => fenster.__arena!.spieleBattlefieldPod(pod.teams, pod.seed, pod.platzJeTeam, pod.optionen));
 }
 
-export async function runBattlefieldPodFixtures(
+/**
+ * Kader und Aufstellung je Pod-Team, VOR dem Motor-Start — ausgelagert (Quick-Sim-Node-Runner-
+ * Nachtrag), analog `bereiteBahnPodsVor()` oben, unveraendert.
+ */
+export function bereiteBattlefieldPodsVor(
   gameState: GameState,
   pods: BattlefieldPodFixtureInput[],
-  options: RunBattlefieldPodFixturesOptions = {},
-): Promise<Array<BattlefieldPodFixtureResult | null>> {
-  if (pods.length === 0) return [];
+  options: Pick<RunBattlefieldPodFixturesOptions, "attributeSheetOverrides" | "matchdayId"> = {},
+) {
   const matchdayId = options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null;
   const vorbereitet = pods.map((pod) => ({
     ...pod,
@@ -1528,6 +1624,59 @@ export async function runBattlefieldPodFixtures(
     platzJeTeam: pod.teamIds.map((teamId) => buildArenaAufstellung(gameState, teamId, matchdayId)),
   }));
   const einsatzfaehig = vorbereitet.map((pod) => pod.kaderJeTeam.every((kader) => kader.length > 0));
+  return { vorbereitet, einsatzfaehig };
+}
+
+export type VorbereiteterBattlefieldPod = ReturnType<typeof bereiteBattlefieldPodsVor>["vorbereitet"][number];
+
+/**
+ * Rohe `spieleBattlefieldPod()`-Ergebnisse -> `BattlefieldPodFixtureResult[]` — ausgelagert, analog
+ * `baueBahnPodErgebnisse()`, unveraendert. `rohErgebnisse` enthaelt NUR die einsatzfaehigen Pods.
+ */
+export function baueBattlefieldPodErgebnisse(
+  vorbereitet: VorbereiteterBattlefieldPod[],
+  einsatzfaehig: boolean[],
+  rohErgebnisse: Array<RoherBattlefieldPodErgebnis | null>,
+): Array<BattlefieldPodFixtureResult | null> {
+  let laufbarIndex = 0;
+  return vorbereitet.map((pod, index) => {
+    if (!einsatzfaehig[index]) return null;
+    const ergebnis = rohErgebnisse[laufbarIndex]!;
+    laufbarIndex += 1;
+    if (!ergebnis || ergebnis.format !== "gefecht") return null;
+    const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
+    const boxscore: BattlefieldPodBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => ({
+      name: eintrag.name,
+      playerId: namenJeTeam[eintrag.side]?.get(eintrag.name) ?? null,
+      teamId: pod.teamIds[eintrag.side] ?? null,
+      podSide: eintrag.side,
+      slotId: eintrag.slot ?? null,
+      eig: eintrag.eig,
+      anteil: eintrag.wert,
+      wertung: eintrag.roh ?? 0,
+      ko: eintrag.ko,
+      down: eintrag.down,
+    }));
+    const teams: BattlefieldPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
+      teamId: pod.teamIds[eintrag.side] ?? "",
+      podSide: eintrag.side,
+      eventPlatz: eintrag.eventPlatz,
+      punkte: eintrag.punkte,
+      lebend: eintrag.lebend,
+      wertung: eintrag.wertung ?? 0,
+      ligaPunkte: eintrag.ligaPunkte,
+    }));
+    return { podId: pod.podId, teamIds: pod.teamIds, ende: ergebnis.ende ?? null, teams, boxscore };
+  });
+}
+
+export async function runBattlefieldPodFixtures(
+  gameState: GameState,
+  pods: BattlefieldPodFixtureInput[],
+  options: RunBattlefieldPodFixturesOptions = {},
+): Promise<Array<BattlefieldPodFixtureResult | null>> {
+  if (pods.length === 0) return [];
+  const { vorbereitet, einsatzfaehig } = bereiteBattlefieldPodsVor(gameState, pods, options);
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
@@ -1566,36 +1715,7 @@ export async function runBattlefieldPodFixtures(
       timeoutMs,
     });
 
-    let laufbarIndex = 0;
-    return vorbereitet.map((pod, index) => {
-      if (!einsatzfaehig[index]) return null;
-      const ergebnis = rohErgebnisse[laufbarIndex]!;
-      laufbarIndex += 1;
-      if (!ergebnis || ergebnis.format !== "gefecht") return null;
-      const namenJeTeam = pod.kaderJeTeam.map((kader) => baueEindeutigeNamenZuordnungFuerTeam(kader));
-      const boxscore: BattlefieldPodBoxscoreEintrag[] = ergebnis.boxscore.map((eintrag) => ({
-        name: eintrag.name,
-        playerId: namenJeTeam[eintrag.side]?.get(eintrag.name) ?? null,
-        teamId: pod.teamIds[eintrag.side] ?? null,
-        podSide: eintrag.side,
-        slotId: eintrag.slot ?? null,
-        eig: eintrag.eig,
-        anteil: eintrag.wert,
-        wertung: eintrag.roh ?? 0,
-        ko: eintrag.ko,
-        down: eintrag.down,
-      }));
-      const teams: BattlefieldPodTeamResult[] = ergebnis.teams.map((eintrag) => ({
-        teamId: pod.teamIds[eintrag.side] ?? "",
-        podSide: eintrag.side,
-        eventPlatz: eintrag.eventPlatz,
-        punkte: eintrag.punkte,
-        lebend: eintrag.lebend,
-        wertung: eintrag.wertung ?? 0,
-        ligaPunkte: eintrag.ligaPunkte,
-      }));
-      return { podId: pod.podId, teamIds: pod.teamIds, ende: ergebnis.ende ?? null, teams, boxscore };
-    });
+    return baueBattlefieldPodErgebnisse(vorbereitet, einsatzfaehig, rohErgebnisse);
   } finally {
     await schliesseBrowserHart(browser);
   }
