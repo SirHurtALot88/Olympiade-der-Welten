@@ -161,6 +161,13 @@ export interface SortimentRow {
   /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
   hidden?: boolean;
   /** Was ein Verkauf HEUTE bringt (heutiger VK, heutiger EK, variable Kosten): Gewinn (DB II) je Stueck, je Monat und im Regal. */
+  /** Platz im Vergleich zu allen AKTIVEN Artikeln (1 = bester): je Fenster nach Stueck und Umsatz, dazu Marge bei Nachkauf und Gewinn je Monat. */
+  ranks?: {
+    total: number;
+    windows: Partial<Record<SaleWindowKey, { qty: number | null; revenue: number | null }>>;
+    marge: number | null;
+    gewinnMonat: number | null;
+  };
   today?: { profitPerUnit: number; marginPct: number; perMonth: number | null; inStock: number | null; maxEk25: number | null; capitalBound: number | null };
   /** Verkaeufe je Monat (aus 90 Tagen) -- Basis fuer Gewinn je Monat. */
   perMonth?: number;
@@ -693,8 +700,43 @@ export function buildFullSortiment(
         (a.windows["365"]?.revenue ?? a.windows.all?.revenue ?? 0)
       );
     })
-    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop));
+    .map((a) => buildSortimentRow(a, classByArticle.get(a) ?? "beobachten", costSettings, shop))
+    .map(withRanks);
 }
+
+/** Setzt auf jede Zeile den Platz unter den AKTIVEN Artikeln (Chris, 11.11.: ausgelaufene zaehlen nicht mit). */
+function withRanks(row: SortimentRow, _i: number, all: SortimentRow[]): SortimentRow {
+  const rank = (value: number | null, get: (r: SortimentRow) => number | null, pool: SortimentRow[]): number | null => {
+    if (value === null || !(value > 0)) return null;
+    let better = 0;
+    for (const r of pool) {
+      const v = get(r);
+      if (v !== null && v > value) better++;
+    }
+    return better + 1;
+  };
+  if (!row.active) return row;
+  const pool = rankPoolCache.get(all) ?? all.filter((r) => r.active);
+  rankPoolCache.set(all, pool);
+  const windows: NonNullable<SortimentRow["ranks"]>["windows"] = {};
+  for (const key of ["30", "90", "365", "all"] as SaleWindowKey[]) {
+    windows[key] = {
+      qty: rank(row.windows[key]?.qty ?? null, (r) => r.windows[key]?.qty ?? null, pool),
+      revenue: rank(row.windows[key]?.revenue ?? null, (r) => r.windows[key]?.revenue ?? null, pool),
+    };
+  }
+  return {
+    ...row,
+    ranks: {
+      total: pool.length,
+      windows,
+      marge: rank(row.market?.margin ?? null, (r) => r.market?.margin ?? null, pool),
+      gewinnMonat: rank(row.today?.perMonth ?? null, (r) => r.today?.perMonth ?? null, pool),
+    },
+  };
+}
+
+const rankPoolCache = new WeakMap<SortimentRow[], SortimentRow[]>();
 
 /** Deutsche Klassen-Labels fuer die Sortiment-Klasse -- wiederverwendbar fuer Filter-Chips etc. */
 export const LABELS_DE: Record<ArticleClass, string> = {
