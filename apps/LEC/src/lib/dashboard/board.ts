@@ -162,7 +162,7 @@ export function pokemonParts(nameRaw: string): { number: string | null; name: st
 
 /** Kartencode aus dem Titel, auch wenn er kein normaler Set-Code ist (SHVI-DESE3, MRD-G090, IOC-SE1). */
 export function titleCode(nameRaw: string): string | null {
-  const m = nameRaw.match(/\b([A-Z0-9]{2,6}-[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?)\b/);
+  const m = nameRaw.match(/\b([A-Z0-9]{2,6}-(?:25TH-)?[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?)\b/);
   return m ? m[1] : null;
 }
 
@@ -191,12 +191,15 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
  * Konflikt der eindeutige Code zum Namen; Pokemon in der Pokemon-Sektion mit dem Kartennamen. Deutsche Karten
  * mit Sprachfilter Deutsch, englische mit Englisch; sonst gleiche harten Filter (Verkaeufer DE, ab NM).
  */
-export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string {
+export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string | null {
   const language = isEnglishCard(row) ? "EN" : "DE";
   if (isPokemonTitle(row.nameRaw)) {
     const p = pokemonParts(row.nameRaw);
     return buildCardmarketSearchUrl(p.name || row.nameRaw, packQty, { game: "Pokemon", language });
   }
+  // Sammlungen, Mystery-Packs und Titel mit mehreren Codes sind keine einzelne Karte: kein Link statt einer falschen Suche.
+  const codes = new Set(row.nameRaw.match(/\b[A-Z0-9]{2,6}-(?:25TH-)?[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?\b/g) ?? []);
+  if (codes.size > 1 || /\b(Sammlung|Mystery|Bulk|Konvolut|Lot)\b/i.test(row.nameRaw)) return null;
   const code = row.codeName?.usedCode || row.setCode || titleCode(row.nameRaw);
   const term = code ? cardmarketCode(code) : cleanTitle(row.nameRaw).name;
   return buildCardmarketSearchUrl(term, packQty, { language });

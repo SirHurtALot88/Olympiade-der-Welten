@@ -336,7 +336,8 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (!showDiscontinued && !showHidden) {
       result = result.filter((r) => r.active);
     }
-    if (stockFilter && !showHidden) {
+    // Mit Suchbegriff (z. B. Link aus den Empfehlungen) auch ausverkaufte Artikel zeigen.
+    if (stockFilter && !showHidden && !normalizedQuery) {
       result = result.filter((r) => r.stock > 0);
     }
     return result;
@@ -352,7 +353,7 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   }, [filtered, sort, selectedWindow]);
 
   // Zaehler je Markt-Filter ueber die aktiven Artikel (ohne die anderen Filter), damit man sieht, wie viele es sind.
-  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
+  const marketCounts = useMemo(() => countMarketFilters(rows.filter((r) => !r.hidden && r.active && (!stockFilter || r.stock > 0)).map((r) => r.market)), [rows, stockFilter]);
 
   const visible = sorted.slice(0, visibleCount);
   const boardRows = useMemo(() => sortBoard(filtered, boardSort).slice(0, visibleCount), [filtered, boardSort, visibleCount]);

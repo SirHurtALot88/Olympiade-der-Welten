@@ -201,7 +201,7 @@ export function buildImportPlan(
   const bandFee = [0, 0, 0, 0];
   const bandRev = [0, 0, 0, 0];
   for (const result of billbeeResults) {
-    if (result.window !== "365" && result.window !== "all") continue;
+    if (result.window !== "365") continue; // ein Fenster, sonst zaehlen ueberlappende Verkaeufe doppelt
     for (const row of result.rows) {
       const fee = feeFor(row.nameNormalized);
       if (!row.isCard || !(fee > 0) || !(row.qty > 0) || !(row.revenue > 0)) continue;
@@ -213,7 +213,7 @@ export function buildImportPlan(
   const totalRate = bandRev.reduce((a, b) => a + b, 0) > 0 ? bandFee.reduce((a, b) => a + b, 0) / bandRev.reduce((a, b) => a + b, 0) : null;
   const estimateFee = (unitPrice: number): number => {
     const b = bandOf(unitPrice);
-    if (bandRev[b] >= 100) return (bandFee[b] / bandRev[b]) * unitPrice; // genug Vergleichsumsatz im Preisband
+    if (bandRev[b] >= 300) return (bandFee[b] / bandRev[b]) * unitPrice; // genug Vergleichsumsatz im Preisband
     if (totalRate !== null) return totalRate * unitPrice;
     return computeEbayFees(unitPrice, costSettings.adFeeRateGood, costSettings).total;
   };

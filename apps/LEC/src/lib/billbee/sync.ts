@@ -33,6 +33,8 @@ export interface BillbeeSyncReport {
   sales: number;
   /** Artikel, bei denen Billbee eine eBay-Artikelnummer geliefert hat. */
   ebayItemIds: number;
+  /** Stammartikel, die nach der Namens-Normalisierung denselben Artikel ergeben (z. B. Einzelkarte und Playset). */
+  duplicateMasters: number;
   windows: { window: string; articles: number; units: number }[];
   /** Auffaelligkeiten in den gelieferten Bestellungen (Doppelte, gebrochene Mengen, Spitzenreiter). */
   diagnostics: OrderDiagnostics;
@@ -87,7 +89,14 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
 
   // eBay-Artikelnummern aus Billbee: sie sind aktueller als die des gesperrten Shop-Abrufs.
   let ebayIds = 0;
+  const seenMasters = new Set<string>();
+  let duplicateMasters = 0;
   for (const m of masters) {
+    if (seenMasters.has(m.row.nameNormalized)) {
+      duplicateMasters++;
+      continue;
+    }
+    seenMasters.add(m.row.nameNormalized);
     if (!m.ebayItemId) continue;
     const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { ebayItemId: m.ebayItemId } });
     ebayIds += res.count;
@@ -128,6 +137,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     orders: orders.length,
     sales: saleRows.length,
     ebayItemIds: ebayIds,
+    duplicateMasters,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,
@@ -135,17 +145,22 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   };
 }
 
-/** eBay-Gebuehr je Stueck aus den zuletzt gespeicherten Fenstern (Datei-Import mit eBay-Report). */
+/**
+ * ECHTE eBay-Gebuehr je Stueck aus den eBay-Verkaufsberichten (EbayListingFact). Bewusst NICHT aus den
+ * gespeicherten Fenstern: dort stehen inzwischen auch geschaetzte Gebuehren, die sich sonst beim naechsten
+ * Lauf als "echt" festschreiben wuerden.
+ */
 async function knownFeePerUnit(prisma: PrismaClient): Promise<Map<string, number>> {
-  const rows = await prisma.saleWindow.findMany({
-    where: { ebayFeeTotal: { gt: 0 }, qty: { gt: 0 } },
-    select: { qty: true, ebayFeeTotal: true, article: { select: { nameNormalized: true } } },
+  const rows = await prisma.ebayListingFact.findMany({
+    where: { articleId: { not: null }, qtySold: { gt: 0 }, totalSellingCosts: { gt: 0 } },
+    select: { qtySold: true, totalSellingCosts: true, article: { select: { nameNormalized: true } } },
   });
   const sums = new Map<string, { fee: number; qty: number }>();
   for (const r of rows) {
+    if (!r.article) continue;
     const s = sums.get(r.article.nameNormalized) ?? { fee: 0, qty: 0 };
-    s.fee += r.ebayFeeTotal;
-    s.qty += r.qty;
+    s.fee += r.totalSellingCosts;
+    s.qty += r.qtySold;
     sums.set(r.article.nameNormalized, s);
   }
   return new Map([...sums].map(([k, v]) => [k, v.fee / v.qty]));

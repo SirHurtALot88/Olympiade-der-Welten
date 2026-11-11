@@ -204,7 +204,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             <h4>Was ein Verkauf heute bringt</h4>
             <table className="bd-dt-t">
               <tbody>
-                <tr><td>Gewinn je Stück (heutiger VK und EK, vor Fixkosten)</td><td className="r"><b style={{ color: row.today.profitPerUnit < 0 ? "var(--crit)" : undefined }}>{eur(row.today.profitPerUnit)}</b> · {formatPercent(row.today.marginPct)} %</td></tr>
+                <tr><td>Gewinn je Stück ({row.listingVk ? "heutiger VK" : "Ø-VK, kein Listenpreis"} und aktueller EK, vor Fixkosten)</td><td className="r"><b style={{ color: row.today.profitPerUnit < 0 ? "var(--crit)" : undefined }}>{eur(row.today.profitPerUnit)}</b> · {formatPercent(row.today.marginPct)} %</td></tr>
                 {row.today.perMonth != null && <tr><td>Gewinn je Monat bei aktuellem Tempo ({row.perMonth?.toFixed(1).replace(".", ",")} Stk/Monat)</td><td className="r">{eur(row.today.perMonth)}</td></tr>}
                 {row.today.inStock != null && <tr><td>Gewinn, wenn der Bestand ({row.stock} Stk) weg ist</td><td className="r">{eur(row.today.inStock)}</td></tr>}
                 {row.today.capitalBound != null && <tr><td>Gebundenes Kapital (Bestand × EK)</td><td className="r">{eur(row.today.capitalBound)}</td></tr>}
@@ -299,29 +299,6 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
           </>
         )}
 
-        <h4>Warenbewegungen</h4>
-        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen.</p>}
-        {movements.length > 0 && (
-          <>
-            <table className="bd-dt-t">
-              <thead>
-                <tr><th>Datum</th><th>Art</th><th className="r">Stück</th><th>Detail</th></tr>
-              </thead>
-              <tbody>
-                {movements.map((x, i) => (
-                  <tr key={i}>
-                    <td>{day(x.at)}</td>
-                    <td>{x.kind}</td>
-                    <td className="r">{x.delta > 0 ? `+${x.delta}` : x.delta}</td>
-                    <td>{x.note}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="bd-fig-note">Verkäufe und Einkäufe stammen aus Billbee bzw. dem Einkaufsimport. „Bestand laut Billbee“ wird seit heute bei jedem Abgleich mitgeschrieben (Billbee liefert keine Lagerhistorie).</p>
-          </>
-        )}
-
         <h4>Einkäufe</h4>
         {failed && <p className="bd-none">Details konnten nicht geladen werden.</p>}
         {!detail && !failed && <p className="bd-none">Lädt …</p>}
@@ -397,12 +374,14 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
     <div className={`bd-dt-stat${tone ? ` ${tone}` : ""}`} title={hint}>
       <span>{label}</span>
       <b>{value}</b>
+      {hint && <small>{hint}</small>}
     </div>
   );
 }
 
 function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void }) {
   const l = ebayLinks(row);
+  const cm = cardmarketLink(row, cleanTitle(row.nameRaw).pack);
   return (
     <div className="bd-dt-actions">
       {l.revise && (
@@ -413,15 +392,11 @@ function EbayActions({ row, hidden, busy, onToggleHidden }: { row: SortimentRow;
       <a className="chip" href={l.view ?? l.search} target="_blank" rel="noopener noreferrer">
         {l.view ? "Angebot ansehen ↗" : "Im eBay-Shop suchen ↗"}
       </a>
-      <a
-        className="chip"
-        href={cardmarketLink(row, cleanTitle(row.nameRaw).pack)}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Sucht die Karte bei Cardmarket (deutsch, ab NM)"
-      >
-        Bei Cardmarket ansehen ↗
-      </a>
+      {cm && (
+        <a className="chip" href={cm} target="_blank" rel="noopener noreferrer" title="Sucht die Karte bei Cardmarket (Sprache der Karte, ab NM)">
+          Bei Cardmarket ansehen ↗
+        </a>
+      )}
       <button type="button" className="chip" onClick={onToggleHidden} disabled={busy} title={hidden ? "Artikel wieder in die Listen aufnehmen" : "Artikel aus allen Listen ausblenden (Daten bleiben erhalten)"}>
         {hidden ? "Wieder einblenden" : "Ausblenden"}
       </button>

@@ -160,6 +160,7 @@ describe("Artikel ausblenden und Bestandslog", () => {
     await db.prisma.article.create({ data: { nameNormalized: "b", nameRaw: "B", isCard: true, hidden: true } });
     const normal = await loadArticleAggregates(db.prisma);
     expect(normal.aggregates.map((a) => a.nameRaw)).toEqual(["A"]);
+    expect(normal.allAggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]); // Summen sehen auch Ausgeblendete
     const all = await loadArticleAggregates(db.prisma, { includeHidden: true });
     expect(all.aggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]);
     expect(all.aggregates.find((a) => a.nameRaw === "B")?.hidden).toBe(true);

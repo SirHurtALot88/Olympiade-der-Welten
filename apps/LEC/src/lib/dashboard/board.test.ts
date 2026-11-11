@@ -102,7 +102,7 @@ describe("ebayLinks", () => {
 
 describe("Links fuer Sonderfaelle (echte Titel)", () => {
   const e = (nameRaw: string, setCode: string | null = null) => new URL(ebayLinks({ ebayItemId: null, setCode, nameRaw }).search).searchParams.get("_nkw");
-  const c = (nameRaw: string, setCode: string | null = null) => new URL(cardmarketLink({ setCode, nameRaw, codeName: null }));
+  const c = (nameRaw: string, setCode: string | null = null) => new URL(cardmarketLink({ setCode, nameRaw, codeName: null })!);
   it("eBay: Sonder-Codes ohne erkannten Set-Code kommen aus dem Titel", () => {
     expect(e("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed")).toBe("SHVI-DESE3");
     expect(e("Yu-Gi-Oh! MRD-G090 Schatten Leichenfledderer Rare NM")).toBe("MRD-G090");
@@ -122,6 +122,13 @@ describe("Links fuer Sonderfaelle (echte Titel)", () => {
     expect(c("Pokemon 078/162 Flutter Mane Holo Promo Trick or Trade NM EN").searchParams.get("language")).toBe("1");
     expect(c("Yu-Gi-Oh! RA03-DE169 Überlastfusion Platinum SecR NM 1st", "RA03-DE169").searchParams.get("language")).toBe("3");
   });
+  it("Cardmarket: Sammlungen und Titel mit mehreren Codes bekommen keinen Link", () => {
+    expect(cardmarketLink({ setCode: null, nameRaw: "250 YuGiOh! Karten Sammlung Deutsch 30 Holos", codeName: null })).toBeNull();
+    expect(cardmarketLink({ setCode: "RA01-DE001", nameRaw: "Yu-Gi-Oh! RA01-DE001 und RA01-DE002 Set", codeName: null })).toBeNull();
+  });
+  it("Sonder-Codes mit 25TH behalten das Set-Praefix", () => {
+    expect(e("Yu-Gi-Oh! MRD-25TH-000 Torwächter Secret Rare NM")).toBe("MRD-25TH-000");
+  });
   it("Cardmarket: Sonder-Code aus dem Titel, wenn kein Set-Code erkannt wurde", () => {
     expect(c("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed").searchParams.get("searchString")).toBe("SHVI-DESE3");
   });
@@ -130,18 +137,18 @@ describe("Links fuer Sonderfaelle (echte Titel)", () => {
 describe("cardmarketLink", () => {
   const cm = (o: object) => cardmarketLink({ setCode: null, nameRaw: "x", codeName: null, ...o } as Parameters<typeof cardmarketLink>[0]);
   it("sucht mit dem Cardmarket-Code ohne DE/EN, deutsch und ab NM", () => {
-    const url = new URL(cm({ setCode: "CT09-DE023" }));
+    const url = new URL(cm({ setCode: "CT09-DE023" })!);
     expect(url.origin + url.pathname).toBe("https://www.cardmarket.com/de/YuGiOh/Products/Search");
     expect(url.searchParams.get("searchString")).toBe("CT09-023");
     expect(url.searchParams.get("language")).toBe("3");
     expect(url.searchParams.get("minCondition")).toBe("2");
   });
   it("nimmt bei Name/Code-Konflikt den Code, der zum Namen passt", () => {
-    const url = new URL(cm({ setCode: "AAAA-DE001", codeName: { usedCode: "BBBB-DE002" } }));
+    const url = new URL(cm({ setCode: "AAAA-DE001", codeName: { usedCode: "BBBB-DE002" } })!);
     expect(url.searchParams.get("searchString")).toBe("BBBB-002");
   });
   it("faellt ohne Set-Code auf den Kartennamen zurueck", () => {
-    const url = new URL(cm({ nameRaw: "3x Yu-Gi-Oh! Mystischer Raum-Taifun Ultra Rare NM" }));
+    const url = new URL(cm({ nameRaw: "3x Yu-Gi-Oh! Mystischer Raum-Taifun Ultra Rare NM" })!);
     expect(url.searchParams.get("searchString")).toContain("Taifun");
   });
 });

@@ -565,8 +565,8 @@ export function buildSortimentRow(
 
   // "Was bringt ein Verkauf heute": heutiger VK und heutiger EK, nur variable Kosten (DB II, ohne Fixkosten).
   let today: SortimentRow["today"];
-  if (vkForCorridor > 0 && !ekMissing) {
-    const ekNow = a.currentEk ?? ekPerUnit;
+  if (vkForCorridor > 0 && !ekMissing && (a.currentEk ?? 0) + ekPerUnit > 0) {
+    const ekNow = a.currentEk !== null && a.currentEk > 0 ? a.currentEk : ekPerUnit;
     const varNonEk = Math.max(0, hk.total - hk.ek - hk.fixedCostShare);
     const fees = computeEbayFees(vkForCorridor, costSettings.adFeeRateGood, costSettings).total;
     const profit = vkForCorridor - fees - varNonEk - ekNow;

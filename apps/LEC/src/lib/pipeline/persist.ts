@@ -179,7 +179,12 @@ export async function persistBillbeeArtikel(
   for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true, currentVk: true } })) {
     before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active, vk: a.currentVk });
   }
+  // Gleicher Name nach Normalisierung (z. B. "3x Foo" und "Foo") ist ein Artikel: nur die erste Zeile zaehlt,
+  // sonst entstuende bei jedem Lauf eine Phantom-Bewegung.
+  const seen = new Set<string>();
   for (const row of rows) {
+    if (seen.has(row.nameNormalized)) continue;
+    seen.add(row.nameNormalized);
     const prev = before.get(row.nameNormalized);
     if (prev && prev.active && prev.stock !== row.stock) {
       await prisma.stockMovement.create({ data: { articleId: prev.id, before: prev.stock, after: row.stock } });
