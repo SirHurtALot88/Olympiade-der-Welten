@@ -43,7 +43,7 @@ import {
   VERZICHT_ANTEIL_DER_LEITER,
   verteileLeihgabenAufSlate,
 } from "@/lib/sponsor/sponsor-leih-slate";
-import { baueRangmarke } from "@/lib/sponsor/sponsor-rangmarke";
+import { baueRangmarke, sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import {
   ACADEMY_RATING_GRENZE,
   sponsorLeihPassungFuerTeam,
@@ -437,7 +437,13 @@ export function buildSponsorOffersForTeam(input: {
         leihwertJeSaison: leihe.leihwertJeSaison,
         startZustandPct: leihe.startZustandPct,
         katalogkostenEndstufe: leihe.katalogkostenEndstufe,
-        rangmarke: baueRangmarke({ startRang: startRangFuerMarke, haerte }),
+        // Rangraum des Spielstands: liga-lokal 16 bei Liga-Split, sonst Legacy-32 — sonst laegen die
+        // Marken einer 16er-Liga auf der 32er-Leiter (Schritt 4 statt 2, „mild" teils unreissbar).
+        rangmarke: baueRangmarke({
+          startRang: startRangFuerMarke,
+          haerte,
+          leagueSize: sponsorRangraumFuer(input.gameState),
+        }),
         rangmarkenHaerte: haerte,
       },
     };
@@ -978,14 +984,24 @@ function resolveAmbitionTargetRank(input: {
   startRank: number;
   profile: TeamStrategyProfile | null;
   identity: TeamIdentity | null;
+  /**
+   * Rangraum der Leiter, gegen die gepasst wird (ihre Laenge: 16 bei Liga-Split, sonst 32). Shift und
+   * Deckel sind in 32er-Raengen geeicht und werden proportional uebernommen — 7 Plaetze Ambition
+   * waeren in einer 16er-Liga fast die halbe Tabelle. Hier stand `Math.min(32, …)`: in einer 16er-Liga
+   * konnte der Zielrang damit hinter das Tabellenende rutschen.
+   */
+  leagueSize?: number;
 }): number {
+  const leagueSize = input.leagueSize ?? 32;
+  const skala = leagueSize / 32;
   const starPriority = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  const shiftMax = AMBITION_RANK_SHIFT_MAX * skala;
   const shift = Math.max(
-    -AMBITION_RANK_SHIFT_MAX,
-    Math.min(AMBITION_RANK_SHIFT_MAX, (starPriority - 5) * AMBITION_RANK_SHIFT_PER_POINT),
+    -shiftMax,
+    Math.min(shiftMax, (starPriority - 5) * AMBITION_RANK_SHIFT_PER_POINT * skala),
   );
   // Hoehere Ambition zieht den Zielrang NACH OBEN (kleinere Zahl = besserer Platz), deshalb minus.
-  return Math.max(1, Math.min(32, Math.round(input.startRank - shift)));
+  return Math.max(1, Math.min(leagueSize, Math.round(input.startRank - shift)));
 }
 
 /**
@@ -1096,8 +1112,12 @@ function scoreOfferForAi(input: {
   // Kurvenform trotz allem meist die schwaechste der vier Wahldimensionen, genau das Gegenteil vom
   // Auftrag.
   if (terms) {
-    const targetRank = resolveAmbitionTargetRank({ startRank: terms.startRank, profile, identity });
-    const fitWeights = sponsorV3AnchorWeights(targetRank, SPONSOR_AI_CURVE_FIT_SIGMA);
+    // Im Rangraum DIESER Leiter (16 bei Liga-Split): die Gewichte muessen genau ihre Sprossen abdecken.
+    // Mit 32er-Gewichten auf einer 16er-Leiter fiele die Masse der Raenge 17..32 einfach weg und
+    // `fitValue` laege systematisch unter dem Anker.
+    const ranks = terms.baseLadder.length || 32;
+    const targetRank = resolveAmbitionTargetRank({ startRank: terms.startRank, profile, identity, leagueSize: ranks });
+    const fitWeights = sponsorV3AnchorWeights(targetRank, (SPONSOR_AI_CURVE_FIT_SIGMA * ranks) / 32, ranks);
     const fitValue = terms.baseLadder.reduce((sum, value, index) => sum + value * (fitWeights[index] ?? 0), 0);
     score += (fitValue - terms.anchor) * SPONSOR_AI_CURVE_FIT_WEIGHT;
   }

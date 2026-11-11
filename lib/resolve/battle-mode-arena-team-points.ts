@@ -182,6 +182,11 @@ import climbingPpsReferenzJson from "@/data/generated/climbing-pps-referenz.json
 // live-save-Abbild vom 27.10., NACH der Kalibrierrunde 3 (32 Ticks, Tresor 45) — die Referenz
 // gehoert zu genau diesem Motorstand, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`.
 import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
+// TDM (TDM-Gefecht-Verdrahtung 11.11.): gezogen von scripts/ziehe-buehne-pps-referenz.ts tdm
+// (Chassis "kampf", s. ARENA_KAMPF_DISCIPLINE_IDS/spieleTdmGefecht) gegen das live-save-Abbild
+// vom 10.11. -- derselbe rohe Boxscore-Wert, den die Liga ab jetzt tatsaechlich bucht
+// (g.kaempfer[].wert aus tdmGefecht()), nicht mehr ein Mass der alten PPS-Duell-Bruecke.
+import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -419,6 +424,25 @@ export const SPURT_INDIVIDUAL_PPS_MAX = 5.5;
 export const SPURT_PPS_ANTEIL_MITTE = 0.25;
 
 /**
+ * STATIONSDUELL-BONUS (Spurt, Chris 10.11., docs/design/spurt-stationsduell-sichtbar-10-11.md):
+ * "Gewonnene duelle koennen fuer die Spieler auch in die PPs mit beitragen, bringen dem team aber
+ * keine zusaetzlichen punkte fuers scoring". Ein Stationsduell gewinnt, wer eine Station, an der
+ * gleichzeitig ein Gegner steht, zuerst verlaesst (Motor: `stationsDuellSchritt()`). Je Sieg
+ * `JE_SIEG` PPs obendrauf, gedeckelt bei `MAX` je Rennen -- additiv NACH der Impact-Kurve, also
+ * hoechstens 5,5 + 0,5 = 6,0 (Chris' "max 5-6"). Gemessen (40 Saaten, 6 gegen 6): im Mittel 33,5
+ * Duelle je Rennen, 2,8 Siege je Laeufer, 0-6 Siege -- der Deckel greift ab dem fuenften Sieg.
+ * Ausschliesslich Spieler-PPs: `seiten` und damit `arenaTeamPointsForFixture()` lesen das nie.
+ */
+export const SPURT_STATIONSDUELL_PPS_JE_SIEG = 0.1;
+export const SPURT_STATIONSDUELL_PPS_MAX = 0.5;
+
+/** Der Duell-Bonus in PPs fuer `duelle` gewonnene Stationsduelle (0 ausser bei Spurt). */
+export function ppsAusStationsduellen(disciplineId: string, duelle: number | undefined): number {
+  if (disciplineId !== "spurt" || typeof duelle !== "number" || !(duelle > 0)) return 0;
+  return roundPps(Math.min(SPURT_STATIONSDUELL_PPS_MAX, duelle * SPURT_STATIONSDUELL_PPS_JE_SIEG));
+}
+
+/**
  * HOECHSTPUNKTZAHL/MITTE-ANTEIL FUER FOOTBALL (PPS-Referenz-Vorarbeit 15.09., NOCH NICHT
  * produktiv geschaltet -- s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`). Dieselbe Impact-Kurve wie Basketball/Hockey
  * (`ppsAusArenaImpact()`) -- Football teilt sich mit ihnen das Feldspiel-Chassis und denselben
@@ -449,6 +473,19 @@ export const FOOTBALL_PPS_ANTEIL_MITTE = 0.25;
  */
 export const CLIMBING_INDIVIDUAL_PPS_MAX = 5.5;
 export const CLIMBING_PPS_ANTEIL_MITTE = 0.25;
+
+/**
+ * TDM (TDM-Gefecht-Verdrahtung 11.11., s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS` in
+ * arena-resolved-disciplines.ts): `tdmGefecht()`s eigene Impact-Kurve ueber dieselbe
+ * `ppsAusArenaImpact()`-Formel wie jede andere resolved Disziplin -- eigene Referenz aus
+ * demselben Grund wie bei jeder vorigen Welle (der rohe Boxscore-Wert, `g.kaempfer[].wert`,
+ * liegt auf seiner eigenen 0..100-Skala, s. tdmGefecht() in battle-mode.engine.js).
+ *
+ * MAX/ANTEIL_MITTE UNVERAENDERT VON BASKETBALLS ENTSCHEIDUNG UEBERNOMMEN -- aus demselben
+ * Grund wie bei jeder vorigen Welle (s. `STAFFEL_INDIVIDUAL_PPS_MAX`-Kommentar).
+ */
+export const TDM_INDIVIDUAL_PPS_MAX = 5.5;
+export const TDM_PPS_ANTEIL_MITTE = 0.25;
 
 /**
  * ARENA-PPS-REFERENZ, GENERISCH JE DISZIPLIN (Gewichtheben-Produktivierung, S6): `iMittel`
@@ -564,6 +601,9 @@ const FOOTBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(footballPpsR
 const CLIMBING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(climbingPpsReferenzJson as ArenaPpsReferenzJson);
 // I-SPY (27.10.): keine Rolle mit eigener Wertformel -- `feldgroessenTorwart` fehlt in der Datei.
 const I_SPY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(iSpyPpsReferenzJson as ArenaPpsReferenzJson);
+// TDM (TDM-Gefecht-Verdrahtung 11.11.): keine Rolle mit eigener Wertformel (anders als Hockeys
+// Torwart) -- `feldgroessenTorwart` fehlt in der Datei, genau wie bei jeder Nicht-Hockey-Disziplin.
+const TDM_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(tdmPpsReferenzJson as ArenaPpsReferenzJson);
 
 /**
  * EIN EINTRAG JE ARENA-AUFGELOESTER DISZIPLIN (s. `ARENA_RESOLVED_DISCIPLINE_IDS`): welche
@@ -816,6 +856,21 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
       anteilMitte: I_SPY_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 6 (dataAdapter.ts), einzeln nachgesehen.
       katalogStandardgroesse: 6,
+    },
+  ],
+  // ==================== TDM-GEFECHT-VERDRAHTUNG (11.11.) ====================
+  // tdmGefecht() ueber das neue Kampf-Chassis, s. Kommentar an `ARENA_RESOLVED_DISCIPLINE_IDS`
+  // (arena-resolved-disciplines.ts) fuer die Abnahmezahlen.
+  [
+    "tdm",
+    {
+      referenzFeldgroessen: TDM_PPS_REFERENZ_FELDGROESSEN,
+      max: TDM_INDIVIDUAL_PPS_MAX,
+      anteilMitte: TDM_PPS_ANTEIL_MITTE,
+      // Discipline.playerCount ist 3 (dataAdapter.ts), NICHT die Motor-Feldgroesse
+      // (ARENA_ART.tdm.jeSeite ist 6) -- einzeln nachgesehen, dieselbe Falle wie bei jeder
+      // vorigen Welle.
+      katalogStandardgroesse: 3,
     },
   ],
 ]);
@@ -1222,7 +1277,11 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
         torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz;
         ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, torwartReferenz, konfig.max, konfig.anteilMitte));
       } else {
-        ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, feldReferenz, konfig.max, konfig.anteilMitte));
+        // + STATIONSDUELL-BONUS (nur Spurt, sonst 0): reine Spieler-Nebenspur, s. `ppsAusStationsduellen()`.
+        // Ohne Bonus bleibt der Wert bit-identisch zum Vorherstand (kein zweites Runden).
+        const basisPps = ppsAusArenaImpact(eintrag.wert, feldReferenz, konfig.max, konfig.anteilMitte);
+        const duellPps = ppsAusStationsduellen(disciplineId, eintrag.duelle);
+        ppsByPlayerId.set(eintrag.playerId, duellPps > 0 ? roundPps(basisPps + duellPps) : basisPps);
       }
     }
   }

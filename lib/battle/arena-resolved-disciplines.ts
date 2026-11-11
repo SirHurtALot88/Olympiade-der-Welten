@@ -268,6 +268,10 @@ export const ARENA_ANGESCHLOSSENE_DISCIPLINE_IDS: ReadonlySet<string> = new Set(
   // oben. Config/Referenz sind vorbereitet (s. ARENA_IMPACT_KONFIG_JE_DISZIPLIN in
   // battle-mode-arena-team-points.ts), der Produktiv-Eintrag folgt erst nach einer eigenen
   // Pp-Rezeptrunde.
+  // TDM (TDM-Gefecht-Verdrahtung 11.11.): `tdmGefecht()` ueber das neue Kampf-Chassis
+  // (`ARENA_KAMPF_DISCIPLINE_IDS`, arena-headless-runner.ts), s. TDM_GEFECHT_VORLAUF_AKTIV und
+  // den Eintrag in ARENA_RESOLVED_DISCIPLINE_IDS unten fuer die Abnahmezahlen.
+  "tdm",
 ]);
 
 /** Die zwei Pflichtkriterien aus CLAUDE.md: Rangtreue (rho je Spiel > 0,80) und Budget-Methode (Pp ≤ 25). */
@@ -388,6 +392,31 @@ export const BATTLEFIELD_POD_VORLAUF_AKTIV = true;
  */
 export const BAHN_POD_VORLAUF_AKTIV = true;
 
+/**
+ * TDM-GEFECHT-VORLAUF-SCHALTER (TDM-Gefecht-Verdrahtung 11.11., docs/design/
+ * tdm-gefecht-abnahme-10-11.md). ANDERS ALS Mini-DM-FFA/Battlefield-Pod/Bahn-Pod oben ist TDM
+ * ein normales ZWEISEITIGES Duell (kein Vier-Team-Pod) und braucht deshalb KEINE eigene
+ * Vorlauf-/Rohdaten-Infrastruktur -- `tdmGefecht()` laeuft ueber dieselbe generische
+ * Chassis-Weiche wie Buehne/Bahn (`ARENA_KAMPF_DISCIPLINE_IDS`, arena-headless-runner.ts,
+ * `window.__arena.spieleTdmGefecht()`), und TDM steht deshalb UNTEN tatsaechlich in
+ * `ARENA_RESOLVED_DISCIPLINE_IDS`, nicht nur in einem eigenen Boolean wie Battlefield/Mini-DM.
+ * Dieser Schalter ist trotzdem derselbe Server-Notschalter-Typ wie die drei oben (eigene
+ * Variable, weil diese Datei client-importierbar ist und kein `process.env` lesen darf, s.
+ * Kopfkommentar) -- `determineArenaDisciplineContexts()` (arena-vorlauf-service.ts) prueft ihn
+ * VOR der generischen `ARENA_RESOLVED_DISCIPLINE_IDS`-Mitgliedschaft und laesst "tdm" bei
+ * `false`/`OLY_TDM_GEFECHT_VORLAUF=aus` aus den Kandidaten faellt -- der Spieltag faellt dann
+ * automatisch auf die PPS-Duell-Bruecke zurueck (keine Mitgliedschaft in dieser Menge mehr nur
+ * fuer diesen einen Aufruf, nicht ein zweiter Dispatch-Pfad).
+ *
+ * ABNAHME (10.11., beide Pflichtkriterien regulaer bestanden, KEINE Ausnahme noetig, neu
+ * nachgemessen auf dem main-Stand dieser PR nach dem Anzeige-Treue-Fix PR #1372): rho je
+ * Gefecht (Median) 0,800-0,827 bei jeder Kadergroesse k=2..6 und beiden Saatstroemen -- ueber
+ * der 0,80-Schranke; Pp-Abweichung 14,2-16,8 (k=6, zwei Stroeme) -- klar unter der 25-Schranke.
+ * `scripts/miss-tdm-gefecht-abnahme.mjs`, `data/generated/disziplin-abnahme.json` Schluessel
+ * "tdm". OHNE jede Kalibrierung (BF_FFA_GRUND-Werte 1:1 uebernommen, wie beim Prototyp 10.11.).
+ */
+export const TDM_GEFECHT_VORLAUF_AKTIV = true;
+
 export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "gewichtheben",
   "speed-schach",
@@ -414,4 +443,10 @@ export const ARENA_RESOLVED_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   // gemessen (n=24, zwei Saatstroeme: 38,5 / 81,5) — die 25-Pp-Schranke bleibt klar verletzt, s.
   // Kopfkommentar und ARENA_ABNAHME_AUSNAHMEN. Bis zu einer Rezeptkalibrierung oder Chris' Pp-Freigabe
   // ueber die PPS-Duell-Bruecke.
+  // TDM (TDM-Gefecht-Verdrahtung 11.11., s. TDM_GEFECHT_VORLAUF_AKTIV im Kommentar oben):
+  // `tdmGefecht()` ersetzt die alte PPS-Duell-Bruecke (rho dort nur 0,324-0,404) -- rho
+  // 0,800-0,827 / Pp 14,2-16,8, beide Pflichtkriterien regulaer bestanden, keine Ausnahme.
+  // Sechzehnte gewertete Disziplin. `determineArenaDisciplineContexts()` prueft zusaetzlich
+  // `TDM_GEFECHT_VORLAUF_AKTIV`, bevor TDM wirklich als Kandidat gilt (s. dort).
+  "tdm",
 ]);

@@ -1025,7 +1025,12 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     params.playerId,
     contractLength,
     contractShape,
-    params.offeredSalary ?? salary ?? "-",
+    // NICHT `?? salary`: ohne Angebot rechnet die Vorschau mit der FORDERUNG als Angebot, nicht
+    // mit dem Grundgehalt. Mit `salary` als Platzhalter teilten sich „kein Angebot" und „Angebot
+    // genau in Hoehe des Grundgehalts" einen Schluessel — das getippte Angebot bekam dann die
+    // Vorschau des Forderungs-Angebots, und der Verhandeln-Klick schrieb die Forderung als
+    // eigenes Angebot in den Draft (Nachtrag 10.11. in verhandlung-rework.md).
+    params.offeredSalary ?? "no-offer",
     scoutingLevel,
     priorRejectedNegotiation ? "prior_rejected" : "fresh",
     affrontRetreat ? "affront" : "no_affront",

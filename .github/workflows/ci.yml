@@ -366,6 +366,8 @@ jobs:
   # bestaetigt. Nach ein paar gruenen Laeufen gehoert er auf Chris' Branch-Schutz-Liste (Settings
   # -> Branches -> Require status checks), genau wie `persistenz-suiten` es vorher war.
   arena-chromium-tests:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -558,6 +560,8 @@ jobs:
   # Differenz aus -- das ist die Zahl, die zur Plan-Schaetzung (Abschnitt 4.2: +0,6-0,75 GB)
   # passt, nicht die 3,7-3,8 GB fuer sich allein.
   arena-image-chromium-probe:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -660,6 +664,8 @@ jobs:
   # (z. B. `npm install -g npm@12` vor `npm install`/`npm install --package-lock-only`), sonst
   # wirft genau dieser Check es wieder raus.
   lockfile-libc-waechter:
+    needs: weiche
+    if: ${{ !cancelled() && needs.weiche.outputs.nur_kartenschmiede != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

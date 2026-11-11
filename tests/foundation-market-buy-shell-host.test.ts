@@ -59,21 +59,27 @@ describe("Kaufdialog sitzt auf der geteilten Entscheidungs-Hülle", () => {
     expect(host()).not.toContain("confirmNote=");
   });
 
-  it("meldet den Trotz-Aufschlag sichtbar — beides: was gilt und was ein Klick auslöst", () => {
+  it("meldet den Trotz-Aufschlag erst, wenn er gilt — keine Ankündigung vor dem Klick", () => {
+    // Chris, 10.11.: „die warnung darf doch nicht auftauchen bevor ich verhandle!!! das macht es
+    // ja sonst zu einfach". Sichtbar ist nur der schon festgeschriebene Aufschlag; was ein Klick
+    // auslösen WÜRDE, verrät die Hülle nicht mehr.
     const text = host();
     expect(text).toContain('data-testid="transfer-buy-defiance-active"');
-    expect(text).toContain('data-testid="transfer-buy-defiance-pending"');
+    expect(text).not.toContain('data-testid="transfer-buy-defiance-pending"');
+    expect(text).not.toContain("buyPreview?.pendingDefianceSurchargePct");
   });
 });
 
-describe("Der Tooltip erklärt alle drei Verhandlungsgedächtnisse an einer Stelle", () => {
-  it("trägt Trotz, angekündigten Trotz und Erwiderung im Geschichts-Bündel", () => {
-    // Verteilt auf drei Ecken der Oberfläche wäre jedes einzeln ein Rätsel. Die Frage lautet
+describe("Der Tooltip erklärt die Verhandlungsgedächtnisse an einer Stelle", () => {
+  it("trägt Trotz und Erwiderung im Geschichts-Bündel, aber keinen angekündigten Trotz", () => {
+    // Verteilt auf mehrere Ecken der Oberfläche wäre jedes einzeln ein Rätsel. Die Frage lautet
     // „warum ist seine Forderung anders als eben?" — und die hat genau eine Antwortstelle.
+    // Der angekündigte Trotz (was ein Klick auslösen WÜRDE) ist seit 10.11. bewusst raus:
+    // Verhandeln soll ein Risiko sein, keine Vorhersage.
     const text = quelle("lib/foundation/tabs/use-market-buy-derivations.ts");
     const block = text.slice(text.indexOf('id: "history"') - 2600, text.indexOf('id: "history"'));
-    expect(block).toContain("defianceSurchargePct");
-    expect(block).toContain("pendingDefianceSurchargePct");
+    expect(block).toContain("buyPreview.defianceSurchargePct");
+    expect(block).not.toContain("buyPreview.pendingDefianceSurchargePct");
     expect(block).toContain("concededFromLastCounter");
   });
 });

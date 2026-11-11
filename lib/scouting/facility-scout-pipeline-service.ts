@@ -1,7 +1,29 @@
 import type { GameState, Player, PlayerScoutIntelRecord, ScoutIntelSource } from "@/lib/data/olyDataTypes";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
-import { getActiveScoutingWishlistEntries, getScoutingPipelineSlotLimit } from "@/lib/scouting/scouting-wishlist-slots";
+import {
+  getFullRevealCertaintyThreshold,
+  getPlayerScoutCertainty,
+  getTeamScoutIntelRecords,
+} from "@/lib/scouting/scouting-reveal-state";
+import {
+  getActiveScoutingWishlistEntries,
+  getScoutingPipelineSlotLimit,
+  getScoutingWishlistQueue,
+} from "@/lib/scouting/scouting-wishlist-slots";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
+
+// Lesende Zustandsfragen liegen seit 11.11. im Blatt-Modul `scouting-reveal-state.ts` (siehe dort,
+// Importkreis Wunschliste ↔ Pipeline); hier unverändert weiter exportiert.
+export {
+  getEffectiveRevealConfidence,
+  getEffectiveScoutingLevel,
+  getFullRevealCertaintyThreshold,
+  getPlayerRevealConfidence,
+  getPlayerScoutCertainty,
+  getScoutingProgressPercent,
+  getTeamScoutIntelRecords,
+  isPlayerFullyScouted,
+} from "@/lib/scouting/scouting-reveal-state";
 
 /**
  * Flat certainty gain per matchday for the team's #1 scouting-focus-queue
@@ -49,61 +71,6 @@ export function getScoutPipelineConfig(gameState: GameState, teamId: string): Sc
     ...base,
     maxSlots: getScoutingPipelineSlotLimit(gameState, teamId),
   };
-}
-
-export function getTeamScoutIntelRecords(gameState: GameState, teamId: string) {
-  const seasonId = gameState.season.id;
-  return (gameState.seasonState.scoutIntelByTeamId?.[teamId] ?? []).filter((entry) => entry.seasonId === seasonId);
-}
-
-export function getPlayerScoutCertainty(gameState: GameState, teamId: string, playerId: string) {
-  const rosterEntry = gameState.rosters.some((entry) => entry.teamId === teamId && entry.playerId === playerId);
-  if (rosterEntry) {
-    return 100;
-  }
-  const record = getTeamScoutIntelRecords(gameState, teamId).find((entry) => entry.playerId === playerId) ?? null;
-  return record?.certainty ?? 0;
-}
-
-/**
- * Auto-Reveal-Fortschritt (0..100) aus dem playerPotential-Record — wächst über die
- * Zeit per advancePlayerPotentialRevealTick (eigene/Watchlist/Free-Agents). Wird mit
- * der aktiven Scout-Certainty zusammengeführt, damit sich das Potenzial auch OHNE
- * aktives Scouting mit den Spieltagen von selbst aufdeckt (und man den Fortschritt sieht).
- */
-export function getPlayerRevealConfidence(gameState: GameState, playerId: string): number {
-  const record = gameState.playerPotential?.find((entry) => entry.playerId === playerId);
-  return clamp(record?.confidence ?? 0, 0, 100);
-}
-
-/**
- * Effektive Reveal-Sicherheit (0..100): das Maximum aus aktivem Scouting (certainty)
- * und dem zeitbasierten Auto-Reveal-Fortschritt. Einziger, glatt steigender Fortschritt,
- * an dem sowohl Anzeige (%) als auch das effektive Scouting-Level hängen.
- */
-export function getEffectiveRevealConfidence(gameState: GameState, teamId: string, playerId: string): number {
-  const certainty = getPlayerScoutCertainty(gameState, teamId, playerId);
-  return Math.max(certainty, getPlayerRevealConfidence(gameState, playerId));
-}
-
-export function getEffectiveScoutingLevel(gameState: GameState, teamId: string, playerId: string) {
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
-  const facilityLevel = getFacilityLevel(teamFacilities, "scouting_office");
-  const certainty = getEffectiveRevealConfidence(gameState, teamId, playerId);
-  return clamp(facilityLevel + Math.floor(certainty / 25), 0, 5);
-}
-
-/**
- * Minimum certainty needed for a player to reach effective scouting level 5
- * ("fully scouted": exact attributes/disciplines, POW/SPE/MEN/SOC and all
- * traits visible) given the team's current Scouting Office level.
- */
-export function getFullRevealCertaintyThreshold(facilityLevel: number) {
-  return clamp((5 - Math.max(0, facilityLevel)) * 25, 0, 100);
-}
-
-export function isPlayerFullyScouted(gameState: GameState, teamId: string, playerId: string) {
-  return getEffectiveScoutingLevel(gameState, teamId, playerId) >= 5;
 }
 
 /**
@@ -226,10 +193,10 @@ export function refreshScoutPipeline(gameState: GameState, teamId: string): Game
   const records: PlayerScoutIntelRecord[] = assignments.map(({ playerId, source }) => {
     const existing = existingByPlayerId.get(playerId);
     if (existing) {
-      return {
-        ...existing,
-        source,
-      };
+      // Wieder aktiv: das Park-Flag fällt weg, der Fortschritt bleibt.
+      const reactivated: PlayerScoutIntelRecord = { ...existing, source };
+      delete reactivated.parked;
+      return reactivated;
     }
     return {
       playerId,
@@ -242,6 +209,24 @@ export function refreshScoutPipeline(gameState: GameState, teamId: string): Game
       ticksCompleted: 0,
     };
   });
+
+  // GEPARKT (seit 11.11.): Wunschlisten-Einträge, die gerade NICHT aktiv gescoutet werden — weil
+  // sie fertig sind oder unter die aktiven Plätze sortiert wurden —, behalten ihren bisherigen
+  // Fortschritt. Ohne das fiele ein voll gescouteter Spieler beim nächsten Refresh auf 0 % und
+  // rutschte sofort zurück in die aktive Queue (Pendeln). Geparkte Records ticken nicht und
+  // belegen keinen Slot (siehe advanceScoutIntelTick / buildScoutPipelineSummary).
+  const queue = getScoutingWishlistQueue(gameState, teamId);
+  for (const entry of [...queue.completed, ...queue.waiting]) {
+    if (assigned.has(entry.playerId)) {
+      continue;
+    }
+    const existing = existingByPlayerId.get(entry.playerId);
+    if (!existing) {
+      continue;
+    }
+    records.push({ ...existing, source: "wishlist_mirror", parked: true });
+    assigned.add(entry.playerId);
+  }
 
   return {
     ...gameState,
@@ -280,6 +265,9 @@ export function advanceScoutIntelTick(input: {
     }
     const focusPlayerId = getFocusScoutTarget(next, teamId)?.playerId ?? null;
     const records = getTeamScoutIntelRecords(next, teamId).map((record) => {
+      if (record.parked) {
+        return record;
+      }
       const isFocusTarget = focusPlayerId != null && record.playerId === focusPlayerId && record.source === "wishlist_mirror";
       const gain = isFocusTarget ? SCOUT_FOCUS_TICK_GAIN : tickGainForSource(config, record.source, facilityLevel);
       const certainty = clamp(record.certainty + gain, 0, 100);
@@ -308,14 +296,17 @@ export function advanceScoutIntelTick(input: {
 export function buildScoutPipelineSummary(gameState: GameState, teamId: string) {
   const config = getScoutPipelineConfig(gameState, teamId);
   const facilityLevel = getFacilityLevel(getTeamFacilityState(gameState, teamId), "scouting_office");
+  // `records` enthält auch geparkte (Fortschritt gemerkt, kein Slot); belegt sind nur die aktiven.
   const records = getTeamScoutIntelRecords(gameState, teamId);
+  const activeRecords = records.filter((entry) => !entry.parked);
   return {
     config,
     facilityLevel,
     records,
-    occupiedSlots: records.length,
-    passiveActive: records.filter((entry) => entry.source === "passive_need").length,
-    wishlistActive: records.filter((entry) => entry.source === "wishlist_mirror").length,
+    activeRecords,
+    occupiedSlots: activeRecords.length,
+    passiveActive: activeRecords.filter((entry) => entry.source === "passive_need").length,
+    wishlistActive: activeRecords.filter((entry) => entry.source === "wishlist_mirror").length,
     focusTickGain: SCOUT_FOCUS_TICK_GAIN,
     wishlistTickGain: tickGainForSource(config, "wishlist_mirror", facilityLevel),
     passiveTickGain: tickGainForSource(config, "passive_need", facilityLevel),

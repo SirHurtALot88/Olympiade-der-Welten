@@ -4,6 +4,7 @@ import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { getInitials } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import ScoutingKnowledgeLadder from "@/app/foundation/scouting-center-v2/ScoutingKnowledgeLadder";
+import ScoutVerdictReport from "@/app/foundation/scouting-center-v2/ScoutVerdictReport";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import { formatScoutedImpactDelta } from "@/lib/market/transfermarkt-scouting";
@@ -144,6 +145,10 @@ export default function ScoutingReportPanel({
           ) : null}
         </div>
       </header>
+
+      {/* Scout-Urteil zuerst (Konzept 11.11., Abschnitt 3): erst „was hält der Scout davon und
+          warum", dann die Zahlen-Karten darunter. */}
+      {report.verdict ? <ScoutVerdictReport verdict={report.verdict} playerName={report.playerName} /> : null}
 
       {newLook ? <ScoutingKnowledgeLadder report={report} /> : null}
 

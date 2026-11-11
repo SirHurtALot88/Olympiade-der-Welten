@@ -33,9 +33,19 @@ import {
   getSponsorV3PrizeCurve,
   getSponsorV3SalaryFactor,
   getSponsorV3Terms,
+  rerollSponsorV3TermsForNewSeason,
+  resolveSponsorLeagueTier,
   SPONSOR_V3_FLOOR_C,
 } from "@/lib/sponsor/sponsor-v3-offer-service";
-import { buildSponsorV3TermsCore, sponsorV3BenchmarkLadder, sponsorV3CardByKey } from "@/lib/sponsor/sponsor-v3-model";
+import {
+  buildSponsorV3TermsCore,
+  sponsorV3BenchmarkLadder,
+  sponsorV3CardByKey,
+  sponsorV3GuaranteedLadder,
+} from "@/lib/sponsor/sponsor-v3-model";
+import { vertragsjahrAus } from "@/lib/sponsor/sponsor-leih-lifecycle";
+import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
+import { isLeagueSplitActive } from "@/lib/season/league-split";
 
 /** Version des Leiter-Formats, auf das migriert wird. Erhoehen heisst: noch einmal migrieren. */
 export const SPONSOR_LADDER_MIGRATION_VERSION = 3;
@@ -176,4 +186,94 @@ export function migrateSponsorLaddersToV3(gameState: GameState): SponsorLadderMi
 /** Bequemlichkeits-Fassade fuer Aufrufer, die nur den neuen Spielstand brauchen (Load-Pfad). */
 export function withMigratedSponsorLadders(gameState: GameState): GameState {
   return migrateSponsorLaddersToV3(gameState).gameState;
+}
+
+export type SponsorLigaRangraumMigrationResult = {
+  gameState: GameState;
+  /** Teams, deren Vertragsleiter auf den Liga-Rangraum (16) umgebaut wurde. */
+  umgebauteTeamIds: string[];
+  /** Teams mit 32er-Leiter, die bereits abgerechnet sind — die bleiben, das Geld ist geflossen. */
+  bereitsAbgerechneteTeamIds: string[];
+};
+
+/**
+ * MIGRATION M3 — UNTERSCHRIEBENE 32er-LEITERN IN EINEM SPLIT-SPIELSTAND AUF 16 SPROSSEN UMBAUEN.
+ *
+ * Bis zum Umbau des Vertragsmodells (PR #1384) baute der Live-Pfad auch bei aktivem Liga-Split
+ * 32er-Leitern. Start- und Endrang zaehlen dort aber liga-lokal 1..16: die Teams landeten nur auf den
+ * oberen 16 Sprossen, und die Liga zahlte so rund 20 % unter der Kalibrierung (gemessen am neutralen
+ * Ligaschnitt bei Faktor 1,0: 1826,2 statt 2294,6 C). Seit dem Umbau bekommen NEUE Angebote 16
+ * Sprossen und der Saisonwechsel baut Mehrjahresleitern um — die BEREITS UNTERSCHRIEBENEN Vertraege
+ * der laufenden Saison aber zahlten am Saisonende noch aus der alten Leiter.
+ *
+ * Chris, 10.11. (PR #1384): „Wenn du da noch was machen kannst, dann passt das an, dass da am Ende
+ * der Saison noch mehr Geld gezahlt wird, weil jetzt ist ja noch keins geflossen." Das ist dieselbe
+ * Lage wie bei M1: eine explizite Design-Korrektur an Vertraegen, aus denen noch nichts gezahlt wurde.
+ *
+ * WAS SIE TUT: jeder Vertrag eines Split-Spielstands, der eine 32er-V3-Leiter MIT Kurvenform traegt
+ * und fuer dessen Saison noch KEIN `season_end`-Auszahlungslog existiert, wird neu gebaut — ueber
+ * `rerollSponsorV3TermsForNewSeason`, also dieselbe Funktion, die auch der Saisonwechsel nimmt:
+ *   - derselbe Salary Factor, mit dem der Vertrag heute rechnet (`terms.salaryFactor`),
+ *   - dasselbe Vertragsjahr (`vertragsjahrAus`) — ein Mehrjahresvertrag in Jahr 2 behaelt seine
+ *     Erosion, ein frischer Vertrag in Jahr 1 hat keine,
+ *   - dieselbe Liga, derselbe eingefrorene Startrang, dieselbe Kurvenform, Rarität, Tilt, Achse und
+ *     derselbe Gebaeude-Verzicht — nur der Rangraum wird 16, mit den flaechentreu abgeleiteten
+ *     16er-Kurvenformen (`sponsorKurvenReferenz`).
+ * Fuer einen Jahr-1-Vertrag ist das Ergebnis exakt die Karte, die `buildSponsorV3Terms` heute bauen
+ * wuerde. `lockedRankPayoutLadder` zieht mit (Anzeige == Settlement).
+ *
+ * KEIN STEMPEL, SONDERN EINE BEDINGUNG: die Migration ist idempotent (eine 16er-Leiter ist kein
+ * Kandidat mehr) und faengt damit auch einen Vertrag, der spaeter noch aus einem alten 32er-Angebot
+ * unterschrieben wird. Ohne Liga-Split tut sie nichts — dort sind 32 Sprossen richtig.
+ *
+ * WAS SIE NICHT TUT: abgerechnete Vertraege anfassen, Vertraege ohne Kurvenform (Altvertraege aus der
+ * Zeit vor dem Ligaleiter-Umbau: ohne Form laesst sich keine 16er-Leiter ableiten) oder offene
+ * Angebote umschreiben.
+ */
+export function migrateSponsorLadderToLeagueRankSpace(gameState: GameState): SponsorLigaRangraumMigrationResult {
+  const seasonState = gameState.seasonState;
+  const unveraendert = { gameState, umgebauteTeamIds: [], bereitsAbgerechneteTeamIds: [] };
+  if (!seasonState || !isLeagueSplitActive(gameState)) return unveraendert;
+  const leagueSize = sponsorRangraumFuer(gameState);
+  const contracts = seasonState.sponsorContractsByTeamId ?? {};
+  const seasonId = gameState.season?.id ?? "";
+  const umgebauteTeamIds: string[] = [];
+  const bereitsAbgerechneteTeamIds: string[] = [];
+  const nextContracts: Record<string, TeamSponsorContract> = { ...contracts };
+
+  for (const [teamId, contract] of Object.entries(contracts)) {
+    if (!contract) continue;
+    const terms = getSponsorV3Terms(contract);
+    if (!terms || !terms.curveShape || terms.rankLadder.length === leagueSize) continue;
+    if (hasSeasonEndPayoutLog(gameState, contract.seasonId ?? seasonId, teamId)) {
+      bereitsAbgerechneteTeamIds.push(teamId);
+      continue;
+    }
+    const umgebaut = rerollSponsorV3TermsForNewSeason(terms, {
+      newSalaryFactor: terms.salaryFactor,
+      contractYear: vertragsjahrAus(contract),
+      leagueTier: resolveSponsorLeagueTier(gameState, teamId),
+      leagueSize,
+    });
+    // Wache: nur uebernehmen, was wirklich eine gueltige Leiter im Liga-Rangraum ist.
+    if (umgebaut.rankLadder.length !== leagueSize || !umgebaut.rankLadder.every(Number.isFinite)) continue;
+    nextContracts[teamId] = {
+      ...contract,
+      sponsorV3: umgebaut,
+      lockedRankPayoutLadder: sponsorV3GuaranteedLadder(umgebaut),
+    };
+    umgebauteTeamIds.push(teamId);
+  }
+
+  if (umgebauteTeamIds.length === 0) return { gameState, umgebauteTeamIds, bereitsAbgerechneteTeamIds };
+  return {
+    gameState: { ...gameState, seasonState: { ...seasonState, sponsorContractsByTeamId: nextContracts } },
+    umgebauteTeamIds,
+    bereitsAbgerechneteTeamIds,
+  };
+}
+
+/** Fassade fuer den Ladepfad. */
+export function withSponsorLadderInLeagueRankSpace(gameState: GameState): GameState {
+  return migrateSponsorLadderToLeagueRankSpace(gameState).gameState;
 }

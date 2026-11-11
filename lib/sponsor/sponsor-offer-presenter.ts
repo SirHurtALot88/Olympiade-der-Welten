@@ -2,6 +2,8 @@ import type { GameState, SponsorOffer, SponsorOfferComponent, SponsorRarity } fr
 import { SPONSOR_RARITIES } from "@/lib/sponsor/sponsor-curve-shapes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { readLockedRankPayout } from "@/lib/sponsor/sponsor-economy-calibration";
+import { LEAGUE_SIZE } from "@/lib/season/league-split";
+import { sponsorRangBloecke, sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import {
@@ -369,7 +371,7 @@ export function buildSponsorOfferPresentation(input: {
           teamId: input.teamId ?? input.offer.teamId,
         })
       : null,
-    v3: buildSponsorV3Presentation(input.offer),
+    v3: buildSponsorV3Presentation(input.offer, sponsorRangraumFuer(input.gameState)),
   };
 }
 
@@ -378,10 +380,20 @@ export function buildSponsorOfferPresentation(input: {
  * Rechnung. `sponsorV3GuaranteedLadder` und `sponsorV3Settle` sind exakt die Funktionen, aus denen
  * auch das Settlement zahlt; die Karte kann deshalb keine anderen Zahlen zeigen als die gebuchten.
  */
-export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presentation | null {
+export function buildSponsorV3Presentation(
+  offer: SponsorOffer,
+  /**
+   * Rangraum des Spielstands (`sponsorRangraumFuer`): bei Liga-Split liga-lokal 16. Neue Vertraege
+   * haben dann selbst 16 Sprossen; Bestandsvertraege aus der laufenden Saison koennen noch 32 tragen,
+   * ein Team einer 16er-Liga erreicht aber nur Platz 1..16 — der schlechteste ERREICHBARE Platz ist
+   * deshalb Platz 16, nicht Sprosse 32.
+   */
+  leagueSize: number = LEAGUE_SIZE,
+): SponsorV3Presentation | null {
   const terms = getSponsorV3Terms(offer);
   if (!terms) return null;
   const ladder = sponsorV3GuaranteedLadder(terms);
+  const lastReachableRank = Math.max(1, Math.min(ladder.length, Math.round(leagueSize)));
   const card = sponsorV3CardByKey(terms.cardKey);
   const hasGoal = terms.goalSize > 0 && terms.goalKey != null;
   return {
@@ -391,7 +403,7 @@ export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presen
     tiltPercent: Math.round(terms.tilt * 100),
     startRank: terms.startRank,
     anchor: roundOfferCash(terms.anchor),
-    guaranteedFloor: roundOfferCash(ladder[31] ?? 0),
+    guaranteedFloor: roundOfferCash(ladder[lastReachableRank - 1] ?? 0),
     guaranteedTop: roundOfferCash(ladder[0] ?? 0),
     risk: roundOfferCash(sponsorV3StandardDeviation(terms)),
     goal: hasGoal
@@ -404,7 +416,7 @@ export function buildSponsorV3Presentation(offer: SponsorOffer): SponsorV3Presen
         }
       : null,
     maxPayout: roundOfferCash(sponsorV3Settle(terms, 1, 1)),
-    minPayout: roundOfferCash(sponsorV3Settle(terms, 32, 0)),
+    minPayout: roundOfferCash(sponsorV3Settle(terms, lastReachableRank, 0)),
   };
 }
 
@@ -440,17 +452,25 @@ export function getSponsorRarityLabel(tier: number): string {
  * Raengen die Karte Sprossen zeigt. Frueher stand hier die Meilenstein-Leiter der alten
  * Auszahlungsmathematik (`SPONSOR_RANK_MILESTONES` samt Bonus-Betraegen) — die Betraege sind mit dem
  * V3-Umbau entfallen, die Beschriftung ist geblieben.
+ *
+ * AUS DER LIGAGROESSE ABGELEITET, nicht fest verdrahtet: hier stand bis zum 10.11. eine feste
+ * 32er-Leiter (Top 28 … Top 4, Meister), obwohl die Liga laengst 16 Teams hat. Chris: „die
+ * sponsorenanzeige ist noch nicht auf 16 teams konfiguriert da sind es immernoch 32! … dann sollte
+ * es für alle 2 plätze mehr cash geben statt alle 4". Schrittweite `leagueSize / 8`:
+ *   16 Teams → Top 14 / 12 / 10 / 8 / 6 / 4 / 2 / Meister
+ *   32 Teams (Legacy-Spielstaende ohne Liga-Split) → Top 28 / 24 / … / 4 / Meister wie bisher.
  */
-export const SPONSOR_RANK_LADDER_RUNGS = [
-  { maxRank: 28, label: "Top 28" },
-  { maxRank: 24, label: "Top 24" },
-  { maxRank: 20, label: "Top 20" },
-  { maxRank: 16, label: "Top 16" },
-  { maxRank: 12, label: "Top 12" },
-  { maxRank: 8, label: "Top 8" },
-  { maxRank: 4, label: "Top 4" },
-  { maxRank: 1, label: "Meister" },
-] as const;
+export type SponsorRankLadderRung = { maxRank: number; label: string };
+
+export function buildSponsorRankLadderRungs(leagueSize: number = LEAGUE_SIZE): SponsorRankLadderRung[] {
+  return sponsorRangBloecke(leagueSize).map((maxRank) => ({
+    maxRank,
+    label: maxRank === 1 ? "Meister" : `Top ${maxRank}`,
+  }));
+}
+
+/** Die Leiter bei der heutigen Ligagroesse (`LEAGUE_SIZE` = 16). */
+export const SPONSOR_RANK_LADDER_RUNGS: readonly SponsorRankLadderRung[] = buildSponsorRankLadderRungs(LEAGUE_SIZE);
 
 export type SponsorRankTierRow = {
   label: string;
@@ -465,10 +485,14 @@ function roundOfferCash(value: number) {
 /**
  * Letzter Liga-Rang = garantierter Boden: hier ist keine Gewinnstufe freigeschaltet,
  * der Sponsor zahlt nur die Basis. Sichtbar gemacht, damit Teams auch den Worst-Case
- * (Tabellen-Letzter, Platz 32) auf der Leiter sehen — nicht nur ab „Top 28".
+ * (Tabellen-Letzter, Platz 16) auf der Leiter sehen — nicht nur ab „Top 14".
+ * Bei Legacy-Spielstaenden ohne Liga-Split ist der letzte Platz 32 (`sponsorRankFloorLabel(32)`).
  */
-export const SPONSOR_RANK_FLOOR_AT = 32;
-export const SPONSOR_RANK_FLOOR_LABEL = `Platz ${SPONSOR_RANK_FLOOR_AT}`;
+export const SPONSOR_RANK_FLOOR_AT = LEAGUE_SIZE;
+export function sponsorRankFloorLabel(leagueSize: number = SPONSOR_RANK_FLOOR_AT): string {
+  return `Platz ${leagueSize}`;
+}
+export const SPONSOR_RANK_FLOOR_LABEL = sponsorRankFloorLabel(SPONSOR_RANK_FLOOR_AT);
 
 /** Absolute sponsor cash (basis + unlocked rank share) at each Gewinnstufe threshold. */
 export function buildSponsorRankTierRows(input: {
@@ -482,9 +506,14 @@ export function buildSponsorRankTierRows(input: {
   rankLadder: number[];
   /**
    * Zeigt die garantierte Boden-Stufe (letzter Rang, nur Basis) als unterste Sprosse an.
-   * Opt-in, damit der bestehende Milestone-Contract (8 Stufen ab „Top 28") stabil bleibt.
+   * Opt-in, damit der bestehende Milestone-Contract (8 Stufen ab „Top 14") stabil bleibt.
    */
   includeFloorRung?: boolean;
+  /**
+   * Rangraum des Spielstands (`sponsorRangraumFuer`): 16 bei Liga-Split (Default, `LEAGUE_SIZE`),
+   * 32 bei Legacy-Spielstaenden. Bestimmt Sprossen und Boden-Stufe — nicht die Betraege.
+   */
+  leagueSize?: number;
 }): SponsorRankTierRow[] {
   // EINE LEERE LEITER IST KEINE LEITER. `buildOfferRankPayoutLadderPreview` liefert `[]`, wenn ein
   // Angebot keine V3-Konditionen traegt — und `readLockedRankPayout([], rang)` gibt 0 zurueck. Ohne
@@ -493,25 +522,29 @@ export function buildSponsorRankTierRows(input: {
   if (input.rankLadder.length === 0) {
     return [];
   }
-  // Sockel = Payout am schlechtesten Rang (32); jede Gewinnstufe zeigt den Rang-Aufschlag darüber —
-  // exakt `readLockedRankPayout(ladder, maxRank) − readLockedRankPayout(ladder, 32)`, wie das Settlement
-  // (sponsor-settlement-service) den rankResidual berechnet.
-  const floorPayout = readLockedRankPayout(input.rankLadder, 32);
-  const milestoneRows = SPONSOR_RANK_LADDER_RUNGS.map((milestone) => {
-    const rankPortion = Math.max(0, readLockedRankPayout(input.rankLadder, milestone.maxRank) - floorPayout);
-    return {
-      label: milestone.label,
-      rankAt: milestone.maxRank,
-      absolutePayout: roundOfferCash(input.baseCash + rankPortion),
-    };
-  });
+  // `baseCash` ist die Basis-Komponente des Angebots = Payout an der LETZTEN SPROSSE der
+  // eingefrorenen Leiter (`ladder[ladder.length − 1]`, heute Sprosse 32, siehe
+  // `applySponsorV3TermsToOffers`). Jede Stufe zeigt `baseCash + (Leiterwert − dieser Anker)`, also
+  // exakt den Leiterwert, aus dem das Settlement zahlt. Der Anker MUSS deshalb die letzte Sprosse
+  // bleiben, auch wenn die Liga nur 16 Plaetze hat — mit Rang 16 als Anker stuende jede Stufe um
+  // `ladder[15] − ladder[31]` zu niedrig da.
+  const ladderAnchor = readLockedRankPayout(input.rankLadder, input.rankLadder.length);
+  const stufeBei = (rank: number) =>
+    roundOfferCash(input.baseCash + Math.max(0, readLockedRankPayout(input.rankLadder, rank) - ladderAnchor));
+  const leagueSize = Math.max(2, Math.round(input.leagueSize ?? LEAGUE_SIZE));
+  const milestoneRows = buildSponsorRankLadderRungs(leagueSize).map((milestone) => ({
+    label: milestone.label,
+    rankAt: milestone.maxRank,
+    absolutePayout: stufeBei(milestone.maxRank),
+  }));
   if (!input.includeFloorRung) {
     return milestoneRows;
   }
-  // Boden-Stufe (garantierte Basis, keine Gewinnstufe) an den Anfang — die Leiter
-  // ist aufsteigend nach Schwierigkeit (schlechtester Rang zuerst).
+  // Boden-Stufe (schlechtester ERREICHBARER Rang, keine Gewinnstufe) an den Anfang — die Leiter
+  // ist aufsteigend nach Schwierigkeit (schlechtester Rang zuerst). Bei 32 Sprossen und 32 Teams ist
+  // das exakt `baseCash`, bei einer 16er-Liga der Leiterwert auf Platz 16.
   return [
-    { label: SPONSOR_RANK_FLOOR_LABEL, rankAt: SPONSOR_RANK_FLOOR_AT, absolutePayout: roundOfferCash(input.baseCash) },
+    { label: sponsorRankFloorLabel(leagueSize), rankAt: leagueSize, absolutePayout: stufeBei(leagueSize) },
     ...milestoneRows,
   ];
 }

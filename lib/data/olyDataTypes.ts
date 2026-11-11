@@ -1769,6 +1769,12 @@ export type PlayerScoutIntelRecord = {
   startedAt: string;
   lastTickAt: string | null;
   ticksCompleted: number;
+  /**
+   * Geparkt (seit 11.11.): Wunschlisten-Eintrag außerhalb der aktiven Scouting-Queue (fertig
+   * gescoutet oder unter die aktiven Plätze sortiert). Fortschritt bleibt erhalten, tickt aber
+   * nicht und belegt keinen Slot. Fehlt bei alten Saves = aktiv.
+   */
+  parked?: boolean;
 };
 
 export type SponsorPayoutLogRecord = {
@@ -2342,7 +2348,8 @@ export type ContractNegotiationDraft = {
    * Abschnitt 9.1.
    *
    * Wächst nur monoton (`max`): es zählt der tiefste je VERHANDELTE Griff, nicht der zuletzt
-   * getippte. Tippen ist frei, die Vorschau warnt vorher; Verhandeln klebt. Klebrig für die
+   * getippte. Tippen ist frei (die Vorschau rechnet ihn, zeigt ihn aber seit 10.11. nicht
+   * mehr vorher an — verhandlung-rework.md 12.1); Verhandeln klebt. Klebrig für die
    * Dauer dieses Drafts (Season/Team/Spieler) — wäre er durch anschließendes Wohlverhalten
    * abbaubar, wäre Lowball-zuerst gratis.
    *

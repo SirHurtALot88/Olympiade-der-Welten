@@ -270,6 +270,28 @@ export const ARENA_BAHN_DISCIPLINE_IDS: ReadonlySet<string> = new Set([
   "climbing",
 ]);
 
+/**
+ * KAMPF-CHASSIS (TDM-Gefecht-Verdrahtung, 11.11., docs/design/tdm-gefecht-abnahme-10-11.md):
+ * SECHSTE Chassis-Menge, fuer `window.__arena.spieleTdmGefecht()` — TDM ist, anders als
+ * Battlefield/Mini-DM, ein normales ZWEISEITIGES Duell (kein Vier-Team-Pod), braucht also keine
+ * eigene Vorlauf-/Rohdaten-Infrastruktur wie `runBattlefieldPodFixtures`/`runMiniDmFfaPodFixtures`
+ * — nur einen weiteren Eintrag in der Chassis-Weiche hier, genau wie Buehne/Bahn.
+ *
+ * TDM lief bis hierher produktiv ueber die PPS-Duell-Bruecke (die echte Tick-Simulation, hinter
+ * `disc==="tdm"` in battle-mode.engine.js, misst nur rho 0,324-0,404 kaderfest, weit unter der
+ * 0,80-Schranke). `tdmGefecht(seiten,saat,jeSeite)` (Prototyp 10.11., nach demselben vorab-
+ * entschiedenen Muster wie `bfffaGefecht()`/`mdffaGefecht()`) misst dagegen rho 0,800-0,827 je
+ * Spiel (kaderfest, k=2..6, zwei Saatstroeme, neu nachgemessen auf dem aktuellen `main`-Stand
+ * 10.11. nach dem Anzeige-Treue-Fix PR #1372 -- die alten 0,808-0,829 galten einem aelteren
+ * `main`) und Pp-Abweichung 14,2-16,8 -- beide Pflichtschranken aus CLAUDE.md bestanden, s.
+ * `data/generated/disziplin-abnahme.json` Schluessel "tdm".
+ *
+ * `window.__arena.spieleTdmGefecht(fd,saat)` ist SELBSTAENDIG (liest SQUAD/OPP/place direkt,
+ * baut dieselbe Rollenauswahl wie `build()`s TDM-Zweig) und unabhaengig von der aktuell
+ * angezeigten `disc` aufrufbar -- exakt dasselbe Muster wie `spieleFeldspiel()`.
+ */
+export const ARENA_KAMPF_DISCIPLINE_IDS: ReadonlySet<string> = new Set(["tdm"]);
+
 export type ArenaFixtureInput = {
   homeTeamId: string;
   awayTeamId: string;
@@ -308,6 +330,14 @@ export type ArenaFixtureBoxscoreEintrag = {
    * `undefined` bedeutet dasselbe wie `false` fuer jeden Aufrufer, der dieses Feld liest.
    */
   torwart?: boolean;
+  /**
+   * GEWONNENE STATIONSDUELLE (Spurt, docs/design/spurt-stationsduell-sichtbar-10-11.md): direktes
+   * Passthrough von `window.__arena.spieleBahn()`s `duelle`-Feld, das der Motor nur fuer Spurt
+   * fuehrt. Reine PP-Nebenspur fuer `computeIndividualBoxscorePpsFromFixtureResults()` -- Chris
+   * 10.11.: "bringen dem team aber keine zusaetzlichen punkte fuers scoring". `seiten` (die
+   * Team-Wertung) und `wert` wissen davon nichts. Fehlt bei jeder anderen Disziplin.
+   */
+  duelle?: number;
 };
 
 /**
@@ -547,7 +577,7 @@ function bereiteFixturesVor(
  * (s. `baueEindeutigeNamenZuordnung()` im Aufrufer unten). `torwart` fehlt im rohen Objekt ganz,
  * wenn `false` (s. battle-mode.engine.js, `spieleFeldspiel()`) -- deshalb optional hier.
  */
-type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean };
+type RoherBrowserBoxscoreEintrag = { name: string; wert: number; torwart?: boolean; duelle?: number };
 /** Rohform von `ArenaMomentEintrag` vor der `teamId`-Aufloesung (s. dort): `seite` ist hier noch 0/1. */
 type RoherBrowserMomentEintrag = { typ: ArenaMomentEintrag["typ"]; seite: 0 | 1; spieler: string | null };
 type RoherBrowserFixtureErgebnis = {
@@ -585,7 +615,7 @@ async function simuliereFixturesImBrowser(payload: {
   // / `ARENA_BUEHNE_DUELL_DISCIPLINE_IDS` / `ARENA_BUEHNE_AUFTRITT_DISCIPLINE_IDS` /
   // `ARENA_BUEHNE_GAUNTLET_DISCIPLINE_IDS` / `ARENA_BAHN_DISCIPLINE_IDS` oben. NUR diese Weiche
   // entscheidet, keine Disziplins-ID-Kenntnis im Browser-Code selbst.
-  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn";
+  chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" | "kampf";
   timeoutMs: number;
 }): Promise<Array<RoherBrowserFixtureErgebnis | null>> {
   const fenster = window as unknown as {
@@ -596,6 +626,7 @@ async function simuliereFixturesImBrowser(payload: {
       spieleBuehneAuftritt: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBuehneGauntlet: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
       spieleBahn: (bd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
+      spieleTdmGefecht: (fd: string, saat: number) => RoherBrowserFixtureErgebnis | null;
     };
     __olyArenaKader?: unknown;
   };
@@ -652,6 +683,8 @@ async function simuliereFixturesImBrowser(payload: {
         ? fenster.__arena.spieleBuehneGauntlet(payload.disziplin, fixture.seed)
         : payload.chassis === "bahn"
         ? fenster.__arena.spieleBahn(payload.disziplin, fixture.seed)
+        : payload.chassis === "kampf"
+        ? fenster.__arena.spieleTdmGefecht(payload.disziplin, fixture.seed)
         : fenster.__arena.spieleFeldspiel(payload.disziplin, fixture.seed),
     );
   }
@@ -763,7 +796,7 @@ export async function runArenaFixtures(
 
     await page.goto(pathToFileURL(seitenPfad).href);
 
-    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
+    const chassis: "feldspiel" | "buehneHeben" | "buehneDuell" | "buehneAuftritt" | "buehneGauntlet" | "bahn" | "kampf" = ARENA_BUEHNE_HEBEN_DISCIPLINE_IDS.has(
       disziplin,
     )
       ? "buehneHeben"
@@ -775,6 +808,8 @@ export async function runArenaFixtures(
       ? "buehneGauntlet"
       : ARENA_BAHN_DISCIPLINE_IDS.has(disziplin)
       ? "bahn"
+      : ARENA_KAMPF_DISCIPLINE_IDS.has(disziplin)
+      ? "kampf"
       : "feldspiel";
     const rohErgebnisse = await page.evaluate(simuliereFixturesImBrowser, {
       fixtures: vorbereitet.map(({ heim, gast, seed, aufstellung }) => ({
@@ -806,6 +841,8 @@ export async function runArenaFixtures(
         ? "spieleBuehneGauntlet"
         : chassis === "bahn"
         ? "spieleBahn"
+        : chassis === "kampf"
+        ? "spieleTdmGefecht"
         : "spieleFeldspiel";
     return rohErgebnisse.map((ergebnis, index) => {
       if (!ergebnis) {
@@ -825,6 +862,8 @@ export async function runArenaFixtures(
           playerId: treffer?.playerId ?? null,
           side: treffer?.side ?? null,
           torwart: !!eintrag.torwart,
+          // Nur gesetzt, wenn der Motor es liefert (Spurt) -- jede andere Disziplin bleibt zeichengleich.
+          ...(typeof eintrag.duelle === "number" ? { duelle: eintrag.duelle } : {}),
         };
       });
       // "SPIEL DES TAGES" (Task #31 Paket 1, s. `ArenaMomentEintrag`): `seite` 0/1 wird hier,

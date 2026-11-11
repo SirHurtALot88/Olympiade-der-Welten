@@ -5,11 +5,12 @@ import {
   getFocusScoutTarget,
   getPlayerScoutCertainty,
 } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildScoutVerdict, type ScoutVerdict } from "@/lib/scouting/scout-verdict-service";
 import {
   getActiveScoutingWishlistEntries,
-  getScoutingWishlistSlotLimit,
+  getScoutingWishlistQueue,
   getTeamTransferWishlistEntries,
-  getWishlistEntryPriorityRank,
+  type ScoutingWishlistQueueState,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
@@ -94,7 +95,8 @@ export function buildScoutingHubTargetSections(input: {
     };
   };
 
-  const activeTargets = pipeline.records
+  // Geparkte Records (Fortschritt gemerkt, kein Slot) sind keine aktiven Ziele.
+  const activeTargets = pipeline.activeRecords
     .map((record) => buildDraft(record.playerId, "active"))
     .filter((entry): entry is ScoutingHubTargetDraft => Boolean(entry));
 
@@ -125,6 +127,10 @@ export type ScoutingQueueEntryDraft = {
   isActiveSlot: boolean;
   isFocusTarget: boolean;
   isFullyScouted: boolean;
+  /** aktiv gescoutet / fertig / wartet auf freien Slot (seit 11.11., unbegrenzte Liste). */
+  queueState: ScoutingWishlistQueueState;
+  /** Scout-Urteil (Note 1+ bis 6, Empfehlung, Bericht) — siehe scout-verdict-service.ts. */
+  verdict: ScoutVerdict | null;
 };
 
 /**
@@ -140,11 +146,8 @@ export function buildScoutingQueueEntries(input: {
 }): ScoutingQueueEntryDraft[] {
   const { gameState, teamId } = input;
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  const entries = [...getTeamTransferWishlistEntries(gameState, teamId)].sort(
-    (left, right) => getWishlistEntryPriorityRank(left) - getWishlistEntryPriorityRank(right),
-  );
-  const slotLimit = getScoutingWishlistSlotLimit(gameState, teamId);
-  const activePlayerIds = new Set(getActiveScoutingWishlistEntries(gameState, teamId).map((entry) => entry.playerId));
+  const queue = getScoutingWishlistQueue(gameState, teamId);
+  const entries = queue.ordered;
   const focusPlayerId = getFocusScoutTarget(gameState, teamId)?.playerId ?? null;
 
   return entries
@@ -164,9 +167,11 @@ export function buildScoutingQueueEntries(input: {
         marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? formatTransfermarktCurrency(player.marketValue) : "—"),
         certainty,
         effectiveScoutingLevel,
-        isActiveSlot: slotLimit == null || activePlayerIds.has(entry.playerId),
+        isActiveSlot: queue.stateByPlayerId.get(entry.playerId) === "active",
         isFocusTarget: focusPlayerId === entry.playerId,
         isFullyScouted: effectiveScoutingLevel >= 5,
+        queueState: queue.stateByPlayerId.get(entry.playerId) ?? "waiting",
+        verdict: player ? buildScoutVerdict({ gameState, teamId, playerId: entry.playerId }) : null,
       };
     })
     .filter((entry): entry is ScoutingQueueEntryDraft => Boolean(entry));

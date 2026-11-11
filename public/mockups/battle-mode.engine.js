@@ -4618,23 +4618,87 @@
     return true;
   }
   // Die Figur selbst. Zustandswahl wie im Baukasten-Pfad (ani=walk/slash/shoot/hurt):
-  //   u.down / u.vizSturz -> "tod" (einmal abgespielt, dann letztes Bild gehalten)
-  //   u.lunge>0           -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
-  //   u.hp gesunken       -> "treffer" (0,3 s Simulationszeit)
-  //   in Bewegung         -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
-  //   sonst               -> Grundpose der Blickrichtung (Stehen)
+  //   u.down (ohne vizSturz) -> "tod"    (einmal abgespielt, dann letztes Bild gehalten)
+  //   u.vizSturz             -> "treffer" (dieselbe Einmal-dann-halten-Formel, aber auf dem
+  //                              treffer-Streifen -- s. STURZ STATT TOD unten)
+  //   u.lunge>0              -> "angriff" (dieselbe Bildformel (1-lunge/0.2)*n wie dort)
+  //   u.hp gesunken          -> "treffer" (0,3 s Simulationszeit)
+  //   in Bewegung            -> "walk" (Takt wie der 9er-Baukasten-Gang, auf n Bilder gestreckt)
+  //   sonst                  -> Grundpose der Blickrichtung (Stehen)
   // Fehlt einer Figur die Animation einer Art (91 Figuren haben nur Grundposen), steht
   // eine gezeichnete Ersatzbewegung aus der Grundpose: Wippen beim Gehen, Ausfallschritt
-  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o.
+  // beim Angriff, Zucken beim Treffer, Umkippen beim K.o./Sturz.
+  //
+  // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3): die
+  // 360-Pixel-Figuren haben vier Animationsarten (walk/angriff/treffer/tod), und Chris hat
+  // Tod-Animationen am 07.11. ausdruecklich blutig/dramatisch freigegeben (CLAUDE.md, Abschnitt
+  // "PixelLab-Tod-Animationen"). Vorher bildete diese Funktion JEDES `u.down`/`u.vizSturz` auf
+  // "tod" ab -- ein Abrutschen am Klettergriff, ein Eiskunstlauf-Sturz, ein Showcase-Patzer und
+  // ein Hockey-Bodycheck sahen damit wie ein echter K.o./Tod aus, und wuerden mit jeder
+  // kuenftigen Politur an den Tod-Animationen zunehmend blutiger. `u.vizSturz` ist seit
+  // stepKuer() (Eiskunstlauf) und der Showcase-Akrobatik ohnehin das eigene, rein
+  // praesentationale Sturz-Feld (bewusst GETRENNT vom Kampf-/Simulationsfeld `u.down`, s. die
+  // Kommentare an den Setzstellen) -- jetzt setzen Climbing (zeichneSpurt, `u.stolper>0`) und
+  // Hockey (HK_STURZ) es ebenfalls, und diese Funktion liest es: ein Sturz zeigt die
+  // treffer- (Hit-/Taumel-)Animation statt der Tod-Animation. Ein ECHTER K.o. (Arena/TDM/
+  // Battlefield, `u.down` OHNE `vizSturz`) bleibt unveraendert "tod". Rein praesentational --
+  // `istUnten` fasst beide Faelle weiterhin zusammen (haelt Laufzyklus/Waffen/Effekte an, s.
+  // unten), nur die ART-Wahl und die Standbild-Ersatzpose unterscheiden jetzt zusaetzlich nach
+  // `istSturz`.
+  //
+  // PIXEL-FIGUR ANGRIFF-AUSNAHMEN (10.11., Backlog #52 "Enforcer greift nur mit Fluegeln an,
+  // keine echte Angriffsanimation"): die Angriff-Animation EXISTIERT fuer Enforcer (und wird
+  // korrekt geladen/ausgewaehlt, s. die Zustandswahl oben) -- der Fehler sitzt im BLATT selbst,
+  // nicht in der Auswahllogik. Per Augenschein an den einzelnen Spalten (identify/crop, 80x80 je
+  // Spalte): enforcer/angriff-south.png zerfaellt an Spalte 15 von 17 in ein generisches, vom
+  // Charakter abgekoppeltes Fluegel-Aufleuchten -- kein Koerper, keine Ruestung, kein Hammer mehr
+  // sichtbar, nur ein goldener Fluegel-Umriss. Spalte 16 (das rechnerische Ende der Lunge-Animation,
+  // s. `f` unten -- also genau die Spalte, die beim Treffer-Moment am laengsten zu sehen ist) zeigt
+  // die Figur zwar wieder, aber mit demselben unpassenden Fluegel-Hintergrund. Ost/Nord zeigen an
+  // ihrer letzten Spalte nur einen goldenen Schwung-/Bewegungsschleier HINTER der weiterhin
+  // sichtbaren Figur (wie bei anderen Figuren, z.B. eradicator/zhyrak -- s. dortige Blaetter),
+  // keinen Koerperverlust, deshalb dort KEINE Sperre.
+  //
+  // Systematisch nachgeprueft (10.11.): alle 19 Figuren, die laut der alten B_FIGUR-Fluegel-Liste
+  // (Kommentar bei DISZIPLIN_WAFFE/VOLLBILD_SCHLAEGER weiter unten, "Othrama, Enforcer, Elyon, ...")
+  // gefluegelt sind UND ein eigenes 360-PixelLab-Blatt (public/sprites/figuren/<slug>) haben. Nur
+  // Lumen Serene zeigt denselben Fehler, dort sogar ausgepraegter: angriff-south.png verliert den
+  // Koerper bereits ab Spalte 7 von 17 (statt erst ab 15) und bekommt ihn bis Spalte 16 nur
+  // bruchstueckhaft zurueck. Othrama/Whispra/Harbinger/Hellvoice/Sunny/Xylaris/Cadrael/Raven/Nimri/
+  // Yuko/Mushu/Brobot/Sanctrix/Leviathan/Butterfly zeigen an ihrer letzten Spalte durchgehend eine
+  // ECHTE, zum Charakter passende Waffen-/Elementareffekt-Spalte (Schwert, Feuer, Eis, Funken...),
+  // keinen Koerperverlust -- keine Sperre noetig. Dyrth zeigt eine abweichende, aber in sich
+  // stimmige Sturzflug-/Tauch-Pose (kein Fluegel-Abbruch) -- ebenfalls keine Sperre.
+  //
+  // Eine NEUE PixelLab-Bestellung fuer die kaputten Spalten braucht Chris' ausdrueckliche Freigabe
+  // (CLAUDE.md "PixelLab-Tod-Animationen": Charaktere/Animationen sind freigabepflichtig) und ist
+  // hier bewusst NICHT erfolgt. Bis dahin reines Wiederverwenden bestehender, bereits freigegebener
+  // Spalten desselben Blatts -- dieselbe Reuse-statt-Neubau-Philosophie wie beim Sturz-statt-Tod-Fix
+  // (PR #1386): PIXEL_ANGRIFF_SPERRFRAMES listet je Figur/Richtung die gesperrten Spalten
+  // (0-basiert), angriffFrameSicher() faellt von einer gesperrten Spalte auf die naechstniedrigere
+  // ungesperrte zurueck (Minimum 0 -- eine Figur ohne jede gute Spalte ab 0 wuerde dort einfrieren,
+  // kommt in der Tabelle unten aber nicht vor). Rein praesentational: veraendert nur, welche
+  // vorhandene Spalte gezeichnet wird, nichts an u.lunge/der Simulation/dem Wertungs-Fingerabdruck.
+  const PIXEL_ANGRIFF_SPERRFRAMES={
+    "Enforcer":{south:[15]},
+    "Lumen Serene":{south:[7,8,9,10,11,12,13]},
+  };
+  function angriffFrameSicher(name,dir,f){
+    const sperr=name&&PIXEL_ANGRIFF_SPERRFRAMES[name]&&PIXEL_ANGRIFF_SPERRFRAMES[name][dir];
+    if(!sperr||!sperr.length)return f;
+    while(f>0&&sperr.includes(f))f--;
+    return f;
+  }
   function zeichnePixelFigur(ctx,u,x,y,G,z,r0){
     const fig=z.fig;
     const grund=z.bilder.get("south.png")||z.bilder.get(fig.r[0]+".png");
     const s=Math.max(0.3,Math.min(1.8,Math.min(PIXEL_HOEHE*G/grund.mass.hoehe,PIXEL_BREITE_MAX*G/Math.max(1,grund.mass.breite))));
     const fussY=y+PIXEL_FUSS*G;
-    const istUnten=!!u.down||!!u.vizSturz;
+    const istSturz=!!u.vizSturz;
+    const istUnten=!!u.down||istSturz;
     let rec=pixelAnzeige.get(u);
     // Erstmals gesehen und schon am Boden (Stellvertreter-Objekte, Sonden, spaet eingehaengte
-    // Ansicht): gleich das Endbild der K.o.-Animation statt sie von vorn abzuspielen.
+    // Ansicht): gleich das Endbild der K.o./Sturz-Animation statt sie von vorn abzuspielen.
     if(!rec){ rec={hp:u.hp,trefferT:-1e9,downT:istUnten?-1e9:null}; try{pixelAnzeige.set(u,rec);}catch(e){} }
     if(typeof u.hp==="number"){
       if(typeof rec.hp==="number"&&u.hp<rec.hp-1e-6)rec.trefferT=t;
@@ -4646,7 +4710,7 @@
     const istAngriff=(u.lunge>0)&&!istUnten;
     const istTreffer=!istUnten&&!istAngriff&&trefferSeit>=0&&trefferSeit<0.3;
     const bewegt=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))||Math.abs(u.vx||0)+Math.abs(u.vy||0)>=3;
-    const art=istUnten?"tod":istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
+    const art=istUnten?(istSturz?"treffer":"tod"):istAngriff?"angriff":istTreffer?"treffer":(bewegt&&!u.vizJubel)?"walk":null;
     // Blickrichtung -> Streifen: Sueden = Front, Osten = rechts, Westen = Osten gespiegelt,
     // Norden = echter Ruecken-Streifen, WO VORHANDEN (Chris, 06.11.: "er kann ja auch einfach
     // von oben nach unten laufen... dass er dann nicht seitlich gezeigt wird, sondern
@@ -4674,8 +4738,13 @@
         const e=z.bilder.get(stamm+"-"+d+".png");
         if(e&&e.im&&e.mass){
           let f;
-          if(art==="tod")f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
-          else if(art==="angriff")f=Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n)));
+          // `istUnten` statt des literalen art==="tod": ein Sturz waehlt oben den
+          // treffer-Streifen (`art="treffer"`), spielt ihn aber mit derselben
+          // Einmal-dann-letztes-Bild-Formel wie ein echter K.o. ab (ueber `rec.downT`, nicht
+          // ueber die HP-getriebene `trefferSeit` -- die liefe bei einem Sturz nie zurueck auf
+          // 0 und wuerde das letzte Treffer-Bild nie zuverlaessig halten).
+          if(istUnten)f=Math.min(n-1,Math.floor((t-rec.downT)/0.9*n));
+          else if(art==="angriff")f=angriffFrameSicher(u.n,d,Math.max(0,Math.min(n-1,Math.floor((1-u.lunge/0.2)*n))));
           else if(art==="treffer")f=Math.max(0,Math.min(n-1,Math.floor(trefferSeit/0.3*n)));
           else{
             const zyklus=(u.vizAniPhase!=null&&isFinite(u.vizAniPhase))?u.vizAniPhase*n:(t*7*n/9+u.id);
@@ -4698,11 +4767,14 @@
     let dx=0,dy=0,winkel=0;
     if(art==="walk")dy=-Math.abs(Math.sin((t*7+u.id)*Math.PI/4.5))*1.6*G;
     else if(art==="angriff")dx=(vor||1)*Math.sin(Math.min(1,Math.max(0,1-u.lunge/0.2))*Math.PI)*4*G;
-    else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
-    else if(art==="tod"){
+    // `istUnten` vor dem literalen art==="treffer"-Zweig: ohne Animationsstreifen (Grundpose-
+    // Ersatzbewegung) soll ein Sturz genauso umkippen wie ein echter K.o. (neutraler als die
+    // HP-Zuck-Wobble unten, die bei einem zeitlich unbegrenzten Sturz nie zur Ruhe kaeme).
+    else if(istUnten){
       const k=Math.min(1,(t-(rec.downT??t))/0.5);
       winkel=(vor<0?-1:1)*k*Math.PI/2;
-    }else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
+    }else if(art==="treffer")dx=Math.sin(trefferSeit*60)*1.2*G;
+    else if(u.vizJubel)dy=-Math.abs(Math.sin(t*6+u.id))*4*G;
     zeichneBild(pe,0,dx,dy,winkel,poseSpiegeln);
   }
   // FEUERWAFFEN (24.08., Skorpio's SciFi Sprite Pack, s. public/sprites/waffen/quellen.json):
@@ -11536,6 +11608,22 @@
   // seltener). Der Getroffene taumelt danach HK_TAUMEL Sekunden mit HK_TAUMEL_TEMPO
   // Tempo und liegt die ersten HK_STURZ Sekunden davon am Boden.
   const HK_TAUMEL=1.4, HK_STURZ=0.45, HK_TAUMEL_TEMPO=0.55;
+  // STURZ STATT TOD, NICHT-AUFZAEHLBAR GESETZT (Opus-Review 10.11., Fingerabdruck-Fund): ein
+  // einfaches `traeger.vizSturz=true` haette den Wertungs-Fingerabdruck verschoben, OBWOHL
+  // wert()/sieger()/punkte NICHT ein einziges Bit anders ausfallen (nachgemessen,
+  // scripts/pruefe-wertung-fingerabdruck.mjs) -- `A.spiele("hockey",s).protokoll` (fsZuege)
+  // haengt an manchen Eintraegen eine rohe Objektreferenz auf den Spieler (`deckt`, s. die
+  // Zyklus-Behandlung im Fingerabdruck-Skript), und ein neues AUFZAEHLBARES Feld auf diesem
+  // Objekt taucht dort beim JSON.stringify() prompt wieder auf, rein als Artefakt der
+  // Protokoll-Rohreferenz, nicht als Wertungsaenderung. `Object.defineProperty(...,{enumerable:
+  // false})` haelt `u.vizSturz` fuer zeichnePixelFigur()/jeden gewoehnlichen Lesezugriff
+  // unveraendert lesbar, aber unsichtbar fuer JSON.stringify()/{...u}/for-in -- genau das macht
+  // aus einer zufaelligen Protokoll-Verschiebung wieder ein bit-identisches Protokoll.
+  function vizSturzSetzen(u,wert){
+    if(!Object.getOwnPropertyDescriptor(u,"vizSturz"))
+      Object.defineProperty(u,"vizSturz",{value:wert,writable:true,configurable:true,enumerable:false});
+    else u.vizSturz=wert;
+  }
   // HK_CHECK_VIS ist eine REINE ZEICHEN-DAUER (Sekunden Spielzeit) fuer die Stoss-Pose und
   // den Aufprall-Bogen des Checkenden — sie steht bewusst hier bei den anderen Check-Zeiten,
   // faehrt aber in keine Formel ein: `wuchtVis` wird nur in zeichneFeldspiel gelesen und in
@@ -15090,7 +15178,13 @@
         // Bully in der Zone des bestraften Teams, und der Gefoulte bekommt die Scheibe.
         if(rr()<HK_FOUL_ANTEIL&&verhaengeStrafe(decker,traeger,"Bandencheck")){
           traeger.taumeltBis=fsT+HK_TAUMEL;
-          traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+          // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt
+          // 5.3): `down` bleibt das Simulationsfeld (sperrt den Spieler fuer Passziel-/
+          // Deckungs-Filter wie bisher, bit-identisch). `vizSturz` ist ZUSAETZLICH rein
+          // praesentational, genau wie bei stepKuer()/Showcase -- zeichnePixelFigur() liest es,
+          // um einen Hockey-Sturz auf die treffer- statt die tod-Animation zu legen. Fuer jede
+          // andere Disziplin bleibt das Feld immer undefined, also ohne jede Wirkung.
+          traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
           traeger.hatBall=false; fsLive.ball.traeger=null; traeger.frischerPassVon=null;
           // DIE UEBERZAHL BEGINNT MIT DEM PUCK. Ein Bully tief in der Zone war der erste
           // Entwurf und ist gemessen falsch: der Anspielpunkt lag regelmaessig weiter als
@@ -15108,7 +15202,8 @@
           return;
         }
         traeger.taumeltBis=fsT+HK_TAUMEL;
-        traeger.down=true; traeger.downBis=fsT+HK_STURZ;
+        // Sturz statt Tod: s. Kommentar im Foul-Zweig direkt oberhalb.
+        traeger.down=true; traeger.downBis=fsT+HK_STURZ; vizSturzSetzen(traeger,true);
         decker.checks++;
         // TON (Assets 80->100, TON_KATALOG.hockey.treffer): der sitzende, nicht gepfiffene
         // Bodycheck — der zu harte Zweig oben endet stattdessen in verhaengeStrafe()/pfiff.
@@ -16054,7 +16149,7 @@
     // 12 Spielen endete so, 3 von 6 mit noch laufendem Taumeln). Diese beiden Zeilen sind
     // ausserhalb von Hockey wirkungslos, weil dort nichts sie je setzt.
     for(const team of FSTEAM)for(const u of team){
-      if(u.down&&fsT>=u.downBis)u.down=false;
+      if(u.down&&fsT>=u.downBis){u.down=false;vizSturzSetzen(u,false);}
       // Zeichen-Zaehler des Bodycheck-Aufpralls, hier abgebaut aus demselben Grund wie
       // `down` darueber: er muss auch nach dem Schlusspfiff und in der Drittelpause
       // auslaufen, sonst haengt der Bogen im letzten Bild fest.
@@ -38107,6 +38202,22 @@
   const ctx=cv.getContext("2d");
   const W=cv.width,H=cv.height,MID=W/2;
   let U=[],pfeile=[],running=false,speed=1,t=0,acc=0,last=0,done=false;
+  // ANZEIGE-TREUE-FIX A1 (09.11.) + B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs,
+  // 24 Saaten je Disziplin): eigener Akkumulator fuer jedes Chassis, dessen Physik sich
+  // ueber die Dauer eines Spiels per `rr()` summiert -- Bahn (istBahn(disc), A1), Kampf
+  // (istKampf(disc): TDM/Mini-DM/Battlefield, B1-Nachtrag) UND Feldspiel (istFeldspiel(disc):
+  // Hockey, B1-Nachtrag) --, getrennt von `acc`. Alle drei nachgemessen 24/24 Saaten
+  // abweichend vor diesem Fix (Battlefield sogar im SIEGER). `acc` zaehlt weiterhin in
+  // ECHTZEIT-Sechzigsteln (unveraendert, speist tickerSendeT/ticksSeitReset genau wie
+  // vorher); `bahnSimAcc` zaehlt dieselben Echtzeit-Sechzigstel ein zweites Mal, aber loest
+  // einen stepSim()-Aufruf erst aus, wenn `zeitFaktor()/60` davon zusammen sind -- und
+  // dieser Aufruf bekommt dann den FESTEN Takt `1/60`, nicht `(1/60)/zeitFaktor()`. Buehne
+  // bleibt AUSSEN VOR: derselbe B1-Nachtrag bestaetigt fuer Fechten/Gewichtheben (beide
+  // ZEIT_DEHNUNG!=1) 24/24 Saaten UEBEREINSTIMMEND -- rundenbasierte Entscheidungspunkte
+  // (stepBuehne()) sind tick-granularitaets-invariant, anders als die kontinuierliche
+  // Positions-/Kontakt-Simulation in Kampf/Feldspiel (wie bei der Bahn).
+  // s. ausfuehrliche Begruendung am Kommentar in loop() direkt vor seiner Verwendung.
+  let bahnSimAcc=0;
   // SONDEN-MODUS (A0.2, docs/design/deterministischer-sonden-modus-19-09.md): additiver
   // Schalter fuer Screenshot-QA. `sondenAktiv` schaltet jetztMs() (s. dort, unten bei den
   // performance.now()-Lesestellen) von der echten Wanduhr auf eine SIMULATIONSGEBUNDENE Uhr
@@ -38445,6 +38556,29 @@
     const gesetzt=inDisc(d);
     const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
     const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    // TDM-GEFECHT (Verdrahtung 11.11., s. Kopfkommentar bei tdmDuellRoster() weiter unten):
+    // das vorab entschiedene Gefecht ersetzt den alten kontinuierlichen Zweikampf-Aufbau
+    // unten vollstaendig fuer TDM -- frueher Return, kein Byte der Reihen-/Slot-Logik darunter
+    // wird fuer diese Disziplin noch erreicht. `tdmDuellRoster()` (statt einer zweiten Kopie
+    // der Rollenauswahl hier) ist dieselbe Funktion, die auch `spieleTdmGefecht()` fuer die
+    // Headless-Buchung ruft -- GARANTIERT dieselben zwei Seiten, "gezeigt = gebucht".
+    if(d==="tdm"){
+      const {mine:mineTdm,gegner:gegnerTdm}=tdmDuellRoster();
+      if(mineTdm.length&&gegnerTdm.length){
+        const alleTdm=[...mineTdm,...gegnerTdm];
+        const g=tdmGefecht([mineTdm,gegnerTdm],seed,n);
+        const seitenZaehlerTdm=[0,0];
+        U=g.kaempfer.map((k,i)=>{
+          const p=alleTdm[i];
+          const idxSeite=seitenZaehlerTdm[k.side]++;
+          const seitenGroesse=k.side===0?mineTdm.length:gegnerTdm.length;
+          return baueEinheit(p,k.side,1,idxSeite,seitenGroesse,i,k.slot,
+            order[p.n]||slotOrd(k.slot),zielOf[p.n],d,SLOTVON[k.slot]);
+        });
+        tdmReplayStarten(g);
+      }
+      return;
+    }
     // BATTLEFIELD: eigene Rollen je Kadergroesse (bfSlotsFuer), sonst unveraendert slotListe.
     const kSlotsHeim=bfSlotsFuer(d,mine.length);
     const slotListeHeim=kSlotsHeim||slotListe;
@@ -40348,6 +40482,13 @@
     if(istBahn(disc))return stepSpurt(dt);
     aktualisiereFuehrung(dt);
     if(done)return;
+    // TDM-GEFECHT (Verdrahtung 11.11.): das Gefecht steht fest, die Arena spielt es nur ab
+    // (tdmReplaySchritt, s. dort) -- dasselbe Abfang-Muster wie Battlefields KP.pod.replay
+    // direkt darunter. `tdmReplay` gibt es nur, wenn build()s TDM-Zweig die Rollenauswahl zu
+    // zwei nichtleeren Seiten aufloesen konnte (s. tdmDuellRoster/tdmReplayStarten) -- sonst
+    // bleibt `U` leer und der alte Zweig unten wird (wirkungslos, weil `U` dann leer ist)
+    // trotzdem erreicht, statt dass hier ein Fehler entsteht.
+    if(tdmReplayAktiv()){ tdmReplaySchritt(dt); return; }
     t+=dt;
     // BATTLEFIELD-POD (02.11. abends): das Gefecht je Ort steht fest, die Arena spielt es nur ab
     // (bfPodReplaySchritt). KP.pod gibt es nur im Pod — das Duell laeuft unveraendert weiter unten.
@@ -44164,6 +44305,12 @@
     // (Schicht 1 und 2 unten, beide unveraendert). Reine Anzeige.
     bodenSpurtGerade();
     const zonen=BA().gelaende; if(!zonen||!zonen.length)return;
+    // STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11., s. zfStreckenbild unten): liegt eine
+    // Kulisse unter dem Rennen, zeichnet der Motor die Zonen als Strassenbild der Tour (Parolen,
+    // Pfeile, Curbs, Warnschilder, Leitpfosten) und das Panorama als Parallaxe aus den echten
+    // PixelLab-Ebenen. Ohne Kulisse (Headless-Runner, Bild fehlt) bleibt der alte Weg darunter
+    // Wort fuer Wort stehen.
+    if(kulisseSichtbar())return zfStreckenbild(zonen);
     const oben=H*0.14, unten=H*0.94;
     // ---- Schicht 1: Terrain-Toenung + Schraffur, Zone fuer Zone ueber der fertigen Bahn.
     for(const z of zonen){
@@ -44232,6 +44379,189 @@
     for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
     ctx.stroke();
     ctx.restore();
+  }
+
+  // ================== ZEITFAHREN: STRECKENBILD STATT FARBBAENDERN (Kulissen-Rework 10.11.) ====
+  // Chris, 10.11., nach einem Screenshot: "was ist das ingame für ein time trial? dachte da sind
+  // schon überall die neuen assets und dass es gut aussieht? aber das ist auch trash wie spurt".
+  // Befund (docs/design/zeitfahren-kulissen-rework-10-11.md): die PixelLab-Streckenkarten liegen
+  // seit der Asset-Runde vollstaendig vor (public/szenen/time-trial/<karte>/assets: far/mid/course/
+  // front, je 4000 px breit), der Motor nutzte davon aber nur einen 58 px hohen, STARREN Ausschnitt
+  // (baue-kulisse-zeitfahren.py) -- und legte ueber den Asphalt die alten, lauten Zonenbaender mit
+  // Schraffur und ▲/▼/S-Glyphen. Was das Bild beherrschte, war also die Fallback-Grafik, nicht die
+  // Kulisse.
+  //
+  // Jetzt, NUR wenn eine Kulisse sichtbar ist (sonst der alte Weg oben, bit-identisch):
+  //  1. PANORAMA ALS PARALLAXE aus den echten Ebenen `far` und `mid` der gewaehlten Karte: beide
+  //     wandern mit der Kamera (0,12 bzw. 0,30 ihrer Fahrt), gespiegelt gekachelt ab x=1000 (links
+  //     davon traegt jede Karte ein Startbild mit harter Kante, s. ZF_PANORAMA_X0 im Builder).
+  //  2. HOEHENPROFIL ALS STRASSE: dieselbe Kontur aus `gelaende` wie oben (ZF_HUEGEL_PX), jetzt als
+  //     Wiesenhuegel mit Asphaltband und Mittelstrich statt brauner Flaeche.
+  //  3. ZONEN ALS STRASSENBILD statt Farbband + Schraffur + Glyphe: Steigung = auf den Asphalt
+  //     gemalte Fan-Parolen wie an jedem Tour-Anstieg (ALLEZ/HOPP/… und die Namen der Fahrer),
+  //     Abfahrt = gemalte Richtungspfeile, Kurve = rot-weisse Curbs an beiden Bahnraendern. Dazu je
+  //     Zonenbeginn ein Warnschild am Strassenrand (Dreieck mit Rampe bzw. Richtungstafel) und
+  //     Leitpfosten entlang der Bahn. Die Toenung bleibt als leise dritte Kodierung (Farbe + Muster
+  //     + Schildform), damit die Zonen auch ohne Farbunterscheidung lesbar sind.
+  // Reine Anzeige: liest `BA().gelaende`, `LAEUFER[].n`, camX/camView -- kein rr(), kein Schreiben
+  // in den Rennzustand. Laden die Ebenen (noch) nicht, bleibt der Kopfstreifen der Kulisse stehen.
+  //
+  // Horizont je Karte: erste Zeile, ab der `mid` dicht wird (dieselbe Regel wie `dicht` in
+  // scripts/baue-kulisse-zeitfahren.py), nachgemessen am 10.11.
+  const ZF_PANO_HORIZONT={standard:199,"bergzeitfahren-alpen":476,"etappe-pass":372,"abfahrt-kamm":373,
+    "etappe-kueste":221,"flachsprint-kueste":215,"etappe-mittelgebirge":199,"huegel-weinberge":202,
+    "etappe-strade-bianche":205,"etappe-vulkan":281,"wueste-hitze":211};
+  const ZF_PANO_X0=1000, ZF_PANO_UNTER=30, ZF_PANO_SKALA=0.24;
+  const ZF_PAROLEN=["ALLEZ","HOPP","VAMOS","FORZA","ALLEZ ALLEZ","GO GO","HOPP HOPP"];
+  const zfEbenenCache={};
+  function zfEbenen(){
+    if(!kulisseAktiv||kulisseAktiv.disc!==disc)return null;
+    const id=kulisseAktiv.id; if(!(id in ZF_PANO_HORIZONT))return null;
+    let e=zfEbenenCache[id];
+    if(!e){
+      const ordner="/szenen/time-trial/"+(id==="standard"?"demo-assets":id+"/assets")+"/";
+      e=zfEbenenCache[id]={};
+      for(const n of ["far","mid"]){
+        const im=new Image();
+        im.onload=()=>{ try{ if(!running&&kulisseAktiv&&kulisseAktiv.id===id&&kulisseAktiv.disc===disc)draw(); }catch(_){} };
+        im.src=ordner+n+".png"; e[n]=im;
+      }
+    }
+    const da=im=>!!im&&im.complete&&im.naturalWidth>0;
+    return da(e.far)&&da(e.mid)?e:null;
+  }
+  function zfPanorama(e,panH){
+    const id=kulisseAktiv.id;
+    const unter=Math.min(e.far.naturalHeight,ZF_PANO_HORIZONT[id]+ZF_PANO_UNTER);
+    const hs=Math.min(unter,Math.round(panH/ZF_PANO_SKALA));
+    const sy=unter-hs, sw=e.far.naturalWidth-ZF_PANO_X0, bw=sw*panH/hs;
+    const weg=camView().links*cam.zoom;     // Kamerafahrt in Bildschirm-Pixeln
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,panH);ctx.clip();
+    ctx.imageSmoothingEnabled=false;
+    for(const [im,par] of [[e.far,0.12],[e.mid,0.30]]){
+      const off=((weg*par)%(2*bw)+2*bw)%(2*bw);
+      for(let i=0,x=-off;x<W;i++,x+=bw){
+        if(x+bw<=0)continue;
+        if(i%2){ ctx.save();ctx.translate(x+bw,0);ctx.scale(-1,1);
+          ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,0,0,bw,panH);ctx.restore(); }
+        else ctx.drawImage(im,ZF_PANO_X0,sy,sw,hs,x,0,bw,panH);
+      }
+    }
+    // Dieselbe Lesbarkeits-Abdunklung wie kulisseZeichnen() sie ueber die ganze Leinwand legt.
+    ctx.fillStyle="rgba(10,10,16,"+kulisseAktiv.dunkel+")";ctx.fillRect(0,0,W,panH);
+    ctx.restore();
+  }
+  // Warnschild am Strassenrand, Fuss auf der Bahnoberkante.
+  function zfSchild(x,fuss,art){
+    ctx.save();
+    ctx.fillStyle="#6b6f78";ctx.fillRect(Math.round(x)-1,fuss-24,2,24);
+    const cy=fuss-32;
+    if(art==="kurve"){
+      ctx.fillStyle="#c0392b";ctx.fillRect(x-13,cy-7,26,14);
+      ctx.strokeStyle="#1a1a1a";ctx.lineWidth=1;ctx.strokeRect(x-13+0.5,cy-7+0.5,25,13);
+      ctx.strokeStyle="#f4f1e8";ctx.lineWidth=2.4;ctx.lineJoin="miter";
+      for(const dx of [-7,0,7]){ctx.beginPath();ctx.moveTo(x+dx-3,cy-4);ctx.lineTo(x+dx+2,cy);ctx.lineTo(x+dx-3,cy+4);ctx.stroke();}
+    } else {
+      ctx.beginPath();ctx.moveTo(x,cy-11);ctx.lineTo(x+12,cy+9);ctx.lineTo(x-12,cy+9);ctx.closePath();
+      ctx.fillStyle="#f4f1e8";ctx.fill();ctx.strokeStyle="#c0392b";ctx.lineWidth=3;ctx.lineJoin="round";ctx.stroke();
+      ctx.fillStyle="#1a1a1a";ctx.beginPath();
+      if(art==="steigung"){ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x+7,cy-2);}
+      else {ctx.moveTo(x-7,cy+6);ctx.lineTo(x+7,cy+6);ctx.lineTo(x-7,cy-2);}
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+  function zfStreckenbild(zonen){
+    const oben=H*0.14, unten=H*0.94;
+    // ---- 1. Panorama-Parallaxe im Kopfstreifen (ueber dem schmalen Grasrand der Kulisse).
+    const e=zfEbenen();
+    if(e)zfPanorama(e,Math.round(oben)-8);
+    // ---- 3. Zonen als Strassenbild (vor dem Profil, damit Schilder obenauf stehen).
+    const namen=LAEUFER.map(u=>String(u.n||"").split(" ")[0].toUpperCase()).filter(n=>n&&n.length<=10);
+    const worte=ZF_PAROLEN.concat(namen);
+    const bandH=unten-oben;
+    zonen.forEach((z,zi)=>{
+      const x0=camX(z.von), x1=camX(z.bis);
+      if(x1<-40||x0>W+40)return;
+      const steig=z.art==="steigung", ab=z.art==="abfahrt";
+      ctx.save();
+      ctx.beginPath();ctx.rect(x0,oben,Math.max(1,x1-x0),bandH);ctx.clip();
+      ctx.fillStyle=steig?"rgba(196,120,70,.10)":ab?"rgba(90,150,220,.09)":"rgba(242,215,90,.06)";
+      ctx.fillRect(x0,oben,x1-x0,bandH);
+      if(steig){
+        // Gemalte Parolen, an der Strecke verankert (wandern mit der Kamera), drei Reihen versetzt.
+        // Abstand in Bildschirm-Pixeln (eine Parole je ~230 px und Reihe), damit sie sich bei keiner
+        // Zoomstufe ueberlappen; was nicht ganz in die Zone passt, entfaellt statt abgeschnitten.
+        ctx.font="900 21px 'Arial Black',Impact,'Helvetica Neue',Arial,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+        ctx.fillStyle="rgba(244,241,232,.27)";
+        const n=Math.max(1,Math.floor((x1-x0)/230)), schritt=(z.bis-z.von)/n;
+        for(let k=0;k<n;k++)for(let r=0;r<3;r++){
+          const p=z.von+schritt*(k+(r%2?0.7:0.3));
+          const wx=camX(p), wy=oben+bandH*(0.2+0.3*r);
+          if(wx<-160||wx>W+160)continue;
+          const wort=worte[(zi*5+k*3+r)%worte.length], hb=ctx.measureText(wort).width/2+4;
+          if(wx-hb<x0||wx+hb>x1)continue;
+          ctx.save();ctx.translate(wx,wy);ctx.rotate(r===1?0.04:-0.04);
+          ctx.fillText(wort,0,0);ctx.restore();
+        }
+        ctx.textBaseline="alphabetic";
+      } else if(ab){
+        // Gemalte Richtungspfeile in Fahrtrichtung.
+        ctx.strokeStyle="rgba(244,241,232,.30)";ctx.lineWidth=4;ctx.lineJoin="miter";ctx.lineCap="butt";
+        const schritt=0.02, n=Math.max(1,Math.ceil((z.bis-z.von)/schritt));
+        for(let k=0;k<n;k++)for(const fy of [0.3,0.7]){
+          const px=camX(z.von+schritt*(k+0.5)), py=oben+bandH*fy;
+          if(px<-30||px>W+30)continue;
+          for(const dx of [-9,0]){ctx.beginPath();ctx.moveTo(px+dx-6,py-14);ctx.lineTo(px+dx+6,py);ctx.lineTo(px+dx-6,py+14);ctx.stroke();}
+        }
+      } else {
+        // Rot-weisse Curbs an beiden Bahnraendern, an der Strecke verankert.
+        const sb=12, start=Math.floor((Math.max(x0,-sb)-x0)/sb);
+        for(let i=start,x=x0+start*sb;x<Math.min(x1,W+sb);i++,x+=sb){
+          ctx.fillStyle=i%2?"rgba(244,241,232,.88)":"rgba(192,57,43,.88)";
+          ctx.fillRect(x,oben,sb,6);ctx.fillRect(x,unten-6,sb,6);
+        }
+      }
+      ctx.restore();
+    });
+    // ---- 2. Hoehenprofil als Strasse ueber einen Wiesenhuegel (Kontur wie im alten Weg).
+    let h=0; const pts=[[0,0]];
+    for(const z of zonen){
+      pts.push([z.von,h]);
+      if(z.art==="steigung")h+=ZF_HUEGEL_PX; else if(z.art==="abfahrt")h=Math.max(0,h-ZF_HUEGEL_PX);
+      pts.push([z.bis,h]);
+    }
+    pts.push([1,h]);
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,oben);ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(camX(pts[0][0]),oben);
+    for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]);
+    ctx.lineTo(camX(pts[pts.length-1][0]),oben);
+    ctx.closePath();
+    const hg=ctx.createLinearGradient(0,oben,0,oben-ZF_HUEGEL_PX*2.2);
+    hg.addColorStop(0,"rgba(44,78,40,.96)");hg.addColorStop(1,"rgba(92,136,66,.94)");
+    ctx.fillStyle=hg;ctx.fill();
+    const strasse=()=>{ctx.beginPath();ctx.moveTo(camX(pts[0][0]),oben-pts[0][1]-2);
+      for(const p of pts)ctx.lineTo(camX(p[0]),oben-p[1]-2);};
+    ctx.lineJoin="round";ctx.lineCap="round";
+    strasse();ctx.strokeStyle="#24262b";ctx.lineWidth=7;ctx.stroke();
+    strasse();ctx.strokeStyle="#5b5e66";ctx.lineWidth=5;ctx.stroke();
+    strasse();ctx.strokeStyle="rgba(244,241,232,.75)";ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // ---- Leitpfosten entlang der Bahnoberkante und Warnschilder je Zonenbeginn.
+    const fuss=Math.round(oben);
+    for(let p=0;p<=1.0001;p+=0.025){
+      const x=Math.round(camX(p)); if(x<-4||x>W+4)continue;
+      ctx.fillStyle="#f4f1e8";ctx.fillRect(x-1,fuss-10,3,10);
+      ctx.fillStyle="#1a1a1a";ctx.fillRect(x-1,fuss-8,3,3);
+    }
+    for(const z of zonen){
+      const x=camX(z.von)+10; if(x<-20||x>W+20)continue;
+      zfSchild(x,fuss,z.art);
+    }
   }
 
   // ================== CLIMBING: EINE ECHTE WAND STATT EINER GERAUTEN BAHN (bodenWand, =======
@@ -45255,6 +45585,12 @@
                   text:"Hält das Tempo konstant und kommt mit der Reserve hin. Der Klassiker im Zeitfahren."},
         negativ: {label:"Negativ-Split", tempo:0.88, sucht:0, ab:0.55,
                   text:"Erste Hälfte verhalten, zweite Hälfte alles. Verlangt Kopf und Reserve."},
+        // Label "Attacke" bewusst NICHT umbenannt (Gegencheck 10.11.): `spiele()` schreibt das
+        // Plan-Label mit in sein Ergebnis, ein geaenderter Name verschiebt dadurch trotz
+        // identischer Zeiten/Raenge/Punkte den Fingerabdruck-Hash (GESAMT) -- s. Befund im
+        // Nachtrag unten. Um die Pflicht-Regressionsschranke strikt byte-identisch zu halten,
+        // bleibt der Schluessel UND das angezeigte Label "Attacke"; Chris kann das separat
+        // entscheiden, falls ihm der Name noch wichtig ist.
         attacke: {label:"Attacke",       tempo:1.00, sucht:0, ab:0.60,
                   text:"Von Beginn an über der eigenen Schwelle. Geht auf oder geht schief."}
       },
@@ -46898,6 +47234,109 @@
     return {x:p.x+vx, y:p.y+vy};
   }
 
+  // ================= S-N5b STATIONSDUELL MIT SIEGER (Chris 10.11.) =================
+  // Chris' Befund, woertlich: "hier steht immer was von duellen, die sieht man aber gar nicht".
+  // Die alte S-N5-Tafel zeigte zwei UNABHAENGIGE Rest-Stationsbalken -- kein Sieger, keine
+  // Auseinandersetzung. Jetzt: stehen ein Heim- und ein Gastlaeufer gleichzeitig an derselben
+  // Station, ist das ein Duell mit Ausgang. SIEGER = wer die Station ZUERST verlaesst. Das ist
+  // kein zweiter Wuerfel, sondern die Station selbst: ihre Dauer haengt am Sub-Skill des
+  // Stationstyps (`hindernisTypen`: HUERDE/STROHBALLEN -> TECHNIK, BALKEN/WASSERGRABEN ->
+  // WENDIGKEIT, PALISADE/SEIL/MAUER -> WUCHT; s. Stationspreis in stepSpurt), plus Ankunftszeit
+  // und Kriechanteil. Gleichstand im selben Schritt: wer tiefer unter 0 gerutscht ist (frueher
+  // im Schritt frei war), dann der hoehere Stations-Sub-Skill, dann Heim.
+  // DESIGN-VORGABE (Chris 10.11.): "Gewonnene duelle koennen fuer die Spieler auch in die PPs mit
+  // beitragen, bringen dem team aber keine zusaetzlichen punkte fuers scoring". Darum:
+  //  - REINE BUCHHALTUNG: liest u.huerde/u.stationIdx/u.pos/u.fertig, schreibt NICHTS am Laeufer
+  //    und ruft kein rr(). Der Zustand liegt in einer WeakMap NEBEN dem Laeufer -- so bleibt
+  //    sogar das Rennprotokoll (rennFertig, serialisiert vom Wertungs-Fingerabdruck)
+  //    zeichengleich, und Rennordnung/Teamstand (`bahnTeamstand()`) koennen es nicht sehen.
+  //  - Die Siege gehen nur in spieleBahn()s Boxscore als `duelle` hinaus; die PP-Gutschrift
+  //    passiert Node-seitig (`computeIndividualBoxscorePpsFromFixtureResults()`), `seiten`
+  //    (die Team-Wertung) bleibt unberuehrt.
+  const STATIONSDUELL=new WeakMap();
+  const STATIONSDUELL_ANZEIGE_S=1.6;   // so lange steht "X GEWINNT DAS DUELL" nach dem Ausgang
+  function stationsDuellZustand(u){
+    let z=STATIONSDUELL.get(u);
+    if(!z){ z={gegner:null,station:-1,seit:0,siege:0,letzter:null}; STATIONSDUELL.set(u,z); }
+    return z;
+  }
+  function stationsDuellGegner(u){ const z=STATIONSDUELL.get(u); return z?z.gegner:null; }
+  function stationsDuellSiege(u){ const z=STATIONSDUELL.get(u); return z?z.siege:0; }
+  function stationsDuellTyp(idx){ const T=BA().hindernisTypen; return T&&idx>=0?T[idx%T.length]:null; }
+  function stationsDuellSkill(u,idx){ const t=stationsDuellTyp(idx); return t?(u[t]||0):0; }
+  // Je Schritt einmal (Anfang von stepSpurt): erst offene Duelle aufloesen, dann neue Paare bilden.
+  function stationsDuellSchritt(){
+    if(!BA().spurt||!spurtSaeule.aktiv||istRoute())return;
+    for(const u of LAEUFER){
+      const z=STATIONSDUELL.get(u);
+      if(!z||!z.gegner||u.seite!==0)continue;
+      const g=z.gegner, zg=stationsDuellZustand(g);
+      const uFrei=!(u.huerde>0)||u.fertig!=null, gFrei=!(g.huerde>0)||g.fertig!=null;
+      if(!uFrei&&!gFrei)continue;
+      let sieger;
+      if(uFrei!==gFrei)sieger=uFrei?u:g;
+      else { const hu=u.huerde||0, hg=g.huerde||0;
+        sieger=hu<hg?u:hg<hu?g:(stationsDuellSkill(g,z.station)>stationsDuellSkill(u,z.station)?g:u); }
+      const verlierer=sieger===u?g:u;
+      stationsDuellZustand(sieger).siege++;
+      const ergebnis={sieger,verlierer,station:z.station,t:rennT};
+      z.letzter=ergebnis; zg.letzter=ergebnis; z.gegner=null; zg.gegner=null;
+      if(!stumm)feedRoutine(sieger.seite,sieger.n+" gewinnt das Duell am "+
+        (((BA().hindernisNamen||[])[z.station])||"Hindernis")+" gegen "+verlierer.n+".");
+    }
+    const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0
+      &&!stationsDuellGegner(o));
+    for(const a of an){
+      if(a.seite!==0||stationsDuellGegner(a))continue;
+      let b=null, best=0.03;
+      for(const o of an){
+        if(o.seite!==1||o.stationIdx!==a.stationIdx||stationsDuellGegner(o))continue;
+        const d=Math.abs(o.pos-a.pos); if(d<best){ b=o; best=d; }
+      }
+      if(!b)continue;
+      const za=stationsDuellZustand(a), zb=stationsDuellZustand(b);
+      za.gegner=b; zb.gegner=a; za.station=zb.station=a.stationIdx; za.seit=zb.seit=rennT;
+    }
+  }
+  // ANZEIGE (nur gelesen von laeuferXY/Sprite/Tafel): wie weit der Zug zum Vorne-Liegenden steht.
+  // Vorne liegt, wer weniger Rest-Stationszeit hat -- also genau der, der zuerst frei sein wird.
+  // Der Zeiger startet in der Mitte und laeuft ueber die Duelldauer bis zum vollen Abstand, so
+  // dass er beim Ausgang beim Sieger steht. Rueckgabe -1..1 aus Sicht des Heimlaeufers (+ = vorn).
+  function stationsDuellZug(a,b){
+    const za=STATIONSDUELL.get(a); if(!za)return 0;
+    const ha=Math.max(0,a.huerde||0), hb=Math.max(0,b.huerde||0);
+    const norm=0.35*Math.max(a.stationDauer||0,b.stationDauer||0,0.2);
+    const lauf=Math.max(0,rennT-za.seit), fortschritt=lauf/(lauf+Math.min(ha,hb)+1e-6);
+    return Math.max(-1,Math.min(1,(hb-ha)/norm))*fortschritt;
+  }
+  // Sprite-Versatz in Laufrichtung: im Duell schiebt sich der Vorne-Liegende sichtbar nach vorn,
+  // der andere wird zurueckgedrueckt (Tauzieh-Muster wie buehneTauziehVersatz); nach dem Ausgang
+  // springt der Sieger kurz nach vorn. Rein kosmetisch, u.pos bleibt der Motor-Wert.
+  function stationsDuellVersatz(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return 0;
+    const z=STATIONSDUELL.get(u); if(!z)return 0;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug;
+      return buehneTauziehVersatz(meins,1,6)+Math.sin(rennT*22+u.seite*Math.PI)*1.2;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; if(da>=0&&da<0.45)return 8*(1-da/0.45); }
+    return 0;
+  }
+  // Stoss-Pose (dieselbe vorhandene Pose wie beim Rempler, `lunge`): im Duell drueckt abwechselnd
+  // jeder, der Vorne-Liegende laenger; beim Ausgang stoesst sich der Sieger kurz ab.
+  function stationsDuellStoss(u){
+    if(!BA().spurt||!spurtSaeule.aktiv)return false;
+    const z=STATIONSDUELL.get(u); if(!z)return false;
+    if(z.gegner){
+      const zug=stationsDuellZug(u.seite===0?u:z.gegner,u.seite===0?z.gegner:u);
+      const meins=u.seite===0?zug:-zug, phase=((rennT/0.6)+(u.seite?0.5:0))%1;
+      return phase<0.5+0.3*meins;
+    }
+    if(z.letzter&&z.letzter.sieger===u){ const da=rennT-z.letzter.t; return da>=0&&da<0.3; }
+    return false;
+  }
+
   // Bildschirmposition eines Laeufers — EINE Stelle statt camX/bahnY an sechs.
   function laeuferXY(u){
     const platz=rennFertig.indexOf(u);
@@ -46918,7 +47357,7 @@
       const L=BA().jokerLaenge||1, p=Math.max(0,Math.min(1,1-u.umwegRest/L));
       return {x:camX(u.pos)+Math.sin(p*Math.PI)*14, y:bahnY(u.bahnZ)+Math.sin(p*Math.PI)*34};
     }
-    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0), y:bahnY(u.bahnZ)};
+    if(!istRoute())return {x:camX(u.pos)+(platz>=0?12+platz*9:0)+stationsDuellVersatz(u), y:bahnY(u.bahnZ)};
     const r=routeXY(u.pos), breite=BA().routeBreite||56;
     // Die zwoelf Spuren verschwinden nicht, sie werden schmal: bahnZ (0..11, bei einem
     // Spurwechsel weich interpoliert) wird zum Versatz QUER zur Route. Die Spur-Mechanik
@@ -48503,6 +48942,8 @@
     if(bahnHatzAktiv){ stepSpurtHatz(dt); return; }
     if(bahnHyroxAktiv){ stepSpurtHyrox(dt); return; }
     rennT+=dt;
+    // S-N5b: Stationsduelle buchen (reine Buchhaltung neben dem Laeufer, s. stationsDuellSchritt).
+    stationsDuellSchritt();
     // BROADCAST-HUD: Verlaufspuffer je Seite mitschreiben (nur push, s. Deklaration
     // an fortschrittVerlauf oben). Push-only bei echtem Fortschritt haelt den
     // Puffer klein und monoton in `p`, genau was staffelZeitDelta fuer die
@@ -50406,10 +50847,35 @@
         // darunter.
         u.vizHuerdeTon=false; u.vizRissTon=false; u.vizZielTon=false; u.vizHuerde=0;
       }
-      // WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL — derselbe Gedanke wie
-      // stepZeitfahrens Startrampe, hier an `u.huerde>0` statt an `u.startT` gegated.
-      const faehrt=u.fertig==null && !(u.huerde>0);
-      if(faehrt)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
+      // BUGFIX (Chris' Meldung, Screenshot "Von vorn"/Nahili-Ke: "sie hat beim rennen
+      // teilweise immer die stand animation noch mit drin"): die Zeile stand bis hierher
+      // als `const faehrt=u.fertig==null && !(u.huerde>0); if(faehrt)u.vizSchritt+=...` —
+      // "WAEHREND EINES HINDERNIS-STOPPS TRETEN DIE BEINE STILL, derselbe Gedanke wie
+      // stepZeitfahrens Startrampe". Das stimmte, SOLANGE `u.huerde>0` auch wirklich
+      // `u.v===0` bedeutete. Seit dem "Kriechen"-Paket (spurtSaeule.kriechen, per Default
+      // AN, s. `let spurtSaeule={aktiv:true,...,kriechen:true}` oben und Chris' Freigabe
+      // 04.10.) ist das nicht mehr so: tempoVon() multipliziert waehrend `u.huerde>0` mit
+      // `(u.kriechK||0)` statt mit 0 (Spurt: `kriechAnteil:0.25`, s. BAHN_ART.spurt) — der
+      // Laeufer KRIECHT mit 25% Tempo weiter vorwaerts, steht also nicht mehr wirklich.
+      // Nachgemessen (Playwright, echtes Spurt-Rennen): `u.pos` ruckelt an jeder der sieben
+      // Huerden-Stationen sichtbar weiter (v ~25% statt 0), waehrend `u.vizSchritt` hier
+      // exakt einfriert (gemessen: 20 Frames in Folge exakt derselbe Wert) — die Figur
+      // gleitet die ganze Stationsdauer (`huerdePreis`, hier 1,45s) im eingefrorenen
+      // Gehbild voran: genau die "Stand-Animation mitten im Rennen", die Chris sah, und das
+      // an JEDER der sieben Stationen, nicht nur bei einem echten Sturz (den zeigt ohnehin
+      // schon `u.down` -> "hurt"/"tod", unabhaengig von dieser Zeile).
+      //
+      // FIX: derselbe Lesezugriff wie bei stepParcours/stepClimbing (`u.v`, das tempoVon()
+      // bereits korrekt auf die Kriech-Geschwindigkeit herunterskaliert hat) OHNE die
+      // zusaetzliche `!(u.huerde>0)`-Bremse — ist `u.v` durch das Kriechen klein, aber
+      // nicht 0, laeuft die Schrittphase proportional langsam mit statt stillzustehen; ist
+      // `u.v` (z. B. ohne das Kriechen-Paket, QA-Schalter aus) wirklich 0, bleibt die
+      // Schrittphase trotzdem von selbst stehen (0*dt=0) — bit-identisch zum alten
+      // Verhalten fuer genau den Fall, fuer den es gedacht war. Reine Praesentation: liest
+      // nur `u.v`/`u.fertig`, schreibt ausschliesslich `u.vizSchritt` (dasselbe Feld wie
+      // vorher), kein rr(), keine Ruecklesung durch tempoVon()/MOTOREN.spurt.wert() —
+      // derselbe Vertrag wie der Rest dieser Funktion.
+      if(u.fertig==null)u.vizSchritt+=dtSicht*Math.max(0,u.v||0)/HUERDEN_SCHRITT_PX;
       // ---- HUERDEN-TON (TON_KATALOG.spurt.huerde), an der KANTE `u.huerde>0`: feuert nur
       // beim EINTRITT in den Hindernis-Stopp, nicht in jedem Frame, waehrend er anhaelt.
       const huerdeAktiv=u.huerde>0;
@@ -50617,7 +51083,13 @@
         // u.lungeVis statt u.kraft (Item 2, #846): dieselbe Stoss-Pose, aber an einem rein
         // kosmetischen Feld, das u.kraft (den gemessenen Tempo-/Kraftverbrauchs-Malus)
         // nicht beruehrt -- s. Setzstelle im Tackle-Zweig oben.
-        lunge:u.lungeVis>0?0.15:0,down:u.stolper>0,hp:1,max:1};
+        // S-N5b: dieselbe Pose auch im Stationsduell (stationsDuellStoss, rein kosmetisch).
+        // STURZ STATT TOD (Opus-Review 10.11., ingame-qualitaets-review-10-11.md Abschnitt 5.3):
+        // `down` bleibt wie bisher (haelt die Figur an, s. die down-gesperrten Zweige oben in
+        // dieser Funktion) -- `vizSturz` ist zusaetzlich, rein praesentational, genauso wie bei
+        // stepKuer()/Showcase, und laesst zeichnePixelFigur() beim Abrutschen (Climbing) bzw.
+        // Stolpern (Huerden/Staffel) die treffer- statt die tod-Animation zeigen.
+        lunge:(u.lungeVis>0||stationsDuellStoss(u))?0.15:0,down:u.stolper>0,vizSturz:u.stolper>0,hp:1,max:1};
       // ZEITFAHREN-KOERPERHALTUNG (Opus-Plan 9.2, Teil 2): reiner Lesezugriff auf
       // `u.vizNeigung`, das ausschliesslich stepZeitfahren schreibt -- fuer jede andere Bahn
       // ist es undefined und `zfTilt`/`zfHaltung` bleiben bei ihrem Neutralwert (0/1), diese
@@ -50942,32 +51414,86 @@
         bahnLabelSchwebeBoxen.push({x,y:ptY,halbBreite:ctx.measureText(pt).width/2+4});}
     }
     ctx.globalAlpha=1;   // s. `wartet`-Dimmung oben — nichts Nachfolgendes soll sie erben.
-    // S-N5 STATIONSDUELL-TAFEL (Spurt, Klasse A, nur mit QA-Schalter `spurtSaeule`): stehen
-    // ein Heim- und ein Gastlaeufer gleichzeitig an DERSELBEN Station (innerhalb 0,03
-    // Strecke), zeigt eine kleine Tafel beider Rest-Stationszeiten als Balken — "wer kommt
-    // zuerst los?", der Positionskampf, der sonst unsichtbar im Hindernis passiert. Liest nur
-    // u.huerde/u.stationDauer/u.stationIdx, schreibt nichts.
+    // S-N5b STATIONSDUELL-TAFEL MIT SIEGER (Chris 10.11.: "hier steht immer was von duellen, die
+    // sieht man aber gar nicht"). `spurtSaeule.aktiv` ist der STANDARD (true), die Tafel laeuft
+    // also live. Vorher: zwei unabhaengige Rest-Stationsbalken ohne Ausgang. Jetzt EIN
+    // Tauzieh-Balken (Heim links/orange, Gast rechts/blau), dessen Zeiger sich ueber die
+    // Duelldauer zum Vorne-Liegenden schiebt (stationsDuellZug), dazu der entscheidende Skill der
+    // Station; nach dem Ausgang ein Aufblitzen am Sieger und "NAME GEWINNT DAS DUELL" fuer
+    // STATIONSDUELL_ANZEIGE_S Sekunden. Liest nur, schreibt nichts (s. stationsDuellSchritt).
     if(BA().spurt && spurtSaeule.aktiv && !istRoute()){
-      const an=LAEUFER.filter(o=>o.fertig==null&&o.huerde>0&&o.stationIdx!=null&&o.stationDauer>0);
-      let paar=null;
-      for(const a of an){ if(a.seite!==0)continue;
-        const b=an.find(o=>o.seite===1&&o.stationIdx===a.stationIdx&&Math.abs(o.pos-a.pos)<0.03);
-        if(b){ paar=[a,b]; break; } }
-      if(paar){
-        const sx=camX(BA().hindernisse[paar[0].stationIdx]);
-        const sy=Math.min(bahnY(paar[0].bahnZ),bahnY(paar[1].bahnZ))-58;
-        const name=(BA().hindernisNamen||[])[paar[0].stationIdx]||("STATION "+(paar[0].stationIdx+1));
-        ctx.save(); ctx.globalAlpha=0.92;
-        ctx.fillStyle="rgba(8,10,14,.82)"; ctx.fillRect(sx-62,sy-12,124,38);
-        ctx.textAlign="center"; ctx.font="700 8px 'RaniraSeason',Georgia,'Times New Roman',serif";
-        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+name,sx,sy-3);
-        paar.forEach((o,k)=>{
-          const rest=Math.max(0,Math.min(1,o.huerde/o.stationDauer)), yy=sy+5+k*11;
-          ctx.fillStyle="rgba(255,255,255,.12)"; ctx.fillRect(sx-20,yy,76,6);
-          ctx.fillStyle=o.seite===0?"#f2a03d":"#45b0c9"; ctx.fillRect(sx-20,yy,76*rest,6);
-          ctx.textAlign="right"; ctx.font="600 7.5px 'RaniraSeason',Georgia,'Times New Roman',serif";
-          ctx.fillStyle="#dfe4ee"; ctx.fillText(o.n.slice(0,9),sx-23,yy+6);
-        });
+      const SKILLWORT={TECHNIK:"TECHNIK",WENDIGKEIT:"WENDIGKEIT",WUCHT:"WUCHT"};
+      const namen=BA().hindernisNamen||[];
+      const stName=i=>namen[i]||("STATION "+(i+1));
+      const schrift=(g,px)=>g+" "+px+"px 'RaniraSeason',Georgia,'Times New Roman',serif";
+      const farbe=s=>s===0?"#f2a03d":"#45b0c9";
+      // ORT DER TAFEL: frueher 58 px UEBER der hoeheren der beiden Bahnen -- bei den oberen
+      // Bahnen lag sie damit unter der Anzeigetafel (nachgemessen im Standbild). Jetzt rechts
+      // neben der Station (dort ist die Bahn frei, beide stehen ja an der Station), auf halber
+      // Hoehe zwischen den beiden Duellanten und in die Spielflaeche geklemmt; zwei duenne
+      // Linien in Teamfarbe zeigen, WER gegen wen ringt.
+      const tafelOrt=(st,a,b)=>({
+        sx:Math.max(80,Math.min(W-80,camX(BA().hindernisse[st])+96)),
+        sy:Math.max(72,Math.min(H-40,(bahnY(a.bahnZ)+bahnY(b.bahnZ))/2-8))});
+      const verbinde=(sx,sy,o)=>{ const p=laeuferXY(o);
+        ctx.strokeStyle=farbe(o.seite); ctx.lineWidth=1.2; ctx.globalAlpha=0.55;
+        ctx.beginPath(); ctx.moveTo(p.x+6,p.y-14); ctx.lineTo(sx-70,sy+7); ctx.stroke(); ctx.globalAlpha=0.94; };
+      const belegt=new Set();
+      // 1) laufende Duelle: je Station die erste Paarung
+      for(const a of LAEUFER){
+        const b=a.seite===0?stationsDuellGegner(a):null;
+        if(!b)continue;
+        const st=STATIONSDUELL.get(a).station;
+        if(belegt.has(st))continue; belegt.add(st);
+        const {sx,sy}=tafelOrt(st,a,b);
+        const zug=stationsDuellZug(a,b);            // + = Heim vorn
+        const typ=stationsDuellTyp(st);
+        ctx.save(); ctx.globalAlpha=0.94;
+        verbinde(sx,sy,a); verbinde(sx,sy,b);
+        ctx.fillStyle="rgba(8,10,14,.84)"; ctx.fillRect(sx-70,sy-13,140,40);
+        ctx.textAlign="center"; ctx.font=schrift(700,8);
+        ctx.fillStyle="#dfe4ee"; ctx.fillText("DUELL · "+stName(st)+(typ?" · "+(SKILLWORT[typ]||typ):""),sx,sy-3);
+        // Tauzieh-Balken: Mitte = offen, Zeiger wandert zum Vorne-Liegenden.
+        const bw=56, by=sy+4;
+        ctx.fillStyle="rgba(242,160,61,.22)"; ctx.fillRect(sx-bw,by,bw,7);
+        ctx.fillStyle="rgba(69,176,201,.22)"; ctx.fillRect(sx,by,bw,7);
+        const zx=sx-buehneTauziehVersatz(zug,1,bw);
+        ctx.fillStyle=zug>=0?farbe(0):farbe(1);
+        ctx.fillRect(Math.min(sx,zx),by,Math.abs(zx-sx),7);
+        ctx.fillStyle="#ffffff"; ctx.fillRect(zx-1.5,by-2,3,11);
+        ctx.fillStyle="rgba(255,255,255,.5)"; ctx.fillRect(sx-0.5,by-1,1,9);
+        ctx.font=schrift(600,7.5);
+        ctx.textAlign="left"; ctx.fillStyle=zug>0.05?farbe(0):"#dfe4ee"; ctx.fillText(a.n.slice(0,11),sx-bw,by+18);
+        ctx.textAlign="right"; ctx.fillStyle=zug<-0.05?farbe(1):"#dfe4ee"; ctx.fillText(b.n.slice(0,11),sx+bw,by+18);
+        ctx.restore();
+      }
+      // 2) frisch entschiedene Duelle: Aufblitzen am Sieger + Siegerzeile
+      const gezeigt=new Set();
+      for(const u of LAEUFER){
+        const z=STATIONSDUELL.get(u); const e=z&&z.letzter;
+        if(!e||e.sieger!==u||gezeigt.has(e.station)||belegt.has(e.station))continue;
+        const da=rennT-e.t; if(da<0||da>STATIONSDUELL_ANZEIGE_S)continue;
+        gezeigt.add(e.station);
+        const p=laeuferXY(u), {sx,sy}=tafelOrt(e.station,e.sieger,e.verlierer);
+        const aus=Math.max(0,Math.min(1,(STATIONSDUELL_ANZEIGE_S-da)/0.4));
+        ctx.save();
+        if(da<0.4){
+          const k=da/0.4;
+          ctx.globalAlpha=1-k; ctx.strokeStyle=farbe(u.seite); ctx.lineWidth=3;
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,10+26*k,0,Math.PI*2); ctx.stroke();
+          ctx.fillStyle="rgba(255,255,255,"+(0.55*(1-k)).toFixed(3)+")";
+          ctx.beginPath(); ctx.arc(p.x,p.y-10,9*(1-k)+3,0,Math.PI*2); ctx.fill();
+        }
+        ctx.globalAlpha=aus;
+        const z1=u.n.toUpperCase()+" GEWINNT DAS DUELL", z2=stName(e.station)+" · gegen "+e.verlierer.n+" · +Duell-PP";
+        ctx.font=schrift(700,9.5); const w1=ctx.measureText(z1).width;
+        ctx.font=schrift(600,7.5); const w2=ctx.measureText(z2).width;
+        const bw=Math.max(w1,w2)/2+8;
+        ctx.fillStyle="rgba(8,10,14,.86)"; ctx.fillRect(sx-bw,sy-13,bw*2,30);
+        ctx.fillStyle=farbe(u.seite); ctx.fillRect(sx-bw,sy-13,3,30);
+        ctx.textAlign="center";
+        ctx.font=schrift(700,9.5); ctx.fillStyle=farbe(u.seite); ctx.fillText(z1,sx,sy);
+        ctx.font=schrift(600,7.5); ctx.fillStyle="#dfe4ee"; ctx.fillText(z2,sx,sy+11);
         ctx.restore();
       }
     }
@@ -52545,6 +53071,65 @@
     if(v>=ENDSTAND_NACHLAUF_MS){ endstandNachlauf=null; n.render(); }
   }
 
+  // ANZEIGE-TREUE-FIX A1 (09.11., docs/design/sendedauer-messung-09-11.md Abschnitt 2,
+  // Auftrag "Anzeige-Treue-Fix"). ROOT CAUSE, nachgewiesen fuer Spurt/Takeshi's Castle/
+  // Staffel/Climbing: `stepSim()` rief fuer die Bahn `stepSpurt((1/60)/zeitFaktor())` auf --
+  // JEDES Bild bekam einen KLEINEREN dt (die Physik lief in kleineren Haeppchen), waehrend
+  // der Buchungspfad (bahnLauf()/MOTOREN[bd].lauf()/bahnPodLauf() -- "M.lauf()") IMMER mit
+  // festem `stepSpurt(1/60)` rechnet, unabhaengig von zeitFaktor(). stepSpurt() wuerfelt pro
+  // TICK (nicht pro Sim-Sekunde) an mindestens zwei Stellen mit einer auf `dt` skalierten
+  // Wahrscheinlichkeit -- Bahnwechsel/Windschatten-Wechsel (`rr()<(0.25+...)* dt*3`, s.
+  // dortiger Kommentar "WECHSELPATZER") und Tackle/Rempler (`rr()<willTackeln*dt*...`, nur
+  // Spurt/Takeshi). Ein kleinerer dt bei GLEICHER Sim-Zeit bedeutet MEHR Ticks bis zum Ziel
+  // und damit MEHR rr()-Ziehungen an exakt diesen beiden Stellen als die Buchung macht --
+  // die Zufallsfolge divergiert dadurch schon nach dem ersten Bahnwechsel-Check, selbst bei
+  // identischer Saat (nachgemessen: Spurt/Takeshi 24/24 Saaten weichen ab, s. Dokument).
+  // Time-Trial blieb fast immun, weil `BA().schatten=false`, ALLE Time-Trial-Plaene
+  // `sucht:0` fuehren UND `hindernisse:[]` ist -- `wunsch` im Bahnwechsel-Block bleibt
+  // dadurch STRUKTURELL immer null (kein Windschatten-Ziel, kein `gefallen`-Nachbar, kein
+  // `tackle`), der dt-skalierte rr()-Wurf also toter Code. GENAU DAS macht dieser Fix fuer
+  // ALLE FUENF Bahn-Disziplinen zur Regel, statt es dem Zufall zu ueberlassen: die Physik
+  // laeuft jetzt fuer `istBahn(disc)` IMMER mit dem FESTEN `1/60`-Takt wie die Buchung
+  // (gleich viele, gleich geformte Ticks -> dieselbe rr()-Folge, dieselbe Saat -> dasselbe
+  // Ergebnis), und NUR noch die ZEICHENHAEUFIGKEIT (wie oft dieser Takt in Echtzeit feuert)
+  // wird weiter von zeitFaktor() gestreckt -- Weg (a) aus der Auftragsbeschreibung, nicht
+  // Weg (b) ("am Ende an die Buchung ranziehen"): (a) aendert nichts am GEBUCHTEN Ergebnis
+  // und zeigt waehrend des ganzen Rennens konsistente Zwischenstaende, waehrend (b) einen
+  // ploetzlichen Sprung in der letzten Phase brauchen wuerde, der selbst wie ein Bug wirkt.
+  // Jede andere Bahn-Disziplin-Eigenschaft (Rezept, Matrix, MOTOREN[bd].wert()) bleibt
+  // unangetastet -- s. Fingerabdruck-Beleg in der PR-Beschreibung.
+  //
+  // `tickerSendeT`/`ticksSeitReset` zaehlen WEITERHIN reale Sechzigstelsekunden (eine
+  // Erhoehung je Aufruf dieser Funktion), NICHT stepSim()-Aufrufe -- sonst waere das
+  // Ticker-Zeilenbudget (s. Kommentar an TICKER_ZEILEN_JE_MIN oben, "tickerSendeT waechst um
+  // GENAU 1/60 je stepSim()-Aufruf") fuer die Bahn plötzlich `zeitFaktor()`-mal so langsam
+  // gefuettert, nur weil `stepSim()` jetzt seltener feuert -- ein eigener, hier bewusst
+  // vermiedener Darstellungsfehler. `bahnSimAcc` (s. Deklaration bei `acc` oben) ist der
+  // GETRENNTE Akkumulator, der stattdessen entscheidet, wann die Physik tatsaechlich einen
+  // Schritt macht.
+  function anzeigeSechzigstel(zf){
+    tickerSendeT+=1/60; ticksSeitReset++;
+    // B1-NACHTRAG (10.11., scripts/miss-anzeige-treue-rest.mjs, 24 Saaten je Disziplin):
+    // `istKampf(disc)` UND `istFeldspiel(disc)` ergaenzt -- TDM/Mini-DM/Battlefield (Duell)
+    // UND Hockey haben dieselbe Divergenz wie die Bahn vor A1 (24/24 Saaten abweichend je
+    // Disziplin, bei Battlefield sogar der SIEGER, s. Kommentar an der Deklaration von
+    // `bahnSimAcc` oben). Buehne (Fechten/Gewichtheben, ebenfalls ZEIT_DEHNUNG!=1) bleibt
+    // AUSSEN VOR -- dieselbe Messung ergab dort 24/24 UEBEREINSTIMMEND: `stepBuehne()`
+    // trifft seine Entscheidungen an diskreten Rundengrenzen (Zeit-Schwellenwerte), die
+    // tick-granularitaets-invariant sind, waehrend Kampf/Feldspiel kontinuierliche
+    // Positions-/Kontakt-Simulationen sind wie die Bahn (kleinerer dt -> mehr Ticks bei
+    // gleicher Sim-Zeit -> mehr/andere rr()-Ziehungen entlang des Wegs, selbst ohne einen
+    // explizit dt-skalierten Wurf wie bei stepSpurt() -- die Positionsintegration selbst
+    // (`u.x+=...*dt`) akkumuliert bei anderer Schrittzahl einen anderen Rundungs-/Kontakt-
+    // Zeitpunkt, der verschiebt, WANN welche Einheit als naechste rr()-Ziehung ansteht).
+    if(istBahn(disc)||istKampf(disc)||istFeldspiel(disc)){
+      bahnSimAcc+=1/60;
+      while(bahnSimAcc>=zf/60){ stepSim(1/60); bahnSimAcc-=zf/60; }
+    } else {
+      stepSim((1/60)/zf);
+    }
+  }
+
   let schnelldurchLetztesBild=0;
   function loop(ts){
     // Quick-Sim (schnellDurch): zeichnen kostet mehr als rechnen -- waehrend des Vorspulens nur
@@ -52556,7 +53141,9 @@
     // nur ruckeln, sondern in Sendezeit LANGSAMER laufen -- unter ~20 Bildern/s fehlte jedem Bild
     // Zeit, Tempo 4x wurde gemessen zu ~1,6x (Saisontest-Fund 02.11., s. schnelldurchDomGedrosselt()).
     // 0,2 s holt bis ~5 Bilder/s voll nach und faengt einen Tab-Wechsel weiterhin ab. Die Ticks
-    // selbst bleiben fest (1/60)/zeitFaktor() -- nur ihre Zahl je Bild aendert sich, das Ergebnis nie.
+    // selbst bleiben fest -- (1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix
+    // A1 das FESTE 1/60 der Buchung fuer die Bahn (s. anzeigeSechzigstel() oben) -- nur ihre
+    // Zahl je Bild aendert sich, das Ergebnis nie.
     let dt=Math.min(.2,(ts-last)/1000);last=ts;
     if(anpfiffLauf)anpfiffTick();
     stingerPruefen();
@@ -52565,8 +53152,11 @@
       acc+=dt*wirksamesTempo();
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
-      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest.
-      while(acc>=1/60){tickerSendeT+=1/60;stepSim((1/60)/zf);acc-=1/60;ticksSeitReset++;}
+      // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest. ANZEIGE-TREUE-
+      // FIX A1 (s. anzeigeSechzigstel() oben): fuer die Bahn feuert stepSim() hier nicht
+      // mehr bei jedem Sechzigstel, sondern erst, wenn `bahnSimAcc` genug Sechzigstel
+      // gesammelt hat -- `zf` bleibt deshalb unveraendert an jeden Aufruf weitergereicht.
+      while(acc>=1/60){anzeigeSechzigstel(zf);acc-=1/60;}
       stepFloats();
       // stepSim ruft updateHud() selbst — das gilt aber nur fuer den Kampf. Auf der Bahn
       // laeuft die Anzeige hier mit, sonst steht ueber dem Rennen dauerhaft 0:00 und 0:0.
@@ -55489,7 +56079,7 @@
   }
 
   function reset(){
-    running=false;done=false;last=0;acc=0;pfeile=[];
+    running=false;done=false;last=0;acc=0;bahnSimAcc=0;pfeile=[];
     // A0.2: dieselbe Nullstellung wie fuer acc/last direkt davor, nur fuer die Sonden-Uhr
     // (s. sondenAktiv/jetztMs() oben). Ohne das wuerde ein zweiter window.__arena.sondenLauf()
     // in DERSELBEN Seite (nach einem erneuten setDisc(), das ja intern reset() aufruft) die
@@ -55900,7 +56490,13 @@
   function renderAll(){renderDbar();renderList();renderBoard();renderNutzwert();}
   mutatorenGrundzustand();
   zieheFormkarten(20260823);
-  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
+  // BOOTSTRAP-AUFRUF VERSCHOBEN (Verdrahtung 11.11., s. Kommentar bei seiner neuen Stelle
+  // ganz am Modulende): `reset()` baut hier synchron die Standarddisziplin ("tdm", s.
+  // `let disc="tdm"` oben) -- seit TDM ueber `tdmGefecht()`/`tdmSchlagwechsel()` laeuft, braucht
+  // dieser Bau Funktionen/Konstanten (mdffaZufall, mdffaMisch, bfPodPlatzierungAus, TDM_GEFECHT
+  // u.a.), die TEXTLICH erst weiter unten im Modul stehen -- an DIESER Stelle waeren sie noch
+  // in ihrer Temporal-Dead-Zone (`let`/`const`, kein `function`). Der Aufruf selbst steht
+  // deshalb jetzt ganz am Ende der Datei, nach jeder Deklaration.
   // MESSFENSTER. Der Entwurf wird ueber das Verhalten beurteilt, nicht ueber Vermutungen —
   // und Verhalten sieht man nur, wenn man IN die Simulation schauen kann. Hier steht sie
   // schreibgeschuetzt zum Nachmessen bereit; das Spiel liest davon nichts.
@@ -56742,6 +57338,456 @@
     const anteil={};
     for(const k of kaempfer)anteil[k.n]=Math.max(0,k.wert)/summe*100;
     return {...g, platzierung:pl, lebend, anteil, teamWert};
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT — SEIT 11.11. DER ECHTE WERTUNGSPFAD (Verdrahtung, s.
+  // lib/battle/arena-headless-runner.ts "ARENA_KAMPF_DISCIPLINE_IDS" und
+  // lib/battle/arena-resolved-disciplines.ts "TDM_GEFECHT_VORLAUF_AKTIV").
+  //
+  // Chris woertlich: „Das was auf dem Feld passiert soll auch das in den Stats sein! Und
+  // das in jeder Disziplin!" TDM lief bis zu dieser Verdrahtung produktiv ueber die
+  // PPS-Duell-Bruecke (s. Kopfkommentar lib/battle/arena-resolved-disciplines.ts) — der echte
+  // Zweikampf (build()/stepSim(), ARENA_ART.tdm) misst rho je Spiel nur 0,324-0,404 (s.
+  // Kommentar bei ARENA_ART.tdm oben), weit unter der CLAUDE.md-Schranke. Dieser Block entstand
+  // 10.11. als reiner Mess-/Prototyp-Schritt (additiv, an nichts angeschlossen) und ist seit
+  // 11.11. der tatsaechliche Wertungspfad: `spieleTdmGefecht()` (s.u.) ist der Headless-
+  // Einstiegspunkt fuer die Buchung, `build()`s TDM-Zweig (s. dort, tdmReplayStarten) spielt
+  // GENAU DASSELBE Gefecht fuer die Live-Anzeige ab — "gezeigt = gebucht" durch dieselbe
+  // Berechnung auf beiden Seiten, nicht durch einen Tick-Taktabgleich (TDM braucht den
+  // Anzeige-Treue-Fix aus PR #1372/`anzeigeSechzigstel()` deshalb NICHT: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick, ruft `stepSim()`/`anzeigeSechzigstel()` nie).
+  // Nach demselben Vorbild wie bfffaGefecht() (Battlefield-Pod, 02.11., bestand rho
+  // 0,861-0,923 / Pp 4,8-20,2 bei k=2..6). Jede Zeile des urspruenglichen Prototyp-Blocks blieb
+  // additiv: kein bestehender Bezeichner wird gelesen UM GEAENDERT ZU WERDEN, nur aufgerufen
+  // (slotAufschlag, mitAufschlag, betroffeneAttribute, gewichtet, formVon, stufenWert,
+  // eigHebung, eigMutator, gehoben, mdffaZufall, mdffaFormkartenFuer, bfPodPlatzierungAus,
+  // normalisiereSaat — alle schon vorher da). Neu durch die Verdrahtung kommen NUR
+  // `spieleTdmGefecht()`, `tdmReplayStarten()`/`tdmReplaySchritt()`/`tdmReplayEreignis()` und die
+  // EINE Zeile in `stepSim()` dazu, die bei aktivem Replay frueh zurueckkehrt (s. dort) — exakt
+  // das Muster, mit dem `KP.pod.replay` dort schon Battlefield abfaengt.
+  // `node scripts/pruefe-wertung-fingerabdruck.mjs` zeigt deshalb ab dieser PR eine Aenderung
+  // NUR in den TDM-Zeilen (s. docs/design/tdm-gefecht-abnahme-10-11.md fuer die Abnahmezahlen).
+  //
+  // ANDERS ALS BATTLEFIELD: TDM ist "reines Deathmatch" (ARENA_ART.tdm-Kommentar sagt das
+  // ausdruecklich, ebenso der Kommentar bei ARENA_DOMINATION oben: "TDM und Mini-DM bleiben
+  // reines Deathmatch"), kein Kontrollpunkt-Gefecht — also kein `orte`, kein Erobern, keine
+  // Rotation. Die Rollen sind ebenfalls FEST (SLOTS_JE_DISC.tdm, sechs Stueck, unabhaengig von
+  // der Kadergroesse k — derselbe feste Pfad, den Mini-DM vor seiner Sechs-Rollen-Erweiterung
+  // hatte), nicht wie Battlefields BATTLEFIELD_SLOTS_JE_K.
+  //
+  // JEDES der neun TDM-Matrixgewichte (BASIS_JE_DISC.tdm, bit-identisch zur gesperrten Matrix
+  // — TDM hat KEINEN Eintrag in spiel-eignung-overrides.ts) bekommt einen eigenen, benannten
+  // Kanal — Budget-Methode, CLAUDE.md:
+  //   health 20         STAND: die Lebenspunkte.
+  //   power 28, torment 2  WUCHT: Schadenshoehe je Treffer (der dominante Kanal, wie die
+  //                      Matrix es vorgibt — Power ist mit Abstand das schwerste Attribut).
+  //   awareness 2        TREFFER: Chance, dass ein Schlag ueberhaupt landet.
+  //   stamina 14         AUSDAUER: wie wenig die Wucht im spaeten Gefecht nachlaesst.
+  //   spirit 12          DECKUNG: mindert jeden erlittenen Treffer.
+  //   intelligence 6     SCHWACHSTELLE: Zielwahl trifft den angeschlagensten Gegner statt
+  //                      zufaellig.
+  //   determination 6    LETZTER ATEM: ein toedlicher Treffer laesst einmal stehen.
+  //   charisma 10        BEFEHL: eigener Wucht-Multiplikator — ein Anfuehrer schlaegt mit mehr
+  //                      Nachdruck zu (es gibt in TDM keine Eroberung, auf die Charisma sonst
+  //                      ginge, vgl. Battlefield/`erobern`).
+  // MENGE AUS DER EIGNUNG, FORM AUS DEM PROFIL: jeder Kanal liest `E + kappa·(a − E)`, exakt
+  // wie in bfffaKaempfer()/mdffaKaempfer(). `kappa` fuer die Grundkanaele (Stand, Wucht,
+  // Treffer, Ausdauer), `kappaWege` fuer die taktischen Kanaele (Deckung, Schwachstelle, Atem,
+  // Befehl) — dieselbe Aufteilung wie bei Battlefield.
+  const TDM_GEFECHT_GRUND=Object.freeze({
+    takte:20, kappa:0.12, kappaWege:0.25, spreizung:3,
+    stand:100, wucht:11, treffer:0.70, muedigkeit:0.03, muedeAb:10,
+    schwachstelle:{basis:0.4, bonus:0.25},
+    deckung:{basis:0.1},
+    atem:{basis:0.1},
+    befehl:{basis:1},
+    wertung:{ko:15, takt:2},
+    hebel:{stand:6.5, wucht:4, treffer:4, deckung:6, ausdauer:5, schwachstelle:1.5, atem:5, befehl:4},
+    // ANZEIGE-TAKT (Verdrahtung 11.11., s. tdmReplaySchritt() weiter unten): reine
+    // Sekunden-pro-Takt-Vorgabe fuer die Live-Wiedergabe, beeinflusst tdmSchlagwechsel()
+    // selbst NICHT (die rechnet taktlos in diskreten Runden) -- dieselbe Rolle wie
+    // BFFFA.taktSek fuer Battlefields Replay. Additiv: kein bestehender Leser dieses Objekts
+    // (tdmGefechtEinfluss/-Sonde/-Parameter) liest `taktSek`, die schon gemessenen rho-/
+    // Pp-Zahlen bleiben deshalb unberuehrt.
+    taktSek:4
+  });
+  const tdmGefechtGrund=()=>JSON.parse(JSON.stringify(TDM_GEFECHT_GRUND));
+  let TDM_GEFECHT=tdmGefechtGrund();
+  const TDM_ZWECK={ziel:21, schwachstelle:22, treffer:23, atem:24};
+
+  // DIE KANAELE EINES KAEMPFERS — Zeile fuer Zeile wie bfffaKaempfer()/mdffaKaempfer(). `idx`
+  // ist die feste Kaempfer-Nummer im Gefecht (Wuerfelschluessel fuer mdffaZufall).
+  function tdmKaempfer(p,side,slotId,slotDef,idx){
+    const d="tdm";
+    const engPunkte=slotId?slotAufschlag(p,slotId,d,slotDef):0;
+    const breitPunkte=formVon(p.n)+stufenWert();
+    const eigOhneMutator=(p.d&&p.d[d]!=null?p.d[d]:gewichtet(p.a,BASIS_JE_DISC[d]||{}))
+                  +engPunkte+breitPunkte+eigHebung(p,d);
+    const E=eigOhneMutator+eigMutator(p,d);
+    let attr=mitAufschlag(gehoben(p),engPunkte,betroffeneAttribute(slotId,d,true,slotDef),d);
+    attr=mitAufschlag(attr,breitPunkte,betroffeneAttribute(slotId,d,false,slotDef),d);
+    const P=TDM_GEFECHT, R=P.mitte||50, W=BASIS_JE_DISC[d]||{};
+    const dvK=(kp)=>(at)=>(E+kp*((attr[at]||0)-E)-R)/R;
+    const dvGrund=dvK(P.kappa), dvWeg=dvK(P.kappaWege!=null?P.kappaWege:P.kappa);
+    const g=(at)=>(W[at]||0)/100;
+    const S=P.spreizung, H=P.hebel;
+    const kanalMit=(dv)=>(hebel,atts)=>S*hebel*atts.reduce((s,at)=>s+g(at)*dv(at),0);
+    const kanal=kanalMit(dvGrund), weg=kanalMit(dvWeg);
+    const klemme=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    const stand0=P.stand*klemme(1+kanal(H.stand,["health"]),0.25,3);
+    return {
+      idx, side, n:p.n, slot:slotId||null, eig:E, eigOhneMutator, mutatorTreffer:mutatorTreffer(p),
+      stand0, stand:stand0,
+      wucht:P.wucht*klemme(1+kanal(H.wucht,["power","torment"]),0.2,3),
+      treffer:klemme(P.treffer+kanal(H.treffer,["awareness"]),0.15,0.97),
+      ermuedung:klemme(1-kanal(H.ausdauer,["stamina"]),0.2,1.8),
+      deckung:klemme(P.deckung.basis+weg(H.deckung,["spirit"]),0,0.6),
+      schwach:klemme(P.schwachstelle.basis+weg(H.schwachstelle,["intelligence"]),0,0.95),
+      atem:klemme(P.atem.basis+weg(H.atem,["determination"]),0,0.9),
+      befehl:klemme(P.befehl.basis+weg(H.befehl,["charisma"]),0.2,3),
+      // Laufzustand
+      raus:false, rausTakt:null, atemWeg:false, wert:0,
+      st:{treffer:0, schlaege:0, wucht:0, kos:0, schwachstellen:0}
+    };
+  }
+
+  // DAS GEFECHT. `kaempfer` sind tdmKaempfer() (Index = idx), `N` die Seitenzahl, `saat` die
+  // Kampfsaat. Kein rr(), kein Zustand ausserhalb der Argumente — dieselben Eingaben liefern
+  // bitgleich dasselbe Gefecht. Jeder Takt: Zielwahl (Schwachstelle via Intelligence, sonst
+  // gleichverteilt unter allen lebenden Gegnern JEDER anderen Seite — bei den zwei Seiten, die
+  // ein echtes TDM-Spiel hat, einfach "der Gegner"), gleichzeitige Schlaege, K.o. mit einmaligem
+  // letzten Atem (Determination), Seiten-Ausscheiden. Rueckgabe wie bfffaGefecht, ohne `orte`.
+  function tdmSchlagwechsel(kaempfer,saat,N){
+    const P=TDM_GEFECHT, Z=TDM_ZWECK, wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
+    const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
+    const takte=[];
+    let gespielt=0, ende="zeit";
+    const lebendeSeiten=()=>{const s=new Set(); for(const k of kaempfer)if(!k.raus)s.add(k.side); return s;};
+    const schnapp=()=>({k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus})),
+      punkte:punkte.slice(), rausTakt:rausTakt.slice()});
+    const start=schnapp();
+    for(let t=1;t<=P.takte;t++){
+      if(lebendeSeiten().size<=1){ ende="allein"; break; }
+      gespielt=t;
+      const ereignisse=[];
+      // 1) ZIELWAHL, auf dem Stand vom Taktbeginn.
+      const angriffe=[];
+      for(const A of kaempfer){
+        if(A.raus)continue;
+        const feinde=kaempfer.filter(B=>!B.raus&&B.side!==A.side);
+        if(!feinde.length)continue;
+        let ziel, schwach=false;
+        if(wurf(A.idx,t,Z.schwachstelle)<A.schwach){
+          ziel=feinde.slice().sort((x,y)=>x.stand/x.stand0-y.stand/y.stand0||x.stand-y.stand||x.idx-y.idx)[0];
+          schwach=true; A.st.schwachstellen++;
+        }else{
+          ziel=feinde[Math.min(feinde.length-1,Math.floor(wurf(A.idx,t,Z.ziel)*feinde.length))];
+        }
+        angriffe.push({A,ziel,schwach});
+      }
+      // 2) SCHLAEGE, gleichzeitig. Wucht laesst ab `muedeAb` nach (Ausdauer), Deckung (Spirit)
+      // mindert, Befehl (Charisma) hebt den eigenen Schlag, Schwachstelle gibt Bonus.
+      const schadenJe=new Map();
+      const muede=(k)=>t>=P.muedeAb?Math.max(0.3,1-P.muedigkeit*(t-P.muedeAb+1)*k.ermuedung):1;
+      for(const x of angriffe){
+        const {A,ziel,schwach}=x;
+        A.st.schlaege++;
+        if(wurf(A.idx,t,Z.treffer)>=A.treffer){ ereignisse.push({typ:"daneben", wer:A.idx, ziel:ziel.idx}); continue; }
+        const dmg=A.wucht*muede(A)*(schwach?1+P.schwachstelle.bonus:1)*A.befehl*(1-ziel.deckung);
+        ziel.stand-=dmg; A.wert+=dmg; A.st.wucht+=dmg; A.st.treffer++;
+        const m=schadenJe.get(ziel)||new Map(); m.set(A,(m.get(A)||0)+dmg); schadenJe.set(ziel,m);
+        ereignisse.push({typ:schwach?"schwachstelle":"treffer", wer:A.idx, ziel:ziel.idx, wucht:Math.round(dmg*10)/10});
+      }
+      // 3) WER FAELLT? Letzter Atem (Determination) einmal je Kaempfer; sonst K.o., gutgeschrieben
+      // dem, der in diesem Takt den meisten Schaden an ihm gemacht hat.
+      for(const k of kaempfer){
+        if(k.raus||k.stand>0)continue;
+        if(!k.atemWeg&&wurf(k.idx,t,Z.atem)<k.atem){
+          k.atemWeg=true; k.stand=1; ereignisse.push({typ:"atem", wer:k.idx}); continue;
+        }
+        k.raus=true; k.rausTakt=t; k.stand=0;
+        const m=schadenJe.get(k);
+        let bester=null,bw=-1;
+        if(m)for(const [A,w] of m)if(w>bw||(w===bw&&A.idx<bester.idx)){bester=A;bw=w;}
+        if(bester){ bester.wert+=P.wertung.ko; bester.st.kos++; punkte[bester.side]++; }
+        ereignisse.push({typ:"ko", wer:bester?bester.idx:null, ziel:k.idx});
+      }
+      // 4) AUSSCHEIDEN: eine Seite ohne Stehende ist raus.
+      for(let s=0;s<N;s++){
+        if(rausTakt[s]!=null||kaempfer.some(k=>k.side===s&&!k.raus))continue;
+        rausTakt[s]=t; ereignisse.push({typ:"seite-raus", side:s});
+      }
+      for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt;
+      takte.push({t, ereignisse, ...schnapp()});
+    }
+    if(ende==="zeit"&&lebendeSeiten().size<=1)ende="allein";
+    // Wer allein uebrig bleibt, „steht" die restlichen Takte — sonst kostete ein schneller Sieg
+    // den Sieger genau die Taktpunkte, die er sich erkaempft hat (dieselbe Regel wie bfffaGefecht).
+    if(ende==="allein"&&gespielt<P.takte)for(const k of kaempfer)if(!k.raus)k.wert+=P.wertung.takt*(P.takte-gespielt);
+    return {kaempfer, punkte, rausTakt, gespielt, ende, start, takte};
+  }
+
+  // DIE OEFFENTLICHE FUNKTION AUS DER AUFGABE: `tdmGefecht(seiten, saat, jeSeite)`. `seiten` ist
+  // eine Liste von Spielerlisten (ArenaSpieler[], je Seite ein Kader — im echten Spiel immer
+  // zwei, s. Kopfkommentar), `saat` die Kampfsaat, `jeSeite` (optional) die Kadergroesse k
+  // (steuert nur, wie viele der sechs festen Rollen SLOTS_JE_DISC.tdm vergeben werden — ohne
+  // Angabe die Rosterlaenge der ersten Seite). Baut die Kaempfer (liest FORMKARTE/MUTATOREN/
+  // ATTR_HEBUNG wie jede andere Gefecht-Bau-Funktion dieses Motors — dieselben Eingaben liefern
+  // dasselbe Ergebnis) und entscheidet das Gefecht in einem Schritt. Rueckgabe im selben Format
+  // wie bfPodLauf()s "gefecht"-Zweig (ohne die Battlefield-eigenen Felder besitz/erob/amOrt/
+  // wechsel/besucht, die TDM nicht hat), damit Mess-Sonden sie identisch lesen koennen.
+  function tdmGefecht(seiten,saat,jeSeite){
+    const N=seiten.length;
+    if(N<2)throw new Error("tdmGefecht: braucht mindestens zwei Seiten, bekam "+N+".");
+    const k=jeSeite||seiten[0].length||ARENA_ART.tdm.jeSeite;
+    const rollen=slotsVon("tdm").slice(0,Math.max(1,Math.min(6,Math.round(k))));
+    const saatN=normalisiereSaat(saat);
+    let idx=0;
+    const kaempfer=[];
+    seiten.forEach((team,side)=>{
+      team.forEach((p,i)=>{
+        const slotId=rollen[i%rollen.length].id;
+        kaempfer.push(tdmKaempfer(p,side,slotId,SLOTVON[slotId],idx++));
+      });
+    });
+    const g=tdmSchlagwechsel(kaempfer,saatN,N);
+    const lebend=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s&&!x.raus).length);
+    const teamWert=Array.from({length:N},(_,s)=>kaempfer.filter(x=>x.side===s).reduce((a,x)=>a+x.wert,0));
+    const pl=bfPodPlatzierungAus(N,g.punkte,lebend,g.rausTakt,teamWert);
+    const summe=kaempfer.reduce((a,x)=>a+Math.max(0,x.wert),0)||1;
+    return {disziplin:"tdm", saat:saatN, format:"gefecht", ende:g.ende, takte:g.gespielt,
+      teams:Array.from({length:N},(_,s)=>({side:s, punkte:+g.punkte[s].toFixed(1),
+        lebend:pl.lebend[s], rausT:pl.rausT[s], eventPlatz:pl.platz[s], ligaPunkte:pl.ligaPunkte[s],
+        wertung:+teamWert[s].toFixed(3)})),
+      kaempfer:kaempfer.map(x=>({n:x.n, side:x.side, slot:x.slot, eig:x.eigOhneMutator,
+        wert:+(Math.max(0,x.wert)/summe*100).toFixed(3), roh:+x.wert.toFixed(3), ko:x.st.kos, down:!!x.raus})),
+      gefecht:g};
+  }
+
+  // RANGTREUE-SONDE, dieselbe Bauart wie battlefieldPodSonde(): `kader` Liste von Team-Kadern,
+  // `opt.gruppen` Liste von ZWEIERGRUPPEN (Indizes in `kader` — TDM ist zwei Seiten, nicht vier),
+  // `opt.n` Kaempfe je Gruppe, `opt.versatz` Saatstrom, `opt.jeSeite` k. Gemessen wird `eig` OHNE
+  // Mutator gegen `wert` (Anteil am Gesamtbeitrag) — exakt die Groessen von disziplinProbe().
+  function tdmGefechtSonde(kader,opt){
+    const o=opt||{}, n=o.n||6, versatz=o.versatz||0;
+    const formVorher=FORMKARTE, mutVorher=MUTATOREN;
+    const events=[];
+    try{
+      (o.gruppen||[]).forEach((gr,gi)=>{
+        const teams=gr.map(i=>kader[i]);
+        for(let i=0;i<n;i++){
+          const saat=(1337+versatz+gi*104729+i*7919)>>>0;
+          FORMKARTE={};
+          mdffaFormkartenFuer(teams,(20260823+versatz+gi*7919+i*104729)>>>0);
+          MUTATOREN=(o.mutatoren||"je-spiel")==="aus"?[]
+            :zieheMutatorenWieSpiel((20260823+versatz+gi*7919+i*15485863)>>>0);
+          const r=tdmGefecht(teams,saat,o.jeSeite);
+          events.push({gruppe:gi, i, saat, teamsIx:gr, dauer:r.takte, ende:r.ende, teams:r.teams,
+            teilnehmer:r.kaempfer.map(u=>({n:u.n, side:u.side, slot:u.slot, eig:Math.round(u.eig*100)/100,
+              wert:Math.round(u.wert*1000)/1000, ko:u.ko, down:u.down}))});
+        }
+      });
+    } finally { FORMKARTE=formVorher; MUTATOREN=mutVorher; }
+    return {disziplin:"tdm", format:"gefecht", events};
+  }
+
+  // PP-ABNAHME (Budget-Methode, CLAUDE.md "Pflichtpruefung"): exakt einflussVon()/
+  // battlefieldPodEinfluss(), aber mit SQUAD/OPP direkt als die zwei TDM-Seiten — TDM braucht,
+  // anders als Battlefields Vier-Team-Pod, keine Zusatzteams, weil es schon im echten Spiel nur
+  // zwei Seiten hat.
+  function tdmGefechtEinfluss(n,plus,saatVersatz,mutatorModus,jeSeite){
+    const hoehe=plus||15, versatz=saatVersatz||0, modus=mutatorModus||"je-lauf";
+    const teams=[SQUAD,OPP];
+    const hebungVorher=ATTR_HEBUNG, mutVorher=MUTATOREN, formVorher=FORMKARTE;
+    const lauf=(i)=>{
+      FORMKARTE={};
+      mdffaFormkartenFuer(teams,(20260823+versatz+i*104729)>>>0);
+      if(modus==="je-lauf")MUTATOREN=zieheMutatorenWieSpiel((20260823+versatz+i*15485863)>>>0);
+      else if(modus==="aus")MUTATOREN=[];
+      return tdmGefecht(teams,1337+versatz+i*7919,jeSeite);
+    };
+    let reihen, abweichung;
+    try{
+      const namen=lauf(0).kaempfer.map(u=>u.n);
+      const durchlauf=(wer,attribut)=>{
+        ATTR_HEBUNG=attribut?{wer,attribut,plus:hoehe}:null;
+        const w={};
+        for(let i=0;i<n;i++)for(const u of lauf(i).kaempfer)w[u.n]=(w[u.n]||0)+u.wert/n;
+        return w;
+      };
+      const grund=durchlauf(null,null);
+      const roh=EINFLUSS_ATTR.map(at=>{
+        let summe=0;
+        for(const wer of namen)summe+=((durchlauf(wer,at)[wer]||0)-(grund[wer]||0));
+        return {attribut:at, gewinn:+(summe/Math.max(1,namen.length)).toFixed(3)};
+      });
+      const s=roh.reduce((x,y)=>x+Math.max(0,y.gewinn),0)||1;
+      reihen=roh.map(x=>({...x, anteil:Math.round(Math.max(0,x.gewinn)/s*1000)/10})).sort((a,b)=>b.gewinn-a.gewinn);
+      const W=PP_MATRIX_JE_DISC.tdm||{};
+      abweichung=EINFLUSS_ATTR.reduce((acc,kk)=>acc+Math.abs((reihen.find(r=>r.attribut===kk)||{anteil:0}).anteil-(W[kk]||0)),0);
+    } finally {
+      ATTR_HEBUNG=hebungVorher; MUTATOREN=mutVorher; FORMKARTE=formVorher;
+    }
+    return {disziplin:"tdm", format:"gefecht", teams:teams.length, laeufe:n, anhebung:hoehe, mutatorModus:modus,
+      saatVersatz:versatz, jeSeite:jeSeite||ARENA_ART.tdm.jeSeite, abweichungPp:Math.round(abweichung*10)/10, reihen};
+  }
+
+  // MESS-SONDE fuer die Kalibrierung (wie battlefieldPodParameter/miniDmFfaParameter): `neu` wird
+  // tief in den Grundwert TDM_GEFECHT_GRUND gemischt, null/undefined setzt zurueck. Ruft im
+  // Spielbetrieb niemand (TDM ist nicht an diese Funktionen angeschlossen) — nur die Mess-/
+  // Kalibrierskripte dieses Prototyps.
+  function tdmGefechtParameter(neu){
+    const misch=(a,b)=>{ for(const k2 in b){ if(b[k2]&&typeof b[k2]==="object"&&!Array.isArray(b[k2])&&a[k2]&&typeof a[k2]==="object")misch(a[k2],b[k2]); else a[k2]=b[k2]; } return a; };
+    TDM_GEFECHT=neu?misch(tdmGefechtGrund(),JSON.parse(JSON.stringify(neu))):tdmGefechtGrund();
+    return JSON.parse(JSON.stringify(TDM_GEFECHT));
+  }
+
+  // ===================================================================================
+  // TDM-GEFECHT-VERDRAHTUNG (11.11.): `spieleTdmGefecht()` ist jetzt der Headless-
+  // Einstiegspunkt fuer die Buchung (s. lib/battle/arena-headless-runner.ts,
+  // "ARENA_KAMPF_DISCIPLINE_IDS"), `tdmReplay*` spielt dasselbe Gefecht fuer die Live-Anzeige
+  // ab (build()s TDM-Zweig, s. dort) -- nach demselben Muster wie Battlefields "DAS REPLAY"
+  // weiter unten, aber ohne Orte/Eroberung/Rotation (TDM ist reines Deathmatch, kein
+  // Kontrollpunkt-Gefecht) und ohne Respawn (tdmSchlagwechsel() kennt keinen, anders als der
+  // alte Echtzeit-Zweikampf -- `schalteAus()`s TDM-Zweig (disc==="tdm", oben) bleibt deshalb
+  // fuer das neue Gefecht ABSICHTLICH ungenutzt: er plant einen Respawn (`downBis`), den es
+  // im neuen Protokoll nicht mehr gibt, und seine Ticker-Zeile ("faellt — zurueck in Xs")
+  // waere hier schlicht falsch. s. tdmReplayKo() unten fuer die eigene, respawnfreie
+  // Buchfuehrung.
+  //
+  // "GEZEIGT = GEBUCHT" ENTSTEHT HIER NICHT UEBER EINEN TICK-TAKTABGLEICH (anders als der
+  // Anzeige-Treue-Fix PR #1372/`anzeigeSechzigstel()` fuer die kontinuierliche Bahn-/Kampf-/
+  // Feldspiel-Physik), SONDERN UEBER DIESELBE BERECHNUNG AUF BEIDEN SEITEN: `tdmGefecht()`
+  // entscheidet synchron VOR dem ersten Tick (reines Takt-Protokoll, kein `stepSim()`-Aufruf
+  // in `tdmSchlagwechsel()`), Headless und Live-Anzeige rufen sie mit DERSELBEN Saat und
+  // DENSELBEN zwei Seiten (`tdmDuellRoster()`, EINE Implementierung fuer beide) -- `stepSim()`
+  // tickt fuer TDM danach nur noch den FERTIGEN Ablauf ab (`tdmReplaySchritt`), wuerfelt
+  // nichts mehr. `anzeigeSechzigstel()` braucht deshalb KEINE eigene TDM-Gefecht-Behandlung
+  // (nachgesehen, nicht angenommen): ihr `istKampf(disc)`-Zweig greift nur, solange
+  // `stepSim()` den alten kontinuierlichen Pfad erreicht -- der Replay-Abfang gleich am Kopf
+  // von `stepSim()` (s. dort) kehrt fuer TDM vorher zurueck.
+
+  // DIESELBE ROLLENAUSWAHL WIE build()s TDM-Zweig, hier als eigene Funktion, damit Headless-
+  // Buchung (spieleTdmGefecht) und Live-Anzeige (build()) garantiert dieselben zwei Seiten
+  // sehen — "gezeigt = gebucht" entsteht aus DIESER einen Implementierung, nicht aus zwei
+  // Kopien, die auseinanderlaufen koennten. SQUAD/OPP/place sind globale, aus
+  // `window.__olyArenaKader` gefuellte Singletons (s. "BRUECKE ZUR ECHTEN APP"), deshalb ohne
+  // `disc`-Abhaengigkeit aufrufbar.
+  function tdmDuellRoster(){
+    const d="tdm", n=jeSeiteVon(d);
+    const gesetzt=inDisc(d);
+    const ersatz=[...SQUAD].sort((a,b)=>(b.d[d]||0)-(a.d[d]||0)).slice(0,n);
+    const mine=(gesetzt.length?gesetzt:ersatz).slice(0,n);
+    const gastGesetzt=OPP.filter(p=>place[p.n]&&place[p.n].d===d);
+    const gegner=(gastGesetzt.length?gastGesetzt:OPP).slice(0,n);
+    return {mine,gegner,n};
+  }
+
+  // HEADLESS-EINSTIEGSPUNKT, exakt im Format von `spieleFeldspiel()`/`spieleBuehneDuell()`
+  // (s. arena-headless-runner.ts, "ARENA_KAMPF_DISCIPLINE_IDS"): EIN Aufruf, EIN fertiges
+  // Ergebnis, unabhaengig von der aktuell gezeigten `disc`. `seiten`/`boxscore` tragen
+  // dieselben Groessen, die `computeIndividualBoxscorePpsFromFixtureResults()`/
+  // `runBattleModeArenaMatchday()` (battle-mode-arena-team-points.ts) fuer jede andere
+  // resolved Disziplin schon lesen.
+  function spieleTdmGefecht(fd,saat){
+    if(fd!=="tdm")return null;
+    const {mine,gegner,n}=tdmDuellRoster();
+    if(!mine.length||!gegner.length)return null;
+    const g=tdmGefecht([mine,gegner],saat,n);
+    return {disziplin:fd, seiten:[g.teams[0].punkte,g.teams[1].punkte],
+      boxscore:g.kaempfer.map(k=>({name:k.n, wert:k.wert}))};
+  }
+
+  // ANMARSCH (Sekunden): keine "Orte", zu denen gelaufen wird (anders als Battlefields
+  // BF_REPLAY_ANMARSCH=6) -- nur eine kurze Pause, bevor der erste Takt faellt.
+  const TDM_REPLAY_ANMARSCH=3;
+  // `null` ausserhalb TDM oder vor dem ersten `tdmReplayStarten()`-Aufruf.
+  let tdmReplay=null;
+
+  // build()s TDM-Zweig ruft dies NACH dem Bau von U (s. dort) -- `g` ist dasselbe Objekt, das
+  // `tdmGefecht()` zurueckgibt; `g.gefecht.takte` ist das fertige Takt-Protokoll aus
+  // `tdmSchlagwechsel()`. `taktSek` kommt aus `TDM_GEFECHT` (additiv ergaenzt, s.
+  // TDM_GEFECHT_GRUND oben) -- reiner Anzeige-Takt, beeinflusst `tdmGefecht()` selbst nicht.
+  function tdmReplayStarten(g){
+    tdmReplay={g, erledigt:new Set(), ende:TDM_REPLAY_ANMARSCH+g.gefecht.gespielt*TDM_GEFECHT.taktSek};
+  }
+  const tdmReplayAktiv=()=>disc==="tdm"&&!!tdmReplay;
+
+  // EIN KO OHNE RESPAWN (s. Kopfkommentar oben): schlanke eigene Buchfuehrung statt
+  // `schalteAus()`. `still`: nur die Zahlen nachziehen (Endstand-Aufholen beim Replay-Ende),
+  // ohne Ticker-Zeile/Highlight-Drosselung anzufassen.
+  function tdmReplayKo(tg,von,still){
+    tg.st.tode++;
+    if(von){ von.st.ko++; verteileKo(tg,von); }
+    tg.down=true;
+    if(still)return;
+    const ersteAusschaltung=!ersteAusschaltungVergeben;
+    ersteAusschaltungVergeben=true;
+    // ANDERS ALS schalteAus()s `disc!=="tdm"`-Ausschluss: im neuen, respawnfreien Protokoll
+    // IST "Seite ohne Stehende" ein echter, endgueltiger Zustand (nicht mehr ein Zufallsbild
+    // zwischen zwei Respawns) -- "entscheidend" gilt deshalb hier bewusst auch fuer TDM.
+    const entscheidend=live(tg.side).length===0;
+    const big=kampfGrossDrosseln(ersteAusschaltung||entscheidend, ersteAusschaltung||entscheidend);
+    const kind=kampfKoKind(entscheidend,false,false,ersteAusschaltung);
+    feed(tg.side,tg.n+" fällt.",big,waehleCaption(CAPTION_KO,tg.n),kind,undefined,von?von.n:undefined,"ereignis");
+  }
+
+  // EIN TAKT-EREIGNIS DES PROTOKOLLS SICHTBAR MACHEN — dieselbe Bauart wie
+  // `bfPodReplayEreignis()`, ohne Orte/Eroberung (TDM hat beides nicht). `still`: nur den
+  // Endzustand nachziehen (Zahlen, ohne Spur/Schwebeschrift/Feed-Zeile).
+  function tdmReplayEreignis(e,still){
+    const U_=(i)=>i!=null?U[i]:null;
+    switch(e.typ){
+      case "treffer": case "schwachstelle": {
+        const A=U_(e.wer), Z=U_(e.ziel); if(!A||!Z)break;
+        const d=e.wucht||0;
+        Z.hp=Math.max(0,Z.hp-d); A.st.dmg+=d; Z.st.tank+=d; A.tgt=Z;
+        if(!still){
+          A.lunge=0.16;
+          schwebe({x:Z.x,y:Z.y-26,txt:"−"+Math.round(d),life:.9,crit:e.typ==="schwachstelle"});
+        }
+        break;
+      }
+      case "daneben": { const A=U_(e.wer), Z=U_(e.ziel); if(A){A.tgt=Z; if(!still)A.lunge=0.16;} break; }
+      case "atem": { const Z=U_(e.wer); if(Z){ Z.hp=Math.max(1,Math.round(Z.max*0.02));
+        if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"letzter Atem",life:1.1,crit:true});
+          feedEreignis(Z.side,Z.n+" bleibt mit letzter Kraft stehen."); } } break; }
+      case "ko": { const Z=U_(e.ziel); if(Z&&!Z.down)tdmReplayKo(Z,U_(e.wer),still); break; }
+      default: break;
+    }
+  }
+
+  // DER REPLAY-TAKT. `dt` wie jeder andere `stepSim()`-Aufruf. Bewegung bleibt bewusst
+  // einfach (kein Orte-System wie bei Battlefield): wer noch steht, ruckt beim eigenen
+  // Treffer kurz auf sein Ziel zu (`lunge`, s. tdmReplayEreignis) — dieselbe Anzeige-Geste,
+  // die der alte Echtzeit-Zweikampf fuer Nahkampf-Treffer ohnehin schon nutzt.
+  function tdmReplaySchritt(dt){
+    t+=dt;
+    const R=tdmReplay, g=R.g, D=TDM_GEFECHT.taktSek, takte=g.gefecht.takte, gespielt=g.gefecht.gespielt;
+    const takt=t<TDM_REPLAY_ANMARSCH?0:Math.min(gespielt,1+Math.floor((t-TDM_REPLAY_ANMARSCH)/D));
+    const imTakt=takt>=1?takte[takt-1]:null;
+    const taktStart=TDM_REPLAY_ANMARSCH+(takt-1)*D, anteilTakt=takt>=1?Math.max(0,Math.min(1,(t-taktStart)/D)):0;
+    for(const u of U)u.lunge=Math.max(0,(u.lunge||0)-dt);
+    if(imTakt){
+      imTakt.ereignisse.forEach((e,ei)=>{
+        const schl=takt+":"+ei;
+        if(R.erledigt.has(schl))return;
+        const istSchlag=e.typ==="treffer"||e.typ==="schwachstelle"||e.typ==="daneben";
+        const zeitpunkt=istSchlag?0.12+0.66*(((e.wer??0)*0.6180339887)%1):0.9;
+        if(anteilTakt<zeitpunkt)return;
+        R.erledigt.add(schl);
+        tdmReplayEreignis(e,false);
+      });
+    }
+    if(t>=R.ende){
+      takte.forEach((tk,ti)=>tk.ereignisse.forEach((e,ei)=>{
+        const schl=(ti+1)+":"+ei;
+        if(!R.erledigt.has(schl)){ R.erledigt.add(schl); tdmReplayEreignis(e,true); }
+      }));
+      finish();
+    }
+    updateHud();
   }
 
   // ===================================================================================
@@ -59994,11 +61040,13 @@
   // fehlten dafuer:
   //
   //  1. EIN QUICK-SIM: schnellDurch() spult das laufende (oder noch nicht gestartete) Spiel bis zum
-  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe Funktion stepSim(), derselbe feste Tick
-  //     (1/60)/zeitFaktor(), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --, nur so
-  //     viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo 1x/2x/4x
-  //     aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel exakt dort,
-  //     wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine zweite Rechnung.
+  //     Ende vor. Es tickt GENAU wie loop() -- dieselbe `anzeigeSechzigstel()` (s. dort), derselbe
+  //     feste Tick ((1/60)/zeitFaktor() fuer Kampf/Buehne, seit dem Anzeige-Treue-Fix A1 das feste
+  //     1/60 der Buchung fuer die Bahn), dieselbe HUD-/Schwebetext-Nachfuehrung wie sondenLauf() --,
+  //     nur so viele Ticks je Bild, wie in ~40 ms passen. Weil jeder Tick fest ist (das Tempo
+  //     1x/2x/4x aendert nur, wie viele Ticks je Bild laufen, nie ihre Groesse), endet das Spiel
+  //     exakt dort, wo es auch beim Zuschauen geendet haette: Quick-Sim ist Vorspulen, keine
+  //     zweite Rechnung.
   //     Mini-DM hat seine Rundenshow statt Ticks; dort ist Quick-Sim dasselbe wie "Alles zeigen".
   //  2. EINE ENDE-MELDUNG: meldeSpielEnde() schickt `oly-arena:ende` (window-CustomEvent) mit der
   //     Disziplin und dem im Endstand gezeigten Sieger (0 = Heim, 1 = Gast, null = offen/Pod). Der
@@ -60044,11 +61092,14 @@
         // Disziplinwechsel/Reset mitten im Vorspulen: der neue Aufbau gehoert nicht mehr dazu.
         if(disc!==startDisc){ ende({disc:startDisc,done:false,ticks,abgebrochen:true}); return; }
         const bis=wandMs()+120;
+        // ANZEIGE-TREUE-FIX A1: ueber `anzeigeSechzigstel()` statt direktem stepSim()-Aufruf
+        // (s. Kommentar dort, vor loop()) -- fuer die Bahn feuert die Physik dadurch mit dem
+        // FESTEN 1/60-Takt der Buchung, nicht mit (1/60)/zf; Quick-Sim bleibt sonst derselbe
+        // vorgespulte Echtzeit-Lauf wie vorher, nur jetzt mit derselben Zufallsfolge wie die
+        // Buchung fuer jede Bahn-Disziplin.
         while(!done&&ticks<GRENZE&&wandMs()<bis){
-          tickerSendeT+=1/60;
-          stepSim((1/60)/zf);
+          anzeigeSechzigstel(zf);
           stepFloats();
-          ticksSeitReset++;
           ticks++;
           if(istFeldspiel(disc))updateHudFeldspiel();
           else if(istBuehne(disc))updateHudBuehne();
@@ -60077,6 +61128,47 @@
     figurenStand:()=>({aktiv:PIXEL_FIGUR_AKTIV, kulisse:kulisseGeladen(), n:pixelFigurenImSpiel.length, alle:pixelFigurenAlleGeladen(),
       ohneGrundpose:pixelFigurenFuerAnpfiff().filter(n=>!pixelGrundGeladen(n)),
       ohneAlleBilder:pixelFigurenFuerAnpfiff().filter(n=>!pixelFigurGeladen(n)), wartet:!!figurenWarten, laeuft:running}),
+    // AUFKLAERUNGS-NEBEL-SONDE (Bugticket #69, 10.11.: "Seraph-11 zeigt schwarzen Platzhalter
+    // ('?') statt PixelLab-Figur in Battlefield" -- Nachpruefung ergab: kein Verdrahtungsfehler
+    // und keine fehlende PixelLab-Figur (Seraph-11 hat eine vollstaendige, s.
+    // data/generated/figuren-sprites.json), sondern der AUFKLAERUNGS-NEBEL selbst, s. dessen
+    // Kommentar bei NEBEL_SICHT_RADIUS oben: jede gegnerische Figur bleibt in Battlefield
+    // Silhouette mit "?", bis eine eigene Figur ihr nahegekommen ist. Reine Lesesonde, identische
+    // Formel wie dort bei "imNebel" -- kein rr()/wert()/stepSim-Bezug, kein Einfluss auf eine
+    // Messung. Erzwingt wie kulisseProbe() einen frischen draw(), damit nebelSichtBis die
+    // aktuellen Positionen widerspiegelt, auch wenn gerade kein rAF-Frame lief.
+    battlefieldNebelStand:()=>{
+      try{draw();}catch(e){}
+      return U.map(u=>({n:u.n, side:u.side, down:!!u.down, nebelSichtBis:u.nebelSichtBis||0, t,
+        imNebel:disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t)}));
+    },
+    // Dieselbe Sonde, aber DETERMINISTISCH und headless (wie arenaFormationsProbe() oben):
+    // baut Battlefield mit `saat` ueber den aktuell geladenen SQUAD/OPP, laesst stepSimStumm()
+    // +draw() (fuer die Nebel-Buchhaltung) `sekunden` virtuelle Sekunden laufen und meldet je
+    // Figur, ob sie IRGENDWANN ("jeFogged") bzw. am ENDE des Fensters ("amEndeFogged") als
+    // Silhouette galt. Sichert/stellt wie arenaFormationsProbe() den Motorzustand wieder her --
+    // reine Messsonde, kein Einfluss auf eine echte Messung.
+    battlefieldNebelProbe:(saat,sekunden)=>{
+      const M=MOTOREN.battlefield; if(!M)return null;
+      const g=M.sichern();
+      try{
+        if(M.vorher)M.vorher();
+        M.bau(saat);
+        const schritte=Math.max(0,Math.round((sekunden||0)*60));
+        const spuren=new Map();
+        for(let i=0;i<schritte&&!done;i++){
+          stepSimStumm(1/60);
+          try{draw();}catch(e){}
+          for(const u of U){
+            const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
+            const eintrag=spuren.get(u.n)||{side:u.side,jeFogged:false,amEndeFogged:false};
+            eintrag.amEndeFogged=imNebel; eintrag.jeFogged=eintrag.jeFogged||imNebel;
+            spuren.set(u.n,eintrag);
+          }
+        }
+        return [...spuren.entries()].map(([n,v])=>({n,...v}));
+      } finally { M.zurueck(g); }
+    },
     kulisseProbe:(saat)=>{ kulisseWaehlen(saat); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     kulisseQa:(id)=>{ kulisseQaId=id||null; kulisseWaehlen(seed); try{draw();}catch(e){} return kulisseAktiv?{...kulisseAktiv}:null; },
     // SICHT-QA-SONDE (Uebersichts-Paket Wettessen 03.11.): Feldgroesse je Seite fuer den Standalone-
@@ -60086,6 +61178,34 @@
     // Screenshot-Hilfe, kein Leser im Spiel.
     buehneJeSeiteQa:(n)=>{ const a=BUEHNE_ART[disc]; if(!a)return null; const v=Math.max(1,Math.floor(Number(n)||0)); if(v)a.jeSeite=v; reset(); return a.jeSeite; },
     spielEndeStand:()=>({disziplin:disc, done, sieger:letzterAngezeigterSieger, schnelldurch:schnelldurchAktiv}),
+    // ANZEIGE-TREUE-SONDE B1 (10.11., scripts/miss-anzeige-treue-rest.mjs): eigene, additive
+    // Funktion statt einer Erweiterung von spieleDisziplin()/`A.spiele()` -- deren Rueckgabeform
+    // ist Teil des Wertungs-Fingerabdrucks (scripts/pruefe-wertung-fingerabdruck.mjs hasht
+    // `A.spiele(d,s)` fuer alle zwanzig Disziplinen wholesale), ein zusaetzliches Feld dort
+    // haette JEDEN Fingerabdruck-Eintrag veraendert, obwohl an keiner einzigen Wertung etwas
+    // geaendert wird (nachgemessen: GESAMT-Hash aenderte sich, reiner Formfehler, kein Befund --
+    // deshalb dieser separate Einstiegspunkt, der spieleDisziplin() NICHT beruehrt). GENAU
+    // DASSELBE Sichern/Vorher/Bau/Lauf/Zurueck-Muster, nur mit `sieger` statt `protokoll`/
+    // `punkte`: kampfSieger()/fsSieger()/buehneSieger() sind dieselben Funktionen, die auch
+    // finish() beim ECHTEN Spielende synchron liest -- kein neuer Wertungsbegriff. `null` fuer
+    // jede Disziplin ohne Motor oder ohne Zweiseiten-Sieger-Begriff (Bahn hat ihre eigene Sonde,
+    // s. bahnLauf()).
+    anzeigeTreueSonde:(dId,saat)=>{
+      const M=MOTOREN[dId]; if(!M)return null;
+      const g=M.sichern(); if(M.vorher)M.vorher();
+      M.bau(saat||1337);
+      M.lauf();
+      const ergebnis={disziplin:dId, wert:M.wert(), namen:M.namen(),
+        sieger:istKampf(dId)?kampfSieger():istFeldspiel(dId)?fsSieger():istBuehne(dId)?buehneSieger():null};
+      M.zurueck(g);
+      return ergebnis;
+    },
+    // Liest MOTOREN[disc].wert()/den Sieger-Begriff am AKTUELLEN (z.B. per sondenLauf()
+    // durchlaufenen) Zustand, ohne selbst zu bauen/zu laufen -- das Gegenstueck zu
+    // anzeigeTreueSonde() fuer die ANGEZEIGTE Seite des Vergleichs. Reiner Lese-Durchgriff,
+    // dieselben Sieger-Funktionen wie oben.
+    anzeigeTreueAktuell:()=>(MOTOREN[disc]?{disziplin:disc, wert:MOTOREN[disc].wert(), namen:MOTOREN[disc].namen(),
+      sieger:istKampf(disc)?kampfSieger():istFeldspiel(disc)?fsSieger():istBuehne(disc)?buehneSieger():null}:null),
     arenaFormation:(dId,saat)=>arenaFormationsProbe(dId,saat),
     // CALLOUT-SONDE (Nachtrag 27.09., Verifikation des #bbugcallout/#bbug-Ueberlapp-Fixes):
     // ruft callout() direkt auf, ohne auf ein organisches big-Ereignis aus feed() zu warten
@@ -60761,6 +61881,15 @@
     // null schaltet zurueck aufs Duell. Baut neu auf, wenn Battlefield gerade gezeigt wird.
     battlefieldPodAnzeigen:(pod)=>{ bfPodAnzeigeVorgabe=pod||null; if(disc==="battlefield")reset(); return !!bfPodAnzeigeKontext(); },
     battlefieldPodStand:()=>bfPodAktiv()?{...bfPodPlatzierung(), namen:Array.from({length:KP.pod.N},(_,s)=>kampfTeamName(s)), t:+t.toFixed(2), done}:null,
+    // TDM-GEFECHT (seit 11.11. der echte Wertungspfad, s. Kopfkommentar bei
+    // TDM_GEFECHT_GRUND/tdmDuellRoster() oben) -- `tdmGefecht` selbst bleibt die reine
+    // Rechenfunktion (auch von den Mess-/Kalibrierskripten direkt genutzt), `spieleTdmGefecht`
+    // ist der Headless-Einstiegspunkt (s. arena-headless-runner.ts).
+    tdmGefecht,
+    tdmGefechtSonde,
+    tdmGefechtEinfluss,
+    tdmGefechtParameter,
+    spieleTdmGefecht,
     spieleArenaDomination:(dId,saat,o)=>{
       const kf=dominationVon(dId); if(!kf)return null;
       const M=MOTOREN[dId]; if(!M)return null;
@@ -61190,7 +62319,12 @@
       const st=bahnTeamstand();
       const namen=M.namen();
       const punkteVonName=new Map(LAEUFER.map(u=>[u.n, st.punkte?(st.punkte.get(u.id)??0):0]));
-      const boxscore=namen.map(n=>({name:n, wert:punkteVonName.get(n)??0}));
+      // S-N5b: gewonnene Stationsduelle als EIGENES Feld (nur Spurt) -- reine PP-Nebenspur fuer
+      // computeIndividualBoxscorePpsFromFixtureResults(); `wert` und `seiten` bleiben unberuehrt.
+      const duelleVonName=BAHN_ART[bd].spurt?new Map(LAEUFER.map(u=>[u.n, stationsDuellSiege(u)])):null;
+      const boxscore=namen.map(n=>duelleVonName
+        ?({name:n, wert:punkteVonName.get(n)??0, duelle:duelleVonName.get(n)??0})
+        :({name:n, wert:punkteVonName.get(n)??0}));
       const seiten=[st.seiten[0], st.seiten[1]];
       M.zurueck(g);
       return {disziplin:bd, seiten, boxscore};
@@ -61328,12 +62462,17 @@
     // (`acc+=dt*speed`) und fuehrt stepSim() aus, sobald 1/60 davon zusammenkommen; wie viele
     // Sechzigstel bis zum Ablauf der Wartezeit zusammenkommen, streut je nach Bildwiederhol-
     // rate und Prozesslast um ein bis zwei Ticks. sondenLauf(ticks) umgeht diese Kopplung
-    // vollstaendig: es ruft stepSim() GENAU `ticks`-mal mit der immer gleichen festen
-    // Tick-Groesse (1/60)/zeitFaktor() auf — derselben Groesse, die loop() auch verwendet, nur
-    // ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Zwei Aufrufe mit demselben
-    // Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit exakt dieselbe
-    // Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig davon, wie lange der
-    // Prozess vorher lief oder wie schnell die Maschine ist.
+    // vollstaendig: es ruft `anzeigeSechzigstel()` (s. dort, Kommentar vor loop()) GENAU
+    // `ticks`-mal auf — ein Aufruf je reale Sechzigstelsekunde, exakt die Rechnung, die auch
+    // loop() macht, nur ohne die Wanduhr dazwischen — und danach GENAU EINMAL draw(). Fuer
+    // jede Nicht-Bahn-Disziplin loest das weiterhin GENAU EINEN stepSim()-Aufruf mit der
+    // festen Tick-Groesse (1/60)/zeitFaktor() je `ticks`-Schritt aus; fuer die Bahn (seit dem
+    // Anzeige-Treue-Fix A1) loest es stepSim(1/60) erst aus, wenn `bahnSimAcc` genug
+    // Sechzigstel gesammelt hat (`zeitFaktor()` Sechzigstel je Tick) — in beiden Faellen
+    // deterministisch an der Tick-Zahl `n`, nicht an Wanduhr/Bildrate. Zwei Aufrufe mit
+    // demselben Ausgangszustand (Kader/Sitz/Saat) und derselben ticks-Zahl fuehren damit
+    // exakt dieselbe Zahl an stepSim()-Aufrufen mit denselben dt-Werten aus, unabhaengig
+    // davon, wie lange der Prozess vorher lief oder wie schnell die Maschine ist.
     //
     // WAS SONST NOCH AN DER WANDUHR HING (alle drei Fundstellen, s. jetztMs() bei der
     // Deklaration von sondenAktiv oben): die Viertelpause-Overlay-Restsekunden (vpSichtbarBis/
@@ -61359,7 +62498,7 @@
     // Lebensdauer ausschliesslich von der Tick-Zahl abhaengt, nicht von der Bildwiederholrate.
     //
     // Ruehrt weder rr() noch wert()/Boxscore-/Rangtreue-Logik an: stepSim() ist dieselbe
-    // Funktion, die auch loop() aufruft, mit derselben Tick-Groesse (1/60)/zeitFaktor() — kein
+    // Funktion, die auch loop() aufruft, ueber dieselbe `anzeigeSechzigstel()` — kein
     // zweiter Motor, keine Kopie. Nur die AUSSENSTEUERUNG (wie oft, mit welchem dt) ist neu,
     // rein additiv wie renderProbe/figurProbe/bahnVizProbe daneben.
     //
@@ -61378,8 +62517,7 @@
       const zf=zeitFaktor();
       for(let i=0;i<n;i++){
         sondenSimMs+=1000/60;
-        tickerSendeT+=1/60;
-        stepSim((1/60)/zf);
+        anzeigeSechzigstel(zf);
         stepFloats();
         // Dieselbe HUD-Nachfuehrung wie in loop() (s. dort): fuer den Kampf ruft stepSim()
         // updateHud() selbst, Feldspiel/Buehne/Bahn brauchen den Aufruf von aussen.
@@ -62393,5 +63531,18 @@
     motoren:()=>Object.keys(MOTOREN), matrix:(d)=>PP_MATRIX_JE_DISC[d]||{}, bahnen:()=>Object.keys(BAHN_ART), kader:()=>SQUAD, opp:()=>OPP, slots:(d)=>slotsVon(d||"tdm"), traitAufschlag, mutatoren:()=>MUTATOREN, mess:()=>MESS, nutzwert:()=>Object.keys(SCHEMA).map(id=>({id,name:SKILLS[id].name,...nutzwertStatisch(SKILLS[id])})), einheiten:()=>U.map(u=>({n:u.n,seite:u.side,hp:Math.round(u.hp),max:u.max,
     x:Math.round(u.x),y:Math.round(u.y),ziel:u.tgt?u.tgt.n:null,durch:!!u.durch,zwang:!!u.zwang,
     down:u.down,TMP:u.TMP,ANG:u.ANG,VER:u.VER,LP:u.LP,AUS:u.AUS,eig:u.eig,slot:u.slot,heiler:!!u.heiler,reach:u.reach,st:u.st})), zeit:()=>t, vorbei:()=>done };
+
+  // BOOTSTRAP-AUFRUF (verschoben hierher bei der TDM-Gefecht-Verdrahtung 11.11., urspruenglich
+  // direkt nach `zieheFormkarten(20260823)` weit oben im Modul, s. Kommentar dort): `reset()`
+  // ruft `build()` synchron fuer die Standarddisziplin ("tdm", `let disc="tdm"` oben) auf, und
+  // TDM baut seit dieser PR ueber `tdmGefecht()`/`tdmSchlagwechsel()` -- Funktionen, die ERST
+  // HIER, am Modulende, lexikalisch alle initialisiert sind (mdffaZufall/mdffaMisch,
+  // bfPodPlatzierungAus, TDM_GEFECHT u.a. sind `let`/`const`, keine gehobenen `function`-
+  // Deklarationen). An der alten Stelle waere jeder dieser Bezeichner noch in seiner Temporal-
+  // Dead-Zone gewesen -- nachgemessen beim ersten Playwright-Smoke-Test dieser PR
+  // ("Cannot access 'TDM_GEFECHT'/'mdffaMisch' before initialization"). Reine Verschiebung,
+  // keine inhaltliche Aenderung: `window.__arena` steht jetzt sogar schon VOR diesem Aufruf
+  // (vorher erst danach), jeder bestehende Aufrufer wartet ohnehin erst auf dessen Erscheinen.
+  renderAll();renderOpp();renderProfile();reset();requestAnimationFrame(loop);
 
 })();

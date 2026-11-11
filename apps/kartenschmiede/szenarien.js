@@ -54,8 +54,8 @@
 
   // ---------- Geländearten nach OPR ----------
   const ARTEN = {
-    deckung: "Deckung: +1 Verteidigung gegen Beschuss.",
-    sicht: "Blockiert Sichtlinie.",
+    deckung: "Deckung: Wer darin oder dahinter steht, verteidigt gegen Beschuss mit +1 (nicht stapelbar, im Nahkampf nicht).",
+    sicht: "Blockiert Sichtlinie: Wer ganz dahinter steht, kann nicht beschossen werden.",
     schwierig: "Schwierig: höchstens 6\" Bewegung, wer hindurch will.",
     gefaehrlich: "Gefährlich: Wer hineinbewegt, würfelt W6, bei 1 eine Wunde.",
     unpassierbar: "Unpassierbar.",
