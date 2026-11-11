@@ -296,7 +296,9 @@ export function shopVolumeFromAggregates(
 
 export function buildDashboardViewModel(
   articles: ArticleAggregate[],
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  /** Alle Artikel inkl. ausgeblendeter: Basis fuer shopweite Mengen (Fixkosten je Stueck). */
+  shopArticles?: ArticleAggregate[]
 ): DashboardViewModel {
   const windowKeys: SaleWindowKey[] = ["30", "90", "365", "all"];
 
@@ -367,7 +369,7 @@ export function buildDashboardViewModel(
   // revenue>0-Filter mehr -- Ladenhueter mit 0 € muessen auf /sortiment
   // sichtbar sein). Die Dashboard-Vorschau schneidet clientseitig auf die
   // ersten N Zeilen (siehe SortimentTable `limit`-Prop).
-  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings);
+  const sortiment: SortimentRow[] = buildFullSortiment(articles, classified, costSettings, shopArticles);
 
   const quotaWindow = windows["365"].revenue > 0 ? windows["365"] : windows.all;
   const quotaAgg = articles.reduce(
@@ -675,10 +677,11 @@ export function buildSortimentRow(
 export function buildFullSortiment(
   articles: ArticleAggregate[],
   classified: ClassifiedArticle[],
-  costSettings: CostSettingsValues
+  costSettings: CostSettingsValues,
+  shopArticles?: ArticleAggregate[]
 ): SortimentRow[] {
   const classByArticle = new Map(classified.map((c) => [c.article, c.articleClass]));
-  const shop = shopVolumeFromAggregates(articles, costSettings);
+  const shop = shopVolumeFromAggregates(shopArticles ?? articles, costSettings);
   return [...articles]
     .sort((a, b) => {
       const qty90Diff = (b.windows["90"]?.qty ?? 0) - (a.windows["90"]?.qty ?? 0);

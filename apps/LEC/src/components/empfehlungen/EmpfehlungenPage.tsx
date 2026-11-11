@@ -189,7 +189,7 @@ export function EmpfehlungenPage({ recommendations, kpis }: Props) {
                   <span className={`chip ${chip.cls}`}>{chip.label}</span>
                   <span className="eff">{rec.effect}</span>
                   {!isLot && rec.linkQuery && (
-                    <a href={`/sortiment?q=${encodeURIComponent(rec.linkQuery)}`} className="chip" style={{ textDecoration: "none" }}>
+                    <a href={`/sortiment?q=${encodeURIComponent(rec.linkQuery)}${rec.id.includes(":") ? `&artikel=${encodeURIComponent(rec.id.split(":")[1])}&flags=ohnebestand` : ""}`} className="chip" style={{ textDecoration: "none" }}>
                       Im Sortiment ansehen →
                     </a>
                   )}

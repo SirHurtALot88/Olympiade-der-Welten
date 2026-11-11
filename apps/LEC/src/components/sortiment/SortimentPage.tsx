@@ -201,7 +201,10 @@ function sortValue(row: SortimentRow, colId: ColId, window: SaleWindowKey): numb
 
 export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount, ladenhueterCount, imageVersions, band }: Props) {
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const searchParams0 = useSearchParams();
+  // Weitere Filter stehen als kommagetrennte Flags in der Adresse, damit Neuladen und Zurueck sie behalten.
+  const initialFlags = new Set((searchParams0.get("flags") ?? "").split(",").filter(Boolean));
+  const [detailId, setDetailId] = useState<string | null>(searchParams0.get("artikel"));
   const detailRow = useMemo(() => (detailId ? rows.find((r) => r.articleId === detailId) ?? null : null), [detailId, rows]);
   const router = useRouter();
   const pathname = usePathname();
@@ -222,22 +225,22 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
   });
   // Eingrenzung aus dem Balkendiagramm: Marktwert-Klasse.
   const [valueRange, setValueRange] = useState<{ lo: number; hi: number; label: string } | null>(null);
-  const [onlyLadenhueter, setOnlyLadenhueter] = useState(false);
-  const [onlySoldOut, setOnlySoldOut] = useState(false);
-  const [onlyMarketFalling, setOnlyMarketFalling] = useState(false);
-  const [onlyNameCheck, setOnlyNameCheck] = useState(false);
+  const [onlyLadenhueter, setOnlyLadenhueter] = useState(initialFlags.has("ladenhueter"));
+  const [onlySoldOut, setOnlySoldOut] = useState(initialFlags.has("ausverkauft"));
+  const [onlyMarketFalling, setOnlyMarketFalling] = useState(initialFlags.has("marktfaellt"));
+  const [onlyNameCheck, setOnlyNameCheck] = useState(initialFlags.has("namecheck"));
   // Ansicht: "kompakt" = Preis-Board (eine Frage je Zeile), "alles" = alle Spalten wie bisher.
   const [view, setView] = useState<"kompakt" | "alles">(searchParams.get("ansicht") === "alles" ? "alles" : "kompakt");
-  const [boardSort, setBoardSort] = useState<BoardSortKey>("abweichung");
+  const [boardSort, setBoardSort] = useState<BoardSortKey>(((searchParams.get("sort") as BoardSortKey | null) && (searchParams.get("sort") as string) in BOARD_SORT_LABEL ? searchParams.get("sort") : "abweichung") as BoardSortKey);
   // Standardmaessig nur AKTIVE Artikel zeigen (Billbee-Artikelstamm-Katalog);
   // ausgelaufene (nur in der Verkaufshistorie bekannte) Artikel sind ein
   // expliziter Opt-in, sonst dominieren tote Alt-Artikel die Liste.
-  const [showDiscontinued, setShowDiscontinued] = useState(false);
-  const [showHidden, setShowHidden] = useState(false);
+  const [showDiscontinued, setShowDiscontinued] = useState(initialFlags.has("ausgelaufen"));
+  const [showHidden, setShowHidden] = useState(initialFlags.has("ausgeblendet"));
   const hiddenCount = useMemo(() => rows.filter((r) => r.hidden).length, [rows]);
   // Standard: nur Artikel mit Bestand (Chris, 14.10.). Ist im ganzen Sortiment gar kein Bestand bekannt
   // (Artikelstamm nicht importiert), wird nicht gefiltert, sonst bliebe die Liste leer.
-  const [showNoStock, setShowNoStock] = useState(false);
+  const [showNoStock, setShowNoStock] = useState(initialFlags.has("ohnebestand"));
   const stockKnown = useMemo(() => rows.some((r) => r.stock > 0), [rows]);
   const stockFilter = !showNoStock && stockKnown;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -254,10 +257,21 @@ export function SortimentPage({ rows, totalCount, activeCount, discontinuedCount
     if (classFilter.size > 0) params.set("klasse", Array.from(classFilter).join(","));
     if (marketFilter.size > 0) params.set("markt", Array.from(marketFilter).join(","));
     if (view === "alles") params.set("ansicht", "alles");
+    if (boardSort !== "abweichung") params.set("sort", boardSort);
+    const flags = [
+      onlyLadenhueter && "ladenhueter",
+      onlySoldOut && "ausverkauft",
+      onlyMarketFalling && "marktfaellt",
+      onlyNameCheck && "namecheck",
+      showNoStock && "ohnebestand",
+      showDiscontinued && "ausgelaufen",
+      showHidden && "ausgeblendet",
+    ].filter(Boolean);
+    if (flags.length > 0) params.set("flags", flags.join(","));
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedWindow, classFilter, marketFilter, view]);
+  }, [query, selectedWindow, classFilter, marketFilter, view, boardSort, onlyLadenhueter, onlySoldOut, onlyMarketFalling, onlyNameCheck, showNoStock, showDiscontinued, showHidden]);
 
   function toggleClass(cls: ArticleClass) {
     setClassFilter((prev) => {

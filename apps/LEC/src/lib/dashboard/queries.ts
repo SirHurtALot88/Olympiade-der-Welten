@@ -210,6 +210,6 @@ export async function listRecentImportBatches(prisma: PrismaClient, limit = 20):
 
 /** Laedt alle Artikel + Fenster-Snapshots aus der DB und baut das Dashboard-View-Model. */
 export async function loadDashboardViewModel(prisma: PrismaClient): Promise<DashboardViewModel> {
-  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
-  return buildDashboardViewModel(aggregates, costSettings);
+  const { aggregates, allAggregates, costSettings } = await loadArticleAggregates(prisma);
+  return buildDashboardViewModel(aggregates, costSettings, allAggregates);
 }

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const costSettings = await loadActiveCostSettings(prisma);
   // Shopweite 365-Tage-Menge (N, N_T) aus dem letzten Import -- gleiche Quelle wie Dashboard/Sortiment.
-  const { aggregates } = await loadArticleAggregates(prisma);
+  const { allAggregates: aggregates } = await loadArticleAggregates(prisma);
   const shopVolume = shopVolumeFromAggregates(aggregates, costSettings);
   const importBatchesRaw = await listRecentImportBatches(prisma, 20);
   const importBatches = importBatchesRaw.map((b) => ({
