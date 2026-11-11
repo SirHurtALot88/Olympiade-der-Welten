@@ -131,10 +131,11 @@ describe("buildMarketComparisonRow", () => {
     expect(row.targetMin).toBeCloseTo(6.029, 2);
   });
 
-  it("Marktwert = 7-Tage-Schnitt, sonst 30-Tage-Schnitt, sonst Trend", () => {
+  it("Marktwert = Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage (vorhandene Werte)", () => {
     const v = (q: Partial<LatestQuote>) => buildMarketComparisonRow(article({ currentVk: 8 }), quote(q), DEFAULT_COST_SETTINGS, null).marketValue;
-    expect(v({ priceAvg7: 2, priceAvg30: 3, priceTrend: 4 })).toBe(2);
-    expect(v({ priceAvg30: 3, priceTrend: 4 })).toBe(3);
+    // Magier des Glaubens (Cardmarket, 11.11.): Trend 5,94, Ø 1 5,99, Ø 7 5,90, Ø 30 5,35 -> 5,795
+    expect(v({ priceTrend: 5.94, priceAvg1: 5.99, priceAvg7: 5.9, priceAvg30: 5.35 })).toBeCloseTo(5.795, 3);
+    expect(v({ priceAvg7: 2, priceAvg30: 4 })).toBe(3);
     expect(v({ priceTrend: 4 })).toBe(4);
   });
 

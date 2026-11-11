@@ -35,13 +35,16 @@ export interface LatestQuote {
 
 /**
  * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
- * (3er-Pack = 3 Karten). 7-Tage-Schnitt (wie Cardcluster), sonst 30-Tage-Schnitt, sonst Trend.
+ * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7 und Ø 30 Tage (Chris, 11.11.: ein einzelner Wert, vor allem der
+ * 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
  * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
  */
 export function marketValueOf(quote: LatestQuote, packQty: number): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
-  const perCard = quote.priceAvg7 ?? quote.priceAvg30 ?? quote.priceTrend ?? null;
-  return perCard === null ? null : perCard * Math.max(1, packQty);
+  const parts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
+  if (parts.length === 0) return null;
+  const perCard = parts.reduce((s, v) => s + v, 0) / parts.length;
+  return perCard * Math.max(1, packQty);
 }
 
 export function marketRangeOf(quote: LatestQuote, packQty: number): { min: number; max: number; variants: number } | null {
@@ -63,7 +66,7 @@ export interface MarketComparisonRow {
   /** Cardmarket-Werte JE KARTE, wie in der Preisliste. */
   marketFrom: number | null;
   marketTrend: number | null;
-  /** Marktwert des ARTIKELS = 7-Tage-Schnitt (wie Cardcluster; sonst 30-T, sonst Trend) x Pack-Menge. Null wenn mehrdeutig. */
+  /** Marktwert des ARTIKELS = Mittelwert aus Trend, Ø 1, 7 und 30 Tage x Pack-Menge. Null wenn mehrdeutig. */
   marketValue: number | null;
   /** Mehrdeutig: Spanne des Artikel-Marktwerts (billigste..teuerste Variante, x Pack). */
   marketRange: { min: number; max: number; variants: number } | null;
