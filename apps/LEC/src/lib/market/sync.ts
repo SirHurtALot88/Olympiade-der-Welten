@@ -115,7 +115,7 @@ export async function syncMarketPrices(prisma: PrismaClient, fetchFn: typeof fet
         idProduct: r.idProduct,
         priceFrom: r.price.low,
         priceTrend: r.price.trend,
-        raw: JSON.stringify({ how: r.how, ...(corrected ? { code } : {}) }),
+        raw: JSON.stringify({ how: r.how, ...(r.edition ? { edition: r.edition } : {}), ...(corrected ? { code } : {}) }),
         priceAvg30: r.price.avg30,
         priceAvg7: r.price.avg7,
         priceAvg1: r.price.avg1,
