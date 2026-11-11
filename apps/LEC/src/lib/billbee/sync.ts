@@ -87,7 +87,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     masters.map((m) => m.row)
   );
 
-  // eBay-Artikelnummern aus Billbee: sie sind aktueller als die des gesperrten Shop-Abrufs.
+  // eBay-Artikelnummern aus Billbee. Eine vom Shop-Abruf bestaetigte Nummer (ebayPrice gesetzt) bleibt: der Shop zeigt, was gerade gelistet ist.
   let ebayIds = 0;
   const seenMasters = new Set<string>();
   let duplicateMasters = 0;
@@ -98,7 +98,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     }
     seenMasters.add(m.row.nameNormalized);
     if (!m.ebayItemId) continue;
-    const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { ebayItemId: m.ebayItemId } });
+    const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized, ebayPrice: null }, data: { ebayItemId: m.ebayItemId } });
     ebayIds += res.count;
   }
 

@@ -75,28 +75,45 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const rarity = rarityFromTitle(row.nameRaw);
   const vk = boardVk(row);
   const bought = detail?.purchases.reduce((s, p) => s + p.qty, 0) ?? 0;
+  const consumed = new Map<object, number>();
   const movements = detail
     ? [
         ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `${eur(x.unitPrice)} je Stück` })),
         ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `${eur(p.unitEk)} EK · ${p.source}` })),
         // Bestandsaenderungen laut Billbee nur, soweit Verkaeufe sie NICHT schon erklaeren (Zugang, Korrektur, Schwund).
         ...detail.stockLog
-          .filter((m) => {
+          .map((m) => {
             const delta = m.after - m.before;
-            if (delta >= 0) return true;
+            if (delta >= 0) return { at: m.at, kind: "Zugang laut Billbee", delta, note: `${m.before} → ${m.after} Stk${row.currentEk != null && delta > 0 ? ` · ca. ${eur(delta * row.currentEk)} Wareneinsatz` : ""}` };
+            // Verkaeufe, die den Abgang erklaeren (3 Tage davor bis 1 Tag danach), werden verbraucht; nur der Rest bleibt "Abgang".
             const at = new Date(m.at).getTime();
-            const explained = detail.sales.filter((x) => { const t = new Date(x.soldAt).getTime(); return t <= at + 86_400_000 && t >= at - 3 * 86_400_000; }).reduce((sum, x) => sum + x.qty, 0);
-            return explained < -delta;
+            let rest = -delta;
+            for (const x of detail.sales) {
+              if (rest <= 0) break;
+              const t = new Date(x.soldAt).getTime();
+              if (t > at + 86_400_000 || t < at - 3 * 86_400_000 || consumed.get(x) === x.qty) continue;
+              const take = Math.min(rest, x.qty - (consumed.get(x) ?? 0));
+              consumed.set(x, (consumed.get(x) ?? 0) + take);
+              rest -= take;
+            }
+            return rest > 0 ? { at: m.at, kind: "Abgang laut Billbee", delta: -rest, note: `${m.before} → ${m.after} Stk, nicht durch Verkäufe erklärt` } : null;
           })
-          .map((m) => ({ at: m.at, kind: m.after > m.before ? "Zugang laut Billbee" : "Abgang laut Billbee", delta: m.after - m.before, note: `${m.before} → ${m.after} Stk${m.after > m.before && row.currentEk != null ? ` · ca. ${eur((m.after - m.before) * row.currentEk)} Wareneinsatz` : ""}` })),
+          .filter((x): x is { at: string; kind: string; delta: number; note: string } => x !== null),
       ]
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 25)
     : [];
+  const lastChange = detail?.priceLog[0] ?? null;
+    const soldSinceChange = lastChange && detail ? detail.sales.filter((x) => x.soldAt >= lastChange.at).reduce((sum, x) => sum + x.qty, 0) : 0;
+  const chg = lastChange && detail ? (() => {
+    const t0 = new Date(lastChange.at).getTime();
+    const daysSince = Math.max(1, (Date.now() - t0) / 86_400_000);
+    const before = detail.sales.filter((x) => { const t = new Date(x.soldAt).getTime(); return t < t0 && t >= t0 - 60 * 86_400_000; }).reduce((s, x) => s + x.qty, 0);
+    const after = detail.sales.filter((x) => new Date(x.soldAt).getTime() >= t0).reduce((s, x) => s + x.qty, 0);
+    return daysSince >= 7 ? { before: (before / 60) * 30, after: (after / daysSince) * 30, daysSince: Math.round(daysSince) } : null;
+  })() : null;
   const lastSale = detail?.sales[0] ? Math.max(0, Math.floor((Date.now() - new Date(detail.sales[0].soldAt).getTime()) / 86_400_000)) : null;
   const mk = detail?.market;
-  const lastChange = detail?.priceLog[0] ?? null;
-  const soldSinceChange = lastChange && detail ? detail.sales.filter((x) => x.soldAt >= lastChange.at).reduce((sum, x) => sum + x.qty, 0) : 0;
   const lastSalePrice = detail?.sales[0] ?? null;
   const marketDir = mk && mk.avg7 != null && mk.avg30 != null && mk.avg30 > 0 ? (mk.avg7 > mk.avg30 * 1.05 ? { label: "↑ Markt steigt", tone: "good" as Tone } : mk.avg7 < mk.avg30 * 0.95 ? { label: "↓ Markt fällt", tone: "warn" as Tone } : { label: "→ Markt stabil", tone: undefined }) : null;
   const vkTone: Tone = !m?.rated ? undefined : m.status === "im_korridor" ? "good" : m.status === "zu_guenstig" ? "warn" : "info";
@@ -186,6 +203,13 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
               <>
                 <b>Letzte VK-Änderung am {day(lastChange.at)}:</b> {eur(lastChange.before)} → {eur(lastChange.after)}
                 {lastChange.after > lastChange.before ? " (erhöht)" : " (gesenkt)"} · seitdem {soldSinceChange} {soldSinceChange === 1 ? "Verkauf" : "Verkäufe"}.
+                {chg && (
+                  <>
+                    {" "}
+                    Tempo: {chg.before.toFixed(1).replace(".", ",")} Stk/Monat in den 60 Tagen davor, {chg.after.toFixed(1).replace(".", ",")} Stk/Monat in den {chg.daysSince} Tagen danach
+                    {chg.before > 0 && chg.after < chg.before * 0.6 ? " – Absatz eingebrochen." : chg.before > 0 && chg.after >= chg.before * 0.9 ? " – Absatz gehalten." : "."}
+                  </>
+                )}
               </>
             ) : (
               <>Noch keine VK-Änderung erfasst – Billbee liefert keine Preishistorie, die App schreibt Änderungen ab jetzt bei jedem Abgleich mit.</>

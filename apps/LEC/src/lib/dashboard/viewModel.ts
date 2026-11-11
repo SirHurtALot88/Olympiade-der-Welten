@@ -574,7 +574,8 @@ export function buildSortimentRow(
   if (vkForCorridor > 0 && !ekMissing && (a.currentEk ?? 0) + ekPerUnit > 0) {
     const ekNow = a.currentEk !== null && a.currentEk > 0 ? a.currentEk : ekPerUnit;
     const varNonEk = Math.max(0, hk.total - hk.ek - hk.fixedCostShare);
-    const fees = computeEbayFees(vkForCorridor, costSettings.adFeeRateGood, costSettings).total;
+    // Werbesatz MIN wie die 25-%-Linie des Korridors, damit Block und Board dieselbe Grenze meinen.
+    const fees = computeEbayFees(vkForCorridor, costSettings.adFeeRateMin, costSettings).total;
     const profit = vkForCorridor - fees - varNonEk - ekNow;
     today = {
       profitPerUnit: profit,
