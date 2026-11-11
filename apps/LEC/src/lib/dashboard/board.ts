@@ -141,10 +141,44 @@ export interface EbayLinks {
 
 const SHOP = "https://www.ebay.de/str/lordenterichcards";
 
-/** Links zu eBay: direkt zum Angebot, sonst Suche im eigenen Shop ueber den Cardmarket-Code (ohne DE/EN). */
+export const isPokemonTitle = (nameRaw: string): boolean => /^\s*(?:\d+\s*x\s+)?pok[eé]mon\b/i.test(nameRaw);
+
+/** Englische Karte: Set-Code mit -EN oder "EN" als eigenes Wort im Titel (ohne DE). */
+function isEnglishCard(row: Pick<SortimentRow, "setCode" | "nameRaw">): boolean {
+  if (row.setCode && /-EN[A-Z]?\d/i.test(row.setCode)) return true;
+  if (/\bDE\b/.test(row.nameRaw) || (row.setCode && /-DE/i.test(row.setCode))) return false;
+  return /\bEN\b/.test(row.nameRaw);
+}
+
+/** Pokemon-Titel: "Pokemon 078/162 Flutter Mane Holo Promo ... NM EN" -> Nummer und Kartenname. */
+export function pokemonParts(nameRaw: string): { number: string | null; name: string } {
+  let t = nameRaw.replace(/^\s*\d+\s*x\s+/i, "").replace(/^\s*pok[eé]mon\s*/i, "");
+  const num = t.match(/\b(\d{1,3}\/\d{1,3})\b/);
+  const rest = t.replace(/\b\d{1,3}(?:\/\d{1,3})?\b/g, " ");
+  const stop = rest.search(/\b(Holo|Reverse|Promo|Rare|NM|LP|MP|HP|EN|DE)\b/i);
+  const name = (stop > 0 ? rest.slice(0, stop) : rest).replace(/\s+/g, " ").trim();
+  return { number: num ? num[1] : null, name };
+}
+
+/** Kartencode aus dem Titel, auch wenn er kein normaler Set-Code ist (SHVI-DESE3, MRD-G090, IOC-SE1). */
+export function titleCode(nameRaw: string): string | null {
+  const m = nameRaw.match(/\b([A-Z0-9]{2,6}-[A-Z]{0,4}[A-Z0-9]?\d{1,3}[A-Z]?)\b/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Links zu eBay: direkt zum Angebot, sonst Suche im eigenen Shop. Gesucht wird so, wie der Code im
+ * eBay-TITEL steht (also MIT DE: "RA03-DE169"); "RA03-169" findet dort nichts.
+ */
 export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "nameRaw">): EbayLinks {
   const id = row.ebayItemId && /^\d{9,14}$/.test(row.ebayItemId) ? row.ebayItemId : null;
-  const term = row.setCode ? cardmarketCode(row.setCode) : row.nameRaw;
+  let term: string;
+  if (isPokemonTitle(row.nameRaw)) {
+    const p = pokemonParts(row.nameRaw);
+    term = [p.number, p.name].filter(Boolean).join(" ") || row.nameRaw;
+  } else {
+    term = row.setCode || titleCode(row.nameRaw) || cleanTitle(row.nameRaw).name || row.nameRaw;
+  }
   return {
     view: id ? `https://www.ebay.de/itm/${id}` : null,
     revise: id ? `https://www.ebay.de/lstng?mode=ReviseItem&itemId=${id}` : null,
@@ -153,13 +187,19 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
 }
 
 /**
- * Cardmarket-Suche zur Karte: Cardmarket-Code ohne DE/EN (MAMA-DE047 -> MAMA-047), bei Name/Code-Konflikt der
- * eindeutige Code zum Namen, ohne Set-Code der Titel. Gleiche harten Filter wie ueberall (deutsch, ab NM).
+ * Cardmarket-Suche zur Karte: Yu-Gi-Oh mit Cardmarket-Code ohne DE/EN (MAMA-DE047 -> MAMA-047), bei Name/Code-
+ * Konflikt der eindeutige Code zum Namen; Pokemon in der Pokemon-Sektion mit dem Kartennamen. Deutsche Karten
+ * mit Sprachfilter Deutsch, englische mit Englisch; sonst gleiche harten Filter (Verkaeufer DE, ab NM).
  */
 export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string {
-  const code = row.codeName?.usedCode || row.setCode;
+  const language = isEnglishCard(row) ? "EN" : "DE";
+  if (isPokemonTitle(row.nameRaw)) {
+    const p = pokemonParts(row.nameRaw);
+    return buildCardmarketSearchUrl(p.name || row.nameRaw, packQty, { game: "Pokemon", language });
+  }
+  const code = row.codeName?.usedCode || row.setCode || titleCode(row.nameRaw);
   const term = code ? cardmarketCode(code) : cleanTitle(row.nameRaw).name;
-  return buildCardmarketSearchUrl(term, packQty);
+  return buildCardmarketSearchUrl(term, packQty, { language });
 }
 
 /** Mengen ohne Nachkommastellen, wenn ganz; sonst auf zwei Stellen (krumme Mengen sollen auffallen). */

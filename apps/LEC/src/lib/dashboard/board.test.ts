@@ -87,16 +87,43 @@ describe("ebayLinks", () => {
     expect(l.view).toBe("https://www.ebay.de/itm/227444381442");
     expect(l.revise).toBe("https://www.ebay.de/lstng?mode=ReviseItem&itemId=227444381442");
   });
-  it("faellt auf die Shop-Suche mit dem Cardmarket-Code zurueck", () => {
+  it("faellt auf die Shop-Suche mit dem Code aus dem Titel zurueck (MIT DE)", () => {
     const l = ebayLinks({ ebayItemId: null, setCode: "MAMA-DE047", nameRaw: "x" });
     expect(l.view).toBeNull();
     expect(l.revise).toBeNull();
-    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=MAMA-047");
+    expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=MAMA-DE047");
   });
   it("ignoriert unplausible Nummern und nutzt ohne Set-Code den Namen", () => {
     const l = ebayLinks({ ebayItemId: "abc", setCode: null, nameRaw: "Karte & Co" });
     expect(l.view).toBeNull();
     expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=Karte%20%26%20Co");
+  });
+});
+
+describe("Links fuer Sonderfaelle (echte Titel)", () => {
+  const e = (nameRaw: string, setCode: string | null = null) => new URL(ebayLinks({ ebayItemId: null, setCode, nameRaw }).search).searchParams.get("_nkw");
+  const c = (nameRaw: string, setCode: string | null = null) => new URL(cardmarketLink({ setCode, nameRaw, codeName: null }));
+  it("eBay: Sonder-Codes ohne erkannten Set-Code kommen aus dem Titel", () => {
+    expect(e("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed")).toBe("SHVI-DESE3");
+    expect(e("Yu-Gi-Oh! MRD-G090 Schatten Leichenfledderer Rare NM")).toBe("MRD-G090");
+  });
+  it("eBay: Pokemon sucht mit Nummer und Kartenname", () => {
+    expect(e("Pokemon 078/162 Flutter Mane Holo Promo Trick or Trade NM EN")).toBe("078/162 Flutter Mane");
+    expect(e("Pokemon 011/159 Hutsassa ex Holo Rare Reisegefährten NM DE")).toBe("011/159 Hutsassa ex");
+  });
+  it("Cardmarket: Pokemon geht in die Pokemon-Sektion, nicht zu Yu-Gi-Oh", () => {
+    const u = c("Pokemon 080/162 Eisenkrieger Holo Gewalten der Zeit NM DE");
+    expect(u.pathname).toBe("/de/Pokemon/Products/Search");
+    expect(u.searchParams.get("searchString")).toBe("Eisenkrieger");
+    expect(u.searchParams.get("language")).toBe("3");
+  });
+  it("Cardmarket: englische Karten mit Sprachfilter Englisch", () => {
+    expect(c("Yu-Gi-Oh! LC01-EN004 Blue Eyes White Dragon Ultra Rare, NM, EN Limited", "LC01-EN004").searchParams.get("language")).toBe("1");
+    expect(c("Pokemon 078/162 Flutter Mane Holo Promo Trick or Trade NM EN").searchParams.get("language")).toBe("1");
+    expect(c("Yu-Gi-Oh! RA03-DE169 Überlastfusion Platinum SecR NM 1st", "RA03-DE169").searchParams.get("language")).toBe("3");
+  });
+  it("Cardmarket: Sonder-Code aus dem Titel, wenn kein Set-Code erkannt wurde", () => {
+    expect(c("Yu-Gi-Oh! SHVI-DESE3 Robe des Magiers Super Rare NM 1st Ed").searchParams.get("searchString")).toBe("SHVI-DESE3");
   });
 });
 

@@ -11,6 +11,7 @@ interface Status {
     products: number;
     deactivated: number;
     orders: number;
+    ebayItemIds?: number;
     windows: { window: string; articles: number; units: number }[];
     diagnostics?: {
       duplicates: number;
@@ -148,6 +149,7 @@ export function BillbeeSyncCard() {
         <div style={{ fontSize: 11.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.6 }}>
           Letzter Lauf {fmtTime(r.finishedAt)}: {r.products.toLocaleString("de-DE")} Artikel, {r.orders.toLocaleString("de-DE")} Bestellungen
           {r.deactivated > 0 ? `, ${r.deactivated} als ausgelaufen markiert` : ""}.
+          {r.ebayItemIds !== undefined && <> eBay-Artikelnummern aus Billbee: {r.ebayItemIds.toLocaleString("de-DE")}.</>}
           <br />
           {r.windows.map((w) => `${w.window} Tage: ${w.units.toLocaleString("de-DE")} Stück bei ${w.articles.toLocaleString("de-DE")} Artikeln`).join(" · ")}
           {r.diagnostics && (

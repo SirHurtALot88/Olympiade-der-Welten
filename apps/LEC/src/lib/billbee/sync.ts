@@ -31,6 +31,8 @@ export interface BillbeeSyncReport {
   orders: number;
   /** Einzelverkaeufe (Bestellpositionen), die gespeichert wurden. */
   sales: number;
+  /** Artikel, bei denen Billbee eine eBay-Artikelnummer geliefert hat. */
+  ebayItemIds: number;
   windows: { window: string; articles: number; units: number }[];
   /** Auffaelligkeiten in den gelieferten Bestellungen (Doppelte, gebrochene Mengen, Spitzenreiter). */
   diagnostics: OrderDiagnostics;
@@ -83,6 +85,14 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     masters.map((m) => m.row)
   );
 
+  // eBay-Artikelnummern aus Billbee: sie sind aktueller als die des gesperrten Shop-Abrufs.
+  let ebayIds = 0;
+  for (const m of masters) {
+    if (!m.ebayItemId) continue;
+    const res = await prisma.article.updateMany({ where: { nameNormalized: m.row.nameNormalized }, data: { ebayItemId: m.ebayItemId } });
+    ebayIds += res.count;
+  }
+
   // Einzelverkaeufe (Datum, Menge, Preis): ersetzt bei jedem Abruf alle.
   const excludeStates = opts.excludeStates ?? excludeStatesFromEnv();
   const idByName = new Map((await prisma.article.findMany({ select: { id: true, nameNormalized: true } })).map((a) => [a.nameNormalized, a.id]));
@@ -117,6 +127,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     deactivated,
     orders: orders.length,
     sales: saleRows.length,
+    ebayItemIds: ebayIds,
     diagnostics: diagnoseOrders(orders, duplicates, { excludeStates }),
     windows: results.map((r) => ({ window: r.window, articles: r.rows.length, units: r.rows.reduce((s, x) => s + x.qty, 0) })),
     startedAt,

@@ -46,6 +46,20 @@ export interface MasterProduct {
   id: string | null;
   /** Netto-Einkaufspreis je Stueck laut Artikelstamm. */
   cost: number | null;
+  /** eBay-Artikelnummer (Billbee: Product.Sources[].SourceId der eBay-Anbindung), falls hinterlegt. */
+  ebayItemId: string | null;
+}
+
+/** eBay-Artikelnummer aus den Marktplatz-Quellen eines Billbee-Artikels (tolerant gelesen). */
+export function ebayItemIdOf(p: Json): string | null {
+  const sources = Array.isArray(p.Sources) ? (p.Sources as Json[]) : [];
+  for (const src of sources) {
+    if (!src || typeof src !== "object") continue;
+    const label = `${src.Source ?? ""} ${src.ApiAccountName ?? ""}`;
+    const id = String(src.SourceId ?? src.ExternalId ?? "").trim();
+    if (/ebay/i.test(label) && /^\d{9,14}$/.test(id)) return id;
+  }
+  return null;
 }
 
 /** Ein Artikel aus /products; null bei Titelloser oder deaktivierter Zeile. */
@@ -72,6 +86,7 @@ export function mapProduct(p: Json): MasterProduct | null {
     sku: p.SKU ? String(p.SKU) : null,
     id: p.Id !== undefined && p.Id !== null ? String(p.Id) : null,
     cost,
+    ebayItemId: ebayItemIdOf(p),
   };
 }
 
