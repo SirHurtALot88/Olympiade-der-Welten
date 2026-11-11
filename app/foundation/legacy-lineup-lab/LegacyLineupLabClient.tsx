@@ -83,6 +83,7 @@ import MyTeamsReadinessPanel from "./MyTeamsReadinessPanel";
 import { buildMyTeamsMatchdayReadiness } from "@/lib/foundation/matchday-human-readiness";
 import { prefetchMatchdayArenaBase } from "@/lib/foundation/foundation-panel-prefetch";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
+import { getSpieltagsGegnerFuerTeam } from "@/lib/season/mini-dm-pod-schedule";
 import { buildStaffelPairGamesLookup, STAFFEL_DISCIPLINE_ID } from "@/lib/season/staffel-wechsel-paar-bonus-service";
 // Rechenkern der Kandidaten-/Kader-Ableitungen und der Bewertungs-/Freigabe-Kette:
 // nach `lib/lineups/lineup-candidate-model.ts` und `lib/lineups/lineup-audit.ts`
@@ -2132,6 +2133,25 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     if (!gameStateForCaptain || !teamId) return null;
     return selectTeamCaptain(gameStateForCaptain, teamId);
   }, [props.embeddedGameState, context?.gameState, context?.teamId, params.teamId]);
+
+  // GEGNER DES SPIELTAGS (11.11.): je Disziplin-Slot Vierergruppe bzw. Duell-Gegner, mit Teamnamen.
+  const spieltagsGegner = useMemo(() => {
+    const gameStateForGegner = props.embeddedGameState ?? context?.gameState ?? null;
+    const teamId = context?.teamId ?? params.teamId;
+    if (!gameStateForGegner || !teamId || !params.matchdayId) return null;
+    try {
+      const nameById = new Map(gameStateForGegner.teams.map((team) => [team.teamId, team.name] as const));
+      return getSpieltagsGegnerFuerTeam(gameStateForGegner, teamId, params.matchdayId, { saveId: params.saveId || null }).map((slot) => ({
+        disciplineSide: slot.disciplineSide,
+        displayName: slot.displayName,
+        art: slot.art,
+        gegnerNamen: slot.gegnerTeamIds.map((id) => nameById.get(id) ?? id),
+      }));
+    } catch {
+      // Ein unvollstaendiger Spielstand (z. B. ohne Saison) soll die Einsatzliste nie umwerfen.
+      return null;
+    }
+  }, [props.embeddedGameState, context?.gameState, context?.teamId, params.teamId, params.matchdayId, params.saveId]);
 
   // STAFFEL O7 "EINGESPIELTE PAARE": gemeinsame Staffel-Spiele je Geber>Nehmer-Paar (Spieler-Ids)
   // VOR diesem Spieltag, aus dem Paar-Zaehler des Spielstands. Nur an einem Staffel-Spieltag und
@@ -6296,6 +6316,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         playerFilter={playerFilter}
         onPlayerFilterChange={setPlayerFilter}
         rosterShortfall={lineupRosterShortfall}
+        spieltagsGegner={spieltagsGegner}
         arenaReady={focusV2ArenaReady}
         onNavigateArena={
           props.onOpenArena

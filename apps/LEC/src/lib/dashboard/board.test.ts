@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SortimentMarket, SortimentRow } from "./viewModel";
-import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, ebayLinks, formatQty } from "./board";
+import { boardGap, boardVk, cleanTitle, sortBoard, cardmarketCode, cardmarketLink, ebayLinks, formatQty } from "./board";
 
 function market(over: Partial<SortimentMarket> = {}): SortimentMarket {
   return {
@@ -97,6 +97,25 @@ describe("ebayLinks", () => {
     const l = ebayLinks({ ebayItemId: "abc", setCode: null, nameRaw: "Karte & Co" });
     expect(l.view).toBeNull();
     expect(l.search).toBe("https://www.ebay.de/str/lordenterichcards?_nkw=Karte%20%26%20Co");
+  });
+});
+
+describe("cardmarketLink", () => {
+  const cm = (o: object) => cardmarketLink({ setCode: null, nameRaw: "x", codeName: null, ...o } as Parameters<typeof cardmarketLink>[0]);
+  it("sucht mit dem Cardmarket-Code ohne DE/EN, deutsch und ab NM", () => {
+    const url = new URL(cm({ setCode: "CT09-DE023" }));
+    expect(url.origin + url.pathname).toBe("https://www.cardmarket.com/de/YuGiOh/Products/Search");
+    expect(url.searchParams.get("searchString")).toBe("CT09-023");
+    expect(url.searchParams.get("language")).toBe("3");
+    expect(url.searchParams.get("minCondition")).toBe("2");
+  });
+  it("nimmt bei Name/Code-Konflikt den Code, der zum Namen passt", () => {
+    const url = new URL(cm({ setCode: "AAAA-DE001", codeName: { usedCode: "BBBB-DE002" } }));
+    expect(url.searchParams.get("searchString")).toBe("BBBB-002");
+  });
+  it("faellt ohne Set-Code auf den Kartennamen zurueck", () => {
+    const url = new URL(cm({ nameRaw: "3x Yu-Gi-Oh! Mystischer Raum-Taifun Ultra Rare NM" }));
+    expect(url.searchParams.get("searchString")).toContain("Taifun");
   });
 });
 
