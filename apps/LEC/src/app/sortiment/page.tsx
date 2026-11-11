@@ -8,7 +8,7 @@ import { SortimentPage } from "@/components/sortiment/SortimentPage";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const { aggregates, costSettings } = await loadArticleAggregates(prisma);
+  const { aggregates, costSettings } = await loadArticleAggregates(prisma, { includeHidden: true });
   const classified = classifyArticles(aggregates);
   const rows = buildFullSortiment(aggregates, classified, costSettings);
 

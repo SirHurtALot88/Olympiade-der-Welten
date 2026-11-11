@@ -51,10 +51,13 @@ export async function loadActiveCostSettings(prisma: PrismaClient): Promise<Cost
  * eigenstaendigen Seiten (/sortiment, /top-flop, /empfehlungen, …), damit
  * nicht jede Seite ihre eigene Prisma-Query schreibt.
  */
-export async function loadArticleAggregates(prisma: PrismaClient): Promise<ArticleAggregatesResult> {
+export async function loadArticleAggregates(
+  prisma: PrismaClient,
+  opts: { includeHidden?: boolean } = {}
+): Promise<ArticleAggregatesResult> {
   const [articles, latestMarketPrices, costSettings, itemFacts] = await Promise.all([
     prisma.article.findMany({
-      where: { isCard: true },
+      where: opts.includeHidden ? { isCard: true } : { isCard: true, hidden: false },
       include: { saleWindows: true },
     }),
     prisma.marketPrice.findMany({
@@ -143,6 +146,7 @@ export async function loadArticleAggregates(prisma: PrismaClient): Promise<Artic
       packQty: article.packQty,
       stock: article.stock,
       active: article.active,
+      hidden: article.hidden,
       // Live-Preis aus dem eBay-Shop vor dem Billbee-Artikelstamm (siehe Article.ebayPrice).
       currentVk: article.ebayPrice ?? article.currentVk,
       vkSource: article.ebayPrice !== null ? "ebay" : article.currentVk !== null ? "billbee" : null,

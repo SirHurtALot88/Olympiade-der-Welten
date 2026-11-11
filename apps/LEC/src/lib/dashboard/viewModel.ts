@@ -41,6 +41,8 @@ export interface ArticleAggregate {
   /** true = im juengsten Billbee-Artikelstamm-Export vorhanden (aktueller Katalog). false = nur aus
    * der Verkaufshistorie bekannt -> ausgelaufen/nicht mehr im Sortiment. */
   active: boolean;
+  /** Von Chris manuell ausgeblendet. */
+  hidden?: boolean;
   /** Aktueller Listen-VK/EK aus dem Artikelstamm-Export (Price gross / CostPrice gross). Getrennt vom
    * REALISIERTEN Ø-VK/EK der Verkaufsfenster (`WindowAggregate.avgPrice`/`ek`) zu halten ist wichtig:
    * die historische Marge (DB I/II) rechnet IMMER mit dem realisierten Fenster-Wert, waehrend der
@@ -152,6 +154,8 @@ export interface SortimentRow {
   windows: Partial<Record<SaleWindowKey, SortimentWindowMetrics>>;
   /** true = im aktuellen Billbee-Artikelstamm-Katalog (nicht ausgelaufen). */
   active: boolean;
+  /** Manuell ausgeblendet (nur in der Sortiment-Liste mit "Ausgeblendete" sichtbar). */
+  hidden?: boolean;
   /** Lagerbestand -- 0 solange kein Bestandsimport lief (PAGES_CONCEPT §B). */
   stock: number;
   /** Stk x aktueller Listen-VK, nur wenn Bestand importiert ist (sonst null -> "Bestand nicht importiert"). */
@@ -599,6 +603,7 @@ export function buildSortimentRow(
     ekMissing,
     windows: windowMetrics,
     active: a.active,
+    hidden: a.hidden === true,
     stock: a.stock,
     potentialRevenue: a.stock > 0 ? a.stock * vkForCorridor : null,
     stockMonthsCover,

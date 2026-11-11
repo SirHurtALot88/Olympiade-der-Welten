@@ -41,6 +41,8 @@ model Article {
   /// "item_id" | "name" | "alias" — wie das Angebot dem Artikel zugeordnet wurde.
   imageMatchedBy String?
   imageFetchedAt DateTime?
+  /// Von Chris im Sortiment ausgeblendet (z. B. gibt es den Artikel nicht mehr): erscheint nicht in den Listen, bleibt aber erhalten.
+  hidden         Boolean  @default(false)
   /// Aktueller Angebotspreis aus Chris' eBay-Shop (Shopseite, siehe src/lib/images/sync.ts).
   /// Hat Vorrang vor currentVk (Billbee-Artikelstamm); null = aktuell nicht im Shop gelistet.
   ebayPrice      Float?
@@ -57,6 +59,7 @@ model Article {
   saleWindows  SaleWindow[]
   purchases    Purchase[]
   sales        Sale[]
+  stockLog     StockMovement[]
   marketPrices MarketPrice[]
   ebayFacts    EbayListingFact[]
 
@@ -193,6 +196,18 @@ model Sale {
   source    String
 
   @@index([articleId, soldAt])
+}
+
+/// Bestandsaenderung eines Artikels, bei jedem Billbee-Abruf festgehalten (Billbee selbst liefert keine Lagerhistorie).
+model StockMovement {
+  id        String   @id @default(cuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  at        DateTime @default(now())
+  before    Int
+  after     Int
+
+  @@index([articleId, at])
 }
 
 /// Zugangsdaten zu Fremddiensten (Billbee), verschluesselt (AES-256-GCM, Schluessel aus LEC_AUTH_SECRET).

@@ -145,3 +145,28 @@ describe("Sortiment-Zeile: eBay-Live-VK und Cardmarket-Marktwert kommen an", () 
     expect(row.listingVkSource).toBe("billbee");
   });
 });
+
+describe("Artikel ausblenden und Bestandslog", () => {
+  it("blendet ausgeblendete Artikel standardmaessig aus und liefert sie mit includeHidden", async () => {
+    await db.prisma.article.create({ data: { nameNormalized: "a", nameRaw: "A", isCard: true } });
+    await db.prisma.article.create({ data: { nameNormalized: "b", nameRaw: "B", isCard: true, hidden: true } });
+    const normal = await loadArticleAggregates(db.prisma);
+    expect(normal.aggregates.map((a) => a.nameRaw)).toEqual(["A"]);
+    const all = await loadArticleAggregates(db.prisma, { includeHidden: true });
+    expect(all.aggregates.map((a) => a.nameRaw).sort()).toEqual(["A", "B"]);
+    expect(all.aggregates.find((a) => a.nameRaw === "B")?.hidden).toBe(true);
+  });
+
+  it("schreibt Bestandsaenderungen beim Artikelstamm-Import mit, den ersten Stand nicht, und setzt hidden nicht zurueck", async () => {
+    const { persistBillbeeArtikel } = await import("../pipeline/persist");
+    const row = (stock: number) => ({ nameNormalized: "x", nameRaw: "X", setCode: null, packQty: 1, isCard: true, stock, currentVk: 5, currentEk: 2, statusRaw: "" });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    expect(await db.prisma.stockMovement.count()).toBe(0);
+    await db.prisma.article.updateMany({ data: { hidden: true } });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    await persistBillbeeArtikel(db.prisma, [row(3)]);
+    const log = await db.prisma.stockMovement.findMany();
+    expect(log.map((m) => [m.before, m.after])).toEqual([[4, 3]]);
+    expect((await db.prisma.article.findFirst())?.hidden).toBe(true);
+  });
+});
