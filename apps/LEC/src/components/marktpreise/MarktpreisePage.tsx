@@ -33,7 +33,7 @@ export function MarktpreisePage({ rows }: Props) {
       subtitle="Cardmarket-Preisliste, täglich automatisch · eigener VK und EK gegen den Markt"
       footer={
         <span>
-          Marktwert = Mittelwert aus Cardmarket-Trend und Ø 1/7/30 Tage je Karte × Pack-Menge. Zielspanne = VK, bei dem die Deckungsbeitrags-Marge
+          Marktwert = Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage (je Karte) und letztem EK × Pack-Menge. Zielspanne = VK, bei dem die Deckungsbeitrags-Marge
           (vor Fixkosten) 25 % (Minimum) bis 33 % (Optimum) beträgt, wenn die Karte heute zum Marktwert nachgekauft wird
           (inkl. anteiligem Einkaufs-Versand), mindestens 4,99 €. Außerhalb der Spanne (±3 %) schlägt die Ampel an.
         </span>

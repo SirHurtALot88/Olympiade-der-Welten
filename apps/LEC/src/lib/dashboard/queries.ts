@@ -162,7 +162,7 @@ export async function loadArticleAggregates(
       codeNameDe: article.codeNameDe,
       codeHint: article.codeHint,
       // Marktwert des Artikels (7-Tage-Schnitt x Pack), null bei mehrdeutiger Seltenheit.
-      latestMarketTrend: quote ? marketValueOf(quote, article.packQty) : null,
+      latestMarketTrend: quote ? marketValueOf(quote, article.packQty, article.currentEk) : null,
       marketQuote: quote ?? null,
       windows,
     };
