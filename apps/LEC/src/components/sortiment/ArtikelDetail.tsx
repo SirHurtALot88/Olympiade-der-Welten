@@ -78,7 +78,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
   const consumed = new Map<object, number>();
   const movements = detail
     ? [
-        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: `verkauft zu ${eur(x.unitPrice)} je Stück` })),
+        ...detail.sales.map((x) => ({ at: x.soldAt, kind: "Verkauf", delta: -x.qty, note: row.currentEk != null && row.currentEk > 0 ? `EK ca. ${eur(row.currentEk)} je Stück` : "" })),
         ...detail.purchases.map((p) => ({ at: p.date, kind: "Einkauf", delta: p.qty, note: `gekauft zu ${eur(p.unitEk)} EK je Stück · ${p.source}` })),
         // Bestandsaenderungen laut Billbee nur, soweit Verkaeufe sie NICHT schon erklaeren (Zugang, Korrektur, Schwund).
         ...detail.stockLog
@@ -318,7 +318,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
         )}
 
         <h4>Warenbewegungen</h4>
-        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen.</p>}
+        {detail && movements.length === 0 && <p className="bd-none">Noch keine Bewegungen. Startbestand: {row.stock} Stk – Änderungen werden ab dem nächsten Billbee-Abgleich festgehalten.</p>}
         {movements.length > 0 && (
           <>
             <table className="bd-dt-t">

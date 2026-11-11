@@ -179,6 +179,9 @@ export async function persistBillbeeArtikel(
   for (const a of await prisma.article.findMany({ select: { id: true, nameNormalized: true, stock: true, active: true, currentVk: true } })) {
     before.set(a.nameNormalized, { id: a.id, stock: a.stock, active: a.active, vk: a.currentVk });
   }
+  // Erster Abgleich ueber die API = Startbestand: der alte Stand stammt aus einem Datei-Import und waere
+  // kein verlaesslicher Vergleich. Bewegungen werden erst ab dem zweiten API-Abgleich mitgeschrieben.
+  const hadApiRun = (await prisma.importBatch.count({ where: { kind: "billbee_artikel", fileName: "Billbee-API" } })) > 0;
   // Gleicher Name nach Normalisierung (z. B. "3x Foo" und "Foo") ist ein Artikel: nur die erste Zeile zaehlt,
   // sonst entstuende bei jedem Lauf eine Phantom-Bewegung.
   const seen = new Set<string>();
@@ -186,11 +189,11 @@ export async function persistBillbeeArtikel(
     if (seen.has(row.nameNormalized)) continue;
     seen.add(row.nameNormalized);
     const prev = before.get(row.nameNormalized);
-    if (prev && prev.active && prev.stock !== row.stock) {
+    if (hadApiRun && prev && prev.active && prev.stock !== row.stock) {
       await prisma.stockMovement.create({ data: { articleId: prev.id, before: prev.stock, after: row.stock } });
     }
     // VK-Aenderung mitschreiben (nur wenn beide Staende bekannt sind; der erste Stand ist nur Ausgangswert).
-    if (prev && prev.vk !== null && row.currentVk !== null && Math.abs(prev.vk - row.currentVk) > 0.004) {
+    if (hadApiRun && prev && prev.vk !== null && row.currentVk !== null && Math.abs(prev.vk - row.currentVk) > 0.004) {
       await prisma.priceChange.create({ data: { articleId: prev.id, before: prev.vk, after: row.currentVk } });
     }
     await prisma.article.upsert({

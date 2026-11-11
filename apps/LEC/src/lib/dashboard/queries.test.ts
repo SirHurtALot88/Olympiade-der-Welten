@@ -171,6 +171,13 @@ describe("Artikel ausblenden und Bestandslog", () => {
     const row = (stock: number) => ({ nameNormalized: "x", nameRaw: "X", setCode: null, packQty: 1, isCard: true, stock, currentVk: 5, currentEk: 2, statusRaw: "" });
     await persistBillbeeArtikel(db.prisma, [row(4)]);
     expect(await db.prisma.stockMovement.count()).toBe(0);
+    // erster API-Abgleich = Startbestand: auch eine Aenderung wird noch nicht geschrieben
+    await persistBillbeeArtikel(db.prisma, [row(6)]);
+    expect(await db.prisma.stockMovement.count()).toBe(0);
+    await db.prisma.importBatch.create({ data: { kind: "billbee_artikel", fileName: "Billbee-API", rowCount: 1, matchedCount: 1, unmatchedCount: 0 } });
+    await persistBillbeeArtikel(db.prisma, [row(4)]);
+    expect(await db.prisma.stockMovement.count()).toBe(1);
+    await db.prisma.stockMovement.deleteMany();
     await db.prisma.article.updateMany({ data: { hidden: true } });
     await persistBillbeeArtikel(db.prisma, [row(4)]);
     await persistBillbeeArtikel(db.prisma, [row(3)]);
